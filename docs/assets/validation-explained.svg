@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="720" viewBox="0 0 1040 720" role="img" aria-labelledby="title desc"><title id="title">Chứng minh từng lợi ích, rồi khóa bài thi cuối</title><desc id="desc">Điểm nhấn: so công bằng; final test không tham gia chọn nguồn hoặc tuning.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10" fill="#60768c"/></marker></defs>
+<rect width="1040" height="720" fill="#ffffff"/>
+<text x="32" y="46" font-family="Arial,sans-serif" font-size="30" font-weight="700" fill="#243244">Chứng minh từng lợi ích, rồi khóa bài thi cuối</text>
+<text x="32" y="80" font-family="Arial,sans-serif" font-size="20" fill="#596b80">Điểm nhấn: so công bằng; final test không tham gia chọn nguồn hoặc tuning.</text>
+<path d="M317 205H372" fill="none" stroke="#60768c" stroke-width="3" marker-end="url(#arrow)"/>
+<path d="M662 205H717" fill="none" stroke="#60768c" stroke-width="3" marker-end="url(#arrow)"/>
+<path d="M865 280V330H520V365" fill="none" stroke="#60768c" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="450" y="320" font-family="Arial,sans-serif" font-size="18" fill="#596b80">Development, chưa final</text>
+<path d="M520 535V575" fill="none" stroke="#60768c" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="548" y="564" font-family="Arial,sans-serif" font-size="18" fill="#596b80">Khóa checkpoint và recipe</text>
+<rect x="32" y="125" width="285" height="155" rx="12" fill="#fff7e7" stroke="#926323" stroke-width="2"/>
+<text x="50" y="154" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#926323">E0 · KHÓA NỀN TẢNG</text>
+<text x="50" y="189" font-family="Arial,sans-serif" font-size="25" font-weight="700" fill="#243244">Chạy được đường học</text>
+<text x="50" y="221" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Task / robot / scorer / splits</text>
+<text x="50" y="248" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Loss → gradient → reload</text>
+<text x="50" y="275" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Closed-loop, chưa success</text>
+<rect x="377" y="125" width="285" height="155" rx="12" fill="#edf4ff" stroke="#285ea6" stroke-width="2"/>
+<text x="395" y="154" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#285ea6">E1 · ROBOT BASELINE</text>
+<text x="395" y="189" font-family="Arial,sans-serif" font-size="25" font-weight="700" fill="#243244">R0: 6 runs core</text>
+<text x="395" y="221" font-family="Arial,sans-serif" font-size="20" fill="#465a70">2 budgets × 3 seeds</text>
+<text x="395" y="248" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Đo công tới acceptance</text>
+<text x="395" y="275" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Health fail: sửa rồi pin lại</text>
+<rect x="722" y="125" width="285" height="155" rx="12" fill="#edf4ff" stroke="#285ea6" stroke-width="2"/>
+<text x="740" y="154" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#285ea6">EXTENSIONS · CÓ GATE</text>
+<text x="740" y="189" font-family="Arial,sans-serif" font-size="25" font-weight="700" fill="#243244">Source / compute / SDG</text>
+<text x="740" y="221" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Human/internet sau E0</text>
+<text x="740" y="248" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Basic trước Cosmos</text>
+<text x="740" y="275" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Contrast và cost riêng</text>
+<rect x="130" y="370" width="780" height="165" rx="12" fill="#fff0f2" stroke="#bd2235" stroke-width="3"/>
+<text x="148" y="399" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#bd2235">E4 · KHÁC BIỆT SẢN PHẨM</text>
+<text x="148" y="434" font-family="Arial,sans-serif" font-size="25" font-weight="700" fill="#243244">T / F / A: 9 runs core từ parent R0</text>
+<text x="148" y="466" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Expert teleop / fixed mixture / condition-cost · catalog / caps</text>
+<text x="148" y="493" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Chỉ chọn từ development probes; báo no-gain nếu không hơn</text>
+<rect x="180" y="580" width="680" height="90" rx="12" fill="#edf7f0" stroke="#36744e" stroke-width="2"/>
+<text x="198" y="609" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#36744e">FINAL FREEZE · INDEPENDENT TEST</text>
+<text x="198" y="644" font-family="Arial,sans-serif" font-size="25" font-weight="700" fill="#243244">Chất lượng + demos + full cost + uncertainty</text>
+<text x="32" y="698" font-family="Arial,sans-serif" font-size="17" fill="#596b80">Sơ đồ giải thích thiết kế · Các mô-đun riêng của đề xuất cần xây và kiểm chứng.</text>
+</svg>

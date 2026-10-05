@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="720" viewBox="0 0 1040 720" role="img" aria-labelledby="title desc"><title id="title">Một recording, nhiều views — một lineage</title><desc id="desc">Điểm nhấn: chọn objective theo tín hiệu; derivative giữ split của recording gốc.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10" fill="#60768c"/></marker></defs>
+<rect width="1040" height="720" fill="#ffffff"/>
+<text x="32" y="46" font-family="Arial,sans-serif" font-size="30" font-weight="700" fill="#243244">Một recording, nhiều views — một lineage</text>
+<text x="32" y="80" font-family="Arial,sans-serif" font-size="20" fill="#596b80">Điểm nhấn: chọn objective theo tín hiệu; derivative giữ split của recording gốc.</text>
+<path d="M322 195H370" fill="none" stroke="#60768c" stroke-width="3" marker-end="url(#arrow)"/>
+<path d="M665 195H713" fill="none" stroke="#60768c" stroke-width="3" marker-end="url(#arrow)"/>
+<path d="M860 270V310H180V350" fill="none" stroke="#60768c" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="352" y="304" font-family="Arial,sans-serif" font-size="18" fill="#596b80">Views chỉ từ training roots</text>
+<path d="M520 310V350" fill="none" stroke="#60768c" stroke-width="3" marker-end="url(#arrow)"/>
+<path d="M860 310V350" fill="none" stroke="#60768c" stroke-width="3" marker-end="url(#arrow)"/>
+<path d="M180 525V550H350V565" fill="none" stroke="#60768c" stroke-width="3" marker-end="url(#arrow)"/>
+<path d="M520 525V565" fill="none" stroke="#60768c" stroke-width="3" marker-end="url(#arrow)"/>
+<path d="M860 525V550H690V565" fill="none" stroke="#60768c" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="32" y="120" width="290" height="150" rx="12" fill="#edf4ff" stroke="#285ea6" stroke-width="2"/>
+<text x="50" y="149" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#285ea6">01 · RAW</text>
+<text x="50" y="184" font-family="Arial,sans-serif" font-size="25" font-weight="700" fill="#243244">Nguồn &amp; bằng chứng</text>
+<text x="50" y="216" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Files, timestamps, rights</text>
+<text x="50" y="243" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Measured / inferred / generated</text>
+<rect x="375" y="120" width="290" height="150" rx="12" fill="#fff7e7" stroke="#926323" stroke-width="2"/>
+<text x="393" y="149" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#926323">02 · QA GATE</text>
+<text x="393" y="184" font-family="Arial,sans-serif" font-size="25" font-weight="700" fill="#243244">Hợp lệ để học?</text>
+<text x="393" y="216" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Timing, geometry, confidence</text>
+<text x="393" y="243" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Reject hoặc quarantine có log</text>
+<rect x="718" y="120" width="290" height="150" rx="12" fill="#fff0f2" stroke="#bd2235" stroke-width="3"/>
+<text x="736" y="149" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#bd2235">03 · ROOT SPLIT</text>
+<text x="736" y="184" font-family="Arial,sans-serif" font-size="25" font-weight="700" fill="#243244">Chia trước biến đổi</text>
+<text x="736" y="216" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Recording + parents cùng split</text>
+<text x="736" y="243" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Final holdout khóa riêng</text>
+<rect x="32" y="355" width="290" height="170" rx="12" fill="#edf4ff" stroke="#285ea6" stroke-width="2"/>
+<text x="50" y="384" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#285ea6">VIEW A · HUMAN / INTERNET</text>
+<text x="50" y="419" font-family="Arial,sans-serif" font-size="25" font-weight="700" fill="#243244">Kiến thức thao tác</text>
+<text x="50" y="451" font-family="Arial,sans-serif" font-size="20" fill="#465a70">RGB → stage / temporal order</text>
+<text x="50" y="478" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Wrist motion chỉ khi valid</text>
+<text x="50" y="505" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Không giả robot-action labels</text>
+<rect x="375" y="355" width="290" height="170" rx="12" fill="#edf4ff" stroke="#285ea6" stroke-width="2"/>
+<text x="393" y="384" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#285ea6">VIEW B · TARGET ROBOT</text>
+<text x="393" y="419" font-family="Arial,sans-serif" font-size="25" font-weight="700" fill="#243244">Học điều khiển</text>
+<text x="393" y="451" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Images + state + action</text>
+<text x="393" y="478" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Units / joints / normalization</text>
+<text x="393" y="505" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Train và calibration đúng roles</text>
+<rect x="718" y="355" width="290" height="170" rx="12" fill="#edf4ff" stroke="#285ea6" stroke-width="2"/>
+<text x="736" y="384" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#285ea6">VIEW C · SYNTHETIC</text>
+<text x="736" y="419" font-family="Arial,sans-serif" font-size="25" font-weight="700" fill="#243244">Biến thể có kiểm</text>
+<text x="736" y="451" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Appearance giữ semantics</text>
+<text x="736" y="478" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Physics actions nếu đã thực thi</text>
+<text x="736" y="505" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Không đổi nghĩa nhãn nguồn</text>
+<rect x="260" y="570" width="520" height="100" rx="12" fill="#edf7f0" stroke="#36744e" stroke-width="2"/>
+<text x="278" y="599" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#36744e">ĐẦU RA DÙNG LẠI</text>
+<text x="278" y="634" font-family="Arial,sans-serif" font-size="25" font-weight="700" fill="#243244">Release bất biến + QA/cost receipt</text>
+<text x="32" y="698" font-family="Arial,sans-serif" font-size="17" fill="#596b80">Sơ đồ giải thích thiết kế · Các mô-đun riêng của đề xuất cần xây và kiểm chứng.</text>
+</svg>

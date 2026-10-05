@@ -1,0 +1,43 @@
+{
+  "revision": "2026-10-05",
+  "status": "planning_assumptions_not_measured",
+  "protocol": {
+    "baselineRuns": 6,
+    "acquisitionRuns": 9,
+    "coreRuns": 15,
+    "extensionRuns": 12
+  },
+  "study": {
+    "engineerHours": 480,
+    "trainRuns": 15,
+    "bridgeRuns": 6,
+    "generationBatches": 1,
+    "evaluationJobs": 15,
+    "storageMonths": 3
+  },
+  "studyNotes": {
+    "engineerHours": "Minh họa 1 kỹ sư × 12 tuần × 40 giờ; gồm implementation, QA, selection, debug và analysis. Không phải estimate đã được đội xác nhận.",
+    "stageHours": "Mỗi job dùng GPU-giờ tham chiếu từ mô hình skill: train 120, bridge 50, generation 20, eval 20. Chưa benchmark; không mặc định mọi arm phải chạy bridge.",
+    "scope": "Subtotal R&D mô phỏng gồm engineering, allocated compute và storage. Operator capture, acquisition fees, licenses/cell, CPU/network và chi phí chưa quote chưa bao gồm. Không cộng subtotal vào per-skill total. Engineer acquisition đã nằm trong giờ toàn study nếu cùng activity; chỉ bổ sung khoản ngoài phạm vi, không cộng ledger engineer lần thứ hai."
+  },
+  "acquisitionCap": 500,
+  "capNote": "USD mỗi arm/parent; cap minh họa cần khóa lại sau E0, chưa actual cost hoặc mức đủ để đạt quality.",
+  "arms": [
+    {
+      "id": "T",
+      "name": "Targeted teleop của kỹ sư",
+      "description": "Chọn robot corrections đúng condition; đối chứng thực dụng."
+    },
+    {
+      "id": "F",
+      "name": "Gói bổ sung cố định",
+      "description": "Mixture/quy tắc đăng ký trước từ catalog đủ quyền/tín hiệu."
+    },
+    {
+      "id": "A",
+      "name": "Chọn theo condition và chi phí",
+      "description": "Chọn teleop/reuse/augmentation/nguồn phù hợp; có thể defer hoặc chọn giống T."
+    }
+  ],
+  "qualityBoundary": "Same-quality/noninferiority phải có protocol/trials/uncertainty; giảm cost đơn thuần hoặc point success không tự chứng minh superiority."
+}

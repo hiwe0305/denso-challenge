@@ -1,0 +1,310 @@
+{
+  "dataset": "lerobot/libero",
+  "revision": "a1aaacb7f6cd6ee5fb43120f673cebb0cfea7dd4",
+  "checked": "2026-10-02",
+  "kind": "Simulation demonstrations · Panda · not real-humanoid teleop",
+  "metadata": {
+    "codebase_version": "v3.0",
+    "robot_type": "panda",
+    "total_episodes": 1693,
+    "total_frames": 273465,
+    "total_tasks": 40,
+    "chunks_size": 1000,
+    "data_files_size_in_mb": 100,
+    "video_files_size_in_mb": 500,
+    "fps": 10.0,
+    "splits": {
+      "train": "0:1693"
+    },
+    "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet",
+    "video_path": "videos/{video_key}/chunk-{chunk_index:03d}/file-{file_index:03d}.mp4",
+    "features": {
+      "observation.images.image": {
+        "dtype": "video",
+        "shape": [
+          256,
+          256,
+          3
+        ],
+        "names": [
+          "height",
+          "width",
+          "channel"
+        ],
+        "fps": 10.0,
+        "info": {
+          "video.height": 256,
+          "video.width": 256,
+          "video.codec": "av1",
+          "video.pix_fmt": "yuv420p",
+          "video.is_depth_map": false,
+          "video.fps": 10,
+          "video.channels": 3,
+          "has_audio": false
+        }
+      },
+      "observation.images.image2": {
+        "dtype": "video",
+        "shape": [
+          256,
+          256,
+          3
+        ],
+        "names": [
+          "height",
+          "width",
+          "channel"
+        ],
+        "fps": 10.0,
+        "info": {
+          "video.height": 256,
+          "video.width": 256,
+          "video.codec": "av1",
+          "video.pix_fmt": "yuv420p",
+          "video.is_depth_map": false,
+          "video.fps": 10,
+          "video.channels": 3,
+          "has_audio": false
+        }
+      },
+      "observation.state": {
+        "dtype": "float32",
+        "shape": [
+          8
+        ],
+        "names": [
+          "state"
+        ],
+        "fps": 10.0
+      },
+      "action": {
+        "dtype": "float32",
+        "shape": [
+          7
+        ],
+        "names": [
+          "actions"
+        ],
+        "fps": 10.0
+      },
+      "timestamp": {
+        "dtype": "float32",
+        "shape": [
+          1
+        ],
+        "names": null
+      },
+      "frame_index": {
+        "dtype": "int64",
+        "shape": [
+          1
+        ],
+        "names": null
+      },
+      "episode_index": {
+        "dtype": "int64",
+        "shape": [
+          1
+        ],
+        "names": null
+      },
+      "index": {
+        "dtype": "int64",
+        "shape": [
+          1
+        ],
+        "names": null
+      },
+      "task_index": {
+        "dtype": "int64",
+        "shape": [
+          1
+        ],
+        "names": null
+      }
+    }
+  },
+  "provenance": {
+    "metadataSource": "https://huggingface.co/datasets/lerobot/libero/resolve/a1aaacb7f6cd6ee5fb43120f673cebb0cfea7dd4/meta/info.json",
+    "numericSource": "https://datasets-server.huggingface.co/rows?dataset=lerobot%2Flibero&config=default&split=train&offset=0&length=6",
+    "limitation": "Rows API reads current revision; preview has not been compared bitwise with pinned parquet.",
+    "taskSource": "https://huggingface.co/datasets/lerobot/libero/resolve/a1aaacb7f6cd6ee5fb43120f673cebb0cfea7dd4/meta/tasks.parquet",
+    "episodeSource": "https://huggingface.co/datasets/lerobot/libero/resolve/a1aaacb7f6cd6ee5fb43120f673cebb0cfea7dd4/meta/episodes/chunk-000/file-000.parquet"
+  },
+  "rows": [
+    {
+      "observation.state": [
+        -0.05338004603981972,
+        0.007029631175100803,
+        0.6783280968666077,
+        3.1407692432403564,
+        0.0017593271331861615,
+        -0.08994418382644653,
+        0.03878866136074066,
+        -0.03878721222281456
+      ],
+      "action": [
+        0.01607142947614193,
+        0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -1.0
+      ],
+      "timestamp": 0.0,
+      "frame_index": 0,
+      "episode_index": 0,
+      "index": 0,
+      "task_index": 0
+    },
+    {
+      "observation.state": [
+        -0.05331140756607056,
+        0.007027116138488054,
+        0.6783228516578674,
+        3.140770196914673,
+        0.0017220743466168642,
+        -0.08966746926307678,
+        0.038882121443748474,
+        -0.0388808399438858
+      ],
+      "action": [
+        0.013392857275903225,
+        0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -1.0
+      ],
+      "timestamp": 0.10000000149011612,
+      "frame_index": 1,
+      "episode_index": 0,
+      "index": 1,
+      "task_index": 0
+    },
+    {
+      "observation.state": [
+        -0.05320742353796959,
+        0.007024175021797419,
+        0.6782967448234558,
+        3.140775442123413,
+        0.00169978360645473,
+        -0.08934350311756134,
+        0.03893638029694557,
+        -0.038935188204050064
+      ],
+      "action": [
+        0.0026785715017467737,
+        0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -1.0
+      ],
+      "timestamp": 0.20000000298023224,
+      "frame_index": 2,
+      "episode_index": 0,
+      "index": 2,
+      "task_index": 0
+    },
+    {
+      "observation.state": [
+        -0.05315941572189331,
+        0.007020609453320503,
+        0.6782735586166382,
+        3.140772581100464,
+        0.0016853907145559788,
+        -0.08930182456970215,
+        0.038982097059488297,
+        -0.038980912417173386
+      ],
+      "action": [
+        0.0,
+        -0.010714286006987095,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -1.0
+      ],
+      "timestamp": 0.30000001192092896,
+      "frame_index": 3,
+      "episode_index": 0,
+      "index": 3,
+      "task_index": 0
+    },
+    {
+      "observation.state": [
+        -0.053153958171606064,
+        0.006965538952499628,
+        0.6782670021057129,
+        3.1407337188720703,
+        0.001578160678036511,
+        -0.08931978791952133,
+        0.03902563080191612,
+        -0.03902474790811539
+      ],
+      "action": [
+        0.0,
+        -0.0535714291036129,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -1.0
+      ],
+      "timestamp": 0.4000000059604645,
+      "frame_index": 4,
+      "episode_index": 0,
+      "index": 4,
+      "task_index": 0
+    },
+    {
+      "observation.state": [
+        -0.053149230778217316,
+        0.00663584191352129,
+        0.678267240524292,
+        3.140554428100586,
+        0.0010026784148067236,
+        -0.08931048959493637,
+        0.03906673565506935,
+        -0.039067257195711136
+      ],
+      "action": [
+        0.0,
+        -0.12589286267757416,
+        -0.013392857275903225,
+        0.0,
+        0.0,
+        -0.0,
+        -1.0
+      ],
+      "timestamp": 0.5,
+      "frame_index": 5,
+      "episode_index": 0,
+      "index": 5,
+      "task_index": 0
+    }
+  ],
+  "taskPreview": {
+    "task_index": 0,
+    "__index_level_0__": "put the white mug on the left plate and put the yellow and white mug on the right plate"
+  },
+  "episodePreview": {
+    "episode_index": 0,
+    "length": 214,
+    "dataset_from_index": 0,
+    "dataset_to_index": 214,
+    "videos/observation.images.image/chunk_index": 0,
+    "videos/observation.images.image/file_index": 0,
+    "videos/observation.images.image/from_timestamp": 0.0,
+    "videos/observation.images.image/to_timestamp": 21.4,
+    "videos/observation.images.image2/chunk_index": 0,
+    "videos/observation.images.image2/file_index": 0,
+    "videos/observation.images.image2/from_timestamp": 0.0,
+    "videos/observation.images.image2/to_timestamp": 21.4
+  }
+}

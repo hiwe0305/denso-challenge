@@ -1,0 +1,18 @@
+.presentation-build/
+.sites-runtime/
+.openai/
+.remember/
+.agents/
+.codex/
+.aws/
+__pycache__/
+*.py[cod]
+*.tar.gz
+.DS_Store
+.env
+.env.*
+!.env.example
+# Offline research library and reproducible handover packages stay local.
+/docs/references/papers/
+/deliverables/*.zip
+/deliverables/*.png

@@ -1,0 +1,406 @@
+{
+  "defaults": {
+    "lines": [
+      {
+        "label": "Thu robot: ghi + setup/reset, gồm failed attempts",
+        "quantityA": 20.833333333333332,
+        "quantityB": 14.583333333333334,
+        "unit": "giờ vận hành",
+        "rate": 31.21428571428572,
+        "baseline": 650.2976190476192,
+        "candidate": 455.2083333333334,
+        "kind": "recurring"
+      },
+      {
+        "label": "QA robot, gồm mọi attempt bị reject",
+        "quantityA": 8.333333333333334,
+        "quantityB": 5.833333333333333,
+        "unit": "giờ kỹ sư",
+        "rate": 70.35714285714286,
+        "baseline": 586.3095238095239,
+        "candidate": 410.4166666666667,
+        "kind": "recurring"
+      },
+      {
+        "label": "Sử dụng robot trong collection",
+        "quantityA": 20.833333333333332,
+        "quantityB": 14.583333333333334,
+        "unit": "robot-giờ",
+        "rate": 4.68125,
+        "baseline": 97.52604166666667,
+        "candidate": 68.26822916666667,
+        "kind": "recurring"
+      },
+      {
+        "label": "Task/scorer/calibration",
+        "quantityA": 18,
+        "quantityB": 18,
+        "unit": "giờ kỹ sư",
+        "rate": 70.35714285714286,
+        "baseline": 1266.4285714285716,
+        "candidate": 1266.4285714285716,
+        "kind": "recurring"
+      },
+      {
+        "label": "Debug/correction review",
+        "quantityA": 6,
+        "quantityB": 10,
+        "unit": "giờ kỹ sư",
+        "rate": 70.35714285714286,
+        "baseline": 422.14285714285717,
+        "candidate": 703.5714285714287,
+        "kind": "recurring"
+      },
+      {
+        "label": "Thu human clips",
+        "quantityA": 0,
+        "quantityB": 3.3333333333333335,
+        "unit": "giờ vận hành",
+        "rate": 31.21428571428572,
+        "baseline": 0,
+        "candidate": 104.04761904761907,
+        "kind": "recurring"
+      },
+      {
+        "label": "Human tracking/stage + internet rights/relevance QA",
+        "quantityA": 0,
+        "quantityB": 11.666666666666666,
+        "unit": "giờ kỹ sư",
+        "rate": 70.35714285714286,
+        "baseline": 0,
+        "candidate": 820.8333333333334,
+        "kind": "recurring"
+      },
+      {
+        "label": "Phí quyền dữ liệu",
+        "quantityA": 0,
+        "quantityB": 0,
+        "unit": "USD",
+        "rate": 1,
+        "baseline": 0,
+        "candidate": 0,
+        "kind": "recurring"
+      },
+      {
+        "label": "Generation, gồm sinh lại và reject",
+        "quantityA": 0,
+        "quantityB": 20,
+        "unit": "GPU-giờ H100",
+        "rate": 3.49,
+        "baseline": 0,
+        "candidate": 69.80000000000001,
+        "kind": "recurring"
+      },
+      {
+        "label": "QA synthetic",
+        "quantityA": 0,
+        "quantityB": 6,
+        "unit": "giờ kỹ sư",
+        "rate": 70.35714285714286,
+        "baseline": 0,
+        "candidate": 422.14285714285717,
+        "kind": "recurring"
+      },
+      {
+        "label": "Target post-train, gồm retry reserve",
+        "quantityA": 138,
+        "quantityB": 138,
+        "unit": "GPU-giờ A100",
+        "rate": 1.59,
+        "baseline": 219.42000000000002,
+        "candidate": 219.42000000000002,
+        "kind": "recurring"
+      },
+      {
+        "label": "Bridge, gồm retry reserve",
+        "quantityA": 0,
+        "quantityB": 57.49999999999999,
+        "unit": "GPU-giờ A100",
+        "rate": 1.59,
+        "baseline": 0,
+        "candidate": 91.425,
+        "kind": "recurring"
+      },
+      {
+        "label": "GPU preprocessing bổ sung",
+        "quantityA": 0,
+        "quantityB": 12,
+        "unit": "GPU-giờ A100",
+        "rate": 1.59,
+        "baseline": 0,
+        "candidate": 19.080000000000002,
+        "kind": "recurring"
+      },
+      {
+        "label": "Sim / development evaluation",
+        "quantityA": 20,
+        "quantityB": 20,
+        "unit": "GPU-giờ RTX4090",
+        "rate": 0.74,
+        "baseline": 14.8,
+        "candidate": 14.8,
+        "kind": "recurring"
+      },
+      {
+        "label": "Real acceptance trials: execute/reset",
+        "quantityA": 8.333333333333334,
+        "quantityB": 8.333333333333334,
+        "unit": "giờ vận hành",
+        "rate": 31.21428571428572,
+        "baseline": 260.11904761904765,
+        "candidate": 260.11904761904765,
+        "kind": "recurring"
+      },
+      {
+        "label": "Review acceptance trials",
+        "quantityA": 1.6666666666666667,
+        "quantityB": 1.6666666666666667,
+        "unit": "giờ kỹ sư",
+        "rate": 70.35714285714286,
+        "baseline": 117.26190476190477,
+        "candidate": 117.26190476190477,
+        "kind": "recurring"
+      },
+      {
+        "label": "Robot trong acceptance trials",
+        "quantityA": 8.333333333333334,
+        "quantityB": 8.333333333333334,
+        "unit": "robot-giờ",
+        "rate": 4.68125,
+        "baseline": 39.01041666666667,
+        "candidate": 39.01041666666667,
+        "kind": "recurring"
+      },
+      {
+        "label": "Storage trong pilot",
+        "quantityA": 200,
+        "quantityB": 300,
+        "unit": "GB-tháng",
+        "rate": 0.07,
+        "baseline": 14.000000000000002,
+        "candidate": 21.000000000000004,
+        "kind": "recurring"
+      },
+      {
+        "label": "Chi phí còn thiếu / augmentation đối chứng",
+        "quantityA": 0,
+        "quantityB": 0,
+        "unit": "USD",
+        "rate": 1,
+        "baseline": 0,
+        "candidate": 0,
+        "kind": "recurring"
+      },
+      {
+        "label": "Tích hợp nền chung, một lần",
+        "quantityA": 80,
+        "quantityB": 80,
+        "unit": "giờ kỹ sư",
+        "rate": 70.35714285714286,
+        "baseline": 5628.571428571429,
+        "candidate": 5628.571428571429,
+        "kind": "oneoff"
+      },
+      {
+        "label": "Source adapters / heads / QA mới, một lần",
+        "quantityA": 0,
+        "quantityB": 80,
+        "unit": "giờ kỹ sư",
+        "rate": 70.35714285714286,
+        "baseline": 0,
+        "candidate": 5628.571428571429,
+        "kind": "oneoff"
+      }
+    ],
+    "op": 31.21428571428572,
+    "eng": 70.35714285714286,
+    "robotHour": 4.68125,
+    "capitalHour": 3.90625,
+    "attemptsA": 500,
+    "attemptsB": 350,
+    "baselineRecurring": 3687.315982142858,
+    "candidateRecurring": 5102.833407738097,
+    "baselineOneoff": 5628.571428571429,
+    "candidateOneoff": 11257.142857142859,
+    "baseline": 9315.887410714287,
+    "candidate": 16359.976264880956,
+    "saving": -7044.088854166668,
+    "marginalSaving": -1415.5174255952388,
+    "breakEvenSkills": null,
+    "perRobotDemo": 3.3353329613095237,
+    "neededDemoReduction": 2231.959716130112,
+    "ops": [
+      [
+        "GPU dedicated, tính cả idle",
+        532.8
+      ],
+      [
+        "Monitoring / model maintenance",
+        562.8571428571429
+      ],
+      [
+        "Robot capital phân bổ tháng",
+        1250
+      ],
+      [
+        "Cell maintenance cố định",
+        200
+      ],
+      [
+        "Cell electricity khi hoạt động",
+        48
+      ],
+      [
+        "Storage + backup",
+        21.000000000000004
+      ],
+      [
+        "OPEX chưa mô hình hóa",
+        0
+      ]
+    ],
+    "monthly": 2614.657142857143,
+    "baselineYearCash": 100577.84083333334,
+    "candidateYearCash": 107646.34375
+  },
+  "extraRows": [
+    {
+      "label": "Thu robot: ghi + setup/reset, gồm failed attempts",
+      "delta": -195.08928571428572,
+      "kind": "recurring"
+    },
+    {
+      "label": "QA robot, gồm mọi attempt bị reject",
+      "delta": -175.89285714285717,
+      "kind": "recurring"
+    },
+    {
+      "label": "Sử dụng robot trong collection",
+      "delta": -29.2578125,
+      "kind": "recurring"
+    },
+    {
+      "label": "Debug/correction review",
+      "delta": 281.4285714285715,
+      "kind": "recurring"
+    },
+    {
+      "label": "Thu human clips",
+      "delta": 104.04761904761907,
+      "kind": "recurring"
+    },
+    {
+      "label": "Human tracking/stage + internet rights/relevance QA",
+      "delta": 820.8333333333334,
+      "kind": "recurring"
+    },
+    {
+      "label": "Generation, gồm sinh lại và reject",
+      "delta": 69.80000000000001,
+      "kind": "recurring"
+    },
+    {
+      "label": "QA synthetic",
+      "delta": 422.14285714285717,
+      "kind": "recurring"
+    },
+    {
+      "label": "Bridge, gồm retry reserve",
+      "delta": 91.425,
+      "kind": "recurring"
+    },
+    {
+      "label": "GPU preprocessing bổ sung",
+      "delta": 19.080000000000002,
+      "kind": "recurring"
+    },
+    {
+      "label": "Storage trong pilot",
+      "delta": 7.000000000000002,
+      "kind": "recurring"
+    },
+    {
+      "label": "Source adapters / heads / QA mới, một lần",
+      "delta": 5628.571428571429,
+      "kind": "oneoff"
+    }
+  ],
+  "robotCollection": 1334.1331845238099,
+  "robotSaving": 400.23995535714295,
+  "extraRecurringGross": 1815.7573809523817,
+  "thresholds": [
+    {
+      "skills": 1,
+      "demosAt30pct": 7439.865720433708,
+      "savedDemosNeeded": 2231.959716130112
+    },
+    {
+      "skills": 10,
+      "demosAt30pct": 2377.1884760351177,
+      "savedDemosNeeded": 713.1565428105353
+    },
+    {
+      "skills": 100,
+      "demosAt30pct": 1870.9207515952585,
+      "savedDemosNeeded": 561.2762254785775
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "Pilot 400 → 280 · 1 skill",
+      "base": 9315.887410714287,
+      "candidate": 16359.976264880956,
+      "extra": 7044.088854166668
+    },
+    {
+      "name": "Collection lớn 2.000 → 1.400 · dùng lại 10 skills",
+      "base": 9586.705863095238,
+      "candidate": 9964.120610119046,
+      "extra": 377.41474702380765
+    },
+    {
+      "name": "Không giảm robot demos · 400 → 400",
+      "base": 9315.887410714287,
+      "candidate": 16760.216220238097,
+      "extra": 7444.3288095238095
+    },
+    {
+      "name": "Đối chứng có augmentation thường",
+      "base": 9565.887410714287,
+      "candidate": 16359.976264880956,
+      "extra": 6794.088854166668
+    }
+  ],
+  "laborPlaceholder": [
+    {
+      "inputs": {
+        "op": 5,
+        "eng": 15
+      },
+      "base": 2240.5897916666663,
+      "candidate": 3871.5536458333336,
+      "extra": 1630.9638541666673
+    },
+    {
+      "inputs": {
+        "op": 10,
+        "eng": 25
+      },
+      "base": 3526.4231250000003,
+      "candidate": 6134.4703125,
+      "extra": 2608.0471874999994
+    }
+  ],
+  "rdTargetTrain30Runs": 6582.599999999999,
+  "scope": "Design inputs held constant; equal accepted quality unverified; no DENSO prices. Calculated 2026-10-05.",
+  "source_hashes": {
+    "docs/01-product.md": "f4494bafe388dc5f337b324a96020096d0cfcc7863617c76afc0cea8266f0f61",
+    "docs/02-system-architecture.md": "d59c0c53c81dc6c0c7ca677021aaf7bf202626479c86f4e98b8481c384110ee8",
+    "docs/03-data-core.md": "cb83c74a7971626bed5d668e0f8c2b38d00a3ec4d19bbfbca42b16dd9f16120c",
+    "docs/04-learning-core.md": "cc2efcd1122328dff163a0258cdae87acbbed63b3e09f2135006b099be9aa56f",
+    "docs/06-validation-and-roadmap.md": "3097133e6f23202b9e8603952dbb0f821f6bf713a40534fa9bb75ea73add7dd3",
+    "docs/07-business-case.md": "61471798b88614ddfebf623900e2655684be068cf7d8ebb4cfbccf1cafb47642",
+    "presentation-site/content/industrial-cost-model.json": "a501bc0b618798f75d3809f7ae4c73444907a8ca2974e5ff256665ba286f854d",
+    "presentation-site/dist/cost-model.js": "b8fa93ba35a863379d5abd884cc7aa4dd5a9448c3b48a4930e64be0a063079ce"
+  }
+}

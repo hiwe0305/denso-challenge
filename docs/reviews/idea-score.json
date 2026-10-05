@@ -1,0 +1,46 @@
+{
+  "status": "design_assessment_before_poc",
+  "rubric": [
+    {
+      "criterion": "Sáng tạo",
+      "original_weight": 30,
+      "weight": 0.3157894736842105,
+      "score": 7,
+      "reason": "Quyết định bổ sung nguồn theo condition có đối chứng; chưa chứng minh hơn T/F/A từ parent R0."
+    },
+    {
+      "criterion": "Nghiệp vụ",
+      "original_weight": 20,
+      "weight": 0.21052631578947367,
+      "score": 8,
+      "reason": "Case, outcome, SOP và ba đầu ra rõ; task DENSO vẫn cần nghiệm thu."
+    },
+    {
+      "criterion": "Kỹ thuật",
+      "original_weight": 20,
+      "weight": 0.21052631578947367,
+      "score": 6,
+      "reason": "Chọn model/simulator/objectives và fallback; E0/custom bridge chưa chạy."
+    },
+    {
+      "criterion": "Hiệu quả",
+      "original_weight": 15,
+      "weight": 0.15789473684210525,
+      "score": 4,
+      "reason": "Protocol demo/cost/source controls rõ; chưa transfer hoặc savings thực."
+    },
+    {
+      "criterion": "Mở rộng",
+      "original_weight": 10,
+      "weight": 0.10526315789473684,
+      "score": 7,
+      "reason": "Adapter và gate task thứ hai rõ; chưa có pilot thứ hai."
+    }
+  ],
+  "total": 6.526315789473683,
+  "assessment_scope": "idea_only_excludes_team_and_resources",
+  "assessment_stage": "design_before_poc_not_btc_score",
+  "weight_method": "Original PROMPT weights 30/20/20/15/10, normalized by 95; excludes team and resource adequacy.",
+  "previous_total_without_team": 5.684210526315789,
+  "cost_model": "presentation-site/content/industrial-cost-model.json"
+}

@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="720" viewBox="0 0 1040 720" role="img" aria-labelledby="title desc"><title id="title">Health → baseline → chọn can thiệp tiếp theo</title><desc id="desc">Điểm nhấn: quyết định bổ sung có đối chứng, cùng chất lượng và tổng chi phí.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10" fill="#60768c"/></marker></defs>
+<rect width="1040" height="720" fill="#ffffff"/>
+<text x="32" y="46" font-family="Arial,sans-serif" font-size="30" font-weight="700" fill="#243244">Health → baseline → chọn can thiệp tiếp theo</text>
+<text x="32" y="80" font-family="Arial,sans-serif" font-size="20" fill="#596b80">Điểm nhấn: quyết định bổ sung có đối chứng, cùng chất lượng và tổng chi phí.</text>
+<path d="M317 214H372" fill="none" stroke="#60768c" stroke-width="3" marker-end="url(#arrow)"/>
+<path d="M662 214H717" fill="none" stroke="#60768c" stroke-width="3" marker-end="url(#arrow)"/>
+<path d="M865 305V365H750V405" fill="none" stroke="#60768c" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="680" y="348" font-family="Arial,sans-serif" font-size="18" fill="#596b80">Báo cáo development</text>
+<path d="M180 515H80V310" fill="none" stroke="#60768c" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="32" y="385" font-family="Arial,sans-serif" font-size="18" fill="#596b80">Thu / QA thêm</text>
+<rect x="32" y="125" width="285" height="180" rx="12" fill="#edf4ff" stroke="#285ea6" stroke-width="2"/>
+<text x="50" y="154" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#285ea6">01 · DATA CORE</text>
+<text x="50" y="189" font-family="Arial,sans-serif" font-size="25" font-weight="700" fill="#243244">Giữ đúng tín hiệu</text>
+<text x="50" y="221" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Human · Internet · Synthetic</text>
+<text x="50" y="248" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Teleop robot thật</text>
+<text x="50" y="275" font-family="Arial,sans-serif" font-size="20" fill="#465a70">QA, quyền, roots và masks</text>
+<rect x="377" y="125" width="285" height="180" rx="12" fill="#edf4ff" stroke="#285ea6" stroke-width="2"/>
+<text x="395" y="154" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#285ea6">02 · FLUXVLA</text>
+<text x="395" y="189" font-family="Arial,sans-serif" font-size="25" font-weight="700" fill="#243244">Học &amp; thích nghi</text>
+<text x="395" y="221" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Pretrained VLA + action head</text>
+<text x="395" y="248" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Human/video sau gate</text>
+<text x="395" y="275" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Target-robot adaptation</text>
+<rect x="722" y="125" width="285" height="180" rx="12" fill="#edf7f0" stroke="#36744e" stroke-width="2"/>
+<text x="740" y="154" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#36744e">03 · EXECUTION</text>
+<text x="740" y="189" font-family="Arial,sans-serif" font-size="25" font-weight="700" fill="#243244">Robot làm được gì?</text>
+<text x="740" y="221" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Controller đã kiểm</text>
+<text x="740" y="248" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Scorer độc lập</text>
+<text x="740" y="275" font-family="Arial,sans-serif" font-size="20" fill="#465a70">ID/OOD + lỗi + chi phí</text>
+<rect x="180" y="410" width="680" height="210" rx="12" fill="#fff0f2" stroke="#bd2235" stroke-width="3"/>
+<text x="198" y="439" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#bd2235">ĐÓNG GÓP CẦN CHỨNG MINH</text>
+<text x="198" y="474" font-family="Arial,sans-serif" font-size="25" font-weight="700" fill="#243244">Chọn gói dữ liệu cho điều kiện còn yếu</text>
+<text x="198" y="506" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Kiểm camera / mapping / reachability trước</text>
+<text x="198" y="533" font-family="Arial,sans-serif" font-size="20" fill="#465a70">Engineer duyệt giả thuyết → bổ sung một nguồn phù hợp</text>
+<text x="198" y="560" font-family="Arial,sans-serif" font-size="20" fill="#465a70">T / F / A từ R0: cùng quality và hai cost caps</text>
+<text x="32" y="698" font-family="Arial,sans-serif" font-size="17" fill="#596b80">Sơ đồ giải thích thiết kế · Các mô-đun riêng của đề xuất cần xây và kiểm chứng.</text>
+</svg>

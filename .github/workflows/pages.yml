@@ -1,0 +1,64 @@
+name: Deploy website to GitHub Pages
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
+    outputs:
+      pages_enabled: ${{ steps.pages-status.outputs.enabled }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Rebuild website content
+        run: python3 presentation-site/build-content.py
+      - name: Validate website
+        run: |
+          for file in presentation-site/dist/*.js; do node --check "$file"; done
+          python3 presentation-site/verify-site.py
+      - name: Check publishing source
+        id: pages-status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pages_mode=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq '.build_type' 2>/dev/null || true)
+          if [ "$pages_mode" = "workflow" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Website validated. To publish: Settings > Pages > Source: GitHub Actions, then run this workflow again." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload website only
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: presentation-site/dist
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.pages_enabled == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
