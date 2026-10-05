@@ -18,6 +18,33 @@ Workflow tại `.github/workflows/pages.yml` dựng lại nội dung, kiểm ass
 
 Website dùng URL tương đối cho script, asset và dữ liệu để chạy dưới `/denso-challenge/`. Không cần domain riêng hoặc backend để đọc hồ sơ; media remote vẫn cần internet.
 
+## Câu chuyện trực quan ở phần mở đầu
+
+Phần đầu dùng `idea-opening.js` / `idea-opening.css`: sơ đồ có hình dữ liệu–học–robot,
+vòng phản hồi và ví dụ lỗi với hai nhánh xử lý. `humanoid-demo.js` dựng humanoid 3D
+chuyển động theo kịch bản, sáu bước trong 30 giây, có dừng/tiếp tục và đổi góc nhìn.
+Phần giải thích bên cạnh làm nổi bước xử lý tương ứng. Không có physics simulation,
+FluxVLA inference hoặc kết quả policy trong demo. Three.js 0.160.1 được pin local,
+giữ MIT license và checksum trong vendor; không có WebGL thì dùng ảnh / giải thích 2D.
+Hướng tham khảo và phạm vi minh họa ở [VISUAL-DIRECTION.md](VISUAL-DIRECTION.md).
+
+`idea-story.js` / `idea-story.css` dựng sơ đồ solution và chín bước cho hai tình huống:
+đổi ánh sáng → gắp hụt, và gắp → tuột vật. Có chọn cảnh, phát/tạm dừng, gallery,
+video 72 giây và bộ ảnh tải xuống. Điều khiển dùng bàn phím được; chuyển trang hoặc
+ẩn tab sẽ dừng câu chuyện. Không có số đo giả hoặc backend huấn luyện được giả lập.
+
+Ảnh trong `dist/assets/story/` được tạo bằng built-in image_gen, từ một cảnh tham chiếu.
+Humanoid trên ảnh là minh họa chung, không là mô hình chính xác của GR1. Toàn bộ hình,
+màn hình workflow và video là giải thích thiết kế, chưa kết quả huấn luyện của đội.
+Prompts ở `content/story-image-prompts.json`; nội dung cảnh ở `content/solution-story.json`.
+
+`story-export.html?scene=0&condition=visual` xuất một cảnh có chú thích; scene=0–8,
+condition=visual/contact. Chụp bằng browser ở 1280×720, ghi các JPEG `scene-{condition}-{01..09}.jpg`.
+Sau thay đổi nội dung hoặc hình, xuất lại các cảnh liên quan và cập nhật content JSON từ `ideaSteps()`.
+Chạy `python3 presentation-site/build-story-media.py` để dựng MP4, VTT, ZIP và manifest hashes.
+FFmpeg chỉ cần lúc dựng video; CI và website sử dụng bản đã xuất. Video không lời đọc,
+có chuyển cảnh nhẹ và chú thích tiếng Việt trên hình. Validator kiểm đủ hai bộ cảnh và hashes.
+
 ## Cập nhật
 
 - Sửa nội dung trang trong `dist/app.js`, giao diện trong `dist/styles.css`.

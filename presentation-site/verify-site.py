@@ -51,5 +51,27 @@ for media in manifest['media'].values():
         digest = media.get('provenance', {}).get(hash_field)
         if digest:
             assert hashlib.sha256((DIST / media[field]).read_bytes()).hexdigest() == digest, f'Stale media: {media[field]}'
+
+# The visual explanation must ship with both branches and its downloadable film.
+story_manifest = json.loads((DIST / 'data/story-media-manifest.json').read_text())
+for asset in story_manifest['assets']:
+    path = DIST / asset['path']
+    assert path.is_file(), f'Missing story asset: {asset["path"]}'
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == asset['sha256'], f'Stale story asset: {path.name}'
+story = json.loads((ROOT / story_manifest['storyFile']).read_text())
+assert set(story['scenes']) == {'visual', 'contact'}
+assert all(len(scenes) == 9 for scenes in story['scenes'].values())
+assert story_manifest['film']['durationSeconds'] == story['secondsPerScene'] * 9 == 72
+for branch in story['scenes']:
+    for i in range(1, 10):
+        assert (DIST / f'assets/story/scene-{branch}-{i:02}.jpg').is_file()
+for asset in ('solution-story.mp4', 'solution-story.vi.vtt', 'storyboard.zip'):
+    assert (DIST / 'assets/story' / asset).is_file()
+export_refs = References()
+export_refs.feed((DIST / 'story-export.html').read_text())
+assert all((DIST / ref).is_file() for ref in export_refs.local), 'Missing storyboard export dependency'
+three = json.loads((DIST / 'vendor/three-manifest.json').read_text())
+assert hashlib.sha256((DIST / 'vendor/three.module.min.js').read_bytes()).hexdigest() == three['moduleSha256']
+assert (DIST / 'vendor/three-LICENSE.txt').is_file(), 'Missing 3D renderer license'
 assert not any(p.is_symlink() for p in DIST.rglob('*')), 'Pages artifact must not contain symlinks'
-print(f'Validated {len(routes)} routes, {len(docs)} documents and local publishing assets.')
+print(f'Validated {len(routes)} routes, {len(docs)} documents, 18 story scenes and local publishing assets.')

@@ -1,0 +1,147 @@
+{
+  "kind": "Illustrated proposed workflow; not experimental robot evidence",
+  "generation": "Built-in image_gen; same canonical reference for all variants",
+  "robot": "Generic illustrated humanoid, not an exact GR1 model",
+  "film": {
+    "durationSeconds": 72,
+    "width": 1280,
+    "height": 720,
+    "fps": 24,
+    "audio": false,
+    "captions": "Burned-in Vietnamese scene text + VTT"
+  },
+  "promptFile": "presentation-site/content/story-image-prompts.json",
+  "storyFile": "presentation-site/content/solution-story.json",
+  "assets": [
+    {
+      "path": "assets/story/contact-failure.png",
+      "sha256": "548e67848f879310ae048821c9985c8cf1ac9425960799d99f6d28418df12712",
+      "bytes": 1520994
+    },
+    {
+      "path": "assets/story/human-demo.png",
+      "sha256": "b922121661622b6d75284cbc522da115a7e113eff129087e7241fc3ccd531f63",
+      "bytes": 1584308
+    },
+    {
+      "path": "assets/story/scene-contact-01.jpg",
+      "sha256": "cd4b68b8ee792f883e0bc9ca0c7f39b52e97a5388d07171b65a950dd644b2cf0",
+      "bytes": 91074
+    },
+    {
+      "path": "assets/story/scene-contact-02.jpg",
+      "sha256": "4a16907f5e6098c5ae42cba4b30d961a42241f2edeb7505647345a33aaa6e607",
+      "bytes": 90380
+    },
+    {
+      "path": "assets/story/scene-contact-03.jpg",
+      "sha256": "94a8d97bc49b242247926d31f3ba06cac83cb70a33b9b45179897a58d9192df5",
+      "bytes": 96225
+    },
+    {
+      "path": "assets/story/scene-contact-04.jpg",
+      "sha256": "6037f3ee81973c9ccf5157aacd0f28720827b1ccefcc1dcc2b3a623ab34d9f99",
+      "bytes": 88521
+    },
+    {
+      "path": "assets/story/scene-contact-05.jpg",
+      "sha256": "c30dadc08a2ee89c64ad4c59313afd9f56e6e35105128b6b4c83dc4d0183463d",
+      "bytes": 92616
+    },
+    {
+      "path": "assets/story/scene-contact-06.jpg",
+      "sha256": "ccb14d2e9a73ca0c32fdc7ca2aa8b25d8ef29a09bb792f5a05dfb20cb69a84d8",
+      "bytes": 88013
+    },
+    {
+      "path": "assets/story/scene-contact-07.jpg",
+      "sha256": "377bfa2044bf70accf6e1f5fc9ec0ac45ee8f342808e375b49ae9643b1b6c0a1",
+      "bytes": 96724
+    },
+    {
+      "path": "assets/story/scene-contact-08.jpg",
+      "sha256": "8dbcb3bbca1fccb0fef1ba8487cc6ed690833cbd6409d7e7678b5be26dd3c20b",
+      "bytes": 94361
+    },
+    {
+      "path": "assets/story/scene-contact-09.jpg",
+      "sha256": "83b56257dfad691417016fea1020875401d007335dca42848446d9b7eefb6dc0",
+      "bytes": 88261
+    },
+    {
+      "path": "assets/story/scene-visual-01.jpg",
+      "sha256": "cd4b68b8ee792f883e0bc9ca0c7f39b52e97a5388d07171b65a950dd644b2cf0",
+      "bytes": 91074
+    },
+    {
+      "path": "assets/story/scene-visual-02.jpg",
+      "sha256": "4a16907f5e6098c5ae42cba4b30d961a42241f2edeb7505647345a33aaa6e607",
+      "bytes": 90380
+    },
+    {
+      "path": "assets/story/scene-visual-03.jpg",
+      "sha256": "94a8d97bc49b242247926d31f3ba06cac83cb70a33b9b45179897a58d9192df5",
+      "bytes": 96225
+    },
+    {
+      "path": "assets/story/scene-visual-04.jpg",
+      "sha256": "268333ba4f95d95f5aa5cd80371e09befa92ad3433378e843b29dd9afd9ad957",
+      "bytes": 82782
+    },
+    {
+      "path": "assets/story/scene-visual-05.jpg",
+      "sha256": "4a91718ce83188a38ea0429437642741122460f93b7e1dca853105ae723e8521",
+      "bytes": 86448
+    },
+    {
+      "path": "assets/story/scene-visual-06.jpg",
+      "sha256": "b343fa54bf2385a605615221eb7ce588f0598954d2b08a30616a92c7f77d86a0",
+      "bytes": 88186
+    },
+    {
+      "path": "assets/story/scene-visual-07.jpg",
+      "sha256": "ad39ccc65fed7def3b5d45f765e17cd74a056a395e94ec6f46cc269bd1a8c0ed",
+      "bytes": 90864
+    },
+    {
+      "path": "assets/story/scene-visual-08.jpg",
+      "sha256": "51136f21b69e3ded6f3f2381a29ceeac50e06830f3a107f84e954f682df0a54a",
+      "bytes": 93869
+    },
+    {
+      "path": "assets/story/scene-visual-09.jpg",
+      "sha256": "83b56257dfad691417016fea1020875401d007335dca42848446d9b7eefb6dc0",
+      "bytes": 88261
+    },
+    {
+      "path": "assets/story/solution-story.mp4",
+      "sha256": "1b205e0508d8d075cc94613c7b82fda332c80829d839e2cb297e0df72fca9ae4",
+      "bytes": 1100075
+    },
+    {
+      "path": "assets/story/solution-story.vi.vtt",
+      "sha256": "b27bd46e013c01a498e2ab289e4e8477bf644958f922e8ddf2c187713507bc8c",
+      "bytes": 2363
+    },
+    {
+      "path": "assets/story/storyboard.zip",
+      "sha256": "e7327ea37a9e91a5a543176800be39a0dd9e3186509d7de142f07210340e5d5e",
+      "bytes": 9157914
+    },
+    {
+      "path": "assets/story/task-start.png",
+      "sha256": "ae7f55a353103101317220be6bb969d30fe3311cf57209e3d097a55e0ea0101d",
+      "bytes": 1545850
+    },
+    {
+      "path": "assets/story/task-success.png",
+      "sha256": "95deed86abbb19708290b1105a149ed6c53608c4a7831dfe4f2f2f4f42739ed2",
+      "bytes": 1542551
+    },
+    {
+      "path": "assets/story/visual-failure.png",
+      "sha256": "e26a15e7bfaad2bb4209510be802ddedfa127d3a477ff30985fa256db1da6b29",
+      "bytes": 1497593
+    }
+  ]
+}

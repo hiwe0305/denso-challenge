@@ -1,0 +1,190 @@
+{
+  "status": "Illustration of proposed workflow, not experimental results",
+  "secondsPerScene": 8,
+  "scenes": {
+    "visual": [
+      {
+        "label": "Giao việc",
+        "phase": "execute",
+        "title": "Một nhiệm vụ cụ thể, một tiêu chuẩn rõ ràng",
+        "body": "“Đặt linh kiện màu vàng vào ô A1.” Một tay hoạt động; thân robot cố định. Linh kiện và khay nằm trong vùng thao tác khả thi.",
+        "image": "task-start.png",
+        "alt": "Minh họa humanoid tiếp cận linh kiện vàng trên bàn; ô đích ở phía trước bên trái của khay.",
+        "view": "mission",
+        "note": "Tác vụ đề xuất cho thử nghiệm đầu trong mô phỏng."
+      },
+      {
+        "label": "Dữ liệu học",
+        "phase": "data",
+        "title": "Mỗi nguồn dạy một phần khác nhau",
+        "body": "Video người bổ sung tín hiệu trình tự thao tác. Mẫu robot đích dạy hành động điều khiển. Video có quyền và dữ liệu mô phỏng được dùng khi phù hợp.",
+        "image": "human-demo.png",
+        "alt": "Minh họa người đặt linh kiện vàng vào cùng khay, với camera thu thao tác.",
+        "view": "data",
+        "note": "Video người không tự trở thành lệnh điều khiển robot."
+      },
+      {
+        "label": "Chạy thử",
+        "phase": "execute",
+        "title": "Từ mô hình đã học tới hành động của robot",
+        "body": "Camera, trạng thái hiện tại và câu lệnh đi vào mô hình. Mô hình dự đoán hành động; bộ điều khiển thực thi, bộ chấm ghi kết quả.",
+        "image": "task-start.png",
+        "alt": "Minh họa cảnh robot chuẩn bị gắp linh kiện trong điều kiện ban đầu.",
+        "view": "execute",
+        "note": "Chuyển động trên hình chỉ giải thích thiết kế; chưa là bản ghi mô hình đã chạy."
+      },
+      {
+        "label": "Gặp lỗi",
+        "phase": "evaluate",
+        "title": "Bộ gắp đóng nhưng không lấy được linh kiện",
+        "body": "Quan sát: bộ gắp tiếp cận lệch, vật vẫn ở trên bàn. Một lượt lỗi giúp đặt câu hỏi cho lần kiểm tra tiếp theo.",
+        "image": "visual-failure.png",
+        "alt": "Minh họa bộ gắp đóng hụt bên trái linh kiện trong ánh sáng tối hơn.",
+        "view": "failure",
+        "note": "Tình huống lỗi được dựng để giải thích; chưa có số đo thực nghiệm."
+      },
+      {
+        "label": "Kiểm tra",
+        "phase": "improve",
+        "title": "Kiểm hệ thống trước khi kết luận thiếu dữ liệu",
+        "body": "Giả thuyết cần kiểm: quan sát trong ánh sáng mới chưa đủ tốt. Kỹ sư xem quan sát, cấu hình và phản hồi để quyết định bước tiếp theo.",
+        "image": "visual-failure.png",
+        "alt": "Cảnh lỗi minh họa đi kèm các điểm cần kiểm tra.",
+        "view": "health",
+        "note": "Nếu camera hoặc điều khiển có lỗi: sửa, rồi lập lại kết quả ban đầu trước khi thử dữ liệu."
+      },
+      {
+        "label": "Chọn cách sửa",
+        "phase": "improve",
+        "title": "Thử biến đổi hình ảnh cơ bản",
+        "body": "Sau khi kiểm hệ thống, thử một gói nhỏ thay đổi ánh sáng trên dữ liệu học hợp lệ.",
+        "image": "task-start.png",
+        "alt": "Cảnh tác vụ dùng làm tham chiếu cho lựa chọn cải thiện.",
+        "view": "choice",
+        "note": "Quyết định do kỹ sư duyệt. Có thể hoãn hoặc giữ nguyên nếu chưa đủ cơ sở."
+      },
+      {
+        "label": "Học lại",
+        "phase": "learn",
+        "title": "Dữ liệu qua kiểm tra, rồi mới vào huấn luyện",
+        "body": "Giữ nhãn hành động chỉ khi vật, hình học và ý nghĩa thao tác không đổi. Gói được chọn tạo một phiên bản mô hình mới, với nguồn dữ liệu và cấu hình được lưu lại.",
+        "image": "human-demo.png",
+        "alt": "Minh họa dữ liệu cho vòng huấn luyện tiếp theo.",
+        "view": "learn",
+        "note": "Huấn luyện là một công việc riêng; robot không tự học lại tức thời sau mỗi lỗi."
+      },
+      {
+        "label": "Đo lại",
+        "phase": "evaluate",
+        "title": "Thử lại cùng điều kiện, đo chất lượng và tổng công",
+        "body": "So với kỹ sư thu mẫu robot có chủ đích và cách bổ sung dữ liệu cố định. Chấm nhiều lượt độc lập; ghi cả thất bại, thời gian và công xử lý thêm.",
+        "image": "task-success.png",
+        "alt": "Minh họa kết quả kỳ vọng: linh kiện nằm trong ô đích, bộ gắp đã nhả.",
+        "view": "evaluate",
+        "note": "Hình đặt đúng là kết quả kỳ vọng. Thử nghiệm có thể cho cải thiện, không cải thiện hoặc chưa đủ kết luận."
+      },
+      {
+        "label": "Bàn giao",
+        "phase": "evaluate",
+        "title": "Bàn giao một kỹ năng có thể kiểm tra và dùng lại",
+        "body": "Mô hình đi cùng cấu hình thực thi, quy trình dữ liệu và báo cáo. Chỉ bàn giao kỹ năng sau khi đạt tiêu chuẩn đã thống nhất.",
+        "image": "task-success.png",
+        "alt": "Cảnh hoàn thành nhiệm vụ kỳ vọng, đi kèm các đầu ra bàn giao.",
+        "view": "deliver",
+        "note": "Mở tác vụ thứ hai để đo khả năng tái sử dụng; robot thật cần nghiệm thu riêng."
+      }
+    ],
+    "contact": [
+      {
+        "label": "Giao việc",
+        "phase": "execute",
+        "title": "Một nhiệm vụ cụ thể, một tiêu chuẩn rõ ràng",
+        "body": "“Đặt linh kiện màu vàng vào ô A1.” Một tay hoạt động; thân robot cố định. Linh kiện và khay nằm trong vùng thao tác khả thi.",
+        "image": "task-start.png",
+        "alt": "Minh họa humanoid tiếp cận linh kiện vàng trên bàn; ô đích ở phía trước bên trái của khay.",
+        "view": "mission",
+        "note": "Tác vụ đề xuất cho thử nghiệm đầu trong mô phỏng."
+      },
+      {
+        "label": "Dữ liệu học",
+        "phase": "data",
+        "title": "Mỗi nguồn dạy một phần khác nhau",
+        "body": "Video người bổ sung tín hiệu trình tự thao tác. Mẫu robot đích dạy hành động điều khiển. Video có quyền và dữ liệu mô phỏng được dùng khi phù hợp.",
+        "image": "human-demo.png",
+        "alt": "Minh họa người đặt linh kiện vàng vào cùng khay, với camera thu thao tác.",
+        "view": "data",
+        "note": "Video người không tự trở thành lệnh điều khiển robot."
+      },
+      {
+        "label": "Chạy thử",
+        "phase": "execute",
+        "title": "Từ mô hình đã học tới hành động của robot",
+        "body": "Camera, trạng thái hiện tại và câu lệnh đi vào mô hình. Mô hình dự đoán hành động; bộ điều khiển thực thi, bộ chấm ghi kết quả.",
+        "image": "task-start.png",
+        "alt": "Minh họa cảnh robot chuẩn bị gắp linh kiện trong điều kiện ban đầu.",
+        "view": "execute",
+        "note": "Chuyển động trên hình chỉ giải thích thiết kế; chưa là bản ghi mô hình đã chạy."
+      },
+      {
+        "label": "Gặp lỗi",
+        "phase": "evaluate",
+        "title": "Linh kiện tuột khỏi bộ gắp trước khi tới khay",
+        "body": "Quan sát: robot đã nâng vật, nhưng vật rơi trong lúc chuyển. Một lượt lỗi giúp đặt câu hỏi cho lần kiểm tra tiếp theo.",
+        "image": "contact-failure.png",
+        "alt": "Minh họa linh kiện vàng đang rơi khỏi bộ gắp trên đường tới khay.",
+        "view": "failure",
+        "note": "Tình huống lỗi được dựng để giải thích; chưa có số đo thực nghiệm."
+      },
+      {
+        "label": "Kiểm tra",
+        "phase": "improve",
+        "title": "Kiểm hệ thống trước khi kết luận thiếu dữ liệu",
+        "body": "Giả thuyết cần kiểm: cách gắp hoặc điều khiển tiếp xúc chưa phù hợp. Kỹ sư xem quan sát, cấu hình và phản hồi để quyết định bước tiếp theo.",
+        "image": "contact-failure.png",
+        "alt": "Cảnh lỗi minh họa đi kèm các điểm cần kiểm tra.",
+        "view": "health",
+        "note": "Nếu camera hoặc điều khiển có lỗi: sửa, rồi lập lại kết quả ban đầu trước khi thử dữ liệu."
+      },
+      {
+        "label": "Chọn cách sửa",
+        "phase": "improve",
+        "title": "Thu mẫu robot sửa lỗi có chủ đích",
+        "body": "Nếu hệ thống đã được kiểm, ưu tiên mẫu robot đích về giữ vật và chuyển vật.",
+        "image": "contact-failure.png",
+        "alt": "Cảnh tác vụ dùng làm tham chiếu cho lựa chọn cải thiện.",
+        "view": "choice",
+        "note": "Quyết định do kỹ sư duyệt. Có thể hoãn hoặc giữ nguyên nếu chưa đủ cơ sở."
+      },
+      {
+        "label": "Học lại",
+        "phase": "learn",
+        "title": "Dữ liệu qua kiểm tra, rồi mới vào huấn luyện",
+        "body": "Camera, trạng thái và hành động đúng robot đích; kiểm kết quả từng lượt. Gói được chọn tạo một phiên bản mô hình mới, với nguồn dữ liệu và cấu hình được lưu lại.",
+        "image": "task-start.png",
+        "alt": "Minh họa dữ liệu cho vòng huấn luyện tiếp theo.",
+        "view": "learn",
+        "note": "Huấn luyện là một công việc riêng; robot không tự học lại tức thời sau mỗi lỗi."
+      },
+      {
+        "label": "Đo lại",
+        "phase": "evaluate",
+        "title": "Thử lại cùng điều kiện, đo chất lượng và tổng công",
+        "body": "So cùng chất lượng yêu cầu và ngân sách; tính cả thu mẫu, đặt lại vật và kiểm dữ liệu. Chấm nhiều lượt độc lập; ghi cả thất bại, thời gian và công xử lý thêm.",
+        "image": "task-success.png",
+        "alt": "Minh họa kết quả kỳ vọng: linh kiện nằm trong ô đích, bộ gắp đã nhả.",
+        "view": "evaluate",
+        "note": "Hình đặt đúng là kết quả kỳ vọng. Thử nghiệm có thể cho cải thiện, không cải thiện hoặc chưa đủ kết luận."
+      },
+      {
+        "label": "Bàn giao",
+        "phase": "evaluate",
+        "title": "Bàn giao một kỹ năng có thể kiểm tra và dùng lại",
+        "body": "Mô hình đi cùng cấu hình thực thi, quy trình dữ liệu và báo cáo. Chỉ bàn giao kỹ năng sau khi đạt tiêu chuẩn đã thống nhất.",
+        "image": "task-success.png",
+        "alt": "Cảnh hoàn thành nhiệm vụ kỳ vọng, đi kèm các đầu ra bàn giao.",
+        "view": "deliver",
+        "note": "Mở tác vụ thứ hai để đo khả năng tái sử dụng; robot thật cần nghiệm thu riêng."
+      }
+    ]
+  }
+}

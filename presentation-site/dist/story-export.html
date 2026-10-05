@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="vi">
+<head>
+ <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+ <title>Cảnh minh họa solution · Humanoid Skill Learning</title>
+ <link rel="stylesheet" href="styles.css?v=visual-story-15"><link rel="stylesheet" href="idea-story.css?v=visual-story-15">
+ <style>
+ body{margin:0;overflow:hidden;background:#fff}.idea-overview{width:100vw;height:100vh}.idea-stage{width:100%;height:100%;grid-template-columns:minmax(0,1.8fr) minmax(330px,1fr);grid-template-rows:minmax(0,1fr) 230px}.idea-scene-image>img{height:100%;min-height:0;max-height:none;object-fit:cover}.idea-system{padding:26px}.idea-system-heading{font-size:12px}.idea-source-role strong,.idea-mini-flow strong,.idea-bundle>strong{font-size:16px}.idea-source-role span,.idea-screen-note,.idea-checks li,.idea-alternatives,.idea-measures,.idea-open-question span,.idea-event p{font-size:14px}.idea-selected-package strong{font-size:18px}.idea-scene-caption{padding:22px 30px;min-height:0}.idea-scene-caption h3{font-size:25px}.idea-scene-caption p{font-size:17px;line-height:1.7}.idea-scene-caption small{font-size:13px}.idea-caption-step{font-size:12px}.idea-image-label{font-size:12px}.idea-task-callout{font-size:15px}.idea-result-pair span{font-size:13px}.idea-result-pair strong{font-size:17px}.idea-result-note{font-size:13px}.idea-branch{font-size:13px}.idea-training-track span{animation:none;width:100%}.idea-command>strong{font-size:25px}.idea-tray>span{font-size:15px}.idea-tray i{font-size:12px}.idea-event strong{font-size:20px}
+ </style>
+</head>
+<body><div class="idea-overview"><div class="idea-stage" id="export-frame"></div></div>
+<script src="idea-story.js?v=visual-story-15"></script>
+<script>
+ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const params=new URLSearchParams(location.search),condition=params.get('condition')==='contact'?'contact':'visual';
+ const index=Math.max(0,Math.min(8,Number(params.get('scene'))||0));
+ document.querySelector('#export-frame').innerHTML=ideaStageMarkup(ideaSteps(condition)[index],IDEA_CONDITIONS[condition],index);
+ document.title=`Cảnh ${index+1} · ${ideaSteps(condition)[index].label} · Minh họa solution`;
+</script></body>
+</html>
