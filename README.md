@@ -1,48 +1,66 @@
 # Humanoid Skill Learning
 
-**Công cụ giúp đội AI/robotics huấn luyện kỹ năng humanoid từ mẫu robot, video người và dữ liệu bổ sung phù hợp, nhằm giảm công thu thập và thử nghiệm ở cùng chất lượng.**
+**Giúp humanoid học kỹ năng từ video người và mẫu thao tác robot, hướng tới giảm công thu thập dữ liệu và thử nghiệm ở cùng chất lượng.**
 
-Case đại diện: humanoid fixed-base lấy linh kiện cứng vào ô khay. Đường chính: FluxVLA + GR00T N1.5 + GR1/RoboCasa/MuJoCo, Robot baseline trước; human/video/Cosmos có gate, bốn nguồn là catalog và SOP. Core15 runs (6 R0 +9 T/F/A); ít nhất hai cách học thật trong report. Task DENSO chưa chốt; lựa chọn này là thiết kế, chưa integration/training result.
+Đề xuất hướng tới bài toán H1 của DENSO: huấn luyện humanoid nhanh, chính xác và giảm công sức con người. Người dùng chính là đội AI/robotics phát triển kỹ năng mới cho robot.
 
-Website hỗ trợ bản nộp idea H1; deck theo mẫu BTC vẫn là hồ sơ chính. [Bảng chấm nội bộ trước PoC](docs/reviews/idea-review.md) được giữ làm tham chiếu lịch sử, không dùng làm điểm đánh giá vòng idea hoặc điểm BTC.
+## Vấn đề
 
-## Đọc và phát triển
+Thu dữ liệu bằng cách điều khiển robot làm mẫu cần người vận hành, thiết bị, chuẩn bị hiện trường và đặt lại vật sau mỗi lượt. Khi tác vụ, vị trí hoặc ánh sáng thay đổi, đội phát triển có thể phải thu thêm mẫu và thử nghiệm nhiều lần.
 
-| Tài liệu canonical | Vai trò |
+Trong khi đó, video người và dữ liệu mô phỏng có thể bổ sung trải nghiệm liên quan. Thách thức là sử dụng đúng tín hiệu của từng nguồn để giúp robot học, đồng thời kiểm tra xem công sức tiết kiệm có lớn hơn phần xử lý và huấn luyện thêm hay không.
+
+## Ý tưởng giải pháp
+
+Xây dựng công cụ hỗ trợ đội AI/robotics xuyên suốt quá trình chuẩn bị dữ liệu, huấn luyện, đánh giá và cải thiện một kỹ năng humanoid.
+
+| Nguồn dữ liệu | Vai trò trong giải pháp |
 |---|---|
-| [Product](docs/01-product.md) | Vấn đề, case/acceptance, contribution, phạm vi và quyết định sản phẩm |
-| [PRD](docs/08-prd.md) | Requirements/user stories, acceptance từng chức năng và NFR |
-| [Architecture](docs/02-system-architecture.md) | Components/runtime/API/storage và production boundaries |
-| [Data Core](docs/03-data-core.md) | Import/QA/signals/lineage/splits/releases |
-| [Learning Core](docs/04-learning-core.md) | Chọn model/sim/objectives/fallback và inference |
-| [Contracts](docs/05-contracts.md) | Schema và invariants để triển khai |
-| [Protocol, roadmap, risks](docs/06-validation-and-roadmap.md) | E0–E4, success/cost, 12 tuần và technical risks |
-| [Business case](docs/07-business-case.md) | Dự toán từng khoản có nguồn, sensitivity và chi phí vận hành có phạm vi |
-| [SOP](docs/10-data-collection-sop.md) | Thu và QA các nguồn, tận dụng teleop đúng splits |
-| [Survey](docs/11-method-survey.md) | 13 phương pháp/source chính thức, chọn/tái sử dụng thay vì SOTA leaderboard |
-| [Public examples](docs/12-public-data-examples.md) | G1/HumanEgo/LIBERO numerical previews và media provenance |
-| [Expected outcomes](docs/13-expected-outcomes.md) | Kết quả bàn giao, task example và tiêu chuẩn nghiệm thu |
+| Video góc nhìn thứ nhất của người | Bổ sung trình tự thao tác và chuyển động tay khi có nhãn đủ tin cậy |
+| Video internet có quyền sử dụng | Bổ sung ví dụ về vật, thao tác và bối cảnh liên quan |
+| Dữ liệu tổng hợp/mô phỏng | Mở rộng điều kiện học bằng biến thể được kiểm tra chất lượng |
+| Mẫu thao tác robot đích | Dạy hành động đúng với robot, hỗ trợ hiệu chuẩn và sửa lỗi tương tác |
 
-Không xóa PRD/TDD/contracts vì chúng có requirements, interfaces và invariants riêng phục vụ hiện thực sản phẩm. Risk register đã hợp nhất vào protocol; biểu mẫu chưa đối chiếu BTC đã bỏ vì lặp product/pitch. Giữ [PROMPT](PROMPT.md), [đề gốc](docs/information-challenge/infor.md) và [paper index](docs/references/README.md) làm nguồn yêu cầu/tham khảo, không phải specification thứ hai.
+Video người không tự trở thành lệnh điều khiển robot. Giải pháp kết hợp tín hiệu học bổ sung từ video với đường học hành động từ mẫu robot. Mỗi phương án chỉ dùng các nguồn phù hợp với tác vụ, quyền sử dụng và khả năng tích hợp.
 
-## Website trên GitHub Pages
+## Ví dụ sử dụng
 
-Repository: [hiwe0305/denso-challenge](https://github.com/hiwe0305/denso-challenge).
+**Nhiệm vụ: “Đặt linh kiện màu vàng vào ô A1.”**
 
-1. Mở **Settings → Pages**, chọn **Source: GitHub Actions**.
-2. Mở **Actions → Deploy website to GitHub Pages → Run workflow**, chọn nhánh `master`.
-3. Sau khi deploy thành công, mở [website](https://hiwe0305.github.io/denso-challenge/#overview).
+Humanoid quan sát linh kiện và khay, tiếp cận, gắp, chuyển, đặt và nhả vật. Video người cung cấp ví dụ về trình tự; mẫu robot cung cấp hành động tương ứng với robot đích.
 
-Workflow kiểm tra và xuất bản riêng `presentation-site/dist`, không xuất bản toàn bộ hồ sơ hoặc PDF. Khi Pages chưa bật đúng source, bước deploy được bỏ qua; sau khi bật, chạy workflow một lần. Các lần push tiếp theo lên `master`/`main` tự cập nhật website. [Hướng dẫn GitHub](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
+Nếu robot còn yếu ở nền hoặc ánh sáng mới, đội thử bổ sung biến thể hình ảnh. Nếu linh kiện bị trượt khi gắp, đội kiểm tra bộ gắp và ưu tiên mẫu sửa lỗi của robot. Mỗi thay đổi được đánh giá lại về chất lượng và tổng công sức.
 
-## Website và proposal
+Đây là tác vụ đại diện đề xuất. Tác vụ cụ thể và tiêu chuẩn tại DENSO cần được xác nhận khi tiếp cận nhà máy.
 
-[Website local](http://127.0.0.1:4175/#overview) chứa đầy đủ idea, survey và ví dụ thật. [Cách chạy/build/kiểm tra](presentation-site/README.md). [Pitch outline](deliverables/Human-first-Humanoid-Pitch.md) là bản tóm tắt cho người trình bày, không deck template đã hoàn thiện.
+## Cách triển khai
 
-Website BTC hiện ghi [H1](https://densohackathon.vn/theme). [Thể lệ](https://densohackathon.vn/challenges) yêu cầu slide theo mẫu chính thức; website là tài liệu bổ sung và localhost không truy cập được từ BTC.
+1. **Định nghĩa kỹ năng:** chọn tác vụ, robot, điều kiện thao tác và tiêu chuẩn hoàn thành.
+2. **Chuẩn bị dữ liệu:** thu mẫu robot, chọn video liên quan, kiểm quyền, nhãn và chất lượng; tách dữ liệu học khỏi dữ liệu đánh giá.
+3. **Huấn luyện:** tận dụng mô hình có sẵn, giữ đường học hành động robot và tích hợp tín hiệu bổ sung từ nguồn đủ điều kiện.
+4. **Đánh giá và cải thiện:** so với cách học từ mẫu robot, đo chất lượng, số mẫu và tổng giờ công; bổ sung dữ liệu cho điều kiện còn yếu.
+5. **Bàn giao:** mô hình điều khiển, cấu hình thực thi, quy trình dữ liệu và báo cáo so sánh có thể tái lập.
 
-Tạo hai gói bàn giao local bằng `python3 presentation-site/package.py`: website và hồ sơ sản phẩm, lưu trong `deliverables/`. ZIP là output có thể tạo lại nên không commit. Video stream từ tác giả, không đóng gói remote media. Chưa có kết quả huấn luyện, tiết kiệm hoặc production ML của đội.
+Đường kỹ thuật dự kiến là **FluxVLA + GR00T N1.5 + humanoid GR1 trong RoboCasa/MuJoCo**. Phạm vi đầu tiên gồm một tác vụ gắp–đặt, một tay hoạt động và torso cố định trong mô phỏng. Nhánh video người cần kiểm tương thích trước khi thử lợi ích; biến đổi hình ảnh cơ bản được ưu tiên trước các phương án tổng hợp phức tạp.
 
-Thư viện PDF nghiên cứu giữ local tại `docs/references/papers/`, không commit hoặc đưa vào Pages. Nguồn chính thức được dẫn trong paper index và catalog. File tạm, cache, ảnh preview cũ và Git repository lồng đã được dọn; chỉ repository ở gốc quản lý project.
+## Kết quả kỳ vọng
 
-Bản cải thiện05/10/2026: T expert teleop / F fixed mixture / A condition-cost từ R0; repair tách khỏi data comparison; augmentation cơ bản trước Cosmos. Chi phí có ba phạm vi, planner R&D và acquisition ledger giữ unknown; full-source stress scenario gốc và điểm6,5 giữ nguyên. [Protocol](docs/06-validation-and-roadmap.md) · [Budget assumptions](presentation-site/content/pilot-budget.json).
+Ba đầu ra của kế hoạch nghiên cứu 12 tuần:
+
+- **Demo kỹ năng:** humanoid thực hiện gắp–đặt bằng mô hình đã huấn luyện trong mô phỏng, kèm tiêu chuẩn chấm kết quả.
+- **Quy trình dữ liệu:** hướng dẫn thu, kiểm tra và sử dụng từng nguồn, lưu nguồn gốc và phiên bản để dùng lại.
+- **Báo cáo so sánh:** ít nhất hai cách huấn luyện thực sự chạy, báo chất lượng, số mẫu robot, giờ công và chi phí.
+
+Mục tiêu PoC dự kiến là **≥75% thành công**, **≥70% trên biến thể giữ riêng** và **giảm ≥30% mẫu robot ở cùng chất lượng**. Đây là mục tiêu cần kiểm chứng và xác nhận theo tác vụ, chưa phải kết quả đã đạt hoặc chuẩn nghiệm thu nhà máy.
+
+Giảm số mẫu robot chưa đồng nghĩa giảm tổng chi phí. Đánh giá phải tính cả thu mẫu, xử lý video, kiểm dữ liệu, huấn luyện, thử lại và phân tích kết quả.
+
+## Giá trị khác biệt và hướng mở rộng
+
+Giá trị đề xuất nằm ở việc nối dữ liệu đa nguồn với hiệu quả phát triển kỹ năng: dùng từng nguồn đúng vai trò, chọn phần cần bổ sung và đo tổng công để đạt chất lượng yêu cầu. Đội tận dụng nền tảng và phương pháp có sẵn, tập trung xây phần tích hợp dữ liệu, tác vụ, đánh giá và quy trình cải thiện.
+
+Sau kỹ năng đầu tiên, thử tác vụ thứ hai trên cùng robot để đo mức tái sử dụng. Chuyển sang robot thật cần kiểm điều khiển, chất lượng, thời gian chu kỳ và nghiệm thu riêng.
+
+**Hiện trạng: đề xuất ở vòng idea; chưa có kết quả huấn luyện hoặc tiết kiệm thực nghiệm của đội.**
+
+Chi tiết: [Sản phẩm](docs/01-product.md) · [Cơ chế học](docs/04-learning-core.md) · [Kết quả kỳ vọng](docs/13-expected-outcomes.md).
