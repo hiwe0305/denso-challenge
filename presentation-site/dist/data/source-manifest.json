@@ -122,7 +122,22 @@
       "kind": "Humanoid simulation demonstration · public FluxVLA dataset",
       "url": "https://huggingface.co/datasets/limxdynamics/FluxVLAData/resolve/7998ab57bc70be66234b5374800705e2b6c14545/robocasa_gr1_24tasks_first30ep/PnPBottleToCabinetClose/videos/chunk-000/observation.images.ego_view/episode_000000.mp4",
       "source": "https://huggingface.co/datasets/limxdynamics/FluxVLAData/tree/7998ab57bc70be66234b5374800705e2b6c14545/robocasa_gr1_24tasks_first30ep",
-      "caption": "GR1 arms/waist/Fourier hands, camera egocentric 20fps. Episode 0 có 376 frames (~18,8s). Task household có waist unlocked; khác task khay fixed-torso của proposal. Dataset demonstration, không policy rollout của đội."
+      "caption": "GR1 arms/waist/Fourier hands, camera egocentric 20fps. Episode 0 có 376 frames (~18,8s). Task household có waist unlocked; khác task khay fixed-torso của proposal. Dataset demonstration, không policy rollout của đội.",
+      "playbackUrl": "assets/gr1-episode-0.mp4",
+      "poster": "assets/gr1-episode-0-poster.jpg",
+      "license": {
+        "label": "NVIDIA / RoboCasa · CC BY-NC 4.0",
+        "url": "https://creativecommons.org/licenses/by-nc/4.0/"
+      },
+      "provenance": {
+        "revision": "7998ab57bc70be66234b5374800705e2b6c14545",
+        "sourceSha256": "c9250ff66dd30a52a9dc5e2b44cb817f8703087d576030df0532e24c96cc55e9",
+        "playbackSha256": "f110cc1c6d5adafb3bde97952d7def0b50e1a00d8a8d5d201eb81b0f5e9e98c0",
+        "posterSha256": "fdca99291b73253f4c17098109175847f7787016634fe03261c41f1bad9ca3de",
+        "changes": "MP4 remux with faststart; H.264 frames unchanged. Poster extracted at t=0. No training result of this project.",
+        "upstream": "https://huggingface.co/datasets/nvidia/PhysicalAI-Robotics-GR00T-Teleop-Sim",
+        "checked": "2026-10-05"
+      }
     }
   },
   "methods": [

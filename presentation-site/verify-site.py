@@ -1,5 +1,6 @@
 """Check the static publishing artifact and generated dossier without network access."""
 import json
+import hashlib
 import re
 from pathlib import Path
 from html.parser import HTMLParser
@@ -41,8 +42,14 @@ for doc in docs:
 
 manifest = json.loads((DIST / 'data/source-manifest.json').read_text())
 for media in manifest['media'].values():
-    url = media['url']
-    if not url.startswith(('https:', 'http:')):
-        assert (DIST / url).is_file(), f'Missing media: {url}'
+    for field in ('url', 'poster', 'playbackUrl'):
+        url = media.get(field)
+        if url and not url.startswith(('https:', 'http:')):
+            assert not url.startswith('/'), f'Root-relative media URL: {url}'
+            assert (DIST / url).is_file(), f'Missing media: {url}'
+    for field, hash_field in (('playbackUrl', 'playbackSha256'), ('poster', 'posterSha256')):
+        digest = media.get('provenance', {}).get(hash_field)
+        if digest:
+            assert hashlib.sha256((DIST / media[field]).read_bytes()).hexdigest() == digest, f'Stale media: {media[field]}'
 assert not any(p.is_symlink() for p in DIST.rglob('*')), 'Pages artifact must not contain symlinks'
 print(f'Validated {len(routes)} routes, {len(docs)} documents and local publishing assets.')

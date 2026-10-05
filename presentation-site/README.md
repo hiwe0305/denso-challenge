@@ -32,7 +32,7 @@ Website có 12 mục, 13 phương pháp, numerical previews GR1 (6 rows từ pin
 
 Research/media catalog được sửa tại `content/research-and-media.json`; numerical previews và provenance ở `dist/data/`. Chạy `python3 presentation-site/sync-docs.py` để render năm SVG nguồn và ba SVG giải thích và rebuild `evidence.js`, `dossier.js`, source manifest cùng docs11–12. Đây là outputs generated, không sửa chúng rồi bỏ qua catalog/canonical docs.
 
-Video và các ảnh remote stream trực tiếp từ máy chủ tác giả; Figure 1 FluxVLA được trích từ PDF gốc, lưu cùng hồ sơ và dùng được offline; ZIP không chứa bản sao remote media. numerical preview và hồ sơ đọc được offline, media remote cần internet. HLS dùng player hls.js 1.6.13/MIT được pin trong vendor. Website là hồ sơ minh họa, chưa backend ML đã tích hợp.
+Clip GR1 episode 0 và ảnh xem trước thật được lưu trong assets, giữ nguồn tác giả và giấy phép CC BY-NC 4.0; MP4 chỉ remux faststart, không đổi frames. Các video/ảnh remote khác tải trực tiếp từ máy chủ tác giả. Figure 1 FluxVLA được trích từ PDF gốc, lưu cùng hồ sơ và dùng được offline. numerical preview và hồ sơ đọc được offline, media remote cần internet. HLS dùng player hls.js 1.6.13/MIT được pin trong vendor. Website là hồ sơ minh họa, chưa backend ML đã tích hợp.
 
 ## Kiểm tra và đóng gói bản 05/10/2026
 

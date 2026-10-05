@@ -1,6 +1,6 @@
 # 12 · Public data examples và media provenance
 
-_Website đã có numerical previews, Figure 1 FluxVLA lưu cùng hồ sơ và remote media; chưa có dataset của đội hoặc training result. Media stream từ máy chủ tác giả, không đóng gói bản sao video trong ZIP._
+_Website đã có numerical previews, Figure 1 FluxVLA lưu cùng hồ sơ và remote media; chưa có dataset của đội hoặc training result. Clip GR1 episode 0 (18,8 giây) và ảnh xem trước thật lưu cùng website/ZIP để phát ổn định; media còn lại tải từ nguồn tác giả._
 
 ## Mẫu robot thật · Unitree G1/Dex3
 
@@ -102,9 +102,13 @@ Humanoid simulation demonstration · public FluxVLA dataset. GR1 arms/waist/Four
 
 [Nguồn chính thức](https://huggingface.co/datasets/limxdynamics/FluxVLAData/tree/7998ab57bc70be66234b5374800705e2b6c14545/robocasa_gr1_24tasks_first30ep) · [Remote asset](https://huggingface.co/datasets/limxdynamics/FluxVLAData/resolve/7998ab57bc70be66234b5374800705e2b6c14545/robocasa_gr1_24tasks_first30ep/PnPBottleToCabinetClose/videos/chunk-000/observation.images.ego_view/episode_000000.mp4)
 
+Clip xem trong website: `assets/gr1-episode-0.mp4`; poster: `assets/gr1-episode-0-poster.jpg`. Nguồn gốc NVIDIA/RoboCasa qua FluxVLA subset, [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/); chỉ minh họa hồ sơ nghiên cứu/idea. MP4 được remux faststart, không đổi frames; poster trích tại t=0. Không phải kết quả của đội.
+
+Provenance: `{"revision": "7998ab57bc70be66234b5374800705e2b6c14545", "sourceSha256": "c9250ff66dd30a52a9dc5e2b44cb817f8703087d576030df0532e24c96cc55e9", "playbackSha256": "f110cc1c6d5adafb3bde97952d7def0b50e1a00d8a8d5d201eb81b0f5e9e98c0", "posterSha256": "fdca99291b73253f4c17098109175847f7787016634fe03261c41f1bad9ca3de", "changes": "MP4 remux with faststart; H.264 frames unchanged. Poster extracted at t=0. No training result of this project.", "upstream": "https://huggingface.co/datasets/nvidia/PhysicalAI-Robotics-GR00T-Teleop-Sim", "checked": "2026-10-05"}`
+
 ## Integrity và phân phối
 
-Numerical samples và Figure 1 FluxVLA đọc được offline; video và các ảnh remote cần internet và codec browser. Source hash dưới đây giúp nhận diện preview đã đóng gói, không thay hash raw dataset.
+Numerical samples, Figure 1 FluxVLA và clip GR1 đọc được offline; các video/ảnh remote khác cần internet và codec browser. Source hash dưới đây giúp nhận diện preview đã đóng gói, không thay hash raw dataset.
 
 - `g1-episode-0.json` · SHA-256 `25bbc482e031cd59d9c2f9e2563a5020f825826d374d3cd127216c12f7861639`
 - `gr1-preview.json` · SHA-256 `b3f219f882e244a272b34cc74faffb16f72eaec4707c35658c8c1759c3455706`
