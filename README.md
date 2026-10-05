@@ -1,6 +1,6 @@
 # Humanoid Skill Learning
 
-**Giúp humanoid học kỹ năng từ video người và mẫu thao tác robot, hướng tới giảm công thu thập dữ liệu và thử nghiệm ở cùng chất lượng.**
+**Giúp đội AI/robotics dạy và cải thiện kỹ năng humanoid: biết bước nào đã được thử, kiểm điểm nghẽn, thu dữ liệu đúng và đo tổng công tới cùng chất lượng.**
 
 Đề xuất hướng tới bài toán H1 của DENSO: huấn luyện humanoid nhanh, chính xác và giảm công sức con người. Người dùng chính là đội AI/robotics phát triển kỹ năng mới cho robot.
 
@@ -38,7 +38,7 @@ Nếu robot còn yếu ở nền hoặc ánh sáng mới, đội thử bổ sung
 1. **Định nghĩa kỹ năng:** chọn tác vụ, robot, điều kiện thao tác và tiêu chuẩn hoàn thành.
 2. **Chuẩn bị dữ liệu:** thu mẫu robot, chọn video liên quan, kiểm quyền, nhãn và chất lượng; tách dữ liệu học khỏi dữ liệu đánh giá.
 3. **Huấn luyện:** tận dụng mô hình có sẵn, giữ đường học hành động robot và tích hợp tín hiệu bổ sung từ nguồn đủ điều kiện.
-4. **Đánh giá và cải thiện:** so với cách học từ mẫu robot, đo chất lượng, số mẫu và tổng giờ công; bổ sung dữ liệu cho điều kiện còn yếu.
+4. **Đánh giá và cải thiện:** chấm từng bước và cả task, kiểm hệ thống/đầu vào bước, chọn correction hoặc bootstrap; huấn luyện với dữ liệu cũ + mới và kiểm regression/tổng công.
 5. **Bàn giao:** mô hình điều khiển, cấu hình thực thi, quy trình dữ liệu và báo cáo so sánh có thể tái lập.
 
 Đường kỹ thuật dự kiến là **FluxVLA + GR00T N1.5 + humanoid GR1 trong RoboCasa/MuJoCo**. Phạm vi đầu tiên gồm một tác vụ gắp–đặt, một tay hoạt động và torso cố định trong mô phỏng. Nhánh video người cần kiểm tương thích trước khi thử lợi ích; biến đổi hình ảnh cơ bản được ưu tiên trước các phương án tổng hợp phức tạp.
@@ -64,3 +64,9 @@ Sau kỹ năng đầu tiên, thử tác vụ thứ hai trên cùng robot để �
 **Hiện trạng: đề xuất ở vòng idea; chưa có kết quả huấn luyện hoặc tiết kiệm thực nghiệm của đội.**
 
 Chi tiết: [Sản phẩm](docs/01-product.md) · [Cơ chế học](docs/04-learning-core.md) · [Kết quả kỳ vọng](docs/13-expected-outcomes.md).
+
+## Revision 2: vòng cải thiện task
+
+Pass/fail/chưa thử/chưa rõ giúp không quy lỗi cho bước chưa tới. Controlled probes kiểm lỗi do bước trước; useful baseline dùng targeted corrections, no basic skill dùng expert seed/curriculum hoặc rescope. Shared policy cần prior replay và whole-task/regression checks; local success không đủ promote.
+
+[Solution đầy đủ](docs/14-task-improvement.md) · [Rà soát toàn idea](docs/reviews/full-idea-audit-2026-10-05.md). Website có ví dụ tương tác khai báo để giải thích logic; chưa verifier hoặc training backend kết nối robot. Bộ ảnh/video 9 cảnh là bản nhập môn; bản revision2 này sở hữu chi tiết cải thiện.

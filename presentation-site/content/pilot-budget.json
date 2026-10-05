@@ -5,7 +5,8 @@
     "baselineRuns": 6,
     "acquisitionRuns": 9,
     "coreRuns": 15,
-    "extensionRuns": 12
+    "extensionRuns": 12,
+    "diagnosticGate": "D0 verifier/probes; extra recording/eval jobs and bootstrap training replan, not free inside core15"
   },
   "study": {
     "engineerHours": 480,
@@ -18,7 +19,7 @@
   "studyNotes": {
     "engineerHours": "Minh họa 1 kỹ sư × 12 tuần × 40 giờ; gồm implementation, QA, selection, debug và analysis. Không phải estimate đã được đội xác nhận.",
     "stageHours": "Mỗi job dùng GPU-giờ tham chiếu từ mô hình skill: train 120, bridge 50, generation 20, eval 20. Chưa benchmark; không mặc định mọi arm phải chạy bridge.",
-    "scope": "Subtotal R&D mô phỏng gồm engineering, allocated compute và storage. Operator capture, acquisition fees, licenses/cell, CPU/network và chi phí chưa quote chưa bao gồm. Không cộng subtotal vào per-skill total. Engineer acquisition đã nằm trong giờ toàn study nếu cùng activity; chỉ bổ sung khoản ngoài phạm vi, không cộng ledger engineer lần thứ hai."
+    "scope": "Subtotal R&D mô phỏng gồm engineering, allocated compute và storage. Operator capture, acquisition fees, licenses/cell, CPU/network và chi phí chưa quote chưa bao gồm. Không cộng subtotal vào per-skill total. Engineer acquisition đã nằm trong giờ toàn study nếu cùng activity; chỉ bổ sung khoản ngoài phạm vi, không cộng ledger engineer lần thứ hai. Revision2 cần verifier/annotation/paired probes/bootstrap/regression trong actual hours; 480h là capacity assumption, chưa đủ-work estimate."
   },
   "acquisitionCap": 500,
   "capNote": "USD mỗi arm/parent; cap minh họa cần khóa lại sau E0, chưa actual cost hoặc mức đủ để đạt quality.",
@@ -26,7 +27,7 @@
     {
       "id": "T",
       "name": "Targeted teleop của kỹ sư",
-      "description": "Chọn robot corrections đúng condition; đối chứng thực dụng."
+      "description": "Chọn robot corrections đúng condition; đối chứng thực dụng. Cùng stage traces/health/scorer và quyền probe như A."
     },
     {
       "id": "F",

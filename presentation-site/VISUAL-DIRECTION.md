@@ -23,3 +23,9 @@
 Demo 3D là chuyển động theo kịch bản, dựng bằng Three.js 0.160.1/MIT đã lưu trong website. Không chạy MuJoCo, không mô phỏng vật lý tiếp xúc, không gọi FluxVLA hoặc GR00T, không phải mô hình GR1 chính xác và không tạo evidence policy. Cảnh đặt đúng là kỳ vọng để giải thích lần đo lại. Render tĩnh khi không phát; dừng khi ẩn tab/chuyển trang; hủy tài nguyên khi đổi tình huống. WebGL không có thì giữ ảnh và chuyển động giải thích 2D.
 
 Ảnh nguồn dùng built-in image_gen; prompts tại `content/story-image-prompts.json`, ảnh và storyboard tại `dist/assets/story/`. Không sao chép video/ảnh của các trang tham khảo vào demo của đội.
+
+## Bổ sung task improvement · revision2
+
+Ngay sau demo robot, người xem chọn năm tình huống: lỗi gắp, lỗi có thể bắt nguồn từ bước trước, cả task không thành công nhưng vẫn có bước làm được, chưa có kỹ năng nền, hoặc chưa đủ tín hiệu để chấm. Biểu đồ giữ riêng bước đạt, lỗi, chưa tới và chưa rõ; đi kèm phép kiểm tra nguyên nhân, kế hoạch thu dữ liệu và cách học. Nhánh lỗi hệ thống đã xác nhận luôn yêu cầu sửa hệ thống trước khi học.
+
+Sơ đồ `assets/task-improvement.svg` mô tả vòng phát triển đầy đủ từ tiêu chí từng bước đến nghiệm thu toàn task độc lập. Website và hồ sơ dùng chung các ví dụ khai báo tại `content/task-improvement.json`; các số liệu và kết quả probe là minh họa theo kịch bản. Video 72 giây và demo 3D vẫn là phần giới thiệu, chưa diễn tả đầy đủ revision2 và không phải kết quả training. Cơ chế verifier, thu correction, bootstrap và training mới được đặc tả; chưa tích hợp với robot hoặc chạy thí nghiệm ML.

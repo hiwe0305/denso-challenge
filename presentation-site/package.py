@@ -10,7 +10,7 @@ with ZipFile(website,'w',ZIP_DEFLATED) as z:
     for p in sorted(DIST.rglob('*')):
         if p.is_file(): z.write(p,str(p.relative_to(DIST)))
 files=[ROOT/'README.md',ROOT/'PROMPT.md',website]
-for pattern in ['docs/*.md','docs/assets/*.svg','docs/assets/*.png','docs/reviews/*','docs/information-challenge/*','deliverables/*.md','presentation-site/*.md','presentation-site/*.py','presentation-site/content/*.json']:
+for pattern in ['docs/*.md','docs/assets/*.svg','docs/assets/*.png','docs/reviews/*','docs/information-challenge/*','deliverables/*.md','presentation-site/*.md','presentation-site/*.py','presentation-site/*.js','presentation-site/content/*.json']:
     files.extend(sorted(ROOT.glob(pattern)))
 files.extend(sorted(p for p in DIST.rglob('*') if p.is_file()))
 reference=(ROOT/'docs/references/README.md').read_text()

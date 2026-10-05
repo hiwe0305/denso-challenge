@@ -136,3 +136,11 @@ Thu time-motion theo activity và vai trò; attempts/yield và reasons reject; p
 [Protocol E0–E4](06-validation-and-roadmap.md) · [Kết quả dự kiến](13-expected-outcomes.md) · [Điểm idea](reviews/idea-review.md).
 
 12 contrast runs chỉ áp khi comparator/parent phù hợp đã có trong core; nếu cần train thêm parents hoặc rerun health baseline, phải cập nhật run grid và study budget trước. 27 không là trần tuyệt đối của mọi thí nghiệm.
+
+## Phần chi phí bổ sung của revision2
+
+Stage specification/verifier annotation, controlled probes/restaging/human reset, correction context QA, bootstrap tới useful parent và local+global regression phải ghi hoạt động. Calculator bổ sung giờ chẩn đoán/probe cho cả baseline và candidate, cùng bootstrap seed nếu thực dùng chung. Giá trị0 mặc định ở các ô mới là **chưa lập lượng công**, chưa confirmed-zero; snapshot9.315,89→16.359,98 vẫn là stress scenario cũ có phần chưa mô hình hóa, không total đầy đủ revision2.
+
+Task/scorer hours gốc chỉ cộng phần bổ sung chưa nằm trong đó; probe reset không cộng lại capture reset đã tính. Robot probe có operator và economic-use; sim probe dùng compute rate thực và giữ other cost nếu chưa có input. Bootstrap train GPU nằm trong train jobs/giờ đã cập nhật, không cộng lại qua person-hours. R&D 480h là capacity assumption; không tự thêm modules vẫn đủ12 tuần. D0/eval jobs và bootstrap training thêm thì replan study.
+
+A/T/F đều được quyền cùng stage traces/probes; hours thực riêng mỗi arm, same-quality/cap trước saving. Unknown trọng yếu không zero-fill để kết luận tiết kiệm. [Solution](14-task-improvement.md) và [audit](reviews/full-idea-audit-2026-10-05.md) giữ ranh giới.

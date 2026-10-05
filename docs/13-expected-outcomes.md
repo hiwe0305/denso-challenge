@@ -8,7 +8,7 @@ _05/10/2026 · Mục tiêu bàn giao, chưa kết quả của đội. Task đạ
 |---|---|---|
 | Policy chạy được | Checkpoint, normalizer, action/controller binding, runtime config | GR1 closed-loop và independent scorer, không expert playback |
 | SOP/data package dùng lại | Rights, source versions, masks, root splits, QA/reject records, releases và hướng dẫn chọn package | Recipe tái chạy được, holdout không leakage |
-| Evidence/cost report | R0 và ≥2 cách học thực sự chạy, E4 T/F/A từ cùng R0, ID/OOD final, all trials, train seed và cost receipts | Có thể kết luận achieved, no-gain hoặc inconclusive đúng evidence |
+| Evidence/cost report | Stage/transition/full-task/regression, unknown/reach/probes, bootstrap/correction decisions; R0 và ≥2 cách học thực sự chạy, E4 T/F/A từ cùng R0, ID/OOD final, all trials, train seed và cost receipts | Có thể kết luận achieved, no-gain hoặc inconclusive đúng evidence |
 
 ## Lợi ích kỳ vọng
 
@@ -54,3 +54,9 @@ Một task/robot/model trước; thêm task thứ hai trên cùng robot và đo 
 Report tách R&D-sim toàn study, per-skill sau pipeline và production-real. Không coi 16.359,98 USD full-source stress scenario là toàn ngân sách12 tuần; không thay assumptions để tạo saving. Cost missing giữ unknown; caps ngang chưa chứng minh same-quality. Đo engineer/operator/robot/GPU-hours và elapsed time, cyclep50/p95, interventions/1000, recoveryminutes, acceptedoutputs/hour. Targets75%/30%/OOD70% là PoC, cần production criteria riêng.
 
 Core15 runs: R0 2budgets ×3seeds =6 và T/F/A ×3parentseeds =9. Extensions source/compute/Cosmos có gate; nếu branch fail vẫn báo ≥2 cách học hợp lệ như native vs declared augmentation, không claim human/internet gain.
+
+## Bàn giao bằng chứng của vòng cải thiện
+
+Thêm task-stage specs/verifier review, traces theo pass/fail/not-attempted/unknown, natural/restaged probe receipts, Acquisition/Bootstrap/TrainingPlans và regression suites. Demo sửa một bước chưa là full-task acceptance. Report bao quát partial progress, no basic skill, unseen stages, transition failures, health repair và no-gain/stop; trường chưa đo giữ unknown.
+
+Chưa có useful R0 hoặc local verifier thì không giao claim “hệ thống biết train đúng chỗ”. Thiết kế đã bổ sung ở [Task improvement](14-task-improvement.md); kết quả chỉ sau E0/D0/E1/E4/final. Costs/numbers core15 chỉ conditional, bootstrap/retrain có thể tăng study jobs.

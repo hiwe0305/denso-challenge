@@ -29,6 +29,7 @@ jobs:
         run: |
           for file in presentation-site/dist/*.js; do node --check "$file"; done
           python3 presentation-site/verify-site.py
+          node presentation-site/test-improvement.js
       - name: Check publishing source
         id: pages-status
         env:

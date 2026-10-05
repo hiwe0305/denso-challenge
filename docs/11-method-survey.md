@@ -1,6 +1,6 @@
 # 11 · Khảo sát phương pháp học từ dữ liệu đa nguồn
 
-_Catalog gốc kiểm 02/10/2026; DataMIL bổ sung, kiểm 05/10/2026. Đây là kết quả/thiết kế của tác giả; không là kết quả của đội. P0/P1/P2 là ưu tiên MVP, không xếp hạng chất lượng công trình._
+_Catalog gốc kiểm 02/10/2026; DataMIL và DAgger/PARTS/CR-DAgger bổ sung, kiểm 05/10/2026. Đây là kết quả/thiết kế của tác giả; không là kết quả của đội. P0/P1/P2 là ưu tiên MVP, không xếp hạng chất lượng công trình._
 
 ## Kết luận cho thiết kế
 
@@ -138,10 +138,40 @@ Nguồn: [DataMIL](https://arxiv.org/html/2505.09603v1).
 **Giới hạn:** Paper ghi selection thêm compute đáng kể; không suy method này tự chọn gói chưa thu hoặc chắc giảm chi phí task khay.
 **Ưu tiên:** P0 · prior art và cost/selection controls; không bắt buộc tích hợp method.
 
+## DAgger · 2011
+
+Nguồn: [DAgger](https://proceedings.mlr.press/v15/ross11a.html).
+
+**Input:** Policy-induced observations và expert action labels
+**Cơ chế:** Thu labels tại states do policy gây ra, tổng hợp dữ liệu qua các vòng imitation learning.
+**Tận dụng:** Correction gần rollout states; giữ failed actions và expert-corrected targets riêng.
+**Giới hạn:** Expert availability/action compatibility và collection cost; không tự diagnosis, không bằng chứng saving của GR1 proposal.
+**Ưu tiên:** P0 · cơ sở collection targeted; không cần port nguyên algorithm trước MVP
+
+## PARTS · v2 · 2026
+
+Nguồn: [PARTS · v2](https://arxiv.org/html/2609.21788v2).
+
+**Input:** Task-specific base policy, local contracts/selectors/verifiers và robot rollout
+**Cơ chế:** Luyện residual RL ở bottleneck với local outcomes; kiểm readiness và full-task execution.
+**Tận dụng:** Thiết kế local probes, preconditions/readiness và natural/restaged entry tests.
+**Giới hạn:** Paper v2 §I/III đọc; chưa port pi0.5/residual RL sang GR00T/GR1; reset/verifier/base là điều kiện, không auto fix mọi task.
+**Ưu tiên:** P0 · thiết kế diagnosis/protocol; residual RL P2 sau gate
+
+## Compliant Residual DAgger · 2025
+
+Nguồn: [Compliant Residual DAgger](https://compliant-residual-dagger.github.io/).
+
+**Input:** Base policy, human delta corrections, force feedback/control
+**Cơ chế:** Correction interface và residual learner cho contact-rich tasks; phân biệt correction với fine-tune base.
+**Tận dụng:** QA takeover/action authority, state distribution và continuity; teacher action labels cho corrections.
+**Giới hạn:** Force/controller/action composition phụ thuộc robot; chưa GR1 integration, không chuyển kết quả tác giả thành evidence đội.
+**Ưu tiên:** P1 · collection QA; residual controller/learner P2
+
 ## Chọn đường trong ba tháng
 
 P0: FluxVLA/GR00T N1.5/GR1 robot baseline và E4 T/F/A từ parent R0. P1: human/video heads, source-drop, compute control và Cosmos-vs-basic sau gate. P2: physics/world-model generation, full-body geometry và WAM. Không train foundation models từ đầu.
 
-MVP chọn robot baseline trên FluxVLA/GR00T N1.5/GR1 trước; auxiliary stage/order/wrist heads có gate signals/rights/E0 riêng. Bốn nguồn là catalog, không mandatory recipe. Core 15 runs: 6 R0 +9 T/F/A, extension tối đa 12. DataMIL là prior art về selection; selection/QA compute và engineer hours phải tính vào total cost.
+MVP chọn robot baseline trên FluxVLA/GR00T N1.5/GR1 trước; auxiliary stage/order/wrist heads có gate signals/rights/E0 riêng. Bốn nguồn là catalog, không mandatory recipe. E0/D0 và E1 tạo useful parent trước E4; core15 conditional: 6 R0 +9 T/F/A; bootstrap/extra jobs replan, extension tối đa12. DataMIL là prior art về selection; selection/QA compute và engineer hours phải tính vào total cost.
 
 [Learning Core](04-learning-core.md) · [Protocol](06-validation-and-roadmap.md) · [Mẫu dữ liệu](12-public-data-examples.md).

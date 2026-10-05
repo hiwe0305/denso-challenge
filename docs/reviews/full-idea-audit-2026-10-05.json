@@ -1,0 +1,698 @@
+{
+  "architecture_key": "task-improvement",
+  "revision": "improvement-v2",
+  "representation": "proposed_design",
+  "view": "combined",
+  "baseCommit": "d82725c9c211c0d4d5420447bb15d9b94325ab52",
+  "sourcesBeforeRevision": [
+    {
+      "path": "docs/01-product.md",
+      "sha256": "8e4ca675707512a9eccbf24627b4ba8dfe547439926ee9d2f5a92377e298f1a7"
+    },
+    {
+      "path": "docs/02-system-architecture.md",
+      "sha256": "edc6ba43a9f7d14f01aecb407ba14de1b75eb93d86bd3850ce14d5b23facab2d"
+    },
+    {
+      "path": "docs/03-data-core.md",
+      "sha256": "23f8f399aa20821d3e83b8db3bbf63bdbadf775b8eb863be181e471d9f050014"
+    },
+    {
+      "path": "docs/04-learning-core.md",
+      "sha256": "6817cfdc287a6141035ae36a25c3840bef2c54d33f0e6fda59fe0b18da8071cd"
+    },
+    {
+      "path": "docs/05-contracts.md",
+      "sha256": "fae6d1e1b318cee7f4b78b8cd6da7200c72ad38c4a7bec503e5b5c4c57e8f41a"
+    },
+    {
+      "path": "docs/06-validation-and-roadmap.md",
+      "sha256": "d49ee26a96b5038eb6e7725657958783d07eae9714c5a4074759ae22ffd59b06"
+    },
+    {
+      "path": "docs/07-business-case.md",
+      "sha256": "4e8e6d1409aebc2d6db017dcfad3399a23e1868235857e296a27ddfc8721f63d"
+    },
+    {
+      "path": "docs/08-prd.md",
+      "sha256": "ab980e33a64561c55c54bccaaf11a0927537f2e799182ee85465630001b27d04"
+    },
+    {
+      "path": "docs/10-data-collection-sop.md",
+      "sha256": "bc539643ed00d5b8d3492ec7fdee7d7a3c8ba5680d221b1e3707fe956539f53b"
+    },
+    {
+      "path": "docs/11-method-survey.md",
+      "sha256": "fef242900763c2d91daf7c896ff277601a6f96476108ec83fe72861f6f2babaa"
+    },
+    {
+      "path": "docs/12-public-data-examples.md",
+      "sha256": "4b0bf16ef50bdbd836f9637cc8cd136132b7aa830f907b1785deda8bbec13a9e"
+    },
+    {
+      "path": "docs/13-expected-outcomes.md",
+      "sha256": "3ba3154f638786d64086c9171816071a1a8e1f4e728636454fb6f17039d3b9b7"
+    },
+    {
+      "path": "README.md",
+      "sha256": "e58e27f68b0f68af8599e8840722425462763380d7169558aeeea180b3030fe3"
+    },
+    {
+      "path": "deliverables/Human-first-Humanoid-Pitch.md",
+      "sha256": "1638771fd554da777b65b983926b1dae1d685bbea7b3c2bcaadfbf9305245758"
+    },
+    {
+      "path": "presentation-site/dist/app.js",
+      "sha256": "30112c7432ef92612809bce32d22460f2f7e1b3650f50b157d747311c6ef588a"
+    },
+    {
+      "path": "presentation-site/dist/idea-opening.js",
+      "sha256": "d5556029c580e321b8c40ebe024fe5282f590a6e30e0d9c9eeaddc7da5a9d000"
+    },
+    {
+      "path": "presentation-site/dist/humanoid-demo.js",
+      "sha256": "a9e473cd0207f9782c0dfb0f5535683dac4801d94d41621aea3bd9b2e7d2a59b"
+    },
+    {
+      "path": "presentation-site/dist/cost-model.js",
+      "sha256": "b8fa93ba35a863379d5abd884cc7aa4dd5a9448c3b48a4930e64be0a063079ce"
+    },
+    {
+      "path": "presentation-site/content/industrial-cost-model.json",
+      "sha256": "a501bc0b618798f75d3809f7ae4c73444907a8ca2974e5ff256665ba286f854d"
+    },
+    {
+      "path": "presentation-site/content/pilot-budget.json",
+      "sha256": "5b5efa9dec7b3a0a905fa879a3e93a37590d3fe6a63f7122e5aa5c528db508cb"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "TASK",
+      "phase": "inference",
+      "source": "docs/14-task-improvement.md"
+    },
+    {
+      "id": "RUNTIME",
+      "phase": "inference",
+      "source": "docs/14-task-improvement.md"
+    },
+    {
+      "id": "TRACE",
+      "phase": "inference",
+      "source": "docs/14-task-improvement.md"
+    },
+    {
+      "id": "STAGE",
+      "phase": "inference",
+      "source": "docs/14-task-improvement.md"
+    },
+    {
+      "id": "HEALTH",
+      "phase": "development",
+      "source": "docs/14-task-improvement.md"
+    },
+    {
+      "id": "REPAIR",
+      "phase": "development",
+      "source": "docs/14-task-improvement.md"
+    },
+    {
+      "id": "PROBE",
+      "phase": "development",
+      "source": "docs/14-task-improvement.md"
+    },
+    {
+      "id": "SELECT",
+      "phase": "development",
+      "source": "docs/14-task-improvement.md"
+    },
+    {
+      "id": "BOOT",
+      "phase": "development",
+      "source": "docs/14-task-improvement.md"
+    },
+    {
+      "id": "DATA",
+      "phase": "development",
+      "source": "docs/14-task-improvement.md"
+    },
+    {
+      "id": "TRAIN",
+      "phase": "development",
+      "source": "docs/14-task-improvement.md"
+    },
+    {
+      "id": "CHECK",
+      "phase": "development",
+      "source": "docs/14-task-improvement.md"
+    },
+    {
+      "id": "FREEZE",
+      "phase": "acceptance",
+      "source": "docs/14-task-improvement.md"
+    },
+    {
+      "id": "FINAL",
+      "phase": "acceptance",
+      "source": "docs/14-task-improvement.md"
+    },
+    {
+      "id": "BUNDLE",
+      "phase": "acceptance",
+      "source": "docs/14-task-improvement.md"
+    },
+    {
+      "id": "COST",
+      "phase": "development",
+      "source": "docs/14-task-improvement.md"
+    },
+    {
+      "id": "STATUS",
+      "phase": "development",
+      "source": "docs/14-task-improvement.md"
+    }
+  ],
+  "findings": [
+    {
+      "id": "G1",
+      "targets": [
+        "TASK",
+        "STAGE"
+      ],
+      "basis": "missing_specification",
+      "resolution": "specified_in_v2_not_validated",
+      "nextCheck": "Stage contract/coverage validation",
+      "title": "Full-task logs alone cannot establish stage failure frequency.",
+      "category": "missing_specification",
+      "scope": "d82725c proposal to improvement-v2 specification",
+      "source_refs": [
+        {
+          "path": "docs/01-product.md",
+          "revision": "baseCommit for observed gap; working improvement-v2 for revised specification"
+        },
+        {
+          "path": "docs/05-contracts.md",
+          "revision": "baseCommit for observed gap; working improvement-v2 for revised specification"
+        }
+      ],
+      "observation": "Product chain/final criterion and ConditionReport lacked entry/exit/readiness and not-attempted/unknown accounting.",
+      "impact": "Full-task logs alone cannot establish stage failure frequency.",
+      "alternative_explanation": "If pre-existing implemented scorer satisfies all states/contracts, missing implementation specification rather than scorer behavior.",
+      "priority": "material",
+      "reasoning": {
+        "premises": [
+          {
+            "kind": "design",
+            "statement": "Product chain/final criterion and ConditionReport lacked entry/exit/readiness and not-attempted/unknown accounting.",
+            "references": [
+              "docs/01-product.md",
+              "docs/05-contracts.md"
+            ]
+          },
+          {
+            "kind": "inference",
+            "statement": "Full-task logs alone cannot establish stage failure frequency."
+          }
+        ],
+        "derivation": "The missing interface/measurement prevents the scoped decision from being inspectable; v2 specifies a check rather than claiming results.",
+        "conclusion": "Full-task logs alone cannot establish stage failure frequency.",
+        "assumptions_and_limits": "Task graph simple/sequential in MVP; verifier signal validity must be checked.",
+        "support": "design_gap_or_risk_not_experimentally_validated"
+      },
+      "falsifier": "If pre-existing implemented scorer satisfies all states/contracts, missing implementation specification rather than scorer behavior.",
+      "resolution_status": "specified_in_v2_not_validated"
+    },
+    {
+      "id": "G2",
+      "targets": [
+        "PROBE"
+      ],
+      "basis": "inferred_risk",
+      "resolution": "specified_in_v2_not_validated",
+      "nextCheck": "Paired canonical vs policy entry and full-task trials",
+      "title": "Visible failure location does not isolate preceding-state cause.",
+      "category": "design_risk_or_unknown",
+      "scope": "d82725c proposal to improvement-v2 specification",
+      "source_refs": [
+        {
+          "path": "docs/04-learning-core.md",
+          "revision": "baseCommit for observed gap; working improvement-v2 for revised specification"
+        }
+      ],
+      "observation": "Health/data hypotheses lacked natural-vs-restaged preceding-state probes.",
+      "impact": "Visible failure location does not isolate preceding-state cause.",
+      "alternative_explanation": "If both entry distributions equally valid and test excludes upstream confounds, upstream explanation may be rejected.",
+      "priority": "material",
+      "reasoning": {
+        "premises": [
+          {
+            "kind": "design",
+            "statement": "Health/data hypotheses lacked natural-vs-restaged preceding-state probes.",
+            "references": [
+              "docs/04-learning-core.md"
+            ]
+          },
+          {
+            "kind": "inference",
+            "statement": "Visible failure location does not isolate preceding-state cause."
+          }
+        ],
+        "derivation": "The missing interface/measurement prevents the scoped decision from being inspectable; v2 specifies a check rather than claiming results.",
+        "conclusion": "Visible failure location does not isolate preceding-state cause.",
+        "assumptions_and_limits": "Reset changes distributions; small samples and alternative control/sensor causes remain.",
+        "support": "design_gap_or_risk_not_experimentally_validated"
+      },
+      "falsifier": "If both entry distributions equally valid and test excludes upstream confounds, upstream explanation may be rejected.",
+      "resolution_status": "specified_in_v2_not_validated"
+    },
+    {
+      "id": "G3",
+      "targets": [
+        "SELECT",
+        "DATA"
+      ],
+      "basis": "missing_specification",
+      "resolution": "specified_in_v2_not_validated",
+      "nextCheck": "Loader/window/takeover QA then downstream contrast",
+      "title": "Collection cannot faithfully supervise targeted corrections without valid context/actions.",
+      "category": "missing_specification",
+      "scope": "d82725c proposal to improvement-v2 specification",
+      "source_refs": [
+        {
+          "path": "docs/03-data-core.md",
+          "revision": "baseCommit for observed gap; working improvement-v2 for revised specification"
+        },
+        {
+          "path": "docs/05-contracts.md",
+          "revision": "baseCommit for observed gap; working improvement-v2 for revised specification"
+        }
+      ],
+      "observation": "Package eligibility/cost existed, but stage/context/action-authority interface unspecified.",
+      "impact": "Collection cannot faithfully supervise targeted corrections without valid context/actions.",
+      "alternative_explanation": "If existing collection schema/window implementation already retains these semantics, gap is documentation.",
+      "priority": "material",
+      "reasoning": {
+        "premises": [
+          {
+            "kind": "design",
+            "statement": "Package eligibility/cost existed, but stage/context/action-authority interface unspecified.",
+            "references": [
+              "docs/03-data-core.md",
+              "docs/05-contracts.md"
+            ]
+          },
+          {
+            "kind": "inference",
+            "statement": "Collection cannot faithfully supervise targeted corrections without valid context/actions."
+          }
+        ],
+        "derivation": "The missing interface/measurement prevents the scoped decision from being inspectable; v2 specifies a check rather than claiming results.",
+        "conclusion": "Collection cannot faithfully supervise targeted corrections without valid context/actions.",
+        "assumptions_and_limits": "Expert labels must match robot action semantics, timing and chunk horizon.",
+        "support": "design_gap_or_risk_not_experimentally_validated"
+      },
+      "falsifier": "If existing collection schema/window implementation already retains these semantics, gap is documentation.",
+      "resolution_status": "specified_in_v2_not_validated"
+    },
+    {
+      "id": "G4",
+      "targets": [
+        "BOOT"
+      ],
+      "basis": "missing_specification",
+      "resolution": "specified_in_v2_not_validated",
+      "nextCheck": "Zero-task vs no-basic fixtures then real useful-parent gate",
+      "title": "A condition-choice trial needs a useful shared parent or separate bootstrap/rescope decision.",
+      "category": "missing_specification",
+      "scope": "d82725c proposal to improvement-v2 specification",
+      "source_refs": [
+        {
+          "path": "docs/04-learning-core.md",
+          "revision": "baseCommit for observed gap; working improvement-v2 for revised specification"
+        },
+        {
+          "path": "docs/06-validation-and-roadmap.md",
+          "revision": "baseCommit for observed gap; working improvement-v2 for revised specification"
+        }
+      ],
+      "observation": "E0/R0/fallback existed, but zero-task/no-basic/not-reached bootstrap distinction absent.",
+      "impact": "A condition-choice trial needs a useful shared parent or separate bootstrap/rescope decision.",
+      "alternative_explanation": "A useful verified parent despite 0 complete success supports bottleneck route and narrows bootstrap requirement.",
+      "priority": "material",
+      "reasoning": {
+        "premises": [
+          {
+            "kind": "design",
+            "statement": "E0/R0/fallback existed, but zero-task/no-basic/not-reached bootstrap distinction absent.",
+            "references": [
+              "docs/04-learning-core.md",
+              "docs/06-validation-and-roadmap.md"
+            ]
+          },
+          {
+            "kind": "inference",
+            "statement": "A condition-choice trial needs a useful shared parent or separate bootstrap/rescope decision."
+          }
+        ],
+        "derivation": "The missing interface/measurement prevents the scoped decision from being inspectable; v2 specifies a check rather than claiming results.",
+        "conclusion": "A condition-choice trial needs a useful shared parent or separate bootstrap/rescope decision.",
+        "assumptions_and_limits": "Early failure cannot infer later-stage skill; feasibility/data cap may prevent learning.",
+        "support": "design_gap_or_risk_not_experimentally_validated"
+      },
+      "falsifier": "A useful verified parent despite 0 complete success supports bottleneck route and narrows bootstrap requirement.",
+      "resolution_status": "specified_in_v2_not_validated"
+    },
+    {
+      "id": "G5",
+      "targets": [
+        "TRAIN"
+      ],
+      "basis": "inferred_risk",
+      "resolution": "specified_in_v2_not_validated",
+      "nextCheck": "Prior/correction recipe manifest and local/global regression",
+      "title": "Shared parameter updates can degrade already good steps; stage targeting does not isolate weights.",
+      "category": "design_risk_or_unknown",
+      "scope": "d82725c proposal to improvement-v2 specification",
+      "source_refs": [
+        {
+          "path": "docs/04-learning-core.md",
+          "revision": "baseCommit for observed gap; working improvement-v2 for revised specification"
+        }
+      ],
+      "observation": "Native loss/parameter gate specified, targeted prior replay/regression unspecified.",
+      "impact": "Shared parameter updates can degrade already good steps; stage targeting does not isolate weights.",
+      "alternative_explanation": "If prior-free update empirically preserves all preregistered conditions, risk narrows within tested domain.",
+      "priority": "material",
+      "reasoning": {
+        "premises": [
+          {
+            "kind": "design",
+            "statement": "Native loss/parameter gate specified, targeted prior replay/regression unspecified.",
+            "references": [
+              "docs/04-learning-core.md"
+            ]
+          },
+          {
+            "kind": "inference",
+            "statement": "Shared parameter updates can degrade already good steps; stage targeting does not isolate weights."
+          }
+        ],
+        "derivation": "The missing interface/measurement prevents the scoped decision from being inspectable; v2 specifies a check rather than claiming results.",
+        "conclusion": "Shared parameter updates can degrade already good steps; stage targeting does not isolate weights.",
+        "assumptions_and_limits": "Replay/freeze cannot guarantee retention outside measured domains.",
+        "support": "design_gap_or_risk_not_experimentally_validated"
+      },
+      "falsifier": "If prior-free update empirically preserves all preregistered conditions, risk narrows within tested domain.",
+      "resolution_status": "specified_in_v2_not_validated"
+    },
+    {
+      "id": "G6",
+      "targets": [
+        "CHECK",
+        "FINAL"
+      ],
+      "basis": "missing_specification",
+      "resolution": "specified_in_v2_not_validated",
+      "nextCheck": "D0 scorer agreement plus natural-start whole-task and regression",
+      "title": "Local gain and privileged stage success do not establish end-to-end or real performance.",
+      "category": "missing_specification",
+      "scope": "d82725c proposal to improvement-v2 specification",
+      "source_refs": [
+        {
+          "path": "docs/06-validation-and-roadmap.md",
+          "revision": "baseCommit for observed gap; working improvement-v2 for revised specification"
+        }
+      ],
+      "observation": "Independent final/splits existed, local/transition/verifier gates missing.",
+      "impact": "Local gain and privileged stage success do not establish end-to-end or real performance.",
+      "alternative_explanation": "Reliable independent verifier and whole-task evidence resolves within tested task/domain.",
+      "priority": "material",
+      "reasoning": {
+        "premises": [
+          {
+            "kind": "design",
+            "statement": "Independent final/splits existed, local/transition/verifier gates missing.",
+            "references": [
+              "docs/06-validation-and-roadmap.md"
+            ]
+          },
+          {
+            "kind": "inference",
+            "statement": "Local gain and privileged stage success do not establish end-to-end or real performance."
+          }
+        ],
+        "derivation": "The missing interface/measurement prevents the scoped decision from being inspectable; v2 specifies a check rather than claiming results.",
+        "conclusion": "Local gain and privileged stage success do not establish end-to-end or real performance.",
+        "assumptions_and_limits": "No full paper benchmark reproduction, no real sensor integration in this revision.",
+        "support": "design_gap_or_risk_not_experimentally_validated"
+      },
+      "falsifier": "Reliable independent verifier and whole-task evidence resolves within tested task/domain.",
+      "resolution_status": "specified_in_v2_not_validated"
+    },
+    {
+      "id": "G7",
+      "targets": [
+        "COST"
+      ],
+      "basis": "unresolved",
+      "resolution": "specified_in_v2_not_validated",
+      "nextCheck": "Activity ledger allocation audit and matched caps/quality",
+      "title": "Original scenario cannot establish full cost of added work.",
+      "category": "design_risk_or_unknown",
+      "scope": "d82725c proposal to improvement-v2 specification",
+      "source_refs": [
+        {
+          "path": "docs/07-business-case.md",
+          "revision": "baseCommit for observed gap; working improvement-v2 for revised specification"
+        },
+        {
+          "path": "presentation-site/content/industrial-cost-model.json",
+          "revision": "baseCommit for observed gap; working improvement-v2 for revised specification"
+        }
+      ],
+      "observation": "Reset/QA/selection costs present, extra verifier/probe/bootstrap quantities not declared.",
+      "impact": "Original scenario cannot establish full cost of added work.",
+      "alternative_explanation": "Complete measured ledger may show costs already included or net advantage.",
+      "priority": "material",
+      "reasoning": {
+        "premises": [
+          {
+            "kind": "design",
+            "statement": "Reset/QA/selection costs present, extra verifier/probe/bootstrap quantities not declared.",
+            "references": [
+              "docs/07-business-case.md",
+              "presentation-site/content/industrial-cost-model.json"
+            ]
+          },
+          {
+            "kind": "inference",
+            "statement": "Original scenario cannot establish full cost of added work."
+          }
+        ],
+        "derivation": "The missing interface/measurement prevents the scoped decision from being inspectable; v2 specifies a check rather than claiming results.",
+        "conclusion": "Original scenario cannot establish full cost of added work.",
+        "assumptions_and_limits": "Snapshot prices/planning hours do not measure DENSO economics; new zero inputs are unknown placeholders.",
+        "support": "design_gap_or_risk_not_experimentally_validated"
+      },
+      "falsifier": "Complete measured ledger may show costs already included or net advantage.",
+      "resolution_status": "specified_in_v2_not_validated"
+    },
+    {
+      "id": "G8",
+      "targets": [
+        "STATUS",
+        "BUNDLE"
+      ],
+      "basis": "unresolved",
+      "resolution": "specified_in_v2_not_validated",
+      "nextCheck": "E0/D0/E1/E4/final artifact-backed review",
+      "title": "Documentation completion and software checks do not establish skill/improvement/saving.",
+      "category": "design_risk_or_unknown",
+      "scope": "d82725c proposal to improvement-v2 specification",
+      "source_refs": [
+        {
+          "path": "presentation-site/dist/humanoid-demo.js",
+          "revision": "baseCommit for observed gap; working improvement-v2 for revised specification"
+        },
+        {
+          "path": "docs/reviews/idea-score.json",
+          "revision": "baseCommit for observed gap; working improvement-v2 for revised specification"
+        }
+      ],
+      "observation": "Static pitch/scripted motion and old design score are not integrated robot evidence.",
+      "impact": "Documentation completion and software checks do not establish skill/improvement/saving.",
+      "alternative_explanation": "Real pinned runs/evidence can establish integration and scoped benefit.",
+      "priority": "material",
+      "reasoning": {
+        "premises": [
+          {
+            "kind": "design",
+            "statement": "Static pitch/scripted motion and old design score are not integrated robot evidence.",
+            "references": [
+              "presentation-site/dist/humanoid-demo.js",
+              "docs/reviews/idea-score.json"
+            ]
+          },
+          {
+            "kind": "inference",
+            "statement": "Documentation completion and software checks do not establish skill/improvement/saving."
+          }
+        ],
+        "derivation": "The missing interface/measurement prevents the scoped decision from being inspectable; v2 specifies a check rather than claiming results.",
+        "conclusion": "Documentation completion and software checks do not establish skill/improvement/saving.",
+        "assumptions_and_limits": "Offline logic fixtures only verify the declared examples.",
+        "support": "design_gap_or_risk_not_experimentally_validated"
+      },
+      "falsifier": "Real pinned runs/evidence can establish integration and scoped benefit.",
+      "resolution_status": "specified_in_v2_not_validated"
+    }
+  ],
+  "implementationBoundary": "Static website and declared examples only; no trained robot diagnostics or ML results.",
+  "edges": [
+    {
+      "id": "e1",
+      "from": "TASK",
+      "to": "RUNTIME",
+      "payload": "binding/instruction/criteria",
+      "sourceRef": "docs/14-task-improvement.md",
+      "uncertainty": "proposed_not_executed"
+    },
+    {
+      "id": "e2",
+      "from": "RUNTIME",
+      "to": "TRACE",
+      "payload": "issued actions and measured observations",
+      "sourceRef": "docs/14-task-improvement.md",
+      "uncertainty": "proposed_not_executed"
+    },
+    {
+      "id": "e3",
+      "from": "TRACE",
+      "to": "STAGE",
+      "payload": "time-aligned signals/verifier",
+      "sourceRef": "docs/14-task-improvement.md",
+      "uncertainty": "proposed_not_executed"
+    },
+    {
+      "id": "e4",
+      "from": "STAGE",
+      "to": "HEALTH",
+      "payload": "development evidence/coverage",
+      "sourceRef": "docs/14-task-improvement.md",
+      "uncertainty": "proposed_not_executed"
+    },
+    {
+      "id": "e5",
+      "from": "HEALTH",
+      "to": "REPAIR",
+      "payload": "confirmed binding error",
+      "sourceRef": "docs/14-task-improvement.md",
+      "uncertainty": "proposed_not_executed"
+    },
+    {
+      "id": "e6",
+      "from": "HEALTH",
+      "to": "PROBE",
+      "payload": "valid path, uncertain cause",
+      "sourceRef": "docs/14-task-improvement.md",
+      "uncertainty": "proposed_not_executed"
+    },
+    {
+      "id": "e7",
+      "from": "PROBE",
+      "to": "SELECT",
+      "payload": "targeted correction hypothesis",
+      "sourceRef": "docs/14-task-improvement.md",
+      "uncertainty": "proposed_not_executed"
+    },
+    {
+      "id": "e8",
+      "from": "PROBE",
+      "to": "BOOT",
+      "payload": "no useful base after feasibility checks",
+      "sourceRef": "docs/14-task-improvement.md",
+      "uncertainty": "proposed_not_executed"
+    },
+    {
+      "id": "e9",
+      "from": "SELECT",
+      "to": "DATA",
+      "payload": "reviewed acquisition plan",
+      "sourceRef": "docs/14-task-improvement.md",
+      "uncertainty": "proposed_not_executed"
+    },
+    {
+      "id": "e10",
+      "from": "BOOT",
+      "to": "DATA",
+      "payload": "expert seed/curriculum",
+      "sourceRef": "docs/14-task-improvement.md",
+      "uncertainty": "proposed_not_executed"
+    },
+    {
+      "id": "e11",
+      "from": "DATA",
+      "to": "TRAIN",
+      "payload": "release/masks/prior+correction windows",
+      "sourceRef": "docs/14-task-improvement.md",
+      "uncertainty": "proposed_not_executed"
+    },
+    {
+      "id": "e12",
+      "from": "TRAIN",
+      "to": "CHECK",
+      "payload": "checkpoint/config",
+      "sourceRef": "docs/14-task-improvement.md",
+      "uncertainty": "proposed_not_executed"
+    },
+    {
+      "id": "e13",
+      "from": "CHECK",
+      "to": "PROBE",
+      "payload": "development no-gain/inconclusive",
+      "sourceRef": "docs/14-task-improvement.md",
+      "uncertainty": "proposed_not_executed"
+    },
+    {
+      "id": "e14",
+      "from": "CHECK",
+      "to": "FREEZE",
+      "payload": "development acceptance/regression gate",
+      "sourceRef": "docs/14-task-improvement.md",
+      "uncertainty": "proposed_not_executed"
+    },
+    {
+      "id": "e15",
+      "from": "FREEZE",
+      "to": "FINAL",
+      "payload": "locked independent plan",
+      "sourceRef": "docs/14-task-improvement.md",
+      "uncertainty": "proposed_not_executed"
+    },
+    {
+      "id": "e16",
+      "from": "FINAL",
+      "to": "BUNDLE",
+      "payload": "accepted skill or scoped no-gain report",
+      "sourceRef": "docs/14-task-improvement.md",
+      "uncertainty": "proposed_not_executed"
+    },
+    {
+      "id": "e17",
+      "from": "COST",
+      "to": "SELECT",
+      "payload": "activity estimates/actual/unknown caps",
+      "sourceRef": "docs/14-task-improvement.md",
+      "uncertainty": "proposed_not_executed"
+    },
+    {
+      "id": "e18",
+      "from": "STATUS",
+      "to": "BUNDLE",
+      "payload": "implementation/evidence boundary",
+      "sourceRef": "docs/14-task-improvement.md",
+      "uncertainty": "proposed_not_executed"
+    }
+  ]
+}

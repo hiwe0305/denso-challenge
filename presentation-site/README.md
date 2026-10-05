@@ -92,3 +92,11 @@ QA thực hiện sau build: syntax/calculation/unknown/cap/invalid-input, browse
 Trang đầu nêu ai dùng/đầu vào/đầu ra, ví dụ đặt linh kiện vào ô A1 và cơ chế video người bổ sung trải nghiệm, mẫu robot dạy điều khiển. Luồng đọc ưu tiên sản phẩm/solution/kết quả/chi phí/lộ trình; giữ các phần chuyên sâu trong mục đọc thêm. Targets, dữ liệu tác giả, dự toán và kết quả thực nghiệm được phân biệt rõ. Lịch vòng thi và kế hoạch kỹ thuật12 tuần có phạm vi riêng.
 
 Đã kiểm12 routes trong browser, mở chi tiết FluxVLA và bộ dự toán, đổi480→240→480 giờ kỹ sư và kiểm ledger trống giữ unknown. Kiểm cú pháp JavaScript, luồng nút tiếp theo12 trang,20 local references và parity14 tài liệu với nguồn canonical. ZIP được đóng lại và kiểm integrity. Đây là QA nội dung/giao diện, không kiểm chất lượng policy hoặc savings.
+
+## Task improvement revision2
+
+Canonical semantics: `docs/14-task-improvement.md`; scoped audit: `docs/reviews/full-idea-audit-2026-10-05.md` and JSON. `content/task-improvement.json` holds five declared examples, generated into evidence.js/data. The website computes counts/coverage and shows reviewed example plans; it does not classify real robot failures, run a verifier or train a policy.
+
+`task-improvement.js` validates count conservation, stage reach and outcome semantics; meaningful edge-case checks run with `node presentation-site/test-improvement.js`. Diagnosis/probe/bootstrap planning fields initially unmeasured zero placeholders, not evidence of complete costing. E0/D0/E1/E4 and independent whole-task/regression remain required.
+
+Older 9-scene images/video are an introductory overview, not the full revision2 method; provenance and source prompts are preserved. Rebuild canonical docs/data with `python3 presentation-site/build-content.py`, verify site, then `python3 presentation-site/package.py` for offline handover.

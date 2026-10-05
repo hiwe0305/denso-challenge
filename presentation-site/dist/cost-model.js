@@ -19,6 +19,10 @@ function calculateIndustrialCost(x){
  line('Sử dụng robot trong collection',ca,cb,'robot-giờ',robotHour),
  line('Task/scorer/calibration',x.taskHours,x.taskHours,'giờ kỹ sư',eng),
  line('Debug/correction review',x.debugHours,x.debugHours+x.extraDebug,'giờ kỹ sư',eng),
+ line('Diagnosis/verifier/probe review bổ sung',x.baseDiagnosisHours||0,x.candidateDiagnosisHours||0,'giờ kỹ sư',eng),
+ line('Probe/reset robot thêm: operator',x.baseProbeRobotHours||0,x.candidateProbeRobotHours||0,'giờ vận hành',op),
+ line('Probe/reset robot thêm: economic use',x.baseProbeRobotHours||0,x.candidateProbeRobotHours||0,'robot-giờ',robotHour),
+ line('Bootstrap seed/curriculum: nhân công bổ sung dùng chung',x.sharedBootstrapHours||0,x.sharedBootstrapHours||0,'giờ kỹ sư',eng),
  line('Thu human clips',0,humanHours,'giờ vận hành',op),
  line('Human tracking/stage + internet rights/relevance QA',0,curatingHours,'giờ kỹ sư',eng),
  line('Phí quyền dữ liệu',0,x.licenseCost,'USD',1),
@@ -46,7 +50,7 @@ function calculateIndustrialCost(x){
  const neededDemoReduction=perRobotDemo>0?(extraRecurring+extraOneoff/x.reuseSkills)/perRobotDemo:null;
  const ops=[['GPU dedicated, tính cả idle',x.inferGpuCount*x.inferHours*x.evalRate],['Monitoring / model maintenance',x.monitorHours*eng],['Robot capital phân bổ tháng',x.robotCapex/(x.robotYears*12)],['Cell maintenance cố định',x.maintenanceMonth],['Cell electricity khi hoạt động',x.deploymentHours*x.powerKw*x.electricRate],['Storage + backup',x.opsStorage*x.storageRate],['OPEX chưa mô hình hóa',x.opsOther]];
  const monthly=ops.reduce((s,l)=>s+l[1],0);
- const baselineDevCapital=(ca+trialHours)*capitalHour*x.reuseSkills,candidateDevCapital=(cb+trialHours)*capitalHour*x.reuseSkills;
+ const baselineDevCapital=(ca+trialHours+(x.baseProbeRobotHours||0))*capitalHour*x.reuseSkills,candidateDevCapital=(cb+trialHours+(x.candidateProbeRobotHours||0))*capitalHour*x.reuseSkills;
  const annualOpsCash=12*(monthly-x.robotCapex/(x.robotYears*12));
  return {lines,op,eng,robotHour,capitalHour,attemptsA:a,attemptsB:b,baselineRecurring,candidateRecurring,baselineOneoff,candidateOneoff,baseline,candidate,saving:baseline-candidate,marginalSaving,breakEvenSkills,perRobotDemo,neededDemoReduction,ops,monthly,
  baselineYearCash:x.robotCapex+baselineOneoff+baselineRecurring*x.reuseSkills-baselineDevCapital+annualOpsCash,

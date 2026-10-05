@@ -1,5 +1,5 @@
 {
-  "status": "design_assessment_before_poc",
+  "status": "historical_design_score_before_improvement_v2",
   "rubric": [
     {
       "criterion": "Sáng tạo",
@@ -42,5 +42,6 @@
   "assessment_stage": "design_before_poc_not_btc_score",
   "weight_method": "Original PROMPT weights 30/20/20/15/10, normalized by 95; excludes team and resource adequacy.",
   "previous_total_without_team": 5.684210526315789,
-  "cost_model": "presentation-site/content/industrial-cost-model.json"
+  "cost_model": "presentation-site/content/industrial-cost-model.json",
+  "currentAudit": "docs/reviews/full-idea-audit-2026-10-05.md"
 }

@@ -73,5 +73,17 @@ assert all((DIST / ref).is_file() for ref in export_refs.local), 'Missing storyb
 three = json.loads((DIST / 'vendor/three-manifest.json').read_text())
 assert hashlib.sha256((DIST / 'vendor/three.module.min.js').read_bytes()).hexdigest() == three['moduleSha256']
 assert (DIST / 'vendor/three-LICENSE.txt').is_file(), 'Missing 3D renderer license'
+# Improvement examples and the canonical specification must be shipped together.
+improvement = json.loads((DIST / 'data/task-improvement.json').read_text())
+assert improvement == json.loads((ROOT / 'presentation-site/content/task-improvement.json').read_text()), 'Stale task improvement examples'
+assert improvement['status'] == 'declared_examples_not_robot_measurements'
+assert {c['id'] for c in improvement['cases']} == {'grasp','upstream','zero_task','bootstrap','unknown'}
+assert any(d['path'] == 'docs/14-task-improvement.md' for d in docs)
+assert any(d['path'] == 'docs/reviews/full-idea-audit-2026-10-05.md' for d in docs)
+assert (DIST / 'assets/task-improvement.svg').read_bytes() == (ROOT / 'docs/assets/task-improvement.svg').read_bytes()
+audit = json.loads((ROOT / 'docs/reviews/full-idea-audit-2026-10-05.json').read_text())
+node_ids = {n['id'] for n in audit['nodes']}
+assert all(set(f['targets']) <= node_ids and f['reasoning']['premises'] for f in audit['findings'])
+assert all(e['from'] in node_ids and e['to'] in node_ids for e in audit['edges'])
 assert not any(p.is_symlink() for p in DIST.rglob('*')), 'Pages artifact must not contain symlinks'
-print(f'Validated {len(routes)} routes, {len(docs)} documents, 18 story scenes and local publishing assets.')
+print(f'Validated {len(routes)} routes, {len(docs)} documents, 18 story scenes, 5 improvement cases and local publishing assets.')

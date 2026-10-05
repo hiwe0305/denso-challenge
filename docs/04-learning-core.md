@@ -79,7 +79,7 @@ flowchart TB
   RESULT --> FREEZE["Freeze policy and independent final test"]
 ```
 
-Vị trí mới yếu: kiểm reachability/calibration/timing; thử targeted teleop coverage trước human/physics tốn công hơn. Nền mới: basic augmentation rồi appearance/RGB exposure nếu hypothesis/QA/cost đủ. Contact/recovery: controller trước, targeted corrections rồi physics fidelity phù hợp; RGB-only không tự thay contact labels. Repair tách khỏi E4 và re-pin baseline; data arms giữ binding cố định. Có stop/defer/no-change khi gói chưa đủ evidence/cap. Final test không chọn nguồn/checkpoint.
+Stage/condition evidence có pass/fail/not_attempted/unknown và coverage; kiểm natural/restaged entry để khoanh vùng first divergence trước chọn dữ liệu. Vị trí mới yếu: kiểm reachability/calibration/timing; thử targeted teleop coverage trước human/physics tốn công hơn. Nền mới: basic augmentation rồi appearance/RGB exposure nếu hypothesis/QA/cost đủ. Contact/recovery: controller trước, targeted corrections rồi physics fidelity phù hợp; RGB-only không tự thay contact labels. Repair tách khỏi E4 và re-pin baseline; data arms giữ binding cố định. Có stop/defer/no-change khi gói chưa đủ evidence/cap. Final test không chọn nguồn/checkpoint.
 
 ## Inference bundle và chuyển sang robot thật
 
@@ -108,3 +108,13 @@ Platform tiết kiệm công xây plumbing đã có tiền lệ; không tự đ�
 Pinned sample PnPBottleToCabinetClose có 29 state/action dimensions ở 20fps và waist unlocked. Không tự áp schema này cho G1 hay mọi release GR1. Metadata subset còn splits.train=0:100 dù 30 episodes; loader cần actual episode validation. Instruction indices 0 và 1 trùng text, không là hai task độc lập. Task khay fixed-torso của proposal cần wrapper/scorer/data phù hợp, không nhận dataset household này đã giải task DENSO. Source và hashes ở [Public examples](12-public-data-examples.md).
 
 12 contrast runs chỉ áp khi comparator/parent phù hợp đã có trong core; nếu cần train thêm parents hoặc rerun health baseline, phải cập nhật run grid và study budget trước. 27 không là trần tuyệt đối của mọi thí nghiệm.
+
+## Targeted training và cold-start · revision 2
+
+Đường MVP: native action supervised post-training từ cùng parent R0; target stage/condition quyết định data sampling, không tự chỉ ra neuron cần update. TrainingPlan pin trainable/frozen params, objective/masks/normalization, LR/steps/batch/seed, prior/correction sampling ratio và context/chunk horizon. Chỉ chốt giá trị sau config/development; LoRA/residual/RTC không mặc định support.
+
+Giữ dữ liệu thành công cũ, thêm correction gần policy-induced states, QA takeover và kiểm regression trên steps/conditions tốt. Chấm local readiness + transitions + full-task natural starts; loss giảm hoặc staged success chưa đủ promote. Auxiliary video stage head không thay independent rollout scorer.
+
+0 full-task success có thể còn local progress; dùng probes/bottleneck. Không basic skill hoặc path mismatch: E0 health trước, expert target-robot seed và curriculum đơn giản để tạo useful R0. Nếu không qua useful-parent gate sau cap, rescope/stop. BOOT thêm jobs thì cập nhật budget/run grid; A/T/F không được dùng bootstrap parents khác nhau.
+
+Residual/RL là extension cần selector/local verifier/reset/reward/action composition và matched-budget experiment riêng; chưa port PARTS hoặc CR-DAgger. [Task improvement](14-task-improvement.md) định nghĩa stages/probes/recipes và [Protocol](06-validation-and-roadmap.md) sở hữu gates.

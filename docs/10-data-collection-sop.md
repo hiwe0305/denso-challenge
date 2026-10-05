@@ -46,3 +46,15 @@ Bốn nguồn có SOP/catalog, không yêu cầu thu cả bốn cho mỗi skill.
 Với visual condition thử basic augmentation/reuse trước Cosmos; human/internet chỉ khi rights/signals/relevance và E0 đủ. Contact ưu tiên robot corrections sau health checks; physics chỉ sau fidelity/controller/scorer gate. Đăng ký T/F/A packages, acquisition và total incremental caps; planning/selection/QA/reset/reject/licensing/generation đều ghi theo activity. Unknown cost không tự thành0; gói không đủ evidence/cap thì defer/pilot nhỏ. Final OOD giữ riêng.
 
 Handoff thêm engineer/operator/robot/GPU-hours, elapsed time tới acceptance, cyclep50/p95, interventions/1000, recoveryminutes và acceptedoutputs/hour. Chưa robot thật: ghi sim-only; không gọi PoC thresholds là production acceptance.
+
+## SOP correction và bootstrap bắt buộc
+
+1. Task owner chốt entry/completion/readiness/timeout/reset cho từng stage; engineer kiểm scorer và signals thật có.
+2. Record toàn rollout, entered/unknown/not-attempted và từng retry/intervention; review first divergence/command-response.
+3. Health lỗi: repair và baseline mới. Health pass: probe canonical entry vs policy entry trên development, ghi setup/reset và mismatches.
+4. Useful baseline: capture expert correction gần state gặp thật, giữ pre/post context và takeover authority; QA switch discontinuity/action-chunk horizon. Dữ liệu sai nguyên trạng role diagnosis.
+5. No basic skill: expert task đơn giản và curriculum; progression theo trials/coverage/owner gate. Chưa tới stage sau không giả đã fail.
+6. Release successful prior + correction views, ratios/config/version pin; train native action path và local/transition/full-task regression. Test final sau freeze, không dùng test để chọn gói.
+7. Ghi stage labeling/verifier/probe/reset/bootstrap/QA/train/eval/stop/defer vào ledger, tránh cộng capture reset lần hai.
+
+[Đặc tả và trường bắt buộc](14-task-improvement.md).

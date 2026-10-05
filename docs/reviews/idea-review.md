@@ -1,5 +1,7 @@
 # Tham chiếu đánh giá nội bộ trước PoC
 
+> Review lịch sử trước task-improvement revision2; audit hiện hành: [Rà soát toàn idea](full-idea-audit-2026-10-05.md). Không coi score/runs cũ là evidence sau sửa.
+
 _Bảng tham chiếu nội bộ trước PoC được giữ nguyên số và công thức. Không dùng bảng này để đánh giá hồ sơ vòng idea: thiếu kết quả huấn luyện ở giai đoạn đề xuất không tự là điểm trừ. Không phải rubric hoặc điểm BTC._
 
 ## Bảng tham chiếu: 6,5/10

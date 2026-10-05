@@ -533,6 +533,51 @@
       "group": "Vận hành sau nghiệm thu",
       "evidence": "Nhập SLA/auth/network/safety/fixture/consumables nếu cần",
       "min": 0
+    },
+    {
+      "key": "baseDiagnosisHours",
+      "label": "Chẩn đoán/verifier/probe review đối chứng",
+      "value": 0,
+      "unit": "giờ kỹ sư",
+      "group": "Task improvement · công bổ sung",
+      "evidence": "Chưa lập lượng công; 0 là placeholder. Chỉ nhập phần chưa có trong task/debug/capture/reset; bootstrap GPU ghi train hours/jobs.",
+      "min": 0
+    },
+    {
+      "key": "candidateDiagnosisHours",
+      "label": "Chẩn đoán/verifier/probe review phương án",
+      "value": 0,
+      "unit": "giờ kỹ sư",
+      "group": "Task improvement · công bổ sung",
+      "evidence": "Chưa lập lượng công; 0 là placeholder. Chỉ nhập phần chưa có trong task/debug/capture/reset; bootstrap GPU ghi train hours/jobs.",
+      "min": 0
+    },
+    {
+      "key": "baseProbeRobotHours",
+      "label": "Probe/reset thêm trên robot đối chứng",
+      "value": 0,
+      "unit": "robot-giờ",
+      "group": "Task improvement · công bổ sung",
+      "evidence": "Chưa lập lượng công; 0 là placeholder. Chỉ nhập phần chưa có trong task/debug/capture/reset; bootstrap GPU ghi train hours/jobs.",
+      "min": 0
+    },
+    {
+      "key": "candidateProbeRobotHours",
+      "label": "Probe/reset thêm trên robot phương án",
+      "value": 0,
+      "unit": "robot-giờ",
+      "group": "Task improvement · công bổ sung",
+      "evidence": "Chưa lập lượng công; 0 là placeholder. Chỉ nhập phần chưa có trong task/debug/capture/reset; bootstrap GPU ghi train hours/jobs.",
+      "min": 0
+    },
+    {
+      "key": "sharedBootstrapHours",
+      "label": "Expert seed/curriculum dùng chung: nhân công bổ sung",
+      "value": 0,
+      "unit": "giờ kỹ sư",
+      "group": "Task improvement · công bổ sung",
+      "evidence": "Chưa lập lượng công; 0 là placeholder. Chỉ nhập phần chưa có trong task/debug/capture/reset; bootstrap GPU ghi train hours/jobs.",
+      "min": 0
     }
   ],
   "scenarios": [
@@ -594,5 +639,6 @@
       }
     }
   ],
-  "boundary": "Engineering estimate conditional on equal accepted quality. No DENSO prices, time-motion or achieved savings. Includes allocated robot capital; not an upfront cash budget. Tax, duties, transport, plant downtime and unmapped costs require quotes/inputs."
+  "boundary": "Engineering estimate conditional on equal accepted quality. No DENSO prices, time-motion or achieved savings. Includes allocated robot capital; not an upfront cash budget. Tax, duties, transport, plant downtime and unmapped costs require quotes/inputs. Revision2 diagnosis/probe/bootstrap quantities initially unknown; zero placeholders do not establish cost completeness. Avoid duplicate activities already in task/debug/capture/reset.",
+  "improvementCostStatus": "unmeasured_zero_placeholders"
 }

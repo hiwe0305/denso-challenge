@@ -75,3 +75,9 @@ CanonicalEpisode dùng `null` + validity mask cho missing signals; raw luôn gi�
 Trong train/development roots: action supervision đúng embodiment, representation/task transitions, calibration cho retarget/IDM nếu recipe có dùng, contact/recovery/correction khi nhãn đúng. Failure không thành expert-positive behavior cloning. Final-test roots chỉ chấm nghiệm thu. Báo unique roots, exposure và compute riêng; "reuse đầy đủ" không có nghĩa train trên holdout.
 
 [Public examples và provenance](12-public-data-examples.md).
+
+## Correction views theo bước và chuyển tiếp
+
+AcquisitionPackage ghi stage/condition, entry distribution, parent policy, hypothesized cause, correction reviewer và planned pre/post context. Dữ liệu có source action authority và takeover timestamps; quãng switch không mượt/missing targets phải QA/mask. Giữ đủ observation/action chunk horizon qua boundary, không nối giả hai episode.
+
+Failed action trace có role diagnosis/negative outcome; chỉ hành động sửa đúng được review mới vào expert-positive action supervision. Successful prior roots và corrections trộn theo TrainingPlan; final roots vẫn cấm. Recovery demo từ state xấu có target đúng, không đổi failure nguyên trạng thành expert demo. Window/validity/readback checks thuộc D0/E0. [Semantics đầy đủ](14-task-improvement.md).

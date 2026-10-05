@@ -296,6 +296,42 @@
       "limit": "Paper ghi selection thêm compute đáng kể; không suy method này tự chọn gói chưa thu hoặc chắc giảm chi phí task khay.",
       "priority": "P0 · prior art và cost/selection controls; không bắt buộc tích hợp method.",
       "checked": "2026-10-05"
+    },
+    {
+      "id": "dagger",
+      "name": "DAgger",
+      "year": "2011",
+      "family": "robot",
+      "input": "Policy-induced observations và expert action labels",
+      "mechanism": "Thu labels tại states do policy gây ra, tổng hợp dữ liệu qua các vòng imitation learning.",
+      "reuse": "Correction gần rollout states; giữ failed actions và expert-corrected targets riêng.",
+      "limit": "Expert availability/action compatibility và collection cost; không tự diagnosis, không bằng chứng saving của GR1 proposal.",
+      "priority": "P0 · cơ sở collection targeted; không cần port nguyên algorithm trước MVP",
+      "url": "https://proceedings.mlr.press/v15/ross11a.html"
+    },
+    {
+      "id": "parts",
+      "name": "PARTS · v2",
+      "year": "2026",
+      "family": "robot",
+      "input": "Task-specific base policy, local contracts/selectors/verifiers và robot rollout",
+      "mechanism": "Luyện residual RL ở bottleneck với local outcomes; kiểm readiness và full-task execution.",
+      "reuse": "Thiết kế local probes, preconditions/readiness và natural/restaged entry tests.",
+      "limit": "Paper v2 §I/III đọc; chưa port pi0.5/residual RL sang GR00T/GR1; reset/verifier/base là điều kiện, không auto fix mọi task.",
+      "priority": "P0 · thiết kế diagnosis/protocol; residual RL P2 sau gate",
+      "url": "https://arxiv.org/html/2609.21788v2"
+    },
+    {
+      "id": "crdagger",
+      "name": "Compliant Residual DAgger",
+      "year": "2025",
+      "family": "robot",
+      "input": "Base policy, human delta corrections, force feedback/control",
+      "mechanism": "Correction interface và residual learner cho contact-rich tasks; phân biệt correction với fine-tune base.",
+      "reuse": "QA takeover/action authority, state distribution và continuity; teacher action labels cho corrections.",
+      "limit": "Force/controller/action composition phụ thuộc robot; chưa GR1 integration, không chuyển kết quả tác giả thành evidence đội.",
+      "priority": "P1 · collection QA; residual controller/learner P2",
+      "url": "https://compliant-residual-dagger.github.io/"
     }
   ],
   "samples": [

@@ -1,5 +1,7 @@
 # Rà lại idea · 05/10/2026
 
+> Review lịch sử trước task-improvement revision2; audit hiện hành: [Rà soát toàn idea](full-idea-audit-2026-10-05.md). Không coi score/runs cũ là evidence sau sửa.
+
 Đánh giá thiết kế hiện có, không tính đội/ngân sách sẵn có, không phải điểm BTC hoặc kết quả huấn luyện. Giữ mức tham chiếu nội bộ **6,5/10**: (7×30+8×20+6×20+4×15+7×10)/95 = 6,5263. Lượt này không có bằng chứng thực nghiệm mới để nâng điểm kỹ thuật/hiệu quả.
 
 ## Kết luận

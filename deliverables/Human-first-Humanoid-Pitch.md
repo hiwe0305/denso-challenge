@@ -12,8 +12,8 @@ _Dàn ý nội dung để chuyển sang slide theo mẫu BTC; chưa là deck đ�
 | 4 | Tái sử dụng phương pháp hiện có | EgoVLA/HumanEgo/LAPA/synthetic/FluxVLA; không nhận engine hoặc human transfer là novelty |
 | 5 | Dữ liệu thật và giới hạn | G1 620 frames, HumanEgo 1002 rows/missing wrist; public samples khác task/robot, chưa paired |
 | 6 | Phương án chính đã chọn | FluxVLA/GR00T N1.5/GR1; custom human/video auxiliary heads; task wrapper và E0 |
-| 7 | Đóng góp cần chứng minh | Development conditions → health check → source package → T expert teleop / F fixed mixture / A condition-cost cùng cost |
-| 8 | Nghiệm thu theo task outcome | Đúng ô/nhả/ổn định/timeout; ID/OOD, demo budget, same-quality và total cost |
+| 7 | Đóng góp cần chứng minh | Stage evidence → health/probe → correction hoặc bootstrap → replay/regression → T expert / F fixed / A condition-cost cùng cost |
+| 8 | Nghiệm thu theo task outcome | Local/readiness/transitions + toàn task, unknown/reach, ID/OOD, regression, same-quality và total cost |
 | 9 | 12 tuần, main/fallback gates | E0 robot baseline → E1 → catalog/caps → E4 T/F/A → gated extensions → final |
 | 10 | Ba đầu ra và lợi ích cần đo | SOP/report/learned sim demo; cùng quality, demo count và tổng công; task thứ hai rồi robot thật |
 
@@ -34,3 +34,9 @@ Nội dung canonical: [Product](../docs/01-product.md), [Learning](../docs/04-le
 ## Phạm vi và giả định của đề xuất
 
 Không bắt mọi recipe dùng đủ bốn nguồn. Health fail thì sửa ngoài E4 và pin baseline lại; A được chọn reuse/basic augmentation/teleop/defer. DataMIL là prior art, chưa claim thuật toán mới. Cost report tách R&D-sim toàn study, per-skill sau pipeline và production-real; bản full-source gốc chưa kinh tế ở giả định400 →280 roots. Đo tổng engineering/operator/robot/GPU-hours, elapsed time, cycle p50/p95/interventions/recovery/outputs. H1 đã xác định nhu cầu tổng quát; tác vụ và điểm nghẽn cụ thể tại nhà máy cần owner xác nhận. Sim/PoC pass cần nghiệm thu riêng trước production.
+
+## Bổ sung cốt lõi sau rà soát revision 2
+
+Kể một lỗi: rơi ở chuyển có thể do gắp sai trước đó. Chấm từng bước/chưa thử/chưa rõ; thử chuyển từ gắp chuẩn và gắp policy để khoanh vùng. Có base: thu correction đúng + dữ liệu tốt cũ, native post-train, kiểm cả task. 0 task success có local progress: luyện bottleneck; no basic skill: mẫu expert/curriculum hoặc stop/rescope. Tính cả verifier/probe/reset/bootstrap/regression vào total cost; core15 conditional, extra jobs replan. Website chỉ demo kịch bản.
+
+[Task improvement](../docs/14-task-improvement.md) · [Audit revision2](../docs/reviews/full-idea-audit-2026-10-05.md). Không tăng điểm nội bộ từ bổ sung docs, chưa nhận auto-diagnosis hoặc thuật toán subtask mới.

@@ -19,8 +19,9 @@ Development chọn condition/gói/recipe. Final ID/OOD conditions và scenario s
 | Experiment | Thiết kế | Gate / claim |
 |---|---|---|
 | E0 | Robot samples → action loss/gradient → reload → GR1 closed-loop/scorer; health checks; mini-batch mỗi auxiliary loss sẽ dùng | Branch fail disabled/not-tested; loader-only chưa đủ; không nhận task success từ runtime smoke |
+| D0 | Stage verifier/unknown/never-reached/retries, paired natural/restaged probes, zero-task/no-basic cases | Scorer agreement/readiness, probes hợp lệ, costs; website fixtures chưa robot validation |
 | E1 | R0 tại 2 target-demo budgets ×3 seeds =6 runs | Same pretrained init/task/controller/scorer; baseline và failure map; budget chốt sau E0 |
-| E4-T | T: engineer chọn targeted robot teleop/corrections từ parent R0 | Đối chứng thực dụng; cùng condition/chi phí bổ sung |
+| E4-T | T: engineer chọn targeted robot teleop/corrections từ parent R0, cùng stage traces/probe access | Đối chứng thực dụng; cùng condition/chi phí bổ sung |
 | E4-F | F: mixture/quy tắc fixed đăng ký trước, catalog đủ quyền/tín hiệu | Không cố ý lấy data vô ích; basic augmentation đã khai |
 | E4-A | A: condition/cost choice; được chọn teleop/reuse/basic augmentation/human/internet/synthetic hợp lệ | Không ép đủ nguồn; unknown utility không thành predicted gain |
 
@@ -28,9 +29,9 @@ Chọn một E1 budget trên development; từ 3 parent R0 seeds fork T/F/A: 3 a
 
 ### E4 cùng điều kiện
 
-Khóa catalog, condition, parent, quyền/signals, cap và fixed-mixture rule trước lựa chọn. T do engineer chọn targeted robot corrections; F theo mixture đã khai; A theo eligibility/condition/cost, engineer duyệt. A chọn giống T thì có thể no-advantage. Không dự đoán gain bằng rules hoặc ép source để đủ bốn nhãn.
+Khóa catalog, target stages/condition, useful parent, quyền/signals, probe access, cap và fixed-mixture rule trước lựa chọn. T do engineer chọn targeted robot corrections; F theo mixture đã khai; A theo eligibility/condition/cost, engineer duyệt. A chọn giống T thì có thể no-advantage. Không dự đoán gain bằng rules hoặc ép source để đủ bốn nhãn.
 
-Binding/scorer và post-train schedule cố định; auxiliary steps/parameters/compute khác phải ghi. Acquisition cap bao gồm capture/reset/QA/reject, rights, preprocessing/generation và selection/planning person-time; phần learning/evaluation/analysis cost báo riêng trong total. Khóa thêm total incremental cost cap để A không dùng extra compute vượt T. Cap tolerance đề xuất 5%; không cân bằng được thì exploratory cost–quality frontier, không claim fair cost superiority.
+Binding/task-stage verifier/scorer và post-train schedule cố định; auxiliary steps/parameters/compute khác phải ghi. Acquisition cap bao gồm capture/reset/QA/reject, rights, preprocessing/generation và selection/planning person-time; phần learning/evaluation/analysis cost báo riêng trong total. Khóa thêm total incremental cost cap để A không dùng extra compute vượt T. Cap tolerance đề xuất 5%; không cân bằng được thì exploratory cost–quality frontier, không claim fair cost superiority.
 
 So T/F/A trên cùng held-out conditions, paired scenario seeds khi hợp lệ; mọi retries/no-gain có ledger. Same-quality cần acceptance/noninferiority margin và sample size chốt trước; baseline chưa đạt threshold không tính saving ở threshold. Không infer causal diagnosis từ failure clip. Fixed là core; nếu muốn claim hơn random nói chung, thêm repeated random-package draws trong budget mở rộng, không suy từ một draw.
 
@@ -42,7 +43,7 @@ Tại một budget/recipe hợp lệ: human-drop, internet-drop, compute-matched
 
 | KPI | Cách đo | Giới hạn |
 |---|---|---|
-| Quality | ID/OOD success theo condition, tất cả trials và confidence intervals | ≥75%/≥70% là PoC targets, không production-ready |
+| Quality | Full-task ID/OOD success, stage conditional success/reach/unknown coverage, transitions/regression, tất cả trials/CI | ≥75%/≥70% là PoC targets, không production-ready |
 | Total effort / time | Engineer/operator-hours, allocated GPU-hours, robot-hours, elapsed days tới acceptance | Reuse/sponsored/sunk/incremental tách; chưa time-motion thì estimated |
 | Acquisition value | A vs T và F, quality/noninferiority + total incremental cost + uncertainty | Hơn random chưa chứng minh hơn expert teleop; no-gain giữ lại |
 | Demo efficiency | Union target roots gồm calibration/corrections/selection; eval roots riêng | 30% là target; views/frames không demos mới; chưa baseline threshold thì undefined |
@@ -69,7 +70,7 @@ flowchart TB
 | Tuần | Đầu ra | Quyết định |
 |---|---|---|
 | 1–2 | Owner workflow/task/quality, binding/scorer/E0, rights và package samples | Main/fallback; sửa runtime trước data experiment |
-| 3–4 | E1 6 runs, baseline failure/cost map; branch mini-batches và catalog | Có parent tái lập; chưa có thì thu hẹp task |
+| 3–4 | D0 stage verification/probes và E1 useful R0; branch mini-batches/catalog | No useful parent: bootstrap theo cap/replan hoặc rescope/stop |
 | 5–6 | Lock T/F/A, hai condition feasibility, caps và selection receipts | Chọn một budget; chưa eligibility thì defer branch |
 | 7–9 | E4 9 runs, same-quality/total cost và repeated trials | A so T/F; no-gain là kết quả hợp lệ |
 | 10 | Gated source/compute/synthetic extension nếu cần và đủ budget | Không mở all-source grid trước core evidence |
@@ -93,3 +94,11 @@ Gate sản phẩm: một skill được owner nghiệm thu → task thứ hai c�
 [Product](01-product.md) · [Learning Core](04-learning-core.md) · [Business case](07-business-case.md).
 
 12 contrast runs chỉ áp khi comparator/parent phù hợp đã có trong core; nếu cần train thêm parents hoặc rerun health baseline, phải cập nhật run grid và study budget trước. 27 không là trần tuyệt đối của mọi thí nghiệm.
+
+## D0 và điều kiện để core15 có ý nghĩa
+
+D0 cần golden traces: not-attempted sau early fail, unknown sensors, retries/abort, late failure từ earlier pose, 0 task success có local progress và no basic skill. Test verifier agreement và readiness, snapshot reset/reachability, natural-vs-restaged entry; người kiểm labels và cost. Offline website fixtures là software/content checks, không scientific D0 pass.
+
+R0 phải useful ở ít nhất một phần tác vụ và có signal học hợp lệ. Chưa useful thì BOOT expert seed/curriculum; extra train jobs/model change/R0 replacement phải version RunPlan, comparator và splits. D0 thêm recording/probe/eval/person/robot jobs, không mặc định nằm miễn phí trong15 training runs. Không claim saving khi baseline/candidate chưa same quality.
+
+E4 T có cùng stage/scorer/health và quyền probe như A; decision/collection overhead mỗi arm ghi riêng. Freeze common training schedule/data eligibility/caps, khai sampling/auxiliary confounds. Sau update kiểm local + transitions + full-task natural starts và regression conditions tốt. Source attribution hoặc residual-RL cần extension budget riêng. [Chi tiết](14-task-improvement.md).

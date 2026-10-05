@@ -8,7 +8,8 @@ _Thiết kế đề xuất, chưa có backend/training adapter/controller integr
 |---|---|
 | Data Core | Sources, QA/semantics, lineage, splits, recipe views/releases |
 | Learning Core | Human learning, robot adaptation trên FluxVLA, checkpoints, evaluation và inference bundles |
-| Shared runtime/evaluator | Observations, controller execution, task outcome/traces |
+| Shared runtime/evaluator | Observations, command/response, task/stage outcome, unknown coverage và traces |
+| Task improvement | Stage contracts, health/probes, bootstrap/corrections, regression và controlled cost choice |
 | Platform services | Metadata/storage/jobs/cost ledger; workspace/audit ở production |
 
 ```mermaid
@@ -45,7 +46,7 @@ Simulator chính: RoboCasa GR1; task khay custom hoặc upstream pick-and-place 
 
 ## Database và API đề xuất
 
-Tables: workspaces, sources, episodes, releases, recipes, experiments, jobs, checkpoints, evaluations, interventions, cost_entries. File/video ở storage ngoài DB. Các records có id/schema_version/workspace_id/immutable_hash/created_at và refs theo [contracts](05-contracts.md). Không sửa release tại chỗ sau khi train.
+Tables: workspaces, sources, episodes, releases, recipes, experiments, jobs, checkpoints, evaluations, interventions, cost_entries; thêm task_stage_specs, stage_attempts, diagnostic_probes và training_plans. File/video ở storage ngoài DB. Các records có id/schema_version/workspace_id/immutable_hash/created_at và refs theo [contracts](05-contracts.md). Không sửa release tại chỗ sau khi train.
 
 | Endpoint đề xuất | Công việc |
 |---|---|
@@ -91,10 +92,29 @@ Release: candidate → validation → locked final test → owner acceptance →
 
 ## Đường đa nguồn và compatibility gate
 
-Đường MVP chọn FluxVLA/GR00T N1.5/GR1, robot-action head upstream; custom auxiliary human/video heads có eligibility/cost gate theo [Learning Core](04-learning-core.md). CLI/report tối thiểu có health checks, condition report, intervention catalog, T/F/A plans và decision/cost receipts. Repair calibration/controller → baseline lại là stage riêng; E4 data arms giữ binding/scorer cố định. Experiment runner khóa parent/cost cap/train protocol; final evaluator không feedback vào selection. UI nhiều workspace sau pilot.
+Đường MVP chọn FluxVLA/GR00T N1.5/GR1, robot-action head upstream; custom auxiliary human/video heads có eligibility/cost gate theo [Learning Core](04-learning-core.md). CLI/report tối thiểu có stage/condition evidence, health/probes, bootstrap/correction plans, intervention catalog, T/F/A và decision/cost receipts. Repair calibration/controller → baseline lại là stage riêng; E4 data arms giữ binding/scorer cố định. Experiment runner khóa parent/cost cap/train protocol; final evaluator không feedback vào selection. UI nhiều workspace sau pilot.
 
 BudgetScope gồm R&D-sim, skill-repeat và production-real; cost_entry có scope/activity/role/unit/rate/status=estimated|measured|unknown, source ref và allocation group. Một activity không ghi hai lần trong cùng scope; shared overhead khai phân bổ. Unknown không biến thành 0 measured. Selection module chỉ lọc quyền/signals/health/cap và hiển thị measured utility cùng scope; không auto causal diagnosis hoặc tự dự đoán gain cho gói chưa thử. Có stop/defer/no-change receipts.
 
 Internet/RGB-only dùng representation hoặc latent-action objective, không gắn robot-action loss khi chưa có mapping. Structured human dùng wrist/hand/geometry masks. Physics synthetic có action/outcome thực thi; appearance kế thừa labels sau QA; generated video với pseudo-actions là inferred, không measured. Recipe views quyết định eligibility cho từng objective. Một backbone có human/internet priors vẫn là initialization của cả hai nhóm E1/E2.
 
 Teleop views: train adaptation; calibration trên train/development roots; contact/correction theo nhãn; evaluation trên roots giữ riêng. Binding pin joint order, action units/reference frame, absolute/delta semantics, camera/time và controller. Public G1 metadata hiện là LeRobot v3.0; phải kiểm loader version path trong FluxVLA, không nhận v3 tương thích vì ví dụ cũ của dataset dùng v2.
+
+## Task improvement và worker interfaces bắt buộc
+
+```mermaid
+flowchart LR
+ TASK[Task và chuẩn từng bước] --> TRACE[Runtime traces và stage attempts]
+ TRACE --> HEALTH[Health và paired probes]
+ HEALTH --> REPAIR[Sửa và baseline mới]
+ HEALTH --> PLAN[Correction hoặc bootstrap plan]
+ PLAN --> QA[Data QA và context windows]
+ QA --> TRAIN[Native action post-train và prior replay]
+ TRAIN --> CHECK[Local, transition, global regression]
+ CHECK --> TRACE
+ CHECK --> FINAL[Freeze và final độc lập]
+```
+
+Contracts/API đề xuất thêm POST /task-stage-specs, /stage-attempts, /diagnostic-probes, /training-plans. Worker: stage verification → health → optional probe → human-reviewed plan → collect/QA → train → regression → final; collection và real reset vẫn có người/thiết bị. POST không chạy model hoặc tiếp nhận user uploads trong website hiện tại.
+
+Stage verifier version độc lập khỏi policy; sim object/contact state không cấp ngầm vào inference inputs. Human/video stage head chưa phải verifier robot. Recovery/stop ghi attempts/interventions; retries không che full-task failures. Reset adapter giữ natural/restaged/human-assisted và checked reachability. Chi tiết IDs/semantics/gates: [Task improvement](14-task-improvement.md).

@@ -12,13 +12,17 @@ Workflow: định nghĩa tác vụ → chuẩn bị và kiểm dữ liệu → h
 
 | Priority | Chức năng | Acceptance phần mềm |
 |---|---|---|
+| Must | Stage contracts/evidence | Entry/exit/readiness/version; pass/fail/not_attempted/unknown, entered/known/unknown/reach/retry, verifier review |
+| Must | Diagnostic probes | Natural/restaged paired entry, hypothesis/held variables/uncertainty, reviewer/reset/cost refs |
+| Must | Bootstrap/stop | 0 task success khác no basic skill; expert seed/curriculum/cap, useful parent hoặc rescope/stop |
+| Must | Targeted training/regression | Correction authority/context/chunk targets + prior replay, pin params/schedule; local/transition/global checks |
 | Must | Task/binding/health | Joints/frame/units/camera/timing/scorer đủ; health fail chặn data claim; repair tạo baseline version mới |
 | Must | Robot baseline / FluxVLA | Loader/loss/gradient/save-reload/closed-loop selected path, pinned refs; playback không là learned rollout |
 | Must | Rights/signals/QA/lineage | Root/session/parents, masks và measured/inferred/generated/missing; split trước derivatives; unknown rights quarantine |
 | Must | Catalog và InterventionPlan | Eligible packages/reuse/new, condition hypothesis, estimated cost range hoặc unknown; engineer duyệt; cho phép defer/no-change |
 | Must | Controlled acquisition | T expert teleop, F prereg fixed mixture, A condition/cost; chung parent R0/catalog/scorer/training/caps; giữ no-gain |
 | Must | BudgetLedger và report | Acquisition và total incremental scopes, hours/receipts/activity IDs; blanks unknown; tính selection/QA/reject/retry và tránh double-count |
-| Must | Core experiments | 6 baseline +9 T/F/A; ít nhất hai cách học thực sự chạy trong report; alternative augmentation hợp lệ nếu branch fail |
+| Must | Core experiments | E0/D0 và E1 tạo useful parent trước E4; core conditional6 baseline +9 T/F/A; extra jobs replan; ít nhất hai cách học thực sự chạy trong report; alternative augmentation hợp lệ nếu branch fail |
 | Must | Sim demo/SOP/bundle | Learned closed-loop checkpoint/config/normalizer/binding/scorer + SOP bốn nguồn có gate, final ID/OOD và cost report |
 | Conditional | Human/internet objectives | Rights/task relevance/QA/masks + từng loss/gradient/reload qua E0; không giả action; branch fail disabled/not-integrated |
 | Conditional | Cosmos appearance | Basic augmentation trước; hypothesis/control maps/semantics/cost gate; downstream contrast mới nhận model-generated gain |
@@ -43,3 +47,9 @@ Integrations: một FluxVLA path, pinned LeRobot loader, simulator/tracker/stora
 Reliability report: cycle p50/p95, interventions/1000 cycles, recovery minutes, accepted outputs/hour, same domain/trial denominator. Real production gates cần task owner/cell acceptance riêng.
 
 [Product](01-product.md) · [TDD](02-system-architecture.md) · [Contracts](05-contracts.md) · [Protocol](06-validation-and-roadmap.md).
+
+## Acceptance chống quyết định sai
+
+Với early fail, bước sau hiển thị chưa thử; unknown verifier không auto label. Với failure sau gắp, report đề xuất test readiness/entry trước khẳng định cần train chuyển. Với 0 full-task success nhưng local pass, route bottleneck; với no basic skill route bootstrap/rescope. Correction action thiếu thì chặn native imitation targets. Local success nhưng full-task/regression giảm thì không promote. Stage definitions/scorer/binding đổi tạo plan version mới.
+
+Ví dụ website là dữ liệu kịch bản có nhãn nguồn; không upload/run robot backend. [Task improvement](14-task-improvement.md) sở hữu semantics; [audit](reviews/full-idea-audit-2026-10-05.md) ghi status chưa validated.

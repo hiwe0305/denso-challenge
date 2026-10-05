@@ -11,8 +11,13 @@ Common fields: id, schema_version, workspace_id, immutable_hash, created_at, own
 | DatasetRelease | Immutable views/splits/hashes, QA/quarantine, loader readback và cost refs |
 | RecipeProfile | FluxVLA/model/weights/loader/objective revisions, human learning vs robot adaptation stages, required signals/masks, action/camera/normalization, source mix and compute |
 | ExperimentPlan | Estimand, control/treatment, changed/held variables, budget/seed/trial/scorer/split protocol và confounds |
-| TaskProfile / ConditionReport | Object/target region, timeout/stability/scorer, active/locked joints, ID/OOD/development domain, denominators/uncertainty và health checks |
-| AcquisitionPackage / AcquisitionPlan | Source/condition/rights/objectives/roots, reuse/new, estimated range/actual cost; shared R0 parent, eligible catalog, T expert-targeted teleop / F fixed mixture / A condition-cost arms, cap/tolerance, training protocol và forbidden final-test refs |
+| TaskProfile / ConditionReport | Object/target region, timeout/stability/scorer, active/locked joints, domain; stage reach/known/unknown, denominators/uncertainty và health refs |
+| SubtaskSpec | task graph/order, stage_id, entry/precondition, completion/readiness, timeout, abort/reset, verifier/version/tolerances/source |
+| StageAttempt | episode/attempt/stage refs, entry/exit/time, pass/fail/not_attempted/unknown, signals/masks/evidence, natural/restaged/human-assisted, intervention/retry and verifier refs |
+| DiagnosticProbe | hypothesized first divergence, controlled/held variables, canonical vs policy entry, scenario/state hash, trials/unknown/uncertainty, reviewer and costs |
+| BootstrapPlan | feasibility/health, expert seed roots, curriculum/progression criterion/cap, fallback/rescope/stop, shared baseline parent |
+| TrainingPlan | target stages/conditions, parent, native objective, trainable/frozen params, LR/steps/batch/seed, prior/correction ratio, context/chunk horizon, regression suite/caps |
+| AcquisitionPackage / AcquisitionPlan | Source/stage/condition/entry distribution, hypothesis/correction authority/window/reviewer, rights/objectives/roots, reuse/new, estimated range/actual cost; shared R0 parent, eligible catalog, T expert-targeted teleop / F fixed mixture / A condition-cost arms, cap/tolerance, training protocol và forbidden final-test refs |
 | RunReceipt | Stages thực chạy, data/recipe/env/hardware/checkpoint refs, logs/status/person/GPU cost |
 | EvaluationReceipt | Sim/real domain, binding/scenarios/scorer, trials/seeds/traces/outcomes/uncertainty/limits |
 | TransferReport | Success-vs-demo comparisons, human/pretraining history, savings threshold, cost completeness and conclusions allowed |
@@ -39,3 +44,14 @@ Common fields: id, schema_version, workspace_id, immutable_hash, created_at, own
 [Architecture](02-system-architecture.md) · [Evaluation](06-validation-and-roadmap.md).
 
 SignalValidity: raw_value, normalized_value/null, evidence_kind, mask, confidence, units/frame, timing/processor refs. Public numeric preview có sample hash và acquisition provenance; paper media có source page và evidence domain.
+
+## Các invariants của vòng cải thiện
+
+12. Not-attempted không là fail; unknown không là pass/fail. Báo entered/known/unknown/reach và retries/episodes riêng; aborted/timeout vẫn full-task fail.
+13. Completion từng bước cần readiness cho bước tiếp theo. Staged entry và privileged sim verifier không thay natural rollout hoặc real sensors.
+14. Failure trace không expert-positive action; corrections giữ takeover authority/context/horizon và QA.
+15. Local gain/loss giảm không đủ promote: cần transition/full-task/regression, freeze và độc lập final.
+16. Shared policy không có stage-specific parameter guarantee. Mọi trainable/frozen params và sampling ratios phải versioned, regression sau update.
+17. Useful-parent chưa có thì bootstrap/rescope/stop, không claim data-choice saving; extra jobs/reset/verifier costs phải vào RunPlan/ledger.
+
+[Định nghĩa và phép kiểm](14-task-improvement.md).

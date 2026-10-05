@@ -4,20 +4,20 @@ _05/10/2026 · Đề xuất cho H1, vòng idea. Nội dung mô tả giải pháp
 
 ## Luận điểm trong một câu
 
-Công cụ dành cho đội AI/robotics giúp humanoid học một kỹ năng từ mẫu thao tác robot, video người và dữ liệu bổ sung phù hợp, nhằm giảm công thu thập và thử nghiệm ở cùng chất lượng.
+Công cụ dành cho đội AI/robotics giúp humanoid học và cải thiện kỹ năng: chấm từng bước, kiểm điểm nghẽn, chọn sửa hệ thống hoặc dữ liệu đúng, huấn luyện và đo tổng công tới cùng chất lượng.
 
 ## Hiểu sản phẩm trong một phút
 
 - **Ai dùng:** đội kỹ sư đưa tác vụ mới lên humanoid, cùng người vận hành và người phụ trách tác vụ.
 - **Đầu vào:** nhiệm vụ, tiêu chuẩn hoàn thành, mẫu thao tác robot đích, video liên quan có quyền và dữ liệu bổ sung qua kiểm tra.
-- **Cách hoạt động:** chuẩn bị dữ liệu → học trình tự từ video và điều khiển từ mẫu robot → chạy kỹ năng → đo chất lượng/tổng công → bổ sung cho điều kiện còn yếu.
+- **Cách hoạt động:** định nghĩa task/bước → tạo baseline → chạy và chấm từng bước → kiểm hệ thống/probe → thu correction hoặc bootstrap → học với dữ liệu cũ + mới → kiểm cả task/tổng công.
 - **Đầu ra:** mô hình điều khiển đã đánh giá trong mô phỏng, SOP dữ liệu và báo cáo so sánh có thể tái lập.
 
 Ví dụ xuyên suốt: **“Đặt linh kiện màu vàng vào ô A1.”** Phạm vi đầu là một tay gắp–đặt, torso cố định, GR1 trong mô phỏng. Video người cung cấp tín hiệu trình tự; wrist motion chỉ dùng khi nhãn đủ tin cậy. Mẫu robot dạy hành động đúng với robot đích. Video người không tự là lệnh robot.
 
 H1 đã xác định nhu cầu huấn luyện nhanh, chính xác, giảm công sức. Khi tiếp cận DENSO cần xác nhận tác vụ cụ thể, công việc đang tốn thời gian nhất và tiêu chuẩn nghiệm thu. Task khay là ví dụ đề xuất, chưa phải tác vụ nhà máy đã khảo sát.
 
-MVP gồm công cụ chạy thử nghiệm và báo cáo tối giản cho một kỹ năng. Sau khi kiểm chứng, đóng gói thành workbench dùng lại cho kỹ năng khác. Tầm nhìn sản phẩm rộng hơn phạm vi thử nghiệm đầu.
+MVP gồm task/stage contracts, dấu vết thực thi, diagnostic probes, acquisition/training plan và báo cáo tối giản cho một kỹ năng. Sau khi kiểm chứng, đóng gói thành workbench dùng lại cho kỹ năng khác. Tầm nhìn sản phẩm rộng hơn phạm vi thử nghiệm đầu.
 
 ## Quy trình hỗ trợ hiệu quả
 
@@ -104,3 +104,11 @@ Website BTC hiện xếp bài toán vào [H1](https://densohackathon.vn/theme). 
 Trước hết bàn giao một kỹ năng và quy trình tái lập. Sau pilot được nghiệm thu, đóng gói task/controller adapter, source adapters, experiment runner và report thành workbench dùng lại. Mở task thứ hai trên cùng robot trước, rồi mới robot khác; mỗi lần phải đo công tích hợp và chạy acceptance riêng. Backend nhiều workspace và mở rộng world models chỉ theo nhu cầu pilot, không dùng số module làm khác biệt.
 
 [PRD](08-prd.md) · [Kiến trúc](02-system-architecture.md) · [Huấn luyện](04-learning-core.md) · [Protocol và rủi ro](06-validation-and-roadmap.md) · [Hiệu quả](07-business-case.md).
+
+## Vòng cải thiện là chức năng cốt lõi · revision 2
+
+TaskProfile cần preconditions/completion/readiness, pass/fail/not_attempted/unknown từng bước, health và reset semantics. Lỗi biểu hiện ở chuyển có thể do gắp trước đó; controlled natural/restaged probes giúp khoanh vùng, không tự chẩn đoán nhân quả từ clip.
+
+Có useful baseline: targeted corrections gần policy states, giữ context và trộn prior dữ liệu tốt, kiểm regression/full task. Không full-task success nhưng có local progress: luyện bottleneck. Không có basic skill: expert robot seed + curriculum để tạo R0; chưa có parent hữu ích sau cap thì rescope/stop. Chưa tới bước sau giữ not_attempted.
+
+Đóng góp cần đo là workflow chọn can thiệp có evidence, engineer approval và total cost so expert T, không novelty của subtask learning/DAgger. [Đặc tả đầy đủ](14-task-improvement.md) là nguồn canonical của vòng này; [audit](reviews/full-idea-audit-2026-10-05.md) giữ gaps và phép kiểm. Việc bổ sung đặc tả chưa là implementation/evidence ML.
