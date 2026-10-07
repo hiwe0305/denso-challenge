@@ -1,114 +1,91 @@
-# 01 · Humanoid Skill Learning — định nghĩa sản phẩm
+# 01 · Ý tưởng, vấn đề thực tế và data flywheel
 
-_05/10/2026 · Đề xuất cho H1, vòng idea. Nội dung mô tả giải pháp, kế hoạch và kết quả kỳ vọng; chưa có kết quả thử nghiệm của đội._
+_Snapshot kỹ thuật từ [hồ sơ engineering](../idea-v3-2026-10-05/01-idea-va-pitch.md); [IDEA.md](../IDEA.md) là bản trình bày gửi đánh giá, recipe mới nhất ở docs/implementation-plan/skill-a1._
+**Hai phần của solution:** Data Core quyết định dữ liệu hữu ích; [Model Engine Core · FluxVLA](../idea-v3-2026-10-05/17-model-engine-core-fluxvla.md) thực hiện training → evaluation → inference trên robot thật. Policy AI vẫn là GR00T N1.5 đề xuất, không đồng nhất với framework.
+_Rà 06/10/2026 theo form DENSO. Đây là đề xuất; native GR1/A1 training, transfer và tiết kiệm chưa đo._
 
-## Luận điểm trong một câu
+## Vấn đề trước giải pháp
 
-Công cụ dành cho đội AI/robotics giúp humanoid học và cải thiện kỹ năng: chấm từng bước, kiểm điểm nghẽn, chọn sửa hệ thống hoặc dữ liệu đúng, huấn luyện và đo tổng công tới cùng chất lượng.
+Khi vật, vị trí, ánh sáng hoặc tiếp xúc thay đổi, một kỹ năng robot có thể cần demonstrations/corrections mới, reset môi trường, QA, training và evaluation lại. Điểm cần giải trong project là **chọn và tổ chức dữ liệu để mỗi vòng cải thiện đáng công hơn**, không chỉ tăng lượng file hoặc variants.
 
-## Hiểu sản phẩm trong một phút
+Video chưa chắc có nhãn điều khiển đúng robot; sim data cần kiểm physics/action semantics; tracking người có thể thiếu geometry/timing/contact. Sai nhãn, trùng lặp hoặc thiếu coverage có thể khiến thêm data vẫn không cải thiện toàn task. Đây là rủi ro thiết kế, chưa thống kê tại một công đoạn DENSO đã khảo sát.
 
-- **Ai dùng:** đội kỹ sư đưa tác vụ mới lên humanoid, cùng người vận hành và người phụ trách tác vụ.
-- **Đầu vào:** nhiệm vụ, tiêu chuẩn hoàn thành, mẫu thao tác robot đích, video liên quan có quyền và dữ liệu bổ sung qua kiểm tra.
-- **Cách hoạt động:** định nghĩa task/bước → tạo baseline → chạy và chấm từng bước → kiểm hệ thống/probe → thu correction hoặc bootstrap → học với dữ liệu cũ + mới → kiểm cả task/tổng công.
-- **Đầu ra:** mô hình điều khiển đã đánh giá trong mô phỏng, SOP dữ liệu và báo cáo so sánh có thể tái lập.
-
-Ví dụ xuyên suốt: **“Đặt linh kiện màu vàng vào ô A1.”** Phạm vi đầu là một tay gắp–đặt, torso cố định, GR1 trong mô phỏng. Video người cung cấp tín hiệu trình tự; wrist motion chỉ dùng khi nhãn đủ tin cậy. Mẫu robot dạy hành động đúng với robot đích. Video người không tự là lệnh robot.
-
-H1 đã xác định nhu cầu huấn luyện nhanh, chính xác, giảm công sức. Khi tiếp cận DENSO cần xác nhận tác vụ cụ thể, công việc đang tốn thời gian nhất và tiêu chuẩn nghiệm thu. Task khay là ví dụ đề xuất, chưa phải tác vụ nhà máy đã khảo sát.
-
-MVP gồm task/stage contracts, dấu vết thực thi, diagnostic probes, acquisition/training plan và báo cáo tối giản cho một kỹ năng. Sau khi kiểm chứng, đóng gói thành workbench dùng lại cho kỹ năng khác. Tầm nhìn sản phẩm rộng hơn phạm vi thử nghiệm đầu.
-
-## Quy trình hỗ trợ hiệu quả
-
-Giảm tổng công và thời gian tới nghiệm thu: kiểm nguyên nhân lỗi, chọn can thiệp tiếp theo theo điều kiện và chi phí, rồi so với kỹ sư thu targeted teleop trên cùng FluxVLA. Health checks là bước bảo đảm quy trình; giá trị chính là phát triển kỹ năng hiệu quả hơn.
-
-Can thiệp gồm sửa binding/calibration/controller trước khi học, tái dùng dữ liệu hợp lệ, augmentation thông thường, targeted teleop, human/internet bridge hoặc synthetic phù hợp. Bốn nguồn vẫn có SOP/catalog; không bắt mọi recipe dùng cả bốn. Chỉ coi giảm chi phí là kết quả sau cùng accepted quality và ledger đầy đủ.
-
-Đơn vị sản phẩm là **một kỹ năng được nghiệm thu trên một robot**, gồm policy, dữ liệu có nguồn gốc, phép đánh giá, SOP và báo cáo chi phí. Khách hàng nhận được kỹ năng và quy trình đưa kỹ năng tiếp theo lên robot; số màn hình quản lý dữ liệu không phải thước đo giá trị.
-
-## Vấn đề và người sử dụng
-
-Teleop cung cấp action/state đúng embodiment nhưng mỗi lượt cần robot, người vận hành, setup và reset. Human egocentric, video internet và synthetic mở rộng tình huống học; chúng có tín hiệu, hình học và độ tin cậy khác nhau. Tăng số frames chưa trả lời được liệu robot có gắp đúng khi vật đổi vị trí, nền đổi hoặc thao tác có contact khó hơn.
-
-Người sử dụng chính: kỹ sư AI/robotics đưa task mới lên humanoid. Kỹ sư dữ liệu hỗ trợ chất lượng dữ liệu; người sở hữu task xác nhận điều kiện và tiêu chuẩn nghiệm thu. Personas và chi phí DENSO cụ thể chưa được khảo sát. Giá trị nghiệp vụ được đo bằng engineer-hours, robot-hours, elapsed time tới nghiệm thu, đầu ra đạt chuẩn/giờ và interventions; demo count là chỉ số phụ.
-
-## Khóa đúng điểm nghẽn trước pilot
-
-Trong tuần 1, task owner và kỹ sư ghi current workflow, số lần đổi SKU/task, công calibration/thu/QA/debug/eval, khả năng truy cập robot và nguyên nhân fail. So phương án hiện hành hoặc robot arm/chương trình phù hợp về cùng outcome; không dùng giả định mọi task cần humanoid. Chọn case khi đổi task/vật/điều kiện làm tăng công đưa skill tới nghiệm thu và dữ liệu là một nguyên nhân có thể kiểm. Nếu controller/fixture/reachability mới là hạn chế chính, sửa phần đó và lập baseline lại trước acquisition experiment.
-
-Case khay là proxy kỹ thuật; lý do kinh tế dùng humanoid và mức chất lượng/cycle time thực tế cần owner xác nhận, chưa có số đo DENSO. Kiểm một condition hình ảnh/vị trí và một condition contact/recovery trong miền khả thi; không chỉ đổi nền để tạo benchmark dễ hơn.
-
-## Một case xuyên suốt: lấy linh kiện và đặt vào ô khay
-
-Đây là **task đại diện đề xuất**, chưa phải task BTC giao. Kịch bản đầu: linh kiện cứng, cỡ vừa bộ gắp, một tay lấy và đặt, khay cố định, base/chân và torso khóa; tay còn lại ở vị trí nghỉ. Phối hợp hai tay và khay di động là phần mở rộng sau acceptance, tránh thêm biến ngay ở phép kiểm đầu.
-
-| Phần của case | Định nghĩa cần khóa trước huấn luyện |
-|---|---|
-| Quan sát | Camera đầu/góc nhìn thứ nhất, camera cổ tay nếu môi trường có, measured state và câu lệnh đặt vào ô đích |
-| Chuỗi thao tác | Tiếp cận → gắp → nâng/chuyển → đặt → nhả và rút tay |
-| Điều khiển | Action profile robot/controller: joints hoặc end-effector theo config đã kiểm; không trộn hai cách biểu diễn ngầm |
-| Thành công đề xuất | Đúng linh kiện nằm hoàn toàn trong ô đích, bộ gắp đã nhả, vật ổn định ≥2 giây, không vi phạm giới hạn thao tác |
-| Giới hạn lượt | Tối đa 30 giây; timeout/rơi/đặt sai ô được tính thất bại, không loại khỏi mẫu số |
-| Điều kiện học | Vị trí trong vùng đã định, một số vật phù hợp bộ gắp, các nền/ánh sáng thuộc train/development |
-| Kiểm tra giữ riêng | Vùng vị trí, instance vật và hình ảnh chưa train/tune; tách từng loại thay đổi để hiểu lỗi |
-
-30 giây và 2 giây là thông số thiết kế ban đầu, cần task owner phê duyệt; không là cycle time đã đo. Các vật ngoài khả năng bộ gắp/reachability không được gọi OOD có thể giải bằng thêm dữ liệu. OOD không thay mục tiêu kỹ năng thành lắp ráp chính xác hoặc thao tác ngón tay tinh.
-
-## Bốn nguồn đi vào học như thế nào?
-
-| Nguồn | Khi nên thử | Tín hiệu dùng được | Giới hạn |
-|---|---|---|---|
-| Human ego | Học cấu trúc tiếp cận–gắp–đặt và chuyển động tay liên quan task | RGB, nhãn bước; wrist motion khi geometry/timing hợp lệ | Human wrist chưa là robot action; tracking thiếu phải mask |
-| Internet | Bổ sung vật, cách thao tác và bối cảnh trong subset có quyền dùng | RGB/text, nhãn bước đã QA; temporal representation | Ghi riêng priors có sẵn trong checkpoint và video đội bổ sung; không tự sinh ground-truth action |
-| Synthetic | Mở điều kiện hình ảnh của train; sau đó thử physics variants có action/outcome đã thực thi | Labels kế thừa qua appearance QA hoặc controller-executed trajectories | Video sinh từ world model chưa là demonstration được thực thi |
-| Teleop robot đích | Học action, hiệu chuẩn mapping, contact/correction và kiểm tra trên phần giữ riêng | Command/state/timing, outcome/correction nếu có nhãn | Dùng lại nhiều views không làm tăng số demo độc lập; holdout không quay về train |
-
-Các nhóm có thể chồng lấp, như human ego được publish trên internet. Phải đếm recording gốc theo lineage, không đếm hai lần. Dữ liệu real robot có thể đa dạng, như DROID; giả thuyết ở đây là tận dụng độ đa dạng ngoài robot để bổ sung collection đích, không mặc định real data luôn kém đa dạng.
-
-## Đường triển khai được chọn
-
-**Phương án chính:** FluxVLA + GR00T N1.5 pretrained base + humanoid GR1 trong RoboCasa/MuJoCo. Chọn N1.5 vì có đường GR1/config công khai để giảm việc nối simulator, không vì cho rằng nó tốt hơn N1.7. Chạy robot-action baseline và scorer trước; task khay là wrapper cần kiểm. Human/internet auxiliary objectives chỉ mở khi có source eligibility, hypothesis và gói QA trong cost cap. Thử appearance augmentation thông thường trước Cosmos-Transfer2.5; physics sau controller/scorer gate. Chi tiết model, losses, fallback và E0 ở [Learning Core](04-learning-core.md).
-
-Lựa chọn này là quyết định thiết kế, **chưa chạy tích hợp của đội**. Không coi các ví dụ G1/HumanEgo đang hiển thị là dữ liệu của GR1/task khay. Khi DENSO giao robot/task khác: giữ pipeline và thay task/controller adapter, chạy lại compatibility và acceptance; kết quả GR1 không tự là kết quả robot DENSO.
-
-**Phương án dự phòng:** nếu N1.5 path không qua E0, thử SmolVLA với cùng GR1/action profile; reset comparator từ một initialization chung và báo thay đổi. Nếu chỉ task khay chưa chạy, dùng task pick-and-place GR1 đã có trong upstream, cập nhật tên/scorer/domain trước tạo final split. Không dùng benchmark cánh tay đơn để thay nghiệm thu humanoid.
-
-## Đóng góp và đối chứng
-
-FluxVLA đã có engine, data generation và human-in-the-loop; EgoVLA/EgoScale đã có human transfer; [DataMIL v1](https://arxiv.org/html/2505.09603v1) có policy-aware data selection và nêu compute overhead của selection. Đóng góp đề xuất là **quy trình chọn can thiệp/gói thu hoặc tái dùng dữ liệu theo điều kiện và tổng chi phí, đo thêm giá trị so với targeted teleop của kỹ sư**. DataMIL chọn subset từ prior dataset khác bài acquisition này; không tuyên bố thuật toán mới hoặc first-ever.
-
-| Phần cần xây | Người dùng nhận gì | Phép kiểm cần có |
+| Nguồn nguyên bản | Số liệu và phạm vi | Ý nghĩa |
 |---|---|---|
-| Adapter đa nguồn và objective masks | Human/video được dùng đúng phần học, teleop giữ semantics | Đọc lại mẫu → gradient từng objective → rollout; không chỉ import thành công |
-| Bảng điều kiện kỹ năng | Biết robot yếu ở vị trí, hình ảnh hay contact nào | Development probes + kiểm mapping/reachability trước kết luận coverage |
-| Quyết định can thiệp tiếp theo | Health-check, hypothesis, gói đủ quyền/tín hiệu, cost range và stop/defer | T: expert-targeted teleop, F: mixture cố định và A: condition/cost selection từ cùng parent |
-| SOP và báo cáo kỹ năng | Có thể lặp lại cách thu, học, nghiệm thu | Model/data/binding/scorer versions + kết quả âm + tổng công |
+| [Figure Index, 25/08/2026](https://www.figure.ai/news/introducing-index) | 16 triệu video upload; 15 triệu USD đã trả creators; filtering/fraud review/dedup/rebalance/annotation. Công bố doanh nghiệp. | Chi phí acquisition/data operations là thật; upload chưa là training clips, payout chưa tổng cost dataset. |
+| [FOCA v1, §5 Q2/Table 2](https://arxiv.org/html/2606.20867v1) | LIBERO 40% demo (~20/task): π0 89,9%; implicit FOCA 93,0%; FOCA+DreamGen 95,7%. | Supervision/recipe ảnh hưởng ích lợi data; generated-video phase implicit action-free, robot phase vẫn có action labels. Chưa GR1/A1 result. |
+| [Figure Helix 2.5, 17/09/2026](https://www.figure.ai/news/helix-2-5-zero-shot-30-home-generalization) | Index pretraining9% →56% whole-task success; cùng downstream data/config;3 việc30 nhà chưa thấy. Công bố doanh nghiệp. | Broad experience có thể giúp transfer. Zero-shot ở nhà/vật eval; task fine-tuning vẫn có data ở nơi khác. |
 
-Ví dụ: camera lệch → sửa calibration và baseline lại; nền mới → thử basic augmentation trước gói appearance/RGB tốn công hơn; trượt contact → kiểm controller rồi targeted teleop/corrections, physics chỉ khi fidelity đủ. Human/internet không thay measured contact. Engineer duyệt hypothesis; không suy nguyên nhân từ một video lỗi. Không có evidence/hợp lệ/cap thì defer hoặc collect một pilot nhỏ; no-gain giữ nguyên.
+[Video nguồn](https://www.youtube.com/watch?v=zKaeODg7xeE) đã đối chiếu transcript/description và nguồn Index/Helix; chưa kiểm trực quan toàn video. Sprint/backflip/dự báo thị trường không chứng minh manipulation A1 nên không dẫn mở đầu.
 
-Vòng lựa chọn dùng danh sách gói đã chốt và chi phí tối đa, không hứa dự đoán gain chính xác. Chỉ xếp theo measured development utility khi có receipts cùng domain; dữ liệu mới chưa đo thì ghi unknown. Binding repair là bước riêng trước E4, không trộn nó vào data-only arms rồi nhận source attribution.
+## Giải pháp: Data Core quyết định dữ liệu cho vòng sau
 
-## Phạm vi và ba đầu ra
+**RUN → kiểm giả thuyết → chọn data/can thiệp → QA release → train có phạm vi → eval → dùng hoặc kiểm tiếp.** Binding/controller faults đi repair; chưa đủ evidence thì hoãn acquisition. Xét supervision cần, rights, coverage và cost; không bắt mỗi round dùng đủ nguồn. Replay data tốt cũ, giữ fail/unknown/no-gain receipts; final độc lập ngoài vòng tune.
 
-MVP: một task, một humanoid, một checkpoint family; robot baseline, health checks, catalog/SOP bốn nguồn và E4 ba arms T/F/A. Một bridge nhỏ và một augmentation contrast chỉ chạy khi tín hiệu/QA/compute đủ; gate fail thì báo not-tested và giới hạn claim, không nhận đã chứng minh cả bốn nguồn. Core 15 training runs theo [Protocol](06-validation-and-roadmap.md); ablations bổ sung có gate. CLI + receipts + report trước, workbench nhiều người sau pilot. Không train foundation model/WM/IDM từ đầu.
+Kế thừa FluxVLA / pretrained GR00T N1.5 / RoboCasa GR1 sau compatibility. Đội xây Data Core lineage/QA/capability routing, adapters, task binding/scorer, trace, update plan và quality–cost report. Đóng góp dự kiến là cách quyết định/sử dụng dữ liệu kiểm được; chưa thuật toán VLA mới hoặc superiority đã chứng minh.
 
-Ba đầu ra H1: SOP thu/QA dữ liệu; báo cáo so ≥2 phương pháp huấn luyện theo demo budget/chất lượng/tổng chi phí; learned-policy demo trong mô phỏng humanoid. Các ngưỡng trong ảnh đề địa phương (success ≥75%, demo saving ≥30%, OOD ≥70%) là mục tiêu thử nghiệm, chưa kết quả và chưa là điều kiện đã đạt ở vòng idea.
+## Model AI là phần cốt lõi của solution
 
-75%/30% là PoC targets, không factory acceptance. Báo cycle time p50/p95, fail/recovery/intervention, good outputs/giờ và engineering/robot-hours, không biến giảm demos thành cash saving. Ba ngân sách tách: R&D simulation study, một skill sau pipeline sẵn, production/real-cell acceptance. Không cộng lại các khoản đã nằm trong subtotal của một ngân sách.
+Data Core cấp eligible releases/batches/targets/masks; **Model AI** học representations và robot actions. Chọn pretrained **GR00T N1.5 qua FluxVLA** sau compatibility: Eagle VLM → features; measured state/embodiment + noisy actions/time → DiT Action Expert → flow velocity/chunk. Binding/controller ở ngoài model. [Nguồn NVIDIA](https://research.nvidia.com/labs/gear/gr00t-n1_5/) và [bản Model AI đầy đủ](../idea-v3-2026-10-05/16-model-ai-va-data-flywheel.md).
 
-Website BTC hiện xếp bài toán vào [H1](https://densohackathon.vn/theme). [Thể lệ](https://densohackathon.vn/challenges) yêu cầu slide theo mẫu chính thức cho vòng idea; website là tài liệu bổ sung. Ảnh đề lưu trong repo ghi H2 là tài liệu tham chiếu cũ, không dùng nhãn đó trong hồ sơ hiện hành.
+Robot adaptation: native action loss cập nhật expert/adapters và visual modules được selected recipe mở, LLM frozen theo Flux config tham chiếu. Human shared-trunk pilot freeze VLM cả hai controls, thêm common wrist branch; video action-free pilot thêm learned conditioning/future-alignment branch. Những extensions này là đề xuất cần implement, không tính mặc định đã có trong native model.
 
-## Hướng phát triển thành sản phẩm
+World Model có roles rõ: DreamGen tạo data offline; FOCA/FLARE là future-representation auxiliary; DreamZero/DreamerV3 là alternative policy stacks với recipe/runtime riêng. Data Core → Model training → inference/eval → evidence → Data Core đóng cùng vòng, không chỉ vòng thu/lưu file.
 
-Trước hết bàn giao một kỹ năng và quy trình tái lập. Sau pilot được nghiệm thu, đóng gói task/controller adapter, source adapters, experiment runner và report thành workbench dùng lại. Mở task thứ hai trên cùng robot trước, rồi mới robot khác; mỗi lần phải đo công tích hợp và chạy acceptance riêng. Backend nhiều workspace và mở rộng world models chỉ theo nhu cầu pilot, không dùng số module làm khác biệt.
+## Dataset và các bước training
 
-[PRD](08-prd.md) · [Kiến trúc](02-system-architecture.md) · [Huấn luyện](04-learning-core.md) · [Protocol và rủi ro](06-validation-and-roadmap.md) · [Hiệu quả](07-business-case.md).
+| Bước | Dataset / trạng thái | Cách sử dụng và output |
+|---|---|---|
+| 0 · Compatibility | [limxdynamics/FluxVLAData](https://huggingface.co/datasets/limxdynamics/FluxVLAData/tree/7998ab57bc70be66234b5374800705e2b6c14545/robocasa_gr1_24tasks_first30ep): public GR1 subset 24 tasks/720 episodes | LeRobotv2.1 MP4+Parquet+metadata; preview ego256²/20fps, state/action 29D. Inspect task/profile/stats/rights, resolve stale split metadata, kiểm native batch/binding trên task tương thích. Bottle-to-cabinet không là A1 labels; waist-unlocked preview khác fixed-torso proposal. |
+| 1 · Native baseline | R_A1 expert/correction, chưa thu; draft 20 train seed roots | Current RGB/text/state→VLM features+Action Expert; future actions normalize/noise→flow targets. Native adaptation→checkpoint R; selected Flux tune_llm=False/tune_visual=True cần pin/gradient check. |
+| 2 · Coverage | S_exec từ R_A1 train roots, chưa sinh native | Transform→execute controller/physics→actions/readback/images mới→QA. R_A1+S_exec+replay, cùng native recipe với R. Synthetic là creation method; descendants không independent roots. |
+| 3a · Human pilot riêng | [HumanEgo](https://huggingface.co/datasets/Leo-TX/HumanEgo) serve_bread preview, chưa relevance/geometry/integration pass | RGB+wristCSV/confidence/timestamps/calibration→camera-frame common wrists 18D. Robot common targets từ measured FK. So R_common/R_common+H, VLM frozen cả hai; H→human adapter/common head/shared motor trunk, không native decoder trực tiếp. Wrist-only chưa dạy contact. |
+| 3b · Action-free candidate riêng | LIBERO/DreamGen recipe study; chưa chọn MVP A1 | LIBERO kiểm phương pháp ở embodiment benchmark; không gộp Panda7D vào GR1. Generated MP4/text/future masks→implicit alignment, action loss disabled; robot phase tiếp theo action+implicit. Conditioning/gradient route cần port và controls. |
 
-## Vòng cải thiện là chức năng cốt lõi · revision 2
+Human/video là hai câu hỏi khác nhau, không gộp R+S rồi quy gain cho một nguồn. Public previews chưa release A1 hợp lệ; upstream có rights/non-commercial conditions. File→tensor→loss→modules chi tiết tại [15](../idea-v3-2026-10-05/15-dataset-training-blueprint.md) và [A1 recipes](../idea-v3-2026-10-05/../docs/implementation-plan/skill-a1/02-recipes-and-data.md).
 
-TaskProfile cần preconditions/completion/readiness, pass/fail/not_attempted/unknown từng bước, health và reset semantics. Lỗi biểu hiện ở chuyển có thể do gắp trước đó; controlled natural/restaged probes giúp khoanh vùng, không tự chẩn đoán nhân quả từ clip.
+## Chuỗi example: data → model → eval → inference → lỗi → flywheel
 
-Có useful baseline: targeted corrections gần policy states, giữ context và trộn prior dữ liệu tốt, kiểm regression/full task. Không full-task success nhưng có local progress: luyện bottleneck. Không có basic skill: expert robot seed + curriculum để tạo R0; chưa có parent hữu ích sau cap thì rescope/stop. Chưa tới bước sau giữ not_attempted.
+1. MP4/Parquet/JSON→sync/sample/tokenize/normalize→RGB tensor/tokens/state/action targets→VLM features. Latent có encoder/layer/shape/processor pin, không nguồn dataset mới.
+2. Current features/state condition Action Expert; training future targets đi vào loss riêng, không vào current observation. Gradient chỉ vào modules mở trong manifest; inheritance pretrained khác pretraining foundation từ đầu.
+3. So R/R+S cùng parent/task/domain/scorer/recipe; log unique roots, development/correction data, generation/QA/train/eval cost. Few-shot5/10/20 roots là đề xuất nếu đủ resources. Full-task, CI, ID/OOD, retention/intervention/latency/regression; native numbers chưa có.
+4. Inference: current camera/language/state/history→cùng processor/VLM→action chunk→denormalization/controller→measured response→independent scorer. Không future labels, human targets hoặc privileged scorer input ở policy.
+5. Error: trace→controlled tests→repair hoặc data/update plan. Ánh sáng có thể mở visual/interface study; thiếu control supervision có thể mở Action Expert post-training với correction+replay. Rơi khi chuyển có thể từ grasp trước đó; một triệu chứng chưa tự xác định module.
+6. Development gain có ích mới xét dùng; no-gain quay lại hypothesis trong cap. Candidate freeze→final độc lập; không tune trên final rồi báo independent.
 
-Đóng góp cần đo là workflow chọn can thiệp có evidence, engineer approval và total cost so expert T, không novelty của subtask learning/DAgger. [Đặc tả đầy đủ](14-task-improvement.md) là nguồn canonical của vòng này; [audit](reviews/full-idea-audit-2026-10-05.md) giữ gaps và phép kiểm. Việc bổ sung đặc tả chưa là implementation/evidence ML.
+Reference [10](../idea-v3-2026-10-05/10-example-chay-toan-he-thong.md) đã chạy MuJoCo nhỏ, action4D/state idealized/scripted sequencer/ridge predictor/weld grasp; chưa VLM/GR1/human transfer. Video72giây/3D là minh họa thiết kế, chưa benchmark.
+
+## Chi phí: giả định rõ, chưa ROI
+
+Capacity-budget scenario pilot sim:20 accepted train roots/yield50% →40 attempts. 6 phút capture/reset→4 operator-h;3 phút QA→2 engineer-h. Giả định operator10 USD/h, engineer20 USD/h. 240 engineer-h integration/preparation/report chưa gồm2hQA này.
+
+| Khoản | Cách tính | USD |
+|---|---|---:|
+| Thu/reset | 4 h×10 | 40,00 |
+| QA attempts | 2 h×20 | 40,00 |
+| Tích hợp/xử lý/báo cáo | 240 h×20 | 4.800,00 |
+| GPU capacity cap | (train120+generation30+eval30)GPUh×1,59 | 286,20 |
+| Storage | 100 GB×3 tháng×0,07 | 21,00 |
+| **Phần đã tính** | **Chưa tổng triển khai** | **5.187,20** |
+
+[Runpod Pods](https://www.runpod.io/pricing): A100PCIe80 GB1,59 USD/GPUh; network Standard dưới1TB0,07 USD/GB-tháng, kiểm 06/10/2026. Nhân công/yield/hours/caps là planning assumptions sửa được, không lương DENSO/VN. Cap chưa benchmark runtime/config fit; vượt cap replan. Chưa gồm robot/cell, CPU riêng, data/license fees, thuế, downtime/production. Real robot economics khác simulator capture.
+
+FOCA AppendixD.3: DreamGen tuning28 h×8H100=224 GPUh; action-free15 h×4A100=60; robot18 h×4A100=72. Đây không cap A1 hoặc đủ mọi  video-generation cost. Bớt demos chưa tự tiết kiệm tổng công; actual ledger và cùng quality mới cho kết luận.
+
+## Các giả định đã chọn cho MVP
+
+Data organization/use/scale là **trọng tâm phù hợp project**, chưa được đo là bottleneck duy nhất/lớn nhất A1. Method/architecture/controller/latency quyết định data có train và execute được không; FOCA cho thấy training objectives vẫn quan trọng.
+
+Ít nhưng chất lượng cần viết thành **ít robot roots hơn ở cùng quality, đủ coverage và tổng cost có ích**. Giảm redundancy khác giảm rare/recovery cases; nhãn sạch ở một scene vẫn thiếu generalization. Không có số mẫu tối thiểu phổ quát.
+
+Flywheel mạnh khi decision-driven acquisition có lợi so reuse/basic augmentation/targeted correction phù hợp ở cùng constraints. Utility đo ở data-package/candidate qua holdout gain và cost, chưa model tự gán true value từng clip. Scale bằng versioned releases/capability/lineage/coverage; task2 mới đo reuse thực.
+
+## Phạm vi, kế hoạch và bàn giao
+
+A1 rigid pick-and-place là proxy công nghiệp, chưa DENSO task đã khảo sát hoặc chứng minh cần humanoid thay arm. Fixed torso/active arm/tolerance/cycle/acceptance cần owner và native profile chốt.8–12 tuần planning cho MVP robot+sim sau đủ people/GPU/checkpoint; human/video/real-deployment có gate/lịch riêng.
+
+Bàn giao checkpoint+processor/normalization/binding; versioned data/rights/root splits; recipe/receipts; all traces/outcomes; SOP và quality–cost report. [Form draft](../idea-v3-2026-10-05/../deliverables/DENSO-Noi-dung-form-y-tuong.md).
+
+## Pitch
+
+Chúng tôi xây Data Core flywheel cho robot learning: từ lỗi có bằng chứng, xác định supervision cần, chọn data phù hợp, QA và đưa vào recipe có phạm vi, rồi đo toàn task và tổng công. MVP kế thừa pretrained VLA trên GR1 mô phỏng với robot demonstrations và sim executions; human motion/action-free video mở sau gate. Mục tiêu là dùng data có ích hơn để đạt cùng quality với ít công hơn; transfer và tiết kiệm còn phải kiểm chứng.

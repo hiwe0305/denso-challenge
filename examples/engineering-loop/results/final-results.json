@@ -1,0 +1,944 @@
+{
+  "R": [
+    {
+      "scenario": {
+        "id": "final-0",
+        "object": [
+          -0.030833607012689196,
+          -0.06566130608845679
+        ],
+        "target": [
+          0.01125601361432807,
+          0.008765673056842227
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-1",
+        "object": [
+          0.04696269212687479,
+          -0.012624326774247394
+        ],
+        "target": [
+          -0.15130903415747238,
+          -0.08388725012970447
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-2",
+        "object": [
+          -0.09172662741656674,
+          0.04656519731774328
+        ],
+        "target": [
+          -0.1056051355313218,
+          -0.0969459445284884
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-3",
+        "object": [
+          -0.06723935741511083,
+          -0.012023717816038684
+        ],
+        "target": [
+          -0.0985153204527361,
+          -0.05137801975722679
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-4",
+        "object": [
+          0.05373108901758189,
+          0.06368722285728462
+        ],
+        "target": [
+          -0.14015680815620019,
+          0.0986203304515065
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-5",
+        "object": [
+          -0.043955810704028986,
+          0.04507889116950703
+        ],
+        "target": [
+          0.045495126753335724,
+          0.0411340039379231
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-6",
+        "object": [
+          -0.05628281460832424,
+          -0.09138279398974314
+        ],
+        "target": [
+          -0.12192898615281267,
+          -0.0624718556754565
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-7",
+        "object": [
+          -0.0898293519425621,
+          0.10193593764465061
+        ],
+        "target": [
+          -0.11065657634099704,
+          0.10173196291354855
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-8",
+        "object": [
+          -0.058515035267496546,
+          0.10722726628492052
+        ],
+        "target": [
+          -0.03391068170220726,
+          0.06119569479573214
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-9",
+        "object": [
+          -0.16877498547692937,
+          0.051739914187706904
+        ],
+        "target": [
+          0.15263431773344702,
+          0.04813583875568936
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-10",
+        "object": [
+          0.13538160394681242,
+          -0.06289528205428443
+        ],
+        "target": [
+          0.1401902670956199,
+          -0.015601684418200715
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-11",
+        "object": [
+          0.10294493985829511,
+          0.004374973583462602
+        ],
+        "target": [
+          -0.04061456031812277,
+          0.10179760449307784
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    }
+  ],
+  "S": [
+    {
+      "scenario": {
+        "id": "final-0",
+        "object": [
+          -0.030833607012689196,
+          -0.06566130608845679
+        ],
+        "target": [
+          0.01125601361432807,
+          0.008765673056842227
+        ]
+      },
+      "success": true,
+      "steps": 41,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-1",
+        "object": [
+          0.04696269212687479,
+          -0.012624326774247394
+        ],
+        "target": [
+          -0.15130903415747238,
+          -0.08388725012970447
+        ]
+      },
+      "success": true,
+      "steps": 48,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-2",
+        "object": [
+          -0.09172662741656674,
+          0.04656519731774328
+        ],
+        "target": [
+          -0.1056051355313218,
+          -0.0969459445284884
+        ]
+      },
+      "success": true,
+      "steps": 43,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-3",
+        "object": [
+          -0.06723935741511083,
+          -0.012023717816038684
+        ],
+        "target": [
+          -0.0985153204527361,
+          -0.05137801975722679
+        ]
+      },
+      "success": true,
+      "steps": 39,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-4",
+        "object": [
+          0.05373108901758189,
+          0.06368722285728462
+        ],
+        "target": [
+          -0.14015680815620019,
+          0.0986203304515065
+        ]
+      },
+      "success": true,
+      "steps": 48,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-5",
+        "object": [
+          -0.043955810704028986,
+          0.04507889116950703
+        ],
+        "target": [
+          0.045495126753335724,
+          0.0411340039379231
+        ]
+      },
+      "success": true,
+      "steps": 42,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-6",
+        "object": [
+          -0.05628281460832424,
+          -0.09138279398974314
+        ],
+        "target": [
+          -0.12192898615281267,
+          -0.0624718556754565
+        ]
+      },
+      "success": true,
+      "steps": 41,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-7",
+        "object": [
+          -0.0898293519425621,
+          0.10193593764465061
+        ],
+        "target": [
+          -0.11065657634099704,
+          0.10173196291354855
+        ]
+      },
+      "success": true,
+      "steps": 41,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-8",
+        "object": [
+          -0.058515035267496546,
+          0.10722726628492052
+        ],
+        "target": [
+          -0.03391068170220726,
+          0.06119569479573214
+        ]
+      },
+      "success": true,
+      "steps": 43,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-9",
+        "object": [
+          -0.16877498547692937,
+          0.051739914187706904
+        ],
+        "target": [
+          0.15263431773344702,
+          0.04813583875568936
+        ]
+      },
+      "success": true,
+      "steps": 48,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-10",
+        "object": [
+          0.13538160394681242,
+          -0.06289528205428443
+        ],
+        "target": [
+          0.1401902670956199,
+          -0.015601684418200715
+        ]
+      },
+      "success": true,
+      "steps": 46,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-11",
+        "object": [
+          0.10294493985829511,
+          0.004374973583462602
+        ],
+        "target": [
+          -0.04061456031812277,
+          0.10179760449307784
+        ]
+      },
+      "success": true,
+      "steps": 47,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    }
+  ],
+  "C": [
+    {
+      "scenario": {
+        "id": "final-0",
+        "object": [
+          -0.030833607012689196,
+          -0.06566130608845679
+        ],
+        "target": [
+          0.01125601361432807,
+          0.008765673056842227
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-1",
+        "object": [
+          0.04696269212687479,
+          -0.012624326774247394
+        ],
+        "target": [
+          -0.15130903415747238,
+          -0.08388725012970447
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-2",
+        "object": [
+          -0.09172662741656674,
+          0.04656519731774328
+        ],
+        "target": [
+          -0.1056051355313218,
+          -0.0969459445284884
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-3",
+        "object": [
+          -0.06723935741511083,
+          -0.012023717816038684
+        ],
+        "target": [
+          -0.0985153204527361,
+          -0.05137801975722679
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-4",
+        "object": [
+          0.05373108901758189,
+          0.06368722285728462
+        ],
+        "target": [
+          -0.14015680815620019,
+          0.0986203304515065
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "fail",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-5",
+        "object": [
+          -0.043955810704028986,
+          0.04507889116950703
+        ],
+        "target": [
+          0.045495126753335724,
+          0.0411340039379231
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "fail",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-6",
+        "object": [
+          -0.05628281460832424,
+          -0.09138279398974314
+        ],
+        "target": [
+          -0.12192898615281267,
+          -0.0624718556754565
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-7",
+        "object": [
+          -0.0898293519425621,
+          0.10193593764465061
+        ],
+        "target": [
+          -0.11065657634099704,
+          0.10173196291354855
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-8",
+        "object": [
+          -0.058515035267496546,
+          0.10722726628492052
+        ],
+        "target": [
+          -0.03391068170220726,
+          0.06119569479573214
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-9",
+        "object": [
+          -0.16877498547692937,
+          0.051739914187706904
+        ],
+        "target": [
+          0.15263431773344702,
+          0.04813583875568936
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-10",
+        "object": [
+          0.13538160394681242,
+          -0.06289528205428443
+        ],
+        "target": [
+          0.1401902670956199,
+          -0.015601684418200715
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    {
+      "scenario": {
+        "id": "final-11",
+        "object": [
+          0.10294493985829511,
+          0.004374973583462602
+        ],
+        "target": [
+          -0.04061456031812277,
+          0.10179760449307784
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "status": "internal_rubric_assessment_current_v3.1",
+  "rubric_source": "PROMPT.md sections3/8",
+  "scope": "current idea/design, not native acceptance or official organizer score; excludes team/resources as in historical scope",
+  "method": "Original weights30/20/20/15/10 normalized by95. Score anchored to PROMPT milestone descriptions; no empirical probability or success guarantee.",
+  "assessment_date": "2026-10-05",
+  "assessment_basis": "content-validation-v3.1-2026-10-05/README.md and current authority docs; historic reasons not transferred",
+  "source_hashes": {
+    "PROMPT.md": "7b47a6ee7b802559d1276b23cff8f79b935ae8099522d57541b9a5275f4ea1c6",
+    "idea-v3-2026-10-05/01-idea-va-pitch.md": "1f7fe48ca3efaafec37857927ef2076ab7936d72d293713e0e788dc7ed01bb4e",
+    "idea-v3-2026-10-05/project-spec.json": "df391c37efd2333d59ed1abdf25043829b0c4b80345562c075ba3068b81475e0",
+    "docs/reviews/idea-score.json": "459c28976f6e8c0d5b9195ad8e89f7def776169bc66a061f57b7f81dfc3e035a"
+  },
+  "rubric": [
+    {
+      "criterion": "Tính sáng tạo và đột phá",
+      "weight_original": 30,
+      "old_score": 7,
+      "score": 6,
+      "reason": "Có cải tiến quy trình nối source QA, evidence, can thiệp và quality-cost evaluation. Human transfer, VLA và synthetic execution là phần kế thừa; source selector T/F/A trước đây không còn là đóng góp hiện hành. Chưa có một cơ chế mới hoặc một lợi thế khác biệt được định nghĩa/kiểm rõ để đạt mốc8.",
+      "missing": "Phạm vi đóng góp của đội so với dùng upstream model/data pipeline và quy trình kỹ sư thông thường; lợi ích bổ sung của evidence workflow.",
+      "improvement": "Chọn một điểm khác biệt có thể kiểm: tạo đúng gói dữ liệu/correction từ bằng chứng với ít công kỹ sư hơn đối chứng expert workflow; giữ nguyên câu hỏi source efficiency.",
+      "normalized_weight": 0.3157894736842105,
+      "weighted_score": 1.894736842105263
+    },
+    {
+      "criterion": "Tính khả thi nghiệp vụ",
+      "weight_original": 20,
+      "old_score": 8,
+      "score": 6,
+      "reason": "Thiết kế xử lý một phần công phát triển skill: QA, trace, sửa lỗi, evaluation và bàn giao. Task A1 là proxy; chưa có owner/task/cycle/tolerance hoặc quyết định vì sao cần humanoid thay phương án hiện hành. Không đủ cho mốc8 “giải quyết hoàn toàn pain point”.",
+      "missing": "Người dùng thực, baseline workflow, công đổi task/SKU, điều kiện nghiệm thu và điểm nghẽn ưu tiên của đơn vị áp dụng.",
+      "improvement": "Khóa một use case cùng task owner: ai làm, bao lâu, công ở đâu, yêu cầu chất lượng/cycle và tiêu chuẩn bàn giao. Liên kết từng thành phần với công việc đó.",
+      "normalized_weight": 0.21052631578947367,
+      "weighted_score": 1.263157894736842
+    },
+    {
+      "criterion": "Tính khả thi kỹ thuật",
+      "weight_original": 20,
+      "old_score": 6,
+      "score": 6,
+      "reason": "Phân tách VLM/features, Action Expert/action chunk, command/response; action provenance, scoring và gates hợp lý. Reference có training/reload và tests thực. Nhưng human bridge chưa chọn, synthetic/controller chưa port29D GR1 và native integration chưa kiểm; phù hợp mốc6 “hợp lý, còn giả định cần kiểm”.",
+      "missing": "Một recipe human cụ thể, batch/loss/gradient path, native binding, checkpoint reload, closed-loop/scorer/trace.",
+      "improvement": "Native baseline đầu tiên; sau đó một source route với receipt và rollout. Không hạ điểm do GPU/tài trợ/kinh nghiệm đội chưa cung cấp; cũng không nâng native readiness từ reference tests.",
+      "normalized_weight": 0.21052631578947367,
+      "weighted_score": 1.263157894736842
+    },
+    {
+      "criterion": "Tính hiệu quả và đo lường",
+      "weight_original": 15,
+      "old_score": 4,
+      "score": 4,
+      "reason": "Có thiết kế so cùng chất lượng và total-cost ledger, nhưng chưa đủ inputs đáng tin cậy để lượng hóa lợi ích năm. Không lấy demo count hoặc kết quả reference làm USD saving. Phù hợp mốc4 “có dự kiến lợi ích nhưng thiếu cơ sở tính toán đầy đủ”.",
+      "missing": "Robot/engineer/operator hours thực, source/bridge/generation/QA/train/eval costs, tần suất skill changes/năm, quality-cost curve và budget/uncertainty.",
+      "improvement": "Đo baseline và source pilot tới cùng quality threshold; annualize theo số skill thay đổi thực, tránh double-count setup. Mốc6/8/10 phụ thuộc ngưỡng lợi ích năm trong PROMPT, không phụ thuộc số tài liệu hoặc số tests.",
+      "normalized_weight": 0.15789473684210525,
+      "weighted_score": 0.631578947368421
+    },
+    {
+      "criterion": "Khả năng mở rộng và tích hợp",
+      "weight_original": 10,
+      "old_score": 7,
+      "score": 6,
+      "reason": "Contracts, versions, source lineage, adapters và SOP tạo khả năng dùng lại trong các workflow robotic learning tương tự. Mỗi task/robot vẫn cần binding/scorer/reset/contact và acceptance riêng; chưa có căn cứ “dễ dàng triển khai trong tập đoàn” của mốc8.",
+      "missing": "Reused vs rebuilt components, effort đo được khi thêm task và interface với stack vận hành của đơn vị mục tiêu.",
+      "improvement": "Thử task thứ hai trên cùng robot, báo công định nghĩa TaskSpec/scorer/data và mức reuse; chỉ sau đó kiểm robot thứ hai. Không mở rộng platform để lấy điểm.",
+      "normalized_weight": 0.10526315789473684,
+      "weighted_score": 0.631578947368421
+    }
+  ],
+  "total": 5.684210526315789,
+  "old_total": 6.526315789473683,
+  "score_change_interpretation": "Scoring calibration plus changed contribution scope; not evidence that content edits worsened native model performance. Earlier business8/scalability7 exceeded current support for those milestones."
+}

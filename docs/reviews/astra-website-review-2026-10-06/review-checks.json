@@ -1,0 +1,22 @@
+{
+  "review_date": "2026-10-07",
+  "reviewed_file_count": 61,
+  "snapshot_mismatches": [],
+  "report_local_link_errors": [],
+  "architecture": {
+    "nodes": 20,
+    "edges": 24,
+    "findings": 10,
+    "anchor_check": "passed"
+  },
+  "static_site_verifier": "passed: 13 routes, 36 documents, 18 story scenes, 5 improvement cases and local publishing assets",
+  "syntax_check": "passed: app.js, model-engine-core.js, learning-core.js",
+  "diff_whitespace_check": "passed",
+  "bounded_reproductions": [
+    "resource-link-repro: wrong README doc0 observed live on 2026-10-06",
+    "primary ZIP: 7 unresolved relative markdown links in 52 entries",
+    "isolated builder missing-PDF: FileNotFoundError at line14",
+    "reference fit/reload: reversed, duplicate and NaN timestamps accepted with increasing steps"
+  ],
+  "scope_limit": "No website mutation, native VLA training, paper reproduction, full hosted CI or fresh 2026-10-07 browser session."
+}

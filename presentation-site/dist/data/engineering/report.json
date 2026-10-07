@@ -1,0 +1,688 @@
+{
+  "schema": "engineering_reference_v3.1",
+  "scope": "executed_reference_pipeline_not_native_vla",
+  "measured_at_utc": "2026-10-07T07:50:53Z",
+  "seed": 17,
+  "simulator": "MuJoCo; mocap Cartesian effector with proximity weld, not contact-accurate gripper",
+  "observation_adapter": "idealized simulator-state features, NOT image VLM",
+  "sequencer": "scripted; independent from outcome scorer",
+  "task": "reference pick/place part into A1; stable 0.6s; reference action 4D, NOT GR1 29D",
+  "human": "not_integrated; real human data cannot enter robot BC without a validated bridge",
+  "generation": {
+    "attempts": 24,
+    "accepted": 24,
+    "rejected": 0,
+    "independent_robot_seed_roots": 1,
+    "variants_are_descendants": true
+  },
+  "development": {
+    "R": {
+      "scenario": {
+        "id": "dev-shift-0",
+        "object": [
+          0.08,
+          0.1
+        ],
+        "target": [
+          -0.14,
+          -0.06
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    "S": {
+      "scenario": {
+        "id": "dev-shift-0",
+        "object": [
+          0.08,
+          0.1
+        ],
+        "target": [
+          -0.14,
+          -0.06
+        ]
+      },
+      "success": true,
+      "steps": 49,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    "C": {
+      "scenario": {
+        "id": "dev-shift-0",
+        "object": [
+          0.08,
+          0.1
+        ],
+        "target": [
+          -0.14,
+          -0.06
+        ]
+      },
+      "success": true,
+      "steps": 49,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    }
+  },
+  "final": {
+    "R": {
+      "successes": 0,
+      "trials": 12,
+      "stages": [
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        }
+      ]
+    },
+    "S": {
+      "successes": 12,
+      "trials": 12,
+      "stages": [
+        {
+          "approach": "pass",
+          "grasp": "pass",
+          "lift": "pass",
+          "transfer": "pass",
+          "place": "pass",
+          "release": "pass",
+          "retreat": "pass"
+        },
+        {
+          "approach": "pass",
+          "grasp": "pass",
+          "lift": "pass",
+          "transfer": "pass",
+          "place": "pass",
+          "release": "pass",
+          "retreat": "pass"
+        },
+        {
+          "approach": "pass",
+          "grasp": "pass",
+          "lift": "pass",
+          "transfer": "pass",
+          "place": "pass",
+          "release": "pass",
+          "retreat": "pass"
+        },
+        {
+          "approach": "pass",
+          "grasp": "pass",
+          "lift": "pass",
+          "transfer": "pass",
+          "place": "pass",
+          "release": "pass",
+          "retreat": "pass"
+        },
+        {
+          "approach": "pass",
+          "grasp": "pass",
+          "lift": "pass",
+          "transfer": "pass",
+          "place": "pass",
+          "release": "pass",
+          "retreat": "pass"
+        },
+        {
+          "approach": "pass",
+          "grasp": "pass",
+          "lift": "pass",
+          "transfer": "pass",
+          "place": "pass",
+          "release": "pass",
+          "retreat": "pass"
+        },
+        {
+          "approach": "pass",
+          "grasp": "pass",
+          "lift": "pass",
+          "transfer": "pass",
+          "place": "pass",
+          "release": "pass",
+          "retreat": "pass"
+        },
+        {
+          "approach": "pass",
+          "grasp": "pass",
+          "lift": "pass",
+          "transfer": "pass",
+          "place": "pass",
+          "release": "pass",
+          "retreat": "pass"
+        },
+        {
+          "approach": "pass",
+          "grasp": "pass",
+          "lift": "pass",
+          "transfer": "pass",
+          "place": "pass",
+          "release": "pass",
+          "retreat": "pass"
+        },
+        {
+          "approach": "pass",
+          "grasp": "pass",
+          "lift": "pass",
+          "transfer": "pass",
+          "place": "pass",
+          "release": "pass",
+          "retreat": "pass"
+        },
+        {
+          "approach": "pass",
+          "grasp": "pass",
+          "lift": "pass",
+          "transfer": "pass",
+          "place": "pass",
+          "release": "pass",
+          "retreat": "pass"
+        },
+        {
+          "approach": "pass",
+          "grasp": "pass",
+          "lift": "pass",
+          "transfer": "pass",
+          "place": "pass",
+          "release": "pass",
+          "retreat": "pass"
+        }
+      ]
+    },
+    "C": {
+      "successes": 0,
+      "trials": 12,
+      "stages": [
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "pass",
+          "grasp": "pass",
+          "lift": "pass",
+          "transfer": "fail",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "pass",
+          "grasp": "pass",
+          "lift": "pass",
+          "transfer": "fail",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        },
+        {
+          "approach": "fail",
+          "grasp": "not_attempted",
+          "lift": "not_attempted",
+          "transfer": "not_attempted",
+          "place": "not_attempted",
+          "release": "not_attempted",
+          "retreat": "not_attempted"
+        }
+      ]
+    }
+  },
+  "regression": {
+    "R": {
+      "scenario": {
+        "id": "regression-seed-disjoint",
+        "object": [
+          -0.101,
+          -0.021
+        ],
+        "target": [
+          0.151,
+          0.041
+        ]
+      },
+      "success": true,
+      "steps": 44,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    "S": {
+      "scenario": {
+        "id": "regression-seed-disjoint",
+        "object": [
+          -0.101,
+          -0.021
+        ],
+        "target": [
+          0.151,
+          0.041
+        ]
+      },
+      "success": true,
+      "steps": 44,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    "C": {
+      "scenario": {
+        "id": "regression-seed-disjoint",
+        "object": [
+          -0.101,
+          -0.021
+        ],
+        "target": [
+          0.151,
+          0.041
+        ]
+      },
+      "success": true,
+      "steps": 44,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    }
+  },
+  "negative_cases": {
+    "binding_fault": {
+      "scenario": {
+        "id": "dev-shift-0",
+        "object": [
+          0.08,
+          0.1
+        ],
+        "target": [
+          -0.14,
+          -0.06
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "pass",
+        "grasp": "fail",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    "unknown_verifier_sensor": {
+      "scenario": {
+        "id": "dev-shift-0",
+        "object": [
+          0.08,
+          0.1
+        ],
+        "target": [
+          -0.14,
+          -0.06
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "pass",
+        "grasp": "unknown",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    },
+    "zero_skill": {
+      "scenario": {
+        "id": "dev-shift-0",
+        "object": [
+          0.08,
+          0.1
+        ],
+        "target": [
+          -0.14,
+          -0.06
+        ]
+      },
+      "success": false,
+      "steps": 150,
+      "timeout": true,
+      "stages": {
+        "approach": "fail",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "policy_recipe": "ridge_behavior_cloning_reference"
+    }
+  },
+  "training": {
+    "R": {
+      "objective": "MSE on absolute xyz/grip targets; NOT flow matching",
+      "rows": 44,
+      "recordings": 1,
+      "independent_roots": 1,
+      "loss": 3.0095613662844445e-12,
+      "wall_seconds": 0.0016869159990164917,
+      "checkpoint_sha256": "90c03d1e7ad7b0866c91a00e38a49a621c1fcaa4efeb3ff5f54e22ab337c7287",
+      "reload_max_error": 0.0,
+      "trainable": "35x4 linear action-target predictor",
+      "frozen": "idealized feature adapter; scripted sequencer",
+      "vlm_status": "not_integrated",
+      "human_status": "not_integrated"
+    },
+    "S": {
+      "objective": "MSE on absolute xyz/grip targets; NOT flow matching",
+      "rows": 1091,
+      "recordings": 25,
+      "independent_roots": 1,
+      "loss": 4.434184804167101e-12,
+      "wall_seconds": 0.002796942000713898,
+      "checkpoint_sha256": "c7cbd47bc763c8d20d867b9ffe965c18fbf9feacb292d4c4e5e05465b153b45b",
+      "reload_max_error": 0.0,
+      "trainable": "35x4 linear action-target predictor",
+      "frozen": "idealized feature adapter; scripted sequencer",
+      "vlm_status": "not_integrated",
+      "human_status": "not_integrated"
+    },
+    "C": {
+      "objective": "MSE on absolute xyz/grip targets; NOT flow matching",
+      "rows": 93,
+      "recordings": 2,
+      "independent_roots": 2,
+      "loss": 2.155835780989089e-11,
+      "wall_seconds": 0.0007676589993934613,
+      "checkpoint_sha256": "f1aa86e754d44bba8edffd1602f9ff08c3bb454ded0efd1917fa429a802ed2b0",
+      "reload_max_error": 0.0,
+      "trainable": "35x4 linear action-target predictor",
+      "frozen": "idealized feature adapter; scripted sequencer",
+      "vlm_status": "not_integrated",
+      "human_status": "not_integrated"
+    }
+  },
+  "capabilities": {
+    "python": "3.10.12",
+    "numpy": "2.2.6",
+    "mujoco": "3.5.0",
+    "fluxvla_importable": false,
+    "native_checkpoint_present": false,
+    "native_vla": "not_tested",
+    "native_gr1": "not_tested",
+    "human_motion_bridge": "not_integrated",
+    "native_action_expert_traces": "not_tested"
+  },
+  "evidence_card": {
+    "observed": "reference R fails on shifted development task",
+    "binding_profile": "reference_cartesian_xyz_grip_v1",
+    "representation": "idealized measured scene coordinates; no semantic VLM claim",
+    "hypothesis": "coverage gap in training; R fit from one scenario is underdetermined",
+    "alternatives": [
+      "controller/binding fault",
+      "reference sequencer issue"
+    ],
+    "test": "two alternatives from R: S adds executed variants; C adds expert correction with R replay; separate binding-fault rollout",
+    "decision": "engineer-reviewed example plan: compare S and correction; never auto causal diagnosis",
+    "source_refs": [
+      "before.json",
+      "after-synthetic.json",
+      "after-correction.json",
+      "binding-fault.json"
+    ]
+  },
+  "promotion": {
+    "reference_S": true,
+    "reference_C": false,
+    "native_vla": false,
+    "real_robot": false,
+    "cost_saving": "not_established"
+  },
+  "usage": {
+    "wall_seconds": 1.489500706000399,
+    "cash_cost": "unknown",
+    "human_hours": "not_measured",
+    "valid_cost_savings_claim": false
+  }
+}

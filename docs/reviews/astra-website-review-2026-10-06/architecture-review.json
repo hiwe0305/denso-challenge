@@ -1,0 +1,1033 @@
+{
+  "architecture_key": "denso-website-audit",
+  "revision": "snapshot-20261006-review-20261007",
+  "view": "combined_with_distinct_lanes",
+  "representation": "reconstructed_from_source",
+  "label": "Reviewer reconstruction, not a paper figure or fully executed native system",
+  "sources": [
+    {
+      "path": "idea-v3-2026-10-05/02-kien-truc-va-cach-hoc.md",
+      "sha256": "e3ee823e98acd9a91d48b832e609c00b3b0ba28806e47b055a4ac03e34aa0b34"
+    },
+    {
+      "path": "idea-v3-2026-10-05/03-workflow-du-lieu.md",
+      "sha256": "0f82547dce3325e32081d53dab21f8c40384e7e6325e60bba754a437eb11126b"
+    },
+    {
+      "path": "idea-v3-2026-10-05/05-thiet-ke-kiem-chung.md",
+      "sha256": "7a0bc068312e58ca8220d9cdcad7b1acca652f2f6bab68ba78a5b9329c7cb1dd"
+    },
+    {
+      "path": "idea-v3-2026-10-05/11-contracts-va-logic.md",
+      "sha256": "80497f432b1929689415755674069d4909b0e56dbac738482ea4cf950591b92f"
+    },
+    {
+      "path": "idea-v3-2026-10-05/17-model-engine-core-fluxvla.md",
+      "sha256": "6e30f0d8b793349cc1405bc4cf8c687f47ce2c526e1c332157206cf8bd0a68f0"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "n01",
+      "label": "Source recordings / executed variants",
+      "role": "external_data",
+      "phase": "training",
+      "source_refs": [
+        {
+          "path": "idea-v3-2026-10-05/03-workflow-du-lieu.md",
+          "sha256": "0f82547dce3325e32081d53dab21f8c40384e7e6325e60bba754a437eb11126b"
+        }
+      ]
+    },
+    {
+      "id": "n02",
+      "label": "QA / lineage / split / immutable release",
+      "role": "data_release",
+      "phase": "training",
+      "source_refs": [
+        {
+          "path": "idea-v3-2026-10-05/03-workflow-du-lieu.md",
+          "sha256": "0f82547dce3325e32081d53dab21f8c40384e7e6325e60bba754a437eb11126b"
+        }
+      ]
+    },
+    {
+      "id": "n03",
+      "label": "Batch → selected objective → trainable modules",
+      "role": "model_training",
+      "phase": "training",
+      "source_refs": [
+        {
+          "path": "idea-v3-2026-10-05/02-kien-truc-va-cach-hoc.md",
+          "sha256": "e3ee823e98acd9a91d48b832e609c00b3b0ba28806e47b055a4ac03e34aa0b34"
+        }
+      ]
+    },
+    {
+      "id": "n04",
+      "label": "Parent / candidate checkpoint + receipts",
+      "role": "checkpoint",
+      "phase": "training",
+      "source_refs": [
+        {
+          "path": "idea-v3-2026-10-05/02-kien-truc-va-cach-hoc.md",
+          "sha256": "e3ee823e98acd9a91d48b832e609c00b3b0ba28806e47b055a4ac03e34aa0b34"
+        }
+      ]
+    },
+    {
+      "id": "n05",
+      "label": "Acquisition choices + decision receipt",
+      "role": "data_selection",
+      "phase": "development",
+      "source_refs": [
+        {
+          "path": "idea-v3-2026-10-05/03-workflow-du-lieu.md",
+          "sha256": "0f82547dce3325e32081d53dab21f8c40384e7e6325e60bba754a437eb11126b"
+        }
+      ]
+    },
+    {
+      "id": "n06",
+      "label": "Current RGB + instruction + measured state",
+      "role": "deployable_input",
+      "phase": "inference",
+      "source_refs": [
+        {
+          "path": "idea-v3-2026-10-05/02-kien-truc-va-cach-hoc.md",
+          "sha256": "e3ee823e98acd9a91d48b832e609c00b3b0ba28806e47b055a4ac03e34aa0b34"
+        }
+      ]
+    },
+    {
+      "id": "n07",
+      "label": "Eagle VLM / interface features",
+      "role": "representation",
+      "phase": "inference",
+      "source_refs": [
+        {
+          "path": "idea-v3-2026-10-05/17-model-engine-core-fluxvla.md",
+          "sha256": "6e30f0d8b793349cc1405bc4cf8c687f47ce2c526e1c332157206cf8bd0a68f0"
+        }
+      ]
+    },
+    {
+      "id": "n08",
+      "label": "Action Expert + state / ID / noise / time",
+      "role": "policy",
+      "phase": "inference",
+      "source_refs": [
+        {
+          "path": "idea-v3-2026-10-05/17-model-engine-core-fluxvla.md",
+          "sha256": "6e30f0d8b793349cc1405bc4cf8c687f47ce2c526e1c332157206cf8bd0a68f0"
+        }
+      ]
+    },
+    {
+      "id": "n09",
+      "label": "Action chunk → binding / controller → robot or sim",
+      "role": "execution",
+      "phase": "inference",
+      "source_refs": [
+        {
+          "path": "idea-v3-2026-10-05/11-contracts-va-logic.md",
+          "sha256": "80497f432b1929689415755674069d4909b0e56dbac738482ea4cf950591b92f"
+        }
+      ]
+    },
+    {
+      "id": "n10",
+      "label": "Observation / prediction / command / response trace",
+      "role": "runtime_evidence",
+      "phase": "inference",
+      "source_refs": [
+        {
+          "path": "idea-v3-2026-10-05/11-contracts-va-logic.md",
+          "sha256": "80497f432b1929689415755674069d4909b0e56dbac738482ea4cf950591b92f"
+        }
+      ]
+    },
+    {
+      "id": "n11",
+      "label": "Development full-task / regression / cost",
+      "role": "development_evaluation",
+      "phase": "evaluation",
+      "source_refs": [
+        {
+          "path": "idea-v3-2026-10-05/05-thiet-ke-kiem-chung.md",
+          "sha256": "7a0bc068312e58ca8220d9cdcad7b1acca652f2f6bab68ba78a5b9329c7cb1dd"
+        }
+      ]
+    },
+    {
+      "id": "n12",
+      "label": "Freeze → independent final → acceptance",
+      "role": "confirmatory_evaluation",
+      "phase": "evaluation",
+      "source_refs": [
+        {
+          "path": "idea-v3-2026-10-05/05-thiet-ke-kiem-chung.md",
+          "sha256": "7a0bc068312e58ca8220d9cdcad7b1acca652f2f6bab68ba78a5b9329c7cb1dd"
+        }
+      ]
+    },
+    {
+      "id": "n13",
+      "label": "Engineer: promote / repair / data / defer / stop",
+      "role": "decision",
+      "phase": "development",
+      "source_refs": [
+        {
+          "path": "idea-v3-2026-10-05/03-workflow-du-lieu.md",
+          "sha256": "0f82547dce3325e32081d53dab21f8c40384e7e6325e60bba754a437eb11126b"
+        }
+      ]
+    },
+    {
+      "id": "n14",
+      "label": "Measured resource plan + caps",
+      "role": "resource_protocol",
+      "phase": "protocol",
+      "source_refs": [
+        {
+          "path": "idea-v3-2026-10-05/06-chi-phi-va-kha-thi.md",
+          "sha256": "190621e4748a7f78a2a59243600a976b4b0d7ebb3e6220dbcb30e6d96dbff02c"
+        }
+      ]
+    },
+    {
+      "id": "n15",
+      "label": "Website: story / authority / budget / timeline",
+      "role": "presentation",
+      "phase": "delivery",
+      "source_refs": [
+        {
+          "local_report": "README.md",
+          "source_files_and_checks": "See anchored findings and receipts"
+        }
+      ]
+    },
+    {
+      "id": "n16",
+      "label": "Markdown full-path document resolver",
+      "role": "document_navigation",
+      "phase": "delivery",
+      "source_refs": [
+        {
+          "local_report": "README.md",
+          "source_files_and_checks": "See anchored findings and receipts"
+        }
+      ]
+    },
+    {
+      "id": "n17",
+      "label": "Primary ZIP + dependency closure",
+      "role": "package",
+      "phase": "delivery",
+      "source_refs": [
+        {
+          "local_report": "README.md",
+          "source_files_and_checks": "See anchored findings and receipts"
+        }
+      ]
+    },
+    {
+      "id": "n18",
+      "label": "Build + source-asset provenance inputs",
+      "role": "build",
+      "phase": "delivery",
+      "source_refs": [
+        {
+          "local_report": "README.md",
+          "source_files_and_checks": "See anchored findings and receipts"
+        }
+      ]
+    },
+    {
+      "id": "n19",
+      "label": "Reference row / step / timestamp validation",
+      "role": "reference_guard",
+      "phase": "reference",
+      "source_refs": [
+        {
+          "local_report": "README.md",
+          "source_files_and_checks": "See anchored findings and receipts"
+        }
+      ]
+    },
+    {
+      "id": "n20",
+      "label": "Optional motion / future objective + negative pool",
+      "role": "optional_training_route",
+      "phase": "training",
+      "source_refs": [
+        {
+          "path": "idea-v3-2026-10-05/02-kien-truc-va-cach-hoc.md",
+          "sha256": "e3ee823e98acd9a91d48b832e609c00b3b0ba28806e47b055a4ac03e34aa0b34"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "e01",
+      "from": "n01",
+      "to": "n02",
+      "direction": "forward",
+      "payload_or_condition": "raw signals / targets / provenance",
+      "implementation_status": "known"
+    },
+    {
+      "id": "e02",
+      "from": "n02",
+      "to": "n03",
+      "direction": "forward",
+      "payload_or_condition": "eligible conditioning / target / masks",
+      "implementation_status": "known"
+    },
+    {
+      "id": "e03",
+      "from": "n03",
+      "to": "n04",
+      "direction": "forward",
+      "payload_or_condition": "trained weights + update / reload receipt",
+      "implementation_status": "native_pending"
+    },
+    {
+      "id": "e04",
+      "from": "n04",
+      "to": "n07",
+      "direction": "forward",
+      "payload_or_condition": "candidate VLM / interface parameters",
+      "implementation_status": "native_pending"
+    },
+    {
+      "id": "e05",
+      "from": "n04",
+      "to": "n08",
+      "direction": "forward",
+      "payload_or_condition": "candidate action parameters",
+      "implementation_status": "native_pending"
+    },
+    {
+      "id": "e06",
+      "from": "n06",
+      "to": "n07",
+      "direction": "forward",
+      "payload_or_condition": "RGB / text",
+      "implementation_status": "known"
+    },
+    {
+      "id": "e07",
+      "from": "n07",
+      "to": "n08",
+      "direction": "forward",
+      "payload_or_condition": "features; state/ID/noise/time enter policy separately",
+      "implementation_status": "known"
+    },
+    {
+      "id": "e08",
+      "from": "n08",
+      "to": "n09",
+      "direction": "forward",
+      "payload_or_condition": "integrated action chunk; commands have profile/time",
+      "implementation_status": "native_pending"
+    },
+    {
+      "id": "e09",
+      "from": "n09",
+      "to": "n10",
+      "direction": "forward",
+      "payload_or_condition": "sent commands + measured readback",
+      "implementation_status": "native_pending"
+    },
+    {
+      "id": "e10",
+      "from": "n10",
+      "to": "n11",
+      "direction": "forward",
+      "payload_or_condition": "all outcomes incl. unknown / intervention / timeout",
+      "implementation_status": "known"
+    },
+    {
+      "id": "e11",
+      "from": "n11",
+      "to": "n13",
+      "direction": "forward",
+      "payload_or_condition": "development gain / regression / effort",
+      "implementation_status": "known"
+    },
+    {
+      "id": "e12",
+      "from": "n13",
+      "to": "n05",
+      "direction": "forward",
+      "payload_or_condition": "data hypothesis or reuse need, after health checks",
+      "implementation_status": "known"
+    },
+    {
+      "id": "e13",
+      "from": "n05",
+      "to": "n01",
+      "direction": "forward",
+      "payload_or_condition": "selected acquisition / reuse, cap and supervision",
+      "implementation_status": "known"
+    },
+    {
+      "id": "e14",
+      "from": "n13",
+      "to": "n09",
+      "direction": "forward",
+      "payload_or_condition": "repair / re-pin, or promoted candidate",
+      "implementation_status": "known"
+    },
+    {
+      "id": "e15",
+      "from": "n04",
+      "to": "n12",
+      "direction": "forward",
+      "payload_or_condition": "frozen candidate / binding / scorer",
+      "implementation_status": "native_pending"
+    },
+    {
+      "id": "e16",
+      "from": "n14",
+      "to": "n03",
+      "direction": "forward",
+      "payload_or_condition": "job budgets and measured feasibility",
+      "implementation_status": "unresolved"
+    },
+    {
+      "id": "e17",
+      "from": "n14",
+      "to": "n11",
+      "direction": "forward",
+      "payload_or_condition": "evaluation / operator / engineer work budgets",
+      "implementation_status": "unresolved"
+    },
+    {
+      "id": "e18",
+      "from": "n20",
+      "to": "n03",
+      "direction": "forward",
+      "payload_or_condition": "custom objective / route gated; not native robot BC labels",
+      "implementation_status": "unimplemented_candidate"
+    },
+    {
+      "id": "e19",
+      "from": "n15",
+      "to": "n16",
+      "direction": "forward",
+      "payload_or_condition": "reader links to authoritative documents",
+      "implementation_status": "known"
+    },
+    {
+      "id": "e20",
+      "from": "n16",
+      "to": "n17",
+      "direction": "forward",
+      "payload_or_condition": "downloaded dossier dependency closure",
+      "implementation_status": "known"
+    },
+    {
+      "id": "e21",
+      "from": "n18",
+      "to": "n15",
+      "direction": "forward",
+      "payload_or_condition": "generated static website",
+      "implementation_status": "known"
+    },
+    {
+      "id": "e22",
+      "from": "n19",
+      "to": "n02",
+      "direction": "forward",
+      "payload_or_condition": "reference-only guard; not native validation proof",
+      "implementation_status": "reference_only"
+    },
+    {
+      "id": "e23",
+      "from": "n06",
+      "to": "n08",
+      "direction": "forward",
+      "payload_or_condition": "measured state + embodiment/profile conditioning; noise/time handled within policy",
+      "implementation_status": "known"
+    },
+    {
+      "id": "e24",
+      "from": "n02",
+      "to": "n20",
+      "direction": "forward",
+      "payload_or_condition": "eligible future frames or wrist targets; target encoder/pool must be specified",
+      "implementation_status": "unimplemented_candidate"
+    }
+  ],
+  "findings": [
+    {
+      "finding_key": "R01",
+      "architecture_key": "denso-website-audit",
+      "architecture_revision": "snapshot-20261006-review-20261007",
+      "title": "Native policy end-to-end evidence pending",
+      "basis": "unresolved",
+      "priority": "decision-blocking",
+      "targets": {
+        "nodes": [
+          "n03",
+          "n04",
+          "n09"
+        ],
+        "edges": [
+          "e03",
+          "e08",
+          "e09"
+        ]
+      },
+      "observation": "Native policy end-to-end evidence pending",
+      "scope": "Project design / website at the fixed snapshot; not an upstream universal claim.",
+      "impact": "Reference outcomes establish scoped engineering behavior, not native VLA control or transfer.",
+      "alternative_explanation": "A native run may exist elsewhere; audit does not establish absence outside reviewed scope.",
+      "reasoning": {
+        "premises": [
+          {
+            "kind": "source_or_design_observation",
+            "statement": "Reference is a 35x4 idealized-state linear predictor; native A1 receipts are not identified in the inspected dossier."
+          },
+          {
+            "kind": "source_or_design_observation",
+            "statement": "Design and UI explicitly label native GR00T/GR1 pending."
+          }
+        ],
+        "derivation": "Reference outcomes establish scoped engineering behavior, not native VLA control or transfer.",
+        "conclusion": "Native policy end-to-end evidence pending",
+        "assumptions": [
+          "Reviewed working-tree files match snapshot.json."
+        ],
+        "limitations": [
+          "A native run may exist elsewhere; audit does not establish absence outside reviewed scope.",
+          "No native experiment or full hosted deployment was performed."
+        ],
+        "support_status": "unresolved"
+      },
+      "source_refs": [
+        {
+          "local_report": "README.md",
+          "section": "R01"
+        },
+        {
+          "local_evidence": "snapshot.json"
+        }
+      ],
+      "suggested_change": "Pinned batch/update/reload plus learned closed-loop natural-start evaluation.",
+      "expected_cost": "Native integration and bounded pilot GPU/operator work.",
+      "next_check": "Pinned batch/update/reload plus learned closed-loop natural-start evaluation.",
+      "falsifier": "The scoped issue is resolved if the proposed check supplies the missing receipt or contradicts the stated observation; no-gain in a different experiment does not falsify an author-reported limitation.",
+      "resolution_status": "open"
+    },
+    {
+      "finding_key": "R02",
+      "architecture_key": "denso-website-audit",
+      "architecture_revision": "snapshot-20261006-review-20261007",
+      "title": "Selection value needs matched workflow comparison",
+      "basis": "inferred_risk",
+      "priority": "material",
+      "targets": {
+        "nodes": [
+          "n05",
+          "n13"
+        ],
+        "edges": [
+          "e12",
+          "e13"
+        ]
+      },
+      "observation": "Selection value needs matched workflow comparison",
+      "scope": "Project design / website at the fixed snapshot; not an upstream universal claim.",
+      "impact": "R versus R+S can isolate a source effect but not the added value of Data Core selection.",
+      "alternative_explanation": "The site already acknowledges this distinction; it does not claim a learned selector exists.",
+      "reasoning": {
+        "premises": [
+          {
+            "kind": "source_or_design_observation",
+            "statement": "Design separates source contrasts from workflow comparison."
+          },
+          {
+            "kind": "source_or_design_observation",
+            "statement": "No concrete comparative acquisition decision receipt/protocol was identified."
+          }
+        ],
+        "derivation": "R versus R+S can isolate a source effect but not the added value of Data Core selection.",
+        "conclusion": "Selection value needs matched workflow comparison",
+        "assumptions": [
+          "Reviewed working-tree files match snapshot.json."
+        ],
+        "limitations": [
+          "The site already acknowledges this distinction; it does not claim a learned selector exists.",
+          "No native experiment or full hosted deployment was performed."
+        ],
+        "support_status": "inferred_risk"
+      },
+      "source_refs": [
+        {
+          "local_report": "README.md",
+          "section": "R02"
+        },
+        {
+          "local_evidence": "snapshot.json"
+        }
+      ],
+      "suggested_change": "Matched parent/cases and intervention access/caps; record gain, regression and total effort for both workflows.",
+      "expected_cost": "At least two intervention/train/eval paths per case pair plus selection time.",
+      "next_check": "Matched parent/cases and intervention access/caps; record gain, regression and total effort for both workflows.",
+      "falsifier": "The scoped issue is resolved if the proposed check supplies the missing receipt or contradicts the stated observation; no-gain in a different experiment does not falsify an author-reported limitation.",
+      "resolution_status": "open"
+    },
+    {
+      "finding_key": "R03",
+      "architecture_key": "denso-website-audit",
+      "architecture_revision": "snapshot-20261006-review-20261007",
+      "title": "Coverage after QA and content-family dedup need receipts",
+      "basis": "inferred_risk",
+      "priority": "material",
+      "targets": {
+        "nodes": [
+          "n01",
+          "n02"
+        ],
+        "edges": [
+          "e01",
+          "e02"
+        ]
+      },
+      "observation": "Coverage after QA and content-family dedup need receipts",
+      "scope": "Project design / website at the fixed snapshot; not an upstream universal claim.",
+      "impact": "Per-episode QA and correct descendant IDs alone do not establish coverage or cross-source split independence.",
+      "alternative_explanation": "No actual native bias or leakage was detected; source scope is a risk prior.",
+      "reasoning": {
+        "premises": [
+          {
+            "kind": "source_or_design_observation",
+            "statement": "Accepted successes need not cover attempted conditions; MimicGen v1 Appendix R reports related limitations."
+          },
+          {
+            "kind": "source_or_design_observation",
+            "statement": "Root IDs and split-before-derivatives are specified, but duplicate-family grouping is not operationalized."
+          }
+        ],
+        "derivation": "Per-episode QA and correct descendant IDs alone do not establish coverage or cross-source split independence.",
+        "conclusion": "Coverage after QA and content-family dedup need receipts",
+        "assumptions": [
+          "Reviewed working-tree files match snapshot.json."
+        ],
+        "limitations": [
+          "No actual native bias or leakage was detected; source scope is a risk prior.",
+          "No native experiment or full hosted deployment was performed."
+        ],
+        "support_status": "inferred_risk"
+      },
+      "source_refs": [
+        {
+          "local_report": "README.md",
+          "section": "R03"
+        },
+        {
+          "local_evidence": "snapshot.json"
+        }
+      ],
+      "suggested_change": "Attempted-to-accepted bucket histograms and duplicate/crop/reencode injection grouping test.",
+      "expected_cost": "Logging/hashing/review plus any added generation and controlled training.",
+      "next_check": "Attempted-to-accepted bucket histograms and duplicate/crop/reencode injection grouping test.",
+      "falsifier": "The scoped issue is resolved if the proposed check supplies the missing receipt or contradicts the stated observation; no-gain in a different experiment does not falsify an author-reported limitation.",
+      "resolution_status": "open"
+    },
+    {
+      "finding_key": "R04",
+      "architecture_key": "denso-website-audit",
+      "architecture_revision": "snapshot-20261006-review-20261007",
+      "title": "Final gate operating characteristics need owner decision",
+      "basis": "unresolved",
+      "priority": "material",
+      "targets": {
+        "nodes": [
+          "n12"
+        ],
+        "edges": []
+      },
+      "observation": "Final gate operating characteristics need owner decision",
+      "scope": "Project design / website at the fixed snapshot; not an upstream universal claim.",
+      "impact": "Formula is coherent, but decision power/cost may matter to planning and source-advantage claims need another comparison.",
+      "alternative_explanation": "A conservative acceptance rule can be an intentional acceptable trade-off.",
+      "reasoning": {
+        "premises": [
+          {
+            "kind": "source_or_design_observation",
+            "statement": "Draft assumes n=100 and a one-sided exact 95% lower bound >=.90."
+          },
+          {
+            "kind": "source_or_design_observation",
+            "statement": "Under IID Bernoulli this requires X>=96; probability of passing at p=.95 is .4359813."
+          }
+        ],
+        "derivation": "Formula is coherent, but decision power/cost may matter to planning and source-advantage claims need another comparison.",
+        "conclusion": "Final gate operating characteristics need owner decision",
+        "assumptions": [
+          "Reviewed working-tree files match snapshot.json."
+        ],
+        "limitations": [
+          "A conservative acceptance rule can be an intentional acceptable trade-off.",
+          "No native experiment or full hosted deployment was performed."
+        ],
+        "support_status": "unresolved"
+      },
+      "source_refs": [
+        {
+          "local_report": "README.md",
+          "section": "R04"
+        },
+        {
+          "local_evidence": "snapshot.json"
+        }
+      ],
+      "suggested_change": "Pre-final power/estimand/sampling/seed plan and paired effect or margin when required.",
+      "expected_cost": "Statistical planning and the chosen number of rollouts/seeds.",
+      "next_check": "Pre-final power/estimand/sampling/seed plan and paired effect or margin when required.",
+      "falsifier": "The scoped issue is resolved if the proposed check supplies the missing receipt or contradicts the stated observation; no-gain in a different experiment does not falsify an author-reported limitation.",
+      "resolution_status": "open"
+    },
+    {
+      "finding_key": "R05",
+      "architecture_key": "denso-website-audit",
+      "architecture_revision": "snapshot-20261006-review-20261007",
+      "title": "Current budget/timeline/outcomes authority differs by route",
+      "basis": "demonstrated_error",
+      "priority": "material",
+      "targets": {
+        "nodes": [
+          "n15"
+        ],
+        "edges": []
+      },
+      "observation": "Current budget/timeline/outcomes authority differs by route",
+      "scope": "Project design / website at the fixed snapshot; not an upstream universal claim.",
+      "impact": "Correctly labelled historical figures still leave the menu question unanswered at the expected route; capacity cap does not define a feasible job set.",
+      "alternative_explanation": "Overview/form contain the missing information; no arithmetic contradiction or guaranteed resource shortage is inferred.",
+      "reasoning": {
+        "premises": [
+          {
+            "kind": "source_or_design_observation",
+            "statement": "Current overview/form show $5187.20 capacity subtotal and conditional 8-12 weeks."
+          },
+          {
+            "kind": "source_or_design_observation",
+            "statement": "Business route emphasizes historical stress model; roadmap omits durations; outcomes maps to claim ledger."
+          }
+        ],
+        "derivation": "Correctly labelled historical figures still leave the menu question unanswered at the expected route; capacity cap does not define a feasible job set.",
+        "conclusion": "Current budget/timeline/outcomes authority differs by route",
+        "assumptions": [
+          "Reviewed working-tree files match snapshot.json."
+        ],
+        "limitations": [
+          "Overview/form contain the missing information; no arithmetic contradiction or guaranteed resource shortage is inferred.",
+          "No native experiment or full hosted deployment was performed."
+        ],
+        "support_status": "demonstrated_error"
+      },
+      "source_refs": [
+        {
+          "local_report": "README.md",
+          "section": "R05"
+        },
+        {
+          "local_evidence": "snapshot.json"
+        }
+      ],
+      "suggested_change": "Unified current registry, route purpose checks, measured native RunPlan.",
+      "expected_cost": "Editorial/rendering work; separate native memory/throughput/yield pilot.",
+      "next_check": "Unified current registry, route purpose checks, measured native RunPlan.",
+      "falsifier": "The scoped issue is resolved if the proposed check supplies the missing receipt or contradicts the stated observation; no-gain in a different experiment does not falsify an author-reported limitation.",
+      "resolution_status": "open"
+    },
+    {
+      "finding_key": "R06",
+      "architecture_key": "denso-website-audit",
+      "architecture_revision": "snapshot-20261006-review-20261007",
+      "title": "Reading hierarchy and route-specific summaries need validation",
+      "basis": "inferred_risk",
+      "priority": "material",
+      "targets": {
+        "nodes": [
+          "n15"
+        ],
+        "edges": []
+      },
+      "observation": "Reading hierarchy and route-specific summaries need validation",
+      "scope": "Project design / website at the fixed snapshot; not an upstream universal claim.",
+      "impact": "The structure may increase effort to locate deliverables, cost and current evidence.",
+      "alternative_explanation": "Dense technical documentation is useful for engineers; word/heading counts alone do not prove poor usability.",
+      "reasoning": {
+        "premises": [
+          {
+            "kind": "source_or_design_observation",
+            "statement": "Five active dossier-backed routes share the same generic H1."
+          },
+          {
+            "kind": "source_or_design_observation",
+            "statement": "Desktop observations show dense multi-section examples/research; no novice usability test was performed."
+          }
+        ],
+        "derivation": "The structure may increase effort to locate deliverables, cost and current evidence.",
+        "conclusion": "Reading hierarchy and route-specific summaries need validation",
+        "assumptions": [
+          "Reviewed working-tree files match snapshot.json."
+        ],
+        "limitations": [
+          "Dense technical documentation is useful for engineers; word/heading counts alone do not prove poor usability.",
+          "No native experiment or full hosted deployment was performed."
+        ],
+        "support_status": "inferred_risk"
+      },
+      "source_refs": [
+        {
+          "local_report": "README.md",
+          "section": "R06"
+        },
+        {
+          "local_evidence": "snapshot.json"
+        }
+      ],
+      "suggested_change": "Novice stakeholder/engineer task comprehension plus mobile/keyboard/media-state checks.",
+      "expected_cost": "Small editorial and user-review sessions; keep full technical appendix.",
+      "next_check": "Novice stakeholder/engineer task comprehension plus mobile/keyboard/media-state checks.",
+      "falsifier": "The scoped issue is resolved if the proposed check supplies the missing receipt or contradicts the stated observation; no-gain in a different experiment does not falsify an author-reported limitation.",
+      "resolution_status": "open"
+    },
+    {
+      "finding_key": "R07",
+      "architecture_key": "denso-website-audit",
+      "architecture_revision": "snapshot-20261006-review-20261007",
+      "title": "Basename document routing and incomplete primary ZIP",
+      "basis": "demonstrated_error",
+      "priority": "material",
+      "targets": {
+        "nodes": [
+          "n16",
+          "n17"
+        ],
+        "edges": [
+          "e19",
+          "e20"
+        ]
+      },
+      "observation": "Basename document routing and incomplete primary ZIP",
+      "scope": "Project design / website at the fixed snapshot; not an upstream universal claim.",
+      "impact": "Readers following authority/A1/example links can receive the wrong document or lack required files.",
+      "alternative_explanation": "Engine crosspage doc17 works; other A1/full packages exist. Finding is bounded to specific links and primary ZIP.",
+      "reasoning": {
+        "premises": [
+          {
+            "kind": "source_or_design_observation",
+            "statement": "app.js resolves the first matching basename; live README links resolve to doc0."
+          },
+          {
+            "kind": "source_or_design_observation",
+            "statement": "Primary ZIP has 52 entries and seven unresolved relative Markdown links."
+          }
+        ],
+        "derivation": "Readers following authority/A1/example links can receive the wrong document or lack required files.",
+        "conclusion": "Basename document routing and incomplete primary ZIP",
+        "assumptions": [
+          "Reviewed working-tree files match snapshot.json."
+        ],
+        "limitations": [
+          "Engine crosspage doc17 works; other A1/full packages exist. Finding is bounded to specific links and primary ZIP.",
+          "No native experiment or full hosted deployment was performed."
+        ],
+        "support_status": "demonstrated_error"
+      },
+      "source_refs": [
+        {
+          "local_report": "README.md",
+          "section": "R07"
+        },
+        {
+          "local_evidence": "snapshot.json"
+        }
+      ],
+      "suggested_change": "Full-path resolution with distinct README assertions; unpack archive and verify dependency closure.",
+      "expected_cost": "Small navigation/catalog/package repair.",
+      "next_check": "Full-path resolution with distinct README assertions; unpack archive and verify dependency closure.",
+      "falsifier": "The scoped issue is resolved if the proposed check supplies the missing receipt or contradicts the stated observation; no-gain in a different experiment does not falsify an author-reported limitation.",
+      "resolution_status": "open"
+    },
+    {
+      "finding_key": "R08",
+      "architecture_key": "denso-website-audit",
+      "architecture_revision": "snapshot-20261006-review-20261007",
+      "title": "Normal build requires ignored local source PDF",
+      "basis": "demonstrated_error",
+      "priority": "material",
+      "targets": {
+        "nodes": [
+          "n18"
+        ],
+        "edges": [
+          "e21"
+        ]
+      },
+      "observation": "Normal build requires ignored local source PDF",
+      "scope": "Project design / website at the fixed snapshot; not an upstream universal claim.",
+      "impact": "A checkout without this ignored prerequisite cannot pass this builder step.",
+      "alternative_explanation": "Existing dist works; hosted CI failure was not observed. Provenance hash checking itself is valuable.",
+      "reasoning": {
+        "premises": [
+          {
+            "kind": "source_or_design_observation",
+            "statement": "build-content.py:14 reads FluxVLA.pdf unconditionally."
+          },
+          {
+            "kind": "source_or_design_observation",
+            "statement": "PDF directory is ignored and workflow has no provisioning step; isolated missing-PDF repro raises FileNotFoundError."
+          }
+        ],
+        "derivation": "A checkout without this ignored prerequisite cannot pass this builder step.",
+        "conclusion": "Normal build requires ignored local source PDF",
+        "assumptions": [
+          "Reviewed working-tree files match snapshot.json."
+        ],
+        "limitations": [
+          "Existing dist works; hosted CI failure was not observed. Provenance hash checking itself is valuable.",
+          "No native experiment or full hosted deployment was performed."
+        ],
+        "support_status": "demonstrated_error"
+      },
+      "source_refs": [
+        {
+          "local_report": "README.md",
+          "section": "R08"
+        },
+        {
+          "local_evidence": "snapshot.json"
+        }
+      ],
+      "suggested_change": "Clean checkout build without local library, or explicit pinned PDF provisioning.",
+      "expected_cost": "Small build separation/provisioning change and clean-build check.",
+      "next_check": "Clean checkout build without local library, or explicit pinned PDF provisioning.",
+      "falsifier": "The scoped issue is resolved if the proposed check supplies the missing receipt or contradicts the stated observation; no-gain in a different experiment does not falsify an author-reported limitation.",
+      "resolution_status": "open"
+    },
+    {
+      "finding_key": "R09",
+      "architecture_key": "denso-website-audit",
+      "architecture_revision": "snapshot-20261006-review-20261007",
+      "title": "Reference temporal guard ignores timestamp",
+      "basis": "demonstrated_error",
+      "priority": "material",
+      "targets": {
+        "nodes": [
+          "n19"
+        ],
+        "edges": [
+          "e22"
+        ]
+      },
+      "observation": "Reference temporal guard ignores timestamp",
+      "scope": "Project design / website at the fixed snapshot; not an upstream universal claim.",
+      "impact": "The guard/claim establishes step ordering but not the broader temporal validation described.",
+      "alternative_explanation": "Stored generated records are not shown to have incorrect timestamps; no native-loader defect is inferred.",
+      "reasoning": {
+        "premises": [
+          {
+            "kind": "source_or_design_observation",
+            "statement": "validate_record/fit inspect dt and step, not timestamp."
+          },
+          {
+            "kind": "source_or_design_observation",
+            "statement": "Two valid rows with increasing step accept reversed, duplicate and NaN timestamp in bounded fit/reload checks."
+          }
+        ],
+        "derivation": "The guard/claim establishes step ordering but not the broader temporal validation described.",
+        "conclusion": "Reference temporal guard ignores timestamp",
+        "assumptions": [
+          "Reviewed working-tree files match snapshot.json."
+        ],
+        "limitations": [
+          "Stored generated records are not shown to have incorrect timestamps; no native-loader defect is inferred.",
+          "No native experiment or full hosted deployment was performed."
+        ],
+        "support_status": "demonstrated_error"
+      },
+      "source_refs": [
+        {
+          "local_report": "README.md",
+          "section": "R09"
+        },
+        {
+          "local_evidence": "snapshot.json"
+        }
+      ],
+      "suggested_change": "Either narrow wording or test finite/monotonic/spacing timestamps per episode.",
+      "expected_cost": "Small validator/wording change; no native GPU run.",
+      "next_check": "Either narrow wording or test finite/monotonic/spacing timestamps per episode.",
+      "falsifier": "The scoped issue is resolved if the proposed check supplies the missing receipt or contradicts the stated observation; no-gain in a different experiment does not falsify an author-reported limitation.",
+      "resolution_status": "open"
+    },
+    {
+      "finding_key": "R10",
+      "architecture_key": "denso-website-audit",
+      "architecture_revision": "snapshot-20261006-review-20261007",
+      "title": "FOCA single-task negative pool needs specification",
+      "basis": "inferred_risk",
+      "priority": "material",
+      "targets": {
+        "nodes": [
+          "n20"
+        ],
+        "edges": [
+          "e18",
+          "e24"
+        ]
+      },
+      "observation": "FOCA single-task negative pool needs specification",
+      "scope": "Project design / website at the fixed snapshot; not an upstream universal claim.",
+      "impact": "If the eligible set is empty, InfoNCE equals zero; unfiltered same-task negatives instead change the objective and may introduce false negatives.",
+      "alternative_explanation": "A train-only multitask pool could resolve the condition; the branch is explicitly unimplemented, not an observed A1 failure.",
+      "reasoning": {
+        "premises": [
+          {
+            "kind": "source_or_design_observation",
+            "statement": "FOCA v1 Eq.(10)-(11), p5, requires task-mismatched negatives."
+          },
+          {
+            "kind": "source_or_design_observation",
+            "statement": "A1 is a single-task pilot; no concrete eligible negative pool is specified for the optional candidate."
+          }
+        ],
+        "derivation": "If the eligible set is empty, InfoNCE equals zero; unfiltered same-task negatives instead change the objective and may introduce false negatives.",
+        "conclusion": "FOCA single-task negative pool needs specification",
+        "assumptions": [
+          "Reviewed working-tree files match snapshot.json."
+        ],
+        "limitations": [
+          "A train-only multitask pool could resolve the condition; the branch is explicitly unimplemented, not an observed A1 failure.",
+          "No native experiment or full hosted deployment was performed."
+        ],
+        "support_status": "inferred_risk"
+      },
+      "source_refs": [
+        {
+          "local_report": "README.md",
+          "section": "R10"
+        },
+        {
+          "local_evidence": "snapshot.json"
+        }
+      ],
+      "suggested_change": "Single-task and multitask batches: eligible negative counts, loss/gradients, then matched action-only vs auxiliary downstream eval.",
+      "expected_cost": "Pool acquisition/sampling/QA and added compute only if branch is selected.",
+      "next_check": "Single-task and multitask batches: eligible negative counts, loss/gradients, then matched action-only vs auxiliary downstream eval.",
+      "falsifier": "The scoped issue is resolved if the proposed check supplies the missing receipt or contradicts the stated observation; no-gain in a different experiment does not falsify an author-reported limitation.",
+      "resolution_status": "open"
+    }
+  ],
+  "persistence": "local artifact only, not Research Workspace database"
+}

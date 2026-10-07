@@ -1,0 +1,100 @@
+{
+  "revision": "2026-10-07",
+  "status": "proposed_workflow_not_native_backend",
+  "steps": [
+    {
+      "id": "RUN",
+      "short": "Chạy & ghi vết",
+      "title": "Policy tạo trải nghiệm mới",
+      "body": "Chạy task trong miền đã khóa. Giữ cả thành công, thất bại, timeout và intervention; nối observations, action, command, response và outcome theo episode/model IDs.",
+      "output": "Episode traces + điều kiện đã thử + chi phí rollout",
+      "gate": "Scorer thiếu quan sát → unknown. Trải nghiệm mới chưa tự là demonstration đúng."
+    },
+    {
+      "id": "DIAG",
+      "short": "Kiểm giả thuyết",
+      "title": "Tìm việc cần sửa trước khi thu thêm",
+      "body": "Kiểm camera, mapping, timing, controller và khả năng với tới trước. Kỹ sư dùng first divergence và phép thử matched entry để phân biệt integration fault, thiếu coverage và lỗi gắp trước đó.",
+      "output": "Evidence card: facts, alternatives, test và quyết định",
+      "gate": "Chưa đủ bằng chứng → thu thêm evidence hoặc tạm hoãn. Trace không tự định danh nguyên nhân."
+    },
+    {
+      "id": "ACQUIRE",
+      "short": "Chọn can thiệp",
+      "title": "Chọn dữ liệu đúng với giả thuyết",
+      "body": "Tái dùng dữ liệu tốt, thu robot expert correction, sinh sim variants hoặc chọn human motion đủ tín hiệu. Chỉ mở nguồn phù hợp với bottleneck và ngân sách; lỗi hệ thống đi sang repair rồi lập lại baseline.",
+      "output": "AcquisitionDecisionReceipt: alternatives, lý do chọn, cap, release IDs, gain/regression và actual cost",
+      "gate": "Không ép dùng đủ R/H/S. Human wrist motion chưa cung cấp finger/contact labels."
+    },
+    {
+      "id": "RELEASE",
+      "short": "QA & phát hành",
+      "title": "Biến mẫu đủ điều kiện thành release tái lập",
+      "body": "Kiểm quyền, geometry, clocks, masks, action semantics, tracking error, contact/collision và outcome. Giữ parent/descendant cùng split; failed actions không thành positive imitation targets.",
+      "output": "Release + requested/attempted/accepted/rejected coverage + duplicate-family/split audit",
+      "gate": "Final holdout không vào acquisition/training. Rejects và QA vẫn tính vào chi phí."
+    },
+    {
+      "id": "TRAIN",
+      "short": "Học candidate",
+      "title": "Học phần cần thiết, giữ dữ liệu tốt cũ",
+      "body": "Từ parent checkpoint đã pin, train theo loss/module manifest hợp lệ và replay dữ liệu cũ. Kiểm gradients, checkpoint reload và native inference. Human pilot giữ VLM frozen giống nhau ở hai arms.",
+      "output": "Candidate checkpoint + recipe + gradient/reload receipts",
+      "gate": "Loss giảm chưa chứng minh robot tốt hơn. Unfreeze là trial riêng khi có bằng chứng về bottleneck representation."
+    },
+    {
+      "id": "EVAL",
+      "short": "Kiểm & chọn bản",
+      "title": "Chỉ phiên bản đạt yêu cầu quay lại rollout",
+      "body": "Đo toàn task từ natural starts, transitions, regression và tổng công trên development. Candidate đủ điều kiện mới thay parent cho vòng development tiếp theo. Khi kết thúc study: freeze rồi final độc lập để nghiệm thu.",
+      "output": "Quyết định promote / reject / no-gain + cập nhật evidence catalog",
+      "gate": "Candidate kém giữ ngoài rollout chính. Không tune theo final rồi tiếp tục gọi nó là independent final."
+    }
+  ],
+  "cases": [
+    {
+      "id": "mapping",
+      "label": "Command lệch prediction",
+      "fact": "Ví dụ giả định: action sau mapping lệch action dự đoán; expert replay cũng bị lệch.",
+      "test": "Đối chiếu units, action order, normalization, clocks và readback với profile đã pin.",
+      "choice": "Sửa binding/controller, pin lại cấu hình và lập lại baseline.",
+      "data": "Giữ fault trace để debug; chưa tạo positive training release.",
+      "check": "Prediction → sent command → response đúng trước khi mở data contrast."
+    },
+    {
+      "id": "coverage",
+      "label": "Yếu ở vị trí mới",
+      "fact": "Ví dụ giả định: expert replay khả thi; policy tốt ở vị trí cũ nhưng yếu ở một vùng mới.",
+      "test": "Giữ controller/scorer, kiểm reachability và so matched scenes/entry states.",
+      "choice": "Thử expert correction hoặc synthetic execution trong vùng train cần bổ sung.",
+      "data": "Accepted variants + seed/context cũ; derivatives giữ cùng root split.",
+      "check": "Đo toàn task ở vùng mới và regression vùng cũ; gain/no-gain và total cost."
+    },
+    {
+      "id": "recovery",
+      "label": "Gắp hụt cần thử lại",
+      "fact": "Ví dụ giả định: robot gắp hụt; task cho phép retry trong deadline.",
+      "test": "Kiểm phát hiện lỗi và trạng thái sau hụt; expert có phục hồi được từ state đó không?",
+      "choice": "Thu expert recovery từ trạng thái lỗi → sửa tiếp cận/gắp → hoàn thành task.",
+      "data": "Recovery demonstrations có actions đúng và context; failure prefix giữ nhãn failure.",
+      "check": "Báo first-attempt và eventual success, retries, cycle time, interventions; không đưa failed actions vào positive BC."
+    }
+  ],
+  "sources": [
+    {
+      "id": "ACTION",
+      "title": "Robot action supervision",
+      "body": "Recorded expert và sim-generated executions cùng native action view. QA command/readback/contact trước release; augmentation giữ lineage."
+    },
+    {
+      "id": "VIDEO",
+      "title": "Temporal video supervision",
+      "body": "Recorded hoặc neural-generated video → optional future objective. Synthetic là cách tạo; video không có action thì action loss disabled."
+    },
+    {
+      "id": "MOTION",
+      "title": "Structured motion supervision",
+      "body": "Human tracking + camera/time/masks → custom common-wrist pilot. Không thay robot joint/contact labels."
+    }
+  ]
+}

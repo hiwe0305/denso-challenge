@@ -1,0 +1,25 @@
+{
+  "status": "template_not_measured",
+  "release_id": null,
+  "bucket_axes": [
+    "object",
+    "pose_target",
+    "appearance",
+    "reachability_contact",
+    "failure_bucket"
+  ],
+  "requested_attempted_accepted_rejected_by_bucket": [],
+  "reject_reasons_and_cost": [],
+  "unique_parent_roots": null,
+  "effective_sampling_weights": null,
+  "coverage_gaps_and_defer_reason": null,
+  "content_identity": {
+    "canonical_repo_revision_recording_episode_time_range": null,
+    "exact_raw_hashes": [],
+    "duplicate_family_groups": [],
+    "near_duplicate_review_if_needed": null
+  },
+  "split_policy": "connected components of root/ancestor/duplicate/session graph, before derivatives",
+  "overlap_audit_receipt": null,
+  "pretraining_overlap_unknowns": null
+}

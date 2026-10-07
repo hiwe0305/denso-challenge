@@ -1,0 +1,41 @@
+{
+  "entries": 52,
+  "unresolved_markdown_links": [
+    {
+      "file": "IDEA.md",
+      "link": "deliverables/DENSO-Noi-dung-form-y-tuong.md",
+      "resolved": "deliverables/DENSO-Noi-dung-form-y-tuong.md"
+    },
+    {
+      "file": "idea-v3-2026-10-05/01-idea-va-pitch.md",
+      "link": "../docs/implementation-plan/skill-a1/02-recipes-and-data.md",
+      "resolved": "docs/implementation-plan/skill-a1/02-recipes-and-data.md"
+    },
+    {
+      "file": "idea-v3-2026-10-05/01-idea-va-pitch.md",
+      "link": "../deliverables/DENSO-Noi-dung-form-y-tuong.md",
+      "resolved": "deliverables/DENSO-Noi-dung-form-y-tuong.md"
+    },
+    {
+      "file": "idea-v3-2026-10-05/02-kien-truc-va-cach-hoc.md",
+      "link": "../docs/implementation-plan/skill-a1/02-recipes-and-data.md",
+      "resolved": "docs/implementation-plan/skill-a1/02-recipes-and-data.md"
+    },
+    {
+      "file": "idea-v3-2026-10-05/15-dataset-training-blueprint.md",
+      "link": "../docs/implementation-plan/skill-a1/dataset-manifest.proposed.json",
+      "resolved": "docs/implementation-plan/skill-a1/dataset-manifest.proposed.json"
+    },
+    {
+      "file": "idea-v3-2026-10-05/15-dataset-training-blueprint.md",
+      "link": "../docs/implementation-plan/skill-a1/02-recipes-and-data.md",
+      "resolved": "docs/implementation-plan/skill-a1/02-recipes-and-data.md"
+    },
+    {
+      "file": "idea-v3-2026-10-05/README.md",
+      "link": "../docs/implementation-plan/skill-a1/README.md",
+      "resolved": "docs/implementation-plan/skill-a1/README.md"
+    }
+  ],
+  "scope": "Static markdown relative-file links in the primary idea ZIP, external URLs not tested"
+}

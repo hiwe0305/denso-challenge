@@ -1,0 +1,5124 @@
+{
+  "scenario": {
+    "id": "dev-shift-0",
+    "object": [
+      0.08,
+      0.1
+    ],
+    "target": [
+      -0.14,
+      -0.06
+    ]
+  },
+  "success": true,
+  "steps": 49,
+  "timeout": false,
+  "stages": {
+    "approach": "pass",
+    "grasp": "pass",
+    "lift": "pass",
+    "transfer": "pass",
+    "place": "pass",
+    "release": "pass",
+    "retreat": "pass"
+  },
+  "trace": [
+    {
+      "step": 0,
+      "t": 0.05,
+      "policy_stage": "approach",
+      "features": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.08,
+        0.1,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "sent_command": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.25,
+          -0.15,
+          0.22
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.01998536581614057
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.215,
+          -0.11499999999999999,
+          0.185
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985642504468264
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "in_progress",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 1,
+      "t": 0.1,
+      "policy_stage": "approach",
+      "features": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.08,
+        0.1,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "sent_command": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.215,
+          -0.11499999999999999,
+          0.185
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985642504468264
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.18,
+          -0.07999999999999999,
+          0.15
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985661654171434
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "in_progress",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 2,
+      "t": 0.15,
+      "policy_stage": "approach",
+      "features": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.08,
+        0.1,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "sent_command": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.18,
+          -0.07999999999999999,
+          0.15
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985661654171434
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.145,
+          -0.044999999999999984,
+          0.11999999993263431
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.01998566297953909
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "in_progress",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 3,
+      "t": 0.2,
+      "policy_stage": "approach",
+      "features": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.08,
+        0.1,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "sent_command": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.145,
+          -0.044999999999999984,
+          0.11999999993263431
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.01998566297953909
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.10999999999999999,
+          -0.009999999999999981,
+          0.11999999993263431
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985663071268985
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "in_progress",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 4,
+      "t": 0.25,
+      "policy_stage": "approach",
+      "features": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.08,
+        0.1,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "sent_command": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.10999999999999999,
+          -0.009999999999999981,
+          0.11999999993263431
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985663071268985
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.07499999999999998,
+          0.025000000000000022,
+          0.11999999993263431
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985663077617694
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "in_progress",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 5,
+      "t": 0.3,
+      "policy_stage": "approach",
+      "features": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.08,
+        0.1,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "sent_command": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.07499999999999998,
+          0.025000000000000022,
+          0.11999999993263431
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985663077617694
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.03999999999999998,
+          0.060000000000000026,
+          0.11999999993263431
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985663078057096
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "in_progress",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 6,
+      "t": 0.35,
+      "policy_stage": "approach",
+      "features": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.08,
+        0.1,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "sent_command": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.03999999999999998,
+          0.060000000000000026,
+          0.11999999993263431
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985663078057096
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.004999999999999977,
+          0.09500000000000003,
+          0.11999999993263431
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985663078087506
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "in_progress",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 7,
+      "t": 0.4,
+      "policy_stage": "approach",
+      "features": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.08,
+        0.1,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "sent_command": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.004999999999999977,
+          0.09500000000000003,
+          0.11999999993263431
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985663078087506
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          0.030000000000000027,
+          0.09999998726638049,
+          0.11999999993263431
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985663078089612
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "in_progress",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 8,
+      "t": 0.45,
+      "policy_stage": "approach",
+      "features": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.08,
+        0.1,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "sent_command": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          0.030000000000000027,
+          0.09999998726638049,
+          0.11999999993263431
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985663078089612
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          0.06500000000000003,
+          0.09999998726638049,
+          0.11999999993263431
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985663078089758
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "not_attempted",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 9,
+      "t": 0.5,
+      "policy_stage": "approach",
+      "features": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.08,
+        0.1,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "sent_command": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          0.06500000000000003,
+          0.09999998726638049,
+          0.11999999993263431
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985663078089758
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          0.07999999418903339,
+          0.09999998726638049,
+          0.11999999993263431
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985663078089765
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "in_progress",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 10,
+      "t": 0.55,
+      "policy_stage": "approach",
+      "features": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.08,
+        0.1,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "sent_command": [
+        0.07999999418903339,
+        0.09999998726638049,
+        0.11999999993263431,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          0.07999999418903339,
+          0.09999998726638049,
+          0.11999999993263431
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985663078089765
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          0.07999999418903339,
+          0.09999998726638049,
+          0.11999999993263431
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985663078089765
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "in_progress",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 11,
+      "t": 0.6,
+      "policy_stage": "grasp",
+      "features": [
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.08,
+        0.1,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        0.07999998614303333,
+        0.09999997078640031,
+        0.019999999968024144,
+        0.9999999984012055
+      ],
+      "sent_command": [
+        0.07999998614303333,
+        0.09999997078640031,
+        0.019999999968024144,
+        0.9999999984012055
+      ],
+      "before": {
+        "ee": [
+          0.07999999418903339,
+          0.09999998726638049,
+          0.11999999993263431
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985663078089765
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          0.07999998614303333,
+          0.09999997078640031,
+          0.08499999993263431
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985663078089765
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "in_progress",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 12,
+      "t": 0.65,
+      "policy_stage": "grasp",
+      "features": [
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.08,
+        0.1,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        0.07999998614303333,
+        0.09999997078640031,
+        0.019999999968024144,
+        0.9999999984012055
+      ],
+      "sent_command": [
+        0.07999998614303333,
+        0.09999997078640031,
+        0.019999999968024144,
+        0.9999999984012055
+      ],
+      "before": {
+        "ee": [
+          0.07999998614303333,
+          0.09999997078640031,
+          0.08499999993263431
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985663078089765
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          0.07999998614303333,
+          0.09999997078640031,
+          0.049999999932634306
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985663078089765
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "in_progress",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 13,
+      "t": 0.7,
+      "policy_stage": "grasp",
+      "features": [
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.08,
+        0.1,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        0.07999998614303333,
+        0.09999997078640031,
+        0.019999999968024144,
+        0.9999999984012055
+      ],
+      "sent_command": [
+        0.07999998614303333,
+        0.09999997078640031,
+        0.019999999968024144,
+        0.9999999984012055
+      ],
+      "before": {
+        "ee": [
+          0.07999998614303333,
+          0.09999997078640031,
+          0.049999999932634306
+        ],
+        "object": [
+          0.08,
+          0.1,
+          0.019985663078089765
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          0.07999998614303333,
+          0.09999997078640031,
+          0.019999999968024144
+        ],
+        "object": [
+          0.07999999264284655,
+          0.09999998448946719,
+          0.019987211668926308
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "not_attempted",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 14,
+      "t": 0.75,
+      "policy_stage": "grasp",
+      "features": [
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.07999999264284655,
+        0.09999998448946719,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        0.07999997878588061,
+        0.09999995527587152,
+        0.019999999968024144,
+        0.9999999984012055
+      ],
+      "sent_command": [
+        0.07999997878588061,
+        0.09999995527587152,
+        0.019999999968024144,
+        0.9999999984012055
+      ],
+      "before": {
+        "ee": [
+          0.07999998614303333,
+          0.09999997078640031,
+          0.019999999968024144
+        ],
+        "object": [
+          0.07999999264284655,
+          0.09999998448946719,
+          0.019987211668926308
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "measured": {
+        "ee": [
+          0.07999997878588061,
+          0.09999995527587152,
+          0.019999999968024144
+        ],
+        "object": [
+          0.07999998557737577,
+          0.09999996959386835,
+          0.01998731734529485
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "in_progress",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 15,
+      "t": 0.8,
+      "policy_stage": "lift",
+      "features": [
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.07999998557737577,
+        0.09999996959386835,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        0.07999997449180311,
+        0.09999994622299364,
+        0.1699999997825646,
+        0.999999998720964
+      ],
+      "sent_command": [
+        0.07999997449180311,
+        0.09999994622299364,
+        0.1699999997825646,
+        0.999999998720964
+      ],
+      "before": {
+        "ee": [
+          0.07999997878588061,
+          0.09999995527587152,
+          0.019999999968024144
+        ],
+        "object": [
+          0.07999998557737577,
+          0.09999996959386835,
+          0.01998731734529485
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "measured": {
+        "ee": [
+          0.07999997449180311,
+          0.09999994622299364,
+          0.05499999996802415
+        ],
+        "object": [
+          0.07999997511607068,
+          0.09999994753908974,
+          0.052982024928027484
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "in_progress",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 16,
+      "t": 0.85,
+      "policy_stage": "lift",
+      "features": [
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.07999997511607068,
+        0.09999994753908974,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        0.07999996403049887,
+        0.09999992416821962,
+        0.1699999997825646,
+        0.9999999987209641
+      ],
+      "sent_command": [
+        0.07999996403049887,
+        0.09999992416821962,
+        0.1699999997825646,
+        0.9999999987209641
+      ],
+      "before": {
+        "ee": [
+          0.07999997449180311,
+          0.09999994622299364,
+          0.05499999996802415
+        ],
+        "object": [
+          0.07999997511607068,
+          0.09999994753908974,
+          0.052982024928027484
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "measured": {
+        "ee": [
+          0.07999996403049887,
+          0.09999992416821962,
+          0.08999999996802416
+        ],
+        "object": [
+          0.0799999646547664,
+          0.09999992548431547,
+          0.0878690998639909
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "in_progress",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 17,
+      "t": 0.9,
+      "policy_stage": "lift",
+      "features": [
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0799999646547664,
+        0.09999992548431547,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        0.07999995356919543,
+        0.09999990211344995,
+        0.1699999997825646,
+        0.9999999987209642
+      ],
+      "sent_command": [
+        0.07999995356919543,
+        0.09999990211344995,
+        0.1699999997825646,
+        0.9999999987209642
+      ],
+      "before": {
+        "ee": [
+          0.07999996403049887,
+          0.09999992416821962,
+          0.08999999996802416
+        ],
+        "object": [
+          0.0799999646547664,
+          0.09999992548431547,
+          0.0878690998639909
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "measured": {
+        "ee": [
+          0.07999995356919543,
+          0.09999990211344995,
+          0.12499999996802416
+        ],
+        "object": [
+          0.0799999541934629,
+          0.09999990342954554,
+          0.12286274065673622
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "in_progress",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 18,
+      "t": 0.95,
+      "policy_stage": "lift",
+      "features": [
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0799999541934629,
+        0.09999990342954554,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        0.07999994310789275,
+        0.09999988005868461,
+        0.16999999978256464,
+        0.9999999987209643
+      ],
+      "sent_command": [
+        0.07999994310789275,
+        0.09999988005868461,
+        0.16999999978256464,
+        0.9999999987209643
+      ],
+      "before": {
+        "ee": [
+          0.07999995356919543,
+          0.09999990211344995,
+          0.12499999996802416
+        ],
+        "object": [
+          0.0799999541934629,
+          0.09999990342954554,
+          0.12286274065673622
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "measured": {
+        "ee": [
+          0.07999994310789275,
+          0.09999988005868461,
+          0.15999999996802416
+        ],
+        "object": [
+          0.07999994373216017,
+          0.09999988137477994,
+          0.15786238254742493
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "not_attempted",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 19,
+      "t": 1.0,
+      "policy_stage": "lift",
+      "features": [
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.07999994373216017,
+        0.09999988137477994,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        0.07999993264659087,
+        0.09999985800392361,
+        0.16999999978256464,
+        0.9999999987209645
+      ],
+      "sent_command": [
+        0.07999993264659087,
+        0.09999985800392361,
+        0.16999999978256464,
+        0.9999999987209645
+      ],
+      "before": {
+        "ee": [
+          0.07999994310789275,
+          0.09999988005868461,
+          0.15999999996802416
+        ],
+        "object": [
+          0.07999994373216017,
+          0.09999988137477994,
+          0.15786238254742493
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "measured": {
+        "ee": [
+          0.07999993264659087,
+          0.09999985800392361,
+          0.16999999978256464
+        ],
+        "object": [
+          0.0799999332708856,
+          0.09999985932007634,
+          0.1692701194661578
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "in_progress",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 20,
+      "t": 1.05,
+      "policy_stage": "transfer",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0799999332708856,
+        0.09999985932007634,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        -0.13999996864975633,
+        -0.05999997326453777,
+        0.1699999997691938,
+        0.9999999986423135
+      ],
+      "sent_command": [
+        -0.13999996864975633,
+        -0.05999997326453777,
+        0.1699999997691938,
+        0.9999999986423135
+      ],
+      "before": {
+        "ee": [
+          0.07999993264659087,
+          0.09999985800392361,
+          0.16999999978256464
+        ],
+        "object": [
+          0.0799999332708856,
+          0.09999985932007634,
+          0.1692701194661578
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "measured": {
+        "ee": [
+          0.04499993264659087,
+          0.0649998580039236,
+          0.1699999997691938
+        ],
+        "object": [
+          0.04697090569657864,
+          0.06697083109287233,
+          0.16991260982190912
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "in_progress",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 21,
+      "t": 1.1,
+      "policy_stage": "transfer",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.04697090569657864,
+        0.06697083109287233,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        -0.13999997263818406,
+        -0.05999997672023712,
+        0.16999999979506042,
+        0.9999999987944703
+      ],
+      "sent_command": [
+        -0.13999997263818406,
+        -0.05999997672023712,
+        0.16999999979506042,
+        0.9999999987944703
+      ],
+      "before": {
+        "ee": [
+          0.04499993264659087,
+          0.0649998580039236,
+          0.1699999997691938
+        ],
+        "object": [
+          0.04697090569657864,
+          0.06697083109287233,
+          0.16991260982190912
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "measured": {
+        "ee": [
+          0.009999932646590867,
+          0.029999858003923602,
+          0.16999999979506042
+        ],
+        "object": [
+          0.012081898081264872,
+          0.032081823440791635,
+          0.1699487907364184
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "in_progress",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 22,
+      "t": 1.15,
+      "policy_stage": "transfer",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.012081898081264872,
+        0.032081823440791635,
+        -0.14,
+        -0.06,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        -0.13999997685121404,
+        -0.059999980370538934,
+        0.16999999982238367,
+        0.9999999989551958
+      ],
+      "sent_command": [
+        -0.13999997685121404,
+        -0.059999980370538934,
+        0.16999999982238367,
+        0.9999999989551958
+      ],
+      "before": {
+        "ee": [
+          0.009999932646590867,
+          0.029999858003923602,
+          0.16999999979506042
+        ],
+        "object": [
+          0.012081898081264872,
+          0.032081823440791635,
+          0.1699487907364184
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "measured": {
+        "ee": [
+          -0.025000067353409136,
+          -0.0050001419960764015,
+          0.16999999982238367
+        ],
+        "object": [
+          -0.022911851547447463,
+          -0.002911926189991176,
+          0.16995082823666438
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "in_progress",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 23,
+      "t": 1.2,
+      "policy_stage": "transfer",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.022911851547447463,
+        -0.002911926189991176,
+        -0.14,
+        -0.06,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        -0.13999998107689218,
+        -0.059999984031799486,
+        0.16999999984978895,
+        0.9999999991164037
+      ],
+      "sent_command": [
+        -0.13999998107689218,
+        -0.059999984031799486,
+        0.16999999984978895,
+        0.9999999991164037
+      ],
+      "before": {
+        "ee": [
+          -0.025000067353409136,
+          -0.0050001419960764015,
+          0.16999999982238367
+        ],
+        "object": [
+          -0.022911851547447463,
+          -0.002911926189991176,
+          0.16995082823666438
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "measured": {
+        "ee": [
+          -0.06000006735340914,
+          -0.040000141996076405,
+          0.16999999984978895
+        ],
+        "object": [
+          -0.05791149956707202,
+          -0.037911574209732325,
+          0.16995094300132646
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "in_progress",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 24,
+      "t": 1.25,
+      "policy_stage": "transfer",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.05791149956707202,
+        -0.037911574209732325,
+        -0.14,
+        -0.06,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        -0.1399999853032826,
+        -0.05999998769367717,
+        0.16999999987719885,
+        0.9999999992776387
+      ],
+      "sent_command": [
+        -0.1399999853032826,
+        -0.05999998769367717,
+        0.16999999987719885,
+        0.9999999992776387
+      ],
+      "before": {
+        "ee": [
+          -0.06000006735340914,
+          -0.040000141996076405,
+          0.16999999984978895
+        ],
+        "object": [
+          -0.05791149956707202,
+          -0.037911574209732325,
+          0.16995094300132646
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "measured": {
+        "ee": [
+          -0.09500006735340914,
+          -0.05999998769367717,
+          0.16999999987719885
+        ],
+        "object": [
+          -0.09291147974581998,
+          -0.058756111496040125,
+          0.16995094948999429
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "in_progress",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 25,
+      "t": 1.3,
+      "policy_stage": "transfer",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.09291147974581998,
+        -0.058756111496040125,
+        -0.14,
+        -0.06,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        -0.1399999890062242,
+        -0.059999990061027075,
+        0.1699999999006353,
+        0.9999999994155007
+      ],
+      "sent_command": [
+        -0.1399999890062242,
+        -0.059999990061027075,
+        0.1699999999006353,
+        0.9999999994155007
+      ],
+      "before": {
+        "ee": [
+          -0.09500006735340914,
+          -0.05999998769367717,
+          0.16999999987719885
+        ],
+        "object": [
+          -0.09291147974581998,
+          -0.058756111496040125,
+          0.16995094948999429
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "measured": {
+        "ee": [
+          -0.13000006735340913,
+          -0.059999990061027075,
+          0.1699999999006353
+        ],
+        "object": [
+          -0.1279114786296156,
+          -0.059929942887160886,
+          0.16995094987751067
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "not_attempted",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 26,
+      "t": 1.35,
+      "policy_stage": "transfer",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.1279114786296156,
+        -0.059929942887160886,
+        -0.14,
+        -0.06,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        -0.13999999198171595,
+        -0.05999999062942546,
+        0.1699999999185499,
+        0.9999999995208807
+      ],
+      "sent_command": [
+        -0.13999999198171595,
+        -0.05999999062942546,
+        0.1699999999185499,
+        0.9999999995208807
+      ],
+      "before": {
+        "ee": [
+          -0.13000006735340913,
+          -0.059999990061027075,
+          0.1699999999006353
+        ],
+        "object": [
+          -0.1279114786296156,
+          -0.059929942887160886,
+          0.16995094987751067
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "measured": {
+        "ee": [
+          -0.13999999198171595,
+          -0.05999999062942546,
+          0.1699999999185499
+        ],
+        "object": [
+          -0.13931911361909569,
+          -0.059996045231784804,
+          0.16995072546491294
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "in_progress",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 27,
+      "t": 1.4,
+      "policy_stage": "place",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.13931911361909569,
+        -0.059996045231784804,
+        -0.14,
+        -0.06,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        -0.13992227863277845,
+        -0.05999689541533046,
+        0.019999999972179706,
+        0.999999998610157
+      ],
+      "sent_command": [
+        -0.13992227863277845,
+        -0.05999689541533046,
+        0.019999999972179706,
+        0.999999998610157
+      ],
+      "before": {
+        "ee": [
+          -0.13999999198171595,
+          -0.05999999062942546,
+          0.1699999999185499
+        ],
+        "object": [
+          -0.13931911361909569,
+          -0.059996045231784804,
+          0.16995072546491294
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "measured": {
+        "ee": [
+          -0.13992227863277845,
+          -0.05999689541533046,
+          0.13499999991854988
+        ],
+        "object": [
+          -0.1398883122909082,
+          -0.05999684753850685,
+          0.13692191029360823
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "in_progress",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 28,
+      "t": 1.45,
+      "policy_stage": "place",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.1398883122909082,
+        -0.05999684753850685,
+        -0.14,
+        -0.06,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        -0.13998833361624252,
+        -0.06000100052254283,
+        0.019999999985326866,
+        0.9999999992665152
+      ],
+      "sent_command": [
+        -0.13998833361624252,
+        -0.06000100052254283,
+        0.019999999985326866,
+        0.9999999992665152
+      ],
+      "before": {
+        "ee": [
+          -0.13992227863277845,
+          -0.05999689541533046,
+          0.13499999991854988
+        ],
+        "object": [
+          -0.1398883122909082,
+          -0.05999684753850685,
+          0.13692191029360823
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "measured": {
+        "ee": [
+          -0.13998833361624252,
+          -0.06000100052254283,
+          0.09999999991854988
+        ],
+        "object": [
+          -0.13998270106386704,
+          -0.06000076665341523,
+          0.10203291463945406
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "in_progress",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 29,
+      "t": 1.5,
+      "policy_stage": "place",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.13998270106386704,
+        -0.06000076665341523,
+        -0.14,
+        -0.06,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        -0.1399993138324226,
+        -0.06000224574043566,
+        0.019999999987543354,
+        0.9999999993771723
+      ],
+      "sent_command": [
+        -0.1399993138324226,
+        -0.06000224574043566,
+        0.019999999987543354,
+        0.9999999993771723
+      ],
+      "before": {
+        "ee": [
+          -0.13998833361624252,
+          -0.06000100052254283,
+          0.09999999991854988
+        ],
+        "object": [
+          -0.13998270106386704,
+          -0.06000076665341523,
+          0.10203291463945406
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "measured": {
+        "ee": [
+          -0.1399993138324226,
+          -0.06000224574043566,
+          0.06499999991854988
+        ],
+        "object": [
+          -0.13999837830903616,
+          -0.06000216244784697,
+          0.06703916568431666
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "in_progress",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 30,
+      "t": 1.55,
+      "policy_stage": "place",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.13999837830903616,
+        -0.06000216244784697,
+        -0.14,
+        -0.06,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        -0.14000114277212294,
+        -0.06000256361522133,
+        0.019999999987918644,
+        0.9999999993959084
+      ],
+      "sent_command": [
+        -0.14000114277212294,
+        -0.06000256361522133,
+        0.019999999987918644,
+        0.9999999993959084
+      ],
+      "before": {
+        "ee": [
+          -0.1399993138324226,
+          -0.06000224574043566,
+          0.06499999991854988
+        ],
+        "object": [
+          -0.13999837830903616,
+          -0.06000216244784697,
+          0.06703916568431666
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "measured": {
+        "ee": [
+          -0.14000114277212294,
+          -0.06000256361522133,
+          0.029999999918549874
+        ],
+        "object": [
+          -0.14000098709549025,
+          -0.06000254102407648,
+          0.032039517702623484
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "not_attempted",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 31,
+      "t": 1.6,
+      "policy_stage": "place",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.14000098709549025,
+        -0.06000254102407648,
+        -0.14,
+        -0.06,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        -0.14000144814202778,
+        -0.0600026383250011,
+        0.019999999987982495,
+        0.9999999993990963
+      ],
+      "sent_command": [
+        -0.14000144814202778,
+        -0.0600026383250011,
+        0.019999999987982495,
+        0.9999999993990963
+      ],
+      "before": {
+        "ee": [
+          -0.14000114277212294,
+          -0.06000256361522133,
+          0.029999999918549874
+        ],
+        "object": [
+          -0.14000098709549025,
+          -0.06000254102407648,
+          0.032039517702623484
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "measured": {
+        "ee": [
+          -0.14000144814202778,
+          -0.0600026383250011,
+          0.019999999987982495
+        ],
+        "object": [
+          -0.14000142216677508,
+          -0.060002632843090056,
+          0.020631475240400567
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "in_progress",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 32,
+      "t": 1.65,
+      "policy_stage": "release",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.14000142216677508,
+        -0.060002632843090056,
+        -0.14,
+        -0.06,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        -0.14000069495400222,
+        -0.06000130077742909,
+        0.01999999996887605,
+        0.0
+      ],
+      "sent_command": [
+        -0.14000069495400222,
+        -0.06000130077742909,
+        0.01999999996887605,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.14000144814202778,
+          -0.0600026383250011,
+          0.019999999987982495
+        ],
+        "object": [
+          -0.14000142216677508,
+          -0.060002632843090056,
+          0.020631475240400567
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": true,
+        "attached_sensor": true
+      },
+      "measured": {
+        "ee": [
+          -0.14000069495400222,
+          -0.06000130077742909,
+          0.01999999996887605
+        ],
+        "object": [
+          -0.1400014392804864,
+          -0.06000263645482944,
+          0.019928710279224306
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "not_attempted"
+      },
+      "success": false
+    },
+    {
+      "step": 33,
+      "t": 1.7,
+      "policy_stage": "release",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.1400014392804864,
+        -0.06000263645482944,
+        -0.14,
+        -0.06,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0
+      ],
+      "predicted_action": [
+        -0.1400007035108568,
+        -0.06000130258329822,
+        0.01999999996887605,
+        0.0
+      ],
+      "sent_command": [
+        -0.1400007035108568,
+        -0.06000130258329822,
+        0.01999999996887605,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.14000069495400222,
+          -0.06000130077742909,
+          0.01999999996887605
+        ],
+        "object": [
+          -0.1400014392804864,
+          -0.06000263645482944,
+          0.019928710279224306
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.1400007035108568,
+          -0.06000130258329822,
+          0.01999999996887605
+        ],
+        "object": [
+          -0.14000143926989278,
+          -0.060002636452593724,
+          0.01998172769277907
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "in_progress"
+      },
+      "success": false
+    },
+    {
+      "step": 34,
+      "t": 1.75,
+      "policy_stage": "retreat",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.14000143926989278,
+        -0.060002636452593724,
+        -0.14,
+        -0.06
+      ],
+      "predicted_action": [
+        -0.140000717487975,
+        -0.060001316145379305,
+        0.15999999996683997,
+        0.0
+      ],
+      "sent_command": [
+        -0.140000717487975,
+        -0.060001316145379305,
+        0.15999999996683997,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.1400007035108568,
+          -0.06000130258329822,
+          0.01999999996887605
+        ],
+        "object": [
+          -0.14000143926989278,
+          -0.060002636452593724,
+          0.01998172769277907
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.140000717487975,
+          -0.060001316145379305,
+          0.05499999996887606
+        ],
+        "object": [
+          -0.1400014392691665,
+          -0.060002636452440444,
+          0.019985390732750474
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "in_progress"
+      },
+      "success": false
+    },
+    {
+      "step": 35,
+      "t": 1.8,
+      "policy_stage": "retreat",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.1400014392691665,
+        -0.060002636452440444,
+        -0.14,
+        -0.06
+      ],
+      "predicted_action": [
+        -0.14000071748761184,
+        -0.060001316145302665,
+        0.15999999996683997,
+        0.0
+      ],
+      "sent_command": [
+        -0.14000071748761184,
+        -0.060001316145302665,
+        0.15999999996683997,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.140000717487975,
+          -0.060001316145379305,
+          0.05499999996887606
+        ],
+        "object": [
+          -0.1400014392691665,
+          -0.060002636452440444,
+          0.019985390732750474
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.14000071748761184,
+          -0.060001316145302665,
+          0.08999999996887606
+        ],
+        "object": [
+          -0.14000143926911654,
+          -0.06000263645242991,
+          0.01998564422894569
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "in_progress"
+      },
+      "success": false
+    },
+    {
+      "step": 36,
+      "t": 1.85,
+      "policy_stage": "retreat",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.14000143926911654,
+        -0.06000263645242991,
+        -0.14,
+        -0.06
+      ],
+      "predicted_action": [
+        -0.14000071748758686,
+        -0.0600013161452974,
+        0.15999999996683997,
+        0.0
+      ],
+      "sent_command": [
+        -0.14000071748758686,
+        -0.0600013161452974,
+        0.15999999996683997,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.14000071748761184,
+          -0.060001316145302665,
+          0.08999999996887606
+        ],
+        "object": [
+          -0.14000143926911654,
+          -0.06000263645242991,
+          0.01998564422894569
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.14000071748758686,
+          -0.0600013161452974,
+          0.12499999996887606
+        ],
+        "object": [
+          -0.1400014392691131,
+          -0.060002636452429196,
+          0.019985661773523986
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "in_progress"
+      },
+      "success": false
+    },
+    {
+      "step": 37,
+      "t": 1.9,
+      "policy_stage": "retreat",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.1400014392691131,
+        -0.060002636452429196,
+        -0.14,
+        -0.06
+      ],
+      "predicted_action": [
+        -0.14000071748758514,
+        -0.06000131614529704,
+        0.15999999996683997,
+        0.0
+      ],
+      "sent_command": [
+        -0.14000071748758514,
+        -0.06000131614529704,
+        0.15999999996683997,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.14000071748758686,
+          -0.0600013161452974,
+          0.12499999996887606
+        ],
+        "object": [
+          -0.1400014392691131,
+          -0.060002636452429196,
+          0.019985661773523986
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.14000071748758514,
+          -0.06000131614529704,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985662987799604
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "in_progress"
+      },
+      "success": false
+    },
+    {
+      "step": 38,
+      "t": 1.95,
+      "policy_stage": "retreat",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.14000143926911288,
+        -0.060002636452429155,
+        -0.14,
+        -0.06
+      ],
+      "predicted_action": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "sent_command": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.14000071748758514,
+          -0.06000131614529704,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985662987799604
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.14000071748758502,
+          -0.06000131614529702,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985663071840718
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "in_progress"
+      },
+      "success": false
+    },
+    {
+      "step": 39,
+      "t": 2.0,
+      "policy_stage": "retreat",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.14000143926911288,
+        -0.060002636452429155,
+        -0.14,
+        -0.06
+      ],
+      "predicted_action": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "sent_command": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.14000071748758502,
+          -0.06000131614529702,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985663071840718
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.14000071748758502,
+          -0.06000131614529702,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985663077657284
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "in_progress"
+      },
+      "success": false
+    },
+    {
+      "step": 40,
+      "t": 2.05,
+      "policy_stage": "retreat",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.14000143926911288,
+        -0.060002636452429155,
+        -0.14,
+        -0.06
+      ],
+      "predicted_action": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "sent_command": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.14000071748758502,
+          -0.06000131614529702,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985663077657284
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.14000071748758502,
+          -0.06000131614529702,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985663078059854
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "in_progress"
+      },
+      "success": false
+    },
+    {
+      "step": 41,
+      "t": 2.1,
+      "policy_stage": "retreat",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.14000143926911288,
+        -0.060002636452429155,
+        -0.14,
+        -0.06
+      ],
+      "predicted_action": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "sent_command": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.14000071748758502,
+          -0.06000131614529702,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985663078059854
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.14000071748758502,
+          -0.06000131614529702,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985663078087718
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "in_progress"
+      },
+      "success": false
+    },
+    {
+      "step": 42,
+      "t": 2.15,
+      "policy_stage": "retreat",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.14000143926911288,
+        -0.060002636452429155,
+        -0.14,
+        -0.06
+      ],
+      "predicted_action": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "sent_command": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.14000071748758502,
+          -0.06000131614529702,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985663078087718
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.14000071748758502,
+          -0.06000131614529702,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985663078089643
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "in_progress"
+      },
+      "success": false
+    },
+    {
+      "step": 43,
+      "t": 2.2,
+      "policy_stage": "retreat",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.14000143926911288,
+        -0.060002636452429155,
+        -0.14,
+        -0.06
+      ],
+      "predicted_action": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "sent_command": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.14000071748758502,
+          -0.06000131614529702,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985663078089643
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.14000071748758502,
+          -0.06000131614529702,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985663078089775
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "in_progress"
+      },
+      "success": false
+    },
+    {
+      "step": 44,
+      "t": 2.25,
+      "policy_stage": "retreat",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.14000143926911288,
+        -0.060002636452429155,
+        -0.14,
+        -0.06
+      ],
+      "predicted_action": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "sent_command": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.14000071748758502,
+          -0.06000131614529702,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985663078089775
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.14000071748758502,
+          -0.06000131614529702,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985663078089782
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "in_progress"
+      },
+      "success": false
+    },
+    {
+      "step": 45,
+      "t": 2.3,
+      "policy_stage": "retreat",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.14000143926911288,
+        -0.060002636452429155,
+        -0.14,
+        -0.06
+      ],
+      "predicted_action": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "sent_command": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.14000071748758502,
+          -0.06000131614529702,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985663078089782
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.14000071748758502,
+          -0.06000131614529702,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985663078089782
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "in_progress"
+      },
+      "success": false
+    },
+    {
+      "step": 46,
+      "t": 2.35,
+      "policy_stage": "retreat",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.14000143926911288,
+        -0.060002636452429155,
+        -0.14,
+        -0.06
+      ],
+      "predicted_action": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "sent_command": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.14000071748758502,
+          -0.06000131614529702,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985663078089782
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.14000071748758502,
+          -0.06000131614529702,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985663078089782
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "in_progress"
+      },
+      "success": false
+    },
+    {
+      "step": 47,
+      "t": 2.4,
+      "policy_stage": "retreat",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.14000143926911288,
+        -0.060002636452429155,
+        -0.14,
+        -0.06
+      ],
+      "predicted_action": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "sent_command": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.14000071748758502,
+          -0.06000131614529702,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985663078089782
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.14000071748758502,
+          -0.06000131614529702,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985663078089782
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "in_progress"
+      },
+      "success": false
+    },
+    {
+      "step": 48,
+      "t": 2.45,
+      "policy_stage": "retreat",
+      "features": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.14000143926911288,
+        -0.060002636452429155,
+        -0.14,
+        -0.06
+      ],
+      "predicted_action": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "sent_command": [
+        -0.14000071748758502,
+        -0.06000131614529702,
+        0.15999999996683997,
+        0.0
+      ],
+      "before": {
+        "ee": [
+          -0.14000071748758502,
+          -0.06000131614529702,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985663078089782
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "measured": {
+        "ee": [
+          -0.14000071748758502,
+          -0.06000131614529702,
+          0.15999999996683997
+        ],
+        "object": [
+          -0.14000143926911288,
+          -0.060002636452429155,
+          0.019985663078089782
+        ],
+        "target": [
+          -0.14,
+          -0.06,
+          0.02
+        ],
+        "grip_closed": false,
+        "attached_sensor": false
+      },
+      "scorer_grasp_sensor_known": true,
+      "reference_stage_advance_halted": false,
+      "score": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "success": true
+    }
+  ],
+  "policy_recipe": "ridge_behavior_cloning_reference"
+}

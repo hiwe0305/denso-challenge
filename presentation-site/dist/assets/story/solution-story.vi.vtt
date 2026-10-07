@@ -2,45 +2,45 @@ WEBVTT
 
 1
 00:00:00.000 --> 00:00:08.000
-Một nhiệm vụ cụ thể, một tiêu chuẩn rõ ràng
-“Đặt linh kiện màu vàng vào ô A1.” Một tay hoạt động; thân robot cố định. Linh kiện và khay nằm trong vùng thao tác khả thi.
+Một task A1, một tiêu chuẩn rõ ràng
+Lấy đúng linh kiện vàng, đặt footprint nằm trọn trong A1, nhả và rút tay. Khóa domain, binding và scorer trước khi nghiệm thu. Geometry và ngưỡng prototype cần task owner chốt.
 
 2
 00:00:08.000 --> 00:00:16.000
-Mỗi nguồn dạy một phần khác nhau
-Video người bổ sung tín hiệu trình tự thao tác. Mẫu robot đích dạy hành động điều khiển. Video có quyền và dữ liệu mô phỏng được dùng khi phù hợp.
+Baseline robot trước; nguồn bổ sung qua gate
+Mẫu robot dạy action native. Synthetic: biến đổi seed → thực thi → QA → robot labels. Human: common wrist objective qua bridge candidate; không gán human motion thành robot joint labels.
 
 3
 00:00:16.000 --> 00:00:24.000
-Từ mô hình đã học tới hành động của robot
-Camera, trạng thái hiện tại và câu lệnh đi vào mô hình. Mô hình dự đoán hành động; bộ điều khiển thực thi, bộ chấm ghi kết quả.
+Training, reload, rồi robot chạy closed-loop
+Batch hợp lệ → loss / gradient → checkpoint → reload. RGB và lệnh qua VLM; Action Expert cùng state dự đoán action chunk. Binding / controller thực thi; scorer chấm kết quả độc lập.
 
 4
 00:00:24.000 --> 00:00:32.000
-Bộ gắp đóng nhưng không lấy được linh kiện
-Quan sát: bộ gắp tiếp cận lệch, vật vẫn ở trên bàn. Một lượt lỗi giúp đặt câu hỏi cho lần kiểm tra tiếp theo.
+Linh kiện tuột khỏi bộ gắp trước khi tới khay
+Robot đã nâng vật, nhưng vật rơi lúc chuyển. Quan sát này chưa cho biết lỗi do pose gắp, action dự đoán, mapping hay điều khiển tiếp xúc.
 
 5
 00:00:32.000 --> 00:00:40.000
-Kiểm hệ thống trước khi kết luận thiếu dữ liệu
-Giả thuyết cần kiểm: quan sát trong ánh sáng mới chưa đủ tốt. Kỹ sư xem quan sát, cấu hình và phản hồi để quyết định bước tiếp theo.
+Tìm điểm lệch đầu tiên, kiểm giả thuyết
+Giữ input → VLM features → action chunk → command / response → outcome. Kiểm mapping và controller; so chuyển vật từ pose gắp chuẩn với pose policy tự tạo để kiểm ảnh hưởng bước trước.
 
 6
 00:00:40.000 --> 00:00:48.000
-Thử biến đổi hình ảnh cơ bản
-Sau khi kiểm hệ thống, thử một gói nhỏ thay đổi ánh sáng trên dữ liệu học hợp lệ.
+Can thiệp theo kết quả phép kiểm, kỹ sư duyệt
+Có lỗi hệ thống: sửa rồi lập lại baseline. Nếu bằng chứng chỉ tới gắp–chuyển: thu correction có context hoặc thử synthetic contact-valid. Không đủ bằng chứng: hoãn hoặc thu phép kiểm tiếp.
 
 7
 00:00:48.000 --> 00:00:56.000
-Dữ liệu qua kiểm tra, rồi mới vào huấn luyện
-Giữ nhãn hành động chỉ khi vật, hình học và ý nghĩa thao tác không đổi. Gói được chọn tạo một phiên bản mô hình mới, với nguồn dữ liệu và cấu hình được lưu lại.
+Chỉ train khi dữ liệu, loss và module đã hợp lệ
+QA và split theo roots trước variants. Recipe khóa loss / train / freeze; giữ dữ liệu cũ, kiểm gradient và reload. Human pilot cùng freeze VLM ở R_common và R_common+H.
 
 8
 00:00:56.000 --> 00:01:04.000
-Thử lại cùng điều kiện, đo chất lượng và tổng công
-So với kỹ sư thu mẫu robot có chủ đích và cách bổ sung dữ liệu cố định. Chấm nhiều lượt độc lập; ghi cả thất bại, thời gian và công xử lý thêm.
+Đo toàn task và tổng công, giữ final riêng
+So cùng ngưỡng task, robot budget và protocol đã khóa. Đo natural starts, chuyển tiếp và regression; tính cả thu/reset, QA, nguồn bổ sung, compute và thử lại.
 
 9
 00:01:04.000 --> 00:01:12.000
-Bàn giao một kỹ năng có thể kiểm tra và dùng lại
-Mô hình đi cùng cấu hình thực thi, quy trình dữ liệu và báo cáo. Chỉ bàn giao kỹ năng sau khi đạt tiêu chuẩn đã thống nhất.
+Bàn giao khi có bằng chứng nghiệm thu
+Checkpoint + preprocessing / binding + dataset release + recipe + receipts + rollout report. Task thứ hai trên cùng robot đo phần tái sử dụng và phần phải xây lại.

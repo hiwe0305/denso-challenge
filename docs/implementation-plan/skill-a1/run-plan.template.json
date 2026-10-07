@@ -1,0 +1,26 @@
+{
+  "status": "template_not_benchmarked",
+  "scope": "R and R+S minimum native study; H/video/workflow optional with their own caps",
+  "code_checkpoint_data_config_hashes": null,
+  "resource_cap": null,
+  "jobs": [
+    {
+      "hypothesis": "native baseline feasibility",
+      "selected_model": null,
+      "trainable_modules": null,
+      "batch_dtype_horizon_views": null,
+      "measured_peak_vram_gb": null,
+      "measured_steps_per_second": null,
+      "steps": null,
+      "training_seeds_repeats": null,
+      "gpu_type_count_wall_hours": null,
+      "generation_attempts_yield_qa_hours": null,
+      "eval_scenarios_rollouts_reset_hours": null,
+      "engineer_operator_cpu_storage_work": null,
+      "retry_contingency": null
+    }
+  ],
+  "total_measured_and_estimated_cost": null,
+  "owner_accepts_gate_power_tradeoff": null,
+  "stop_defer_rule": "No job-set commitment before measured native feasibility; stop/replan when cap is reached."
+}

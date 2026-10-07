@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1300" viewBox="0 0 1440 1300" role="img"><title>Kiến trúc, native proposal và reference đã thực thi</title><defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#71839a"/></marker></defs><rect width="1440" height="1300" fill="#f1f5f9"/><style>text{font-family:DejaVu Sans,sans-serif}.t{font-size:30px;font-weight:700;fill:#14243c}.h{font-size:19px;font-weight:700;fill:#14243c}.b{font-size:16px;fill:#405572}.small{font-size:14px;fill:#526981}.wire{stroke:#71839a;stroke-width:2;fill:none;marker-end:url(#a)}</style>
+<text x="48" y="52" class="t">Robot Skill Learning</text>
+<text x="48" y="86" class="b">Dữ liệu → học → thực thi → bằng chứng → can thiệp → nghiệm thu. Kiểm đúng scope trước claim.</text>
+<text x="48" y="132" class="h">A. NATIVE VLA · THIẾT KẾ CẦN TÍCH HỢP</text>
+<g id="node-R"><rect x="48" y="155" width="310" height="173" rx="12" fill="white" stroke="#d5dfeb"/><rect x="48" y="155" width="5" height="173" fill="#2563eb"/>
+<text x="66" y="180" class="small">R</text>
+<text x="66" y="207" class="h">Robot anchor</text>
+<text x="66" y="236" class="b">Seed / calibration / correction</text>
+<text x="66" y="261" class="b">Action profile và timing rõ</text>
+<text x="66" y="286" class="b">GR1 native: chưa tested</text>
+</g>
+<g id="node-S"><rect x="390" y="155" width="310" height="173" rx="12" fill="white" stroke="#d5dfeb"/><rect x="390" y="155" width="5" height="173" fill="#0891b2"/>
+<text x="408" y="180" class="small">S</text>
+<text x="408" y="207" class="h">Sim-generated robot data</text>
+<text x="408" y="236" class="b">Seed → transform → execute</text>
+<text x="408" y="261" class="b">Action / state / outcome QA</text>
+<text x="408" y="286" class="b">F2: native generator chưa port</text>
+</g>
+<g id="node-H"><rect x="732" y="155" width="310" height="173" rx="12" fill="white" stroke="#d5dfeb"/><rect x="732" y="155" width="5" height="173" fill="#8b5cf6"/>
+<text x="750" y="180" class="small">H</text>
+<text x="750" y="207" class="h">Human eligibility</text>
+<text x="750" y="236" class="b">RGB / pose / camera / masks</text>
+<text x="750" y="261" class="b">Common wrist candidate · cần QA</text>
+<text x="750" y="286" class="b">F1: wrist pilot chưa port</text>
+</g>
+<g id="node-TASK"><rect x="1074" y="155" width="318" height="173" rx="12" fill="white" stroke="#d5dfeb"/><rect x="1074" y="155" width="5" height="173" fill="#64748b"/>
+<text x="1092" y="180" class="small">TASK</text>
+<text x="1092" y="207" class="h">Task và binding</text>
+<text x="1092" y="236" class="b">Một kỹ năng / một robot</text>
+<text x="1092" y="261" class="b">Owner khóa domain / quality</text>
+<text x="1092" y="286" class="b">Fixed torso: cần kiểm profile</text>
+</g>
+<path d="M203 328 V357" class="wire"/>
+<path d="M545 328 V357" class="wire"/>
+<path d="M887 328 V357" class="wire"/>
+<g id="node-QA"><rect x="48" y="357" width="994" height="106" rx="12" fill="white" stroke="#d5dfeb"/><rect x="48" y="357" width="5" height="106" fill="#64748b"/>
+<text x="66" y="382" class="small">QA</text>
+<text x="66" y="409" class="h">Release + supervision contracts</text>
+<text x="66" y="438" class="b">Rights · ancestors/splits · frame/time/units · missing masks · action provenance</text>
+</g>
+<path d="M545 463 V492" class="wire"/>
+<g id="node-TRAIN"><rect x="48" y="492" width="994" height="106" rx="12" fill="white" stroke="#d5dfeb"/><rect x="48" y="492" width="5" height="106" fill="#2563eb"/>
+<text x="66" y="517" class="small">TRAIN</text>
+<text x="66" y="544" class="h">Loss / gradients / recipe → checkpoint</text>
+<text x="66" y="573" class="b">ACT loss theo selected config; VLM params theo manifest. Human route conditional.</text>
+</g>
+<g id="node-STUDY"><rect x="1074" y="357" width="318" height="241" rx="12" fill="white" stroke="#d5dfeb"/><rect x="1074" y="357" width="5" height="241" fill="#64748b"/>
+<text x="1092" y="382" class="small">STUDY</text>
+<text x="1092" y="409" class="h">Protocol trước grid</text>
+<text x="1092" y="438" class="b">Useful baseline → source pilots</text>
+<text x="1092" y="463" class="b">Giữ robot budgets / costs rõ</text>
+<text x="1092" y="488" class="b">Prefix / 27jobs chưa commitment</text>
+<text x="1092" y="513" class="b">Freeze → independent final</text>
+<text x="1092" y="538" class="b">F5/F8: native study chưa chạy</text>
+</g>
+<text x="48" y="636" class="h">INFERENCE · camera/language → features → action → controller → response</text>
+<g id="node-INPUT"><rect x="48" y="658" width="200" height="137" rx="12" fill="white" stroke="#d5dfeb"/><rect x="48" y="658" width="5" height="137" fill="#64748b"/>
+<text x="66" y="683" class="small">INPUT</text>
+<text x="66" y="710" class="h">Input</text>
+<text x="66" y="739" class="b">Frames / tokens</text>
+<text x="66" y="764" class="b">Measured state</text>
+</g>
+<path d="M248 727 H268" class="wire"/>
+<g id="node-VLM"><rect x="272" y="658" width="200" height="137" rx="12" fill="white" stroke="#d5dfeb"/><rect x="272" y="658" width="5" height="137" fill="#2563eb"/>
+<text x="290" y="683" class="small">VLM</text>
+<text x="290" y="710" class="h">VLM</text>
+<text x="290" y="739" class="b">Representation</text>
+<text x="290" y="764" class="b">Chưa native trace</text>
+</g>
+<path d="M472 727 H492" class="wire"/>
+<g id="node-IFACE"><rect x="496" y="658" width="200" height="137" rx="12" fill="white" stroke="#d5dfeb"/><rect x="496" y="658" width="5" height="137" fill="#2563eb"/>
+<text x="514" y="683" class="small">IFACE</text>
+<text x="514" y="710" class="h">Interface</text>
+<text x="514" y="739" class="b">Features / masks</text>
+<text x="514" y="764" class="b">F3: debug parity</text>
+</g>
+<path d="M696 727 H716" class="wire"/>
+<g id="node-ACT"><rect x="720" y="658" width="200" height="137" rx="12" fill="white" stroke="#d5dfeb"/><rect x="720" y="658" width="5" height="137" fill="#2563eb"/>
+<text x="738" y="683" class="small">ACT</text>
+<text x="738" y="710" class="h">Action expert</text>
+<text x="738" y="739" class="b">State / ID + features</text>
+<text x="738" y="764" class="b">Normalized chunk</text>
+</g>
+<path d="M920 727 H940" class="wire"/>
+<g id="node-EXEC"><rect x="944" y="658" width="200" height="137" rx="12" fill="white" stroke="#d5dfeb"/><rect x="944" y="658" width="5" height="137" fill="#64748b"/>
+<text x="962" y="683" class="small">EXEC</text>
+<text x="962" y="710" class="h">Controller</text>
+<text x="962" y="739" class="b">Order / denorm</text>
+<text x="962" y="764" class="b">F4: response</text>
+</g>
+<path d="M1144 727 H1164" class="wire"/>
+<g id="node-SCORE"><rect x="1168" y="658" width="200" height="137" rx="12" fill="white" stroke="#d5dfeb"/><rect x="1168" y="658" width="5" height="137" fill="#64748b"/>
+<text x="1186" y="683" class="small">SCORE</text>
+<text x="1186" y="710" class="h">Evaluator</text>
+<text x="1186" y="739" class="b">Stage / full task</text>
+<text x="1186" y="764" class="b">Unknown / reach</text>
+</g>
+<text x="48" y="826" class="small">Robot state vào ACT riêng. Scorer privilege không cấp ngầm cho native image policy.</text>
+<g id="node-EVID"><rect x="48" y="855" width="654" height="112" rx="12" fill="white" stroke="#d5dfeb"/><rect x="48" y="855" width="5" height="112" fill="#d97706"/>
+<text x="66" y="880" class="small">EVID</text>
+<text x="66" y="907" class="h">Evidence → engineer review → controlled test</text>
+<text x="66" y="936" class="b">Input / feature / action / command / response; không auto cause/update.</text>
+</g>
+<g id="node-COST"><rect x="734" y="855" width="658" height="112" rx="12" fill="white" stroke="#d5dfeb"/><rect x="734" y="855" width="5" height="112" fill="#d97706"/>
+<text x="752" y="880" class="small">COST</text>
+<text x="752" y="907" class="h">F6 · Quality và total cost</text>
+<text x="752" y="936" class="b">Capture / bridge / generation / rejects / QA / train / eval; saving chưa established.</text>
+</g>
+<path d="M596 795 V848" class="wire" stroke-dasharray="5 5"/>
+<path d="M1268 795 V826 H1000 V848" class="wire" stroke-dasharray="5 5"/>
+<text x="48" y="1015" class="h">B. REFERENCE ĐÃ CHẠY · KHÔNG PHẢI GR00T / GR1 / HUMAN TRANSFER</text>
+<g id="node-REF1"><rect x="48" y="1040" width="248" height="130" rx="12" fill="white" stroke="#d5dfeb"/><rect x="48" y="1040" width="5" height="130" fill="#0d9488"/>
+<text x="66" y="1065" class="small">REF1</text>
+<text x="66" y="1092" class="h">Seed + QA</text>
+<text x="66" y="1121" class="b">MuJoCo execute</text>
+<text x="66" y="1146" class="b">4D xyz / grip</text>
+</g>
+<path d="M296 1110 H316" class="wire"/>
+<g id="node-REF2"><rect x="320" y="1040" width="248" height="130" rx="12" fill="white" stroke="#d5dfeb"/><rect x="320" y="1040" width="5" height="130" fill="#0d9488"/>
+<text x="338" y="1065" class="small">REF2</text>
+<text x="338" y="1092" class="h">Variants</text>
+<text x="338" y="1121" class="b">24 execute / accept</text>
+<text x="338" y="1146" class="b">Một ancestor root</text>
+</g>
+<path d="M568 1110 H588" class="wire"/>
+<g id="node-REF3"><rect x="592" y="1040" width="248" height="130" rx="12" fill="white" stroke="#d5dfeb"/><rect x="592" y="1040" width="5" height="130" fill="#0d9488"/>
+<text x="610" y="1065" class="small">REF3</text>
+<text x="610" y="1092" class="h">Học + reload</text>
+<text x="610" y="1121" class="b">Predictor 35×4</text>
+<text x="610" y="1146" class="b">R / S / C weights</text>
+</g>
+<path d="M840 1110 H860" class="wire"/>
+<g id="node-REF4"><rect x="864" y="1040" width="248" height="130" rx="12" fill="white" stroke="#d5dfeb"/><rect x="864" y="1040" width="5" height="130" fill="#0d9488"/>
+<text x="882" y="1065" class="small">REF4</text>
+<text x="882" y="1092" class="h">Rollout + lỗi</text>
+<text x="882" y="1121" class="b">Pred / sent / measured</text>
+<text x="882" y="1146" class="b">Binding / unknown</text>
+</g>
+<path d="M1112 1110 H1132" class="wire"/>
+<g id="node-REF5"><rect x="1136" y="1040" width="248" height="130" rx="12" fill="white" stroke="#d5dfeb"/><rect x="1136" y="1040" width="5" height="130" fill="#0d9488"/>
+<text x="1154" y="1065" class="small">REF5</text>
+<text x="1154" y="1092" class="h">Final + gate</text>
+<text x="1154" y="1121" class="b">R 0/12 · S 12/12</text>
+<text x="1154" y="1146" class="b">C 0/12 → reject</text>
+</g>
+<text x="48" y="1210" class="b">Reference: idealized state adapter · scripted sequencer · proximity weld grasp · action predictor học thật.</text>
+<text x="48" y="1240" class="small">Kiểm plumbing/contracts/gates; chưa perception, language grounding, human motor transfer, native action hoặc real cost.</text>
+</svg>

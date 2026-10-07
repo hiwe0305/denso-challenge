@@ -1,0 +1,60 @@
+{
+  "status": "template_not_measured_not_backend",
+  "round_id": null,
+  "parent_checkpoint": null,
+  "task_profile_scorer_revisions": null,
+  "failure_bucket": null,
+  "facts": [],
+  "alternative_hypotheses": [],
+  "health_checks": null,
+  "supervision_required": [],
+  "candidate_pool_and_query": null,
+  "alternatives": [
+    {
+      "method": "reuse",
+      "eligible": null,
+      "reason": null,
+      "anticipated_cost": null
+    },
+    {
+      "method": "appearance_augmentation",
+      "eligible": null,
+      "reason": null,
+      "anticipated_cost": null
+    },
+    {
+      "method": "sim_execution",
+      "eligible": null,
+      "reason": null,
+      "anticipated_cost": null
+    },
+    {
+      "method": "expert_correction",
+      "eligible": null,
+      "reason": null,
+      "anticipated_cost": null
+    },
+    {
+      "method": "repair",
+      "eligible": null,
+      "reason": null,
+      "anticipated_cost": null
+    },
+    {
+      "method": "defer",
+      "eligible": null,
+      "reason": null,
+      "anticipated_cost": null
+    }
+  ],
+  "selection_rule_and_reviewer": null,
+  "chosen_release_ids": [],
+  "cost_cap": null,
+  "candidate_checkpoint": null,
+  "realized_training_cost": null,
+  "development_gain_regression_uncertainty": null,
+  "actual_total_effort": null,
+  "decision": null,
+  "next_acquisition_or_stop_reason": null,
+  "final_use": "never selection/tuning signal for the current confirmatory claim"
+}

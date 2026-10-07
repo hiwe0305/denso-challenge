@@ -1,6 +1,6 @@
 # 12 · Public data examples và media provenance
 
-_Website đã có numerical previews, Figure 1 FluxVLA lưu cùng hồ sơ và remote media; chưa có dataset của đội hoặc training result. Clip GR1 episode 0 (18,8 giây) và ảnh xem trước thật lưu cùng website/ZIP để phát ổn định; media còn lại tải từ nguồn tác giả._
+_Website đã có numerical previews, Figures 1–5 FluxVLA lưu cùng hồ sơ và remote media; public previews không là training result của đội; executed reference artifacts v3.1 lưu riêng, chưa native VLA/human transfer. Clip GR1 episode 0 (18,8 giây) và ảnh xem trước thật lưu cùng website/ZIP để phát ổn định; media còn lại tải từ nguồn tác giả._
 
 ## Mẫu robot thật · Unitree G1/Dex3
 
@@ -90,6 +90,10 @@ Hình gốc trong paper · Figure 1, trang 2 · arXiv v1. Hình trích trực ti
 
 [Nguồn chính thức](https://arxiv.org/abs/2609.17210v1) · [Hình lưu cùng hồ sơ](assets/fluxvla-paper-figure-1.png)
 
+Crédit : Li et al., FluxVLA Engine (2026), arXiv:2609.17210v1. [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Figure trích nguyên vùng hình từ PDF; không vẽ lại. Chú thích tiếng Việt đặt ngoài hình.
+
+Provenance: `{"paper": "docs/references/papers/FluxVLA.pdf", "paperSha256": "072b043efcd9126baec332b746c335b3bab3312b8e0ead6974e261bfc6e04acc", "figure": 1, "page": 2, "cropPoints": [51, 51, 561, 266], "renderScale": 6, "assetSha256": "9a3d3458ffb1915c634eca04c7f1dcdf3564075823a52d8e0136ae2e4f7a658b", "checked": "2026-10-03"}`
+
 ### LIBERO · Panda · episode 0
 
 Simulation demonstration · public LeRobotDataset v3. Task public: đặt cốc trắng lên đĩa trái, cốc vàng-trắng lên đĩa phải. Episode 0 có 214 frames, 10fps, segment 0–21,4s trong file ghép nhiều episodes. Đây là demonstration trong sim, không real-humanoid teleop hoặc rollout của đội.
@@ -106,9 +110,49 @@ Clip xem trong website: `assets/gr1-episode-0.mp4`; poster: `assets/gr1-episode-
 
 Provenance: `{"revision": "7998ab57bc70be66234b5374800705e2b6c14545", "sourceSha256": "c9250ff66dd30a52a9dc5e2b44cb817f8703087d576030df0532e24c96cc55e9", "playbackSha256": "f110cc1c6d5adafb3bde97952d7def0b50e1a00d8a8d5d201eb81b0f5e9e98c0", "posterSha256": "fdca99291b73253f4c17098109175847f7787016634fe03261c41f1bad9ca3de", "changes": "MP4 remux with faststart; H.264 frames unchanged. Poster extracted at t=0. No training result of this project.", "upstream": "https://huggingface.co/datasets/nvidia/PhysicalAI-Robotics-GR00T-Teleop-Sim", "checked": "2026-10-05"}`
 
+### FluxVLA · Data pipeline
+
+Hình gốc trong paper · Figure 2, trang 8 · arXiv v1. Episode → temporal sample → transforms → batch → model. Hình của Li và cộng sự (2026); không phải kết quả triển khai A1 của đội.
+
+[Nguồn chính thức](https://arxiv.org/pdf/2609.17210v1#page=8) · [Hình lưu cùng hồ sơ](assets/fluxvla-paper-figure-2.png)
+
+Crédit : Li et al., FluxVLA Engine (2026), arXiv:2609.17210v1. [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Figure trích nguyên vùng hình từ PDF; không vẽ lại. Chú thích tiếng Việt đặt ngoài hình.
+
+Provenance: `{"paper": "docs/references/papers/FluxVLA.pdf", "paperSha256": "072b043efcd9126baec332b746c335b3bab3312b8e0ead6974e261bfc6e04acc", "figure": 2, "page": 8, "cropPoints": [51, 51, 561, 256], "renderScale": 6, "assetSha256": "1cb05d9ed8d2ad2a9b2272f3d1a4ae530f3faa444a036defc510b33493bf3711", "checked": "2026-10-06", "credit": "Li và cộng sự, FluxVLA Engine (2026)", "extraction": "Trích nguyên vùng figure từ PDF; giữ nội dung/nhãn/mũi tên, không vẽ lại; chú thích tiếng Việt nằm ngoài ảnh."}`
+
+### FluxVLA · Model composition
+
+Hình gốc trong paper · Figure 3, trang 9 · arXiv v1. Config → registry → các model families; phân biệt forward/loss và predict_action. Hình của Li và cộng sự (2026); không phải kết quả triển khai A1 của đội.
+
+[Nguồn chính thức](https://arxiv.org/pdf/2609.17210v1#page=9) · [Hình lưu cùng hồ sơ](assets/fluxvla-paper-figure-3.png)
+
+Crédit : Li et al., FluxVLA Engine (2026), arXiv:2609.17210v1. [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Figure trích nguyên vùng hình từ PDF; không vẽ lại. Chú thích tiếng Việt đặt ngoài hình.
+
+Provenance: `{"paper": "docs/references/papers/FluxVLA.pdf", "paperSha256": "072b043efcd9126baec332b746c335b3bab3312b8e0ead6974e261bfc6e04acc", "figure": 3, "page": 9, "cropPoints": [51, 51, 561, 303], "renderScale": 6, "assetSha256": "99ceea3991a547ed371a9acf5de6e12c763126e5abbaca73461b25fffe9bedfb", "checked": "2026-10-06", "credit": "Li và cộng sự, FluxVLA Engine (2026)", "extraction": "Trích nguyên vùng figure từ PDF; giữ nội dung/nhãn/mũi tên, không vẽ lại; chú thích tiếng Việt nằm ngoài ảnh."}`
+
+### FluxVLA · Closed-loop simulation evaluation
+
+Hình gốc trong paper · Figure 4, trang 12 · arXiv v1. Reload checkpoint → observe / predict / execute → đo kết quả và lưu artifacts. Hình của Li và cộng sự (2026); không phải kết quả triển khai A1 của đội.
+
+[Nguồn chính thức](https://arxiv.org/pdf/2609.17210v1#page=12) · [Hình lưu cùng hồ sơ](assets/fluxvla-paper-figure-4.png)
+
+Crédit : Li et al., FluxVLA Engine (2026), arXiv:2609.17210v1. [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Figure trích nguyên vùng hình từ PDF; không vẽ lại. Chú thích tiếng Việt đặt ngoài hình.
+
+Provenance: `{"paper": "docs/references/papers/FluxVLA.pdf", "paperSha256": "072b043efcd9126baec332b746c335b3bab3312b8e0ead6974e261bfc6e04acc", "figure": 4, "page": 12, "cropPoints": [51, 51, 561, 322], "renderScale": 6, "assetSha256": "bae402c0dc3c38445b03c9d5abee9a50677b015deab985d2709374c847c58d11", "checked": "2026-10-06", "credit": "Li và cộng sự, FluxVLA Engine (2026)", "extraction": "Trích nguyên vùng figure từ PDF; giữ nội dung/nhãn/mũi tên, không vẽ lại; chú thích tiếng Việt nằm ngoài ảnh."}`
+
+### FluxVLA · Inference acceleration
+
+Hình gốc trong paper · Figure 5, trang 14 · arXiv v1. Thay modules cho inference và tối ưu execution; đây là kiến trúc tăng tốc model, không phải sơ đồ controller robot. Hình của Li và cộng sự (2026); không phải kết quả triển khai A1 của đội.
+
+[Nguồn chính thức](https://arxiv.org/pdf/2609.17210v1#page=14) · [Hình lưu cùng hồ sơ](assets/fluxvla-paper-figure-5.png)
+
+Crédit : Li et al., FluxVLA Engine (2026), arXiv:2609.17210v1. [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Figure trích nguyên vùng hình từ PDF; không vẽ lại. Chú thích tiếng Việt đặt ngoài hình.
+
+Provenance: `{"paper": "docs/references/papers/FluxVLA.pdf", "paperSha256": "072b043efcd9126baec332b746c335b3bab3312b8e0ead6974e261bfc6e04acc", "figure": 5, "page": 14, "cropPoints": [51, 51, 561, 345], "renderScale": 6, "assetSha256": "1d9a7c7a333f6c4c19896898dad4aea88f5b123b021601242f26ff5daefdf743", "checked": "2026-10-06", "credit": "Li và cộng sự, FluxVLA Engine (2026)", "extraction": "Trích nguyên vùng figure từ PDF; giữ nội dung/nhãn/mũi tên, không vẽ lại; chú thích tiếng Việt nằm ngoài ảnh."}`
+
 ## Integrity và phân phối
 
-Numerical samples, Figure 1 FluxVLA và clip GR1 đọc được offline; các video/ảnh remote khác cần internet và codec browser. Source hash dưới đây giúp nhận diện preview đã đóng gói, không thay hash raw dataset.
+Numerical samples, Figures 1–5 FluxVLA và clip GR1 đọc được offline; các video/ảnh remote khác cần internet và codec browser. Source hash dưới đây giúp nhận diện preview đã đóng gói, không thay hash raw dataset.
 
 - `g1-episode-0.json` · SHA-256 `25bbc482e031cd59d9c2f9e2563a5020f825826d374d3cd127216c12f7861639`
 - `gr1-preview.json` · SHA-256 `b3f219f882e244a272b34cc74faffb16f72eaec4707c35658c8c1759c3455706`

@@ -1,0 +1,44 @@
+{
+  "R": {
+    "objective": "MSE on absolute xyz/grip targets; NOT flow matching",
+    "rows": 44,
+    "recordings": 1,
+    "independent_roots": 1,
+    "loss": 3.0095613662844445e-12,
+    "wall_seconds": 0.0016869159990164917,
+    "checkpoint_sha256": "90c03d1e7ad7b0866c91a00e38a49a621c1fcaa4efeb3ff5f54e22ab337c7287",
+    "reload_max_error": 0.0,
+    "trainable": "35x4 linear action-target predictor",
+    "frozen": "idealized feature adapter; scripted sequencer",
+    "vlm_status": "not_integrated",
+    "human_status": "not_integrated"
+  },
+  "S": {
+    "objective": "MSE on absolute xyz/grip targets; NOT flow matching",
+    "rows": 1091,
+    "recordings": 25,
+    "independent_roots": 1,
+    "loss": 4.434184804167101e-12,
+    "wall_seconds": 0.002796942000713898,
+    "checkpoint_sha256": "c7cbd47bc763c8d20d867b9ffe965c18fbf9feacb292d4c4e5e05465b153b45b",
+    "reload_max_error": 0.0,
+    "trainable": "35x4 linear action-target predictor",
+    "frozen": "idealized feature adapter; scripted sequencer",
+    "vlm_status": "not_integrated",
+    "human_status": "not_integrated"
+  },
+  "C": {
+    "objective": "MSE on absolute xyz/grip targets; NOT flow matching",
+    "rows": 93,
+    "recordings": 2,
+    "independent_roots": 2,
+    "loss": 2.155835780989089e-11,
+    "wall_seconds": 0.0007676589993934613,
+    "checkpoint_sha256": "f1aa86e754d44bba8edffd1602f9ff08c3bb454ded0efd1917fa429a802ed2b0",
+    "reload_max_error": 0.0,
+    "trainable": "35x4 linear action-target predictor",
+    "frozen": "idealized feature adapter; scripted sequencer",
+    "vlm_status": "not_integrated",
+    "human_status": "not_integrated"
+  }
+}

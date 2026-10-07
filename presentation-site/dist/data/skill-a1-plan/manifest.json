@@ -1,0 +1,57 @@
+{
+  "status": "proposal_not_native_results",
+  "files": [
+    {
+      "name": "01-native-task.md",
+      "sha256": "fb809f162425bbd66b028d3e44525757ea831b1968a2b749492c63e1eb6c51f9"
+    },
+    {
+      "name": "02-recipes-and-data.md",
+      "sha256": "1d9cf5dd86cdb1dab651d852b2e489057b8f03cc9fe62312eef5fcc2ddc3718f"
+    },
+    {
+      "name": "03-example-failure-and-recovery.md",
+      "sha256": "eeb93f07d4a7275c8500377a5b5bdaa38d35a1c429d48e4134228caf2be93a25"
+    },
+    {
+      "name": "04-evaluation-and-cost.md",
+      "sha256": "4f4828a7ee9e4b2ab28a4e7b53f25468d183ef597ec1b0c9c3029e8050c1bb17"
+    },
+    {
+      "name": "05-data-decision-and-run-contracts.md",
+      "sha256": "49dea6f12fd73c16995845deb70d000cd811d7961a803d0d0e62fd8fcf698b92"
+    },
+    {
+      "name": "README.md",
+      "sha256": "0e61f578778b67d545b60bf803924bb79bb28314d6a16d579e132421b5d49b4f"
+    },
+    {
+      "name": "acquisition-decision.template.json",
+      "sha256": "adee0706bf40ac44ba1f60371b928f742d18fb03f91e0864b0b4ea405d333745"
+    },
+    {
+      "name": "cost-ledger.template.csv",
+      "sha256": "0c1e39cec2b98345df74f3d0eb472f664e1d04e205cb7ab8649b778c45dc0a1b"
+    },
+    {
+      "name": "dataset-manifest.proposed.json",
+      "sha256": "e1c40395cc7910ee75f1840cbe12e7599af0a5d5917168bcc77e8df3b28265a9"
+    },
+    {
+      "name": "native-preflight.json",
+      "sha256": "ead0675fbf3c79822d01f2dab18630a4314bafcaae3a9de6cb186677a9da6349"
+    },
+    {
+      "name": "release-quality.template.json",
+      "sha256": "9216ae308f51e27a915bfe881cc56b3d42826aff97e95313ebedc87ab41183ac"
+    },
+    {
+      "name": "run-plan.template.json",
+      "sha256": "5fdda171a93efe01bbd17e624f334ae01fec60ac6c7d8a68d3f522b8031ae3ba"
+    },
+    {
+      "name": "task-spec.proposed.json",
+      "sha256": "2050b00f7fc67865134f01e223720b18979b2ffa94f9647c37583d7389bc9500"
+    }
+  ]
+}

@@ -1,0 +1,951 @@
+{
+  "architecture": {
+    "architecture_key": "denso-v3.1-content-audit-local",
+    "revision": "2026-10-05-a1",
+    "view": "combined",
+    "representation": "proposed_design",
+    "description": "Tái dựng từ thiết kế project v3.1 để audit; không phải hình paper và không tuyên bố native implementation.",
+    "sources": {
+      "D1": {
+        "path": "idea-v3-2026-10-05/project-spec.json",
+        "section": "native / human / reference / study"
+      },
+      "D2": {
+        "path": "idea-v3-2026-10-05/02-kien-truc-va-cach-hoc.md",
+        "section": "Native model / human candidates / instrumentation gates"
+      },
+      "D3": {
+        "path": "idea-v3-2026-10-05/03-workflow-du-lieu.md",
+        "section": "Human release / synthetic / QA"
+      },
+      "D4": {
+        "path": "idea-v3-2026-10-05/04-bang-chung-vla-va-loi.md",
+        "section": "Probes / stage semantics / zero success"
+      },
+      "D5": {
+        "path": "idea-v3-2026-10-05/05-thiet-ke-kiem-chung.md",
+        "section": "Native contrasts / final / acceptance"
+      },
+      "D6": {
+        "path": "idea-v3-2026-10-05/06-chi-phi-va-kha-thi.md",
+        "section": "Total cost / resource feasibility"
+      },
+      "D7": {
+        "path": "idea-v3-2026-10-05/13-example-native-tu-dau-den-cuoi.md",
+        "section": "TaskSpec / native walkthrough / missing proofs"
+      },
+      "D8": {
+        "path": "examples/engineering-loop/run.py",
+        "section": "lines 1–3, 187–254: reference simulator, source contrasts and final"
+      },
+      "D9": {
+        "path": "examples/engineering-loop/world.xml",
+        "section": "tip collision disabled / proximity weld"
+      },
+      "D10": {
+        "path": "presentation-site/dist/idea-opening.js",
+        "section": "openingCaseBody / health=data default"
+      },
+      "D11": {
+        "path": "presentation-site/dist/idea-story.js",
+        "section": "current story / introductory video disclosure"
+      },
+      "D12": {
+        "path": "presentation-site/content/solution-story.json",
+        "section": "original scene text used for media generation"
+      },
+      "W1": {
+        "url": "https://github.com/FluxVLA/FluxVLA/blob/main/configs/gr00tn15/gr00tn15_eagle_3b_robocasa_30_eps_full_finetune.py",
+        "version": "main observed 2026-10-05; not commit-pinned",
+        "section": "model / inference_model / evaluation: 29D, padded32, chunk16, distinct inference head"
+      },
+      "W2": {
+        "url": "https://raw.githubusercontent.com/FluxVLA/FluxVLA/main/fluxvla/models/vlas/llava_vla.py",
+        "version": "main observed 2026-10-05; not commit-pinned",
+        "section": "forward / predict_action: features and masks"
+      },
+      "W3": {
+        "url": "https://raw.githubusercontent.com/FluxVLA/FluxVLA/main/fluxvla/models/heads/flow_matching_head.py",
+        "version": "main observed 2026-10-05; not commit-pinned",
+        "section": "forward: velocity supervision; denoise / predict: integrated action chunk"
+      },
+      "W4": {
+        "url": "https://mimicgen.github.io/docs/modules/task_spec.html",
+        "version": "documentation 1.0 observed 2026-10-05",
+        "section": "object frames / subtask termination / waypoint interpolation"
+      },
+      "W5": {
+        "url": "https://research.nvidia.com/labs/gear/egoscale/",
+        "version": "official project page dated 2026-02-19; observed 2026-10-05",
+        "section": "Human-to-Robot Learning Framework / action-labeled pretraining and aligned transfer"
+      },
+      "W6": {
+        "url": "https://humanego-ai.github.io/",
+        "version": "official project page observed 2026-10-05; not paper reproduction",
+        "section": "Architecture / preprocessing / FAQ: dexterous hands and precision limitations"
+      },
+      "W7": {
+        "url": "https://arxiv.org/html/2503.14734v1",
+        "version": "arXiv v1",
+        "section": "2.1–2.3: VLM/action architecture and offline latent-action/synthetic supervision"
+      },
+      "W8": {
+        "url": "https://arxiv.org/html/2507.12440v1",
+        "version": "arXiv v1",
+        "section": "3.2, 5, 7: human action representation, robot adaptation and limits"
+      }
+    },
+    "inspected_visuals": [
+      "idea-v3-2026-10-05/assets/kien-truc-v3.png",
+      "live website overview"
+    ],
+    "nodes": [
+      {
+        "id": "TASK",
+        "label": "TaskSpec / binding\nA5 · yêu cầu chưa khóa",
+        "phase": "setup",
+        "role": "TaskSpec / binding",
+        "source_refs": [
+          "D2",
+          "D7"
+        ]
+      },
+      {
+        "id": "H",
+        "label": "Human motion / RGB\nA2 · bridge chưa chọn",
+        "phase": "training",
+        "role": "Human motion / RGB",
+        "source_refs": [
+          "D2",
+          "D7"
+        ]
+      },
+      {
+        "id": "R",
+        "label": "Mẫu robot đích",
+        "phase": "training",
+        "role": "Mẫu robot đích",
+        "source_refs": [
+          "D2",
+          "D7"
+        ]
+      },
+      {
+        "id": "S",
+        "label": "Sim-executed trajectories\nA3 · chưa port GR1",
+        "phase": "training",
+        "role": "Sim-executed trajectories",
+        "source_refs": [
+          "D2",
+          "D7"
+        ]
+      },
+      {
+        "id": "QA",
+        "label": "Source / label / split QA",
+        "phase": "training",
+        "role": "Source / label / split QA",
+        "source_refs": [
+          "D2",
+          "D7"
+        ]
+      },
+      {
+        "id": "TRAIN",
+        "label": "Loss / modules / training\nA1 · native chưa chạy",
+        "phase": "training",
+        "role": "Loss / modules / training",
+        "source_refs": [
+          "D2",
+          "D7"
+        ]
+      },
+      {
+        "id": "INPUT",
+        "label": "RGB + instruction + state",
+        "phase": "inference",
+        "role": "RGB + instruction + state",
+        "source_refs": [
+          "D2",
+          "D7"
+        ]
+      },
+      {
+        "id": "VLM",
+        "label": "VLM features + masks\nA4 · trace chưa thu",
+        "phase": "inference",
+        "role": "VLM features + masks",
+        "source_refs": [
+          "D2",
+          "D7"
+        ]
+      },
+      {
+        "id": "IFACE",
+        "label": "Interface / conditioning",
+        "phase": "inference",
+        "role": "Interface / conditioning",
+        "source_refs": [
+          "D2",
+          "D7"
+        ]
+      },
+      {
+        "id": "ACT",
+        "label": "Action Expert\nfinal action chunk",
+        "phase": "inference",
+        "role": "Action Expert",
+        "source_refs": [
+          "D2",
+          "D7"
+        ]
+      },
+      {
+        "id": "EXEC",
+        "label": "Binding / controller\ncommands → response",
+        "phase": "inference",
+        "role": "Binding / controller",
+        "source_refs": [
+          "D2",
+          "D7"
+        ]
+      },
+      {
+        "id": "SCORE",
+        "label": "Scorer độc lập\npass/fail/unknown/chưa tới",
+        "phase": "evaluation",
+        "role": "Scorer độc lập",
+        "source_refs": [
+          "D2",
+          "D7"
+        ]
+      },
+      {
+        "id": "EVID",
+        "label": "Evidence / engineer review\nA8 · demo chọn sẵn nhánh",
+        "phase": "evaluation",
+        "role": "Evidence / engineer review",
+        "source_refs": [
+          "D2",
+          "D7"
+        ]
+      },
+      {
+        "id": "STUDY",
+        "label": "Full-task / final / regression\nA6 · native chưa đo",
+        "phase": "evaluation",
+        "role": "Full-task / final / regression",
+        "source_refs": [
+          "D2",
+          "D7"
+        ]
+      },
+      {
+        "id": "COST",
+        "label": "Chất lượng + tổng công\nA7 · chưa chứng minh saving",
+        "phase": "evaluation",
+        "role": "Chất lượng + tổng công",
+        "source_refs": [
+          "D2",
+          "D7"
+        ]
+      },
+      {
+        "id": "MEDIA",
+        "label": "Website / video / storyboard\nA9 · media nhập môn cũ",
+        "phase": "presentation",
+        "role": "Website / video / storyboard",
+        "source_refs": [
+          "D2",
+          "D7"
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "id": "E_H_QA",
+        "from_node": "H",
+        "to_node": "QA",
+        "direction": "forward",
+        "payload": "target/loss qua bridge được kiểm",
+        "uncertainty": "unresolved",
+        "source_refs": [
+          "D2",
+          "D4",
+          "D5",
+          "D7"
+        ]
+      },
+      {
+        "id": "E_R_QA",
+        "from_node": "R",
+        "to_node": "QA",
+        "direction": "forward",
+        "payload": "robot targets / timing",
+        "uncertainty": "proposed",
+        "source_refs": [
+          "D2",
+          "D4",
+          "D5",
+          "D7"
+        ]
+      },
+      {
+        "id": "E_S_QA",
+        "from_node": "S",
+        "to_node": "QA",
+        "direction": "forward",
+        "payload": "commands / response / outcome",
+        "uncertainty": "unresolved",
+        "source_refs": [
+          "D2",
+          "D4",
+          "D5",
+          "D7"
+        ]
+      },
+      {
+        "id": "E_QA_TRAIN",
+        "from_node": "QA",
+        "to_node": "TRAIN",
+        "direction": "forward",
+        "payload": "eligible release",
+        "uncertainty": "proposed",
+        "source_refs": [
+          "D2",
+          "D4",
+          "D5",
+          "D7"
+        ]
+      },
+      {
+        "id": "E_TRAIN_VLM",
+        "from_node": "TRAIN",
+        "to_node": "VLM",
+        "direction": "forward",
+        "payload": "checkpoint / modules được cập nhật",
+        "uncertainty": "unresolved",
+        "source_refs": [
+          "D2",
+          "D4",
+          "D5",
+          "D7"
+        ]
+      },
+      {
+        "id": "E_TRAIN_ACT",
+        "from_node": "TRAIN",
+        "to_node": "ACT",
+        "direction": "forward",
+        "payload": "checkpoint / modules được cập nhật",
+        "uncertainty": "unresolved",
+        "source_refs": [
+          "D2",
+          "D4",
+          "D5",
+          "D7"
+        ]
+      },
+      {
+        "id": "E_INPUT_VLM",
+        "from_node": "INPUT",
+        "to_node": "VLM",
+        "direction": "forward",
+        "payload": "processed image / tokens",
+        "uncertainty": "proposed",
+        "source_refs": [
+          "D2",
+          "D4",
+          "D5",
+          "D7"
+        ]
+      },
+      {
+        "id": "E_VLM_IFACE",
+        "from_node": "VLM",
+        "to_node": "IFACE",
+        "direction": "forward",
+        "payload": "features / masks",
+        "uncertainty": "proposed",
+        "source_refs": [
+          "D2",
+          "D4",
+          "D5",
+          "D7"
+        ]
+      },
+      {
+        "id": "E_IFACE_ACT",
+        "from_node": "IFACE",
+        "to_node": "ACT",
+        "direction": "forward",
+        "payload": "conditioning + state / embodiment",
+        "uncertainty": "proposed",
+        "source_refs": [
+          "D2",
+          "D4",
+          "D5",
+          "D7"
+        ]
+      },
+      {
+        "id": "E_ACT_EXEC",
+        "from_node": "ACT",
+        "to_node": "EXEC",
+        "direction": "forward",
+        "payload": "normalization / units / scheduling",
+        "uncertainty": "unresolved",
+        "source_refs": [
+          "D2",
+          "D4",
+          "D5",
+          "D7"
+        ]
+      },
+      {
+        "id": "E_EXEC_SCORE",
+        "from_node": "EXEC",
+        "to_node": "SCORE",
+        "direction": "forward",
+        "payload": "measured response / scene state",
+        "uncertainty": "proposed",
+        "source_refs": [
+          "D2",
+          "D4",
+          "D5",
+          "D7"
+        ]
+      },
+      {
+        "id": "E_SCORE_EVID",
+        "from_node": "SCORE",
+        "to_node": "EVID",
+        "direction": "forward",
+        "payload": "outcome + traces",
+        "uncertainty": "proposed",
+        "source_refs": [
+          "D2",
+          "D4",
+          "D5",
+          "D7"
+        ]
+      },
+      {
+        "id": "E_SCORE_STUDY",
+        "from_node": "SCORE",
+        "to_node": "STUDY",
+        "direction": "forward",
+        "payload": "all episodes / interventions",
+        "uncertainty": "proposed",
+        "source_refs": [
+          "D2",
+          "D4",
+          "D5",
+          "D7"
+        ]
+      },
+      {
+        "id": "E_STUDY_COST",
+        "from_node": "STUDY",
+        "to_node": "COST",
+        "direction": "forward",
+        "payload": "same-quality comparison + ledger",
+        "uncertainty": "unresolved",
+        "source_refs": [
+          "D2",
+          "D4",
+          "D5",
+          "D7"
+        ]
+      },
+      {
+        "id": "E_EVID_TRAIN",
+        "from_node": "EVID",
+        "to_node": "TRAIN",
+        "direction": "forward",
+        "payload": "approved plan, chưa tự update",
+        "uncertainty": "unresolved",
+        "source_refs": [
+          "D2",
+          "D4",
+          "D5",
+          "D7"
+        ]
+      },
+      {
+        "id": "E_TASK_EXEC",
+        "from_node": "TASK",
+        "to_node": "EXEC",
+        "direction": "forward",
+        "payload": "profile / constraints / acceptance",
+        "uncertainty": "unresolved",
+        "source_refs": [
+          "D2",
+          "D4",
+          "D5",
+          "D7"
+        ]
+      },
+      {
+        "id": "E_STUDY_MEDIA",
+        "from_node": "STUDY",
+        "to_node": "MEDIA",
+        "direction": "forward",
+        "payload": "claims giới hạn theo evidence",
+        "uncertainty": "proposed",
+        "source_refs": [
+          "D2",
+          "D4",
+          "D5",
+          "D7"
+        ]
+      }
+    ]
+  },
+  "findings": [
+    {
+      "finding_key": "A1",
+      "architecture_key": "denso-v3.1-content-audit-local",
+      "architecture_revision": "2026-10-05-a1",
+      "title": "Chưa có bằng chứng chạy toàn hệ native",
+      "targets": [
+        "TRAIN",
+        "ACT",
+        "EXEC",
+        "STUDY"
+      ],
+      "priority": "decision-blocking",
+      "basis": "unresolved",
+      "observation": "ProjectSpec ghi native not_tested; walkthrough số 13 là contract triển khai. Ví dụ có weights thật là ridge 35×4, state lý tưởng và sequencer dựng sẵn.",
+      "scope": "Nội dung và thiết kế native v3.1 tại snapshot kiểm tra; không tái lập paper hoặc đo robot thật.",
+      "category": "content_and_evidence_validation",
+      "source_refs": [
+        "D1",
+        "D7",
+        "D8",
+        "D9",
+        "W1"
+      ],
+      "evidence_ids": [],
+      "claim_ids": [],
+      "audit_ids": [],
+      "reasoning": {
+        "premises": [
+          "D1: native_vla/GR1 chưa kiểm.",
+          "D7: chưa có native checkpoint, rollout hoặc receipts.",
+          "D8–D9: reference không chứa VLM/Action Expert hoặc bàn tay GR1."
+        ],
+        "derivation": "Bằng chứng reference xác nhận một pipeline thu nhỏ nối được; thay model, observation và controller làm thay đổi interfaces cần kiểm.",
+        "scoped_conclusion": "Chưa đạt yêu cầu “một example chạy toàn solution trên VLA/GR1”. Không có cơ sở kết luận native đã chạy hoặc sẽ fail.",
+        "assumptions": [
+          "Snapshot được đọc là bản dự định trình bày hiện hành; native artifacts không có trong hồ sơ đã kiểm."
+        ],
+        "limitations": [
+          "Thiếu artifact không chứng minh phương pháp không thể hoạt động.",
+          "Kết quả tác giả không phải kết quả của đội."
+        ],
+        "support_status": "local evidence audit; native effectiveness unresolved"
+      },
+      "impact": "Chưa đạt yêu cầu “một example chạy toàn solution trên VLA/GR1”. Không có cơ sở kết luận native đã chạy hoặc sẽ fail.",
+      "alternative_explanation": "Native có thể đã chạy ở môi trường ngoài hồ sơ, nhưng chưa có artifact để kiểm định.",
+      "suggested_change": "Nêu ngay đầu: thiết kế native + ví dụ reference đã chạy. Chỉ đổi trạng thái native khi có artifacts tương ứng.",
+      "expected_cost": "GPU, cài native runtime, dữ liệu seed, binding và thời gian integration; chưa đo.",
+      "next_check": "Pin code/config/weights; chạy một task GR1 được upstream hỗ trợ: batch → gradient/update → checkpoint reload → learned closed-loop → independent scorer và trace.",
+      "falsifier": "Receipts và rollout native tái lập được trên đúng profile sẽ giải quyết khoảng trống này; test reference bổ sung không giải quyết nó.",
+      "resolution_status": "open_local_draft"
+    },
+    {
+      "finding_key": "A2",
+      "architecture_key": "denso-v3.1-content-audit-local",
+      "architecture_revision": "2026-10-05-a1",
+      "title": "Human bridge là phần nghiên cứu chưa chốt",
+      "targets": [
+        "H",
+        "E_H_QA",
+        "TRAIN"
+      ],
+      "priority": "decision-blocking",
+      "basis": "unresolved",
+      "observation": "Có ba candidate A/B/C nhưng chưa có route, target/loss, adapter và receipt dùng human batch trên selected model.",
+      "scope": "Nội dung và thiết kế native v3.1 tại snapshot kiểm tra; không tái lập paper hoặc đo robot thật.",
+      "category": "content_and_evidence_validation",
+      "source_refs": [
+        "D1",
+        "D2",
+        "D3",
+        "W5",
+        "W6",
+        "W8"
+      ],
+      "evidence_ids": [],
+      "claim_ids": [],
+      "audit_ids": [],
+      "reasoning": {
+        "premises": [
+          "D2–D3: human not_integrated; route A auxiliary, B embodiment adapter, C retarget→execute đều conditional.",
+          "W5: human action-labeled data có thể học motor prior trong recipe của tác giả.",
+          "W6: human-to-robot cũng có recipe không dùng robot demonstrations trong phạm vi riêng."
+        ],
+        "derivation": "Tiền lệ chứng minh không nên giới hạn human vào “chỉ dạy VLM”; cũng không chứng minh loader GR00T hiện tại hiểu human action.",
+        "scoped_conclusion": "Thesis dùng human có cơ sở; cách học của project còn thiếu một quyết định kỹ thuật cốt lõi. Mẫu robot đích là lựa chọn của project, không phải quy luật cho mọi phương pháp.",
+        "assumptions": [
+          "Snapshot được đọc là bản dự định trình bày hiện hành; native artifacts không có trong hồ sơ đã kiểm."
+        ],
+        "limitations": [
+          "Thiếu artifact không chứng minh phương pháp không thể hoạt động.",
+          "Kết quả tác giả không phải kết quả của đội."
+        ],
+        "support_status": "local evidence audit; native effectiveness unresolved"
+      },
+      "impact": "Thesis dùng human có cơ sở; cách học của project còn thiếu một quyết định kỹ thuật cốt lõi. Mẫu robot đích là lựa chọn của project, không phải quy luật cho mọi phương pháp.",
+      "alternative_explanation": "Giữ ba route ở giai đoạn exploration là hợp lý; chưa hợp lý nếu trình bày như recipe sẵn sàng chạy.",
+      "suggested_change": "Sơ đồ đặt gate “bridge được chọn và kiểm” trên mũi tên H→TRAIN; mô tả rõ source, target, frame, loss, module và chi phí của route được chọn sau pilot.",
+      "expected_cost": "Tracking/geometry, adapter hoặc retarget, training và controls; phải tính cả source reject.",
+      "next_check": "Một source có geometry/timing hợp lệ → một route được chọn → target batch/loss/module gradients → robot downstream đối chứng R/H với chi phí và compute ghi riêng.",
+      "falsifier": "Route có artifacts hợp lệ sẽ giải quyết thiếu specification; downstream không tăng chất lượng trong budget sẽ bác lợi ích của route đó trong task này, không bác mọi human learning.",
+      "resolution_status": "open_local_draft"
+    },
+    {
+      "finding_key": "A3",
+      "architecture_key": "denso-v3.1-content-audit-local",
+      "architecture_revision": "2026-10-05-a1",
+      "title": "Synthetic action hợp lệ trong sim chưa đủ cho GR1",
+      "targets": [
+        "S",
+        "E_S_QA",
+        "QA",
+        "EXEC"
+      ],
+      "priority": "decision-blocking",
+      "basis": "unresolved",
+      "observation": "Reference sinh action Cartesian 4D và gắp bằng weld. Native config 29D arm/hand/waist chưa có generator/controller port và acceptance traces.",
+      "scope": "Nội dung và thiết kế native v3.1 tại snapshot kiểm tra; không tái lập paper hoặc đo robot thật.",
+      "category": "content_and_evidence_validation",
+      "source_refs": [
+        "D2",
+        "D3",
+        "D8",
+        "D9",
+        "W1",
+        "W4"
+      ],
+      "evidence_ids": [],
+      "claim_ids": [],
+      "audit_ids": [],
+      "reasoning": {
+        "premises": [
+          "D8–D9: mô hình gắp reference không kiểm contact/finger dynamics.",
+          "W1: action profile native khác.",
+          "W4: generation cần subtask/object-frame/termination và execution adapter."
+        ],
+        "derivation": "Action đã thực thi có provenance tốt hơn video-only; tính đúng của nhãn vẫn phụ thuộc profile, controller, outcome và fidelity.",
+        "scoped_conclusion": "Có thể sinh robot action bằng thực thi trong simulator. Chưa chứng minh generator hiện tại sinh dữ liệu đúng cho GR1 hoặc giữ được vật thật.",
+        "assumptions": [
+          "Snapshot được đọc là bản dự định trình bày hiện hành; native artifacts không có trong hồ sơ đã kiểm."
+        ],
+        "limitations": [
+          "Thiếu artifact không chứng minh phương pháp không thể hoạt động.",
+          "Kết quả tác giả không phải kết quả của đội."
+        ],
+        "support_status": "local evidence audit; native effectiveness unresolved"
+      },
+      "impact": "Có thể sinh robot action bằng thực thi trong simulator. Chưa chứng minh generator hiện tại sinh dữ liệu đúng cho GR1 hoặc giữ được vật thật.",
+      "alternative_explanation": "Weld là approximation có chủ đích để kiểm contracts; không phải lỗi của reference khi đã công bố scope.",
+      "suggested_change": "Giữ hai nhánh tách bạch: sim-executed robot trajectories và generated video/pseudo labels; chỉ nhánh có QA phù hợp được vào robot-action loss.",
+      "expected_cost": "Task assets, controller adapter, physics/contact calibration và generation rejects; chưa đo.",
+      "next_check": "Replay một GR1 seed; sinh variants trong miền đã chốt; lưu commands/response/contact/outcome/reject rate; QA rồi train S và đo full-task.",
+      "falsifier": "Native executed trajectories đúng schema, binding và outcome sẽ giải quyết compatibility; sim pass vẫn không đủ xác nhận sim-to-real.",
+      "resolution_status": "open_local_draft"
+    },
+    {
+      "finding_key": "A4",
+      "architecture_key": "denso-v3.1-content-audit-local",
+      "architecture_revision": "2026-10-05-a1",
+      "title": "Trace VLM/latent hỗ trợ giả thuyết, chưa chứng minh module lỗi",
+      "targets": [
+        "VLM",
+        "IFACE",
+        "ACT",
+        "EVID"
+      ],
+      "priority": "material",
+      "basis": "unresolved",
+      "observation": "Nội dung đã phân biệt feature, final action, command và response. Chưa có native hooks, optimized parity, probes và interventions thực.",
+      "scope": "Nội dung và thiết kế native v3.1 tại snapshot kiểm tra; không tái lập paper hoặc đo robot thật.",
+      "category": "content_and_evidence_validation",
+      "source_refs": [
+        "D2",
+        "D4",
+        "D7",
+        "W1",
+        "W2",
+        "W3",
+        "W7"
+      ],
+      "evidence_ids": [],
+      "claim_ids": [],
+      "audit_ids": [],
+      "reasoning": {
+        "premises": [
+          "W2–W3: selected interface dùng features/masks; flow training velocity khác integrated action.",
+          "W1: training/inference head implementations khác.",
+          "D4: probe đọc được tín hiệu không tự là causal diagnosis."
+        ],
+        "derivation": "Tensor quan sát được chỉ cho biết đầu ra tại boundary. Muốn chọn training scope phải kiểm mapping, effect và alternatives; instrumentation còn có thể làm thay đổi runtime.",
+        "scoped_conclusion": "Yêu cầu kiểm cả VLM và Action Expert đã đúng hướng. Chưa thể nói hệ thống xác định chính xác module cần train từ video, attention hoặc probe.",
+        "assumptions": [
+          "Snapshot được đọc là bản dự định trình bày hiện hành; native artifacts không có trong hồ sơ đã kiểm."
+        ],
+        "limitations": [
+          "Thiếu artifact không chứng minh phương pháp không thể hoạt động.",
+          "Kết quả tác giả không phải kết quả của đội."
+        ],
+        "support_status": "local evidence audit; native effectiveness unresolved"
+      },
+      "impact": "Yêu cầu kiểm cả VLM và Action Expert đã đúng hướng. Chưa thể nói hệ thống xác định chính xác module cần train từ video, attention hoặc probe.",
+      "alternative_explanation": "MVP engineer-assisted không cần automatic causal classifier; đây là giới hạn hợp lý nếu giữ đúng wording.",
+      "suggested_change": "EvidenceCard phải có observation/hypothesis/test/decision cùng link artifacts; route update luôn có engineer review và no-gain/defer.",
+      "expected_cost": "Logging/storage, calibration labels, probe controls và overhead; cần pilot giới hạn.",
+      "next_check": "Một lỗi native có synchronized five-boundary trace, action noise seed, debug/optimized parity, labels độc lập và phép kiểm đổi một yếu tố; lưu cả giả thuyết bị loại và chưa biết.",
+      "falsifier": "Trace/hook parity giải quyết khả năng quan sát; can thiệp và rollout controls mới kiểm giả thuyết module. Probe score tốt một mình không đủ.",
+      "resolution_status": "open_local_draft"
+    },
+    {
+      "finding_key": "A5",
+      "architecture_key": "denso-v3.1-content-audit-local",
+      "architecture_revision": "2026-10-05-a1",
+      "title": "Task A1 chưa khóa yêu cầu để xét nguồn có phù hợp",
+      "targets": [
+        "TASK",
+        "H",
+        "EXEC"
+      ],
+      "priority": "decision-blocking",
+      "basis": "unresolved",
+      "observation": "Dung sai, domain và owner acceptance pending; fixed torso/one arm là đề xuất binding. Không thể xét source transfer bằng hình gắp-đặt chung.",
+      "scope": "Nội dung và thiết kế native v3.1 tại snapshot kiểm tra; không tái lập paper hoặc đo robot thật.",
+      "category": "content_and_evidence_validation",
+      "source_refs": [
+        "D1",
+        "D7",
+        "W5",
+        "W6"
+      ],
+      "evidence_ids": [],
+      "claim_ids": [],
+      "audit_ids": [],
+      "reasoning": {
+        "premises": [
+          "D1/D7: task acceptance chưa chốt.",
+          "W6 FAQ: tác giả nêu precision khoảng 1 cm và real results dùng parallel-jaw; chưa thử real dexterous hand.",
+          "W5: có hướng dexterous human transfer khác, nhưng recipe và quy mô khác."
+        ],
+        "derivation": "Nếu task cần độ chính xác hoặc contact ngoài miền nguồn đã chứng minh thì source precedent không đủ. Tuy nhiên task hiện chưa có tolerance, nên chưa kết luận bất tương thích.",
+        "scoped_conclusion": "Chưa thể nói HumanEgo hoặc bridge bất kỳ phù hợp với A1/GR1. Phải phân biệt gắp-đặt thô với lắp/đặt chính xác và bàn tay nhiều ngón.",
+        "assumptions": [
+          "Snapshot được đọc là bản dự định trình bày hiện hành; native artifacts không có trong hồ sơ đã kiểm."
+        ],
+        "limitations": [
+          "Thiếu artifact không chứng minh phương pháp không thể hoạt động.",
+          "Kết quả tác giả không phải kết quả của đội."
+        ],
+        "support_status": "local evidence audit; native effectiveness unresolved"
+      },
+      "impact": "Chưa thể nói HumanEgo hoặc bridge bất kỳ phù hợp với A1/GR1. Phải phân biệt gắp-đặt thô với lắp/đặt chính xác và bàn tay nhiều ngón.",
+      "alternative_explanation": "Nếu A1 là đặt thô với tolerance rộng, HumanEgo precedent có thể phù hợp hơn; chưa có số đo để quyết định.",
+      "suggested_change": "Trình bày ô A1 có kích thước và tiêu chuẩn pass cụ thể; đánh dấu one-arm/fixed-torso là binding cần kiểm.",
+      "expected_cost": "Owner spec, calibration, seed replay và verifier; thường nhỏ hơn triển khai thêm model nhưng chưa có giờ công đo.",
+      "next_check": "Owner khóa object/target geometry, pose tolerance, holding/slip criteria, timeout, cycle, camera và action binding; replay seed kiểm reachability/contact trước chọn nguồn.",
+      "falsifier": "TaskSpec và replay cho thấy source/bridge đạt dung sai sẽ giải quyết risk; yêu cầu chặt hơn giới hạn nguồn có thể bác việc dùng nguyên recipe cho task này.",
+      "resolution_status": "open_local_draft"
+    },
+    {
+      "finding_key": "A6",
+      "architecture_key": "denso-v3.1-content-audit-local",
+      "architecture_revision": "2026-10-05-a1",
+      "title": "Tập reference không kiểm visual generalization hoặc hiệu quả native",
+      "targets": [
+        "SCORE",
+        "STUDY"
+      ],
+      "priority": "material",
+      "basis": "unresolved",
+      "observation": "12 final scenes chủ yếu thay vị trí trong miền gần miền sinh train; regression chỉ một vị trí gần seed. Tests pass không phải native experiments.",
+      "scope": "Nội dung và thiết kế native v3.1 tại snapshot kiểm tra; không tái lập paper hoặc đo robot thật.",
+      "category": "content_and_evidence_validation",
+      "source_refs": [
+        "D5",
+        "D8",
+        "D9"
+      ],
+      "evidence_ids": [],
+      "claim_ids": [],
+      "audit_ids": [],
+      "reasoning": {
+        "premises": [
+          "D8 lines 200–223: train/final spatial ranges chồng nhiều; regression gần seed.",
+          "D5: đã ghi sample nhỏ/deterministic và native study chưa chạy.",
+          "D8: policy nhận idealized state, không RGB."
+        ],
+        "derivation": "Scenario IDs độc lập giúp tránh tái dùng scene cụ thể nhưng không mở rộng coverage sang ảnh, lighting, object, contact hay embodiment.",
+        "scoped_conclusion": "Final12/12 xác nhận scope nhỏ của reference; chưa đo native robustness, human transfer, production rate hoặc VLM quality.",
+        "assumptions": [
+          "Snapshot được đọc là bản dự định trình bày hiện hành; native artifacts không có trong hồ sơ đã kiểm."
+        ],
+        "limitations": [
+          "Thiếu artifact không chứng minh phương pháp không thể hoạt động.",
+          "Kết quả tác giả không phải kết quả của đội."
+        ],
+        "support_status": "local evidence audit; native effectiveness unresolved"
+      },
+      "impact": "Final12/12 xác nhận scope nhỏ của reference; chưa đo native robustness, human transfer, production rate hoặc VLM quality.",
+      "alternative_explanation": "Final interpolation là hợp lệ cho smoke/reference test; chỉ sai scope nếu dùng kết luận OOD hoặc robot thật.",
+      "suggested_change": "Ghi rõ observed metrics thuộc model/task nào; giữ scenario/root split và final độc lập; không quảng bá “24 tests” thành “24 thí nghiệm robot”.",
+      "expected_cost": "Native runs, resets, scoring/annotation, seeds và fresh final; chưa định budget.",
+      "next_check": "Sau native baseline, khóa conditions, multiple training seeds, full natural starts, transitions/regression, scorer coverage và uncertainty; chọn cỡ mẫu theo câu hỏi trước final.",
+      "falsifier": "Native independent outcomes đủ coverage/uncertainty mới hỗ trợ claim tương ứng; tăng số unit tests không thay phép thử behavior.",
+      "resolution_status": "open_local_draft"
+    },
+    {
+      "finding_key": "A7",
+      "architecture_key": "denso-v3.1-content-audit-local",
+      "architecture_revision": "2026-10-05-a1",
+      "title": "Giảm tổng chi phí vẫn là giả thuyết trung tâm",
+      "targets": [
+        "COST",
+        "STUDY"
+      ],
+      "priority": "decision-blocking",
+      "basis": "unresolved",
+      "observation": "Không có native quality-cost curve hoặc ledger human/robot/bridge/generation/QA/train/eval. 24 variants chỉ từ một seed root.",
+      "scope": "Nội dung và thiết kế native v3.1 tại snapshot kiểm tra; không tái lập paper hoặc đo robot thật.",
+      "category": "content_and_evidence_validation",
+      "source_refs": [
+        "D1",
+        "D5",
+        "D6",
+        "D8",
+        "W5",
+        "W6"
+      ],
+      "evidence_ids": [],
+      "claim_ids": [],
+      "audit_ids": [],
+      "reasoning": {
+        "premises": [
+          "D1/D6: savings not_established, total-cost components đã liệt kê.",
+          "D8: source variants là descendants một root, không phải independent collected seeds.",
+          "D5: source contrasts cần compute/cost controls và cùng tiêu chuẩn chất lượng."
+        ],
+        "derivation": "Collection giảm có thể bị offset bởi integration, labels, generation rejects, GPU và evaluation. Không đủ quality thì cost-per-accepted-skill chưa xác định.",
+        "scoped_conclusion": "Nội dung không nên hứa “giảm mạnh chi phí” ở hiện trạng. Có thể trình bày đây là mục tiêu cần kiểm, với tiền lệ data efficiency từ nguồn.",
+        "assumptions": [
+          "Snapshot được đọc là bản dự định trình bày hiện hành; native artifacts không có trong hồ sơ đã kiểm."
+        ],
+        "limitations": [
+          "Thiếu artifact không chứng minh phương pháp không thể hoạt động.",
+          "Kết quả tác giả không phải kết quả của đội."
+        ],
+        "support_status": "local evidence audit; native effectiveness unresolved"
+      },
+      "impact": "Nội dung không nên hứa “giảm mạnh chi phí” ở hiện trạng. Có thể trình bày đây là mục tiêu cần kiểm, với tiền lệ data efficiency từ nguồn.",
+      "alternative_explanation": "Có thể có saving ở skill tiếp theo sau amortized setup; phải tách giả thuyết first-skill và repeated-skill để kiểm.",
+      "suggested_change": "Hero nói “mục tiêu giảm công”; phần giá trị hiển thị chất lượng và tổng công cùng scope, thay mọi số tiết kiệm minh họa bằng số đo khi có ledger.",
+      "expected_cost": "Activity tracking và đối chứng baseline/source; không thể định số tiết kiệm trước đo.",
+      "next_check": "Đo R và source pilot qua nhiều target-robot budgets tới cùng ngưỡng chất lượng; tính setup một lần, công lặp lại, rejected data, training/compute và tất cả failed attempts.",
+      "falsifier": "Source đạt cùng chất lượng với tổng cost thấp hơn trong miền/budget đã chốt sẽ hỗ trợ claim; giảm robot samples nhưng total cost tăng sẽ bác claim tiết kiệm tổng ở miền đó.",
+      "resolution_status": "open_local_draft"
+    },
+    {
+      "finding_key": "A8",
+      "architecture_key": "denso-v3.1-content-audit-local",
+      "architecture_revision": "2026-10-05-a1",
+      "title": "Nhánh demo được chọn sẵn dễ tạo cảm giác đã chẩn đoán",
+      "targets": [
+        "EVID",
+        "E_EVID_TRAIN"
+      ],
+      "priority": "minor",
+      "basis": "inferred_risk",
+      "observation": "Website mặc định health=data; scenario chọn sẵn augmentation/correction. Labels minh họa đã có nhưng người xem có thể bỏ qua.",
+      "scope": "Nội dung và thiết kế native v3.1 tại snapshot kiểm tra; không tái lập paper hoặc đo robot thật.",
+      "category": "content_and_evidence_validation",
+      "source_refs": [
+        "D4",
+        "D10"
+      ],
+      "evidence_ids": [],
+      "claim_ids": [],
+      "audit_ids": [],
+      "reasoning": {
+        "premises": [
+          "D10: default branch và c.choice có sẵn, không chạy diagnosis.",
+          "Live overview: hiển thị “Đã kiểm, xét dữ liệu” và ảnh kết quả kỳ vọng.",
+          "D4: engineer phải thử giả thuyết trước quyết định."
+        ],
+        "derivation": "Các trạng thái UI là nội dung dựng để giải thích đường đi, không có actual probe kết luận camera/lighting sạch.",
+        "scoped_conclusion": "Không tìm thấy claim automatic diagnosis đã được chứng minh; rủi ro là cách đọc của demo làm quá mức evidence đang có.",
+        "assumptions": [
+          "Snapshot được đọc là bản dự định trình bày hiện hành; native artifacts không có trong hồ sơ đã kiểm."
+        ],
+        "limitations": [
+          "Thiếu artifact không chứng minh phương pháp không thể hoạt động.",
+          "Kết quả tác giả không phải kết quả của đội."
+        ],
+        "support_status": "local evidence audit; native effectiveness unresolved"
+      },
+      "impact": "Không tìm thấy claim automatic diagnosis đã được chứng minh; rủi ro là cách đọc của demo làm quá mức evidence đang có.",
+      "alternative_explanation": "Top-level labels đã nêu minh họa và engineer review, nên đây là clarity risk chứ không khẳng định đội đã giả mạo kết quả.",
+      "suggested_change": "Khi chỉnh sau audit, trạng thái ban đầu nên là “chưa có phép kiểm”; nhánh hiện tại đặt tên “giả sử kiểm hệ thống đạt”.",
+      "expected_cost": "Chỉnh copy/state nhỏ; native diagnosis artifact vẫn cần công riêng.",
+      "next_check": "Kiểm một native EvidenceCard thực và cách viewer phân biệt observed/hypothesis/pending decision; user comprehension check cho câu “vì sao chọn nhánh này?”.",
+      "falsifier": "Viewer hiểu đây là nhánh giả định và xem được probe artifact ở bản thực sẽ giảm risk; animation đẹp hơn không giải quyết evidence.",
+      "resolution_status": "open_local_draft"
+    },
+    {
+      "finding_key": "A9",
+      "architecture_key": "denso-v3.1-content-audit-local",
+      "architecture_revision": "2026-10-05-a1",
+      "title": "Ảnh/video tải về còn là câu chuyện phiên bản ban đầu",
+      "targets": [
+        "MEDIA"
+      ],
+      "priority": "minor",
+      "basis": "accepted_tradeoff",
+      "observation": "Text tương tác v3.1 đã cập nhật VLM/Action Expert/bridge, nhưng source storyboard vẫn mô tả human chủ yếu là trình tự và execution tổng quát. Video/ZIP được gắn nhãn ban đầu.",
+      "scope": "Nội dung và thiết kế native v3.1 tại snapshot kiểm tra; không tái lập paper hoặc đo robot thật.",
+      "category": "content_and_evidence_validation",
+      "source_refs": [
+        "D11",
+        "D12"
+      ],
+      "evidence_ids": [],
+      "claim_ids": [],
+      "audit_ids": [],
+      "reasoning": {
+        "premises": [
+          "D11: disclosure video nhập môn ban đầu, không thay v3.1 spec.",
+          "D12: dữ liệu học/chạy thử chưa có các boundary và gates hiện hành.",
+          "Live overview: link tải video/bộ cảnh ban đầu còn hoạt động."
+        ],
+        "derivation": "Những bản tóm tắt không nhất thiết sai cơ chế, nhưng không đáp ứng nhu cầu một bộ media tự chứa toàn workflow cuối khi chia sẻ ngoài website.",
+        "scoped_conclusion": "Media được scoped minh họa nên không phải lỗi scientific validity. Còn khoảng trống đồng nhất nội dung và độ đầy đủ của bản tải về.",
+        "assumptions": [
+          "Snapshot được đọc là bản dự định trình bày hiện hành; native artifacts không có trong hồ sơ đã kiểm."
+        ],
+        "limitations": [
+          "Thiếu artifact không chứng minh phương pháp không thể hoạt động.",
+          "Kết quả tác giả không phải kết quả của đội."
+        ],
+        "support_status": "local evidence audit; native effectiveness unresolved"
+      },
+      "impact": "Media được scoped minh họa nên không phải lỗi scientific validity. Còn khoảng trống đồng nhất nội dung và độ đầy đủ của bản tải về.",
+      "alternative_explanation": "Video nhập môn cố ý đơn giản hóa, phù hợp nếu chỉ dùng để giới thiệu, không làm bản triển khai đầy đủ.",
+      "suggested_change": "Dùng một authority cho text tương tác/captions/storyboard khi được yêu cầu chỉnh; giữ lịch sử ban đầu có revision riêng.",
+      "expected_cost": "Cập nhật story source, render media và visual QA; không phải chạy thêm training.",
+      "next_check": "Đối chiếu captions/ảnh/ZIP với revision được công bố; từng claim native gắn trạng thái và cùng một example artifact xuyên suốt.",
+      "falsifier": "Bộ media xuất từ một script nội dung hiện hành và kiểm các captions sẽ giải quyết drift; chỉ đổi nhãn ZIP chưa cập nhật nội dung.",
+      "resolution_status": "open_local_draft"
+    }
+  ]
+}

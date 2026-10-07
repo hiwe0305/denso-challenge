@@ -1,0 +1,69 @@
+digraph Audit {
+graph [rankdir=TB, bgcolor="white", fontname="DejaVu Sans", fontsize=20, labelloc=t, label="DENSO · Model Engine × Data Flywheel
+Reviewer reconstruction · snapshot 06 Oct 2026
+Markers: Rxx = findings; native implementation pending"];
+node [shape=box, style="rounded,filled", fillcolor="#f8fafc", color="#94a3b8", fontname="DejaVu Sans", fontsize=11, margin="0.16,0.12"];
+edge [fontname="DejaVu Sans", fontsize=9, color="#64748b", arrowsize=.7];
+subgraph cluster_training { label="TRAINING · sources / supervision / params"; color="#cbd5e1"; style="rounded";
+n01 [label="n01\nSource recordings / executed variants\nR03 RISK", fillcolor="#fef3c7"];
+n02 [label="n02\nQA / lineage / split / immutable release\nR03 RISK", fillcolor="#fef3c7"];
+n03 [label="n03\nBatch → selected objective → trainable modules\nR01 PENDING", fillcolor="#e2e8f0"];
+n04 [label="n04\nParent / candidate checkpoint + receipts\nR01 PENDING", fillcolor="#e2e8f0"];
+n20 [label="n20\nOptional motion / future objective + negative pool\nR10 RISK", fillcolor="#fef3c7"];
+}
+subgraph cluster_inference { label="INFERENCE / CONTROL · deployable information only"; color="#cbd5e1"; style="rounded";
+n06 [label="n06\nCurrent RGB + instruction + measured state", fillcolor="#f8fafc"];
+n07 [label="n07\nEagle VLM / interface features", fillcolor="#f8fafc"];
+n08 [label="n08\nAction Expert + state / ID / noise / time", fillcolor="#f8fafc"];
+n09 [label="n09\nAction chunk → binding / controller → robot or sim\nR01 PENDING", fillcolor="#e2e8f0"];
+n10 [label="n10\nObservation / prediction / command / response trace", fillcolor="#f8fafc"];
+}
+subgraph cluster_evaluation { label="EVALUATION · development separate from final"; color="#cbd5e1"; style="rounded";
+n11 [label="n11\nDevelopment full-task / regression / cost", fillcolor="#f8fafc"];
+n12 [label="n12\nFreeze → independent final → acceptance\nR04 PENDING", fillcolor="#e2e8f0"];
+}
+subgraph cluster_development { label="FLYWHEEL · engineer decisions"; color="#cbd5e1"; style="rounded";
+n05 [label="n05\nAcquisition choices + decision receipt\nR02 RISK", fillcolor="#fef3c7"];
+n13 [label="n13\nEngineer: promote / repair / data / defer / stop\nR02 RISK", fillcolor="#fef3c7"];
+}
+subgraph cluster_protocol { label="PROTOCOL / RESOURCES"; color="#cbd5e1"; style="rounded";
+n14 [label="n14\nMeasured resource plan + caps", fillcolor="#f8fafc"];
+}
+subgraph cluster_delivery { label="WEBSITE DELIVERY · content / reader / packages / build"; color="#cbd5e1"; style="rounded";
+n15 [label="n15\nWebsite: story / authority / budget / timeline\nR05 ERROR / R06 RISK", fillcolor="#fee2e2"];
+n16 [label="n16\nMarkdown full-path document resolver\nR07 ERROR", fillcolor="#fee2e2"];
+n17 [label="n17\nPrimary ZIP + dependency closure\nR07 ERROR", fillcolor="#fee2e2"];
+n18 [label="n18\nBuild + source-asset provenance inputs\nR08 ERROR", fillcolor="#fee2e2"];
+}
+subgraph cluster_reference { label="REFERENCE ONLY · not native proof"; color="#cbd5e1"; style="rounded";
+n19 [label="n19\nReference row / step / timestamp validation\nR09 ERROR", fillcolor="#fee2e2"];
+}
+n01 -> n02 [label="e01 · raw → QA", style="solid"];
+n02 -> n03 [label="e02 · batch / masks", style="solid"];
+n03 -> n04 [label="e03 · update / reload", style="solid"];
+n04 -> n07 [label="e04 · params", style="dashed"];
+n04 -> n08 [label="e05 · params", style="dashed"];
+n06 -> n07 [label="e06 · RGB / text", style="solid"];
+n07 -> n08 [label="e07 · features", style="solid"];
+n08 -> n09 [label="e08 · chunk", style="solid"];
+n09 -> n10 [label="e09 · response", style="solid"];
+n10 -> n11 [label="e10 · outcomes", style="solid"];
+n11 -> n13 [label="e11 · gain / cost", style="solid"];
+n13 -> n05 [label="e12 · hypothesis", style="solid"];
+n05 -> n01 [label="e13 · acquire / reuse", style="solid"];
+n13 -> n09 [label="e14 · repair or promote", style="solid"];
+n04 -> n12 [label="e15 · frozen candidate", style="dashed"];
+n14 -> n03 [label="e16 · job cap", style="dashed"];
+n14 -> n11 [label="e17 · eval cap", style="dashed"];
+n20 -> n03 [label="e18 · gated objective", style="dashed"];
+n15 -> n16 [label="e19 · links", style="dashed"];
+n16 -> n17 [label="e20 · closure", style="dashed"];
+n18 -> n15 [label="e21 · build", style="dashed"];
+n19 -> n02 [label="e22 · reference guard", style="dashed"];
+n06 -> n08 [label="e23 · state / profile", style="solid"];
+n02 -> n20 [label="e24 · motion / future targets", style="solid"];
+legend [shape=note,label="ERROR: reproduced or direct content mismatch
+RISK: conditional design concern
+PENDING: missing native / planning evidence
+No color means no specific finding attached, not verified correctness",fillcolor="#ffffff"];
+}

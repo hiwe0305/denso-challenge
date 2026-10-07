@@ -1,0 +1,428 @@
+{
+  "checked": "2026-10-07",
+  "status": "proposal_not_native_results",
+  "evidence": [
+    {
+      "label": "Thu dữ liệu có chi phí thật",
+      "metric": "$15 triệu",
+      "context": "Figure công bố tiền đã trả người quay; 16 triệu video tải lên. Đây chưa là tổng chi phí dataset.",
+      "takeaway": "Thu → lọc → loại trùng → cân bằng → gán nhãn mới tạo được dữ liệu dùng được.",
+      "source": "Figure · Index · 25/08/2026 · công bố doanh nghiệp",
+      "url": "https://www.figure.ai/news/introducing-index"
+    },
+    {
+      "label": "Cách dùng supervision tạo khác biệt",
+      "metric": "89,9% → 95,7%",
+      "context": "FOCA Table 2: π0 → FOCA + DreamGen trên LIBERO, cùng mức 40% demo (~20/task).",
+      "takeaway": "Video không action học future alignment; adaptation tiếp theo vẫn dùng action robot. Chưa là kết quả A1.",
+      "source": "FOCA · arXiv:2606.20867v1 · Table 2 / §5 Q2",
+      "url": "https://arxiv.org/html/2606.20867v1"
+    },
+    {
+      "label": "Dữ liệu cần giúp nhiệm vụ thực",
+      "metric": "9% → 56%",
+      "context": "Figure: Index pretraining, cùng downstream data/config, 3 việc ở 30 nhà chưa thấy. Fine-tuning tác vụ vẫn có ở nơi khác.",
+      "takeaway": "Đo hoàn thành toàn việc; chất lượng video hoặc loss thấp chưa đủ.",
+      "source": "Figure · Helix 2.5 · 17/09/2026 · công bố doanh nghiệp",
+      "url": "https://www.figure.ai/news/helix-2-5-zero-shot-30-home-generalization"
+    }
+  ],
+  "datasets": [
+    {
+      "id": "compat",
+      "name": "FluxVLAData · GR1",
+      "role": "Kiểm tương thích trước",
+      "status": "Public sample đã đọc",
+      "files": "LeRobot v2.1 · MP4 + Parquet + JSON/JSONL",
+      "signals": "RGB 256² / 20 fps · state 29D · action 29D · instruction",
+      "use": "Adapter / batch / normalization / binding sanity. Chọn task tương thích để kiểm trước A1; không đổi bottle-to-cabinet thành nhãn task khay.",
+      "url": "https://huggingface.co/datasets/limxdynamics/FluxVLAData/tree/7998ab57bc70be66234b5374800705e2b6c14545/robocasa_gr1_24tasks_first30ep",
+      "note": "720 episodes / 24 tasks. Public task preview có waist unlocked; binding A1 fixed torso phải kiểm riêng. Parent dataset có điều kiện non-commercial."
+    },
+    {
+      "id": "robot",
+      "name": "R_A1 · expert / correction",
+      "role": "Dạy hành động robot đích",
+      "status": "Dự kiến thu · chưa có",
+      "files": "MP4 + signals Parquet + instructions + calibration + QA",
+      "signals": "Ảnh/lệnh/state hiện tại · future action targets · command/readback riêng",
+      "use": "20 train seed roots là budget khởi đầu đề xuất. Tách development/final trước sinh variants; số mẫu đủ hay chưa phải đo.",
+      "note": "Ghi action semantics, units, controller profile; không lấy policy failure làm positive demonstration."
+    },
+    {
+      "id": "sim",
+      "name": "S_exec · biến thể từ R_A1",
+      "role": "Mở độ phủ có mục tiêu",
+      "status": "Sinh trong mô phỏng · chưa có",
+      "files": "Cùng schema robot + parent root + generator / QA receipts",
+      "signals": "RGB/text/state/action mới ghi sau thực thi simulator",
+      "use": "Thay vị trí/ánh sáng/vật trong miền hợp lệ → execute → QA. Batch R_A1 + S_exec cùng action route; replay dữ liệu tốt cũ.",
+      "note": "Synthetic là cách tạo dữ liệu. 100 variants từ một seed vẫn là một root; chỉ giữ nhãn cũ khi phép biến đổi bảo toàn semantics."
+    },
+    {
+      "id": "human",
+      "name": "HumanEgo · serve_bread",
+      "role": "Pilot chuyển động có điều kiện",
+      "status": "Public preview · chưa tích hợp",
+      "files": "Ego RGB + wrist CSV + timestamps / confidence + camera geometry",
+      "signals": "Tracked human wrists + masks; không robot joint actions",
+      "use": "Nếu geometry và relevance đạt: human state adapter → common wrist 18D head/shared motor trunk. So R_common với R_common+H; VLM frozen ở cả hai.",
+      "url": "https://huggingface.co/datasets/Leo-TX/HumanEgo",
+      "note": "Task khác A1; phải kiểm ích lợi trước. Wrist-only chưa dạy lực gắp/contact. Dataset và mã có điều kiện non-commercial riêng."
+    },
+    {
+      "id": "video",
+      "name": "LIBERO / DreamGen · nghiên cứu mở rộng",
+      "role": "Thử action-free future alignment",
+      "status": "Nhánh nghiên cứu · chưa chọn MVP",
+      "files": "Recorded/generated MP4 + task text + temporal / region annotations",
+      "signals": "Current/future RGB/text, action absent ở generated video",
+      "use": "LIBERO để kiểm recipe trên robot benchmark gốc; không gộp Panda 7D vào GR1 29D. DreamGen tạo video từ train roots, không sinh action thật.",
+      "url": "https://focavla.github.io/",
+      "note": "FOCA: video phase implicit loss → robot phase action + implicit. Target future encoder frozen; trainable conditioning/VLM/policy pin theo port."
+    }
+  ],
+  "routes": [
+    {
+      "id": "robot",
+      "title": "Robot + sim execution",
+      "input": "MP4 + text + Parquet state/action",
+      "prepare": "Decode/sync RGB · tokenize text · normalize bằng train stats · sample action horizon",
+      "condition": "Current RGB/text → pretrained VLM → features; state + features + noisy actions/time → Action Expert → predicted velocity",
+      "target": "Future actions + noise/time → flow target (actions − noise); mask valid",
+      "train": "Native action loss → Action Expert + selected allowed adapters/visual modules. Flux baseline tune_llm=False, tune_visual=True theo config cần pin; R và R+S giữ cùng recipe.",
+      "runtime": "Ảnh/lệnh/state hiện tại → action chunk. Không đọc action labels hoặc future frame."
+    },
+    {
+      "id": "video",
+      "title": "Video không action · candidate",
+      "input": "MP4 + text + timestamps / region annotations",
+      "prepare": "Sample current/future cùng episode, giữ root split; ground regions nếu recipe cần",
+      "condition": "Current RGB/text → VLM + learned conditioning tokens → projected representation",
+      "target": "Future frame → frozen target vision encoder → goal embedding; task-mismatched negatives",
+      "train": "Implicit alignment → conditioning tokens/heads và VLM modules được mở. Video-only không action loss; sau đó labeled robot phase action + implicit, Q2 explicit disabled.",
+      "runtime": "Current context tạo learned future-aware features. Không cần ground-truth future hoặc future boxes."
+    },
+    {
+      "id": "human",
+      "title": "Human motion · pilot riêng",
+      "input": "Ego RGB/text + tracked wrist poses / confidence / calibration",
+      "prepare": "Align clocks → camera-frame wrist poses + masks; robot common targets lấy từ measured FK",
+      "condition": "Frozen VLM features + state adapter + noisy wrist sequence/time → shared trunk/common head → predicted wrist velocity",
+      "target": "Future common wrists 18D: hai tay × (xyz + rotation6D); native robot target tách riêng",
+      "train": "R: native action + common wrist losses. H: wrist loss → human adapter/common head/shared trunk; không update native decoder trực tiếp. VLM frozen cả R_common và R_common+H.",
+      "runtime": "Robot native branch → robot actions. Human tracking/common wrist target chỉ phục vụ training."
+    }
+  ],
+  "errors": [
+    {
+      "id": "binding",
+      "title": "Command không khớp prediction",
+      "observe": "Action chunk hợp lệ nhưng lệnh gửi sai thứ tự joint / units / thời điểm.",
+      "test": "Replay cùng action, so prediction → denormalization → issued command → readback; kiểm profile và clocks.",
+      "collect": "Giữ trace và bản sửa cấu hình; không cần thêm positive demonstrations cho lỗi binding.",
+      "update": "Sửa binding/controller/preprocessing; chưa train model.",
+      "eval": "Chạy lại parity và task baseline với profile đã pin."
+    },
+    {
+      "id": "visual",
+      "title": "Đổi ánh sáng → tiếp cận lệch",
+      "observe": "Gắp hụt trong điều kiện ảnh mới. Đây là triệu chứng, chưa nguyên nhân đã chứng minh.",
+      "test": "Kiểm camera/sync/calibration/controller; so cùng geometry dưới ánh sáng cũ/mới và thử input/representation probe.",
+      "collect": "Reuse + appearance augmentation bảo toàn nhãn trước; sim executions hoặc expert correction khi geometry đổi.",
+      "update": "Nếu controlled test ủng hộ visual gap: thử visual encoder/interface adapter theo manifest; action head chỉ mở nếu phép kiểm cần. Giữ control cùng scope/compute.",
+      "eval": "Full-task trên ánh sáng giữ riêng + regression; video đẹp hơn không đủ."
+    },
+    {
+      "id": "contact",
+      "title": "Nâng được → vật trượt khi chuyển",
+      "observe": "Lỗi ở transfer có thể bắt đầu từ grasp hoặc controller trước đó.",
+      "test": "Kiểm bộ gắp/contact/readback; thử transfer từ expert grasp và policy grasp để khoanh vùng.",
+      "collect": "Expert correction về grasp/retention, hoặc sim executions vật lý đã QA. Wrist video thiếu contact không giải mặc định.",
+      "update": "Nếu control ổn và action supervision thiếu: post-train Action Expert/native branch với correction + replay. Probe chưa tách nguyên nhân thì tiếp tục kiểm, chưa chọn update.",
+      "eval": "Đo retention, transitions và toàn task; không chỉ success của đoạn sửa."
+    }
+  ],
+  "flywheel": [
+    {
+      "title": "Chạy & ghi",
+      "artifact": "Episode trace",
+      "body": "Input → prediction → command → response → outcome, kèm versions/timestamps. Giữ cả fail/unknown/intervention."
+    },
+    {
+      "title": "Kiểm giả thuyết",
+      "artifact": "Evidence card",
+      "body": "Khoanh điều kiện yếu bằng controlled tests. Lỗi hệ thống đi sang repair; chưa đủ cơ sở thì hoãn acquisition."
+    },
+    {
+      "title": "Chọn dữ liệu hữu ích",
+      "artifact": "Acquisition plan",
+      "body": "Xét reuse, correction, augmentation, sim execution hoặc eligible video/motion theo supervision cần và ngân sách. Chưa dùng model tự định giá utility trước khi có phép đo."
+    },
+    {
+      "title": "QA & release",
+      "artifact": "Dataset version",
+      "body": "Đúng nhãn/timing/geometry, đủ coverage, loại trùng, roots/splits và provenance. Failures giữ riêng, không biến thành positive BC."
+    },
+    {
+      "title": "Học có phạm vi",
+      "artifact": "Checkpoint + recipe",
+      "body": "Batch theo capability; target/loss/module rõ; replay data tốt cũ. Chỉ update scope được phép kiểm ủng hộ."
+    },
+    {
+      "title": "Đo & quyết định",
+      "artifact": "Quality–cost report",
+      "body": "So parent/candidate ở development: full-task, regression, unique roots và tổng công. Có ích mới dùng; no-gain quay lại kiểm. Final độc lập ngoài vòng tune."
+    }
+  ],
+  "cost": {
+    "status": "illustrative_capacity_budget_not_quote_or_savings",
+    "currency": "USD",
+    "roots": 20,
+    "yield": 0.5,
+    "minutesPerAttempt": 6,
+    "qaMinutesPerAttempt": 3,
+    "operatorRate": 10,
+    "engineerRate": 20,
+    "engineeringHours": 240,
+    "gpuHours": {
+      "train": 120,
+      "generation": 30,
+      "evaluation": 30
+    },
+    "a100Rate": 1.59,
+    "storageGB": 100,
+    "storageMonths": 3,
+    "storageRate": 0.07,
+    "priceSource": "https://www.runpod.io/pricing",
+    "priceChecked": "2026-10-06",
+    "note": "Nhân công/giờ việc/accepted yield là giả định thay được. GPU là cap công suất thuê, chưa runtime đã benchmark hoặc bảo đảm config fits. Công QA attempts tính riêng; integration/preparation/report nằm trong 240 engineer-hours. Chưa gồm robot/cell, CPU riêng, phí dữ liệu/license, thuế, downtime và triển khai thật."
+  },
+  "video": {
+    "url": "https://www.youtube.com/watch?v=zKaeODg7xeE",
+    "title": "Video nguồn · Vì sao thu dữ liệu robot vẫn tốn công?",
+    "scope": "Đã đối chiếu transcript/description với nguồn gốc. Dùng Index và Helix làm dẫn chứng có giới hạn; không lấy sprint/backflip/forecast làm bằng chứng thao tác A1. Chưa kiểm trực quan toàn bộ video."
+  },
+  "model": {
+    "name": "GR00T N1.5 · triển khai qua FluxVLA",
+    "purpose": "Pretrained VLA là policy nền: mã hóa quan sát và lệnh, kết hợp state robot, dự đoán chuỗi hành động. Data Core cấp release; Model AI biến supervision thành cập nhật weights.",
+    "source": "https://research.nvidia.com/labs/gear/gr00t-n1_5/",
+    "status": "Native A1: kiến trúc đề xuất · chưa tích hợp/training",
+    "modes": [
+      {
+        "id": "run",
+        "title": "Robot inference",
+        "caption": "Thông tin hiện tại → features → action chunk → robot",
+        "nodes": [
+          {
+            "name": "Quan sát + lệnh",
+            "tag": "INPUT",
+            "body": "RGB và instruction qua cùng processor đã pin. Robot state đo được cấp riêng cho Action Expert.",
+            "output": "Images + token IDs",
+            "scope": "Processor"
+          },
+          {
+            "name": "Eagle VLM",
+            "tag": "BIỂU DIỄN",
+            "body": "Vision encoder + language backbone mã hóa visual/text context. GR00T N1.5 kế thừa Eagle 2.5 đã được tăng cường grounding.",
+            "output": "Vision–language embeddings",
+            "scope": "Forward · không gradient"
+          },
+          {
+            "name": "Action Expert · DiT",
+            "tag": "DỰ ĐOÁN ACTION",
+            "body": "Cross-attend VLM features; state/embodiment + noise/time đi vào action branch. Tích phân flow nhiều bước để tạo chunk.",
+            "output": "Normalized action chunk",
+            "scope": "State/action adapters + DiT"
+          },
+          {
+            "name": "Robot thực thi",
+            "tag": "NGOÀI MODEL",
+            "body": "Denormalize, map units/joint order, schedule và gửi controller. Readback + scorer độc lập phản hồi về flywheel.",
+            "output": "Commands → measured outcome",
+            "scope": "Controller / evaluator"
+          }
+        ],
+        "target": "Inference không có ground-truth future targets. VLM features là representation; action chunk là output policy, command là output binding.",
+        "loss": "Không optimizer/backward khi robot chạy.",
+        "modules": "Model weights của phiên bản đã chọn được giữ cố định trong episode. Chưa có online learning tự động.",
+        "deliver": "Checkpoint + processor + normalization + robot profile + inference config",
+        "contrast": "Config tham chiếu có horizon16, action padded32 / original29. Đây là quan sát upstream; fixed torso/one arm A1 và semantics từng chiều còn phải kiểm."
+      },
+      {
+        "id": "robot",
+        "title": "Train robot action",
+        "caption": "R_A1 + QA S_exec + replay → native action adaptation",
+        "nodes": [
+          {
+            "name": "Robot training batch",
+            "tag": "DỮ LIỆU + TARGET",
+            "body": "Current RGB/text/state; future actions có mask. Stats chỉ từ train roots; windows không vượt episode/split.",
+            "output": "Conditioning + action horizon",
+            "scope": "Data Core release"
+          },
+          {
+            "name": "VLM + interface",
+            "tag": "ENCODE CONTEXT",
+            "body": "Image/text → embeddings/masks. Native Flux recipe tham chiếu cho phép tune_visual và giữ LLM frozen; phải kiểm actual parameter groups.",
+            "output": "Features condition DiT",
+            "scope": "Visual: train · LLM: frozen theo selected config"
+          },
+          {
+            "name": "Action Expert · DiT",
+            "tag": "FLOW MATCHING",
+            "body": "Normalize action labels, trộn noise theo flow time. Head nhận noised actions/time + state/features và dự đoán velocity.",
+            "output": "Predicted velocity vθ",
+            "scope": "Action Expert + allowed adapters"
+          },
+          {
+            "name": "Loss → update",
+            "tag": "BACKWARD",
+            "body": "So predicted velocity với target actions−noise trên valid mask. Backprop chỉ qua modules mở; lưu checkpoint rồi reload/rollout.",
+            "output": "Candidate checkpoint",
+            "scope": "Optimizer + gradient checks"
+          }
+        ],
+        "target": "Future native robot actions → normalize → noise interpolation; target velocity theo convention actions−noise. Loss không so velocity trực tiếp với command controller.",
+        "loss": "L_action = masked MSE(vθ, actions − noise), theo native flow convention đã pin.",
+        "modules": "Train Action Expert/state-action adapters và visual modules được recipe mở; LLM frozen theo selected Flux config. R và R+S dùng cùng trainable scope.",
+        "deliver": "Weights mới + recipe/optimizer/gradient receipts → development full-task + regression",
+        "contrast": "Official GR00T N1.5 recipe freezes VLM; Flux visual-tuning là lựa chọn implementation riêng. Chốt một manifest trước run; không trộn hai recipe để quy gain cho dữ liệu."
+      },
+      {
+        "id": "video",
+        "title": "Train video action-free",
+        "caption": "Candidate FOCA-style: video phase → labeled robot adaptation",
+        "nodes": [
+          {
+            "name": "Temporal video batch",
+            "tag": "KHÔNG ACTION LABEL",
+            "body": "Recorded/generated current/future frames cùng train episode + instruction; vùng/task/clock annotations theo recipe.",
+            "output": "Current context + offline future",
+            "scope": "Candidate release"
+          },
+          {
+            "name": "Future-aware VLM",
+            "tag": "NHÁNH CẦN THÊM",
+            "body": "Learned conditioning tokens xử lý current image/text. Projection head tạo representation để so với future goal embedding.",
+            "output": "Projected current tokens",
+            "scope": "Conditioning + allowed VLM modules"
+          },
+          {
+            "name": "Frozen target encoder",
+            "tag": "TARGET · TRAIN ONLY",
+            "body": "Future frame/region từ cùng episode → target embedding; task-mismatched negatives. Stop-gradient ở target encoder.",
+            "output": "Future embedding targets",
+            "scope": "Frozen vision target"
+          },
+          {
+            "name": "Alignment → adaptation",
+            "tag": "HAI PHASE",
+            "body": "Video phase implicit alignment; robot phase dùng action labels + implicit. Q2 FOCA disable explicit prediction.",
+            "output": "Future-aware policy candidate",
+            "scope": "Phase2: native robot action route"
+          }
+        ],
+        "target": "Future observations chỉ ở target branch. Video-only không có native action loss; không gán pseudo-action như measured GT.",
+        "loss": "Phase1: L_implicit. Phase2: L_action + λ L_implicit. Đây là FOCA Q2-inspired candidate cần port, chưa native recipe đã chạy.",
+        "modules": "Thêm conditioning tokens/projection heads, mở VLM modules theo port; target encoder frozen. Action Expert học robot actions ở phase2. Frozen target encoder không đồng nghĩa toàn VLM frozen.",
+        "deliver": "Candidate representation/policy → kiểm downstream control, không chỉ alignment loss",
+        "contrast": "Single-task A1 cần semantic task IDs và train-only task-mismatched negative pool. Zero-negative batch phải reject/skip có receipt; đổi objective phải ghi adaptation. So downstream action-only với action+implicit, cùng protocol."
+      },
+      {
+        "id": "human",
+        "title": "Train human shared trunk",
+        "caption": "Custom candidate: cùng motor trunk, riêng state adapters và target heads",
+        "nodes": [
+          {
+            "name": "R_common + H batch",
+            "tag": "HAI EMBODIMENTS",
+            "body": "Robot current state/native actions + measured wrist targets; human current tracked wrists + future wrist targets. Geometry/time/masks đã QA.",
+            "output": "Native29D / common18D targets riêng",
+            "scope": "Unpaired nhưng cùng pose convention"
+          },
+          {
+            "name": "Frozen VLM + adapters",
+            "tag": "FEATURES + STATE",
+            "body": "Robot/human image-text qua VLM frozen. Source-specific state adapters giữ semantics khác nhau; common targets camera-frame xyz+rotation6D.",
+            "output": "Features + source-conditioned state",
+            "scope": "VLM frozen cả hai controls"
+          },
+          {
+            "name": "Shared Action Expert trunk",
+            "tag": "CUSTOM MOTOR BRANCH",
+            "body": "Shared motor trunk có native robot head và common-wrist encoder/head riêng. Source/noise/time/masks định rõ; H không giả thành robot joints.",
+            "output": "Robot velocity / wrist velocity",
+            "scope": "Shared trunk + common/human modules"
+          },
+          {
+            "name": "Losses theo capability",
+            "tag": "SO ĐỐI CHỨNG",
+            "body": "R_common học native actions + robot common wrists; thêm H wrist loss ở R_common+H. Robot runtime dùng native head.",
+            "output": "Transfer candidate cần đo",
+            "scope": "H không update native decoder trực tiếp"
+          }
+        ],
+        "target": "Common wrists18D = hai tay × (xyz3 + rotation6D). Robot wrist targets từ measured FK; human từ tracking/geometry. Native action targets giữ riêng.",
+        "loss": "L_total = L_robot_action + λRW L_robot_wrist + λH L_human_wrist; mean trên valid elements, lambda chọn ở development.",
+        "modules": "H loss → human state adapter/common head/shared trunk. R losses → native robot branch/common branch/shared trunk. VLM detached/frozen trong R_common và R_common+H.",
+        "deliver": "Native robot policy dùng shared weights sau training → full-task / retention / regression",
+        "contrast": "So R_common với R_common+H cùng architecture/objective robot; thêm compute-matched control khi cần source attribution. Wrist-only không có finger/contact labels; transfer chưa chứng minh."
+      }
+    ],
+    "worldRoles": [
+      {
+        "name": "DreamGen · tạo dữ liệu offline",
+        "role": "Video generator tạo rollout từ initial frame + text. Recipe chọn action-free alignment hoặc pseudo-actions có provenance; generator không bắt buộc chạy cùng robot.",
+        "status": "Extension / chưa selected MVP"
+      },
+      {
+        "name": "Future modeling · học representation",
+        "role": "FOCA/FLARE dùng future targets để cải thiện biểu diễn phục vụ policy. Không đồng nghĩa đã có simulator vật lý hoặc full dynamics model.",
+        "status": "Candidate auxiliary objective"
+      },
+      {
+        "name": "DreamZero / DreamerV3 · policy khác",
+        "role": "Joint video–action generation hoặc latent dynamics + actor/critic thay architecture, data và runtime. Đánh giá như alternative stack, không cắm vào native head hiện tại.",
+        "status": "Khảo sát / chưa tích hợp"
+      }
+    ]
+  },
+  "pitch": {
+    "case": "Thêm một vị trí linh kiện. Robot gắp hụt.",
+    "problem": "Đội kỹ sư phải kiểm lỗi, thu mẫu, reset, kiểm dữ liệu và thử lại. Thu thêm video chưa chắc cung cấp đúng tín hiệu để robot học.",
+    "scope": "Tình huống đề xuất: GR1 gắp–đặt vào ô A1 trong mô phỏng; chưa là khảo sát công đoạn DENSO.",
+    "caseSteps": [
+      {
+        "title": "Chạy & ghi",
+        "artifact": "Trace của lần gắp hụt",
+        "body": "Lưu ảnh, state, action dự đoán, lệnh gửi và phản hồi robot; scorer ghi outcome độc lập."
+      },
+      {
+        "title": "Kiểm giả thuyết",
+        "artifact": "Bằng chứng trước quyết định",
+        "body": "Kiểm camera, timing, controller; thử cùng vật ở vị trí cũ/mới. Lệnh sai thì sửa binding; chưa rõ nguyên nhân thì kiểm tiếp."
+      },
+      {
+        "title": "Chọn dữ liệu",
+        "artifact": "Kế hoạch theo điều kiện yếu",
+        "body": "Thử tái sử dụng/augmentation hợp lệ trước; chọn expert correction hoặc sim execution cho vùng vị trí còn thiếu, trong ngân sách."
+      },
+      {
+        "title": "QA & release",
+        "artifact": "Dataset có phiên bản",
+        "body": "Kiểm nhãn, thời gian, nguồn gốc và trùng lặp. Chia theo mẫu gốc trước sinh biến thể; không dùng lần gắp lỗi làm mẫu action đúng."
+      },
+      {
+        "title": "Học có phạm vi",
+        "artifact": "Candidate checkpoint",
+        "body": "Nếu thiếu action supervision đã được phép kiểm ủng hộ: học Action Expert với correction + replay dữ liệu tốt. Phạm vi visual/VLM theo recipe đã chốt."
+      },
+      {
+        "title": "Đo & quyết định",
+        "artifact": "Báo cáo chất lượng–chi phí",
+        "body": "So candidate với parent trên development và kỹ năng cũ. Có ích mới giữ; không gain thì kiểm lại. Freeze trước final độc lập."
+      }
+    ]
+  }
+}

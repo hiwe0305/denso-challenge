@@ -1,0 +1,6 @@
+{
+  "repro": "Isolated source-builder prerequisite check with current catalog and Figure1 asset; ignored local PDF deliberately absent, like a clean checkout",
+  "exit_code": 1,
+  "stderr": "Traceback (most recent call last):\n  File \"/tmp/denso-review-clean-6w3i9lki/presentation-site/build-content.py\", line 14, in <module>\n    assert hashlib.sha256((ROOT/provenance['paper']).read_bytes()).hexdigest()==provenance['paperSha256']\n  File \"/usr/lib/python3.10/pathlib.py\", line 1126, in read_bytes\n    with self.open(mode='rb') as f:\n  File \"/usr/lib/python3.10/pathlib.py\", line 1119, in open\n    return self._accessor.open(self, mode, buffering, encoding, errors,\nFileNotFoundError: [Errno 2] No such file or directory: '/tmp/denso-review-clean-6w3i9lki/docs/references/papers/FluxVLA.pdf'\n",
+  "scope": "Confirms missing PDF dependency, not a complete hosted CI run."
+}

@@ -16,6 +16,7 @@ ASSETS = ROOT / 'presentation-site/dist/assets/story'
 CONTENT = ROOT / 'presentation-site/content'
 STORY = json.loads((CONTENT / 'solution-story.json').read_text())
 SECONDS = STORY['secondsPerScene']
+PRIMARY = STORY.get('primaryCondition', 'visual')
 
 def run(*args):
     subprocess.run(args, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
@@ -23,7 +24,7 @@ def run(*args):
 def stamp(seconds):
     return f'{seconds // 3600:02}:{seconds // 60 % 60:02}:{seconds % 60:02}.000'
 
-frames = [ASSETS / f'scene-visual-{i:02}.jpg' for i in range(1, 10)]
+frames = [ASSETS / f'scene-{PRIMARY}-{i:02}.jpg' for i in range(1, 10)]
 for branch in ('visual', 'contact'):
     for i in range(1, 10):
         assert (ASSETS / f'scene-{branch}-{i:02}.jpg').is_file(), (branch, i)
@@ -46,7 +47,7 @@ with TemporaryDirectory(prefix='humanoid-story-') as temp:
         str(ASSETS / 'solution-story.mp4'))
 
 vtt = ['WEBVTT', '']
-for i, scene in enumerate(STORY['scenes']['visual']):
+for i, scene in enumerate(STORY['scenes'][PRIMARY]):
     vtt += [str(i + 1), f'{stamp(i * SECONDS)} --> {stamp((i + 1) * SECONDS)}',
             scene['title'], scene['body'], '']
 (ASSETS / 'solution-story.vi.vtt').write_text('\n'.join(vtt), encoding='utf-8')
@@ -60,7 +61,9 @@ contact (gắp rồi trượt). Ảnh 1280x720 có màn hình workflow và chú 
 hay bản ghi robot thực hiện của đội. Cảnh đặt đúng mô tả kết quả kỳ vọng.
 Robot trên hình là humanoid minh họa; không là ảnh hay mô hình chính xác của GR1.
 
-Video 72 giây dùng 9 cảnh visual, chuyển cảnh nhẹ, chú thích trên hình, không lời đọc.
+Video 72 giây dùng 9 cảnh contact đã đồng bộ với bản triển khai A1,
+chuyển cảnh nhẹ, chú thích trên hình, không lời đọc. Can thiệp có điều kiện;
+không mặc định thêm dữ liệu hoặc training sẽ sửa được lỗi.
 Nguyên bản ảnh AI, prompt và nội dung các cảnh được kèm để chỉnh sửa và tái sử dụng.
 '''
 with ZipFile(ASSETS / 'storyboard.zip', 'w', ZIP_DEFLATED) as bundle:
@@ -83,6 +86,9 @@ manifest = {
              'fps': 24, 'audio': False, 'captions': 'Burned-in Vietnamese scene text + VTT'},
     'promptFile': 'presentation-site/content/story-image-prompts.json',
     'storyFile': 'presentation-site/content/solution-story.json',
+    'storySha256': hashlib.sha256((CONTENT / 'solution-story.json').read_bytes()).hexdigest(),
+    'contentRevision': STORY['revision'],
+    'primaryCondition': PRIMARY,
     'assets': [
         {'path': 'assets/story/' + p.name,
          'sha256': hashlib.sha256(p.read_bytes()).hexdigest(), 'bytes': p.stat().st_size}

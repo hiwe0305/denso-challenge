@@ -1,0 +1,204 @@
+{
+  "controls": [
+    {
+      "aria": null,
+      "id": "",
+      "tag": "BUTTON",
+      "text": "▶ Xem video"
+    },
+    {
+      "aria": null,
+      "id": "gr1-frame",
+      "tag": "SELECT",
+      "text": "Row 0 · 0.00sRow 1 · 0.05sRow 2 · 0.10sRow 3 · 0.15sRow 4 · 0.20sRow 5 · 0.25s"
+    },
+    {
+      "aria": null,
+      "id": "gr1-dimension",
+      "tag": "SELECT",
+      "text": "Dimension 0Dimension 1Dimension 2Dimension 3Dimension 4Dimension 5Dimension 6Dimension 7Dimension 8Dimension 9Dimension 10Dimension 11Dimension 12Dimension 13Dimension 14Dimension 15Dimension 16Dimension 17Dimension 18Dimension 19Dimension 20Dimension 21Dimension 22Dimension 23Dimension 24Dimension 25Dimension 26Dimension 27Dimension 28"
+    },
+    {
+      "aria": null,
+      "id": "",
+      "tag": "BUTTON",
+      "text": "1Seed & QA"
+    },
+    {
+      "aria": null,
+      "id": "",
+      "tag": "BUTTON",
+      "text": "2Học baseline"
+    },
+    {
+      "aria": null,
+      "id": "",
+      "tag": "BUTTON",
+      "text": "3Chạy & gặp lỗi"
+    },
+    {
+      "aria": null,
+      "id": "",
+      "tag": "BUTTON",
+      "text": "4Xem bằng chứng"
+    },
+    {
+      "aria": null,
+      "id": "",
+      "tag": "BUTTON",
+      "text": "5Synthetic / correction"
+    },
+    {
+      "aria": null,
+      "id": "",
+      "tag": "BUTTON",
+      "text": "6Final & gate"
+    },
+    {
+      "aria": null,
+      "id": "eng-case",
+      "tag": "SELECT",
+      "text": "R · một seed · lỗi trên vị trí mớiS · thêm sim execution · hoàn thành referenceC · model thu nhỏ học thêm correctionLỗi binding · command lệch predictionThiếu sensor của verifier · unknownChưa basic skill · fail bước đầu"
+    },
+    {
+      "aria": null,
+      "id": "eng-play",
+      "tag": "BUTTON",
+      "text": "▶ Phát bản ghi"
+    },
+    {
+      "aria": null,
+      "id": "eng-end",
+      "tag": "BUTTON",
+      "text": "Xem bước cuối"
+    },
+    {
+      "aria": null,
+      "id": "",
+      "tag": "BUTTON",
+      "text": "Command không khớp prediction"
+    },
+    {
+      "aria": null,
+      "id": "",
+      "tag": "BUTTON",
+      "text": "Đổi ánh sáng → tiếp cận lệch"
+    },
+    {
+      "aria": null,
+      "id": "",
+      "tag": "BUTTON",
+      "text": "Nâng được → vật trượt khi chuyển"
+    },
+    {
+      "aria": null,
+      "id": "",
+      "tag": "BUTTON",
+      "text": "▶ Xem video"
+    },
+    {
+      "aria": null,
+      "id": "robot-joint",
+      "tag": "SELECT",
+      "text": "kLeftShoulderPitchkLeftShoulderRollkLeftShoulderYawkLeftElbowkLeftWristRollkLeftWristPitchkLeftWristYawkRightShoulderPitchkRightShoulderRollkRightShoulderYawkRightElbowkRightWristRollkRightWristPitchkRightWristYawkLeftHandThumb0kLeftHandThumb1kLeftHandThumb2kLeftHandMiddle0kLeftHandMiddle1kLeftHandIndex0kLeftHandIndex1kRightHandThumb0kRightHandThumb1kRightHandThumb2kRightHandIndex0kRightHandIndex1kRightHandMiddle0kRightHandMiddle1"
+    },
+    {
+      "aria": null,
+      "id": "robot-camera",
+      "tag": "SELECT",
+      "text": "Camera trái phía trênCamera phải phía trênCamera cổ tay tráiCamera cổ tay phải"
+    },
+    {
+      "aria": null,
+      "id": "",
+      "tag": "BUTTON",
+      "text": "▶ Xem video"
+    },
+    {
+      "aria": null,
+      "id": "",
+      "tag": "BUTTON",
+      "text": "▶ Xem video"
+    },
+    {
+      "aria": null,
+      "id": "",
+      "tag": "BUTTON",
+      "text": "▶ Xem video"
+    },
+    {
+      "aria": null,
+      "id": "",
+      "tag": "BUTTON",
+      "text": "▶ Xem video"
+    },
+    {
+      "aria": null,
+      "id": "",
+      "tag": "BUTTON",
+      "text": "▶ Xem video"
+    },
+    {
+      "aria": null,
+      "id": "",
+      "tag": "BUTTON",
+      "text": "▶ Xem video"
+    }
+  ],
+  "h1": [
+    "Theo một episode.Hiểu từng biến đổi."
+  ],
+  "headings": [
+    "Theo một episode.Hiểu từng biến đổi.",
+    "Files & signals",
+    "Training model",
+    "Benchmark",
+    "Inference & flywheel",
+    "Data: video đi cùng tín hiệu nào?",
+    "Ví dụ đúng embodiment: lấy chai nước vào tủ rồi đóng cửa",
+    "RoboCasa GR1 · đưa chai vào tủ và đóng cửa",
+    "Từ files đến training tensors và model",
+    "Benchmark: đọc cả phạm vi và kết quả",
+    "Inference: model dự đoán, controller thực thi",
+    "Mô phỏng nhỏ để kiểm contracts",
+    "1 · Seed được thực thi, rồi kiểm release",
+    "Prediction → command → response",
+    "Kết quả của run · không loại lượt thất bại",
+    "Có lỗi: kiểm gì, lấy data gì, train phần nào?",
+    "Nâng được → vật trượt khi chuyển",
+    "1. Teleop robot thật: Unitree G1/Dex3",
+    "Unitree G1/Dex3 · toasted bread, episode 0",
+    "observation.state và action",
+    "2. Human ego thật: RGB và tín hiệu tracking",
+    "HumanEgo · serve_bread_000",
+    "Tracking tay và validity",
+    "Ví dụ dữ liệu thật làm thay đổi thiết kế",
+    "Video collection: góc nhìn và tương tác của người",
+    "Người thao tác, camera góc nhìn thứ nhất",
+    "Từ quay người đến supervision",
+    "3. Synthetic trong physics: seed → biến thể được thực thi",
+    "MimicGen · các seed demonstrations",
+    "MimicGen · biến thể môi trường",
+    "4. Synthetic từ model: video sinh → policy rollout",
+    "DreamGen · video được sinh",
+    "DreamGen · robot thực thi sau học",
+    "5. Đích humanoid: policy rollout trong mô phỏng",
+    "EgoVLA · humanoid xếp lon",
+    "Nối lại với ví dụ gắp vào khay"
+  ],
+  "height": 905,
+  "images": [
+    {
+      "alt": "HumanEgo · serve_bread_000",
+      "loaded": false,
+      "src": "https://huggingface.co/datasets/Leo-TX/HumanEgo/resolve/f0aa87fade6a41316d65322512f56f066dec62e3/serve_bread/aria/mps_serve_bread_000_vrs/preprocess/vis/aria_vis.gif",
+      "width": 0
+    }
+  ],
+  "route": "#examples",
+  "scrollWidth": 1610,
+  "text": "DATA → MODEL → EVAL → ROBOT\nTheo một episode.\nHiểu từng biến đổi.\n\nGR1 public sample cho thấy dữ liệu thật; native training là thiết kế. Reference MuJoCo nhỏ có receipts riêng để xem model học và thực thi, chưa dùng GR1 public data.\n\n01\nFiles & signals\n\nĐọc video, state và action target\n\n02\nTraining model\n\nProcessor → features → target/loss\n\n03\nBenchmark\n\nNative chưa đo; reference có receipts\n\n04–05\nInference & flywheel\n\nPrediction → command → response → kiểm / update\n\n01\nData: video đi cùng tín hiệu nào?\n\nPublic GR1 data thuộc tác giả; row action là dataset target, chưa issued command của đội.\n\nHumanoid GR1 · simulation demonstration · LeRobot v2.1\nVí dụ đúng embodiment: lấy chai nước vào tủ rồi đóng cửa\n\nSubset FluxVLA: PnPBottleToCabinetClose, 30 episodes; episode 0 có 376 frames ở 20fps. Robot metadata GR1ArmsAndWaistFourierHands, ảnh ego 256×256, state/action 29 chiều. Đây là video demonstration từ dataset, chưa rollout policy của đội.\n\n▶ Xem video\nClip tham khảo · 18,8 giây\nHUMANOID SIMULATION DEMONSTRATION · PUBLIC FLUXVLA DATASET\nRoboCasa GR1 · đưa chai vào tủ và đóng cửa\n\nGR1 arms/waist/Fourier hands, camera egocentric 20fps. Episode 0 có 376 frames (~18,8s). Task household có waist unlocked; khác task khay fixed-torso của proposal. Dataset demonstration, không policy rollout của đội.\n\nNguồn tác giả ↗\nAsset gốc ↗\nNVIDIA / RoboCasa · CC BY-NC 4.0 ↗\n\nClip lưu cùng website để xem nhanh; nguồn gốc được ghi bên trên.\n\nInstruction đã tra task index: unlocked_waist: pick up the bottled water, place it into the cabinet and close the cabinet\n\nInspector giữ 6 rows đầu, chọn độc lập với player; không tự đồng bộ số với frame video đang phát.\n\nFrame trong mẫu GR1\nRow 0 · 0.00s\nRow 1 · 0.05s\nRow 2 · 0.10s\nRow 3 · 0.15s\nRow 4 · 0.20s\nRow 5 · 0.25s\nDimension state/action\nDimension 0\nDimension 1\nDimension 2\nDimension 3\nDimension 4\nDimension 5\nDimension 6\nDimension 7\nDimension 8\nDimension 9\nDimension 10\nDimension 11\nDimension 12\nDimension 13\nDimension 14\nDimension 15\nDimension 16\nDimension 17\nDimension 18\nDimension 19\nDimension 20\nDimension 21\nDimension 22\nDimension 23\nDimension 24\nDimension 25\nDimension 26\nDimension 27\nDimension 28\n\nepisode=0 · task_index=1 · index=0 · t=0.000s\n\nobservation.state[0]\n0.00988\naction[0] · dataset target\n-0.01459\n\nDimension index không tự là joint name/unit; metadata mẫu không ghi tên từng chiều. next.reward=0, next.done=false; 6 rows đầu không đủ kết luận episode success.\n\nĐủ 29 values và raw row\nFormat, provenance và điểm cần kiểm khi đưa vào training\n02\nTừ files đến training tensors và model\n\nĐường native dự kiến; chưa feature vector hoặc gradient receipt từ GR1 của project.\n\nFILE → TENSOR\nMP4 + text + Parquet state/action\n\nDecode/sync RGB · tokenize text · normalize bằng train stats · sample action horizon\n\n→\nCURRENT INPUT → PREDICTION\nCurrent RGB/text → pretrained VLM → features; state + features + noisy actions/time → Action Expert → predicted velocity\n↔\nOFFLINE TARGET → LOSS\nTarget từ train episode, so với prediction\nFuture actions + noise/time → flow target (actions − noise); mask valid\n\nNative action loss → Action Expert + selected allowed adapters/visual modules. Flux baseline tune_llm=False, tune_visual=True theo config cần pin; R và R+S giữ cùng recipe.\n\nInference: Ảnh/lệnh/state hiện tại → action chunk. Không đọc action labels hoặc future frame.\n\nRGB 256×256 và state/action29D là metadata sample trên đĩa. Processor resolution, token/feature dimensions và action horizon lấy selected config; không suy từ kích thước file. Robot profile mới phải pin lại.\n\nKhám phá robot / video / motion routes →\nManifest và formats →\n03\nBenchmark: đọc cả phạm vi và kết quả\n\nProject native A1: chưa đo. Reference thu nhỏ: model4D/state idealized, sequencer scripted và weld grasp; không VLM/GR1.\n\nReference run\tIndependent seed roots\tTraining MSE\tFinal whole-task\tScope\nR\t1\t3.01e-12\t0/12\tBaseline · reference only\nS\t1\t4.43e-12\t12/12\tSim variants · reference only\nC\t2\t2.16e-11\t0/12\tCorrection · chưa đạt final\n\nReport thực + conditions ↗ · S variants vẫn descendants của training root, không independent demonstrations. Native A1: chưa training/eval.\n\nReference không huấn luyện bằng episode GR1 phía trên. Local gain/training loss phải đi cùng final/regression. Chi phí tiền và human transfer chưa có evidence từ reference.\n\nKế hoạch đo A1 và final độc lập →\n04\nInference: model dự đoán, controller thực thi\n\nĐọc playback theo measured positions và action/command/readback đã ghi, không animation tự quyết định kết quả.\n\nPHÉP THỬ PIPELINE THU NHỎ · BẢN CHẠY ĐÃ GHI\nMô phỏng nhỏ để kiểm contracts\n\nSeed → QA → học → rollout → evidence → S/C alternatives → final/gate.\n\nReport đo được ↗\n\nMuJoCo nhỏ · state idealized · sequencer scripted · action predictor học thật · grasp bằng weld. Đây là reference engineering, chưa VLM/GR1 hoặc human data.\n\n1\nSeed & QA\n2\nHọc baseline\n3\nChạy & gặp lỗi\n4\nXem bằng chứng\n5\nSynthetic / correction\n6\nFinal & gate\n1 · Seed được thực thi, rồi kiểm release\n\nMột expert seed recording trong MuJoCo. Root và action profile4D khai rõ; dt0.05s, world meters. Human/RGB thiếu target không vào robot BC.\n\n24 variants là descendants của 1 seed root, không 24 robot demonstrations độc lập.\n\n24 tests passed: contracts, scoring, heldout, reload và promotion; không native tests.\n\nBản chạy để xem\nR · một seed · lỗi trên vị trí mới\nS · thêm sim execution · hoàn thành reference\nC · model thu nhỏ học thêm correction\nLỗi binding · command lệch prediction\nThiếu sensor của verifier · unknown\nChưa basic skill · fail bước đầu\nNhìn từ trên · measured positions\nA1\nz (m)\n0 → 0.3\nXanh: effector · Vàng: vật · A1: đích · Cột: độ cao\n▶ Phát bản ghi\nXem bước cuối\nBước 1/150 · 0.05s\nBước thời gian trong bản ghi\n\nSơ đồ dựng từ measured simulator positions; không camera input hay robot video. Phát bản ghi không chạy training/backend trong browser.\n\nPrediction → command → response\n\nPolicy stage: Tiếp cận · grip open · attached no\n\nxyz / grip\tPrediction\tCommand đã gửi\tResponse đo\nx (m)\t-0.0934\t-0.0934\t-0.2150\ny (m)\t-0.0187\t-0.0187\t-0.1150\nz (m)\t0.1121\t0.1121\t0.1850\ngrip\t0.0000\t0.0000\topen\n\nOutcome episode: FAIL / TIMEOUT. Feature35 không là VLM latent.\n\nTiếp cận\nĐang thử\nGắp\nChưa thử\nNâng\nChưa thử\nChuyển\nChưa thử\nĐặt\nChưa thử\nNhả\nChưa thử\nRút\nChưa thử\nRaw step và feature vector thực\nKết quả của run · không loại lượt thất bại\nCandidate\tDevelopment\tFinal giữ riêng\tRegression\tGate reference\nR\tFail\t0/12\tPass\tKhông promote\nS\tPass\t12/12\tPass\tĐạt trong reference\nC\tPass\t0/12\tPass\tKhông promote\n\nKết quả C chỉ thuộc phép thử model thu nhỏ. Không kết luận phải thêm correction sau S hoặc cố dùng mọi nguồn. Native VLA / robot thật: chưa promote. Monetary saving: chưa chứng minh.\n\nRun 2026-10-05T13:36:19Z · 24 reference tests passed · artifact hashes và source trong manifest.\n\nManifest / hashes ↗\nKết quả tests thực ↗\nCode để chạy lại ↓\n05\nCó lỗi: kiểm gì, lấy data gì, train phần nào?\n\nCác cases dưới đây là kế hoạch native; dùng controlled tests trước khi chọn scope update.\n\nCommand không khớp prediction\nĐổi ánh sáng → tiếp cận lệch\nNâng được → vật trượt khi chuyển\nQUAN SÁT\nNâng được → vật trượt khi chuyển\n\nLỗi ở transfer có thể bắt đầu từ grasp hoặc controller trước đó.\n\n1\n\nKiểm trước\nKiểm bộ gắp/contact/readback; thử transfer từ expert grasp và policy grasp để khoanh vùng.\n\n2\n\nChọn dữ liệu\nExpert correction về grasp/retention, hoặc sim executions vật lý đã QA. Wrist video thiếu contact không giải mặc định.\n\n3\n\nTrain phần nào?\nNếu control ổn và action supervision thiếu: post-train Action Expert/native branch với correction + replay. Probe chưa tách nguyên nhân thì tiếp tục kiểm, chưa chọn update.\n\n4\n\nĐo lại\nĐo retention, transitions và toàn task; không chỉ success của đoạn sửa.\n\nVòng sau\nEvidence → acquisition plan → QA release → update + replay → full-task / cost → quyết định\nMở data flywheel →\nThêm video G1, HumanEgo, simulation và generated video từ tác giả",
+  "width": 1625,
+  "label": "09Dữ liệu & video thật",
+  "ax": "- link \"Đến nội dung\":\n  - /url: \"#main\"\n- complementary:\n  - link \"DENSO Humanoid tổng quan\":\n    - /url: \"#overview\"\n    - generic: DENSO\n    - generic: Skill Learning · FluxVLA\n  - generic: H1 · HỒ SƠ Ý TƯỞNG\n  - navigation \"Mục lục\":\n    - link \"01 Ý tưởng & vấn đề\":\n      - /url: \"#overview\"\n      - generic: \"01\"\n      - text: Ý tưởng & vấn đề\n    - link \"02 Sản phẩm & khác biệt\":\n      - /url: \"#product\"\n      - generic: \"02\"\n      - text: Sản phẩm & khác biệt\n    - link \"03 Solution · Cách robot học\":\n      - /url: \"#learning\"\n      - generic: \"03\"\n      - text: Solution · Cách robot học\n    - link \"04 Model Engine Core\":\n      - /url: \"#engine\"\n      - generic: \"04\"\n      - text: Model Engine Core\n    - link \"05 Kết quả kỳ vọng\":\n      - /url: \"#outcomes\"\n      - generic: \"05\"\n      - text: Kết quả kỳ vọng\n    - link \"06 Chi phí & tính khả thi\":\n      - /url: \"#business\"\n      - generic: \"06\"\n      - text: Chi phí & tính khả thi\n    - link \"07 Lộ trình thực hiện\":\n      - /url: \"#roadmap\"\n      - generic: \"07\"\n      - text: Lộ trình thực hiện\n    - link \"08 Dataset & cách tạo\":\n      - /url: \"#sources\"\n      - generic: \"08\"\n      - text: Dataset & cách tạo\n    - link \"09 Dữ liệu & video thật\":\n      - /url: \"#examples\"\n      - generic: \"09\"\n      - text: Dữ liệu & video thật\n    - link \"10 Khảo sát phương pháp\":\n      - /url: \"#research\"\n      - generic: \"10\"\n      - text: Khảo sát phương pháp\n    - link \"11 Kiến trúc & Data Core\":\n      - /url: \"#architecture\"\n      - generic: \"11\"\n      - text: Kiến trúc & Data Core\n    - link \"12 Thiết kế kiểm chứng\":\n      - /url: \"#validation\"\n      - generic: \"12\"\n      - text: Thiết kế kiểm chứng\n    - link \"13 Hồ sơ & nguồn gốc\":\n      - /url: \"#resources\"\n      - generic: \"13\"\n      - text: Hồ sơ & nguồn gốc\n  - strong: Thao tác thân trên humanoid\n  - paragraph:\n    - text: Dataset · Training · Evaluation\n    - text: Học, thực thi và kiểm chứng.\n  - text: Reference đã chạy · Native chưa kiểm\n- banner:\n  - text: DENSO Challenge/\n  - strong: Dữ liệu & video thật\n  - generic: Bản đề xuất\n  - button \"In trang\"\n- main [active]:\n  - generic: DATA → MODEL → EVAL → ROBOT\n  - heading \"Theo một episode. Hiểu từng biến đổi.\" [level=1]:\n    - text: Theo một episode.\n    - text: Hiểu từng biến đổi.\n  - paragraph: GR1 public sample cho thấy dữ liệu thật; native training là thiết kế. Reference MuJoCo nhỏ có receipts riêng để xem model học và thực thi, chưa dùng GR1 public data.\n  - article:\n    - generic: \"01\"\n    - heading \"Files & signals\" [level=3]\n    - paragraph: Đọc video, state và action target\n  - article:\n    - generic: \"02\"\n    - heading \"Training model\" [level=3]\n    - paragraph: Processor → features → target/loss\n  - article:\n    - generic: \"03\"\n    - heading \"Benchmark\" [level=3]\n    - paragraph: Native chưa đo; reference có receipts\n  - article:\n    - generic: 04–05\n    - heading \"Inference & flywheel\" [level=3]\n    - paragraph: Prediction → command → response → kiểm / update\n  - generic: \"01\"\n  - 'heading \"Data: video đi cùng tín hiệu nào?\" [level=2]'\n  - paragraph: Public GR1 data thuộc tác giả; row action là dataset target, chưa issued command của đội.\n  - generic: Humanoid GR1 · simulation demonstration · LeRobot v2.1\n  - 'heading \"Ví dụ đúng embodiment: lấy chai nước vào tủ rồi đóng cửa\" [level=2]'\n  - paragraph:\n    - text: \"Subset FluxVLA:\"\n    - code: PnPBottleToCabinetClose\n    - text: \", 30 episodes; episode 0 có 376 frames ở 20fps. Robot metadata\"\n    - code: GR1ArmsAndWaistFourierHands\n    - text: \", ảnh ego 256×256, state/action\"\n    - strong: 29 chiều\n    - text: . Đây là video demonstration từ dataset, chưa rollout policy của đội.\n  - figure \"Humanoid simulation demonstration · public FluxVLA dataset RoboCasa GR1 · đưa chai vào tủ và đóng cửa GR1 arms/waist/Fourier hands, camera egocentric 20fps. Episode 0 có 376 frames (~18,8s). Task household có waist unlocked; khác task khay fixed-torso của proposal. Dataset demonstration, không policy rollout của đội. Nguồn tác giả ↗ Asset gốc ↗ NVIDIA / RoboCasa · CC BY-NC 4.0 ↗ Clip lưu cùng website để xem nhanh; nguồn gốc được ghi bên trên.\":\n    - generic \"RoboCasa GR1 · đưa chai vào tủ và đóng cửa\"\n    - button \"▶ Xem video\"\n    - generic: Clip tham khảo · 18,8 giây\n    - generic: Humanoid simulation demonstration · public FluxVLA dataset\n    - heading \"RoboCasa GR1 · đưa chai vào tủ và đóng cửa\" [level=3]\n    - paragraph: GR1 arms/waist/Fourier hands, camera egocentric 20fps. Episode 0 có 376 frames (~18,8s). Task household có waist unlocked; khác task khay fixed-torso của proposal. Dataset demonstration, không policy rollout của đội.\n    - link \"Nguồn tác giả ↗\":\n      - /url: https://huggingface.co/datasets/limxdynamics/FluxVLAData/tree/7998ab57bc70be66234b5374800705e2b6c14545/robocasa_gr1_24tasks_first30ep\n    - link \"Asset gốc ↗\":\n      - /url: https://huggingface.co/datasets/limxdynamics/FluxVLAData/resolve/7998ab57bc70be66234b5374800705e2b6c14545/robocasa_gr1_24tasks_first30ep/PnPBottleToCabinetClose/videos/chunk-000/observation.images.ego_view/episode_000000.mp4\n    - link \"NVIDIA / RoboCasa · CC BY-NC 4.0 ↗\":\n      - /url: https://creativecommons.org/licenses/by-nc/4.0/\n    - status: Clip lưu cùng website để xem nhanh; nguồn gốc được ghi bên trên.\n  - paragraph:\n    - strong: \"Instruction đã tra task index:\"\n    - text: \"unlocked_waist: pick up the bottled water, place it into the cabinet and close the cabinet\"\n  - paragraph: Inspector giữ 6 rows đầu, chọn độc lập với player; không tự đồng bộ số với frame video đang phát.\n  - generic: Frame trong mẫu GR1\n  - combobox \"Frame trong mẫu GR1\":\n    - option \"Row 0 · 0.00s\" [selected]\n    - option \"Row 1 · 0.05s\"\n    - option \"Row 2 · 0.10s\"\n    - option \"Row 3 · 0.15s\"\n    - option \"Row 4 · 0.20s\"\n    - option \"Row 5 · 0.25s\"\n  - generic: Dimension state/action\n  - combobox \"Dimension state/action\":\n    - option \"Dimension 0\" [selected]\n    - option \"Dimension 1\"\n    - option \"Dimension 2\"\n    - option \"Dimension 3\"\n    - option \"Dimension 4\"\n    - option \"Dimension 5\"\n    - option \"Dimension 6\"\n    - option \"Dimension 7\"\n    - option \"Dimension 8\"\n    - option \"Dimension 9\"\n    - option \"Dimension 10\"\n    - option \"Dimension 11\"\n    - option \"Dimension 12\"\n    - option \"Dimension 13\"\n    - option \"Dimension 14\"\n    - option \"Dimension 15\"\n    - option \"Dimension 16\"\n    - option \"Dimension 17\"\n    - option \"Dimension 18\"\n    - option \"Dimension 19\"\n    - option \"Dimension 20\"\n    - option \"Dimension 21\"\n    - option \"Dimension 22\"\n    - option \"Dimension 23\"\n    - option \"Dimension 24\"\n    - option \"Dimension 25\"\n    - option \"Dimension 26\"\n    - option \"Dimension 27\"\n    - option \"Dimension 28\"\n  - paragraph: episode=0 · task_index=1 · index=0 · t=0.000s\n  - generic: observation.state[0]\n  - strong: \"0.00988\"\n  - generic: action[0] · dataset target\n  - strong: \"-0.01459\"\n  - paragraph: Dimension index không tự là joint name/unit; metadata mẫu không ghi tên từng chiều. next.reward=0, next.done=false; 6 rows đầu không đủ kết luận episode success.\n  - generic \"Đủ 29 values và raw row\"\n  - generic \"Format, provenance và điểm cần kiểm khi đưa vào training\"\n  - generic: \"02\"\n  - heading \"Từ files đến training tensors và model\" [level=2]\n  - paragraph: Đường native dự kiến; chưa feature vector hoặc gradient receipt từ GR1 của project.\n  - generic: FILE → TENSOR\n  - strong: MP4 + text + Parquet state/action\n  - paragraph: Decode/sync RGB · tokenize text · normalize bằng train stats · sample action horizon\n  - generic: →\n  - generic: CURRENT INPUT → PREDICTION\n  - strong: Current RGB/text → pretrained VLM → features; state + features + noisy actions/time → Action Expert → predicted velocity\n  - generic: ↔\n  - generic: OFFLINE TARGET → LOSS\n  - generic: Target từ train episode, so với prediction\n  - strong: Future actions + noise/time → flow target (actions − noise); mask valid\n  - paragraph: Native action loss → Action Expert + selected allowed adapters/visual modules. Flux baseline tune_llm=False, tune_visual=True theo config cần pin; R và R+S giữ cùng recipe.\n  - paragraph:\n    - strong: \"Inference:\"\n    - text: Ảnh/lệnh/state hiện tại → action chunk. Không đọc action labels hoặc future frame.\n  - paragraph: RGB 256×256 và state/action29D là metadata sample trên đĩa. Processor resolution, token/feature dimensions và action horizon lấy selected config; không suy từ kích thước file. Robot profile mới phải pin lại.\n  - link \"Khám phá robot / video / motion routes →\":\n    - /url: \"#learning\"\n  - link \"Manifest và formats →\":\n    - /url: \"#sources\"\n  - generic: \"03\"\n  - 'heading \"Benchmark: đọc cả phạm vi và kết quả\" [level=2]'\n  - paragraph: \"Project native A1: chưa đo. Reference thu nhỏ: model4D/state idealized, sequencer scripted và weld grasp; không VLM/GR1.\"\n  - paragraph: Đang đọc report reference…\n  - paragraph: Reference không huấn luyện bằng episode GR1 phía trên. Local gain/training loss phải đi cùng final/regression. Chi phí tiền và human transfer chưa có evidence từ reference.\n  - link \"Kế hoạch đo A1 và final độc lập →\":\n    - /url: \"#validation\"\n  - generic: \"04\"\n  - 'heading \"Inference: model dự đoán, controller thực thi\" [level=2]'\n  - paragraph: Đọc playback theo measured positions và action/command/readback đã ghi, không animation tự quyết định kết quả.\n  - text: PHÉP THỬ PIPELINE THU NHỎ · BẢN CHẠY ĐÃ GHI\n  - heading \"Mô phỏng nhỏ để kiểm contracts\" [level=2]\n  - paragraph: Seed → QA → học → rollout → evidence → S/C alternatives → final/gate.\n  - link \"Report đo được ↗\":\n    - /url: data/engineering/report.json\n  - paragraph: MuJoCo nhỏ · state idealized · sequencer scripted · action predictor học thật · grasp bằng weld. Đây là reference engineering, chưa VLM/GR1 hoặc human data.\n  - group \"Các bước pipeline\":\n    - button \"1 Seed & QA\" [pressed]:\n      - generic: \"1\"\n      - text: Seed & QA\n    - button \"2 Học baseline\":\n      - generic: \"2\"\n      - text: Học baseline\n    - button \"3 Chạy & gặp lỗi\":\n      - generic: \"3\"\n      - text: Chạy & gặp lỗi\n    - button \"4 Xem bằng chứng\":\n      - generic: \"4\"\n      - text: Xem bằng chứng\n    - button \"5 Synthetic / correction\":\n      - generic: \"5\"\n      - text: Synthetic / correction\n    - button \"6 Final & gate\":\n      - generic: \"6\"\n      - text: Final & gate\n  - paragraph: Đang tải artifacts đã ghi…\n  - generic: Bản chạy để xem\n  - combobox \"Bản chạy để xem\":\n    - option \"R · một seed · lỗi trên vị trí mới\" [selected]\n    - option \"S · thêm sim execution · hoàn thành reference\"\n    - option \"C · model thu nhỏ học thêm correction\"\n    - option \"Lỗi binding · command lệch prediction\"\n    - option \"Thiếu sensor của verifier · unknown\"\n    - option \"Chưa basic skill · fail bước đầu\"\n  - generic \"Sơ đồ theo measured positions của bản ghi\"\n  - button \"▶ Phát bản ghi\" [disabled]\n  - button \"Xem bước cuối\" [disabled]\n  - status: —\n  - generic: Bước thời gian trong bản ghi\n  - slider \"Bước thời gian trong bản ghi\" [disabled]: \"0\"\n  - paragraph: Sơ đồ dựng từ measured simulator positions; không camera input hay robot video. Phát bản ghi không chạy training/backend trong browser.\n  - heading \"Prediction → command → response\" [level=3]\n  - generic \"Raw step và feature vector thực\"\n  - status\n  - link \"Manifest / hashes ↗\":\n    - /url: data/engineering/manifest.json\n  - link \"Kết quả tests thực ↗\":\n    - /url: data/engineering/validation.json\n  - link \"Code để chạy lại ↓\":\n    - /url: assets/idea-v3.1.zip\n  - generic: \"05\"\n  - 'heading \"Có lỗi: kiểm gì, lấy data gì, train phần nào?\" [level=2]'\n  - paragraph: Các cases dưới đây là kế hoạch native; dùng controlled tests trước khi chọn scope update.\n  - button \"Command không khớp prediction\"\n  - button \"Đổi ánh sáng → tiếp cận lệch\"\n  - button \"Nâng được → vật trượt khi chuyển\" [pressed]\n  - generic: QUAN SÁT\n  - heading \"Nâng được → vật trượt khi chuyển\" [level=3]\n  - paragraph: Lỗi ở transfer có thể bắt đầu từ grasp hoặc controller trước đó.\n  - generic: \"1\"\n  - paragraph:\n    - strong: Kiểm trước\n    - text: Kiểm bộ gắp/contact/readback; thử transfer từ expert grasp và policy grasp để khoanh vùng.\n  - generic: \"2\"\n  - paragraph:\n    - strong: Chọn dữ liệu\n    - text: Expert correction về grasp/retention, hoặc sim executions vật lý đã QA. Wrist video thiếu contact không giải mặc định.\n  - generic: \"3\"\n  - paragraph:\n    - strong: Train phần nào?\n    - text: \"Nếu control ổn và action supervision thiếu: post-train Action Expert/native branch với correction + replay. Probe chưa tách nguyên nhân thì tiếp tục kiểm, chưa chọn update.\"\n  - generic: \"4\"\n  - paragraph:\n    - strong: Đo lại\n    - text: Đo retention, transitions và toàn task; không chỉ success của đoạn sửa.\n  - strong: Vòng sau\n  - generic: Evidence → acquisition plan → QA release → update + replay → full-task / cost → quyết định\n  - link \"Mở data flywheel →\":\n    - /url: \"#architecture\"\n  - generic \"Thêm video G1, HumanEgo, simulation và generated video từ tác giả\"\n- contentinfo:\n  - text: Humanoid Skill Learning\n  - generic: Data flywheel · 06.10.2026"
+}

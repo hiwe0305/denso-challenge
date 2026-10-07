@@ -1,0 +1,383 @@
+[
+  {
+    "h1": [
+      "Thu thêm dữ liệu.Robot đã học tốt hơn?"
+    ],
+    "headings": [
+      "Thu thêm dữ liệu.Robot đã học tốt hơn?",
+      "Vấn đề có cơ sở. Hiệu quả của idea còn phải đo.",
+      "Đếm cả công biến dữ liệu thành mẫu dùng được.",
+      "Giải pháp bắt đầu bằng dữ liệu nào?",
+      "Chọn đúng dữ liệu",
+      "Học để tạo hành động",
+      "R_A1 · expert / correction",
+      "Kiểm tương thích",
+      "Robot baseline",
+      "Mở coverage",
+      "Mở rộng có điều kiện",
+      "Model AI: quan sát → biểu diễn → hành động.",
+      "GR00T N1.5 · triển khai qua FluxVLA",
+      "Quan sát + lệnh",
+      "Eagle VLM",
+      "Action Expert · DiT",
+      "Robot thực thi",
+      "DreamGen · tạo dữ liệu offline",
+      "Future modeling · học representation",
+      "DreamZero / DreamerV3 · policy khác",
+      "PnPBottleToCabinetClose",
+      "Benchmark trước. Chạy robot rồi mới phân tích lỗi.",
+      "Nâng được → vật trượt khi chuyển",
+      "Data flywheel: vòng sau dùng dữ liệu tốt hơn.",
+      "1. Chạy & ghi",
+      "Mapping vào form ý tưởng"
+    ],
+    "height": 905,
+    "route": "#overview",
+    "scrollWidth": 1849,
+    "width": 1864,
+    "label": "01Ý tưởng & vấn đề"
+  },
+  {
+    "h1": [
+      "Cách làm và điều kiện kiểm chứng."
+    ],
+    "headings": [
+      "Cách làm và điều kiện kiểm chứng.",
+      "01 · Ý tưởng, vấn đề thực tế và data flywheel",
+      "Vấn đề trước giải pháp",
+      "Giải pháp: Data Core quyết định dữ liệu cho vòng sau",
+      "Model AI là phần cốt lõi của solution",
+      "Dataset và các bước training",
+      "Chuỗi example: data → model → eval → inference → lỗi → flywheel",
+      "Chi phí: giả định rõ, chưa ROI",
+      "Nhận xét của anh: đúng và cần điều chỉnh",
+      "Phạm vi, kế hoạch và bàn giao",
+      "Pitch"
+    ],
+    "height": 905,
+    "route": "#product",
+    "scrollWidth": 1849,
+    "width": 1864,
+    "label": "02Sản phẩm & khác biệt"
+  },
+  {
+    "h1": [
+      "Từ điều robot nhìn thấyđến hành động cần thực hiện."
+    ],
+    "headings": [
+      "Từ điều robot nhìn thấyđến hành động cần thực hiện.",
+      "Robot nhận đầu vào",
+      "Data flywheel đóng vòng.",
+      "Robot tốt hơn mới có ý nghĩa.",
+      "02 · Kiến trúc và cách học theo AI Engineering",
+      "Model AI × Data Core",
+      "Stable nodes",
+      "Taxonomy và training views hiện hành",
+      "Inference native",
+      "Training native",
+      "Loss routing cần khai trước run",
+      "Human bridge: candidate và các alternatives",
+      "Reference implementation hiện chạy",
+      "Các checks cần vượt"
+    ],
+    "height": 905,
+    "route": "#learning",
+    "scrollWidth": 1849,
+    "width": 1864,
+    "label": "03Solution · Cách robot học"
+  },
+  {
+    "h1": [
+      "Một engine.Từ học đến robot thật."
+    ],
+    "headings": [
+      "Một engine.Từ học đến robot thật.",
+      "FluxVLA · Figure 1 từ paper gốc",
+      "Training → eval → robot thật",
+      "Dataset release → policy candidate",
+      "FluxVLA gồm những thành phần nào?",
+      "Biến episode thành batch có nghĩa",
+      "FluxVLA · Data pipeline",
+      "Policy nào thực sự được học?",
+      "GR00T N1.5 · triển khai qua FluxVLA",
+      "Quan sát + lệnh",
+      "Eagle VLM",
+      "Action Expert · DiT",
+      "Robot thực thi",
+      "DreamGen · tạo dữ liệu offline",
+      "Future modeling · học representation",
+      "DreamZero / DreamerV3 · policy khác",
+      "Chạy trên robot thật cần gì?",
+      "Máy robot chạy policy",
+      "Robot gửi obs, server trả action",
+      "Tăng tốc model",
+      "Nối hai action chunks",
+      "Đưa chunk tới robot",
+      "FluxVLA · Inference acceleration",
+      "Kết nối engine với data flywheel",
+      "Command sai",
+      "Nguồn để kiểm lại"
+    ],
+    "height": 905,
+    "route": "#engine",
+    "scrollWidth": 1849,
+    "width": 1864,
+    "label": "04Model Engine Core"
+  },
+  {
+    "h1": [
+      "Cách làm và điều kiện kiểm chứng."
+    ],
+    "headings": [
+      "Cách làm và điều kiện kiểm chứng.",
+      "12 · Claim → evidence → phạm vi"
+    ],
+    "height": 905,
+    "route": "#outcomes",
+    "scrollWidth": 1610,
+    "width": 1625,
+    "label": "05Kết quả kỳ vọng"
+  },
+  {
+    "h1": [
+      "Cách làm và điều kiện kiểm chứng."
+    ],
+    "headings": [
+      "Cách làm và điều kiện kiểm chứng.",
+      "06 · Chi phí và nguồn lực",
+      "Total cost",
+      "Hiện đo được gì?",
+      "Resource gate native",
+      "Kinh tế lịch sử",
+      "Điều kiện dừng"
+    ],
+    "height": 905,
+    "route": "#business",
+    "scrollWidth": 1610,
+    "width": 1625,
+    "label": "06Chi phí & tính khả thi"
+  },
+  {
+    "h1": [
+      "Cách làm và điều kiện kiểm chứng."
+    ],
+    "headings": [
+      "Cách làm và điều kiện kiểm chứng.",
+      "08 · Kế hoạch theo artifacts và gates",
+      "Example hiện chạy để kiểm plumbing",
+      "Bàn giao native sau P6",
+      "Khi pipeline không chạy"
+    ],
+    "height": 905,
+    "route": "#roadmap",
+    "scrollWidth": 1610,
+    "width": 1625,
+    "label": "07Lộ trình thực hiện"
+  },
+  {
+    "h1": [
+      "Dữ liệu chứa gì?Model học gì từ đó?"
+    ],
+    "headings": [
+      "Dữ liệu chứa gì?Model học gì từ đó?",
+      "Học điều khiển robot đích",
+      "Dataset trên đĩa",
+      "Conditioning & target",
+      "Đường gradient",
+      "Cùng một schema, nhiều cách tạo dữ liệu.",
+      "Ghi / thực thi",
+      "Biến đổi hình ảnh",
+      "Sinh & chạy trajectory",
+      "Sinh video bằng model",
+      "Latent có “hộ chiếu” encoder.",
+      "15 · Dataset → training → evaluation → inference",
+      "Đánh giá các nhận xét",
+      "Khảo sát cách training nhiều model",
+      "Phân loại sạch: bốn trục riêng",
+      "File formats và release contract đề xuất",
+      "Data qua architecture: điều kiện và target tách riêng",
+      "Chuẩn bị → train → evaluation → inference",
+      "Đề xuất chốt cho idea"
+    ],
+    "height": 905,
+    "route": "#sources",
+    "scrollWidth": 1610,
+    "width": 1625,
+    "label": "08Dataset & cách tạo"
+  },
+  {
+    "h1": [
+      "Theo một episode.Hiểu từng biến đổi."
+    ],
+    "headings": [
+      "Theo một episode.Hiểu từng biến đổi.",
+      "Files & signals",
+      "Training model",
+      "Benchmark",
+      "Inference & flywheel",
+      "Data: video đi cùng tín hiệu nào?",
+      "Ví dụ đúng embodiment: lấy chai nước vào tủ rồi đóng cửa",
+      "RoboCasa GR1 · đưa chai vào tủ và đóng cửa",
+      "Từ files đến training tensors và model",
+      "Benchmark: đọc cả phạm vi và kết quả",
+      "Inference: model dự đoán, controller thực thi",
+      "Mô phỏng nhỏ để kiểm contracts",
+      "1 · Seed được thực thi, rồi kiểm release",
+      "Prediction → command → response",
+      "Kết quả của run · không loại lượt thất bại",
+      "Có lỗi: kiểm gì, lấy data gì, train phần nào?",
+      "Nâng được → vật trượt khi chuyển",
+      "1. Teleop robot thật: Unitree G1/Dex3",
+      "Unitree G1/Dex3 · toasted bread, episode 0",
+      "observation.state và action",
+      "2. Human ego thật: RGB và tín hiệu tracking",
+      "HumanEgo · serve_bread_000",
+      "Tracking tay và validity",
+      "Ví dụ dữ liệu thật làm thay đổi thiết kế",
+      "Video collection: góc nhìn và tương tác của người",
+      "Người thao tác, camera góc nhìn thứ nhất",
+      "Từ quay người đến supervision",
+      "3. Synthetic trong physics: seed → biến thể được thực thi",
+      "MimicGen · các seed demonstrations",
+      "MimicGen · biến thể môi trường",
+      "4. Synthetic từ model: video sinh → policy rollout",
+      "DreamGen · video được sinh",
+      "DreamGen · robot thực thi sau học",
+      "5. Đích humanoid: policy rollout trong mô phỏng",
+      "EgoVLA · humanoid xếp lon",
+      "Nối lại với ví dụ gắp vào khay"
+    ],
+    "height": 905,
+    "route": "#examples",
+    "scrollWidth": 1610,
+    "width": 1625,
+    "label": "09Dữ liệu & video thật"
+  },
+  {
+    "h1": [
+      "Cùng dữ liệu.Khác target, khác cách học."
+    ],
+    "headings": [
+      "Cùng dữ liệu.Khác target, khác cách học.",
+      "Chọn model để đọc training → inference.",
+      "GR00T N1.5 Frozen VLM + flow + FLARE",
+      "Dữ liệu có gì?",
+      "Model cập nhật gì?",
+      "Khi chạy cần gì?",
+      "Học policy từ demonstrations",
+      "Tạo dữ liệu offline",
+      "Đổi cách học và runtime",
+      "Action-free ở nhánh video.Robot actions vẫn học control.",
+      "EgoVLA",
+      "HumanEgo",
+      "EgoScale",
+      "LAPA",
+      "MimicGen",
+      "Cosmos-Transfer2.5",
+      "DreamGen",
+      "DreamZero",
+      "GRAIL",
+      "GR00T 1.7",
+      "DROID",
+      "FluxVLA",
+      "DataMIL",
+      "DAgger",
+      "PARTS · v2",
+      "Compliant Residual DAgger",
+      "FOCA",
+      "π0",
+      "OpenVLA",
+      "DreamerV3",
+      "15 · Dataset → training → evaluation → inference",
+      "Đánh giá các nhận xét",
+      "Khảo sát cách training nhiều model",
+      "Phân loại sạch: bốn trục riêng",
+      "File formats và release contract đề xuất",
+      "Data qua architecture: điều kiện và target tách riêng",
+      "Chuẩn bị → train → evaluation → inference",
+      "Đề xuất chốt cho idea",
+      "09 · Nguồn, versions và phạm vi bằng chứng bản hiện hành",
+      "Tuyên bố truyền thông được phép trước thực nghiệm",
+      "Mối liên hệ với repo trước bản hiện hành"
+    ],
+    "height": 905,
+    "route": "#research",
+    "scrollWidth": 1610,
+    "width": 1625,
+    "label": "10Khảo sát phương pháp"
+  },
+  {
+    "h1": [
+      "Mỗi lượt chạy cho biếtlần học tiếp theo cần gì."
+    ],
+    "headings": [
+      "Mỗi lượt chạy cho biếtlần học tiếp theo cần gì.",
+      "Policy tạo trải nghiệm mới",
+      "Robot lỗi, có phải luôn thu thêm data?",
+      "Ba supervision views, mỗi view có việc riêng",
+      "Robot action supervision",
+      "Temporal video supervision",
+      "Structured motion supervision",
+      "Flywheel tích lũy điều gì?",
+      "03 · Data Core: data flywheel có kiểm chứng",
+      "Vòng lặp và trách nhiệm",
+      "Flywheel tích lũy và đo giá trị",
+      "Ba đường can thiệp minh họa",
+      "Dataset release chung",
+      "R · Robot anchor và correction",
+      "S · Synthetic execution",
+      "H · Human egocentric",
+      "QA không chỉ là shape",
+      "11 · Contracts bắt buộc, không chỉ sơ đồ",
+      "Native batch contract (cần instantiate từ pin config)",
+      "Native inference contract",
+      "Runtime trace",
+      "Reference contract đã chạy",
+      "State transitions và rejection",
+      "Nội dung example không được xuyên tạc"
+    ],
+    "height": 905,
+    "route": "#architecture",
+    "scrollWidth": 1610,
+    "width": 1625,
+    "label": "11Kiến trúc & Data Core"
+  },
+  {
+    "h1": [
+      "Cách làm và điều kiện kiểm chứng."
+    ],
+    "headings": [
+      "Cách làm và điều kiện kiểm chứng.",
+      "05 · Protocol và phạm vi claim",
+      "Câu hỏi chính",
+      "Hai cấp kiểm chứng",
+      "Native contrasts sau eligibility",
+      "Freeze/final",
+      "Nghiệm thu",
+      "Mở rộng evaluation sau khảo sát training"
+    ],
+    "height": 905,
+    "route": "#validation",
+    "scrollWidth": 1610,
+    "width": 1625,
+    "label": "12Thiết kế kiểm chứng"
+  },
+  {
+    "h1": [
+      "Một bản thiết kế.Mỗi claim có phạm vi."
+    ],
+    "headings": [
+      "Một bản thiết kế.Mỗi claim có phạm vi.",
+      "Pipeline dữ liệu và cải thiện kỹ năng robot",
+      "Hiện có gì thực sự chạy?",
+      "Đọc để hiểu và triển khai",
+      "Quyết định được giữ",
+      "Điểm sửa quan trọng so với v3"
+    ],
+    "height": 905,
+    "route": "#resources",
+    "scrollWidth": 1610,
+    "width": 1625,
+    "label": "13Hồ sơ & nguồn gốc"
+  }
+]

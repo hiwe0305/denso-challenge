@@ -1,0 +1,15 @@
+<mujoco model="engineering_reference_pick_place">
+  <option timestep="0.005" gravity="0 0 -9.81"/>
+  <default><geom friction="0.8 0.05 0.01" solref="0.01 1"/></default>
+  <worldbody>
+    <geom name="table" type="plane" size="1 1 .1" rgba=".2 .3 .4 1"/>
+    <body name="gripper" mocap="true" pos="-.25 -.15 .22">
+      <geom name="tip" type="sphere" size=".012" contype="0" conaffinity="0" rgba=".1 .4 .9 1"/>
+    </body>
+    <body name="part" pos="-.1 0 .022">
+      <freejoint name="part_joint"/>
+      <geom name="part_geom" type="box" size=".02 .02 .02" mass=".04" rgba="1 .8 .05 1"/>
+    </body>
+  </worldbody>
+  <equality><weld name="grasp_constraint" body1="gripper" body2="part" active="false" relpose="0 0 0 1 0 0 0" solref=".005 1"/></equality>
+</mujoco>

@@ -1,0 +1,48 @@
+{
+  "task_id": "skill-a1",
+  "status": "proposal_not_owner_approved_not_native_executed",
+  "authority_parent": "idea-v3-2026-10-05/project-spec.json",
+  "instruction": "Lấy đúng linh kiện vàng, đặt vào ô A1, nhả và rút tay.",
+  "scope": "coarse rigid pick-and-place in native simulator; not factory acceptance",
+  "robot": "RoboCasa GR1",
+  "binding_status": "requires_pin_and_expert_replay",
+  "compatibility_smoke_task": "gr1_unified/PosttrainPnPNovelFromTrayToPlateSplitA_GR1ArmsAndWaistFourierHands_Env",
+  "smoke_task_not_a1_acceptance": true,
+  "geometry_proposal": {
+    "part_box_mm": [40, 25, 15],
+    "target_inner_rectangle_mm": [80, 60],
+    "orientation_requirement": "none in MVP; actual footprint must be fully contained",
+    "support_geometry": "pending_native_asset"
+  },
+  "draft_thresholds_not_measurements": {
+    "episode_deadline_s": 30,
+    "lift_clearance_mm": 20,
+    "holding_window_s": 0.3,
+    "settle_duration_s": 2,
+    "max_settled_speed_mm_s": 5,
+    "withdraw_clearance_mm": 50,
+    "quality_target": 0.9,
+    "proposed_final_independent_starts": 100,
+    "confidence_rule": "one_sided_95_percent_exact_binomial_lower_bound_ge_quality_target_if_sampling_assumptions_hold"
+  },
+  "required_scorer_information": [
+    "correct_object_id_and_pose_geometry",
+    "target_frame_and_support_geometry",
+    "hand_anchor_pose_and_transform",
+    "native_physical_contact_readback",
+    "synchronized_control_and_sensor_times"
+  ],
+  "policy_privileged_scorer_state_allowed": false,
+  "scoring_states": ["not_attempted", "in_progress", "pass", "fail", "unknown"],
+  "unknown_counts_as_success": false,
+  "timeout_counts_as_full_task_failure": true,
+  "owner_pending": [
+    "business_user_and_actual_workflow",
+    "task_geometry_and_domain",
+    "acceptance_quality_cycle_and_tolerances",
+    "contact_motion_coupling_and_approach_predicates",
+    "control_profile_timebase_and_constraints",
+    "resource_cap_and_runplan",
+    "final_sampling_analysis_and_training_seed_plan"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "date": "2026-10-07",
+  "scope": "Full current workspace copy without ignored PDF library or Git; checks builder/static artifact/route summaries, not hosted CI or browser.",
+  "source_paper_library_present": false,
+  "checks": [
+    {
+      "check": "python presentation-site/build-content.py",
+      "exit_code": 0,
+      "output": "Built 20 research entries, 17 media credits, 19 readable documents.\nPublished dossier, A1 proposal, form and reference with complete local link dependencies."
+    },
+    {
+      "check": "python presentation-site/verify-site.py",
+      "exit_code": 0,
+      "output": "Validated 13 routes, 45 documents, 18 story scenes, 5 improvement cases and local publishing assets."
+    },
+    {
+      "check": "node presentation-site/test-presentation.js",
+      "exit_code": 0,
+      "output": "Passed 13 route summaries, current budget/deliverables/timeline, native/FOCA evidence boundaries and distinct full-path document targets."
+    }
+  ]
+}

@@ -7,7 +7,7 @@
       "family": "human",
       "input": "Human ego + wrist/MANO; robot demos cho adaptation",
       "mechanism": "Học biểu diễn thao tác chung của cổ tay và bàn tay, rồi thích nghi sang humanoid bằng dữ liệu robot.",
-      "reuse": "Tham khảo wrist/hand masks, representation và retargeting. MVP chọn auxiliary human heads trên FluxVLA thay vì port toàn bộ EgoVLA/IsaacLab.",
+      "reuse": "Tham khảo wrist/hand masks và embodiment alignment. A1 chọn common wrist18D + shared Action Expert trunk, custom candidate trên FluxVLA; không port toàn bộ EgoVLA/IsaacLab.",
       "limit": "Cần tracking và retargeting phù hợp. Demo trong benchmark là mô phỏng; port sang FluxVLA chưa được kiểm.",
       "priority": "P1 · Tiền lệ structured human supervision; chưa port nguyên model",
       "url": "https://rchalyang.github.io/EgoVLA/"
@@ -191,6 +191,54 @@
       "limit": "Force/controller/action composition phụ thuộc robot; chưa GR1 integration, không chuyển kết quả tác giả thành evidence đội.",
       "priority": "P1 · collection QA; residual controller/learner P2",
       "url": "https://compliant-residual-dagger.github.io/"
+    },
+    {
+      "id": "foca",
+      "name": "FOCA",
+      "year": "2026",
+      "family": "mixed",
+      "input": "Current/future video + language; action-labeled robot demonstrations ở adaptation.",
+      "mechanism": "Future-conditioned latent objectives; implicit video phase không cần pseudo-actions, rồi học control với action supervision.",
+      "reuse": "Candidate future-alignment cho few-shot; tách video-only loss và robot action loss. Single-task A1 phải chốt semantic task IDs, train-only negative pool và zero-negative handling trước port.",
+      "limit": "Không hoàn toàn robot-action-free. 95.7% là FOCA + DreamGen, LIBERO 40% demos (Table 2). Co-training code LIBERO còn ghi coming soon khi đọc 06/10/2026.",
+      "priority": "P1 · sau native baseline và code/compute gate",
+      "url": "https://arxiv.org/html/2606.20867v1"
+    },
+    {
+      "id": "pi0",
+      "name": "π0",
+      "year": "2024",
+      "family": "robot",
+      "input": "Multi-view RGB + language + state + robot action chunks.",
+      "mechanism": "Pretrained PaliGemma + action expert; flow matching; diverse robot pretraining → curated task posttraining.",
+      "reuse": "Phân biệt backbone initialization, robot pretraining và task adaptation.",
+      "limit": "Đây là recipe model khác GR00T; dimensions, mixture và objective không copy nguyên sang GR1.",
+      "priority": "P0 · tham khảo training contract",
+      "url": "https://arxiv.org/html/2410.24164v1"
+    },
+    {
+      "id": "openvla",
+      "name": "OpenVLA",
+      "year": "2024",
+      "family": "robot",
+      "input": "Robot images, instructions và discretized actions; official RLDS loader.",
+      "mechanism": "Autoregressive action-token learning trên pretrained Prismatic VLM; full/partial/LoRA adaptation.",
+      "reuse": "Control example cho trainability và token loss; không mọi VLA đều flow-matching.",
+      "limit": "Frozen-vision ablation Franka không là kết luận về mọi frozen VLM. Token accuracy không thay closed-loop success.",
+      "priority": "P0 · tham khảo loss và evaluation",
+      "url": "https://openvla.github.io/"
+    },
+    {
+      "id": "dreamer3",
+      "name": "DreamerV3",
+      "year": "2023",
+      "family": "mixed",
+      "input": "Replay observations/actions/rewards/continuation flags.",
+      "mechanism": "Action-conditioned RSSM học prediction/reconstruction + KL; actor/critic học qua imagined rollouts.",
+      "reuse": "Phân biệt latent dynamics-control với video generator và VLA auxiliary future learning.",
+      "limit": "Không RGB-only recipe; RL objectives và runtime riêng, chưa dependency MVP A1.",
+      "priority": "P2 · architecture alternative",
+      "url": "https://arxiv.org/html/2301.04104v2"
     }
   ],
   "media": {
@@ -298,6 +346,10 @@
         "renderScale": 6,
         "assetSha256": "9a3d3458ffb1915c634eca04c7f1dcdf3564075823a52d8e0136ae2e4f7a658b",
         "checked": "2026-10-03"
+      },
+      "license": {
+        "label": "CC BY 4.0",
+        "url": "https://creativecommons.org/licenses/by/4.0/"
       }
     },
     "libero": {
@@ -329,6 +381,122 @@
         "changes": "MP4 remux with faststart; H.264 frames unchanged. Poster extracted at t=0. No training result of this project.",
         "upstream": "https://huggingface.co/datasets/nvidia/PhysicalAI-Robotics-GR00T-Teleop-Sim",
         "checked": "2026-10-05"
+      }
+    },
+    "fluxDataPipeline": {
+      "type": "image",
+      "title": "FluxVLA · Data pipeline",
+      "kind": "Hình gốc trong paper · Figure 2, trang 8 · arXiv v1",
+      "url": "assets/fluxvla-paper-figure-2.png",
+      "source": "https://arxiv.org/pdf/2609.17210v1#page=8",
+      "caption": "Episode → temporal sample → transforms → batch → model. Hình của Li và cộng sự (2026); không phải kết quả triển khai A1 của đội.",
+      "license": {
+        "label": "CC BY 4.0",
+        "url": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      "provenance": {
+        "paper": "docs/references/papers/FluxVLA.pdf",
+        "paperSha256": "072b043efcd9126baec332b746c335b3bab3312b8e0ead6974e261bfc6e04acc",
+        "figure": 2,
+        "page": 8,
+        "cropPoints": [
+          51,
+          51,
+          561,
+          256
+        ],
+        "renderScale": 6,
+        "assetSha256": "1cb05d9ed8d2ad2a9b2272f3d1a4ae530f3faa444a036defc510b33493bf3711",
+        "checked": "2026-10-06",
+        "credit": "Li và cộng sự, FluxVLA Engine (2026)",
+        "extraction": "Trích nguyên vùng figure từ PDF; giữ nội dung/nhãn/mũi tên, không vẽ lại; chú thích tiếng Việt nằm ngoài ảnh."
+      }
+    },
+    "fluxModelComposition": {
+      "type": "image",
+      "title": "FluxVLA · Model composition",
+      "kind": "Hình gốc trong paper · Figure 3, trang 9 · arXiv v1",
+      "url": "assets/fluxvla-paper-figure-3.png",
+      "source": "https://arxiv.org/pdf/2609.17210v1#page=9",
+      "caption": "Config → registry → các model families; phân biệt forward/loss và predict_action. Hình của Li và cộng sự (2026); không phải kết quả triển khai A1 của đội.",
+      "license": {
+        "label": "CC BY 4.0",
+        "url": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      "provenance": {
+        "paper": "docs/references/papers/FluxVLA.pdf",
+        "paperSha256": "072b043efcd9126baec332b746c335b3bab3312b8e0ead6974e261bfc6e04acc",
+        "figure": 3,
+        "page": 9,
+        "cropPoints": [
+          51,
+          51,
+          561,
+          303
+        ],
+        "renderScale": 6,
+        "assetSha256": "99ceea3991a547ed371a9acf5de6e12c763126e5abbaca73461b25fffe9bedfb",
+        "checked": "2026-10-06",
+        "credit": "Li và cộng sự, FluxVLA Engine (2026)",
+        "extraction": "Trích nguyên vùng figure từ PDF; giữ nội dung/nhãn/mũi tên, không vẽ lại; chú thích tiếng Việt nằm ngoài ảnh."
+      }
+    },
+    "fluxSimulationEvaluation": {
+      "type": "image",
+      "title": "FluxVLA · Closed-loop simulation evaluation",
+      "kind": "Hình gốc trong paper · Figure 4, trang 12 · arXiv v1",
+      "url": "assets/fluxvla-paper-figure-4.png",
+      "source": "https://arxiv.org/pdf/2609.17210v1#page=12",
+      "caption": "Reload checkpoint → observe / predict / execute → đo kết quả và lưu artifacts. Hình của Li và cộng sự (2026); không phải kết quả triển khai A1 của đội.",
+      "license": {
+        "label": "CC BY 4.0",
+        "url": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      "provenance": {
+        "paper": "docs/references/papers/FluxVLA.pdf",
+        "paperSha256": "072b043efcd9126baec332b746c335b3bab3312b8e0ead6974e261bfc6e04acc",
+        "figure": 4,
+        "page": 12,
+        "cropPoints": [
+          51,
+          51,
+          561,
+          322
+        ],
+        "renderScale": 6,
+        "assetSha256": "bae402c0dc3c38445b03c9d5abee9a50677b015deab985d2709374c847c58d11",
+        "checked": "2026-10-06",
+        "credit": "Li và cộng sự, FluxVLA Engine (2026)",
+        "extraction": "Trích nguyên vùng figure từ PDF; giữ nội dung/nhãn/mũi tên, không vẽ lại; chú thích tiếng Việt nằm ngoài ảnh."
+      }
+    },
+    "fluxInferenceAcceleration": {
+      "type": "image",
+      "title": "FluxVLA · Inference acceleration",
+      "kind": "Hình gốc trong paper · Figure 5, trang 14 · arXiv v1",
+      "url": "assets/fluxvla-paper-figure-5.png",
+      "source": "https://arxiv.org/pdf/2609.17210v1#page=14",
+      "caption": "Thay modules cho inference và tối ưu execution; đây là kiến trúc tăng tốc model, không phải sơ đồ controller robot. Hình của Li và cộng sự (2026); không phải kết quả triển khai A1 của đội.",
+      "license": {
+        "label": "CC BY 4.0",
+        "url": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      "provenance": {
+        "paper": "docs/references/papers/FluxVLA.pdf",
+        "paperSha256": "072b043efcd9126baec332b746c335b3bab3312b8e0ead6974e261bfc6e04acc",
+        "figure": 5,
+        "page": 14,
+        "cropPoints": [
+          51,
+          51,
+          561,
+          345
+        ],
+        "renderScale": 6,
+        "assetSha256": "1d9a7c7a333f6c4c19896898dad4aea88f5b123b021601242f26ff5daefdf743",
+        "checked": "2026-10-06",
+        "credit": "Li và cộng sự, FluxVLA Engine (2026)",
+        "extraction": "Trích nguyên vùng figure từ PDF; giữ nội dung/nhãn/mũi tên, không vẽ lại; chú thích tiếng Việt nằm ngoài ảnh."
       }
     }
   },

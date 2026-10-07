@@ -1,0 +1,14 @@
+{
+  "observed_date": "2026-10-05",
+  "scope": "current_local_environment_only",
+  "torch_installed": true,
+  "torch_version": "2.10.0+cu128",
+  "cuda_available": false,
+  "cuda_device_count": 0,
+  "fluxvla_installed": false,
+  "mujoco_installed": true,
+  "checkpoint_scan_scope": "repository/checkpoints/**/*.safetensors",
+  "native_checkpoint_files_found": [],
+  "native_training_or_rollout_executed": false,
+  "interpretation": "Plan preview complete; current environment is not ready for native execution. No inference about feasibility on another machine."
+}

@@ -1,0 +1,254 @@
+{
+  "review_date": "2026-10-06",
+  "site": "http://127.0.0.1:4175/",
+  "scope": "13 website routes plus current dossier, recipes, experiment artifacts and source papers; read-only content audit",
+  "models_requested": "gpt-6-astra",
+  "git_head": "e45cf7f0309f3fe58112c98c10b1111f5bee1864",
+  "working_tree": "dirty; file digests fix the actual reviewed state",
+  "files": [
+    {
+      "path": "IDEA.md",
+      "sha256": "cb8e1e8b9793c342668ceb0884451700379c5c4154826a61d610780571593db7"
+    },
+    {
+      "path": "deliverables/DENSO-Noi-dung-form-y-tuong.md",
+      "sha256": "b308a7fbe0271412a1477b8f38e739e31f2569de838d82bb0a5d1414edd13b73"
+    },
+    {
+      "path": "presentation-site/content/data-flywheel.json",
+      "sha256": "ec1ef4db5c9e33f0a3dbaf4960588cbf500f57706f863391d006399609d1dc9f"
+    },
+    {
+      "path": "presentation-site/content/industrial-cost-model.json",
+      "sha256": "9d532f17d2b3868ca0c84bded7398e0338caacbdd1bcc922d519dfe8ac08269a"
+    },
+    {
+      "path": "presentation-site/content/model-engine-core.json",
+      "sha256": "f20b6c7cd4fe283bf3a87f8b18e29dda6492b99aa6570cd93ebe188c91463ede"
+    },
+    {
+      "path": "presentation-site/content/overview-flywheel.json",
+      "sha256": "5f58634983d01b237adba4875f7930eaaa9ecb44a20b0db949190ff73f19b1e7"
+    },
+    {
+      "path": "presentation-site/content/pilot-budget.json",
+      "sha256": "7f16f6765ad6470e0fb2b43d773f5895a49b5cdab4ec2eea821f72c87ab3e336"
+    },
+    {
+      "path": "presentation-site/content/research-and-media.json",
+      "sha256": "c38d745c8fe66f3b679f06da7724823ceac237147d897e94765aeb8a111291b1"
+    },
+    {
+      "path": "presentation-site/content/solution-story.json",
+      "sha256": "b8c1b850d7de75f3382d2de6cff0eeceaa324cf018dd4c3ac9cf5630c18b203c"
+    },
+    {
+      "path": "presentation-site/content/story-image-prompts.json",
+      "sha256": "4b3a58562865081bf8845bf3240ee0d62c675c29e34f40388bd372f9669fbcb7"
+    },
+    {
+      "path": "presentation-site/content/task-improvement.json",
+      "sha256": "79bca733aa90b05816ba3935f915a617d31194da625e55c4bb4f194ac792e10d"
+    },
+    {
+      "path": "presentation-site/content/training-blueprint.json",
+      "sha256": "e6b9bc99bedf29bc6229004de5591ed8758ee454a3d24b4d824ef6b2af45d7a5"
+    },
+    {
+      "path": "presentation-site/dist/app.js",
+      "sha256": "3fa73ab1dd8f9a137244e29f760f41c54caee0af15ba214e177e8e0ad8e4ebc3"
+    },
+    {
+      "path": "presentation-site/dist/cost-model.js",
+      "sha256": "8cdf96015e6addf47f2074c107ad71cdd2dcdf4f23cb340084984e073b7ac2c4"
+    },
+    {
+      "path": "presentation-site/dist/data-flywheel-data.js",
+      "sha256": "11ae5957057e033a643f34a45a43f0b2aba15f5ff9e98b7cc85882f780d54681"
+    },
+    {
+      "path": "presentation-site/dist/data-flywheel.js",
+      "sha256": "e2e258fc57aee9e126b0fd0e2d11615e216111dc6ae96bcdaf1ef2ca66d4ec08"
+    },
+    {
+      "path": "presentation-site/dist/dossier.js",
+      "sha256": "676c395d0e9345be32fa315a72c73f9f3f1c756094dfdb2cab752c1284d1e8bd"
+    },
+    {
+      "path": "presentation-site/dist/engineering.js",
+      "sha256": "1feea749c85c0476ccbadba7d0b4a881275f4187e8bd9f96dcceea0eae4e4546"
+    },
+    {
+      "path": "presentation-site/dist/evidence.js",
+      "sha256": "f5fe172f7eb23f989ac5a3d77c0f2330ca07d1c2fc6df9b448d99d03ad9deb10"
+    },
+    {
+      "path": "presentation-site/dist/humanoid-demo.js",
+      "sha256": "06900ecd03e6d8f49b642d5dd05126f5aa6758c3ac3a9aa321a1788b976991d3"
+    },
+    {
+      "path": "presentation-site/dist/idea-opening.js",
+      "sha256": "21b72a82a96a695341d916c15cdd097c0bfcac92bdfcc933e971ddfa82f13192"
+    },
+    {
+      "path": "presentation-site/dist/idea-story.js",
+      "sha256": "27b306b35064dafd92783760dd086e917c14588c7bdcfe70d5688b872848b430"
+    },
+    {
+      "path": "presentation-site/dist/learning-core.js",
+      "sha256": "5c4dad9a487ac961f81704952fcaee84901eaf9bb9c4da581a4071af3a5000d9"
+    },
+    {
+      "path": "presentation-site/dist/model-engine-core-data.js",
+      "sha256": "d6017879a8773bbf9a3e4516f79f6e9949c6d06181d7cafaaa5554079252d25e"
+    },
+    {
+      "path": "presentation-site/dist/model-engine-core.js",
+      "sha256": "6b34665f8351e2039bd9f5ffe7b74afcbd2fd0a900f9a956a65deeebcdb19fe2"
+    },
+    {
+      "path": "presentation-site/dist/overview-flywheel-data.js",
+      "sha256": "d96ebf692fa394927bd2f5623c5b88d6386ca311558d3bbe09861ea7ef19f003"
+    },
+    {
+      "path": "presentation-site/dist/overview-flywheel.js",
+      "sha256": "b5662960343ed63c7bca1f0094c27043cdedff59967c505559d8385362fae3ce"
+    },
+    {
+      "path": "presentation-site/dist/pilot-budget.js",
+      "sha256": "f66bc40e4327c6450a17f4ecc5f32096c2e025d2fdec3cc3c15c33c7fe18d13f"
+    },
+    {
+      "path": "presentation-site/dist/skill-plan-data.js",
+      "sha256": "14cb857ba010479001c268440d3ae97ce84f5df262d1553fcd4d6e9490f645e7"
+    },
+    {
+      "path": "presentation-site/dist/skill-plan.js",
+      "sha256": "4d9eb5e6d6e3904089ac3c7d46269579f07ac1f3361f936c827a97894354e23b"
+    },
+    {
+      "path": "presentation-site/dist/task-improvement.js",
+      "sha256": "5ce2b86f7aef0a71cc1f05e83a96221f21ee83ea5bd17995888a5e3fbba52f96"
+    },
+    {
+      "path": "presentation-site/dist/training-blueprint-data.js",
+      "sha256": "d0665934d9da80df0a37f6e6c717e29dd358c08f67b722b47e856a988f999a87"
+    },
+    {
+      "path": "presentation-site/dist/training-blueprint.js",
+      "sha256": "ae2d64cb386c2b20302552226a0d5609c95a6f7e9e378e7f69dd72a66e48fd42"
+    },
+    {
+      "path": "presentation-site/dist/data-flywheel.css",
+      "sha256": "feb62bf62f808aa5ea23acadfc14cf54156e047562ce0917291f279ca8863b62"
+    },
+    {
+      "path": "presentation-site/dist/engineering.css",
+      "sha256": "4ede7bb497a6decc7154db7ad4476d85d816b6e382570eb8df73a6e85c0587a2"
+    },
+    {
+      "path": "presentation-site/dist/idea-opening.css",
+      "sha256": "a378b28baa4832f58a4346511daa4766f23d1c98dc81b0fccee9a9c165f06892"
+    },
+    {
+      "path": "presentation-site/dist/idea-story.css",
+      "sha256": "aeca16f27340a16e164a48d08d1f0f23fc04b8d9345b61464b92d57e71645eda"
+    },
+    {
+      "path": "presentation-site/dist/learning-core.css",
+      "sha256": "0602a26516f3ad4a0609595999d5cd54ec50954b9aac1d7bf98895f9dd3bc79e"
+    },
+    {
+      "path": "presentation-site/dist/model-ai.css",
+      "sha256": "538fcfa1914cfd172aab1cc96576872d9152c51baef5e128f1157bf5036cfd13"
+    },
+    {
+      "path": "presentation-site/dist/model-engine-core.css",
+      "sha256": "ce42655089f869e207147de555e925d6fb734c5f0705d69e90bcbd75ed92afe8"
+    },
+    {
+      "path": "presentation-site/dist/overview-flywheel.css",
+      "sha256": "5db50b4ae38392046bfb4936e206fa5144eab5837108d76b229681d1b817452b"
+    },
+    {
+      "path": "presentation-site/dist/styles.css",
+      "sha256": "fb0aa7857629f609e447539ae38523695628d04611fd89dfe13cf8b6d5b2dd3d"
+    },
+    {
+      "path": "presentation-site/dist/task-improvement.css",
+      "sha256": "1e5132aa3f4e192677865838f95ee601111e0e0e3d16f7c44f3cdcbefe2b0473"
+    },
+    {
+      "path": "presentation-site/dist/training-blueprint.css",
+      "sha256": "edb828a5e6502a69c6dd5dee36c447cdcf4f83a39c307103b16e3da53f2b0592"
+    },
+    {
+      "path": "idea-v3-2026-10-05/01-idea-va-pitch.md",
+      "sha256": "2198ad6f833b8d051860397d039289a6fbeb3fbf8f651e1600a4df14b583e3aa"
+    },
+    {
+      "path": "idea-v3-2026-10-05/02-kien-truc-va-cach-hoc.md",
+      "sha256": "e3ee823e98acd9a91d48b832e609c00b3b0ba28806e47b055a4ac03e34aa0b34"
+    },
+    {
+      "path": "idea-v3-2026-10-05/03-workflow-du-lieu.md",
+      "sha256": "0f82547dce3325e32081d53dab21f8c40384e7e6325e60bba754a437eb11126b"
+    },
+    {
+      "path": "idea-v3-2026-10-05/04-bang-chung-vla-va-loi.md",
+      "sha256": "e7b42d5211665a84235bf2f609a389b0eb1d7ccf19eb193032c49242a9f5d924"
+    },
+    {
+      "path": "idea-v3-2026-10-05/05-thiet-ke-kiem-chung.md",
+      "sha256": "7a0bc068312e58ca8220d9cdcad7b1acca652f2f6bab68ba78a5b9329c7cb1dd"
+    },
+    {
+      "path": "idea-v3-2026-10-05/06-chi-phi-va-kha-thi.md",
+      "sha256": "190621e4748a7f78a2a59243600a976b4b0d7ebb3e6220dbcb30e6d96dbff02c"
+    },
+    {
+      "path": "idea-v3-2026-10-05/07-danh-gia-va-quyet-dinh.md",
+      "sha256": "561072edc517a2c69bfdd5f54c7eb414878035908eef9335dcc5991afee491a7"
+    },
+    {
+      "path": "idea-v3-2026-10-05/08-ke-hoach-trien-khai.md",
+      "sha256": "f6bc7879ae2b35e1542a3ea82e463e9582d9c6d2c83ef5fe89aeb3098b2fb4ff"
+    },
+    {
+      "path": "idea-v3-2026-10-05/09-nguon-va-bang-chung.md",
+      "sha256": "04b0489eca2c2483ae0a4eaedecdf880505fd4e42285c229bb8e8667b2b4966a"
+    },
+    {
+      "path": "idea-v3-2026-10-05/10-example-chay-toan-he-thong.md",
+      "sha256": "e2c035895805b16aebf9a763de1c91729e8d621ddd89d4500b4aeabd84966602"
+    },
+    {
+      "path": "idea-v3-2026-10-05/11-contracts-va-logic.md",
+      "sha256": "80497f432b1929689415755674069d4909b0e56dbac738482ea4cf950591b92f"
+    },
+    {
+      "path": "idea-v3-2026-10-05/12-bang-kiem-chung.md",
+      "sha256": "6e310008a6c51ea079bed809e940a4913ec159a2036703ec8f5e0cb31bebcf2c"
+    },
+    {
+      "path": "idea-v3-2026-10-05/13-example-native-tu-dau-den-cuoi.md",
+      "sha256": "8de8cabd5433f0f693cbcc39ba9688838e750ab35e9591104845f05aca5e4b1e"
+    },
+    {
+      "path": "idea-v3-2026-10-05/15-dataset-training-blueprint.md",
+      "sha256": "b006ab4ee65cd511a3be8621c70355f3e8d777e4189d7d353e8e4f053ab1d7c3"
+    },
+    {
+      "path": "idea-v3-2026-10-05/16-model-ai-va-data-flywheel.md",
+      "sha256": "9692f70b1938b59e813044051952bd9e7fbd832b93ec7652682e8bf53ee56c81"
+    },
+    {
+      "path": "idea-v3-2026-10-05/17-model-engine-core-fluxvla.md",
+      "sha256": "6e30f0d8b793349cc1405bc4cf8c687f47ce2c526e1c332157206cf8bd0a68f0"
+    },
+    {
+      "path": "idea-v3-2026-10-05/README.md",
+      "sha256": "9d2c4f240c0c60f8621a047f01be8e3e826bd7146921666e74b30bbdc7e2ef74"
+    }
+  ]
+}

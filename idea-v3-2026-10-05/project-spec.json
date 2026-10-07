@@ -1,0 +1,62 @@
+{
+  "revision": "v3.1",
+  "date": "2026-10-05",
+  "authority": "idea-v3-2026-10-05/README.md",
+  "primary_question": "same-quality robot-data and total-cost efficiency",
+  "native": {
+    "engine": "FluxVLA",
+    "model": "GR00T N1.5",
+    "robot": "RoboCasa GR1",
+    "status": "not_tested",
+    "code_revision": "unresolved_must_pin",
+    "checkpoint_revision": "unresolved_must_pin",
+    "reference_config": "configs/gr00tn15/gr00tn15_eagle_3b_robocasa_30_eps_full_finetune.py",
+    "config_action_dim": 29,
+    "config_chunk_size": 16,
+    "selected_task_binding": "not_validated",
+    "task": "pick rigid yellow part to A1",
+    "task_owner_acceptance": "pending",
+    "one_arm_fixed_torso": "proposed_binding_not_verified"
+  },
+  "human": {
+    "status": "not_integrated",
+    "role": "eligible supervision after source audit",
+    "motor_bridge": "research hypothesis; representation/adapter/schedule unresolved",
+    "mandatory_shared_motor_trunk": false
+  },
+  "reference": {
+    "status": "executed",
+    "model": "35x4 ridge action-target predictor",
+    "simulator": "MuJoCo",
+    "action_profile": "reference_cartesian_xyz_grip_v1",
+    "encoder": "idealized state adapter; not VLM",
+    "sequencer": "scripted",
+    "grasp": "proximity-triggered weld; not contact-accurate gripper",
+    "independent_final_trials": 12,
+    "policy_names": [
+      "R",
+      "S",
+      "C"
+    ],
+    "human_integrated": false,
+    "native_vla_integrated": false
+  },
+  "study": {
+    "order": [
+      "native baseline",
+      "source compatibility",
+      "development recipe",
+      "preregistered contrasts",
+      "freeze",
+      "independent final"
+    ],
+    "source_contrasts": [
+      "R",
+      "H",
+      "S",
+      "HS"
+    ],
+    "grid": "conditional after recipe/compute/rights validated; no committed 27 jobs",
+    "cost_saving_status": "not_established"
+  }
+}

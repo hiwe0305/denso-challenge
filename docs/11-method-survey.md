@@ -1,12 +1,12 @@
 # 11 · Khảo sát phương pháp học từ dữ liệu đa nguồn
 
-_Catalog gốc kiểm 02/10/2026; DataMIL và DAgger/PARTS/CR-DAgger bổ sung, kiểm 05/10/2026. Đây là kết quả/thiết kế của tác giả; không là kết quả của đội. P0/P1/P2 là ưu tiên MVP, không xếp hạng chất lượng công trình._
+_Catalog gốc kiểm 02/10/2026; DataMIL/DAgger bổ sung 05/10; FOCA và training VLA/WM bổ sung 06/10/2026. Đây là kết quả/thiết kế của tác giả; không là kết quả của đội. P0/P1/P2 là ưu tiên MVP, không xếp hạng chất lượng công trình._
 
 ## Kết luận cho thiết kế
 
-Human/video mở prior và coverage; bridge cần chọn theo tín hiệu. Synthetic có ba loại supervision khác nhau. Dữ liệu robot thật giữ vai trò học điều khiển, hiệu chuẩn, contact/recovery và đánh giá độc lập. FluxVLA có sẵn nhiều năng lực platform/SDG/HITL; đóng góp của đội phải đo ở recipe, binding, mixture và hiệu quả theo task, không chỉ wrapper.
+Phân biệt origin, cách tạo, supervision và representation. Synthetic là cách tạo dữ liệu, không modality; latent là derived representation. Robot action-labeled trajectories học control; video action-free dùng objective riêng. MVP robot demonstrations được thu trong sim; hardware thật kiểm ở phase riêng. FluxVLA có sẵn nhiều năng lực platform/SDG/HITL; đóng góp của đội phải đo ở recipe, binding, mixture và hiệu quả theo task, không chỉ wrapper.
 
-Không đối chiếu success percentages giữa các paper như leaderboard: task, robot, splits và protocol khác nhau. HumanEgo có cấu hình robot-data-free; không nói mọi human-to-robot learning đều bắt buộc teleop. Thiết kế này chủ động dùng real-robot anchors.
+Không đối chiếu success percentages giữa các paper như leaderboard: task, robot, splits và protocol khác nhau. HumanEgo có cấu hình robot-data-free; không nói mọi human-to-robot learning đều bắt buộc teleop. Thiết kế này chủ động dùng target-robot anchors trong sim cho MVP, không gọi chúng là real-robot recordings.
 
 ## EgoVLA · 2025
 
@@ -14,7 +14,7 @@ Nguồn: [EgoVLA](https://rchalyang.github.io/EgoVLA/).
 
 **Input:** Human ego + wrist/MANO; robot demos cho adaptation
 **Cơ chế:** Học biểu diễn thao tác chung của cổ tay và bàn tay, rồi thích nghi sang humanoid bằng dữ liệu robot.
-**Tận dụng:** Tham khảo wrist/hand masks, representation và retargeting. MVP chọn auxiliary human heads trên FluxVLA thay vì port toàn bộ EgoVLA/IsaacLab.
+**Tận dụng:** Tham khảo wrist/hand masks và embodiment alignment. A1 chọn common wrist18D + shared Action Expert trunk, custom candidate trên FluxVLA; không port toàn bộ EgoVLA/IsaacLab.
 **Giới hạn:** Cần tracking và retargeting phù hợp. Demo trong benchmark là mô phỏng; port sang FluxVLA chưa được kiểm.
 **Ưu tiên:** P1 · Tiền lệ structured human supervision; chưa port nguyên model
 
@@ -168,10 +168,54 @@ Nguồn: [Compliant Residual DAgger](https://compliant-residual-dagger.github.io
 **Giới hạn:** Force/controller/action composition phụ thuộc robot; chưa GR1 integration, không chuyển kết quả tác giả thành evidence đội.
 **Ưu tiên:** P1 · collection QA; residual controller/learner P2
 
+## FOCA · 2026
+
+Nguồn: [FOCA](https://arxiv.org/html/2606.20867v1).
+
+**Input:** Current/future video + language; action-labeled robot demonstrations ở adaptation.
+**Cơ chế:** Future-conditioned latent objectives; implicit video phase không cần pseudo-actions, rồi học control với action supervision.
+**Tận dụng:** Candidate future-alignment cho few-shot; tách video-only loss và robot action loss. Single-task A1 phải chốt semantic task IDs, train-only negative pool và zero-negative handling trước port.
+**Giới hạn:** Không hoàn toàn robot-action-free. 95.7% là FOCA + DreamGen, LIBERO 40% demos (Table 2). Co-training code LIBERO còn ghi coming soon khi đọc 06/10/2026.
+**Ưu tiên:** P1 · sau native baseline và code/compute gate
+
+## π0 · 2024
+
+Nguồn: [π0](https://arxiv.org/html/2410.24164v1).
+
+**Input:** Multi-view RGB + language + state + robot action chunks.
+**Cơ chế:** Pretrained PaliGemma + action expert; flow matching; diverse robot pretraining → curated task posttraining.
+**Tận dụng:** Phân biệt backbone initialization, robot pretraining và task adaptation.
+**Giới hạn:** Đây là recipe model khác GR00T; dimensions, mixture và objective không copy nguyên sang GR1.
+**Ưu tiên:** P0 · tham khảo training contract
+
+## OpenVLA · 2024
+
+Nguồn: [OpenVLA](https://openvla.github.io/).
+
+**Input:** Robot images, instructions và discretized actions; official RLDS loader.
+**Cơ chế:** Autoregressive action-token learning trên pretrained Prismatic VLM; full/partial/LoRA adaptation.
+**Tận dụng:** Control example cho trainability và token loss; không mọi VLA đều flow-matching.
+**Giới hạn:** Frozen-vision ablation Franka không là kết luận về mọi frozen VLM. Token accuracy không thay closed-loop success.
+**Ưu tiên:** P0 · tham khảo loss và evaluation
+
+## DreamerV3 · 2023
+
+Nguồn: [DreamerV3](https://arxiv.org/html/2301.04104v2).
+
+**Input:** Replay observations/actions/rewards/continuation flags.
+**Cơ chế:** Action-conditioned RSSM học prediction/reconstruction + KL; actor/critic học qua imagined rollouts.
+**Tận dụng:** Phân biệt latent dynamics-control với video generator và VLA auxiliary future learning.
+**Giới hạn:** Không RGB-only recipe; RL objectives và runtime riêng, chưa dependency MVP A1.
+**Ưu tiên:** P2 · architecture alternative
+
+## Blueprint sau khảo sát
+
+[Dataset → training → evaluation → inference](../idea-v3-2026-10-05/15-dataset-training-blueprint.md): file formats, loss/gradient routes và comparison controls.
+
 ## Chọn đường trong ba tháng
 
-P0: FluxVLA/GR00T N1.5/GR1 robot baseline và E4 T/F/A từ parent R0. P1: human/video heads, source-drop, compute control và Cosmos-vs-basic sau gate. P2: physics/world-model generation, full-body geometry và WAM. Không train foundation models từ đầu.
+V3.1: FluxVLA/GR00T N1.5/GR1 native baseline trước, source compatibility và recipe gates, rồi source contrasts R/H/S/HS đủ điều kiện. Human common-wrist route là custom candidate ở A1; action-free future route là candidate riêng. Reference pipeline có execution nhưng không native VLA. Không train foundation models từ đầu.
 
-MVP chọn robot baseline trên FluxVLA/GR00T N1.5/GR1 trước; auxiliary stage/order/wrist heads có gate signals/rights/E0 riêng. Bốn nguồn là catalog, không mandatory recipe. E0/D0 và E1 tạo useful parent trước E4; core15 conditional: 6 R0 +9 T/F/A; bootstrap/extra jobs replan, extension tối đa12. DataMIL là prior art về selection; selection/QA compute và engineer hours phải tính vào total cost.
+V3.1 là current design trong folder idea-v3-2026-10-05. V2 T/F/A core15/extension12 đã superseded; v3 prefix/grid27 cũng chưa khóa. Native source/control RunPlan chốt sau compatibility/resource pilots. DataMIL là prior art, không thuật toán selection đã triển khai trong project.
 
 [Learning Core](04-learning-core.md) · [Protocol](06-validation-and-roadmap.md) · [Mẫu dữ liệu](12-public-data-examples.md).

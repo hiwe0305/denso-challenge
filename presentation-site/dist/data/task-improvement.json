@@ -1,5 +1,5 @@
 {
-  "revision": "improvement-v2",
+  "revision": "improvement-v3.1",
   "status": "declared_examples_not_robot_measurements",
   "stages": [
     {
@@ -91,7 +91,7 @@
         "Giữ đoạn tiếp cận → gắp → nâng, ghi hành động sửa đúng và nguồn điều khiển."
       ],
       "training": [
-        "Cùng parent R0; native action loss trên nhãn robot hợp lệ.",
+        "Cùng parent policy đã khóa; native action loss trên nhãn robot hợp lệ.",
         "Trộn correction và mẫu thành công cũ; chốt tỷ lệ bằng development.",
         "Pin tham số cập nhật/steps/normalization; đo lại cả chuỗi và conditions đang tốt."
       ],
@@ -227,7 +227,7 @@
         "Ghi đầy đủ reset và human assistance; đánh giá lại từ đầu task."
       ],
       "training": [
-        "Fine-tune từ cùng R0; correction + successful prior, đủ action horizon.",
+        "Fine-tune từ parent policy đã khóa; correction + successful prior, đủ action horizon.",
         "Đo local readiness và toàn task, không nhận gain từ loss giảm.",
         "Không gọi 0 task success là cả mô hình không có kỹ năng."
       ],
@@ -285,8 +285,8 @@
       "route": "bootstrap",
       "probe": {
         "question": "Path điều khiển lỗi, task không khả thi hay chưa có kỹ năng nền?",
-        "test": "E0 health/normalization/reachability trước; expert playback chỉ kiểm binding. Thử kỹ năng cơ bản với task đơn giản và entry hợp lệ.",
-        "example": "Không suy từ early fail rằng cả năm bước đều fail. Chưa có useful baseline thì chưa mở E4.",
+        "test": "Kiểm input, normalization, mapping, controller và vùng với tới; expert playback chỉ kiểm binding. Thử kỹ năng cơ bản với task đơn giản và entry hợp lệ.",
+        "example": "Fail ngay đầu chưa cho biết năng lực các bước sau. Chưa có baseline học được đủ dùng thì chưa so lợi ích human / synthetic.",
         "status": "hypothesis"
       },
       "plan": [
@@ -296,7 +296,7 @@
       ],
       "training": [
         "Native action post-training từ pretrained base, không train foundation từ đầu.",
-        "BOOT tạo R0 chung cho T/F/A; extra jobs phải cập nhật budget.",
+        "Tạo baseline robot đủ dùng trước. Nhánh human / sim chỉ mở sau kiểm recipe; ghi thêm jobs, nguồn dữ liệu và tổng chi phí.",
         "Chỉ lên độ khó khi đủ trials/coverage; hỗ trợ/reset vẫn ghi chi phí."
       ],
       "limit": "Nếu chưa đo bước cơ bản riêng, kết luận là chưa biết năng lực các bước sau; bootstrap có gate, không tự động bảo đảm học được."
@@ -375,8 +375,8 @@
     "clear": "Đã kiểm hệ thống không đồng nghĩa đã chứng minh nguyên nhân từ dữ liệu; vẫn cần probe."
   },
   "sourceRefs": [
-    "docs/14-task-improvement.md",
-    "docs/05-contracts.md",
-    "docs/06-validation-and-roadmap.md"
+    "idea-v3-2026-10-05/04-bang-chung-vla-va-loi.md",
+    "idea-v3-2026-10-05/11-contracts-va-logic.md",
+    "idea-v3-2026-10-05/05-thiet-ke-kiem-chung.md"
   ]
 }

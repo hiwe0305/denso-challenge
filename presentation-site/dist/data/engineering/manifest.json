@@ -1,0 +1,83 @@
+{
+  "scope": "executed_reference_pipeline_not_native_vla",
+  "source_sha256": "71c1b0b65e44cf4b0211129932bceb22a83e8cb2ce46081006422f5d5460ebb8",
+  "world_sha256": "706eda93e0031c98ed35712f16f09e48ca6b183cc87695fe7eb4844c383da859",
+  "artifacts": [
+    {
+      "file": "C.checkpoint.json",
+      "sha256": "f1aa86e754d44bba8edffd1602f9ff08c3bb454ded0efd1917fa429a802ed2b0"
+    },
+    {
+      "file": "R.checkpoint.json",
+      "sha256": "90c03d1e7ad7b0866c91a00e38a49a621c1fcaa4efeb3ff5f54e22ab337c7287"
+    },
+    {
+      "file": "S.checkpoint.json",
+      "sha256": "c7cbd47bc763c8d20d867b9ffe965c18fbf9feacb292d4c4e5e05465b153b45b"
+    },
+    {
+      "file": "after-correction.json",
+      "sha256": "d0c9442b556e5963e62869441d0edb8511ca2e47dbc5901b18a0e846a67faae0"
+    },
+    {
+      "file": "after-synthetic.json",
+      "sha256": "7ea0ccbef1c9e13b52517b1fdc9e1be02fe71c58f37e4e3f90faaaa6c033b7f0"
+    },
+    {
+      "file": "before.json",
+      "sha256": "c1d91cff6aadd4cd71a6e50a3757fd9b85b47953b4ef92b4ec9567edf0552a39"
+    },
+    {
+      "file": "binding-fault.json",
+      "sha256": "6b81b5252f5f94ddf3ceb49f67083f9e52eac328d89926199dd7a4331b0ce8b1"
+    },
+    {
+      "file": "correction-release.json",
+      "sha256": "16083e9aaad52ef001c1215838149315500b00681585a71579b56a8b5e4692a1"
+    },
+    {
+      "file": "final-results.json",
+      "sha256": "8b6ed8b38d23f54b67e0f44807ef91b3bc280f1490e05d6bca9c8e2b298701ec"
+    },
+    {
+      "file": "generated-trajectories.json",
+      "sha256": "20f4765d4b736e8dc0a6360605b4a43ad71bf0e0ba02698d18709727062153a9"
+    },
+    {
+      "file": "generation-log.json",
+      "sha256": "3c14b37969f0c5a8a8a592b0c510fc78c14e1305ea90198f982be09dfef7b256"
+    },
+    {
+      "file": "report.json",
+      "sha256": "bb579aa6e8cb4eb601164b6f3b6116e2e9dde1e8e0a068a125433d8ce3cc0587"
+    },
+    {
+      "file": "robot-release.json",
+      "sha256": "1b469ce375b3acc106a2483129821caf3bda288b978a5e88f151c9b167eba925"
+    },
+    {
+      "file": "seed-episode.json",
+      "sha256": "da2e194213d3a73b11e03192fe1219029c736c86bc8eabaf3da768ae5537a4e1"
+    },
+    {
+      "file": "synthetic-release.json",
+      "sha256": "99f337c31f78724639c903ac47a0673b5bc450419d407e2caaedb0eb8f7d698d"
+    },
+    {
+      "file": "training-receipts.json",
+      "sha256": "7763c9ad45246e892d1e5bab7be3a36e41d97ed766d46cdeefbe8d67f4191644"
+    },
+    {
+      "file": "unknown.json",
+      "sha256": "203705ed3063a9003b34c20dd102a76efa1f5c2c8e160518812d369104ba99b1"
+    },
+    {
+      "file": "zero-skill.json",
+      "sha256": "08396057e3800c1ea65fb9f5b23fb0e1b123d8dca3fb30b31c7fca6cee454917"
+    },
+    {
+      "file": "validation.json",
+      "sha256": "44661426250cfdcf748b521abff99e6e482906618fc2181c5bc2a5cb929783cd"
+    }
+  ]
+}

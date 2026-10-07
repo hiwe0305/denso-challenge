@@ -1,120 +1,78 @@
-# 02 · Kiến trúc và Technical Design
+# 02 · Kiến trúc và cách học theo AI Engineering
 
-_Thiết kế đề xuất, chưa có backend/training adapter/controller integration của đội đã chạy._
+_Snapshot kỹ thuật từ [hồ sơ engineering](../idea-v3-2026-10-05/02-kien-truc-va-cach-hoc.md); [IDEA.md](../IDEA.md) là bản trình bày gửi đánh giá, recipe mới nhất ở docs/implementation-plan/skill-a1._
+[Model Engine Core · FluxVLA](../idea-v3-2026-10-05/17-model-engine-core-fluxvla.md): lý do chọn framework là hỗ trợ training → evaluation → inference trên robot thật; policy và data flywheel được nối bằng artifacts, runners và robot operators.
+**Native: proposed / not tested. Reference: executed / scope giới hạn.** Không xem hai action profiles là tương đương.
 
-## Hai core và ownership
+![Kiến trúc v3.1](../idea-v3-2026-10-05/assets/kien-truc-v3.png)
 
-| Thành phần | Trách nhiệm |
+## Model AI × Data Core
+
+[16 · Model nền, components, training phases, loss/modules và World Model roles](../idea-v3-2026-10-05/16-model-ai-va-data-flywheel.md) bổ sung phần Model AI rõ trong solution. Data Core cấp release/targets; pretrained VLM + Action Expert học và xuất actions; inference/evaluation trả evidence vào vòng sau. Native là proposal, không execution.
+
+## Stable nodes
+
+| ID | Trách nhiệm |
 |---|---|
-| Data Core | Sources, QA/semantics, lineage, splits, recipe views/releases |
-| Learning Core | Human learning, robot adaptation trên FluxVLA, checkpoints, evaluation và inference bundles |
-| Shared runtime/evaluator | Observations, command/response, task/stage outcome, unknown coverage và traces |
-| Task improvement | Stage contracts, health/probes, bootstrap/corrections, regression và controlled cost choice |
-| Platform services | Metadata/storage/jobs/cost ledger; workspace/audit ở production |
+| TASK | TaskSpec, domain/acceptance/binding owner duyệt |
+| H | Human release eligibility/geometry; bridge chưa chọn |
+| S | Seed transform → controller execution → positive-demo QA |
+| R | Robot seed/calibration/corrections |
+| QA | Signal, rights, geometry/time/action provenance, roots/splits |
+| TRAIN | Loss/parameter manifest/sampling/optimizer/schedule/reload |
+| INPUT | Actual frames/tokens/state và preprocessing |
+| VLM | Native image/language representation; reference không có VLM |
+| IFACE | Features/masks/projectors/shape/dtype và numerical parity |
+| ACT | Native action expert; reference predictor 35×4 khác kiến trúc |
+| EXEC | Denormalization/rate limits/scheduler/controller/response |
+| SCORE | Independent stage và full-task scorer |
+| EVID | Observed facts, hypotheses, controlled tests, engineer review |
+| STUDY | Comparators, budgets/seeds, freeze/independent final |
+| COST | Unique activities/resources và total cost at same quality |
 
-```mermaid
-flowchart TB
-  USER["Robotics team / workbench"] --> ING
-  subgraph DC["DATA CORE"]
-    ING["Human ego / internet / real teleop / synthetic"] --> QA["QA / provenance / semantics"]
-    QA --> VIEW["Root splits / recipe views / releases"]
-  end
-  subgraph LC["LEARNING CORE ON FLUXVLA"]
-    H["Optional human or video bridge after gate"] --> A["Target-robot adaptation"]
-    A --> CK["Checkpoint / normalization / action profile"]
-    REP["Conditions / health checks / cost ledger"] --> TEST["T targeted teleop / F fixed mixture / A condition-cost experiment"]
-  end
-  VIEW --> H
-  VIEW --> A
-  CK --> RT["Upper-body sim or real controller runtime"]
-  RT --> EV["Independent task evaluator / traces"]
-  EV --> REP
-  TEST --> QA
-  TEST --> A
-  EV --> LED["Run / evaluation / decision / cost receipts"]
-```
+## Taxonomy và training views hiện hành
 
-## Stack và frontend/backend
+[Blueprint dataset → training → evaluation → inference](../idea-v3-2026-10-05/15-dataset-training-blueprint.md) bổ sung 06/10/2026 sau khảo sát OpenVLA, π0, GR00T N1.5, FOCA, DreamGen, DreamZero và DreamerV3. Origin/cách tạo khác supervision và latent representation. Synthetic variants vào loader theo payload có thật; không một modality mới.
 
-FluxVLA là engine bắt buộc theo người dùng. Main: GR00T N1.5/GR1 trong RoboCasa/MuJoCo, robot-action baseline trước auxiliary bridge theo gate. Pin code/weights/loader/config/adapter. EgoVLA-style là tham khảo, chưa port. SmolVLA fallback phải reset đối chứng, không tương đương objective EgoVLA.
+Native robot action view; action-free future-alignment candidate; human common-wrist candidate là ba routes riêng. Current inputs là conditioning; future action/frame/pose là offline targets. Upstream pretrained checkpoint cung cấp foundation prior; MVP không pretrain VLM từ đầu.
 
-PyTorch theo upstream; Python workers; CLI/tracker/report trước; React/TypeScript + FastAPI sau pilot gate, chưa cài. SQLite/filesystem cho một workspace pilot, PostgreSQL/object storage khi scale. Dùng tracker/queue library có sẵn, không viết distributed trainer mới.
+## Inference native
 
-Workbench: Task & binding, Data review, Recipe & runs, Evaluation, Improvement. Worker stages: validate → preprocess → optional eligible human/video learning → robot adaptation → eval → package. Persist job state; checkpoint giữa stages; concurrency=1 mặc định để tránh tranh VRAM. Stage không chạy và metric chưa đo hiển thị rõ. Website hiện có là pitch, không frontend sản phẩm hoạt động.
+Actual image + instruction → VLM features/masks → action expert với measured robot state/embodiment ID → normalized action chunk → denormalize/order/clipping → scheduler/controller → measured response. Privileged scorer state không vào image-policy input ngầm. Một policy có thể điều khiển cả task; không bắt 5 policies hoặc LLM đổi policy mỗi bước.
 
-Simulator chính: RoboCasa GR1; task khay custom hoặc upstream pick-and-place fallback chốt trước final split. [Benchmark EgoVLA](https://github.com/quincy-u/Ego_Humanoid_Manipulation_Benchmark) là tham khảo khác domain, không thay humanoid acceptance hoặc chứng minh sim-to-real.
+Selected upstream config tham chiếu có chunk16, action tensor padded32 và ori_action_dim29, gồm arm/hand/waist. Đây là config observations, chưa selected task profile pass. 29 là schema/action semantics cần kiểm, không chỉ shape. Native fixed-torso/one-arm phải binding thật; reference4D không thay thế.
 
-## Database và API đề xuất
+## Training native
 
-Tables: workspaces, sources, episodes, releases, recipes, experiments, jobs, checkpoints, evaluations, interventions, cost_entries; thêm task_stage_specs, stage_attempts, diagnostic_probes và training_plans. File/video ở storage ngoài DB. Các records có id/schema_version/workspace_id/immutable_hash/created_at và refs theo [contracts](05-contracts.md). Không sửa release tại chỗ sau khi train.
+Robot samples: processed images/tokens, state, embodiment ID, normalized future actions, action masks. Action objective của selected head áp vào những targets hợp lệ. FlowMatchingHead tham chiếu học velocity actions−noise trong training; predict_action tích phân để tạo action chunk. Không so training vector field với sent command như cùng đại lượng.
 
-| Endpoint đề xuất | Công việc |
-|---|---|
-| POST /sources, /episodes/import | Đăng ký nguồn/schema và validate |
-| POST /releases | Chốt splits/views/QA receipt |
-| POST /experiments, /jobs | Chốt comparator và tạo run |
-| GET /jobs/{id}, POST /jobs/{id}/cancel | Status, log refs và cancellation |
-| POST /evaluations | Eval checkpoint theo protocol |
-| GET /reports/{id} | Transfer/capability/cost và uncertainty |
-| POST /interventions | Ghi controlled change/review |
-| POST /inference-bundles | Đóng gói checkpoint/config/binding |
+VLM và action expert không bắt hai training độc lập. Action loss backprop qua các modules được mở. Config khai tune_llm=False/tune_visual=True; kiểm actual requires_grad/optimizer/update hashes. Không gọi mọi run là fine-tune toàn VLM. Native text/semantic objective cần forward/loss riêng nếu selected wrapper không cung cấp; thêm labels vào batch chưa đủ.
 
-API chưa triển khai. Idempotency keys, stable error codes và workspace authorization là yêu cầu.
+## Loss routing cần khai trước run
 
-## Runtime và AI boundaries
+| Source | Target/loss | Module path và điều kiện |
+|---|---|---|
+| Robot / sim execution | Native action objective | ACT và allowed VLM/IFACE params theo manifest |
+| Human tracked | Motion objective có frame/time/masks hợp lệ | Adapters/decoder/representation route phải chọn và kiểm; chưa mặc định shared ACT |
+| RGB + semantic labels | Objective tương ứng đã implemented | Semantic/temporal branch không tự robot-action supervision |
+| Appearance valid parent | Parent objective | Chỉ kế thừa target sau QA; giữ root/split |
+| Temporal video action-free | Future/temporal objective đã implemented | Recorded hoặc generated video; không robot action loss khi thiếu labels; target encoder và trainable route khai riêng |
+| Generated video + IDM/latent labels | Inferred objective/decoder riêng | Alternative extension, giữ pseudo status; không measured ground truth |
 
-```mermaid
-flowchart TB
-  B["Task / camera / robot / controller binding"] --> O["Timestamped observations and state"]
-  O --> P["FluxVLA inference adapter"]
-  P --> C["Optional RTC / action chunk scheduler"]
-  C --> V["Semantics / limits / stale deadline checks"]
-  V --> R["Robot controller or simulator"]
-  R --> M["Measured response and task outcome"]
-  M --> O
-  M --> E["Independent rollout receipt"]
-  STOP["Operator stop / fallback / accepted bundle"] --> V
-```
+## Human bridge: candidate và các alternatives
 
-AI học representation/actions theo recipe. Rules xử lý QA/format/bounds/cost. Không cần LLM agent hoặc RAG trong critical path. Observation-only có thể phục vụ representation; action learning cần nhãn phù hợp. Inferred labels giữ confidence/provenance, rollout là phép kiểm downstream.
+Recipe A1 hiện chọn common-wrist/shared motor route làm custom candidate, VLM frozen ở cả R_common và R_common+H; chi tiết ở [A1 recipe](../idea-v3-2026-10-05/../docs/implementation-plan/skill-a1/02-recipes-and-data.md). Chưa triển khai native hoặc chứng minh transfer. Các alternatives: auxiliary motion head trên shared features, hoặc validated retarget → sim execution → robot labels. Không chạy mọi bridge mặc định. Action-free FOCA/FLARE-style future route trả lời câu hỏi khác, không thay wrist objective bằng tên mới.
 
-RTC chỉ cho action-chunk paths có integration phù hợp, không thay IK/servo/controller. Đo inference p50/p95, stale observations, continuity và task success. Quá deadline dùng fallback theo controller đã thử. WM/WAM mở sau khi có objective/use case/compute; predicted future không là task outcome.
+A có thể rẻ hơn nhưng không chứng minh motor trunk học human dynamics. B cần state/action representations, dimensions, normalization, sampling time, masking và per-embodiment loss/noise semantics. C cần kinematics/contact/reachability. Không có tracking/geometry thì branch motion disabled; không zero-fill. Cùng dimensions không đồng nghĩa cùng action semantics.
 
-## Deployment, reliability và security
+Chọn prefix/co-training/replay schedule theo development và risk forgetting; chưa khóa human prefix bắt buộc hoặc 27 jobs. Một human forward/backward thành công chưa transfer. Downstream R/H ở robot budget ngang và extra compute/cost khai mới đánh giá tác dụng.
 
-Pilot local/private với pinned environment, config/data/evaluator hashes. Thuê GPU cần quyền dữ liệu và secret handling. Code/data/weights license kiểm riêng. Production: auth/SSO, role/workspace isolation, audit/export controls, retention/delete, encrypted backups và access tests. Chưa có controls đã triển khai.
+## Reference implementation hiện chạy
 
-Monitor stage duration/status, OOM/peak VRAM, NaN/loader failures, dropped frames, deadlines, success và person/GPU-hours. Retry transient có giới hạn; semantic error không retry vô hạn. Backup metadata/manifests/checkpoints hằng ngày; target đề xuất RPO≤24h/RTO≤4h, phải restore-drill mới xác nhận.
+Adapter đọc idealized simulator state + task target binding; scripted sequencer cấp stage riêng, không lấy stage từ scorer. Feature vector35 là one-hot stage và stage×object/target xy. Linear weights35×4 dự đoán absolute xyz/grip targets. Fit MSE qua closed-form ridge; reset policy memory giữa episodes. Không pretrained VLM, language grounding học được, flow matching hoặc human bridge.
 
-Release: candidate → validation → locked final test → owner acceptance → bundle. Rollback về last accepted bundle với matching normalization/controller. Real inference cần hardware/calibration/operator và trial acceptance riêng. Performance/scaling: bounded queue, incremental cache theo content hash, partition workspace/task, không train multi-GPU ở MVP nếu không cần.
+MuJoCo step/controller tạo measured positions, conditional weld attach và outcome. Scorer stage riêng; stable0.6s trong reference, không native threshold2s. Checkpoints/reload, negative controls và local-vs-final gate được chạy. Vì reference có idealized state/scripted phases, kết quả không chứng minh visual generalization hay learned high-level task planning.
 
-[Data Core](03-data-core.md) · [Learning Core](04-learning-core.md) · [Roadmap](06-validation-and-roadmap.md).
+## Các checks cần vượt
 
-## Đường đa nguồn và compatibility gate
-
-Đường MVP chọn FluxVLA/GR00T N1.5/GR1, robot-action head upstream; custom auxiliary human/video heads có eligibility/cost gate theo [Learning Core](04-learning-core.md). CLI/report tối thiểu có stage/condition evidence, health/probes, bootstrap/correction plans, intervention catalog, T/F/A và decision/cost receipts. Repair calibration/controller → baseline lại là stage riêng; E4 data arms giữ binding/scorer cố định. Experiment runner khóa parent/cost cap/train protocol; final evaluator không feedback vào selection. UI nhiều workspace sau pilot.
-
-BudgetScope gồm R&D-sim, skill-repeat và production-real; cost_entry có scope/activity/role/unit/rate/status=estimated|measured|unknown, source ref và allocation group. Một activity không ghi hai lần trong cùng scope; shared overhead khai phân bổ. Unknown không biến thành 0 measured. Selection module chỉ lọc quyền/signals/health/cap và hiển thị measured utility cùng scope; không auto causal diagnosis hoặc tự dự đoán gain cho gói chưa thử. Có stop/defer/no-change receipts.
-
-Internet/RGB-only dùng representation hoặc latent-action objective, không gắn robot-action loss khi chưa có mapping. Structured human dùng wrist/hand/geometry masks. Physics synthetic có action/outcome thực thi; appearance kế thừa labels sau QA; generated video với pseudo-actions là inferred, không measured. Recipe views quyết định eligibility cho từng objective. Một backbone có human/internet priors vẫn là initialization của cả hai nhóm E1/E2.
-
-Teleop views: train adaptation; calibration trên train/development roots; contact/correction theo nhãn; evaluation trên roots giữ riêng. Binding pin joint order, action units/reference frame, absolute/delta semantics, camera/time và controller. Public G1 metadata hiện là LeRobot v3.0; phải kiểm loader version path trong FluxVLA, không nhận v3 tương thích vì ví dụ cũ của dataset dùng v2.
-
-## Task improvement và worker interfaces bắt buộc
-
-```mermaid
-flowchart LR
- TASK[Task và chuẩn từng bước] --> TRACE[Runtime traces và stage attempts]
- TRACE --> HEALTH[Health và paired probes]
- HEALTH --> REPAIR[Sửa và baseline mới]
- HEALTH --> PLAN[Correction hoặc bootstrap plan]
- PLAN --> QA[Data QA và context windows]
- QA --> TRAIN[Native action post-train và prior replay]
- TRAIN --> CHECK[Local, transition, global regression]
- CHECK --> TRACE
- CHECK --> FINAL[Freeze và final độc lập]
-```
-
-Contracts/API đề xuất thêm POST /task-stage-specs, /stage-attempts, /diagnostic-probes, /training-plans. Worker: stage verification → health → optional probe → human-reviewed plan → collect/QA → train → regression → final; collection và real reset vẫn có người/thiết bị. POST không chạy model hoặc tiếp nhận user uploads trong website hiện tại.
-
-Stage verifier version độc lập khỏi policy; sim object/contact state không cấp ngầm vào inference inputs. Human/video stage head chưa phải verifier robot. Recovery/stop ghi attempts/interventions; retries không che full-task failures. Reset adapter giữ natural/restaged/human-assisted và checked reachability. Chi tiết IDs/semantics/gates: [Task improvement](14-task-improvement.md).
+Native batch/gradient/reload/inference parity → controller/scorer closed-loop → useful baseline → source route eligibility/gradients → development recipe → freeze/final. Instrumentation phải kiểm storage/latency và debug/optimized parity. Không coi hooks chạy trong Python là hooks hoạt động trong mọi optimized inference path.

@@ -1,0 +1,367 @@
+{
+  "reviewedAt": "06/10/2026",
+  "sourceScope": "Technical report arXiv:2609.17210v1; repository main và các file liên kết được đọc ngày 06/10/2026. Đây là khảo sát nguồn, chưa commit pin hay tái lập thực nghiệm.",
+  "modules": [
+    {
+      "id": "data",
+      "label": "Dataset",
+      "tag": "FILES → BATCH",
+      "title": "Biến episode thành batch có nghĩa",
+      "input": "Release đã QA: MP4 + Parquet + meta/statistics; current RGB/text/state và future action labels.",
+      "process": "ParquetDataset lấy cửa sổ trong episode. ProcessParquetInputs → RobocasaGR1N15Bridge → prompt/tokenizer → image transforms → NormalizeStatesAndActions → DictCollator.",
+      "output": "images / img_masks, lang_tokens / lang_masks, states, actions / action_masks, embodiment_ids. Future actions là training targets; không đưa vào quan sát hiện tại.",
+      "boundary": "Data Core phải khóa roots/splits, quyền, calibration, units và action semantics trước. Generated video thiếu actions dùng objective riêng; không đi thẳng vào loader BC này.",
+      "path": "configs/gr00tn15/gr00tn15_eagle_3b_robocasa_30_eps_full_finetune.py",
+      "anchor": "L70-L160",
+      "figure": "fluxDataPipeline"
+    },
+    {
+      "id": "policy",
+      "label": "Policy",
+      "tag": "BATCH → LOSS / ACTION",
+      "title": "Model được dựng từ cấu hình",
+      "input": "RGB + instruction tokens → Eagle; state + embodiment ID → Action Expert; noise/time cho flow matching.",
+      "process": "LlavaVLA nối EagleBackbone với FlowMatchingHead. VLM trả hidden states và attention mask; head cross-attend representation đó cùng state/action embeddings.",
+      "output": "Train: loss và dự đoán velocity. predict_action: tích phân velocity từ noise thành normalized action chunk. Tên pred_actions trong train không đồng nghĩa chunk thực thi.",
+      "boundary": "FluxVLA tổ chức mô-đun; GR00T N1.5 cung cấp policy/weights nền. Registry chung vẫn cần khớp shape, masks, horizon và semantics khi thay backbone/head.",
+      "path": "fluxvla/models/vlas/llava_vla.py",
+      "anchor": "L114-L234",
+      "figure": "fluxModelComposition"
+    },
+    {
+      "id": "train",
+      "label": "Trainer",
+      "tag": "LOSS → WEIGHTS",
+      "title": "Runner quản lý quá trình học",
+      "input": "Model, dataloader, optimizer, scheduler, precision và scope tham số được mở.",
+      "process": "FSDPTrainRunner trong recipe đang khảo sát; runner thực hiện optimization, logging và checkpoint. Repo cũng có DDPTrainRunner. Tên FSDP không tự có nghĩa recipe đang shard: config này chọn no-shard.",
+      "output": "Weights candidate + training logs. Đội bổ sung receipt nối release ID, parent checkpoint, params/gradient manifest và compute thực dùng.",
+      "boundary": "MVP là adaptation từ pretrained checkpoint. Mở visual/head theo recipe; human common-wrist và FOCA-style future losses phải được port, kiểm gradient, rồi so đối chứng.",
+      "path": "fluxvla/engines/runners/fsdp_train_runner.py",
+      "anchor": ""
+    },
+    {
+      "id": "artifact",
+      "label": "Checkpoint",
+      "tag": "TRAIN → EVAL / DEPLOY",
+      "title": "Bàn giao cả policy và cách xử lý dữ liệu",
+      "input": "Weights đã học, resolved config và normalization metadata của run.",
+      "process": "Thiết kế FluxVLA đóng gói trạng thái model cùng cấu hình/metadata phục vụ khôi phục. Đội khóa thêm code/data/processor versions, profile, split và checkpoint digest.",
+      "output": "Một candidate có thể reload cho eval hoặc inference; software environment, simulator, SDK và robot vẫn là dependencies bên ngoài.",
+      "boundary": "Không lấy một file weights rồi dùng stats/camera/action order khác. Reload parity là gate đầu; rollout toàn task là gate tiếp theo.",
+      "path": "fluxvla/engines/runners/base_train_runner.py",
+      "anchor": ""
+    },
+    {
+      "id": "eval",
+      "label": "Evaluator",
+      "tag": "ROLLOUT → MEASUREMENTS",
+      "title": "Kiểm policy trong vòng điều khiển kín",
+      "input": "Checkpoint + online transforms + đúng stats + simulator/task suite + seeds/horizons.",
+      "process": "RobocasaEvalRunner hoặc LiberoEvalRunner gọi predict_action → denormalize → execute prefix → nhận observation mới → chấm kết quả. Simulator stepping nằm ở evaluator, không trong VLM.",
+      "output": "Episode/task counts, success/failure, durations và rollout artifacts theo cấu hình. A1 cần scorer riêng và report ID/OOD/regression/latency/cost.",
+      "boundary": "Public recipe RoboCasa 24 tasks × 50 trials, seed 7, tối đa 720 steps, execute chunk 16. Đây là cấu hình tham khảo, chưa benchmark A1 hay kết quả của đội.",
+      "path": "fluxvla/engines/runners/robocasa_eval_runner.py",
+      "anchor": ""
+    },
+    {
+      "id": "robot",
+      "label": "Robot runtime",
+      "tag": "OBS → COMMAND → RESPONSE",
+      "title": "Inference trên thiết bị thật",
+      "input": "Camera + state có timestamps, task instruction, checkpoint/profile và operator tương ứng robot.",
+      "process": "Runner xử lý observation, gọi policy, postprocess và schedule chunk. Operator nhận sensor và chuyển commands sang SDK/controller. Có local và remote GPU serving; RTC ở các paths tương thích.",
+      "output": "Commands thực thi và measured response. Đội ghi trace nối observation → prediction → sent command → readback → independent outcome.",
+      "boundary": "Repo có Franka, UR, Aloha, Oli, Tron2 integrations. RoboCasa GR1 config không tự là real-GR1 operator. Đích humanoid A1 cần xác minh hoặc viết binding/runner/operator tương thích.",
+      "path": "fluxvla/engines/runners/base_inference_runner.py",
+      "anchor": ""
+    }
+  ],
+  "lifecycle": [
+    {
+      "id": "train",
+      "label": "01 · Training",
+      "title": "Dataset release → policy candidate",
+      "steps": [
+        [
+          "Release",
+          "R_A1 + QA S_exec / replay"
+        ],
+        [
+          "Preprocess",
+          "RGB/text/state + action window"
+        ],
+        [
+          "Model & loss",
+          "Eagle + DiT / flow objective"
+        ],
+        [
+          "Update",
+          "Scope tham số đã khai"
+        ],
+        [
+          "Artifact",
+          "Checkpoint + config + stats"
+        ]
+      ],
+      "detail": "Robot action labels tạo supervision cho native head. Với selected FluxVLA config, LLM đóng băng và visual được mở; kiểm actual trainable parameters khi dựng model. Action-only và frozen-VLM là các recipe đối chứng riêng.",
+      "handoff": "Đội phải lưu: release/parent IDs, trainable params và gradient receipt, split, normalization, compute và reload parity.",
+      "source": "config"
+    },
+    {
+      "id": "eval",
+      "label": "02 · Evaluation",
+      "title": "Checkpoint → closed-loop evidence",
+      "steps": [
+        [
+          "Reload",
+          "Weights / config / statistics"
+        ],
+        [
+          "Observe",
+          "Simulator + task instruction"
+        ],
+        [
+          "Predict",
+          "Online processor → policy chunk"
+        ],
+        [
+          "Execute",
+          "Denormalize → K-step prefix"
+        ],
+        [
+          "Measure",
+          "Whole-task / regression / cost"
+        ]
+      ],
+      "detail": "RoboCasa GR1 và LIBERO là paths upstream riêng. Với A1, chọn/tune trên development; khóa recipe/checkpoint/binding/scorer trước final độc lập. Không dùng final để chọn dữ liệu hoặc sửa model.",
+      "handoff": "Đội phải lưu: mọi lượt, unknown/timeout/intervention, success với khoảng tin cậy, ID/OOD và regression; success trên sim chưa nghiệm thu robot thật.",
+      "source": "eval",
+      "figure": "fluxSimulationEvaluation"
+    },
+    {
+      "id": "robot",
+      "label": "03 · Robot thật",
+      "title": "Observation sống → hành động → phản hồi",
+      "steps": [
+        [
+          "Acquire",
+          "Operator đồng bộ RGB/state"
+        ],
+        [
+          "Preprocess",
+          "Cùng semantics với training"
+        ],
+        [
+          "Predict",
+          "Local model hoặc GPU server"
+        ],
+        [
+          "Execute",
+          "Postprocess / schedule / SDK"
+        ],
+        [
+          "Feedback",
+          "Response / outcome → Data Core"
+        ]
+      ],
+      "detail": "Local: policy chạy ở máy client. Remote: client gửi raw observation; GPU server transform → predict → denormalize → trả action. Tránh denormalize lần hai ở client. Stats/action mode/order phải khớp cả hai phía.",
+      "handoff": "Đội phải đo camera freshness, inference/transport/end-to-end latency, timing chunk và command/readback. Safety envelope thuộc controller/SDK và cell setup.",
+      "source": "remote"
+    }
+  ],
+  "configFacts": [
+    [
+      "Wrapper",
+      "LlavaVLA",
+      "Ghép backbone và continuous action head"
+    ],
+    [
+      "Backbone",
+      "EagleBackbone",
+      "tune_llm=False; tune_visual=True"
+    ],
+    [
+      "Action head",
+      "FlowMatchingHead",
+      "state_dim=64; action_dim=32; active=29"
+    ],
+    [
+      "Horizon",
+      "16 actions / chunk",
+      "4 flow integration steps khi inference"
+    ],
+    [
+      "Processor",
+      "1 ego image → 224×224",
+      "max text/image prompt length 900"
+    ],
+    [
+      "Trainer",
+      "FSDPTrainRunner / no-shard",
+      "AdamW; lr 6e−5; 30.000 steps; bf16"
+    ],
+    [
+      "Eval",
+      "RobocasaEvalRunner",
+      "24 tasks; 50 trials/task; seed 7"
+    ],
+    [
+      "Fast inference",
+      "EagleInferenceBackbone + FlowMatchingInferenceHead",
+      "Inference graph thay đổi; checkpoint phải load tương thích"
+    ]
+  ],
+  "runtime": [
+    {
+      "title": "Tăng tốc model",
+      "tag": "GPU INFERENCE",
+      "body": "Inference-specific modules, fused kernels và CUDA Graphs ở các model paths được hỗ trợ. Phải đo action parity và task behavior với eager path; hardware và static shapes quyết định khả năng dùng."
+    },
+    {
+      "title": "Nối hai action chunks",
+      "tag": "RTC / SCHEDULING",
+      "body": "RTC điều kiện hóa chunk mới bằng phần còn thực thi của chunk cũ. Training-time prefix route và test-time guidance là hai lựa chọn; cần runner/head/config tương thích, không bật mặc định cho mọi robot."
+    },
+    {
+      "title": "Đưa chunk tới robot",
+      "tag": "OPERATOR / CONTROLLER",
+      "body": "Postprocess sau khôi phục đơn vị, chọn action horizon và publish rate phù hợp. Joint/Cartesian, active arms, gripper và action ordering phải trùng dataset; collision/workspace/torque limits do controller/SDK đảm nhiệm."
+    }
+  ],
+  "ownership": [
+    [
+      "Dataset → model",
+      "Parquet loader, transforms, collator và model registry",
+      "QA/rights/lineage, splits theo roots, A1 action profile, release version"
+    ],
+    [
+      "Training → artifact",
+      "Runners, optimization, logging và checkpoint pipeline",
+      "Data/compute caps, gradient scope, experiment receipts và controlled contrasts"
+    ],
+    [
+      "Artifact → eval",
+      "LIBERO / RoboCasa runners, online processing và stats",
+      "A1 task/scorer, heldout protocol, regression, total cost và promotion gate"
+    ],
+    [
+      "Artifact → robot",
+      "Inference runners, supported operators, serving / RTC paths",
+      "Robot đích binding, controller integration, measured traces và acceptance"
+    ],
+    [
+      "Feedback → vòng học mới",
+      "Framework có execution / correction-related capabilities",
+      "Evidence review → chọn data hoặc repair → release → retrain → so gain; workflow A1 chưa nối"
+    ],
+    [
+      "Human / action-free",
+      "Các model contracts và extension points",
+      "Common-wrist branch / FOCA port là nghiên cứu riêng; chưa tính năng tự có của selected N1.5 recipe"
+    ]
+  ],
+  "flywheel": [
+    [
+      "Data Core",
+      "Chọn coverage; QA; giữ lineage / splits"
+    ],
+    [
+      "Model Engine Core",
+      "Train / reload / eval / inference"
+    ],
+    [
+      "Evidence",
+      "Trace + whole-task + total cost"
+    ],
+    [
+      "Can thiệp",
+      "Repair hoặc targeted data / update"
+    ]
+  ],
+  "failures": [
+    {
+      "id": "binding",
+      "label": "Command sai",
+      "observed": "Prediction hợp lý nhưng sent command sai order/units hoặc measured response lệch.",
+      "action": "Kiểm stats, mapping, camera/time, operator và controller. Sửa integration, re-pin baseline; chưa tự retrain.",
+      "data": "Trace prediction / command / readback; calibration/profile receipt.",
+      "scope": "Binding / runtime repair",
+      "eval": "Replay parity, rồi whole-task/regression; log cả công repair."
+    },
+    {
+      "id": "coverage",
+      "label": "Scene mới",
+      "observed": "Binding đã kiểm; policy yếu ở một điều kiện mới trong development.",
+      "action": "Thử reuse/basic augmentation hoặc sim-executed variants đủ QA; nếu contact/recovery cần thêm robot correction. So action-only với visual/head update khi có hypothesis riêng.",
+      "data": "Eligible robot episodes hoặc executed sim action labels + prior replay; variants giữ parent roots.",
+      "scope": "Dataset release + recipe đã chọn",
+      "eval": "Cùng parent, steps/budget và scorer; đo gain ID/OOD/regression + total cost."
+    },
+    {
+      "id": "video",
+      "label": "Thêm video",
+      "observed": "Có nhiều video người/generated video, nhưng không có robot action labels.",
+      "action": "Không nhét vào native robot BC. Kiểm action-free future objective hoặc common-wrist bridge như candidate riêng; module/loss routes phải port và kiểm.",
+      "data": "Future frames/embeddings hoặc geometry/timing/masks hợp lệ; robot batches giữ action objective.",
+      "scope": "Custom auxiliary branch · chưa tích hợp",
+      "eval": "Matched few-shot roots + downstream rollout; compute/QA/generation tính đủ."
+    }
+  ],
+  "sources": [
+    {
+      "id": "report",
+      "title": "Technical report · arXiv v1",
+      "url": "https://arxiv.org/html/2609.17210v1",
+      "scope": "§3–4: engine boundaries, data/model/runner contracts; khảo sát, không tái lập"
+    },
+    {
+      "id": "config",
+      "title": "Recipe GR00T N1.5 / RoboCasa GR1",
+      "url": "https://github.com/FluxVLA/FluxVLA/blob/main/configs/gr00tn15/gr00tn15_eagle_3b_robocasa_30_eps_full_finetune.py",
+      "scope": "model / train_dataloader / runner / inference_model / eval"
+    },
+    {
+      "id": "wrapper",
+      "title": "LlavaVLA · forward / predict_action",
+      "url": "https://github.com/FluxVLA/FluxVLA/blob/main/fluxvla/models/vlas/llava_vla.py",
+      "scope": "Features/masks → head; train losses khác inference chunk"
+    },
+    {
+      "id": "head",
+      "title": "FlowMatchingHead · loss / integration",
+      "url": "https://github.com/FluxVLA/FluxVLA/blob/main/fluxvla/models/heads/flow_matching_head.py",
+      "scope": "velocity=actions−noise; mask-aware MSE; action integration"
+    },
+    {
+      "id": "eval",
+      "title": "Eval runners trong repository",
+      "url": "https://github.com/FluxVLA/FluxVLA/tree/main/fluxvla/engines/runners",
+      "scope": "RoboCasa / LIBERO và real-robot runner paths"
+    },
+    {
+      "id": "remote",
+      "title": "Remote inference serving",
+      "url": "https://github.com/FluxVLA/FluxVLA/blob/main/docs/remote_inference_serving.md",
+      "scope": "GPU server / ZMQ client; preprocess + denormalize ở server"
+    },
+    {
+      "id": "franka",
+      "title": "Franka: ví dụ real-robot integration",
+      "url": "https://github.com/FluxVLA/FluxVLA/blob/main/docs/franka.md",
+      "scope": "π0.5 configs; single/dual arm, joint/Cartesian; không là proof GR1 A1"
+    },
+    {
+      "id": "rtc",
+      "title": "RTC: training-time / test-time",
+      "url": "https://github.com/FluxVLA/FluxVLA/blob/main/docs/rtc.md",
+      "scope": "Prefix conditioning / guidance; tương thích theo path"
+    },
+    {
+      "id": "groot",
+      "title": "Policy GR00T N1.5 · NVIDIA",
+      "url": "https://research.nvidia.com/labs/gear/gr00t-n1_5/",
+      "scope": "Eagle VLM + DiT, flow matching / FLARE; official VLM frozen khác recipe Flux đang khảo sát"
+    }
+  ]
+}

@@ -1,0 +1,106 @@
+{
+  "action": "resources README → kế hoạch triển khai",
+  "observedPath": "idea-v3-2026-10-05/README.md",
+  "links": [
+    {
+      "doc": "0",
+      "href": "#resources",
+      "text": "kế hoạch triển khai"
+    },
+    {
+      "doc": "1",
+      "href": "#resources",
+      "text": "01 · Idea và phạm vi"
+    },
+    {
+      "doc": "2",
+      "href": "#resources",
+      "text": "02 · Kiến trúc"
+    },
+    {
+      "doc": "3",
+      "href": "#resources",
+      "text": "03 · Dữ liệu"
+    },
+    {
+      "doc": "4",
+      "href": "#resources",
+      "text": "04 · Xử lý lỗi"
+    },
+    {
+      "doc": "5",
+      "href": "#resources",
+      "text": "05 · Kiểm chứng"
+    },
+    {
+      "doc": "6",
+      "href": "#resources",
+      "text": "06 · Chi phí"
+    },
+    {
+      "doc": "7",
+      "href": "#resources",
+      "text": "07 · Đánh giá/quyết định"
+    },
+    {
+      "doc": "8",
+      "href": "#resources",
+      "text": "08 · Triển khai"
+    },
+    {
+      "doc": "9",
+      "href": "#resources",
+      "text": "09 · Nguồn"
+    },
+    {
+      "doc": "16",
+      "href": "#resources",
+      "text": "17 · Model Engine Core"
+    },
+    {
+      "doc": "15",
+      "href": "#resources",
+      "text": "16 · Model AI"
+    },
+    {
+      "doc": "14",
+      "href": "#resources",
+      "text": "15 · Dataset và training blueprint"
+    },
+    {
+      "doc": "13",
+      "href": "#resources",
+      "text": "13 · Example native từng bước"
+    },
+    {
+      "doc": "10",
+      "href": "#resources",
+      "text": "10 · Example toàn luồng"
+    },
+    {
+      "doc": "11",
+      "href": "#resources",
+      "text": "11 · Contracts và logic"
+    },
+    {
+      "doc": "12",
+      "href": "#resources",
+      "text": "12 · Kiểm chứng nội dung"
+    },
+    {
+      "doc": null,
+      "href": "assets/kien-truc-v3.svg",
+      "text": "SVG gốc"
+    },
+    {
+      "doc": "0",
+      "href": "#resources",
+      "text": "examples/engineering-loop"
+    },
+    {
+      "doc": "15",
+      "href": "#resources",
+      "text": "16 · Model AI × Data Core"
+    }
+  ]
+}

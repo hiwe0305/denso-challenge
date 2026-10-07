@@ -1,0 +1,47 @@
+{
+  "date": "2026-10-05",
+  "base_git_head": "e45cf7f0309f3fe58112c98c10b1111f5bee1864",
+  "working_tree": "dirty; reviewed current file hashes, not HEAD alone",
+  "artifacts": {
+    "examples/engineering-loop/results/manifest.json": "0aec9c9eff4c21bf9c9deeb0a903e654825daef8c31219c0ffbae40ced1fff58",
+    "examples/engineering-loop/results/report.json": "596bbaea4343394f506a9a51559e5fbacf4faf49ba25c7d448073ae865f68ef6",
+    "examples/engineering-loop/run.py": "1e4117ce280b1172b4775a125fe3a99da6fc390bdeae531bfa1c78abf95f0534",
+    "examples/engineering-loop/test_pipeline.py": "d66eb608d1cebb93dbb3d27138deccd0bba92ad132461c89fabc3b1b47900c9f",
+    "examples/engineering-loop/world.xml": "706eda93e0031c98ed35712f16f09e48ca6b183cc87695fe7eb4844c383da859",
+    "idea-v3-2026-10-05/02-kien-truc-va-cach-hoc.md": "6a6f8b59e825e3cd0cd9d27a80d078bed9f08604ebac00594acde823c46382f4",
+    "idea-v3-2026-10-05/03-workflow-du-lieu.md": "caf9c709cc014350fc1610c9aa0b9280892c6f695a2916f0739ba335dbb26d88",
+    "idea-v3-2026-10-05/04-bang-chung-vla-va-loi.md": "e7b42d5211665a84235bf2f609a389b0eb1d7ccf19eb193032c49242a9f5d924",
+    "idea-v3-2026-10-05/05-thiet-ke-kiem-chung.md": "9e656851c7bd7f18728e72b1d5df1f85bf420327bf5a8806844642c2f893d47e",
+    "idea-v3-2026-10-05/06-chi-phi-va-kha-thi.md": "190621e4748a7f78a2a59243600a976b4b0d7ebb3e6220dbcb30e6d96dbff02c",
+    "idea-v3-2026-10-05/13-example-native-tu-dau-den-cuoi.md": "8de8cabd5433f0f693cbcc39ba9688838e750ab35e9591104845f05aca5e4b1e",
+    "idea-v3-2026-10-05/project-spec.json": "df391c37efd2333d59ed1abdf25043829b0c4b80345562c075ba3068b81475e0",
+    "presentation-site/content/solution-story.json": "c290bb2261601b61c65e7d7c13c1de24524d579b161256c99d29c1b3ff5d4ce4",
+    "presentation-site/content/task-improvement.json": "79bca733aa90b05816ba3935f915a617d31194da625e55c4bb4f194ac792e10d",
+    "presentation-site/dist/engineering.js": "dc547fd6875329bae234a4f5dce6e7f7349697c3a0ad74dddcb9e4a3c6ecd374",
+    "presentation-site/dist/idea-opening.js": "9c0b433e2196ef797afda41575e143497dd9d554d6c3e5be5c50ed0591863ece",
+    "presentation-site/dist/idea-story.js": "cbe6cf2af99340a9e337302cea1545329fface858a2450481ddf0beb1d19cbdf",
+    "presentation-site/dist/task-improvement.js": "5ce2b86f7aef0a71cc1f05e83a96221f21ee83ea5bd17995888a5e3fbba52f96"
+  },
+  "checks": [
+    {
+      "check": "python -m pytest -q examples/engineering-loop/test_pipeline.py",
+      "result": "24 passed; reference only"
+    },
+    {
+      "check": "python presentation-site/verify-site.py",
+      "result": "passed: 12 routes, 30 docs, 18 frames, 5 fixtures"
+    },
+    {
+      "check": "node presentation-site/test-improvement.js",
+      "result": "passed: fixture accounting and routing checks"
+    },
+    {
+      "check": "reference manifest",
+      "result": "19 artifact hashes plus source/world/tests/report checked"
+    },
+    {
+      "check": "live browser",
+      "result": "all 12 routes inspected; returned to overview"
+    }
+  ]
+}

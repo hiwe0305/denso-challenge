@@ -1,0 +1,9 @@
+{
+  "scope": "reference_contract_scoring_and_pipeline_tests_not_native_vla",
+  "exit_code": 0,
+  "passed": 32,
+  "source_sha256": "71c1b0b65e44cf4b0211129932bceb22a83e8cb2ce46081006422f5d5460ebb8",
+  "tests_sha256": "9ebd49701d0cf955a461274f8f726c39836614d11ebd53c852591379f68cf464",
+  "report_sha256": "bb579aa6e8cb4eb601164b6f3b6116e2e9dde1e8e0a068a125433d8ce3cc0587",
+  "output": "................................                                         [100%]\n32 passed in 0.32s"
+}

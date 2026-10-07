@@ -1,57 +1,30 @@
-# 05 · Contracts, data model và invariants
+# 11 · Contracts bắt buộc, không chỉ sơ đồ
 
-_Contracts đề xuất của platform, chưa API triển khai của đội hoặc upstream._
+_Snapshot kỹ thuật từ [hồ sơ engineering](../idea-v3-2026-10-05/11-contracts-va-logic.md); [IDEA.md](../IDEA.md) là bản trình bày gửi đánh giá, recipe mới nhất ở docs/implementation-plan/skill-a1._
+## Native batch contract (cần instantiate từ pin config)
 
-Common fields: id, schema_version, workspace_id, immutable_hash, created_at, owner, refs. Unknown evidence không pass, credentials không vào artifacts.
+Images/views/masks, language tokens/masks, state schema, embodiment ID, action chunk/masks, timestamps/profile/source/root/split. Khóa dimensions/dtype/token layout/units/frame/action absolute-vs-delta/order/dt/horizon/normalization revision. Selected config29D/chunk16 là reference, task binding chưa pass; không coi batch đúng shape là controller-compatible.
 
-| Object | Required semantics |
-|---|---|
-| SourceRecord | origin/actor/viewpoint/embodiment/signals/confidence/domain/modalities/provider/rights/retention/session/raw hash và acquisition costs |
-| CanonicalEpisode | measured/inferred/generated/missing signals, frame/time/units, command-vs-response, roots/parents/processing/outcome |
-| DatasetRelease | Immutable views/splits/hashes, QA/quarantine, loader readback và cost refs |
-| RecipeProfile | FluxVLA/model/weights/loader/objective revisions, human learning vs robot adaptation stages, required signals/masks, action/camera/normalization, source mix and compute |
-| ExperimentPlan | Estimand, control/treatment, changed/held variables, budget/seed/trial/scorer/split protocol và confounds |
-| TaskProfile / ConditionReport | Object/target region, timeout/stability/scorer, active/locked joints, domain; stage reach/known/unknown, denominators/uncertainty và health refs |
-| SubtaskSpec | task graph/order, stage_id, entry/precondition, completion/readiness, timeout, abort/reset, verifier/version/tolerances/source |
-| StageAttempt | episode/attempt/stage refs, entry/exit/time, pass/fail/not_attempted/unknown, signals/masks/evidence, natural/restaged/human-assisted, intervention/retry and verifier refs |
-| DiagnosticProbe | hypothesized first divergence, controlled/held variables, canonical vs policy entry, scenario/state hash, trials/unknown/uncertainty, reviewer and costs |
-| BootstrapPlan | feasibility/health, expert seed roots, curriculum/progression criterion/cap, fallback/rescope/stop, shared baseline parent |
-| TrainingPlan | target stages/conditions, parent, native objective, trainable/frozen params, LR/steps/batch/seed, prior/correction ratio, context/chunk horizon, regression suite/caps |
-| AcquisitionPackage / AcquisitionPlan | Source/stage/condition/entry distribution, hypothesis/correction authority/window/reviewer, rights/objectives/roots, reuse/new, estimated range/actual cost; shared R0 parent, eligible catalog, T expert-targeted teleop / F fixed mixture / A condition-cost arms, cap/tolerance, training protocol và forbidden final-test refs |
-| RunReceipt | Stages thực chạy, data/recipe/env/hardware/checkpoint refs, logs/status/person/GPU cost |
-| EvaluationReceipt | Sim/real domain, binding/scenarios/scorer, trials/seeds/traces/outcomes/uncertainty/limits |
-| TransferReport | Success-vs-demo comparisons, human/pretraining history, savings threshold, cost completeness and conclusions allowed |
-| DatasetValueCard | Conditional source/cohort/model/task/domain/budget comparison, measured effect/uncertainty/not-tested |
-| BottleneckCase/DecisionReceipt | Signals/hypotheses/controlled change/reviewer, actual run/outcome gain/no-gain/inconclusive |
-| InterventionPlan | health-check status, repair/collect/reuse/augment/defer/stop, reason, reviewer; repairs ngoài E4 data contrast, version/baseline reset và unknown expected utility |
-| BudgetLedger / SkillAcceptance | R&D-sim/skill-repeat/production-real scope, estimated/measured/unknown, unique activity/allocation refs, engineer/robot/elapsed hours; cycle p50/p95, interventions/recovery/good outputs và owner thresholds |
-| InferenceBundle/DeploymentBinding | Weights/normalization/action/camera/controller/calibration, active/locked joints, domain/limits/deadline/stop/rollback/acceptance |
+Rights/validity và provenance theo03. Human labels dùng human objective/adapters riêng; không pad giả robot29D để gọi native action loss. Per-source gradient/update manifest: trainable params, frozen params, actual gradients/update hashes, optimizer groups, loss scaling/masks, mixing/replay schedule. Missing target không zero-fill.
 
-## Invariants
+## Native inference contract
 
-1. Shared root/derivatives giữ lineage/rights và cùng split. Final-test evidence không dùng làm training/tuning/acquisition cho cùng acceptance round.
-2. Human approval không đổi inferred label thành measured action. Video-only không tự đáp ứng robot-action supervision.
-3. Issued command và measured response tách. Candidate trajectory/qpos playback/predicted future không là controller-executed demo.
-4. Source quality/value phụ thuộc recipe/task/budget. Unlike-model contrast ghi confound, không gọi nhân quả human data.
-5. Unique roots/training seeds/trials riêng; nhiều frames/variants không giả independent samples. Missing/negative results giữ lại.
-6. Sim, real và model prediction giữ domain riêng. Scorer/binding/version đổi phải đánh giá lại acceptance.
-7. Candidate checkpoint không auto promote. Release/run immutable; retry idempotent; rollback matching controller/normalization.
-8. Cost ghi cả sponsored resources theo usage/giá giả định hoặc chưa biết; không coi tài trợ làm mất chi phí kinh tế.
-9. Binding/controller repair không trộn vào E4 data-only treatment. Re-pin baseline/plan khi binding/scorer đổi. T/F/A cùng parent, catalog/cap/train protocol; final refs bị chặn.
-10. Nguồn không đủ tín hiệu/quyền/cap bị loại trước chọn. Unknown utility/cost không trở thành measured zero hoặc auto promote. Không claim algorithmic novelty hay tiết kiệm từ rules/template.
-11. Một activity không double-count trong cùng budget scope. R&D train runs đã tính không cộng lại như per-skill runs. Cost incomplete hoặc same-quality chưa kiểm thì chưa claim net saving. Core run grid 6 baseline +9 T/F/A=15, theo protocol revision 05/10.
+Same preprocessing/action statistics/profile như train; future labels không future input. Actual VLM feature refs/masks → selected ACT/state/ID → normalized chunk → denormalize/order/clipping → scheduler executed horizon → controller/state. Model/API không expose tensors thì status not_observable; không fabricate semantic output. Optimized/debug paths parity required.
 
-[Architecture](02-system-architecture.md) · [Evaluation](06-validation-and-roadmap.md).
+## Runtime trace
 
-SignalValidity: raw_value, normalized_value/null, evidence_kind, mask, confidence, units/frame, timing/processor refs. Public numeric preview có sample hash và acquisition provenance; paper media có source page và evidence domain.
+Episode/scenario/split/version; observation and processing refs/times; model/config/checkpoint; predicted vs sent action and normalization/clipping; command/queue/send/response timestamps; measured state/contact if available; scorer/version/outcome/unknown; intervention authority; trace hash. Controller fault outside data-only arms.
 
-## Các invariants của vòng cải thiện
+## Reference contract đã chạy
 
-12. Not-attempted không là fail; unknown không là pass/fail. Báo entered/known/unknown/reach và retries/episodes riêng; aborted/timeout vẫn full-task fail.
-13. Completion từng bước cần readiness cho bước tiếp theo. Staged entry và privileged sim verifier không thay natural rollout hoặc real sensors.
-14. Failure trace không expert-positive action; corrections giữ takeover authority/context/horizon và QA.
-15. Local gain/loss giảm không đủ promote: cần transition/full-task/regression, freeze và độc lập final.
-16. Shared policy không có stage-specific parameter guarantee. Mọi trainable/frozen params và sampling ratios phải versioned, regression sau update.
-17. Useful-parent chưa có thì bootstrap/rescope/stop, không claim data-choice saving; extra jobs/reset/verifier costs phải vào RunPlan/ledger.
+Feature35; command4 absolute world xyz meters + grip threshold0.5; dt0.05s; profiles explicit; project-authored rights; finite values; monotonically increasing step per recording; train scenario không final-*. Pose rate limit0.035m/control step; attachment khi closed và proximity<0.026m; weld/contact simplification công khai. Reference stable0.6s; native thresholds không kế thừa.
 
-[Định nghĩa và phép kiểm](14-task-improvement.md).
+Scorer riêng từ measured world state; policy sequencer own-stage không đọc scorer status. Fit35×4 closed-form ridge, MSE; checkpoint reload numeric parity. Seed/variant/correction IDs và ancestor roots; sim descendants không independent robot seed roots. C replay R + correction, S replay R + transformed/executed variants; hai alternatives, không tự train C sau S đã tốt.
+
+## State transitions và rejection
+
+release_draft → QA_pass → frozen_release → trained_candidate → reload/runtime_pass → development_checked → frozen_candidate → independent_final → promote/reject(scope). Reference promote chỉ scope reference. Rights/profile/geometry/missing/leakage fail → reject/quarantine. Unknown verifier → unknown; fulltask timeout fail. Local correction gain nhưng final fail → reject; nguồn missing → not_integrated.
+
+## Nội dung example không được xuyên tạc
+
+Scorer giữ privileged state để chấm; reference policy cũng có idealized state vì declared test profile. Native image policy không được nhận privilege đó ngầm. Reference model/encoder/sequencer khác native architecture. Một example kiểm plumbing không kiểm perception/language/human-transfer/costs của model lớn. MuJoCo run không robot thật.

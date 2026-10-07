@@ -1,0 +1,226 @@
+{
+  "status": "schema_proposal_no_collected_native_dataset",
+  "schema_version": "a1-release-proposal-2",
+  "release_id": null,
+  "raw_source_revision": null,
+  "rights_receipt": null,
+  "profile_revision": null,
+  "must_resolve_before_train": [
+    "release_id",
+    "raw_source_revision",
+    "rights_receipt",
+    "profile_revision",
+    "signal_dimensions",
+    "action_semantics",
+    "clock_alignment",
+    "split_manifest",
+    "qa_receipt"
+  ],
+  "taxonomy": {
+    "subject": [
+      "robot",
+      "human"
+    ],
+    "environment": [
+      "hardware",
+      "simulation",
+      "human_recording",
+      "neural_generated"
+    ],
+    "creation_method": [
+      "recorded",
+      "expert_executed",
+      "appearance_augmented",
+      "sim_trajectory_generated",
+      "neural_video_generated"
+    ],
+    "action_provenance": [
+      "robot_recorded",
+      "sim_executed",
+      "inherited_validated",
+      "pseudo_inferred",
+      "missing"
+    ],
+    "internet_repository": "distribution_location_metadata_not_supervision_type"
+  },
+  "files": {
+    "videos/{camera}/file-*.mp4": {
+      "payload": "encoded_RGB",
+      "requires": [
+        "camera_id",
+        "decoded_frame_timestamps",
+        "episode_offsets",
+        "frame_size",
+        "codec"
+      ]
+    },
+    "instructions.jsonl": {
+      "columns": [
+        "task_id",
+        "episode_id",
+        "instruction",
+        "language",
+        "segment_start",
+        "segment_end"
+      ]
+    },
+    "episodes.parquet": {
+      "columns": [
+        "episode_id",
+        "root_id",
+        "parent_ids",
+        "session_id",
+        "scenario_id",
+        "split",
+        "data_offsets",
+        "video_offsets",
+        "capabilities"
+      ]
+    },
+    "signals/file-*.parquet": {
+      "columns": {
+        "timestamp_s": "float64; monotonic within episode; clock origin declared",
+        "frame_index": "int64; mapping to decoded camera frames declared",
+        "observation.state": "float32[Ds]; units/order/frame from profile",
+        "action": "float32[Da] when available; target semantics from profile",
+        "action.valid": "bool[Da] when actions available; padding/invalid masked",
+        "issued_command": "controller-specific vector; separate schema/units/order",
+        "measured_response": "sensor-specific vector; not desired command"
+      }
+    },
+    "annotations/poses.parquet": {
+      "payload": "tracked human geometry; source CSV may be preserved",
+      "requires": [
+        "timestamp",
+        "wrist_pose",
+        "coordinate_frame",
+        "confidence",
+        "position_valid",
+        "orientation_valid"
+      ]
+    },
+    "calibration/cameras.json": {
+      "requires_for_motion": [
+        "intrinsics",
+        "extrinsics",
+        "clock_transforms",
+        "calibration_revision"
+      ]
+    },
+    "annotations/regions.parquet": {
+      "payload": "optional training region annotations",
+      "requires": [
+        "episode_id",
+        "camera_id",
+        "frame_index",
+        "region",
+        "annotator_revision",
+        "valid"
+      ]
+    },
+    "qa/receipts.jsonl": {
+      "payload": "accept/reject and trace evidence",
+      "requires": [
+        "episode_id",
+        "checks",
+        "outcome",
+        "unknown_fields",
+        "review_scope",
+        "processing_cost"
+      ]
+    },
+    "derived/features.safetensors": {
+      "payload": "optional derived encoder cache",
+      "requires": [
+        "encoder_hash",
+        "processor_hash",
+        "input_hash",
+        "layer",
+        "shape",
+        "dtype",
+        "stop_gradient_role"
+      ]
+    }
+  },
+  "training_views": {
+    "robot_action": {
+      "requires": [
+        "current_RGB",
+        "instruction",
+        "current_state",
+        "future_actions",
+        "action_valid",
+        "profile"
+      ],
+      "loss": "native_selected_head_objective",
+      "allowed_origins": [
+        "robot_hardware",
+        "robot_simulation"
+      ]
+    },
+    "temporal_action_free": {
+      "requires": [
+        "current_frames",
+        "later_frames_same_episode",
+        "task_text",
+        "temporal_valid"
+      ],
+      "robot_action_loss": "disabled_without_labels",
+      "target_encoder": "recipe_defined_and_versioned",
+      "foca_specific_negative_contract": {
+        "semantic_task_ids": null,
+        "train_only_pool_revision": null,
+        "minimum_eligible_task_mismatched_negatives": null,
+        "zero_negative_handling": "reject or skip with receipt; never silently train zero contrastive signal",
+        "single_task_adaptation": "different objective or negative semantics must be declared and tested for collapse/false negatives; paraphrases are not distinct semantic tasks"
+      }
+    },
+    "human_motion": {
+      "requires": [
+        "RGB",
+        "tracked_current_wrists",
+        "future_wrists",
+        "camera_geometry",
+        "clock_alignment",
+        "pose_masks"
+      ],
+      "robot_joint_action_loss": "disabled_on_human_samples",
+      "loss": "custom_common_wrist_objective"
+    }
+  },
+  "representation_contract": {
+    "signal_dimensions": {
+      "Ds": null,
+      "Da": null,
+      "action_horizon": null,
+      "camera_count": null
+    },
+    "action_semantics": {
+      "absolute_or_delta": null,
+      "units": null,
+      "channel_order": null,
+      "target_command_or_other": null
+    },
+    "missing_action_policy": "capability=false; absent targets; never valid zero-filled actions",
+    "normalization": "fit only on train roots; native and common wrist stats separate",
+    "future_target_policy": "training branch only; no target leakage into current conditioning",
+    "encoder_compatibility": "equal vector width alone does not establish aligned semantics"
+  },
+  "split_contract": {
+    "group_by": [
+      "root_and_ancestors",
+      "session",
+      "scenario_instance",
+      "content_duplicate_family"
+    ],
+    "derivatives": "inherit parent split",
+    "final": "excluded from acquisition, normalization, generation and tuning",
+    "before_split": "canonicalize source/revision/recording/episode/time ranges; hash raw content and review duplicate families; split connected components",
+    "overlap_audit_receipt": null
+  },
+  "publication": {
+    "native_loader_compatibility": "not_validated",
+    "plan": "adapter to selected pinned model dataset format after compatibility gate"
+  },
+  "release_quality_receipt": "release-quality.template.json"
+}

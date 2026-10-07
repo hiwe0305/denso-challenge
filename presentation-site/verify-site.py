@@ -29,7 +29,7 @@ for ref in refs.local:
 
 app = (DIST / 'app.js').read_text()
 routes = re.findall(r"\['([a-z]+)','[^']+'\]", app.split('const main=')[0])
-assert len(routes) == len(set(routes)) == 12, routes
+assert len(routes) == len(set(routes)) == 13, routes
 for route in routes:
     assert f'function {route}()' in app, f'Missing route: {route}'
 for name in re.findall(r"(?:diagramViewer\('|assets/)([\w.-]+\.(?:svg|png))", app):
@@ -47,6 +47,9 @@ for media in manifest['media'].values():
         if url and not url.startswith(('https:', 'http:')):
             assert not url.startswith('/'), f'Root-relative media URL: {url}'
             assert (DIST / url).is_file(), f'Missing media: {url}'
+    digest = media.get('provenance', {}).get('assetSha256')
+    if digest:
+        assert hashlib.sha256((DIST / media['url']).read_bytes()).hexdigest() == digest, f"Changed paper figure: {media['url']}"
     for field, hash_field in (('playbackUrl', 'playbackSha256'), ('poster', 'posterSha256')):
         digest = media.get('provenance', {}).get(hash_field)
         if digest:
@@ -59,6 +62,24 @@ for asset in story_manifest['assets']:
     assert path.is_file(), f'Missing story asset: {asset["path"]}'
     assert hashlib.sha256(path.read_bytes()).hexdigest() == asset['sha256'], f'Stale story asset: {path.name}'
 story = json.loads((ROOT / story_manifest['storyFile']).read_text())
+assert story_manifest['storySha256'] == hashlib.sha256((ROOT / story_manifest['storyFile']).read_bytes()).hexdigest(), 'Stale story media content'
+published_data = (DIST / 'skill-plan-data.js').read_text()
+published_story = json.loads(published_data.split('const IDEA_STORY = ', 1)[1].removesuffix(';\n'))
+assert published_story == story, 'Interactive story differs from media authority'
+plan_dir = ROOT / 'docs/implementation-plan/skill-a1'
+published_spec = json.loads(published_data.split('const SKILL_PLAN_SPEC = ', 1)[1].split(';\nconst IDEA_STORY', 1)[0])
+assert published_spec == json.loads((plan_dir / 'task-spec.proposed.json').read_text())
+plan_manifest = json.loads((DIST / 'data/skill-a1-plan/manifest.json').read_text())
+for item in plan_manifest['files']:
+    source = plan_dir / item['name']
+    published = DIST / 'data/skill-a1-plan' / item['name']
+    assert source.read_bytes() == published.read_bytes()
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == item['sha256']
+from zipfile import ZipFile
+with ZipFile(DIST / 'assets/skill-a1-plan.zip') as plan_zip:
+    assert plan_zip.testzip() is None
+    for item in plan_manifest['files']:
+        assert plan_zip.read('skill-a1/' + item['name']) == (plan_dir / item['name']).read_bytes()
 assert set(story['scenes']) == {'visual', 'contact'}
 assert all(len(scenes) == 9 for scenes in story['scenes'].values())
 assert story_manifest['film']['durationSeconds'] == story['secondsPerScene'] * 9 == 72
@@ -86,4 +107,18 @@ node_ids = {n['id'] for n in audit['nodes']}
 assert all(set(f['targets']) <= node_ids and f['reasoning']['premises'] for f in audit['findings'])
 assert all(e['from'] in node_ids and e['to'] in node_ids for e in audit['edges'])
 assert not any(p.is_symlink() for p in DIST.rglob('*')), 'Pages artifact must not contain symlinks'
+# A valid ZIP CRC does not establish that its local document links are usable.
+from urllib.parse import urlsplit, unquote
+import posixpath
+with ZipFile(DIST / 'assets/idea-v3.1.zip') as dossier_zip:
+    names=set(dossier_zip.namelist())
+    assert {'IDEA.md','deliverables/DENSO-Noi-dung-form-y-tuong.md','docs/implementation-plan/skill-a1/README.md','examples/engineering-loop/README.md'} <= names
+    for name in names:
+        if not name.endswith('.md'): continue
+        for link in re.findall(r'\]\(([^)]+)\)',dossier_zip.read(name).decode()):
+            target=urlsplit(link.strip('<>'))
+            if target.scheme or not target.path: continue
+            resolved=posixpath.normpath(posixpath.join(posixpath.dirname(name),unquote(target.path)))
+            assert resolved in names, f'Package link missing: {name} -> {link}'
+assert json.loads((DIST/'data/pitch-pages.json').read_text())==json.loads((ROOT/'presentation-site/content/pitch-pages.json').read_text()), 'Stale route summaries'
 print(f'Validated {len(routes)} routes, {len(docs)} documents, 18 story scenes, 5 improvement cases and local publishing assets.')

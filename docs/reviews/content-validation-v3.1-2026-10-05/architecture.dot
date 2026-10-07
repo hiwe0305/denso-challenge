@@ -1,0 +1,44 @@
+digraph Audit {
+graph [rankdir=TB,bgcolor="white",fontname="DejaVu Sans",fontsize=18,pad="0.35",nodesep="0.35",ranksep="0.55",label="KIỂM ĐỊNH V3.1 · KIẾN TRÚC NATIVE ĐỀ XUẤT
+Reference đã chạy ≠ Native đã kiểm chứng",labelloc=t];
+node [shape=box,style="rounded,filled",fillcolor="#f1f3f6",color="#8290a2",fontname="DejaVu Sans",fontsize=12,margin="0.16,0.12"];
+edge [color="#617186",fontname="DejaVu Sans",fontsize=9,arrowsize=0.65];
+TASK [label="TASK\nTaskSpec / binding\nA5 · yêu cầu chưa khóa"];
+H [label="H\nHuman motion / RGB\nA2 · bridge chưa chọn"];
+R [label="R\nMẫu robot đích"];
+S [label="S\nSim-executed trajectories\nA3 · chưa port GR1"];
+QA [label="QA\nSource / label / split QA"];
+TRAIN [label="TRAIN\nLoss / modules / training\nA1 · native chưa chạy"];
+INPUT [label="INPUT\nRGB + instruction + state"];
+VLM [label="VLM\nVLM features + masks\nA4 · trace chưa thu"];
+IFACE [label="IFACE\nInterface / conditioning"];
+ACT [label="ACT\nAction Expert\nfinal action chunk"];
+EXEC [label="EXEC\nBinding / controller\ncommands → response"];
+SCORE [label="SCORE\nScorer độc lập\npass/fail/unknown/chưa tới"];
+EVID [label="EVID\nEvidence / engineer review\nA8 · demo chọn sẵn nhánh"];
+STUDY [label="STUDY\nFull-task / final / regression\nA6 · native chưa đo"];
+COST [label="COST\nChất lượng + tổng công\nA7 · chưa chứng minh saving"];
+MEDIA [label="MEDIA\nWebsite / video / storyboard\nA9 · media nhập môn cũ"];
+subgraph cluster_setup { label="0 · TASK VÀ ĐIỀU KIỆN"; style="rounded"; color="#cbd3df"; TASK;  }
+subgraph cluster_training { label="1 · TRAINING / DỮ LIỆU"; style="rounded"; color="#cbd3df"; H;R;S;QA;TRAIN; {rank=same;H;R;S;} }
+subgraph cluster_inference { label="2 · INFERENCE / THỰC THI"; style="rounded"; color="#cbd3df"; INPUT;VLM;IFACE;ACT;EXEC; {rank=same;INPUT;VLM;IFACE;ACT;EXEC;} }
+subgraph cluster_evaluation { label="3 · EVALUATION / QUYẾT ĐỊNH"; style="rounded"; color="#cbd3df"; SCORE;EVID;STUDY;COST; {rank=same;EVID;STUDY;COST;} }
+subgraph cluster_presentation { label="4 · PRESENTATION"; style="rounded"; color="#cbd3df"; MEDIA;  }
+H -> QA [style=dashed,label="A2 · target/loss qua bridge được kiểm"];
+R -> QA [label="robot targets / timing"];
+S -> QA [style=dashed,label="A3 · commands / response / outcome"];
+QA -> TRAIN [label="eligible release"];
+TRAIN -> VLM [style=dashed,label="checkpoint / modules được cập nhật"];
+TRAIN -> ACT [style=dashed,label="checkpoint / modules được cập nhật"];
+INPUT -> VLM [label="processed image / tokens"];
+VLM -> IFACE [label="features / masks"];
+IFACE -> ACT [label="conditioning + state / embodiment"];
+ACT -> EXEC [style=dashed,label="normalization / units / scheduling"];
+EXEC -> SCORE [label="measured response / scene state"];
+SCORE -> EVID [label="outcome + traces"];
+SCORE -> STUDY [label="all episodes / interventions"];
+STUDY -> COST [style=dashed,label="same-quality comparison + ledger"];
+EVID -> TRAIN [style=dashed,constraint=false,label="approved plan, chưa tự update"];
+TASK -> EXEC [style=dashed,label="profile / constraints / acceptance"];
+STUDY -> MEDIA [label="claims giới hạn theo evidence"];
+}

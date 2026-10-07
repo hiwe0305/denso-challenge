@@ -1,0 +1,629 @@
+{
+  "generator": "seed object/target frame waypoint transform and execute",
+  "attempts": [
+    {
+      "scenario": {
+        "id": "train-sim-0",
+        "object": [
+          0.10732542955128649,
+          -0.08814699629603219
+        ],
+        "target": [
+          0.020788037051649166,
+          -0.03429921516728947
+        ]
+      },
+      "success": true,
+      "steps": 46,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-1",
+        "object": [
+          -0.10691973238899874,
+          -0.029685750226808402
+        ],
+        "target": [
+          -0.02586078032630096,
+          0.028949208209734956
+        ]
+      },
+      "success": true,
+      "steps": 40,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-2",
+        "object": [
+          0.07037119597451741,
+          -0.126024689284855
+        ],
+        "target": [
+          -0.08854527103464986,
+          0.027077922186621833
+        ]
+      },
+      "success": true,
+      "steps": 47,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-3",
+        "object": [
+          -0.1515295238063713,
+          0.1294185570399739
+        ],
+        "target": [
+          0.11964460482025341,
+          -0.12043788700649555
+        ]
+      },
+      "success": true,
+      "steps": 49,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-4",
+        "object": [
+          0.01296353647047116,
+          0.028428435631726895
+        ],
+        "target": [
+          -0.17750643137486344,
+          -0.08343819278255901
+        ]
+      },
+      "success": true,
+      "steps": 47,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-5",
+        "object": [
+          -0.12392644740102546,
+          -0.009890943521195308
+        ],
+        "target": [
+          0.024121301841825316,
+          -0.012503601802340558
+        ]
+      },
+      "success": true,
+      "steps": 41,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-6",
+        "object": [
+          0.13272373123680936,
+          0.08188029378598097
+        ],
+        "target": [
+          -0.03558022038002104,
+          -0.077177995319924
+        ]
+      },
+      "success": true,
+      "steps": 49,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-7",
+        "object": [
+          -0.05816931690477757,
+          0.09412910942171546
+        ],
+        "target": [
+          -0.05442640035014712,
+          0.12767706173076343
+        ]
+      },
+      "success": true,
+      "steps": 41,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-8",
+        "object": [
+          0.012361405432571027,
+          -0.06842007816063425
+        ],
+        "target": [
+          0.057131029818425105,
+          0.04165889283286467
+        ]
+      },
+      "success": true,
+      "steps": 44,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-9",
+        "object": [
+          -0.005033425107312028,
+          -0.05743582736862074
+        ],
+        "target": [
+          0.046770550860420534,
+          -0.005410385844992802
+        ]
+      },
+      "success": true,
+      "steps": 42,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-10",
+        "object": [
+          0.042118197058089946,
+          0.010982472043094771
+        ],
+        "target": [
+          -0.13636398786378018,
+          0.10627188671150131
+        ]
+      },
+      "success": true,
+      "steps": 47,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-11",
+        "object": [
+          -0.17414749146823058,
+          -0.04920223648763543
+        ],
+        "target": [
+          -0.1183091178862526,
+          -0.04080700713941046
+        ]
+      },
+      "success": true,
+      "steps": 38,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-12",
+        "object": [
+          0.02995500977246937,
+          0.013217704787777146
+        ],
+        "target": [
+          0.07779430048179603,
+          -0.0027420291800731023
+        ]
+      },
+      "success": true,
+      "steps": 43,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-13",
+        "object": [
+          0.10610931935688461,
+          -0.039532816796528036
+        ],
+        "target": [
+          0.01729620810313609,
+          0.001154215606907677
+        ]
+      },
+      "success": true,
+      "steps": 46,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-14",
+        "object": [
+          -0.17250107185047925,
+          -0.07072547694282388
+        ],
+        "target": [
+          -0.1498833950481196,
+          -0.06530685437583997
+        ]
+      },
+      "success": true,
+      "steps": 37,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-15",
+        "object": [
+          -0.17776014725704672,
+          -0.05376584386176299
+        ],
+        "target": [
+          -0.04540058893353485,
+          0.03817412944533119
+        ]
+      },
+      "success": true,
+      "steps": 40,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-16",
+        "object": [
+          0.10686500298729623,
+          -0.0219725737250744
+        ],
+        "target": [
+          0.047400653717086766,
+          0.005138990237469165
+        ]
+      },
+      "success": true,
+      "steps": 45,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-17",
+        "object": [
+          -0.10155278843910444,
+          -0.07827948636711314
+        ],
+        "target": [
+          -0.017176592711455774,
+          0.07653449578251773
+        ]
+      },
+      "success": true,
+      "steps": 42,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-18",
+        "object": [
+          0.02171430970285712,
+          0.05182373496113496
+        ],
+        "target": [
+          0.0828807301423814,
+          0.031528975733814274
+        ]
+      },
+      "success": true,
+      "steps": 43,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-19",
+        "object": [
+          -0.09694177008566357,
+          -0.015157081812768813
+        ],
+        "target": [
+          0.0049161049901886855,
+          -0.1271108007818777
+        ]
+      },
+      "success": true,
+      "steps": 41,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-20",
+        "object": [
+          -0.07952844991054517,
+          -0.0365902446287964
+        ],
+        "target": [
+          -0.17627746786991227,
+          0.016163524759965853
+        ]
+      },
+      "success": true,
+      "steps": 41,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-21",
+        "object": [
+          0.006626879010862258,
+          -0.10673426728303505
+        ],
+        "target": [
+          -0.09027666176481587,
+          0.1051143104100091
+        ]
+      },
+      "success": true,
+      "steps": 47,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-22",
+        "object": [
+          -0.03099038086916639,
+          -0.06228195279112182
+        ],
+        "target": [
+          0.13056658615118438,
+          -0.01152539318189448
+        ]
+      },
+      "success": true,
+      "steps": 44,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    },
+    {
+      "scenario": {
+        "id": "train-sim-23",
+        "object": [
+          0.03261850115636253,
+          0.10500124374398795
+        ],
+        "target": [
+          0.016191918019222235,
+          -0.08904687384170465
+        ]
+      },
+      "success": true,
+      "steps": 47,
+      "timeout": false,
+      "stages": {
+        "approach": "pass",
+        "grasp": "pass",
+        "lift": "pass",
+        "transfer": "pass",
+        "place": "pass",
+        "release": "pass",
+        "retreat": "pass"
+      },
+      "policy_recipe": "seed_object_frame_transform_and_replay"
+    }
+  ]
+}

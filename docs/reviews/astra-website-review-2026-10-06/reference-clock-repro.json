@@ -1,0 +1,29 @@
+{
+  "scope": "Two existing valid reference rows, only timestamp mutated. Runs fit/reload in temporary directory, no simulator rollout or native model.",
+  "checks": [
+    {
+      "case": "reversed",
+      "step_indices": [
+        0,
+        1
+      ],
+      "outcome": "accepted"
+    },
+    {
+      "case": "duplicate",
+      "step_indices": [
+        0,
+        1
+      ],
+      "outcome": "accepted"
+    },
+    {
+      "case": "nonfinite",
+      "step_indices": [
+        0,
+        1
+      ],
+      "outcome": "accepted"
+    }
+  ]
+}

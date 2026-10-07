@@ -1,0 +1,10 @@
+activity_id,arm,skill,round,scope,activity,hours,rate,currency,compute_units,compute_unit_rate,evidence_ref,status
+proposal-setup,R_and_source,skill-a1,initial,one_time_setup,native_task_binding_scorer_integration,,,,,,,unmeasured
+proposal-robot,R,skill-a1,pilot,per_skill,seed_capture_calibration_reset_QA,,,,,,,unmeasured
+proposal-sim,R_plus_S,skill-a1,pilot,per_skill,generate_execute_reject_QA,,,,,,,unmeasured
+proposal-human,R_plus_H,skill-a1,human_pilot,per_skill,source_tracking_geometry_QA,,,,,,,unmeasured
+proposal-human-bridge,R_plus_H,skill-a1,human_pilot,one_time_setup,human_adapters_shared_trunk_loading,,,,,,,unmeasured
+proposal-train,R,skill-a1,pilot,per_skill,training_retries,,,,,,,unmeasured
+proposal-train-s,R_plus_S,skill-a1,pilot,per_skill,training_retries,,,,,,,unmeasured
+proposal-debug,R_and_source,skill-a1,pilot,study_R_and_D,trace_probes_correction,,,,,,,unmeasured
+proposal-eval,R_and_source,skill-a1,final,per_skill,evaluation_reset_annotation_report,,,,,,,unmeasured
