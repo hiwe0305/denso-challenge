@@ -1,14 +1,14 @@
 # 18 · Kết quả kỳ vọng và tiêu chuẩn bàn giao
 
 _Snapshot kỹ thuật từ [hồ sơ engineering](../idea-v3-2026-10-05/18-ket-qua-ky-vong.md); [IDEA.md](../IDEA.md) là bản trình bày gửi đánh giá, recipe mới nhất ở docs/implementation-plan/skill-a1._
-Phạm vi MVP đề xuất: GR1 gắp–đặt A1 trong mô phỏng. Native VLA, human transfer và savings chưa được đo. Dự kiến bốn đầu ra:
+Ưu tiên triển khai 07/10/2026: **PoC 30 ngày**, public task đúng nhãn trước, hướng tới model học được task và inference trên robot BTC khi hardware gate đạt. Một vòng dữ liệu từ lỗi tới release/candidate và before/after. Native training, robot thật, human transfer và savings chưa đo. [Lịch/bốn pipeline/gates hiện hành](../idea-v3-2026-10-05/08-ke-hoach-trien-khai.md). Thiết kế A1/source studies mở rộng giữ ở phụ lục, chưa bắt buộc trong tháng đầu. Dự kiến bốn đầu ra:
 
 | Bàn giao | Nội dung | Acceptance |
 |---|---|---|
-| Policy/SkillBundle A1 | Checkpoint, processor/stats, task/profile/controller/camera, code/config hashes, update/reload receipts | Learned closed-loop natural starts; full-task, regression và cycle theo owner/protocol đã khóa |
+| Policy/SkillBundle một task | Checkpoint, processor/stats, task/profile/controller/camera, code/config hashes, update/reload receipts | Learned closed-loop natural starts; full-task, regression và cycle theo owner/protocol đã khóa |
 | Dataset releases | Nguồn, targets/masks/timebase, provenance, roots/duplicate groups/splits và QA/coverage | Sample→batch đúng semantics; no prohibited overlap; requested/attempted/accepted gaps công khai |
 | Trace/scorer/decision receipts | Observation→action→command→response→outcome; facts/hypotheses/alternatives/decision | Giữ failure/unknown/timeout/intervention/no-gain; không auto-cause; temporal/binding checks đúng |
-| QualityCostReport | R/R+S pilot, total work tới quality threshold, setup/recurring và skill2 reuse | Cùng quality mới so saving; source effect và workflow selection effect có comparator riêng |
+| QualityCostReport | PoC baseline/candidate, full-task và total work. Source/workflow controls và skill2 reuse kiểm sau PoC | Cùng quality mới so saving; source effect và workflow selection effect có comparator riêng |
 
 ## Bằng chứng hiện có
 
@@ -18,4 +18,4 @@ Reference nhỏ thực thi trong MuJoCo, idealized state, scripted sequencer và
 
 ## Điều kiện tiếp tục
 
-Native feasibility và useful robot-only baseline trước source studies. Không đạt gate thì repair/rescope/defer với receipt. H/video là optional, không là điều kiện bắt buộc của MVP R+S. Robot thật/production cần acceptance phase riêng. Bộ hồ sơ nộp phải đồng bộ scope/budget/timeline/status; form Markdown và PowerPoint đã đồng bộ ngày 07/10/2026. PowerPoint hiện hành gồm 21 slide, dưới 15MB. Tên đội, thành viên và task owner còn cần bổ sung trước nộp.
+Native feasibility và useful robot-only baseline trước source studies. Không đạt gate thì repair/rescope/defer với receipt. H/video là optional, không là điều kiện bắt buộc của MVP R+S. Robot thật là đích PoC có hardware gate riêng; production cần nghiệm thu mở rộng. Bộ hồ sơ nộp phải đồng bộ scope/budget/timeline/status; form Markdown và PowerPoint đã đồng bộ ngày 07/10/2026. PowerPoint hiện hành gồm 24 slide, dưới 15MB. Bổ sung tên đội/thành viên. Robot/task/lịch tiếp cận chưa được BTC xác nhận ghi pending, không chờ thiết bị mới nộp ý tưởng.

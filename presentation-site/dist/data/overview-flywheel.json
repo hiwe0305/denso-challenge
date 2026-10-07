@@ -87,7 +87,7 @@
       "id": "robot",
       "title": "Robot + sim execution",
       "input": "MP4 + text + Parquet state/action",
-      "prepare": "Decode/sync RGB · tokenize text · normalize bằng train stats · sample action horizon",
+      "prepare": "Decode/sync RGB · tokenize text · xử lý state theo profile, action theo train stats · sample action horizon",
       "condition": "Current RGB/text → pretrained VLM → features; state + features + noisy actions/time → Action Expert → predicted velocity",
       "target": "Future actions + noise/time → flow target (actions − noise); mask valid",
       "train": "Native action loss → Action Expert + selected allowed adapters/visual modules. Flux baseline tune_llm=False, tune_visual=True theo config cần pin; R và R+S giữ cùng recipe.",
@@ -196,7 +196,7 @@
     "storageRate": 0.07,
     "priceSource": "https://www.runpod.io/pricing",
     "priceChecked": "2026-10-06",
-    "note": "Nhân công/giờ việc/accepted yield là giả định thay được. GPU là cap công suất thuê, chưa runtime đã benchmark hoặc bảo đảm config fits. Công QA attempts tính riêng; integration/preparation/report nằm trong 240 engineer-hours. Chưa gồm robot/cell, CPU riêng, phí dữ liệu/license, thuế, downtime và triển khai thật."
+    "note": "Ví dụ capacity budget sim trước đây, dùng A100 thuê; chưa là ngân sách PoC 30 ngày với RTX 3060 12GB + RTX 5090 và robot BTC. Nhân công/giờ việc/yield là giả định. GPU là cap, chưa runtime đo. Chưa gồm robot/cell, CPU riêng, phí dữ liệu/license, thuế, downtime. Actual ledger tháng đầu cần giờ người, GPU/điện, robot và vật tư."
   },
   "video": {
     "url": "https://www.youtube.com/watch?v=zKaeODg7xeE",
@@ -391,7 +391,7 @@
   "pitch": {
     "case": "Thêm một vị trí linh kiện. Robot gắp hụt.",
     "problem": "Đội kỹ sư phải kiểm lỗi, thu mẫu, reset, kiểm dữ liệu và thử lại. Thu thêm video chưa chắc cung cấp đúng tín hiệu để robot học.",
-    "scope": "Tình huống đề xuất: GR1 gắp–đặt vào ô A1 trong mô phỏng; chưa là khảo sát công đoạn DENSO.",
+    "scope": "PoC 13/10–11/11: model học từ dataset public đúng task trước, hướng tới inference trên robot BTC và một vòng data update. GPU có RTX 3060 12GB + 5090; hardware/lịch cấp chưa chốt. GR1/A1 trong sim là proxy nghiên cứu riêng.",
     "caseSteps": [
       {
         "title": "Chạy & ghi",

@@ -18,8 +18,8 @@ for(const [id,html] of Object.entries(rendered)){
 }
 assert.equal(new Set(h1s).size,13,'Distinct route questions');
 assert.match(rendered.business,/5\.187,20/);assert.match(rendered.business,/data-current-budget="pilot-sim"/);
-assert.match(rendered.outcomes,/Policy A1 \+ skill bundle/);assert.match(rendered.outcomes,/Dataset release/);
-assert.match(rendered.roadmap,/8–12 tuần/);assert.match(rendered.roadmap,/Nhánh tùy chọn/);
+assert.match(rendered.outcomes,/Policy một task \+ skill bundle/);assert.match(rendered.outcomes,/Dataset release/);
+assert.match(rendered.roadmap,/30 ngày cho PoC/);assert.match(rendered.roadmap,/13\/10–11\/11/);assert.match(rendered.roadmap,/Nộp 30\/11/);assert.match(rendered.roadmap,/Robot là điều kiện/);assert.match(rendered.roadmap,/sim pass chưa là physical pass/);
 assert.match(rendered.validation,/43,6%/);assert.match(rendered.validation,/96\/100/);
 assert.match(rendered.engine,/n1_5\/architecture\.svg/);assert.match(rendered.engine,/SELECTED NATIVE RUN/);
 assert.match(rendered.architecture,/ACQUISITION DECISION RECEIPT/);

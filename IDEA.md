@@ -2,13 +2,19 @@
 
 ## Data flywheel: tổ chức và dùng dữ liệu để cải thiện kỹ năng robot với tổng công có thể kiểm chứng
 
-**Bản gửi đánh giá idea — 06/10/2026.** Tài liệu này trình bày đề xuất hiện tại, cơ sở nghiên cứu, cách hệ thống dự kiến chạy và phép kiểm cần thực hiện. Số liệu bên ngoài được dẫn nguồn tại chỗ; mục tiêu triển khai là đề xuất của nhóm.
+**Bản gửi đánh giá idea — 07/10/2026.** Tài liệu này trình bày đề xuất hiện tại, cơ sở nghiên cứu, cách hệ thống dự kiến chạy và phép kiểm cần thực hiện. Số liệu bên ngoài được dẫn nguồn tại chỗ; mục tiêu triển khai là đề xuất của nhóm.
+
+## Mốc ưu tiên: PoC 30 ngày trước vòng thuyết trình
+
+**13/10–11/11/2026:** dùng dataset public đúng task để train/update/reload và eval ngay khi chờ robot BTC; hướng tới checkpoint học được task chạy closed-loop trên robot thật, cùng một vòng data flywheel có so sánh trước/sau. Một robot, một task, miền điều kiện giới hạn. GPU đã xác nhận: RTX 3060 12GB và RTX 5090; robot/camera/collector và lịch truy cập chưa chốt.
+
+[Lịch chính thức 2026](https://densohackathon.vn/): nộp ý tưởng 12/10, xét online 13–19/10, thuyết trình 16/11, chung kết 02/12. Làm PoC trong lúc chờ xét ý tưởng, buffer 12–15/11. Demo vật lý phụ thuộc hardware gate, không coi sim là hoàn thành mục tiêu ngoài đời. [Kế hoạch bốn pipeline/bốn tuần](idea-v3-2026-10-05/08-ke-hoach-trien-khai.md) là ưu tiên triển khai mới; thiết kế GR1/A1 đa nguồn bên dưới là nghiên cứu mở rộng khi đủ gates.
 
 ## 1. Idea trong một phút
 
 Khi vật, vị trí, ánh sáng hoặc tiếp xúc thay đổi, đội robot learning có thể phải lặp lại thu mẫu, reset, QA, training và evaluation. Có thêm video/variants chưa chắc có supervision phù hợp hoặc mở đúng coverage; chưa có số liệu hiện trạng một công đoạn DENSO đã khảo sát.
 
-Chúng tôi đề xuất **Data Core flywheel**: chạy và ghi evidence → kiểm giả thuyết → chọn data/can thiệp → QA release → train có phạm vi + replay → đo outcome/cost và quyết định vòng sau. MVP kế thừa pretrained VLA với robot demonstrations và sim executions đã QA; human motion/action-free video là pilots có gate riêng. Synthetic là cách tạo, latent là representation; loader dựa supervision thực có.
+Chúng tôi đề xuất **Data Core flywheel**: chạy và ghi evidence → kiểm giả thuyết → chọn data/can thiệp → QA release → train có phạm vi + replay → đo outcome/cost và quyết định vòng sau. PoC kế thừa pretrained VLA, bắt đầu bằng public robot demonstrations đúng task rồi adaptation lên robot BTC tương thích; human motion/action-free video là pilots có gate riêng. Synthetic là cách tạo, latent là representation; loader dựa supervision thực có.
 
 Khi robot thực hiện sai, hệ thống ghi lại bằng chứng xuyên suốt từ đầu vào, đặc trưng VLM, action dự đoán đến command thực thi và phản hồi robot. Kỹ sư dùng bằng chứng và phép thử có kiểm soát để chọn sửa hệ thống, bổ sung dữ liệu hoặc cập nhật mô hình. Sau mỗi thay đổi, robot được đánh giá lại cả task và các điều kiện trước đó đã làm tốt.
 
@@ -40,7 +46,7 @@ MVP chọn một ví dụ xuyên suốt:
 
 Task gồm tiếp cận → gắp → nâng/chuyển → đặt → nhả/rút. Đây là proxy cho thao tác công nghiệp, chưa phải công đoạn DENSO đã được xác nhận. Trước triển khai cần thống nhất lý do dùng humanoid cho công việc này so với robot arm hoặc giải pháp tự động hóa hiện có.
 
-Phạm vi đầu là rigid pick-and-place thô trong mô phỏng trên một robot/model đã khóa. Kích thước, lực, tolerance, cycle time và ngưỡng chấp nhận được chốt sau feasibility pilot. Lắp ghép chính xác, đồ mềm, di chuyển toàn thân và production deployment là các bước mở rộng.
+Proxy nghiên cứu A1 là rigid pick-and-place thô trong mô phỏng trên một robot/model đã khóa. PoC 30 ngày bắt đầu từ task đúng nhãn public, ưu tiên PnPBottleToCabinetClose; task vật lý chốt theo robot BTC, không đổi public labels thành A1. Kích thước, lực, tolerance, cycle time và ngưỡng chấp nhận được chốt sau feasibility pilot. Lắp ghép chính xác, đồ mềm, di chuyển toàn thân và production deployment là các bước mở rộng.
 
 Đầu ra dự kiến gồm:
 
@@ -103,7 +109,7 @@ Sơ đồ mô tả thiết kế đề xuất. Human motion branch phục vụ tr
 
 ### 5.1. Robot demonstrations: học điều khiển robot đích
 
-Trong MVP, R là demonstrations được thực thi trên embodiment robot đích **trong mô phỏng**. Đây chưa phải recordings trên hardware thật; sim-to-real và chi phí thu robot thật sẽ được kiểm ở bước mở rộng.
+Trong thiết kế nghiên cứu A1 bên dưới, R là demonstrations trên robot đích **trong mô phỏng**, chưa là hardware recordings. PoC 30 ngày dùng public task trước, hướng tới hardware BTC với real release/profile riêng; success sim không là bằng chứng sim-to-real.
 
 Mỗi episode cần camera frames, instruction, proprio/state, action targets đúng profile, timestamps và outcome. Controller mapping, units, action order, normalization và timebase phải được kiểm trước khi train.
 
@@ -252,3 +258,7 @@ Mở rộng ưu tiên sang một task thứ hai trên cùng robot, đo phần d�
 7. Đầu ra prototype và kế hoạch nguồn lực có đủ để đánh giá idea trong 12 tuần không?
 
 **Thông điệp đề xuất:** tận dụng kinh nghiệm người và mô phỏng để giảm công phát triển kỹ năng robot, đồng thời dùng bằng chứng từ execution để cải thiện đúng chỗ và đánh giá cả công việc. Nghiên cứu bên ngoài tạo cơ sở cho hướng đi; prototype của nhóm sẽ kiểm khả năng transfer, hiệu quả và giới hạn trong một phạm vi cụ thể.
+
+### Yêu cầu demo theo thể thức BTC
+
+[Trang thể thức](https://densohackathon.vn/challenges), đọc trực tiếp 07/10/2026: vòng 2 yêu cầu video demo tối đa 15 phút và pitch, thể hiện input/output, environment, thiết bị, data/resource và quy trình xử lý. Vòng 3 ghi mentoring/phát triển 20/10–02/12, hạn nộp trước 23:59:59 ngày 30/11 và demo trực tiếp 02/12. Giai đoạn phát triển hiển thị chồng với vòng 2, không phải ba tháng nối tiếp. Nộp slide PPTX hoặc Canva công khai ở vòng 3. Chưa thấy yêu cầu mọi video vòng 2 bắt buộc phải là robot thật; đây là mục tiêu mạnh hơn do nhóm đề xuất, phụ thuộc BTC cấp thiết bị.

@@ -16,6 +16,7 @@ function renderFlywheelOverview(){const d=OVERVIEW_FLYWHEEL,p=d.pitch,c=d.cost;
  </section>
  <div class="overview-effort" aria-label="Công việc phát sinh"><span>Thu / sửa mẫu</span><b>→</b><span>Reset + QA</span><b>→</b><span>Train + thử lại</span><strong>Giờ công + giờ máy</strong></div>
  <p class="thesis-scope">${esc(p.scope)}</p>
+ ${monthProofView()}
  <section class="thesis-section" id="overview-evidence">${thesisSection('01','Vì sao cần giải bài toán dữ liệu?','Dẫn chứng bên ngoài cho cơ hội nghiên cứu; chưa phải hiệu quả của dự án.')}
  <div class="thesis-evidence">${d.evidence.map(e=>`<article><span>${esc(e.label)}</span><strong>${esc(e.metric)}</strong><p>${esc(e.context)}</p><a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.source)} ↗</a></article>`).join('')}</div>
  <p class="overview-source-note"><a href="${esc(d.video.url)}" target="_blank" rel="noopener">Video nguồn đã đối chiếu transcript ↗</a> · Dẫn chứng Index / Helix; chưa kiểm trực quan toàn bộ video.</p>
@@ -31,8 +32,8 @@ function renderFlywheelOverview(){const d=OVERVIEW_FLYWHEEL,p=d.pitch,c=d.cost;
  </div>
  <p class="overview-hypothesis"><strong>Giả thuyết cần chứng minh:</strong> đạt cùng chất lượng với ít mẫu robot gốc hoặc tổng công thấp hơn đối chứng. Kiến trúc model và controller vẫn có thể là điểm nghẽn.</p>
  </section>
- <section class="thesis-section" id="overview-training">${thesisSection('03','Bắt đầu bằng robot data. Mở rộng có kiểm định.','MVP gắp–đặt A1: kiểm tương thích trước, rồi mới học và so sánh.')}
- <div class="overview-data-lineage"><article><small>MẪU GỐC · R_A1 · DỰ KIẾN THU</small><h3>Expert / correction robot đích</h3><p>GR1 sim: MP4 + Parquet + instruction + calibration.</p><strong>Tín hiệu: RGB / text / state / action</strong></article><div class="overview-derived-arrow" aria-label="Từ mẫu gốc tạo biến thể">Tạo biến thể<span>→</span></div><article><small>CÁCH TẠO · S_exec · CHƯA SINH</small><h3>Đổi điều kiện → execute → QA</h3><p>Ghi lại ảnh, state và action sau thực thi simulator.</p><strong>Cùng schema robot + nguồn gốc mẫu</strong></article></div>
+ <section class="thesis-section" id="overview-training">${thesisSection('03','Bắt đầu bằng robot data. Mở rộng có kiểm định.','PoC dùng public task đúng nhãn trước. A1 bên dưới là proxy nghiên cứu mở rộng.')}
+ <div class="overview-data-lineage"><article><small>PROXY A1 MỞ RỘNG · R_A1 · DỰ KIẾN THU</small><h3>Expert / correction robot đích</h3><p>GR1 sim: MP4 + Parquet + instruction + calibration.</p><strong>Tín hiệu: RGB / text / state / action</strong></article><div class="overview-derived-arrow" aria-label="Từ mẫu gốc tạo biến thể">Tạo biến thể<span>→</span></div><article><small>CÁCH TẠO · S_exec · CHƯA SINH</small><h3>Đổi điều kiện → execute → QA</h3><p>Ghi lại ảnh, state và action sau thực thi simulator.</p><strong>Cùng schema robot + nguồn gốc mẫu</strong></article></div>
  <p class="overview-source-note"><strong>Synthetic là cách tạo dữ liệu.</strong> Augmentation chỉ giữ nhãn khi hợp lệ; sim execution tạo trajectory và nhãn mới. Generated video có thể thiếu action.</p>
  <div class="overview-training-path">${[['0','Kiểm tương thích','Checkpoint + public GR1 sample'],['1','Học baseline R','Mẫu robot đích → action loss'],['2','Học candidate R+S','Biến thể QA + replay → update'],['3','Eval → inference','Reload → rollout → chấm task']].map(([n,t,b])=>`<article><span>${n}</span><h3>${t}</h3><p>${b}</p></article>`).join('')}</div>
  <p class="overview-source-note">Train: VLM mã hóa ảnh/text; Action Expert học future action targets. Chỉ cập nhật modules theo recipe đã chốt. Inference dùng quan sát hiện tại và history theo config, không đọc future ground truth.</p>
@@ -45,7 +46,7 @@ function renderFlywheelOverview(){const d=OVERVIEW_FLYWHEEL,p=d.pitch,c=d.cost;
  <section class="thesis-section overview-proof" id="overview-validation">${thesisSection('05','Chứng minh bằng task, dữ liệu và tổng công','So R với R+S cùng recipe và phạm vi cập nhật; kiểm giá trị chọn dữ liệu bằng đối chứng riêng.')}
  <div class="overview-measures"><article><h3>Robot làm tốt hơn?</h3><p>Hoàn thành toàn task, điều kiện mới và regression; không chỉ loss giảm.</p></article><article><h3>Dữ liệu có ích hơn?</h3><p>Đếm mẫu gốc và coverage; biến thể không thành demonstrations độc lập.</p></article><article><h3>Tổng công có giảm?</h3><p>So tại cùng yêu cầu chất lượng; tính cả vòng không có gain.</p></article></div>
  <p class="overview-source-note">Reference MuJoCo nhỏ đã chạy, chưa VLM/GR1. Native A1, human transfer và savings chưa đo. Chọn trên development; final độc lập ngoài vòng tune.</p>
- <div class="overview-next"><div><strong>Đầu ra dự kiến</strong><span>Dataset release · policy / skill bundle · trace / scorer · báo cáo chất lượng–chi phí.</span></div><div><strong>Pilot 8–12 tuần có điều kiện</strong><span>Phụ thuộc baseline và nguồn lực; human/video và robot thật có gate riêng.</span></div></div>
+ <div class="overview-next"><div><strong>Đầu ra dự kiến</strong><span>Dataset release · policy / skill bundle · trace / scorer · báo cáo chất lượng–chi phí.</span></div><div><strong>PoC 30 ngày, hardware có gate</strong><span>Public data trước, hướng tới robot thật trước 16/11; robot do BTC bố trí. Human/video là mở rộng.</span></div></div>
  <div class="thesis-inline-links"><a class="button" href="#validation">Thiết kế kiểm chứng →</a><a href="#outcomes">Đầu ra & tiêu chí →</a><a href="#roadmap">Lộ trình →</a><a href="data/denso-form-draft.md" download>Tải nội dung form ↓</a></div>
  </section>
  </div>`;
