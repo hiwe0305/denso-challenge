@@ -1,13 +1,23 @@
-# 08 · PoC 30 ngày: dữ liệu có sẵn trước, hướng tới robot thật
+# 08 · Ước lượng 30 ngày để MVP sản phẩm vận hành đầu-cuối
 
 _Snapshot kỹ thuật từ [hồ sơ engineering](../idea-v3-2026-10-05/08-ke-hoach-trien-khai.md); [IDEA.md](../IDEA.md) là bản trình bày gửi đánh giá, recipe mới nhất ở docs/implementation-plan/skill-a1._
-**Ưu tiên cập nhật 07/10/2026.** Đội xác nhận có RTX 3060 12GB và RTX 5090. Robot/camera/collector phụ thuộc BTC, chưa biết embodiment hoặc ngày tiếp cận. Mục tiêu là một model học task và chạy closed-loop ngoài đời, cùng một vòng data flywheel tối thiểu. Chưa có native training/rollout của đội.
+**Ưu tiên cập nhật 07/10/2026.** Đội xác nhận có RTX 3060 12GB và RTX 5090. Robot/camera/collector phụ thuộc BTC, chưa biết embodiment hoặc ngày tiếp cận. Mục tiêu là **bản MVP sản phẩm nối Data Core và Model Engine chạy đầu-cuối**, gồm dữ liệu, training, evaluation, inference và vòng phản hồi dữ liệu. Model học task/chạy closed-loop ngoài đời là bằng chứng kiểm tính khả thi của MVP; không diễn giải 30 ngày là thời gian để model học một task. Chưa có native training/rollout của đội.
 
 ## 1. Kết quả sau tháng đầu
 
-Một dataset release đúng task, checkpoint fine-tune nạp lại được, evaluation trên môi trường tương ứng, trace lỗi và candidate sau data update. Đầu ra đích là video **robot thật** thực hiện task bằng policy học được, báo cáo mọi lượt thử và công đã dùng. Chỉ có sim thì ghi rõ hoàn thành phần sim, chưa đạt physical demo.
+Một MVP chạy được luồng **nhập dataset → QA/release → gọi training → quản lý checkpoint → gọi evaluation → inference → thu trace → quyết định dữ liệu → release mới/train lại → so sánh**. Kế thừa trainer/runner của FluxVLA, đội tích hợp các bước cùng IDs/artifacts và đường vận hành lặp lại; website chỉ đọc tài liệu chưa thay MVP này. Kèm dataset release, checkpoint nạp lại, evaluation, trace và candidate sau data update. Đầu ra đích là video **robot thật** thực hiện task bằng policy học được, báo cáo mọi lượt thử và công đã dùng. Chỉ có sim thì ghi rõ hoàn thành phần sim, chưa đạt physical demo.
 
 Phạm vi demo cuối: một embodiment, một task thao tác cứng, một miền khởi đầu đã khóa. GR1 public là tuyến kiểm pipeline ban đầu. Nếu robot BTC khác, không cam kết tái sử dụng checkpoint GR1 hoặc hoàn thành hai task trong tháng; demo cuối chốt một robot/task tương thích riêng. Task public ưu tiên `PnPBottleToCabinetClose` trong FluxVLAData/RoboCasa GR1, giữ đúng instruction và task scorer. Task gắp linh kiện vào A1 là **proxy thiết kế riêng**, không phải nhãn mới cho public episodes và chưa nằm trên đường bắt buộc tháng đầu. Nếu robot BTC khác GR1, phải chốt task/policy/dataset tương thích robot đó; thành công public GR1 không chứng minh chuyển embodiment.
+
+## Tiêu chí nghiệm thu MVP sản phẩm
+
+- Data Core nhập một public dataset được hỗ trợ, kiểm schema/QA/splits và phát hành release có ID/provenance.
+- Từ release, người dùng chạy được training và evaluation qua cấu hình/điểm gọi engine thống nhất. Sản phẩm ghi job status, config, logs, checkpoint và kết quả; không chỉ hướng dẫn copy lệnh rời rạc.
+- Từ checkpoint/profile, chạy inference trong môi trường test và tiếp nhận trace theo cùng run ID. Robot thật là đích demo có điều kiện hardware, báo riêng với sim.
+- Kỹ sư xem một failure bucket, ghi quyết định reuse/correction/repair, tạo release/candidate mới với replay rồi xem so sánh quality/cost/regression.
+- Gói cấu hình và hướng dẫn chạy lại toàn luồng từ release đã khóa. Video demo thể hiện thao tác sản phẩm, input/output và artifacts chuyển giữa các bước, ngoài video robot.
+
+MVP có thể dùng một operator và một workspace, thin UI hoặc CLI/API thống nhất với status/report; chưa cần multi-user platform, distributed trainer tự xây hoặc tự động kết luận nguyên nhân. **Một robot/task là test case của sản phẩm.** Mốc 30 ngày là ước lượng engineering/integration có điều kiện, không là số ngày training hoặc cam kết mọi model phải học xong sau 30 ngày.
 
 ## 2. Mapping lịch ba vòng
 
@@ -52,15 +62,15 @@ Ngay tuần 1 lấy robot model/SDK, gripper, action space/units/frequency, came
 
 | Mốc | Việc bắt buộc | Điều kiện tiếp tục / bàn giao |
 |---|---|---|
-| Tuần 1 · 13–19/10 | P1 + P2 smoke, pretrained baseline; khóa public task, robot request, code/checkpoint. Đo VRAM/throughput. | Batch/update/reload đúng. Cuối tuần khóa recipe khả thi và tình trạng hardware; chưa được thì repair/thu hẹp ngay. |
-| Tuần 2 · 20–26/10 | Fine-tune public baseline, P3 sim/eval; tiếp cận bridge robot nếu có. | Checkpoint learned baseline, all-trial sim report. **26/10:** cần quyền truy cập robot, profile/task đã chốt, camera/controller đọc–ghi được và recipe tương thích đã update/reload để nhận mục tiêu physical demo trước 16/11; thiếu thì lịch vật lý tiếp tục có điều kiện. |
-| Tuần 3 · 27/10–02/11 | Tích hợp/adapt robot đúng profile nếu có. P4 chọn một failure bucket, correction/reuse + replay. | Candidate, release v2 và development before/after. Nếu chưa đủ để chọn train scope thì kiểm tiếp, không gán nguyên nhân. |
-| Tuần 4 · 03–09/11, chốt 10–11/11 | Freeze parent/candidate/checkpoint/profile/scorer. Final giữ riêng, báo cáo, video và gói nạp lại. | Ghi mọi fail/unknown/timeout/intervention. Hardware kết quả riêng; final không quay lại tune. |
+| Tuần 1 · 13–19/10 | Data Core nhập/QA/release + run/job IDs và P2 smoke, pretrained baseline; khóa public task, robot request, code/checkpoint. Đo VRAM/throughput. | Batch/update/reload đúng. Cuối tuần khóa recipe khả thi và tình trạng hardware; chưa được thì repair/thu hẹp ngay. |
+| Tuần 2 · 20–26/10 | Model Engine nối release → train job → checkpoint → eval job/report, P3 sim/eval; tiếp cận bridge robot nếu có. | Checkpoint learned baseline, all-trial sim report. **26/10:** cần quyền truy cập robot, profile/task đã chốt, camera/controller đọc–ghi được và recipe tương thích đã update/reload để nhận mục tiêu physical demo trước 16/11; thiếu thì lịch vật lý tiếp tục có điều kiện. |
+| Tuần 3 · 27/10–02/11 | Inference/trace và quyết định dữ liệu nối vào sản phẩm. Tích hợp/adapt robot khi có. P4 chọn một failure bucket, release mới, correction/reuse + replay. | Candidate, release v2 và development before/after. Nếu chưa đủ để chọn train scope thì kiểm tiếp, không gán nguyên nhân. |
+| Tuần 4 · 03–09/11, chốt 10–11/11 | Nghiệm thu luồng sản phẩm chạy lặp lại, freeze parent/candidate/profile/scorer. Final giữ riêng, video toàn luồng và gói nạp lại. | Ghi mọi fail/unknown/timeout/intervention. Hardware kết quả riêng; final không quay lại tune. |
 | 12–15/11 | Buffer cho packaging và tập thuyết trình | Sửa kỹ thuật sau final nếu ảnh hưởng policy/profile phải chạy fresh final, không sửa rồi dùng kết quả cũ |
 
 ## 7. Ba mức bằng chứng
 
-**A · Model học task:** có gradient/weights update, checkpoint nạp lại và full-task closed-loop trên starts giữ riêng, so pretrained parent với fine-tuned baseline. Pretrained đã làm tốt mà không gain thì không nhận năng lực sẵn có là do dữ liệu mới. Loss giảm/video playback không đủ.
+**A · Sản phẩm vận hành và model học task:** MVP đi qua các bước nghiệm thu bên trên với IDs/artifacts nối được và chạy lại được. Riêng model: có gradient/weights update, checkpoint nạp lại và full-task closed-loop trên starts giữ riêng, so pretrained parent với fine-tuned baseline. Pretrained đã làm tốt mà không gain thì không nhận năng lực sẵn có là do dữ liệu mới. Loss giảm/video playback không đủ.
 
 **B · Model chạy ngoài đời:** cùng policy bundle tương thích tạo commands thật, nhận quan sát mới. Đề xuất small final **20 lượt cho mỗi baseline/candidate**, cùng danh sách starts giữ riêng, cân bằng thứ tự/reset. Gate PoC dự thảo candidate ≥16/20 successes không can thiệp trong timeout đã khóa; công bố độ bất định và toàn bộ failures. 16/20 là chỉ tiêu planning cần owner chốt, không bằng chứng true success ≥80% hay chuẩn sản xuất.
 

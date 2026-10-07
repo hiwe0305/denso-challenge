@@ -1,6 +1,6 @@
 # Nội dung điền form DENSO · Robot Skill Data Flywheel
 
-**Cập nhật 07/10/2026.** Mục tiêu mới là PoC 30 ngày: model học task từ dữ liệu có sẵn trước, hướng tới inference trên robot thật do BTC bố trí. Native training và robot demo của đội chưa thực hiện. Kế hoạch sim 8–12 tuần trước đây là tham khảo mở rộng, không thay thế mục tiêu vật lý.
+**Cập nhật 07/10/2026.** **Ước lượng 30 ngày để bản sản phẩm MVP vận hành đầu-cuối:** Data Core nối Model Engine, evaluation, inference và phản hồi dữ liệu. Demo model học task/chạy robot là phép kiểm sản phẩm, không phải toàn bộ sản phẩm. Dùng public data trước; robot do BTC bố trí. Native training và robot demo của đội chưa thực hiện. Kế hoạch sim 8–12 tuần trước đây là tham khảo mở rộng, không thay thế mục tiêu vật lý.
 
 ## Danh mục quan tâm
 
@@ -16,7 +16,7 @@ Khi đưa robot sang vật hoặc vị trí thao tác mới, kỹ sư thường 
 
 ### Mục đích của giải pháp
 
-Xây vòng cải thiện kỹ năng robot từ dữ liệu thực thi. **Trong 30 ngày, mục tiêu là model học được một task, nạp checkpoint chạy lại và hoàn thành một vòng cải thiện từ lỗi. Đích demo là inference trên robot thật**, phụ thuộc BTC cung cấp robot và thông số tích hợp đủ sớm. Dùng dữ liệu có sẵn để phát triển trước khi nhận thiết bị, với một robot/task và miền điều kiện giới hạn. Demo kiểm tính khả thi; lợi ích tiết kiệm và mở rộng cần kiểm tiếp. GR1 public là bước kiểm pipeline, không cam kết chuyển checkpoint sang robot BTC bất kỳ hoặc làm hai task trong tháng.
+Xây vòng cải thiện kỹ năng robot từ dữ liệu thực thi. **Ước lượng 30 ngày để sản phẩm MVP chạy được luồng dữ liệu → training → evaluation → inference → phản hồi lỗi → cập nhật dữ liệu và học lại.** Model học task và inference trên robot thật là tiêu chí demo kiểm tính khả thi của sản phẩm, phụ thuộc BTC cung cấp robot và thông số tích hợp đủ sớm. Dùng dữ liệu có sẵn để phát triển sản phẩm trước khi nhận thiết bị. Một robot/task trong miền giới hạn là phạm vi kiểm chứng MVP, không phải định nghĩa của sản phẩm. Demo kiểm tính khả thi; lợi ích tiết kiệm và mở rộng cần kiểm tiếp. GR1 public là bước kiểm pipeline, không cam kết chuyển checkpoint sang robot BTC bất kỳ hoặc làm hai task trong tháng.
 
 ### Công nghệ sử dụng
 
@@ -35,7 +35,7 @@ Human/action-free video và FOCA có objectives riêng, nằm ở hướng mở 
 
 ### Dữ liệu đầu ra
 
-Checkpoint đã fine-tune kèm recipe, processor/stats và robot profile để nạp lại; dataset có phiên bản/QA; báo cáo baseline/candidate; traces và video task. Đầu ra đích là video **robot thật chạy policy học được**, khi điều kiện hardware đạt. Inference tạo action chunks, controller chuyển thành lệnh, scorer đo outcome riêng. Báo cáo ghi toàn bộ số lần thử, thành công/lỗi/can thiệp, độ trễ và công/GPU thực dùng; phân biệt kết quả sim với hardware.
+**Bản MVP vận hành được** gồm nhập/QA/phát hành dataset, gọi job training/evaluation qua Model Engine, quản lý checkpoint và cấu hình inference, tiếp nhận trace, ghi quyết định dữ liệu và so sánh lần cập nhật. Bàn giao kèm checkpoint/recipe/processor/stats/robot profile để nạp lại, dataset có phiên bản, báo cáo baseline/candidate và video demo toàn luồng. Đầu ra đích là video **robot thật chạy policy học được**, khi điều kiện hardware đạt. Inference tạo action chunks, controller chuyển thành lệnh, scorer đo outcome riêng. Báo cáo ghi toàn bộ số lần thử, thành công/lỗi/can thiệp, độ trễ và công/GPU thực dùng; phân biệt kết quả sim với hardware.
 
 ## 3. Quy trình thực hiện công việc
 
@@ -55,7 +55,7 @@ Vòng data flywheel: **chạy → bằng chứng lỗi → chọn dữ liệu �
 
 ## 4. Hiệu quả mang lại
 
-Tháng đầu kiểm model học task và pipeline dữ liệu–training–evaluation–inference chạy được. So policy trước adaptation, baseline sau fine-tuning và candidate sau data update để tránh nhận năng lực pretrained là kết quả học mới. Báo cáo full-task, lỗi/can thiệp, độ trễ, unique demonstrations và tổng công.
+Tháng đầu kiểm **sản phẩm vận hành toàn luồng**, với run/release/checkpoint IDs nối được từ đầu vào đến kết quả và vòng cải thiện tiếp theo. Model học task/chạy robot thật kiểm hiệu lực của luồng này; riêng một video robot làm được task chưa đủ nghiệm thu sản phẩm. So policy trước adaptation, baseline sau fine-tuning và candidate sau data update để tránh nhận năng lực pretrained là kết quả học mới. Báo cáo full-task, lỗi/can thiệp, độ trễ, unique demonstrations và tổng công.
 
 Khi có hardware, đề xuất final nhỏ **20 lượt robot thật cho mỗi baseline/candidate**, cùng danh sách điều kiện khởi đầu giữ riêng, cân bằng thứ tự và reset. Mục tiêu PoC dự thảo cho candidate: **ít nhất 16/20 lượt hoàn thành không can thiệp trong timeout đã chốt**. Báo cả độ bất định; đây không là chuẩn tin cậy sản xuất. Nếu candidate không cải thiện, báo no-gain. Nếu chỉ hoàn thành sim, ghi rõ chưa đạt mục tiêu demo thật. Train/inference chạy được chưa chứng minh flywheel tiết kiệm hơn cách thu thông thường.
 
@@ -69,14 +69,14 @@ Nguồn lực đã xác nhận: RTX 3060 12GB và RTX 5090; robot phụ thuộc 
 
 ## 6. Kế hoạch triển khai trong bao lâu
 
-**PoC 30 ngày, 13/10–11/11/2026**, dự phòng 12–15/11, hướng tới demo thật trước thuyết trình 16/11. Phát triển bằng dữ liệu public ngay khi chờ BTC; mốc hardware phải thống nhất với BTC.
+**Ước lượng 30 ngày phát triển MVP sản phẩm**, minh họa theo cửa sổ 13/10–11/11/2026, dự phòng 12–15/11. Mục tiêu là demo luồng sản phẩm và kiểm model/robot trước thuyết trình 16/11; đây là ước lượng triển khai, không phải thời gian model cần học một task. Phát triển bằng dữ liệu public ngay khi chờ BTC; mốc hardware phải thống nhất với BTC.
 
 | Thời gian | Pipeline / công việc | Bằng chứng bàn giao |
 |---|---|---|
-| Tuần 1 · 13–19/10 | Audit public task, loader/splits, GPU batch/update/reload. Lấy thông số và lịch robot BTC. | Dataset v1 đúng nhãn, receipt update/nạp lại, baseline pretrained. Chốt recipe theo VRAM thực. |
-| Tuần 2 · 20–26/10 | Fine-tune từ public data, closed-loop evaluation trong sim tương ứng. Kiểm robot bridge nếu đã có thiết bị. | Checkpoint baseline, video/traces sim, kết quả held-out. 26/10 kiểm quyền truy cập, profile/task, camera/controller I/O và recipe update/reload để chốt lịch physical demo. |
-| Tuần 3 · 27/10–02/11 | Robot-compatible adaptation/inference nếu có hardware. Chọn một failure bucket, reuse/correction có mục tiêu, train với replay. | Release v2, candidate, video development và before/after. Ghi rõ sim hay robot thật. |
-| Tuần 4 · 03–09/11; hoàn tất 10–11/11 | Freeze checkpoint/profile/scorer rồi final giữ riêng. | Video task, số lần thử/báo cáo chất lượng–công, gói nạp lại. Final robot thật khi hardware gate đạt. |
+| Tuần 1 · 13–19/10 | Data Core: nhập public data, QA/version/splits. Nối run/job IDs với engine, smoke GPU/update/reload. Lấy thông số/lịch robot BTC. | Dataset v1 đúng nhãn, receipt update/nạp lại, baseline pretrained. Chốt recipe theo VRAM thực. |
+| Tuần 2 · 20–26/10 | Model Engine: gọi training và evaluation từ release, lưu/nạp checkpoint và trả kết quả về sản phẩm. Kiểm robot bridge khi có thiết bị. | Checkpoint baseline, video/traces sim, kết quả held-out. 26/10 kiểm quyền truy cập, profile/task, camera/controller I/O và recipe update/reload để chốt lịch physical demo. |
+| Tuần 3 · 27/10–02/11 | Inference + feedback: nối runtime, trace và màn/báo cáo lỗi. Chọn data update, release v2 và gọi học lại với replay. Hardware adaptation khi đủ điều kiện. | Release v2, candidate, video development và before/after. Ghi rõ sim hay robot thật. |
+| Tuần 4 · 03–09/11; hoàn tất 10–11/11 | Tích hợp/nghiệm thu sản phẩm đầu-cuối, freeze checkpoint/profile/scorer rồi final giữ riêng. | MVP chạy lặp lại được, video toàn luồng, báo cáo chất lượng–công và gói nạp lại. Robot thật là phép kiểm khi hardware gate đạt. |
 
 Robot/controller/camera/collector phù hợp nên có chậm nhất tuần 2 để còn thời gian adaptation và test; đây là **giả định planning cần BTC xác nhận**, không bảo đảm hai tuần đủ cho một robot mới. Nếu chưa có quyền truy cập hoặc profile không tương thích, trình bày PoC sim đã đạt và kế hoạch robot thật có ngày phụ thuộc, không gọi mô phỏng là hoàn thành mục tiêu vật lý.
 

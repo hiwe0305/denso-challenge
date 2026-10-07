@@ -4,9 +4,9 @@
 
 **Bản gửi đánh giá idea — 07/10/2026.** Tài liệu này trình bày đề xuất hiện tại, cơ sở nghiên cứu, cách hệ thống dự kiến chạy và phép kiểm cần thực hiện. Số liệu bên ngoài được dẫn nguồn tại chỗ; mục tiêu triển khai là đề xuất của nhóm.
 
-## Mốc ưu tiên: PoC 30 ngày trước vòng thuyết trình
+## Mốc ưu tiên: ước lượng 30 ngày để MVP sản phẩm hoạt động
 
-**13/10–11/11/2026:** dùng dataset public đúng task để train/update/reload và eval ngay khi chờ robot BTC; hướng tới checkpoint học được task chạy closed-loop trên robot thật, cùng một vòng data flywheel có so sánh trước/sau. Một robot, một task, miền điều kiện giới hạn. GPU đã xác nhận: RTX 3060 12GB và RTX 5090; robot/camera/collector và lịch truy cập chưa chốt.
+**Ước lượng 30 ngày phát triển MVP đầu-cuối**, cửa sổ minh họa 13/10–11/11/2026: Data Core nhập/QA/release dataset, Model Engine chạy training/evaluation/checkpoint, inference trả trace để chọn data update và học/đo lại. Dùng public data ngay khi chờ robot BTC. Model học task/chạy robot thật là phép kiểm sản phẩm; một robot/task là test case ban đầu, không phải toàn bộ sản phẩm. GPU đã xác nhận: RTX 3060 12GB và RTX 5090; robot/camera/collector và lịch truy cập chưa chốt.
 
 [Lịch chính thức 2026](https://densohackathon.vn/): nộp ý tưởng 12/10, xét online 13–19/10, thuyết trình 16/11, chung kết 02/12. Làm PoC trong lúc chờ xét ý tưởng, buffer 12–15/11. Demo vật lý phụ thuộc hardware gate, không coi sim là hoàn thành mục tiêu ngoài đời. [Kế hoạch bốn pipeline/bốn tuần](idea-v3-2026-10-05/08-ke-hoach-trien-khai.md) là ưu tiên triển khai mới; thiết kế GR1/A1 đa nguồn bên dưới là nghiên cứu mở rộng khi đủ gates.
 

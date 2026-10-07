@@ -391,7 +391,7 @@
   "pitch": {
     "case": "Thêm một vị trí linh kiện. Robot gắp hụt.",
     "problem": "Đội kỹ sư phải kiểm lỗi, thu mẫu, reset, kiểm dữ liệu và thử lại. Thu thêm video chưa chắc cung cấp đúng tín hiệu để robot học.",
-    "scope": "PoC 13/10–11/11: model học từ dataset public đúng task trước, hướng tới inference trên robot BTC và một vòng data update. GPU có RTX 3060 12GB + 5090; hardware/lịch cấp chưa chốt. GR1/A1 trong sim là proxy nghiên cứu riêng.",
+    "scope": "Ước lượng 30 ngày để MVP sản phẩm chạy từ dữ liệu → training/eval → inference → trace → data update. Một task là test case. Public data trước, robot BTC có gate. RTX 3060 12GB + 5090 đã có.",
     "caseSteps": [
       {
         "title": "Chạy & ghi",

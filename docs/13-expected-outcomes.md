@@ -1,7 +1,7 @@
 # 18 · Kết quả kỳ vọng và tiêu chuẩn bàn giao
 
 _Snapshot kỹ thuật từ [hồ sơ engineering](../idea-v3-2026-10-05/18-ket-qua-ky-vong.md); [IDEA.md](../IDEA.md) là bản trình bày gửi đánh giá, recipe mới nhất ở docs/implementation-plan/skill-a1._
-Ưu tiên triển khai 07/10/2026: **PoC 30 ngày**, public task đúng nhãn trước, hướng tới model học được task và inference trên robot BTC khi hardware gate đạt. Một vòng dữ liệu từ lỗi tới release/candidate và before/after. Native training, robot thật, human transfer và savings chưa đo. [Lịch/bốn pipeline/gates hiện hành](../idea-v3-2026-10-05/08-ke-hoach-trien-khai.md). Thiết kế A1/source studies mở rộng giữ ở phụ lục, chưa bắt buộc trong tháng đầu. Dự kiến bốn đầu ra:
+Ưu tiên triển khai 07/10/2026: **Ước lượng 30 ngày phát triển MVP sản phẩm đầu-cuối**, gồm Data Core, engine jobs/checkpoints, eval/inference và feedback data. Một task là test case; model học task/robot inference kiểm tính khả thi khi hardware gate đạt. Một vòng dữ liệu từ lỗi tới release/candidate và before/after. Native training, robot thật, human transfer và savings chưa đo. [Lịch/bốn pipeline/gates hiện hành](../idea-v3-2026-10-05/08-ke-hoach-trien-khai.md). Thiết kế A1/source studies mở rộng giữ ở phụ lục, chưa bắt buộc trong tháng đầu. Dự kiến bốn đầu ra:
 
 | Bàn giao | Nội dung | Acceptance |
 |---|---|---|
