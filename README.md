@@ -12,7 +12,7 @@ Hệ thống đề xuất giúp đội AI/robotics phát triển kỹ năng robo
 - [Hồ sơ engineering](idea-v3-2026-10-05/README.md): contracts, nguồn và bằng chứng reference.
 - [Reference code và kết quả](examples/engineering-loop/README.md): một bản code/results duy nhất trong repository.
 - [Đối chiếu video và nguồn số liệu](docs/research/video-zKaeODg7xeE-2026-10-06/README.md).
-- [PowerPoint mới nhất](deliverables/DENSO-Humanoid-Skill-A1-Review-2026-v2.pptx).
+- [PowerPoint mới nhất](deliverables/DENSO-Humanoid-Data-Flywheel-2026.pptx).
 - [Website và cách chạy](presentation-site/README.md).
 - [Phản hồi nhận xét kiến trúc và quyết định cập nhật](docs/reviews/architecture-feedback-response-2026-10-06.md).
 - [Data Core flywheel](idea-v3-2026-10-05/03-workflow-du-lieu.md): execution → evidence → acquisition → QA → training → evaluation; mở trên website tại `#architecture`.

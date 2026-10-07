@@ -18,4 +18,4 @@ Reference nhỏ thực thi trong MuJoCo, idealized state, scripted sequencer và
 
 ## Điều kiện tiếp tục
 
-Native feasibility và useful robot-only baseline trước source studies. Không đạt gate thì repair/rescope/defer với receipt. H/video là optional, không là điều kiện bắt buộc của MVP R+S. Robot thật/production cần acceptance phase riêng. Bộ hồ sơ nộp phải đồng bộ scope/budget/timeline/status; form Markdown hiện là draft, deck cũ chưa thay bằng bản nộp mới.
+Native feasibility và useful robot-only baseline trước source studies. Không đạt gate thì repair/rescope/defer với receipt. H/video là optional, không là điều kiện bắt buộc của MVP R+S. Robot thật/production cần acceptance phase riêng. Bộ hồ sơ nộp phải đồng bộ scope/budget/timeline/status; form Markdown và PowerPoint đã đồng bộ ngày 07/10/2026. PowerPoint hiện hành gồm 21 slide, dưới 15MB. Tên đội, thành viên và task owner còn cần bổ sung trước nộp.

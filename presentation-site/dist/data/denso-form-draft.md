@@ -92,7 +92,7 @@ Human/video pilots có lịch/budget riêng sau gate. Robot thật/production, d
 
 ## Tải lên ý tưởng
 
-Bản này để chuẩn bị nội dung. Cần xuất/kiểm PDF/DOCX/PPTX đồng bộ trước tải theo form (<15MB). Deck cũ chưa cập nhật theo bản rà này; chưa gửi/tải form.
+PowerPoint hiện hành `DENSO-Humanoid-Data-Flywheel-2026.pptx` đã đồng bộ với nội dung website ngày 07/10/2026, gồm 21 slide và dưới 15MB. Chỉ giữ một bản PowerPoint hiện hành. Cần bổ sung tên đội, thành viên và task owner, rồi đối chiếu yêu cầu form trước nộp. Chưa gửi/tải form.
 
 ## Link liên quan
 
