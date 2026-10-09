@@ -1,0 +1,43 @@
+{
+  "assumptions": {
+    "operator": 10,
+    "engineer": 20,
+    "rootsBefore": 200,
+    "rootsAfter": 140,
+    "yield": 0.8,
+    "captureMin": 6,
+    "qaMin": 3,
+    "debugBefore": 20,
+    "debugAfter": 10,
+    "mainA100h": 120,
+    "evalA100h": 20,
+    "sim4090h": 20,
+    "syntheticQAh": 6,
+    "integrationh": 2,
+    "storageBeforeGB": 200,
+    "storageAfterGB": 300,
+    "a100": 1.59,
+    "rtx4090": 0.74,
+    "storage": 0.07
+  },
+  "beforeTotal": 1136.6,
+  "afterTotal": 968.4,
+  "net": 168.19999999999993,
+  "annualOpex": 1380,
+  "initialInvestment": 3750.7999999999997,
+  "annualScenarios": [
+    {
+      "cycles": 72,
+      "operatingBenefit": 10730.399999999994,
+      "firstYear": 6979.599999999995
+    },
+    {
+      "cycles": 144,
+      "operatingBenefit": 22840.79999999999,
+      "firstYear": 19089.99999999999
+    }
+  ],
+  "annualThreshold": 128,
+  "firstYearThreshold": 150,
+  "notes": "Mô hình ước lượng cho workflow Ψ0+SIMPLE ngày 08/10/2026. Chưa có kết quả đo hoặc báo giá nhân sự nội bộ. Đơn giá public Runpod https://www.runpod.io/pricing: A100 PCIe 80GB $1.59/GPU-h, RTX4090 24GB $0.74/GPU-h. Storage https://docs.runpod.io/pods/pricing: network volume <1TB $0.07/GB-month. Giá này không chứng minh model chạy được trên GPU hoặc số giờ đủ; phải benchmark VRAM, train, render, inference và xác nhận console khi thuê. Toàn bộ quantities sau là giả định ngân sách. Operator $10/h, kỹ sư $20/h. Đơn vị: một lần cải thiện task đạt cùng quality và coverage. Baseline 200 demo gốc được chấp nhận, candidate140, yield80% =>250/175 attempts. Thu/reset6min/attempt:25h/17.5h*$10=$250/$175. QA3min/attempt:12.5h/8.75h*$20=$250/$175. Capture+QA=$500/$350. Debug20h/10h*$20=$400/$200. Main training120+eval20 A100-h cả hai:140*1.59=$222.60. Sim generation thêm20 RTX4090-h*.74=$14.80. QA synthetic6h*20=$120; integration thêm2h*20=$40. Scratch200/300GB*0.07=$14/$21 giữ1tháng. Baseline total1136.60; candidate968.40; gross savings350; added costs181.80; net168.20/cycle. Public data và pretrained human prior kế thừa; chi phí chuẩn bị lần đầu nằm trong setup, không coi thu human video mới miễn phí. Initial build80engh*$20=$1600 +20A100h*$1.59=$31.80 +200GB-month*.07=$14 =>1645.80. Pilot đối chứng một cặp1136.60+968.40=2105.00. Initial total3750.80. Shared annual OPEX48engh*$20=$960 + archive500GB*12*.07=$420 =>1380. Annual benefit72cycles=$10730.40,144cycles=$22840.80. First year144cycles=22840.80-3750.80=$19090.00. >$20k annual operating benefit requires128cycles; >$20k first year requires150cycles, with this same model. 72/144 are scenarios, not confirmed DENSO demand. Annual144 may represent6teams*24 cycles only if verified actual accepted cycles. Setup pilot cycles excluded from benefit-producing count. Savings are resource value, not automatic cash reduction. Hardware purchase, additional cameras/teleop devices, taxes, downtime, licenses, simulator/robot adaptation and security overhead unquoted: add if incremental. New human capture or world model adaptation not included because excluded from this specific first demo. If no debug reduction, net=-31.80/cycle; if no demo or debug reduction, net=-181.80/cycle. Never extrapolate failed quality or count variants as independent root demos. Sources support unit prices and available code, not assumed savings."
+}

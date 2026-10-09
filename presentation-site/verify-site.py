@@ -30,6 +30,7 @@ for ref in refs.local:
 app = (DIST / 'app.js').read_text()
 routes = re.findall(r"\['([a-z]+)','[^']+'\]", app.split('const main=')[0])
 assert len(routes) == len(set(routes)) == 13, routes
+assert 'resources' not in routes
 for route in routes:
     assert f'function {route}()' in app, f'Missing route: {route}'
 for name in re.findall(r"(?:diagramViewer\('|assets/)([\w.-]+\.(?:svg|png))", app):
@@ -122,3 +123,21 @@ with ZipFile(DIST / 'assets/idea-v3.1.zip') as dossier_zip:
             assert resolved in names, f'Package link missing: {name} -> {link}'
 assert json.loads((DIST/'data/pitch-pages.json').read_text())==json.loads((ROOT/'presentation-site/content/pitch-pages.json').read_text()), 'Stale route summaries'
 print(f'Validated {len(routes)} routes, {len(docs)} documents, 18 story scenes, 5 improvement cases and local publishing assets.')
+
+# Approved presentation versions and original author figures are publishing inputs.
+current = json.loads((DIST / 'data/current-platform.json').read_text())
+assert current == json.loads((ROOT / 'presentation-site/content/current-platform.json').read_text())
+assert json.loads((DIST / 'data/current-cost-model.json').read_text()) == json.loads((ROOT / 'presentation-site/content/current-cost-model.json').read_text())
+sources = json.loads((DIST / 'data/presentation-sources.json').read_text())
+assert len(sources['decks']) == 2 and len(sources['figures']) == 5
+for deck in sources['decks']:
+    assert hashlib.sha256((DIST / deck['path']).read_bytes()).hexdigest() == deck['sha256']
+    assert hashlib.sha256((ROOT / 'deliverables' / deck['file']).read_bytes()).hexdigest() == deck['sha256']
+    assert len(deck['slideTexts']) == deck['slideCount']
+for figure in sources['figures']:
+    assert hashlib.sha256((DIST / figure['path']).read_bytes()).hexdigest() == figure['sha256']
+    assert hashlib.sha256((ROOT / 'presentation-site/assets/platform' / Path(figure['path']).name).read_bytes()).hexdigest() == figure['sha256']
+    assert figure['sourceUrl'].startswith('https://') and figure['kind'] == 'original_author_figure'
+assert sum(len(t['names']) for t in current['team']) == 5
+assert all(t['status'] == 'Chờ bổ sung minh chứng' for t in current['team'])
+print('Verified current pitch/workflow SHA-256, 5 original figures, cost inputs and team evidence status.')

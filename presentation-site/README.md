@@ -1,29 +1,31 @@
-# Website · Model Engine Core × Data Flywheel
+# Website · Humanoid Data Flywheel
 
-Current presentation: 07/10/2026. A static proposal and evidence reader, with 13 routes. Native GR00T/GR1 A1, human transfer and monetary savings remain unmeasured. The executed MuJoCo reference has idealized state, a scripted sequencer, a learned35×4 predictor and proximity-weld grasp; playback reads saved artifacts.
+Bản nội dung ngày 09/10/2026, dựa trên hai PowerPoint còn giữ trong `deliverables/`:
 
-## Content authority and route ownership
+- **Pitch v8**: thông điệp DENSO, đội, PoC Ψ₀ + SIMPLE / G1, chi phí và roadmap.
+- **Visual Workflow v1**: dữ liệu, NVIDIA V2D, DreamDojo, training và flywheel. Thời hạn MVP cũ trong deck kỹ thuật không áp dụng; roadmap theo các mốc nghiệm thu của pitch v8.
 
-| Role / routes | Source | Renderer |
+Website có 13 trang. Mười một mục chính đi từ vấn đề đến workflow, dữ liệu, training, flywheel, đối chứng, chi phí, roadmap, mở rộng và đội. Hai mục paper/toolkit và reference nằm trong nhóm thu gọn; mục PowerPoint & hồ sơ đã bỏ. Ví dụ dataset và công cụ NVIDIA nằm trong Dữ liệu & V2D. Số liệu hiệu quả là **ước lượng có điều kiện**, không phải kết quả đo tại DENSO. Chưa chạy PoC Ψ₀ hoặc robot thật. Reference MuJoCo cũ vẫn có thể phát bản ghi, với giới hạn state lý tưởng, model thu nhỏ và grasp weld.
+
+## Nguồn nội dung và cách sửa
+
+| Thành phần | Nguồn | Hiển thị |
 |---|---|---|
-| Pitch and form | `../IDEA.md`, `../deliverables/DENSO-Noi-dung-form-y-tuong.md` | reader / resources |
-| overview | `content/overview-flywheel.json` | `dist/overview-flywheel.js/css` |
-| product, outcomes, business, roadmap, validation | `content/pitch-pages.json` + engineering/A1 details | `dist/pitch-pages.js/css` |
-| Current pilot subtotal | `content/overview-flywheel.json.cost`; shared calculator | overview and business, same inputs |
-| learning | engineering architecture and recipe | `dist/learning-core.js/css` |
-| engine | `content/model-engine-core.json`, engineering doc17 | `dist/model-engine-core.js/css` |
-| sources/research | `content/training-blueprint.json`, `content/research-and-media.json` | `dist/training-blueprint.js/css` |
-| architecture | `content/data-flywheel.json`, A1 decision/release/RunPlan contracts | `dist/data-flywheel.js/css` |
-| examples | pinned public previews + executed reference | overview-flywheel / engineering renderers |
-| Technical architecture | `../idea-v3-2026-10-05/` | expandable dossier |
-| Candidate recipe/measurement | `../docs/implementation-plan/skill-a1/` | reader and raw templates |
+| Workflow, team, roadmap, nguồn paper, hai deck | `content/current-platform.json` | `dist/current-platform.js` |
+| Giả định chi phí của pitch v8 | `content/current-cost-model.json` | Bảng tính trực tiếp trên trang chi phí |
+| Hình tác giả gốc, attribution | `assets/platform/`, `assets/platform/sources.json` | Ψ₀, V2D, DreamDojo |
+| Tệp PowerPoint tải về | Hai tệp được khai báo trong `current-platform.json` | `dist/assets/decks/` |
+| Phạm vi, hash và text snapshot PPT | Sinh bởi `build-current-platform.py` | `dist/data/presentation-sources.json` |
+| Điều hướng, trình đọc Markdown | `dist/app.js` | Mục lục và tài liệu lưu trữ |
+| Reference đã ghi | `../examples/engineering-loop/results/` | `dist/engineering.js` |
 
-`dist/engineering.js::renderEngineeringPage` is the route dispatcher. The old route bodies in `app.js` remain historical support code; their presence does not define the current rendered pages. `app.js` owns navigation, full-path Markdown links, media and the reader. The dossier contains current pitch/form, engineering docs, A1 recipes and reference README, followed by canonical/source/history records.
+`renderEngineeringPage()` ưu tiên `renderCurrentPlatform()` trên tất cả các trang hiện hành. Các renderer và tài liệu GR00T/FluxVLA trước đây được giữ để đọc lịch sử, không quyết định nội dung pitch hiện tại. Đặc biệt, ngân sách cũ trong `deliverables/DENSO-Cost-Model-2026-10-08.json` không phải mô hình của pitch v8; website dùng `content/current-cost-model.json` đối chiếu với slide 8/12/13.
 
-## Build and checks
+Minh chứng team hiện chỉ có mô tả cần bổ sung, chưa có URL. Khi có link được cấp quyền xem, cập nhật nội dung và renderer; không dùng link giả. Không cần GitHub công khai.
+
+## Chạy và kiểm tra
 
 ```bash
-python examples/engineering-loop/check.py
 python presentation-site/build-content.py
 python presentation-site/verify-site.py
 node presentation-site/test-presentation.js
@@ -31,26 +33,14 @@ node presentation-site/test-improvement.js
 bash start-website.sh
 ```
 
-Reference source/physics/test edits require `check.py` to refresh results, validation receipts and hashes before build. It runs the CPU reference and its tests, not native VLA. `build-content.py` updates canonical snapshots and invokes `build-engineering.py`; it performs no network fetch. Keep the existing static/media assets when copying the project. Normal publishing verifies extracted figure hashes; the optional local source PDF, if present, is also verified. A checkout without `docs/references/papers/` can build.
+Mở [website cục bộ](http://127.0.0.1:4175/#overview) và giữ tiến trình máy chủ chạy khi xem. Đây là bản xem trước trên máy, chưa xuất bản ra internet.
 
-`verify-site.py` checks generated docs, local media, provenance hashes, source/plan integrity and local Markdown dependency closure inside the primary ZIP. `test-presentation.js` renders all13 route functions with minimal DOM stubs and checks user-level content and full-path document targets; it is not a real browser/responsive/accessibility test. `test-improvement.js` checks outcome/cost accounting in the supporting examples.
+Build thực hiện offline: tái tạo hồ sơ cũ để giữ liên kết, rồi xuất nội dung hiện hành, chép hai PPT và năm hình gốc từ nguồn trong project. Manifest chứa SHA-256 để kiểm lại đúng phiên bản. `verify-site.py` kiểm các tệp, nguồn và hash. `test-presentation.js` kiểm nội dung 13 trang, phép tính, tình huống chi phí âm, quality gate và liên kết tài liệu; không thay thế kiểm tra trình duyệt.
 
-Keep the server terminal open while viewing [the local website](http://127.0.0.1:4175/#overview). If it is already running, open the link directly. Use Ctrl+C in that terminal to stop it.
+Chỉ khi sửa code/physics/tests của reference mới chạy `python examples/engineering-loop/check.py` để cập nhật kết quả và hash. Không cần chạy lại training/reference chỉ để đổi website.
 
-## Packages and source images
+## Hồ sơ cũ và xuất bản sao
 
-`assets/idea-v3.1.zip` ships the current dossier, IDEA/form, A1 recipes/templates and reference code/results at original relative paths, with local Markdown dependencies included. `assets/skill-a1-plan.zip` remains an optional smaller A1-only package. Template null values mean not measured; they are not native receipts.
+`dist/assets/idea-v3.1.zip` và `skill-a1-plan.zip` phục vụ hồ sơ/reference cũ, không phải recipe hiện hành. Các Markdown trong phần hồ sơ thu gọn có nhãn lưu trữ rõ ràng.
 
-Create an extra handover ZIP only when needed:
-
-```bash
-python presentation-site/package.py --kind website
-# Or: working dossier including the website, without a nested website ZIP
-python presentation-site/package.py --kind dossier
-```
-
-Exports go to `deliverables/`. The default creates only the website package; `--kind all` explicitly creates both. Source papers and build caches are excluded. Normal builds need neither export; they can be deleted and recreated later.
-
-Prioritize original paper/author architecture figures, with attribution and scope. FluxVLA Figures1–5 are pinned extracted assets with source hashes and CC BY4.0 credit, shipped offline. The original GR00T N1.5 architecture SVG loads from NVIDIA and needs internet; the source link remains visible if the image cannot load. Custom flywheel/A1 diagrams are labelled proposals, separate from original figures. Upstream benchmarks are not project results.
-
-Planning is8–12weeks after resource/task feasibility; H/action-free/workflow studies and real hardware have separate gates and caps. The current form and PowerPoint are synchronized as of07/10/2026. The editable deck contains21slides and is below15MB. Team names, member capabilities and task ownership still need completion before submission. This site is ready for local review, not a claim of production or factory acceptance.
+Nếu cần chuyển website sang máy khác, có thể dùng `python presentation-site/package.py --kind website`. Lệnh này tạo bản sao trong `deliverables/`; không cần chạy để xem website hoặc build bình thường. Giữ nguyên cấu trúc `dist/` khi chuyển sang một máy chủ static khác.

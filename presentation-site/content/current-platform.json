@@ -1,0 +1,220 @@
+{
+  "updated": "2026-10-09",
+  "teamName": "ilovephysicalintelligence",
+  "recipe": "Ψ₀ + SIMPLE / G1",
+  "task": "G1WholebodyBendPickAndPlaceTeleop-v0",
+  "status": "Đề xuất PoC; chưa thực nghiệm Ψ₀ hoặc robot thật",
+  "decks": [
+    {
+      "file": "DENSO-ilovephysicalintelligence-Pitch-2026-10-09-v8.pptx",
+      "label": "Pitch chính · v8",
+      "role": "Ưu tiên thông điệp, team, PoC, ngân sách và roadmap"
+    },
+    {
+      "file": "DENSO-Platform-Visual-Workflow-2026-10-08-v1.pptx",
+      "label": "Workflow kỹ thuật · v1",
+      "role": "Bổ sung dữ liệu, V2D, DreamDojo, training và flywheel; thời hạn MVP cũ không áp dụng"
+    }
+  ],
+  "steps": [
+    {
+      "id": "input",
+      "title": "Dữ liệu đầu vào",
+      "short": "Human · teleop · sim",
+      "icon": "camera",
+      "input": "Human egocentric, RGB/state/action teleop và rollout mô phỏng.",
+      "process": "Human prior được kế thừa từ checkpoint. Teleop dạy hành động của robot; sim bổ sung điều kiện task thiếu.",
+      "output": "Các episode cùng nguồn gốc, robot profile và quyền sử dụng rõ ràng.",
+      "gate": "Video người không tự có nhãn hành động khớp robot."
+    },
+    {
+      "id": "qa",
+      "title": "Chuẩn hóa & QA",
+      "short": "Đúng nhãn · đúng phiên bản",
+      "icon": "data",
+      "input": "Episode từ các nguồn dữ liệu.",
+      "process": "Kiểm đồng bộ ảnh–state–action, đơn vị, thứ tự khớp, controller; lưu parent/root và tách train/test trước khi sinh biến thể.",
+      "output": "Dataset release, báo cáo QA và cấu hình dữ liệu có thể tái lập.",
+      "gate": "Loại mẫu thiếu nhãn hoặc sai binding; không rò rỉ root sang bộ test."
+    },
+    {
+      "id": "sim",
+      "title": "Bổ sung trong sim",
+      "short": "Thực thi → RGB/state/action",
+      "icon": "sim",
+      "input": "Task, teleop seed, robot/controller và cảnh mô phỏng đã cấu hình.",
+      "process": "Biến đổi vị trí vật/khay trong miền cho phép, thực thi trong simulator, ghi ảnh–state–action và kết quả. Lọc theo scorer/QA.",
+      "output": "Rollout synthetic được chấp nhận, liên kết về episode gốc và cấu hình sinh.",
+      "gate": "Đếm demo gốc riêng với biến thể. Sim đạt không đồng nghĩa robot thật đạt."
+    },
+    {
+      "id": "train",
+      "title": "Học task",
+      "short": "Ψ₀ + SIMPLE",
+      "icon": "train",
+      "input": "Checkpoint có human prior + teleop và sim đạt QA, cùng schema robot.",
+      "process": "Fine-tune policy cho một task. A dùng D demo teleop; B dùng 0,7D demo gốc + sim, cùng checkpoint và ngân sách đối chứng.",
+      "output": "Policy ứng viên nạp lại được; log training, phiên bản dữ liệu và GPU-h.",
+      "gate": "Không train foundation model từ đầu trong PoC này."
+    },
+    {
+      "id": "gate",
+      "title": "Kiểm thử đối chứng",
+      "short": "Cùng chất lượng · so chi phí",
+      "icon": "gate",
+      "input": "Baseline A và candidate B; bộ test giữ riêng và cùng scorer.",
+      "process": "Đo full-task success, coverage, regression và tổng công thu/QA/debug/GPU. Chỉ tính lợi ích cho đợt đạt nghiệm thu.",
+      "output": "Quyết định cập nhật hoặc giữ policy cũ, kèm bằng chứng chất lượng và chi phí.",
+      "gate": "Target ≥80%/50 lượt test và −30% demo gốc; chưa có kết quả đo."
+    },
+    {
+      "id": "feedback",
+      "title": "Chạy & ghi lỗi",
+      "short": "Lỗi → can thiệp → vòng mới",
+      "icon": "robot",
+      "input": "Policy đã qua gate và robot profile tương thích.",
+      "process": "Ghi video/log/outcome; kỹ sư phân loại lỗi do hệ thống hay do dữ liệu. Sửa controller/calibration hoặc chọn đúng mẫu cần bổ sung.",
+      "output": "Một hồ sơ lỗi nối can thiệp → dataset → policy → kiểm thử → chi phí.",
+      "gate": "PoC chạy trong sim. Robot thật cần controller, calibration và nghiệm thu riêng."
+    }
+  ],
+  "team": [
+    {
+      "area": "Robot Learning",
+      "names": [
+        "Dương Đình Hiếu"
+      ],
+      "skills": "Huấn luyện VLA nhẹ; Reinforcement Learning cho humanoid.",
+      "affiliation": "Smart Lab, FPT University",
+      "output": "Policy và báo cáo đối chứng",
+      "proof": "Video VLA/RL + cấu hình, log và kết quả",
+      "status": "Chờ bổ sung minh chứng"
+    },
+    {
+      "area": "Robotics / Simulation",
+      "names": [
+        "Trần Ngọc Hưng",
+        "Trần Trịnh Hoàng Châu"
+      ],
+      "skills": "Thiết kế môi trường MuJoCo và Isaac Sim.",
+      "affiliation": "Smart Lab, FPT University",
+      "output": "Môi trường và dữ liệu mô phỏng",
+      "proof": "Video chạy task + mô tả cảnh, controller và vai trò cá nhân",
+      "status": "Chờ bổ sung minh chứng"
+    },
+    {
+      "area": "Data / Platform",
+      "names": [
+        "Nguyễn Thăng Long",
+        "Dương Tiến Thông"
+      ],
+      "skills": "Phân tích dataset, xử lý và chuẩn hóa dữ liệu.",
+      "affiliation": "",
+      "output": "Dataset chuẩn hóa và báo cáo QA",
+      "proof": "Mẫu trước/sau chuẩn hóa + schema và báo cáo QA",
+      "status": "Chờ bổ sung minh chứng"
+    }
+  ],
+  "milestones": [
+    [
+      "Chốt task với DENSO",
+      "Task owner, baseline, bộ test giữ riêng",
+      "Thống nhất chất lượng và điều kiện test"
+    ],
+    [
+      "Chạy baseline Ψ₀ + SIMPLE",
+      "Rollout baseline, log GPU-h và chi phí",
+      "Policy chạy và nạp lại được"
+    ],
+    [
+      "Chuẩn hóa dữ liệu",
+      "Dataset release có QA và nguồn gốc",
+      "RGB/state/action cùng schema"
+    ],
+    [
+      "Sinh sim & fine-tune",
+      "Rollout được chấp nhận và candidate policy",
+      "Cùng ngân sách, điều kiện A/B"
+    ],
+    [
+      "Đối chứng độc lập",
+      "Full-task success, regression, tổng cost",
+      "Đạt ngưỡng đã thống nhất"
+    ],
+    [
+      "Khép một vòng flywheel",
+      "Lỗi, can thiệp, release mới và kết quả đo lại",
+      "Quyết định giữ hay cập nhật policy"
+    ]
+  ],
+  "sources": {
+    "psi": "https://psi-lab.ai/Psi0/",
+    "psiCode": "https://github.com/physical-superintelligence-lab/Psi0",
+    "simple": "https://github.com/physical-superintelligence-lab/SIMPLE",
+    "psiData": "https://huggingface.co/datasets/USC-PSI-Lab/psi-data/tree/main/simple",
+    "ego": "https://github.com/apple-aiml-research/ml-egodex",
+    "v2d": "https://nvidia-isaac.github.io/video_to_data/",
+    "v2dData": "https://huggingface.co/datasets/nvidia/video-to-data-robot-dexterity-task-library-and-dataset",
+    "dream": "https://dreamdojo-world.github.io/",
+    "price": "https://www.runpod.io/pricing",
+    "storage": "https://docs.runpod.io/pods/pricing",
+    "v2dRepo": "https://github.com/nvidia-isaac/video_to_data",
+    "v2dTutorial": "https://nvidia-isaac.github.io/video_to_data/v2d_corl_tutorial/",
+    "dreamCode": "https://github.com/NVIDIA/DreamDojo",
+    "dreamPaper": "https://arxiv.org/html/2602.06949v1"
+  },
+  "datasetExamples": [
+    {
+      "id": "human",
+      "label": "HumanEgo · RGB + tracking",
+      "kind": "Human egocentric"
+    },
+    {
+      "id": "g1",
+      "label": "G1 · Teleop thật",
+      "kind": "RGB / state / action"
+    },
+    {
+      "id": "gr1",
+      "label": "GR1 · Teleop trong sim",
+      "kind": "Humanoid simulation"
+    },
+    {
+      "id": "libero",
+      "label": "LIBERO · Robot arm trong sim",
+      "kind": "Physics simulation"
+    },
+    {
+      "id": "mimicgen",
+      "label": "MimicGen · Seed → biến thể",
+      "kind": "Synthetic thực thi trong sim"
+    },
+    {
+      "id": "dreamgen",
+      "label": "DreamGen · Video synthetic",
+      "kind": "Ví dụ khác DreamDojo"
+    }
+  ],
+  "v2dTooling": [
+    [
+      "Chọn clip",
+      "video_ingestion_agent/ · LangGraph, VLM, SigLIP-2",
+      "Video → clip JSONL, entity graph, embeddings và truy xuất theo task"
+    ],
+    [
+      "Tái dựng",
+      "reconstruction/ · MoGe, SAM2, FoundationPose, mô hình human body",
+      "Clip → depth, mask, mesh, pose/quỹ đạo người–vật"
+    ],
+    [
+      "Grounding & policy",
+      "robotic_grounding/ · retargeting, Isaac Lab, RSL-RL / PPO",
+      "Motion + assets → task robot, policy tracking và rollout"
+    ],
+    [
+      "Đóng gói dữ liệu",
+      "Data Core / QA của platform (đề xuất)",
+      "Rollout được chấp nhận → dataset robot dùng cho training"
+    ]
+  ]
+}

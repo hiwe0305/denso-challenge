@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#bd2235">
-  <meta name="description" content="Công cụ cho đội AI/robotics giúp humanoid học kỹ năng từ mẫu robot, video người và dữ liệu bổ sung; giải pháp, kết quả kỳ vọng và chi phí cho đề xuất H1.">
-  <title>Humanoid Skill Learning</title>
+  <meta name="description" content="Đề xuất giảm công dạy humanoid tại DENSO Việt Nam: human video, teleop, synthetic, Ψ₀ + SIMPLE và data flywheel có đối chứng chất lượng, chi phí.">
+  <title>Humanoid Data Flywheel</title>
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
   <link rel="stylesheet" href="styles.css?v=review-fixes-20261007">
   <script defer src="vendor/hls.min.js"></script>
@@ -31,7 +31,7 @@
   <link rel="stylesheet" href="task-improvement.css?v=review-fixes-20261007">
   <script defer src="task-improvement.js?v=skill-a1-reviewed-20261005"></script>
   <link rel="stylesheet" href="engineering.css?v=review-fixes-20261007">
-  <script defer src="engineering.js?v=review-fixes-20261007"></script>
+  <script defer src="engineering.js?v=dataset-v2d-20261009"></script>
   <link rel="stylesheet" href="overview-flywheel.css?v=overview-pitch-20261007">
   <link rel="stylesheet" href="model-ai.css?v=review-fixes-20261007">
   <script defer src="overview-flywheel-data.js?v=overview-pitch-20261007"></script>
@@ -42,15 +42,18 @@
   <link rel="stylesheet" href="pitch-pages.css?v=review-fixes-20261007">
   <script defer src="pitch-pages-data.js?v=review-fixes-20261007"></script>
   <script defer src="pitch-pages.js?v=review-fixes-20261007"></script>
-  <script defer src="app.js?v=review-fixes-20261007"></script>
+  <link rel="stylesheet" href="current-platform.css?v=dataset-v2d-20261009">
+  <script defer src="current-platform-data.js?v=dataset-v2d-20261009"></script>
+  <script defer src="current-platform.js?v=dataset-v2d-20261009"></script>
+  <script defer src="app.js?v=dataset-v2d-20261009"></script>
 </head>
 <body>
   <a class="skip" href="#main">Đến nội dung</a>
   <aside class="sidebar" id="sidebar">
-    <a class="brand" href="#overview" aria-label="DENSO Humanoid tổng quan"><span class="brandmark">DENSO</span><span class="brand-caption">Skill Learning · FluxVLA</span></a>
-    <div class="nav-caption">H1 · HỒ SƠ Ý TƯỞNG</div>
+    <a class="brand" href="#overview" aria-label="DENSO Humanoid tổng quan"><span class="brandmark">DENSO</span><span class="brand-caption">Humanoid Data Flywheel</span></a>
+    <div class="nav-caption">ILOVEPHYSICALINTELLIGENCE</div>
     <nav id="navigation" aria-label="Mục lục"></nav>
-    <div class="sidebar-bottom"><strong>Thao tác thân trên humanoid</strong><p>Dataset · Training · Evaluation<br>Học, thực thi và kiểm chứng.</p><span>Reference đã chạy · Native chưa kiểm</span></div>
+    <div class="sidebar-bottom"><strong>Một task · một vòng cải thiện</strong><p>Dataset · Training · Evaluation<br>Học, thực thi và kiểm chứng.</p><span>PoC đề xuất · Chưa đo DENSO</span></div>
   </aside>
   <div class="workspace">
     <header class="topbar">
@@ -59,7 +62,7 @@
       <div class="top-meta"><span class="tag">Bản đề xuất</span><button id="print" class="small-button">In trang</button></div>
     </header>
     <main id="main" tabindex="-1"></main>
-    <footer>Humanoid Skill Learning <span>Data flywheel · 07.10.2026</span></footer>
+    <footer>Humanoid Data Flywheel <span>Pitch v8 + Workflow v1 · 09.10.2026</span></footer>
   </div>
   <div id="veil" hidden></div>
 </body>

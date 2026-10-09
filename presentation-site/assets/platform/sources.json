@@ -1,0 +1,39 @@
+{
+  "sources": {
+    "dream": "https://dreamdojo-world.github.io/",
+    "dreamPaper": "https://arxiv.org/html/2602.06949v1",
+    "psi": "https://psi-lab.ai/Psi0/",
+    "psiCode": "https://github.com/physical-superintelligence-lab/Psi0",
+    "simple": "https://github.com/physical-superintelligence-lab/SIMPLE",
+    "v2d": "https://github.com/nvidia-isaac/video_to_data",
+    "v2dSite": "https://nvidia-isaac.github.io/video_to_data/",
+    "v2dData": "https://huggingface.co/datasets/nvidia/video-to-data-robot-dexterity-task-library-and-dataset",
+    "ego": "https://github.com/apple-aiml-research/ml-egodex",
+    "psiData": "https://huggingface.co/datasets/USC-PSI-Lab/psi-data/tree/main/simple",
+    "price": "https://www.runpod.io/pricing",
+    "storage": "https://docs.runpod.io/pods/pricing"
+  },
+  "assets": [
+    {
+      "file": "dreamdojo-overview.png",
+      "url": "https://dreamdojo-world.github.io/overview.png"
+    },
+    {
+      "file": "psi0-architecture.png",
+      "url": "https://psi-lab.ai/Psi0/figures/architecture.png"
+    },
+    {
+      "file": "psi0-sim-data.png",
+      "url": "https://psi-lab.ai/Psi0/figures/sim-data.png"
+    },
+    {
+      "file": "v2d-overview.png",
+      "url": "https://nvidia-isaac.github.io/video_to_data/figures/v2d_overview.png"
+    },
+    {
+      "file": "psi0-teleoperation.png",
+      "url": "https://psi-lab.ai/Psi0/figures/teleoperation.png"
+    }
+  ],
+  "generatedAssetsUsed": []
+}

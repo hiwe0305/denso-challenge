@@ -62,3 +62,5 @@ print('Built',len(c['methods']),'research entries,',len(c['media']),'media credi
 # Current authority and executed artifacts, standard-library publishing only.
 import runpy
 runpy.run_path(str(SITE/"build-engineering.py"))
+
+runpy.run_path(str(SITE / "build-current-platform.py"))
