@@ -37,6 +37,14 @@ assert.match(rendered.roadmap,/Điều kiện đi tiếp/);assert.doesNotMatch(r
 assert.match(rendered.team,/Dương Đình Hiếu/);assert.match(rendered.team,/Trần Ngọc Hưng/);
 assert.match(rendered.team,/Trần Trịnh Hoàng Châu/);assert.match(rendered.team,/Nguyễn Thăng Long/);assert.match(rendered.team,/Dương Tiến Thông/);
 assert.match(rendered.team,/Chờ bổ sung minh chứng/);
+assert.match(rendered.team,/Đã có video và mã nguồn/);
+assert.match(rendered.team,/DỰ ÁN TRƯỚC ĐÂY CỦA ĐỘI/);
+assert.match(rendered.team,/FOCA trên SmolVLA/);
+assert.match(rendered.team,/50.000/);
+assert.match(rendered.team,/github.com\/hiwe0305\/humanoid-rl/);
+assert.match(rendered.team,/14t8FROExp0IGz2PeSXfVRLxv7lpOCKN7/);
+assert.match(rendered.team,/chưa đối chiếu log/);
+assert.doesNotMatch(rendered.team,/Website chưa gắn link/);
 assert.equal(rendered.resources,undefined);assert.equal(run("Object.hasOwn(pages,'resources')"),false);
 for(const [id,html] of Object.entries(rendered))if(!['sources','examples'].includes(id))assert.doesNotMatch(html,/FluxVLA|GR00T|GR1|FLARE|5\.187,20/,id+' uses approved recipe, not the archived one');
 

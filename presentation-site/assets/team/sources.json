@@ -1,0 +1,31 @@
+{
+  "captured": "2026-10-09",
+  "assets": [
+    {
+      "image": "foca-libero-source.jpg",
+      "sourceUrl": "https://drive.google.com/file/d/14t8FROExp0IGz2PeSXfVRLxv7lpOCKN7/view",
+      "kind": "team_video",
+      "crop": {
+        "x": 316,
+        "y": 255,
+        "width": 633,
+        "height": 285,
+        "sourceWidth": 1280,
+        "sourceHeight": 720
+      }
+    },
+    {
+      "image": "humanoid-rl-source.jpg",
+      "sourceUrl": "https://github.com/hiwe0305/humanoid-rl",
+      "kind": "team_code",
+      "crop": {
+        "x": 31,
+        "y": 250,
+        "width": 880,
+        "height": 396,
+        "sourceWidth": 1265,
+        "sourceHeight": 712
+      }
+    }
+  ]
+}

@@ -6,8 +6,8 @@
   "status": "Đề xuất PoC; chưa thực nghiệm Ψ₀ hoặc robot thật",
   "decks": [
     {
-      "file": "DENSO-ilovephysicalintelligence-Pitch-2026-10-09-v8.pptx",
-      "label": "Pitch chính · v8",
+      "file": "DENSO-ilovephysicalintelligence-Pitch-2026-10-09-v9.pptx",
+      "label": "Pitch chính · v9",
       "role": "Ưu tiên thông điệp, team, PoC, ngân sách và roadmap"
     },
     {
@@ -87,8 +87,8 @@
       "skills": "Huấn luyện VLA nhẹ; Reinforcement Learning cho humanoid.",
       "affiliation": "Smart Lab, FPT University",
       "output": "Policy và báo cáo đối chứng",
-      "proof": "Video VLA/RL + cấu hình, log và kết quả",
-      "status": "Chờ bổ sung minh chứng"
+      "proof": "FOCA trên SmolVLA / RTX 3060 và PPO H1 / MuJoCo. Log và phần việc cụ thể đang bổ sung.",
+      "status": "Đã có video và mã nguồn"
     },
     {
       "area": "Robotics / Simulation",
@@ -216,5 +216,81 @@
       "Data Core / QA của platform (đề xuất)",
       "Rollout được chấp nhận → dataset robot dùng cho training"
     ]
+  ],
+  "teamEvidence": [
+    {
+      "id": "vla",
+      "title": "Fine-tuning VLA trên RTX 3060",
+      "subtitle": "FOCA trên SmolVLA trong LIBERO",
+      "image": "foca-libero-source.jpg",
+      "imageAlt": "Hai góc camera của rollout LIBERO trích từ video FOCA trên SmolVLA do đội cung cấp",
+      "sourceUrl": "https://drive.google.com/file/d/14t8FROExp0IGz2PeSXfVRLxv7lpOCKN7/view",
+      "embedUrl": "https://drive.google.com/file/d/14t8FROExp0IGz2PeSXfVRLxv7lpOCKN7/preview",
+      "folderUrl": "https://drive.google.com/drive/folders/18pFrIFwmWszjqUgvT4LFVcLgnSPxMloc",
+      "metrics": [
+        [
+          "RTX 3060",
+          "12 GB VRAM"
+        ],
+        [
+          "50.000",
+          "bước / run"
+        ],
+        [
+          "2 run",
+          "fine-tuning"
+        ]
+      ],
+      "summary": "Video của đội trình bày fine-tuning FOCA trên SmolVLA và các rollout thao tác trong LIBERO. Mỗi run được ghi là đánh giá 400 episode.",
+      "relevance": "Liên quan PoC: fine-tuning policy, làm việc với VRAM giới hạn và đánh giá hành vi trong mô phỏng.",
+      "scope": "Các con số theo video đội cung cấp, chưa đối chiếu log. Clip là các episode được chọn, không phải success rate của toàn bộ tập.",
+      "detail": "Phần FOCA 3B chạy checkpoint pretrained có 68/100 rollout LIBERO-10; không gán kết quả đó cho nhánh SmolVLA fine-tuning. Fine-tuning kế thừa pretrained model, không phải pretraining foundation model từ đầu. Cần bổ sung config, log/eval JSON, checkpoint và phần việc của từng người.",
+      "kind": "team_video",
+      "crop": {
+        "x": 316,
+        "y": 255,
+        "width": 633,
+        "height": 285,
+        "sourceWidth": 1280,
+        "sourceHeight": 720
+      }
+    },
+    {
+      "id": "rl",
+      "title": "RL cho humanoid Unitree H1",
+      "subtitle": "PPO trong môi trường MuJoCo",
+      "image": "humanoid-rl-source.jpg",
+      "imageAlt": "README repository humanoid-rl của đội, minh chứng mã nguồn H1/MuJoCo và PPO",
+      "sourceUrl": "https://github.com/hiwe0305/humanoid-rl",
+      "revision": "28a8ba7b8d6c9fe2c2a1ed571320025b55ae71b3",
+      "codeUrl": "https://github.com/hiwe0305/humanoid-rl/blob/28a8ba7b8d6c9fe2c2a1ed571320025b55ae71b3/scripts/train_walk.py",
+      "metrics": [
+        [
+          "Unitree H1",
+          "humanoid"
+        ],
+        [
+          "MuJoCo",
+          "simulation"
+        ],
+        [
+          "PPO",
+          "reinforcement learning"
+        ]
+      ],
+      "summary": "Repo có môi trường H1, điều khiển PD, reward và mã curriculum cho các phase đứng, đi chậm và đi.",
+      "relevance": "Liên quan PoC: xây môi trường, thiết kế reward và pipeline học điều khiển humanoid.",
+      "scope": "Minh chứng mã triển khai. Chưa kèm log/checkpoint và rollout đánh giá để kết luận chất lượng locomotion hoặc triển khai robot thật.",
+      "detail": "Số bước trong script là cấu hình, không chứng minh run đã hoàn tất. Script train_walk.py tại revision đã xem tắt domain/push randomization cho các phase định nghĩa. Repo có module randomization nhưng không suy ra policy đã được kiểm độ bền vững. Ảnh là README, không phải video robot thực thi. Thông tin RTX 3060 của video VLA không được gán cho run RL này.",
+      "kind": "team_code",
+      "crop": {
+        "x": 31,
+        "y": 250,
+        "width": 880,
+        "height": 396,
+        "sourceWidth": 1265,
+        "sourceHeight": 712
+      }
+    }
   ]
 }

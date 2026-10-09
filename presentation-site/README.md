@@ -2,8 +2,8 @@
 
 Bản nội dung ngày 09/10/2026, dựa trên hai PowerPoint còn giữ trong `deliverables/`:
 
-- **Pitch v8**: thông điệp DENSO, đội, PoC Ψ₀ + SIMPLE / G1, chi phí và roadmap.
-- **Visual Workflow v1**: dữ liệu, NVIDIA V2D, DreamDojo, training và flywheel. Thời hạn MVP cũ trong deck kỹ thuật không áp dụng; roadmap theo các mốc nghiệm thu của pitch v8.
+- **Pitch v9**: thông điệp DENSO, đội, PoC Ψ₀ + SIMPLE / G1, chi phí và roadmap.
+- **Visual Workflow v1**: dữ liệu, NVIDIA V2D, DreamDojo, training và flywheel. Thời hạn MVP cũ trong deck kỹ thuật không áp dụng; roadmap theo các mốc nghiệm thu của pitch v9.
 
 Website có 13 trang. Mười một mục chính đi từ vấn đề đến workflow, dữ liệu, training, flywheel, đối chứng, chi phí, roadmap, mở rộng và đội. Hai mục paper/toolkit và reference nằm trong nhóm thu gọn; mục PowerPoint & hồ sơ đã bỏ. Ví dụ dataset và công cụ NVIDIA nằm trong Dữ liệu & V2D. Số liệu hiệu quả là **ước lượng có điều kiện**, không phải kết quả đo tại DENSO. Chưa chạy PoC Ψ₀ hoặc robot thật. Reference MuJoCo cũ vẫn có thể phát bản ghi, với giới hạn state lý tưởng, model thu nhỏ và grasp weld.
 
@@ -12,16 +12,16 @@ Website có 13 trang. Mười một mục chính đi từ vấn đề đến wor
 | Thành phần | Nguồn | Hiển thị |
 |---|---|---|
 | Workflow, team, roadmap, nguồn paper, hai deck | `content/current-platform.json` | `dist/current-platform.js` |
-| Giả định chi phí của pitch v8 | `content/current-cost-model.json` | Bảng tính trực tiếp trên trang chi phí |
+| Giả định chi phí của pitch v9 | `content/current-cost-model.json` | Bảng tính trực tiếp trên trang chi phí |
 | Hình tác giả gốc, attribution | `assets/platform/`, `assets/platform/sources.json` | Ψ₀, V2D, DreamDojo |
 | Tệp PowerPoint tải về | Hai tệp được khai báo trong `current-platform.json` | `dist/assets/decks/` |
 | Phạm vi, hash và text snapshot PPT | Sinh bởi `build-current-platform.py` | `dist/data/presentation-sources.json` |
 | Điều hướng, trình đọc Markdown | `dist/app.js` | Mục lục và tài liệu lưu trữ |
 | Reference đã ghi | `../examples/engineering-loop/results/` | `dist/engineering.js` |
 
-`renderEngineeringPage()` ưu tiên `renderCurrentPlatform()` trên tất cả các trang hiện hành. Các renderer và tài liệu GR00T/FluxVLA trước đây được giữ để đọc lịch sử, không quyết định nội dung pitch hiện tại. Đặc biệt, ngân sách cũ trong `deliverables/DENSO-Cost-Model-2026-10-08.json` không phải mô hình của pitch v8; website dùng `content/current-cost-model.json` đối chiếu với slide 8/12/13.
+`renderEngineeringPage()` ưu tiên `renderCurrentPlatform()` trên tất cả các trang hiện hành. Các renderer và tài liệu GR00T/FluxVLA trước đây được giữ để đọc lịch sử, không quyết định nội dung pitch hiện tại. Đặc biệt, ngân sách cũ trong `deliverables/DENSO-Cost-Model-2026-10-08.json` không phải mô hình của pitch v9; website dùng `content/current-cost-model.json` đối chiếu với slide 8/12/13.
 
-Minh chứng team hiện chỉ có mô tả cần bổ sung, chưa có URL. Khi có link được cấp quyền xem, cập nhật nội dung và renderer; không dùng link giả. Không cần GitHub công khai.
+Robot Learning đã có video Drive FOCA/SmolVLA trên RTX 3060 và repo Humanoid-RL. Đây là các dự án trước đây của đội, chưa là kết quả PoC Ψ₀ + SIMPLE hoặc DENSO. Số liệu fine-tuning theo video đội cung cấp; log và phần việc cụ thể đang bổ sung. Hai ảnh chụp nguồn được giữ trong assets/team và được crop khi hiển thị. Các mảng Simulation/Data vẫn chờ minh chứng riêng.
 
 ## Chạy và kiểm tra
 

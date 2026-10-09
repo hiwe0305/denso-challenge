@@ -10,7 +10,7 @@ DIST = SITE / 'dist'
 data = json.loads((SITE / 'content/current-platform.json').read_text())
 cost = json.loads((SITE / 'content/current-cost-model.json').read_text())
 sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
-manifest = {'updated': data['updated'], 'priority': 'Pitch v8 supersedes older recipes, budgets and durations', 'decks': [], 'figures': []}
+manifest = {'updated': data['updated'], 'priority': 'Current pitch supersedes older recipes, budgets and durations', 'decks': [], 'figures': [], 'teamEvidence': []}
 for deck in data['decks']:
     source = ROOT / 'deliverables' / deck['file']
     target = DIST / 'assets/decks' / source.name
@@ -28,7 +28,13 @@ for item in figure_sources['assets']:
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy(source, target)
     manifest['figures'].append({'path': 'assets/platform/' + source.name, 'sha256': sha(source), 'sourceUrl': item['url'], 'kind': 'original_author_figure'})
+for item in data.get('teamEvidence', []):
+    source = SITE / 'assets/team' / item['image']
+    target = DIST / 'assets/team' / source.name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy(source, target)
+    manifest['teamEvidence'].append({'path': 'assets/team/' + source.name, 'sha256': sha(source), 'sourceUrl': item['sourceUrl'], 'kind': item['kind']})
 for filename, obj in [('current-platform.json', data), ('current-cost-model.json', cost), ('presentation-sources.json', manifest)]:
     (DIST / 'data' / filename).write_text(json.dumps(obj, ensure_ascii=False, indent=2) + '\n')
 (DIST / 'current-platform-data.js').write_text('const CURRENT_PLATFORM = ' + json.dumps(data, ensure_ascii=False) + ';\nconst CURRENT_COST_MODEL = ' + json.dumps(cost, ensure_ascii=False) + ';\nconst PRESENTATION_SOURCES = ' + json.dumps(manifest, ensure_ascii=False) + ';\n')
-print('Published current pitch + technical workflow, cost model and 5 original figures with source hashes.')
+print('Published current pitch + technical workflow, cost model, 5 original figures and team evidence with source hashes.')

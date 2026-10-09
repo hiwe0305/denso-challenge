@@ -139,5 +139,11 @@ for figure in sources['figures']:
     assert hashlib.sha256((ROOT / 'presentation-site/assets/platform' / Path(figure['path']).name).read_bytes()).hexdigest() == figure['sha256']
     assert figure['sourceUrl'].startswith('https://') and figure['kind'] == 'original_author_figure'
 assert sum(len(t['names']) for t in current['team']) == 5
-assert all(t['status'] == 'Chờ bổ sung minh chứng' for t in current['team'])
+assert current['team'][0]['status'] == 'Đã có video và mã nguồn'
+assert all(t['status'] == 'Chờ bổ sung minh chứng' for t in current['team'][1:])
+assert len(current['teamEvidence']) == len(sources['teamEvidence']) == 2
+for proof in sources['teamEvidence']:
+    assert hashlib.sha256((DIST / proof['path']).read_bytes()).hexdigest() == proof['sha256']
+    assert hashlib.sha256((ROOT / 'presentation-site/assets/team' / Path(proof['path']).name).read_bytes()).hexdigest() == proof['sha256']
+    assert proof['sourceUrl'].startswith('https://')
 print('Verified current pitch/workflow SHA-256, 5 original figures, cost inputs and team evidence status.')
