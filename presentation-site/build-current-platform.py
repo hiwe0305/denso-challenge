@@ -11,6 +11,10 @@ data = json.loads((SITE / 'content/current-platform.json').read_text())
 cost = json.loads((SITE / 'content/current-cost-model.json').read_text())
 sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
 manifest = {'updated': data['updated'], 'priority': 'Current pitch supersedes older recipes, budgets and durations', 'decks': [], 'figures': [], 'teamEvidence': []}
+active_deck_files = {deck['file'] for deck in data['decks']}
+for stale_deck in (DIST / 'assets/decks').glob('DENSO-*.pptx'):
+    if stale_deck.name not in active_deck_files:
+        stale_deck.unlink()
 for deck in data['decks']:
     source = ROOT / 'deliverables' / deck['file']
     target = DIST / 'assets/decks' / source.name

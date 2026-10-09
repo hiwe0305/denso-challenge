@@ -2,7 +2,7 @@
 
 Hệ thống đề xuất giúp đội AI/robotics phát triển kỹ năng robot bằng human video, synthetic trajectories và demonstrations robot đích, kèm bằng chứng để chọn cách cải thiện. Mục tiêu là giảm công thu dữ liệu và tổng chi phí ở chất lượng được thống nhất.
 
-**Bản trình bày hiện hành: [Pitch v10](deliverables/DENSO-ilovephysicalintelligence-Pitch-2026-10-09-v10.pptx).** Website ngày 09/10/2026 kết hợp pitch này với [workflow kỹ thuật](deliverables/DENSO-Platform-Visual-Workflow-2026-10-08-v1.pptx). [IDEA.md](IDEA.md) và các hồ sơ engineering trước đây được giữ để đối chiếu lịch sử; recipe hiện hành là Ψ₀ + SIMPLE / G1.
+**Bản trình bày hiện hành: [Pitch v10](deliverables/DENSO-ilovephysicalintelligence-1.pptx).** Website ngày 09/10/2026 kết hợp pitch này với [workflow kỹ thuật](deliverables/DENSO-Platform-Visual-Workflow-2026-10-08-v1.pptx). [IDEA.md](IDEA.md) và các hồ sơ engineering trước đây được giữ để đối chiếu lịch sử; recipe hiện hành là Ψ₀ + SIMPLE / G1.
 
 **Mở website:** chạy `bash start-website.sh` trong thư mục project, rồi mở [website cục bộ](http://127.0.0.1:4175/#overview). Giữ cửa sổ chạy website mở trong lúc xem; nếu máy chủ đang chạy thì chỉ cần mở đường dẫn.
 
@@ -12,7 +12,7 @@ Hệ thống đề xuất giúp đội AI/robotics phát triển kỹ năng robo
 - [Hồ sơ engineering](idea-v3-2026-10-05/README.md): contracts, nguồn và bằng chứng reference.
 - [Reference code và kết quả](examples/engineering-loop/README.md): một bản code/results duy nhất trong repository.
 - [Đối chiếu video và nguồn số liệu](docs/research/video-zKaeODg7xeE-2026-10-06/README.md).
-- [PowerPoint trình bày mới nhất](deliverables/DENSO-ilovephysicalintelligence-Pitch-2026-10-09-v10.pptx).
+- [PowerPoint trình bày mới nhất](deliverables/DENSO-ilovephysicalintelligence-1.pptx).
 - [PowerPoint workflow kỹ thuật để bổ sung website](deliverables/DENSO-Platform-Visual-Workflow-2026-10-08-v1.pptx).
 - [Website và cách chạy](presentation-site/README.md).
 - [Phản hồi nhận xét kiến trúc và quyết định cập nhật](docs/reviews/architecture-feedback-response-2026-10-06.md).
