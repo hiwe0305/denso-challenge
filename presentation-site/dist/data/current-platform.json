@@ -6,8 +6,8 @@
   "status": "Đề xuất PoC; chưa thực nghiệm Ψ₀ hoặc robot thật",
   "decks": [
     {
-      "file": "DENSO-ilovephysicalintelligence-Pitch-2026-10-09-v9.pptx",
-      "label": "Pitch chính · v9",
+      "file": "DENSO-ilovephysicalintelligence-Pitch-2026-10-09-v10.pptx",
+      "label": "Pitch chính · v10",
       "role": "Ưu tiên thông điệp, team, PoC, ngân sách và roadmap"
     },
     {
@@ -84,7 +84,7 @@
       "names": [
         "Dương Đình Hiếu"
       ],
-      "skills": "Huấn luyện VLA nhẹ; Reinforcement Learning cho humanoid.",
+      "skills": "Huấn luyện lightweight VLA; Reinforcement Learning cho humanoid.",
       "affiliation": "Smart Lab, FPT University",
       "output": "Policy và báo cáo đối chứng",
       "proof": "FOCA trên SmolVLA / RTX 3060 và PPO H1 / MuJoCo. Log và phần việc cụ thể đang bổ sung.",
