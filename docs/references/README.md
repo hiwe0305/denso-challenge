@@ -9,7 +9,7 @@ Kết quả của tác giả không phải kết quả của đội. Khi triển
 | [Ψ₀](https://psi-lab.ai/Psi0/) | Model nền được fine-tune trong PoC |
 | [SIMPLE](https://github.com/physical-superintelligence-lab/SIMPLE) | Simulator, dữ liệu teleop/motion planning và bộ đánh giá Level 0/1/2 |
 | [psi-data/simple](https://huggingface.co/datasets/USC-PSI-Lab/psi-data/tree/main/simple) | Dữ liệu task G1 cho PoC |
-| [MimicGen](https://mimicgen.github.io/), [DAgger](https://arxiv.org/abs/1011.0686), [HG-DAgger](https://arxiv.org/abs/1810.02890), [DataMIL](https://arxiv.org/html/2505.09603v1) | Tiền lệ cho sinh biến thể, correction và chọn dữ liệu trong thuật toán Failure → Data |
+| [MimicGen](https://mimicgen.github.io/), [DAgger](https://arxiv.org/abs/1011.0686), [HG-DAgger](https://arxiv.org/abs/1810.02890), [DataMIL](https://arxiv.org/html/2505.09603v1), [Mulligan](https://arxiv.org/abs/2610.05882), [DISEIL](https://arxiv.org/abs/2609.08123) | Tiền lệ cho sinh biến thể, correction và chọn dữ liệu theo lỗi trong thuật toán Failure → Data |
 | [NVIDIA V2D](https://nvidia-isaac.github.io/video_to_data/), [DreamDojo](https://dreamdojo-world.github.io/) | Hướng mở rộng sau PoC |
 
 Cách dùng các nguồn này nằm trong [spec v10](../spec-v10-failure-to-data.md).

@@ -36,6 +36,12 @@ chapters = re.findall(r"\['([a-z]+)','[^']+'\]", app.split('const main=')[0])
 routes = re.search(r'const routes=\{([^}]*)\}', page)[1]
 assert sorted(chapters) == sorted(r.split(':')[0] for r in routes.split(',')), (chapters, routes)
 assert len(chapters) == 12 and 'examples' not in chapters
+# Five-part story: every route sits in exactly one part and has a bridge line and pager lead.
+parts_src = page.split('const CP_PARTS=')[1].split('];')[0]
+part_routes = [r.strip("'") for p in re.findall(r"routes:\[([^\]]*)\]", parts_src) for r in p.split(',')]
+assert sorted(part_routes) == sorted(chapters), part_routes
+meta = re.findall(r"^ ([a-z]+):\{answers:'[^']+',lead:'[^']+'", page, re.M)
+assert sorted(meta) == sorted(chapters), meta
 
 # Media referenced by pages exist in the catalog; local media files ship with the site.
 media = json.loads((SITE / 'content/media.json').read_text())['media']
@@ -74,4 +80,4 @@ for proof in sources['teamEvidence']:
     assert sha(SITE / 'assets/team' / Path(proof['path']).name) == proof['sha256']
     assert proof['sourceUrl'].startswith('https://')
 assert not any(p.is_symlink() for p in DIST.rglob('*')), 'Pages artifact must not contain symlinks'
-print(f'Verified {len(chapters)} routes, {len(media)} media entries, 2 deck SHA-256, 5 original figures, cost inputs and team evidence.')
+print(f'Verified {len(chapters)} routes in 5 story parts, {len(media)} media entries, 2 deck SHA-256, 5 original figures, cost inputs and team evidence.')

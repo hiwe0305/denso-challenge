@@ -1,5 +1,6 @@
-// Router, menu và các inspector dataset cho các trang Pitch v10; nội dung từng trang nằm trong current-platform.js.
-const chapters=[['overview','Ý tưởng & DENSO'],['product','Workflow platform'],['sources','Dữ liệu & V2D'],['learning','Dữ liệu → training'],['engine','DreamDojo · Input/Output'],['architecture','Data flywheel'],['validation','PoC Ψ₀ + SIMPLE'],['business','Chi phí & hiệu quả'],['roadmap','Mốc triển khai'],['outcomes','Mở rộng & pilot'],['team','Đội thực hiện'],['research','Paper & toolkit']];
+// Router, menu nhóm theo 5 phần (CP_PARTS) và các inspector dataset; nội dung và khung mạch truyện của từng trang nằm trong current-platform.js.
+// Thứ tự trình bày; nút "Tiếp theo" đi theo mảng này. Nhóm 5 phần nằm ở CP_PARTS.
+const chapters=[['overview','Vấn đề & ý tưởng'],['product','Vòng data flywheel'],['architecture','Failure → Data: khác biệt'],['engine','Thuật toán 12 bước'],['sources','Dữ liệu & nguồn'],['learning','Model Ψ₀ & training'],['validation','PoC & bằng chứng'],['business','Giá trị & chi phí'],['roadmap','Lộ trình 12 tuần'],['outcomes','Mở rộng L0 → L4'],['team','Đội thực hiện'],['research','Nguồn & tiền lệ']];
 const main=document.querySelector('main');let viewController=new AbortController();
 
 const mobileViewport=matchMedia('(max-width:760px)');
@@ -19,10 +20,10 @@ function navigate(){
  viewController.abort();viewController=new AbortController();
  if(location.hash==='#main'){main.focus();return;}
  let hash;try{hash=decodeURIComponent(location.hash.slice(1)||'overview');}catch{hash='overview';}
- const aliases={flow:'product',technology:'research','data-core':'architecture','skill-core':'learning',skill:'learning',data:'architecture',ai:'research',production:'roadmap',evaluation:'validation',contracts:'architecture',review:'business',examples:'research'};
+ const aliases={flow:'product',technology:'research','data-core':'architecture','skill-core':'learning',skill:'learning',data:'architecture',ai:'research',production:'roadmap',evaluation:'validation',contracts:'architecture',review:'business',examples:'research',dreamdojo:'research'};
  hash=aliases[hash]||hash;const id=chapters.some(([k])=>k===hash)?hash:'overview';
- const navLink=([k,v],i)=>`<a href="#${k}" ${id===k?'class="active" aria-current="page"':''}><span class="nav-number">${String(i+1).padStart(2,'0')}</span>${v}</a>`;
- document.querySelector('#navigation').innerHTML=chapters.slice(0,11).map(navLink).join('')+`<details class="cp-nav-reference" ${id==='research'?'open':''}><summary>Nguồn & minh chứng</summary>${chapters.slice(11).map((r,i)=>navLink(r,i+11)).join('')}</details>`;
+ const navLink=k=>{const i=chapters.findIndex(c=>c[0]===k);return `<a href="#${k}" ${id===k?'class="active" aria-current="page"':''}><span class="nav-number">${String(i+1).padStart(2,'0')}</span>${esc(chapters[i][1])}</a>`;};
+ document.querySelector('#navigation').innerHTML=CP_PARTS.map(p=>`<div class="cp-nav-group${p.reference?' cp-nav-group-ref':''}" role="group" aria-label="${p.reference?p.label:'Phần '+p.no+': '+p.label}"><p class="cp-nav-part">${p.reference?p.label:p.no+' · '+p.label}</p>${p.routes.map(navLink).join('')}</div>`).join('');
  document.querySelector('#crumb').textContent=chapters.find(x=>x[0]===id)[1];
  main.innerHTML=renderCurrentPlatform(id);document.title=`${chapters.find(x=>x[0]===id)[1]} | Humanoid Data Flywheel`;
  initCurrentPlatform(viewController.signal);

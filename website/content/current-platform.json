@@ -1,9 +1,9 @@
 {
-  "updated": "2026-10-09",
+  "updated": "2026-10-22",
   "teamName": "ilovephysicalintelligence",
   "recipe": "Ψ₀ + SIMPLE / G1",
   "task": "G1WholebodyBendPickAndPlaceTeleop-v0",
-  "status": "Đề xuất PoC; chưa thực nghiệm Ψ₀ hoặc robot thật",
+  "status": "Đặc tả spec v10.1; chưa thực nghiệm Ψ₀ hoặc robot thật",
   "decks": [
     {
       "file": "DENSO-ilovephysicalintelligence-1.pptx",
@@ -18,64 +18,84 @@
   ],
   "steps": [
     {
-      "id": "input",
-      "title": "Dữ liệu đầu vào",
-      "short": "Human · teleop · sim",
-      "icon": "camera",
-      "input": "Human egocentric, RGB/state/action teleop và rollout mô phỏng.",
-      "process": "Human prior được kế thừa từ checkpoint. Teleop dạy hành động của robot; sim bổ sung điều kiện task thiếu.",
-      "output": "Các episode cùng nguồn gốc, robot profile và quyền sử dụng rõ ràng.",
-      "gate": "Video người không tự có nhãn hành động khớp robot."
+      "id": "run",
+      "title": "Chạy",
+      "short": "90 điều kiện dev",
+      "icon": "robot",
+      "input": "Policy hiện tại và 90 điều kiện dev đã khai (30 mỗi mức × 3 mức).",
+      "process": "Chạy mỗi điều kiện một lượt trong SIMPLE; ghi ảnh kèm timestamp, lệnh gửi tới WBC, trạng thái đo và độ trễ mỗi chu kỳ.",
+      "output": "Trace cho mọi episode, kể cả episode thành công.",
+      "gate": "Rollout đánh giá không bao giờ vào dữ liệu train."
     },
     {
-      "id": "qa",
-      "title": "Chuẩn hóa & QA",
-      "short": "Đúng nhãn · đúng phiên bản",
+      "id": "score",
+      "title": "Chấm từng bước",
+      "short": "Bước hỏng đầu tiên",
+      "icon": "gate",
+      "input": "Trace của từng episode.",
+      "process": "Scorer độc lập chấm 6 bước: tiếp cận, gắp, nâng, di chuyển, đặt, nhả; gán bước hỏng đầu tiên k và kiểu lỗi.",
+      "output": "Nhãn lỗi: bước k, kiểu lỗi, lớp lỗi chung.",
+      "gate": "Scorer phải trùng cờ thành công của SIMPLE ≥ 95% (cổng G1). Bước chưa tới là “chưa thử”, thiếu tín hiệu là “chưa rõ”."
+    },
+    {
+      "id": "diagnose",
+      "title": "Chẩn đoán",
+      "short": "Hệ thống trước, dữ liệu sau",
       "icon": "data",
-      "input": "Episode từ các nguồn dữ liệu.",
-      "process": "Kiểm đồng bộ ảnh–state–action, đơn vị, thứ tự khớp, controller; lưu parent/root và tách train/test trước khi sinh biến thể.",
-      "output": "Dataset release, báo cáo QA và cấu hình dữ liệu có thể tái lập.",
-      "gate": "Loại mẫu thiếu nhãn hoặc sai binding; không rò rỉ root sang bộ test."
+      "input": "Các cụm lỗi, tối đa 5 đại diện mỗi cụm.",
+      "process": "Chuỗi phép kiểm cố định: hệ thống → khả thi → khoanh vùng → thị giác → vùng phủ.",
+      "output": "Evidence card và một trong 11 chẩn đoán.",
+      "gate": "Lỗi hệ thống dừng ở đây thành phiếu sửa, không đi tiếp vào nhánh dữ liệu."
     },
     {
-      "id": "sim",
-      "title": "Bổ sung trong sim",
-      "short": "Thực thi → RGB/state/action",
+      "id": "decide",
+      "title": "Quyết định",
+      "short": "Lợi ích / chi phí",
+      "icon": "gate",
+      "input": "Chẩn đoán, đơn giá trong sổ chi phí, tỉ lệ sửa được của từng loại can thiệp.",
+      "process": "Đề xuất can thiệp và số lượng; xếp theo lợi ích kỳ vọng trên chi phí trong ngân sách vòng. Kỹ sư duyệt hoặc ghi đè, có ghi lý do.",
+      "output": "Kế hoạch thu dữ liệu định lượng.",
+      "gate": "Chỉ 3 trong 11 chẩn đoán được tiêu ngân sách dữ liệu."
+    },
+    {
+      "id": "acquire",
+      "title": "Thu & QA",
+      "short": "Release có lineage",
       "icon": "sim",
-      "input": "Task, teleop seed, robot/controller và cảnh mô phỏng đã cấu hình.",
-      "process": "Biến đổi vị trí vật/khay trong miền cho phép, thực thi trong simulator, ghi ảnh–state–action và kết quả. Lọc theo scorer/QA.",
-      "output": "Rollout synthetic được chấp nhận, liên kết về episode gốc và cấu hình sinh.",
-      "gate": "Đếm demo gốc riêng với biến thể. Sim đạt không đồng nghĩa robot thật đạt."
+      "input": "Kế hoạch đã duyệt.",
+      "process": "Sinh sim quanh điểm lỗi, thu teleop correction hoặc dữ liệu phục hồi; QA bắt buộc: timestamp, đồng bộ, giới hạn khớp, lineage, chia tập.",
+      "output": "Dataset release mới, giữ lineage và trộn lại dữ liệu cũ.",
+      "gate": "Rollout sim và biến thể không đếm là demo gốc. Mẫu bị loại vẫn giữ cùng lý do và chi phí."
     },
     {
       "id": "train",
-      "title": "Học task",
-      "short": "Ψ₀ + SIMPLE",
+      "title": "Huấn luyện",
+      "short": "Ứng viên từ checkpoint cha",
       "icon": "train",
-      "input": "Checkpoint có human prior + teleop và sim đạt QA, cùng schema robot.",
-      "process": "Fine-tune policy cho một task. A dùng D demo teleop; B dùng 0,7D demo gốc + sim, cùng checkpoint và ngân sách đối chứng.",
-      "output": "Policy ứng viên nạp lại được; log training, phiên bản dữ liệu và GPU-h.",
-      "gate": "Không train foundation model từ đầu trong PoC này."
+      "input": "Release mới cộng dữ liệu cũ (replay).",
+      "process": "Fine-tune từ checkpoint cha trong vòng. Model cuối của nhánh C train lại từ checkpoint gốc với cùng số bước S như A và B.",
+      "output": "Policy ứng viên nạp lại được, kèm log và GPU-giờ.",
+      "gate": "Cùng số bước, batch và learning rate giữa các nhánh, để chỉ khác nhau ở dữ liệu."
     },
     {
       "id": "gate",
-      "title": "Kiểm thử đối chứng",
-      "short": "Cùng chất lượng · so chi phí",
+      "title": "Cổng kiểm",
+      "short": "Tập cổng mới · A/A",
       "icon": "gate",
-      "input": "Baseline A và candidate B; bộ test giữ riêng và cùng scorer.",
-      "process": "Đo full-task success, coverage, regression và tổng công thu/QA/debug/GPU. Chỉ tính lợi ích cho đợt đạt nghiệm thu.",
-      "output": "Quyết định cập nhật hoặc giữ policy cũ, kèm bằng chứng chất lượng và chi phí.",
-      "gate": "Target ≥80%/50 lượt test và −30% demo gốc; chưa có kết quả đo."
+      "input": "Policy cha và ứng viên trên 90 điều kiện cổng mới, mỗi điều kiện ≥ 3 lượt.",
+      "process": "Tăng ≥ 1 sai số chuẩn ghép cặp; cụm được can thiệp cải thiện trên điều kiện mới quanh lỗi; hồi quy ≤ max(5%, sàn A/A).",
+      "output": "Dùng hoặc từ chối ứng viên; ứng viên bị từ chối vẫn giữ evidence card và chi phí.",
+      "gate": "Holdout chỉ chạy một lần cho mỗi nhánh và seed, sau khi nhánh đóng băng."
     },
     {
-      "id": "feedback",
-      "title": "Chạy & ghi lỗi",
-      "short": "Lỗi → can thiệp → vòng mới",
-      "icon": "robot",
-      "input": "Policy đã qua gate và robot profile tương thích.",
-      "process": "Ghi video/log/outcome; kỹ sư phân loại lỗi do hệ thống hay do dữ liệu. Sửa controller/calibration hoặc chọn đúng mẫu cần bổ sung.",
-      "output": "Một hồ sơ lỗi nối can thiệp → dataset → policy → kiểm thử → chi phí.",
-      "gate": "PoC chạy trong sim. Robot thật cần controller, calibration và nghiệm thu riêng."
+      "id": "ledger",
+      "title": "Sổ chi phí",
+      "short": "Ghi thật · cập nhật f_t",
+      "icon": "data",
+      "input": "Mọi hoạt động tốn nguồn lực trong vòng.",
+      "process": "Ghi phút operator, giờ kỹ sư, GPU-giờ, lưu trữ với cờ ước tính hoặc thực đo; cập nhật tỉ lệ sửa được, đo có đối chứng cha và ứng viên.",
+      "output": "Sổ chi phí và thống kê “loại can thiệp nào sửa được loại lỗi nào”.",
+      "gate": "Sổ đo giá trị nguồn lực theo đơn giá giả định, không phải tiết kiệm tiền mặt."
     }
   ],
   "team": [
@@ -116,36 +136,54 @@
     }
   ],
   "milestones": [
-    [
-      "Chốt task với DENSO",
-      "Task owner, baseline, bộ test giữ riêng",
-      "Thống nhất chất lượng và điều kiện test"
-    ],
-    [
-      "Chạy baseline Ψ₀ + SIMPLE",
-      "Rollout baseline, log GPU-h và chi phí",
-      "Policy chạy và nạp lại được"
-    ],
-    [
-      "Chuẩn hóa dữ liệu",
-      "Dataset release có QA và nguồn gốc",
-      "RGB/state/action cùng schema"
-    ],
-    [
-      "Sinh sim & fine-tune",
-      "Rollout được chấp nhận và candidate policy",
-      "Cùng ngân sách, điều kiện A/B"
-    ],
-    [
-      "Đối chứng độc lập",
-      "Full-task success, regression, tổng cost",
-      "Đạt ngưỡng đã thống nhất"
-    ],
-    [
-      "Khép một vòng flywheel",
-      "Lỗi, can thiệp, release mới và kết quả đo lại",
-      "Quyết định giữ hay cập nhật policy"
-    ]
+    {
+      "sprint": "S1",
+      "weeks": "Tuần 1–2",
+      "dates": "26/10–08/11",
+      "gate": "G0 · Tái tạo",
+      "work": "Cài SIMPLE và Ψ₀, tái tạo số công bố; trả lời Q0–Q6 và V3; thử tuyến T1, T2 song song; lưu hash camera tham chiếu; đo VRAM, GPU-giờ.",
+      "exit": "30 lượt mỗi mức, kiểm nhị thức một phía không thấp hơn số công bố; Q0 chốt checkpoint pre.* hoặc postpre.*; tuyến T1–T4 chốt cuối tuần 2."
+    },
+    {
+      "sprint": "S2",
+      "weeks": "Tuần 3–4",
+      "dates": "09/11–22/11",
+      "gate": "G1 · Data Core v0",
+      "work": "Nạp psi-data, QA, lineage, chia tập, guard gần trùng; scorer từng bước; hiệu chỉnh τ_track, τ_cov, τ_sync; lát dọc trên SIMPLE; train thử ACT, Diffusion Policy.",
+      "exit": "Scorer trùng cờ SIMPLE ≥ 95%; lát dọc chạy → scorer → evidence card → sổ chi phí trước tuần 4."
+    },
+    {
+      "sprint": "S3",
+      "weeks": "Tuần 5–6",
+      "dates": "23/11–06/12",
+      "gate": "G2 · Đường cong",
+      "work": "E1 cho ACT, Diffusion Policy, Ψ₀ ở 10–100% dữ liệu; seed thứ hai quanh ngưỡng; chọn D*; power analysis.",
+      "exit": "D* nằm trong lưới, không chạm trần hoặc sàn; MDE đã tính và lựa chọn khi MDE > 10 điểm % đã ghi vào RunPlan."
+    },
+    {
+      "sprint": "S4",
+      "weeks": "Tuần 7–8",
+      "dates": "07/12–20/12",
+      "gate": "G3 · Nhánh B",
+      "work": "Chốt N_B và trần GPU-giờ; sinh sim theo tuyến đã chọn; chọn ρ; train A, A₀.₇, B; A/A test; π₀ và B-fail trên ACT.",
+      "exit": "Rollout sim qua QA; B_add đã đo; Level 0 có ≥ 15 lỗi dev hoặc đã kích hoạt luật đổi task."
+    },
+    {
+      "sprint": "S5",
+      "weeks": "Tuần 9–10",
+      "dates": "21/12–03/01",
+      "gate": "G4 · Nhánh C và HD",
+      "work": "1 vòng Failure → Data trên Ψ₀, C cuối train lại từ base; F-ACT 5–8 vòng trên ACT; thí nghiệm HD; holdout sớm và niêm phong cho nhánh không phụ thuộc C.",
+      "exit": "Sổ chi phí đủ cho C; evidence card cho mọi cụm. Sprint trùng lễ, tính 80% năng lực."
+    },
+    {
+      "sprint": "S6",
+      "weeks": "Tuần 11–12",
+      "dates": "04/01–17/01",
+      "gate": "G5 Holdout · G6 Bàn giao",
+      "work": "Đóng băng, chạy holdout cho C, mở niêm phong; báo cáo so sánh, SOP, video demo, khuyến nghị thu dữ liệu định lượng; rà claim của pitch.",
+      "exit": "Mỗi cặp nhánh và seed chạy holdout đúng một lần; mọi claim có số đo đi kèm hoặc được gỡ."
+    }
   ],
   "sources": {
     "psi": "https://psi-lab.ai/Psi0/",
@@ -161,7 +199,20 @@
     "v2dRepo": "https://github.com/nvidia-isaac/video_to_data",
     "v2dTutorial": "https://nvidia-isaac.github.io/video_to_data/v2d_corl_tutorial/",
     "dreamCode": "https://github.com/NVIDIA/DreamDojo",
-    "dreamPaper": "https://arxiv.org/html/2602.06949v1"
+    "dreamPaper": "https://arxiv.org/html/2602.06949v1",
+    "simpleDocs": "https://psi-lab.ai/SIMPLE/docs",
+    "g1Decoupled": "https://psi-lab.ai/SIMPLE/docs/tasks/g1_decoupled.html",
+    "g1Amo": "https://psi-lab.ai/SIMPLE/docs/tasks/g1_mp_amo.html",
+    "psiModel": "https://huggingface.co/USC-PSI-Lab/psi-model/tree/main/psi0",
+    "mulligan": "https://arxiv.org/abs/2610.05882",
+    "diseil": "https://arxiv.org/abs/2609.08123",
+    "datamil": "https://arxiv.org/html/2505.09603v1",
+    "mimicgen": "https://arxiv.org/abs/2310.17596",
+    "intervengen": "https://arxiv.org/abs/2405.01472",
+    "cupid": "https://arxiv.org/abs/2506.19121",
+    "dagger": "https://arxiv.org/abs/1011.0686",
+    "hgdagger": "https://arxiv.org/abs/1810.02890",
+    "rerun": "https://github.com/rerun-io/rerun"
   },
   "datasetExamples": [
     {
@@ -291,6 +342,38 @@
         "sourceWidth": 1265,
         "sourceHeight": 712
       }
+    }
+  ],
+  "roles": [
+    {
+      "name": "Dương Đình Hiếu",
+      "role": "Trưởng nhóm, PO của đội; đầu mối DENSO, BTC, mentor; quyết định về Ψ₀ (checkpoint gốc, D*, ρ, luật MDE), duyệt đề xuất vòng C, ký cổng G0–G6",
+      "backup": "Trần Trịnh Hoàng Châu (việc Ψ₀); Long chủ trì họp khi Hiếu vắng",
+      "covers": "Không ai, để giữ tải thấp"
+    },
+    {
+      "name": "Trần Ngọc Hưng",
+      "role": "Simulation lead: môi trường SIMPLE, V3 và tuyến generator, khôi phục trạng thái, cấy lỗi, sinh sim B-fail, điều phối HD, chạy holdout, lịch máy GPU",
+      "backup": "Trần Trịnh Hoàng Châu",
+      "covers": "Châu"
+    },
+    {
+      "name": "Trần Trịnh Hoàng Châu",
+      "role": "Scorer, TaskDefinition, vùng phủ; ACT và Diffusion Policy; vận hành F-ACT; vận hành train Ψ₀ trên A100; khóa holdout",
+      "backup": "Trần Ngọc Hưng",
+      "covers": "Hiếu (Ψ₀), Hưng"
+    },
+    {
+      "name": "Nguyễn Thăng Long",
+      "role": "Tech lead lõi: khung repo, contracts, catalog, runner, chia tập, chẩn đoán, quyết định, điều phối vòng C, sinh báo cáo",
+      "backup": "Dương Tiến Thông",
+      "covers": "Thông"
+    },
+    {
+      "name": "Dương Tiến Thông",
+      "role": "Scrum Master; dữ liệu và đo lường: nhập psi-data, QA, sổ chi phí, cổng dev, thống kê, evidence card, công cụ HD, SOP",
+      "backup": "Nguyễn Thăng Long",
+      "covers": "Long"
     }
   ]
 }

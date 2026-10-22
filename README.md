@@ -9,7 +9,8 @@ Trạng thái: đề xuất PoC, chưa chạy Ψ₀ hoặc robot thật. Số li
 | Đường dẫn | Nội dung |
 |---|---|
 | [docs/spec-v10-failure-to-data.md](docs/spec-v10-failure-to-data.md) | Đặc tả hiện hành: giả thuyết, thuật toán Failure → Data, PoC ba nhánh, sổ chi phí, lộ trình 12 tuần, glossary |
-| [docs/challenge/](docs/challenge/README.md) | Đề bài H1 của BTC |
+| [docs/product/](docs/product/README.md) | Hồ sơ sản phẩm theo BMAD: phân tích idea, brief, PRD, kiến trúc lõi flywheel, kế hoạch chia việc 5 người, phản biện và câu hỏi cho mentor, story Sprint 1 |
+| [docs/challenge/](docs/challenge/README.md) | Đề bài của BTC, kèm tiêu chí 3 cấp |
 | [docs/references/](docs/references/README.md) | Nguồn nghiên cứu; PDF giữ cục bộ, không commit |
 | [deliverables/](deliverables) | [Pitch v10](deliverables/DENSO-ilovephysicalintelligence-1.pptx) và [deck workflow kỹ thuật](deliverables/DENSO-Platform-Visual-Workflow-2026-10-08-v1.pptx) |
 | [website/](website/README.md) | Website trình bày 12 trang, build từ `website/content` và hai deck |
