@@ -1,4 +1,4 @@
-# Spec v10: thuật toán Failure → Data và PoC ba nhánh
+# Spec v10.1: thuật toán Failure → Data và PoC đối chứng
 
 _Trạng thái: đặc tả đề xuất, chưa thực nghiệm. Ngày 22/10/2026. Phiên bản v10.1: đã áp dụng [quyết định phản biện vòng 1](product/06-review-round-1-decisions.md), xem mục 14. Áp dụng cho recipe Ψ₀ + SIMPLE / G1 của [Pitch v10](../deliverables/DENSO-ilovephysicalintelligence-1.pptx). Tài liệu này là đặc tả canonical cho thuật toán flywheel và thiết kế đánh giá. Hồ sơ của recipe cũ FluxVLA / GR00T N1.5 / GR1 (docs 01–14, idea v3) nằm trong tag git `archive/v3`; các quy tắc dữ liệu cần dùng đã được đưa vào mục 4. Thuật ngữ được định nghĩa ở mục 12._
 
@@ -30,7 +30,7 @@ _Trạng thái: đặc tả đề xuất, chưa thực nghiệm. Ngày 22/10/202
 | Lớp | Nội dung | Ghi chú khi trình bày |
 |---|---|---|
 | Kế thừa | Checkpoint Ψ₀ đã pretrain trên video người (EgoDex) và dữ liệu humanoid; simulator SIMPLE; dữ liệu psi-data; stack decoupled WBC của SIMPLE (task chính) và bộ điều khiển AMO (pipeline MP) | Viết "kế thừa prior video người từ Ψ₀", không viết "platform kết hợp video người" như đóng góp của đội |
-| Đội làm trong PoC | Data Core (QA, lineage, chia tập), scorer từng bước, thuật toán Failure → Data, evidence card, sổ chi phí, thiết kế và chạy PoC ba nhánh, so sánh phương pháp. Data Core cộng SOP gọi là **DENSO Data Model** | Đây là phần được chấm là đóng góp |
+| Đội làm trong PoC | Data Core (QA, lineage, chia tập), scorer từng bước, thuật toán Failure → Data, evidence card, sổ chi phí, thiết kế và chạy PoC với các nhánh đối chứng, so sánh phương pháp. Data Core cộng SOP gọi là **DENSO Data Model** | Đây là phần được chấm là đóng góp |
 | Sau PoC | Video công nhân DENSO qua V2D, world model DreamDojo, task DENSO thật, robot thật | Mỗi hướng cần cổng nghiệm thu riêng |
 
 ### 1.2 Không claim
@@ -816,3 +816,4 @@ Hồ sơ cũ không còn trong thư mục làm việc. Xem lại một file bằ
 | 22/10/2026 | v10.1 | #8 Nguồn gốc checkpoint và chống rò: thêm Q0 (mục 2.4); guard gần trùng theo khoảng cách điều kiện, dải hạt giống rời với dải tác giả (mục 4.3); checkpoint gốc `pre.*` hoặc `postpre.*`, `simple-checkpoints` và `sonic-checkpoints` chỉ để tái tạo ở G0 (mục 7.3, 9) | Biên tập theo 06 |
 | 22/10/2026 | v10.1 | #9 Năng lực: lập kế hoạch ở 70% năng lực, lát dọc trên SIMPLE trước tuần 4, mặc định 1 vòng C cho Ψ₀ và vòng thêm chạy ACT, holdout sớm niêm phong, bảng khối lượng có B-fail và F-ACT (mục 6.1, 6.11, 6.13, 7.3, 7.5, 9); chỉ số chính ở holdout lấy từ cờ thành công của SIMPLE (mục 5.3, 7.5); thêm "lớp lỗi chung" (mục 5.2) | Biên tập theo 06 |
 | 22/10/2026 | v10.1 | #10 Kinh tế: chi phí giờ cell (mục 8.1); điểm yếu của công thức và r_debug dạng khoảng (mục 8.2); chỉ số chính mới gồm chi phí mỗi điểm % của C so với B và B-fail, HT báo theo phút người và GPU-giờ (mục 8.3); bảng độ nhạy theo đơn giá và chi phí giờ cell (mục 8.4) | Biên tập theo 06 |
+| 22/10/2026 | v10.1 | Sửa nhỏ: tiêu đề đổi "PoC ba nhánh" thành "PoC đối chứng" vì PoC nay có các nhánh A, A₀.₇, B, B-fail, C (mục 7.2); sửa câu tương ứng ở mục 1.1 | Trưởng nhóm |

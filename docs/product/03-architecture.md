@@ -1,6 +1,6 @@
 # 03 · Kiến trúc: Humanoid Data Flywheel
 
-_Vai trò: Architect (Winston), quy trình BMAD. Ngày 22/10/2026. Đầu vào: [00-idea-analysis](00-idea-analysis.md), [spec v10](../spec-v10-failure-to-data.md), phản biện [05](05-review-and-mentor-questions.md) và bảng quyết định [06](06-review-round-1-decisions.md). Tài liệu trả lời câu hỏi: xây lõi flywheel thế nào để L0 chạy được trong 12 tuần, và L1–L3 chỉ cần thêm adapter và dữ liệu, không phải viết lại. Từ bản 0.3, tên giả thuyết theo 06: **HS** (sim thay được 30% demo teleop), **HT** gồm **HTa** và **HTb** (nhắm theo lỗi), **HD** (evidence card giảm thời gian chẩn đoán)._
+_Vai trò: Architect (Winston), quy trình BMAD. Ngày 22/10/2026. Đầu vào: [00-idea-analysis](00-idea-analysis.md), [spec v10.1](../spec-v10-failure-to-data.md), phản biện [05](05-review-and-mentor-questions.md) và bảng quyết định [06](06-review-round-1-decisions.md). Tài liệu trả lời câu hỏi: xây lõi flywheel thế nào để L0 chạy được trong 12 tuần, và L1–L3 chỉ cần thêm adapter và dữ liệu, không phải viết lại. Từ bản 0.3, tên giả thuyết theo 06: **HS** (sim thay được 30% demo teleop), **HT** gồm **HTa** và **HTb** (nhắm theo lỗi), **HD** (evidence card giảm thời gian chẩn đoán)._
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|

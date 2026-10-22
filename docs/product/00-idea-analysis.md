@@ -1,6 +1,6 @@
 # 00 · Phân tích idea: Humanoid Data Flywheel
 
-_Ngày 22/10/2026. Đây là đầu vào chung cho cả "phòng phát triển sản phẩm" (các file 01–05 trong thư mục này). Chi tiết thuật toán và thiết kế PoC nằm ở [spec v10](../spec-v10-failure-to-data.md); file này trả lời: sản phẩm là gì, lõi là gì, đã chứng minh gì, và cần gì để mở rộng. Bản 0.2 áp quyết định phản biện vòng 1 ở [06](06-review-round-1-decisions.md); tên giả thuyết theo 06: HS (sim), HT gồm HTa và HTb (nhắm theo lỗi), HD (debug)._
+_Ngày 22/10/2026. Đây là đầu vào chung cho cả "phòng phát triển sản phẩm" (các file 01–05 trong thư mục này). Chi tiết thuật toán và thiết kế PoC nằm ở [spec v10.1](../spec-v10-failure-to-data.md); file này trả lời: sản phẩm là gì, lõi là gì, đã chứng minh gì, và cần gì để mở rộng. Bản 0.2 áp quyết định phản biện vòng 1 ở [06](06-review-round-1-decisions.md); tên giả thuyết theo 06: HS (sim), HT gồm HTa và HTb (nhắm theo lỗi), HD (debug)._
 
 ## 1. Sản phẩm trong một câu
 

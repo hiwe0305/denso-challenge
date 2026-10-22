@@ -8,7 +8,7 @@ Trạng thái: đề xuất PoC, chưa chạy Ψ₀ hoặc robot thật. Số li
 
 | Đường dẫn | Nội dung |
 |---|---|
-| [docs/spec-v10-failure-to-data.md](docs/spec-v10-failure-to-data.md) | Đặc tả hiện hành: giả thuyết, thuật toán Failure → Data, PoC ba nhánh, sổ chi phí, lộ trình 12 tuần, glossary |
+| [docs/spec-v10-failure-to-data.md](docs/spec-v10-failure-to-data.md) | Đặc tả hiện hành: giả thuyết HS, HTa, HTb, HD, thuật toán Failure → Data 12 bước, PoC với các nhánh A, A₀.₇, B, B-fail, C, sổ chi phí, lộ trình 12 tuần, glossary |
 | [docs/product/](docs/product/README.md) | Hồ sơ sản phẩm theo BMAD: phân tích idea, brief, PRD, kiến trúc lõi flywheel, kế hoạch chia việc 5 người, phản biện và câu hỏi cho mentor, story Sprint 1 |
 | [docs/challenge/](docs/challenge/README.md) | Đề bài của BTC, kèm tiêu chí 3 cấp |
 | [docs/references/](docs/references/README.md) | Nguồn nghiên cứu; PDF giữ cục bộ, không commit |

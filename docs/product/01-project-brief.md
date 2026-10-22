@@ -1,6 +1,6 @@
 # 01 · Project Brief: Humanoid Data Flywheel
 
-_Ngày 22/10/2026. Vai trò: Analyst (BMAD). Đầu vào: [00 · Phân tích idea](00-idea-analysis.md), [spec v10](../spec-v10-failure-to-data.md), [đề H1](../challenge/README.md), [README](../../README.md). Brief không đổi phạm vi của các đầu vào này. Chỗ nào là đề xuất riêng của Analyst thì ghi rõ "đề xuất". Thuật ngữ theo glossary ở mục 12 của spec v10. Bản 0.3 áp quyết định phản biện vòng 1 ở [06](06-review-round-1-decisions.md)._
+_Ngày 22/10/2026. Vai trò: Analyst (BMAD). Đầu vào: [00 · Phân tích idea](00-idea-analysis.md), [spec v10.1](../spec-v10-failure-to-data.md), [đề H1](../challenge/README.md), [README](../../README.md). Brief không đổi phạm vi của các đầu vào này. Chỗ nào là đề xuất riêng của Analyst thì ghi rõ "đề xuất". Thuật ngữ theo glossary ở mục 12 của spec v10. Bản 0.3 áp quyết định phản biện vòng 1 ở [06](06-review-round-1-decisions.md)._
 
 Quy ước nhãn bằng chứng dùng trong toàn file:
 

@@ -12,14 +12,14 @@ Thư mục này là bộ hồ sơ sản phẩm làm theo BMAD Method (Breakthrou
 | 3 | Architect | [03 · Kiến trúc](03-architecture.md) | Xây thế nào để mở rộng từ 1 task sim lên nhiều robot, nhiều nhà máy |
 | 4 | Product Owner + Scrum Master | [04 · Kế hoạch triển khai](04-delivery-plan.md) | Ai làm gì, sprint nào, định nghĩa hoàn thành |
 | 5 | QA + phản biện | [05 · Phản biện và câu hỏi cho mentor](05-review-and-mentor-questions.md) | Chỗ nào yếu, hỏi mentor gì |
-| 4 | Scrum Master | [stories/](stories) | 11 story của Sprint 1 theo mẫu story của BMAD |
 | 6 | Trưởng nhóm | [06 · Quyết định áp dụng phản biện vòng 1](06-review-round-1-decisions.md) | Cách áp 10 sửa ưu tiên của QA, đổi tên giả thuyết HS, HT, HD |
+| — | Scrum Master | [stories/](stories) | 11 story của Sprint 1 theo mẫu story của BMAD |
 
-Đặc tả thuật toán và thiết kế thí nghiệm gốc: [spec v10](../spec-v10-failure-to-data.md).
+Đặc tả thuật toán và thiết kế thí nghiệm gốc: [spec v10.1](../spec-v10-failure-to-data.md).
 
 ## Trạng thái ngày 22/10/2026
 
-- 00–05 và story Sprint 1 đã có bản đầu. PO đã đồng bộ tên giữa 01, 02, 03 (xem change log từng file).
+- 00–06 và 11 story Sprint 1 đã có; website 12 trang đã cập nhật theo spec v10.1. PO đã đồng bộ tên giữa 01, 02, 03 (xem change log từng file).
 - QA xếp 01, 02, 03 ở mức "cần sửa". 10 sửa ưu tiên ([05 mục 7](05-review-and-mentor-questions.md)) đã áp ngày 22/10/2026 theo [06](06-review-round-1-decisions.md): spec v10.1, 00 bản 0.2, 01–03 bản 0.3, 04 bản 0.2. Câu hỏi mở sau vòng 1 ở 05 mục 6.6.
 - Mã đề: ảnh đề của BTC ghi H2, bản chữ ghi H1 (xem [đề bài](../challenge/README.md)). Cần xác nhận với BTC.
 

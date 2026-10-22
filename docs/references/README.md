@@ -12,7 +12,7 @@ Kết quả của tác giả không phải kết quả của đội. Khi triển
 | [MimicGen](https://mimicgen.github.io/), [DAgger](https://arxiv.org/abs/1011.0686), [HG-DAgger](https://arxiv.org/abs/1810.02890), [DataMIL](https://arxiv.org/html/2505.09603v1), [Mulligan](https://arxiv.org/abs/2610.05882), [DISEIL](https://arxiv.org/abs/2609.08123) | Tiền lệ cho sinh biến thể, correction và chọn dữ liệu theo lỗi trong thuật toán Failure → Data |
 | [NVIDIA V2D](https://nvidia-isaac.github.io/video_to_data/), [DreamDojo](https://dreamdojo-world.github.io/) | Hướng mở rộng sau PoC |
 
-Cách dùng các nguồn này nằm trong [spec v10](../spec-v10-failure-to-data.md).
+Cách dùng các nguồn này nằm trong [spec v10.1](../spec-v10-failure-to-data.md).
 
 ## Thư viện paper local
 
