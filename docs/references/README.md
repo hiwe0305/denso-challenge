@@ -14,6 +14,12 @@ Kết quả của tác giả không phải kết quả của đội. Khi triển
 
 Cách dùng các nguồn này nằm trong [spec v10.1](../spec-v10-failure-to-data.md).
 
+## Tổng hợp chuyên đề
+
+| Tài liệu | Nội dung |
+|---|---|
+| [data-flywheel.md](data-flywheel.md) | Định nghĩa data flywheel của NVIDIA, paper flywheel cho robotics chia 4 nhóm, vị trí của Failure → Data, câu hỏi mở, và NVIDIA OSMO |
+
 ## Thư viện paper local
 
 PDF giữ trên máy tại `docs/references/papers/` và không commit lên GitHub (xem `.gitignore`). Website và spec không cần thư mục này để chạy.
