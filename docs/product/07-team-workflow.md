@@ -55,7 +55,7 @@ Chủ sở hữu không có nghĩa là người duy nhất được sửa. Ngư�
 
 ### 2.2 Story Pha A của design
 
-Đặt mã `DA-xx` (Design, Pha A) cho tới khi SM gắn vào sprint. Các story này chạy song song với story S1–S6 ở 04 mục 4. Giờ là ước lượng chi tiết hơn bảng ở 04 mục 4.9; tổng khoảng 185–255 giờ, cao hơn khoảng 160–220 giờ đã ghi, nên SM cập nhật 04 mục 4.9 sau họp lập kế hoạch.
+Đặt mã `DA-xx` (Design, Pha A) cho tới khi SM gắn vào sprint. Các story này chạy song song với story S1–S6 ở 04 mục 4. Giờ là ước lượng chi tiết hơn bảng ở 04 mục 4.9; tổng khoảng 185–255 giờ, cao hơn ước thô 160–220 giờ ban đầu của design; 04 mục 4.9 đã dùng con số này. Mỗi story ứng với một story 9.x của Epic 9 trong [02](02-prd.md).
 
 | Mã | Story | Chủ | Phạm vi file chính | Phụ thuộc | Giờ | Sprint |
 |---|---|---|---|---|---|---|

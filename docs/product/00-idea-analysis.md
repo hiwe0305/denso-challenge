@@ -1,12 +1,12 @@
 # 00 · Phân tích idea: Humanoid Data Flywheel
 
-_Ngày 22/10/2026. Đây là đầu vào chung cho cả "phòng phát triển sản phẩm" (các file 01–05 trong thư mục này). Chi tiết thuật toán và thiết kế PoC nằm ở [spec v10.1](../spec-v10-failure-to-data.md); file này trả lời: sản phẩm là gì, lõi là gì, đã chứng minh gì, và cần gì để mở rộng. Bản 0.2 áp quyết định phản biện vòng 1 ở [06](06-review-round-1-decisions.md); tên giả thuyết theo 06: HS (sim), HT gồm HTa và HTb (nhắm theo lỗi), HD (debug)._
+_Ngày 22/10/2026, cập nhật 23/10/2026. Đây là đầu vào chung cho cả "phòng phát triển sản phẩm" (các file 01–07 trong thư mục này). Chi tiết thuật toán và thiết kế PoC nằm ở [spec v10.2](../spec-v10-failure-to-data.md); pipeline dữ liệu, robot DENSO và bảng lỗi ở [design 23/10/2026](../superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md). File này trả lời: sản phẩm là gì, lõi là gì, đã chứng minh gì, và cần gì để mở rộng. Bản 0.2 áp quyết định phản biện vòng 1 ở [06](06-review-round-1-decisions.md); tên giả thuyết theo 06: HS (sim), HT gồm HTa và HTb (nhắm theo lỗi), HD (debug). Bản 0.3 áp quyết định ngày 23/10/2026 (06 mục 11)._
 
 ## 1. Sản phẩm trong một câu
 
 **Một nền tảng giúp đội robot biết, sau mỗi lần humanoid làm hỏng một task, nên sửa hệ thống hay bổ sung loại dữ liệu nào, bổ sung bao nhiêu, và lần sửa đó tốn bao nhiêu so với chất lượng nhận được.**
 
-Không phải một model mới, cũng không phải một bộ dữ liệu. Model (Ψ₀), simulator (SIMPLE) và robot (G1) là những thứ được cắm vào nền tảng.
+Không phải một model mới, cũng không phải một bộ dữ liệu. Model (Ψ₀), simulator (SIMPLE, Isaac Sim), robot (G1, mobile manipulator của DENSO) và bộ sinh dữ liệu (planner, Cosmos qua NVIDIA NIM) là những thứ được cắm vào nền tảng.
 
 **Định vị:** _Humanoid Data Flywheel là quy trình vận hành có kiểm toán cho vòng lỗi → dữ liệu: loại lỗi hệ thống trước khi tiêu tiền vào dữ liệu, chọn giữa nhiều loại can thiệp theo chi phí thật kể cả chi phí chẩn đoán, và xuất **khuyến nghị thu dữ liệu định lượng** cho DENSO. PoC kiểm lại trên G1 toàn thân với Ψ₀ xem "nhắm lỗi thắng rải đều" có còn đúng khi tính đủ chi phí._
 
@@ -58,13 +58,14 @@ Vòng càng quay, phần đoán càng ít, chi phí mỗi điểm % thành công
 | Thuộc lõi (không đổi khi đổi model, robot, simulator) | Thuộc phần cắm (adapter, thay được) |
 |---|---|
 | Mô hình dữ liệu: episode, release, trace, evidence card, ledger | Model và trainer: Ψ₀, ACT, Diffusion Policy... |
-| Lineage, chia tập, QA chung | Simulator: SIMPLE (Isaac Sim, MuJoCo), sau này cell thật |
-| Scorer từng bước (khung), phân loại lỗi | Robot: G1 trong sim, sau này G1 thật hoặc robot khác |
-| Chuỗi phép kiểm chẩn đoán và bảng quyết định | Bộ sinh dữ liệu: motion planning, MimicGen-style, V2D |
-| Chọn can thiệp theo ngân sách, thống kê tỉ lệ sửa được | Nguồn teleop: thiết bị VR, bàn điều khiển |
+| Lineage, chia tập, QA chung | Simulator: SIMPLE (Isaac Sim, MuJoCo), Isaac Sim cho robot DENSO, sau này cell thật |
+| Scorer từng bước (khung), phân loại lỗi | Robot: G1 trong sim, mobile manipulator của DENSO hoặc robot thay thế, sau này robot thật |
+| Chuỗi phép kiểm chẩn đoán và bảng quyết định, quy lỗi về stage của model | Bộ sinh dữ liệu: motion planning, MimicGen-style, Cosmos Transfer và Predict qua NIM, V2D |
+| Chọn can thiệp theo ngân sách, thống kê tỉ lệ sửa được | Nguồn teleop: thiết bị VR, bàn điều khiển, teleop của DENSO |
 | Sổ chi phí, cổng kiểm, báo cáo | Định nghĩa task cụ thể và vị từ của scorer |
+| Pipeline 6 tầng về định dạng episode chung: che danh tính, cắt đoạn, QA, export | Bộ đọc từng nguồn: teleop, video egocentric, synthetic; model NIM tự host hoặc API |
 
-**Ψ₀ + SIMPLE / G1 là recipe đầu tiên cắm vào lõi**, không phải bản thân sản phẩm.
+**Ψ₀ + SIMPLE / G1 là recipe đầu tiên cắm vào lõi**, không phải bản thân sản phẩm. **Ψ₀ + Isaac Sim / robot DENSO là recipe thứ hai** (từ 23/10/2026) và là robot chính của DENSO: task lấy linh kiện từ khay đặt vào máy; stage 1 của Ψ₀ giữ nguyên, stage 2 train lại cho robot mới, stage 3 fine-tune theo task. G1 được giữ làm bàn thử để kiểm HS, HT, HD với số công bố có sẵn. Việc lõi chạy được với hai robot khác hẳn nhau (humanoid và mobile manipulator) cũng là phép thử cho nguyên tắc "lõi không đổi, chỉ đổi phần cắm".
 
 ## 4. Đã chứng minh gì, còn là giả định gì
 
@@ -81,6 +82,11 @@ Vòng càng quay, phần đoán càng ít, chi phí mỗi điểm % thành công
 | Checkpoint gốc Ψ₀ chưa thấy dữ liệu task chính (Q0) | Chưa kiểm; chọn `pre.*` hoặc `postpre.*`, hỏi PSI Lab ở G0 |
 | Lợi ích $168,20 mỗi đợt, 144 đợt/năm | Mô hình ước lượng; số đợt chưa có cơ sở; chỉ số chính chuyển sang giờ người và số ngày |
 | Chạy trên robot thật | Ngoài phạm vi 12 tuần |
+| Thông số robot DENSO, dữ liệu teleop và video egocentric của nhà máy | Chưa có; đã liệt kê 21 mục cần xin (design mục 9) |
+| Robot thay thế giống robot DENSO ≥ 95% | Thước đo đã định nghĩa (spec mục 2.5); trước khi có thông số chỉ chấm được so với hình vẽ |
+| Video egocentric giúp được robot dùng gripper | Giả định; giá trị chính dự kiến ở hình ảnh và cấu trúc task, không ở nhãn action (tay người khác gripper) |
+| Model Cosmos qua NIM dùng được cho tầng S3–S4 | Chưa kiểm; API hosted có thể bị ngừng, bản tự host cần GPU lớn (V-D4, V-D5 của design) |
+| Ψ₀ stage 2 chuyển được sang robot DENSO | Chưa kiểm; ba phương án S2-A, S2-B, S2-C đo song song |
 
 Không claim thuật toán học máy mới; đóng góp là cách ghép và phép đo. Phần khác biệt còn lại hẹp: kiểm hệ thống trước, chọn giữa nhiều loại can thiệp trên một thước đo chi phí gồm cả chi phí chẩn đoán.
 
@@ -94,12 +100,15 @@ Không claim thuật toán học máy mới; đóng góp là cách ghép và ph�
 6. **Bộ điều khiển (V3).** Teleop của task chính chạy decoupled WBC, motion planning chạy AMO. Nếu không ánh xạ được, nhánh B không có dữ liệu sinh hợp lệ. Hạn trả lời ngày 5 của Sprint 1; tuyến thay thế T1–T4 ở [06 mục 1](06-review-round-1-decisions.md).
 7. **Nguồn gốc checkpoint (Q0).** Nếu checkpoint gốc Ψ₀ đã train trên dữ liệu SIMPLE hoặc sonic của task chính, đường cong E1 và mọi nhánh mất nghĩa. Chốt checkpoint có nguồn gốc rõ ở G0.
 8. **Thống kê.** Khoảng tin cậy cũ bỏ phương sai giữa seed; với 3 seed, HT có thể chỉ phát hiện được chênh lệch cỡ 7–14 điểm %. Chuyển sang bootstrap phân cấp và power analysis ở G2; nếu hiệu ứng nhỏ nhất phát hiện được trên 10 điểm %, thêm seed hoặc hạ HT thành kết quả mô tả.
+9. **Phụ thuộc DENSO (bản 0.3).** Robot chính chưa có thông số. Bù bằng robot thay thế tham số và pipeline chạy trước trên dữ liệu công khai; danh sách 21 mục gửi DENSO trong tuần 1.
+10. **Tải người (bản 0.3).** Phạm vi thêm khoảng 185–255 giờ, đưa tải từng người lên khoảng 138–178% mức kế hoạch 70% (07 mục 2.3). Quyết định: giữ đủ phạm vi, vượt thời gian thì chuyển phần trễ sang API trước khi cắt.
+11. **Bằng chứng ngược chiều cho HS (bản 0.3).** Mirchandani và cộng sự (CoRL 2024) thấy thu dữ liệu tự động chỉ giúp vừa phải so với thu thêm dữ liệu người. HS phải giữ điều kiện so với A₀.₇ và báo số demo người theo nhánh.
 
 ## 6. Các trục mở rộng
 
 | Mức | Phạm vi | Lõi cần thêm gì |
 |---|---|---|
-| L0 · PoC (12 tuần) | 1 task, 1 robot, sim | Mô hình dữ liệu, scorer, chẩn đoán, ledger chạy được cho 1 recipe |
+| L0 · PoC (12 tuần) | 1 task trên mỗi robot: G1 (bàn thử) và robot DENSO hoặc robot thay thế, sim | Mô hình dữ liệu, pipeline ba nguồn, scorer, chẩn đoán, ledger chạy được cho 2 recipe |
 | L1 · Nhiều task | 3–5 task cùng robot, sim | Thư viện scorer theo loại task; thống kê can thiệp dùng chung giữa task |
 | L2 · Robot thật | 1 cell thật | Adapter robot thật, an toàn, teleop thật, real2sim cho tình huống lỗi |
 | L3 · Nhiều robot | Nhiều embodiment | Chuẩn hóa schema state/action theo embodiment; adapter model đa robot |
@@ -126,6 +135,9 @@ Thiết kế lõi trong 12 tuần chỉ cần chạy ở L0, nhưng **mô hình 
 3. Có thiết bị teleop cho SIMPLE không (VR hay bàn điều khiển)?
 4. Gói psi-data của task chính có bao nhiêu demo teleop đạt QA?
 5. Ngân sách GPU thuê ngoài tối đa cho 12 tuần là bao nhiêu?
+6. DENSO trả lời 21 mục về robot, teleop, video egocentric, trạm làm việc và quyền dữ liệu khi nào (design mục 9)?
+7. Dữ liệu nhà máy có được gửi lên API hosted của NVIDIA không, hay bắt buộc NIM tự host?
+8. Có gọi là "flywheel" khi L0 chỉ chạy trong sim, và có kéo "dùng dữ liệu lỗi để train" từ L1 vào PoC không ([data-flywheel.md](../references/data-flywheel.md) mục 4, D1–D5)?
 
 ## 9. Change log
 
@@ -137,3 +149,4 @@ Thiết kế lõi trong 12 tuần chỉ cần chạy ở L0, nhưng **mô hình 
 | 22/10/2026 | 0.2 | Mục 3: bỏ câu "Đây là thứ đối thủ không có sẵn"; tỉ lệ sửa được là tài sản cần đo ở L1, có đối chứng policy cha và thí nghiệm F-ACT (06 mục 3) | Analyst theo 06 |
 | 22/10/2026 | 0.2 | Mục 4: HT là kiểm lại kiểu Mulligan / DISEIL, tách HTa và HTb, bỏ "điểm khác biệt chính"; thêm dòng V3 và Q0; thêm câu không claim thuật toán mới | Analyst theo 06 |
 | 22/10/2026 | 0.2 | Mục 5: thêm điểm yếu V3, nguồn gốc checkpoint, thống kê; nhắc nhánh B-fail và r_debug dạng khoảng | Analyst theo 06 |
+| 23/10/2026 | 0.3 | Theo spec v10.2 và 06 mục 11: mục 1 thêm Isaac Sim, robot DENSO, Cosmos qua NIM; mục 3 thêm dòng pipeline 6 tầng và quy lỗi về stage vào bảng lõi và phần cắm, thêm recipe thứ hai Ψ₀ + Isaac Sim / robot DENSO; mục 4 thêm 5 dòng giả định mới; mục 5 thêm điểm yếu 9–11 (phụ thuộc DENSO, tải người, kết quả âm của Mirchandani); mục 6 L0 có 2 robot; mục 8 thêm câu 6–8 | Analyst theo 06 mục 11 |

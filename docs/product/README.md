@@ -22,8 +22,8 @@ Thư mục này là bộ hồ sơ sản phẩm làm theo BMAD Method (Breakthrou
 
 - Robot chính là mobile manipulator của DENSO; G1 trong SIMPLE là bàn thử. Task đầu tiên: lấy linh kiện từ khay, đặt vào máy. DENSO gửi muộn thì dùng robot thay thế giống ≥ 95%.
 - Ψ₀ dùng lại checkpoint của tác giả: stage 1 giữ nguyên, stage 2 train lại cho robot DENSO, stage 3 fine-tune theo task.
-- Đã cập nhật spec lên v10.2, 03 lên bản 0.4, thêm 04 mục 4.9 (phạm vi thêm khoảng 160–220 giờ, giữ đủ phạm vi, vượt thời gian thì dùng API theo từng phần trước).
-- Chưa cập nhật: 00, 01, 02, 05, 06, story Sprint 1, website và Pitch v10.
+- Đã cập nhật spec lên v10.2, 00 lên 0.3, 01 lên 0.4, 02 lên 0.4 (Epic 9, FR48–FR57, NFR13), 03 lên 0.4, 04 mục 4.9 (phạm vi thêm khoảng 185–255 giờ, giữ đủ phạm vi, vượt thời gian thì dùng API theo từng phần trước), 05 lên 0.3 (mục 6.7, MO6–MO13), 06 thêm mục 11 (quyết định ngày 23/10/2026); thêm 07.
+- Chưa cập nhật: file story DA-01…DA-14, mục "Phạm vi file" của story Sprint 1, website và Pitch v10.
 
 ## Trạng thái ngày 22/10/2026
 

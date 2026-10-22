@@ -2,12 +2,13 @@
 
 _Ngày 22/10/2026. Vai trò: QA / Test Architect (Quinn) kiêm người phản biện độc lập (BMAD). Đầu vào: [spec v10.1](../spec-v10-failure-to-data.md), [00](00-idea-analysis.md), [01](01-project-brief.md), [02](02-prd.md), [03](03-architecture.md), [đề BTC](../challenge/README.md) gồm hai ảnh `1.jpeg`, `2.jpeg`. File này không sửa tài liệu khác; mọi đề xuất sửa nằm ở mục 7 để trưởng nhóm áp dụng. Nguồn mới kiểm ngày 22/10/2026 ở mục 8. Đã rà lại theo bản 0.2 của 01, 02, 03 và bản sửa mục 1.2 của spec (PO, cùng ngày); 04 chưa có trên đĩa lúc rà nên các chỗ trỏ "04 mục 1.3" chưa được kiểm._
 
-> **Trạng thái áp dụng:** 10 sửa ở mục 7 đã áp ngày 22/10/2026 theo [06](06-review-round-1-decisions.md); xem change log spec v10.1, 00 0.2, 01 0.3, 02 0.3, 03 0.3. Cột "Đã áp" ở mục 7 ghi nơi áp từng sửa. Các bảng phản biện ở mục 1–5 giữ nguyên như lúc rà để làm bằng chứng; trích dẫn trong đó trỏ tới bản cũ (spec v10, 01 0.2, 02 0.2, 03 0.2). Câu hỏi mới phát sinh khi áp sửa nằm ở mục 6.6. Tên giả thuyết đã đổi theo 06: HS, HT (HTa, HTb), HD; mã đề giữ "H1".
+> **Trạng thái áp dụng:** 10 sửa ở mục 7 đã áp ngày 22/10/2026 theo [06](06-review-round-1-decisions.md); xem change log spec v10.1, 00 0.2, 01 0.3, 02 0.3, 03 0.3. Cột "Đã áp" ở mục 7 ghi nơi áp từng sửa. Các bảng phản biện ở mục 1–5 giữ nguyên như lúc rà để làm bằng chứng; trích dẫn trong đó trỏ tới bản cũ (spec v10, 01 0.2, 02 0.2, 03 0.2). Câu hỏi mới phát sinh khi áp sửa nằm ở mục 6.6. Tên giả thuyết đã đổi theo 06: HS, HT (HTa, HTb), HD; mã đề giữ "H1". Phản biện cho [spec v10.2](../spec-v10-failure-to-data.md) và [design 23/10/2026](../superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md) nằm ở mục 6.7.
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
 | 22/10/2026 | 0.1 | Bản đầu: phản biện, chiến lược kiểm thử, pre-mortem, sổ rủi ro, câu hỏi mentor, 10 sửa ưu tiên | QA |
 | 22/10/2026 | 0.2 | Ghi trạng thái áp dụng; đổi tên giả thuyết theo 06 (giữ mã đề); thêm cột "Đã áp" ở mục 7; thêm mục 6.6 câu hỏi mở sau vòng 1 (MO1–MO5); sửa trích dẫn trỏ sai (RL8, KT2, mục 5, mục 6) | SM theo 06 |
+| 23/10/2026 | 0.3 | Thêm mục 6.7: phản biện và câu hỏi cho spec v10.2 (robot DENSO, pipeline ba nguồn, NIM, probe theo stage, robot thay thế, tải người), MO6–MO13; thêm PM9 vào mục 4; ghi trạng thái áp dụng của MO4 | QA theo 06 mục 11 |
 
 Quy ước: **Cao** là có thể làm sai kết luận HS, HT, HD hoặc lỡ cổng; **TB** là làm yếu claim hoặc tốn thêm 1–2 tuần; **Thấp** là cần sửa cho sạch. Mã tham chiếu: "spec 6.11" là mục 6.11 của spec v10; "01 §8.2" là mục 8.2 của brief; "02 · 6.5" là story 6.5 của PRD. Mã vấn đề của file này (TM, TH, DK, KT, AR, KD, SR) và mã câu hỏi mở (MO) không liên quan tới mã tính năng TN1–TN10 của brief. Tài liệu khác trích mã của file này bằng tiền tố đúng, ví dụ "05 TH12", không phải "05 TN12".
 
@@ -213,6 +214,7 @@ Nguyên tắc: kết quả flywheel chỉ đáng tin khi từng mắt xích đã
 | PM6 | **Chẩn đoán sai mà không ai biết.** Trễ camera bị gán KỸ NĂNG YẾU; C mua dữ liệu sai chỗ; HD cho thấy card nhanh hơn nhưng sai; giám khảo hỏi đúng chỗ này | Recall lỗi cấy theo lớp thấp; tỉ lệ ghi đè > 50%; nhiều cụm hòa phiếu | Bộ lỗi cấy chuẩn (mục 3), nghiệm thu theo lớp trước G4; thêm phép kiểm đồng bộ cảm biến |
 | PM7 | **Kết quả bị vô hiệu vì dữ liệu.** Giám khảo chỉ ra checkpoint gốc đã post-train trên dữ liệu sonic có task chính; hoặc PSI Lab không cho dùng psi-data ngoài nghiên cứu | Ψ₀ ở 10% dữ liệu cao bất thường; email PSI Lab không được trả lời sau 2 tuần | Provenance checkpoint ở G0; email tác giả tuần 1; ghi giới hạn trong báo cáo |
 | PM8 | **"Không mới, không phải của DENSO."** Mentor và giám khảo dẫn Mulligan, DISEIL; kinh tế có lãi chỉ nhờ r_debug tự đo; DENSO không thấy kỹ năng của mình | Phản hồi mentor ở buổi đầu; DENSO chưa gửi mô tả kỹ năng, layout ở tuần 4 | Định vị lại (mục 2.1); map tiêu chí BTC; dùng layout DENSO cho vector điều kiện |
+| PM9 | **Hai robot, nửa kết quả (bản 0.3).** Tuần 12 có pipeline đẹp và robot thay thế trong Isaac Sim, nhưng Ψ₀ trên robot DENSO chưa đủ tốt để có lỗi có nghĩa; G1 thì thiếu nhánh vì người đã dồn sang robot DENSO; không giả thuyết nào kết luận được | Cuối G2 chưa có episode robot thay thế nào chạy trọn task; k sau Sprint 1 > 1,2; Hưng và Long trễ cùng lúc | Giữ G1 là đường tới HS, HT, HD; robot DENSO đo theo MT8 chứ không gánh giả thuyết; chuyển phần trễ sang API sớm (04 mục 4.9); review G2 quyết dừng hay giữ nhánh nào |
 
 ## 5. Sổ rủi ro
 
@@ -316,6 +318,23 @@ Các điểm dưới đây được báo lại khi áp 10 sửa ngày 22/10/2026
 | MO3 | Nhánh C trên ACT lấy từ F-ACT: chọn checkpoint ở vòng mà chi phí thu lũy kế chạm B_add (02 · 7.10 AC 5) hay release vòng cuối train lại 3 seed từ khởi tạo (spec 7.8)? | Hai cách cho ngân sách và số seed khác nhau, làm đổi so sánh HTb (C so với B-fail) | PO xác nhận (02 §9 "Gửi PO" điểm 1); mentor cho ý kiến | Khai trong RunPlan F-ACT trước vòng 1; chốt ở review G2 |
 | MO4 | Phạm vi mặc định cần khoảng 200–215 người-ngày theo ước 3,5 ngày mỗi story (02 §4), so với 147 người-ngày ở mức 70% năng lực. Theo giờ của 04 là khoảng 962 so với 730 giờ; thứ tự cắt đã duyệt chỉ bớt khoảng 30 giờ người. Chọn H thực cao hơn, cắt thêm ngoài danh sách, hay hạ đệm? | Kế hoạch hiện không vừa mức 70% của 06 mục 9 (04 mục 4.8) | Hiếu, PO | Họp lập kế hoạch S1; xem lại ở review G0 khi có hệ số k |
 | MO5 | Episode do người thu (teleop correction, `operator_kind = human`) không tái tạo được nên phải nằm trong backup. 03 §10.4 đã liệt kê, nhưng 06 mục 9 và 02 · 2.8 AC 1 chưa ghi | Mất máy 5090 là mất demo người của nhánh C, không thu lại được cùng điều kiện | PM sửa 02 · 2.8 AC 1; Thông thêm vào job backup | Trước story 2.8 (S3) |
+
+Trạng thái MO4 (23/10/2026): trưởng nhóm quyết giữ đủ phạm vi, đo k sau Sprint 1, khi vượt thì chuyển phần trễ sang API theo từng phần trước khi cắt (06 mục 11). Phạm vi còn tăng thêm khoảng 185–255 giờ (04 mục 4.9), nên MO4 vẫn mở tới review G0.
+
+### 6.7 Phản biện và câu hỏi cho spec v10.2
+
+Spec v10.2 thêm robot chính của DENSO, pipeline ba nguồn, synthetic qua NIM, probe theo stage và robot thay thế. QA rà ngày 23/10/2026; các điểm dưới đây chưa có câu trả lời trong spec v10.2, design hay 03 bản 0.4.
+
+| Mã | Câu hỏi | Vì sao quan trọng | Ai trả lời | Hạn |
+|---|---|---|---|---|
+| MO6 | **[Chặn]** Robot thay thế giống ≥ 95% về động học (vùng với tới, link, khớp, camera, gripper) có đủ để kết quả trên nó còn đúng cho robot thật không? Thước đo chưa gồm động lực học tiếp xúc, ma sát gripper và cách render | Kết quả trên robot thay thế dễ bị đọc như kết quả trên robot DENSO; tiếp xúc khi gắp và đặt vào đồ gá là chỗ hay hỏng nhất | Hưng; hỏi mentor simulation | Trước khi chốt DA-10 (S1) |
+| MO7 | Robot DENSO cần tiêu chí chấp nhận định lượng nào? MT8 mới yêu cầu "chạy trọn", chưa có ngưỡng thành công hay map 3 cấp BTC riêng | Không có ngưỡng thì không biết robot DENSO "đạt" hay chưa ở G6 | Hiếu, PO; hỏi DENSO (DN2) | Review G1 |
+| MO8 | Bước 4b quy lỗi về stage dựa trên probe là bằng chứng gián tiếp. Làm sao biết quy tắc quy đúng? Có bộ lỗi cấy theo stage (ví dụ làm hỏng VLM bằng nhiễu ảnh, làm hỏng action expert bằng checkpoint sớm) để đo độ chính xác không? | Quy sai stage dẫn tới mua sai loại dữ liệu, giống PM6 | Long, Hiếu; thêm vào AC của 02 · 9.13 | Trước G4 |
+| MO9 | So S2-A, S2-B, S2-C cần bao nhiêu lần train Ψ₀ thêm, bao nhiêu A100-giờ? Bảng khối lượng ở spec mục 9 chưa tính | Có thể vượt ngân sách GPU đã duyệt ở G0 | Châu, Hiếu đo ở G0 (Q5) | G0 |
+| MO10 | Cosmos Transfer đổi ngoại hình có giữ đúng vị trí và tiếp xúc tới mức action gốc còn hợp lệ không (V-D5)? Nếu IoU đạt mà vị trí gripper lệch vài mm thì sao? | S3 có thể đưa vào train những cặp ảnh và action không khớp | Hưng (DA-06); hỏi mentor | Trước khi S3 vào release (G3) |
+| MO11 | Video egocentric không train stage 1 lại thì có đáng thu không? Nếu U1–U3 (probe, mẫu sinh, cấu trúc task) cho ít giá trị, có nên đề nghị DENSO ưu tiên teleop thay vì video? | Ảnh hưởng tới khuyến nghị thu dữ liệu cho DENSO (Cấp 3 BTC) | Hiếu; số đo từ probe P1 ở G2–G3 | Review G3 |
+| MO12 | Có đổi định vị "flywheel" khi L0 chỉ chạy trong sim, và có kéo "dùng dữ liệu lỗi để train" từ L1 vào PoC không (D1, D2 ở [data-flywheel.md](../references/data-flywheel.md))? Mulligan, LoopWAM, RECAP, LWD đều dùng dữ liệu lỗi | Giám khảo dễ hỏi đúng hai điểm này | Hiếu; hỏi mentor | Buổi mentor đầu |
+| MO13 | Tải người sau khi cộng Epic 9 là khoảng 138–178% mức kế hoạch 70% (07 mục 2.3). Phần nào chuyển sang API trước, ai quyết, theo dấu hiệu gì? | Không có luật kích hoạt thì việc chuyển sang API sẽ đến muộn | Hiếu, Thông | Họp lập kế hoạch S1 |
 
 ## 7. Danh sách sửa ưu tiên
 

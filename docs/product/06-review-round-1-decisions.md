@@ -1,6 +1,6 @@
 # 06 · Quyết định áp dụng phản biện vòng 1
 
-_Ngày 22/10/2026. Trưởng nhóm duyệt áp dụng 10 sửa ưu tiên ở [05 mục 7](05-review-and-mentor-questions.md). File này chốt **cách** áp dụng từng sửa để spec và 00–03 sửa thống nhất. Mã đề giữ "H1" cho đến khi BTC xác nhận (ảnh đề ghi H2, xem [đề bài](../challenge/README.md))._
+_Ngày 22/10/2026. Trưởng nhóm duyệt áp dụng 10 sửa ưu tiên ở [05 mục 7](05-review-and-mentor-questions.md). File này chốt **cách** áp dụng từng sửa để spec và 00–03 sửa thống nhất. Mã đề giữ "H1" cho đến khi BTC xác nhận (ảnh đề ghi H2, xem [đề bài](../challenge/README.md)). Mục 11 (thêm ngày 23/10/2026) ghi các quyết định của trưởng nhóm sau phản biện vòng 1, làm căn cứ cho spec v10.2 và các bản cập nhật cùng ngày._
 
 ## Quy ước đổi tên áp dụng cho mọi tài liệu
 
@@ -97,3 +97,21 @@ Câu định vị dùng thống nhất: _Humanoid Data Flywheel là quy trình v
 - Chỉ số chính chuyển sang: số demo người để đạt ngưỡng; phút operator mỗi điểm %; sai số dự báo chi phí (ước tính so với thực đo trong ledger); số ngày để policy đạt lại ngưỡng.
 - r_debug báo dạng khoảng; thêm bảng độ nhạy theo đơn giá DENSO và **chi phí giờ cell** (robot, người giám sát, thời gian dừng).
 - HT báo kèm hai ràng buộc riêng: phút người và GPU-giờ.
+
+## 11. Quyết định ngày 23/10/2026 (sau vòng 1)
+
+Trưởng nhóm quyết trong buổi thảo luận 22–23/10/2026 và duyệt [design 23/10/2026](../superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md). Đây không phải sửa từ phản biện của 05; QA phản biện các quyết định này ở 05 mục 6.7.
+
+| # | Quyết định | Áp vào |
+|---|---|---|
+| 11.1 | Robot chính là mobile manipulator của DENSO (đế bánh xe, cột nâng, hai tay, gripper hai ngón, camera đỉnh cột), chạy trong Isaac Sim. G1 trong SIMPLE được giữ làm bàn thử cho HS, HT, HD | Spec v10.2 mục 0, 1.1, 2.5; 00 0.3; 01 0.4; 02 0.4 (MT8, Epic 9); 03 0.4 |
+| 11.2 | Task đầu tiên của robot DENSO: lấy linh kiện từ khay, đặt vào máy, theo layout trạm làm việc | Design mục 7.1; 02 FR57 |
+| 11.3 | Ψ₀ dùng lại checkpoint của tác giả: stage 1 giữ nguyên, stage 2 train lại cho robot DENSO, stage 3 fine-tune theo task. Mỗi stage được đánh giá riêng | Design mục 6; spec mục 2.5, 6.4; 02 FR53–FR55 |
+| 11.4 | Dữ liệu teleop và video egocentric lấy từ nhà máy DENSO; xây pipeline xử lý và chuẩn hóa cho ba nguồn, kể cả synthetic | Design mục 4, 5; 02 FR48–FR50 |
+| 11.5 | Ưu tiên model trên NVIDIA NIM cho xử lý và sinh dữ liệu. Giữ hai phương án: API hosted và NIM tự host, định tuyến theo mức nhạy cảm của dữ liệu | Design mục 5.4; 02 FR51, FR52, NFR13 |
+| 11.6 | Video egocentric giữ hai phương án thu (chỉ RGB, hoặc có tracking tay và đầu) cho tới khi trao đổi với DENSO | Design mục 5.3; 02 FR50 |
+| 11.7 | Nếu DENSO gửi thông tin muộn, dùng robot thay thế giống ít nhất 95% theo thước đo đã định nghĩa | Design mục 3.1; spec mục 2.5; 02 FR56 |
+| 11.8 | Giữ đủ phạm vi, không cắt trước. Khi vượt thời gian, chuyển phần trễ sang API theo từng phần trước, rồi mới cắt | Design mục 11; spec mục 9, 10; 04 mục 4.9 |
+| 11.9 | Chia việc theo bản đồ sở hữu đường dẫn, mỗi story một nhánh, một worktree, một phiên Claude; theo dõi theo nhiệm vụ con | [07](07-team-workflow.md); CLAUDE.md |
+
+Còn mở: 21 mục thông tin từ DENSO (design mục 9); tiêu chí chấp nhận định lượng cho robot DENSO (05 MO7); câu hỏi D1–D5 ở [data-flywheel.md](../references/data-flywheel.md).

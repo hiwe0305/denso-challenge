@@ -1,6 +1,6 @@
 # Design: pipeline dữ liệu đa nguồn, scale bằng synthetic và định nghĩa lỗi cho Ψ₀ trên G1 và robot DENSO
 
-_Ngày 23/10/2026. Trạng thái: bản thiết kế chờ duyệt, chưa có code. Bổ sung cho [spec v10.1](../../spec-v10-failure-to-data.md) và [03-architecture](../../product/03-architecture.md); không thay thế hai tài liệu đó._
+_Ngày 23/10/2026. Trạng thái: **đã duyệt** (trưởng nhóm, 23/10/2026), chưa có code. Đã đưa vào [spec v10.2](../../spec-v10-failure-to-data.md), [03-architecture](../../product/03-architecture.md) bản 0.4 và [07 · Chia việc](../../product/07-team-workflow.md); tài liệu này giữ phần chi tiết, không thay thế các tài liệu đó._
 
 Quy ước trong tài liệu: **[Đã chốt]** là quyết định của trưởng nhóm trong buổi thảo luận 22–23/10/2026. **[Đề xuất]** là lựa chọn của người viết, trưởng nhóm cần xem lại. **[Option]** là hai phương án song song vì còn chờ DENSO trả lời.
 
@@ -432,7 +432,7 @@ Pha B khi DENSO gửi thông tin: chấm lại robot thay thế theo thông số
 **Năng lực** [Đã chốt: giữ đủ phạm vi, không cắt trước]. Ghi chú để quyết định này được theo dõi:
 
 - Ước lượng khoảng 962 giờ của 04-delivery-plan **đã tính việc dùng AI viết mã** (04 mục 0). Dùng model mạnh hơn có thể làm k nhỏ hơn, nhưng chỉ đo được sau Sprint 1.
-- Phần tài liệu này thêm chưa nằm trong 962 giờ. Ước thô [Đề xuất]: robot thay thế và cảnh trạm 40–60 giờ; pipeline teleop và egocentric 50–70; NIM và S3 30–40; probe và log train 25–30; task khay → máy và scorer 15–20. Tổng khoảng 160–220 giờ.
+- Phần tài liệu này thêm chưa nằm trong 962 giờ. Ước thô ban đầu khoảng 160–220 giờ; ước chi tiết theo 14 story DA-01…DA-14 ở [07 mục 2.2](../../product/07-team-workflow.md) là khoảng **185–255 giờ**, dùng con số này.
 - AI không rút ngắn được: GPU-giờ train và eval, thời gian chạy rollout, thời gian chờ DENSO, giờ người của thí nghiệm HD và duyệt nhãn.
 - Quy tắc giữ nguyên của 04: đo k sau Sprint 1; nếu nhu cầu còn lại × k vượt 110% mức kế hoạch ở review G0, áp thứ tự cắt 04 mục 7.2, rồi cắt trong tài liệu này theo thứ tự: S4, U4, E-A trên dữ liệu thật, S2-B.
 

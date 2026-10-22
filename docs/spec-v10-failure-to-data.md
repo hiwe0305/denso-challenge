@@ -712,7 +712,7 @@ Ngân sách 140 A100-giờ mỗi đợt trong Pitch v10 phải được kiểm l
 - **Pha A, không cần chờ DENSO:** định dạng episode chung và export LeRobot; pipeline teleop trên psi-data; log train theo stage và bảng lỗi trên một lần fine-tune G1; pipeline egocentric hai phương án trên mẫu EgoDex; probe P1–P4 trên `pre.*` và `postpre.*`; NIM Cosmos Reason tự host và thử S3 trên video sim G1; robot thay thế, cảnh trạm và task khay → máy trong Isaac Sim.
 - **Pha B, khi DENSO gửi thông tin:** chấm lại robot thay thế theo thông số thật, bộ đọc teleop DENSO, so S2-A, S2-B, S2-C, chạy Failure → Data trên task khay → máy.
 
-Phần này ước thêm khoảng 160–220 giờ người ngoài khối lượng ở 04. Quyết định ngày 23/10/2026: giữ đủ phạm vi; khi vượt thời gian, thay phần tự xây bằng API theo từng phần trước, rồi mới cắt theo 04 mục 7.2.
+Phần này ước thêm khoảng 185–255 giờ người ngoài khối lượng ở 04 (theo 14 story DA-01…DA-14, [07 mục 2.2](product/07-team-workflow.md)). Quyết định ngày 23/10/2026: giữ đủ phạm vi; khi vượt thời gian, thay phần tự xây bằng API theo từng phần trước, rồi mới cắt theo 04 mục 7.2.
 
 ## 10. Rủi ro và phương án dự phòng
 
@@ -732,6 +732,7 @@ Phần này ước thêm khoảng 160–220 giờ người ngoài khối lượn
 | Model NIM ngừng hoặc dữ liệu nhà máy không được gửi ra ngoài | API hosted bị ngừng (Cosmos Reason1-7B ngừng 24/03/2026); DENSO cấm gửi dữ liệu | Tự host NIM; bộ định tuyến chỉ cho dữ liệu `public` đi API hosted |
 | Vượt thời gian ước tính | k đo sau Sprint 1 làm nhu cầu vượt mức kế hoạch | Trước khi cắt phạm vi, thay phần tự xây bằng API theo từng phần, ghi Decision và chi phí; giữ quy tắc định tuyến dữ liệu. Sau đó mới áp thứ tự cắt |
 | Khác biệt tay người và gripper | Video egocentric không cho nhãn action dùng được cho robot | Dùng video cho probe, mẫu sinh và cấu trúc task; continued pretraining stage 1 chỉ là tùy chọn |
+| Dữ liệu sinh tự động giúp ít hơn dữ liệu người | Kết quả âm của Mirchandani và cộng sự (CoRL 2024): thu dữ liệu tự động chỉ giúp vừa phải, thu thêm dữ liệu người thường giúp nhiều hơn hẳn. Đây là bằng chứng ngược chiều cho HS | Giữ điều kiện (B − A₀.₇) > 0 của HS (mục 3); nêu kết quả này trong phần rủi ro của pitch; báo riêng số demo người theo nhánh (mục 7.3); nếu HS âm thì khuyến nghị thu dữ liệu ưu tiên teleop correction thay vì sim |
 
 **Các tuyến khi V3 âm** (công sức là ước lượng, Simulation xác nhận ở tuần 1). Tuyến được chọn cần story xây riêng 1–4 tuần.
 
@@ -857,7 +858,7 @@ Hồ sơ cũ không còn trong thư mục làm việc. Xem lại một file bằ
 
 | Ngày | Phiên bản | Nội dung | Người sửa |
 |---|---|---|---|
-| 23/10/2026 | v10.2 | Robot chính là mobile manipulator của DENSO, G1 là bàn thử; task khay → máy; robot thay thế giống ≥ 95% (mục 0, 1.1, 2.5); kiểm hệ thống cho robot DENSO và quy lỗi về stage của Ψ₀ (mục 6.4); tầng synthetic S1–S4 qua NIM (mục 6.10); rủi ro DENSO muộn, NIM, vượt thời gian thì dùng API theo phần, khác biệt tay người và gripper (mục 10); glossary và nguồn (mục 12, 13). Theo design ngày 23/10/2026 | Trưởng nhóm |
+| 23/10/2026 | v10.2 | Robot chính là mobile manipulator của DENSO, G1 là bàn thử; task khay → máy; robot thay thế giống ≥ 95% (mục 0, 1.1, 2.5); kiểm hệ thống cho robot DENSO và quy lỗi về stage của Ψ₀ (mục 6.4); tầng synthetic S1–S4 qua NIM (mục 6.10); rủi ro DENSO muộn, NIM, vượt thời gian thì dùng API theo phần, khác biệt tay người và gripper, kết quả âm của Mirchandani cho HS (mục 10); giờ thêm khớp 07 là khoảng 185–255 giờ (mục 9); glossary và nguồn (mục 12, 13). Theo design ngày 23/10/2026 | Trưởng nhóm |
 | 22/10/2026 | v10.1 | #1 Bộ điều khiển: System-0 của task chính là decoupled WBC `g1_sonic`, AMO là của pipeline MP (mục 1.1, 2.1); F1 không còn là dự phòng cho Q2 (mục 2.3, 2.4, 10); thêm V3 hạn ngày 5 Sprint 1 (mục 2.4, 9); kiểm hệ thống nhắm stack WBC, lệnh gửi và trạng thái đo theo giao diện WBC (mục 4.5, 6.4); planner của bước 5–6 phải chạy trong env WBC (mục 6.5); tuyến T1–T4 và kịch bản V3 âm cộng Q6 âm (mục 10) | Biên tập theo 06 |
 | 22/10/2026 | v10.1 | #2 Thống kê: bootstrap phân cấp, mô hình hỗn hợp làm kiểm tra chéo, quy tắc 2/3 seed thành chỉ số phụ, power analysis ở G2 và luật MDE > 10 điểm % (mục 7.5); 2 seed quanh ngưỡng khi chọn D\* (mục 7.1); G0 dùng 30 lượt mỗi mức và kiểm nhị thức một phía, G2 có power analysis (mục 9) | Biên tập theo 06 |
 | 22/10/2026 | v10.1 | #3 Chọn can thiệp và tỉ lệ sửa được: `p.gain` dùng n_eff (mục 6.1); n_eff, ưu tiên bước sớm khi hòa, vòng 1 chỉ là xếp theo đơn giá, có unit test (mục 6.10, 6.11); tập cổng mới mỗi vòng, ≥ 3 lượt, A/A test, ngưỡng hồi quy max(5%, sàn A/A), "tăng ≥ 1 SE" (mục 6.12, 6.15); tỉ lệ sửa được đo có đối chứng trên điều kiện mới quanh lỗi (mục 6.13); thêm thí nghiệm F-ACT (mục 7.8) | Biên tập theo 06 |

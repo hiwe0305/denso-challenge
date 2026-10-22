@@ -447,14 +447,20 @@ Nếu H = 20 và k ≥ 1: mức 1–7 cộng B và D còn khoảng 887 giờ, v�
 
 Theo spec v10.2 và [design ngày 23/10/2026](../superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md): robot DENSO (hoặc robot thay thế) trong Isaac Sim với task khay → máy, pipeline dữ liệu ba nguồn, synthetic S1–S4 qua NIM, probe theo stage của Ψ₀, log train theo nhóm action và bảng lỗi 5 nguồn.
 
-| Hạng mục | Giờ người (ước thô) | Pha |
-|---|---|---|
-| Robot thay thế và cảnh trạm làm việc | 40–60 | A |
-| Pipeline teleop và egocentric | 50–70 | A, bộ đọc DENSO ở B |
-| NIM và tầng S3 | 30–40 | A |
-| Probe P1–P4 và log train | 25–30 | A |
-| Task khay → máy và scorer | 15–20 | A |
-| **Tổng** | **160–220** | Chưa nằm trong khoảng 962 giờ ở mục 4.8 |
+Ước theo 14 story DA-01…DA-14 ở [07 mục 2.2](07-team-workflow.md) (ước thô ban đầu của design là 160–220 giờ):
+
+| Hạng mục | Story | Giờ người | Pha |
+|---|---|---|---|
+| Robot thay thế và cảnh trạm làm việc | DA-10, DA-11 | 40–60 | A |
+| Định dạng chung, export, pipeline teleop và egocentric | DA-01–DA-04 | 61–84 | A, bộ đọc DENSO ở B |
+| NIM và tầng S3 | DA-05, DA-06 | 27–35 | A |
+| Log train, phát hiện lỗi train, probe P1–P4 | DA-07–DA-09 | 30–44 | A |
+| Task khay → máy và scorer | DA-12 | 15–20 | A |
+| Quy lỗi về stage | DA-13 | 8–10 | A |
+| Xin thông tin DENSO | DA-14 | 3 | A |
+| **Tổng** | | **khoảng 185–255** | Chưa nằm trong khoảng 962 giờ ở mục 4.8 |
+
+Tải từng người sau khi cộng phần này ở 07 mục 2.3.
 
 **Quyết định của trưởng nhóm (23/10/2026):**
 
