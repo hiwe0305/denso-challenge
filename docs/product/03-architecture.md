@@ -18,6 +18,7 @@ _Vai trò: Architect (Winston), quy trình BMAD. Ngày 22/10/2026. Đầu vào: 
 | 22/10/2026 | 0.3 | 06 #4: chẩn đoán NGOÀI MIỀN (mục 6.2); tăng cường thị giác là recipe chung trong RunPlan, bỏ `visual_aug` khỏi loại can thiệp (ADR-17); RunPlan và `gate` hỗ trợ B-fail, F-ACT, N_B | Architect theo 06 |
 | 22/10/2026 | 0.3 | 06 #5: `diagnosis` thêm phép kiểm đồng bộ cảm biến (τ_sync) và camera chuẩn, chẩn đoán LỖI ĐỒNG BỘ và LỖI CALIBRATION; trace lưu timestamp ảnh, timestamp state và tham số camera (V11); mục 6.4 HD theo 06 mục 5 | Architect theo 06 |
 | 22/10/2026 | 0.3 | 06 #8: mục 8.1 RunPlan dùng `pre.*` hoặc `postpre.*` có provenance trong Source, chỉ RunPlan `g0_repro` được trỏ `simple-checkpoints`, `sonic-checkpoints`; mục 8.3 guard gần trùng theo khoảng cách điều kiện, dải seed rời dải tác giả | Architect theo 06 |
+| 23/10/2026 | 0.4 | Theo spec v10.2 và [design ngày 23/10/2026](../superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md): mục 1.1 thêm robot DENSO, pipeline ba nguồn, probe theo stage; mục 2.1 thêm NIM trên máy 5090 và A100; mục 4.3 thêm trường episode cho nguồn dữ liệu, độ tin action, che danh tính, `segments.parquet`, `action_layout`; mục 5.4 thêm adapter robot DENSO, robot thay thế, NIM, ingest; mục 6.2 thêm bước 4b quy lỗi về stage; mục 7.1 thêm package `flywheel-ingest`, `flywheel-nim`, `flywheel-isaac` | Architect |
 | 22/10/2026 | 0.3 | 06 #9: mục 2.4 L0-lite và ADR-13; mục 4 còn 12 thực thể kèm bảng gộp, `task_id`, `embodiment_id`, `site_id` là cột thường có mặc định; mục 3.1, 7, 8.4 hoãn MLflow, Streamlit, fsspec S3, phân vùng ngày, lệnh dựng lại chỉ mục, revision card; mục 10.4 backup và diễn tập khôi phục (AR3); ADR-14 chỉ số chính holdout từ cờ SIMPLE (AR4); `failure_class` (AR5); mục 9.4 phác L2 (AR6); khóa holdout theo checkpoint để chạy sớm và niêm phong | Architect theo 06 |
 
 ## 1. Giới thiệu, phạm vi, nguyên tắc
@@ -25,6 +26,7 @@ _Vai trò: Architect (Winston), quy trình BMAD. Ngày 22/10/2026. Đầu vào: 
 ### 1.1 Phạm vi
 
 - **Trong phạm vi L0:** mô hình dữ liệu L0-lite (mục 2.4); nạp psi-data, QA, lineage, chia tập (spec mục 4); scorer từng bước (mục 5); thuật toán Failure → Data 12 bước (mục 6); chạy E1, các nhánh A, A₀.₇, B, C, B-fail (chạy trên ACT là chính), B⁺ (tùy chọn, ưu tiên thấp hơn B-fail), chuỗi vòng F-ACT trên ACT và holdout ghép cặp (mục 7.1–7.5); thí nghiệm HD (mục 7.6); sổ chi phí (mục 8).
+- **Thêm từ bản 0.4 (spec v10.2):** robot DENSO (mobile manipulator) hoặc robot thay thế giống ≥ 95% trong Isaac Sim, task khay → máy; pipeline 6 tầng cho teleop, video egocentric và synthetic về một định dạng episode chung; synthetic tầng S1–S4, tầng S3–S4 qua NVIDIA NIM; probe P1–P4 trên checkpoint từng stage Ψ₀; log train theo nhóm action; bảng lỗi 5 nguồn tín hiệu. Chi tiết ở [design ngày 23/10/2026](../superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md).
 - **Ngoài phạm vi L0:** robot thật, nhiều người dùng, giao diện web đầy đủ, dịch vụ mạng của riêng ta. Tài liệu chỉ để sẵn điểm nối cho các phần này (mục 9).
 
 ### 1.2 Nguyên tắc kiến trúc
@@ -48,9 +50,9 @@ Lõi là **một thư viện Python kèm CLI `fw`**, chạy trên máy host. Ada
 
 | Máy | Chạy gì |
 |---|---|
-| RTX 5090 32 GB (máy chính) | Catalog và view DuckDB, container SIMPLE (W worker song song), server suy luận Ψ₀ |
+| RTX 5090 32 GB (máy chính) | Catalog và view DuckDB, container SIMPLE (W worker song song), server suy luận Ψ₀; từ bản 0.4: Isaac Sim cho robot DENSO, NIM Cosmos Reason bản nano tự host (khoảng 23 GB, chạy xen kẽ với server Ψ₀, không cùng lúc) |
 | RTX 3060 12 GB | Train ACT và Diffusion Policy (gồm B-fail và F-ACT), test CPU, dựng báo cáo, console HD; nhận backup hằng ngày của máy chính |
-| A100 80 GB thuê theo giờ | Fine-tune Ψ₀; chỉ nhận job spec và bản export dataset, trả checkpoint và log về qua rsync |
+| A100 80 GB thuê theo giờ | Fine-tune Ψ₀ (stage 2 và 3); từ bản 0.4: NIM Cosmos Transfer và Predict tự host cho tầng S3–S4; chỉ nhận job spec và bản export dataset, trả checkpoint, video sinh và log về qua rsync |
 
 Máy 5090 là điểm hỏng đơn lẻ (05 AR3). Bù bằng backup hằng ngày sang máy 3060 và một lần diễn tập khôi phục trước G3 (mục 10.4).
 
@@ -233,6 +235,8 @@ Mười hai bảng catalog. Cột chung ở mục 4.1 không ghi lại.
 | LedgerEntry | `led_<ULID>` | hoạt động, loại tài nguyên, số lượng, đơn vị, `pricebook_id`, thành tiền, `estimated` hay `measured`, nhánh, `run_plan_id`, cụm, `intervention_id`, job, người (mã giả danh) | JSONL append-only; sửa sai bằng bút toán đảo |
 | Decision | `dec_<ULID>` | `kind` (plan_review, dev_gate, aa_test, holdout, milestone, repair_ticket), đối tượng (ID), số đo, tiêu chí đã chốt, kết luận, người ký, lý do; `meta`: với `plan_review` là danh sách can thiệp đã duyệt (`iv_<ULID>`, loại, cụm, số lượng, chi phí ước tính) và ghi đè; với `repair_ticket` là trạng thái và `rebaseline_required` | Append-only; trạng thái hiện hành là bản mới nhất cùng đối tượng |
 
+**Trường thêm ở bản 0.4** (design mục 4). Episode thêm cột `source_kind` (teleop, egocentric, synthetic), `action_quality` (measured, planned, retargeted, pseudo, none) và `deid_status` (raw, blurred, verified); `meta` thêm `synthetic_tier` (S1–S4). Bundle episode thêm `segments.parquet` (đoạn theo bước task, nhãn ngôn ngữ, nguồn nhãn). `frames.parquet` đặt cột theo nhóm action của Embodiment với hậu tố `_cmd` và `_meas`. Cấu hình Embodiment thêm `action_layout`: vị trí từng nhóm trong vector action 36 chiều của Ψ₀ và mask phần đệm. Episode `pseudo` hoặc `retargeted` chỉ vào train khi RunPlan cho phép; `catalog` chặn rời bước Annotate nếu `deid_status = raw`.
+
 **Gộp 28 thực thể của bản 0.2 vào L0-lite.** Tên cũ vẫn dùng được trong 02, 04 và story như tên khái niệm; bảng dưới chỉ ra nơi lưu.
 
 | Thực thể ở bản 0.2 | Ở L0-lite |
@@ -369,6 +373,12 @@ class TaskDefinition(Protocol):
 | TeleopSource | `SimpleTeleop` nếu có thiết bị (Q6); `PlannerCorrectionSource` nếu không, đi theo cùng tuyến V3 | Bản dự phòng có `operator_kind = machine`, không vào `r_demo` |
 | TaskDefinition | `G1BendPickAndPlace` (6 bước, 9 kiểu lỗi của spec 5, kèm `failure_class`); `G1BendPick` cho task F1 | F1 chỉ kiểm khả năng tổng quát của lõi (NFR7), không làm dự phòng cho Q2 tới khi V3 xác nhận. Dùng `decompose()` của SIMPLE để đối chiếu ranh giới bước |
 | Bộ giả | `FakeSim2D`, `FakePolicy`, `FakeTrainer`, `FakeGenerator`, `FakeTeleop`, `ToyPickPlace` | Chạy CPU, cấy được từng loại lỗi kể cả lệch đồng bộ, lệch camera, ngoài miền (mục 11) |
+| SimulatorAdapter (bản 0.4) | `DensoIsaacSim` | Nhận robot DENSO thật hoặc robot thay thế qua cấu hình Embodiment; `control_spec` theo nhóm đế, cột nâng, tay, gripper |
+| TaskDefinition (bản 0.4) | `DensoTrayToMachine` | 6 bước và 10 kiểu lỗi của task khay → máy (design mục 7.1) |
+| TeleopSource (bản 0.4) | `DensoTeleop` | Bộ đọc định dạng thô của DENSO, chờ thông tin (design mục 9) |
+| GeneratorAdapter (bản 0.4) | Theo tầng S1–S4: planner Isaac Sim, biến thể teleop, `CosmosTransferGenerator`, `CosmosPredictGenerator` | Mỗi tầng là một loại can thiệp riêng trong `decide` |
+| `NimClient` (bản 0.4) | Một client cho mọi model NIM, có bộ định tuyến theo `data_class` | `restricted` và `internal` chỉ đi NIM tự host; `public` được đi API hosted nếu bật |
+| Robot thay thế (bản 0.4) | File tham số trong `configs/embodiments/`, lệnh `fw embodiment score` | Chấm giống ≥ 95% theo design mục 3.1 |
 
 ## 6. Luồng chính
 
@@ -463,6 +473,8 @@ sequenceDiagram
 | 8 | Khoanh vùng | `plan(until_stage=k)` rồi M lượt; s_k so với τ_k | TRẠNG THÁI ĐẦU XẤU | Có; dữ liệu phục hồi |
 | 9 | Thị giác | Chạy lại với `VisualOverride`, chỉ mức 1 hoặc 2 | NHẬN THỨC | Không trong PoC; tăng cường thị giác đã là recipe chung (ADR-17), chẩn đoán chỉ ghi nhận và báo cáo |
 | 10 | Vùng phủ | Khoảng cách kNN tới train so với τ_cov | THIẾU VÙNG PHỦ nếu xa; KỸ NĂNG YẾU nếu gần | Có; sinh sim quanh lỗi, hoặc teleop correction. Kiểm demo mâu thuẫn chỉ ra báo cáo, không loại demo |
+
+**Bước 4b: quy lỗi về stage (bản 0.4).** Sau dòng 1–6 và trước dòng 7, `diagnosis` đọc kết quả probe P1, P3, P4 của checkpoint đang chạy (do `gate` chạy khi đăng ký checkpoint) và gắn giả thuyết stage gây lỗi vào Cluster: nhận thức (stage 1), học action (stage 2 hoặc 3), lỗi tích lũy khi chạy, hoặc quên sau fine-tune. Giả thuyết chỉ hiện trên card, không đổi chẩn đoán hay can thiệp nếu kỹ sư chưa xác nhận. Quy tắc ở spec v10.2 mục 6.4.
 
 **Lợi ích và chi phí trong `decide`.** Với cụm j, loại can thiệp t: n_eff_j = min(m_j, giới hạn mỗi cụm của t); g_j = (n_eff_j / N_dev) × f̄_t; c_j = n_eff_j × q_t × đơn giá_t, với q_t là số lượng mỗi lỗi ở spec 6.10. Hòa thì ưu tiên bước hỏng sớm hơn. Hệ quả ghi công khai: g_j / c_j = f̄_t / (N_dev × q_t × đơn giá_t) không phụ thuộc cụm, nên ở vòng 1 (mọi prior Beta(1, 1)) thứ tự chọn chỉ là **chi phí mỗi lỗi của loại can thiệp, trong các loại chẩn đoán cho phép**. Unit test khóa tính chất này (mục 11).
 
@@ -562,6 +574,9 @@ denso-challenge/
     flywheel-simple/              # host/: SimpleSimulator, các generator theo tuyến V3, SimpleTeleop; worker/: chạy trong container
     flywheel-psi0/                # Psi0Policy, Psi0Trainer; contract test đọc lại bản export
     flywheel-lerobot/             # LeRobotPolicy, LeRobotTrainer cho ACT, Diffusion Policy
+    flywheel-ingest/              # bản 0.4: bộ đọc teleop DENSO, pipeline egocentric (che danh tính, cắt đoạn, pose tay), export theo action_layout
+    flywheel-nim/                 # bản 0.4: NimClient, bộ định tuyến theo data_class, generator Cosmos Transfer và Predict
+    flywheel-isaac/               # bản 0.4: DensoIsaacSim, cảnh trạm làm việc, robot thay thế, DensoTrayToMachine
   configs/                        # sites/, pricebook/, embodiments/, tasks/, splits/, recipes/, thresholds/, runplans/
   docker/compose.yaml             # simple-worker, psi0-serve, psi0-train; image ghim theo digest
   ops/backup.sh                   # rsync hằng ngày sang máy 3060; hướng dẫn diễn tập khôi phục (mục 10.4)

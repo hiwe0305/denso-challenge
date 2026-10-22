@@ -15,7 +15,14 @@ Thư mục này là bộ hồ sơ sản phẩm làm theo BMAD Method (Breakthrou
 | 6 | Trưởng nhóm | [06 · Quyết định áp dụng phản biện vòng 1](06-review-round-1-decisions.md) | Cách áp 10 sửa ưu tiên của QA, đổi tên giả thuyết HS, HT, HD |
 | — | Scrum Master | [stories/](stories) | 11 story của Sprint 1 theo mẫu story của BMAD |
 
-Đặc tả thuật toán và thiết kế thí nghiệm gốc: [spec v10.1](../spec-v10-failure-to-data.md).
+Đặc tả thuật toán và thiết kế thí nghiệm gốc: [spec v10.2](../spec-v10-failure-to-data.md). Pipeline dữ liệu ba nguồn, robot DENSO, probe theo stage và bảng lỗi: [design ngày 23/10/2026](../superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md).
+
+## Cập nhật ngày 23/10/2026
+
+- Robot chính là mobile manipulator của DENSO; G1 trong SIMPLE là bàn thử. Task đầu tiên: lấy linh kiện từ khay, đặt vào máy. DENSO gửi muộn thì dùng robot thay thế giống ≥ 95%.
+- Ψ₀ dùng lại checkpoint của tác giả: stage 1 giữ nguyên, stage 2 train lại cho robot DENSO, stage 3 fine-tune theo task.
+- Đã cập nhật spec lên v10.2, 03 lên bản 0.4, thêm 04 mục 4.9 (phạm vi thêm khoảng 160–220 giờ, giữ đủ phạm vi, vượt thời gian thì dùng API theo từng phần trước).
+- Chưa cập nhật: 00, 01, 02, 05, 06, story Sprint 1, website và Pitch v10.
 
 ## Trạng thái ngày 22/10/2026
 

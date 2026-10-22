@@ -2,13 +2,16 @@
 
 Đề xuất của đội ilovephysicalintelligence cho thử thách H1 của DENSO Factory Hacks: huấn luyện humanoid nhanh, chính xác, ít công. Recipe hiện hành là **Ψ₀ + SIMPLE / G1**: fine-tune Ψ₀ trên dữ liệu teleop và dữ liệu sinh trong mô phỏng, rồi dùng thuật toán **Failure → Data** để chọn dữ liệu cần bổ sung sau mỗi lỗi, có đối chứng chất lượng và chi phí.
 
+Từ 23/10/2026, robot chính là **mobile manipulator của DENSO** chạy trong Isaac Sim, với task lấy linh kiện từ khay đặt vào máy; G1 trong SIMPLE là bàn thử. Dữ liệu teleop, video egocentric và synthetic (qua NVIDIA NIM) đi qua cùng một pipeline; mỗi stage của Ψ₀ được chấm riêng để quy lỗi về stage.
+
 Trạng thái: đề xuất PoC, chưa chạy Ψ₀ hoặc robot thật. Số liệu hiệu quả là ước lượng có điều kiện.
 
 ## Cấu trúc
 
 | Đường dẫn | Nội dung |
 |---|---|
-| [docs/spec-v10-failure-to-data.md](docs/spec-v10-failure-to-data.md) | Đặc tả hiện hành: giả thuyết HS, HTa, HTb, HD, thuật toán Failure → Data 12 bước, PoC với các nhánh A, A₀.₇, B, B-fail, C, sổ chi phí, lộ trình 12 tuần, glossary |
+| [docs/spec-v10-failure-to-data.md](docs/spec-v10-failure-to-data.md) | Đặc tả hiện hành (v10.2): giả thuyết HS, HTa, HTb, HD, thuật toán Failure → Data 12 bước, PoC với các nhánh A, A₀.₇, B, B-fail, C, robot DENSO và robot thay thế, sổ chi phí, lộ trình 12 tuần, glossary |
+| [docs/superpowers/specs/](docs/superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md) | Design ngày 23/10/2026: pipeline dữ liệu ba nguồn, synthetic S1–S4 qua NIM, output từng stage Ψ₀, bảng lỗi, thông tin cần xin DENSO |
 | [docs/product/](docs/product/README.md) | Hồ sơ sản phẩm theo BMAD: phân tích idea, brief, PRD, kiến trúc lõi flywheel, kế hoạch chia việc 5 người, phản biện và câu hỏi cho mentor, story Sprint 1 |
 | [docs/challenge/](docs/challenge/README.md) | Đề bài của BTC, kèm tiêu chí 3 cấp |
 | [docs/references/](docs/references/README.md) | Nguồn nghiên cứu; PDF giữ cục bộ, không commit |

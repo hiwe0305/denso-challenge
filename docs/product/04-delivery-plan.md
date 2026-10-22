@@ -443,6 +443,27 @@ Cắt mức 1–7 còn khoảng **935 giờ**, vẫn bằng 128% mức 70% và 8
 
 Nếu H = 20 và k ≥ 1: mức 1–7 cộng B và D còn khoảng 887 giờ, vẫn 122% mức 70%. Khi đó chỉ còn chọn E, hoặc bỏ bớt một phần giả thuyết phụ (ví dụ HD chỉ còn lỗi cấy và card sai; F-ACT chỉ chạy đủ để có nhánh C của ACT cho HTb). **Đề xuất của SM:** chốt H thực ở họp lập kế hoạch S1; áp sẵn mức 1–7 từ đầu dự án như 02 §4 yêu cầu, trừ khi phương án A được cam kết; quyết B và C ở review G0; nếu sau G0 vẫn vượt 110% mức 70% thì PO chọn D rồi E.
 
+### 4.9 Phạm vi thêm ngày 23/10/2026
+
+Theo spec v10.2 và [design ngày 23/10/2026](../superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md): robot DENSO (hoặc robot thay thế) trong Isaac Sim với task khay → máy, pipeline dữ liệu ba nguồn, synthetic S1–S4 qua NIM, probe theo stage của Ψ₀, log train theo nhóm action và bảng lỗi 5 nguồn.
+
+| Hạng mục | Giờ người (ước thô) | Pha |
+|---|---|---|
+| Robot thay thế và cảnh trạm làm việc | 40–60 | A |
+| Pipeline teleop và egocentric | 50–70 | A, bộ đọc DENSO ở B |
+| NIM và tầng S3 | 30–40 | A |
+| Probe P1–P4 và log train | 25–30 | A |
+| Task khay → máy và scorer | 15–20 | A |
+| **Tổng** | **160–220** | Chưa nằm trong khoảng 962 giờ ở mục 4.8 |
+
+**Quyết định của trưởng nhóm (23/10/2026):**
+
+1. Giữ đủ phạm vi, không cắt trước. Ước lượng ở mục 0 đã tính việc dùng AI viết mã; mức tăng tốc thật đo bằng k sau Sprint 1.
+2. Khi vượt thời gian, **thay phần tự xây bằng API theo từng phần trước** (design mục 11), mỗi lần ghi Decision và chi phí API; quy tắc định tuyến dữ liệu theo `data_class` không nới.
+3. Nếu sau bước 2 vẫn vượt 110% mức kế hoạch ở review G0, áp thứ tự cắt mục 7.2, rồi cắt phần mới theo thứ tự S4, U4, E-A trên dữ liệu thật, S2-B.
+
+Story cho phần này chưa viết. SM tách story theo design mục 11 ở họp lập kế hoạch Sprint 1 và giao người theo RACI mục 3.3; Hiếu gửi danh sách 21 mục cần xin DENSO (design mục 9) trong tuần 1.
+
 ## 5. Định nghĩa Sẵn sàng và Hoàn thành
 
 ### 5.1 Definition of Ready (story được kéo vào sprint)

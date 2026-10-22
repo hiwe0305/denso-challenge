@@ -1,6 +1,6 @@
-# Spec v10.1: thuật toán Failure → Data và PoC đối chứng
+# Spec v10.2: thuật toán Failure → Data và PoC đối chứng
 
-_Trạng thái: đặc tả đề xuất, chưa thực nghiệm. Ngày 22/10/2026. Phiên bản v10.1: đã áp dụng [quyết định phản biện vòng 1](product/06-review-round-1-decisions.md), xem mục 14. Áp dụng cho recipe Ψ₀ + SIMPLE / G1 của [Pitch v10](../deliverables/DENSO-ilovephysicalintelligence-1.pptx). Tài liệu này là đặc tả canonical cho thuật toán flywheel và thiết kế đánh giá. Hồ sơ của recipe cũ FluxVLA / GR00T N1.5 / GR1 (docs 01–14, idea v3) nằm trong tag git `archive/v3`; các quy tắc dữ liệu cần dùng đã được đưa vào mục 4. Thuật ngữ được định nghĩa ở mục 12._
+_Trạng thái: đặc tả đề xuất, chưa thực nghiệm. Ngày 23/10/2026. Phiên bản v10.2: thêm robot chính của DENSO, pipeline dữ liệu ba nguồn và bảng lỗi theo [design ngày 23/10/2026](superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md). Bản v10.1 đã áp dụng [quyết định phản biện vòng 1](product/06-review-round-1-decisions.md); xem mục 14. Áp dụng cho recipe Ψ₀ + SIMPLE / G1 của [Pitch v10](../deliverables/DENSO-ilovephysicalintelligence-1.pptx). Tài liệu này là đặc tả canonical cho thuật toán flywheel và thiết kế đánh giá. Hồ sơ của recipe cũ FluxVLA / GR00T N1.5 / GR1 (docs 01–14, idea v3) nằm trong tag git `archive/v3`; các quy tắc dữ liệu cần dùng đã được đưa vào mục 4. Thuật ngữ được định nghĩa ở mục 12._
 
 ## 0. Đọc nhanh
 
@@ -13,6 +13,14 @@ _Trạng thái: đặc tả đề xuất, chưa thực nghiệm. Ngày 22/10/202
 - **HS · Sim thay được teleop:** 0,7D\* demo teleop cộng dữ liệu sim đạt chất lượng không kém D\* demo teleop và đạt ≥ 75% (Cấp 2 của BTC).
 - **HT · Nhắm theo lỗi tốt hơn bổ sung đều:** cùng ngân sách thu dữ liệu, dữ liệu do Failure → Data chọn cho kết quả tốt hơn dữ liệu sim rải đều. Đây là **kiểm lại** kết quả kiểu Mulligan / DISEIL, không phải điểm mới. Tách hai phần: **HTa** nhắm theo lỗi có tốt hơn bổ sung đều không (B-fail so với B); **HTb** chẩn đoán có giúp thêm ngoài việc chỉ nhắm theo lỗi không (C so với B-fail).
 - **HD · Giảm giờ chẩn đoán:** evidence card giúp kỹ sư chẩn đoán lỗi nhanh hơn công cụ chuẩn mà không sai nhiều hơn.
+
+**Cập nhật v10.2 (23/10/2026).** Chi tiết ở [design ngày 23/10/2026](superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md).
+
+- **Hai robot.** Robot chính là mobile manipulator của DENSO (đế bánh xe, cột nâng, hai tay, gripper hai ngón, camera đỉnh cột), chạy trong Isaac Sim. G1 trong SIMPLE được giữ làm bàn thử: tái tạo số công bố và kiểm các giả thuyết HS, HT, HD như các mục dưới. Nếu DENSO gửi thông số muộn, dùng robot thay thế giống ít nhất 95% theo thước đo đã định nghĩa (mục 2.5).
+- **Task đầu tiên của robot DENSO:** lấy linh kiện từ khay, đặt vào máy, theo layout trạm làm việc.
+- **Ψ₀:** dùng lại checkpoint của tác giả. Stage 1 (VLM, `pre.*`) giữ nguyên; stage 2 (action expert) train lại cho robot DENSO; stage 3 fine-tune theo task. Checkpoint của mọi stage được chấm bằng bộ probe cố định.
+- **Dữ liệu ba nguồn** (teleop, video egocentric, synthetic) đi qua cùng pipeline 6 tầng về một định dạng episode chung. Synthetic chia 4 tầng S1–S4; tầng S3–S4 dùng model Cosmos qua NVIDIA NIM.
+- **Lỗi** được định nghĩa theo 5 nguồn tín hiệu (dữ liệu, train, eval offline, closed-loop, runtime), kèm quy tắc quy lỗi về stage của Ψ₀ (mục 6.4).
 
 **Các nhánh chính:** A (D\* teleop), B (0,7D\* teleop + sim rải đều), C (0,7D\* teleop + dữ liệu chọn bởi Failure → Data). Nhánh đối chứng A₀.₇ (chỉ 0,7D\* teleop) cho biết khoảng cách mà B và C cần lấp. Nhánh B-fail (sinh sim quanh mọi lỗi dev, không chẩn đoán) tách tác dụng của chẩn đoán khỏi tác dụng của việc nhắm theo lỗi.
 
@@ -29,9 +37,9 @@ _Trạng thái: đặc tả đề xuất, chưa thực nghiệm. Ngày 22/10/202
 
 | Lớp | Nội dung | Ghi chú khi trình bày |
 |---|---|---|
-| Kế thừa | Checkpoint Ψ₀ đã pretrain trên video người (EgoDex) và dữ liệu humanoid; simulator SIMPLE; dữ liệu psi-data; stack decoupled WBC của SIMPLE (task chính) và bộ điều khiển AMO (pipeline MP) | Viết "kế thừa prior video người từ Ψ₀", không viết "platform kết hợp video người" như đóng góp của đội |
-| Đội làm trong PoC | Data Core (QA, lineage, chia tập), scorer từng bước, thuật toán Failure → Data, evidence card, sổ chi phí, thiết kế và chạy PoC với các nhánh đối chứng, so sánh phương pháp. Data Core cộng SOP gọi là **DENSO Data Model** | Đây là phần được chấm là đóng góp |
-| Sau PoC | Video công nhân DENSO qua V2D, world model DreamDojo, task DENSO thật, robot thật | Mỗi hướng cần cổng nghiệm thu riêng |
+| Kế thừa | Checkpoint Ψ₀ đã pretrain trên video người (EgoDex) và dữ liệu humanoid; simulator SIMPLE và Isaac Sim; dữ liệu psi-data; stack decoupled WBC của SIMPLE (task chính) và bộ điều khiển AMO (pipeline MP); model Cosmos qua NVIDIA NIM | Viết "kế thừa prior video người từ Ψ₀", không viết "platform kết hợp video người" như đóng góp của đội |
+| Đội làm trong PoC | Data Core (QA, lineage, chia tập), pipeline dữ liệu ba nguồn, scorer từng bước, thuật toán Failure → Data, evidence card, sổ chi phí, probe theo stage của Ψ₀, thiết kế và chạy PoC với các nhánh đối chứng, so sánh phương pháp; robot DENSO (hoặc robot thay thế) trong Isaac Sim với task khay → máy. Data Core cộng SOP gọi là **DENSO Data Model** | Đây là phần được chấm là đóng góp |
+| Sau PoC | Robot DENSO thật, world model DreamDojo, continued pretraining stage 1 trên video nhà máy ở quy mô lớn | Mỗi hướng cần cổng nghiệm thu riêng |
 
 ### 1.2 Không claim
 
@@ -91,6 +99,19 @@ V3 có hạn riêng là **ngày 5 của Sprint 1**; các câu khác hạn cuối
 | Q4 | Có tách được ngẫu nhiên hóa hình ảnh khỏi ngẫu nhiên hóa vật lý không? | Bỏ phép kiểm thị giác (mục 6.7) |
 | Q5 | Fine-tune Ψ₀ cần bao nhiêu VRAM và GPU-giờ; mỗi episode đánh giá mất bao lâu? | Dùng LoRA hoặc đóng băng VLM; thuê A100 80 GB; giảm số seed |
 | Q6 | Đội có thiết bị teleop cho SIMPLE không? | Correction do planner sinh từ trạng thái lỗi thay cho người điều khiển |
+
+### 2.5 Robot DENSO và robot thay thế (v10.2)
+
+| Điểm | Nội dung |
+|---|---|
+| Robot | Mobile manipulator: đế bánh xe, cột nâng, hai tay nhiều khớp, gripper hai ngón, camera đỉnh cột; action chia theo nhóm `base`, `lift`, `arm_l`, `arm_r`, `gripper_l`, `gripper_r`, `head`, khoảng 18–22 chiều, ánh xạ vào khung action 36 chiều của Ψ₀ (cần kiểm, V-D1 của design) |
+| Simulator | Isaac Sim, cảnh trạm làm việc dựng từ layout DENSO |
+| System-0 | Bộ điều khiển đế, cột nâng, khớp tay và gripper; không có WBC, không có kiểu lỗi thăng bằng |
+| Ψ₀ | Stage 1 dùng `pre.*`; stage 2 có ba phương án đo S2-A (fine-tune từ `postpre.*`), S2-B (train lại action expert), S2-C (khởi tạo từ robot thay thế); stage 3 fine-tune task khay → máy |
+| Robot thay thế | Dựng tham số từ hình vẽ DENSO. Đạt "giống 95%" khi đúng mọi điều kiện cấu trúc và mỗi điểm thành phần (vùng với tới tại trạm, kích thước link, giới hạn khớp, camera, gripper, động học) ≥ 0,95. Trước khi có thông số chỉ chấm được so với hình vẽ |
+| Thông tin cần xin DENSO | 21 mục về robot, teleop, video egocentric, trạm làm việc và quyền dữ liệu (design mục 9) |
+
+Các giả thuyết HS, HT, HD và thiết kế nhánh ở mục 3 và 7 kiểm trên G1. Với robot DENSO, thuật toán Failure → Data chạy như mục 6, dùng bảng bước và kiểu lỗi của task khay → máy (design mục 7.1); tiêu chí 3 cấp của BTC báo riêng cho robot DENSO khi có kết quả.
 
 ## 3. Giả thuyết và tiêu chí chấp nhận
 
@@ -350,6 +371,19 @@ Chỉ dùng log, chạy theo thứ tự:
 
 Lỗi hệ thống được sửa trước. Sau khi sửa phải chạy lại baseline của policy hiện tại, vì phép đo cũ không còn giá trị.
 
+**Robot DENSO (v10.2).** Đối tượng của phép kiểm bám lệnh là bộ điều khiển đế, cột nâng, khớp tay và gripper; sai số và τ_track tính theo từng nhóm action. Không có phép kiểm thăng bằng.
+
+**Quy lỗi về stage của Ψ₀ (v10.2, bước 4b).** Lỗi đã qua kiểm hệ thống và kiểm dữ liệu được gắn giả thuyết về stage gây lỗi trước khi sang bước 5. Bằng chứng lấy từ bộ probe chạy trên checkpoint (P1 hiểu cảnh, P3 action offline, P4 giữ năng lực; design mục 6.1):
+
+| Bằng chứng | Quy về | Can thiệp gợi ý |
+|---|---|---|
+| P1 sai trên khung hình của chính lượt lỗi | Stage 1 · nhận thức | Synthetic tầng S3 (đổi ngoại hình) |
+| P1 đúng, P3 của nhóm action liên quan cao | Stage 2 hoặc 3 · học action | Thêm teleop hoặc synthetic S1–S2 cho bước k |
+| P1 đúng, P3 thấp, closed-loop vẫn hỏng | Lỗi tích lũy khi chạy | Dữ liệu phục hồi, correction (bước 6, 8) |
+| Lỗi mới sau fine-tune, P4 giảm | Stage 3 · quên | Tăng replay, giảm learning rate |
+
+Giả thuyết này hiện trên evidence card và kỹ sư xác nhận; không tự chuyển thành can thiệp. Bảng lỗi đầy đủ theo 5 nguồn tín hiệu (dữ liệu D1–D8, train T1–T8, offline O1–O4, closed-loop, runtime R1–R6) nằm ở design mục 7.2.
+
 ### 6.5 Bước 5: kiểm khả thi
 
 Chạy planner motion planning của SIMPLE từ đúng điều kiện đầu. Nếu planner cũng thất bại thì điều kiện có thể không khả thi (vật ngoài tầm với, va chạm không tránh được). Chẩn đoán KHÔNG KHẢ THI; kỹ sư sửa cảnh hoặc loại vùng điều kiện đó khỏi miền task và ghi lại. Planner ở bước 5 và bước 6 phải chạy trong env WBC của task chính (tuyến T1 hoặc T3, mục 10), vì khả thi dưới AMO không chứng minh khả thi dưới WBC và trạng thái sinh trong env AMO không nạp được vào env WBC. Nếu chưa có planner như vậy (Q2 hoặc V3 âm), dùng demo teleop có điều kiện gần nhất làm phép thử thay thế và đánh dấu "kiểm khả thi gần đúng".
@@ -407,6 +441,8 @@ Giá trị mặc định, ghi vào RunPlan và chỉnh được:
 | Dữ liệu phục hồi | 1 đoạn phục hồi cho mỗi lỗi, bắt đầu từ trạng thái lỗi đã lưu | 10 đoạn | 10 |
 
 Khi cụm có m_j > L_t lỗi, chọn ngẫu nhiên L_t lỗi, có ghi hạt giống. Số lỗi thực được xử lý là n_eff_j = min(m_j, L_t); lợi ích và chi phí ở mục 6.11 tính trên n_eff_j.
+
+**Tầng synthetic (v10.2).** "Sinh sim quanh điều kiện lỗi" được tách thành các tầng, mỗi tầng là một loại can thiệp riêng có đơn giá và tỉ lệ sửa được f_t riêng: S1 planner trong sim, S2 biến thể từ teleop, S3 đổi ngoại hình bằng Cosmos Transfer (giữ action gốc), S4 sinh video task mới bằng Cosmos Predict (action suy ra, chỉ dùng khi RunPlan cho phép). Mở theo thứ tự S1 → S2 → S3, S4 sau cùng. Không sinh với tham số Level 1 hoặc Level 2 (mục 7.3). Chi tiết ở design mục 5.2.
 
 Hai việc không còn là can thiệp tiêu ngân sách của C:
 
@@ -671,6 +707,13 @@ Chi phí giờ cell áp cho mọi phút teleop, correction và reset, vì trên 
 
 Ngân sách 140 A100-giờ mỗi đợt trong Pitch v10 phải được kiểm lại theo số đo ở G0.
 
+**Robot DENSO (v10.2)** chạy song song với lộ trình G1 trên, chia hai pha (design mục 11):
+
+- **Pha A, không cần chờ DENSO:** định dạng episode chung và export LeRobot; pipeline teleop trên psi-data; log train theo stage và bảng lỗi trên một lần fine-tune G1; pipeline egocentric hai phương án trên mẫu EgoDex; probe P1–P4 trên `pre.*` và `postpre.*`; NIM Cosmos Reason tự host và thử S3 trên video sim G1; robot thay thế, cảnh trạm và task khay → máy trong Isaac Sim.
+- **Pha B, khi DENSO gửi thông tin:** chấm lại robot thay thế theo thông số thật, bộ đọc teleop DENSO, so S2-A, S2-B, S2-C, chạy Failure → Data trên task khay → máy.
+
+Phần này ước thêm khoảng 160–220 giờ người ngoài khối lượng ở 04. Quyết định ngày 23/10/2026: giữ đủ phạm vi; khi vượt thời gian, thay phần tự xây bằng API theo từng phần trước, rồi mới cắt theo 04 mục 7.2.
+
 ## 10. Rủi ro và phương án dự phòng
 
 | Rủi ro | Dấu hiệu | Dự phòng |
@@ -685,6 +728,10 @@ Ngân sách 140 A100-giờ mỗi đợt trong Pitch v10 phải được kiểm l
 | Không có thiết bị teleop | Q6 là "không" | Correction do planner trong env WBC sinh; báo cáo r_demo chỉ trên demo gốc |
 | C không hơn B | Cận dưới CI của (C − B) ≤ 0 | Báo cáo trung thực; thu hẹp claim của pitch về Data Core, sổ chi phí và khuyến nghị thu dữ liệu |
 | Kết quả sim không chuyển sang robot thật | Ngoài phạm vi PoC | Cổng nghiệm thu robot thật riêng; real2sim cho cell trước khi lên robot |
+| DENSO gửi thông số robot hoặc dữ liệu muộn | Chưa có URDF, thông số camera, layout trạm | Robot thay thế tham số giống ≥ 95% (mục 2.5); pipeline chạy trước trên psi-data và mẫu EgoDex |
+| Model NIM ngừng hoặc dữ liệu nhà máy không được gửi ra ngoài | API hosted bị ngừng (Cosmos Reason1-7B ngừng 24/03/2026); DENSO cấm gửi dữ liệu | Tự host NIM; bộ định tuyến chỉ cho dữ liệu `public` đi API hosted |
+| Vượt thời gian ước tính | k đo sau Sprint 1 làm nhu cầu vượt mức kế hoạch | Trước khi cắt phạm vi, thay phần tự xây bằng API theo từng phần, ghi Decision và chi phí; giữ quy tắc định tuyến dữ liệu. Sau đó mới áp thứ tự cắt |
+| Khác biệt tay người và gripper | Video egocentric không cho nhãn action dùng được cho robot | Dùng video cho probe, mẫu sinh và cấu trúc task; continued pretraining stage 1 chỉ là tùy chọn |
 
 **Các tuyến khi V3 âm** (công sức là ước lượng, Simulation xác nhận ở tuần 1). Tuyến được chọn cần story xây riêng 1–4 tuần.
 
@@ -758,6 +805,9 @@ Hồ sơ cũ không còn trong thư mục làm việc. Xem lại một file bằ
 | Không kém hơn | Non-inferiority | Kiểm rằng nhánh mới không kém nhánh cũ quá một biên đã chốt trước (10 điểm %) |
 | Level 0, 1, 2 | Evaluation levels | Ba mức thay đổi môi trường của SIMPLE (mục 2.2) |
 | Lineage | Lineage | Thông tin nguồn gốc: từ đâu, giấy phép, episode cha, phiên bản bộ sinh |
+| Probe P1–P4 | Stage probes | Bộ kiểm cố định chạy trên checkpoint của từng stage Ψ₀: hiểu cảnh, dự đoán action token, action offline, giữ năng lực (mục 6.4, design mục 6.1) |
+| Robot thay thế | Proxy robot | Mô hình robot dựng tham số từ hình vẽ DENSO, dùng khi chưa có thông số thật; đạt khi giống ≥ 95% theo mục 2.5 |
+| Tầng synthetic S1–S4 | Synthetic tiers | Bốn cách sinh dữ liệu từ rẻ đến đắt: planner, biến thể teleop, đổi ngoại hình, video task mới (mục 6.10) |
 | Lớp lỗi chung | Generic failure class | Nhóm kiểu lỗi dùng chung giữa task (tiếp cận, gắp, mang, đặt, thăng bằng), để L1 gộp thống kê giữa task (mục 5.2) |
 | MDE | Minimum detectable effect | Hiệu ứng nhỏ nhất phát hiện được với 80% lực; tính ở G2 cho C − B (mục 7.5) |
 | MP | Motion planning | Sinh quỹ đạo bằng thuật toán lập kế hoạch chuyển động thay vì người điều khiển |
@@ -800,12 +850,14 @@ Hồ sơ cũ không còn trong thư mục làm việc. Xem lại một file bằ
 - Bộ điều khiển của task trong SIMPLE: [G1 Decoupled](https://psi-lab.ai/SIMPLE/docs/tasks/g1_decoupled.html), [G1 MP (AMO)](https://psi-lab.ai/SIMPLE/docs/tasks/g1_mp_amo.html), theo [03 mục 3.2](product/03-architecture.md).
 - Checkpoint Ψ₀ trên Hugging Face, thư mục `psi0/`: [USC-PSI-Lab/psi-model](https://huggingface.co/USC-PSI-Lab/psi-model/tree/main/psi0). Không có thẻ model, không ghi giấy phép; vai trò từng thư mục cần tác giả xác nhận (Q0).
 - Công cụ chuẩn cho HD: [Rerun](https://github.com/rerun-io/rerun).
+- Pipeline dữ liệu, robot DENSO và bảng lỗi: [design ngày 23/10/2026](superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md). Tổng hợp paper data flywheel và NVIDIA OSMO: [references/data-flywheel.md](references/data-flywheel.md).
 - Đơn giá: [Runpod pricing](https://www.runpod.io/pricing), [Runpod storage](https://docs.runpod.io/pods/pricing), theo slide 13 của Pitch v10.
 
 ## 14. Change log
 
 | Ngày | Phiên bản | Nội dung | Người sửa |
 |---|---|---|---|
+| 23/10/2026 | v10.2 | Robot chính là mobile manipulator của DENSO, G1 là bàn thử; task khay → máy; robot thay thế giống ≥ 95% (mục 0, 1.1, 2.5); kiểm hệ thống cho robot DENSO và quy lỗi về stage của Ψ₀ (mục 6.4); tầng synthetic S1–S4 qua NIM (mục 6.10); rủi ro DENSO muộn, NIM, vượt thời gian thì dùng API theo phần, khác biệt tay người và gripper (mục 10); glossary và nguồn (mục 12, 13). Theo design ngày 23/10/2026 | Trưởng nhóm |
 | 22/10/2026 | v10.1 | #1 Bộ điều khiển: System-0 của task chính là decoupled WBC `g1_sonic`, AMO là của pipeline MP (mục 1.1, 2.1); F1 không còn là dự phòng cho Q2 (mục 2.3, 2.4, 10); thêm V3 hạn ngày 5 Sprint 1 (mục 2.4, 9); kiểm hệ thống nhắm stack WBC, lệnh gửi và trạng thái đo theo giao diện WBC (mục 4.5, 6.4); planner của bước 5–6 phải chạy trong env WBC (mục 6.5); tuyến T1–T4 và kịch bản V3 âm cộng Q6 âm (mục 10) | Biên tập theo 06 |
 | 22/10/2026 | v10.1 | #2 Thống kê: bootstrap phân cấp, mô hình hỗn hợp làm kiểm tra chéo, quy tắc 2/3 seed thành chỉ số phụ, power analysis ở G2 và luật MDE > 10 điểm % (mục 7.5); 2 seed quanh ngưỡng khi chọn D\* (mục 7.1); G0 dùng 30 lượt mỗi mức và kiểm nhị thức một phía, G2 có power analysis (mục 9) | Biên tập theo 06 |
 | 22/10/2026 | v10.1 | #3 Chọn can thiệp và tỉ lệ sửa được: `p.gain` dùng n_eff (mục 6.1); n_eff, ưu tiên bước sớm khi hòa, vòng 1 chỉ là xếp theo đơn giá, có unit test (mục 6.10, 6.11); tập cổng mới mỗi vòng, ≥ 3 lượt, A/A test, ngưỡng hồi quy max(5%, sàn A/A), "tăng ≥ 1 SE" (mục 6.12, 6.15); tỉ lệ sửa được đo có đối chứng trên điều kiện mới quanh lỗi (mục 6.13); thêm thí nghiệm F-ACT (mục 7.8) | Biên tập theo 06 |
