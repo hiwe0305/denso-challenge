@@ -1,25 +1,34 @@
 # Humanoid Data Flywheel
 
-Hệ thống đề xuất giúp đội AI/robotics phát triển kỹ năng robot bằng human video, synthetic trajectories và demonstrations robot đích, kèm bằng chứng để chọn cách cải thiện. Mục tiêu là giảm công thu dữ liệu và tổng chi phí ở chất lượng được thống nhất.
+Đề xuất của đội ilovephysicalintelligence cho thử thách H1 của DENSO Factory Hacks: huấn luyện humanoid nhanh, chính xác, ít công. Recipe hiện hành là **Ψ₀ + SIMPLE / G1**: fine-tune Ψ₀ trên dữ liệu teleop và dữ liệu sinh trong mô phỏng, rồi dùng thuật toán **Failure → Data** để chọn dữ liệu cần bổ sung sau mỗi lỗi, có đối chứng chất lượng và chi phí.
 
-**Bản trình bày hiện hành: [Pitch v10](deliverables/DENSO-ilovephysicalintelligence-1.pptx).** Website ngày 09/10/2026 kết hợp pitch này với [workflow kỹ thuật](deliverables/DENSO-Platform-Visual-Workflow-2026-10-08-v1.pptx). [IDEA.md](IDEA.md) và các hồ sơ engineering trước đây được giữ để đối chiếu lịch sử; recipe hiện hành là Ψ₀ + SIMPLE / G1.
+Trạng thái: đề xuất PoC, chưa chạy Ψ₀ hoặc robot thật. Số liệu hiệu quả là ước lượng có điều kiện.
 
-**Mở website:** chạy `bash start-website.sh` trong thư mục project, rồi mở [website cục bộ](http://127.0.0.1:4175/#overview). Giữ cửa sổ chạy website mở trong lúc xem; nếu máy chủ đang chạy thì chỉ cần mở đường dẫn.
+## Cấu trúc
 
-## Tài liệu và sản phẩm còn giữ
+| Đường dẫn | Nội dung |
+|---|---|
+| [docs/spec-v10-failure-to-data.md](docs/spec-v10-failure-to-data.md) | Đặc tả hiện hành: giả thuyết, thuật toán Failure → Data, PoC ba nhánh, sổ chi phí, lộ trình 12 tuần, glossary |
+| [docs/challenge/](docs/challenge/README.md) | Đề bài H1 của BTC |
+| [docs/references/](docs/references/README.md) | Nguồn nghiên cứu; PDF giữ cục bộ, không commit |
+| [deliverables/](deliverables) | [Pitch v10](deliverables/DENSO-ilovephysicalintelligence-1.pptx) và [deck workflow kỹ thuật](deliverables/DENSO-Platform-Visual-Workflow-2026-10-08-v1.pptx) |
+| [website/](website/README.md) | Website trình bày 12 trang, build từ `website/content` và hai deck |
+| [.github/workflows/pages.yml](.github/workflows/pages.yml) | Build, kiểm tra và đăng website lên GitHub Pages |
 
-- [Kế hoạch triển khai Skill A1](docs/implementation-plan/skill-a1/README.md): task, data/training recipes và phép đo chi tiết.
-- [Hồ sơ engineering](idea-v3-2026-10-05/README.md): contracts, nguồn và bằng chứng reference.
-- [Reference code và kết quả](examples/engineering-loop/README.md): một bản code/results duy nhất trong repository.
-- [Đối chiếu video và nguồn số liệu](docs/research/video-zKaeODg7xeE-2026-10-06/README.md).
-- [PowerPoint trình bày mới nhất](deliverables/DENSO-ilovephysicalintelligence-1.pptx).
-- [PowerPoint workflow kỹ thuật để bổ sung website](deliverables/DENSO-Platform-Visual-Workflow-2026-10-08-v1.pptx).
-- [Website và cách chạy](presentation-site/README.md).
-- [Phản hồi nhận xét kiến trúc và quyết định cập nhật](docs/reviews/architecture-feedback-response-2026-10-06.md).
-- [Data Core flywheel](idea-v3-2026-10-05/03-workflow-du-lieu.md): execution → evidence → acquisition → QA → training → evaluation; mở trên website tại `#architecture`.
+## Mở website
 
-Reference MuJoCo đã kiểm luồng engineering với các đơn giản hóa được công bố. PoC Ψ₀ + SIMPLE, human transfer và mức tiết kiệm của nhóm còn cần thử nghiệm. Số liệu nghiên cứu trong IDEA.md là cơ sở cho đề xuất, không phải kết quả project.
+```bash
+bash start-website.sh
+```
 
-Các ZIP xuất dư, ảnh xem thử cũ và cache dựng đã được dọn. Hồ sơ technical, tài liệu nghiên cứu, PowerPoint và snapshots đang dùng để build website được giữ; Pitch v10 và website là điểm vào để đánh giá idea. Chỉ tạo ZIP khi cần gửi sang máy khác; hướng dẫn nằm trong README của website.
+Sau đó mở [website cục bộ](http://127.0.0.1:4175/#overview) và giữ cửa sổ máy chủ chạy trong lúc xem. Cách sửa nội dung và build lại nằm trong [website/README.md](website/README.md).
 
-Training review và schema hiện hành: [Dataset → training → evaluation → inference](idea-v3-2026-10-05/15-dataset-training-blueprint.md), khảo sát 7 VLA/WM recipes; [catalog](docs/11-method-survey.md).
+## Hồ sơ cũ
+
+Hồ sơ của các thiết kế trước Pitch v10 (idea v3/v3.1 với FluxVLA / GR00T N1.5 / GR1, docs 01–14, kế hoạch skill-a1, các bản review, code reference MuJoCo, website đầy đủ) đã được gỡ khỏi thư mục làm việc và giữ trong tag git `archive/v3`.
+
+```bash
+git show archive/v3:IDEA.md
+```
+
+Lệnh trên in một file cũ ra màn hình. Muốn lấy lại cả thư mục, dùng `git checkout archive/v3 -- <đường dẫn>`.

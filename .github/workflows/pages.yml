@@ -23,22 +23,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Set up Python for the reference pipeline
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Run the reference simulator, training and tests
-        run: |
-          python -m pip install -r examples/engineering-loop/requirements.txt
-          python examples/engineering-loop/check.py
-      - name: Rebuild website content
-        run: python3 presentation-site/build-content.py
+      - name: Build website
+        run: python3 website/build.py
       - name: Validate website
         run: |
-          for file in presentation-site/dist/*.js; do node --check "$file"; done
-          python3 presentation-site/verify-site.py
-          node presentation-site/test-improvement.js
-          node presentation-site/test-presentation.js
+          for file in website/dist/*.js; do node --check "$file"; done
+          python3 website/verify.py
+          node website/test.js
       - name: Check publishing source
         id: pages-status
         env:
@@ -54,7 +45,7 @@ jobs:
       - name: Upload website only
         uses: actions/upload-pages-artifact@v4
         with:
-          path: presentation-site/dist
+          path: website/dist
 
   deploy:
     needs: build

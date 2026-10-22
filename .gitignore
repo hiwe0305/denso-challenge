@@ -1,18 +1,20 @@
-.presentation-build/
+# Local tool state
 .sites-runtime/
 .openai/
 .remember/
 .agents/
 .codex/
 .aws/
+.env
+.env.*
+!.env.example
+
+# Python, OS and office lock files
 __pycache__/
 *.py[cod]
 *.tar.gz
 .DS_Store
-.env
-.env.*
-!.env.example
-# Offline research library and reproducible handover packages stay local.
+.~lock.*#
+
+# Offline paper library stays local; see docs/references/README.md.
 /docs/references/papers/
-/deliverables/*.zip
-/deliverables/*.png
