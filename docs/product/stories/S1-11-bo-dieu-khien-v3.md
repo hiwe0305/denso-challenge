@@ -5,6 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (SM tạo 22/10/2026 theo 02 bản 0.3; PO duyệt ở họp lập kế hoạch S1) |
+| Người làm | Hưng |
 | Story PRD | 1.9 · Epic 1 (story mới ở 02 bản 0.3, tách từ AC 5 cũ của 1.5) |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:sim` · `spike` |
 | Sprint | S1. **Bảng đối chiếu xong trước ngày 5 (thứ Sáu 30/10/2026).** Thử T1 và T2 song song tuần 1–2; chốt tuyến cuối tuần 2 ở review G0, chậm nhất S2 ngày 3 |

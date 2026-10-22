@@ -5,6 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 22/10/2026) |
+| Người làm | Châu |
 | Story PRD | 1.4 · Epic 1 |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:rl` |
 | Sprint | S1 (tuần 1–2), bắt đầu ngày 1 |

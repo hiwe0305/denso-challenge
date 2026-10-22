@@ -13,6 +13,7 @@ Thư mục này là bộ hồ sơ sản phẩm làm theo BMAD Method (Breakthrou
 | 4 | Product Owner + Scrum Master | [04 · Kế hoạch triển khai](04-delivery-plan.md) | Ai làm gì, sprint nào, định nghĩa hoàn thành |
 | 5 | QA + phản biện | [05 · Phản biện và câu hỏi cho mentor](05-review-and-mentor-questions.md) | Chỗ nào yếu, hỏi mentor gì |
 | 6 | Trưởng nhóm | [06 · Quyết định áp dụng phản biện vòng 1](06-review-round-1-decisions.md) | Cách áp 10 sửa ưu tiên của QA, đổi tên giả thuyết HS, HT, HD |
+| 7 | Scrum Master + Product Owner | [07 · Chia việc và quy trình git](07-team-workflow.md) | Ai sở hữu đường dẫn nào, 14 story Pha A, cách 5 người cùng dùng Claude mà không xung đột, theo dõi theo nhiệm vụ con |
 | — | Scrum Master | [stories/](stories) | 11 story của Sprint 1 theo mẫu story của BMAD |
 
 Đặc tả thuật toán và thiết kế thí nghiệm gốc: [spec v10.2](../spec-v10-failure-to-data.md). Pipeline dữ liệu ba nguồn, robot DENSO, probe theo stage và bảng lỗi: [design ngày 23/10/2026](../superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md).

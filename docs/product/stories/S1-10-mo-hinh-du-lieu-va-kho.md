@@ -5,6 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 22/10/2026) |
+| Người làm | Thông |
 | Story PRD | 2.1, phần a · Epic 2. Phần b (RunPlan, `fw plan freeze`, test NFR7) làm ở S3 |
 | Nhãn | [Lõi] · `epic:2` · `gate:G1` · `area:data` |
 | Sprint | S1, tuần 1–2 |

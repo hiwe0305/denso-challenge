@@ -5,6 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 22/10/2026) |
+| Người làm | Thông |
 | Story PRD | 1.6 · Epic 1 |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:data` |
 | Sprint | S1, nên xong trong tuần 1 vì Q1 có thể đổi task |

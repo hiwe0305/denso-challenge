@@ -5,6 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 22/10/2026; SM sửa phạm vi theo 02 bản 0.3 cùng ngày) |
+| Người làm | Hưng |
 | Story PRD | 1.5, phần Q2 (AC 1 và AC 4 cho cờ `plan`) · Epic 1. V3 (AC 5 cũ của 1.5) chuyển sang story 1.9, file [S1-11](S1-11-bo-dieu-khien-v3.md) |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:sim` · `spike` |
 | Sprint | S1, tuần 1; chạy song song S1-11 |

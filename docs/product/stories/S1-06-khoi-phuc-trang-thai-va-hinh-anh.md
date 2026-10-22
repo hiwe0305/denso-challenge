@@ -5,6 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 22/10/2026) |
+| Người làm | Châu |
 | Story PRD | 1.5, phần Q3 và Q4 · Epic 1 |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:sim` · `spike` |
 | Sprint | S1. Câu trả lời ở G0 được phép là "tạm"; chốt cuối trong story 6.4 (S3) |

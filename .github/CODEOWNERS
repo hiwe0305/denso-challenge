@@ -1,0 +1,53 @@
+# Chủ sở hữu đường dẫn theo docs/product/07-team-workflow.md mục 2.1.
+# Dòng sau cùng khớp sẽ thắng. Điền tên GitHub của từng người rồi bỏ dấu # ở đầu dòng.
+#   Hiếu  = @hiwe0305
+#   Hưng  = @<github-hung>
+#   Châu  = @<github-chau>
+#   Long  = @<github-long>
+#   Thông = @<github-thong>
+
+# Mặc định: trưởng nhóm
+*                                                   @hiwe0305
+
+# Tài liệu và website
+/docs/                                              @hiwe0305
+/website/                                           @hiwe0305
+/deliverables/                                      @hiwe0305
+# /docs/product/stories/                            @<github-thong>
+
+# Hạ tầng repo
+# /pyproject.toml                                   @<github-long>
+# /uv.lock                                          @<github-long>
+# /.github/workflows/                               @<github-long>
+# /scripts/                                         @<github-long>
+
+# Lõi flywheel
+# /packages/flywheel/                               @<github-long>
+# /packages/flywheel/src/flywheel/qa/               @<github-thong>
+# /packages/flywheel/src/flywheel/ledger/           @<github-thong>
+# /packages/flywheel/src/flywheel/gate/             @<github-thong>
+# /packages/flywheel/src/flywheel/scorer/           @<github-chau>
+/packages/flywheel/src/flywheel/training/           @hiwe0305
+# /packages/flywheel-fakes/                         @<github-long>
+
+# Adapter
+# /packages/flywheel-tasks/                         @<github-chau>
+# /packages/flywheel-simple/                        @<github-hung>
+# /packages/flywheel-isaac/                         @<github-hung>
+# /docker/                                          @<github-hung>
+# /packages/flywheel-psi0/                          @<github-chau> @hiwe0305
+# /packages/flywheel-lerobot/                       @<github-chau>
+# /packages/flywheel-ingest/                        @<github-thong>
+# /packages/flywheel-ingest/egocentric/             @<github-long>
+/packages/flywheel-nim/                             @hiwe0305
+# /packages/flywheel-nim/generators/                @<github-hung>
+
+# Cấu hình
+# /configs/embodiments/                             @<github-hung>
+# /configs/tasks/                                   @<github-chau>
+# /configs/splits/                                  @<github-long>
+# /configs/thresholds/                              @<github-thong>
+# /configs/pricebook/                               @<github-thong>
+# /ops/                                             @<github-thong>
+/configs/runplans/                                  @hiwe0305
+/configs/recipes/                                   @hiwe0305
