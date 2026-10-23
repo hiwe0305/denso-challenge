@@ -14,12 +14,14 @@
 /website/                                           @hiwe0305
 /deliverables/                                      @hiwe0305
 # /docs/product/stories/                            @<github-thong>
+# /docs/g0/                                         @<github-hung> @hiwe0305
 
 # Hạ tầng repo
 # /pyproject.toml                                   @<github-long>
 # /uv.lock                                          @<github-long>
 # /.github/workflows/                               @<github-long>
 # /scripts/                                         @<github-long>
+# /scripts/g0/                                      @<github-hung> @hiwe0305
 
 # Lõi flywheel
 # /packages/flywheel/                               @<github-long>
