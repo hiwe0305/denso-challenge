@@ -14,7 +14,7 @@ Trạng thái: đề xuất PoC, chưa chạy Ψ₀ hoặc robot thật. Số li
 | [docs/superpowers/specs/](docs/superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md) | Design ngày 23/10/2026: pipeline dữ liệu ba nguồn, synthetic S1–S4 qua NIM, output từng stage Ψ₀, bảng lỗi, thông tin cần xin DENSO |
 | [docs/product/](docs/product/README.md) | Hồ sơ sản phẩm theo BMAD: phân tích idea, brief, PRD, kiến trúc lõi flywheel, kế hoạch chia việc 5 người, phản biện và câu hỏi cho mentor, story Sprint 1 |
 | [CLAUDE.md](CLAUDE.md) | Quy tắc chung cho mọi phiên Claude Code và cho người: đọc gì trước, phạm vi file, quy ước nhánh và commit, bất biến kiến trúc. Có thêm [docs/CLAUDE.md](docs/CLAUDE.md) và [website/CLAUDE.md](website/CLAUDE.md) |
-| [scripts/](scripts) | `check_links.py` kiểm liên kết nội bộ; `progress.py` in tiến độ nhiệm vụ con theo story |
+| [scripts/](scripts) | `check_links.py` kiểm liên kết nội bộ; `progress.py` in tiến độ theo story; `pr_guard.py` và `daily_report.py` cho rule kiểm soát theo ngày ([08](docs/product/08-daily-control.md)); `setup_labels.sh` tạo label GitHub |
 | [docs/challenge/](docs/challenge/README.md) | Đề bài của BTC, kèm tiêu chí 3 cấp |
 | [docs/references/](docs/references/README.md) | Nguồn nghiên cứu; PDF giữ cục bộ, không commit |
 | [deliverables/](deliverables) | [Pitch v10](deliverables/DENSO-ilovephysicalintelligence-1.pptx) và [deck workflow kỹ thuật](deliverables/DENSO-Platform-Visual-Workflow-2026-10-08-v1.pptx) |

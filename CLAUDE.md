@@ -17,6 +17,7 @@ Trạng thái: thiết kế đã duyệt, **chưa có code**. Package `packages/
 | Module lõi, adapter, schema, cây thư mục | [03 · Kiến trúc](docs/product/03-architecture.md) |
 | Pipeline dữ liệu, synthetic, NIM, probe theo stage, bảng lỗi, robot DENSO | [Design 23/10/2026](docs/superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md) |
 | Ai làm gì, sprint, Definition of Done | [04 · Kế hoạch](docs/product/04-delivery-plan.md) |
+| Rule kiểm soát theo ngày, báo lỗi, nhãn nguyên nhân | [08 · Kiểm soát dự án theo ngày](docs/product/08-daily-control.md) |
 | Thuật ngữ | Spec mục 12 |
 
 Khi tài liệu mâu thuẫn: spec và design thắng PRD (02); 03 thắng mọi mô tả cấu trúc mã khác. Báo cho Product Owner (Hiếu) thay vì tự chọn.
@@ -33,7 +34,9 @@ Khi tài liệu mâu thuẫn: spec và design thắng PRD (02); 03 thắng mọi
 
 - Nhánh: `<story-id>-<mô-tả-ngắn>`, ví dụ `S1-01-repo-skeleton`, `DA-03-teleop-pipeline`. Tạo từ `origin/master` mới nhất.
 - Worktree: `git worktree add ../denso-S1-01 -b S1-01-repo-skeleton origin/master`.
-- Commit: dòng đầu `<story-id>/<nhiệm vụ con>: <việc đã làm, tiếng Anh, thể mệnh lệnh>`, ví dụ `S1-01/2.1: Add fw --version with git SHA`. Thân commit ghi AC liên quan và bằng chứng.
+- Commit: dòng đầu `<story-id>/<nhiệm vụ con>: <việc đã làm, tiếng Anh, thể mệnh lệnh>`, ví dụ `S1-01/2.1: Add fw --version with git SHA`. Thân commit ghi AC liên quan, bằng chứng, và dòng cuối `Time-spent: <giờ>h` (giờ tập trung thực của nhiệm vụ con, ví dụ `Time-spent: 1.5h`). Khi viết commit hộ người dùng, hỏi họ số giờ thay vì tự đoán.
+- Việc ngoài story dùng nhánh `docs-…`, `chore-…` hoặc `hotfix-…`. Nhánh `docs-…` chỉ được sửa tài liệu và website.
+- Trước khi mở PR, chạy `python3 scripts/pr_guard.py --base origin/master --head HEAD --branch "$(git branch --show-current)"`; workflow `pr-guard` chạy lại đúng kiểm tra này và chặn PR nếu sai (08 mục 3, rule R6).
 - Mỗi người commit bằng tài khoản git của chính mình. Không push thẳng lên `master`; luôn qua PR.
 - Trước khi mở PR: `git fetch origin && git rebase origin/master`, chạy lại kiểm tra. Không force-push nhánh của người khác.
 - Không commit: dữ liệu (`fwdata/`), checkpoint (`*.ckpt`, `*.safetensors`, `*.pt`), PDF trong `docs/references/papers/`, file `.env`, khóa API.

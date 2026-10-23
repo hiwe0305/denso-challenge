@@ -3,6 +3,9 @@ name: Deploy website to GitHub Pages
 on:
   push:
     branches: [master, main]
+  schedule:
+    # Refresh the progress page after the daily report (docs/product/08-daily-control.md).
+    - cron: "15 2 * * 1-5"
   workflow_dispatch:
 
 permissions:
@@ -18,13 +21,22 @@ jobs:
     permissions:
       contents: read
       pages: read
+      issues: read
+      pull-requests: read
+      actions: read
     outputs:
       pages_enabled: ${{ steps.pages-status.outputs.enabled }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - name: Build website
         run: python3 website/build.py
+      - name: Generate progress data
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/daily_report.py --json website/dist/data/progress.json
       - name: Validate website
         run: |
           for file in website/dist/*.js; do node --check "$file"; done

@@ -15,6 +15,7 @@
 - [ ] Diff chỉ chạm các đường dẫn trong mục "Phạm vi file" của story (`git diff --stat origin/master...`)
 - [ ] Không đổi file dùng chung (`contracts/`, schema trong `configs/`, `pyproject.toml` gốc, `uv.lock`, `.github/workflows/`), hoặc đã có PR contract riêng: #<!-- số -->
 - [ ] Đã rebase lên `origin/master` mới nhất
+- [ ] Mỗi commit có dòng đầu `<story-id>/<số>: ...` và dòng `Time-spent: <giờ>h`; `scripts/pr_guard.py` chạy qua tại máy
 
 ## Bằng chứng
 

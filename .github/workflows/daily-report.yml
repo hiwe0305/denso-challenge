@@ -1,0 +1,45 @@
+name: daily-report
+
+# Daily control report of docs/product/08-daily-control.md, 9:00 Vietnam time on weekdays.
+on:
+  schedule:
+    - cron: "0 2 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+  actions: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Build report
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/daily_report.py --markdown report.md --json progress.json
+      - name: Post report to the daily-report issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          issue=$(gh issue list --repo "$GITHUB_REPOSITORY" --label daily-report --state open --limit 1 --json number --jq '.[0].number')
+          if [ -z "$issue" ]; then
+            gh label create daily-report --repo "$GITHUB_REPOSITORY" --color 0e8a16 --description "Báo cáo ngày tự động" || true
+            issue=$(gh issue create --repo "$GITHUB_REPOSITORY" --title "Báo cáo ngày" --label daily-report \
+              --body "Workflow daily-report đăng báo cáo vào đây mỗi sáng ngày làm việc. Rule: docs/product/08-daily-control.md." | grep -o '[0-9]*$')
+          fi
+          gh issue comment "$issue" --repo "$GITHUB_REPOSITORY" --body-file report.md
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-report
+          path: |
+            report.md
+            progress.json

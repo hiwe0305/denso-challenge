@@ -161,6 +161,8 @@ Dừng sau mỗi nhiệm vụ con giữ cho mỗi commit nhỏ, người làm xe
 
 ## 4. Theo dõi và đánh giá theo nhiệm vụ con
 
+Rule kiểm soát theo ngày (R1–R9), báo cáo ngày tự động, nhãn nguyên nhân lỗi và trang Tiến độ nằm ở [08 · Kiểm soát dự án theo ngày](08-daily-control.md). Label ở mục 3.5 được tạo bằng `bash scripts/setup_labels.sh`.
+
 Đơn vị theo dõi là **nhiệm vụ con**: một dòng `- [ ]` trong file story, một commit `<story-id>/<số>: …`, một dòng trong checklist của issue.
 
 | Muốn biết | Cách xem |

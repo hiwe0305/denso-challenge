@@ -7,4 +7,5 @@ Website tĩnh trình bày dự án, đăng lên GitHub Pages bằng `.github/wor
 - Thứ tự trang nằm ở mảng `chapters` trong `dist/app.js`; giữ nguyên route id để link cũ không hỏng.
 - Số liệu trên website là mục tiêu hoặc giả định; ghi rõ như vậy.
 - Website hiện theo spec v10.1; cập nhật sang v10.2 là việc riêng, có người làm riêng (07 mục 2).
+- `dist/progress.html` và `dist/progress.js` là trang Tiến độ độc lập, không thuộc 12 trang; dữ liệu `dist/data/progress.json` do `scripts/daily_report.py` sinh khi build Pages và không commit (docs/product/08-daily-control.md).
 - Trình duyệt có thể giữ bản cũ của `dist/index.html`; khi kiểm thì mở kèm tham số mới, ví dụ `?fresh=1`.
