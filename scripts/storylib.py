@@ -54,7 +54,7 @@ def parse_story(path: Path) -> Story:
     if scope_text:
         for line in scope_text.splitlines():
             if line.lstrip().startswith("- "):
-                scope += [item.strip().lstrip("./") for item in CODE.findall(line)]
+                scope += [item.strip().removeprefix("./") for item in CODE.findall(line)]
     return Story(
         id="-".join(path.stem.split("-")[:2]),
         path=path,
