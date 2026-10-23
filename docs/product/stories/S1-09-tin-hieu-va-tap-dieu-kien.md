@@ -23,7 +23,7 @@ Là kỹ sư simulation, tôi muốn biết SIMPLE cho lấy những tín hiệu
 3. V6 phần sim: `Task.reset(seed)` có tất định không: 10 seed, mỗi seed 2 lần, so layout.
 4. V6 phần sim: tự sinh được tập điều kiện mới (90 dev, 150 holdout) theo định dạng `simple-eval` không, hay phải dùng tập có sẵn; nếu tự sinh được, ghi dải seed tác giả đã dùng để tránh trùng (05 TH13).
 5. Ghi kết quả `decompose()` (`SubtaskSpec`) của task chính và đối chiếu với 6 bước của spec 5.1.
-6. Kết quả ở `docs/g0/signals-conditions.md`; cập nhật dòng V6 (phần sim), V7 ở 03 §3.3 có change log.
+6. Kết quả ở `docs/g0/signals-conditions.md`, có mục "Đề xuất cho 03 §3.3" với dòng V6 (phần sim), V7 ([docs/g0/README.md](../../g0/README.md)). Hiếu gom vào 03 §3.3 ở review G0.
 
 ## Nhiệm vụ
 
@@ -34,7 +34,15 @@ Là kỹ sư simulation, tôi muốn biết SIMPLE cho lấy những tín hiệu
 - [ ] 3. Kiểm `reset(seed)` tất định (AC 3)
 - [ ] 4. Thử sinh tập điều kiện theo định dạng `simple-eval` (AC 4)
 - [ ] 5. Ghi `decompose()` và đối chiếu bước (AC 5)
-- [ ] 6. Viết tài liệu, cập nhật 03 (AC 6)
+- [ ] 6. Viết tài liệu kèm đề xuất cho 03 §3.3 (AC 6)
+
+## Phạm vi file
+
+Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
+
+- `scripts/g0/probe_signals.py`, `scripts/g0/probe_reset_determinism.py`
+- `docs/g0/signals-conditions.md`
+- `docs/g0/ledger/S1-09.csv`
 
 ## Ghi chú cho người làm
 
@@ -62,6 +70,7 @@ Là kỹ sư simulation, tôi muốn biết SIMPLE cho lấy những tín hiệu
 |---|---|---|
 | 22/10/2026 | Tạo story từ 02 · 1.8 (PO thêm để phủ V6, V7) | SM (Bob), PO (Sarah) duyệt |
 | 22/10/2026 | Đồng bộ 03 bản 0.3: tín hiệu lệnh theo giao diện WBC; ghi chú V11 và lớp lỗi chung; sửa mã trích 05 TN13 thành TH13. AC của 02 · 1.8 không đổi | SM (Bob) theo 06 |
+| 24/10/2026 | Thêm mục Phạm vi file. AC 6: đề xuất dòng V6, V7 ghi trong file kết quả, Hiếu gom vào 03 §3.3 ở review G0 | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

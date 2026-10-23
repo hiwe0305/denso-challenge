@@ -10,6 +10,7 @@ _Ngày 22/10/2026. Vai trò BMAD: Product Owner (Sarah) viết mục 1; Scrum Ma
 | 22/10/2026 | 0.2 | Lập kế hoạch ở 70% năng lực (06 mục 9); ước lại giờ theo AC bản 0.3; bảng tải mới (mục 4.7); thêm mục 4.8 kết luận tải: phạm vi mặc định vượt mức 70%, thứ tự cắt đã duyệt không đủ bù, nêu phương án chờ quyết | SM theo 06 |
 | 22/10/2026 | 0.2 | Phạm vi mặc định: 1 vòng C trên Ψ₀, F-ACT trên ACT, B-fail trên ACT, holdout sớm niêm phong; thứ tự cắt (mục 7.2) khớp 02 §8 bản 0.3; G0 30 lượt mỗi mức; luật MDE ở G2 | SM theo 06 |
 | 22/10/2026 | 0.2 | Mục 1: ghi "Cập nhật 0.2" cho P04, P11, P12, P20, P21, P22, P27, P29–P33 theo 06; mục 1.3, 1.4 theo L0-lite (03 §2.4, §4.3) và tuyến V3 mới | SM theo 06 |
+| 24/10/2026 | 0.3 | Mục 4.1 (điều kiện qua G0) và mục 5 (DoD, ý 7): sổ chi phí G0 tách theo story trong `docs/g0/ledger/`; story spike ghi đề xuất cho 03 §3.3 trong file của mình, Hiếu gom ở review G0 | PO (Hiếu) |
 | 22/10/2026 | 0.2 | Mục 6: lịch mentor khớp câu hỏi của 05, gồm câu hỏi mở sau vòng 1 (05 mục 6.6, MO1–MO5); câu đã chốt theo 06 chuyển thành câu xác nhận | SM theo 06 |
 
 ## 0. Giả định lập kế hoạch
@@ -276,7 +277,7 @@ Việc ngoài story: Hiếu 10 giờ (DENSO DN1, ngân sách GPU, mã đề, ema
 
 **Phụ thuộc.** Bước 1 của S1-11 (bảng đối chiếu) đọc cấu hình và mã SIMPLE nên bắt đầu ngày 1, không chờ S1-02; thử T1, T2 cần S1-02. S1-02 xong trong tuần 1 vì S1-03, S1-05, S1-06, S1-09, S1-11 cần môi trường SIMPLE. Phần serve Ψ₀ của S1-03 và toàn bộ S1-04 bắt đầu ngày 1. S1-08 và S1-10 cùng dùng `contracts`: Thông đưa `contracts/base.py` trước ngày 4. **Rủi ro.** V3 âm (05 R01); Isaac Sim hoặc flash-attn không chạy trên 5090 (R05); checkpoint gốc đã thấy dữ liệu task chính (R02); tranh máy 5090 giữa S1-03, S1-04 và T1, T2.
 
-**Điều kiện qua G0.** Ψ₀ chạy 30 lượt mỗi mức, kiểm nhị thức một phía (α = 0,05) không cho thấy tỉ lệ thấp hơn số công bố; Q0 có checkpoint `pre.*` hoặc `postpre.*` kèm provenance trong Source, hoặc giới hạn được ghi; Q1, Q2, Q5, Q6 có câu trả lời; Q3, Q4 có câu trả lời tạm, chốt trong 6.4 ở S3; V3 có kết luận trước ngày 5 và tuyến chốt cuối tuần 2, chậm nhất S2 ngày 3; V1–V11 có câu trả lời hoặc người giữ và hạn (V11 do Hưng chốt trong 3.1a ở S2; V8 gồm W khi policy là ACT, đầu vào cho 05 MO2); ngân sách GPU biết; email giấy phép và Q0 đã gửi; vòng rỗng xanh trong CI dưới 10 phút; chi phí G0 có trong `docs/g0/ledger-g0.csv`; H thực từng người và quyết định phạm vi ở mục 4.8 đã ghi. **Demo cuối sprint.** Video Ψ₀ chạy task công bố trong SIMPLE kèm bảng so với số công bố; bảng V3 và kết quả T1, T2; `fw --version`; CI chạy vòng rỗng; bảng trả lời Q và V.
+**Điều kiện qua G0.** Ψ₀ chạy 30 lượt mỗi mức, kiểm nhị thức một phía (α = 0,05) không cho thấy tỉ lệ thấp hơn số công bố; Q0 có checkpoint `pre.*` hoặc `postpre.*` kèm provenance trong Source, hoặc giới hạn được ghi; Q1, Q2, Q5, Q6 có câu trả lời; Q3, Q4 có câu trả lời tạm, chốt trong 6.4 ở S3; V3 có kết luận trước ngày 5 và tuyến chốt cuối tuần 2, chậm nhất S2 ngày 3; V1–V11 có câu trả lời hoặc người giữ và hạn (V11 do Hưng chốt trong 3.1a ở S2; V8 gồm W khi policy là ACT, đầu vào cho 05 MO2); ngân sách GPU biết; email giấy phép và Q0 đã gửi; vòng rỗng xanh trong CI dưới 10 phút; chi phí G0 có trong `docs/g0/ledger/`, mỗi story một file (bản 0.3); H thực từng người và quyết định phạm vi ở mục 4.8 đã ghi. **Demo cuối sprint.** Video Ψ₀ chạy task công bố trong SIMPLE kèm bảng so với số công bố; bảng V3 và kết quả T1, T2; `fw --version`; CI chạy vòng rỗng; bảng trả lời Q và V.
 
 ### 4.2 Sprint 2 · Tuần 3–4 · G1
 
@@ -514,7 +515,7 @@ Story cho phần này chưa viết. SM tách story theo design mục 11 ở họ
 4. Đổi đơn vị và khung tại biên theo 03 §4.1.
 5. Ghi đủ phiên bản: digest image, commit SIMPLE, revision HF, phiên bản bộ sinh.
 6. Có runbook chạy lại trong README của package.
-7. Story spike ở G0: câu trả lời ghi vào `docs/g0/` và dòng tương ứng của 03 §3.3, có change log; người review chạy lại được ít nhất một lệnh từ tài liệu.
+7. Story spike ở G0: câu trả lời ghi vào file của story trong `docs/g0/`, kèm mục đề xuất cho dòng tương ứng của 03 §3.3; Hiếu gom vào 03 §3.3 ở review G0, có change log (bản 0.3, quy ước ở [docs/g0/README.md](../g0/README.md)); người review chạy lại được ít nhất một lệnh từ tài liệu.
 
 ## 6. Lịch làm việc với mentor
 

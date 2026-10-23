@@ -24,7 +24,7 @@ Là kỹ sư data, tôi muốn biết gói psi-data của task chính có bao nh
 4. V6 phần dữ liệu: episode có ghi layout, seed hay tham số ngẫu nhiên hóa không; nếu không, trường nào dùng để suy vector điều kiện (spec 4.2).
 5. V9: bảng trạng thái giấy phép của psi-data, psi-model, SIMPLE, cảnh HSSD, tài sản Objaverse: nguồn, ngày kiểm, kết luận. Soạn sẵn nội dung câu hỏi giấy phép cho Hiếu gửi PSI Lab.
 6. Q6: hỏi đội và BTC (qua Hiếu) về thiết bị teleop cho SIMPLE; ghi câu trả lời.
-7. Kết quả ở `docs/g0/psi-data.md`; cập nhật dòng V1, V6 (phần dữ liệu), V9 ở 03 §3.3 có change log.
+7. Kết quả ở `docs/g0/psi-data.md`, có mục "Đề xuất cho 03 §3.3" với dòng V1, V6 (phần dữ liệu), V9 ([docs/g0/README.md](../../g0/README.md)). Hiếu gom vào 03 §3.3 ở review G0.
 
 ## Nhiệm vụ
 
@@ -34,7 +34,15 @@ Là kỹ sư data, tôi muốn biết gói psi-data của task chính có bao nh
 - [ ] 4. Tìm layout, seed, tham số điều kiện trong dữ liệu (AC 4)
 - [ ] 5. Bảng giấy phép, soạn câu hỏi cho tác giả (AC 5)
 - [ ] 6. Ghi câu trả lời Q6 (AC 6)
-- [ ] 7. Viết `docs/g0/psi-data.md`, cập nhật 03 (AC 7)
+- [ ] 7. Viết `docs/g0/psi-data.md` kèm đề xuất cho 03 §3.3 (AC 7)
+
+## Phạm vi file
+
+Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
+
+- `scripts/g0/inspect_psi_data.py`
+- `docs/g0/psi-data.md`
+- `docs/g0/ledger/S1-07.csv`
 
 ## Ghi chú cho người làm
 
@@ -62,6 +70,7 @@ Là kỹ sư data, tôi muốn biết gói psi-data của task chính có bao nh
 |---|---|---|
 | 22/10/2026 | Tạo story từ 02 · 1.6, thêm V1, V6, V9 theo AC mới | SM (Bob), PO (Sarah) duyệt |
 | 22/10/2026 | Sửa mã trích 05 TN13 thành TH13; ghi liên hệ Q6 với S1-11. AC không đổi | SM (Bob) theo 06 |
+| 24/10/2026 | Thêm mục Phạm vi file. AC 7: đề xuất dòng V1, V6, V9 ghi trong file kết quả, Hiếu gom vào 03 §3.3 ở review G0 | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

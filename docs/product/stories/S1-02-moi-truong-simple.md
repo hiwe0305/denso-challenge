@@ -22,7 +22,7 @@ Là kỹ sư simulation, tôi muốn dựng SIMPLE trên Isaac Sim 4.5 bằng m�
 2. Chạy headless được một episode của `G1WholebodyBendPickAndPlaceTeleop-v0` (phát lại một demo hoặc action rỗng) và lưu video MP4 ra ngoài git.
 3. Đo thời gian mỗi episode đánh giá trên RTX 5090 (trung bình và p95 trên ít nhất 5 episode) và VRAM đỉnh của simulator. Đây là đầu vào cho V8 và số worker W.
 4. Thử trên RTX 3060 12 GB trong ngày 1–3 và ghi kết quả: chạy được, chạy được nhưng chậm, hay không chạy (05 SI3, KT4).
-5. Tạo `docs/g0/ledger-g0.csv` với cột theo LedgerEntry (03 §4.3) và ghi các mục chi phí của story này.
+5. Ghi các mục chi phí của story này vào `docs/g0/ledger/S1-02.csv`, cột theo [docs/g0/README.md](../../g0/README.md) (lấy từ LedgerEntry, 03 §4.3).
 
 ## Nhiệm vụ
 
@@ -34,8 +34,17 @@ Là kỹ sư simulation, tôi muốn dựng SIMPLE trên Isaac Sim 4.5 bằng m�
 - [ ] 3. Đo thời gian và VRAM (AC 3, 4)
   - [ ] 3.1 Trên 5090
   - [ ] 3.2 Trên 3060
-- [ ] 4. Tạo `docs/g0/ledger-g0.csv` và ghi chi phí (AC 5)
+- [ ] 4. Ghi chi phí vào `docs/g0/ledger/S1-02.csv` (AC 5)
 - [ ] 5. Báo nhóm trong check-in khi môi trường sẵn sàng để S1-03, S1-05, S1-06, S1-09, S1-11 bắt đầu
+
+## Phạm vi file
+
+Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
+
+- `docker/compose.yaml`: service simple-worker
+- `scripts/g0/setup_simple.sh`, `scripts/g0/run_one_episode.sh`
+- `docs/g0/env-simple.md`
+- `docs/g0/ledger/S1-02.csv`
 
 ## Ghi chú cho người làm
 
@@ -44,8 +53,8 @@ Là kỹ sư simulation, tôi muốn dựng SIMPLE trên Isaac Sim 4.5 bằng m�
 - Token Hugging Face chỉ để trong `.env`, không ghi vào script hay log.
 - Video, dữ liệu tải về để trong `fwdata/` (đã gitignore ở S1-01) hoặc thư mục ngoài repo.
 - Số đo ở AC 3 là đầu vào cho câu hỏi mở 05 MO2 (thông lượng F-ACT, khoảng 630–850 rollout mỗi vòng). Nếu baseline ACT của SIMPLE chạy được trong tuần 2, ghi thêm số worker W khi policy là ACT (03 §3.3 V8, V10); nếu chưa, ghi "chưa đo" để 4.1 đo ở S2.
-- Cột gợi ý cho `ledger-g0.csv`: `date, activity, resource_type, quantity, unit, unit_price_usd, amount_usd, estimated_or_measured, branch, round, job, person, note`. `branch` ghi `g0`; `person` dùng mã giả danh (03 §10.3).
-- File sẽ tạo: `docker/compose.yaml`, `scripts/g0/setup_simple.sh`, `scripts/g0/run_one_episode.sh`, `docs/g0/env-simple.md`, `docs/g0/ledger-g0.csv`.
+- Cột của sổ chi phí G0 và quy ước `branch`, `person` ở [docs/g0/README.md](../../g0/README.md).
+- File sẽ tạo: `docker/compose.yaml`, `scripts/g0/setup_simple.sh`, `scripts/g0/run_one_episode.sh`, `docs/g0/env-simple.md`, `docs/g0/ledger/S1-02.csv`.
 
 ## Kiểm thử
 
@@ -65,6 +74,7 @@ Là kỹ sư simulation, tôi muốn dựng SIMPLE trên Isaac Sim 4.5 bằng m�
 |---|---|---|
 | 22/10/2026 | Tạo story từ 02 · 1.2 | SM (Bob), PO (Sarah) duyệt |
 | 22/10/2026 | Thêm S1-11 vào danh sách chặn; ghi chú đo W khi policy là ACT cho 05 MO2. AC không đổi | SM (Bob) theo 06 |
+| 24/10/2026 | Thêm mục Phạm vi file. Sổ chi phí G0 tách theo story: AC 5 ghi vào `docs/g0/ledger/S1-02.csv` thay vì tạo `ledger-g0.csv` chung | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

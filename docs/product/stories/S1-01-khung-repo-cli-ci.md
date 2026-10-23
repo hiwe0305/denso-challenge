@@ -44,6 +44,18 @@ Là kỹ sư data xây lõi, tôi muốn một monorepo uv workspace có CLI `fw
   - [ ] 4.3 Viết `core-ci.yml`; chạy thử một PR có import vi phạm, ghi kết quả vào Ghi chép khi làm
 - [ ] 5. `.gitignore` và README (AC 6, 7)
 
+## Phạm vi file
+
+Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
+
+- `pyproject.toml`, `uv.lock`: workspace gốc
+- `packages/flywheel/pyproject.toml`, `packages/flywheel/README.md`
+- `packages/flywheel/src/flywheel/`: chỉ file init có docstring của từng module và cli/main.py; nội dung module do story sau viết
+- `packages/flywheel/tests/test_version.py`, `packages/flywheel/tests/test_import_rules.py`
+- `packages/flywheel-fakes/pyproject.toml`
+- `.github/workflows/core-ci.yml`
+- `.gitignore`
+
 ## Ghi chú cho người làm
 
 - Nguồn: 02 · 1.1, NFR1, NFR2, NFR12, mục 4 (chiến lược test); 03 §1.2 (nguyên tắc lõi), §2.4 (L0-lite), §3.1 (stack), §7.1 (cây mã), ADR-01, ADR-02, ADR-13.
@@ -72,6 +84,7 @@ Là kỹ sư data xây lõi, tôi muốn một monorepo uv workspace có CLI `fw
 |---|---|---|
 | 22/10/2026 | Tạo story từ 02 · 1.1 | SM (Bob), PO (Sarah) duyệt |
 | 22/10/2026 | Theo L0-lite (06 mục 9, 03 bản 0.3): bỏ fsspec khỏi phụ thuộc lõi, thêm statsmodels và extra `hd`; bỏ `mlruns/` khỏi `.gitignore`; ước lượng 12 → 11 giờ | SM (Bob) theo 06 |
+| 24/10/2026 | Thêm mục Phạm vi file (07 mục 3.1). AC không đổi | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

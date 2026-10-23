@@ -4,6 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Đầu vào
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 24/10/2026 | 0.2 | Mục 2.1: thêm `scripts/g0/`, `docs/g0/` (chủ Hưng, review Hiếu); mục 3.2: bảng tổng hợp và sổ chi phí chung không sửa trong nhánh story | PO (Hiếu) |
 | 23/10/2026 | 0.1 | Bản đầu: bản đồ sở hữu đường dẫn, 14 story Pha A, quy trình git và Claude, cách theo dõi theo nhiệm vụ con | SM, PO |
 
 ## 1. Ba lớp chống "chèn code vào nhau"
@@ -46,7 +47,8 @@ Theo RACI ở 04 mục 3.3: chủ sở hữu là người A hoặc R chính củ
 | `configs/splits/` | Long | Thông |
 | `configs/thresholds/`, `configs/pricebook/`, `ops/` | Thông | Long |
 | `configs/runplans/`, `configs/recipes/` | Hiếu | Châu |
-| `pyproject.toml` gốc, `uv.lock`, `.github/workflows/`, `scripts/` | Long | Thông |
+| `pyproject.toml` gốc, `uv.lock`, `.github/workflows/`, `scripts/` (trừ `scripts/g0/`) | Long | Thông |
+| `scripts/g0/`, `docs/g0/` (spike G0, bản 0.2) | Hưng | Hiếu |
 | `docs/spec-v10-failure-to-data.md`, `docs/product/00`–`07`, `docs/superpowers/` | Hiếu | Thông |
 | `docs/product/stories/` | Thông | Hiếu |
 | `website/`, `deliverables/` | Hiếu | Long |
@@ -111,7 +113,8 @@ File dùng chung: `contracts/`, schema trong `configs/`, `pyproject.toml` gốc,
 1. Người cần đổi mở issue "Contract change: …" mô tả trường cần thêm và lý do.
 2. Chủ sở hữu (Long, hoặc người ở mục 2.1) làm một PR nhỏ chỉ đổi contract, kèm test; nhánh `<story-id>-contract`.
 3. PR contract merge trước. Người cần dùng rebase lên `master` rồi làm tiếp.
-4. Thêm phụ thuộc Python: người cần thêm sửa `pyproject.toml` của package mình; `uv.lock` chỉ được tạo lại bằng `uv lock` sau khi rebase, không sửa tay; xung đột ở `uv.lock` thì lấy bản của `master` rồi chạy lại `uv lock`.
+4. Bảng tổng hợp và sổ chi phí chung (bản 0.2): nhánh story không sửa 03 §3.3 hay một file sổ chi phí dùng chung. Story ghi kết quả và chi phí vào file của mình; chủ của bảng gom lại vào mốc cố định. Quy ước cho G0 ở [docs/g0/README.md](../g0/README.md).
+5. Thêm phụ thuộc Python: người cần thêm sửa `pyproject.toml` của package mình; `uv.lock` chỉ được tạo lại bằng `uv lock` sau khi rebase, không sửa tay; xung đột ở `uv.lock` thì lấy bản của `master` rồi chạy lại `uv lock`.
 
 ### 3.3 Vòng đời một story
 

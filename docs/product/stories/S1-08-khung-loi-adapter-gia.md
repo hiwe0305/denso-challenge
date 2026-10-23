@@ -39,6 +39,16 @@ Là kỹ sư data xây lõi, tôi muốn một vòng rỗng chạy → chấm �
 - [ ] 4. Contract test v0 (AC 5)
 - [ ] 5. Kiểm import-linter (AC 6)
 
+## Phạm vi file
+
+Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
+
+- `packages/flywheel/src/flywheel/contracts/protocols.py`, `packages/flywheel/src/flywheel/contracts/v0.py`
+- `packages/flywheel/src/flywheel/contracts/__init__.py`: story này giữ file export; S1-10 không sửa, mã khác import thực thể từ module base
+- `packages/flywheel/src/flywheel/testing/`
+- `packages/flywheel/tests/e2e/`
+- `packages/flywheel-fakes/`
+
 ## Ghi chú cho người làm
 
 - Nguồn: 02 · 1.7, NFR2, mục 4 (chiến lược test); 03 §2.2, §2.3 (luồng một vòng), §5.2, §5.3 (11 điều hợp đồng), §5.4 (bộ giả), §11; 05 mục 3 (bộ giả cần nhưng chưa đủ).
@@ -66,6 +76,7 @@ Là kỹ sư data xây lõi, tôi muốn một vòng rỗng chạy → chấm �
 |---|---|---|
 | 22/10/2026 | Tạo story từ 02 · 1.7; ghi cách gỡ phụ thuộc với S1-10 | SM (Bob), PO (Sarah) duyệt |
 | 22/10/2026 | Đồng bộ Protocol với 03 §5.2 bản 0.3: `control_spec`, cờ `camera_params`, `controller`, `family`, `failure_class`. AC của 02 · 1.7 không đổi; ước lượng giữ 18 giờ | SM (Bob) theo 06 |
+| 24/10/2026 | Thêm mục Phạm vi file; story giữ file export của `contracts`. AC không đổi | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

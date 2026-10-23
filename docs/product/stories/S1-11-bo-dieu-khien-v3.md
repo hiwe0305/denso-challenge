@@ -23,7 +23,7 @@ Là kỹ sư simulation, tôi muốn biết rollout motion planning có cùng b�
 3. Cùng bộ điều khiển hoặc có ánh xạ tường minh: ghi ánh xạ, đề xuất `embodiment_id` cho từng nguồn; story 5.5 đóng với ghi chú "không cần".
 4. Khác bộ điều khiển: thử song song trong tuần 1–2. T1 (Hưng): lấy quỹ đạo thân trên của rollout MP, suy lệnh thân dưới, chạy lại trong env WBC. T2 (Châu, 6 giờ): biến đổi một đoạn teleop theo tư thế vật mới, chạy bằng IK cộng WBC trong env Teleop. Mỗi tuyến ghi tỉ lệ thành công trên ít nhất 10 lượt và ước công sức xây đến mức chạy được (đầu vào cho 5.5). Chốt tuyến cuối tuần 2; T3, T4 chỉ chọn theo cây ở 04 mục 1.3.
 5. Ghi kịch bản V3 âm cộng Q6 âm (Q6 lấy từ S1-07) vào RunPlan nháp và mục rủi ro: C chỉ còn kiểm demo mâu thuẫn, HT sụp, báo cáo phải nêu.
-6. Kết luận ở `docs/g0/v3-planner-controller.md`; cập nhật dòng V3 của 03 §3.3 có change log và giá trị cờ `GenCapabilities.plan`; nháp cấu hình embodiment trong `configs/embodiments/`.
+6. Kết luận ở `docs/g0/v3-planner-controller.md`, có mục "Đề xuất cho 03 §3.3" với dòng V3 và giá trị cờ `GenCapabilities.plan` ([docs/g0/README.md](../../g0/README.md)); Hiếu gom vào 03 §3.3 ở review G0; nháp cấu hình embodiment trong `configs/embodiments/`.
 
 ## Nhiệm vụ
 
@@ -35,7 +35,17 @@ Là kỹ sư simulation, tôi muốn biết rollout motion planning có cùng b�
 - [ ] 3. Nếu khác: Hưng thử T1 (AC 4)
 - [ ] 4. Nếu khác: Châu thử T2 trong 6 giờ (AC 4)
 - [ ] 5. Ghi kịch bản V3 âm cộng Q6 âm (AC 5)
-- [ ] 6. Viết kết luận, đề xuất tuyến cho review G0, cập nhật 03 §3.3, nháp `configs/embodiments/` (AC 6)
+- [ ] 6. Viết kết luận, đề xuất tuyến cho review G0 kèm đề xuất cho 03 §3.3, nháp `configs/embodiments/` (AC 6)
+
+## Phạm vi file
+
+Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
+
+- `scripts/g0/t1_replay_probe.py`, `scripts/g0/t2_variant_probe.py`
+- `docs/g0/v3-planner-controller.md`
+- `configs/embodiments/g1_sonic_dwbc.yaml`, `configs/embodiments/g1_wholebody_amo.yaml`
+- `docs/g0/ledger/S1-11.csv`
+- Chạy datagen_probe.sh của S1-05, không sửa
 
 ## Ghi chú cho người làm
 
@@ -64,6 +74,7 @@ Là kỹ sư simulation, tôi muốn biết rollout motion planning có cùng b�
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 22/10/2026 | Tạo story từ 02 · 1.9 (bản 0.3), tách V3 khỏi S1-05 theo 06 mục 1; hạn ngày 5, thử T1 và T2 song song, chốt cuối tuần 2 | SM (Bob) theo 06 |
+| 24/10/2026 | Thêm mục Phạm vi file. AC 6: đề xuất dòng V3 ghi trong file kết quả, Hiếu gom vào 03 §3.3 ở review G0; chạy `datagen_probe.sh` của S1-05, không sửa | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

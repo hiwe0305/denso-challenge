@@ -22,7 +22,7 @@ Là kỹ sư simulation, tôi muốn biết pipeline motion planning của SIMPL
 2. Kiểm planner có chạy được từ một trạng thái lưu giữa episode không (cần cho kiểm khả thi, trạng thái chuẩn, correction do máy sinh; 02 · 5.5 AC 4).
 3. Đề xuất giá trị cờ khả năng liên quan cho SimulatorAdapter và GeneratorAdapter (02 · 1.5 AC 4). Giá trị cuối của `GenCapabilities.plan` chốt cùng kết luận V3 ở S1-11, vì planner dưới AMO không chứng minh khả thi dưới WBC.
 4. Không ghi task F1 là dự phòng cho Q2, trừ khi S1-11 xác nhận cặp task của F1 cùng bộ điều khiển (06 mục 1, 02 · 1.9 AC 2).
-5. Kết quả ở `docs/g0/q2-planner.md`; chi phí vào `docs/g0/ledger-g0.csv`.
+5. Kết quả ở `docs/g0/q2-planner.md`; chi phí vào `docs/g0/ledger/S1-05.csv`.
 
 ## Nhiệm vụ
 
@@ -31,12 +31,20 @@ Là kỹ sư simulation, tôi muốn biết pipeline motion planning của SIMPL
 - [ ] 3. Đề xuất cờ khả năng, chuyển số liệu cho S1-11 (AC 3, 4)
 - [ ] 4. Viết `docs/g0/q2-planner.md`, ghi sổ chi phí (AC 5)
 
+## Phạm vi file
+
+Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
+
+- `scripts/g0/datagen_probe.sh`: story này giữ script; S1-11 chỉ chạy, không sửa
+- `docs/g0/q2-planner.md`
+- `docs/g0/ledger/S1-05.csv`
+
 ## Ghi chú cho người làm
 
 - Nguồn: 02 · 1.5 (bản 0.3), 1.9, 5.1, 5.5; spec 2.4 Q2, 6.5, 6.6, 10; 03 §3.2 (dòng "Sinh dữ liệu motion planning"), §5.2 (`GenCapabilities`), §5.4; 05 DK3, DK4.
 - Theo 06 mục 1, V3 tách thành story riêng có hạn ngày 5 (S1-11). Story này chỉ trả lời Q2; bảng đối chiếu bộ điều khiển và thử T1, T2 nằm ở S1-11.
 - Theo 03 §3.2, task `*MP-v0` chạy AMO (`g1_wholebody`), khác bộ điều khiển với task chính. Rollout từ datagen ở story này chưa được trộn vào release nào cho tới khi S1-11 kết luận (ADR-08).
-- File sẽ tạo: `scripts/g0/datagen_probe.sh`, `docs/g0/q2-planner.md`. Dùng chung `datagen_probe.sh` với S1-11.
+- File sẽ tạo: `scripts/g0/datagen_probe.sh`, `docs/g0/q2-planner.md`, `docs/g0/ledger/S1-05.csv`. Story này giữ `datagen_probe.sh`; S1-11 chạy script, không sửa. Cần đổi thì sửa trong nhánh S1-05.
 
 ## Kiểm thử
 
@@ -55,6 +63,7 @@ Là kỹ sư simulation, tôi muốn biết pipeline motion planning của SIMPL
 |---|---|---|
 | 22/10/2026 | Tạo story từ 02 · 1.5 (phần Q2) và AC V3 mới; tách khỏi Q3, Q4 (S1-06) | SM (Bob), PO (Sarah) duyệt |
 | 22/10/2026 | Theo 02 bản 0.3 (06 mục 1): V3 tách sang story 1.9, file S1-11; story này chỉ còn Q2 và kiểm planner từ trạng thái lưu; bỏ F1 khỏi vai dự phòng cho Q2; ước lượng 12 → 6 giờ; review chuyển sang Châu | SM (Bob) theo 06 |
+| 24/10/2026 | Thêm mục Phạm vi file. Story giữ `datagen_probe.sh`, S1-11 chỉ chạy; sổ chi phí riêng của story | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

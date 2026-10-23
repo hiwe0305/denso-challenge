@@ -25,7 +25,7 @@ Giờ là ước lượng (04 mục 4.7 cộng phần DA ở 07 mục 2.3). Ai c
 
 - **Story:** S1-02 môi trường SIMPLE · S1-05 planner · **S1-11 bộ điều khiển V3, hạn ngày 5 (30/10)** · S2 `SimpleSimulator`, TaskDefinition G1, tuyến generator · S3 khôi phục trạng thái · S4 correction, B-fail · S5–S6 cấy lỗi, điều phối HD, holdout, video demo.
 - **Pha A:** DA-06 Cosmos Transfer (tầng S3) · **DA-10 robot thay thế giống ≥ 95%** · **DA-11 cảnh trạm và `DensoIsaacSim`**.
-- Sở hữu: `flywheel-simple/`, `flywheel-isaac/`, `docker/`, `configs/embodiments/`, generator của `flywheel-nim/`. Tổng khoảng 260 giờ, cao nhất đội.
+- Sở hữu: `flywheel-simple/`, `flywheel-isaac/`, `docker/`, `configs/embodiments/`, generator của `flywheel-nim/`, `scripts/g0/`, `docs/g0/`. Tổng khoảng 260 giờ, cao nhất đội.
 
 ### Trần Trịnh Hoàng Châu · Scorer, ACT/DP, vận hành Ψ₀
 
@@ -37,7 +37,7 @@ Giờ là ước lượng (04 mục 4.7 cộng phần DA ở 07 mục 2.3). Ai c
 
 - **Story:** **S1-01 khung repo, CLI, CI (chặn S1-08, S1-10)** · S1-08 khung lõi trên adapter giả · S2 chia tập, runner, release · S3 RunPlan, chẩn đoán, kiểm hệ thống · S4 chọn can thiệp, `fw review` · S5 vòng C · S6 báo cáo.
 - **Pha A:** DA-01 định dạng episode chung · **DA-04 pipeline video egocentric** · DA-13 quy lỗi về stage.
-- Sở hữu: `contracts/`, `store/`, `catalog/`, `runner/`, `scenarios/`, `diagnosis/`, `decide/`, `acquisition/`, `reports/`, `cli/`, `pyproject.toml` gốc, `uv.lock`, CI, `scripts/`. Tổng khoảng 248 giờ. **Mọi thay đổi `contracts/` đi qua Long.**
+- Sở hữu: `contracts/`, `store/`, `catalog/`, `runner/`, `scenarios/`, `diagnosis/`, `decide/`, `acquisition/`, `reports/`, `cli/`, `pyproject.toml` gốc, `uv.lock`, CI, `scripts/` (trừ `scripts/g0/`). Tổng khoảng 248 giờ. **Mọi thay đổi `contracts/` đi qua Long.**
 
 ### Dương Tiến Thông · Scrum Master, dữ liệu và đo lường
 

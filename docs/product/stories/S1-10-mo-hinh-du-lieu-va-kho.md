@@ -40,6 +40,16 @@ Là kỹ sư data, tôi muốn schema có phiên bản và kho lưu bất biến
 - [ ] 5. `ledger.append` và test (AC 7)
 - [ ] 6. Xuất JSON Schema (AC 8)
 
+## Phạm vi file
+
+Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
+
+- `packages/flywheel/src/flywheel/contracts/base.py`, `packages/flywheel/src/flywheel/contracts/configs.py`
+- `packages/flywheel/src/flywheel/contracts/entities.py` hoặc `packages/flywheel/src/flywheel/contracts/entities/`
+- `packages/flywheel/src/flywheel/store/`, `packages/flywheel/src/flywheel/ledger/`
+- `packages/flywheel/schemas/`
+- `packages/flywheel/tests/contracts/`, `packages/flywheel/tests/store/`, `packages/flywheel/tests/ledger/`
+
 ## Ghi chú cho người làm
 
 - Nguồn: 02 · 2.1 (bản 0.3), FR1–FR4, NFR6, NFR7, NFR12; 03 §2.4 (L0-lite), §4 (bản 0.3), §7.2, ADR-03, ADR-04, ADR-05, ADR-06, ADR-08, ADR-12, ADR-13; bảng tên ở 04 mục 1.4.
@@ -69,6 +79,7 @@ Là kỹ sư data, tôi muốn schema có phiên bản và kho lưu bất biến
 |---|---|---|
 | 22/10/2026 | Tạo story từ 02 · 2.1, tách phần a cho S1; phụ thuộc đổi thành 1.1 (04 P17) | SM (Bob), PO (Sarah) duyệt |
 | 22/10/2026 | Theo L0-lite (06 mục 9, 02 · 2.1 bản 0.3, 03 §2.4, §4.3): 12 thực thể, cấu hình ngoài catalog, `task_id`, `embodiment_id`, `site_id` là cột có mặc định; JSONL không phân vùng ngày, view DuckDB tự tạo, bỏ `fw index rebuild`, bỏ fsspec; ước lượng 14 → 10 giờ | SM (Bob) theo 06 |
+| 24/10/2026 | Thêm mục Phạm vi file. AC không đổi | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
