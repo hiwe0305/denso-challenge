@@ -1,6 +1,6 @@
 # CLAUDE.md · Humanoid Data Flywheel
 
-Hướng dẫn cho Claude Code (và người) làm việc trong repo này. Đội 5 người cùng dùng Claude; mục tiêu của file là để mọi phiên Claude làm cùng một cách và không giẫm lên việc của nhau.
+Hướng dẫn cho Claude Code (và người) làm việc trong repo này. Đội 5 người cùng dùng Claude; mục tiêu của file là để mọi phiên Claude làm cùng một cách và không giẫm lên việc của nhau. Bản tóm tắt cho người (công việc từng người, rule, quy trình một story) ở [RULE.md](RULE.md).
 
 ## Dự án
 
