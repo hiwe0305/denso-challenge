@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+from typing import get_type_hints
 
 import pytest
 from flywheel.contracts import (
@@ -16,6 +17,7 @@ from flywheel.contracts import (
     TeleopSource,
     TrainerAdapter,
 )
+from flywheel.contracts.v0 import ControlSpec
 from pydantic import ValidationError
 
 PROTOCOL_METHODS = {
@@ -85,3 +87,9 @@ def test_capability_records_are_immutable() -> None:
 
     with pytest.raises(ValidationError):
         capabilities.plan = False
+
+
+def test_simulator_control_spec_returns_the_contract_type() -> None:
+    hints = get_type_hints(SimulatorAdapter.control_spec)
+
+    assert hints["return"] is ControlSpec
