@@ -6,6 +6,7 @@ import re
 import subprocess
 from pathlib import Path
 
+import pytest
 from click import unstyle
 from flywheel.cli.main import app, build_version
 from typer.testing import CliRunner
@@ -13,7 +14,9 @@ from typer.testing import CliRunner
 runner = CliRunner()
 
 
-def test_fw_version_reports_package_full_sha_and_dirty_state() -> None:
+def test_fw_version_reports_package_repo_when_called_outside_repo(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     sha = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         check=True,
@@ -26,6 +29,7 @@ def test_fw_version_reports_package_full_sha_and_dirty_state() -> None:
         capture_output=True,
         text=True,
     ).stdout
+    monkeypatch.chdir(tmp_path)
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0

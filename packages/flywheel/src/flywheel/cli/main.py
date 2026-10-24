@@ -13,6 +13,7 @@ app = typer.Typer(
     help="Operate the DENSO Humanoid Data Flywheel.",
     no_args_is_help=True,
 )
+PACKAGE_DIRECTORY = Path(__file__).resolve().parent
 
 
 def _package_version() -> str:
@@ -42,11 +43,17 @@ def _git_output(*args: str, cwd: Path | None = None) -> str | None:
 
 def build_version(cwd: Path | None = None) -> str:
     """Combine the package version with the current Git SHA and dirty state."""
-    sha = _git_output("rev-parse", "HEAD", cwd=cwd)
+    repository_location = cwd if cwd is not None else PACKAGE_DIRECTORY
+    sha = _git_output("rev-parse", "HEAD", cwd=repository_location)
     if sha is None:
         return f"{_package_version()}+unknown"
 
-    status = _git_output("status", "--porcelain", "--untracked-files=normal", cwd=cwd)
+    status = _git_output(
+        "status",
+        "--porcelain",
+        "--untracked-files=normal",
+        cwd=repository_location,
+    )
     dirty = "-dirty" if status else ""
     return f"{_package_version()}+{sha}{dirty}"
 
