@@ -1,0 +1,35 @@
+# Psi0 serving environment for the G0 reproduction (S1-03 subtask 2.1), shared with S1-04.
+# Used through scripts/g0/serve_psi0.sh with PSI0_RUNTIME=docker; that script exports PSI0_ROOT
+# and PSI0_SRC. The image holds dependencies only (python 3.11, torch 2.7 cu12, flash-attn in
+# /workspace/.venv-psi); the Psi0 checkout made by `serve_psi0.sh setup` is bind-mounted.
+# Needs the NVIDIA container toolkit on the host.
+name: fw-psi0
+
+services:
+  psi0:
+    # Upstream tag 260830 (also `latest` on 24/10/2026), pinned by index digest (03 §3.1).
+    image: ghcr.io/physical-superintelligence-lab/psi0@sha256:0d580125284ded59b81e9f9cbff77d97b6554ff7d44efb95b8a1b005836b80b2
+    runtime: nvidia
+    # The server binds the host port directly so the SIMPLE client reaches it on localhost.
+    network_mode: host
+    # Non-root (03 §10.3).
+    user: "${FW_UID:-1000}:${FW_GID:-1000}"
+    working_dir: ${PSI0_SRC:?run through scripts/g0/serve_psi0.sh}
+    environment:
+      NVIDIA_VISIBLE_DEVICES: ${GPUS:-0}
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      PYTHONUNBUFFERED: "1"
+      HOME: /tmp
+      HF_HOME: ${PSI0_ROOT:?run through scripts/g0/serve_psi0.sh}/hf-cache
+      VIRTUAL_ENV: /workspace/.venv-psi
+      PATH: /workspace/.venv-psi/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    volumes:
+      # Run dirs, smoke reports and the Psi0 checkout, at the same path as on the host.
+      - type: bind
+        source: ${PSI0_ROOT}
+        target: ${PSI0_ROOT}
+      # The image installs psi editable from /workspace/src.
+      - type: bind
+        source: ${PSI0_SRC}/src
+        target: /workspace/src
+    shm_size: "16gb"
