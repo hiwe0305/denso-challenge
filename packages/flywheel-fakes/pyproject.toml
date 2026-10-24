@@ -1,0 +1,9 @@
+[project]
+name = "flywheel-fakes"
+version = "0.1.0"
+description = "Fake adapters used to test the Flywheel core"
+requires-python = ">=3.10"
+dependencies = ["flywheel"]
+
+[tool.uv.sources]
+flywheel = { workspace = true }
