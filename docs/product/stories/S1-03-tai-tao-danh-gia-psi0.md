@@ -30,7 +30,7 @@ Là kỹ sư robot learning, tôi muốn chạy checkpoint Ψ₀ công bố trê
 ## Nhiệm vụ
 
 - [ ] 1. Q0 và chọn task tái tạo (AC 1, 6)
-  - [ ] 1.1 Liệt kê checkpoint trong `psi0/` ở revision ghim; ghi tên, ngày, kích thước
+  - [x] 1.1 Liệt kê checkpoint trong `psi0/` ở revision ghim; ghi tên, ngày, kích thước
   - [ ] 1.2 Chọn checkpoint gốc trong `pre.*` hoặc `postpre.*` và task tái tạo; ghi provenance vào Source; ghi rủi ro nếu chưa chắc (AC 6, 7)
   - [ ] 1.3 Soạn câu hỏi provenance, gửi chung email giấy phép (việc trưởng nhóm)
 - [ ] 2. Serve Ψ₀ (AC 2, 4)
