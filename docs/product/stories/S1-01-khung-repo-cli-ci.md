@@ -28,21 +28,21 @@ Là kỹ sư data xây lõi, tôi muốn một monorepo uv workspace có CLI `fw
 
 ## Nhiệm vụ
 
-- [ ] 1. Dựng uv workspace (AC 1)
-  - [ ] 1.1 `pyproject.toml` gốc khai workspace `packages/*`; Python ≥ 3.10
-  - [ ] 1.2 `packages/flywheel/pyproject.toml` với phụ thuộc lõi của 03 §7.1 bản 0.3 (pydantic, pyarrow, duckdb, numpy, scipy, statsmodels, typer, structlog, jinja2); extra `hd` chứa `rerun-sdk`. Không thêm fsspec, MLflow, Streamlit (L0-lite)
-  - [ ] 1.3 Commit `uv.lock`
-- [ ] 2. CLI `fw` bằng Typer (AC 2)
-  - [ ] 2.1 Lệnh `fw --version` đọc phiên bản package và `git rev-parse HEAD`, kiểm cây bẩn
-  - [ ] 2.2 Khai entry point `fw` trong `pyproject.toml`
-- [ ] 3. Khung module (AC 3)
-  - [ ] 3.1 Tạo thư mục và docstring cho từng module
-  - [ ] 3.2 Tạo `packages/flywheel-fakes/` rỗng
-- [ ] 4. CI (AC 4, 5)
-  - [ ] 4.1 Cấu hình ruff, mypy, pytest trong `pyproject.toml`
-  - [ ] 4.2 Hợp đồng import-linter cho danh sách cấm ở AC 5
-  - [ ] 4.3 Viết `core-ci.yml`; chạy thử một PR có import vi phạm, ghi kết quả vào Ghi chép khi làm
-- [ ] 5. `.gitignore` và README (AC 6, 7)
+- [x] 1. Dựng uv workspace (AC 1)
+  - [x] 1.1 `pyproject.toml` gốc khai workspace `packages/*`; Python ≥ 3.10
+  - [x] 1.2 `packages/flywheel/pyproject.toml` với phụ thuộc lõi của 03 §7.1 bản 0.3 (pydantic, pyarrow, duckdb, numpy, scipy, statsmodels, typer, structlog, jinja2); extra `hd` chứa `rerun-sdk`. Không thêm fsspec, MLflow, Streamlit (L0-lite)
+  - [x] 1.3 Commit `uv.lock`
+- [x] 2. CLI `fw` bằng Typer (AC 2)
+  - [x] 2.1 Lệnh `fw --version` đọc phiên bản package và `git rev-parse HEAD`, kiểm cây bẩn
+  - [x] 2.2 Khai entry point `fw` trong `pyproject.toml`
+- [x] 3. Khung module (AC 3)
+  - [x] 3.1 Tạo thư mục và docstring cho từng module
+  - [x] 3.2 Tạo `packages/flywheel-fakes/` rỗng
+- [x] 4. CI (AC 4, 5)
+  - [x] 4.1 Cấu hình ruff, mypy, pytest trong `pyproject.toml`
+  - [x] 4.2 Hợp đồng import-linter cho danh sách cấm ở AC 5
+  - [x] 4.3 Viết `core-ci.yml`; chạy thử một PR có import vi phạm, ghi kết quả vào Ghi chép khi làm
+- [x] 5. `.gitignore` và README (AC 6, 7)
 
 ## Phạm vi file
 
@@ -85,10 +85,18 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 22/10/2026 | Tạo story từ 02 · 1.1 | SM (Bob), PO (Sarah) duyệt |
 | 22/10/2026 | Theo L0-lite (06 mục 9, 03 bản 0.3): bỏ fsspec khỏi phụ thuộc lõi, thêm statsmodels và extra `hd`; bỏ `mlruns/` khỏi `.gitignore`; ước lượng 12 → 11 giờ | SM (Bob) theo 06 |
 | 24/10/2026 | Thêm mục Phạm vi file (07 mục 3.1). AC không đổi | PO (Hiếu) |
+| 24/10/2026 | Hoàn thành triển khai và kiểm thử cục bộ toàn bộ nhiệm vụ S1-01; chờ review PR | Nguyễn Thăng Long |
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
-- Ghi chú hoàn thành:
-- File đã tạo hoặc sửa:
+- Giờ thực: 1,1 giờ (1 giờ triển khai ban đầu; 0,1 giờ sửa review).
+- Công cụ AI đã dùng: Codex.
+- Ghi chú hoàn thành: Ruff, mypy, 5 pytest và import-linter đều xanh. Phép thử
+  import cố ý `flywheel.catalog -> torch` làm Core CI đỏ tại
+  `test_flywheel_has_no_forbidden_imports`; bằng chứng:
+  <https://github.com/hiwe0305/denso-challenge/actions/runs/40057217059>.
+  Import thử nghiệm đã được gỡ và cổng được chạy lại. Sau review, `fw --version`
+  được neo vào thư mục package và có test gọi từ thư mục hiện hành ngoài repo.
+- File đã tạo hoặc sửa: `pyproject.toml`, `uv.lock`, `.gitignore`,
+  `.github/workflows/core-ci.yml`, `packages/flywheel/`, `packages/flywheel-fakes/`,
+  và file story này.

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "flywheel"
+version = "0.1.0"
+description = "Core library for the DENSO Humanoid Data Flywheel"
+requires-python = ">=3.10"
+dependencies = [
+    "duckdb",
+    "jinja2",
+    "numpy",
+    "pyarrow",
+    "pydantic>=2",
+    "scipy",
+    "statsmodels",
+    "structlog",
+    "typer",
+]
+
+[project.scripts]
+fw = "flywheel.cli.main:main"
+
+[project.optional-dependencies]
+hd = ["rerun-sdk"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/flywheel"]
