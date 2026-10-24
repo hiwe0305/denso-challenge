@@ -10,11 +10,22 @@
 !.env.example
 
 # Python, OS and office lock files
+.venv/
+.uv-cache/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
 __pycache__/
 *.py[cod]
 *.tar.gz
 .DS_Store
 .~lock.*#
+
+# Local Flywheel data and model artifacts must stay outside Git.
+fwdata/
+*.ckpt
+*.safetensors
+*.pt
 
 # Offline paper library stays local; see docs/references/README.md.
 /docs/references/papers/
