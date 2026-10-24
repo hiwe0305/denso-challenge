@@ -29,7 +29,7 @@ Là kỹ sư robot learning, tôi muốn đo VRAM và GPU-giờ của fine-tune 
 
 - [ ] 1. Chuẩn bị (AC 1)
   - [ ] 1.1 Dùng image Ψ₀ ở `docker/psi0/` của S1-03, không dựng môi trường riêng; tải gói task chính ở revision ghim
-  - [ ] 1.2 Đọc `scripts/train/psi0/finetune-simple-psi0.sh`, ghi S, batch, learning rate mặc định
+  - [x] 1.2 Đọc `scripts/train/psi0/finetune-simple-psi0.sh`, ghi S, batch, learning rate mặc định
 - [ ] 2. Chạy thử theo thứ tự 5090 → LoRA hoặc đóng băng VLM → A100 (AC 1, 2)
 - [ ] 3. Tính GPU-giờ và USD, ghi sổ (AC 3)
 - [ ] 4. Viết đề xuất, Hiếu duyệt, tạo RunPlan nháp (AC 4)
