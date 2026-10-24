@@ -28,7 +28,7 @@ Là kỹ sư data xây lõi, tôi muốn một vòng rỗng chạy → chấm �
 ## Nhiệm vụ
 
 - [ ] 1. Protocol và kiểu dữ liệu (AC 1, 2)
-  - [ ] 1.1 Ngày 1–2: thống nhất với Thông ranh giới file trong `contracts` (Long: `protocols.py`, kiểu request, result; Thông: `base.py`, thực thể)
+  - [x] 1.1 Ngày 1–2: thống nhất với Thông ranh giới file trong `contracts` (Long: `protocols.py`, kiểu request, result; Thông: `base.py`, thực thể)
   - [ ] 1.2 Viết 6 Protocol và kiểu capability
   - [ ] 1.3 Viết kiểu v0 tối thiểu, ghi chú sẽ thay ở S2
 - [ ] 2. Bộ giả (AC 3)
@@ -83,4 +83,5 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - Giờ thực:
 - Công cụ AI đã dùng:
 - Ghi chú hoàn thành:
+- Bằng chứng 1.1: đối chiếu phạm vi S1-08 và S1-10 bằng script; S1-08 giữ `protocols.py`, `v0.py`, S1-10 giữ `base.py`, `entities`; 6/6 kiểm tra ranh giới đạt.
 - File đã tạo hoặc sửa:
