@@ -141,6 +141,8 @@ class FakeSim2D:
                     "gripper_y": round(y, 6),
                     "part_x": round(x, 6),
                     "part_y": round(y, 6),
+                    "target_x": target_x,
+                    "target_y": target_y,
                 }
             )
         return {
