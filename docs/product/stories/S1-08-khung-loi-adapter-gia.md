@@ -33,7 +33,7 @@ Là kỹ sư data xây lõi, tôi muốn một vòng rỗng chạy → chấm �
   - [x] 1.3 Viết kiểu v0 tối thiểu, ghi chú sẽ thay ở S2
 - [ ] 2. Bộ giả (AC 3)
   - [x] 2.1 `FakeSim2D`: bài gắp đặt 2D tất định, vector điều kiện nhỏ
-  - [ ] 2.2 `FakePolicy`, `FakeTrainer`, `FakeGenerator`, `FakeTeleop`
+  - [x] 2.2 `FakePolicy`, `FakeTrainer`, `FakeGenerator`, `FakeTeleop`
   - [ ] 2.3 `ToyPickPlace`
 - [ ] 3. Vòng rỗng end-to-end và marker `e2e_fake` (AC 4)
 - [ ] 4. Contract test v0 (AC 5)
@@ -87,4 +87,5 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - Bằng chứng 1.2: `pytest packages/flywheel/tests/e2e/test_protocols.py -q` đạt 9 test; Ruff đạt; mypy đạt trên 19 file nguồn.
 - Bằng chứng 1.3: test Protocol và model v0 đạt 14 test; Ruff đạt; mypy đạt trên 20 file nguồn. `v0.py` ghi rõ model tạm sẽ được thay bằng model chuẩn của S1-10 ở S2.
 - Bằng chứng 2.1: unit test `FakeSim2D` đạt 5 test, gồm cùng seed cho condition giống nhau, trace trùng từng byte và idempotent theo `job_id`; Ruff và mypy đạt.
+- Bằng chứng 2.2: toàn bộ unit test package fakes đạt 12 test; bốn adapter đạt kiểm tra runtime Protocol và kiểm tra cùng seed/đầu vào cho cùng kết quả; Ruff và mypy đạt.
 - File đã tạo hoặc sửa:
