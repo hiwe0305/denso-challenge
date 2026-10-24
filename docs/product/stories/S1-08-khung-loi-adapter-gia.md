@@ -31,10 +31,10 @@ Là kỹ sư data xây lõi, tôi muốn một vòng rỗng chạy → chấm �
   - [x] 1.1 Ngày 1–2: thống nhất với Thông ranh giới file trong `contracts` (Long: `protocols.py`, kiểu request, result; Thông: `base.py`, thực thể)
   - [x] 1.2 Viết 6 Protocol và kiểu capability
   - [x] 1.3 Viết kiểu v0 tối thiểu, ghi chú sẽ thay ở S2
-- [ ] 2. Bộ giả (AC 3)
+- [x] 2. Bộ giả (AC 3)
   - [x] 2.1 `FakeSim2D`: bài gắp đặt 2D tất định, vector điều kiện nhỏ
   - [x] 2.2 `FakePolicy`, `FakeTrainer`, `FakeGenerator`, `FakeTeleop`
-  - [ ] 2.3 `ToyPickPlace`
+  - [x] 2.3 `ToyPickPlace`
 - [ ] 3. Vòng rỗng end-to-end và marker `e2e_fake` (AC 4)
 - [ ] 4. Contract test v0 (AC 5)
 - [ ] 5. Kiểm import-linter (AC 6)
@@ -88,4 +88,5 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - Bằng chứng 1.3: test Protocol và model v0 đạt 14 test; Ruff đạt; mypy đạt trên 20 file nguồn. `v0.py` ghi rõ model tạm sẽ được thay bằng model chuẩn của S1-10 ở S2.
 - Bằng chứng 2.1: unit test `FakeSim2D` đạt 5 test, gồm cùng seed cho condition giống nhau, trace trùng từng byte và idempotent theo `job_id`; Ruff và mypy đạt.
 - Bằng chứng 2.2: toàn bộ unit test package fakes đạt 12 test; bốn adapter đạt kiểm tra runtime Protocol và kiểm tra cùng seed/đầu vào cho cùng kết quả; Ruff và mypy đạt.
+- Bằng chứng 2.3: toàn bộ unit test package fakes đạt 17 test trong 80,67 giây; `ToyPickPlace` đạt runtime Protocol, ba bước/ba kiểu lỗi có `failure_class`, đánh giá thuần và tất định; Ruff và mypy đạt.
 - File đã tạo hoặc sửa:
