@@ -37,7 +37,7 @@ Là kỹ sư data xây lõi, tôi muốn một vòng rỗng chạy → chấm �
   - [x] 2.3 `ToyPickPlace`
 - [x] 3. Vòng rỗng end-to-end và marker `e2e_fake` (AC 4)
 - [x] 4. Contract test v0 (AC 5)
-- [ ] 5. Kiểm import-linter (AC 6)
+- [x] 5. Kiểm import-linter (AC 6)
 
 ## Phạm vi file
 
@@ -80,8 +80,8 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
+- Giờ thực: 5 giờ
+- Công cụ AI đã dùng: Codex
 - Ghi chú hoàn thành:
 - Bằng chứng 1.1: đối chiếu phạm vi S1-08 và S1-10 bằng script; S1-08 giữ `protocols.py`, `v0.py`, S1-10 giữ `base.py`, `entities`; 6/6 kiểm tra ranh giới đạt.
 - Bằng chứng 1.2: `pytest packages/flywheel/tests/e2e/test_protocols.py -q` đạt 9 test; Ruff đạt; mypy đạt trên 19 file nguồn.
@@ -91,4 +91,5 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - Bằng chứng 2.3: toàn bộ unit test package fakes đạt 17 test trong 80,67 giây; `ToyPickPlace` đạt runtime Protocol, ba bước/ba kiểu lỗi có `failure_class`, đánh giá thuần và tất định; Ruff và mypy đạt.
 - Bằng chứng 3: `pytest -m e2e_fake -q` đạt 1 test, 19 test không chọn, trong 0,79 giây; đủ 7 bản ghi JSON cho run, score, diagnose, decide, acquire, train, gate; Ruff và mypy đạt.
 - Bằng chứng 4: contract suite dùng chung đạt 5 test; kiểm capability, idempotent theo `job_id`, tách lỗi hạ tầng khỏi kết quả task; suite bắt đúng `LyingCameraSimulator` khai `camera_params=True` nhưng không trả hash; Ruff và mypy đạt.
-- File đã tạo hoặc sửa:
+- Bằng chứng 5: import-linter phân tích 31 file và 22 phụ thuộc, 1 contract được giữ, 0 contract hỏng; test AST cấm import adapter/runtime thật đạt 2 test.
+- File đã tạo hoặc sửa: `contracts/{protocols,v0,__init__}.py`; `testing/{contract_suite,__init__}.py`; `packages/flywheel-fakes/src/flywheel_fakes/`; `packages/flywheel-fakes/tests/`; `packages/flywheel/tests/e2e/`; file story này.
