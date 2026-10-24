@@ -6,6 +6,7 @@ import re
 import subprocess
 from pathlib import Path
 
+from click import unstyle
 from flywheel.cli.main import app, build_version
 from typer.testing import CliRunner
 
@@ -55,4 +56,4 @@ def test_fw_help_is_available() -> None:
     result = runner.invoke(app, ["--help"])
 
     assert result.exit_code == 0
-    assert "--version" in result.stdout
+    assert "--version" in unstyle(result.stdout)
