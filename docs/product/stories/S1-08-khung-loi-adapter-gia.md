@@ -36,7 +36,7 @@ Là kỹ sư data xây lõi, tôi muốn một vòng rỗng chạy → chấm �
   - [x] 2.2 `FakePolicy`, `FakeTrainer`, `FakeGenerator`, `FakeTeleop`
   - [x] 2.3 `ToyPickPlace`
 - [x] 3. Vòng rỗng end-to-end và marker `e2e_fake` (AC 4)
-- [ ] 4. Contract test v0 (AC 5)
+- [x] 4. Contract test v0 (AC 5)
 - [ ] 5. Kiểm import-linter (AC 6)
 
 ## Phạm vi file
@@ -90,4 +90,5 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - Bằng chứng 2.2: toàn bộ unit test package fakes đạt 12 test; bốn adapter đạt kiểm tra runtime Protocol và kiểm tra cùng seed/đầu vào cho cùng kết quả; Ruff và mypy đạt.
 - Bằng chứng 2.3: toàn bộ unit test package fakes đạt 17 test trong 80,67 giây; `ToyPickPlace` đạt runtime Protocol, ba bước/ba kiểu lỗi có `failure_class`, đánh giá thuần và tất định; Ruff và mypy đạt.
 - Bằng chứng 3: `pytest -m e2e_fake -q` đạt 1 test, 19 test không chọn, trong 0,79 giây; đủ 7 bản ghi JSON cho run, score, diagnose, decide, acquire, train, gate; Ruff và mypy đạt.
+- Bằng chứng 4: contract suite dùng chung đạt 5 test; kiểm capability, idempotent theo `job_id`, tách lỗi hạ tầng khỏi kết quả task; suite bắt đúng `LyingCameraSimulator` khai `camera_params=True` nhưng không trả hash; Ruff và mypy đạt.
 - File đã tạo hoặc sửa:
