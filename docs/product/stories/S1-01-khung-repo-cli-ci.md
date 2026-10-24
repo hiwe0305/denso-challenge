@@ -89,11 +89,14 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực: 1 giờ.
+- Giờ thực: 1,1 giờ (1 giờ triển khai ban đầu; 0,1 giờ sửa review).
 - Công cụ AI đã dùng: Codex.
 - Ghi chú hoàn thành: Ruff, mypy, 5 pytest và import-linter đều xanh. Phép thử
-  import cố ý `flywheel.catalog -> torch` làm import-linter đỏ với exit code 1;
-  import thử nghiệm đã được gỡ và cổng được chạy lại.
+  import cố ý `flywheel.catalog -> torch` làm Core CI đỏ tại
+  `test_flywheel_has_no_forbidden_imports`; bằng chứng:
+  <https://github.com/hiwe0305/denso-challenge/actions/runs/40057217059>.
+  Import thử nghiệm đã được gỡ và cổng được chạy lại. Sau review, `fw --version`
+  được neo vào thư mục package và có test gọi từ thư mục hiện hành ngoài repo.
 - File đã tạo hoặc sửa: `pyproject.toml`, `uv.lock`, `.gitignore`,
   `.github/workflows/core-ci.yml`, `packages/flywheel/`, `packages/flywheel-fakes/`,
   và file story này.
