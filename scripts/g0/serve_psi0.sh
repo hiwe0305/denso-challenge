@@ -44,6 +44,9 @@ psi_exec() {
       [[ -x "$PSI0_VENV/bin/python" ]] || die "no Psi0 env at $PSI0_VENV; run: $0 setup"
       (cd "$PSI0_SRC" && VIRTUAL_ENV="$PSI0_VENV" PATH="$PSI0_VENV/bin:$PATH" "$@") ;;
     docker)
+      # Docker would create missing bind-mount sources as root-owned empty dirs, which then
+      # block the clone in setup.
+      [[ -d "$PSI0_SRC/.git" ]] || die "no Psi0 checkout at $PSI0_SRC; run: $0 setup"
       docker compose -f "$REPO/docker/psi0/compose.yaml" run --rm --no-deps -T psi0 "$@" ;;
     *) die "PSI0_RUNTIME must be venv or docker, got $PSI0_RUNTIME" ;;
   esac
@@ -110,7 +113,7 @@ cmd_check() {
   out="$SMOKE_DIR/check-$(date +%Y%m%dT%H%M%S).json"
   psi_exec serve_psi0_simple --help >/dev/null || die "serve_psi0_simple --help failed"
   local status=0
-  psi_exec python - "$RUN_DIR" "$CKPT_STEP" "$ACTION_EXEC_HORIZON" "$RTC_FLAG" "$PSI0_COMMIT" "$PSI_MODEL_REV" \
+  psi_exec python - "$RUN_DIR" "$CKPT_STEP" "$ACTION_EXEC_HORIZON" "$RTC_FLAG" "$PSI0_COMMIT" "$PSI_MODEL_REV" "$DEVICE" \
     > "$out" <<'PY' || status=$?
 import json, os, subprocess, sys
 from pathlib import Path
@@ -122,7 +125,7 @@ import psi
 from psi.models.psi0 import QWEN3VL_VARIANT
 from psi.utils import apply_legacy_model_config_defaults, parse_args_to_tyro_config
 
-run_dir, ckpt_step, exec_horizon, rtc_flag, psi0_commit, model_rev = sys.argv[1:7]
+run_dir, ckpt_step, exec_horizon, rtc_flag, psi0_commit, model_rev, device = sys.argv[1:8]
 run_dir = Path(run_dir)
 config = parse_args_to_tyro_config(run_dir / "argv.txt")
 launch = config.model_validate(apply_legacy_model_config_defaults(json.loads((run_dir / "run_config.json").read_text())))
@@ -142,6 +145,8 @@ AutoProcessor.from_pretrained(QWEN3VL_VARIANT)
 
 weights = run_dir / "checkpoints" / f"ckpt_{ckpt_step}" / "model.safetensors"
 cuda = torch.cuda.is_available()
+if device.startswith("cuda") and not cuda:
+    problems.append(f"DEVICE={device} but torch sees no CUDA device")
 vram_gb = torch.cuda.get_device_properties(0).total_memory / 1e9 if cuda else 0.0
 weights_gb = weights.stat().st_size / 1e9 if weights.exists() else 6.25
 try:

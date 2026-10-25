@@ -21,6 +21,10 @@ services:
       PYTHONUNBUFFERED: "1"
       HOME: /tmp
       HF_HOME: ${PSI0_ROOT:?run through scripts/g0/serve_psi0.sh}/hf-cache
+      # The image is CUDA 12.9. On an older host driver (550 on the 3060) the toolkit puts the
+      # image's forward-compat libcuda first, which GeForce cards reject (CUDA error 804). The
+      # host libcuda mounted by the toolkit is always the right one, so load it first.
+      LD_LIBRARY_PATH: /usr/lib/x86_64-linux-gnu:/usr/local/cuda/lib64
       VIRTUAL_ENV: /workspace/.venv-psi
       PATH: /workspace/.venv-psi/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     volumes:
@@ -32,4 +36,9 @@ services:
       - type: bind
         source: ${PSI0_SRC}/src
         target: /workspace/src
+      # serve_psi0_simple asserts load_dotenv(), which searches upwards from /workspace/src.
+      - type: bind
+        source: ${PSI0_SRC}/.env
+        target: /workspace/.env
+        read_only: true
     shm_size: "16gb"
