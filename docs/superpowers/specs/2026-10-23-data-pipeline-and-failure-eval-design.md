@@ -2,6 +2,8 @@
 
 _Ngày 23/10/2026. Trạng thái: **đã duyệt** (trưởng nhóm, 23/10/2026), chưa có code. Đã đưa vào [spec v10.2](../../spec-v10-failure-to-data.md), [03-architecture](../../product/03-architecture.md) bản 0.4 và [07 · Chia việc](../../product/07-team-workflow.md); tài liệu này giữ phần chi tiết, không thay thế các tài liệu đó._
 
+_Cập nhật 25/10/2026: [design ngày 25/10/2026](2026-10-25-denso-mujoco-and-stage-qa-design.md) thay một phần tài liệu này. Robot DENSO chạy trên MuJoCo, Isaac Sim chỉ render khi có cảnh nhà máy (thay mục 3 và cột simulator ở mục 3); G1 trong SIMPLE không còn là bàn thử của giả thuyết; egocentric dùng để fine-tune stage 1 (thay một phần mục 5.3, cách dùng U4); synthetic S1–S2 sinh trên MuJoCo (thay cột công cụ ở mục 5.2); log train lấy từ code của tác giả (bổ sung mục 6.3). Phần còn lại giữ nguyên._
+
 Quy ước trong tài liệu: **[Đã chốt]** là quyết định của trưởng nhóm trong buổi thảo luận 22–23/10/2026. **[Đề xuất]** là lựa chọn của người viết, trưởng nhóm cần xem lại. **[Option]** là hai phương án song song vì còn chờ DENSO trả lời.
 
 ## 1. Bối cảnh và lý do
