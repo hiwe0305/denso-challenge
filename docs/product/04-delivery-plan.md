@@ -10,6 +10,7 @@ _Ngày 22/10/2026. Vai trò BMAD: Product Owner (Sarah) viết mục 1; Scrum Ma
 | 22/10/2026 | 0.2 | Lập kế hoạch ở 70% năng lực (06 mục 9); ước lại giờ theo AC bản 0.3; bảng tải mới (mục 4.7); thêm mục 4.8 kết luận tải: phạm vi mặc định vượt mức 70%, thứ tự cắt đã duyệt không đủ bù, nêu phương án chờ quyết | SM theo 06 |
 | 22/10/2026 | 0.2 | Phạm vi mặc định: 1 vòng C trên Ψ₀, F-ACT trên ACT, B-fail trên ACT, holdout sớm niêm phong; thứ tự cắt (mục 7.2) khớp 02 §8 bản 0.3; G0 30 lượt mỗi mức; luật MDE ở G2 | SM theo 06 |
 | 22/10/2026 | 0.2 | Mục 1: ghi "Cập nhật 0.2" cho P04, P11, P12, P20, P21, P22, P27, P29–P33 theo 06; mục 1.3, 1.4 theo L0-lite (03 §2.4, §4.3) và tuyến V3 mới | SM theo 06 |
+| 25/10/2026 | 0.6 | Mục 3.2: quy tắc duyệt theo 07 mục 3.4 bản 0.3 (Hiếu duyệt và merge duy nhất), bỏ quy tắc cũ "Hiếu không là người review duy nhất" | PO (Hiếu) |
 | 25/10/2026 | 0.5 | Mục 4.10: chủ của story và tải theo người lấy theo 07 bản 0.4 (chia làn); thêm DA-24, DA-25 và PR `chore-restructure` | PO (Hiếu) |
 | 25/10/2026 | 0.4 | Theo spec v10.3 và design ngày 25/10/2026: mục 4.1 ghi story Sprint 1 bị bỏ, thu nhỏ, đổi hướng; thêm mục 4.10 (robot DENSO trên MuJoCo, story DA-15…DA-23, giờ ước, máy chạy, quy trình duyệt) | PO (Hiếu) |
 | 24/10/2026 | 0.3 | Mục 4.1 (điều kiện qua G0) và mục 5 (DoD, ý 7): sổ chi phí G0 tách theo story trong `docs/g0/ledger/`; story spike ghi đề xuất cho 03 §3.3 trong file của mình, Hiếu gom ở review G0 | PO (Hiếu) |
@@ -199,7 +200,7 @@ Châu dự phòng cho hai người. Bù bằng: runbook Ψ₀ (`packages/flywhee
 
 Story mới không thuộc Robot Learning nhưng cần Hiếu duyệt: 7.10 F-ACT (02 gợi ý Data-Platform; Châu vận hành, Thông báo cáo theo vòng; Hiếu duyệt RunPlan F-ACT trước vòng 1) và 7.11 B-fail (Hưng sinh sim, Châu train ACT; Hiếu quyết B-fail trên Ψ₀ ở review G4).
 
-Quy tắc: Hiếu không là người review duy nhất của PR nào; mọi lệnh train và serve Ψ₀ có trong runbook; card chờ Hiếu duyệt quá 2 ngày thì Thông nhắc trong check-in.
+Quy tắc (bản 0.6, theo [07 mục 3.4](07-team-workflow.md) bản 0.3, thay quy tắc cũ "Hiếu không là người review duy nhất của PR nào"): Hiếu là người duyệt và merge duy nhất vào `master`; chủ sở hữu đường dẫn và người bình luận ở 07 mục 2.1 góp ý nhưng không chặn merge. Cách Hiếu merge PR của chính mình chờ câu Q-E của [design 25/10/2026](../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md). Mọi lệnh train và serve Ψ₀ có trong runbook; card chờ Hiếu duyệt quá 2 ngày thì Thông nhắc trong check-in.
 
 ### 3.3 RACI theo module và adapter
 
