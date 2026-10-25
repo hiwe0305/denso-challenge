@@ -10,6 +10,7 @@ _Ngày 22/10/2026. Vai trò BMAD: Product Owner (Sarah) viết mục 1; Scrum Ma
 | 22/10/2026 | 0.2 | Lập kế hoạch ở 70% năng lực (06 mục 9); ước lại giờ theo AC bản 0.3; bảng tải mới (mục 4.7); thêm mục 4.8 kết luận tải: phạm vi mặc định vượt mức 70%, thứ tự cắt đã duyệt không đủ bù, nêu phương án chờ quyết | SM theo 06 |
 | 22/10/2026 | 0.2 | Phạm vi mặc định: 1 vòng C trên Ψ₀, F-ACT trên ACT, B-fail trên ACT, holdout sớm niêm phong; thứ tự cắt (mục 7.2) khớp 02 §8 bản 0.3; G0 30 lượt mỗi mức; luật MDE ở G2 | SM theo 06 |
 | 22/10/2026 | 0.2 | Mục 1: ghi "Cập nhật 0.2" cho P04, P11, P12, P20, P21, P22, P27, P29–P33 theo 06; mục 1.3, 1.4 theo L0-lite (03 §2.4, §4.3) và tuyến V3 mới | SM theo 06 |
+| 25/10/2026 | 0.5 | Mục 4.10: chủ của story và tải theo người lấy theo 07 bản 0.4 (chia làn); thêm DA-24, DA-25 và PR `chore-restructure` | PO (Hiếu) |
 | 25/10/2026 | 0.4 | Theo spec v10.3 và design ngày 25/10/2026: mục 4.1 ghi story Sprint 1 bị bỏ, thu nhỏ, đổi hướng; thêm mục 4.10 (robot DENSO trên MuJoCo, story DA-15…DA-23, giờ ước, máy chạy, quy trình duyệt) | PO (Hiếu) |
 | 24/10/2026 | 0.3 | Mục 4.1 (điều kiện qua G0) và mục 5 (DoD, ý 7): sổ chi phí G0 tách theo story trong `docs/g0/ledger/`; story spike ghi đề xuất cho 03 §3.3 trong file của mình, Hiếu gom ở review G0 | PO (Hiếu) |
 | 22/10/2026 | 0.2 | Mục 6: lịch mentor khớp câu hỏi của 05, gồm câu hỏi mở sau vòng 1 (05 mục 6.6, MO1–MO5); câu đã chốt theo 06 chuyển thành câu xác nhận | SM theo 06 |
@@ -477,6 +478,8 @@ Story cho phần này chưa viết. SM tách story theo design mục 11 ở họ
 ### 4.10 Thay đổi ngày 25/10/2026: robot DENSO trên MuJoCo
 
 Theo spec v10.3 và [design ngày 25/10/2026](../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md). Thí nghiệm có đối chứng chạy trên robot DENSO trong MuJoCo; SIMPLE chỉ còn G0; Isaac Sim sau demo.
+
+**Bản 0.5.** Sau [design chia làn](../superpowers/specs/2026-10-25-lanes-and-code-structure-design.md) chủ của một số story đổi (DA-17, DA-18 sang Thông; DA-20 sang Châu; DA-23 sang Long; S1-02, S1-04 sang Hiếu; S1-06, S1-09 sang Hưng) và có thêm DA-24 (ROS 2, Hưng, 25–35 giờ), DA-25 (schema artifact, Hiếu, 6–10 giờ), PR `chore-restructure` (Long, trước 28/10). Cột người ở bảng dưới là bản 0.4; bảng đúng ở 07 mục 2.2, tải ở 07 mục 2.3.
 
 **Story mới** (07 mục 2.2). Giờ là ước lượng thô của SM, chốt lại khi viết file story:
 
