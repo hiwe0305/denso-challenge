@@ -1,6 +1,6 @@
-# Spec v10.2: thuật toán Failure → Data và PoC đối chứng
+# Spec v10.3: thuật toán Failure → Data và PoC đối chứng
 
-_Trạng thái: đặc tả đề xuất, chưa thực nghiệm. Ngày 23/10/2026. Phiên bản v10.2: thêm robot chính của DENSO, pipeline dữ liệu ba nguồn và bảng lỗi theo [design ngày 23/10/2026](superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md). Bản v10.1 đã áp dụng [quyết định phản biện vòng 1](product/06-review-round-1-decisions.md); xem mục 14. Áp dụng cho recipe Ψ₀ + SIMPLE / G1 của [Pitch v10](../deliverables/DENSO-ilovephysicalintelligence-1.pptx). Tài liệu này là đặc tả canonical cho thuật toán flywheel và thiết kế đánh giá. Hồ sơ của recipe cũ FluxVLA / GR00T N1.5 / GR1 (docs 01–14, idea v3) nằm trong tag git `archive/v3`; các quy tắc dữ liệu cần dùng đã được đưa vào mục 4. Thuật ngữ được định nghĩa ở mục 12._
+_Trạng thái: đặc tả đề xuất, chưa thực nghiệm. Ngày 25/10/2026. Phiên bản v10.3: thí nghiệm có đối chứng chuyển sang robot DENSO trên MuJoCo, SIMPLE chỉ còn là benchmark G0, theo [design ngày 25/10/2026](superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md); đọc mục 0 phần "Cập nhật v10.3" trước. Phiên bản v10.2: thêm robot chính của DENSO, pipeline dữ liệu ba nguồn và bảng lỗi theo [design ngày 23/10/2026](superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md). Bản v10.1 đã áp dụng [quyết định phản biện vòng 1](product/06-review-round-1-decisions.md); xem mục 14. Áp dụng cho recipe Ψ₀ + SIMPLE / G1 của [Pitch v10](../deliverables/DENSO-ilovephysicalintelligence-1.pptx). Tài liệu này là đặc tả canonical cho thuật toán flywheel và thiết kế đánh giá. Hồ sơ của recipe cũ FluxVLA / GR00T N1.5 / GR1 (docs 01–14, idea v3) nằm trong tag git `archive/v3`; các quy tắc dữ liệu cần dùng đã được đưa vào mục 4. Thuật ngữ được định nghĩa ở mục 12._
 
 ## 0. Đọc nhanh
 
@@ -22,13 +22,34 @@ _Trạng thái: đặc tả đề xuất, chưa thực nghiệm. Ngày 23/10/202
 - **Dữ liệu ba nguồn** (teleop, video egocentric, synthetic) đi qua cùng pipeline 6 tầng về một định dạng episode chung. Synthetic chia 4 tầng S1–S4; tầng S3–S4 dùng model Cosmos qua NVIDIA NIM.
 - **Lỗi** được định nghĩa theo 5 nguồn tín hiệu (dữ liệu, train, eval offline, closed-loop, runtime), kèm quy tắc quy lỗi về stage của Ψ₀ (mục 6.4).
 
+**Cập nhật v10.3 (25/10/2026).** Quyết định của trưởng nhóm; chi tiết ở [design ngày 25/10/2026](superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md).
+
+- **SIMPLE chỉ còn là benchmark G0**: tái tạo số công bố của Ψ₀, kiểm serve và eval. Thí nghiệm có đối chứng trên G1 để phát triển sau.
+- **Thí nghiệm có đối chứng chạy trên robot DENSO trong MuJoCo**, task khay → máy. Isaac Sim chỉ thêm khi có cảnh nhà máy rõ ràng, vật lý vẫn là MuJoCo; demo không cần Isaac Sim.
+- **Dữ liệu teleop** thu bằng bàn phím trong MuJoCo (điều khiển đầu tay qua IK) cộng dataset của BTC DENSO. Mọi episode có action robot được **phát lại trên MuJoCo** để kiểm trước khi train.
+- **Train cả 3 stage của Ψ₀ bằng code của tác giả**, ghim commit; log train lấy bằng cách đọc code của họ và bọc thêm phần thiếu. Stage 1 được fine-tune trên video egocentric hợp với task DENSO.
+- **Agent QA/QC** (Nemotron 3.5 Bolt E4B 4GB chạy cục bộ) đọc log và output từng stage, đưa insight và ước lượng; AI Engineer quyết.
+- **Closed-loop eval có chế độ bất đồng bộ**; chỉ số chính của mọi nhánh lấy ở chế độ này để không che lỗi của real-time chunking.
+
+Đọc các mục viết cho G1 theo bảng sau; mục nào đã sửa riêng thì ghi nhãn (v10.3).
+
+| Trong spec viết | Với v10.3 đọc là |
+|---|---|
+| Task chính `G1WholebodyBendPickAndPlaceTeleop-v0`, SIMPLE | Task khay → máy của robot DENSO trên MuJoCo (design 23/10 mục 7.1) |
+| Demo teleop của psi-data | Demo teleop bàn phím trong MuJoCo và dataset của BTC |
+| Level 0, 1, 2 của SIMPLE | Level 0, 1, 2 do đội định nghĩa cho task khay → máy (design 25/10 mục 8), chốt trước demo đầu tiên |
+| Cờ thành công của SIMPLE | Vị từ thành công của env MuJoCo, viết tách khỏi scorer từng bước |
+| Stack decoupled WBC, AMO | Bộ điều khiển đế, cột nâng, khớp tay, gripper của robot DENSO; không có kiểm thăng bằng |
+| V3, tuyến T1–T4, Q2 | Chỉ còn cho G1; không nằm trên đường găng vì teleop, planner và policy dùng cùng bộ điều khiển |
+| Planner của SIMPLE (CuRobo, datagen) | Planner cho robot DENSO trên MuJoCo (synthetic S1) |
+
 **Các nhánh chính:** A (D\* teleop), B (0,7D\* teleop + sim rải đều), C (0,7D\* teleop + dữ liệu chọn bởi Failure → Data). Nhánh đối chứng A₀.₇ (chỉ 0,7D\* teleop) cho biết khoảng cách mà B và C cần lấp. Nhánh B-fail (sinh sim quanh mọi lỗi dev, không chẩn đoán) tách tác dụng của chẩn đoán khỏi tác dụng của việc nhắm theo lỗi.
 
 **Đầu ra 12 tuần, khớp đề H1 của BTC** (mã đề giữ "H1" cho tới khi BTC xác nhận; ảnh đề ghi "H2"):
 
 1. SOP thu và kiểm dữ liệu: mục 4 và mục 6 viết thành checklist. Data Core cộng SOP là **DENSO Data Model** theo tên đề.
 2. Báo cáo so sánh phương pháp huấn luyện: ACT, Diffusion Policy và Ψ₀, kèm kết quả HS, HT, HD.
-3. Demo kỹ năng đã học: video rollout trong SIMPLE trên tập holdout.
+3. Demo kỹ năng đã học: video rollout trên tập holdout. (v10.3) Rollout của robot DENSO làm task khay → máy trên MuJoCo, tỉ lệ thành công đạt tiêu chí BTC.
 4. Khuyến nghị thu dữ liệu định lượng (Cấp 3 của BTC): đầu ra của bước 10–11 (mục 6.1) cộng sổ chi phí (mục 8).
 
 ## 1. Phạm vi và ranh giới claim
@@ -105,13 +126,13 @@ V3 có hạn riêng là **ngày 5 của Sprint 1**; các câu khác hạn cuối
 | Điểm | Nội dung |
 |---|---|
 | Robot | Mobile manipulator: đế bánh xe, cột nâng, hai tay nhiều khớp, gripper hai ngón, camera đỉnh cột; action chia theo nhóm `base`, `lift`, `arm_l`, `arm_r`, `gripper_l`, `gripper_r`, `head`, khoảng 18–22 chiều, ánh xạ vào khung action 36 chiều của Ψ₀ (cần kiểm, V-D1 của design) |
-| Simulator | Isaac Sim, cảnh trạm làm việc dựng từ layout DENSO |
+| Simulator | (v10.3) MuJoCo, một file MJCF là nguồn sự thật; Isaac Sim render cảnh trạm dựng từ layout DENSO khi có, vật lý vẫn MuJoCo |
 | System-0 | Bộ điều khiển đế, cột nâng, khớp tay và gripper; không có WBC, không có kiểu lỗi thăng bằng |
 | Ψ₀ | Stage 1 dùng `pre.*`; stage 2 có ba phương án đo S2-A (fine-tune từ `postpre.*`), S2-B (train lại action expert), S2-C (khởi tạo từ robot thay thế); stage 3 fine-tune task khay → máy |
 | Robot thay thế | Dựng tham số từ hình vẽ DENSO. Đạt "giống 95%" khi đúng mọi điều kiện cấu trúc và mỗi điểm thành phần (vùng với tới tại trạm, kích thước link, giới hạn khớp, camera, gripper, động học) ≥ 0,95. Trước khi có thông số chỉ chấm được so với hình vẽ |
 | Thông tin cần xin DENSO | 21 mục về robot, teleop, video egocentric, trạm làm việc và quyền dữ liệu (design mục 9) |
 
-Các giả thuyết HS, HT, HD và thiết kế nhánh ở mục 3 và 7 kiểm trên G1. Với robot DENSO, thuật toán Failure → Data chạy như mục 6, dùng bảng bước và kiểu lỗi của task khay → máy (design mục 7.1); tiêu chí 3 cấp của BTC báo riêng cho robot DENSO khi có kết quả.
+(v10.3) Các giả thuyết HS, HT, HD và thiết kế nhánh ở mục 3 và 7 kiểm trên robot DENSO trong MuJoCo; G1 không còn là bàn thử của giả thuyết. Câu cũ của v10.2: các giả thuyết kiểm trên G1. Với robot DENSO, thuật toán Failure → Data chạy như mục 6, dùng bảng bước và kiểu lỗi của task khay → máy (design mục 7.1); tiêu chí 3 cấp của BTC báo riêng cho robot DENSO khi có kết quả.
 
 ## 3. Giả thuyết và tiêu chí chấp nhận
 
@@ -520,6 +541,8 @@ Thuật toán đề xuất; kỹ sư quyết định. Kỹ sư được ghi đè
 
 ## 7. Thiết kế PoC
 
+(v10.3) Toàn bộ mục 7 áp cho robot DENSO trên MuJoCo theo bảng ánh xạ ở mục 0. Vector điều kiện của task khay → máy: tư thế linh kiện trong khay, vị trí khay, vị trí đồ gá, độ lệch xuất phát của đế, ánh sáng, số vật gây nhiễu (design 25/10 mục 8). Chỉ số chính lấy ở chế độ eval bất đồng bộ. Kết quả không so được với số công bố trên SIMPLE; mốc tin cậy là phần tái tạo ở G0.
+
 ### 7.1 Giai đoạn E1: đường cong hiệu quả dữ liệu và D\*
 
 Train mỗi phương pháp (ACT, Diffusion Policy, Ψ₀) với 10%, 25%, 50%, 70% và 100% của N_teleop demo teleop (1 seed). Đánh giá trên 90 điều kiện dev.
@@ -712,14 +735,22 @@ Ngân sách 140 A100-giờ mỗi đợt trong Pitch v10 phải được kiểm l
 - **Pha A, không cần chờ DENSO:** định dạng episode chung và export LeRobot; pipeline teleop trên psi-data; log train theo stage và bảng lỗi trên một lần fine-tune G1; pipeline egocentric hai phương án trên mẫu EgoDex; probe P1–P4 trên `pre.*` và `postpre.*`; NIM Cosmos Reason tự host và thử S3 trên video sim G1; robot thay thế, cảnh trạm và task khay → máy trong Isaac Sim.
 - **Pha B, khi DENSO gửi thông tin:** chấm lại robot thay thế theo thông số thật, bộ đọc teleop DENSO, so S2-A, S2-B, S2-C, chạy Failure → Data trên task khay → máy.
 
+**(v10.3)** Lộ trình trên chạy trên robot DENSO trong MuJoCo, không còn hai sân song song. G0 trên SIMPLE chỉ còn tái tạo Ψ₀ và đo chi phí; V3 và T1–T4 bỏ khỏi G0. Thêm vào G0: robot DENSO tương đương chạy trong MuJoCo, teleop bàn phím ghi được episode, đo giờ người cho 20 demo thử, đo giờ một lần train Ψ₀ trên một A100 hoặc H100 (Colab). Lát dọc trước tuần 4 chạy trên MuJoCo. Story mới DA-15…DA-23 ở [07 mục 2.2](product/07-team-workflow.md).
+
 Phần này ước thêm khoảng 185–255 giờ người ngoài khối lượng ở 04 (theo 14 story DA-01…DA-14, [07 mục 2.2](product/07-team-workflow.md)). Quyết định ngày 23/10/2026: giữ đủ phạm vi; khi vượt thời gian, thay phần tự xây bằng API theo từng phần trước, rồi mới cắt theo 04 mục 7.2.
 
 ## 10. Rủi ro và phương án dự phòng
 
 | Rủi ro | Dấu hiệu | Dự phòng |
 |---|---|---|
+| (v10.3) Không đủ GPU cho Ψ₀ | Máy có RTX 3060 12 GB và Colab Pro; spec cần khoảng 22 lần train Ψ₀ cộng stage 2 cho robot DENSO và fine-tune stage 1; S1-04 đo giờ một lần train | Chạy phần lớn vòng lặp trên ACT và DP (như F-ACT), giữ Ψ₀ cho nhánh cuối; LoRA; mua thêm compute unit; ghi Decision |
+| (v10.3) Dữ liệu DENSO không được lên Colab | Colab là máy của Google, nên dataset BTC và video nhà máy là `internal` | Xin phép bằng văn bản (D-A) hoặc giữ dữ liệu DENSO cục bộ (D-B), design 25/10 mục 9 |
+| (v10.3) Demo bàn phím ít hoặc kém | Giờ người cho 20 demo thử ở tuần 1 cao; demo giật, chậm | Bù bằng dataset BTC; S1–S2 sinh từ planner và biến thể; thêm gamepad hoặc SpaceMouse qua cùng giao diện |
+| (v10.3) Môi trường dễ hơn task thật | Dung sai đồ gá, ma sát hoặc khối lượng nới so với thông số DENSO | Thông số giả định ghi kèm nguồn trong `configs/embodiments/`; chấm lại khi có URDF; báo "trên tham số giả định" |
+| (v10.3) Lỗi bất đồng bộ bị che | Eval đồng bộ đạt, eval bất đồng bộ tụt | Chỉ số chính lấy ở chế độ bất đồng bộ; lỗi trễ đi vào kiểm hệ thống (LỖI RUNTIME) trước |
+| (v10.3) Agent QA/QC sai | Ước lượng của agent lệch kết quả đo; agent nêu số không có trong log | Code tính mọi con số; bộ ca mẫu chấm agent trước khi dùng; lưu và so ước lượng với kết quả đo |
 | Ψ₀ không vừa VRAM hoặc quá chậm | G0: hết bộ nhớ hoặc một lần fine-tune quá ngân sách | LoRA hoặc đóng băng VLM; thuê A100 80 GB; giảm còn 2 seed và ghi rõ; khi đó HT tự động thành kết quả mô tả (mục 7.5) |
-| Teleop và MP khác bộ điều khiển | V3 âm (hạn ngày 5 của Sprint 1): teleop chạy decoupled WBC, MP chạy AMO, không ánh xạ trực tiếp | Bốn tuyến T1–T4 ở bảng dưới; thử T1 và T2 song song tuần 1–2, chốt cuối tuần 2; T4 là phương án cuối |
+| Teleop và MP khác bộ điều khiển (v10.3: chỉ còn cho G1) | V3 âm (hạn ngày 5 của Sprint 1): teleop chạy decoupled WBC, MP chạy AMO, không ánh xạ trực tiếp | Bốn tuyến T1–T4 ở bảng dưới; thử T1 và T2 song song tuần 1–2, chốt cuối tuần 2; T4 là phương án cuối |
 | Không có planner cho task chính | Q2 là "không" | Biến đổi đoạn teleop theo vị trí vật kiểu MimicGen / IntervenGen (tuyến T2). F1 chỉ dùng khi V3 xác nhận cặp của F1 cùng bộ điều khiển |
 | V3 âm và Q6 âm | Không tuyến T1–T3 nào cho dữ liệu sinh trong env WBC; không có thiết bị teleop | C chỉ còn kiểm demo mâu thuẫn, mà kiểm này chỉ ra báo cáo, nên C không có can thiệp dữ liệu và HT sụp. Ghi kịch bản này vào báo cáo; còn lại HD và HS nếu B có dữ liệu qua T4 |
 | Chạm trần | Mọi mức dữ liệu đều ≥ 90%; hoặc Level 0 có dưới 15 lỗi dev sau G3 | Chỉ tiêu chính chuyển sang Level 2; hoặc đổi task khó hơn (mục 7.1) |
@@ -804,7 +835,13 @@ Hồ sơ cũ không còn trong thư mục làm việc. Xem lại một file bằ
 | HTb | Targeting hypothesis, part b | Chẩn đoán có giúp thêm ngoài việc chỉ nhắm theo lỗi không: C so với B-fail |
 | Khoanh vùng | Localization | Phép kiểm ở mục 6.6, xác định lỗi do bước k hay do bước trước |
 | Không kém hơn | Non-inferiority | Kiểm rằng nhánh mới không kém nhánh cũ quá một biên đã chốt trước (10 điểm %) |
-| Level 0, 1, 2 | Evaluation levels | Ba mức thay đổi môi trường của SIMPLE (mục 2.2) |
+| Level 0, 1, 2 | Evaluation levels | Ba mức thay đổi môi trường của SIMPLE (mục 2.2). (v10.3) Với robot DENSO trên MuJoCo, ba mức do đội định nghĩa (design 25/10 mục 8) |
+| Agent QA/QC | Agent QA/QC | (v10.3) Model ngôn ngữ chạy cục bộ (Nemotron 3.5 Bolt E4B 4GB) đọc log và output từng stage của train, eval, inference; diễn giải số do code tính, đưa insight và ước lượng; kỹ sư quyết |
+| Eval bất đồng bộ | Asynchronous evaluation | (v10.3) Closed-loop eval mà sim không dừng chờ policy; độ trễ lấy từ log inference thật. Chỉ số chính lấy ở chế độ này |
+| MuJoCo | MuJoCo | (v10.3) Simulator vật lý chính của robot DENSO; dùng cho teleop, phát lại action, eval và demo |
+| Phát lại action | Action replay | (v10.3) Chạy lại action của một episode trên MuJoCo: động học (đặt state từng khung) hoặc động lực học (áp action từ state đầu) để kiểm dữ liệu trước khi train |
+| RTC | Real-time chunking | Cách Ψ₀ chạy: robot tiếp tục action cũ trong lúc chờ chunk mới; log inference ghi độ trễ, delay, mức buffer, bước nhảy ở ranh giới chunk |
+| Teleop bàn phím | Keyboard teleoperation | (v10.3) Người điều khiển robot DENSO trong MuJoCo bằng bàn phím, theo không gian đầu tay qua IK, để thu demo |
 | Lineage | Lineage | Thông tin nguồn gốc: từ đâu, giấy phép, episode cha, phiên bản bộ sinh |
 | Probe P1–P4 | Stage probes | Bộ kiểm cố định chạy trên checkpoint của từng stage Ψ₀: hiểu cảnh, dự đoán action token, action offline, giữ năng lực (mục 6.4, design mục 6.1) |
 | Robot thay thế | Proxy robot | Mô hình robot dựng tham số từ hình vẽ DENSO, dùng khi chưa có thông số thật; đạt khi giống ≥ 95% theo mục 2.5 |
@@ -851,6 +888,7 @@ Hồ sơ cũ không còn trong thư mục làm việc. Xem lại một file bằ
 - Bộ điều khiển của task trong SIMPLE: [G1 Decoupled](https://psi-lab.ai/SIMPLE/docs/tasks/g1_decoupled.html), [G1 MP (AMO)](https://psi-lab.ai/SIMPLE/docs/tasks/g1_mp_amo.html), theo [03 mục 3.2](product/03-architecture.md).
 - Checkpoint Ψ₀ trên Hugging Face, thư mục `psi0/`: [USC-PSI-Lab/psi-model](https://huggingface.co/USC-PSI-Lab/psi-model/tree/main/psi0). Không có thẻ model, không ghi giấy phép; vai trò từng thư mục cần tác giả xác nhận (Q0).
 - Công cụ chuẩn cho HD: [Rerun](https://github.com/rerun-io/rerun).
+- Robot DENSO trên MuJoCo, pipeline theo stage, Agent QA/QC, kết quả đọc code train của Ψ₀ ngày 25/10/2026: [design ngày 25/10/2026](superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md). Nemotron 3.5 Bolt E4B 4GB: [trang NVIDIA](https://research.nvidia.com/labs/nemotron/Nemotron-3.5-Bolt-E4B-4GB/).
 - Pipeline dữ liệu, robot DENSO và bảng lỗi: [design ngày 23/10/2026](superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md). Tổng hợp paper data flywheel và NVIDIA OSMO: [references/data-flywheel.md](references/data-flywheel.md).
 - Đơn giá: [Runpod pricing](https://www.runpod.io/pricing), [Runpod storage](https://docs.runpod.io/pods/pricing), theo slide 13 của Pitch v10.
 
@@ -858,6 +896,7 @@ Hồ sơ cũ không còn trong thư mục làm việc. Xem lại một file bằ
 
 | Ngày | Phiên bản | Nội dung | Người sửa |
 |---|---|---|---|
+| 25/10/2026 | v10.3 | Thí nghiệm có đối chứng chuyển sang robot DENSO trên MuJoCo, SIMPLE chỉ còn G0, bảng ánh xạ G1 → DENSO (mục 0); đầu ra demo trên MuJoCo (mục 0); simulator của robot DENSO (mục 2.5); thiết kế PoC trên MuJoCo, eval bất đồng bộ (mục 7); lộ trình một sân, G0 bỏ V3 và T1–T4 (mục 9); rủi ro GPU, Colab và dữ liệu DENSO, demo bàn phím, môi trường dễ hơn task thật, lỗi bất đồng bộ, Agent QA/QC (mục 10); glossary và nguồn (mục 12, 13). Theo design ngày 25/10/2026 | Trưởng nhóm |
 | 23/10/2026 | v10.2 | Robot chính là mobile manipulator của DENSO, G1 là bàn thử; task khay → máy; robot thay thế giống ≥ 95% (mục 0, 1.1, 2.5); kiểm hệ thống cho robot DENSO và quy lỗi về stage của Ψ₀ (mục 6.4); tầng synthetic S1–S4 qua NIM (mục 6.10); rủi ro DENSO muộn, NIM, vượt thời gian thì dùng API theo phần, khác biệt tay người và gripper, kết quả âm của Mirchandani cho HS (mục 10); giờ thêm khớp 07 là khoảng 185–255 giờ (mục 9); glossary và nguồn (mục 12, 13). Theo design ngày 23/10/2026 | Trưởng nhóm |
 | 22/10/2026 | v10.1 | #1 Bộ điều khiển: System-0 của task chính là decoupled WBC `g1_sonic`, AMO là của pipeline MP (mục 1.1, 2.1); F1 không còn là dự phòng cho Q2 (mục 2.3, 2.4, 10); thêm V3 hạn ngày 5 Sprint 1 (mục 2.4, 9); kiểm hệ thống nhắm stack WBC, lệnh gửi và trạng thái đo theo giao diện WBC (mục 4.5, 6.4); planner của bước 5–6 phải chạy trong env WBC (mục 6.5); tuyến T1–T4 và kịch bản V3 âm cộng Q6 âm (mục 10) | Biên tập theo 06 |
 | 22/10/2026 | v10.1 | #2 Thống kê: bootstrap phân cấp, mô hình hỗn hợp làm kiểm tra chéo, quy tắc 2/3 seed thành chỉ số phụ, power analysis ở G2 và luật MDE > 10 điểm % (mục 7.5); 2 seed quanh ngưỡng khi chọn D\* (mục 7.1); G0 dùng 30 lượt mỗi mức và kiểm nhị thức một phía, G2 có power analysis (mục 9) | Biên tập theo 06 |
