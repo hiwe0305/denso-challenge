@@ -18,6 +18,7 @@ _Vai trò: Architect (Winston), quy trình BMAD. Ngày 22/10/2026. Đầu vào: 
 | 22/10/2026 | 0.3 | 06 #4: chẩn đoán NGOÀI MIỀN (mục 6.2); tăng cường thị giác là recipe chung trong RunPlan, bỏ `visual_aug` khỏi loại can thiệp (ADR-17); RunPlan và `gate` hỗ trợ B-fail, F-ACT, N_B | Architect theo 06 |
 | 22/10/2026 | 0.3 | 06 #5: `diagnosis` thêm phép kiểm đồng bộ cảm biến (τ_sync) và camera chuẩn, chẩn đoán LỖI ĐỒNG BỘ và LỖI CALIBRATION; trace lưu timestamp ảnh, timestamp state và tham số camera (V11); mục 6.4 HD theo 06 mục 5 | Architect theo 06 |
 | 22/10/2026 | 0.3 | 06 #8: mục 8.1 RunPlan dùng `pre.*` hoặc `postpre.*` có provenance trong Source, chỉ RunPlan `g0_repro` được trỏ `simple-checkpoints`, `sonic-checkpoints`; mục 8.3 guard gần trùng theo khoảng cách điều kiện, dải seed rời dải tác giả | Architect theo 06 |
+| 25/10/2026 | 0.5 | Theo spec v10.3 và [design ngày 25/10/2026](../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md): robot DENSO trên MuJoCo là simulator chính, SIMPLE chỉ còn G0 (mục 2.1, 5.4, 7.1, ADR-18); Agent QA/QC trước bước kỹ sư duyệt (mục 2.3, ADR-19); `RolloutRequest.timing` cho eval bất đồng bộ (mục 5.2, ADR-20); chỉ số chính là vị từ thành công của env MuJoCo (ADR-21); package `flywheel-mujoco`, `flywheel-agentqa` (mục 7.1); rủi ro mới (mục 12.2) | PO (Hiếu) |
 | 23/10/2026 | 0.4 | Theo spec v10.2 và [design ngày 23/10/2026](../superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md): mục 1.1 thêm robot DENSO, pipeline ba nguồn, probe theo stage; mục 2.1 thêm NIM trên máy 5090 và A100; mục 4.3 thêm trường episode cho nguồn dữ liệu, độ tin action, che danh tính, `segments.parquet`, `action_layout`; mục 5.4 thêm adapter robot DENSO, robot thay thế, NIM, ingest; mục 6.2 thêm bước 4b quy lỗi về stage; mục 7.1 thêm package `flywheel-ingest`, `flywheel-nim`, `flywheel-isaac` | Architect |
 | 22/10/2026 | 0.3 | 06 #9: mục 2.4 L0-lite và ADR-13; mục 4 còn 12 thực thể kèm bảng gộp, `task_id`, `embodiment_id`, `site_id` là cột thường có mặc định; mục 3.1, 7, 8.4 hoãn MLflow, Streamlit, fsspec S3, phân vùng ngày, lệnh dựng lại chỉ mục, revision card; mục 10.4 backup và diễn tập khôi phục (AR3); ADR-14 chỉ số chính holdout từ cờ SIMPLE (AR4); `failure_class` (AR5); mục 9.4 phác L2 (AR6); khóa holdout theo checkpoint để chạy sớm và niêm phong | Architect theo 06 |
 
@@ -55,6 +56,8 @@ Lõi là **một thư viện Python kèm CLI `fw`**, chạy trên máy host. Ada
 | A100 80 GB thuê theo giờ | Fine-tune Ψ₀ (stage 2 và 3); từ bản 0.4: NIM Cosmos Transfer và Predict tự host cho tầng S3–S4; chỉ nhận job spec và bản export dataset, trả checkpoint, video sinh và log về qua rsync |
 
 Máy 5090 là điểm hỏng đơn lẻ (05 AR3). Bù bằng backup hằng ngày sang máy 3060 và một lần diễn tập khôi phục trước G3 (mục 10.4).
+
+**Bản 0.5.** Máy đội đang có: RTX 3060 12 GB (dev, MuJoCo, teleop bàn phím, phát lại action, ACT và DP, Agent QA/QC với Nemotron bản Q4, thử inference Ψ₀) và Colab Pro chạy qua CLI (A100, H100) cho train Ψ₀ stage 1–3. Máy 5090 ở bảng trên chờ xác nhận còn dùng được (design 25/10 mục 12, Q-C). Colab là máy của Google nên chưa nhận dữ liệu DENSO cho tới khi chọn phương án ở design 25/10 mục 9; job train trên Colab phải tiếp tục được từ checkpoint và ghi compute unit vào sổ chi phí.
 
 ### 2.2 Sơ đồ module
 
@@ -104,6 +107,8 @@ Mũi tên liền là luồng dữ liệu giữa module lõi; mũi tên chấm l�
 7. `training` dựng `TrainSpec` từ recipe chung của RunPlan (gồm tăng cường thị giác cố định, ADR-17), gọi `TrainerAdapter`, đăng ký `Checkpoint` ứng viên. Bước 12b.
 8. `gate` xin `scenarios` một tập cổng mới chưa dùng, chạy cha và ứng viên ≥ 3 lượt mỗi điều kiện, so với sàn A/A, ra `Decision` (`dev_gate`); nếu đạt thì cập nhật con trỏ `refs/policy/<nhánh>/current`. Bước 12c.
 9. `gate` đo tỉ lệ sửa được có đối chứng trên điều kiện mới quanh điểm lỗi của từng cụm đã can thiệp (mục 6.2); `ledger` lưu `FixRateEvent`; `reports` dựng card, báo cáo vòng, sổ chi phí.
+
+**Bản 0.5.** Ở bước 2, closed-loop eval chạy ở chế độ bất đồng bộ cho chỉ số chính (ADR-20). Giữa bước 4 và bước 5, **Agent QA/QC** đọc log train, eval, inference và output từng stage do code dựng (bảng ảnh của stage 1, video MuJoCo phát lại action dự đoán của stage 2–3, dòng thời gian RTC), viết báo cáo HTML tĩnh có insight và ước lượng; kỹ sư đọc báo cáo này cùng evidence card khi chạy `fw review` (ADR-19). Ở bước 6, mọi episode có action robot qua phát lại trên MuJoCo trước `qa`.
 
 ### 2.4 L0-lite: phạm vi xây ở L0
 
@@ -342,7 +347,7 @@ class TaskDefinition(Protocol):
     def evaluate(self, signals: pa.Table, params: ScorerParams) -> StageEvaluation: ...
 ```
 
-`RolloutRequest` gồm: `job_id`, `task`, `condition`, `level`, `rollout_seed`, `start_state: StateRef | None`, `visual_override: VisualOverride | None`, `fault: FaultSpec | None` (cho HD và bộ lỗi cấy), `max_steps`, `record` (camera, tín hiệu). `RolloutResult` gồm: `trace_ref`, `sim_success` (cờ `check_success` của SIMPLE, chỉ số chính ở holdout theo ADR-14), `infra_status` (ok hoặc mã lỗi), `usage` (giây tường, GPU-giây), `camera_params_hash`, `adapter_info`.
+`RolloutRequest` gồm: `job_id`, `task`, `condition`, `level`, `rollout_seed`, `start_state: StateRef | None`, `visual_override: VisualOverride | None`, `fault: FaultSpec | None` (cho HD và bộ lỗi cấy), `max_steps`, `record` (camera, tín hiệu). `RolloutResult` gồm: `trace_ref`, `sim_success` (cờ `check_success` của SIMPLE, chỉ số chính ở holdout theo ADR-14), `infra_status` (ok hoặc mã lỗi), `usage` (giây tường, GPU-giây), `camera_params_hash`, `adapter_info`. (bản 0.5) `RolloutRequest` thêm `timing: sync | async` và `latency_profile_ref` (phân phối độ trễ lấy từ log inference) cho eval bất đồng bộ; với robot DENSO, `sim_success` là vị từ thành công của env MuJoCo, viết tách khỏi scorer (ADR-21). Thay đổi `contracts` đi qua Long theo 07 mục 3.2.
 
 **Giao diện bộ điều khiển (ADR-15).** Với task chính, `control_spec` trả `controller = decoupled_wbc` và hai nhóm kênh. Thân trên: lệnh khớp tay và bàn tay policy gửi, so với khớp đo được. Thân dưới: lệnh gửi cho WBC (vận tốc nền, chiều cao thân, hướng thân), so với giá trị đo của nền và thân. Tên kênh chính xác chốt ở V2 và V7. Phép kiểm bám lệnh tính sai số riêng cho từng nhóm, với τ_track riêng hiệu chỉnh từ demo teleop thành công. Env MP trả `controller = amo` và là embodiment khác (ADR-08).
 
@@ -373,7 +378,12 @@ class TaskDefinition(Protocol):
 | TeleopSource | `SimpleTeleop` nếu có thiết bị (Q6); `PlannerCorrectionSource` nếu không, đi theo cùng tuyến V3 | Bản dự phòng có `operator_kind = machine`, không vào `r_demo` |
 | TaskDefinition | `G1BendPickAndPlace` (6 bước, 9 kiểu lỗi của spec 5, kèm `failure_class`); `G1BendPick` cho task F1 | F1 chỉ kiểm khả năng tổng quát của lõi (NFR7), không làm dự phòng cho Q2 tới khi V3 xác nhận. Dùng `decompose()` của SIMPLE để đối chiếu ranh giới bước |
 | Bộ giả | `FakeSim2D`, `FakePolicy`, `FakeTrainer`, `FakeGenerator`, `FakeTeleop`, `ToyPickPlace` | Chạy CPU, cấy được từng loại lỗi kể cả lệch đồng bộ, lệch camera, ngoài miền (mục 11) |
-| SimulatorAdapter (bản 0.4) | `DensoIsaacSim` | Nhận robot DENSO thật hoặc robot thay thế qua cấu hình Embodiment; `control_spec` theo nhóm đế, cột nâng, tay, gripper |
+| SimulatorAdapter (bản 0.5) | `DensoMujocoSim` | Simulator chính của robot DENSO: MJCF là nguồn sự thật, `restore_state` có sẵn, `replay()` hai chế độ động học và động lực học, eval đồng bộ và bất đồng bộ; `SimpleSimulator` chỉ còn cho G0 |
+| TeleopSource (bản 0.5) | `KeyboardTeleop`, `BtcDatasetSource` | Teleop bàn phím trong MuJoCo (đầu tay qua IK, chuyển chế độ theo nhóm action); bộ đọc dataset của BTC DENSO |
+| GeneratorAdapter (bản 0.5) | S1 planner trên MuJoCo, S2 biến thể từ teleop bàn phím và correction từ trạng thái lỗi | Thay các generator theo tuyến V3 cho robot DENSO |
+| TrainerAdapter (bản 0.5) | `Psi0Trainer` gọi script của tác giả cho cả 3 stage (`pretrain-*`, `posttrain-*`, `finetune-*`), ghim commit; lớp bọc log ghi `metrics.jsonl` | Chạy trên Colab; phần log thiếu (loss theo nhóm action, theo vị trí trong chunk, phương sai dự đoán) tính lại trên batch val, không sửa code gốc |
+| Agent QA/QC (bản 0.5) | `flywheel-agentqa`: Nemotron 3.5 Bolt E4B 4GB chạy cục bộ, ghim revision | Không phải Protocol; đọc tệp do code sinh, không đọc `vault/`, không chạy job |
+| SimulatorAdapter (bản 0.4) | `DensoIsaacSim` | Bản 0.5: chỉ làm sau khi demo MuJoCo đạt tiêu chí, render cảnh nhà máy, vật lý MuJoCo. Nhận robot DENSO thật hoặc robot thay thế qua cấu hình Embodiment; `control_spec` theo nhóm đế, cột nâng, tay, gripper |
 | TaskDefinition (bản 0.4) | `DensoTrayToMachine` | 6 bước và 10 kiểu lỗi của task khay → máy (design mục 7.1) |
 | TeleopSource (bản 0.4) | `DensoTeleop` | Bộ đọc định dạng thô của DENSO, chờ thông tin (design mục 9) |
 | GeneratorAdapter (bản 0.4) | Theo tầng S1–S4: planner Isaac Sim, biến thể teleop, `CosmosTransferGenerator`, `CosmosPredictGenerator` | Mỗi tầng là một loại can thiệp riêng trong `decide` |
@@ -577,6 +587,8 @@ denso-challenge/
     flywheel-ingest/              # bản 0.4: bộ đọc teleop DENSO, pipeline egocentric (che danh tính, cắt đoạn, pose tay), export theo action_layout
     flywheel-nim/                 # bản 0.4: NimClient, bộ định tuyến theo data_class, generator Cosmos Transfer và Predict
     flywheel-isaac/               # bản 0.4: DensoIsaacSim, cảnh trạm làm việc, robot thay thế, DensoTrayToMachine
+    flywheel-mujoco/              # bản 0.5: DensoMujocoSim, MJCF robot DENSO và cảnh trạm, KeyboardTeleop, phát lại action, eval bất đồng bộ
+    flywheel-agentqa/             # bản 0.5: Agent QA/QC (Nemotron cục bộ), dựng hình từng stage, bộ ca mẫu chấm agent
   configs/                        # sites/, pricebook/, embodiments/, tasks/, splits/, recipes/, thresholds/, runplans/
   docker/compose.yaml             # simple-worker, psi0-serve, psi0-train; image ghim theo digest
   ops/backup.sh                   # rsync hằng ngày sang máy 3060; hướng dẫn diễn tập khôi phục (mục 10.4)
@@ -817,12 +829,19 @@ L0 không chứng minh chẩn đoán trên robot thật; pitch phải nói rõ. 
 | ADR-15 | V3: task chính chạy decoupled WBC, pipeline MP chạy AMO; spec 2.1 bản cũ ghi System-0 là AMO | System-0 của task chính là decoupled WBC `g1_sonic`; `SimulatorAdapter.control_spec` khai cặp kênh lệnh gửi, trạng thái đo theo bộ điều khiển (thân trên, thân dưới); kiểm hệ thống nhắm stack WBC | Phép kiểm bám lệnh không giả định AMO; đổi bộ điều khiển là đổi embodiment |
 | ADR-16 | 05 TH6–TH8: tỉ lệ sửa được thiên lệch hồi quy về trung bình; cổng dev nhạy nhiễu và thích nghi theo một tập dev | Cổng dev dùng tập điều kiện mới mỗi vòng, cha và ứng viên ≥ 3 lượt, sàn A/A; tỉ lệ sửa được đo có đối chứng cha trên điều kiện mới quanh lỗi | Mỗi vòng tăng từ khoảng 90 lên 1.300–1.600 rollout (mục 9.2); đổi lại số đo có nghĩa; F-ACT dùng giao thức thu nhỏ |
 | ADR-17 | 05 TH4: tăng cường thị giác chỉ C có làm lệch so sánh | Tăng cường thị giác là phần cố định của recipe, khai trong RunPlan, áp như nhau cho mọi nhánh; bỏ khỏi loại can thiệp của `decide` | NHẬN THỨC vẫn được chẩn đoán và báo cáo nhưng không tiêu ngân sách; test công bằng kiểm TrainSpec chỉ khác `release_id` |
+| ADR-18 | Bản 0.5: SIMPLE buộc teleop và MP chạy hai bộ điều khiển khác nhau (V3, T1–T4); robot của SIMPLE không phải robot DENSO | Robot DENSO trên MuJoCo là simulator chính, MJCF là nguồn sự thật; SIMPLE chỉ cho G0; Isaac Sim render sau, vật lý vẫn MuJoCo | Bỏ V3 và T1–T4 khỏi đường găng; mất số so được với công bố; mốc tin cậy là tái tạo G0 |
+| ADR-19 | Bản 0.5: kỹ sư cần insight từ log và output từng stage; dữ liệu DENSO không được ra API ngoài | Agent QA/QC dùng model nhỏ chạy cục bộ; code tính mọi con số, agent chỉ diễn giải; ước lượng của agent được lưu và so với kết quả đo | Agent không thể bịa số đi vào quyết định; đo được độ tin của agent |
+| ADR-20 | Bản 0.5: Ψ₀ dùng real-time chunking; eval đồng bộ che lỗi do trễ | `RolloutRequest.timing`; chỉ số chính ở chế độ bất đồng bộ với độ trễ từ log inference thật | Eval chậm hơn và nhiễu hơn; lỗi trễ đi vào kiểm hệ thống (LỖI RUNTIME) |
+| ADR-21 | Bản 0.5: không còn cờ `check_success` của SIMPLE cho robot DENSO | `sim_success` là vị từ thành công của env MuJoCo, viết và review tách khỏi scorer từng bước | Giữ ý của ADR-14: lỗi scorer không làm sai kết luận |
 
 ### 12.2 Rủi ro kỹ thuật mở
 
 | Rủi ro | Dấu hiệu, nơi kiểm | Giảm thiểu |
 |---|---|---|
-| Rollout MP (AMO) không cùng bộ điều khiển và không gian action với demo teleop (decoupled WBC) | V3, hạn ngày 5 của Sprint 1 | Thử T1 và T2 song song tuần 1–2, chốt tuyến cuối tuần 2 (bảng dưới); T3 khi cả hai hỏng; T4 là phương án cuối. F1 không phải dự phòng cho Q2 tới khi V3 xác nhận cặp của F1 cùng bộ điều khiển. Ghi rõ trong báo cáo |
+| (bản 0.5) Không đủ GPU cho Ψ₀ | S1-04 đo giờ một lần train trên một A100 hoặc H100 ở Colab | Vòng lặp chạy trên ACT và DP, Ψ₀ cho nhánh cuối; LoRA; ghi Decision |
+| (bản 0.5) Tiếp xúc khi lắp linh kiện vào đồ gá trên MuJoCo không ổn định | Phát lại động lực học của demo thành công vẫn trượt ở bước 5 | Chỉnh tham số tiếp xúc và bước tích phân; ghi tham số vào `configs/embodiments/`; không nới dung sai đồ gá |
+| (bản 0.5) Inference Ψ₀ trên 3060 quá chậm cho eval bất đồng bộ | Độ trễ p99 so với chu kỳ điều khiển, đo ở G0 | Chạy eval Ψ₀ trên Colab; hoặc báo eval bất đồng bộ với độ trễ của phần cứng đích, ghi rõ |
+| Rollout MP (AMO) không cùng bộ điều khiển và không gian action với demo teleop (decoupled WBC); bản 0.5: chỉ còn cho G1 | V3, chỉ khi phát triển G1 | Thử T1 và T2 song song tuần 1–2, chốt tuyến cuối tuần 2 (bảng dưới); T3 khi cả hai hỏng; T4 là phương án cuối. F1 không phải dự phòng cho Q2 tới khi V3 xác nhận cặp của F1 cùng bộ điều khiển. Ghi rõ trong báo cáo |
 | V3 âm và Q6 âm cùng lúc | V3, Q6 ở G0 | C chỉ còn kiểm demo mâu thuẫn, mà phần này chỉ ra báo cáo; HT sụp. Ghi vào báo cáo, không giấu; HS và M vẫn kiểm được |
 | Checkpoint gốc đã thấy dữ liệu task chính | Q0 ở G0; email PSI Lab tuần 1 | Chỉ dùng `pre.*` hoặc `postpre.*` có provenance sạch; `fw plan freeze` chặn (mục 8.3 điểm 7) |
 | `set_states()` không khôi phục được trạng thái WBC và hàng đợi action | V4: so quỹ đạo khôi phục với quỹ đạo gốc | Bỏ phép kiểm khoanh vùng, dùng phương án của spec mục 10 (chạy lại cùng seed, planner tiếp quản ở bước k) |
