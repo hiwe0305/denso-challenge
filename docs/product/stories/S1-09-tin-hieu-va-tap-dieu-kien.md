@@ -5,7 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 22/10/2026; sửa 25/10/2026) |
-| Người làm | Châu |
+| Người làm | Hưng |
 | Story PRD | 1.8 (story mới do PO thêm) · Epic 1 |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:sim` · `spike` |
 | Sprint | S1, tuần 2 |
@@ -45,7 +45,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 ## Ghi chú cho người làm
 
 - Nguồn: 02 · 1.8 (mới), 2.4, 2.5, 3.3, 3.4; spec 4.2, 4.3, 5.1, 5.2, 5.3; 03 §3.2 (dòng "Điều kiện ban đầu", "Ngẫu nhiên hóa"), §3.3 V6, V7, §8.3 (chia tập theo `layout_hash`), §12.2.
-- Châu sẽ làm scorer (3.3) và hiệu chỉnh (3.5) ở S2, nên story này là bước chuẩn bị trực tiếp. Hưng dùng bảng tín hiệu để viết hook ghi tín hiệu trong 3.1a.
+- Châu làm scorer (3.3) và hiệu chỉnh (3.5) ở S2 trong làn Đánh giá, nên bảng tín hiệu là đầu vào trực tiếp; bảng tín hiệu chốt thành schema trong `flywheel.contracts` qua Hiếu (DA-25), Châu không đọc code của env.
 - Không đoán tín hiệu từ tài liệu; ghi tín hiệu đã thấy thật trong episode chạy thử.
 - V11 (timestamp riêng cho state và từng khung ảnh, tham số camera; 03 §3.3) do Hưng chốt trong 3.1a ở S2. Nếu story này thấy được các trường đó thì ghi vào bảng để 3.1a dùng.
 - Scorer ở S2 cần thêm lớp lỗi chung cho mỗi kiểu lỗi (02 · 3.3 AC 4); khi đối chiếu 9 kiểu lỗi, ghi bước hỏng tương ứng để gán lớp.
@@ -54,13 +54,13 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 ## Kiểm thử
 
 - `probe_reset_determinism.py` trả mã khác 0 khi hai lần reset cùng seed cho layout khác nhau.
-- Hưng đọc bảng tín hiệu và xác nhận viết được hook từ đó (review).
+- Châu đọc bảng tín hiệu và xác nhận scorer lấy đủ từ đó (bình luận).
 
 ## Người phụ trách
 
-- Làm: Trần Trịnh Hoàng Châu
-- Review: Trần Ngọc Hưng
-- Dự phòng: Trần Ngọc Hưng
+- Làm: Trần Ngọc Hưng
+- Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
+- Bình luận: Trần Trịnh Hoàng Châu (tín hiệu scorer cần)
 
 ## Change log
 
@@ -70,6 +70,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 22/10/2026 | Đồng bộ 03 bản 0.3: tín hiệu lệnh theo giao diện WBC; ghi chú V11 và lớp lỗi chung; sửa mã trích 05 TN13 thành TH13. AC của 02 · 1.8 không đổi | SM (Bob) theo 06 |
 | 24/10/2026 | Thêm mục Phạm vi file. AC 6: đề xuất dòng V6, V7 ghi trong file kết quả, Hiếu gom vào 03 §3.3 ở review G0 | PO (Hiếu) |
 | 25/10/2026 | Đổi sang task khay → máy trên MuJoCo; phụ thuộc DA-15 thay S1-02; bỏ phần `decompose()` và `simple-eval` | PO (Hiếu) theo design 25/10/2026 |
+| 25/10/2026 | Chuyển cho Hưng: là khả năng của env MuJoCo (design chia làn mục 3.1) | PO (Hiếu) theo design chia làn |
 
 ## Ghi chép khi làm
 
