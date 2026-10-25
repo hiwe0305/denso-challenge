@@ -5,7 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 22/10/2026; sửa 25/10/2026) |
-| Người làm | Hưng |
+| Người làm | Hiếu |
 | Story PRD | 1.2 · Epic 1 |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:sim` |
 | Sprint | S1, tuần 1 |
@@ -40,7 +40,8 @@ _Thu nhỏ ngày 25/10/2026 ([design 25/10/2026](../../superpowers/specs/2026-10
 
 Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
 
-- `docker/compose.yaml`: service simple-worker
+- `compose.yaml`: service simple-worker
+- `docker/simple/`
 - `scripts/g0/setup_simple.sh`, `scripts/g0/run_one_episode.sh`
 - `docs/g0/env-simple.md`
 - `docs/g0/ledger/S1-02.csv`
@@ -63,9 +64,9 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Người phụ trách
 
-- Làm: Trần Ngọc Hưng
-- Review: Trần Trịnh Hoàng Châu; Nguyễn Thăng Long xem phần compose
-- Dự phòng: Trần Trịnh Hoàng Châu
+- Làm: Dương Đình Hiếu
+- Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
+- Bình luận: Trần Ngọc Hưng (compose)
 
 ## Change log
 
@@ -75,6 +76,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 22/10/2026 | Thêm S1-11 vào danh sách chặn; ghi chú đo W khi policy là ACT cho 05 MO2. AC không đổi | SM (Bob) theo 06 |
 | 24/10/2026 | Thêm mục Phạm vi file. Sổ chi phí G0 tách theo story: AC 5 ghi vào `docs/g0/ledger/S1-02.csv` thay vì tạo `ledger-g0.csv` chung | PO (Hiếu) |
 | 25/10/2026 | Thu nhỏ: SIMPLE chỉ cho G0; bỏ thử trên 3060 và bỏ chặn S1-05, S1-06, S1-09, S1-11; 16 → 8 giờ | PO (Hiếu) theo design 25/10/2026 |
+| 25/10/2026 | Chuyển cho Hiếu vì chỉ Hiếu có phần cứng ([design chia làn](../../superpowers/specs/2026-10-25-lanes-and-code-structure-design.md) mục 3.1); image theo `docker/simple/` và `compose.yaml` gốc | PO (Hiếu) theo design chia làn |
 
 ## Ghi chép khi làm
 

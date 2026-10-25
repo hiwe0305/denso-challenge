@@ -5,7 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 22/10/2026; sửa 25/10/2026) |
-| Người làm | Châu |
+| Người làm | Hưng |
 | Story PRD | 1.5, phần Q3 và Q4 · Epic 1 |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:sim` · `spike` |
 | Sprint | S1. Câu trả lời ở G0 được phép là "tạm"; chốt cuối trong story 6.4 (S3) |
@@ -49,13 +49,13 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 ## Kiểm thử
 
 - Script in ra sai số so với chạy liền và trả mã khác 0 nếu vượt ngưỡng đã ghi.
-- Hưng chạy lại một lần và ra cùng kết luận.
+- Châu chạy lại một lần và ra cùng kết luận (bình luận).
 
 ## Người phụ trách
 
-- Làm: Trần Trịnh Hoàng Châu
-- Review: Trần Ngọc Hưng
-- Dự phòng: Trần Ngọc Hưng
+- Làm: Trần Ngọc Hưng
+- Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
+- Bình luận: Trần Trịnh Hoàng Châu
 
 ## Change log
 
@@ -64,6 +64,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 22/10/2026 | Tạo story từ 02 · 1.5 (phần Q3, Q4); cho phép câu trả lời tạm ở G0 | SM (Bob), PO (Sarah) duyệt |
 | 24/10/2026 | Thêm mục Phạm vi file. AC 4: đề xuất dòng V4, V5 ghi trong file kết quả, Hiếu gom vào 03 §3.3 ở review G0 | PO (Hiếu) |
 | 25/10/2026 | Đổi sang env MuJoCo của robot DENSO; phụ thuộc DA-15 thay S1-02; 8 → 4 giờ | PO (Hiếu) theo design 25/10/2026 |
+| 25/10/2026 | Chuyển cho Hưng: là khả năng của env MuJoCo (design chia làn mục 3.1) | PO (Hiếu) theo design chia làn |
 
 ## Ghi chép khi làm
 

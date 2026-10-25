@@ -5,7 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 22/10/2026; sửa 25/10/2026) |
-| Người làm | Châu |
+| Người làm | Hiếu |
 | Story PRD | 1.4 · Epic 1 |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:rl` |
 | Sprint | S1 (tuần 1–2), bắt đầu ngày 1 |
@@ -65,9 +65,9 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Người phụ trách
 
-- Làm: Trần Trịnh Hoàng Châu
-- Chịu trách nhiệm cuối và review: Dương Đình Hiếu
-- Dự phòng: Dương Đình Hiếu
+- Làm: Dương Đình Hiếu (tiếp tục trên nhánh `S1-04-finetune-cost`, giữ commit 1.2 của Châu)
+- Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
+- Bình luận: Trần Trịnh Hoàng Châu
 
 ## Change log
 
@@ -77,6 +77,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 22/10/2026 | Đồng bộ spec v10.1: checkpoint gốc trong `pre.*`, `postpre.*`; khối lượng 22 lần train Ψ₀ mặc định, tối đa 33. AC của 02 · 1.4 không đổi | SM (Bob) theo 06 |
 | 24/10/2026 | Thêm mục Phạm vi file. Dùng image Ψ₀ của S1-03 thay vì dựng chung; AC 6: đề xuất V8 (phần fine-tune) ghi trong file kết quả, Hiếu gom vào 03 §3.3; sổ chi phí riêng của story | PO (Hiếu) |
 | 25/10/2026 | Thêm AC 7, 8 và nhiệm vụ con 6, 7: đo stage 2, 3 trên Colab và inference trên 3060; giữ nguyên số nhiệm vụ con cũ vì nhánh S1-04 đang mở; 12 → 18 giờ | PO (Hiếu) theo design 25/10/2026 |
+| 25/10/2026 | Chuyển cho Hiếu vì cần phần cứng; nhánh đang mở giữ nguyên, nhiệm vụ con 1.2 vẫn tính cho Châu | PO (Hiếu) theo design chia làn |
 
 ## Ghi chép khi làm
 

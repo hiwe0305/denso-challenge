@@ -206,7 +206,7 @@ Một lần, trước khi các làn viết code (design chia làn mục 8):
 1. Merge S1-08 như hiện tại.
 2. Long mở nhánh `chore-restructure` từ `origin/master`: tách `packages/flywheel` thành `flywheel-contracts`, `flywheel-store`, `flywheel-testkit` (gồm `flywheel-fakes`), `flywheel-cli`; tạo khung rỗng `flywheel-data`, `flywheel-eval`, `flywheel-loop`, `flywheel-mujoco`, `flywheel-psi0`, `denso-sim`; chuyển test e2e ra `tests/e2e/`; sửa ruff, mypy, pytest, import-linter, CI; dời `scripts/*.py` vào `scripts/repo/` và sửa đường dẫn trong workflow, `CLAUDE.md`, `RULE.md`, `08`.
 3. Chỉ di chuyển file và sửa cấu hình; không đổi logic. Bằng chứng: CI xanh, `uv run pytest` chạy cả test của testkit, `lint-imports` báo đủ các luật mới.
-4. Hạn: trước 28/10/2026, vì DA-15, DA-22, DA-25 bắt đầu viết vào package mới từ ngày đó.
+4. Hạn: hết ngày 27/10/2026. Ngày 26–27/10 các làn làm nhiệm vụ con không nằm trong package mới (đọc, kiểm kê, file tham số robot, `docs/g0/`).
 
 ## 4. Theo dõi và đánh giá theo nhiệm vụ con
 

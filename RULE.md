@@ -42,7 +42,7 @@ Từ 25/10/2026 việc chia theo **làn** ([design chia làn](docs/superpowers/s
 
 ### Nguyễn Thăng Long · Làn Vòng quyết định
 
-- **Một lần trước 28/10:** merge S1-08 rồi làm **PR `chore-restructure`** (07 mục 3.6).
+- **Một lần, hết ngày 27/10:** merge S1-08 rồi làm **PR `chore-restructure`** (07 mục 3.6).
 - **Làn Vòng (`flywheel-loop`):** S2 runner, sổ chi phí · S3 RunPlan, cổng dev, bảng quyết định, backup · S4 decide, `fw review`, N_B · S5 vòng C, công cụ HD · S6 báo cáo, thống kê · DA-23 runner bất đồng bộ · khóa holdout.
 - Sở hữu: `flywheel-loop`, `configs/loop/`, `pyproject.toml` gốc, `uv.lock`, CI, `scripts/` (trừ `scripts/g0/`), `ops/`. Tổng khoảng 250–260 giờ. Không còn giữ `contracts/` (chuyển cho Hiếu).
 

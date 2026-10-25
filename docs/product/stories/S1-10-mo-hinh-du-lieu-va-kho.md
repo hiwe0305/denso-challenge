@@ -10,7 +10,7 @@
 | Nhãn | [Lõi] · `epic:2` · `gate:G1` · `area:data` |
 | Sprint | S1, tuần 1–2 |
 | Ước lượng | 10 giờ (bản 0.1: 14 giờ; L0-lite bớt phân vùng ngày, lệnh dựng lại chỉ mục, fsspec) |
-| Phụ thuộc | S1-01. Dùng chung `contracts` với S1-08; đưa `contracts/base.py` trước ngày 4 |
+| Phụ thuộc | PR `chore-restructure` (07 mục 3.6, hết 27/10). Dùng chung `contracts` với S1-08; đưa `contracts/base.py` trước ngày 4. Thông làm, Hiếu giữ nhân |
 
 ## Story
 
@@ -25,7 +25,7 @@ Là kỹ sư data, tôi muốn schema có phiên bản và kho lưu bất biến
 5. `flywheel.store` theo 03 §7.2: đường dẫn cục bộ qua `pathlib` (không fsspec); `$FW_ROOT` mặc định `./fwdata`, dữ liệu dưới `sites/local/`; blob theo sha256 ở `objects/sha256/ab/cd/<hash>`; bảng append-only ở `catalog/<bảng>/part-<ulid>.jsonl`, không phân vùng ngày; mỗi tiến trình ghi tệp part riêng.
 6. Chỉ mục `index/fw.duckdb` chỉ chứa view, tự tạo khi mở (`CREATE OR REPLACE VIEW` trên glob của từng bảng, đọc bằng `read_json` với `union_by_name`). Xóa tệp rồi mở lại cho cùng kết quả truy vấn (có test). Không có lệnh `fw index rebuild` (hoãn tới L1, ADR-13).
 7. `ledger.append(entry)` ghi LedgerEntry vào `ledger.jsonl` của thư mục job; trường `estimated` và `measured` tách riêng. Đây là nền cho `ledger.meter()` của runner ở S2.
-8. Xuất JSON Schema của các model vào `packages/flywheel/schemas/` (ADR-06).
+8. Xuất JSON Schema của các model vào `packages/flywheel-contracts/schemas/` (ADR-06).
 9. Test chạy trên CPU, không phụ thuộc adapter.
 
 ## Nhiệm vụ
@@ -44,11 +44,11 @@ Là kỹ sư data, tôi muốn schema có phiên bản và kho lưu bất biến
 
 Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
 
-- `packages/flywheel/src/flywheel/contracts/base.py`, `packages/flywheel/src/flywheel/contracts/configs.py`
-- `packages/flywheel/src/flywheel/contracts/entities.py` hoặc `packages/flywheel/src/flywheel/contracts/entities/`
-- `packages/flywheel/src/flywheel/store/`, `packages/flywheel/src/flywheel/ledger/`
-- `packages/flywheel/schemas/`
-- `packages/flywheel/tests/contracts/`, `packages/flywheel/tests/store/`, `packages/flywheel/tests/ledger/`
+- `packages/flywheel-contracts/src/flywheel/contracts/base.py`, `packages/flywheel-contracts/src/flywheel/contracts/configs.py`
+- `packages/flywheel-contracts/src/flywheel/contracts/entities.py` hoặc `packages/flywheel-contracts/src/flywheel/contracts/entities/`
+- `packages/flywheel-contracts/schemas/`, `packages/flywheel-contracts/tests/`
+- `packages/flywheel-store/src/flywheel/store/` (gồm `ledger_append.py`: ghi sổ chi phí append-only)
+- `packages/flywheel-store/tests/`
 
 ## Ghi chú cho người làm
 
@@ -57,7 +57,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - Holdout không nằm ở bảng Condition mà trong vault (03 §4.3); story này không tạo vault.
 - Sinh ULID: dùng thư viện nhỏ hoặc tự viết; nếu thêm phụ thuộc mới ngoài danh sách 03 §7.1, ghi vào PR.
 - Mặc định PO cho psi-data: `license = unknown`, `data_class = restricted`.
-- File sẽ tạo: `packages/flywheel/src/flywheel/contracts/base.py`, `contracts/entities.py` (hoặc thư mục `contracts/entities/`), `contracts/configs.py`, `packages/flywheel/src/flywheel/store/{paths,blobs,tables,views}.py`, `packages/flywheel/src/flywheel/ledger/append.py`, `packages/flywheel/schemas/*.json`, test tương ứng trong `packages/flywheel/tests/`.
+- File sẽ tạo: `packages/flywheel-contracts/src/flywheel/contracts/base.py`, `contracts/entities.py` (hoặc thư mục `contracts/entities/`), `contracts/configs.py`, `packages/flywheel-store/src/flywheel/store/{paths,blobs,tables,views}.py`, `packages/flywheel-store/src/flywheel/store/ledger_append.py`, `packages/flywheel-contracts/schemas/*.json`, test tương ứng trong `tests/` của từng package.
 
 ## Kiểm thử
 
@@ -80,6 +80,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 22/10/2026 | Tạo story từ 02 · 2.1, tách phần a cho S1; phụ thuộc đổi thành 1.1 (04 P17) | SM (Bob), PO (Sarah) duyệt |
 | 22/10/2026 | Theo L0-lite (06 mục 9, 02 · 2.1 bản 0.3, 03 §2.4, §4.3): 12 thực thể, cấu hình ngoài catalog, `task_id`, `embodiment_id`, `site_id` là cột có mặc định; JSONL không phân vùng ngày, view DuckDB tự tạo, bỏ `fw index rebuild`, bỏ fsspec; ước lượng 14 → 10 giờ | SM (Bob) theo 06 |
 | 24/10/2026 | Thêm mục Phạm vi file. AC không đổi | PO (Hiếu) |
+| 25/10/2026 | Đường dẫn theo nhân mới: `flywheel-contracts`, `flywheel-store`; hàm ghi sổ chi phí nằm trong kho vì mọi làn đều ghi; phân tích sổ chi phí thuộc làn Vòng (Long) | PO (Hiếu) theo design chia làn |
 
 ## Ghi chép khi làm
 
