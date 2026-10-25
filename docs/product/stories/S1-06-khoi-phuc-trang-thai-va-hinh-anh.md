@@ -4,13 +4,13 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt 22/10/2026) |
+| Trạng thái | Sẵn sàng (PO duyệt 22/10/2026; sửa 25/10/2026) |
 | Người làm | Châu |
 | Story PRD | 1.5, phần Q3 và Q4 · Epic 1 |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:sim` · `spike` |
 | Sprint | S1. Câu trả lời ở G0 được phép là "tạm"; chốt cuối trong story 6.4 (S3) |
-| Ước lượng | 8 giờ |
-| Phụ thuộc | S1-02 |
+| Ước lượng | 4 giờ (bản trước: 8 giờ) |
+| Phụ thuộc | DA-15 nhiệm vụ con 1 (MJCF tối thiểu của robot DENSO). Không còn phụ thuộc S1-02 |
 
 ## Story
 
@@ -18,20 +18,17 @@ Là kỹ sư simulation, tôi muốn biết SIMPLE có khôi phục được tr�
 
 ## Tiêu chí chấp nhận
 
-1. Q3, V4: lưu trạng thái giữa một episode, khôi phục, chạy tiếp cùng chuỗi action; so với chạy liền một mạch: sai số tư thế vật và góc khớp sau 1 giây. Ghi rõ có khôi phục được trạng thái bên trong WBC và hàng đợi action, RTC của policy không, hoặc chưa kiểm được.
-2. Q4, V5: giữ layout vật lý, chỉ đặt ánh sáng và vật liệu về mức Level 0; kiểm tư thế vật và robot không đổi. Đối chiếu mã nguồn `DRManager` vì tài liệu SIMPLE mô tả mức DR theo hai cách ngược nhau.
-3. Mỗi câu có một trong ba trả lời: "có", "không", "tạm" kèm việc còn thiếu. Đề xuất giá trị `SimCapabilities.restore_state` và `visual_override`.
-4. Kết quả ở `docs/g0/q3-q4-restore-visual.md`, có mục "Đề xuất cho 03 §3.3" với dòng V4, V5 ([docs/g0/README.md](../../g0/README.md)). Hiếu gom vào 03 §3.3 ở review G0.
+_Đổi ngày 25/10/2026 ([design 25/10/2026](../../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) mục 11.1): Q3, Q4 trả lời trên env MuJoCo của robot DENSO thay cho SIMPLE. MuJoCo đặt state trực tiếp nên phần còn lại chủ yếu là trạng thái nằm ngoài sim._
+
+1. Q3: lưu trạng thái MuJoCo giữa một episode (`qpos`, `qvel`, `act`, thời gian, trạng thái bộ điều khiển), khôi phục, chạy tiếp cùng chuỗi action; so với chạy liền: sai số tư thế linh kiện và góc khớp sau 1 giây. Liệt kê trạng thái nằm ngoài sim cần lưu thêm (hàng đợi action, buffer RTC của policy).
+2. Q4: đổi ánh sáng và vật liệu (màu, texture) mà giữ vật lý; kiểm trạng thái vật lý từng bước trùng với khi không đổi.
+3. Mỗi câu có một trong ba trả lời: "có", "không", "tạm" kèm việc còn thiếu. Đề xuất giá trị `SimCapabilities.restore_state` và `visual_override` cho `DensoMujocoSim`.
+4. Kết quả ở `docs/g0/q3-q4-restore-visual.md`, có mục "Đề xuất cho 03 §3.3" ([docs/g0/README.md](../../g0/README.md)).
 
 ## Nhiệm vụ
 
-- [ ] 1. Thử lưu và khôi phục (AC 1)
-  - [ ] 1.1 Dùng `get_states()`, `set_states()` của simulator và `state_dict()`, `load_state_dict()` của task
-  - [ ] 1.2 So quỹ đạo khôi phục với quỹ đạo liền; ghi ngưỡng sai số đã dùng
-  - [ ] 1.3 Ghi phần trạng thái WBC và policy có hay không được khôi phục
+- [ ] 1. Thử lưu và khôi phục trên MuJoCo, ghi trạng thái ngoài sim (AC 1)
 - [ ] 2. Thử đổi hình ảnh giữ vật lý (AC 2)
-  - [ ] 2.1 Đọc mã `DRManager.load_state_dict(state_dict, dr_level)`, `LightingDR`, `MaterialDR`
-  - [ ] 2.2 So trạng thái vật lý từng bước có và không có ghi đè hình ảnh
 - [ ] 3. Viết kết luận kèm đề xuất cho 03 §3.3 (AC 3, 4)
 
 ## Phạm vi file
@@ -66,6 +63,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 |---|---|---|
 | 22/10/2026 | Tạo story từ 02 · 1.5 (phần Q3, Q4); cho phép câu trả lời tạm ở G0 | SM (Bob), PO (Sarah) duyệt |
 | 24/10/2026 | Thêm mục Phạm vi file. AC 4: đề xuất dòng V4, V5 ghi trong file kết quả, Hiếu gom vào 03 §3.3 ở review G0 | PO (Hiếu) |
+| 25/10/2026 | Đổi sang env MuJoCo của robot DENSO; phụ thuộc DA-15 thay S1-02; 8 → 4 giờ | PO (Hiếu) theo design 25/10/2026 |
 
 ## Ghi chép khi làm
 

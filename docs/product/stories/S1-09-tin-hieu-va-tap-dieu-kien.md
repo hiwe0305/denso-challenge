@@ -4,13 +4,13 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt 22/10/2026) |
+| Trạng thái | Sẵn sàng (PO duyệt 22/10/2026; sửa 25/10/2026) |
 | Người làm | Châu |
 | Story PRD | 1.8 (story mới do PO thêm) · Epic 1 |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:sim` · `spike` |
 | Sprint | S1, tuần 2 |
 | Ước lượng | 8 giờ |
-| Phụ thuộc | S1-02. Là đầu vào cho 3.1a, 3.3, 3.4, 2.5 ở S2 |
+| Phụ thuộc | DA-15 nhiệm vụ con 1 (MJCF tối thiểu). Là đầu vào cho DA-12, scorer và tập điều kiện ở S2 |
 
 ## Story
 
@@ -18,23 +18,21 @@ Là kỹ sư simulation, tôi muốn biết SIMPLE cho lấy những tín hiệu
 
 ## Tiêu chí chấp nhận
 
-1. V7: bảng tín hiệu lấy được khi rollout task chính: lệnh thân trên và lệnh thân dưới gửi cho WBC cùng giá trị đo tương ứng (03 §5.2 `control_spec`, ADR-15), tư thế vật, tiếp xúc tay–vật, va chạm, chiều cao và độ nghiêng thân, timestamp. Mỗi dòng ghi tần số và cách lấy (API, hook).
-2. Đối chiếu bảng trên với tín hiệu scorer cần cho 6 bước (spec 5.1) và 9 kiểu lỗi (spec 5.2). Tín hiệu thiếu: dựng lại bằng phát lại trong sim được không; nếu không, scorer hạ xuống mức nào (03 §12.2).
-3. V6 phần sim: `Task.reset(seed)` có tất định không: 10 seed, mỗi seed 2 lần, so layout.
-4. V6 phần sim: tự sinh được tập điều kiện mới (90 dev, 150 holdout) theo định dạng `simple-eval` không, hay phải dùng tập có sẵn; nếu tự sinh được, ghi dải seed tác giả đã dùng để tránh trùng (05 TH13).
-5. Ghi kết quả `decompose()` (`SubtaskSpec`) của task chính và đối chiếu với 6 bước của spec 5.1.
-6. Kết quả ở `docs/g0/signals-conditions.md`, có mục "Đề xuất cho 03 §3.3" với dòng V6 (phần sim), V7 ([docs/g0/README.md](../../g0/README.md)). Hiếu gom vào 03 §3.3 ở review G0.
+_Đổi ngày 25/10/2026 ([design 25/10/2026](../../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) mục 8, 11.1): tín hiệu và tập điều kiện lấy từ env MuJoCo của task khay → máy thay cho task G1 trong SIMPLE._
+
+1. V7: bảng tín hiệu lấy được khi rollout task khay → máy: lệnh gửi và giá trị đo theo nhóm action (`base`, `lift`, `arm_l`, `arm_r`, `gripper_l`, `gripper_r`, `head`), tư thế linh kiện, tiếp xúc gripper–linh kiện, va chạm, lực tại đồ gá, timestamp. Mỗi dòng ghi tần số và cách lấy (trường của `mjData`, sensor trong MJCF).
+2. Đối chiếu bảng với tín hiệu scorer cần cho 6 bước và 10 kiểu lỗi (design 23/10 mục 7.1). Tín hiệu thiếu: đề xuất sensor thêm vào MJCF cho DA-15.
+3. V6: `reset(seed)` tất định: 10 seed, mỗi seed 2 lần, so layout.
+4. V6: sinh tập điều kiện theo vector điều kiện của design 25/10 mục 8 (90 dev, 150 holdout), dải seed rời nhau; đề xuất định nghĩa Level 0, 1, 2 để Hiếu chốt trước khi thu demo đầu tiên.
+5. Kết quả ở `docs/g0/signals-conditions.md`, có mục "Đề xuất cho 03 §3.3" ([docs/g0/README.md](../../g0/README.md)).
 
 ## Nhiệm vụ
 
-- [ ] 1. Liệt kê tín hiệu (AC 1)
-  - [ ] 1.1 Đọc lớp env và robot của task chính; tìm điểm gắn hook ghi tín hiệu
-  - [ ] 1.2 Chạy một episode, ghi mẫu từng tín hiệu
-- [ ] 2. Đối chiếu với nhu cầu scorer (AC 2)
+- [ ] 1. Liệt kê tín hiệu trên env MuJoCo (AC 1)
+- [ ] 2. Đối chiếu với nhu cầu scorer, đề xuất sensor thiếu (AC 2)
 - [ ] 3. Kiểm `reset(seed)` tất định (AC 3)
-- [ ] 4. Thử sinh tập điều kiện theo định dạng `simple-eval` (AC 4)
-- [ ] 5. Ghi `decompose()` và đối chiếu bước (AC 5)
-- [ ] 6. Viết tài liệu kèm đề xuất cho 03 §3.3 (AC 6)
+- [ ] 4. Sinh tập điều kiện, đề xuất Level 0–2 (AC 4)
+- [ ] 5. Viết tài liệu kèm đề xuất cho 03 §3.3 (AC 5)
 
 ## Phạm vi file
 
@@ -71,6 +69,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 22/10/2026 | Tạo story từ 02 · 1.8 (PO thêm để phủ V6, V7) | SM (Bob), PO (Sarah) duyệt |
 | 22/10/2026 | Đồng bộ 03 bản 0.3: tín hiệu lệnh theo giao diện WBC; ghi chú V11 và lớp lỗi chung; sửa mã trích 05 TN13 thành TH13. AC của 02 · 1.8 không đổi | SM (Bob) theo 06 |
 | 24/10/2026 | Thêm mục Phạm vi file. AC 6: đề xuất dòng V6, V7 ghi trong file kết quả, Hiếu gom vào 03 §3.3 ở review G0 | PO (Hiếu) |
+| 25/10/2026 | Đổi sang task khay → máy trên MuJoCo; phụ thuộc DA-15 thay S1-02; bỏ phần `decompose()` và `simple-eval` | PO (Hiếu) theo design 25/10/2026 |
 
 ## Ghi chép khi làm
 

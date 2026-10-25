@@ -4,12 +4,13 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt 22/10/2026; SM sửa phạm vi theo 02 bản 0.3 cùng ngày) |
+| Trạng thái | Hủy (25/10/2026) |
+| Lý do hủy | Theo [design 25/10/2026](../../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) mục 11.1: teleop, planner và policy chạy cùng bộ điều khiển trên MuJoCo; planner cho robot DENSO làm trong DA-15 |
 | Người làm | Hưng |
 | Story PRD | 1.5, phần Q2 (AC 1 và AC 4 cho cờ `plan`) · Epic 1. V3 (AC 5 cũ của 1.5) chuyển sang story 1.9, file [S1-11](S1-11-bo-dieu-khien-v3.md) |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:sim` · `spike` |
 | Sprint | S1, tuần 1; chạy song song S1-11 |
-| Ước lượng | 6 giờ (bản 0.1: 12 giờ gồm cả V3) |
+| Ước lượng | 0 giờ (hủy; trước đó 6 giờ) |
 | Phụ thuộc | S1-02. Kết quả datagen là đầu vào cho bảng đối chiếu và thử T1 của S1-11 |
 
 ## Story
@@ -26,10 +27,10 @@ Là kỹ sư simulation, tôi muốn biết pipeline motion planning của SIMPL
 
 ## Nhiệm vụ
 
-- [ ] 1. Chạy datagen cho task MP gần nhất và thử cho task chính (AC 1)
-- [ ] 2. Kiểm planner từ trạng thái lưu (AC 2)
-- [ ] 3. Đề xuất cờ khả năng, chuyển số liệu cho S1-11 (AC 3, 4)
-- [ ] 4. Viết `docs/g0/q2-planner.md`, ghi sổ chi phí (AC 5)
+- ~~1. Chạy datagen cho task MP gần nhất và thử cho task chính (AC 1)~~
+- ~~2. Kiểm planner từ trạng thái lưu (AC 2)~~
+- ~~3. Đề xuất cờ khả năng, chuyển số liệu cho S1-11 (AC 3, 4)~~
+- ~~4. Viết `docs/g0/q2-planner.md`, ghi sổ chi phí (AC 5)~~
 
 ## Phạm vi file
 
@@ -64,6 +65,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 22/10/2026 | Tạo story từ 02 · 1.5 (phần Q2) và AC V3 mới; tách khỏi Q3, Q4 (S1-06) | SM (Bob), PO (Sarah) duyệt |
 | 22/10/2026 | Theo 02 bản 0.3 (06 mục 1): V3 tách sang story 1.9, file S1-11; story này chỉ còn Q2 và kiểm planner từ trạng thái lưu; bỏ F1 khỏi vai dự phòng cho Q2; ước lượng 12 → 6 giờ; review chuyển sang Châu | SM (Bob) theo 06 |
 | 24/10/2026 | Thêm mục Phạm vi file. Story giữ `datagen_probe.sh`, S1-11 chỉ chạy; sổ chi phí riêng của story | PO (Hiếu) |
+| 25/10/2026 | Hủy: teleop, planner và policy chạy cùng bộ điều khiển trên MuJoCo; planner cho robot DENSO làm trong DA-15. Nhiệm vụ con gạch bỏ, không xóa nội dung | PO (Hiếu) theo design 25/10/2026 |
 
 ## Ghi chép khi làm
 
