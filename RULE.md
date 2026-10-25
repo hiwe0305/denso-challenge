@@ -14,38 +14,37 @@ Muốn hiểu sâu: [spec v10.2](docs/spec-v10-failure-to-data.md), [design 23/1
 
 Giờ là ước lượng (04 mục 4.7 cộng phần DA ở 07 mục 2.3). Ai cũng đang vượt mức kế hoạch 70%; nếu trễ thì chuyển phần trễ sang API trước khi cắt việc (mục 5, R5).
 
-### Dương Đình Hiếu · Trưởng nhóm, Product Owner, Ψ₀
+Từ 25/10/2026 việc chia theo **làn** ([design chia làn](docs/superpowers/specs/2026-10-25-lanes-and-code-structure-design.md)): mỗi người giữ trọn package của mình, chỉ import phần **nhân** (hợp đồng, kho, bộ giả, CLI) do Hiếu giữ, không import code của người khác. Muốn thêm hoặc đổi dữ liệu đi giữa hai làn thì mở PR hợp đồng cho Hiếu. Giờ là ước lượng thô ở 07 mục 2.3.
 
-- **Việc trưởng nhóm:** đầu mối DENSO, BTC, mentor; chọn checkpoint gốc (Q0), D\*, ρ; duyệt kế hoạch vòng C; ký cổng G0–G6; rà claim và pitch.
-- **Story:** S1-03 tái tạo đánh giá Ψ₀ · S2 TrainerAdapter Ψ₀ · S3 đường cong E1, D\*, power analysis · S4 train nhánh A, A₀.₇, B.
-- **Pha A (robot DENSO):** DA-05 NimClient và định tuyến dữ liệu · DA-09 probe P1–P4 · **DA-14 gửi DENSO danh sách 21 mục, tuần 1** · **DA-19 đọc code train của tác giả, lớp bọc log 3 stage (gộp DA-07), train trên Colab**.
-- **Duyệt và merge mọi PR vào `master`**; thảo luận tổng kết cuối ngày lúc 21:30.
-- Sở hữu: `training/`, phần trainer và probe của `flywheel-psi0/`, `flywheel-nim/`, `configs/runplans/`, tài liệu, website. Tổng khoảng 245–275 giờ, tính cả việc duyệt (07 mục 2.3).
+### Dương Đình Hiếu · Trưởng nhóm, nhân, model và phần cứng
 
-### Trần Ngọc Hưng · Simulation lead
+- **Việc trưởng nhóm:** đầu mối DENSO, BTC, mentor; chọn checkpoint gốc (Q0), D\*, ρ; duyệt kế hoạch vòng C; ký cổng G0–G6; rà claim và pitch; **duyệt và merge mọi PR**; thảo luận tổng kết cuối ngày lúc 21:30.
+- **Nhân:** `flywheel-contracts`, `flywheel-store`, `flywheel-testkit`, `flywheel-cli`; **DA-25 schema và file mẫu cho artifact mới, trước 29/10**.
+- **Model và phần cứng (chỉ Hiếu có máy):** S1-02 SIMPLE · S1-03 tái tạo Ψ₀ · S1-04 chi phí train · DA-19 code train 3 stage, log, Colab, client RTC · DA-05 NIM · DA-09 probe · `Psi0Policy`, ACT, DP · chạy mọi job GPU (E1, nhánh A, A₀.₇, B, C, F-ACT, B-fail của ACT) · DA-14 gửi DENSO 21 mục.
+- Sở hữu: nhân, `flywheel-psi0`, `flywheel-lerobot`, `flywheel-simple`, `flywheel-nim`, `configs/kernel/`, `configs/models/`, `configs/runplans/` (duyệt), `docker/simple/`, `docker/psi0/`, `tests/e2e/`, tài liệu, website. Tổng khoảng 340–370 giờ, **cao nhất đội**; cách giảm ở 07 mục 2.3.
 
-- **Story:** S1-02 môi trường SIMPLE (thu nhỏ, chỉ cho S1-03) · S3 khôi phục trạng thái · S4 correction, B-fail · S5–S6 cấy lỗi, điều phối HD, holdout, video demo. S1-05 và S1-11 đã hủy (25/10/2026).
-- **Pha A:** **DA-15 robot DENSO tương đương trên MuJoCo, cảnh trạm, env task, planner** · **DA-16 teleop bàn phím** · DA-06 Cosmos Transfer (tầng S3). DA-10 gộp vào DA-15; DA-11 (Isaac Sim) dời sau demo.
-- Sở hữu: `flywheel-mujoco/`, `flywheel-simple/`, `flywheel-isaac/`, `docker/`, `configs/embodiments/`, generator của `flywheel-nim/`, `scripts/g0/`, `docs/g0/`. Tổng khoảng 205 giờ.
+### Trần Ngọc Hưng · Simulation
 
-### Trần Trịnh Hoàng Châu · Scorer, ACT/DP, vận hành Ψ₀
+- **Story:** **DA-15 robot DENSO tương đương trên MuJoCo, MJCF tối thiểu trước 28/10** · **DA-24 workspace ROS 2 và môi trường sim** · DA-16 teleop bàn phím trên ROS 2, ghi MCAP · S1-06 khôi phục trạng thái, tách hình ảnh · S1-09 tín hiệu và tập điều kiện · DA-06 generator Cosmos S3 (Hiếu chạy) · về sau: correction và sim cho B-fail, cấy lỗi cho HD, video demo; DA-11 Isaac sau demo.
+- Sở hữu: `denso-sim`, `flywheel-mujoco`, `ros2_ws/`, `docker/ros2-sim/`, `.devcontainer/`, `configs/embodiments/`, `configs/sim/`, `generators/` của `flywheel-nim`, thư mục `scripts/g0/`, `docs/g0/`. Tổng khoảng 235–240 giờ.
 
-- **Story:** S1-04 chi phí fine-tune (mở rộng sang stage 2–3 trên Colab) · S1-06 tách hình ảnh (thu nhỏ) · S1-09 tín hiệu từng bước của task khay → máy · S2 `Psi0Policy`, khung và hiệu chỉnh scorer · S3 ACT/DP, vector điều kiện, kNN · S4 phép kiểm cần rollout · S5–S6 C cuối, khóa holdout, F-ACT, B-fail của ACT.
-- **Pha A:** DA-12 `DensoTrayToMachine` (6 bước, 10 kiểu lỗi) · DA-17 phát lại action trên MuJoCo · DA-23 eval bất đồng bộ và log RTC.
-- Sở hữu: `scorer/`, `flywheel-tasks/`, `flywheel-lerobot/`, phần policy của `flywheel-psi0/`, `configs/tasks/`. Tổng khoảng 205 giờ. Châu dự phòng cho Hiếu (Ψ₀) và Hưng.
+### Dương Tiến Thông · Scrum Master, làn Dữ liệu
 
-### Nguyễn Thăng Long · Tech lead lõi
+- **Việc SM:** bảng công việc, check-in, bản tin tuần, viết file story (kể cả "Phạm vi file"), sổ can thiệp ở 08; **viết file story DA-01…DA-14 còn thiếu**.
+- **Làn Dữ liệu (`flywheel-data`):** S1-10 mô hình dữ liệu và kho (làm cho nhân, Hiếu duyệt) · DA-01 định dạng episode (làm cho nhân) · DA-22 dataset BTC · DA-03 pipeline teleop (đọc MCAP) · DA-17 phát lại để kiểm · DA-02, DA-21 export LeRobot v2.1, v3 · DA-04, DA-18 egocentric → dữ liệu stage 1 · S2 nạp, QA, release · S6 SOP.
+- Sở hữu: `flywheel-data`, `configs/data/`, `docs/product/stories/`. Tổng khoảng 240–250 giờ.
 
-- **Story:** **S1-01 khung repo, CLI, CI (chặn S1-08, S1-10)** · S1-08 khung lõi trên adapter giả · S2 chia tập, runner, release · S3 RunPlan, chẩn đoán, kiểm hệ thống · S4 chọn can thiệp, `fw review` · S5 vòng C · S6 báo cáo.
-- **Pha A:** DA-01 định dạng episode chung · **DA-04 pipeline video egocentric** · DA-18 egocentric → dữ liệu fine-tune stage 1 · DA-13 quy lỗi về stage.
-- Sở hữu: `contracts/`, `store/`, `catalog/`, `runner/`, `scenarios/`, `diagnosis/`, `decide/`, `acquisition/`, `reports/`, `cli/`, `pyproject.toml` gốc, `uv.lock`, CI, `scripts/` (trừ `scripts/g0/`). Tổng khoảng 273 giờ. **Mọi thay đổi `contracts/` đi qua Long.**
+### Trần Trịnh Hoàng Châu · Làn Đánh giá
 
-### Dương Tiến Thông · Scrum Master, dữ liệu và đo lường
+- **Làn Đánh giá (`flywheel-eval`):** DA-12 task khay → máy và scorer · S2 khung và hiệu chỉnh scorer · tập điều kiện, chia tập, guard gần trùng · S3 vector điều kiện, kNN, chẩn đoán, kiểm hệ thống · DA-13 quy lỗi về stage · DA-08 phát hiện lỗi train · evidence card · **DA-20 Agent QA/QC** · S4 code các phép kiểm cần rollout (Hiếu chạy).
+- Không còn việc cần GPU: S1-04, `Psi0Policy`, ACT, DP, F-ACT, C cuối chuyển cho Hiếu.
+- Sở hữu: `flywheel-eval`, `configs/eval/`. Tổng khoảng 180–185 giờ.
 
-- **Việc SM:** bảng công việc, check-in, bản tin tuần, viết file story (kể cả mục "Phạm vi file"), sổ can thiệp ở 08.
-- **Story:** S1-10 mô hình dữ liệu · S2 nhập dữ liệu teleop, QA, sổ chi phí · S3 cổng dev, bảng quyết định, backup · S4 N_B, evidence card · S5 công cụ HD · S6 thống kê, SOP.
-- **Pha A:** **DA-22 dataset BTC (thay S1-07)** · DA-02 export LeRobot v2.1 · DA-21 export v3 · DA-03 pipeline teleop · DA-08 phát hiện lỗi train · **DA-20 Agent QA/QC**.
-- Sở hữu: `qa/`, `ledger/`, `gate/`, `flywheel-agentqa/`, `flywheel-ingest/teleop/`, `export/`, `configs/thresholds/`, `configs/pricebook/`, `ops/`, `docs/product/stories/`. Tổng khoảng 269 giờ.
+### Nguyễn Thăng Long · Làn Vòng quyết định
+
+- **Một lần trước 28/10:** merge S1-08 rồi làm **PR `chore-restructure`** (07 mục 3.6).
+- **Làn Vòng (`flywheel-loop`):** S2 runner, sổ chi phí · S3 RunPlan, cổng dev, bảng quyết định, backup · S4 decide, `fw review`, N_B · S5 vòng C, công cụ HD · S6 báo cáo, thống kê · DA-23 runner bất đồng bộ · khóa holdout.
+- Sở hữu: `flywheel-loop`, `configs/loop/`, `pyproject.toml` gốc, `uv.lock`, CI, `scripts/` (trừ `scripts/g0/`), `ops/`. Tổng khoảng 250–260 giờ. Không còn giữ `contracts/` (chuyển cho Hiếu).
 
 Bảng đầy đủ: sở hữu đường dẫn ở [07 mục 2.1](docs/product/07-team-workflow.md), story Pha A ở [07 mục 2.2](docs/product/07-team-workflow.md), sprint ở [04 mục 4](docs/product/04-delivery-plan.md), RACI ở [04 mục 3.3](docs/product/04-delivery-plan.md).
 
@@ -150,11 +149,11 @@ Label nguyên nhân quan trọng hơn số lượng lỗi: nhờ nó đội bi�
 
 | Chủ đề | Hỏi |
 |---|---|
-| DENSO, BTC, mentor, Ψ₀ (checkpoint, cấu hình train), quyết định phạm vi | Hiếu |
-| MuJoCo, robot DENSO tương đương, teleop bàn phím, SIMPLE (G0), Isaac Sim, generator, holdout | Hưng |
-| Scorer, TaskDefinition, phát lại action, eval bất đồng bộ, ACT, Diffusion Policy, vận hành Ψ₀ | Châu |
-| Lõi `flywheel`, `contracts`, CI, cấu trúc repo | Long |
-| Story, bảng công việc, QA dữ liệu, LeRobot v2.1/v3, dataset BTC, Agent QA/QC, sổ chi phí, thống kê, rule ở 08 | Thông |
+| DENSO, BTC, mentor, quyết định phạm vi; hợp đồng giữa các làn; Ψ₀, ACT, DP, SIMPLE, job GPU, Colab | Hiếu |
+| MuJoCo, `denso-sim`, robot DENSO tương đương, ROS 2, teleop bàn phím, Isaac Sim, generator | Hưng |
+| Task và scorer, tập điều kiện, chẩn đoán, evidence card, Agent QA/QC | Châu |
+| RunPlan, runner, decide, cổng dev, holdout, sổ chi phí, báo cáo, CI, cấu trúc repo | Long |
+| Story, bảng công việc, ingest, QA dữ liệu, phát lại để kiểm, LeRobot v2.1/v3, dataset BTC, egocentric, rule ở 08 | Thông |
 
 ## 8. Lệnh hay dùng
 
