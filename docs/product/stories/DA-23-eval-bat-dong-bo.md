@@ -1,69 +1,67 @@
-# DA-23 · Eval bất đồng bộ trên MuJoCo và log inference RTC
+# DA-23 · Runner eval đồng bộ và bất đồng bộ
 
 ## Trạng thái
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt 25/10/2026 theo design 25/10/2026) |
-| Người làm | Châu |
-| Story PRD | Story mới của [design 25/10/2026](../../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) mục 11.2 · Epic 9 |
-| Nhãn | [Adapter] · `epic:9` · `area:sim` |
+| Trạng thái | Sẵn sàng (PO duyệt 25/10/2026; sửa theo design chia làn cùng ngày) |
+| Người làm | Long |
+| Làn | Vòng quyết định |
+| Story PRD | Story mới của [design MuJoCo 25/10/2026](../../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) và [design chia làn](../../superpowers/specs/2026-10-25-lanes-and-code-structure-design.md) · Epic 9 |
+| Nhãn | [Lõi] · `epic:9` · `area:core` |
 | Sprint | S2 |
-| Ước lượng | 12 giờ (khoảng 10–15, ước lượng của SM) |
-| Phụ thuộc | DA-15 (env), S1-04 AC 8 (độ trễ trên 3060). Code trên `FakePolicy` có độ trễ giả trong lúc chờ. Khung package: DA-19 nhiệm vụ con 1 |
+| Ước lượng | 10 giờ (khoảng 8–12, ước lượng của SM) |
+| Phụ thuộc | Schema `RolloutRequest.timing`, log RTC (DA-25). Code trên simulator và policy giả của testkit có độ trễ giả. PR `chore-restructure` (07 mục 3.6, hết 27/10) tạo khung package `flywheel-loop` |
 
 ## Story
 
-Là kỹ sư đánh giá, tôi muốn eval closed-loop chạy cả đồng bộ và bất đồng bộ và ghi log inference RTC, để thấy lỗi do trễ của action chunking trước khi coi nó là lỗi dữ liệu.
+Là người vận hành vòng, tôi muốn runner chạy closed-loop eval ở cả hai chế độ và gom log inference, để chỉ số chính của mọi nhánh lấy ở chế độ bất đồng bộ và lỗi do trễ đi vào kiểm hệ thống.
 
 ## Tiêu chí chấp nhận
 
-1. Hai chế độ của `RolloutRequest.timing`: đồng bộ (sim dừng chờ policy) và bất đồng bộ (sim chạy theo đồng hồ thật, hoặc chèn độ trễ lấy mẫu từ log inference thật).
-2. Client RTC ghi mỗi lần suy luận: lúc gửi quan sát, lúc nhận chunk, độ trễ, số action đã tiêu trong lúc chờ (delay d), mức buffer, chỉ số chunk, bước nhảy action ở ranh giới chunk so với trong chunk, lúc buffer cạn.
-3. Dòng thời gian RTC dựng thành hình cho DA-20.
-4. Demo bằng `FakePolicy` có độ trễ giả: chế độ đồng bộ đạt, chế độ bất đồng bộ lộ lỗi; kiểm hệ thống ghi LỖI RUNTIME.
-5. Chạy Ψ₀ trên 3060 nếu S1-04 cho thấy đủ VRAM; nếu không, ghi rõ chỉ số bất đồng bộ đo với độ trễ của phần cứng nào.
+1. Runner phát `RolloutRequest` với `timing = sync` hoặc `async`; `async` kèm `latency_profile_ref` lấy từ log inference thật.
+2. Gom log RTC của mỗi rollout vào thư mục job, đúng schema; gắn với `Trace`.
+3. Demo với simulator và policy giả có độ trễ: `sync` đạt, `async` lộ lỗi; với độ trễ bằng 0 hai chế độ cho cùng kết quả trên cùng seed.
+4. RunPlan khai chế độ eval; mặc định chỉ số chính ở `async` (03 ADR-20).
 
 ## Nhiệm vụ
 
-- [ ] 1. Hai chế độ timing trong runner của env (AC 1)
-- [ ] 2. Log RTC phía client (AC 2)
-- [ ] 3. Dòng thời gian RTC (AC 3)
-- [ ] 4. Demo `FakePolicy` có trễ (AC 4)
-- [ ] 5. Chạy với Ψ₀ hoặc ghi giới hạn phần cứng (AC 5)
+- [ ] 1. Hai chế độ trong runner (AC 1)
+- [ ] 2. Gom log RTC (AC 2)
+- [ ] 3. Demo với bộ giả có độ trễ (AC 3)
+- [ ] 4. Khai chế độ trong RunPlan (AC 4)
 
 ## Phạm vi file
 
 Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
 
-- `packages/flywheel-mujoco/src/flywheel_mujoco/eval/`
-- `packages/flywheel-mujoco/tests/eval/`
-- `packages/flywheel-psi0/src/flywheel_psi0/policy/`
+- `packages/flywheel-loop/src/flywheel/loop/runner/`
+- `packages/flywheel-loop/tests/unit/runner/`, `packages/flywheel-loop/tests/contract/runner/`
+- `configs/loop/eval.yaml`
 - `docs/g0/async-eval.md`
 
 ## Ghi chú cho người làm
 
-- Nguồn: [design 25/10](../../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) mục 7.2, 7.3; 03 ADR-20; code RTC của Ψ₀: `real/deploy/psi-inference_rtc.py`, `scripts/deploy/serve_psi0-rtc-*.sh`.
-- `RolloutRequest.timing` là thay đổi `contracts`: Long làm PR contract nhỏ trước (07 mục 3.2); trong lúc chờ dùng tham số cục bộ của env.
-- Ψ₀ cần khoảng 160 ms mỗi lần suy luận (số tác giả báo); đo lại trên phần cứng của đội.
+- Nguồn: [design MuJoCo](../../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) mục 7.3; [design chia làn](../../superpowers/specs/2026-10-25-lanes-and-code-structure-design.md) mục 3.2; 03 ADR-20.
+- Chỉ import nhân (`flywheel.contracts`, `flywheel.store`, `flywheel.testkit`); không import làn khác hay adapter (03 mục 7.3). Thiếu trường trong schema thì báo Hiếu mở PR hợp đồng, không thêm trường tạm.
+- `timing` của sim thuộc DA-15; client RTC thuộc DA-19; dòng thời gian RTC dựng trong DA-20.
 
 ## Kiểm thử
 
-- Test: với độ trễ giả bằng 0, hai chế độ cho cùng kết quả trên cùng seed.
-- Log RTC của demo `FakePolicy` dựng lại đúng dòng thời gian.
+- Với độ trễ giả bằng 0, hai chế độ cho cùng kết quả trên cùng seed.
 
 ## Người phụ trách
 
-- Làm: Trần Trịnh Hoàng Châu
+- Làm: Nguyễn Thăng Long
 - Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
-- Bình luận: Hưng (env), Thông (Agent QA/QC)
+- Bình luận: Hưng (`timing`), Hiếu (client RTC), Châu (dòng thời gian)
 
 ## Change log
 
 | Ngày | Nội dung | Người |
 |---|---|---|
-| 25/10/2026 | Tạo story theo design 25/10/2026 mục 11.2 | PO (Hiếu) |
-| 25/10/2026 | Phụ thuộc thêm khung package từ DA-19 nhiệm vụ con 1 | PO (Hiếu) |
+| 25/10/2026 | Tạo story theo design MuJoCo 25/10/2026 mục 11.2 | PO (Hiếu) |
+| 25/10/2026 | Viết lại theo design chia làn: chuyển sang làn Vòng; tách `timing` sang DA-15, client RTC sang DA-19 | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

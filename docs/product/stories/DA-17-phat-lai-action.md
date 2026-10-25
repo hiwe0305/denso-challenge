@@ -1,68 +1,69 @@
-# DA-17 · Phát lại action trên MuJoCo
+# DA-17 · Kiểm dữ liệu bằng phát lại action
 
 ## Trạng thái
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt 25/10/2026 theo design 25/10/2026) |
-| Người làm | Châu |
-| Story PRD | Story mới của [design 25/10/2026](../../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) mục 11.2 · Epic 9 |
-| Nhãn | [Adapter] · `epic:9` · `gate:G1` · `area:data` |
+| Trạng thái | Sẵn sàng (PO duyệt 25/10/2026; sửa theo design chia làn cùng ngày) |
+| Người làm | Thông |
+| Làn | Dữ liệu |
+| Story PRD | Story mới của [design MuJoCo 25/10/2026](../../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) và [design chia làn](../../superpowers/specs/2026-10-25-lanes-and-code-structure-design.md) · Epic 9 |
+| Nhãn | [Lõi] · `epic:9` · `gate:G1` · `area:data` |
 | Sprint | S1–S2 |
-| Ước lượng | 10 giờ (khoảng 8–12, ước lượng của SM) |
-| Phụ thuộc | DA-15 nhiệm vụ con 1 (MJCF tối thiểu). Code trên episode mẫu trong lúc chờ teleop thật |
+| Ước lượng | 9 giờ (khoảng 7–11, ước lượng của SM) |
+| Phụ thuộc | DA-25 (schema `ReplayReport`). Gọi `SimulatorAdapter.replay()` qua Protocol; trong lúc DA-15 chưa xong dùng simulator giả của testkit. PR `chore-restructure` (07 mục 3.6, hết 27/10) tạo khung package `flywheel-data` |
 
 ## Story
 
-Là kỹ sư dữ liệu, tôi muốn phát lại action của mọi episode trên MuJoCo, để biết dữ liệu đúng trước khi tốn GPU train.
+Là kỹ sư dữ liệu, tôi muốn mọi episode có action robot được phát lại và so với state đã ghi, để loại dữ liệu sai trước khi tốn GPU train.
 
 ## Tiêu chí chấp nhận
 
-1. Chế độ động học: đặt `qpos` theo state đã ghi từng khung; bắt sai ánh xạ khớp, sai đơn vị, vượt giới hạn khớp, tự va chạm, ảnh lệch thời gian với state; ra danh sách khung lỗi.
-2. Chế độ động lực học: từ state đầu, áp action đã ghi qua bộ điều khiển; đo sai lệch state theo thời gian và theo nhóm action, thời điểm đóng mở gripper, kết quả vị từ thành công khi phát lại.
-3. Video ghép cạnh nhau: phát lại so với video gốc của episode.
-4. Ngưỡng sai lệch động lực học hiệu chỉnh từ episode thành công (phân vị 99), như spec mục 4.4; episode trượt động học bị đánh dấu loại, trượt động lực học bị đánh dấu cho kỹ sư xem.
-5. Đầu ra là tệp JSON theo episode mà `qa` đọc được; phát lại được cả action dự đoán của policy từ cùng state đầu (cho Agent QA/QC, DA-20).
-6. Hiện thực `SimulatorAdapter.replay()` của `DensoMujocoSim`.
+1. Gọi `replay()` chế độ động học: liệt kê khung sai ánh xạ khớp, sai đơn vị, vượt giới hạn khớp, tự va chạm, ảnh lệch thời gian với state.
+2. Gọi `replay()` chế độ động lực học: sai lệch state theo thời gian và theo nhóm action, thời điểm đóng mở gripper, vị từ thành công khi phát lại.
+3. Ngưỡng hiệu chỉnh từ episode thành công (phân vị 99) trong `configs/data/replay.yaml`; trượt động học thì loại, trượt động lực học thì đánh dấu cho kỹ sư.
+4. Ra `ReplayReport` đúng schema; bước QA của release đọc report này.
+5. Phát lại được action dự đoán của policy từ cùng state đầu (đầu vào cho Agent QA/QC); video ghép cạnh nhau ngoài git.
 
 ## Nhiệm vụ
 
-- [ ] 1. Phát lại động học, danh sách khung lỗi (AC 1)
-- [ ] 2. Phát lại động lực học, sai lệch theo nhóm (AC 2)
-- [ ] 3. Video ghép (AC 3)
-- [ ] 4. Hiệu chỉnh ngưỡng trên episode thành công (AC 4)
-- [ ] 5. Tệp kết quả cho `qa`, phát lại action dự đoán, `replay()` (AC 5, 6)
+- [ ] 1. Động học và danh sách khung lỗi (AC 1)
+- [ ] 2. Động lực học và sai lệch theo nhóm (AC 2)
+- [ ] 3. Ngưỡng hiệu chỉnh và cấu hình (AC 3)
+- [ ] 4. `ReplayReport` và nối vào QA (AC 4)
+- [ ] 5. Phát lại action dự đoán, video (AC 5)
 
 ## Phạm vi file
 
 Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
 
-- `packages/flywheel-mujoco/src/flywheel_mujoco/replay/`
-- `packages/flywheel-mujoco/tests/replay/`
+- `packages/flywheel-data/src/flywheel/data/replay_check/`
+- `packages/flywheel-data/tests/unit/replay_check/`, `packages/flywheel-data/tests/contract/replay_check/`
+- `configs/data/replay.yaml`
 - `docs/g0/replay.md`
 
 ## Ghi chú cho người làm
 
-- Nguồn: [design 25/10](../../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) mục 5.4, 7.2; 03 mục 5.2 (`replay()`).
-- Cài lỗi cố ý vào episode mẫu (đảo dấu một khớp, sai đơn vị độ và radian, lệch 2 khung ảnh) để chứng minh phép kiểm bắt được.
-- Video egocentric chỉ phát lại được sau khi chuyển sang robot; không thuộc story này.
+- Nguồn: [design MuJoCo](../../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) mục 5.4; [design chia làn](../../superpowers/specs/2026-10-25-lanes-and-code-structure-design.md) mục 3.
+- Chỉ import nhân (`flywheel.contracts`, `flywheel.store`, `flywheel.testkit`); không import làn khác hay adapter (03 mục 7.3). Thiếu trường trong schema thì báo Hiếu mở PR hợp đồng, không thêm trường tạm.
+- Cấy lỗi vào episode mẫu (đảo dấu một khớp, sai đơn vị độ và radian, lệch 2 khung ảnh) để chứng minh phép kiểm bắt được.
 
 ## Kiểm thử
 
-- Ba lỗi cấy ở ghi chú đều bị bắt; episode sạch không bị đánh dấu.
-- Phát lại động học một demo DA-16 cho video khớp video gốc.
+- Ba lỗi cấy đều bị bắt; episode sạch không bị đánh dấu (chạy với simulator giả, không cần MuJoCo).
 
 ## Người phụ trách
 
-- Làm: Trần Trịnh Hoàng Châu
+- Làm: Dương Tiến Thông
 - Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
-- Bình luận: Hưng (MJCF), Thông (QA)
+- Bình luận: Hưng (`replay()`), Châu (Agent QA/QC đọc report)
 
 ## Change log
 
 | Ngày | Nội dung | Người |
 |---|---|---|
-| 25/10/2026 | Tạo story theo design 25/10/2026 mục 11.2 | PO (Hiếu) |
+| 25/10/2026 | Tạo story theo design MuJoCo 25/10/2026 mục 11.2 | PO (Hiếu) |
+| 25/10/2026 | Viết lại theo design chia làn: chuyển sang làn Dữ liệu; hàm `replay()` thuộc DA-15 | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

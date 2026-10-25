@@ -1,69 +1,71 @@
-# DA-16 · Teleop bàn phím trên MuJoCo
+# DA-16 · Teleop bàn phím trên ROS 2, ghi MCAP
 
 ## Trạng thái
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt 25/10/2026 theo design 25/10/2026) |
+| Trạng thái | Sẵn sàng (PO duyệt 25/10/2026; sửa theo design chia làn cùng ngày) |
 | Người làm | Hưng |
-| Story PRD | Story mới của [design 25/10/2026](../../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) mục 11.2 · Epic 9 |
+| Làn | Simulation |
+| Story PRD | Story mới của [design MuJoCo 25/10/2026](../../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) và [design chia làn](../../superpowers/specs/2026-10-25-lanes-and-code-structure-design.md) · Epic 9 |
 | Nhãn | [Adapter] · `epic:9` · `gate:G0` · `area:data` |
 | Sprint | S1 |
 | Ước lượng | 12 giờ (khoảng 10–15, ước lượng của SM) |
-| Phụ thuộc | DA-15 nhiệm vụ con 1 (MJCF tối thiểu); DA-01 cho định dạng episode, trong lúc chờ dùng episode mẫu của S1-08 |
+| Phụ thuộc | DA-15 nhiệm vụ con 1 (MJCF), DA-24 (node sim và bringup), DA-25 (bảng topic). Trong lúc chờ: viết `denso_sim.teleop` thuần Python và test trên MJCF tối thiểu |
 
 ## Story
 
-Là người thu dữ liệu, tôi muốn điều khiển robot DENSO trong MuJoCo bằng bàn phím và ghi ra episode đúng định dạng chung, để đội tự thu demo teleop cho các nhánh thí nghiệm.
+Là người thu dữ liệu, tôi muốn điều khiển robot DENSO trong sim bằng bàn phím và ghi bản ghi MCAP đúng bảng topic, để đội tự thu demo và đường dữ liệu giống robot thật.
 
 ## Tiêu chí chấp nhận
 
-1. Điều khiển theo đầu tay (EEF) qua IK; đế bằng vận tốc; cột nâng, gripper, đầu bằng phím riêng; chuyển chế độ theo nhóm action; bảng phím hiện trên màn hình.
-2. Ghi ở tần số điều khiển của `control_spec`; ảnh theo fps camera, mỗi khung có `t_image`; ghi ra episode bundle (03 mục 4) với `source = teleop_keyboard`, người điều khiển, hạt giống điều kiện, phiên bản MJCF.
-3. Phím kết thúc thành công hoặc thất bại; phím reset về trạng thái đầu của hạt giống; episode bị hủy giữa chừng vẫn ghi với lý do.
-4. Mỗi phiên ghi một mục sổ chi phí: phút người, số episode, số episode đạt vị từ thành công.
-5. Đo giờ người cho 20 demo thử trên Level 0 (design 25/10 mục 4.3); ghi trung bình và p90 phút mỗi demo đạt, đầu vào cho kế hoạch thu.
-6. Hướng dẫn cho người điều khiển trong `docs/g0/teleop-keyboard.md`.
+1. `denso_sim.teleop`: ánh xạ phím → lệnh đầu tay qua IK; đế bằng vận tốc; cột nâng, gripper, đầu bằng phím riêng; chuyển chế độ theo nhóm action; không phụ thuộc ROS.
+2. Node `denso_teleop` (ROS 2) dùng `denso_sim.teleop`, xuất lệnh theo bảng topic (design chia làn mục 6.4); bảng phím hiện trên màn hình.
+3. Launch `record.launch.py` ghi rosbag2 dạng MCAP đủ topic trong bảng; mỗi bản ghi kèm hạt giống điều kiện, người điều khiển, phiên bản MJCF, kết quả do người bấm (thành công, thất bại, hủy).
+4. Mỗi phiên ghi một mục sổ chi phí (phút người, số episode, số episode đạt vị từ thành công).
+5. Đo giờ người cho 20 demo thử trên Level 0: trung bình và p90 phút mỗi demo đạt.
+6. Hướng dẫn người điều khiển ở `docs/g0/teleop-keyboard.md`.
 
 ## Nhiệm vụ
 
-- [ ] 1. Bảng phím, IK đầu tay, chuyển chế độ (AC 1)
-- [ ] 2. Ghi episode bundle (AC 2, 3)
-- [ ] 3. Mục sổ chi phí mỗi phiên (AC 4)
-- [ ] 4. Thu 20 demo thử, đo giờ (AC 5)
-- [ ] 5. Hướng dẫn người điều khiển (AC 6)
+- [ ] 1. `denso_sim.teleop`: phím, IK đầu tay, chế độ (AC 1)
+- [ ] 2. Node `denso_teleop` (AC 2)
+- [ ] 3. Ghi MCAP và metadata (AC 3)
+- [ ] 4. Sổ chi phí mỗi phiên (AC 4)
+- [ ] 5. 20 demo thử, đo giờ, hướng dẫn (AC 5, 6)
 
 ## Phạm vi file
 
 Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
 
-- `packages/flywheel-mujoco/src/flywheel_mujoco/teleop/`
-- `packages/flywheel-mujoco/tests/teleop/`
+- `packages/denso-sim/src/denso_sim/teleop/`, `packages/denso-sim/tests/teleop/`
+- `ros2_ws/src/denso_teleop/`
+- `ros2_ws/src/denso_bringup/launch/record.launch.py`, `ros2_ws/src/denso_bringup/launch/teleop.launch.py`
 - `docs/g0/teleop-keyboard.md`, `docs/g0/ledger/DA-16.csv`
 
 ## Ghi chú cho người làm
 
-- Nguồn: [design 25/10](../../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) mục 4; 03 mục 4 (bundle); spec mục 4.1 (demo teleop là demo gốc).
-- Demo bàn phím chậm và giật hơn teleop thật; báo riêng, không dùng để nói số tuyệt đối về dữ liệu nhà máy.
-- Thiết bị khác (gamepad, SpaceMouse) cắm vào cùng giao diện sau; giữ lớp đọc thiết bị tách khỏi lớp ghi.
-- Không commit demo; dữ liệu nằm trong `fwdata/`.
+- Nguồn: [design MuJoCo](../../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) mục 4; [design chia làn](../../superpowers/specs/2026-10-25-lanes-and-code-structure-design.md) mục 6.
+- Chuyển MCAP thành episode bundle thuộc làn Dữ liệu (DA-03), không thuộc story này.
+- Demo bàn phím chậm và giật hơn teleop thật; báo riêng. Không commit bản ghi; dữ liệu ở `fwdata/`.
 
 ## Kiểm thử
 
-- Unit test: chuỗi phím giả cho ra chuỗi lệnh đúng; bundle ghi ra qua validate của `contracts`.
-- Phát lại động học (DA-17) một demo thử cho ra video khớp video gốc.
+- Chuỗi phím giả cho chuỗi lệnh đúng (test không cần ROS).
+- `launch_testing`: ghi 5 giây, MCAP có đủ topic trong bảng.
 
 ## Người phụ trách
 
 - Làm: Trần Ngọc Hưng
 - Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
-- Bình luận: Châu (phát lại), Thông (QA teleop)
+- Bình luận: Thông (MCAP)
 
 ## Change log
 
 | Ngày | Nội dung | Người |
 |---|---|---|
-| 25/10/2026 | Tạo story theo design 25/10/2026 mục 11.2 | PO (Hiếu) |
+| 25/10/2026 | Tạo story theo design MuJoCo 25/10/2026 mục 11.2 | PO (Hiếu) |
+| 25/10/2026 | Viết lại theo design chia làn: teleop qua ROS 2, ra MCAP thay cho ghi bundle trực tiếp | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
