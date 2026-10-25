@@ -4,7 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Đầu vào
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
-| 25/10/2026 | 0.3 | Theo [design ngày 25/10/2026](../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md): mục 2.1 thêm `flywheel-mujoco`, `flywheel-agentqa`, cột review thành người bình luận vì Hiếu duyệt duy nhất; mục 2.2 thêm DA-15…DA-23, DA-07 gộp vào DA-19, DA-10 gộp vào DA-15, DA-11 dời sau demo, DA-03, DA-06, DA-12 đổi theo MuJoCo; mục 2.3 tải mới; mục 3.4, 3.5 quy trình duyệt và merge | PO (Hiếu) |
+| 25/10/2026 | 0.3 | Theo [design ngày 25/10/2026](../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md): mục 2.1 thêm `flywheel-mujoco`, `flywheel-agentqa`, cột review thành người bình luận vì Hiếu duyệt duy nhất; mục 2.2 thêm DA-15…DA-23, DA-07 gộp vào DA-19, DA-10 gộp vào DA-15, DA-11 dời sau demo, DA-03, DA-06, DA-12 đổi theo MuJoCo; khung package `flywheel-psi0` thuộc DA-19, `flywheel-ingest` thuộc DA-22; mục 2.3 tải mới; mục 3.4, 3.5 quy trình duyệt và merge | PO (Hiếu) |
 | 24/10/2026 | 0.2 | Mục 2.1: thêm `scripts/g0/`, `docs/g0/` (chủ Hưng, review Hiếu); mục 3.2: bảng tổng hợp và sổ chi phí chung không sửa trong nhánh story | PO (Hiếu) |
 | 23/10/2026 | 0.1 | Bản đầu: bản đồ sở hữu đường dẫn, 14 story Pha A, quy trình git và Claude, cách theo dõi theo nhiệm vụ con | SM, PO |
 
@@ -84,10 +84,10 @@ Chủ sở hữu không có nghĩa là người duy nhất được sửa. Ngư�
 | DA-16 | Teleop bàn phím trong MuJoCo (đầu tay qua IK), ghi episode bundle, mục sổ chi phí mỗi phiên | Hưng | `flywheel-mujoco/teleop/` | DA-15 (code trên MJCF tối thiểu) | 10–15 | S1 |
 | DA-17 | Phát lại action động học và động lực học, video so sánh, ngưỡng hiệu chỉnh | Châu | `flywheel-mujoco/replay/` | DA-15 (code trên MJCF tối thiểu) | 8–12 | S1–S2 |
 | DA-18 | Egocentric thô → định dạng EgoDex cho stage 1, contract test bằng loader Ψ₀, stats | Long | `flywheel-ingest/egocentric/` | DA-01, DA-04 | 20–30 | S2–S3 |
-| DA-19 | Đọc code train của tác giả, lớp bọc log cho 3 stage (gồm phần DA-07), adapter train trên Colab | Hiếu | `flywheel-psi0/` phần trainer, `docs/g0/` | Không | 20–28 | S1–S2 |
+| DA-19 | Khung package `flywheel-psi0`; đọc code train của tác giả, lớp bọc log cho 3 stage (gồm phần DA-07), adapter train trên Colab | Hiếu | `flywheel-psi0/` khung và phần trainer, `docs/g0/` | Không | 20–28 | S1–S2 |
 | DA-20 | Agent QA/QC: serve Nemotron cục bộ, dựng hình từng stage, báo cáo HTML, bộ ca mẫu | Thông | `flywheel-agentqa/` | DA-19 cho log thật (code trên log giả) | 20–30 | S2–S3 |
 | DA-21 | Export LeRobot v3 từ v2.1, checklist chuẩn hóa trong contract test | Thông | `flywheel-ingest/export/` | DA-02 | 4–6 | S2 |
-| DA-22 | Đọc và phân tích dataset BTC, bộ đọc `BtcDatasetSource` | Thông | `flywheel-ingest/teleop/`, `docs/g0/` | Dataset từ BTC | 8–12 | S1 |
+| DA-22 | Khung package `flywheel-ingest`; đọc và phân tích dataset BTC, bộ đọc `BtcDatasetSource` | Thông | `flywheel-ingest/` khung và `teleop/`, `docs/g0/` | Dataset từ BTC | 8–12 | S1 |
 | DA-23 | Eval bất đồng bộ trên MuJoCo, log inference RTC, dòng thời gian | Châu | `flywheel-mujoco/eval/`, `flywheel-psi0/` phần policy | DA-15 (code trên policy giả) | 10–15 | S2 |
 
 File story DA-15…DA-23 nằm trong `docs/product/stories/` (bản 0.3). Việc chưa có chủ: cập nhật website và Pitch theo spec v10.3 (khoảng 10–15 giờ), cập nhật 00–02, 05, 06. Hiếu chọn người ở họp lập kế hoạch.

@@ -10,7 +10,7 @@
 | Nhãn | [Adapter] · `epic:9` · `area:data` |
 | Sprint | S2–S3 |
 | Ước lượng | 25 giờ (khoảng 20–30, ước lượng của SM) |
-| Phụ thuộc | DA-04 (che danh tính, cắt đoạn, pose); DA-01. Code trên đoạn EgoDex mẫu trong lúc chờ |
+| Phụ thuộc | DA-04 (che danh tính, cắt đoạn, pose); DA-01. Code trên đoạn EgoDex mẫu trong lúc chờ. Khung package: DA-22 nhiệm vụ con 1 |
 
 ## Story
 
@@ -65,6 +65,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 25/10/2026 | Tạo story theo design 25/10/2026 mục 11.2 | PO (Hiếu) |
+| 25/10/2026 | Phụ thuộc thêm khung package từ DA-22 nhiệm vụ con 1 | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
