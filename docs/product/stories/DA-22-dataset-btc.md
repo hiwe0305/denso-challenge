@@ -23,19 +23,23 @@ Là kỹ sư dữ liệu, tôi muốn biết dataset của BTC gồm gì và đ�
 3. Nếu robot trong dataset khớp robot DENSO tương đương: phát lại 5 episode bằng DA-17 và ghi kết quả.
 4. Kết luận: dataset bù được bao nhiêu phần trong 100–200 demo cần cho E1 (design 25/10 mục 4.3), còn phải thu bao nhiêu bằng bàn phím.
 5. Dữ liệu ở máy cục bộ, không lên Colab hay dịch vụ ngoài khi chưa có quyền (design 25/10 mục 9). Ghi chi phí vào `docs/g0/ledger/DA-22.csv`, cột theo [docs/g0/README.md](../../g0/README.md).
+6. Khung package `flywheel-ingest` (nhiệm vụ con 1, mở PR riêng trong 2 ngày đầu): `pyproject.toml`, `src/flywheel_ingest/__init__.py`, README ghi thư mục nào thuộc story nào (`teleop/`, `export/` của Thông; `egocentric/` của Long, gồm DA-18); tạo lại `uv.lock` bằng lệnh uv lock; `uv run pytest` chạy được trên package rỗng. Story khác viết vào package này chờ PR khung merge, trong lúc chờ code trong thư mục của mình trên nhánh riêng.
 
 ## Nhiệm vụ
 
-- [ ] 1. Kiểm kê dataset (AC 1)
-- [ ] 2. `BtcDatasetSource` và QA (AC 2)
-- [ ] 3. Phát lại mẫu nếu robot khớp (AC 3)
-- [ ] 4. Kết luận số demo còn thiếu (AC 4)
-- [ ] 5. Sổ chi phí (AC 5)
+- [ ] 1. Khung package `flywheel-ingest`, mở PR riêng (AC 6)
+- [ ] 2. Kiểm kê dataset (AC 1)
+- [ ] 3. `BtcDatasetSource` và QA (AC 2)
+- [ ] 4. Phát lại mẫu nếu robot khớp (AC 3)
+- [ ] 5. Kết luận số demo còn thiếu (AC 4)
+- [ ] 6. Sổ chi phí (AC 5)
 
 ## Phạm vi file
 
 Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
 
+- `packages/flywheel-ingest/pyproject.toml`, `packages/flywheel-ingest/README.md`, `packages/flywheel-ingest/src/flywheel_ingest/__init__.py`
+- `uv.lock`: chỉ tạo lại bằng lệnh uv lock sau khi rebase (07 mục 3.2 điểm 5)
 - `packages/flywheel-ingest/src/flywheel_ingest/teleop/btc/`
 - `packages/flywheel-ingest/tests/teleop/`
 - `docs/g0/btc-dataset.md`, `docs/g0/ledger/DA-22.csv`
@@ -61,6 +65,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 25/10/2026 | Tạo story theo design 25/10/2026 mục 11.2 | PO (Hiếu) |
+| 25/10/2026 | Thêm AC 6 và nhiệm vụ con 1: story này tạo khung package `flywheel-ingest` vì là story chạy sớm nhất dùng package; các nhiệm vụ con cũ lùi một số | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

@@ -10,7 +10,7 @@
 | Nhãn | [Adapter] · `epic:9` · `area:sim` |
 | Sprint | S2 |
 | Ước lượng | 12 giờ (khoảng 10–15, ước lượng của SM) |
-| Phụ thuộc | DA-15 (env), S1-04 AC 8 (độ trễ trên 3060). Code trên `FakePolicy` có độ trễ giả trong lúc chờ |
+| Phụ thuộc | DA-15 (env), S1-04 AC 8 (độ trễ trên 3060). Code trên `FakePolicy` có độ trễ giả trong lúc chờ. Khung package: DA-19 nhiệm vụ con 1 |
 
 ## Story
 
@@ -63,6 +63,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 25/10/2026 | Tạo story theo design 25/10/2026 mục 11.2 | PO (Hiếu) |
+| 25/10/2026 | Phụ thuộc thêm khung package từ DA-19 nhiệm vụ con 1 | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
