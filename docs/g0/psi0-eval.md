@@ -139,14 +139,34 @@ Giao thức `act()` đọc từ cấu hình run, chưa đo trên server thật (
 5. `envs.txt` của run có token đã che một phần của tác giả. Không chép file này vào tài liệu hay log.
 6. flash-attn chưa cài trên máy dev; Ψ₀ tự dùng SDPA. Trên 5090 image đã có flash-attn; nếu không chạy thì ghi lại (nhiệm vụ con 2.1).
 
-### 2.4 Việc còn lại trên máy 5090
+### 2.4 Chạy trên máy 3060, 25/10/2026
+
+Máy: RTX 3060 12 GB, driver 550.163.01 (CUDA 12.4), RAM 94 GB, Ubuntu 22.04, Docker có runtime `nvidia` (NVIDIA Container Toolkit 1.20.1), Docker Compose v5.6.1. Chạy bằng `PSI0_RUNTIME=docker`, `FW_UID`, `FW_GID` = 1000.
+
+| Kiểm | Kết quả |
+|---|---|
+| `setup` | Đạt: clone Ψ₀ ở `cda3fdf`, image ghim đã có (32,4 GB khi giải nén) |
+| `fetch --weights` | Đạt: `ckpt_40000/model.safetensors` 6,25 GB, khoảng 1 phút |
+| `check` | Đạt sau ba bản sửa dưới đây: CUDA có, RTX 3060 12,4 GB, flash-attn có, `fits_gpu_bf16: true` (báo cáo `fwdata/psi0/smoke/check-20261025T134246.json` trên máy 3060) |
+| `serve` | Chưa: hết VRAM khi đưa model lên GPU vì một container Isaac Sim khác (`phyrc-2027:isaac-6.0.1`) đang giữ 7,6 GB. Lúc lỗi PyTorch mới cấp 2,61 GiB, GPU còn 422 MiB trống. Chạy lại khi GPU trống |
+
+Ba lỗi đã sửa:
+
+1. **Thư mục `fwdata/` thuộc root.** Container chạy trước khi có bản clone Ψ₀, Docker tự tạo nguồn bind mount bằng root, rồi `git clone` không ghi được. Script nay dừng ở chế độ Docker nếu chưa có bản clone.
+2. **`assert load_dotenv()` thất bại trong container.** `load_dotenv` tìm `.env` từ `/workspace/src` đi lên; compose nay mount `.env` của bản clone vào `/workspace/.env`, chỉ đọc.
+3. **CUDA error 804 ("forward compatibility was attempted on non supported HW").** Image dựng trên CUDA 12.9 (`NVIDIA_REQUIRE_CUDA=cuda>=12.9`), driver máy là 550, nên toolkit đặt `libcuda` forward-compat của image (575.57.08) lên trước; card GeForce không dùng được thư viện này. `nvidia-smi` trong container vẫn chạy, chỉ torch lỗi. Compose nay đặt `LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/usr/local/cuda/lib64` để nạp `libcuda` của driver máy trước. torch 2.7.0+cu126 chạy được trên driver 550 nhờ tương thích trong dòng CUDA 12; đã thử nhân ma trận bf16 trên GPU. `check` nay báo lỗi khi `DEVICE` là `cuda` mà torch không thấy GPU.
+
+Giới hạn: số đo trên 3060 chỉ để tham khảo cho AC 4. p99 độ trễ làm nền cho τ_lat phải đo trên máy chạy thí nghiệm. SIMPLE và Ψ₀ cùng chạy trên một card 12 GB sẽ thiếu VRAM.
+
+### 2.5 Việc còn lại trên máy 5090
 
 ```bash
-PSI0_RUNTIME=docker bash scripts/g0/serve_psi0.sh setup
-PSI0_RUNTIME=docker bash scripts/g0/serve_psi0.sh fetch --weights
-PSI0_RUNTIME=docker bash scripts/g0/serve_psi0.sh check
-PSI0_RUNTIME=docker bash scripts/g0/serve_psi0.sh serve
-PSI0_RUNTIME=docker bash scripts/g0/eval_psi0.sh smoke --calls 5
+export FW_UID=$(id -u) FW_GID=$(id -g) PSI0_RUNTIME=docker
+bash scripts/g0/serve_psi0.sh setup
+bash scripts/g0/serve_psi0.sh fetch --weights
+bash scripts/g0/serve_psi0.sh check
+bash scripts/g0/serve_psi0.sh serve
+bash scripts/g0/eval_psi0.sh smoke --calls 5
 ```
 
-Lệnh cuối chạy ở terminal khác, sau khi server in `Server listens on 0.0.0.0:22085`. Cần NVIDIA container toolkit trên máy 5090; nếu chưa có thì bỏ `PSI0_RUNTIME=docker` (venv) và ghi lại giới hạn ở mục 2.3 ý 2. `check` trên 5090 phải báo `fits_gpu_bf16: true`. Smoke đạt thì mới chạy nhiệm vụ con 2.3 (VRAM, p99 độ trễ) và 3.
+Lệnh cuối chạy ở terminal khác, sau khi server in `Server listens on 0.0.0.0:22085`. Cần NVIDIA container toolkit trên máy 5090; nếu chưa có thì bỏ `PSI0_RUNTIME=docker` (venv) và ghi lại giới hạn ở mục 2.3 ý 2. Trước khi chạy, kiểm GPU không bị tiến trình khác chiếm (`nvidia-smi`). `check` trên 5090 phải báo `fits_gpu_bf16: true`. Smoke đạt thì mới chạy nhiệm vụ con 2.3 (VRAM, p99 độ trễ) và 3.
