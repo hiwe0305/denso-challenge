@@ -1,6 +1,6 @@
 # Design: robot DENSO trên MuJoCo, pipeline dữ liệu theo stage và Agent QA/QC
 
-_Ngày 25/10/2026. Trạng thái: **đã duyệt** (trưởng nhóm, 25/10/2026), chưa có code. Tài liệu này đổi trọng tâm của [spec v10.2](../../spec-v10-failure-to-data.md) và [design ngày 23/10/2026](2026-10-23-data-pipeline-and-failure-eval-design.md); phần bị thay liệt kê ở mục 13. Đã đưa vào spec v10.3, 03 bản 0.5, 04, 07, 08, RULE và file story ngày 25/10/2026._
+_Ngày 25/10/2026. Trạng thái: **đã duyệt** (trưởng nhóm, 25/10/2026), chưa có code. Tài liệu này đổi trọng tâm của [spec v10.2](../../spec-v10-failure-to-data.md) và [design ngày 23/10/2026](2026-10-23-data-pipeline-and-failure-eval-design.md); phần bị thay liệt kê ở mục 13. Đã đưa vào spec v10.3, 03 bản 0.5, 04, 07, 08, RULE và file story ngày 25/10/2026 Người làm ở mục 11 và cấu trúc package đã được thay bởi [design chia làn](2026-10-25-lanes-and-code-structure-design.md)._
 
 Quy ước: **[Đã chốt]** là câu trả lời của trưởng nhóm (Hiếu) ngày 25/10/2026. **[Đề xuất]** là lựa chọn của người viết, cần duyệt. **[Option]** là nhiều phương án song song, chờ thông tin. Số liệu chưa đo ghi là ước lượng.
 
