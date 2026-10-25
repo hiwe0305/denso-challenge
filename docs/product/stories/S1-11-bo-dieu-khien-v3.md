@@ -4,12 +4,13 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (SM tạo 22/10/2026 theo 02 bản 0.3; PO duyệt ở họp lập kế hoạch S1) |
+| Trạng thái | Hủy (25/10/2026) |
+| Lý do hủy | Theo [design 25/10/2026](../../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) mục 11.1: không còn V3 vì teleop, planner và policy chạy cùng bộ điều khiển trên MuJoCo; V3 chỉ quay lại khi phát triển G1 |
 | Người làm | Hưng |
 | Story PRD | 1.9 · Epic 1 (story mới ở 02 bản 0.3, tách từ AC 5 cũ của 1.5) |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:sim` · `spike` |
 | Sprint | S1. **Bảng đối chiếu xong trước ngày 5 (thứ Sáu 30/10/2026).** Thử T1 và T2 song song tuần 1–2; chốt tuyến cuối tuần 2 ở review G0, chậm nhất S2 ngày 3 |
-| Ước lượng | 18 giờ: Hưng 12 (bảng đối chiếu, T1, kết luận), Châu 6 (T2) |
+| Ước lượng | 0 giờ (hủy; trước đó 18 giờ) |
 | Phụ thuộc | Bước 1 không cần S1-02 (đọc cấu hình và mã SIMPLE). Thử T1, T2 cần S1-02. Dùng số liệu datagen của S1-05. Chặn 5.5, 5.1, 6.3, 6.4, 7.4, 7.11 |
 
 ## Story
@@ -27,15 +28,15 @@ Là kỹ sư simulation, tôi muốn biết rollout motion planning có cùng b�
 
 ## Nhiệm vụ
 
-- [ ] 1. Bảng đối chiếu (AC 1, 2), xong trước ngày 5
-  - [ ] 1.1 Đọc cấu hình env, robot, bộ điều khiển của task chính và task MP; ghi bảng có nguồn
-  - [ ] 1.2 Làm tương tự cho cặp F1
-  - [ ] 1.3 Báo kết luận sơ bộ trong check-in thứ Sáu ngày 5; V3 âm thì báo Hiếu ngay
-- [ ] 2. Nếu cùng bộ điều khiển hoặc có ánh xạ: ghi ánh xạ, đề xuất `embodiment_id`, đóng 5.5 (AC 3)
-- [ ] 3. Nếu khác: Hưng thử T1 (AC 4)
-- [ ] 4. Nếu khác: Châu thử T2 trong 6 giờ (AC 4)
-- [ ] 5. Ghi kịch bản V3 âm cộng Q6 âm (AC 5)
-- [ ] 6. Viết kết luận, đề xuất tuyến cho review G0 kèm đề xuất cho 03 §3.3, nháp `configs/embodiments/` (AC 6)
+- ~~1. Bảng đối chiếu (AC 1, 2), xong trước ngày 5~~
+  - ~~1.1 Đọc cấu hình env, robot, bộ điều khiển của task chính và task MP; ghi bảng có nguồn~~
+  - ~~1.2 Làm tương tự cho cặp F1~~
+  - ~~1.3 Báo kết luận sơ bộ trong check-in thứ Sáu ngày 5; V3 âm thì báo Hiếu ngay~~
+- ~~2. Nếu cùng bộ điều khiển hoặc có ánh xạ: ghi ánh xạ, đề xuất `embodiment_id`, đóng 5.5 (AC 3)~~
+- ~~3. Nếu khác: Hưng thử T1 (AC 4)~~
+- ~~4. Nếu khác: Châu thử T2 trong 6 giờ (AC 4)~~
+- ~~5. Ghi kịch bản V3 âm cộng Q6 âm (AC 5)~~
+- ~~6. Viết kết luận, đề xuất tuyến cho review G0 kèm đề xuất cho 03 §3.3, nháp `configs/embodiments/` (AC 6)~~
 
 ## Phạm vi file
 
@@ -75,6 +76,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 |---|---|---|
 | 22/10/2026 | Tạo story từ 02 · 1.9 (bản 0.3), tách V3 khỏi S1-05 theo 06 mục 1; hạn ngày 5, thử T1 và T2 song song, chốt cuối tuần 2 | SM (Bob) theo 06 |
 | 24/10/2026 | Thêm mục Phạm vi file. AC 6: đề xuất dòng V3 ghi trong file kết quả, Hiếu gom vào 03 §3.3 ở review G0; chạy `datagen_probe.sh` của S1-05, không sửa | PO (Hiếu) |
+| 25/10/2026 | Hủy: không còn V3 vì teleop, planner và policy chạy cùng bộ điều khiển trên MuJoCo; V3 chỉ quay lại khi phát triển G1. Nhiệm vụ con gạch bỏ, không xóa nội dung | PO (Hiếu) theo design 25/10/2026 |
 
 ## Ghi chép khi làm
 
