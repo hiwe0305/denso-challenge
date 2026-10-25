@@ -4,9 +4,9 @@ Hướng dẫn cho Claude Code (và người) làm việc trong repo này. Độ
 
 ## Dự án
 
-Đề xuất của đội ilovephysicalintelligence cho thử thách DENSO Factory Hacks. Lõi là **thuật toán Failure → Data**: khi policy robot hỏng trong mô phỏng, kiểm lỗi hệ thống trước, rồi chọn dữ liệu cần thu theo chi phí thật, có đối chứng. Model là Ψ₀ (dùng lại checkpoint của tác giả). Robot chính là mobile manipulator của DENSO trong Isaac Sim, task lấy linh kiện từ khay đặt vào máy; G1 trong SIMPLE là bàn thử.
+Đề xuất của đội ilovephysicalintelligence cho thử thách DENSO Factory Hacks. Lõi là **thuật toán Failure → Data**: khi policy robot hỏng trong mô phỏng, kiểm lỗi hệ thống trước, rồi chọn dữ liệu cần thu theo chi phí thật, có đối chứng. Model là Ψ₀ (dùng lại checkpoint của tác giả). Robot chính là mobile manipulator của DENSO trên MuJoCo, task lấy linh kiện từ khay đặt vào máy; mọi thí nghiệm có đối chứng chạy trên robot này. SIMPLE chỉ là benchmark G0; Isaac Sim thêm sau demo (design 25/10/2026).
 
-Trạng thái: thiết kế đã duyệt, **chưa có code**. Package `packages/` sẽ được tạo ở story S1-01.
+Trạng thái 25/10/2026: S1-01 đã merge (khung `packages/`, CLI `fw`, CI); hướng MuJoCo đã duyệt, Sprint 1 bắt đầu 26/10/2026.
 
 ## Đọc gì trước
 
@@ -15,6 +15,7 @@ Trạng thái: thiết kế đã duyệt, **chưa có code**. Package `packages/
 | Bất kỳ việc gì | File story của mình trong `docs/product/stories/`, rồi [07 · Chia việc và quy trình git](docs/product/07-team-workflow.md) |
 | Thuật toán, giả thuyết, thí nghiệm | [Spec v10.2](docs/spec-v10-failure-to-data.md) |
 | Module lõi, adapter, schema, cây thư mục | [03 · Kiến trúc](docs/product/03-architecture.md) |
+| Robot DENSO trên MuJoCo, teleop bàn phím, phát lại action, pipeline theo stage, LeRobot v2.1/v3, Agent QA/QC, quy trình duyệt | [Design 25/10/2026](docs/superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) (thắng design 23/10 ở phần trùng) |
 | Pipeline dữ liệu, synthetic, NIM, probe theo stage, bảng lỗi, robot DENSO | [Design 23/10/2026](docs/superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md) |
 | Ai làm gì, sprint, Definition of Done | [04 · Kế hoạch](docs/product/04-delivery-plan.md) |
 | Rule kiểm soát theo ngày, báo lỗi, nhãn nguyên nhân | [08 · Kiểm soát dự án theo ngày](docs/product/08-daily-control.md) |
@@ -37,7 +38,7 @@ Khi tài liệu mâu thuẫn: spec và design thắng PRD (02); 03 thắng mọi
 - Commit: dòng đầu `<story-id>/<nhiệm vụ con>: <việc đã làm, tiếng Anh, thể mệnh lệnh>`, ví dụ `S1-01/2.1: Add fw --version with git SHA`. Thân commit ghi AC liên quan, bằng chứng, và dòng cuối `Time-spent: <giờ>h` (giờ tập trung thực của nhiệm vụ con, ví dụ `Time-spent: 1.5h`). Khi viết commit hộ người dùng, hỏi họ số giờ thay vì tự đoán.
 - Việc ngoài story dùng nhánh `docs-…`, `chore-…` hoặc `hotfix-…`. Nhánh `docs-…` chỉ được sửa tài liệu và website.
 - Trước khi mở PR, chạy `python3 scripts/pr_guard.py --base origin/master --head HEAD --branch "$(git branch --show-current)"`; workflow `pr-guard` chạy lại đúng kiểm tra này và chặn PR nếu sai (08 mục 3, rule R6).
-- Mỗi người commit bằng tài khoản git của chính mình. Không push thẳng lên `master`; luôn qua PR.
+- Mỗi người commit bằng tài khoản git của chính mình. Không push thẳng lên `master`; luôn qua PR. Hiếu là người duyệt và merge duy nhất; không tạo nhánh từ nhánh chưa merge, dùng bản giả và file mẫu trong lúc chờ.
 - Trước khi mở PR: `git fetch origin && git rebase origin/master`, chạy lại kiểm tra. Không force-push nhánh của người khác.
 - Không commit: dữ liệu (`fwdata/`), checkpoint (`*.ckpt`, `*.safetensors`, `*.pt`), PDF trong `docs/references/papers/`, file `.env`, khóa API.
 

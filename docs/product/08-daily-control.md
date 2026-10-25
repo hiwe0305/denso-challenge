@@ -4,6 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Trưởng n
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 25/10/2026 | 0.2 | Theo [design ngày 25/10/2026](../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) mục 10: Hiếu là người duyệt và merge duy nhất, R2 đổi hành động (mục 3.2); thêm lịch tracking tự động và tổng kết cuối ngày (mục 5, 7) | PO (Hiếu) |
 | 23/10/2026 | 0.1 | Bản đầu: quy ước dữ liệu, chỉ số, 9 rule, phân loại lỗi, nhịp, sổ can thiệp, công cụ | SM, PO |
 
 ## 1. Mục đích và nguyên tắc
@@ -55,7 +56,7 @@ Time-spent: 2.5h
 | # | Điều kiện | Phát hiện bởi | Hành động | Ai |
 |---|---|---|---|---|
 | R1 | CI trên `master` đỏ | Báo cáo ngày | Ngừng merge; người gây lỗi sửa trong 4 giờ hoặc revert | Người gây lỗi; Long theo dõi |
-| R2 | PR chờ review quá 1 ngày làm việc | Báo cáo ngày | Người review dự phòng (07 mục 2.1) nhận; quá 2 ngày thì nêu ở check-in | Người review; Thông |
+| R2 | PR chờ review quá 1 ngày làm việc | Báo cáo ngày, tracking tự động | Bản 0.2: Hiếu duyệt hoặc ghi lý do chờ dưới PR; tổng kết 21:30 xếp thứ tự duyệt, ưu tiên PR đang chặn người khác; quá 2 ngày thì nêu ở check-in. Không còn người review dự phòng | Hiếu; Thông |
 | R3 | Một người có quá 2 PR đang mở | Báo cáo ngày | Không mở story mới tới khi về ≤ 2 | Người làm |
 | R4 | Story đã bắt đầu, không có commit 2 ngày làm việc | Báo cáo ngày | Ghi vào issue của story đang bị chặn ở đâu; Thông gỡ hoặc báo Hiếu | Người làm; Thông |
 | R5 | k của một người (7 ngày) > 1,3 | Báo cáo ngày | Xét chuyển phần trễ sang API theo từng phần (06 mục 11.8); nếu không chuyển được, ước lại story | Hiếu, Thông |
@@ -94,6 +95,8 @@ Lỗi kỹ thuật của chính flywheel (D1–D8, T1–T8, O1–O4, R1–R6 ở
 | Trước 10:00 | Mỗi người trả lời dưới báo cáo 3 dòng: **Xong**, **Tiếp theo**, **Bị chặn** | Cả đội |
 | Trong ngày | Xử lý rule đã kích hoạt theo cột "Hành động" | Theo cột "Ai" |
 | Thứ Sáu | Thông tổng hợp tuần: xu hướng k, top nguyên nhân lỗi, can thiệp mới ở mục 6, đề xuất chỉnh ngưỡng | Thông |
+| 10:00, 14:00, 18:00 mỗi ngày (bản 0.2) | Tracking tự động trên máy của Hiếu (scheduled task `denso-tracking` của Claude desktop, chỉ đọc): chạy `daily_report.py`, `pr_guard.py` cho từng nhánh, liệt kê PR chờ Hiếu, ai bị chặn, vi phạm rule; ghi `~/denso-tracking/YYYY-MM-DD-HHMM.md` | Tự động |
+| 21:30 mỗi ngày (bản 0.2) | Tổng kết cuối ngày (`denso-cuoi-ngay`): việc đã xong, PR chờ duyệt kèm thứ tự đề xuất, rủi ro, câu hỏi cần Hiếu quyết; Hiếu và Claude thảo luận | Tự động, Hiếu |
 | Review mỗi cổng G | Xem lại ngưỡng và hệ số k của đội cho quyết định ở 04 mục 4.8–4.9 | Hiếu, Thông |
 
 ## 6. Sổ can thiệp
@@ -113,6 +116,7 @@ Mỗi lần R7 hoặc R8 kích hoạt, thêm một dòng. Đây là chỗ các "
 | Trang Tiến độ | Hiển thị báo cáo ngày mới nhất: rule kích hoạt, theo người, PR, story | `website/dist/progress.html`; dữ liệu `data/progress.json` sinh khi build Pages |
 | Label | Tạo đủ label ở mục 4 và 07 mục 3.5 | `bash scripts/setup_labels.sh` (chạy một lần, cần `gh` đã đăng nhập) |
 | Tiến độ story tại máy | In tiến độ nhiệm vụ con theo story | `python3 scripts/progress.py` |
+| Tracking và tổng kết cuối ngày (bản 0.2) | Đọc repo và GitHub, không đăng gì; báo cáo nằm trên máy của Hiếu | `~/.claude/scheduled-tasks/denso-tracking/`, `denso-cuoi-ngay/`; báo cáo ở `~/denso-tracking/` |
 
 Chạy thử báo cáo tại máy (không có token thì bỏ qua phần GitHub API):
 
