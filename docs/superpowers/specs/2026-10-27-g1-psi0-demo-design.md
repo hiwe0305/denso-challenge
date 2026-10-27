@@ -1,6 +1,6 @@
 # Design: demo G1 + Ψ₀ trên SIMPLE, thí nghiệm dữ liệu egocentric và data flywheel đầy đủ
 
-_Ngày 27/10/2026. Trạng thái: **đã duyệt hướng** (trưởng nhóm, 27/10/2026, sau buổi gặp DENSO), chưa có code. Tài liệu này là design hiện hành duy nhất. Nó thay ba design cũ (23/10 về pipeline dữ liệu và robot DENSO; 25/10 về MuJoCo và Agent QA/QC; 25/10 về chia làn); phần còn dùng được của ba tài liệu đó đã chép vào đây, phần còn lại bị bỏ (mục 14). Ba file cũ đã xóa khỏi repo; xem lại bằng `git log --all -- docs/superpowers/specs/`. Đã đưa vào spec v10.4, 01 bản 0.5, 02 bản 0.5, 03 bản 0.7, 04 bản 0.7, 07 bản 0.5, RULE, CLAUDE.md, README và file story ngày 27/10/2026. **Sửa cùng ngày** sau khi trưởng nhóm làm rõ: hệ thống có ba loại dữ liệu cố định (egocentric, teleop, synthetic); dataset của tác giả, bàn phím và sinh tự động chỉ là nguồn để test hiện giờ (mục 0 ý 3, mục 1, 2, 5, 6.6, 7.8, 11, 13)._
+_Ngày 27/10/2026. Trạng thái: **đã duyệt hướng** (trưởng nhóm, 27/10/2026, sau buổi gặp DENSO), chưa có code. Tài liệu này là design hiện hành duy nhất. Nó thay ba design cũ (23/10 về pipeline dữ liệu và robot DENSO; 25/10 về MuJoCo và Agent QA/QC; 25/10 về chia làn); phần còn dùng được của ba tài liệu đó đã chép vào đây, phần còn lại bị bỏ (mục 14). Ba file cũ đã xóa khỏi repo; xem lại bằng `git log --all -- docs/superpowers/specs/`. Đã đưa vào spec v10.4, 01 bản 0.5, 02 bản 0.5, 03 bản 0.7, 04 bản 0.7, 07 bản 0.5, RULE, CLAUDE.md, README và file story ngày 27/10/2026. **Sửa cùng ngày** sau khi trưởng nhóm làm rõ: hệ thống có ba loại dữ liệu cố định (egocentric, teleop, synthetic); dataset của tác giả, bàn phím và sinh tự động chỉ là nguồn để test hiện giờ (mục 0 ý 3, mục 1, 2, 5, 6.6, 7.8, 11, 13). Thêm mục 6.7 (model phụ trợ, chép từ design chia làn 25/10/2026 đã xóa) và thông tin đầy đủ của model Agent QA/QC (mục 9.1, 9.4)._
 
 Quy ước: **[Đã chốt]** là quyết định của trưởng nhóm (Hiếu). **[Đề xuất]** là lựa chọn của người viết, cần duyệt. **[Option]** là nhiều phương án song song. Số liệu của tác giả paper ghi rõ là số tác giả báo; số chưa đo ghi là giả định hoặc ước lượng.
 
@@ -297,6 +297,79 @@ Egocentric đi cùng sáu tầng, khác ở tầng 1–4 và đích export:
 
 Episode egocentric không có action robot: chỉ vào stage 1, probe P1, P2 và làm mẫu cho bộ sinh; không bao giờ vào stage 3.
 
+### 6.7 Model phụ trợ cho các pipeline dữ liệu
+
+Ngoài Ψ₀, mỗi pipeline dùng một số model nhỏ để xử lý dữ liệu. Thông tin model tra ngày 25/10/2026 (khi trưởng nhóm hỏi so sánh Nemotron 3.5 Bolt E4B với Qwen3.5, RoboBrain 2.5, Molmo2, SmolVLM2, HY-Embodied); mọi điểm benchmark là số **tự công bố** của từng nhóm, chưa đo trên task của đội.
+
+**Nguyên tắc chọn** [Đề xuất ở design chia làn 25/10/2026, đã duyệt; chép lại vì file đó đã xóa]:
+
+- Trọng số mở, **chạy cục bộ** trên RTX 3060 12 GB, để giữ quy tắc `data_class`: dữ liệu DENSO sau này không rời máy.
+- Model và revision ghim trong `configs/models/`; dev và CI dùng model giả trong `flywheel.testkit`.
+- Model chỉ **gợi ý**; luật và người duyệt mẫu vẫn quyết. Mọi kết quả do model sinh ghi nguồn nhãn `model` kèm tên và revision.
+- Chọn cuối cùng bằng một vòng thử trên dữ liệu của đội (mục 6.7.4), không chọn theo benchmark công bố.
+
+#### 6.7.1 Bảng so sánh
+
+| Model | Nhận gì | Kích thước | Mạnh ở (tác giả báo) | Giấy phép | Trên RTX 3060 12 GB |
+|---|---|---|---|---|---|
+| Nemotron 3.5 Bolt E4B 4GB | Chữ (theo NVIDIA; trang Ollama ghi có ảnh, hai nguồn mâu thuẫn) | 8B tổng, 4B hiệu dụng | Hội thoại, gọi tool, ngữ cảnh 64K | OpenMDW-1.1 | Có, bản Q4 khoảng 3–4 GB |
+| Qwen3.5-2B, 4B | Chữ, ảnh | 2B, 4B | VLM tổng quát; Qwen báo hơn Qwen3-VL về hiểu ảnh; ngữ cảnh 262K | Apache 2.0 | Có, bản lượng tử khoảng 2–3 GB |
+| RoboBrain 2.5-4B | Ảnh, video | 4B, kiến trúc Qwen3-VL | Không gian 3D có độ sâu, quỹ đạo thao tác 3D, ước tiến độ task theo từng khung | Xem model card | Có |
+| Molmo2-4B | Ảnh, video | 4B, LLM Qwen3, SigLIP 2 | Chỉ điểm và theo dõi vật trong video, đếm | Apache 2.0 (dữ liệu xem riêng) | Có |
+| SmolVLM2-2.2B | Ảnh, video | 2,2B | Nhẹ (5,2 GB khi xử lý video); Video-MME 52,1 | Apache 2.0 | Có |
+| HY-Embodied-0.5 (bản 2B) | Ảnh, video | 4B tổng, 2,2B hoạt động (Mixture-of-Transformers) | Suy luận không gian và hành động; đứng đầu 16/22 benchmark cùng cỡ | Xem model card | Có, trọng số khoảng 8 GB |
+
+#### 6.7.2 Chọn theo vai
+
+| Vai | Chọn | Lý do |
+|---|---|---|
+| VLM stage 1 của Ψ₀ | Giữ **Qwen3-VL-2B** | Action expert học trên đặc trưng của backbone này; đổi backbone là train lại stage 1 (khoảng 829 giờ video, tác giả báo) và stage 2, ngoài phạm vi 12 tuần. RoboBrain 2.5 cùng họ Qwen3-VL nhưng bản 4B khác kích thước ẩn, không lắp thẳng được |
+| Gợi ý ranh giới bước trong video egocentric (ước tiến độ task) | **RoboBrain 2.5-4B** | Ước tiến độ theo từng khung; chạy cục bộ; thay vai của Cosmos Reason (cần GPU lớn) trong pipeline egocentric |
+| Theo dõi tay và vật, chỉ điểm gắp trong video egocentric | **Molmo2-4B** | Chỉ điểm và theo dõi vật trong video |
+| Sinh và kiểm cặp hỏi đáp cho probe P1 | RoboBrain 2.5-4B, có người duyệt | Hiểu không gian; P1 cần đáp án đúng, nên người duyệt mọi câu |
+| Đối chứng cho probe P1 | RoboBrain 2.5-4B hoặc HY-Embodied-0.5 | Cho thấy Qwen3-VL-2B của Ψ₀ yếu hơn mức có thể ở loại câu hỏi nào |
+| Lọc thô, tóm tắt video nhanh | SmolVLM2-2.2B | Rẻ nhất, yếu nhất về không gian; chỉ dùng để lọc đoạn không có tay hay vật |
+| Agent QA/QC đọc log và báo cáo | **Nemotron 3.5 Bolt E4B 4GB** [Đã chốt 25/10] | Việc là đọc số và chữ, gọi tool; xem mục 9 |
+| Agent QA/QC nhìn hình | **Qwen3.5-4B**, tùy chọn | Nemotron không nhìn được; chỉ thêm khi trưởng nhóm muốn agent tự xem hình (câu Q-M) |
+| Egocentric với Nemotron | **Không dùng** | Nemotron chỉ đọc chữ |
+
+#### 6.7.3 Model theo từng pipeline
+
+| Pipeline | Bước | Model hoặc công cụ | Chạy ở đâu | Trạng thái |
+|---|---|---|---|---|
+| Egocentric | Che danh tính | Model phát hiện mặt và chữ (thẻ tên, màn hình) rồi làm mờ; người kiểm mẫu đặt `verified` | Cục bộ | Model cụ thể chọn khi làm DA-04 [Để lại cho người làm] |
+| Egocentric | Lọc thô | SmolVLM2-2.2B | Cục bộ | Tùy chọn |
+| Egocentric | Gợi ý ranh giới bước | RoboBrain 2.5-4B; luật trước, model khi luật mơ hồ | Cục bộ | Chốt sau vòng thử |
+| Egocentric | Theo dõi tay, vật, điểm gắp | Molmo2-4B | Cục bộ | Chốt sau vòng thử |
+| Egocentric | Pose tay 3D (E-A, video tự quay) | Model hand pose từ RGB | Cục bộ | Chọn khi làm DA-04 [Để lại cho người làm] |
+| Egocentric | Tư thế camera (E-A) | Thư viện visual SLAM | Cục bộ | Chọn khi làm DA-04 [Để lại cho người làm] |
+| Egocentric | Pose (E-B, EgoDex) | Không cần model; đọc tracking có sẵn | | |
+| Teleop | Cắt đoạn | Luật (bàn tay đóng mở, vận tốc thân); không cần model | | |
+| Teleop | Phát lại action | MuJoCo của SIMPLE | Cục bộ | |
+| Synthetic S1 | Lập quỹ đạo | cuRobo (hai tay), script đi bộ hoặc AMO | Cục bộ | Theo V3 |
+| Synthetic S2 | Biến đổi đoạn teleop | IK của SIMPLE, lệnh vận tốc tới WBC | Cục bộ | |
+| Synthetic S3 (sau demo) | Đổi ngoại hình | Cosmos Transfer qua NIM | NIM tự host (A100 thuê) hoặc API hosted với dữ liệu `public` | Sau demo |
+| Synthetic S4 (sau PoC) | Video task mới | Cosmos Predict qua NIM; action suy ra bằng inverse dynamics model | Như trên | Sau PoC |
+| Synthetic S3, S4 | Lọc mẫu sai vật lý | Cosmos Reason qua NIM | Như trên | Sau demo |
+| Đánh giá | Probe P1 | Qwen3-VL-2B của Ψ₀ (đối tượng đo); RoboBrain hoặc HY-Embodied làm đối chứng | Cục bộ | |
+| Đánh giá | Agent QA/QC | Nemotron 3.5 Bolt E4B 4GB; Qwen3.5-4B tùy chọn | Cục bộ | Mục 9 |
+
+**NVIDIA NIM** (sau demo, cho S3, S4): hai phương án triển khai, chọn theo `data_class`:
+
+| | N-A · API hosted | N-B · NIM tự host |
+|---|---|---|
+| Nơi chạy | build.nvidia.com hoặc endpoint NVIDIA quản lý | Container NIM trên máy đội hoặc máy thuê |
+| Dữ liệu được gửi | Chỉ `public` | Mọi `data_class` |
+| Nhược | Model có thể bị ngừng (API hosted của Cosmos Reason1-7B ngừng 24/03/2026) | Cần GPU lớn: Reasoner bản nano khoảng 23 GB; Generator bản nano 58 GB BF16, khoảng 31 GB khi offload (nên chạy trên A100 80 GB thuê) |
+
+`NimClient` định tuyến theo `data_class`: `restricted`, `internal` chỉ đi N-B; mỗi lời gọi ghi `LedgerEntry` (giây video, token, GPU-giây) và phiên bản model.
+
+**Bộ nhớ trên 3060** (ước lượng, chưa đo): mỗi model 4B ở bản lượng tử cần vài GB, nên chạy **lần lượt theo job**, không giữ cùng lúc với server Ψ₀. Lịch chạy model do runner xếp; đo VRAM thật ở vòng thử.
+
+#### 6.7.4 Vòng thử trước khi chốt
+
+Trước khi chốt model gán nhãn và model nhìn hình: một vòng thử 4–6 giờ (ước lượng) trong DA-04 và DA-20, trên 30 khung EgoDex mẫu, 30 khung render SIMPLE của task hai bàn và bộ câu hỏi P1. Đo: độ đúng câu hỏi đáp, sai số ranh giới bước (số khung), tỉ lệ chỉ đúng điểm gắp, VRAM và độ trễ trên 3060. Kết quả ghi `Decision`.
+
 ## 7. Thí nghiệm HE: dữ liệu egocentric giảm demo robot cần
 
 ### 7.1 Giả thuyết
@@ -422,14 +495,16 @@ job dữ liệu / train / eval / infer ─► code tính số và dựng hình �
 
 | Điểm | Quyết định |
 |---|---|
-| Model | Nemotron 3.5 Bolt E4B 4GB chạy cục bộ trên 3060, ghim revision [Đã chốt 25/10] |
+| Model | Nemotron 3.5 Bolt E4B 4GB [Đã chốt 25/10]: NVIDIA, ra 23/10/2026; dựng trên Gemma-4-E4B-it; 8B tham số tổng, 4B hiệu dụng; ngữ cảnh 64K; chỉ đọc chữ theo tài liệu NVIDIA (trang Ollama ghi có ảnh, mâu thuẫn); gọi được tool; bản Q4 khoảng 3–4 GB VRAM; giấy phép OpenMDW-1.1. Chạy cục bộ trên 3060 (service `llm-serve`, API kiểu OpenAI), ghim revision [Đề xuất]; dev và CI dùng model giả của testkit |
+| Vì sao | Việc là đọc số và chữ có cấu trúc, so ngưỡng, xếp hạng, viết đề xuất; model nhỏ cục bộ giữ dữ liệu trong máy, gần như không tốn tiền mỗi lần chạy |
+| Prompt, tool | Prompt trong `configs/eval/agentqa/` có hash; đổi prompt là phiên bản mới và phải chấm lại. Chỉ tool đọc artifact theo ID [Đề xuất]; log dài được code tóm tắt theo cửa sổ để vừa 64K |
 | Phạm vi | Báo cáo dataset (mục 6.5), log train, output từng stage, log inference, kết quả eval |
 | Không được | Đọc `vault/`; tự chạy job; tự chọn dữ liệu; đưa số không có trong đầu vào |
 | Số liệu | Mọi con số do code tính; agent diễn giải, xếp hạng, viết đề xuất và trích số |
 | Ước lượng | Có khoảng, được lưu; khi có kết quả đo thì so lại để biết agent đáng tin tới đâu |
 | Đầu ra | Báo cáo HTML tĩnh mỗi job: phát hiện, bằng chứng (đường dẫn hình và số), insight, đề xuất; kỹ sư ghi đồng ý hoặc ghi đè kèm lý do |
 
-Nemotron chỉ đọc chữ: agent đọc metadata, số và chú thích đi kèm hình do code dựng, không nhìn ảnh hay video. Qwen3.5-4B là tùy chọn nếu trưởng nhóm muốn agent tự xem hình.
+Nemotron chỉ đọc chữ: agent đọc metadata, số và chú thích đi kèm hình do code dựng, không nhìn ảnh hay video. Qwen3.5-4B (Apache 2.0, nhận ảnh, bản lượng tử khoảng 2–3 GB) qua endpoint thứ hai là tùy chọn nếu trưởng nhóm muốn agent tự xem hình (câu Q-M), chấm bằng cùng bộ ca mẫu và bộ lỗi cấy.
 
 ### 9.2 Bộ lỗi cấy: demo hiệu suất trước khi train [Đã chốt có demo trên dữ liệu; cách làm là Đề xuất]
 
@@ -462,7 +537,7 @@ Log train và log inference cấy lỗi sinh từ `FakeTrainer` và log RTC gi�
 
 ### 9.4 Kiểm agent
 
-Trước khi dùng trên log thật: chạy bộ lỗi cấy ở mục 9.2 làm bộ ca mẫu; chạy lại khi đổi model hoặc prompt; lưu kết quả có hash.
+Trước khi dùng: bộ ca mẫu ≥ 10 ca có đáp án (log train bình thường, loss phân kỳ, chiều action chết, độ trễ vượt ngưỡng, chunk giật) và bộ lỗi cấy ở mục 9.2; chạy lại khi đổi model hoặc prompt; lưu kết quả có hash. Sau khi có log thật: chạy trên log fine-tune và eval của HE, báo riêng với kết quả trên lỗi cấy; mỗi vòng so ước lượng của agent với kết quả đo.
 
 ## 10. Định nghĩa lỗi
 
@@ -584,6 +659,8 @@ Người làm do Product Owner giao sau [Đã chốt]. Bảng dưới chỉ ghi 
 | Q-27F | Đội có mua bộ PICO không? | Hiếu | Nguồn teleop thứ hai (mục 4.4) |
 | Q-27G | Video egocentric tự quay: thiết bị nào (điện thoại, camera đội đầu, mượn Vision Pro), bao nhiêu giờ, mấy người? | Hiếu, mentor | Độ tin pose (E-A hay E-B), giá trị của fine-tune stage 1 (mục 7.8) |
 | Q-27H | Tập con EgoDex nào để test (task gần gắp và đặt), bao nhiêu giờ? | Người làm DA-04 | Thời gian chạy pipeline và lần chạy stage 1 ngắn |
+| Q-M | Agent QA/QC có cần tự nhìn hình không (thêm Qwen3.5-4B)? | Hiếu | Model và chi phí của Agent QA/QC (mục 9.1) |
+| Q-27I | Model che danh tính, hand pose và SLAM cụ thể cho video tự quay | Người làm DA-04 | Chất lượng pose E-A (mục 6.7.3) |
 | Q0 | Checkpoint `pre.*`, `postpre.*` nào đã xác nhận không thấy dữ liệu task hai bàn? | Hiếu hỏi PSI Lab | Ghi giới hạn cho HE và E1 (spec mục 2.4) |
 
 **Lựa chọn của người viết** (cần Hiếu xem khi duyệt): task hai bàn của SIMPLE thay cảnh tự dựng (mục 3); bước L-WALK (mục 3); quy tắc render (mục 4.2); cách cắm bàn phím (mục 5.2); hai tuyến sinh tự động (mục 5.3); lưới, seed và quy tắc diễn giải của HE (mục 7); Colab cho mọi dữ liệu public (mục 8.4); HE báo ở chế độ đồng bộ (mục 8.5); tỉ lệ cấy lỗi và cách chấm (mục 9.2); kịch bản demo (mục 11); danh sách story (mục 13).

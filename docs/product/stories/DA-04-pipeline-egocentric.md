@@ -51,7 +51,8 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 - Nguồn: design 27/10 mục 5.0, 6.6; spec mục 2.5; 02 FR50, NFR13; 03 mục 5.4 (dòng "Nguồn egocentric").
 - Episode egocentric không có action robot: không bao giờ vào stage 3 (có test ở release).
-- Model hand pose, SLAM và model gợi ý cắt đoạn phải chạy cục bộ; ghi model và revision trong `configs/`.
+- Model (design 27/10 mục 6.7): RoboBrain 2.5-4B gợi ý ranh giới bước (ước tiến độ task); Molmo2-4B theo dõi tay, vật và điểm gắp; SmolVLM2-2.2B lọc thô (tùy chọn). Model che danh tính, hand pose và SLAM chọn khi làm story này (câu Q-27I). Mọi model chạy cục bộ trên 3060, lần lượt theo job; ghi model và revision trong `configs/models/`; dev và CI dùng model giả.
+- Vòng thử 4–6 giờ (ước lượng) trước khi chốt model gán nhãn: 30 khung EgoDex, 30 khung render SIMPLE của task hai bàn; đo sai số ranh giới bước (số khung), tỉ lệ chỉ đúng điểm gắp, VRAM, độ trễ; ghi `Decision`.
 - Xuất sang định dạng stage 1 của Ψ₀ thuộc DA-18, không thuộc story này.
 - Chỉ import nhân; không import làn khác hay adapter (03 mục 7.3).
 
