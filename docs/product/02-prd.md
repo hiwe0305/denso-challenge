@@ -37,7 +37,7 @@ Chỉ số giá trị chính (06 mục 10), báo ở 7.8 và 8.4: số demo ngư
 
 - **Vấn đề.** Khi humanoid hỏng một task, đội robot đoán nguyên nhân từ video và log, rồi thường chọn thu thêm teleop. Không ai biết trước một lần sửa tốn bao nhiêu công (00, mục 2).
 - **Sản phẩm.** Lõi data flywheel quyết định sau mỗi lỗi: sửa hệ thống hay bổ sung loại dữ liệu nào, bao nhiêu, tốn bao nhiêu. Model, simulator, robot và task là phần cắm. Câu định vị (06 mục 6): quy trình vận hành có kiểm toán cho vòng lỗi → dữ liệu, loại lỗi hệ thống trước khi tiêu tiền vào dữ liệu, chọn giữa nhiều loại can thiệp theo chi phí thật kể cả chi phí chẩn đoán, và xuất **khuyến nghị thu dữ liệu định lượng** cho DENSO. Data Core cộng SOP gọi là **"DENSO Data Model"** như tên đề.
-- **Recipe đầu tiên.** Ψ₀ + SIMPLE / Unitree G1 trong mô phỏng. Task chính `G1WholebodyBendPickAndPlaceTeleop-v0`, bộ điều khiển là decoupled WBC (`g1_sonic`, env `SonicLocoManipEnv`); AMO là bộ điều khiển của pipeline motion planning. Task dự phòng F1 là cặp `G1WholebodyBendPick*`: dự phòng cho Q1 và phép thử tổng quát của lõi; **không** là dự phòng cho Q2 cho tới khi story 1.9 xác nhận cặp task của F1 cùng bộ điều khiển.
+- **Recipe đầu tiên.** Ψ₀ + SIMPLE / Unitree G1 trong mô phỏng. Task chính (bản 0.5) `G1WholebodyLocomotionPickBetweenTablesTeleop-v0`, thay `G1WholebodyBendPickAndPlaceTeleop-v0` của bản trước; bộ điều khiển là decoupled WBC (`g1_sonic`, env `SonicLocoManipEnv`); AMO là bộ điều khiển của pipeline motion planning. Task dự phòng F1 là cặp `G1WholebodyBendPick*`: dự phòng cho Q1 và phép thử tổng quát của lõi; **không** là dự phòng cho Q2 cho tới khi story 1.9 xác nhận cặp task của F1 cùng bộ điều khiển.
 - **Recipe chính (bản 0.5).** Ψ₀ + SIMPLE / G1, task hai bàn `G1WholebodyLocomotionPickBetweenTablesTeleop-v0`. Dùng checkpoint của tác giả, chỉ fine-tune stage 3. Dữ liệu robot từ dataset của tác giả, teleop bàn phím và sinh tự động; thu và sinh ở chế độ MuJoCo thuần của SIMPLE, Isaac Sim chỉ render. Bản 0.4 (robot DENSO trong Isaac Sim) đã bỏ.
 - **Bằng chứng.** Đã kiểm: gói dữ liệu task chính có trên psi-data (108 MB). Chưa kiểm: tái tạo số của Ψ₀, fine-tune trên GPU của đội, V3, HS, HT, HD. Số kinh tế trong pitch là giả định.
 - **Người dùng trong 12 tuần.** Chính 5 thành viên đội (kỹ sư robot learning, simulation, data) và giám khảo đọc báo cáo. Operator teleop và chủ công đoạn là người dùng của L1–L2.
@@ -193,7 +193,7 @@ Nguyên tắc:
 ```text
 packages/flywheel/          lõi: contracts, store, 12 module, testing (contract test), cli (lệnh fw)
 packages/flywheel-fakes/    adapter giả, task đồ chơi
-packages/flywheel-tasks/    TaskDefinition: G1BendPickAndPlace, G1BendPick (task dự phòng F1)
+packages/flywheel-tasks/    TaskDefinition: G1LocomotionPickBetweenTables (bản 0.5), G1BendPick (task F1)
 packages/flywheel-simple/   SimpleSimulator, SimpleMPGenerator, SimpleTeleop
 packages/flywheel-psi0/     Psi0Policy, Psi0Trainer
 packages/flywheel-lerobot/  LeRobotPolicy, LeRobotTrainer (ACT, Diffusion Policy)

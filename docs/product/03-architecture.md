@@ -168,7 +168,7 @@ Giữ nguyên 12 module và 6 package. Tên module là ranh giới trách nhiệ
 | Đầu ra đánh giá | `eval_stats.txt` và video theo episode `episode_<i>/<camera>_{success hoặc failed}.mp4` | Như trên |
 | Điều kiện ban đầu | `Task.reset(seed, options)` dựng một `Layout`; `state_dict()` và `load_state_dict()` tuần tự hóa layout để tái hiện đúng khi replay hoặc đánh giá; `check_success()` và `decompose()` (ra `SubtaskSpec`) có sẵn | [Task](https://psi-lab.ai/SIMPLE/docs/core/task.html) |
 | Ngẫu nhiên hóa | `DRManager` gồm `TargetDR`, `DistractorDR`, `SpatialDR`, `MaterialDR`, `LightingDR`, `TabletopSceneDR`, `CameraDR`, `LanguageDR`. `DRManager.load_state_dict(state_dict, dr_level)` cho phép giữ layout đã ghi và chỉ ngẫu nhiên lại một phần. Tập đánh giá là thư mục LeRobot có `meta/episodes.jsonl` | [Domain randomization](https://psi-lab.ai/SIMPLE/docs/dr/index.html) |
-| Bộ điều khiển của task chính | Task `*Teleop-v0` (gồm `G1WholebodyBendPickAndPlaceTeleop-v0`) chạy trên `SonicLocoManipEnv`, robot `g1_sonic`, stack GR00T decoupled WBC, agent `psi0_decoupled_wbc`. Task `*MP-v0` chạy trên `LocoManipulationEnv`, robot `g1_wholebody`, thân dưới AMO. **Vì vậy System-0 của task chính là decoupled WBC `g1_sonic`, không phải AMO; AMO là bộ điều khiển của pipeline MP.** Kiểm hệ thống nhắm stack WBC, "lệnh gửi" và "trạng thái đo" theo giao diện WBC (mục 5.2) | [G1 Decoupled](https://psi-lab.ai/SIMPLE/docs/tasks/g1_decoupled.html), [G1 MP (AMO)](https://psi-lab.ai/SIMPLE/docs/tasks/g1_mp_amo.html) |
+| Bộ điều khiển của task chính | Task `*Teleop-v0` (gồm task chính `G1WholebodyLocomotionPickBetweenTablesTeleop-v0`, bản 0.7) chạy trên `SonicLocoManipEnv`, robot `g1_sonic`, stack GR00T decoupled WBC, agent `psi0_decoupled_wbc`. Task `*MP-v0` chạy trên `LocoManipulationEnv`, robot `g1_wholebody`, thân dưới AMO. **Vì vậy System-0 của task chính là decoupled WBC `g1_sonic`, không phải AMO; AMO là bộ điều khiển của pipeline MP.** Kiểm hệ thống nhắm stack WBC, "lệnh gửi" và "trạng thái đo" theo giao diện WBC (mục 5.2) | [G1 Decoupled](https://psi-lab.ai/SIMPLE/docs/tasks/g1_decoupled.html), [G1 MP (AMO)](https://psi-lab.ai/SIMPLE/docs/tasks/g1_mp_amo.html) |
 | Sinh dữ liệu motion planning | `uv run datagen simple/<task>MP-v0 --sim-mode=mujoco_isaac ...`, dùng `CuRoboPlanner`; chỉ ghi episode thành công (`clear_episode_buffer()` bỏ episode hỏng); xuất LeRobot | [Motion Planning](https://psi-lab.ai/SIMPLE/docs/data_gen_mp.html) |
 | Ψ₀: cài đặt, train, serve | Python 3.11, torch 2.7 cu12, `flash_attn==2.7.4.post1`; fine-tune `scripts/train/psi0/finetune-simple-psi0.sh <task>`; khuyên batch toàn cục 128; serve `serve_psi0 --port 22085 --run-dir ... --ckpt-step ... --action-exec-horizon=24 --rtc`; checkpoint trên HF `USC-PSI-Lab/psi-model`, thư mục `psi0/` có `pre.*`, `postpre.*`, `sonic-checkpoints/`, `simple-checkpoints/` (05 TH12). Hai thư mục cuối chỉ dùng tái tạo số công bố ở G0 (mục 8.3); giấy phép mã Apache 2.0 | [README Ψ₀](https://github.com/physical-superintelligence-lab/Psi0) |
 | psi-data | Tổng 469 GB; chưa có dataset card, **không ghi giấy phép**. `simple/` có 18 file zip (task chính 107.703.398 byte). `simple-eval/` có 25 file zip, của task chính là 378.554 byte | [psi-data](https://huggingface.co/datasets/USC-PSI-Lab/psi-data), API cây thư mục của HF |
@@ -398,7 +398,7 @@ sequenceDiagram
   participant SCO as scorer
   participant QA as qa
   participant LED as ledger
-  E->>CLI: fw import psi-data --task G1WholebodyBendPickAndPlaceTeleop-v0 --revision ghim
+  E->>CLI: fw import psi-data --task G1WholebodyLocomotionPickBetweenTablesTeleop-v0 --revision ghim
   CLI->>CAT: tải zip, sha256, Source kèm giấy phép, tách LeRobot thành bundle, gán embodiment
   CAT->>SCN: trích layout và vector c cho từng episode
   SCN-->>CAT: Condition, split train theo SplitPlan
@@ -659,7 +659,7 @@ Artifact giữa các làn (Pydantic model trong `flywheel.contracts`, lưu trong
 name: g5-holdout-psi0
 purpose: holdout                  # g0_repro, e1, branch_train, aa_test, round, holdout, hd
 site_id: local                    # cột thường, mặc định local
-task: {id: g1_bend_pick_place, version: 1.0.0}
+task: {id: g1_locomotion_pick_between_tables, version: 1.0.0}   # bản 0.7: task hai bàn
 embodiment: g1_sonic_dwbc@1       # decoupled WBC, System-0 của task chính; chốt sau V3
 code: {git_sha: "<40 ký tự>", dirty: false}
 images: {simple: "ghcr.io/physical-superintelligence-lab/simple@sha256:<digest>", psi0: "...psi0@sha256:<digest>"}
