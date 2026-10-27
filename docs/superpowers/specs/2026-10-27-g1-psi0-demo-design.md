@@ -1,6 +1,6 @@
 # Design: demo G1 + Ψ₀ trên SIMPLE, thí nghiệm dữ liệu egocentric và data flywheel đầy đủ
 
-_Ngày 27/10/2026. Trạng thái: **đã duyệt hướng** (trưởng nhóm, 27/10/2026, sau buổi gặp DENSO), chưa có code. Tài liệu này là design hiện hành duy nhất. Nó thay ba design cũ (23/10 về pipeline dữ liệu và robot DENSO; 25/10 về MuJoCo và Agent QA/QC; 25/10 về chia làn); phần còn dùng được của ba tài liệu đó đã chép vào đây, phần còn lại bị bỏ (mục 14). Ba file cũ đã xóa khỏi repo; xem lại bằng `git log --all -- docs/superpowers/specs/`. Đã đưa vào spec v10.4, 01 bản 0.5, 02 bản 0.5, 03 bản 0.7, 04 bản 0.7, 07 bản 0.5, RULE, CLAUDE.md, README và file story ngày 27/10/2026._
+_Ngày 27/10/2026. Trạng thái: **đã duyệt hướng** (trưởng nhóm, 27/10/2026, sau buổi gặp DENSO), chưa có code. Tài liệu này là design hiện hành duy nhất. Nó thay ba design cũ (23/10 về pipeline dữ liệu và robot DENSO; 25/10 về MuJoCo và Agent QA/QC; 25/10 về chia làn); phần còn dùng được của ba tài liệu đó đã chép vào đây, phần còn lại bị bỏ (mục 14). Ba file cũ đã xóa khỏi repo; xem lại bằng `git log --all -- docs/superpowers/specs/`. Đã đưa vào spec v10.4, 01 bản 0.5, 02 bản 0.5, 03 bản 0.7, 04 bản 0.7, 07 bản 0.5, RULE, CLAUDE.md, README và file story ngày 27/10/2026. **Sửa cùng ngày** sau khi trưởng nhóm làm rõ: hệ thống có ba loại dữ liệu cố định (egocentric, teleop, synthetic); dataset của tác giả, bàn phím và sinh tự động chỉ là nguồn để test hiện giờ (mục 0 ý 3, mục 1, 2, 5, 6.6, 7.8, 11, 13)._
 
 Quy ước: **[Đã chốt]** là quyết định của trưởng nhóm (Hiếu). **[Đề xuất]** là lựa chọn của người viết, cần duyệt. **[Option]** là nhiều phương án song song. Số liệu của tác giả paper ghi rõ là số tác giả báo; số chưa đo ghi là giả định hoặc ước lượng.
 
@@ -8,7 +8,7 @@ Quy ước: **[Đã chốt]** là quyết định của trưởng nhóm (Hiếu)
 
 1. **Demo ngày 17/11/2026 dùng đúng robot và model của paper**: Unitree G1 trong SIMPLE, Ψ₀ với checkpoint của tác giả [Đã chốt]. Robot DENSO trên MuJoCo bị bỏ hẳn [Đã chốt].
 2. **Cảnh chính là hai bàn**: G1 gắp vật ở bàn này, đi sang bàn kia, đặt vật lên đó. SIMPLE có sẵn đúng task này, `G1WholebodyLocomotionPickBetweenTablesTeleop-v0`, kèm dữ liệu teleop và checkpoint công bố (mục 3).
-3. **Thu dữ liệu trên sim, giảm compute của Isaac Sim**: vật lý và thu dữ liệu chạy MuJoCo thuần (`--sim-mode=mujoco`); Isaac Sim chỉ render lại khi cần ảnh đẹp hoặc so với số công bố. Nguồn dữ liệu robot: dataset có sẵn của tác giả, teleop bằng bàn phím (đội tự viết, vì SIMPLE chỉ hỗ trợ kính PICO), và sinh tự động bằng motion planning (mục 4, 5).
+3. **Thu dữ liệu trên sim, giảm compute của Isaac Sim**: vật lý và thu dữ liệu chạy MuJoCo thuần (`--sim-mode=mujoco`); Isaac Sim chỉ render lại khi cần ảnh đẹp hoặc so với số công bố. Hệ thống có **ba loại dữ liệu cố định: egocentric của người, teleop, synthetic** [Đã chốt]. Nguồn để test mỗi loại thay đổi theo thời gian: trước hết là dữ liệu công bố và sim (mẫu EgoDex; dataset teleop của tác giả và teleop bàn phím trong SIMPLE, vì SIMPLE chỉ hỗ trợ kính PICO; synthetic S1 và S2 trong SIMPLE), rồi video egocentric đội tự quay, về sau là dữ liệu DENSO (mục 4, 5).
 4. **Giả thuyết mới HE**: dữ liệu egocentric của người giúp Ψ₀ cần ít demo robot hơn. Kiểm bằng ba checkpoint ablation mà tác giả đã công bố (có EgoDex, 10% EgoDex, không EgoDex), fine-tune ở nhiều mức demo, ra đường cong success theo số demo. Paper chưa có đường cong này (mục 7).
 5. **Data flywheel xây đủ kiến trúc**, gồm cả xử lý và chuẩn hóa dataset (6 tầng: Ingest → Normalize → Annotate → QA → Release → Export) [Đã chốt] (mục 6).
 6. **Agent QA/QC demo trên dữ liệu thật có cài lỗi**: cấy lỗi có đáp án vào dataset của tác giả, đo precision và recall theo loại lỗi. Có số đo thật trước khi đội train model; sau khi train thì chạy trên log và output thật (mục 9).
@@ -25,7 +25,16 @@ Ngày 27/10/2026 trưởng nhóm gặp DENSO và chốt bốn ý:
 | 3 | Bằng chứng | Chứng minh điều Ψ₀ nói: dữ liệu egocentric của người giúp cần ít dữ liệu robot hơn mà hiệu quả cao hơn; benchmark rõ như paper, video demo rõ; chạy trên dataset có sẵn, rồi trên dataset tự xây ở ý 2; cảnh hai bàn |
 | 4 | Data flywheel | Ưu tiên xây đủ kiến trúc, gồm xử lý và chuẩn hóa dataset; Agent QA/QC có demo trên dữ liệu (giả định trước khi train, phân tích trên dữ liệu thật sau); demo được toàn bộ luồng và hiệu suất |
 
-Cùng ngày trưởng nhóm chốt thêm: bỏ hẳn robot DENSO trên MuJoCo; xóa tài liệu và story lỗi thời; chưa sửa website và hai file PowerPoint; sửa tài liệu trên nền nhánh `docs-denso-mujoco-pivot`.
+Cùng ngày trưởng nhóm làm rõ thêm [Đã chốt]:
+
+| # | Câu hỏi | Trả lời |
+|---|---|---|
+| 5 | Dữ liệu của hệ thống là gì | Vẫn là ba loại: egocentric của người, teleop, synthetic. Dataset của tác giả, bàn phím, sinh tự động chỉ là cách có dữ liệu hiện giờ để test từng loại cho cả data flywheel và model |
+| 6 | Nguồn egocentric để test | Mẫu EgoDex, cộng video đội tự quay |
+| 7 | Egocentric với model tới mức nào | Làm và chứng minh hệ thống trên dữ liệu công bố trước; còn thời gian thì dùng dữ liệu egocentric đội thu |
+| 8 | Synthetic trước demo | S1 và S2; S3, S4 sau demo |
+
+Trưởng nhóm cũng chốt: bỏ hẳn robot DENSO trên MuJoCo; xóa tài liệu và story lỗi thời; chưa sửa website và hai file PowerPoint; sửa tài liệu trên nền nhánh `docs-denso-mujoco-pivot`.
 
 **Những gì người viết kiểm ngày 27/10/2026** (tài liệu SIMPLE, README Ψ₀ ở commit `cda3fdf`, Hugging Face `USC-PSI-Lab`, paper arXiv 2603.12263):
 
@@ -51,20 +60,21 @@ Ba điều rút ra:
 **Mục tiêu**
 
 - M1. Tái tạo Ψ₀ trên task hai bàn trong SIMPLE, so với số công bố (G0).
-- M2. Ba nguồn dữ liệu robot cho task hai bàn: dataset của tác giả, teleop bàn phím, sinh tự động; cả ba ra cùng định dạng episode chung.
-- M3. Pipeline data flywheel đủ 6 tầng chạy trên cả ba nguồn, xuất LeRobot v2.1 đọc được bằng loader Ψ₀; có báo cáo dataset (số episode, pass, flag, reject, stats).
-- M4. Thí nghiệm HE: ba checkpoint ablation × lưới số demo, đường cong success theo số demo, trên dataset có sẵn rồi trên dataset tự xây; video rollout cạnh nhau.
+- M2. Ba loại dữ liệu có nguồn test cho task hai bàn: egocentric (mẫu EgoDex, sau đó video đội tự quay), teleop (dataset của tác giả, bàn phím), synthetic (S1, S2); cả ba ra cùng định dạng episode chung.
+- M3. Pipeline data flywheel đủ 6 tầng chạy trên cả ba loại: teleop và synthetic xuất LeRobot v2.1, egocentric xuất định dạng stage 1 của Ψ₀, đều đọc lại được bằng loader Ψ₀; có báo cáo dataset (số episode, pass, flag, reject, stats).
+- M4. Thí nghiệm HE: ba checkpoint ablation × lưới số demo, đường cong success theo số demo, trên dataset có sẵn rồi trên dataset tự xây; video rollout cạnh nhau. Đường đi egocentric → stage 1 chạy trọn trên EgoDex (mục 7.8).
 - M5. Agent QA/QC có số đo hiệu suất trên bộ lỗi cấy (dữ liệu, log train, log inference) trước khi train; chạy trên log thật sau khi train.
 - M6. Demo 17/11 chạy trọn một vòng: dữ liệu thô → QA → release → train hoặc chọn checkpoint → eval → thất bại → chẩn đoán → đề xuất dữ liệu → sổ chi phí.
 - M7. Giữ lộ trình 12 tuần của spec (HS, HT, HD) trên G1 sau demo.
 
 **Không làm**
 
-- Robot DENSO, MuJoCo riêng ngoài SIMPLE, ROS 2, dataset của BTC, video egocentric của nhà máy [Đã chốt: bỏ hẳn robot DENSO trên MuJoCo].
+- Robot DENSO, MuJoCo riêng ngoài SIMPLE, ROS 2 [Đã chốt: bỏ hẳn robot DENSO trên MuJoCo]. Dữ liệu DENSO (video nhà máy, teleop của DENSO, dataset BTC) là nguồn của giai đoạn sau, không có trong phạm vi demo.
 - Pretrain lại stage 1 hay post-train lại stage 2 từ đầu; chỉ fine-tune stage 3 từ checkpoint của tác giả.
 - Thiết bị PICO cho teleop; chỉ dùng khi đội tự mua (mục 4.4).
 - Website và Pitch trước khi chuẩn bị demo 17/11.
-- Synthetic tầng S3, S4 (Cosmos qua NIM) trước demo.
+- Synthetic tầng S3, S4 (Cosmos qua NIM) trước demo [Đã chốt].
+- Fine-tune stage 1 thành thí nghiệm trên dữ liệu công bố: trên EgoDex chỉ chạy ngắn để chứng minh đường đi; fine-tune thật chỉ với video đội tự quay (mục 7.8).
 
 **Phản mục tiêu** (vẫn chạy được nhưng coi là hỏng)
 
@@ -119,7 +129,27 @@ Kiểu lỗi giữ bảng spec mục 5.2, thêm **L-WALK** (dừng hoặc đi sa
 
 PICO không có trong kế hoạch. Nếu đội mua được bộ PICO 4 cùng tracker, dùng thẳng đường teleop của tác giả; bàn phím vẫn giữ để thu correction nhanh.
 
-## 5. Ba nguồn dữ liệu robot
+## 5. Ba loại dữ liệu và nguồn để test
+
+[Đã chốt] Hệ thống có ba loại dữ liệu cố định. Mỗi loại đi qua data flywheel và vào một phần của model. Chỉ nguồn để có dữ liệu thay đổi theo thời gian; thay nguồn không đổi pipeline hay model.
+
+| Loại | Nguồn bây giờ (công bố, sim) | Nguồn sau (khi còn thời gian) | Về sau | Vào model ở đâu |
+|---|---|---|---|---|
+| Egocentric của người | Mẫu EgoDex (mục 5.0) | Video đội tự quay người làm task hai bàn | Video công nhân DENSO | Stage 1 (VLM); thí nghiệm HE |
+| Teleop | Dataset của tác giả cho task hai bàn (mục 5.1); teleop bàn phím trong SIMPLE (mục 5.2) | | Teleop trên robot DENSO | Stage 3 |
+| Synthetic | S1 motion planning (mục 5.3); S2 biến thể từ đoạn teleop (mục 5.4) | | S3, S4 bằng Cosmos qua NIM | Stage 3, trộn ở nhánh B, C |
+
+### 5.0 Egocentric: mẫu EgoDex và video đội tự quay
+
+| Nguồn | Có gì | Pose tay và camera | `action_quality` |
+|---|---|---|---|
+| Mẫu EgoDex | Video Apple Vision Pro, có tracking tay và đầu; là dữ liệu Ψ₀ đã pretrain stage 1 | Đọc trực tiếp (E-B) | `retargeted` sau khi đổi sang định dạng của Ψ₀ |
+| Video đội tự quay [Đề xuất cách quay] | Điện thoại hoặc camera đội đầu, người làm task hai bàn: gắp ở bàn này, đi, đặt ở bàn kia | Ước lượng bằng model hand pose và SLAM (E-A) | `pseudo` |
+
+Ψ₀ đọc dữ liệu stage 1 qua `src/psi/data/egodex/egodex_dataset.py` (biến đổi khớp tay cộng video), stats bằng `scripts/data/calc_egodex_stats.py`, action 48 chiều theo pipeline tiền xử lý của H-RDT. Pipeline egocentric của đội phải xuất đúng định dạng này (mục 6.6).
+
+Giới hạn phải nêu: stage 1 học chuyển động bàn tay người, còn G1 cầm bằng bàn tay robot khác cấu trúc. Giá trị chính của egocentric nằm ở hình ảnh và cấu trúc task; tác dụng lên số demo robot đo bằng HE, không giả định.
+
 
 ### 5.1 Dataset có sẵn của tác giả
 
@@ -141,7 +171,7 @@ SIMPLE không có bàn phím, nên đội viết một **thiết bị bàn phím
 
 Giới hạn phải nêu: demo bàn phím chậm và kém mượt hơn PICO. Dùng tốt để so các phương pháp với nhau trên cùng nguồn, và để thu correction từ trạng thái lỗi; không dùng để nói số tuyệt đối về dữ liệu người thật. Đo giờ người cho 20 demo thử ở tuần đầu rồi mới chốt số demo cần thu.
 
-### 5.3 Sinh tự động
+### 5.3 Synthetic S1: sinh tự động bằng motion planning
 
 Hai tuyến, chọn bằng câu V3 (spec mục 2.4) ở G0 [Option]:
 
@@ -152,7 +182,19 @@ Hai tuyến, chọn bằng câu V3 (spec mục 2.4) ở G0 [Option]:
 
 Checkpoint `…locomotionpickbetweentablesmixed-v0` của tác giả gợi ý họ đã trộn hai nguồn cho đúng task này. Nhiệm vụ con đầu của S1-11 đọc `run_config.json` và `argv.txt` của checkpoint đó để biết họ trộn gì và qua bộ điều khiển nào, trước khi chọn tuyến.
 
-Sau demo: biến thể kiểu MimicGen từ đoạn teleop (tầng S2) và correction từ trạng thái lỗi đã lưu.
+### 5.4 Synthetic S2: biến thể từ đoạn teleop [Đã chốt S2 trước demo; cách làm là Đề xuất]
+
+| Phần | Cách làm |
+|---|---|
+| Đầu vào | Đoạn teleop đạt QA (psi-data, bàn phím), đã cắt theo bước ở tầng Annotate |
+| Biến đổi | Kiểu MimicGen: đoạn gần vật (tiếp cận, gắp, đặt) biến đổi theo tư thế vật và vị trí bàn mới; đoạn đi bộ sinh lại bằng lệnh vận tốc tới WBC; nối các đoạn bằng IK của SIMPLE |
+| Correction | Từ trạng thái lỗi đã lưu của policy (cần Q3 có), sinh đoạn phục hồi bằng planner |
+| Chạy | Trong env Teleop của task hai bàn, decoupled WBC, `--sim-mode=mujoco`; đây là tuyến T2 của spec mục 10 |
+| Kiểm trước khi nhận | Chạy lại trong sim đạt; khoảng cách tới demo gốc ghi lại; trỏ về episode cha |
+| Ghi | `synthetic_tier = S2`, `action_quality = planned`, episode cha, tham số biến đổi |
+
+S1 và S2 mỗi tầng là một loại can thiệp riêng trong `decide`, có đơn giá và tỉ lệ sửa được riêng (spec mục 6.10).
+
 
 Mỗi episode sinh tự động ghi `source_kind = synthetic`, `synthetic_tier = S1`, `action_quality = planned`, tuyến và phiên bản planner. Không sinh với tham số của Level 1 hoặc Level 2 (spec mục 7.3).
 
@@ -243,7 +285,17 @@ Mỗi release có một trang HTML tĩnh: số episode theo nguồn, pass, flag,
 
 ### 6.6 Egocentric
 
-Thí nghiệm HE dùng checkpoint của tác giả nên **không cần** pipeline egocentric trước demo. Sau demo, nếu còn thời gian: nạp mẫu EgoDex qua cùng 6 tầng (`source_kind = egocentric`, không có action robot) để bộ probe P1, P2 có dữ liệu (mục 8.3).
+Egocentric đi cùng sáu tầng, khác ở tầng 1–4 và đích export:
+
+| Tầng | Việc |
+|---|---|
+| Ingest | Video, tracking tay và đầu nếu có (EgoDex); video tự quay kèm thông tin thiết bị |
+| Annotate | **Che danh tính trước mọi bước khác** (mặt, thẻ tên, màn hình; `deid_status`); cắt đoạn theo 6 bước của task hai bàn (luật trước, model gợi ý khi luật mơ hồ, người duyệt mẫu); câu lệnh ngôn ngữ mỗi đoạn |
+| Pose | E-B: đọc từ EgoDex. E-A: ước lượng từ RGB bằng model hand pose và SLAM, gắn `pseudo` |
+| QA riêng | Độ tin của pose, tỉ lệ tay ra khỏi khung, độ rung; so E-A với E-B trên cùng mẫu EgoDex (bỏ dữ liệu tracking) để biết pose ước lượng lệch bao nhiêu |
+| Export | Định dạng stage 1 của Ψ₀ (biến đổi khớp tay cộng mp4, `chunk_size`, `upsample_rate`, delta action như config gốc), stats; contract test bằng loader Ψ₀ |
+
+Episode egocentric không có action robot: chỉ vào stage 1, probe P1, P2 và làm mẫu cho bộ sinh; không bao giờ vào stage 3.
 
 ## 7. Thí nghiệm HE: dữ liệu egocentric giảm demo robot cần
 
@@ -303,13 +355,22 @@ Báo cáo theo khuôn bảng của paper (thành công trên số lượt, theo 
 
 HE dùng lại lưới E1 của spec mục 7.1 cho Ψ₀ (thêm biến thể V-NOEGO). Lưới chung giúp E1 và HE dùng chung một lần fine-tune V-EGO ở mỗi N. HS, HT, HD giữ nguyên và chạy sau demo.
 
+### 7.8 Egocentric → stage 1: hai tầng chứng minh
+
+[Đã chốt: chứng minh trên dữ liệu công bố trước, còn thời gian thì dùng dữ liệu đội thu.]
+
+| Tầng | Dữ liệu | Việc | Chứng minh gì |
+|---|---|---|---|
+| Trên dữ liệu công bố | Ba checkpoint ablation; mẫu EgoDex qua pipeline mục 6.6 | HE (mục 7.1–7.6); một lần chạy stage 1 ngắn (vài trăm bước, recipe `pretrain-egodex-psi0-fast.sh`, khởi tạo từ `pre.*`) trên dữ liệu pipeline xuất ra [Đề xuất] | HE: tác dụng của egocentric lên số demo robot. Lần chạy ngắn: đường đi dữ liệu → model chạy trọn, loss giảm, không lỗi định dạng. Đây không phải thí nghiệm |
+| Trên dữ liệu đội tự quay | Video người làm task hai bàn qua pipeline (E-A) | Fine-tune stage 1 từ `pre.*`, rồi stage 3 như các điểm HE | So với VLM gốc bằng P1 (hiểu cảnh hai bàn), P2, và closed-loop ở cùng N demo. Giữ fine-tune khi P1 hoặc closed-loop tốt lên mà P4 không tụt quá ngưỡng chốt trước |
+
 ## 8. Training, máy chạy và log
 
 ### 8.1 Code của tác giả
 
 | Stage | Code | Đội dùng thế nào |
 |---|---|---|
-| 1 · VLM | `pretrain-*-psi0-fast.sh`, `trainers/pretrain.py` | Không train; dùng checkpoint `pre.*` |
+| 1 · VLM | `pretrain-egodex-psi0-fast.sh`, `trainers/pretrain.py` | Không pretrain lại; chạy ngắn trên EgoDex do pipeline xuất ra để chứng minh đường đi; fine-tune từ `pre.*` trên video đội tự quay khi còn thời gian (mục 7.8) |
 | 2 · Action expert | `posttrain-*-psi0.sh`, `trainers/posttrain.py` | Không train; dùng `postpre.*` |
 | 3 · Task | `finetune-simple-psi0.sh`, `trainers/finetune.py` | Fine-tune mọi điểm của HE, E1 và các nhánh |
 | Baseline | `baselines/act`, `baselines/dp` | ACT, Diffusion Policy cho so sánh phương pháp (spec mục 3, M) |
@@ -329,7 +390,7 @@ Checkpoint công bố không kèm log train, nên "output của stage" là kết
 | Probe | Checkpoint | Đo gì |
 |---|---|---|
 | P1 · Hiểu cảnh | `pre.*` | Hỏi đáp có đáp án về vật, bàn, bước đang làm trên khung hình SIMPLE |
-| P2 · Token action | `pre.*` | Loss token FAST trên egocentric giữ lại (mẫu EgoDex, sau demo) |
+| P2 · Token action | `pre.*` | Loss token FAST trên egocentric giữ lại (mẫu EgoDex; video tự quay khi có) |
 | P3 · Action offline | `postpre.*`, checkpoint fine-tune | Sai số action open-loop theo nhóm và vị trí trong chunk trên episode held-out |
 | P4 · Giữ năng lực | Sau fine-tune | Chạy lại P1, P3 trên dữ liệu gốc để đo quên |
 
@@ -456,13 +517,13 @@ Lỗi chia theo nguồn tín hiệu. Ngưỡng hiệu chỉnh từ episode thàn
 | # | Phần | Cho thấy | Bằng chứng |
 |---|---|---|---|
 | 1 | Tái tạo Ψ₀ | Checkpoint của tác giả trên task hai bàn trong SIMPLE | Bảng so với 7/5/6; video Isaac |
-| 2 | Thu dữ liệu | Teleop bàn phím một episode trực tiếp; vài episode sinh tự động | Video MuJoCo; mục sổ chi phí của phiên |
-| 3 | Pipeline | Ba nguồn qua 6 tầng ra một release LeRobot v2.1 | Báo cáo dataset (mục 6.5); contract test xanh |
+| 2 | Thu dữ liệu ba loại | Mẫu EgoDex; teleop bàn phím một episode trực tiếp; vài episode S1 và S2 | Video; mục sổ chi phí của phiên |
+| 3 | Pipeline | Ba loại dữ liệu qua 6 tầng: mẫu EgoDex ra định dạng stage 1, teleop và synthetic (S1, S2) ra release LeRobot v2.1 | Báo cáo dataset (mục 6.5); contract test xanh; lần chạy stage 1 ngắn |
 | 4 | Agent QA/QC | Chạy trên bản cài lỗi | Bảng precision, recall theo loại; một báo cáo mẫu |
 | 5 | HE-1 | Đường cong sơ bộ V-EGO so với V-NOEGO | Đồ thị, bảng theo mức, video ba cột |
 | 6 | Một vòng Failure → Data | Lượt thất bại → scorer → chẩn đoán → evidence card → đề xuất dữ liệu → sổ chi phí | Evidence card thật trên một cụm lỗi của eval HE |
 
-**Chưa có ở demo** (nói thẳng khi trình bày): HE-2 trên dataset tự xây, HS, HT, HD, holdout.
+**Chưa có ở demo** (nói thẳng khi trình bày): video egocentric đội tự quay, HE-2 trên dataset tự xây, S3, S4, HS, HT, HD, holdout.
 
 **Thứ tự để kịp** [Đề xuất]: tuần 26/10 đọc mã và đo (S1-02, S1-03, S1-04, S1-07, S1-11 nhiệm vụ con đầu); tuần 2/11 thiết bị bàn phím, tuyến sinh tự động, pipeline trên psi-data, bộ lỗi cấy, fine-tune HE-1 đầu tiên; tuần 9/11 eval HE-1, Agent QA/QC trên bộ lỗi cấy, vòng Failure → Data trên eval HE, ghép kịch bản demo; 16/11 chạy thử toàn bộ.
 
@@ -496,7 +557,10 @@ Người làm do Product Owner giao sau [Đã chốt]. Bảng dưới chỉ ghi 
 | S1-08, S1-10 | Giữ |
 | S1-09 | Về lại SIMPLE: tín hiệu từng bước và tập điều kiện cho task hai bàn |
 | S1-11 | Mở lại: V3 cho task hai bàn, đọc checkpoint `…mixed-v0`, chọn tuyến |
-| DA-15, DA-18, DA-22, DA-24 | Xóa (robot DENSO, video nhà máy, dataset BTC, ROS 2) |
+| DA-15, DA-22, DA-24 | Xóa (robot DENSO, dataset BTC, ROS 2) |
+| DA-04 | Mở lại (sửa cùng ngày): pipeline egocentric E-A, E-B trên mẫu EgoDex và video tự quay (mục 6.6) |
+| DA-18 | Khôi phục với nội dung mới (sửa cùng ngày): egocentric sang định dạng stage 1 của Ψ₀, lần chạy stage 1 ngắn, fine-tune trên video tự quay (mục 7.8) |
+| DA-29 (mới) | Synthetic S2: biến thể từ đoạn teleop và correction (mục 5.4) |
 | DA-16 | Viết lại: thiết bị bàn phím cho teleop decoupled WBC của SIMPLE |
 | DA-17 | Viết lại: phát lại action trên MuJoCo của SIMPLE |
 | DA-19, DA-21 | Giữ, bỏ phần DENSO |
@@ -506,7 +570,7 @@ Người làm do Product Owner giao sau [Đã chốt]. Bảng dưới chỉ ghi 
 | DA-26 (mới) | Thí nghiệm HE (mục 7) |
 | DA-27 (mới) | Bộ lỗi cấy cho Agent QA/QC (mục 9.2) |
 | DA-28 (mới) | Kịch bản demo 17/11 chạy trọn luồng (mục 11) |
-| DA-01…DA-14 (chưa có file) | Giữ DA-01, DA-02, DA-03 (chạy trên psi-data, bàn phím, sinh tự động), DA-08, DA-09, DA-13; hoãn sau demo DA-04, DA-05, DA-06; bỏ DA-10, DA-11, DA-12, DA-14 (robot DENSO); DA-07 đã gộp vào DA-19 |
+| DA-01…DA-14 (chưa có file) | Giữ DA-01, DA-02, DA-03 (chạy trên psi-data, bàn phím, sinh tự động), DA-08, DA-09, DA-13; mở lại DA-04 (có file); hoãn sau demo DA-05, DA-06; bỏ DA-10, DA-11, DA-12, DA-14 (robot DENSO); DA-07 đã gộp vào DA-19 |
 
 ## 14. Câu hỏi còn mở
 
@@ -518,6 +582,8 @@ Người làm do Product Owner giao sau [Đã chốt]. Bảng dưới chỉ ghi 
 | Q-27D | Isaac Sim chạy được trên Colab không, hay eval Isaac phải chạy trên máy đội? | S1-04 | Lịch eval HE |
 | Q-27E | Số bước pretrain của từng checkpoint ablation, và ablation có cùng recipe post-train không? | Hiếu hỏi PSI Lab | Giới hạn của HE (mục 7.2) |
 | Q-27F | Đội có mua bộ PICO không? | Hiếu | Nguồn teleop thứ hai (mục 4.4) |
+| Q-27G | Video egocentric tự quay: thiết bị nào (điện thoại, camera đội đầu, mượn Vision Pro), bao nhiêu giờ, mấy người? | Hiếu, mentor | Độ tin pose (E-A hay E-B), giá trị của fine-tune stage 1 (mục 7.8) |
+| Q-27H | Tập con EgoDex nào để test (task gần gắp và đặt), bao nhiêu giờ? | Người làm DA-04 | Thời gian chạy pipeline và lần chạy stage 1 ngắn |
 | Q0 | Checkpoint `pre.*`, `postpre.*` nào đã xác nhận không thấy dữ liệu task hai bàn? | Hiếu hỏi PSI Lab | Ghi giới hạn cho HE và E1 (spec mục 2.4) |
 
 **Lựa chọn của người viết** (cần Hiếu xem khi duyệt): task hai bàn của SIMPLE thay cảnh tự dựng (mục 3); bước L-WALK (mục 3); quy tắc render (mục 4.2); cách cắm bàn phím (mục 5.2); hai tuyến sinh tự động (mục 5.3); lưới, seed và quy tắc diễn giải của HE (mục 7); Colab cho mọi dữ liệu public (mục 8.4); HE báo ở chế độ đồng bộ (mục 8.5); tỉ lệ cấy lỗi và cách chấm (mục 9.2); kịch bản demo (mục 11); danh sách story (mục 13).
@@ -532,7 +598,7 @@ Người làm do Product Owner giao sau [Đã chốt]. Bảng dưới chỉ ghi 
 | Spec v10.3 → v10.4 | Bỏ phần robot DENSO và MuJoCo riêng; task chính đổi sang task hai bàn; thêm HE; lộ trình theo demo 17/11 |
 | 00 · Phân tích idea | Đã xóa: nội dung đã nằm trong spec và 01 |
 | 05, 06 | Giữ làm lưu trữ, có ghi chú ở đầu file: 02, 03, 04 trích mã của chúng (ví dụ "06 #3", "05 AR3") làm vết quyết định |
-| Story | Xóa DA-15, DA-18, DA-22, DA-24; viết lại hoặc mở lại theo mục 13 |
+| Story | Xóa DA-15, DA-22, DA-24; DA-18 xóa rồi khôi phục với nội dung mới; viết lại hoặc mở lại theo mục 13 |
 
 ## Nguồn
 

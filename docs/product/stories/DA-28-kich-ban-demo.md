@@ -11,7 +11,7 @@
 | Nhãn | [Lõi] · `epic:9` · `gate:G1` · `area:core` |
 | Sprint | S2; chạy thử toàn bộ ngày 16/11/2026 |
 | Ước lượng | 10 giờ (khoảng 8–12, ước lượng) |
-| Phụ thuộc | S1-03, S1-05, DA-03, DA-16, DA-20, DA-26 (sơ bộ), DA-27; một vòng Failure → Data cần scorer, chẩn đoán và evidence card của S2 |
+| Phụ thuộc | S1-03, S1-05, DA-03, DA-04, DA-16, DA-18, DA-20, DA-26 (sơ bộ), DA-27, DA-29; một vòng Failure → Data cần scorer, chẩn đoán và evidence card của S2 |
 
 ## Story
 
@@ -19,10 +19,10 @@ Là trưởng nhóm, tôi muốn một kịch bản demo chạy lại được, 
 
 ## Tiêu chí chấp nhận
 
-1. Kịch bản sáu phần theo design mục 11: tái tạo Ψ₀ trên task hai bàn; thu dữ liệu (một episode bàn phím trực tiếp, vài episode sinh tự động); ba nguồn qua pipeline 6 tầng ra release LeRobot v2.1 và báo cáo dataset; Agent QA/QC trên bộ lỗi cấy; HE-1 sơ bộ; một vòng Failure → Data trên lượt lỗi của eval HE (scorer → chẩn đoán → evidence card → đề xuất dữ liệu → sổ chi phí).
+1. Kịch bản sáu phần theo design mục 11: tái tạo Ψ₀ trên task hai bàn; thu ba loại dữ liệu (mẫu EgoDex, một episode bàn phím trực tiếp, vài episode synthetic S1 và S2); ba loại qua pipeline 6 tầng (egocentric ra định dạng stage 1 kèm lần chạy stage 1 ngắn, teleop và synthetic ra release LeRobot v2.1) và báo cáo dataset; Agent QA/QC trên bộ lỗi cấy; HE-1 sơ bộ; một vòng Failure → Data trên lượt lỗi của eval HE (scorer → chẩn đoán → evidence card → đề xuất dữ liệu → sổ chi phí).
 2. Mỗi phần một lệnh trong `scripts/demo/`, chạy được từ máy sạch theo `docs/demo/README.md`; phần cần GPU có bản ghi sẵn (video, báo cáo) để demo không phụ thuộc mạng.
 3. Mỗi con số trên màn hình demo trỏ tới file nguồn (báo cáo, sổ chi phí, RunPlan); số sơ bộ hoặc trên lỗi cấy ghi rõ như vậy.
-4. Mục "Chưa có ở demo" ghi thẳng: HE-2, HS, HT, HD, holdout.
+4. Mục "Chưa có ở demo" ghi thẳng: video egocentric đội tự quay, HE-2, S3, S4, HS, HT, HD, holdout.
 5. Chạy thử toàn bộ ngày 16/11/2026, ghi thời gian từng phần và lỗi gặp phải.
 
 ## Nhiệm vụ
@@ -59,6 +59,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 27/10/2026 | Tạo story theo design 27/10/2026 mục 11 | PO (Hiếu) |
+| 27/10/2026 | Thêm ba loại dữ liệu vào phần thu và pipeline (EgoDex, S2) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

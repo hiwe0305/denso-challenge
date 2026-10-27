@@ -4,7 +4,7 @@ _Ngày 22/10/2026. Vai trò BMAD: Product Owner (Sarah) viết mục 1; Scrum Ma
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
-| 27/10/2026 | 0.7 | Theo spec v10.4 và [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md): mục 4.1 ghi story Sprint 1 mở lại hoặc về lại SIMPLE; mục 4.9 thay mục 4.9 và 4.10 cũ (robot DENSO trong Isaac Sim, robot DENSO trên MuJoCo): demo 17/11/2026 trên G1 + Ψ₀, story DA giữ, sửa, xóa, thêm DA-26 đến DA-28, giờ ước, điều kiện qua G0. Người làm của story mới và story đổi hướng chờ PO giao | PO (Hiếu) |
+| 27/10/2026 | 0.7 | Theo spec v10.4 và [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md): mục 4.1 ghi story Sprint 1 mở lại hoặc về lại SIMPLE; mục 4.9 thay mục 4.9 và 4.10 cũ (robot DENSO trong Isaac Sim, robot DENSO trên MuJoCo): demo 17/11/2026 trên G1 + Ψ₀, ba loại dữ liệu, story DA giữ, sửa, xóa, mở lại DA-04, khôi phục DA-18, thêm DA-26 đến DA-29, giờ ước, điều kiện qua G0. Người làm của story mới và story đổi hướng chờ PO giao | PO (Hiếu) |
 | 22/10/2026 | 0.1 | Bản đầu: kết quả kiểm PO, nhịp sprint, phân công, kế hoạch 6 sprint, DoR, DoD, lịch mentor, phương án trễ, chỉ số theo dõi | PO, SM |
 | 22/10/2026 | 0.2 | Đổi tên giả thuyết H1, H2, H3 thành HS, HT (HTa, HTb), HD; giữ mã đề. Sửa mã trích 05 bị sai: "05 TN…" thành "05 TH…" (TN là mã tính năng của 01) | SM theo 06 |
 | 22/10/2026 | 0.2 | Thêm 5 story mới của 02 bản 0.3: 1.9 V3 (S1-11, S1, hạn ngày 5); 5.5 tuyến generator (S2–S3); 2.8 backup (S3–S4); 7.11 B-fail (S4–S5); 7.10 F-ACT (S5–S6). Phân công theo vai ở mục 3; S1-05 còn Q2 | SM theo 06 |
@@ -461,6 +461,9 @@ Theo spec v10.4 và [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1
 | Story | Việc | Giờ | Sprint |
 |---|---|---|---|
 | DA-01, DA-02, DA-03 | Định dạng episode chung; export LeRobot v2.1; pipeline teleop trên psi-data, bàn phím và sinh tự động | 36–49 | S1–S2 |
+| DA-04 | Pipeline egocentric E-A, E-B trên mẫu EgoDex, sau đó video tự quay | 25–35 | S1–S2 |
+| DA-18 | Egocentric sang định dạng stage 1, lần chạy stage 1 ngắn; fine-tune trên video tự quay khi còn thời gian | 15–25 | S2–S3 |
+| DA-29 | Synthetic S2: biến thể từ đoạn teleop và correction | 15–20 | S2 |
 | DA-08, DA-13 | Phát hiện lỗi F-TRAIN, F-OFF; quy lỗi về stage | 16–22 | S2–S3 |
 | DA-09 | Probe P1–P4 | 12–18 | S2–S3 |
 | DA-16 | Thiết bị bàn phím cho teleop decoupled WBC của SIMPLE | 10–15 | S1–S2 |
@@ -473,9 +476,9 @@ Theo spec v10.4 và [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1
 | DA-26 | Thí nghiệm HE (không tính GPU-giờ) | 15–25 | S1–S3 |
 | DA-27 | Bộ lỗi cấy cho QA và Agent QA/QC | 10–15 | S2 |
 | DA-28 | Kịch bản demo 17/11 chạy trọn luồng | 8–12 | S2 |
-| **Tổng** | | **khoảng 175–255** | |
+| **Tổng** | | **khoảng 230–335** | |
 
-**Hoãn sau demo:** DA-04 (egocentric trên mẫu EgoDex), DA-05 (NimClient), DA-06 (tầng S3). **Xóa:** DA-10, DA-11, DA-12, DA-14, DA-15, DA-18, DA-22, DA-24 (robot DENSO, video nhà máy, dataset BTC, ROS 2). DA-07 đã gộp vào DA-19.
+**Ba loại dữ liệu** [Đã chốt 27/10/2026]: egocentric, teleop, synthetic; nguồn test bây giờ là mẫu EgoDex, dataset teleop của tác giả, bàn phím, synthetic S1 và S2; video egocentric đội tự quay khi còn thời gian. **Hoãn sau demo:** DA-05 (NimClient), DA-06 (tầng S3). **Xóa:** DA-10, DA-11, DA-12, DA-14, DA-15, DA-22, DA-24 (robot DENSO, dataset BTC, ROS 2). DA-18 khôi phục với nội dung mới. DA-07 đã gộp vào DA-19.
 
 **Story Sprint 1 mở lại** (giờ ước lượng): S1-05 sinh tự động cho task hai bàn 15–25 (cao hơn 6 giờ cũ vì tuyến A phải tự viết planner trong env WBC); S1-07 8–12; S1-11 6–10 (đọc cấu hình và checkpoint `…mixed-v0`, chọn tuyến).
 

@@ -18,8 +18,8 @@ _Trạng thái: đặc tả đề xuất, chưa thực nghiệm. Ngày 27/10/202
 
 - **Một sân: G1 trong SIMPLE với Ψ₀**, robot và model của paper. Robot DENSO (Isaac Sim ở v10.2, MuJoCo ở v10.3) bị bỏ hẳn. Mọi giả thuyết kiểm trên G1.
 - **Task chính là task hai bàn** `G1WholebodyLocomotionPickBetweenTablesTeleop-v0`: gắp vật ở bàn này, đi sang bàn kia, đặt lên (mục 2.3).
-- **Ba nguồn dữ liệu robot**: dataset teleop của tác giả, teleop bằng bàn phím (đội tự viết, vì SIMPLE chỉ hỗ trợ kính PICO), sinh tự động bằng motion planning. Thu và sinh ở chế độ MuJoCo thuần để giảm compute của Isaac Sim; Isaac Sim chỉ render lại (mục 2.2).
-- **Giả thuyết mới HE**: prior egocentric của Ψ₀ giảm số demo robot cần. Kiểm bằng ba checkpoint ablation tác giả đã công bố, ra đường cong thành công theo số demo (mục 3, 7.9).
+- **Ba loại dữ liệu cố định: egocentric của người, teleop, synthetic.** Nguồn để test thay đổi theo thời gian: trước hết dữ liệu công bố và sim (mẫu EgoDex; dataset teleop của tác giả và teleop bàn phím do đội tự viết, vì SIMPLE chỉ hỗ trợ kính PICO; synthetic S1, S2 trong SIMPLE), rồi video egocentric đội tự quay, về sau là dữ liệu DENSO. Thu và sinh ở chế độ MuJoCo thuần để giảm compute của Isaac Sim; Isaac Sim chỉ render lại (mục 2.5).
+- **Giả thuyết mới HE**: prior egocentric của Ψ₀ giảm số demo robot cần. Kiểm bằng ba checkpoint ablation tác giả đã công bố, ra đường cong thành công theo số demo (mục 3, 7.9). Đường đi egocentric → stage 1 chứng minh trước trên mẫu EgoDex, rồi fine-tune thật trên video đội tự quay khi còn thời gian.
 - **Data flywheel đủ 6 tầng**, gồm xử lý và chuẩn hóa dataset; mọi episode có action robot được phát lại trên MuJoCo trước khi train (mục 4.4).
 - **Agent QA/QC** (Nemotron 3.5 Bolt E4B 4GB chạy cục bộ) đọc báo cáo dataset, log và output từng stage; hiệu suất đo trên bộ lỗi cấy có đáp án trong dữ liệu thật của tác giả trước khi đội train.
 - **Train bằng code của tác giả**, chỉ fine-tune stage 3 từ checkpoint `pre.*`, `postpre.*`. Log train lấy bằng cách đọc code của họ và bọc thêm phần thiếu.
@@ -41,7 +41,7 @@ _Trạng thái: đặc tả đề xuất, chưa thực nghiệm. Ngày 27/10/202
 | Lớp | Nội dung | Ghi chú khi trình bày |
 |---|---|---|
 | Kế thừa | Checkpoint Ψ₀ đã pretrain trên video người (EgoDex) và dữ liệu humanoid; simulator SIMPLE và Isaac Sim; dữ liệu psi-data; stack decoupled WBC của SIMPLE (task chính) và bộ điều khiển AMO (pipeline MP); model Cosmos qua NVIDIA NIM | Viết "kế thừa prior video người từ Ψ₀", không viết "platform kết hợp video người" như đóng góp của đội |
-| Đội làm trong PoC | Data Core (QA, lineage, chia tập), pipeline dữ liệu 6 tầng cho ba nguồn robot, teleop bàn phím và sinh tự động cho task hai bàn, scorer từng bước, thuật toán Failure → Data, evidence card, sổ chi phí, probe theo stage của Ψ₀, Agent QA/QC, thiết kế và chạy PoC với các nhánh đối chứng, thí nghiệm HE, so sánh phương pháp. Data Core cộng SOP gọi là **DENSO Data Model** | Đây là phần được chấm là đóng góp |
+| Đội làm trong PoC | Data Core (QA, lineage, chia tập), pipeline dữ liệu 6 tầng cho ba loại dữ liệu (egocentric, teleop, synthetic), teleop bàn phím và sinh tự động S1, S2 cho task hai bàn, scorer từng bước, thuật toán Failure → Data, evidence card, sổ chi phí, probe theo stage của Ψ₀, Agent QA/QC, thiết kế và chạy PoC với các nhánh đối chứng, thí nghiệm HE, so sánh phương pháp. Data Core cộng SOP gọi là **DENSO Data Model** | Đây là phần được chấm là đóng góp |
 | Sau PoC | Robot của DENSO (trong sim rồi robot thật), world model DreamDojo, synthetic tầng S3–S4 qua NIM, continued pretraining stage 1 trên video nhà máy | Mỗi hướng cần cổng nghiệm thu riêng |
 
 ### 1.2 Không claim
@@ -103,13 +103,15 @@ V3 có hạn riêng là **ngày 5 của Sprint 1**; các câu khác hạn cuối
 | Q5 | Fine-tune Ψ₀ cần bao nhiêu VRAM và GPU-giờ; mỗi episode đánh giá mất bao lâu? | Dùng LoRA hoặc đóng băng VLM; thuê A100 80 GB; giảm số seed |
 | Q6 | Đội có thiết bị teleop cho SIMPLE không? (v10.4) Đã trả lời: không có PICO; đội viết thiết bị bàn phím cắm vào teleop decoupled WBC (mục 2.5) | Correction do planner sinh từ trạng thái lỗi thay cho người điều khiển |
 
-### 2.5 Ba nguồn dữ liệu robot và simulator (v10.4)
+### 2.5 Ba loại dữ liệu, nguồn để test và simulator (v10.4)
 
-| Nguồn | Cách thu | Bộ điều khiển | `action_quality` |
-|---|---|---|---|
-| Dataset của tác giả | Gói psi-data của task hai bàn (teleop PICO) | Decoupled WBC `g1_sonic` | `measured` |
-| Teleop bàn phím | Thiết bị bàn phím của đội cắm vào `teleop_decoupled_wbc`: phím lái vận tốc đi bộ, phím dịch cổ tay qua IK, phím đóng mở bàn tay | Decoupled WBC `g1_sonic` | `measured` |
-| Sinh tự động | Tuyến A: script đi bộ cộng cuRobo trong env WBC. Tuyến B: task MP mới chạy `datagen` của SIMPLE (AMO). Chọn bằng V3 | A: WBC; B: AMO | `planned` |
+Hệ thống có ba loại dữ liệu cố định [Đã chốt 27/10/2026]. Chỉ nguồn để có dữ liệu thay đổi; thay nguồn không đổi pipeline hay model.
+
+| Loại | Nguồn để test bây giờ | Nguồn sau | Bộ điều khiển | `action_quality` | Vào model |
+|---|---|---|---|---|---|
+| Egocentric | Mẫu EgoDex (có tracking tay và đầu) | Video đội tự quay người làm task hai bàn (pose ước lượng); về sau video nhà máy DENSO | Không có (tay người) | `retargeted` (EgoDex), `pseudo` (tự quay) | Stage 1 |
+| Teleop | Gói psi-data của task hai bàn (teleop PICO); thiết bị bàn phím của đội cắm vào `teleop_decoupled_wbc` (phím lái vận tốc đi bộ, phím dịch cổ tay qua IK, phím đóng mở bàn tay) | Teleop trên robot DENSO | Decoupled WBC `g1_sonic` | `measured` | Stage 3 |
+| Synthetic | S1: tuyến A (script đi bộ cộng cuRobo trong env WBC) hoặc tuyến B (task MP mới chạy `datagen`, AMO), chọn bằng V3. S2: biến thể từ đoạn teleop kiểu MimicGen và correction từ trạng thái lỗi | S3, S4 bằng Cosmos qua NIM | S1 A, S2: WBC; S1 B: AMO | `planned` | Stage 3 |
 
 Thu dữ liệu, sinh tự động, phát lại và eval nhanh chạy `--sim-mode=mujoco`; eval so với số công bố và video demo chạy `mujoco_isaac` (Isaac Sim chỉ render). Trong một thí nghiệm, ảnh train và ảnh eval cùng một renderer. Theo README Ψ₀, một episode eval ở `mujoco_isaac` mất 6–10 phút; S1-04 đo cả hai chế độ. Chi tiết ở design mục 4, 5.
 
@@ -443,7 +445,7 @@ Giá trị mặc định, ghi vào RunPlan và chỉnh được:
 
 Khi cụm có m_j > L_t lỗi, chọn ngẫu nhiên L_t lỗi, có ghi hạt giống. Số lỗi thực được xử lý là n_eff_j = min(m_j, L_t); lợi ích và chi phí ở mục 6.11 tính trên n_eff_j.
 
-**Tầng synthetic (v10.2).** "Sinh sim quanh điều kiện lỗi" được tách thành các tầng, mỗi tầng là một loại can thiệp riêng có đơn giá và tỉ lệ sửa được f_t riêng: S1 planner trong sim, S2 biến thể từ teleop, S3 đổi ngoại hình bằng Cosmos Transfer (giữ action gốc), S4 sinh video task mới bằng Cosmos Predict (action suy ra, chỉ dùng khi RunPlan cho phép). Mở theo thứ tự S1 → S2 → S3, S4 sau cùng. Không sinh với tham số Level 1 hoặc Level 2 (mục 7.3). Trước demo chỉ dùng S1 (mục 2.5); S2 sau demo; S3, S4 sau PoC. Chi tiết ở design mục 5.3.
+**Tầng synthetic (v10.2).** "Sinh sim quanh điều kiện lỗi" được tách thành các tầng, mỗi tầng là một loại can thiệp riêng có đơn giá và tỉ lệ sửa được f_t riêng: S1 planner trong sim, S2 biến thể từ teleop, S3 đổi ngoại hình bằng Cosmos Transfer (giữ action gốc), S4 sinh video task mới bằng Cosmos Predict (action suy ra, chỉ dùng khi RunPlan cho phép). Mở theo thứ tự S1 → S2 → S3, S4 sau cùng. Không sinh với tham số Level 1 hoặc Level 2 (mục 7.3). Trước demo dùng S1 và S2 (mục 2.5); S3, S4 sau demo. Chi tiết ở design mục 5.3.
 
 Hai việc không còn là can thiệp tiêu ngân sách của C:
 
@@ -727,7 +729,7 @@ Chi phí giờ cell áp cho mọi phút teleop, correction và reset, vì trên 
 
 Ngân sách 140 A100-giờ mỗi đợt trong Pitch v10 phải được kiểm lại theo số đo ở G0.
 
-**(v10.4) Demo ngày 17/11/2026** rơi vào thứ Ba tuần 4, trước review cổng G1. Lịch bắt đầu thứ Hai 26/10/2026. Demo cho thấy: tái tạo Ψ₀ trên task hai bàn (G0); teleop bàn phím và sinh tự động; ba nguồn qua pipeline 6 tầng ra release LeRobot v2.1 và báo cáo dataset; Agent QA/QC trên bộ lỗi cấy; HE-1 sơ bộ; một vòng Failure → Data trên lượt lỗi của eval HE. Thêm vào G0: thiết bị bàn phím ghi được episode; đo giờ người cho 20 demo thử; đo thời gian eval ở `mujoco` và `mujoco_isaac`; đo giờ một lần fine-tune Ψ₀ trên một A100 hoặc H100 (Colab). V3 quay lại G0 cho task hai bàn. HE-1 chạy trong G1–G2, HE-2 sau demo. Kịch bản demo ở design mục 11.
+**(v10.4) Demo ngày 17/11/2026** rơi vào thứ Ba tuần 4, trước review cổng G1. Lịch bắt đầu thứ Hai 26/10/2026. Demo cho thấy: tái tạo Ψ₀ trên task hai bàn (G0); thu ba loại dữ liệu (mẫu EgoDex, teleop bàn phím, synthetic S1 và S2); ba loại qua pipeline 6 tầng (egocentric ra định dạng stage 1, teleop và synthetic ra LeRobot v2.1) và báo cáo dataset; một lần chạy stage 1 ngắn trên EgoDex để chứng minh đường đi; Agent QA/QC trên bộ lỗi cấy; HE-1 sơ bộ; một vòng Failure → Data trên lượt lỗi của eval HE. Thêm vào G0: thiết bị bàn phím ghi được episode; đo giờ người cho 20 demo thử; đo thời gian eval ở `mujoco` và `mujoco_isaac`; đo giờ một lần fine-tune Ψ₀ trên một A100 hoặc H100 (Colab). V3 quay lại G0 cho task hai bàn. HE-1 chạy trong G1–G2, HE-2 sau demo. Kịch bản demo ở design mục 11.
 
 ## 10. Rủi ro và phương án dự phòng
 
@@ -887,7 +889,7 @@ Hồ sơ cũ không còn trong thư mục làm việc. Xem lại một file bằ
 
 | Ngày | Phiên bản | Nội dung | Người sửa |
 |---|---|---|---|
-| 27/10/2026 | v10.4 | Bỏ robot DENSO (v10.2, v10.3); một sân G1 trong SIMPLE với Ψ₀ (mục 0, 1.1, 2.5); task chính đổi sang task hai bàn `G1WholebodyLocomotionPickBetweenTablesTeleop-v0` (mục 2.3, 5.1, 5.2 thêm L-WALK, 7.1); Q6 trả lời bằng teleop bàn phím, ba nguồn dữ liệu robot và quy tắc renderer (mục 2.4, 2.5); QA thêm phát lại action (mục 4.4); giả thuyết HE và thí nghiệm 7.9; lộ trình theo demo 17/11/2026, V3 quay lại G0 (mục 9); rủi ro GPU, eval Isaac chậm, bàn phím, nhiễu của HE, khác renderer (mục 10); glossary và nguồn (mục 12, 13). Theo design ngày 27/10/2026 | Trưởng nhóm |
+| 27/10/2026 | v10.4 | Bỏ robot DENSO (v10.2, v10.3); một sân G1 trong SIMPLE với Ψ₀ (mục 0, 1.1, 2.5); task chính đổi sang task hai bàn `G1WholebodyLocomotionPickBetweenTablesTeleop-v0` (mục 2.3, 5.1, 5.2 thêm L-WALK, 7.1); ba loại dữ liệu egocentric, teleop, synthetic với nguồn test từng loại, synthetic S1 và S2 trước demo (mục 0, 2.5, 6.10); Q6 trả lời bằng teleop bàn phím, ba nguồn dữ liệu robot và quy tắc renderer (mục 2.4, 2.5); QA thêm phát lại action (mục 4.4); giả thuyết HE và thí nghiệm 7.9; lộ trình theo demo 17/11/2026, V3 quay lại G0 (mục 9); rủi ro GPU, eval Isaac chậm, bàn phím, nhiễu của HE, khác renderer (mục 10); glossary và nguồn (mục 12, 13). Theo design ngày 27/10/2026 | Trưởng nhóm |
 | 25/10/2026 | v10.3 | Thí nghiệm có đối chứng chuyển sang robot DENSO trên MuJoCo, SIMPLE chỉ còn G0, bảng ánh xạ G1 → DENSO (mục 0); đầu ra demo trên MuJoCo (mục 0); simulator của robot DENSO (mục 2.5); thiết kế PoC trên MuJoCo, eval bất đồng bộ (mục 7); lộ trình một sân, G0 bỏ V3 và T1–T4 (mục 9); rủi ro GPU, Colab và dữ liệu DENSO, demo bàn phím, môi trường dễ hơn task thật, lỗi bất đồng bộ, Agent QA/QC (mục 10); glossary và nguồn (mục 12, 13). Theo design ngày 25/10/2026 | Trưởng nhóm |
 | 23/10/2026 | v10.2 | Robot chính là mobile manipulator của DENSO, G1 là bàn thử; task khay → máy; robot thay thế giống ≥ 95% (mục 0, 1.1, 2.5); kiểm hệ thống cho robot DENSO và quy lỗi về stage của Ψ₀ (mục 6.4); tầng synthetic S1–S4 qua NIM (mục 6.10); rủi ro DENSO muộn, NIM, vượt thời gian thì dùng API theo phần, khác biệt tay người và gripper, kết quả âm của Mirchandani cho HS (mục 10); giờ thêm khớp 07 là khoảng 185–255 giờ (mục 9); glossary và nguồn (mục 12, 13). Theo design ngày 23/10/2026 | Trưởng nhóm |
 | 22/10/2026 | v10.1 | #1 Bộ điều khiển: System-0 của task chính là decoupled WBC `g1_sonic`, AMO là của pipeline MP (mục 1.1, 2.1); F1 không còn là dự phòng cho Q2 (mục 2.3, 2.4, 10); thêm V3 hạn ngày 5 Sprint 1 (mục 2.4, 9); kiểm hệ thống nhắm stack WBC, lệnh gửi và trạng thái đo theo giao diện WBC (mục 4.5, 6.4); planner của bước 5–6 phải chạy trong env WBC (mục 6.5); tuyến T1–T4 và kịch bản V3 âm cộng Q6 âm (mục 10) | Biên tập theo 06 |
