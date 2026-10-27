@@ -4,7 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Trưởng n
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
-| 25/10/2026 | 0.2 | Theo [design ngày 25/10/2026](../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) mục 10: Hiếu là người duyệt và merge duy nhất, R2 đổi hành động (mục 3.2); thêm lịch tracking tự động và tổng kết cuối ngày (mục 5, 7) | PO (Hiếu) |
+| 25/10/2026 | 0.2 | Theo design ngày 25/10/2026 (file đã xóa ngày 27/10/2026) mục 10: Hiếu là người duyệt và merge duy nhất, R2 đổi hành động (mục 3.2); thêm lịch tracking tự động và tổng kết cuối ngày (mục 5, 7) | PO (Hiếu) |
 | 23/10/2026 | 0.1 | Bản đầu: quy ước dữ liệu, chỉ số, 9 rule, phân loại lỗi, nhịp, sổ can thiệp, công cụ | SM, PO |
 
 ## 1. Mục đích và nguyên tắc
@@ -83,7 +83,7 @@ Ngưỡng mặc định: k 1,3; chờ review 1 ngày làm việc; WIP 2; đứng
 | `cause:review-miss` | Review bỏ sót | Thêm câu vào checklist PR |
 | `cause:test-gap` | Thiếu test cho trường hợp đó | Thêm test; thêm vào DoD |
 | `cause:data` | Dữ liệu sai, thiếu, lệch đồng bộ | Thêm phép kiểm QA (bảng F-DATA của design) |
-| `cause:denso-wait` | Chờ thông tin từ DENSO, BTC, mentor | Nêu ở buổi với DENSO; dùng phương án thay thế (robot thay thế, dữ liệu công khai) |
+| `cause:denso-wait` | Chờ thông tin từ DENSO, BTC, mentor | Nêu ở buổi với DENSO; dùng phương án thay thế (dữ liệu công khai) |
 
 Lỗi kỹ thuật của chính flywheel (D1–D8, T1–T8, O1–O4, R1–R6 ở design mục 7.2) là kết quả thí nghiệm, không phải lỗi quy trình; chúng nằm trong ledger và báo cáo vòng, không mở issue trừ khi do mã sai.
 

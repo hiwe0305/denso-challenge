@@ -1,6 +1,6 @@
 # 01 · Project Brief: Humanoid Data Flywheel
 
-_Ngày 22/10/2026. Vai trò: Analyst (BMAD). Đầu vào: [00 · Phân tích idea](00-idea-analysis.md), [spec v10.1](../spec-v10-failure-to-data.md), [đề H1](../challenge/README.md), [README](../../README.md). Brief không đổi phạm vi của các đầu vào này. Chỗ nào là đề xuất riêng của Analyst thì ghi rõ "đề xuất". Thuật ngữ theo glossary ở mục 12 của spec v10. Bản 0.3 áp quyết định phản biện vòng 1 ở [06](06-review-round-1-decisions.md). Bản 0.4 áp [spec v10.2](../spec-v10-failure-to-data.md) và quyết định ngày 23/10/2026 ([06 mục 11](06-review-round-1-decisions.md)): robot chính của DENSO, pipeline dữ liệu ba nguồn, synthetic qua NVIDIA NIM, probe theo stage và bảng lỗi ([design 23/10/2026](../superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md))._
+_Ngày 22/10/2026. Vai trò: Analyst (BMAD). Đầu vào: [spec v10.1](../spec-v10-failure-to-data.md), [đề H1](../challenge/README.md), [README](../../README.md); 00 · Phân tích idea là đầu vào của bản đầu, file đã xóa ngày 27/10/2026. Brief không đổi phạm vi của các đầu vào này. Chỗ nào là đề xuất riêng của Analyst thì ghi rõ "đề xuất". Thuật ngữ theo glossary ở mục 12 của spec v10. Bản 0.3 áp quyết định phản biện vòng 1 ở [06](06-review-round-1-decisions.md). Bản 0.4 áp spec v10.2 (robot DENSO, pipeline ba nguồn). **Bản 0.5 áp [spec v10.4](../spec-v10-failure-to-data.md) và [design 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md): bỏ robot DENSO; demo và thí nghiệm trên G1 trong SIMPLE, task hai bàn; thêm giả thuyết HE.** Các dòng ghi "bản 0.4" về robot DENSO đã sửa hoặc bỏ._
 
 Quy ước nhãn bằng chứng dùng trong toàn file:
 
@@ -20,7 +20,7 @@ Lõi là vòng flywheel 8 bước: chạy, chấm, chẩn đoán, quyết địn
 Các quyết định chính của brief:
 
 1. **Định vị:** _Humanoid Data Flywheel là quy trình vận hành có kiểm toán cho vòng lỗi → dữ liệu: loại lỗi hệ thống trước khi tiêu tiền vào dữ liệu, chọn giữa nhiều loại can thiệp theo chi phí thật kể cả chi phí chẩn đoán, và xuất **khuyến nghị thu dữ liệu định lượng** cho DENSO. PoC kiểm lại trên G1 toàn thân với Ψ₀ xem "nhắm lỗi thắng rải đều" có còn đúng khi tính đủ chi phí._ Không claim thuật toán học máy mới; đóng góp là cách ghép và phép đo.
-2. **Phạm vi 12 tuần là L0:** mô phỏng, 1 task trên mỗi robot: G1 (bàn thử cho HS, HT, HD) và robot DENSO, hoặc robot thay thế giống ≥ 95% nếu DENSO gửi thông số muộn. Mô hình dữ liệu và giao diện adapter phải đúng cho L1–L3 để không viết lại; chạy được trên hai robot khác hẳn nhau là phép thử đầu tiên cho điều này.
+2. **Phạm vi 12 tuần là L0:** mô phỏng, G1 trong SIMPLE, task chính là task hai bàn (bản 0.5; bản 0.4 có thêm robot DENSO, đã bỏ ngày 27/10/2026). Mô hình dữ liệu và giao diện adapter phải đúng cho L1–L3 để không viết lại; task F1 là phép thử khả năng tổng quát trên task thứ hai.
 3. **Thành công của MVP** là vòng Failure → Data chạy trọn, có sổ chi phí, và HS, HT, HD được kết luận trung thực. HT trượt vẫn là kết quả hợp lệ; khi đó claim thu hẹp về DENSO Data Model và sổ chi phí.
 4. **Khoảng trống cạnh tranh:** đã có công cụ tốt cho từng khâu riêng lẻ (xem log, sinh dữ liệu, thu dữ liệu, chọn dữ liệu trong nghiên cứu). Trong phạm vi đã tra ngày 22/10/2026, chưa thấy quy trình kiểm hệ thống trước rồi chọn giữa nhiều loại can thiệp bằng một thước đo tiền và giờ công gồm cả chi phí chẩn đoán, rồi đo lại có đối chứng. Ý "chọn dữ liệu theo lỗi" tự nó không mới: HT là kiểm lại kết quả kiểu Mulligan / DISEIL (mục 8).
 
@@ -242,9 +242,9 @@ Mã TN (tính năng) khác với "task F1" của spec v10 mục 2.3.
 | TN8 | Sổ chi phí | Mỗi hoạt động một mục: loại nguồn lực, số lượng, đơn giá, nhánh, vòng, cụm | G1–G4 |
 | TN9 | Thí nghiệm và báo cáo | E1 đường cong hiệu quả dữ liệu; nhánh A, A₀.₇, B, C; nhánh B-fail trên ACT; holdout ghép cặp 3 seed; thí nghiệm HD; F-ACT 5–8 vòng trên ACT; SOP | G2–G6 |
 | TN10 | Giao diện adapter | Hợp đồng cho model, simulator, robot, bộ sinh dữ liệu, nguồn teleop; đúng cho L1–L3 | G0–G1 |
-| TN11 | Pipeline dữ liệu ba nguồn (bản 0.4) | Teleop, video egocentric (hai phương án thu), synthetic đi qua 6 tầng về một định dạng episode chung; che danh tính bắt buộc; synthetic tầng S1–S4, tầng S3–S4 qua Cosmos trên NIM; định tuyến theo mức nhạy cảm của dữ liệu | G1–G3 |
-| TN12 | Robot DENSO trong sim (bản 0.4) | Robot DENSO hoặc robot thay thế giống ≥ 95% trong Isaac Sim, cảnh trạm làm việc, task khay → máy với 6 bước và 10 kiểu lỗi; stage 2 của Ψ₀ train lại theo ba phương án đo | G1–G4 |
-| TN13 | Đánh giá theo stage và bảng lỗi (bản 0.4) | Probe P1–P4 trên checkpoint của từng stage Ψ₀; log train theo nhóm action; phát hiện lỗi từ 5 nguồn tín hiệu; quy lỗi về stage trên evidence card | G2–G4 |
+| TN11 | Pipeline dữ liệu ba nguồn robot (bản 0.5) | Dataset của tác giả, teleop bàn phím, sinh tự động đi qua 6 tầng về một định dạng episode chung; phát lại action trước khi train; export LeRobot v2.1 và v3; báo cáo dataset. Egocentric và synthetic S3–S4 qua NIM để sau demo | G0–G2 |
+| TN12 | Thí nghiệm HE (bản 0.5; thay robot DENSO của bản 0.4) | Ψ₀ có và không có prior egocentric (checkpoint ablation của tác giả) fine-tune ở nhiều mức demo robot trên task hai bàn; đường cong thành công theo số demo, video so sánh | G1–G3 |
+| TN13 | Đánh giá theo stage, bảng lỗi, Agent QA/QC (bản 0.4, sửa 0.5) | Probe P1–P4 trên checkpoint của từng stage Ψ₀; log train theo nhóm action; phát hiện lỗi từ 5 nguồn tín hiệu; quy lỗi về stage trên evidence card; Agent QA/QC chấm trên bộ lỗi cấy | G1–G4 |
 
 Nhánh **B-fail** (06 mục 4): sinh sim quanh mọi điều kiện lỗi dev, không chẩn đoán, cùng ngân sách với C (kiểu Mulligan rút gọn, không cần value function). HTa so B-fail với B; HTb so C với B-fail.
 
@@ -253,7 +253,7 @@ Nên có nếu kịp: B-fail trên Ψ₀ nếu còn ngân sách sau G4; nhánh B
 ### 6.2 Ngoài phạm vi 12 tuần
 
 - Robot thật (kể cả robot DENSO thật), cell thật, real2sim.
-- Video công nhân DENSO qua V2D; world model DreamDojo; continued pretraining stage 1 ở quy mô lớn. Video egocentric của DENSO trong L0 chỉ dùng cho probe, mẫu sinh, cấu trúc task, và continued pretraining tùy chọn ở quy mô nhỏ.
+- Robot của DENSO (trong sim hay thật) ở L0 (bản 0.5). Video công nhân DENSO qua V2D; world model DreamDojo; continued pretraining stage 1 trên video nhà máy.
 - Nhiều task chạy vòng Failure → Data. L0 chỉ có task chính và task F1. F1 kiểm khả năng tổng quát của lõi; chỉ thành dự phòng cho Q2 khi V3 xác nhận cặp task của F1 cùng bộ điều khiển.
 - Dùng episode lỗi làm tín hiệu train (Mulligan học value function từ cả dữ liệu lỗi). Đây là hướng L1.
 - Hơn hai embodiment; phân quyền nhiều người dùng; lưu trữ tập trung cho nhiều đội.
@@ -272,7 +272,7 @@ MVP thành công khi **đủ cả sáu điều** sau. Không yêu cầu HT đún
 3. Holdout chạy đúng một lần; không lộ dữ liệu.
 4. HS, HT (HTa, HTb), HD được kết luận đúng tiêu chí đã chốt, kể cả khi trượt hoặc khi HT hạ thành kết quả mô tả.
 5. Ba đầu ra BTC được giao; mọi claim trong pitch có số đo đi kèm hoặc đã bị gỡ.
-6. Trên robot DENSO hoặc robot thay thế: dữ liệu ba nguồn đi trọn pipeline thành release có lineage; Ψ₀ fine-tune và chạy được task khay → máy trong Isaac Sim; ít nhất một vòng Failure → Data chạy trọn với bảng lỗi và quy lỗi về stage; điểm giống của robot thay thế được báo đúng cơ sở chấm (hình vẽ hay thông số thật).
+6. (Bản 0.5, thay tiêu chí robot DENSO của bản 0.4.) Demo ngày 17/11/2026 chạy trọn: ba nguồn dữ liệu robot qua pipeline thành release có lineage và báo cáo dataset; Agent QA/QC có precision, recall trên bộ lỗi cấy; HE-1 có kết quả sơ bộ; ít nhất một vòng Failure → Data chạy trọn với bảng lỗi và quy lỗi về stage.
 
 ## 7. Tầm nhìn sau MVP
 
@@ -350,8 +350,8 @@ Những điều phải nói rõ khi trình bày:
 | Teleop | Chưa rõ có thiết bị cho SIMPLE (Q6) | Correction có thể do planner hoặc bộ sinh kiểu IntervenGen tạo; phải ghi rõ trong báo cáo |
 | Phân phối sim | Dữ liệu sim cùng phân phối với môi trường test | Lợi ích của sim có thể bị phóng đại so với robot thật |
 | Quyền dữ liệu | Bộ GR00T Teleop-Sim của NVIDIA (video RoboCasa GR1 đang dùng trên website) có giấy phép CC BY-NC 4.0, chỉ dùng phi thương mại | Không đưa dữ liệu NC vào release dùng cho mục đích thương mại của DENSO |
-| Robot DENSO (bản 0.4) | Chưa có URDF, thông số camera, bộ điều khiển, layout trạm | Robot thay thế tham số; 21 mục cần xin DENSO (design mục 9); chấm giống lại khi có thông số |
-| Dữ liệu nhà máy (bản 0.4) | Video egocentric có người thật; DENSO chưa nói dữ liệu có được rời site không | Che danh tính trước mọi bước; dữ liệu `restricted`, `internal` chỉ xử lý bằng NIM tự host |
+| Thiết bị teleop (bản 0.5) | SIMPLE chỉ hỗ trợ kính PICO, đội không có | Thiết bị bàn phím tự viết cắm vào teleop decoupled WBC; sinh tự động bằng motion planning |
+| Dữ liệu nhà máy (bản 0.4) | Video egocentric có người thật; DENSO chưa nói dữ liệu có được rời site không | Ngoài L0 từ bản 0.5; khi có: che danh tính trước mọi bước; dữ liệu `restricted`, `internal` chỉ xử lý bằng NIM tự host |
 | NIM (bản 0.4) | API hosted có thể bị ngừng (Cosmos Reason1-7B ngừng 24/03/2026); bộ sinh video tự host cần khoảng 31–58 GB VRAM | Bộ sinh video chạy trên A100 thuê; danh sách model NIM nằm trong cấu hình có hash |
 | Quyền dữ liệu | psi-data và trọng số Ψ₀ trên Hugging Face chưa khai giấy phép (kiểm 22/10/2026); mã Ψ₀ là Apache 2.0; SIMPLE là MIT nhưng tài sản Objaverse và HSSD có giấy phép riêng | Lineage phải ghi giấy phép; cần hỏi tác giả trước khi dùng ngoài PoC |
 
@@ -373,8 +373,8 @@ Giả định thêm ở bản 0.4:
 
 | Mã | Giả định | Ai xác nhận, khi nào |
 |---|---|---|
-| A10 | Robot DENSO có cấu trúc như hình vẽ: đế bánh xe, cột nâng, hai tay nhiều khớp, gripper hai ngón, camera đỉnh cột | DENSO, theo 21 mục ở design mục 9, tuần 1 |
-| A11 | Action của robot DENSO (khoảng 18–22 chiều) xếp được vào khung action 36 chiều của Ψ₀ | G0–G1, câu V-D1 của design |
+| A10 | (Bản 0.5) Checkpoint ablation của tác giả (VLM có EgoDex, 10% EgoDex, chỉ HE) chỉ khác nhau ở dữ liệu pretrain đủ để đọc kết quả HE | PSI Lab, câu Q-27E của design 27/10; tuần 1 |
+| A11 | (Bản 0.5) Ψ₀ eval ở chế độ MuJoCo thuần giữ được độ chính xác như khi render Isaac | G0, S1-03 |
 | A12 | Video egocentric của nhà máy có ích cho probe, mẫu sinh và cấu trúc task, dù nhãn tay người không dùng được trực tiếp cho gripper | Đo bằng probe P1 ở G2–G3 |
 | A13 | Cosmos Transfer giữ đủ chính xác vị trí vật để action gốc vẫn đúng sau khi đổi ngoại hình | Câu V-D5, kiểm ở DA-06 |
 
@@ -396,10 +396,10 @@ Giả định thêm ở bản 0.4:
 | Trôi phạm vi sang làm giao diện | Vòng chưa chạy trọn khi hết 12 tuần | Tuần 6 chưa có trace và scorer chạy được | Giao diện chỉ ở mức "nên có"; ưu tiên TN1–TN8 |
 | Đối thủ lớn thêm tính năng tương tự | Giảm giá trị khác biệt | Thông báo sản phẩm của Foxglove, Encord, NVIDIA | Tích hợp thay vì cạnh tranh; hào chắn dựa vào dữ liệu của DENSO |
 | Giấy phép dữ liệu | Không dùng được kết quả cho DENSO | Nguồn không khai giấy phép hoặc là NC | Ghi giấy phép trong lineage; hỏi tác giả psi-data |
-| DENSO gửi thông tin muộn (bản 0.4) | Robot chính không có mô hình thật; task khay → máy dựng trên giả định | Cuối tuần 2 chưa có trả lời cho 21 mục | Robot thay thế giống ≥ 95%; pipeline chạy trước trên psi-data và mẫu EgoDex; báo rõ cơ sở chấm giống |
+| HE không cho khác biệt (bản 0.5) | Không chứng minh được claim egocentric trên task hai bàn | Hai đường cong chồng nhau ở HE-1 | Báo kết quả âm như kết quả hợp lệ; nêu giới hạn của checkpoint ablation; vẫn giữ Data Core, Agent QA/QC và sổ chi phí làm đầu ra |
 | Tải người vượt mức (bản 0.4) | Phạm vi thêm khoảng 185–255 giờ; tải từng người khoảng 138–178% mức kế hoạch 70% | k sau Sprint 1 > 1; PR chờ review quá 2 ngày | Giữ đủ phạm vi; phần trễ chuyển sang API theo từng phần trước; sau đó mới cắt theo 04 mục 7.2 |
 | Sim giúp ít hơn dữ liệu người (bản 0.4) | HS âm; khuyến nghị thu dữ liệu phải nghiêng về teleop | Kết quả âm của Mirchandani và cộng sự (CoRL 2024) | Giữ điều kiện so với A₀.₇; báo số demo người theo nhánh; khuyến nghị dựa trên số đo, không dựa trên kỳ vọng |
-| Stage 2 không chuyển được sang robot DENSO (bản 0.4) | Ψ₀ trên robot DENSO kém, không đủ lỗi có ý nghĩa để chạy Failure → Data | P3 cao ở mọi nhóm action sau fine-tune | So S2-A, S2-B, S2-C; nếu cả ba kém, báo cáo và dùng ACT trên robot DENSO làm policy chạy vòng |
+| Eval có render Isaac quá chậm (bản 0.5) | Không đủ điểm cho đường cong HE trước demo | S1-04 đo 6–10 phút mỗi episode | Eval ở chế độ MuJoCo nếu G0 cho phép; rút gọn lưới HE (design mục 7.4) |
 
 ### 10.2 Câu hỏi mở, theo thứ tự ưu tiên
 
@@ -429,6 +429,7 @@ Nội bộ, trả lời ở cổng G0: Q0–Q6 của spec v10 mục 2.4 và V3 (
 
 | Ngày | Phiên bản | Nội dung | Người sửa |
 |---|---|---|---|
+| 27/10/2026 | 0.5 | Theo spec v10.4 và design 27/10/2026: bỏ robot DENSO (mục 1, 6.1 TN12 thay bằng thí nghiệm HE, TN11 ba nguồn robot, TN13 thêm Agent QA/QC, 6.2, tiêu chí MVP 6 theo demo 17/11, rủi ro mục 10, A10–A11); bỏ liên kết tới 00 đã xóa | PO (Hiếu) |
 | 22/10/2026 | 0.1 | Bản đầu | Analyst |
 | 22/10/2026 | 0.2 | Mục 6.1, 9.1, 10.1: đổi mã tính năng F1–F10 thành TN1–TN10 để không trùng "task dự phòng F1" của spec | PO |
 | 22/10/2026 | 0.2 | Mục 6.1: TN8 (sổ chi phí) đổi cổng thành G1–G4, TN10 (giao diện adapter) thành G0–G1, khớp PRD Epic 1, 2 | PO |
