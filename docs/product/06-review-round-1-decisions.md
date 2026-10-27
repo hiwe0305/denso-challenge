@@ -1,5 +1,7 @@
 # 06 · Quyết định áp dụng phản biện vòng 1
 
+> **Lưu trữ (27/10/2026).** File này giữ làm vết quyết định của bản v10.1–v10.2; 02, 03, 04 vẫn trích mã của nó. Không cập nhật theo hướng hiện hành; hướng hiện hành ở [spec v10.4](../spec-v10-failure-to-data.md) và [design 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md).
+
 _Ngày 22/10/2026. Trưởng nhóm duyệt áp dụng 10 sửa ưu tiên ở [05 mục 7](05-review-and-mentor-questions.md). File này chốt **cách** áp dụng từng sửa để spec và 00–03 sửa thống nhất. Mã đề giữ "H1" cho đến khi BTC xác nhận (ảnh đề ghi H2, xem [đề bài](../challenge/README.md)). Mục 11 (thêm ngày 23/10/2026) ghi các quyết định của trưởng nhóm sau phản biện vòng 1, làm căn cứ cho spec v10.2 và các bản cập nhật cùng ngày._
 
 ## Quy ước đổi tên áp dụng cho mọi tài liệu
@@ -100,7 +102,7 @@ Câu định vị dùng thống nhất: _Humanoid Data Flywheel là quy trình v
 
 ## 11. Quyết định ngày 23/10/2026 (sau vòng 1)
 
-Trưởng nhóm quyết trong buổi thảo luận 22–23/10/2026 và duyệt [design 23/10/2026](../superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md). Đây không phải sửa từ phản biện của 05; QA phản biện các quyết định này ở 05 mục 6.7.
+Trưởng nhóm quyết trong buổi thảo luận 22–23/10/2026 và duyệt design 23/10/2026 (file đã xóa ngày 27/10/2026). Đây không phải sửa từ phản biện của 05; QA phản biện các quyết định này ở 05 mục 6.7.
 
 | # | Quyết định | Áp vào |
 |---|---|---|

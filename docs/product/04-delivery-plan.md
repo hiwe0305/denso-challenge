@@ -1,9 +1,10 @@
 # 04 · Kế hoạch triển khai: Humanoid Data Flywheel
 
-_Ngày 22/10/2026. Vai trò BMAD: Product Owner (Sarah) viết mục 1; Scrum Master (Bob) viết mục 0, 2–8. Đầu vào: [README](README.md), [00](00-idea-analysis.md), [01](01-project-brief.md), [02](02-prd.md), [03](03-architecture.md), [spec v10.1](../spec-v10-failure-to-data.md), phản biện của QA ở [05](05-review-and-mentor-questions.md) và quyết định áp phản biện ở [06](06-review-round-1-decisions.md). Bản 0.2 đồng bộ với spec v10.1, 00 bản 0.2, 01 bản 0.3, 02 bản 0.3, 03 bản 0.3. Tên giả thuyết theo 06: **HS** (sim), **HT** gồm **HTa** và **HTb** (nhắm theo lỗi), **HD** (debug); mã đề giữ "H1" cho tới khi BTC xác nhận. Story Sprint 1 nằm ở [stories/](stories/). Câu hỏi cụ thể cho mentor do QA soạn ở 05 mục 6 và 6.6; file này chỉ trỏ tới._
+_Ngày 22/10/2026. Vai trò BMAD: Product Owner (Sarah) viết mục 1; Scrum Master (Bob) viết mục 0, 2–8. Đầu vào: [README](README.md), [01](01-project-brief.md), [02](02-prd.md), [03](03-architecture.md), [spec v10.1](../spec-v10-failure-to-data.md), phản biện của QA ở [05](05-review-and-mentor-questions.md) và quyết định áp phản biện ở [06](06-review-round-1-decisions.md). Bản 0.2 đồng bộ với spec v10.1, 00 bản 0.2, 01 bản 0.3, 02 bản 0.3, 03 bản 0.3. Tên giả thuyết theo 06: **HS** (sim), **HT** gồm **HTa** và **HTb** (nhắm theo lỗi), **HD** (debug); mã đề giữ "H1" cho tới khi BTC xác nhận. Story Sprint 1 nằm ở [stories/](stories/). Câu hỏi cụ thể cho mentor do QA soạn ở 05 mục 6 và 6.6; file này chỉ trỏ tới._
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 27/10/2026 | 0.7 | Theo spec v10.4 và [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md): mục 4.1 ghi story Sprint 1 mở lại hoặc về lại SIMPLE; mục 4.9 thay mục 4.9 và 4.10 cũ (robot DENSO trong Isaac Sim, robot DENSO trên MuJoCo): demo 17/11/2026 trên G1 + Ψ₀, story DA giữ, sửa, xóa, thêm DA-26 đến DA-28, giờ ước, điều kiện qua G0. Người làm của story mới và story đổi hướng chờ PO giao | PO (Hiếu) |
 | 22/10/2026 | 0.1 | Bản đầu: kết quả kiểm PO, nhịp sprint, phân công, kế hoạch 6 sprint, DoR, DoD, lịch mentor, phương án trễ, chỉ số theo dõi | PO, SM |
 | 22/10/2026 | 0.2 | Đổi tên giả thuyết H1, H2, H3 thành HS, HT (HTa, HTb), HD; giữ mã đề. Sửa mã trích 05 bị sai: "05 TN…" thành "05 TH…" (TN là mã tính năng của 01) | SM theo 06 |
 | 22/10/2026 | 0.2 | Thêm 5 story mới của 02 bản 0.3: 1.9 V3 (S1-11, S1, hạn ngày 5); 5.5 tuyến generator (S2–S3); 2.8 backup (S3–S4); 7.11 B-fail (S4–S5); 7.10 F-ACT (S5–S6). Phân công theo vai ở mục 3; S1-05 còn Q2 | SM theo 06 |
@@ -200,7 +201,7 @@ Châu dự phòng cho hai người. Bù bằng: runbook Ψ₀ (`packages/flywhee
 
 Story mới không thuộc Robot Learning nhưng cần Hiếu duyệt: 7.10 F-ACT (02 gợi ý Data-Platform; Châu vận hành, Thông báo cáo theo vòng; Hiếu duyệt RunPlan F-ACT trước vòng 1) và 7.11 B-fail (Hưng sinh sim, Châu train ACT; Hiếu quyết B-fail trên Ψ₀ ở review G4).
 
-Quy tắc (bản 0.6, theo [07 mục 3.4](07-team-workflow.md) bản 0.3, thay quy tắc cũ "Hiếu không là người review duy nhất của PR nào"): Hiếu là người duyệt và merge duy nhất vào `master`; chủ sở hữu đường dẫn và người bình luận ở 07 mục 2.1 góp ý nhưng không chặn merge. Cách Hiếu merge PR của chính mình chờ câu Q-E của [design 25/10/2026](../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md). Mọi lệnh train và serve Ψ₀ có trong runbook; card chờ Hiếu duyệt quá 2 ngày thì Thông nhắc trong check-in.
+Quy tắc (bản 0.6, theo [07 mục 3.4](07-team-workflow.md) bản 0.3, thay quy tắc cũ "Hiếu không là người review duy nhất của PR nào"): Hiếu là người duyệt và merge duy nhất vào `master`; chủ sở hữu đường dẫn và người bình luận ở 07 mục 2.1 góp ý nhưng không chặn merge. Cách Hiếu merge PR của chính mình chờ câu Q-E của design 25/10/2026 (file đã xóa ngày 27/10/2026). Mọi lệnh train và serve Ψ₀ có trong runbook; card chờ Hiếu duyệt quá 2 ngày thì Thông nhắc trong check-in.
 
 ### 3.3 RACI theo module và adapter
 
@@ -276,7 +277,7 @@ Giờ trong bảng là ước lượng ở mục 0, cho **phạm vi mặc địn
 | [S1-10](stories/S1-10-mo-hinh-du-lieu-va-kho.md) | 2.1 phần a | Mô hình dữ liệu L0-lite và kho lưu | [Lõi] | Thông | 10 |
 | [S1-11](stories/S1-11-bo-dieu-khien-v3.md) | 1.9 | Bộ điều khiển teleop và MP (V3), hạn ngày 5; thử T1 (Hưng 12 giờ), T2 (Châu 6 giờ) | [Adapter] | Hưng | 18 |
 
-**Bản 0.4 (25/10/2026).** Theo [design ngày 25/10/2026](../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) mục 11.1: S1-05 và S1-11 **hủy** (teleop, planner và policy chạy cùng bộ điều khiển trên MuJoCo, không còn V3); S1-02 thu nhỏ còn môi trường đủ cho S1-03; S1-06 thu nhỏ còn phần tách hình ảnh; S1-07 thay bằng DA-22 (dataset BTC); S1-09 đổi sang task khay → máy trên MuJoCo; S1-04 mở rộng sang stage 2–3 trên Colab. S1-01, S1-03, S1-08, S1-10 giữ nguyên. Story mới của Sprint 1 ở mục 4.10.
+**Bản 0.7 (27/10/2026).** Theo [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 13: task chính là task hai bàn `G1WholebodyLocomotionPickBetweenTablesTeleop-v0`. S1-05 (sinh tự động cho task hai bàn), S1-07 (phân tích gói psi-data của task hai bàn) và S1-11 (V3 cho task hai bàn) **mở lại**; S1-02, S1-06, S1-09 về lại SIMPLE; S1-03, S1-04 thêm task hai bàn và thời gian eval ở `mujoco`, `mujoco_isaac`. Người ở bảng trên là bản 0.2; người của story đổi hướng chờ PO giao. Bản 0.4 (hủy S1-05, S1-11, đổi S1-07 sang dataset BTC, S1-09 sang task khay → máy) bị thay. Story DA của Sprint 1 ở mục 4.9.
 
 Việc ngoài story: Hiếu 10 giờ (DENSO DN1, ngân sách GPU, mã đề, email PSI Lab, buổi mentor đầu, rà claim theo 05 mục 2.1, chốt H thực từng người); Hưng 2 giờ hỗ trợ S1-03; Thông 4 giờ dựng bảng công việc.
 
@@ -449,61 +450,42 @@ Cắt mức 1–7 còn khoảng **935 giờ**, vẫn bằng 128% mức 70% và 8
 
 Nếu H = 20 và k ≥ 1: mức 1–7 cộng B và D còn khoảng 887 giờ, vẫn 122% mức 70%. Khi đó chỉ còn chọn E, hoặc bỏ bớt một phần giả thuyết phụ (ví dụ HD chỉ còn lỗi cấy và card sai; F-ACT chỉ chạy đủ để có nhánh C của ACT cho HTb). **Đề xuất của SM:** chốt H thực ở họp lập kế hoạch S1; áp sẵn mức 1–7 từ đầu dự án như 02 §4 yêu cầu, trừ khi phương án A được cam kết; quyết B và C ở review G0; nếu sau G0 vẫn vượt 110% mức 70% thì PO chọn D rồi E.
 
-### 4.9 Phạm vi thêm ngày 23/10/2026
+### 4.9 Thay đổi ngày 27/10/2026: demo G1 + Ψ₀
 
-Theo spec v10.2 và [design ngày 23/10/2026](../superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md): robot DENSO (hoặc robot thay thế) trong Isaac Sim với task khay → máy, pipeline dữ liệu ba nguồn, synthetic S1–S4 qua NIM, probe theo stage của Ψ₀, log train theo nhóm action và bảng lỗi 5 nguồn.
+Theo spec v10.4 và [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md). Mục này thay mục 4.9 (robot DENSO trong Isaac Sim, 23/10/2026) và 4.10 (robot DENSO trên MuJoCo, 25/10/2026) của các bản trước.
 
-Ước theo 14 story DA-01…DA-14 ở [07 mục 2.2](07-team-workflow.md) (ước thô ban đầu của design là 160–220 giờ):
+**Mốc.** Lịch bắt đầu thứ Hai 26/10/2026; demo ngày **17/11/2026** rơi vào thứ Ba tuần 4 của Sprint 2, trước review cổng G1. Kịch bản demo ở design mục 11. HS, HT, HD và holdout theo lộ trình 12 tuần sau demo.
 
-| Hạng mục | Story | Giờ người | Pha |
+**Story DA** (07 mục 2.2). Giờ là ước lượng thô, chốt lại khi viết đủ file story. Người làm chờ PO giao:
+
+| Story | Việc | Giờ | Sprint |
 |---|---|---|---|
-| Robot thay thế và cảnh trạm làm việc | DA-10, DA-11 | 40–60 | A |
-| Định dạng chung, export, pipeline teleop và egocentric | DA-01–DA-04 | 61–84 | A, bộ đọc DENSO ở B |
-| NIM và tầng S3 | DA-05, DA-06 | 27–35 | A |
-| Log train, phát hiện lỗi train, probe P1–P4 | DA-07–DA-09 | 30–44 | A |
-| Task khay → máy và scorer | DA-12 | 15–20 | A |
-| Quy lỗi về stage | DA-13 | 8–10 | A |
-| Xin thông tin DENSO | DA-14 | 3 | A |
-| **Tổng** | | **khoảng 185–255** | Chưa nằm trong khoảng 962 giờ ở mục 4.8 |
+| DA-01, DA-02, DA-03 | Định dạng episode chung; export LeRobot v2.1; pipeline teleop trên psi-data, bàn phím và sinh tự động | 36–49 | S1–S2 |
+| DA-08, DA-13 | Phát hiện lỗi F-TRAIN, F-OFF; quy lỗi về stage | 16–22 | S2–S3 |
+| DA-09 | Probe P1–P4 | 12–18 | S2–S3 |
+| DA-16 | Thiết bị bàn phím cho teleop decoupled WBC của SIMPLE | 10–15 | S1–S2 |
+| DA-17 | Phát lại action trên MuJoCo của SIMPLE | 7–11 | S1–S2 |
+| DA-19 | Code train của tác giả, lớp bọc log, Colab, client RTC | 22–30 | S1–S2 |
+| DA-20 | Agent QA/QC | 20–30 | S2 |
+| DA-21 | Export LeRobot v3, checklist chuẩn hóa | 4–6 | S2 |
+| DA-23 | Eval bất đồng bộ trên SIMPLE | 8–12 | S2–S3 |
+| DA-25 | Schema và file mẫu artifact giữa các làn | 6–10 | S1 |
+| DA-26 | Thí nghiệm HE (không tính GPU-giờ) | 15–25 | S1–S3 |
+| DA-27 | Bộ lỗi cấy cho QA và Agent QA/QC | 10–15 | S2 |
+| DA-28 | Kịch bản demo 17/11 chạy trọn luồng | 8–12 | S2 |
+| **Tổng** | | **khoảng 175–255** | |
 
-Tải từng người sau khi cộng phần này ở 07 mục 2.3.
+**Hoãn sau demo:** DA-04 (egocentric trên mẫu EgoDex), DA-05 (NimClient), DA-06 (tầng S3). **Xóa:** DA-10, DA-11, DA-12, DA-14, DA-15, DA-18, DA-22, DA-24 (robot DENSO, video nhà máy, dataset BTC, ROS 2). DA-07 đã gộp vào DA-19.
 
-**Quyết định của trưởng nhóm (23/10/2026):**
+**Story Sprint 1 mở lại** (giờ ước lượng): S1-05 sinh tự động cho task hai bàn 15–25 (cao hơn 6 giờ cũ vì tuyến A phải tự viết planner trong env WBC); S1-07 8–12; S1-11 6–10 (đọc cấu hình và checkpoint `…mixed-v0`, chọn tuyến).
 
-1. Giữ đủ phạm vi, không cắt trước. Ước lượng ở mục 0 đã tính việc dùng AI viết mã; mức tăng tốc thật đo bằng k sau Sprint 1.
-2. Khi vượt thời gian, **thay phần tự xây bằng API theo từng phần trước** (design mục 11), mỗi lần ghi Decision và chi phí API; quy tắc định tuyến dữ liệu theo `data_class` không nới.
-3. Nếu sau bước 2 vẫn vượt 110% mức kế hoạch ở review G0, áp thứ tự cắt mục 7.2, rồi cắt phần mới theo thứ tự S4, U4, E-A trên dữ liệu thật, S2-B.
+**Quyết định của trưởng nhóm còn giữ từ 23/10/2026:** giữ đủ phạm vi, không cắt trước; khi vượt thời gian, thay phần tự xây bằng API hoặc phần có sẵn theo từng phần trước, mỗi lần ghi Decision và chi phí; quy tắc định tuyến theo `data_class` không nới; nếu vẫn vượt 110% mức kế hoạch ở review G0, áp thứ tự cắt mục 7.2.
 
-Story cho phần này chưa viết. SM tách story theo design mục 11 ở họp lập kế hoạch Sprint 1 và giao người theo RACI mục 3.3; Hiếu gửi danh sách 21 mục cần xin DENSO (design mục 9) trong tuần 1.
+**Máy chạy.** RTX 3060 12 GB cho dev, SIMPLE ở `mujoco`, teleop bàn phím, ACT, DP, Agent QA/QC; Colab Pro (A100, H100) cho fine-tune Ψ₀. Mọi dữ liệu của demo là `public` nên lên Colab được. S1-04 đo giờ một lần fine-tune và thời gian eval ở hai chế độ trước review G0. HE thêm khoảng 8–10 lần fine-tune Ψ₀ (ước lượng); nếu vượt ngân sách, rút gọn theo design mục 7.4.
 
-### 4.10 Thay đổi ngày 25/10/2026: robot DENSO trên MuJoCo
+**Điều kiện qua G0 thêm** (bản 0.7): Ψ₀ tái tạo trên task hai bàn; thiết bị bàn phím ghi được episode qua QA và phát lại; giờ người của 20 demo thử đã đo; thời gian eval ở `mujoco` và `mujoco_isaac` đã đo; giờ một lần fine-tune Ψ₀ trên Colab đã đo; V3 có kết luận cho task hai bàn và tuyến sinh tự động đã chọn.
 
-Theo spec v10.3 và [design ngày 25/10/2026](../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md). Thí nghiệm có đối chứng chạy trên robot DENSO trong MuJoCo; SIMPLE chỉ còn G0; Isaac Sim sau demo.
-
-**Bản 0.5.** Sau [design chia làn](../superpowers/specs/2026-10-25-lanes-and-code-structure-design.md) chủ của một số story đổi (DA-17, DA-18 sang Thông; DA-20 sang Châu; DA-23 sang Long; S1-02, S1-04 sang Hiếu; S1-06, S1-09 sang Hưng) và có thêm DA-24 (ROS 2, Hưng, 25–35 giờ), DA-25 (schema artifact, Hiếu, 6–10 giờ), PR `chore-restructure` (Long, trước 28/10). Cột người ở bảng dưới là bản 0.4; bảng đúng ở 07 mục 2.2, tải ở 07 mục 2.3.
-
-**Story mới** (07 mục 2.2). Giờ là ước lượng thô của SM, chốt lại khi viết file story:
-
-| Story | Việc | Người | Giờ | Sprint |
-|---|---|---|---|---|
-| DA-15 | Robot DENSO tương đương (MJCF), cảnh trạm, task khay → máy, planner | Hưng | 25–35 | S1–S2 |
-| DA-16 | Teleop bàn phím, ghi episode | Hưng | 10–15 | S1 |
-| DA-17 | Phát lại action hai chế độ | Châu | 8–12 | S1–S2 |
-| DA-18 | Egocentric thô → định dạng EgoDex cho stage 1 | Long | 20–30 | S2–S3 |
-| DA-19 | Đọc code train của tác giả, lớp bọc log cho 3 stage (gộp DA-07), adapter train trên Colab | Hiếu | 20–28 | S1–S2 |
-| DA-20 | Agent QA/QC (Nemotron), dựng hình từng stage, bộ ca mẫu | Thông | 20–30 | S2–S3 |
-| DA-21 | Export LeRobot v3, checklist chuẩn hóa | Thông | 4–6 | S2 |
-| DA-22 | Đọc và phân tích dataset BTC | Thông | 8–12 | S1 |
-| DA-23 | Eval bất đồng bộ trên MuJoCo, log inference RTC | Châu | 10–15 | S2 |
-| **Tổng** | | | **khoảng 125–183** | |
-
-**Phần bớt** (ước lượng): S1-05 6 giờ, S1-11 18 giờ, story 5.5 tuyến generator 36 giờ, phần thu nhỏ của S1-02 và S1-06 khoảng 12 giờ, S1-07 12 giờ thay bằng DA-22; DA-07 10–14 giờ gộp vào DA-19; DA-10 gộp vào DA-15 và DA-11 (cảnh Isaac Sim) dời sau demo, bớt khoảng 40–60 giờ trong 12 tuần. Tổng bớt khoảng 135–160 giờ, nên tổng tải gần như không đổi; phân bố theo người ở 07 mục 2.3. Tốc độ đo đầu tiên (S1-01, S1-08) cho thấy phần viết mã nhanh hơn ước lượng 3–10 lần; k chính thức tính sau Sprint 1 (mục 8).
-
-**Máy chạy.** RTX 3060 12 GB cho dev, MuJoCo, ACT, DP, Agent QA/QC; Colab Pro (A100, H100) cho train Ψ₀. S1-04 đo giờ một lần train Ψ₀ trên một GPU trước review G0; nếu tổng số lần train ở spec mục 9 vượt ngân sách, vòng lặp chạy trên ACT và DP, Ψ₀ giữ cho nhánh cuối. Dữ liệu DENSO chưa được lên Colab (design 25/10 mục 9).
-
-**Điều kiện qua G0 thêm** (bản 0.4): robot DENSO tương đương chạy trong MuJoCo; teleop bàn phím ghi được episode qua QA và phát lại; giờ người của 20 demo thử đã đo; giờ một lần train Ψ₀ trên Colab đã đo; bỏ điều kiện V3 và T1, T2.
-
-**Quy trình.** Hiếu là người duyệt và merge duy nhất vào `master` (08 mục 3, RULE mục 4). Lịch tracking tự động lúc 10:00, 14:00, 18:00 và tổng kết cuối ngày lúc 21:30 thay cho người review dự phòng của R2. Không ai phải chờ ai: mỗi chỗ nối có schema trong `contracts`, bản giả trong `flywheel-fakes` và file mẫu (design 25/10 mục 10.1).
+**Quy trình.** Hiếu là người duyệt và merge duy nhất vào `master` (08 mục 3, RULE mục 4). Lịch tracking tự động lúc 10:00, 14:00, 18:00 và tổng kết cuối ngày lúc 21:30 thay cho người review dự phòng của R2. Không ai phải chờ ai: mỗi chỗ nối có schema trong `flywheel.contracts`, bản giả và file mẫu trong `flywheel.testkit`.
 
 ## 5. Định nghĩa Sẵn sàng và Hoàn thành
 
@@ -553,7 +535,7 @@ Theo spec v10.3 và [design ngày 25/10/2026](../superpowers/specs/2026-10-25-de
 
 ## 6. Lịch làm việc với mentor
 
-Chuyên môn của mentor chưa rõ (00 §8 câu 2). Buổi S0 xác định mảng mentor mạnh; câu hỏi ở mảng mentor không mạnh thì Hiếu xin mentor giới thiệu người khác hoặc hỏi BTC. Mã câu hỏi theo 05 mục 6. Câu đã chốt theo 06 (RL7, DS1, DS5, DS6, TK1, TK8) chỉ còn để mentor xác nhận hoặc phản bác. MO4 và MO5 là câu hỏi nội bộ, trả lời ở họp lập kế hoạch S1 và story 2.8, không cần mentor.
+Chuyên môn của mentor chưa rõ (câu 2 mục 8 của 00 · Phân tích idea, file đã xóa ngày 27/10/2026). Buổi S0 xác định mảng mentor mạnh; câu hỏi ở mảng mentor không mạnh thì Hiếu xin mentor giới thiệu người khác hoặc hỏi BTC. Mã câu hỏi theo 05 mục 6. Câu đã chốt theo 06 (RL7, DS1, DS5, DS6, TK1, TK8) chỉ còn để mentor xác nhận hoặc phản bác. MO4 và MO5 là câu hỏi nội bộ, trả lời ở họp lập kế hoạch S1 và story 2.8, không cần mentor.
 
 | Khi | Mang tới | Câu hỏi trong 05 | Mảng | Kết quả mong đợi |
 |---|---|---|---|---|

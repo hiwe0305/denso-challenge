@@ -6,25 +6,24 @@ Thư mục này là bộ hồ sơ sản phẩm làm theo BMAD Method (Breakthrou
 
 | Bước | Vai trò BMAD | Tài liệu | Trả lời câu hỏi |
 |---|---|---|---|
-| 0 | Trưởng nhóm | [00 · Phân tích idea](00-idea-analysis.md) | Sản phẩm là gì, lõi là gì, đã chứng minh gì |
 | 1 | Analyst | [01 · Project brief](01-project-brief.md) | Vì sao đáng làm, cho ai, khác gì giải pháp có sẵn |
 | 2 | Product Manager | [02 · PRD](02-prd.md) | Phải làm gì, theo epic và story nào, nghiệm thu ra sao |
 | 3 | Architect | [03 · Kiến trúc](03-architecture.md) | Xây thế nào để mở rộng từ 1 task sim lên nhiều robot, nhiều nhà máy |
 | 4 | Product Owner + Scrum Master | [04 · Kế hoạch triển khai](04-delivery-plan.md) | Ai làm gì, sprint nào, định nghĩa hoàn thành |
-| 5 | QA + phản biện | [05 · Phản biện và câu hỏi cho mentor](05-review-and-mentor-questions.md) | Chỗ nào yếu, hỏi mentor gì |
-| 6 | Trưởng nhóm | [06 · Quyết định áp dụng phản biện vòng 1](06-review-round-1-decisions.md) | Cách áp 10 sửa ưu tiên của QA, đổi tên giả thuyết HS, HT, HD |
-| 7 | Scrum Master + Product Owner | [07 · Chia việc và quy trình git](07-team-workflow.md) | Ai sở hữu đường dẫn nào, 14 story Pha A, cách 5 người cùng dùng Claude mà không xung đột, theo dõi theo nhiệm vụ con |
+| 5 | QA + phản biện | [05 · Phản biện và câu hỏi cho mentor](05-review-and-mentor-questions.md) | Chỗ nào yếu, hỏi mentor gì. Lưu trữ: bảng phản biện viết cho bản v10.1 |
+| 6 | Trưởng nhóm | [06 · Quyết định áp dụng phản biện vòng 1](06-review-round-1-decisions.md) | Cách áp 10 sửa ưu tiên của QA, đổi tên giả thuyết HS, HT, HD. Lưu trữ: các sửa đã áp vào spec và 01–04 |
+| 7 | Scrum Master + Product Owner | [07 · Chia việc và quy trình git](07-team-workflow.md) | Ai sở hữu đường dẫn nào, bảng story DA, cách 5 người cùng dùng Claude mà không xung đột, theo dõi theo nhiệm vụ con |
 | 8 | Scrum Master + Product Owner | [08 · Kiểm soát dự án theo ngày](08-daily-control.md) | Chỉ số hiệu suất và lỗi, 9 rule có ngưỡng, nhãn nguyên nhân, báo cáo ngày tự động, sổ can thiệp |
-| — | Scrum Master | [stories/](stories) | 11 story của Sprint 1 theo mẫu story của BMAD |
+| — | Scrum Master | [stories/](stories) | Story Sprint 1 (S1-xx) và story của design (DA-xx) theo mẫu story của BMAD |
 
-Đặc tả thuật toán và thiết kế thí nghiệm gốc: [spec v10.2](../spec-v10-failure-to-data.md). Pipeline dữ liệu ba nguồn, robot DENSO, probe theo stage và bảng lỗi: [design ngày 23/10/2026](../superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md).
+Đặc tả thuật toán và thiết kế thí nghiệm: [spec v10.4](../spec-v10-failure-to-data.md). Design hiện hành duy nhất: [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md).
 
-## Cập nhật ngày 23/10/2026
+## Cập nhật ngày 27/10/2026
 
-- Robot chính là mobile manipulator của DENSO; G1 trong SIMPLE là bàn thử. Task đầu tiên: lấy linh kiện từ khay, đặt vào máy. DENSO gửi muộn thì dùng robot thay thế giống ≥ 95%.
-- Ψ₀ dùng lại checkpoint của tác giả: stage 1 giữ nguyên, stage 2 train lại cho robot DENSO, stage 3 fine-tune theo task.
-- Đã cập nhật spec lên v10.2, 00 lên 0.3, 01 lên 0.4, 02 lên 0.4 (Epic 9, FR48–FR57, NFR13), 03 lên 0.4, 04 mục 4.9 (phạm vi thêm khoảng 185–255 giờ, giữ đủ phạm vi, vượt thời gian thì dùng API theo từng phần trước), 05 lên 0.3 (mục 6.7, MO6–MO13), 06 thêm mục 11 (quyết định ngày 23/10/2026); thêm 07.
-- Chưa cập nhật: file story DA-01…DA-14, mục "Phạm vi file" của story Sprint 1, website và Pitch v10.
+- Demo ngày 17/11/2026 và mọi thí nghiệm chạy trên G1 trong SIMPLE với Ψ₀; task chính là task hai bàn. Robot DENSO (Isaac Sim ở bản 23/10, MuJoCo ở bản 25/10) đã bỏ.
+- Thêm giả thuyết HE (dữ liệu egocentric giảm số demo robot cần), teleop bàn phím, sinh tự động, bộ lỗi cấy cho Agent QA/QC.
+- Đã cập nhật spec lên v10.4, 01 lên 0.5, 02 lên 0.5, 03 lên 0.7, 04 lên 0.7, 07 lên 0.5, RULE, CLAUDE.md, file story. Đã xóa 00, ba design ngày 23/10 và 25/10, story DA-15, DA-18, DA-22, DA-24. 01 và 02 chỉ sửa phần nói về robot DENSO; 05 và 06 giữ làm lưu trữ.
+- Chưa cập nhật: website và Pitch v10 (làm khi chuẩn bị demo 17/11); người làm của story mới.
 
 ## Trạng thái ngày 22/10/2026
 
@@ -36,7 +35,7 @@ Thư mục này là bộ hồ sơ sản phẩm làm theo BMAD Method (Breakthrou
 
 BMAD đi theo vòng **Làm rõ → Lập kế hoạch → Xây và kiểm → Học và điều chỉnh**. Áp vào đội:
 
-1. **Làm rõ:** mỗi thay đổi lớn bắt đầu bằng việc sửa 00 hoặc 01, không sửa thẳng code.
+1. **Làm rõ:** mỗi thay đổi lớn bắt đầu bằng một design trong `docs/superpowers/specs/` hoặc sửa 01, không sửa thẳng code.
 2. **Lập kế hoạch:** PRD (02) và kiến trúc (03) là nguồn sự thật; story trong 04 trỏ về requirement và module tương ứng.
 3. **Xây và kiểm:** mỗi story có tiêu chí chấp nhận; xong khi qua định nghĩa hoàn thành trong 04.
 4. **Học và điều chỉnh:** cuối mỗi sprint, cập nhật sổ chi phí, kết quả cổng, và đưa câu hỏi mới vào 05 để hỏi mentor.

@@ -1,9 +1,10 @@
 # 03 · Kiến trúc: Humanoid Data Flywheel
 
-_Vai trò: Architect (Winston), quy trình BMAD. Ngày 22/10/2026. Đầu vào: [00-idea-analysis](00-idea-analysis.md), [spec v10.1](../spec-v10-failure-to-data.md), phản biện [05](05-review-and-mentor-questions.md) và bảng quyết định [06](06-review-round-1-decisions.md). Tài liệu trả lời câu hỏi: xây lõi flywheel thế nào để L0 chạy được trong 12 tuần, và L1–L3 chỉ cần thêm adapter và dữ liệu, không phải viết lại. Từ bản 0.3, tên giả thuyết theo 06: **HS** (sim thay được 30% demo teleop), **HT** gồm **HTa** và **HTb** (nhắm theo lỗi), **HD** (evidence card giảm thời gian chẩn đoán)._
+_Vai trò: Architect (Winston), quy trình BMAD. Ngày 22/10/2026. Đầu vào: [spec v10.1](../spec-v10-failure-to-data.md) (bản hiện hành v10.4), phản biện [05](05-review-and-mentor-questions.md) và bảng quyết định [06](06-review-round-1-decisions.md). Tài liệu trả lời câu hỏi: xây lõi flywheel thế nào để L0 chạy được trong 12 tuần, và L1–L3 chỉ cần thêm adapter và dữ liệu, không phải viết lại. Từ bản 0.3, tên giả thuyết theo 06: **HS** (sim thay được 30% demo teleop), **HT** gồm **HTa** và **HTb** (nhắm theo lỗi), **HD** (evidence card giảm thời gian chẩn đoán)._
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 27/10/2026 | 0.7 | Theo spec v10.4 và [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md): bỏ robot DENSO, MuJoCo riêng và ROS 2 (mục 1.1, 2.1, 5.4, 7.1, 7.3); SIMPLE là simulator chính, thu và sinh dữ liệu ở `--sim-mode=mujoco` (mục 2.1, ADR-25); adapter `SimpleSim` có `replay()`, thiết bị bàn phím, hai tuyến sinh tự động, task hai bàn (mục 5.4); Agent QA/QC đọc báo cáo dataset và chấm trên bộ lỗi cấy (mục 2.3, ADR-26); cây mã không ghi tên người, chủ ở 07 (mục 7.1); luật import và artifact giữa làn chép vào mục 7.3 vì design chia làn đã xóa; ADR-18, ADR-21, ADR-23 bị thay | PO (Hiếu) |
 | 22/10/2026 | 0.1 | Bản đầu; đã đối chiếu repo SIMPLE, Ψ₀ và psi-data (mục 3.2) | Architect |
 | 22/10/2026 | 0.2 | Mục 1.1: B⁺ ghi là tùy chọn, khớp spec 7.2 và PRD 7.9 | PO |
 | 22/10/2026 | 0.2 | Mục 4.3: Episode thêm `data_class` (mức phân loại theo PRD NFR6) | PO |
@@ -18,9 +19,9 @@ _Vai trò: Architect (Winston), quy trình BMAD. Ngày 22/10/2026. Đầu vào: 
 | 22/10/2026 | 0.3 | 06 #4: chẩn đoán NGOÀI MIỀN (mục 6.2); tăng cường thị giác là recipe chung trong RunPlan, bỏ `visual_aug` khỏi loại can thiệp (ADR-17); RunPlan và `gate` hỗ trợ B-fail, F-ACT, N_B | Architect theo 06 |
 | 22/10/2026 | 0.3 | 06 #5: `diagnosis` thêm phép kiểm đồng bộ cảm biến (τ_sync) và camera chuẩn, chẩn đoán LỖI ĐỒNG BỘ và LỖI CALIBRATION; trace lưu timestamp ảnh, timestamp state và tham số camera (V11); mục 6.4 HD theo 06 mục 5 | Architect theo 06 |
 | 22/10/2026 | 0.3 | 06 #8: mục 8.1 RunPlan dùng `pre.*` hoặc `postpre.*` có provenance trong Source, chỉ RunPlan `g0_repro` được trỏ `simple-checkpoints`, `sonic-checkpoints`; mục 8.3 guard gần trùng theo khoảng cách điều kiện, dải seed rời dải tác giả | Architect theo 06 |
-| 25/10/2026 | 0.6 | Theo [design chia làn ngày 25/10/2026](../superpowers/specs/2026-10-25-lanes-and-code-structure-design.md): mục 7.1 thay bằng cây mới (nhân, ba làn, adapter, `denso-sim`, `ros2_ws`), namespace `flywheel.*`, mục 7.3 khuôn package và luật import mới; mục 5.4 thêm `denso-sim` và ROS 2; ADR-22 đến ADR-24 | PO (Hiếu) |
-| 25/10/2026 | 0.5 | Theo spec v10.3 và [design ngày 25/10/2026](../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md): robot DENSO trên MuJoCo là simulator chính, SIMPLE chỉ còn G0 (mục 2.1, 5.4, 7.1, ADR-18); Agent QA/QC trước bước kỹ sư duyệt (mục 2.3, ADR-19); `RolloutRequest.timing` cho eval bất đồng bộ (mục 5.2, ADR-20); chỉ số chính là vị từ thành công của env MuJoCo (ADR-21); package `flywheel-mujoco`, `flywheel-agentqa` (mục 7.1); rủi ro mới (mục 12.2) | PO (Hiếu) |
-| 23/10/2026 | 0.4 | Theo spec v10.2 và [design ngày 23/10/2026](../superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md): mục 1.1 thêm robot DENSO, pipeline ba nguồn, probe theo stage; mục 2.1 thêm NIM trên máy 5090 và A100; mục 4.3 thêm trường episode cho nguồn dữ liệu, độ tin action, che danh tính, `segments.parquet`, `action_layout`; mục 5.4 thêm adapter robot DENSO, robot thay thế, NIM, ingest; mục 6.2 thêm bước 4b quy lỗi về stage; mục 7.1 thêm package `flywheel-ingest`, `flywheel-nim`, `flywheel-isaac` | Architect |
+| 25/10/2026 | 0.6 | Theo design chia làn ngày 25/10/2026 (file đã xóa ngày 27/10/2026): mục 7.1 thay bằng cây mới (nhân, ba làn, adapter, `denso-sim`, `ros2_ws`), namespace `flywheel.*`, mục 7.3 khuôn package và luật import mới; mục 5.4 thêm `denso-sim` và ROS 2; ADR-22 đến ADR-24 | PO (Hiếu) |
+| 25/10/2026 | 0.5 | Theo spec v10.3 và design ngày 25/10/2026 (file đã xóa ngày 27/10/2026): robot DENSO trên MuJoCo là simulator chính, SIMPLE chỉ còn G0 (mục 2.1, 5.4, 7.1, ADR-18); Agent QA/QC trước bước kỹ sư duyệt (mục 2.3, ADR-19); `RolloutRequest.timing` cho eval bất đồng bộ (mục 5.2, ADR-20); chỉ số chính là vị từ thành công của env MuJoCo (ADR-21); package `flywheel-mujoco`, `flywheel-agentqa` (mục 7.1); rủi ro mới (mục 12.2) | PO (Hiếu) |
+| 23/10/2026 | 0.4 | Theo spec v10.2 và design ngày 23/10/2026 (file đã xóa ngày 27/10/2026): mục 1.1 thêm robot DENSO, pipeline ba nguồn, probe theo stage; mục 2.1 thêm NIM trên máy 5090 và A100; mục 4.3 thêm trường episode cho nguồn dữ liệu, độ tin action, che danh tính, `segments.parquet`, `action_layout`; mục 5.4 thêm adapter robot DENSO, robot thay thế, NIM, ingest; mục 6.2 thêm bước 4b quy lỗi về stage; mục 7.1 thêm package `flywheel-ingest`, `flywheel-nim`, `flywheel-isaac` | Architect |
 | 22/10/2026 | 0.3 | 06 #9: mục 2.4 L0-lite và ADR-13; mục 4 còn 12 thực thể kèm bảng gộp, `task_id`, `embodiment_id`, `site_id` là cột thường có mặc định; mục 3.1, 7, 8.4 hoãn MLflow, Streamlit, fsspec S3, phân vùng ngày, lệnh dựng lại chỉ mục, revision card; mục 10.4 backup và diễn tập khôi phục (AR3); ADR-14 chỉ số chính holdout từ cờ SIMPLE (AR4); `failure_class` (AR5); mục 9.4 phác L2 (AR6); khóa holdout theo checkpoint để chạy sớm và niêm phong | Architect theo 06 |
 
 ## 1. Giới thiệu, phạm vi, nguyên tắc
@@ -28,7 +29,7 @@ _Vai trò: Architect (Winston), quy trình BMAD. Ngày 22/10/2026. Đầu vào: 
 ### 1.1 Phạm vi
 
 - **Trong phạm vi L0:** mô hình dữ liệu L0-lite (mục 2.4); nạp psi-data, QA, lineage, chia tập (spec mục 4); scorer từng bước (mục 5); thuật toán Failure → Data 12 bước (mục 6); chạy E1, các nhánh A, A₀.₇, B, C, B-fail (chạy trên ACT là chính), B⁺ (tùy chọn, ưu tiên thấp hơn B-fail), chuỗi vòng F-ACT trên ACT và holdout ghép cặp (mục 7.1–7.5); thí nghiệm HD (mục 7.6); sổ chi phí (mục 8).
-- **Thêm từ bản 0.4 (spec v10.2):** robot DENSO (mobile manipulator) hoặc robot thay thế giống ≥ 95% trong Isaac Sim, task khay → máy; pipeline 6 tầng cho teleop, video egocentric và synthetic về một định dạng episode chung; synthetic tầng S1–S4, tầng S3–S4 qua NVIDIA NIM; probe P1–P4 trên checkpoint từng stage Ψ₀; log train theo nhóm action; bảng lỗi 5 nguồn tín hiệu. Chi tiết ở [design ngày 23/10/2026](../superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md).
+- **Thêm từ bản 0.4, sửa ở bản 0.7:** task hai bàn của G1 trong SIMPLE; ba nguồn dữ liệu robot (dataset của tác giả, teleop bàn phím, sinh tự động); pipeline 6 tầng về một định dạng episode chung, có phát lại action; probe P1–P4 trên checkpoint từng stage Ψ₀; log train theo nhóm action; bảng lỗi 5 nguồn tín hiệu; Agent QA/QC; thí nghiệm HE (spec mục 7.9). Chi tiết ở [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md). Synthetic tầng S3–S4 qua NIM để sau PoC.
 - **Ngoài phạm vi L0:** robot thật, nhiều người dùng, giao diện web đầy đủ, dịch vụ mạng của riêng ta. Tài liệu chỉ để sẵn điểm nối cho các phần này (mục 9).
 
 ### 1.2 Nguyên tắc kiến trúc
@@ -52,13 +53,13 @@ Lõi là **một thư viện Python kèm CLI `fw`**, chạy trên máy host. Ada
 
 | Máy | Chạy gì |
 |---|---|
-| RTX 5090 32 GB (máy chính) | Catalog và view DuckDB, container SIMPLE (W worker song song), server suy luận Ψ₀; từ bản 0.4: Isaac Sim cho robot DENSO, NIM Cosmos Reason bản nano tự host (khoảng 23 GB, chạy xen kẽ với server Ψ₀, không cùng lúc) |
+| RTX 5090 32 GB (máy chính) | Catalog và view DuckDB, container SIMPLE (W worker song song), server suy luận Ψ₀; từ bản 0.4: NIM Cosmos Reason bản nano tự host (khoảng 23 GB, chạy xen kẽ với server Ψ₀, không cùng lúc) |
 | RTX 3060 12 GB | Train ACT và Diffusion Policy (gồm B-fail và F-ACT), test CPU, dựng báo cáo, console HD; nhận backup hằng ngày của máy chính |
 | A100 80 GB thuê theo giờ | Fine-tune Ψ₀ (stage 2 và 3); từ bản 0.4: NIM Cosmos Transfer và Predict tự host cho tầng S3–S4; chỉ nhận job spec và bản export dataset, trả checkpoint, video sinh và log về qua rsync |
 
 Máy 5090 là điểm hỏng đơn lẻ (05 AR3). Bù bằng backup hằng ngày sang máy 3060 và một lần diễn tập khôi phục trước G3 (mục 10.4).
 
-**Bản 0.5.** Máy đội đang có: RTX 3060 12 GB (dev, MuJoCo, teleop bàn phím, phát lại action, ACT và DP, Agent QA/QC với Nemotron bản Q4, thử inference Ψ₀) và Colab Pro chạy qua CLI (A100, H100) cho train Ψ₀ stage 1–3. Máy 5090 ở bảng trên chờ xác nhận còn dùng được (design 25/10 mục 12, Q-C). Colab là máy của Google nên chưa nhận dữ liệu DENSO cho tới khi chọn phương án ở design 25/10 mục 9; job train trên Colab phải tiếp tục được từ checkpoint và ghi compute unit vào sổ chi phí.
+**Bản 0.5, sửa ở bản 0.7.** Máy đội đang có: RTX 3060 12 GB (dev, SIMPLE ở `--sim-mode=mujoco`, teleop bàn phím, phát lại action, ACT và DP, Agent QA/QC với Nemotron bản Q4, thử inference Ψ₀) và Colab Pro chạy qua CLI (A100, H100) cho fine-tune Ψ₀. Máy 5090 ở bảng trên chờ xác nhận còn dùng được. Mọi dữ liệu của demo là `public` (psi-data, sim G1) nên Colab nhận được mọi job; quy tắc `data_class` vẫn giữ trong mã. Job trên Colab phải tiếp tục được từ checkpoint và ghi compute unit vào sổ chi phí. Eval có render Isaac (`mujoco_isaac`) mất 6–10 phút mỗi episode theo README Ψ₀; S1-04 đo cả hai chế độ.
 
 ### 2.2 Sơ đồ module
 
@@ -109,7 +110,7 @@ Mũi tên liền là luồng dữ liệu giữa module lõi; mũi tên chấm l�
 8. `gate` xin `scenarios` một tập cổng mới chưa dùng, chạy cha và ứng viên ≥ 3 lượt mỗi điều kiện, so với sàn A/A, ra `Decision` (`dev_gate`); nếu đạt thì cập nhật con trỏ `refs/policy/<nhánh>/current`. Bước 12c.
 9. `gate` đo tỉ lệ sửa được có đối chứng trên điều kiện mới quanh điểm lỗi của từng cụm đã can thiệp (mục 6.2); `ledger` lưu `FixRateEvent`; `reports` dựng card, báo cáo vòng, sổ chi phí.
 
-**Bản 0.5.** Ở bước 2, closed-loop eval chạy ở chế độ bất đồng bộ cho chỉ số chính (ADR-20). Giữa bước 4 và bước 5, **Agent QA/QC** đọc log train, eval, inference và output từng stage do code dựng (bảng ảnh của stage 1, video MuJoCo phát lại action dự đoán của stage 2–3, dòng thời gian RTC), viết báo cáo HTML tĩnh có insight và ước lượng; kỹ sư đọc báo cáo này cùng evidence card khi chạy `fw review` (ADR-19). Ở bước 6, mọi episode có action robot qua phát lại trên MuJoCo trước `qa`.
+**Bản 0.5.** Ở bước 2, closed-loop eval chạy ở chế độ bất đồng bộ cho chỉ số chính (ADR-20). Giữa bước 4 và bước 5, **Agent QA/QC** đọc báo cáo dataset (bản 0.7), log train, eval, inference và output từng stage do code dựng (bảng ảnh của stage 1, video MuJoCo phát lại action dự đoán của stage 3, dòng thời gian RTC), viết báo cáo HTML tĩnh có insight và ước lượng; kỹ sư đọc báo cáo này cùng evidence card khi chạy `fw review` (ADR-19). Ở bước 6, mọi episode có action robot qua phát lại trên MuJoCo trước `qa`.
 
 ### 2.4 L0-lite: phạm vi xây ở L0
 
@@ -241,7 +242,7 @@ Mười hai bảng catalog. Cột chung ở mục 4.1 không ghi lại.
 | LedgerEntry | `led_<ULID>` | hoạt động, loại tài nguyên, số lượng, đơn vị, `pricebook_id`, thành tiền, `estimated` hay `measured`, nhánh, `run_plan_id`, cụm, `intervention_id`, job, người (mã giả danh) | JSONL append-only; sửa sai bằng bút toán đảo |
 | Decision | `dec_<ULID>` | `kind` (plan_review, dev_gate, aa_test, holdout, milestone, repair_ticket), đối tượng (ID), số đo, tiêu chí đã chốt, kết luận, người ký, lý do; `meta`: với `plan_review` là danh sách can thiệp đã duyệt (`iv_<ULID>`, loại, cụm, số lượng, chi phí ước tính) và ghi đè; với `repair_ticket` là trạng thái và `rebaseline_required` | Append-only; trạng thái hiện hành là bản mới nhất cùng đối tượng |
 
-**Trường thêm ở bản 0.4** (design mục 4). Episode thêm cột `source_kind` (teleop, egocentric, synthetic), `action_quality` (measured, planned, retargeted, pseudo, none) và `deid_status` (raw, blurred, verified); `meta` thêm `synthetic_tier` (S1–S4). Bundle episode thêm `segments.parquet` (đoạn theo bước task, nhãn ngôn ngữ, nguồn nhãn). `frames.parquet` đặt cột theo nhóm action của Embodiment với hậu tố `_cmd` và `_meas`. Cấu hình Embodiment thêm `action_layout`: vị trí từng nhóm trong vector action 36 chiều của Ψ₀ và mask phần đệm. Episode `pseudo` hoặc `retargeted` chỉ vào train khi RunPlan cho phép; `catalog` chặn rời bước Annotate nếu `deid_status = raw`.
+**Trường thêm ở bản 0.4, sửa ở bản 0.7** (design mục 6.1; bản 0.7 thêm `source_detail`, `renderer`, `injected_defect` và `embodiment_id` riêng cho dữ liệu AMO). Episode thêm cột `source_kind` (teleop, egocentric, synthetic), `action_quality` (measured, planned, retargeted, pseudo, none) và `deid_status` (raw, blurred, verified); `meta` thêm `synthetic_tier` (S1–S4). Bundle episode thêm `segments.parquet` (đoạn theo bước task, nhãn ngôn ngữ, nguồn nhãn). `frames.parquet` đặt cột theo nhóm action của Embodiment với hậu tố `_cmd` và `_meas`. Cấu hình Embodiment thêm `action_layout`: vị trí từng nhóm trong vector action 36 chiều của Ψ₀ và mask phần đệm. Episode `pseudo` hoặc `retargeted` chỉ vào train khi RunPlan cho phép; `catalog` chặn rời bước Annotate nếu `deid_status = raw`.
 
 **Gộp 28 thực thể của bản 0.2 vào L0-lite.** Tên cũ vẫn dùng được trong 02, 04 và story như tên khái niệm; bảng dưới chỉ ra nơi lưu.
 
@@ -372,26 +373,15 @@ class TaskDefinition(Protocol):
 
 | Adapter | Hiện thực | Ghi chú |
 |---|---|---|
-| SimulatorAdapter | `SimpleSimulator`: phía host dựng job và gọi `docker compose run`; worker trong container gọi client đánh giá SIMPLE và gắn hook ghi tín hiệu | Worker chỉ dùng stdlib cộng `simple`; đọc job JSON, ghi bundle có `t_state`, `t_image`, tham số camera (V11); `control_spec` theo decoupled WBC |
+| SimulatorAdapter | `SimpleSim` (bản 0.7: simulator chính): phía host dựng job và gọi `docker compose run`; worker trong container gọi SIMPLE và gắn hook ghi tín hiệu; chạy `--sim-mode=mujoco` hoặc `mujoco_isaac`; `replay()` hai chế độ động học và động lực học; eval đồng bộ và bất đồng bộ | Worker chỉ dùng stdlib cộng `simple`; đọc job JSON, ghi bundle có `t_state`, `t_image`, tham số camera, `renderer` (V11); `control_spec` theo decoupled WBC |
 | PolicyAdapter | `Psi0Policy` (serve_psi0, `/health`); `LeRobotPolicy` cho ACT và Diffusion Policy | Cách serve ACT và DP trong SIMPLE cần kiểm (V10) |
-| TrainerAdapter | `Psi0Trainer` (script fine-tune SIMPLE, chạy trên A100 thuê); `LeRobotTrainer` (ACT, DP trên 5090 hoặc 3060) | `export_dataset` ghi LeRobot đúng phiên bản V1, có contract test đọc lại (mục 11); tăng cường thị giác lấy từ recipe chung trong `TrainSpec`, như nhau cho mọi nhánh |
-| GeneratorAdapter | Theo V3. Cùng bộ điều khiển hoặc có ánh xạ: `SimpleMPGenerator` (datagen, CuRobo). Khác: tuyến chọn ở mục 12.2, gồm `MPReplayGenerator` (T1), `TeleopVariantGenerator` (T2), `WBCPlannerGenerator` (T3) | Ghi cả lượt hỏng để đo tỉ lệ sinh đạt. Tuyến không cấp `plan()` dưới WBC thì `GenCapabilities.plan = False`: kiểm khả thi dùng demo teleop gần nhất, đánh dấu "gần đúng" |
-| TeleopSource | `SimpleTeleop` nếu có thiết bị (Q6); `PlannerCorrectionSource` nếu không, đi theo cùng tuyến V3 | Bản dự phòng có `operator_kind = machine`, không vào `r_demo` |
-| TaskDefinition | `G1BendPickAndPlace` (6 bước, 9 kiểu lỗi của spec 5, kèm `failure_class`); `G1BendPick` cho task F1 | F1 chỉ kiểm khả năng tổng quát của lõi (NFR7), không làm dự phòng cho Q2 tới khi V3 xác nhận. Dùng `decompose()` của SIMPLE để đối chiếu ranh giới bước |
+| TrainerAdapter | `Psi0Trainer` gọi `finetune-simple-psi0.sh` của tác giả, ghim commit, chạy trên Colab; lớp bọc log ghi `metrics.jsonl`; `LeRobotTrainer` (ACT, DP trên 3060) | `export_dataset` ghi LeRobot v2.1 đúng fork của Ψ₀, có contract test đọc lại (mục 11); phần log thiếu (loss theo nhóm action, theo vị trí trong chunk, phương sai dự đoán) tính lại trên batch val, không sửa code gốc |
+| GeneratorAdapter | Bản 0.7, theo V3: `WbcPlannerGenerator` (tuyến A: script đi bộ cộng cuRobo trong env WBC) hoặc `SimpleMPGenerator` (tuyến B: task MP mới chạy `datagen`, AMO); sau demo `TeleopVariantGenerator` (S2) | Ghi cả lượt hỏng để đo tỉ lệ sinh đạt. Tuyến không cấp `plan()` dưới WBC thì `GenCapabilities.plan = False`: kiểm khả thi dùng demo teleop gần nhất, đánh dấu "gần đúng" |
+| TeleopSource | Bản 0.7: `PsiDataSource` (gói psi-data), `KeyboardTeleop` (thiết bị bàn phím cắm vào `teleop_decoupled_wbc`: vận tốc đi bộ, cổ tay qua IK, đóng mở bàn tay); `SimplePicoTeleop` nếu đội có PICO | Correction từ trạng thái lỗi thu bằng bàn phím; mỗi phiên ghi mục sổ chi phí |
+| TaskDefinition | Bản 0.7: `G1LocomotionPickBetweenTables` (6 bước, kiểu lỗi của spec 5 thêm L-WALK, kèm `failure_class`); `G1BendPick` cho task F1 | Dùng `decompose()` của SIMPLE để đối chiếu ranh giới bước |
 | Bộ giả | `FakeSim2D`, `FakePolicy`, `FakeTrainer`, `FakeGenerator`, `FakeTeleop`, `ToyPickPlace` | Chạy CPU, cấy được từng loại lỗi kể cả lệch đồng bộ, lệch camera, ngoài miền (mục 11) |
-| SimulatorAdapter (bản 0.5) | `DensoMujocoSim` | Simulator chính của robot DENSO: MJCF là nguồn sự thật, `restore_state` có sẵn, `replay()` hai chế độ động học và động lực học, eval đồng bộ và bất đồng bộ; `SimpleSimulator` chỉ còn cho G0 |
-| TeleopSource (bản 0.5) | `KeyboardTeleop`, `BtcDatasetSource` | Teleop bàn phím trong MuJoCo (đầu tay qua IK, chuyển chế độ theo nhóm action); bộ đọc dataset của BTC DENSO |
-| GeneratorAdapter (bản 0.5) | S1 planner trên MuJoCo, S2 biến thể từ teleop bàn phím và correction từ trạng thái lỗi | Thay các generator theo tuyến V3 cho robot DENSO |
-| TrainerAdapter (bản 0.5) | `Psi0Trainer` gọi script của tác giả cho cả 3 stage (`pretrain-*`, `posttrain-*`, `finetune-*`), ghim commit; lớp bọc log ghi `metrics.jsonl` | Chạy trên Colab; phần log thiếu (loss theo nhóm action, theo vị trí trong chunk, phương sai dự đoán) tính lại trên batch val, không sửa code gốc |
-| Agent QA/QC (bản 0.5) | `flywheel-agentqa`: Nemotron 3.5 Bolt E4B 4GB chạy cục bộ, ghim revision. Bản 0.6: nằm trong làn Đánh giá `flywheel.eval.agentqa`; Qwen3.5-4B tùy chọn khi cần nhìn hình; model gán nhãn egocentric là RoboBrain 2.5-4B và Molmo2-4B (ADR-24) | Không phải Protocol; đọc tệp do code sinh, không đọc `vault/`, không chạy job |
-| Thư viện sim (bản 0.6) | `denso-sim`: robot, cảnh, env task, điều khiển, IK, planner, ánh xạ phím, `timing` cho eval bất đồng bộ | Dùng chung cho `flywheel-mujoco` và node ROS 2; không phụ thuộc ROS hay flywheel |
-| ROS 2 (bản 0.6) | `ros2_ws/src/denso_*` trên ROS 2 Jazzy trong Docker | Teleop bàn phím, RViz, ghi rosbag2 MCAP theo bảng topic trong `flywheel.contracts`; làn Dữ liệu đọc MCAP không cần ROS |
-| SimulatorAdapter (bản 0.4) | `DensoIsaacSim` | Bản 0.5: chỉ làm sau khi demo MuJoCo đạt tiêu chí, render cảnh nhà máy, vật lý MuJoCo. Nhận robot DENSO thật hoặc robot thay thế qua cấu hình Embodiment; `control_spec` theo nhóm đế, cột nâng, tay, gripper |
-| TaskDefinition (bản 0.4) | `DensoTrayToMachine` | 6 bước và 10 kiểu lỗi của task khay → máy (design mục 7.1) |
-| TeleopSource (bản 0.4) | `DensoTeleop` | Bộ đọc định dạng thô của DENSO, chờ thông tin (design mục 9) |
-| GeneratorAdapter (bản 0.4) | Theo tầng S1–S4: planner Isaac Sim, biến thể teleop, `CosmosTransferGenerator`, `CosmosPredictGenerator` | Mỗi tầng là một loại can thiệp riêng trong `decide` |
-| `NimClient` (bản 0.4) | Một client cho mọi model NIM, có bộ định tuyến theo `data_class` | `restricted` và `internal` chỉ đi NIM tự host; `public` được đi API hosted nếu bật |
-| Robot thay thế (bản 0.4) | File tham số trong `configs/embodiments/`, lệnh `fw embodiment score` | Chấm giống ≥ 95% theo design mục 3.1 |
+| Agent QA/QC (bản 0.5, 0.7) | Trong làn Đánh giá `flywheel.eval.agentqa`: Nemotron 3.5 Bolt E4B 4GB chạy cục bộ, ghim revision; Qwen3.5-4B tùy chọn khi cần nhìn hình (ADR-24) | Không phải Protocol; đọc tệp do code sinh, không đọc `vault/`, không chạy job; chấm trên bộ lỗi cấy trước khi dùng (ADR-26) |
+| `NimClient` (bản 0.4) | Một client cho mọi model NIM, có bộ định tuyến theo `data_class` | Sau demo; `restricted` và `internal` chỉ đi NIM tự host |
 
 ## 6. Luồng chính
 
@@ -570,30 +560,27 @@ sequenceDiagram
 
 ### 7.1 Source tree
 
-**Bản 0.6** thay cây cũ. Chi tiết, lý do và thứ tự chuyển ở [design chia làn](../superpowers/specs/2026-10-25-lanes-and-code-structure-design.md) mục 4, 8.
+**Bản 0.6, sửa ở bản 0.7.** Bản 0.7 bỏ `denso-sim`, `flywheel-mujoco`, `ros2_ws/`; `flywheel-simple` thành adapter simulator chính. Cây không ghi tên người; chủ của từng đường dẫn ở [07 mục 2.1](07-team-workflow.md).
 
 ```text
 denso-challenge/
   packages/                       # uv workspace; tên import theo namespace flywheel.* (PEP 420)
-    flywheel-contracts/           # NHÂN · Hiếu · flywheel.contracts: Pydantic model, 6 Protocol, schema artifact, bảng topic ROS
-    flywheel-store/               # NHÂN · Hiếu · flywheel.store: kho sha256, view DuckDB, refs, ghi sổ chi phí append-only, khóa vault
-    flywheel-testkit/             # NHÂN · Hiếu · flywheel.testkit: bộ giả (từ flywheel-fakes), contract suite, file mẫu mọi artifact
-    flywheel-cli/                 # NHÂN · Hiếu · flywheel.cli: lệnh fw, composition root, đăng ký làn và adapter qua entry point
-    flywheel-data/                # LÀN · Thông · flywheel.data: ingest, normalize, annotate, qa, replay_check, release, export
-    flywheel-eval/                # LÀN · Châu · flywheel.eval: scenarios, tasks, scorer, diagnosis, cards, agentqa
-    flywheel-loop/                # LÀN · Long · flywheel.loop: runplan, runner, decide, acquisition, gate, ledger, reports, hd
-    flywheel-mujoco/              # ADAPTER · Hưng · DensoMujocoSim trên denso-sim
-    flywheel-psi0/                # ADAPTER · Hiếu · policy, trainer, probe, client RTC
-    flywheel-lerobot/             # ADAPTER · Hiếu · ACT, Diffusion Policy
-    flywheel-simple/              # ADAPTER · Hiếu · chỉ G0
-    flywheel-nim/                 # ADAPTER · Hiếu · NimClient; generators/ của Hưng
-    denso-sim/                    # THƯ VIỆN SIM · Hưng · MuJoCo thuần Python; không import ROS hay flywheel
-  ros2_ws/src/denso_*/            # Hưng · description, interfaces, mujoco, control, teleop, bringup
-  configs/                        # kernel/, models/, runplans/, embodiments/, sim/, data/, eval/, loop/; mỗi thư mục một chủ
-  docker/<image>/  compose.yaml   # ros2-sim (Hưng), simple, psi0 (Hiếu); service sim, simple-worker, psi0-serve, psi0-train, llm-serve
-  tests/e2e/                      # test nối các làn bằng bộ giả · Hiếu
-  scripts/repo/  scripts/g0/      # công cụ repo (Long); spike G0 (theo story)
-  ops/backup.sh                   # Long
+    flywheel-contracts/           # NHÂN · flywheel.contracts: Pydantic model, 6 Protocol, schema artifact
+    flywheel-store/               # NHÂN · flywheel.store: kho sha256, view DuckDB, refs, ghi sổ chi phí append-only, khóa vault
+    flywheel-testkit/             # NHÂN · flywheel.testkit: bộ giả (từ flywheel-fakes), contract suite, file mẫu mọi artifact, bộ lỗi cấy mẫu
+    flywheel-cli/                 # NHÂN · flywheel.cli: lệnh fw, composition root, đăng ký làn và adapter qua entry point
+    flywheel-data/                # LÀN Dữ liệu · flywheel.data: ingest, normalize, annotate, qa, replay_check, release, export, inject (bộ lỗi cấy)
+    flywheel-eval/                # LÀN Đánh giá · flywheel.eval: scenarios, tasks, scorer, diagnosis, cards, agentqa
+    flywheel-loop/                # LÀN Vòng quyết định · flywheel.loop: runplan, runner, decide, acquisition, gate, ledger, reports, hd
+    flywheel-simple/              # ADAPTER · SimpleSim, KeyboardTeleop, generator tuyến A và B, worker trong môi trường SIMPLE
+    flywheel-psi0/                # ADAPTER · policy, trainer, probe, client RTC
+    flywheel-lerobot/             # ADAPTER · ACT, Diffusion Policy
+    flywheel-nim/                 # ADAPTER · NimClient (sau demo)
+  configs/                        # kernel/, models/, runplans/, embodiments/ (g1.yaml), sim/ (task hai bàn, dải hạt giống, renderer), data/, eval/, loop/
+  docker/<image>/  compose.yaml   # simple, psi0; service simple-worker, psi0-serve, psi0-train, llm-serve
+  tests/e2e/                      # test nối các làn bằng bộ giả
+  scripts/repo/  scripts/g0/      # công cụ repo; spike G0 (theo story)
+  ops/backup.sh
 ```
 
 ### 7.2 Bố cục lưu trữ
@@ -619,12 +606,49 @@ $FW_ROOT/                         # mặc định ./fwdata (đưa vào .gitignor
 
 Mỗi tiến trình ghi tệp `part-<ulid>.jsonl` riêng nên không có tranh chấp khóa. Khi mở, `store` chạy `CREATE OR REPLACE VIEW` cho từng bảng trên glob của `catalog/<bảng>/` và `runs/**/ledger.jsonl` (đọc bằng `read_json` với `union_by_name`), trace đọc bằng `read_parquet`. Tệp `fw.duckdb` không giữ dữ liệu riêng, nên mất tệp không mất gì và không cần lệnh dựng lại. Backup theo mục 10.4.
 
-### 7.3 Khuôn package và luật import (bản 0.6)
+### 7.3 Khuôn package và luật import (bản 0.6, sửa ở bản 0.7)
 
 - Mỗi package có `pyproject.toml`, `README.md`, `src/`, `tests/unit/`, `tests/contract/`, `py.typed`. Package làn có `api.py` (hàm công khai nhận và trả artifact), `cli.py` (lệnh con đăng ký vào `fw`), `config.py` (Pydantic model cho thư mục `configs/` của làn).
-- Gốc `pyproject.toml` cấu hình ruff, mypy, pytest, import-linter cho mọi package; CI có job `core`, `ros`, `guard`.
-- Luật import: nhân không import làn, adapter hay runtime; ba làn độc lập với nhau (`independence`); làn không import adapter hay runtime, chỉ dùng Protocol; `denso_sim` không import `flywheel` hay `rclpy`; chỉ `flywheel.cli` được import cả làn và adapter. Nội dung luật ở design chia làn mục 5.3.
-- Dữ liệu giữa hai làn là artifact có schema trong `flywheel.contracts` và file mẫu trong `flywheel.testkit`; danh sách ở design chia làn mục 3.2.
+- Gốc `pyproject.toml` cấu hình ruff, mypy, pytest, import-linter cho mọi package; CI có job `core`, `guard`. Marker pytest `gpu` và `sim` không chạy trong CI mặc định.
+- Không đọc biến môi trường hay đường dẫn cứng trong module; mọi giá trị đi qua `config.py`. Không có `utils.py` chung; một module làm một việc. Số chưa đo trong mã hoặc cấu hình ghi `# giả định` kèm nguồn.
+- Chỉ `flywheel.cli` được import cả làn và adapter.
+
+Luật import (import-linter):
+
+```toml
+[[tool.importlinter.contracts]]
+name = "Nhân không phụ thuộc làn, adapter hay runtime"
+type = "forbidden"
+source_modules = ["flywheel.contracts", "flywheel.store", "flywheel.testkit"]
+forbidden_modules = ["flywheel.data", "flywheel.eval", "flywheel.loop", "flywheel.cli",
+                     "flywheel_simple", "flywheel_psi0", "flywheel_lerobot", "flywheel_nim",
+                     "mujoco", "torch", "lerobot", "simple", "psi0", "isaacsim"]
+
+[[tool.importlinter.contracts]]
+name = "Ba làn không import lẫn nhau"
+type = "independence"
+modules = ["flywheel.data", "flywheel.eval", "flywheel.loop"]
+
+[[tool.importlinter.contracts]]
+name = "Làn chỉ đi qua Protocol, không import adapter hay runtime"
+type = "forbidden"
+source_modules = ["flywheel.data", "flywheel.eval", "flywheel.loop"]
+forbidden_modules = ["flywheel_simple", "flywheel_psi0", "flywheel_lerobot", "flywheel_nim",
+                     "mujoco", "torch", "lerobot", "simple", "psi0", "isaacsim"]
+```
+
+Artifact giữa các làn (Pydantic model trong `flywheel.contracts`, lưu trong kho có sha256; người tạo ghi, người khác chỉ đọc; mỗi artifact có file mẫu trong `flywheel.testkit` ngay khi schema được merge):
+
+| Artifact | Làn ghi | Làn đọc |
+|---|---|---|
+| `Episode`, `Segment`, `ReleaseManifest`, `DatasetRef`, `DatasetReport` | Dữ liệu | Đánh giá, Vòng, adapter Ψ₀ |
+| `ReplayReport` | Dữ liệu | Đánh giá (Agent QA/QC) |
+| `DefectManifest` (đáp án của bộ lỗi cấy, khóa) | Dữ liệu | Chỉ bộ chấm của Đánh giá, sau khi agent đã chạy |
+| `RunPlan`, `TrainSpec`, `RolloutRequest` | Vòng | Adapter |
+| `Trace`, `RolloutResult` | Adapter simulator | Đánh giá |
+| `Checkpoint`, `metrics.jsonl`, kết quả probe, log RTC | Adapter Ψ₀ | Đánh giá |
+| `Score`, `Cluster`, `EvidenceCard`, `QAReport` | Đánh giá | Vòng |
+| `Decision`, `LedgerEntry`, `FixRateEvent` | Vòng | Mọi làn |
 
 ## 8. Tái lập và theo dõi thí nghiệm
 
@@ -838,22 +862,25 @@ L0 không chứng minh chẩn đoán trên robot thật; pitch phải nói rõ. 
 | ADR-15 | V3: task chính chạy decoupled WBC, pipeline MP chạy AMO; spec 2.1 bản cũ ghi System-0 là AMO | System-0 của task chính là decoupled WBC `g1_sonic`; `SimulatorAdapter.control_spec` khai cặp kênh lệnh gửi, trạng thái đo theo bộ điều khiển (thân trên, thân dưới); kiểm hệ thống nhắm stack WBC | Phép kiểm bám lệnh không giả định AMO; đổi bộ điều khiển là đổi embodiment |
 | ADR-16 | 05 TH6–TH8: tỉ lệ sửa được thiên lệch hồi quy về trung bình; cổng dev nhạy nhiễu và thích nghi theo một tập dev | Cổng dev dùng tập điều kiện mới mỗi vòng, cha và ứng viên ≥ 3 lượt, sàn A/A; tỉ lệ sửa được đo có đối chứng cha trên điều kiện mới quanh lỗi | Mỗi vòng tăng từ khoảng 90 lên 1.300–1.600 rollout (mục 9.2); đổi lại số đo có nghĩa; F-ACT dùng giao thức thu nhỏ |
 | ADR-17 | 05 TH4: tăng cường thị giác chỉ C có làm lệch so sánh | Tăng cường thị giác là phần cố định của recipe, khai trong RunPlan, áp như nhau cho mọi nhánh; bỏ khỏi loại can thiệp của `decide` | NHẬN THỨC vẫn được chẩn đoán và báo cáo nhưng không tiêu ngân sách; test công bằng kiểm TrainSpec chỉ khác `release_id` |
-| ADR-18 | Bản 0.5: SIMPLE buộc teleop và MP chạy hai bộ điều khiển khác nhau (V3, T1–T4); robot của SIMPLE không phải robot DENSO | Robot DENSO trên MuJoCo là simulator chính, MJCF là nguồn sự thật; SIMPLE chỉ cho G0; Isaac Sim render sau, vật lý vẫn MuJoCo | Bỏ V3 và T1–T4 khỏi đường găng; mất số so được với công bố; mốc tin cậy là tái tạo G0 |
+| ADR-18 | (Bị thay bởi ADR-25, bản 0.7.) Bản 0.5: SIMPLE buộc teleop và MP chạy hai bộ điều khiển khác nhau (V3, T1–T4); robot của SIMPLE không phải robot DENSO | Robot DENSO trên MuJoCo là simulator chính, MJCF là nguồn sự thật; SIMPLE chỉ cho G0; Isaac Sim render sau, vật lý vẫn MuJoCo | Bỏ V3 và T1–T4 khỏi đường găng; mất số so được với công bố; mốc tin cậy là tái tạo G0 |
 | ADR-19 | Bản 0.5: kỹ sư cần insight từ log và output từng stage; dữ liệu DENSO không được ra API ngoài | Agent QA/QC dùng model nhỏ chạy cục bộ; code tính mọi con số, agent chỉ diễn giải; ước lượng của agent được lưu và so với kết quả đo | Agent không thể bịa số đi vào quyết định; đo được độ tin của agent |
 | ADR-20 | Bản 0.5: Ψ₀ dùng real-time chunking; eval đồng bộ che lỗi do trễ | `RolloutRequest.timing`; chỉ số chính ở chế độ bất đồng bộ với độ trễ từ log inference thật | Eval chậm hơn và nhiễu hơn; lỗi trễ đi vào kiểm hệ thống (LỖI RUNTIME) |
-| ADR-21 | Bản 0.5: không còn cờ `check_success` của SIMPLE cho robot DENSO | `sim_success` là vị từ thành công của env MuJoCo, viết và review tách khỏi scorer từng bước | Giữ ý của ADR-14: lỗi scorer không làm sai kết luận |
+| ADR-21 | (Bị thay bởi ADR-25, bản 0.7: quay lại ADR-14.) Bản 0.5: không còn cờ `check_success` của SIMPLE cho robot DENSO | `sim_success` là vị từ thành công của env MuJoCo, viết và review tách khỏi scorer từng bước | Giữ ý của ADR-14: lỗi scorer không làm sai kết luận |
 | ADR-22 | Bản 0.6: một package lõi của 5 người, không có luật import bên trong lõi, công cụ chỉ quét lõi | Nhân (contracts, store, testkit, cli) do Hiếu giữ; ba làn data, eval, loop mỗi làn một package một chủ; import-linter `independence` giữa ba làn; artifact có schema là giao diện duy nhất giữa làn | Người làm không phụ thuộc code của nhau, chỉ phụ thuộc hợp đồng do Hiếu duyệt; một PR di chuyển file trước khi viết code |
-| ADR-23 | Bản 0.6: cần cả rollout tất định số lượng lớn lẫn teleop và giao diện giống robot thật | Hai lớp: `denso-sim` gọi thẳng MuJoCo cho flywheel; ROS 2 bọc ngoài cho teleop, RViz, rosbag2 MCAP | Thí nghiệm nhanh và tất định; dữ liệu teleop trong sim và trên robot thật đi cùng đường MCAP |
-| ADR-24 | Bản 0.6: chọn model phụ trợ quanh Ψ₀ | Stage 1 giữ Qwen3-VL-2B; Nemotron cho Agent QA/QC đọc log; RoboBrain 2.5-4B và Molmo2-4B gán nhãn egocentric; Qwen3.5-4B tùy chọn cho agent nhìn hình; chốt bằng vòng thử trên dữ liệu đội | Không đổi backbone của Ψ₀ trong 12 tuần; mọi model chạy cục bộ nên giữ quy tắc `data_class` |
+| ADR-23 | (Bị thay bởi ADR-25, bản 0.7: không còn ROS 2.) Bản 0.6: cần cả rollout tất định số lượng lớn lẫn teleop và giao diện giống robot thật | Hai lớp: `denso-sim` gọi thẳng MuJoCo cho flywheel; ROS 2 bọc ngoài cho teleop, RViz, rosbag2 MCAP | Thí nghiệm nhanh và tất định; dữ liệu teleop trong sim và trên robot thật đi cùng đường MCAP |
+| ADR-24 | Bản 0.6: chọn model phụ trợ quanh Ψ₀ | Stage 1 giữ Qwen3-VL-2B; Nemotron cho Agent QA/QC đọc log; Qwen3.5-4B tùy chọn cho agent nhìn hình. Bản 0.7: model gán nhãn egocentric (RoboBrain 2.5-4B, Molmo2-4B) để sau demo | Không đổi backbone của Ψ₀ trong 12 tuần; mọi model chạy cục bộ nên giữ quy tắc `data_class` |
+| ADR-25 | Bản 0.7: trưởng nhóm chốt demo và thí nghiệm trên G1 của paper, bỏ robot DENSO; Isaac Sim tốn compute | SIMPLE là simulator chính; thu, sinh, phát lại và eval nhanh ở `--sim-mode=mujoco`; Isaac Sim chỉ render (Replay & Render, eval so số công bố, video); ảnh train và eval cùng renderer trong một thí nghiệm; chỉ số chính lại là `check_success` của SIMPLE (ADR-14) | V3 quay lại đường găng cho tuyến B; so được với số công bố; phải ghi renderer ở mọi con số |
+| ADR-26 | Bản 0.7: cần số đo hiệu suất của Agent QA/QC trước khi đội có log train thật | Bộ lỗi cấy có đáp án khóa trên bản sao dữ liệu và log thật; chấm precision, recall theo loại, báo nhầm trên bản sạch; tách phần của phép kiểm bằng code khỏi phần agent thêm | Số đo trên lỗi cấy, không phải lỗi tự nhiên; phải báo rõ |
 
 ### 12.2 Rủi ro kỹ thuật mở
 
 | Rủi ro | Dấu hiệu, nơi kiểm | Giảm thiểu |
 |---|---|---|
 | (bản 0.5) Không đủ GPU cho Ψ₀ | S1-04 đo giờ một lần train trên một A100 hoặc H100 ở Colab | Vòng lặp chạy trên ACT và DP, Ψ₀ cho nhánh cuối; LoRA; ghi Decision |
-| (bản 0.5) Tiếp xúc khi lắp linh kiện vào đồ gá trên MuJoCo không ổn định | Phát lại động lực học của demo thành công vẫn trượt ở bước 5 | Chỉnh tham số tiếp xúc và bước tích phân; ghi tham số vào `configs/embodiments/`; không nới dung sai đồ gá |
+| (bản 0.7) Eval có render Isaac quá chậm cho đường cong HE | 6–10 phút mỗi episode; S1-04 đo | Eval ở `mujoco` nếu G0 cho thấy Ψ₀ giữ độ chính xác; giảm điều kiện; chạy song song nhiều worker |
+| (bản 0.7) Thiết bị bàn phím không cắm được vào teleop decoupled WBC | DA-16 nhiệm vụ con đầu, đọc mã SIMPLE | Viết thiết bị như một nguồn tư thế giả lập PICO; nếu vẫn không được, bàn phím lái trực tiếp lệnh thân trên của WBC |
 | (bản 0.5) Inference Ψ₀ trên 3060 quá chậm cho eval bất đồng bộ | Độ trễ p99 so với chu kỳ điều khiển, đo ở G0 | Chạy eval Ψ₀ trên Colab; hoặc báo eval bất đồng bộ với độ trễ của phần cứng đích, ghi rõ |
-| Rollout MP (AMO) không cùng bộ điều khiển và không gian action với demo teleop (decoupled WBC); bản 0.5: chỉ còn cho G1 | V3, chỉ khi phát triển G1 | Thử T1 và T2 song song tuần 1–2, chốt tuyến cuối tuần 2 (bảng dưới); T3 khi cả hai hỏng; T4 là phương án cuối. F1 không phải dự phòng cho Q2 tới khi V3 xác nhận cặp của F1 cùng bộ điều khiển. Ghi rõ trong báo cáo |
+| Rollout MP (AMO) không cùng bộ điều khiển và không gian action với demo teleop (decoupled WBC); bản 0.7: áp cho tuyến B của sinh tự động trên task hai bàn | V3 ở G0, đọc checkpoint `…mixed-v0` của tác giả | Thử T1 và T2 song song tuần 1–2, chốt tuyến cuối tuần 2 (bảng dưới); T3 khi cả hai hỏng; T4 là phương án cuối. F1 không phải dự phòng cho Q2 tới khi V3 xác nhận cặp của F1 cùng bộ điều khiển. Ghi rõ trong báo cáo |
 | V3 âm và Q6 âm cùng lúc | V3, Q6 ở G0 | C chỉ còn kiểm demo mâu thuẫn, mà phần này chỉ ra báo cáo; HT sụp. Ghi vào báo cáo, không giấu; HS và M vẫn kiểm được |
 | Checkpoint gốc đã thấy dữ liệu task chính | Q0 ở G0; email PSI Lab tuần 1 | Chỉ dùng `pre.*` hoặc `postpre.*` có provenance sạch; `fw plan freeze` chặn (mục 8.3 điểm 7) |
 | `set_states()` không khôi phục được trạng thái WBC và hàng đợi action | V4: so quỹ đạo khôi phục với quỹ đạo gốc | Bỏ phép kiểm khoanh vùng, dùng phương án của spec mục 10 (chạy lại cùng seed, planner tiếp quản ở bước k) |
