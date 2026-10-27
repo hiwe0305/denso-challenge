@@ -49,7 +49,9 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chú cho người làm
 
-- Nguồn: design 27/10 mục 9; 03 ADR-19, ADR-24, ADR-26. Đáp án của bộ lỗi cấy (`DefectManifest`) chỉ bộ chấm đọc, sau khi agent đã chạy.
+- Nguồn: design 27/10 mục 6.7, 9; 03 ADR-19, ADR-24, ADR-26.
+- Model: Nemotron 3.5 Bolt E4B 4GB (NVIDIA, ra 23/10/2026; dựng trên Gemma-4-E4B-it; 8B tổng, 4B hiệu dụng; ngữ cảnh 64K; chỉ đọc chữ theo tài liệu NVIDIA; gọi được tool; bản Q4 khoảng 3–4 GB VRAM). Prompt trong `configs/eval/agentqa/` có hash; log dài do code tóm tắt theo cửa sổ để vừa 64K; tool chỉ đọc artifact theo ID.
+- Vòng thử chung với DA-04 (design mục 6.7.4) quyết có cần Qwen3.5-4B để nhìn hình (AC 7). Đáp án của bộ lỗi cấy (`DefectManifest`) chỉ bộ chấm đọc, sau khi agent đã chạy.
 - Chỉ import nhân (`flywheel.contracts`, `flywheel.store`, `flywheel.testkit`); không import làn khác hay adapter (03 mục 7.3). Thiếu trường trong schema thì báo Hiếu mở PR hợp đồng, không thêm trường tạm.
 - Nemotron chỉ đọc chữ; hình do code dựng, agent đọc metadata và số đi kèm.
 - Giấy phép OpenMDW-1.1 của Nemotron ghi vào Source trước khi dùng cho sản phẩm giao DENSO.
