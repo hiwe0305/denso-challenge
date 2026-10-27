@@ -12,7 +12,7 @@ Quy ước: **[Đã chốt]** là quyết định của trưởng nhóm (Hiếu)
 4. **Giả thuyết mới HE**: dữ liệu egocentric của người giúp Ψ₀ cần ít demo robot hơn. Kiểm bằng ba checkpoint ablation mà tác giả đã công bố (có EgoDex, 10% EgoDex, không EgoDex), fine-tune ở nhiều mức demo, ra đường cong success theo số demo. Paper chưa có đường cong này (mục 7).
 5. **Data flywheel xây đủ kiến trúc**, gồm cả xử lý và chuẩn hóa dataset (6 tầng: Ingest → Normalize → Annotate → QA → Release → Export) [Đã chốt] (mục 6).
 6. **Agent QA/QC demo trên dữ liệu thật có cài lỗi**: cấy lỗi có đáp án vào dataset của tác giả, đo precision và recall theo loại lỗi. Có số đo thật trước khi đội train model; sau khi train thì chạy trên log và output thật (mục 9).
-7. **Website và hai file PowerPoint chưa sửa**; chỉ tính tới khi chuẩn bị demo 17/11 [Đã chốt]. Người làm từng story do Product Owner giao sau [Đã chốt].
+7. **Website và hai file PowerPoint chưa sửa**; chỉ tính tới khi chuẩn bị demo 17/11 [Đã chốt]. Người làm theo 07 mục 2.0 (phân công ngày 27/10/2026): bốn người làm data flywheel, trưởng nhóm làm phần còn lại và duyệt cuối [Đã chốt hướng].
 
 ## 1. Bối cảnh và lý do
 
@@ -618,7 +618,7 @@ Lõi không đổi nguyên tắc: không import `simple`, `psi0`, `lerobot`, `to
 
 ## 13. Story
 
-Người làm do Product Owner giao sau [Đã chốt]. Bảng dưới chỉ ghi việc.
+Người làm ở 07 mục 2.0, 2.2. Bảng dưới chỉ ghi việc.
 
 | Story | Thay đổi |
 |---|---|
@@ -634,16 +634,18 @@ Người làm do Product Owner giao sau [Đã chốt]. Bảng dưới chỉ ghi 
 | S1-11 | Mở lại: V3 cho task hai bàn, đọc checkpoint `…mixed-v0`, chọn tuyến |
 | DA-15, DA-22, DA-24 | Xóa (robot DENSO, dataset BTC, ROS 2) |
 | DA-04 | Mở lại (sửa cùng ngày): pipeline egocentric E-A, E-B trên mẫu EgoDex và video tự quay (mục 6.6) |
-| DA-18 | Khôi phục với nội dung mới (sửa cùng ngày): egocentric sang định dạng stage 1 của Ψ₀, lần chạy stage 1 ngắn, fine-tune trên video tự quay (mục 7.8) |
+| DA-18 | Khôi phục với nội dung mới (sửa cùng ngày): egocentric sang định dạng stage 1 của Ψ₀ (mục 6.6) |
+| DA-30 (mới, tách từ DA-18) | Lần chạy stage 1 ngắn trên EgoDex, fine-tune trên video tự quay (mục 7.8) |
 | DA-29 (mới) | Synthetic S2: biến thể từ đoạn teleop và correction (mục 5.4) |
 | DA-16 | Viết lại: thiết bị bàn phím cho teleop decoupled WBC của SIMPLE |
 | DA-17 | Viết lại: phát lại action trên MuJoCo của SIMPLE |
 | DA-19, DA-21 | Giữ, bỏ phần DENSO |
-| DA-20 | Giữ; thêm chạy trên bộ lỗi cấy (DA-27) |
+| DA-20 | Giữ; thêm chạy trên bộ lỗi cấy (DA-27, DA-31) |
 | DA-23 | Viết lại: eval bất đồng bộ trên SIMPLE |
 | DA-25 | Giữ, bỏ bảng topic MCAP |
 | DA-26 (mới) | Thí nghiệm HE (mục 7) |
-| DA-27 (mới) | Bộ lỗi cấy cho Agent QA/QC (mục 9.2) |
+| DA-27 (mới) | Cấy lỗi có đáp án cho QA và Agent QA/QC (mục 9.2) |
+| DA-31 (mới, tách từ DA-27) | Bộ chấm lỗi cấy (mục 9.2) |
 | DA-28 (mới) | Kịch bản demo 17/11 chạy trọn luồng (mục 11) |
 | DA-01…DA-14 (chưa có file) | Giữ DA-01, DA-02, DA-03 (chạy trên psi-data, bàn phím, sinh tự động), DA-08, DA-09, DA-13; mở lại DA-04 (có file); hoãn sau demo DA-05, DA-06; bỏ DA-10, DA-11, DA-12, DA-14 (robot DENSO); DA-07 đã gộp vào DA-19 |
 

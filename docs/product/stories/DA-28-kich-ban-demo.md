@@ -5,7 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt hướng 27/10/2026) |
-| Người làm | Chờ PO giao |
+| Người làm | Long |
 | Làn | Vòng quyết định (ghép luồng); dùng lệnh của mọi làn qua `fw` |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 11 · Epic 9 |
 | Nhãn | [Lõi] · `epic:9` · `gate:G1` · `area:core` |
@@ -51,7 +51,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Người phụ trách
 
-- Làm: chờ PO giao
+- Làm: Nguyễn Thăng Long
 - Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
 
 ## Change log
@@ -60,6 +60,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 |---|---|---|
 | 27/10/2026 | Tạo story theo design 27/10/2026 mục 11 | PO (Hiếu) |
 | 27/10/2026 | Thêm ba loại dữ liệu vào phần thu và pipeline (EgoDex, S2) | PO (Hiếu) |
+| 27/10/2026 | Giao cho Long theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

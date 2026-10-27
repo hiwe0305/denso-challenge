@@ -12,42 +12,41 @@ Muốn hiểu sâu: [spec v10.4](docs/spec-v10-failure-to-data.md), [design 27/1
 
 ## 2. Công việc của từng người
 
-Giờ là ước lượng (04 mục 4.7 cộng phần DA ở 07 mục 2.3). Ai cũng đang vượt mức kế hoạch 70%; nếu trễ thì chuyển phần trễ sang API trước khi cắt việc (mục 5, R5).
+**Phân công ngày 27/10/2026** (07 mục 2.0): bốn người làm toàn bộ **data flywheel** (nhân và ba làn, chạy được trên CPU với bộ giả); Hiếu làm **phần còn lại** (SIMPLE, Ψ₀, GPU, thí nghiệm) và duyệt, merge mọi PR. Mỗi người chỉ sửa đường dẫn của mình (07 mục 2.1); dữ liệu giữa hai người chỉ đi qua artifact có schema trong `flywheel.contracts`; không import code bên trong phần của người khác. Giờ là ước lượng ở 07 mục 2.3.
 
-**Cập nhật 27/10/2026:** việc của robot DENSO (MuJoCo riêng, ROS 2, dataset BTC, egocentric nhà máy) đã bỏ; story mới và story đổi hướng (S1-05, S1-06, S1-09, S1-11, DA-04, DA-16, DA-18, DA-26, DA-27, DA-28, DA-29, `flywheel-simple`) **chờ Hiếu giao người**. Danh sách dưới chỉ còn việc đã có chủ.
+### Nguyễn Thăng Long · Nhân và Vòng quyết định
 
-Từ 25/10/2026 việc chia theo **làn** (03 mục 7): mỗi người giữ trọn package của mình, chỉ import phần **nhân** (hợp đồng, kho, bộ giả, CLI) do Hiếu giữ, không import code của người khác. Muốn thêm hoặc đổi dữ liệu đi giữa hai làn thì mở PR hợp đồng cho Hiếu. Giờ là ước lượng thô ở 07 mục 2.3.
+- **Một lần:** merge S1-08, mở **PR `chore-restructure`** ngày 28/10, merge 29/10 (07 mục 3.6); **DA-25 schema và file mẫu của mọi artifact trước 30/10**.
+- **Nhân:** `flywheel-contracts`, `flywheel-store`, `flywheel-testkit`, `flywheel-cli`, `tests/e2e/`; S1-10 mô hình dữ liệu và kho; DA-01 định dạng episode. Mọi thay đổi schema do Hiếu duyệt.
+- **Làn Vòng (`flywheel-loop`):** RunPlan và `fw plan freeze` · runner, DA-23 eval bất đồng bộ · sổ chi phí · decide, `fw review` · acquisition · gate, cổng dev, A/A test, tỉ lệ sửa được, holdout · báo cáo, thống kê · công cụ HD · backup · **DA-28 kịch bản demo 17/11**.
+- Sở hữu: nhân, `flywheel-loop`, `configs/kernel/`, `configs/loop/`, công cụ RunPlan, `pyproject.toml` gốc, `uv.lock`, `.github/`, `scripts/repo/`, `ops/`, `scripts/demo/`, `docs/demo/`.
 
-### Dương Đình Hiếu · Trưởng nhóm, nhân, model và phần cứng
+### Dương Tiến Thông · Scrum Master, Dữ liệu robot
 
-- **Việc trưởng nhóm:** đầu mối DENSO, BTC, mentor; chọn checkpoint gốc (Q0), D\*, ρ; duyệt kế hoạch vòng C; ký cổng G0–G6; rà claim và pitch; **duyệt và merge mọi PR**; thảo luận tổng kết cuối ngày lúc 21:30.
-- **Nhân:** `flywheel-contracts`, `flywheel-store`, `flywheel-testkit`, `flywheel-cli`; **DA-25 schema và file mẫu cho artifact mới, trước 29/10**.
-- **Model và phần cứng (chỉ Hiếu có máy):** S1-02 SIMPLE · S1-03 tái tạo Ψ₀ · S1-04 chi phí train · DA-19 code train 3 stage, log, Colab, client RTC · DA-09 probe (gồm ba VLM của HE) · `Psi0Policy`, ACT, DP · chạy mọi job GPU (HE, E1, nhánh A, A₀.₇, B, C, F-ACT, B-fail của ACT). DA-05 NIM hoãn sau demo.
-- Sở hữu: nhân, `flywheel-psi0`, `flywheel-lerobot`, `flywheel-nim`, `configs/kernel/`, `configs/models/`, `configs/runplans/` (duyệt), `docker/simple/`, `docker/psi0/`, `tests/e2e/`, tài liệu, website. Tải tính lại sau khi giao người (07 mục 2.3); vẫn dễ quá tải nhất đội.
+- **Việc SM:** bảng công việc, check-in, bản tin tuần, viết file story (kể cả "Phạm vi file"), sổ can thiệp ở 08; **viết file story DA-01, DA-02, DA-03, DA-08, DA-13 ngày 28/10**.
+- **Dữ liệu robot (`flywheel-data`, trừ phần egocentric):** S1-07 phân tích psi-data task hai bàn · DA-03 pipeline teleop và synthetic qua 6 tầng, báo cáo dataset · DA-17 phát lại action · release và chia tập · DA-02, DA-21 export LeRobot v2.1, v3 · DA-27 cấy lỗi · S6 SOP.
+- Sở hữu: `flywheel-data` trừ `ingest/egocentric/`, `annotate/deid/`, `qa/egocentric.py`, `export/egodex.py`; `configs/data/` trừ `egocentric.yaml`; `docs/product/stories/`. Giữ `pyproject.toml`, `api.py`, `cli.py` của `flywheel-data`.
 
-### Trần Ngọc Hưng · Simulation
+### Trần Ngọc Hưng · Dữ liệu egocentric và Agent QA/QC
 
-- Việc cũ (robot DENSO trên MuJoCo, ROS 2, DA-15, DA-24) đã bỏ ngày 27/10/2026. **Chờ Hiếu giao việc mới.** Thư mục `scripts/g0/`, `docs/g0/` vẫn do Hưng giữ.
+- **Egocentric (trong `flywheel-data`):** DA-04 pipeline egocentric (che danh tính, cắt đoạn, pose E-A và E-B, QA) trên mẫu EgoDex rồi video tự quay · DA-18 xuất định dạng stage 1 của Ψ₀ · vòng thử model gán nhãn (RoboBrain 2.5-4B, Molmo2-4B).
+- **Agent QA/QC (trong `flywheel-eval`):** DA-20 Agent QA/QC với Nemotron 3.5 Bolt E4B · DA-31 bộ chấm lỗi cấy.
+- Không cần chạy SIMPLE: code trên bộ giả và file mẫu; model chạy thật qua job trên máy 3060.
+- Sở hữu: `flywheel-data/.../ingest/egocentric/`, `annotate/deid/`, `qa/egocentric.py`, `export/egodex.py`; `flywheel-eval/.../agentqa/`; `configs/data/egocentric.yaml`, `configs/eval/agentqa/`. Xuất API và lệnh `fw` qua module và entry point riêng, không sửa tệp chung của chủ package.
 
-### Dương Tiến Thông · Scrum Master, làn Dữ liệu
+### Trần Trịnh Hoàng Châu · Đánh giá
 
-- **Việc SM:** bảng công việc, check-in, bản tin tuần, viết file story (kể cả "Phạm vi file"), sổ can thiệp ở 08; **viết file story DA-01, DA-02, DA-03, DA-08, DA-09, DA-13 còn thiếu**.
-- **Làn Dữ liệu (`flywheel-data`):** S1-10 mô hình dữ liệu và kho (làm cho nhân, Hiếu duyệt) · DA-01 định dạng episode (làm cho nhân) · S1-07 phân tích psi-data task hai bàn · DA-03 pipeline teleop (psi-data, bàn phím, sinh tự động) và báo cáo dataset · DA-17 phát lại để kiểm · DA-02, DA-21 export LeRobot v2.1, v3 · S2 nạp, QA, release · S6 SOP. DA-04 pipeline egocentric chờ Hiếu giao người.
-- Sở hữu: `flywheel-data`, `configs/data/`, `docs/product/stories/`. Tải tính lại sau khi giao người.
+- **Làn Đánh giá (`flywheel-eval`, trừ `agentqa/`):** tập điều kiện, chia tập, guard gần trùng, vector điều kiện, kNN · TaskDefinition và scorer của task hai bàn, hiệu chỉnh scorer · chuỗi chẩn đoán, kiểm hệ thống · DA-08 phát hiện lỗi train và offline · DA-13 quy lỗi về stage · evidence card · code các phép kiểm cần rollout (Hiếu chạy).
+- Sở hữu: `flywheel-eval` trừ `agentqa/`; `configs/eval/` trừ `agentqa/`. Giữ `pyproject.toml`, `api.py`, `cli.py` của `flywheel-eval`.
 
-### Trần Trịnh Hoàng Châu · Làn Đánh giá
+### Dương Đình Hiếu · Trưởng nhóm, phần còn lại, duyệt cuối
 
-- **Làn Đánh giá (`flywheel-eval`):** scorer của task hai bàn · S2 khung và hiệu chỉnh scorer · tập điều kiện, chia tập, guard gần trùng · S3 vector điều kiện, kNN, chẩn đoán, kiểm hệ thống · DA-13 quy lỗi về stage · DA-08 phát hiện lỗi train · evidence card · **DA-20 Agent QA/QC** (chấm trên bộ lỗi cấy) · S4 code các phép kiểm cần rollout (Hiếu chạy).
-- Không còn việc cần GPU: S1-04, `Psi0Policy`, ACT, DP, F-ACT, C cuối chuyển cho Hiếu.
-- Sở hữu: `flywheel-eval`, `configs/eval/`. Tải tính lại sau khi giao người.
+- **Việc trưởng nhóm:** đầu mối DENSO, BTC, mentor; chọn checkpoint gốc (Q0), D\*, ρ; duyệt kế hoạch vòng C; ký cổng G0–G6; rà claim và pitch; **duyệt và merge mọi PR**, kể cả PR schema; thảo luận tổng kết cuối ngày lúc 21:30.
+- **SIMPLE và sinh dữ liệu:** S1-02 · S1-05 sinh tự động S1 · S1-06 · S1-09 · S1-11 (V3) · DA-16 teleop bàn phím · DA-29 synthetic S2 · story 3.1a `SimpleSim`.
+- **Ψ₀ và GPU:** S1-03 · S1-04 · DA-19 code train, log, Colab, client RTC · DA-09 probe · DA-26 thí nghiệm HE · DA-30 stage 1 trên egocentric · `Psi0Policy`, ACT, DP · mọi job GPU.
+- Sở hữu: `flywheel-simple`, `flywheel-psi0`, `flywheel-lerobot`, `flywheel-nim`, `configs/models/`, `configs/embodiments/`, `configs/sim/`, RunPlan, `docker/`, `compose.yaml`, `scripts/g0/`, `docs/g0/`, tài liệu, website. **Tải cao nhất đội** (07 mục 2.3); nếu Hưng có máy chạy SIMPLE, chuyển S1-06, S1-09, DA-16 cho Hưng trước.
 
-### Nguyễn Thăng Long · Làn Vòng quyết định
-
-- **Một lần, hết ngày 27/10:** merge S1-08 rồi làm **PR `chore-restructure`** (07 mục 3.6).
-- **Làn Vòng (`flywheel-loop`):** S2 runner, sổ chi phí · S3 RunPlan, cổng dev, bảng quyết định, backup · S4 decide, `fw review`, N_B · S5 vòng C, công cụ HD · S6 báo cáo, thống kê · DA-23 runner bất đồng bộ · khóa holdout.
-- Sở hữu: `flywheel-loop`, `configs/loop/`, `pyproject.toml` gốc, `uv.lock`, CI, `scripts/` (trừ `scripts/g0/`), `ops/`. Tải tính lại sau khi giao người. Không còn giữ `contracts/` (chuyển cho Hiếu).
-
-Bảng đầy đủ: sở hữu đường dẫn ở [07 mục 2.1](docs/product/07-team-workflow.md), story Pha A ở [07 mục 2.2](docs/product/07-team-workflow.md), sprint ở [04 mục 4](docs/product/04-delivery-plan.md), RACI ở [04 mục 3.3](docs/product/04-delivery-plan.md).
+Bảng đầy đủ: sở hữu đường dẫn ở [07 mục 2.1](docs/product/07-team-workflow.md), story DA ở [07 mục 2.2](docs/product/07-team-workflow.md), sprint ở [04 mục 4](docs/product/04-delivery-plan.md), RACI ở [04 mục 3.3](docs/product/04-delivery-plan.md).
 
 ## 3. Một ngày làm việc
 

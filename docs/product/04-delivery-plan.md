@@ -456,13 +456,14 @@ Theo spec v10.4 và [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1
 
 **Mốc.** Lịch bắt đầu thứ Hai 26/10/2026; demo ngày **17/11/2026** rơi vào thứ Ba tuần 4 của Sprint 2, trước review cổng G1. Kịch bản demo ở design mục 11. HS, HT, HD và holdout theo lộ trình 12 tuần sau demo.
 
-**Story DA** (07 mục 2.2). Giờ là ước lượng thô, chốt lại khi viết đủ file story. Người làm chờ PO giao:
+**Story DA** (07 mục 2.2). Giờ là ước lượng thô, chốt lại khi viết đủ file story. Người làm theo 07 mục 2.0, 2.2 (phân công ngày 27/10/2026):
 
 | Story | Việc | Giờ | Sprint |
 |---|---|---|---|
 | DA-01, DA-02, DA-03 | Định dạng episode chung; export LeRobot v2.1; pipeline teleop trên psi-data, bàn phím và sinh tự động | 36–49 | S1–S2 |
 | DA-04 | Pipeline egocentric E-A, E-B trên mẫu EgoDex, sau đó video tự quay | 25–35 | S1–S2 |
-| DA-18 | Egocentric sang định dạng stage 1, lần chạy stage 1 ngắn; fine-tune trên video tự quay khi còn thời gian | 15–25 | S2–S3 |
+| DA-18 | Egocentric sang định dạng stage 1 của Ψ₀ | 6–10 | S2 |
+| DA-30 | Stage 1 trên egocentric: lần chạy ngắn trên EgoDex; fine-tune trên video tự quay khi còn thời gian | 10–15 | S2–S3 |
 | DA-29 | Synthetic S2: biến thể từ đoạn teleop và correction | 15–20 | S2 |
 | DA-08, DA-13 | Phát hiện lỗi F-TRAIN, F-OFF; quy lỗi về stage | 16–22 | S2–S3 |
 | DA-09 | Probe P1–P4 | 12–18 | S2–S3 |
@@ -474,9 +475,10 @@ Theo spec v10.4 và [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1
 | DA-23 | Eval bất đồng bộ trên SIMPLE | 8–12 | S2–S3 |
 | DA-25 | Schema và file mẫu artifact giữa các làn | 6–10 | S1 |
 | DA-26 | Thí nghiệm HE (không tính GPU-giờ) | 15–25 | S1–S3 |
-| DA-27 | Bộ lỗi cấy cho QA và Agent QA/QC | 10–15 | S2 |
+| DA-27 | Cấy lỗi có đáp án | 6–8 | S2 |
+| DA-31 | Bộ chấm lỗi cấy | 5–8 | S2 |
 | DA-28 | Kịch bản demo 17/11 chạy trọn luồng | 8–12 | S2 |
-| **Tổng** | | **khoảng 230–335** | |
+| **Tổng** | | **khoảng 232–336** | |
 
 **Ba loại dữ liệu** [Đã chốt 27/10/2026]: egocentric, teleop, synthetic; nguồn test bây giờ là mẫu EgoDex, dataset teleop của tác giả, bàn phím, synthetic S1 và S2; video egocentric đội tự quay khi còn thời gian. **Hoãn sau demo:** DA-05 (NimClient), DA-06 (tầng S3). **Xóa:** DA-10, DA-11, DA-12, DA-14, DA-15, DA-22, DA-24 (robot DENSO, dataset BTC, ROS 2). DA-18 khôi phục với nội dung mới. DA-07 đã gộp vào DA-19.
 

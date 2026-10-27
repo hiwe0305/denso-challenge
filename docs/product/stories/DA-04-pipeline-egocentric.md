@@ -5,7 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 27/10/2026) |
-| Người làm | Chờ PO giao |
+| Người làm | Hưng |
 | Làn | Dữ liệu |
 | Story PRD | 9.4 · Epic 9 · [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 5.0, 6.6 |
 | Nhãn | [Lõi] · `epic:9` · `gate:G1` · `area:data` |
@@ -42,6 +42,7 @@ Là kỹ sư dữ liệu, tôi muốn video egocentric của người đi qua c�
 Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
 
 - `packages/flywheel-data/src/flywheel/data/ingest/egocentric/`
+- `packages/flywheel-data/src/flywheel/data/annotate/deid/`
 - `packages/flywheel-data/src/flywheel/data/qa/egocentric.py`
 - `packages/flywheel-data/tests/unit/egocentric/`, `packages/flywheel-data/tests/contract/egocentric/`
 - `configs/data/egocentric.yaml`
@@ -64,7 +65,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Người phụ trách
 
-- Làm: chờ PO giao
+- Làm: Trần Ngọc Hưng
 - Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
 
 ## Change log
@@ -72,6 +73,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 27/10/2026 | Tạo file story; trước đó DA-04 chỉ có trong bảng 07 mục 2.2. Mở lại theo quyết định ba loại dữ liệu (design 27/10 mục 1, câu 5–7) | PO (Hiếu) |
+| 27/10/2026 | Giao cho Hưng theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

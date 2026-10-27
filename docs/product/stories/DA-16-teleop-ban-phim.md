@@ -5,7 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 25/10/2026; viết lại 27/10/2026) |
-| Người làm | Chờ PO giao |
+| Người làm | Hiếu |
 | Làn | Adapter simulator (`flywheel-simple`) |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 5.2 · Epic 9 |
 | Nhãn | [Adapter] · `epic:9` · `gate:G0` · `area:sim` |
@@ -59,7 +59,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Người phụ trách
 
-- Làm: chờ PO giao
+- Làm: Dương Đình Hiếu
 - Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
 
 ## Change log
@@ -69,6 +69,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Tạo story: teleop bàn phím cho robot DENSO trên MuJoCo | PO (Hiếu) theo design 25/10/2026 (đã xóa) |
 | 25/10/2026 | Viết lại: teleop qua ROS 2, ra MCAP | PO (Hiếu) theo design chia làn (đã xóa) |
 | 27/10/2026 | Viết lại: thiết bị bàn phím cắm vào `teleop_decoupled_wbc` của SIMPLE trên task hai bàn, ghi LeRobot; bỏ ROS 2, MCAP, robot DENSO; người làm chờ PO giao | PO (Hiếu) theo design 27/10/2026 |
+| 27/10/2026 | Giao cho Hiếu theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

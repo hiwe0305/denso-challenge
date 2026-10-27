@@ -5,13 +5,13 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 25/10/2026; sửa 27/10/2026) |
-| Người làm | Châu |
+| Người làm | Hưng |
 | Làn | Đánh giá |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 9 · Epic 9 |
 | Nhãn | [Lõi] · `epic:9` · `area:core` |
 | Sprint | S2; kết quả trên bộ lỗi cấy trước 13/11/2026 cho demo (DA-28) |
 | Ước lượng | 25 giờ (khoảng 20–30, ước lượng của SM) |
-| Phụ thuộc | DA-25 (schema `QAReport`, `DatasetReport`, log RTC, kết quả probe), DA-27 (bộ lỗi cấy và bộ chấm). Code trên file mẫu của testkit; log thật của DA-19 và report của DA-17 chỉ cần khi chạy thật. PR `chore-restructure` (07 mục 3.6, hết 27/10) tạo khung package `flywheel-eval` |
+| Phụ thuộc | DA-25 (schema `QAReport`, `DatasetReport`, log RTC, kết quả probe), DA-27 (bộ lỗi cấy), DA-31 (bộ chấm, cùng người làm). Code trên file mẫu của testkit; log thật của DA-19 và report của DA-17 chỉ cần khi chạy thật. PR `chore-restructure` (07 mục 3.6, hết 27/10) tạo khung package `flywheel-eval` |
 
 ## Story
 
@@ -24,7 +24,7 @@ Là AI Engineer, tôi muốn một agent đọc báo cáo dataset, log và outpu
 3. Code tính mọi con số; agent chỉ diễn giải và trích dẫn; câu nêu số không có trong đầu vào thì báo cáo bị đánh dấu hỏng.
 4. Dựng hình cho người: báo cáo dataset (phép kiểm trượt nhiều nhất theo nguồn); bảng ảnh stage 1 (khung hình SIMPLE, câu hỏi, câu trả lời của VLM); đồ thị action dự đoán so với thật kèm link video phát lại; dòng thời gian RTC.
 5. Ra `QAReport` đúng schema và báo cáo HTML tĩnh; kỹ sư ghi đồng ý hoặc ghi đè kèm lý do.
-6. Chạy trên bộ lỗi cấy của DA-27 trước khi dùng: precision, recall theo loại lỗi, báo nhầm trên bản sạch; tách phần phép kiểm bằng code bắt được khỏi phần agent thêm (design mục 9.2). Mỗi ước lượng lưu lại và so với kết quả đo.
+6. Chạy trên bộ lỗi cấy của DA-27, chấm bằng DA-31, trước khi dùng: precision, recall theo loại lỗi, báo nhầm trên bản sạch; tách phần phép kiểm bằng code bắt được khỏi phần agent thêm (design mục 9.2). Mỗi ước lượng lưu lại và so với kết quả đo.
 8. Sau khi đội có log fine-tune thật (DA-19, DA-26): chạy trên log thật, báo riêng với kết quả trên lỗi cấy.
 7. Câu Q-M: nếu trưởng nhóm muốn agent tự nhìn hình thì thêm Qwen3.5-4B qua endpoint thứ hai, cùng bộ ca mẫu.
 
@@ -63,7 +63,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Người phụ trách
 
-- Làm: Trần Trịnh Hoàng Châu
+- Làm: Trần Ngọc Hưng
 - Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
 - Bình luận: Hiếu (endpoint, log), Long (báo cáo)
 
@@ -74,6 +74,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Tạo story | PO (Hiếu) theo design 25/10/2026 (đã xóa) |
 | 25/10/2026 | Chuyển sang làn Đánh giá; serve model do Hiếu; thêm Qwen3.5-4B tùy chọn | PO (Hiếu) theo design chia làn (đã xóa) |
 | 27/10/2026 | Thêm báo cáo dataset vào đầu vào; AC 6 chấm trên bộ lỗi cấy của DA-27 thay bộ ca mẫu tự viết; thêm AC 8 và nhiệm vụ con 7 chạy trên log thật | PO (Hiếu) theo design 27/10/2026 |
+| 27/10/2026 | Giao cho Hưng theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

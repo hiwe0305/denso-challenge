@@ -6,7 +6,7 @@ Hướng dẫn cho Claude Code (và người) làm việc trong repo này. Độ
 
 Đề xuất của đội ilovephysicalintelligence cho thử thách DENSO Factory Hacks. Lõi là **thuật toán Failure → Data**: khi policy robot hỏng trong mô phỏng, kiểm lỗi hệ thống trước, rồi chọn dữ liệu cần thu theo chi phí thật, có đối chứng. Model là Ψ₀ (dùng lại checkpoint của tác giả). Từ 27/10/2026 robot là Unitree G1 trong SIMPLE, đúng robot và model của paper; task chính là task hai bàn (gắp vật ở bàn này, đi sang bàn kia, đặt lên). Hệ thống có ba loại dữ liệu cố định: egocentric của người, teleop, synthetic; nguồn để test bây giờ là dữ liệu công bố và sim (mẫu EgoDex, dataset teleop của tác giả, teleop bàn phím, synthetic S1 và S2), sau đó video egocentric đội tự quay. Thu và sinh dữ liệu chạy MuJoCo thuần của SIMPLE, Isaac Sim chỉ render. Robot DENSO đã bỏ khỏi phạm vi.
 
-Trạng thái 27/10/2026: S1-01 đã merge (khung `packages/`, CLI `fw`, CI); Sprint 1 bắt đầu 26/10/2026; demo ngày 17/11/2026. Người làm của story mới và story đổi hướng chờ Product Owner giao.
+Trạng thái 27/10/2026: S1-01 đã merge (khung `packages/`, CLI `fw`, CI); Sprint 1 bắt đầu 26/10/2026; demo ngày 17/11/2026. Phân công theo 07 mục 2.0: Long (nhân, làn Vòng), Thông (dữ liệu robot), Hưng (egocentric, Agent QA/QC), Châu (làn Đánh giá) làm data flywheel; Hiếu làm phần còn lại và duyệt cuối.
 
 ## Đọc gì trước
 
