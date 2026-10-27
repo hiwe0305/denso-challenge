@@ -4,10 +4,10 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt 25/10/2026; sửa theo design chia làn cùng ngày) |
+| Trạng thái | Sẵn sàng (PO duyệt 25/10/2026; sửa 27/10/2026) |
 | Người làm | Thông |
 | Làn | Dữ liệu |
-| Story PRD | Story mới của [design MuJoCo 25/10/2026](../../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) và [design chia làn](../../superpowers/specs/2026-10-25-lanes-and-code-structure-design.md) · Epic 9 |
+| Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 6.4 · Epic 9 |
 | Nhãn | [Lõi] · `epic:9` · `area:data` |
 | Sprint | S2 |
 | Ước lượng | 5 giờ (khoảng 4–6, ước lượng của SM) |
@@ -21,7 +21,7 @@ Là kỹ sư dữ liệu, tôi muốn xuất dataset sang LeRobot v3 từ bản 
 
 1. Chuyển v2.1 sang v3 bằng script chuyển đổi chính thức của LeRobot, ghim phiên bản; không xử lý lại từ bundle.
 2. Contract test đọc lại bản v3 bằng `lerobot` bản mới; so số episode, số khung, một batch mẫu với bản v2.1.
-3. Checklist 7 mục (design MuJoCo mục 5.1) chạy tự động cho cả v2.1 và v3.
+3. Checklist 7 mục (design 27/10 mục 6.4) chạy tự động cho cả v2.1 và v3.
 4. v2.1 là bản bắt buộc cho Ψ₀ (fork lerobot `v2.1`); v3 tùy chọn.
 
 ## Nhiệm vụ
@@ -40,7 +40,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chú cho người làm
 
-- Nguồn: [design MuJoCo](../../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) mục 5.1; 03 ADR-03.
+- Nguồn: design 27/10 mục 6.4; 03 ADR-03.
 - Chỉ import nhân (`flywheel.contracts`, `flywheel.store`, `flywheel.testkit`); không import làn khác hay adapter (03 mục 7.3). Thiếu trường trong schema thì báo Hiếu mở PR hợp đồng, không thêm trường tạm.
 
 ## Kiểm thử
@@ -57,8 +57,9 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 | Ngày | Nội dung | Người |
 |---|---|---|
-| 25/10/2026 | Tạo story theo design MuJoCo 25/10/2026 mục 11.2 | PO (Hiếu) |
-| 25/10/2026 | Viết lại theo design chia làn: đường dẫn trong `flywheel-data` | PO (Hiếu) |
+| 25/10/2026 | Tạo story | PO (Hiếu) theo design 25/10/2026 (đã xóa) |
+| 25/10/2026 | Đường dẫn trong `flywheel-data` | PO (Hiếu) theo design chia làn (đã xóa) |
+| 27/10/2026 | Nguồn chuyển sang design 27/10; nội dung không đổi | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

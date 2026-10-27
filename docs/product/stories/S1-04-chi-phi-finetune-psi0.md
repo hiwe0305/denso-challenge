@@ -4,12 +4,12 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt 22/10/2026; sửa 25/10/2026) |
+| Trạng thái | Sẵn sàng (PO duyệt 22/10/2026; sửa 25/10/2026, 27/10/2026) |
 | Người làm | Hiếu |
 | Story PRD | 1.4 · Epic 1 |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:rl` |
 | Sprint | S1 (tuần 1–2), bắt đầu ngày 1 |
-| Ước lượng | 18 giờ (bản trước: 12 giờ) |
+| Ước lượng | 20 giờ (bản 25/10: 18 giờ; bản đầu: 12 giờ) |
 | Phụ thuộc | S1-03 nhiệm vụ con 2.1 cho image Ψ₀ ở `docker/psi0/`; nhiệm vụ con 1.2 bắt đầu ngày 1. Cần ngân sách thuê GPU nếu 5090 không đủ. Từ 25/10/2026: máy là RTX 3060 12 GB và Colab Pro (A100, H100); 5090 chờ xác nhận |
 
 ## Story
@@ -24,8 +24,9 @@ Là kỹ sư robot learning, tôi muốn đo VRAM và GPU-giờ của fine-tune 
 4. Đề xuất cấu hình (toàn phần, LoRA, đóng băng VLM), phần cứng, số seed; Hiếu duyệt. Ghi vào `configs/runplans/draft-g0.yaml`.
 5. Không commit trọng số; xóa trạng thái optimizer sau khi đo và ghi chú vào sổ (03 §9.2).
 6. Kết quả ở `docs/g0/psi0-finetune-cost.md`, có mục "Đề xuất cho 03 §3.3" với phần fine-tune của V8 ([docs/g0/README.md](../../g0/README.md)). Hiếu gom vào 03 §3.3 ở review G0.
-7. (25/10/2026, [design 25/10/2026](../../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) mục 6.3) Đo trên một A100 hoặc H100 của Colab: giây mỗi bước và VRAM cho stage 3 (`finetune-*`) và stage 2 (`posttrain-*`) với `action_layout` của robot DENSO đệm 36 chiều (dữ liệu giả cùng shape nếu chưa có dữ liệu thật); quy ra compute unit cho khối lượng spec mục 9. Dữ liệu DENSO không lên Colab (design 25/10 mục 9).
+7. (25/10/2026, sửa 27/10/2026 theo [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 8.4) Đo trên một A100 hoặc H100 của Colab: giây mỗi bước và VRAM cho stage 3 (`finetune-simple-psi0.sh`) trên gói task hai bàn; quy ra compute unit cho khối lượng spec mục 9 cộng thí nghiệm HE (khoảng 8–10 lần fine-tune thêm, ước lượng). Bản 25/10 đo cả stage 2 cho robot DENSO; phần đó bỏ vì robot DENSO bị bỏ.
 8. (25/10/2026) Đo inference Ψ₀ trên RTX 3060 12 GB: VRAM, độ trễ p50 và p99 mỗi lần suy luận, so với chu kỳ điều khiển; là đầu vào cho DA-23.
+9. (27/10/2026) Thời gian eval một episode task hai bàn ở `mujoco` và `mujoco_isaac` (lấy từ S1-02, S1-03); Isaac Sim chạy được trên Colab không (câu Q-27D); ước tổng giờ máy eval của HE theo design mục 4.3 và đề xuất phương án rút gọn nếu vượt (design mục 7.4).
 
 ## Nhiệm vụ
 
@@ -38,6 +39,7 @@ Là kỹ sư robot learning, tôi muốn đo VRAM và GPU-giờ của fine-tune 
 - [ ] 5. Dọn trọng số, optimizer; viết tài liệu kèm đề xuất cho 03 §3.3 (AC 5, 6)
 - [ ] 6. Đo stage 2 và stage 3 trên Colab, quy ra compute unit (AC 7)
 - [ ] 7. Đo inference trên 3060 (AC 8)
+- [ ] 8. Ước giờ máy eval và fine-tune của HE, thử Isaac Sim trên Colab (AC 9)
 
 ## Phạm vi file
 
@@ -76,8 +78,9 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 22/10/2026 | Tạo story từ 02 · 1.4; giao Châu làm, Hiếu duyệt, theo 04 mục 3.2 | SM (Bob), PO (Sarah) duyệt |
 | 22/10/2026 | Đồng bộ spec v10.1: checkpoint gốc trong `pre.*`, `postpre.*`; khối lượng 22 lần train Ψ₀ mặc định, tối đa 33. AC của 02 · 1.4 không đổi | SM (Bob) theo 06 |
 | 24/10/2026 | Thêm mục Phạm vi file. Dùng image Ψ₀ của S1-03 thay vì dựng chung; AC 6: đề xuất V8 (phần fine-tune) ghi trong file kết quả, Hiếu gom vào 03 §3.3; sổ chi phí riêng của story | PO (Hiếu) |
-| 25/10/2026 | Thêm AC 7, 8 và nhiệm vụ con 6, 7: đo stage 2, 3 trên Colab và inference trên 3060; giữ nguyên số nhiệm vụ con cũ vì nhánh S1-04 đang mở; 12 → 18 giờ | PO (Hiếu) theo design 25/10/2026 |
-| 25/10/2026 | Chuyển cho Hiếu vì cần phần cứng; nhánh đang mở giữ nguyên, nhiệm vụ con 1.2 vẫn tính cho Châu | PO (Hiếu) theo design chia làn |
+| 25/10/2026 | Thêm AC 7, 8 và nhiệm vụ con 6, 7: đo stage 2, 3 trên Colab và inference trên 3060; giữ nguyên số nhiệm vụ con cũ vì nhánh S1-04 đang mở; 12 → 18 giờ | PO (Hiếu) theo design 25/10/2026 (đã xóa) |
+| 25/10/2026 | Chuyển cho Hiếu vì cần phần cứng; nhánh đang mở giữ nguyên, nhiệm vụ con 1.2 vẫn tính cho Châu | PO (Hiếu) theo design chia làn (đã xóa) |
+| 27/10/2026 | AC 7 bỏ stage 2 của robot DENSO, đo trên task hai bàn và tính thêm HE; thêm AC 9 và nhiệm vụ con 8 (thời gian eval hai chế độ, Isaac trên Colab); giữ số nhiệm vụ con cũ; 18 → 20 giờ | PO (Hiếu) theo design 27/10/2026 |
 
 ## Ghi chép khi làm
 
