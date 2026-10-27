@@ -112,7 +112,7 @@ Theo tinh thần PO master checklist của BMAD: (1) khởi tạo dự án và h
 
 ### 1.4 Tên thống nhất
 
-Thực thể theo 03 §4.3 bản 0.3 (L0-lite, 12 bảng): Source, Condition, Episode, QAReport, Release, Checkpoint, RunPlan, Score, Cluster, FixRateEvent, LedgerEntry, Decision. Tên khái niệm của 02, spec và bản 0.2 ánh xạ như sau: cụm lỗi là Cluster; evidence card là trang sinh lại từ Cluster và Decision; can thiệp là một dòng `iv_<ULID>` trong `plan.json` cộng Decision `plan_review`; phiếu sửa và quyết định cổng là Decision `repair_ticket`, `dev_gate`; mục sổ chi phí là LedgerEntry; tỉ lệ sửa được là FixRateEvent với posterior tính lúc đọc (`ledger`); trace là Episode có `kind` là `eval_rollout` hoặc `diag_rollout`; bước hỏng và kiểu lỗi nằm trong Score (có `failure_class`); vòng flywheel là RunPlan `purpose = round`; Embodiment, Task, SplitPlan, PriceBook là cấu hình YAML có hash trong `configs/`. Adapter giả: `FakeSim2D`, `FakePolicy`, `FakeTrainer`, `FakeGenerator`, `FakeTeleop`, `ToyPickPlace`. TaskDefinition: `G1BendPickAndPlace` (task chính), `G1BendPick` (task F1).
+Thực thể theo 03 §4.3 bản 0.3 (L0-lite, 12 bảng): Source, Condition, Episode, QAReport, Release, Checkpoint, RunPlan, Score, Cluster, FixRateEvent, LedgerEntry, Decision. Tên khái niệm của 02, spec và bản 0.2 ánh xạ như sau: cụm lỗi là Cluster; evidence card là trang sinh lại từ Cluster và Decision; can thiệp là một dòng `iv_<ULID>` trong `plan.json` cộng Decision `plan_review`; phiếu sửa và quyết định cổng là Decision `repair_ticket`, `dev_gate`; mục sổ chi phí là LedgerEntry; tỉ lệ sửa được là FixRateEvent với posterior tính lúc đọc (`ledger`); trace là Episode có `kind` là `eval_rollout` hoặc `diag_rollout`; bước hỏng và kiểu lỗi nằm trong Score (có `failure_class`); vòng flywheel là RunPlan `purpose = round`; Embodiment, Task, SplitPlan, PriceBook là cấu hình YAML có hash trong `configs/`. Adapter giả: `FakeSim2D`, `FakePolicy`, `FakeTrainer`, `FakeGenerator`, `FakeTeleop`, `ToyPickPlace`. TaskDefinition: `G1LocomotionPickBetweenTables` (task chính, bản 0.7; trước đó `G1BendPickAndPlace`), `G1BendPick` (task F1).
 
 ### 1.5 Kết luận checklist
 
@@ -229,7 +229,7 @@ R: làm. A: chịu trách nhiệm cuối, mỗi dòng một người. C: hỏi �
 | TrainerAdapter: `Psi0Trainer` | A, R | I | R | C | I |
 | GeneratorAdapter: tuyến V3 đã chọn (1.9, 5.1, 5.5) | C | A, R | R | C | I |
 | TeleopSource: `SimpleTeleop`, `PlannerCorrectionSource` | C | A, R | I | C | I |
-| TaskDefinition: `G1BendPickAndPlace`, `G1BendPick` | C | R | A, R | I | I |
+| TaskDefinition: `G1LocomotionPickBetweenTables` (bản 0.7), `G1BendPick` | C | R | A, R | I | I |
 | Bộ giả `flywheel-fakes` | I | I | C | A, R | C |
 | Cấy lỗi trên SIMPLE, khóa đáp án | I | A, R | I | C | I |
 | Thí nghiệm Ψ₀ (E1, nhánh, vòng C) | A | C | R | R | I |
@@ -298,7 +298,7 @@ Việc ngoài story: Hiếu 10 giờ (DENSO DN1, ngân sách GPU, mã đề, ema
 | 3.2 | Runner và trace | [Lõi] | Long | 12 | S1-08, S1-10 |
 | 2.6 | Release bất biến, export, đếm demo gốc | [Lõi] | Long | 12 | 2.3, 2.5 |
 | 3.1a | `SimpleSimulator`, hook ghi tín hiệu, `t_state`, `t_image`, tham số camera (chốt V11) | [Adapter] | Hưng | 16 | S1-02, S1-09 |
-| 3.4 phần task chính | TaskDefinition `G1BendPickAndPlace`; khung F1 dời S6 | [Adapter] | Hưng | 8 | 3.3, S1-09 |
+| 3.4 phần task chính | TaskDefinition `G1LocomotionPickBetweenTables` (bản 0.7); khung F1 dời S6 | [Adapter] | Hưng | 8 | 3.3, S1-09 |
 | 5.5 phần 1 | Xây tuyến generator đã chọn (T1 hoặc T2) | [Adapter] | Hưng | 12 | S1-11, 3.1a |
 | 4.1 phần G1 | ACT, DP train thử từ export | [Adapter] | Châu | 4 | 2.6 |
 | 3.1b | `Psi0Policy`, contract test | [Adapter] | Châu | 8 | S1-03 |
