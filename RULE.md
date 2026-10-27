@@ -5,46 +5,47 @@
 ## 1. Dự án trong 3 câu
 
 1. Đội ilovephysicalintelligence làm **Humanoid Data Flywheel** cho DENSO Factory Hacks: khi policy robot hỏng trong mô phỏng, hệ thống kiểm lỗi hệ thống trước, rồi chọn dữ liệu cần thu theo chi phí thật (thuật toán **Failure → Data**).
-2. Model là Ψ₀ (dùng lại checkpoint và code train 3 stage của tác giả). Robot chính là **mobile manipulator của DENSO trên MuJoCo**, task lấy linh kiện từ khay đặt vào máy; mọi thí nghiệm HS, HT, HD chạy trên robot này. **SIMPLE chỉ là benchmark G0**; Isaac Sim thêm sau demo.
-3. Trạng thái 25/10/2026: đổi hướng sang MuJoCo đã duyệt ([design 25/10/2026](docs/superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md)); S1-01 đã merge. Sprint 1 bắt đầu thứ Hai 26/10/2026. **Hiếu là người duyệt và merge duy nhất vào `master`.**
+2. Model là Ψ₀ (dùng lại checkpoint và code train của tác giả). Từ 27/10/2026 robot là **Unitree G1 trong SIMPLE**, đúng robot và model của paper; task chính là **task hai bàn**: gắp vật ở bàn này, đi sang bàn kia, đặt lên. Thu và sinh dữ liệu chạy MuJoCo thuần, Isaac Sim chỉ render. Robot DENSO đã bỏ khỏi phạm vi.
+3. Trạng thái 27/10/2026: hướng G1 + Ψ₀ đã duyệt ([design 27/10/2026](docs/superpowers/specs/2026-10-27-g1-psi0-demo-design.md), design hiện hành duy nhất); S1-01 đã merge; Sprint 1 bắt đầu thứ Hai 26/10/2026; **demo ngày 17/11/2026**. **Hiếu là người duyệt và merge duy nhất vào `master`.**
 
-Muốn hiểu sâu: [spec v10.2](docs/spec-v10-failure-to-data.md), [design 23/10/2026](docs/superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md), [03 · Kiến trúc](docs/product/03-architecture.md).
+Muốn hiểu sâu: [spec v10.4](docs/spec-v10-failure-to-data.md), [design 27/10/2026](docs/superpowers/specs/2026-10-27-g1-psi0-demo-design.md), [03 · Kiến trúc](docs/product/03-architecture.md).
 
 ## 2. Công việc của từng người
 
 Giờ là ước lượng (04 mục 4.7 cộng phần DA ở 07 mục 2.3). Ai cũng đang vượt mức kế hoạch 70%; nếu trễ thì chuyển phần trễ sang API trước khi cắt việc (mục 5, R5).
 
-Từ 25/10/2026 việc chia theo **làn** ([design chia làn](docs/superpowers/specs/2026-10-25-lanes-and-code-structure-design.md)): mỗi người giữ trọn package của mình, chỉ import phần **nhân** (hợp đồng, kho, bộ giả, CLI) do Hiếu giữ, không import code của người khác. Muốn thêm hoặc đổi dữ liệu đi giữa hai làn thì mở PR hợp đồng cho Hiếu. Giờ là ước lượng thô ở 07 mục 2.3.
+**Cập nhật 27/10/2026:** việc của robot DENSO (MuJoCo riêng, ROS 2, dataset BTC, egocentric nhà máy) đã bỏ; story mới và story đổi hướng (S1-05, S1-06, S1-09, S1-11, DA-16, DA-26, DA-27, DA-28, `flywheel-simple`) **chờ Hiếu giao người**. Danh sách dưới chỉ còn việc đã có chủ.
+
+Từ 25/10/2026 việc chia theo **làn** (03 mục 7): mỗi người giữ trọn package của mình, chỉ import phần **nhân** (hợp đồng, kho, bộ giả, CLI) do Hiếu giữ, không import code của người khác. Muốn thêm hoặc đổi dữ liệu đi giữa hai làn thì mở PR hợp đồng cho Hiếu. Giờ là ước lượng thô ở 07 mục 2.3.
 
 ### Dương Đình Hiếu · Trưởng nhóm, nhân, model và phần cứng
 
 - **Việc trưởng nhóm:** đầu mối DENSO, BTC, mentor; chọn checkpoint gốc (Q0), D\*, ρ; duyệt kế hoạch vòng C; ký cổng G0–G6; rà claim và pitch; **duyệt và merge mọi PR**; thảo luận tổng kết cuối ngày lúc 21:30.
 - **Nhân:** `flywheel-contracts`, `flywheel-store`, `flywheel-testkit`, `flywheel-cli`; **DA-25 schema và file mẫu cho artifact mới, trước 29/10**.
-- **Model và phần cứng (chỉ Hiếu có máy):** S1-02 SIMPLE · S1-03 tái tạo Ψ₀ · S1-04 chi phí train · DA-19 code train 3 stage, log, Colab, client RTC · DA-05 NIM · DA-09 probe · `Psi0Policy`, ACT, DP · chạy mọi job GPU (E1, nhánh A, A₀.₇, B, C, F-ACT, B-fail của ACT) · DA-14 gửi DENSO 21 mục.
-- Sở hữu: nhân, `flywheel-psi0`, `flywheel-lerobot`, `flywheel-simple`, `flywheel-nim`, `configs/kernel/`, `configs/models/`, `configs/runplans/` (duyệt), `docker/simple/`, `docker/psi0/`, `tests/e2e/`, tài liệu, website. Tổng khoảng 340–370 giờ, **cao nhất đội**; cách giảm ở 07 mục 2.3.
+- **Model và phần cứng (chỉ Hiếu có máy):** S1-02 SIMPLE · S1-03 tái tạo Ψ₀ · S1-04 chi phí train · DA-19 code train 3 stage, log, Colab, client RTC · DA-09 probe (gồm ba VLM của HE) · `Psi0Policy`, ACT, DP · chạy mọi job GPU (HE, E1, nhánh A, A₀.₇, B, C, F-ACT, B-fail của ACT). DA-05 NIM hoãn sau demo.
+- Sở hữu: nhân, `flywheel-psi0`, `flywheel-lerobot`, `flywheel-nim`, `configs/kernel/`, `configs/models/`, `configs/runplans/` (duyệt), `docker/simple/`, `docker/psi0/`, `tests/e2e/`, tài liệu, website. Tải tính lại sau khi giao người (07 mục 2.3); vẫn dễ quá tải nhất đội.
 
 ### Trần Ngọc Hưng · Simulation
 
-- **Story:** **DA-15 robot DENSO tương đương trên MuJoCo, MJCF tối thiểu trước 28/10** · **DA-24 workspace ROS 2 và môi trường sim** · DA-16 teleop bàn phím trên ROS 2, ghi MCAP · S1-06 khôi phục trạng thái, tách hình ảnh · S1-09 tín hiệu và tập điều kiện · DA-06 generator Cosmos S3 (Hiếu chạy) · về sau: correction và sim cho B-fail, cấy lỗi cho HD, video demo; DA-11 Isaac sau demo.
-- Sở hữu: `denso-sim`, `flywheel-mujoco`, `ros2_ws/`, `docker/ros2-sim/`, `.devcontainer/`, `configs/embodiments/`, `configs/sim/`, `generators/` của `flywheel-nim`, thư mục `scripts/g0/`, `docs/g0/`. Tổng khoảng 235–240 giờ.
+- Việc cũ (robot DENSO trên MuJoCo, ROS 2, DA-15, DA-24) đã bỏ ngày 27/10/2026. **Chờ Hiếu giao việc mới.** Thư mục `scripts/g0/`, `docs/g0/` vẫn do Hưng giữ.
 
 ### Dương Tiến Thông · Scrum Master, làn Dữ liệu
 
-- **Việc SM:** bảng công việc, check-in, bản tin tuần, viết file story (kể cả "Phạm vi file"), sổ can thiệp ở 08; **viết file story DA-01…DA-14 còn thiếu**.
-- **Làn Dữ liệu (`flywheel-data`):** S1-10 mô hình dữ liệu và kho (làm cho nhân, Hiếu duyệt) · DA-01 định dạng episode (làm cho nhân) · DA-22 dataset BTC · DA-03 pipeline teleop (đọc MCAP) · DA-17 phát lại để kiểm · DA-02, DA-21 export LeRobot v2.1, v3 · DA-04, DA-18 egocentric → dữ liệu stage 1 · S2 nạp, QA, release · S6 SOP.
-- Sở hữu: `flywheel-data`, `configs/data/`, `docs/product/stories/`. Tổng khoảng 240–250 giờ.
+- **Việc SM:** bảng công việc, check-in, bản tin tuần, viết file story (kể cả "Phạm vi file"), sổ can thiệp ở 08; **viết file story DA-01, DA-02, DA-03, DA-08, DA-09, DA-13 còn thiếu**.
+- **Làn Dữ liệu (`flywheel-data`):** S1-10 mô hình dữ liệu và kho (làm cho nhân, Hiếu duyệt) · DA-01 định dạng episode (làm cho nhân) · S1-07 phân tích psi-data task hai bàn · DA-03 pipeline teleop (psi-data, bàn phím, sinh tự động) và báo cáo dataset · DA-17 phát lại để kiểm · DA-02, DA-21 export LeRobot v2.1, v3 · S2 nạp, QA, release · S6 SOP. DA-04 egocentric hoãn sau demo.
+- Sở hữu: `flywheel-data`, `configs/data/`, `docs/product/stories/`. Tải tính lại sau khi giao người.
 
 ### Trần Trịnh Hoàng Châu · Làn Đánh giá
 
-- **Làn Đánh giá (`flywheel-eval`):** DA-12 task khay → máy và scorer · S2 khung và hiệu chỉnh scorer · tập điều kiện, chia tập, guard gần trùng · S3 vector điều kiện, kNN, chẩn đoán, kiểm hệ thống · DA-13 quy lỗi về stage · DA-08 phát hiện lỗi train · evidence card · **DA-20 Agent QA/QC** · S4 code các phép kiểm cần rollout (Hiếu chạy).
+- **Làn Đánh giá (`flywheel-eval`):** scorer của task hai bàn · S2 khung và hiệu chỉnh scorer · tập điều kiện, chia tập, guard gần trùng · S3 vector điều kiện, kNN, chẩn đoán, kiểm hệ thống · DA-13 quy lỗi về stage · DA-08 phát hiện lỗi train · evidence card · **DA-20 Agent QA/QC** (chấm trên bộ lỗi cấy) · S4 code các phép kiểm cần rollout (Hiếu chạy).
 - Không còn việc cần GPU: S1-04, `Psi0Policy`, ACT, DP, F-ACT, C cuối chuyển cho Hiếu.
-- Sở hữu: `flywheel-eval`, `configs/eval/`. Tổng khoảng 180–185 giờ.
+- Sở hữu: `flywheel-eval`, `configs/eval/`. Tải tính lại sau khi giao người.
 
 ### Nguyễn Thăng Long · Làn Vòng quyết định
 
 - **Một lần, hết ngày 27/10:** merge S1-08 rồi làm **PR `chore-restructure`** (07 mục 3.6).
 - **Làn Vòng (`flywheel-loop`):** S2 runner, sổ chi phí · S3 RunPlan, cổng dev, bảng quyết định, backup · S4 decide, `fw review`, N_B · S5 vòng C, công cụ HD · S6 báo cáo, thống kê · DA-23 runner bất đồng bộ · khóa holdout.
-- Sở hữu: `flywheel-loop`, `configs/loop/`, `pyproject.toml` gốc, `uv.lock`, CI, `scripts/` (trừ `scripts/g0/`), `ops/`. Tổng khoảng 250–260 giờ. Không còn giữ `contracts/` (chuyển cho Hiếu).
+- Sở hữu: `flywheel-loop`, `configs/loop/`, `pyproject.toml` gốc, `uv.lock`, CI, `scripts/` (trừ `scripts/g0/`), `ops/`. Tải tính lại sau khi giao người. Không còn giữ `contracts/` (chuyển cho Hiếu).
 
 Bảng đầy đủ: sở hữu đường dẫn ở [07 mục 2.1](docs/product/07-team-workflow.md), story Pha A ở [07 mục 2.2](docs/product/07-team-workflow.md), sprint ở [04 mục 4](docs/product/04-delivery-plan.md), RACI ở [04 mục 3.3](docs/product/04-delivery-plan.md).
 
@@ -150,10 +151,10 @@ Label nguyên nhân quan trọng hơn số lượng lỗi: nhờ nó đội bi�
 | Chủ đề | Hỏi |
 |---|---|
 | DENSO, BTC, mentor, quyết định phạm vi; hợp đồng giữa các làn; Ψ₀, ACT, DP, SIMPLE, job GPU, Colab | Hiếu |
-| MuJoCo, `denso-sim`, robot DENSO tương đương, ROS 2, teleop bàn phím, Isaac Sim, generator | Hưng |
+| SIMPLE ở chế độ MuJoCo, teleop bàn phím, sinh tự động, Isaac Sim render | Hiếu cho tới khi giao người |
 | Task và scorer, tập điều kiện, chẩn đoán, evidence card, Agent QA/QC | Châu |
 | RunPlan, runner, decide, cổng dev, holdout, sổ chi phí, báo cáo, CI, cấu trúc repo | Long |
-| Story, bảng công việc, ingest, QA dữ liệu, phát lại để kiểm, LeRobot v2.1/v3, dataset BTC, egocentric, rule ở 08 | Thông |
+| Story, bảng công việc, ingest, QA dữ liệu, phát lại để kiểm, LeRobot v2.1/v3, rule ở 08 | Thông |
 
 ## 8. Lệnh hay dùng
 
@@ -174,5 +175,5 @@ Label nguyên nhân quan trọng hơn số lượng lỗi: nhờ nó đội bi�
 | Rule theo ngày, chỉ số, sổ can thiệp | [08](docs/product/08-daily-control.md) |
 | Sprint, Definition of Done | [04](docs/product/04-delivery-plan.md) |
 | Yêu cầu và story theo epic | [02 · PRD](docs/product/02-prd.md) |
-| Thuật toán và giả thuyết | [Spec v10.2](docs/spec-v10-failure-to-data.md) |
-| Pipeline dữ liệu, robot DENSO, bảng lỗi | [Design 23/10/2026](docs/superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md) |
+| Thuật toán và giả thuyết | [Spec v10.4](docs/spec-v10-failure-to-data.md) |
+| Task hai bàn, dữ liệu, HE, Agent QA/QC, demo 17/11 | [Design 27/10/2026](docs/superpowers/specs/2026-10-27-g1-psi0-demo-design.md) |

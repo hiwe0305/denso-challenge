@@ -2,17 +2,17 @@
 
 Đề xuất của đội ilovephysicalintelligence cho thử thách H1 của DENSO Factory Hacks: huấn luyện humanoid nhanh, chính xác, ít công. Recipe hiện hành là **Ψ₀ + SIMPLE / G1**: fine-tune Ψ₀ trên dữ liệu teleop và dữ liệu sinh trong mô phỏng, rồi dùng thuật toán **Failure → Data** để chọn dữ liệu cần bổ sung sau mỗi lỗi, có đối chứng chất lượng và chi phí.
 
-Từ 23/10/2026, robot chính là **mobile manipulator của DENSO** chạy trong Isaac Sim, với task lấy linh kiện từ khay đặt vào máy; G1 trong SIMPLE là bàn thử. Dữ liệu teleop, video egocentric và synthetic (qua NVIDIA NIM) đi qua cùng một pipeline; mỗi stage của Ψ₀ được chấm riêng để quy lỗi về stage.
+Từ 27/10/2026, demo ngày 17/11/2026 và mọi thí nghiệm chạy trên **Unitree G1 trong SIMPLE**, task hai bàn: gắp vật ở bàn này, đi sang bàn kia, đặt lên. Dữ liệu robot đến từ dataset của tác giả Ψ₀, teleop bằng bàn phím và sinh tự động; cả ba qua pipeline 6 tầng về một định dạng chung. Thí nghiệm HE kiểm claim của Ψ₀ rằng dữ liệu egocentric của người giúp cần ít demo robot hơn. Agent QA/QC đọc báo cáo dataset, log và output từng stage.
 
-Trạng thái: đề xuất PoC, chưa chạy Ψ₀ hoặc robot thật. Số liệu hiệu quả là ước lượng có điều kiện.
+Trạng thái: đề xuất PoC, chưa chạy Ψ₀ hoặc robot thật. Số liệu hiệu quả là ước lượng có điều kiện. Website và hai file PowerPoint chưa cập nhật theo hướng 27/10/2026.
 
 ## Cấu trúc
 
 | Đường dẫn | Nội dung |
 |---|---|
-| [docs/spec-v10-failure-to-data.md](docs/spec-v10-failure-to-data.md) | Đặc tả hiện hành (v10.2): giả thuyết HS, HTa, HTb, HD, thuật toán Failure → Data 12 bước, PoC với các nhánh A, A₀.₇, B, B-fail, C, robot DENSO và robot thay thế, sổ chi phí, lộ trình 12 tuần, glossary |
-| [docs/superpowers/specs/](docs/superpowers/specs/2026-10-23-data-pipeline-and-failure-eval-design.md) | Design ngày 23/10/2026: pipeline dữ liệu ba nguồn, synthetic S1–S4 qua NIM, output từng stage Ψ₀, bảng lỗi, thông tin cần xin DENSO |
-| [docs/product/](docs/product/README.md) | Hồ sơ sản phẩm theo BMAD: phân tích idea, brief, PRD, kiến trúc lõi flywheel, kế hoạch chia việc 5 người, phản biện và câu hỏi cho mentor, story Sprint 1 |
+| [docs/spec-v10-failure-to-data.md](docs/spec-v10-failure-to-data.md) | Đặc tả hiện hành (v10.4): giả thuyết HS, HTa, HTb, HD, HE, thuật toán Failure → Data 12 bước, PoC với các nhánh A, A₀.₇, B, B-fail, C, thí nghiệm HE, sổ chi phí, lộ trình 12 tuần, glossary |
+| [docs/superpowers/specs/](docs/superpowers/specs/2026-10-27-g1-psi0-demo-design.md) | Design ngày 27/10/2026 (hiện hành duy nhất): task hai bàn, simulator, teleop bàn phím, sinh tự động, pipeline 6 tầng, thí nghiệm HE, Agent QA/QC và bộ lỗi cấy, bảng lỗi, kịch bản demo 17/11 |
+| [docs/product/](docs/product/README.md) | Hồ sơ sản phẩm theo BMAD: brief, PRD, kiến trúc lõi flywheel, kế hoạch chia việc 5 người, phản biện và câu hỏi cho mentor, story Sprint 1 |
 | [RULE.md](RULE.md) | **Đọc đầu tiên nếu bạn là thành viên đội:** công việc của từng người, một ngày làm việc, cách làm một story, rule R1–R9, điều không được phá, hỏi ai |
 | [CLAUDE.md](CLAUDE.md) | Quy tắc chung cho mọi phiên Claude Code và cho người: đọc gì trước, phạm vi file, quy ước nhánh và commit, bất biến kiến trúc. Có thêm [docs/CLAUDE.md](docs/CLAUDE.md) và [website/CLAUDE.md](website/CLAUDE.md) |
 | [scripts/](scripts) | `check_links.py` kiểm liên kết nội bộ; `progress.py` in tiến độ theo story; `pr_guard.py` và `daily_report.py` cho rule kiểm soát theo ngày ([08](docs/product/08-daily-control.md)); `setup_labels.sh` tạo label GitHub |
