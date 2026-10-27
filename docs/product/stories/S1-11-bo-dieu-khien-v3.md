@@ -4,71 +4,66 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Hủy (25/10/2026) |
-| Lý do hủy | Theo [design 25/10/2026](../../superpowers/specs/2026-10-25-denso-mujoco-and-stage-qa-design.md) mục 11.1: không còn V3 vì teleop, planner và policy chạy cùng bộ điều khiển trên MuJoCo; V3 chỉ quay lại khi phát triển G1 |
-| Người làm | Hưng |
+| Trạng thái | Sẵn sàng (PO duyệt 22/10/2026; hủy 25/10/2026; mở lại 27/10/2026) |
+| Người làm | Chờ PO giao |
 | Story PRD | 1.9 · Epic 1 (story mới ở 02 bản 0.3, tách từ AC 5 cũ của 1.5) |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:sim` · `spike` |
-| Sprint | S1. **Bảng đối chiếu xong trước ngày 5 (thứ Sáu 30/10/2026).** Thử T1 và T2 song song tuần 1–2; chốt tuyến cuối tuần 2 ở review G0, chậm nhất S2 ngày 3 |
-| Ước lượng | 0 giờ (hủy; trước đó 18 giờ) |
-| Phụ thuộc | Bước 1 không cần S1-02 (đọc cấu hình và mã SIMPLE). Thử T1, T2 cần S1-02. Dùng số liệu datagen của S1-05. Chặn 5.5, 5.1, 6.3, 6.4, 7.4, 7.11 |
+| Sprint | S1. **Bảng đối chiếu xong trước thứ Sáu 30/10/2026.** Chốt tuyến sinh tự động cuối tuần 2 ở review G0 |
+| Ước lượng | 8 giờ (bản 22/10: 18 giờ gồm thử T1, T2; phần xây tuyến nay thuộc S1-05) |
+| Phụ thuộc | Bước 1 không cần S1-02 (đọc cấu hình, mã SIMPLE và metadata checkpoint). Bước 3 cần S1-02. Chặn S1-05 phần chọn tuyến, DA-03 phần trộn nguồn |
 
 ## Story
 
-Là kỹ sư simulation, tôi muốn biết rollout motion planning có cùng bộ điều khiển với demo teleop của task chính không, để nhánh B, C và B-fail có dữ liệu sinh hợp lệ hoặc chọn sớm tuyến thay thế.
+Là kỹ sư simulation, tôi muốn biết dữ liệu sinh tự động của task hai bàn có cùng bộ điều khiển với demo teleop không, để chọn đúng tuyến sinh tự động và biết dữ liệu nào được trộn trong một release.
 
 ## Tiêu chí chấp nhận
 
-1. Trước ngày 5: bảng đối chiếu demo teleop task chính (`G1WholebodyBendPickAndPlaceTeleop-v0`) và rollout MP: env, robot, bộ điều khiển, không gian state, không gian action, tần số điều khiển, camera. Mỗi ô có nguồn là file cấu hình hoặc mã SIMPLE. Bảng ghi rõ System-0 của task chính là decoupled WBC (`g1_sonic`, env `SonicLocoManipEnv`) và AMO (`g1_wholebody`) là bộ điều khiển của pipeline MP.
-2. Cùng bảng cho cặp task F1 (`G1WholebodyBendPickTeleop-v0`, `G1WholebodyBendPickMP-v0`). F1 chỉ được ghi là dự phòng cho Q2 khi bảng xác nhận cặp này cùng bộ điều khiển; nếu không, F1 chỉ giữ vai trò kiểm khả năng tổng quát của lõi (NFR7).
-3. Cùng bộ điều khiển hoặc có ánh xạ tường minh: ghi ánh xạ, đề xuất `embodiment_id` cho từng nguồn; story 5.5 đóng với ghi chú "không cần".
-4. Khác bộ điều khiển: thử song song trong tuần 1–2. T1 (Hưng): lấy quỹ đạo thân trên của rollout MP, suy lệnh thân dưới, chạy lại trong env WBC. T2 (Châu, 6 giờ): biến đổi một đoạn teleop theo tư thế vật mới, chạy bằng IK cộng WBC trong env Teleop. Mỗi tuyến ghi tỉ lệ thành công trên ít nhất 10 lượt và ước công sức xây đến mức chạy được (đầu vào cho 5.5). Chốt tuyến cuối tuần 2; T3, T4 chỉ chọn theo cây ở 04 mục 1.3.
-5. Ghi kịch bản V3 âm cộng Q6 âm (Q6 lấy từ S1-07) vào RunPlan nháp và mục rủi ro: C chỉ còn kiểm demo mâu thuẫn, HT sụp, báo cáo phải nêu.
-6. Kết luận ở `docs/g0/v3-planner-controller.md`, có mục "Đề xuất cho 03 §3.3" với dòng V3 và giá trị cờ `GenCapabilities.plan` ([docs/g0/README.md](../../g0/README.md)); Hiếu gom vào 03 §3.3 ở review G0; nháp cấu hình embodiment trong `configs/embodiments/`.
+_Mở lại ngày 27/10/2026 theo [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 5.3: task chính là `G1WholebodyLocomotionPickBetweenTablesTeleop-v0`; dữ liệu bàn phím chạy cùng decoupled WBC với teleop, nhưng dữ liệu sinh bằng `datagen` của SIMPLE chạy AMO._
+
+1. Bảng đối chiếu task hai bàn (`G1WholebodyLocomotionPickBetweenTablesTeleop-v0`) với một task MP gần nhất có đi bộ (ví dụ `G1WholebodyPickAndBendPlaceMP-v0`): env, robot, bộ điều khiển, không gian state, không gian action, tần số điều khiển, camera. Mỗi ô có nguồn là file cấu hình hoặc mã SIMPLE.
+2. Đọc `run_config.json` và `argv.txt` của ba checkpoint task hai bàn của tác giả (`…teleop-v0`, `…mixed-v0`, `…variant5-v0-processed`): `mixed` trộn nguồn gì, qua bộ điều khiển nào, dataset nào; ghi vào bảng.
+3. Thử nhanh mỗi tuyến 10 lượt trên một điều kiện: tuyến A (script đi bộ cộng cuRobo trong env WBC của task hai bàn) và tuyến B (task MP chạy `datagen`, AMO). Ghi tỉ lệ thành công và ước công sức xây đến mức chạy được (đầu vào cho S1-05).
+4. Kết luận: tuyến được chọn; nếu chọn B thì ghi ánh xạ không gian lệnh AMO sang `action_layout` của WBC hoặc ghi rõ hai `embodiment_id` không trộn trong một release (ADR-08).
+5. Cùng bảng cho cặp F1 (`BendPickTeleop`, `BendPickMP`) như bản 22/10, chỉ để kiểm khả năng tổng quát của lõi.
+6. Kết luận ở `docs/g0/v3-planner-controller.md`, có mục "Đề xuất cho 03 §3.3" với dòng V3 và giá trị cờ `GenCapabilities.plan` ([docs/g0/README.md](../../g0/README.md)); nháp `configs/embodiments/g1_sonic_dwbc.yaml` và `g1_wholebody_amo.yaml`.
 
 ## Nhiệm vụ
 
-- ~~1. Bảng đối chiếu (AC 1, 2), xong trước ngày 5~~
-  - ~~1.1 Đọc cấu hình env, robot, bộ điều khiển của task chính và task MP; ghi bảng có nguồn~~
-  - ~~1.2 Làm tương tự cho cặp F1~~
-  - ~~1.3 Báo kết luận sơ bộ trong check-in thứ Sáu ngày 5; V3 âm thì báo Hiếu ngay~~
-- ~~2. Nếu cùng bộ điều khiển hoặc có ánh xạ: ghi ánh xạ, đề xuất `embodiment_id`, đóng 5.5 (AC 3)~~
-- ~~3. Nếu khác: Hưng thử T1 (AC 4)~~
-- ~~4. Nếu khác: Châu thử T2 trong 6 giờ (AC 4)~~
-- ~~5. Ghi kịch bản V3 âm cộng Q6 âm (AC 5)~~
-- ~~6. Viết kết luận, đề xuất tuyến cho review G0 kèm đề xuất cho 03 §3.3, nháp `configs/embodiments/` (AC 6)~~
+- [ ] 1. Bảng đối chiếu (AC 1, 2), xong trước 30/10/2026
+  - [ ] 1.1 Đọc cấu hình env, robot, bộ điều khiển của task hai bàn và task MP gần nhất; ghi bảng có nguồn
+  - [ ] 1.2 Đọc metadata ba checkpoint task hai bàn của tác giả
+  - [ ] 1.3 Báo kết luận sơ bộ trong check-in thứ Sáu 30/10/2026
+- [ ] 2. Thử tuyến A và tuyến B, 10 lượt mỗi tuyến (AC 3)
+- [ ] 3. Kết luận tuyến, ánh xạ hoặc tách `embodiment_id` (AC 4)
+- [ ] 4. Bảng cho cặp F1 (AC 5)
+- [ ] 5. Viết kết luận, đề xuất cho 03 §3.3, nháp `configs/embodiments/` (AC 6)
 
 ## Phạm vi file
 
 Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
 
-- `scripts/g0/t1_replay_probe.py`, `scripts/g0/t2_variant_probe.py`
+- `scripts/g0/v3_route_probe.py`
 - `docs/g0/v3-planner-controller.md`
 - `configs/embodiments/g1_sonic_dwbc.yaml`, `configs/embodiments/g1_wholebody_amo.yaml`
 - `docs/g0/ledger/S1-11.csv`
-- Chạy datagen_probe.sh của S1-05, không sửa
 
 ## Ghi chú cho người làm
 
-- Nguồn: 02 · 1.9, 1.5, 5.1, 5.5, 7.4, §8; spec 2.1, 2.3, 2.4 (V3), 4.1, 6.5, 6.6, 10 (bảng T1–T4); 03 §3.2 (dòng "Bộ điều khiển của task chính", "Sinh dữ liệu motion planning"), §3.3 V3, §5.2 (`control_spec`), §5.4, ADR-08, ADR-15, §12.2 (bảng tuyến); 05 mục 2.3 (DK1–DK4), R01, PM1, RL2; 06 mục 1.
-- Story tách từ AC 5 cũ của 1.5 (S1-05 bản 0.1) theo 06 mục 1, để V3 có hạn riêng là ngày 5. S1-05 nay chỉ còn Q2.
-- Theo 03 §3.2, mọi task `*Teleop-v0` dùng `g1_sonic` còn `*MP-v0` dùng AMO; F1 nhiều khả năng không chữa được V3 (05 DK4). Cần xác nhận, không giả định.
-- Release sẽ cấm trộn embodiment không tương thích (ADR-08); kết luận của story này quyết định có cần ánh xạ hay tuyến khác.
-- T1, T2 tranh máy 5090 với S1-03 và S1-04: Hưng xếp lịch máy từ ngày 1.
-- Kết luận T3 thì báo Hiếu ngay để kích hoạt cắt giảm mức 2–4 (04 mục 7, 4.8). T4 cần Hiếu và mentor đồng ý; claim HS thu hẹp thành "sim thay sim".
-- File sẽ tạo: `docs/g0/v3-planner-controller.md`, `scripts/g0/t1_replay_probe.py`, `scripts/g0/t2_variant_probe.py`, `configs/embodiments/g1_sonic_dwbc.yaml` và `configs/embodiments/g1_wholebody_amo.yaml` (bản nháp).
+- Nguồn: spec 2.1, 2.3, 2.4 (V3), 2.5, 10 (bảng T1–T4); 03 §3.2, §3.3 V3, §5.2 (`control_spec`), §5.4, ADR-08, ADR-15, ADR-25; design 27/10 mục 5.3.
+- Tuyến A tương ứng T3 của spec mục 10; tuyến B tương ứng T4 nhưng chỉ cho phần dữ liệu sinh, không đổi task chính.
+- Theo 03 §3.2, mọi task `*Teleop-v0` dùng `g1_sonic` còn `*MP-v0` dùng AMO. Cần xác nhận, không giả định.
+- Checkpoint nằm ở `USC-PSI-Lab/psi-model`, thư mục `psi0/simple-checkpoints/`; chỉ tải metadata, không tải trọng số.
+- File sẽ tạo: `docs/g0/v3-planner-controller.md`, `scripts/g0/v3_route_probe.py`, hai file nháp trong `configs/embodiments/`.
 
 ## Kiểm thử
 
-- Bảng đối chiếu có nguồn (đường dẫn file cấu hình hoặc mã nguồn SIMPLE) cho từng ô; Long đối chiếu ngẫu nhiên 3 ô với mã SIMPLE.
-- Người review chạy lại probe T1 hoặc T2 cho 5 lượt và ra tỉ lệ thành công cùng bậc.
+- Bảng đối chiếu có nguồn cho từng ô; người review đối chiếu ngẫu nhiên 3 ô với mã SIMPLE.
+- Người review chạy lại probe của tuyến được chọn cho 5 lượt và ra tỉ lệ thành công cùng bậc.
 
 ## Người phụ trách
 
-- Làm: Trần Ngọc Hưng
-- Hỗ trợ: Trần Trịnh Hoàng Châu (T2, 6 giờ)
-- Review: Dương Đình Hiếu (tác động tới thí nghiệm), Nguyễn Thăng Long (embodiment trong catalog)
-- Dự phòng: Trần Trịnh Hoàng Châu
+- Làm: chờ PO giao
+- Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
 
 ## Change log
 
@@ -76,7 +71,8 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 |---|---|---|
 | 22/10/2026 | Tạo story từ 02 · 1.9 (bản 0.3), tách V3 khỏi S1-05 theo 06 mục 1; hạn ngày 5, thử T1 và T2 song song, chốt cuối tuần 2 | SM (Bob) theo 06 |
 | 24/10/2026 | Thêm mục Phạm vi file. AC 6: đề xuất dòng V3 ghi trong file kết quả, Hiếu gom vào 03 §3.3 ở review G0; chạy `datagen_probe.sh` của S1-05, không sửa | PO (Hiếu) |
-| 25/10/2026 | Hủy: không còn V3 vì teleop, planner và policy chạy cùng bộ điều khiển trên MuJoCo; V3 chỉ quay lại khi phát triển G1. Nhiệm vụ con gạch bỏ, không xóa nội dung | PO (Hiếu) theo design 25/10/2026 |
+| 25/10/2026 | Hủy: không còn V3 vì teleop, planner và policy chạy cùng bộ điều khiển trên MuJoCo | PO (Hiếu) theo design 25/10/2026 (đã xóa) |
+| 27/10/2026 | Mở lại cho task hai bàn: bảng đối chiếu với task MP có đi bộ, đọc metadata ba checkpoint của tác giả, thử tuyến A và B, chọn tuyến; phần xây tuyến chuyển sang S1-05; người làm chờ PO giao; 18 → 8 giờ | PO (Hiếu) theo design 27/10/2026 |
 
 ## Ghi chép khi làm
 
