@@ -5,7 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt hướng 27/10/2026) |
-| Người làm | Chờ PO giao |
+| Người làm | Hiếu |
 | Làn | Adapter simulator (`flywheel-simple`) |
 | Story PRD | 9.26 · Epic 9 · [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 5.4 · spec mục 6.10, tuyến T2 ở mục 10 |
 | Nhãn | [Adapter] · `epic:9` · `gate:G1` · `area:sim` |
@@ -56,7 +56,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Người phụ trách
 
-- Làm: chờ PO giao
+- Làm: Dương Đình Hiếu
 - Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
 
 ## Change log
@@ -64,6 +64,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 27/10/2026 | Tạo story: trưởng nhóm chốt synthetic S1 và S2 trước demo | PO (Hiếu) |
+| 27/10/2026 | Giao cho Hiếu theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

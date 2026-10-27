@@ -5,7 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 22/10/2026; sửa 25/10/2026; về lại SIMPLE 27/10/2026) |
-| Người làm | Chờ PO giao |
+| Người làm | Hiếu |
 | Story PRD | 1.5, phần Q3 và Q4 · Epic 1 |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:sim` · `spike` |
 | Sprint | S1. Câu trả lời ở G0 được phép là "tạm"; chốt cuối trong story 6.4 (S3) |
@@ -56,7 +56,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Người phụ trách
 
-- Làm: chờ PO giao
+- Làm: Dương Đình Hiếu
 - Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
 
 ## Change log
@@ -67,6 +67,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 24/10/2026 | Thêm mục Phạm vi file. AC 4: đề xuất dòng V4, V5 ghi trong file kết quả, Hiếu gom vào 03 §3.3 ở review G0 | PO (Hiếu) |
 | 25/10/2026 | Đổi sang env MuJoCo của robot DENSO; 8 → 4 giờ; chuyển cho Hưng | PO (Hiếu) theo hai design 25/10/2026 (đã xóa) |
 | 27/10/2026 | Về lại SIMPLE trên task hai bàn; thêm AC 3 (tham số ngẫu nhiên hóa đổi được); phụ thuộc S1-02; người làm chờ PO giao; 4 → 8 giờ | PO (Hiếu) theo design 27/10/2026 |
+| 27/10/2026 | Giao cho Hiếu theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

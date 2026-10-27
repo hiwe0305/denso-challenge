@@ -5,7 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 25/10/2026; sửa 27/10/2026) |
-| Người làm | Hiếu |
+| Người làm | Long |
 | Làn | Nhân |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 12; 03 mục 7.3 · Epic 9 |
 | Nhãn | [Lõi] · `epic:9` · `gate:G0` · `area:core` |
@@ -15,7 +15,7 @@
 
 ## Story
 
-Là trưởng nhóm giữ nhân, tôi muốn có schema và file mẫu cho mọi artifact mới giữa các làn, để ba làn và người làm adapter code song song mà không phải hỏi nhau.
+Là người giữ nhân, tôi muốn có schema và file mẫu cho mọi artifact mới giữa các làn, để ba làn và người làm adapter code song song mà không phải hỏi nhau.
 
 ## Tiêu chí chấp nhận
 
@@ -53,7 +53,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Người phụ trách
 
-- Làm: Dương Đình Hiếu
+- Làm: Nguyễn Thăng Long
 - Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
 - Bình luận: Long, Thông, Châu, Hưng (mỗi người xem schema mình dùng)
 
@@ -63,6 +63,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 |---|---|---|
 | 25/10/2026 | Tạo story | PO (Hiếu) theo design chia làn (đã xóa) |
 | 27/10/2026 | Bỏ bảng topic MCAP; thêm `DatasetReport`, `DefectManifest`, trường Episode mới | PO (Hiếu) theo design 27/10/2026 |
+| 27/10/2026 | Giao cho Long theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

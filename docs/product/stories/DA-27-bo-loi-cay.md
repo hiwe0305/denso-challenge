@@ -1,21 +1,21 @@
-# DA-27 · Bộ lỗi cấy cho QA và Agent QA/QC
+# DA-27 · Bộ lỗi cấy: cấy lỗi có đáp án
 
 ## Trạng thái
 
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt hướng 27/10/2026) |
-| Người làm | Chờ PO giao |
-| Làn | Dữ liệu (cấy lỗi) và Đánh giá (bộ chấm) |
+| Người làm | Thông |
+| Làn | Dữ liệu |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 9.2 · Epic 9 · 03 ADR-26 |
 | Nhãn | [Lõi] · `epic:9` · `gate:G1` · `area:data` |
 | Sprint | S2; bộ lỗi dữ liệu xong trước 10/11/2026 để DA-20 chấm kịp demo |
-| Ước lượng | 12 giờ (khoảng 10–15, ước lượng) |
+| Ước lượng | 7 giờ (khoảng 6–8, ước lượng; bộ chấm tách sang DA-31) |
 | Phụ thuộc | DA-25 (schema `DefectManifest`, trường `injected_defect`), S1-07 (gói psi-data task hai bàn). Log train và log RTC cấy lỗi dựng trên `FakeTrainer` và log RTC giả của testkit cho tới khi có log thật |
 
 ## Story
 
-Là AI Engineer, tôi muốn một bộ dữ liệu và log thật được cấy lỗi có đáp án khóa trước, để đo được phép kiểm QA và Agent QA/QC bắt đúng bao nhiêu trước khi đội train model.
+Là kỹ sư dữ liệu, tôi muốn một bộ dữ liệu và log thật được cấy lỗi có đáp án khóa trước, để bộ chấm (DA-31) đo được phép kiểm QA và Agent QA/QC bắt đúng bao nhiêu trước khi đội train model.
 
 ## Tiêu chí chấp nhận
 
@@ -23,8 +23,7 @@ Là AI Engineer, tôi muốn một bộ dữ liệu và log thật được cấ
 2. Log train cấy lỗi T1–T8 và log RTC cấy lỗi R1, R2 sinh từ bộ giả, cùng schema với log thật.
 3. Đáp án ghi vào `DefectManifest`, hash khóa trước khi chạy QA và agent; agent và phép kiểm không đọc được file này (có test).
 4. Một bản sạch (không cấy) cùng kích thước để đo báo nhầm.
-5. Bộ chấm: precision và recall theo từng loại lỗi, không gộp; tỉ lệ báo nhầm trên bản sạch; thời gian từ lúc job xong tới lúc có báo cáo; tách hai cột "phép kiểm bằng code" (QA tầng 4) và "Agent QA/QC" (DA-20).
-6. Báo cáo HTML tĩnh ghi rõ "trên lỗi cấy"; dùng trong demo 17/11 (DA-28).
+5. Bản cấy lỗi và bản sạch giao cho DA-31 qua `DatasetRef` và `DefectManifest`; bản cấy lỗi không vào release train (có test).
 
 ## Nhiệm vụ
 
@@ -32,33 +31,31 @@ Là AI Engineer, tôi muốn một bộ dữ liệu và log thật được cấ
 - [ ] 2. Log train và log RTC cấy lỗi từ bộ giả (AC 2)
 - [ ] 3. `DefectManifest` có hash, chặn agent đọc (AC 3)
 - [ ] 4. Bản sạch (AC 4)
-- [ ] 5. Bộ chấm và báo cáo (AC 5, 6)
+- [ ] 5. Giao bản cấy và bản sạch, test chặn release (AC 5)
 
 ## Phạm vi file
 
 Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
 
 - `packages/flywheel-data/src/flywheel/data/inject/`, `packages/flywheel-data/tests/unit/inject/`
-- `packages/flywheel-eval/src/flywheel/eval/agentqa/bench/`, `packages/flywheel-eval/tests/unit/agentqa/bench/`
 - `configs/data/inject.yaml`
-- `docs/g0/defect-bench.md`
+- `docs/g0/defect-inject.md`
 
 ## Ghi chú cho người làm
 
 - Nguồn: design 27/10 mục 9.2, 10 (mã lỗi D, T, R); spec mục 7.6 (lỗi cấy cho HD dùng cùng ý tưởng); 03 mục 7.3 (artifact), ADR-26.
-- Phần cấy lỗi thuộc làn Dữ liệu, phần chấm thuộc làn Đánh giá; hai phần chỉ nối qua `DefectManifest` trong `flywheel.contracts`, không import nhau.
+- Phần chấm là DA-31 (Hưng, làn Đánh giá); hai phần chỉ nối qua `DefectManifest` trong `flywheel.contracts`, không import nhau.
 - Bản sao cấy lỗi không bao giờ vào release train (có test chặn theo `injected_defect`).
 - Dữ liệu cấy lỗi để trong `fwdata/`, không commit; chỉ commit cấu hình và mã.
 
 ## Kiểm thử
 
 - Mỗi loại lỗi có một test: cấy một lần, phép kiểm tương ứng bắt được.
-- Bộ chấm có test trên đầu vào giả có đáp án biết trước (precision, recall tính đúng).
-- Test chặn: agent không mở được `DefectManifest`; release từ chối episode có `injected_defect`.
+- Test chặn: release từ chối episode có `injected_defect`.
 
 ## Người phụ trách
 
-- Làm: chờ PO giao
+- Làm: Dương Tiến Thông
 - Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
 
 ## Change log
@@ -66,6 +63,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 27/10/2026 | Tạo story theo design 27/10/2026 mục 9.2 | PO (Hiếu) |
+| 27/10/2026 | Tách bộ chấm sang DA-31; giao cho Thông theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

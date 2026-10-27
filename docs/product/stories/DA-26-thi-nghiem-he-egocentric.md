@@ -5,7 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt hướng 27/10/2026) |
-| Người làm | Chờ PO giao |
+| Người làm | Hiếu |
 | Làn | Model và phần cứng (chạy job GPU); kết quả đi qua làn Đánh giá |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 7 · spec mục 3 (HE), 7.9 |
 | Nhãn | [Adapter] · `epic:9` · `gate:G2` · `area:rl` |
@@ -62,7 +62,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Người phụ trách
 
-- Làm: chờ PO giao (job GPU chạy trên máy và Colab của Hiếu)
+- Làm: Dương Đình Hiếu
 - Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
 
 ## Change log
@@ -70,6 +70,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 27/10/2026 | Tạo story theo design 27/10/2026 mục 7 | PO (Hiếu) |
+| 27/10/2026 | Giao cho Hiếu theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

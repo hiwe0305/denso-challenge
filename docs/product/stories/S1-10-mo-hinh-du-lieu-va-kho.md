@@ -5,7 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 22/10/2026) |
-| Người làm | Thông |
+| Người làm | Long |
 | Story PRD | 2.1, phần a · Epic 2. Phần b (RunPlan, `fw plan freeze`, test NFR7) làm ở S3 |
 | Nhãn | [Lõi] · `epic:2` · `gate:G1` · `area:data` |
 | Sprint | S1, tuần 1–2 |
@@ -69,7 +69,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Người phụ trách
 
-- Làm: Dương Tiến Thông
+- Làm: Nguyễn Thăng Long
 - Chịu trách nhiệm cuối và review: Nguyễn Thăng Long
 - Dự phòng: Nguyễn Thăng Long
 
@@ -81,6 +81,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 22/10/2026 | Theo L0-lite (06 mục 9, 02 · 2.1 bản 0.3, 03 §2.4, §4.3): 12 thực thể, cấu hình ngoài catalog, `task_id`, `embodiment_id`, `site_id` là cột có mặc định; JSONL không phân vùng ngày, view DuckDB tự tạo, bỏ `fw index rebuild`, bỏ fsspec; ước lượng 14 → 10 giờ | SM (Bob) theo 06 |
 | 24/10/2026 | Thêm mục Phạm vi file. AC không đổi | PO (Hiếu) |
 | 25/10/2026 | Đường dẫn theo nhân mới: `flywheel-contracts`, `flywheel-store`; hàm ghi sổ chi phí nằm trong kho vì mọi làn đều ghi; phân tích sổ chi phí thuộc làn Vòng (Long) | PO (Hiếu) theo design chia làn |
+| 27/10/2026 | Giao cho Long theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

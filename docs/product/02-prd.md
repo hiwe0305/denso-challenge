@@ -641,9 +641,9 @@ Mục tiêu (bản 0.5): ba loại dữ liệu (egocentric, teleop, synthetic) �
 | 9.20 | DA-23 | Eval bất đồng bộ trên SIMPLE | [Lõi] | FR12 | G1–G2 | `sync` và `async` cho cùng kết quả khi độ trễ bằng 0 |
 | 9.21 | DA-25 | Schema artifact giữa các làn | [Lõi] | FR48 | G0 | Mọi file mẫu qua validate |
 | 9.22 | DA-26 | Thí nghiệm HE | [Adapter] | FR58 | G1–G3 | RunPlan HE ký trước khi chạy; HE-1 sơ bộ trước 13/11/2026; báo cáo theo tiêu chí đã chốt |
-| 9.23 | DA-27 | Bộ lỗi cấy | [Lõi] | FR60 | G1 | Mỗi loại lỗi có test cấy và bắt; agent không đọc được đáp án |
+| 9.23 | DA-27, DA-31 | Bộ lỗi cấy (cấy ở DA-27, chấm ở DA-31) | [Lõi] | FR60 | G1 | Mỗi loại lỗi có test cấy và bắt; agent không đọc được đáp án |
 | 9.24 | DA-28 | Kịch bản demo 17/11 | [Lõi] | FR61 | G1 | Một người không viết script chạy lại sáu phần từ tài liệu |
-| 9.25 | DA-18 | Egocentric sang định dạng stage 1, lần chạy stage 1 ngắn, fine-tune trên video tự quay | [Adapter] | FR50, FR53 | G1–G3 | Dữ liệu EgoDex do pipeline xuất ra đọc được bằng loader stage 1 của Ψ₀; lần chạy ngắn có loss giảm |
+| 9.25 | DA-18, DA-30 | Egocentric sang định dạng stage 1 (DA-18); lần chạy stage 1 ngắn, fine-tune trên video tự quay (DA-30) | [Adapter] | FR50, FR53 | G1–G3 | Dữ liệu EgoDex do pipeline xuất ra đọc được bằng loader stage 1 của Ψ₀; lần chạy ngắn có loss giảm |
 | 9.26 | DA-29 | Synthetic S2: biến thể từ đoạn teleop và correction | [Adapter] | FR51 | G1 | Biến thể chạy lại trong sim đạt; tỉ lệ sinh đạt và chi phí mỗi mẫu trong sổ |
 
 ## 7. Ngoài phạm vi 12 tuần

@@ -5,7 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 22/10/2026; hủy 25/10/2026; mở lại 27/10/2026) |
-| Người làm | Chờ PO giao |
+| Người làm | Hiếu |
 | Story PRD | 1.9 · Epic 1 (story mới ở 02 bản 0.3, tách từ AC 5 cũ của 1.5) |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:sim` · `spike` |
 | Sprint | S1. **Bảng đối chiếu xong trước thứ Sáu 30/10/2026.** Chốt tuyến sinh tự động cuối tuần 2 ở review G0 |
@@ -62,7 +62,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Người phụ trách
 
-- Làm: chờ PO giao
+- Làm: Dương Đình Hiếu
 - Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
 
 ## Change log
@@ -73,6 +73,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 24/10/2026 | Thêm mục Phạm vi file. AC 6: đề xuất dòng V3 ghi trong file kết quả, Hiếu gom vào 03 §3.3 ở review G0; chạy `datagen_probe.sh` của S1-05, không sửa | PO (Hiếu) |
 | 25/10/2026 | Hủy: không còn V3 vì teleop, planner và policy chạy cùng bộ điều khiển trên MuJoCo | PO (Hiếu) theo design 25/10/2026 (đã xóa) |
 | 27/10/2026 | Mở lại cho task hai bàn: bảng đối chiếu với task MP có đi bộ, đọc metadata ba checkpoint của tác giả, thử tuyến A và B, chọn tuyến; phần xây tuyến chuyển sang S1-05; người làm chờ PO giao; 18 → 8 giờ | PO (Hiếu) theo design 27/10/2026 |
+| 27/10/2026 | Giao cho Hiếu theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
