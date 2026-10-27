@@ -4,7 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Đầu vào
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
-| 27/10/2026 | 0.5 | Theo [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md): mục 2.1 bỏ `denso-sim`, `flywheel-mujoco`, `ros2_ws`, `docker/ros2-sim`; `flywheel-simple` thành adapter simulator chính, chủ chờ PO giao; mục 2.2 bảng story mới: giữ, sửa, hoãn, xóa, thêm DA-26 đến DA-28; mục 2.3 tải theo người chờ PO giao lại; mục 3.6 PR `chore-restructure` bỏ khung `flywheel-mujoco`, `denso-sim` | PO (Hiếu) |
+| 27/10/2026 | 0.5 | Theo [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md): mục 2.1 bỏ `denso-sim`, `flywheel-mujoco`, `ros2_ws`, `docker/ros2-sim`; `flywheel-simple` thành adapter simulator chính, chủ chờ PO giao; mục 2.2 bảng story mới: giữ, sửa, hoãn, xóa, mở lại DA-04, khôi phục DA-18, thêm DA-26 đến DA-29 (ba loại dữ liệu egocentric, teleop, synthetic); mục 2.3 tải theo người chờ PO giao lại; mục 3.6 PR `chore-restructure` bỏ khung `flywheel-mujoco`, `denso-sim` | PO (Hiếu) |
 | 25/10/2026 | 0.4 | Theo design chia làn ngày 25/10/2026 (file đã xóa ngày 27/10/2026): mục 2.1 sở hữu theo nhân, ba làn, adapter, `denso-sim`, `ros2_ws`, `configs/` theo làn; mục 2.2 đổi chủ DA-01, DA-04, DA-08, DA-13, DA-17, DA-18, DA-20, DA-23, thêm DA-24, DA-25; mục 2.3 tải mới; mục 3.2 hợp đồng do Hiếu giữ; mục 3.6 PR `chore-restructure` | PO (Hiếu) |
 | 25/10/2026 | 0.3 | Theo design ngày 25/10/2026 (file đã xóa ngày 27/10/2026): mục 2.1 thêm `flywheel-mujoco`, `flywheel-agentqa`, cột review thành người bình luận vì Hiếu duyệt duy nhất; mục 2.2 thêm DA-15…DA-23, DA-07 gộp vào DA-19, DA-10 gộp vào DA-15, DA-11 dời sau demo, DA-03, DA-06, DA-12 đổi theo MuJoCo; khung package `flywheel-psi0` thuộc DA-19, `flywheel-ingest` thuộc DA-22; mục 2.3 tải mới; mục 3.4, 3.5 quy trình duyệt và merge | PO (Hiếu) |
 | 24/10/2026 | 0.2 | Mục 2.1: thêm `scripts/g0/`, `docs/g0/` (chủ Hưng, review Hiếu); mục 3.2: bảng tổng hợp và sổ chi phí chung không sửa trong nhánh story | PO (Hiếu) |
@@ -63,7 +63,7 @@ Chủ sở hữu không có nghĩa là người duy nhất được sửa. Ngư�
 | DA-01 | Định dạng episode chung, `action_layout` của G1 (đệm 36 chiều), trường mới của Episode (design mục 6.1) | Giữ | Thông (Hiếu giữ hợp đồng) | `flywheel-contracts/`, `configs/embodiments/` (schema) | S1-10 | 8–12 | S1 |
 | DA-02 | Export LeRobot v2.1 theo `action_layout`, `stats_psi0.json`, contract test bằng loader Ψ₀ | Giữ | Thông | `flywheel-data/export/` | DA-01 | 8–12 | S2 |
 | DA-03 | Pipeline teleop: normalize, cắt đoạn, QA riêng nguồn, chạy trên psi-data, bàn phím và sinh tự động; báo cáo dataset (design mục 6.5) | Sửa | Thông | `flywheel-data/ingest/`, `normalize/`, `annotate/`, `qa/` | DA-01 | 20–25 | S1–S2 |
-| DA-04 | Pipeline egocentric trên mẫu EgoDex | Hoãn sau demo | | | | | |
+| DA-04 | Pipeline egocentric E-A, E-B: che danh tính, cắt đoạn, pose tay và camera, QA; trên mẫu EgoDex, sau đó video đội tự quay | Mở lại | Chờ PO giao | `flywheel-data/ingest/egocentric/` | DA-01 | 25–35 | S1–S2 |
 | DA-05 | `NimClient`, định tuyến theo `data_class` | Hoãn sau demo | | | | | |
 | DA-06 | Tầng S3: Cosmos Transfer | Hoãn sau PoC | | | | | |
 | DA-07 | Log train theo nhóm action | Đã gộp vào DA-19 | | | | | |
@@ -71,9 +71,10 @@ Chủ sở hữu không có nghĩa là người duy nhất được sửa. Ngư�
 | DA-09 | Probe P1–P4 đóng băng có hash; chạy trên `pre.*`, `postpre.*` và ba VLM của HE | Sửa | Hiếu | `flywheel-psi0/` phần probe | S1-03 | 12–18 | S2–S3 |
 | DA-10, DA-11, DA-12, DA-14 | Robot thay thế, cảnh trạm Isaac Sim, task khay → máy, xin thông tin DENSO | Xóa | | | | | |
 | DA-13 | Quy lỗi về stage và quy tắc F-SYS trong `diagnosis` | Giữ | Châu | `flywheel-eval/diagnosis/` | DA-09 | 8–10 | S3 |
-| DA-15, DA-18, DA-22, DA-24 | Robot DENSO trên MuJoCo, egocentric nhà máy, dataset BTC, ROS 2 | Xóa | | | | | |
+| DA-15, DA-22, DA-24 | Robot DENSO trên MuJoCo, dataset BTC, ROS 2 | Xóa | | | | | |
 | DA-16 | Thiết bị bàn phím cho teleop decoupled WBC của SIMPLE, ghi episode, mục sổ chi phí mỗi phiên | Sửa | Chờ PO giao | `flywheel-simple/teleop/` | S1-02 | 10–15 | S1–S2 |
 | DA-17 | Phát lại action động học và động lực học trên MuJoCo của SIMPLE, video so sánh, ngưỡng | Sửa | Thông | `flywheel-data/replay_check/` | `SimpleSim.replay()` (code trên bản giả) | 7–11 | S1–S2 |
+| DA-18 | Egocentric sang định dạng stage 1 của Ψ₀, contract test bằng loader, lần chạy stage 1 ngắn; fine-tune trên video tự quay khi còn thời gian | Khôi phục, nội dung mới | Chờ PO giao | `flywheel-psi0/stage1/`, `flywheel-data/export/egodex.py` | DA-04, DA-19 | 15–25 | S2–S3 |
 | DA-19 | Khung `flywheel-psi0`; đọc code train của tác giả, lớp bọc log, adapter fine-tune trên Colab, client RTC | Giữ | Hiếu | `flywheel-psi0/` | Không | 22–30 | S1–S2 |
 | DA-20 | Agent QA/QC: serve Nemotron cục bộ, dựng hình từng stage, báo cáo HTML, chấm trên bộ lỗi cấy | Sửa | Châu | `flywheel-eval/agentqa/`, `configs/eval/` | DA-27 cho bộ chấm (code trên file mẫu) | 20–30 | S2 |
 | DA-21 | Export LeRobot v3 từ v2.1, checklist chuẩn hóa trong contract test | Giữ | Thông | `flywheel-data/export/` | DA-02 | 4–6 | S2 |
@@ -82,6 +83,7 @@ Chủ sở hữu không có nghĩa là người duy nhất được sửa. Ngư�
 | DA-26 | Thí nghiệm HE: ba checkpoint ablation × lưới N, eval, đường cong, video | Mới | Chờ PO giao | `configs/runplans/he/`, `docs/he/` | S1-03, S1-04, S1-07, DA-19 | 15–25 | S1–S3 |
 | DA-27 | Bộ lỗi cấy có đáp án khóa trên dữ liệu và log thật, bộ chấm precision và recall | Mới | Chờ PO giao | `flywheel-data/inject/`, `flywheel-eval/agentqa/bench/` | DA-01, DA-25 | 10–15 | S2 |
 | DA-28 | Kịch bản demo 17/11/2026 chạy trọn luồng, mỗi phần một lệnh | Mới | Chờ PO giao | `scripts/demo/`, `docs/demo/` | Mọi story trên | 8–12 | S2 |
+| DA-29 | Synthetic S2: biến thể từ đoạn teleop kiểu MimicGen và correction từ trạng thái lỗi | Mới | Chờ PO giao | `flywheel-simple/generators/variants/` | S1-02, S1-06 (Q3), DA-03 | 15–20 | S2 |
 
 File story nằm trong `docs/product/stories/`. DA-01 đến DA-14 chưa có file; người làm viết file theo mẫu story hiện có khi nhận việc. Việc chưa có chủ: cập nhật website và Pitch khi chuẩn bị demo 17/11 [Đã chốt: chưa làm trước đó].
 
@@ -93,7 +95,7 @@ File story nằm trong `docs/product/stories/`. DA-01 đến DA-14 chưa có fil
 
 ### 2.3 Tải thêm theo người
 
-**Bản 0.5 (27/10/2026).** Bảng tải theo người của bản 0.1, 0.3 và 0.4 tính cả việc của robot DENSO, nên không còn đúng. PO giao lại người cho story mới và story đổi hướng (mục 2.2), rồi tính lại tải ở đây theo 04 mục 4.7, 4.8. Tổng giờ của story DA ở 04 mục 4.9 (khoảng 175–255 giờ, ước lượng).
+**Bản 0.5 (27/10/2026).** Bảng tải theo người của bản 0.1, 0.3 và 0.4 tính cả việc của robot DENSO, nên không còn đúng. PO giao lại người cho story mới và story đổi hướng (mục 2.2), rồi tính lại tải ở đây theo 04 mục 4.7, 4.8. Tổng giờ của story DA ở 04 mục 4.9 (khoảng 230–335 giờ, ước lượng).
 
 Quy tắc giữ từ 23/10/2026: giữ đủ phạm vi; đo k sau Sprint 1; vượt thì chuyển phần trễ sang API hoặc phần có sẵn trước, rồi mới cắt. Hiếu giữ nhân, Ψ₀ và mọi job GPU nên là người dễ quá tải nhất; nếu hàng chờ PR quá 1 ngày lặp lại (báo cáo tracking), chuyển phần viết code của DA-09 (probe) cho người khác trước khi cắt phạm vi.
 

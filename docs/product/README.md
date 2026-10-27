@@ -21,8 +21,9 @@ Thư mục này là bộ hồ sơ sản phẩm làm theo BMAD Method (Breakthrou
 ## Cập nhật ngày 27/10/2026
 
 - Demo ngày 17/11/2026 và mọi thí nghiệm chạy trên G1 trong SIMPLE với Ψ₀; task chính là task hai bàn. Robot DENSO (Isaac Sim ở bản 23/10, MuJoCo ở bản 25/10) đã bỏ.
-- Thêm giả thuyết HE (dữ liệu egocentric giảm số demo robot cần), teleop bàn phím, sinh tự động, bộ lỗi cấy cho Agent QA/QC.
-- Đã cập nhật spec lên v10.4, 01 lên 0.5, 02 lên 0.5, 03 lên 0.7, 04 lên 0.7, 07 lên 0.5, RULE, CLAUDE.md, file story. Đã xóa 00, ba design ngày 23/10 và 25/10, story DA-15, DA-18, DA-22, DA-24. 01 và 02 chỉ sửa phần nói về robot DENSO; 05 và 06 giữ làm lưu trữ.
+- Ba loại dữ liệu cố định: egocentric, teleop, synthetic; nguồn test bây giờ là mẫu EgoDex, dataset teleop của tác giả, teleop bàn phím, synthetic S1 và S2, sau đó video egocentric đội tự quay.
+- Thêm giả thuyết HE (dữ liệu egocentric giảm số demo robot cần), bộ lỗi cấy cho Agent QA/QC.
+- Đã cập nhật spec lên v10.4, 01 lên 0.5, 02 lên 0.5, 03 lên 0.7, 04 lên 0.7, 07 lên 0.5, RULE, CLAUDE.md, file story. Đã xóa 00, ba design ngày 23/10 và 25/10, story DA-15, DA-22, DA-24; DA-18 khôi phục với nội dung mới. 01 và 02 chỉ sửa phần nói về robot DENSO; 05 và 06 giữ làm lưu trữ.
 - Chưa cập nhật: website và Pitch v10 (làm khi chuẩn bị demo 17/11); người làm của story mới.
 
 ## Trạng thái ngày 22/10/2026

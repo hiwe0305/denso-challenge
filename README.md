@@ -2,7 +2,7 @@
 
 Đề xuất của đội ilovephysicalintelligence cho thử thách H1 của DENSO Factory Hacks: huấn luyện humanoid nhanh, chính xác, ít công. Recipe hiện hành là **Ψ₀ + SIMPLE / G1**: fine-tune Ψ₀ trên dữ liệu teleop và dữ liệu sinh trong mô phỏng, rồi dùng thuật toán **Failure → Data** để chọn dữ liệu cần bổ sung sau mỗi lỗi, có đối chứng chất lượng và chi phí.
 
-Từ 27/10/2026, demo ngày 17/11/2026 và mọi thí nghiệm chạy trên **Unitree G1 trong SIMPLE**, task hai bàn: gắp vật ở bàn này, đi sang bàn kia, đặt lên. Dữ liệu robot đến từ dataset của tác giả Ψ₀, teleop bằng bàn phím và sinh tự động; cả ba qua pipeline 6 tầng về một định dạng chung. Thí nghiệm HE kiểm claim của Ψ₀ rằng dữ liệu egocentric của người giúp cần ít demo robot hơn. Agent QA/QC đọc báo cáo dataset, log và output từng stage.
+Từ 27/10/2026, demo ngày 17/11/2026 và mọi thí nghiệm chạy trên **Unitree G1 trong SIMPLE**, task hai bàn: gắp vật ở bàn này, đi sang bàn kia, đặt lên. Hệ thống có ba loại dữ liệu: egocentric của người, teleop, synthetic; cả ba qua pipeline 6 tầng về một định dạng chung. Nguồn để test bây giờ là dữ liệu công bố và sim (mẫu EgoDex, dataset teleop của tác giả Ψ₀, teleop bàn phím, synthetic S1 và S2 trong SIMPLE), sau đó video egocentric đội tự quay. Thí nghiệm HE kiểm claim của Ψ₀ rằng dữ liệu egocentric của người giúp cần ít demo robot hơn. Agent QA/QC đọc báo cáo dataset, log và output từng stage.
 
 Trạng thái: đề xuất PoC, chưa chạy Ψ₀ hoặc robot thật. Số liệu hiệu quả là ước lượng có điều kiện. Website và hai file PowerPoint chưa cập nhật theo hướng 27/10/2026.
 

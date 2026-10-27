@@ -14,7 +14,7 @@ Muốn hiểu sâu: [spec v10.4](docs/spec-v10-failure-to-data.md), [design 27/1
 
 Giờ là ước lượng (04 mục 4.7 cộng phần DA ở 07 mục 2.3). Ai cũng đang vượt mức kế hoạch 70%; nếu trễ thì chuyển phần trễ sang API trước khi cắt việc (mục 5, R5).
 
-**Cập nhật 27/10/2026:** việc của robot DENSO (MuJoCo riêng, ROS 2, dataset BTC, egocentric nhà máy) đã bỏ; story mới và story đổi hướng (S1-05, S1-06, S1-09, S1-11, DA-16, DA-26, DA-27, DA-28, `flywheel-simple`) **chờ Hiếu giao người**. Danh sách dưới chỉ còn việc đã có chủ.
+**Cập nhật 27/10/2026:** việc của robot DENSO (MuJoCo riêng, ROS 2, dataset BTC, egocentric nhà máy) đã bỏ; story mới và story đổi hướng (S1-05, S1-06, S1-09, S1-11, DA-04, DA-16, DA-18, DA-26, DA-27, DA-28, DA-29, `flywheel-simple`) **chờ Hiếu giao người**. Danh sách dưới chỉ còn việc đã có chủ.
 
 Từ 25/10/2026 việc chia theo **làn** (03 mục 7): mỗi người giữ trọn package của mình, chỉ import phần **nhân** (hợp đồng, kho, bộ giả, CLI) do Hiếu giữ, không import code của người khác. Muốn thêm hoặc đổi dữ liệu đi giữa hai làn thì mở PR hợp đồng cho Hiếu. Giờ là ước lượng thô ở 07 mục 2.3.
 
@@ -32,7 +32,7 @@ Từ 25/10/2026 việc chia theo **làn** (03 mục 7): mỗi người giữ tr�
 ### Dương Tiến Thông · Scrum Master, làn Dữ liệu
 
 - **Việc SM:** bảng công việc, check-in, bản tin tuần, viết file story (kể cả "Phạm vi file"), sổ can thiệp ở 08; **viết file story DA-01, DA-02, DA-03, DA-08, DA-09, DA-13 còn thiếu**.
-- **Làn Dữ liệu (`flywheel-data`):** S1-10 mô hình dữ liệu và kho (làm cho nhân, Hiếu duyệt) · DA-01 định dạng episode (làm cho nhân) · S1-07 phân tích psi-data task hai bàn · DA-03 pipeline teleop (psi-data, bàn phím, sinh tự động) và báo cáo dataset · DA-17 phát lại để kiểm · DA-02, DA-21 export LeRobot v2.1, v3 · S2 nạp, QA, release · S6 SOP. DA-04 egocentric hoãn sau demo.
+- **Làn Dữ liệu (`flywheel-data`):** S1-10 mô hình dữ liệu và kho (làm cho nhân, Hiếu duyệt) · DA-01 định dạng episode (làm cho nhân) · S1-07 phân tích psi-data task hai bàn · DA-03 pipeline teleop (psi-data, bàn phím, sinh tự động) và báo cáo dataset · DA-17 phát lại để kiểm · DA-02, DA-21 export LeRobot v2.1, v3 · S2 nạp, QA, release · S6 SOP. DA-04 pipeline egocentric chờ Hiếu giao người.
 - Sở hữu: `flywheel-data`, `configs/data/`, `docs/product/stories/`. Tải tính lại sau khi giao người.
 
 ### Trần Trịnh Hoàng Châu · Làn Đánh giá

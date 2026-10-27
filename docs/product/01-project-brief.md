@@ -242,7 +242,7 @@ Mã TN (tính năng) khác với "task F1" của spec v10 mục 2.3.
 | TN8 | Sổ chi phí | Mỗi hoạt động một mục: loại nguồn lực, số lượng, đơn giá, nhánh, vòng, cụm | G1–G4 |
 | TN9 | Thí nghiệm và báo cáo | E1 đường cong hiệu quả dữ liệu; nhánh A, A₀.₇, B, C; nhánh B-fail trên ACT; holdout ghép cặp 3 seed; thí nghiệm HD; F-ACT 5–8 vòng trên ACT; SOP | G2–G6 |
 | TN10 | Giao diện adapter | Hợp đồng cho model, simulator, robot, bộ sinh dữ liệu, nguồn teleop; đúng cho L1–L3 | G0–G1 |
-| TN11 | Pipeline dữ liệu ba nguồn robot (bản 0.5) | Dataset của tác giả, teleop bàn phím, sinh tự động đi qua 6 tầng về một định dạng episode chung; phát lại action trước khi train; export LeRobot v2.1 và v3; báo cáo dataset. Egocentric và synthetic S3–S4 qua NIM để sau demo | G0–G2 |
+| TN11 | Pipeline ba loại dữ liệu (bản 0.5) | Egocentric, teleop, synthetic đi qua 6 tầng về một định dạng episode chung. Nguồn test bây giờ: mẫu EgoDex, dataset teleop của tác giả, teleop bàn phím, synthetic S1 và S2; sau đó video egocentric đội tự quay. Che danh tính egocentric; phát lại action với dữ liệu robot; egocentric ra định dạng stage 1, teleop và synthetic ra LeRobot v2.1 và v3; báo cáo dataset. S3, S4 qua NIM sau demo | G0–G2 |
 | TN12 | Thí nghiệm HE (bản 0.5; thay robot DENSO của bản 0.4) | Ψ₀ có và không có prior egocentric (checkpoint ablation của tác giả) fine-tune ở nhiều mức demo robot trên task hai bàn; đường cong thành công theo số demo, video so sánh | G1–G3 |
 | TN13 | Đánh giá theo stage, bảng lỗi, Agent QA/QC (bản 0.4, sửa 0.5) | Probe P1–P4 trên checkpoint của từng stage Ψ₀; log train theo nhóm action; phát hiện lỗi từ 5 nguồn tín hiệu; quy lỗi về stage trên evidence card; Agent QA/QC chấm trên bộ lỗi cấy | G1–G4 |
 
@@ -272,7 +272,7 @@ MVP thành công khi **đủ cả sáu điều** sau. Không yêu cầu HT đún
 3. Holdout chạy đúng một lần; không lộ dữ liệu.
 4. HS, HT (HTa, HTb), HD được kết luận đúng tiêu chí đã chốt, kể cả khi trượt hoặc khi HT hạ thành kết quả mô tả.
 5. Ba đầu ra BTC được giao; mọi claim trong pitch có số đo đi kèm hoặc đã bị gỡ.
-6. (Bản 0.5, thay tiêu chí robot DENSO của bản 0.4.) Demo ngày 17/11/2026 chạy trọn: ba nguồn dữ liệu robot qua pipeline thành release có lineage và báo cáo dataset; Agent QA/QC có precision, recall trên bộ lỗi cấy; HE-1 có kết quả sơ bộ; ít nhất một vòng Failure → Data chạy trọn với bảng lỗi và quy lỗi về stage.
+6. (Bản 0.5, thay tiêu chí robot DENSO của bản 0.4.) Demo ngày 17/11/2026 chạy trọn: ba loại dữ liệu (egocentric, teleop, synthetic) qua pipeline thành release có lineage và báo cáo dataset; đường đi egocentric → stage 1 chạy trọn trên mẫu EgoDex; Agent QA/QC có precision, recall trên bộ lỗi cấy; HE-1 có kết quả sơ bộ; ít nhất một vòng Failure → Data chạy trọn với bảng lỗi và quy lỗi về stage.
 
 ## 7. Tầm nhìn sau MVP
 
@@ -429,7 +429,7 @@ Nội bộ, trả lời ở cổng G0: Q0–Q6 của spec v10 mục 2.4 và V3 (
 
 | Ngày | Phiên bản | Nội dung | Người sửa |
 |---|---|---|---|
-| 27/10/2026 | 0.5 | Theo spec v10.4 và design 27/10/2026: bỏ robot DENSO (mục 1, 6.1 TN12 thay bằng thí nghiệm HE, TN11 ba nguồn robot, TN13 thêm Agent QA/QC, 6.2, tiêu chí MVP 6 theo demo 17/11, rủi ro mục 10, A10–A11); bỏ liên kết tới 00 đã xóa | PO (Hiếu) |
+| 27/10/2026 | 0.5 | Theo spec v10.4 và design 27/10/2026: bỏ robot DENSO (mục 1, 6.1 TN12 thay bằng thí nghiệm HE, TN11 ba loại dữ liệu và nguồn test, TN13 thêm Agent QA/QC, 6.2, tiêu chí MVP 6 theo demo 17/11, rủi ro mục 10, A10–A11); bỏ liên kết tới 00 đã xóa | PO (Hiếu) |
 | 22/10/2026 | 0.1 | Bản đầu | Analyst |
 | 22/10/2026 | 0.2 | Mục 6.1, 9.1, 10.1: đổi mã tính năng F1–F10 thành TN1–TN10 để không trùng "task dự phòng F1" của spec | PO |
 | 22/10/2026 | 0.2 | Mục 6.1: TN8 (sổ chi phí) đổi cổng thành G1–G4, TN10 (giao diện adapter) thành G0–G1, khớp PRD Epic 1, 2 | PO |
