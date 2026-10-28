@@ -57,6 +57,14 @@ def test_place_failure_is_classified() -> None:
     assert result.failure_class == "place"
 
 
+def test_approach_before_grasp_can_succeed() -> None:
+    signals = successful_signals().set_column(0, "gripper_x", pa.array([0.0, 0.5, 0.8]))
+
+    result = ToyPickPlace().evaluate(signals, ScorerParams(thresholds={"distance": 0.05}))
+
+    assert result.stage_success == (True, True, True)
+
+
 def test_missing_signal_returns_unknown_stages() -> None:
     result = ToyPickPlace().evaluate(pa.table({"part_x": [0.2]}), ScorerParams())
 
