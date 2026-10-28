@@ -11,7 +11,7 @@
 | Nhãn | [Lõi] · `epic:9` · `gate:G1` · `area:data` |
 | Sprint | S1–S2 |
 | Ước lượng | 9 giờ (khoảng 7–11, ước lượng của SM) |
-| Phụ thuộc | DA-25 (schema `ReplayReport`). Gọi `SimulatorAdapter.replay()` qua Protocol; hàm `replay()` của `SimpleSim` thuộc story 3.1a (adapter SIMPLE, S2); trong lúc chờ dùng simulator giả của testkit. PR `chore-restructure` (07 mục 3.6, hết 27/10) tạo khung package `flywheel-data` |
+| Phụ thuộc | DA-25 (schema `ReplayReport`). Gọi `SimulatorAdapter.replay()` qua Protocol; hàm `replay()` của `SimpleSim` thuộc story 3.1a (adapter SIMPLE, S2); trong lúc chờ dùng simulator giả của testkit. PR `chore-restructure` (07 mục 3.6; mở PR 28/10, merge 29/10/2026) tạo khung package `flywheel-data` |
 
 ## Story
 
@@ -66,6 +66,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Tạo story cho robot DENSO trên MuJoCo | PO (Hiếu) theo design 25/10/2026 (đã xóa) |
 | 25/10/2026 | Chuyển sang làn Dữ liệu; hàm `replay()` thuộc DA-15 | PO (Hiếu) theo design chia làn (đã xóa) |
 | 27/10/2026 | Đổi sang MuJoCo của SIMPLE trên task hai bàn; `replay()` thuộc story 3.1a; thêm nguồn AMO | PO (Hiếu) theo design 27/10/2026 |
+| 28/10/2026 | Sửa hạn PR `chore-restructure` theo 07 mục 3.6 bản 0.6: mở 28/10, merge 29/10 | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

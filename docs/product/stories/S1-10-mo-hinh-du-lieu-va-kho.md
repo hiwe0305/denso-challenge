@@ -10,7 +10,7 @@
 | Nhãn | [Lõi] · `epic:2` · `gate:G1` · `area:data` |
 | Sprint | S1, tuần 1–2 |
 | Ước lượng | 10 giờ (bản 0.1: 14 giờ; L0-lite bớt phân vùng ngày, lệnh dựng lại chỉ mục, fsspec) |
-| Phụ thuộc | PR `chore-restructure` (07 mục 3.6, hết 27/10). Dùng chung `contracts` với S1-08; đưa `contracts/base.py` trước ngày 4. Thông làm, Hiếu giữ nhân |
+| Phụ thuộc | PR `chore-restructure` (07 mục 3.6; mở PR 28/10, merge 29/10/2026). Dùng chung `contracts` với S1-08, cùng người làm. Long làm và giữ nhân; Hiếu duyệt mọi thay đổi schema (07 mục 2.0) |
 
 ## Story
 
@@ -82,6 +82,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 24/10/2026 | Thêm mục Phạm vi file. AC không đổi | PO (Hiếu) |
 | 25/10/2026 | Đường dẫn theo nhân mới: `flywheel-contracts`, `flywheel-store`; hàm ghi sổ chi phí nằm trong kho vì mọi làn đều ghi; phân tích sổ chi phí thuộc làn Vòng (Long) | PO (Hiếu) theo design chia làn |
 | 27/10/2026 | Giao cho Long theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
+| 28/10/2026 | Sửa dòng Phụ thuộc: Long làm và giữ nhân, hạn PR `chore-restructure` mới | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

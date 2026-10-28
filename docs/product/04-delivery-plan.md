@@ -4,6 +4,7 @@ _Ngày 22/10/2026. Vai trò BMAD: Product Owner (Sarah) viết mục 1; Scrum Ma
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 28/10/2026 | 0.8 | Mục 3 và 4: ghi chú rằng vai, RACI, cột người của 4.2–4.6 và tải 4.7–4.8 còn theo phân công cũ, phân công hiện hành ở 07 mục 2.0–2.2; mục 4.1 điền người làm theo 07 bản 0.6, bỏ hỗ trợ S1-03 của Hưng và hẹn `contracts/base.py` của Thông | PO (Hiếu) |
 | 27/10/2026 | 0.7 | Theo spec v10.4 và [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md): mục 4.1 ghi story Sprint 1 mở lại hoặc về lại SIMPLE; mục 4.9 thay mục 4.9 và 4.10 cũ (robot DENSO trong Isaac Sim, robot DENSO trên MuJoCo): demo 17/11/2026 trên G1 + Ψ₀, ba loại dữ liệu, story DA giữ, sửa, xóa, mở lại DA-04, khôi phục DA-18, thêm DA-26 đến DA-29, giờ ước, điều kiện qua G0. Người làm của story mới và story đổi hướng chờ PO giao | PO (Hiếu) |
 | 22/10/2026 | 0.1 | Bản đầu: kết quả kiểm PO, nhịp sprint, phân công, kế hoạch 6 sprint, DoR, DoD, lịch mentor, phương án trễ, chỉ số theo dõi | PO, SM |
 | 22/10/2026 | 0.2 | Đổi tên giả thuyết H1, H2, H3 thành HS, HT (HTa, HTb), HD; giữ mã đề. Sửa mã trích 05 bị sai: "05 TN…" thành "05 TH…" (TN là mã tính năng của 01) | SM theo 06 |
@@ -163,6 +164,8 @@ Khởi tạo và hạ tầng: đạt sau P02–P03. Truy vết requirement ↔ s
 
 ## 3. Phân công
 
+**Bản 0.8 (28/10/2026).** Mục 3.1–3.4 và người giữ rủi ro ở mục 8 còn theo phân công trước ngày 27/10/2026 và chưa tính lại. Phân công hiện hành ở [07 mục 2.0–2.2](07-team-workflow.md): Long, Thông, Hưng, Châu làm data flywheel, Hiếu làm phần còn lại; story Epic đi theo chủ module ở 07 mục 2.1. Khi hai nơi khác nhau, theo 07. Vai, người dự phòng và RACI tính lại ở họp cuối Sprint 1.
+
 ### 3.1 Vai chính và người dự phòng
 
 | Người | Vai chính | Người dự phòng | Người này dự phòng cho |
@@ -257,6 +260,8 @@ Theo 00 §7, năng lực đã nêu chỉ ở mức mảng. Các kỹ năng sau c
 
 ## 4. Kế hoạch sprint
 
+**Bản 0.8 (28/10/2026).** Cột Người ở bảng 4.2–4.6 và tải ở 4.7–4.8 còn theo phân công cũ. Người làm hiện hành của story Epic theo chủ module ở 07 mục 2.1; tải hiện hành ở 07 mục 2.3.
+
 Giờ trong bảng là ước lượng ở mục 0, cho **phạm vi mặc định trước khi cắt**. "Quyết định" là việc chọn phương án có hạn chót. Phần lớn đề xuất của 05 mục 7 đã chốt theo 06; phần còn mở nằm ở 05 mục 6.6.
 
 ### 4.1 Sprint 1 · Tuần 1–2 · G0
@@ -266,22 +271,22 @@ Giờ trong bảng là ước lượng ở mục 0, cho **phạm vi mặc địn
 | File story | PRD | Story | Nhãn | Người | Giờ |
 |---|---|---|---|---|---|
 | [S1-01](stories/S1-01-khung-repo-cli-ci.md) | 1.1 | Khung repo, CLI `fw`, CI (L0-lite) | [Lõi] | Long | 11 |
-| [S1-02](stories/S1-02-moi-truong-simple.md) | 1.2 | Môi trường SIMPLE ghim phiên bản | [Adapter] | Hưng | 16 |
+| [S1-02](stories/S1-02-moi-truong-simple.md) | 1.2 | Môi trường SIMPLE ghim phiên bản | [Adapter] | Hiếu | 16 |
 | [S1-03](stories/S1-03-tai-tao-danh-gia-psi0.md) | 1.3 | Tái tạo đánh giá Ψ₀ 30 lượt mỗi mức, Q0, độ không tất định | [Adapter] | Hiếu | 20 |
-| [S1-04](stories/S1-04-chi-phi-finetune-psi0.md) | 1.4 | Đo chi phí fine-tune Ψ₀ (Q5) | [Adapter] | Châu | 12 |
-| [S1-05](stories/S1-05-planner-va-bo-dieu-khien.md) | 1.5 phần Q2 | Planner của SIMPLE cho task chính | [Adapter] | Hưng | 6 |
-| [S1-06](stories/S1-06-khoi-phuc-trang-thai-va-hinh-anh.md) | 1.5 phần Q3, Q4 | Khôi phục trạng thái, tách hình ảnh | [Adapter] | Châu | 8 |
+| [S1-04](stories/S1-04-chi-phi-finetune-psi0.md) | 1.4 | Đo chi phí fine-tune Ψ₀ (Q5) | [Adapter] | Hiếu | 12 |
+| [S1-05](stories/S1-05-planner-va-bo-dieu-khien.md) | 1.5 phần Q2 | Planner của SIMPLE cho task chính | [Adapter] | Hiếu | 6 |
+| [S1-06](stories/S1-06-khoi-phuc-trang-thai-va-hinh-anh.md) | 1.5 phần Q3, Q4 | Khôi phục trạng thái, tách hình ảnh | [Adapter] | Hiếu | 8 |
 | [S1-07](stories/S1-07-phan-tich-psi-data.md) | 1.6 | Phân tích psi-data (Q1, Q6, V1, V6, V9) | [Adapter] | Thông | 12 |
 | [S1-08](stories/S1-08-khung-loi-adapter-gia.md) | 1.7 | Khung lõi chạy trên adapter giả | [Lõi] | Long | 18 |
-| [S1-09](stories/S1-09-tin-hieu-va-tap-dieu-kien.md) | 1.8 | Tín hiệu từng bước, tập điều kiện (V6, V7) | [Adapter] | Châu | 8 |
-| [S1-10](stories/S1-10-mo-hinh-du-lieu-va-kho.md) | 2.1 phần a | Mô hình dữ liệu L0-lite và kho lưu | [Lõi] | Thông | 10 |
-| [S1-11](stories/S1-11-bo-dieu-khien-v3.md) | 1.9 | Bộ điều khiển teleop và MP (V3), hạn ngày 5; thử T1 (Hưng 12 giờ), T2 (Châu 6 giờ) | [Adapter] | Hưng | 18 |
+| [S1-09](stories/S1-09-tin-hieu-va-tap-dieu-kien.md) | 1.8 | Tín hiệu từng bước, tập điều kiện (V6, V7) | [Adapter] | Hiếu | 8 |
+| [S1-10](stories/S1-10-mo-hinh-du-lieu-va-kho.md) | 2.1 phần a | Mô hình dữ liệu L0-lite và kho lưu | [Lõi] | Long | 10 |
+| [S1-11](stories/S1-11-bo-dieu-khien-v3.md) | 1.9 | Bộ điều khiển teleop và MP (V3), hạn ngày 5; thử T1, T2 | [Adapter] | Hiếu | 18 |
 
-**Bản 0.7 (27/10/2026).** Theo [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 13: task chính là task hai bàn `G1WholebodyLocomotionPickBetweenTablesTeleop-v0`. S1-05 (sinh tự động cho task hai bàn), S1-07 (phân tích gói psi-data của task hai bàn) và S1-11 (V3 cho task hai bàn) **mở lại**; S1-02, S1-06, S1-09 về lại SIMPLE; S1-03, S1-04 thêm task hai bàn và thời gian eval ở `mujoco`, `mujoco_isaac`. Người ở bảng trên là bản 0.2; người của story đổi hướng chờ PO giao. Bản 0.4 (hủy S1-05, S1-11, đổi S1-07 sang dataset BTC, S1-09 sang task khay → máy) bị thay. Story DA của Sprint 1 ở mục 4.9.
+**Bản 0.7 (27/10/2026).** Theo [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 13: task chính là task hai bàn `G1WholebodyLocomotionPickBetweenTablesTeleop-v0`. S1-05 (sinh tự động cho task hai bàn), S1-07 (phân tích gói psi-data của task hai bàn) và S1-11 (V3 cho task hai bàn) **mở lại**; S1-02, S1-06, S1-09 về lại SIMPLE; S1-03, S1-04 thêm task hai bàn và thời gian eval ở `mujoco`, `mujoco_isaac`. Bản 0.8: người ở bảng trên theo 07 mục 2.0 bản 0.6; giờ ở bảng là bản 0.2, giờ mới ở 07 mục 2.3. Bản 0.4 (hủy S1-05, S1-11, đổi S1-07 sang dataset BTC, S1-09 sang task khay → máy) bị thay. Story DA của Sprint 1 ở mục 4.9.
 
-Việc ngoài story: Hiếu 10 giờ (DENSO DN1, ngân sách GPU, mã đề, email PSI Lab, buổi mentor đầu, rà claim theo 05 mục 2.1, chốt H thực từng người); Hưng 2 giờ hỗ trợ S1-03; Thông 4 giờ dựng bảng công việc.
+Việc ngoài story: Hiếu 10 giờ (DENSO DN1, ngân sách GPU, mã đề, email PSI Lab, buổi mentor đầu, rà claim theo 05 mục 2.1, chốt H thực từng người); Thông 4 giờ dựng bảng công việc.
 
-**Phụ thuộc.** Bước 1 của S1-11 (bảng đối chiếu) đọc cấu hình và mã SIMPLE nên bắt đầu ngày 1, không chờ S1-02; thử T1, T2 cần S1-02. S1-02 xong trong tuần 1 vì S1-03, S1-05, S1-06, S1-09, S1-11 cần môi trường SIMPLE. Phần serve Ψ₀ của S1-03 và toàn bộ S1-04 bắt đầu ngày 1. S1-08 và S1-10 cùng dùng `contracts`: Thông đưa `contracts/base.py` trước ngày 4. **Rủi ro.** V3 âm (05 R01); Isaac Sim hoặc flash-attn không chạy trên 5090 (R05); checkpoint gốc đã thấy dữ liệu task chính (R02); tranh máy 5090 giữa S1-03, S1-04 và T1, T2.
+**Phụ thuộc.** Bước 1 của S1-11 (bảng đối chiếu) đọc cấu hình và mã SIMPLE nên bắt đầu ngày 1, không chờ S1-02; thử T1, T2 cần S1-02. S1-02 xong trong tuần 1 vì S1-03, S1-05, S1-06, S1-09, S1-11 cần môi trường SIMPLE. Phần serve Ψ₀ của S1-03 và toàn bộ S1-04 bắt đầu ngày 1. S1-08 và S1-10 cùng dùng `contracts` và cùng do Long làm. **Rủi ro.** V3 âm (05 R01); Isaac Sim hoặc flash-attn không chạy trên 5090 (R05); checkpoint gốc đã thấy dữ liệu task chính (R02); tranh máy 5090 giữa S1-03, S1-04 và T1, T2.
 
 **Điều kiện qua G0.** Ψ₀ chạy 30 lượt mỗi mức, kiểm nhị thức một phía (α = 0,05) không cho thấy tỉ lệ thấp hơn số công bố; Q0 có checkpoint `pre.*` hoặc `postpre.*` kèm provenance trong Source, hoặc giới hạn được ghi; Q1, Q2, Q5, Q6 có câu trả lời; Q3, Q4 có câu trả lời tạm, chốt trong 6.4 ở S3; V3 có kết luận trước ngày 5 và tuyến chốt cuối tuần 2, chậm nhất S2 ngày 3; V1–V11 có câu trả lời hoặc người giữ và hạn (V11 do Hưng chốt trong 3.1a ở S2; V8 gồm W khi policy là ACT, đầu vào cho 05 MO2); ngân sách GPU biết; email giấy phép và Q0 đã gửi; vòng rỗng xanh trong CI dưới 10 phút; chi phí G0 có trong `docs/g0/ledger/`, mỗi story một file (bản 0.3); H thực từng người và quyết định phạm vi ở mục 4.8 đã ghi. **Demo cuối sprint.** Video Ψ₀ chạy task công bố trong SIMPLE kèm bảng so với số công bố; bảng V3 và kết quả T1, T2; `fw --version`; CI chạy vòng rỗng; bảng trả lời Q và V.
 

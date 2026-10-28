@@ -11,7 +11,7 @@
 | Nhãn | [Lõi] · `epic:9` · `area:core` |
 | Sprint | S2; kết quả trên bộ lỗi cấy trước 13/11/2026 cho demo (DA-28) |
 | Ước lượng | 25 giờ (khoảng 20–30, ước lượng của SM) |
-| Phụ thuộc | DA-25 (schema `QAReport`, `DatasetReport`, log RTC, kết quả probe), DA-27 (bộ lỗi cấy), DA-31 (bộ chấm, cùng người làm). Code trên file mẫu của testkit; log thật của DA-19 và report của DA-17 chỉ cần khi chạy thật. PR `chore-restructure` (07 mục 3.6, hết 27/10) tạo khung package `flywheel-eval` |
+| Phụ thuộc | DA-25 (schema `QAReport`, `DatasetReport`, log RTC, kết quả probe), DA-27 (bộ lỗi cấy), DA-31 (bộ chấm, cùng người làm). Code trên file mẫu của testkit; log thật của DA-19 và report của DA-17 chỉ cần khi chạy thật. PR `chore-restructure` (07 mục 3.6; mở PR 28/10, merge 29/10/2026) tạo khung package `flywheel-eval` |
 
 ## Story
 
@@ -75,6 +75,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Chuyển sang làn Đánh giá; serve model do Hiếu; thêm Qwen3.5-4B tùy chọn | PO (Hiếu) theo design chia làn (đã xóa) |
 | 27/10/2026 | Thêm báo cáo dataset vào đầu vào; AC 6 chấm trên bộ lỗi cấy của DA-27 thay bộ ca mẫu tự viết; thêm AC 8 và nhiệm vụ con 7 chạy trên log thật | PO (Hiếu) theo design 27/10/2026 |
 | 27/10/2026 | Giao cho Hưng theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
+| 28/10/2026 | Sửa hạn PR `chore-restructure` theo 07 mục 3.6 bản 0.6: mở 28/10, merge 29/10 | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

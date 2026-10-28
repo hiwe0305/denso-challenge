@@ -10,7 +10,7 @@
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:sim` |
 | Sprint | S1, tuần 1 |
 | Ước lượng | 14 giờ (bản 25/10: 8 giờ; bản đầu: 16 giờ) |
-| Phụ thuộc | Không. Chặn S1-03, S1-05, S1-06, S1-09, S1-11, DA-16, DA-17 |
+| Phụ thuộc | Không. Cần cho phần chạy SIMPLE của S1-03, S1-05, S1-06, S1-09, S1-11, DA-16, DA-29, đều của Hiếu. Không chặn người khác: DA-17 và DA-23 code trên simulator giả của testkit; `SimpleSim` thật thuộc story 3.1a (S2) |
 
 ## Story
 
@@ -79,6 +79,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Thu nhỏ: SIMPLE chỉ cho G0; bỏ thử trên 3060 và bỏ chặn S1-05, S1-06, S1-09, S1-11; 16 → 8 giờ | PO (Hiếu) theo design 25/10/2026 (đã xóa) |
 | 25/10/2026 | Chuyển cho Hiếu vì chỉ Hiếu có phần cứng; image theo `docker/simple/` và `compose.yaml` gốc | PO (Hiếu) theo design chia làn (đã xóa) |
 | 27/10/2026 | Mở rộng lại: SIMPLE là simulator chính; task hai bàn; hai chế độ `mujoco` và `mujoco_isaac`; gọi được teleop, datagen, Replay & Render; đo trên 3060; chặn lại S1-05, S1-06, S1-09, S1-11, DA-16, DA-17; 8 → 14 giờ | PO (Hiếu) theo design 27/10/2026 |
+| 28/10/2026 | Sửa dòng Phụ thuộc: S1-02 chỉ cần cho story của Hiếu; DA-17, DA-23 code trên bản giả | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

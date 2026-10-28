@@ -11,7 +11,7 @@
 | Nhãn | [Adapter] · `epic:9` · `gate:G0` · `area:rl` |
 | Sprint | S1–S2 |
 | Ước lượng | 26 giờ (khoảng 22–30, ước lượng của SM) |
-| Phụ thuộc | Không phụ thuộc người khác. PR `chore-restructure` (07 mục 3.6, hết 27/10) tạo khung package `flywheel-psi0`. Code trên `FakeTrainer` của testkit trong lúc chờ job thật |
+| Phụ thuộc | Không phụ thuộc người khác. PR `chore-restructure` (07 mục 3.6; mở PR 28/10, merge 29/10/2026) tạo khung package `flywheel-psi0`. Code trên `FakeTrainer` của testkit trong lúc chờ job thật |
 
 ## Story
 
@@ -70,6 +70,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Tạo story | PO (Hiếu) theo design 25/10/2026 (đã xóa) |
 | 25/10/2026 | Bỏ khung package (chuyển vào PR restructure); thêm client RTC từ DA-23; recipe ở `configs/models/` | PO (Hiếu) theo design chia làn (đã xóa) |
 | 27/10/2026 | Bỏ phần robot DENSO; Colab nhận dữ liệu `public`; ưu tiên fine-tune stage 3 cho HE | PO (Hiếu) theo design 27/10/2026 |
+| 28/10/2026 | Sửa hạn PR `chore-restructure` theo 07 mục 3.6 bản 0.6: mở 28/10, merge 29/10 | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

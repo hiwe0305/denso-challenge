@@ -11,7 +11,7 @@
 | Nhãn | [Lõi] · `epic:9` · `area:core` |
 | Sprint | S2 |
 | Ước lượng | 10 giờ (khoảng 8–12, ước lượng của SM) |
-| Phụ thuộc | Schema `RolloutRequest.timing`, log RTC (DA-25). Code trên simulator và policy giả của testkit có độ trễ giả. PR `chore-restructure` (07 mục 3.6, hết 27/10) tạo khung package `flywheel-loop` |
+| Phụ thuộc | Schema `RolloutRequest.timing`, log RTC (DA-25). Code trên simulator và policy giả của testkit có độ trễ giả. PR `chore-restructure` (07 mục 3.6; mở PR 28/10, merge 29/10/2026) tạo khung package `flywheel-loop` |
 
 ## Story
 
@@ -65,6 +65,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Tạo story cho MuJoCo của robot DENSO | PO (Hiếu) theo design 25/10/2026 (đã xóa) |
 | 25/10/2026 | Chuyển sang làn Vòng; tách `timing` sang DA-15, client RTC sang DA-19 | PO (Hiếu) theo design chia làn (đã xóa) |
 | 27/10/2026 | Đổi sang SIMPLE: `timing` thuộc story 3.1a; G0 và HE ở `sync`; thêm AC 5 và nhiệm vụ con 5 chạy với Ψ₀ thật | PO (Hiếu) theo design 27/10/2026 |
+| 28/10/2026 | Sửa hạn PR `chore-restructure` theo 07 mục 3.6 bản 0.6: mở 28/10, merge 29/10 | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

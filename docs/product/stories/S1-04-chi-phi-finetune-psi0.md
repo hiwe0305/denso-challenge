@@ -55,7 +55,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 ## Ghi chú cho người làm
 
 - Nguồn: 02 · 1.4; spec 2.1, 2.4 (Q0), 7.3, 7.5 (luật MDE), 8.1, 9, 10; 03 §2.1 (bố trí máy), §3.2 (dòng Ψ₀: batch toàn cục 128), §9.2 (mỗi checkpoint khoảng 5 GB); 05 KT4, RL3, PM3.
-- Đây là lần đầu Châu làm fine-tune model lớn: làm cặp với Hiếu buổi đầu, sau đó tự chạy. Mục tiêu phụ là Châu thành người dự phòng cho việc train Ψ₀.
+- Châu đã làm nhiệm vụ con 1.2 trên nhánh `S1-04-finetune-cost`; từ 25/10/2026 story chuyển cho Hiếu vì cần phần cứng. Việc làm cặp để có người dự phòng train Ψ₀ xét ở họp cuối Sprint 1.
 - Thuê GPU cần ngân sách do Hiếu hỏi BTC trong tuần 1. Chưa có ngân sách thì chỉ đo trên 5090 và ước tính phần A100.
 - Ghi rõ nếu cấu hình khác (LoRA, đóng băng VLM) thì phải dùng chung cho mọi nhánh (spec 7.3).
 - File sẽ tạo: `scripts/g0/finetune_probe.sh`, `docs/g0/psi0-finetune-cost.md`, `configs/runplans/draft-g0.yaml`, `docs/g0/ledger/S1-04.csv`.
@@ -81,6 +81,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Thêm AC 7, 8 và nhiệm vụ con 6, 7: đo stage 2, 3 trên Colab và inference trên 3060; giữ nguyên số nhiệm vụ con cũ vì nhánh S1-04 đang mở; 12 → 18 giờ | PO (Hiếu) theo design 25/10/2026 (đã xóa) |
 | 25/10/2026 | Chuyển cho Hiếu vì cần phần cứng; nhánh đang mở giữ nguyên, nhiệm vụ con 1.2 vẫn tính cho Châu | PO (Hiếu) theo design chia làn (đã xóa) |
 | 27/10/2026 | AC 7 bỏ stage 2 của robot DENSO, đo trên task hai bàn và tính thêm HE; thêm AC 9 và nhiệm vụ con 8 (thời gian eval hai chế độ, Isaac trên Colab); giữ số nhiệm vụ con cũ; 18 → 20 giờ | PO (Hiếu) theo design 27/10/2026 |
+| 28/10/2026 | Sửa ghi chú làm cặp với Châu theo 07 mục 2.0 bản 0.6 | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

@@ -40,7 +40,7 @@ Là kỹ sư robot learning, tôi muốn chạy checkpoint Ψ₀ công bố trê
   - [ ] 2.1 Dựng môi trường Ψ₀ (Python 3.11, torch 2.7, flash-attn 2.7.4.post1) trong image riêng ở `docker/psi0/`, dùng chung với S1-04; ghi lỗi nếu flash-attn không chạy trên 5090
   - [ ] 2.2 `scripts/g0/serve_psi0.sh` với `--action-exec-horizon`, `--rtc` theo README Ψ₀
   - [ ] 2.3 Đo VRAM, độ trễ; ghi giao thức `act()`
-- [ ] 3. Chạy đánh giá 3 mức × 30 lượt, kiểm nhị thức một phía từng mức (AC 2, 3), cùng Hưng
+- [ ] 3. Chạy đánh giá 3 mức × 30 lượt, kiểm nhị thức một phía từng mức (AC 2, 3)
 - [ ] 4. Đo độ không tất định trên 20 điều kiện (AC 5)
 - [ ] 5. Viết `docs/g0/psi0-eval.md` kèm đề xuất cho 03 §3.3, ghi sổ chi phí (AC 8)
 - [ ] 6. Tái tạo task hai bàn ở `mujoco_isaac`, 3 mức × 30 lượt (AC 9)
@@ -51,7 +51,7 @@ Là kỹ sư robot learning, tôi muốn chạy checkpoint Ψ₀ công bố trê
 
 Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
 
-- `docker/psi0/`: image Ψ₀ dùng chung với S1-04; Hưng review vì là chủ thư mục docker
+- `docker/psi0/`: image Ψ₀ dùng chung với S1-04; Hiếu giữ thư mục docker (07 mục 2.1)
 - `scripts/g0/serve_psi0.sh`, `scripts/g0/eval_psi0.sh`
 - `docs/g0/psi0-eval.md`
 - `docs/g0/ledger/S1-03.csv`
@@ -69,14 +69,13 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 ## Kiểm thử
 
 - `scripts/g0/eval_psi0.sh` chạy lại cho cùng cấu hình, ghi revision checkpoint và commit SIMPLE vào đầu ra.
-- Châu chạy lại một mức từ tài liệu (để làm dự phòng Ψ₀).
+- Một người khác chạy lại một mức từ tài liệu (để làm dự phòng Ψ₀); chọn người ở họp cuối Sprint 1.
 
 ## Người phụ trách
 
 - Làm: Dương Đình Hiếu
-- Hỗ trợ: Trần Ngọc Hưng (client SIMPLE, khoảng 2 giờ)
-- Review: Trần Trịnh Hoàng Châu
-- Dự phòng: Trần Trịnh Hoàng Châu
+- Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
+- Dự phòng: chưa giao; xét ở họp cuối Sprint 1 khi có k (07 mục 2.3)
 
 ## Change log
 
@@ -86,6 +85,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 22/10/2026 | Theo 02 · 1.3 bản 0.3 (06 mục 2, 8): 30 lượt mỗi mức, kiểm nhị thức một phía thay quy tắc 1/10 và chạy thêm 20 lượt; Q0 chọn trong `pre.*`, `postpre.*`, provenance vào Source; thêm AC 7 về `simple-checkpoints`, kết quả thành AC 8; sửa mã trích 05 TN thành TH; ước lượng 18 → 20 giờ | SM (Bob) theo 06 |
 | 27/10/2026 | Thêm AC 9–11 và nhiệm vụ con 6–8: tái tạo task hai bàn (mốc của HE), so `mujoco` với `mujoco_isaac`, Q0 cho checkpoint ablation; giữ số nhiệm vụ con cũ vì nhánh S1-03 đang mở; 20 → 28 giờ | PO (Hiếu) theo design 27/10/2026 |
 | 24/10/2026 | Thêm mục Phạm vi file. AC 8: đề xuất dòng V2, V8 (phần suy luận) ghi trong file kết quả, Hiếu gom vào 03 §3.3 ở review G0; sổ chi phí riêng của story. Nhiệm vụ con 2.1 giữ image Ψ₀ ở `docker/psi0/` cho cả S1-04 | PO (Hiếu) |
+| 28/10/2026 | Bỏ phần việc của Hưng và Châu theo 07 mục 2.0 bản 0.6; dự phòng chưa giao | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
