@@ -4,6 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Đầu vào
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 28/10/2026 | 0.9 | Mục 3.4: lệnh merge chuẩn `--admin --rebase` và lý do PR xanh vẫn BLOCKED (ruleset "Only Hiếu merges into master") | PO (Hiếu) |
 | 28/10/2026 | 0.8 | Mục 2.2: thêm DA-32, DA-33, DA-34 (nhánh task bê khay của Hiếu, chạy song song, [design 28/10/2026](../superpowers/specs/2026-10-28-tray-transfer-he-design.md)) | PO (Hiếu) |
 | 28/10/2026 | 0.7 | Mục 3.2: chủ `flywheel-contracts`, `flywheel-testkit` là Long theo mục 2.0, thay ghi chú bản 0.4 | PO (Hiếu) |
 | 27/10/2026 | 0.6 | Phân công: thêm mục 2.0 (bốn người làm data flywheel, Hiếu làm phần còn lại; dữ liệu đi giữa người; luật để không đụng nhau; thứ tự ngày đầu); mục 2.1 điền chủ theo thư mục con; mục 2.2 điền người làm, tách DA-18 thành DA-18 và DA-30, DA-27 thành DA-27 và DA-31; mục 2.3 tải mới; mục 3.6 PR restructure tạo nhóm phụ thuộc và cập nhật `CODEOWNERS` | PO (Hiếu) |
@@ -218,6 +219,7 @@ Dừng sau mỗi nhiệm vụ con giữ cho mỗi commit nhỏ, người làm xe
 - Review (bản 0.3, thay quy tắc cũ "Hiếu không là người review duy nhất"): **Hiếu là người duyệt và merge duy nhất** vào `master`. Chủ sở hữu đường dẫn và người ở cột thứ ba của mục 2.1 bình luận, không chặn merge. Trước khi xin duyệt, PR phải xanh ở `core` và `guard`. Lịch tracking tự động (10:00, 14:00, 18:00) liệt kê PR chờ Hiếu; tổng kết 21:30 đề xuất thứ tự duyệt, ưu tiên PR đang chặn người khác và PR sửa `contracts/`.
 - Không ai chờ PR của người khác để code tiếp: dùng schema trong `flywheel.contracts`, bản giả và file mẫu trong `flywheel.testkit` (trước PR restructure là `flywheel-fakes`); không tạo nhánh từ nhánh chưa merge.
 - Merge bằng **Rebase and merge** để giữ từng commit nhiệm vụ con trên `master`, lịch sử thẳng. Không dùng squash, vì squash gộp mất ranh giới nhiệm vụ con.
+- Bản 0.9: lệnh merge chuẩn là `gh pr merge <số> --admin --rebase`. Ruleset "Only Hiếu merges into master" (luật `update`, chỉ vai Admin bypass) chặn mọi cập nhật `master` khác, kể cả PR đã có approval, nên PR xanh vẫn hiện BLOCKED cho tới khi Hiếu merge. PR của chính Hiếu không cần approval của người khác (GitHub không cho tác giả tự approve); chủ đường dẫn vẫn bình luận.
 
 ### 3.5 Cài đặt GitHub (Hiếu làm một lần)
 
