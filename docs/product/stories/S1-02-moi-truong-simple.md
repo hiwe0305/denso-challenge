@@ -31,7 +31,7 @@ _Mở rộng lại ngày 27/10/2026 theo [design 27/10/2026](../../superpowers/s
 - [ ] 1. Dựng môi trường (AC 1)
   - [ ] 1.1 Lấy digest image `ghcr.io/physical-superintelligence-lab/simple`; viết service `simple-worker` trong `compose.yaml`, chạy người dùng không phải root
   - [x] 1.2 Nếu Docker gặp vấn đề GPU, thử uv hoặc Nix theo README SIMPLE; ghi lý do chọn
-  - [ ] 1.3 Viết `scripts/g0/setup_simple.sh` và ghi phiên bản vào `docs/g0/env-simple.md`
+  - [x] 1.3 Viết `scripts/g0/setup_simple.sh` và ghi phiên bản vào `docs/g0/env-simple.md`
 - [ ] 2. Chạy một episode task hai bàn ở hai chế độ và lưu video (AC 2)
 - [ ] 3. Gọi `teleop_decoupled_wbc`, `datagen`, Replay & Render (AC 3)
 - [ ] 4. Đo thời gian và VRAM ở hai chế độ (AC 4)
