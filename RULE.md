@@ -149,11 +149,11 @@ Label nguyên nhân quan trọng hơn số lượng lỗi: nhờ nó đội bi�
 
 | Chủ đề | Hỏi |
 |---|---|
-| DENSO, BTC, mentor, quyết định phạm vi; hợp đồng giữa các làn; Ψ₀, ACT, DP, SIMPLE, job GPU, Colab | Hiếu |
-| SIMPLE ở chế độ MuJoCo, teleop bàn phím, sinh tự động, Isaac Sim render | Hiếu cho tới khi giao người |
-| Task và scorer, tập điều kiện, chẩn đoán, evidence card, Agent QA/QC | Châu |
-| RunPlan, runner, decide, cổng dev, holdout, sổ chi phí, báo cáo, CI, cấu trúc repo | Long |
-| Story, bảng công việc, ingest, QA dữ liệu, phát lại để kiểm, LeRobot v2.1/v3, rule ở 08 | Thông |
+| DENSO, BTC, mentor, quyết định phạm vi, duyệt hợp đồng; Ψ₀, ACT, DP, SIMPLE ở chế độ MuJoCo, teleop bàn phím, sinh tự động, Isaac Sim render, job GPU, Colab | Hiếu |
+| Schema và file mẫu giữa các làn (`flywheel-contracts`, `flywheel-testkit`), RunPlan, runner, decide, cổng dev, holdout, sổ chi phí, báo cáo, CI, cấu trúc repo, kịch bản demo | Long |
+| Story, bảng công việc, ingest, QA dữ liệu teleop và synthetic, phát lại để kiểm, LeRobot v2.1/v3, cấy lỗi, rule ở 08 | Thông |
+| Egocentric (che danh tính, pose, export stage 1), Agent QA/QC, bộ chấm lỗi cấy | Hưng |
+| Task và scorer, tập điều kiện, chẩn đoán, evidence card | Châu |
 
 ## 8. Lệnh hay dùng
 

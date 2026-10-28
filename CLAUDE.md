@@ -16,7 +16,8 @@ Trạng thái 27/10/2026: S1-01 đã merge (khung `packages/`, CLI `fw`, CI); Sp
 | Thuật toán, giả thuyết, thí nghiệm | [Spec v10.4](docs/spec-v10-failure-to-data.md) |
 | Module lõi, adapter, schema, cây thư mục, luật import, artifact giữa làn | [03 · Kiến trúc](docs/product/03-architecture.md) |
 | Task hai bàn, simulator, teleop bàn phím, sinh tự động, pipeline dữ liệu 6 tầng, LeRobot v2.1/v3, thí nghiệm HE, probe theo stage, Agent QA/QC và bộ lỗi cấy, bảng lỗi, kịch bản demo 17/11 | [Design 27/10/2026](docs/superpowers/specs/2026-10-27-g1-psi0-demo-design.md), design hiện hành duy nhất |
-| Ai làm gì, sprint, Definition of Done | [04 · Kế hoạch](docs/product/04-delivery-plan.md) |
+| Ai làm gì, ai giữ đường dẫn nào | [07 · Chia việc](docs/product/07-team-workflow.md) mục 2.0–2.2 |
+| Sprint, Definition of Done | [04 · Kế hoạch](docs/product/04-delivery-plan.md) |
 | Rule kiểm soát theo ngày, báo lỗi, nhãn nguyên nhân | [08 · Kiểm soát dự án theo ngày](docs/product/08-daily-control.md) |
 | Thuật ngữ | Spec mục 12 |
 

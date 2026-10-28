@@ -4,6 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Đầu vào
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 28/10/2026 | 0.7 | Mục 3.2: chủ `flywheel-contracts`, `flywheel-testkit` là Long theo mục 2.0, thay ghi chú bản 0.4 | PO (Hiếu) |
 | 27/10/2026 | 0.6 | Phân công: thêm mục 2.0 (bốn người làm data flywheel, Hiếu làm phần còn lại; dữ liệu đi giữa người; luật để không đụng nhau; thứ tự ngày đầu); mục 2.1 điền chủ theo thư mục con; mục 2.2 điền người làm, tách DA-18 thành DA-18 và DA-30, DA-27 thành DA-27 và DA-31; mục 2.3 tải mới; mục 3.6 PR restructure tạo nhóm phụ thuộc và cập nhật `CODEOWNERS` | PO (Hiếu) |
 | 27/10/2026 | 0.5 | Theo [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md): mục 2.1 bỏ `denso-sim`, `flywheel-mujoco`, `ros2_ws`, `docker/ros2-sim`; `flywheel-simple` thành adapter simulator chính, chủ chờ PO giao; mục 2.2 bảng story mới: giữ, sửa, hoãn, xóa, mở lại DA-04, khôi phục DA-18, thêm DA-26 đến DA-29 (ba loại dữ liệu egocentric, teleop, synthetic); mục 2.3 tải theo người chờ PO giao lại; mục 3.6 PR `chore-restructure` bỏ khung `flywheel-mujoco`, `denso-sim` | PO (Hiếu) |
 | 25/10/2026 | 0.4 | Theo design chia làn ngày 25/10/2026 (file đã xóa ngày 27/10/2026): mục 2.1 sở hữu theo nhân, ba làn, adapter, `denso-sim`, `ros2_ws`, `configs/` theo làn; mục 2.2 đổi chủ DA-01, DA-04, DA-08, DA-13, DA-17, DA-18, DA-20, DA-23, thêm DA-24, DA-25; mục 2.3 tải mới; mục 3.2 hợp đồng do Hiếu giữ; mục 3.6 PR `chore-restructure` | PO (Hiếu) |
@@ -170,7 +171,7 @@ Mỗi story có mục "Phạm vi file": danh sách thư mục hoặc file đư�
 File dùng chung: `contracts/`, schema trong `configs/`, `pyproject.toml` gốc, `uv.lock`, `.github/workflows/`.
 
 1. Người cần đổi mở issue "Contract change: …" mô tả trường cần thêm và lý do.
-2. Chủ sở hữu (bản 0.4: Hiếu giữ `flywheel-contracts`, `flywheel-testkit`; người khác viết khi Hiếu giao) làm một PR nhỏ chỉ đổi contract, kèm schema, file mẫu trong `flywheel-testkit` và test; nhánh `<story-id>-contract`.
+2. Chủ sở hữu (bản 0.7: Long giữ `flywheel-contracts`, `flywheel-testkit` theo mục 2.0, 2.1; Hiếu duyệt) làm một PR nhỏ chỉ đổi contract, kèm schema, file mẫu trong `flywheel-testkit` và test; nhánh `<story-id>-contract`.
 3. PR contract merge trước. Người cần dùng rebase lên `master` rồi làm tiếp.
 4. Bảng tổng hợp và sổ chi phí chung (bản 0.2): nhánh story không sửa 03 §3.3 hay một file sổ chi phí dùng chung. Story ghi kết quả và chi phí vào file của mình; chủ của bảng gom lại vào mốc cố định. Quy ước cho G0 ở [docs/g0/README.md](../g0/README.md).
 5. Thêm phụ thuộc Python: người cần thêm sửa `pyproject.toml` của package mình; `uv.lock` chỉ được tạo lại bằng `uv lock` sau khi rebase, không sửa tay; xung đột ở `uv.lock` thì lấy bản của `master` rồi chạy lại `uv lock`.

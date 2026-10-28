@@ -11,7 +11,7 @@
 | Nhãn | [Lõi] · `epic:9` · `area:data` |
 | Sprint | S2 |
 | Ước lượng | 5 giờ (khoảng 4–6, ước lượng của SM) |
-| Phụ thuộc | DA-02 (export v2.1, cùng người làm). Code trên dataset v2.1 mẫu của testkit. PR `chore-restructure` (07 mục 3.6, hết 27/10) tạo khung package `flywheel-data` |
+| Phụ thuộc | DA-02 (export v2.1, cùng người làm). Code trên dataset v2.1 mẫu của testkit. PR `chore-restructure` (07 mục 3.6; mở PR 28/10, merge 29/10/2026) tạo khung package `flywheel-data` |
 
 ## Story
 
@@ -60,6 +60,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Tạo story | PO (Hiếu) theo design 25/10/2026 (đã xóa) |
 | 25/10/2026 | Đường dẫn trong `flywheel-data` | PO (Hiếu) theo design chia làn (đã xóa) |
 | 27/10/2026 | Nguồn chuyển sang design 27/10; nội dung không đổi | PO (Hiếu) |
+| 28/10/2026 | Sửa hạn PR `chore-restructure` theo 07 mục 3.6 bản 0.6: mở 28/10, merge 29/10 | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
