@@ -11,25 +11,25 @@
 | Nhãn | [Adapter] · `epic:9` · `gate:G1` · `area:sim` |
 | Sprint | S2 tuần 1; M2 8/11/2026 |
 | Ước lượng | 20 giờ (khoảng 15–30, ước lượng) |
-| Phụ thuộc | DA-32 (task, vị từ). Máy có CUDA cho cuRobo (máy 3060 hoặc server thuê) |
+| Phụ thuộc | DA-32 (task, vị từ, bộ điều khiển đứng và đi). Không cần cuRobo; chạy hàng loạt trên máy 3060 hoặc server thuê cho nhanh |
 
 ## Story
 
-Là trưởng nhóm, tôi muốn sinh tự động episode G1 bê khay bằng hai tay qua đường MP của SIMPLE, để có ít nhất 80 demo robot đạt QA cho thí nghiệm DA-34.
+Là trưởng nhóm, tôi muốn sinh tự động episode G1 bê khay bằng hai tay bằng planner kịch bản trên decoupled WBC, để có ít nhất 80 demo robot đạt QA cho thí nghiệm DA-34.
 
 ## Tiêu chí chấp nhận
 
-1. Bước con cầm hai tay cùng lúc (hai tay tới hai tay cầm, đóng cả hai, nhấc, mang, hạ, mở cả hai) chạy được trong MP agent của SIMPLE từ package của đội, không fork SIMPLE; nếu bắt buộc fork thì ghim commit và ghi lý do.
-2. `decompose()` của task khay cho chuỗi bước theo 7 bước scorer của DA-32.
+1. Planner kịch bản sinh quỹ đạo tư thế hai cổ tay theo hình học tay cầm (tiếp cận, cầm, nhấc, mang, hạ, nhả) và đưa vào `TeleopRetargetingIK` của decoupled_wbc thay cho luồng PICO; đóng mở bàn tay Dex3; lệnh đi qua `navigate_cmd`. Chạy từ package của đội, không fork SIMPLE.
+2. Chuỗi pha của planner theo 7 bước scorer của DA-32; mỗi pha có điều kiện chuyển đo được.
 3. Một episode sinh tự động mang khay thành công theo `check_success()` của DA-32 (mục tiêu 6/11).
-4. `datagen` sinh ≥ 100 episode, ≥ 80 đạt QA; release có hash; mỗi episode ghi `source_kind = synthetic`, `synthetic_tier = S1`, `action_quality = planned`, phiên bản planner.
+4. Sinh ≥ 100 episode bằng bộ ghi LeRobot của SIMPLE, ≥ 80 đạt QA; release có hash; mỗi episode ghi `source_kind = synthetic`, `synthetic_tier = S1`, `action_quality = planned`, phiên bản planner.
 5. Đo thời gian sinh mỗi episode, tỉ lệ đạt, GPU-giờ; ghi sổ chi phí.
-6. Ghi `action_layout` và bộ điều khiển của dữ liệu (AMO) để DA-34 khớp với đường eval của Ψ₀.
+6. Ghi `action_layout` (cổ tay, bàn tay, `navigate_cmd`) và bộ điều khiển (decoupled WBC) của dữ liệu, khớp với `eval-decoupled-wbc` mà DA-34 dùng.
 
 ## Nhiệm vụ
 
-- [ ] 1. Bước con cầm hai tay trong MP agent (AC 1)
-- [ ] 2. `decompose()` và một episode thành công (AC 2, 3)
+- [ ] 1. Planner kịch bản hai cổ tay qua `TeleopRetargetingIK` (AC 1)
+- [ ] 2. Chuỗi 7 pha và một episode thành công (AC 2, 3)
 - [ ] 3. Sinh hàng loạt, QA, release (AC 4)
 - [ ] 4. Đo, sổ chi phí, ghi `action_layout` (AC 5, 6)
 
@@ -38,14 +38,15 @@ Là trưởng nhóm, tôi muốn sinh tự động episode G1 bê khay bằng ha
 Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
 
 - `packages/flywheel-simple/src/flywheel_simple/tray/`, `packages/flywheel-simple/tests/tray/`
+- `packages/flywheel-simple/src/flywheel_simple/wbc/`, `packages/flywheel-simple/tests/wbc/`
 - `scripts/g0/tray/`
 - `docs/g0/tray/`, `docs/g0/ledger/DA-33.csv`
 
 ## Ghi chú cho người làm
 
-- MP agent của SIMPLE (`simple/agents/mp.py`) lên kế hoạch từng tay một (`switch_arm`) và cầm vật theo grasp dựng sẵn (Bodex). Cầm khay cần bước con mới; tay cầm khay có tư thế cầm cố định theo hình học nên có thể tính trực tiếp thay vì tìm grasp.
-- `decompose()` của task hai bàn (`g1_wholebody_locomotion_pick_between_tables_teleop.py`) là mẫu cho Walk, Turn, Lift.
-- cuRobo cần CUDA; laptop RTX 3050 4 GB chỉ để thử, chạy hàng loạt trên máy 3060 hoặc server thuê.
+- Luồng PICO của SIMPLE (`agents/pico_decoupled_agent.py`) là mẫu: PicoStreamer → `TeleopPolicy` (`TeleopRetargetingIK`, IK bàn tay `instantiate_g1_hand_ik_solver`) → `G1DecoupledWholeBodyPolicy`. Planner thay PicoStreamer bằng quỹ đạo cổ tay tự sinh. Tay cầm khay có tư thế cầm cố định theo hình học nên tính trực tiếp, không cần tìm grasp.
+- Khi mang, giữ cố định tư thế tương đối hai cổ tay trong khung thân để khay không nghiêng; policy Balance và Walk train không có tải ở tay (rủi ro ở design mục 9).
+- Không cần cuRobo. Laptop RTX 3050 4 GB chạy được để thử; sinh hàng loạt trên máy 3060 hoặc server thuê.
 
 ## Người phụ trách
 
@@ -57,5 +58,6 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 28/10/2026 | Tạo story nháp theo design 28/10/2026 | PO (Hiếu) |
+| 28/10/2026 | Đổi sang planner kịch bản trên decoupled WBC, bỏ MP agent, `datagen` và cuRobo | PO (Hiếu) |
 
 ## Ghi chép khi làm
