@@ -4,6 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Đầu vào
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 28/10/2026 | 0.8 | Mục 2.2: thêm DA-32, DA-33, DA-34 (nhánh task bê khay của Hiếu, chạy song song, [design 28/10/2026](../superpowers/specs/2026-10-28-tray-transfer-he-design.md)) | PO (Hiếu) |
 | 28/10/2026 | 0.7 | Mục 3.2: chủ `flywheel-contracts`, `flywheel-testkit` là Long theo mục 2.0, thay ghi chú bản 0.4 | PO (Hiếu) |
 | 27/10/2026 | 0.6 | Phân công: thêm mục 2.0 (bốn người làm data flywheel, Hiếu làm phần còn lại; dữ liệu đi giữa người; luật để không đụng nhau; thứ tự ngày đầu); mục 2.1 điền chủ theo thư mục con; mục 2.2 điền người làm, tách DA-18 thành DA-18 và DA-30, DA-27 thành DA-27 và DA-31; mục 2.3 tải mới; mục 3.6 PR restructure tạo nhóm phụ thuộc và cập nhật `CODEOWNERS` | PO (Hiếu) |
 | 27/10/2026 | 0.5 | Theo [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md): mục 2.1 bỏ `denso-sim`, `flywheel-mujoco`, `ros2_ws`, `docker/ros2-sim`; `flywheel-simple` thành adapter simulator chính, chủ chờ PO giao; mục 2.2 bảng story mới: giữ, sửa, hoãn, xóa, mở lại DA-04, khôi phục DA-18, thêm DA-26 đến DA-29 (ba loại dữ liệu egocentric, teleop, synthetic); mục 2.3 tải theo người chờ PO giao lại; mục 3.6 PR `chore-restructure` bỏ khung `flywheel-mujoco`, `denso-sim` | PO (Hiếu) |
@@ -137,6 +138,9 @@ Chủ sở hữu không có nghĩa là người duy nhất được sửa. Ngư�
 | DA-29 | Synthetic S2: biến thể từ đoạn teleop kiểu MimicGen và correction từ trạng thái lỗi | Mới | Hiếu | `flywheel-simple/generators/variants/` | S1-02, S1-06 (Q3), DA-03 | 15–20 | S2 |
 | DA-30 | Stage 1 trên dữ liệu egocentric: lần chạy ngắn trên EgoDex, fine-tune trên video tự quay | Mới (tách từ DA-18) | Hiếu | `flywheel-psi0/stage1/`, `configs/runplans/stage1/`, `docs/he/stage1.md` | DA-18, DA-19 | 10–15 | S2–S3 |
 | DA-31 | Bộ chấm lỗi cấy: precision, recall theo loại, báo nhầm, tách phần code và phần agent | Mới (tách từ DA-27) | Hưng | `flywheel-eval/agentqa/bench/` | DA-27, DA-20 | 5–8 | S2 |
+| DA-32 | Task bê khay trên SIMPLE ở `mujoco`: cảnh, task, ngẫu nhiên hóa, vị từ 7 bước, thành công (design 28/10/2026) | Mới | Hiếu | `flywheel-simple/tray/`, `configs/sim/tray.yaml` | PR restructure | 16–26 | S1–S2 |
+| DA-33 | Synthetic S1 cho task bê khay: cầm hai tay trong MP agent, `decompose()`, sinh hàng loạt, release | Mới | Hiếu | `flywheel-simple/tray/` | DA-32 | 15–30 | S2 |
+| DA-34 | Thí nghiệm egocentric trên task bê khay: nhánh A, C, C-NOEGO trước demo, B sau | Mới | Hiếu | `configs/runplans/tray/`, `flywheel-psi0/tray/`, `docs/he/tray.md` | DA-33, DA-19 | 15 | S2 |
 
 File story nằm trong `docs/product/stories/`. DA-01, DA-02, DA-03, DA-08, DA-13 chưa có file; Thông viết ngày 28/10 theo mẫu story hiện có. Việc chưa có chủ: cập nhật website và Pitch khi chuẩn bị demo 17/11 [Đã chốt: chưa làm trước đó].
 
