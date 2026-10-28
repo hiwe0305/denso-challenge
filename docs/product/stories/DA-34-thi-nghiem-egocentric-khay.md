@@ -11,7 +11,7 @@
 | Nhãn | [Adapter] · `epic:9` · `gate:G1` · `area:train` |
 | Sprint | S2; M4 12/11/2026, M5 15/11/2026; nhánh B sau demo |
 | Ước lượng | 15 giờ trước demo (ước lượng), không tính GPU-giờ |
-| Phụ thuộc | DA-33 (release synthetic), DA-19 (adapter fine-tune trên Colab; kiểm đường eval MP của Ψ₀), S1-03 (Q0, serve Ψ₀), S1-04 (giờ fine-tune) |
+| Phụ thuộc | DA-33 (release synthetic), DA-19 (adapter fine-tune trên Colab; kiểm đường `eval-decoupled-wbc` của Ψ₀), S1-03 (Q0, serve Ψ₀), S1-04 (giờ fine-tune) |
 
 ## Story
 
@@ -21,7 +21,7 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
 
 1. RunPlan cho nhánh A (N = 80), C (N = 40), C-NOEGO (N = 40, checkpoint ablation không EgoDex) với cùng recipe, cùng số bước, cùng hạt giống điều kiện; tập 40 là tập con của 80, cố định bằng hash.
 2. Ba lần fine-tune stage 3 chạy trên Colab Pro hoặc server thuê, tiếp tục được từ checkpoint, ghi sổ chi phí.
-3. Eval 30 điều kiện dev × 3 mức ở `sim_mode=mujoco`, đồng bộ, dưới bộ điều khiển AMO; Ψ₀ tự xuất lệnh đi.
+3. Eval 30 điều kiện dev × 3 mức ở `sim_mode=mujoco`, đồng bộ, qua `eval-decoupled-wbc` (decoupled WBC); Ψ₀ tự xuất lệnh đi.
 4. Bảng theo design mục 6.3, khoảng tin cậy bootstrap, diễn giải theo design mục 6.4 ghi "sơ bộ, trên dev"; video rollout cạnh nhau.
 5. Sau khi có video egocentric: stage 1 và stage 3 của nhánh B, eval B, cập nhật bảng.
 
@@ -55,5 +55,6 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 28/10/2026 | Tạo story nháp theo design 28/10/2026 | PO (Hiếu) |
+| 28/10/2026 | Eval qua `eval-decoupled-wbc` thay đường MP với AMO | PO (Hiếu) |
 
 ## Ghi chép khi làm

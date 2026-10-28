@@ -1,14 +1,14 @@
 # Design: task bê khay công nghiệp trên SIMPLE (MuJoCo) và thí nghiệm egocentric thay một phần demo robot
 
-_Ngày 28/10/2026. Trạng thái: **nháp, chờ trưởng nhóm duyệt**. Tài liệu này **thêm** một nhánh việc chạy song song với [design 27/10/2026](2026-10-27-g1-psi0-demo-design.md) [Đã chốt: song song]. Task hai bàn vẫn là task chính của data flywheel và của demo; Long, Thông, Hưng, Châu không đổi việc. Task bê khay và thí nghiệm của nó là nhánh của trưởng nhóm. Khi duyệt, thêm story mới và sửa story của trưởng nhóm kèm dòng change log; design 27/10 chỉ thêm một dòng trỏ tới tài liệu này._
+_Ngày 28/10/2026. Trạng thái: **nháp, chờ trưởng nhóm duyệt**. Tài liệu này **thêm** một nhánh việc chạy song song với [design 27/10/2026](2026-10-27-g1-psi0-demo-design.md) [Đã chốt: song song]. Task hai bàn vẫn là task chính của data flywheel và của demo; Long, Thông, Hưng, Châu không đổi việc. Task bê khay và thí nghiệm của nó là nhánh của trưởng nhóm. Khi duyệt, thêm story mới và sửa story của trưởng nhóm kèm dòng change log; design 27/10 chỉ thêm một dòng trỏ tới tài liệu này. **Sửa chiều 28/10/2026** [Đã chốt]: bộ điều khiển đổi từ đường MP với AMO sang decoupled WBC (mục 4), sau khi S1-02 chạy được task hai bàn với decoupled WBC trên máy dev._
 
 Quy ước như design 27/10: **[Đã chốt]** là quyết định của trưởng nhóm (Hiếu). **[Đề xuất]** là lựa chọn của người viết, cần duyệt. Số chưa đo là ước lượng.
 
 ## 0. Đọc nhanh
 
 1. **Task mới hoàn toàn**: G1 bê một khay linh kiện bằng hai tay từ bàn A, đi qua hành lang, đặt khay vào vùng đích trên bàn B [Đã chốt]. Cảnh theo spec "Humanoid Industrial Tray Transfer" của trưởng nhóm (mục 3), chuyển từ Isaac Lab sang SIMPLE.
-2. **Chỉ MuJoCo**: vật lý, ảnh camera của policy, thu dữ liệu, train và eval đều dùng MuJoCo của SIMPLE (`sim_mode=mujoco`, render offscreen EGL), với robot G1 của SIMPLE [Đã chốt]. Isaac Sim không nằm trên đường chính.
-3. **Dữ liệu robot là synthetic sinh trong sim của task mới** [Đã chốt]. Task mới chưa có teleop PICO, nên "demo robot" chủ yếu là synthetic S1 (motion planning), thêm S2 và teleop bàn phím khi có (mục 5).
+2. **Chỉ MuJoCo**: vật lý, ảnh camera của policy, thu dữ liệu, train và eval đều dùng MuJoCo của SIMPLE (`sim_mode=mujoco`, render offscreen EGL), với robot G1 của SIMPLE [Đã chốt]. Isaac Sim không nằm trên đường chính. Bộ điều khiển là **decoupled WBC** (robot `g1_sonic`, env `SonicLocoManipEnv`), như task hai bàn [Đã chốt 28/10/2026].
+3. **Dữ liệu robot là synthetic sinh trong sim của task mới** [Đã chốt]. Task mới chưa có teleop PICO, nên "demo robot" chủ yếu là synthetic S1 (planner kịch bản trên decoupled WBC), thêm S2 và teleop bàn phím khi có (mục 5).
 4. **Thí nghiệm chứng minh idea, theo đúng Ψ₀** [Đã chốt]: so công thức dữ liệu **100% demo robot** với công thức **egocentric của người đã qua data flywheel cộng demo robot bị cắt bớt**. Nếu nhánh có egocentric giữ được tỉ lệ thành công thì egocentric đã thay được phần demo bị cắt (mục 6).
 5. **Thêm một nhánh đối chứng** [Đề xuất]: demo robot bị cắt bớt nhưng **không** có egocentric. Không có nhánh này thì không biết tỉ lệ thành công giữ được là nhờ egocentric hay vì task vốn không cần nhiều demo.
 6. **Egocentric phải là video người làm đúng task bê khay** [Đề xuất]. Checkpoint gốc của Ψ₀ đã pretrain trên EgoDex, nên thêm EgoDex lần nữa không chứng minh được gì.
@@ -28,7 +28,7 @@ Task gần nhất có sẵn trong SIMPLE là `G1WholebodyXMoveBendCarryBoxSonic-
 
 **Mục tiêu**
 
-- T1. Task bê khay chạy trong SIMPLE ở `sim_mode=mujoco` với G1: cảnh tĩnh đúng va chạm, `check_success`, `decompose()`, ngẫu nhiên hóa có hạt giống, ảnh camera đầu (và cổ tay nếu G1 của SIMPLE có).
+- T1. Task bê khay chạy trong SIMPLE ở `sim_mode=mujoco` với G1 dưới decoupled WBC: cảnh tĩnh đúng va chạm, `check_success`, ngẫu nhiên hóa có hạt giống, ảnh camera đầu (và cổ tay nếu G1 của SIMPLE có).
 - T2. Sinh synthetic S1 cho task khay bằng planner, ra episode LeRobot đi qua pipeline 6 tầng của data flywheel.
 - T3. Video egocentric người bê khay đi qua pipeline egocentric (che danh tính, cắt đoạn theo bước, pose tay và camera, QA, xuất stage 1 của Ψ₀).
 - T4. Trước demo 17/11: nhánh A, C và tầng phụ (mục 6.2) có kết quả sơ bộ. Nhánh B có kết quả sau khi quay video.
@@ -109,10 +109,10 @@ Quan sát của policy theo đúng đầu vào Ψ₀ cho G1 trong SIMPLE (ảnh,
 
 - SIMPLE ở `sim_mode=mujoco`, render offscreen EGL cho ảnh policy. Train và eval cùng renderer MuJoCo, nên quy tắc "ảnh train và ảnh eval cùng renderer" của design 27/10 mục 4.2 tự đạt [Đã chốt].
 - Hệ quả phải đo: checkpoint gốc của Ψ₀ train trên ảnh Isaac. Fine-tune stage 3 trên ảnh MuJoCo sẽ phải bù khoảng cách hình ảnh này. Ba nhánh cùng chịu, nên phép so giữa nhánh vẫn công bằng; số tuyệt đối không so được với số công bố.
-- Task viết theo lớp `Task` của SIMPLE (`reset`, `check_success`, `decompose`, `state_dict`), file đặt tên theo quy ước `<robot>_<skill>_<pipeline>.py`.
+- Task viết theo lớp `Task` của SIMPLE (`reset`, `check_success`, `state_dict`), lấy task hai bàn `g1_wholebody_locomotion_pick_between_tables_teleop.py` làm mẫu; uid `g1_wholebody_tray_transfer_teleop`, env id `simple/G1WholebodyTrayTransferTeleop-v0`. Hậu tố `Teleop` theo quy ước của SIMPLE chỉ họ bộ điều khiển (decoupled WBC), không phải nguồn dữ liệu.
 - **Chỗ đặt mã của task** [Đề xuất]: trong `flywheel-simple`, đăng ký env id từ package của đội, không fork SIMPLE. Nếu SIMPLE không cho đăng ký task từ ngoài package, fork SIMPLE ở commit ghim, chỉ thêm file task và asset, ghi lý do.
-- **Bộ điều khiển** [Đề xuất]: dùng đường MP của SIMPLE (đế đi theo script, cuRobo cho hai tay, AMO cho thân dưới), như `PickAndBendPlaceMP-v0` và `TabletopHandoverMP-v0`, vì đây là đường sinh tự động có sẵn và tuyến B của design 27/10 mục 5.3. Teleop bàn phím (DA-16) chạy decoupled WBC; trộn hai bộ điều khiển là câu V3, S1-11 trả lời cho task khay.
-- **Bộ điều khiển khi eval** [Đề xuất]: Ψ₀ chạy dưới **cùng bộ điều khiển AMO** với dữ liệu train, theo đường eval mà tác giả dùng cho task MP (`eval simple/<Task>MP-v0 psi0`; tác giả đã công bố checkpoint cho task MP như `…bendpick-v0`, `…xmovebendpickmp-v0`). Policy xuất **toàn bộ** action của G1 theo `action_layout` của đường MP, kể cả lệnh đi của đế; không có script đi khi eval, vì nếu đế đi theo script thì tỉ lệ thành công không đo policy. Việc đầu của DA-19 là đọc agent `psi0` của đường MP trong SIMPLE và config fine-tune của checkpoint `…xmovebendpickmp-v0` để xác nhận `action_layout` và cách ánh xạ lệnh AMO; nếu đường MP không cho policy điều khiển đế, dừng lại và báo trưởng nhóm trước M2.
+- **Bộ điều khiển** [Đã chốt 28/10/2026]: **decoupled WBC** của GR00T, đường SIMPLE dùng cho mọi task `*Teleop-v0`: robot `g1_sonic`, env `SonicLocoManipEnv`, `physics_dt` 0,005, `render_hz` 50, `sonic_config` từ `gear_sonic` như `src/simple/cli/teleop_decoupled_wbc.py`. Thân dưới là policy RL `Balance.onnx` và `Walk.onnx` nhận `navigate_cmd`; thân trên nhận tư thế hai cổ tay qua `TeleopRetargetingIK` (IK thân trên và bàn tay của decoupled_wbc). Lý do: (a) đứng và đi đã chạy trên máy dev không cần cuRobo (S1-02, `docs/g0/env-simple.md`); (b) hai cổ tay đặt mục tiêu cùng lúc, hợp với cầm khay hai tay, trong khi MP agent của SIMPLE lên kế hoạch từng tay một; (c) cùng bộ điều khiển và `action_layout` với checkpoint Ψ₀ của task hai bàn và với teleop bàn phím (DA-16). Cái giá: synthetic không dùng `datagen` của SIMPLE mà dùng planner kịch bản của đội (mục 5); đây là tuyến A của design 27/10 mục 5.3.
+- **Bộ điều khiển khi eval** [Đề xuất]: Ψ₀ chạy dưới **cùng decoupled WBC** với dữ liệu train, qua `eval-decoupled-wbc` của SIMPLE (agent `psi0_decoupled_wbc`), như checkpoint `…locomotionpickbetweentablesteleop-v0` của tác giả. Policy xuất toàn bộ action theo `action_layout` của đường này, kể cả lệnh đi; không có script đi khi eval, vì nếu đế đi theo script thì tỉ lệ thành công không đo policy. Việc đầu của DA-19 là đọc `eval-decoupled-wbc` và config fine-tune của checkpoint đó để xác nhận `action_layout` (cổ tay, bàn tay, `navigate_cmd`); planner của DA-33 ghi đúng các trường này.
 - **Giới hạn thời gian episode** [Đề xuất]: 90 giây sim; hết giờ tính là thất bại (L-TIMEOUT). Đo thời gian episode synthetic ở M2; nếu trung vị trên 60 giây thì nâng giới hạn lên 1,5 lần trung vị và ghi `Decision`.
 - Asset khay, linh kiện, bàn: hình học đơn giản (hộp, trụ) ở MJCF hoặc định dạng `Layout` của SIMPLE; không cần mesh đẹp.
 
@@ -120,7 +120,7 @@ Quan sát của policy theo đúng đầu vào Ψ₀ cho G1 trong SIMPLE (ảnh,
 
 | Loại | Nguồn cho task khay | Vào đâu | Ghi |
 |---|---|---|---|
-| Synthetic S1 | Planner MP sinh trọn episode | Stage 3 | `source_kind = synthetic`, `synthetic_tier = S1`, `action_quality = planned` |
+| Synthetic S1 | Planner kịch bản trên decoupled WBC: quỹ đạo hai cổ tay theo hình học tay cầm, `navigate_cmd` cho đi, đóng mở bàn tay; ghi bằng bộ ghi LeRobot của SIMPLE | Stage 3 | `source_kind = synthetic`, `synthetic_tier = S1`, `action_quality = planned` |
 | Synthetic S2 | Biến thể từ episode S1 hoặc bàn phím (design 27/10 mục 5.4) | Stage 3 | Sau S1; không bắt buộc cho thí nghiệm sơ bộ |
 | Teleop bàn phím | DA-16 trên task khay | Stage 3, và tập nhỏ để đối chứng nguồn | Chậm; dùng khi có |
 | Egocentric | Video đội tự quay người bê khay giữa hai bàn, dựng cảnh giống task (mục 5.1) | Stage 1 | Qua pipeline egocentric (design 27/10 mục 6.6), pose E-A, `pseudo` |
@@ -189,7 +189,7 @@ Trước demo: ba lần fine-tune stage 3 (A, C, C-NOEGO). Sau khi có video: th
 |---|---|---|---|
 | M0 · cảnh tĩnh | 1/11 | Cảnh mục 3.1 load trong SIMPLE `mujoco`, G1 đứng, khay và linh kiện đứng yên 30 s không xuyên, ảnh camera đầu ra đúng; đo thời gian một bước sim | |
 | M1 · task chạy được | 4/11 | `reset`, `check_success`, ngẫu nhiên hóa 3 mức; một quỹ đạo planner viết tay mang khay thành công trong sim | 6/11: đơn giản hóa (khay không linh kiện, rồi khay có gờ cao) và ghi `Decision` |
-| M2 · synthetic S1 | 8/11 | `decompose()` 7 bước, `datagen` sinh ≥ 100 episode, ≥ 80 đạt QA (pipeline của Thông nếu đã có, không thì QA tối thiểu mục 7); release có hash | 10/11: giảm N_full còn số đạt QA thực có |
+| M2 · synthetic S1 | 8/11 | Planner kịch bản theo 7 bước sinh ≥ 100 episode, ≥ 80 đạt QA (pipeline của Thông nếu đã có, không thì QA tối thiểu mục 7); release có hash | 10/11: giảm N_full còn số đạt QA thực có |
 | M4 · train | 12/11 | Stage 3 của A, C, C-NOEGO xong trên Colab hoặc server thuê | Chỉ A và C; C-NOEGO sau demo |
 | M5 · eval | 15/11 | Eval A, C, C-NOEGO; bảng mục 6.3; video rollout cạnh nhau | Giảm còn 20 điều kiện mỗi mức, ghi `Decision` |
 | Chạy thử | 16/11 | Phần task khay chạy được trong kịch bản demo | |
@@ -204,9 +204,9 @@ Vì chạy song song [Đã chốt], chỉ việc của trưởng nhóm đổi:
 | Story | Thay đổi [Đề xuất] |
 |---|---|
 | **DA-32 task bê khay** (mới) | Cảnh, asset, task SIMPLE, ngẫu nhiên hóa, quan sát, `check_success` và vị từ 7 bước trong `flywheel-simple`; mốc M0, M1 |
-| **DA-33 synthetic S1 cho task khay** (mới) | `decompose()`, planner MP hai tay, `datagen`, QA tối thiểu, release có hash; mốc M2 |
+| **DA-33 synthetic S1 cho task khay** (mới) | Planner kịch bản hai tay trên decoupled WBC (quỹ đạo cổ tay qua `TeleopRetargetingIK`, `navigate_cmd`), sinh hàng loạt, QA tối thiểu, release có hash; mốc M2 |
 | **DA-34 thí nghiệm egocentric trên task khay** (mới) | RunPlan và chạy A, C, C-NOEGO (M4, M5); B sau khi có video |
-| DA-19 | Thêm nhiệm vụ con: đọc agent `psi0` của đường MP và config `…xmovebendpickmp-v0` (mục 4); kiểm ghép VLM fine-tune với `postpre.*` (mục 6.2) |
+| DA-19 | Thêm nhiệm vụ con: đọc `eval-decoupled-wbc` và config `…locomotionpickbetweentablesteleop-v0` để xác nhận `action_layout` (mục 4); kiểm ghép VLM fine-tune với `postpre.*` (mục 6.2) |
 | S1-04 | Thêm đo thời gian eval một episode task khay ở `mujoco` |
 | S1-05, S1-11, DA-16, DA-26, DA-29, DA-30 | Không đổi; vẫn cho task hai bàn |
 
@@ -219,7 +219,8 @@ Tải: ba story mới khoảng 40–60 giờ (ước lượng thô), cộng vào
 | Rủi ro | Dấu hiệu | Xử lý |
 |---|---|---|
 | G1 không giữ thăng bằng khi mang khay có tải | M1 thất bại vì ngã | Giảm khối lượng khay và linh kiện; đi chậm hơn; đọc cách task bê hộp SONIC làm |
-| Planner hai tay không giữ khay song song khi đi | Linh kiện rơi trong episode sinh tự động | Ràng buộc tư thế tương đối hai tay trong cuRobo; khay có gờ cao hơn |
+| Planner hai tay không giữ khay song song khi đi | Linh kiện rơi trong episode sinh tự động | Giữ cố định tư thế tương đối hai cổ tay trong khung thân khi mang; khay có gờ cao hơn |
+| Policy Balance, Walk của decoupled WBC train không có tải ở tay | Robot nghiêng, trôi hoặc ngã khi mang khay | Giảm khối lượng khay và linh kiện; giữ khay sát thân; đi chậm hơn; ghi `Decision` |
 | Bàn tay G1 không cầm chắc tay cầm | Khay trượt ở bước 3 | Đổi hình tay cầm; tăng ma sát trong giới hạn hợp lý; ghi `Decision` |
 | Ψ₀ không học được từ ảnh MuJoCo | A dưới 10% thành công | Tăng N_full nếu planner sinh rẻ; kiểm lại pipeline ảnh bằng P3 offline |
 | Colab không đủ (giới hạn phiên, hàng đợi GPU) | Job bị ngắt, chờ GPU lâu | Resume từ checkpoint; thuê server cho fine-tune và eval |
@@ -227,9 +228,9 @@ Tải: ba story mới khoảng 40–60 giờ (ước lượng thô), cộng vào
 
 ## 10. Quyết định và câu hỏi
 
-**Đã chốt (trưởng nhóm, 28/10/2026)**: task bê khay mới hoàn toàn; chỉ MuJoCo với G1 của SIMPLE; dữ liệu robot là synthetic sinh trong sim; baseline theo Ψ₀; thí nghiệm so 100% demo robot với egocentric qua flywheel cộng demo robot cắt bớt; chạy song song với task hai bàn; simulation trước, quay video sau; Colab Pro, thuê server khi cần.
+**Đã chốt (trưởng nhóm, 28/10/2026)**: task bê khay mới hoàn toàn; bộ điều khiển decoupled WBC (`g1_sonic`, `SonicLocoManipEnv`); chỉ MuJoCo với G1 của SIMPLE; dữ liệu robot là synthetic sinh trong sim; baseline theo Ψ₀; thí nghiệm so 100% demo robot với egocentric qua flywheel cộng demo robot cắt bớt; chạy song song với task hai bàn; simulation trước, quay video sau; Colab Pro, thuê server khi cần.
 
-**Lựa chọn của người viết, cần trưởng nhóm xem**: nhánh đối chứng C (mục 6.2); tầng phụ C-NOEGO chạy trước demo (mục 6.2); egocentric phải là video bê khay tự quay (mục 0 ý 6, mục 5.1); Ψ₀ eval dưới AMO và tự xuất lệnh đi (mục 4); giới hạn 90 giây (mục 4); 7 bước scorer gộp từ 12 bước (mục 3.2); 4 kiểu lỗi mới (mục 3.3); ba mức ngẫu nhiên hóa (mục 3.5); đăng ký task từ `flywheel-simple`, không fork (mục 4); đường MP với AMO (mục 4); N_full = 80, N_cut = 40, δ = 10 điểm (mục 6); eval trên dev trước demo (mục 6.3); lộ trình và đường lui (mục 7); ba story mới DA-32, DA-33, DA-34 (mục 8).
+**Lựa chọn của người viết, cần trưởng nhóm xem**: nhánh đối chứng C (mục 6.2); tầng phụ C-NOEGO chạy trước demo (mục 6.2); egocentric phải là video bê khay tự quay (mục 0 ý 6, mục 5.1); Ψ₀ eval qua `eval-decoupled-wbc` và tự xuất lệnh đi (mục 4); giới hạn 90 giây (mục 4); 7 bước scorer gộp từ 12 bước (mục 3.2); 4 kiểu lỗi mới (mục 3.3); ba mức ngẫu nhiên hóa (mục 3.5); đăng ký task từ `flywheel-simple`, không fork (mục 4); planner kịch bản thay `datagen` (mục 4, 5); N_full = 80, N_cut = 40, δ = 10 điểm (mục 6); eval trên dev trước demo (mục 6.3); lộ trình và đường lui (mục 7); ba story mới DA-32, DA-33, DA-34 (mục 8).
 
 **Câu hỏi còn mở**
 
