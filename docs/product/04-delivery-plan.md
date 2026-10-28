@@ -4,6 +4,7 @@ _Ngày 22/10/2026. Vai trò BMAD: Product Owner (Sarah) viết mục 1; Scrum Ma
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 28/10/2026 | 0.9 | Mục 3.2: chốt câu Q-E, Hiếu merge mọi PR bằng quyền admin (`--admin --rebase`) | PO (Hiếu) |
 | 28/10/2026 | 0.8 | Mục 3 và 4: ghi chú rằng vai, RACI, cột người của 4.2–4.6 và tải 4.7–4.8 còn theo phân công cũ, phân công hiện hành ở 07 mục 2.0–2.2; mục 4.1 điền người làm theo 07 bản 0.6, bỏ hỗ trợ S1-03 của Hưng và hẹn `contracts/base.py` của Thông | PO (Hiếu) |
 | 27/10/2026 | 0.7 | Theo spec v10.4 và [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md): mục 4.1 ghi story Sprint 1 mở lại hoặc về lại SIMPLE; mục 4.9 thay mục 4.9 và 4.10 cũ (robot DENSO trong Isaac Sim, robot DENSO trên MuJoCo): demo 17/11/2026 trên G1 + Ψ₀, ba loại dữ liệu, story DA giữ, sửa, xóa, mở lại DA-04, khôi phục DA-18, thêm DA-26 đến DA-29, giờ ước, điều kiện qua G0. Người làm của story mới và story đổi hướng chờ PO giao | PO (Hiếu) |
 | 22/10/2026 | 0.1 | Bản đầu: kết quả kiểm PO, nhịp sprint, phân công, kế hoạch 6 sprint, DoR, DoD, lịch mentor, phương án trễ, chỉ số theo dõi | PO, SM |
@@ -204,7 +205,7 @@ Châu dự phòng cho hai người. Bù bằng: runbook Ψ₀ (`packages/flywhee
 
 Story mới không thuộc Robot Learning nhưng cần Hiếu duyệt: 7.10 F-ACT (02 gợi ý Data-Platform; Châu vận hành, Thông báo cáo theo vòng; Hiếu duyệt RunPlan F-ACT trước vòng 1) và 7.11 B-fail (Hưng sinh sim, Châu train ACT; Hiếu quyết B-fail trên Ψ₀ ở review G4).
 
-Quy tắc (bản 0.6, theo [07 mục 3.4](07-team-workflow.md) bản 0.3, thay quy tắc cũ "Hiếu không là người review duy nhất của PR nào"): Hiếu là người duyệt và merge duy nhất vào `master`; chủ sở hữu đường dẫn và người bình luận ở 07 mục 2.1 góp ý nhưng không chặn merge. Cách Hiếu merge PR của chính mình chờ câu Q-E của design 25/10/2026 (file đã xóa ngày 27/10/2026). Mọi lệnh train và serve Ψ₀ có trong runbook; card chờ Hiếu duyệt quá 2 ngày thì Thông nhắc trong check-in.
+Quy tắc (bản 0.6, theo [07 mục 3.4](07-team-workflow.md) bản 0.3, thay quy tắc cũ "Hiếu không là người review duy nhất của PR nào"): Hiếu là người duyệt và merge duy nhất vào `master`; chủ sở hữu đường dẫn và người bình luận ở 07 mục 2.1 góp ý nhưng không chặn merge. Câu Q-E (cách Hiếu merge PR của chính mình) [Đã chốt 28/10/2026, bản 0.9]: Hiếu merge mọi PR, kể cả PR của mình, bằng `gh pr merge <số> --admin --rebase` sau khi CI xanh; ruleset "Only Hiếu merges into master" chỉ cho vai Admin cập nhật `master` (07 mục 3.4). Mọi lệnh train và serve Ψ₀ có trong runbook; card chờ Hiếu duyệt quá 2 ngày thì Thông nhắc trong check-in.
 
 ### 3.3 RACI theo module và adapter
 
