@@ -36,7 +36,7 @@ jobs:
       - name: Generate progress data
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: python3 scripts/daily_report.py --json website/dist/data/progress.json
+        run: python3 scripts/repo/daily_report.py --json website/dist/data/progress.json
       - name: Validate website
         run: |
           for file in website/dist/*.js; do node --check "$file"; done

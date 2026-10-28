@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "flywheel-loop"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["flywheel-contracts", "jinja2", "numpy", "scipy", "statsmodels"]
+
+[project.optional-dependencies]
+hd = ["rerun-sdk"]
+
+[tool.uv.sources]
+flywheel-contracts = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/flywheel"]

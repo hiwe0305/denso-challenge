@@ -2,30 +2,32 @@
 name = "denso-humanoid-data-flywheel"
 version = "0.1.0"
 requires-python = ">=3.10"
-dependencies = ["flywheel"]
+dependencies = ["flywheel-contracts", "flywheel-store", "flywheel-testkit", "flywheel-cli", "flywheel-data", "flywheel-eval", "flywheel-loop", "flywheel-simple", "flywheel-psi0"]
 
 [tool.uv]
 package = false
 
 [tool.uv.sources]
-flywheel = { workspace = true }
+flywheel-contracts = { workspace = true }
+flywheel-store = { workspace = true }
+flywheel-testkit = { workspace = true }
+flywheel-cli = { workspace = true }
+flywheel-data = { workspace = true }
+flywheel-eval = { workspace = true }
+flywheel-loop = { workspace = true }
+flywheel-simple = { workspace = true }
+flywheel-psi0 = { workspace = true }
 
 [tool.uv.workspace]
 members = ["packages/*"]
 
 [dependency-groups]
-dev = [
-    "hypothesis",
-    "import-linter",
-    "mypy",
-    "pytest",
-    "ruff",
-]
+dev = ["hypothesis", "import-linter", "mypy", "pytest", "ruff"]
 
 [tool.ruff]
 target-version = "py310"
 line-length = 100
-include = ["packages/flywheel/**/*.py"]
+include = ["packages/**/*.py", "tests/**/*.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
@@ -33,28 +35,31 @@ select = ["E", "F", "I", "UP"]
 [tool.mypy]
 python_version = "3.10"
 strict = true
-packages = ["flywheel"]
+explicit_package_bases = true
+mypy_path = ["packages/flywheel-contracts/src", "packages/flywheel-testkit/src", "packages/flywheel-cli/src", "packages/flywheel-store/src", "packages/flywheel-data/src", "packages/flywheel-eval/src", "packages/flywheel-loop/src", "packages/flywheel-simple/src", "packages/flywheel-psi0/src"]
 
 [tool.pytest.ini_options]
-addopts = "-ra"
-testpaths = ["packages/flywheel/tests"]
+addopts = "-ra -m 'not gpu and not sim'"
+testpaths = ["packages", "tests"]
+markers = ["e2e_fake: CPU-only end-to-end loop on fake adapters", "gpu: requires a GPU", "sim: requires a simulator"]
 
 [tool.importlinter]
-root_packages = ["flywheel"]
+root_packages = ["flywheel", "flywheel_simple", "flywheel_psi0"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
-name = "The Flywheel core must remain independent of adapters and model runtimes"
+name = "Core independent of lanes and runtimes"
 type = "forbidden"
-source_modules = ["flywheel"]
-forbidden_modules = [
-    "flywheel_lerobot",
-    "flywheel_psi0",
-    "flywheel_simple",
-    "isaacsim",
-    "lerobot",
-    "mujoco",
-    "psi0",
-    "simple",
-    "torch",
-]
+source_modules = ["flywheel.contracts", "flywheel.store", "flywheel.testkit"]
+forbidden_modules = ["flywheel.data", "flywheel.eval", "flywheel.loop", "flywheel.cli", "flywheel_simple", "flywheel_psi0", "flywheel_lerobot", "flywheel_nim", "mujoco", "torch", "lerobot", "simple", "psi0", "isaacsim"]
+
+[[tool.importlinter.contracts]]
+name = "Lanes are independent"
+type = "independence"
+modules = ["flywheel.data", "flywheel.eval", "flywheel.loop"]
+
+[[tool.importlinter.contracts]]
+name = "Lanes independent of adapters and runtimes"
+type = "forbidden"
+source_modules = ["flywheel.data", "flywheel.eval", "flywheel.loop"]
+forbidden_modules = ["flywheel_simple", "flywheel_psi0", "flywheel_lerobot", "flywheel_nim", "mujoco", "torch", "lerobot", "simple", "psi0", "isaacsim"]

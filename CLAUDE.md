@@ -37,7 +37,7 @@ Khi tài liệu mâu thuẫn: spec và design thắng PRD (02); 03 thắng mọi
 - Worktree: `git worktree add ../denso-S1-01 -b S1-01-repo-skeleton origin/master`.
 - Commit: dòng đầu `<story-id>/<nhiệm vụ con>: <việc đã làm, tiếng Anh, thể mệnh lệnh>`, ví dụ `S1-01/2.1: Add fw --version with git SHA`. Thân commit ghi AC liên quan, bằng chứng, và dòng cuối `Time-spent: <giờ>h` (giờ tập trung thực của nhiệm vụ con, ví dụ `Time-spent: 1.5h`). Khi viết commit hộ người dùng, hỏi họ số giờ thay vì tự đoán.
 - Việc ngoài story dùng nhánh `docs-…`, `chore-…` hoặc `hotfix-…`. Nhánh `docs-…` chỉ được sửa tài liệu và website.
-- Trước khi mở PR, chạy `python3 scripts/pr_guard.py --base origin/master --head HEAD --branch "$(git branch --show-current)"`; workflow `pr-guard` chạy lại đúng kiểm tra này và chặn PR nếu sai (08 mục 3, rule R6).
+- Trước khi mở PR, chạy `python3 scripts/repo/pr_guard.py --base origin/master --head HEAD --branch "$(git branch --show-current)"`; workflow `pr-guard` chạy lại đúng kiểm tra này và chặn PR nếu sai (08 mục 3, rule R6).
 - Mỗi người commit bằng tài khoản git của chính mình. Không push thẳng lên `master`; luôn qua PR. Hiếu là người duyệt và merge duy nhất; không tạo nhánh từ nhánh chưa merge, dùng bản giả và file mẫu trong lúc chờ.
 - Trước khi mở PR: `git fetch origin && git rebase origin/master`, chạy lại kiểm tra. Không force-push nhánh của người khác.
 - Không commit: dữ liệu (`fwdata/`), checkpoint (`*.ckpt`, `*.safetensors`, `*.pt`), PDF trong `docs/references/papers/`, file `.env`, khóa API.
@@ -63,7 +63,7 @@ Khi tài liệu mâu thuẫn: spec và design thắng PRD (02); 03 thắng mọi
 ## Kiểm tra trước khi báo xong
 
 - Mã (sau S1-01): `uv run ruff check`, `uv run mypy`, `uv run pytest`, import-linter. Lệnh chính xác ghi trong `packages/flywheel/README.md`; sau PR `chore-restructure` (07 mục 3.6) mọi package đều được quét và lệnh ghi trong README gốc của workspace.
-- Tài liệu: `python3 scripts/check_links.py` (liên kết nội bộ).
+- Tài liệu: `python3 scripts/repo/check_links.py` (liên kết nội bộ).
 - Website: `python3 website/build.py` rồi `python3 website/verify.py`. `node website/test.js` cần Node; máy không có Node thì để CI chạy.
 
 ## Không làm

@@ -13,7 +13,7 @@ Mỗi ngày biết ba điều: đội đang đi nhanh hay chậm so với ước
 
 1. **Tự động trước.** Mọi chỉ số lấy từ git, file story và GitHub. Việc nhập tay duy nhất là dòng `Time-spent:` trong commit.
 2. **Đo quy trình, không xếp hạng người.** Số liệu dùng để gỡ chặn và chỉnh kế hoạch, không dùng để so ai giỏi hơn. Một người k cao thường do story bị ước thấp hoặc bị chặn, không phải do làm chậm.
-3. **Ngưỡng có thể chỉnh.** Ngưỡng ở mục 3 là mặc định; đổi ở review cổng, ghi change log ở đây và hằng số trong `scripts/daily_report.py`.
+3. **Ngưỡng có thể chỉnh.** Ngưỡng ở mục 3 là mặc định; đổi ở review cổng, ghi change log ở đây và hằng số trong `scripts/repo/daily_report.py`.
 
 ## 2. Quy ước dữ liệu đầu vào
 
@@ -111,26 +111,26 @@ Mỗi lần R7 hoặc R8 kích hoạt, thêm một dòng. Đây là chỗ các "
 
 | Công cụ | Làm gì | Ở đâu |
 |---|---|---|
-| `pr-guard` | Kiểm tên nhánh, định dạng commit, `Time-spent`, phạm vi file (R6); gắn `size:large` (R9) | `.github/workflows/pr-guard.yml`, `scripts/pr_guard.py` |
-| `daily-report` | Tính chỉ số mục 3.1, kiểm R1–R5, R7–R9, đăng báo cáo vào issue | `.github/workflows/daily-report.yml`, `scripts/daily_report.py` |
+| `pr-guard` | Kiểm tên nhánh, định dạng commit, `Time-spent`, phạm vi file (R6); gắn `size:large` (R9) | `.github/workflows/pr-guard.yml`, `scripts/repo/pr_guard.py` |
+| `daily-report` | Tính chỉ số mục 3.1, kiểm R1–R5, R7–R9, đăng báo cáo vào issue | `.github/workflows/daily-report.yml`, `scripts/repo/daily_report.py` |
 | Trang Tiến độ | Hiển thị báo cáo ngày mới nhất: rule kích hoạt, theo người, PR, story | `website/dist/progress.html`; dữ liệu `data/progress.json` sinh khi build Pages |
-| Label | Tạo đủ label ở mục 4 và 07 mục 3.5 | `bash scripts/setup_labels.sh` (chạy một lần, cần `gh` đã đăng nhập) |
-| Tiến độ story tại máy | In tiến độ nhiệm vụ con theo story | `python3 scripts/progress.py` |
+| Label | Tạo đủ label ở mục 4 và 07 mục 3.5 | `bash scripts/repo/setup_labels.sh` (chạy một lần, cần `gh` đã đăng nhập) |
+| Tiến độ story tại máy | In tiến độ nhiệm vụ con theo story | `python3 scripts/repo/progress.py` |
 | Tracking và tổng kết cuối ngày (bản 0.2) | Đọc repo và GitHub, không đăng gì; báo cáo nằm trên máy của Hiếu | `~/.claude/scheduled-tasks/denso-tracking/`, `denso-cuoi-ngay/`; báo cáo ở `~/denso-tracking/` |
 
 Chạy thử báo cáo tại máy (không có token thì bỏ qua phần GitHub API):
 
 ```bash
-python3 scripts/daily_report.py
+python3 scripts/repo/daily_report.py
 ```
 
 Kiểm một nhánh trước khi mở PR:
 
 ```bash
-python3 scripts/pr_guard.py --base origin/master --head HEAD --branch "$(git branch --show-current)"
+python3 scripts/repo/pr_guard.py --base origin/master --head HEAD --branch "$(git branch --show-current)"
 ```
 
-Việc Hiếu làm trên GitHub một lần: chạy `scripts/setup_labels.sh`; tạo một issue tiêu đề "Báo cáo ngày" gắn label `daily-report` (workflow tự tạo nếu chưa có); thêm `pr-guard` vào status check bắt buộc của luật bảo vệ `master`; trong Settings → Pages chọn nguồn GitHub Actions nếu chưa chọn.
+Việc Hiếu làm trên GitHub một lần: chạy `scripts/repo/setup_labels.sh`; tạo một issue tiêu đề "Báo cáo ngày" gắn label `daily-report` (workflow tự tạo nếu chưa có); thêm `pr-guard` vào status check bắt buộc của luật bảo vệ `master`; trong Settings → Pages chọn nguồn GitHub Actions nếu chưa chọn.
 
 ## 8. Giới hạn
 

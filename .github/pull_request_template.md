@@ -15,7 +15,7 @@
 - [ ] Diff chỉ chạm các đường dẫn trong mục "Phạm vi file" của story (`git diff --stat origin/master...`)
 - [ ] Không đổi file dùng chung (`contracts/`, schema trong `configs/`, `pyproject.toml` gốc, `uv.lock`, `.github/workflows/`), hoặc đã có PR contract riêng: #<!-- số -->
 - [ ] Đã rebase lên `origin/master` mới nhất
-- [ ] Mỗi commit có dòng đầu `<story-id>/<số>: ...` và dòng `Time-spent: <giờ>h`; `scripts/pr_guard.py` chạy qua tại máy
+- [ ] Mỗi commit có dòng đầu `<story-id>/<số>: ...` và dòng `Time-spent: <giờ>h`; `scripts/repo/pr_guard.py` chạy qua tại máy
 
 ## Bằng chứng
 
@@ -28,7 +28,7 @@
 ## Kiểm tra đã chạy
 
 - [ ] Test và lint của package bị sửa
-- [ ] `python3 scripts/check_links.py` (nếu sửa tài liệu)
+- [ ] `python3 scripts/repo/check_links.py` (nếu sửa tài liệu)
 - [ ] `python3 website/build.py` và `python3 website/verify.py` (nếu sửa website)
 
 ## Ghi chú cho người review
