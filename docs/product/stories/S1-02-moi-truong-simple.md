@@ -30,7 +30,7 @@ _Mở rộng lại ngày 27/10/2026 theo [design 27/10/2026](../../superpowers/s
 
 - [ ] 1. Dựng môi trường (AC 1)
   - [ ] 1.1 Lấy digest image `ghcr.io/physical-superintelligence-lab/simple`; viết service `simple-worker` trong `compose.yaml`, chạy người dùng không phải root
-  - [ ] 1.2 Nếu Docker gặp vấn đề GPU, thử uv hoặc Nix theo README SIMPLE; ghi lý do chọn
+  - [x] 1.2 Nếu Docker gặp vấn đề GPU, thử uv hoặc Nix theo README SIMPLE; ghi lý do chọn
   - [ ] 1.3 Viết `scripts/g0/setup_simple.sh` và ghi phiên bản vào `docs/g0/env-simple.md`
 - [ ] 2. Chạy một episode task hai bàn ở hai chế độ và lưu video (AC 2)
 - [ ] 3. Gọi `teleop_decoupled_wbc`, `datagen`, Replay & Render (AC 3)
@@ -45,6 +45,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `compose.yaml`: service simple-worker
 - `docker/simple/`
 - `scripts/g0/setup_simple.sh`, `scripts/g0/run_one_episode.sh`
+- `scripts/g0/simple/`: script smoke, đứng và đi, render của task G1; gói cuRobo giả cho máy dev
 - `docs/g0/env-simple.md`
 - `docs/g0/ledger/S1-02.csv`
 
@@ -80,6 +81,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Chuyển cho Hiếu vì chỉ Hiếu có phần cứng; image theo `docker/simple/` và `compose.yaml` gốc | PO (Hiếu) theo design chia làn (đã xóa) |
 | 27/10/2026 | Mở rộng lại: SIMPLE là simulator chính; task hai bàn; hai chế độ `mujoco` và `mujoco_isaac`; gọi được teleop, datagen, Replay & Render; đo trên 3060; chặn lại S1-05, S1-06, S1-09, S1-11, DA-16, DA-17; 8 → 14 giờ | PO (Hiếu) theo design 27/10/2026 |
 | 28/10/2026 | Sửa dòng Phụ thuộc: S1-02 chỉ cần cho story của Hiếu; DA-17, DA-23 code trên bản giả | PO (Hiếu) |
+| 28/10/2026 | Thêm `scripts/g0/simple/` vào Phạm vi file; đường uv thay Docker trên máy dev (nhiệm vụ con 1.2) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
@@ -87,3 +89,4 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - Công cụ AI đã dùng:
 - Ghi chú hoàn thành:
 - File đã tạo hoặc sửa:
+
