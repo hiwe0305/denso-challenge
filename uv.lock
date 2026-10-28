@@ -23,8 +23,15 @@ resolution-markers = [
 [manifest]
 members = [
     "denso-humanoid-data-flywheel",
-    "flywheel",
-    "flywheel-fakes",
+    "flywheel-cli",
+    "flywheel-contracts",
+    "flywheel-data",
+    "flywheel-eval",
+    "flywheel-loop",
+    "flywheel-psi0",
+    "flywheel-simple",
+    "flywheel-store",
+    "flywheel-testkit",
 ]
 
 [[package]]
@@ -141,7 +148,15 @@ name = "denso-humanoid-data-flywheel"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "flywheel" },
+    { name = "flywheel-cli" },
+    { name = "flywheel-contracts" },
+    { name = "flywheel-data" },
+    { name = "flywheel-eval" },
+    { name = "flywheel-loop" },
+    { name = "flywheel-psi0" },
+    { name = "flywheel-simple" },
+    { name = "flywheel-store" },
+    { name = "flywheel-testkit" },
 ]
 
 [package.dev-dependencies]
@@ -155,7 +170,17 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "flywheel", editable = "packages/flywheel" }]
+requires-dist = [
+    { name = "flywheel-cli", editable = "packages/flywheel-cli" },
+    { name = "flywheel-contracts", editable = "packages/flywheel-contracts" },
+    { name = "flywheel-data", editable = "packages/flywheel-data" },
+    { name = "flywheel-eval", editable = "packages/flywheel-eval" },
+    { name = "flywheel-loop", editable = "packages/flywheel-loop" },
+    { name = "flywheel-psi0", editable = "packages/flywheel-psi0" },
+    { name = "flywheel-simple", editable = "packages/flywheel-simple" },
+    { name = "flywheel-store", editable = "packages/flywheel-store" },
+    { name = "flywheel-testkit", editable = "packages/flywheel-testkit" },
+]
 
 [package.metadata.requires-dev]
 dev = [
@@ -263,25 +288,70 @@ wheels = [
 ]
 
 [[package]]
-name = "flywheel"
+name = "flywheel-cli"
 version = "0.1.0"
-source = { editable = "packages/flywheel" }
+source = { editable = "packages/flywheel-cli" }
 dependencies = [
-    { name = "duckdb", version = "1.5.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "duckdb", version = "2.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "typer" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "typer" }]
+
+[[package]]
+name = "flywheel-contracts"
+version = "0.1.0"
+source = { editable = "packages/flywheel-contracts" }
+dependencies = [
+    { name = "pyarrow", version = "25.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "pyarrow", version = "26.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pyarrow" },
+    { name = "pydantic", specifier = ">=2" },
+]
+
+[[package]]
+name = "flywheel-data"
+version = "0.1.0"
+source = { editable = "packages/flywheel-data" }
+dependencies = [
+    { name = "flywheel-contracts" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "flywheel-contracts", editable = "packages/flywheel-contracts" }]
+provides-extras = ["egocentric"]
+
+[[package]]
+name = "flywheel-eval"
+version = "0.1.0"
+source = { editable = "packages/flywheel-eval" }
+dependencies = [
+    { name = "flywheel-contracts" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "flywheel-contracts", editable = "packages/flywheel-contracts" }]
+provides-extras = ["agentqa"]
+
+[[package]]
+name = "flywheel-loop"
+version = "0.1.0"
+source = { editable = "packages/flywheel-loop" }
+dependencies = [
+    { name = "flywheel-contracts" },
     { name = "jinja2" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
     { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "pyarrow", version = "25.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "pyarrow", version = "26.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "pydantic" },
     { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
     { name = "scipy", version = "1.18.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "statsmodels" },
-    { name = "structlog" },
-    { name = "typer" },
 ]
 
 [package.optional-dependencies]
@@ -292,29 +362,56 @@ hd = [
 
 [package.metadata]
 requires-dist = [
-    { name = "duckdb" },
+    { name = "flywheel-contracts", editable = "packages/flywheel-contracts" },
     { name = "jinja2" },
     { name = "numpy" },
-    { name = "pyarrow" },
-    { name = "pydantic", specifier = ">=2" },
     { name = "rerun-sdk", marker = "extra == 'hd'" },
     { name = "scipy" },
     { name = "statsmodels" },
-    { name = "structlog" },
-    { name = "typer" },
 ]
 provides-extras = ["hd"]
 
 [[package]]
-name = "flywheel-fakes"
+name = "flywheel-psi0"
 version = "0.1.0"
-source = { virtual = "packages/flywheel-fakes" }
+source = { editable = "packages/flywheel-psi0" }
+
+[[package]]
+name = "flywheel-simple"
+version = "0.1.0"
+source = { editable = "packages/flywheel-simple" }
+
+[[package]]
+name = "flywheel-store"
+version = "0.1.0"
+source = { editable = "packages/flywheel-store" }
 dependencies = [
-    { name = "flywheel" },
+    { name = "duckdb", version = "1.5.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "duckdb", version = "2.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "flywheel-contracts" },
+    { name = "pyarrow", version = "25.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "pyarrow", version = "26.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "structlog" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "flywheel", editable = "packages/flywheel" }]
+requires-dist = [
+    { name = "duckdb" },
+    { name = "flywheel-contracts", editable = "packages/flywheel-contracts" },
+    { name = "pyarrow" },
+    { name = "structlog" },
+]
+
+[[package]]
+name = "flywheel-testkit"
+version = "0.1.0"
+source = { editable = "packages/flywheel-testkit" }
+dependencies = [
+    { name = "flywheel-contracts" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "flywheel-contracts", editable = "packages/flywheel-contracts" }]
 
 [[package]]
 name = "formulaic"
@@ -1085,11 +1182,11 @@ wheels = [
 
 [[package]]
 name = "narwhals"
-version = "2.27.1"
+version = "2.28.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/bf/21/f64d6b2dbea7bf3f8c38cdc786dcc6ef012ca3d173ad208c782c9a7bedf6/narwhals-2.27.1.tar.gz", hash = "sha256:aed93076a3ea42d9c32c88e4eb5ea422a21937011cbe1f480f9572a523c82094", size = 735013, upload-time = "2026-10-10T06:52:18.113Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/67/43/e11d75a7fb635c6f63dd6e176cb3e050ec2fee35f2f2267b332a6ad351ec/narwhals-2.28.0.tar.gz", hash = "sha256:2d9860c80d6610820826e94c6e42ce4b1d92d89cdd479586e652a8d211dab345", size = 754977, upload-time = "2026-10-27T12:19:33.777Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d1/89/5d4c86da1130d9059681e5b6cd7645df5c10279a6a079c5c37dcb2cc6f3f/narwhals-2.27.1-py3-none-any.whl", hash = "sha256:d057df13f5852b8e157596e82eb5e955fad267425df5e420e0ee9863da483b31", size = 483211, upload-time = "2026-10-10T06:52:16.32Z" },
+    { url = "https://files.pythonhosted.org/packages/cf/82/8ef9c7e0f50493307a49c09cfa7f00c5a778b6d1921f7b2dabe1d3a5809e/narwhals-2.28.0-py3-none-any.whl", hash = "sha256:1f69d6385ec30e2fa6e1fdeb37c562ecabd0f713f6f3e3b58a668c5c9df9567f", size = 490591, upload-time = "2026-10-27T12:19:31.649Z" },
 ]
 
 [[package]]
@@ -2633,11 +2730,11 @@ wheels = [
 
 [[package]]
 name = "tzdata"
-version = "2026.5"
+version = "2026.6"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d9/68/f1b440335057bfce71b6e50a9d09445aa2ecbd08359a337976627b8409e7/tzdata-2026.5.tar.gz", hash = "sha256:8cc73c0a0bfca7dbfa59235d60b2eff82231dee33f53d206db1acd9173cfc0a7", size = 200404, upload-time = "2026-10-03T09:23:14.143Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7a/29/6a1391d31cd00ff9e927215a224a880e1e84e826b64ba80a499e51c074d8/tzdata-2026.6.tar.gz", hash = "sha256:85d2cd9c09f81f0bb29db27759fc83af4f1e620efb814f8c5bf8b4cc4feece6d", size = 201017, upload-time = "2026-10-28T09:57:09.137Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/94/21/1e5995a1c920cce14e4bffae20c665ec10e7ed03ab25e006cd741092b718/tzdata-2026.5-py2.py3-none-any.whl", hash = "sha256:b683bd1b6659ddcd810ff02ad09ba821d4bf1065072805063eb35c49617905ac", size = 347996, upload-time = "2026-10-03T09:23:12.535Z" },
+    { url = "https://files.pythonhosted.org/packages/0a/66/9a06c2227fedfd4919f0eaaa8b94377d9730882a7e4f95823c9a331ab5e1/tzdata-2026.6-py2.py3-none-any.whl", hash = "sha256:0a10eec6e13ef16b627fabed9a5f2ba61a62b1c67f327305f4e7e412a70b4aec", size = 348210, upload-time = "2026-10-28T09:57:07.276Z" },
 ]
 
 [[package]]

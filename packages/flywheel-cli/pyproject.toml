@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "flywheel-cli"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["typer"]
+
+[project.scripts]
+fw = "flywheel.cli.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/flywheel"]

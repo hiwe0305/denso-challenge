@@ -24,10 +24,10 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           BRANCH: ${{ github.head_ref }}
-        run: python3 scripts/pr_guard.py --base "$BASE_SHA" --head "$HEAD_SHA" --branch "$BRANCH"
+        run: python3 scripts/repo/pr_guard.py --base "$BASE_SHA" --head "$HEAD_SHA" --branch "$BRANCH"
       - name: Label large PR
         if: always() && steps.guard.outputs.size_large == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
-        run: gh pr edit "$PR" --repo "$GITHUB_REPOSITORY" --add-label "size:large" || echo "Label size:large missing; run scripts/setup_labels.sh"
+        run: gh pr edit "$PR" --repo "$GITHUB_REPOSITORY" --add-label "size:large" || echo "Label size:large missing; run scripts/repo/setup_labels.sh"

@@ -15,7 +15,7 @@ Trạng thái: đề xuất PoC, chưa chạy Ψ₀ hoặc robot thật. Số li
 | [docs/product/](docs/product/README.md) | Hồ sơ sản phẩm theo BMAD: brief, PRD, kiến trúc lõi flywheel, kế hoạch chia việc 5 người, phản biện và câu hỏi cho mentor, story Sprint 1 |
 | [RULE.md](RULE.md) | **Đọc đầu tiên nếu bạn là thành viên đội:** công việc của từng người, một ngày làm việc, cách làm một story, rule R1–R9, điều không được phá, hỏi ai |
 | [CLAUDE.md](CLAUDE.md) | Quy tắc chung cho mọi phiên Claude Code và cho người: đọc gì trước, phạm vi file, quy ước nhánh và commit, bất biến kiến trúc. Có thêm [docs/CLAUDE.md](docs/CLAUDE.md) và [website/CLAUDE.md](website/CLAUDE.md) |
-| [scripts/](scripts) | `check_links.py` kiểm liên kết nội bộ; `progress.py` in tiến độ theo story; `pr_guard.py` và `daily_report.py` cho rule kiểm soát theo ngày ([08](docs/product/08-daily-control.md)); `setup_labels.sh` tạo label GitHub |
+| [scripts/repo/](scripts/repo) | `check_links.py` kiểm liên kết nội bộ; `progress.py` in tiến độ theo story; `pr_guard.py` và `daily_report.py` cho rule kiểm soát theo ngày ([08](docs/product/08-daily-control.md)); `setup_labels.sh` tạo label GitHub |
 | [docs/challenge/](docs/challenge/README.md) | Đề bài của BTC, kèm tiêu chí 3 cấp |
 | [docs/references/](docs/references/README.md) | Nguồn nghiên cứu; PDF giữ cục bộ, không commit |
 | [deliverables/](deliverables) | [Pitch v10](deliverables/DENSO-ilovephysicalintelligence-1.pptx) và [deck workflow kỹ thuật](deliverables/DENSO-Platform-Visual-Workflow-2026-10-08-v1.pptx) |
@@ -39,3 +39,17 @@ git show archive/v3:IDEA.md
 ```
 
 Lệnh trên in một file cũ ra màn hình. Muốn lấy lại cả thư mục, dùng `git checkout archive/v3 -- <đường dẫn>`.
+
+## Thi?t l?p v? ki?m tra workspace
+
+```bash
+uv sync --locked
+uv run fw --version
+uv run ruff check
+uv run mypy -p flywheel.contracts -p flywheel.store -p flywheel.testkit -p flywheel.cli -p flywheel.data -p flywheel.eval -p flywheel.loop -p flywheel_simple -p flywheel_psi0
+uv run pytest
+uv run lint-imports
+python scripts/repo/check_links.py
+```
+
+C?c test c?n GPU ho?c simulator ???c b? qua m?c ??nh. C?i th?m c?ng c? HD b?ng `uv sync --all-packages --all-extras`.

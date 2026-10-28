@@ -91,7 +91,7 @@ Bảng đầy đủ: sở hữu đường dẫn ở [07 mục 2.1](docs/product/
 6. **Trước khi mở PR, tự kiểm:**
 
    ```bash
-   python3 scripts/pr_guard.py --base origin/master --head HEAD --branch "$(git branch --show-current)"
+   python3 scripts/repo/pr_guard.py --base origin/master --head HEAD --branch "$(git branch --show-current)"
    ```
 
 7. **Mở PR** tiêu đề `[DA-03] ...`, điền template (nhiệm vụ con, bằng chứng cho từng AC). PR nên ≤ 400 dòng.
@@ -159,10 +159,10 @@ Label nguyên nhân quan trọng hơn số lượng lỗi: nhờ nó đội bi�
 
 | Việc | Lệnh |
 |---|---|
-| Tiến độ mọi story | `python3 scripts/progress.py` |
-| Báo cáo ngày tại máy | `python3 scripts/daily_report.py` |
-| Kiểm nhánh trước PR | `python3 scripts/pr_guard.py --base origin/master --head HEAD --branch "$(git branch --show-current)"` |
-| Kiểm liên kết tài liệu | `python3 scripts/check_links.py` |
+| Tiến độ mọi story | `python3 scripts/repo/progress.py` |
+| Báo cáo ngày tại máy | `python3 scripts/repo/daily_report.py` |
+| Kiểm nhánh trước PR | `python3 scripts/repo/pr_guard.py --base origin/master --head HEAD --branch "$(git branch --show-current)"` |
+| Kiểm liên kết tài liệu | `python3 scripts/repo/check_links.py` |
 | Xem website | `bash start-website.sh` |
 
 ## 9. Tài liệu để đọc tiếp

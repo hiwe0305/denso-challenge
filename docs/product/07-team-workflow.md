@@ -240,13 +240,13 @@ Một lần, trước khi các làn viết code (design chia làn mục 8):
 
 ## 4. Theo dõi và đánh giá theo nhiệm vụ con
 
-Rule kiểm soát theo ngày (R1–R9), báo cáo ngày tự động, nhãn nguyên nhân lỗi và trang Tiến độ nằm ở [08 · Kiểm soát dự án theo ngày](08-daily-control.md). Label ở mục 3.5 được tạo bằng `bash scripts/setup_labels.sh`.
+Rule kiểm soát theo ngày (R1–R9), báo cáo ngày tự động, nhãn nguyên nhân lỗi và trang Tiến độ nằm ở [08 · Kiểm soát dự án theo ngày](08-daily-control.md). Label ở mục 3.5 được tạo bằng `bash scripts/repo/setup_labels.sh`.
 
 Đơn vị theo dõi là **nhiệm vụ con**: một dòng `- [ ]` trong file story, một commit `<story-id>/<số>: …`, một dòng trong checklist của issue.
 
 | Muốn biết | Cách xem |
 |---|---|
-| Tiến độ mọi story theo người | `python3 scripts/progress.py` (đếm nhiệm vụ con đã đánh dấu trong file story) |
+| Tiến độ mọi story theo người | `python3 scripts/repo/progress.py` (đếm nhiệm vụ con đã đánh dấu trong file story) |
 | Nhiệm vụ con nào của một story đã vào `master` | `git log origin/master --oneline --grep '^DA-03/'` |
 | Ai đang làm gì | Board của GitHub Project; `gh pr list --state open` |
 | Bằng chứng của một nhiệm vụ con | Thân commit và mục "Bằng chứng" của PR |
