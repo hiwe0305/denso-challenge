@@ -13,7 +13,7 @@ Website tĩnh 12 trang trình bày Humanoid Data Flywheel theo [spec v10.1](../d
 | `build.py` | Chép hai deck từ `deliverables/`, hình gốc, sinh `dist/current-platform-data.js`, `dist/media.js` và `dist/data/*.json` |
 | `verify.py` | Kiểm offline: file được tham chiếu, route và nhóm 5 phần, media, SHA-256 của deck và hình |
 | `test.js` | Kiểm mạch trình bày, nội dung 12 trang, quyết định Failure → Data, phép tính chi phí và tình huống âm (cần Node) |
-| `dist/` | Thư mục được phục vụ và đăng lên GitHub Pages |
+| `dist/` | Thư mục được phục vụ và đăng lên GitHub Pages. Git chỉ giữ file viết tay; file `build.py` chép hoặc sinh ra (deck, hình, `current-platform-data.js`, `media.js`, `data/current-*.json`, `data/presentation-sources.json`) nằm trong `.gitignore` và được dựng lại bởi Pages CI và `start-website.sh` |
 
 Trong `dist/`, các file viết tay là `index.html`, `app.js` (router, menu nhóm theo phần, inspector dataset), `current-platform.js` (nội dung từng trang và khung mạch truyện), `styles.css`, `current-platform.css` và `vendor/hls.min.js`. Các mẫu số liệu công khai nằm ở `dist/data/` (G1, GR1, HumanEgo, LIBERO) cùng clip `dist/assets/gr1-episode-0.mp4`.
 
