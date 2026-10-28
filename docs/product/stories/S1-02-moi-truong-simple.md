@@ -90,3 +90,4 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - Ghi chú hoàn thành:
 - File đã tạo hoặc sửa:
 
+- 28/10/2026: venv uv chỉ MuJoCo trên laptop RTX 3050; task hai bàn chạy ở `mujoco`, G1 đứng và đi bằng decoupled WBC. Còn `mujoco_isaac`, Replay & Render, `datagen` với cuRobo thật, đo trên 3060 (`docs/g0/env-simple.md` mục cuối).
