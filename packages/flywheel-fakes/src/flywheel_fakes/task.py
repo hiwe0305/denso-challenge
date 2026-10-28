@@ -71,7 +71,8 @@ class ToyPickPlace:
             for gx, gy, px, py in zip(gripper_x, gripper_y, part_x, part_y, strict=True)
         ]
         approach_ok = min(gripper_part) <= threshold
-        grasp_ok = approach_ok and max(gripper_part) <= threshold
+        first_contact = next((i for i, distance in enumerate(gripper_part) if distance <= threshold), None)
+        grasp_ok = first_contact is not None and max(gripper_part[first_contact:]) <= threshold
         place_distance = hypot(
             float(part_x[-1]) - float(target_x[-1]),
             float(part_y[-1]) - float(target_y[-1]),
