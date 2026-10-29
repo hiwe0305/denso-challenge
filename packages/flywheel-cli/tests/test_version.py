@@ -61,3 +61,13 @@ def test_fw_help_is_available() -> None:
 
     assert result.exit_code == 0
     assert "--version" in unstyle(result.stdout)
+
+
+def test_fw_lists_installed_lane_commands() -> None:
+    result = runner.invoke(app, ["--help"])
+
+    assert result.exit_code == 0
+    output = unstyle(result.stdout)
+    for name in ("data", "egocentric", "eval", "agentqa"):
+        assert re.search(rf"\b{name}\b", output)
+        assert runner.invoke(app, [name, "--help"]).exit_code == 0

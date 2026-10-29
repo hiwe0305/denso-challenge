@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.15' and sys_platform == 'win32'",
@@ -320,10 +320,14 @@ version = "0.1.0"
 source = { editable = "packages/flywheel-data" }
 dependencies = [
     { name = "flywheel-contracts" },
+    { name = "typer" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "flywheel-contracts", editable = "packages/flywheel-contracts" }]
+requires-dist = [
+    { name = "flywheel-contracts", editable = "packages/flywheel-contracts" },
+    { name = "typer" },
+]
 provides-extras = ["egocentric"]
 
 [[package]]
@@ -332,11 +336,27 @@ version = "0.1.0"
 source = { editable = "packages/flywheel-eval" }
 dependencies = [
     { name = "flywheel-contracts" },
+    { name = "flywheel-store" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
+    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "typer" },
+]
+
+[package.optional-dependencies]
+test = [
+    { name = "flywheel-testkit" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "flywheel-contracts", editable = "packages/flywheel-contracts" }]
-provides-extras = ["agentqa"]
+requires-dist = [
+    { name = "flywheel-contracts", editable = "packages/flywheel-contracts" },
+    { name = "flywheel-store", editable = "packages/flywheel-store" },
+    { name = "flywheel-testkit", marker = "extra == 'test'", editable = "packages/flywheel-testkit" },
+    { name = "numpy" },
+    { name = "typer" },
+]
+provides-extras = ["agentqa", "test"]
 
 [[package]]
 name = "flywheel-loop"
@@ -344,6 +364,7 @@ version = "0.1.0"
 source = { editable = "packages/flywheel-loop" }
 dependencies = [
     { name = "flywheel-contracts" },
+    { name = "flywheel-store" },
     { name = "jinja2" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
@@ -363,6 +384,7 @@ hd = [
 [package.metadata]
 requires-dist = [
     { name = "flywheel-contracts", editable = "packages/flywheel-contracts" },
+    { name = "flywheel-store", editable = "packages/flywheel-store" },
     { name = "jinja2" },
     { name = "numpy" },
     { name = "rerun-sdk", marker = "extra == 'hd'" },

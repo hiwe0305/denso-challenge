@@ -6,10 +6,11 @@ build-backend = "hatchling.build"
 name = "flywheel-eval"
 version = "0.1.0"
 requires-python = ">=3.10"
-dependencies = ["flywheel-contracts"]
+dependencies = ["flywheel-contracts", "flywheel-store", "numpy", "typer"]
 
 [project.optional-dependencies]
 agentqa = []
+test = ["flywheel-testkit"]
 
 [project.entry-points."flywheel.commands"]
 eval = "flywheel.eval.cli:app"
@@ -17,6 +18,8 @@ agentqa = "flywheel.eval.agentqa.cli:app"
 
 [tool.uv.sources]
 flywheel-contracts = { workspace = true }
+flywheel-store = { workspace = true }
+flywheel-testkit = { workspace = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/flywheel"]
