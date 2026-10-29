@@ -22,7 +22,7 @@ Spec, 00–06 và design có bảng change log.
 ## Liên kết
 
 - Dùng đường dẫn tương đối giữa các file trong repo.
-- Chạy `python3 scripts/check_links.py` trước khi commit; lệnh trả mã khác 0 nếu có liên kết hỏng.
+- Chạy `python3 scripts/repo/check_links.py` trước khi commit; lệnh trả mã khác 0 nếu có liên kết hỏng.
 
 ## Story
 

@@ -1,4 +1,4 @@
-// Render data/progress.json, written by scripts/daily_report.py when the Pages site is built.
+// Render data/progress.json, written by scripts/repo/daily_report.py when the Pages site is built.
 (function () {
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const table = (head, rows) => rows.length
@@ -72,6 +72,6 @@
     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(render)
     .catch(() => {
-      document.getElementById('meta').innerHTML = 'Chưa có báo cáo. Dữ liệu được sinh khi build GitHub Pages; tại máy, chạy <code>python3 scripts/daily_report.py --json website/dist/data/progress.json</code>.';
+      document.getElementById('meta').innerHTML = 'Chưa có báo cáo. Dữ liệu được sinh khi build GitHub Pages; tại máy, chạy <code>python3 scripts/repo/daily_report.py --json website/dist/data/progress.json</code>.';
     });
 })();
