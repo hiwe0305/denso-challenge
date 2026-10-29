@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import subprocess
-from importlib.metadata import PackageNotFoundError, version
+from importlib.metadata import PackageNotFoundError, entry_points, version
 from pathlib import Path
 
 import typer
@@ -75,6 +75,10 @@ def root(
 ) -> None:
     """Operate the DENSO Humanoid Data Flywheel."""
     del version_requested
+
+
+for command in entry_points(group="flywheel.commands"):
+    app.add_typer(command.load(), name=command.name)
 
 
 def main() -> None:

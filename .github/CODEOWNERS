@@ -16,7 +16,7 @@
 # /packages/flywheel-data/src/flywheel/data/annotate/deid/ @<github-hung>
 # /packages/flywheel-data/src/flywheel/data/qa/egocentric.py @<github-hung>
 # /packages/flywheel-data/src/flywheel/data/export/egodex.py @<github-hung>
-# /packages/flywheel-eval/ @<github-chau>
+/packages/flywheel-eval/ @HoangChau6179
 # /packages/flywheel-eval/src/flywheel/eval/agentqa/ @<github-hung>
 /packages/flywheel-simple/ @hiwe0305
 /packages/flywheel-psi0/ @hiwe0305
@@ -29,7 +29,7 @@
 # /configs/loop/ @<github-long>
 # /configs/data/ @<github-thong>
 # /configs/data/egocentric.yaml @<github-hung>
-# /configs/eval/ @<github-chau>
+/configs/eval/ @HoangChau6179
 # /configs/eval/agentqa/ @<github-hung>
 # /pyproject.toml @<github-long>
 # /uv.lock @<github-long>

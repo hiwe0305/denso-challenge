@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "flywheel-data"
 version = "0.1.0"
 requires-python = ">=3.10"
-dependencies = ["flywheel-contracts"]
+dependencies = ["flywheel-contracts", "typer"]
 
 [project.optional-dependencies]
 egocentric = []
