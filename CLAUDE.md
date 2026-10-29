@@ -62,7 +62,7 @@ Khi tài liệu mâu thuẫn: spec và design thắng PRD (02); 03 thắng mọi
 
 ## Kiểm tra trước khi báo xong
 
-- Mã (sau S1-01): `uv run ruff check`, `uv run mypy`, `uv run pytest`, import-linter. Lệnh chính xác ghi trong `packages/flywheel/README.md`; sau PR `chore-restructure` (07 mục 3.6) mọi package đều được quét và lệnh ghi trong README gốc của workspace.
+- Mã: `uv run ruff check`, `uv run mypy`, `uv run pytest`, import-linter. Mọi package đều được quét; lệnh chính xác ghi trong README gốc của workspace.
 - Tài liệu: `python3 scripts/repo/check_links.py` (liên kết nội bộ).
 - Website: `python3 website/build.py` rồi `python3 website/verify.py`. `node website/test.js` cần Node; máy không có Node thì để CI chạy.
 

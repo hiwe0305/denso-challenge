@@ -40,7 +40,7 @@ git show archive/v3:IDEA.md
 
 Lệnh trên in một file cũ ra màn hình. Muốn lấy lại cả thư mục, dùng `git checkout archive/v3 -- <đường dẫn>`.
 
-## Thi?t l?p v? ki?m tra workspace
+## Thiết lập và kiểm tra workspace
 
 ```bash
 uv sync --locked
@@ -52,4 +52,4 @@ uv run lint-imports
 python scripts/repo/check_links.py
 ```
 
-C?c test c?n GPU ho?c simulator ???c b? qua m?c ??nh. C?i th?m c?ng c? HD b?ng `uv sync --all-packages --all-extras`.
+Các test cần GPU hoặc simulator được bỏ qua mặc định. Cài thêm công cụ HD bằng `uv sync --all-packages --all-extras`.
