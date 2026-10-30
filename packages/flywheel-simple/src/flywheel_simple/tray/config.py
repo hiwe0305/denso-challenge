@@ -48,6 +48,10 @@ class TrayConfig:
     tilt_max_deg: float
     r_reach: float
     episode_limit_s: float
+    approach_zone: float
+    still_speed: float
+    contact_grace: float
+    fall_height: float
 
     @property
     def tray_footprint(self) -> tuple[float, float]:
