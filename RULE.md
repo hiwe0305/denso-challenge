@@ -8,7 +8,7 @@
 2. Model là Ψ₀ (dùng lại checkpoint và code train của tác giả). Từ 27/10/2026 robot là **Unitree G1 trong SIMPLE**, đúng robot và model của paper; task chính là **task hai bàn**: gắp vật ở bàn này, đi sang bàn kia, đặt lên. Thu và sinh dữ liệu chạy MuJoCo thuần, Isaac Sim chỉ render. Robot DENSO đã bỏ khỏi phạm vi.
 3. Trạng thái 27/10/2026: hướng G1 + Ψ₀ đã duyệt ([design 27/10/2026](docs/superpowers/specs/2026-10-27-g1-psi0-demo-design.md), design hiện hành duy nhất); S1-01 đã merge; Sprint 1 bắt đầu thứ Hai 26/10/2026; **demo ngày 17/11/2026**. **Hiếu là người duyệt và merge duy nhất vào `master`.**
 
-Muốn hiểu sâu: [spec v10.4](docs/spec-v10-failure-to-data.md), [design 27/10/2026](docs/superpowers/specs/2026-10-27-g1-psi0-demo-design.md), [03 · Kiến trúc](docs/product/03-architecture.md).
+Muốn hiểu sâu: [spec v10.5](docs/spec-v10-failure-to-data.md), [design 27/10/2026](docs/superpowers/specs/2026-10-27-g1-psi0-demo-design.md), [03 · Kiến trúc](docs/product/03-architecture.md).
 
 ## 2. Công việc của từng người
 
@@ -174,5 +174,5 @@ Label nguyên nhân quan trọng hơn số lượng lỗi: nhờ nó đội bi�
 | Rule theo ngày, chỉ số, sổ can thiệp | [08](docs/product/08-daily-control.md) |
 | Sprint, Definition of Done | [04](docs/product/04-delivery-plan.md) |
 | Yêu cầu và story theo epic | [02 · PRD](docs/product/02-prd.md) |
-| Thuật toán và giả thuyết | [Spec v10.4](docs/spec-v10-failure-to-data.md) |
+| Thuật toán và giả thuyết | [Spec v10.5](docs/spec-v10-failure-to-data.md) |
 | Task hai bàn, dữ liệu, HE, Agent QA/QC, demo 17/11 | [Design 27/10/2026](docs/superpowers/specs/2026-10-27-g1-psi0-demo-design.md) |
