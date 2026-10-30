@@ -1,7 +1,10 @@
 """Scene geometry of the tray task, computed from TrayConfig (design 3.1).
 
-World frame: x along the corridor, table A at negative x, table B at positive x,
-z up, floor at z = 0. The tray's long side is along its own y axis.
+World frame: x along the corridor, table A at positive x, table B at negative x,
+z up, floor at z = 0. The robot spawns between them facing +x (yaw 0): the
+elastic band that holds G1 at the start pulls its pelvis towards the identity
+orientation, so any other spawn yaw makes it spin. SIMPLE's two-table task uses
+the same layout. The tray's long side is along its own y axis.
 """
 
 from __future__ import annotations
@@ -56,11 +59,11 @@ def scene_geometry_with_gap(cfg: TrayConfig, corridor: float) -> SceneGeometry:
     xs = (np.arange(cols) - (cols - 1) / 2) * cfg.tray_width / cols
     compartments = np.array([[x, y] for y in ys for x in xs])
     return SceneGeometry(
-        table_a_center=np.array([-table_x, 0.0]),
-        table_b_center=np.array([table_x, 0.0]),
+        table_a_center=np.array([table_x, 0.0]),
+        table_b_center=np.array([-table_x, 0.0]),
         table_top_z=cfg.table_height,
-        tray_pose=Pose2D(-tray_x, 0.0, 0.0),
-        target_pose=Pose2D(tray_x, 0.0, 0.0),
+        tray_pose=Pose2D(tray_x, 0.0, 0.0),
+        target_pose=Pose2D(-tray_x, 0.0, 0.0),
         compartment_centers=compartments,
-        robot_spawn=Pose2D(cfg.robot_spawn_x, 0.0, math.pi),
+        robot_spawn=Pose2D(cfg.robot_spawn_x, 0.0, 0.0),
     )

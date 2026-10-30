@@ -22,9 +22,8 @@ def rect_inside(
 def test_corridor_gap_matches_config() -> None:
     cfg = TrayConfig.load()
     g = scene_geometry(cfg)
-    a_edge = g.table_a_center[0] + cfg.table_depth / 2
-    b_edge = g.table_b_center[0] - cfg.table_depth / 2
-    assert b_edge - a_edge == pytest.approx(1.8)
+    gap = abs(g.table_a_center[0] - g.table_b_center[0]) - cfg.table_depth
+    assert gap == pytest.approx(1.8)
 
 
 def test_tray_fully_on_table_a_and_target_on_table_b() -> None:
@@ -46,7 +45,9 @@ def test_six_compartments_inside_tray() -> None:
 def test_robot_spawn_between_tables_closer_to_a() -> None:
     cfg = TrayConfig.load()
     g = scene_geometry(cfg)
-    assert g.table_a_center[0] + cfg.table_depth / 2 < g.robot_spawn.x < 0.0
+    a_edge = g.table_a_center[0] - cfg.table_depth / 2  # table A is at +x
+    assert 0.0 < g.robot_spawn.x < a_edge
+    assert g.robot_spawn.yaw == 0.0  # the elastic band holds the pelvis at yaw 0
 
 
 def test_defaults_follow_design_3_1() -> None:

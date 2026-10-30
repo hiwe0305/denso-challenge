@@ -5,7 +5,8 @@ dress the boxes as render-only geoms (contype 0, no mass); the boxes they cover 
 to HIDDEN_GROUP, which default renderers do not draw. Handles and dividers stay
 visible because the SimReady crate has neither.
 
-World frame as in geometry.py. The tray body's origin is the centre of its underside.
+World frame as in geometry.py; `tray_handle_left` is on the robot's left as it
+faces table A. The tray body's origin is the centre of its underside.
 """
 
 from __future__ import annotations
@@ -82,7 +83,7 @@ def _tray_boxes(cfg: TrayConfig) -> list[_Box]:
             )
         )
     hl, hd, ht = cfg.handle_length / 2, cfg.handle_depth / 2, cfg.handle_thickness / 2
-    for side, sign in (("left", -1.0), ("right", 1.0)):
+    for side, sign in (("left", 1.0), ("right", -1.0)):  # robot's left facing A (+x)
         boxes.append(
             _Box(
                 f"tray_handle_{side}",
@@ -179,14 +180,18 @@ def _add_box(body: Any, box: _Box, hidden: bool, friction: float, mass: float | 
         geom.mass = mass
 
 
-def tray_spec(cfg: TrayConfig, visuals: Visuals | None = None) -> Any:
-    """Tray (free joint `tray_joint`) and parts `part_0..5` at the origin, tray underside z = 0."""
-    mj = _mujoco()
+def add_tray(
+    spec: Any, cfg: TrayConfig, pose: Pose2D, z: float, visuals: Visuals | None = None
+) -> None:
+    """Tray (free joint `tray_joint`, underside at `z`) and parts `part_0..5` in its compartments.
+
+    Bodies go straight into `spec` rather than through MjSpec.attach, whose
+    unnamed default class does not survive a round trip through XML.
+    """
     visuals = _resolve(visuals)
-    spec = mj.MjSpec()
-    spec.option.timestep = TIMESTEP
     dresser = _Dresser(spec, visuals)
-    tray = spec.worldbody.add_body(name="tray")
+    quat = _yaw_quat(pose.yaw)
+    tray = spec.worldbody.add_body(name="tray", pos=[pose.x, pose.y, z], quat=quat)
     tray.add_freejoint(name="tray_joint")
     boxes = _tray_boxes(cfg)
     volumes = [8 * b.half[0] * b.half[1] * b.half[2] for b in boxes]
@@ -197,10 +202,11 @@ def tray_spec(cfg: TrayConfig, visuals: Visuals | None = None) -> Any:
         size = (cfg.tray_width, cfg.tray_length, cfg.tray_height)
         dresser.dress(tray, "tray", 0, size, (0, 0, cfg.tray_height / 2), "stretch")
 
-    centres = scene_geometry(cfg).compartment_centers
-    z = cfg.tray_floor + SPAWN_GAP + cfg.part_height / 2
-    for i, (x, y) in enumerate(centres):
-        part = spec.worldbody.add_body(name=f"part_{i}", pos=[float(x), float(y), z])
+    c, s = math.cos(pose.yaw), math.sin(pose.yaw)
+    part_z = z + cfg.tray_floor + SPAWN_GAP + cfg.part_height / 2
+    for i, (x, y) in enumerate(scene_geometry(cfg).compartment_centers):
+        pos = [pose.x + c * x - s * y, pose.y + s * x + c * y, part_z]
+        part = spec.worldbody.add_body(name=f"part_{i}", pos=pos, quat=quat)
         part.add_freejoint(name=f"part_{i}_joint")
         half = (cfg.part_size / 2, cfg.part_size / 2, cfg.part_height / 2)
         box = _Box(f"part_{i}_geom", half, (0, 0, 0), PART_RGBA, True)
@@ -208,7 +214,6 @@ def tray_spec(cfg: TrayConfig, visuals: Visuals | None = None) -> Any:
         if dresser.has("part"):
             size = (cfg.part_size, cfg.part_size, cfg.part_height)
             dresser.dress(part, "part", i, size, (0, 0, 0), "uniform")
-    return spec
 
 
 def add_tables(spec: Any, cfg: TrayConfig, visuals: Visuals | None = None) -> None:
@@ -242,30 +247,38 @@ def add_tables(spec: Any, cfg: TrayConfig, visuals: Visuals | None = None) -> No
             dresser.dress(body, "table", 0, (d, ln, h), (0, 0, h / 2), "stretch")
 
 
-def static_scene_spec(cfg: TrayConfig, visuals: Visuals | None = None) -> Any:
-    """Floor, both tables, and the tray with its parts at the default pose on table A."""
+def task_scene_spec(
+    cfg: TrayConfig, tray_pose: Pose2D | None = None, visuals: Visuals | None = None
+) -> Any:
+    """Both tables and the tray with its parts on table A (default pose unless `tray_pose`)."""
     mj = _mujoco()
     visuals = _resolve(visuals)
     spec = mj.MjSpec()
     spec.option.timestep = TIMESTEP
+    add_tables(spec, cfg, visuals)
+    pose = tray_pose or scene_geometry(cfg).tray_pose
+    add_tray(spec, cfg, pose, cfg.table_height + SPAWN_GAP, visuals)
+    return spec
+
+
+def static_scene_spec(cfg: TrayConfig, visuals: Visuals | None = None) -> Any:
+    """task_scene_spec on a floor, under one light: the scene without a robot."""
+    mj = _mujoco()
+    spec = task_scene_spec(cfg, visuals=visuals)
     spec.worldbody.add_geom(
         name="floor", type=mj.mjtGeom.mjGEOM_PLANE, size=[5, 5, 0.1], rgba=[0.35, 0.37, 0.40, 1]
     )
     spec.worldbody.add_light(
         pos=[0, 0, 4], dir=[0, 0, -1], type=mj.mjtLightType.mjLIGHT_DIRECTIONAL
     )
-    add_tables(spec, cfg, visuals)
-    pose: Pose2D = scene_geometry(cfg).tray_pose
-    frame = spec.worldbody.add_frame(
-        pos=[pose.x, pose.y, cfg.table_height + SPAWN_GAP], quat=_yaw_quat(pose.yaw)
-    )
-    spec.attach(tray_spec(cfg, visuals), frame=frame, prefix="")
     return spec
 
 
-def write_tray_mjcf(cfg: TrayConfig, path: Path, visuals: Visuals | None = None) -> Path:
-    """Write the tray and parts as an MJCF file (absolute asset paths) for SIMPLE's actor path."""
-    spec = tray_spec(cfg, visuals)
+def write_scene_mjcf(
+    cfg: TrayConfig, path: Path, tray_pose: Pose2D | None = None, visuals: Visuals | None = None
+) -> Path:
+    """Write task_scene_spec as MJCF (absolute asset paths) for SIMPLE's articulated actor."""
+    spec = task_scene_spec(cfg, tray_pose, visuals)
     spec.compile()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(spec.to_xml())
