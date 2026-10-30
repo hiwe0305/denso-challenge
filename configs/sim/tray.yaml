@@ -1,6 +1,7 @@
 # DA-32 tray-transfer task: sizes, masses, friction, tolerances (design 28/10/2026, 3.1-3.4).
 # Flat `key: number` lines only; read by flywheel_simple.tray.config without PyYAML.
-# World frame: x along the corridor (table A at -x, table B at +x), z up, floor z = 0.
+# World frame: x along the corridor (table A at +x, table B at -x), z up, floor z = 0;
+# the robot spawns facing +x (yaw 0), towards table A.
 # Units: metres, kilograms, seconds, degrees.
 
 # Tables A and B, either side of the corridor; length along y, depth along x.
@@ -36,7 +37,7 @@ table_leg: 0.05
 
 # Default poses: tray centre this far from table A's corridor edge (B mirrored); robot spawn x.
 tray_edge_offset: 0.25
-robot_spawn_x: -0.45
+robot_spawn_x: 0.45
 
 # Success and step predicates.
 target_pos_tol: 0.05
