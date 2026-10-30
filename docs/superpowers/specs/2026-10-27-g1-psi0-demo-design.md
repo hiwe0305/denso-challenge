@@ -579,11 +579,13 @@ Lỗi chia theo nguồn tín hiệu. Ngưỡng hiệu chỉnh từ episode thàn
 
 | Bằng chứng | Quy về | Can thiệp gợi ý |
 |---|---|---|
-| P1 sai trên khung hình của lượt lỗi | Stage 1 · nhận thức | Tăng cường thị giác; dữ liệu thêm ở điều kiện hình ảnh đó |
+| P1 sai trên khung hình của lượt lỗi | Stage 1 · nhận thức | Ghi nhận và báo cáo; tăng cường thị giác đã cố định cho mọi nhánh (spec mục 7.3) |
 | P1 đúng, P3 nhóm liên quan cao | Stage 3 · học action nhóm đó | Thêm demo hoặc dữ liệu sinh cho bước k |
 | P1 đúng, P3 thấp, closed-loop vẫn hỏng | Lệch phân phối khi chạy | Correction từ trạng thái lỗi |
 | Lỗi mới sau fine-tune kèm T7 | Stage 3 · quên | Giảm learning rate, tăng replay |
 | Ngoài miền train | Không phải lỗi stage | Chỉ báo cáo |
+
+Sửa 30/10/2026 [Đã chốt]: bảng này là bảng chung với spec v10.5 mục 6.4. Can thiệp của dòng Stage 1 đổi từ "Tăng cường thị giác; dữ liệu thêm ở điều kiện hình ảnh đó" sang chỉ ghi nhận, vì spec mục 7.3 cố định tăng cường thị giác cho mọi nhánh và không cho sinh dữ liệu với tham số hình ảnh Level 1, 2.
 
 ## 11. Demo ngày 17/11/2026
 

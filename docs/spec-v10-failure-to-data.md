@@ -1,6 +1,6 @@
-# Spec v10.4: thuật toán Failure → Data và PoC đối chứng
+# Spec v10.5: thuật toán Failure → Data và PoC đối chứng
 
-_Trạng thái: đặc tả đề xuất, chưa thực nghiệm. Ngày 27/10/2026. Phiên bản v10.4: demo ngày 17/11/2026 và mọi thí nghiệm chạy trên G1 trong SIMPLE với Ψ₀; task chính là task hai bàn; thêm giả thuyết HE về dữ liệu egocentric; bỏ robot DENSO; theo [design ngày 27/10/2026](superpowers/specs/2026-10-27-g1-psi0-demo-design.md), là design hiện hành duy nhất. Đọc mục 0 phần "Cập nhật v10.4" trước. Các bản v10.2 (robot DENSO trong Isaac Sim) và v10.3 (robot DENSO trên MuJoCo) đã bị thay; xem mục 14. Bản v10.1 đã áp dụng [quyết định phản biện vòng 1](product/06-review-round-1-decisions.md). Áp dụng cho recipe Ψ₀ + SIMPLE / G1 của [Pitch v10](../deliverables/DENSO-ilovephysicalintelligence-1.pptx). Tài liệu này là đặc tả canonical cho thuật toán flywheel và thiết kế đánh giá. Hồ sơ của recipe cũ FluxVLA / GR00T N1.5 / GR1 (docs 01–14, idea v3) nằm trong tag git `archive/v3`; các quy tắc dữ liệu cần dùng đã được đưa vào mục 4. Thuật ngữ được định nghĩa ở mục 12._
+_Trạng thái: đặc tả đề xuất, chưa thực nghiệm. Ngày 27/10/2026, sửa 30/10/2026. Phiên bản v10.5: bảng quy lỗi về stage ở mục 6.4 thống nhất với design mục 10. Phiên bản v10.4: demo ngày 17/11/2026 và mọi thí nghiệm chạy trên G1 trong SIMPLE với Ψ₀; task chính là task hai bàn; thêm giả thuyết HE về dữ liệu egocentric; bỏ robot DENSO; theo [design ngày 27/10/2026](superpowers/specs/2026-10-27-g1-psi0-demo-design.md), là design hiện hành duy nhất. Đọc mục 0 phần "Cập nhật v10.4" trước. Các bản v10.2 (robot DENSO trong Isaac Sim) và v10.3 (robot DENSO trên MuJoCo) đã bị thay; xem mục 14. Bản v10.1 đã áp dụng [quyết định phản biện vòng 1](product/06-review-round-1-decisions.md). Áp dụng cho recipe Ψ₀ + SIMPLE / G1 của [Pitch v10](../deliverables/DENSO-ilovephysicalintelligence-1.pptx). Tài liệu này là đặc tả canonical cho thuật toán flywheel và thiết kế đánh giá. Hồ sơ của recipe cũ FluxVLA / GR00T N1.5 / GR1 (docs 01–14, idea v3) nằm trong tag git `archive/v3`; các quy tắc dữ liệu cần dùng đã được đưa vào mục 4. Thuật ngữ được định nghĩa ở mục 12._
 
 ## 0. Đọc nhanh
 
@@ -376,14 +376,15 @@ Chỉ dùng log, chạy theo thứ tự:
 
 Lỗi hệ thống được sửa trước. Sau khi sửa phải chạy lại baseline của policy hiện tại, vì phép đo cũ không còn giá trị.
 
-**Quy lỗi về stage của Ψ₀ (v10.2, bước 4b).** Lỗi đã qua kiểm hệ thống và kiểm dữ liệu được gắn giả thuyết về stage gây lỗi trước khi sang bước 5. Bằng chứng lấy từ bộ probe chạy trên checkpoint (P1 hiểu cảnh, P3 action offline, P4 giữ năng lực; design mục 8.3):
+**Quy lỗi về stage của Ψ₀ (v10.2, bước 4b; bảng sửa ở v10.5).** Lỗi đã qua kiểm hệ thống và kiểm dữ liệu được gắn giả thuyết về stage gây lỗi trước khi sang bước 5. Bằng chứng lấy từ bộ probe chạy trên checkpoint (P1 hiểu cảnh, P3 action offline, P4 giữ năng lực; design mục 8.3). Bảng dưới là bảng của design mục 10 [Đã chốt 30/10/2026], trừ can thiệp của dòng Stage 1 giữ theo mục 6.7 và 7.3:
 
 | Bằng chứng | Quy về | Can thiệp gợi ý |
 |---|---|---|
-| P1 sai trên khung hình của chính lượt lỗi | Stage 1 · nhận thức | Synthetic tầng S3 (đổi ngoại hình) |
-| P1 đúng, P3 của nhóm action liên quan cao | Stage 2 hoặc 3 · học action | Thêm teleop hoặc synthetic S1–S2 cho bước k |
-| P1 đúng, P3 thấp, closed-loop vẫn hỏng | Lỗi tích lũy khi chạy | Dữ liệu phục hồi, correction (bước 6, 8) |
-| Lỗi mới sau fine-tune, P4 giảm | Stage 3 · quên | Tăng replay, giảm learning rate |
+| P1 sai trên khung hình của chính lượt lỗi | Stage 1 · nhận thức | Ghi nhận và báo cáo, không tiêu ngân sách: tăng cường thị giác đã cố định cho mọi nhánh (mục 7.3); synthetic S3 là hướng sau PoC (mục 1.1) |
+| P1 đúng, P3 của nhóm action liên quan cao | Stage 3 · học action nhóm đó | Thêm demo hoặc dữ liệu sinh (S1, S2) cho bước k |
+| P1 đúng, P3 thấp, closed-loop vẫn hỏng | Lệch phân phối khi chạy | Correction từ trạng thái lỗi (bước 6, 8) |
+| Lỗi mới sau fine-tune kèm T7 (P4 giảm so với checkpoint cha) | Stage 3 · quên | Giảm learning rate, tăng replay |
+| Ngoài miền train | Không phải lỗi stage | Chỉ báo cáo (NGOÀI MIỀN, mục 6.8) |
 
 Giả thuyết này hiện trên evidence card và kỹ sư xác nhận; không tự chuyển thành can thiệp. Bảng lỗi đầy đủ theo 5 nguồn tín hiệu (dữ liệu D1–D8, train T1–T8, offline O1–O4, closed-loop, runtime R1–R6) nằm ở design mục 10.
 
@@ -889,6 +890,7 @@ Hồ sơ cũ không còn trong thư mục làm việc. Xem lại một file bằ
 
 | Ngày | Phiên bản | Nội dung | Người sửa |
 |---|---|---|---|
+| 30/10/2026 | v10.5 | Bảng quy lỗi về stage (mục 6.4) theo design mục 10: P3 cao quy về Stage 3, "Lệch phân phối khi chạy" thay "Lỗi tích lũy", dòng quên dựa trên T7, thêm dòng ngoài miền train. Can thiệp của dòng Stage 1 đổi từ synthetic S3 sang chỉ ghi nhận (mục 6.7, 7.3; S3 là hướng sau PoC); design mục 10 sửa dòng này cho khớp. Quyết định khi duyệt PR #18 (plan DA-08, DA-13) | Trưởng nhóm |
 | 27/10/2026 | v10.4 | Bỏ robot DENSO (v10.2, v10.3); một sân G1 trong SIMPLE với Ψ₀ (mục 0, 1.1, 2.5); task chính đổi sang task hai bàn `G1WholebodyLocomotionPickBetweenTablesTeleop-v0` (mục 2.3, 5.1, 5.2 thêm L-WALK, 7.1); ba loại dữ liệu egocentric, teleop, synthetic với nguồn test từng loại, synthetic S1 và S2 trước demo (mục 0, 2.5, 6.10); Q6 trả lời bằng teleop bàn phím, ba nguồn dữ liệu robot và quy tắc renderer (mục 2.4, 2.5); QA thêm phát lại action (mục 4.4); giả thuyết HE và thí nghiệm 7.9; lộ trình theo demo 17/11/2026, V3 quay lại G0 (mục 9); rủi ro GPU, eval Isaac chậm, bàn phím, nhiễu của HE, khác renderer (mục 10); glossary và nguồn (mục 12, 13). Theo design ngày 27/10/2026 | Trưởng nhóm |
 | 25/10/2026 | v10.3 | Thí nghiệm có đối chứng chuyển sang robot DENSO trên MuJoCo, SIMPLE chỉ còn G0, bảng ánh xạ G1 → DENSO (mục 0); đầu ra demo trên MuJoCo (mục 0); simulator của robot DENSO (mục 2.5); thiết kế PoC trên MuJoCo, eval bất đồng bộ (mục 7); lộ trình một sân, G0 bỏ V3 và T1–T4 (mục 9); rủi ro GPU, Colab và dữ liệu DENSO, demo bàn phím, môi trường dễ hơn task thật, lỗi bất đồng bộ, Agent QA/QC (mục 10); glossary và nguồn (mục 12, 13). Theo design ngày 25/10/2026 | Trưởng nhóm |
 | 23/10/2026 | v10.2 | Robot chính là mobile manipulator của DENSO, G1 là bàn thử; task khay → máy; robot thay thế giống ≥ 95% (mục 0, 1.1, 2.5); kiểm hệ thống cho robot DENSO và quy lỗi về stage của Ψ₀ (mục 6.4); tầng synthetic S1–S4 qua NIM (mục 6.10); rủi ro DENSO muộn, NIM, vượt thời gian thì dùng API theo phần, khác biệt tay người và gripper, kết quả âm của Mirchandani cho HS (mục 10); giờ thêm khớp 07 là khoảng 185–255 giờ (mục 9); glossary và nguồn (mục 12, 13). Theo design ngày 23/10/2026 | Trưởng nhóm |

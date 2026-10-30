@@ -47,7 +47,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 ## Ghi chú cho người làm
 
 - Nguồn: spec mục 6.4 (thứ tự kiểm hệ thống, bước 4b), 7.6 (nghiệm thu trên lỗi cấy); design 27/10 mục 8.3, 10.
-- **Bảng quy lỗi về stage khác nhau giữa spec 6.4 và design 10** (ví dụ "Stage 2 hoặc 3" so với "Stage 3"; can thiệp S3 so với tăng cường thị giác; design thêm dòng "Ngoài miền"). Theo CLAUDE.md, báo Hiếu chốt; chưa chốt thì bảng để trong `stage.yaml` để đổi không cần sửa mã.
+- **Bảng quy lỗi về stage** [Đã chốt 30/10/2026]: dùng một bảng chung ở spec v10.5 mục 6.4 và design mục 10 (năm dòng: Stage 1, Stage 3 học action, lệch phân phối, quên, ngoài miền). Dòng Stage 1 chỉ ghi nhận và báo cáo, không đề xuất can thiệp dữ liệu. Bảng vẫn để trong `stage.yaml` để đổi không cần sửa mã, nhưng chỉ một bản, không có khóa chọn biến thể.
 - Trường "lệnh gửi" và "trạng thái đo" của WBC chốt ở G0 theo agent `psi0_decoupled_wbc` (spec 6.4); trước đó dùng trường của `Trace` mẫu.
 - Chỉ import nhân; `diagnosis/` dùng chung với DA-08: story này chỉ sửa `diagnosis/system/` và `diagnosis/stage/`.
 
@@ -67,6 +67,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 |---|---|---|
 | 28/10/2026 | Nháp story theo spec mục 6.4 và design 27/10 mục 10 | Châu (chờ SM, PO) |
 | 28/10/2026 | Đưa nháp của Châu (issue #6) vào repo; nhãn theo 02 bản 0.5 (story 9.13, Epic 9, cổng G4). Bảng quy lỗi về stage (spec 6.4 khác design mục 10) chưa chốt, để trong `stage.yaml` | PO (Hiếu) |
+| 30/10/2026 | Chốt bảng quy lỗi về stage theo spec v10.5 mục 6.4 (khớp design mục 10); sửa ghi chú cho người làm | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
