@@ -20,12 +20,13 @@ from __future__ import annotations
 
 import math
 import os
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 from gymnasium import spaces  # type: ignore[import-not-found]
+from numpy.typing import NDArray
 from simple.assets.articulate import ArticulatedObjectAsset  # type: ignore[import-not-found]
 from simple.core.layout import Layout  # type: ignore[import-not-found]
 from simple.core.task import Task  # type: ignore[import-not-found]
@@ -38,6 +39,7 @@ from simple.tasks.registry import TaskRegistry  # type: ignore[import-not-found]
 from flywheel_simple.tray.config import TrayConfig
 from flywheel_simple.tray.geometry import Pose2D
 from flywheel_simple.tray.mjcf import write_scene_mjcf
+from flywheel_simple.tray.predicates import StepReport, StepTracker, TrayState
 from flywheel_simple.tray.randomize import SEED_RANGES, EpisodeSample, sample_episode, split_of
 from flywheel_simple.wbc import make_sonic_env
 
@@ -56,6 +58,49 @@ def scene_dir() -> Path:
     if "FLYWHEEL_TRAY_DIR" in os.environ:
         return Path(os.environ["FLYWHEEL_TRAY_DIR"])
     return TrayConfig.default_path().parents[2] / "fwdata/simple/tray/scene"
+
+
+def tray_state(mj_model: Any, mj_data: Any) -> TrayState:
+    """Snapshot of the tray scene for StepTracker, read from MuJoCo.
+
+    Hand contacts are contacts between a handle geom and any body of that side's
+    hand or wrist, as SIMPLE's two-table task matches bodies by name. g1_sonic has
+    no palm link; the palm point is midway between the wrist and the middle finger
+    base.
+    """
+    left = right = False
+    on_table = "none"
+    tray_id = mj_model.body("tray").id
+    for i in range(mj_data.ncon):
+        contact = mj_data.contact[i]
+        for mine, other in ((contact.geom1, contact.geom2), (contact.geom2, contact.geom1)):
+            geom = mj_model.geom(mine).name
+            other_body = mj_model.body(mj_model.geom_bodyid[other]).name
+            if geom == "tray_handle_left" and other_body.startswith(("left_hand", "left_wrist")):
+                left = True
+            if geom == "tray_handle_right" and other_body.startswith(("right_hand", "right_wrist")):
+                right = True
+            if mj_model.geom_bodyid[mine] == tray_id and other_body in ("table_a", "table_b"):
+                on_table = "A" if other_body == "table_a" else "B"
+
+    def palm(side: str) -> NDArray[np.float64]:
+        wrist = mj_data.body(f"{side}_wrist_yaw_link").xpos
+        finger = mj_data.body(f"{side}_hand_middle_0_link").xpos
+        return np.asarray((wrist + finger) / 2)
+
+    pelvis = mj_data.body("pelvis").xpos
+    return TrayState(
+        t=float(mj_data.time),
+        tray_pos=np.asarray(mj_data.body("tray").xpos).copy(),
+        tray_quat=np.asarray(mj_data.body("tray").xquat).copy(),
+        part_pos=np.array([mj_data.body(f"part_{i}").xpos for i in range(6)]),
+        hand_contacts=(left, right),
+        tray_on_table=on_table,  # type: ignore[arg-type]
+        base_xy=np.asarray(pelvis[:2]).copy(),
+        pelvis_height=float(pelvis[2]),
+        left_palm=palm("left"),
+        right_palm=palm("right"),
+    )
 
 
 def _yaw_quat(yaw: float) -> list[float]:
@@ -181,6 +226,8 @@ class G1WholebodyTrayTransferTeleop(Task):  # type: ignore[misc]
                 cam_cfg.pose["quaternion"] = self.robot.head_camera_orientation
             layout.add_camera(cam_id, cam_cfg)
         self._layout = layout
+        self.tracker = StepTracker(self.cfg, self.sample)
+        self.report: StepReport | None = None
         self.robot.reset(spawn_pose=layout.robot.pose)
 
     def privileged_state(self, mujoco_env: Any) -> dict[str, Any]:
@@ -193,12 +240,36 @@ class G1WholebodyTrayTransferTeleop(Task):  # type: ignore[misc]
             "target_pose": np.array([self.target_pose.x, self.target_pose.y, self.target_pose.yaw]),
         }
 
-    def check_success(self, info: dict[str, Any], *args: Any, **kwargs: Any) -> bool:
-        return False
-
     def compute_reward(self, info: dict[str, Any], *args: Any, **kwargs: Any) -> float:
-        # Reward is not designed for this task (design 2); kept for SIMPLE's interface.
-        return 0.0
+        """Advance the step tracker once per env step; reward = fraction of steps reached.
+
+        SonicLocoManipEnv calls this before check_success with the same `info`,
+        which also gets the report as `info["tray_report"]`. Reward is not designed
+        for this task (design 2); the value only keeps SIMPLE's interface.
+        """
+        mujoco_env = kwargs["mujoco_env"]
+        self.report = self.tracker.update(tray_state(mujoco_env.mjModel, mujoco_env.mjData))
+        info["tray_report"] = self.report
+        return sum(self.report.steps) / len(self.report.steps)
+
+    def check_success(self, info: dict[str, Any], *args: Any, **kwargs: Any) -> bool:
+        """Design 3.4, held for T_stable: the report of this step's compute_reward."""
+        return self.report is not None and self.report.success
+
+    def state_dict(self) -> dict[str, Any]:
+        # SIMPLE's Task.state_dict serialises a layout with a "target" actor and a
+        # tabletop scene, which this task does not have.
+        return {
+            "uid": self.uid,
+            "label": self.label,
+            "description": self.description,
+            "metadata": self.metadata,
+            "robot_cfg": self.robot_cfg,
+            "tray": {
+                "sample": asdict(self.sample),
+                "report": asdict(self.report) if self.report is not None else None,
+            },
+        }
 
 
 class TrayTransferEnv(SonicLocoManipEnv):  # type: ignore[misc]

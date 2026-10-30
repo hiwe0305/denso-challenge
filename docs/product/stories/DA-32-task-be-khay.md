@@ -35,7 +35,7 @@ Là trưởng nhóm, tôi muốn có task G1 bê khay linh kiện từ bàn A sa
 - [x] 4. Task SIMPLE và env id, reset ở `mujoco` (AC 4)
 - [x] 5. Ngẫu nhiên hóa ba mức và dải hạt giống (AC 5)
 - [x] 6. Vị từ 7 bước, thành công, nhãn lỗi (AC 6)
-- [ ] 7. Kiểm thành công bằng quỹ đạo oracle, script xem cảnh (AC 7)
+- [x] 7. Kiểm thành công bằng quỹ đạo oracle, script xem cảnh (AC 7)
 
 ## Phạm vi file
 

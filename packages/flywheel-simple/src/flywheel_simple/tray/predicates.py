@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 import numpy as np
+from numpy.typing import NDArray
 
 from flywheel_simple.tray.config import TrayConfig
 from flywheel_simple.tray.geometry import scene_geometry_with_gap
@@ -28,15 +29,15 @@ PART_Z_MARGIN = (0.01, 0.03)  # below the tray floor, above the rim: still "in t
 @dataclass(frozen=True)
 class TrayState:
     t: float
-    tray_pos: np.ndarray  # (3,) tray underside centre, world
-    tray_quat: np.ndarray  # (4,) wxyz
-    part_pos: np.ndarray  # (6, 3) world
+    tray_pos: NDArray[np.float64]  # (3,) tray underside centre, world
+    tray_quat: NDArray[np.float64]  # (4,) wxyz
+    part_pos: NDArray[np.float64]  # (6, 3) world
     hand_contacts: tuple[bool, bool]  # left, right handle
     tray_on_table: Literal["A", "B", "none"]
-    base_xy: np.ndarray  # (2,)
+    base_xy: NDArray[np.float64]  # (2,)
     pelvis_height: float
-    left_palm: np.ndarray  # (3,)
-    right_palm: np.ndarray  # (3,)
+    left_palm: NDArray[np.float64]  # (3,)
+    right_palm: NDArray[np.float64]  # (3,)
 
 
 @dataclass(frozen=True)
@@ -51,7 +52,7 @@ def yaw_error(a: float, b: float) -> float:
     return abs((a - b + math.pi) % (2 * math.pi) - math.pi)
 
 
-def quat_to_mat(q: np.ndarray) -> np.ndarray:
+def quat_to_mat(q: NDArray[np.float64]) -> NDArray[np.float64]:
     w, x, y, z = (float(v) for v in q / np.linalg.norm(q))
     return np.array(
         [
@@ -125,7 +126,7 @@ class StepTracker:
         return StepReport(tuple(self._steps), self._success, self._failure)
 
     def _first_failure(
-        self, s: TrayState, rot: np.ndarray, parts_ok: bool, both: bool, standing: bool
+        self, s: TrayState, rot: NDArray[np.float64], parts_ok: bool, both: bool, standing: bool
     ) -> Failure | None:
         carrying = self._steps[2] and s.tray_on_table == "none"
         self._one_hand_since = self._since(self._one_hand_since, s.t, carrying and not both)
@@ -156,17 +157,19 @@ class StepTracker:
             return 0.0
         return float(np.linalg.norm(s.tray_pos - self._prev.tray_pos) / (s.t - self._prev.t))
 
-    def _tilt(self, rot: np.ndarray) -> float:
+    def _tilt(self, rot: NDArray[np.float64]) -> float:
         return math.acos(max(-1.0, min(1.0, float(rot[2, 2]))))
 
-    def _parts_in_tray(self, s: TrayState, rot: np.ndarray) -> bool:
+    def _parts_in_tray(self, s: TrayState, rot: NDArray[np.float64]) -> bool:
+        if rot[2, 2] <= 0.0:  # upside down: parts in the cavity are under it, not in it
+            return False
         local = (s.part_pos - s.tray_pos) @ rot  # world -> tray frame
         half = np.array(self.cfg.tray_footprint) / 2
         inside = np.all(np.abs(local[:, :2]) <= half, axis=1)
         low, high = -PART_Z_MARGIN[0], self.cfg.tray_height + PART_Z_MARGIN[1]
         return bool(np.all(inside & (local[:, 2] >= low) & (local[:, 2] <= high)))
 
-    def _in_target(self, s: TrayState, rot: np.ndarray) -> bool:
+    def _in_target(self, s: TrayState, rot: NDArray[np.float64]) -> bool:
         target = self.sample.target_pose
         dist = math.hypot(s.tray_pos[0] - target.x, s.tray_pos[1] - target.y)
         yaw = math.atan2(rot[1, 0], rot[0, 0])
@@ -180,7 +183,7 @@ class StepTracker:
         across = abs(float(s.base_xy[1]))
         return 0.0 <= gap <= self.cfg.approach_zone and across <= self.cfg.table_length / 2
 
-    def _palms_on_handles(self, s: TrayState, rot: np.ndarray) -> bool:
+    def _palms_on_handles(self, s: TrayState, rot: NDArray[np.float64]) -> bool:
         y = self.cfg.tray_length / 2 + self.cfg.handle_depth / 2
         z = self.cfg.tray_height - self.cfg.handle_thickness / 2
         left = s.tray_pos + rot @ np.array([0.0, y, z])

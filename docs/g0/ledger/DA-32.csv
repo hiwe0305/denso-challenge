@@ -1,0 +1,7 @@
+date,activity,resource_type,quantity,unit,unit_price_usd,amount_usd,estimated_or_measured,branch,round,job,person,note
+2026-10-28,tray_task_build,engineer_time,20,hour,0.0,0.0,estimated,g0,0,job_da32_est,eng_lead_01,Story estimate for DA-32 (range 16-26 h)
+2026-10-31,tray_task_build,engineer_time,1.75,hour,0.0,0.0,measured,g0,0,job_da32_exec,eng_lead_01,Sum of Time-spent over subtasks 1-7 (7 x 0.25 h)
+2026-10-30,simready_import,cpu_local,0.004,hour,0.0,0.0,measured,g0,0,job_da32_simready,eng_lead_01,import_simready.py: 4 assets 17 MB in 15 s; CC-BY-4.0
+2026-10-31,tray_sim_tests,gpu_local_rtx3050_laptop,0.026,hour,0.0,0.0,measured,g0,0,job_da32_sim_tests,eng_lead_01,pytest tests/tray tests/wbc -m sim: 22 passed in 92.7 s; peak RAM 3.2 GB
+2026-10-31,tray_view_scene,gpu_local_rtx3050_laptop,0.006,hour,0.0,0.0,measured,g0,0,job_da32_view,eng_lead_01,view_scene.py seed 1000000 level 2 6 s: 21.9 s wall
+2026-10-31,tray_episode_90s,gpu_local_rtx3050_laptop,0.027,hour,0.0,0.0,measured,g0,0,job_da32_episode,eng_lead_01,One 90 s scripted episode with all channels recorded: 96.9 s wall; data deleted after review
