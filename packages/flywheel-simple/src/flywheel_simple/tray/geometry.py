@@ -13,6 +13,7 @@ import math
 from dataclasses import dataclass
 
 import numpy as np
+from numpy.typing import NDArray
 
 from flywheel_simple.tray.config import TrayConfig
 
@@ -26,16 +27,16 @@ class Pose2D:
 
 @dataclass(frozen=True)
 class SceneGeometry:
-    table_a_center: np.ndarray  # (2,) xy
-    table_b_center: np.ndarray  # (2,) xy
+    table_a_center: NDArray[np.float64]  # (2,) xy
+    table_b_center: NDArray[np.float64]  # (2,) xy
     table_top_z: float
     tray_pose: Pose2D
     target_pose: Pose2D
-    compartment_centers: np.ndarray  # (6, 2) in the tray frame
+    compartment_centers: NDArray[np.float64]  # (6, 2) in the tray frame
     robot_spawn: Pose2D
 
 
-def rect_corners(pose: Pose2D, size: tuple[float, float]) -> np.ndarray:
+def rect_corners(pose: Pose2D, size: tuple[float, float]) -> NDArray[np.float64]:
     """World xy of the four corners of a rectangle of `size` (x, y in its frame) at `pose`."""
     hx, hy = size[0] / 2, size[1] / 2
     local = np.array([[hx, hy], [hx, -hy], [-hx, -hy], [-hx, hy]])
@@ -49,7 +50,11 @@ def scene_geometry(cfg: TrayConfig) -> SceneGeometry:
 
 
 def scene_geometry_with_gap(cfg: TrayConfig, corridor: float) -> SceneGeometry:
-    """Scene geometry with the corridor between the tables replaced by `corridor`."""
+    """Scene geometry with the corridor between the tables replaced by `corridor`.
+
+    The robot keeps its distance to table A's edge, so it stays clear of the table
+    when the corridor narrows.
+    """
     table_x = corridor / 2 + cfg.table_depth / 2
     tray_x = corridor / 2 + cfg.tray_edge_offset
     rows, cols = 3, 2  # along the long side (y) x across (x)
@@ -65,5 +70,5 @@ def scene_geometry_with_gap(cfg: TrayConfig, corridor: float) -> SceneGeometry:
         tray_pose=Pose2D(tray_x, 0.0, 0.0),
         target_pose=Pose2D(-tray_x, 0.0, 0.0),
         compartment_centers=compartments,
-        robot_spawn=Pose2D(cfg.robot_spawn_x, 0.0, 0.0),
+        robot_spawn=Pose2D(cfg.robot_spawn_x - (cfg.corridor - corridor) / 2, 0.0, 0.0),
     )

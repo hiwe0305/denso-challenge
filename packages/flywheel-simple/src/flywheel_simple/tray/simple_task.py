@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import math
 import os
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -35,8 +36,9 @@ from simple.sensors import StereoCameraCfg  # type: ignore[import-not-found]
 from simple.tasks.registry import TaskRegistry  # type: ignore[import-not-found]
 
 from flywheel_simple.tray.config import TrayConfig
-from flywheel_simple.tray.geometry import Pose2D, scene_geometry
+from flywheel_simple.tray.geometry import Pose2D
 from flywheel_simple.tray.mjcf import write_scene_mjcf
+from flywheel_simple.tray.randomize import SEED_RANGES, EpisodeSample, sample_episode, split_of
 from flywheel_simple.wbc import make_sonic_env
 
 TASK_UID = "g1_wholebody_tray_transfer_teleop"
@@ -46,6 +48,7 @@ INSTRUCTION = (
     "and place it in the target zone."
 )
 SCENE_ACTOR = "articulated"  # the key SIMPLE's MuJoCo engine expects for this actor path
+SCENE_LIGHT_DIFFUSE = 0.4  # scaled by the level-2 light factor
 
 
 def scene_dir() -> Path:
@@ -140,15 +143,29 @@ class G1WholebodyTrayTransferTeleop(Task):  # type: ignore[misc]
         return spaces.Dict(obs)
 
     def reset(self, seed: int | None = None, options: dict[str, Any] | None = None) -> None:
-        geo = scene_geometry(self.cfg)
-        self.target_pose: Pose2D = geo.target_pose
+        """Sample the episode for (level, seed), write its scene and lay out robot and camera.
+
+        `options["level"]` overrides the env's dr_level. A seed outside the train,
+        dev and holdout ranges is refused; no seed draws one from the train range.
+        """
+        level = int((options or {}).get("level", self.metadata.get("dr_level", 0)))
+        if seed is None:
+            seed = int(np.random.default_rng().integers(SEED_RANGES["train"].stop))
+        split_of(seed)
+        self.sample: EpisodeSample = sample_episode(self.cfg, level, seed)
+        self.target_pose: Pose2D = self.sample.target_pose
         scene = write_scene_mjcf(
-            self.cfg, scene_dir() / f"scene_{os.getpid()}.xml", tray_pose=geo.tray_pose
+            replace(self.cfg, part_mass=self.sample.part_mass),
+            scene_dir() / f"scene_{os.getpid()}.xml",
+            tray_pose=self.sample.tray_pose,
+            table_gap=self.sample.table_gap,
+            light_diffuse=SCENE_LIGHT_DIFFUSE * self.sample.light_scale,
         )
+        spawn = self.sample.robot_spawn
         layout = Layout()
         layout.add_robot(self.robot)
-        layout.robot.pose.position = [geo.robot_spawn.x, geo.robot_spawn.y, 0.0]
-        layout.robot.pose.quaternion = _yaw_quat(geo.robot_spawn.yaw)
+        layout.robot.pose.position = [spawn.x, spawn.y, 0.0]
+        layout.robot.pose.quaternion = _yaw_quat(spawn.yaw)
         layout.add_articulated_object(
             SCENE_ACTOR,
             ArticulatedObjectAsset(
