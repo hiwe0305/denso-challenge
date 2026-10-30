@@ -28,6 +28,17 @@ class TrayConfig:
     part_count: int
     part_mass: float
     friction: float
+    tray_wall: float
+    tray_floor: float
+    tray_divider: float
+    divider_height_ratio: float
+    handle_length: float
+    handle_depth: float
+    handle_thickness: float
+    part_size: float
+    part_height: float
+    table_top: float
+    table_leg: float
     tray_edge_offset: float
     robot_spawn_x: float
     target_pos_tol: float

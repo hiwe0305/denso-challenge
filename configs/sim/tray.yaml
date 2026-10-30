@@ -18,6 +18,22 @@ part_count: 6
 part_mass: 0.05
 friction: 1.0
 
+# Tray build: wall, floor and divider thickness; dividers stand this fraction of the inner height.
+tray_wall: 0.008
+tray_floor: 0.006
+tray_divider: 0.004
+divider_height_ratio: 0.7
+# Handles: bars on the +-y end walls, flush with the rim, sticking out by handle_depth.
+handle_length: 0.12
+handle_depth: 0.04
+handle_thickness: 0.02
+# Parts: boxes, part_size square, part_height tall.
+part_size: 0.035
+part_height: 0.03
+# Table build: top slab thickness and square leg width.
+table_top: 0.04
+table_leg: 0.05
+
 # Default poses: tray centre this far from table A's corridor edge (B mirrored); robot spawn x.
 tray_edge_offset: 0.25
 robot_spawn_x: -0.45
