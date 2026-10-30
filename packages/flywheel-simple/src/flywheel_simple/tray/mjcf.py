@@ -19,7 +19,7 @@ from typing import Any
 import numpy as np
 
 from flywheel_simple.tray.config import TrayConfig
-from flywheel_simple.tray.geometry import Pose2D, scene_geometry
+from flywheel_simple.tray.geometry import Pose2D, scene_geometry, scene_geometry_with_gap
 from flywheel_simple.tray.visuals import (
     FitMode,
     VisualAsset,
@@ -216,11 +216,13 @@ def add_tray(
             dresser.dress(part, "part", i, size, (0, 0, 0), "uniform")
 
 
-def add_tables(spec: Any, cfg: TrayConfig, visuals: Visuals | None = None) -> None:
-    """Static tables `table_a` and `table_b`: a top slab on four legs."""
+def add_tables(
+    spec: Any, cfg: TrayConfig, visuals: Visuals | None = None, table_gap: float | None = None
+) -> None:
+    """Static tables `table_a` and `table_b`, `table_gap` apart: a top slab on four legs."""
     visuals = _resolve(visuals)
     dresser = _Dresser(spec, visuals)
-    geo = scene_geometry(cfg)
+    geo = scene_geometry_with_gap(cfg, cfg.corridor if table_gap is None else table_gap)
     d, ln, h = cfg.table_depth, cfg.table_length, cfg.table_height
     top, leg = cfg.table_top, cfg.table_leg
     hidden = dresser.has("table")
@@ -248,14 +250,30 @@ def add_tables(spec: Any, cfg: TrayConfig, visuals: Visuals | None = None) -> No
 
 
 def task_scene_spec(
-    cfg: TrayConfig, tray_pose: Pose2D | None = None, visuals: Visuals | None = None
+    cfg: TrayConfig,
+    tray_pose: Pose2D | None = None,
+    visuals: Visuals | None = None,
+    table_gap: float | None = None,
+    light_diffuse: float | None = None,
 ) -> Any:
-    """Both tables and the tray with its parts on table A (default pose unless `tray_pose`)."""
+    """Both tables and the tray with its parts on table A (default pose unless `tray_pose`).
+
+    `light_diffuse` adds a directional light `tray_scene_light` over the scene.
+    """
     mj = _mujoco()
     visuals = _resolve(visuals)
     spec = mj.MjSpec()
     spec.option.timestep = TIMESTEP
-    add_tables(spec, cfg, visuals)
+    add_tables(spec, cfg, visuals, table_gap)
+    if light_diffuse is not None:
+        spec.worldbody.add_light(
+            name="tray_scene_light",
+            pos=[0, 0, 3],
+            dir=[0, 0, -1],
+            castshadow=False,
+            type=mj.mjtLightType.mjLIGHT_DIRECTIONAL,
+            diffuse=[light_diffuse] * 3,
+        )
     pose = tray_pose or scene_geometry(cfg).tray_pose
     add_tray(spec, cfg, pose, cfg.table_height + SPAWN_GAP, visuals)
     return spec
@@ -275,10 +293,15 @@ def static_scene_spec(cfg: TrayConfig, visuals: Visuals | None = None) -> Any:
 
 
 def write_scene_mjcf(
-    cfg: TrayConfig, path: Path, tray_pose: Pose2D | None = None, visuals: Visuals | None = None
+    cfg: TrayConfig,
+    path: Path,
+    tray_pose: Pose2D | None = None,
+    visuals: Visuals | None = None,
+    table_gap: float | None = None,
+    light_diffuse: float | None = None,
 ) -> Path:
     """Write task_scene_spec as MJCF (absolute asset paths) for SIMPLE's articulated actor."""
-    spec = task_scene_spec(cfg, tray_pose, visuals)
+    spec = task_scene_spec(cfg, tray_pose, visuals, table_gap, light_diffuse)
     spec.compile()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(spec.to_xml())

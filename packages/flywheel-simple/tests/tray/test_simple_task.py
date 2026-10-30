@@ -164,3 +164,31 @@ def test_runner_rejects_unknown_command() -> None:
     from flywheel_simple.tray import run
 
     assert run.main(["datagen"]) == 2
+
+
+def test_level2_reset_applies_the_sampled_episode(env: Any) -> None:
+    from flywheel_simple.tray import TrayConfig
+    from flywheel_simple.tray.randomize import sample_episode
+    from flywheel_simple.tray.simple_task import SCENE_LIGHT_DIFFUSE
+
+    cfg = TrayConfig.load()
+    env.reset(seed=1_000_000, options={"level": 2})
+    task, model, data = env.unwrapped.task, env.unwrapped.mjModel, env.unwrapped.mjData
+    sample = sample_episode(cfg, 2, 1_000_000)
+    assert task.sample == sample
+    # MJCF stores 6 significant digits.
+    assert data.body("table_a").xpos[0] == pytest.approx(sample.table_gap / 2 + 0.4, abs=1e-5)
+    assert np.allclose(data.body("tray").xpos[:2], [sample.tray_pose.x, sample.tray_pose.y])
+    assert model.body("part_0").mass[0] == pytest.approx(sample.part_mass)
+    assert data.body("pelvis").xpos[0] == pytest.approx(sample.robot_spawn.x, abs=0.01)
+    light = model.light("tray_scene_light")
+    assert light.diffuse[0] == pytest.approx(SCENE_LIGHT_DIFFUSE * sample.light_scale)
+    info = env.unwrapped._get_info()
+    assert np.allclose(
+        info["privileged"]["target_pose"][:2], [sample.target_pose.x, sample.target_pose.y]
+    )
+
+
+def test_reset_rejects_seed_outside_the_split_ranges(env: Any) -> None:
+    with pytest.raises(ValueError):
+        env.reset(seed=1_500_000)
