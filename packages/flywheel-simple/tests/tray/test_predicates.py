@@ -37,6 +37,23 @@ def test_placed_still_and_released_succeeds_after_t_stable(
     assert reports[int(1.1 / DT)].success and reports[-1].failure is None
 
 
+@pytest.mark.parametrize("yaw", [np.pi, np.pi - 0.1, -np.pi + 0.1])
+def test_tray_turned_half_a_turn_is_in_target(
+    make_tracker: Callable[[], Any], placed_state_sequence: Callable[..., Iterator[Any]], yaw: float
+) -> None:
+    # The tray is symmetric under a half turn, and a carry with a 180-degree turn
+    # delivers it that way (D-14).
+    reports = run(make_tracker(), placed_state_sequence(yaw=yaw))
+    assert reports[-1].success and reports[-1].failure is None
+
+
+def test_tray_turned_a_quarter_turn_is_off_target(
+    make_tracker: Callable[[], Any], placed_state_sequence: Callable[..., Iterator[Any]]
+) -> None:
+    reports = run(make_tracker(), placed_state_sequence(yaw=np.pi / 2))
+    assert not reports[-1].success and reports[-1].failure == "L-PLACE-POSE"
+
+
 def test_part_drop_is_failure_and_final(
     make_tracker: Callable[[], Any], carry_sequence: Callable[..., Iterator[Any]]
 ) -> None:
