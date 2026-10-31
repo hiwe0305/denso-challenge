@@ -1,0 +1,108 @@
+{
+  "$defs": {
+    "InjectedDefect": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "parameters": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "title": "Parameters",
+          "type": "object"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "title": "InjectedDefect",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "source_detail": {
+      "anyOf": [
+        {
+          "enum": [
+            "psi_data",
+            "teleop_keyboard",
+            "teleop_pico",
+            "planner_wbc",
+            "planner_amo"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Detail"
+    },
+    "renderer": {
+      "anyOf": [
+        {
+          "enum": [
+            "mujoco",
+            "isaac"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Renderer"
+    },
+    "synthetic_tier": {
+      "anyOf": [
+        {
+          "enum": [
+            "S1",
+            "S2",
+            "S3",
+            "S4"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Synthetic Tier"
+    },
+    "injected_defect": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/InjectedDefect"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "title": "EpisodeMetadata",
+  "type": "object"
+}

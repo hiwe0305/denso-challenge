@@ -1,0 +1,6 @@
+{
+  "probe": "P2",
+  "checkpoint_id": "ckpt_1",
+  "dataset_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "token_loss": 0.4
+}

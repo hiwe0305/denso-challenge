@@ -1,0 +1,8 @@
+{
+  "report_id": "qa_1",
+  "episode_id": "ep_1",
+  "threshold_version": "v1",
+  "decision": "invalid",
+  "reasons": [],
+  "checks": []
+}

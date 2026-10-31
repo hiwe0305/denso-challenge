@@ -1,0 +1,13 @@
+{
+  "dataset_id": "ds_1",
+  "seed": 5,
+  "defects": [
+    {
+      "target_ref": "ep_1",
+      "code": "D1",
+      "parameters": {
+        "frame": 1
+      }
+    }
+  ]
+}

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 FailureClass = Literal["approach", "grasp", "carry", "place", "balance"]
 InfraStatus = Literal["ok", "simulator_error", "policy_error", "timeout", "out_of_memory"]
@@ -99,6 +99,14 @@ class RolloutRequest(V0Model):
     fault: FaultSpec | None = None
     max_steps: int = Field(gt=0)
     record: RecordSpec = Field(default_factory=RecordSpec)
+    timing: Literal["sync", "async"] = "sync"
+    latency_profile_ref: str | None = None
+
+    @model_validator(mode="after")
+    def validate_timing(self) -> RolloutRequest:
+        if self.timing == "async" and not self.latency_profile_ref:
+            raise ValueError("async timing requires latency_profile_ref")
+        return self
 
 
 class ResourceUsage(V0Model):

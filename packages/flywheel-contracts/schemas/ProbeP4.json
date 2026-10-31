@@ -1,0 +1,128 @@
+{
+  "$defs": {
+    "ProbeP1": {
+      "additionalProperties": false,
+      "properties": {
+        "probe": {
+          "const": "P1",
+          "default": "P1",
+          "title": "Probe",
+          "type": "string"
+        },
+        "checkpoint_id": {
+          "minLength": 1,
+          "title": "Checkpoint Id",
+          "type": "string"
+        },
+        "dataset_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Dataset Sha256",
+          "type": "string"
+        },
+        "accuracy_by_question_type": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Accuracy By Question Type",
+          "type": "object"
+        }
+      },
+      "required": [
+        "checkpoint_id",
+        "dataset_sha256",
+        "accuracy_by_question_type"
+      ],
+      "title": "ProbeP1",
+      "type": "object"
+    },
+    "ProbeP3": {
+      "additionalProperties": false,
+      "properties": {
+        "probe": {
+          "const": "P3",
+          "default": "P3",
+          "title": "Probe",
+          "type": "string"
+        },
+        "checkpoint_id": {
+          "minLength": 1,
+          "title": "Checkpoint Id",
+          "type": "string"
+        },
+        "dataset_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Dataset Sha256",
+          "type": "string"
+        },
+        "error_by_group": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Error By Group",
+          "type": "object"
+        },
+        "error_by_chunk_pos": {
+          "items": {
+            "type": "number"
+          },
+          "title": "Error By Chunk Pos",
+          "type": "array"
+        },
+        "hand_event_offset_steps": {
+          "title": "Hand Event Offset Steps",
+          "type": "number"
+        },
+        "out_of_limit_dims": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Out Of Limit Dims",
+          "type": "array"
+        }
+      },
+      "required": [
+        "checkpoint_id",
+        "dataset_sha256",
+        "error_by_group",
+        "error_by_chunk_pos",
+        "hand_event_offset_steps",
+        "out_of_limit_dims"
+      ],
+      "title": "ProbeP3",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "probe": {
+      "const": "P4",
+      "default": "P4",
+      "title": "Probe",
+      "type": "string"
+    },
+    "checkpoint_id": {
+      "minLength": 1,
+      "title": "Checkpoint Id",
+      "type": "string"
+    },
+    "parent_checkpoint_id": {
+      "minLength": 1,
+      "title": "Parent Checkpoint Id",
+      "type": "string"
+    },
+    "p1": {
+      "$ref": "#/$defs/ProbeP1"
+    },
+    "p3": {
+      "$ref": "#/$defs/ProbeP3"
+    }
+  },
+  "required": [
+    "checkpoint_id",
+    "parent_checkpoint_id",
+    "p1",
+    "p3"
+  ],
+  "title": "ProbeP4",
+  "type": "object"
+}

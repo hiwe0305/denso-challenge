@@ -1,0 +1,57 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "job_id": {
+      "minLength": 1,
+      "title": "Job Id",
+      "type": "string"
+    },
+    "trace_id": {
+      "minLength": 1,
+      "title": "Trace Id",
+      "type": "string"
+    },
+    "chunk_index": {
+      "minimum": 0,
+      "title": "Chunk Index",
+      "type": "integer"
+    },
+    "observation_sent_s": {
+      "minimum": 0,
+      "title": "Observation Sent S",
+      "type": "number"
+    },
+    "chunk_received_s": {
+      "minimum": 0,
+      "title": "Chunk Received S",
+      "type": "number"
+    },
+    "delay_steps": {
+      "minimum": 0,
+      "title": "Delay Steps",
+      "type": "integer"
+    },
+    "buffer_level": {
+      "minimum": 0,
+      "title": "Buffer Level",
+      "type": "integer"
+    },
+    "boundary_jump": {
+      "minimum": 0,
+      "title": "Boundary Jump",
+      "type": "number"
+    }
+  },
+  "required": [
+    "job_id",
+    "trace_id",
+    "chunk_index",
+    "observation_sent_s",
+    "chunk_received_s",
+    "delay_steps",
+    "buffer_level",
+    "boundary_jump"
+  ],
+  "title": "RTCInferenceRecord",
+  "type": "object"
+}

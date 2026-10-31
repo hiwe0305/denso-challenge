@@ -1,0 +1,11 @@
+{
+  "dimensions": [
+    {
+      "name": "arm_0",
+      "group": "arm",
+      "masked": false,
+      "limit_low": -1.0,
+      "limit_high": 1.0
+    }
+  ]
+}

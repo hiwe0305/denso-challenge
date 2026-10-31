@@ -1,0 +1,38 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "dataset_id": {
+      "minLength": 1,
+      "title": "Dataset Id",
+      "type": "string"
+    },
+    "episode_count": {
+      "minimum": 0,
+      "title": "Episode Count",
+      "type": "integer"
+    },
+    "counts_by_source": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Counts By Source",
+      "type": "object"
+    },
+    "failed_checks_by_source": {
+      "additionalProperties": {
+        "additionalProperties": {
+          "type": "integer"
+        },
+        "type": "object"
+      },
+      "title": "Failed Checks By Source",
+      "type": "object"
+    }
+  },
+  "required": [
+    "dataset_id",
+    "episode_count"
+  ],
+  "title": "DatasetReport",
+  "type": "object"
+}
