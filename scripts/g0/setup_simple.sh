@@ -84,6 +84,9 @@ if command -v nvidia-smi >/dev/null; then torch_index=cu128; else torch_index=cp
 # runs its RL policies). Installed without their own dependency lists, which pull
 # in PICO teleop, ROS and GUI packages this environment does not use.
 "$UV" pip install -q "cyclonedds==0.10.2" tyro pin onnxruntime
+# decoupled_wbc's TeleopRetargetingIK (DA-33 wrist IK, flywheel_simple.wbc.upper_body)
+# solves with pink on the quadprog backend of qpsolvers.
+"$UV" pip install -q "pin-pink==4.4.0" "qpsolvers[quadprog]==4.13.0"
 "$UV" pip install -q --no-deps \
   -e "$SIMPLE_DIR/third_party/unitree_sdk2_python" \
   -e "$SIMPLE_DIR/third_party/gear_sonic" \
@@ -106,6 +109,9 @@ MUJOCO_GL=egl "$VENV/bin/python" - <<'EOF'
 import mujoco, simple, sys
 import simple.envs.sonic_loco_manip, simple.robots.g1_sonic  # two-table env and robot
 from decoupled_wbc.control.policy.wbc_policy_factory import get_wbc_policy  # noqa: F401
+# TeleopRetargetingIK itself imports a visualizer left out here, so check its solver.
+import pink, qpsolvers  # noqa: F401
+assert "quadprog" in qpsolvers.available_solvers
 assert "isaacsim" not in sys.modules
 print(f"simple {simple.__version__}, mujoco {mujoco.__version__}, python {sys.version.split()[0]}")
 EOF

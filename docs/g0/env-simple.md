@@ -20,7 +20,7 @@ Script tạo venv Python 3.10 ở `fwdata/simple/.venv` của checkout chính (m
 | torch | 2.7.0+cu128 (bản CPU khi máy không có `nvidia-smi`) |
 | `unitree_sdk2_python` | `cf26ccef0e615c9509140322bec154adc391c052`; cầu nối DDS, kèm `cyclonedds==0.10.2` |
 | `gear_sonic` | `e61eeb1dec9678dcc02f97c5ac27ca6a4fe82128`; cấu hình và robot SONIC, kèm `tyro`, `pin` |
-| `decoupled_wbc` | `5b304e4d643fe89cd000068dcbba7e7519539caa`; GR00T decoupled WBC, policy RL `Balance.onnx`, `Walk.onnx` (1,9 MB mỗi file, file thật), kèm `onnxruntime` |
+| `decoupled_wbc` | `5b304e4d643fe89cd000068dcbba7e7519539caa`; GR00T decoupled WBC, policy RL `Balance.onnx`, `Walk.onnx` (1,9 MB mỗi file, file thật), kèm `onnxruntime`; `pin-pink==4.4.0` và `qpsolvers[quadprog]==4.13.0` cho IK cổ tay `TeleopRetargetingIK` (DA-33) |
 | Asset | SIMPLE tự tải từ Hugging Face `USC-PSI-Lab/SIMPLE` lần đầu dùng (`robots_g1.zip` 134 MB, `robots_g1_sonic.zip`, cảnh HSSD, `assets_objects.zip` …); 2,1 GB trong `fwdata/simple/SIMPLE/data/` sau khi chạy cả task MP và task hai bàn (`du`, 28/10) |
 
 ## Khác với `pyproject.toml` của SIMPLE
@@ -32,7 +32,7 @@ Script tạo venv Python 3.10 ở `fwdata/simple/.venv` của checkout chính (m
 | **Gói `curobo` giả** (`scripts/g0/simple/curobo_stub/`) khi máy không có `nvcc` | SIMPLE import cuRobo khi nạp bất kỳ robot nào (`robots/mixin.py` raise nếu thiếu). cuRobo thật cần biên dịch CUDA. Gói giả chỉ cho import qua; gọi tới bất kỳ lớp nào của nó báo lỗi "cần cuRobo thật". **Không dùng được cho datagen (DA-33)**: máy sinh dữ liệu phải cài cuRobo thật bằng `scripts/install_curobo.sh` của SIMPLE |
 | Thêm `opencv-python-headless`, `matplotlib`, `huggingface_hub`, `platformdirs`, `requests`, `scipy`, `pyyaml`, `imageio`, `imageio-ffmpeg`, `pytest` | SIMPLE import khi chạy nhưng không khai trong phụ thuộc chính, hoặc test và tải asset của đội cần |
 | Ba submodule `unitree_sdk2_python`, `gear_sonic`, `decoupled_wbc` clone qua HTTPS, không qua `git submodule` | `.gitmodules` của SIMPLE khai `unitree_sdk2_python` và `decoupled_wbc` qua SSH. Script đối chiếu commit với gitlink của SIMPLE và dừng nếu lệch. Các submodule khác (`curobo`, `AMO`, `GR00T-WholeBodyControl`, `XRoboToolkit`, …) không cần cho `sim_mode=mujoco` |
-| Ba submodule cài `--no-deps`, chỉ thêm `cyclonedds==0.10.2`, `tyro`, `pin`, `onnxruntime` | Danh sách phụ thuộc của chúng kéo theo teleop PICO, ROS, GUI (`decoupled_wbc[full]`); `unitree_sdk2py` đòi `opencv-python` bản có GUI, venv đã có bản headless |
+| Ba submodule cài `--no-deps`, chỉ thêm `cyclonedds==0.10.2`, `tyro`, `pin`, `onnxruntime`, `pin-pink==4.4.0`, `qpsolvers[quadprog]==4.13.0` | Danh sách phụ thuộc của chúng kéo theo teleop PICO, ROS, GUI (`decoupled_wbc[full]`); `unitree_sdk2py` đòi `opencv-python` bản có GUI, venv đã có bản headless |
 | Ba file Git LFS của policy AMO (`src/simple/robots/policy/amo_jit.pt`, `adapter_jit.pt`, `adapter_norm_stats.pt`) tải qua HTTPS từ `media.githubusercontent.com` theo commit ghim | Máy không có `git-lfs`; clone chỉ có con trỏ LFS. Vì vậy `git status` của clone SIMPLE báo ba file này đã sửa; đó là file thật thay cho con trỏ, không phải sửa mã |
 
 ## Bốn điều phải biết khi chạy
