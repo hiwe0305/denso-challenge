@@ -1,0 +1,4 @@
+date,activity,resource_type,quantity,unit,unit_price_usd,amount_usd,estimated_or_measured,branch,round,job,person,note
+2026-10-27,psi_data_analysis,engineer_time,10,hour,0.0,0.0,estimated,g0,0,job_s1_07_est,eng_data_02,Initial estimate for S1-07 psi-data analysis
+2026-10-29,psi_data_analysis,engineer_time,2.5,hour,0.0,0.0,measured,g0,0,job_s1_07_exec,eng_data_02,Inspect LeRobot structure QA verification and seed analysis
+
