@@ -1,0 +1,12 @@
+{
+  "checkpoint_id": "ckpt_example",
+  "config_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "findings": [
+    {
+      "code": "T1",
+      "start_step": 1,
+      "value": "NaN",
+      "stop_job": true
+    }
+  ]
+}

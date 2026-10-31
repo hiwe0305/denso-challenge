@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "probe": {
+      "const": "P1",
+      "default": "P1",
+      "title": "Probe",
+      "type": "string"
+    },
+    "checkpoint_id": {
+      "minLength": 1,
+      "title": "Checkpoint Id",
+      "type": "string"
+    },
+    "dataset_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Dataset Sha256",
+      "type": "string"
+    },
+    "accuracy_by_question_type": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "title": "Accuracy By Question Type",
+      "type": "object"
+    }
+  },
+  "required": [
+    "checkpoint_id",
+    "dataset_sha256",
+    "accuracy_by_question_type"
+  ],
+  "title": "ProbeP1",
+  "type": "object"
+}

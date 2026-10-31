@@ -1,0 +1,302 @@
+{
+  "$defs": {
+    "Condition": {
+      "additionalProperties": false,
+      "properties": {
+        "condition_id": {
+          "title": "Condition Id",
+          "type": "string"
+        },
+        "task": {
+          "$ref": "#/$defs/TaskRef"
+        },
+        "seed": {
+          "title": "Seed",
+          "type": "integer"
+        },
+        "values": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "title": "Values",
+          "type": "object"
+        },
+        "vector": {
+          "default": [],
+          "items": {
+            "type": "number"
+          },
+          "title": "Vector",
+          "type": "array"
+        }
+      },
+      "required": [
+        "condition_id",
+        "task",
+        "seed"
+      ],
+      "title": "Condition",
+      "type": "object"
+    },
+    "FaultSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "parameters": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "title": "Parameters",
+          "type": "object"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "FaultSpec",
+      "type": "object"
+    },
+    "RecordSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "cameras": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Cameras",
+          "type": "array"
+        },
+        "signals": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Signals",
+          "type": "array"
+        }
+      },
+      "title": "RecordSpec",
+      "type": "object"
+    },
+    "StateRef": {
+      "additionalProperties": false,
+      "properties": {
+        "trace": {
+          "$ref": "#/$defs/TraceRef"
+        },
+        "step": {
+          "minimum": 0,
+          "title": "Step",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "trace",
+        "step"
+      ],
+      "title": "StateRef",
+      "type": "object"
+    },
+    "TaskRef": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "version": {
+          "default": "v0",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id"
+      ],
+      "title": "TaskRef",
+      "type": "object"
+    },
+    "TraceRef": {
+      "additionalProperties": false,
+      "properties": {
+        "trace_id": {
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "uri": {
+          "title": "Uri",
+          "type": "string"
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sha256"
+        }
+      },
+      "required": [
+        "trace_id",
+        "uri"
+      ],
+      "title": "TraceRef",
+      "type": "object"
+    },
+    "VisualOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "values": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "title": "Values",
+          "type": "object"
+        }
+      },
+      "title": "VisualOverride",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "job_id": {
+      "title": "Job Id",
+      "type": "string"
+    },
+    "task": {
+      "$ref": "#/$defs/TaskRef"
+    },
+    "condition": {
+      "$ref": "#/$defs/Condition"
+    },
+    "level": {
+      "minimum": 0,
+      "title": "Level",
+      "type": "integer"
+    },
+    "rollout_seed": {
+      "title": "Rollout Seed",
+      "type": "integer"
+    },
+    "start_state": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/StateRef"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "visual_override": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/VisualOverride"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "fault": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FaultSpec"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "max_steps": {
+      "exclusiveMinimum": 0,
+      "title": "Max Steps",
+      "type": "integer"
+    },
+    "record": {
+      "$ref": "#/$defs/RecordSpec"
+    },
+    "timing": {
+      "default": "sync",
+      "enum": [
+        "sync",
+        "async"
+      ],
+      "title": "Timing",
+      "type": "string"
+    },
+    "latency_profile_ref": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Latency Profile Ref"
+    }
+  },
+  "required": [
+    "job_id",
+    "task",
+    "condition",
+    "level",
+    "rollout_seed",
+    "max_steps"
+  ],
+  "title": "RolloutRequest",
+  "type": "object"
+}

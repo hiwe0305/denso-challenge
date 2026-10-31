@@ -1,0 +1,15 @@
+{
+  "report_id": "qa_1",
+  "episode_id": "ep_1",
+  "threshold_version": "v1",
+  "decision": "pass",
+  "reasons": [],
+  "checks": [
+    {
+      "name": "sync",
+      "value": 0.01,
+      "threshold": 0.1,
+      "passed": true
+    }
+  ]
+}

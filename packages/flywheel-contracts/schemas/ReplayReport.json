@@ -1,0 +1,92 @@
+{
+  "$defs": {
+    "ReplayIssue": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "frames": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Frames",
+          "type": "array"
+        },
+        "detail": {
+          "title": "Detail",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "detail"
+      ],
+      "title": "ReplayIssue",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "episode_id": {
+      "minLength": 1,
+      "title": "Episode Id",
+      "type": "string"
+    },
+    "mode": {
+      "enum": [
+        "kinematic",
+        "dynamic"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "issues": {
+      "items": {
+        "$ref": "#/$defs/ReplayIssue"
+      },
+      "title": "Issues",
+      "type": "array"
+    },
+    "error_by_group": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "title": "Error By Group",
+      "type": "object"
+    },
+    "hand_event_offset_steps": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Hand Event Offset Steps"
+    },
+    "sim_success": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sim Success"
+    }
+  },
+  "required": [
+    "episode_id",
+    "mode",
+    "issues"
+  ],
+  "title": "ReplayReport",
+  "type": "object"
+}

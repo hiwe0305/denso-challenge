@@ -1,0 +1,188 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "run_plan_id": {
+      "minLength": 1,
+      "title": "Run Plan Id",
+      "type": "string"
+    },
+    "job_id": {
+      "minLength": 1,
+      "title": "Job Id",
+      "type": "string"
+    },
+    "checkpoint_id": {
+      "minLength": 1,
+      "title": "Checkpoint Id",
+      "type": "string"
+    },
+    "release_id": {
+      "minLength": 1,
+      "title": "Release Id",
+      "type": "string"
+    },
+    "attempt": {
+      "minimum": 0,
+      "title": "Attempt",
+      "type": "integer"
+    },
+    "step": {
+      "minimum": 0,
+      "title": "Step",
+      "type": "integer"
+    },
+    "epoch": {
+      "minimum": 0,
+      "title": "Epoch",
+      "type": "integer"
+    },
+    "split": {
+      "enum": [
+        "train",
+        "val"
+      ],
+      "title": "Split",
+      "type": "string"
+    },
+    "loss": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "enum": [
+            "NaN",
+            "Infinity",
+            "-Infinity"
+          ],
+          "type": "string"
+        }
+      ],
+      "title": "Loss"
+    },
+    "lr": {
+      "minimum": 0,
+      "title": "Lr",
+      "type": "number"
+    },
+    "vlm_frozen": {
+      "title": "Vlm Frozen",
+      "type": "boolean"
+    },
+    "loss_by_group": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "title": "Loss By Group",
+      "type": "object"
+    },
+    "loss_by_chunk_pos": {
+      "items": {
+        "type": "number"
+      },
+      "title": "Loss By Chunk Pos",
+      "type": "array"
+    },
+    "grad_norm_vlm": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Grad Norm Vlm"
+    },
+    "grad_norm_action": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Grad Norm Action"
+    },
+    "pred_var_by_dim": {
+      "items": {
+        "type": "number"
+      },
+      "title": "Pred Var By Dim",
+      "type": "array"
+    },
+    "pred_std": {
+      "items": {
+        "type": "number"
+      },
+      "title": "Pred Std",
+      "type": "array"
+    },
+    "target_std": {
+      "items": {
+        "type": "number"
+      },
+      "title": "Target Std",
+      "type": "array"
+    },
+    "hand_open_hist": {
+      "items": {
+        "type": "number"
+      },
+      "title": "Hand Open Hist",
+      "type": "array"
+    },
+    "vram_gb": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Vram Gb"
+    },
+    "throughput": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Throughput"
+    },
+    "wall_time_s": {
+      "minimum": 0,
+      "title": "Wall Time S",
+      "type": "number"
+    }
+  },
+  "required": [
+    "run_plan_id",
+    "job_id",
+    "checkpoint_id",
+    "release_id",
+    "attempt",
+    "step",
+    "epoch",
+    "split",
+    "loss",
+    "lr",
+    "vlm_frozen",
+    "wall_time_s"
+  ],
+  "title": "TrainingMetric",
+  "type": "object"
+}

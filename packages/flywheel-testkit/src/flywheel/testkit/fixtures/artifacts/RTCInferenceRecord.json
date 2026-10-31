@@ -1,0 +1,10 @@
+{
+  "job_id": "job_1",
+  "trace_id": "trace_1",
+  "chunk_index": 0,
+  "observation_sent_s": 1.0,
+  "chunk_received_s": 1.1,
+  "delay_steps": 1,
+  "buffer_level": 4,
+  "boundary_jump": 0.0
+}

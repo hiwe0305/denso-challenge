@@ -1,0 +1,124 @@
+{
+  "$defs": {
+    "DiagnosisFinding": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "T1",
+            "T2",
+            "T3",
+            "T4",
+            "T5",
+            "T6",
+            "T7",
+            "T8",
+            "O1",
+            "O2",
+            "O3",
+            "O4"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "start_step": {
+          "minimum": 0,
+          "title": "Start Step",
+          "type": "integer"
+        },
+        "group": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group"
+        },
+        "dim": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dim"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "enum": [
+                "NaN",
+                "Infinity",
+                "-Infinity"
+              ],
+              "type": "string"
+            }
+          ],
+          "title": "Value"
+        },
+        "threshold": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Threshold"
+        },
+        "stop_job": {
+          "default": false,
+          "title": "Stop Job",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "start_step",
+        "value"
+      ],
+      "title": "DiagnosisFinding",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "checkpoint_id": {
+      "minLength": 1,
+      "title": "Checkpoint Id",
+      "type": "string"
+    },
+    "config_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Config Sha256",
+      "type": "string"
+    },
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/DiagnosisFinding"
+      },
+      "title": "Findings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "checkpoint_id",
+    "config_sha256",
+    "findings"
+  ],
+  "title": "TrainDiagnosis",
+  "type": "object"
+}
