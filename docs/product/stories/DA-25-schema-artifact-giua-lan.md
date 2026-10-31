@@ -27,11 +27,11 @@ Là người giữ nhân, tôi muốn có schema và file mẫu cho mọi artifa
 
 ## Nhiệm vụ
 
-- [ ] 1. Schema `ReplayReport`, `DatasetReport`, `DefectManifest` (AC 1)
-- [ ] 2. Schema log RTC, probe, `QAReport` (AC 1)
-- [ ] 3. `RolloutRequest.timing` (AC 3)
+- [x] 1. Schema `ReplayReport`, `DatasetReport`, `DefectManifest` (AC 1)
+- [x] 2. Schema log RTC, probe, `QAReport` (AC 1)
+- [x] 3. `RolloutRequest.timing` (AC 3)
 - [ ] 4. File mẫu và model giả trong testkit (AC 2, 4)
-- [ ] 5. Test và JSON Schema (AC 5)
+- [x] 5. Test và JSON Schema (AC 5)
 
 ## Phạm vi file
 

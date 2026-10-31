@@ -1,0 +1,86 @@
+{
+  "$defs": {
+    "QACheck": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        },
+        "threshold": {
+          "title": "Threshold",
+          "type": "number"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "value",
+        "threshold",
+        "passed"
+      ],
+      "title": "QACheck",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "report_id": {
+      "minLength": 1,
+      "title": "Report Id",
+      "type": "string"
+    },
+    "episode_id": {
+      "minLength": 1,
+      "title": "Episode Id",
+      "type": "string"
+    },
+    "threshold_version": {
+      "minLength": 1,
+      "title": "Threshold Version",
+      "type": "string"
+    },
+    "decision": {
+      "enum": [
+        "pass",
+        "flag",
+        "quarantine",
+        "reject"
+      ],
+      "title": "Decision",
+      "type": "string"
+    },
+    "reasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reasons",
+      "type": "array"
+    },
+    "checks": {
+      "items": {
+        "$ref": "#/$defs/QACheck"
+      },
+      "title": "Checks",
+      "type": "array"
+    }
+  },
+  "required": [
+    "report_id",
+    "episode_id",
+    "threshold_version",
+    "decision",
+    "reasons",
+    "checks"
+  ],
+  "title": "QAReport",
+  "type": "object"
+}

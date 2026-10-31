@@ -1,0 +1,70 @@
+{
+  "$defs": {
+    "ActionDimension": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "group": {
+          "minLength": 1,
+          "title": "Group",
+          "type": "string"
+        },
+        "masked": {
+          "title": "Masked",
+          "type": "boolean"
+        },
+        "limit_low": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Limit Low"
+        },
+        "limit_high": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Limit High"
+        }
+      },
+      "required": [
+        "name",
+        "group",
+        "masked"
+      ],
+      "title": "ActionDimension",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "dimensions": {
+      "items": {
+        "$ref": "#/$defs/ActionDimension"
+      },
+      "minItems": 1,
+      "title": "Dimensions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "dimensions"
+  ],
+  "title": "ActionLayout",
+  "type": "object"
+}

@@ -1,0 +1,31 @@
+{
+  "episode_id": "ep_1",
+  "kind": "teleop_demo",
+  "operator_kind": "human",
+  "is_root": true,
+  "condition_id": "cond_1",
+  "root_id": null,
+  "parent_id": null,
+  "source_id": null,
+  "intervention_id": null,
+  "checkpoint_id": null,
+  "rollout_seed": null,
+  "sim_success": null,
+  "infra_status": null,
+  "camera_params_hash": null,
+  "run_plan_id": "rp_1",
+  "bundle_uri": "data/ep_1",
+  "license": "example",
+  "data_class": "public",
+  "split": "train",
+  "source_kind": "teleop",
+  "action_quality": "measured",
+  "deid_status": "verified",
+  "embodiment_id": "g1_sonic_dwbc@1",
+  "meta": {
+    "source_detail": "psi_data",
+    "renderer": "mujoco",
+    "synthetic_tier": null,
+    "injected_defect": null
+  }
+}

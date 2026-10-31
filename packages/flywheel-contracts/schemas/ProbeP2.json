@@ -1,0 +1,33 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "probe": {
+      "const": "P2",
+      "default": "P2",
+      "title": "Probe",
+      "type": "string"
+    },
+    "checkpoint_id": {
+      "minLength": 1,
+      "title": "Checkpoint Id",
+      "type": "string"
+    },
+    "dataset_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Dataset Sha256",
+      "type": "string"
+    },
+    "token_loss": {
+      "minimum": 0,
+      "title": "Token Loss",
+      "type": "number"
+    }
+  },
+  "required": [
+    "checkpoint_id",
+    "dataset_sha256",
+    "token_loss"
+  ],
+  "title": "ProbeP2",
+  "type": "object"
+}

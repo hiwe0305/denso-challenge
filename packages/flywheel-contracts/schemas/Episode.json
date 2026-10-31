@@ -1,0 +1,341 @@
+{
+  "$defs": {
+    "EpisodeMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "source_detail": {
+          "anyOf": [
+            {
+              "enum": [
+                "psi_data",
+                "teleop_keyboard",
+                "teleop_pico",
+                "planner_wbc",
+                "planner_amo"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Detail"
+        },
+        "renderer": {
+          "anyOf": [
+            {
+              "enum": [
+                "mujoco",
+                "isaac"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Renderer"
+        },
+        "synthetic_tier": {
+          "anyOf": [
+            {
+              "enum": [
+                "S1",
+                "S2",
+                "S3",
+                "S4"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Synthetic Tier"
+        },
+        "injected_defect": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InjectedDefect"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "EpisodeMetadata",
+      "type": "object"
+    },
+    "InjectedDefect": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "parameters": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "title": "Parameters",
+          "type": "object"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "title": "InjectedDefect",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "episode_id": {
+      "minLength": 1,
+      "title": "Episode Id",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "teleop_demo",
+        "teleop_correction",
+        "recovery",
+        "sim_rollout",
+        "variant",
+        "eval_rollout",
+        "diag_rollout"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "operator_kind": {
+      "enum": [
+        "human",
+        "machine"
+      ],
+      "title": "Operator Kind",
+      "type": "string"
+    },
+    "is_root": {
+      "title": "Is Root",
+      "type": "boolean"
+    },
+    "condition_id": {
+      "minLength": 1,
+      "title": "Condition Id",
+      "type": "string"
+    },
+    "root_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Root Id"
+    },
+    "parent_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parent Id"
+    },
+    "source_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Id"
+    },
+    "intervention_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Intervention Id"
+    },
+    "checkpoint_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Checkpoint Id"
+    },
+    "rollout_seed": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Rollout Seed"
+    },
+    "sim_success": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sim Success"
+    },
+    "infra_status": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Infra Status"
+    },
+    "camera_params_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Camera Params Hash"
+    },
+    "run_plan_id": {
+      "minLength": 1,
+      "title": "Run Plan Id",
+      "type": "string"
+    },
+    "bundle_uri": {
+      "minLength": 1,
+      "title": "Bundle Uri",
+      "type": "string"
+    },
+    "license": {
+      "minLength": 1,
+      "title": "License",
+      "type": "string"
+    },
+    "data_class": {
+      "enum": [
+        "public",
+        "internal",
+        "restricted"
+      ],
+      "title": "Data Class",
+      "type": "string"
+    },
+    "split": {
+      "minLength": 1,
+      "title": "Split",
+      "type": "string"
+    },
+    "source_kind": {
+      "enum": [
+        "teleop",
+        "synthetic",
+        "egocentric"
+      ],
+      "title": "Source Kind",
+      "type": "string"
+    },
+    "action_quality": {
+      "enum": [
+        "measured",
+        "planned",
+        "retargeted",
+        "pseudo",
+        "none"
+      ],
+      "title": "Action Quality",
+      "type": "string"
+    },
+    "deid_status": {
+      "enum": [
+        "raw",
+        "blurred",
+        "verified"
+      ],
+      "title": "Deid Status",
+      "type": "string"
+    },
+    "embodiment_id": {
+      "minLength": 1,
+      "title": "Embodiment Id",
+      "type": "string"
+    },
+    "meta": {
+      "$ref": "#/$defs/EpisodeMetadata"
+    }
+  },
+  "required": [
+    "episode_id",
+    "kind",
+    "operator_kind",
+    "is_root",
+    "condition_id",
+    "run_plan_id",
+    "bundle_uri",
+    "license",
+    "data_class",
+    "split",
+    "source_kind",
+    "action_quality",
+    "deid_status",
+    "embodiment_id",
+    "meta"
+  ],
+  "title": "Episode",
+  "type": "object"
+}

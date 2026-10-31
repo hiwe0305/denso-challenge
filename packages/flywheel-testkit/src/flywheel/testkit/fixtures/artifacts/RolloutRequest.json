@@ -1,0 +1,29 @@
+{
+  "job_id": "job_1",
+  "task": {
+    "task_id": "task_1",
+    "version": "v0"
+  },
+  "condition": {
+    "condition_id": "cond_1",
+    "task": {
+      "task_id": "task_1",
+      "version": "v0"
+    },
+    "seed": 1,
+    "values": {},
+    "vector": []
+  },
+  "level": 0,
+  "rollout_seed": 1,
+  "start_state": null,
+  "visual_override": null,
+  "fault": null,
+  "max_steps": 10,
+  "record": {
+    "cameras": [],
+    "signals": []
+  },
+  "timing": "async",
+  "latency_profile_ref": "latency.json"
+}

@@ -1,0 +1,8 @@
+{
+  "probe": "P1",
+  "checkpoint_id": "ckpt_1",
+  "dataset_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "accuracy_by_question_type": {
+    "object": 0.9
+  }
+}
