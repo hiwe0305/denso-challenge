@@ -84,6 +84,12 @@ class TrayConfig:
                 kwargs[name] = value
         return cls(**kwargs)  # type: ignore[arg-type]
 
+    def write(self, path: Path) -> Path:
+        """Write this config in the format `load` reads, e.g. a variant for a test scene."""
+        lines = [f"{f.name}: {getattr(self, f.name)!r}" for f in dataclasses.fields(self)]
+        path.write_text("\n".join(lines) + "\n")
+        return path
+
 
 def _read_flat_yaml(text: str) -> dict[str, float]:
     values: dict[str, float] = {}

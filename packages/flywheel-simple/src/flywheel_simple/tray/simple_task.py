@@ -154,6 +154,7 @@ class G1WholebodyTrayTransferTeleop(Task):  # type: ignore[misc]
         self.metadata = dict(type(self).metadata)
         self.cfg = TrayConfig.load(Path(tray_config) if tray_config else None)
         self._layout: Any = None
+        self.scene_path: Path | None = None
         self._robot = RobotRegistry.make(uid=robot_uid, **kwargs)
         super().__init__(
             dr=DRManager(level=dr_level),
@@ -199,9 +200,10 @@ class G1WholebodyTrayTransferTeleop(Task):  # type: ignore[misc]
         split_of(seed)
         self.sample: EpisodeSample = sample_episode(self.cfg, level, seed)
         self.target_pose: Pose2D = self.sample.target_pose
+        self.scene_path = scene_dir() / f"scene_{os.getpid()}.xml"
         scene = write_scene_mjcf(
             replace(self.cfg, part_mass=self.sample.part_mass),
-            scene_dir() / f"scene_{os.getpid()}.xml",
+            self.scene_path,
             tray_pose=self.sample.tray_pose,
             table_gap=self.sample.table_gap,
             light_diffuse=SCENE_LIGHT_DIFFUSE * self.sample.light_scale,
@@ -280,6 +282,12 @@ class TrayTransferEnv(SonicLocoManipEnv):  # type: ignore[misc]
         info["privileged"] = self.task.privileged_state(self.mujoco)
         return info
 
+    def close(self) -> None:
+        """Close the simulator, then remove this process's scene MJCF (rewritten on reset)."""
+        super().close()
+        if self.task.scene_path is not None:
+            self.task.scene_path.unlink(missing_ok=True)
+
 
 def register() -> None:
     """Add ENV_ID to gymnasium's registry; safe to call more than once."""
@@ -294,5 +302,15 @@ def register() -> None:
 
 
 def make_env(seed: int | None = 0, level: int = 0, **kwargs: Any) -> Any:
+    """A tray env built with these kwargs. Close the previous env first: one live env per process.
+
+    SIMPLE's registries keep one Task and one Robot per uid for the whole process
+    (`RegistryMixin._instances`), built with the first caller's kwargs, so a later
+    env would silently reuse the first env's `tray_config` and `dr_level`. Both
+    cached instances are dropped here; the robot is shared state, so two live envs
+    would drive the same robot object.
+    """
     register()
+    TaskRegistry._instances.pop(TASK_UID, None)
+    RobotRegistry._instances.pop(G1WholebodyTrayTransferTeleop.robot_cfg["uid"], None)
     return make_sonic_env(ENV_ID, seed=seed, dr_level=level, **kwargs)
