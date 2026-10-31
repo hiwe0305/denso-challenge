@@ -14,6 +14,8 @@ Thư mục này là bộ hồ sơ sản phẩm làm theo BMAD Method (Breakthrou
 | 6 | Trưởng nhóm | [06 · Quyết định áp dụng phản biện vòng 1](06-review-round-1-decisions.md) | Cách áp 10 sửa ưu tiên của QA, đổi tên giả thuyết HS, HT, HD. Lưu trữ: các sửa đã áp vào spec và 01–04 |
 | 7 | Scrum Master + Product Owner | [07 · Chia việc và quy trình git](07-team-workflow.md) | Ai sở hữu đường dẫn nào, bảng story DA, cách 5 người cùng dùng Claude mà không xung đột, theo dõi theo nhiệm vụ con |
 | 8 | Scrum Master + Product Owner | [08 · Kiểm soát dự án theo ngày](08-daily-control.md) | Chỉ số hiệu suất và lỗi, 9 rule có ngưỡng, nhãn nguyên nhân, báo cáo ngày tự động, sổ can thiệp |
+| 9 | Product Owner | [09 · Luồng dữ liệu cho backend và website](09-data-flows.md) | Chín luồng dữ liệu, từ điển artifact, vòng đời trạng thái, gợi ý backend, khoảng trống cần chốt (nháp 30/10/2026) |
+| 10 | Product Owner | [10 · Cơ sở dữ liệu cho backend và website](10-database.md) | Kiểm chứng tài liệu web tham khảo; schema PostgreSQL có trigger giữ bất biến, bộ test kịch bản (nháp 30/10/2026) |
 | — | Scrum Master | [stories/](stories) | Story Sprint 1 (S1-xx) và story của design (DA-xx) theo mẫu story của BMAD |
 
 Đặc tả thuật toán và thiết kế thí nghiệm: [spec v10.4](../spec-v10-failure-to-data.md). Design hiện hành duy nhất: [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md).
