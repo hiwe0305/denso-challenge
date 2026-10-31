@@ -30,7 +30,7 @@ Là trưởng nhóm, tôi muốn sinh tự động episode G1 bê khay bằng ha
 
 Kế hoạch chi tiết: [docs/superpowers/plans/2026-10-31-da33-tray-synthetic.md](../../superpowers/plans/2026-10-31-da33-tray-synthetic.md).
 
-- [ ] 1. Đo đi và quay của G1 trong cảnh khay; bộ tích phân `navigate_cmd`; dọn file cảnh MJCF khi đóng env (AC 1)
+- [x] 1. Đo đi và quay của G1 trong cảnh khay; bộ tích phân `navigate_cmd`; dọn file cảnh MJCF khi đóng env (AC 1)
 - [ ] 2. Mục tiêu hai cổ tay qua `TeleopRetargetingIK`, đóng mở bàn tay Dex3 (AC 1)
 - [ ] 3. Máy pha của planner theo 7 bước scorer, có điều kiện chuyển và timeout (AC 2)
 - [ ] 4. Một episode planner mang khay thành công theo `check_success()` (AC 3, mục tiêu 6/11)

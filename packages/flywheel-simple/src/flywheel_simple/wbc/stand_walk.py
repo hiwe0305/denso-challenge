@@ -83,6 +83,11 @@ class StandWalkController:
         self._control_frequency = loop_cfg.control_frequency
         self._started = False
 
+    @property
+    def lower_body(self) -> Any:
+        """GR00T's G1GearWbcPolicy (Balance/Walk ONNX) inside the decoupled WBC."""
+        return self._policy.lower_body_policy
+
     def reset(self) -> None:
         """Fresh WBC pipeline with the RL lower body engaged, as teleop_decoupled_wbc does."""
         self._policy.reset(init_time=time.monotonic())

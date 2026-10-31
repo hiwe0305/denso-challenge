@@ -11,6 +11,7 @@ G1 bê khay 6 linh kiện bằng hai tay từ bàn A sang vùng đích trên bà
 | `flywheel_simple.tray` | Cấu hình, hình học, MJCF, ngẫu nhiên hóa 3 mức, vị từ 7 bước, task và env id `simple/G1WholebodyTrayTransferTeleop-v0` |
 | `scripts/g0/tray/import_simready.py` | Tải và đổi mesh SimReady cho lớp hiển thị |
 | `scripts/g0/tray/view_scene.py` | Ghi video camera đầu và video toàn cảnh |
+| `scripts/g0/tray/measure_locomotion.py` | Đo tốc độ đi và quay của G1 (DA-33, [locomotion.md](locomotion.md)) |
 
 ## Lệnh
 
