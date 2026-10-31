@@ -6,5 +6,13 @@ from flywheel_simple.wbc.stand_walk import (
     make_sonic_env,
     release_band,
 )
+from flywheel_simple.wbc.upper_body import UpperBodyIK, hand_q
 
-__all__ = ["NavIntegrator", "StandWalkController", "make_sonic_env", "release_band"]
+__all__ = [
+    "NavIntegrator",
+    "StandWalkController",
+    "UpperBodyIK",
+    "hand_q",
+    "make_sonic_env",
+    "release_band",
+]

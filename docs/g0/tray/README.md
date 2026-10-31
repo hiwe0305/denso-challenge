@@ -7,7 +7,7 @@ G1 bê khay 6 linh kiện bằng hai tay từ bàn A sang vùng đích trên bà
 | Mã | Việc |
 |---|---|
 | `configs/sim/tray.yaml` | Mọi kích thước, khối lượng, ma sát, dung sai, ngưỡng |
-| `flywheel_simple.wbc` | Đứng và đi bằng decoupled WBC: `GR00T-WholeBodyControl-Balance.onnx` khi lệnh đi gần 0, `GR00T-WholeBodyControl-Walk.onnx` khi có lệnh đi |
+| `flywheel_simple.wbc` | Đứng và đi bằng decoupled WBC: `GR00T-WholeBodyControl-Balance.onnx` khi lệnh đi gần 0, `GR00T-WholeBodyControl-Walk.onnx` khi có lệnh đi; mục tiêu cổ tay qua `TeleopRetargetingIK` và đóng mở bàn tay Dex3 (DA-33, [upper-body.md](upper-body.md)) |
 | `flywheel_simple.tray` | Cấu hình, hình học, MJCF, ngẫu nhiên hóa 3 mức, vị từ 7 bước, task và env id `simple/G1WholebodyTrayTransferTeleop-v0` |
 | `scripts/g0/tray/import_simready.py` | Tải và đổi mesh SimReady cho lớp hiển thị |
 | `scripts/g0/tray/view_scene.py` | Ghi video camera đầu và video toàn cảnh |

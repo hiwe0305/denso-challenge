@@ -1,7 +1,8 @@
 """Stand and walk G1 under GR00T decoupled WBC, the controller of SIMPLE's *Teleop-v0 tasks.
 
 Ported from scripts/g0/simple/run_two_table.py (S1-02). The upper body holds the
-WBC default pose; the lower body runs the Balance/Walk RL policies and follows
+WBC default pose, or reaches two wrist targets through TeleopRetargetingIK
+(DA-33, `upper_body`); the lower body runs the Balance/Walk RL policies and follows
 `navigate_cmd = [vx, vy, yaw flag, target yaw]`. Facts S1-02 measured and this
 module keeps: the WBC runs from the first step while the elastic band holds the
 pelvis, the band stops lowering at -0.25 m (lowering further drags the robot into
@@ -21,6 +22,8 @@ from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
+
+from flywheel_simple.wbc.upper_body import UpperBodyIK, configuration, hand_q
 
 CONTROL_DT = 1.0 / 50  # env step at render_hz 50
 BAND_STOP_LENGTH = -0.25
@@ -81,7 +84,15 @@ class StandWalkController:
             "g1", self._model, wbc_cfg, init_time=loop_cfg.upper_body_joint_speed
         )
         self._control_frequency = loop_cfg.control_frequency
+        self.ik = UpperBodyIK(self._model)
         self._started = False
+        self._ik_anchored = False
+        self.last_record: dict[str, NDArray[np.float64]] = {}
+
+    @property
+    def model(self) -> Any:
+        """decoupled_wbc's G1 robot model (43 joints, pelvis root) shared with the IK."""
+        return self._model
 
     @property
     def lower_body(self) -> Any:
@@ -93,24 +104,43 @@ class StandWalkController:
         self._policy.reset(init_time=time.monotonic())
         self._policy.lower_body_policy.use_policy_action = True
         self._started = False
+        self._ik_anchored = False
+        self.last_record = {}
 
     def action(
         self,
         sim_obs: dict[str, Any],
         navigate_cmd: Sequence[float] = (0.0, 0.0, 0.0, 0.0),
-        wrist_pose: NDArray[np.float64] | None = None,
+        wrist_pose: tuple[NDArray[np.float64], NDArray[np.float64]] | None = None,
+        hand_closure: tuple[float, float] = (0.0, 0.0),
     ) -> Any:
-        """One `decoupled_wbc` ActionCmd; the first call ramps to the target over 2 s."""
+        """One `decoupled_wbc` ActionCmd; the first call ramps to the target over 2 s.
+
+        `wrist_pose` is (left, right) as 4 x 4 poses in the pelvis frame; None holds
+        the WBC default upper-body pose. The first call with wrist targets after
+        `reset` anchors the IK at the robot's current joints. `hand_closure` is
+        (left, right), 0 open to 1 closed (`hand_q`).
+        """
         base_height = _mod("decoupled_wbc.control.main.constants").DEFAULT_BASE_HEIGHT
         ActionCmd = _mod("simple.core.action").ActionCmd
 
-        if wrist_pose is not None:
-            raise NotImplementedError("wrist targets go through TeleopRetargetingIK (DA-33)")
+        if wrist_pose is None:
+            upper = np.asarray(self._model.get_initial_upper_body_pose(), dtype=float).copy()
+            eef = self.ik.current_wrists(sim_obs)
+        else:
+            if not self._ik_anchored:
+                self.ik.reset(sim_obs)
+                self._ik_anchored = True
+            upper = self.ik.solve(*wrist_pose)
+            eef = wrist_pose
+        for side, closure in zip(("left", "right"), hand_closure):
+            upper[self.ik.hand_slots[side]] = hand_q(side, closure)  # type: ignore[arg-type]
+
         t_now = time.monotonic()
         self._policy.set_observation(self._wbc_observation(sim_obs))
         self._policy.set_goal(
             {
-                "target_upper_body_pose": self._model.get_initial_upper_body_pose(),
+                "target_upper_body_pose": upper,
                 "navigate_cmd": np.asarray(navigate_cmd, dtype=float),
                 "base_height_command": np.atleast_1d(np.asarray(base_height)),
                 "target_time": t_now + (1 / self._control_frequency if self._started else 2.0),
@@ -120,29 +150,33 @@ class StandWalkController:
         )
         self._started = True
         q = self._policy.get_action(time=t_now)
+        # The fields SIMPLE's teleop recorder reads from PicoDecoupledAgent's
+        # action (teleop_decoupled_wbc._build_frame); navigate and base height are
+        # the WBC's synced values, as that agent records them.
+        self.last_record = {
+            "target_q": np.asarray(self._model.get_body_actuated_joints(q["q"]), dtype=float),
+            "target_waist": np.asarray(q["target_waist"], dtype=float),
+            "left_hand_q": np.asarray(self._model.get_hand_actuated_joints(q["q"], side="left")),
+            "right_hand_q": np.asarray(self._model.get_hand_actuated_joints(q["q"], side="right")),
+            "navigate_cmd": np.asarray(q["navigate_cmd"], dtype=float),
+            "base_height_command": np.atleast_1d(np.asarray(q["base_height_command"], dtype=float)),
+            "torso_rpy_cmd": np.asarray(q["torso_rpy_cmd"], dtype=float),
+            "action_eef": np.concatenate([_pos_wxyz(eef[0]), _pos_wxyz(eef[1])]),
+        }
+        rec = self.last_record
         return ActionCmd(
             "decoupled_wbc",
-            target_q=self._model.get_body_actuated_joints(q["q"]),
-            target_waist=q["target_waist"],
-            left_hand_q=self._model.get_hand_actuated_joints(q["q"], side="left"),
-            right_hand_q=self._model.get_hand_actuated_joints(q["q"], side="right"),
+            target_q=rec["target_q"],
+            target_waist=rec["target_waist"],
+            left_hand_q=rec["left_hand_q"],
+            right_hand_q=rec["right_hand_q"],
         )
 
     def _wbc_observation(self, sim_obs: dict[str, Any]) -> dict[str, Any]:
         # As PicoDecoupledAgent._build_wbc_observation; importing that module pulls
         # in PICO video-streaming dependencies.
-        z7 = np.zeros(7)
-
-        # MJCF hand joint order -> natural
-        def natural(q: NDArray[np.float64]) -> NDArray[np.float64]:
-            return np.concatenate([q[:3], q[5:7], q[3:5]])
-
         def full(body_key: str, hand_key: str, default_body: NDArray[np.float64] | None) -> Any:
-            return self._model.get_configuration_from_actuated_joints(
-                body_actuated_joint_values=sim_obs.get(body_key, default_body),
-                left_hand_actuated_joint_values=natural(sim_obs.get(f"left_hand_{hand_key}", z7)),
-                right_hand_actuated_joint_values=natural(sim_obs.get(f"right_hand_{hand_key}", z7)),
-            )
+            return configuration(self._model, sim_obs, body_key, hand_key, default_body)
 
         imu_vel = sim_obs.get("secondary_imu_vel")
         return {
@@ -157,6 +191,13 @@ class StandWalkController:
             "torso_ang_vel": imu_vel[3:6] if imu_vel is not None else np.zeros(3),
             "wrist_pose": sim_obs.get("wrist_pose", np.zeros(14)),
         }
+
+
+def _pos_wxyz(pose: NDArray[np.float64]) -> NDArray[np.float64]:
+    """xyz + quaternion (w, x, y, z) of a 4 x 4 pose, as TeleopPolicy's `wrist_pose`."""
+    Rotation = _mod("scipy.spatial.transform").Rotation
+    quat = Rotation.from_matrix(pose[:3, :3]).as_quat(scalar_first=True)
+    return np.concatenate([pose[:3, 3], quat])
 
 
 def release_band(
