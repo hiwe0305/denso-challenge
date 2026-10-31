@@ -173,7 +173,10 @@ class StepTracker:
         target = self.sample.target_pose
         dist = math.hypot(s.tray_pos[0] - target.x, s.tray_pos[1] - target.y)
         yaw = math.atan2(rot[1, 0], rot[0, 0])
-        return dist <= self.cfg.target_pos_tol and yaw_error(yaw, target.yaw) <= math.radians(
+        # The tray is the same after a half turn (handles on both ends, symmetric
+        # compartments), and a carry with a 180-degree turn delivers it so (D-14).
+        error = min(yaw_error(yaw, target.yaw), yaw_error(yaw, target.yaw + math.pi))
+        return dist <= self.cfg.target_pos_tol and error <= math.radians(
             self.cfg.target_yaw_tol_deg
         )
 

@@ -1,0 +1,81 @@
+# DA-33 scripted tray planner: phase targets, speeds, tolerances, timeouts.
+# Flat `key: number` lines only; read by flywheel_simple.tray.planner (same loader as tray.yaml).
+# Wrist and palm positions are in the base frame of flywheel_simple.wbc.upper_body:
+# pelvis xy and yaw, origin at pelvis height, x forward, y left, z up; straight waist.
+# Units: metres, seconds, m/s, rad/s, degrees.
+# Values marked [assumption] are first guesses to tune in DA-33 Task 4 against sim videos.
+
+# Palm point (midway between wrist_yaw_link and hand_middle_0_link) in the left wrist
+# frame; the right hand is mirrored across its xz plane. [assumption]
+palm_offset_x: 0.06
+palm_offset_y: 0.0
+palm_offset_z: 0.0
+# Left wrist orientation in the tray frame while grasping (roll, pitch, yaw); right mirrored. [assumption]
+grasp_roll_deg: 0.0
+grasp_pitch_deg: 0.0
+grasp_yaw_deg: 0.0
+# Palm height above the handle bar's centre while grasping. [assumption]
+grasp_dz: 0.0
+
+# APPROACH_A: palms go to the ready pose (above the table top) before walking; at the
+# default pose G1's fingers hit table A's edge 6 cm after the start (locomotion.md).
+ready_x: 0.25
+ready_y: 0.20
+ready_z: 0.25
+ready_clear: 0.08
+standoff: 0.30
+vx_approach: 0.2
+
+# REACH, GRASP: pre-grasp this far outside each handle along the tray's +-y; palms
+# count as there within palm_tol; both handle contacts held grasp_hold to leave GRASP.
+pregrasp_offset: 0.06
+palm_tol: 0.02
+grasp_hold: 0.3
+# Measured-palm correction while reaching, grasping and lifting (arm PD sags 2-3 cm):
+# gain per control step, total correction capped at palm_correction_max per hand,
+# integrated only while the palm is within palm_correction_window of its target.
+palm_correction_gain: 0.1
+palm_correction_max: 0.05
+palm_correction_window: 0.05
+
+# LIFT, BACK_OFF, TURN.
+lift_height: 0.10
+backoff: 0.35
+vx_backoff: -0.25
+# turn_rate integrates target_yaw; the lower body turns at (error / 0.5) rad/s, max 1.
+turn_rate: 0.5
+turn_tol_deg: 5.0
+# Turn flag sent while walking so the lower body holds the heading (D-10).
+heading_hold: 0.1
+
+# CARRY to the base pose that puts the tray on the target zone, ARRIVE_B.
+vx_carry: 0.3
+vx_min: 0.15
+vx_gain: 1.0
+vy_gain: 1.0
+vy_max: 0.1
+carry_tol: 0.03
+arrive_speed: 0.05
+arrive_hold: 0.5
+
+# LOWER, RELEASE, RETREAT.
+lower_speed: 0.05
+release_hold: 0.5
+retreat: 0.20
+vx_retreat: -0.2
+
+# Abort when the tray is below this height (on the floor).
+abort_tray_z: 0.4
+
+# Phase timeouts (s).
+timeout_approach_a: 15.0
+timeout_reach: 5.0
+timeout_grasp: 6.0
+timeout_lift: 5.0
+timeout_back_off: 6.0
+timeout_turn: 12.0
+timeout_carry: 15.0
+timeout_arrive_b: 5.0
+timeout_lower: 6.0
+timeout_release: 4.0
+timeout_retreat: 5.0

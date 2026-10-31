@@ -98,18 +98,24 @@ def idle_state() -> Callable[..., Any]:
 
 @pytest.fixture
 def placed_state_sequence() -> Callable[..., Iterator[Any]]:
-    """Tray resting on table B after release, 3 s; optional bounce and offset."""
+    """Tray resting on table B after release, 3 s; optional bounce, offset and yaw."""
 
     def build(
-        bounce_at: float | None = None, offset_xy: tuple[float, float] = (0.0, 0.0)
+        bounce_at: float | None = None,
+        offset_xy: tuple[float, float] = (0.0, 0.0),
+        yaw: float = 0.0,
     ) -> Iterator[Any]:
         base_x = _geo().table_b_center[0] + 0.8
+        quat = np.array([np.cos(yaw / 2), 0.0, 0.0, np.sin(yaw / 2)])
         for k in range(int(3.0 / DT)):
             t = k * DT
             pos, on_table = _at_target(offset_xy), "B"
             if bounce_at is not None and bounce_at <= t < bounce_at + 0.1:
                 pos, on_table = pos + [0, 0, 0.01], "none"
-            yield state(t, pos, on_table, (False, False), base_x)
+            parts = _parts_at(pos)
+            c, s_ = np.cos(yaw), np.sin(yaw)
+            parts[:, :2] = (parts[:, :2] - pos[:2]) @ np.array([[c, s_], [-s_, c]]) + pos[:2]
+            yield state(t, pos, on_table, (False, False), base_x, tray_quat=quat, parts=parts)
 
     return build
 

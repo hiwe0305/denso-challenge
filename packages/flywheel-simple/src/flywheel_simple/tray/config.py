@@ -1,4 +1,4 @@
-"""Tray task configuration, loaded from configs/sim/tray.yaml.
+"""Tray task configuration, loaded from configs/sim/tray.yaml; the flat-file loader it shares.
 
 The file is a flat YAML subset (`key: number` lines and comments) so it loads
 without PyYAML, which the workspace does not ship.
@@ -10,6 +10,7 @@ import dataclasses
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TypeVar
 
 CONFIG_RELPATH = Path("configs/sim/tray.yaml")
 _LINE = re.compile(r"^([a-z_][a-z0-9_]*):\s*(-?[0-9]+(?:\.[0-9]+)?(?:[eE]-?[0-9]+)?)\s*$")
@@ -60,35 +61,47 @@ class TrayConfig:
 
     @staticmethod
     def default_path() -> Path:
-        for parent in Path(__file__).resolve().parents:
-            if (parent / CONFIG_RELPATH).is_file():
-                return parent / CONFIG_RELPATH
-        raise FileNotFoundError(f"{CONFIG_RELPATH} not found above {__file__}")
+        return find_config(CONFIG_RELPATH)
 
     @classmethod
     def load(cls, path: Path | None = None) -> TrayConfig:
-        path = path or cls.default_path()
-        values = _read_flat_yaml(path.read_text())
-        fields = {f.name: f for f in dataclasses.fields(cls)}
-        unknown = sorted(set(values) - set(fields))
-        missing = sorted(set(fields) - set(values))
-        if unknown or missing:
-            raise ValueError(f"{path}: unknown keys {unknown}, missing keys {missing}")
-        kwargs: dict[str, float | int] = {}
-        for name, value in values.items():
-            if fields[name].type in (int, "int"):
-                if value != int(value):
-                    raise ValueError(f"{path}: {name} must be an integer, got {value}")
-                kwargs[name] = int(value)
-            else:
-                kwargs[name] = value
-        return cls(**kwargs)  # type: ignore[arg-type]
+        return load_flat_config(cls, path or cls.default_path())
 
     def write(self, path: Path) -> Path:
         """Write this config in the format `load` reads, e.g. a variant for a test scene."""
         lines = [f"{f.name}: {getattr(self, f.name)!r}" for f in dataclasses.fields(self)]
         path.write_text("\n".join(lines) + "\n")
         return path
+
+
+C = TypeVar("C")
+
+
+def find_config(relpath: Path) -> Path:
+    """`relpath` (e.g. configs/sim/tray.yaml) under the nearest parent directory holding it."""
+    for parent in Path(__file__).resolve().parents:
+        if (parent / relpath).is_file():
+            return parent / relpath
+    raise FileNotFoundError(f"{relpath} not found above {__file__}")
+
+
+def load_flat_config(cls: type[C], path: Path) -> C:
+    """A frozen dataclass from a flat `key: number` file; every field once, ints checked."""
+    values = _read_flat_yaml(path.read_text())
+    fields = {f.name: f for f in dataclasses.fields(cls)}  # type: ignore[arg-type]
+    unknown = sorted(set(values) - set(fields))
+    missing = sorted(set(fields) - set(values))
+    if unknown or missing:
+        raise ValueError(f"{path}: unknown keys {unknown}, missing keys {missing}")
+    kwargs: dict[str, float | int] = {}
+    for name, value in values.items():
+        if fields[name].type in (int, "int"):
+            if value != int(value):
+                raise ValueError(f"{path}: {name} must be an integer, got {value}")
+            kwargs[name] = int(value)
+        else:
+            kwargs[name] = value
+    return cls(**kwargs)
 
 
 def _read_flat_yaml(text: str) -> dict[str, float]:
