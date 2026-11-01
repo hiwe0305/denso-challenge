@@ -53,6 +53,8 @@ PLANNER_CONFIG_RELPATH = Path("configs/sim/tray_planner.yaml")
 MIRROR = np.diag([1.0, -1.0, 1.0])  # left <-> right across the xz plane
 # Measured-palm correction per phase: axes it acts on. GRASP and LIFT correct height
 # only: across the handles the squeezing hands are blocked on purpose.
+# Phases in which the hands level the held tray (when `level_gain` is not 0).
+LEVELLED = ("LIFT", "BACK_OFF", "TURN", "CARRY", "ARRIVE_B", "LOWER")
 CORRECTED = {
     "REACH": np.ones(3),
     "GRASP": np.array([0.0, 0.0, 1.0]),
@@ -88,6 +90,7 @@ class PlannerConfig:
     grip_y: float
     grip_z: float
     grasp_dy: float
+    grasp_dz: float
     squeeze: float
     hand_closure_open: float
     grasp_close_after: float
@@ -108,6 +111,9 @@ class PlannerConfig:
     lift_height: float
     lift_speed: float
     lift_hold: float
+    lift_pull: float
+    level_gain: float
+    level_max_deg: float
     keep_tol: float
     keep_vx: float
     backoff: float
@@ -123,13 +129,16 @@ class PlannerConfig:
     carry_tol: float
     arrive_speed: float
     arrive_hold: float
+    arrive_lat_tol: float
     lower_speed: float
     place_shift_max: float
     place_gain: float
     place_height_tol: float
     place_tilt_deg: float
     lower_hold: float
+    lower_settle: float
     release_hold: float
+    release_dz: float
     retreat: float
     vx_retreat: float
     abort_tray_z: float
@@ -238,7 +247,8 @@ def grasp_palms_world(
     """World palm points of the grasp (left, right).
 
     Each hand's grip point sits on its handle centre, `grasp_dy` + `outward` away
-    from the tray, with the wrist at the grasp orientation turned with the tray.
+    from the tray and `grasp_dz` up, with the wrist at the grasp orientation turned
+    with the tray.
     """
     yaw_rot = rpy_matrix(0.0, 0.0, tray_yaw)
     handles = handle_points(tray_cfg, tray_pos, tray_yaw)
@@ -246,7 +256,7 @@ def grasp_palms_world(
     palms = []
     for side, sign in ((0, 1.0), (1, -1.0)):
         wrist_rot = yaw_rot @ cfg.grasp_rotation_side(side)
-        grip = handles[side] + yaw_rot @ np.array([0.0, sign * out, 0.0])
+        grip = handles[side] + yaw_rot @ np.array([0.0, sign * out, cfg.grasp_dz])
         offset = cfg.palm_offsets[side] - cfg.grip_points[side]
         palms.append(grip + wrist_rot @ offset)
     return palms[0], palms[1]
@@ -261,6 +271,19 @@ def _tilt(quat: NDArray[np.float64]) -> float:
     """Angle between the tray's up axis and the world's (rad)."""
     w, x, y, z = (float(v) for v in quat / np.linalg.norm(quat))
     return math.acos(max(-1.0, min(1.0, 1 - 2 * (x * x + y * y))))
+
+
+def _pitch(quat: NDArray[np.float64]) -> float:
+    """Rotation of the tray about its own y axis (the line between the handles), rad."""
+    w, x, y, z = (float(v) for v in quat / np.linalg.norm(quat))
+    return math.asin(max(-1.0, min(1.0, 2 * (w * y - z * x))))
+
+
+def _axis_angle(axis: NDArray[np.float64], angle: float) -> NDArray[np.float64]:
+    """Rotation matrix for `angle` about the unit vector `axis` (Rodrigues)."""
+    k = np.array([[0.0, -axis[2], axis[1]], [axis[2], 0.0, -axis[0]], [-axis[1], axis[0], 0.0]])
+    out: NDArray[np.float64] = np.eye(3) + math.sin(angle) * k + (1 - math.cos(angle)) * k @ k
+    return out
 
 
 def _wrap(angle: float) -> float:
@@ -292,6 +315,9 @@ class TrayPlanner:
     _grasp_world: tuple[NDArray[np.float64], NDArray[np.float64]] | None = None  # squeeze
     _station: Pose2D | None = None  # base pose kept while reaching and grasping
     _closing: bool = False  # GRASP has started closing the hands
+    _on_b_since: float | None = None  # LOWER: tray resting on table B since
+    _level_angle: float = 0.0  # hands' turn against the tray's pitch (rad)
+    _arrive_goal: NDArray[np.float64] | None = None  # ARRIVE_B base goal, world xy
     _place_shift: NDArray[np.float64] | None = None  # hands' shift while lowering, base frame
     _carry: _Carry | None = None
     _lowered: tuple[NDArray[np.float64], NDArray[np.float64]] | None = None
@@ -409,7 +435,12 @@ class TrayPlanner:
             assert self._grasp_world is not None and self._entered_t is not None
             # Ramp up: a 10 cm step in the target jerks the squeezed tray.
             rise = min(cfg.lift_height, cfg.lift_speed * (state.t - self._entered_t))
-            up = np.array([0.0, 0.0, rise])
+            # Pull the hands toward the body as they rise: at full reach (far trays,
+            # palms 0.44 m ahead) the loaded arms raised the hands 2-3 cm of 15.
+            assert self._station is not None
+            pull = cfg.lift_pull * rise / cfg.lift_height
+            yaw = self._station.yaw
+            up = np.array([-pull * math.cos(yaw), -pull * math.sin(yaw), rise])
             lifting = (self._grasp_world[0] + up, self._grasp_world[1] + up)
             palms = self._to_base(state, base, lifting)
             lifted = state.tray_on_table == "none" and (
@@ -453,6 +484,33 @@ class TrayPlanner:
             return self._emit(state, base, carry.palms, nav, closure=True, heading=carry.heading)
 
         if p is Phase.ARRIVE_B:
+            # CARRY ends on the distance ahead only; step until the tray is within
+            # `arrive_lat_tol` of the target ahead and sideways, as the hands can only
+            # shift it by `place_shift_max` (8.6 cm sideways was left on seed 12). The
+            # goal comes from the tray's error when ARRIVE_B starts, not from LIFT: the
+            # tray shifts in the hands on the way (5.7 cm short on seed 22). Stepping
+            # on the live tray error chased its sway and timed out.
+            if self._arrive_goal is None:
+                target = self.sample.target_pose
+                error = np.array([target.x, target.y]) - state.tray_pos[:2]
+                self._arrive_goal = np.array([base.x, base.y]) + error
+            d = self._arrive_goal - np.array([base.x, base.y])
+            c, s = math.cos(base.yaw), math.sin(base.yaw)
+            along, lateral = c * d[0] + s * d[1], -s * d[0] + c * d[1]
+            assert self._entered_t is not None
+            budget = state.t - self._entered_t < cfg.timeout_arrive_b - cfg.arrive_hold - 1.0
+            if budget and max(abs(along), abs(lateral)) > cfg.arrive_lat_tol:
+                self._since = None
+                vx = math.copysign(cfg.keep_vx, along) if abs(along) > cfg.arrive_lat_tol else 0.0
+                vy = (
+                    math.copysign(cfg.keep_vx, lateral)
+                    if abs(lateral) > cfg.arrive_lat_tol
+                    else 0.0
+                )
+                nav = (vx, vy, cfg.heading_hold)
+                return self._emit(
+                    state, base, carry.palms, nav, closure=True, heading=carry.heading
+                )
             if self._held(
                 self._base_speed(state, base) < cfg.arrive_speed, state.t, cfg.arrive_hold
             ):
@@ -479,7 +537,16 @@ class TrayPlanner:
                 and state.tray_pos[2] - self.tray_cfg.table_height <= cfg.place_height_tol
                 and _tilt(state.tray_quat) <= math.radians(cfg.place_tilt_deg)
             )
-            if self._held(flat, state.t, cfg.lower_hold):
+            # Or once it has rested on B for `lower_settle`: hands that still hold it a
+            # few degrees tilted keep it from ever counting as flat; opening settles it.
+            if state.tray_on_table == "B":
+                self._on_b_since = state.t if self._on_b_since is None else self._on_b_since
+            else:
+                self._on_b_since = None
+            settled = (
+                self._on_b_since is not None and state.t - self._on_b_since >= cfg.lower_settle
+            )
+            if self._held(flat, state.t, cfg.lower_hold) or settled:
                 self._lowered = palms
                 self._enter(Phase.RELEASE, state, base)
                 return self._command(state, base)
@@ -487,8 +554,12 @@ class TrayPlanner:
 
         assert self._lowered is not None
         if p is Phase.RELEASE:
+            # Out and down: fingers hooked under the handle lip stayed in contact when
+            # the hands only moved outward.
             back = cfg.pregrasp_offset + cfg.squeeze
-            palms = self._outward(state, base, self._lowered, back)
+            out = self._outward(state, base, self._lowered, back)
+            drop = np.array([0.0, 0.0, cfg.release_dz])
+            palms = (out[0] + drop, out[1] + drop)
             if self._held(not any(state.hand_contacts), state.t, cfg.release_hold):
                 self._lowered = palms
                 self._enter(Phase.RETREAT, state, base)
@@ -541,6 +612,31 @@ class TrayPlanner:
         if norm > self.cfg.place_shift_max:
             return shift * (self.cfg.place_shift_max / norm)
         return shift
+
+    def _level(
+        self, state: TrayState, wrists: list[NDArray[np.float64]]
+    ) -> list[NDArray[np.float64]]:
+        """Turn both wrists about the line through the palms against the tray's pitch.
+
+        The held tray pitches about that line (10-14 deg seen with a finger pinch)
+        while the contacts stay put on it: the hands turn with it, so turning them
+        back levels it. The angle integrates `level_gain` x pitch, capped.
+        """
+        pitch = _pitch(state.tray_quat)
+        cap = math.radians(self.cfg.level_max_deg)
+        self._level_angle = float(
+            np.clip(self._level_angle + self.cfg.level_gain * pitch, -cap, cap)
+        )
+        offsets = self.cfg.palm_offsets
+        palms = [(w @ np.r_[o, 1.0])[:3] for w, o in zip(wrists, offsets)]
+        axis = palms[1] - palms[0]
+        axis /= float(np.linalg.norm(axis))
+        turn = np.eye(4)
+        turn[:3, :3] = _axis_angle(axis, self._level_angle)
+        centre = (palms[0] + palms[1]) / 2
+        to_c, from_c = np.eye(4), np.eye(4)
+        to_c[:3, 3], from_c[:3, 3] = -centre, centre
+        return [from_c @ turn @ to_c @ w for w in wrists]
 
     def _keep_station(self, base: Pose2D) -> tuple[float, float, float]:
         """Step forward when the base has slid back from where REACH started.
@@ -640,6 +736,8 @@ class TrayPlanner:
         else:
             rots = [self._wrist_rotation(k, state, base) for k in range(2)]
         wrists = [self._wrist(palms[k] + self._correction[k], k, rots[k]) for k in range(2)]
+        if self.phase.name in LEVELLED and cfg.level_gain != 0.0:
+            wrists = self._level(state, wrists)
         hand = 1.0 if closure else cfg.hand_closure_open
         cmd = PlannerCommand(
             phase=self.phase,

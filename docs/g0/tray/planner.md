@@ -1,24 +1,47 @@
 # Planner kịch bản bê khay (DA-33 nhiệm vụ 3, 4)
 
-Planner thay luồng PICO: mỗi bước đọc trạng thái cảnh, sinh lệnh đi, hướng, hai tư thế cổ tay và độ nắm cho `StandWalkController` ([plan DA-33](../../superpowers/plans/2026-10-31-da33-tray-synthetic.md) Task 3–4, [story DA-33](../../product/stories/DA-33-synthetic-s1-khay.md) AC 2, 3). Mã ở `flywheel_simple.tray.planner` và `flywheel_simple.tray.agent`; mọi giá trị ở `configs/sim/tray_planner.yaml`. Quyết định đi kèm ở [decisions.md](decisions.md) D-14 đến D-18.
+Planner thay luồng PICO: mỗi bước đọc trạng thái cảnh, sinh lệnh đi, hướng, hai tư thế cổ tay và độ nắm cho `StandWalkController` ([plan DA-33](../../superpowers/plans/2026-10-31-da33-tray-synthetic.md) Task 3–4, [story DA-33](../../product/stories/DA-33-synthetic-s1-khay.md) AC 2, 3). Mã ở `flywheel_simple.tray.planner` và `flywheel_simple.tray.agent`; mọi giá trị ở `configs/sim/tray_planner.yaml`. Quyết định đi kèm ở [decisions.md](decisions.md) D-14 đến D-19.
 
-## Kết quả (1/11/2026)
+## Kết quả (2/11/2026)
 
-| Phép | Kết quả |
+Mọi số đo trên cùng 48 episode (mức 0 seed 0, mức 1 seed 1–47), máy `rtx3060`. Cùng seed cho cùng quỹ đạo trên laptop và `rtx3060` (bộ điều khiển chạy theo đồng hồ điều khiển, D-17).
+
+| Cách cầm | Thành công | Lỗi còn lại | Thời gian một episode thành công |
+|---|---|---|---|
+| **Kẹp bằng ngón tay Dex3 (mặc định, D-19)** | **40/48** | 4 `timeout:LIFT` (khay xa, seed 4, 10, 13, 34), 2 nghiêng, 1 `timeout:ARRIVE_B`, 1 đặt lệch | 27,4 s mô phỏng trung bình, tối đa 32,5 s |
+| Ép mu hai nắm tay (D-18, cấu hình thay thế) | 44/48 | 2 ngoài tầm với, 2 nghiêng | 24,4 s, tối đa 26,4 s |
+
+Hiếu chọn kẹp ngón (1/11/2026) vì dữ liệu có đóng mở bàn tay thật như dữ liệu teleop Ψ₀; ép mu tay giữ bàn tay nắm cố định suốt episode. Lần thử hỏng chỉ bị loại và ghi sổ, nên tỉ lệ 83 % không chặn việc sinh dữ liệu.
+
+## Kẹp bằng ngón tay
+
+Tay cầm là gờ đặc 12 × 4 × 2 cm. Với khay 9 cm (D-16), mặt dưới gờ cách mặt bàn 7 cm, đủ cho ngón luồn vào. Lòng bàn tay ngửa, cổ tay xoay −60°, nghiêng 30°, xoay vào 15°: ngón giữa móc dưới gờ, ngón cái kẹp mặt ngoài gờ. Khay lên khoảng 13 cm trên mặt bàn (ép mu tay chỉ được ~3 cm). Tay mở khi tiếp cận và chỉ khép khi tới gờ (`grasp_close_after`).
+
+Từng bước đã đưa tỉ lệ từ 30/48 lên 40/48:
+
+| Thay đổi | Thành công | Nguyên nhân đo được |
+|---|---|---|
+| Bộ thông số kẹp ngón đầu tiên | 30/48 | — |
+| Nhả khi khay đã nằm trên B đủ `lower_settle` (1 s) | 31/48 | Tay giữ khay nghiêng 4–6°, khay không bao giờ "phẳng" |
+| ARRIVE_B bước tới đích theo cả trước và ngang (`arrive_lat_tol` 4 cm) | 35/48 | CARRY dừng theo khoảng cách phía trước; lệch ngang tới 8,6 cm |
+| Cân bằng khay: xoay hai cổ tay ngược độ chúi của khay (`level_gain` +0,05) | 37/48 | Khay chúi 10–14° quanh trục hai tay; tiếp xúc không trượt, tay xoay theo khay |
+| Đích của ARRIVE_B lấy từ sai số khay khi vào pha; nhả tay đi xuống rồi ra (`release_dz`) | **40/48** | Khay xê dịch trong tay trên đường (5,7 cm); ngón móc dưới gờ còn chạm khi chỉ đi ra |
+
+Đã thử và bỏ: kéo tay về phía thân khi nhấc (`lift_pull` 0,06 / 0,12 → 27 / 13 của 48), đứng gần bàn hơn (`standoff` 0,08 → nghiêng nhiều hơn), ngắm thấp hơn (`grasp_dz` −0,005 / −0,01 → 34 / 27), tiếp cận thấp hơn (`pregrasp_dz` 0 / −0,01), cân bằng ngược dấu (`level_gain` −0,05 → 1/48).
+
+## Ép mu hai nắm tay (cấu hình thay thế)
+
+Cổ tay xoay 180° cho mu bàn tay hướng vào khay, nắm tay lại, xoay vào −20°; hai mu tay ép `squeeze` 5 cm vào trong mặt ngoài gờ và nhấc bằng ma sát. Hai tiếp xúc điểm là một bản lề: khay trôi tới khi trọng tâm treo dưới đường nối hai tiếp xúc, nên tiếp xúc phải nằm đúng trên trọng tâm (lệch 1,4 cm cho góc cân bằng ~19°, quá ngưỡng 15°). Đổi lại bằng các khóa:
+
+| Khóa | Giá trị |
 |---|---|
-| Episode đầu thành công | Mức 0, seed 0: đủ 7 bước scorer, 22–24 s mô phỏng |
-| Tỉ lệ thành công, cấu hình cuối | **44/48** (mức 0 seed 0, mức 1 seed 1–47), máy `rtx3060` |
-| Thời gian một episode thành công | 24,4 s mô phỏng trung bình, tối đa 26,4 s (giới hạn 90 s) |
-| Lỗi còn lại | 2 khay ngoài tầm với (`timeout:REACH`, seed 14, 42), 2 khay nghiêng (`L-TRAY-TILT`, seed 33, 38) |
-| Tái lập | Cùng seed cho cùng quỹ đạo trên laptop và `rtx3060` (bộ điều khiển chạy theo đồng hồ điều khiển, D-17) |
+| `grasp_roll_deg`, `grasp_pitch_deg`, `grasp_yaw_deg` | 180, 0, −20 |
+| `grip_x`, `grip_y`, `grip_z` | 0,11, 0,02, 0 |
+| `grasp_dy`, `squeeze` | 0,02, 0,05 |
+| `hand_closure_open`, `grasp_close_after` | 1 (nắm tay), 0 |
+| `arrive_lat_tol`, `level_gain` | 1,0 (tắt), 0 |
 
-## Cách cầm: ép hai mu bàn tay
-
-Tay cầm là gờ đặc 12 × 4 × 2 cm, không có chỗ luồn ngón. Với khay 6 cm, mặt dưới gờ chỉ cách mặt bàn 4 cm: quét động học 16 tư thế kẹp gờ, tư thế nào ngón tay cũng chạm bàn A. Planner ép khay bằng mu hai bàn tay nắm lại (cổ tay xoay 180°), ép `squeeze` vào trong mặt ngoài gờ và nhấc bằng ma sát (D-18).
-
-Hai tiếp xúc điểm hoạt động như một bản lề. Khay xoay dần quanh đường nối hai tiếp xúc cho tới khi trọng tâm treo dưới đường đó. Tiếp xúc lệch trọng tâm 1,4 cm cho góc cân bằng khoảng 19°, quá ngưỡng 15°, nên khay "trôi" tới lỗi khi lùi và quay. Vì vậy tiếp xúc phải nằm đúng trên trọng tâm; đây là tham số nhạy nhất:
-
-| `grip_x` (m), góc xoay vào −20° | Thành công |
+| `grip_x` (m), xoay vào −20° | Thành công |
 |---|---|
 | 0,10 | 11/24 |
 | 0,11 | **44/48** |
@@ -26,9 +49,7 @@ Hai tiếp xúc điểm hoạt động như một bản lề. Khay xoay dần qu
 | 0,12 | 30/48 |
 | 0,13 | 5/24 |
 
-Góc xoay vào (`grasp_yaw_deg`) cũng nhạy: −15° nghiêng 46–47/48 episode, −25° kém hơn −20°.
-
-## Những gì đã thử và kết quả
+## Chung cho hai cách cầm
 
 | Thay đổi | Ảnh hưởng đo được |
 |---|---|
@@ -37,34 +58,12 @@ Góc xoay vào (`grasp_yaw_deg`) cũng nhạy: −15° nghiêng 46–47/48 episo
 | Giữ chỗ khi với tay (`keep_tol`, `keep_vx`) | Hông trượt lùi ~5 cm khi hai tay vươn ra |
 | Mục tiêu GRASP cố định trong khung thế giới | Tay không đuổi theo khay khi hông trượt |
 | Nhấc theo dốc (`lift_speed`), kết thúc LIFT theo khay đã nhấc | Bước nhảy 10 cm làm giật khay; tay mang tải chỉ lên được một phần mục tiêu |
-| `squeeze` 0,03 → 0,05, `lift_height` 0,10 → 0,15 | Khay lên đủ trên 3 cm (trước đó 2,2 cm, `timeout:LIFT`) |
-| Tốc độ lùi, quay, mang chậm hơn; lùi xa hơn; nhấc cao hơn | Không đổi số thành công: lỗi nghiêng là trôi tới cân bằng, không do va chạm hay gia tốc |
-| Hạ: dịch hai tay theo sai số vị trí khay, chỉ nhả khi khay nằm phẳng | Hết `L-PLACE-POSE` (trước đó lệch tới 5,9 cm) |
-
-## Cầm bằng ngón tay (thử 1/11/2026)
-
-Với khay 9 cm (D-16), khe dưới gờ là 7 cm, đủ cho ngón luồn vào. Cách cầm này dùng bàn tay Dex3 thật: lòng bàn tay ngửa, ngón giữa móc dưới gờ, ngón cái kẹp mặt ngoài gờ; khay lên tới khoảng 13 cm trên mặt bàn (ép mu tay chỉ được ~3 cm). Chỉ cần đổi config, không đổi mã:
-
-| Khóa | Giá trị |
-|---|---|
-| `grasp_roll_deg`, `grasp_pitch_deg`, `grasp_yaw_deg` | −60, 30, 15 |
-| `grip_x`, `grip_y`, `grip_z` | 0,115, −0,04, 0 (điểm kẹp của Dex3 trong khung cổ tay) |
-| `grasp_dy`, `squeeze`, `pregrasp_dz` | 0,01, 0, 0,04 |
-| `hand_closure_open`, `grasp_close_after` | 0 (tay mở khi tiếp cận), 1,5 s |
-
-So sánh trên cùng 48 episode (mức 0 seed 0, mức 1 seed 1–47), máy `rtx3060`:
-
-| Cách cầm | Thành công | Lỗi |
-|---|---|---|
-| Ép mu nắm tay (mặc định) | **44/48** | 2 ngoài tầm với, 2 nghiêng |
-| Kẹp bằng ngón tay | **30/48** | 6 `timeout:LIFT`, 6 nghiêng, 3 `timeout:LOWER`, 2 đặt lệch, 1 khác |
-
-Episode kẹp ngón thành công dài 26,0 s mô phỏng trung bình. Lỗi đặt lệch khi kẹp ngón chủ yếu do tay mang tải kéo khay lùi khi hạ (6 cm ở seed 7); LOWER giờ bù sai số liên tục (`place_gain`).
+| Hạ: hai tay dịch khay theo sai số tới đích, bù liên tục (`place_gain`) | Tay mang tải kéo khay lùi khi hạ (6 cm ở seed 7) |
 
 ## Việc còn mở
 
-1. **Khay ngoài tầm với.** Khay cách mép 0,23–0,25 m (mức 1 dịch +5 cm) thì tay cầm xa quá tầm với khi robot đã đứng sát bàn. Hướng: cúi người bằng eo (pitch) khi với, hoặc giảm `tray_edge_offset` thêm (cần quyết định mới).
-2. **Ma sát xoắn của tay cầm.** Hình học va chạm của tay cầm có `condim 4` nhưng hệ số ma sát xoắn chỉ 0,005: với lực ép ~15 N, mô-men cản quay chỉ ~0,08 N·m, so với ~0,25 N·m do trọng tâm lệch 2 cm. Một vùng tiếp xúc mu bàn tay thật cỡ 0,03. Tăng hệ số này giảm độ nhạy của `grip_x`; là thay đổi vật lý của task, cần quyết định.
+1. **Khay xa ngoài tầm nhấc** (4/48, luôn là seed 4, 10, 13, 34): khay cách mép 0,23–0,25 m (mức 1 dịch +5 cm), tay vươn hết cỡ thì không nhấc nổi. Hướng: cúi người bằng eo khi với, hoặc giảm `tray_edge_offset` thêm (cần quyết định mới).
+2. **Ma sát xoắn của tay cầm.** Hình học va chạm của tay cầm có `condim 4` nhưng hệ số ma sát xoắn chỉ 0,005. Một vùng tiếp xúc tay thật cỡ 0,03 sẽ giảm lỗi nghiêng của cả hai cách cầm; đây là thay đổi vật lý của task, cần quyết định.
 
 ## Chạy
 

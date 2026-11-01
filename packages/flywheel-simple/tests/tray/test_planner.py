@@ -139,3 +139,14 @@ def test_pinch_grasp_closes_only_once_the_hands_are_there() -> None:
     grasp = [r.cmd for r in records if r.cmd.phase is Phase.GRASP]
     assert grasp[0].hand_closure == (0.0, 0.0) and grasp[-1].hand_closure == (1.0, 1.0)
     assert records[-1].cmd.phase is Phase.DONE and records[-1].report.success
+
+
+def test_levelling_reads_pitch_about_the_handle_axis() -> None:
+    from flywheel_simple.tray.planner import _axis_angle, _pitch
+
+    angle = math.radians(12.0)
+    about_y = np.array([math.cos(angle / 2), 0.0, math.sin(angle / 2), 0.0])
+    about_x = np.array([math.cos(angle / 2), math.sin(angle / 2), 0.0, 0.0])
+    assert _pitch(about_y) == pytest.approx(angle) and _pitch(about_x) == pytest.approx(0.0)
+    turn = _axis_angle(np.array([0.0, 1.0, 0.0]), angle)
+    assert np.allclose(turn @ np.array([1.0, 0.0, 0.0]), [math.cos(angle), 0.0, -math.sin(angle)])
