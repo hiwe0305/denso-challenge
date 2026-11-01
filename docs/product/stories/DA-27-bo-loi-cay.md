@@ -27,7 +27,7 @@ Là kỹ sư dữ liệu, tôi muốn một bộ dữ liệu và log thật đư
 
 ## Nhiệm vụ
 
-- [ ] 1. Bộ cấy lỗi dữ liệu trên bản sao psi-data (AC 1)
+- [x] 1. Bộ cấy lỗi dữ liệu trên bản sao psi-data (AC 1)
 - [ ] 2. Log train và log RTC cấy lỗi từ bộ giả (AC 2)
 - [ ] 3. `DefectManifest` có hash, chặn agent đọc (AC 3)
 - [ ] 4. Bản sạch (AC 4)
@@ -78,7 +78,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
-- Ghi chú hoàn thành:
-- File đã tạo hoặc sửa:
+- Giờ thực: 6.5h
+- Công cụ AI đã dùng: Antigravity
+- Ghi chú hoàn thành: Đã cấy 11 loại lỗi dữ liệu, log train T1-T8, log RTC R1-R2, khóa DefectManifest và rào chắn release. 29/29 tests passed.
+- File đã tạo hoặc sửa: packages/flywheel-data/src/flywheel/data/inject/, packages/flywheel-data/tests/unit/inject/, configs/data/inject.yaml, docs/g0/defect-inject.md
