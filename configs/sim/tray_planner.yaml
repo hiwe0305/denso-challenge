@@ -10,37 +10,33 @@
 palm_offset_x: 0.060
 palm_offset_y: 0.002
 palm_offset_z: -0.014
-# Two-hand squeeze. The handles are solid lips (12 x 4 x 2 cm). With the 6 cm tray their
-# underside was 4 cm above the table top and every pinch pose hit table A in a kinematic
-# scan; the 9 cm tray (D-16) leaves 7 cm, still tight for Dex3's fingers and palm. The left wrist rolls 180 deg so the back of the hand
-# faces the tray and the thumb points away; the backs of both hands press the lips'
-# outer faces and the tray rises by friction (1.0). The hands toe in so the fist's
-# knuckles, not the round wrist link, meet the lip. Two point contacts are a hinge: the tray
-# creeps until its centre of mass hangs under the line through them, so the contacts must sit
-# over the centre of mass (1.4 cm off gives ~19 deg, beyond the 15 deg limit). Right hand
-# mirrored. Orientation in the tray frame (roll, pitch, yaw):
-grasp_roll_deg: 180.0
-grasp_pitch_deg: 0.0
-grasp_yaw_deg: -20.0
-# The point of the left hand put on the handle, in the left wrist frame: the back of the
-# fist's knuckles. At yaw -20 over 48 episodes (level 0 seed 0, level 1 seeds 1-47):
-# grip_x 0.11 -> 44, 0.115 -> 40, 0.12 -> 30 successes; over 24 episodes 0.10 -> 11,
-# 0.13 -> 5. Yaw -15 tilts in 46-47 of 48.
-grip_x: 0.11
-grip_y: 0.02
+# Finger pinch with the Dex3 hands (D-19, Hiếu chose it 1/11/2026 over the back-of-fist
+# squeeze; docs/g0/tray/planner.md has both parameter sets); 40/48 episodes succeed.
+# Palm up, wrist rolled -60 deg
+# and pitched 30 deg, toed in 15 deg: the middle fingers hook under the handle lip (12 x 4
+# x 2 cm, underside 7 cm above the table with the 9 cm tray, D-16) and the thumbs clamp
+# its outer face. Right hand mirrored. Orientation in the tray frame (roll, pitch, yaw):
+grasp_roll_deg: -60.0
+grasp_pitch_deg: 30.0
+grasp_yaw_deg: 15.0
+# Where Dex3 pinches when it closes, in the left wrist frame (index and middle tips meet
+# the thumb there, measured); the planner puts this point on the handle. grip_x swept:
+# 0.11 / 0.115 / 0.12 -> 28 / 30 / 29 of 48 before levelling.
+grip_x: 0.115
+grip_y: -0.04
 grip_z: 0.0
-# Grip point this far further away from the tray than the handle centre: the lip's
-# outer face is handle_depth / 2 = 0.02 out.
-grasp_dy: 0.02
-# GRASP commands the grip points this far inside the outer faces; the arm PD turns the
-# blocked distance into the squeeze force. At 0.03 the tray slipped and rose only 2.2 cm.
-squeeze: 0.05
-# Hand closure outside the grasp (approach, reach, release, retreat): 1 keeps a fist, so
-# the open fingers neither drag on the table nor catch the tray rim while reaching.
-hand_closure_open: 1.0
+# Grip point this far further away from the tray than the handle centre (m)...
+grasp_dy: 0.01
+# ...and this far above it (m). Aiming lower (-0.005, -0.01) did not hook better: 34, 27 of 48.
+grasp_dz: 0.0
+# GRASP commands the grip points this far inside the grip point; a pinch needs none (the
+# squeeze used 0.05).
+squeeze: 0.0
+# Hand closure outside the grasp (approach, reach, release, retreat): open for a pinch.
+hand_closure_open: 0.0
 # GRASP closes the hands once both palms are at the grasp targets, or after this many
-# seconds; 0 closes at once (squeeze). A finger pinch slides in open first.
-grasp_close_after: 0.0
+# seconds; the pinch slides in open first (0 closes at once, as the squeeze did).
+grasp_close_after: 1.5
 
 # APPROACH_A: palms go to the ready pose (above the table top, outside the tray's width)
 # before walking; at the default pose G1's fingers hit table A's edge 6 cm after the
@@ -82,6 +78,14 @@ lift_height: 0.15
 lift_speed: 0.05
 # LIFT ends once the ramp is done and the tray has stayed above h_lift this long (s).
 lift_hold: 0.5
+# Hands move this far toward the body over the lift ramp (m); for far trays the loaded arms
+# at full reach barely rise.
+lift_pull: 0.0
+# Levelling from LIFT to LOWER: both wrists turn about the line through the palms by an
+# angle integrating level_gain x tray pitch (per step), capped at level_max_deg; 0 = off.
+# Swept with the pinch over 48 episodes: 0 -> 35, +0.05 -> 37, +0.15 -> 36, -0.05 -> 1.
+level_gain: 0.05
+level_max_deg: 20.0
 backoff: 0.35
 vx_backoff: -0.25
 # turn_rate integrates target_yaw; the lower body turns at (error / 0.5) rad/s, max 1.
@@ -99,6 +103,9 @@ vy_max: 0.1
 carry_tol: 0.03
 arrive_speed: 0.05
 arrive_hold: 0.5
+# ARRIVE_B steps (at keep_vx) until the base is within this of its goal ahead and sideways.
+# 1.0 (off) -> 31 of 48 with the pinch, 0.04 -> 35: placement misses 4 -> 0.
+arrive_lat_tol: 0.04
 
 # LOWER, RELEASE, RETREAT.
 lower_speed: 0.05
@@ -112,7 +119,12 @@ place_gain: 0.1
 place_height_tol: 0.005
 place_tilt_deg: 3.0
 lower_hold: 0.2
+# ...or once it has rested on B this long (s), even if the hands keep it a few degrees tilted.
+lower_settle: 1.0
 release_hold: 0.5
+# RELEASE moves the hands this far up (m) as they open and move out; negative drops the
+# fingers out from under the handle lip.
+release_dz: -0.02
 retreat: 0.20
 vx_retreat: -0.2
 
@@ -127,7 +139,7 @@ timeout_lift: 5.0
 timeout_back_off: 6.0
 timeout_turn: 12.0
 timeout_carry: 15.0
-timeout_arrive_b: 5.0
+timeout_arrive_b: 8.0
 timeout_lower: 6.0
 timeout_release: 4.0
 timeout_retreat: 5.0
