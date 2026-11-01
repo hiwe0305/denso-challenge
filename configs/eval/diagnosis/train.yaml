@@ -1,0 +1,57 @@
+# Ngưỡng chẩn đoán train F-TRAIN (T1-T8) và lỗi offline F-OFF (O1-O4).
+# Nguồn định nghĩa: design 27/10/2026 mục 10; spec v10.5 mục 6.4. Story DA-08 AC 3.
+#
+# Mọi dòng `# giả định` phải hiệu chỉnh lại trên log thật của DA-19 (khoảng
+# 6/11/2026) trước cổng G2; cách hiệu chỉnh ghi ngay trên dòng. Dòng `# chốt`
+# là quyết định đã có, không phải số đo.
+#
+# Cửa sổ đếm theo `step`, không theo số dòng log (issue #5, chốt 29/10/2026):
+# hai job ghi log thưa dày khác nhau phải ra cùng kết luận.
+# Không có khóa nào là tùy chọn: thiếu một khóa là lỗi cấu hình, không phải
+# giá trị mặc định ngầm (DA-08 AC 3).
+
+t1:
+  k: 10.0            # giả định; design mục 10 "loss tăng quá k lần"; hiệu chỉnh: lấy tỉ lệ loss lớn nhất trên job sạch của DA-19 rồi nhân 2
+  window_steps: 500  # giả định; cửa sổ W tính lùi từ step đang xét, đơn vị step (issue #5, chốt 29/10/2026)
+
+t2:
+  n_steps: 2000             # giả định; "sau N step mà loss val chưa giảm"
+  min_relative_drop: 0.05   # giả định; "giảm dưới x%" của design mục 10
+  baseline_val_count: 3     # chốt ở issue #5: baseline là trung vị 3 lần đo val đầu, để một lần đo nhiễu không thành baseline
+
+t3:
+  m_measurements: 3  # giả định; "val tăng liên tiếp M lần đo" trong khi train vẫn giảm
+
+t4:
+  window_steps: 2000     # giả định; cửa sổ so baseline với cuối của từng nhóm action
+  min_group_drop: 0.05   # giả định; nhóm giảm dưới mức này là nhóm chậm
+  ref_group_drop: 0.30   # giả định; cần một nhóm khác giảm được mức này mới gọi là mất cân bằng
+
+t5:
+  window_steps: 1000     # giả định; cửa sổ lấy trung bình phương sai dự đoán của từng chiều
+  epsilon: 1.0e-6        # giả định; dưới mức này coi là chiều chết. Chiều `masked` của action_layout không bao giờ bị đánh dấu
+
+t6:
+  min_std_ratio: 0.30    # giả định; pred_std / target_std dưới mức này là sụp mode
+
+t7:
+  max_relative_drop: 0.10  # giả định; (cha - con) / cha của chỉ số P4 vượt mức này là quên
+
+t8:
+  frozen_tolerance: 0.0    # chốt: VLM khai đóng băng thì gradient của nó phải bằng 0
+  max_grad_norm: 10.0      # giả định; hiệu chỉnh: phân vị 99 của grad_norm_action trên job sạch của DA-19
+  max_exceedances: 5       # giả định; số bản ghi vượt max_grad_norm mới báo, để một spike đơn lẻ không báo
+
+o1:
+  max_error_by_group: {}   # chốt: để rỗng tới khi có P3 thật của DA-09; nhóm không có ngưỡng rơi về max_error_ratio
+  max_error_ratio: 2.0     # giả định; sai số nhóm so với trung vị các nhóm
+
+o2:
+  max_slope: 0.05          # giả định; hệ số góc của error_by_chunk_pos theo vị trí trong chunk
+  max_ratio: 3.0           # giả định; sai số vị trí cuối chunk chia vị trí đầu
+
+o3:
+  max_offset_steps: 5      # giả định; lệch thời điểm sự kiện bàn tay, đơn vị step
+
+o4:
+  max_fraction: 0.0        # chốt: một khung ngoài giới hạn khớp là đã lỗi. Giới hạn lấy từ action_layout, không ghi số ở đây (AC 2)

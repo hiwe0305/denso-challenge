@@ -32,7 +32,7 @@ Là kỹ sư đánh giá, tôi muốn mỗi checkpoint được kiểm động h
 - [ ] 2. T1–T3: phân kỳ, không học, quá khớp (AC 1)
 - [ ] 3. T4–T6, T8: mất cân bằng nhóm, chiều chết, sụp mode, gradient bất thường (AC 1)
 - [ ] 4. T7 và O1–O4 từ P3, P4 (AC 2)
-- [ ] 5. Cấu hình ngưỡng có hash (AC 3)
+- [x] 5. Cấu hình ngưỡng có hash (AC 3)
 - [ ] 6. Artifact kết quả, lệnh `fw` (AC 4, 5)
 - [ ] 7. Bộ log cấy lỗi và test dương, âm cho từng mã (AC 6)
 
@@ -72,7 +72,16 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
+- Giờ thực: 3h (1/11/2026)
+- Công cụ AI đã dùng: Claude Code (Opus 5), theo plan DA-08 và DA-13 ngày 30/10/2026 (PR #18, chưa merge nên chưa liên kết được)
 - Ghi chú hoàn thành:
+  - 1/11/2026: làm phần không phụ thuộc hợp đồng của DA-25 (PR #22 còn mở). Xong **nhiệm vụ 5**; nhiệm vụ 1 và 2 mới có phần thuần numpy, chưa đánh dấu.
+  - Nhiệm vụ 1 còn `reader.py`: cần `TrainingMetric`, `ProbeP1`, `ProbeP3`, `ProbeP4`, `ActionLayout` của DA-25. `series.py` đã xong vì chỉ là hàm thuần trên numpy.
+  - Nhiệm vụ 2, 3, 4 cần `TrainSeries` của `reader.py`; đã có `finding.py` (`Finding`, `Skipped`, `DetectorResult`) là giao diện chung của mọi bộ phát hiện, theo soát của PO trên PR #18.
+  - Nhiệm vụ 6 còn chờ hai chỗ hợp đồng đã nêu dưới PR #22: `TrainDiagnosis` chưa có trường `skipped` (mà `Contract` đặt `extra="forbid"`), và `ProbeP4` chưa cho T7 so với checkpoint cha ở lần fine-tune đầu.
+  - Workspace chưa có thư viện đọc YAML nên `load_train_thresholds` cần thêm `pyyaml` (và `types-pyyaml` cho mypy). Theo quyết định của người làm story ngày 1/11, thêm luôn trong nhánh này; pr-guard sẽ báo R6 cho `pyproject.toml` gốc, `packages/flywheel-eval/pyproject.toml` và `uv.lock` vì ba file này ngoài Phạm vi file của DA-08. Hiếu quyết: hoặc mở rộng Phạm vi file, hoặc tách ba file đó sang một PR `chore-` của Long (07 mục 3.2).
+  - Ngưỡng trong `train.yaml` đều là `# giả định` hoặc `# chốt`, chưa có số đo; hiệu chỉnh trên log thật của DA-19 trước G2. Có test chặn một dòng ngưỡng không ghi nguồn.
 - File đã tạo hoặc sửa:
+  - Tạo: `packages/flywheel-eval/src/flywheel/eval/diagnosis/train/{__init__,series,finding}.py`, `packages/flywheel-eval/tests/unit/diagnosis/train/{test_series,test_finding,test_config}.py`, `configs/eval/diagnosis/train.yaml`
+  - Sửa: `packages/flywheel-eval/src/flywheel/eval/config.py`, `packages/flywheel-eval/pyproject.toml`, `pyproject.toml`, `uv.lock`
+  - Bằng chứng: `uv run pytest` → 1110 passed, 22 deselected; `uv run ruff check`, `uv run mypy` (61 file), `uv run lint-imports` (3 contract) xanh
