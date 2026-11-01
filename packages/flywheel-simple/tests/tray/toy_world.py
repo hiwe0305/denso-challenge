@@ -8,7 +8,8 @@ CONTACT_R of its squeezed grasp point (`grasp_palms_world`). A squeeze holds
 while the hands stay no further apart than when they gripped (plus SLACK), so
 spreading them releases it as opening does; while both grip, the tray moves
 rigidly with the palms. Released over a table, the tray rests on it; elsewhere it falls to the
-floor. DA-32's StepTracker scores every step.
+floor. DA-32's StepTracker scores every step. The arms start hanging at rest
+(`start_wrists`), where the planner's first targets start from.
 """
 
 from __future__ import annotations
@@ -66,8 +67,15 @@ class ToyWorld:
         self.tray_pos = np.array([tray.x, tray.y, self.cfg.table_height])
         self.tray_yaw = tray.yaw
         self.palm_sag = palm_sag
+        # The arms hang at rest, wrists unrotated in the base frame; the planner starts there.
+        offsets = self.planner_cfg.palm_offsets
+        self.start_wrists = []
+        for k, side in enumerate((1, -1)):
+            wrist = np.eye(4)
+            wrist[:3, 3] = np.array([0.2, side * 0.2, -0.1]) - offsets[k]
+            self.start_wrists.append(wrist)
         rest = base_transform(self.base, PELVIS_Z)
-        self.palms = [(rest @ np.array([0.2, s * 0.2, -0.1, 1.0]))[:3] for s in (1, -1)]
+        self.palms = [(rest @ w @ np.r_[o, 1.0])[:3] for w, o in zip(self.start_wrists, offsets)]
         self.contacts = (False, False)
         self.grip: tuple[float, np.ndarray] | None = None  # tray yaw - base yaw, tray - palm mid
         self.grip_width = 0.0
@@ -88,6 +96,7 @@ class ToyWorld:
 
     def run(self, max_s: float = 150.0) -> list[Record]:
         planner = TrayPlanner(self.planner_cfg, self.cfg, self.sample)
+        planner.start(self.start_wrists[0], self.start_wrists[1])
         tracker = StepTracker(self.cfg, self.sample)
         state = self._state()
         report = tracker.update(state)

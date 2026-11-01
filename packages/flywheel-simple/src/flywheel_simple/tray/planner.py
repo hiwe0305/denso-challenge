@@ -7,7 +7,7 @@ of DA-32:
 | Phase | Command | Leaves when | Scorer step |
 |---|---|---|---|
 | APPROACH_A | palms ready, walk square to the tray | `approach_dist` to it or `standoff` | 1 |
-| REACH | palms to pre-grasp outside each handle, base kept | both palms within `palm_tol` | 1 |
+| REACH | palms to pre-grasp outside the handles, base kept | moved, palms within `palm_tol` | 1 |
 | GRASP | grip points `squeeze` inside the handles | both handle contacts for `grasp_hold` | 2 |
 | LIFT | palms up `lift_height` at `lift_speed` | ramp done, tray lifted for `lift_hold` | 3 |
 | BACK_OFF | walk back `backoff` | distance reached | 4 |
@@ -15,7 +15,7 @@ of DA-32:
 | CARRY | walk to the base pose that puts the tray on the target | within `carry_tol` | 4-5 |
 | ARRIVE_B | stand, hold the heading | base slower than `arrive_speed` for `arrive_hold` | 5 |
 | LOWER | palms down, shifted onto the target | tray flat on table B for `lower_hold` | 6 |
-| RELEASE | open, palms out `pregrasp_offset` + `squeeze` | no handle contact `release_hold` | 7 |
+| RELEASE | open, then out `pregrasp_offset` + `squeeze` | no handle contact `release_hold` | 7 |
 | RETREAT | walk back `retreat` | distance reached | 7 |
 
 Every phase has a timeout; a timeout, a StepTracker failure label or a tray on
@@ -27,9 +27,13 @@ gravity, so while reaching (and grasping and lifting, in height) the planner add
 correction from the measured palm error, integrated only once the palm is near its
 target.
 
-The grasp is a two-hand squeeze: the handles are solid lips 4 cm above the table
-top, too low for Dex3 fingers to get under, so the backs of both hands press the
-lips' outer faces and the tray rises by friction.
+The default grasp is a Dex3 finger pinch under the handle lips (D-19); the
+squeeze with the backs of both fists (D-18) is a configuration of the same planner.
+
+decoupled_wbc reaches a new arm target within one control step, so a phase change
+that moves the wrist targets would make the arm lunge. The planner turns each such
+jump into an offset that decays along a minimum-jerk profile (bell-shaped speed, as
+in human reaching); the targets' continuous motion passes through unchanged (D-20).
 
 Pure numpy: runs in the workspace.
 """
@@ -153,6 +157,10 @@ class PlannerConfig:
     timeout_lower: float
     timeout_release: float
     timeout_retreat: float
+    smooth_speed: float
+    smooth_rot_speed_deg: float
+    smooth_min_s: float
+    hand_close_s: float
 
     @staticmethod
     def default_path() -> Path:
@@ -290,6 +298,44 @@ def _wrap(angle: float) -> float:
     return math.atan2(math.sin(angle), math.cos(angle))
 
 
+def min_jerk(tau: float) -> float:
+    """Minimum-jerk profile on [0, 1]: 0 to 1 with zero speed and acceleration at both ends."""
+    tau = min(1.0, max(0.0, tau))
+    return tau**3 * (10.0 + tau * (6.0 * tau - 15.0))
+
+
+def _rotvec(rot: NDArray[np.float64]) -> NDArray[np.float64]:
+    """Rotation vector (axis x angle) of a rotation matrix; inverse of `_axis_angle`."""
+    w = np.array([rot[2, 1] - rot[1, 2], rot[0, 2] - rot[2, 0], rot[1, 0] - rot[0, 1]])
+    sin2 = float(np.linalg.norm(w))  # 2 sin(angle)
+    angle = math.atan2(sin2, float(np.trace(rot)) - 1.0)
+    if sin2 > 1e-9:
+        return np.asarray(angle / sin2 * w)
+    if angle < 1.0:
+        return np.zeros(3)
+    # A half turn: the axis is the column of rot + I with the largest norm.
+    sym = rot + np.eye(3)
+    axis = sym[:, int(np.argmax(np.linalg.norm(sym, axis=0)))]
+    return np.asarray(math.pi * axis / float(np.linalg.norm(axis)))
+
+
+def _rotation(rotvec: NDArray[np.float64]) -> NDArray[np.float64]:
+    angle = float(np.linalg.norm(rotvec))
+    return np.eye(3) if angle < 1e-12 else _axis_angle(rotvec / angle, angle)
+
+
+@dataclass(frozen=True)
+class _Blend:
+    """A jump in nominal targets, `offset` = before - after, decaying to 0 along min jerk."""
+
+    t0: float
+    duration: float
+    offset: NDArray[np.float64]  # wrists: (hand, [palm shift, rotation vector], xyz); hands: (2,)
+
+    def weight(self, t: float) -> float:
+        return 1.0 - min_jerk((t - self.t0) / self.duration)
+
+
 @dataclass
 class _Carry:
     """What LIFT fixes for the rest of the carry."""
@@ -324,6 +370,16 @@ class TrayPlanner:
     _prev: tuple[float, Pose2D] | None = None
     _hold: PlannerCommand | None = None
     _abort_reason: str | None = None
+    # Smoothing (D-20): the last nominal targets (phase, palms, wrist rotations), the
+    # nominal hand closure, and the jumps still decaying.
+    _nominal: (
+        tuple[tuple[Phase, int] | None, list[NDArray[np.float64]], list[NDArray[np.float64]]] | None
+    ) = None
+    _hand: float | None = None
+    _commanded: list[NDArray[np.float64]] | None = None  # last smoothed palms, base frame
+    _release_rots: list[NDArray[np.float64]] | None = None  # wrists held while opening
+    _wrist_blends: list[_Blend] = field(default_factory=list)
+    _hand_blends: list[_Blend] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         geo = scene_geometry_with_gap(self.tray_cfg, self.sample.table_gap)
@@ -333,6 +389,14 @@ class TrayPlanner:
         fresh = TrayPlanner(self.cfg, self.tray_cfg, self.sample)
         for f in fields(self):
             setattr(self, f.name, getattr(fresh, f.name))
+
+    def start(self, left_wrist: NDArray[np.float64], right_wrist: NDArray[np.float64]) -> None:
+        """The wrist poses the robot holds now (base frame), hands open: the first targets
+        move from there. Without it the first command goes straight to the targets."""
+        wrists = (left_wrist, right_wrist)
+        palms = [(w @ np.r_[o, 1.0])[:3] for w, o in zip(wrists, self.cfg.palm_offsets)]
+        self._nominal = (None, palms, [w[:3, :3].copy() for w in wrists])
+        self._hand = 0.0
 
     def step(self, state: TrayState, base: Pose2D, report: StepReport) -> PlannerCommand:
         """One command for this control step."""
@@ -399,7 +463,7 @@ class TrayPlanner:
             above = np.array([0.0, 0.0, cfg.pregrasp_dz])
             outside = self._handle_palms(state, base, outward=cfg.pregrasp_offset)
             palms = (outside[0] + above, outside[1] + above)
-            if self._palms_at(state, base, palms):
+            if self._arrived(state, base, palms):
                 self._enter(Phase.GRASP, state, base)
                 return self._command(state, base)
             return self._emit(
@@ -421,7 +485,7 @@ class TrayPlanner:
             # after `grasp_close_after`); a squeeze (0) closes at once.
             assert self._entered_t is not None
             waited = state.t - self._entered_t >= cfg.grasp_close_after
-            if not self._closing and (waited or self._palms_at(state, base, palms)):
+            if not self._closing and (waited or self._arrived(state, base, palms)):
                 self._closing = True
             if self._held(all(state.hand_contacts), state.t, cfg.grasp_hold):
                 self._enter(Phase.LIFT, state, base)
@@ -554,7 +618,16 @@ class TrayPlanner:
 
         assert self._lowered is not None
         if p is Phase.RELEASE:
-            # Out and down: fingers hooked under the handle lip stayed in contact when
+            # Open first, holding the wrists as LOWER left them: hands moving out while
+            # still opening dragged the tray by a hooked thumb (level 0 seed 0: 9.9 deg).
+            assert self._entered_t is not None and self._nominal is not None
+            if self._release_rots is None:
+                self._release_rots = [r.copy() for r in self._nominal[2]]
+            if state.t - self._entered_t < cfg.hand_close_s:
+                return self._emit(
+                    state, base, self._lowered, (0.0, 0.0, 0.0), rots=self._release_rots
+                )
+            # Then out and down: fingers hooked under the handle lip stayed in contact when
             # the hands only moved outward.
             back = cfg.pregrasp_offset + cfg.squeeze
             out = self._outward(state, base, self._lowered, back)
@@ -564,7 +637,7 @@ class TrayPlanner:
                 self._lowered = palms
                 self._enter(Phase.RETREAT, state, base)
                 return self._command(state, base)
-            return self._emit(state, base, palms, (0.0, 0.0, 0.0))
+            return self._emit(state, base, palms, (0.0, 0.0, 0.0), segment=1)
 
         # RETREAT
         if self._travelled(base) >= cfg.retreat:
@@ -614,29 +687,26 @@ class TrayPlanner:
         return shift
 
     def _level(
-        self, state: TrayState, wrists: list[NDArray[np.float64]]
+        self,
+        state: TrayState,
+        palms: list[NDArray[np.float64]],
+        rots: list[NDArray[np.float64]],
     ) -> list[NDArray[np.float64]]:
         """Turn both wrists about the line through the palms against the tray's pitch.
 
         The held tray pitches about that line (10-14 deg seen with a finger pinch)
         while the contacts stay put on it: the hands turn with it, so turning them
-        back levels it. The angle integrates `level_gain` x pitch, capped.
+        back levels it. The angle integrates `level_gain` x pitch, capped. The palms
+        lie on the line, so only the wrist rotations change.
         """
         pitch = _pitch(state.tray_quat)
         cap = math.radians(self.cfg.level_max_deg)
         self._level_angle = float(
             np.clip(self._level_angle + self.cfg.level_gain * pitch, -cap, cap)
         )
-        offsets = self.cfg.palm_offsets
-        palms = [(w @ np.r_[o, 1.0])[:3] for w, o in zip(wrists, offsets)]
         axis = palms[1] - palms[0]
-        axis /= float(np.linalg.norm(axis))
-        turn = np.eye(4)
-        turn[:3, :3] = _axis_angle(axis, self._level_angle)
-        centre = (palms[0] + palms[1]) / 2
-        to_c, from_c = np.eye(4), np.eye(4)
-        to_c[:3, 3], from_c[:3, 3] = -centre, centre
-        return [from_c @ turn @ to_c @ w for w in wrists]
+        turn = _axis_angle(axis / float(np.linalg.norm(axis)), self._level_angle)
+        return [turn @ r for r in rots]
 
     def _keep_station(self, base: Pose2D) -> tuple[float, float, float]:
         """Step forward when the base has slid back from where REACH started.
@@ -713,13 +783,38 @@ class TrayPlanner:
         nav: tuple[float, float, float],
         closure: bool = False,
         heading: float | None = None,
+        rots: list[NDArray[np.float64]] | None = None,
+        segment: int = 0,
     ) -> PlannerCommand:
+        """Command for `palms` (base frame); `rots` overrides the phase's wrist rotations.
+
+        A new `segment` within a phase marks a switch of the nominal targets that is
+        smoothed like a phase change.
+        """
         cfg = self.cfg
+        if rots is None:
+            if self._carry is not None:  # fixed from the end of LIFT on
+                rots = list(self._carry.rotations)
+            elif self.phase is Phase.APPROACH_A:
+                rots = [self._wrist_rotation(k) for k in range(2)]
+            else:
+                rots = [self._wrist_rotation(k, state, base) for k in range(2)]
+            if self.phase.name in LEVELLED and cfg.level_gain != 0.0:
+                # Levelling is part of the nominal targets: RELEASE drops it (up to
+                # `level_max_deg`), and that turn is smoothed like any other jump.
+                corrected = [palms[k] + self._correction[k] for k in range(2)]
+                rots = self._level(state, corrected, rots)
+        smooth_palms, smooth_rots = self._smoothed(state.t, (self.phase, segment), palms, rots)
         axes = CORRECTED.get(self.phase.name)
+        # The measured palms answer the last step's smoothed targets; correcting against
+        # those takes up the sag on the way too (the GRASP correction pushes the fingers
+        # down under the handle lip) without integrating the move itself.
+        commanded = self._commanded or smooth_palms
+        self._commanded = smooth_palms
         if axes is not None:
             measured = self._measured_palms(state, base)
             for k in range(2):
-                error = axes * (palms[k] - measured[k])
+                error = axes * (commanded[k] - measured[k])
                 # Only near the target, where the error is the steady sag rather
                 # than the arm still on its way.
                 if float(np.linalg.norm(error)) > cfg.palm_correction_window:
@@ -729,27 +824,75 @@ class TrayPlanner:
                 if norm > cfg.palm_correction_max:
                     corr = corr * cfg.palm_correction_max / norm
                 self._correction[k] = corr
-        if self._carry is not None:  # fixed from the end of LIFT on
-            rots = list(self._carry.rotations)
-        elif self.phase is Phase.APPROACH_A:
-            rots = [self._wrist_rotation(k) for k in range(2)]
-        else:
-            rots = [self._wrist_rotation(k, state, base) for k in range(2)]
-        wrists = [self._wrist(palms[k] + self._correction[k], k, rots[k]) for k in range(2)]
-        if self.phase.name in LEVELLED and cfg.level_gain != 0.0:
-            wrists = self._level(state, wrists)
-        hand = 1.0 if closure else cfg.hand_closure_open
+        wrists = [
+            self._wrist(smooth_palms[k] + self._correction[k], k, smooth_rots[k]) for k in range(2)
+        ]
+        hand = self._hand_closure(state.t, 1.0 if closure else cfg.hand_closure_open)
         cmd = PlannerCommand(
             phase=self.phase,
             nav=(float(nav[0]), float(nav[1]), float(nav[2])),
             heading=base.yaw if heading is None else heading,
             left_wrist=wrists[0],
             right_wrist=wrists[1],
-            hand_closure=(hand, hand),
+            hand_closure=hand,
             abort_reason=None,
         )
         self._hold = cmd
         return cmd
+
+    def _smoothed(
+        self,
+        t: float,
+        key: tuple[Phase, int],
+        palms: tuple[NDArray[np.float64], NDArray[np.float64]],
+        rots: list[NDArray[np.float64]],
+    ) -> tuple[list[NDArray[np.float64]], list[NDArray[np.float64]]]:
+        """Palms and wrist rotations to command: the nominal ones plus the decaying jumps.
+
+        A phase change, a new segment of one (`key`), or the first step after `start` may
+        move the nominal targets by centimetres in one step; that jump becomes a blend
+        decaying over max(`smooth_min_s`, distance / `smooth_speed`, angle /
+        `smooth_rot_speed_deg`), both hands together.
+        Blends add up, so a new jump while one decays keeps position and speed continuous.
+        """
+        cfg = self.cfg
+        if self._nominal is not None and self._nominal[0] != key:
+            _, before, before_rots = self._nominal
+            offset = np.array(
+                [[before[k] - palms[k], _rotvec(rots[k].T @ before_rots[k])] for k in range(2)]
+            )
+            dist = float(np.max(np.linalg.norm(offset[:, 0], axis=1)))
+            angle = float(np.max(np.linalg.norm(offset[:, 1], axis=1)))
+            if dist > 1e-9 or angle > 1e-9:
+                duration = max(
+                    cfg.smooth_min_s,
+                    dist / cfg.smooth_speed,
+                    angle / math.radians(cfg.smooth_rot_speed_deg),
+                )
+                self._wrist_blends.append(_Blend(t, duration, offset))
+        self._nominal = (key, [p.copy() for p in palms], [r.copy() for r in rots])
+        self._wrist_blends = [b for b in self._wrist_blends if b.weight(t) > 0.0]
+        out_palms, out_rots = [], []
+        for k in range(2):
+            palm, rot = palms[k].copy(), rots[k]
+            for b in reversed(self._wrist_blends):  # newest first, next to the nominal
+                w = b.weight(t)
+                palm = palm + w * b.offset[k, 0]
+                rot = rot @ _rotation(w * b.offset[k, 1])
+            out_palms.append(palm)
+            out_rots.append(rot)
+        return out_palms, out_rots
+
+    def _hand_closure(self, t: float, nominal: float) -> tuple[float, float]:
+        """Both hands' closure: a change of the nominal one ramps over `hand_close_s`."""
+        if self._hand is not None and nominal != self._hand:
+            offset = np.full(2, self._hand - nominal)
+            self._hand_blends.append(_Blend(t, self.cfg.hand_close_s, offset))
+        self._hand = nominal
+        self._hand_blends = [b for b in self._hand_blends if b.weight(t) > 0.0]
+        out = nominal + sum((b.weight(t) * b.offset for b in self._hand_blends), np.zeros(2))
+        left, right = (float(v) for v in np.clip(out, 0.0, 1.0))
+        return left, right
 
     def _stand(self, state: TrayState, base: Pose2D) -> PlannerCommand:
         """DONE and ABORT: stand where the last command left the wrists; ABORT keeps the grip."""
@@ -797,6 +940,20 @@ class TrayPlanner:
             float(np.linalg.norm(mask * (measured[k] - palms[k]))) <= self.cfg.palm_tol
             for k in range(2)
         )
+
+    def _arrived(
+        self,
+        state: TrayState,
+        base: Pose2D,
+        palms: tuple[NDArray[np.float64], NDArray[np.float64]],
+    ) -> bool:
+        """The smoothed move has ended and both measured palms are at its final targets.
+
+        Not the measured palms alone: sagging arms put them within `palm_tol` of the
+        pre-grasp pose while the commanded ones were still on the way (seed 22, level 1:
+        REACH ended after 0.16 s and the hands cut down onto the handles).
+        """
+        return not self._wrist_blends and self._palms_at(state, base, palms)
 
     def _held(self, condition: bool, t: float, duration: float) -> bool:
         if not condition:
