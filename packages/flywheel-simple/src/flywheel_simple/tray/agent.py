@@ -64,8 +64,11 @@ class TrayAgent:
         self.last_command = None
 
     def start(self) -> None:
-        """Begin planning from the robot's current heading (after the band is released)."""
+        """Begin planning from the robot's heading and wrists now (after the band is released)."""
+        assert self.planner is not None, "call reset() first"
         self.nav.reset(yaw=pelvis_pose(self.env)[1])
+        robot = self.env.unwrapped.task.robot
+        self.planner.start(*self.ctrl.ik.current_wrists(robot.prepare_obs()))
 
     def stand(self) -> Any:
         """Default upper body, no walking: for band release and settling."""

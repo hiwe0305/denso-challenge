@@ -21,10 +21,6 @@ def ordered_unique(phases: list[Phase]) -> list[Phase]:
     return out
 
 
-def first(records: list[Record], phase: Phase) -> Record:
-    return next(r for r in records if r.cmd.phase == phase)
-
-
 def in_tray_frame(record: Record, wrist: np.ndarray) -> np.ndarray:
     pos, quat = record.state.tray_pos, record.state.tray_quat
     yaw = 2 * math.atan2(quat[3], quat[0])
@@ -63,7 +59,9 @@ def test_wrists_stay_fixed_in_base_frame_while_carrying() -> None:
 
 @pytest.mark.parametrize("seed", [0, 1])
 def test_grasp_targets_mirror_about_the_tray(seed: int) -> None:
-    record = first(ToyWorld(level=1, seed=seed).run(), Phase.GRASP)
+    # The last GRASP command: the first still carries the decaying REACH jump (D-20).
+    records = ToyWorld(level=1, seed=seed).run()
+    record = [r for r in records if r.cmd.phase is Phase.GRASP][-1]
     left = in_tray_frame(record, record.cmd.left_wrist)
     right = in_tray_frame(record, record.cmd.right_wrist)
     assert np.allclose(left[:3, 3], MIRROR @ right[:3, 3], atol=1e-6)
@@ -133,12 +131,21 @@ def test_hands_shift_the_tray_onto_the_target_while_lowering() -> None:
 def test_pinch_grasp_closes_only_once_the_hands_are_there() -> None:
     from dataclasses import replace
 
+    from flywheel_simple.tray.planner import grasp_palms_world, tray_yaw_of
+
     # A finger pinch slides in open and closes at the handles; a squeeze closes at once.
     cfg = replace(PlannerConfig.load(), hand_closure_open=0.0, squeeze=0.0, grasp_close_after=5.0)
-    records = ToyWorld(planner_cfg=cfg).run()
-    grasp = [r.cmd for r in records if r.cmd.phase is Phase.GRASP]
-    assert grasp[0].hand_closure == (0.0, 0.0) and grasp[-1].hand_closure == (1.0, 1.0)
+    world = ToyWorld(planner_cfg=cfg)
+    records = world.run()
+    grasp = [r for r in records if r.cmd.phase is Phase.GRASP]
+    assert grasp[0].cmd.hand_closure == (0.0, 0.0) and grasp[-1].cmd.hand_closure == (1.0, 1.0)
     assert records[-1].cmd.phase is Phase.DONE and records[-1].report.success
+    # Closing starts only once the commanded palms have arrived, not on the way.
+    closing = next(r for r in grasp if r.cmd.hand_closure[0] > 0.0)
+    state = grasp[0].state
+    targets = grasp_palms_world(cfg, world.cfg, state.tray_pos, tray_yaw_of(state.tray_quat))
+    for palm, target in zip(commanded_palms_world(world, closing), targets):
+        assert float(np.linalg.norm(palm - target)) < 0.002
 
 
 def test_levelling_reads_pitch_about_the_handle_axis() -> None:
@@ -150,3 +157,102 @@ def test_levelling_reads_pitch_about_the_handle_axis() -> None:
     assert _pitch(about_y) == pytest.approx(angle) and _pitch(about_x) == pytest.approx(0.0)
     turn = _axis_angle(np.array([0.0, 1.0, 0.0]), angle)
     assert np.allclose(turn @ np.array([1.0, 0.0, 0.0]), [math.cos(angle), 0.0, -math.sin(angle)])
+
+
+def palm_path(world: ToyWorld, records: list[Record], side: int = 0) -> np.ndarray:
+    """Commanded palm point per step in the base frame, starting at the start wrists."""
+    offset = np.r_[world.planner_cfg.palm_offsets[side], 1.0]
+    wrists = [world.start_wrists[side]] + [
+        r.cmd.left_wrist if side == 0 else r.cmd.right_wrist for r in records
+    ]
+    return np.array([(w @ offset)[:3] for w in wrists])
+
+
+def rotation_steps_deg(world: ToyWorld, records: list[Record], side: int) -> np.ndarray:
+    wrists = [world.start_wrists[side]] + [
+        r.cmd.left_wrist if side == 0 else r.cmd.right_wrist for r in records
+    ]
+    cos = [(np.trace(a[:3, :3].T @ b[:3, :3]) - 1) / 2 for a, b in zip(wrists, wrists[1:])]
+    return np.degrees(np.arccos(np.clip(cos, -1.0, 1.0)))
+
+
+@pytest.mark.parametrize(("level", "seed"), [(0, 0), (1, 1)])
+def test_commanded_wrists_never_jump(level: int, seed: int) -> None:
+    # decoupled_wbc interpolates one control step ahead, so a target step is an arm
+    # lunge (11.7 cm in one 20 ms step at REACH measured on seed 22, level 1).
+    world = ToyWorld(level=level, seed=seed)
+    records = world.run()
+    assert records[-1].cmd.phase is Phase.DONE
+    for side in (0, 1):
+        steps = np.linalg.norm(np.diff(palm_path(world, records, side), axis=0), axis=1)
+        assert float(np.max(steps)) < 0.015  # m per 20 ms step
+        assert float(np.max(rotation_steps_deg(world, records, side))) < 3.0
+
+
+def test_reaching_has_a_bell_shaped_speed_profile() -> None:
+    # Minimum jerk: speed zero at both ends, one peak in the middle (human reaching).
+    world = ToyWorld()
+    records = world.run()
+    reach = [r for r in records if r.cmd.phase is Phase.APPROACH_A]
+    speed = np.linalg.norm(np.diff(palm_path(world, reach), axis=0), axis=1) / 0.02
+    moving = np.flatnonzero(speed > 1e-9)
+    assert moving.size and moving[-1] + 1 < speed.size  # settles before APPROACH_A ends
+    profile = speed[: moving[-1] + 1]
+    peak = int(np.argmax(profile))
+    assert profile[0] < 0.05 * profile[peak] and profile[-1] < 0.1 * profile[peak]
+    assert 0.4 <= peak / (profile.size - 1) <= 0.6
+    assert np.all(np.diff(profile[: peak + 1]) >= -1e-9)
+    assert np.all(np.diff(profile[peak:]) <= 1e-9)
+    assert profile.size * 0.02 >= world.planner_cfg.smooth_min_s - 0.02
+
+
+def commanded_palms_world(world: ToyWorld, record: Record) -> list[np.ndarray]:
+    offsets = world.planner_cfg.palm_offsets
+    to_world = base_transform(record.base, PELVIS_Z)
+    wrists = (record.cmd.left_wrist, record.cmd.right_wrist)
+    return [(to_world @ w @ np.r_[o, 1.0])[:3] for w, o in zip(wrists, offsets)]
+
+
+def test_reach_ends_only_once_the_hands_have_arrived() -> None:
+    # Sagging arms put the measured palms within palm_tol of the pre-grasp pose while
+    # the commanded ones were still on the way (seed 22, level 1: REACH ended after
+    # 0.16 s and the hands cut down onto the handles). REACH waits for the end of the
+    # trajectory, then for the measured palms at the final target.
+    from flywheel_simple.tray.planner import grasp_palms_world, tray_yaw_of
+
+    world = ToyWorld(level=1, seed=1)
+    records = world.run()
+    k = next(i for i, r in enumerate(records) if r.cmd.phase is Phase.GRASP)
+    last_reach = records[k - 1]
+    cfg = world.planner_cfg
+    state = last_reach.state
+    outside = grasp_palms_world(
+        cfg, world.cfg, state.tray_pos, tray_yaw_of(state.tray_quat), cfg.pregrasp_offset
+    )
+    above = np.array([0.0, 0.0, cfg.pregrasp_dz])
+    for palm, target in zip(commanded_palms_world(world, last_reach), outside):
+        assert float(np.linalg.norm(palm - (target + above))) < 0.002
+    reach_s = sum(r.cmd.phase is Phase.REACH for r in records) * 0.02
+    assert reach_s >= cfg.smooth_min_s - 0.02
+
+
+def test_hands_close_and_open_gradually() -> None:
+    records = ToyWorld().run()
+    closure = np.array([r.cmd.hand_closure[0] for r in records])
+    assert float(np.max(np.abs(np.diff(closure)))) <= 0.1
+    assert np.any((closure > 0.05) & (closure < 0.95))
+    assert float(np.max(closure)) == 1.0 and closure[-1] == records[0].cmd.hand_closure[0]
+
+
+def test_release_opens_the_hands_before_moving_them_out() -> None:
+    # Hands moving out while still opening dragged the tray by a hooked thumb (level 0
+    # seed 0: 9.9 deg tilt, RELEASE timed out).
+    world = ToyWorld()
+    records = [r for r in world.run() if r.cmd.phase is Phase.RELEASE]
+    opened = next(i for i, r in enumerate(records) if r.cmd.hand_closure[0] == 0.0)
+    assert opened > 0
+    for side in (0, 1):
+        held = palm_path(world, records[: opened + 1], side)[1:]
+        assert float(np.max(np.abs(held - held[0]))) < 0.002  # LOWER's last 1 mm step
+        moved = palm_path(world, records, side)[1:]
+        assert float(np.linalg.norm(moved[-1] - moved[0])) > 0.05

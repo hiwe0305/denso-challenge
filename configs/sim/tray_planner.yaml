@@ -34,9 +34,12 @@ grasp_dz: 0.0
 squeeze: 0.0
 # Hand closure outside the grasp (approach, reach, release, retreat): open for a pinch.
 hand_closure_open: 0.0
-# GRASP closes the hands once both palms are at the grasp targets, or after this many
-# seconds; the pinch slides in open first (0 closes at once, as the squeeze did).
-grasp_close_after: 1.5
+# GRASP closes the hands once the move has ended with both palms at the grasp targets, or
+# after this many seconds; the pinch slides in open first (0 closes at once, as the squeeze
+# did). With min-jerk moves (D-20) closing as the hands arrive hooks the lip; swept over 48
+# episodes at pregrasp_offset 0.12: 0.6 / 0.5 / 0.45 / 0.4 / 0.35 -> 31 / 33 / 29 / 37 / 36,
+# and with smooth_speed 0.3: 0.5 / 0.4 / 0.35 -> 36 / 39 / 40 (1.5 before D-20: 40).
+grasp_close_after: 0.35
 
 # APPROACH_A: palms go to the ready pose (above the table top, outside the tray's width)
 # before walking; at the default pose G1's fingers hit table A's edge 6 cm after the
@@ -54,7 +57,9 @@ vx_approach: 0.2
 # REACH, GRASP: pre-grasp this far outside the grip point along the tray's +-y; palms
 # count as there within palm_tol (the left arm stalls 2.5-3 cm short of pre-grasp at its
 # limit; pre-grasp is only a waypoint); both handle contacts held grasp_hold to leave GRASP.
-pregrasp_offset: 0.06
+# RELEASE moves the hands out as far. With min-jerk moves 0.06 left the wrists under the lip
+# in RELEASE; 0.10 / 0.12 / 0.14 -> 31 / 33 / 20 of 48 (grasp_close_after 0.5).
+pregrasp_offset: 0.12
 # ...and this far above it: with the arm sagging ~3 cm the fist's knuckles otherwise rest
 # on table A and block the reach.
 pregrasp_dz: 0.04
@@ -127,6 +132,16 @@ release_hold: 0.5
 release_dz: -0.02
 retreat: 0.20
 vx_retreat: -0.2
+
+# Minimum-jerk smoothing (D-20): when a phase change moves the nominal wrist targets, the
+# commanded wrists move from where they were along a min-jerk profile (bell-shaped speed)
+# lasting max(smooth_min_s, distance / smooth_speed, angle / smooth_rot_speed_deg);
+# continuous corrections (palm sag, place shift, levelling) pass straight through.
+smooth_speed: 0.30
+smooth_rot_speed_deg: 60.0
+smooth_min_s: 0.6
+# Hand closure changes ramp along a min-jerk profile over this many seconds.
+hand_close_s: 0.5
 
 # Abort when the tray is below this height (on the floor).
 abort_tray_z: 0.4
