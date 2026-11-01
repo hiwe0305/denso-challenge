@@ -40,3 +40,15 @@ def test_diagnosis_stop_and_schema() -> None:
     with pytest.raises(ValidationError):
         DiagnosisFinding(code="T3", start_step=1, value=1, stop_job=True)
     assert "findings" in TrainDiagnosis.model_json_schema()["properties"]
+
+
+def test_diagnosis_skips_round_trip_and_legacy_default() -> None:
+    legacy = {"checkpoint_id": "ckpt1", "config_sha256": "a" * 64, "findings": []}
+    assert TrainDiagnosis.model_validate(legacy).skipped == []
+    diagnosis = TrainDiagnosis.model_validate(
+        {**legacy, "skipped": [{"code": "T8a", "reason": "missing flag"}]}
+    )
+    assert TrainDiagnosis.model_validate_json(diagnosis.model_dump_json()) == diagnosis
+    for skip in ({"code": "", "reason": "missing"}, {"code": "T7", "reason": ""}):
+        with pytest.raises(ValidationError):
+            TrainDiagnosis.model_validate({**legacy, "skipped": [skip]})
