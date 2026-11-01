@@ -30,7 +30,7 @@ Là kỹ sư dữ liệu, tôi muốn một bộ dữ liệu và log thật đư
 - [x] 1. Bộ cấy lỗi dữ liệu trên bản sao psi-data (AC 1)
 - [x] 2. Log train và log RTC cấy lỗi từ bộ giả (AC 2)
 - [x] 3. `DefectManifest` có hash, chặn agent đọc (AC 3)
-- [ ] 4. Bản sạch (AC 4)
+- [x] 4. Bản sạch (AC 4)
 - [ ] 5. Giao bản cấy và bản sạch, test chặn release (AC 5)
 
 Bản 3/11/2026 (nhiệm vụ 1–5 là 5 commit của Thông; [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) session 2):
