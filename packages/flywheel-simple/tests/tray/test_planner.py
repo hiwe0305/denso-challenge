@@ -128,3 +128,14 @@ def test_hands_shift_the_tray_onto_the_target_while_lowering() -> None:
 
     # Seed 2 ends 5.9 cm off (tolerance 5 cm); a 5 cm shift brings it under 1.5 cm.
     assert miss(0.0) > 0.05 and miss(0.05) < 0.015
+
+
+def test_pinch_grasp_closes_only_once_the_hands_are_there() -> None:
+    from dataclasses import replace
+
+    # A finger pinch slides in open and closes at the handles; a squeeze closes at once.
+    cfg = replace(PlannerConfig.load(), hand_closure_open=0.0, squeeze=0.0, grasp_close_after=5.0)
+    records = ToyWorld(planner_cfg=cfg).run()
+    grasp = [r.cmd for r in records if r.cmd.phase is Phase.GRASP]
+    assert grasp[0].hand_closure == (0.0, 0.0) and grasp[-1].hand_closure == (1.0, 1.0)
+    assert records[-1].cmd.phase is Phase.DONE and records[-1].report.success

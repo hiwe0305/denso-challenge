@@ -38,6 +38,9 @@ squeeze: 0.05
 # Hand closure outside the grasp (approach, reach, release, retreat): 1 keeps a fist, so
 # the open fingers neither drag on the table nor catch the tray rim while reaching.
 hand_closure_open: 1.0
+# GRASP closes the hands once both palms are at the grasp targets, or after this many
+# seconds; 0 closes at once (squeeze). A finger pinch slides in open first.
+grasp_close_after: 0.0
 
 # APPROACH_A: palms go to the ready pose (above the table top, outside the tray's width)
 # before walking; at the default pose G1's fingers hit table A's edge 6 cm after the
@@ -103,6 +106,9 @@ lower_speed: 0.05
 # walking, at most place_shift_max (m). RELEASE starts once the tray sits flat on B
 # (within place_height_tol of the table top, tilt under place_tilt_deg) for lower_hold (s).
 place_shift_max: 0.05
+# The shift keeps tracking the tray's error while it is in the air (gain per step): the
+# loaded arms pull the tray back as they bend down.
+place_gain: 0.1
 place_height_tol: 0.005
 place_tilt_deg: 3.0
 lower_hold: 0.2
