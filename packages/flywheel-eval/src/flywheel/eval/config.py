@@ -1,1 +1,273 @@
-"""Reserved for the eval config."""
+"""Thresholds of the evaluation lane, read from `configs/eval/diagnosis/` (DA-08 AC 3).
+
+Two rules hold this module together. No threshold has a default in code: a key
+missing from the config file raises, so a detector can never quietly compare
+against a number nobody wrote down. And every result artifact carries
+`config_sha256` of the file it ran on (AC 4), which is what lets a finding be
+reproduced later, or be told apart from a finding made under other thresholds.
+
+`load_train_thresholds` hashes the same bytes it parses, so the hash in an
+artifact can only ever name the file that run actually read. Validation lives in
+`from_mapping`, which takes a parsed mapping and knows nothing about the file
+format.
+"""
+
+from __future__ import annotations
+
+import hashlib
+from collections.abc import Mapping
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+
+class ConfigError(ValueError):
+    """A threshold file a detector must not run on."""
+
+
+@dataclass(frozen=True)
+class T1Thresholds:
+    """Divergence: loss over `k` times the window minimum, or not finite at all."""
+
+    k: float
+    window_steps: int
+
+
+@dataclass(frozen=True)
+class T2Thresholds:
+    """No learning: val loss still near its baseline after `n_steps`."""
+
+    n_steps: int
+    min_relative_drop: float
+    baseline_val_count: int
+
+
+@dataclass(frozen=True)
+class T3Thresholds:
+    """Overfitting: val loss up over `m_measurements` while smoothed train loss falls."""
+
+    m_measurements: int
+
+
+@dataclass(frozen=True)
+class T4Thresholds:
+    """Group imbalance: one action group barely improves while another does."""
+
+    window_steps: int
+    min_group_drop: float
+    ref_group_drop: float
+
+
+@dataclass(frozen=True)
+class T5Thresholds:
+    """Dead dimension: prediction variance under `epsilon` on an unmasked dimension."""
+
+    window_steps: int
+    epsilon: float
+
+
+@dataclass(frozen=True)
+class T6Thresholds:
+    """Mode collapse: predicted std far under the target std of the same dimension."""
+
+    min_std_ratio: float
+
+
+@dataclass(frozen=True)
+class T7Thresholds:
+    """Forgetting: a probe score of the child checkpoint below its parent."""
+
+    max_relative_drop: float
+
+
+@dataclass(frozen=True)
+class T8Thresholds:
+    """Gradient faults: gradient on a frozen VLM, or repeated action-head spikes."""
+
+    frozen_tolerance: float
+    max_grad_norm: float
+    max_exceedances: int
+
+
+@dataclass(frozen=True)
+class O1Thresholds:
+    """Offline error of one action group, against its own budget or the group median."""
+
+    max_error_by_group: dict[str, float]
+    max_error_ratio: float
+
+
+@dataclass(frozen=True)
+class O2Thresholds:
+    """Offline error growing along the action chunk."""
+
+    max_slope: float
+    max_ratio: float
+
+
+@dataclass(frozen=True)
+class O3Thresholds:
+    """Hand events landing off the demonstrated step."""
+
+    max_offset_steps: int
+
+
+@dataclass(frozen=True)
+class O4Thresholds:
+    """Predicted actions outside the joint limits of the embodiment."""
+
+    max_fraction: float
+
+
+@dataclass(frozen=True)
+class TrainThresholds:
+    """Every threshold the F-TRAIN and F-OFF detectors of DA-08 read."""
+
+    t1: T1Thresholds
+    t2: T2Thresholds
+    t3: T3Thresholds
+    t4: T4Thresholds
+    t5: T5Thresholds
+    t6: T6Thresholds
+    t7: T7Thresholds
+    t8: T8Thresholds
+    o1: O1Thresholds
+    o2: O2Thresholds
+    o3: O3Thresholds
+    o4: O4Thresholds
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> TrainThresholds:
+        """Validate a parsed threshold mapping; raise `ConfigError` on anything unclear."""
+        _reject_unknown(data, tuple(cls.__dataclass_fields__), "train.yaml")
+        t1, t2, t3, t4 = (_section(data, name) for name in ("t1", "t2", "t3", "t4"))
+        t5, t6, t7, t8 = (_section(data, name) for name in ("t5", "t6", "t7", "t8"))
+        o1, o2, o3, o4 = (_section(data, name) for name in ("o1", "o2", "o3", "o4"))
+        return cls(
+            t1=T1Thresholds(
+                k=_number(t1, "k", "t1"),
+                window_steps=_steps(t1, "window_steps", "t1"),
+            ),
+            t2=T2Thresholds(
+                n_steps=_steps(t2, "n_steps", "t2"),
+                min_relative_drop=_number(t2, "min_relative_drop", "t2"),
+                baseline_val_count=_steps(t2, "baseline_val_count", "t2"),
+            ),
+            t3=T3Thresholds(m_measurements=_steps(t3, "m_measurements", "t3")),
+            t4=T4Thresholds(
+                window_steps=_steps(t4, "window_steps", "t4"),
+                min_group_drop=_number(t4, "min_group_drop", "t4"),
+                ref_group_drop=_number(t4, "ref_group_drop", "t4"),
+            ),
+            t5=T5Thresholds(
+                window_steps=_steps(t5, "window_steps", "t5"),
+                epsilon=_number(t5, "epsilon", "t5"),
+            ),
+            t6=T6Thresholds(min_std_ratio=_number(t6, "min_std_ratio", "t6")),
+            t7=T7Thresholds(max_relative_drop=_number(t7, "max_relative_drop", "t7")),
+            t8=T8Thresholds(
+                frozen_tolerance=_number(t8, "frozen_tolerance", "t8"),
+                max_grad_norm=_number(t8, "max_grad_norm", "t8"),
+                max_exceedances=_steps(t8, "max_exceedances", "t8"),
+            ),
+            o1=O1Thresholds(
+                max_error_by_group=_number_map(o1, "max_error_by_group", "o1"),
+                max_error_ratio=_number(o1, "max_error_ratio", "o1"),
+            ),
+            o2=O2Thresholds(
+                max_slope=_number(o2, "max_slope", "o2"),
+                max_ratio=_number(o2, "max_ratio", "o2"),
+            ),
+            o3=O3Thresholds(max_offset_steps=_steps(o3, "max_offset_steps", "o3")),
+            o4=O4Thresholds(max_fraction=_number(o4, "max_fraction", "o4")),
+        )
+
+
+def load_train_thresholds(path: Path) -> tuple[TrainThresholds, str]:
+    """Read a threshold file; return the thresholds and the hash to record with them.
+
+    One read serves both answers, so the hash an artifact carries is the hash of
+    the bytes the detectors actually ran on (AC 3, 4).
+    """
+    raw = path.read_bytes()
+    parsed = yaml.safe_load(raw.decode("utf-8"))
+    if not isinstance(parsed, Mapping):
+        kind = type(parsed).__name__
+        raise ConfigError(f"`{path}` must hold a mapping of threshold sections, got {kind}")
+    return TrainThresholds.from_mapping(parsed), _sha256(raw)
+
+
+def config_sha256(path: Path) -> str:
+    """Hash of the config file as it was read, for the result artifact (AC 3, 4)."""
+    return _sha256(path.read_bytes())
+
+
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _section(data: Mapping[str, Any], name: str) -> Mapping[str, Any]:
+    if name not in data:
+        raise ConfigError(f"missing section `{name}`")
+    section = data[name]
+    if not isinstance(section, Mapping):
+        raise ConfigError(f"section `{name}` must be a mapping, got {type(section).__name__}")
+    _reject_unknown(section, _SECTION_FIELDS[name], name)
+    return section
+
+
+def _reject_unknown(data: Mapping[str, Any], expected: tuple[str, ...], where: str) -> None:
+    # a key nobody reads means the number its author wrote is not the number in use
+    unknown = sorted(set(data) - set(expected))
+    if unknown:
+        raise ConfigError(f"`{where}` has unknown key(s) {unknown}; expected {list(expected)}")
+
+
+def _require(section: Mapping[str, Any], key: str, where: str) -> Any:
+    if key not in section:
+        raise ConfigError(f"missing threshold `{where}.{key}`")
+    return section[key]
+
+
+def _number(section: Mapping[str, Any], key: str, where: str) -> float:
+    value = _require(section, key, where)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ConfigError(f"`{where}.{key}` must be a number, got {value!r}")
+    return float(value)
+
+
+def _steps(section: Mapping[str, Any], key: str, where: str) -> int:
+    value = _require(section, key, where)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ConfigError(f"`{where}.{key}` must be a whole number of steps, got {value!r}")
+    return value
+
+
+def _number_map(section: Mapping[str, Any], key: str, where: str) -> dict[str, float]:
+    value = _require(section, key, where)
+    if not isinstance(value, Mapping):
+        raise ConfigError(f"`{where}.{key}` must be a mapping of name to number, got {value!r}")
+    budgets: dict[str, float] = {}
+    for name, number in value.items():
+        if isinstance(number, bool) or not isinstance(number, (int, float)):
+            raise ConfigError(f"`{where}.{key}.{name}` must be a number, got {number!r}")
+        budgets[str(name)] = float(number)
+    return budgets
+
+
+_SECTION_FIELDS: dict[str, tuple[str, ...]] = {
+    "t1": tuple(T1Thresholds.__dataclass_fields__),
+    "t2": tuple(T2Thresholds.__dataclass_fields__),
+    "t3": tuple(T3Thresholds.__dataclass_fields__),
+    "t4": tuple(T4Thresholds.__dataclass_fields__),
+    "t5": tuple(T5Thresholds.__dataclass_fields__),
+    "t6": tuple(T6Thresholds.__dataclass_fields__),
+    "t7": tuple(T7Thresholds.__dataclass_fields__),
+    "t8": tuple(T8Thresholds.__dataclass_fields__),
+    "o1": tuple(O1Thresholds.__dataclass_fields__),
+    "o2": tuple(O2Thresholds.__dataclass_fields__),
+    "o3": tuple(O3Thresholds.__dataclass_fields__),
+    "o4": tuple(O4Thresholds.__dataclass_fields__),
+}
