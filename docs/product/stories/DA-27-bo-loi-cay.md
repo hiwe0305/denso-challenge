@@ -29,7 +29,7 @@ Là kỹ sư dữ liệu, tôi muốn một bộ dữ liệu và log thật đư
 
 - [x] 1. Bộ cấy lỗi dữ liệu trên bản sao psi-data (AC 1)
 - [x] 2. Log train và log RTC cấy lỗi từ bộ giả (AC 2)
-- [ ] 3. `DefectManifest` có hash, chặn agent đọc (AC 3)
+- [x] 3. `DefectManifest` có hash, chặn agent đọc (AC 3)
 - [ ] 4. Bản sạch (AC 4)
 - [ ] 5. Giao bản cấy và bản sạch, test chặn release (AC 5)
 
