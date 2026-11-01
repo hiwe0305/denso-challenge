@@ -113,3 +113,18 @@ def test_reset_starts_a_new_episode() -> None:
     planner.phase = Phase.CARRY
     planner.reset()
     assert planner.step(state, world.base, report).phase is Phase.APPROACH_A
+
+
+def test_hands_shift_the_tray_onto_the_target_while_lowering() -> None:
+    from dataclasses import replace
+
+    # Without sideways steps the walk ends off target in y; the arms take up the rest.
+    def miss(shift_max: float) -> float:
+        cfg = replace(PlannerConfig.load(), place_shift_max=shift_max)
+        world = ToyWorld(level=1, seed=2, vy_scale=0.0, planner_cfg=cfg)
+        world.run()
+        target = world.sample.target_pose
+        return math.hypot(world.tray_pos[0] - target.x, world.tray_pos[1] - target.y)
+
+    # Seed 2 ends 5.9 cm off (tolerance 5 cm); a 5 cm shift brings it under 1.5 cm.
+    assert miss(0.0) > 0.05 and miss(0.05) < 0.015

@@ -16,7 +16,6 @@ are absent.
 from __future__ import annotations
 
 import importlib
-import time
 from collections.abc import Sequence
 from typing import Any
 
@@ -87,6 +86,7 @@ class StandWalkController:
         self.ik = UpperBodyIK(self._model)
         self._started = False
         self._ik_anchored = False
+        self._clock = 0.0  # control time (s), advanced CONTROL_DT per action
         self.last_record: dict[str, NDArray[np.float64]] = {}
 
     @property
@@ -101,7 +101,8 @@ class StandWalkController:
 
     def reset(self) -> None:
         """Fresh WBC pipeline with the RL lower body engaged, as teleop_decoupled_wbc does."""
-        self._policy.reset(init_time=time.monotonic())
+        self._clock = 0.0
+        self._policy.reset(init_time=self._clock)
         self._policy.lower_body_policy.use_policy_action = True
         self._started = False
         self._ik_anchored = False
@@ -110,7 +111,7 @@ class StandWalkController:
     def action(
         self,
         sim_obs: dict[str, Any],
-        navigate_cmd: Sequence[float] = (0.0, 0.0, 0.0, 0.0),
+        navigate_cmd: Sequence[float] | NDArray[np.float64] = (0.0, 0.0, 0.0, 0.0),
         wrist_pose: tuple[NDArray[np.float64], NDArray[np.float64]] | None = None,
         hand_closure: tuple[float, float] = (0.0, 0.0),
     ) -> Any:
@@ -136,7 +137,11 @@ class StandWalkController:
         for side, closure in zip(("left", "right"), hand_closure):
             upper[self.ik.hand_slots[side]] = hand_q(side, closure)  # type: ignore[arg-type]
 
-        t_now = time.monotonic()
+        # Control clock, not wall time: the WBC interpolates its targets in time, so
+        # with time.monotonic() the same commands moved the arm differently (0.022 rad
+        # after 40 steps) depending on how long each env step took.
+        t_now = self._clock
+        self._clock += CONTROL_DT
         self._policy.set_observation(self._wbc_observation(sim_obs))
         self._policy.set_goal(
             {

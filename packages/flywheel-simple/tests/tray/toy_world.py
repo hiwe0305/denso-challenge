@@ -4,9 +4,11 @@ The base follows `nav` as decoupled WBC does (vx, vy in the base frame; with a
 turn flag >= 0.1 the yaw goes to `heading` at (error / 0.5) rad/s, at most
 1 rad/s). Palms sit at the commanded wrists plus the palm offset, optionally
 sagging. A hand grips its handle when closed past half with the palm within
-CONTACT_R; while both grip, the tray moves rigidly with the palms. Released
-over a table, the tray rests on it; elsewhere it falls to the floor. DA-32's
-StepTracker scores every step.
+CONTACT_R of its squeezed grasp point (`grasp_palms_world`). A squeeze holds
+while the hands stay no further apart than when they gripped (plus SLACK), so
+spreading them releases it as opening does; while both grip, the tray moves
+rigidly with the palms. Released over a table, the tray rests on it; elsewhere it falls to the
+floor. DA-32's StepTracker scores every step.
 """
 
 from __future__ import annotations
@@ -24,7 +26,7 @@ from flywheel_simple.tray.planner import (
     PlannerConfig,
     TrayPlanner,
     base_transform,
-    handle_points,
+    grasp_palms_world,
 )
 from flywheel_simple.tray.predicates import StepReport, StepTracker, TrayState
 from flywheel_simple.tray.randomize import sample_episode
@@ -32,6 +34,7 @@ from flywheel_simple.tray.randomize import sample_episode
 DT = 0.02
 PELVIS_Z = 0.75
 CONTACT_R = 0.03
+SLACK = 0.02
 LINGER_S = 2.0  # keep stepping after DONE or ABORT so success can register
 
 
@@ -44,9 +47,17 @@ class Record:
 
 
 class ToyWorld:
-    def __init__(self, level: int = 0, seed: int = 0, palm_sag: float = 0.0) -> None:
+    def __init__(
+        self,
+        level: int = 0,
+        seed: int = 0,
+        palm_sag: float = 0.0,
+        vy_scale: float = 1.0,
+        planner_cfg: PlannerConfig | None = None,
+    ) -> None:
         self.cfg = TrayConfig.load()
-        self.planner_cfg = PlannerConfig.load()
+        self.planner_cfg = planner_cfg or PlannerConfig.load()
+        self.vy_scale = vy_scale  # 0 blocks sideways steps, leaving a lateral error
         self.sample = sample_episode(self.cfg, level, seed)
         self.geo = scene_geometry_with_gap(self.cfg, self.sample.table_gap)
         spawn = self.sample.robot_spawn
@@ -59,6 +70,7 @@ class ToyWorld:
         self.palms = [(rest @ np.array([0.2, s * 0.2, -0.1, 1.0]))[:3] for s in (1, -1)]
         self.contacts = (False, False)
         self.grip: tuple[float, np.ndarray] | None = None  # tray yaw - base yaw, tray - palm mid
+        self.grip_width = 0.0
         self.blocked = False
         self.drop_left_in: Phase | None = None
         self.left_dropped = False
@@ -102,6 +114,7 @@ class ToyWorld:
         x, y = self.base.x, self.base.y
         if not self.blocked:
             c, s = math.cos(self.base.yaw), math.sin(self.base.yaw)
+            vy *= self.vy_scale
             x += (c * vx - s * vy) * DT
             y += (s * vx + c * vy) * DT
         self.base = Pose2D(x, y, math.atan2(math.sin(yaw), math.cos(yaw)))
@@ -114,12 +127,17 @@ class ToyWorld:
 
         if self.drop_left_in is not None and cmd.phase == self.drop_left_in:
             self.left_dropped = True
-        handles = handle_points(self.cfg, self.tray_pos, self.tray_yaw)
+        squeeze = -self.planner_cfg.squeeze  # the planner presses this far inside
+        grasp = grasp_palms_world(self.planner_cfg, self.cfg, self.tray_pos, self.tray_yaw, squeeze)
+        width = float(np.linalg.norm(self.palms[0] - self.palms[1]))
         gripping = []
         for k in range(2):
             closed = cmd.hand_closure[k] >= 0.5
-            near = np.linalg.norm(self.palms[k] - handles[k]) <= CONTACT_R
-            gripping.append(closed and (near or self.grip is not None))
+            if self.grip is None:
+                held = np.linalg.norm(self.palms[k] - grasp[k]) <= CONTACT_R
+            else:
+                held = width <= self.grip_width + SLACK
+            gripping.append(closed and bool(held))
         if self.left_dropped:
             gripping[0] = False
         self.contacts = (gripping[0], gripping[1])
@@ -127,6 +145,7 @@ class ToyWorld:
         mid = (self.palms[0] + self.palms[1]) / 2
         if self.grip is None and all(gripping):
             self.grip = (self.tray_yaw - self.base.yaw, self.tray_pos - mid)
+            self.grip_width = width
         if self.grip is not None and (gripping[1] or all(gripping)):
             rel_yaw, offset = self.grip
             turn = self.base.yaw + rel_yaw - self.tray_yaw

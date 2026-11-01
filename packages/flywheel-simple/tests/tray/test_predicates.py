@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+from flywheel_simple.tray import TrayConfig
 from flywheel_simple.tray.predicates import yaw_error
 
 DT = 0.02
@@ -146,7 +147,7 @@ def test_upturned_tray_over_its_parts_is_a_part_drop(
 
     s = idle_state(t=0.0)
     flipped = np.array([0.0, 1.0, 0.0, 0.0])  # 180 deg about x
-    rim_down = s.tray_pos + [0, 0, 0.06]
+    rim_down = s.tray_pos + [0, 0, TrayConfig.load().tray_height]
     parts = s.part_pos.copy()
     parts[:, 2] = s.tray_pos[2] + 0.015  # on the table, under the upturned tray
     report = make_tracker().update(replace(s, tray_quat=flipped, tray_pos=rim_down, part_pos=parts))

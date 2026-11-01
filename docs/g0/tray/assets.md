@@ -20,7 +20,7 @@ CC-BY-4.0 cho phép sửa, với điều kiện ghi nguồn và nói rõ đã s�
 
 | Vai trong cảnh | Asset | Kích thước gốc (m) | Đã sửa |
 |---|---|---|---|
-| Khay | `crate_green_a20` | 0,612 × 0,412 × 0,090 | Xoay 90° quanh z; co giãn không đều cho khít hộp khay 0,30 × 0,45 × 0,06 m; texture albedo thu về 512 px; bỏ normal và ORM |
+| Khay | `crate_green_a20` | 0,612 × 0,412 × 0,090 | Xoay 90° quanh z; co giãn không đều cho khít hộp khay 0,30 × 0,45 × 0,09 m (0,06 m trước D-16); texture albedo thu về 512 px; bỏ normal và ORM |
 | Bàn A, B | `table_metal_stainless_a03` | 1,800 × 0,699 × 0,850 | Xoay 90°; co giãn về 0,8 × 1,2 × 0,85 m; chỉ dùng texture thép (chân nhựa đen cũng mang texture thép) |
 | Linh kiện 0, 2, 4 | `factory_nut_m20_loose` | 0,030 × 0,035 × 0,016 | Giữ tỉ lệ, đặt vào hộp linh kiện 0,035 × 0,035 × 0,03 m; khối lượng lấy từ config (asset khai sai, đai ốc M16 chỉ 3,6 g) |
 | Linh kiện 1, 3, 5 | `consumable_bearing_ball_a01` | 0,038 × 0,038 × 0,008 | Như trên |

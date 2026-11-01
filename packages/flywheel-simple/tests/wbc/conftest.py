@@ -73,3 +73,9 @@ def tray_env_standing(scene_envs: SceneEnvs) -> Any:
 def open_floor_standing(scene_envs: SceneEnvs) -> Any:
     """As tray_env_standing, with the tables OPEN_CORRIDOR apart."""
     return _standing(scene_envs.get("open"))
+
+
+@pytest.fixture
+def make_standing(scene_envs: SceneEnvs) -> Any:
+    """Factory: a fresh standing Driver on `scene` ("default" or "open"), as often as needed."""
+    return lambda scene="default": _standing(scene_envs.get(scene))

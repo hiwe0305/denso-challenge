@@ -9,7 +9,8 @@ G1 bê khay 6 linh kiện bằng hai tay từ bàn A sang vùng đích trên bà
 | `configs/sim/tray.yaml` | Mọi kích thước, khối lượng, ma sát, dung sai, ngưỡng |
 | `flywheel_simple.wbc` | Đứng và đi bằng decoupled WBC: `GR00T-WholeBodyControl-Balance.onnx` khi lệnh đi gần 0, `GR00T-WholeBodyControl-Walk.onnx` khi có lệnh đi; mục tiêu cổ tay qua `TeleopRetargetingIK` và đóng mở bàn tay Dex3 (DA-33, [upper-body.md](upper-body.md)) |
 | `flywheel_simple.tray` | Cấu hình, hình học, MJCF, ngẫu nhiên hóa 3 mức, vị từ 7 bước, task và env id `simple/G1WholebodyTrayTransferTeleop-v0` |
-| `flywheel_simple.tray.planner`, `configs/sim/tray_planner.yaml` | Máy pha của planner kịch bản theo 7 bước scorer (DA-33, D-15) |
+| `flywheel_simple.tray.planner`, `configs/sim/tray_planner.yaml` | Máy pha của planner kịch bản theo 7 bước scorer (DA-33, D-15, [planner.md](planner.md)) |
+| `flywheel_simple.tray.agent` | Chạy planner trong sim từ reset tới DONE hoặc ABORT (DA-33) |
 | `scripts/g0/tray/import_simready.py` | Tải và đổi mesh SimReady cho lớp hiển thị |
 | `scripts/g0/tray/view_scene.py` | Ghi video camera đầu và video toàn cảnh |
 | `scripts/g0/tray/measure_locomotion.py` | Đo tốc độ đi và quay của G1 (DA-33, [locomotion.md](locomotion.md)) |

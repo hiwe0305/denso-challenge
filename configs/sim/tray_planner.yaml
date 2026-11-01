@@ -3,43 +3,82 @@
 # Wrist and palm positions are in the base frame of flywheel_simple.wbc.upper_body:
 # pelvis xy and yaw, origin at pelvis height, x forward, y left, z up; straight waist.
 # Units: metres, seconds, m/s, rad/s, degrees.
-# Values marked [assumption] are first guesses to tune in DA-33 Task 4 against sim videos.
+# Tuned in DA-33 Task 4 with parallel sweeps on rtx3060 (docs/g0/tray/planner.md).
 
 # Palm point (midway between wrist_yaw_link and hand_middle_0_link) in the left wrist
-# frame; the right hand is mirrored across its xz plane. [assumption]
-palm_offset_x: 0.06
-palm_offset_y: 0.0
-palm_offset_z: 0.0
-# Left wrist orientation in the tray frame while grasping (roll, pitch, yaw); right mirrored. [assumption]
-grasp_roll_deg: 0.0
+# frame; the right hand is mirrored across its xz plane. Measured from g1_sonic's MJCF.
+palm_offset_x: 0.060
+palm_offset_y: 0.002
+palm_offset_z: -0.014
+# Two-hand squeeze. The handles are solid lips (12 x 4 x 2 cm). With the 6 cm tray their
+# underside was 4 cm above the table top and every pinch pose hit table A in a kinematic
+# scan; the 9 cm tray (D-16) leaves 7 cm, still tight for Dex3's fingers and palm. The left wrist rolls 180 deg so the back of the hand
+# faces the tray and the thumb points away; the backs of both hands press the lips'
+# outer faces and the tray rises by friction (1.0). The hands toe in so the fist's
+# knuckles, not the round wrist link, meet the lip. Two point contacts are a hinge: the tray
+# creeps until its centre of mass hangs under the line through them, so the contacts must sit
+# over the centre of mass (1.4 cm off gives ~19 deg, beyond the 15 deg limit). Right hand
+# mirrored. Orientation in the tray frame (roll, pitch, yaw):
+grasp_roll_deg: 180.0
 grasp_pitch_deg: 0.0
-grasp_yaw_deg: 0.0
-# Palm height above the handle bar's centre while grasping. [assumption]
-grasp_dz: 0.0
+grasp_yaw_deg: -20.0
+# The point of the left hand put on the handle, in the left wrist frame: the back of the
+# fist's knuckles. At yaw -20 over 48 episodes (level 0 seed 0, level 1 seeds 1-47):
+# grip_x 0.11 -> 44, 0.115 -> 40, 0.12 -> 30 successes; over 24 episodes 0.10 -> 11,
+# 0.13 -> 5. Yaw -15 tilts in 46-47 of 48.
+grip_x: 0.11
+grip_y: 0.02
+grip_z: 0.0
+# Grip point this far further away from the tray than the handle centre: the lip's
+# outer face is handle_depth / 2 = 0.02 out.
+grasp_dy: 0.02
+# GRASP commands the grip points this far inside the outer faces; the arm PD turns the
+# blocked distance into the squeeze force. At 0.03 the tray slipped and rose only 2.2 cm.
+squeeze: 0.05
+# Hand closure outside the grasp (approach, reach, release, retreat): 1 keeps a fist, so
+# the open fingers neither drag on the table nor catch the tray rim while reaching.
+hand_closure_open: 1.0
 
-# APPROACH_A: palms go to the ready pose (above the table top) before walking; at the
-# default pose G1's fingers hit table A's edge 6 cm after the start (locomotion.md).
-ready_x: 0.25
-ready_y: 0.20
-ready_z: 0.25
+# APPROACH_A: palms go to the ready pose (above the table top, outside the tray's width)
+# before walking; at the default pose G1's fingers hit table A's edge 6 cm after the
+# start (locomotion.md), and further forward they catch the tray rim.
+ready_x: 0.15
+ready_y: 0.30
+ready_z: 0.30
 ready_clear: 0.08
-standoff: 0.30
+standoff: 0.10
+# Approach square to the tray (facing its yaw, centred on it) and stop this far short of
+# its centre: the knuckles reach ~0.27-0.30 m ahead of the pelvis.
+approach_dist: 0.30
 vx_approach: 0.2
 
-# REACH, GRASP: pre-grasp this far outside each handle along the tray's +-y; palms
-# count as there within palm_tol; both handle contacts held grasp_hold to leave GRASP.
+# REACH, GRASP: pre-grasp this far outside the grip point along the tray's +-y; palms
+# count as there within palm_tol (the left arm stalls 2.5-3 cm short of pre-grasp at its
+# limit; pre-grasp is only a waypoint); both handle contacts held grasp_hold to leave GRASP.
 pregrasp_offset: 0.06
-palm_tol: 0.02
+# ...and this far above it: with the arm sagging ~3 cm the fist's knuckles otherwise rest
+# on table A and block the reach.
+pregrasp_dz: 0.04
+# Station keeping in REACH and GRASP: the base slides back ~5 cm as the arms reach
+# forward; step forward at keep_vx (Walk.onnx needs >= 0.1) when it is keep_tol behind.
+keep_tol: 0.02
+keep_vx: 0.12
+palm_tol: 0.04
 grasp_hold: 0.3
 # Measured-palm correction while reaching, grasping and lifting (arm PD sags 2-3 cm):
 # gain per control step, total correction capped at palm_correction_max per hand,
 # integrated only while the palm is within palm_correction_window of its target.
 palm_correction_gain: 0.1
 palm_correction_max: 0.05
-palm_correction_window: 0.05
+palm_correction_window: 0.08
 
 # LIFT, BACK_OFF, TURN.
-lift_height: 0.10
+# The loaded arms reach only part of it (palm 3.5 cm up for a 12 cm target at 0.10).
+lift_height: 0.15
+# The lift target rises at this speed (m/s); a step jerks the squeezed tray.
+lift_speed: 0.05
+# LIFT ends once the ramp is done and the tray has stayed above h_lift this long (s).
+lift_hold: 0.5
 backoff: 0.35
 vx_backoff: -0.25
 # turn_rate integrates target_yaw; the lower body turns at (error / 0.5) rad/s, max 1.
@@ -60,6 +99,13 @@ arrive_hold: 0.5
 
 # LOWER, RELEASE, RETREAT.
 lower_speed: 0.05
+# While lowering, the hands shift the tray onto the target by the xy error left after
+# walking, at most place_shift_max (m). RELEASE starts once the tray sits flat on B
+# (within place_height_tol of the table top, tilt under place_tilt_deg) for lower_hold (s).
+place_shift_max: 0.05
+place_height_tol: 0.005
+place_tilt_deg: 3.0
+lower_hold: 0.2
 release_hold: 0.5
 retreat: 0.20
 vx_retreat: -0.2
