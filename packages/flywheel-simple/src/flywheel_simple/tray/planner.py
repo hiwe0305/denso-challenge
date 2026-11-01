@@ -90,6 +90,7 @@ class PlannerConfig:
     grasp_dy: float
     squeeze: float
     hand_closure_open: float
+    grasp_close_after: float
     ready_x: float
     ready_y: float
     ready_z: float
@@ -124,6 +125,7 @@ class PlannerConfig:
     arrive_hold: float
     lower_speed: float
     place_shift_max: float
+    place_gain: float
     place_height_tol: float
     place_tilt_deg: float
     lower_hold: float
@@ -289,6 +291,7 @@ class TrayPlanner:
     )
     _grasp_world: tuple[NDArray[np.float64], NDArray[np.float64]] | None = None  # squeeze
     _station: Pose2D | None = None  # base pose kept while reaching and grasping
+    _closing: bool = False  # GRASP has started closing the hands
     _place_shift: NDArray[np.float64] | None = None  # hands' shift while lowering, base frame
     _carry: _Carry | None = None
     _lowered: tuple[NDArray[np.float64], NDArray[np.float64]] | None = None
@@ -388,11 +391,19 @@ class TrayPlanner:
                     cfg, self.tray_cfg, state.tray_pos, tray_yaw_of(state.tray_quat), -cfg.squeeze
                 )
             palms = self._to_base(state, base, self._grasp_world)
+            # A pinch slides in open and closes once the hands are at the handles (or
+            # after `grasp_close_after`); a squeeze (0) closes at once.
+            assert self._entered_t is not None
+            waited = state.t - self._entered_t >= cfg.grasp_close_after
+            if not self._closing and (waited or self._palms_at(state, base, palms)):
+                self._closing = True
             if self._held(all(state.hand_contacts), state.t, cfg.grasp_hold):
                 self._enter(Phase.LIFT, state, base)
                 return self._command(state, base)
             nav = self._keep_station(base)
-            return self._emit(state, base, palms, nav, closure=True, heading=self._station.yaw)
+            return self._emit(
+                state, base, palms, nav, closure=self._closing, heading=self._station.yaw
+            )
 
         if p is Phase.LIFT:
             assert self._grasp_world is not None and self._entered_t is not None
@@ -451,8 +462,13 @@ class TrayPlanner:
 
         if p is Phase.LOWER:
             assert self._entered_t is not None
+            # Closed loop: the loaded arms pull the tray back as they bend down (6 cm
+            # on seed 7 with a finger pinch), so the shift keeps tracking the error.
+            error = self._place_error(state, base)
             if self._place_shift is None:
-                self._place_shift = self._place_error(state, base)
+                self._place_shift = error
+            elif state.tray_on_table == "none":
+                self._place_shift = self._capped(self._place_shift + cfg.place_gain * error)
             down = np.array([0.0, 0.0, cfg.lower_speed * (state.t - self._entered_t)])
             move = self._place_shift - down
             palms = (carry.palms[0] + move, carry.palms[1] + move)
@@ -518,11 +534,13 @@ class TrayPlanner:
         target = self.sample.target_pose
         d = np.array([target.x, target.y]) - state.tray_pos[:2]
         c, s = math.cos(base.yaw), math.sin(base.yaw)
-        local = np.array([c * d[0] + s * d[1], -s * d[0] + c * d[1]])
-        norm = float(np.linalg.norm(local))
+        return self._capped(np.array([c * d[0] + s * d[1], -s * d[0] + c * d[1], 0.0]))
+
+    def _capped(self, shift: NDArray[np.float64]) -> NDArray[np.float64]:
+        norm = float(np.linalg.norm(shift))
         if norm > self.cfg.place_shift_max:
-            local *= self.cfg.place_shift_max / norm
-        return np.array([local[0], local[1], 0.0])
+            return shift * (self.cfg.place_shift_max / norm)
+        return shift
 
     def _keep_station(self, base: Pose2D) -> tuple[float, float, float]:
         """Step forward when the base has slid back from where REACH started.

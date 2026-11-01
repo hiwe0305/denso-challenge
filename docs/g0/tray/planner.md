@@ -41,6 +41,26 @@ Góc xoay vào (`grasp_yaw_deg`) cũng nhạy: −15° nghiêng 46–47/48 episo
 | Tốc độ lùi, quay, mang chậm hơn; lùi xa hơn; nhấc cao hơn | Không đổi số thành công: lỗi nghiêng là trôi tới cân bằng, không do va chạm hay gia tốc |
 | Hạ: dịch hai tay theo sai số vị trí khay, chỉ nhả khi khay nằm phẳng | Hết `L-PLACE-POSE` (trước đó lệch tới 5,9 cm) |
 
+## Cầm bằng ngón tay (thử 1/11/2026)
+
+Với khay 9 cm (D-16), khe dưới gờ là 7 cm, đủ cho ngón luồn vào. Cách cầm này dùng bàn tay Dex3 thật: lòng bàn tay ngửa, ngón giữa móc dưới gờ, ngón cái kẹp mặt ngoài gờ; khay lên tới khoảng 13 cm trên mặt bàn (ép mu tay chỉ được ~3 cm). Chỉ cần đổi config, không đổi mã:
+
+| Khóa | Giá trị |
+|---|---|
+| `grasp_roll_deg`, `grasp_pitch_deg`, `grasp_yaw_deg` | −60, 30, 15 |
+| `grip_x`, `grip_y`, `grip_z` | 0,115, −0,04, 0 (điểm kẹp của Dex3 trong khung cổ tay) |
+| `grasp_dy`, `squeeze`, `pregrasp_dz` | 0,01, 0, 0,04 |
+| `hand_closure_open`, `grasp_close_after` | 0 (tay mở khi tiếp cận), 1,5 s |
+
+So sánh trên cùng 48 episode (mức 0 seed 0, mức 1 seed 1–47), máy `rtx3060`:
+
+| Cách cầm | Thành công | Lỗi |
+|---|---|---|
+| Ép mu nắm tay (mặc định) | **44/48** | 2 ngoài tầm với, 2 nghiêng |
+| Kẹp bằng ngón tay | **30/48** | 6 `timeout:LIFT`, 6 nghiêng, 3 `timeout:LOWER`, 2 đặt lệch, 1 khác |
+
+Episode kẹp ngón thành công dài 26,0 s mô phỏng trung bình. Lỗi đặt lệch khi kẹp ngón chủ yếu do tay mang tải kéo khay lùi khi hạ (6 cm ở seed 7); LOWER giờ bù sai số liên tục (`place_gain`).
+
 ## Việc còn mở
 
 1. **Khay ngoài tầm với.** Khay cách mép 0,23–0,25 m (mức 1 dịch +5 cm) thì tay cầm xa quá tầm với khi robot đã đứng sát bàn. Hướng: cúi người bằng eo (pitch) khi với, hoặc giảm `tray_edge_offset` thêm (cần quyết định mới).
