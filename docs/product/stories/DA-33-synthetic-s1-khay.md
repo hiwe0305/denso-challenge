@@ -33,7 +33,7 @@ Kế hoạch chi tiết: [docs/superpowers/plans/2026-10-31-da33-tray-synthetic.
 - [x] 1. Đo đi và quay của G1 trong cảnh khay; bộ tích phân `navigate_cmd`; dọn file cảnh MJCF khi đóng env (AC 1)
 - [x] 2. Mục tiêu hai cổ tay qua `TeleopRetargetingIK`, đóng mở bàn tay Dex3 (AC 1)
 - [x] 3. Máy pha của planner theo 7 bước scorer, có điều kiện chuyển và timeout (AC 2)
-- [ ] 4. Một episode planner mang khay thành công theo `check_success()` (AC 3, mục tiêu 6/11)
+- [x] 4. Một episode planner mang khay thành công theo `check_success()` (AC 3, mục tiêu 6/11)
 - [ ] 5. Bộ ghi LeRobot cùng định dạng teleop của SIMPLE, kèm khối `flywheel` trong `environment_config` (AC 4)
 - [ ] 6. Sinh hàng loạt, sổ lượt sinh chỉ ghi thêm, QA tối thiểu (AC 4, 5)
 - [ ] 7. QA bằng phát lại `replay-decoupled-wbc` ở `mujoco` (AC 4)
@@ -47,6 +47,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `packages/flywheel-simple/src/flywheel_simple/tray/`, `packages/flywheel-simple/tests/tray/`
 - `packages/flywheel-simple/src/flywheel_simple/wbc/`, `packages/flywheel-simple/tests/wbc/`
 - `configs/sim/tray_planner.yaml`
+- `configs/sim/tray.yaml` (từ 31/10/2026, chỉ chiều cao khay và khoảng cách tới mép bàn, theo D-16, Hiếu duyệt)
 - `scripts/g0/tray/`
 - `docs/g0/tray/`, `docs/g0/ledger/DA-33.csv`
 
@@ -67,6 +68,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 |---|---|---|
 | 28/10/2026 | Tạo story nháp theo design 28/10/2026 | PO (Hiếu) |
 | 28/10/2026 | Đổi sang planner kịch bản trên decoupled WBC, bỏ MP agent, `datagen` và cuRobo | PO (Hiếu) |
+| 31/10/2026 | Thêm `configs/sim/tray.yaml` vào Phạm vi file: khay cao 0,09 m, cách mép 0,20 m (D-16) | PO (Hiếu) |
 | 31/10/2026 | Viết 9 nhiệm vụ con theo plan 31/10/2026; thêm `configs/sim/tray_planner.yaml` vào Phạm vi file; đường dữ liệu ghi bằng bộ ghi teleop của SIMPLE, QA bằng `replay-decoupled-wbc`, xuất bằng `postprocess_psi0_sonic.py` | Claude, chờ PO (Hiếu) duyệt |
 
 ## Ghi chép khi làm

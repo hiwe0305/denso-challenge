@@ -53,7 +53,8 @@ def test_robot_spawn_between_tables_closer_to_a() -> None:
 def test_defaults_follow_design_3_1() -> None:
     cfg = TrayConfig.load()
     assert (cfg.table_length, cfg.table_depth, cfg.table_height) == (1.2, 0.8, 0.85)
-    assert (cfg.tray_length, cfg.tray_width, cfg.tray_height) == (0.45, 0.30, 0.06)
+    # Height 0.09 m instead of design 3.1's 0.06 m (D-16).
+    assert (cfg.tray_length, cfg.tray_width, cfg.tray_height) == (0.45, 0.30, 0.09)
     assert cfg.corridor == 1.8 and cfg.part_count == 6
 
 

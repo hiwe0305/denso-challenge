@@ -13,7 +13,8 @@ corridor: 1.8
 # Tray: long side along y, handles on the +-y ends; six compartments, 3 along y x 2 across.
 tray_length: 0.45
 tray_width: 0.30
-tray_height: 0.06
+# 0.09 m (design 3.1: 0.06): Dex3 cannot get under lips 4 cm above the table (D-16).
+tray_height: 0.09
 tray_mass: 1.0
 part_count: 6
 part_mass: 0.05
@@ -36,7 +37,8 @@ table_top: 0.04
 table_leg: 0.05
 
 # Default poses: tray centre this far from table A's corridor edge (B mirrored); robot spawn x.
-tray_edge_offset: 0.25
+# 0.20 m (D-03: 0.25): G1's palm reaches ~0.40 m ahead of the pelvis (D-16).
+tray_edge_offset: 0.20
 robot_spawn_x: 0.45
 
 # Success and step predicates.

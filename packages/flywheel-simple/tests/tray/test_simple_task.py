@@ -40,7 +40,8 @@ def flat_keys(tree: Any, prefix: str = "") -> list[str]:
 
 
 def handle_height(env: Any) -> float:
-    return float(env.unwrapped.mjData.body("tray").xpos[2]) + 0.06
+    cfg = env.unwrapped.task.cfg
+    return float(env.unwrapped.mjData.body("tray").xpos[2]) + cfg.tray_height
 
 
 def arm_reach_band(env: Any, side: str = "left") -> tuple[float, float]:

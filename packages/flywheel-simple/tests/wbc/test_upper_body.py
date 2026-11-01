@@ -139,3 +139,21 @@ def test_last_record_has_teleop_recorder_fields(tray_env_standing: Any) -> None:
             "right_hand_q": (7,),
         }.items()
     )
+
+
+@pytest.mark.sim
+def test_controller_ignores_wall_clock(make_standing: Any) -> None:
+    """Same commands, same arm motion, however long each step takes (Review Focus 3)."""
+    import time
+
+    def reach(delay: float) -> np.ndarray:
+        driver = make_standing()
+        left, right = driver.ctrl.ik.current_wrists(proprio(driver))
+        for k in range(40):  # a moving target, as the planner's ramps and walks give
+            if delay:
+                time.sleep(delay)
+            target = (shift(left, dx=0.003 * k), right)
+            driver.env.step(driver.ctrl.action(proprio(driver), wrist_pose=target))
+        return arm_q(driver)
+
+    assert np.max(np.abs(reach(0.0) - reach(0.01))) < 1e-3
