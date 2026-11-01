@@ -58,7 +58,13 @@ class DiagnosisFinding(Contract):
         return self
 
 
+class DiagnosisSkip(Contract):
+    code: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+
+
 class TrainDiagnosis(Contract):
     checkpoint_id: str = Field(min_length=1)
     config_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     findings: list[DiagnosisFinding]
+    skipped: list[DiagnosisSkip] = Field(default_factory=list)

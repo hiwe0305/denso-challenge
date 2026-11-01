@@ -92,6 +92,27 @@
       ],
       "title": "DiagnosisFinding",
       "type": "object"
+    },
+    "DiagnosisSkip": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "reason"
+      ],
+      "title": "DiagnosisSkip",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -111,6 +132,13 @@
         "$ref": "#/$defs/DiagnosisFinding"
       },
       "title": "Findings",
+      "type": "array"
+    },
+    "skipped": {
+      "items": {
+        "$ref": "#/$defs/DiagnosisSkip"
+      },
+      "title": "Skipped",
       "type": "array"
     }
   },
