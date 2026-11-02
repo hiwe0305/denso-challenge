@@ -92,7 +92,7 @@ def test_environment_config_carries_flywheel_meta(recorded: tuple[Path, Any]) ->
     assert env_cfg["tray"]["sample"]["seed"] == 1
 
 
-def test_recording_starts_after_band_release(recorded: tuple[Path, Any]) -> None:
+def test_recording_starts_once_the_robot_is_stable(recorded: tuple[Path, Any]) -> None:
     root, _ = recorded
     table = _table(root)
     base_pose = np.asarray(table.column("observation.base_pose")[0].as_py())

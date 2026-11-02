@@ -18,6 +18,7 @@ Only runs in the SIMPLE venv (S1-02).
 
 from __future__ import annotations
 
+import json
 import math
 import os
 from dataclasses import asdict, replace
@@ -194,7 +195,14 @@ class G1WholebodyTrayTransferTeleop(Task):  # type: ignore[misc]
 
         `options["level"]` overrides the env's dr_level. A seed outside the train,
         dev and holdout ranges is refused; no seed draws one from the train range.
+        `options["state_dict"]` (a recorded environment_config, as SIMPLE's
+        replay-decoupled-wbc passes it) rebuilds that episode's scene: its seed and
+        level win over both.
         """
+        recorded = (options or {}).get("state_dict")
+        if recorded is not None:
+            sample = recorded["tray"]["sample"]
+            seed, options = int(sample["seed"]), {**(options or {}), "level": sample["level"]}
         level = int((options or {}).get("level", self.metadata.get("dr_level", 0)))
         if seed is None:
             seed = int(np.random.default_rng().integers(SEED_RANGES["train"].stop))
@@ -286,17 +294,63 @@ class G1WholebodyTrayTransferTeleop(Task):  # type: ignore[misc]
         }
 
 
+# Env var naming a JSON-lines file: each finished episode appends its outcome
+# (replay QA reads it; SIMPLE's replay CLI only reports success per episode).
+OUTCOMES_ENV = "FLYWHEEL_TRAY_OUTCOMES"
+_live_env: TrayTransferEnv | None = None
+
+
+def live_env() -> TrayTransferEnv | None:
+    """The process's live tray env (one per process, D-11), for a sim-time clock."""
+    return _live_env
+
+
 class TrayTransferEnv(SonicLocoManipEnv):  # type: ignore[misc]
     """SonicLocoManipEnv that adds the task's privileged state to `info`."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        global _live_env
+        super().__init__(*args, **kwargs)
+        _live_env = self
 
     def _get_info(self) -> dict[str, Any]:
         info: dict[str, Any] = super()._get_info()
         info["privileged"] = self.task.privileged_state(self.mujoco)
         return info
 
+    def outcome(self) -> dict[str, Any]:
+        """The current episode: seed, level, success, failure label, tray pose, steps."""
+        task, data = self.task, self.mujoco.mjData
+        report = task.report
+        return {
+            "seed": task.sample.seed,
+            "level": task.sample.level,
+            "success": bool(report is not None and report.success),
+            "failure": report.failure if report is not None else None,
+            "tray_pos": np.asarray(data.body("tray").xpos).tolist(),
+            "tray_quat": np.asarray(data.body("tray").xquat).tolist(),
+            "steps": int(self.step_count),
+        }
+
+    def _log_outcome(self) -> None:
+        path = os.environ.get(OUTCOMES_ENV)
+        if not path or getattr(self.task, "report", None) is None or not self.step_count:
+            return
+        line = json.dumps(self.outcome())
+        with Path(path).open("a") as f:
+            f.write(line + "\n")
+
+    def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None) -> Any:
+        self._log_outcome()
+        return super().reset(seed=seed, options=options)
+
     def close(self) -> None:
         """Close the simulator, then remove this process's scene MJCF (rewritten on reset)."""
+        global _live_env
+        self._log_outcome()
         super().close()
+        if _live_env is self:
+            _live_env = None
         if self.task.scene_path is not None:
             self.task.scene_path.unlink(missing_ok=True)
 

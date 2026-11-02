@@ -3,16 +3,17 @@
 TrayAgent turns each step's scene state into a PlannerCommand and that into a
 decoupled-WBC ActionCmd: wrists and hands through StandWalkController, base
 through NavIntegrator (`limit_yaw` = the command's heading). run_episode resets
-the env, lowers the elastic band, waits for the pelvis to stand still (it
-slides ~9 cm in the 0.6 s after release, docs/g0/tray/upper-body.md), then runs
-the planner until DONE plus the success window, ABORT, or the 90 s limit.
+the env and starts an episode as SIMPLE's eval-decoupled-wbc and
+replay-decoupled-wbc do (D-24): no elastic band, the WBC holds its standing pose
+until `robot.stabilized` (at most STABILIZE_MAX_STEPS steps). Recorded episodes
+then begin from the state a replay or a policy evaluation begins from. The
+planner runs until DONE plus the success window, ABORT, or the 90 s limit.
 
 Only runs in the SIMPLE venv.
 """
 
 from __future__ import annotations
 
-import math
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -21,13 +22,11 @@ from typing import Any
 from flywheel_simple.tray.geometry import Pose2D
 from flywheel_simple.tray.planner import Phase, PlannerCommand, PlannerConfig, TrayPlanner
 from flywheel_simple.tray.simple_task import tray_state
-from flywheel_simple.wbc import NavIntegrator, StandWalkController, release_band
+from flywheel_simple.wbc import NavIntegrator, StandWalkController
 from flywheel_simple.wbc.drive import pelvis_pose
 
 CONTROL_DT = 1.0 / 50
-STILL_SPEED = 0.05  # m/s, pelvis
-STILL_HOLD_S = 0.5
-MAX_SETTLE_S = 5.0
+STABILIZE_MAX_STEPS = 300  # eval_decoupled_wbc's cap
 EPISODE_LIMIT_S = 90.0
 SUCCESS_WINDOW_S = 3.0  # after DONE: release_stand needs t_stable of a still tray
 
@@ -92,19 +91,20 @@ class TrayAgent:
         )
 
 
-def settle(env: Any, agent: TrayAgent) -> int:
-    """Stand until the pelvis is slower than STILL_SPEED for STILL_HOLD_S; returns steps."""
-    still = 0.0
-    prev = pelvis_pose(env)[0]
-    for k in range(round(MAX_SETTLE_S / CONTROL_DT)):
-        env.step(agent.stand())
-        xy = pelvis_pose(env)[0]
-        speed = math.hypot(*(xy - prev)) / CONTROL_DT
-        prev = xy
-        still = still + CONTROL_DT if speed < STILL_SPEED else 0.0
-        if still >= STILL_HOLD_S:
-            return k + 1
-    raise RuntimeError(f"pelvis not still within {MAX_SETTLE_S} s of band release")
+def stabilize(env: Any, agent: TrayAgent) -> tuple[dict[str, Any], dict[str, Any], int]:
+    """Stand until `robot.stabilized`, as eval/replay-decoupled-wbc's loop; (obs, info, steps).
+
+    `robot.stabilized` counts its calls (it needs 100 before it checks the base
+    velocity), so it is read once per step, as SIMPLE does.
+    """
+    robot = env.unwrapped.task.robot
+    obs: dict[str, Any] = {}
+    info: dict[str, Any] = {}
+    steps = 0
+    while not robot.stabilized and steps < STABILIZE_MAX_STEPS:
+        obs, _, _, _, info = env.step(agent.stand())
+        steps += 1
+    return obs, info, steps
 
 
 def run_episode(
@@ -116,21 +116,20 @@ def run_episode(
     on_frame: OnFrame | None = None,
     limit_s: float = EPISODE_LIMIT_S,
 ) -> EpisodeResult:
-    """Reset to (seed, level), release the band, settle, then run the planner.
+    """Reset to (seed, level), stand until stabilized (D-24), then run the planner.
 
     `on_frame` sees every planner step before it is applied (the recorder's input),
-    so frames start once the pelvis is still after band release (Review Focus 4);
-    `on_step` sees the result. `limit_s` caps the planner's sim time.
+    so frames start on the step after stabilization, where a replay starts its
+    first recorded frame (Review Focus 4); `on_step` sees the result. `limit_s`
+    caps the planner's sim time.
     """
     wall0 = time.perf_counter()
-    obs, info = env.reset(seed=seed, options={"level": level})
+    env.reset(seed=seed, options={"level": level})
     agent.reset()
-    release_band(env, agent.ctrl)
-    settle(env, agent)
+    obs, info, _ = stabilize(env, agent)
     agent.start()
     sim = env.unwrapped
     t0 = float(sim.mjData.time)
-    obs, _, _, _, info = env.step(agent.stand())
 
     phases: list[tuple[str, float]] = []
     steps, done_since = 0, None

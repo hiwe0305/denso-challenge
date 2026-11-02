@@ -137,8 +137,12 @@ def test_last_record_has_teleop_recorder_fields(tray_env_standing: Any) -> None:
             "target_q": (29,),
             "left_hand_q": (7,),
             "right_hand_q": (7,),
+            "goal_navigate_cmd": (4,),
+            "goal_base_height_command": (1,),
         }.items()
     )
+    model = tray_env_standing.ctrl.model
+    assert shapes["goal_upper_body"] == (len(model.get_joint_group_indices("upper_body")),)
 
 
 @pytest.mark.sim

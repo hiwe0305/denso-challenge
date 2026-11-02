@@ -8,7 +8,8 @@ Mọi số đo trên cùng 48 episode (mức 0 seed 0, mức 1 seed 1–47), má
 
 | Cách cầm | Thành công | Seed mới | Lỗi còn lại | Thời gian một episode thành công |
 |---|---|---|---|---|
-| **Đỡ ngửa bàn tay, nâng tay ở 0,50 m, dừng hạ sớm, lùi tay khi nhả (mặc định từ 3/11/2026, D-25)** | **39/47** (mức 1 seed 1–47) | **44/48** | 3 đặt lệch, 3 tuột một tay, 2 nghiêng, 2 `timeout:LIFT` (seed mới 92, 93), 1 `timeout:ARRIVE_B`; không lần nào chạm bàn A khi tiếp cận | chưa đo |
+| **Đỡ ngửa bàn tay, nâng tay ở 0,50 m, dừng hạ sớm, lùi tay khi nhả; bắt đầu như eval của SIMPLE (mặc định, D-24, D-25)** | **41/47** (mức 1 seed 1–47) | **39/48** | 5 nghiêng khi khay rơi lúc nhả, 4 tuột một tay, 3 đặt lệch, 2 `timeout:LIFT`, 1 `timeout:REACH`, 1 `timeout:RELEASE`; không chạm bàn A | 81 s máy mỗi lượt khi 22 worker chạy song song |
+| Như trên, bắt đầu sau khi hạ và thả dây treo | 39/47 | 44/48 | 3 đặt lệch, 3 tuột một tay, 2 nghiêng, 2 `timeout:LIFT`, 1 `timeout:ARRIVE_B` | chưa đo |
 | Như trên, nâng tay ở 0,40 m | 35/47 | 40/48 | Ngón trỏ quét vào cạnh bàn A khi nâng tay (22/22 episode); 6 tuột một tay, 5 `timeout:REACH` | chưa đo |
 | Kẹp bằng ngón tay Dex3, tư thế tay tự nhiên, chuyển động mượt (D-19, D-20, D-21; cấu hình thay thế) | 48/48 | 43/48 | Seed mới: 3 đặt lệch (65, 68, 90), 2 `timeout:RELEASE` (48, 93) | 30,5 s mô phỏng trung bình, tối đa 34,8 s |
 | Kẹp bằng ngón tay, chuyển động mượt (D-20, commit `874f45b`) | 40/48 | 34/48 | 4 `timeout:LIFT` (seed 4, 10: khay xa; 41, 46), 3 đặt lệch, 1 `timeout:RELEASE`; seed mới: 12 `timeout:LIFT` | 28,4 s, tối đa 33,2 s |

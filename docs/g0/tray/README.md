@@ -13,6 +13,7 @@ G1 bê khay 6 linh kiện bằng hai tay từ bàn A sang vùng đích trên bà
 | `flywheel_simple.tray.agent` | Chạy planner trong sim từ reset tới DONE hoặc ABORT (DA-33) |
 | `flywheel_simple.tray.recorder` | Ghi episode của planner thành dataset LeRobot v2.1 cùng trường với teleop của SIMPLE, thêm tư thế khay, vị trí linh kiện, 7 cờ bước và khối `flywheel` trong `environment_config` (DA-33, D-22) |
 | `flywheel_simple.tray.generate`, `scripts/g0/tray/generate.py` | Sinh episode hàng loạt theo shard song song (mỗi process một env), sổ lượt sinh `gen_log.jsonl` chỉ ghi thêm, QA tối thiểu, chạy lại cùng lệnh để tiếp tục (DA-33, D-23) |
+| `flywheel_simple.tray.replay_qa`, `scripts/g0/tray/replay_qa.py` | QA: phát lại episode đã ghi qua `replay-decoupled-wbc` của SIMPLE theo đồng hồ mô phỏng, so tư thế khay cuối với bản ghi; chạy song song theo shard (DA-33, D-24) |
 | `scripts/g0/tray/import_simready.py` | Tải và đổi mesh SimReady cho lớp hiển thị |
 | `scripts/g0/tray/view_scene.py` | Ghi video camera đầu và video toàn cảnh |
 | `scripts/g0/tray/measure_arm_pose.py` | Đo tư thế tay khi cầm khay (khuỷu so với vai và đường vai–cổ tay) và tỉ lệ thành công theo biến thể cấu hình, song song nhiều process (DA-33, D-25) |
@@ -38,6 +39,11 @@ MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/py
 ```bash
 MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/python scripts/g0/tray/generate.py \
     --out fwdata/simple/tray/gen/<lô> --n 130 --level 1 --seed-start 100 --workers 22
+```
+
+```bash
+MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/python scripts/g0/tray/replay_qa.py \
+    --out fwdata/simple/tray/gen/<lô> --workers 22
 ```
 
 ```bash
