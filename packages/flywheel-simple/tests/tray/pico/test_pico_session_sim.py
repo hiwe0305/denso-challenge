@@ -63,10 +63,13 @@ class MemoryExporter:
 @pytest.fixture(scope="module")
 def env_and_agent() -> Iterator[tuple[Any, Any]]:
     from flywheel_simple.tray.pico.agent import ScriptedStreamer, StreamerDecoupledAgent
+    from flywheel_simple.tray.pico.clock import SimClock
     from flywheel_simple.tray.pico.session import make_teleop_env
 
     env = make_teleop_env(level=0, headless=True, max_episode_steps=MAX_STEPS)
-    agent = StreamerDecoupledAgent(env.unwrapped.task.robot, ScriptedStreamer())
+    # The clock replaces `time` in SIMPLE's agent module for the whole process,
+    # so every test here shares this one clocked agent.
+    agent = StreamerDecoupledAgent(env.unwrapped.task.robot, ScriptedStreamer(), clock=SimClock())
     yield env, agent
     agent.close()
     env.close()
@@ -173,3 +176,28 @@ def test_lerobot_dataset_has_the_tray_columns(
     table = pq.read_table(next(root.glob("data/**/episode_000000.parquet")))
     for key in ("observation.tray_pose", "observation.part_pos", "observation.tray_steps"):
         assert key in table.column_names
+
+
+def test_clocked_runs_are_identical_and_faster_than_real_time(
+    env_and_agent: tuple[Any, Any], tmp_path: Path
+) -> None:
+    runs: list[list[dict[str, Any]]] = []
+    for k in range(2):
+        exporters: list[MemoryExporter] = []
+
+        def make(root: Path, *_: Any) -> MemoryExporter:
+            exporters.append(MemoryExporter(root))
+            return exporters[-1]
+
+        run(env_and_agent, tmp_path / str(k), "1:7", keep=True, make_exporter=make)
+        runs.append(exporters[0].saved[0])
+        (attempt,) = attempts(tmp_path / str(k))
+        # MAX_STEPS steps of 0.02 s sim time in less wall time
+        assert attempt["wall_s"] < MAX_STEPS * 0.02
+
+    first, second = runs
+    assert len(first) == len(second) > 0
+    for key in ("action", "action.eef", "observation.state", "observation.tray_pose"):
+        np.testing.assert_array_equal(
+            np.stack([f[key] for f in first]), np.stack([f[key] for f in second]), err_msg=key
+        )
