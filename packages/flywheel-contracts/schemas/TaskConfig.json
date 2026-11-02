@@ -1,0 +1,192 @@
+{
+  "$defs": {
+    "ConditionFieldSpec": {
+      "additionalProperties": false,
+      "description": "Specification of one field in a ConditionSchema.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "default": "float",
+          "title": "Type",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "bounds": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bounds"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ConditionFieldSpec",
+      "type": "object"
+    },
+    "ConditionSchemaConfig": {
+      "additionalProperties": false,
+      "description": "Schema for condition vector / map.",
+      "properties": {
+        "version": {
+          "default": "1.0.0",
+          "title": "Version",
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/ConditionFieldSpec"
+          },
+          "title": "Fields",
+          "type": "array"
+        }
+      },
+      "title": "ConditionSchemaConfig",
+      "type": "object"
+    },
+    "FailureKindSpecConfig": {
+      "additionalProperties": false,
+      "description": "Specification of a failure code and its common failure class.",
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "failure_class": {
+          "anyOf": [
+            {
+              "enum": [
+                "approach",
+                "grasp",
+                "carry",
+                "place",
+                "balance"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failure Class"
+        }
+      },
+      "required": [
+        "code",
+        "description"
+      ],
+      "title": "FailureKindSpecConfig",
+      "type": "object"
+    },
+    "StageSpecConfig": {
+      "additionalProperties": false,
+      "description": "Specification of one task step / stage.",
+      "properties": {
+        "stage_no": {
+          "title": "Stage No",
+          "type": "integer"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "failure_class": {
+          "anyOf": [
+            {
+              "enum": [
+                "approach",
+                "grasp",
+                "carry",
+                "place",
+                "balance"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failure Class"
+        }
+      },
+      "required": [
+        "stage_no",
+        "name"
+      ],
+      "title": "StageSpecConfig",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Task configuration including ConditionSchema and failure classes.",
+  "properties": {
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "version": {
+      "default": "1.0.0",
+      "title": "Version",
+      "type": "string"
+    },
+    "family": {
+      "default": "pick_place",
+      "title": "Family",
+      "type": "string"
+    },
+    "n_steps": {
+      "default": 6,
+      "title": "N Steps",
+      "type": "integer"
+    },
+    "condition_schema": {
+      "$ref": "#/$defs/ConditionSchemaConfig"
+    },
+    "stages": {
+      "items": {
+        "$ref": "#/$defs/StageSpecConfig"
+      },
+      "title": "Stages",
+      "type": "array"
+    },
+    "failure_kinds": {
+      "items": {
+        "$ref": "#/$defs/FailureKindSpecConfig"
+      },
+      "title": "Failure Kinds",
+      "type": "array"
+    },
+    "meta": {
+      "additionalProperties": true,
+      "title": "Meta",
+      "type": "object"
+    }
+  },
+  "required": [
+    "task_id"
+  ],
+  "title": "TaskConfig",
+  "type": "object"
+}
