@@ -32,6 +32,8 @@ EPISODE_LIMIT_S = 90.0
 SUCCESS_WINDOW_S = 3.0  # after DONE: release_stand needs t_stable of a still tray
 
 OnStep = Callable[[dict[str, Any], dict[str, Any], Any], None]
+# (observation, info, StandWalkController.last_record): the step's input and its action
+OnFrame = Callable[[dict[str, Any], dict[str, Any], dict[str, Any]], None]
 
 
 @dataclass(frozen=True)
@@ -111,8 +113,15 @@ def run_episode(
     seed: int,
     level: int,
     on_step: OnStep | None = None,
+    on_frame: OnFrame | None = None,
+    limit_s: float = EPISODE_LIMIT_S,
 ) -> EpisodeResult:
-    """Reset to (seed, level), release the band, settle, then run the planner."""
+    """Reset to (seed, level), release the band, settle, then run the planner.
+
+    `on_frame` sees every planner step before it is applied (the recorder's input),
+    so frames start once the pelvis is still after band release (Review Focus 4);
+    `on_step` sees the result. `limit_s` caps the planner's sim time.
+    """
     wall0 = time.perf_counter()
     obs, info = env.reset(seed=seed, options={"level": level})
     agent.reset()
@@ -126,12 +135,14 @@ def run_episode(
     phases: list[tuple[str, float]] = []
     steps, done_since = 0, None
     report = info["tray_report"]
-    while float(sim.mjData.time) - t0 < EPISODE_LIMIT_S:
+    while float(sim.mjData.time) - t0 < limit_s:
         action = agent.act(obs, info)
         cmd = agent.last_command
         assert cmd is not None
         if not phases or phases[-1][0] != cmd.phase.name:
             phases.append((cmd.phase.name, round(float(sim.mjData.time) - t0, 2)))
+        if on_frame is not None:
+            on_frame(obs, info, agent.ctrl.last_record)
         obs, _, terminated, _, info = env.step(action)
         steps += 1
         if on_step is not None:
