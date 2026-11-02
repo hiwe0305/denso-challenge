@@ -40,7 +40,7 @@ Kế hoạch ở mục "Kế hoạch teleop ảo" và "Kế hoạch generator S2
 
 - [x] 1. Đọc đường teleop PICO của SIMPLE trên env khay, ghi chỗ cắm và khoảng trống (AC 1)
 - [x] 2. Wrapper teleop khay: reset theo (level, seed), ghi trạng thái khay, khối `flywheel`, log lượt thử; test bằng streamer giả, không cần kính (AC 1)
-- [ ] 3. Đo phong cách teleop người từ psi-data của tác giả (ôm thùng hai tay, đi giữa hai bàn), ra dải tham số phong cách (AC 2, 8)
+- [x] 3. Đo phong cách teleop người từ psi-data của tác giả (ôm thùng hai tay, đi giữa hai bàn), ra dải tham số phong cách (AC 2, 8)
 - [ ] 4. Đồng hồ sim cho agent: tất định, chạy nhanh hơn thời gian thực; hai lần chạy cùng seed ra cùng frame (AC 2, 5)
 - [ ] 5. Teleop ảo: phép đổi ngược của `WristsPreProcessor` (test CPU khứ hồi), cần gạt, cò và grip, máy pha 7 bước; một episode đạt `check_success` (AC 2)
 - [ ] 6. Phong cách ngẫu nhiên mỗi episode theo seed phong cách; meta của AC 3 (AC 2, 3)
@@ -133,6 +133,6 @@ Rủi ro: điều kiện xa demo cha thì cầm trượt; đế trôi khi mang l
 ## Ghi chép khi làm
 
 - Giờ thực:
-- Công cụ AI đã dùng: Claude Code (nhiệm vụ 1, 2)
+- Công cụ AI đã dùng: Claude Code (nhiệm vụ 1–3)
 - Ghi chú hoàn thành: Nhiệm vụ 2 (3/11/2026): wrapper, agent với streamer bất kỳ và vòng phiên; ghi được dataset LeRobot thật sau khi cài các gói ghi của [PR #27](https://github.com/hiwe0305/denso-challenge/pull/27) ([pico-teleop.md](../../g0/tray/pico-teleop.md) khoảng trống 11)
-- File đã tạo hoặc sửa: `docs/g0/tray/pico-teleop.md`, `packages/flywheel-simple/src/flywheel_simple/tray/pico/`, `packages/flywheel-simple/tests/tray/pico/`
+- File đã tạo hoặc sửa: `docs/g0/tray/pico-teleop.md`, `docs/g0/tray/virtual-teleop.md`, `packages/flywheel-simple/src/flywheel_simple/tray/pico/`, `packages/flywheel-simple/tests/tray/pico/`, `scripts/g0/tray/pico/measure_teleop_style.py`
