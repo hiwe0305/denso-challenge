@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+from flywheel.contracts.artifacts import ActionLayout
 from flywheel.contracts.training import TrainDiagnosis, TrainingMetric
 
 FIXTURES = Path(__file__).parents[2] / "flywheel-testkit/src/flywheel/testkit/fixtures/training"
@@ -13,6 +14,7 @@ def test_shared_examples_validate() -> None:
         for line in lines:
             TrainingMetric.model_validate_json(line)
     TrainDiagnosis.model_validate_json((FIXTURES / "diagnosis.json").read_text(encoding="utf-8"))
+    ActionLayout.model_validate_json((FIXTURES / "action_layout.json").read_text(encoding="utf-8"))
 
 
 def test_exported_schemas_match_models() -> None:
