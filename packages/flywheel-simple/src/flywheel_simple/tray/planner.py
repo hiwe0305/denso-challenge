@@ -151,8 +151,10 @@ class PlannerConfig:
     place_tilt_deg: float
     lower_hold: float
     lower_settle: float
+    lower_tray_clear: float
     release_hold: float
     release_dz: float
+    release_back: float
     retreat: float
     vx_retreat: float
     abort_tray_z: float
@@ -650,7 +652,13 @@ class TrayPlanner:
             settled = (
                 self._on_b_since is not None and state.t - self._on_b_since >= cfg.lower_settle
             )
-            if self._held(flat, state.t, cfg.lower_hold) or settled:
+            # Palm-up hold (D-25): the wrists under the handle lip reach the table before the
+            # tray does and prop it up, so let go while it is still this close above B.
+            near = (
+                cfg.lower_tray_clear > 0
+                and state.tray_pos[2] - self.tray_cfg.table_height <= cfg.lower_tray_clear
+            )
+            if self._held(flat, state.t, cfg.lower_hold) or settled or near:
                 self._lowered = palms
                 self._enter(Phase.RELEASE, state, base)
                 return self._command(state, base)
@@ -673,7 +681,10 @@ class TrayPlanner:
                 return self._emit(state, base, lowering, stand, rots=self._release_rots)
             back = cfg.pregrasp_offset + cfg.squeeze
             out = self._outward(state, base, self._lowered, back)
-            palms = (out[0] + drop, out[1] + drop)
+            # Palm-up hold (D-25): a wrist under the near end of the handle stayed caught
+            # when the arm could only reach part of the way out; pull back as well.
+            toward_robot = np.array([-cfg.release_back, 0.0, 0.0])
+            palms = (out[0] + drop + toward_robot, out[1] + drop + toward_robot)
             if self._held(not any(state.hand_contacts), state.t, cfg.release_hold):
                 self._lowered = palms
                 self._enter(Phase.RETREAT, state, base)

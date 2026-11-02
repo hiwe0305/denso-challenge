@@ -10,18 +10,21 @@
 palm_offset_x: 0.060
 palm_offset_y: 0.002
 palm_offset_z: -0.014
-# Finger pinch with the Dex3 hands (D-19, Hiếu chose it 1/11/2026 over the back-of-fist
-# squeeze; docs/g0/tray/planner.md has both parameter sets); 40/48 episodes succeed.
-# Palm up, wrist rolled -60 deg
-# and pitched 30 deg, toed in 15 deg: the middle fingers hook under the handle lip (12 x 4
-# x 2 cm, underside 7 cm above the table with the 9 cm tray, D-16) and the thumbs clamp
-# its outer face. Right hand mirrored. Orientation in the tray frame (roll, pitch, yaw):
-grasp_roll_deg: -60.0
-grasp_pitch_deg: 30.0
-grasp_yaw_deg: 15.0
+# Palm-up hold (D-25, Hiếu chose it 3/11/2026 for a human-like pose over the D-19 pinch,
+# whose rolled wrists pushed the elbows out; docs/g0/tray/planner.md has all parameter sets):
+# wrist rolled -90 deg so the palm faces up under the handle lip (12 x 4 x 2 cm, underside
+# 7 cm above the table with the 9 cm tray, D-16), fingers pitched 10 deg down along the bar,
+# closing up around its outer edge; elbows hang beside the body. Right hand mirrored.
+# Orientation in the tray frame (roll, pitch, yaw). Over 22 episodes (level 1, seeds
+# 100-121): pinch (-60, 30, 15) 20, up90 14 (15 with release_dz -0.035), pitch 20 -> 12,
+# roll -75 -> 8, palms in (0 or -30) raise the elbows above the shoulders, yaw 30-60 -> 0.
+grasp_roll_deg: -90.0
+grasp_pitch_deg: 10.0
+grasp_yaw_deg: 0.0
 # Where Dex3 pinches when it closes, in the left wrist frame (index and middle tips meet
 # the thumb there, measured); the planner puts this point on the handle. grip_x swept:
 # 0.11 / 0.115 / 0.12 -> 28 / 30 / 29 of 48 before levelling.
+# With the palm-up hold, 0.14 / 0.16 / 0.18 -> 12 / 6 / 0 of 22 (the hand slides off the bar).
 grip_x: 0.115
 grip_y: -0.04
 grip_z: 0.0
@@ -61,9 +64,10 @@ ready_clear: 0.08
 # turns them the rest of the way. Left wrist, base frame (roll, pitch, yaw); right mirrored.
 # Over the first 22 episodes at y 0.30, z 0.26: standing (10, 10, 0) -> 0 (thumbs push the
 # tray while REACH turns the wrists), halfway -> 18, grasp (-60, 30, 15) -> 15 of 22.
-ready_roll_deg: -25.0
-ready_pitch_deg: 20.0
-ready_yaw_deg: 8.0
+# D-25: halfway to the palm-up hold.
+ready_roll_deg: -45.0
+ready_pitch_deg: 10.0
+ready_yaw_deg: 0.0
 standoff: 0.10
 # Approach square to the tray (facing its yaw, centred on it) and stop this far short of
 # its centre: the knuckles reach ~0.27-0.30 m ahead of the pelvis.
@@ -144,10 +148,17 @@ place_tilt_deg: 3.0
 lower_hold: 0.2
 # ...or once it has rested on B this long (s), even if the hands keep it a few degrees tilted.
 lower_settle: 1.0
+# Palm-up hold (D-25): leave LOWER once the held tray is this close above table B (m),
+# before the wrists under the handle lip touch the table; 0 = off (lower onto B).
+lower_tray_clear: 0.035
 release_hold: 0.5
 # RELEASE moves the hands this far up (m) as they open and move out; negative drops the
-# fingers out from under the handle lip.
-release_dz: -0.02
+# fingers out from under the handle lip. Palm-up hold over 22 episodes: 0 / -0.02 / -0.035
+# -> 14 / 14 / 15 (the wrists under the lip touch table B and tilt the placed tray).
+release_dz: 0.0
+# ...and this far back toward the robot (m) as they move out (D-25: the palm-up hold's
+# wrists caught under the near end of the handle); 0 for the pinch.
+release_back: 0.05
 # RETREAT walks back this far, until the fingers clear table B, then lowers the hands to rest.
 retreat: 0.35
 vx_retreat: -0.2
