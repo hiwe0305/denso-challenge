@@ -28,7 +28,7 @@ Là kỹ sư đánh giá, tôi muốn mỗi checkpoint được kiểm động h
 
 ## Nhiệm vụ
 
-- [ ] 1. Bộ đọc `metrics.jsonl` và kết quả probe qua contracts, chuỗi thời gian theo nhóm action (AC 1, 2)
+- [x] 1. Bộ đọc `metrics.jsonl` và kết quả probe qua contracts, chuỗi thời gian theo nhóm action (AC 1, 2)
 - [x] 2. T1–T3: phân kỳ, không học, quá khớp (AC 1)
 - [ ] 3. T4–T6, T8: mất cân bằng nhóm, chiều chết, sụp mode, gradient bất thường (AC 1)
 - [ ] 4. T7 và O1–O4 từ P3, P4 (AC 2)
