@@ -9,6 +9,7 @@ rather than report a clean checkpoint.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from importlib.metadata import entry_points
 from io import StringIO
@@ -20,12 +21,22 @@ from flywheel.contracts.training import TrainDiagnosis
 from flywheel.eval.cli import app, use_utf8
 from typer.testing import CliRunner
 
-runner = CliRunner()
+# Typer draws its help with rich, which styles and wraps to the terminal width.
+# CI has a colour terminal and the developer machine may not, so the width and
+# the colour are pinned here: without that the same assertion passes locally and
+# fails in CI, which is what happened on PR #32.
+runner = CliRunner(env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"})
 JobWriter = Callable[..., Path]
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def run(*args: str | Path) -> Any:
     return runner.invoke(app, [str(one) for one in args])
+
+
+def plain(output: str) -> str:
+    """Help output without the styling, so an assertion reads what a user reads."""
+    return ANSI.sub("", output)
 
 
 class TestRegistration:
@@ -38,11 +49,12 @@ class TestRegistration:
 
     def test_the_command_has_help(self) -> None:
         result = run("diag-train", "--help")
+        help_text = plain(result.output)
 
         assert result.exit_code == 0
-        assert "--job" in result.output
-        assert "--config" in result.output
-        assert "--store" in result.output
+        assert "--job" in help_text
+        assert "--config" in help_text
+        assert "--store" in help_text
 
 
 class TestOutput:
