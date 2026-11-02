@@ -1,6 +1,6 @@
 # Planner kịch bản bê khay (DA-33 nhiệm vụ 3, 4)
 
-Planner thay luồng PICO: mỗi bước đọc trạng thái cảnh, sinh lệnh đi, hướng, hai tư thế cổ tay và độ nắm cho `StandWalkController` ([plan DA-33](../../superpowers/plans/2026-10-31-da33-tray-synthetic.md) Task 3–4, [story DA-33](../../product/stories/DA-33-synthetic-s1-khay.md) AC 2, 3). Mã ở `flywheel_simple.tray.planner` và `flywheel_simple.tray.agent`; mọi giá trị ở `configs/sim/tray_planner.yaml`. Quyết định đi kèm ở [decisions.md](decisions.md) D-14 đến D-21.
+Planner thay luồng PICO: mỗi bước đọc trạng thái cảnh, sinh lệnh đi, hướng, hai tư thế cổ tay và độ nắm cho `StandWalkController` ([plan DA-33](../../superpowers/plans/2026-10-31-da33-tray-synthetic.md) Task 3–4, [story DA-33](../../product/stories/DA-33-synthetic-s1-khay.md) AC 2, 3). Mã ở `flywheel_simple.tray.planner` và `flywheel_simple.tray.agent`; mọi giá trị ở `configs/sim/tray_planner.yaml`. Quyết định đi kèm ở [decisions.md](decisions.md) D-14 đến D-21 và D-25.
 
 ## Kết quả (3/11/2026)
 
@@ -8,12 +8,33 @@ Mọi số đo trên cùng 48 episode (mức 0 seed 0, mức 1 seed 1–47), má
 
 | Cách cầm | Thành công | Seed mới | Lỗi còn lại | Thời gian một episode thành công |
 |---|---|---|---|---|
-| **Kẹp bằng ngón tay Dex3, tư thế tay tự nhiên, chuyển động mượt (mặc định, D-19, D-20, D-21)** | **48/48** | **43/48** | Seed mới: 3 đặt lệch (65, 68, 90), 2 `timeout:RELEASE` (48, 93) | 30,5 s mô phỏng trung bình, tối đa 34,8 s |
+| **Đỡ ngửa bàn tay, dừng hạ sớm, lùi tay khi nhả (mặc định từ 3/11/2026, D-25)** | **35/47** (mức 1 seed 1–47) | **40/48** | 6 tuột một tay, 5 `timeout:REACH` (seed 4, 31, 46, 47, 81), 4 nghiêng, 3 đặt lệch, 1 `timeout:LIFT`, 1 `timeout:RELEASE` | chưa đo |
+| Kẹp bằng ngón tay Dex3, tư thế tay tự nhiên, chuyển động mượt (D-19, D-20, D-21; cấu hình thay thế) | 48/48 | 43/48 | Seed mới: 3 đặt lệch (65, 68, 90), 2 `timeout:RELEASE` (48, 93) | 30,5 s mô phỏng trung bình, tối đa 34,8 s |
 | Kẹp bằng ngón tay, chuyển động mượt (D-20, commit `874f45b`) | 40/48 | 34/48 | 4 `timeout:LIFT` (seed 4, 10: khay xa; 41, 46), 3 đặt lệch, 1 `timeout:RELEASE`; seed mới: 12 `timeout:LIFT` | 28,4 s, tối đa 33,2 s |
 | Kẹp bằng ngón tay, trước D-20 (tay nhảy mục tiêu mỗi lần đổi pha) | 40/48 | chưa đo | 4 `timeout:LIFT` (khay xa, seed 4, 10, 13, 34), 2 nghiêng, 1 `timeout:ARRIVE_B`, 1 đặt lệch | 27,4 s, tối đa 32,5 s |
 | Ép mu hai nắm tay (D-18, cấu hình thay thế; đo trước D-20, chưa đo lại) | 44/48 | chưa đo | 2 ngoài tầm với, 2 nghiêng | 24,4 s, tối đa 26,4 s |
 
 Hiếu chọn kẹp ngón (1/11/2026) vì dữ liệu có đóng mở bàn tay thật như dữ liệu teleop Ψ₀; ép mu tay giữ bàn tay nắm cố định suốt episode. Lần thử hỏng chỉ bị loại và ghi sổ, nên tỉ lệ 83 % không chặn việc sinh dữ liệu.
+
+## Đỡ ngửa bàn tay (D-25)
+
+Hiếu đổi cách cầm (3/11/2026) vì tư thế kẹp ngón không giống người: cổ tay xoay −60° quyết định hướng cẳng tay, khuỷu chĩa ra. Đỡ ngửa bàn tay giống người bưng khay có quai: lòng bàn tay ngửa dưới gờ tay cầm, ngón chạy dọc gờ và khép lên ôm mép ngoài, khuỷu buông sát hông, cẳng tay chĩa tới.
+
+Mọi số trên 22 episode (mức 1, seed 100–121), `rtx3060`:
+
+| Thử | Thành công | Nguyên nhân đo được |
+|---|---|---|
+| Chi phí khuỷu trong IK (kẹp ngón giữ nguyên), `elbow_cost` 2 / 8 | 4/8, 0/8 | Khuỷu chỉ vào gần thân 5 cm khi cổ tay lệch đích; hướng bàn tay quyết định hướng cẳng tay. Đã bỏ |
+| Lòng bàn tay hướng vào, (0°, 20°, 10°) và (−30°, 25°, 10°) | mang được ở seed 100 | Khuỷu nhấc cao hơn vai |
+| Đỡ ngửa (−90°, 10°, 0°) | 14/22 | 5 đặt lệch: cổ tay dưới gờ chạm bàn B trước khay, khay kê nghiêng 5° rồi bị kéo khi rút tay |
+| Đỡ ngửa, chúc 20° / xoay −75° | 12/22, 8/22 | Đặt lệch, nghiêng |
+| Đỡ ngửa, xoay bàn tay vào 30° / 45° / 60° | 0/22 | Tay không với tới tay cầm từ ngoài khay |
+| Đỡ ngửa, cầm gần đầu ngón (`grip_x` 0,14 / 0,16 / 0,18) | 12 / 6 / 0 | Tay trượt khỏi gờ |
+| Đỡ ngửa, `release_dz` 0 / −0,02 / −0,035 | 14 / 14 / 15 | Như trên |
+| Dừng hạ khi khay còn cách bàn `lower_tray_clear` 2 / 2,5 / 3,5 cm | 14 / 14 / 17 | Hết đặt lệch; cổ tay trái kẹt dưới đầu gờ gần robot khi rút ra (`timeout:RELEASE`, seed 118) |
+| **3,5 cm, lùi tay `release_back` 5 cm khi nhả** | **19/22** | 2 tuột một tay, 1 `timeout:RELEASE`; lùi 3 cm hoặc 8 cm, dừng ở 4,5 cm: 17/22 |
+
+Ảnh so sánh ba cách cầm (toàn thân và cận cảnh bàn tay) được dựng bằng `fwdata/tune/grasp_look.py` trên `rtx3060`, không commit. Độ chĩa khuỷu đo bằng `scripts/g0/tray/measure_arm_pose.py` (khuỷu so với vai, trung bình khi cầm khay): kẹp ngón +13,8 cm, đỡ ngửa +11,7 cm; khác biệt nhìn thấy chủ yếu là cẳng tay không còn xoắn.
 
 ## Kẹp bằng ngón tay
 
@@ -141,7 +162,7 @@ Cổ tay xoay 180° cho mu bàn tay hướng vào khay, nắm tay lại, xoay v�
 ## Việc còn mở
 
 1. **Khay xa ngoài tầm nhấc**: trước D-20 là 4/48 (seed 4, 10, 13, 34); với D-21 không còn lỗi nhấc nào trên 96 episode: khay cách mép 0,23–0,25 m (mức 1 dịch +5 cm), tay vươn hết cỡ thì không nhấc nổi. Hướng: cúi người bằng eo khi với, hoặc giảm `tray_edge_offset` thêm (cần quyết định mới).
-2. **Đặt và nhả khay.** Trên seed mới còn 3 đặt lệch và 2 `timeout:RELEASE`: ngón cái vẫn đẩy khay 2–3 cm khi nhả. Cấu hình ép mu tay (D-18) chưa đo lại với D-20, D-21; phải chỉnh lại trước khi dùng (cần `hand_closure_rest` 1).
+2. **Đặt và nhả khay.** Với đỡ ngửa (D-25), khay rơi 3,5 cm khi tay rút ra; còn 3 đặt lệch, 1 `timeout:RELEASE` trên 95 episode. Tay đỡ võng ~10 cm khi mang nên 6 lần tuột một tay. Với kẹp ngón, trên seed mới còn 3 đặt lệch và 2 `timeout:RELEASE`: ngón cái vẫn đẩy khay 2–3 cm khi nhả. Cấu hình ép mu tay (D-18) chưa đo lại với D-20, D-21; phải chỉnh lại trước khi dùng (cần `hand_closure_rest` 1).
 3. **Ma sát xoắn của tay cầm.** Hình học va chạm của tay cầm có `condim 4` nhưng hệ số ma sát xoắn chỉ 0,005. Một vùng tiếp xúc tay thật cỡ 0,03 sẽ giảm lỗi nghiêng của cả hai cách cầm; đây là thay đổi vật lý của task, cần quyết định.
 
 ## Chạy

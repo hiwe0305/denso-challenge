@@ -310,3 +310,34 @@ def test_hands_return_to_rest_after_stepping_back() -> None:
     back = [i for i, r in enumerate(retreat) if r.cmd.nav[0] < 0.0]
     still = [i for i, r in enumerate(retreat) if r.cmd.nav == (0.0, 0.0, 0.0)]
     assert back and still and max(back) < min(still)  # lowered only after stepping back
+
+
+def test_support_hold_releases_before_the_wrists_reach_the_table() -> None:
+    from dataclasses import replace
+
+    # With the palm-up hold (D-25) the wrists under the handle lip touched table B before
+    # the tray did and propped it 1.7 cm up (seed 110); lowering stops while the tray
+    # is still lower_tray_clear above the table, and it drops the rest when let go.
+    def release_heights(clear: float) -> tuple[float, bool]:
+        cfg = replace(PlannerConfig.load(), lower_tray_clear=clear)
+        world = ToyWorld(level=1, seed=1, planner_cfg=cfg)
+        records = world.run()
+        first = next(r for r in records if r.cmd.phase is Phase.RELEASE)
+        height = float(first.state.tray_pos[2]) - world.cfg.table_height
+        return height, records[-1].report.success
+
+    held_up, success = release_heights(0.025)
+    assert 0.015 <= held_up <= 0.026 and success
+    on_table, success = release_heights(0.0)  # off: lower until the tray sits on B
+    assert on_table <= 0.001 and success
+
+
+def test_release_pulls_the_hands_back_as_they_move_out() -> None:
+    from dataclasses import replace
+
+    cfg = replace(PlannerConfig.load(), release_back=0.05)
+    world = ToyWorld(planner_cfg=cfg)
+    records = [r for r in world.run() if r.cmd.phase is Phase.RELEASE]
+    for side in (0, 1):
+        path = palm_path(world, records, side)[1:]
+        assert path[-1, 0] - path[0, 0] == pytest.approx(-0.05, abs=0.005)  # base x: back

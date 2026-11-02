@@ -15,6 +15,7 @@ G1 bê khay 6 linh kiện bằng hai tay từ bàn A sang vùng đích trên bà
 | `flywheel_simple.tray.generate`, `scripts/g0/tray/generate.py` | Sinh episode hàng loạt theo shard song song (mỗi process một env), sổ lượt sinh `gen_log.jsonl` chỉ ghi thêm, QA tối thiểu, chạy lại cùng lệnh để tiếp tục (DA-33, D-23) |
 | `scripts/g0/tray/import_simready.py` | Tải và đổi mesh SimReady cho lớp hiển thị |
 | `scripts/g0/tray/view_scene.py` | Ghi video camera đầu và video toàn cảnh |
+| `scripts/g0/tray/measure_arm_pose.py` | Đo tư thế tay khi cầm khay (khuỷu so với vai và đường vai–cổ tay) và tỉ lệ thành công theo biến thể cấu hình, song song nhiều process (DA-33, D-25) |
 | `scripts/g0/tray/measure_locomotion.py` | Đo tốc độ đi và quay của G1 (DA-33, [locomotion.md](locomotion.md)) |
 
 ## Lệnh
