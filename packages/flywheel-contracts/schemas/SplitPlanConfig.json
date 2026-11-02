@@ -1,0 +1,50 @@
+{
+  "additionalProperties": false,
+  "description": "Configuration for dataset split rules, seed ranges, and duplicate guards.",
+  "properties": {
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "version": {
+      "default": "1.0.0",
+      "title": "Version",
+      "type": "string"
+    },
+    "seed_ranges": {
+      "additionalProperties": {
+        "items": {
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "title": "Seed Ranges",
+      "type": "object"
+    },
+    "author_ranges_to_avoid": {
+      "items": {
+        "items": {
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "title": "Author Ranges To Avoid",
+      "type": "array"
+    },
+    "near_duplicate_threshold_d_dup": {
+      "default": 0.05,
+      "title": "Near Duplicate Threshold D Dup",
+      "type": "number"
+    },
+    "meta": {
+      "additionalProperties": true,
+      "title": "Meta",
+      "type": "object"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "SplitPlanConfig",
+  "type": "object"
+}

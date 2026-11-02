@@ -160,6 +160,15 @@ class QAReport(EventEntity):
     reviewed_by: str | None = None
 
 
+# Aliases for catalog records to differentiate from cross-lane artifacts in schemas
+class CatalogEpisode(Episode):
+    """Catalog entity episode record."""
+
+
+class CatalogQAReport(QAReport):
+    """Catalog entity QA report record."""
+
+
 # 5. Release (content)
 class Release(ContentEntity):
     """Frozen or draft dataset release manifest."""

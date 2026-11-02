@@ -1,0 +1,64 @@
+{
+  "additionalProperties": false,
+  "description": "Configuration for an embodiment / robot embodiment.",
+  "properties": {
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "version": {
+      "default": "1.0.0",
+      "title": "Version",
+      "type": "string"
+    },
+    "domain": {
+      "default": "sim",
+      "enum": [
+        "sim",
+        "real"
+      ],
+      "title": "Domain",
+      "type": "string"
+    },
+    "controller": {
+      "default": "sonic_dwbc",
+      "title": "Controller",
+      "type": "string"
+    },
+    "camera_ref_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Camera Ref Hash"
+    },
+    "action_layout": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Action Layout"
+    },
+    "meta": {
+      "additionalProperties": true,
+      "title": "Meta",
+      "type": "object"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "EmbodimentConfig",
+  "type": "object"
+}

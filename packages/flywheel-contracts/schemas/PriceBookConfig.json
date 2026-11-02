@@ -1,0 +1,74 @@
+{
+  "$defs": {
+    "PriceRateConfig": {
+      "additionalProperties": false,
+      "description": "Rate specification for a single resource type.",
+      "properties": {
+        "resource_type": {
+          "title": "Resource Type",
+          "type": "string"
+        },
+        "unit": {
+          "title": "Unit",
+          "type": "string"
+        },
+        "usd_per_unit": {
+          "title": "Usd Per Unit",
+          "type": "number"
+        },
+        "human_hours_per_unit": {
+          "default": 0.0,
+          "title": "Human Hours Per Unit",
+          "type": "number"
+        },
+        "is_assumption": {
+          "default": true,
+          "title": "Is Assumption",
+          "type": "boolean"
+        },
+        "note": {
+          "default": "",
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "resource_type",
+        "unit",
+        "usd_per_unit"
+      ],
+      "title": "PriceRateConfig",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Pricebook configuration containing resource cost rates.",
+  "properties": {
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "version": {
+      "default": "1.0.0",
+      "title": "Version",
+      "type": "string"
+    },
+    "rates": {
+      "items": {
+        "$ref": "#/$defs/PriceRateConfig"
+      },
+      "title": "Rates",
+      "type": "array"
+    },
+    "meta": {
+      "additionalProperties": true,
+      "title": "Meta",
+      "type": "object"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "PriceBookConfig",
+  "type": "object"
+}
