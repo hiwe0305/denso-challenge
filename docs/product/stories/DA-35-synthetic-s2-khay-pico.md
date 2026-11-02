@@ -11,7 +11,7 @@
 | Nhãn | [Adapter] · `epic:9` · `gate:G1` · `area:sim` |
 | Sprint | S2; demo cha trước 10/11/2026, lô S2 trước 13/11/2026 (đề xuất, cho demo 17/11) |
 | Ước lượng | Chưa chốt. Người viết ước lượng thô 30–45 giờ; PO chốt |
-| Phụ thuộc | DA-32 (task, vị từ 7 bước, `check_success`; đã merge). [PR #27](https://github.com/hiwe0305/denso-challenge/pull/27) (gói ghi LeRobot trong `setup_simple.sh`; đã cài trên laptop và rtx3060). Số đã chỉnh của DA-33 cho cách cầm tay cầm khay (D-19), chép dạng số vào config, không import mã DA-33. Nhiệm vụ 3 cần PO cho tải psi-data |
+| Phụ thuộc | DA-32 (task, vị từ 7 bước, `check_success`; đã merge). [PR #27](https://github.com/hiwe0305/denso-challenge/pull/27) (gói ghi LeRobot trong `setup_simple.sh`; đã cài trên laptop và rtx3060). DA-33 nhiệm vụ 1–4 (planner `TrayPlanner`, cách cầm D-19): PO chọn merge DA-33 rồi dùng lại mã planner (3/11/2026); nhiệm vụ 5 trở đi cần DA-33 đã merge, trong lúc chờ chỉ làm phần không phụ thuộc planner, với planner giả |
 
 ## Story
 
@@ -42,7 +42,7 @@ Kế hoạch ở mục "Kế hoạch teleop ảo" và "Kế hoạch generator S2
 - [x] 2. Wrapper teleop khay: reset theo (level, seed), ghi trạng thái khay, khối `flywheel`, log lượt thử; test bằng streamer giả, không cần kính (AC 1)
 - [x] 3. Đo phong cách teleop người từ psi-data của tác giả (ôm thùng hai tay, đi giữa hai bàn), ra dải tham số phong cách (AC 2, 8)
 - [x] 4. Đồng hồ sim cho agent: tất định, không chờ thời gian thực; hai lần chạy cùng seed ra cùng frame (AC 2, 5). Đo: gần 1× thời gian thực mỗi worker, xem [virtual-teleop.md](../../g0/tray/virtual-teleop.md)
-- [ ] 5. Teleop ảo: phép đổi ngược của `WristsPreProcessor` (test CPU khứ hồi), cần gạt, cò và grip, máy pha 7 bước; một episode đạt `check_success` (AC 2)
+- [ ] 5. Teleop ảo: phép đổi ngược của `WristsPreProcessor` (test CPU khứ hồi), streamer ảo lấy ý định từ `TrayPlanner` của DA-33 (cổ tay, lệnh đi, bàn tay) và phát tín hiệu PICO; một episode đạt `check_success` (AC 2)
 - [ ] 6. Phong cách ngẫu nhiên mỗi episode theo seed phong cách; meta của AC 3 (AC 2, 3)
 - [ ] 7. Sinh hàng loạt demo cha: ít nhất 100 đạt, sổ lượt, sổ chi phí (AC 3, 7)
 - [ ] 8. Cắt demo theo 7 bước (AC 4)
@@ -74,7 +74,7 @@ Ngoài phạm vi, cần PR riêng: dòng DA-35 trong 07 mục 2.2; sửa design 
 | Chỗ cắm | Một streamer thay `PicoStreamer` trong `StreamerDecoupledAgent` (nhiệm vụ 2). Ra `StreamerOutput` giống hệt PICO: `left_wrist`, `right_wrist` (4 × 4, khung tay cầm so với kính), ngón tay dạng ba mức của PICO, `navigate_cmd` từ cần gạt (tối đa 0,5 m/s và 1 rad/s như `PicoStreamer`), chiều cao thân, nút kích hoạt |
 | Đổi ngược cổ tay | Người điều khiển ảo nghĩ bằng mục tiêu cổ tay trong khung robot. `WristsPreProcessor` là phép affine (`T_robot = T_ee_hiệu_chuẩn · S(T_tay_cầm_lúc_kích_hoạt⁻¹ · T_tay_cầm)`, `S` nhân phần tịnh tiến với `motion_scale`), nên đổi ngược chính xác được. Test CPU: khứ hồi sai số dưới 1e-9 |
 | Quan sát | Tư thế khay và vùng đích lấy từ `info["privileged"]`, như người thấy qua kính. Chỉ teleop ảo đọc, policy không thấy (design 28/10 mục 3.6) |
-| Máy pha | Đi tới bàn A, với tới tay cầm, cầm, nhấc, lùi và quay, mang, tới bàn B, hạ, nhả, lùi; điều kiện chuyển theo cờ 7 bước và hình học. Cách cầm và độ cao lấy từ số DA-33 đã chỉnh (D-19), chép vào `configs/sim/tray_virtual_teleop.yaml` |
+| Máy pha | Dùng lại `flywheel_simple.tray.planner.TrayPlanner` của DA-33 (sau khi merge): pha theo 7 bước scorer, cách cầm D-19, bù cổ tay chùng theo lòng bàn tay đo được. Teleop ảo đổi đầu ra của planner (cổ tay trong khung đế, lệnh đi, hướng, độ đóng tay) thành tín hiệu PICO và thêm lớp phong cách. Planner được chỉnh khi eo khóa; IK của PICO cho eo cử động, nên kiểm lại tỉ lệ đạt |
 | Chuyển động | Mỗi đoạn tay là min-jerk có điểm qua giữa (đường cong), hồ sơ vận tốc lệch đỉnh, thời gian theo khoảng cách; tư thế nghỉ khuỷu sát thân, lòng bàn tay hướng vào; với thấp thì IK có eo tự nghiêng thân. Cần gạt tăng và giảm dần như tay người |
 | Phong cách mỗi lượt | Rút từ seed phong cách trong dải đã chốt: tốc độ với, độ cong, lệch đỉnh vận tốc, thời gian dừng giữa pha, độ cao mang, khoảng cách hai tay, tốc độ đi, gia tốc cần gạt, biên độ và tần số rung nhỏ. Ghi cả bộ tham số vào meta |
 | Dải phong cách | Đo từ psi-data (nhiệm vụ 3): `G1WholebodyPickAndPlaceAndHugContainerTeleop-v0` (119,4 MB, decoupled WBC, ôm thùng hai tay) và `G1WholebodyLocomotionPickBetweenTablesTeleop-v0` (202,6 MB, đi giữa hai bàn). Nếu không được dùng, ước lượng và ghi là giả định |
@@ -104,6 +104,7 @@ Rủi ro: điều kiện xa demo cha thì cầm trượt; đế trôi khi mang l
 
 - Nguồn: design 27/10 mục 5.3, 5.4; design 28/10 mục 4, 5; story DA-29 (cùng ý cho task hai bàn), DA-33 (planner S1, cách cầm D-19), DA-16 (chỗ cắm thiết bị vào `teleop_decoupled_wbc`); spec 4.1 (biến thể không tính là demo gốc), 6.10, 10 (tuyến T2).
 - psi-data trên Hugging Face không khai license (đọc API 3/11/2026). Chỉ dùng để đo thống kê phong cách sau khi PO cho phép; không train, không đưa vào release.
+- Theo CLAUDE.md, không tạo nhánh từ nhánh chưa merge: trước khi DA-33 merge, phần cần planner dùng planner giả cùng giao diện (`step(state, base, report) -> PlannerCommand`).
 - `flywheel_block` hiện ghi cứng `source_kind = teleop`; nhiệm vụ 6 cho nó nhận `synthetic` và tham số phong cách.
 - Dữ liệu là sim G1, mức `public` (design 27/10 mục 8.4). Dữ liệu ở `fwdata/`, không commit.
 - Chạy trên rtx3060 trong `~/denso-da35` (bản sao nhánh, venv SIMPLE dùng chung với `~/denso-da33`), lệnh dài chạy `nohup setsid … < /dev/null &`, tối đa 22 worker.
@@ -125,6 +126,7 @@ Rủi ro: điều kiện xa demo cha thì cầm trượt; đế trôi khi mang l
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 3/11/2026 | PO chọn merge DA-33 và dùng lại `TrayPlanner` làm phần ý định của teleop ảo (thay cho chỉ chép số D-19); nhiệm vụ 5 trở đi phụ thuộc DA-33 đã merge | PO (Hiếu) |
 | 3/11/2026 | PO duyệt bản teleop ảo cộng S2 và việc tải hai file psi-data (322 MB) chỉ để đo phong cách | PO (Hiếu) |
 | 3/11/2026 | Viết lại theo hướng teleop ảo cộng S2 (PO chọn, vì đội không có kính PICO): AC 2, 3, 7, 8 mới, nhiệm vụ 3–12, thêm `configs/sim/tray_virtual_teleop.yaml` và `docs/g0/tray/virtual-teleop.md` vào Phạm vi file; demo PICO thật thành phần làm khi có kính | Claude |
 | 3/11/2026 | PO duyệt story và Phạm vi file. Người làm, ước lượng, phần cứng PICO, người thu và máy chạy sim chưa chốt | PO (Hiếu) |
