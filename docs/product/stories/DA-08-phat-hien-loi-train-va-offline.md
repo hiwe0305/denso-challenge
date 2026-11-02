@@ -30,7 +30,7 @@ Là kỹ sư đánh giá, tôi muốn mỗi checkpoint được kiểm động h
 
 - [x] 1. Bộ đọc `metrics.jsonl` và kết quả probe qua contracts, chuỗi thời gian theo nhóm action (AC 1, 2)
 - [x] 2. T1–T3: phân kỳ, không học, quá khớp (AC 1)
-- [ ] 3. T4–T6, T8: mất cân bằng nhóm, chiều chết, sụp mode, gradient bất thường (AC 1)
+- [x] 3. T4–T6, T8: mất cân bằng nhóm, chiều chết, sụp mode, gradient bất thường (AC 1)
 - [ ] 4. T7 và O1–O4 từ P3, P4 (AC 2)
 - [x] 5. Cấu hình ngưỡng có hash (AC 3)
 - [ ] 6. Artifact kết quả, lệnh `fw` (AC 4, 5)
@@ -72,7 +72,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực: 3h (1/11/2026)
+- Giờ thực: 3h (1/11/2026) + 3h (2/11/2026)
 - Công cụ AI đã dùng: Claude Code (Opus 5), theo plan DA-08 và DA-13 ngày 30/10/2026 (PR #18, chưa merge nên chưa liên kết được)
 - Ghi chú hoàn thành:
   - 1/11/2026: làm phần không phụ thuộc hợp đồng của DA-25 (PR #22 còn mở). Xong **nhiệm vụ 5**; nhiệm vụ 1 và 2 mới có phần thuần numpy, chưa đánh dấu.
@@ -81,7 +81,14 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
   - Nhiệm vụ 6 còn chờ hai chỗ hợp đồng đã nêu dưới PR #22: `TrainDiagnosis` chưa có trường `skipped` (mà `Contract` đặt `extra="forbid"`), và `ProbeP4` chưa cho T7 so với checkpoint cha ở lần fine-tune đầu.
   - Workspace chưa có thư viện đọc YAML nên `load_train_thresholds` cần thêm `pyyaml` (và `types-pyyaml` cho mypy). Theo quyết định của người làm story ngày 1/11, thêm luôn trong nhánh này; pr-guard sẽ báo R6 cho `pyproject.toml` gốc, `packages/flywheel-eval/pyproject.toml` và `uv.lock` vì ba file này ngoài Phạm vi file của DA-08. Hiếu quyết: hoặc mở rộng Phạm vi file, hoặc tách ba file đó sang một PR `chore-` của Long (07 mục 3.2).
   - Ngưỡng trong `train.yaml` đều là `# giả định` hoặc `# chốt`, chưa có số đo; hiệu chỉnh trên log thật của DA-19 trước G2. Có test chặn một dòng ngưỡng không ghi nguồn.
+  - 2/11/2026: DA-25 (PR #22) và chore PyYAML (PR #29) đã merge, nên nhiệm vụ 1 và 3 hết chặn. Rebase lên `origin/master` làm biến mất luôn ba lỗi R6 ngày 1/11: `pyproject.toml`, `packages/flywheel-eval/pyproject.toml` và `uv.lock` không còn trong diff vì `pyyaml` đã vào master qua PR #29. Hiếu không phải quyết (a) hay (b) nữa.
+  - Ba quyết định của issue #5 nằm trong `reader.py`, mỗi cái một test: giữ bản ghi có `attempt` lớn nhất cho mỗi `(split, step)` (không phải dòng cuối tệp, và có test cho cả hai thứ tự dòng); `"NaN"` thành float ngay lúc nạp; tín hiệu ghi thưa hơn loss được điền nan thay vì làm lệch trục step — nan là "không đo", `0.0` là cái T8 đọc thành VLM đóng băng, hai thứ không được trộn.
+  - Bỏ `TrainSeries.parent_checkpoint_id`: hợp đồng đặt nó ở `ProbeP4` nên T7 đọc từ probe (issue #5 mục 2b). Thay bằng các trường định danh mà nhiệm vụ 6 cần cho `TrainDiagnosis.checkpoint_id`.
+  - **File mẫu train của DA-25 chưa chạy được T2–T8** [cần Long xem]: mỗi tệp 1–6 dòng trong 5 step, mà cửa sổ của T2 là 2000 step, T4 2000 step, T5 1000 step; và quan trọng hơn, lỗi cấy nằm ở bản ghi `split: "val"` trong bốn tệp — `t4_group_loss` (`arm: 10.0`), `t5_low_variance` (`pred_var_by_dim: [0.2, 0.0]`, tệp chỉ có đúng một dòng val), `t6_std_mismatch` (`pred_std 0.01` vs `target_std 1.0`) và `t8_vlm_gradient` (`grad_norm_vlm: 1.0`). T4–T6, T8 đều là tín hiệu của split train, nên bốn tệp này ra "sạch" chứ không bắt được gì. Với `grad_norm_vlm` thì bản ghi val còn sai về nghĩa: lượt val không có gradient. Chạy cả bảy bộ phát hiện trên tám tệp cho thấy mọi mã đều `skipped` kèm lý do, không có mã nào im lặng thành sạch (FR21 đúng như thiết kế) — nhưng không tệp nào là test dương được. Bộ log cấy lỗi đủ dài là **nhiệm vụ 7** của story này, trong `packages/flywheel-eval/tests/`, nên không cần đổi file mẫu của DA-25; chỉ cần Long biết là README của fixture nói "minh hoạ" là đúng theo nghĩa hẹp.
+  - T4 chỉ báo khi có một nhóm khác giảm được `ref_group_drop`: job mà mọi nhóm đều chậm là T2, gọi là T4 sẽ chỉ người đọc artifact đi thu sai loại dữ liệu. Có test cho đúng ca đó.
+  - T5 và T6 không bao giờ báo chiều `masked` của `action_layout`, và `LayoutView` là nơi duy nhất đọc mask, nhóm và giới hạn khớp, nên lệnh cấm chép số của AC 2 đúng theo cấu trúc chứ không chỉ theo quy ước. Log sai số chiều so với layout thì `skipped` kèm lý do, không chấm chiều `i` vào khớp khác.
+  - T6 với `target_std == 0` trên chiều không mask ra `DiagnosisSkip` kèm tên chiều, đúng ca mà Long thêm trường `skipped` cho (issue #5 chốt 1/11). T8 tách hai nhánh `T8a`, `T8b` để artifact nói rõ nửa nào chưa đo được; phát hiện vẫn mang mã `T8` vì `FindingCode` chỉ nhận T1–T8.
 - File đã tạo hoặc sửa:
-  - Tạo: `packages/flywheel-eval/src/flywheel/eval/diagnosis/train/{__init__,series,finding}.py`, `packages/flywheel-eval/tests/unit/diagnosis/train/{test_series,test_finding,test_config}.py`, `configs/eval/diagnosis/train.yaml`
-  - Sửa: `packages/flywheel-eval/src/flywheel/eval/config.py`, `packages/flywheel-eval/pyproject.toml`, `pyproject.toml`, `uv.lock`
-  - Bằng chứng: `uv run pytest` → 1110 passed, 22 deselected; `uv run ruff check`, `uv run mypy` (61 file), `uv run lint-imports` (3 contract) xanh
+  - Tạo: `packages/flywheel-eval/src/flywheel/eval/diagnosis/train/{__init__,series,finding,reader,divergence,learning,groups,dimensions,gradients}.py`, `packages/flywheel-eval/tests/unit/diagnosis/train/{conftest,test_series,test_finding,test_config,test_divergence,test_learning,test_reader,test_groups,test_dimensions,test_gradients}.py`, `configs/eval/diagnosis/train.yaml`
+  - Sửa: `packages/flywheel-eval/src/flywheel/eval/config.py`. (`pyproject.toml`, `packages/flywheel-eval/pyproject.toml` và `uv.lock` của ngày 1/11 đã bỏ khỏi nhánh sau khi rebase: `pyyaml` vào master qua PR #29.)
+  - Bằng chứng (2/11/2026): `uv run pytest` → 1256 passed, 38 deselected (123 test trong `tests/unit/diagnosis/train/`); `uv run ruff check` xanh; `uv run mypy` 78 file xanh; `uv run lint-imports` 3 contract, 0 broken; `scripts/repo/check_links.py` 0 broken; `pr_guard.py` không còn R6, còn cảnh báo R9
