@@ -51,7 +51,10 @@ grasp_close_after: 0.35
 # height, fingers 0.35 m ahead, 10 cm under the table top; the robot starts 0.53 m from table
 # A's edge) until the pelvis is raise_at from the edge, then stop, raise the palms to the
 # ready pose above the table top and walk on once both are ready_clear above it.
-raise_at: 0.40
+# With the palm-up hold's wrists rolling to -45 deg on the way up (D-25), the curled index
+# fingers swept into table A's edge at 0.40 in 22 of 22 episodes (seeds 100-121); 0.45 / 0.50
+# -> 0 touches, 19 / 21 of 22 succeed.
+raise_at: 0.50
 # Ready pose: wide enough that the thumbs clear the tray handles (outer ends at +-0.265 m).
 # Swept over 48 episodes with the halfway wrists below (y, z): 0.30, 0.26 -> 34;
 # 0.32, 0.26 -> 39; 0.34, 0.26 -> 37; 0.30, 0.24 -> 28 (D-20's 0.15, 0.30, 0.30 had the

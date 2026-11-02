@@ -8,7 +8,8 @@ Mọi số đo trên cùng 48 episode (mức 0 seed 0, mức 1 seed 1–47), má
 
 | Cách cầm | Thành công | Seed mới | Lỗi còn lại | Thời gian một episode thành công |
 |---|---|---|---|---|
-| **Đỡ ngửa bàn tay, dừng hạ sớm, lùi tay khi nhả (mặc định từ 3/11/2026, D-25)** | **35/47** (mức 1 seed 1–47) | **40/48** | 6 tuột một tay, 5 `timeout:REACH` (seed 4, 31, 46, 47, 81), 4 nghiêng, 3 đặt lệch, 1 `timeout:LIFT`, 1 `timeout:RELEASE` | chưa đo |
+| **Đỡ ngửa bàn tay, nâng tay ở 0,50 m, dừng hạ sớm, lùi tay khi nhả (mặc định từ 3/11/2026, D-25)** | **39/47** (mức 1 seed 1–47) | **44/48** | 3 đặt lệch, 3 tuột một tay, 2 nghiêng, 2 `timeout:LIFT` (seed mới 92, 93), 1 `timeout:ARRIVE_B`; không lần nào chạm bàn A khi tiếp cận | chưa đo |
+| Như trên, nâng tay ở 0,40 m | 35/47 | 40/48 | Ngón trỏ quét vào cạnh bàn A khi nâng tay (22/22 episode); 6 tuột một tay, 5 `timeout:REACH` | chưa đo |
 | Kẹp bằng ngón tay Dex3, tư thế tay tự nhiên, chuyển động mượt (D-19, D-20, D-21; cấu hình thay thế) | 48/48 | 43/48 | Seed mới: 3 đặt lệch (65, 68, 90), 2 `timeout:RELEASE` (48, 93) | 30,5 s mô phỏng trung bình, tối đa 34,8 s |
 | Kẹp bằng ngón tay, chuyển động mượt (D-20, commit `874f45b`) | 40/48 | 34/48 | 4 `timeout:LIFT` (seed 4, 10: khay xa; 41, 46), 3 đặt lệch, 1 `timeout:RELEASE`; seed mới: 12 `timeout:LIFT` | 28,4 s, tối đa 33,2 s |
 | Kẹp bằng ngón tay, trước D-20 (tay nhảy mục tiêu mỗi lần đổi pha) | 40/48 | chưa đo | 4 `timeout:LIFT` (khay xa, seed 4, 10, 13, 34), 2 nghiêng, 1 `timeout:ARRIVE_B`, 1 đặt lệch | 27,4 s, tối đa 32,5 s |
@@ -32,7 +33,8 @@ Mọi số trên 22 episode (mức 1, seed 100–121), `rtx3060`:
 | Đỡ ngửa, cầm gần đầu ngón (`grip_x` 0,14 / 0,16 / 0,18) | 12 / 6 / 0 | Tay trượt khỏi gờ |
 | Đỡ ngửa, `release_dz` 0 / −0,02 / −0,035 | 14 / 14 / 15 | Như trên |
 | Dừng hạ khi khay còn cách bàn `lower_tray_clear` 2 / 2,5 / 3,5 cm | 14 / 14 / 17 | Hết đặt lệch; cổ tay trái kẹt dưới đầu gờ gần robot khi rút ra (`timeout:RELEASE`, seed 118) |
-| **3,5 cm, lùi tay `release_back` 5 cm khi nhả** | **19/22** | 2 tuột một tay, 1 `timeout:RELEASE`; lùi 3 cm hoặc 8 cm, dừng ở 4,5 cm: 17/22 |
+| 3,5 cm, lùi tay `release_back` 5 cm khi nhả | 19/22 | 2 tuột một tay, 1 `timeout:RELEASE`; lùi 3 cm hoặc 8 cm, dừng ở 4,5 cm: 17/22 |
+| **Nâng tay khi hông cách mép bàn A `raise_at` 0,50 m (0,40 / 0,45 / 0,50)** | **21/22** (19 / 19 / 21) | Ở 0,40 cổ tay xoay tới −45° khi nâng, ngón trỏ cong quét vào cạnh bàn A trong cả 22 episode; ở 0,45 và 0,50 không lần nào chạm |
 
 Ảnh so sánh ba cách cầm (toàn thân và cận cảnh bàn tay) được dựng bằng `fwdata/tune/grasp_look.py` trên `rtx3060`, không commit. Độ chĩa khuỷu đo bằng `scripts/g0/tray/measure_arm_pose.py` (khuỷu so với vai, trung bình khi cầm khay): kẹp ngón +13,8 cm, đỡ ngửa +11,7 cm; khác biệt nhìn thấy chủ yếu là cẳng tay không còn xoắn.
 
@@ -106,7 +108,7 @@ Trình tự mới:
 
 | Đoạn | Tay | Điều kiện chuyển |
 |---|---|---|
-| APPROACH_A, đi | Tư thế đứng, ngón hơi cong (`hand_closure_rest` 0,3) | Hông cách mép bàn A `raise_at` 0,40 m: đầu ngón còn cách mép ~5 cm |
+| APPROACH_A, đi | Tư thế đứng, ngón hơi cong (`hand_closure_rest` 0,3) | Hông cách mép bàn A `raise_at` 0,40 m: đầu ngón còn cách mép ~5 cm (từ D-25: 0,50 m, xem mục đỡ ngửa) |
 | APPROACH_A, nâng tay | Dừng, nâng lòng bàn tay lên (0,15; ±0,32; 0,26) m, cổ tay xoay nửa đường tới tư thế kẹp (−25°, 20°, 8°) | Lòng bàn tay cao hơn mặt bàn `ready_clear`, rồi đi tiếp |
 | REACH | Xoay nốt cổ tay sang tư thế kẹp, mở ngón | Như D-20 |
 | RELEASE | Mở tay trong khi hạ `release_dz` 2 cm, rồi đưa tay ra | Như D-20 |

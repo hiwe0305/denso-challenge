@@ -4,6 +4,7 @@ For each (variant, seed), runs one planner episode and, while both hands hold th
 tray (GRASP to LOWER), averages over both arms, in the simulated pelvis frame:
 - flare: |elbow y| - |shoulder y| (m); positive = elbow out beside the body.
 - rise: elbow z - midpoint z of shoulder and wrist (m); positive = elbow above the arm line.
+Also counts the steps of APPROACH_A in which a hand or wrist touches table A (`touch_a`).
 Writes one JSON row per episode to --out and prints a table per variant.
 
     MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/python \
@@ -59,16 +60,29 @@ def run_one(job: tuple[str, dict[str, float], int, int]) -> dict[str, Any]:
     agent = TrayAgent(env, cfg)
     flare: list[float] = []
     rise: list[float] = []
+    touch_a = 0
 
     def in_pelvis(data: Any, body: str) -> Any:
         pelvis = data.body("pelvis")
         return pelvis.xmat.reshape(3, 3).T @ (data.body(body).xpos - pelvis.xpos)
 
+    def hand_on_table_a(model: Any, data: Any) -> bool:
+        for c in data.contact[: data.ncon]:
+            names = {model.body(model.geom_bodyid[g]).name for g in (c.geom1, c.geom2)}
+            if any(n.startswith("table_a") for n in names) and any(
+                "hand" in n or "wrist" in n for n in names
+            ):
+                return True
+        return False
+
     def on_step(obs: Any, info: Any, action: Any) -> None:
+        nonlocal touch_a
         cmd = agent.last_command
+        data = env.unwrapped.mjData
+        if cmd is not None and cmd.phase.name == "APPROACH_A":
+            touch_a += hand_on_table_a(env.unwrapped.mjModel, data)
         if cmd is None or cmd.phase.name not in HOLDING:
             return
-        data = env.unwrapped.mjData
         for side in ("left", "right"):
             shoulder = in_pelvis(data, f"{side}_shoulder_pitch_link")
             elbow = in_pelvis(data, f"{side}_elbow_link")
@@ -86,6 +100,7 @@ def run_one(job: tuple[str, dict[str, float], int, int]) -> dict[str, Any]:
         "failure": result.failure or result.abort_reason,
         "flare_m": round(float(np.mean(flare)), 4) if flare else None,
         "rise_m": round(float(np.mean(rise)), 4) if rise else None,
+        "touch_a": touch_a,
     }
 
 
@@ -135,9 +150,10 @@ def main() -> int:
         flare = sum(r["flare_m"] for r in held) / max(len(held), 1)
         rise = sum(r["rise_m"] for r in held) / max(len(held), 1)
         fails = sorted((r["seed"], r["failure"]) for r in mine if not r["success"])
+        touched = sum(r.get("touch_a", 0) > 0 for r in mine)
         print(
             f"{name:10s} success {sum(r['success'] for r in mine)}/{len(mine)}  "
-            f"flare {flare:+.3f} m  rise {rise:+.3f} m  failures {fails}"
+            f"flare {flare:+.3f} m  rise {rise:+.3f} m  touched A {touched}  failures {fails}"
         )
     return 1 if failed else 0
 
