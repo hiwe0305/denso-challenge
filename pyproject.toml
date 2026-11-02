@@ -22,7 +22,7 @@ flywheel-psi0 = { workspace = true }
 members = ["packages/*"]
 
 [dependency-groups]
-dev = ["hypothesis", "import-linter", "mypy", "pytest", "ruff"]
+dev = ["hypothesis", "import-linter", "mypy", "pytest", "ruff", "types-pyyaml"]
 
 [tool.ruff]
 target-version = "py310"
