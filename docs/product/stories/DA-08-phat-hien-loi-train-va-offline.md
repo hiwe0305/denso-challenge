@@ -34,7 +34,7 @@ Là kỹ sư đánh giá, tôi muốn mỗi checkpoint được kiểm động h
 - [x] 4. T7 và O1–O4 từ P3, P4 (AC 2)
 - [x] 5. Cấu hình ngưỡng có hash (AC 3)
 - [x] 6. Artifact kết quả, lệnh `fw` (AC 4, 5)
-- [ ] 7. Bộ log cấy lỗi và test dương, âm cho từng mã (AC 6)
+- [x] 7. Bộ log cấy lỗi và test dương, âm cho từng mã (AC 6)
 
 ## Phạm vi file
 
@@ -72,7 +72,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực: 3h (1/11/2026) + 3h (2/11/2026)
+- Giờ thực: 3h (1/11/2026) + 7h (2/11/2026: 3h sáng, 4h chiều)
 - Công cụ AI đã dùng: Claude Code (Opus 5), theo plan DA-08 và DA-13 ngày 30/10/2026 (PR #18, chưa merge nên chưa liên kết được)
 - Ghi chú hoàn thành:
   - 1/11/2026: làm phần không phụ thuộc hợp đồng của DA-25 (PR #22 còn mở). Xong **nhiệm vụ 5**; nhiệm vụ 1 và 2 mới có phần thuần numpy, chưa đánh dấu.
@@ -88,7 +88,15 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
   - T4 chỉ báo khi có một nhóm khác giảm được `ref_group_drop`: job mà mọi nhóm đều chậm là T2, gọi là T4 sẽ chỉ người đọc artifact đi thu sai loại dữ liệu. Có test cho đúng ca đó.
   - T5 và T6 không bao giờ báo chiều `masked` của `action_layout`, và `LayoutView` là nơi duy nhất đọc mask, nhóm và giới hạn khớp, nên lệnh cấm chép số của AC 2 đúng theo cấu trúc chứ không chỉ theo quy ước. Log sai số chiều so với layout thì `skipped` kèm lý do, không chấm chiều `i` vào khớp khác.
   - T6 với `target_std == 0` trên chiều không mask ra `DiagnosisSkip` kèm tên chiều, đúng ca mà Long thêm trường `skipped` cho (issue #5 chốt 1/11). T8 tách hai nhánh `T8a`, `T8b` để artifact nói rõ nửa nào chưa đo được; phát hiện vẫn mang mã `T8` vì `FindingCode` chỉ nhận T1–T8.
+  - 2/11/2026 (phiên chiều): xong **nhiệm vụ 4, 6, 7**, story hết nhiệm vụ con. Trường `DiagnosisSkip` và `TrainDiagnosis.skipped` đã vào master cùng DA-25, nên chỗ hợp đồng chặn nhiệm vụ 6 đóng lại mà không phải sửa `flywheel.contracts`.
+  - T7 quyết chiều so cho từng chỉ số: accuracy của P1 kém đi là giảm xuống, error của P3 kém đi là tăng lên, nên công thức `(cha − con) / cha` của plan áp cho điểm và công thức đối xứng áp cho sai số. Chỉ số chỉ có ở một bên, và chỉ số kém đi khi giá trị cha bằng 0, đều ra `skipped` kèm tên chỉ số chứ không ra sạch.
+  - Câu hỏi thứ hai gửi Long ở plan (bảo đảm hai bên chạy cùng bộ probe) **không cần sửa hợp đồng**: `ProbeP1` và `ProbeP3` đã có `dataset_sha256`, nên T7 chỉ so khi hai bên trùng hash, lệch hash thì `skipped`. Giới hạn còn lại vẫn đúng như plan ghi: lần fine-tune đầu từ checkpoint công bố không có P4 của cha nên T7 `skipped`, đây là ca của demo.
+  - O4 giữ hai nhánh của plan: `out_of_limit_dims` không rỗng là nhánh (a), đúng với `max_fraction: 0.0` đã chốt; nếu ai đặt `max_fraction > 0` thì ra `skipped` mã `O4b` vì P3 không ghi tỉ lệ khung. Chiều `masked`, chiều layout không có, và chiều layout không đặt giới hạn: cả ba ra `skipped` kèm tên chiều.
+  - Lệnh `fw eval diag-train` chết giữa lúc in trên console Windows: Python nhận stream cp1252 mà lý do `skipped` viết tiếng Việt. `use_utf8` trong `cli.py` đặt stream về UTF-8 trước khi in, có test trên tệp cp1252 thật. Đây là lỗi thật, không phải lỗi môi trường của máy một người: cả đội chạy Windows.
+  - Kho artifact là JSONL ghi thêm (`<store>/diagnosis/train.jsonl`), mỗi lần chạy một dòng, không ghi đè: `flywheel.store` còn là khung rỗng nên làn tự giữ, đúng bất biến append-only. Khi `flywheel.store` có API thì chỉ `write_artifact` phải đổi.
+  - Nhiệm vụ 7 chạy **cả 12 mã qua `diagnose_all`**, không chạy từng bộ phát hiện, để bắt ca một bộ ăn mất tín hiệu của bộ khác. Đối chứng sạch kiểm hai lần: không có phát hiện **và** không có mã nào `skipped`.
+  - Chỉ `t1_nan.jsonl` của testkit bật được mã của nó, đúng như ghi chú sáng nay; 11 ca còn lại dựng log cấy lỗi đủ dài ngay trong `tests/unit/diagnosis/train/test_all_codes.py`, **không nới ngưỡng nào** trong `train.yaml`. Khoảng trống của file mẫu đã ghi trong docstring của test và cần Long xem dưới PR #22.
 - File đã tạo hoặc sửa:
-  - Tạo: `packages/flywheel-eval/src/flywheel/eval/diagnosis/train/{__init__,series,finding,reader,divergence,learning,groups,dimensions,gradients}.py`, `packages/flywheel-eval/tests/unit/diagnosis/train/{conftest,test_series,test_finding,test_config,test_divergence,test_learning,test_reader,test_groups,test_dimensions,test_gradients}.py`, `configs/eval/diagnosis/train.yaml`
-  - Sửa: `packages/flywheel-eval/src/flywheel/eval/config.py`. (`pyproject.toml`, `packages/flywheel-eval/pyproject.toml` và `uv.lock` của ngày 1/11 đã bỏ khỏi nhánh sau khi rebase: `pyyaml` vào master qua PR #29.)
-  - Bằng chứng (2/11/2026): `uv run pytest` → 1256 passed, 38 deselected (123 test trong `tests/unit/diagnosis/train/`); `uv run ruff check` xanh; `uv run mypy` 78 file xanh; `uv run lint-imports` 3 contract, 0 broken; `scripts/repo/check_links.py` 0 broken; `pr_guard.py` không còn R6, còn cảnh báo R9
+  - Tạo: `packages/flywheel-eval/src/flywheel/eval/diagnosis/train/{__init__,series,finding,reader,divergence,learning,groups,dimensions,gradients,forgetting,offline,artifact}.py`, `packages/flywheel-eval/tests/unit/diagnosis/train/{conftest,test_series,test_finding,test_config,test_divergence,test_learning,test_reader,test_groups,test_dimensions,test_gradients,test_forgetting,test_offline,test_artifact,test_all_codes}.py`, `packages/flywheel-eval/tests/contract/diagnosis/train/{conftest,test_diag_train_cli}.py`, `configs/eval/diagnosis/train.yaml`
+  - Sửa: `packages/flywheel-eval/src/flywheel/eval/{config,api,cli}.py`. (`pyproject.toml`, `packages/flywheel-eval/pyproject.toml` và `uv.lock` của ngày 1/11 đã bỏ khỏi nhánh sau khi rebase: `pyyaml` vào master qua PR #29.)
+  - Bằng chứng (2/11/2026, phiên chiều): `uv run pytest` → 1342 passed, 38 deselected (207 test trong `tests/unit/diagnosis/train/` và `tests/contract/diagnosis/train/`); `uv run ruff check` xanh; `uv run mypy` 81 file xanh; `uv run lint-imports` 3 contract, 0 broken; `scripts/repo/check_links.py` 0 broken; `fw eval diag-train` chạy thật trên một job cấy lỗi, in T1 (stop yes), T4, T5, O2, O3, O4 và một mã `skipped`, ghi artifact vào kho
