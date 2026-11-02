@@ -155,6 +155,7 @@ class G1WholebodyTrayTransferTeleop(Task):  # type: ignore[misc]
         self.cfg = TrayConfig.load(Path(tray_config) if tray_config else None)
         self._layout: Any = None
         self.scene_path: Path | None = None
+        self.flywheel: dict[str, Any] | None = None
         self._robot = RobotRegistry.make(uid=robot_uid, **kwargs)
         super().__init__(
             dr=DRManager(level=dr_level),
@@ -230,7 +231,17 @@ class G1WholebodyTrayTransferTeleop(Task):  # type: ignore[misc]
         self._layout = layout
         self.tracker = StepTracker(self.cfg, self.sample)
         self.report: StepReport | None = None
+        self.flywheel = None  # set per episode by the recorder's caller
         self.robot.reset(spawn_pose=layout.robot.pose)
+
+    def set_flywheel_meta(self, meta: Any) -> None:
+        """Provenance of this episode (a recorder.FlywheelMeta), saved in state_dict."""
+        if (meta.seed, meta.level) != (self.sample.seed, self.sample.level):
+            raise ValueError(
+                f"meta is for (seed {meta.seed}, level {meta.level}), the episode for "
+                f"(seed {self.sample.seed}, level {self.sample.level})"
+            )
+        self.flywheel = asdict(meta)
 
     def privileged_state(self, mujoco_env: Any) -> dict[str, Any]:
         """Tray, part and target poses: for the scorer, planner and logs, never the policy."""
@@ -271,6 +282,7 @@ class G1WholebodyTrayTransferTeleop(Task):  # type: ignore[misc]
                 "sample": asdict(self.sample),
                 "report": asdict(self.report) if self.report is not None else None,
             },
+            "flywheel": self.flywheel,
         }
 
 

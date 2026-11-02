@@ -56,6 +56,9 @@ from flywheel_simple.tray.predicates import StepReport, TrayState, yaw_error
 from flywheel_simple.tray.randomize import EpisodeSample
 
 PLANNER_CONFIG_RELPATH = Path("configs/sim/tray_planner.yaml")
+# Bump when the phase logic changes; config values are hashed into the recorded
+# planner_version separately (recorder.planner_version).
+PLANNER_VERSION = "da33-planner-4"
 MIRROR = np.diag([1.0, -1.0, 1.0])  # left <-> right across the xz plane
 # Measured-palm correction per phase: axes it acts on. GRASP and LIFT correct height
 # only: across the handles the squeezing hands are blocked on purpose.
