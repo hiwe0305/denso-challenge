@@ -1,11 +1,10 @@
 """What the F-TRAIN detector tests share (DA-08 task 2).
 
 `series_from` builds a `TrainSeries` out of step-to-loss points, so a detector
-test states the curve it means and nothing else. The reader and its
-`metrics_builder` are task 1 and wait on the contracts of DA-25 (PR #22); the
-questions only a real `metrics.jsonl` can raise - a resumed job logging the
-same step twice, a loss written as the string `"NaN"`, two logging rates in one
-file - belong to that test and are not restated here.
+test states the curve it means and nothing else. The questions only a real
+`metrics.jsonl` can raise - a resumed job logging the same step twice, a loss
+written as the string `"NaN"`, two logging rates in one file - belong to
+`test_reader.py`, which drives `read_series`, and are not restated here.
 
 `cfg` is the threshold file the repo ships, not a mapping written in the test:
 a number changed in `configs/eval/diagnosis/train.yaml` has to show up as a
