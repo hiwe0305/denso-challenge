@@ -197,7 +197,7 @@ def test_reaching_has_a_bell_shaped_speed_profile() -> None:
     speed = np.linalg.norm(np.diff(palm_path(world, reach), axis=0), axis=1) / 0.02
     moving = np.flatnonzero(speed > 1e-9)
     assert moving.size and moving[-1] + 1 < speed.size  # settles before APPROACH_A ends
-    profile = speed[: moving[-1] + 1]
+    profile = speed[moving[0] : moving[-1] + 1]  # the raise at the table
     peak = int(np.argmax(profile))
     assert profile[0] < 0.05 * profile[peak] and profile[-1] < 0.1 * profile[peak]
     assert 0.4 <= peak / (profile.size - 1) <= 0.6
@@ -241,18 +241,72 @@ def test_hands_close_and_open_gradually() -> None:
     closure = np.array([r.cmd.hand_closure[0] for r in records])
     assert float(np.max(np.abs(np.diff(closure)))) <= 0.1
     assert np.any((closure > 0.05) & (closure < 0.95))
-    assert float(np.max(closure)) == 1.0 and closure[-1] == records[0].cmd.hand_closure[0]
+    rest = ToyWorld().planner_cfg.hand_closure_rest  # open from the stand, curled at the end
+    assert float(np.max(closure)) == 1.0 and closure[0] == 0.0 and closure[-1] == rest
 
 
-def test_release_opens_the_hands_before_moving_them_out() -> None:
+def test_release_opens_the_hands_while_lowering_them_before_moving_out() -> None:
     # Hands moving out while still opening dragged the tray by a hooked thumb (level 0
-    # seed 0: 9.9 deg tilt, RELEASE timed out).
+    # seed 0: 9.9 deg tilt, RELEASE timed out); fingers opening in place pried the lip up
+    # (2.9 cm, 8.4 deg). They open while the hands go down `release_dz`, then move out.
     world = ToyWorld()
+    dz = world.planner_cfg.release_dz
     records = [r for r in world.run() if r.cmd.phase is Phase.RELEASE]
     opened = next(i for i, r in enumerate(records) if r.cmd.hand_closure[0] == 0.0)
     assert opened > 0
     for side in (0, 1):
         held = palm_path(world, records[: opened + 1], side)[1:]
-        assert float(np.max(np.abs(held - held[0]))) < 0.002  # LOWER's last 1 mm step
+        assert float(np.max(np.abs(held[:, :2] - held[0, :2]))) < 0.002  # not out yet
+        assert held[-1, 2] - held[0, 2] < 0.5 * dz  # most of the way down
         moved = palm_path(world, records, side)[1:]
-        assert float(np.linalg.norm(moved[-1] - moved[0])) > 0.05
+        assert float(np.linalg.norm(moved[-1, :2] - moved[0, :2])) > 0.05
+
+
+def edge_of_table_a(world: ToyWorld) -> float:
+    from flywheel_simple.tray.geometry import scene_geometry_with_gap
+
+    geo = scene_geometry_with_gap(world.cfg, world.sample.table_gap)
+    return float(geo.table_a_center[0]) - world.cfg.table_depth / 2
+
+
+def at_rest(world: ToyWorld, record: Record) -> bool:
+    return bool(
+        np.allclose(record.cmd.left_wrist, world.start_wrists[0], atol=1e-9)
+        and np.allclose(record.cmd.right_wrist, world.start_wrists[1], atol=1e-9)
+    )
+
+
+def test_walks_with_the_hands_down_and_raises_them_at_the_table() -> None:
+    # Arms stay in the robot's standing pose, fingers slightly curled, while it walks; they
+    # rise with neutral wrists only once the pelvis is `raise_at` from table A's edge.
+    from flywheel_simple.tray.planner import MIRROR, rpy_matrix
+
+    world = ToyWorld()
+    cfg = world.planner_cfg
+    approach = [r for r in world.run() if r.cmd.phase is Phase.APPROACH_A]
+    k = next(i for i, r in enumerate(approach) if not at_rest(world, r))
+    walking = approach[:k]
+    assert walking and any(r.cmd.nav[0] > 0.0 for r in walking)
+    # Fingers curl from the stand's open hands towards rest, never opening further.
+    curls = [r.cmd.hand_closure[0] for r in walking]
+    assert np.all(np.diff(curls) >= 0.0) and max(curls) <= cfg.hand_closure_rest
+    assert edge_of_table_a(world) - approach[k].base.x <= cfg.raise_at + 1e-9
+    ready = rpy_matrix(
+        *(math.radians(a) for a in (cfg.ready_roll_deg, cfg.ready_pitch_deg, cfg.ready_yaw_deg))
+    )
+    last = approach[-1].cmd
+    assert np.allclose(last.left_wrist[:3, :3], ready, atol=1e-6)
+    assert np.allclose(last.right_wrist[:3, :3], MIRROR @ ready @ MIRROR, atol=1e-6)
+
+
+def test_hands_return_to_rest_after_stepping_back() -> None:
+    world = ToyWorld()
+    cfg = world.planner_cfg
+    records = world.run()
+    assert records[-1].cmd.phase is Phase.DONE and records[-1].report.success
+    assert at_rest(world, records[-1])
+    assert records[-1].cmd.hand_closure == (cfg.hand_closure_rest, cfg.hand_closure_rest)
+    retreat = [r for r in records if r.cmd.phase is Phase.RETREAT]
+    back = [i for i, r in enumerate(retreat) if r.cmd.nav[0] < 0.0]
+    still = [i for i, r in enumerate(retreat) if r.cmd.nav == (0.0, 0.0, 0.0)]
+    assert back and still and max(back) < min(still)  # lowered only after stepping back

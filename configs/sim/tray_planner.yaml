@@ -32,8 +32,11 @@ grasp_dz: 0.0
 # GRASP commands the grip points this far inside the grip point; a pinch needs none (the
 # squeeze used 0.05).
 squeeze: 0.0
-# Hand closure outside the grasp (approach, reach, release, retreat): open for a pinch.
+# Hand closure while reaching and releasing: open for a pinch.
 hand_closure_open: 0.0
+# Hand closure at rest (walking to table A, raising the hands, the end): fingers slightly
+# curled (D-21). 1 for the squeeze, whose fists stay closed.
+hand_closure_rest: 0.3
 # GRASP closes the hands once the move has ended with both palms at the grasp targets, or
 # after this many seconds; the pinch slides in open first (0 closes at once, as the squeeze
 # did). With min-jerk moves (D-20) closing as the hands arrive hooks the lip; swept over 48
@@ -41,13 +44,26 @@ hand_closure_open: 0.0
 # and with smooth_speed 0.3: 0.5 / 0.4 / 0.35 -> 36 / 39 / 40 (1.5 before D-20: 40).
 grasp_close_after: 0.35
 
-# APPROACH_A: palms go to the ready pose (above the table top, outside the tray's width)
-# before walking; at the default pose G1's fingers hit table A's edge 6 cm after the
-# start (locomotion.md), and further forward they catch the tray rim.
+# APPROACH_A (D-21): walk with the arms in the standing pose (palms 0.25 m ahead at pelvis
+# height, fingers 0.35 m ahead, 10 cm under the table top; the robot starts 0.53 m from table
+# A's edge) until the pelvis is raise_at from the edge, then stop, raise the palms to the
+# ready pose above the table top and walk on once both are ready_clear above it.
+raise_at: 0.40
+# Ready pose: wide enough that the thumbs clear the tray handles (outer ends at +-0.265 m).
+# Swept over 48 episodes with the halfway wrists below (y, z): 0.30, 0.26 -> 34;
+# 0.32, 0.26 -> 39; 0.34, 0.26 -> 37; 0.30, 0.24 -> 28 (D-20's 0.15, 0.30, 0.30 had the
+# wrists at the grasp orientation).
 ready_x: 0.15
-ready_y: 0.30
-ready_z: 0.30
+ready_y: 0.32
+ready_z: 0.26
 ready_clear: 0.08
+# Ready wrists halfway from the standing pose (10, 10, 0 deg measured) to the grasp; REACH
+# turns them the rest of the way. Left wrist, base frame (roll, pitch, yaw); right mirrored.
+# Over the first 22 episodes at y 0.30, z 0.26: standing (10, 10, 0) -> 0 (thumbs push the
+# tray while REACH turns the wrists), halfway -> 18, grasp (-60, 30, 15) -> 15 of 22.
+ready_roll_deg: -25.0
+ready_pitch_deg: 20.0
+ready_yaw_deg: 8.0
 standoff: 0.10
 # Approach square to the tray (facing its yaw, centred on it) and stop this far short of
 # its centre: the knuckles reach ~0.27-0.30 m ahead of the pelvis.
@@ -109,8 +125,10 @@ carry_tol: 0.03
 arrive_speed: 0.05
 arrive_hold: 0.5
 # ARRIVE_B steps (at keep_vx) until the base is within this of its goal ahead and sideways.
-# 1.0 (off) -> 31 of 48 with the pinch, 0.04 -> 35: placement misses 4 -> 0.
-arrive_lat_tol: 0.04
+# 1.0 (off) -> 31 of 48 with the pinch, 0.04 -> 35: placement misses 4 -> 0. With D-21 the
+# opening hands push the placed tray 2-3 cm, so it needs the margin: 0.04 / 0.03 / 0.02 ->
+# 40 / 42 / 48 of 48.
+arrive_lat_tol: 0.02
 
 # LOWER, RELEASE, RETREAT.
 lower_speed: 0.05
@@ -130,7 +148,8 @@ release_hold: 0.5
 # RELEASE moves the hands this far up (m) as they open and move out; negative drops the
 # fingers out from under the handle lip.
 release_dz: -0.02
-retreat: 0.20
+# RETREAT walks back this far, until the fingers clear table B, then lowers the hands to rest.
+retreat: 0.35
 vx_retreat: -0.2
 
 # Minimum-jerk smoothing (D-20): when a phase change moves the nominal wrist targets, the

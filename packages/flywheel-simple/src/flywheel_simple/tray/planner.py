@@ -6,7 +6,7 @@ of DA-32:
 
 | Phase | Command | Leaves when | Scorer step |
 |---|---|---|---|
-| APPROACH_A | palms ready, walk square to the tray | `approach_dist` to it or `standoff` | 1 |
+| APPROACH_A | walk square to tray, raise hands at `raise_at` | `approach_dist`, `standoff` | 1 |
 | REACH | palms to pre-grasp outside the handles, base kept | moved, palms within `palm_tol` | 1 |
 | GRASP | grip points `squeeze` inside the handles | both handle contacts for `grasp_hold` | 2 |
 | LIFT | palms up `lift_height` at `lift_speed` | ramp done, tray lifted for `lift_hold` | 3 |
@@ -16,7 +16,7 @@ of DA-32:
 | ARRIVE_B | stand, hold the heading | base slower than `arrive_speed` for `arrive_hold` | 5 |
 | LOWER | palms down, shifted onto the target | tray flat on table B for `lower_hold` | 6 |
 | RELEASE | open, then out `pregrasp_offset` + `squeeze` | no handle contact `release_hold` | 7 |
-| RETREAT | walk back `retreat` | distance reached | 7 |
+| RETREAT | walk back `retreat`, lower the hands to rest | hands at rest | 7 |
 
 Every phase has a timeout; a timeout, a StepTracker failure label or a tray on
 the floor ends in ABORT. Wrist poses are 4 x 4 in the base frame of
@@ -34,6 +34,8 @@ decoupled_wbc reaches a new arm target within one control step, so a phase chang
 that moves the wrist targets would make the arm lunge. The planner turns each such
 jump into an offset that decays along a minimum-jerk profile (bell-shaped speed, as
 in human reaching); the targets' continuous motion passes through unchanged (D-20).
+The arms keep the robot's standing pose (from `start`) while walking to table A and
+go back to it at the end, fingers slightly curled (D-21).
 
 Pure numpy: runs in the workspace.
 """
@@ -97,11 +99,16 @@ class PlannerConfig:
     grasp_dz: float
     squeeze: float
     hand_closure_open: float
+    hand_closure_rest: float
     grasp_close_after: float
     ready_x: float
     ready_y: float
     ready_z: float
     ready_clear: float
+    ready_roll_deg: float
+    ready_pitch_deg: float
+    ready_yaw_deg: float
+    raise_at: float
     standoff: float
     approach_dist: float
     vx_approach: float
@@ -188,6 +195,15 @@ class PlannerConfig:
     def grasp_rotation_side(self, side: int) -> NDArray[np.float64]:
         """Wrist orientation in the tray frame while grasping; the right hand mirrored."""
         left = self.grasp_rotation
+        return left if side == 0 else MIRROR @ left @ MIRROR
+
+    def ready_rotation_side(self, side: int) -> NDArray[np.float64]:
+        """Wrist orientation of the ready pose, base frame; the right hand mirrored."""
+        left = rpy_matrix(
+            math.radians(self.ready_roll_deg),
+            math.radians(self.ready_pitch_deg),
+            math.radians(self.ready_yaw_deg),
+        )
         return left if side == 0 else MIRROR @ left @ MIRROR
 
     @property
@@ -378,6 +394,11 @@ class TrayPlanner:
     _hand: float | None = None
     _commanded: list[NDArray[np.float64]] | None = None  # last smoothed palms, base frame
     _release_rots: list[NDArray[np.float64]] | None = None  # wrists held while opening
+    # The robot's standing pose from `start` (palms, wrist rotations; base frame): the arms
+    # hang there while walking to table A and go back there at the end.
+    _rest: tuple[list[NDArray[np.float64]], list[NDArray[np.float64]]] | None = None
+    _raised: bool = False  # APPROACH_A has raised the hands
+    _stepped_back: bool = False  # RETREAT has walked back `retreat`
     _wrist_blends: list[_Blend] = field(default_factory=list)
     _hand_blends: list[_Blend] = field(default_factory=list)
 
@@ -395,7 +416,9 @@ class TrayPlanner:
         move from there. Without it the first command goes straight to the targets."""
         wrists = (left_wrist, right_wrist)
         palms = [(w @ np.r_[o, 1.0])[:3] for w, o in zip(wrists, self.cfg.palm_offsets)]
-        self._nominal = (None, palms, [w[:3, :3].copy() for w in wrists])
+        rots = [w[:3, :3].copy() for w in wrists]
+        self._nominal = (None, palms, rots)
+        self._rest = ([p.copy() for p in palms], [r.copy() for r in rots])
         self._hand = 0.0
 
     def step(self, state: TrayState, base: Pose2D, report: StepReport) -> PlannerCommand:
@@ -436,10 +459,6 @@ class TrayPlanner:
             return self._stand(state, base)
 
         if p is Phase.APPROACH_A:
-            palms = self._ready_palms()
-            ready = min(state.left_palm[2], state.right_palm[2]) >= (
-                self.tray_cfg.table_height + cfg.ready_clear
-            )
             # Square up to the tray: face its yaw, centre on it, stop `approach_dist`
             # short of its centre, or at `standoff` from the table edge (the torso hits
             # the table closer). Level 1 moves the tray 5 cm and turns it 10 deg, which
@@ -451,11 +470,29 @@ class TrayPlanner:
             if along <= cfg.approach_dist or self._edge_a - base.x <= cfg.standoff:
                 self._enter(Phase.REACH, state, base)
                 return self._command(state, base)
-            if not ready:
-                return self._emit(state, base, palms, (0.0, 0.0, 0.0), heading=self._entry_yaw)
             vy = float(np.clip(cfg.vy_gain * lateral, -cfg.vy_max, cfg.vy_max))
             nav = (cfg.vx_approach, vy, cfg.heading_hold)
-            return self._emit(state, base, palms, nav, heading=tray_yaw)
+            rest = cfg.hand_closure_rest
+            # Walk with the arms in the standing pose, fingers curled, until the pelvis is
+            # `raise_at` from table A's edge: they reach 0.35 m ahead at pelvis height, under
+            # the table top. Then stop, raise the hands above it (wrists still neutral), and
+            # walk on; REACH turns the wrists to the grasp.
+            if self._rest is not None and not self._raised:
+                if self._edge_a - base.x > cfg.raise_at:
+                    at_rest, rest_rots = self._rest
+                    hanging = (at_rest[0], at_rest[1])
+                    return self._emit(
+                        state, base, hanging, nav, heading=tray_yaw, rots=rest_rots, hand=rest
+                    )
+            self._raised = True
+            palms = self._ready_palms()
+            ready = min(state.left_palm[2], state.right_palm[2]) >= (
+                self.tray_cfg.table_height + cfg.ready_clear
+            )
+            if not ready:
+                stand = (0.0, 0.0, 0.0)
+                return self._emit(state, base, palms, stand, heading=tray_yaw, hand=rest, segment=1)
+            return self._emit(state, base, palms, nav, heading=tray_yaw, hand=rest, segment=1)
 
         if p is Phase.REACH:
             if self._station is None:
@@ -618,20 +655,21 @@ class TrayPlanner:
 
         assert self._lowered is not None
         if p is Phase.RELEASE:
-            # Open first, holding the wrists as LOWER left them: hands moving out while
-            # still opening dragged the tray by a hooked thumb (level 0 seed 0: 9.9 deg).
+            # Open while going down `release_dz`, wrists as LOWER left them, then move out.
+            # Hands moving out while still opening dragged the tray by a hooked thumb (level
+            # 0 seed 0: 9.9 deg tilt); fingers opening in place pried the lip up (2.9 cm,
+            # 8.4 deg); going down takes them off its underside. Moving only outward left
+            # the fingers hooked under the lip.
             assert self._entered_t is not None and self._nominal is not None
             if self._release_rots is None:
                 self._release_rots = [r.copy() for r in self._nominal[2]]
+            drop = np.array([0.0, 0.0, cfg.release_dz])
             if state.t - self._entered_t < cfg.hand_close_s:
-                return self._emit(
-                    state, base, self._lowered, (0.0, 0.0, 0.0), rots=self._release_rots
-                )
-            # Then out and down: fingers hooked under the handle lip stayed in contact when
-            # the hands only moved outward.
+                lowering = (self._lowered[0] + drop, self._lowered[1] + drop)
+                stand = (0.0, 0.0, 0.0)
+                return self._emit(state, base, lowering, stand, rots=self._release_rots)
             back = cfg.pregrasp_offset + cfg.squeeze
             out = self._outward(state, base, self._lowered, back)
-            drop = np.array([0.0, 0.0, cfg.release_dz])
             palms = (out[0] + drop, out[1] + drop)
             if self._held(not any(state.hand_contacts), state.t, cfg.release_hold):
                 self._lowered = palms
@@ -639,12 +677,23 @@ class TrayPlanner:
                 return self._command(state, base)
             return self._emit(state, base, palms, (0.0, 0.0, 0.0), segment=1)
 
-        # RETREAT
+        # RETREAT: step back until the fingers clear table B, then lower the hands to the
+        # standing pose (fingers curled) and finish once they are there.
         if self._travelled(base) >= cfg.retreat:
+            self._stepped_back = True
+        if not self._stepped_back:
+            nav = (cfg.vx_retreat, 0.0, cfg.heading_hold)
+            return self._emit(state, base, self._lowered, nav, heading=self._entry_yaw)
+        lowered = self._nominal is not None and self._nominal[0] == (Phase.RETREAT, 1)
+        if self._rest is None or (lowered and not self._wrist_blends):
             self._enter(Phase.DONE, state, base)
             return self._command(state, base)
-        nav = (cfg.vx_retreat, 0.0, cfg.heading_hold)
-        return self._emit(state, base, self._lowered, nav, heading=self._entry_yaw)
+        at_rest, rest_rots = self._rest
+        hand = cfg.hand_closure_rest
+        stand = (0.0, 0.0, 0.0)
+        return self._emit(
+            state, base, (at_rest[0], at_rest[1]), stand, rots=rest_rots, hand=hand, segment=1
+        )
 
     # -- geometry ------------------------------------------------------------
 
@@ -785,8 +834,10 @@ class TrayPlanner:
         heading: float | None = None,
         rots: list[NDArray[np.float64]] | None = None,
         segment: int = 0,
+        hand: float | None = None,
     ) -> PlannerCommand:
-        """Command for `palms` (base frame); `rots` overrides the phase's wrist rotations.
+        """Command for `palms` (base frame); `rots` overrides the phase's wrist rotations,
+        `hand` the closure (`closure` picks closed or `hand_closure_open`).
 
         A new `segment` within a phase marks a switch of the nominal targets that is
         smoothed like a phase change.
@@ -796,7 +847,7 @@ class TrayPlanner:
             if self._carry is not None:  # fixed from the end of LIFT on
                 rots = list(self._carry.rotations)
             elif self.phase is Phase.APPROACH_A:
-                rots = [self._wrist_rotation(k) for k in range(2)]
+                rots = [cfg.ready_rotation_side(k) for k in range(2)]
             else:
                 rots = [self._wrist_rotation(k, state, base) for k in range(2)]
             if self.phase.name in LEVELLED and cfg.level_gain != 0.0:
@@ -827,14 +878,16 @@ class TrayPlanner:
         wrists = [
             self._wrist(smooth_palms[k] + self._correction[k], k, smooth_rots[k]) for k in range(2)
         ]
-        hand = self._hand_closure(state.t, 1.0 if closure else cfg.hand_closure_open)
+        if hand is None:
+            hand = 1.0 if closure else cfg.hand_closure_open
+        closures = self._hand_closure(state.t, hand)
         cmd = PlannerCommand(
             phase=self.phase,
             nav=(float(nav[0]), float(nav[1]), float(nav[2])),
             heading=base.yaw if heading is None else heading,
             left_wrist=wrists[0],
             right_wrist=wrists[1],
-            hand_closure=hand,
+            hand_closure=closures,
             abort_reason=None,
         )
         self._hold = cmd
@@ -895,16 +948,17 @@ class TrayPlanner:
         return left, right
 
     def _stand(self, state: TrayState, base: Pose2D) -> PlannerCommand:
-        """DONE and ABORT: stand where the last command left the wrists; ABORT keeps the grip."""
+        """DONE and ABORT: hold the last command's wrists and hands (ABORT keeps the grip)."""
         hold = self._hold
+        rest = (self.cfg.hand_closure_rest, self.cfg.hand_closure_rest)
         if hold is None:
             ready = self._ready_palms()
-            wrists = [self._wrist(ready[k], k, self._wrist_rotation(k)) for k in range(2)]
+            rots = [self.cfg.ready_rotation_side(k) for k in range(2)]
+            wrists = [self._wrist(ready[k], k, rots[k]) for k in range(2)]
         else:
             wrists = [hold.left_wrist, hold.right_wrist]
         aborted = self.phase is Phase.ABORT
-        open_ = (self.cfg.hand_closure_open, self.cfg.hand_closure_open)
-        closure = hold.hand_closure if hold is not None and aborted else open_
+        closure = hold.hand_closure if hold is not None else rest
         return PlannerCommand(
             phase=self.phase,
             nav=(0.0, 0.0, 0.0),
