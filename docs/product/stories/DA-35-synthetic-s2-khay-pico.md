@@ -41,7 +41,7 @@ Kế hoạch ở mục "Kế hoạch teleop ảo" và "Kế hoạch generator S2
 - [x] 1. Đọc đường teleop PICO của SIMPLE trên env khay, ghi chỗ cắm và khoảng trống (AC 1)
 - [x] 2. Wrapper teleop khay: reset theo (level, seed), ghi trạng thái khay, khối `flywheel`, log lượt thử; test bằng streamer giả, không cần kính (AC 1)
 - [x] 3. Đo phong cách teleop người từ psi-data của tác giả (ôm thùng hai tay, đi giữa hai bàn), ra dải tham số phong cách (AC 2, 8)
-- [ ] 4. Đồng hồ sim cho agent: tất định, chạy nhanh hơn thời gian thực; hai lần chạy cùng seed ra cùng frame (AC 2, 5)
+- [x] 4. Đồng hồ sim cho agent: tất định, không chờ thời gian thực; hai lần chạy cùng seed ra cùng frame (AC 2, 5). Đo: gần 1× thời gian thực mỗi worker, xem [virtual-teleop.md](../../g0/tray/virtual-teleop.md)
 - [ ] 5. Teleop ảo: phép đổi ngược của `WristsPreProcessor` (test CPU khứ hồi), cần gạt, cò và grip, máy pha 7 bước; một episode đạt `check_success` (AC 2)
 - [ ] 6. Phong cách ngẫu nhiên mỗi episode theo seed phong cách; meta của AC 3 (AC 2, 3)
 - [ ] 7. Sinh hàng loạt demo cha: ít nhất 100 đạt, sổ lượt, sổ chi phí (AC 3, 7)
@@ -78,7 +78,7 @@ Ngoài phạm vi, cần PR riêng: dòng DA-35 trong 07 mục 2.2; sửa design 
 | Chuyển động | Mỗi đoạn tay là min-jerk có điểm qua giữa (đường cong), hồ sơ vận tốc lệch đỉnh, thời gian theo khoảng cách; tư thế nghỉ khuỷu sát thân, lòng bàn tay hướng vào; với thấp thì IK có eo tự nghiêng thân. Cần gạt tăng và giảm dần như tay người |
 | Phong cách mỗi lượt | Rút từ seed phong cách trong dải đã chốt: tốc độ với, độ cong, lệch đỉnh vận tốc, thời gian dừng giữa pha, độ cao mang, khoảng cách hai tay, tốc độ đi, gia tốc cần gạt, biên độ và tần số rung nhỏ. Ghi cả bộ tham số vào meta |
 | Dải phong cách | Đo từ psi-data (nhiệm vụ 3): `G1WholebodyPickAndPlaceAndHugContainerTeleop-v0` (119,4 MB, decoupled WBC, ôm thùng hai tay) và `G1WholebodyLocomotionPickBetweenTablesTeleop-v0` (202,6 MB, đi giữa hai bàn). Nếu không được dùng, ước lượng và ghi là giả định |
-| Đồng hồ | Agent con thay `time.monotonic()` bằng thời gian sim (cùng ý D-17), không ngủ cho đủ 50 Hz: tất định và chạy nhanh hơn thời gian thực |
+| Đồng hồ | Agent con thay `time.monotonic()` bằng thời gian sim (cùng ý D-17), không ngủ cho đủ 50 Hz: tất định; tốc độ đo được gần 1× thời gian thực mỗi worker (nhiệm vụ 4) |
 | Bàn tay | Chỉ ba mức đóng của PICO (cò, grip). Nếu không cầm chắc được tay cầm, ghi `Decision` và hỏi PO trước khi cho bàn tay đóng liên tục (lệch khỏi dữ liệu PICO thật) |
 
 Rủi ro: chỉnh cách cầm có thể tốn nhiều vòng như DA-33 (40/48 sau nhiều lượt quét); ba mức đóng của PICO có thể không đủ cho tay cầm khay; "giống người" chỉ đúng tới mức dải phong cách đo được. Teleop ảo tự sinh được nhiều; S2 vẫn làm vì nó là đường nhân demo PICO thật sau này, và spec mục 6.10 cần đơn giá riêng của S1 và S2.
@@ -133,6 +133,6 @@ Rủi ro: điều kiện xa demo cha thì cầm trượt; đế trôi khi mang l
 ## Ghi chép khi làm
 
 - Giờ thực:
-- Công cụ AI đã dùng: Claude Code (nhiệm vụ 1–3)
+- Công cụ AI đã dùng: Claude Code (nhiệm vụ 1–4)
 - Ghi chú hoàn thành: Nhiệm vụ 2 (3/11/2026): wrapper, agent với streamer bất kỳ và vòng phiên; ghi được dataset LeRobot thật sau khi cài các gói ghi của [PR #27](https://github.com/hiwe0305/denso-challenge/pull/27) ([pico-teleop.md](../../g0/tray/pico-teleop.md) khoảng trống 11)
 - File đã tạo hoặc sửa: `docs/g0/tray/pico-teleop.md`, `docs/g0/tray/virtual-teleop.md`, `packages/flywheel-simple/src/flywheel_simple/tray/pico/`, `packages/flywheel-simple/tests/tray/pico/`, `scripts/g0/tray/pico/measure_teleop_style.py`

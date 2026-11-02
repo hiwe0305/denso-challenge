@@ -82,3 +82,15 @@ Mỗi episode rút đều trong dải, từ seed phong cách. Dải lấy từ p
 | \|y\| khuỷu khi nghỉ và khi mang | 0,17–0,20 m | \|y\| khuỷu |
 
 Kiểm sau khi có teleop ảo (AC 8): cùng các chỉ số đo trên episode teleop ảo phải nằm trong p10–p90 của người, trừ khoảng cách hai tay, độ dài và thời lượng episode (riêng của task khay).
+
+## Đồng hồ sim (nhiệm vụ 4)
+
+Agent PICO của SIMPLE nội suy thân trên của WBC theo `time.monotonic()`, và CLI ngủ cho đủ 50 Hz thời gian thực. Với streamer kịch bản, kết quả khi đó phụ thuộc tốc độ máy. `flywheel_simple.tray.pico.clock.SimClock` tính thời gian từ số bước (`start + ticks · 0,02 s`, không cộng dồn sai số), quay về `start` ở mỗi lần reset episode, trước khi agent reset ống WBC. `StreamerDecoupledAgent(..., clock=SimClock())` thay `time` trong module agent PICO của SIMPLE bằng một proxy đọc đồng hồ này; vòng phiên tick một lần mỗi bước env và không ngủ. Proxy thay cho cả process, nên mỗi process chỉ có một agent có đồng hồ (mỗi worker một env). Teleop bằng kính thật vẫn dùng giờ thật.
+
+| Đo (rtx3060, 3/11/2026) | Kết quả |
+|---|---|
+| Hai lần chạy cùng điều kiện `1:7`, streamer kịch bản, 250 bước | `action`, `action.eef`, `observation.state`, `observation.tray_pose` giống hệt từng bit (`assert_array_equal`) |
+| Một lượt 1000 bước (20 s sim), ghi LeRobot thật | 21,3 s thời gian thực, khoảng 21 ms mỗi bước: gần 1× thời gian thực, không nhanh hơn rõ |
+| Profile 500 bước | `env.step` khoảng 16 ms mỗi bước, trong đó render hai camera stereo 10,5 ms (chỉ mắt trái được ghi); phần còn lại là agent (WBC, IK) và ghi frame |
+
+Hệ quả cho quy mô: mỗi worker chạy khoảng 1× thời gian thực, nên số episode mỗi giờ đến từ số worker (tối đa 22 trên rtx3060). Bỏ render mắt phải là chỗ tối ưu đầu tiên nếu cần (nhiệm vụ 12).

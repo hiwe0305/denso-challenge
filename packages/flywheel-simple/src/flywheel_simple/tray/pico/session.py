@@ -1,14 +1,16 @@
 """Record PICO teleop demos of the tray task with SIMPLE's recorder (DA-35 AC 1, 2).
 
 The loop follows `simple.cli.teleop_decoupled_wbc.main` step for step (same
-agent calls, same frame builder, same LeRobot exporter, real-time 50 Hz) and
-adds what the tray task needs:
+agent calls, same frame builder, same LeRobot exporter, real-time 50 Hz for a
+person at the headset) and adds what the tray task needs:
 
 - reset to an explicit (level, seed) list instead of a random seed;
 - tray pose, part positions and the seven step flags in every frame;
 - a `flywheel` block in each saved episode's environment_config;
 - one line per attempt in `attempts.jsonl` and one per session in
   `sessions.jsonl`, also for attempts that are not saved;
+- scripted streamers run on a SimClock: one tick per step, no pacing, so an
+  episode is the same on every run and faster than real time;
 - only successful attempts are saved, unless `keep_failed`; an attempt ends at
   success, the first StepTracker failure label, time out or operator reset.
 
@@ -162,16 +164,24 @@ class AttemptResult:
 
 
 def run_attempt(env: Any, agent: Any, exporter: Any, obs: Any, info: Any, realtime: bool) -> Any:
-    """Step until the attempt ends; frames go into the exporter's open episode."""
+    """Step until the attempt ends; frames go into the exporter's open episode.
+
+    An agent with a `clock` (SimClock) is ticked once per env step and never
+    paced; otherwise `realtime` holds 50 Hz wall time, as the CLI does.
+    """
     cli = _mod("simple.cli.teleop_decoupled_wbc")
     sonic_env = env.unwrapped
     task, robot = sonic_env.task, sonic_env.task.robot
+    clock = getattr(agent, "clock", None)
+    pace = realtime and clock is None
     recording, frames, report = False, 0, None
     while True:
         step_start = time.monotonic()
         action = agent.get_action(obs, instruction=task.instruction, privileged_info=info)
         step_obs, step_info, step_action = obs.copy(), info.copy(), action.copy()
         obs, _, terminated, truncated, info = env.step(action)
+        if clock is not None:
+            clock.tick()
         reset_requested = agent.reset_requested  # clears on read
         sonic_env.update_viewer()
         sonic_env.update_reward()
@@ -200,7 +210,7 @@ def run_attempt(env: Any, agent: Any, exporter: Any, obs: Any, info: Any, realti
                 failure=None if report is None else report.failure,
                 steps_reached=0 if report is None else sum(report.steps),
             )
-        if realtime:
+        if pace:
             time.sleep(max(0.0, CONTROL_DT - (time.monotonic() - step_start)))
 
 
@@ -231,6 +241,8 @@ def run_session(
     try:
         while (condition := queue.current) is not None:
             obs, info = env.reset(seed=condition.seed, options={"level": condition.level})
+            if getattr(agent, "clock", None) is not None:
+                agent.clock.reset()  # before the pipeline reset reads the time
             on_episode_reset(robot, agent)
             if exporter is None:
                 root = save_dir / env.unwrapped.spec.id
@@ -336,8 +348,9 @@ def main(argv: list[str] | None = None) -> int:
         agent = _mod("simple.agents.pico_decoupled_agent").PicoDecoupledAgent(robot)
     else:
         from flywheel_simple.tray.pico.agent import ScriptedStreamer, StreamerDecoupledAgent
+        from flywheel_simple.tray.pico.clock import SimClock
 
-        agent = StreamerDecoupledAgent(robot, ScriptedStreamer())
+        agent = StreamerDecoupledAgent(robot, ScriptedStreamer(), clock=SimClock())
     agent.num_episodes = len(conditions)
     try:
         summary = run_session(

@@ -22,9 +22,12 @@ from typing import Any
 from unittest import mock
 
 import numpy as np
+from simple.agents import pico_decoupled_agent  # type: ignore[import-not-found]
 from simple.agents.pico_decoupled_agent import (  # type: ignore[import-not-found]
     PicoDecoupledAgent,
 )
+
+from flywheel_simple.tray.pico.clock import ClockedTime, SimClock
 
 STANDING_HEIGHT = 0.74  # PicoStreamer's initial base height command
 
@@ -92,11 +95,31 @@ class ScriptedStreamer:
         )
 
 
-class StreamerDecoupledAgent(PicoDecoupledAgent):  # type: ignore[misc]
-    """PicoDecoupledAgent reading `streamer` instead of the PICO headset."""
+def _install_clock(clock: SimClock) -> None:
+    """Make SIMPLE's PICO agent module read `clock` wherever it calls `time.monotonic()`.
 
-    def __init__(self, robot: Any, streamer: Any) -> None:
+    The module's `time` is swapped process-wide, so only one clocked agent may
+    live in a process (one env per worker anyway); a second, different clock is
+    refused.
+    """
+    current = pico_decoupled_agent.time
+    if isinstance(current, ClockedTime) and current.clock is not clock:
+        raise RuntimeError("another SimClock already drives this process's PICO agent")
+    pico_decoupled_agent.time = ClockedTime(clock)
+
+
+class StreamerDecoupledAgent(PicoDecoupledAgent):  # type: ignore[misc]
+    """PicoDecoupledAgent reading `streamer` instead of the PICO headset.
+
+    With `clock`, the pipeline runs on simulated time (see flywheel_simple.tray.pico.clock);
+    the session ticks it once per env step. Without, it keeps the wall clock.
+    """
+
+    def __init__(self, robot: Any, streamer: Any, clock: SimClock | None = None) -> None:
         self._external_streamer = streamer
+        self.clock = clock
+        if clock is not None:
+            _install_clock(clock)
         super().__init__(robot)
 
     def _init_pico_streamer(self) -> None:
