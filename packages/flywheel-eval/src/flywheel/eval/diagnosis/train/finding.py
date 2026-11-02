@@ -25,7 +25,10 @@ class Finding:
     group: str | None
     dim: int | None
     value: float
-    threshold: float
+    # None where the rule counts measurements rather than comparing against a
+    # number, as T1 does on a loss that is not finite. `DiagnosisFinding` of the
+    # contract spells it the same way (plan, undecided-points table).
+    threshold: float | None
     stop_job: bool = False  # T1 only; the train adapter is what actually stops a job
 
 
