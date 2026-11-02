@@ -73,7 +73,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 ## Ghi chép khi làm
 
 - Giờ thực: 3h (1/11/2026) + 7h (2/11/2026: 3h sáng, 4h chiều)
-- Công cụ AI đã dùng: Claude Code (Opus 5), theo plan DA-08 và DA-13 ngày 30/10/2026 (PR #18, chưa merge nên chưa liên kết được)
+- Công cụ AI đã dùng: Claude Code (Opus 5), theo [plan DA-08 và DA-13 ngày 30/10/2026](../../superpowers/plans/2026-10-30-da08-da13-diagnosis.md) (PR #18, đã merge)
 - Ghi chú hoàn thành:
   - 1/11/2026: làm phần không phụ thuộc hợp đồng của DA-25 (PR #22 còn mở). Xong **nhiệm vụ 5**; nhiệm vụ 1 và 2 mới có phần thuần numpy, chưa đánh dấu.
   - Nhiệm vụ 1 còn `reader.py`: cần `TrainingMetric`, `ProbeP1`, `ProbeP3`, `ProbeP4`, `ActionLayout` của DA-25. `series.py` đã xong vì chỉ là hàm thuần trên numpy.
