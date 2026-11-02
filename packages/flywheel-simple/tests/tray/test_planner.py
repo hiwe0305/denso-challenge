@@ -279,9 +279,12 @@ def at_rest(world: ToyWorld, record: Record) -> bool:
 def test_walks_with_the_hands_down_and_raises_them_at_the_table() -> None:
     # Arms stay in the robot's standing pose, fingers slightly curled, while it walks; they
     # rise with neutral wrists only once the pelvis is `raise_at` from table A's edge.
+    from dataclasses import replace
+
     from flywheel_simple.tray.planner import MIRROR, rpy_matrix
 
-    world = ToyWorld()
+    # The default raise_at (0.50) is within 3 cm of the start: test the walk at 0.40.
+    world = ToyWorld(planner_cfg=replace(PlannerConfig.load(), raise_at=0.40))
     cfg = world.planner_cfg
     approach = [r for r in world.run() if r.cmd.phase is Phase.APPROACH_A]
     k = next(i for i, r in enumerate(approach) if not at_rest(world, r))
