@@ -86,7 +86,6 @@ class StandWalkController:
         self.ik = UpperBodyIK(self._model)
         self._started = False
         self._ik_anchored = False
-        self._clock = 0.0  # control time (s), advanced CONTROL_DT per action
         self.last_record: dict[str, NDArray[np.float64]] = {}
 
     @property
@@ -99,10 +98,14 @@ class StandWalkController:
         """GR00T's G1GearWbcPolicy (Balance/Walk ONNX) inside the decoupled WBC."""
         return self._policy.lower_body_policy
 
+    def _now(self) -> float:
+        """Sim time (s): the WBC's clock (D-17, D-24)."""
+        data = getattr(self.robot, "mjData", None)
+        return float(data.time) if data is not None else 0.0
+
     def reset(self) -> None:
         """Fresh WBC pipeline with the RL lower body engaged, as teleop_decoupled_wbc does."""
-        self._clock = 0.0
-        self._policy.reset(init_time=self._clock)
+        self._policy.reset(init_time=self._now())
         self._policy.lower_body_policy.use_policy_action = True
         self._started = False
         self._ik_anchored = False
@@ -137,11 +140,13 @@ class StandWalkController:
         for side, closure in zip(("left", "right"), hand_closure):
             upper[self.ik.hand_slots[side]] = hand_q(side, closure)  # type: ignore[arg-type]
 
-        # Control clock, not wall time: the WBC interpolates its targets in time, so
-        # with time.monotonic() the same commands moved the arm differently (0.022 rad
-        # after 40 steps) depending on how long each env step took.
-        t_now = self._clock
-        self._clock += CONTROL_DT
+        # Sim time, not wall time: the WBC interpolates its targets in time, so with
+        # time.monotonic() the same commands moved the arm differently (0.022 rad after
+        # 40 steps) depending on how long each env step took (D-17). It is the clock
+        # flywheel_simple.tray.run gives replay-decoupled-wbc: the same float values make
+        # a replay bit-identical; a counter of 0.02 s steps differed in the last bits and
+        # a grasp contact grew that into 12 cm (D-24).
+        t_now = self._now()
         self._policy.set_observation(self._wbc_observation(sim_obs))
         self._policy.set_goal(
             {
@@ -157,8 +162,12 @@ class StandWalkController:
         q = self._policy.get_action(time=t_now)
         # The fields SIMPLE's teleop recorder reads from PicoDecoupledAgent's
         # action (teleop_decoupled_wbc._build_frame); navigate and base height are
-        # the WBC's synced values, as that agent records them.
+        # the WBC's synced values, as that agent records them. The goal_* fields are
+        # what this call commanded, which replay and eval feed back as commands (D-24).
         self.last_record = {
+            "goal_upper_body": np.asarray(upper, dtype=float).copy(),
+            "goal_navigate_cmd": np.asarray(navigate_cmd, dtype=float).copy(),
+            "goal_base_height_command": np.atleast_1d(np.asarray(base_height, dtype=float)),
             "target_q": np.asarray(self._model.get_body_actuated_joints(q["q"]), dtype=float),
             "target_waist": np.asarray(q["target_waist"], dtype=float),
             "left_hand_q": np.asarray(self._model.get_hand_actuated_joints(q["q"], side="left")),

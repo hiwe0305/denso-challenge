@@ -121,8 +121,15 @@ def build_frame(
 ) -> dict[str, Any]:
     """One frame: the observation an action was computed from, and that action.
 
-    Keys and values as SIMPLE's `teleop_decoupled_wbc._build_frame`; `record` is
-    `StandWalkController.last_record` of the same step.
+    Keys as SIMPLE's `teleop_decoupled_wbc._build_frame`; `record` is
+    `StandWalkController.last_record` of the same step. Unlike that recorder, the
+    upper body of `action` (arms, hands, waist), `teleop.navigate_command` and
+    `teleop.base_height_command` are the commands this step sent to the WBC, not its
+    synced output (D-24): the output lags the command by a step, and its navigate
+    mixes the previous step's velocity with this step's turn flag, so replaying the
+    output drifted from the recording as soon as the robot walked. replay- and
+    eval-decoupled-wbc feed these fields back as commands. The lower body of
+    `action` stays the WBC's output.
     """
     proprio = info["proprio"]
     action_q = robot_model.get_configuration_from_actuated_joints(
@@ -130,8 +137,7 @@ def build_frame(
         left_hand_actuated_joint_values=record["left_hand_q"],
         right_hand_actuated_joint_values=record["right_hand_q"],
     )
-    # waist joints are 12-14 in robot_model order: the IK's target, the lower body's input
-    action_q[12:15] = record["target_waist"]
+    action_q[list(robot_model.get_joint_group_indices("upper_body"))] = record["goal_upper_body"]
     frame = {
         "observation.images.ego_view": observation["head_stereo_left"],
         "observation.state": np.asarray(observation["joint_qpos"], dtype=np.float64),
@@ -139,8 +145,10 @@ def build_frame(
         "action": np.asarray(action_q, dtype=np.float64),
         "action.eef": np.asarray(record["action_eef"], dtype=np.float64),
         "observation.img_state_delta": np.array([0.0], dtype=np.float32),
-        "teleop.navigate_command": np.asarray(record["navigate_cmd"], dtype=np.float64),
-        "teleop.base_height_command": np.asarray(record["base_height_command"], dtype=np.float64),
+        "teleop.navigate_command": np.asarray(record["goal_navigate_cmd"], dtype=np.float64),
+        "teleop.base_height_command": np.asarray(
+            record["goal_base_height_command"], dtype=np.float64
+        ),
         "observation.base_pose": np.asarray(proprio["floating_base_pose"], dtype=np.float64),
         "observation.base_vel": np.asarray(proprio["floating_base_vel"], dtype=np.float64),
     }

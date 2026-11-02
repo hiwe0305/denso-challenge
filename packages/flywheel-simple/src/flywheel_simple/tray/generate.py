@@ -232,7 +232,7 @@ def generate(
             wall0 = time.perf_counter()
             try:
                 result = run_episode(env, agent, seed=seed, level=level, on_frame=recorder.add)
-            except RuntimeError as exc:  # settle() timing out; the next reset rebuilds the scene
+            except RuntimeError as exc:  # e.g. a renderer error; the next reset rebuilds the scene
                 recorder.discard()
                 result = EpisodeResult(False, f"error:{type(exc).__name__}", str(exc)[:200])
             index: int | None = None

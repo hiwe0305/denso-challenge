@@ -26,7 +26,14 @@ import sys
 import time
 from pathlib import Path
 
-from flywheel_simple.tray.generate import generate, shard_dir, split_attempts, summarize
+from flywheel_simple.tray.generate import (
+    LOG_NAME,
+    generate,
+    read_log,
+    shard_dir,
+    split_attempts,
+    summarize,
+)
 
 
 def main() -> int:
@@ -57,12 +64,8 @@ def main() -> int:
     env = dict(os.environ)
     for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
         env.setdefault(var, "1")
-    procs = []
-    for shard, n in enumerate(split_attempts(args.n, args.workers)):
-        if n == 0:
-            continue
-        if procs:
-            time.sleep(args.stagger)
+
+    def start(shard: int, n: int) -> subprocess.Popen[bytes]:
         work = shard_dir(args.out, shard)
         work.mkdir(parents=True, exist_ok=True)
         cmd = [sys.executable, __file__, "--out", str(args.out), "--n", str(n)]
@@ -70,11 +73,28 @@ def main() -> int:
         cmd += ["--workers", str(args.workers), "--shard", str(shard)]
         cmd += ["--allow-plain"] if args.allow_plain else []
         with (work / "worker.log").open("a") as log:
-            procs.append(
-                (shard, subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=env))
-            )
-    failed = [shard for shard, p in procs if p.wait() != 0]
-    summary = {**summarize(args.out), "failed_shards": failed}
+            return subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=env)
+
+    shares = dict(enumerate(split_attempts(args.n, args.workers)))
+    procs = []
+    for shard, n in shares.items():
+        if n == 0:
+            continue
+        if procs:
+            time.sleep(args.stagger)
+        procs.append((shard, start(shard, n)))
+    crashed = [shard for shard, p in procs if p.wait() != 0]
+    # A worker sometimes dies in native code at start-up without a traceback (rtx3060,
+    # 1 of 22); run what is left of its share once more, resuming from its log.
+    retries = []
+    for shard in crashed:
+        left = shares[shard] - len(read_log(shard_dir(args.out, shard) / LOG_NAME))
+        if left > 0:
+            if retries:
+                time.sleep(args.stagger)
+            retries.append((shard, start(shard, left)))
+    failed = [shard for shard, p in retries if p.wait() != 0]
+    summary = {**summarize(args.out), "retried_shards": crashed, "failed_shards": failed}
     (args.out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     print(json.dumps(summary))
     return 1 if failed else 0
