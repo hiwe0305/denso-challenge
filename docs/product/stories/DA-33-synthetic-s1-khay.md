@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Đang làm. Nhiệm vụ 1–4 đã merge (PR #28, 2/11/2026); nhiệm vụ 5 xong trên nhánh `DA-33-tray-data`. PO duyệt kế hoạch nhiệm vụ 5–9 và mặc định Q-33A, Q-33B, Q-33D (3/11/2026) |
+| Trạng thái | Đang làm. Nhiệm vụ 1–4 đã merge (PR #28, 2/11/2026); nhiệm vụ 5, 6 xong trên nhánh `DA-33-tray-data`. PO duyệt kế hoạch nhiệm vụ 5–9 và mặc định Q-33A, Q-33B, Q-33D (3/11/2026) |
 | Người làm | Hiếu |
 | Làn | Adapter simulator (`flywheel-simple`) |
 | Story PRD | Story của [design 28/10/2026](../../superpowers/specs/2026-10-28-tray-transfer-he-design.md) mục 4, 5, 7 (M2) |
@@ -35,7 +35,7 @@ Kế hoạch chi tiết: [docs/superpowers/plans/2026-10-31-da33-tray-synthetic.
 - [x] 3. Máy pha của planner theo 7 bước scorer, có điều kiện chuyển và timeout (AC 2)
 - [x] 4. Một episode planner mang khay thành công theo `check_success()` (AC 3, mục tiêu 6/11)
 - [x] 5. Bộ ghi LeRobot cùng định dạng teleop của SIMPLE, kèm khối `flywheel` trong `environment_config` (AC 4)
-- [ ] 6. Sinh hàng loạt, sổ lượt sinh chỉ ghi thêm, QA tối thiểu (AC 4, 5)
+- [x] 6. Sinh hàng loạt, sổ lượt sinh chỉ ghi thêm, QA tối thiểu (AC 4, 5)
 - [ ] 7. QA bằng phát lại `replay-decoupled-wbc` ở `mujoco` (AC 4)
 - [ ] 8. Xuất sang định dạng Ψ₀ (action 36, state 32, LeRobot v2.1), contract test (AC 4, 6)
 - [ ] 9. Chạy lô sản xuất, release có hash, `action_layout`, sổ chi phí (AC 4, 5, 6; M2 8/11/2026)
