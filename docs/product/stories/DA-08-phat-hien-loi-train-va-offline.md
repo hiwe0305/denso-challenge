@@ -33,7 +33,7 @@ Là kỹ sư đánh giá, tôi muốn mỗi checkpoint được kiểm động h
 - [x] 3. T4–T6, T8: mất cân bằng nhóm, chiều chết, sụp mode, gradient bất thường (AC 1)
 - [x] 4. T7 và O1–O4 từ P3, P4 (AC 2)
 - [x] 5. Cấu hình ngưỡng có hash (AC 3)
-- [ ] 6. Artifact kết quả, lệnh `fw` (AC 4, 5)
+- [x] 6. Artifact kết quả, lệnh `fw` (AC 4, 5)
 - [ ] 7. Bộ log cấy lỗi và test dương, âm cho từng mã (AC 6)
 
 ## Phạm vi file
