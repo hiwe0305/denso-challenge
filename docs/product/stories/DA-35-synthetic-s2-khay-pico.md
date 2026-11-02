@@ -35,7 +35,7 @@ Bối cảnh [Đã chốt, Hiếu, 3/11/2026]: chọn S2 từ demo PICO, không 
 Kế hoạch generator ở mục "Kế hoạch generator" bên dưới.
 
 - [x] 1. Đọc đường teleop PICO của SIMPLE trên env khay, ghi chỗ cắm và khoảng trống (AC 1)
-- [ ] 2. Wrapper teleop khay: reset theo (level, seed), ghi trạng thái khay, khối `flywheel`, log lượt thử; test bằng streamer giả, không cần kính (AC 1)
+- [x] 2. Wrapper teleop khay: reset theo (level, seed), ghi trạng thái khay, khối `flywheel`, log lượt thử; test bằng streamer giả, không cần kính (AC 1)
 - [ ] 3. Cài PyAV, `xrobotoolkit_sdk`, XRoboToolkit PC service trên máy sim; nối kính; một demo thử (AC 1)
 - [ ] 4. Thu 5–10 demo PICO, QA bằng `check_success`, sổ chi phí, hướng dẫn người thu (AC 2)
 - [ ] 5. Cắt demo theo 7 bước, kiểm khung tọa độ của `action.eef` (AC 3)
@@ -107,5 +107,5 @@ Rủi ro chính: điều kiện xa demo cha thì cầm trượt (MimicGen chỉ 
 
 - Giờ thực:
 - Công cụ AI đã dùng: Claude Code (nhiệm vụ 1)
-- Ghi chú hoàn thành:
-- File đã tạo hoặc sửa:
+- Ghi chú hoàn thành: Nhiệm vụ 2 (3/11/2026): wrapper, agent với streamer bất kỳ và vòng phiên; ghi được dataset LeRobot thật sau khi cài các gói ghi của [PR #27](https://github.com/hiwe0305/denso-challenge/pull/27) ([pico-teleop.md](../../g0/tray/pico-teleop.md) khoảng trống 11)
+- File đã tạo hoặc sửa: `docs/g0/tray/pico-teleop.md`, `packages/flywheel-simple/src/flywheel_simple/tray/pico/`, `packages/flywheel-simple/tests/tray/pico/`

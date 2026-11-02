@@ -4,7 +4,7 @@
 
 ## Kết luận
 
-Đường teleop PICO của SIMPLE cắm được vào env khay mà không fork SIMPLE: `flywheel_simple.tray.run teleop-decoupled-wbc` (DA-32/4) đăng ký env rồi giao cho CLI của SIMPLE. Chưa chạy được ngay vì ba thứ: (1) venv SIMPLE thiếu PyAV và `xrobotoolkit_sdk`, máy sim chưa cài XRoboToolkit PC service; (2) chưa có kính PICO; (3) recorder của SIMPLE không ghi trạng thái khay và không chọn được seed, cần một wrapper nhỏ của đội (nhiệm vụ 2).
+Đường teleop PICO của SIMPLE cắm được vào env khay mà không fork SIMPLE: `flywheel_simple.tray.run teleop-decoupled-wbc` (DA-32/4) đăng ký env rồi giao cho CLI của SIMPLE. Chưa chạy được với kính thật vì ba thứ: (1) venv SIMPLE thiếu `xrobotoolkit_sdk`, máy sim chưa cài XRoboToolkit PC service (PyAV, `pyzmq` và bộ ghi LeRobot đã có từ PR #27); (2) chưa có kính PICO; (3) recorder của SIMPLE không ghi trạng thái khay và không chọn được seed, cần một wrapper nhỏ của đội (nhiệm vụ 2).
 
 Đường decoupled WBC của SIMPLE điều khiển cả eo (`enable_waist = True` trong cấu hình sonic, đo được): IK tính eo từ tư thế hai tay rồi đưa cho policy thân dưới. Vì thế demo PICO có nghiêng eo như video teleop G1, điều planner S1 của DA-33 không có (eo khóa, D-12 trên nhánh DA-33).
 
@@ -45,8 +45,36 @@ Người thu nhìn qua kính (luồng ảnh camera đầu của robot), nên má
 | 7 | Agent dùng `time.monotonic()` cho nội suy WBC và ngủ cho đủ 50 Hz thời gian thực | Mã `pico_decoupled_agent.py` | Đúng cho người thu. Khi sinh S2, agent con dùng đồng hồ sim để ra kết quả tất định (cùng ý D-17) |
 | 8 | Lượt hỏng bị bỏ khi reset, không để lại bản ghi | Mã `teleop_decoupled_wbc.py` (`skip_and_start_new_episode`) | Wrapper ghi log mọi lượt cho sổ chi phí |
 | 9 | Chưa có khối `flywheel` (nguồn, người thu, phiên bản) | | Wrapper thêm vào `environment_config`, như DA-33 nhiệm vụ 5 |
-| 10 | `action.eef` lấy từ `TeleopPolicy`; chưa rõ ở khung tay cầm so với kính hay khung robot | Mã `teleop_policy.py` | Kiểm ở nhiệm vụ 5 trước khi biến đổi; nếu là khung người thì tính tư thế cổ tay bằng FK từ `action` |
+| 10 | ~~`action.eef` ở khung nào~~ Đã rõ (nhiệm vụ 2): là `body_data` sau `WristsPreProcessor`, tức tư thế cổ tay trong khung gốc của robot model. Bộ tiền xử lý lấy độ dịch của tay cầm so với lúc kích hoạt, nhân `motion_scale`, đặt lên tư thế cổ tay hiệu chuẩn | Mã `wrists.py`, `teleop_policy.py` | S2 biến đổi `action.eef` rồi đưa thẳng vào IK, bỏ qua bộ tiền xử lý (nhiệm vụ 6) |
+| 11 | Venv SIMPLE (laptop và rtx3060) thiếu cả bộ ghi: extra `lerobot` của SIMPLE (fork `songlin/lerobot`, kéo `datasets`, `pyarrow`), `pandas`, cùng `pyzmq` mà agent PICO import; IK của SIMPLE import một visualizer cần `meshcat_shapes` | `decoupled_wbc.data.exporter`: `No module named 'datasets'`; agent: `No module named 'zmq'`, rồi `meshcat_shapes` | `meshcat_shapes`: placeholder như DA-33. Phần còn lại: [PR #27](https://github.com/hiwe0305/denso-challenge/pull/27) thêm 11 gói `--no-deps` vào `setup_simple.sh`; đã cài vào venv laptop và venv rtx3060, chỉ thêm gói, không đổi gói nào (3/11/2026) |
 
 ## Kiểm được khi chưa có kính
 
-`decoupled_wbc` có `DummyStreamer`, nhưng `PicoDecoupledAgent` vẫn mở cổng TCP và đọc nút qua `xr_client`. Wrapper nhiệm vụ 2 nên có agent con nhận một streamer bất kỳ; cùng cơ chế đó là streamer phát lại của S2 (nhiệm vụ 6). Nhờ vậy wrapper, recorder và streamer phát lại test được trên rtx3060 trước khi có kính.
+`DummyStreamer` của `decoupled_wbc` không dùng được: nó import ROS cho bộ nghe bàn phím. `PicoDecoupledAgent` cũng mở cổng TCP và đọc nút qua `xr_client`. Vì thế `flywheel_simple.tray.pico.agent.StreamerDecoupledAgent` dựng đúng ống của SIMPLE nhưng không có thiết bị thật (`enable_real_device=False`, vẫn có bộ tiền xử lý cổ tay và ngón), rồi cắm một streamer bất kỳ vào chỗ `PicoStreamer`. `ScriptedStreamer` kích hoạt teleop một lần và giữ hai cổ tay ở tư thế hiệu chuẩn. Streamer phát lại của S2 (nhiệm vụ 6) cắm vào cùng chỗ.
+
+## Phiên thu (nhiệm vụ 2)
+
+`flywheel_simple.tray.pico.session` chạy theo đúng vòng lặp của `teleop_decoupled_wbc.main` (cùng lời gọi agent, `_build_frame`, exporter LeRobot, 50 Hz thời gian thực) và thêm khoảng trống 4, 5, 6, 8, 9:
+
+```bash
+MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/python \
+    -m flywheel_simple.tray.pico.session --conditions 0:0-4,1:1-5 --operator op-01
+```
+
+| Ra | Nội dung |
+|---|---|
+| `<save-dir>/simple/G1WholebodyTrayTransferTeleop-v0/` | Dataset LeRobot; mỗi frame thêm `observation.tray_pose` (7), `observation.part_pos` (18), `observation.tray_steps` (7 cờ bước); `environment_config` thêm khối `flywheel` (story, `source_kind`, `source_detail`, người thu, phiên, level, seed, kết quả, commit SIMPLE, phiên bản wrapper) |
+| `<save-dir>/attempts.jsonl` | Mỗi lượt một dòng, kể cả lượt bỏ: level, seed, lần thử, kết quả, nhãn lỗi, số bước đạt, số frame, giây sim, giây thực, chỉ số episode |
+| `<save-dir>/sessions.jsonl` | Mỗi phiên một dòng: phút thực, số lượt, số đạt, số lưu (cho sổ chi phí) |
+
+Quyết định của nhiệm vụ 2 **[Đề xuất]**:
+
+| Quyết định | Lý do | Nếu sai |
+|---|---|---|
+| Chỉ lưu lượt đạt `check_success`; `--keep-failed` lưu cả lượt hỏng, có `outcome` trong khối `flywheel` | Demo cha của S2 phải đạt (AC 2); lượt hỏng vẫn đếm trong `attempts.jsonl` | Bật `--keep-failed` nếu cần dữ liệu correction |
+| Lượt kết thúc ở nhãn lỗi đầu tiên của `StepTracker` | Sau nhãn lỗi không còn thành công (D-08), chờ hết 90 s chỉ tốn giờ người | Bỏ nhánh `failure` trong `episode_outcome` |
+| Mỗi điều kiện thử tối đa 3 lần rồi sang điều kiện sau (`--max-attempts`) | Một seed khó không chặn cả phiên; vẫn ưu tiên đủ demo đạt | Đổi tham số |
+| Người thu chỉ ghi bằng mã giả danh dạng `op-01`; tên khác bị từ chối | Không lưu tên người vào dữ liệu | |
+| Điều kiện chỉ ở mức 0, 1, seed train | Spec mục 7.3; S2 sinh trong miền train | |
+
+Số đo (rtx3060, 3/11/2026, venv SIMPLE có các gói của PR #27): `pytest packages/flywheel-simple/tests/tray/pico -m sim`, 3 passed. Lượt bằng `ScriptedStreamer` reset đúng (level, seed) đã chọn, ghi frame có ba trường khay, hết giờ đúng giới hạn bước, ghi `attempts.jsonl` và khối `flywheel`. Chạy lệnh phiên với `--streamer scripted --keep-failed --max-episode-steps 300` trên điều kiện `0:0,1:2`: dataset LeRobot 2 episode, mỗi episode 136 frame, video 640 × 360 có 136 frame, parquet có `observation.tray_pose`, `observation.part_pos`, `observation.tray_steps`; mỗi lượt khoảng 6,8 s thời gian thực.
