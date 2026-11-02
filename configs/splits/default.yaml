@@ -1,0 +1,21 @@
+# Shared SplitPlan for every task and every data source (03 sections 4.3, 5.1; spec 7.3).
+# Decided by the PO on 2/11/2026: one table, not one per task.
+#
+# A condition is (task_id, level, seed); the seed here is the condition seed that lays out
+# the scene. Training seeds of Psi0 and the runner's rollout_seed are not split by range;
+# they are recorded in the RunPlan.
+#
+# Ranges are half-open [start, stop) and pairwise disjoint.
+# - train: generators and teleop sample only here. The authors' psi-data and simple-eval
+#   seeds are small integers, so they fall in train, far from dev and holdout (spec 7.3).
+# - dev: failure finding, the fresh gate set of each round and the conditions around a
+#   failure all draw from the unused part of dev; there is no separate "gate" split.
+# - holdout: sealed in vault/holdout/, read only by gate (`fw holdout run`); spec 7.3 uses
+#   50 seeds x 3 levels = 150 conditions of this range.
+#
+# flywheel_simple.tray.randomize.SEED_RANGES must equal this table (test_split_plan.py).
+version: 1
+seed_ranges:
+  train: {start: 0, stop: 1000000}
+  dev: {start: 1000000, stop: 1001000}
+  holdout: {start: 2000000, stop: 2001000}
