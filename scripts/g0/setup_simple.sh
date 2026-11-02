@@ -91,6 +91,16 @@ if command -v nvidia-smi >/dev/null; then torch_index=cu128; else torch_index=cp
   -e "$SIMPLE_DIR/third_party/unitree_sdk2_python" \
   -e "$SIMPLE_DIR/third_party/gear_sonic" \
   -e "$SIMPLE_DIR/third_party/decoupled_wbc"
+# Teleop recording (teleop_decoupled_wbc --record, DA-35): decoupled_wbc's LeRobot
+# exporter needs SIMPLE's lerobot fork (the `lerobot` extra, pinned as in SIMPLE's
+# uv.lock) with datasets and pyarrow; the PICO agent imports PyAV and pyzmq.
+# Installed without dependency resolution: the full extra pulls wandb, diffusers,
+# rerun-sdk and downgrades numpy, protobuf and others already in this venv.
+"$UV" pip install -q --no-deps \
+  "lerobot @ git+https://github.com/songlin/lerobot.git@09929d8057b044b53aecaf5c6d7eb71f99e8beb9" \
+  "datasets==3.6.0" "pyarrow==23.0.1" "pandas==2.3.3" "pytz==2026.1.post1" \
+  "dill==0.3.8" "multiprocess==0.70.16" "xxhash==3.6.0" "jsonlines==4.0.0" \
+  "av==17.0.0" "pyzmq==27.1.0"
 
 # SIMPLE imports cuRobo when it loads any robot. Without nvcc the real cuRobo
 # cannot be built, so install the dev-only stub (raises on use) instead.
@@ -112,6 +122,7 @@ from decoupled_wbc.control.policy.wbc_policy_factory import get_wbc_policy  # no
 # TeleopRetargetingIK itself imports a visualizer left out here, so check its solver.
 import pink, qpsolvers  # noqa: F401
 assert "quadprog" in qpsolvers.available_solvers
+import decoupled_wbc.data.exporter, simple.agents.pico_decoupled_agent  # noqa: F401  teleop recording
 assert "isaacsim" not in sys.modules
 print(f"simple {simple.__version__}, mujoco {mujoco.__version__}, python {sys.version.split()[0]}")
 EOF
