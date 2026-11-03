@@ -35,6 +35,10 @@ Chỉ ghi lỗi đã cấy thật (DA-31 tính recall theo loại từ manifest)
 | D6 | `wrong_task_instruction` | Sai câu lệnh task | Đổi câu lệnh gốc thành câu lệnh sai lệch | `corrupted_prompt` |
 | D7 | `action_sign_flip` | Đảo dấu action | Đổi dấu một chiều action có độ lệch chuẩn khác 0 trên episode | chọn theo episode |
 
+### Cấy trên bản sao LeRobot
+
+`flywheel.data.inject.lerobot_copy.inject_copy(src_root, out_root, cfg, layout)` đọc gói bằng bộ đọc của DA-03 (`iter_episodes`), chọn và cấy lỗi như trên, rồi ghi bản sao bằng `write_episode`; làn không có mã parquet riêng. Bản gốc không bị ghi. Mọi episode của bản sao được ghi lại theo thứ tự tăng dần, không chỉ episode có lỗi, vì bộ ghi đánh số lại `index` và ghi `meta/flywheel_lineage.jsonl`; ghi lại một phần sẽ làm lộ episode có lỗi. `duplicate_episode` nhận parquet và video của episode nguồn. Seed rò ghi vào `environment_config.flywheel.seed` của dòng `meta/episodes.jsonl`. Bản sao có `meta/benchmark_copy.json` (`benchmark_copy_id`); đáp án chỉ ở manifest trả về. Id episode trong manifest là tên file parquet (`episode_000012`).
+
 ---
 
 ## 3. Lỗi log huấn luyện (F-TRAIN) và log RTC (F-SYS)
@@ -56,6 +60,6 @@ Hỗ trợ sinh log giả định theo đúng schema của `FakeTrainer` và RTC
 
 ## 4. Kiểm thử và Nghiệm thu
 
-* **Unit tests:** 69 test case tự động tại `packages/flywheel-data/tests/unit/inject/`.
+* **Unit tests:** 77 test case tự động tại `packages/flywheel-data/tests/unit/inject/`.
 * **Độ bao phủ:** 100% các loại lỗi cấy đều có test kiểm chứng.
 * **Độc lập kiến trúc:** Không import vòng, tuân thủ nghiêm ngặt 3 hợp đồng kiến trúc của repo.
