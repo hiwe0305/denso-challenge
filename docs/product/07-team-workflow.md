@@ -4,6 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Đầu vào
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 3/11/2026 | 1.1 | Mục 2.4: thêm PR hợp đồng `TraceStep`, `CameraParams` của Long (6/11) và hook `SimpleSim` của Hiếu (8/11) theo quyết định issue #31 (làm đủ R3–R5 cho demo) | PO (Hiếu) |
 | 3/11/2026 | 1.0 | Mục 2.0 (bảng dữ liệu đi giữa người): Hưng giao Long `AgentReport` thay `QAReport` (issue #34; 03 bản 0.8). Mục 2.2, DA-01: layout action G1 là 36 chiều thật của Ψ₀, không phải đệm (đối chiếu `src/psi/data/simple/__init__.py` ở `cda3fdf` và gói psi-data task hai bàn). Thêm mục 2.4 lịch hoàn thiện 13/11/2026; DA-31 và `agentqa/bench/` chuyển sang Châu (mục 2.1, 2.2) | PO (Hiếu) |
 | 28/10/2026 | 0.9 | Mục 3.4: lệnh merge chuẩn `--admin --rebase` và lý do PR xanh vẫn BLOCKED (ruleset "Only Hiếu merges into master") | PO (Hiếu) |
 | 28/10/2026 | 0.8 | Mục 2.2: thêm DA-32, DA-33, DA-34 (nhánh task bê khay của Hiếu, chạy song song, [design 28/10/2026](../superpowers/specs/2026-10-28-tray-transfer-he-design.md)) | PO (Hiếu) |
@@ -179,13 +180,15 @@ Hiếu phải hoàn thiện mọi thứ cho demo trước **13/11/2026**, nên h
 | Thông | DA-17: phát lại action | S1–S2 | 9/11 |
 | Long | S1-10 (#36); PR hợp đồng `AgentReport`, `AgentReview` (issue #34) | 6/11 | 5/11 |
 | Long | DA-01: `action_layout` G1 theo layout của Ψ₀ | S1 | 5/11 |
+| Long | PR hợp đồng `TraceStep`, `CameraParams` và 4 file mẫu (issue #31; bản 1.1) | — | 6/11 |
+| Hiếu | Hook trong `SimpleSim` ghi `TraceStep` và `CameraParams` từ MuJoCo (issue #31; bản 1.1) | — | 8/11 |
 | Long | DA-23 runner eval; DA-28 lệnh và kịch bản demo | S2 | 10/11; chạy thử 12/11 |
 | Hưng | DA-04 nhiệm vụ 1, 2, 3, 4, 6 | 10/11 | 7/11 |
 | Hưng | DA-18: export EgoDex cho stage 1 (để Hiếu chạy DA-30) | 10/11 | 8/11 |
 | Hưng | DA-20 nhiệm vụ 1–5 | 13/11 | 10/11 |
 | Châu | #30: sửa hai story scorer | — | 4/11 |
 | Châu | Khung scorer từng bước (04 mục 4.2, story 3.3) | S2 | 8/11 |
-| Châu | DA-13: kiểm hệ thống và quy lỗi về stage (phần 6 của demo) | S3 | 10/11 |
+| Châu | DA-13: kiểm hệ thống và quy lỗi về stage (phần 6 của demo); R3–R5 trên file mẫu trước, trên trace thật từ 8/11 | S3 | 10/11 |
 | Châu | DA-31: bộ chấm lỗi cấy (chuyển từ Hưng) | 13/11 | 11/11 |
 | Sau 13/11 | Hiệu chỉnh scorer (story 3.5), DA-21 (v3), DA-04 nhiệm vụ 5 và 7, DA-20 nhiệm vụ 6 và 7 | | sau demo |
 
