@@ -236,7 +236,7 @@ Quy tắc: episode `planned` và `measured` khác `embodiment_id` không trộn 
 |---|---|
 | Đồng bộ | Mọi luồng về đồng hồ chung; nội suy state về tần số điều khiển; giữ `t_image` riêng từng camera |
 | Đơn vị và khung | SI, radian; khung theo URDF của G1 trong SIMPLE |
-| Ánh xạ action | Vào `action_layout` của G1 đệm 36 chiều như Ψ₀ (`pad36`), kèm mask cho chiều đệm |
+| Ánh xạ action | Vào `action_layout` 36 chiều của G1. Sửa 3/11/2026 [Đã chốt]: action của G1 trong SIMPLE có đúng 36 chiều, **không có chiều đệm** (`pad-action-dim 36` của Ψ₀ stage 3 không thêm gì); chỉ `states` 32 chiều được đệm lên 36 (chỉ số 32–35). Mask chỉ dùng cho embodiment có ít hơn 36 chiều action |
 | Ảnh | Đổi kích thước theo config fine-tune SIMPLE của Ψ₀ (180 × 320), giữ bản gốc |
 | Ngôn ngữ | Câu lệnh task chuẩn hóa một mẫu cho mọi nguồn |
 | Nguồn AMO | Bộ ánh xạ riêng từ không gian lệnh AMO sang `action_layout`; chỉ dùng khi V3 cho phép |
@@ -276,7 +276,7 @@ Mẫu bị loại vẫn giữ cùng lý do và chi phí; không xóa âm thầm.
 3. `timestamp` khớp `frame_index / fps` trong dung sai nửa chu kỳ.
 4. Video giải mã được, số khung khớp số dòng; codec và độ phân giải đúng khai báo.
 5. `tasks` có câu lệnh cho mọi episode.
-6. Stats tính trên đúng release, không NaN; chiều đệm có mask.
+6. Stats tính trên đúng release, không NaN; chiều đệm có mask. Chiều hằng số mà `action_layout` khai (chiều 31 của G1) không phải lỗi: normalizer của Ψ₀ giữ nguyên giá trị khi min = max hoặc std = 0.
 7. Đọc lại bằng loader Ψ₀ ra đúng một batch mẫu đã lưu (so từng giá trị).
 
 ### 6.5 Báo cáo dataset
@@ -534,10 +534,20 @@ Log train và log inference cấy lỗi sinh từ `FakeTrainer` và log RTC gi�
 | `wrong_task_instruction` | Sai câu lệnh task | D6 |
 | `action_sign_flip` | Đảo dấu một chiều action | D7 |
 
-Lỗi cấy trên action chỉ đặt vào chiều có nghĩa với loại lỗi. Layout 36 chiều của G1 trong SIMPLE (`ACTION_SLICES_36D` của Ψ₀ ở commit `cda3fdf`): 0–13 bàn tay, 14–27 cánh tay, 28–30 hông, 31 chiều cao thân (m), 32–33 vận tốc tương đối, 34 cờ rẽ rời rạc, 35 hướng đích (rad).
+Lỗi cấy trên action chỉ đặt vào chiều có nghĩa với loại lỗi. Layout 36 chiều của G1 trong SIMPLE (`ACTION_SLICES_36D` của Ψ₀ ở commit `cda3fdf`): 0–13 bàn tay, 14–27 cánh tay, 28–30 hông, 31 chiều cao thân (m), 32–33 vận tốc tương đối, 34 cờ rẽ, 35 hướng đích (rad).
+
+**Sửa 3/11/2026 [Đã chốt], theo số đo của [S1-07](../../product/stories/S1-07-phan-tich-psi-data.md) và mã nguồn:**
+
+| Điểm | Đúng là | Nguồn |
+|---|---|---|
+| Chiều 34 | Giá trị **liên tục** trong [−1, 1] (input thô của cần điều khiển), không phải cờ 0/1. Thân dưới chỉ quay khi \|giá trị\| ≥ 0,1, rồi quay về `target_yaw`. Trong gói hai bàn: 51.104 giá trị khác nhau, 17% khung bằng đúng 0, 54% dưới 0,1 | Dữ liệu psi-data `e78fb93`; `G1GearWbcPolicy` ở `songlin/decoupled_wbc@5b304e4` (submodule của SIMPLE `6d10628`), dòng 250, 264. Chú thích `turning_flag` trong `src/psi/data/simple/__init__.py` của Ψ₀ `cda3fdf` chỉ đúng về nghĩa, không đúng về giá trị |
+| Chiều 0–13 | Tay trái (0–6) gần như không dùng: khác 0 ở 99 trên 62.764 khung, trong 2 episode. Tay phải (7–13) khác 0 ở 87% khung, độ lệch chuẩn 0,18–0,55 | Dữ liệu psi-data `e78fb93` |
+| Chiều 31 | Hằng số 0,74 m ở mọi khung của gói hai bàn; là chiều duy nhất có độ lệch chuẩn 0 | Dữ liệu psi-data `e78fb93` |
+| Chiều 32–33 | Trong [−0,5; 0,5] m/s | Dữ liệu psi-data `e78fb93` |
+
 - `unit_deg_rad` chỉ nhân chiều góc (0–30, 35).
 - `joint_limit_exceeded` chỉ áp cho chiều khớp (0–30).
-- `action_sign_flip` phải chọn chiều có độ lệch chuẩn khác 0 trên episode được cấy. Trên task hai bàn, chiều 0–13 gần như luôn bằng 0.
+- `action_sign_flip` phải chọn chiều có độ lệch chuẩn khác 0 trên episode được cấy. Trên task hai bàn, tay trái (0–6) và chiều 31 gần như luôn hằng; tay phải (7–13), cánh tay, hông và chiều 32–35 dùng được (sửa 3/11/2026).
 
 **Cách chấm**:
 
@@ -572,7 +582,7 @@ Lỗi chia theo nguồn tín hiệu. Ngưỡng hiệu chỉnh từ episode thàn
 | D1 | Sai schema | Thiếu cột của `action_layout` hoặc sai kiểu | Từ chối ingest |
 | D2 | Lệch đồng bộ hoặc rơi khung | Lệch `t_image` và `t_state` p99 > τ_sync; khoảng trống trong `frame_index` hoặc `timestamp` | Cách ly, sửa bộ đọc |
 | D3 | Action ngoài giới hạn | Vượt giới hạn khớp, vận tốc, gia tốc | Cách ly |
-| D4 | Stats sai | `stats_psi0.json` không tính trên đúng release, hoặc chiều có độ lệch chuẩn 0 mà không mask | Chặn export |
+| D4 | Stats sai | `stats_psi0.json` không tính trên đúng release, hoặc chiều có độ lệch chuẩn 0 mà không mask và không được `action_layout` khai là hằng số (sửa 3/11/2026: chiều 31 của G1 hằng trong dữ liệu tác giả) | Chặn export |
 | D5 | Rò chia tập hoặc trùng episode | Trùng hạt giống hoặc gần trùng với holdout; hai episode trùng hoặc gần trùng trong cùng release | Chặn release |
 | D6 | Nhãn sai | Câu lệnh hoặc đoạn không khớp bước theo luật; nhãn thành công mâu thuẫn scorer | Đưa người duyệt |
 | D7 | Phát lại trượt | Phát lại động học trượt (loại) hoặc động lực học vượt ngưỡng (đánh dấu); gồm cả action bị đảo dấu một chiều, khi phát lại lệch khỏi state đã ghi | Theo mục 6.3 |
@@ -588,7 +598,7 @@ Sửa 3/11/2026 [Đã chốt, issue #34]: D2 thêm rơi khung, D5 thêm trùng e
 | T2 | Không học | Loss val giảm dưới x% sau N bước đầu |
 | T3 | Quá khớp | Loss train giảm trong khi loss val tăng liên tiếp M lần đo |
 | T4 | Mất cân bằng nhóm | Loss một nhóm không giảm trong khi nhóm khác giảm |
-| T5 | Chiều chết | Phương sai dự đoán của một chiều không mask < ε |
+| T5 | Chiều chết | Phương sai dự đoán của một chiều không mask < ε trong khi phương sai đích của chiều đó ≥ ε (sửa 3/11/2026: chiều hằng trong dữ liệu như chiều 31 không phải chiều chết) |
 | T6 | Sụp mode | Độ lệch chuẩn dự đoán so với thật dưới ngưỡng |
 | T7 | Quên | P4 giảm quá ngưỡng so với checkpoint cha |
 | T8 | Gradient bất thường | Gradient VLM khác 0 khi khai đóng băng; chuẩn gradient vượt ngưỡng nhiều lần |
