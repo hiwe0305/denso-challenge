@@ -151,6 +151,7 @@
     },
     "dropped_frames": {
       "default": 0,
+      "description": "Camera frames due in this cycle that never reached the policy; a count for this cycle, not a running total. Renders are synchronous in sim, so 0 there is measured.",
       "minimum": 0,
       "title": "Dropped Frames",
       "type": "integer"
