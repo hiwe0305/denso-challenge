@@ -19,6 +19,7 @@ before the first job (design 6.4) cannot drift silently.
 draft until its targeted episodes exist.
 
     python -m flywheel_psi0.tray.runplan check configs/runplans/tray/he-tray.yaml
+    python -m flywheel_psi0.tray.runplan check configs/runplans/tray/round-tray-cplus.yaml
     python -m flywheel_psi0.tray.runplan freeze configs/runplans/tray/he-tray.yaml
 """
 
@@ -44,6 +45,7 @@ REPO = Path(__file__).resolve().parents[5]
 # Recipe args a plan may override for all its branches: they change what is logged,
 # not the weights (PO 4/11/2026, docs/g0/psi0-finetune-cost.md 4.1 on S1-04).
 TRAINING_NEUTRAL_OVERRIDES = frozenset({"train.validation_steps"})
+STATUS_FIELDS = {"superseded_by"}
 
 
 class _Frozen(BaseModel):
@@ -163,6 +165,9 @@ class TrayRunPlan(_Frozen):
     interpretation: Interpretation
     pricebook: str
     supersedes: str | None = None  # run_plan_id of a plan this one replaces before it ran
+    # Repo path of the plan that replaced this one. Set after the freeze, so it is left
+    # out of the id and the lock (STATUS_FIELDS): it says whether to run, not what runs.
+    superseded_by: str | None = None
 
     @classmethod
     def load(cls, path: Path) -> TrayRunPlan:
@@ -206,8 +211,10 @@ def recipe_sha256(recipe: Psi0Recipe) -> str:
 
 
 def plan_json(plan: BaseModel) -> Any:
-    """The plan as JSON; unset optional fields are left out, so adding one keeps old ids."""
-    return plan.model_dump(mode="json", exclude_none=True)
+    """The plan as JSON; unset optional fields are left out, so adding one keeps old ids.
+
+    STATUS_FIELDS are left out too: marking a frozen plan superseded keeps its id."""
+    return plan.model_dump(mode="json", exclude_none=True, exclude=STATUS_FIELDS)
 
 
 def run_plan_id(plan: BaseModel) -> str:
@@ -317,6 +324,8 @@ def check_round(round_plan: TrayRoundPlan, repo: Path = REPO) -> list[str]:
 def freeze(plan_path: Path, repo: Path = REPO) -> Path:
     plan = TrayRunPlan.load(plan_path)
     problems = check(plan, repo)
+    if plan.superseded_by is not None:
+        problems.append(f"superseded by {plan.superseded_by}: freeze that plan instead")
     if not (repo / plan.interpretation.doc).is_file():
         problems.append(f"{plan.interpretation.doc} is missing: fix the reading rules first")
     if problems:
@@ -340,12 +349,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         out = freeze(args.plan)
         print(f"wrote {out}: {json.loads(out.read_text())['run_plan_id']}")
         return 0
-    plan = TrayRunPlan.load(args.plan)
-    problems = check(plan)
+    raw = yaml.safe_load(args.plan.read_text(encoding="utf-8"))
+    if raw.get("purpose") == "round":
+        round_plan = TrayRoundPlan.model_validate(raw)
+        problems = check_round(round_plan)
+        summary = f"{args.plan}: round {round_plan.status}, branch {round_plan.branch}"
+    else:
+        plan = TrayRunPlan.model_validate(raw)
+        problems = check(plan)
+        summary = f"{args.plan}: {run_plan_id(plan)}, {len(plan.eval_conditions())} eval conditions"
+        if plan.superseded_by is not None:
+            problems.append(f"SUPERSEDED by {plan.superseded_by}: do not run this plan")
     for problem in problems:
         print(problem, file=sys.stderr)
     if not problems:
-        print(f"{args.plan}: {run_plan_id(plan)}, {len(plan.eval_conditions())} eval conditions")
+        print(summary)
     return 1 if problems else 0
 
 

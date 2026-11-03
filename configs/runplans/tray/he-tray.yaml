@@ -1,7 +1,8 @@
 # SUPERSEDED - DO NOT RUN. Version 1 (80/40 demos, 90 conditions), frozen as rp_c49c99c8d8da
 # and never run. Replaced by he-tray-v2.yaml (320/160 quality-filtered demos, 270
-# conditions; decision of 3/11/2026, docs/he/tray.md section 7), subtask 1.8 of DA-34 in
-# the same PR #73. Kept so the ids already cited stay checkable.
+# conditions; decision of 3/11/2026, docs/he/tray.md section 7), subtask 1.8 of DA-34, in
+# the PR that freezes v2. Kept so the ids already cited stay checkable; field superseded_by
+# says the same to `runplan check`, which then exits 1.
 #
 # DA-34 AC 1: RunPlan of the tray experiment before the demo, branches A, C and C-NOEGO
 # (design 28/10/2026 sections 6.2-6.4; shape of 03 section 8.1). Branch B waits for the
@@ -79,7 +80,7 @@ recipe:
   sha256: 71ba5de8ef22a11432a829e86e93b7e662f5f38f453cca27f73d6fbe777a1dbd # recipe_sha256, no `estimate`
   overrides: # PO 4/11/2026 (S1-04 4.1): val every 2000 steps, does not change training
     train.validation_steps: 2000
-  nproc_per_node: 1 # one Colab GPU: global batch 16, not the authors' 8 x 16 = 128
+  nproc_per_node: 1 # one Colab GPU: global batch 16, not the authors' 16 x 4 GPUs = 64 (S1-04 section 1.4)
   dataset_stats: own_train_set # each branch's stats_psi0.json is computed on its own episodes
 train_seeds: [0] # one seed per branch for the preliminary result (design 6.3)
 
@@ -112,3 +113,4 @@ comparisons:
 
 interpretation: {doc: docs/he/tray.md, delta_pp: 10}
 pricebook: "assumption: Colab 100 CU pack, 0.0999 USD per CU (docs/g0/ledger/DA-19.csv)"
+superseded_by: configs/runplans/tray/he-tray-v2.yaml # not part of the id (runplan.STATUS_FIELDS)

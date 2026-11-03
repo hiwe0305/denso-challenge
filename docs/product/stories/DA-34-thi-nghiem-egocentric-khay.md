@@ -40,6 +40,7 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
   - [ ] 1.9 Cập nhật sổ chi phí theo bản 2 và giờ máy thực đo của lô sinh
   - [x] 1.10 (quyết định của Hiếu 4/11/2026 ở S1-04 mục 4.1) Ghi đè `train.validation_steps: 2000` ở cấp plan, chung ba nhánh; `runplan check` chỉ cho ghi đè không đổi quá trình train; đóng băng lại bản 1 thành `rp_c49c99c8d8da`; sổ chi phí fine-tune sang Colab L4, 16,6 CU mỗi lần
   - [x] 1.11 (review của PO 4/11/2026) Kiểm trước khi chạy job: cổng phát lại 3 episode S1 qua `eval-decoupled-wbc` (server giả `flywheel_psi0.tray.replay_server`); mức 0 có phải giả lặp; Ψ₀ tại `cda3fdf` có đọc cột `index` không; ghi bản 1 đã thay. Kết quả và quy tắc bản 2 ở `docs/he/tray.md` mục 8
+  - [x] 1.12 (sau review, 4/11/2026) Ghi Decision của Hiếu (eval ở thời gian sim; mức 0 là lượt lặp, phân bổ 30 / 120 / 120, nhiễu gieo theo episode) ở `docs/he/tray.md` mục 8; kiểm gieo nhiễu theo episode tại `cda3fdf` (mục 8.5); bản 1 có trường `superseded_by` (không vào id); `runplan check` nhận plan round; sửa batch toàn cục của tác giả thành 16 × 4 = 64 (S1-04)
 - [ ] 2. Fine-tune A, C, C-NOEGO (AC 2)
 - [ ] 3. Eval và bảng kết quả, video (AC 3, 4)
 - [ ] 4. Nhánh B khi có video (AC 5)
@@ -74,6 +75,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 3/11/2026 | Hiếu chốt tăng dữ liệu, chất lượng cao: thêm nhiệm vụ con 1.6–1.9 (N 320/160, lọc chất lượng, eval 270 điều kiện); nhiệm vụ 1 mở lại | PO (Hiếu) |
 | 4/11/2026 | Theo quyết định PO ở S1-04 (L4, validation mỗi 2.000 bước): thêm nhiệm vụ con 1.10; RunPlan bản 1 đóng băng lại thành `rp_c49c99c8d8da` | Claude cho Hiếu |
 | 4/11/2026 | Review của PO trên PR #73: thêm nhiệm vụ con 1.11 (cổng phát lại, mức 0, cột `index`, bản 1 đã thay) | Claude cho Hiếu |
+| 4/11/2026 | Hiếu chốt eval ở thời gian sim và cách đếm mức 0 (30 / 120 / 120, gieo nhiễu theo episode): thêm nhiệm vụ con 1.12 | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
