@@ -8,6 +8,8 @@ import random
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from flywheel.loop.runner.rtc_log import read_rtc_log
+
 
 @dataclass(frozen=True)
 class LatencyProfile:
@@ -65,30 +67,9 @@ class LatencyProfile:
 
     @classmethod
     def from_log(cls, log_path: str | Path, name: str = "empirical") -> LatencyProfile:
-        """Extract empirical inference durations from an RTC or metrics jsonl log."""
-        file_path = Path(log_path)
-        if not file_path.is_file():
-            raise FileNotFoundError(f"Inference log not found: {file_path}")
-
-        samples: list[float] = []
-        for line in file_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            rec = json.loads(line)
-            if "observation_sent_s" in rec and "chunk_received_s" in rec:
-                dur = float(rec["chunk_received_s"]) - float(rec["observation_sent_s"])
-                if dur >= 0:
-                    samples.append(dur)
-            elif "latency_s" in rec:
-                samples.append(float(rec["latency_s"]))
-            elif "latency_ms" in rec:
-                samples.append(float(rec["latency_ms"]) / 1000.0)
-
-        if not samples:
-            return cls(name=name)
-
-        samples.sort()
+        """Empirical profile from the request latencies of an RTC log (`rtc.jsonl`)."""
+        records = read_rtc_log(Path(log_path))
+        samples = sorted(r.chunk_received_s - r.observation_sent_s for r in records)
         n = len(samples)
         p50 = samples[int(n * 0.50)] * 1000.0
         p95 = samples[min(int(n * 0.95), n - 1)] * 1000.0
