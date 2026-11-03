@@ -25,6 +25,7 @@ Là người giữ nhân, tôi muốn có schema và file mẫu cho mọi artifa
 4. Model giả cho endpoint LLM trong testkit (cho DA-20).
 5. Test: mọi file mẫu qua validate; mọi schema có trong JSON Schema xuất ra.
 6. Schema `AgentReport` và `AgentReview` cho Agent QA/QC theo Issue #34, kèm file mẫu và xuất JSON Schema.
+7. Schema `TraceStep` và `CameraParams` cho chẩn đoán hệ thống DA-13 (Issue #31), kèm 4 file mẫu trace (tối thiểu 100 chu kỳ) và xuất JSON Schema.
 
 ## Nhiệm vụ
 
@@ -34,6 +35,7 @@ Là người giữ nhân, tôi muốn có schema và file mẫu cho mọi artifa
 - [x] 4. File mẫu và model giả trong testkit (AC 2, 4)
 - [x] 5. Test và JSON Schema (AC 5)
 - [x] 6. Schema và file mẫu AgentReport, AgentReview cho DA-20, DA-31 (Issue #34, AC 6)
+- [x] 7. Schema TraceStep, CameraParams và 4 file mẫu trace cho DA-13 (Issue #31, AC 7)
 
 ## Phạm vi file
 
