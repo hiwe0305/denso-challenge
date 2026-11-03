@@ -4,6 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Đầu vào
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 3/11/2026 | 1.4 | Mục 2.4: phần 6 của demo chạy trên cả hai task; thêm dòng vòng Failure → Data trên task khay (DA-34, C+) hạn 12/11 | PO (Hiếu) |
 | 3/11/2026 | 1.3 | Mục 3.4: ngưỡng kích thước PR theo R9 mới (08 bản 0.3): 1500 dòng mã | PO (Hiếu) |
 | 3/11/2026 | 1.2 | Mục 2.4: cắt phạm vi của Hiếu trước 13/11 (dời S1-05, DA-29, S1-06, S1-09, S1-11, DA-16, DA-09; S1-02, S1-03, S1-04 chỉ làm phần DA-26 cần) và thêm hạn cho việc của Hiếu trên đường găng | PO (Hiếu) |
 | 3/11/2026 | 1.1 | Mục 2.4: thêm PR hợp đồng `TraceStep`, `CameraParams` của Long (6/11) và hook `SimpleSim` của Hiếu (8/11) theo quyết định issue #31 (làm đủ R3–R5 cho demo) | PO (Hiếu) |
@@ -189,6 +190,7 @@ Hiếu phải hoàn thiện mọi thứ cho demo trước **13/11/2026**, nên h
 | Hiếu | DA-33 nhiệm vụ 8, 9: xuất sang định dạng Ψ₀, lô sản xuất, release có hash (nhiệm vụ 5–7 ở #39; bản 1.2) | 8/11 (M2) | 8/11 |
 | Hiếu | DA-35: demo cha teleop ảo, rồi lô S2 (nhiệm vụ 1–4 ở #40; bản 1.2) | — | demo cha 10/11; S2 13/11 |
 | Hiếu | DA-26: HE sơ bộ V-EGO, V-NOEGO ở N = 20, 80; DA-34: nhánh A, C, C-NOEGO; DA-30: lần chạy stage 1 ngắn trên EgoDex (bản 1.2) | S1–S3 | 12/11 |
+| Hiếu | DA-34: vòng Failure → Data trên lỗi của nhánh C, sinh nhắm lỗi bằng DA-33, fine-tune và eval C+ (design 28/10 mục 6.6; bản 1.4). Trễ thì dừng ở episode nhắm lỗi đã qua QA | — | 12/11 |
 | Long | DA-23 runner eval; DA-28 lệnh và kịch bản demo | S2 | 10/11; chạy thử 12/11 |
 | Hưng | DA-04 nhiệm vụ 1, 2, 3, 4, 6 | 10/11 | 7/11 |
 | Hưng | DA-18: export EgoDex cho stage 1 (để Hiếu chạy DA-30) | 10/11 | 8/11 |

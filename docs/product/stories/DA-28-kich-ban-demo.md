@@ -11,7 +11,7 @@
 | Nhãn | [Lõi] · `epic:9` · `gate:G1` · `area:core` |
 | Sprint | S2; chạy thử toàn bộ ngày 16/11/2026 · **Lịch 3/11/2026:** lệnh và kịch bản demo trước **10/11/2026**; chạy thử toàn bộ **12/11/2026** (thay 16/11) |
 | Ước lượng | 10 giờ (khoảng 8–12, ước lượng) |
-| Phụ thuộc | S1-03, DA-03, DA-04, DA-18, DA-20, DA-26 (sơ bộ), DA-27, DA-33, DA-35 (**3/11/2026:** synthetic S1, S2 của demo lấy từ task khay thay S1-05, DA-29; bỏ teleop bàn phím DA-16, 07 mục 2.4); một vòng Failure → Data cần scorer, chẩn đoán và evidence card của S2 |
+| Phụ thuộc | S1-03, DA-03, DA-04, DA-18, DA-20, DA-26 (sơ bộ), DA-27, DA-33, DA-35 (**3/11/2026:** synthetic S1, S2 của demo lấy từ task khay thay S1-05, DA-29; bỏ teleop bàn phím DA-16, 07 mục 2.4); một vòng Failure → Data cần scorer, chẩn đoán và evidence card của S2 **3/11/2026:** phần 6 chạy trên cả hai task: task hai bàn tới đề xuất dữ liệu (DA-26), task khay chạy hết vòng với nhánh C+ (DA-34 AC 6). |
 
 ## Story
 
@@ -63,6 +63,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 27/10/2026 | Giao cho Long theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 | 3/11/2026 | Phụ thuộc: synthetic S1, S2 lấy từ DA-33, DA-35 thay S1-05, DA-29; bỏ DA-16 khỏi demo (07 mục 2.4, bản 1.2) | PO (Hiếu) |
+| 3/11/2026 | Phần 6 chạy trên cả hai task; task khay chạy hết vòng (design 27/10 mục 11, design 28/10 mục 6.6) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
