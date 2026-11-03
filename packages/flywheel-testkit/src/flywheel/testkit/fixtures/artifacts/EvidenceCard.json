@@ -1,0 +1,898 @@
+{
+  "schema_version": "1.0.0",
+  "cluster_id": "clu_8406056e72ff77ac",
+  "run_plan_id": "rp_7d2306b437d7fbbf",
+  "task_id": "g1_locomotion_pick_between_tables",
+  "embodiment_id": "g1_sonic_dwbc@1",
+  "level": 1,
+  "first_failed_step": 2,
+  "failure_kind": "L-GRASP",
+  "failure_class": "grasp",
+  "member_episode_ids": [
+    "ep_01M6HXNZ010000000000000001",
+    "ep_01M6HXNZ020000000000000002",
+    "ep_01M6HXNZ030000000000000003",
+    "ep_01M6HXNZ040000000000000004",
+    "ep_01M6HXNZ050000000000000005",
+    "ep_01M6HXNZ060000000000000006",
+    "ep_01M6HXNZ070000000000000007"
+  ],
+  "representative_seed": 20261104,
+  "representatives": [
+    {
+      "episode_id": "ep_01M6HXNZ010000000000000001",
+      "score_id": "sc_c7997071f19e4242",
+      "condition_seed": 9100,
+      "trace_sha256": "e0c9cb35d197a81c639d412f3e0b36e9650870da9417e6ae7ef49490dc060024",
+      "system_config_sha256": "5635f57bfa073ebb7bfa485b29b2176b6dd9a222cf90a3c1910318a0ba6ff91f",
+      "stage_table_sha256": "e7faf7c228fb99ef6860cfd6d03ab2b217d3fdfd799248135628cb61e5948d1d",
+      "checks": [
+        {
+          "check": "infra_status",
+          "part": null,
+          "outcome": "not_fired",
+          "value": "ok",
+          "threshold": [
+            "ok"
+          ],
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "tracking_error",
+          "part": "upper_body",
+          "outcome": "not_fired",
+          "value": 0.041,
+          "threshold": 0.1,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "tracking_error",
+          "part": "lower_body",
+          "outcome": "not_fired",
+          "value": 0.063,
+          "threshold": 0.15,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "latency_p99",
+          "part": null,
+          "outcome": "not_fired",
+          "value": 0.083,
+          "threshold": 0.15,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "buffer_underruns",
+          "part": null,
+          "outcome": "not_fired",
+          "value": 0.0,
+          "threshold": 0.0,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "sync_offset",
+          "part": null,
+          "outcome": "not_fired",
+          "value": 0.008,
+          "threshold": 0.02,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "camera_reference",
+          "part": null,
+          "outcome": "not_fired",
+          "value": "fc7f9c90ebbf8c4662fd70e58de5aed668c0fbc5ccfbbd951dce705729cdeea2",
+          "threshold": "fc7f9c90ebbf8c4662fd70e58de5aed668c0fbc5ccfbbd951dce705729cdeea2",
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "planner_feasible",
+          "part": null,
+          "outcome": "not_fired",
+          "value": true,
+          "threshold": null,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "reset_success",
+          "part": null,
+          "outcome": "not_fired",
+          "value": 0.3,
+          "threshold": 0.8,
+          "n_success": 3,
+          "n_runs": 10,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "nominal_visuals",
+          "part": null,
+          "outcome": "not_fired",
+          "value": false,
+          "threshold": null,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "in_train_domain",
+          "part": null,
+          "outcome": "not_fired",
+          "value": true,
+          "threshold": null,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "coverage_distance",
+          "part": null,
+          "outcome": "fired",
+          "value": 0.19,
+          "threshold": 0.12,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        }
+      ],
+      "stage_hypotheses": [
+        {
+          "row_id": "stage3_action_group",
+          "attribute_to": "Stage 3 · học action nhóm đó",
+          "intervention": "Thêm demo hoặc dữ liệu sinh (S1, S2) cho bước k",
+          "consumes_budget": true,
+          "confirmed": true,
+          "evidence": [
+            {
+              "probe": "P3",
+              "where": "nhóm action `hand`",
+              "value": 0.41,
+              "threshold": 0.3
+            }
+          ]
+        }
+      ],
+      "stage_unavailable": [
+        {
+          "row_id": "stage3_forgetting",
+          "reason": "không có P4: checkpoint gốc của tác giả, không có checkpoint cha"
+        }
+      ],
+      "diagnosis": "coverage_gap"
+    },
+    {
+      "episode_id": "ep_01M6HXNZ030000000000000003",
+      "score_id": "sc_788ee9cc8cd36958",
+      "condition_seed": 9102,
+      "trace_sha256": "82aeea645e0422b44557265425a15ecadd3f6ae5d4cab1ade3cc6c60c1d4d453",
+      "system_config_sha256": "5635f57bfa073ebb7bfa485b29b2176b6dd9a222cf90a3c1910318a0ba6ff91f",
+      "stage_table_sha256": "e7faf7c228fb99ef6860cfd6d03ab2b217d3fdfd799248135628cb61e5948d1d",
+      "checks": [
+        {
+          "check": "infra_status",
+          "part": null,
+          "outcome": "not_fired",
+          "value": "ok",
+          "threshold": [
+            "ok"
+          ],
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "tracking_error",
+          "part": "upper_body",
+          "outcome": "not_fired",
+          "value": 0.038,
+          "threshold": 0.1,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "tracking_error",
+          "part": "lower_body",
+          "outcome": "not_fired",
+          "value": 0.071,
+          "threshold": 0.15,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "latency_p99",
+          "part": null,
+          "outcome": "not_fired",
+          "value": 0.091,
+          "threshold": 0.15,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "buffer_underruns",
+          "part": null,
+          "outcome": "not_fired",
+          "value": 0.0,
+          "threshold": 0.0,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "sync_offset",
+          "part": null,
+          "outcome": "not_fired",
+          "value": 0.011,
+          "threshold": 0.02,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "camera_reference",
+          "part": null,
+          "outcome": "not_fired",
+          "value": "fc7f9c90ebbf8c4662fd70e58de5aed668c0fbc5ccfbbd951dce705729cdeea2",
+          "threshold": "fc7f9c90ebbf8c4662fd70e58de5aed668c0fbc5ccfbbd951dce705729cdeea2",
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "planner_feasible",
+          "part": null,
+          "outcome": "not_fired",
+          "value": true,
+          "threshold": null,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "reset_success",
+          "part": null,
+          "outcome": "not_fired",
+          "value": 0.4,
+          "threshold": 0.8,
+          "n_success": 4,
+          "n_runs": 10,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "nominal_visuals",
+          "part": null,
+          "outcome": "not_fired",
+          "value": false,
+          "threshold": null,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "in_train_domain",
+          "part": null,
+          "outcome": "not_fired",
+          "value": true,
+          "threshold": null,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "coverage_distance",
+          "part": null,
+          "outcome": "fired",
+          "value": 0.23,
+          "threshold": 0.12,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        }
+      ],
+      "stage_hypotheses": [
+        {
+          "row_id": "stage3_action_group",
+          "attribute_to": "Stage 3 · học action nhóm đó",
+          "intervention": "Thêm demo hoặc dữ liệu sinh (S1, S2) cho bước k",
+          "consumes_budget": true,
+          "confirmed": true,
+          "evidence": [
+            {
+              "probe": "P3",
+              "where": "nhóm action `hand`",
+              "value": 0.44,
+              "threshold": 0.3
+            }
+          ]
+        }
+      ],
+      "stage_unavailable": [
+        {
+          "row_id": "stage3_forgetting",
+          "reason": "không có P4: checkpoint gốc của tác giả, không có checkpoint cha"
+        }
+      ],
+      "diagnosis": "coverage_gap"
+    },
+    {
+      "episode_id": "ep_01M6HXNZ040000000000000004",
+      "score_id": "sc_8db255b159d0bdbd",
+      "condition_seed": 9103,
+      "trace_sha256": "47b9f711b58704e46a8670484e01cff3e09a648904d6e15d53f1b325639e9fd3",
+      "system_config_sha256": "5635f57bfa073ebb7bfa485b29b2176b6dd9a222cf90a3c1910318a0ba6ff91f",
+      "stage_table_sha256": "e7faf7c228fb99ef6860cfd6d03ab2b217d3fdfd799248135628cb61e5948d1d",
+      "checks": [
+        {
+          "check": "infra_status",
+          "part": null,
+          "outcome": "not_fired",
+          "value": "ok",
+          "threshold": [
+            "ok"
+          ],
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "tracking_error",
+          "part": "upper_body",
+          "outcome": "not_fired",
+          "value": 0.044,
+          "threshold": 0.1,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "tracking_error",
+          "part": "lower_body",
+          "outcome": "not_fired",
+          "value": 0.058,
+          "threshold": 0.15,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "latency_p99",
+          "part": null,
+          "outcome": "not_fired",
+          "value": 0.079,
+          "threshold": 0.15,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "buffer_underruns",
+          "part": null,
+          "outcome": "not_fired",
+          "value": 0.0,
+          "threshold": 0.0,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "sync_offset",
+          "part": null,
+          "outcome": "not_fired",
+          "value": 0.009,
+          "threshold": 0.02,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "camera_reference",
+          "part": null,
+          "outcome": "not_fired",
+          "value": "fc7f9c90ebbf8c4662fd70e58de5aed668c0fbc5ccfbbd951dce705729cdeea2",
+          "threshold": "fc7f9c90ebbf8c4662fd70e58de5aed668c0fbc5ccfbbd951dce705729cdeea2",
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "planner_feasible",
+          "part": null,
+          "outcome": "not_fired",
+          "value": true,
+          "threshold": null,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "reset_success",
+          "part": null,
+          "outcome": "fired",
+          "value": 0.9,
+          "threshold": 0.8,
+          "n_success": 9,
+          "n_runs": 10,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "nominal_visuals",
+          "part": null,
+          "outcome": "not_judged",
+          "value": null,
+          "threshold": null,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": "dừng ở bước 6: s_k ≥ τ_k là TRẠNG THÁI ĐẦU XẤU (spec mục 6.6)",
+          "note": null
+        },
+        {
+          "check": "in_train_domain",
+          "part": null,
+          "outcome": "not_judged",
+          "value": null,
+          "threshold": null,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": "dừng ở bước 6: s_k ≥ τ_k là TRẠNG THÁI ĐẦU XẤU (spec mục 6.6)",
+          "note": null
+        },
+        {
+          "check": "coverage_distance",
+          "part": null,
+          "outcome": "not_judged",
+          "value": null,
+          "threshold": 0.12,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": "dừng ở bước 6: s_k ≥ τ_k là TRẠNG THÁI ĐẦU XẤU (spec mục 6.6)",
+          "note": null
+        }
+      ],
+      "stage_hypotheses": [
+        {
+          "row_id": "stage3_action_group",
+          "attribute_to": "Stage 3 · học action nhóm đó",
+          "intervention": "Thêm demo hoặc dữ liệu sinh (S1, S2) cho bước k",
+          "consumes_budget": true,
+          "confirmed": true,
+          "evidence": [
+            {
+              "probe": "P3",
+              "where": "nhóm action `hand`",
+              "value": 0.33,
+              "threshold": 0.3
+            }
+          ]
+        }
+      ],
+      "stage_unavailable": [
+        {
+          "row_id": "stage3_forgetting",
+          "reason": "không có P4: checkpoint gốc của tác giả, không có checkpoint cha"
+        }
+      ],
+      "diagnosis": "bad_start_state"
+    },
+    {
+      "episode_id": "ep_01M6HXNZ060000000000000006",
+      "score_id": "sc_50cd3745c0fa6065",
+      "condition_seed": 9105,
+      "trace_sha256": "18ae23399386e89ea9318643ae01038d3db4624b0177d811927472f068ee84f6",
+      "system_config_sha256": "5635f57bfa073ebb7bfa485b29b2176b6dd9a222cf90a3c1910318a0ba6ff91f",
+      "stage_table_sha256": "e7faf7c228fb99ef6860cfd6d03ab2b217d3fdfd799248135628cb61e5948d1d",
+      "checks": [
+        {
+          "check": "infra_status",
+          "part": null,
+          "outcome": "not_fired",
+          "value": "ok",
+          "threshold": [
+            "ok"
+          ],
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "tracking_error",
+          "part": "upper_body",
+          "outcome": "not_fired",
+          "value": 0.036,
+          "threshold": 0.1,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "tracking_error",
+          "part": "lower_body",
+          "outcome": "not_fired",
+          "value": 0.066,
+          "threshold": 0.15,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "latency_p99",
+          "part": null,
+          "outcome": "not_fired",
+          "value": 0.087,
+          "threshold": 0.15,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "buffer_underruns",
+          "part": null,
+          "outcome": "not_fired",
+          "value": 0.0,
+          "threshold": 0.0,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "sync_offset",
+          "part": null,
+          "outcome": "not_fired",
+          "value": 0.007,
+          "threshold": 0.02,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "camera_reference",
+          "part": null,
+          "outcome": "not_fired",
+          "value": "fc7f9c90ebbf8c4662fd70e58de5aed668c0fbc5ccfbbd951dce705729cdeea2",
+          "threshold": "fc7f9c90ebbf8c4662fd70e58de5aed668c0fbc5ccfbbd951dce705729cdeea2",
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "planner_feasible",
+          "part": null,
+          "outcome": "not_fired",
+          "value": true,
+          "threshold": null,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "reset_success",
+          "part": null,
+          "outcome": "not_fired",
+          "value": 0.2,
+          "threshold": 0.8,
+          "n_success": 2,
+          "n_runs": 10,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "nominal_visuals",
+          "part": null,
+          "outcome": "not_fired",
+          "value": false,
+          "threshold": null,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "in_train_domain",
+          "part": null,
+          "outcome": "not_fired",
+          "value": true,
+          "threshold": null,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "coverage_distance",
+          "part": null,
+          "outcome": "fired",
+          "value": 0.17,
+          "threshold": 0.12,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        }
+      ],
+      "stage_hypotheses": [
+        {
+          "row_id": "stage3_action_group",
+          "attribute_to": "Stage 3 · học action nhóm đó",
+          "intervention": "Thêm demo hoặc dữ liệu sinh (S1, S2) cho bước k",
+          "consumes_budget": true,
+          "confirmed": true,
+          "evidence": [
+            {
+              "probe": "P3",
+              "where": "nhóm action `hand`",
+              "value": 0.38,
+              "threshold": 0.3
+            }
+          ]
+        }
+      ],
+      "stage_unavailable": [
+        {
+          "row_id": "stage3_forgetting",
+          "reason": "không có P4: checkpoint gốc của tác giả, không có checkpoint cha"
+        }
+      ],
+      "diagnosis": "coverage_gap"
+    },
+    {
+      "episode_id": "ep_01M6HXNZ070000000000000007",
+      "score_id": "sc_3cfeedbd8ca01428",
+      "condition_seed": 9106,
+      "trace_sha256": "779395dffad789afedabef99b6a1daca980fc71ba590c23478f6f02ea62d6d74",
+      "system_config_sha256": "5635f57bfa073ebb7bfa485b29b2176b6dd9a222cf90a3c1910318a0ba6ff91f",
+      "stage_table_sha256": null,
+      "checks": [
+        {
+          "check": "infra_status",
+          "part": null,
+          "outcome": "not_fired",
+          "value": "ok",
+          "threshold": [
+            "ok"
+          ],
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "tracking_error",
+          "part": "upper_body",
+          "outcome": "not_fired",
+          "value": 0.04,
+          "threshold": 0.1,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "tracking_error",
+          "part": "lower_body",
+          "outcome": "not_fired",
+          "value": 0.061,
+          "threshold": 0.15,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "latency_p99",
+          "part": null,
+          "outcome": "not_fired",
+          "value": 0.085,
+          "threshold": 0.15,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "buffer_underruns",
+          "part": null,
+          "outcome": "not_fired",
+          "value": 0.0,
+          "threshold": 0.0,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "sync_offset",
+          "part": null,
+          "outcome": "not_fired",
+          "value": 0.01,
+          "threshold": 0.02,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": null,
+          "note": null
+        },
+        {
+          "check": "camera_reference",
+          "part": null,
+          "outcome": "not_judged",
+          "value": null,
+          "threshold": "fc7f9c90ebbf8c4662fd70e58de5aed668c0fbc5ccfbbd951dce705729cdeea2",
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": "không có camera_params.jsonl trong thư mục trace: R5 CHƯA RÕ",
+          "note": null
+        },
+        {
+          "check": "planner_feasible",
+          "part": null,
+          "outcome": "not_judged",
+          "value": null,
+          "threshold": null,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": "chưa chạy: kiểm hệ thống chưa xong (spec mục 6.9, hệ thống trước)",
+          "note": null
+        },
+        {
+          "check": "reset_success",
+          "part": null,
+          "outcome": "not_judged",
+          "value": null,
+          "threshold": 0.8,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": "chưa chạy: kiểm hệ thống chưa xong (spec mục 6.9, hệ thống trước)",
+          "note": null
+        },
+        {
+          "check": "nominal_visuals",
+          "part": null,
+          "outcome": "not_judged",
+          "value": null,
+          "threshold": null,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": "chưa chạy: kiểm hệ thống chưa xong (spec mục 6.9, hệ thống trước)",
+          "note": null
+        },
+        {
+          "check": "in_train_domain",
+          "part": null,
+          "outcome": "not_judged",
+          "value": null,
+          "threshold": null,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": "chưa chạy: kiểm hệ thống chưa xong (spec mục 6.9, hệ thống trước)",
+          "note": null
+        },
+        {
+          "check": "coverage_distance",
+          "part": null,
+          "outcome": "not_judged",
+          "value": null,
+          "threshold": 0.12,
+          "n_success": null,
+          "n_runs": null,
+          "skipped_reason": "chưa chạy: kiểm hệ thống chưa xong (spec mục 6.9, hệ thống trước)",
+          "note": null
+        }
+      ],
+      "stage_hypotheses": [],
+      "stage_unavailable": [
+        {
+          "row_id": "stage1_perception",
+          "reason": "chưa chạy: quy lỗi về stage đi sau kiểm hệ thống (spec mục 6.4, bước 4b)"
+        },
+        {
+          "row_id": "stage3_action_group",
+          "reason": "chưa chạy: quy lỗi về stage đi sau kiểm hệ thống (spec mục 6.4, bước 4b)"
+        },
+        {
+          "row_id": "runtime_distribution_shift",
+          "reason": "chưa chạy: quy lỗi về stage đi sau kiểm hệ thống (spec mục 6.4, bước 4b)"
+        },
+        {
+          "row_id": "stage3_forgetting",
+          "reason": "chưa chạy: quy lỗi về stage đi sau kiểm hệ thống (spec mục 6.4, bước 4b)"
+        },
+        {
+          "row_id": "out_of_domain",
+          "reason": "chưa chạy: quy lỗi về stage đi sau kiểm hệ thống (spec mục 6.4, bước 4b)"
+        }
+      ],
+      "diagnosis": "unknown"
+    }
+  ],
+  "diagnosis": "coverage_gap",
+  "proposal": {
+    "kind": "sim_s1",
+    "description": "Sinh 20 rollout S1 đạt QA cho mỗi lỗi, điều kiện lấy đều trong bán kính τ_cov quanh điều kiện lỗi và trong miền train (spec mục 6.10)",
+    "consumes_budget": true,
+    "quantity": 140,
+    "unit": "rollout",
+    "gain": {
+      "n_failures": 7,
+      "cap": 10,
+      "n_effective": 7,
+      "n_dev": 90,
+      "fix_rate_alpha": 1.0,
+      "fix_rate_beta": 1.0,
+      "expected_gain_pp": 3.888888888888889
+    },
+    "cost": {
+      "measure_kind": "estimated",
+      "usd_amount": 0.42,
+      "human_hours": 0.5,
+      "ledger_entry_ids": [
+        "led_01M6HXNZ0M000000000000000M"
+      ]
+    },
+    "intervention_id": "iv_01M6HXNZ0N000000000000000N"
+  },
+  "decision": {
+    "verdict": "accept",
+    "decision_id": "dec_01M6HXNZ0P000000000000000P",
+    "signed_by": "hieu",
+    "reason": "3/5 đại diện thiếu vùng phủ, P3 nhóm `hand` cao trên cả ba",
+    "diagnosis": null,
+    "intervention": null
+  },
+  "result": null
+}
