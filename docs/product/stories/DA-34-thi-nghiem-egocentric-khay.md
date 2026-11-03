@@ -9,9 +9,9 @@
 | Làn | Adapter Ψ₀ (`flywheel-psi0`), RunPlan |
 | Story PRD | Story của [design 28/10/2026](../../superpowers/specs/2026-10-28-tray-transfer-he-design.md) mục 6, 7 (M4, M5) |
 | Nhãn | [Adapter] · `epic:9` · `gate:G1` · `area:train` |
-| Sprint | S2; M4 12/11/2026, M5 15/11/2026; nhánh B sau demo |
+| Sprint | S2; M4 12/11/2026, M5 15/11/2026; nhánh B sau demo · **Lịch 3/11/2026:** A, C, C-NOEGO và vòng Failure → Data (C+) xong trước **12/11/2026** (07 mục 2.4) |
 | Ước lượng | 15 giờ trước demo (ước lượng), không tính GPU-giờ |
-| Phụ thuộc | DA-33 (release synthetic), DA-19 (adapter fine-tune trên Colab; kiểm đường `eval-decoupled-wbc` của Ψ₀), S1-03 (Q0, serve Ψ₀), S1-04 (giờ fine-tune) |
+| Phụ thuộc | DA-33 (release synthetic), DA-19 (adapter fine-tune trên Colab; kiểm đường `eval-decoupled-wbc` của Ψ₀), S1-03 (Q0, serve Ψ₀), S1-04 (giờ fine-tune). **3/11/2026:** vòng Failure → Data cần DA-13 (chẩn đoán, Châu), hook `SimpleSim` ghi trace của env khay, và cờ nhận danh sách điều kiện trong `generate.py` của DA-33 |
 
 ## Story
 
@@ -24,6 +24,7 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
 3. Eval 30 điều kiện dev × 3 mức ở `sim_mode=mujoco`, đồng bộ, qua `eval-decoupled-wbc` (decoupled WBC); Ψ₀ tự xuất lệnh đi.
 4. Bảng theo design mục 6.3, khoảng tin cậy bootstrap, diễn giải theo design mục 6.4 ghi "sơ bộ, trên dev"; video rollout cạnh nhau.
 5. Sau khi có video egocentric: stage 1 và stage 3 của nhánh B, eval B, cập nhật bảng.
+6. (3/11/2026) Một vòng Failure → Data trên lượt thất bại của nhánh C theo design 28/10/2026 mục 6.6: evidence card cho cụm lớn nhất, N_add episode S1 nhắm lỗi qua QA và sổ chi phí, fine-tune C+, eval C+ trên 90 điều kiện dev và trên điều kiện C đã hỏng; bảng C, C+, A ghi "sơ bộ, trên dev", kèm số hồi quy. Trễ thì dừng ở episode nhắm lỗi đã qua QA và ghi `Decision`.
 
 ## Nhiệm vụ
 
@@ -31,6 +32,7 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
 - [ ] 2. Fine-tune A, C, C-NOEGO (AC 2)
 - [ ] 3. Eval và bảng kết quả, video (AC 3, 4)
 - [ ] 4. Nhánh B khi có video (AC 5)
+- [ ] 5. Vòng Failure → Data trên lỗi của C: chẩn đoán, sinh nhắm lỗi, fine-tune và eval C+ (AC 6; trước 12/11/2026)
 
 ## Phạm vi file
 
@@ -56,5 +58,6 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 |---|---|---|
 | 28/10/2026 | Tạo story nháp theo design 28/10/2026 | PO (Hiếu) |
 | 28/10/2026 | Eval qua `eval-decoupled-wbc` thay đường MP với AMO | PO (Hiếu) |
+| 3/11/2026 | Thêm AC 6 và nhiệm vụ 5: phần 6 của demo chạy hết vòng Failure → Data trên task khay, có nhánh C+ (design 28/10 mục 6.6) | PO (Hiếu) |
 
 ## Ghi chép khi làm

@@ -621,7 +621,9 @@ Sửa 30/10/2026 [Đã chốt]: bảng này là bảng chung với spec v10.5 m�
 | 3 | Pipeline | Ba loại dữ liệu qua 6 tầng: mẫu EgoDex ra định dạng stage 1, teleop và synthetic (S1, S2) ra release LeRobot v2.1 | Báo cáo dataset (mục 6.5); contract test xanh; lần chạy stage 1 ngắn |
 | 4 | Agent QA/QC | Chạy trên bản cài lỗi | Bảng precision, recall theo loại; một báo cáo mẫu |
 | 5 | HE-1 | Đường cong sơ bộ V-EGO so với V-NOEGO | Đồ thị, bảng theo mức, video ba cột |
-| 6 | Một vòng Failure → Data | Lượt thất bại → scorer → chẩn đoán → evidence card → đề xuất dữ liệu → sổ chi phí | Evidence card thật trên một cụm lỗi của eval HE |
+| 6 | Một vòng Failure → Data, trên cả hai task (sửa 3/11/2026) | Task hai bàn: lượt thất bại của eval HE → scorer → chẩn đoán → evidence card → đề xuất dữ liệu → sổ chi phí. Task khay: chạy hết vòng trên lượt thất bại của nhánh C (design 28/10/2026 mục 6.6): chẩn đoán → sinh episode S1 quanh điều kiện lỗi → QA → fine-tune C+ → eval lại | Evidence card thật trên một cụm lỗi của mỗi task; bảng C, C+, A của task khay trên dev |
+
+Sửa 3/11/2026 [Đã chốt]: phần 6 chạy trên **cả hai task**. Task hai bàn dừng ở đề xuất dữ liệu, vì trước 13/11 không thu thêm được dữ liệu cho task này (07 mục 2.4, bản 1.2). Task khay chạy hết vòng vì planner của DA-33 sinh được episode theo điều kiện; thiết kế ở [design 28/10/2026](2026-10-28-tray-transfer-he-design.md) mục 6.6.
 
 **Chưa có ở demo** (nói thẳng khi trình bày): video egocentric đội tự quay, HE-2 trên dataset tự xây, S3, S4, HS, HT, HD, holdout.
 

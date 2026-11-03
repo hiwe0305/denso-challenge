@@ -183,6 +183,23 @@ Nếu chưa có video tự quay khi cần chạy nhánh B, dùng tập con EgoDe
 
 Trước demo: ba lần fine-tune stage 3 (A, C, C-NOEGO). Sau khi có video: thêm stage 1 và stage 3 của B. Fine-tune chạy trên Colab Pro (A100 hoặc H100); thuê server khi Colab không đủ (giới hạn phiên, hàng đợi GPU) [Đã chốt]. Eval 90 episode mỗi nhánh ở MuJoCo trên máy 3060 hoặc server thuê; thời gian mỗi episode đo ở mốc M0. S1-04 đo giờ một lần fine-tune trước 6/11. Không có trần cứng; nếu tổng chi phí dự kiến vượt khoảng gấp đôi ước lượng sau M0, báo trưởng nhóm trước khi chạy tiếp.
 
+### 6.6 Một vòng Failure → Data trên task khay (sửa 3/11/2026) [Đã chốt: chạy hết vòng, có train lại]
+
+Phần 6 của demo (design 27/10 mục 11) chạy trên cả hai task. Trên task khay, vòng chạy hết, vì planner S1 của DA-33 sinh được episode theo điều kiện cho trước.
+
+| Bước | Làm gì | Ghi chú |
+|---|---|---|
+| 1 · Lỗi | Lượt thất bại của nhánh C (N_cut = 40) trên 90 điều kiện dev của mục 6.3 | Dùng lại eval của M5, không chạy thêm |
+| 2 · Chấm và chẩn đoán | Scorer 7 bước (mục 3.2), kiểu lỗi mục 3.3; kiểm hệ thống R1–R6 trên trace từ hook `SimpleSim`; gom cụm theo bước hỏng và kiểu lỗi | Code của làn Đánh giá (DA-13) chạy không đổi; `TaskDefinition` của task khay do adapter `flywheel-simple` cấp qua Protocol [Đề xuất] |
+| 3 · Đề xuất | Evidence card cho cụm lớn nhất; đề xuất N_add episode S1 quanh điều kiện lỗi, trong miền train (seed train, Q-33A), ngân sách chia đều theo cụm | N_add = 40, bằng phần demo bị cắt [Đề xuất]; ghi `Decision` |
+| 4 · Sinh | `generate.py` của DA-33 nhận danh sách điều kiện; QA tối thiểu và phát lại như release S1; mục sổ chi phí | Cần cờ nhận danh sách điều kiện (DA-33) |
+| 5 · Train | Nhánh **C+** = 40 demo của C cộng N_add episode nhắm lỗi; cùng recipe, số bước, checkpoint gốc với A và C | Một lần fine-tune thêm trên Colab |
+| 6 · Đo | Eval C+ trên 90 điều kiện dev (cùng hạt giống) và báo riêng trên các điều kiện C đã hỏng | Hồi quy: điều kiện C làm được mà C+ hỏng |
+
+**Đọc kết quả** [Đề xuất, chốt trước khi chạy]: A có đúng 40 demo bổ sung **lấy đều** so với C, nên **C+ so với A** là phép so "bổ sung nhắm lỗi" với "bổ sung đều" cùng số episode, kiểu HT của spec mục 3 nhưng trên dev, 1 seed, 1 vòng. Báo là kết quả mô tả, ghi "sơ bộ, trên dev"; không gọi là kiểm HT. C+ so với C cho biết vòng có sửa được lỗi không; báo kèm số hồi quy.
+
+**Lịch** [Đề xuất]: eval C xong ngày 10/11 → sinh N_add 11/11 → fine-tune C+ 11–12/11 → eval C+ 12/11. **Đường lui:** nếu ngày 11/11 C+ chưa bắt đầu train được, dừng ở bước 4 (episode nhắm lỗi đã qua QA cộng sổ chi phí) và ghi `Decision`; C+ chạy sau demo.
+
 ## 7. Lộ trình tới demo 17/11/2026 [Đề xuất]
 
 | Mốc | Ngày | Xong khi | Đường lui nếu trễ |
@@ -192,6 +209,7 @@ Trước demo: ba lần fine-tune stage 3 (A, C, C-NOEGO). Sau khi có video: th
 | M2 · synthetic S1 | 8/11 | Planner kịch bản theo 7 bước sinh ≥ 100 episode, ≥ 80 đạt QA (pipeline của Thông nếu đã có, không thì QA tối thiểu mục 7); release có hash | 10/11: giảm N_full còn số đạt QA thực có |
 | M4 · train | 12/11 | Stage 3 của A, C, C-NOEGO xong trên Colab hoặc server thuê | Chỉ A và C; C-NOEGO sau demo |
 | M5 · eval | 15/11 | Eval A, C, C-NOEGO; bảng mục 6.3; video rollout cạnh nhau | Giảm còn 20 điều kiện mỗi mức, ghi `Decision` |
+| M6 · vòng Failure → Data (sửa 3/11/2026) | 12/11 | Mục 6.6: C+ train và eval xong, bảng C, C+, A | Dừng ở episode nhắm lỗi đã qua QA; C+ sau demo |
 | Chạy thử | 16/11 | Phần task khay chạy được trong kịch bản demo | |
 | M3 · egocentric | Sau demo, ngày chốt sau | Video bê khay quay xong, qua pipeline egocentric, xuất stage 1; chạy stage 1 và stage 3 của B, eval B | |
 
