@@ -148,6 +148,7 @@
     },
     "TraceRef": {
       "additionalProperties": false,
+      "description": "A rollout trace. `uri` names the directory `<trace_id>/` holding `steps.jsonl` and\n`camera_params.jsonl` (flywheel.contracts.trace; PO decision G1 on PR #48, 3/11/2026).",
       "properties": {
         "trace_id": {
           "title": "Trace Id",

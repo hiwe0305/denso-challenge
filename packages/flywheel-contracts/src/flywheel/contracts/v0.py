@@ -48,6 +48,9 @@ class Condition(V0Model):
 
 
 class TraceRef(V0Model):
+    """A rollout trace. `uri` names the directory `<trace_id>/` holding `steps.jsonl` and
+    `camera_params.jsonl` (flywheel.contracts.trace; PO decision G1 on PR #48, 3/11/2026)."""
+
     trace_id: str
     uri: str
     sha256: str | None = None

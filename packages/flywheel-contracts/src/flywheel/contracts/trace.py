@@ -5,6 +5,14 @@ lower body (R3 tracking), the simulation-clock stamps of state and image (R4
 sync), and frames lost in the cycle (missing-signal check). CameraParams records
 the intrinsics, render resolution, mount and pose of one camera of a trace (R5
 calibration).
+
+File layout (PO decision G1 on PR #48, 3/11/2026): `TraceRef.uri` names a
+directory `<trace_id>/` holding
+
+    steps.jsonl          one TraceStep per line, in step order
+    camera_params.jsonl  one CameraParams per line, one per camera the policy sees
+
+`fixtures/trace/README.md` in flywheel.testkit has the rest of the conventions.
 """
 
 from __future__ import annotations
@@ -19,6 +27,9 @@ from typing_extensions import Self
 
 NonFinite = Literal["NaN", "Infinity", "-Infinity"]
 FloatOrNonFinite = float | NonFinite
+
+STEPS_NAME = "steps.jsonl"
+CAMERA_NAME = "camera_params.jsonl"
 
 # G1 36-D action (Psi0 ACTION_SLICES_36D, names as in docs/g0/psi-data.md and D-26):
 # the left hand goes thumb, middle, index; the right hand thumb, index, middle.
@@ -75,7 +86,7 @@ G0_RUN_PLAN_ID = re.compile(r"^g0-[A-Z][A-Z0-9]*-[0-9]+-[0-9]{8}$")
 
 
 class TraceStep(Artifact):
-    """A single control cycle in a rollout trace.
+    """A single control cycle in a rollout trace; one line of `steps.jsonl`.
 
     One clock: MuJoCo simulation time `data.time`, in seconds. Non-finite values are
     written as the strings "NaN", "Infinity", "-Infinity" so the line stays JSON; a
@@ -147,12 +158,15 @@ class TraceStep(Artifact):
 
 
 class CameraParams(Artifact):
-    """One camera of an episode run.
+    """One camera of a trace; one line of `camera_params.jsonl`.
 
     `fx`, `fy`, `cx`, `cy` are pixels at the render resolution `width` x `height`;
     `pose` is position (m) + MuJoCo quaternion (w, x, y, z) relative to the mount body.
+    `reference_sha256` is the hash of the camera reference pinned at G0, copied from the
+    RunPlan (PO decision Q3, 3/11/2026), never a hash of the episode's own cameras.
     """
 
+    trace_id: str = Field(min_length=1)
     episode_id: str = Field(min_length=1)
     uid: str = Field(min_length=1)
     mount: str = Field(min_length=1)
@@ -163,7 +177,14 @@ class CameraParams(Artifact):
     cx: float = Field(gt=0.0)
     cy: float = Field(gt=0.0)
     pose: list[float]
-    reference_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    reference_sha256: str = Field(
+        pattern=r"^[0-9a-f]{64}$",
+        description=(
+            "Hash of the camera reference pinned at G0, copied from the RunPlan (PO decision "
+            "Q3, 3/11/2026); not a hash of this camera. R5 compares these values against "
+            "that reference."
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_pose(self) -> Self:
