@@ -72,8 +72,8 @@ def cfg() -> SystemThresholds:
 
 
 @pytest.fixture
-def episode(tmp_path: Path, clean_rows, rtc_rows, camera_entry):
-    """Write a healthy episode, then let a test move one thing in it."""
+def episode(write_job, rollout_result, clean_rows, rtc_rows, camera_entry):
+    """Write a healthy episode in the hook's layout, then let a test move one thing in it."""
 
     def write(
         trace_rows: list[dict[str, Any]] | None = None,
@@ -81,23 +81,12 @@ def episode(tmp_path: Path, clean_rows, rtc_rows, camera_entry):
         camera: dict[str, Any] | list[dict[str, Any]] | None = None,
         infra_status: str = "ok",
     ) -> Path:
-        folder = tmp_path / f"ep_{len(list(tmp_path.iterdir()))}"
-        folder.mkdir()
-        rows = trace_rows if trace_rows is not None else clean_rows
-        (folder / "trace.jsonl").write_text(
-            "".join(json.dumps(item) + "\n" for item in rows), encoding="utf-8"
+        return write_job(
+            trace_rows if trace_rows is not None else clean_rows,
+            rtc=rtc if rtc is not None else rtc_rows,
+            camera=camera if camera is not None else camera_entry,
+            result=rollout_result(infra_status),
         )
-        (folder / "rtc.jsonl").write_text(
-            "".join(json.dumps(item) + "\n" for item in (rtc if rtc is not None else rtc_rows)),
-            encoding="utf-8",
-        )
-        (folder / "camera_params.json").write_text(
-            json.dumps(camera if camera is not None else camera_entry), encoding="utf-8"
-        )
-        (folder / "episode.json").write_text(
-            json.dumps({"infra_status": infra_status}), encoding="utf-8"
-        )
-        return folder
 
     return write
 
@@ -178,20 +167,22 @@ def test_an_injected_latency_spike_comes_back_as_a_runtime_fault(episode, cfg, r
 
 
 def test_a_server_fault_is_recorded_and_is_not_a_policy_fault(episode, cfg) -> None:
-    verdict = diagnose_system(load_episode(episode(infra_status="rtc_unreachable")), cfg)
+    verdict = diagnose_system(load_episode(episode(infra_status="timeout")), cfg)
 
     assert verdict.diagnosis is Diagnosis.INFRA
-    assert verdict.infra_status == "rtc_unreachable"
+    assert verdict.infra_status == "timeout"
     assert [finding.code for finding in verdict.findings] == ["R6"]
 
 
 def test_a_crashed_simulator_is_never_a_controller_fault(episode, cfg, row) -> None:
-    # The PO reproduction of #71: `sim_crash` plus a tracking error came back
-    # `controller`. Commands and measurements after a crash are its consequence.
+    # The PO reproduction of #71: a crashed simulator (`simulator_error`, what
+    # the hook writes when SIMPLE never reported the episode) plus a tracking
+    # error came back `controller`. Commands and measurements after a crash
+    # are its consequence.
     off = [row(step, meas_upper=[0.4, 0.2, 0.3]) for step in range(20)]
 
     verdict = diagnose_system(
-        load_episode(episode(trace_rows=off, infra_status="sim_crash")), cfg
+        load_episode(episode(trace_rows=off, infra_status="simulator_error")), cfg
     )
 
     assert verdict.diagnosis is Diagnosis.INFRA

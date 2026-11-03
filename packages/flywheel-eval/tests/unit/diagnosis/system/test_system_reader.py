@@ -193,41 +193,78 @@ def test_a_camera_pose_that_is_not_seven_numbers_is_refused(tmp_path: Path, came
         read_camera_params(path)
 
 
-def test_load_episode_finds_the_files_beside_the_trace(
-    tmp_path: Path, clean_rows, rtc_rows, camera_entry
+def test_load_episode_reads_the_layout_the_hook_writes(
+    write_job, rollout_result, clean_rows, rtc_rows, camera_entry
 ) -> None:
-    (tmp_path / "trace.jsonl").write_text(
-        "".join(json.dumps(item) + "\n" for item in clean_rows), encoding="utf-8"
+    # SimpleSim hook (DA-38): <job>/<episode>/{trace.jsonl, camera_params.json,
+    # episode.json}; the RTC log of DA-19 is one per job, in <job>/.
+    folder = write_job(
+        clean_rows, rtc=rtc_rows, camera=[camera_entry], result=rollout_result("ok")
     )
-    (tmp_path / "rtc.jsonl").write_text(
-        "".join(json.dumps(item) + "\n" for item in rtc_rows), encoding="utf-8"
-    )
-    (tmp_path / "camera_params.json").write_text(json.dumps(camera_entry), encoding="utf-8")
-    (tmp_path / "episode.json").write_text(json.dumps({"infra_status": "ok"}), encoding="utf-8")
 
-    inputs = load_episode(tmp_path)
+    inputs = load_episode(folder)
 
     assert inputs.trace.num_steps == 20
     assert inputs.has_rtc_log and inputs.has_camera_params
+    assert len(inputs.rtc) == len(rtc_rows)
     assert inputs.infra_status == "ok"
 
 
-def _write_episode(folder: Path, trace_rows, rtc) -> None:
-    (folder / "trace.jsonl").write_text(
-        "".join(json.dumps(item) + "\n" for item in trace_rows), encoding="utf-8"
-    )
+def test_the_trace_file_itself_finds_the_same_files(
+    write_job, rollout_result, clean_rows, rtc_rows
+) -> None:
+    folder = write_job(clean_rows, rtc=rtc_rows, result=rollout_result("ok"))
+
+    inputs = load_episode(folder / "trace.jsonl")
+
+    assert len(inputs.rtc) == len(rtc_rows)
+    assert inputs.infra_status == "ok"
+
+
+def test_an_rtc_log_beside_the_trace_is_not_the_job_log(write_job, clean_rows, rtc_rows) -> None:
+    # The job log is the one DA-19 writes; a file in the episode dir is not
+    # read, and its absence from the job dir costs R1 and R2 by name.
+    folder = write_job(clean_rows)
     (folder / "rtc.jsonl").write_text(
-        "".join(json.dumps(item) + "\n" for item in rtc), encoding="utf-8"
+        "".join(json.dumps(item) + "\n" for item in rtc_rows), encoding="utf-8"
     )
 
+    assert not load_episode(folder).has_rtc_log
 
-def test_a_job_wide_rtc_log_is_filtered_to_the_trace(tmp_path: Path, clean_rows, rtc_rows) -> None:
+
+def test_infra_status_is_read_from_the_rollout_result(
+    write_job, rollout_result, clean_rows
+) -> None:
+    folder = write_job(clean_rows, result=rollout_result("simulator_error"))
+
+    assert load_episode(folder).infra_status == "simulator_error"
+
+
+def test_an_episode_json_that_is_not_a_rollout_result_is_refused(write_job, clean_rows) -> None:
+    folder = write_job(clean_rows, result={"infra_status": "sim_crash"})
+
+    with pytest.raises(ReaderError, match="RolloutResult"):
+        load_episode(folder)
+
+
+def test_a_rollout_result_of_another_trace_is_refused(
+    write_job, rollout_result, clean_rows
+) -> None:
+    # Files of two episodes in one directory would pair this trace with
+    # another episode's infra status.
+    folder = write_job(clean_rows, result=rollout_result("ok", trace_id="trace_9"))
+
+    with pytest.raises(ReaderError, match="trace_9"):
+        load_episode(folder)
+
+
+def test_a_job_wide_rtc_log_is_filtered_to_the_trace(write_job, clean_rows, rtc_rows) -> None:
     # `RTCClient` of DA-19 writes one `rtc.jsonl` per job for every trace in
     # it; the latency of another episode is not this episode's latency.
     other = [{**record, "trace_id": "trace_2", "chunk_received_s": 9.0} for record in rtc_rows]
-    _write_episode(tmp_path, clean_rows, [*rtc_rows, *other])
+    folder = write_job(clean_rows, rtc=[*rtc_rows, *other])
 
-    inputs = load_episode(tmp_path)
+    inputs = load_episode(folder)
 
     assert inputs.trace.trace_id == "trace_1"
     assert len(inputs.rtc) == len(rtc_rows)
@@ -235,34 +272,30 @@ def test_a_job_wide_rtc_log_is_filtered_to_the_trace(tmp_path: Path, clean_rows,
 
 
 def test_an_rtc_log_with_no_chunk_of_the_trace_costs_r1_and_r2(
-    tmp_path: Path, clean_rows, rtc_rows
+    write_job, clean_rows, rtc_rows
 ) -> None:
     other = [{**record, "trace_id": "trace_2"} for record in rtc_rows]
-    _write_episode(tmp_path, clean_rows, other)
+    folder = write_job(clean_rows, rtc=other)
 
-    inputs = load_episode(tmp_path)
+    inputs = load_episode(folder)
 
     assert inputs.has_rtc_log
     assert inputs.rtc == ()
 
 
 def test_a_trace_without_an_id_cannot_pick_from_a_job_wide_log(
-    tmp_path: Path, clean_rows, rtc_rows
+    write_job, clean_rows, rtc_rows
 ) -> None:
     unnamed = [{key: item[key] for key in item if key != "trace_id"} for item in clean_rows]
     other = [{**record, "trace_id": "trace_2"} for record in rtc_rows]
-    _write_episode(tmp_path, unnamed, [*rtc_rows, *other])
+    folder = write_job(unnamed, rtc=[*rtc_rows, *other])
 
     with pytest.raises(ReaderError, match="trace_id"):
-        load_episode(tmp_path)
+        load_episode(folder)
 
 
-def test_an_episode_without_the_optional_files_still_loads(tmp_path: Path, clean_rows) -> None:
-    (tmp_path / "trace.jsonl").write_text(
-        "".join(json.dumps(item) + "\n" for item in clean_rows), encoding="utf-8"
-    )
-
-    inputs = load_episode(tmp_path)
+def test_an_episode_without_the_optional_files_still_loads(write_job, clean_rows) -> None:
+    inputs = load_episode(write_job(clean_rows))
 
     assert inputs.rtc == () and inputs.cameras == ()
     assert not inputs.has_rtc_log and not inputs.has_camera_params

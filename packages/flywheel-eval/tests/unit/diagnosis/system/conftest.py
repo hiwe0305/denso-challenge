@@ -108,6 +108,70 @@ def camera_entry() -> dict[str, Any]:
     }
 
 
+def _rollout_result(infra_status: str = "ok", trace_id: str = "trace_1") -> dict[str, Any]:
+    """`episode.json` as the SimpleSim hook (DA-38 @ f94d5bc) writes it: a v0 RolloutResult."""
+    return {
+        "job_id": "job_1",
+        "trace_ref": {"trace_id": trace_id, "uri": "ep_1/trace.jsonl", "sha256": None},
+        "sim_success": infra_status == "ok",
+        "infra_status": infra_status,
+        "usage": {"wall_seconds": 12.0, "gpu_seconds": 0.0},
+        "camera_params_hash": "b" * 64,
+        "adapter_info": {"name": "flywheel-simple.trace", "version": "0.1.0"},
+    }
+
+
+Result = Callable[..., dict[str, Any]]
+WriteJob = Callable[..., Path]
+
+
+@pytest.fixture
+def rollout_result() -> Result:
+    """`episode.json` of one episode, `infra_status` and `trace_id` replaced."""
+    return _rollout_result
+
+
+def write_job_episode(
+    job: Path,
+    trace_rows: list[dict[str, Any]],
+    rtc: list[dict[str, Any]] | None = None,
+    camera: dict[str, Any] | list[dict[str, Any]] | None = None,
+    result: dict[str, Any] | None = None,
+    episode_id: str = "ep_1",
+) -> Path:
+    """Write one episode in the layout of the SimpleSim hook; return the episode dir.
+
+    <job>/rtc.jsonl is the job-wide RTC log of DA-19; <job>/<episode_id>/ holds
+    trace.jsonl, camera_params.json and episode.json. A file passed as None
+    is not written.
+    """
+    folder = job / episode_id
+    folder.mkdir(parents=True)
+    (folder / "trace.jsonl").write_text(
+        "".join(json.dumps(item) + "\n" for item in trace_rows), encoding="utf-8"
+    )
+    if rtc is not None:
+        (job / "rtc.jsonl").write_text(
+            "".join(json.dumps(item) + "\n" for item in rtc), encoding="utf-8"
+        )
+    if camera is not None:
+        (folder / "camera_params.json").write_text(json.dumps(camera), encoding="utf-8")
+    if result is not None:
+        (folder / "episode.json").write_text(json.dumps(result), encoding="utf-8")
+    return folder
+
+
+@pytest.fixture
+def write_job(tmp_path: Path) -> WriteJob:
+    """`write_job_episode` under a fresh job directory of this test."""
+
+    def write(trace_rows: list[dict[str, Any]], **files: Any) -> Path:
+        job = tmp_path / f"job_{len(list(tmp_path.glob('job_*')))}"
+        return write_job_episode(job, trace_rows, **files)
+
+    return write
+
+
 @pytest.fixture
 def inputs_from(write_trace: Rows) -> Inputs:
     """Rows as `SystemInputs` carrying the trace alone, for the trace-only checks."""

@@ -47,13 +47,22 @@ SHA-256 of each beside the trace's; one trace with two RTC logs is then two
 records the store can tell apart. The RTC hash is of the whole file, before it
 is kept to this trace's chunks, because that is the file that was read.
 
-**Where `infra_status` comes from is provisional.** It is read from
-`episode.json` beside the trace, a layout no writer on master produces yet;
-`infra_status` lives on `RolloutResult` and `Episode` of the contracts, and the
-SimpleSim hook (DA-38, Hiếu) is where it will be written. Until that hook fixes
-the file and the seam test of `tests/e2e/test_demo_seams.py` covers it, R6 is
-skipped on every real episode, by name. When the layout is fixed, only
-`_infra_status` and `EPISODE_NAME` change.
+**The layout is the one the SimpleSim hook writes** (DA-38, branch
+`DA-38-trace-hook-v2` at `f94d5bc`, not merged yet)::
+
+    <job_dir>/
+      rtc.jsonl              # RTCClient of DA-19, one per job, keyed by trace_id
+      <episode_id>/
+        trace.jsonl          # one TraceStep per control cycle
+        camera_params.json   # list of CameraParams; absent when no reference is pinned
+        episode.json         # v0 RolloutResult: infra_status "ok" or "simulator_error"
+
+`episode.json` is read through `flywheel.contracts.v0.RolloutResult`, so an
+`infra_status` outside the contract's `InfraStatus` is refused rather than
+read as a fault, and a `trace_ref` naming another trace is refused rather than
+paired with this one. Until the hook merges with a seam test in
+`tests/e2e/test_demo_seams.py`, this layout is the hook branch's word, not a
+contract.
 """
 
 from __future__ import annotations
@@ -68,6 +77,7 @@ from typing import Any, TypeVar
 
 import numpy as np
 from flywheel.contracts.artifacts import ProbeP1, ProbeP3, ProbeP4, RTCInferenceRecord
+from flywheel.contracts.v0 import RolloutResult
 from numpy.typing import NDArray
 from pydantic import ValidationError
 
@@ -238,24 +248,23 @@ class StageInputs:
 TRACE_NAME = "trace.jsonl"
 RTC_NAME = "rtc.jsonl"
 CAMERA_NAME = "camera_params.json"
-# Provisional: no writer on master yet, pending the SimpleSim hook (DA-38).
 EPISODE_NAME = "episode.json"
 
 
 def load_episode(path: Path) -> SystemInputs:
     """Read an episode directory, or the trace inside one, off disk.
 
-    The layout is file names rather than a manifest, because a rollout writes
-    its trace, its RTC log and its camera parameters as separate files and
-    nothing in the contracts ties them together yet. Naming the trace directly
-    is allowed, and the rest is looked for beside it. The RTC log is kept to
-    the chunks of this trace (`_of_trace`), since DA-19 writes one per job.
+    The layout is the hook's (module docstring): file names rather than a
+    manifest, because nothing in the contracts ties the files together yet.
+    The camera parameters and `episode.json` are beside the trace; the RTC log
+    is the job's, in the episode directory's parent, and is kept to the chunks
+    of this trace (`_of_trace`).
     """
     trace_path = path if path.is_file() else path / TRACE_NAME
     if not trace_path.is_file():
         raise ReaderError(f"{path}: không tìm thấy {TRACE_NAME}")
     directory = trace_path.parent
-    rtc_path = directory / RTC_NAME
+    rtc_path = directory.parent / RTC_NAME
     camera_path = directory / CAMERA_NAME
     trace = read_trace_log(trace_path)
     rtc_data = _read_bytes(rtc_path) if rtc_path.is_file() else None
@@ -267,7 +276,9 @@ def load_episode(path: Path) -> SystemInputs:
         trace=trace,
         rtc=_of_trace(rtc, trace, rtc_path),
         cameras=() if camera_data is None else _camera_views(camera_data, camera_path),
-        infra_status=None if episode_data is None else _infra_status(episode_data, episode_path),
+        infra_status=(
+            None if episode_data is None else _infra_status(episode_data, episode_path, trace)
+        ),
         has_rtc_log=rtc_data is not None,
         has_camera_params=camera_data is not None,
         rtc_sha256=_digest(rtc_data),
@@ -501,21 +512,19 @@ def _artifact(path: Path, model: type[_ARTIFACT]) -> _ARTIFACT:
         raise ReaderError(f"`{path}` không phải {model.__name__}: {error}") from error
 
 
-def _infra_status(data: bytes, path: Path) -> str | None:
-    """`infra_status` of the episode, for R6, from `episode.json` (provisional layout).
-
-    None where the file carries no `infra_status`. The layout is the one this
-    lane picked while no writer exists; see the module docstring.
-    """
-    parsed = _parse_json(data, path)
-    if not isinstance(parsed, dict):
-        raise ReaderError(f"`{path}` phải là một đối tượng JSON")
-    status = parsed.get("infra_status")
-    if status is None:
-        return None
-    if not isinstance(status, str) or not status.strip():
-        raise ReaderError(f"`{path}`: `infra_status` phải là chuỗi khác rỗng, gặp {status!r}")
-    return status
+def _infra_status(data: bytes, path: Path, trace: TraceLog) -> str:
+    """`infra_status` of the episode, for R6, from the RolloutResult in `episode.json`."""
+    try:
+        result = RolloutResult.model_validate(_parse_json(data, path))
+    except ValidationError as error:
+        raise ReaderError(f"`{path}` không phải RolloutResult: {error}") from error
+    ref = result.trace_ref
+    if ref is not None and trace.trace_id is not None and ref.trace_id != trace.trace_id:
+        raise ReaderError(
+            f"`{path}` là RolloutResult của trace `{ref.trace_id}`, "
+            f"không phải `{trace.trace_id}` của trace bên cạnh"
+        )
+    return result.infra_status
 
 
 def _first_text(rows: list[dict[str, Any]], key: str) -> str | None:
