@@ -24,7 +24,7 @@ Mỗi rollout có một thư mục job `<staging_root>/<job_id>/`. Simulator ada
 | `buffer_level` | Số action còn trong buffer khi gửi request |
 | `boundary_jump` | Thay đổi lớn nhất theo từng chiều giữa action cuối của chunk cũ và action đầu của chunk mới |
 
-Ở chế độ `async`, runner kiểm log trước khi chấm. Log hỏng thì rollout bị báo `infra_status = policy_error`, `sim_success = None`, lý do ghi vào `runner.json`, và lần chạy sau sẽ chạy lại. Log bị coi là hỏng khi:
+Ở chế độ `async`, runner kiểm log trước khi chấm. Log hỏng thì rollout bị báo `infra_status = policy_error` và `timing_verdict = not_checked`. `sim_success` vẫn là kết luận của sim. Lý do ghi vào `runner.json`, và lần chạy sau sẽ chạy lại. Log bị coi là hỏng khi:
 
 - không có file, file rỗng, hoặc có dòng không đúng schema;
 - `job_id` hoặc `trace_id` khác với rollout;
@@ -43,11 +43,19 @@ Mỗi rollout có một thư mục job `<staging_root>/<job_id>/`. Simulator ada
 |---|---|
 | Bước bị cạn ở chunk k ≥ 1 | `max(0, delay_steps − refill_level)`; `refill_level` không vượt kích thước chunk |
 | Chunk 0 | Không tính, vì robot chưa chạy |
-| Kết luận định thời | `starved` khi tổng số bước bị cạn lớn hơn `max_starved_steps` (mặc định 0); còn lại `pass` |
+| Kết luận định thời | `starved` khi tổng số bước bị cạn lớn hơn `max_starved_steps` (mặc định 0); còn lại `ok` |
 
 Ví dụ: chunk 16, 50 Hz. Trễ 3 bước không làm cạn. Trễ 9 bước làm cạn 1 bước ở mỗi chunk từ chunk 1.
 
-`sim_success` trong `RolloutResult` luôn là kết luận của sim. Kết luận định thời (`timing_verdict`) và tóm tắt lịch (`rtc`: số chunk, độ trễ lớn nhất, `refill_level`, số bước và số chunk bị cạn) nằm trong `runner.json`. Khi PR hợp đồng thêm `RolloutResult.timing_verdict` được merge, runner sẽ ghi kết luận vào trường đó.
+Kết quả nằm trong `RolloutResult` (03 bản 1.1, quyết định E2):
+
+| Trường | `sync` | `async`, log dùng được | `async`, không có log dùng được |
+|---|---|---|---|
+| `sim_success` | Kết luận của sim | Kết luận của sim | Kết luận của sim |
+| `timing_verdict` | `None` | `ok` hoặc `starved` | `not_checked` |
+| `starved_steps` | `None` | Tổng số bước bị cạn | `None` |
+
+"Không có log dùng được" gồm cả rollout mà chính adapter đã báo `infra_status` khác `ok`. `runner.json` giữ một bản sao của `timing_verdict` cùng tóm tắt lịch (`rtc`: số chunk, độ trễ lớn nhất, `refill_level`, số bước và số chunk bị cạn) để tra lại.
 
 Với độ trễ bằng 0, log có `delay_steps = 0` ở mọi chunk, nên hai chế độ cho cùng kết quả trên cùng seed.
 

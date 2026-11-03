@@ -72,6 +72,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 03/11/2026 | Sửa review của Hiếu trên PR #49: ngữ nghĩa bất đồng bộ thật, gom log RTC từ adapter, phân phối log-normal, bộ đọc eval.yaml, sửa boundary_jump float, dịch tài liệu sang tiếng Việt | Nguyễn Thăng Long |
 | 3/11/2026 | Làm lại theo lần soát thứ hai của PO: khóa bộ đệm theo mọi đầu vào; async bắt buộc có log RTC và kiểm theo nghĩa; runner phát lại lịch RTC để chấm async; bỏ `[x]` ở nhiệm vụ 1 và 4 | Hiếu (cùng Claude) |
 | 3/11/2026 | Theo chốt của Hiếu: tính bước bị cạn theo `refill_level`; giữ `sim_success` của sim, ghi `timing_verdict` vào `runner.json` | Hiếu (cùng Claude) |
+| 4/11/2026 | Runner ghi `timing_verdict` (`ok`, `starved`, `not_checked`) và `starved_steps` vào `RolloutResult` theo hợp đồng #75; log hỏng không còn xóa `sim_success` | Hiếu (cùng Claude) |
 
 ## Ghi chép khi làm
 
@@ -84,6 +85,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
   - Nhiệm vụ 4 còn thiếu chỗ RunPlan gọi `timing_for_purpose`: trên master chưa có schema RunPlan.
   - Bản giả client RTC chuyển vào `flywheel.testkit` sau 13/11/2026 (Hiếu chốt 3/11/2026).
   - Hiếu chốt 3/11/2026: bước bị cạn tính theo `refill_level = 8` trong eval.yaml, không theo `buffer_level` của log; `sim_success` giữ kết luận của sim; kết luận định thời nằm trong `runner.json` cho tới khi PR hợp đồng thêm `RolloutResult.timing_verdict` được merge.
+  - 4/11/2026: #75 đã merge; runner ghi `timing_verdict` và `starved_steps` vào `RolloutResult` (nhánh `DA-23-timing-verdict`).
 - File đã tạo hoặc sửa:
   - packages/flywheel-loop/src/flywheel/loop/runner/latency.py
   - packages/flywheel-loop/src/flywheel/loop/runner/config.py

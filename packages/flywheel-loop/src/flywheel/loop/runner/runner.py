@@ -2,11 +2,11 @@
 
 An async rollout is only scored when the job directory holds the RTC log of the
 policy's client (DA-19) and that log describes this rollout; anything else is
-reported as `infra_status="policy_error"` with the reason in `runner.json`. The
-runner then replays the log on a real-time clock and writes a timing verdict to
-`runner.json`: "starved" when the robot would have run out of actions while a chunk
-was in flight, even though the synchronously stepped sim succeeded. `sim_success`
-always stays the simulator's.
+reported as `infra_status="policy_error"` and `timing_verdict="not_checked"`, with the
+reason in `runner.json`. The runner then replays the log on a real-time clock and
+fills `RolloutResult.timing_verdict`: "starved" when the robot would have run out of
+actions while a chunk was in flight, even though the synchronously stepped sim
+succeeded. `sim_success` always stays the simulator's.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ from flywheel.loop.runner.rtc_log import (
 
 CACHE_FILE = "runner.json"
 # Bump when the runner changes what a cached result means.
-CACHE_VERSION = 1
+CACHE_VERSION = 2
 
 
 class Runner:
@@ -100,15 +100,16 @@ class Runner:
 
         # In async mode the RTC log is part of the result: without a log that holds up,
         # the rollout says nothing about latency and must not count as a pass.
+        # sim_success always stays the simulator's (decision E2, 3/11/2026).
         entry: dict[str, object] = {"key": key, "error": None}
-        if request.timing == "async" and result.infra_status == "ok":
-            result, entry["error"], schedule = self._score_async(job_dir, result)
-            if schedule is not None:
-                starved = schedule["starved_steps"] > self.config.max_starved_steps
-                # Until RolloutResult.timing_verdict exists (contract PR), the verdict
-                # lives next to the result; sim_success stays the simulator's.
-                entry["timing_verdict"] = "starved" if starved else "pass"
-                entry["rtc"] = schedule
+        if request.timing == "async":
+            schedule = None
+            if result.infra_status == "ok":
+                result, entry["error"], schedule = self._score_async(job_dir, result)
+            result = self._with_timing_verdict(result, schedule)
+            # runner.json keeps its own copy of the verdict, for the record.
+            entry["timing_verdict"] = result.timing_verdict
+            entry["rtc"] = schedule
         entry["result"] = result.model_dump(mode="json")
         cache_path.write_text(json.dumps(entry, sort_keys=True), encoding="utf-8")
         return result
@@ -148,7 +149,7 @@ class Runner:
         """Check an ok async rollout's RTC log and replay its schedule.
 
         Returns the result (`policy_error` when the log cannot be used), the reason it
-        cannot, and the replayed schedule.
+        cannot, and the replayed schedule (None when there is none to replay).
         """
         if result.trace_ref is None:
             error = "async rollout returned no trace to tie the RTC log to"
@@ -167,6 +168,18 @@ class Runner:
         schedule = replay_schedule(records, self.config.refill_level, self.chunk_size)
         return result, None, asdict(schedule)
 
+    def _with_timing_verdict(
+        self, result: RolloutResult, schedule: dict[str, int] | None
+    ) -> RolloutResult:
+        """Fill `timing_verdict` and `starved_steps`; "not_checked" without a schedule."""
+        if schedule is None:
+            update: dict[str, object] = {"timing_verdict": "not_checked", "starved_steps": None}
+        else:
+            starved = schedule["starved_steps"]
+            verdict = "starved" if starved > self.config.max_starved_steps else "ok"
+            update = {"timing_verdict": verdict, "starved_steps": starved}
+        return result.model_copy(update=update)
+
     def run_eval(
         self,
         requests: Sequence[RolloutRequest],
@@ -178,7 +191,7 @@ class Runner:
 
 
 def _unscored(result: RolloutResult) -> RolloutResult:
-    return result.model_copy(update={"sim_success": None, "infra_status": "policy_error"})
+    return result.model_copy(update={"infra_status": "policy_error"})
 
 
 def _read_cache(path: Path, key: str) -> RolloutResult | None:
