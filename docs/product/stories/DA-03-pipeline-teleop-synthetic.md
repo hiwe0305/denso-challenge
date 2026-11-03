@@ -35,7 +35,7 @@ PR 1 (hạn 5/11/2026):
 - [x] 1. Bộ đọc và ghi LeRobot v2.1, test trên dataset 3 episode sinh trong test (AC 1)
   - [x] 1.1 Không ép kiểu âm thầm: giá trị đổi khi đọc ra float32 (hay int64) thì báo lỗi có tên file, cột, số giá trị đổi (review #69 mục 2)
   - [x] 1.2 Số khung video đọc từ box `stsz` của mp4, video giả trong test có số khung bằng số dòng; ghi lại meta giữ các khóa bộ ghi không sở hữu (review #69 mục 6, 7)
-  - [ ] 1.3 Cột `index`: đánh số lại theo LeRobot v2.1 một cách tường minh, ghi dòng lineage, báo ở ingest, có test (review #69 mục 1; đề xuất Q7 chờ PO)
+  - [x] 1.3 Cột `index`: đánh số lại theo LeRobot v2.1 một cách tường minh, ghi dòng lineage, báo ở ingest, có test (review #69 mục 1; đề xuất Q7 chờ PO)
 - [x] 2. `register_source`, `to_episode` cho ba nguồn (AC 2)
   - [x] 2.1 Lineage: `parent_id`, `root_id`, seed và level của episode sinh ra lấy từ `environment_config.flywheel`; nhãn ghi theo từng episode phải khớp nguồn (review #69 mục 3, 8)
   - [x] 2.2 Kiểm `split`: từ chối `holdout` (chỉ nằm trong `vault/`, chỉ `gate` đọc) và tên lạ; đối chiếu split đã ghi trong episode (review #69 mục 4)

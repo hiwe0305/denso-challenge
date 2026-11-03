@@ -50,6 +50,10 @@ STATE_DIM = 32
 ACTION_DIM = 36
 # Columns write_episode builds from EpisodeFrames; any other non-video feature is
 # carried over from the parquet already at the target path.
+# Append-only record, next to the dataset's meta, of every value the writer changed
+# that the frames did not ask it to (03: lineage is append-only).
+LINEAGE = "flywheel_lineage.jsonl"
+INDEX_RULE = "LeRobot v2.1: index = dataset_from_index + row"
 OWNED = ("states", "action", "timestamp", "frame_index", "episode_index", "index",
          "next.done", "task_index")
 
@@ -128,7 +132,12 @@ def write_episode(root: Path, frames: EpisodeFrames) -> None:
     The global `index` column starts after the episodes with a smaller index as
     the meta lists them now, so write a dataset in ascending episode order;
     changing the length of an earlier episode leaves later ones stale until they
-    are written again.
+    are written again. Writing renumbers `index` to that rule (proposal Q7,
+    pending the PO): psi-data starts episode i at 2 x dataset_from_index in 95
+    of 99 episodes. The renumbering is never silent: when any kept row's index
+    changes, a row goes to `meta/flywheel_lineage.jsonl` with the old and new
+    first index and the number of rows changed, and `check_index` reports the
+    source's own mismatches at ingest.
     """
     info = read_info(root)
     path = root / _episode_path(info, "data_path", frames.episode_index)
@@ -175,8 +184,12 @@ def write_episode(root: Path, frames: EpisodeFrames) -> None:
     table = pa.table({n: owned.get(n, columns.get(n)) for n in names})
     if old is not None:
         table = _cast_like(table, old)
+    renumbered = _renumbering(old, owned["index"], frames, path)
     path.parent.mkdir(parents=True, exist_ok=True)
     pq.write_table(table, path)
+    if renumbered is not None:
+        with (root / "meta" / LINEAGE).open("a") as f:
+            f.write(json.dumps(renumbered) + "\n")
 
     row = dict(rows.get(frames.episode_index, {}))
     string_tasks = any(isinstance(t, str) for t in row.get("tasks", []))
@@ -203,6 +216,41 @@ def write_episode(root: Path, frames: EpisodeFrames) -> None:
         total_chunks=len(chunks),
     )
     (meta / "info.json").write_text(json.dumps(info, indent=4))
+
+
+@dataclass(frozen=True)
+class IndexFinding:
+    """An episode whose parquet `index` is not LeRobot v2.1's numbering."""
+
+    episode_index: int
+    rows: int
+    rows_off: int  # rows whose index is not dataset_from_index + row
+    expected_first: int  # dataset_from_index of the meta (else lengths before it)
+    found_first: int | None  # None: no index column, or no rows
+
+
+def check_index(root: Path) -> list[IndexFinding]:
+    """Episodes of the dataset at root whose `index` column breaks INDEX_RULE."""
+    info = read_info(root)
+    findings = []
+    offset = 0
+    for row in _read_episode_rows(root):
+        episode = int(row["episode_index"])
+        path = root / _episode_path(info, "data_path", episode)
+        if not path.is_file():
+            raise FileNotFoundError(f"{path}: episode {episode} is in meta/episodes.jsonl")
+        rows = pq.ParquetFile(path).metadata.num_rows
+        start = int(row.get("dataset_from_index", offset))
+        offset += int(row.get("length", rows))
+        if "index" not in pq.read_schema(path).names:
+            findings.append(IndexFinding(episode, rows, rows, start, None))
+            continue
+        found = _scalar(pq.read_table(path, columns=["index"]), path, "index", np.int64)
+        off = int((found != np.arange(start, start + rows)).sum())
+        if off:
+            first = int(found[0]) if len(found) else None
+            findings.append(IndexFinding(episode, rows, off, start, first))
+    return findings
 
 
 def read_episode_rows(root: Path) -> list[dict[str, Any]]:
@@ -435,6 +483,32 @@ def _rows_by_frame(old: pa.Table, frame_index: NDArray[np.int64], path: Path) ->
             f"{path}: column 'frame_index' has no rows {missing[:5]} to carry other columns from"
         )
     return pa.array([positions[f] for f in frame_index.tolist()], pa.int64())
+
+
+def _renumbering(
+    old: pa.Table | None, index: pa.Array, frames: EpisodeFrames, path: Path
+) -> dict[str, Any] | None:
+    """The lineage row for the index values this write changes, or None if it changes none."""
+    if old is None or "index" not in old.column_names or not len(index):
+        return None
+    before = _scalar(old, path, "index", np.int64)[
+        _rows_by_frame(old, frames.frame_index, path).to_numpy()
+    ]
+    after = index.to_numpy()
+    changed = int((before != after).sum())
+    if not changed:
+        return None
+    return {
+        "change": "index_renumbered",
+        "episode_index": frames.episode_index,
+        "file": path.name,
+        "rule": INDEX_RULE,
+        "rows_changed": changed,
+        "rows": len(after),
+        "old_first": int(before[0]),
+        "new_first": int(after[0]),
+        "decision": "Q7 proposal, pending PO",
+    }
 
 
 def _cast_like(table: pa.Table, old: pa.Table) -> pa.Table:

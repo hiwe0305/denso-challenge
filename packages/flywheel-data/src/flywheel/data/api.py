@@ -13,8 +13,11 @@ from __future__ import annotations
 
 from flywheel.data.ingest.lerobot import (
     EpisodeFrames,
+    IndexFinding,
     LeRobotFormatError,
+    check_index,
     iter_episodes,
+    mp4_frame_count,
     read_info,
     write_episode,
 )
@@ -22,9 +25,12 @@ from flywheel.data.ingest.sources import SourceRecord, register_source, to_episo
 
 __all__ = [
     "EpisodeFrames",
+    "IndexFinding",
     "LeRobotFormatError",
     "SourceRecord",
+    "check_index",
     "iter_episodes",
+    "mp4_frame_count",
     "read_info",
     "register_source",
     "to_episode",
