@@ -9,7 +9,8 @@ object down passes all six steps.
 The check is a comparison against limits read from config, over the signals
 config names. Neither the signal names nor the numbers are written here: the
 tray task watches the tilt of a tray as well, and the limits themselves are
-what DA-37 calibrates.
+what DA-37 calibrates. `BalanceLimits` lives in `config` for the same reason
+the numbers do, and so the imports run one way only.
 
 Missing balance signals come back as unknown, not as balance held. An episode
 whose torso height nobody recorded is not an episode that stayed upright, and
@@ -22,23 +23,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pyarrow as pa  # type: ignore[import-untyped]
+from flywheel.eval.config import BalanceLimits
 from flywheel.eval.scorer.failure import FailureVerdict, unknown_verdict
 from flywheel.eval.scorer.status import ScorerError
 
 BALANCE_KIND = "L-BALANCE"
-
-
-@dataclass(frozen=True)
-class BalanceLimits:
-    """Which signals bound the body, and by how much (configured, never in code)."""
-
-    min_height: float
-    max_tilt: float
-    height_signal: str
-    tilt_signal: str
-
-    def signals(self) -> tuple[str, ...]:
-        return (self.height_signal, self.tilt_signal)
 
 
 @dataclass(frozen=True)
@@ -48,7 +37,7 @@ class BalanceVerdict:
     violated: bool
     # The trace row the violation was first measured on, not a step of the
     # task: mapping a row onto a step needs the per-step enter and exit times
-    # that `StageEvaluation` does not carry (AC 1, Contract change for Long).
+    # that `StageEvaluation` does not carry (AC 1, Contract change #59).
     row: int | None = None
     signal: str | None = None
     value: float | None = None

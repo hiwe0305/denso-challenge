@@ -9,17 +9,23 @@ step's state is, and it is the only place the two conventions of spec section
   usually reports the later steps as failed too - `place_ok = grasp_ok and ...`
   is false once the grasp is - and counting those as failures would triple the
   place failures in every report built on top (DA-13, the clusters, the cards).
-- **A step with no signal behind it is "chưa rõ".** It never becomes "đạt". The
-  reason travels with it, named after the signals the trace was missing when
-  that is what happened.
+- **A step with no signal behind it is "chưa rõ".** It never becomes "đạt",
+  and it never becomes "trượt" either. This convention is held here rather
+  than left to the task: a predicate asked about a signal nobody recorded
+  answers `True` or `False` like any other, and either answer would be a
+  verdict nobody measured. A step whose own signals are missing is therefore
+  unknown whatever `evaluate()` returned for it, and the reason names that
+  step's missing signals and no others - a step is never told it is unknown
+  because of a signal it does not use.
 
-The number of steps comes from `stages()`; nothing here knows that the
-two-table task has six or that the tray task has seven.
+The number of steps comes from `stages()` and the signals of each step come
+from config; nothing here knows that the two-table task has six steps, that
+the tray task has seven, or which signal any step is judged on.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from flywheel.contracts import StageEvaluation, StageSpec
 from flywheel.eval.scorer.status import ScorerError, StepScore, StepStatus
@@ -31,19 +37,43 @@ def score_steps(
     evaluation: StageEvaluation,
     stages: Sequence[StageSpec],
     missing_signals: Sequence[str] = (),
+    *,
+    step_signals: Mapping[str, Sequence[str]],
 ) -> tuple[StepScore, ...]:
-    """State every step of the task, in the order the task declares them."""
+    """State every step of the task, in the order the task declares them.
+
+    `step_signals` maps a step name onto the signals that step is judged on, so
+    a step whose signals the trace does not have comes back unknown however the
+    task's predicate answered for it. It is keyword-only and has no default:
+    a scorer that could be called without it is a scorer that can be called
+    without the convention of AC 2.
+    """
     outcomes = evaluation.stage_success
     if len(outcomes) != len(stages):
         raise ScorerError(
             f"`evaluate()` trả {len(outcomes)} bước, `stages()` khai {len(stages)} bước"
         )
     failed = first_failed_step(evaluation)
-    reason = unknown_reason(missing_signals)
     return tuple(
-        _step(stage.name, outcome, index, failed, reason)
+        _step(
+            stage.name,
+            outcome,
+            index,
+            failed,
+            missing_for_step(stage.name, step_signals, missing_signals),
+        )
         for index, (stage, outcome) in enumerate(zip(stages, outcomes, strict=True))
     )
+
+
+def missing_for_step(
+    name: str,
+    step_signals: Mapping[str, Sequence[str]],
+    missing_signals: Sequence[str],
+) -> tuple[str, ...]:
+    """The signals this step is judged on that the trace does not have."""
+    declared = set(step_signals.get(name, ()))
+    return tuple(signal for signal in missing_signals if signal in declared)
 
 
 def first_failed_step(evaluation: StageEvaluation) -> int | None:
@@ -78,14 +108,18 @@ def _step(
     outcome: bool | None,
     index: int,
     failed: int | None,
-    reason: str,
+    missing: Sequence[str],
 ) -> StepScore:
     if failed is not None and index > failed:
         # Reached after the task had already stopped: not attempted, whatever
         # the predicate chain reported for it.
         return StepScore(name=name, status=StepStatus.NOT_ATTEMPTED)
+    if missing:
+        # The predicate may well have answered; it answered about a signal
+        # nobody recorded, which is not a verdict (AC 2, FR21).
+        return StepScore(name=name, status=StepStatus.UNKNOWN, reason=unknown_reason(missing))
     if outcome is None:
-        return StepScore(name=name, status=StepStatus.UNKNOWN, reason=reason)
+        return StepScore(name=name, status=StepStatus.UNKNOWN, reason=NO_VERDICT)
     if outcome:
         return StepScore(name=name, status=StepStatus.PASSED)
     return StepScore(name=name, status=StepStatus.FAILED)

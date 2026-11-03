@@ -6,9 +6,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from conftest import BY_STEP
 from flywheel.contracts import StageEvaluation, TaskDefinition
-from flywheel.eval.config import ConfigError, load_scorer_config
-from flywheel.eval.scorer.balance import BALANCE_KIND, BalanceLimits, apply_balance, check_balance
+from flywheel.eval.config import BalanceLimits, ConfigError, load_scorer_config
+from flywheel.eval.scorer.balance import BALANCE_KIND, apply_balance, check_balance
 from flywheel.eval.scorer.failure import UNKNOWN_KIND, judge_failure
 from flywheel.eval.scorer.reader import read_signals
 from flywheel.eval.scorer.steps import first_failed_step, score_steps
@@ -99,9 +100,10 @@ def test_an_empty_trace_is_unknown(limits: BalanceLimits) -> None:
 
 
 def verdict_for(evaluation: StageEvaluation, task: TaskDefinition):  # noqa: ANN201
-    steps = score_steps(evaluation, tuple(task.stages()))
+    stages = tuple(task.stages())
+    steps = score_steps(evaluation, stages, step_signals=BY_STEP)
     return judge_failure(
-        evaluation, steps, tuple(task.failure_kinds()), first_failed_step(evaluation)
+        evaluation, steps, tuple(task.failure_kinds()), first_failed_step(evaluation), stages
     )
 
 
@@ -177,33 +179,66 @@ def test_the_shipped_config_is_the_one_the_tests_score_against() -> None:
     assert config.task_id == "two-table"
     assert set(config.thresholds) == {"r_reach", "h_grasp", "h_place", "T_stable"}
     assert config.balance.height_signal == "torso_height"
+    # The step signals the tests score by hand are the ones the file ships.
+    assert config.step_signals == BY_STEP
+    assert config.episode_signals == ("collision",)
+    assert config.class_from_failed_step == ("L-COLLIDE", "L-TIMEOUT")
     assert len(digest) == 64
     assert load_scorer_config(CONFIG)[1] == digest
+
+
+BALANCE_SECTION = "balance: {min_height: 0.6, max_tilt: 0.3, height_signal: h, tilt_signal: t}\n"
+STEP_SECTION = "step_signals: {s0: [a]}\nepisode_signals: []\nclass_from_failed_step: []\n"
+HEAD = "task_id: t\nscorer_version: '1'\nthresholds: {a: 1}\n"
 
 
 @pytest.mark.parametrize(
     ("body", "fragment"),
     [
-        ("task_id: t\nscorer_version: '1'\nthresholds: {a: 1}\n", "balance"),
+        (HEAD + STEP_SECTION, "balance"),
         (
-            "task_id: t\nscorer_version: '1'\nthresholds: {}\n"
-            "balance: {min_height: 0.6, max_tilt: 0.3, height_signal: h, tilt_signal: t}\n",
+            "task_id: t\nscorer_version: '1'\nthresholds: {}\n" + BALANCE_SECTION + STEP_SECTION,
             "không được rỗng",
         ),
         (
-            "task_id: t\nscorer_version: '1'\nthresholds: {a: 1}\n"
-            "balance: {min_height: 0.6, max_tilt: 0.3, height_signal: h}\n",
+            HEAD
+            + "balance: {min_height: 0.6, max_tilt: 0.3, height_signal: h}\n"
+            + STEP_SECTION,
             "tilt_signal",
         ),
         (
             "task_id: ''\nscorer_version: '1'\nthresholds: {a: 1}\n"
-            "balance: {min_height: 0.6, max_tilt: 0.3, height_signal: h, tilt_signal: t}\n",
+            + BALANCE_SECTION
+            + STEP_SECTION,
             "task_id",
         ),
+        (HEAD + "extra: 2\n" + BALANCE_SECTION + STEP_SECTION, "unknown key"),
+        # The three sections of the review fixes are not optional either: a
+        # config without them cannot keep a missing signal from scoring as a
+        # pass, so it is refused rather than defaulted.
+        (HEAD + BALANCE_SECTION, "step_signals"),
         (
-            "task_id: t\nscorer_version: '1'\nthresholds: {a: 1}\nextra: 2\n"
-            "balance: {min_height: 0.6, max_tilt: 0.3, height_signal: h, tilt_signal: t}\n",
-            "unknown key",
+            HEAD + BALANCE_SECTION + "step_signals: {}\nepisode_signals: []\n"
+            "class_from_failed_step: []\n",
+            "step_signals` không được rỗng",
+        ),
+        (
+            HEAD + BALANCE_SECTION + "step_signals: {s0: [a]}\nclass_from_failed_step: []\n",
+            "episode_signals",
+        ),
+        (
+            HEAD + BALANCE_SECTION + "step_signals: {s0: [a]}\nepisode_signals: []\n",
+            "class_from_failed_step",
+        ),
+        (
+            HEAD + BALANCE_SECTION + "step_signals: {s0: a}\nepisode_signals: []\n"
+            "class_from_failed_step: []\n",
+            "must be a list of names",
+        ),
+        (
+            HEAD + BALANCE_SECTION + "step_signals: {s0: [a, a]}\nepisode_signals: []\n"
+            "class_from_failed_step: []\n",
+            "repeats",
         ),
     ],
 )

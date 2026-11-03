@@ -19,7 +19,9 @@ step (AC 1).
 
 `meta` holds what this run measured and the next reader would otherwise have to
 re-derive: the signals the trace was missing, the reason behind every unknown
-step, and where the balance condition broke. The per-group tracking error and
+step, and where the balance condition broke. It does not go into the contract:
+the PO review of 3/11/2026 asks for whatever has to survive to be named as a
+typed field in #62 instead. The per-group tracking error and
 the p99 latencies that 03 section 4.3 also lists are measured by the system
 check of DA-13, not here, and are left out rather than filled with zeros.
 
@@ -58,9 +60,12 @@ class ScoreRecord(BaseModel):
     balance_violated: bool = False
     # Not in `Score`: the scorer's own provenance and measurements. `task_id`
     # and `config_sha256` are what make a record reproducible, and the artifact
-    # is useless without them.
+    # is useless without them. `trace_sha256` is what `Score.id` is built from
+    # (03 section 4.3: `sc_<hash trace + scorer_version>`), recorded now so the
+    # switch to `Score` stays a rename; all three are in #62.
     task_id: str
     config_sha256: str
+    trace_sha256: str
     meta: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -83,6 +88,7 @@ def build_record(score: EpisodeScore, level: int | None = None) -> ScoreRecord:
         balance_violated=score.balance.violated,
         task_id=score.task_id,
         config_sha256=score.config_sha256,
+        trace_sha256=score.trace_sha256,
         meta=_meta(score),
     )
 

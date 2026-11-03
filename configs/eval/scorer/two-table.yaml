@@ -26,8 +26,39 @@ thresholds:
   h_place: 0.02    # m; giả định; vật đã nằm trên bàn đích, bước 5
   T_stable: 0.5    # s; giả định; vật đứng yên trong vùng đích trước khi kết, bước 6
 
+# Tín hiệu mỗi bước được chấm trên. Thiếu một tín hiệu khai ở đây thì bước đó
+# là "chưa rõ", bất kể vị từ của task trả gì (AC 2, FR21): vị từ hỏi về tín
+# hiệu không ai ghi vẫn trả True hoặc False, và cả hai đều là kết luận không
+# ai đo. Tên bước phải trùng `StageSpec.name` của task; scorer từ chối cấu
+# hình khai bước hoặc tín hiệu task không có.
+#
+# Chỗ này nằm trong cấu hình vì `StageSpec` chưa chở được danh sách tín hiệu
+# của bước (issue #59 mục 5 xin thêm); là cấu hình theo task nên không có bước
+# nào của task nào viết cứng trong mã.
+step_signals:
+  approach: [hand_object_distance]
+  grasp: [hand_object_contact, object_height]
+  walk: [hand_object_contact, torso_in_source_zone]
+  arrive: [hand_object_contact, torso_in_target_zone]
+  place: [object_in_target_zone, object_height]
+  release: [hand_object_contact, object_in_target_zone, t]
+
+# Tín hiệu không thuộc bước nào: thiếu nó thì episode sạch mất quyền "đạt" và
+# ra L-UNKNOWN, chứ không phải một bước mất kết luận. Va chạm đo suốt episode
+# và quyết định kiểu lỗi, không quyết định bước nào đạt.
+episode_signals: [collision]
+
+# Kiểu lỗi lấy lớp lỗi chung theo bước hỏng k thay vì lớp riêng của mình
+# (spec mục 5.2; 03 mục 4.3 dòng "StageSpec có lớp mặc định"). Khai ở đây vì
+# `FailureKindSpec.failure_class` chỉ chở được một giá trị cố định (issue #59
+# mục 5). Kiểu nào không khai thì lấy lớp của `FailureKindSpec`; lớp do
+# `evaluate()` điền cho từng episode luôn thắng cả hai.
+class_from_failed_step: [L-COLLIDE, L-TIMEOUT]
+
 # Điều kiện chạy suốt episode (spec mục 5.1 dòng cuối). Vi phạm ở bất kỳ bước
-# nào là L-BALANCE (spec mục 5.2).
+# nào là L-BALANCE (spec mục 5.2), khi không bước nào trượt và không bước nào
+# chưa rõ; episode đã có kiểu lỗi thì giữ kiểu đó và chỉ ghi `balance_violated`
+# (quyết định PO 3/11/2026 trên #58).
 balance:
   height_signal: torso_height  # tên tín hiệu trong trace, không phải trong mã
   tilt_signal: torso_tilt
