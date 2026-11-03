@@ -13,6 +13,7 @@ G1 bê khay 6 linh kiện bằng hai tay từ bàn A sang vùng đích trên bà
 | `flywheel_simple.tray.agent` | Chạy planner trong sim từ reset tới DONE hoặc ABORT (DA-33) |
 | `flywheel_simple.tray.recorder` | Ghi episode của planner thành dataset LeRobot v2.1 cùng trường với teleop của SIMPLE, thêm tư thế khay, vị trí linh kiện, 7 cờ bước và khối `flywheel` trong `environment_config` (DA-33, D-22) |
 | `flywheel_simple.tray.generate`, `scripts/g0/tray/generate.py` | Sinh episode hàng loạt theo shard song song (mỗi process một env), sổ lượt sinh `gen_log.jsonl` chỉ ghi thêm, QA tối thiểu, chạy lại cùng lệnh để tiếp tục (DA-33, D-23) |
+| `flywheel_simple.tray.targets`, `generate.py --conditions` | Sinh nhắm lỗi cho vòng Failure → Data: chọn seed train có cảnh gần điều kiện lỗi nhất, ghi kế hoạch `targets.jsonl`, đánh dấu `purpose = failure_targeted` và `cluster_id` (DA-33, D-27) |
 | `flywheel_simple.tray.replay_qa`, `scripts/g0/tray/replay_qa.py` | QA: phát lại episode đã ghi qua `replay-decoupled-wbc` của SIMPLE theo đồng hồ mô phỏng, so tư thế khay cuối với bản ghi; chạy song song theo shard (DA-33, D-24) |
 | `flywheel_simple.tray.export`, `scripts/g0/tray/export_psi0.py` | Xuất episode qua cả hai bước QA sang định dạng Ψ₀ (LeRobot v2.1, action 36, state 32) bằng `postprocess_psi0_sonic.py` của SIMPLE, kèm `meta/action_layout.json` và `meta/flywheel_export.json` (DA-33, D-26) |
 | `flywheel_simple.tray.release`, `scripts/g0/tray/release.py` | Xuất lô đã QA, ghi `release_manifest.json` (sha256 từng file, `release_hash`) và đặt tên thư mục `tray_s1_<release_hash[:12]>`; release đầu tiên ở [synthetic-s1.md](synthetic-s1.md) (DA-33) |
@@ -41,6 +42,11 @@ MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/py
 ```bash
 MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/python scripts/g0/tray/generate.py \
     --out fwdata/simple/tray/gen/<lô> --n 130 --level 1 --seed-start 100 --workers 14
+```
+
+```bash
+MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/python scripts/g0/tray/generate.py \
+    --out fwdata/simple/tray/gen/<lô nhắm lỗi> --conditions <điều kiện lỗi>.jsonl --workers 14
 ```
 
 ```bash

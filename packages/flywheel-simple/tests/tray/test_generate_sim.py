@@ -42,3 +42,24 @@ def test_two_attempts_are_logged_and_recorded_then_resume_skips_them(tmp_path: P
 
     again = generate(tmp_path, n_attempts=1, level=1, seed_start=1)
     assert again.attempts == 1 and [r["seed"] for r in read_log(log)] == [1, 2, 3]
+
+
+def test_targeted_batch_records_the_planned_seeds_with_their_cluster(tmp_path: Path) -> None:
+    from flywheel_simple.tray.generate import generate, read_log, shard_dir
+    from flywheel_simple.tray.targets import PURPOSE, write_targets
+
+    conditions = tmp_path / "conditions.jsonl"
+    conditions.write_text(json.dumps({"cluster_id": "c1", "level": 1, "n": 2, "seed": 1_000_007}))
+    plan = write_targets(tmp_path / "gen", conditions, search=range(100_000, 101_000))
+    summary = generate(tmp_path / "gen", n_attempts=10, level=2, seed_start=0, targeted=True)
+
+    rows = read_log(shard_dir(tmp_path / "gen", 0) / "gen_log.jsonl")
+    assert summary.attempts == 2 and [r["seed"] for r in rows] == [t.seed for t in plan]
+    assert all(r["level"] == 1 and r["purpose"] == PURPOSE for r in rows)
+    assert all(r["cluster_id"] == "c1" for r in rows)
+    raw = shard_dir(tmp_path / "gen", 0) / "raw/meta/episodes.jsonl"
+    for line in raw.read_text().splitlines() if raw.exists() else []:
+        meta = json.loads(json.loads(line)["environment_config"])["flywheel"]
+        assert (meta["purpose"], meta["cluster_id"], meta["split"]) == (PURPOSE, "c1", "train")
+    again = generate(tmp_path / "gen", n_attempts=10, level=1, seed_start=0, targeted=True)
+    assert again.attempts == 0

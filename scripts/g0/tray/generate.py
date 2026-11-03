@@ -13,7 +13,14 @@ episode, and 5 of 22 started at once failed in eglMakeCurrent (EGL_NOT_INITIALIZ
 
     MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/python \
         scripts/g0/tray/generate.py --out fwdata/simple/tray/gen/<run> --n 130 --level 1 \
-        --seed-start 100 --workers 22
+        --seed-start 100 --workers 14
+
+With --conditions <file.jsonl> (Task 10, a Failure -> Data round), the batch
+records the train seeds nearest to each failure condition instead
+(flywheel_simple.tray.targets): the plan is written once to <out>/targets.jsonl,
+--n, --level and --seed-start are ignored, and running again resumes the plan.
+On rtx3060 keep to 14 workers inside `systemd-run --user --scope -p MemoryMax=56G
+-p MemorySwapMax=0` (about 4 GB per worker).
 """
 
 from __future__ import annotations
@@ -39,7 +46,9 @@ from flywheel_simple.tray.generate import (
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--out", type=Path, required=True)
-    ap.add_argument("--n", type=int, required=True, help="new attempts over all shards")
+    ap.add_argument("--n", type=int, help="new attempts over all shards")
+    ap.add_argument("--conditions", type=Path, help="failure conditions JSONL (targets.py)")
+    ap.add_argument("--targeted", action="store_true", help="set by --conditions for workers")
     ap.add_argument("--level", type=int, default=1)
     ap.add_argument("--seed-start", type=int, default=100)
     ap.add_argument("--workers", type=int, default=1)
@@ -47,6 +56,8 @@ def main() -> int:
     ap.add_argument("--allow-plain", action="store_true", help="record without SimReady visuals")
     ap.add_argument("--stagger", type=float, default=5.0, help="seconds between worker starts")
     args = ap.parse_args()
+    if args.n is None and args.conditions is None and not args.targeted:
+        ap.error("give --n or --conditions")
 
     if args.shard is not None:
         summary = generate(
@@ -57,6 +68,7 @@ def main() -> int:
             allow_plain=args.allow_plain,
             shard=args.shard,
             workers=args.workers,
+            targeted=args.targeted,
         )
         print(json.dumps({"shard": args.shard, **summary.__dict__}))
         return 0
@@ -72,10 +84,17 @@ def main() -> int:
         cmd += ["--level", str(args.level), "--seed-start", str(args.seed_start)]
         cmd += ["--workers", str(args.workers), "--shard", str(shard)]
         cmd += ["--allow-plain"] if args.allow_plain else []
+        cmd += ["--targeted"] if args.conditions is not None else []
         with (work / "worker.log").open("a") as log:
             return subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=env)
 
-    shares = dict(enumerate(split_attempts(args.n, args.workers)))
+    if args.conditions is not None:
+        from flywheel_simple.tray.targets import write_targets
+
+        plan = write_targets(args.out, args.conditions)
+        shares = {k: len(plan[k :: args.workers]) for k in range(args.workers)}
+    else:
+        shares = dict(enumerate(split_attempts(args.n, args.workers)))
     procs = []
     for shard, n in shares.items():
         if n == 0:
