@@ -2,6 +2,14 @@
 
 _Story: [S1-04](../product/stories/S1-04-chi-phi-finetune-psi0.md). Mục 1 (nhiệm vụ con 1.2): Châu, 24/10/2026. Mục 2 trở đi (nhiệm vụ con 1.1, nhiệm vụ 6, 8): Hiếu, 3–4/11/2026, theo lịch cắt phạm vi của [07 mục 2.4](../product/07-team-workflow.md). Nhiệm vụ 2–5, 7 để sau 13/11/2026._
 
+## Kết luận
+
+- **Recipe** (mục 1): stage 3 là `scripts/train.py finetune_simple_psi0_config` với tham số của bản cuối `finetune-simple-psi0.sh`: 40.000 bước, batch 16 mỗi GPU, learning rate 1e-4 cosine, warmup 1.000, VLM đóng băng. Checkpoint hai bàn của tác giả chạy trên 4 GPU, nên batch toàn cục của tác giả là 64; trên một GPU recipe chỉ thấy 1/4 số mẫu đó.
+- **Số đo** (mục 3, Colab 3–4/11/2026): batch 16 chạy 0,47 s/bước trên A100 và 0,71 s/bước trên L4; VRAM đỉnh 17,7 GB (batch 64: 19,6 GB), vừa L4 24 GB. Job bị chặn ở CPU nạp dữ liệu, không phải GPU. Ngắt rồi chạy lại nối liền đúng loss. H100 không dùng được trên tài khoản.
+- **Compute unit** (mục 4): một lần 40.000 bước khoảng 16,6 CU trên L4 (val mỗi 2.000 bước) hoặc 44 CU trên A100; 8 lần của demo khoảng 133 CU trên L4, gần hết 140,8 CU còn lại. [Đề xuất] L4, giữ recipe, val mỗi 2.000 bước; Hiếu chốt cách bù ngân sách.
+- **Eval HE** (mục 5): 450 episode tới 12/11. Ở `mujoco` khoảng 7,5 giờ `rtx3060`, 0 CU; ở `mujoco_isaac` khoảng 185 giờ và 358 CU, không vừa. [Đề xuất] eval HE ở `mujoco` nếu lượt chạy lại của S1-03 cho phép, Isaac chỉ cho video demo.
+- Đã tiêu cho phiên đo: khoảng 6,2 CU (A100 5,65; L4 0,53), trong trần 14 CU Hiếu duyệt.
+
 ## 1. Cấu hình mặc định của script công bố (nhiệm vụ con 1.2)
 
 ### 1.1 Nguồn và revision
@@ -141,8 +149,53 @@ Số dư lúc 00:02 ngày 4/11/2026 là 140,81 CU, và đang giảm vì các phi
 4. **Ngân sách**: R1 trên L4 cần khoảng 133 CU cho 8 lần, gần hết số dư, chưa tính chạy lại và eval. Hiếu cần chọn một trong: dừng các phiên không cần (`wam-audit-l4` của dự án khác), mua thêm CU (gói 100 CU giá khoảng 9,99 USD, giả định theo DA-19), hoặc chuyển sang R3 (105 CU).
 5. **Drive**: mỗi lần R1 để lại 4 checkpoint × 9,5 GB = 38 GB; 8 lần là 304 GB, quá 215 GB còn trống (DA-19). Chỉ giữ checkpoint cuối của mỗi lần trên Drive.
 
+## 5. Giờ máy eval của HE (nhiệm vụ 8)
+
+_Ước lượng ngày 4/11/2026 từ số đo S1-03 (`docs/g0/psi0-eval.md` mục 3 trên nhánh `S1-03-psi0-eval`, PR #66, chưa merge) và design mục 4.3, 7.4. Chưa chạy eval nào cho S1-04._
+
+### 5.1 Số đo đầu vào (S1-03)
+
+| Chế độ | Thời gian một episode | Máy | Ghi chú |
+|---|---|---|---|
+| `mujoco` | khoảng 60 s (90 episode, 1.200 bước, 50 lần `/act`) | `rtx3060`, server Ψ₀ cùng máy (7,2 GB VRAM) | Client đỉnh 3,3 GiB RAM. Mọi lượt dùng file task của SIMPLE `6d10628` (lỗi spawn); thời gian không phụ thuộc lỗi này |
+| `mujoco_isaac` | khoảng 24,6 phút (1 episode: 1.715 s tường, trừ khoảng 4 phút khởi động Isaac) | Client Isaac trên `rtx3060`, server Ψ₀ trên Colab L4 (1,94 CU/giờ) | Server và Isaac không cùng vừa card 12 GB. Chỉ một điểm đo; README Ψ₀ báo 6–10 phút |
+
+Tập eval: `psi-data` `simple-eval` chỉ có **10 điều kiện mỗi mức** (S1-03, S1-07). "30 điều kiện × 3 mức" của design mục 7.3 thực tế là 10 điều kiện × 3 lượt × 3 mức = 90 episode mỗi checkpoint. Gói eval ghim `de140d6` có thêm mức `hard`; HE chỉ dùng Level 0, 1, 2.
+
+### 5.2 Khối lượng tới 12/11/2026
+
+| Việc | Checkpoint | Episode |
+|---|---|---|
+| DA-26 HE-1 sơ bộ | V-EGO, V-NOEGO ở N = 20 và 80, cộng mốc so của tác giả | 5 × 90 = 450 |
+| DA-34 (task khay, `mujoco` cố định ở AC 3) | A, C, C-NOEGO, C+, cộng C+ trên điều kiện C hỏng | 4 × 90 + tối đa 90 = tối đa 450 |
+
+### 5.3 Giờ máy
+
+| Phương án cho HE (450 episode) | Giờ máy | CU | Vừa trước 12/11 không |
+|---|---|---|---|
+| `mujoco` trên `rtx3060` | khoảng 7,5 giờ, tuần tự | 0 | Có |
+| `mujoco_isaac`, số đo S1-03 (24,6 phút) | khoảng 185 giờ `rtx3060` cộng 185 giờ L4 cho server | khoảng 358 | Không: quá cả số dư (140 CU) lẫn 8 ngày còn lại |
+| `mujoco_isaac`, theo README (6–10 phút) | 45–75 giờ | 87–146 | Không, nếu cộng 133 CU fine-tune |
+
+Design mục 4.3 ước 144 giờ cho lưới HE đầy đủ (12 điểm, 8 phút mỗi episode). Với số đo S1-03, chỉ phần sơ bộ của HE trên Isaac đã vượt ngân sách. DA-34 ở `mujoco` thêm khoảng 7,5 giờ `rtx3060` nếu episode khay dài như episode hai bàn (giả định; episode khay chưa đo).
+
+### 5.4 Rút gọn khi phải dùng Isaac [Đề xuất]
+
+Theo design mục 7.4 và số đo trên, theo thứ tự:
+
+1. **Eval HE ở `mujoco`** nếu lượt chạy lại của S1-03 với file task `b75c678` cho checkpoint tác giả đạt gần số công bố ở `mujoco` (Q-27C, quyết ở S1-03 AC 10). 7,5 giờ, 0 CU. Đây là phương án chính.
+2. **Isaac chỉ cho video demo** (design mục 7.6: cùng điều kiện, ba cột, hai mức N): khoảng 10 episode, 4 giờ, 8 CU.
+3. Nếu `mujoco` không dùng được: **Isaac một lượt, chỉ Level 0** (10 episode mỗi checkpoint, 50 episode): khoảng 20 giờ, 40 CU, ghi "sơ bộ". Một lượt cả ba mức (150 episode) là 62 giờ, 119 CU, không vừa nếu giữ 8 lần fine-tune R1.
+4. "Giảm còn 20 điều kiện mỗi mức" của design mục 7.4 không áp được, vì tập eval chỉ có 10. Bỏ V-EGO10 và giữ N = 20, 80 đã có trong khối lượng ở mục 5.2.
+
+Mỗi rút gọn ghi một `Decision` (DA-26 AC 8).
+
+### 5.5 Isaac Sim trên Colab (Q-27D)
+
+**Chưa thử** trong phiên này (ngoài phạm vi Hiếu giao cho lịch 3/11). Dữ kiện đã có: A100 không có RT core nên không render được Isaac; L4 có RT core, 24 GB VRAM và 52 GB RAM, đủ cho server Ψ₀ (7,2 GB, khoảng 6 GB RAM) cùng client Isaac (5,7 GB, đỉnh 11,5 GiB RAM) trên một VM. Colab không chạy Docker, nên phải cài Isaac Sim 4.5 bằng pip; chưa biết có chạy được. Nếu được, mỗi episode vẫn tốn khoảng 0,8 CU (24,6 phút × 1,94 CU/giờ): không rẻ hơn, chỉ giải phóng `rtx3060` và cho chạy song song nhiều VM.
+
 ## Đề xuất cho 03 §3.3
 
 | Dòng | Câu trả lời đề xuất | Trạng thái | Bằng chứng |
 |---|---|---|---|
-| V8 phần fine-tune | Chưa có | tạm: chưa chạy | Mục 1 (đọc script) |
+| V8 phần fine-tune | Stage 3 trên một GPU Colab: recipe DA-19 (batch 16 × 40.000 bước) vừa 24 GB (đỉnh 17,7 GB; batch 64 là 19,6 GB). Job bị chặn ở CPU nạp dữ liệu: A100 0,47 s/bước, L4 0,71 s/bước. Một lần khoảng 8,5 giờ, 16,6 CU trên L4 (44 CU trên A100); 8 lần của demo khoảng 133 CU. Tiếp tục được từ checkpoint, loss nối liền | tạm: số đo từ vài trăm bước, chưa chạy trọn 40.000 bước; recipe và chu kỳ val chờ Hiếu chốt (mục 4.1) | Mục 3, 4; `ledger/S1-04.csv`; `scripts/g0/colab_train_probe.sh` |

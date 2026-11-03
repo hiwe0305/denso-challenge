@@ -39,7 +39,7 @@ Là kỹ sư robot learning, tôi muốn đo VRAM và GPU-giờ của fine-tune 
 - [ ] 5. Dọn trọng số, optimizer; viết tài liệu kèm đề xuất cho 03 §3.3 (AC 5, 6)
 - [x] 6. Đo stage 2 và stage 3 trên Colab, quy ra compute unit (AC 7; stage 2 bỏ từ 27/10/2026)
 - [ ] 7. Đo inference trên 3060 (AC 8)
-- [ ] 8. Ước giờ máy eval và fine-tune của HE, thử Isaac Sim trên Colab (AC 9)
+- [x] 8. Ước giờ máy eval và fine-tune của HE, thử Isaac Sim trên Colab (AC 9; Isaac trên Colab chưa thử, xem `psi0-finetune-cost.md` mục 5.5)
 
 ## Phạm vi file
 
@@ -86,7 +86,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
-- Ghi chú hoàn thành:
-- File đã tạo hoặc sửa:
+- Giờ thực: 1.2 khoảng 1 giờ (Châu); 1.1, 6, 8 khoảng 2,5 giờ (Hiếu, 3–4/11/2026). Colab: khoảng 6,2 CU.
+- Công cụ AI đã dùng: Claude Code.
+- Ghi chú hoàn thành: 3–4/11/2026 xong 1, 6, 8 theo lịch cắt phạm vi; nhiệm vụ 2–5, 7 để sau 13/11. H100 bị Colab từ chối; đo A100 và L4. Isaac trên Colab (Q-27D) chưa thử.
+- File đã tạo hoặc sửa: `docs/g0/psi0-finetune-cost.md`, `docs/g0/ledger/S1-04.csv`, `scripts/g0/colab_train_probe.sh`.
