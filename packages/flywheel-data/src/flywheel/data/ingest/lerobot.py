@@ -13,9 +13,14 @@ tray S1 (DA-33) and tray S2 (DA-35) - all leave SIMPLE's
 Only `pyarrow` and `json` read them here; the lane never imports `lerobot`
 (03 section 7.3). A parquet that lacks a column the lane needs, or holds a
 vector of the wrong width, raises `LeRobotFormatError` naming the file and the
-column. Anything that is a data quality question rather than a format one -
-a meta `length` that disagrees with the rows, a timestamp that goes backwards,
-an empty episode - reads without error and is left to QA (task 3).
+column. The interface types are float32 for states and action, float64 for
+timestamp and int64 for frame_index (Psi0 trains on float32). A file whose
+values do not survive that cast exactly - a float64 action of 0.1 - raises
+too, naming the column, how many values change and by how much; the lane never
+rounds data without saying so. Anything that is a data quality question rather
+than a format one - a meta `length` that disagrees with the rows, a timestamp
+that goes backwards, an empty episode - reads without error and is left to QA
+(task 3).
 
 Video frame counts come from the meta, never from decoding (DA-02 point 4
 decodes in the adapter). psi-data's meta holds no per-video count, so the
@@ -243,8 +248,8 @@ def _vector(table: pa.Table, path: Path, name: str, width: int) -> NDArray[np.fl
         raise LeRobotFormatError(
             f"{path}: column {name!r} has width {sorted(widths)}, expected {width}"
         )
-    values = column.flatten().to_numpy(zero_copy_only=False)
-    return np.asarray(values, dtype=np.float32).reshape(-1, width)
+    values = _exact(column.flatten().to_numpy(zero_copy_only=False), np.float32, path, name)
+    return values.reshape(-1, width)
 
 
 def _scalar(table: pa.Table, path: Path, name: str, dtype: type[Any]) -> NDArray[Any]:
@@ -253,7 +258,24 @@ def _scalar(table: pa.Table, path: Path, name: str, dtype: type[Any]) -> NDArray
         if set(pc.list_value_length(column).to_pylist()) - {1}:
             raise LeRobotFormatError(f"{path}: column {name!r} is not one value per row")
         column = column.flatten()
-    return np.asarray(column.to_numpy(zero_copy_only=False), dtype=dtype)
+    return _exact(column.to_numpy(zero_copy_only=False), dtype, path, name)
+
+
+def _exact(values: NDArray[Any], dtype: type[Any], path: Path, name: str) -> NDArray[Any]:
+    """values as dtype, or LeRobotFormatError if the cast changes any of them."""
+    cast = np.asarray(values, dtype=dtype)
+    if cast.dtype == values.dtype:
+        return cast
+    source = np.asarray(values, dtype=np.float64)
+    back = cast.astype(np.float64)
+    changed = ~((back == source) | (np.isnan(back) & np.isnan(source)))
+    if changed.any():
+        loss = float(np.max(np.abs(back[changed] - source[changed])))
+        raise LeRobotFormatError(
+            f"{path}: column {name!r} is {values.dtype}; {int(changed.sum())} of {values.size}"
+            f" values change when read as {np.dtype(dtype).name} (largest change {loss:g})"
+        )
+    return cast
 
 
 def _check_episode_index(table: pa.Table, path: Path, index: int) -> None:
