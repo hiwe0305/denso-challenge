@@ -1,0 +1,10 @@
+date,activity,resource_type,quantity,unit,unit_price_usd,amount_usd,estimated_or_measured,branch,round,job,person,note
+2026-10-28,tray_synthetic_build,engineer_time,20,hour,0.0,0.0,estimated,g0,0,job_da33_est,eng_lead_01,Story estimate for DA-33 (range 15-30 h)
+2026-11-03,tray_s1_generate,gpu_local_rtx3060,0.18,hour,0.0,0.0,estimated,g0,0,job_da33_batch_est,eng_lead_01,130 attempts x 109.5 s (D-23) over 22 workers on one RTX 3060
+2026-11-03,tray_s1_generate,gpu_local_rtx3060,0.339,hour,0.0,0.0,measured,g0,0,job_da33_batch,eng_lead_01,Batch s1-prod-1103 wall clock 09:37:55-09:58:16; 22 workers; 130 attempts 102 successes; 5.80 worker-hours; 2 workers OOM-killed and resumed; estimate job_da33_batch_est
+2026-11-03,tray_s1_replay_qa,gpu_local_rtx3060,0.197,hour,0.0,0.0,measured,g0,0,job_da33_replay,eng_lead_01,replay_qa.py 22 workers 09:58:25-10:10:13; 102/102 pass; tray error 0.0 mm
+2026-11-03,tray_s1_release,cpu_local,0.018,hour,0.0,0.0,measured,g0,0,job_da33_release,eng_lead_01,export_psi0 + manifest: 20.7 s for a release with wrong action_layout names (superseded) + 42.5 s for tray_s1_0d84cc87b1e5
+2026-11-03,tray_s1_storage,storage_local,0.90,gb,0.0,0.0,measured,g0,0,job_da33_release,eng_lead_01,tray_s1_0d84cc87b1e5: 217 files 901495734 bytes on rtx3060
+2026-11-03,tray_s1_storage,storage_local,1.04,gb,0.0,0.0,measured,g0,0,job_da33_batch,eng_lead_01,Raw batch s1-prod-1103 (22 shards: LeRobot raw + gen_log + replay verdicts) 1035231681 bytes on rtx3060
+2026-11-03,tray_s1_contract_tests,gpu_local_rtx3060,0.15,hour,0.0,0.0,measured,g0,0,job_da33_contract,eng_lead_01,test_export_contract.py -m sim: t7 runs ~64 s; on tray_s1_0d84cc87b1e5 11 passed in 214.6 s; self-contained generate+replay+export 10 passed 1 skipped in 259 s peak RSS 4.1 GB
+2026-11-03,tray_synthetic_build,engineer_time,22.5,hour,0.0,0.0,measured,g0,0,job_da33_exec,eng_lead_01,Sum of Time-spent over DA-33/1-9 commits: 21.5 h tasks 1-7 + 1.0 h tasks 8-9 (Claude session time; Hiếu chose to let the session record it); estimate job_da33_est
