@@ -7,6 +7,20 @@ attribution, and the engineer's part from a `Decision` (03 section 2.4, no
 revision at L0). So it is a plain model here, not an entity of `entities.py`,
 and it is never stored in the catalog.
 
+**Where it is written.** `runs/<run_plan_id>/cards/<cluster_id>/card.json`,
+with the HTML beside it, by `flywheel.store.paths.StorePaths.card_path`. The
+path is derived from the cluster id and never written into the `Cluster`:
+`Cluster.card_uri` is part of its content id, so setting it would change the
+id the card names (PO decision P1, 4/11/2026).
+
+**Where the engineer's part comes from.** A `Decision` with `subject_kind`
+"cluster" and `subject_id` the cluster id. Its `verdict` "approved" is an
+accept and "overridden" an override; what an override changes sits in
+`Decision.criteria` under two keys, `OVERRIDE_DIAGNOSIS_KEY`
+("override.diagnosis") and `OVERRIDE_INTERVENTION_KEY`
+("override.intervention"), each holding the new value or absent (PO decision
+P4, 4/11/2026). `EngineerDecision.from_decision` reads them back.
+
 Three rules shape it, because they are what makes a card evidence rather than
 an opinion:
 
@@ -28,11 +42,15 @@ from __future__ import annotations
 import math
 from typing import Annotated, Literal
 
+from flywheel.contracts.entities import Decision
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
 from typing_extensions import Self
 
 SHA256 = r"^[0-9a-f]{64}$"
 LEDGER_ID = r"^led_[0-9A-HJKMNP-TV-Z]{26}$"
+# Keys of `Decision.criteria` that carry what an override changes (PO P4).
+OVERRIDE_DIAGNOSIS_KEY = "override.diagnosis"
+OVERRIDE_INTERVENTION_KEY = "override.intervention"
 
 
 class Contract(BaseModel):
@@ -411,6 +429,31 @@ class EngineerDecision(Contract):
             raise ValueError("an override names the diagnosis or intervention it changes")
         return self
 
+    @classmethod
+    def from_decision(cls, decision: Decision) -> EngineerDecision:
+        """The card's view of the engineer's `Decision` on a cluster."""
+        verdicts = {"approved": "accept", "overridden": "override"}
+        if decision.subject_kind != "cluster" or decision.verdict not in verdicts:
+            raise ValueError(
+                f"{decision.id}: an engineer decision is approved or overridden on a cluster"
+            )
+        return cls(
+            verdict=verdicts[decision.verdict],  # type: ignore[arg-type]
+            decision_id=decision.id,
+            signed_by=decision.signed_by,
+            reason=decision.reason or None,
+            diagnosis=decision.criteria.get(OVERRIDE_DIAGNOSIS_KEY),
+            intervention=decision.criteria.get(OVERRIDE_INTERVENTION_KEY),
+        )
+
+    def criteria(self) -> dict[str, str]:
+        """The `Decision.criteria` keys this decision writes; empty on an accept."""
+        keys = {
+            OVERRIDE_DIAGNOSIS_KEY: self.diagnosis,
+            OVERRIDE_INTERVENTION_KEY: self.intervention,
+        }
+        return {key: value for key, value in keys.items() if value is not None}
+
 
 class RetrainResult(Contract):
     """Fix rate measured against the parent on new conditions (spec section 6.13)."""
@@ -525,6 +568,8 @@ __all__ = [
     "CHECK_RULES",
     "DATA_DIAGNOSES",
     "INTERVENTIONS_OF_DIAGNOSIS",
+    "OVERRIDE_DIAGNOSIS_KEY",
+    "OVERRIDE_INTERVENTION_KEY",
     "REQUIRED_CHECKS",
     "CheckResult",
     "Cost",

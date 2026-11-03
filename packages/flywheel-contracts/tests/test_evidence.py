@@ -5,7 +5,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from flywheel.contracts.entities import Decision
 from flywheel.contracts.evidence import (
+    OVERRIDE_DIAGNOSIS_KEY,
+    OVERRIDE_INTERVENTION_KEY,
     REQUIRED_CHECKS,
     CheckResult,
     EngineerDecision,
@@ -304,3 +307,55 @@ def test_representatives_drawn_from_members_record_the_seed() -> None:
     card["member_episode_ids"] = card["member_episode_ids"][1:]
     with pytest.raises(ValidationError, match="members"):
         EvidenceCard.model_validate(card)
+
+
+def engineer_decision(verdict: str, criteria: dict[str, Any], reason: str) -> Decision:
+    return Decision(
+        id=DECISION_ID,
+        kind="plan_review",
+        subject_kind="cluster",
+        subject_id="clu_8406056e72ff77ac",
+        verdict=verdict,  # type: ignore[arg-type]
+        criteria=criteria,
+        signed_by="hieu",
+        reason=reason,
+    )
+
+
+def test_override_round_trips_through_decision_criteria() -> None:
+    criteria = {
+        OVERRIDE_DIAGNOSIS_KEY: "weak_skill",
+        OVERRIDE_INTERVENTION_KEY: "teleop_correction",
+    }
+    decision = engineer_decision("overridden", criteria, "Demo gần nhất mâu thuẫn ở bước 2")
+    stored = Decision.model_validate_json(decision.model_dump_json())
+    engineer = EngineerDecision.from_decision(stored)
+    assert (engineer.verdict, engineer.diagnosis, engineer.intervention) == (
+        "override",
+        "weak_skill",
+        "teleop_correction",
+    )
+    assert engineer.decision_id == decision.id and engineer.criteria() == criteria
+    card = example()
+    card["decision"] = engineer.model_dump(mode="json")
+    assert EvidenceCard.model_validate(card).decision == engineer
+
+
+def test_accept_reads_from_an_approved_decision() -> None:
+    engineer = EngineerDecision.from_decision(engineer_decision("approved", {}, ""))
+    assert (engineer.verdict, engineer.reason, engineer.criteria()) == ("accept", None, {})
+
+
+@pytest.mark.parametrize(
+    "decision",
+    [
+        engineer_decision("overridden", {}, "no change named"),
+        engineer_decision("overridden", {OVERRIDE_DIAGNOSIS_KEY: "weak_skill"}, ""),
+        engineer_decision("overridden", {OVERRIDE_DIAGNOSIS_KEY: "not_a_diagnosis"}, "x"),
+        engineer_decision("pass", {}, "a gate verdict"),
+    ],
+    ids=["no-key", "no-reason", "unknown-diagnosis", "not-an-engineer-verdict"],
+)
+def test_decision_that_is_not_a_valid_engineer_decision_is_refused(decision: Decision) -> None:
+    with pytest.raises(ValueError):
+        EngineerDecision.from_decision(decision)
