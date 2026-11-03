@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Đang làm (PO duyệt bản teleop ảo cộng S2 và việc tải psi-data, 3/11/2026). Nhiệm vụ 1–5 xong |
+| Trạng thái | Đang làm (PO duyệt bản teleop ảo cộng S2 và việc tải psi-data, 3/11/2026). Nhiệm vụ 1–6 xong |
 | Người làm | Hiếu (đề xuất, PO giao) |
 | Làn | Adapter simulator (`flywheel-simple`) |
 | Story PRD | Story của [design 28/10/2026](../../superpowers/specs/2026-10-28-tray-transfer-he-design.md) mục 5 (dòng Synthetic S1, S2) · [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 5.3, 5.4 · spec mục 6.10, tuyến T2 ở mục 10 |
@@ -43,7 +43,7 @@ Kế hoạch ở mục "Kế hoạch teleop ảo" và "Kế hoạch generator S2
 - [x] 3. Đo phong cách teleop người từ psi-data của tác giả (ôm thùng hai tay, đi giữa hai bàn), ra dải tham số phong cách (AC 2, 8)
 - [x] 4. Đồng hồ sim cho agent: tất định, không chờ thời gian thực; hai lần chạy cùng seed ra cùng frame (AC 2, 5). Đo: gần 1× thời gian thực mỗi worker, xem [virtual-teleop.md](../../g0/tray/virtual-teleop.md)
 - [x] 5. Teleop ảo: phép đổi ngược của `WristsPreProcessor` (test CPU khứ hồi), streamer ảo lấy ý định từ `TrayPlanner` của DA-33 (cổ tay, lệnh đi, bàn tay) và phát tín hiệu PICO; một episode đạt `check_success` (AC 2). Đo: 8/9 lượt đạt, xem [virtual-teleop.md](../../g0/tray/virtual-teleop.md)
-- [ ] 6. Phong cách ngẫu nhiên mỗi episode theo seed phong cách; meta của AC 3 (AC 2, 3)
+- [x] 6. Phong cách ngẫu nhiên mỗi episode theo seed phong cách; meta của AC 3 (AC 2, 3). Đo: 16/16 đạt, đủ 7 cờ bước, xem [virtual-teleop.md](../../g0/tray/virtual-teleop.md)
 - [ ] 7. Sinh hàng loạt demo cha: ít nhất 100 đạt, sổ lượt, sổ chi phí (AC 3, 7)
 - [ ] 8. Cắt demo theo 7 bước (AC 4)
 - [ ] 9. Streamer phát lại S2: phát lại demo không biến đổi qua ống teleop, đo tỉ lệ tái tạo (AC 5)
@@ -135,6 +135,6 @@ Rủi ro: điều kiện xa demo cha thì cầm trượt; đế trôi khi mang l
 ## Ghi chép khi làm
 
 - Giờ thực:
-- Công cụ AI đã dùng: Claude Code (nhiệm vụ 1–5)
+- Công cụ AI đã dùng: Claude Code (nhiệm vụ 1–6)
 - Ghi chú hoàn thành: Nhiệm vụ 2 (3/11/2026): wrapper, agent với streamer bất kỳ và vòng phiên; ghi được dataset LeRobot thật sau khi cài các gói ghi của [PR #27](https://github.com/hiwe0305/denso-challenge/pull/27) ([pico-teleop.md](../../g0/tray/pico-teleop.md) khoảng trống 11)
 - File đã tạo hoặc sửa: `configs/sim/tray_virtual_teleop.yaml`, `docs/g0/tray/pico-teleop.md`, `docs/g0/tray/virtual-teleop.md`, `packages/flywheel-simple/src/flywheel_simple/tray/pico/`, `packages/flywheel-simple/tests/tray/pico/`, `scripts/g0/tray/pico/measure_teleop_style.py`

@@ -21,9 +21,12 @@ from numpy.typing import NDArray
 
 from flywheel_simple.tray.pico.conditions import Condition
 from flywheel_simple.tray.predicates import STEP_NAMES, StepReport
+from flywheel_simple.tray.randomize import split_of
 
-WRAPPER_VERSION = "da35-pico-1"
+WRAPPER_VERSION = "da35-pico-2"
 STORY = "DA-35"
+SOURCE_KINDS = ("teleop", "synthetic")
+EMBODIMENT_ID = "g1_sonic_dwbc@1"  # as DA-33's S1 episodes
 OPERATOR = re.compile(r"^op-[0-9a-z]+$")  # pseudonym only, never a name
 
 Outcome = Literal["success", "failure", "timeout", "operator_reset", "interrupted"]
@@ -89,22 +92,38 @@ def flywheel_block(
     source_detail: str,
     outcome: Outcome,
     simple_commit: str,
+    source_kind: str = "teleop",
+    extra: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Meta stored as `environment_config["flywheel"]` of a saved episode."""
+    """Meta stored as `environment_config["flywheel"]` of a saved episode.
+
+    `extra` adds fields of the source (the virtual operator's tier, style and
+    versions); it may not overwrite the fields above.
+    """
     if not OPERATOR.match(operator):
         raise ValueError(f"operator {operator!r} must be a pseudonym like op-01")
-    return {
+    if source_kind not in SOURCE_KINDS:
+        raise ValueError(f"source_kind {source_kind!r} is not one of {SOURCE_KINDS}")
+    block = {
         "story": STORY,
-        "source_kind": "teleop",
+        "source_kind": source_kind,
         "source_detail": source_detail,
         "operator": operator,
         "session": session,
         "level": condition.level,
         "seed": condition.seed,
+        "split": split_of(condition.seed),
         "outcome": outcome,
         "simple_commit": simple_commit,
         "wrapper_version": WRAPPER_VERSION,
+        "embodiment_id": EMBODIMENT_ID,
+        "renderer": "mujoco",
+        "data_class": "public",  # sim G1 (design 27/10 section 8.4)
     }
+    clash = sorted(set(block) & set(extra or {}))
+    if clash:
+        raise ValueError(f"extra meta would overwrite {clash}")
+    return {**block, **(extra or {})}
 
 
 class AttemptLog:

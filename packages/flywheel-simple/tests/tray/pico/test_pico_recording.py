@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
@@ -90,6 +91,37 @@ def test_flywheel_block() -> None:
     assert (block["level"], block["seed"]) == (1, 7)
     assert block["operator"] == "op-02"
     json.dumps(block)  # goes into environment_config as JSON
+
+
+def test_flywheel_block_of_a_virtual_teleop_episode() -> None:
+    block = flywheel_block(
+        condition=Condition(0, 12),
+        operator="op-virtual",
+        session="s",
+        source_detail="virtual_teleop",
+        outcome="success",
+        simple_commit="6d10628",
+        source_kind="synthetic",
+        extra={"synthetic_tier": "S1", "action_quality": "planned", "style_seed": 5},
+    )
+    assert (block["source_kind"], block["synthetic_tier"]) == ("synthetic", "S1")
+    assert (block["split"], block["data_class"], block["style_seed"]) == ("train", "public", 5)
+    json.dumps(block)
+
+
+def test_flywheel_block_refuses_unknown_kinds_and_overwrites() -> None:
+    kw: dict[str, Any] = dict(
+        condition=Condition(0, 0),
+        operator="op-virtual",
+        session="s",
+        source_detail="virtual_teleop",
+        outcome="success",
+        simple_commit="x",
+    )
+    with pytest.raises(ValueError, match="source_kind"):
+        flywheel_block(**kw, source_kind="human")
+    with pytest.raises(ValueError, match="overwrite"):
+        flywheel_block(**kw, source_kind="synthetic", extra={"seed": 3})
 
 
 @pytest.mark.parametrize("operator", ["Hieu", "op-", "op-Hung", "op 01", ""])
