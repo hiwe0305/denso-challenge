@@ -38,3 +38,8 @@ data_defects:
   holdout_seed_leak:  # D5
     enabled: true
     holdout_seed_range: [2000000, 2000999]  # holdout của configs/splits/default.yaml
+
+# Lỗi log train (T1-T8) và log RTC (R1, R2): mỗi loại 3 job; mức cấy đặt vượt ngưỡng của
+# configs/eval/diagnosis/{train,system}.yaml (xem LogDefectConfig)
+log_defects:
+  jobs_per_kind: 3

@@ -127,7 +127,39 @@ Còn lại:
 
 ## 3. Lỗi log huấn luyện (F-TRAIN) và log RTC (F-SYS)
 
-Log train cấy lỗi T1–T8 và log RTC cấy lỗi R1, R2 (nhiệm vụ 2 của story) chuyển sang PR sau `DA-27-log-defects`, để PR này dưới ngưỡng R9 (quyết định PO 4/11/2026). Mã của Thông giữ nguyên trong lịch sử nhánh này và sẽ được cherry-pick, giữ tác giả.
+Nhiệm vụ 2 của story, PR `DA-27-log-defects` sau khi PR dữ liệu (#53) merge (quyết định PO 4/11/2026). Commit gốc của Thông được cherry-pick, giữ tác giả; mã viết lại trên hợp đồng.
+
+Log viết đúng schema của log thật và đúng layout mà làn Đánh giá đọc (DA-08, DA-13):
+
+```
+copies/<id>/train/<job>/metrics.jsonl         TrainingMetric từng dòng (log của trainer DA-19)
+copies/<id>/train/<job>/action_layout.json    ActionLayout G1 (configs/embodiments/g1.yaml)
+copies/<id>/train/<job>/probe_p4.json         ProbeP4 của checkpoint, và của checkpoint cha
+copies/<id>/train/<job>/probe_p4_parent.json
+copies/<id>/rtc/<job>/rtc.jsonl               RTCInferenceRecord từng chunk (RTCClient DA-19)
+answers/<id>/defect_manifest.json (+ .sha256)
+```
+
+Mỗi bản có 30 job train (8 loại × 3, cộng 6 job sạch) và 10 job RTC (2 loại × 3, cộng 4 job sạch); bản sạch cùng số job, không lỗi. Job sạch là một lần chạy mượt, sinh tất định theo id của job. Mỗi lỗi đổi đúng một tín hiệu, vượt ngưỡng của `configs/eval/diagnosis/{train,system}.yaml`:
+
+| Mã | Loại (`kind`) | Cấy |
+|---|---|---|
+| T1 | `T1_divergence` | một bước loss train là NaN |
+| T2 | `T2_not_learning` | loss train, val và mọi nhóm gần phẳng (giảm 1% cả job, dưới 5%) |
+| T3 | `T3_overfitting` | val tăng 5 lần đo cuối (trên 3) trong khi train vẫn giảm |
+| T4 | `T4_group_imbalance` | một nhóm action đứng yên, các nhóm khác vẫn giảm |
+| T5 | `T5_dead_dimension` | phương sai dự đoán một chiều bằng 0 ở 2000 step cuối |
+| T6 | `T6_mode_collapse` | `pred_std` bằng 0,1 × `target_std` nửa sau job (dưới 0,30) |
+| T7 | `T7_forgetting` | P1 của checkpoint con giảm 25% một loại câu hỏi so với cha (trên 10%) |
+| T8 | `T8_gradient_anomaly` | gradient VLM 0,5 ở một bước khi khai đóng băng |
+| R1 | `R1_high_latency` | 5% chunk trễ 0,155 s (p99 trên 0,15 s; `delay_steps` 8, chưa vượt R2) |
+| R2 | `R2_buffer_depleted` | một chunk trễ 0,24 s (`delay_steps` 12, trên 8; p99 vẫn dưới 0,15 s) |
+
+Test chạy chính bộ phát hiện của làn Đánh giá trên từng job: job có lỗi ra đúng mã của nó và không mã nào khác, job sạch và bản sạch không ra mã nào. testkit chưa có bộ giả sinh metrics hay log RTC, nên bộ sinh ở đây thay cho `FakeTrainer` và log RTC giả của design 9.2. Hai bản có cùng hình dạng, id trung tính (`copy_ids(seed, namespace="logs")`), một mtime, `meta/benchmark_copy.json` ghi log là tổng hợp, không phải số đo.
+
+```bash
+uv run python -m flywheel.data.inject.log_defects --out fwdata/inject-logs
+```
 
 ---
 

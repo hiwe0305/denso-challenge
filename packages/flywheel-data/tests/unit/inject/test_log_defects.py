@@ -1,104 +1,123 @@
-"""Unit tests for train log and RTC log defect injection (AC 2)."""
+"""Train log defects T1-T8 and RTC log defects R1-R2 (story task 2, AC 2).
 
-import math
+The logs are written in the contract schemas the real ones use (`TrainingMetric`,
+`RTCInferenceRecord`, `ProbeP4`) and in the job layout the evaluation lane reads, so the
+evaluation lane's own detectors judge them here: an injected job must raise exactly its
+code, a clean job none (story: "cấy một lần, phép kiểm tương ứng bắt được").
+"""
 
-from flywheel.data.inject.log_defects import RTCLogDefectInjector, TrainLogDefectInjector
+import json
+from collections import Counter
+from pathlib import Path
+from typing import Any
 
+import pytest
+from flywheel.contracts.artifacts import ProbeP4, RTCInferenceRecord
+from flywheel.contracts.training import TrainingMetric
+from flywheel.data.inject.codes import LOG_DEFECT_CODES
+from flywheel.data.inject.dataset import copy_ids
+from flywheel.data.inject.log_defects import build_log_benchmark, main
+from flywheel.data.inject.manifest import ManifestLock, load_manifest
+from flywheel.eval.config import load_system_thresholds, load_train_thresholds
+from flywheel.eval.diagnosis.system.reader import read_rtc_log
+from flywheel.eval.diagnosis.system.runtime import check_r1, check_r2
+from flywheel.eval.diagnosis.train.artifact import diagnose_all, load_job
 
-def test_train_clean_log_generation() -> None:
-    injector = TrainLogDefectInjector()
-    logs = injector.generate_clean_train_log(total_steps=10)
-    assert len(logs) == 10
-    assert logs[0]["train_loss"] > logs[-1]["train_loss"]
-    assert logs[0]["frozen_vlm_grad"] == 0.0
-
-
-def test_inject_t1_divergence() -> None:
-    injector = TrainLogDefectInjector()
-    logs = injector.generate_clean_train_log(total_steps=10)
-    mod, defect = injector.inject_t1_divergence(logs)
-    assert defect.code == "T1_divergence"
-    # Contains NaN in loss
-    assert any(math.isnan(entry["train_loss"]) for entry in mod)
-
-
-def test_inject_t2_not_learning() -> None:
-    injector = TrainLogDefectInjector()
-    logs = injector.generate_clean_train_log(total_steps=10)
-    mod, defect = injector.inject_t2_not_learning(logs)
-    assert defect.code == "T2_not_learning"
-    assert mod[-1]["val_loss"] >= mod[0]["val_loss"] - 0.05
-
-
-def test_inject_t3_overfitting() -> None:
-    injector = TrainLogDefectInjector()
-    logs = injector.generate_clean_train_log(total_steps=10)
-    mod, defect = injector.inject_t3_overfitting(logs)
-    assert defect.code == "T3_overfitting"
-    # Later val losses increase
-    assert mod[-1]["val_loss"] > mod[-2]["val_loss"]
+REPO = Path(__file__).resolve().parents[5]
+TRAIN = load_train_thresholds(REPO / "configs/eval/diagnosis/train.yaml")[0]
+SYSTEM = load_system_thresholds(REPO / "configs/eval/diagnosis/system.yaml")[0]
+TRAIN_CODES = {f"T{i}" for i in range(1, 9)}
+WORDS = (b"inject", b"defect", b"duplicate", b"bench")
 
 
-def test_inject_t4_group_imbalance() -> None:
-    injector = TrainLogDefectInjector()
-    logs = injector.generate_clean_train_log(total_steps=10)
-    mod, defect = injector.inject_t4_group_imbalance(logs)
-    assert defect.code == "T4_group_imbalance"
-    assert mod[-1]["loss_groups"]["right_arm"] == 1.85
+@pytest.fixture(scope="module")
+def built(tmp_path_factory: pytest.TempPathFactory) -> Any:
+    out = tmp_path_factory.mktemp("logs") / "logs"
+    return out, build_log_benchmark(out)
 
 
-def test_inject_t5_dead_dimension() -> None:
-    injector = TrainLogDefectInjector()
-    logs = injector.generate_clean_train_log(total_steps=10)
-    mod, defect = injector.inject_t5_dead_dimension(logs)
-    assert defect.code == "T5_dead_dimension"
-    assert mod[-1]["pred_variance"][12] == 0.0
+def _codes(job: Path) -> set[str]:
+    if (job / "rtc.jsonl").is_file():
+        records = read_rtc_log(job / "rtc.jsonl")
+        found = check_r1(records, SYSTEM.r1).findings + check_r2(records, SYSTEM.r2).findings
+        return {f.code for f in found}
+    return {f.code for f in diagnose_all(load_job(job), TRAIN).findings} & TRAIN_CODES
 
 
-def test_inject_t6_mode_collapse() -> None:
-    injector = TrainLogDefectInjector()
-    logs = injector.generate_clean_train_log(total_steps=10)
-    mod, defect = injector.inject_t6_mode_collapse(logs)
-    assert defect.code == "T6_mode_collapse"
-    assert mod[-1]["pred_std"] < 1e-4
+def _jobs(root: Path) -> list[Path]:
+    return sorted(p for p in (root / "train").iterdir()) + sorted((root / "rtc").iterdir())
 
 
-def test_inject_t7_forgetting() -> None:
-    injector = TrainLogDefectInjector()
-    logs = injector.generate_clean_train_log(total_steps=10)
-    mod, defect = injector.inject_t7_forgetting(logs)
-    assert defect.code == "T7_forgetting"
-    assert mod[-1]["p4_score"] < logs[-1]["p4_score"]
+def test_logs_are_in_the_contract_schemas(built: Any) -> None:
+    _, result = built
+    for copy in (result.defect, result.clean):
+        root = Path(copy.ref.uri)
+        for job in sorted((root / "train").iterdir()):
+            for line in (job / "metrics.jsonl").read_text().splitlines():
+                TrainingMetric.model_validate_json(line)
+            for name in ("probe_p4.json", "probe_p4_parent.json"):
+                ProbeP4.model_validate_json((job / name).read_text())
+        for job in sorted((root / "rtc").iterdir()):
+            for line in (job / "rtc.jsonl").read_text().splitlines():
+                RTCInferenceRecord.model_validate_json(line)
 
 
-def test_inject_t8_gradient_anomaly() -> None:
-    injector = TrainLogDefectInjector()
-    logs = injector.generate_clean_train_log(total_steps=10)
-    mod, defect = injector.inject_t8_gradient_anomaly(logs)
-    assert defect.code == "T8_gradient_anomaly"
-    assert mod[-1]["frozen_vlm_grad"] == 2.5
+def test_three_jobs_per_kind_and_the_design_codes(built: Any) -> None:
+    _, result = built
+    manifest = load_manifest(result.defect.manifest_path)
+    assert Counter(d.parameters["kind"] for d in manifest.defects) == {
+        kind: 3 for kind in LOG_DEFECT_CODES
+    }
+    assert all(d.code == LOG_DEFECT_CODES[str(d.parameters["kind"])] for d in manifest.defects)
+    assert len({d.target_ref for d in manifest.defects}) == 30
+    assert load_manifest(result.clean.manifest_path).defects == []
 
 
-def test_rtc_clean_log_generation() -> None:
-    injector = RTCLogDefectInjector()
-    logs = injector.generate_clean_rtc_log(total_chunks=10)
-    assert len(logs) == 10
-    assert logs[0]["delay_steps"] == 1
-    assert logs[0]["buffer_level"] == 4
+def test_the_evaluation_detectors_find_exactly_the_injected_code(built: Any) -> None:
+    _, result = built
+    root = Path(result.defect.ref.uri)
+    expected = {d.target_ref: d.code for d in load_manifest(result.defect.manifest_path).defects}
+    for job in _jobs(root):
+        ref = job.relative_to(root).as_posix()
+        assert _codes(job) == ({expected[ref]} if ref in expected else set()), ref
 
 
-def test_inject_r1_high_latency() -> None:
-    injector = RTCLogDefectInjector()
-    logs = injector.generate_clean_rtc_log(total_chunks=10)
-    mod, defect = injector.inject_r1_high_latency(logs)
-    assert defect.code == "R1_high_latency"
-    assert mod[-1]["latency_ms"] == 120.0
-    assert mod[-1]["delay_steps"] == 5
+def test_the_clean_copy_raises_nothing(built: Any) -> None:
+    _, result = built
+    root = Path(result.clean.ref.uri)
+    for job in _jobs(root):
+        assert _codes(job) == set(), job.name
 
 
-def test_inject_r2_buffer_depleted() -> None:
-    injector = RTCLogDefectInjector()
-    logs = injector.generate_clean_rtc_log(total_chunks=10)
-    mod, defect = injector.inject_r2_buffer_depleted(logs)
-    assert defect.code == "R2_buffer_depleted"
-    assert mod[-1]["buffer_level"] == 0
+def test_both_copies_look_alike_and_keep_the_answer_outside(built: Any) -> None:
+    out, result = built
+    roots = [Path(result.defect.ref.uri), Path(result.clean.ref.uri)]
+
+    def shape(root: Path) -> list[tuple[str, int, list[str]]]:
+        return [
+            (job.parent.name, len(job.name), sorted(p.name for p in job.iterdir()))
+            for job in _jobs(root)
+        ]
+
+    assert shape(roots[0]) == shape(roots[1])
+    assert {r.name for r in roots}.isdisjoint(copy_ids(42))  # not the data copies' ids
+    for copy in (result.defect, result.clean):
+        assert copy.manifest_path.is_relative_to(out / "answers")
+        assert ManifestLock(copy.manifest_path).verify_integrity()
+    stamps = set()
+    for root in roots:
+        marker = json.loads((root / "meta/benchmark_copy.json").read_text())
+        assert marker["benchmark_copy_id"] == root.name
+        for path in root.rglob("*"):
+            if path.is_file():
+                stamps.add(path.stat().st_mtime)
+                if path.name != "benchmark_copy.json":
+                    assert not [w for w in WORDS if w in path.read_bytes().lower()], path
+    assert len(stamps) == 1
+
+
+def test_cli_prints_the_handoff(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["--out", str(tmp_path / "logs")]) == 0
+    handoff = json.loads(capsys.readouterr().out)
+    assert len(handoff["copies"]) == 2
+    assert all(len(c["manifest_sha256"]) == 64 for c in handoff["copies"])
