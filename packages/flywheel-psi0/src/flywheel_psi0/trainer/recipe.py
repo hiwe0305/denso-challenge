@@ -60,6 +60,11 @@ class Psi0Recipe(_Frozen):
     def vlm_frozen(self) -> bool:
         return self.args.get("model.no-tune-vlm") is True
 
+    @property
+    def rtc_prefix(self) -> int:
+        """Leading chunk positions RTC can leave out of the train loss (`max-delay`)."""
+        return self.int_arg("model.max-delay", 0) if self.args.get("model.rtc") is True else 0
+
     def int_arg(self, key: str, default: int) -> int:
         value = self.args.get(key, default)
         if isinstance(value, bool) or not isinstance(value, (int, float, str)):

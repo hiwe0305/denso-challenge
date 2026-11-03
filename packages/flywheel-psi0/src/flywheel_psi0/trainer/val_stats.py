@@ -95,11 +95,17 @@ class LossBreakdown:
     on the flow-matching velocity, before masking and summing it; the launcher hands
     that array here on every micro-batch. The split is in velocity space, so it is
     comparable between groups of one train line, not with the val line's action
-    error. It is taken before Psi0's RTC mask, so chunk positions below
-    `--model.max-delay` include steps the loss leaves out for some samples.
+    error.
+
+    The array is taken before Psi0's RTC mask, which leaves a random prefix of
+    `delay < --model.max-delay` positions out of each sample's loss. `rtc_prefix`
+    drops the first `max-delay` positions from both splits so they match the loss
+    Psi0 trains on (Hiếu, 3/11/2026): `loss_by_chunk_pos[i]` on a train line is chunk
+    position `rtc_prefix + i`. Without RTC it is 0 and nothing is dropped.
     """
 
     layout: ActionLayout
+    rtc_prefix: int = 0
     _squared: list[Array] = field(default_factory=list)
 
     def add(self, squared: NDArray[np.floating]) -> None:
@@ -107,7 +113,9 @@ class LossBreakdown:
         dims = len(self.layout.dimensions)
         if array.ndim != 3 or array.shape[2] != dims:
             raise ValueError(f"expected (batch, chunk, {dims}), got {array.shape}")
-        self._squared.append(array)
+        if array.shape[1] <= self.rtc_prefix:
+            raise ValueError(f"chunk of {array.shape[1]} has nothing past {self.rtc_prefix}")
+        self._squared.append(array[:, self.rtc_prefix :])
 
     def summary(self) -> dict[str, object]:
         """The split over the micro-batches added since the last summary."""
