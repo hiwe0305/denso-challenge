@@ -182,4 +182,5 @@ def _issue(
 def _past(x: NDArray[np.float64], layout: ActionLayout, dims: list[int]) -> NDArray[np.float64]:
     low = np.array([layout.dimensions[i].limit_low for i in dims], dtype=np.float64)
     high = np.array([layout.dimensions[i].limit_high for i in dims], dtype=np.float64)
-    return np.maximum(np.maximum(low - x, x - high), 0.0)
+    past: NDArray[np.float64] = np.maximum(np.maximum(low - x, x - high), 0.0)
+    return past
