@@ -15,7 +15,7 @@ Việc phát sinh cho người khác, Hiếu quyết:
 |---|---|---|---|
 | 1 | Chiều action 34 là `vyaw` liên tục trong `[-1, 1]`, không phải `turning_flag` 0/1 như chú thích Ψ₀ và comment 3/11 trên #24 | `configs/embodiments/g1.yaml`; T4, O4 của DA-08 | Hiếu (DA-01), Châu |
 | 2 | Chiều 31 (`base_height_command`) hằng số 0,74 trong gói hai bàn; F1 có 4–10 chiều hằng số | T5, T6 của DA-08 phải loại theo phương sai đích, không theo `masked` | Châu |
-| 3 | Tập eval trên `rtx3060:~/denso-s103` là bản ở `main` (`de140d6`, 4 mức, vị trí robot khác), không phải `e78fb93` | Số eval S1-03 so với gói train đã ghim | Hiếu chốt bản eval |
+| 3 | Tập eval trên `rtx3060:~/denso-s103` là bản ở `main` (`de140d6`, 4 mức, vị trí robot khác), không phải `e78fb93` | Số eval S1-03 so với gói train đã ghim | **Đã chốt 3/11/2026** (mục 4.1): eval `de140d6`, train giữ `e78fb93` tới sau 13/11 |
 | 4 | Eval mức 0, 1 dùng lại vị trí ban đầu của 10 episode train đầu | Số eval của tác giả không đo trên điều kiện mới; dev và holdout của đội rời cả hai | Hiếu, Châu |
 | 5 | HSSD CC-BY-NC-4.0 và GraspNet CC BY-NC-SA 4.0 nằm trong video psi-data | Rủi ro giấy phép nếu demo bị coi là dùng thương mại; khác với `data_class` | Hiếu |
 | 6 | Design lệch dữ liệu ở ba chỗ: dòng 239 ("`action_layout` đệm 36 chiều như Ψ₀ (`pad36`), kèm mask": action không có chiều đệm, chỉ state đệm 32–35), dòng 537 ("34 cờ rẽ rời rạc": giá trị liên tục, WBC dùng ngưỡng 0,1), dòng 540 ("chiều 0–13 gần như luôn bằng 0": chỉ tay trái 0–6; tay phải 7–13 khác 0 ở 87% khung) | Design mục 6, 9.2; `g1.yaml` của DA-01; T4–T6, O4 của DA-08; `action_sign_flip` của DA-27 | Hiếu sửa design (cần change log) |
@@ -303,6 +303,26 @@ Kết luận:
 - **Dải hạt giống của `simple-eval`: không suy được số.** Bản #24 ghi `0..24`; số đó gán cứng trong script cũ, không có trong gói. Điều suy được, **suy luận** từ bảng trên: ở mức 0 và 1, episode eval thứ i có vị trí ban đầu của robot, vật và thùng trùng đến từng bit với episode train thứ i (10/10 ở cả ba task); ở mức 2 chỉ vị trí robot còn trùng. SpatialDR rút vị trí theo một thứ tự cố định từ bộ sinh số ngẫu nhiên của episode, nên trùng đến từng bit nghĩa là episode eval i và episode train i bắt đầu từ cùng một luồng ngẫu nhiên, tức cùng seed. Hệ quả: ở mức 0 và 1, tập eval của tác giả đặt vật và thùng đúng chỗ như 10 demo train đầu tiên (vật gây nhiễu, ánh sáng, vật liệu khác). Số đo trên eval của tác giả vì vậy không phải số trên điều kiện mới; dải `dev` và `holdout` của đội phải rời cả train lẫn eval của tác giả.
 - **Dải hạt giống của đội** **[Đã chốt]** (Hiếu, 2/11/2026): một bảng chung cho mọi task và mọi nguồn, [`configs/splits/default.yaml`](../../configs/splits/default.yaml): `train` `[0, 1_000_000)`, `dev` `[1_000_000, 1_001_000)`, `holdout` `[2_000_000, 2_001_000)`; không có split `gate` riêng. Seed của tác giả, theo suy luận trên là số nhỏ quanh chỉ số episode, rơi vào `train`. Bản #24 đề xuất dải `1000..1999`, `2000..2999`, `9000..9999` và split `gate`; đã bỏ.
 - Hai bộ eval khác nhau: bản `main` mà S1-03 đang dùng có vị trí robot khác hẳn train (0/10) nhưng giữ vật và thùng (10/10 ở mức 0, 1). Báo Hiếu chốt bản eval nào là bản của đội: `e78fb93` (khớp gói train đã ghim) hay `main`.
+
+### 4.1 Hai bản psi-data và bản đội dùng (3/11/2026)
+
+Ngày 2/11/2026 tác giả đẩy 5 commit lên `main` của psi-data: `38e43f2` ("eval-fixed", đổi `simple-eval/`), rồi `bf9f4b3`, `7e63b1f`, `7939f89`, `de140d6` ("data-fixed", đổi `simple/`). Gói train hai bàn đổi ở `bf9f4b3`, `7e63b1f` (cắt phần giữ cuối ở 50 dòng) và `de140d6` (mã hóa lại video). So trực tiếp hai bản, đo ngoài script ngày 3/11/2026 sau khi tải bằng `fetch` (sha256 khớp `lfs.oid`):
+
+| | Bản A `e78fb93` (14/09/2026) | Bản B `de140d6` (02/11/2026) |
+|---|---|---|
+| Train | 99 episode, 62.764 khung; episode dừng ở khung `next.done` | Cùng 99 episode; phần đầu **trùng từng bit** (`action`, `states`) với bản A, rồi thêm 50 hoặc 100 khung giữ (vx, vy, vyaw bằng 0; cánh tay phải, chiều 21–27, còn cử động); 69.464 khung. `features`, `modality.json` không đổi; `stats_psi0.json`, `episodes.jsonl` đổi theo độ dài. Video mã hóa lại (keyframe mỗi 10 khung, theo commit `de140d6`). QA 8 phép: 99/99 |
+| Eval | 3 mức × 10 điều kiện | 4 mức × 10 (thêm `dr-level-hard`) |
+| Eval mức 0, 1 so với train bản A | Robot, vật, khay trùng 10/10: đúng điều kiện của 10 episode train đầu | Vật, khay trùng 10/10; robot lùi 6,1 cm, lệch ngang 2 mm, xoay 0,17°, như nhau ở mọi episode |
+| Eval mức 2 | Vật mới, robot như train | Vật mới, robot lùi như trên |
+
+Số công bố 7/5/6 có trước cả hai bản (checkpoint train tháng 4/2026), nên không biết tác giả đo trên bản nào; câu hỏi đi trong Q-27E của S1-03.
+
+**Quyết định [Đã chốt 3/11/2026, Hiếu]:**
+
+- **Eval:** bản B, ghim `de140d67ba77a541f2a58354f7edf4e2480b7c56` (không dùng chữ `main`). Lý do: mức 0, 1 của bản A là chính điều kiện train kể cả tư thế robot, nên chỉ đo khả năng nhớ; bản B là bản tác giả sửa và có mức hard. S1-03 đã chạy trên bản này.
+- **Train:** giữ bản A `e78fb93` tới sau 13/11/2026. Mọi số của file này, export DA-02, DA-33 và test đều dựng trên bản A; bản B chỉ thêm phần giữ ở cuối episode nên đổi sau rẻ. Xét lại sau demo, vì phần giữ có thể giúp policy học dừng.
+- **SIMPLE:** chuyển pin lên `b75c678` ([env-simple.md](env-simple.md)); không liên quan đến bản dữ liệu nhưng ảnh hưởng trực tiếp tới eval task hai bàn.
+- Dev và holdout của đội vẫn theo [`configs/splits/default.yaml`](../../configs/splits/default.yaml), rời cả hai bản eval công bố.
 
 ## 5. Giấy phép (AC 5 · V9)
 

@@ -19,11 +19,19 @@ A spawned worker imports this module as `__mp_main__` and never runs `main()`,
 so the env id is registered on that import too. The command is unknown there
 (runpy sets `sys.argv[0]` to this file while it runs the module); only eval
 starts workers, and it keeps the wall clock.
+
+`eval-decoupled-wbc --data-format lerobot` reads each condition with SIMPLE's
+`get_episode_lerobot`, which rewrites `environment_config["dr_state_dict"]`'s
+scene uid (a FIXME for its hssd scenes). Tray conditions have no `dr_state_dict`:
+the tray env rebuilds the episode from the seed and level it recorded. The
+function is swapped, in the parent and in spawned workers, for one that skips
+that rewrite when the key is missing.
 """
 
 from __future__ import annotations
 
 import importlib
+import json
 import sys
 import time
 from typing import Any
@@ -65,13 +73,43 @@ def use_sim_time(module_names: tuple[str, ...]) -> None:
         importlib.import_module(name).time = SimTime()  # type: ignore[attr-defined]
 
 
+def get_episode_lerobot(
+    dataset: Any, eps_idx: int, data_format: Any = None
+) -> tuple[dict[str, Any], list[Any]]:
+    """SIMPLE's `simple.datasets.lerobot.get_episode_lerobot` (@ 6d10628), whose scene
+    uid rewrite applies only to conditions that have `dr_state_dict`."""
+
+    def _to_int(value: Any) -> int:
+        item = getattr(value, "item", None)
+        if callable(item):
+            return int(item())
+        return int(value)
+
+    from_idx = _to_int(dataset.episode_data_index["from"][eps_idx])
+    to_idx = _to_int(dataset.episode_data_index["to"][eps_idx])
+    episode = [dataset[i] for i in range(from_idx, to_idx)]
+
+    env_conf: dict[str, Any] = json.loads(dataset.meta.episodes[eps_idx]["environment_config"])
+    if "dr_state_dict" in env_conf:
+        scene = env_conf["dr_state_dict"]["scene"]
+        scene["uid"] = scene["uid"].replace("102344280", "scene3")
+    return env_conf, episode
+
+
+def prepare() -> None:
+    """Register the tray env id and swap SIMPLE's condition reader; safe to call again."""
+    from flywheel_simple.tray.simple_task import register
+
+    register()
+    lerobot = importlib.import_module("simple.datasets.lerobot")
+    lerobot.get_episode_lerobot = get_episode_lerobot  # type: ignore[attr-defined]
+
+
 def main(argv: list[str]) -> int:
     if not argv or argv[0] not in COMMANDS:
         print(f"usage: run {{{','.join(COMMANDS)}}} [args...]", file=sys.stderr)
         return 2
-    from flywheel_simple.tray.simple_task import register
-
-    register()
+    prepare()
     command, rest = argv[0], argv[1:]
     use_sim_time(SIM_TIME_MODULES.get(command, ()))
     sys.argv = [command, *rest]
@@ -80,9 +118,7 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__mp_main__":
-    from flywheel_simple.tray.simple_task import register
-
-    register()
+    prepare()
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))
