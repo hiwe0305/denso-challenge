@@ -25,7 +25,7 @@ Là người giữ nhân, tôi muốn có schema và file mẫu cho mọi artifa
 4. Model giả cho endpoint LLM trong testkit (cho DA-20).
 5. Test: mọi file mẫu qua validate; mọi schema có trong JSON Schema xuất ra.
 6. Schema `AgentReport` và `AgentReview` cho Agent QA/QC theo Issue #34, kèm file mẫu và xuất JSON Schema.
-7. Schema `TraceStep` và `CameraParams` cho chẩn đoán hệ thống DA-13 (Issue #31), kèm 4 file mẫu trace (tối thiểu 100 chu kỳ) và xuất JSON Schema.
+7. Schema `TraceStep` và `CameraParams` cho kiểm hệ thống R3–R5 của DA-13 (Issue #31): đúng 28 chiều thân trên và 7 chiều thân dưới có thứ tự, đơn vị, hệ tọa độ; trace là thư mục `<trace_id>/` gồm `steps.jsonl` và `camera_params.jsonl`; 4 trace mẫu, mỗi trace 100 chu kỳ, với hash tham chiếu camera G0 thật; xuất JSON Schema.
 
 ## Nhiệm vụ
 
@@ -35,7 +35,7 @@ Là người giữ nhân, tôi muốn có schema và file mẫu cho mọi artifa
 - [x] 4. File mẫu và model giả trong testkit (AC 2, 4)
 - [x] 5. Test và JSON Schema (AC 5)
 - [x] 6. Schema và file mẫu AgentReport, AgentReview cho DA-20, DA-31 (Issue #34, AC 6)
-- [x] 7. Schema TraceStep, CameraParams và 4 file mẫu trace cho DA-13 (Issue #31, AC 7)
+- [x] 7. Schema `TraceStep`, `CameraParams` và 4 trace mẫu cho DA-13 (Issue #31, PR #48, AC 7)
 
 ## Phạm vi file
 
@@ -90,3 +90,10 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
   - packages/flywheel-testkit/src/flywheel/testkit/fixtures/artifacts/AgentReview.json
   - packages/flywheel-testkit/src/flywheel/testkit/fixtures/artifacts/invalid-AgentReview.json
   - docs/product/stories/DA-25-schema-artifact-giua-lan.md
+
+### Nhiệm vụ 7 (PR #48)
+
+- Giờ thực: 2h (Long), 2.6h (sửa theo review PO)
+- Công cụ AI đã dùng: Antigravity; Claude Code
+- Ghi chú hoàn thành: hợp đồng `TraceStep`, `CameraParams` (`trace.py`) và 4 trace mẫu dạng thư mục `<trace_id>/` trong testkit cho DA-13 kiểm R3–R5 (Issue #31); xuất JSON Schema, test tự động. Quy ước và ghi chú G3–G5 ở `fixtures/trace/README.md`.
+- File đã tạo hoặc sửa: `packages/flywheel-contracts/src/flywheel/contracts/trace.py`, `v0.py` (docstring `TraceRef`); `schemas/TraceStep.json`, `CameraParams.json`, `RolloutRequest.json`; `tests/test_trace.py`; `packages/flywheel-testkit/src/flywheel/testkit/fixtures/artifacts/TraceStep.json`, `CameraParams.json`; `fixtures/trace/` (README và 4 thư mục trace)
