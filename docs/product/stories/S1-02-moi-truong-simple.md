@@ -8,7 +8,7 @@
 | Người làm | Hiếu |
 | Story PRD | 1.2 · Epic 1 |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:sim` |
-| Sprint | S1, tuần 1 |
+| Sprint | S1, tuần 1 · **Lịch 3/11/2026:** trước 13/11/2026 chỉ làm phần DA-26, DA-34 cần (eval task hai bàn và task khay); `datagen`, Replay & Render và phần còn lại sau 13/11 (07 mục 2.4) |
 | Ước lượng | 14 giờ (bản 25/10: 8 giờ; bản đầu: 16 giờ) |
 | Phụ thuộc | Không. Cần cho phần chạy SIMPLE của S1-03, S1-05, S1-06, S1-09, S1-11, DA-16, DA-29, đều của Hiếu. Không chặn người khác: DA-17 và DA-23 code trên simulator giả của testkit; `SimpleSim` thật thuộc story 3.1a (S2) |
 
@@ -82,6 +82,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 27/10/2026 | Mở rộng lại: SIMPLE là simulator chính; task hai bàn; hai chế độ `mujoco` và `mujoco_isaac`; gọi được teleop, datagen, Replay & Render; đo trên 3060; chặn lại S1-05, S1-06, S1-09, S1-11, DA-16, DA-17; 8 → 14 giờ | PO (Hiếu) theo design 27/10/2026 |
 | 28/10/2026 | Sửa dòng Phụ thuộc: S1-02 chỉ cần cho story của Hiếu; DA-17, DA-23 code trên bản giả | PO (Hiếu) |
 | 28/10/2026 | Thêm `scripts/g0/simple/` vào Phạm vi file; đường uv thay Docker trên máy dev (nhiệm vụ con 1.2) | PO (Hiếu) |
+| 3/11/2026 | Cắt phạm vi trước 13/11/2026: chỉ làm phần DA-26 cần (07 mục 2.4, bản 1.2) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

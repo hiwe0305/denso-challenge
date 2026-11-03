@@ -8,7 +8,7 @@
 | Người làm | Hiếu |
 | Story PRD | 1.4 · Epic 1 |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:rl` |
-| Sprint | S1 (tuần 1–2), bắt đầu ngày 1 |
+| Sprint | S1 (tuần 1–2), bắt đầu ngày 1 · **Lịch 3/11/2026:** trước 8/11/2026 chỉ làm phần DA-26 cần: nhiệm vụ 1, 6, 8 (giờ fine-tune và eval của HE); còn lại sau 13/11 (07 mục 2.4) [Đề xuất] |
 | Ước lượng | 20 giờ (bản 25/10: 18 giờ; bản đầu: 12 giờ) |
 | Phụ thuộc | S1-03 nhiệm vụ con 2.1 cho image Ψ₀ ở `docker/psi0/`; nhiệm vụ con 1.2 bắt đầu ngày 1. Cần ngân sách thuê GPU nếu 5090 không đủ. Từ 25/10/2026: máy là RTX 3060 12 GB và Colab Pro (A100, H100); 5090 chờ xác nhận |
 
@@ -82,6 +82,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Chuyển cho Hiếu vì cần phần cứng; nhánh đang mở giữ nguyên, nhiệm vụ con 1.2 vẫn tính cho Châu | PO (Hiếu) theo design chia làn (đã xóa) |
 | 27/10/2026 | AC 7 bỏ stage 2 của robot DENSO, đo trên task hai bàn và tính thêm HE; thêm AC 9 và nhiệm vụ con 8 (thời gian eval hai chế độ, Isaac trên Colab); giữ số nhiệm vụ con cũ; 18 → 20 giờ | PO (Hiếu) theo design 27/10/2026 |
 | 28/10/2026 | Sửa ghi chú làm cặp với Châu theo 07 mục 2.0 bản 0.6 | PO (Hiếu) |
+| 3/11/2026 | Cắt phạm vi trước 13/11/2026: chỉ làm phần DA-26 cần (07 mục 2.4, bản 1.2) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

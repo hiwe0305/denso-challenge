@@ -9,7 +9,7 @@
 | Làn | Adapter simulator (`flywheel-simple`) |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 5.2 · Epic 9 |
 | Nhãn | [Adapter] · `epic:9` · `gate:G0` · `area:sim` |
-| Sprint | S1 tuần 2 đến S2 tuần 3; một episode bàn phím ghi được trước 6/11/2026 |
+| Sprint | S1 tuần 2 đến S2 tuần 3; một episode bàn phím ghi được trước 6/11/2026 · **Lịch 3/11/2026:** dời sau 13/11/2026 (07 mục 2.4). Demo không có teleop bàn phím; teleop ảo của DA-35 thay phần teleop trong sim |
 | Ước lượng | 12 giờ (khoảng 10–15, ước lượng) |
 | Phụ thuộc | S1-02 (môi trường SIMPLE, entry point `teleop_decoupled_wbc`). Trong lúc chờ: viết ánh xạ phím thuần Python và test bằng chuỗi phím giả |
 
@@ -70,6 +70,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Viết lại: teleop qua ROS 2, ra MCAP | PO (Hiếu) theo design chia làn (đã xóa) |
 | 27/10/2026 | Viết lại: thiết bị bàn phím cắm vào `teleop_decoupled_wbc` của SIMPLE trên task hai bàn, ghi LeRobot; bỏ ROS 2, MCAP, robot DENSO; người làm chờ PO giao | PO (Hiếu) theo design 27/10/2026 |
 | 27/10/2026 | Giao cho Hiếu theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
+| 3/11/2026 | Dời sau 13/11/2026 khi cắt phạm vi của Hiếu (07 mục 2.4, bản 1.2) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
