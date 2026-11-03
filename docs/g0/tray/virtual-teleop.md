@@ -173,3 +173,39 @@ Quyết định **[Đề xuất]**:
 | Bấm nút đóng ngay khi planner đóng, không chờ tay bắt kịp | Phong cách tay đã tắt khi kẹp; bản chờ tay (tới 0,3 s) cho 7/16 đạt | |
 
 Chưa làm: lúc dừng giữa pha (0–3 lần mỗi episode ở người). Dừng tay khi planner đang chạy đồng hồ pha sẽ làm lệch các mốc giờ của planner; planner đã có các lúc chờ riêng (giữ khi kẹp, khi nâng, khi tới bàn B). So chuyển động với người (AC 8) để nhiệm vụ 12.
+
+## Lô demo cha (nhiệm vụ 7)
+
+```bash
+MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src nohup setsid \
+    fwdata/simple/.venv/bin/python scripts/g0/tray/pico/generate_parents.py \
+    --out fwdata/simple/tray/virtual/parents-1103b --levels 0,1 --seeds 100-179 --workers 16 \
+    < /dev/null > parents-1103b.log 2>&1 &
+```
+
+`generate_parents.py` chia điều kiện xoay vòng cho các worker; mỗi worker là một phiên `--streamer virtual` với env và dataset LeRobot riêng ở `<out>/shard-NN/`. Chạy lại thì bỏ qua điều kiện shard đã ghi. Cuối lô ghi `<out>/summary.json`: số lượt, kết quả, nhãn lỗi, giây sim, giây worker, danh sách demo cha đủ 7 cờ bước (shard, chỉ số episode, level, seed, seed phong cách).
+
+Trong lúc làm nhiệm vụ 5–7, DA-33 merge vào master cách cầm ngửa lòng bàn tay dưới tay cầm (D-25, Hiếu chọn 3/11/2026), thay cho cách kẹp ngón D-19 mà nhiệm vụ 5, 6 đã chỉnh trên đó. Vì vậy có hai lô, cùng 160 điều kiện (mức 0 và 1, seed train 100–179, mỗi điều kiện một lượt, `style_base` 0, cùng seed phong cách), rtx3060, 3/11/2026. **Bộ demo cha cho S2 là `parents-1103b`**: cùng planner với mã đang commit và với S1 của DA-33.
+
+| Đo | `parents-1103b` (D-25, mã hiện hành) | `parents-1103` (D-19, trước khi rebase) |
+|---|---|---|
+| `operator_version` | `da35-virtual-1+cfg.69a57a6c` | `da35-virtual-1+cfg.cdc6ee44` |
+| Đạt `check_success` | 129/160 (80,6%) | 139/160 (86,9%) |
+| Demo cha đủ 7 cờ bước | **129**: mức 0 62/80, mức 1 67/80 | 138: mức 0 68/80, mức 1 70/80 |
+| Hỏng | `L-TRAY-TILT` 16, `timeout:ARRIVE_B` 11, `L-PLACE-POSE` 3, `timeout:RELEASE` 1 | `timeout:ARRIVE_B` 15, `L-PLACE-POSE` 4, `L-TRAY-TILT` 2 |
+| Dữ liệu (rtx3060, `~/denso-da35/fwdata/simple/tray/virtual/`, không commit) | 129 episode, 203 782 frame (1,13 giờ ở 50 Hz), 1,2 GB | 139 episode, 228 844 frame (1,27 giờ), 1,4 GB |
+| Meta | Cả lô: `synthetic`, `S1`, `virtual_teleop`, `planned`, `train`, `public`; mỗi episode một seed phong cách | Như bên trái |
+| Lô (thực) | 18,6 phút (0,311 giờ), 16 worker | 20,7 phút (0,345 giờ), 14 worker |
+| Giây worker | 4,35 giờ; **121 s mỗi demo cha** | 4,21 giờ; 110 s mỗi demo cha |
+| Máy dùng chung | Hai server Ψ₀ của phiên khác (GPU và CPU) | Một server Ψ₀ trên GPU |
+
+Một lượt chạy 2,9–3,2 lần chậm hơn thời gian thực khi chạy 14–16 worker (94–98 s thực cho 30–33 s sim). Kiểm tra trước lô D-25 trên 16 điều kiện của nhiệm vụ 6: 15/16 đạt, cả 15 đủ cờ (một `timeout:ARRIVE_B`).
+
+Sổ chi phí: [DA-35.csv](../ledger/DA-35.csv) (mỗi lô một dòng ước lượng trước khi chạy và một dòng đo).
+
+Khoảng trống đã biết:
+
+- Với D-25, `L-TRAY-TILT` thành lỗi chính (10%): PICO chỉ có ba kiểu đóng bàn tay cố định, kiểu "middle" giữ khay ngửa tay kém chắc hơn khi quay và đi. Chưa chỉnh; đủ demo cha cho S2.
+- `timeout:ARRIVE_B` (7–9%): planner bước tới khi khay cách đích dưới 2 cm và thân lắc khi bước.
+- Khi lượt **cuối** của một shard hỏng, bộ xuất của SIMPLE vẫn ghi video của episode bị bỏ (`parents-1103`: 2 file thừa ở `shard-02` episode 11 và `shard-06` episode 8). Meta và parquet không có chúng; công cụ đọc theo `meta/episodes.jsonl` thì không ảnh hưởng.
+- Bảng chỉnh ở nhiệm vụ 6 đo với planner D-19; với D-25 chỉ đo lại bản cuối (15/16).
