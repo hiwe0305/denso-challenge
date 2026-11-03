@@ -126,6 +126,7 @@ class TraceLog:
     """
 
     episode_id: str
+    trace_id: str | None
     rows: tuple[TraceRow, ...]
     absent_fields: tuple[str, ...]
     gap_counts: dict[str, int]
@@ -227,7 +228,8 @@ def load_episode(path: Path) -> SystemInputs:
     The layout is file names rather than a manifest, because a rollout writes
     its trace, its RTC log and its camera parameters as separate files and
     nothing in the contracts ties them together yet. Naming the trace directly
-    is allowed, and the rest is looked for beside it.
+    is allowed, and the rest is looked for beside it. The RTC log is kept to
+    the chunks of this trace (`_of_trace`), since DA-19 writes one per job.
     """
     trace_path = path if path.is_file() else path / TRACE_NAME
     if not trace_path.is_file():
@@ -235,9 +237,10 @@ def load_episode(path: Path) -> SystemInputs:
     directory = trace_path.parent
     rtc_path = directory / RTC_NAME
     camera_path = directory / CAMERA_NAME
+    trace = read_trace_log(trace_path)
     return SystemInputs(
-        trace=read_trace_log(trace_path),
-        rtc=read_rtc_log(rtc_path) if rtc_path.is_file() else (),
+        trace=trace,
+        rtc=_of_trace(read_rtc_log(rtc_path), trace, rtc_path) if rtc_path.is_file() else (),
         cameras=read_camera_params(camera_path) if camera_path.is_file() else (),
         infra_status=_infra_status(directory / EPISODE_NAME),
         has_rtc_log=rtc_path.is_file(),
@@ -252,7 +255,8 @@ def read_trace_log(path: Path) -> TraceLog:
     parsed = tuple(_trace_row(row, path, number) for number, row in enumerate(rows, start=1))
     absent = _absent_fields(rows)
     return TraceLog(
-        episode_id=_episode_id(rows) or path.stem,
+        episode_id=_first_text(rows, "episode_id") or path.stem,
+        trace_id=_first_text(rows, "trace_id"),
         rows=parsed,
         absent_fields=absent,
         gap_counts=_gap_counts(parsed, absent),
@@ -464,12 +468,34 @@ def _infra_status(path: Path) -> str | None:
     return status
 
 
-def _episode_id(rows: list[dict[str, Any]]) -> str | None:
+def _first_text(rows: list[dict[str, Any]], key: str) -> str | None:
     for row in rows:
-        value = row.get("episode_id")
+        value = row.get(key)
         if isinstance(value, str) and value:
             return value
     return None
+
+
+def _of_trace(
+    records: tuple[RTCInferenceRecord, ...], trace: TraceLog, path: Path
+) -> tuple[RTCInferenceRecord, ...]:
+    """The chunks of this trace in an RTC log that may hold a whole job.
+
+    `RTCClient` of DA-19 writes one `rtc.jsonl` per job and tells the traces
+    in it apart by `trace_id`, so the log beside a trace can carry the
+    latency of every other episode of the job too. A trace that names no
+    `trace_id` can only take a log that holds one trace; anything else would
+    be picking another episode's latency by guess.
+    """
+    if trace.trace_id is not None:
+        return tuple(record for record in records if record.trace_id == trace.trace_id)
+    traces = {record.trace_id for record in records}
+    if len(traces) > 1:
+        raise ReaderError(
+            f"`{path}` chứa log RTC của {len(traces)} trace mà trace không ghi `trace_id`, "
+            f"không biết chunk nào là của episode này"
+        )
+    return records
 
 
 def _step(row: dict[str, Any], path: Path, number: int) -> int:
