@@ -25,6 +25,8 @@ Script tạo venv Python 3.10 ở `fwdata/simple/.venv` của checkout chính (m
 
 **Đổi pin SIMPLE ngày 3/11/2026 [Đã chốt, Hiếu].** `b75c678` là `6d10628` cộng đúng một sửa của tác giả (PR #29, commit `77872fe`, 29/10/2026): task hai bàn khởi động G1 với tay ở tư thế 0. Ở `6d10628`, `g1_sonic` khởi động tay giơ (`init_qpos` cánh tay `[0.5, 0, ±0.2, 0.55, 0, 0, 0]`), ngón chạm bàn 1 trong lúc WBC ổn định nên robot bị đẩy lùi 0,1–0,28 m khỏi điểm xuất phát; theo commit, dữ liệu và checkpoint của task được thu với tay ở 0. Giữa hai commit chỉ đổi `src/simple/tasks/g1_wholebody_locomotion_pick_between_tables_teleop.py`; gitlink của mọi submodule và ba file LFS của AMO giữ nguyên (kiểm bằng `gh api` ngày 3/11/2026). Task khay (DA-32) có lớp task riêng trong `flywheel_simple.tray`, nên số đo và dữ liệu khay đã ghi với `6d10628` vẫn dùng được. Image Docker công bố của SIMPLE (build 30/8/2026) là bản trước sửa này: eval Ψ₀ của S1-03 phải vá file task hoặc ghi đè `init_qpos` cánh tay về 0.
 
+**Bản tham chiếu camera G0 của task hai bàn (3/11/2026, DA-38).** [`camera-reference-two-table.yaml`](camera-reference-two-table.yaml) ghi hai camera `head_stereo_left`, `head_stereo_right` (640×360, fx = fy = 224,0664, tâm ảnh (320, 180), pose so với `eye_in_head`). Các giá trị đọc từ model MuJoCo đã dựng ở SIMPLE `b75c678` bằng `scripts/g0/trace/pin_camera_reference.py`. `reference_sha256 = fc7f9c90ebbf8c4662fd70e58de5aed668c0fbc5ccfbbd951dce705729cdeea2`. Đây là hash mà mọi `CameraParams` của task hai bàn mang, và là giá trị cho khối `r5` của `configs/eval/diagnosis/system.yaml`. Đổi pin SIMPLE thì chạy lại script; hash đổi nghĩa là camera đổi.
+
 ## Khác với `pyproject.toml` của SIMPLE
 
 | Thay đổi | Lý do |

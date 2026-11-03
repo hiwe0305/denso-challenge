@@ -1,0 +1,40 @@
+# Bản tham chiếu camera G0 của một task SIMPLE (DA-38 nhiệm vụ 3.2, review PO 3/11/2026 B3).
+# Sinh bởi scripts/g0/trace/pin_camera_reference.py; không sửa tay. Khóa reference_sha256
+# và cameras có dạng khối r5 của configs/eval/diagnosis/system.yaml.
+env_id: simple/G1WholebodyLocomotionPickBetweenTablesTeleop-v0
+simple_commit: b75c6786f87b4a7f43b52b0ac5b83a1d9ea62e11
+pinned_on: '2026-11-03'
+reference_sha256: fc7f9c90ebbf8c4662fd70e58de5aed668c0fbc5ccfbbd951dce705729cdeea2
+cameras:
+  head_stereo_left:
+    mount: eye_in_head
+    width: 640
+    height: 360
+    fx: 224.06641222710715
+    fy: 224.06641222710715
+    cx: 320.0
+    cy: 180.0
+    pose:
+    - 0.05762353911995888
+    - 0.017529990524053574
+    - 0.4298701882362366
+    - 0.6592535452986646
+    - 0.25570444464487047
+    - -0.2557044446448706
+    - -0.6592535452986645
+  head_stereo_right:
+    mount: eye_in_head
+    width: 640
+    height: 360
+    fx: 224.06641222710715
+    fy: 224.06641222710715
+    cx: 320.0
+    cy: 180.0
+    pose:
+    - 0.05762353911995888
+    - -0.03247000947594643
+    - 0.4298701882362366
+    - 0.6592535452986646
+    - 0.25570444464487047
+    - -0.2557044446448706
+    - -0.6592535452986645
