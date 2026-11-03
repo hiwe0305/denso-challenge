@@ -229,3 +229,23 @@ def test_revealing_dataset_ids_are_rejected() -> None:
             create_defect_dataset(episodes, dataset_id=name)
     with pytest.raises(ValueError, match="reveals"):
         create_clean_dataset(episodes, dataset_id="ds_psi_data_clean")
+
+
+def test_dataset_passes_the_layout_to_the_injector() -> None:
+    from flywheel.contracts.artifacts import ActionDimension, ActionLayout
+
+    layout = ActionLayout(
+        dimensions=[
+            ActionDimension(
+                name=f"a{d}",
+                group="g",
+                masked=d < 25,
+                limit_low=-1.0 if d < 31 else None,
+                limit_high=1.0 if d < 31 else None,
+            )
+            for d in range(36)
+        ]
+    )
+    _, manifest = create_defect_dataset(_make_episodes(99), layout=layout)
+    dims = [int(d.parameters["dimension"]) for d in manifest.defects if "dimension" in d.parameters]
+    assert dims and all(d >= 25 for d in dims)
