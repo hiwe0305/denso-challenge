@@ -10,11 +10,15 @@ from pathlib import Path
 import pytest
 from flywheel.contracts.artifacts import ActionLayout
 from flywheel_psi0.trainer.colab import (
+    JOB_ID,
+    completed_checkpoints,
     continuity,
     g1_layout_json,
     interrupting_runner,
     lock_constraints,
+    persist,
     repair_lock,
+    restore,
 )
 
 WRITER = """
@@ -159,3 +163,36 @@ def test_the_first_real_colab_log_is_valid_and_resumes_bit_for_bit() -> None:
         assert train[(0, step)].lr == train[(1, step)].lr
     assert {r.grad_norm_vlm for r in train.values()} == {0.0}  # frozen VLM, measured
     assert all(len(r.loss_by_chunk_pos) == 30 - 8 for r in train.values())
+
+
+def fake_job(work: Path, saved_step: int, steps: tuple[int, ...]) -> Path:
+    """A job directory as Psi0Trainer leaves it, with `ckpt_<step>` for each of `steps`."""
+    job = work / "runs" / JOB_ID
+    run = job / "psi0" / "finetune" / "fw-run.da19" / "checkpoints"
+    for step in steps:
+        (run / f"ckpt_{step}").mkdir(parents=True)
+        (run / f"ckpt_{step}" / "model.safetensors").write_bytes(b"w" * step)
+    (job / "metrics.jsonl").write_text(line(0, saved_step, 1.0) + "\n")
+    (job / "result.json").write_text(json.dumps({"checkpoint_step": saved_step}))
+    return job
+
+
+def test_only_fully_saved_checkpoints_count_as_complete(tmp_path: Path) -> None:
+    job = fake_job(tmp_path, saved_step=40, steps=(20, 40, 60))  # ckpt_60 still writing
+
+    assert [p.name for p in completed_checkpoints(job)] == ["ckpt_20", "ckpt_40"]
+
+
+def test_persist_then_restore_brings_the_job_back_on_a_fresh_vm(tmp_path: Path) -> None:
+    fake_job(tmp_path / "vm1", saved_step=40, steps=(20, 40, 60))
+    drive = tmp_path / "drive"
+
+    persist(tmp_path / "vm1", drive)
+    restore(tmp_path / "vm2", drive)
+
+    restored = tmp_path / "vm2" / "runs" / JOB_ID
+    names = sorted(p.name for p in restored.glob("psi0/*/*/checkpoints/ckpt_*"))
+    assert names == ["ckpt_20", "ckpt_40"]  # the half-written ckpt_60 never left vm1
+    assert (restored / "metrics.jsonl").read_text() == line(0, 40, 1.0) + "\n"
+    report = json.loads((tmp_path / "vm2" / "report.json").read_text())
+    assert report["phases"]["restore"]["source"] == str(drive / JOB_ID)
