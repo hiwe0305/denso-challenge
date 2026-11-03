@@ -34,7 +34,7 @@ Là kỹ sư duyệt một cụm lỗi ở phần 6 của demo, tôi muốn mộ
 - [x] 1. Model `EvidenceCard` và các phần của nó trong `flywheel.contracts.evidence` (AC 1–5, 9)
 - [x] 2. JSON Schema và file mẫu dùng chung, kèm script sinh lại (AC 6)
 - [x] 3. Contract test (AC 7)
-- [ ] 4. Dòng seam: vị trí hợp đồng, chủ, story, hạn (AC 8)
+- [x] 4. Dòng seam: vị trí hợp đồng, chủ, story, hạn (AC 8)
 
 ## Phạm vi file
 
