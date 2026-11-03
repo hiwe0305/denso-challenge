@@ -28,7 +28,7 @@ Là kỹ sư dữ liệu, tôi muốn một bộ dữ liệu và log thật đư
 ## Nhiệm vụ
 
 - [ ] 1. Bộ cấy lỗi dữ liệu trên bản sao psi-data (AC 1)
-- [ ] 2. Log train và log RTC cấy lỗi từ bộ giả (AC 2) · chuyển sang PR sau `DA-27-log-defects` (PO 4/11/2026)
+- [x] 2. Log train và log RTC cấy lỗi từ bộ giả (AC 2) · PR `DA-27-log-defects`
 - [ ] 3. `DefectManifest` có hash, chặn agent đọc (AC 3)
 - [ ] 4. Bản sạch (AC 4)
 - [ ] 5. Giao bản cấy và bản sạch, test chặn release (AC 5)
@@ -105,6 +105,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - 4/11/2026 (`DA-27/9.10`): chạy lại trên psi-data ở `rtx3060` với `c2e0b23`: mọi kiểm tra đạt (33 lỗi đủ 11 × 3, footer một biến thể, video đi qua nguyên vẹn, stats khớp, không lineage trong bản sao); sha256 manifest bản cấy `e41e8d49…`, cây `4efe79fa…`; bản sạch không đổi.
 - 4/11/2026 (`DA-27/9.11`): theo quyết định của Hiếu, mọi episode của cả hai bản sao có seed điều kiện dàn dựng (dải train, cùng giá trị ở hai bản), riêng 3 episode `holdout_seed_leak` mang seed holdout; `meta/benchmark_copy.json` ghi đây là dàn dựng, không phải dữ liệu của tác giả.
 - 4/11/2026 (`DA-27/9.12`): chạy lại trên psi-data ở `rtx3060` với `5f8d6bd`: mọi kiểm tra đạt, gồm seed dàn dựng; manifest không đổi (`8962a6cf…`, `e41e8d49…`); sha256 cây mới `62f48eaf…` (bản sạch), `3a5630f7…` (bản cấy).
+- 4/11/2026 (`DA-27/2.2`, PR `DA-27-log-defects`): log train T1–T8 và log RTC R1, R2 viết lại trên hợp đồng (`TrainingMetric`, `RTCInferenceRecord`, `ProbeP4`) theo layout làn Đánh giá đọc; mỗi loại 3 job, bản sạch cùng hình dạng, đáp án niêm phong; bộ phát hiện của DA-08 và DA-13 bắt đúng mã từng job, không báo nhầm trên job sạch. Sửa `InjectConfig.default_path` (trỏ nhầm `packages/`, nên `configs/data/inject.yaml` chưa bao giờ được đọc). Nhiệm vụ 2 xong.
 - 3/11/2026 (`DA-27/9.2`): `seal_manifest` ghi `defect_manifest.json` và `.sha256`, từ chối ghi vào thư mục bản sao; test quét mã chặn agent (`flywheel.eval.agentqa` trừ `bench/`) và phép kiểm (`flywheel.data` trừ `inject/`) nhắc tới đáp án; bỏ `ManifestLock.can_agent_read` (chỉ so tên vai). Nhiệm vụ 9 còn mở tới khi bản sạch và niêm phong chạy trên parquet thật.
 - 3/11/2026 (`DA-27/10.1`): `flywheel.data.inject.api.has_injected_defect(episode: Episode) -> bool` cho `release` của DA-03, có test; theo hợp đồng hiện tại xét `meta.injected_defect`, đổi sang `benchmark_copy_id` khi #36 merge. Nhiệm vụ 10 còn mở (chạy trên `rtx3060`, giao DA-31).
 - 3/11/2026 (issue #62, sau khi #36 merge): episode không còn mang `injected_defect`; mọi episode của hai bản sao chấm mang `benchmark_copy_id` bằng `dataset_id` trung tính của bản sao; đáp án chỉ trong `DefectManifest`; rào release và `has_injected_defect` chặn theo `benchmark_copy_id` (design 6.1, 9.2; 03 bản 1.0 mục 4.3). Nhiệm vụ 6 làm lại theo hợp đồng mới ở `DA-27/6.1`.

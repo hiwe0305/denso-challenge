@@ -62,19 +62,7 @@ def build_benchmark(
     cfg = config or load_inject_config()
     defect_id, clean_id = copy_ids(cfg.seed)
     copies, answers = out_dir / "copies", out_dir / "answers"
-    run_plan_id, job_id = f"rp_inject_{defect_id}", f"job_inject_{defect_id}"
     frames = int(read_info(src_root)["total_frames"])
-    estimate = LedgerEntry(
-        activity="data_generation",
-        resource_type="cpu_seconds",
-        quantity=2 * frames * ESTIMATED_SECONDS_PER_FRAME,
-        unit="s",
-        usd_amount=0.0,
-        measure_kind="estimated",
-        run_plan_id=run_plan_id,
-        job_id=job_id,
-        note=f"Assumed {ESTIMATED_SECONDS_PER_FRAME} s per frame per copy, two copies",
-    )
     start = clock()
 
     def seal(copy_id: str, manifest: DefectManifest) -> BuiltCopy:
@@ -90,21 +78,50 @@ def build_benchmark(
 
     defect = seal(defect_id, inject_copy(src_root, copies / defect_id, cfg, layout))
     clean = seal(clean_id, clean_copy(src_root, copies / clean_id, cfg))
+    rows = ledger_rows(
+        f"rp_inject_{defect_id}",
+        f"job_inject_{defect_id}",
+        estimate_s=2 * frames * ESTIMATED_SECONDS_PER_FRAME,
+        measured_s=round(clock() - start, 3),
+        note=f"Assumed {ESTIMATED_SECONDS_PER_FRAME} s per frame per copy, two copies",
+    )
+    append_ledger(out_dir, rows)
+    return BenchmarkBuild(defect, clean, rows)
+
+
+def ledger_rows(
+    run_plan_id: str, job_id: str, estimate_s: float, measured_s: float, note: str
+) -> tuple[LedgerEntry, LedgerEntry]:
+    """The job's estimated and measured CPU-time rows; the measured one points at the estimate."""
+    estimate = LedgerEntry(
+        activity="data_generation",
+        resource_type="cpu_seconds",
+        quantity=estimate_s,
+        unit="s",
+        usd_amount=0.0,
+        measure_kind="estimated",
+        run_plan_id=run_plan_id,
+        job_id=job_id,
+        note=note,
+    )
     measured = LedgerEntry(
         activity="data_generation",
         resource_type="cpu_seconds",
-        quantity=round(clock() - start, 3),
+        quantity=measured_s,
         unit="s",
         usd_amount=0.0,
         measure_kind="measured",
         estimate_entry_id=estimate.id,
         run_plan_id=run_plan_id,
         job_id=job_id,
-        note="Wall time of both copies on one CPU process",
+        note="Wall time of the job on one CPU process",
     )
+    return estimate, measured
+
+
+def append_ledger(out_dir: Path, rows: tuple[LedgerEntry, LedgerEntry]) -> None:
     with (out_dir / "ledger.jsonl").open("a", encoding="utf-8") as f:
-        f.write(canonical_json(estimate) + "\n" + canonical_json(measured) + "\n")
-    return BenchmarkBuild(defect, clean, (estimate, measured))
+        f.write("".join(canonical_json(row) + "\n" for row in rows))
 
 
 def load_layout(path: Path) -> ActionLayout:

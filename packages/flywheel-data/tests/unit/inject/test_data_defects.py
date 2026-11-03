@@ -8,7 +8,7 @@ import pytest
 import yaml
 from flywheel.contracts.artifacts import ActionDimension, ActionLayout
 from flywheel.data.inject.applied import defect_applied
-from flywheel.data.inject.config import DataDefectConfig, load_inject_config
+from flywheel.data.inject.config import DataDefectConfig, InjectConfig, load_inject_config
 from flywheel.data.inject.data_defects import (
     ANGLE_ACTION_DIMS,
     JOINT_ACTION_DIMS,
@@ -298,3 +298,9 @@ def test_layout_without_limited_joints_makes_joint_limit_not_applicable() -> Non
     )
     with pytest.raises(NotApplicable):
         DataDefectInjector(layout=layout).inject_joint_limit_exceeded(_make_dummy_episode())
+
+
+def test_default_config_path_is_the_repo_file() -> None:
+    # parents[5] pointed at packages/, so the loader silently fell back to defaults.
+    assert InjectConfig.default_path() == REPO / "configs/data/inject.yaml"
+    assert InjectConfig.default_path().is_file()

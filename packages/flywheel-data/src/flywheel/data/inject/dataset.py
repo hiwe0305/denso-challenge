@@ -15,13 +15,15 @@ from flywheel.data.inject.manifest import manifest_sha256
 _REVEALING_WORDS = ("clean", "defect", "inject", "pristine", "dirty")
 
 
-def copy_ids(seed: int) -> tuple[str, str]:
+def copy_ids(seed: int, namespace: str = "data") -> tuple[str, str]:
     """Neutral ids of the defect copy and the clean copy, in that order.
 
     Both share one format so the agent under test cannot tell the copies apart; which id
-    holds defects is recorded only in the DefectManifest that the scorer reads.
+    holds defects is recorded only in the DefectManifest that the scorer reads. The log
+    copies use namespace "logs", so their ids differ from the data copies'.
     """
-    rng = random.Random(f"benchmark-copy-ids:{seed}")
+    key = f"benchmark-copy-ids:{seed}" if namespace == "data" else f"copy-ids:{namespace}:{seed}"
+    rng = random.Random(key)
     first, second = (f"bench-{rng.getrandbits(48):012x}" for _ in range(2))
     return first, second
 

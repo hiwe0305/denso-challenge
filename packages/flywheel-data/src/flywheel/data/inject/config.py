@@ -22,15 +22,39 @@ class DataDefectConfig:
 
 
 @dataclass(frozen=True)
+class LogDefectConfig:
+    """Log defects, each set past its threshold in configs/eval/diagnosis/*.yaml."""
+
+    jobs_per_kind: int = 3
+    extra_clean_train_jobs: int = 6
+    extra_clean_rtc_jobs: int = 4
+    steps: int = 3000
+    train_every: int = 50
+    val_every: int = 250
+    t2_val_drop: float = 0.01  # under t2.min_relative_drop 0.05
+    t3_val_rises: int = 5  # over t3.m_measurements 3
+    t5_window_steps: int = 1000  # t5.window_steps; the dead dim covers twice that
+    t6_std_ratio: float = 0.1  # under t6.min_std_ratio 0.30
+    t7_p1_drop: float = 0.25  # over t7.max_relative_drop 0.10
+    t8_frozen_grad: float = 0.5  # over t8.frozen_tolerance 0
+    rtc_chunks: int = 200
+    control_hz: float = 50.0
+    r1_latency_s: float = 0.155  # over r1.tau_lat_s 0.15; ceil(0.155 * 50) = 8, not over r2
+    r1_fraction: float = 0.05  # enough chunks to lift the 99th percentile
+    r2_latency_s: float = 0.24  # one chunk, delay 12 over r2.max_delay_steps 8
+
+
+@dataclass(frozen=True)
 class InjectConfig:
     version: str = "1.0.0"
     seed: int = 42
     episodes_per_kind: int = 3
     data: DataDefectConfig = field(default_factory=DataDefectConfig)
+    logs: LogDefectConfig = field(default_factory=LogDefectConfig)
 
     @classmethod
     def default_path(cls) -> Path:
-        return Path(__file__).resolve().parents[5] / "configs" / "data" / "inject.yaml"
+        return Path(__file__).resolve().parents[6] / "configs" / "data" / "inject.yaml"
 
 
 def parse_simple_yaml(text: str) -> dict[str, Any]:
@@ -123,4 +147,7 @@ def load_inject_config(path: Path | None = None) -> InjectConfig:
         seed=int(data.get("seed", 42)),
         episodes_per_kind=int(data.get("episodes_per_kind", 3)),
         data=data_cfg,
+        logs=LogDefectConfig(
+            jobs_per_kind=int(data.get("log_defects", {}).get("jobs_per_kind", 3)),
+        ),
     )
