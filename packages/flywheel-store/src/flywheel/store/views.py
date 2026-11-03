@@ -99,6 +99,32 @@ def get_table_columns(table_name: str) -> dict[str, str]:
     return cols
 
 
+# Episode and QAReport carry their own id field; `id` is only a property there.
+ID_COLUMNS: dict[str, str] = {
+    "episode": "COALESCE(id, episode_id)",
+    "qa_report": "COALESCE(id, report_id)",
+}
+
+
+def _view_sql(table_name: str, pattern: str, id_expr: str) -> str:
+    """One row per record id over every part file of a table.
+
+    The store is append-only, so a record written twice (a scorer re-run on the
+    same trace, a retried write) is on disk twice. An id names one record, so
+    the view keeps the copy in the earliest part file and drops the rest; part
+    files are named by ULID, so that is the first one written.
+    """
+    cols = get_table_columns(table_name)
+    cols_dict_sql = "{" + ", ".join(f"'{k}': '{v}'" for k, v in cols.items()) + "}"
+    return (
+        f"CREATE OR REPLACE VIEW {table_name} AS "
+        f"SELECT {id_expr} AS id, * EXCLUDE (id, filename) "
+        f"FROM read_json('{pattern}', columns={cols_dict_sql}, union_by_name=true, "
+        f"filename=true) "
+        f"QUALIFY row_number() OVER (PARTITION BY {id_expr} ORDER BY filename) = 1"
+    )
+
+
 def init_views(con: duckdb.DuckDBPyConnection, paths: StorePaths) -> None:
     """Create or replace DuckDB views on catalog tables and runs ledger."""
     # 1. Catalog tables
@@ -114,26 +140,7 @@ def init_views(con: duckdb.DuckDBPyConnection, paths: StorePaths) -> None:
                 init_file.write_text("", encoding="utf-8")
 
         pattern = (table_dir / "*.jsonl").as_posix()
-        cols = get_table_columns(table_name)
-        cols_dict_sql = "{" + ", ".join(f"'{k}': '{v}'" for k, v in cols.items()) + "}"
-
-        if table_name == "episode":
-            con.execute(
-                f"CREATE OR REPLACE VIEW {table_name} AS "
-                f"SELECT COALESCE(id, episode_id) AS id, * EXCLUDE (id) "
-                f"FROM read_json('{pattern}', columns={cols_dict_sql}, union_by_name=true)"
-            )
-        elif table_name == "qa_report":
-            con.execute(
-                f"CREATE OR REPLACE VIEW {table_name} AS "
-                f"SELECT COALESCE(id, report_id) AS id, * EXCLUDE (id) "
-                f"FROM read_json('{pattern}', columns={cols_dict_sql}, union_by_name=true)"
-            )
-        else:
-            con.execute(
-                f"CREATE OR REPLACE VIEW {table_name} AS "
-                f"SELECT * FROM read_json('{pattern}', columns={cols_dict_sql}, union_by_name=true)"
-            )
+        con.execute(_view_sql(table_name, pattern, ID_COLUMNS.get(table_name, "id")))
 
     # 2. Cost ledger from runs/**/ledger*.jsonl
     runs_dir = paths.runs_dir
@@ -146,13 +153,7 @@ def init_views(con: duckdb.DuckDBPyConnection, paths: StorePaths) -> None:
             init_ledger.write_text("", encoding="utf-8")
 
     ledger_pattern = (runs_dir / "**/ledger*.jsonl").as_posix()
-    ledger_cols = get_table_columns("ledger_entry")
-    ledger_cols_dict_sql = "{" + ", ".join(f"'{k}': '{v}'" for k, v in ledger_cols.items()) + "}"
-    con.execute(
-        "CREATE OR REPLACE VIEW ledger_entry AS "
-        f"SELECT * FROM read_json('{ledger_pattern}', "
-        f"columns={ledger_cols_dict_sql}, union_by_name=true)"
-    )
+    con.execute(_view_sql("ledger_entry", ledger_pattern, "id"))
 
 
 def open_duckdb(
