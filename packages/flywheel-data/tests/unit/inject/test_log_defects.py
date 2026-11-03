@@ -27,6 +27,8 @@ from flywheel.data.inject.log_defects import (
     main,
 )
 from flywheel.data.inject.manifest import ManifestLock, load_manifest
+from flywheel.store.ledger_append import read_job_ledger
+from flywheel.store.paths import StorePaths
 
 REPO = Path(__file__).resolve().parents[5]
 WORDS = (b"inject", b"defect", b"duplicate", b"bench")
@@ -35,7 +37,7 @@ WORDS = (b"inject", b"defect", b"duplicate", b"bench")
 @pytest.fixture(scope="module")
 def built(tmp_path_factory: pytest.TempPathFactory) -> Any:
     out = tmp_path_factory.mktemp("logs") / "logs"
-    return out, build_log_benchmark(out)
+    return out, build_log_benchmark(out, store=out.parent / "store")
 
 
 def _jobs(root: Path) -> list[Path]:
@@ -209,7 +211,17 @@ def test_both_copies_look_alike_and_keep_the_answer_outside(built: Any) -> None:
 
 
 def test_cli_prints_the_handoff(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    assert main(["--out", str(tmp_path / "logs")]) == 0
+    assert main(["--out", str(tmp_path / "logs"), "--store", str(tmp_path / "store")]) == 0
     handoff = json.loads(capsys.readouterr().out)
     assert len(handoff["copies"]) == 2
     assert all(len(c["manifest_sha256"]) == 64 for c in handoff["copies"])
+
+
+def test_the_log_build_writes_its_ledger_rows_to_the_store(built: Any) -> None:
+    out, result = built
+    job = result.ledger
+    rows = read_job_ledger(job.run_plan_id, job.job_id, StorePaths(out.parent / "store"))
+    assert [r["measure_kind"] for r in rows] == ["estimated", "measured"]
+    assert rows[1]["estimate_entry_id"] == rows[0]["id"]
+    assert job.job_id.startswith("job_inject_logs_") and job.run_plan_id.startswith("g0-DA-27-")
+    assert not (out / "ledger.jsonl").exists()

@@ -44,7 +44,8 @@ def _jobs(root: Path) -> list[Path]:
 
 @pytest.fixture(scope="module")
 def built(tmp_path_factory: pytest.TempPathFactory):  # type: ignore[no-untyped-def]
-    return build_log_benchmark(tmp_path_factory.mktemp("logs") / "logs")
+    base = tmp_path_factory.mktemp("logs")
+    return build_log_benchmark(base / "logs", store=base / "store")
 
 
 def test_each_injected_job_raises_exactly_its_code(built) -> None:  # type: ignore[no-untyped-def]
@@ -64,7 +65,7 @@ def test_the_clean_copy_raises_nothing(built) -> None:  # type: ignore[no-untype
 def test_a_defect_short_of_its_threshold_goes_unseen(tmp_path: Path) -> None:
     # The check bites: pred_std at half of target_std is above t6.min_std_ratio 0.30.
     weak = dataclasses.replace(InjectConfig(), logs=LogDefectConfig(t6_std_ratio=0.5))
-    result = build_log_benchmark(tmp_path / "logs", weak)
+    result = build_log_benchmark(tmp_path / "logs", weak, store=tmp_path / "store")
     root = Path(result.defect.ref.uri)
     t6 = [d for d in load_manifest(result.defect.manifest_path).defects if d.code == "T6"]
     assert len(t6) == 3

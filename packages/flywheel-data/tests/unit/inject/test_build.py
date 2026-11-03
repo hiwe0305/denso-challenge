@@ -1,6 +1,7 @@
 """Both benchmark copies, the sealed answers and the job's ledger rows (tasks 9 and 10)."""
 
 import json
+import re
 from pathlib import Path
 
 import numpy as np
@@ -11,6 +12,8 @@ from flywheel.data.inject.api import copy_marker
 from flywheel.data.inject.build import build_benchmark, main
 from flywheel.data.inject.dataset import copy_ids
 from flywheel.data.inject.manifest import ManifestLock, load_manifest
+from flywheel.store.ledger_append import read_job_ledger
+from flywheel.store.paths import StorePaths
 from lerobot_data import make_dataset, tree_hashes
 
 
@@ -20,7 +23,7 @@ def built(tmp_path_factory: pytest.TempPathFactory):  # type: ignore[no-untyped-
     src = base / "psi"
     make_dataset(src, count=40, length=8)
     before = tree_hashes(src)
-    result = build_benchmark(src, base / "inject")
+    result = build_benchmark(src, base / "inject", store=base / "store")
     assert tree_hashes(src) == before
     return src, base / "inject", result
 
@@ -57,24 +60,33 @@ def test_answers_are_sealed_outside_both_copies(built) -> None:  # type: ignore[
         assert not list(copy_root.rglob("defect_manifest*"))
 
 
-def test_job_writes_an_estimate_and_a_measurement(built) -> None:  # type: ignore[no-untyped-def]
+def test_job_writes_an_estimate_and_a_measurement_to_the_store(built) -> None:  # type: ignore[no-untyped-def]
+    # Both rows go through flywheel.data.ledger.job_ledger into the store's run ledger.
     _, out, result = built
+    job = result.ledger
+    store = out.parent / "store"
     rows = [
-        LedgerEntry.model_validate_json(line)
-        for line in (out / "ledger.jsonl").read_text().splitlines()
+        LedgerEntry.model_validate(row)
+        for row in read_job_ledger(job.run_plan_id, job.job_id, StorePaths(store))
     ]
-    assert rows == list(result.ledger)
+    assert rows == [job.estimate, job.measured]
     estimate, measured = rows
     assert (estimate.measure_kind, measured.measure_kind) == ("estimated", "measured")
     assert measured.estimate_entry_id == estimate.id
-    assert estimate.run_plan_id == measured.run_plan_id and measured.job_id
-    assert measured.quantity >= 0 and measured.unit == "s"
+    assert re.fullmatch(r"g0-DA-27-\d{8}", job.run_plan_id) and job.job_id.startswith("job_inject_")
+    assert estimate.activity == "data_generation" and measured.quantity >= 0
+    assert not (out / "ledger.jsonl").exists()
 
 
 def test_cli_prints_the_handoff(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     src = tmp_path / "psi"
     make_dataset(src, count=40, length=6)
-    assert main(["--source", str(src), "--out", str(tmp_path / "inject")]) == 0
+    store = tmp_path / "store"
+    args = ["--source", str(src), "--out", str(tmp_path / "inject"), "--store", str(store)]
+    assert main(args) == 0
     handoff = json.loads(capsys.readouterr().out)
     assert {c["dataset_id"] for c in handoff["copies"]} == set(copy_ids(42))
     assert all(len(c["manifest_sha256"]) == 64 for c in handoff["copies"])
+    assert read_job_ledger(
+        handoff["ledger"]["run_plan_id"], handoff["ledger"]["job_id"], StorePaths(store)
+    )

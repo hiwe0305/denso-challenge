@@ -71,7 +71,7 @@ uv run python -m flywheel.data.inject.build --source <gốc LeRobot> --out fwdat
     --layout configs/embodiments/g1.yaml --config configs/data/inject.yaml
 ```
 
-Lệnh ghi `copies/<id>/` (bản cấy và bản sạch, id trung tính từ `copy_ids(seed)`), `answers/<id>/defect_manifest.json` và `.sha256` (chỉ bộ chấm đọc), `ledger.jsonl` (một dòng ước tính, một dòng thực đo trỏ về dòng ước tính), rồi in `DatasetRef`, đường dẫn và hash manifest của từng bản cho DA-31. Bản sạch chép từ bản gốc qua cùng đường ghi như bản cấy, nên hai bản chỉ khác nhau ở lỗi. Ingest một bản sao gọi `flywheel.data.inject.api.mark_copy_episode` để mọi `Episode` mang `benchmark_copy_id`. `ledger.jsonl` chưa ghi vào sổ của store vì `flywheel-data` chưa khai phụ thuộc `flywheel-store` (`pyproject.toml` thuộc DA-03).
+Lệnh ghi `copies/<id>/` (bản cấy và bản sạch, id trung tính từ `copy_ids(seed)`), `answers/<id>/defect_manifest.json` và `.sha256` (chỉ bộ chấm đọc), và hai dòng `LedgerEntry` của job (một dòng ước tính, một dòng thực đo trỏ về dòng ước tính) vào sổ của store qua `flywheel.data.ledger.job_ledger` (`runs/<run_plan_id>/<job_id>/ledger.jsonl` dưới gốc store, run plan `g0-DA-27-<yyyymmdd>`), rồi in `DatasetRef`, đường dẫn và hash manifest của từng bản cho DA-31. Bản sạch chép từ bản gốc qua cùng đường ghi như bản cấy, nên hai bản chỉ khác nhau ở lỗi. Ingest một bản sao gọi `flywheel.data.inject.api.mark_copy_episode` để mọi `Episode` mang `benchmark_copy_id`. `ledger.jsonl` chưa ghi vào sổ của store vì `flywheel-data` chưa khai phụ thuộc `flywheel-store` (`pyproject.toml` thuộc DA-03).
 
 ### Chạy trên psi-data thật (4/11/2026)
 
@@ -112,7 +112,7 @@ Bàn giao cho DA-31 (Châu), in ra từ lệnh trên, đường dẫn tính từ
      "manifest": "fwdata/inject/answers/bench-d19e112835e3/defect_manifest.json",
      "manifest_sha256": "e41e8d49467c5ee30365c9c5993069195d6e41cf5ceae88b509de9bc0081820f"}
   ],
-  "ledger": "fwdata/inject/ledger.jsonl"
+  "ledger": "fwdata/inject/ledger.jsonl (lần chạy 5f8d6bd, trước PR DA-27-ledger-store)"
 }
 ```
 
@@ -121,7 +121,7 @@ Bộ chấm biết bản nào sạch qua manifest (`defects` rỗng); agent ch�
 Còn lại:
 
 - **Quy tắc chạy [Đã chốt 4/11/2026, Hiếu]:** mỗi lượt chạy Agent QA/QC (DA-20) và mỗi lượt QA của DA-31 gắn đúng một bản sao, chỉ đọc; không có đường tới psi-data gốc, tới bản sao kia, hay tới `answers/`. So hai bản với nhau, hoặc với bản gốc, là thấy hết lỗi; đọc `answers/` là thấy đáp án.
-- `ledger.jsonl` chưa vào sổ của store: cần thêm `"flywheel-store"` vào `dependencies` của `packages/flywheel-data/pyproject.toml` (và `uv lock`), thuộc DA-03; Hiếu quyết.
+- Sổ chi phí: từ PR `DA-27-ledger-store`, cả hai lệnh dựng (dữ liệu và log) ghi dòng ước tính và thực đo vào sổ của store qua `job_ledger` của DA-03, không còn `ledger.jsonl` cạnh đầu ra. Lần chạy ở trên (`5f8d6bd`) có trước thay đổi này nên còn file đó.
 
 ---
 
@@ -158,7 +158,7 @@ Mỗi bản có 30 job train (8 loại × 3, cộng 6 job sạch) và 10 job RTC
 Test trong làn (`tests/unit/inject/test_log_defects.py`) so mỗi job với job sạch cùng id: lỗi đổi đúng một tín hiệu, đúng mức cấu hình. Test nối làn (`tests/e2e/test_log_defects_detected.py`) chạy bộ phát hiện của làn Đánh giá trên từng job: job có lỗi ra đúng mã của nó và không mã nào khác, job sạch và bản sạch không ra mã nào; T1–T8 qua `flywheel.eval.api.diagnose_train`, R1, R2 qua hàm nội bộ vì api chưa có hàm đọc riêng log RTC. testkit chưa có bộ giả sinh metrics hay log RTC, nên bộ sinh ở đây thay cho `FakeTrainer` và log RTC giả của design 9.2. Hai bản có cùng hình dạng, id trung tính (`copy_ids(seed, namespace="logs")`), một mtime, `meta/benchmark_copy.json` ghi log là tổng hợp, không phải số đo.
 
 ```bash
-uv run python -m flywheel.data.inject.log_defects --out fwdata/inject-logs
+uv run python -m flywheel.data.inject.log_defects --out fwdata/inject-logs [--store <gốc store>]
 ```
 
 ---

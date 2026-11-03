@@ -23,7 +23,6 @@ import json
 import math
 import os
 import random
-import time
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
@@ -39,11 +38,12 @@ from flywheel.contracts.artifacts import (
 )
 from flywheel.contracts.training import TrainingMetric
 from flywheel.contracts.v0 import DatasetRef
-from flywheel.data.inject.build import BenchmarkBuild, BuiltCopy, ledger_rows, load_layout
+from flywheel.data.inject.build import BenchmarkBuild, BuiltCopy, ledger_handoff, load_layout
 from flywheel.data.inject.codes import LOG_DEFECT_CODES
 from flywheel.data.inject.config import InjectConfig, LogDefectConfig, load_inject_config
 from flywheel.data.inject.dataset import copy_ids
 from flywheel.data.inject.manifest import MANIFEST_FILENAME, seal_manifest
+from flywheel.data.ledger import job_ledger
 
 G1_LAYOUT = Path(__file__).resolve().parents[6] / "configs" / "embodiments" / "g1.yaml"
 PROBE_SET = hashlib.sha256(b"DA-27 synthetic probe set").hexdigest()
@@ -345,40 +345,45 @@ def _write_copy(
 
 
 def build_log_benchmark(
-    out_dir: Path, config: InjectConfig | None = None, layout: ActionLayout | None = None
+    out_dir: Path,
+    config: InjectConfig | None = None,
+    layout: ActionLayout | None = None,
+    *,
+    store: Path | None = None,
+    run_plan_id: str | None = None,
 ) -> BenchmarkBuild:
     """Write the defect and the clean log copy under `out_dir` and seal their answers."""
     cfg = config or load_inject_config()
     layout = layout or load_layout(G1_LAYOUT)
     defect_id, clean_id = copy_ids(cfg.seed, namespace="logs")
     copies, answers = out_dir / "copies", out_dir / "answers"
-    start = time.monotonic()
-    built = []
-    for copy_id, inject in ((defect_id, True), (clean_id, False)):
-        manifest = _write_copy(copies / copy_id, copy_id, cfg.seed, layout, cfg.logs, inject)
-        path = answers / copy_id / MANIFEST_FILENAME
-        digest = seal_manifest(manifest, path, copy_roots=[copies])
-        built.append(
-            BuiltCopy(DatasetRef(dataset_id=copy_id, uri=str(copies / copy_id)), path, digest)
-        )
-    rows = ledger_rows(
-        f"rp_inject_{defect_id}",
-        f"job_inject_{defect_id}",
-        estimate_s=1.0,
-        measured_s=round(time.monotonic() - start, 3),
+    with job_ledger(
+        "data_generation",
+        "inject_logs",
+        1.0,
         note="Assumed 1 s for both log copies",
-    )
-    with (out_dir / "ledger.jsonl").open("a", encoding="utf-8") as f:
-        f.write("".join(row.model_dump_json() + "\n" for row in rows))
-    return BenchmarkBuild(built[0], built[1], rows)
+        run_plan_id=run_plan_id,
+        story="DA-27",
+        store=store,
+    ) as job:
+        built = []
+        for copy_id, inject in ((defect_id, True), (clean_id, False)):
+            manifest = _write_copy(copies / copy_id, copy_id, cfg.seed, layout, cfg.logs, inject)
+            path = answers / copy_id / MANIFEST_FILENAME
+            digest = seal_manifest(manifest, path, copy_roots=[copies])
+            built.append(
+                BuiltCopy(DatasetRef(dataset_id=copy_id, uri=str(copies / copy_id)), path, digest)
+            )
+    return BenchmarkBuild(built[0], built[1], job)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build the two DA-27 log benchmark copies")
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--config", type=Path)
+    parser.add_argument("--store", type=Path, help="store root; default $FW_ROOT or ./fwdata")
     args = parser.parse_args(argv)
-    result = build_log_benchmark(args.out, load_inject_config(args.config))
+    result = build_log_benchmark(args.out, load_inject_config(args.config), store=args.store)
     copies = sorted((result.defect, result.clean), key=lambda c: c.ref.dataset_id)
     print(
         json.dumps(
@@ -391,7 +396,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                         "manifest_sha256": c.manifest_sha256,
                     }
                     for c in copies
-                ]
+                ],
+                "ledger": ledger_handoff(result.ledger),
             },
             indent=2,
         )
