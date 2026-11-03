@@ -49,7 +49,7 @@ PR 2 (hạn 9/11/2026):
   - [x] 3.1 Ngưỡng và hành động khi trượt trong `configs/data/qa.yaml`, bộ nạp không có giá trị mặc định ngầm; ngưỡng bước nhảy action hiệu chỉnh trên psi-data
   - [x] 3.2 Bảy phép kiểm của spec mục 4.4 và phép kiểm riêng nguồn, mỗi phép kiểm mang một mã D của design mục 10; episode 0 hoặc 1 khung ra `reject`; đọc `ReplayReport` (động học trượt thì `reject`, động lực học thì `flag`); kiểm stats của dataset (D4)
 - [ ] 4. Release: chặn bản cấy lỗi, chặn hạt giống ngoài dải, manifest có hash (AC 4)
-  - [ ] 4.1 `build_release` từ chối cả release khi có bản sao chấm lỗi, hạt giống ngoài dải `train`, episode thiếu `QAReport` hoặc không thuộc split `train`
+  - [x] 4.1 `build_release` từ chối cả release khi có bản sao chấm lỗi, hạt giống ngoài dải `train`, episode thiếu `QAReport` hoặc không thuộc split `train`
   - [ ] 4.2 `Release` đóng băng có `manifest_sha256`, giữ episode bị loại cùng lý do; `ReleaseManifest` và file mẫu dùng chung trong testkit (mối nối `3-ReleaseManifest`)
 - [ ] 5. `DatasetReport` và trang HTML (AC 5)
 - [ ] 6. Lệnh `fw data`; chạy trên psi-data và khay S1 trên `rtx3060` (AC 6)
