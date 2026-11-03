@@ -301,6 +301,29 @@ class StreamerDecoupledAgent(PicoDecoupledAgent):  # type: ignore[misc]
         if bind is not None:
             bind(streamer.body_pre_processor)
 
+    def reset_policy(self) -> None:
+        """SIMPLE's reset, plus the calibration decoupled_wbc keeps across episodes.
+
+        TeleopStreamer stays `is_calibrated` after the first activation, so in every
+        later episode of a process the activation step already maps the controllers
+        with the old calibration, and WristsPreProcessor appends its hands to
+        `ee_name_list` again at every calibration. An episode then differed from
+        the same episode run first in a fresh process from the activation step on
+        (DA-35 task 10: identical up to step 165, apart after). Reset both to how a
+        new pipeline starts.
+        """
+        super().reset_policy()
+        streamer = self._teleop_policy.teleop_streamer
+        streamer.is_calibrated = False
+        pre = streamer.body_pre_processor
+        if pre is not None:
+            pre.calibration_ee_pose = {}
+            pre.ee_name_list = []
+            pre.robot_world_T_init_ee = {}
+            pre.init_teleop_T_teleop_world = {}
+            pre.init_teleop_T_init_ee = {}
+            pre.latest_data = None
+
     def _poll_pico_buttons(self) -> None:
         # No controller buttons; a streamer that gives up (the virtual operator) asks
         # for the reset that holding both grips would.

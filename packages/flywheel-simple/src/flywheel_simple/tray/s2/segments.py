@@ -7,19 +7,24 @@
 | P, place | until the end (success, step 7) | 6 place, 7 release_stand |
 
 Each frame also gets an anchor: the frame its wrist targets follow when S2
-moves the scene (task 10). The hands follow the robot while it walks (the
-approach to table A, the carry, the arrival at table B) and the tray or the
-target zone while they handle the tray there:
+moves the scene (task 10). The hands follow the tray while they reach for it and
+close on the handles, the target zone while they lower and release it, and the
+robot otherwise (walking, lifting, carrying):
 
 | Anchor | Frames |
 |---|---|
-| robot | [0, walk_a_end), [k_end, place_start) |
-| tray | [walk_a_end, k_end) |
+| tray | [reach_start, grasp_end) |
 | target | [place_start, end) |
+| robot | the rest |
 
-`walk_a_end` is the end of the approach walk: the last walking run of at least
+`reach_start` is the frame from which both wrist targets stay within
+`reach_radius` of where they are when the grasp flag comes on (in the world,
+robot frame = pelvis position and yaw); `grasp_end` is that flag plus
+`grasp_hold_s`. Once the tray is in the hands it moves with the robot, as in
+the parent. The robot's walks set where S2 waits for the base (task 10):
+`walk_a_end` is the end of the approach walk, the last walking run of at least
 `walk_min_s` that starts before step 1 (shorter runs are the corrective steps
-DA-33's planner takes while reaching). `place_start` is the end of the last
+DA-33's planner takes while reaching); `place_start` is the end of the last
 walking run that starts before step 6, i.e. once the robot stands at table B.
 The lower body walks while |(vx, vy, vyaw)| >= 0.1 (G1GearWbcPolicy's switch
 between its walk and balance policies).
@@ -59,6 +64,8 @@ class Segmentation:
     walk_a_end: int
     place_start: int
     walking: tuple[tuple[int, int], ...]  # [start, end) runs of the walking policy
+    reach_start: int
+    grasp_end: int
 
     def segment_of(self, frame: int) -> Segment:
         if not 0 <= frame < self.frames:
@@ -68,9 +75,9 @@ class Segmentation:
         return "W" if frame < self.w_end else "P"
 
     def anchor_of(self, frame: int) -> Anchor:
-        segment = self.segment_of(frame)
-        if segment == "K":
-            return "tray" if frame >= self.walk_a_end else "robot"
+        self.segment_of(frame)  # range check
+        if self.reach_start <= frame < self.grasp_end:
+            return "tray"
         return "target" if frame >= self.place_start else "robot"
 
     def as_dict(self) -> dict[str, Any]:
@@ -89,6 +96,8 @@ class Segmentation:
             walk_a_end=int(data["walk_a_end"]),
             place_start=int(data["place_start"]),
             walking=tuple((int(a), int(b)) for a, b in data["walking"]),
+            reach_start=int(data["reach_start"]),
+            grasp_end=int(data["grasp_end"]),
         )
 
 
@@ -108,7 +117,25 @@ def first_frames(steps: NDArray[np.bool_]) -> tuple[int | None, ...]:
     return tuple(out)
 
 
-def segment(demo: ParentDemo, hold_s: float = 0.5, walk_min_s: float = 0.5) -> Segmentation:
+def wrist_positions(demo: ParentDemo) -> np.ndarray:
+    """(T, 2, 3) world positions of the wrist targets (robot frame = pelvis position and yaw)."""
+    w, x, y, z = (demo.base_pose[:, k] for k in range(3, 7))
+    yaw = np.arctan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
+    c, s = np.cos(yaw), np.sin(yaw)
+    out = np.zeros((demo.frames, 2, 3))
+    for k, off in enumerate((0, 7)):
+        px, py, pz = (demo.eef[:, off + i] for i in range(3))
+        out[:, k] = demo.base_pose[:, :3] + np.stack([c * px - s * py, s * px + c * py, pz], 1)
+    return out
+
+
+def segment(
+    demo: ParentDemo,
+    hold_s: float = 0.5,
+    walk_min_s: float = 0.5,
+    reach_radius: float = 0.25,
+    grasp_hold_s: float = 0.2,
+) -> Segmentation:
     """The K, W, P cut and the anchors of `demo`; SegmentError if its flags do not allow it."""
     first = first_frames(demo.steps)
     needed = first[: PLACE + 1]
@@ -130,6 +157,11 @@ def segment(demo: ParentDemo, hold_s: float = 0.5, walk_min_s: float = 0.5) -> S
     walk_a_end = min(approach[-1][1], k_end) if approach else 0
     to_b = [run for run in runs if k_end <= run[0] < reached[PLACE]]
     place_start = max(w_end, to_b[-1][1]) if to_b else w_end
+
+    grasp = reached[GRASP]
+    wrists = wrist_positions(demo)
+    far = np.linalg.norm(wrists[:grasp] - wrists[grasp], axis=2).max(axis=1) > reach_radius
+    reach_start = int(np.flatnonzero(far)[-1]) + 1 if far.any() else 0
     return Segmentation(
         frames=demo.frames,
         step_frames=first,
@@ -138,4 +170,6 @@ def segment(demo: ParentDemo, hold_s: float = 0.5, walk_min_s: float = 0.5) -> S
         walk_a_end=walk_a_end,
         place_start=min(place_start, demo.frames),
         walking=runs,
+        reach_start=reach_start,
+        grasp_end=min(grasp + round(grasp_hold_s * FPS), k_end),
     )
