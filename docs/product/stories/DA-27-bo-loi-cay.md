@@ -19,7 +19,7 @@ Là kỹ sư dữ liệu, tôi muốn một bộ dữ liệu và log thật đư
 
 ## Tiêu chí chấp nhận
 
-1. Bộ cấy chạy trên bản sao của gói psi-data task hai bàn (không sửa bản gốc): mỗi loại lỗi dữ liệu ở design mục 9.2 (rơi khung ảnh; lệch thời gian ảnh và state; nhảy khớp; vượt giới hạn khớp; NaN; sai đơn vị độ và radian; đảo dấu một chiều action; episode hỏng gắn nhãn thành công; sai câu lệnh task; trùng episode; rò hạt giống holdout) có tham số, tỉ lệ cấy khoảng 5–10% số episode, hạt giống ghi lại.
+1. Bộ cấy chạy trên bản sao của gói psi-data task hai bàn (không sửa bản gốc): mỗi loại lỗi dữ liệu ở design mục 9.2 (rơi khung ảnh; lệch thời gian ảnh và state; nhảy khớp; vượt giới hạn khớp; NaN; sai đơn vị độ và radian; đảo dấu một chiều action; episode hỏng gắn nhãn thành công; sai câu lệnh task; trùng episode; rò hạt giống holdout) có tham số, mỗi loại 3 episode (33 trên 99), quyết định PO 3/11/2026; mỗi episode mang tối đa một lỗi, hạt giống ghi lại.
 2. Log train cấy lỗi T1–T8 và log RTC cấy lỗi R1, R2 sinh từ bộ giả, cùng schema với log thật.
 3. Đáp án ghi vào `DefectManifest`, hash khóa trước khi chạy QA và agent; agent và phép kiểm không đọc được file này (có test). Bản 3/11/2026: dùng `DefectManifest`, `Defect` của `flywheel.contracts`, không định nghĩa bản ghi riêng; mã lỗi theo design 27/10 mục 10 (D1, D2, D3, D5, D6, D7; log giữ T1–T8, R1–R2), tên lỗi cũ giữ trong `parameters["kind"]`; episode cấy lỗi mang `EpisodeMetadata.injected_defect`.
 4. Một bản sạch (không cấy) cùng kích thước để đo báo nhầm.
@@ -37,7 +37,7 @@ Bản 3/11/2026 (nhiệm vụ 1–5 là 5 commit của Thông; [plan chia lại 
 
 - [x] 6. Thay bản ghi manifest riêng bằng `DefectManifest`, `Defect` của hợp đồng; episode cấy lỗi mang `EpisodeMetadata.injected_defect` (AC 3)
 - [x] 7. Đổi mã lỗi theo design mục 10: NaN → D1; rơi khung, lệch đồng bộ → D2; nhảy khớp, vượt giới hạn, sai đơn vị → D3; trùng episode, rò hạt giống → D5; nhãn thành công sai, câu lệnh sai → D6; đảo dấu một chiều action → D7 (AC 1, 3)
-- [ ] 8. Cấy lên bản sao parquet thật bằng bộ đọc và ghi của DA-03 PR 1, tỉ lệ 5–10%, hạt giống ghi trong manifest (AC 1)
+- [ ] 8. Cấy lên bản sao parquet thật bằng bộ đọc và ghi của DA-03 PR 1, mỗi loại 3 episode (33 trên 99), hạt giống ghi trong manifest (AC 1)
 - [ ] 9. Bản sạch cùng số episode; `seal_manifest` ghi `defect_manifest.json` và `.sha256`; test agent không đọc được manifest (AC 3, 4)
 - [ ] 10. `has_injected_defect` và test; chạy trên `rtx3060` ra `fwdata/inject/<dataset_id>/{injected,clean}`, gửi `DatasetRef` và đường dẫn manifest cho Châu (DA-31) (AC 5)
 
@@ -75,6 +75,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 27/10/2026 | Tách bộ chấm sang DA-31; giao cho Thông theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 | 3/11/2026 | Người làm Thông → Hiếu theo quyết định PO (07 bản 1.6; [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) Q1, Q4, Q5): giữ 5 commit của Thông làm nhiệm vụ 1–5; thêm nhiệm vụ 6–10 (hợp đồng, mã lỗi D/T/R, parquet thật, niêm phong, `has_injected_defect`); AC 3, AC 5 ghi rõ theo Q5; bộ chấm DA-31 của Châu | PO (Hiếu) |
+| 3/11/2026 | AC 1: tỉ lệ cấy đổi từ khoảng 5–10% số episode sang mỗi loại 3 episode (33 trên 99), mỗi episode tối đa một lỗi; NaN giữ mã D1 theo design mục 9.2 | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
