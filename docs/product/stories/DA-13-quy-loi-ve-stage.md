@@ -28,7 +28,7 @@ Là kỹ sư đánh giá, tôi muốn mỗi cụm lỗi closed-loop được ki�
 
 ## Nhiệm vụ
 
-- [ ] 1. Bộ đọc `Trace`, log RTC, kết quả probe qua contracts (AC 1, 3)
+- [x] 1. Bộ đọc `Trace`, log RTC, kết quả probe qua contracts (AC 1, 3)
 - [ ] 2. Kiểm thiếu tín hiệu và R3 sai số bám lệnh (AC 1)
 - [ ] 3. R1, R2 độ trễ và buffer; R4 đồng bộ; R5 camera; R6 hạ tầng (AC 1)
 - [ ] 4. Cấu hình ngưỡng có hash (AC 2)
