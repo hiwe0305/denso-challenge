@@ -31,8 +31,8 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
 - [ ] 1. RunPlan ba nhánh, chọn tập demo có hash (AC 1)
   - [x] 1.1 Code chọn tập demo lồng nhau tất định từ release DA-33, có hash (`flywheel_psi0.tray.demo_sets`); test CPU: cùng đầu vào ra cùng hash, tập 40 ⊂ tập 80, không phụ thuộc thứ tự, kiểm manifest của release
   - [x] 1.2 Chạy chọn tập trên release `tray_s1_0d84cc87b1e5`, ghi `configs/runplans/tray/demo_sets.json`; chạy lại với `--check` khớp
-  - [ ] 1.3 RunPlan `he-tray.yaml` cho A, C, C-NOEGO (cùng recipe, số bước, seed train, hạt giống điều kiện eval; checkpoint gốc và ablation có revision và sha256); khung `round-tray-cplus.yaml` cho C+ (AC 6, chưa đóng băng); code kiểm bất biến và tính `run_plan_id`, có test
-  - [ ] 1.4 Chốt quy tắc diễn giải trước khi chạy ở `docs/he/tray.md` (design mục 6.4, 6.6)
+  - [x] 1.3 RunPlan `he-tray.yaml` cho A, C, C-NOEGO (cùng recipe, số bước, seed train, hạt giống điều kiện eval; checkpoint gốc và ablation có revision và sha256); khung `round-tray-cplus.yaml` cho C+ (AC 6, chưa đóng băng); code kiểm bất biến và tính `run_plan_id`, có test
+  - [ ] 1.4 Chốt quy tắc diễn giải trước khi chạy ở `docs/he/tray.md` (design mục 6.4, 6.6), rồi đóng băng RunPlan (`he-tray.lock.json`)
   - [ ] 1.5 Sổ chi phí ước lượng `docs/g0/ledger/DA-34.csv` (dòng `estimated`: fine-tune A, C, C-NOEGO, C+ và eval)
 - [ ] 2. Fine-tune A, C, C-NOEGO (AC 2)
 - [ ] 3. Eval và bảng kết quả, video (AC 3, 4)
