@@ -1,0 +1,19 @@
+{
+  "site_id": "local",
+  "task_id": "two-table",
+  "embodiment_id": "g1",
+  "schema_version": "1.0.0",
+  "meta": {},
+  "id": "clu_a3c3225f3336c3d6",
+  "run_plan_id": "rp_1",
+  "first_failed_step": 2,
+  "failure_kind": "L-GRASP",
+  "level": 1,
+  "failure_class": "grasp",
+  "parent_cluster_id": null,
+  "representative_seed": 1,
+  "member_episode_ids": [
+    "ep_1"
+  ],
+  "card_uri": null
+}

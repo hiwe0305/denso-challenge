@@ -353,7 +353,7 @@ Những điều phải nói rõ khi trình bày:
 | Thiết bị teleop (bản 0.5) | SIMPLE chỉ hỗ trợ kính PICO, đội không có | Thiết bị bàn phím tự viết cắm vào teleop decoupled WBC; sinh tự động bằng motion planning |
 | Dữ liệu nhà máy (bản 0.4) | Video egocentric có người thật; DENSO chưa nói dữ liệu có được rời site không | Ngoài L0 từ bản 0.5; khi có: che danh tính trước mọi bước; dữ liệu `restricted`, `internal` chỉ xử lý bằng NIM tự host |
 | NIM (bản 0.4) | API hosted có thể bị ngừng (Cosmos Reason1-7B ngừng 24/03/2026); bộ sinh video tự host cần khoảng 31–58 GB VRAM | Bộ sinh video chạy trên A100 thuê; danh sách model NIM nằm trong cấu hình có hash |
-| Quyền dữ liệu | psi-data và trọng số Ψ₀ trên Hugging Face chưa khai giấy phép (kiểm 22/10/2026); mã Ψ₀ là Apache 2.0; SIMPLE là MIT nhưng tài sản Objaverse và HSSD có giấy phép riêng | Lineage phải ghi giấy phép; cần hỏi tác giả trước khi dùng ngoài PoC |
+| Quyền dữ liệu | psi-data và trọng số Ψ₀ trên Hugging Face chưa khai giấy phép (kiểm 22/10/2026); mã Ψ₀ là Apache 2.0; SIMPLE là MIT nhưng tài sản Objaverse và HSSD có giấy phép riêng | Lineage phải ghi giấy phép; bản 0.6: không hỏi tác giả (PO, 3/11/2026), `license = unknown` ghi là giới hạn, chỉ dùng trong PoC |
 
 ### 9.2 Giả định
 
@@ -395,7 +395,7 @@ Giả định thêm ở bản 0.4:
 | Lõi dính chặt vào Ψ₀ hoặc SIMPLE | Không mở rộng được L1–L3 | Lõi có trường hoặc lệnh riêng của Ψ₀ | Viết adapter ACT và Diffusion Policy ngay từ G1 để kiểm ranh giới |
 | Trôi phạm vi sang làm giao diện | Vòng chưa chạy trọn khi hết 12 tuần | Tuần 6 chưa có trace và scorer chạy được | Giao diện chỉ ở mức "nên có"; ưu tiên TN1–TN8 |
 | Đối thủ lớn thêm tính năng tương tự | Giảm giá trị khác biệt | Thông báo sản phẩm của Foxglove, Encord, NVIDIA | Tích hợp thay vì cạnh tranh; hào chắn dựa vào dữ liệu của DENSO |
-| Giấy phép dữ liệu | Không dùng được kết quả cho DENSO | Nguồn không khai giấy phép hoặc là NC | Ghi giấy phép trong lineage; hỏi tác giả psi-data |
+| Giấy phép dữ liệu | Không dùng được kết quả cho DENSO | Nguồn không khai giấy phép hoặc là NC | Ghi giấy phép trong lineage; bản 0.6: không hỏi tác giả psi-data (PO, 3/11/2026), ghi `license = unknown` là giới hạn |
 | HE không cho khác biệt (bản 0.5) | Không chứng minh được claim egocentric trên task hai bàn | Hai đường cong chồng nhau ở HE-1 | Báo kết quả âm như kết quả hợp lệ; nêu giới hạn của checkpoint ablation; vẫn giữ Data Core, Agent QA/QC và sổ chi phí làm đầu ra |
 | Tải người vượt mức (bản 0.4) | Phạm vi thêm khoảng 185–255 giờ; tải từng người khoảng 138–178% mức kế hoạch 70% | k sau Sprint 1 > 1; PR chờ review quá 2 ngày | Giữ đủ phạm vi; phần trễ chuyển sang API theo từng phần trước; sau đó mới cắt theo 04 mục 7.2 |
 | Sim giúp ít hơn dữ liệu người (bản 0.4) | HS âm; khuyến nghị thu dữ liệu phải nghiêng về teleop | Kết quả âm của Mirchandani và cộng sự (CoRL 2024) | Giữ điều kiện so với A₀.₇; báo số demo người theo nhánh; khuyến nghị dựa trên số đo, không dựa trên kỳ vọng |
@@ -429,6 +429,7 @@ Nội bộ, trả lời ở cổng G0: Q0–Q6 của spec v10 mục 2.4 và V3 (
 
 | Ngày | Phiên bản | Nội dung | Người sửa |
 |---|---|---|---|
+| 3/11/2026 | 0.6 | Mục 9.1 (quyền dữ liệu) và 10.1 (giấy phép dữ liệu): bỏ việc hỏi tác giả về giấy phép theo quyết định PO 3/11/2026; `license = unknown` ghi là giới hạn | PO (Hiếu) |
 | 27/10/2026 | 0.5 | Theo spec v10.4 và design 27/10/2026: bỏ robot DENSO (mục 1, 6.1 TN12 thay bằng thí nghiệm HE, TN11 ba loại dữ liệu và nguồn test, TN13 thêm Agent QA/QC, 6.2, tiêu chí MVP 6 theo demo 17/11, rủi ro mục 10, A10–A11); bỏ liên kết tới 00 đã xóa | PO (Hiếu) |
 | 22/10/2026 | 0.1 | Bản đầu | Analyst |
 | 22/10/2026 | 0.2 | Mục 6.1, 9.1, 10.1: đổi mã tính năng F1–F10 thành TN1–TN10 để không trùng "task dự phòng F1" của spec | PO |

@@ -1,0 +1,43 @@
+{
+  "report_id": "rep_invalid_001",
+  "subject_ref": "releases/rel_001/dataset_report.json",
+  "stage": "dataset",
+  "created_at": "2026-11-03T10:00:00Z",
+  "model": {
+    "name": "nemotron-3.5-bolt-e4b",
+    "revision": "r1",
+    "temperature": 0.0,
+    "prompt_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  },
+  "inputs": [
+    {
+      "ref": "releases/rel_001/dataset_report.json",
+      "kind": "dataset_report",
+      "sha256": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+    }
+  ],
+  "facts": [
+    {
+      "fact_id": "F1",
+      "name": "drop_rate_pct",
+      "value": 4.5,
+      "unit": "%",
+      "source_ref": "releases/rel_001/dataset_report.json"
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "find_001",
+      "code": "D2",
+      "rank": 1,
+      "target_ref": "episodes/ep_001",
+      "evidence": ["F1"],
+      "figures": [],
+      "insight": "High frame drop rate detected with {F99} unsupported citations.",
+      "suggestion": "Re-record episode."
+    }
+  ],
+  "estimates": [],
+  "status": "ok",
+  "problems": []
+}

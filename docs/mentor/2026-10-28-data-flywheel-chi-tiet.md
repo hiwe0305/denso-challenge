@@ -803,5 +803,5 @@ Giả sử policy π₀ là Ψ₀ V-EGO fine-tune trên 20 demo teleop của tas
 | Thiết bị và lượng video egocentric tự quay | Độ tin pose, giá trị fine-tune stage 1 | Hiếu, mentor |
 | Model gán nhãn egocentric (RoboBrain, Molmo2) và model nhìn hình của agent (Qwen3.5-4B) | Chất lượng cắt đoạn, có cần agent tự xem hình | Vòng thử mục 4.5.4; câu Q-M |
 | Model che danh tính, hand pose, SLAM | Pipeline egocentric E-A | Người làm DA-04 |
-| Giấy phép psi-data (V9) | Dữ liệu demo có coi là `public` để lên Colab không | Hiếu hỏi PSI Lab |
+| Giấy phép psi-data (V9) | Dữ liệu demo có coi là `public` để lên Colab không | Đã chốt `public` (Hiếu, 2/11/2026); `license = unknown` ghi là giới hạn, không hỏi PSI Lab (Hiếu, 3/11/2026) |
 | Tên lệnh `fw` mới | Giao diện của làn Dữ liệu và bộ lỗi cấy | Khi viết story |
