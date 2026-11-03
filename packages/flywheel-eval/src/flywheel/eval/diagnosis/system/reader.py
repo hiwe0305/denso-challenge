@@ -59,12 +59,16 @@ directory `<trace_id>/`, the one `TraceRef.uri` points at::
         rollout_result.json    # v0 RolloutResult (infra_status); proposed, not yet decided
 
 The file names are the constants below and nowhere else. `rollout_result.json`
-is the proposal awaiting the PO: if it lands elsewhere, `ROLLOUT_NAME` is the
-one line that changes. The RolloutResult is read through
+is the proposal awaiting the PO (G1b): if it lands elsewhere, `ROLLOUT_NAME` is
+the one line that changes. The RolloutResult is read through
 `flywheel.contracts.v0.RolloutResult`, so an `infra_status` outside the
-contract's `InfraStatus` is refused rather than read as a fault, and a
-`trace_ref` naming another trace is refused rather than paired with this one;
-a camera line of another trace is refused the same way. The contract of #48
+contract's `InfraStatus` is refused rather than read as a fault. Its
+`trace_ref` is checked against the directory it sits in, loudly: `trace_id`
+must be the steps' own, `uri` must name this `<trace_id>/` directory, and
+`sha256` - the hash of `steps.jsonl` as the hook wrote it - must be the hash of
+the steps read, so a result is never paired with steps it is not about. A
+camera line of another trace is refused the same way. Either the directory,
+the steps file or the RolloutResult file names a trace. The contract of #48
 and the SimpleSim hook (DA-38) are not merged yet, so this layout is the
 decision's word until a seam test in `tests/e2e/test_demo_seams.py` covers it.
 """
@@ -76,7 +80,7 @@ import json
 import math
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, TypeVar
 
 import numpy as np
@@ -259,17 +263,18 @@ RTC_NAME = "rtc.jsonl"  # in the job dir, the parent of <trace_id>/
 
 
 def load_episode(path: Path) -> SystemInputs:
-    """Read a trace directory `<trace_id>/`, or the `steps.jsonl` inside one, off disk.
+    """Read a trace directory `<trace_id>/` off disk, named by itself or a file in it.
 
+    `path` is the directory, its `steps.jsonl` or its `rollout_result.json`.
     The layout is decision G1 (module docstring). The camera parameters and
     the RolloutResult are beside the steps; the RTC log is the job's, in the
     trace directory's parent, and is kept to the chunks of this trace
     (`_of_trace`).
     """
-    trace_path = path if path.is_file() else path / STEPS_NAME
+    directory = path if path.is_dir() else path.parent
+    trace_path = path if path.is_file() and path.name != ROLLOUT_NAME else directory / STEPS_NAME
     if not trace_path.is_file():
         raise ReaderError(f"{path}: không tìm thấy {STEPS_NAME}")
-    directory = trace_path.parent
     rtc_path = directory.parent / RTC_NAME
     camera_path = directory / CAMERA_NAME
     rollout_path = directory / ROLLOUT_NAME
@@ -284,7 +289,9 @@ def load_episode(path: Path) -> SystemInputs:
         rtc=_of_trace(rtc, trace, rtc_path),
         cameras=_cameras_of_trace(cameras, trace, camera_path),
         infra_status=(
-            None if episode_data is None else _infra_status(episode_data, rollout_path, trace)
+            None
+            if episode_data is None
+            else _infra_status(episode_data, rollout_path, trace, directory)
         ),
         has_rtc_log=rtc_data is not None,
         has_camera_params=camera_data is not None,
@@ -536,17 +543,34 @@ def _artifact(path: Path, model: type[_ARTIFACT]) -> _ARTIFACT:
         raise ReaderError(f"`{path}` không phải {model.__name__}: {error}") from error
 
 
-def _infra_status(data: bytes, path: Path, trace: TraceLog) -> str:
-    """`infra_status` of the episode, for R6, from the RolloutResult beside the steps."""
+def _infra_status(data: bytes, path: Path, trace: TraceLog, directory: Path) -> str:
+    """`infra_status` of the episode, for R6, from the RolloutResult beside the steps.
+
+    The result's `trace_ref` must be about these steps (module docstring); a
+    mismatch raises, because pairing an infra status with the wrong steps is
+    worse than not judging R6.
+    """
     try:
         result = RolloutResult.model_validate(_parse_json(data, path))
     except ValidationError as error:
         raise ReaderError(f"`{path}` không phải RolloutResult: {error}") from error
     ref = result.trace_ref
-    if ref is not None and trace.trace_id is not None and ref.trace_id != trace.trace_id:
+    if ref is None:
+        return result.infra_status
+    if trace.trace_id is not None and ref.trace_id != trace.trace_id:
         raise ReaderError(
             f"`{path}` là RolloutResult của trace `{ref.trace_id}`, "
             f"không phải `{trace.trace_id}` của trace bên cạnh"
+        )
+    if PurePosixPath(ref.uri.rstrip("/")).name != directory.name:
+        raise ReaderError(
+            f"`{path}`: `trace_ref.uri` là `{ref.uri}`, không trỏ vào thư mục trace "
+            f"`{directory.name}/` chứa nó"
+        )
+    if ref.sha256 is not None and ref.sha256 != trace.trace_sha256:
+        raise ReaderError(
+            f"`{path}`: `trace_ref.sha256` là `{ref.sha256}` nhưng `{STEPS_NAME}` có sha256 "
+            f"`{trace.trace_sha256}`; steps đã đổi sau khi rollout ghi kết quả"
         )
     return result.infra_status
 

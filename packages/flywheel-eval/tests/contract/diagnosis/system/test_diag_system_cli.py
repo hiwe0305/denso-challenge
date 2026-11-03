@@ -164,6 +164,17 @@ def test_an_injected_camera_delay_prints_the_sync_label(write_episode, pinned_co
     assert "R4" in result.output
 
 
+def test_the_rollout_result_file_is_accepted_as_the_episode(write_episode, pinned_config) -> None:
+    # The RolloutResult is what the rollout side hands over; its directory is the trace.
+    folder = write_episode()
+
+    by_result = _run("--episode", str(folder / ROLLOUT_NAME), "--config", str(pinned_config))
+    by_directory = _run("--episode", str(folder), "--config", str(pinned_config))
+
+    assert by_result.exit_code == 0, by_result.output
+    assert by_result.output == by_directory.output
+
+
 def test_the_shipped_config_prints_an_unjudged_calibration(write_episode) -> None:
     # The shipped reference is the two-table task's; a camera it does not
     # know is CHƯA RÕ with R5 skipped, which has to be visible without opening
