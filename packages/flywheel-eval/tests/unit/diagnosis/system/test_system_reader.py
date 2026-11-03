@@ -234,3 +234,18 @@ def test_a_percentile_of_nothing_finite_is_nan_not_zero() -> None:
     # every threshold, which is the silent pass FR21 forbids.
     assert math.isnan(percentile(np.array([np.nan, np.nan]), 99))
     assert percentile(np.array([1.0, np.nan, 3.0]), 50) == pytest.approx(2.0)
+
+
+def test_a_vector_logged_as_null_is_a_row_of_gaps_not_a_width_change(row, write_trace) -> None:
+    # With `max_gap_fraction` above zero, as the calibration note in
+    # `system.yaml` asks for, a null vector must reach R3 as one unmeasured
+    # cycle rather than stop the reader.
+    rows = [row(0), row(1, cmd_upper=None), row(2, cmd_upper=[])]
+
+    trace = read_trace_log(write_trace(rows))
+
+    assert trace.gap_counts == {"cmd_upper": 2}
+    error = trace.tracking_error("upper")
+    assert error.shape == (3,)
+    assert error[0] == pytest.approx(0.0)
+    assert math.isnan(error[1]) and math.isnan(error[2])
