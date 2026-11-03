@@ -40,6 +40,20 @@ frame" as None.
 absent RTC log costs R1 and R2 their verdict, by name, and the loader returns
 None for it. A file that is there and cannot be parsed raises, because
 something was written and nobody knows what it says.
+
+**Every file a verdict is read from is hashed.** R1 and R2 read the RTC log,
+R5 the camera parameters and R6 `episode.json`, so `SystemInputs` carries the
+SHA-256 of each beside the trace's; one trace with two RTC logs is then two
+records the store can tell apart. The RTC hash is of the whole file, before it
+is kept to this trace's chunks, because that is the file that was read.
+
+**Where `infra_status` comes from is provisional.** It is read from
+`episode.json` beside the trace, a layout no writer on master produces yet;
+`infra_status` lives on `RolloutResult` and `Episode` of the contracts, and the
+SimpleSim hook (DA-38, Hiếu) is where it will be written. Until that hook fixes
+the file and the seam test of `tests/e2e/test_demo_seams.py` covers it, R6 is
+skipped on every real episode, by name. When the layout is fixed, only
+`_infra_status` and `EPISODE_NAME` change.
 """
 
 from __future__ import annotations
@@ -193,6 +207,10 @@ class SystemInputs:
     infra_status: str | None = None
     has_rtc_log: bool = False
     has_camera_params: bool = False
+    # SHA-256 of the bytes each optional input was read from, None where absent
+    rtc_sha256: str | None = None
+    camera_sha256: str | None = None
+    infra_sha256: str | None = None
 
 
 @dataclass(frozen=True)
@@ -219,6 +237,7 @@ class StageInputs:
 TRACE_NAME = "trace.jsonl"
 RTC_NAME = "rtc.jsonl"
 CAMERA_NAME = "camera_params.json"
+# Provisional: no writer on master yet, pending the SimpleSim hook (DA-38).
 EPISODE_NAME = "episode.json"
 
 
@@ -238,13 +257,21 @@ def load_episode(path: Path) -> SystemInputs:
     rtc_path = directory / RTC_NAME
     camera_path = directory / CAMERA_NAME
     trace = read_trace_log(trace_path)
+    rtc_data = _read_bytes(rtc_path) if rtc_path.is_file() else None
+    camera_data = _read_bytes(camera_path) if camera_path.is_file() else None
+    episode_path = directory / EPISODE_NAME
+    episode_data = _read_bytes(episode_path) if episode_path.is_file() else None
+    rtc = () if rtc_data is None else _rtc_records(rtc_data, rtc_path)
     return SystemInputs(
         trace=trace,
-        rtc=_of_trace(read_rtc_log(rtc_path), trace, rtc_path) if rtc_path.is_file() else (),
-        cameras=read_camera_params(camera_path) if camera_path.is_file() else (),
-        infra_status=_infra_status(directory / EPISODE_NAME),
-        has_rtc_log=rtc_path.is_file(),
-        has_camera_params=camera_path.is_file(),
+        rtc=_of_trace(rtc, trace, rtc_path),
+        cameras=() if camera_data is None else _camera_views(camera_data, camera_path),
+        infra_status=None if episode_data is None else _infra_status(episode_data, episode_path),
+        has_rtc_log=rtc_data is not None,
+        has_camera_params=camera_data is not None,
+        rtc_sha256=_digest(rtc_data),
+        camera_sha256=_digest(camera_data),
+        infra_sha256=_digest(episode_data),
     )
 
 
@@ -261,13 +288,17 @@ def read_trace_log(path: Path) -> TraceLog:
         absent_fields=absent,
         gap_counts=_gap_counts(parsed, absent),
         dropped_frames=sum(row.dropped_frames for row in parsed),
-        trace_sha256=hashlib.sha256(data).hexdigest(),
+        trace_sha256=_sha256(data),
     )
 
 
 def read_rtc_log(path: Path) -> tuple[RTCInferenceRecord, ...]:
     """Read a JSONL RTC inference log through `RTCInferenceRecord` (R1, R2)."""
-    rows = _read_rows(_read_bytes(path), path)
+    return _rtc_records(_read_bytes(path), path)
+
+
+def _rtc_records(data: bytes, path: Path) -> tuple[RTCInferenceRecord, ...]:
+    rows = _read_rows(data, path)
     records = []
     for number, row in enumerate(rows, start=1):
         try:
@@ -282,7 +313,11 @@ def read_rtc_log(path: Path) -> tuple[RTCInferenceRecord, ...]:
 
 def read_camera_params(path: Path) -> tuple[CameraView, ...]:
     """Read the camera parameters of an episode: one object, or a list of them (R5)."""
-    parsed = _read_json(path)
+    return _camera_views(_read_bytes(path), path)
+
+
+def _camera_views(data: bytes, path: Path) -> tuple[CameraView, ...]:
+    parsed = _parse_json(data, path)
     entries = parsed if isinstance(parsed, list) else [parsed]
     return tuple(_camera_view(entry, path) for entry in entries)
 
@@ -440,10 +475,22 @@ def _read_rows(data: bytes, path: Path) -> list[dict[str, Any]]:
 
 
 def _read_json(path: Path) -> Any:
+    return _parse_json(_read_bytes(path), path)
+
+
+def _parse_json(data: bytes, path: Path) -> Any:
     try:
-        return json.loads(_read_bytes(path).decode("utf-8"))
+        return json.loads(data.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise ReaderError(f"`{path}` không phải JSON đọc được: {error}") from error
+
+
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _digest(data: bytes | None) -> str | None:
+    return None if data is None else _sha256(data)
 
 
 def _artifact(path: Path, model: type[_ARTIFACT]) -> _ARTIFACT:
@@ -453,11 +500,13 @@ def _artifact(path: Path, model: type[_ARTIFACT]) -> _ARTIFACT:
         raise ReaderError(f"`{path}` không phải {model.__name__}: {error}") from error
 
 
-def _infra_status(path: Path) -> str | None:
-    """`infra_status` of the episode, for R6, or None where the file is not there."""
-    if not path.is_file():
-        return None
-    parsed = _read_json(path)
+def _infra_status(data: bytes, path: Path) -> str | None:
+    """`infra_status` of the episode, for R6, from `episode.json` (provisional layout).
+
+    None where the file carries no `infra_status`. The layout is the one this
+    lane picked while no writer exists; see the module docstring.
+    """
+    parsed = _parse_json(data, path)
     if not isinstance(parsed, dict):
         raise ReaderError(f"`{path}` phải là một đối tượng JSON")
     status = parsed.get("infra_status")

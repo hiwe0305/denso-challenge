@@ -20,6 +20,12 @@ diagnosis and an opinion:
   (FR21).
 * **The hash of the thresholds.** A finding is only reproducible against the
   numbers it was judged by (AC 2).
+* **The hash of every input.** R1 and R2 read the RTC log, R5 the camera
+  parameters and R6 the `infra_status` source, not only the trace, so each
+  is hashed beside `trace_sha256` (None where the episode had no such file).
+  Without them one trace with two RTC logs gives two verdicts nothing tells
+  apart.
+
 The stage attribution has its own record beside this one, in
 `diagnosis/stage/artifact.py`, because it is answered per failure while this
 is answered per episode.
@@ -29,6 +35,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from flywheel.eval.diagnosis.system.reader import SystemInputs
 from flywheel.eval.diagnosis.system.verdict import SystemVerdict
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -68,20 +75,26 @@ class SystemDiagnosisRecord(BaseModel):
     diagnosis: str
     config_sha256: str
     trace_sha256: str
+    rtc_sha256: str | None = None
+    camera_sha256: str | None = None
+    infra_sha256: str | None = None
     infra_status: str | None = None
     findings: list[SystemFindingRecord] = Field(default_factory=list)
     skipped: list[SystemSkipRecord] = Field(default_factory=list)
 
 
 def build_system_record(
-    verdict: SystemVerdict, config_sha256: str, trace_sha256: str
+    verdict: SystemVerdict, config_sha256: str, inputs: SystemInputs
 ) -> SystemDiagnosisRecord:
-    """The record of one system check, both lists of it."""
+    """The record of one system check: both lists, and the hash of every input."""
     return SystemDiagnosisRecord(
         episode_id=verdict.episode_id,
         diagnosis=verdict.diagnosis.value,
         config_sha256=config_sha256,
-        trace_sha256=trace_sha256,
+        trace_sha256=inputs.trace.trace_sha256,
+        rtc_sha256=inputs.rtc_sha256,
+        camera_sha256=inputs.camera_sha256,
+        infra_sha256=inputs.infra_sha256,
         infra_status=verdict.infra_status,
         findings=[
             SystemFindingRecord(
