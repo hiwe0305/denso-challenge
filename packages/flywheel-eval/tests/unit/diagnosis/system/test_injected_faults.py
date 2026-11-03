@@ -26,7 +26,7 @@ import pytest
 import yaml
 from flywheel.eval.config import SystemThresholds
 from flywheel.eval.diagnosis.system.check import diagnose_system
-from flywheel.eval.diagnosis.system.reader import load_episode
+from flywheel.eval.diagnosis.system.reader import CAMERA_NAME, load_episode
 from flywheel.eval.diagnosis.system.verdict import Diagnosis
 
 CAMERA_REFERENCE: dict[str, Any] = {
@@ -227,10 +227,11 @@ def _shipped() -> SystemThresholds:
 
 
 def _hook_cameras() -> list[dict[str, Any]]:
-    # `camera_params.json` as the SimpleSim hook (DA-38 @ f94d5bc) writes it for
+    # The camera file as the SimpleSim hook (DA-38 @ f94d5bc) fills it for
     # the two-table task at SIMPLE b75c678: both head cameras, with the hash of
     # the G0 reference copied from the job spec.
-    return json.loads((DA38 / "camera_params.json").read_text(encoding="utf-8"))
+    lines = (DA38 / CAMERA_NAME).read_text(encoding="utf-8").splitlines()
+    return [json.loads(line) for line in lines]
 
 
 def test_the_shipped_config_clears_the_cameras_the_hook_writes(episode) -> None:
@@ -254,16 +255,16 @@ def test_the_shipped_config_catches_a_hook_camera_that_drifted(episode) -> None:
 
 
 def test_an_episode_without_camera_params_is_unknown_on_the_shipped_config(episode) -> None:
-    # The hook writes no `camera_params.json` when the job had no pinned hash;
+    # The hook writes no camera file when the job had no pinned hash;
     # R5 must then say CHƯA RÕ, not pass.
     folder = episode(camera=_hook_cameras())
-    (folder / "camera_params.json").unlink()
+    (folder / CAMERA_NAME).unlink()
 
     verdict = diagnose_system(load_episode(folder), _shipped())
 
     assert verdict.diagnosis is Diagnosis.UNKNOWN
     assert [skip.code for skip in verdict.skipped] == ["R5"]
-    assert "camera_params.json" in verdict.skipped[0].reason
+    assert CAMERA_NAME in verdict.skipped[0].reason
 
 
 def test_the_same_episode_scores_the_same_twice(episode, cfg) -> None:

@@ -46,6 +46,12 @@ from flywheel.eval.api import (
 )
 from flywheel.eval.config import ConfigError
 from flywheel.eval.diagnosis.system.artifact import SystemDiagnosisRecord
+from flywheel.eval.diagnosis.system.reader import (
+    CAMERA_NAME,
+    ROLLOUT_NAME,
+    RTC_NAME,
+    STEPS_NAME,
+)
 from flywheel.eval.diagnosis.system.reader import ReaderError as SystemReaderError
 from flywheel.eval.diagnosis.train.reader import ReaderError
 from flywheel.eval.scorer.reader import TraceError
@@ -121,8 +127,8 @@ def diag_system(
     episode: Path = typer.Option(
         ...,
         "--episode",
-        help="Thư mục episode theo bố cục của hook SimpleSim (trace.jsonl, camera_params.json, "
-        "episode.json; rtc.jsonl của job ở thư mục cha), hoặc chính file trace.",
+        help=f"Thư mục trace <trace_id>/ ({STEPS_NAME}, {CAMERA_NAME}, {ROLLOUT_NAME}; "
+        f"{RTC_NAME} của job ở thư mục cha), hoặc chính file {STEPS_NAME}.",
     ),
     config: Path = typer.Option(
         DEFAULT_SYSTEM_CONFIG,

@@ -15,6 +15,9 @@ from typing import Any
 import numpy as np
 import pytest
 from flywheel.eval.diagnosis.system.reader import (
+    CAMERA_NAME,
+    RTC_NAME,
+    STEPS_NAME,
     ReaderError,
     load_episode,
     percentile,
@@ -143,7 +146,7 @@ def test_dropped_frames_are_summed_over_the_episode(row, write_trace) -> None:
 
 
 def test_a_line_that_is_not_json_says_which_line(tmp_path: Path) -> None:
-    path = tmp_path / "trace.jsonl"
+    path = tmp_path / STEPS_NAME
     path.write_text('{"step": 0}\nnot json\n', encoding="utf-8")
 
     with pytest.raises(ReaderError, match="dòng 2 không phải JSON"):
@@ -156,7 +159,7 @@ def test_a_signal_that_is_not_a_number_is_refused(row, write_trace) -> None:
 
 
 def test_the_rtc_log_is_read_through_the_contract(tmp_path: Path, rtc_rows) -> None:
-    path = tmp_path / "rtc.jsonl"
+    path = tmp_path / RTC_NAME
     path.write_text("".join(json.dumps(item) + "\n" for item in rtc_rows), encoding="utf-8")
 
     records = read_rtc_log(path)
@@ -168,36 +171,54 @@ def test_the_rtc_log_is_read_through_the_contract(tmp_path: Path, rtc_rows) -> N
 def test_an_rtc_line_the_contract_rejects_says_so(tmp_path: Path, rtc_rows) -> None:
     broken: dict[str, Any] = dict(rtc_rows[0])
     broken["chunk_received_s"] = broken["observation_sent_s"] - 1.0
-    path = tmp_path / "rtc.jsonl"
+    path = tmp_path / RTC_NAME
     path.write_text(json.dumps(broken) + "\n", encoding="utf-8")
 
     with pytest.raises(ReaderError, match="không phải RTCInferenceRecord"):
         read_rtc_log(path)
 
 
-def test_camera_params_read_as_one_object_or_a_list(tmp_path: Path, camera_entry) -> None:
-    single = tmp_path / "one.json"
-    single.write_text(json.dumps(camera_entry), encoding="utf-8")
-    many = tmp_path / "many.json"
-    many.write_text(json.dumps([camera_entry, {**camera_entry, "uid": "wrist"}]), encoding="utf-8")
+def test_camera_params_are_one_camera_per_line(tmp_path: Path, camera_entry) -> None:
+    # Decision G1 on PR #48: `camera_params.jsonl`, one CameraParams per line.
+    path = tmp_path / CAMERA_NAME
+    lines = [camera_entry, {**camera_entry, "uid": "wrist"}]
+    path.write_text("".join(json.dumps(item) + "\n" for item in lines), encoding="utf-8")
 
-    assert [view.uid for view in read_camera_params(single)] == ["head"]
-    assert [view.uid for view in read_camera_params(many)] == ["head", "wrist"]
+    views = read_camera_params(path)
+
+    assert [view.uid for view in views] == ["head", "wrist"]
+    assert {view.trace_id for view in views} == {"trace_1"}
+
+
+def test_a_camera_line_without_a_trace_id_is_refused(tmp_path: Path, camera_entry) -> None:
+    path = tmp_path / CAMERA_NAME
+    entry = {key: camera_entry[key] for key in camera_entry if key != "trace_id"}
+    path.write_text(json.dumps(entry) + "\n", encoding="utf-8")
+
+    with pytest.raises(ReaderError, match="trace_id"):
+        read_camera_params(path)
+
+
+def test_a_camera_of_another_trace_is_refused(write_job, clean_rows, camera_entry) -> None:
+    folder = write_job(clean_rows, camera=[camera_entry, {**camera_entry, "trace_id": "trace_9"}])
+
+    with pytest.raises(ReaderError, match="trace_9"):
+        load_episode(folder)
 
 
 def test_a_camera_pose_that_is_not_seven_numbers_is_refused(tmp_path: Path, camera_entry) -> None:
-    path = tmp_path / "camera_params.json"
-    path.write_text(json.dumps({**camera_entry, "pose": [0.0, 0.0, 1.5]}), encoding="utf-8")
+    path = tmp_path / CAMERA_NAME
+    path.write_text(json.dumps({**camera_entry, "pose": [0.0, 0.0, 1.5]}) + "\n", encoding="utf-8")
 
     with pytest.raises(ReaderError, match="7 số hữu hạn"):
         read_camera_params(path)
 
 
-def test_load_episode_reads_the_layout_the_hook_writes(
+def test_load_episode_reads_the_trace_directory_of_decision_g1(
     write_job, rollout_result, clean_rows, rtc_rows, camera_entry
 ) -> None:
-    # SimpleSim hook (DA-38): <job>/<episode>/{trace.jsonl, camera_params.json,
-    # episode.json}; the RTC log of DA-19 is one per job, in <job>/.
+    # Decision G1 on PR #48: <job>/<trace_id>/{steps.jsonl, camera_params.jsonl,
+    # rollout_result.json}; the RTC log of DA-19 is one per job, in <job>/.
     folder = write_job(
         clean_rows, rtc=rtc_rows, camera=[camera_entry], result=rollout_result("ok")
     )
@@ -215,7 +236,7 @@ def test_the_trace_file_itself_finds_the_same_files(
 ) -> None:
     folder = write_job(clean_rows, rtc=rtc_rows, result=rollout_result("ok"))
 
-    inputs = load_episode(folder / "trace.jsonl")
+    inputs = load_episode(folder / STEPS_NAME)
 
     assert len(inputs.rtc) == len(rtc_rows)
     assert inputs.infra_status == "ok"
@@ -225,7 +246,7 @@ def test_an_rtc_log_beside_the_trace_is_not_the_job_log(write_job, clean_rows, r
     # The job log is the one DA-19 writes; a file in the episode dir is not
     # read, and its absence from the job dir costs R1 and R2 by name.
     folder = write_job(clean_rows)
-    (folder / "rtc.jsonl").write_text(
+    (folder / RTC_NAME).write_text(
         "".join(json.dumps(item) + "\n" for item in rtc_rows), encoding="utf-8"
     )
 
@@ -240,7 +261,7 @@ def test_infra_status_is_read_from_the_rollout_result(
     assert load_episode(folder).infra_status == "simulator_error"
 
 
-def test_an_episode_json_that_is_not_a_rollout_result_is_refused(write_job, clean_rows) -> None:
+def test_a_rollout_file_that_is_not_a_rollout_result_is_refused(write_job, clean_rows) -> None:
     folder = write_job(clean_rows, result={"infra_status": "sim_crash"})
 
     with pytest.raises(ReaderError, match="RolloutResult"):
@@ -303,7 +324,7 @@ def test_an_episode_without_the_optional_files_still_loads(write_job, clean_rows
 
 
 def test_an_episode_without_a_trace_is_refused(tmp_path: Path) -> None:
-    with pytest.raises(ReaderError, match="không tìm thấy trace.jsonl"):
+    with pytest.raises(ReaderError, match=f"không tìm thấy {STEPS_NAME}"):
         load_episode(tmp_path)
 
 
@@ -327,3 +348,12 @@ def test_a_vector_logged_as_null_is_a_row_of_gaps_not_a_width_change(row, write_
     assert error.shape == (3,)
     assert error[0] == pytest.approx(0.0)
     assert math.isnan(error[1]) and math.isnan(error[2])
+
+
+def test_steps_naming_no_episode_fall_back_to_the_trace_directory(write_job, row) -> None:
+    # Every trace's steps file is `steps.jsonl`; the directory is what names it.
+    rows = [row(step) for step in range(3)]
+    for item in rows:
+        del item["episode_id"]
+
+    assert load_episode(write_job(rows)).trace.episode_id == "trace_1"
