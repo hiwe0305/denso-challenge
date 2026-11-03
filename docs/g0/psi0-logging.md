@@ -27,6 +27,15 @@ _Ngày 3/11/2026. Story [DA-19](../product/stories/DA-19-code-train-va-log.md) n
 
 Stage 1 và 2 chỉ đọc code (design mục 8): stage 1 log `action_accuracy`, `action_l1_loss` trên token FAST, không có loss flow; stage 2 log giống stage 3 trừ `state_drop_frac`.
 
+## Chạy một stage (nhiệm vụ con 2)
+
+`flywheel_psi0.trainer.Psi0Trainer` đọc recipe `configs/models/psi0-stage{1,2,3}.yaml`, điền phần theo job (dữ liệu, checkpoint cha, seed, thư mục ra) từ `TrainSpec`, rồi chạy `torchrun -m flywheel_psi0.trainer.launch <launch.json>` từ thư mục gốc Ψ₀, bằng Python của `.venv-psi`. Launcher gắn các hook ở bảng trên rồi chạy nguyên `scripts/train.py` của tác giả. Thư mục job `runs/<job_id>/` có `metrics.jsonl`, `launch.json`, `result.json` (thư mục run và checkpoint cuối của Ψ₀, trạng thái) và `psi0/` (`--train.output_dir`).
+
+- Recipe stage 3 giữ đúng mọi cờ của bản cuối `finetune-simple-psi0.sh`, so từng cờ với `git show 2830f93^:…`. Khác duy nhất là cờ theo job, cộng bốn cờ để chạy lại: `--timestamp` (lấy từ `job_id`), `--train.output_dir`, `--train.resume_from_checkpoint=latest`, `--train.skip_resumed_steps`.
+- Argv của cả ba stage được kiểm bằng chính `tyro` và `DynamicLaunchConfig` của Ψ₀ ở `cda3fdf` (bước đầu của `scripts/train.py`, không cần GPU): parse đúng.
+- Điều kiện của môi trường Ψ₀: có `.env` ở thư mục gốc (`scripts/train.py` chạy `assert load_dotenv()`; `cp .env.sample .env`), và `pyarrow` import được, vì launcher import `flywheel.contracts`. `Psi0Trainer` đặt `WANDB_MODE=offline` và thêm `src/` của `flywheel-psi0`, `flywheel-contracts` vào `PYTHONPATH`. `.venv-psi` trên laptop hiện lệch phiên bản (pyarrow cần NumPy ≥ 2, venv có 1.26.4) vì `uv.lock` của clone bị sửa cục bộ; môi trường cài đúng từ `uv.lock` của tác giả không gặp lỗi này.
+- Chưa chạy job GPU thật: chạy thử stage 3 và chạy lại từ checkpoint thuộc nhiệm vụ con 5 (Colab, hoặc `rtx3060` khi máy đủ RAM theo quy tắc của đội).
+
 ## Bảng sinh từ code
 
 <!-- BEGIN read_psi0_logging.py -->
