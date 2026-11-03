@@ -1,4 +1,4 @@
-"""The runner registers the tray env in workers that SIMPLE's eval spawns.
+"""The runner prepares workers that SIMPLE's eval spawns: tray env id, condition reader.
 
 A spawned worker re-imports the runner as `__mp_main__` with
 `runpy.run_module(..., run_name="__mp_main__", alter_sys=True)` (multiprocessing.spawn's
@@ -28,25 +28,36 @@ ENV_ID = "simple/G1WholebodyTrayTransferTeleop-v0"
 
 
 @pytest.fixture
-def register_calls(monkeypatch: pytest.MonkeyPatch) -> list[str]:
-    """Calls to a fake `simple_task.register`; the runner is not yet imported."""
+def simple_fakes(monkeypatch: pytest.MonkeyPatch) -> tuple[list[str], types.ModuleType]:
+    """Calls to a fake `simple_task.register` and a fake `simple.datasets.lerobot`.
+
+    The runner is not yet imported.
+    """
     calls: list[str] = []
-    fake = types.ModuleType("flywheel_simple.tray.simple_task")
-    fake.register = lambda: calls.append("register")  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, fake.__name__, fake)
+    task = types.ModuleType("flywheel_simple.tray.simple_task")
+    task.register = lambda: calls.append("register")  # type: ignore[attr-defined]
+    lerobot = types.ModuleType("simple.datasets.lerobot")
+    for fake in (task, lerobot):
+        monkeypatch.setitem(sys.modules, fake.__name__, fake)
     monkeypatch.delitem(sys.modules, RUN, raising=False)
     monkeypatch.setattr(sys, "argv", ["eval-decoupled-wbc", ENV_ID, "--num-workers", "2"])
-    return calls
+    return calls, lerobot
 
 
-def test_spawned_worker_registers_the_env(register_calls: list[str]) -> None:
-    runpy.run_module(RUN, run_name="__mp_main__", alter_sys=True)
-    assert register_calls == ["register"]
+def test_spawned_worker_registers_the_env_and_reads_tray_conditions(
+    simple_fakes: tuple[list[str], types.ModuleType],
+) -> None:
+    calls, lerobot = simple_fakes
+    worker = runpy.run_module(RUN, run_name="__mp_main__", alter_sys=True)
+    assert calls == ["register"]
+    assert lerobot.get_episode_lerobot is worker["get_episode_lerobot"]
 
 
-def test_plain_import_registers_nothing(register_calls: list[str]) -> None:
+def test_plain_import_patches_nothing(simple_fakes: tuple[list[str], types.ModuleType]) -> None:
+    calls, lerobot = simple_fakes
     importlib.import_module(RUN)
-    assert register_calls == []
+    assert calls == []
+    assert not hasattr(lerobot, "get_episode_lerobot")
 
 
 @pytest.mark.sim
