@@ -7,7 +7,7 @@ _Kết quả của story [S1-03](../product/stories/S1-03-tai-tao-danh-gia-psi0.
 | 1.1 Liệt kê checkpoint trong `psi0/` | Xong 24/10/2026 |
 | 1.2 Chọn checkpoint gốc và task tái tạo | Chưa |
 | 1.3 Câu hỏi provenance cho PSI Lab | Chưa |
-| 2.1–2.2 Môi trường và script serve | Smoke không model đạt trên máy dev 24/10/2026; nạp model và `/act` chờ máy 5090 (mục 2) |
+| 2.1–2.2 Môi trường và script serve | Xong 3/11/2026 trên máy 3060: serve checkpoint task hai bàn, smoke 30 lần `/act` đạt (mục 2.6) |
 | 2.3–5 Đo VRAM, độ trễ, đánh giá, độ không tất định | Chưa; cần máy 5090 |
 | 8 Checkpoint ablation của HE (AC 11) | Liệt kê xong 3/11/2026 (mục 4); câu hỏi Q-27E chờ Hiếu gửi PSI Lab |
 
@@ -171,6 +171,32 @@ bash scripts/g0/eval_psi0.sh smoke --calls 5
 ```
 
 Lệnh cuối chạy ở terminal khác, sau khi server in `Server listens on 0.0.0.0:22085`. Cần NVIDIA container toolkit trên máy 5090; nếu chưa có thì bỏ `PSI0_RUNTIME=docker` (venv) và ghi lại giới hạn ở mục 2.3 ý 2. Trước khi chạy, kiểm GPU không bị tiến trình khác chiếm (`nvidia-smi`). `check` trên 5090 phải báo `fits_gpu_bf16: true`. Smoke đạt thì mới chạy nhiệm vụ con 2.3 (VRAM, p99 độ trễ) và 3.
+
+### 2.6 Serve checkpoint task hai bàn trên máy 3060, 3/11/2026
+
+Từ 3/11/2026 mọi việc chạy nặng làm trên máy 3060 (quy tắc của Hiếu); mục 2.5 giữ cho trường hợp có máy lớn hơn. Thư mục làm việc riêng `~/denso-s103`, chạy bằng `PSI0_RUNTIME=docker`, image Ψ₀ ghim theo digest như mục 2.1.
+
+```bash
+export FW_UID=$(id -u) FW_GID=$(id -g) PSI0_RUNTIME=docker
+export RUN=g1wholebodylocomotionpickbetweentablesteleop-v0.simple.flow1000.cosine.lr1.0e-04.b64.gpus4.2604081126
+bash scripts/g0/serve_psi0.sh setup
+bash scripts/g0/serve_psi0.sh fetch --weights
+bash scripts/g0/serve_psi0.sh check
+bash scripts/g0/serve_psi0.sh serve            # nền: nohup setsid ... < /dev/null &
+bash scripts/g0/eval_psi0.sh smoke --calls 30
+```
+
+| Kiểm | Kết quả |
+|---|---|
+| Trọng số `ckpt_40000/model.safetensors` | 6 253 648 840 byte, sha256 `c69c2ae866cdff4c51aee3aa2948b6400e8f001e73d38cbff2b364e41b4cf07b`, khớp oid LFS ở revision `cb1480f…` |
+| `check` | Đạt, `problems` rỗng: `train_repo_ids` = `G1WholebodyLocomotionPickBetweenTablesTeleop-v0`, action 36, chunk 30, phục vụ 24, `rtc` có, flash-attn có (báo cáo `fwdata/psi0/smoke/check-20261103T102841.json` trên máy 3060) |
+| `serve` | Đạt: `Server listens on 0.0.0.0:22085` khoảng 1 phút sau khi chạy; server báo RTC `inference_delay` 6, `min_exec_horizon` 24 |
+| `smoke --calls 30` | Đạt: 30 lần `/act` trả (24, 36), số hữu hạn (báo cáo `fwdata/psi0/smoke/smoke-20261103T103238.json`) |
+| VRAM | 7,2 GB cho tiến trình server (`nvidia-smi`); đỉnh của cả card khi smoke 7,8 GB, gồm khoảng 0,8 GB của màn hình và tiến trình khác |
+| RAM | RSS của server khoảng 6 GB; `docker stats` 10,4 GiB (gồm page cache) |
+| Độ trễ `/act` (ảnh và state bằng 0, cùng máy) | Lần đầu 2,46 s (khởi động); 29 lần sau: trung vị 0,41 s, lớn nhất 0,52 s |
+
+Độ trễ trên là của smoke, chưa phải chu kỳ thật trong SIMPLE; p99 cho τ_lat lấy từ lượt eval (nhiệm vụ con 2.3). Docker `mem_limit` của server đặt 16 GiB (`PSI0_MEM_LIMIT`): `systemd-run --scope` chỉ giới hạn tiến trình `docker` phía client, không giới hạn container chạy dưới `dockerd`.
 
 ## 4. Checkpoint ablation của thí nghiệm HE (AC 11, nhiệm vụ con 8)
 
