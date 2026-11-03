@@ -130,3 +130,73 @@ Kết luận:
 - **Chiều hằng số không phải chiều đệm.** Gói hai bàn có chiều 31 (`base_height_command`) bằng 0,74 ở mọi khung; tay trái (0–6) chỉ có 6–7 giá trị, tức teleop gửi vài tư thế cố định. Với T5 và T6 của DA-08: phương sai đích bằng 0 ở chiều 31 là thật, không phải lỗi; cần loại theo phương sai đích, không theo `masked`.
 - Đơn vị lấy từ chú thích Ψ₀, chưa kiểm độc lập: qpos theo rad, `base_height` theo m (mốc 0,75), `vx`, `vy` theo m/s trong hệ thân, `target_yaw` theo rad trong hệ thế giới. Giới hạn khớp không có trong gói; sẽ đến từ MJCF `g1_sonic` qua `configs/embodiments/g1.yaml` (DA-01), không áp cho chiều 32–34.
 - F1 cùng cấu trúc: cả hai gói `v2.1`, 50 Hz, `action` 36, `states` 32, camera 360×640, cùng `modality.json`. Chiều hằng số: `BendPickTeleop` 0–6 (tay trái không dùng), 32, 33, 35; `BendPickMP` 32–35 (không di chuyển thân). Bảng đầy đủ trong `layout-<gói>.md` trên `rtx3060`.
+
+## 3. QA sơ bộ và N_teleop (AC 2 · Q1)
+
+Script đọc từng parquet trong zip và kiểm 7 phép trên mỗi episode. Ngưỡng độ dài 2–60 s là **giả định** của S1-07 (không có trong spec hay gói); độ dài thật nằm trong 9,6–25,0 s (mục 6), xa cả hai ngưỡng. Gói không có trường thành công nào (`episodes.jsonl` và các cột parquet đều được quét tìm `success`), nên phép kiểm cờ thành công không áp được; thành công thật chỉ kiểm được bằng phát lại (DA-17).
+
+```bash
+python3 -I scripts/g0/inspect_psi_data.py qa <gói>.zip --min-seconds 2 --max-seconds 60 --json qa-<gói>.json
+```
+
+Gói hai bàn:
+
+`G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip`: `info.json` 99 episode, 62,764 khung; parquet 99 episode, 62,764 khung; `episodes.jsonl` 99 dòng; video 99
+
+| Phép kiểm | Đạt |
+|---|---|
+| Số khung parquet = `length` trong `episodes.jsonl` | 99/99 |
+| `frame_index` = 0, 1, …, T−1 | 99/99 |
+| `timestamp` tăng nghiêm ngặt | 99/99 |
+| Không NaN hay Inf ở mọi cột số thực | 99/99 |
+| Độ dài trong [2 s, 60 s] (ngưỡng giả định) | 99/99 |
+| `next.done` chỉ đúng ở khung cuối | 99/99 |
+| Có file video của episode | 99/99 |
+| Cờ thành công | không có trường nào |
+| **Đạt mọi phép kiểm** | **99/99** |
+
+Lệch lớn nhất giữa `timestamp` và `frame_index / fps`: 0 s
+
+Gói F1:
+
+`G1WholebodyBendPickTeleop-v0.zip`: `info.json` 97 episode, 17,623 khung; parquet 97 episode, 17,623 khung; `episodes.jsonl` 97 dòng; video 97
+
+| Phép kiểm | Đạt |
+|---|---|
+| Số khung parquet = `length` trong `episodes.jsonl` | 97/97 |
+| `frame_index` = 0, 1, …, T−1 | 97/97 |
+| `timestamp` tăng nghiêm ngặt | 97/97 |
+| Không NaN hay Inf ở mọi cột số thực | 97/97 |
+| Độ dài trong [2 s, 60 s] (ngưỡng giả định) | 97/97 |
+| `next.done` chỉ đúng ở khung cuối | 97/97 |
+| Có file video của episode | 97/97 |
+| Cờ thành công | không có trường nào |
+| **Đạt mọi phép kiểm** | **97/97** |
+
+Lệch lớn nhất giữa `timestamp` và `frame_index / fps`: 0 s
+
+`G1WholebodyBendPickMP-v0.zip`: `info.json` 100 episode, 15,509 khung; parquet 100 episode, 15,509 khung; `episodes.jsonl` 100 dòng; video 100
+
+| Phép kiểm | Đạt |
+|---|---|
+| Số khung parquet = `length` trong `episodes.jsonl` | 100/100 |
+| `frame_index` = 0, 1, …, T−1 | 100/100 |
+| `timestamp` tăng nghiêm ngặt | 100/100 |
+| Không NaN hay Inf ở mọi cột số thực | 100/100 |
+| Độ dài trong [2 s, 60 s] (ngưỡng giả định) | 100/100 |
+| `next.done` chỉ đúng ở khung cuối | 100/100 |
+| Có file video của episode | 100/100 |
+| Cờ thành công | không có trường nào |
+| **Đạt mọi phép kiểm** | **100/100** |
+
+Lệch lớn nhất giữa `timestamp` và `frame_index / fps`: 0 s
+
+| Gói | Nguồn | N đạt QA sơ bộ |
+|---|---|---|
+| `simple/G1WholebodyLocomotionPickBetweenTablesTeleop-v0` | teleop | **N_teleop = 99** |
+| `simple/G1WholebodyBendPickTeleop-v0` (F1) | teleop | **N_teleop = 97** |
+| `simple/G1WholebodyBendPickMP-v0` (F1) | MP, sinh tự động | 100 (không tính vào N_teleop) |
+
+**Kết luận cho lưới HE (design mục 7.3):** N_teleop của task hai bàn là 99 ≥ 80, nên điểm cuối của lưới giữ ở 80 demo; không cần báo động (< 40).
+
+Kiểm rằng phép kiểm không rỗng: một zip giả 5 episode cấy lần lượt NaN, `timestamp` lùi, episode 1 s, `next.done` giữa chừng và thiếu video. Script bắt đúng 4 episode lỗi, mỗi episode đúng phép kiểm đã cấy, và cho 1/5 đạt.
