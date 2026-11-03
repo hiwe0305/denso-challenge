@@ -115,9 +115,11 @@ def diagnose_episode_system(
 
     `episode_path` is the episode directory, which holds `trace.jsonl` with the
     RTC log, the camera parameters and `episode.json` beside it, or the trace
-    itself. `config_path` is the threshold file; its hash travels in the
-    record, so a finding can always be traced back to the numbers it was judged
-    against (DA-13 AC 2).
+    itself. Where `infra_status` is read from (`episode.json`) is provisional
+    until the SimpleSim hook of DA-38 writes it. The record carries the hash
+    of every one of those files, not only the trace's. `config_path` is the
+    threshold file; its hash travels in the record, so a finding can always be
+    traced back to the numbers it was judged against (DA-13 AC 2).
 
     A record whose `findings` and `skipped` are both empty is an episode where
     every code ran and none fired. One with a `skipped` entry is an episode
@@ -130,7 +132,7 @@ def diagnose_episode_system(
     thresholds, digest = load_system_thresholds(config_path)
     inputs = load_episode(episode_path)
     verdict = diagnose_system(inputs, thresholds)
-    return build_system_record(verdict, digest, inputs.trace.trace_sha256)
+    return build_system_record(verdict, digest, inputs)
 
 
 def attribute_failure_stage(
