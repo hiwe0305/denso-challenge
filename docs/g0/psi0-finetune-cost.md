@@ -6,7 +6,7 @@ _Story: [S1-04](../product/stories/S1-04-chi-phi-finetune-psi0.md). Mục 1 (nhi
 
 - **Recipe** (mục 1): stage 3 là `scripts/train.py finetune_simple_psi0_config` với tham số của bản cuối `finetune-simple-psi0.sh`: 40.000 bước, batch 16 mỗi GPU, learning rate 1e-4 cosine, warmup 1.000, VLM đóng băng. Checkpoint hai bàn của tác giả chạy trên 4 GPU, nên batch toàn cục của tác giả là 64; trên một GPU recipe chỉ thấy 1/4 số mẫu đó.
 - **Số đo** (mục 3, Colab 3–4/11/2026): batch 16 chạy 0,47 s/bước trên A100 và 0,71 s/bước trên L4; VRAM đỉnh 17,7 GB (batch 64: 19,6 GB), vừa L4 24 GB. Job bị chặn ở CPU nạp dữ liệu, không phải GPU. Ngắt rồi chạy lại nối liền đúng loss. H100 không dùng được trên tài khoản.
-- **Compute unit** (mục 4): một lần 40.000 bước khoảng 16,6 CU trên L4 (val mỗi 2.000 bước) hoặc 44 CU trên A100; 8 lần của demo khoảng 133 CU trên L4, gần hết 140,8 CU còn lại. [Đề xuất] L4, giữ recipe, val mỗi 2.000 bước; Hiếu chốt cách bù ngân sách.
+- **Compute unit** (mục 4): một lần 40.000 bước khoảng 16,6 CU trên L4 (val mỗi 2.000 bước) hoặc 44 CU trên A100; 8 lần của demo khoảng 133 CU trên L4, gần hết 140,8 CU còn lại. **[Đã chốt]** (Hiếu, 4/11/2026): L4, giữ recipe DA-19. Giữ cả chu kỳ val 500 bước của recipe thì 19,2 CU mỗi lần, 153 CU cho 8 lần; còn mở: val mỗi 2.000 bước (133 CU) và cách bù ngân sách.
 - **Eval HE** (mục 5): 450 episode tới 12/11. Ở `mujoco` khoảng 7,5 giờ `rtx3060`, 0 CU; ở `mujoco_isaac` khoảng 185 giờ và 358 CU, không vừa. [Đề xuất] eval HE ở `mujoco` nếu lượt chạy lại của S1-03 cho phép, Isaac chỉ cho video demo.
 - Đã tiêu cho phiên đo: khoảng 6,2 CU (A100 5,65; L4 0,53), trong trần 14 CU Hiếu duyệt.
 
@@ -141,12 +141,12 @@ _Ước lượng từ số đo mục 3.1, chưa chạy trọn một lần 40.000
 
 Số dư lúc 00:02 ngày 4/11/2026 là 140,81 CU, và đang giảm vì các phiên khác cùng tài khoản: `wam-audit-l4` (dự án khác, 1,94 CU/giờ, khoảng 47 CU mỗi ngày nếu để chạy) và `s103psi0` (A100 của S1-03, 6,73 CU/giờ). Ước 208 CU trước đây (8 × 26 CU từ smoke DA-19) thấp hơn R1 trên A100 khoảng 40%.
 
-### 4.1 Đề xuất [Đề xuất]
+### 4.1 Đề xuất và quyết định
 
-1. **Máy: L4, không phải A100.** Job bị chặn ở CPU, nên L4 rẻ hơn A100 2,3 lần mỗi lần fine-tune R1. Colab cho chạy nhiều phiên cùng lúc (đã có 3 phiên song song ngày 3/11), nên 8 lần × 8,5 giờ chia 3 phiên song song xong trong khoảng một ngày rưỡi.
-2. **Recipe: R1 (giữ nguyên tham số DA-19).** R1 chỉ khác tác giả ở số GPU. R2 đúng batch của tác giả nhưng 8 lần cần 410 CU, gấp 3 lần số dư. R3 đúng batch toàn cục nhưng đổi số bước và lịch learning rate: là thay đổi recipe, cần Hiếu chốt và phải dùng chung cho mọi nhánh (spec 7.3).
-3. **Validation mỗi 2.000 bước thay vì 500**, giữ 20 batch. Validation không đổi quá trình train, nhưng ít điểm `val` hơn cho bộ kiểm DA-08 (21 điểm thay vì 81 mỗi lần). Tiết kiệm 2,6 CU mỗi lần trên L4.
-4. **Ngân sách**: R1 trên L4 cần khoảng 133 CU cho 8 lần, gần hết số dư, chưa tính chạy lại và eval. Hiếu cần chọn một trong: dừng các phiên không cần (`wam-audit-l4` của dự án khác), mua thêm CU (gói 100 CU giá khoảng 9,99 USD, giả định theo DA-19), hoặc chuyển sang R3 (105 CU).
+1. **[Đã chốt]** (Hiếu, 4/11/2026) **Máy: L4, không phải A100.** Job bị chặn ở CPU, nên L4 rẻ hơn A100 2,3 lần mỗi lần fine-tune R1. Colab cho chạy nhiều phiên cùng lúc (đã có 3 phiên song song ngày 3/11), nên 8 lần × 8,5 giờ chia 3 phiên song song xong trong khoảng một ngày rưỡi.
+2. **[Đã chốt]** (Hiếu, 4/11/2026) **Recipe: R1 (giữ nguyên tham số DA-19).** R1 chỉ khác tác giả ở số GPU. R2 đúng batch của tác giả nhưng 8 lần cần 410 CU, gấp 3 lần số dư. R3 đúng batch toàn cục nhưng đổi số bước và lịch learning rate: là thay đổi recipe, cần Hiếu chốt và phải dùng chung cho mọi nhánh (spec 7.3).
+3. **[Đề xuất] Validation mỗi 2.000 bước thay vì 500**, giữ 20 batch. Chưa chốt; tới khi chốt, chu kỳ 500 của recipe vẫn áp, nên 8 lần là 153 CU. Validation không đổi quá trình train, nhưng ít điểm `val` hơn cho bộ kiểm DA-08 (21 điểm thay vì 81 mỗi lần). Tiết kiệm 2,6 CU mỗi lần trên L4.
+4. **[Đề xuất] Ngân sách** (còn mở): R1 trên L4 cần khoảng 153 CU cho 8 lần (133 CU nếu val mỗi 2.000 bước), gần hết số dư, chưa tính chạy lại và eval. Hiếu cần chọn một trong: dừng các phiên không cần (`wam-audit-l4` của dự án khác), mua thêm CU (gói 100 CU giá khoảng 9,99 USD, giả định theo DA-19), hoặc giảm số lần fine-tune. R3 (105 CU) bị loại vì Hiếu chọn giữ recipe.
 5. **Drive**: mỗi lần R1 để lại 4 checkpoint × 9,5 GB = 38 GB; 8 lần là 304 GB, quá 215 GB còn trống (DA-19). Chỉ giữ checkpoint cuối của mỗi lần trên Drive.
 
 ## 5. Giờ máy eval của HE (nhiệm vụ 8)
