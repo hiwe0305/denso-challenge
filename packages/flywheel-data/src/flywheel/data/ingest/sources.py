@@ -41,7 +41,13 @@ from pathlib import Path
 from typing import Any, Literal, cast, get_args
 
 from flywheel.contracts.artifacts import Episode, EpisodeMetadata
-from flywheel.data.ingest.lerobot import EpisodeFrames, read_episode_rows, read_info
+from flywheel.data.ingest.lerobot import (
+    EpisodeFrames,
+    IndexFinding,
+    check_index,
+    read_episode_rows,
+    read_info,
+)
 
 DataClass = Literal["public", "internal", "restricted"]
 SourceKind = Literal["teleop", "synthetic", "egocentric"]
@@ -111,6 +117,9 @@ class SourceRecord:
     data_path: str  # info.json template of the episode parquet
     chunks_size: int
     lineage: dict[int, EpisodeLineage]  # episode_index -> lineage from its meta row
+    # Episodes whose parquet `index` breaks LeRobot v2.1's numbering, as registered;
+    # the ingest report shows them (psi-data e78fb93: 95 of 99, review #69 point 1).
+    index_findings: tuple[IndexFinding, ...] = ()
 
 
 def register_source(
@@ -146,6 +155,7 @@ def register_source(
         data_path=str(info["data_path"]),
         chunks_size=int(info["chunks_size"]),
         lineage={int(r["episode_index"]): _lineage(r) for r in read_episode_rows(root)},
+        index_findings=tuple(check_index(root)),
     )
 
 

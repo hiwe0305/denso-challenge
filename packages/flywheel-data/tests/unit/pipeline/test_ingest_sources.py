@@ -8,6 +8,8 @@ from dataclasses import replace
 from pathlib import Path
 from urllib.parse import urlparse
 
+import pyarrow as pa  # type: ignore[import-untyped]
+import pyarrow.parquet as pq  # type: ignore[import-untyped]
 import pytest
 import yaml
 from flywheel.data.ingest.lerobot import EpisodeFrames
@@ -318,3 +320,14 @@ def test_an_episode_of_another_dataset_is_refused(dataset: Dataset) -> None:
     stranger = replace(written[0], episode_index=42)
     with pytest.raises(ValueError, match="episode 42 is not in source"):
         to_episode(stranger, source, "train")
+
+
+def test_register_source_reports_index_findings(dataset: Dataset) -> None:
+    root, _ = dataset
+    assert register_source(root, "psi_data", "unknown", "public").index_findings == ()
+    path = root / "data" / "chunk-000" / "episode_000001.parquet"
+    table = pq.read_table(path)
+    position = table.schema.get_field_index("index")
+    pq.write_table(table.set_column(position, "index", pa.array(range(10, 17))), path)
+    findings = register_source(root, "psi_data", "unknown", "public").index_findings
+    assert [(f.episode_index, f.expected_first, f.found_first) for f in findings] == [(1, 5, 10)]

@@ -14,7 +14,9 @@ import pyarrow.parquet as pq  # type: ignore[import-untyped]
 import pytest
 from flywheel.data.ingest.lerobot import (
     EpisodeFrames,
+    IndexFinding,
     LeRobotFormatError,
+    check_index,
     iter_episodes,
     mp4_frame_count,
     read_info,
@@ -414,3 +416,79 @@ def test_fractional_frame_index_is_refused(dataset: tuple[Path, list[EpisodeFram
     _rewrite(path, fractional)
     with pytest.raises(LeRobotFormatError, match="'frame_index'.*1 of 3 values change"):
         list(iter_episodes(root))
+
+
+def psi_style_index(root: Path, index: int) -> None:
+    """Number episode index the way psi-data e78fb93 does: from 2 x dataset_from_index."""
+    path = parquet(root, index)
+    meta = (root / "meta" / "episodes.jsonl").read_text().splitlines()
+    rows = [json.loads(line) for line in meta]
+    start = 2 * next(r["dataset_from_index"] for r in rows if r["episode_index"] == index)
+
+    def doubled(table: pa.Table) -> pa.Table:
+        position = table.schema.get_field_index("index")
+        values = pa.array(range(start, start + table.num_rows), pa.int64())
+        return table.set_column(position, "index", values)
+
+    _rewrite(path, doubled)
+
+
+def lineage_rows(root: Path) -> list[dict[str, object]]:
+    path = root / "meta" / "flywheel_lineage.jsonl"
+    return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
+
+
+def test_check_index_finds_psi_data_style_numbering(
+    dataset: tuple[Path, list[EpisodeFrames]],
+) -> None:
+    # Review #69 point 1: psi-data starts episode i at 2 x dataset_from_index (95/99).
+    root, _ = dataset
+    assert check_index(root) == []
+    psi_style_index(root, 1)
+    psi_style_index(root, 2)
+    assert check_index(root) == [
+        IndexFinding(episode_index=1, rows=7, rows_off=7, expected_first=5, found_first=10),
+        IndexFinding(episode_index=2, rows=3, rows_off=3, expected_first=12, found_first=24),
+    ]
+
+
+def test_renumbering_index_is_written_to_the_lineage_file(
+    dataset: tuple[Path, list[EpisodeFrames]],
+) -> None:
+    root, _ = dataset
+    psi_style_index(root, 1)
+    episodes = list(iter_episodes(root))
+    for frames in episodes:
+        write_episode(root, frames)
+    assert pq.read_table(parquet(root, 1)).column("index").to_pylist() == list(range(5, 12))
+    assert lineage_rows(root) == [
+        {
+            "change": "index_renumbered",
+            "episode_index": 1,
+            "file": "episode_000001.parquet",
+            "rule": "LeRobot v2.1: index = dataset_from_index + row",
+            "rows_changed": 7,
+            "rows": 7,
+            "old_first": 10,
+            "new_first": 5,
+            "decision": "Q7 proposal, pending PO",
+        }
+    ]
+    assert check_index(root) == []
+
+
+def test_lineage_file_is_append_only(dataset: tuple[Path, list[EpisodeFrames]]) -> None:
+    root, _ = dataset
+    for _ in range(2):
+        psi_style_index(root, 2)
+        write_episode(root, list(iter_episodes(root))[2])
+    assert [r["episode_index"] for r in lineage_rows(root)] == [2, 2]
+
+
+def test_rewriting_without_index_changes_writes_no_lineage(
+    dataset: tuple[Path, list[EpisodeFrames]],
+) -> None:
+    root, _ = dataset
+    for frames in iter_episodes(root):
+        write_episode(root, frames)
+    assert lineage_rows(root) == []
