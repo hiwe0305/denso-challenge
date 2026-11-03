@@ -23,7 +23,6 @@ from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
-from numpy.lib.format import descr_to_dtype, dtype_to_descr
 from numpy.typing import NDArray
 
 
@@ -33,7 +32,8 @@ def encode(value: Any) -> Any:
         array = np.ascontiguousarray(value)
         return {
             "__numpy__": b64encode(array.tobytes()).decode(),
-            "dtype": dtype_to_descr(array.dtype),
+            # numpy.lib.format.dtype_to_descr is dtype.str for every non-structured dtype.
+            "dtype": array.dtype.str,
             "shape": list(array.shape),
         }
     if isinstance(value, Mapping):
@@ -47,7 +47,7 @@ def decode(value: Any) -> Any:
     """The inverse of `encode`: wire-form arrays back to numpy, recursively."""
     if isinstance(value, Mapping):
         if "__numpy__" in value:
-            array = np.frombuffer(b64decode(value["__numpy__"]), descr_to_dtype(value["dtype"]))
+            array = np.frombuffer(b64decode(value["__numpy__"]), np.dtype(value["dtype"]))
             shape = value["shape"]
             return array.reshape(shape) if shape else array[0]
         return {key: decode(item) for key, item in value.items()}
