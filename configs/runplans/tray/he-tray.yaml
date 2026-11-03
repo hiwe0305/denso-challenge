@@ -1,3 +1,8 @@
+# SUPERSEDED - DO NOT RUN. Version 1 (80/40 demos, 90 conditions), frozen as rp_c49c99c8d8da
+# and never run. Replaced by he-tray-v2.yaml (320/160 quality-filtered demos, 270
+# conditions; decision of 3/11/2026, docs/he/tray.md section 7), subtask 1.8 of DA-34 in
+# the same PR #73. Kept so the ids already cited stay checkable.
+#
 # DA-34 AC 1: RunPlan of the tray experiment before the demo, branches A, C and C-NOEGO
 # (design 28/10/2026 sections 6.2-6.4; shape of 03 section 8.1). Branch B waits for the
 # team's egocentric video (AC 5); branch C+ of the Failure -> Data round is the separate
