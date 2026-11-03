@@ -36,7 +36,7 @@ r2:
 
 r3:
   tau_track_upper: 0.10    # giả định; chuẩn của (lệnh gửi - trạng thái đo) thân trên, đơn vị rad. Hiệu chỉnh: phân vị 99 trên episode teleop thành công
-  tau_track_lower: 0.15    # giả định; thân dưới (vận tốc gốc, chiều cao, hướng thân) có đơn vị khác thân trên nên ngưỡng riêng. Hiệu chỉnh: phân vị 99 trên episode teleop thành công
+  tau_track_lower: 0.15    # giả định; thân dưới (vận tốc gốc, chiều cao, hướng thân) có đơn vị khác thân trên nên ngưỡng riêng. Hiệu chỉnh: phân vị 99 trên episode teleop thành công, có cả đoạn quay (cmd yaw là hướng đích của WBC, đi trước yaw đo khi quay; điểm mở trong story DA-13)
   percentile: 99.0         # giả định; thống kê lấy trên các chu kỳ của episode. Ghi ra đây để hai lần đo khác thống kê không bị so với nhau
 
 r4:
