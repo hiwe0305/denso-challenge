@@ -14,6 +14,17 @@ SECTION = re.compile(r"^## (.+?)\s*$", re.MULTILINE)
 CODE = re.compile(r"`([^`]+)`")
 NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
 
+# R9 of docs/product/08-daily-control.md (version 0.3): only code that runs counts toward PR size.
+# Lock files, fixtures and examples, tests, Markdown and generated JSON Schemas are left out.
+PR_SIZE_LIMIT = 1500
+SIZE_EXEMPT = re.compile(
+    r"(^|/)(uv\.lock|package-lock\.json)$|(^|/)(fixtures|examples|tests?)/|\.md$|(^|/)schemas/[^/]+\.json$"
+)
+
+
+def counts_toward_size(path: str) -> bool:
+    return not SIZE_EXEMPT.search(path)
+
 
 @dataclass
 class Story:

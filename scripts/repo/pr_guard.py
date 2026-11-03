@@ -1,7 +1,7 @@
 """Check a pull request branch against rules R6 and R9 of docs/product/08-daily-control.md.
 
 R6: branch name, commit subject format, Time-spent trailer and file scope of the story.
-R9: warn (never fail) when the diff is larger than SIZE_LIMIT lines.
+R9: warn (never fail) when the code lines of the diff exceed PR_SIZE_LIMIT (see storylib.counts_toward_size).
 """
 
 import argparse
@@ -10,14 +10,12 @@ import re
 import subprocess
 import sys
 
-from storylib import ROOT, STORY_ID, load_stories
+from storylib import PR_SIZE_LIMIT, ROOT, STORY_ID, counts_toward_size, load_stories
 
 BRANCH_STORY = re.compile(rf"^({STORY_ID})-[a-z0-9][a-z0-9-]*$")
 BRANCH_FREE = re.compile(r"^(docs|chore|hotfix)-[a-z0-9][a-z0-9-]*$")
 TRAILER = re.compile(r"^Time-spent:\s*\d+(?:\.\d+)?\s*h\s*$", re.MULTILINE | re.IGNORECASE)
 DOCS_PREFIXES = ("docs/", "website/")
-SIZE_LIMIT = 400
-SIZE_EXEMPT = re.compile(r"(^|/)(uv\.lock|package-lock\.json)$|(^|/)fixtures/")
 
 
 def git(*args: str) -> str:
@@ -41,7 +39,7 @@ def diff_size(base: str, head: str) -> int:
     total = 0
     for line in git("diff", "--numstat", f"{base}...{head}").splitlines():
         added, deleted, path = line.split("\t", 2)
-        if added != "-" and not SIZE_EXEMPT.search(path):
+        if added != "-" and counts_toward_size(path):
             total += int(added) + int(deleted)
     return total
 
@@ -82,8 +80,8 @@ def check(base: str, head: str, branch: str) -> tuple[list[str], list[str], int]
         errors += [f"R6 · Nhánh docs- không được sửa `{name}`." for name in outside]
 
     size = diff_size(base, head)
-    if size > SIZE_LIMIT:
-        warnings.append(f"R9 · PR thay đổi {size} dòng (ngưỡng {SIZE_LIMIT}); nên tách story.")
+    if size > PR_SIZE_LIMIT:
+        warnings.append(f"R9 · PR thay đổi {size} dòng mã (ngưỡng {PR_SIZE_LIMIT}); nên tách story.")
     return errors, warnings, size
 
 
@@ -107,7 +105,7 @@ def main() -> int:
             handle.write(report + "\n")
     if output := os.environ.get("GITHUB_OUTPUT"):
         with open(output, "a", encoding="utf-8") as handle:
-            handle.write(f"size_large={'true' if size > SIZE_LIMIT else 'false'}\n")
+            handle.write(f"size_large={'true' if size > PR_SIZE_LIMIT else 'false'}\n")
     return 1 if errors else 0
 
 

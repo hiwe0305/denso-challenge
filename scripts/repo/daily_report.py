@@ -17,7 +17,7 @@ import urllib.parse
 import urllib.request
 from collections import Counter, defaultdict
 
-from storylib import ROOT, STORY_ID, load_stories
+from storylib import PR_SIZE_LIMIT, ROOT, STORY_ID, counts_toward_size, load_stories
 
 ICT = dt.timezone(dt.timedelta(hours=7))
 SUBJECT = re.compile(rf"^({STORY_ID})/(\d+(?:\.\d+)*): (.+)$")
@@ -29,7 +29,6 @@ REVIEW_WAIT_DAYS = 1
 WIP_LIMIT = 2
 STALE_DAYS = 2
 CAUSE_REPEAT = 3
-PR_SIZE_LIMIT = 400
 
 
 def git(*args: str) -> str:
@@ -81,6 +80,17 @@ class GitHub:
         )
         with urllib.request.urlopen(request, timeout=30) as response:
             return json.load(response)
+
+
+def pr_code_size(gh: GitHub, number: int) -> int:
+    """Changed lines of a PR in files that count toward R9 (GitHub lists at most 3000 files)."""
+    total = 0
+    for page in range(1, 31):
+        files = gh.get(f"/pulls/{number}/files", per_page=100, page=page)
+        total += sum(f["additions"] + f["deletions"] for f in files if counts_toward_size(f["filename"]))
+        if len(files) < 100:
+            break
+    return total
 
 
 def repo_from_remote() -> str | None:
@@ -166,16 +176,15 @@ def collect(now: dt.datetime) -> dict:
             author = pr["user"]["login"]
             wip[author] += 1
             created = dt.datetime.fromisoformat(pr["created_at"].replace("Z", "+00:00"))
-            detail = gh.get(f"/pulls/{pr['number']}")
             reviewed = bool(gh.get(f"/pulls/{pr['number']}/reviews", per_page=1))
-            size = detail["additions"] + detail["deletions"]
+            size = pr_code_size(gh, pr["number"])
             age = business_days(created, now)
             report["prs"].append({"number": pr["number"], "title": pr["title"], "author": author,
                                   "draft": pr["draft"], "age_days": age, "reviewed": reviewed, "size": size})
             if not pr["draft"] and not reviewed and age > REVIEW_WAIT_DAYS:
                 rule("R2", f"PR #{pr['number']} của {author} chờ review {age} ngày làm việc.")
             if size > PR_SIZE_LIMIT:
-                rule("R9", f"PR #{pr['number']} thay đổi {size} dòng (> {PR_SIZE_LIMIT}).")
+                rule("R9", f"PR #{pr['number']} thay đổi {size} dòng mã (> {PR_SIZE_LIMIT}).")
         for author, count in wip.items():
             if count > WIP_LIMIT:
                 rule("R3", f"{author} có {count} PR đang mở (> {WIP_LIMIT}).")

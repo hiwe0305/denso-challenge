@@ -4,6 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Trưởng n
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 3/11/2026 | 0.3 | Mục 3.2: R9 chỉ đếm dòng mã chạy và nâng ngưỡng từ 400 lên 1500 dòng; cả 6 PR gần nhất đều vượt 400 nên cờ `size:large` không còn phân biệt PR lớn thật | PO (Hiếu) |
 | 25/10/2026 | 0.2 | Theo design ngày 25/10/2026 (file đã xóa ngày 27/10/2026) mục 10: Hiếu là người duyệt và merge duy nhất, R2 đổi hành động (mục 3.2); thêm lịch tracking tự động và tổng kết cuối ngày (mục 5, 7) | PO (Hiếu) |
 | 23/10/2026 | 0.1 | Bản đầu: quy ước dữ liệu, chỉ số, 9 rule, phân loại lỗi, nhịp, sổ can thiệp, công cụ | SM, PO |
 
@@ -63,9 +64,9 @@ Time-spent: 2.5h
 | R6 | PR sửa file ngoài "Phạm vi file", sai tên nhánh, commit sai định dạng hoặc thiếu `Time-spent` | `pr-guard` (chặn PR) | Sửa commit hoặc phạm vi; cần sửa file dùng chung thì theo 07 mục 3.2 | Người làm |
 | R7 | Issue `severity:high` đang mở (rò holdout, gửi dữ liệu `restricted` ra ngoài, sai kết luận HS/HT/HD, mất dữ liệu) | Báo cáo ngày | Đổi thành `type:incident`; postmortem 1 trang trong 2 ngày, ghi vào mục 6 | Người phát hiện; Hiếu |
 | R8 | Cùng một `cause:*` có ≥ 3 issue trong 7 ngày | Báo cáo ngày | Bắt buộc một can thiệp (rule, test, sửa CLAUDE.md hoặc template), ghi vào mục 6 | Thông chủ trì |
-| R9 | PR > 400 dòng | `pr-guard` (gắn `size:large`), báo cáo ngày | Đề nghị tách story; không chặn | Người làm, người review |
+| R9 | PR > 1500 dòng mã (bản 0.3: không tính test, file `.md`, schema JSON sinh ra, fixture, `examples/` và lock file) | `pr-guard` (gắn `size:large`), báo cáo ngày | Đề nghị tách story; không chặn | Người làm, người review |
 
-Ngưỡng mặc định: k 1,3; chờ review 1 ngày làm việc; WIP 2; đứng yên 2 ngày làm việc; lặp nguyên nhân 3 lần trong 7 ngày; PR 400 dòng.
+Ngưỡng mặc định: k 1,3; chờ review 1 ngày làm việc; WIP 2; đứng yên 2 ngày làm việc; lặp nguyên nhân 3 lần trong 7 ngày; PR 1500 dòng mã (bản 0.3; trước là 400 dòng tính cả test và tài liệu).
 
 ## 4. Phân loại lỗi
 
