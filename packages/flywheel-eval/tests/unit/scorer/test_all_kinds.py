@@ -161,6 +161,21 @@ def test_one_case_for_each_declared_kind(
     assert all(step.status is StepStatus.NOT_ATTEMPTED for step in scored.steps[failed_step + 1 :])
 
 
+def test_a_fall_after_a_step_failure_keeps_the_step_failure(
+    tmp_path: Path, task: TaskDefinition, make_rows: MakeRows
+) -> None:
+    # PO decision of 3/11/2026: the grasp is what failed, and `L-BALANCE` there
+    # would move the episode out of the grasp cluster. The fall is recorded as
+    # `balance_violated` instead.
+    rows = make_rows(object_height=[0.0] * 20, torso_tilt=[0.05] * 15 + [0.9] * 5)
+
+    scored = score(tmp_path, task, rows)
+
+    assert scored.failure.failure_kind == "L-GRASP"
+    assert scored.failure.first_failed_step == 1
+    assert scored.balance.violated is True
+
+
 @pytest.mark.parametrize(
     ("signal", "value"),
     [("torso_height", 0.2), ("torso_tilt", 0.9)],
