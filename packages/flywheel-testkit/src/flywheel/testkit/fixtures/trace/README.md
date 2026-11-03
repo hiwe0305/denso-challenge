@@ -3,7 +3,7 @@
 Four traces for the system checks R3 (tracking), R4 (camera-state sync) and R5 (camera
 calibration), written against `flywheel.contracts.trace`.
 
-## Layout (PO decision G1 on PR #48, 3/11/2026)
+## Layout (PO decisions G1 and G1b on PR #48, 3/11/2026)
 
 Each directory is one trace, named after its `trace_id`; `TraceRef.uri` points at it.
 
@@ -12,10 +12,15 @@ Each directory is one trace, named after its `trace_id`; `TraceRef.uri` points a
   steps.jsonl          one TraceStep per line, in step order
   camera_params.jsonl  one CameraParams per line, one per camera the policy sees,
                        each carrying the trace's trace_id
+  rollout_result.json  the episode's v0 RolloutResult: infra_status (R6), sim_success
 ```
 
-The `SimpleSim` hook (DA-38) also writes the episode's `RolloutResult` there as
-`rollout_result.json` (PO decision G1b). These fixtures carry none, so R6 has no input here.
+In `rollout_result.json`, `trace_ref.trace_id` is the directory's name, `trace_ref.uri`
+names the directory (its last path component is the `trace_id`) and `trace_ref.sha256` is
+the sha256 of `steps.jsonl`, so a result cannot be paired with steps it is not about. The
+`SimpleSim` hook (DA-38) writes `uri` as the directory's path; these fixtures write the bare
+`<trace_id>`, relative to this folder. Every fixture has `infra_status: "ok"`, so R6 finds
+nothing; `sim_success` is `true` for `tr_clean/` only.
 
 ## Cases
 

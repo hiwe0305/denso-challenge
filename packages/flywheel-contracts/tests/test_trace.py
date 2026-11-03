@@ -3,17 +3,19 @@
 import hashlib
 import json
 import math
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 from flywheel.contracts.trace import (
     CAMERA_NAME,
     LOWER_BODY,
+    RESULT_NAME,
     STEPS_NAME,
     UPPER_BODY,
     CameraParams,
     TraceStep,
 )
+from flywheel.contracts.v0 import RolloutResult
 from pydantic import ValidationError
 
 FIXTURES_DIR = (
@@ -218,8 +220,22 @@ def test_every_trace_fixture_is_a_g1_directory() -> None:
     for trace_id in TRACES:
         assert sorted(p.name for p in (TRACE_DIR / trace_id).iterdir()) == [
             CAMERA_NAME,
+            RESULT_NAME,
             STEPS_NAME,
         ]
+
+
+@pytest.mark.parametrize("trace_id", TRACES)
+def test_rollout_result_points_at_its_own_steps(trace_id: str) -> None:
+    folder = TRACE_DIR / trace_id
+    result = RolloutResult.model_validate_json((folder / RESULT_NAME).read_text("utf-8"))
+    ref = result.trace_ref
+    assert ref is not None
+    assert ref.trace_id == trace_id
+    assert PurePosixPath(ref.uri.rstrip("/")).name == trace_id
+    assert ref.sha256 == hashlib.sha256((folder / STEPS_NAME).read_bytes()).hexdigest()
+    assert result.camera_params_hash == REFERENCE_SHA256
+    assert result.infra_status == "ok"
 
 
 @pytest.mark.parametrize("trace_id", TRACES)
