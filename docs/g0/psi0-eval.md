@@ -9,8 +9,8 @@ _Kết quả của story [S1-03](../product/stories/S1-03-tai-tao-danh-gia-psi0.
 | 1.3 Câu hỏi provenance cho PSI Lab | Chưa |
 | 2.1–2.2 Môi trường và script serve | Xong 3/11/2026 trên máy 3060: serve checkpoint task hai bàn, smoke 30 lần `/act` đạt (mục 2.6) |
 | 2.3–5 Đo VRAM, độ trễ, đánh giá, độ không tất định | Chưa; cần máy 5090 |
-| 6 Task hai bàn ở `mujoco_isaac` (AC 9) | Chưa: server Ψ₀ và Isaac Sim không cùng vừa card 12 GB; chờ Hiếu chọn GPU (mục 3.4) |
-| 7 Task hai bàn ở `mujoco` (AC 10) | Chạy xong 3/11/2026: 0/30 Level 0, 0/10 Level 1, 0/10 Level 2; open-loop xác nhận server đúng; kết luận Q-27C tạm (mục 3) |
+| 6 Task hai bàn ở `mujoco_isaac` (AC 9) | Chưa: server Ψ₀ và Isaac Sim không cùng vừa card 12 GB; chờ Hiếu duyệt thuê GPU 24 GB có RT core (mục 3.4) |
+| 7 Task hai bàn ở `mujoco` (AC 10) | Chạy xong 3/11/2026: 0/30 ở mỗi mức (10 điều kiện × 3 lượt); open-loop xác nhận server đúng; kết luận Q-27C tạm (mục 3) |
 | 8 Checkpoint ablation của HE (AC 11) | Liệt kê xong 3/11/2026 (mục 4); câu hỏi Q-27E chờ Hiếu gửi PSI Lab |
 
 ## 1. Q0 · Checkpoint trong `psi0/`
@@ -214,17 +214,21 @@ Mỗi lần chạy ghi `fwdata/simple/s103/runs/<mode>/level-<L>/pass-<K>/ep<S>-
 
 ### 3.1 Điều kiện eval công bố chỉ có 10 mỗi mức
 
-`psi-data` revision `de140d67ba77a541f2a58354f7edf4e2480b7c56`, file `simple-eval/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` (690 kB) có bốn thư mục LeRobot v2.1 `dr-level-0`, `dr-level-1`, `dr-level-2`, `dr-level-hard`, **mỗi thư mục 10 điều kiện**. Số công bố 7/5/6 là trên đúng 10 điều kiện này. "30 lượt mỗi mức" của AC 9, 10 vì vậy là 3 lượt lặp (`--pass 1..3`) trên cùng 10 điều kiện; policy lấy mẫu flow nên mỗi lượt lặp cho kết quả khác. Các lượt lặp không độc lập theo điều kiện, nên kiểm nhị thức dưới đây lạc quan về độ chắc [Đề xuất: Hiếu chọn giữ cách này hay sinh thêm 20 điều kiện mỗi mức bằng domain randomization của SIMPLE].
+`psi-data` revision `de140d67ba77a541f2a58354f7edf4e2480b7c56`, file `simple-eval/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` (690 kB) có bốn thư mục LeRobot v2.1 `dr-level-0`, `dr-level-1`, `dr-level-2`, `dr-level-hard`, **mỗi thư mục 10 điều kiện**. Số công bố 7/5/6 là trên đúng 10 điều kiện này. **[Đã chốt]** (Hiếu, 3/11/2026): "30 lượt mỗi mức" của AC 9, 10 là **10 điều kiện × 3 lượt lặp** (`--pass 1..3`) trên đúng 10 điều kiện của bộ eval tác giả, không sinh điều kiện mới. Đây **không phải 30 điều kiện độc lập**: policy lấy mẫu flow nên mỗi lượt lặp có thể cho kết quả khác, nhưng ba lượt cùng một điều kiện tương quan với nhau, nên kiểm nhị thức trên n = 30 lạc quan về độ chắc. Ba lượt lặp dùng để báo độ không tất định: với mỗi điều kiện, ghi số lượt thành công trên 3 và tỉ lệ điều kiện mà ba lượt không cùng kết quả.
 
 ### 3.2 Kết quả `mujoco` (AC 10)
 
 | Mức | Thành công | Wilson 95% | Công bố (`mujoco_isaac`, 10 lượt) | p một phía, H0: p ≥ số công bố | Giờ máy |
 |---|---|---|---|---|---|
-| Level 0 | 0/30 (3 lượt × 10 điều kiện) | [0%, 11%] | 7/10 | 2 × 10⁻¹⁶ | 30 phút |
-| Level 1 | 0/10 | [0%, 28%] | 5/10 | 0,001 | 10 phút |
-| Level 2 | 0/10 | [0%, 28%] | 6/10 | 0,0001 | 10 phút |
+| Level 0 | 0/30 | [0%, 11%] | 7/10 | 2 × 10⁻¹⁶ | 30 phút |
+| Level 1 | 0/30 | [0%, 11%] | 5/10 | 9 × 10⁻¹⁰ | 30 phút |
+| Level 2 | 0/30 | [0%, 11%] | 6/10 | 1 × 10⁻¹² | 29 phút |
 
-Kiểm Fisher một phía cho Level 0, 0/30 ở `mujoco` so với 7/10 công bố: p = 6 × 10⁻⁶. Mỗi episode `mujoco` khoảng 60 s (1 200 bước, 50 lần `/act`); client dùng đỉnh 3,3 GiB RAM.
+Mỗi mức là 10 điều kiện × 3 lượt lặp (mục 3.1). Wilson tính trên n = 30 nên hẹp hơn thực; tính theo 10 điều kiện (0/10) thì cận trên là 28%, vẫn dưới cả ba số công bố. Kiểm Fisher một phía cho Level 0, 0/30 ở `mujoco` so với 7/10 công bố: p = 6 × 10⁻⁶.
+
+Độ không tất định qua 3 lượt lặp: cả 30 điều kiện (3 mức × 10) đều 0/3, không điều kiện nào đổi kết quả giữa các lượt (tỉ lệ đổi chiều 0%). Con số này không nói gì về độ không tất định ở `mujoco_isaac`, nơi tỉ lệ thành công nằm giữa 0 và 1.
+
+Mỗi episode `mujoco` khoảng 60 s (1 200 bước, 50 lần `/act`); client dùng đỉnh 3,3 GiB RAM. Chạy server và client bên trong `systemd-run --user --scope -p MemoryMax=20G -p MemorySwapMax=0`, nhưng giới hạn RAM thật là `mem_limit` của Docker (16 GiB mỗi container), vì scope chỉ bọc tiến trình `docker` phía client (mục 2.6).
 
 Hình ảnh: ở `mujoco` cảnh là bàn xám, sàn ô bàn cờ, vật màu trắng không texture, khác xa ảnh Isaac của cảnh HSSD mà checkpoint được train. Trong video, robot vẫn đi giữa hai bàn và đưa tay về phía vật, nhưng không lần nào nắm được vật và mang sang bàn 2.
 
@@ -253,7 +257,9 @@ Kết luận: trên máy 3060, server Ψ₀ và client Isaac không cùng chạy
 
 ### 3.5 Trả lời Q-27C [Đề xuất, tạm]
 
-Không: ở `mujoco`, checkpoint của tác giả không giữ được thành công (0/50 trên ba mức, so với 7/5/6 công bố ở `mujoco_isaac`). Kiểm open-loop cho thấy server đúng, nên nguyên nhân nhiều khả năng là khác biệt ảnh giữa render MuJoCo và Isaac. Đề xuất cho HE: giữ mặc định của design mục 4.2 (ảnh train và ảnh eval đều render Isaac; eval ở `mujoco_isaac`), không chuyển sang `mujoco`. Kết luận còn "tạm" cho tới khi có lượt `mujoco_isaac` của chính đội đạt gần 7/5/6 bằng cùng pipeline (mục 3.4); nếu lượt đó cũng hỏng thì lỗi ở phía client và kết luận trên phải xét lại.
+Không: ở `mujoco`, checkpoint của tác giả không giữ được thành công (0/90, mỗi mức 0/30, so với 7/5/6 công bố ở `mujoco_isaac`); lệch rõ ở cả ba mức. Kiểm open-loop cho thấy server đúng, nên nguyên nhân nhiều khả năng là khác biệt ảnh giữa render MuJoCo và Isaac. Đề xuất cho HE: giữ mặc định của design mục 4.2 (ảnh train và ảnh eval đều render Isaac; eval ở `mujoco_isaac`), không chuyển sang `mujoco`. Kết luận còn "tạm" cho tới khi có lượt `mujoco_isaac` của chính đội đạt gần 7/5/6 bằng cùng pipeline (mục 3.4); nếu lượt đó cũng hỏng thì lỗi ở phía client và kết luận trên phải xét lại.
+
+Theo quyết định của Hiếu ngày 3/11/2026 ("chờ số mujoco"): vì `mujoco` lệch rõ, AC 9 cần chạy đủ ở `mujoco_isaac` trên một GPU 24 GB có RT core (phương án (b) mục 3.4); việc thuê máy chờ Hiếu duyệt.
 
 ## 4. Checkpoint ablation của thí nghiệm HE (AC 11, nhiệm vụ con 8)
 

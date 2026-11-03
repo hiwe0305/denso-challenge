@@ -6,3 +6,5 @@ date,activity,resource_type,quantity,unit,unit_price_usd,amount_usd,estimated_or
 2026-11-03,psi0_eval_two_table_isaac_trials,gpu_local_rtx3060,0.4,hour,0.0,0.0,measured,g0,0,job_s103_isaac_trials,eng_lead_01,3 failed mujoco_isaac trials (Kit cache; RAM cap 20 GiB; Vulkan OOM with server on the same 12 GB card); against job_s103_isaac_est
 2026-11-03,psi0_openloop_check,gpu_local_rtx3060,0.05,hour,0.0,0.0,measured,g0,0,job_s103_openloop,eng_lead_01,mock_psi0_client_openloop on 3 train episodes; stride 5; 390 /act calls
 2026-11-03,psi0_repro,engineer_time,2.75,hour,0.0,0.0,measured,g0,0,job_s103_exec,eng_lead_01,Sum of Time-spent of subtasks 8; 2.1; 2.2; 7 committed on 3/11/2026; against job_s103_est
+2026-11-03,psi0_serve,gpu_local_rtx3060,0.7,hour,0.0,0.0,measured,g0,0,job_s103_serve2,eng_lead_01,Psi0 server restarted 12:50-13:32 for the extra mujoco passes
+2026-11-03,psi0_eval_two_table_mujoco,gpu_local_rtx3060,0.65,hour,0.0,0.0,measured,g0,0,job_s103_eval_mujoco2,eng_lead_01,40 more episodes mujoco (L1 and L2 passes 2-3) ~59 s each; 0/40 success; mujoco total 0/90
