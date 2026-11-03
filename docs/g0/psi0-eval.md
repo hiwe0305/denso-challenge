@@ -298,6 +298,31 @@ Thêm từ S1-07 (PR #55, `docs/g0/psi-data.md`): ở Level 0 và 1, tư thế r
 
 Theo quyết định của Hiếu ngày 3/11/2026 ("chờ số mujoco"): vì `mujoco` lệch rõ, AC 9 cần chạy đủ ở `mujoco_isaac` trên một GPU 24 GB có RT core (phương án (b) mục 3.4); việc thuê máy chờ Hiếu duyệt.
 
+### 3.6 Bộ benchmark chứng minh kết luận [Đề xuất]
+
+Mỗi phép kiểm chỉ đổi một yếu tố, giữ nguyên mọi thứ khác. Tiêu chí đạt ghi ở đây trước khi có kết quả Isaac.
+
+| # | Câu cần chứng minh | Chỉ đổi | Tiêu chí đạt | Kết quả |
+|---|---|---|---|---|
+| B1 | Server, trọng số, chuẩn hóa đúng | (không đổi; so action dự đoán với action ghi lại) | Sai số gần 0 ngoài lúc chuyển pha | Đạt (mục 3.3) |
+| B2 | Server Colab giống server Docker | Máy chạy server | L1 hai bên chênh trong cỡ nhiễu lấy mẫu | Đạt (mục 3.4.1) |
+| B3 | Độ trễ `/act` không đổi kết quả | Độ trễ: 0 s, 0 s, +2 s mỗi lần gọi | Lệch quỹ đạo của lượt +2 s không lớn hơn lệch giữa hai lượt 0 s | Chờ chạy (sau lượt Isaac Level 0) |
+| B4 | Policy dựa vào ảnh | Ảnh: thật, xám, mờ, lệch thời gian | L1 tăng rõ khi ảnh sai | Đạt (dưới đây) |
+| B5 | `mujoco` hỏng vì renderer | Renderer: MuJoCo hay Isaac | Isaac không thấp hơn 7/5/6 có ý nghĩa (nhị thức một phía, α = 0,05) và Fisher `mujoco` so với `mujoco_isaac` có p < 0,05 | `mujoco` 0/90; Isaac đang chạy |
+
+Cách đọc B5: Isaac gần 7/5/6 thì renderer là nguyên nhân và AC 9 đạt; Isaac cũng gần 0 thì lỗi ở phía client SIMPLE (B1 đã loại phía server); ở giữa thì chờ PSI Lab trả lời Q-27E.
+
+**B4 · Policy dựa vào ảnh** (3/11/2026, `eval_psi0.sh openloop`, server thứ hai trên Colab L4 cổng 22086, 3 episode train `e78fb93`, mỗi 5 khung). L1 bước đầu của chunk, trung bình 3 episode:
+
+| Ảnh đưa vào | L1 tổng | Tay | Cánh tay | Thân rpy | vx | vy | vyaw |
+|---|---|---|---|---|---|---|---|
+| Thật | 0,090 | 0,082 | 0,078 | 0,042 | 0,060 | 0,026 | 0,209 |
+| Mờ (Gauss bán kính 8) | 0,149 (×1,7) | 0,075 | 0,090 | 0,040 | 0,108 | 0,024 | 0,417 |
+| Xám (128) | 0,179 (×2,0) | 0,074 | 0,122 | 0,050 | 0,119 | 0,023 | 0,338 |
+| Lệch thời gian (ảnh thật, cách nửa episode) | 0,231 (×2,6) | 0,130 | 0,126 | 0,045 | 0,234 | 0,033 | 0,534 |
+
+Policy dựa vào ảnh: chỉ làm mờ ảnh (giữ bố cục) đã tăng sai số 1,7 lần, chủ yếu ở lệnh đi (vx, vyaw) và cánh tay. Lệnh tay gần như không đổi khi ảnh xám hoặc mờ, nên đóng mở tay chủ yếu theo state; nó chỉ hỏng khi ảnh cho thấy sai pha (lệch thời gian). Ảnh MuJoCo (bàn xám, vật trắng, sàn ô bàn cờ) còn khác ảnh train nhiều hơn ảnh làm mờ, nên việc policy hỏng ở `mujoco` khớp với kết quả này. B4 chưa chứng minh riêng ảnh MuJoCo gây hỏng; B5 mới chứng minh điều đó.
+
 ## 4. Checkpoint ablation của thí nghiệm HE (AC 11, nhiệm vụ con 8)
 
 Kiểm ngày 3/11/2026. `psi-model` đã có revision mới `76febdc998e5d32a1ed978c286018752676fce64` (commit 02/11/2026). Sáu thư mục dưới đây giống hệt nhau ở revision ghim `cb1480f…` và ở `76febdc…`: cùng danh sách file, cùng sha256 của mọi file LFS. Vì vậy giữ revision ghim `cb1480f…` cho DA-26, không cần đổi.
