@@ -128,7 +128,8 @@ def diag_system(
         ...,
         "--episode",
         help=f"Thư mục trace <trace_id>/ ({STEPS_NAME}, {CAMERA_NAME}, {ROLLOUT_NAME}; "
-        f"{RTC_NAME} của job ở thư mục cha), hoặc chính file {STEPS_NAME}.",
+        f"{RTC_NAME} của job ở thư mục cha), hoặc file {ROLLOUT_NAME} hay {STEPS_NAME} "
+        "trong thư mục đó.",
     ),
     config: Path = typer.Option(
         DEFAULT_SYSTEM_CONFIG,

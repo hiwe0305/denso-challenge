@@ -116,8 +116,10 @@ def diagnose_episode_system(
     `episode_path` is the trace directory `<trace_id>/` of decision G1 on
     PR #48 - the steps, the camera parameters and the RolloutResult carrying
     `infra_status`, named by the constants of `diagnosis/system/reader.py` - or
-    the steps file itself. The RTC log is the job's, in the directory above,
-    kept to this trace's `trace_id`. The record carries the hash of every one
+    the RolloutResult or steps file inside it. The RTC log is the job's, in the
+    directory above, kept to this trace's `trace_id`; a RolloutResult whose
+    `trace_ref` (trace id, directory, sha256 of the steps) is not about these
+    steps raises `ReaderError`. The record carries the hash of every one
     of those files, not only the trace's. `config_path` is the
     threshold file; its hash travels in the record, so a finding can always be
     traced back to the numbers it was judged against (DA-13 AC 2).

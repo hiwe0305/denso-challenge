@@ -1,0 +1,19 @@
+{
+ "job_id": "job-g1",
+ "trace_ref": {
+  "trace_id": "job-g1-0123456789ab",
+  "uri": "job-g1/job-g1-0123456789ab",
+  "sha256": "951bdfc566ed05e01011046f92d3b88bed3ae6622cc1d2a37446fbdfd4ae38ed"
+ },
+ "sim_success": true,
+ "infra_status": "ok",
+ "usage": {
+  "wall_seconds": 3.0,
+  "gpu_seconds": 0.0
+ },
+ "camera_params_hash": "fc7f9c90ebbf8c4662fd70e58de5aed668c0fbc5ccfbbd951dce705729cdeea2",
+ "adapter_info": {
+  "name": "flywheel-simple.trace",
+  "version": "b75c678"
+ }
+}
