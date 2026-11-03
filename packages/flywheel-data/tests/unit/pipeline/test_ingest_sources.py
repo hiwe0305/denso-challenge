@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import shutil
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
-from urllib.parse import urlparse
 
 import pyarrow as pa  # type: ignore[import-untyped]
 import pyarrow.parquet as pq  # type: ignore[import-untyped]
@@ -150,13 +150,38 @@ def test_episode_ids_are_stable_and_distinct(dataset: Dataset) -> None:
     assert ids == [to_episode(f, source, "train").episode_id for f in written]
 
 
-def test_bundle_uri_points_at_the_episode_parquet(dataset: Dataset) -> None:
+def test_bundle_uri_is_relative_to_the_store_root(dataset: Dataset, store: Path) -> None:
+    # Q6, decided by the PO 3/11/2026: a store copied to another machine keeps working.
     root, written = dataset
     source = register_source(root, "psi_data", "unknown", "public")
     uri = to_episode(written[2], source, "train").bundle_uri
-    path = Path(urlparse(uri).path)
-    assert path == root.resolve() / "data" / "chunk-000" / "episode_000002.parquet"
-    assert path.is_file()
+    assert uri == "psi/data/chunk-000/episode_000002.parquet"
+    assert source.store_path == "psi"
+    assert (store / uri).is_file()
+
+
+def test_a_moved_store_gives_the_same_source_and_bundle(
+    dataset: Dataset, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, written = dataset
+    before = register_source(root, "psi_data", "unknown", "public")
+    moved = tmp_path / "elsewhere"
+    shutil.copytree(tmp_path / "psi", moved / "psi")
+    monkeypatch.setenv("FW_ROOT", str(moved))
+    after = register_source(moved / "psi", "psi_data", "unknown", "public")
+    assert after.source_id == before.source_id
+    assert to_episode(written[0], after, "train") == to_episode(written[0], before, "train")
+
+
+def test_a_dataset_outside_the_store_root_is_refused(
+    dataset: Dataset, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, _ = dataset
+    monkeypatch.setenv("FW_ROOT", str(tmp_path / "other"))
+    with pytest.raises(ValueError, match="is not under the store root"):
+        register_source(root, "psi_data", "unknown", "public")
+    explicit = register_source(root, "psi_data", "unknown", "public", store=tmp_path)
+    assert explicit.store_path == "psi"
 
 
 def test_condition_is_marked_unknown_per_episode(dataset: Dataset) -> None:

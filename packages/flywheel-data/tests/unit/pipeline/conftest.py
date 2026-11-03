@@ -142,3 +142,10 @@ def s1_block() -> dict[str, object]:
 @pytest.fixture
 def mp4() -> Callable[..., None]:
     return fake_mp4
+
+
+@pytest.fixture(autouse=True)
+def store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Every test's datasets sit under tmp_path, which is the store root ($FW_ROOT)."""
+    monkeypatch.setenv("FW_ROOT", str(tmp_path))
+    return tmp_path
