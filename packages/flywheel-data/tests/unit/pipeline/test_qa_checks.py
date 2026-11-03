@@ -111,6 +111,13 @@ def test_each_check_catches_its_defect(
     assert len(report.reasons) == 1 and report.reasons[0].startswith(f"{name} ({code}): ")
 
 
+def test_a_limit_rounded_in_the_layout_is_no_breach(qa_config: QAConfig) -> None:
+    frames = clean_frames()
+    action = frames.action.copy()
+    action[:, 18] = -1.972222  # URDF left_wrist_roll; the layout says -1.97222
+    assert qa(with_(frames, action=action), qa_config).decision == "pass"
+
+
 def test_a_nan_rejects_without_judging_limits_or_jumps_on_it(qa_config: QAConfig) -> None:
     names = {c.name for c in qa(broken("finite_values"), qa_config).checks}
     assert "joint_limits" not in names and not any(n.startswith("action_jump") for n in names)
@@ -224,8 +231,10 @@ def test_shipped_stats_against_the_dataset_own_frames(
     frames = [clean_frames(0), clean_frames(1, length=30)]
     write_stats(tmp_path, frames, shift)
     findings = {f.check.name: f for f in dataset_checks(tmp_path, frames, qa_config)}
-    assert set(findings) == {"stats_json", "episodes_stats"}
+    assert set(findings) == {"stats_json.states", "stats_json.action", "episodes_stats.action",
+                             "episodes_stats.timestamp"}
     assert all(f.check.passed == passed and f.code == "D4" for f in findings.values())
     if not passed:
-        assert findings["stats_json"].check.value == pytest.approx(3.6e-4)
-        assert "states.mean[0]" in findings["stats_json"].detail
+        assert findings["stats_json.states"].check.value == pytest.approx(3.6e-4)
+        assert "at states.mean[0]" in findings["stats_json.states"].detail
+        assert "at episode 0 action.mean[0]" in findings["episodes_stats.action"].detail
