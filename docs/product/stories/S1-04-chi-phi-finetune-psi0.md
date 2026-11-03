@@ -37,7 +37,7 @@ Là kỹ sư robot learning, tôi muốn đo VRAM và GPU-giờ của fine-tune 
 - [ ] 3. Tính GPU-giờ và USD, ghi sổ (AC 3)
 - [ ] 4. Viết đề xuất, Hiếu duyệt, tạo RunPlan nháp (AC 4)
 - [ ] 5. Dọn trọng số, optimizer; viết tài liệu kèm đề xuất cho 03 §3.3 (AC 5, 6)
-- [ ] 6. Đo stage 2 và stage 3 trên Colab, quy ra compute unit (AC 7)
+- [x] 6. Đo stage 2 và stage 3 trên Colab, quy ra compute unit (AC 7; stage 2 bỏ từ 27/10/2026)
 - [ ] 7. Đo inference trên 3060 (AC 8)
 - [ ] 8. Ước giờ máy eval và fine-tune của HE, thử Isaac Sim trên Colab (AC 9)
 
