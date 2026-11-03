@@ -117,7 +117,17 @@ def check_r2(records: tuple[RTCInferenceRecord, ...], cfg: R2Thresholds) -> Chec
 
 
 def check_r4(trace: TraceLog, cfg: R4Thresholds) -> CheckResult:
-    """The largest offset between the image clock and the state clock (step 4)."""
+    """The largest offset between the image clock and the state clock (step 4).
+
+    **On a SIMPLE rollout this is 0 by construction.** SIMPLE steps the
+    simulator synchronously and renders the frame at the sim time of the
+    state, so the SimpleSim hook (DA-38) writes `t_image = t_state` on every
+    cycle that carries a frame. R4 never fires on a sim rollout and that is
+    correct, but a clean R4 there says nothing about sensor sync: it only
+    measures something on teleop data and on the injected
+    `timestamp_sync_offset` fault. Part 6 of the demo must not present "R4
+    clean" on sim as sync having been checked.
+    """
     offset = trace.sync_offset()
     statistic = percentile(offset, 100.0)  # the largest offset, as spec 6.4 asks
     if not np.isfinite(statistic):
