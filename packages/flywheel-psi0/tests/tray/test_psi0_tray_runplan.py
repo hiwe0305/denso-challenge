@@ -16,6 +16,7 @@ from flywheel_psi0.tray.runplan import (
     check_round,
     freeze,
     lock_path,
+    plan_json,
     recipe_sha256,
     run_plan_id,
 )
@@ -95,6 +96,30 @@ def test_check_catches_a_changed_recipe(tmp_path: Path, plan: TrayRunPlan) -> No
     assert any("hashes to" in p for p in check(plan, repo))
 
 
+def test_plan_validates_every_2000_steps_on_all_branches(plan: TrayRunPlan) -> None:
+    # PO decision 4/11/2026 (docs/g0/psi0-finetune-cost.md 4.1 on S1-04): val every
+    # 2000 steps instead of 500, as a plan-level override so the three branches share it.
+    assert plan.recipe.overrides == {"train.validation_steps": 2000}
+    assert check(plan) == []
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"train.max_training_steps": 1000}, "changes training"),
+        ({"train.learning_rate": 5e-5}, "changes training"),
+        ({"train.validation_steps": 0}, "positive step count"),
+        ({"train.validation_steps": "2000"}, "positive step count"),
+    ],
+)
+def test_check_rejects_overrides_that_change_training(
+    plan: TrayRunPlan, overrides: dict[str, object], message: str
+) -> None:
+    raw = plan_json(plan)
+    raw["recipe"]["overrides"] = overrides
+    assert any(message in p for p in check(TrayRunPlan.model_validate(raw)))
+
+
 def test_check_catches_a_changed_demo_set(tmp_path: Path, plan: TrayRunPlan) -> None:
     repo = _repo_copy(tmp_path)
     sets = repo / "configs/runplans/tray/demo_sets.json"
@@ -121,8 +146,10 @@ def test_cplus_slot_is_a_draft_on_branch_c() -> None:
     round_plan = TrayRoundPlan.load(ROUND)
     assert round_plan.status == "draft" and round_plan.base_branch == "C"
     assert round_plan.targets.n_add == 40 and round_plan.targets.seeds == []
-    problems = check_round(round_plan)
-    assert problems in ([], [f"{round_plan.inherits} is not frozen"])
+    assert check_round(round_plan) == []
+    # C+ has no recipe of its own: it trains with the frozen plan's, override included.
+    inherited = TrayRunPlan.load(REPO / round_plan.inherits)
+    assert inherited.recipe.overrides == {"train.validation_steps": 2000}
     frozen = round_plan.model_copy(update={"status": "frozen"})
     assert any("n_add targeted seeds" in p for p in check_round(frozen))
 
@@ -131,9 +158,19 @@ def test_plan_is_unchanged_since_it_was_frozen(plan: TrayRunPlan) -> None:
     # Reading rules and branches are fixed before the first job (design 6.4). Changing
     # the plan means a new RunPlan and a Decision, not an edit of this one.
     lock = json.loads(lock_path(PLAN).read_text())
-    assert lock["plan"] == plan.model_dump(mode="json")
+    assert lock["plan"] == plan_json(plan)
     assert lock["run_plan_id"] == run_plan_id(plan)
     assert (REPO / plan.interpretation.doc).is_file()
+
+
+def test_round_refuses_a_plan_edited_after_its_lock(tmp_path: Path) -> None:
+    repo = _repo_copy(tmp_path)
+    shutil.copy(ROUND, repo / "configs/runplans/tray/round-tray-cplus.yaml")
+    shutil.copy(lock_path(PLAN), lock_path(repo / "configs/runplans/tray/he-tray.yaml"))
+    plan_file = repo / "configs/runplans/tray/he-tray.yaml"
+    plan_file.write_text(plan_file.read_text().replace("delta_pp: 10}", "delta_pp: 5}"))
+    round_plan = TrayRoundPlan.load(repo / "configs/runplans/tray/round-tray-cplus.yaml")
+    assert any("changed since it was frozen" in p for p in check_round(round_plan, repo))
 
 
 def test_freeze_refuses_without_the_reading_rules(tmp_path: Path) -> None:

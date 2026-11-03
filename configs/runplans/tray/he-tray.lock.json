@@ -1,5 +1,5 @@
 {
- "frozen_at": "2026-11-03T15:57:28+00:00",
+ "frozen_at": "2026-11-03T17:43:01+00:00",
  "plan": {
   "branches": {
    "A": {
@@ -113,7 +113,9 @@
    "dataset_stats": "own_train_set",
    "file": "configs/models/psi0-stage3.yaml",
    "nproc_per_node": 1,
-   "overrides": {},
+   "overrides": {
+    "train.validation_steps": 2000
+   },
    "sha256": "71ba5de8ef22a11432a829e86e93b7e662f5f38f453cca27f73d6fbe777a1dbd"
   },
   "release": {
@@ -139,5 +141,5 @@
    0
   ]
  },
- "run_plan_id": "rp_59164e3970c4"
+ "run_plan_id": "rp_c49c99c8d8da"
 }

@@ -6,6 +6,8 @@ and eval conditions sit once at plan level and a branch can only pick a demo
 set and a parent checkpoint, so "same recipe, same steps, same condition seeds"
 holds by construction. `check` ties the plan to the files it names: the recipe
 hash, the parent paths of the recipe, the demo-set hashes and the dev split.
+The only recipe override allowed is one that leaves training unchanged
+(`train.validation_steps`), set once for all branches.
 
 `run_plan_id` is `rp_` + sha256 of the plan as canonical JSON, cut to 12
 characters. `freeze` writes `<plan>.lock.json` beside the plan; a test fails if
@@ -24,19 +26,24 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import json
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 from flywheel_psi0.trainer.recipe import Psi0Recipe
 from flywheel_psi0.tray.demo_sets import DemoSets, canonical_sha256
+from flywheel_psi0.tray.quality import QualityFilter
 
 REPO = Path(__file__).resolve().parents[5]
+# Recipe args a plan may override for all its branches: they change what is logged,
+# not the weights (PO 4/11/2026, docs/g0/psi0-finetune-cost.md 4.1 on S1-04).
+TRAINING_NEUTRAL_OVERRIDES = frozenset({"train.validation_steps"})
 
 
 class _Frozen(BaseModel):
@@ -72,10 +79,17 @@ class Release(_Frozen):
     data_class: Literal["public", "internal", "restricted"]
 
 
+class QualityRef(_Frozen):
+    file: str  # repo-relative quality.jsonl of the release's batch
+    sha256: str = Field(min_length=64, max_length=64)
+    filter: QualityFilter
+
+
 class DemoSetPins(_Frozen):
     file: str  # repo-relative
     salt: str
     hashes: dict[str, str]
+    quality: QualityRef | None = None
 
 
 class Recipe(_Frozen):
@@ -148,6 +162,7 @@ class TrayRunPlan(_Frozen):
     comparisons: list[Comparison]
     interpretation: Interpretation
     pricebook: str
+    supersedes: str | None = None  # run_plan_id of a plan this one replaces before it ran
 
     @classmethod
     def load(cls, path: Path) -> TrayRunPlan:
@@ -190,8 +205,13 @@ def recipe_sha256(recipe: Psi0Recipe) -> str:
     return canonical_sha256(recipe.model_dump(mode="json", exclude={"estimate"}))
 
 
+def plan_json(plan: BaseModel) -> Any:
+    """The plan as JSON; unset optional fields are left out, so adding one keeps old ids."""
+    return plan.model_dump(mode="json", exclude_none=True)
+
+
 def run_plan_id(plan: BaseModel) -> str:
-    return "rp_" + canonical_sha256(plan.model_dump(mode="json"))[:12]
+    return "rp_" + canonical_sha256(plan_json(plan))[:12]
 
 
 def lock_path(plan_path: Path) -> Path:
@@ -206,8 +226,13 @@ def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
         problems.append(f"{plan.recipe.file} is stage {recipe.stage}, not 3")
     if recipe_sha256(recipe) != plan.recipe.sha256:
         problems.append(f"{plan.recipe.file} hashes to {recipe_sha256(recipe)}")
-    if plan.recipe.overrides:
-        problems.append("recipe.overrides must stay empty: every branch runs the file as is")
+    for key, value in plan.recipe.overrides.items():
+        if key not in TRAINING_NEUTRAL_OVERRIDES:
+            problems.append(f"override {key} changes training: every branch runs the recipe as is")
+        elif key not in recipe.args:
+            problems.append(f"override {key} is not an arg of {plan.recipe.file}")
+        elif isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            problems.append(f"override {key} must be a positive step count, not {value!r}")
 
     for name, parent in plan.parents.items():
         known = recipe.parents.get(name)
@@ -233,6 +258,15 @@ def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
         got = sets.sets.get(name)
         if got is None or got.set_hash != pinned:
             problems.append(f"demo set {name}: file has {got and got.set_hash}, plan pins {pinned}")
+    pinned_q, used_q = plan.demo_sets.quality, sets.quality
+    if (pinned_q is None) != (used_q is None):
+        problems.append("plan and demo-set file disagree on whether a quality filter was used")
+    elif pinned_q is not None and used_q is not None:
+        actual = hashlib.sha256((repo / pinned_q.file).read_bytes()).hexdigest()
+        if not pinned_q.sha256 == used_q.file_sha256 == actual:
+            problems.append(f"{pinned_q.file} is not the quality file the sets were cut from")
+        if pinned_q.filter != used_q.filter:
+            problems.append("plan pins other quality limits than the demo sets used")
     ordered = sorted(sets.sets.values(), key=lambda s: s.n)
     for small, large in zip(ordered, ordered[1:]):
         if not set(small.seeds) <= set(large.seeds):
@@ -267,8 +301,11 @@ def check_round(round_plan: TrayRoundPlan, repo: Path = REPO) -> list[str]:
         problems.append(f"branch {round_plan.branch} already exists in {round_plan.inherits}")
     if round_plan.targets.from_failures_of != round_plan.base_branch:
         problems.append("targets must come from the failures of the base branch")
-    if not lock_path(repo / round_plan.inherits).is_file():
+    lock = lock_path(repo / round_plan.inherits)
+    if not lock.is_file():
         problems.append(f"{round_plan.inherits} is not frozen")
+    elif json.loads(lock.read_text(encoding="utf-8"))["run_plan_id"] != run_plan_id(parent):
+        problems.append(f"{round_plan.inherits} changed since it was frozen")
     targets = round_plan.targets
     if round_plan.status == "frozen" and (
         len(targets.seeds) != targets.n_add or not targets.set_hash
@@ -287,7 +324,7 @@ def freeze(plan_path: Path, repo: Path = REPO) -> Path:
     lock = {
         "run_plan_id": run_plan_id(plan),
         "frozen_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
-        "plan": plan.model_dump(mode="json"),
+        "plan": plan_json(plan),
     }
     out = lock_path(plan_path)
     out.write_text(json.dumps(lock, indent=1, sort_keys=True) + "\n", encoding="utf-8")

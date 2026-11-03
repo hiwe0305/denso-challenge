@@ -72,7 +72,8 @@ demo_sets:
 recipe:
   file: configs/models/psi0-stage3.yaml # 40k steps, batch 16, lr 1e-4 cosine, VLM frozen, RTC
   sha256: 71ba5de8ef22a11432a829e86e93b7e662f5f38f453cca27f73d6fbe777a1dbd # recipe_sha256, no `estimate`
-  overrides: {}
+  overrides: # PO 4/11/2026 (S1-04 4.1): val every 2000 steps, does not change training
+    train.validation_steps: 2000
   nproc_per_node: 1 # one Colab GPU: global batch 16, not the authors' 8 x 16 = 128
   dataset_stats: own_train_set # each branch's stats_psi0.json is computed on its own episodes
 train_seeds: [0] # one seed per branch for the preliminary result (design 6.3)
