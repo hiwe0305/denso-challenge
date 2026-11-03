@@ -15,7 +15,7 @@ format.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -420,6 +420,89 @@ class ScorerConfig:
 
 
 @dataclass(frozen=True)
+class StageRow:
+    """One row of the stage attribution table (DA-13 AC 3; spec section 6.4).
+
+    `evidence` names the rule in code that decides whether the row applies.
+    The wording, what the row blames and what it suggests all live in
+    `stage.yaml` so they change without touching code, but the rules
+    themselves are code: a row whose `evidence` nothing implements is a row
+    that would silently never fire, so the loader refuses it.
+
+    `consumes_budget` is False on the rows that only report. The Stage 1 row
+    is one of them: spec section 7.3 fixes visual augmentation for every
+    branch, so there is no data intervention left for it to ask for, and
+    saying so here keeps `decide` from costing a budget against it (decision
+    of 30/10/2026).
+    """
+
+    row_id: str
+    evidence: str
+    attribute_to: str
+    intervention: str
+    consumes_budget: bool
+
+
+@dataclass(frozen=True)
+class StageThresholds:
+    """What counts as a wrong P1 answer and as a high or low P3 error.
+
+    `p3_high_error_by_group` lets one action group carry its own budget, the
+    way `o1.max_error_by_group` of DA-08 does; a group with no entry falls back
+    to `p3_high_error`.
+    """
+
+    p1_min_accuracy: float
+    p3_high_error: float
+    p3_high_error_by_group: dict[str, float]
+    p3_low_error: float
+
+
+@dataclass(frozen=True)
+class StageTable:
+    """The one stage attribution table (AC 3).
+
+    One table, no key selecting a variant: spec section 6.4 and design section
+    10 are the same table since 30/10/2026, and a second copy is a second
+    answer to the same question.
+    """
+
+    thresholds: StageThresholds
+    rows: tuple[StageRow, ...]
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any], known: Iterable[str]) -> StageTable:
+        """Validate a parsed stage table; `known` is the evidence rules in code."""
+        _reject_unknown(data, tuple(cls.__dataclass_fields__), "stage.yaml")
+        thresholds = _section(data, "thresholds")
+        rows = _require(data, "rows", "stage.yaml")
+        if not isinstance(rows, list) or not rows:
+            raise ConfigError("`stage.yaml.rows` must be a non-empty list of rows")
+        parsed = tuple(_stage_row(row, index, known) for index, row in enumerate(rows))
+        repeated = sorted({row.row_id for row in parsed if _count(parsed, row.row_id) > 1})
+        if repeated:
+            raise ConfigError(f"`stage.yaml.rows` repeats row_id {repeated}")
+        return cls(
+            thresholds=StageThresholds(
+                p1_min_accuracy=_fraction(thresholds, "p1_min_accuracy", "thresholds"),
+                p3_high_error=_number(thresholds, "p3_high_error", "thresholds"),
+                p3_high_error_by_group=_number_map(
+                    thresholds, "p3_high_error_by_group", "thresholds"
+                ),
+                p3_low_error=_number(thresholds, "p3_low_error", "thresholds"),
+            ),
+            rows=parsed,
+        )
+
+    def row(self, evidence: str) -> StageRow | None:
+        """The row one evidence rule belongs to, or None where the table omits it."""
+        for row in self.rows:
+            if row.evidence == evidence:
+                return row
+        return None
+
+
+@dataclass(frozen=True)
 class SystemThresholds:
     """Every threshold the F-SYS checks of DA-13 read, from `system.yaml` (AC 2)."""
 
@@ -473,6 +556,12 @@ def load_scorer_config(path: Path) -> tuple[ScorerConfig, str]:
     """Read a scorer config; return it and the hash to record with every `Score`."""
     raw, parsed = _read_yaml(path)
     return ScorerConfig.from_mapping(parsed), _sha256(raw)
+
+
+def load_stage_table(path: Path, known: Iterable[str]) -> tuple[StageTable, str]:
+    """Read `stage.yaml`; return the table and the hash to record with a hypothesis."""
+    raw, parsed = _read_yaml(path)
+    return StageTable.from_mapping(parsed, known), _sha256(raw)
 
 
 def load_system_thresholds(path: Path) -> tuple[SystemThresholds, str]:
@@ -569,6 +658,38 @@ def _steps(section: Mapping[str, Any], key: str, where: str) -> int:
     value = _require(section, key, where)
     if isinstance(value, bool) or not isinstance(value, int):
         raise ConfigError(f"`{where}.{key}` must be a whole number of steps, got {value!r}")
+    return value
+
+
+def _stage_row(row: Any, index: int, known: Iterable[str]) -> StageRow:
+    place = f"stage.yaml.rows[{index}]"
+    if not isinstance(row, Mapping):
+        raise ConfigError(f"`{place}` must be a mapping, got {row!r}")
+    _reject_unknown(row, tuple(StageRow.__dataclass_fields__), place)
+    evidence = _text(row, "evidence", place)
+    if evidence not in set(known):
+        # A row nothing implements would never fire and nobody would notice.
+        raise ConfigError(
+            f"`{place}.evidence` là `{evidence}`, không có luật nào trong mã; "
+            f"luật đang có: {sorted(known)}"
+        )
+    return StageRow(
+        row_id=_text(row, "row_id", place),
+        evidence=evidence,
+        attribute_to=_text(row, "attribute_to", place),
+        intervention=_text(row, "intervention", place),
+        consumes_budget=_flag(row, "consumes_budget", place),
+    )
+
+
+def _count(rows: tuple[StageRow, ...], row_id: str) -> int:
+    return sum(1 for row in rows if row.row_id == row_id)
+
+
+def _flag(section: Mapping[str, Any], key: str, where: str) -> bool:
+    value = _require(section, key, where)
+    if not isinstance(value, bool):
+        raise ConfigError(f"`{where}.{key}` must be true or false, got {value!r}")
     return value
 
 
@@ -688,6 +809,7 @@ def _name(value: Any, where: str) -> str:
 
 _SECTION_FIELDS: dict[str, tuple[str, ...]] = {
     "balance": tuple(BalanceLimits.__dataclass_fields__),
+    "thresholds": tuple(StageThresholds.__dataclass_fields__),
     "signals": tuple(SignalLimits.__dataclass_fields__),
     "r1": tuple(R1Thresholds.__dataclass_fields__),
     "r2": tuple(R2Thresholds.__dataclass_fields__),
