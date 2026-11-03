@@ -10,7 +10,7 @@
 
 **Nguồn:** [Design 27/10/2026](../specs/2026-10-27-g1-psi0-demo-design.md) mục 6, 9.2, 10, 11; [03 · Kiến trúc](../../product/03-architecture.md) mục 7.3; [07 · Chia việc](../../product/07-team-workflow.md) mục 2.2–2.4; file story trong `docs/product/stories/`.
 
-_Ngày 3/11/2026. Trạng thái: [Đề xuất] của Claude theo yêu cầu của Hiếu; Hiếu chốt các quyết định ở mục 3 trước khi chạy session 1._
+_Ngày 3/11/2026. Trạng thái: [Đã chốt 3/11/2026] Hiếu chốt Q1–Q6 ở mục 3; lịch và giờ ở mục 5, 6 là ước lượng. Session 0 cập nhật 07 (bản 1.6), 08 (bản 0.4), RULE.md, CLAUDE.md gốc và file story._
 
 ## 1. Lý do
 
@@ -39,16 +39,16 @@ Số liệu tới 3/11/2026, kể từ khi giao việc ngày 27/10/2026:
 | Dữ liệu | `rtx3060:~/denso-da33/fwdata/psi-data/simple/G1WholebodyLocomotionPickBetweenTablesTeleop-v0`; `rtx3060:~/denso-s103/fwdata/simple-eval/` | Gói task hai bàn và tập eval đã tải; F1 chưa tải |
 | `flywheel-data` | `packages/flywheel-data/` | Chỉ có khung rỗng; phụ thuộc chỉ gồm `flywheel-contracts`, `pyyaml`, `typer`, chưa đọc được parquet |
 
-## 3. Quyết định cần Hiếu chốt
+## 3. Quyết định đã chốt
 
-| # | Quyết định | Đề xuất |
+| # | Quyết định | Kết quả |
 |---|---|---|
-| Q1 | Rút Thông khỏi S1-07, DA-27, DA-02, DA-03, DA-17, DA-21 và vai Scrum Master | [Đề xuất] Có. Hiếu làm với Claude; DA-21 để sau 13/11, chưa có chủ |
-| Q2 | Thu hẹp DA-02, DA-03, DA-17 về lớp phía làn, dùng lại adapter DA-33 | [Đề xuất] Có, theo mục 5 |
-| Q3 | Dời sau 13/11: DA-17 AC 5 (phát lại action dự đoán, video); DA-03 tầng normalize và annotate (cắt đoạn), nguồn bàn phím | [Đề xuất] Có. Cả ba nguồn trước demo đã ở layout Ψ₀; DA-29 và DA-16 đã dời ngày 3/11 |
-| Q4 | Giữ phần dùng được của Thông | [Đề xuất] DA-27: cherry-pick 5 commit, giữ tác giả Thông. S1-07: nhánh mới, dùng lại số đúng của #24, đóng #24 kèm lời cảm ơn |
-| Q5 | Rào chặn release (DA-27 AC 5) | [Đề xuất] DA-27 xuất `has_injected_defect()`; `release` của DA-03 gọi hàm này, mỗi bên có test riêng |
-| Q6 | Chủ đường dẫn của Thông (07 mục 2.1) | [Đề xuất] Chuyển sang Hiếu; người dự phòng của phần egocentric trong `flywheel-data` đổi từ Thông sang Hiếu |
+| Q1 | Rút Thông khỏi S1-07, DA-27, DA-02, DA-03, DA-17, DA-21 và vai Scrum Master | [Đã chốt 3/11/2026] Có. Hiếu làm với Claude; DA-21 để sau 13/11, chưa có chủ |
+| Q2 | Thu hẹp DA-02, DA-03, DA-17 về lớp phía làn, dùng lại adapter DA-33 | [Đã chốt 3/11/2026] Có, theo mục 5 |
+| Q3 | Dời sau 13/11: DA-17 AC 5 (phát lại action dự đoán, video); DA-03 tầng normalize và annotate (cắt đoạn), nguồn bàn phím | [Đã chốt 3/11/2026] Có. Cả ba nguồn trước demo đã ở layout Ψ₀; DA-29 và DA-16 đã dời ngày 3/11 |
+| Q4 | Giữ phần dùng được của Thông | [Đã chốt 3/11/2026] DA-27: cherry-pick 5 commit, giữ tác giả Thông. S1-07: nhánh mới, dùng lại số đúng của #24, đóng #24 kèm lời cảm ơn |
+| Q5 | Rào chặn release (DA-27 AC 5) | [Đã chốt 3/11/2026] DA-27 xuất `has_injected_defect()`; `release` của DA-03 gọi hàm này, mỗi bên có test riêng |
+| Q6 | Chủ đường dẫn của Thông (07 mục 2.1) | [Đã chốt 3/11/2026] Chuyển sang Hiếu; người dự phòng của phần egocentric trong `flywheel-data` đổi từ Thông sang Hiếu |
 
 ## 4. Ràng buộc chung
 
@@ -65,7 +65,7 @@ Số liệu tới 3/11/2026, kể từ khi giao việc ngày 27/10/2026:
 
 | Session | Nhánh | Việc | Hạn merge | Cần trước | Giờ (ước lượng) |
 |---|---|---|---|---|---|
-| 0 | `docs-reassign-thong`, `chore-data-pyarrow` | Tài liệu chia lại việc; thêm `pyarrow`, `numpy` cho `flywheel-data` | 3/11 | Q1–Q6 | 1,5 |
+| 0 | `docs-reassign-thong`, `chore-data-pyarrow` | Tài liệu chia lại việc; thêm `pyarrow`, `numpy` cho `flywheel-data` | 3/11 | Q1–Q6 (đã chốt) | 1,5 |
 | 1 | `S1-07-psi-data-v2` | S1-07 | 4/11 | — | 3,5 |
 | 2 | `DA-27-defect-inject` | DA-27 | 6/11 | Session 0 (pyarrow), session 3 PR 1 (bộ đọc) cho nhiệm vụ 4 | 5 |
 | 3 | `DA-03-data-pipeline` | DA-03, hai PR | PR 1: 5/11; PR 2: 9/11 | Session 0 | 10 |
@@ -78,9 +78,9 @@ Tổng khoảng 28,5 giờ ước lượng, so với khoảng 48 giờ còn lạ
 
 **PR `docs-reassign-thong`:**
 
-- [ ] 0.1 Sửa 07: mục 2.0 (vai của Thông), 2.1 (chủ đường dẫn theo Q6), 2.2 (cột Chủ, Giờ của DA-02, DA-03, DA-17, DA-21, DA-27), 2.3, 2.4 (hạn mới theo bảng trên); tăng bản, thêm change log.
-- [ ] 0.2 Sửa file story S1-07, DA-17, DA-21, DA-27: "Người làm", "Người phụ trách", phạm vi theo Q2–Q5, change log. DA-17 thêm vào phạm vi `packages/flywheel-simple/src/flywheel_simple/replay/` và test tương ứng.
-- [ ] 0.3 Viết file story DA-02, DA-03 theo mẫu, có "Phạm vi file" (mục 2.2 của 07 và session 3, 5 dưới đây).
+- [x] 0.1 Sửa 07: mục 2.0 (vai của Thông), 2.1 (chủ đường dẫn theo Q6), 2.2 (cột Chủ, Giờ của DA-02, DA-03, DA-17, DA-21, DA-27), 2.3, 2.4 (hạn mới theo bảng trên); tăng bản, thêm change log.
+- [x] 0.2 Sửa file story S1-07, DA-17, DA-21, DA-27: "Người làm", "Người phụ trách", phạm vi theo Q2–Q5, change log. DA-17 thêm vào phạm vi `packages/flywheel-simple/src/flywheel_simple/replay/` và test tương ứng.
+- [x] 0.3 Viết file story DA-02, DA-03 theo mẫu, có "Phạm vi file" (mục 2.2 của 07 và session 3, 5 dưới đây).
 - [ ] 0.4 `python3 scripts/repo/check_links.py`, `pr_guard.py`, mở PR.
 
 **PR `chore-data-pyarrow`:**
