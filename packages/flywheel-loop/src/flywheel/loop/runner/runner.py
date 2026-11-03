@@ -1,4 +1,9 @@
-"""Closed-loop evaluation runner supporting sync and async modes with RTC logging (DA-23)."""
+"""Closed-loop evaluation runner supporting sync and async modes with RTC logging (DA-23).
+
+An async rollout is only scored when the job directory holds the RTC log of the
+policy's client (DA-19) and that log describes this rollout; anything else is
+reported as `infra_status="policy_error"` with the reason in `runner.json`.
+"""
 
 from __future__ import annotations
 
@@ -9,7 +14,6 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal, cast
 
-from flywheel.contracts.artifacts import RTCInferenceRecord
 from flywheel.contracts.protocols import SimulatorAdapter
 from flywheel.contracts.v0 import (
     PolicyEndpoint,
@@ -19,6 +23,7 @@ from flywheel.contracts.v0 import (
     TraceRef,
 )
 from flywheel.loop.runner.config import EvalConfig, load_eval_config
+from flywheel.loop.runner.rtc_log import RTC_LOG_FILE, RTCLogError, check_rtc_log, read_rtc_log
 
 CACHE_FILE = "runner.json"
 # Bump when the runner changes what a cached result means.
@@ -82,14 +87,18 @@ class Runner:
         # Call simulator rollout (timing and latency profile passed directly in request)
         result = self.simulator.rollout(request, policy)
 
-        # Gom (collect) RTC log if executed in async mode
-        if request.timing == "async":
-            self._collect_rtc_log(job_dir, result)
+        # In async mode the RTC log is part of the result: without a log that holds up,
+        # the rollout says nothing about latency and must not count as a pass.
+        error = None
+        if request.timing == "async" and result.infra_status == "ok":
+            error = self._check_async(job_dir, result)
+            if error is not None:
+                result = result.model_copy(
+                    update={"sim_success": None, "infra_status": "policy_error"}
+                )
 
-        if result.infra_status == "ok":
-            entry = {"key": key, "result": result.model_dump(mode="json")}
-            cache_path.write_text(json.dumps(entry, sort_keys=True), encoding="utf-8")
-
+        entry = {"key": key, "result": result.model_dump(mode="json"), "error": error}
+        cache_path.write_text(json.dumps(entry, sort_keys=True), encoding="utf-8")
         return result
 
     def cache_key(self, request: RolloutRequest, policy: PolicyEndpoint) -> str:
@@ -121,41 +130,22 @@ class Runner:
             raise ValueError(f"job_id must be a single path component, got {job_id!r}")
         return self.staging_root / job_id
 
-    def _collect_rtc_log(self, job_dir: Path, result: RolloutResult) -> Path:
-        """Collect and validate RTC inference log emitted by simulator/client."""
-        rtc_path = job_dir / "rtc.jsonl"
-
-        # If not at job_dir/rtc.jsonl, check trace directory
-        if not rtc_path.is_file() and result.trace_ref is not None:
-            trace_rtc = Path(result.trace_ref.uri).parent / "rtc.jsonl"
-            if trace_rtc.is_file() and trace_rtc != rtc_path:
-                shutil.copy(trace_rtc, rtc_path)
-
-        # If rtc.jsonl is present, validate every record against RTCInferenceRecord
-        if rtc_path.is_file():
-            validated_lines: list[str] = []
-            for line in rtc_path.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if not line:
-                    continue
-                rec = RTCInferenceRecord.model_validate_json(line)
-                # Verify attached to Trace (AC 2)
-                if result.trace_ref is not None and rec.trace_id != result.trace_ref.trace_id:
-                    raise ValueError(
-                        f"RTC log trace_id '{rec.trace_id}' does not match "
-                        f"rollout trace_id '{result.trace_ref.trace_id}'"
-                    )
-                if not isinstance(rec.boundary_jump, float) or rec.boundary_jump < 0:
-                    raise ValueError(
-                        f"boundary_jump must be float >= 0, got {rec.boundary_jump!r}"
-                    )
-                validated_lines.append(rec.model_dump_json())
-            rtc_path.write_text(
-                "\n".join(validated_lines) + ("\n" if validated_lines else ""),
-                encoding="utf-8",
+    def _check_async(self, job_dir: Path, result: RolloutResult) -> str | None:
+        """Why the async rollout cannot be scored, or None if its RTC log holds up."""
+        if result.trace_ref is None:
+            return "async rollout returned no trace to tie the RTC log to"
+        try:
+            records = read_rtc_log(job_dir / RTC_LOG_FILE)
+            check_rtc_log(
+                records,
+                job_id=result.job_id,
+                trace_id=result.trace_ref.trace_id,
+                hz=self.control_hz,
+                chunk_size=self.chunk_size,
             )
-
-        return rtc_path
+        except RTCLogError as error:
+            return str(error)
+        return None
 
     def run_eval(
         self,

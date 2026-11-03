@@ -28,7 +28,7 @@ Là người vận hành vòng, tôi muốn runner chạy closed-loop eval ở c
 ## Nhiệm vụ
 
 - [ ] 1. Hai chế độ trong runner (AC 1)
-- [ ] 2. Gom log RTC (AC 2)
+- [x] 2. Gom log RTC (AC 2)
 - [ ] 3. Demo với bộ giả có độ trễ (AC 3)
 - [ ] 4. Khai chế độ trong RunPlan (AC 4)
 - [ ] 5. Chạy với `SimpleSim` và Ψ₀ thật (AC 5)

@@ -20,7 +20,6 @@ def test_runner_batch_eval_contract(tmp_path: Path) -> None:
     policy = FakePolicy()
     runner = Runner(sim, staging_root)
 
-    profile_path = LatencyProfile.zero().to_file(tmp_path / "zero.json")
     task_ref = TaskRef(task_id="toy-pick-place")
     requests = [
         RolloutRequest(
@@ -35,8 +34,6 @@ def test_runner_batch_eval_contract(tmp_path: Path) -> None:
             level=0,
             rollout_seed=100 + i,
             max_steps=5,
-            timing="async",
-            latency_profile_ref=str(profile_path),
         )
         for i in range(3)
     ]
@@ -51,3 +48,25 @@ def test_runner_batch_eval_contract(tmp_path: Path) -> None:
         assert res.trace_ref is not None
         job_dir = staging_root / f"batch-job-{idx}"
         assert (job_dir / "runner.json").is_file()
+
+
+def test_async_on_a_simulator_without_rtc_log_does_not_pass(tmp_path: Path) -> None:
+    """FakeSim2D has no RTC client, so an async eval on it is an infra failure."""
+    sim = FakeSim2D(tmp_path)
+    task_ref = TaskRef(task_id="toy-pick-place")
+    request = RolloutRequest(
+        job_id="async-no-log",
+        task=task_ref,
+        condition=sim.materialize_conditions(task_ref, [1], level=0)[0],
+        level=0,
+        rollout_seed=1,
+        max_steps=5,
+        timing="async",
+        latency_profile_ref=str(LatencyProfile.zero().to_file(tmp_path / "zero.json")),
+    )
+
+    with FakePolicy().serve(CheckpointRef(checkpoint_id="base"), "cpu") as endpoint:
+        result = Runner(sim, tmp_path).run_rollout(request, endpoint)
+
+    assert result.infra_status == "policy_error"
+    assert result.sim_success is None
