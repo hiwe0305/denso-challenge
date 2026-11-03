@@ -41,6 +41,7 @@ from flywheel.data.ingest.sources import (
     register_source,
     to_episode,
 )
+from flywheel.data.inject.api import mark_copy_episode
 from flywheel.data.ledger import job_ledger
 from flywheel.data.qa.checks import calibrate_action_jump, dataset_checks, run_qa
 from flywheel.data.release.build import build_release
@@ -54,8 +55,6 @@ SPLIT_PLAN = Path("configs/splits/default.yaml")
 # Assumptions for the estimated ledger rows, not measurements: CPU seconds per unit.
 ESTIMATE = {"ingest": (2e-5, "frame"), "qa": (5e-5, "frame"), "release": (1e-3, "episode"),
             "report": (1e-3, "episode")}
-# DA-27's benchmark-copy marker (#53, inject/lerobot_copy.py COPY_MARKER).
-COPY_MARKER = "benchmark_copy.json"
 
 RunPlan = Annotated[str | None, typer.Option(help="RunPlan id; default g0-DA-03-<yyyymmdd>")]
 Work = Annotated[Path, typer.Argument(help="work directory that `fw data ingest` printed")]
@@ -83,7 +82,7 @@ def ingest(
         indices = {}
         episodes = []
         for f in iter_episodes(dataset):
-            episode = _mark_copy(to_episode(f, source, split), dataset)
+            episode = mark_copy_episode(to_episode(f, source, split), dataset)
             indices[episode.episode_id] = f.episode_index
             episodes.append(episode)
         out = work or store_root() / "pipeline" / source.source_id
@@ -249,21 +248,6 @@ def _read_work(work: Path) -> tuple[SourceRecord, list[Episode], dict[str, int]]
 
 def _total_frames(dataset: Path) -> int:
     return int(read_info(dataset).get("total_frames", 0))
-
-
-def _mark_copy(episode: Episode, dataset: Path) -> Episode:
-    """Stamp `benchmark_copy_id` on an Episode of a DA-27 benchmark copy.
-
-    TODO(#53): call `flywheel.data.inject.api.mark_copy_episode` once DA-27 merges;
-    until then this reads the same marker file, so a copy never reaches a release
-    unmarked.
-    """
-    marker = dataset / "meta" / COPY_MARKER
-    if not marker.is_file():
-        return episode
-    copy_id = str(json.loads(marker.read_text())["benchmark_copy_id"])
-    meta = episode.meta.model_copy(update={"benchmark_copy_id": copy_id})
-    return episode.model_copy(update={"meta": meta})
 
 
 def _check_unchanged(source: SourceRecord, dataset: Path) -> None:

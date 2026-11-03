@@ -35,7 +35,6 @@ from flywheel.data.qa.checks import DatasetFinding, calibrate_action_jump, datas
 from flywheel.data.release.build import (
     ReleaseRefused,
     build_release,
-    is_benchmark_copy,
     read_release,
 )
 from flywheel.data.release.report import DatasetSummary, dataset_report, render_html, summarize
@@ -58,7 +57,6 @@ __all__ = [
     "dataset_report",
     "default_run_plan_id",
     "deid_blocks_annotate",
-    "is_benchmark_copy",
     "iter_episodes",
     "job_ledger",
     "load_layout",

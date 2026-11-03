@@ -3,8 +3,8 @@
 `build_release` either refuses the whole release or freezes one; it never drops an
 episode quietly. It refuses, listing every reason at once, when
 
-- an episode belongs to a benchmark copy (`benchmark_copy_id`, defective or clean:
-  design 6.1, 9.2; Q5). One such episode refuses the release;
+- an episode belongs to a benchmark copy, defective or clean (DA-27's
+  `has_injected_defect`: design 6.1, 9.2; Q5). One such episode refuses the release;
 - an episode's condition seed lies outside the `train` range of the SplitPlan
   (spec 4.4 "Chia tập": invalidate the release; design 10 D5), or a machine-made
   episode has no seed to check (03 invariant 10). A human demo whose source records
@@ -38,6 +38,7 @@ from flywheel.contracts.base import canonical_json
 from flywheel.contracts.entities import Release
 from flywheel.contracts.v0 import ReleaseManifest
 from flywheel.data.config import load_train_seeds
+from flywheel.data.inject.api import has_injected_defect
 
 INCLUDED = ("pass", "flag")
 RELEASE_FILE = "release.json"
@@ -51,15 +52,6 @@ class ReleaseRefused(ValueError):
     def __init__(self, problems: list[str]) -> None:
         self.problems = problems
         super().__init__("release refused:\n" + "\n".join(f"- {p}" for p in problems))
-
-
-def is_benchmark_copy(episode: Episode) -> bool:
-    """Whether the episode belongs to a DA-27 benchmark copy, defective or clean.
-
-    TODO(#53): call `flywheel.data.inject.api.has_injected_defect` once DA-27's PR
-    #53 is on master; it checks the same field.
-    """
-    return episode.meta.benchmark_copy_id is not None
 
 
 def build_release(
@@ -148,7 +140,7 @@ def _problems(
     problems = []
     ids = Counter(e.episode_id for e in episodes)
     problems += [f"episode id {i} given {n} times" for i, n in ids.items() if n > 1]
-    copies = [e for e in episodes if is_benchmark_copy(e)]
+    copies = [e for e in episodes if has_injected_defect(e)]
     if copies:
         names = sorted({str(e.meta.benchmark_copy_id) for e in copies})
         problems.append(
