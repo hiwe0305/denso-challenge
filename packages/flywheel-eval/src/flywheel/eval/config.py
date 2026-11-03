@@ -265,6 +265,7 @@ class R2Thresholds:
     request went out and `delay_steps` as the control steps the inference
     took, so a chunk with `delay_steps > buffer_level` is one where the robot
     would have had nothing to execute before the new chunk came back. The
+    first chunk of a trace is left out, since nothing was executing yet. The
     level alone says nothing: the client asks at `refill_at`, which is 0 by
     default, so a level floor would count every healthy chunk.
 

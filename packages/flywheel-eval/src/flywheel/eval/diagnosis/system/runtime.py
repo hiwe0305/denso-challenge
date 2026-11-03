@@ -91,10 +91,17 @@ def check_r2(records: tuple[RTCInferenceRecord, ...], cfg: R2Thresholds) -> Chec
 
     `buffer_level` is the level when the request went out, not when the chunk
     came back, so a low level is healthy as long as it covers `delay_steps`.
+    The first chunk of a trace is left out: the client asks for it with
+    nothing buffered, before any action ran, so its wait is the start of the
+    trace and not a stall - counting it would fire R2 on every episode.
     """
     if not records:
         return CheckResult(skipped=[Skipped("R2", _no_rtc_log())])
-    underruns = [record for record in records if record.delay_steps > record.buffer_level]
+    underruns = [
+        record
+        for record in records
+        if record.chunk_index > 0 and record.delay_steps > record.buffer_level
+    ]
     if len(underruns) <= cfg.max_underruns:
         return CheckResult()
     return CheckResult(
