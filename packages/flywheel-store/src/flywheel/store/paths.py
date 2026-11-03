@@ -9,6 +9,9 @@ from pathlib import Path
 from flywheel.contracts.base import new_ulid
 
 SHA256_REGEX = re.compile(r"^[0-9a-f]{64}$")
+# One directory name: ids, table and site names. No leading dot, so neither "."
+# nor ".." nor a hidden directory; no separators, spaces or drive letters.
+PATH_SEGMENT_REGEX = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._-]*$")
 
 
 def get_fw_root() -> Path:
@@ -20,11 +23,11 @@ def get_fw_root() -> Path:
 
 
 def _validate_path_segment(value: str, name: str) -> str:
-    """Validate that path segment does not contain directory traversal characters."""
-    if not value or ".." in value or "/" in value or "\\" in value:
+    """Validate that a path segment names one directory inside the store."""
+    if not PATH_SEGMENT_REGEX.fullmatch(value) or ".." in value:
         raise ValueError(
-            f"Invalid path segment for {name}: '{value}' cannot be empty "
-            f"or contain '..', '/', or '\\'"
+            f"Invalid path segment for {name}: {value!r} must be letters, digits, "
+            f"'_', '-' or '.', must not start with '.' and must not contain '..'"
         )
     return value
 
@@ -34,7 +37,7 @@ class StorePaths:
 
     def __init__(self, root: Path | str | None = None, site: str = "local") -> None:
         self.root = Path(root).resolve() if root is not None else get_fw_root()
-        self.site = site
+        self.site = _validate_path_segment(site, "site")
         self.site_dir = self.root / "sites" / self.site
         self.objects_dir = self.site_dir / "objects" / "sha256"
         self.catalog_dir = self.site_dir / "catalog"

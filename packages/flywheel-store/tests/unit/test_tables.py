@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
-from flywheel.contracts.entities import Condition
+from flywheel.contracts.entities import Condition, Source
 from flywheel.store.paths import StorePaths
 from flywheel.store.tables import TableWriter, read_table_records, write_record
 from pydantic import ValidationError
@@ -68,3 +68,19 @@ def test_concurrent_partition_writers(tmp_path: Path) -> None:
 
     seeds = {r["condition_seed"] for r in all_records}
     assert len(seeds) == num_writers * records_per_writer
+
+
+@pytest.mark.parametrize("table", ["scores", "ledger_entry", "evidence_card"])
+def test_writer_refuses_a_table_outside_the_catalog(tmp_path: Path, table: str) -> None:
+    """PO review 3/11 item 6: an unknown table no longer takes any BaseModel unchecked.
+
+    `ledger_entry` is refused too: the ledger lives under runs/, and a part file
+    under catalog/ledger_entry/ would never reach the ledger_entry view.
+    """
+    paths = StorePaths(root=tmp_path)
+    record = Source(uri="https://example.com", sha256="3" * 64, downloaded_at="2026-11-03")
+    with pytest.raises(ValueError, match="not a catalog table"):
+        TableWriter(table, paths=paths)
+    with pytest.raises(ValueError, match="not a catalog table"):
+        write_record(table, record, paths=paths)
+    assert not (paths.catalog_dir / table).exists()
