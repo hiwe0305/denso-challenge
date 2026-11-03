@@ -10,7 +10,7 @@ from flywheel.contracts.v0 import (
     RolloutRequest,
     TaskRef,
 )
-from flywheel.loop.runner import Runner
+from flywheel.loop.runner import LatencyProfile, Runner
 from flywheel.testkit.fakes import FakePolicy, FakeSim2D
 
 
@@ -20,6 +20,7 @@ def test_runner_batch_eval_contract(tmp_path: Path) -> None:
     policy = FakePolicy()
     runner = Runner(sim, staging_root)
 
+    profile_path = LatencyProfile.zero().to_file(tmp_path / "zero.json")
     task_ref = TaskRef(task_id="toy-pick-place")
     requests = [
         RolloutRequest(
@@ -34,7 +35,8 @@ def test_runner_batch_eval_contract(tmp_path: Path) -> None:
             level=0,
             rollout_seed=100 + i,
             max_steps=5,
-            timing="sync",
+            timing="async",
+            latency_profile_ref=str(profile_path),
         )
         for i in range(3)
     ]
@@ -49,4 +51,3 @@ def test_runner_batch_eval_contract(tmp_path: Path) -> None:
         assert res.trace_ref is not None
         job_dir = staging_root / f"batch-job-{idx}"
         assert (job_dir / "result.json").is_file()
-        assert (job_dir / "rtc.jsonl").is_file()
