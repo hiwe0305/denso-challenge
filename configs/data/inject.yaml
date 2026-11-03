@@ -4,41 +4,42 @@ version: "1.0.0"
 seed: 42
 injection_rate: 0.08  # 8% (tiêu chí 5-10% số episode)
 
-# 11 loại lỗi dữ liệu (F-DATA: D1-D8)
+# 11 loại lỗi dữ liệu dồn vào 6 mã F-DATA (design mục 9.2, sửa 3/11/2026).
+# Mã ghi ở `Defect.code`, tên loại ở `parameters["kind"]` (flywheel.data.inject.codes).
 data_defects:
-  drop_frames:
+  drop_frames:  # D2
     enabled: true
     drop_rate: 0.15
-  timestamp_sync_offset:
+  timestamp_sync_offset:  # D2
     enabled: true
     offset_seconds: 0.08  # Vượt ngưỡng tau_sync (0.033s)
-  joint_jump:
+  joint_jump:  # D3
     enabled: true
     jump_magnitude: 1.5   # rad/s spike
-  joint_limit_exceeded:
+  joint_limit_exceeded:  # D3
     enabled: true
     excess_factor: 1.25   # Vượt giới hạn 25%
-  nan_values:
+  nan_values:  # D1
     enabled: true
     nan_ratio: 0.05
-  unit_deg_rad:
+  unit_deg_rad:  # D3
     enabled: true
     scale: 57.2957795     # 180 / pi
-  action_sign_flip:
+  action_sign_flip:  # D7
     enabled: true
     dimensions: [0, 6]    # Chiều action bị đảo dấu
-  corrupted_success_label:
+  corrupted_success_label:  # D6
     enabled: true
-  wrong_task_instruction:
+  wrong_task_instruction:  # D6
     enabled: true
     corrupted_prompt: "move to random location and stop"
-  duplicate_episode:
+  duplicate_episode:  # D5
     enabled: true
-  holdout_seed_leak:
+  holdout_seed_leak:  # D5
     enabled: true
     holdout_seed_range: [9000, 9999]
 
-# Lỗi log huấn luyện (F-TRAIN: T1-T8)
+# Lỗi log huấn luyện (F-TRAIN: T1-T8); mã là tiền tố của tên loại
 train_defects:
   T1_divergence:
     loss_multiplier: 15.0

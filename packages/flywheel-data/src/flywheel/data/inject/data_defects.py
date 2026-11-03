@@ -6,6 +6,7 @@ import random
 from dataclasses import dataclass, field
 
 from flywheel.contracts.artifacts import Defect, EpisodeMetadata, InjectedDefect
+from flywheel.data.inject.codes import DATA_DEFECT_CODES
 from flywheel.data.inject.config import DataDefectConfig
 
 Parameters = dict[str, bool | float | int | str]
@@ -30,8 +31,13 @@ def _join(values: list[int]) -> str:
     return ",".join(str(v) for v in values)
 
 
-def _mark(ep: EpisodeData, code: str, parameters: Parameters) -> Defect:
-    """Stamp the episode with its injected defect and return the matching manifest entry."""
+def _mark(ep: EpisodeData, kind: str, parameters: Parameters) -> Defect:
+    """Stamp the episode with its injected defect and return the matching manifest entry.
+
+    The design code goes in `code`; the kind stays in `parameters["kind"]`.
+    """
+    code = DATA_DEFECT_CODES[kind]
+    parameters = {"kind": kind, **parameters}
     ep.meta = ep.meta.model_copy(
         update={"injected_defect": InjectedDefect(code=code, parameters=parameters)}
     )

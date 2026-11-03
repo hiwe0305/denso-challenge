@@ -8,7 +8,16 @@ import random
 from typing import Any
 
 from flywheel.contracts.artifacts import Defect
+from flywheel.data.inject.codes import LOG_DEFECT_CODES
 from flywheel.data.inject.config import RTCDefectConfig, TrainDefectConfig
+
+
+def _log_defect(target_ref: str, kind: str, parameters: dict[str, float | int | str]) -> Defect:
+    return Defect(
+        target_ref=target_ref,
+        code=LOG_DEFECT_CODES[kind],
+        parameters={"kind": kind, **parameters},
+    )
 
 
 class TrainLogDefectInjector:
@@ -53,10 +62,10 @@ class TrainLogDefectInjector:
             mult = self.config.t1_loss_multiplier
             val = float("nan") if i == mid + 2 else new_logs[i]["train_loss"] * mult
             new_logs[i]["train_loss"] = val
-        defect = Defect(
-            target_ref=target_job,
-            code="T1_divergence",
-            parameters={"step_started": mid, "multiplier": self.config.t1_loss_multiplier},
+        defect = _log_defect(
+            target_job,
+            "T1_divergence",
+            {"step_started": mid, "multiplier": self.config.t1_loss_multiplier},
         )
         return new_logs, defect
 
@@ -67,10 +76,8 @@ class TrainLogDefectInjector:
         initial_val = new_logs[0]["val_loss"]
         for entry in new_logs:
             entry["val_loss"] = initial_val - (entry["step"] * self.config.t2_decay_rate)
-        defect = Defect(
-            target_ref=target_job,
-            code="T2_not_learning",
-            parameters={"decay_rate": self.config.t2_decay_rate},
+        defect = _log_defect(
+            target_job, "T2_not_learning", {"decay_rate": self.config.t2_decay_rate}
         )
         return new_logs, defect
 
@@ -82,10 +89,10 @@ class TrainLogDefectInjector:
         for i in range(start, len(new_logs)):
             new_logs[i]["train_loss"] *= 0.85
             new_logs[i]["val_loss"] = new_logs[i - 1]["val_loss"] * 1.15
-        defect = Defect(
-            target_ref=target_job,
-            code="T3_overfitting",
-            parameters={"consecutive_val_increases": self.config.t3_val_loss_steps},
+        defect = _log_defect(
+            target_job,
+            "T3_overfitting",
+            {"consecutive_val_increases": self.config.t3_val_loss_steps},
         )
         return new_logs, defect
 
@@ -96,11 +103,7 @@ class TrainLogDefectInjector:
         grp = self.config.t4_frozen_group
         for entry in new_logs:
             entry["loss_groups"][grp] = 1.85  # constant flat high loss
-        defect = Defect(
-            target_ref=target_job,
-            code="T4_group_imbalance",
-            parameters={"stuck_group": grp},
-        )
+        defect = _log_defect(target_job, "T4_group_imbalance", {"stuck_group": grp})
         return new_logs, defect
 
     def inject_t5_dead_dimension(
@@ -110,11 +113,7 @@ class TrainLogDefectInjector:
         dim = self.config.t5_dead_dim
         for entry in new_logs:
             entry["pred_variance"][dim] = 0.0
-        defect = Defect(
-            target_ref=target_job,
-            code="T5_dead_dimension",
-            parameters={"dead_dimension": dim},
-        )
+        defect = _log_defect(target_job, "T5_dead_dimension", {"dead_dimension": dim})
         return new_logs, defect
 
     def inject_t6_mode_collapse(
@@ -124,11 +123,7 @@ class TrainLogDefectInjector:
         thresh = self.config.t6_std_threshold
         for entry in new_logs:
             entry["pred_std"] = thresh * 0.1
-        defect = Defect(
-            target_ref=target_job,
-            code="T6_mode_collapse",
-            parameters={"std_value": thresh * 0.1},
-        )
+        defect = _log_defect(target_job, "T6_mode_collapse", {"std_value": thresh * 0.1})
         return new_logs, defect
 
     def inject_t7_forgetting(
@@ -138,11 +133,7 @@ class TrainLogDefectInjector:
         drop = self.config.t7_drop_ratio
         for entry in new_logs[len(new_logs) // 2 :]:
             entry["p4_score"] = round(entry["p4_score"] * (1.0 - drop), 3)
-        defect = Defect(
-            target_ref=target_job,
-            code="T7_forgetting",
-            parameters={"score_drop_ratio": drop},
-        )
+        defect = _log_defect(target_job, "T7_forgetting", {"score_drop_ratio": drop})
         return new_logs, defect
 
     def inject_t8_gradient_anomaly(
@@ -152,11 +143,7 @@ class TrainLogDefectInjector:
         norm = self.config.t8_frozen_grad_norm
         for entry in new_logs:
             entry["frozen_vlm_grad"] = norm
-        defect = Defect(
-            target_ref=target_job,
-            code="T8_gradient_anomaly",
-            parameters={"frozen_vlm_grad": norm},
-        )
+        defect = _log_defect(target_job, "T8_gradient_anomaly", {"frozen_vlm_grad": norm})
         return new_logs, defect
 
 
@@ -195,11 +182,7 @@ class RTCLogDefectInjector:
             entry["latency_ms"] = lat
             entry["chunk_received_s"] = entry["observation_sent_s"] + (lat / 1000.0)
             entry["delay_steps"] = 5
-        defect = Defect(
-            target_ref=target_job,
-            code="R1_high_latency",
-            parameters={"p99_latency_ms": lat},
-        )
+        defect = _log_defect(target_job, "R1_high_latency", {"p99_latency_ms": lat})
         return new_logs, defect
 
     def inject_r2_buffer_depleted(
@@ -209,9 +192,5 @@ class RTCLogDefectInjector:
         depleted = self.config.r2_depleted_steps
         for entry in new_logs[-depleted:]:
             entry["buffer_level"] = 0
-        defect = Defect(
-            target_ref=target_job,
-            code="R2_buffer_depleted",
-            parameters={"depleted_steps": depleted},
-        )
+        defect = _log_defect(target_job, "R2_buffer_depleted", {"depleted_steps": depleted})
         return new_logs, defect

@@ -40,7 +40,11 @@ def test_manifest_serialization_and_lock(tmp_path: Path) -> None:
     manifest = DefectManifest(
         dataset_id="test_ds",
         seed=42,
-        defects=[Defect(target_ref="ep_001", code="joint_jump", parameters={"dim": 0})],
+        defects=[
+            Defect(
+                target_ref="ep_001", code="D3", parameters={"kind": "joint_jump", "dimension": 0}
+            )
+        ],
     )
     manifest_file = tmp_path / "defects.json"
     h = seal_manifest(manifest, manifest_file)
@@ -99,6 +103,8 @@ def test_every_data_defect_fits_the_contract() -> None:
         _make_episodes(200), config=InjectConfig(injection_rate=0.10)
     )
     assert len(manifest.defects) == 20
+    assert len({d.parameters["kind"] for d in manifest.defects}) == 11
+    assert {d.code for d in manifest.defects} == {"D1", "D2", "D3", "D5", "D6", "D7"}
     assert DefectManifest.model_validate(manifest.model_dump()) == manifest
 
 
