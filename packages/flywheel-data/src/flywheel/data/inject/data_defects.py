@@ -7,7 +7,7 @@ import statistics
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from flywheel.contracts.artifacts import ActionLayout, Defect, EpisodeMetadata, InjectedDefect
+from flywheel.contracts.artifacts import ActionLayout, Defect, EpisodeMetadata
 from flywheel.data.inject.codes import DATA_DEFECT_CODES
 from flywheel.data.inject.config import DataDefectConfig
 
@@ -43,17 +43,14 @@ def _join(values: list[int]) -> str:
     return ",".join(str(v) for v in values)
 
 
-def _mark(ep: EpisodeData, kind: str, parameters: Parameters) -> Defect:
-    """Stamp the episode with its injected defect and return the matching manifest entry.
+def _defect(ep: EpisodeData, kind: str, parameters: Parameters) -> Defect:
+    """Build the manifest entry for a defect injected into `ep`.
 
-    The design code goes in `code`; the kind stays in `parameters["kind"]`.
+    The design code goes in `code`; the kind stays in `parameters["kind"]`. Nothing is
+    written on the episode: the answer lives only in the DefectManifest (design 9.2).
     """
     code = DATA_DEFECT_CODES[kind]
-    parameters = {"kind": kind, **parameters}
-    ep.meta = ep.meta.model_copy(
-        update={"injected_defect": InjectedDefect(code=code, parameters=parameters)}
-    )
-    return Defect(target_ref=ep.episode_id, code=code, parameters=parameters)
+    return Defect(target_ref=ep.episode_id, code=code, parameters={"kind": kind, **parameters})
 
 
 class DataDefectInjector:
@@ -120,7 +117,7 @@ class DataDefectInjector:
             kept_ts.pop(1)
         new_ep.images = kept_images
         new_ep.timestamps_image = kept_ts
-        return new_ep, _mark(
+        return new_ep, _defect(
             new_ep,
             "drop_frames",
             {
@@ -135,7 +132,7 @@ class DataDefectInjector:
         new_ep = copy.deepcopy(ep)
         offset = self.config.timestamp_offset_seconds
         new_ep.timestamps_image = [ts + offset for ts in new_ep.timestamps_image]
-        return new_ep, _mark(
+        return new_ep, _defect(
             new_ep,
             "timestamp_sync_offset",
             {"offset_seconds": offset},
@@ -147,7 +144,7 @@ class DataDefectInjector:
         mag = self.config.joint_jump_magnitude
         step = len(new_ep.actions) // 2
         new_ep.actions[step][dim] += mag
-        return new_ep, _mark(
+        return new_ep, _defect(
             new_ep,
             "joint_jump",
             {"step": step, "dimension": dim, "magnitude": mag},
@@ -166,7 +163,7 @@ class DataDefectInjector:
         new_ep = copy.deepcopy(ep)
         for a in new_ep.actions:
             a[dim] = exceeded
-        return new_ep, _mark(
+        return new_ep, _defect(
             new_ep,
             "joint_limit_exceeded",
             {"dimension": dim, "limit_low": low, "limit_high": high, "exceeded_value": exceeded},
@@ -180,7 +177,7 @@ class DataDefectInjector:
         new_ep = copy.deepcopy(ep)
         step = len(new_ep.actions) // 2
         new_ep.actions[step][dim] = float("nan")
-        return new_ep, _mark(
+        return new_ep, _defect(
             new_ep,
             "nan_values",
             {"step": step, "dimension": dim, "type": "nan"},
@@ -195,7 +192,7 @@ class DataDefectInjector:
         scale = self.config.unit_deg_rad_scale
         for a in new_ep.actions:
             a[dim] *= scale
-        return new_ep, _mark(
+        return new_ep, _defect(
             new_ep,
             "unit_deg_rad",
             {"dimension": dim, "scale": scale},
@@ -209,7 +206,7 @@ class DataDefectInjector:
         new_ep = copy.deepcopy(ep)
         for a in new_ep.actions:
             a[dim] = -a[dim]
-        return new_ep, _mark(
+        return new_ep, _defect(
             new_ep,
             "action_sign_flip",
             {"dimension": dim},
@@ -219,7 +216,7 @@ class DataDefectInjector:
         new_ep = copy.deepcopy(ep)
         original_success = new_ep.sim_success
         new_ep.sim_success = not original_success
-        return new_ep, _mark(
+        return new_ep, _defect(
             new_ep,
             "corrupted_success_label",
             {"original": original_success, "corrupted": new_ep.sim_success},
@@ -230,7 +227,7 @@ class DataDefectInjector:
             raise NotApplicable("wrong_task_instruction: episode already has the wrong prompt")
         new_ep = copy.deepcopy(ep)
         new_ep.instruction = self.config.corrupted_prompt
-        return new_ep, _mark(
+        return new_ep, _defect(
             new_ep,
             "wrong_task_instruction",
             {"instruction": self.config.corrupted_prompt},
@@ -241,7 +238,7 @@ class DataDefectInjector:
     ) -> tuple[EpisodeData, Defect]:
         new_ep = copy.deepcopy(ep)
         new_ep.episode_id = dup_id or f"{ep.episode_id}_dup"
-        return new_ep, _mark(
+        return new_ep, _defect(
             new_ep,
             "duplicate_episode",
             {"original_id": ep.episode_id},
@@ -254,7 +251,7 @@ class DataDefectInjector:
         new_ep = copy.deepcopy(ep)
         leaked_seed = self.rng.randint(low, high)
         new_ep.seed = leaked_seed
-        return new_ep, _mark(
+        return new_ep, _defect(
             new_ep,
             "holdout_seed_leak",
             {"leaked_seed": leaked_seed, "holdout_low": low, "holdout_high": high},

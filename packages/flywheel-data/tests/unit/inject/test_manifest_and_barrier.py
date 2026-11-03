@@ -5,8 +5,8 @@ from collections import Counter
 from pathlib import Path
 
 import pytest
-from flywheel.contracts.artifacts import Defect, DefectManifest
-from flywheel.data.inject.applied import defect_applied
+from flywheel.contracts.artifacts import Defect, DefectManifest, EpisodeMetadata
+from flywheel.data.inject.applied import content, defect_applied
 from flywheel.data.inject.codes import DATA_DEFECT_CODES
 from flywheel.data.inject.config import InjectConfig, load_inject_config
 from flywheel.data.inject.data_defects import EpisodeData
@@ -71,29 +71,30 @@ def test_create_defect_and_clean_dataset() -> None:
 
     assert len(injected) == 20
     assert len(manifest.defects) == 11
-    # Check that injected episodes have metadata record
-    injected_count = sum(1 for ep in injected if ep.meta.injected_defect is not None)
-    assert injected_count == len(manifest.defects)
 
     # Clean dataset is a fresh copy of the originals, same size, no defect metadata
     clean, clean_manifest = create_clean_dataset(episodes)
     assert len(clean) == 20
     assert clean_manifest.defects == []
-    assert all(ep.meta.injected_defect is None for ep in clean)
+    # Marked as a benchmark copy too, with the same data as the originals
+    assert all(ep.meta.benchmark_copy_id == clean_manifest.dataset_id for ep in clean)
+    assert [content(ep) for ep in clean] == [content(ep) for ep in episodes]
 
 
-def test_release_barrier_blocks_injected_episodes() -> None:
+def test_release_barrier_blocks_every_benchmark_copy_episode() -> None:
     episodes = _make_episodes(40)
-    injected, _ = create_defect_dataset(episodes)
-
-    # Injected dataset must be rejected by release barrier
-    with pytest.raises(ValueError, match="Release train barrier violation"):
-        verify_release_barrier(injected)
-
-    # Clean dataset passes through barrier
+    injected, manifest = create_defect_dataset(episodes)
+    targets = {d.target_ref for d in manifest.defects}
     clean, _ = create_clean_dataset(episodes)
-    passed = verify_release_barrier(clean)
-    assert len(passed) == 40
+
+    # Design 9.2 (3/11/2026): clean episodes of the copies are blocked as well
+    untouched_copy = [ep for ep in injected if ep.episode_id not in targets]
+    for candidate in (injected, untouched_copy, clean):
+        with pytest.raises(ValueError, match="Release train barrier violation"):
+            verify_release_barrier(candidate)
+
+    # The originals carry no marker and pass
+    assert len(verify_release_barrier(episodes)) == 40
 
 
 def test_dataset_ref_handoff() -> None:
@@ -110,13 +111,10 @@ def test_every_data_defect_fits_the_contract() -> None:
     assert DefectManifest.model_validate(manifest.model_dump()) == manifest
 
 
-def test_injected_episode_carries_its_manifest_entry() -> None:
+def test_every_copy_episode_carries_only_the_copy_marker() -> None:
     injected, manifest = create_defect_dataset(_make_episodes(40))
-    by_id = {ep.episode_id: ep for ep in injected}
-    for defect in manifest.defects:
-        mark = by_id[defect.target_ref].meta.injected_defect
-        assert mark is not None
-        assert (mark.code, mark.parameters) == (defect.code, defect.parameters)
+    # Same metadata on defective and clean episodes, so it reveals no answer
+    assert {ep.meta for ep in injected} == {EpisodeMetadata(benchmark_copy_id=manifest.dataset_id)}
 
 
 def test_config_loader() -> None:
@@ -133,8 +131,14 @@ def test_three_distinct_episodes_per_kind() -> None:
     assert Counter(d.parameters["kind"] for d in manifest.defects) == {
         kind: 3 for kind in DATA_DEFECT_CODES
     }
-    assert len({d.target_ref for d in manifest.defects}) == 33
-    assert sum(ep.meta.injected_defect is not None for ep in injected) == 33
+    targets = {d.target_ref for d in manifest.defects}
+    assert len(targets) == 33
+    changed = {
+        new.episode_id
+        for new, old in zip(injected, _make_episodes(99))
+        if content(new) != content(old)
+    }
+    assert changed == targets
 
 
 def test_same_seed_gives_same_manifest() -> None:
@@ -155,7 +159,7 @@ def test_duplicate_copies_a_clean_episode_and_keeps_the_original() -> None:
     assert len(dups) == 3
     for d in dups:
         copy, source = by_id[d.target_ref], by_id[str(d.parameters["original_id"])]
-        assert source.meta.injected_defect is None
+        assert source.episode_id not in {t.target_ref for t in manifest.defects}
         assert (copy.seed, copy.states, copy.actions) == (
             source.seed,
             source.states,

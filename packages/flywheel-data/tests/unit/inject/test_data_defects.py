@@ -4,7 +4,7 @@ import math
 import statistics
 
 import pytest
-from flywheel.contracts.artifacts import ActionDimension, ActionLayout, InjectedDefect
+from flywheel.contracts.artifacts import ActionDimension, ActionLayout
 from flywheel.data.inject.applied import defect_applied
 from flywheel.data.inject.config import DataDefectConfig
 from flywheel.data.inject.data_defects import (
@@ -36,8 +36,17 @@ def test_injector_preserves_original() -> None:
     injector = DataDefectInjector()
     modified, _ = injector.inject_drop_frames(original)
     assert len(original.images) == 5
-    assert original.meta.injected_defect is None
-    assert modified.meta.injected_defect is not None
+    assert len(modified.images) < 5
+
+
+def test_injectors_never_write_the_answer_on_the_episode() -> None:
+    # Design 9.2 (3/11/2026): the answer lives only in DefectManifest.
+    injector = DataDefectInjector()
+    for name in dir(injector):
+        if name.startswith("inject_"):
+            original = _make_dummy_episode()
+            modified, _ = getattr(injector, name)(original)
+            assert modified.meta == original.meta
 
 
 def test_inject_drop_frames() -> None:
@@ -46,9 +55,6 @@ def test_inject_drop_frames() -> None:
     mod, defect = injector.inject_drop_frames(ep)
     assert defect.code == "D2"
     assert defect.parameters["kind"] == "drop_frames"
-    assert mod.meta.injected_defect == InjectedDefect(
-        code=defect.code, parameters=defect.parameters
-    )
     assert len(mod.images) < len(ep.images)
     assert len(mod.timestamps_image) == len(mod.images)
 
@@ -59,9 +65,6 @@ def test_inject_timestamp_sync_offset() -> None:
     mod, defect = injector.inject_timestamp_sync_offset(ep)
     assert defect.code == "D2"
     assert defect.parameters["kind"] == "timestamp_sync_offset"
-    assert mod.meta.injected_defect == InjectedDefect(
-        code=defect.code, parameters=defect.parameters
-    )
     assert mod.timestamps_image[0] == 0.10
     assert mod.timestamps_state[0] == 0.0
 
@@ -72,9 +75,6 @@ def test_inject_joint_jump() -> None:
     mod, defect = injector.inject_joint_jump(ep)
     assert defect.code == "D3"
     assert defect.parameters["kind"] == "joint_jump"
-    assert mod.meta.injected_defect == InjectedDefect(
-        code=defect.code, parameters=defect.parameters
-    )
     step, dim = int(defect.parameters["step"]), int(defect.parameters["dimension"])
     assert dim in JOINT_ACTION_DIMS
     assert mod.actions[step][dim] == ep.actions[step][dim] + 2.0
@@ -86,9 +86,6 @@ def test_inject_joint_limit_exceeded() -> None:
     mod, defect = injector.inject_joint_limit_exceeded(ep)
     assert defect.code == "D3"
     assert defect.parameters["kind"] == "joint_limit_exceeded"
-    assert mod.meta.injected_defect == InjectedDefect(
-        code=defect.code, parameters=defect.parameters
-    )
     dim = int(defect.parameters["dimension"])
     assert dim in JOINT_ACTION_DIMS
     assert all(a[dim] > math.pi for a in mod.actions)
@@ -100,9 +97,6 @@ def test_inject_nan_values() -> None:
     mod, defect = injector.inject_nan_values(ep)
     assert defect.code == "D1"
     assert defect.parameters["kind"] == "nan_values"
-    assert mod.meta.injected_defect == InjectedDefect(
-        code=defect.code, parameters=defect.parameters
-    )
     step = defect.parameters["step"]
     assert math.isnan(mod.actions[step][int(defect.parameters["dimension"])])
 
@@ -113,9 +107,6 @@ def test_inject_unit_deg_rad() -> None:
     mod, defect = injector.inject_unit_deg_rad(ep)
     assert defect.code == "D3"
     assert defect.parameters["kind"] == "unit_deg_rad"
-    assert mod.meta.injected_defect == InjectedDefect(
-        code=defect.code, parameters=defect.parameters
-    )
     dim = int(defect.parameters["dimension"])
     # Design 9.2: only angle dims, and only one that is not all zero, so the scaling shows.
     assert dim in ANGLE_ACTION_DIMS and dim >= 14
@@ -137,9 +128,6 @@ def test_inject_action_sign_flip() -> None:
     mod, defect = injector.inject_action_sign_flip(ep)
     assert defect.code == "D7"
     assert defect.parameters["kind"] == "action_sign_flip"
-    assert mod.meta.injected_defect == InjectedDefect(
-        code=defect.code, parameters=defect.parameters
-    )
     dim = int(defect.parameters["dimension"])
     # Design 9.2: one dim whose std is not zero on this episode.
     assert statistics.pstdev(a[dim] for a in ep.actions) > 0
@@ -186,9 +174,6 @@ def test_inject_corrupted_success_label() -> None:
     mod, defect = injector.inject_corrupted_success_label(ep)
     assert defect.code == "D6"
     assert defect.parameters["kind"] == "corrupted_success_label"
-    assert mod.meta.injected_defect == InjectedDefect(
-        code=defect.code, parameters=defect.parameters
-    )
     assert mod.sim_success is False
 
 
@@ -198,9 +183,6 @@ def test_inject_wrong_task_instruction() -> None:
     mod, defect = injector.inject_wrong_task_instruction(ep)
     assert defect.code == "D6"
     assert defect.parameters["kind"] == "wrong_task_instruction"
-    assert mod.meta.injected_defect == InjectedDefect(
-        code=defect.code, parameters=defect.parameters
-    )
     assert mod.instruction != ep.instruction
 
 
@@ -210,9 +192,6 @@ def test_inject_duplicate_episode() -> None:
     mod, defect = injector.inject_duplicate_episode(ep)
     assert defect.code == "D5"
     assert defect.parameters["kind"] == "duplicate_episode"
-    assert mod.meta.injected_defect == InjectedDefect(
-        code=defect.code, parameters=defect.parameters
-    )
     assert mod.episode_id.endswith("_dup")
 
 
@@ -222,9 +201,6 @@ def test_inject_holdout_seed_leak() -> None:
     mod, defect = injector.inject_holdout_seed_leak(ep)
     assert defect.code == "D5"
     assert defect.parameters["kind"] == "holdout_seed_leak"
-    assert mod.meta.injected_defect == InjectedDefect(
-        code=defect.code, parameters=defect.parameters
-    )
     assert 9000 <= mod.seed <= 9999
 
 

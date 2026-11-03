@@ -8,5 +8,9 @@ from flywheel.contracts.artifacts import Episode
 
 
 def has_injected_defect(episode: Episode) -> bool:
-    """True when the episode belongs to a defect-injected benchmark copy."""
-    return episode.meta.injected_defect is not None
+    """True when the episode belongs to a benchmark copy, defective or clean.
+
+    Every episode of a copy carries `benchmark_copy_id` (design 6.1, 9.2; issue #62), so
+    clean episodes of a copy stay out of the release train too.
+    """
+    return episode.meta.benchmark_copy_id is not None

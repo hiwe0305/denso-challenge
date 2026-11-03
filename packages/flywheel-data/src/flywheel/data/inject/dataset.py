@@ -107,6 +107,7 @@ def create_defect_dataset(
         if placed < per_kind:
             raise ValueError(f"Only {placed} of {total} episodes can take {kind}; need {per_kind}")
 
+    _mark_benchmark_copy(cloned_episodes, dataset_id)
     manifest = DefectManifest(
         dataset_id=dataset_id,
         seed=cfg.seed,
@@ -114,6 +115,12 @@ def create_defect_dataset(
     )
 
     return cloned_episodes, manifest
+
+
+def _mark_benchmark_copy(episodes: list[EpisodeData], dataset_id: str) -> None:
+    """Mark every episode of a benchmark copy, defective or not (design 6.1, 9.2)."""
+    for ep in episodes:
+        ep.meta = ep.meta.model_copy(update={"benchmark_copy_id": dataset_id})
 
 
 def create_clean_dataset(
@@ -129,28 +136,27 @@ def create_clean_dataset(
     cfg = config or InjectConfig()
     dataset_id = _neutral(dataset_id or copy_ids(cfg.seed)[1])
     clean = [copy.deepcopy(ep) for ep in episodes]
-    for ep in clean:
-        ep.meta = ep.meta.model_copy(update={"injected_defect": None})
+    _mark_benchmark_copy(clean, dataset_id)
     return clean, DefectManifest(dataset_id=dataset_id, seed=cfg.seed, defects=[])
 
 
 def verify_release_barrier(episodes: Sequence[EpisodeData]) -> list[EpisodeData]:
-    """Enforce barrier: reject any episode with an injected defect from the release train.
+    """Enforce barrier: reject every episode of a benchmark copy from the release train.
 
-    Raises ValueError if an injected defect is present in the release candidate set.
+    Raises ValueError if any episode carries `benchmark_copy_id`, defective or clean.
     """
     clean_episodes: list[EpisodeData] = []
     poisoned_ids: list[str] = []
 
     for ep in episodes:
-        if ep.meta.injected_defect is not None:
+        if ep.meta.benchmark_copy_id is not None:
             poisoned_ids.append(ep.episode_id)
         else:
             clean_episodes.append(ep)
 
     if poisoned_ids:
         raise ValueError(
-            f"Release train barrier violation: {len(poisoned_ids)} defect-injected episodes "
+            f"Release train barrier violation: {len(poisoned_ids)} benchmark copy episodes "
             f"attempted to enter release: {poisoned_ids[:5]}"
         )
 
