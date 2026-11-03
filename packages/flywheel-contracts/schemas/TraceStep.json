@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "A single control cycle in a rollout trace.\n\nOne clock: MuJoCo simulation time `data.time`, in seconds. Non-finite values are\nwritten as the strings \"NaN\", \"Infinity\", \"-Infinity\" so the line stays JSON; a\ncheck that needs such a value says CHƯA RÕ instead of scoring it.",
+  "description": "A single control cycle in a rollout trace; one line of `steps.jsonl`.\n\nOne clock: MuJoCo simulation time `data.time`, in seconds. Non-finite values are\nwritten as the strings \"NaN\", \"Infinity\", \"-Infinity\" so the line stays JSON; a\ncheck that needs such a value says CHƯA RÕ instead of scoring it.",
   "properties": {
     "trace_id": {
       "minLength": 1,
