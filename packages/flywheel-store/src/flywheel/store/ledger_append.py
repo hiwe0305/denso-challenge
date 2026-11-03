@@ -11,6 +11,47 @@ from flywheel.contracts.entities import LedgerEntry
 from flywheel.store.paths import StorePaths
 
 
+def _measure_kinds(paths: StorePaths) -> dict[str, str]:
+    """Map every entry id already in the site's ledger to its measure_kind."""
+    kinds: dict[str, str] = {}
+    for ledger_path in sorted(paths.runs_dir.glob("**/ledger*.jsonl")):
+        with open(ledger_path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    row = json.loads(line)
+                    kinds[row["id"]] = row["measure_kind"]
+    return kinds
+
+
+def _check_links(entry: LedgerEntry, paths: StorePaths) -> None:
+    """A measured row points at an estimated row and a reversal at a row, both on disk.
+
+    The model only checks the shape of the ids; whether they name a real row
+    can only be known here. The lookup covers the whole site ledger, not only
+    this job, since the estimate may be written by the job that planned the
+    work and the measurement by the job that ran it.
+    """
+    if entry.estimate_entry_id is None and entry.reverses_entry_id is None:
+        return
+    kinds = _measure_kinds(paths)
+    if entry.estimate_entry_id is not None:
+        kind = kinds.get(entry.estimate_entry_id)
+        if kind is None:
+            raise ValueError(
+                f"estimate_entry_id '{entry.estimate_entry_id}' does not exist in the ledger"
+            )
+        if kind != "estimated":
+            raise ValueError(
+                f"estimate_entry_id '{entry.estimate_entry_id}' is a {kind} row, "
+                "not an estimated row"
+            )
+    if entry.reverses_entry_id is not None and entry.reverses_entry_id not in kinds:
+        raise ValueError(
+            f"reverses_entry_id '{entry.reverses_entry_id}' does not exist in the ledger"
+        )
+
+
 def append_ledger_entry(
     entry: LedgerEntry,
     paths: StorePaths | None = None,
@@ -19,6 +60,7 @@ def append_ledger_entry(
     if paths is None:
         paths = StorePaths()
 
+    _check_links(entry, paths)
     run_plan_id = entry.run_plan_id or "default"
     job_id = entry.job_id or "default"
     ledger_path = paths.job_ledger_path(run_plan_id, job_id)
