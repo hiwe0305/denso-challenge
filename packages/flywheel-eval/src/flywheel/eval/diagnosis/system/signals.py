@@ -7,10 +7,12 @@ it would clear R1 through R5 and come out as a system that behaved. The answer
 spec section 6.4 requires is CHƯA RÕ with a request for more evidence, and this
 module is what produces it.
 
-It answers per code, not for the whole episode. A trace that logged no image
-timestamp cannot be judged on sync offset, and saying so costs R4 its verdict
-and nothing else: the tracking error of the upper body was still measured, and
-hiding it would lose a fault somebody has to fix. What a missing signal does
+It answers per code, not for the whole episode, and per half of the body for
+R3. A trace that logged no image timestamp cannot be judged on sync offset,
+and saying so costs R4 its verdict and nothing else: the tracking error of the
+upper body was still measured, and hiding it would lose a fault somebody has
+to fix. A trace with no lower-body measurement costs `R3/lower` and leaves
+`R3/upper` judged, for the same reason. What a missing signal does
 cost the episode is the clean verdict - `combine` turns "nothing fired and
 something went unjudged" into UNKNOWN, never into CLEAN (`verdict.py`).
 
@@ -29,15 +31,19 @@ Three kinds of incompleteness, reported apart because they are collected apart:
 from __future__ import annotations
 
 from flywheel.eval.config import SignalLimits
-from flywheel.eval.diagnosis.system.reader import SYNC_FIELDS, TRACK_FIELDS, SystemInputs
+from flywheel.eval.diagnosis.system.reader import SYNC_FIELDS, SystemInputs
 from flywheel.eval.diagnosis.system.verdict import CheckResult
 from flywheel.eval.diagnosis.train.finding import Skipped
 
 # Which fields of the trace each code is measured on. R1 and R2 read the RTC
 # log and R5 the camera parameters, so they are not here; their own checks say
-# when the file they need is absent.
+# when the file they need is absent. R3 is two entries, one per half of the
+# body, the way `SystemFinding.part` splits it: raw psi-data logs no
+# `meas_lower`, and losing the lower half must not cost the upper half its
+# verdict and hide a controller fault there.
 FIELDS_OF_CODE: dict[str, tuple[str, ...]] = {
-    "R3": TRACK_FIELDS,
+    "R3/upper": ("cmd_upper", "meas_upper"),
+    "R3/lower": ("cmd_lower", "meas_lower"),
     "R4": SYNC_FIELDS,
 }
 

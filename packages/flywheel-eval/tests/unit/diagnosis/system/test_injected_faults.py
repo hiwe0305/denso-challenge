@@ -148,6 +148,23 @@ def test_an_injected_tracking_fault_comes_back_as_a_controller_fault(episode, cf
     assert [(f.code, f.part) for f in verdict.findings] == [("R3", "upper")]
 
 
+def test_an_upper_body_fault_is_caught_when_the_lower_body_is_not_measured(
+    episode, cfg, row
+) -> None:
+    # Raw psi-data logs no `meas_lower` (README of the #31 fixtures). Losing the
+    # lower half must not cost the upper half its verdict and hide a real
+    # controller fault there.
+    off = [
+        row(step, meas_upper=[0.6, 0.2, 0.3], meas_lower=["NaN", "NaN"]) for step in range(20)
+    ]
+
+    verdict = diagnose_system(load_episode(episode(trace_rows=off)), cfg)
+
+    assert verdict.diagnosis is Diagnosis.CONTROLLER
+    assert [(f.code, f.part) for f in verdict.findings] == [("R3", "upper")]
+    assert [skip.code for skip in verdict.skipped] == ["R3/lower"]
+
+
 def test_an_injected_latency_spike_comes_back_as_a_runtime_fault(episode, cfg, rtc_rows) -> None:
     slow = [
         {**record, "chunk_received_s": record["observation_sent_s"] + 0.4} for record in rtc_rows

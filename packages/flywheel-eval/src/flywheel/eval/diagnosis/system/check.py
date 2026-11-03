@@ -22,7 +22,7 @@ from flywheel.eval.config import SystemThresholds
 from flywheel.eval.diagnosis.system.reader import SystemInputs
 from flywheel.eval.diagnosis.system.runtime import check_r1, check_r2, check_r4, check_r5, check_r6
 from flywheel.eval.diagnosis.system.signals import check_signals, unjudgeable_codes
-from flywheel.eval.diagnosis.system.tracking import check_r3
+from flywheel.eval.diagnosis.system.tracking import PARTS, check_r3
 from flywheel.eval.diagnosis.system.verdict import CheckResult, SystemVerdict, combine
 
 
@@ -36,8 +36,9 @@ def diagnose_system(inputs: SystemInputs, cfg: SystemThresholds) -> SystemVerdic
     """
     unjudgeable = unjudgeable_codes(inputs, cfg.signals)
     results: list[CheckResult] = [check_signals(inputs, cfg.signals)]
-    if "R3" not in unjudgeable:
-        results.append(check_r3(inputs.trace, cfg.r3))
+    parts = tuple(part for part in PARTS if f"R3/{part}" not in unjudgeable)
+    if parts:
+        results.append(check_r3(inputs.trace, cfg.r3, parts))
     results.append(check_r1(inputs.rtc, cfg.r1))
     results.append(check_r2(inputs.rtc, cfg.r2))
     if "R4" not in unjudgeable:

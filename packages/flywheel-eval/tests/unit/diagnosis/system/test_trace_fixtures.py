@@ -106,3 +106,6 @@ def test_the_missing_signals_fixture_is_unknown(tmp_path: Path, cfg) -> None:
     assert verdict.diagnosis is Diagnosis.UNKNOWN
     assert verdict.findings == []
     assert "R4" in _skipped(verdict)
+    # raw psi-data has no lower-body measurement; the upper half is still judged
+    assert "R3/lower" in _skipped(verdict)
+    assert "R3/upper" not in _skipped(verdict)
