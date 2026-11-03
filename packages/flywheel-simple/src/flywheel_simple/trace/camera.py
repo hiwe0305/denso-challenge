@@ -75,7 +75,15 @@ def _canonical(cam: CameraValues) -> dict[str, object]:
 
 
 def reference_sha256(cameras: Iterable[CameraValues]) -> str:
-    """sha256 of a camera set, independent of camera order and of float noise below 1e-9."""
+    """sha256 of a camera set, independent of camera order and of float noise below 1e-9.
+
+    Used once per task to pin the G0 camera reference
+    (`scripts/g0/trace/pin_camera_reference.py`). `CameraParams.reference_sha256` of an
+    episode is that pinned hash, copied from the job spec, and never this hash of the
+    episode's own cameras: R5 compares the cameras with the reference values within a
+    tolerance, which a hash of the cameras themselves would turn into exact equality
+    (PO decision Q3, 3/11/2026).
+    """
     records = sorted((_canonical(c) for c in cameras), key=lambda r: str(r["uid"]))
     payload = json.dumps(records, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()

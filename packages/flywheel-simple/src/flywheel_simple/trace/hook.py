@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import itertools
 import re
+import time
+import uuid
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Protocol, cast
@@ -49,11 +51,13 @@ class CycleRecord:
 
 @dataclass
 class EpisodeTrace:
+    trace_id: str
     episode_id: str
     run_plan_id: str
     cameras: list[CameraValues]
     cycles: list[CycleRecord] = field(default_factory=list)
     sim_success: bool | None = None  # None: the eval loop never reported the episode
+    wall_seconds: float = 0.0  # env reset to the stats line (or to the flush)
 
 
 class TraceSink(Protocol):
@@ -67,17 +71,33 @@ def parse_stats_line(line: str) -> tuple[str, bool] | None:
 
 
 class TraceRecorder:
-    """Collects the cycles of one episode at a time and hands each finished one to a sink."""
+    """Collects the cycles of one episode at a time and hands each finished one to a sink.
 
-    def __init__(self, sink: TraceSink, *, run_plan_id: str) -> None:
+    Each episode gets its `trace_id` when the env is reset, before the agent is: SIMPLE
+    resets the env, then the agent (`eval_decoupled_wbc`, episode loop), so an RTC client
+    driven by the agent can be reset with the same id (`TracedAgent.fw_trace_id`) and its
+    `rtc.jsonl` lines join this trace by `trace_id`.
+    """
+
+    def __init__(self, sink: TraceSink, *, run_plan_id: str, job_id: str = "local") -> None:
         self.sink = sink
         self.run_plan_id = run_plan_id
+        self.job_id = job_id
         self._open: EpisodeTrace | None = None
+        self._started = 0.0
         self._unfinished = itertools.count()
+
+    @property
+    def trace_id(self) -> str | None:
+        """Trace id of the open episode; None between episodes."""
+        return self._open.trace_id if self._open is not None else None
 
     def start_episode(self, *, cameras: list[CameraValues]) -> None:
         self._flush(None)
+        self._started = time.perf_counter()
         self._open = EpisodeTrace(
+            # unique across the spawned workers of one job, which share its job_id
+            trace_id=f"{self.job_id}-{uuid.uuid4().hex[:12]}",
             episode_id=f"unfinished-{next(self._unfinished)}",
             run_plan_id=self.run_plan_id,
             cameras=cameras,
@@ -123,6 +143,7 @@ class TraceRecorder:
             return
         episode, self._open = self._open, None
         episode.sim_success = success
+        episode.wall_seconds = time.perf_counter() - self._started
         self.sink.write(episode)
 
 
@@ -164,6 +185,7 @@ def traced_agent_class(base: type[Any], recorder: TraceRecorder) -> type[Any]:
 
         def reset(self, **kwargs: Any) -> Any:
             self._fw_mirror.clear()
+            self.fw_trace_id = recorder.trace_id  # what an RTC client must be reset with
             return super().reset(**kwargs)
 
         def get_action(self, observation: Any, *args: Any, **kwargs: Any) -> Any:
