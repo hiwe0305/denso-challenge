@@ -47,6 +47,39 @@ STATE_SLICES = (
 # waist_roll_joint, waist_pitch_joint, waist_yaw_joint; the agent builds its state the same way
 WAIST_RPY = (13, 14, 12)
 
+# Joint names of cmd_upper/meas_upper, flywheel.contracts.trace.UPPER_BODY; the `sim`
+# test checks that STATE_SLICES picks exactly these joints out of SIMPLE's g1_sonic.
+UPPER_NAMES = (
+    "left_hand_thumb_0_joint",
+    "left_hand_thumb_1_joint",
+    "left_hand_thumb_2_joint",
+    "left_hand_middle_0_joint",
+    "left_hand_middle_1_joint",
+    "left_hand_index_0_joint",
+    "left_hand_index_1_joint",
+    "right_hand_thumb_0_joint",
+    "right_hand_thumb_1_joint",
+    "right_hand_thumb_2_joint",
+    "right_hand_index_0_joint",
+    "right_hand_index_1_joint",
+    "right_hand_middle_0_joint",
+    "right_hand_middle_1_joint",
+    "left_shoulder_pitch_joint",
+    "left_shoulder_roll_joint",
+    "left_shoulder_yaw_joint",
+    "left_elbow_joint",
+    "left_wrist_roll_joint",
+    "left_wrist_pitch_joint",
+    "left_wrist_yaw_joint",
+    "right_shoulder_pitch_joint",
+    "right_shoulder_roll_joint",
+    "right_shoulder_yaw_joint",
+    "right_elbow_joint",
+    "right_wrist_roll_joint",
+    "right_wrist_pitch_joint",
+    "right_wrist_yaw_joint",
+)
+
 NonFinite = Literal["NaN", "Infinity", "-Infinity"]
 
 

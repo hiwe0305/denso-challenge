@@ -34,10 +34,10 @@ Là người làm làn Đánh giá, tôi muốn mỗi rollout SIMPLE của độ
 
 - [x] 1. File story và phạm vi file
 - [x] 2. Vector lệnh và đo, intrinsics và pose camera từ mảng số, test CPU (AC 2, 3, 5)
-- [ ] 3. Dựng `TraceStep`, `CameraParams` và bộ ghi trace theo quy ước tệp của hợp đồng, kèm cờ `sim_success` (AC 1, 3, 4)
+- [x] 3. Dựng `TraceStep`, `CameraParams` và bộ ghi trace theo quy ước tệp của hợp đồng, kèm cờ `sim_success` (AC 1, 3, 4)
   - [x] 3.1. Bộ ghi một thư mục `<trace_id>/` mỗi episode (`steps.jsonl`, `camera_params.jsonl`, `RolloutResult`), `trace_id` chung với client RTC, `reference_sha256` chép từ job spec (review PO 3/11/2026, B1; layout theo G1 của PR #48)
   - [x] 3.2. Ghim bản tham chiếu camera G0 của task hai bàn ở SIMPLE `b75c678` (review PO 3/11/2026, B3)
-  - [ ] 3.3. Entry module cài hook ở cấp module, đọc `job_id`, `run_plan_id`, thư mục job và bản tham chiếu từ job spec
+  - [x] 3.3. Entry module cài hook ở cấp module, đọc `job_id`, `run_plan_id`, thư mục job và bản tham chiếu từ job spec
   - [x] 3.4. Đọc lại tệp qua `TraceStep`, `CameraParams` khi PR #48 merge (test đang skip hoặc xfail tới lúc đó)
 - [x] 4. Cài hook vào `eval-decoupled-wbc` (bọc env và agent), test `sim` (AC 1, 5)
 - [ ] 5. Lượt chạy thật task hai bàn trên `rtx3060`, ghi ledger (AC 6)
@@ -195,3 +195,12 @@ Hệ quả:
 - PR #48 merge thành #79 (master `3f02b1a`) với G1, G1b, `CameraParams.trace_id` và tên 28/7 chiều. Nhánh merge `origin/master` (không rebase, không force-push).
 - Hợp đồng trên master bắt `run_plan_id` bắt đầu bằng `g0-` theo G2 (`g0-<story>-<yyyymmdd>`). Hai id trong test (`g0-DA-38-test`, `g0-DA-38-seams`) bị từ chối; đổi sang `g0-DA-38-20261104`.
 - Kết quả: `test_files.py` không còn skip (mọi dòng `steps.jsonl` là `TraceStep`, mọi dòng `camera_params.jsonl` là `CameraParams`, `rollout_result.json` là `RolloutResult`); test seam của hook qua thay vì xfail.
+
+### 4/11/2026 · Nhiệm vụ 3.3: entry module
+
+- `python -m flywheel_simple.trace.run <env_id> psi0_decoupled_wbc [tham số của eval-decoupled-wbc]`. Job spec đi qua biến môi trường vì worker spawn kế thừa môi trường, không nhận tham số: `FW_TRACE_JOB_DIR`, `FW_JOB_ID`, `FW_RUN_PLAN_ID` (bắt buộc; `g0-…` phải theo G2), `FW_CAMERA_REFERENCE_SHA256` (không có thì không ghi `camera_params.jsonl`).
+- Hook cài khi import, dưới cả `__main__` và `__mp_main__` (rủi ro 2 ở trên). Module gọi `prepare()` của `tray/run.py` cho task khay. `adapter_info.version` là `simple@<HEAD của checkout SIMPLE>`.
+- Venv SIMPLE không có gói `flywheel`, nên `signals`, `files`, `run` giữ bản chép của tên trong hợp đồng: `UPPER_BODY`, `LOWER_BODY`, ba tên tệp, mẫu `G0_RUN_PLAN_ID`. Test CPU `test_run.py` giữ bản chép bằng hợp đồng.
+- Kiểm tận nguồn thứ tự 28 chiều: `STATE_SLICES` lấy từ `WHOLE_BODY_JOINTS` của `g1_sonic` (SIMPLE `b75c678`) đúng các khớp của `UPPER_BODY`, theo đúng thứ tự (tay trái thumb, middle, index; tay phải thumb, index, middle), và `WAIST_RPY` là roll, pitch, yaw. Có test `sim` cho điều này.
+- Test `sim` mới chạy entry module trong vòng eval thật (stub thay server Ψ₀). Kết quả: đúng một thư mục `<trace_id>/` với 40 dòng `steps.jsonl`, hai camera mang hash đã ghim, `trace_ref.uri` là thư mục đó, `infra_status` là `ok`. Trên `rtx3060` 4/11/2026 00:34, SIMPLE `b75c678`, task hai bàn: 5 passed, 2 skipped (khay chưa đặt dữ liệu; test hợp đồng vì venv không có `flywheel`) trong 53 s.
+- Chưa chạy với `--num-workers > 1`; lượt chạy thật của nhiệm vụ 5 sẽ chạy.

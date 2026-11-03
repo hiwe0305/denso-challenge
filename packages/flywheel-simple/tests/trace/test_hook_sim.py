@@ -129,3 +129,52 @@ def test_trace_of_a_real_eval_episode(env_id: str, var: str, tmp_path: Path) -> 
     fy_cfg = 640 / (2 * np.tan(np.radians(110) / 2))  # CameraCfg: fov 110 deg on 640 px
     assert left.fy == pytest.approx(fy_cfg, rel=1e-6)
     assert np.linalg.norm(left.pose[3:]) == pytest.approx(1.0, abs=1e-6)
+
+
+def test_upper_names_are_the_joints_state_slices_picks_from_g1_sonic() -> None:
+    from flywheel_simple.trace.signals import UPPER_NAMES, WAIST_RPY
+    from simple.robots.g1_sonic import WHOLE_BODY_JOINTS
+
+    joints = list(WHOLE_BODY_JOINTS)
+    picked = [joints[i] for _, start, end in STATE_SLICES for i in range(start, end)]
+    assert tuple(picked) == UPPER_NAMES
+    assert [joints[i] for i in WAIST_RPY] == ["waist_roll_joint", "waist_pitch_joint",
+                                             "waist_yaw_joint"]  # fmt: skip
+
+
+def test_entry_module_writes_one_trace_directory_per_episode(tmp_path: Path) -> None:
+    import json
+
+    from flywheel_simple.trace.run import install_from_env
+    from simple.baselines import client
+    from simple.cli import eval_decoupled_wbc
+    from simple.evals.api import EvalConfig
+
+    data_dir = os.environ.get("FW_TRACE_DATA_TWO_TABLE")
+    if not data_dir:
+        pytest.skip("FW_TRACE_DATA_TWO_TABLE not set")
+    job_dir = tmp_path / "job"
+    pinned = "fc7f9c90ebbf8c4662fd70e58de5aed668c0fbc5ccfbbd951dce705729cdeea2"
+    install_from_env({"FW_TRACE_JOB_DIR": str(job_dir), "FW_JOB_ID": "sim-test",
+                      "FW_RUN_PLAN_ID": "g0-DA-38-20261104",
+                      "FW_CAMERA_REFERENCE_SHA256": pinned})  # fmt: skip
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(client.HttpActionClient, "query_action", hold_pose_query)
+        eval_decoupled_wbc.run_eval(
+            EvalConfig(env_id=TWO_TABLE, policy="psi0_decoupled_wbc", data_format="lerobot",
+                       data_dir=data_dir, sim_mode="mujoco", headless=True, save_video=False,
+                       eval_dir=str(tmp_path / "eval"), max_episode_steps=STEPS,
+                       num_episodes=1, num_workers=1),  # fmt: skip
+            show_progress=False,
+        )
+    (trace_dir,) = [d for d in job_dir.iterdir() if (d / "steps.jsonl").exists()]
+    steps = [json.loads(line) for line in (trace_dir / "steps.jsonl").read_text().splitlines()]
+    camera_lines = (trace_dir / "camera_params.jsonl").read_text().splitlines()
+    cams = [json.loads(line) for line in camera_lines]
+    result = json.loads((trace_dir / "rollout_result.json").read_text())
+    assert len(steps) == STEPS and {s["trace_id"] for s in steps} == {trace_dir.name}
+    assert {c["uid"] for c in cams} == {"head_stereo_left", "head_stereo_right"}
+    assert {c["reference_sha256"] for c in cams} == {pinned}
+    assert result["trace_ref"]["uri"] == trace_dir.as_posix()
+    assert result["infra_status"] == "ok"
+    assert result["adapter_info"]["version"].startswith("simple@")
