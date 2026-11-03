@@ -94,3 +94,40 @@ Agent PICO của SIMPLE nội suy thân trên của WBC theo `time.monotonic()`,
 | Profile 500 bước | `env.step` khoảng 16 ms mỗi bước, trong đó render hai camera stereo 10,5 ms (chỉ mắt trái được ghi); phần còn lại là agent (WBC, IK) và ghi frame |
 
 Hệ quả cho quy mô: mỗi worker chạy khoảng 1× thời gian thực, nên số episode mỗi giờ đến từ số worker (tối đa 22 trên rtx3060). Bỏ render mắt phải là chỗ tối ưu đầu tiên nếu cần (nhiệm vụ 12).
+
+## Người điều khiển ảo (nhiệm vụ 5)
+
+`flywheel_simple.tray.pico.operator.VirtualOperator` lấy ý định từ `TrayPlanner` của DA-33 và phát tín hiệu như `PicoStreamer`; `flywheel_simple.tray.pico.agent.VirtualPicoStreamer` cắm nó vào chỗ của kính trong `StreamerDecoupledAgent`. Lệnh phiên:
+
+```bash
+MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/python \
+    -m flywheel_simple.tray.pico.session --conditions 0:0 --operator op-virtual --streamer virtual
+```
+
+| Planner ra | Người điều khiển ảo phát |
+|---|---|
+| Hai cổ tay, khung đế | Tư thế hai tay cầm: `robot_to_teleop` của mục tiêu (qua lớp phong cách nếu có), với `ctrl0` lúc kích hoạt và tư thế hiệu chuẩn đọc từ `WristsPreProcessor` |
+| Độ đóng bàn tay 0–1 | Từ 0,5 trở lên: cò cộng grip (kiểu đóng "middle" của PICO); dưới: mở |
+| `vx`, `vy` | Cần trái, giới hạn gia tốc (`JoystickShaper`) |
+| Hướng thân | Cần phải, vòng kín trên yaw thân đo được (`YawStick`); `target_yaw` là tích phân của cần như `PicoStreamer` |
+| ABORT, hoặc DONE mà chưa đạt | Bỏ lượt bằng nút reset sau `give_up_s` hoặc `done_wait_s` |
+
+Một episode bắt đầu như với kính: robot đứng vững, người ảo bấm kích hoạt với tay cầm ở `ctrl0` (bộ tiền xử lý hiệu chuẩn lúc đó), giữ yên `engage_s` cho SIMPLE đưa tay về tư thế hiệu chuẩn, rồi chạy planner từ tư thế đó. Tham số ở `configs/sim/tray_virtual_teleop.yaml`; mỗi lượt ghi dòng thời gian pha và lý do abort vào `attempts.jsonl`.
+
+Quyết định **[Đề xuất]**:
+
+| Quyết định | Lý do | Nếu sai |
+|---|---|---|
+| Bàn tay chỉ dùng ba mức đóng của PICO, chọn cò cộng grip; tư thế nghỉ (planner đóng 0,3) thành mở | Dữ liệu cùng dạng với PICO thật (story, mục Bàn tay). Kiểu "middle" không xoay ngón cái, gần cách kẹp ngón D-19 nhất. Đo: cầm và đặt được (bảng dưới), nên không cần hỏi PO về bàn tay đóng liên tục | Đổi `grasp` (0 cò, 2 grip) |
+| Yaw lái vòng kín: đẩy cần khi thân lệch hướng planner quá 2°, thả khi còn dưới 0,5°, tốc độ `yaw_gain` × sai số trong [0,12; 0,5] rad/s | Thân dưới chỉ quay khi \|vyaw\| ≥ 0,1, còn `PicoStreamer` tích phân `target_yaw` từ cần. Cờ giữ hướng 0,1 của S1 (D-10) với `target_yaw` đứng yên thì PICO không phát được | Chỉnh ngưỡng, hoặc quay về cờ giữ hướng (lệch khỏi dữ liệu PICO) |
+| Planner bắt đầu từ tư thế cổ tay hiệu chuẩn, không từ tư thế đứng | Lúc kích hoạt ống PICO đưa tay tới tư thế này; planner dùng nó làm tư thế nghỉ lúc đi và lúc xong | |
+| Người ảo bỏ lượt 1 s sau khi planner abort, 5 s sau DONE mà chưa đạt | Như người thu giữ hai grip để reset; không chạy hết 90 s | Chỉnh tham số |
+
+Số đo (rtx3060, 3/11/2026, chưa có lớp phong cách):
+
+| Đo | Kết quả |
+|---|---|
+| Test CPU trên thế giới giả của planner, qua đường tín hiệu PICO (đổi thuận của bộ tiền xử lý, ba mức đóng, cờ quay) | Đạt ở mức 0 seed 0 và mức 1 seed 3; `target_yaw` bằng tích phân của `vyaw`; cần quay khi đẩy luôn ≥ 0,1 |
+| Một lượt mức 0 seed 0 qua phiên thu thật, ghi LeRobot | Đạt `check_success`, đủ 7 bước, 35,0 s sim, 1751 frame |
+| 8 lượt, mức 0 seed 1–4 và mức 1 seed 1–4, mỗi worker một lượt | 7/8 đạt (31,0–35,0 s sim). Mức 1 seed 4 hỏng `L-TRAY-TILT` lúc quay |
+| Thời gian máy | Chưa đo sạch: lúc đo, lô S1 của DA-33 (22 worker) chạy cùng máy, load 47–80. Một lượt một mình 144 s thực cho 35 s sim; profile 1000 bước: `env.step` 46 ms (render 31 ms), agent PICO 19 ms, vật lý 10 ms. Đo lại khi máy rảnh (nhiệm vụ 7) |
