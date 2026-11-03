@@ -19,8 +19,8 @@ Là AI Engineer, tôi muốn chấm phép kiểm QA và Agent QA/QC trên bộ l
 
 ## Tiêu chí chấp nhận
 
-1. Đọc kết quả QA (QAReport của làn Dữ liệu) và báo cáo của agent (`QAReport` của DA-20) trên bản cấy lỗi và bản sạch; chỉ mở `DefectManifest` sau khi cả hai đã chạy xong (có test).
-2. Precision và recall theo từng loại lỗi, không gộp; tỉ lệ báo nhầm trên bản sạch; thời gian từ lúc job xong tới lúc có báo cáo.
+1. Đọc kết quả QA (QAReport của làn Dữ liệu) và báo cáo của agent (`AgentReport` của DA-20) trên bản cấy lỗi và bản sạch; chỉ mở `DefectManifest` sau khi cả hai đã chạy xong (có test).
+2. Precision và recall theo từng loại lỗi, không gộp: recall theo loại của `DefectManifest`, precision theo mã design mục 10, qua bảng ánh xạ ở design mục 9.2; tỉ lệ báo nhầm trên bản sạch; thời gian từ lúc job xong tới lúc có báo cáo.
 3. Tách hai cột: phần **phép kiểm bằng code** bắt được, và phần **Agent QA/QC** thêm vào (xếp hạng đúng, giải thích đúng, đề xuất đúng hay sai).
 4. Báo cáo HTML tĩnh ghi rõ "trên lỗi cấy"; dùng trong demo 17/11 (DA-28).
 
@@ -60,6 +60,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 27/10/2026 | Tạo story, tách phần chấm từ DA-27 | PO (Hiếu) |
+| 3/11/2026 | AC 1: `AgentReport` thay `QAReport` của DA-20; AC 2: recall theo loại, precision theo mã (design mục 9.2) | PO (Hiếu) theo issue #34 |
 
 ## Ghi chép khi làm
 

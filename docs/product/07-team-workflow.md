@@ -4,6 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Đầu vào
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 3/11/2026 | 1.0 | Mục 2.0 (bảng dữ liệu đi giữa người): Hưng giao Long `AgentReport` thay `QAReport` (issue #34; 03 bản 0.8). Mục 2.2, DA-01: layout action G1 là 36 chiều thật của Ψ₀, không phải đệm (đối chiếu `src/psi/data/simple/__init__.py` ở `cda3fdf` và gói psi-data task hai bàn) | PO (Hiếu) |
 | 28/10/2026 | 0.9 | Mục 3.4: lệnh merge chuẩn `--admin --rebase` và lý do PR xanh vẫn BLOCKED (ruleset "Only Hiếu merges into master") | PO (Hiếu) |
 | 28/10/2026 | 0.8 | Mục 2.2: thêm DA-32, DA-33, DA-34 (nhánh task bê khay của Hiếu, chạy song song, [design 28/10/2026](../superpowers/specs/2026-10-28-tray-transfer-he-design.md)) | PO (Hiếu) |
 | 28/10/2026 | 0.7 | Mục 3.2: chủ `flywheel-contracts`, `flywheel-testkit` là Long theo mục 2.0, thay ghi chú bản 0.4 | PO (Hiếu) |
@@ -52,7 +53,7 @@ Hưng không cần chạy SIMPLE: pipeline egocentric và Agent QA/QC code trên
 | Hưng | Thông | Episode egocentric đã qua QA, đi vào `release` của Thông qua API công khai của làn |
 | Châu | Long | `Score`, `Cluster`, `EvidenceCard` (cho `decide`) |
 | Châu | Hưng | `Score`, `Cluster` (cho Agent QA/QC) |
-| Hưng | Long | `QAReport` (kỹ sư đọc trong `fw review`) |
+| Hưng | Long | `AgentReport` (kỹ sư đọc và ghi `AgentReview` trong `fw review`; bản 1.0) |
 | Hiếu | Mọi người | `Trace`, `RolloutResult`, `Checkpoint`, `metrics.jsonl`, log RTC, kết quả probe |
 
 **Luật để không đụng nhau:**
@@ -113,7 +114,7 @@ Chủ sở hữu không có nghĩa là người duy nhất được sửa. Ngư�
 
 | Mã | Story | Trạng thái 27/10 | Chủ | Phạm vi file chính | Phụ thuộc | Giờ | Sprint |
 |---|---|---|---|---|---|---|---|
-| DA-01 | Định dạng episode chung, `action_layout` của G1 (đệm 36 chiều), trường mới của Episode (design mục 6.1) | Giữ | Long (Hiếu duyệt schema; Hiếu điền giá trị `configs/embodiments/g1.yaml`) | `flywheel-contracts/` | S1-10 | 8–12 | S1 |
+| DA-01 | Định dạng episode chung, `action_layout` của G1 (36 chiều theo `ACTION_SLICES_36D` của Ψ₀, không đệm action; state 32 chiều đệm lên 36; bản 1.0), trường mới của Episode (design mục 6.1) | Giữ | Long (Hiếu duyệt schema; Hiếu điền giá trị `configs/embodiments/g1.yaml`) | `flywheel-contracts/` | S1-10 | 8–12 | S1 |
 | DA-02 | Export LeRobot v2.1 theo `action_layout`, `stats_psi0.json`, contract test bằng loader Ψ₀ | Giữ | Thông | `flywheel-data/export/` (trừ `egodex.py`) | DA-01 | 8–12 | S2 |
 | DA-03 | Pipeline teleop và synthetic: ingest, normalize, cắt đoạn, QA riêng nguồn trên psi-data, bàn phím, S1, S2; báo cáo dataset | Sửa | Thông | `flywheel-data/ingest/` (trừ `egocentric/`), `normalize/`, `annotate/` (trừ `deid/`), `qa/` (trừ `egocentric.py`), `release/` | DA-01 | 20–25 | S1–S2 |
 | DA-04 | Pipeline egocentric E-A, E-B: che danh tính, cắt đoạn, pose tay và camera, QA; mẫu EgoDex, sau đó video tự quay; vòng thử model gán nhãn | Mở lại | Hưng | `flywheel-data/ingest/egocentric/`, `annotate/deid/`, `qa/egocentric.py` | DA-01 | 25–35 | S1–S2 |
