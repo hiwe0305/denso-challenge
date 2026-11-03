@@ -20,6 +20,7 @@ times point at the changed episodes. The copy is marked as a benchmark copy in
 `meta/benchmark_copy.json`; the answer key is only in the returned manifest.
 """
 
+import hashlib
 import json
 import os
 import shutil
@@ -41,6 +42,12 @@ from flywheel.data.inject.dataset import create_clean_dataset, create_defect_dat
 from flywheel.data.inject.stats import write_stats
 
 COPY_MARKER = "benchmark_copy.json"
+# What a copy holds that is not the authors' data (PO 4/11/2026).
+SCAFFOLDING = {
+    "flywheel.seed": "condition seed drawn by DA-27 from the train range of"
+    " configs/splits/default.yaml for every episode whose source records none, the same in"
+    " both copies; not the authors' data"
+}
 
 
 def episode_ref(index: int) -> str:
@@ -55,6 +62,31 @@ def row_seed(row: dict[str, Any]) -> int | None:
         config = json.loads(config)
     seed = (config.get("flywheel") or {}).get("seed")
     return None if seed is None else int(seed)
+
+
+def scaffold_seed(config_seed: int, index: int, seed_range: tuple[int, int]) -> int:
+    """A deterministic condition seed for an episode, keyed by its index, not by its copy."""
+    low, high = seed_range
+    digest = hashlib.sha256(f"scaffold-seed:{config_seed}:{episode_ref(index)}".encode())
+    return low + int(digest.hexdigest()[:16], 16) % (high - low + 1)
+
+
+def _load(src_root: Path, cfg: InjectConfig) -> tuple[list[EpisodeFrames], list[EpisodeData]]:
+    """The source's episodes, each with its recorded seed or else a scaffold seed.
+
+    psi-data records no seed; a seed on only the leaked episodes would single them out,
+    so every episode of both copies gets one (PO 4/11/2026).
+    """
+    fps = float(read_info(src_root)["fps"])
+    seeds = {int(r["episode_index"]): row_seed(r) for r in read_episode_rows(src_root)}
+    frames = list(iter_episodes(src_root))
+    originals = []
+    for f in frames:
+        seed = seeds[f.episode_index]
+        if seed is None:
+            seed = scaffold_seed(cfg.seed, f.episode_index, cfg.data.scaffold_seed_range)
+        originals.append(frames_to_data(f, fps, seed))
+    return frames, originals
 
 
 def frames_to_data(
@@ -105,10 +137,7 @@ def inject_copy(
     if out_root.exists():
         raise FileExistsError(f"{out_root} exists; a benchmark copy is never overwritten")
     cfg = config or InjectConfig()
-    fps = float(read_info(src_root)["fps"])
-    seeds = {int(r["episode_index"]): row_seed(r) for r in read_episode_rows(src_root)}
-    frames = list(iter_episodes(src_root))
-    originals = [frames_to_data(f, fps, seeds[f.episode_index]) for f in frames]
+    frames, originals = _load(src_root, cfg)
     injected, manifest = create_defect_dataset(originals, config=cfg, layout=layout)
     duplicates = {
         d.target_ref: str(d.parameters["original_id"])
@@ -131,10 +160,7 @@ def clean_copy(
     if out_root.exists():
         raise FileExistsError(f"{out_root} exists; a benchmark copy is never overwritten")
     cfg = config or InjectConfig()
-    fps = float(read_info(src_root)["fps"])
-    seeds = {int(r["episode_index"]): row_seed(r) for r in read_episode_rows(src_root)}
-    frames = list(iter_episodes(src_root))
-    originals = [frames_to_data(f, fps, seeds[f.episode_index]) for f in frames]
+    frames, originals = _load(src_root, cfg)
     clean, manifest = create_clean_dataset(originals, config=cfg)
     write_copy(src_root, out_root, frames, clean, manifest.dataset_id, {})
     return manifest
@@ -167,7 +193,8 @@ def write_copy(
     seeds = {int(ep.episode_id.removeprefix("episode_")): ep.seed for ep in episodes}
     _write_rows(out_root, src_root, seeds, owners)
     write_stats(out_root, source=src_root, owners=owners)
-    (out_root / "meta" / COPY_MARKER).write_text(json.dumps({"benchmark_copy_id": copy_id}))
+    marker = {"benchmark_copy_id": copy_id, "scaffolding": SCAFFOLDING}
+    (out_root / "meta" / COPY_MARKER).write_text(json.dumps(marker))
     # One mtime for every file and directory, so write times point at no episode.
     stamp = (src_root / "meta" / "info.json").stat().st_mtime
     for path in [*out_root.rglob("*"), out_root]:

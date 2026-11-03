@@ -58,7 +58,9 @@ Tín hiệu đổi theo từng loại, ngoài chính lỗi (giữ khi một lầ
 | `corrupted_success_label` | stats action và state | có. Bản trước cắt episode nên số dòng nhỏ hơn số khung video, điều mà một episode dừng sớm thật không có; nay robot dừng tại chỗ, số khung giữ nguyên |
 | `wrong_task_instruction` | thêm một dòng trong `tasks.jsonl`, `total_tasks` tăng | có |
 | `duplicate_episode` | parquet, video, stats và `environment_config` giống episode nguồn | có; trước đây `environment_config` còn là của chỗ bị ghi đè, nay chép theo nguồn |
-| `holdout_seed_leak` | chỉ 3 dòng `episodes.jsonl` có khối `flywheel` (psi-data không ghi seed) | **không**: dữ liệu thật có seed thì mọi episode đều có. Sửa cần gán seed train cho mọi episode của hai bản (bịa dữ liệu nguồn không có); để PO quyết |
+| `holdout_seed_leak` | seed của episode nằm trong dải holdout thay vì train | có. Trước đây chỉ 3 dòng có khối `flywheel` (psi-data không ghi seed); nay mọi episode của cả hai bản có seed dàn dựng (xem dưới), nên chỉ giá trị seed khác |
+
+**Seed dàn dựng của bản sao [Đã chốt 4/11/2026, Hiếu].** psi-data không ghi seed điều kiện. Mỗi episode của cả hai bản sao có khối `environment_config.flywheel = {"seed": …}`: seed lấy tất định từ dải train của `configs/splits/default.yaml` (0–999.999), theo `scaffold_seed(seed cấu hình, episode)`, nên một episode có cùng seed ở hai bản; 3 episode `holdout_seed_leak` thay bằng seed dải holdout. Đây là dàn dựng của benchmark, **không phải dữ liệu của tác giả**; `meta/benchmark_copy.json` của cả hai bản ghi điều này ở khóa `scaffolding`. Nguồn nào đã ghi seed thì giữ seed của nguồn.
 
 Mọi lỗi trên action và state còn lệch với video (video quay lần chạy gốc); đó là giới hạn chung của cấy lỗi vào dữ liệu đã ghi, chỉ phát lại hoặc nhìn ảnh mới thấy.
 

@@ -243,6 +243,8 @@ def test_holdout_range_is_the_split_plan_holdout() -> None:
     expected = (holdout["start"], holdout["stop"] - 1)
     assert DataDefectConfig().holdout_seed_range == expected
     assert load_inject_config().data.holdout_seed_range == expected
+    train = plan["seed_ranges"]["train"]
+    assert DataDefectConfig().scaffold_seed_range == (train["start"], train["stop"] - 1)
 
 
 def _layout() -> ActionLayout:
