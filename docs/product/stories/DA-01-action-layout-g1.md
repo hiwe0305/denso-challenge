@@ -30,7 +30,7 @@ Là người của mọi làn, tôi muốn một file `configs/embodiments/g1.ya
 
 - [x] 1. Viết file story (AC 1–6)
 - [x] 2. `action_layout` 36 chiều của G1 trong `configs/embodiments/g1.yaml`, trích nguồn theo commit (AC 1–4, 6)
-- [ ] 3. `control_spec` theo decoupled WBC và test validate `ControlSpec` (AC 5)
+- [x] 3. `control_spec` theo decoupled WBC và test validate `ControlSpec` (AC 5)
 - [ ] 4. `segments.parquet` của bundle episode (07 mục 2.2 nhiệm vụ con gợi ý 3; chưa làm trong PR này)
 - [ ] 5. Test tính chất cho validate `Episode`, `ActionLayout` (07 mục 2.2 nhiệm vụ con gợi ý 4; chưa làm trong PR này)
 

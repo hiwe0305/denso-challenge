@@ -1,5 +1,6 @@
 # Unitree G1 in SIMPLE (robot `g1_sonic`, decoupled WBC): the 36-D action every lane
-# reads (DA-01). `action_layout` validates as flywheel.contracts.artifacts.ActionLayout.
+# reads (DA-01). `action_layout` validates as flywheel.contracts.artifacts.ActionLayout,
+# `control_spec` as flywheel.contracts.v0.ControlSpec (03 section 5.2, ADR-15).
 #
 # Sources, each pinned:
 # - Psi0 @ cda3fdf, src/psi/data/simple/__init__.py (sha256 ddb135a2...): the layout
@@ -83,3 +84,95 @@ action_layout:
     # 35 target heading, absolute, rad, world frame (Psi0 cda3fdf comment block; integrated
     # target yaw, g1_gear_wbc_policy.py @ 5b304e4, line 251). Wraps at +-pi.
     - {name: navigate.target_yaw, group: target_yaw, masked: false}
+
+# Paired command and measured channels of the decoupled WBC (03 section 5.2, ADR-15):
+# command_channels[i] is tracked against state_channels[i]. Upper body: the joint
+# targets the policy sends, against measured `q` of the same joints. Lower body: what
+# the WBC's lower-body policy (legs and waist, `get_action` @ 5b304e4 lines 214-221)
+# takes, against the floating base it measures (`floating_base_pose` [x y z qw qx qy qz],
+# `floating_base_vel` [vx vy vz wx wy wz], lines 127-128). Exact channel names are set
+# at V2 and V7 (03 section 5.2); the frame of `floating_base_vel` against the base frame
+# of dims 32-33 is not yet checked.
+control_spec:
+  controller: decoupled_wbc
+  groups:
+    - name: upper_body
+      command_channels:
+        - left_hand_thumb_0_joint
+        - left_hand_thumb_1_joint
+        - left_hand_thumb_2_joint
+        - left_hand_middle_0_joint
+        - left_hand_middle_1_joint
+        - left_hand_index_0_joint
+        - left_hand_index_1_joint
+        - right_hand_thumb_0_joint
+        - right_hand_thumb_1_joint
+        - right_hand_thumb_2_joint
+        - right_hand_index_0_joint
+        - right_hand_index_1_joint
+        - right_hand_middle_0_joint
+        - right_hand_middle_1_joint
+        - left_shoulder_pitch_joint
+        - left_shoulder_roll_joint
+        - left_shoulder_yaw_joint
+        - left_elbow_joint
+        - left_wrist_roll_joint
+        - left_wrist_pitch_joint
+        - left_wrist_yaw_joint
+        - right_shoulder_pitch_joint
+        - right_shoulder_roll_joint
+        - right_shoulder_yaw_joint
+        - right_elbow_joint
+        - right_wrist_roll_joint
+        - right_wrist_pitch_joint
+        - right_wrist_yaw_joint
+      state_channels:
+        - q.left_hand_thumb_0_joint
+        - q.left_hand_thumb_1_joint
+        - q.left_hand_thumb_2_joint
+        - q.left_hand_middle_0_joint
+        - q.left_hand_middle_1_joint
+        - q.left_hand_index_0_joint
+        - q.left_hand_index_1_joint
+        - q.right_hand_thumb_0_joint
+        - q.right_hand_thumb_1_joint
+        - q.right_hand_thumb_2_joint
+        - q.right_hand_index_0_joint
+        - q.right_hand_index_1_joint
+        - q.right_hand_middle_0_joint
+        - q.right_hand_middle_1_joint
+        - q.left_shoulder_pitch_joint
+        - q.left_shoulder_roll_joint
+        - q.left_shoulder_yaw_joint
+        - q.left_elbow_joint
+        - q.left_wrist_roll_joint
+        - q.left_wrist_pitch_joint
+        - q.left_wrist_yaw_joint
+        - q.right_shoulder_pitch_joint
+        - q.right_shoulder_roll_joint
+        - q.right_shoulder_yaw_joint
+        - q.right_elbow_joint
+        - q.right_wrist_roll_joint
+        - q.right_wrist_pitch_joint
+        - q.right_wrist_yaw_joint
+    - name: lower_body
+      command_channels:
+        - waist_roll_joint
+        - waist_pitch_joint
+        - waist_yaw_joint
+        - base_height_command
+        - navigate.vx
+        - navigate.vy
+        # Tracked against yaw rate only while |value| >= 0.1 (line 264); below that the
+        # WBC commands zero yaw rate whatever the value.
+        - navigate.vyaw
+        - navigate.target_yaw
+      state_channels:
+        - q.waist_roll_joint
+        - q.waist_pitch_joint
+        - q.waist_yaw_joint
+        - floating_base_pose.z
+        - floating_base_vel.vx
+        - floating_base_vel.vy
+        - floating_base_vel.wz
+        - floating_base_pose.yaw
