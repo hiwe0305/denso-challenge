@@ -30,7 +30,7 @@ Là kỹ sư dữ liệu, tôi muốn mọi episode có action robot (psi-data, 
 - [x] 1. Động học và danh sách khung lỗi (AC 1)
 - [x] 2. Động lực học và sai lệch theo nhóm (AC 2)
 - [x] 3. Ngưỡng hiệu chỉnh và cấu hình (AC 3)
-- [ ] 4. `ReplayReport` và nối vào QA (AC 4)
+- [x] 4. `ReplayReport` và nối vào QA (AC 4)
 - [ ] 5. Phát lại action dự đoán, video (AC 5; sau 13/11/2026)
 
 ## Phạm vi file
@@ -75,7 +75,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
-- Ghi chú hoàn thành:
-- File đã tạo hoặc sửa:
+- Giờ thực: 6 giờ cho nhiệm vụ 1–4 (mỗi nhiệm vụ 1,5 giờ, theo `Time-spent` của commit); ước lượng là 5 giờ.
+- Công cụ AI đã dùng: Claude Code (Opus 5.5), một phiên trong worktree `DA-17-replay-check`.
+- Ghi chú hoàn thành: AC 1–4 xong, AC 5 dời sau 13/11/2026. Số đo và việc phát sinh cho Hiếu nằm ở [docs/g0/replay.md](../../g0/replay.md). Ba điểm chính: chỉ 26/99 episode psi-data đạt `check_success` khi phát lại, dù các khớp được tái tạo tốt; không kiểm tự va chạm (AC 1 còn thiếu phần này); khay S1 có 1/102 episode bị loại do `joint_mapping`.
+- File đã tạo hoặc sửa: `packages/flywheel-data/src/flywheel/data/replay_check/` (`kinematic.py`, `dynamic.py`, `thresholds.py`, `cli.py`, `__main__.py`); `packages/flywheel-simple/src/flywheel_simple/replay/` (`compare.py`, `run.py`, `outcomes.py`); test trong `packages/flywheel-data/tests/unit/replay_check/` và `packages/flywheel-simple/tests/replay/`; `configs/data/replay.yaml`; `docs/g0/replay.md`.

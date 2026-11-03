@@ -7,6 +7,10 @@
                environment (PYTHONPATH, MUJOCO_GL) is passed on as is.
     calibrate  thresholds from a clean dataset and its replay outcomes: writes
                configs/data/replay.yaml (AC 3) and prints its version@hash.
+    reports    one ReplayReport per episode and mode of a source `fw data ingest`
+               registered: <out>/<episode_id>.kinematic.json, and .dynamic.json when
+               --outcomes is given. `fw data qa <work> --replay <out>` reads them
+               (AC 4): a kinematic issue rejects, a dynamic one flags (qa.yaml).
 
 Every command is one job with its estimated and measured LedgerEntry
 (`job_ledger`, run plan `g0-DA-17-<yyyymmdd>` unless one is given). A refusal
@@ -17,14 +21,17 @@ from __future__ import annotations
 
 import json
 import subprocess
+from collections import Counter
 from pathlib import Path
 from typing import Annotated, Any
 
 import typer
-from flywheel.data.config import load_layout
+from flywheel.data.config import load_layout, store_root
 from flywheel.data.ingest.lerobot import iter_episodes, read_info
+from flywheel.data.ingest.sources import load_source
 from flywheel.data.ledger import job_ledger
-from flywheel.data.replay_check.dynamic import read_outcomes
+from flywheel.data.replay_check.dynamic import read_outcomes, report_from_outcome
+from flywheel.data.replay_check.kinematic import check_kinematic
 from flywheel.data.replay_check.thresholds import (
     REPLAY_YAML,
     dump_thresholds,
@@ -124,6 +131,54 @@ def calibrate(
         passed = sum(by_index[f.episode_index].success for f in frames)
         job.notes.append(f"{version}; {passed}/{len(frames)} replays succeeded")
     typer.echo(f"{out}: {version}; {passed}/{len(frames)} replays succeeded")
+    typer.echo(f"ledger: {job.run_plan_id}/{job.job_id}")
+
+
+@app.command()
+def reports(
+    work: Annotated[Path, typer.Argument(help="work directory that `fw data ingest` printed")],
+    out: Annotated[Path, typer.Option(help="new directory for the ReplayReport .json files")],
+    outcomes: Annotated[Path | None, typer.Option(help="replay_outcomes.jsonl")] = None,
+    config: Annotated[Path, typer.Option(help="replay thresholds")] = REPLAY_YAML,
+    layout: Annotated[Path, typer.Option(help="embodiment with the action_layout")] = LAYOUT,
+    run_plan_id: RunPlan = None,
+) -> None:
+    """Write the ReplayReports of every episode of an ingested source (AC 4)."""
+    source = load_source((work / "source.json").read_text())
+    indices: dict[str, int] = json.loads((work / "episode_index.json").read_text())
+    dataset = store_root() / source.store_path
+    frames_count = sum(int(r["length"]) for r in _episode_rows(dataset))
+    if out.exists() and any(out.iterdir()):
+        _refuse(f"{out} is not empty; give a new directory")
+    with job_ledger("qa", "replay_check", frames_count * CHECK_S_PER_FRAME,
+                    note=f"{frames_count} frames x {CHECK_S_PER_FRAME} s (assumed)",
+                    story=STORY, run_plan_id=run_plan_id) as job:
+        th, act = load_thresholds(config), load_layout(layout)
+        fps = float(read_info(dataset)["fps"])
+        by_index = read_outcomes(outcomes) if outcomes else {}
+        ids = {index: episode_id for episode_id, index in indices.items()}
+        out.mkdir(parents=True, exist_ok=True)
+        codes: Counter[str] = Counter()
+        flagged = {"kinematic": 0, "dynamic": 0}
+        unreplayed = 0
+        for frames in iter_episodes(dataset):
+            episode_id = ids[frames.episode_index]
+            built = [check_kinematic(frames, act, th, episode_id=episode_id, fps=fps)]
+            if frames.episode_index in by_index:
+                built.append(report_from_outcome(episode_id, by_index[frames.episode_index], th))
+            elif outcomes:
+                unreplayed += 1
+            for report in built:
+                (out / f"{episode_id}.{report.mode}.json").write_text(report.model_dump_json())
+                flagged[report.mode] += bool(report.issues)
+                codes.update(f"{report.mode}:{i.code}" for i in report.issues)
+        summary = (f"{len(ids)} episodes, thresholds {th.version}; with issues: kinematic"
+                   f" {flagged['kinematic']}, dynamic {flagged['dynamic']}; {dict(codes)}")
+        job.notes.append(summary + (f"; {unreplayed} without an outcome" if unreplayed else ""))
+    typer.echo(summary)
+    if unreplayed:
+        typer.echo(f"{unreplayed} episodes have no replay outcome: no dynamic report")
+    typer.echo(f"reports: {out}")
     typer.echo(f"ledger: {job.run_plan_id}/{job.job_id}")
 
 
