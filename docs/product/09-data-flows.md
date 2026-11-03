@@ -4,6 +4,7 @@ _Ngày 30/10/2026. Trạng thái: **[Đề xuất]**, chờ Product Owner (Hiế
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 3/11/2026 | 0.4 | Mục 1: ước tính và thực đo của `LedgerEntry` là hai dòng, theo 03 bản 0.9 | PO (Hiếu) |
 | 30/10/2026 | 0.3 | Mục 7.2: trỏ tới [10](10-database.md), nơi schema đề xuất cách lấp G2, G4, G5, G6, G9 | PO (Hiếu), soạn cùng Claude |
 | 30/10/2026 | 0.2 | Mục 2: sơ đồ tách train stage 1 và stage 3, ghi rõ teleop và synthetic vào stage 3; mục 4 F4: thành phần release và `MixSpec`; F5: bảng dữ liệu theo stage và công thức dữ liệu theo nhánh; F7 bước 11; mục 7.2 thêm G9 | PO (Hiếu), soạn cùng Claude |
 | 30/10/2026 | 0.1 | Bản đầu | PO (Hiếu), soạn cùng Claude |
@@ -30,7 +31,7 @@ Mỗi dòng là một bất biến đã có trong repo; cột cuối là hệ qu
 | `restricted`, `internal` không đi ra API hosted | CLAUDE.md; design 27/10 mục 8.4 | Nếu website chạy ngoài máy đội thì chỉ phục vụ dữ liệu `public`, lọc theo `data_class` ở tầng truy vấn |
 | `injected_defect` không vào release train; `DefectManifest` chỉ bộ chấm đọc | CLAUDE.md; design 27/10 mục 9.2 | Không có endpoint trả `DefectManifest` trước khi agent chạy xong; bản sao cấy lỗi đánh dấu rõ trên giao diện |
 | Video egocentric che danh tính trước mọi bước | CLAUDE.md; design 27/10 mục 6.6 | Không phục vụ video có `deid_status = raw` |
-| Mọi job sinh `LedgerEntry`; ước tính và thực đo là hai trường | CLAUDE.md; 03 mục 1.2 | Job do backend khởi tạo cũng phải đi qua `ledger.meter`. Màn hình chi phí hiện hai cột, không gộp |
+| Mọi job sinh `LedgerEntry`; ước tính và thực đo là hai dòng riêng, dòng thực đo trỏ về dòng ước tính (bản 0.4) | CLAUDE.md; 03 mục 1.2 | Job do backend khởi tạo cũng phải đi qua `ledger.meter`. Màn hình chi phí hiện hai cột, không gộp |
 | Kỹ sư quyết, máy đề xuất | 03 mục 1.2 | Mọi nút "duyệt", "ghi đè", "ký cổng" trên website sinh một `Decision` có người, thời điểm, lý do |
 | Job GPU chỉ Hiếu chạy, từ RunPlan | CLAUDE.md | Backend không tự phát job GPU; nút chạy job GPU cần phân quyền hoặc chỉ hiển thị lệnh |
 | Lỗi hạ tầng không bao giờ là lỗi policy | 03 mục 5.3 điểm 8 | Hiển thị `infra_status` tách khỏi `sim_success`; thống kê thành công loại lượt có `infra_status != ok` |
