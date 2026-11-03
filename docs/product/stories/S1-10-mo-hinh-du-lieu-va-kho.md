@@ -49,6 +49,8 @@ Là kỹ sư data, tôi muốn schema có phiên bản và kho lưu bất biến
   - [x] 8.6 Bốn file mẫu chung trong testkit: `Score.json`, `Cluster.json`, `Decision.json`, `LedgerEntry.json`
   - [x] 8.7 Cột kiểu `X | None` trong view có kiểu SQL thật (`BOOLEAN`, `BIGINT`, …), không phải `VARCHAR`
   - [x] 8.8 `StorePaths` kiểm mọi đoạn đường dẫn (cả `.` và `site`); bảng ngoài danh sách catalog bị từ chối khi ghi
+  - [x] 8.9 Quyết định D1: ghi một `id` đã có với nội dung khác bị từ chối (catalog và sổ chi phí); ghi lại đúng nội dung cũ vẫn được nhận
+  - [ ] 8.10 Quyết định D4: `LedgerEntry.run_plan_id` luôn bắt buộc; dòng `measured` bắt buộc thêm `job_id`
 
 ## Phạm vi file
 

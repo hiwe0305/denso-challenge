@@ -9,18 +9,21 @@ from typing import Any
 from flywheel.contracts.base import canonical_json
 from flywheel.contracts.entities import LedgerEntry
 from flywheel.store.paths import StorePaths
+from flywheel.store.tables import complete_lines, refuse_reused_ids
+
+
+def _ledger_files(paths: StorePaths) -> list[Path]:
+    """Every job ledger of the site."""
+    return sorted(paths.runs_dir.glob("**/ledger*.jsonl"))
 
 
 def _measure_kinds(paths: StorePaths) -> dict[str, str]:
     """Map every entry id already in the site's ledger to its measure_kind."""
     kinds: dict[str, str] = {}
-    for ledger_path in sorted(paths.runs_dir.glob("**/ledger*.jsonl")):
-        with open(ledger_path, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    row = json.loads(line)
-                    kinds[row["id"]] = row["measure_kind"]
+    for ledger_path in _ledger_files(paths):
+        for line in complete_lines(ledger_path):
+            row = json.loads(line)
+            kinds[row["id"]] = row["measure_kind"]
     return kinds
 
 
@@ -61,12 +64,13 @@ def append_ledger_entry(
         paths = StorePaths()
 
     _check_links(entry, paths)
+    line = canonical_json(entry)
+    refuse_reused_ids("ledger_entry", [json.loads(line)], _ledger_files(paths))
     run_plan_id = entry.run_plan_id or "default"
     job_id = entry.job_id or "default"
     ledger_path = paths.job_ledger_path(run_plan_id, job_id)
 
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
-    line = canonical_json(entry)
     with open(ledger_path, "a", encoding="utf-8") as f:
         f.write(line + "\n")
 

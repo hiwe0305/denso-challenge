@@ -3,12 +3,51 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
+from pathlib import Path
 from typing import Any
 
 from flywheel.contracts.base import canonical_json, new_ulid
 from flywheel.store.paths import StorePaths
 from flywheel.store.views import CATALOG_TABLES, TABLE_MODELS
 from pydantic import BaseModel
+
+# Episode and QAReport name their id field themselves; `id` is a property there.
+ID_FIELDS: dict[str, str] = {"episode": "episode_id", "qa_report": "report_id"}
+
+
+def complete_lines(path: Path) -> list[str]:
+    """The JSON lines of a part file, leaving out a last line still being written."""
+    lines = path.read_text(encoding="utf-8").split("\n")[:-1]
+    return [line for line in lines if line.strip()]
+
+
+def refuse_reused_ids(
+    table_name: str,
+    rows: list[dict[str, Any]],
+    files: Iterable[Path],
+    id_field: str = "id",
+) -> None:
+    """Refuse a row whose id is already stored, or earlier in `rows`, with other content.
+
+    One id names one record (PO decision D1, 3/11/2026). Writing the same
+    record again is harmless, since the views keep one row per id; giving the
+    id a second meaning would make the view silently pick one of the two.
+    """
+    wanted = {row[id_field] for row in rows}
+    seen: dict[str, dict[str, Any]] = {}
+    for path in files:
+        for line in complete_lines(path):
+            stored = json.loads(line)
+            if stored.get(id_field) in wanted:
+                seen.setdefault(stored[id_field], stored)
+    for row in rows:
+        stored = seen.setdefault(row[id_field], row)
+        if stored != row:
+            raise ValueError(
+                f"{table_name}: id '{row[id_field]}' is already stored with other content; "
+                "an id names one record, write the change under a new id"
+            )
 
 
 class TableWriter:
@@ -54,10 +93,7 @@ class TableWriter:
 
     def append(self, record: BaseModel | dict[str, Any]) -> None:
         """Append a single record as a JSON line to this partition file."""
-        validated = self._validate_record(record)
-        line = canonical_json(validated)
-        with open(self.part_path, "a", encoding="utf-8") as f:
-            f.write(line + "\n")
+        self.append_many([record])
 
     def append_many(self, records: list[BaseModel | dict[str, Any]]) -> None:
         """Append multiple records to this partition file."""
@@ -65,6 +101,12 @@ class TableWriter:
             return
         validated_list = [self._validate_record(r) for r in records]
         lines = [canonical_json(r) for r in validated_list]
+        refuse_reused_ids(
+            self.table_name,
+            [json.loads(line) for line in lines],
+            sorted(self.table_dir.glob("part-*.jsonl")),
+            ID_FIELDS.get(self.table_name, "id"),
+        )
         with open(self.part_path, "a", encoding="utf-8") as f:
             for line in lines:
                 f.write(line + "\n")
