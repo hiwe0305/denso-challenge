@@ -10,6 +10,9 @@
 
 CREATE TABLE defect_manifests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  -- = DefectManifest.dataset_id: mã bản sao chấm, cũng là giá trị mà
+  -- `episodes.benchmark_copy_id` mang khi #62 merge.
+  manifest_ref VARCHAR(64) NOT NULL UNIQUE,
   dataset_id UUID NOT NULL REFERENCES datasets(id),
   seed BIGINT NOT NULL CHECK (seed >= 0),
   sha256 CHAR(64) NOT NULL,                    -- khoá đáp án

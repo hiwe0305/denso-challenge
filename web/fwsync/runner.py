@@ -69,8 +69,8 @@ IMPORT_ORDER: tuple[str, ...] = (
 )
 
 #: Cột được nhận cho bảng đi đường khoan dung. Giữ ở đây thay vì đọc từ
-#: schema.sql vì bộ nạp phải chạy được khi chưa có database; test so hai bên
-#: để chúng không lệch.
+#: schema.sql vì bộ nạp phải chạy được khi chưa có database;
+#: `test_loader_matches_schema.py` so hai bên để chúng không lệch.
 TOLERANT_COLUMNS: dict[str, frozenset[str]] = {
     "sources": frozenset(
         {
@@ -117,7 +117,7 @@ TOLERANT_COLUMNS: dict[str, frozenset[str]] = {
     ),
     "sim_evaluations": frozenset(
         {
-            "checkpoint_ref", "run_plan_ref", "task_id", "condition_set_id",
+            "evaluation_ref", "checkpoint_ref", "run_plan_ref", "task_id", "condition_set_id",
             "split", "level", "renderer", "eval_mode", "scorer_version",
             "total_episodes", "success_count", "infra_failed_count",
             "sealed_until", "started_at", "finished_at",
@@ -125,7 +125,7 @@ TOLERANT_COLUMNS: dict[str, frozenset[str]] = {
     ),
     "eval_episodes": frozenset(
         {
-            "evaluation_ref", "episode_index", "condition_id", "level",
+            "eval_episode_ref", "evaluation_ref", "episode_index", "condition_id", "level",
             "episode_seed", "rollout_seed", "scorer_version", "sim_success",
             "scorer_success", "infra_status", "step_status",
             "first_failed_step", "failure_code", "failure_class",
@@ -160,7 +160,7 @@ TOLERANT_COLUMNS: dict[str, frozenset[str]] = {
     ),
     "failure_clusters": frozenset(
         {
-            "recommendation_ref", "failed_step", "failure_code", "level",
+            "cluster_ref", "recommendation_ref", "failed_step", "failure_code", "level",
             "member_count", "representative_ids", "representative_seed",
             "diagnosis", "diagnosis_source", "override_reason",
             "parent_cluster_ref", "checks", "card_uri",
@@ -345,7 +345,7 @@ def _map(
         head: dict[str, Any] = manifest["manifest"]
         rows: list[tuple[str, dict[str, Any]]] = [("defect_manifests", head)]
         for item in manifest["items"]:
-            rows.append(("defect_items", {"manifest_ref": head["dataset_ref"], **item}))
+            rows.append(("defect_items", {"manifest_ref": head["manifest_ref"], **item}))
         return rows
     if table in TOLERANT_TABLES:
         allowed = TOLERANT_COLUMNS.get(table)

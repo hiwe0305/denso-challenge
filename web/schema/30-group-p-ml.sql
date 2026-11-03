@@ -178,6 +178,7 @@ CREATE INDEX ON probe_results (checkpoint_id, probe);
 -- ---------------------------------------------------------------------------
 CREATE TABLE sim_evaluations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  evaluation_ref VARCHAR(64) NOT NULL UNIQUE,   -- khoá tự nhiên của lõi
   checkpoint_id UUID NOT NULL REFERENCES model_checkpoints(id),
   run_plan_id UUID REFERENCES run_plans(id),
   task_id VARCHAR(16) NOT NULL CHECK (task_id IN ('two_table','tray')),
@@ -219,6 +220,7 @@ CREATE INDEX ON sim_evaluations (sealed_until) WHERE sealed_until IS NOT NULL;
 -- ---------------------------------------------------------------------------
 CREATE TABLE eval_episodes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  eval_episode_ref VARCHAR(64) NOT NULL UNIQUE, -- khoá tự nhiên của lõi
   evaluation_id UUID NOT NULL REFERENCES sim_evaluations(id),
   episode_index INTEGER NOT NULL,
   condition_id VARCHAR(64) NOT NULL,
@@ -314,6 +316,7 @@ CREATE INDEX ON system_diagnoses (diagnosis);
 -- ---------------------------------------------------------------------------
 CREATE TABLE flywheel_recommendations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  recommendation_ref VARCHAR(64) NOT NULL UNIQUE, -- khoá tự nhiên của lõi
   run_plan_id UUID REFERENCES run_plans(id),
   checkpoint_id UUID NOT NULL REFERENCES model_checkpoints(id),
   evaluation_id UUID REFERENCES sim_evaluations(id),
@@ -335,6 +338,7 @@ CREATE TABLE flywheel_recommendations (
 -- ---------------------------------------------------------------------------
 CREATE TABLE failure_clusters (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  cluster_ref VARCHAR(64) NOT NULL UNIQUE,      -- clu_<hash> (03 §4.3)
   recommendation_id UUID NOT NULL REFERENCES flywheel_recommendations(id),
   failed_step SMALLINT NOT NULL,
   failure_code VARCHAR(32) NOT NULL,
