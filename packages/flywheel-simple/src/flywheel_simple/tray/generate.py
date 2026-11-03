@@ -57,6 +57,8 @@ class AttemptRow:
     recorded: bool
     episode_index: int | None
     qa: str  # "pass", the first failing check, or "not_recorded"
+    purpose: str = "coverage"  # or targets.PURPOSE (Task 10)
+    cluster_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -106,6 +108,18 @@ def next_seeds(used: set[int], start: int, n: int, shard: int = 0, workers: int 
             seeds.append(seed)
         seed += workers
     return seeds
+
+
+Job = tuple[int, int, str, "str | None"]  # seed, level, purpose, cluster_id
+
+
+def targeted_jobs(out: Path, shard: int = 0, workers: int = 1) -> list[Job]:
+    """This shard's rows of <out>/targets.jsonl (k, k + W, ...) whose seed is not logged yet."""
+    from flywheel_simple.tray.targets import read_targets
+
+    used = logged_seeds(out)
+    mine = read_targets(out)[shard::workers]
+    return [(t.seed, t.level, t.purpose, t.cluster_id) for t in mine if t.seed not in used]
 
 
 def split_attempts(n: int, workers: int) -> list[int]:
@@ -197,8 +211,14 @@ def generate(
     allow_plain: bool = False,
     shard: int = 0,
     workers: int = 1,
+    targeted: bool = False,
 ) -> GenSummary:
-    """Run n_attempts new seeds of this shard; record, QA and log each attempt."""
+    """Run n_attempts new seeds of this shard; record, QA and log each attempt.
+
+    With `targeted`, the seeds and levels come from the batch's targets.jsonl
+    (targets.write_targets): shard k takes rows k, k + W, ... not yet logged, and
+    `level` / `seed_start` are ignored.
+    """
     from flywheel_simple.tray.agent import EpisodeResult, TrayAgent, run_episode
     from flywheel_simple.tray.planner import PlannerConfig
     from flywheel_simple.tray.recorder import (
@@ -218,17 +238,24 @@ def generate(
     work = shard_dir(out, shard)
     log, raw = work / LOG_NAME, work / "raw"
     _check_resume(raw, read_log(log))
-    seeds = next_seeds(logged_seeds(out), seed_start, n_attempts, shard, workers)
+    jobs: list[Job]
+    if targeted:
+        jobs = targeted_jobs(out, shard, workers)[:n_attempts]
+    else:
+        seeds = next_seeds(logged_seeds(out), seed_start, n_attempts, shard, workers)
+        jobs = [(seed, level, "coverage", None) for seed in seeds]
+    if not jobs:
+        return GenSummary(0, 0, 0, 0)
 
     cfg = PlannerConfig.load()
     version = planner_version(cfg)
     gpu = gpu_name()
-    env = make_env(seed=seeds[0], level=level)
+    env = make_env(seed=jobs[0][0], level=jobs[0][1])
     agent = TrayAgent(env, cfg)
     recorder = EpisodeRecorder.for_env(env, agent, raw)
     successes = recorded = qa_pass = 0
     try:
-        for seed in seeds:
+        for seed, level, purpose, cluster_id in jobs:
             wall0 = time.perf_counter()
             try:
                 result = run_episode(env, agent, seed=seed, level=level, on_frame=recorder.add)
@@ -240,7 +267,9 @@ def generate(
             if result.success:
                 successes += 1
                 task = env.unwrapped.task
-                task.set_flywheel_meta(FlywheelMeta(seed, level, version, revision))
+                task.set_flywheel_meta(
+                    FlywheelMeta(seed, level, version, revision, purpose, cluster_id)
+                )
                 index = recorder.save(task.state_dict())
                 recorded += 1
                 qa = minimal_qa(raw, index, [name for name, _ in result.phases])
@@ -266,12 +295,14 @@ def generate(
                     recorded=index is not None,
                     episode_index=index,
                     qa=qa,
+                    purpose=purpose,
+                    cluster_id=cluster_id,
                 ),
             )
     finally:
         recorder.close()
         env.close()
-    return GenSummary(len(seeds), successes, recorded, qa_pass)
+    return GenSummary(len(jobs), successes, recorded, qa_pass)
 
 
 def summarize(out: Path) -> dict[str, Any]:

@@ -240,6 +240,9 @@ def run_session(
     attempts = successes = saved = 0
     try:
         while (condition := queue.current) is not None:
+            begin = getattr(getattr(agent, "_pico_streamer", None), "begin_attempt", None)
+            if callable(begin):  # before the reset below hands the streamer its new episode
+                begin(condition, queue.attempt)
             obs, info = env.reset(seed=condition.seed, options={"level": condition.level})
             if getattr(agent, "clock", None) is not None:
                 agent.clock.reset()  # before the pipeline reset reads the time
@@ -256,6 +259,7 @@ def run_session(
             episode_index = _finish_episode(
                 exporter, task, result, keep_failed or success, condition,
                 operator=operator, session=session, source_detail=source_detail, commit=commit,
+                meta=streamer_meta(agent),
             )  # fmt: skip
             attempts += 1
             successes += success
@@ -276,6 +280,7 @@ def run_session(
                     "wall_s": round(time.monotonic() - attempt_start, 2),
                     "episode_index": episode_index,
                     "finished_at": datetime.now().isoformat(timespec="seconds"),
+                    **streamer_notes(agent),
                 }
             )
             if result.outcome == "interrupted":
@@ -298,6 +303,18 @@ def run_session(
     return summary
 
 
+def streamer_notes(agent: Any) -> dict[str, Any]:
+    """What a scripted streamer adds to the attempt log (the virtual operator's phases)."""
+    notes = getattr(getattr(agent, "_pico_streamer", None), "attempt_notes", None)
+    return dict(notes()) if callable(notes) else {}
+
+
+def streamer_meta(agent: Any) -> dict[str, Any]:
+    """`source_kind` and extra flywheel meta of a scripted streamer's episode (else teleop)."""
+    meta = getattr(getattr(agent, "_pico_streamer", None), "episode_meta", None)
+    return dict(meta()) if callable(meta) else {}
+
+
 def _finish_episode(
     exporter: Any,
     task: Any,
@@ -309,6 +326,7 @@ def _finish_episode(
     session: str,
     source_detail: str,
     commit: str,
+    meta: dict[str, Any] | None = None,
 ) -> int | None:
     """Save the open episode with its meta, or drop it; the saved index or None."""
     if result.frames == 0 or not keep:
@@ -323,6 +341,8 @@ def _finish_episode(
         source_detail=source_detail,
         outcome=result.outcome,
         simple_commit=commit,
+        source_kind=(meta or {}).get("source_kind", "teleop"),
+        extra={k: v for k, v in (meta or {}).items() if k != "source_kind"},
     )
     write_environment_config(exporter, task, episode_index, block)
     return episode_index
@@ -334,10 +354,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--operator", required=True, help="pseudonym, e.g. op-01")
     parser.add_argument("--session", default=datetime.now().strftime("s-%Y%m%d-%H%M%S"))
     parser.add_argument("--save-dir", type=Path, default=DEFAULT_SAVE_DIR)
-    parser.add_argument("--streamer", choices=["pico", "scripted"], default="pico")
+    parser.add_argument("--streamer", choices=["pico", "scripted", "virtual"], default="pico")
     parser.add_argument("--max-attempts", type=int, default=3, help="per condition")
     parser.add_argument("--max-episode-steps", type=int, default=MAX_EPISODE_STEPS)
     parser.add_argument("--keep-failed", action="store_true", help="also save failed attempts")
+    parser.add_argument(
+        "--style-base", type=int, default=0, help="virtual: base of the per-attempt style seeds"
+    )
+    parser.add_argument("--no-style", action="store_true", help="virtual: plain planner targets")
+    parser.add_argument(
+        "--operator-config", type=Path, default=None, help="virtual: tray_virtual_teleop.yaml"
+    )
     parser.add_argument("--no-headless", action="store_true", help="open the MuJoCo viewer")
     args = parser.parse_args(argv)
 
@@ -347,10 +374,22 @@ def main(argv: list[str] | None = None) -> int:
     if args.streamer == "pico":
         agent = _mod("simple.agents.pico_decoupled_agent").PicoDecoupledAgent(robot)
     else:
-        from flywheel_simple.tray.pico.agent import ScriptedStreamer, StreamerDecoupledAgent
+        from flywheel_simple.tray.pico import agent as pico_agent
         from flywheel_simple.tray.pico.clock import SimClock
 
-        agent = StreamerDecoupledAgent(robot, ScriptedStreamer(), clock=SimClock())
+        streamer: Any = pico_agent.ScriptedStreamer()
+        if args.streamer == "virtual":
+            from flywheel_simple.tray.pico.operator import OperatorConfig, VirtualOperator
+            from flywheel_simple.tray.planner import PlannerConfig
+
+            operator = VirtualOperator(OperatorConfig.load(args.operator_config))
+            streamer = pico_agent.VirtualPicoStreamer(
+                env,
+                operator,
+                PlannerConfig.load(),
+                style_base=None if args.no_style else args.style_base,
+            )
+        agent = pico_agent.StreamerDecoupledAgent(robot, streamer, clock=SimClock())
     agent.num_episodes = len(conditions)
     try:
         summary = run_session(
@@ -360,7 +399,9 @@ def main(argv: list[str] | None = None) -> int:
             save_dir=args.save_dir,
             operator=args.operator,
             session=args.session,
-            source_detail=f"teleop_{args.streamer}",
+            source_detail="virtual_teleop"
+            if args.streamer == "virtual"
+            else f"teleop_{args.streamer}",
             keep_failed=args.keep_failed,
         )
     finally:

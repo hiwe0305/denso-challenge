@@ -12,6 +12,7 @@ from flywheel_simple.tray.pico.virtual import (
     StyleFollower,
     robot_to_teleop,
     sample_style,
+    style_seed_for,
     teleop_to_robot,
 )
 
@@ -83,6 +84,7 @@ def step_targets(length: float = 0.3, seconds: float = 3.0) -> np.ndarray:
 
 def calm(**kw: float) -> Style:
     base = dict(omega=8.0, zeta=1.0, curvature=0.0, tremor_mm=0.0, joystick_accel=1.0, arc_seed=0.0)
+    base["turn_rate"] = 0.5
     base.update(kw)
     return Style(**base)
 
@@ -130,3 +132,10 @@ def test_joystick_limits_acceleration() -> None:
     assert out[-1] == pytest.approx(0.5)
     stop = [shaper.step(0.0) for _ in range(100)]
     assert stop[-1] == pytest.approx(0.0)
+
+
+def test_style_seeds_are_reproducible_and_differ_per_attempt_and_condition() -> None:
+    a = style_seed_for(0, 1, 7, 1)
+    assert a == style_seed_for(0, 1, 7, 1)
+    others = {style_seed_for(0, 1, 7, 2), style_seed_for(0, 0, 7, 1), style_seed_for(1, 1, 7, 1)}
+    assert a not in others and len(others) == 3

@@ -6,7 +6,14 @@ build-backend = "hatchling.build"
 name = "flywheel-psi0"
 version = "0.1.0"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = ["flywheel-contracts", "numpy", "pydantic", "pyyaml"]
+
+[project.optional-dependencies]
+test = ["flywheel-testkit"]
+
+[tool.uv.sources]
+flywheel-contracts = { workspace = true }
+flywheel-testkit = { workspace = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/flywheel_psi0"]

@@ -28,6 +28,24 @@ class ConfigError(ValueError):
 
 
 @dataclass(frozen=True)
+class BalanceLimits:
+    """Which signals bound the body, and by how much (configured, never in code).
+
+    It lives in this module rather than beside the check that uses it so the
+    imports run one way only: every scorer module reads `config`, and `config`
+    reads no scorer module.
+    """
+
+    min_height: float
+    max_tilt: float
+    height_signal: str
+    tilt_signal: str
+
+    def signals(self) -> tuple[str, ...]:
+        return (self.height_signal, self.tilt_signal)
+
+
+@dataclass(frozen=True)
 class T1Thresholds:
     """Divergence: loss over `k` times the window minimum, or not finite at all."""
 
@@ -185,18 +203,117 @@ class TrainThresholds:
         )
 
 
+@dataclass(frozen=True)
+class ScorerConfig:
+    """What `configs/eval/scorer/<task>.yaml` tells the scorer (DA-36 AC 5).
+
+    `thresholds` is passed through to `TaskDefinition.evaluate()` untouched. The
+    scorer reads no key of it: which predicate needs `r_reach` and which needs
+    `T_stable` is the task's business, and a scorer that knew would be a scorer
+    with one task's steps baked into it.
+
+    `task_id` is checked against the task being scored, so a tray config cannot
+    be used to score a two-table episode and quietly supply the wrong numbers.
+
+    `step_signals` says which signals each step is judged on, and it is what
+    lets the scorer hold the "chưa rõ" convention of AC 2 itself instead of
+    trusting the task to hold it. Without it, a task that returns `True` for a
+    step whose signal was never recorded scores as a pass and one that returns
+    `False` scores as a failure, and spec section 5.1 says neither. `StageSpec`
+    carries no signal list, so the declaration lives in config until it reaches
+    the contract (Contract change #59); either way it is per task, so no task's
+    steps are written in code.
+
+    `episode_signals` are the signals no single step owns - the collision flag
+    of the two-table task - and a missing one costs a clean episode its pass
+    rather than one step its verdict. `class_from_failed_step` names the kinds
+    whose shared class is the class of the failed step rather than one of their
+    own: `L-COLLIDE` and `L-TIMEOUT` of spec section 5.2.
+    """
+
+    task_id: str
+    scorer_version: str
+    thresholds: dict[str, float]
+    balance: BalanceLimits
+    step_signals: dict[str, tuple[str, ...]]
+    episode_signals: tuple[str, ...]
+    class_from_failed_step: tuple[str, ...]
+
+    def declared_signals(self) -> frozenset[str]:
+        """Every signal the config accounts for, by step, by episode or by limit."""
+        names = set(self.episode_signals) | set(self.balance.signals())
+        for signals in self.step_signals.values():
+            names |= set(signals)
+        return frozenset(names)
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> ScorerConfig:
+        """Validate a parsed scorer config; raise `ConfigError` on anything unclear."""
+        _reject_unknown(data, tuple(cls.__dataclass_fields__), "scorer config")
+        balance = _section(data, "balance")
+        thresholds = _number_map(data, "thresholds", "scorer config")
+        if not thresholds:
+            raise ConfigError("`thresholds` không được rỗng: task nào cũng có ngưỡng vị từ")
+        step_signals = _name_list_map(data, "step_signals", "scorer config")
+        if not step_signals:
+            raise ConfigError(
+                "`step_signals` không được rỗng: mỗi bước phải khai tín hiệu nó "
+                "được chấm trên, thiếu tín hiệu mà không khai thì thành đạt hoặc trượt (AC 2)"
+            )
+        return cls(
+            task_id=_text(data, "task_id", "scorer config"),
+            scorer_version=_text(data, "scorer_version", "scorer config"),
+            thresholds=thresholds,
+            balance=BalanceLimits(
+                min_height=_number(balance, "min_height", "balance"),
+                max_tilt=_number(balance, "max_tilt", "balance"),
+                height_signal=_text(balance, "height_signal", "balance"),
+                tilt_signal=_text(balance, "tilt_signal", "balance"),
+            ),
+            step_signals=step_signals,
+            episode_signals=_name_list(data, "episode_signals", "scorer config"),
+            class_from_failed_step=_name_list(data, "class_from_failed_step", "scorer config"),
+        )
+
+
+def load_scorer_config(path: Path) -> tuple[ScorerConfig, str]:
+    """Read a scorer config; return it and the hash to record with every `Score`."""
+    raw, parsed = _read_yaml(path)
+    return ScorerConfig.from_mapping(parsed), _sha256(raw)
+
+
 def load_train_thresholds(path: Path) -> tuple[TrainThresholds, str]:
     """Read a threshold file; return the thresholds and the hash to record with them.
 
     One read serves both answers, so the hash an artifact carries is the hash of
     the bytes the detectors actually ran on (AC 3, 4).
     """
-    raw = path.read_bytes()
-    parsed = yaml.safe_load(raw.decode("utf-8"))
+    raw, parsed = _read_yaml(path)
+    return TrainThresholds.from_mapping(parsed), _sha256(raw)
+
+
+def _read_yaml(path: Path) -> tuple[bytes, Mapping[str, Any]]:
+    """Read and parse a config file, hashing the same bytes that were parsed.
+
+    One read serves both answers, so the hash in an artifact can only ever name
+    the file that run actually read (AC 5; DA-08 AC 3, 4).
+
+    A file that is not there and a file that is not YAML both come back as a
+    `ConfigError`, so the command that asked for it can say what it could not
+    do rather than hand the engineer a traceback (review of #58, point 5).
+    """
+    try:
+        raw = path.read_bytes()
+    except OSError as error:
+        raise ConfigError(f"`{path}` không đọc được: {error}") from error
+    try:
+        parsed = yaml.safe_load(raw.decode("utf-8"))
+    except (UnicodeDecodeError, yaml.YAMLError) as error:
+        raise ConfigError(f"`{path}` không phải YAML đọc được: {error}") from error
     if not isinstance(parsed, Mapping):
         kind = type(parsed).__name__
-        raise ConfigError(f"`{path}` must hold a mapping of threshold sections, got {kind}")
-    return TrainThresholds.from_mapping(parsed), _sha256(raw)
+        raise ConfigError(f"`{path}` must hold a mapping of sections, got {kind}")
+    return raw, parsed
 
 
 def config_sha256(path: Path) -> str:
@@ -231,6 +348,13 @@ def _require(section: Mapping[str, Any], key: str, where: str) -> Any:
     return section[key]
 
 
+def _text(section: Mapping[str, Any], key: str, where: str) -> str:
+    value = _require(section, key, where)
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError(f"`{where}.{key}` must be a non-empty string, got {value!r}")
+    return value
+
+
 def _number(section: Mapping[str, Any], key: str, where: str) -> float:
     value = _require(section, key, where)
     if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -257,7 +381,35 @@ def _number_map(section: Mapping[str, Any], key: str, where: str) -> dict[str, f
     return budgets
 
 
+def _name_list(section: Mapping[str, Any], key: str, where: str) -> tuple[str, ...]:
+    value = _require(section, key, where)
+    if not isinstance(value, list):
+        raise ConfigError(f"`{where}.{key}` must be a list of names, got {value!r}")
+    names = tuple(_name(item, f"{where}.{key}") for item in value)
+    repeated = sorted({name for name in names if names.count(name) > 1})
+    if repeated:
+        raise ConfigError(f"`{where}.{key}` repeats {repeated}")
+    return names
+
+
+def _name_list_map(section: Mapping[str, Any], key: str, where: str) -> dict[str, tuple[str, ...]]:
+    value = _require(section, key, where)
+    if not isinstance(value, Mapping):
+        raise ConfigError(f"`{where}.{key}` must be a mapping of name to list, got {value!r}")
+    return {
+        _name(name, f"{where}.{key}"): _name_list(value, str(name), f"{where}.{key}")
+        for name in value
+    }
+
+
+def _name(value: Any, where: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError(f"`{where}` must hold non-empty names, got {value!r}")
+    return value
+
+
 _SECTION_FIELDS: dict[str, tuple[str, ...]] = {
+    "balance": tuple(BalanceLimits.__dataclass_fields__),
     "t1": tuple(T1Thresholds.__dataclass_fields__),
     "t2": tuple(T2Thresholds.__dataclass_fields__),
     "t3": tuple(T3Thresholds.__dataclass_fields__),

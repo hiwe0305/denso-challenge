@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt bản teleop ảo cộng S2 và việc tải psi-data, 3/11/2026). Nhiệm vụ 1, 2 xong |
+| Trạng thái | Đang làm (PO duyệt bản teleop ảo cộng S2 và việc tải psi-data, 3/11/2026). Nhiệm vụ 1–7 xong; demo cha cho S2 đã có |
 | Người làm | Hiếu (đề xuất, PO giao) |
 | Làn | Adapter simulator (`flywheel-simple`) |
 | Story PRD | Story của [design 28/10/2026](../../superpowers/specs/2026-10-28-tray-transfer-he-design.md) mục 5 (dòng Synthetic S1, S2) · [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 5.3, 5.4 · spec mục 6.10, tuyến T2 ở mục 10 |
@@ -42,9 +42,9 @@ Kế hoạch ở mục "Kế hoạch teleop ảo" và "Kế hoạch generator S2
 - [x] 2. Wrapper teleop khay: reset theo (level, seed), ghi trạng thái khay, khối `flywheel`, log lượt thử; test bằng streamer giả, không cần kính (AC 1)
 - [x] 3. Đo phong cách teleop người từ psi-data của tác giả (ôm thùng hai tay, đi giữa hai bàn), ra dải tham số phong cách (AC 2, 8)
 - [x] 4. Đồng hồ sim cho agent: tất định, không chờ thời gian thực; hai lần chạy cùng seed ra cùng frame (AC 2, 5). Đo: gần 1× thời gian thực mỗi worker, xem [virtual-teleop.md](../../g0/tray/virtual-teleop.md)
-- [ ] 5. Teleop ảo: phép đổi ngược của `WristsPreProcessor` (test CPU khứ hồi), streamer ảo lấy ý định từ `TrayPlanner` của DA-33 (cổ tay, lệnh đi, bàn tay) và phát tín hiệu PICO; một episode đạt `check_success` (AC 2)
-- [ ] 6. Phong cách ngẫu nhiên mỗi episode theo seed phong cách; meta của AC 3 (AC 2, 3)
-- [ ] 7. Sinh hàng loạt demo cha: ít nhất 100 đạt, sổ lượt, sổ chi phí (AC 3, 7)
+- [x] 5. Teleop ảo: phép đổi ngược của `WristsPreProcessor` (test CPU khứ hồi), streamer ảo lấy ý định từ `TrayPlanner` của DA-33 (cổ tay, lệnh đi, bàn tay) và phát tín hiệu PICO; một episode đạt `check_success` (AC 2). Đo: 8/9 lượt đạt, xem [virtual-teleop.md](../../g0/tray/virtual-teleop.md)
+- [x] 6. Phong cách ngẫu nhiên mỗi episode theo seed phong cách; meta của AC 3 (AC 2, 3). Đo: 16/16 đạt, đủ 7 cờ bước, xem [virtual-teleop.md](../../g0/tray/virtual-teleop.md)
+- [x] 7. Sinh hàng loạt demo cha: ít nhất 100 đạt, sổ lượt, sổ chi phí (AC 3, 7). Đo: 129 demo cha đủ 7 cờ bước từ 160 lượt với planner D-25 (lô `parents-1103b`), 121 s worker mỗi demo cha, xem [virtual-teleop.md](../../g0/tray/virtual-teleop.md)
 - [ ] 8. Cắt demo theo 7 bước (AC 4)
 - [ ] 9. Streamer phát lại S2: phát lại demo không biến đổi qua ống teleop, đo tỉ lệ tái tạo (AC 5)
 - [ ] 10. Biến đổi theo khung khay và vùng đích, sinh lại đoạn đi, nối đoạn (AC 5)
@@ -126,6 +126,7 @@ Rủi ro: điều kiện xa demo cha thì cầm trượt; đế trôi khi mang l
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 3/11/2026 | PO chốt: S2 chỉ dùng lô demo cha D-25 `parents-1103b` (129 demo), lô D-19 `parents-1103` giữ để tham khảo; nhận hai giới hạn phong cách (tay có phong cách chỉ khi xa khay, dải cần gạt hẹp hơn người) làm giới hạn đã biết ([virtual-teleop.md](../../g0/tray/virtual-teleop.md)) | PO (Hiếu) |
 | 3/11/2026 | PO chọn merge DA-33 và dùng lại `TrayPlanner` làm phần ý định của teleop ảo (thay cho chỉ chép số D-19); nhiệm vụ 5 trở đi phụ thuộc DA-33 đã merge | PO (Hiếu) |
 | 3/11/2026 | PO duyệt bản teleop ảo cộng S2 và việc tải hai file psi-data (322 MB) chỉ để đo phong cách | PO (Hiếu) |
 | 3/11/2026 | Viết lại theo hướng teleop ảo cộng S2 (PO chọn, vì đội không có kính PICO): AC 2, 3, 7, 8 mới, nhiệm vụ 3–12, thêm `configs/sim/tray_virtual_teleop.yaml` và `docs/g0/tray/virtual-teleop.md` vào Phạm vi file; demo PICO thật thành phần làm khi có kính | Claude |
@@ -135,6 +136,6 @@ Rủi ro: điều kiện xa demo cha thì cầm trượt; đế trôi khi mang l
 ## Ghi chép khi làm
 
 - Giờ thực:
-- Công cụ AI đã dùng: Claude Code (nhiệm vụ 1–4)
+- Công cụ AI đã dùng: Claude Code (nhiệm vụ 1–7)
 - Ghi chú hoàn thành: Nhiệm vụ 2 (3/11/2026): wrapper, agent với streamer bất kỳ và vòng phiên; ghi được dataset LeRobot thật sau khi cài các gói ghi của [PR #27](https://github.com/hiwe0305/denso-challenge/pull/27) ([pico-teleop.md](../../g0/tray/pico-teleop.md) khoảng trống 11)
-- File đã tạo hoặc sửa: `docs/g0/tray/pico-teleop.md`, `docs/g0/tray/virtual-teleop.md`, `packages/flywheel-simple/src/flywheel_simple/tray/pico/`, `packages/flywheel-simple/tests/tray/pico/`, `scripts/g0/tray/pico/measure_teleop_style.py`
+- File đã tạo hoặc sửa: `configs/sim/tray_virtual_teleop.yaml`, `docs/g0/ledger/DA-35.csv`, `docs/g0/tray/pico-teleop.md`, `docs/g0/tray/virtual-teleop.md`, `packages/flywheel-simple/src/flywheel_simple/tray/pico/`, `packages/flywheel-simple/tests/tray/pico/`, `scripts/g0/tray/pico/generate_parents.py`, `scripts/g0/tray/pico/measure_teleop_style.py`

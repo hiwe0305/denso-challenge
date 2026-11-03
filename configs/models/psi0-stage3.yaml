@@ -1,0 +1,95 @@
+# Psi0 stage 3: fine-tune on a SIMPLE task (DA-19 task 2; HE experiment DA-26).
+#
+# Psi0 pin cda3fdf no longer has scripts/train/psi0/finetune-simple-psi0.sh (deleted
+# upstream in 2830f93, 28/09/2026). Hiếu decided on 3/11/2026 that Psi0Trainer calls
+# `scripts/train.py finetune_simple_psi0_config` with the args of its last version:
+#   git show 2830f93^:scripts/train/psi0/finetune-simple-psi0.sh
+# `args` below are those args verbatim, except the per-job ones in
+# `job_args`. A key maps to `--key=value`; `true` is a bare flag; a list is
+# `--key v1 v2`. Overrides in a RunPlan replace a key, never append a duplicate.
+stage: 3
+config_module: finetune_simple_psi0_config
+trainer_module: finetune # --train.name; selects psi.trainers.finetune.FinetuneTrainer
+source: "git show 2830f93^:scripts/train/psi0/finetune-simple-psi0.sh"
+
+# Per-job args, filled by Psi0Trainer: {exp} {seed} {timestamp} {output_dir} come from
+# the TrainSpec and the job directory, {dataset_root} {dataset_name} from the dataset
+# URI, {vlm} {action_header} from `parents`. Resume (task 5): rerunning a job with the
+# same timestamp makes Psi0 pick up its latest ckpt_<step> and skip consumed batches.
+job_args:
+  exp: "{exp}"
+  seed: "{seed}"
+  timestamp: "{timestamp}"
+  train.output_dir: "{output_dir}"
+  train.resume_from_checkpoint: latest
+  train.skip_resumed_steps: true
+  data.root_dir: "{dataset_root}"
+  data.train-repo-ids: "{dataset_name}"
+  model.model_name_or_path: "{vlm}"
+  model.pretrained-action-header-path: "{action_header}"
+
+args:
+  train.name: finetune
+  train.data_parallel: ddp
+  train.mixed_precision: bf16
+  train.train_batch_size: 16
+  train.max_checkpoints_to_keep: 5
+  train.gradient_accumulation_steps: 1
+  train.learning_rate: 1e-4
+  train.max_training_steps: 40000
+  train.warmup_ratio: "None"
+  train.warmup_steps: 1000
+  train.checkpointing_steps: 10000
+  train.validation_steps: 500
+  train.val_num_batches: 20
+  train.max_grad_norm: 1.0
+  train.lr_scheduler_type: cosine
+  train.lr_scheduler_kwargs.weight_decay: 1e-6
+  train.lr_scheduler_kwargs.betas: [0.95, 0.999]
+  log.report_to: wandb # WANDB_MODE=offline is set by Psi0Trainer
+  data.transform.repack.pad-action-dim: 36
+  data.transform.repack.pad-state-dim: 36
+  data.transform.field.stat-path: meta/stats_psi0.json
+  data.transform.field.stat-action-key: action
+  data.transform.field.stat-state-key: states
+  data.transform.field.action_norm_type: bounds
+  data.transform.field.no-use-norm-mask: true
+  data.transform.field.normalize-state: true
+  data.transform.field.pad-action-dim: 36
+  data.transform.field.pad-state-dim: 36
+  data.transform.model.img-aug: true
+  data.transform.model.resize.size: [180, 320]
+  data.transform.model.center_crop.size: [180, 320]
+  model.noise-scheduler: flow
+  model.train-diffusion-steps: 1000
+  model.n_conditions: 0
+  model.action-chunk-size: 30
+  model.action-dim: 36
+  model.action-exec-horizon: 30
+  model.observation-horizon: 1
+  model.odim: 36
+  model.view_feature_dim: 2048
+  model.no-tune-vlm: true
+  model.no-use_film: true
+  model.no-combined_temb: true
+  model.rtc: true
+  model.max-delay: 8
+
+# Parent checkpoints by TrainSpec.parent.checkpoint_id: Psi0 loads a VLM and an
+# action header separately. Paths are relative to the Psi0 repo root (released on
+# Hugging Face USC-PSI-Lab/psi-model). The two ablation pairs are DA-26's arms.
+parents:
+  psi0-baseline-egodex-he:
+    model_name_or_path: cache/checkpoints/psi0/pre.fast.1by1.2601091803.ckpt.ego200k.he30k
+    pretrained_action_header_path: cache/checkpoints/psi0/postpre.1by1.pad36.2601131206.ckpt.he30k
+  psi0-abl-he-only:
+    model_name_or_path: cache/checkpoints/psi0/pre.abl.only.he.2512311516.48k
+    pretrained_action_header_path: cache/checkpoints/psi0/postpre.abl.only.he.2602050012
+  psi0-abl-egodex-10pct:
+    model_name_or_path: cache/checkpoints/psi0/pre.abl.ego.10per.2602021632.46k
+    pretrained_action_header_path: cache/checkpoints/psi0/postpre.abl.ego.10per.2602050006
+
+# Assumptions until the first measured run (not measurements): seconds per optimiser
+# step at batch 16 on one A100, used by Psi0Trainer.estimate.
+estimate:
+  seconds_per_step: 1.0

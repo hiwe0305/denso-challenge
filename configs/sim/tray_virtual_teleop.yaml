@@ -1,0 +1,50 @@
+# DA-35 virtual PICO operator: how it activates, maps the planner to buttons and sticks.
+# Flat `key: number` lines only; read by flywheel_simple.tray.pico.operator (same loader as
+# tray.yaml). The planner's own targets stay in tray_planner.yaml (DA-33).
+# Units: metres, seconds, m/s, rad/s, degrees.
+
+# After pressing activation the operator brings the hands from the calibration pose to the
+# rest pose along a minimum-jerk path this long (SIMPLE eases the arms in over 1 s,
+# PicoDecoupledAgent._arm_engage_smooth_secs), then starts the planner from the rest pose.
+engage_s: 1.5
+# Rest pose = calibration wrist pose moved this far (m, robot frame; x forward, z up): PICO's
+# open fingers reach ~3 cm further than DA-33's curled rest (D-21) and hit table A's edge
+# before the planner raises the hands.
+rest_dx: -0.05
+rest_dz: 0.0
+# Left controller at activation in PicoStreamer's frame (relative to the headset, x forward,
+# y left, z up, headset yaw removed); the right one mirrored. Any pose works for the pipeline
+# (WristsPreProcessor uses motion relative to it); this one is hands in front of the chest.
+ctrl_x: 0.30
+ctrl_y: 0.20
+ctrl_z: -0.45
+
+# PICO closes a hand in one of three fixed Dex3 grasps: 0 trigger (index), 1 trigger + grip
+# (middle), 2 grip (ring). 1 is nearest to the planner's finger pinch (D-19): no thumb rotation.
+grasp: 1
+# The planner's continuous closure presses the buttons at or above this.
+closure_threshold: 0.5
+
+# The hands' style (lag, overshoot, curved paths, tremor) fades out over this many seconds
+# when they go to the tray (REACH) and back in when they leave it (RETREAT), like a person
+# who slows down near what they handle. The sticks keep their style throughout.
+style_fade_s: 0.3
+
+# Left stick acceleration (m/s^2) when the episode has no style; a style draws its own.
+joystick_accel: 1.0
+# Right stick, pushed once the body is yaw_engage_deg off the planner's heading and let go
+# within yaw_release_deg. While pushed it steers PICO's integrated target yaw to yaw_lead x
+# the body's error beyond the heading, at yaw_gain x the gap, between yaw_rate_min (>= 0.1,
+# the lower body's turn flag) and turn_rate (rad/s, the planner's turn_rate; a style draws
+# its own).
+turn_rate: 0.5
+yaw_gain: 2.0
+yaw_rate_min: 0.12
+yaw_engage_deg: 2.0
+yaw_release_deg: 0.5
+yaw_lead: 0.5
+
+# The operator gives up (reset button) this long after the planner aborts, or after it is
+# done without check_success (which needs the tray still for its T_stable).
+give_up_s: 1.0
+done_wait_s: 5.0

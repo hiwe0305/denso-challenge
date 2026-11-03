@@ -322,6 +322,11 @@ version = "0.1.0"
 source = { editable = "packages/flywheel-data" }
 dependencies = [
     { name = "flywheel-contracts" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
+    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "pyarrow", version = "25.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "pyarrow", version = "26.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "pyyaml" },
     { name = "typer" },
 ]
@@ -329,6 +334,8 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "flywheel-contracts", editable = "packages/flywheel-contracts" },
+    { name = "numpy" },
+    { name = "pyarrow" },
     { name = "pyyaml" },
     { name = "typer" },
 ]
@@ -344,6 +351,8 @@ dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
     { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "pyarrow", version = "25.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "pyarrow", version = "26.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "pyyaml" },
     { name = "typer" },
 ]
@@ -359,6 +368,7 @@ requires-dist = [
     { name = "flywheel-store", editable = "packages/flywheel-store" },
     { name = "flywheel-testkit", marker = "extra == 'test'", editable = "packages/flywheel-testkit" },
     { name = "numpy" },
+    { name = "pyarrow" },
     { name = "pyyaml" },
     { name = "typer" },
 ]
@@ -405,6 +415,29 @@ provides-extras = ["hd"]
 name = "flywheel-psi0"
 version = "0.1.0"
 source = { editable = "packages/flywheel-psi0" }
+dependencies = [
+    { name = "flywheel-contracts" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
+    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+]
+
+[package.optional-dependencies]
+test = [
+    { name = "flywheel-testkit" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "flywheel-contracts", editable = "packages/flywheel-contracts" },
+    { name = "flywheel-testkit", marker = "extra == 'test'", editable = "packages/flywheel-testkit" },
+    { name = "numpy" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+]
+provides-extras = ["test"]
 
 [[package]]
 name = "flywheel-simple"
