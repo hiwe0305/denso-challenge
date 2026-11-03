@@ -1,0 +1,201 @@
+"""The whole-episode balance condition (DA-36 task 4, AC 1, 3)."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from pathlib import Path
+
+import pytest
+from flywheel.contracts import StageEvaluation, TaskDefinition
+from flywheel.eval.config import ConfigError, load_scorer_config
+from flywheel.eval.scorer.balance import BALANCE_KIND, BalanceLimits, apply_balance, check_balance
+from flywheel.eval.scorer.failure import UNKNOWN_KIND, judge_failure
+from flywheel.eval.scorer.reader import read_signals
+from flywheel.eval.scorer.steps import first_failed_step, score_steps
+
+MakeRows = Callable[..., list[dict[str, object]]]
+CONFIG = Path("configs") / "eval" / "scorer" / "two-table.yaml"
+
+
+@pytest.fixture
+def limits() -> BalanceLimits:
+    return load_scorer_config(CONFIG)[0].balance
+
+
+def test_a_clean_episode_holds_its_limits(make_rows: MakeRows, limits: BalanceLimits) -> None:
+    verdict = check_balance(read_signals(make_rows()), limits)
+
+    # The control has to be checked twice over: no violation *and* nothing
+    # unknown, because an episode nobody could check also violates nothing.
+    assert verdict.violated is False
+    assert verdict.unknown is False
+
+
+@pytest.mark.parametrize(
+    ("signal", "value"),
+    [("torso_height", 0.4), ("torso_tilt", 0.9), ("torso_tilt", -0.9)],
+)
+def test_a_body_outside_its_limits_is_a_violation(
+    make_rows: MakeRows, limits: BalanceLimits, sig: object, signal: str, value: float
+) -> None:
+    rows = make_rows(**{signal: sig.switch(11, 0.05 if "tilt" in signal else 0.95, value)})  # type: ignore[attr-defined]
+
+    verdict = check_balance(read_signals(rows), limits)
+
+    assert verdict.violated is True
+    assert verdict.row == 11
+    assert verdict.signal == signal
+    assert verdict.value == value
+
+
+def test_a_violation_at_the_last_step_still_counts(
+    make_rows: MakeRows, limits: BalanceLimits, sig: object
+) -> None:
+    # Falling after the object is down passes all six steps, which is why the
+    # condition cannot live in the per-step predicates (AC 1).
+    rows = make_rows(torso_height=sig.switch(19, 0.95, 0.3))  # type: ignore[attr-defined]
+
+    assert check_balance(read_signals(rows), limits).row == 19
+
+
+def test_missing_balance_signals_are_unknown_not_upright(
+    make_rows: MakeRows, limits: BalanceLimits
+) -> None:
+    rows = [
+        {key: value for key, value in row.items() if key != "torso_tilt"} for row in make_rows()
+    ]
+
+    verdict = check_balance(read_signals(rows), limits)
+
+    assert verdict.violated is False
+    assert verdict.unknown_reason == "thiếu tín hiệu: torso_tilt"
+
+
+def test_a_gap_in_a_balance_signal_is_unknown(make_rows: MakeRows, limits: BalanceLimits) -> None:
+    rows = make_rows()
+    del rows[7]["torso_height"]
+
+    verdict = check_balance(read_signals(rows), limits)
+
+    assert verdict.unknown_reason == "tín hiệu có khoảng trống: torso_height"
+
+
+def test_an_empty_trace_is_unknown(limits: BalanceLimits) -> None:
+    assert check_balance(read_signals([]), limits).unknown is True
+
+
+def verdict_for(evaluation: StageEvaluation, task: TaskDefinition):  # noqa: ANN201
+    steps = score_steps(evaluation, tuple(task.stages()))
+    return judge_failure(
+        evaluation, steps, tuple(task.failure_kinds()), first_failed_step(evaluation)
+    )
+
+
+def test_a_violation_renames_a_passing_episode(
+    make_rows: MakeRows, task: TaskDefinition, limits: BalanceLimits, sig: object
+) -> None:
+    passed = verdict_for(StageEvaluation(stage_success=(True,) * 6), task)
+    rows = make_rows(torso_height=sig.switch(15, 0.95, 0.2))  # type: ignore[attr-defined]
+
+    folded = apply_balance(passed, check_balance(read_signals(rows), limits))
+
+    assert folded.failure_kind == BALANCE_KIND
+    assert folded.failure_class == "balance"
+    assert folded.success is False
+
+
+def test_a_violation_renames_a_step_failure_and_keeps_its_step(
+    make_rows: MakeRows, task: TaskDefinition, limits: BalanceLimits, sig: object
+) -> None:
+    evaluation = StageEvaluation(
+        stage_success=(True, True, False, False, False, False),
+        first_failed_stage=2,
+        failure_kind="L-SLIP",
+        failure_class="carry",
+    )
+    rows = make_rows(torso_tilt=sig.const(0.8))  # type: ignore[attr-defined]
+
+    folded = apply_balance(verdict_for(evaluation, task), check_balance(read_signals(rows), limits))
+
+    assert folded.failure_kind == BALANCE_KIND
+    assert folded.first_failed_step == 2
+
+
+def test_an_uncheckable_condition_costs_a_clean_episode_its_pass(
+    make_rows: MakeRows, task: TaskDefinition, limits: BalanceLimits
+) -> None:
+    passed = verdict_for(StageEvaluation(stage_success=(True,) * 6), task)
+    rows = [
+        {key: value for key, value in row.items() if key != "torso_height"} for row in make_rows()
+    ]
+
+    folded = apply_balance(passed, check_balance(read_signals(rows), limits))
+
+    # Six steps passed with nobody watching the torso is not a success.
+    assert folded.failure_kind == UNKNOWN_KIND
+    assert folded.success is None
+    assert "thăng bằng" in (folded.reason or "")
+
+
+def test_an_uncheckable_condition_leaves_a_named_failure_alone(
+    make_rows: MakeRows, task: TaskDefinition, limits: BalanceLimits
+) -> None:
+    evaluation = StageEvaluation(
+        stage_success=(True, False, False, False, False, False),
+        first_failed_stage=1,
+        failure_kind="L-GRASP",
+        failure_class="grasp",
+    )
+    rows = [
+        {key: value for key, value in row.items() if key != "torso_height"} for row in make_rows()
+    ]
+
+    folded = apply_balance(verdict_for(evaluation, task), check_balance(read_signals(rows), limits))
+
+    assert folded.failure_kind == "L-GRASP"
+
+
+def test_the_shipped_config_is_the_one_the_tests_score_against() -> None:
+    config, digest = load_scorer_config(CONFIG)
+
+    # A number changed in the file has to show up as a changed verdict
+    # somewhere, and these tests are where it does.
+    assert config.task_id == "two-table"
+    assert set(config.thresholds) == {"r_reach", "h_grasp", "h_place", "T_stable"}
+    assert config.balance.height_signal == "torso_height"
+    assert len(digest) == 64
+    assert load_scorer_config(CONFIG)[1] == digest
+
+
+@pytest.mark.parametrize(
+    ("body", "fragment"),
+    [
+        ("task_id: t\nscorer_version: '1'\nthresholds: {a: 1}\n", "balance"),
+        (
+            "task_id: t\nscorer_version: '1'\nthresholds: {}\n"
+            "balance: {min_height: 0.6, max_tilt: 0.3, height_signal: h, tilt_signal: t}\n",
+            "không được rỗng",
+        ),
+        (
+            "task_id: t\nscorer_version: '1'\nthresholds: {a: 1}\n"
+            "balance: {min_height: 0.6, max_tilt: 0.3, height_signal: h}\n",
+            "tilt_signal",
+        ),
+        (
+            "task_id: ''\nscorer_version: '1'\nthresholds: {a: 1}\n"
+            "balance: {min_height: 0.6, max_tilt: 0.3, height_signal: h, tilt_signal: t}\n",
+            "task_id",
+        ),
+        (
+            "task_id: t\nscorer_version: '1'\nthresholds: {a: 1}\nextra: 2\n"
+            "balance: {min_height: 0.6, max_tilt: 0.3, height_signal: h, tilt_signal: t}\n",
+            "unknown key",
+        ),
+    ],
+)
+def test_a_config_that_cannot_be_trusted_raises(tmp_path: Path, body: str, fragment: str) -> None:
+    path = tmp_path / "scorer.yaml"
+    path.write_text(body, encoding="utf-8")
+
+    with pytest.raises(ConfigError, match=fragment):
+        load_scorer_config(path)

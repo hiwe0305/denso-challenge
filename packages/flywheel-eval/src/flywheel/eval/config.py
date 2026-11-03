@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from flywheel.eval.scorer.balance import BalanceLimits
 
 
 class ConfigError(ValueError):
@@ -185,18 +186,73 @@ class TrainThresholds:
         )
 
 
+@dataclass(frozen=True)
+class ScorerConfig:
+    """What `configs/eval/scorer/<task>.yaml` tells the scorer (DA-36 AC 5).
+
+    `thresholds` is passed through to `TaskDefinition.evaluate()` untouched. The
+    scorer reads no key of it: which predicate needs `r_reach` and which needs
+    `T_stable` is the task's business, and a scorer that knew would be a scorer
+    with one task's steps baked into it.
+
+    `task_id` is checked against the task being scored, so a tray config cannot
+    be used to score a two-table episode and quietly supply the wrong numbers.
+    """
+
+    task_id: str
+    scorer_version: str
+    thresholds: dict[str, float]
+    balance: BalanceLimits
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> ScorerConfig:
+        """Validate a parsed scorer config; raise `ConfigError` on anything unclear."""
+        _reject_unknown(data, tuple(cls.__dataclass_fields__), "scorer config")
+        balance = _section(data, "balance")
+        thresholds = _number_map(data, "thresholds", "scorer config")
+        if not thresholds:
+            raise ConfigError("`thresholds` không được rỗng: task nào cũng có ngưỡng vị từ")
+        return cls(
+            task_id=_text(data, "task_id", "scorer config"),
+            scorer_version=_text(data, "scorer_version", "scorer config"),
+            thresholds=thresholds,
+            balance=BalanceLimits(
+                min_height=_number(balance, "min_height", "balance"),
+                max_tilt=_number(balance, "max_tilt", "balance"),
+                height_signal=_text(balance, "height_signal", "balance"),
+                tilt_signal=_text(balance, "tilt_signal", "balance"),
+            ),
+        )
+
+
+def load_scorer_config(path: Path) -> tuple[ScorerConfig, str]:
+    """Read a scorer config; return it and the hash to record with every `Score`."""
+    raw, parsed = _read_yaml(path)
+    return ScorerConfig.from_mapping(parsed), _sha256(raw)
+
+
 def load_train_thresholds(path: Path) -> tuple[TrainThresholds, str]:
     """Read a threshold file; return the thresholds and the hash to record with them.
 
     One read serves both answers, so the hash an artifact carries is the hash of
     the bytes the detectors actually ran on (AC 3, 4).
     """
+    raw, parsed = _read_yaml(path)
+    return TrainThresholds.from_mapping(parsed), _sha256(raw)
+
+
+def _read_yaml(path: Path) -> tuple[bytes, Mapping[str, Any]]:
+    """Read and parse a config file, hashing the same bytes that were parsed.
+
+    One read serves both answers, so the hash in an artifact can only ever name
+    the file that run actually read (AC 5; DA-08 AC 3, 4).
+    """
     raw = path.read_bytes()
     parsed = yaml.safe_load(raw.decode("utf-8"))
     if not isinstance(parsed, Mapping):
         kind = type(parsed).__name__
-        raise ConfigError(f"`{path}` must hold a mapping of threshold sections, got {kind}")
-    return TrainThresholds.from_mapping(parsed), _sha256(raw)
+        raise ConfigError(f"`{path}` must hold a mapping of sections, got {kind}")
+    return raw, parsed
 
 
 def config_sha256(path: Path) -> str:
@@ -231,6 +287,13 @@ def _require(section: Mapping[str, Any], key: str, where: str) -> Any:
     return section[key]
 
 
+def _text(section: Mapping[str, Any], key: str, where: str) -> str:
+    value = _require(section, key, where)
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError(f"`{where}.{key}` must be a non-empty string, got {value!r}")
+    return value
+
+
 def _number(section: Mapping[str, Any], key: str, where: str) -> float:
     value = _require(section, key, where)
     if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -258,6 +321,7 @@ def _number_map(section: Mapping[str, Any], key: str, where: str) -> dict[str, f
 
 
 _SECTION_FIELDS: dict[str, tuple[str, ...]] = {
+    "balance": tuple(BalanceLimits.__dataclass_fields__),
     "t1": tuple(T1Thresholds.__dataclass_fields__),
     "t2": tuple(T2Thresholds.__dataclass_fields__),
     "t3": tuple(T3Thresholds.__dataclass_fields__),
