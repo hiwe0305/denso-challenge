@@ -148,8 +148,9 @@ def test_an_injected_camera_delay_prints_the_sync_label(write_episode, pinned_co
 
 
 def test_the_shipped_config_prints_an_unjudged_calibration(write_episode) -> None:
-    # Until G0 pins the reference the command says CHƯA RÕ with R5 skipped,
-    # which has to be visible without opening the record.
+    # The shipped reference is the two-table task's; a camera it does not
+    # know is CHƯA RÕ with R5 skipped, which has to be visible without opening
+    # the record.
     result = _run("--episode", str(write_episode()), "--config", str(SYSTEM_YAML))
 
     assert result.exit_code == 0, result.output

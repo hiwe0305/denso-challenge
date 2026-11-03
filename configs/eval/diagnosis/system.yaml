@@ -50,8 +50,31 @@ r5:
   # của bản tham chiếu đã ghim ở G0, hook chép từ RunPlan, không phải hash của
   # bộ camera đang có. R5 so hash đó với `reference_sha256` dưới đây, rồi so giá
   # trị với `cameras` trong dung sai, dù hash khớp hay không.
-  reference_sha256: null   # chưa ghim: bản tham chiếu camera chốt ở G0 (spec mục 6.4 bước 5). Còn `null` thì R5 ra CHƯA RÕ, không phải đạt; đặt hash rồi khai `cameras` bên dưới
-  cameras: {}              # khai theo `uid` của CameraParams khi G0 chốt; giá trị lấy từ cấu hình camera của SIMPLE, không gõ tay
+  # chốt 3/11/2026, G0 task hai bàn, SIMPLE b75c678: bản tham chiếu ghim ở
+  # docs/g0/camera-reference-two-table.yaml (DA-38, sinh bởi
+  # scripts/g0/trace/pin_camera_reference.py từ model MuJoCo đã biên dịch).
+  # Kiểm chéo: fov 110° trên 640 px cho fx = 320 / tan(55°) = 224.07. Đổi task
+  # hoặc commit SIMPLE thì ghim lại, không sửa tay.
+  reference_sha256: fc7f9c90ebbf8c4662fd70e58de5aed668c0fbc5ccfbbd951dce705729cdeea2
+  cameras:
+    head_stereo_left:
+      mount: eye_in_head
+      width: 640
+      height: 360
+      fx: 224.06641222710715
+      fy: 224.06641222710715
+      cx: 320.0
+      cy: 180.0
+      pose: [0.05762353911995888, 0.017529990524053574, 0.4298701882362366, 0.6592535452986646, 0.25570444464487047, -0.2557044446448706, -0.6592535452986645]
+    head_stereo_right:
+      mount: eye_in_head
+      width: 640
+      height: 360
+      fx: 224.06641222710715
+      fy: 224.06641222710715
+      cx: 320.0
+      cy: 180.0
+      pose: [0.05762353911995888, -0.03247000947594643, 0.4298701882362366, 0.6592535452986646, 0.25570444464487047, -0.2557044446448706, -0.6592535452986645]
   tolerance_intrinsics_px: 0.5    # giả định; fx, fy, cx, cy, đơn vị pixel
   tolerance_position_m: 0.005     # giả định; vị trí camera so với thân gắn, đơn vị mét
   tolerance_quaternion: 0.01      # giả định; thành phần quaternion, không đơn vị; q và -q là cùng một hướng nên so với dấu gần hơn
