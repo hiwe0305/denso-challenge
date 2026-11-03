@@ -36,7 +36,35 @@ Stage 1 và 2 chỉ đọc code (design mục 8): stage 1 log `action_accuracy`,
 - Recipe stage 3 giữ đúng mọi cờ của bản cuối `finetune-simple-psi0.sh`, so từng cờ với `git show 2830f93^:…`. Khác duy nhất là cờ theo job, cộng bốn cờ để chạy lại: `--timestamp` (lấy từ `job_id`), `--train.output_dir`, `--train.resume_from_checkpoint=latest`, `--train.skip_resumed_steps`.
 - Argv của cả ba stage được kiểm bằng chính `tyro` và `DynamicLaunchConfig` của Ψ₀ ở `cda3fdf` (bước đầu của `scripts/train.py`, không cần GPU): parse đúng.
 - Điều kiện của môi trường Ψ₀: có `.env` ở thư mục gốc (`scripts/train.py` chạy `assert load_dotenv()`; `cp .env.sample .env`), và `pyarrow` import được, vì launcher import `flywheel.contracts`. `Psi0Trainer` đặt `WANDB_MODE=offline` và thêm `src/` của `flywheel-psi0`, `flywheel-contracts` vào `PYTHONPATH`. `.venv-psi` trên laptop hiện lệch phiên bản (pyarrow cần NumPy ≥ 2, venv có 1.26.4) vì `uv.lock` của clone bị sửa cục bộ; môi trường cài đúng từ `uv.lock` của tác giả không gặp lỗi này.
-- Chưa chạy job GPU thật: chạy thử stage 3 và chạy lại từ checkpoint thuộc nhiệm vụ con 5 (Colab, hoặc `rtx3060` khi máy đủ RAM theo quy tắc của đội).
+- Job GPU thật đầu tiên: xem mục dưới.
+
+## Chạy stage 3 trên Colab, ngắt và chạy lại (nhiệm vụ con 5)
+
+_Thực đo ngày 3/11/2026, một lần chạy trên một A100-SXM4-40GB của Colab Pro, bằng `python -m flywheel_psi0.trainer.colab setup|smoke`. Recipe stage 3, cặp checkpoint `psi0-baseline-egodex-he`, dữ liệu psi-data `G1WholebodyLocomotionPickBetweenTablesTeleop-v0`. Override cho lần chạy thử: 60 bước, checkpoint và validation mỗi 20 bước, 2 batch val, `warmup_steps=0`._
+
+| Mục | Kết quả |
+|---|---|
+| Ngắt | Lần 0 bị giết khi dòng train của bước 30 xuất hiện; dòng cuối là bước 31; checkpoint cuối `ckpt_20` |
+| Chạy lại | Lần 1 bắt đầu ở bước 20, chạy tới bước 59, lưu `ckpt_60`, `infra_status = ok` |
+| Nối liền | Ở 12 bước trùng (20–31), loss và lr của hai lần trùng nhau tới 4 chữ số: Ψ₀ khôi phục vị trí dữ liệu (`--train.skip_resumed_steps`) và trạng thái RNG |
+| `metrics.jsonl` | 77 dòng, đều đúng `TrainingMetric`; reader DA-08 bỏ 13 dòng trùng của phần nối, còn 60 bước train và 4 lần val. Lưu ở `packages/flywheel-psi0/tests/unit/trainer/fixtures/metrics_colab_smoke.jsonl` |
+| Đỉnh VRAM | 16,2 GB (batch 16): không vừa `rtx3060` 12 GB; L4 24 GB vừa (suy ra, chưa chạy) |
+| Throughput | Trung vị 49,3 mẫu/s, tức 3,1 bước/s |
+| Checkpoint | 9,5 GB mỗi `ckpt_<step>` (`model.safetensors`, `optimizer.bin`, scheduler, RNG) |
+| Chi phí | 6,73 CU/giờ (`colab usage`); phiên 68 phút, khoảng 7,6 CU, gồm khoảng 20 phút VM rỗi sau một lần cài flash-attn lỗi. Một lần fine-tune 40000 bước ước khoảng 26 CU (`docs/g0/ledger/DA-19.csv`) |
+
+DA-08 trên log thật: T8 báo `grad_norm_action = 153,7` ở bước 0 (ngưỡng 10), phần lớn do lần chạy thử bỏ 1000 bước warmup của recipe. T6 bỏ qua các chiều 0–6 (tay trái) và 31 (chiều cao thân) vì `target_std = 0` trên batch train: trong task hai bàn hai nhóm này không đổi, nên layout G1 của DA-01 nên ghi điều đó.
+
+**Môi trường Ψ₀ ở commit ghim không dựng được theo README.** Ba chỗ phải sửa trong `colab.py`, đều không đụng repo tác giả:
+
+1. `uv.lock` ở `cda3fdf` là hai lock bị trộn: khóa `[package.optional-dependencies]` lặp, khoảng 30 gói ở hai phiên bản (mirror Tsinghua và PyPI), thiếu mục `xyzservices`; `uv sync` không parse được. `repair_lock` đổi URL mirror sang PyPI (cùng đường dẫn, cùng hash), bỏ bản trùng, giữ bản mới hơn của gói hai phiên bản; rồi `uv pip install -e . --group psi -c <368 ràng buộc từ lock>` giải lại với mọi phiên bản lock có. Kết quả giữ đúng `torch 2.7.0`, `numpy 1.26.4`, `pyarrow 21.0.0`, `datasets 3.6.0`, `transformers 4.57.1`, `lerobot` từ `songlin/lerobot@09929d8`. `.venv-psi` trên laptop lệch NumPy chính vì lần giải lại không có ràng buộc này.
+2. Colab đặt `UV_SYSTEM_PYTHON`, nên `uv` cài vào Python 3.13 của hệ thống; phải gỡ biến đó và chỉ định `--python .venv-psi/bin/python`.
+3. Qwen3-VL được nạp với `flash_attention_2`: không có flash-attn thì train không chạy (README chỉ nói fallback SDPA cho inference trên XPU). Cài `flash_attn 2.7.4.post1` từ wheel dựng sẵn `cu12torch2.7cxx11abiTRUE-cp311`, với `--no-config` để `uv` không đòi build theo `pyproject` của Ψ₀.
+
+**Còn mở:**
+- Kho bền cho checkpoint: `colab drivemount` qua CLI mất kết nối kernel, chưa gắn được Google Drive; lần chạy thử không giữ checkpoint (9,5 GB, 60 bước, không dùng tiếp). Job thật cần chọn kho: Drive gắn một lần trên trình duyệt, hoặc kho khác.
+- Probe P3, P4 trên checkpoint trung gian (AC 5) chưa làm.
+- `colab exec` qua kernel hay treo sau khi khởi động lại kernel; điều khiển VM qua `colab ssh --proxy-mode` ổn định hơn.
 
 ## Bảng sinh từ code
 
