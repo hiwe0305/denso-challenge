@@ -322,6 +322,10 @@ def map_defect_manifest(payload: Any) -> dict[str, Any]:
     manifest: DefectManifest = _validated(DefectManifest, payload, "defect manifest")
     return {
         "manifest": {
+            # Hợp đồng không cho manifest một ID riêng; danh tính của nó là
+            # mã bản sao chấm, cũng là giá trị `benchmark_copy_id` của mọi
+            # episode trong bản sao (#62).
+            "manifest_ref": manifest.dataset_id,
             "dataset_ref": manifest.dataset_id,
             "seed": manifest.seed,
         },

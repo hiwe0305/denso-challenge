@@ -336,7 +336,9 @@ def test_a_probe_without_a_known_name_is_refused() -> None:
 def test_the_shipped_defect_manifest_maps_into_group_s_only() -> None:
     rows = map_defect_manifest(_artifact("DefectManifest"))
 
-    assert rows["manifest"] == {"dataset_ref": "ds_1", "seed": 5}
+    # `manifest_ref` là mã bản sao chấm: hợp đồng không cho manifest một ID
+    # riêng, và đây cũng là giá trị `benchmark_copy_id` khi #62 merge.
+    assert rows["manifest"] == {"manifest_ref": "ds_1", "dataset_ref": "ds_1", "seed": 5}
     assert rows["items"] == [
         {"target_ref": "ep_1", "code": "D1", "parameters": {"frame": 1}}
     ]
