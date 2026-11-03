@@ -2,7 +2,7 @@
 
 from importlib.resources import files
 
-from flywheel.contracts.artifacts import Episode, InjectedDefect
+from flywheel.contracts.artifacts import Episode
 from flywheel.data.inject.api import has_injected_defect
 
 
@@ -15,13 +15,9 @@ def test_plain_episode_has_no_injected_defect() -> None:
     assert has_injected_defect(_episode()) is False
 
 
-def test_marked_episode_has_an_injected_defect() -> None:
+def test_any_benchmark_copy_episode_is_caught() -> None:
     ep = _episode()
     marked = ep.model_copy(
-        update={
-            "meta": ep.meta.model_copy(
-                update={"injected_defect": InjectedDefect(code="D1", parameters={})}
-            )
-        }
+        update={"meta": ep.meta.model_copy(update={"benchmark_copy_id": "bench-000000000001"})}
     )
     assert has_injected_defect(marked) is True
