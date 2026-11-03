@@ -30,6 +30,13 @@
       "value": 12,
       "unit": "frames",
       "source_ref": "releases/rel_001/dataset_report.json"
+    },
+    {
+      "fact_id": "F3",
+      "name": "sync_offset_p99_ms",
+      "value": 42.0,
+      "unit": "ms",
+      "source_ref": "releases/rel_001/dataset_report.json"
     }
   ],
   "findings": [
@@ -42,6 +49,16 @@
       "figures": ["figures/ep_001_drops.png"],
       "insight": "High frame drop rate detected at {F1} with {F2} lost frames.",
       "suggestion": "Re-record episode {F2} with higher sync margin."
+    },
+    {
+      "finding_id": "find_002",
+      "code": "D2",
+      "rank": 2,
+      "target_ref": "episodes/ep_002",
+      "evidence": ["F3"],
+      "figures": [],
+      "insight": "Camera-to-state offset reaches {F3} at p99, above tau_sync.",
+      "suggestion": "Quarantine the episode and check the reader clock before the next release."
     }
   ],
   "estimates": [

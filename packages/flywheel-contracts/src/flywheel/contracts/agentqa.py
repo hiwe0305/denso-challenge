@@ -171,9 +171,7 @@ class AgentReport(Artifact):
             basis_set = set(estimate.basis)
             if not basis_set <= known_facts:
                 unknown = basis_set - known_facts
-                raise ValueError(
-                    f"{estimate.estimate_id}: basis cites unknown fact(s): {unknown}"
-                )
+                raise ValueError(f"{estimate.estimate_id}: basis cites unknown fact(s): {unknown}")
 
         if (self.status == "ok") == bool(self.problems):
             raise ValueError("status ok needs no problems; status broken needs at least one")
@@ -209,3 +207,12 @@ class AgentReview(Artifact):
         if len(finding_ids) != len(set(finding_ids)):
             raise ValueError("decision finding ids must be unique")
         return self
+
+    def check_against(self, report: AgentReport) -> None:
+        """Raise ValueError unless this review answers ``report`` and only its findings."""
+        if self.report_id != report.report_id:
+            raise ValueError(f"review answers report {self.report_id!r}, not {report.report_id!r}")
+        known = {finding.finding_id for finding in report.findings}
+        unknown = sorted(d.finding_id for d in self.decisions if d.finding_id not in known)
+        if unknown:
+            raise ValueError(f"review decides finding(s) not in the report: {unknown}")
