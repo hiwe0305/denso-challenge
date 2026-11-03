@@ -28,6 +28,7 @@ from flywheel.testkit.fakes import FakeTrainer
 from flywheel_psi0.trainer import JobIdentity, MetricsLog, ValStats
 from flywheel_psi0.trainer.val_stats import (
     HAND_HIST_BINS,
+    LossBreakdown,
     hand_openness,
     normalised_open_pose,
 )
@@ -101,11 +102,22 @@ def psi0_loop(
     val_batches: int = 2,
     seed: int = 0,
 ) -> None:
-    """The logging calls of `scripts/train.py` for `steps`, with synthetic numbers."""
+    """The logging calls of `scripts/train.py` for `steps`, with synthetic numbers.
+
+    What the launcher's hooks feed `MetricsLog` is fed here too, when it has the
+    sink: the per-element train loss every step, and actions sampled on the train
+    batch at validation steps.
+    """
     rng = np.random.default_rng(seed)
     dims = len(stats.layout.dimensions)
     for global_step in steps:
         loss = 1.0 / (1 + 0.1 * global_step)
+        if log.train_loss is not None:  # LossTap: F.mse_loss(..., reduction="none")
+            growth = np.linspace(0.5, 1.5, CHUNK)[None, :, None]
+            log.train_loss.add(rng.exponential(loss, size=(4, CHUNK, dims)) * growth)
+        if log.train_stats is not None and global_step % validation_steps == 0:
+            target = rng.uniform(-1, 1, size=(4, CHUNK, dims))
+            log.train_stats.add(target + rng.normal(0, 0.03, target.shape), target)
         train = {
             "train/lr_act": 1e-4,
             "train/grad_norm_act": 0.5,
@@ -236,13 +248,19 @@ def test_committed_sample_matches_the_wrapper(tmp_path: Path) -> None:
         produced,
         fake_identity(tmp_path),
         val_stats=stats,
+        train_loss=LossBreakdown(g1_layout()),
+        train_stats=ValStats(g1_layout(), hand_open_pose=g1_open_pose()),
         global_batch_size=16,
         vram_gb=lambda: 21.5,
         clock=counter_clock(),
     )
     psi0_loop(log, stats, range(0, 101), validation_steps=50)
 
-    val = [r for r in read(produced) if r.split == "val"]
+    records = read(produced)
+    train = [r for r in records if r.split == "train"]
+    val = [r for r in records if r.split == "val"]
+    assert all(r.loss_by_group and len(r.loss_by_chunk_pos) == CHUNK for r in train)
+    assert [r.step for r in train if r.pred_std] == [0, 50, 100]
     assert len(val[0].hand_open_hist) == HAND_HIST_BINS
     assert sum(val[0].hand_open_hist) == pytest.approx(1.0)
     if os.environ.get("UPDATE_FIXTURES"):

@@ -19,6 +19,7 @@ from flywheel.contracts.artifacts import ActionDimension, ActionLayout
 from flywheel.contracts.protocols import TrainerAdapter
 from flywheel.contracts.training import TrainingMetric
 from flywheel_psi0.trainer import Psi0Recipe, Psi0Trainer
+from flywheel_psi0.trainer.launch import LossTap
 from flywheel_psi0.trainer.launch import main as launch_main
 
 REPO = Path(__file__).resolve().parents[5]
@@ -64,11 +65,52 @@ class Model:
         yield "module.action_header.proj.weight", Param(FakeTensor([3.0, 4.0]))
 
 
+class Functional:
+    # `torch.nn.functional` reduced to what `forward_and_loss` uses.
+
+    @staticmethod
+    def mse_loss(input, target, reduction="mean"):
+        squared = (input.array - target.array) ** 2
+        return FakeTensor(squared if reduction == "none" else squared.mean())
+
+
+F = Functional()
+
+
+class Cfg:
+    def __init__(self, validation_steps):
+        train = {"validation_steps": validation_steps, "data_parallel": "ddp"}
+        self.train = type("Train", (), train)
+
+
 class FinetuneTrainer:
-    def __init__(self, output_dir):
+    def __init__(self, output_dir, validation_steps):
         self.project_dir = os.path.join(output_dir, "finetune", "run.job")
+        self.cfg = Cfg(validation_steps)
         self.model = Model()
         self.global_step = 0
+        self.dtype = "bf16"
+        self.calls = []
+
+    def set_train(self):
+        self.calls.append("train")
+
+    def set_eval(self):
+        self.calls.append("eval")
+
+    def unwrap_model(self):
+        return self.model
+
+    def forward_and_loss(self, model, batch):
+        actions = batch["actions"]
+        # The velocity error grows along the chunk, as an untrained header's would.
+        noise = np.linspace(0.1, 0.5, actions.shape[1])[None, :, None]
+        loss = F.mse_loss(FakeTensor(actions.array + noise), actions, reduction="none")
+        return {"loss": float(loss.array.mean())}
+
+    def training_step(self, batch):
+        losses = self.forward_and_loss(self.model, batch)
+        return True, {"loss": losses["loss"]}
 
     def log(self, metrics, start_time=None):
         pass
@@ -80,6 +122,13 @@ class FinetuneTrainer:
         rng = np.random.default_rng(self.global_step)
         actions = batch["actions"].array
         return FakeTensor(actions[:, :30] + rng.normal(0, 0.1, actions[:, :30].shape))
+
+    def evaluate(self, batches):
+        # Psi0 computes the val loss with the same F.mse_loss, outside training_step.
+        losses = [self.forward_and_loss(self.model, batch)["loss"] for batch in batches]
+        for batch in batches:
+            self.inference(self.model, batch)
+        return {"loss": sum(losses) / len(losses)}
 
     def save_checkpoint(self, global_step):
         path = os.path.join(self.project_dir, "checkpoints", f"ckpt_{global_step}")
@@ -96,19 +145,20 @@ args = dict(a[2:].split("=", 1) for a in sys.argv[2:] if a.startswith("--") and 
 if args.get("seed") == "13":
     OutOfMemoryError = type("OutOfMemoryError", (RuntimeError,), {})
     raise OutOfMemoryError("CUDA out of memory")
-trainer = FinetuneTrainer(args["train.output_dir"])
+trainer = FinetuneTrainer(args["train.output_dir"], int(args["train.validation_steps"]))
 rng = np.random.default_rng(0)
 for step in range(int(args["train.max_training_steps"])):
     trainer.global_step = step
+    batch = {"actions": FakeTensor(rng.uniform(-1, 1, (2, 30, 36)))}
+    _, losses = trainer.training_step(batch)
     trainer.clip_grad_norms()
-    trainer.log({"train/lr_act": 1e-4, "train/grad_norm_act": 0.5, "train/loss": 1.0 / (step + 1),
+    trainer.log({"train/lr_act": 1e-4, "train/grad_norm_act": 0.5, "train/loss": losses["loss"],
                  "train/epoch": 0})
     if (step + 1) % int(args["train.checkpointing_steps"]) == 0:
         trainer.save_checkpoint(step + 1)
     if step % int(args["train.validation_steps"]) == 0:
-        for _ in range(2):
-            trainer.inference(None, {"actions": FakeTensor(rng.uniform(-1, 1, (2, 30, 36)))})
-        trainer.log({"eval/loss": 0.9, "eval/simple/err_l1_hand_joints": 0.02})
+        val = [{"actions": FakeTensor(rng.uniform(-1, 1, (2, 30, 36)))} for _ in range(2)]
+        trainer.log({"eval/" + k: v for k, v in trainer.evaluate(val).items()})
 """
 
 
@@ -142,13 +192,15 @@ def in_process(command: Sequence[str], cwd: Path, env: Mapping[str, str]) -> int
     return 0
 
 
+GROUPS = {"hand": 14, "arm": 14, "torso_rpy": 3, "height": 1}
+GROUPS |= {"base_velocity": 2, "turn": 1, "target_yaw": 1}
+
+
 def g1_layout() -> ActionLayout:
-    groups = [("hand", 14), ("arm", 14), ("torso_rpy", 3), ("height", 1)]
-    groups += [("base_velocity", 2), ("turn", 1), ("target_yaw", 1)]
     return ActionLayout(
         dimensions=[
             ActionDimension(name=f"{group}_{i}", group=group, masked=False)
-            for group, size in groups
+            for group, size in GROUPS.items()
             for i in range(size)
         ]
     )
@@ -260,6 +312,15 @@ def test_train_writes_metrics_and_reports_the_checkpoint(fake_psi0: Path, tmp_pa
     # The fake VLM is frozen: measured in clip_grad_norms, before zero_grad.
     assert {r.grad_norm_vlm for r in train} == {0.0}
     assert len(val[0].hand_open_hist) == 10 and len(val[0].pred_std) == DIMS
+    # Every train line splits its own loss; the fake's error grows along the chunk.
+    assert all(set(r.loss_by_group) == set(GROUPS) for r in train)
+    assert train[0].loss_by_chunk_pos[-1] > train[0].loss_by_chunk_pos[0]
+    assert train[0].loss == pytest.approx(
+        sum(train[0].loss_by_chunk_pos) / len(train[0].loss_by_chunk_pos)
+    )
+    # Validation steps (0 and 5) also sample actions on the train batch.
+    assert [r.step for r in train if r.pred_std] == [0, 5]
+    assert len(train[0].hand_open_hist) == 10 and len(train[0].pred_var_by_dim) == DIMS
     reported = json.loads((tmp_path / "runs" / "job.smoke-1" / "result.json").read_text())
     assert reported["checkpoint_step"] == 6 and reported["checkpoint_dir"].endswith("ckpt_6")
 
@@ -283,3 +344,22 @@ def test_missing_dotenv_is_a_clear_error(fake_psi0: Path, tmp_path: Path) -> Non
     (fake_psi0 / ".env").unlink()
     with pytest.raises(FileNotFoundError, match="cp .env.sample .env"):
         trainer(fake_psi0, tmp_path).train(spec(tmp_path))
+
+
+def test_loss_tap_records_only_unreduced_loss_inside_training_step() -> None:
+    class Functional:
+        @staticmethod
+        def mse_loss(input: float, target: float, reduction: str = "mean") -> tuple[str, float]:
+            return reduction, input - target
+
+        relu = "passed through"
+
+    seen: list[object] = []
+    tap = LossTap(Functional(), seen.append)
+    tap.mse_loss(3.0, 1.0, reduction="none")  # evaluate(): not active
+    tap.active = True
+    tap.mse_loss(3.0, 1.0)  # a reduced loss is not the per-element one
+    assert tap.mse_loss(5.0, 1.0, reduction="none") == ("none", 4.0)
+
+    assert seen == [("none", 4.0)]
+    assert tap.relu == "passed through"

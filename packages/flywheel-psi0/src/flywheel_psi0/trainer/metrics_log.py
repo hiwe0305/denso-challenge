@@ -4,8 +4,12 @@ Psi0 logs only through `accelerator.log(metrics, step=global_step)`, once per
 optimiser step with `train/*` keys and once per evaluation with `eval/*` keys
 (docs/g0/psi0-logging.md). `MetricsLog.log` takes the same dict and step and
 appends one `TrainingMetric` line per split it finds, adding what Psi0 lacks:
-the job identity, wall time, VRAM, throughput, and - on the val line - the
-statistics `ValStats` recomputed from that evaluation's predictions.
+the job identity, wall time, VRAM, throughput, and recomputed statistics:
+
+* train line, every step: the train loss split by group and chunk position
+  (`LossBreakdown`); at validation steps also the per-dimension statistics of
+  actions sampled on that step's train batch (`train_stats`);
+* val line: all of them from the evaluation's own predictions (`val_stats`).
 
 The file is append-only: a resumed job opens it again with `attempt` raised by
 one, and the evaluation lane keeps the highest attempt for each `(split, step)`.
@@ -21,7 +25,7 @@ from pathlib import Path
 
 from flywheel.contracts.training import TrainingMetric
 
-from flywheel_psi0.trainer.val_stats import ValStats
+from flywheel_psi0.trainer.val_stats import LossBreakdown, ValStats
 
 
 @dataclass(frozen=True)
@@ -58,6 +62,8 @@ class MetricsLog:
         path: Path,
         identity: JobIdentity,
         val_stats: ValStats | None = None,
+        train_loss: LossBreakdown | None = None,
+        train_stats: ValStats | None = None,
         global_batch_size: int | None = None,
         vram_gb: Callable[[], float | None] = lambda: None,
         clock: Callable[[], float] = time.monotonic,
@@ -65,6 +71,8 @@ class MetricsLog:
         self.path = path
         self.identity = identity
         self.val_stats = val_stats
+        self.train_loss = train_loss
+        self.train_stats = train_stats
         self._global_batch_size = global_batch_size
         self._vram_gb = vram_gb
         self._clock = clock
@@ -112,9 +120,13 @@ class MetricsLog:
             elapsed = now - self._last_train_time
             throughput = self._global_batch_size / elapsed if elapsed > 0 else None
         self._last_train_time = now
+        loss_split = self.train_loss.summary() if self.train_loss is not None else {}
+        sampled = self.train_stats.summary(errors=False) if self.train_stats is not None else {}
         return TrainingMetric.model_validate(
             {
                 **self._common(step, now),
+                **loss_split,
+                **sampled,
                 "split": "train",
                 "loss": _loss(float(metrics["train/loss"])),
                 "grad_norm_vlm": _optional(metrics, "train/grad_norm_vlm"),
