@@ -6,7 +6,8 @@
 Writes, under --out:
 
     copies/<copy id>/     the defect copy and the clean copy, ids from copy_ids(seed)
-    answers/<copy id>/    defect_manifest.json and .sha256 of each copy (scorer only)
+    answers/<copy id>/    defect_manifest.json and .sha256 of each copy, and the
+                          writer's flywheel_lineage.jsonl of that copy (scorer only)
     ledger.jsonl          the job's estimated and measured LedgerEntry rows
 
 and prints the handoff for DA-31: each copy's DatasetRef, manifest path and hash.
@@ -15,6 +16,7 @@ Neither the copy names nor the handoff say which copy is clean; only the manifes
 
 import argparse
 import json
+import shutil
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -25,7 +27,7 @@ from flywheel.contracts.artifacts import ActionLayout, DefectManifest
 from flywheel.contracts.base import canonical_json
 from flywheel.contracts.entities import LedgerEntry
 from flywheel.contracts.v0 import DatasetRef
-from flywheel.data.ingest.lerobot import read_info
+from flywheel.data.ingest.lerobot import LINEAGE, read_info
 from flywheel.data.inject.config import InjectConfig, load_inject_config
 from flywheel.data.inject.dataset import copy_ids
 from flywheel.data.inject.lerobot_copy import clean_copy, inject_copy
@@ -76,6 +78,12 @@ def build_benchmark(
     start = clock()
 
     def seal(copy_id: str, manifest: DefectManifest) -> BuiltCopy:
+        # The writer's renumbering record names source index values, from which the
+        # source lengths and so the cut episodes follow: it goes to the scorer's side.
+        lineage = copies / copy_id / "meta" / LINEAGE
+        if lineage.is_file():
+            (answers / copy_id).mkdir(parents=True, exist_ok=True)
+            shutil.move(lineage, answers / copy_id / LINEAGE)
         path = answers / copy_id / MANIFEST_FILENAME
         digest = seal_manifest(manifest, path, copy_roots=[copies])
         return BuiltCopy(DatasetRef(dataset_id=copy_id, uri=str(copies / copy_id)), path, digest)

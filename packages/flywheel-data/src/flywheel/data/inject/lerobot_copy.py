@@ -14,11 +14,14 @@ Every episode of the copy is written again in ascending order, not just the
 injected ones: the writer renumbers `index` to LeRobot's rule and logs it, and
 rewriting only some episodes would single them out. A duplicate gets the parquet
 and video of its source first, so the columns the writer carries over and the
-video match the source too. The copy is marked as a benchmark copy in
+video match the source too. The stats files are recomputed from the copy's own data
+(`stats.write_stats`) and every file gets one mtime, so neither stale stats nor write
+times point at the changed episodes. The copy is marked as a benchmark copy in
 `meta/benchmark_copy.json`; the answer key is only in the returned manifest.
 """
 
 import json
+import os
 import shutil
 from pathlib import Path
 from typing import Any
@@ -35,6 +38,7 @@ from flywheel.data.ingest.lerobot import (
 from flywheel.data.inject.config import InjectConfig
 from flywheel.data.inject.data_defects import EpisodeData
 from flywheel.data.inject.dataset import create_clean_dataset, create_defect_dataset
+from flywheel.data.inject.stats import write_stats
 
 COPY_MARKER = "benchmark_copy.json"
 
@@ -159,7 +163,12 @@ def write_copy(
     _write_seeds(
         out_root, {int(ep.episode_id.removeprefix("episode_")): ep.seed for ep in episodes}
     )
+    write_stats(out_root)
     (out_root / "meta" / COPY_MARKER).write_text(json.dumps({"benchmark_copy_id": copy_id}))
+    # One mtime for every file and directory, so write times point at no episode.
+    stamp = (src_root / "meta" / "info.json").stat().st_mtime
+    for path in [*out_root.rglob("*"), out_root]:
+        os.utime(path, (stamp, stamp))
 
 
 def _files(info: dict[str, Any], ref: str) -> list[str]:
