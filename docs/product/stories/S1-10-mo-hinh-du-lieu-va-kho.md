@@ -47,9 +47,12 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 - `packages/flywheel-contracts/src/flywheel/contracts/base.py`, `packages/flywheel-contracts/src/flywheel/contracts/configs.py`
 - `packages/flywheel-contracts/src/flywheel/contracts/entities.py` hoặc `packages/flywheel-contracts/src/flywheel/contracts/entities/`
+- `packages/flywheel-contracts/src/flywheel/contracts/artifacts.py`
 - `packages/flywheel-contracts/schemas/`, `packages/flywheel-contracts/tests/`
+- `packages/flywheel-testkit/src/flywheel/testkit/fixtures/artifacts/`
 - `packages/flywheel-store/src/flywheel/store/` (gồm `ledger_append.py`: ghi sổ chi phí append-only)
 - `packages/flywheel-store/tests/`
+- `configs/splits/default.yaml`
 
 ## Ghi chú cho người làm
 
@@ -87,10 +90,11 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 02/11/2026 | Hoàn thành toàn bộ AC 1–9, hoàn thành các nhiệm vụ con 1–6, cập nhật tiến độ | Nguyễn Thăng Long |
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 | 03/11/2026 | Sửa 7 điểm feedback review của Hiếu trên PR #36: LedgerEntry hai dòng, tái sử dụng Episode/QAReport, kiểm tra schema, type action_layout, SplitPlanConfig | Nguyễn Thăng Long |
+| 03/11/2026 | Sửa 2 lỗi chặn merge (episode_id catalog theo DA-25, DuckDB view khi kho rỗng) và hoàn thiện Issue #62 (benchmark_copy_id, Score task_id/config_sha256, path traversal guard, TableWriter validation) | Nguyễn Thăng Long |
 
 ## Ghi chép khi làm
 
-- Giờ thực: 11h
+- Giờ thực: 12.5h
 - Công cụ AI đã dùng: Antigravity
 - Ghi chú hoàn thành: Đã hiện thực đầy đủ BaseRecord, 12 thực thể L0-lite, 4 cấu hình YAML, StorePaths, sha256 blobs, TableWriter, tự tạo view DuckDB khi kết nối, LedgerStore và xuất JSON Schema. Sửa theo toàn bộ 7 mục góp ý của Hiếu trên PR #36. Tất cả test unit và e2e đều đạt.
 - File đã tạo hoặc sửa:

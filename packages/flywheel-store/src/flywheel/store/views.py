@@ -2,10 +2,27 @@
 
 from __future__ import annotations
 
+import typing
 from collections.abc import Sequence
+from typing import Any
 
 import duckdb
+from flywheel.contracts.entities import (
+    Checkpoint,
+    Cluster,
+    Condition,
+    Decision,
+    Episode,
+    FixRateEvent,
+    LedgerEntry,
+    QAReport,
+    Release,
+    RunPlan,
+    Score,
+    Source,
+)
 from flywheel.store.paths import StorePaths
+from pydantic import BaseModel
 
 CATALOG_TABLES: Sequence[str] = (
     "source",
@@ -21,6 +38,66 @@ CATALOG_TABLES: Sequence[str] = (
     "decision",
 )
 
+TABLE_MODELS: dict[str, type[BaseModel]] = {
+    "source": Source,
+    "condition": Condition,
+    "episode": Episode,
+    "qa_report": QAReport,
+    "release": Release,
+    "checkpoint": Checkpoint,
+    "run_plan": RunPlan,
+    "score": Score,
+    "cluster": Cluster,
+    "fix_rate_event": FixRateEvent,
+    "decision": Decision,
+    "ledger_entry": LedgerEntry,
+}
+
+
+def _duckdb_type(annotation: Any) -> str:
+    """Map python/pydantic field types to DuckDB SQL types."""
+    origin = typing.get_origin(annotation)
+    args = typing.get_args(annotation)
+    if origin is typing.Union:
+        non_none = [a for a in args if a is not type(None)]
+        if len(non_none) == 1:
+            return _duckdb_type(non_none[0])
+        return "VARCHAR"
+    if origin is typing.Literal:
+        first = args[0] if args else ""
+        if isinstance(first, int):
+            return "BIGINT"
+        if isinstance(first, float):
+            return "DOUBLE"
+        if isinstance(first, bool):
+            return "BOOLEAN"
+        return "VARCHAR"
+    if annotation in (str,):
+        return "VARCHAR"
+    if annotation in (int,):
+        return "BIGINT"
+    if annotation in (float,):
+        return "DOUBLE"
+    if annotation in (bool,):
+        return "BOOLEAN"
+    if origin in (list, dict, set) or hasattr(annotation, "model_fields"):
+        return "JSON"
+    return "VARCHAR"
+
+
+def get_table_columns(table_name: str) -> dict[str, str]:
+    """Return dictionary of column names to DuckDB types for a given table."""
+    model = TABLE_MODELS.get(table_name)
+    if model is None:
+        return {"id": "VARCHAR"}
+    cols: dict[str, str] = {
+        fname: _duckdb_type(finfo.annotation)
+        for fname, finfo in model.model_fields.items()
+    }
+    if "id" not in cols and hasattr(model, "id"):
+        cols["id"] = "VARCHAR"
+    return cols
+
 
 def init_views(con: duckdb.DuckDBPyConnection, paths: StorePaths) -> None:
     """Create or replace DuckDB views on catalog tables and runs ledger."""
@@ -29,33 +106,52 @@ def init_views(con: duckdb.DuckDBPyConnection, paths: StorePaths) -> None:
         table_dir = paths.table_dir(table_name)
         table_dir.mkdir(parents=True, exist_ok=True)
 
-        # Ensure at least one JSONL file exists so read_json pattern resolves
+        # Ensure at least one JSONL file exists so read_json glob pattern resolves
         jsonl_files = list(table_dir.glob("*.jsonl"))
         if not jsonl_files:
-            init_file = table_dir / ".init.jsonl"
+            init_file = table_dir / "part-00000000000000000000000000.jsonl"
             if not init_file.is_file():
                 init_file.write_text("", encoding="utf-8")
 
         pattern = (table_dir / "*.jsonl").as_posix()
-        con.execute(
-            f"CREATE OR REPLACE VIEW {table_name} AS "
-            f"SELECT * FROM read_json('{pattern}', union_by_name=true)"
-        )
+        cols = get_table_columns(table_name)
+        cols_dict_sql = "{" + ", ".join(f"'{k}': '{v}'" for k, v in cols.items()) + "}"
+
+        if table_name == "episode":
+            con.execute(
+                f"CREATE OR REPLACE VIEW {table_name} AS "
+                f"SELECT COALESCE(id, episode_id) AS id, * EXCLUDE (id) "
+                f"FROM read_json('{pattern}', columns={cols_dict_sql}, union_by_name=true)"
+            )
+        elif table_name == "qa_report":
+            con.execute(
+                f"CREATE OR REPLACE VIEW {table_name} AS "
+                f"SELECT COALESCE(id, report_id) AS id, * EXCLUDE (id) "
+                f"FROM read_json('{pattern}', columns={cols_dict_sql}, union_by_name=true)"
+            )
+        else:
+            con.execute(
+                f"CREATE OR REPLACE VIEW {table_name} AS "
+                f"SELECT * FROM read_json('{pattern}', columns={cols_dict_sql}, union_by_name=true)"
+            )
 
     # 2. Cost ledger from runs/**/ledger*.jsonl
     runs_dir = paths.runs_dir
     runs_dir.mkdir(parents=True, exist_ok=True)
     ledger_files = list(runs_dir.glob("**/ledger*.jsonl"))
     if not ledger_files:
-        init_ledger = runs_dir / ".init" / ".init" / "ledger.jsonl"
+        init_ledger = runs_dir / ".init" / "ledger.jsonl"
         init_ledger.parent.mkdir(parents=True, exist_ok=True)
         if not init_ledger.is_file():
             init_ledger.write_text("", encoding="utf-8")
 
     ledger_pattern = (runs_dir / "**/ledger*.jsonl").as_posix()
+    ledger_cols = get_table_columns("ledger_entry")
+    ledger_cols_dict_sql = "{" + ", ".join(f"'{k}': '{v}'" for k, v in ledger_cols.items()) + "}"
     con.execute(
         "CREATE OR REPLACE VIEW ledger_entry AS "
-        f"SELECT * FROM read_json('{ledger_pattern}', union_by_name=true)"
+        f"SELECT * FROM read_json('{ledger_pattern}', "
+        f"columns={ledger_cols_dict_sql}, union_by_name=true)"
     )
 
 

@@ -9,6 +9,7 @@
     },
     "task_id": {
       "default": "default",
+      "minLength": 1,
       "title": "Task Id",
       "type": "string"
     },
@@ -34,6 +35,11 @@
     },
     "episode_id": {
       "title": "Episode Id",
+      "type": "string"
+    },
+    "config_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Config Sha256",
       "type": "string"
     },
     "scorer_version": {
@@ -122,7 +128,8 @@
     }
   },
   "required": [
-    "episode_id"
+    "episode_id",
+    "config_sha256"
   ],
   "title": "Score",
   "type": "object"

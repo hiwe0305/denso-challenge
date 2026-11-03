@@ -24,6 +24,24 @@ def test_views_created_on_open_and_queryable(tmp_path: Path) -> None:
     con.close()
 
 
+def test_empty_store_views_have_fixed_columns(tmp_path: Path) -> None:
+    """Feedback item 2: Empty store views have columns so specific queries succeed."""
+    paths = StorePaths(root=tmp_path)
+    con = open_duckdb(paths=paths)
+
+    # All three queries from Hieu's review must succeed without BinderException
+    res_ledger = con.execute("SELECT measure_kind FROM ledger_entry").fetchall()
+    assert res_ledger == []
+
+    res_decision = con.execute("SELECT verdict FROM decision").fetchall()
+    assert res_decision == []
+
+    res_episode = con.execute("SELECT id FROM episode").fetchall()
+    assert res_episode == []
+
+    con.close()
+
+
 def test_views_reflect_data_and_persist_after_duckdb_deletion(tmp_path: Path) -> None:
     """AC 6: Delete fw.duckdb, reopen it, and obtain the exact same query results."""
     paths = StorePaths(root=tmp_path)

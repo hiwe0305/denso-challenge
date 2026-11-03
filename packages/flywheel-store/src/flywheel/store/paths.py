@@ -16,6 +16,16 @@ def get_fw_root() -> Path:
     return Path("./fwdata").resolve()
 
 
+def _validate_path_segment(value: str, name: str) -> str:
+    """Validate that path segment does not contain directory traversal characters."""
+    if not value or ".." in value or "/" in value or "\\" in value:
+        raise ValueError(
+            f"Invalid path segment for {name}: '{value}' cannot be empty "
+            f"or contain '..', '/', or '\\'"
+        )
+    return value
+
+
 class StorePaths:
     """Store layout under $FW_ROOT using pathlib."""
 
@@ -38,6 +48,7 @@ class StorePaths:
 
     def table_dir(self, table_name: str) -> Path:
         """Return catalog table directory: catalog/<bảng>/."""
+        _validate_path_segment(table_name, "table_name")
         return self.catalog_dir / table_name
 
     def new_part_path(self, table_name: str) -> Path:
@@ -46,7 +57,14 @@ class StorePaths:
 
     def job_dir(self, run_plan_id: str, job_id: str) -> Path:
         """Return job run directory: runs/<run_plan_id>/<job_id>/."""
-        return self.runs_dir / run_plan_id / job_id
+        _validate_path_segment(run_plan_id, "run_plan_id")
+        _validate_path_segment(job_id, "job_id")
+        path = self.runs_dir / run_plan_id / job_id
+        if not path.resolve().is_relative_to(self.runs_dir.resolve()):
+            raise ValueError(
+                f"Path escape detected for run_plan_id='{run_plan_id}', job_id='{job_id}'"
+            )
+        return path
 
     def job_ledger_path(self, run_plan_id: str, job_id: str) -> Path:
         """Return job cost ledger path: runs/<run_plan_id>/<job_id>/ledger.jsonl."""

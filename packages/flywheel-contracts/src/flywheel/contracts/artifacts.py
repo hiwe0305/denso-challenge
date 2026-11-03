@@ -9,18 +9,13 @@ class Artifact(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
 
 
-class InjectedDefect(Artifact):
-    code: str = Field(min_length=1)
-    parameters: dict[str, bool | float | int | str] = Field(default_factory=dict)
-
-
 class EpisodeMetadata(Artifact):
     source_detail: (
         Literal["psi_data", "teleop_keyboard", "teleop_pico", "planner_wbc", "planner_amo"] | None
     ) = None
     renderer: Literal["mujoco", "isaac"] | None = None
     synthetic_tier: Literal["S1", "S2", "S3", "S4"] | None = None
-    injected_defect: InjectedDefect | None = None
+    benchmark_copy_id: str | None = Field(default=None, min_length=1)
 
 
 class Episode(Artifact):
