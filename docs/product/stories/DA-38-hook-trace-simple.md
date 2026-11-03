@@ -86,6 +86,7 @@ Ngoài phạm vi, làm PR docs riêng: dòng DA-38 trong 07 mục 2.2 và 2.4; �
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 3/11/2026 | Tạo story cho phần hook của story 3.1a theo issue #31 và 07 mục 2.4 (bản 1.1) | PO (Hiếu) |
+| 3/11/2026 | G1b: `RolloutResult` của episode ghi ở `<job_dir>/<trace_id>/rollout_result.json` | PO (Hiếu) |
 | 3/11/2026 | Review PO: tách nhiệm vụ 3 thành 3.1–3.4; thêm bản tham chiếu camera, ghi chú `env-simple.md` và seam e2e vào phạm vi file (B1, B3) | PO (Hiếu) |
 
 ## Ghi chép khi làm
@@ -171,7 +172,7 @@ Hệ quả:
 |---|---|---|
 | `<job_dir>/<trace_id>/steps.jsonl` | Một `TraceStep` mỗi chu kỳ, có `trace_id` | DA-13 (R3, R4, thiếu tín hiệu) |
 | `<job_dir>/<trace_id>/camera_params.jsonl` | Một `CameraParams` mỗi dòng, mỗi camera policy thấy một dòng, có `trace_id` | DA-13 (R5) |
-| `<job_dir>/<trace_id>/rollout_result.json` | Một `RolloutResult` (`flywheel.contracts.v0`): `sim_success`, `infra_status`, `trace_ref` (`trace_id`, `uri` là thư mục `<trace_id>/`, sha256 của `steps.jsonl`), `camera_params_hash`. Tên tệp là **[Đề xuất]** đang chờ PO, giữ sau một hằng `RESULT_NAME` | DA-13 (R6 đọc `infra_status`), scorer |
+| `<job_dir>/<trace_id>/rollout_result.json` | Một `RolloutResult` (`flywheel.contracts.v0`): `sim_success`, `infra_status`, `trace_ref` (`trace_id`, `uri` là thư mục `<trace_id>/`, sha256 của `steps.jsonl`), `camera_params_hash`. Tên tệp **Đã chốt 3/11/2026 [Hiếu]** (G1b, chuyển qua phiên Orchetration), giữ sau hằng `RESULT_NAME` | DA-13 (R6 đọc `infra_status`), scorer |
 | `<job_dir>/rtc.jsonl` | `RTCInferenceRecord` của client RTC (DA-19), một tệp mỗi job, nối với trace qua `trace_id`. Hook không ghi tệp này | DA-13 (R1, R2) |
 
 - `infra_status` lấy theo `RolloutResult.infra_status`: `ok` khi SIMPLE ghi dòng `episode_<i>: <bool>` cho episode; `simulator_error` khi episode bị cắt trước dòng đó (tiến trình sim chết, env đóng giữa chừng). **[Đề xuất]**

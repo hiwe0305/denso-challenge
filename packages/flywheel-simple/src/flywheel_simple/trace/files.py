@@ -9,7 +9,7 @@ after its `trace_id` (PO decision G1 on PR #48, 3/11/2026):
         steps.jsonl             # one TraceStep per control cycle
         camera_params.jsonl     # one CameraParams per line, one per camera the policy sees
         rollout_result.json     # RolloutResult of the episode: sim_success, infra_status
-                                # (file name proposed, awaiting the PO: RESULT_NAME)
+                                # (PO decision G1b, 3/11/2026: RESULT_NAME)
 
 Field names are those of `flywheel.contracts.trace` (Contract change #31, PR #48 at
 5b373e2) and `flywheel.contracts.v0.RolloutResult`. The writer runs inside SIMPLE's
@@ -34,7 +34,7 @@ from flywheel_simple.trace.signals import encode, encode_all
 
 STEPS_NAME = "steps.jsonl"
 CAMERA_NAME = "camera_params.jsonl"
-RESULT_NAME = "rollout_result.json"  # [Đề xuất], not yet confirmed by the PO
+RESULT_NAME = "rollout_result.json"  # Đã chốt 3/11/2026 [Hiếu], G1b
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
