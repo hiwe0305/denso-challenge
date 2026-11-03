@@ -20,6 +20,7 @@ G1 bê khay 6 linh kiện bằng hai tay từ bàn A sang vùng đích trên bà
 | `scripts/g0/tray/import_simready.py` | Tải và đổi mesh SimReady cho lớp hiển thị |
 | `scripts/g0/tray/view_scene.py` | Ghi video camera đầu và video toàn cảnh |
 | `scripts/g0/tray/measure_arm_pose.py` | Đo tư thế tay khi cầm khay (khuỷu so với vai và đường vai–cổ tay) và tỉ lệ thành công theo biến thể cấu hình, song song nhiều process (DA-33, D-25) |
+| `scripts/g0/tray/wrist_jump.py`, `wrist_jump_sim.py`, `wrist_jump_fix_trial.py`, `video_writer_race.py` | Phân tích cờ `action_jump.arm` của release S1: bước nhảy khớp tay theo pha planner, sai số IK, độ bám của WBC; thử bản sửa giới hạn vận tốc của IK; test tranh chấp luồng của `VideoWriter` ([wrist-jump.md](wrist-jump.md)) |
 | `scripts/g0/tray/measure_locomotion.py` | Đo tốc độ đi và quay của G1 (DA-33, [locomotion.md](locomotion.md)) |
 
 ## Lệnh
