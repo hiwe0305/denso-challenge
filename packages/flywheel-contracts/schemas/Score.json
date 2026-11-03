@@ -8,7 +8,6 @@
       "type": "string"
     },
     "task_id": {
-      "default": "default",
       "minLength": 1,
       "title": "Task Id",
       "type": "string"
@@ -128,6 +127,7 @@
     }
   },
   "required": [
+    "task_id",
     "episode_id",
     "config_sha256"
   ],

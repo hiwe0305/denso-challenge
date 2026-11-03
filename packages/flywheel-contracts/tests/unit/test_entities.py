@@ -94,6 +94,7 @@ def test_all_12_entities_can_be_instantiated_with_defaults() -> None:
     # 8. Score (content)
     sc = Score(
         episode_id=ep.id,
+        task_id="two-table",
         config_sha256="d" * 64,
         first_failed_step=2,
         failure_kind="L-GRASP",
@@ -316,3 +317,18 @@ def test_episode_accepts_custom_episode_id() -> None:
     )
     assert ep.id == "ep_1"
     assert ep.episode_id == "ep_1"
+
+
+def test_score_requires_task_id() -> None:
+    """PO review 3/11 item 1: a Score without task_id must not fall back to "default"."""
+    with pytest.raises(ValidationError, match="task_id"):
+        Score(  # type: ignore[call-arg]
+            episode_id="ep_1",
+            config_sha256="d" * 64,
+        )
+    with pytest.raises(ValidationError, match="task_id"):
+        Score(
+            episode_id="ep_1",
+            task_id="",
+            config_sha256="d" * 64,
+        )
