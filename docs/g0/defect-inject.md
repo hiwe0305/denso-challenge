@@ -39,6 +39,13 @@ Chỉ ghi lỗi đã cấy thật (DA-31 tính recall theo loại từ manifest)
 
 `flywheel.data.inject.lerobot_copy.inject_copy(src_root, out_root, cfg, layout)` đọc gói bằng bộ đọc của DA-03 (`iter_episodes`), chọn và cấy lỗi như trên, rồi ghi bản sao bằng `write_episode`; làn không có mã parquet riêng. Bản gốc không bị ghi. Mọi episode của bản sao được ghi lại theo thứ tự tăng dần, không chỉ episode có lỗi, vì bộ ghi đánh số lại `index` và ghi `meta/flywheel_lineage.jsonl`; ghi lại một phần sẽ làm lộ episode có lỗi. `duplicate_episode` nhận parquet và video của episode nguồn. Seed rò ghi vào `environment_config.flywheel.seed` của dòng `meta/episodes.jsonl`. Bản sao có `meta/benchmark_copy.json` (`benchmark_copy_id`); đáp án chỉ ở manifest trả về. Id episode trong manifest là tên file parquet (`episode_000012`).
 
+Hai bản sao không được lộ đáp án qua thứ gì ngoài chính lỗi (sửa 4/11/2026):
+
+- **Stats tính lại từ dữ liệu của bản sao.** `flywheel.data.inject.stats.write_stats` ghi `episodes_stats.jsonl`, `stats.json`, `stats_psi0.json`, `relative_stats.json` cho mọi episode của cả hai bản, theo đúng `stats_block` của `scripts/postprocess_psi0_sonic.py` (SIMPLE `6d10628`). Nếu chép stats của bản gốc, ai tính lại stats cũng liệt kê được đúng các episode đã đổi mà không cần phát hiện lỗi. `stats.json` của psi-data `e78fb93` không suy ra được từ parquet của chính nó ở cột `states` (lệch mean tới 3,6e-4), nên stats của bản gốc không dùng làm chuẩn.
+- **Lineage của bộ ghi ở phía bộ chấm.** Mỗi dòng `meta/flywheel_lineage.jsonl` ghi `old_first` (index của bản gốc); từ đó suy ra độ dài episode gốc và lộ episode bị cắt, còn số dòng thì lộ bản nào sạch (95 so với 98 trên psi-data). Bản ghi vẫn giữ nguyên, append-only, nhưng chuyển sang `answers/<id>/flywheel_lineage.jsonl`. Hai bản sao có cùng tập file.
+- **Một mtime cho mọi file** của cả hai bản, nên thời điểm ghi không chỉ episode nào.
+- Ngoài `meta/benchmark_copy.json` (dấu bản sao, có ở cả hai), không file nào chứa chữ `inject`, `defect`, `duplicate`, `bench` (có test).
+
 ### Dựng hai bản sao và niêm phong
 
 ```bash
@@ -118,6 +125,6 @@ Hỗ trợ sinh log giả định theo đúng schema của `FakeTrainer` và RTC
 
 ## 4. Kiểm thử và Nghiệm thu
 
-* **Unit tests:** 83 test case tự động; chạy thật trên psi-data ở trên tại `packages/flywheel-data/tests/unit/inject/`.
+* **Unit tests:** 89 test case tự động; chạy thật trên psi-data ở trên tại `packages/flywheel-data/tests/unit/inject/`.
 * **Độ bao phủ:** 100% các loại lỗi cấy đều có test kiểm chứng.
 * **Độc lập kiến trúc:** Không import vòng, tuân thủ nghiêm ngặt 3 hợp đồng kiến trúc của repo.

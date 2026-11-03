@@ -80,6 +80,11 @@ def make_dataset(root: Path, count: int = 40, length: int = 20) -> None:
             ),
         )
         fake_mp4(video_path(root, index), length, index)
+    # Every psi-data row carries the recorder's environment_config (no flywheel block).
+    meta = root / "meta" / "episodes.jsonl"
+    rows = [json.loads(line) for line in meta.read_text().splitlines()]
+    config = json.dumps({"uid": "g1_wholebody_locomotion_pick_between_tables_teleop"})
+    meta.write_text("".join(json.dumps({**r, "environment_config": config}) + "\n" for r in rows))
 
 
 def tree_hashes(root: Path) -> dict[str, str]:
