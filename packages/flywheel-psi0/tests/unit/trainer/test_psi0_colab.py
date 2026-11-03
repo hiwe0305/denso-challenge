@@ -7,6 +7,7 @@ import sys
 import time
 from pathlib import Path
 
+import pytest
 from flywheel.contracts.artifacts import ActionLayout
 from flywheel_psi0.trainer.colab import (
     continuity,
@@ -120,7 +121,7 @@ source = {{ git = "https://github.com/songlin/lerobot.git?rev=09929d8" }}
 
 
 def test_repair_lock_folds_the_mirror_and_drops_the_merge_duplicates() -> None:
-    import tomllib  # the test runs on 3.11+, like the VM
+    tomllib = pytest.importorskip("tomllib")  # 3.11+, like the VM; CI also runs 3.10
 
     fixed = repair_lock(BROKEN_LOCK)
     packages = tomllib.loads(fixed)["package"]  # the original does not even parse
