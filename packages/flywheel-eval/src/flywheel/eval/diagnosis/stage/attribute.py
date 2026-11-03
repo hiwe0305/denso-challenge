@@ -176,17 +176,9 @@ def _p3_high(inputs: StageInputs, cfg: StageThresholds) -> Verdict:
         # at, and looking at every group would blame whichever one happens to
         # be worst.
         return NO_GROUPS
-    high = []
-    for group in inputs.action_groups:
-        error = inputs.p3.error_by_group.get(group)
-        if error is None:
-            continue
-        limit = cfg.p3_high_error_by_group.get(group, cfg.p3_high_error)
-        if error > limit:
-            high.append(
-                Evidence(probe="P3", where=f"nhóm action `{group}`", value=error, threshold=limit)
-            )
-    return high or None
+    if not _related_errors(inputs, inputs.p3):
+        return _no_related_group(inputs)
+    return _high_groups(inputs, inputs.p3, cfg) or None
 
 
 def _p3_low(inputs: StageInputs, cfg: StageThresholds) -> Verdict:
@@ -199,16 +191,22 @@ def _p3_low(inputs: StageInputs, cfg: StageThresholds) -> Verdict:
         return NO_P3
     if not inputs.closed_loop_failed:
         return None
-    errors = [
-        inputs.p3.error_by_group[group]
-        for group in inputs.action_groups
-        if group in inputs.p3.error_by_group
-    ]
-    if not errors:
+    if not inputs.action_groups:
         return NO_GROUPS
-    worst = max(errors)
+    errors = _related_errors(inputs, inputs.p3)
+    if not errors:
+        return _no_related_group(inputs)
+    worst = max(errors.values())
     if worst >= cfg.p3_low_error:
-        return None
+        if _high_groups(inputs, inputs.p3, cfg):
+            return None  # P3 is high, so row 2 applies and this one does not
+        # Neither low enough for this row nor high enough for row 2: said, so
+        # the record does not come back empty as though every row was judged.
+        return (
+            f"P3 của nhóm liên quan nằm giữa hai ngưỡng: lớn nhất {worst:g}, không dưới "
+            f"p3_low_error {cfg.p3_low_error:g} và không nhóm nào trên ngưỡng cao của nó; "
+            f"không dòng P3 nào áp dụng"
+        )
     return [
         Evidence(
             probe="P3",
@@ -244,6 +242,30 @@ def _forgetting(inputs: StageInputs) -> Verdict:
             threshold=None,
         )
     ]
+
+
+def _related_errors(inputs: StageInputs, p3: ProbeP3) -> dict[str, float]:
+    """The P3 error of every group behind the failed step that P3 measured."""
+    measured = p3.error_by_group
+    return {group: measured[group] for group in inputs.action_groups if group in measured}
+
+
+def _high_groups(inputs: StageInputs, p3: ProbeP3, cfg: StageThresholds) -> list[Evidence]:
+    """The related groups whose P3 error is over their threshold (row 2)."""
+    high = []
+    for group, error in _related_errors(inputs, p3).items():
+        limit = cfg.p3_high_error_by_group.get(group, cfg.p3_high_error)
+        if error > limit:
+            high.append(
+                Evidence(probe="P3", where=f"nhóm action `{group}`", value=error, threshold=limit)
+            )
+    return high
+
+
+def _no_related_group(inputs: StageInputs) -> str:
+    # Rows 2 and 3 lack the same data here, so they give the same answer.
+    groups = ", ".join(f"`{group}`" for group in inputs.action_groups)
+    return f"P3 không đo nhóm action nào của bước hỏng ({groups})"
 
 
 def _wrong_answers(inputs: StageInputs, cfg: StageThresholds) -> list[Evidence]:

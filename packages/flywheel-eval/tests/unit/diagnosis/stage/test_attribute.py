@@ -214,6 +214,34 @@ def test_a_missing_group_mapping_is_unjudged_not_a_clean_answer(table, p1_from, 
     )
 
 
+def test_no_related_group_in_p3_is_unjudged_on_both_p3_rows(table, p1_from, p3_from) -> None:
+    # The groups behind the failed step are known but P3 measured none of
+    # them: rows 2 and 3 lack the same data and must give the same answer.
+    inputs = StageInputs(p1=p1_from(), p3=p3_from({"leg": 0.9}), action_groups=("arm",))
+
+    attribution = attribute_stage(inputs, table)
+
+    assert _rows(attribution) == []
+    reasons = {item.row_id: item.reason for item in attribution.unavailable}
+    assert reasons["stage3_action_group"] == reasons["runtime_distribution_shift"]
+    assert "arm" in reasons["stage3_action_group"]
+
+
+def test_p3_between_the_two_thresholds_is_said_not_left_empty(table, p1_from, p3_from) -> None:
+    # 0.2 is above `p3_low_error` (0.1) and under `p3_high_error` (0.3): neither
+    # row applies, and the record must say why rather than come back empty.
+    inputs = StageInputs(
+        p1=p1_from(), p3=p3_from({"arm": 0.2}), action_groups=("arm",), closed_loop_failed=True
+    )
+
+    attribution = attribute_stage(inputs, table)
+
+    assert _rows(attribution) == []
+    reasons = {item.row_id: item.reason for item in attribution.unavailable}
+    assert "giữa hai ngưỡng" in reasons["runtime_distribution_shift"]
+    assert "stage3_action_group" not in reasons
+
+
 def test_nothing_this_module_produces_is_confirmed(table, p1_from, p3_from) -> None:
     # AC 4: the hypothesis is a proposal the engineer confirms on the evidence
     # card, so nothing here may mark itself confirmed.
