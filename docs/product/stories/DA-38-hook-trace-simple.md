@@ -155,3 +155,4 @@ Hệ quả:
     - camera `head_stereo_left` 640×360 có fy khớp `CameraCfg` tới 1e-6, quaternion chuẩn hóa;
     - `episode_0` và cờ `sim_success` khớp dòng trong `eval_stats.txt`.
 - Entry point cài hook ở cấp module (cho worker spawn) đi cùng bộ ghi hợp đồng ở nhiệm vụ 3 và lượt chạy thật ở nhiệm vụ 5.
+- 3/11/2026, sau khi PR #67 merge: test `sim` bỏ shim, gọi `flywheel_simple.tray.run.prepare()` (đăng ký env khay và thay bộ đọc điều kiện của SIMPLE). Kết quả chạy lại trên `rtx3060`: 4 passed trong 495 s.

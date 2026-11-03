@@ -66,35 +66,17 @@ def hold_pose_query(
     return np.tile(row, (CHUNK, 1)), None
 
 
-def episode_without_scene_uid(dataset: Any, eps_idx: int, data_format: Any = None) -> Any:
-    """SIMPLE's get_episode_lerobot without its FIXME line on `dr_state_dict.scene.uid`.
-
-    Tray datasets (DA-33, DA-35) have no `dr_state_dict`: the tray env rebuilds the
-    episode from the seed and level in `environment_config`. Test-only shim; how the
-    real tray eval reads its conditions is DA-34's call.
-    """
-    import json
-
-    start = int(dataset.episode_data_index["from"][eps_idx].item())
-    stop = int(dataset.episode_data_index["to"][eps_idx].item())
-    env_conf = json.loads(dataset.meta.episodes[eps_idx]["environment_config"])
-    return env_conf, [dataset[i] for i in range(start, stop)]
-
-
 def run_traced_eval(env_id: str, data_dir: str, eval_dir: Path) -> EpisodeTrace:
-    import simple.datasets.lerobot as lerobot_episodes
-    from flywheel_simple.tray.simple_task import register
+    from flywheel_simple.tray.run import prepare
     from simple.baselines import client, psi0_decoupled_wbc
     from simple.cli import eval_decoupled_wbc
     from simple.evals.api import EvalConfig
 
-    register()
+    prepare()  # tray env id and SIMPLE's condition reader for tray datasets (PR #67)
     sink = ListSink()
     install(eval_decoupled_wbc, psi0_decoupled_wbc, TraceRecorder(sink, run_plan_id="sim-test"))
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(client.HttpActionClient, "query_action", hold_pose_query)
-        if env_id == TRAY:
-            mp.setattr(lerobot_episodes, "get_episode_lerobot", episode_without_scene_uid)
         eval_decoupled_wbc.run_eval(
             EvalConfig(
                 env_id=env_id,
