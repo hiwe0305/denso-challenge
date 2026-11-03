@@ -38,7 +38,7 @@ PR 1 (hạn 5/11/2026):
   - [ ] 1.3 Cột `index`: đánh số lại theo LeRobot v2.1 một cách tường minh, ghi dòng lineage, báo ở ingest, có test (review #69 mục 1; đề xuất Q7 chờ PO)
 - [x] 2. `register_source`, `to_episode` cho ba nguồn (AC 2)
   - [x] 2.1 Lineage: `parent_id`, `root_id`, seed và level của episode sinh ra lấy từ `environment_config.flywheel`; nhãn ghi theo từng episode phải khớp nguồn (review #69 mục 3, 8)
-  - [ ] 2.2 Kiểm `split`: từ chối `holdout` (chỉ nằm trong `vault/`, chỉ `gate` đọc) và tên lạ; đối chiếu split đã ghi trong episode (review #69 mục 4)
+  - [x] 2.2 Kiểm `split`: từ chối `holdout` (chỉ nằm trong `vault/`, chỉ `gate` đọc) và tên lạ; đối chiếu split đã ghi trong episode (review #69 mục 4)
 
 PR 2 (hạn 9/11/2026):
 

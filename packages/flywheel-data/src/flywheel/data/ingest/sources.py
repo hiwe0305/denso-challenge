@@ -59,6 +59,10 @@ CHUNK = 1 << 20
 LABELS = ("source_kind", "source_detail", "synthetic_tier", "action_quality",
           "embodiment_id", "renderer", "data_class")
 GENERATOR_KEYS = ("generator_version", "planner_version", "wrapper_version")
+# Splits an ingested episode may carry: configs/splits/default.yaml without holdout,
+# which is sealed in vault/ and read only by gate (spec 7.3; a test keeps them equal).
+SPLITS = ("train", "dev")
+HOLDOUT = "holdout"
 
 
 @dataclass(frozen=True)
@@ -153,6 +157,7 @@ def to_episode(frames: EpisodeFrames, source: SourceRecord, split: str) -> Episo
         raise ValueError(f"episode {index} is not in source {source.source_id}")
     lineage = source.lineage[index]
     renderer = _check_labels(index, lineage, profile, source)
+    _check_split(index, lineage, split)
     key = hashlib.sha256(f"{source.source_id}:{index}".encode()).hexdigest()[:16]
     if not profile.human:
         needed = {"seed": lineage.seed, "generator version": lineage.generator_version}
@@ -248,6 +253,18 @@ def _check_labels(
     if renderer is not None and renderer not in get_args(Renderer):
         raise ValueError(f"episode {index}: renderer {renderer!r} is not mujoco or isaac")
     return cast("Renderer | None", renderer)
+
+
+def _check_split(index: int, lineage: EpisodeLineage, split: str) -> None:
+    if split == HOLDOUT:
+        raise ValueError(
+            "split 'holdout' is never ingested: holdout lives only in vault/ and only gate"
+            " reads it (fw holdout run)"
+        )
+    if split not in SPLITS:
+        raise ValueError(f"split {split!r} is not one of {', '.join(SPLITS)}")
+    if lineage.split is not None and lineage.split != split:
+        raise ValueError(f"episode {index} was recorded in split {lineage.split!r}, not {split!r}")
 
 
 def _condition_id(lineage: EpisodeLineage, key: str) -> str:
