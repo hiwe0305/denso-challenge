@@ -142,13 +142,20 @@ def test_both_copies_hold_the_same_files_and_no_lineage(
 def test_no_file_but_the_marker_names_the_benchmark(
     copies: tuple[Path, dict[str, Path]],
 ) -> None:
-    _, roots = copies
+    # A word counts only where a copy holds it more often than the source file:
+    # psi-data's own environment_config says "allow_duplicates" in every row.
+    out, roots = copies
+    source = out.parent / "psi"
+
+    def count(path: Path, word: bytes) -> int:
+        return path.read_bytes().lower().count(word) if path.is_file() else 0
+
     for root in roots.values():
         for name in _files(root):
             if name == MARKER:
                 continue
-            data = (root / name).read_bytes().lower()
-            assert not [w for w in WORDS if w in data], (root.name, name)
+            added = [w for w in WORDS if count(root / name, w) > count(source / name, w)]
+            assert not added, (root.name, name)
 
 
 def test_every_file_of_both_copies_has_one_mtime(copies: tuple[Path, dict[str, Path]]) -> None:
