@@ -27,10 +27,10 @@ Là người vận hành vòng, tôi muốn runner chạy closed-loop eval ở c
 
 ## Nhiệm vụ
 
-- [ ] 1. Hai chế độ trong runner (AC 1)
-- [ ] 2. Gom log RTC (AC 2)
-- [ ] 3. Demo với bộ giả có độ trễ (AC 3)
-- [ ] 4. Khai chế độ trong RunPlan (AC 4)
+- [x] 1. Hai chế độ trong runner (AC 1)
+- [x] 2. Gom log RTC (AC 2)
+- [x] 3. Demo với bộ giả có độ trễ (AC 3)
+- [x] 4. Khai chế độ trong RunPlan (AC 4)
 - [ ] 5. Chạy với `SimpleSim` và Ψ₀ thật (AC 5)
 
 ## Phạm vi file
@@ -67,10 +67,19 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 27/10/2026 | Đổi sang SIMPLE: `timing` thuộc story 3.1a; G0 và HE ở `sync`; thêm AC 5 và nhiệm vụ con 5 chạy với Ψ₀ thật | PO (Hiếu) theo design 27/10/2026 |
 | 28/10/2026 | Sửa hạn PR `chore-restructure` theo 07 mục 3.6 bản 0.6: mở 28/10, merge 29/10 | PO (Hiếu) |
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
+| 03/11/2026 | Triển khai runner hai chế độ sync/async, gom log RTC, demo bộ giả có độ trễ, cấu hình eval.yaml và tài liệu async-eval.md | Nguyễn Thăng Long |
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
-- Ghi chú hoàn thành:
+- Giờ thực: 4.0h
+- Công cụ AI đã dùng: Antigravity
+- Ghi chú hoàn thành: Đã hoàn thiện AC 1-4 với kiểm thử đơn vị và hợp đồng; AC 5 đợi adapter SimpleSim và checkpoint Ψ₀ hoàn chỉnh.
 - File đã tạo hoặc sửa:
+  - packages/flywheel-loop/src/flywheel/loop/runner/latency.py
+  - packages/flywheel-loop/src/flywheel/loop/runner/runner.py
+  - packages/flywheel-loop/src/flywheel/loop/runner/__init__.py
+  - packages/flywheel-loop/tests/unit/runner/test_runner.py
+  - packages/flywheel-loop/tests/contract/runner/test_runner_contract.py
+  - configs/loop/eval.yaml
+  - docs/g0/async-eval.md
+  - docs/product/stories/DA-23-eval-bat-dong-bo.md

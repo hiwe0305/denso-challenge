@@ -1,0 +1,28 @@
+# Evaluation configuration for closed-loop rollouts (ADR-20, DA-23)
+# Default evaluation timing mode
+default_timing: async
+
+# Timing mode mapping per RunPlan purpose:
+# - g0_repro and he report under synchronous mode for direct comparison with author baseline
+# - data flywheel branches (HS, HT, round, holdout) report under async mode with realistic latency
+timing_by_purpose:
+  g0_repro: sync
+  he: sync
+  branch_train: async
+  round: async
+  holdout: async
+
+# Control and chunking parameters
+control_hz: 50.0
+chunk_size: 16
+
+# Latency profile specifications
+latency_profiles:
+  psi0_default:
+    name: psi0_default
+    p50_ms: 160.0
+    p95_ms: 190.0
+    p99_ms: 230.0
+  zero:
+    name: zero
+    fixed_delay_s: 0.0
