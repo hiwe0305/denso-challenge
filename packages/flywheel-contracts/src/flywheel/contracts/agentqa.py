@@ -7,11 +7,10 @@ isolation, problem-status consistency, unique identifiers, and override reasons.
 from __future__ import annotations
 
 import re
-from datetime import datetime
 from typing import Literal
 
 from flywheel.contracts.artifacts import Artifact
-from pydantic import Field, model_validator
+from pydantic import AwareDatetime, Field, model_validator
 from typing_extensions import Self
 
 FACT_ID = r"^F[0-9]+$"
@@ -116,7 +115,7 @@ class AgentReport(Artifact):
     report_id: str = Field(min_length=1)
     subject_ref: str = Field(min_length=1)
     stage: Stage
-    created_at: datetime
+    created_at: AwareDatetime
     model: AgentModel
     inputs: list[AgentInput] = Field(min_length=1)
     facts: list[AgentFact] = Field(default_factory=list)
@@ -201,7 +200,7 @@ class AgentReview(Artifact):
 
     report_id: str = Field(min_length=1)
     reviewer: str = Field(min_length=1)
-    decided_at: datetime
+    decided_at: AwareDatetime
     decisions: list[FindingDecision] = Field(default_factory=list)
 
     @model_validator(mode="after")
