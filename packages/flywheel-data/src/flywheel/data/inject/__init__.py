@@ -13,6 +13,7 @@ from flywheel.data.inject.dataset import (
 )
 from flywheel.data.inject.log_defects import RTCLogDefectInjector, TrainLogDefectInjector
 from flywheel.data.inject.manifest import (
+    MANIFEST_FILENAME,
     ManifestLock,
     load_manifest,
     manifest_sha256,
@@ -20,6 +21,7 @@ from flywheel.data.inject.manifest import (
 )
 
 __all__ = [
+    "MANIFEST_FILENAME",
     "DataDefectInjector",
     "DataDefectConfig",
     "EpisodeData",

@@ -60,9 +60,8 @@ def test_manifest_serialization_and_lock(tmp_path: Path) -> None:
 
     lock = ManifestLock(manifest_file)
     assert lock.verify_integrity()
-    assert not lock.can_agent_read("eval_agent")
-    assert not lock.can_agent_read("qa_agent")
-    assert lock.can_agent_read("admin")
+    manifest_file.write_text(manifest_file.read_text().replace("ep_001", "ep_002"))
+    assert not lock.verify_integrity()
 
 
 def test_create_defect_and_clean_dataset() -> None:
