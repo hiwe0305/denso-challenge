@@ -28,12 +28,12 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
 
 ## Nhiệm vụ
 
-- [ ] 1. RunPlan ba nhánh, chọn tập demo có hash (AC 1)
+- [x] 1. RunPlan ba nhánh, chọn tập demo có hash (AC 1)
   - [x] 1.1 Code chọn tập demo lồng nhau tất định từ release DA-33, có hash (`flywheel_psi0.tray.demo_sets`); test CPU: cùng đầu vào ra cùng hash, tập 40 ⊂ tập 80, không phụ thuộc thứ tự, kiểm manifest của release
   - [x] 1.2 Chạy chọn tập trên release `tray_s1_0d84cc87b1e5`, ghi `configs/runplans/tray/demo_sets.json`; chạy lại với `--check` khớp
   - [x] 1.3 RunPlan `he-tray.yaml` cho A, C, C-NOEGO (cùng recipe, số bước, seed train, hạt giống điều kiện eval; checkpoint gốc và ablation có revision và sha256); khung `round-tray-cplus.yaml` cho C+ (AC 6, chưa đóng băng); code kiểm bất biến và tính `run_plan_id`, có test
   - [x] 1.4 Chốt quy tắc diễn giải trước khi chạy ở `docs/he/tray.md` (design mục 6.4, 6.6), rồi đóng băng RunPlan (`he-tray.lock.json`)
-  - [ ] 1.5 Sổ chi phí ước lượng `docs/g0/ledger/DA-34.csv` (dòng `estimated`: fine-tune A, C, C-NOEGO, C+ và eval)
+  - [x] 1.5 Sổ chi phí ước lượng `docs/g0/ledger/DA-34.csv` (dòng `estimated`: fine-tune A, C, C-NOEGO, C+ và eval)
 - [ ] 2. Fine-tune A, C, C-NOEGO (AC 2)
 - [ ] 3. Eval và bảng kết quả, video (AC 3, 4)
 - [ ] 4. Nhánh B khi có video (AC 5)
@@ -67,3 +67,5 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 3/11/2026 | DA-33 có release: viết nhiệm vụ con 1.1–1.5, trạng thái sang Đang làm | Claude cho Hiếu |
 
 ## Ghi chép khi làm
+
+- 3/11/2026 (nhiệm vụ 1): RunPlan `rp_59164e3970c4` đóng băng ([`he-tray.yaml`](../../../configs/runplans/tray/he-tray.yaml)); tập `A` = `94245f8d36ab…`, `C` = `5db98a38ed80…` ([`demo_sets.json`](../../../configs/runplans/tray/demo_sets.json)); quy tắc diễn giải ở [docs/he/tray.md](../../he/tray.md). Sổ ước lượng 4 lần fine-tune × 26 CU = 104 CU trong khoảng 162 CU còn lại. Rủi ro: con số giữ chỗ 1,0 s/bước của `psi0-stage3.yaml` cho 11,1 giờ và khoảng 75 CU mỗi lần, tức khoảng 300 CU cho 4 lần; cần số đo của S1-04 trước khi chạy nhiệm vụ 2. Tập con 40 và 80 chưa thành dataset LeRobot: Ψ₀ `LerobotDataConfig` không có bộ lọc episode, nên nhiệm vụ 2 phải dựng hai dataset con kèm `stats_psi0.json` riêng.
