@@ -29,7 +29,7 @@ Là kỹ sư dữ liệu, tôi muốn mọi episode có action robot (psi-data, 
 
 - [x] 1. Động học và danh sách khung lỗi (AC 1)
 - [x] 2. Động lực học và sai lệch theo nhóm (AC 2)
-- [ ] 3. Ngưỡng hiệu chỉnh và cấu hình (AC 3)
+- [x] 3. Ngưỡng hiệu chỉnh và cấu hình (AC 3)
 - [ ] 4. `ReplayReport` và nối vào QA (AC 4)
 - [ ] 5. Phát lại action dự đoán, video (AC 5; sau 13/11/2026)
 

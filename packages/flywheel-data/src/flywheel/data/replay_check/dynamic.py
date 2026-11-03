@@ -28,10 +28,12 @@ import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from flywheel.contracts.artifacts import ReplayIssue, ReplayReport
-from flywheel.data.replay_check.thresholds import ReplayThresholds
+
+if TYPE_CHECKING:
+    from flywheel.data.replay_check.thresholds import ReplayThresholds
 
 REQUIRED = ("episode_index", "success", "state_error_by_group", "hand_event_offset_steps")
 OPTIONAL = ("state_error_peak_frame_by_group", "replayed_frames", "recorded_frames")

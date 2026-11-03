@@ -12,8 +12,9 @@ lane (03 section 7.3; no MuJoCo):
                       action that moves `unit_ratio` times more than its state
     joint_mapping     a joint's action that does not follow its state: correlation
                       under `mapping_correlation` (a sign flip turns it negative)
-    joint_jump        a recorded joint state that moves more in one frame than
-                      `joint_jump` of its group
+
+A joint that jumps between two frames (D3) is not a replay issue: design 6.3 lists
+none for the kinematic mode, and QA's `action_jump` flags it.
 
 The joints are the layout dimensions with limits that the 32-D `states` also
 holds at the same index: G1's 0-30 (hands, arms, waist; DA-01, and the tray
@@ -28,12 +29,15 @@ robot's geometry, so it is left to the adapter and not checked here.
 from __future__ import annotations
 
 import math
+from typing import TYPE_CHECKING
 
 import numpy as np
 from flywheel.contracts.artifacts import ActionLayout, ReplayIssue, ReplayReport
 from flywheel.data.ingest.lerobot import EpisodeFrames
-from flywheel.data.replay_check.thresholds import ReplayThresholds
 from numpy.typing import NDArray
+
+if TYPE_CHECKING:
+    from flywheel.data.replay_check.thresholds import ReplayThresholds
 
 DEG_PER_RAD = 180.0 / math.pi
 FULL_TURN = 2.0 * math.pi
@@ -66,7 +70,6 @@ def check_kinematic(
             issues += _limits(frames, layout, dims, array, th)
         issues += _units(frames, layout, dims, th)
         issues += _mapping(frames, layout, dims, th)
-        issues += _jumps(frames, layout, dims, th)
     return ReplayReport(episode_id=episode_id, mode="kinematic", issues=issues)
 
 
@@ -96,11 +99,6 @@ def past_limits(
 ) -> NDArray[np.float64]:
     """(T, len(dims)) rad past the layout limits, 0 inside them."""
     return _past(values[:, dims].astype(np.float64), layout, dims)
-
-
-def state_jumps(frames: EpisodeFrames, dims: list[int]) -> NDArray[np.float64]:
-    """(T-1, len(dims)) |s[t+1] - s[t]| of the joint states."""
-    return np.abs(np.diff(frames.states[:, dims].astype(np.float64), axis=0))
 
 
 def _timestamp(frames: EpisodeFrames, fps: float, th: ReplayThresholds) -> list[ReplayIssue]:
@@ -172,22 +170,6 @@ def _mapping(
     named = [f"{name} {r:.3g} (min {floor:.3g})" for name, (r, floor) in low.items()]
     detail = "action does not follow its state, correlation: " + ", ".join(named)
     return [ReplayIssue(code="joint_mapping", frames=[], detail=detail)]
-
-
-def _jumps(
-    frames: EpisodeFrames, layout: ActionLayout, dims: list[int], th: ReplayThresholds
-) -> list[ReplayIssue]:
-    steps = state_jumps(frames, dims)
-    groups = [layout.dimensions[i].group for i in dims]
-    limit = np.array([th.joint_jump.get(g, math.inf) for g in groups])
-    bad = steps > limit
-    if not bad.any():
-        return []
-    worst = {groups[j]: float(steps[:, j].max()) for j in np.flatnonzero(bad.any(axis=0))}
-    named = [f"{g} {v:.3g}" for g, v in sorted(worst.items())]
-    rows = np.concatenate([[False], bad.any(axis=1)])  # step t -> t+1 is frame t+1's
-    detail = "recorded joint state jumps in one frame (rad): " + ", ".join(named)
-    return [_issue("joint_jump", frames, rows, detail)]
 
 
 def _issue(

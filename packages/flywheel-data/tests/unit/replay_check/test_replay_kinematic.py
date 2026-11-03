@@ -96,11 +96,11 @@ def test_action_sign_flip_breaks_the_joint_mapping() -> None:
     assert "right_elbow_joint" in report.issues[0].detail and report.issues[0].frames == []
 
 
-def test_state_jump_lists_the_frame_after_the_step() -> None:
+def test_a_joint_jump_is_left_to_qa() -> None:
     frames = clean_frames(0)
     states = frames.states.copy()
     states[120:, ARM] += 0.3
-    assert check(dataclasses.replace(frames, states=states)) == {"joint_jump": [120]}
+    assert check(dataclasses.replace(frames, states=states)) == {}
 
 
 @pytest.mark.parametrize("length", [0, 1])

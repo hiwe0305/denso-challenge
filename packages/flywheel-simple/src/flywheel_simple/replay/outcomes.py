@@ -10,7 +10,8 @@ are split into `workers` contiguous shards, one process each (`replay.run`, one
 live env per process, as `tray/replay_qa.py` runs). Every shard replays a
 staged copy of the dataset - `meta/` copied, its own parquet files symlinked -
 so SIMPLE's `meta/replay.txt` never lands in the source and each process loads
-only its own episodes.
+only its own episodes. The replay runs on sim time unless `clock="wall"`
+(`run.py` says why).
 
 Writes into `work`: `replay_outcomes.jsonl` (one line per episode, ascending,
 see `compare.outcome`), `replay_run.json` (counts, wall seconds per shard,
@@ -86,12 +87,14 @@ def stage(root: Path, shard: Shard, into: Path) -> Path:
     return into
 
 
-def shard_command(python: str, data: Path, env_id: str, shard: Shard, out: Path) -> list[str]:
+def shard_command(
+    python: str, data: Path, env_id: str, shard: Shard, out: Path, clock: str
+) -> list[str]:
     return [
         python, "-m", "flywheel_simple.replay.run",
         "--data-dir", str(data), "--env-id", env_id, "--outcomes", str(out / OUTCOMES),
         "--episode-start", str(shard.episodes[0]), "--num-episodes", str(len(shard.episodes)),
-        "--save-dir", str(out / "unused"),
+        "--save-dir", str(out / "unused"), "--clock", clock,
     ]  # fmt: skip
 
 
@@ -101,6 +104,7 @@ def replay_lerobot(
     workers: int,
     *,
     env_id: str | None = None,
+    clock: str = "sim",
     python: str = sys.executable,
     stagger_s: float = STARTUP_STAGGER_S,
 ) -> Path:
@@ -116,7 +120,7 @@ def replay_lerobot(
         if k:
             time.sleep(stagger_s)
         with (out / "replay.log").open("w") as log:
-            cmd = shard_command(python, data, env, shard, out)
+            cmd = shard_command(python, data, env, shard, out, clock)
             proc = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=dict(os.environ))
         running.append((shard, proc, time.monotonic()))
     walls: dict[str, float] = {}
@@ -126,11 +130,16 @@ def replay_lerobot(
         walls[shard.name] = round(time.monotonic() - started, 1)
         if code:
             failed[shard.name] = code
-    return _merge(work, plan, env, walls, failed)
+    return _merge(work, plan, env, clock, walls, failed)
 
 
 def _merge(
-    work: Path, plan: list[Shard], env: str, walls: dict[str, float], failed: dict[str, int]
+    work: Path,
+    plan: list[Shard],
+    env: str,
+    clock: str,
+    walls: dict[str, float],
+    failed: dict[str, int],
 ) -> Path:
     lines: dict[int, str] = {}
     for shard in plan:
@@ -145,6 +154,7 @@ def _merge(
     successes = sum(bool(json.loads(lines[i])["success"]) for i in lines)
     summary = {
         "env_id": env,
+        "clock": clock,
         "episodes": len(expected),
         "replayed": len(lines),
         "succeeded": successes,
@@ -168,8 +178,10 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--work", type=Path, required=True)
     ap.add_argument("--workers", type=int, default=1)
     ap.add_argument("--env-id")
+    ap.add_argument("--clock", choices=("sim", "wall"), default="sim")
     args = ap.parse_args(argv)
-    path = replay_lerobot(args.root, args.work, args.workers, env_id=args.env_id)
+    path = replay_lerobot(args.root, args.work, args.workers, env_id=args.env_id,
+                          clock=args.clock)
     print(json.loads((args.work / SUMMARY).read_text()))
     print(path)
     return 0
