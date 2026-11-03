@@ -139,7 +139,9 @@ def test_episode_carries_source_license_class_and_split(dataset: Dataset) -> Non
     assert episode.data_class == "public"
     assert episode.split == "dev"
     assert episode.deid_status == "raw"
-    assert episode.meta.injected_defect is None
+    # Neither injected_defect (master) nor benchmark_copy_id (#36) is set; simplify after #36.
+    meta = episode.meta.model_dump()
+    assert all(meta.get(k) is None for k in ("injected_defect", "benchmark_copy_id"))
 
 
 def test_episode_ids_are_stable_and_distinct(dataset: Dataset) -> None:
