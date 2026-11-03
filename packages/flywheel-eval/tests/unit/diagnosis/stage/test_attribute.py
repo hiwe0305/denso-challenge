@@ -156,6 +156,22 @@ def test_p4_without_the_t7_finding_is_not_forgetting(table, p1_from, p3_from, p4
     assert "stage3_forgetting" not in _rows(attribute_stage(inputs, table))
 
 
+def test_a_caller_that_has_not_run_t7_gets_unavailable_not_inapplicable(
+    table, p1_from, p3_from, p4_from
+) -> None:
+    # Without DA-08's T7 verdict nobody knows whether the checkpoint forgot;
+    # reading the absence as "did not forget" is the silent pass FR21 forbids.
+    inputs = StageInputs(
+        p1=p1_from(), p3=p3_from({"arm": 0.05}), p4=p4_from(), action_groups=("arm",)
+    )
+
+    attribution = attribute_stage(inputs, table)
+
+    assert "stage3_forgetting" not in _rows(attribution)
+    reasons = {item.row_id: item.reason for item in attribution.unavailable}
+    assert "T7" in reasons["stage3_forgetting"]
+
+
 def test_out_of_domain_is_not_blamed_on_any_stage(table, p1_from, p3_from) -> None:
     # The row exists to stop exactly that: a condition outside the train domain
     # is reported, not attributed (spec section 6.8).
