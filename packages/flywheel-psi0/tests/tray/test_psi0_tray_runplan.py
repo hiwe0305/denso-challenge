@@ -16,6 +16,7 @@ from flywheel_psi0.tray.runplan import (
     check_round,
     freeze,
     lock_path,
+    main,
     plan_json,
     recipe_sha256,
     run_plan_id,
@@ -171,6 +172,30 @@ def test_round_refuses_a_plan_edited_after_its_lock(tmp_path: Path) -> None:
     plan_file.write_text(plan_file.read_text().replace("delta_pp: 10}", "delta_pp: 5}"))
     round_plan = TrayRoundPlan.load(repo / "configs/runplans/tray/round-tray-cplus.yaml")
     assert any("changed since it was frozen" in p for p in check_round(round_plan, repo))
+
+
+def test_v1_is_superseded_without_changing_its_id(plan: TrayRunPlan) -> None:
+    assert plan.superseded_by == "configs/runplans/tray/he-tray-v2.yaml"
+    assert run_plan_id(plan) == run_plan_id(plan.model_copy(update={"superseded_by": None}))
+    assert run_plan_id(plan) == json.loads(lock_path(PLAN).read_text())["run_plan_id"]
+
+
+def test_cli_refuses_to_pass_a_superseded_plan(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["check", str(PLAN)]) == 1
+    assert "SUPERSEDED by configs/runplans/tray/he-tray-v2.yaml" in capsys.readouterr().err
+
+
+def test_cli_checks_a_round_plan(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["check", str(ROUND)]) == 0
+    assert "round draft, branch C_PLUS" in capsys.readouterr().out
+
+
+def test_freeze_refuses_a_superseded_plan(tmp_path: Path) -> None:
+    repo = _repo_copy(tmp_path)
+    (repo / "docs/he").mkdir(parents=True)
+    (repo / "docs/he/tray.md").write_text("rules")
+    with pytest.raises(ValueError, match="superseded by"):
+        freeze(repo / "configs/runplans/tray/he-tray.yaml", repo)
 
 
 def test_freeze_refuses_without_the_reading_rules(tmp_path: Path) -> None:
