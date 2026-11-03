@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import types
 import typing
 from collections.abc import Sequence
 from typing import Any
@@ -58,7 +59,8 @@ def _duckdb_type(annotation: Any) -> str:
     """Map python/pydantic field types to DuckDB SQL types."""
     origin = typing.get_origin(annotation)
     args = typing.get_args(annotation)
-    if origin is typing.Union:
+    # `X | None` is a types.UnionType, `Optional[X]` a typing.Union: same column.
+    if origin is typing.Union or origin is types.UnionType:
         non_none = [a for a in args if a is not type(None)]
         if len(non_none) == 1:
             return _duckdb_type(non_none[0])
