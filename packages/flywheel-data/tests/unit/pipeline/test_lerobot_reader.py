@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import struct
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
@@ -15,6 +16,7 @@ from flywheel.data.ingest.lerobot import (
     EpisodeFrames,
     LeRobotFormatError,
     iter_episodes,
+    mp4_frame_count,
     read_info,
     write_episode,
 )
@@ -139,14 +141,72 @@ def test_missing_video_file_reads_as_zero_frames(
     dataset: tuple[Path, list[EpisodeFrames]],
 ) -> None:
     root, _ = dataset
-    (root / "videos" / "chunk-000" / "egocentric" / "episode_000001.mp4").unlink()
-    meta = root / "meta" / "episodes.jsonl"
-    rows = [json.loads(line) for line in meta.read_text().splitlines()]
-    for row in rows:
-        row.pop("video_frames")  # as psi-data ships it: no count, only `length`
-    meta.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    video(root, 1).unlink()
     counts = [e.video_frames for e in iter_episodes(root)]
     assert counts == [{CAMERA: 5}, {CAMERA: 0}, {CAMERA: 3}]
+
+
+def video(root: Path, index: int) -> Path:
+    return root / "videos" / "chunk-000" / "egocentric" / f"episode_{index:06d}.mp4"
+
+
+def test_video_count_comes_from_the_mp4_not_the_meta(
+    dataset: tuple[Path, list[EpisodeFrames]], mp4: Callable[..., None]
+) -> None:
+    # Review #69 point 6: a count copied from `length` could never disagree with the rows.
+    root, _ = dataset
+    mp4(video(root, 0), 9)
+    assert next(iter_episodes(root)).video_frames == {CAMERA: 9}
+
+
+def test_mp4_frame_count_reads_large_boxes_and_stz2(tmp_path: Path) -> None:
+    hdlr = struct.pack(">I4s", 33, b"hdlr") + bytes(8) + b"vide" + bytes(12) + b"\0"
+    stz2 = struct.pack(">I4s", 20, b"stz2") + bytes(4) + struct.pack(">II", 8, 4)
+    stbl = struct.pack(">I4s", 8 + len(stz2), b"stbl") + stz2
+    minf = struct.pack(">I4s", 8 + len(stbl), b"minf") + stbl
+    mdia_payload = hdlr + minf
+    # size 1: the real size follows as a 64-bit largesize
+    mdia = struct.pack(">I4sQ", 1, b"mdia", 16 + len(mdia_payload)) + mdia_payload
+    trak = struct.pack(">I4s", 8 + len(mdia), b"trak") + mdia
+    moov = struct.pack(">I4s", 8 + len(trak), b"moov") + trak
+    path = tmp_path / "large.mp4"
+    path.write_bytes(moov)
+    assert mp4_frame_count(path) == 4
+
+
+@pytest.mark.parametrize(
+    "content, reason",
+    [
+        (b"\x00not a real mp4", "broken mp4 box"),
+        (b"", "no moov box"),
+        (b"\x00\x00\x00\x10moov\x00\x00\x00\x08mvex", "fragmented"),
+        (b"\x00\x00\x00\x08moov", "no video track"),
+        (b"\x00\x00\x00\x40moov", "broken mp4 box"),
+    ],
+)
+def test_an_mp4_the_reader_cannot_walk_is_named(
+    tmp_path: Path, content: bytes, reason: str
+) -> None:
+    path = tmp_path / "bad.mp4"
+    path.write_bytes(content)
+    with pytest.raises(LeRobotFormatError, match=reason) as err:
+        mp4_frame_count(path)
+    assert str(path) in str(err.value)
+
+
+def test_write_episode_keeps_meta_it_does_not_own(
+    dataset: tuple[Path, list[EpisodeFrames]],
+) -> None:
+    # Review #69 point 7: no new keys in episodes.jsonl, tasks.jsonl rows unchanged.
+    root, _ = dataset
+    tasks = root / "meta" / "tasks.jsonl"
+    rows = [json.loads(line) for line in tasks.read_text().splitlines()]
+    rows[0] |= {"category": "", "description": "as the authors wrote it"}
+    tasks.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    write_episode(root, next(iter_episodes(root)))
+    assert [json.loads(line) for line in tasks.read_text().splitlines()] == rows
+    episodes = (root / "meta" / "episodes.jsonl").read_text().splitlines()
+    assert all("video_frames" not in json.loads(line) for line in episodes)
 
 
 def _rewrite(path: Path, edit: Callable[[pa.Table], pa.Table]) -> None:

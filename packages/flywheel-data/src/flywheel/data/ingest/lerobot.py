@@ -22,21 +22,22 @@ than a format one - a meta `length` that disagrees with the rows, a timestamp
 that goes backwards, an empty episode - reads without error and is left to QA
 (task 3).
 
-Video frame counts come from the meta, never from decoding (DA-02 point 4
-decodes in the adapter). psi-data's meta holds no per-video count, so the
-count of a camera is the episode's `length` when its video file exists and 0
-when it does not. `write_episode` records the count it is given under
-`video_frames` in the episode's meta row, which the reader prefers; that is how
-a frame drop injected by DA-27 keeps the video longer than the rows.
+Video frame counts come from the mp4 container, never from decoding (DA-02
+point 4 decodes in the adapter): the sample count of the video track's `stsz`
+box, which is the number of frames the encoder wrote. psi-data's meta holds no
+per-video count. A camera whose file is missing counts 0; a file that is not an
+mp4 the reader can walk raises. `write_episode` never touches videos, so a frame
+drop injected by DA-27 leaves the video longer than the rows, as it should.
 """
 
 from __future__ import annotations
 
 import json
+import struct
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import IO, Any
 
 import numpy as np
 import pyarrow as pa  # type: ignore[import-untyped]
@@ -65,7 +66,7 @@ class EpisodeFrames:
     frame_index: NDArray[np.int64]  # (T,)
     states: NDArray[np.float32]  # (T, 32)
     action: NDArray[np.float32]  # (T, 36)
-    video_frames: dict[str, int]  # camera -> frame count from meta
+    video_frames: dict[str, int]  # camera -> frame count from the mp4 (stsz), 0 if missing
 
 
 def read_info(root: Path) -> dict[str, Any]:
@@ -114,7 +115,9 @@ def write_episode(root: Path, frames: EpisodeFrames) -> None:
     `observation.*` joints of Psi0's export) are carried over row by row,
     matched on frame_index, so a copy with dropped frames stays loadable. The
     episode's row in `meta/episodes.jsonl` keeps its other keys (instruction,
-    environment_config). Totals in info.json are recounted.
+    environment_config) and `meta/tasks.jsonl` keeps its rows as they are.
+    Totals in info.json are recounted. Videos are not written: `video_frames`
+    of the frames is not stored, the count is read from the mp4 there.
 
     A replaced parquet keeps its column order, types and schema metadata. A new
     one takes the types Psi0's postprocess actually writes - float64 lists for
@@ -131,11 +134,17 @@ def write_episode(root: Path, frames: EpisodeFrames) -> None:
     path = root / _episode_path(info, "data_path", frames.episode_index)
     length = _check_frames(frames, path)
     rows = {int(r["episode_index"]): r for r in _read_episode_rows(root, missing_ok=True)}
-    tasks = _read_tasks(root)
+    task_rows = _read_task_rows(root)
+    tasks = {int(r["task_index"]): str(r["task"]) for r in task_rows}
     task_index = next((i for i, t in tasks.items() if t == frames.task), None)
     if task_index is None:
         task_index = max(tasks, default=-1) + 1
         tasks[task_index] = frames.task
+        # The shape of psi-data's rows: category empty, description = task.
+        task_rows.append(
+            {"task_index": task_index, "task": frames.task, "category": "",
+             "description": frames.task}
+        )
     offset = sum(int(r["length"]) for i, r in rows.items() if i < frames.episode_index)
 
     old = pq.read_table(path) if path.is_file() else None
@@ -178,15 +187,13 @@ def write_episode(root: Path, frames: EpisodeFrames) -> None:
         dataset_from_index=offset,
         dataset_to_index=offset + length - 1,
         instruction={"task_index": task_index, "task": frames.task},
-        video_frames=dict(frames.video_frames),
     )
     rows[frames.episode_index] = row
     meta = root / "meta"
     ordered = [rows[i] for i in sorted(rows)]
     (meta / "episodes.jsonl").write_text("".join(json.dumps(r) + "\n" for r in ordered))
-    (meta / "tasks.jsonl").write_text(
-        "".join(json.dumps({"task_index": i, "task": t}) + "\n" for i, t in sorted(tasks.items()))
-    )
+    task_rows.sort(key=lambda r: int(r["task_index"]))
+    (meta / "tasks.jsonl").write_text("".join(json.dumps(r) + "\n" for r in task_rows))
     chunks = {i // int(info["chunks_size"]) for i in rows}
     info.update(
         total_episodes=len(rows),
@@ -227,11 +234,13 @@ def _read_episode_rows(root: Path, missing_ok: bool = False) -> list[dict[str, A
     return sorted(_read_jsonl(path), key=lambda r: int(r["episode_index"]))
 
 
-def _read_tasks(root: Path) -> dict[int, str]:
+def _read_task_rows(root: Path) -> list[dict[str, Any]]:
     path = root / "meta" / "tasks.jsonl"
-    if not path.is_file():
-        return {}
-    return {int(r["task_index"]): str(r["task"]) for r in _read_jsonl(path)}
+    return _read_jsonl(path) if path.is_file() else []
+
+
+def _read_tasks(root: Path) -> dict[int, str]:
+    return {int(r["task_index"]): str(r["task"]) for r in _read_task_rows(root)}
 
 
 def _column(table: pa.Table, path: Path, name: str) -> pa.Array:
@@ -315,15 +324,80 @@ def _task_of(table: pa.Table, row: dict[str, Any], tasks: dict[int, str], path: 
 def _video_frames(
     root: Path, info: dict[str, Any], cameras: list[str], row: dict[str, Any]
 ) -> dict[str, int]:
-    recorded = row.get("video_frames")
-    if isinstance(recorded, dict):
-        return {str(k): int(v) for k, v in recorded.items()}
     index = int(row["episode_index"])
-    length = int(row.get("length", 0))
-    return {
-        camera: length if (root / _episode_path(info, "video_path", index, camera)).is_file() else 0
-        for camera in cameras
-    }
+    counts = {}
+    for camera in cameras:
+        video = root / _episode_path(info, "video_path", index, camera)
+        counts[camera] = mp4_frame_count(video) if video.is_file() else 0
+    return counts
+
+
+def mp4_frame_count(path: Path) -> int:
+    """Frames of the video track of an mp4, from its `stsz` (or `stz2`) box; no decoding.
+
+    Walks moov/trak/mdia: the track whose `hdlr` is `vide`, then minf/stbl. A
+    fragmented mp4 (moov/mvex) keeps its samples in moof boxes and is refused.
+    """
+    with path.open("rb") as f:
+        moov = _child(f, 0, path.stat().st_size, b"moov", path)
+        if moov is None:
+            raise LeRobotFormatError(f"{path}: no moov box, not an mp4 the reader can walk")
+        if _child(f, *moov, b"mvex", path) is not None:
+            raise LeRobotFormatError(f"{path}: fragmented mp4, frame count not in stsz")
+        for kind, start, end in _boxes(f, *moov, path):
+            mdia = _child(f, start, end, b"mdia", path) if kind == b"trak" else None
+            hdlr = None if mdia is None else _child(f, *mdia, b"hdlr", path)
+            if mdia is None or hdlr is None:
+                continue
+            f.seek(hdlr[0] + 8)  # version/flags, pre_defined
+            if f.read(4) != b"vide":
+                continue
+            stbl = _descend(f, mdia, (b"minf", b"stbl"), path)
+            sizes = stbl and (_child(f, *stbl, b"stsz", path) or _child(f, *stbl, b"stz2", path))
+            if not sizes:
+                raise LeRobotFormatError(f"{path}: video track has no stsz box")
+            f.seek(sizes[0] + 8)  # version/flags, sample_size (stsz) or field_size (stz2)
+            count: int = struct.unpack(">I", f.read(4))[0]
+            return count
+    raise LeRobotFormatError(f"{path}: no video track")
+
+
+def _boxes(f: IO[bytes], start: int, end: int, path: Path) -> Iterator[tuple[bytes, int, int]]:
+    """(type, payload start, box end) of the boxes between start and end."""
+    pos = start
+    while pos + 8 <= end:
+        f.seek(pos)
+        size, kind = struct.unpack(">I4s", f.read(8))
+        header = 8
+        if size == 1:
+            size = struct.unpack(">Q", f.read(8))[0]
+            header = 16
+        elif size == 0:
+            size = end - pos
+        if size < header or pos + size > end:
+            raise LeRobotFormatError(f"{path}: broken mp4 box {kind!r} at byte {pos}")
+        yield kind, pos + header, pos + size
+        pos += size
+
+
+def _child(
+    f: IO[bytes], start: int, end: int, kind: bytes, path: Path
+) -> tuple[int, int] | None:
+    for found, payload, box_end in _boxes(f, start, end, path):
+        if found == kind:
+            return payload, box_end
+    return None
+
+
+def _descend(
+    f: IO[bytes], box: tuple[int, int], kinds: tuple[bytes, ...], path: Path
+) -> tuple[int, int] | None:
+    current: tuple[int, int] | None = box
+    for kind in kinds:
+        if current is None:
+            return None
+        current = _child(f, *current, kind, path)
+    return current
 
 
 def _check_frames(frames: EpisodeFrames, path: Path) -> int:
