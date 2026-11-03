@@ -31,8 +31,8 @@ Là trưởng nhóm phụ trách Ψ₀, tôi muốn train cả 3 stage bằng co
 - [x] 1. Script đọc code, bảng log (AC 1)
 - [x] 2. `Psi0Trainer` 3 stage (AC 2)
 - [x] 3. Lớp bọc log, `metrics.jsonl` (AC 3)
-- [ ] 4. Client RTC và log inference (AC 4)
-- [ ] 5. Colab, tiếp tục từ checkpoint, probe, sổ chi phí (AC 5, 6)
+- [x] 4. Client RTC và log inference (AC 4)
+- [x] 5. Colab, tiếp tục từ checkpoint, probe, sổ chi phí (AC 5, 6). Phần chạy probe P3, P4 trên checkpoint trung gian chờ DA-09 (Hiếu chốt 3/11/2026, xem Ghi chép khi làm)
 
 ## Phạm vi file
 
@@ -71,10 +71,11 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Bỏ khung package (chuyển vào PR restructure); thêm client RTC từ DA-23; recipe ở `configs/models/` | PO (Hiếu) theo design chia làn (đã xóa) |
 | 27/10/2026 | Bỏ phần robot DENSO; Colab nhận dữ liệu `public`; ưu tiên fine-tune stage 3 cho HE | PO (Hiếu) theo design 27/10/2026 |
 | 28/10/2026 | Sửa hạn PR `chore-restructure` theo 07 mục 3.6 bản 0.6: mở 28/10, merge 29/10 | PO (Hiếu) |
+| 3/11/2026 | AC 5: phần "checkpoint trung gian chạy P3, P4" chờ DA-09 (probe P1–P4 thuộc DA-09, mà 07 bản 1.2 dời sau 13/11); phía DA-19 đưa từng `ckpt_<step>` đã lưu xong lên Google Drive cho DA-09 chạy probe. Stage 3 gọi `scripts/train.py finetune_simple_psi0_config` vì `finetune-simple-psi0.sh` không còn ở commit ghim `cda3fdf` | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
 - Giờ thực:
 - Công cụ AI đã dùng:
-- Ghi chú hoàn thành:
+- Ghi chú hoàn thành: AC 5, phần "checkpoint trung gian chạy P3, P4", dời theo DA-09 (Hiếu chốt 3/11/2026). Probe P1–P4 là việc của DA-09 (07 mục 2.2), mà bản 1.2 của 07 dời DA-09 sang sau 13/11; P4 còn cần bộ câu hỏi P1 có đáp án chưa có. Phía DA-19 đã sẵn chỗ gắn: `persist` đưa từng `ckpt_<step>` đã lưu xong lên Google Drive (`MyDrive/denso/da19/<job_id>`), DA-09 chạy probe trên các thư mục đó.
 - File đã tạo hoặc sửa:

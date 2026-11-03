@@ -36,7 +36,40 @@ Stage 1 và 2 chỉ đọc code (design mục 8): stage 1 log `action_accuracy`,
 - Recipe stage 3 giữ đúng mọi cờ của bản cuối `finetune-simple-psi0.sh`, so từng cờ với `git show 2830f93^:…`. Khác duy nhất là cờ theo job, cộng bốn cờ để chạy lại: `--timestamp` (lấy từ `job_id`), `--train.output_dir`, `--train.resume_from_checkpoint=latest`, `--train.skip_resumed_steps`.
 - Argv của cả ba stage được kiểm bằng chính `tyro` và `DynamicLaunchConfig` của Ψ₀ ở `cda3fdf` (bước đầu của `scripts/train.py`, không cần GPU): parse đúng.
 - Điều kiện của môi trường Ψ₀: có `.env` ở thư mục gốc (`scripts/train.py` chạy `assert load_dotenv()`; `cp .env.sample .env`), và `pyarrow` import được, vì launcher import `flywheel.contracts`. `Psi0Trainer` đặt `WANDB_MODE=offline` và thêm `src/` của `flywheel-psi0`, `flywheel-contracts` vào `PYTHONPATH`. `.venv-psi` trên laptop hiện lệch phiên bản (pyarrow cần NumPy ≥ 2, venv có 1.26.4) vì `uv.lock` của clone bị sửa cục bộ; môi trường cài đúng từ `uv.lock` của tác giả không gặp lỗi này.
-- Chưa chạy job GPU thật: chạy thử stage 3 và chạy lại từ checkpoint thuộc nhiệm vụ con 5 (Colab, hoặc `rtx3060` khi máy đủ RAM theo quy tắc của đội).
+- Job GPU thật đầu tiên: xem mục dưới.
+
+## Chạy stage 3 trên Colab, ngắt và chạy lại (nhiệm vụ con 5)
+
+_Thực đo ngày 3/11/2026, một lần chạy trên một A100-SXM4-40GB của Colab Pro, bằng `python -m flywheel_psi0.trainer.colab setup|smoke`. Recipe stage 3, cặp checkpoint `psi0-baseline-egodex-he`, dữ liệu psi-data `G1WholebodyLocomotionPickBetweenTablesTeleop-v0`. Override cho lần chạy thử: 60 bước, checkpoint và validation mỗi 20 bước, 2 batch val, `warmup_steps=0`._
+
+| Mục | Kết quả |
+|---|---|
+| Ngắt | Lần 0 bị giết khi dòng train của bước 30 xuất hiện; dòng cuối là bước 31; checkpoint cuối `ckpt_20` |
+| Chạy lại | Lần 1 bắt đầu ở bước 20, chạy tới bước 59, lưu `ckpt_60`, `infra_status = ok` |
+| Nối liền | Ở 12 bước trùng (20–31), loss và lr của hai lần trùng nhau tới 4 chữ số: Ψ₀ khôi phục vị trí dữ liệu (`--train.skip_resumed_steps`) và trạng thái RNG |
+| `metrics.jsonl` | 77 dòng, đều đúng `TrainingMetric`; reader DA-08 bỏ 13 dòng trùng của phần nối, còn 60 bước train và 4 lần val. Lưu ở `packages/flywheel-psi0/tests/unit/trainer/fixtures/metrics_colab_smoke.jsonl` |
+| Đỉnh VRAM | 16,2 GB (batch 16): không vừa `rtx3060` 12 GB; L4 24 GB vừa (suy ra, chưa chạy) |
+| Throughput | Trung vị 49,3 mẫu/s, tức 3,1 bước/s |
+| Checkpoint | 9,5 GB mỗi `ckpt_<step>` (`model.safetensors`, `optimizer.bin`, scheduler, RNG) |
+| Chi phí | 6,73 CU/giờ (`colab usage`); phiên 68 phút, khoảng 7,6 CU, gồm khoảng 20 phút VM rỗi sau một lần cài flash-attn lỗi. Một lần fine-tune 40000 bước ước khoảng 26 CU (`docs/g0/ledger/DA-19.csv`) |
+
+DA-08 trên log thật: T8 báo `grad_norm_action = 153,7` ở bước 0 (ngưỡng 10), phần lớn do lần chạy thử bỏ 1000 bước warmup của recipe. T6 bỏ qua các chiều 0–6 (tay trái) và 31 (chiều cao thân) vì `target_std = 0` trên batch train: trong task hai bàn hai nhóm này không đổi, nên layout G1 của DA-01 nên ghi điều đó.
+
+**Môi trường Ψ₀ ở commit ghim không dựng được theo README.** Ba chỗ phải sửa trong `colab.py`, đều không đụng repo tác giả:
+
+1. `uv.lock` ở `cda3fdf` là hai lock bị trộn: khóa `[package.optional-dependencies]` lặp, khoảng 30 gói ở hai phiên bản (mirror Tsinghua và PyPI), thiếu mục `xyzservices`; `uv sync` không parse được. `repair_lock` đổi URL mirror sang PyPI (cùng đường dẫn, cùng hash), bỏ bản trùng, giữ bản mới hơn của gói hai phiên bản; rồi `uv pip install -e . --group psi -c <368 ràng buộc từ lock>` giải lại với mọi phiên bản lock có. Kết quả giữ đúng `torch 2.7.0`, `numpy 1.26.4`, `pyarrow 21.0.0`, `datasets 3.6.0`, `transformers 4.57.1`, `lerobot` từ `songlin/lerobot@09929d8`. `.venv-psi` trên laptop lệch NumPy chính vì lần giải lại không có ràng buộc này.
+2. Colab đặt `UV_SYSTEM_PYTHON`, nên `uv` cài vào Python 3.13 của hệ thống; phải gỡ biến đó và chỉ định `--python .venv-psi/bin/python`.
+3. Qwen3-VL được nạp với `flash_attention_2`: không có flash-attn thì train không chạy (README chỉ nói fallback SDPA cho inference trên XPU). Cài `flash_attn 2.7.4.post1` từ wheel dựng sẵn `cu12torch2.7cxx11abiTRUE-cp311`, với `--no-config` để `uv` không đòi build theo `pyproject` của Ψ₀.
+
+**Kho bền là Google Drive.** **[Đã chốt]** (Hiếu, 3/11/2026). Mỗi VM mới gắn Drive bằng `colab drivemount -s <session> /content/drive`; Hiếu đã cấp quyền một lần ngày 3/11, lần gắn sau trên cùng tài khoản không cần trình duyệt (đã thử: gắn lại không hỏi, ghi được từ cả kernel lẫn shell `colab ssh`; Drive còn 215 GB trống). Thư mục đích mặc định `MyDrive/denso/da19/<job_id>`.
+
+- `persist --watch 600 --pid <PID của job>` chạy song song với job, `rsync` mỗi 10 phút: metrics, kết quả, và chỉ những `ckpt_<step>` đã lưu xong (bước không vượt `checkpoint_step` trong `result.json`, vì launcher chỉ ghi file đó sau khi `save_checkpoint` trả về). Checkpoint đang ghi dở không bao giờ lên Drive, nên lần chạy lại không gặp một "checkpoint mới nhất" hỏng.
+- Trên VM mới: `setup`, gắn Drive, `restore` (kéo thư mục job về), rồi chạy lại job như cũ; `Psi0Trainer` tự tìm checkpoint cuối và tăng `attempt`.
+- Dung lượng: mỗi checkpoint 9,5 GB; recipe stage 3 lưu mỗi 10000 bước nên một lần 40000 bước để lại 4 checkpoint, khoảng 38 GB trên Drive. 215 GB đủ khoảng 5 lần chạy; lưới của DA-26 cần dọn checkpoint không dùng (Drive không tự xóa, `persist` không dùng `--delete`).
+
+**Còn mở:**
+- Probe P3, P4 trên checkpoint trung gian (AC 5) chưa làm.
+- `colab exec` qua kernel hay treo sau khi khởi động lại kernel; điều khiển VM qua `colab ssh --proxy-mode` ổn định hơn.
 
 ## Bảng sinh từ code
 
@@ -119,3 +152,21 @@ python3 scripts/g0/read_psi0_logging.py --repo fwdata/psi0/Psi0 --commit <commit
 ```
 
 `--check docs/g0/psi0-logging.md` trả mã 1 nếu bảng không còn khớp code. Script chỉ dùng thư viện chuẩn và đọc file qua `git show`, nên clone không cần checkout ở commit ghim. Khi một trường đổi từ "có" sang "thiếu", sửa lớp bọc trước khi chạy job.
+
+## Log inference RTC (nhiệm vụ con 4)
+
+`flywheel_psi0.policy.Psi0Policy` phục vụ checkpoint bằng chính server của tác giả, `serve_psi0_simple --rtc` (module `psi.deploy.serve_psi0_simple`, lệnh S1-03 cũng dùng), và `RTCClient` nói chuyện với nó qua `POST /act` đúng định dạng của `psi.deploy.helpers` mà không import `psi`. RTC nằm ở server: server giữ chunk trước và đặt độ trễ suy luận theo cấu hình; client giữ đồng hồ điều khiển (50 Hz, theo `fps` của dữ liệu hai bàn), phát mỗi bước một action từ bộ đệm và xin chunk mới khi bộ đệm cạn.
+
+Mỗi lần xin chunk ghi một dòng `RTCInferenceRecord` (DA-25) vào `rtc.jsonl` của job:
+
+| Trường | Cách lấy |
+|---|---|
+| `observation_sent_s`, `chunk_received_s` | Đồng hồ của client, tính từ đầu trace |
+| `delay_steps` | `ceil(độ trễ × Hz)`: số bước điều khiển một vòng thời gian thực sẽ chạy trong lúc chờ. SIMPLE bước sim đồng bộ nên robot không đi trong lúc chờ; số này là d mà RTC phải che trên phần cứng, để so với `max_delay` (8 ở stage 3) |
+| `buffer_level` | Số action còn trong bộ đệm lúc gửi |
+| `chunk_index` | 0, 1, ... trong một trace |
+| `boundary_jump` | Thay đổi lớn nhất theo một chiều giữa action cuối của chunk cũ và action đầu của chunk mới, đơn vị đã khử chuẩn hóa (rad, m) |
+
+Server chỉ cho một client giữ "chunk trước" của RTC, nhận diện qua `history["session_id"]`; client gửi `session_id = trace_id` ở mọi request và `reset` ở request đầu của trace, như client eval của SIMPLE. Thiếu `session_id` thì server lấy host làm định danh, và hai rollout từ một máy sẽ nhận 409 hoặc chunk dựa trên chunk của nhau.
+
+Kiểm thử chạy trên CPU với một server giả có độ trễ, cùng định dạng và cùng route (`/health`, `/act`) qua HTTP thật. Chưa chạy với server Ψ₀ thật: việc đó đi cùng hook `SimpleSim` và eval HE (DA-26).

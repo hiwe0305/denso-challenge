@@ -4,6 +4,7 @@ _Ngày 30/10/2026. Trạng thái: **[Đề xuất]**, chờ Product Owner (Hiế
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 3/11/2026 | 0.5 | Mục 4 (F1, F2, F3, F4, F9): người làm theo 07 bản 1.6; phần của Thông (DA-02, DA-03, DA-17, DA-27) sang Hiếu, DA-21 chưa có chủ; DA-31 của Châu | PO (Hiếu) |
 | 3/11/2026 | 0.4 | Mục 1: ước tính và thực đo của `LedgerEntry` là hai dòng, theo 03 bản 0.9 | PO (Hiếu) |
 | 30/10/2026 | 0.3 | Mục 7.2: trỏ tới [10](10-database.md), nơi schema đề xuất cách lấp G2, G4, G5, G6, G9 | PO (Hiếu), soạn cùng Claude |
 | 30/10/2026 | 0.2 | Mục 2: sơ đồ tách train stage 1 và stage 3, ghi rõ teleop và synthetic vào stage 3; mục 4 F4: thành phần release và `MixSpec`; F5: bảng dữ liệu theo stage và công thức dữ liệu theo nhánh; F7 bước 11; mục 7.2 thêm G9 | PO (Hiếu), soạn cùng Claude |
@@ -118,7 +119,7 @@ Mỗi nguồn có bộ đọc riêng, cùng đầu ra: `Source` (nếu là tệp
 
 | Nguồn | Loại | Kích hoạt | Trường đặc trưng của Episode | Story |
 |---|---|---|---|---|
-| psi-data task hai bàn (LeRobot v2.1 của fork Ψ₀) | teleop | `fw import psi-data --task … --revision …` | `source_detail = psi_data`, `action_quality = measured`, `embodiment_id = g1_sonic_dwbc@1`, `operator_kind = human`, `kind = teleop_demo` | S1-07, DA-03 (Thông) |
+| psi-data task hai bàn (LeRobot v2.1 của fork Ψ₀) | teleop | `fw import psi-data --task … --revision …` | `source_detail = psi_data`, `action_quality = measured`, `embodiment_id = g1_sonic_dwbc@1`, `operator_kind = human`, `kind = teleop_demo` | S1-07, DA-03 (Hiếu, bản 0.5) |
 | Teleop bàn phím trong SIMPLE | teleop | Phiên teleop `--record`; mỗi phiên một `LedgerEntry` (phút người, số episode, số đạt) | `source_detail = teleop_keyboard`, `measured`; nhãn thành công của người chỉ để đối chiếu | DA-16 (Hiếu) → DA-03 |
 | S1 planner | synthetic | `GeneratorAdapter.generate` từ F7 hoặc lệnh sinh hàng loạt | `synthetic_tier = S1`, `action_quality = planned`, `source_detail = planner_wbc` hoặc `planner_amo` (embodiment AMO riêng), tuyến, phiên bản planner; ghi cả lượt hỏng | S1-05, S1-11 (Hiếu) → DA-03 |
 | S2 biến thể | synthetic | `GeneratorAdapter.generate` | `synthetic_tier = S2`, `planned`, `parent_id` trỏ episode teleop gốc, tham số biến đổi | DA-29 (Hiếu) → DA-03 |
@@ -130,7 +131,7 @@ Ràng buộc chung khi ingest: sha256 cho mọi tệp; `license` và `data_class
 
 ### F2 · Pipeline robot (teleop và synthetic)
 
-Tầng 2–4 của pipeline 6 tầng (design 27/10 mục 6). Người làm: Thông (DA-03, DA-17), Châu (scorer cho phép kiểm "kết quả task").
+Tầng 2–4 của pipeline 6 tầng (design 27/10 mục 6). Người làm (bản 0.5): Hiếu (DA-03, DA-17), Châu (scorer cho phép kiểm "kết quả task").
 
 | Tầng | Việc | Ghi ra |
 |---|---|---|
@@ -157,11 +158,11 @@ flowchart LR
 
 - `catalog` chặn rời bước Annotate khi `deid_status = raw` (03 mục 4.3).
 - Episode egocentric không có action robot: chỉ vào stage 1, probe P1, P2 và làm mẫu cho bộ sinh; **không bao giờ vào stage 3** (design 27/10 mục 6.6).
-- Episode đạt QA đi vào `release` của Thông qua API công khai của làn (07 mục 2.0); release egocentric export bằng `export/egodex.py`, không phải LeRobot.
+- Episode đạt QA đi vào `release` của làn Dữ liệu qua API công khai của làn (07 mục 2.0); release egocentric export bằng `export/egodex.py`, không phải LeRobot.
 
 ### F4 · Release và export
 
-Người làm: Thông (DA-02, DA-21, tầng 5–6); Long giữ schema.
+Người làm (bản 0.5): Hiếu (DA-02, tầng 5–6; DA-21 chưa có chủ, sau 13/11); Long giữ schema.
 
 1. `fw release create` dựng manifest nháp (`items.parquet`: `episode_id`, trọng số mẫu, cờ `excluded` kèm lý do). Một release robot chứa cả teleop và synthetic khi thí nghiệm cần trộn; `meta` của release đếm số episode theo `source_kind`, `source_detail`, `synthetic_tier` và theo `is_root` (03 mục 4.3), nên luôn biết release có bao nhiêu demo người và bao nhiêu mẫu sinh. Release egocentric tách riêng vì đi stage khác.
 2. Guard trước khi đóng băng: mọi item có QAReport pass, hoặc flag đã có kỹ sư xem; seed, `layout_hash` và gần trùng (d_dup) theo SplitPlan; không trộn `embodiment_id` khác nhau nếu chưa có Decision V3 (ADR-08); `pseudo`, `retargeted` chỉ khi RunPlan cho phép; không có episode mang `injected_defect`; giấy phép gộp.
@@ -265,7 +266,7 @@ Chỉ `gate` chạy, qua `fw holdout run --plan rp_holdout` (03 mục 6.3, 8.3).
 
 ### F9 · Agent QA/QC và bộ lỗi cấy
 
-Người làm: Hưng (DA-20, DA-31), Thông (DA-27).
+Người làm (bản 0.5): Hưng (DA-20), Châu (DA-31), Hiếu (DA-27).
 
 ```text
 job dữ liệu / train / eval / infer ─► code tính số và dựng hình ─► Agent QA/QC viết báo cáo ─► kỹ sư duyệt (fw review)
