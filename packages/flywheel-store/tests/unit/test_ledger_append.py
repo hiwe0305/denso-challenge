@@ -166,3 +166,16 @@ def test_reversal_must_point_at_an_entry_that_exists(tmp_path: Path) -> None:
         )
     )
     assert len(store.read("rp_1", "job_1")) == 2
+
+
+def test_ledger_refuses_an_id_reused_with_other_content(tmp_path: Path) -> None:
+    """PO decision D1 (3/11): the ledger holds one row per id, like the catalog."""
+    store = LedgerStore(paths=StorePaths(root=tmp_path))
+    estimate = _gpu_entry(measure_kind="estimated")
+    store.append(estimate)
+    store.append(estimate)  # same content: a harmless re-write, the view counts it once
+
+    inflated = _gpu_entry(measure_kind="estimated", id=estimate.id, usd_amount=99.0)
+    with pytest.raises(ValueError, match=f"ledger_entry.*{estimate.id}"):
+        store.append(inflated)
+    assert [row["usd_amount"] for row in store.read("rp_1", "job_1")] == [0.2, 0.2]

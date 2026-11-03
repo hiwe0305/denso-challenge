@@ -1,13 +1,19 @@
 """Unit tests for append-only partition tables and concurrent writing (AC 5)."""
 
+import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
-from flywheel.contracts.entities import Condition, Source
+from flywheel.contracts.entities import Condition, Decision, Episode, Source
 from flywheel.store.paths import StorePaths
 from flywheel.store.tables import TableWriter, read_table_records, write_record
 from pydantic import ValidationError
+
+FIXTURES = (
+    Path(__file__).resolve().parents[4]
+    / "packages/flywheel-testkit/src/flywheel/testkit/fixtures/artifacts"
+)
 
 
 def test_table_writer_append_and_read(tmp_path: Path) -> None:
@@ -84,3 +90,48 @@ def test_writer_refuses_a_table_outside_the_catalog(tmp_path: Path, table: str) 
     with pytest.raises(ValueError, match="not a catalog table"):
         write_record(table, record, paths=paths)
     assert not (paths.catalog_dir / table).exists()
+
+
+def _decision(**fields: str) -> Decision:
+    base = {
+        "kind": "dev_gate",
+        "subject_kind": "checkpoint",
+        "subject_id": "ckpt_1",
+        "signed_by": "hieu",
+        "reason": "dev gate passed",
+    }
+    return Decision.model_validate({**base, **fields})
+
+
+def test_writer_refuses_an_id_reused_with_other_content(tmp_path: Path) -> None:
+    """PO decision D1 (3/11): one id names one record; a second meaning is refused."""
+    paths = StorePaths(root=tmp_path)
+    first = _decision()
+    TableWriter("decision", paths=paths).append(first)
+    TableWriter("decision", paths=paths).append(first)  # same content: a harmless re-write
+
+    changed = _decision(id=first.id, reason="dev gate failed")
+    with pytest.raises(ValueError, match=f"decision.*{first.id}"):
+        TableWriter("decision", paths=paths).append(changed)
+    reasons = [r["reason"] for r in read_table_records("decision", paths=paths)]
+    assert reasons == ["dev gate passed", "dev gate passed"]
+
+
+def test_writer_refuses_a_reused_episode_id(tmp_path: Path) -> None:
+    """Episode ids are set by the writer, so a reused one is the likely collision."""
+    paths = StorePaths(root=tmp_path)
+    example = json.loads((FIXTURES / "Episode.json").read_text(encoding="utf-8"))
+    writer = TableWriter("episode", paths=paths)
+    writer.append(Episode.model_validate(example))
+    with pytest.raises(ValueError, match="episode.*ep_1"):
+        writer.append(Episode.model_validate({**example, "bundle_uri": "data/other"}))
+
+
+def test_writer_refuses_a_batch_that_reuses_an_id(tmp_path: Path) -> None:
+    paths = StorePaths(root=tmp_path)
+    first = _decision()
+    with pytest.raises(ValueError, match="decision"):
+        TableWriter("decision", paths=paths).append_many(
+            [first, _decision(id=first.id, reason="other")]
+        )
+    assert read_table_records("decision", paths=paths) == []
