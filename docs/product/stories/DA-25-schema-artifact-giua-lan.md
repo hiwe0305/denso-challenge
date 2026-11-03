@@ -24,14 +24,16 @@ Là người giữ nhân, tôi muốn có schema và file mẫu cho mọi artifa
 3. `RolloutRequest` thêm `timing` và `latency_profile_ref` (03 bản 0.5).
 4. Model giả cho endpoint LLM trong testkit (cho DA-20).
 5. Test: mọi file mẫu qua validate; mọi schema có trong JSON Schema xuất ra.
+6. Schema `TraceStep` và `CameraParams` cho chẩn đoán hệ thống DA-13 (Issue #31), kèm 4 file mẫu trace (tối thiểu 100 chu kỳ) và xuất JSON Schema.
 
 ## Nhiệm vụ
 
 - [x] 1. Schema `ReplayReport`, `DatasetReport`, `DefectManifest` (AC 1)
 - [x] 2. Schema log RTC, probe, `QAReport` (AC 1)
 - [x] 3. `RolloutRequest.timing` (AC 3)
-- [ ] 4. File mẫu và model giả trong testkit (AC 2, 4)
+- [x] 4. File mẫu và model giả trong testkit (AC 2, 4)
 - [x] 5. Test và JSON Schema (AC 5)
+- [x] 6. Schema TraceStep, CameraParams và 4 file mẫu trace cho DA-13 (Issue #31, AC 6)
 
 ## Phạm vi file
 
@@ -64,10 +66,25 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Tạo story | PO (Hiếu) theo design chia làn (đã xóa) |
 | 27/10/2026 | Bỏ bảng topic MCAP; thêm `DatasetReport`, `DefectManifest`, trường Episode mới | PO (Hiếu) theo design 27/10/2026 |
 | 27/10/2026 | Giao cho Long theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
+| 03/11/2026 | Thêm schema TraceStep, CameraParams và 4 file mẫu trace (clean, r4_sync_delay, r5_calibration_offset, missing_signals) theo Issue #31 | Nguyễn Thăng Long |
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
-- Ghi chú hoàn thành:
+- Giờ thực: 2h
+- Công cụ AI đã dùng: Antigravity
+- Ghi chú hoàn thành: Đã bổ sung hợp đồng TraceStep và CameraParams (trace.py) cùng 4 file mẫu trace đạt 100 chu kỳ và 2 cấu hình camera trong testkit cho DA-13 kiểm hệ thống R3-R5 theo Issue #31; xuất JSON Schema và viết test tự động.
 - File đã tạo hoặc sửa:
+  - packages/flywheel-contracts/src/flywheel/contracts/trace.py
+  - packages/flywheel-contracts/schemas/TraceStep.json
+  - packages/flywheel-contracts/schemas/CameraParams.json
+  - packages/flywheel-contracts/tests/test_trace.py
+  - packages/flywheel-testkit/src/flywheel/testkit/fixtures/artifacts/TraceStep.json
+  - packages/flywheel-testkit/src/flywheel/testkit/fixtures/artifacts/CameraParams.json
+  - packages/flywheel-testkit/src/flywheel/testkit/fixtures/trace/clean.jsonl
+  - packages/flywheel-testkit/src/flywheel/testkit/fixtures/trace/r4_sync_delay.jsonl
+  - packages/flywheel-testkit/src/flywheel/testkit/fixtures/trace/r5_calibration_offset.jsonl
+  - packages/flywheel-testkit/src/flywheel/testkit/fixtures/trace/missing_signals.jsonl
+  - packages/flywheel-testkit/src/flywheel/testkit/fixtures/trace/camera_clean.json
+  - packages/flywheel-testkit/src/flywheel/testkit/fixtures/trace/camera_offset.json
+  - packages/flywheel-testkit/src/flywheel/testkit/fixtures/trace/README.md
+  - docs/product/stories/DA-25-schema-artifact-giua-lan.md

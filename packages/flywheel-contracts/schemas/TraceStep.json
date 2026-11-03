@@ -1,0 +1,157 @@
+{
+  "additionalProperties": false,
+  "description": "A single control cycle in a rollout trace.",
+  "properties": {
+    "trace_id": {
+      "minLength": 1,
+      "title": "Trace Id",
+      "type": "string"
+    },
+    "episode_id": {
+      "minLength": 1,
+      "title": "Episode Id",
+      "type": "string"
+    },
+    "run_plan_id": {
+      "minLength": 1,
+      "title": "Run Plan Id",
+      "type": "string"
+    },
+    "step": {
+      "minimum": 0,
+      "title": "Step",
+      "type": "integer"
+    },
+    "t_state": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "enum": [
+            "NaN",
+            "Infinity",
+            "-Infinity"
+          ],
+          "type": "string"
+        }
+      ],
+      "title": "T State"
+    },
+    "t_image": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "enum": [
+            "NaN",
+            "Infinity",
+            "-Infinity"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "T Image"
+    },
+    "cmd_upper": {
+      "items": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "enum": [
+              "NaN",
+              "Infinity",
+              "-Infinity"
+            ],
+            "type": "string"
+          }
+        ]
+      },
+      "title": "Cmd Upper",
+      "type": "array"
+    },
+    "meas_upper": {
+      "items": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "enum": [
+              "NaN",
+              "Infinity",
+              "-Infinity"
+            ],
+            "type": "string"
+          }
+        ]
+      },
+      "title": "Meas Upper",
+      "type": "array"
+    },
+    "cmd_lower": {
+      "items": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "enum": [
+              "NaN",
+              "Infinity",
+              "-Infinity"
+            ],
+            "type": "string"
+          }
+        ]
+      },
+      "title": "Cmd Lower",
+      "type": "array"
+    },
+    "meas_lower": {
+      "items": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "enum": [
+              "NaN",
+              "Infinity",
+              "-Infinity"
+            ],
+            "type": "string"
+          }
+        ]
+      },
+      "title": "Meas Lower",
+      "type": "array"
+    },
+    "dropped_frames": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Dropped Frames",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "trace_id",
+    "episode_id",
+    "run_plan_id",
+    "step",
+    "t_state",
+    "cmd_upper",
+    "meas_upper",
+    "cmd_lower",
+    "meas_lower"
+  ],
+  "title": "TraceStep",
+  "type": "object"
+}

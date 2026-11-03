@@ -1,0 +1,78 @@
+{
+  "additionalProperties": false,
+  "description": "Camera intrinsic and extrinsic parameters for an episode run.",
+  "properties": {
+    "episode_id": {
+      "minLength": 1,
+      "title": "Episode Id",
+      "type": "string"
+    },
+    "uid": {
+      "minLength": 1,
+      "title": "Uid",
+      "type": "string"
+    },
+    "mount": {
+      "minLength": 1,
+      "title": "Mount",
+      "type": "string"
+    },
+    "width": {
+      "exclusiveMinimum": 0,
+      "title": "Width",
+      "type": "integer"
+    },
+    "height": {
+      "exclusiveMinimum": 0,
+      "title": "Height",
+      "type": "integer"
+    },
+    "fx": {
+      "exclusiveMinimum": 0.0,
+      "title": "Fx",
+      "type": "number"
+    },
+    "fy": {
+      "exclusiveMinimum": 0.0,
+      "title": "Fy",
+      "type": "number"
+    },
+    "cx": {
+      "exclusiveMinimum": 0.0,
+      "title": "Cx",
+      "type": "number"
+    },
+    "cy": {
+      "exclusiveMinimum": 0.0,
+      "title": "Cy",
+      "type": "number"
+    },
+    "pose": {
+      "items": {
+        "type": "number"
+      },
+      "title": "Pose",
+      "type": "array"
+    },
+    "reference_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Reference Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "episode_id",
+    "uid",
+    "mount",
+    "width",
+    "height",
+    "fx",
+    "fy",
+    "cx",
+    "cy",
+    "pose",
+    "reference_sha256"
+  ],
+  "title": "CameraParams",
+  "type": "object"
+}
