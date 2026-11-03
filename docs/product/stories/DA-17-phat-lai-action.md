@@ -27,7 +27,7 @@ Là kỹ sư dữ liệu, tôi muốn mọi episode có action robot (psi-data, 
 
 ## Nhiệm vụ
 
-- [ ] 1. Động học và danh sách khung lỗi (AC 1)
+- [x] 1. Động học và danh sách khung lỗi (AC 1)
 - [ ] 2. Động lực học và sai lệch theo nhóm (AC 2)
 - [ ] 3. Ngưỡng hiệu chỉnh và cấu hình (AC 3)
 - [ ] 4. `ReplayReport` và nối vào QA (AC 4)
