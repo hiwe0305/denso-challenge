@@ -1,0 +1,315 @@
+{
+  "$defs": {
+    "AgentEstimate": {
+      "additionalProperties": false,
+      "description": "A range the agent predicts; the measured value lives in a later record, never here.",
+      "properties": {
+        "estimate_id": {
+          "minLength": 1,
+          "title": "Estimate Id",
+          "type": "string"
+        },
+        "quantity": {
+          "minLength": 1,
+          "title": "Quantity",
+          "type": "string"
+        },
+        "low": {
+          "title": "Low",
+          "type": "number"
+        },
+        "high": {
+          "title": "High",
+          "type": "number"
+        },
+        "unit": {
+          "minLength": 1,
+          "title": "Unit",
+          "type": "string"
+        },
+        "basis": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Basis",
+          "type": "array"
+        }
+      },
+      "required": [
+        "estimate_id",
+        "quantity",
+        "low",
+        "high",
+        "unit",
+        "basis"
+      ],
+      "title": "AgentEstimate",
+      "type": "object"
+    },
+    "AgentFact": {
+      "additionalProperties": false,
+      "description": "A deterministic fact computed by code that the agent's prose can reference.",
+      "properties": {
+        "fact_id": {
+          "pattern": "^F[0-9]+$",
+          "title": "Fact Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "title": "Value"
+        },
+        "unit": {
+          "default": "",
+          "title": "Unit",
+          "type": "string"
+        },
+        "source_ref": {
+          "minLength": 1,
+          "title": "Source Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fact_id",
+        "name",
+        "value",
+        "source_ref"
+      ],
+      "title": "AgentFact",
+      "type": "object"
+    },
+    "AgentFinding": {
+      "additionalProperties": false,
+      "description": "A specific problem or observation identified by the agent.",
+      "properties": {
+        "finding_id": {
+          "minLength": 1,
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "code": {
+          "pattern": "^(D[1-8]|T[1-8]|O[1-4]|R[1-6])$",
+          "title": "Code",
+          "type": "string"
+        },
+        "rank": {
+          "minimum": 1,
+          "title": "Rank",
+          "type": "integer"
+        },
+        "target_ref": {
+          "minLength": 1,
+          "title": "Target Ref",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "figures": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Figures",
+          "type": "array"
+        },
+        "insight": {
+          "minLength": 1,
+          "title": "Insight",
+          "type": "string"
+        },
+        "suggestion": {
+          "minLength": 1,
+          "title": "Suggestion",
+          "type": "string"
+        }
+      },
+      "required": [
+        "finding_id",
+        "code",
+        "rank",
+        "target_ref",
+        "evidence",
+        "insight",
+        "suggestion"
+      ],
+      "title": "AgentFinding",
+      "type": "object"
+    },
+    "AgentInput": {
+      "additionalProperties": false,
+      "description": "An input artifact inspected by the agent.",
+      "properties": {
+        "ref": {
+          "minLength": 1,
+          "title": "Ref",
+          "type": "string"
+        },
+        "kind": {
+          "minLength": 1,
+          "title": "Kind",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "kind",
+        "sha256"
+      ],
+      "title": "AgentInput",
+      "type": "object"
+    },
+    "AgentModel": {
+      "additionalProperties": false,
+      "description": "Identification and configuration of the LLM generating the report.",
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "revision": {
+          "minLength": 1,
+          "title": "Revision",
+          "type": "string"
+        },
+        "temperature": {
+          "minimum": 0.0,
+          "title": "Temperature",
+          "type": "number"
+        },
+        "prompt_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prompt Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "revision",
+        "temperature",
+        "prompt_sha256"
+      ],
+      "title": "AgentModel",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The complete QA/QC report produced by the agent for a single job or artifact.",
+  "properties": {
+    "report_id": {
+      "minLength": 1,
+      "title": "Report Id",
+      "type": "string"
+    },
+    "subject_ref": {
+      "minLength": 1,
+      "title": "Subject Ref",
+      "type": "string"
+    },
+    "stage": {
+      "enum": [
+        "dataset",
+        "train",
+        "stage1",
+        "stage3",
+        "inference",
+        "eval"
+      ],
+      "title": "Stage",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "model": {
+      "$ref": "#/$defs/AgentModel"
+    },
+    "inputs": {
+      "items": {
+        "$ref": "#/$defs/AgentInput"
+      },
+      "minItems": 1,
+      "title": "Inputs",
+      "type": "array"
+    },
+    "facts": {
+      "items": {
+        "$ref": "#/$defs/AgentFact"
+      },
+      "title": "Facts",
+      "type": "array"
+    },
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/AgentFinding"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "estimates": {
+      "items": {
+        "$ref": "#/$defs/AgentEstimate"
+      },
+      "title": "Estimates",
+      "type": "array"
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "broken"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "problems": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Problems",
+      "type": "array"
+    }
+  },
+  "required": [
+    "report_id",
+    "subject_ref",
+    "stage",
+    "created_at",
+    "model",
+    "inputs",
+    "status"
+  ],
+  "title": "AgentReport",
+  "type": "object"
+}

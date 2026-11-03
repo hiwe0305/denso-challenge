@@ -1,0 +1,178 @@
+# Unitree G1 in SIMPLE (robot `g1_sonic`, decoupled WBC): the 36-D action every lane
+# reads (DA-01). `action_layout` validates as flywheel.contracts.artifacts.ActionLayout,
+# `control_spec` as flywheel.contracts.v0.ControlSpec (03 section 5.2, ADR-15).
+#
+# Sources, each pinned:
+# - Psi0 @ cda3fdf, src/psi/data/simple/__init__.py (sha256 ddb135a2...): the layout
+#   comment block at the top of the file gives all 36 dims; the ACTION_SLICES_36D list
+#   itself only covers 0-27 (left_arm, right_arm, left_hand_thumb/index/middle,
+#   right_hand). 36 real dims, no padding: Psi0's pad-action-dim 36 adds nothing.
+# - songlin/decoupled_wbc @ 5b304e4 (submodule of SIMPLE 6d10628 and b75c678),
+#   control/policy/g1_gear_wbc_policy.py: how the WBC reads dims 28-35.
+# - psi-data @ e78fb93, two-table package (docs/g0/psi-data.md section 2): value ranges.
+# - Joint names: g1_sonic WHOLE_BODY_JOINTS in the output order of SIMPLE's
+#   scripts/postprocess_psi0_sonic.py (6d10628), as the DA-33 tray export writes them.
+#   The left hand holds middle at 3-4 and index at 5-6; Psi0's comment labels 3:5
+#   "index", which the data does not follow.
+# - Joint limits (dims 0-30): `range` of data/robots/g1_sonic/g1_29dof_with_hand.xml
+#   (sha256 8d120ef823a27c96eae88aec07796e224615afe0f289a5a3ab4eaf6c3cf72c91), the MJCF
+#   SIMPLE downloads from Hugging Face USC-PSI-Lab/SIMPLE; compiler angle="radian".
+#   Dims 31-35 are WBC commands, not joints, and carry no limit.
+#
+# One group per slice of the Psi0 layout; the group names are the `loss_by_group` keys
+# DA-19 already logs (flywheel_psi0.trainer.colab G1_GROUPS).
+
+embodiment: g1_sonic
+controller: decoupled_wbc
+
+action_layout:
+  dimensions:
+    # 0-13 hand qpos, absolute, rad (Psi0 cda3fdf: "[0:14] hand qpos absolute").
+    # Left hand 0-6 is almost unused in psi-data e78fb93 (non-zero in 99 of 62,764 frames).
+    # Right-hand dims 9-13 sit on their 0 bound in psi-data and cross it by float noise
+    # (up to 2.2e-16, docs/g0/psi-data.md section 2): limit checks need an absolute
+    # tolerance; the limits here stay those of the MJCF.
+    - {name: left_hand_thumb_0_joint, group: hand, masked: false, limit_low: -1.0472, limit_high: 1.0472}
+    - {name: left_hand_thumb_1_joint, group: hand, masked: false, limit_low: -0.724312, limit_high: 1.0472}
+    - {name: left_hand_thumb_2_joint, group: hand, masked: false, limit_low: 0.0, limit_high: 1.74533}
+    - {name: left_hand_middle_0_joint, group: hand, masked: false, limit_low: -1.5708, limit_high: 0.0}
+    - {name: left_hand_middle_1_joint, group: hand, masked: false, limit_low: -1.74533, limit_high: 0.0}
+    - {name: left_hand_index_0_joint, group: hand, masked: false, limit_low: -1.5708, limit_high: 0.0}
+    - {name: left_hand_index_1_joint, group: hand, masked: false, limit_low: -1.74533, limit_high: 0.0}
+    - {name: right_hand_thumb_0_joint, group: hand, masked: false, limit_low: -1.0472, limit_high: 1.0472}
+    - {name: right_hand_thumb_1_joint, group: hand, masked: false, limit_low: -1.0472, limit_high: 0.724312}
+    - {name: right_hand_thumb_2_joint, group: hand, masked: false, limit_low: -1.74533, limit_high: 0.0}
+    - {name: right_hand_index_0_joint, group: hand, masked: false, limit_low: 0.0, limit_high: 1.5708}
+    - {name: right_hand_index_1_joint, group: hand, masked: false, limit_low: 0.0, limit_high: 1.74533}
+    - {name: right_hand_middle_0_joint, group: hand, masked: false, limit_low: 0.0, limit_high: 1.5708}
+    - {name: right_hand_middle_1_joint, group: hand, masked: false, limit_low: 0.0, limit_high: 1.74533}
+    # 14-27 arm qpos, absolute, rad (Psi0 cda3fdf: "[14:28] arm qpos absolute (L_arm 7, R_arm 7)").
+    - {name: left_shoulder_pitch_joint, group: arm, masked: false, limit_low: -3.0892, limit_high: 2.6704}
+    - {name: left_shoulder_roll_joint, group: arm, masked: false, limit_low: -1.5882, limit_high: 2.2515}
+    - {name: left_shoulder_yaw_joint, group: arm, masked: false, limit_low: -2.618, limit_high: 2.618}
+    - {name: left_elbow_joint, group: arm, masked: false, limit_low: -1.0472, limit_high: 2.0944}
+    - {name: left_wrist_roll_joint, group: arm, masked: false, limit_low: -1.97222, limit_high: 1.97222}
+    - {name: left_wrist_pitch_joint, group: arm, masked: false, limit_low: -1.61443, limit_high: 1.61443}
+    - {name: left_wrist_yaw_joint, group: arm, masked: false, limit_low: -1.61443, limit_high: 1.61443}
+    - {name: right_shoulder_pitch_joint, group: arm, masked: false, limit_low: -3.0892, limit_high: 2.6704}
+    - {name: right_shoulder_roll_joint, group: arm, masked: false, limit_low: -2.2515, limit_high: 1.5882}
+    - {name: right_shoulder_yaw_joint, group: arm, masked: false, limit_low: -2.618, limit_high: 2.618}
+    - {name: right_elbow_joint, group: arm, masked: false, limit_low: -1.0472, limit_high: 2.0944}
+    - {name: right_wrist_roll_joint, group: arm, masked: false, limit_low: -1.97222, limit_high: 1.97222}
+    - {name: right_wrist_pitch_joint, group: arm, masked: false, limit_low: -1.61443, limit_high: 1.61443}
+    - {name: right_wrist_yaw_joint, group: arm, masked: false, limit_low: -1.61443, limit_high: 1.61443}
+    # 28-30 waist roll/pitch/yaw, absolute, rad (Psi0 cda3fdf comment block). The WBC
+    # takes them as `torso_orientation_rpy` (g1_gear_wbc_policy.py @ 5b304e4, lines 276-279).
+    - {name: waist_roll_joint, group: torso_rpy, masked: false, limit_low: -0.52, limit_high: 0.52}
+    - {name: waist_pitch_joint, group: torso_rpy, masked: false, limit_low: -0.52, limit_high: 0.52}
+    - {name: waist_yaw_joint, group: torso_rpy, masked: false, limit_low: -2.618, limit_high: 2.618}
+    # 31 torso (base) height, absolute, m (Psi0 cda3fdf: "reference 0.75"). Constant 0.74
+    # in every frame of the two-table package (psi-data e78fb93), the `height_cmd: 0.74`
+    # of the WBC config (decoupled_wbc @ 5b304e4: control/main/teleop/configs/g1_29dof_gear_wbc.yaml
+    # points to sim2mujoco/resources/robots/g1/g1_gear_wbc.yaml, line 38).
+    # Zero target variance here is real, not a dead dim: T5/T6 exclude it by target std.
+    - {name: base_height_command, group: height, masked: false}
+    # 32-33 vx, vy, relative, m/s in the base frame (Psi0 cda3fdf comment block); the WBC
+    # copies them unchanged (g1_gear_wbc_policy.py @ 5b304e4, line 249). [-0.5, 0.5] in psi-data.
+    - {name: navigate.vx, group: base_velocity, masked: false}
+    - {name: navigate.vy, group: base_velocity, masked: false}
+    # 34 turn command: the raw controller input, continuous in [-1, 1] (51,104 distinct
+    # values in psi-data e78fb93), not the 0/1 `turning_flag` of Psi0's comment. The WBC
+    # reads it as a flag: it turns toward dim 35 only when |value| >= 0.1
+    # (g1_gear_wbc_policy.py @ 5b304e4, line 250 reads it, line 264 applies the 0.1 dead zone).
+    - {name: navigate.vyaw, group: turn, masked: false}
+    # 35 target heading, absolute, rad, world frame (Psi0 cda3fdf comment block; integrated
+    # target yaw, g1_gear_wbc_policy.py @ 5b304e4, line 251). Wraps at +-pi.
+    - {name: navigate.target_yaw, group: target_yaw, masked: false}
+
+# Paired command and measured channels of the decoupled WBC (03 section 5.2, ADR-15):
+# command_channels[i] is tracked against state_channels[i]. Upper body: the joint
+# targets the policy sends, against measured `q` of the same joints. Lower body: what
+# the WBC's lower-body policy (legs and waist, `get_action` @ 5b304e4 lines 214-221)
+# takes, against the floating base it measures (`floating_base_pose` [x y z qw qx qy qz],
+# `floating_base_vel` [vx vy vz wx wy wz], lines 127-128). Exact channel names are set
+# at V2 and V7 (03 section 5.2); the frame of `floating_base_vel` against the base frame
+# of dims 32-33 is not yet checked.
+control_spec:
+  controller: decoupled_wbc
+  groups:
+    - name: upper_body
+      command_channels:
+        - left_hand_thumb_0_joint
+        - left_hand_thumb_1_joint
+        - left_hand_thumb_2_joint
+        - left_hand_middle_0_joint
+        - left_hand_middle_1_joint
+        - left_hand_index_0_joint
+        - left_hand_index_1_joint
+        - right_hand_thumb_0_joint
+        - right_hand_thumb_1_joint
+        - right_hand_thumb_2_joint
+        - right_hand_index_0_joint
+        - right_hand_index_1_joint
+        - right_hand_middle_0_joint
+        - right_hand_middle_1_joint
+        - left_shoulder_pitch_joint
+        - left_shoulder_roll_joint
+        - left_shoulder_yaw_joint
+        - left_elbow_joint
+        - left_wrist_roll_joint
+        - left_wrist_pitch_joint
+        - left_wrist_yaw_joint
+        - right_shoulder_pitch_joint
+        - right_shoulder_roll_joint
+        - right_shoulder_yaw_joint
+        - right_elbow_joint
+        - right_wrist_roll_joint
+        - right_wrist_pitch_joint
+        - right_wrist_yaw_joint
+      state_channels:
+        - q.left_hand_thumb_0_joint
+        - q.left_hand_thumb_1_joint
+        - q.left_hand_thumb_2_joint
+        - q.left_hand_middle_0_joint
+        - q.left_hand_middle_1_joint
+        - q.left_hand_index_0_joint
+        - q.left_hand_index_1_joint
+        - q.right_hand_thumb_0_joint
+        - q.right_hand_thumb_1_joint
+        - q.right_hand_thumb_2_joint
+        - q.right_hand_index_0_joint
+        - q.right_hand_index_1_joint
+        - q.right_hand_middle_0_joint
+        - q.right_hand_middle_1_joint
+        - q.left_shoulder_pitch_joint
+        - q.left_shoulder_roll_joint
+        - q.left_shoulder_yaw_joint
+        - q.left_elbow_joint
+        - q.left_wrist_roll_joint
+        - q.left_wrist_pitch_joint
+        - q.left_wrist_yaw_joint
+        - q.right_shoulder_pitch_joint
+        - q.right_shoulder_roll_joint
+        - q.right_shoulder_yaw_joint
+        - q.right_elbow_joint
+        - q.right_wrist_roll_joint
+        - q.right_wrist_pitch_joint
+        - q.right_wrist_yaw_joint
+    - name: lower_body
+      command_channels:
+        - waist_roll_joint
+        - waist_pitch_joint
+        - waist_yaw_joint
+        - base_height_command
+        - navigate.vx
+        - navigate.vy
+        # Tracked against yaw rate only while |value| >= 0.1 (line 264); below that the
+        # WBC commands zero yaw rate whatever the value.
+        - navigate.vyaw
+        - navigate.target_yaw
+      state_channels:
+        - q.waist_roll_joint
+        - q.waist_pitch_joint
+        - q.waist_yaw_joint
+        - floating_base_pose.z
+        - floating_base_vel.vx
+        - floating_base_vel.vy
+        - floating_base_vel.wz
+        - floating_base_pose.yaw

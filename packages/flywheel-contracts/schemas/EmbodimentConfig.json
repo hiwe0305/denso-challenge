@@ -1,0 +1,132 @@
+{
+  "$defs": {
+    "ActionDimension": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "group": {
+          "minLength": 1,
+          "title": "Group",
+          "type": "string"
+        },
+        "masked": {
+          "title": "Masked",
+          "type": "boolean"
+        },
+        "limit_low": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Limit Low"
+        },
+        "limit_high": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Limit High"
+        }
+      },
+      "required": [
+        "name",
+        "group",
+        "masked"
+      ],
+      "title": "ActionDimension",
+      "type": "object"
+    },
+    "ActionLayout": {
+      "additionalProperties": false,
+      "properties": {
+        "dimensions": {
+          "items": {
+            "$ref": "#/$defs/ActionDimension"
+          },
+          "minItems": 1,
+          "title": "Dimensions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "dimensions"
+      ],
+      "title": "ActionLayout",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Configuration for an embodiment / robot embodiment.",
+  "properties": {
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "version": {
+      "default": "1.0.0",
+      "title": "Version",
+      "type": "string"
+    },
+    "domain": {
+      "default": "sim",
+      "enum": [
+        "sim",
+        "real"
+      ],
+      "title": "Domain",
+      "type": "string"
+    },
+    "controller": {
+      "default": "sonic_dwbc",
+      "title": "Controller",
+      "type": "string"
+    },
+    "camera_ref_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Camera Ref Hash"
+    },
+    "action_layout": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ActionLayout"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "meta": {
+      "additionalProperties": true,
+      "title": "Meta",
+      "type": "object"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "EmbodimentConfig",
+  "type": "object"
+}

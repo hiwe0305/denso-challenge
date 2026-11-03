@@ -2,5 +2,5 @@
   "source_detail": "psi_data",
   "renderer": "mujoco",
   "synthetic_tier": null,
-  "injected_defect": null
+  "benchmark_copy_id": null
 }

@@ -7,7 +7,7 @@ _Ngày 3/11/2026. Story [S1-07](../product/stories/S1-07-phan-tich-psi-data.md),
 - **Q1:** N_teleop của task hai bàn là **99**, cả 99 episode đạt QA sơ bộ; điểm cuối lưới HE giữ ở 80 demo. F1: `BendPickTeleop` N_teleop = 97, `BendPickMP` 100 episode sinh tự động. Gói không có cờ thành công (mục 3).
 - **V1:** LeRobot `v2.1`, 50 Hz, `action` **36 chiều thật, không chiều đệm, không khớp chân**; `states` 32 chiều, Ψ₀ đệm state lên 36 (chỉ số 32–35). Camera `observation.images.egocentric` 360×640. Bảng 36 dòng `index, name, group, masked` ở mục 2.
 - **V6:** episode ghi `layout`, `dr_cfgs` và `dr_state_dict` (vị trí ban đầu), không ghi seed. Dải seed của `simple-eval` không suy được số, nhưng ở mức 0 và 1 episode eval i có vị trí ban đầu trùng episode train i đến từng bit (mục 4). Dải của đội theo [`configs/splits/default.yaml`](../../configs/splits/default.yaml).
-- **V9:** psi-data và psi-model không ghi giấy phép (`license = unknown`); `data_class = public` theo quyết định của Hiếu ngày 2/11/2026. Cảnh HSSD và vật GraspNet trong video là phi thương mại (mục 5). Thư hỏi PSI Lab ở mục 5.
+- **V9:** psi-data và psi-model không ghi giấy phép (`license = unknown`); `data_class = public` theo quyết định của Hiếu ngày 2/11/2026. Cảnh HSSD và vật GraspNet trong video là phi thương mại (mục 5). Đội không hỏi PSI Lab về giấy phép (Hiếu, 3/11/2026); `license = unknown` ghi là giới hạn của demo.
 
 Việc phát sinh cho người khác, Hiếu quyết:
 
@@ -353,7 +353,7 @@ Bảng kiểm ngày 3/11/2026. Trường license của Hugging Face đọc qua `
 
 | Tài sản | Nguồn đã kiểm | Ngày kiểm | Thấy gì | Kết luận |
 |---|---|---|---|---|
-| `USC-PSI-Lab/psi-data` (gói, gồm video) | HF API, revision `e78fb93` và `main` `de140d6` | 3/11/2026 | Không `cardData`, không thẻ `license`, không `LICENSE` hay `README.md` ở gốc | `license = unknown`. **`data_class = public`** **[Đã chốt]** (Hiếu, 2/11/2026, theo design 27/10 mục 8.4 và CLAUDE.md): Colab dùng được cho fine-tune. Thư hỏi tác giả vẫn gửi |
+| `USC-PSI-Lab/psi-data` (gói, gồm video) | HF API, revision `e78fb93` và `main` `de140d6` | 3/11/2026 | Không `cardData`, không thẻ `license`, không `LICENSE` hay `README.md` ở gốc | `license = unknown`. **`data_class = public`** **[Đã chốt]** (Hiếu, 2/11/2026, theo design 27/10 mục 8.4 và CLAUDE.md): Colab dùng được cho fine-tune. `license = unknown` ghi là giới hạn; không hỏi tác giả (Hiếu, 3/11/2026) |
 | `USC-PSI-Lab/psi-model` (checkpoint) | HF API, `main` `76febdc` | 3/11/2026 | Không `cardData`, không thẻ `license`, không `LICENSE` ở gốc | `license = unknown` cho trọng số. Giấy phép Apache 2.0 của mã Ψ₀ không tự áp cho checkpoint |
 | Mã Ψ₀ (`physical-superintelligence-lab/Psi0`) | GitHub, file `LICENSE` | 3/11/2026 | Apache License 2.0, "Copyright 2026 PSI-lab, USC" (GitHub báo `NOASSERTION` vì file có thêm dòng bản quyền) | Dùng và sửa được, giữ thông báo bản quyền |
 | SIMPLE (`physical-superintelligence-lab/SIMPLE`) | GitHub, file `license.md` | 3/11/2026 | MIT License, "Copyright (c) 2025-2026 The SIMPLE Authors" | Dùng và tích hợp được, giữ thông báo bản quyền. Chỉ áp cho mã; tài sản SIMPLE tải về theo giấy phép riêng của từng nguồn |
@@ -362,48 +362,20 @@ Bảng kiểm ngày 3/11/2026. Trường license của Hugging Face đọc qua `
 | NVIDIA vMaterials 2 (vật liệu bàn) | Tìm trên web | 3/11/2026 | Điều khoản là EULA hiện khi cài, cần tài khoản NVIDIA Developer; không thấy bản công khai | Chưa kiểm được. Không phân phối lại file `.mdl`; gói chỉ chứa đường dẫn và ảnh render |
 | Objaverse | HF API `allenai/objaverse` @ `5566370` | 3/11/2026 | `odc-by` cho bộ dữ liệu, giấy phép riêng theo từng vật | Không áp: gói không tham chiếu Objaverse |
 
-Báo Hiếu: HSSD và GraspNet đều phi thương mại, và video trong psi-data là ảnh render của hai nguồn này. Quyết định `data_class = public` ngày 2/11 nói về việc được gửi lên Colab, không nói về quyền dùng thương mại. Nếu kết quả demo cho DENSO được coi là dùng thương mại thì đây là rủi ro giấy phép riêng, ngoài `data_class`; thư dưới đây hỏi cả điểm này.
+Báo Hiếu: HSSD và GraspNet đều phi thương mại, và video trong psi-data là ảnh render của hai nguồn này. Quyết định `data_class = public` ngày 2/11 nói về việc được gửi lên Colab, không nói về quyền dùng thương mại. Nếu kết quả demo cho DENSO được coi là dùng thương mại thì đây là rủi ro giấy phép riêng, ngoài `data_class`. Đội không hỏi tác giả về giấy phép (Hiếu, 3/11/2026); rủi ro này ghi là giới hạn trong báo cáo, Hiếu quyết (bảng việc phát sinh, dòng 5).
 
-### Thư hỏi PSI Lab (cho Hiếu gửi)
+### Câu hỏi về tập eval cho PSI Lab (ngoài giấy phép)
 
-Viết bằng tiếng Anh vì người nhận ở USC. Hiếu sửa phần chữ ký và kênh gửi (issue GitHub của Ψ₀ hoặc email tác giả liên hệ trong paper).
+Bản trước của mục này là thư cho Hiếu gửi PSI Lab, gồm hai câu giấy phép và hai câu về tập eval. Hiếu quyết ngày 3/11/2026 bỏ mọi việc xin giấy phép, nên thư không gửi. Hai câu về tập eval giữ lại dưới đây, chưa gửi; Hiếu quyết có hỏi không, chung với Q0 nếu hỏi. Viết bằng tiếng Anh vì người nhận ở USC.
 
 ```text
-Subject: License of USC-PSI-Lab/psi-data and psi-model checkpoints, and how simple-eval was built
-
-Dear PSI Lab team,
-
-We are ilovephysicalintelligence, a five-person team in the DENSO Factory Hacks
-challenge. We build a data flywheel around Psi0 (arXiv:2603.12263) and SIMPLE:
-when the policy fails in simulation we choose which data to collect next. We use
-your released data and checkpoints as they are, pinned to psi-data revision
-e78fb93cc28912a3031a10b8656d32d7f0a2b867 and Psi0 commit cda3fdf, mainly the
-two-table task G1WholebodyLocomotionPickBetweenTablesTeleop-v0 and
-G1WholebodyBendPickTeleop-v0 / BendPickMP-v0.
-
-We could not find a license for the dataset or for the checkpoints on Hugging
-Face, so we would like to ask:
-
-1. Under which license are the psi-data bundles released (parquet, videos,
-   meta), and the checkpoints in USC-PSI-Lab/psi-model? May we fine-tune the
-   checkpoints, show the results in a demo to DENSO judges, and publish our
-   benchmark numbers with attribution?
-2. The episodes render HSSD scenes (CC BY-NC 4.0) and GraspNet-1Billion objects
-   (CC BY-NC-SA 4.0). Do you consider the psi-data videos to carry those
-   non-commercial terms? Is a demo inside an industry-sponsored challenge within
-   the use you intend?
-3. In simple-eval at e78fb93, episode i of dr-level-0 and dr-level-1 starts with
+1. In simple-eval at e78fb93, episode i of dr-level-0 and dr-level-1 starts with
    exactly the robot, object and container positions of training episode i of
    the same task (bit for bit, 10/10, on all three tasks we checked). Were the
    eval conditions generated with the same seeds as the first training
    episodes? Which seeds did you use for training and for simple-eval?
-4. The simple-eval bundle at main (de140d6) adds dr-level-hard and changes the
+2. The simple-eval bundle at main (de140d6) adds dr-level-hard and changes the
    robot start positions. Which revision do you report numbers on?
-
-Thank you for releasing Psi0, SIMPLE and the data.
-
-Best regards,
-<name>, on behalf of team ilovephysicalintelligence
 ```
 
 ## 6. Thống kê mô tả (AC 6)
@@ -464,5 +436,5 @@ Kết luận:
 | Dòng | Câu trả lời đề xuất | Trạng thái | Bằng chứng |
 |---|---|---|---|
 | V1 | Gói psi-data của SIMPLE (task hai bàn và F1) là LeRobot `v2.1`, 50 Hz. `action` có 36 chiều thật theo `meta/modality.json`: tay 0–13, cánh tay 14–27, hông roll/pitch/yaw 28–30 (tuyệt đối), `base_height` 31, `vx`, `vy`, `vyaw` 32–34 (tương đối, `vyaw` liên tục), `target_yaw` 35. Không chiều nào là đệm, không có khớp chân. `states` 32 chiều, Ψ₀ đệm lên 36 (state 32–35). Camera `observation.images.egocentric` 360×640, một camera. `ActionLayout` của nguồn psi-data dùng đúng bảng mục 2 | có | Mục 2: `inspect_psi_data.py layout` trên ba gói ở `e78fb93`; `modality.json`; Ψ₀ `cda3fdf` |
-| V6 (phần dữ liệu) | Mỗi episode ghi `environment_config` với `layout`, `dr_cfgs`, `dr_state_dict`; không ghi seed. `simple-eval` ở `e78fb93`: 3 mức × 10 episode, 1 khung mỗi episode; ở mức 0, 1 vị trí ban đầu trùng 10 episode train đầu đến từng bit, nên seed eval suy ra là seed của các episode train đó, số cụ thể không suy được. Đội dùng một bảng seed chung [`configs/splits/default.yaml`](../../configs/splits/default.yaml) (train `[0, 10⁶)`, dev `[10⁶, 10⁶+1000)`, holdout `[2·10⁶, 2·10⁶+1000)`), không có split `gate`. Điều kiện của đội lưu như `dr_state_dict` để so trùng được | có, trừ số seed của tác giả (không suy được; đã hỏi PSI Lab) | Mục 4: `inspect_psi_data.py seeds` |
-| V9 | psi-data và psi-model: không ghi giấy phép trên HF (`license = unknown`), `data_class = public` **[Đã chốt]** 2/11/2026. Mã Ψ₀ Apache 2.0, SIMPLE MIT. Cảnh HSSD CC-BY-NC-4.0, vật GraspNet-1Billion CC BY-NC-SA 4.0 (có trong video); vMaterials 2 chưa kiểm được; Objaverse không dùng | tạm: chờ PSI Lab trả lời thư mục 5; Hiếu quyết rủi ro phi thương mại | Mục 5, kiểm ngày 3/11/2026 |
+| V6 (phần dữ liệu) | Mỗi episode ghi `environment_config` với `layout`, `dr_cfgs`, `dr_state_dict`; không ghi seed. `simple-eval` ở `e78fb93`: 3 mức × 10 episode, 1 khung mỗi episode; ở mức 0, 1 vị trí ban đầu trùng 10 episode train đầu đến từng bit, nên seed eval suy ra là seed của các episode train đó, số cụ thể không suy được. Đội dùng một bảng seed chung [`configs/splits/default.yaml`](../../configs/splits/default.yaml) (train `[0, 10⁶)`, dev `[10⁶, 10⁶+1000)`, holdout `[2·10⁶, 2·10⁶+1000)`), không có split `gate`. Điều kiện của đội lưu như `dr_state_dict` để so trùng được | có, trừ số seed của tác giả (không suy được; câu hỏi ở mục 5, chưa gửi) | Mục 4: `inspect_psi_data.py seeds` |
+| V9 | psi-data và psi-model: không ghi giấy phép trên HF (`license = unknown`), `data_class = public` **[Đã chốt]** 2/11/2026. Mã Ψ₀ Apache 2.0, SIMPLE MIT. Cảnh HSSD CC-BY-NC-4.0, vật GraspNet-1Billion CC BY-NC-SA 4.0 (có trong video); vMaterials 2 chưa kiểm được; Objaverse không dùng | có: `license = unknown` ghi là giới hạn, không hỏi tác giả (Hiếu, 3/11/2026); Hiếu quyết rủi ro phi thương mại | Mục 5, kiểm ngày 3/11/2026 |
