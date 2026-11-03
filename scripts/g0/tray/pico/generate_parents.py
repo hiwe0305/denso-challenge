@@ -8,10 +8,14 @@ conditions a shard has already logged, so a killed worker resumes. At the end
 successes with all seven step flags (the parents S2 can cut), failure labels,
 sim and machine time, and the parent list.
 
-Run on the sim machine in the SIMPLE venv, detached:
+Every batch writes its two ledger rows through `flywheel.data.ledger.job_ledger`
+(estimate before the workers start, measured wall seconds after; DA-35 PO review
+of #84). The launcher runs in the workspace venv for that; the workers in the
+SIMPLE venv (`--worker-python`). Run on the sim machine, detached:
 
     MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src nohup setsid \\
-        fwdata/simple/.venv/bin/python scripts/g0/tray/pico/generate_parents.py \\
+        .venv/bin/python scripts/g0/tray/pico/generate_parents.py \\
+        --worker-python fwdata/simple/.venv/bin/python \\
         --out fwdata/simple/tray/virtual/parents-1103 --levels 0,1 --seeds 100-179 \\
         --workers 16 < /dev/null > parents.log 2>&1 &
 """
@@ -53,7 +57,7 @@ def launch(args: argparse.Namespace) -> list[subprocess.Popen[bytes]]:
             continue
         shard.mkdir(parents=True, exist_ok=True)
         cmd = [
-            sys.executable, "-m", "flywheel_simple.tray.pico.session",
+            args.worker_python, "-m", "flywheel_simple.tray.pico.session",
             "--conditions", ",".join(f"{level}:{seed}" for level, seed in mine),
             "--operator", "op-virtual", "--streamer", "virtual",
             "--max-attempts", str(args.max_attempts), "--style-base", str(args.style_base),
@@ -123,15 +127,37 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-attempts", type=int, default=1, help="per condition")
     parser.add_argument("--style-base", type=int, default=0)
     parser.add_argument("--summarize", action="store_true", help="only rewrite summary.json")
+    parser.add_argument("--worker-python", default=sys.executable, help="the SIMPLE venv's python")
+    parser.add_argument(
+        "--est-attempt-s", type=float, default=110.0,
+        help="ledger estimate: worker wall seconds per attempt (parents-1103: 110 per parent)",
+    )  # fmt: skip
     args = parser.parse_args(argv)
     args.levels = [int(x) for x in args.levels.split(",")]
     if not args.summarize:
-        t0 = time.monotonic()
-        procs = launch(args)
-        print(f"{len(procs)} workers started", flush=True)
-        codes = [p.wait() for p in procs]
-        print(f"workers done, exit codes {Counter(codes)}", flush=True)
-        summary = summarize(args.out, time.monotonic() - t0)
+        from flywheel.data.ledger import job_ledger  # workspace venv only
+
+        done = {(a["level"], a["seed"]) for s in args.out.glob("shard-*") for a in attempts_of(s)}
+        todo = [c for c in conditions(args.levels, args.seeds) if c not in done]
+        workers = max(1, min(args.workers, len(todo)))
+        note = (
+            f"Assumption: {len(todo)} virtual-teleop attempts x {args.est_attempt_s:g} s worker "
+            f"wall over {workers} workers on rtx3060; batch {args.out.name}"
+        )
+        estimate = len(todo) * args.est_attempt_s / workers
+        command = f"da35_parents_{args.out.name}"
+        with job_ledger("teleop_session", command, estimate, note=note, story="DA-35") as job:
+            t0 = time.monotonic()
+            procs = launch(args)
+            print(f"{len(procs)} workers started", flush=True)
+            codes = [p.wait() for p in procs]
+            print(f"workers done, exit codes {Counter(codes)}", flush=True)
+            summary = summarize(args.out, time.monotonic() - t0)
+            job.notes.append(
+                f"{summary['attempts']} attempts, {summary['parents_all_steps']} parents with "
+                f"seven flags, {summary['worker_s']} worker-s, exit codes {dict(Counter(codes))}"
+            )
+        print(f"ledger: run plan {job.run_plan_id}, job {job.job_id}", flush=True)
     else:
         summary = summarize(args.out, None)
     print(json.dumps({k: v for k, v in summary.items() if k != "parents"}, indent=1))
