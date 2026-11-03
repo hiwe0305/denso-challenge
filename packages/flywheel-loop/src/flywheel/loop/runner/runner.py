@@ -2,7 +2,10 @@
 
 An async rollout is only scored when the job directory holds the RTC log of the
 policy's client (DA-19) and that log describes this rollout; anything else is
-reported as `infra_status="policy_error"` with the reason in `runner.json`.
+reported as `infra_status="policy_error"` with the reason in `runner.json`. The
+runner then replays the log on a real-time clock: a rollout whose robot would have
+run out of actions while a chunk was in flight fails in async mode, even though the
+synchronously stepped sim succeeded.
 """
 
 from __future__ import annotations
@@ -11,6 +14,7 @@ import hashlib
 import json
 import shutil
 from collections.abc import Sequence
+from dataclasses import asdict
 from pathlib import Path
 from typing import Literal, cast
 
@@ -23,7 +27,13 @@ from flywheel.contracts.v0 import (
     TraceRef,
 )
 from flywheel.loop.runner.config import EvalConfig, load_eval_config
-from flywheel.loop.runner.rtc_log import RTC_LOG_FILE, RTCLogError, check_rtc_log, read_rtc_log
+from flywheel.loop.runner.rtc_log import (
+    RTC_LOG_FILE,
+    RTCLogError,
+    check_rtc_log,
+    read_rtc_log,
+    replay_schedule,
+)
 
 CACHE_FILE = "runner.json"
 # Bump when the runner changes what a cached result means.
@@ -89,15 +99,11 @@ class Runner:
 
         # In async mode the RTC log is part of the result: without a log that holds up,
         # the rollout says nothing about latency and must not count as a pass.
-        error = None
+        entry: dict[str, object] = {"key": key, "error": None}
         if request.timing == "async" and result.infra_status == "ok":
-            error = self._check_async(job_dir, result)
-            if error is not None:
-                result = result.model_copy(
-                    update={"sim_success": None, "infra_status": "policy_error"}
-                )
-
-        entry = {"key": key, "result": result.model_dump(mode="json"), "error": error}
+            entry["adapter_sim_success"] = result.sim_success
+            result, entry["error"], entry["rtc"] = self._score_async(job_dir, result)
+        entry["result"] = result.model_dump(mode="json")
         cache_path.write_text(json.dumps(entry, sort_keys=True), encoding="utf-8")
         return result
 
@@ -130,10 +136,19 @@ class Runner:
             raise ValueError(f"job_id must be a single path component, got {job_id!r}")
         return self.staging_root / job_id
 
-    def _check_async(self, job_dir: Path, result: RolloutResult) -> str | None:
-        """Why the async rollout cannot be scored, or None if its RTC log holds up."""
+    def _score_async(
+        self, job_dir: Path, result: RolloutResult
+    ) -> tuple[RolloutResult, str | None, dict[str, int] | None]:
+        """Score an ok rollout in async mode from its RTC log.
+
+        Returns the result, why it could not be scored (then `policy_error`), and the
+        replayed schedule. The adapter steps synchronously, so its `sim_success` holds
+        only if the robot was never left without an action for more than
+        `max_starved_steps` control steps on a real-time clock.
+        """
         if result.trace_ref is None:
-            return "async rollout returned no trace to tie the RTC log to"
+            error = "async rollout returned no trace to tie the RTC log to"
+            return _unscored(result), error, None
         try:
             records = read_rtc_log(job_dir / RTC_LOG_FILE)
             check_rtc_log(
@@ -144,8 +159,11 @@ class Runner:
                 chunk_size=self.chunk_size,
             )
         except RTCLogError as error:
-            return str(error)
-        return None
+            return _unscored(result), str(error), None
+        schedule = replay_schedule(records)
+        if result.sim_success and schedule.starved_steps > self.config.max_starved_steps:
+            result = result.model_copy(update={"sim_success": False})
+        return result, None, asdict(schedule)
 
     def run_eval(
         self,
@@ -155,6 +173,10 @@ class Runner:
     ) -> list[RolloutResult]:
         """Execute a batch of rollout requests sequentially with resume capability."""
         return [self.run_rollout(req, policy, force_rerun=force_rerun) for req in requests]
+
+
+def _unscored(result: RolloutResult) -> RolloutResult:
+    return result.model_copy(update={"sim_success": None, "infra_status": "policy_error"})
 
 
 def _read_cache(path: Path, key: str) -> RolloutResult | None:

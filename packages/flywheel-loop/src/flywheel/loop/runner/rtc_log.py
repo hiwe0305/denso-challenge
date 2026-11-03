@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 from flywheel.contracts.artifacts import RTCInferenceRecord
@@ -84,3 +85,32 @@ def check_rtc_log(
                 f"{where}: buffer_level {record.buffer_level} exceeds chunk size {chunk_size}"
             )
         previous = record
+
+
+@dataclass(frozen=True)
+class RTCSchedule:
+    """What an RTC log means for a robot that keeps moving during inference."""
+
+    chunks: int
+    max_delay_steps: int
+    # Control steps with no action to execute, summed over chunks.
+    starved_steps: int
+    starved_chunks: int
+
+
+def replay_schedule(records: Sequence[RTCInferenceRecord]) -> RTCSchedule:
+    """Replay the log on a real-time clock (async eval, ADR-20, design 8.5).
+
+    SIMPLE steps the sim synchronously: nothing moves while the client waits for a
+    chunk, so the trace never shows a late one. On a real-time controller the robot
+    goes on executing the `buffer_level` actions left when the request went out, then
+    has nothing to execute for `delay_steps - buffer_level` steps. The first request
+    is made before the robot moves, so its wait is not a stall.
+    """
+    stalls = [max(0, r.delay_steps - r.buffer_level) for r in records[1:]]
+    return RTCSchedule(
+        chunks=len(records),
+        max_delay_steps=max((r.delay_steps for r in records), default=0),
+        starved_steps=sum(stalls),
+        starved_chunks=sum(1 for stall in stalls if stall > 0),
+    )

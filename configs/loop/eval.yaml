@@ -12,9 +12,13 @@ timing_by_purpose:
   round: async
   holdout: async
 
-# Control and chunking parameters
+# Control and chunking parameters (used when the runner has no PolicySpec)
 control_hz: 50.0
 chunk_size: 16
+
+# Async: control steps the RTC log may leave the robot without an action before the
+# rollout counts as failed (docs/g0/async-eval.md section 3)
+max_starved_steps: 0
 
 # Latency profile specifications
 latency_profiles:

@@ -37,8 +37,9 @@ class RTCLoggingSim(FakeSim2D):
     """FakeSim2D plus the RTC client's log, as `flywheel_psi0.policy.rtc` writes it.
 
     Like SIMPLE, the sim steps synchronously: nothing moves while a chunk is in flight,
-    and the new chunk replaces the buffer. The latency of each request is drawn from the
-    request's latency profile (seeded by `rollout_seed`), or is zero in sync mode.
+    and the new chunk replaces the buffer. The client runs `max_steps` control steps; the
+    latency of each request is drawn from the request's latency profile, seeded by
+    `rollout_seed`.
     """
 
     def __init__(
@@ -60,8 +61,8 @@ class RTCLoggingSim(FakeSim2D):
         if req.timing == "async" and result.trace_ref is not None:
             assert req.latency_profile_ref is not None
             profile = LatencyProfile.from_file(req.latency_profile_ref)
-            steps = len(load_trace(result.trace_ref)["frames"])  # type: ignore[arg-type]
-            self._log(req.job_id, result.trace_ref.trace_id, steps, profile, req.rollout_seed)
+            trace_id = result.trace_ref.trace_id
+            self._log(req.job_id, trace_id, req.max_steps, profile, req.rollout_seed)
         return result
 
     def _log(
@@ -328,6 +329,91 @@ def test_valid_async_rtc_log_is_kept_in_the_job_dir(tmp_path: Path) -> None:
     assert [r.delay_steps for r in records] == [1] * 5  # ceil(0.1 s * 10 Hz)
 
 
+# Async mode: the runner replays the real-time schedule (review finding 1, AC 3)
+
+PSI0_LIKE = PolicySpec(
+    embodiment="fake-2d",
+    observation_keys=SPEC.observation_keys,
+    action_schema=SPEC.action_schema,
+    chunk_size=16,
+    hz=50.0,
+)
+
+
+def _sync_and_async(
+    tmp_path: Path,
+    delay_s: float,
+    spec: PolicySpec = SPEC,
+    refill_at: int = 0,
+    max_steps: int = 5,
+    config: EvalConfig | None = None,
+) -> tuple[RolloutResult, RolloutResult]:
+    sim = RTCLoggingSim(tmp_path, spec=spec, refill_at=refill_at)
+    runner = Runner(sim, tmp_path, config=config or EvalConfig(), policy_spec=spec)
+    profile = _profile(tmp_path / "profile.json", delay_s)
+    sync = runner.run_rollout(
+        _request(sim, seed=11, job_id="sync", max_steps=max_steps), _endpoint()
+    )
+    async_ = runner.run_rollout(
+        _async(sim, profile, seed=11, job_id="async", max_steps=max_steps), _endpoint()
+    )
+    return sync, async_
+
+
+def test_sync_passes_and_async_reveals_the_latency_failure(tmp_path: Path) -> None:
+    sync, async_ = _sync_and_async(tmp_path, delay_s=0.34)
+
+    assert sync.sim_success is True
+    assert async_.infra_status == "ok"
+    assert async_.sim_success is False
+    entry = json.loads((tmp_path / "async" / "runner.json").read_text(encoding="utf-8"))
+    assert entry["adapter_sim_success"] is True
+    # chunk size 1 at 10 Hz, refill when empty: each of chunks 1-4 leaves
+    # ceil(0.34 * 10) = 4 steps with no action.
+    assert entry["rtc"] == {
+        "chunks": 5,
+        "max_delay_steps": 4,
+        "starved_chunks": 4,
+        "starved_steps": 16,
+    }
+
+
+def test_zero_latency_async_matches_sync_on_the_same_seed(tmp_path: Path) -> None:
+    sync, async_ = _sync_and_async(tmp_path, delay_s=0.0)
+
+    assert async_.infra_status == sync.infra_status == "ok"
+    assert async_.sim_success == sync.sim_success is True
+    assert sync.trace_ref is not None and async_.trace_ref is not None
+    assert load_trace(async_.trace_ref)["frames"] == load_trace(sync.trace_ref)["frames"]
+
+
+@pytest.mark.parametrize(
+    ("delay_s", "refill_at", "success"),
+    [
+        (0.16, 8, True),  # 8 steps of latency, 8 actions left when asking: covered
+        (0.20, 8, False),  # 10 steps of latency outrun the 8 actions left
+        (0.16, 0, False),  # asking only when empty stalls every chunk after the first
+    ],
+)
+def test_buffer_left_at_request_decides_async_success(
+    tmp_path: Path, delay_s: float, refill_at: int, success: bool
+) -> None:
+    sync, async_ = _sync_and_async(
+        tmp_path, delay_s, spec=PSI0_LIKE, refill_at=refill_at, max_steps=64
+    )
+
+    assert sync.sim_success is True
+    assert async_.sim_success is success
+
+
+def test_starvation_limit_comes_from_the_eval_config(tmp_path: Path) -> None:
+    config = EvalConfig(max_starved_steps=16)
+
+    _, async_ = _sync_and_async(tmp_path, delay_s=0.34, config=config)
+
+    assert async_.sim_success is True
+
+
 # Latency profile and eval config
 
 
@@ -376,3 +462,8 @@ def test_eval_config_and_purpose_timing() -> None:
     assert config.timing_for_purpose("branch_train") == "async"
     assert config.timing_for_purpose("round") == "async"
     assert config.timing_for_purpose("holdout") == "async"
+
+
+def test_eval_config_rejects_unknown_keys() -> None:
+    with pytest.raises(ValueError, match="max_starved_step"):
+        EvalConfig.model_validate({"max_starved_step": 3})
