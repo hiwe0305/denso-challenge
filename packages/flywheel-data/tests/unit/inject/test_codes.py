@@ -1,5 +1,6 @@
 """Defect codes follow design 27/10/2026 sections 9.2 and 10 (fixed 3/11/2026, issue #34)."""
 
+from flywheel.data.inject.applied import CHECKS
 from flywheel.data.inject.codes import DATA_DEFECT_CODES, LOG_DEFECT_CODES
 
 
@@ -24,3 +25,7 @@ def test_log_codes_keep_t_and_r() -> None:
         [f"T{i}" for i in range(1, 9)] + ["R1", "R2"]
     )
     assert all(kind.startswith(code + "_") for kind, code in LOG_DEFECT_CODES.items())
+
+
+def test_every_data_kind_has_an_applied_check() -> None:
+    assert set(CHECKS) | {"duplicate_episode"} == set(DATA_DEFECT_CODES)

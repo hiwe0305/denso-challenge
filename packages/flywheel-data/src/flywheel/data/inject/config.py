@@ -13,7 +13,6 @@ class DataDefectConfig:
     joint_limit_excess_factor: float = 1.25
     nan_ratio: float = 0.05
     unit_deg_rad_scale: float = 57.2957795
-    action_sign_flip_dims: tuple[int, ...] = (0, 6)
     corrupted_prompt: str = "move to random location and stop"
     holdout_seed_range: tuple[int, int] = (9000, 9999)
 
@@ -121,9 +120,6 @@ def load_inject_config(path: Path | None = None) -> InjectConfig:
         ),
         nan_ratio=float(dd_data.get("nan_values", {}).get("nan_ratio", 0.05)),
         unit_deg_rad_scale=float(dd_data.get("unit_deg_rad", {}).get("scale", 57.2957795)),
-        action_sign_flip_dims=tuple(
-            int(x) for x in dd_data.get("action_sign_flip", {}).get("dimensions", [0, 6])
-        ),
         corrupted_prompt=str(
             dd_data.get("wrong_task_instruction", {}).get(
                 "corrupted_prompt", "move to random location and stop"

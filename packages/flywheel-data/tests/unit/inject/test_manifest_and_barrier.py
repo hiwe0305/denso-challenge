@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 from flywheel.contracts.artifacts import Defect, DefectManifest
+from flywheel.data.inject.applied import defect_applied
 from flywheel.data.inject.codes import DATA_DEFECT_CODES
 from flywheel.data.inject.config import InjectConfig, load_inject_config
 from flywheel.data.inject.data_defects import EpisodeData
@@ -29,7 +30,8 @@ def _make_episodes(n: int = 15) -> list[EpisodeData]:
             timestamps_state=[0.0, 0.05, 0.10],
             timestamps_image=[0.0, 0.05, 0.10],
             states=[[0.1, 0.2] for _ in range(3)],
-            actions=[[0.05, 0.15] for _ in range(3)],
+            # 36-D G1 action; hands (0-13) at zero, the rest moves.
+            actions=[[0.0] * 14 + [0.05 * (j + 1) + 0.001 * i] * 22 for j in range(3)],
             images=["f0.jpg", "f1.jpg", "f2.jpg"],
             sim_success=True,
             seed=2000 + i,
@@ -163,3 +165,34 @@ def test_duplicate_copies_a_clean_episode_and_keeps_the_original() -> None:
 def test_too_few_episodes_is_rejected() -> None:
     with pytest.raises(ValueError, match="needs more than 33 episodes"):
         create_defect_dataset(_make_episodes(33))
+
+
+def test_every_manifest_entry_was_applied() -> None:
+    # Recall per kind is computed from the manifest, so no entry may be listed only.
+    episodes = _make_episodes(99)
+    injected, manifest = create_defect_dataset(episodes)
+    before = {ep.episode_id: ep for ep in episodes}
+    after = {ep.episode_id: ep for ep in injected}
+    for d in manifest.defects:
+        source = before.get(str(d.parameters.get("original_id", "")))
+        assert defect_applied(before[d.target_ref], after[d.target_ref], d, source), d
+
+
+def test_episodes_without_signal_are_skipped_for_action_kinds() -> None:
+    # 70 episodes with all-zero actions cannot take unit_deg_rad or action_sign_flip.
+    episodes = _make_episodes(99)
+    for ep in episodes[:70]:
+        ep.actions = [[0.0] * 36 for _ in ep.actions]
+    _, manifest = create_defect_dataset(episodes)
+    action_kinds = {"unit_deg_rad", "action_sign_flip"}
+    targets = {d.target_ref for d in manifest.defects if d.parameters["kind"] in action_kinds}
+    assert len(targets) == 6
+    assert targets <= {ep.episode_id for ep in episodes[70:]}
+
+
+def test_too_few_eligible_episodes_names_the_kind() -> None:
+    episodes = _make_episodes(99)
+    for ep in episodes:
+        ep.actions = [[0.0] * 36 for _ in ep.actions]
+    with pytest.raises(ValueError, match="unit_deg_rad"):
+        create_defect_dataset(episodes)

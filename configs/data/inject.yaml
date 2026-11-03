@@ -13,21 +13,20 @@ data_defects:
   timestamp_sync_offset:  # D2
     enabled: true
     offset_seconds: 0.08  # Vượt ngưỡng tau_sync (0.033s)
-  joint_jump:  # D3
+  joint_jump:  # D3 · chiều khớp 0–30 của action
     enabled: true
     jump_magnitude: 1.5   # rad/s spike
-  joint_limit_exceeded:  # D3
+  joint_limit_exceeded:  # D3 · chỉ chiều khớp 0–30 của action (design 9.2)
     enabled: true
     excess_factor: 1.25   # Vượt giới hạn 25%
   nan_values:  # D1
     enabled: true
     nan_ratio: 0.05
-  unit_deg_rad:  # D3
+  unit_deg_rad:  # D3 · chỉ chiều góc 0–30, 35 của action, khác 0 trên episode (design 9.2)
     enabled: true
     scale: 57.2957795     # 180 / pi
   action_sign_flip:  # D7
-    enabled: true
-    dimensions: [0, 6]    # Chiều action bị đảo dấu
+    enabled: true         # Một chiều action có độ lệch chuẩn khác 0 trên episode (design 9.2)
   corrupted_success_label:  # D6
     enabled: true
   wrong_task_instruction:  # D6
