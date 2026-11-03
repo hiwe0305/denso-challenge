@@ -140,7 +140,20 @@ def test_same_job_gives_the_same_variant_wherever_it_runs(
     pipeline: tuple[Any, Any, Any], tmp_path: Path
 ) -> None:
     alone = run(pipeline, tmp_path / "a", [X], max_steps=SHORT_STEPS)[1][-1]
-    after = run(pipeline, tmp_path / "b", [Y, X], max_steps=SHORT_STEPS)[1][-1]
+    attempts, saved, blocks = run(pipeline, tmp_path / "b", [Y, X], max_steps=SHORT_STEPS)
+    after = saved[-1]
+    # Lineage and the transform on every attempt and in the saved episode's block (AC 6).
+    assert [a["parent_episode"] for a in attempts] == [Y["parent_id"], X["parent_id"]]
+    assert all(a["transform"]["t_k"] and a["condition_distance"] for a in attempts)
+    block = blocks[-1]
+    assert (block["source_kind"], block["synthetic_tier"], block["action_quality"]) == (
+        "synthetic",
+        "S2",
+        "planned",
+    )
+    assert block["parent_episode"] == X["parent_id"] and block["gen_seed"] == X["gen_seed"]
+    assert block["generator_version"].startswith("da35-s2-") and block["transform"]["t_p"]
+    assert block["split"] == "train" and block["level"] == X["level"]
     assert len(alone) == len(after) > 0
     for key in ("action", "action.eef", "observation.state", "teleop.navigate_command"):
         np.testing.assert_array_equal(
