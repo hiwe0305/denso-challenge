@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 def _default_timing_by_purpose() -> dict[str, Literal["sync", "async"]]:
@@ -22,6 +22,8 @@ def _default_timing_by_purpose() -> dict[str, Literal["sync", "async"]]:
 class EvalConfig(BaseModel):
     """Configuration mapping RunPlan purposes and default timing modes."""
 
+    model_config = ConfigDict(extra="forbid")
+
     default_timing: Literal["sync", "async"] = "async"
     timing_by_purpose: dict[str, Literal["sync", "async"]] = Field(
         default_factory=_default_timing_by_purpose
@@ -29,6 +31,9 @@ class EvalConfig(BaseModel):
     control_hz: float = 50.0
     chunk_size: int = 16
     latency_profiles: dict[str, Any] = Field(default_factory=dict)
+    # Async: control steps an RTC log may leave the robot without an action before the
+    # rollout counts as failed.
+    max_starved_steps: int = Field(default=0, ge=0)
 
     def timing_for_purpose(self, purpose: str) -> Literal["sync", "async"]:
         """Return evaluation timing mode for the specified RunPlan purpose."""

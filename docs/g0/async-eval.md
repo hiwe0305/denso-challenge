@@ -1,48 +1,54 @@
 # Đánh giá vòng kín đồng bộ và bất đồng bộ
 
-Tài liệu kiến trúc runner đánh giá vòng kín (closed-loop eval runner) và hai chế độ định thời (DA-23, 03 ADR-20).
+Runner closed-loop eval của làn Vòng có hai chế độ định thời (DA-23, 03 ADR-20, design 27/10 mục 8.5). Mã ở `packages/flywheel-loop/src/flywheel/loop/runner/`.
 
-## 1. Bối cảnh và lý tưởng thiết kế
+## 1. Vì sao cần chế độ bất đồng bộ
 
-Khi triển khai robot thực tế, việc suy luận chính sách mạng nơ-ron (policy inference) tiêu tốn thời gian tính toán thực tế (khoảng 160 ms cho $\Psi_0$ mỗi lần gọi suy luận trên phần cứng chuẩn). Cơ chế Real-Time Chunking (RTC) truyền các đoạn hành động (action chunk) bất đồng bộ xuống bộ điều khiển robot, trong khi các khung quan sát tiếp theo được xử lý song song.
+Ψ₀ cần khoảng 160 ms mỗi lần suy luận (số tác giả báo) và dùng real-time chunking (RTC). SIMPLE bước sim đồng bộ: trong lúc client RTC chờ chunk, sim không chạy. Vì vậy trace của sim không bao giờ cho thấy một chunk về muộn. Trên robot thật, trong lúc chờ, robot vẫn chạy nốt các action còn trong buffer; hết buffer mà chunk mới chưa về thì robot không có action để chạy (buffer cạn, mã R2).
 
-Mô phỏng đồng bộ truyền thống tạm dừng đồng hồ môi trường mô phỏng trong lúc tính toán đầu ra của policy, dẫn tới việc che giấu các lỗi do độ trễ gây ra:
-- Cạn bộ đệm hành động (buffer starvation) và giật điều khiển.
-- Phân kỳ trạng thái - hành động tại ranh giới các chunk (boundary jump).
-- Vượt quá vị trí mục tiêu (overshooting) ở vận tốc cao do phản ứng chậm.
+| Chế độ | Dùng cho | Chỉ số |
+|---|---|---|
+| `sync` | G0 (`g0_repro`) và HE (`he`), để so được với tác giả | `sim_success` của sim |
+| `async` | Các nhánh HS, HT (`branch_train`, `round`, `holdout`) | `sim_success` của sim, rồi xét lại bằng log RTC (mục 3) |
 
-Nhằm vừa đảm bảo khả năng đối sánh tái lập với kết quả công bố của tác giả, vừa phản ánh đúng kiểm thử hệ thống trong thực tế, runner hỗ trợ hai chế độ đánh giá:
-1. **Chế độ đồng bộ (`timing = "sync"`):** Đồng hồ mô phỏng dừng khi suy luận. Được dùng cho bài toán tái lập công thức G0 (`g0_repro`) và thử nghiệm lịch sử (`he`) để so sánh trực tiếp với bài báo gốc.
-2. **Chế độ bất đồng bộ (`timing = "async"`):** Mô phỏng độ trễ suy luận chính sách thực tế dựa trên profile đo đạc thực nghiệm từ log suy luận thật. Chế độ này cung cấp chỉ số chính cho toàn bộ các nhánh vòng dữ liệu (`branch_train`, `round`, `holdout`).
+## 2. Thư mục job và log RTC
 
-## 2. Gom log suy luận thời gian thực (RTC Logging)
+Mỗi rollout có một thư mục job `<staging_root>/<job_id>/`. Simulator adapter và client RTC của policy (DA-19, `flywheel_psi0/policy/rtc.py`) phải dùng chung thư mục này. Client ghi thêm (append) một `RTCInferenceRecord` cho mỗi chunk vào `<job_dir>/rtc.jsonl`. Làn Vòng chỉ đọc log qua hợp đồng `RTCInferenceRecord`, không import adapter.
 
-Trong chế độ bất đồng bộ, runner gom log viễn trắc suy luận của từng chunk vào `<job_dir>/rtc.jsonl`, tuân thủ hợp đồng `RTCInferenceRecord` và liên kết trực tiếp với `Trace`:
-- `job_id`: Mã định danh công việc đánh giá.
-- `trace_id`: Khóa liên kết với `TraceRef.trace_id` của bản ghi vết chuyển động.
-- `chunk_index`: Chỉ số tăng dần của đoạn hành động.
-- `observation_sent_s`: Mốc thời gian mô phỏng khi ảnh/trạng thái được chụp và gửi đi suy luận.
-- `chunk_received_s`: Mốc thời gian mô phỏng khi đoạn hành động đến bộ điều khiển robot.
-- `delay_steps`: Độ trễ tính theo số chu kỳ điều khiển rời rạc ($round(\text{delay\_s} \times \text{control\_hz})$).
-- `buffer_level`: Số lượng hành động còn lại trong hàng đợi bộ đệm tại thời điểm nhận chunk mới.
-- `boundary_jump`: Khoảng cách dịch chuyển thực tế giữa vị trí hiện tại và hành động đầu tiên của chunk mới (số thực $\ge 0.0$).
+| Trường | Nghĩa (theo client DA-19) |
+|---|---|
+| `job_id`, `trace_id` | Job và trace của rollout |
+| `chunk_index` | 0, 1, … trong trace |
+| `observation_sent_s`, `chunk_received_s` | Giây tính từ đầu trace |
+| `delay_steps` | `ceil(độ trễ × hz)`: số bước điều khiển trôi qua trong lúc suy luận |
+| `buffer_level` | Số action còn trong buffer khi gửi request |
+| `boundary_jump` | Thay đổi lớn nhất theo từng chiều giữa action cuối của chunk cũ và action đầu của chunk mới |
 
-## 3. Cấu hình và tích hợp RunPlan
+Ở chế độ `async`, runner kiểm log trước khi chấm. Log hỏng thì rollout bị báo `infra_status = policy_error`, `sim_success = None`, lý do ghi vào `runner.json`, và lần chạy sau sẽ chạy lại. Log bị coi là hỏng khi:
 
-Cấu hình phân định chế độ được khai báo tập trung trong `configs/loop/eval.yaml`:
+- không có file, file rỗng, hoặc có dòng không đúng schema;
+- `job_id` hoặc `trace_id` khác với rollout;
+- `chunk_index` không đếm 0, 1, … theo thứ tự;
+- request gửi đi trước khi chunk trước về (client chỉ có một request mỗi lúc);
+- `delay_steps` khác `ceil((chunk_received_s − observation_sent_s) × hz)`;
+- `buffer_level` lớn hơn kích thước chunk.
 
-```yaml
-default_timing: async
+`hz` và kích thước chunk lấy từ `PolicySpec`.
 
-timing_by_purpose:
-  g0_repro: sync
-  he: sync
-  branch_train: async
-  round: async
-  holdout: async
+## 3. Chấm ở chế độ bất đồng bộ
 
-control_hz: 50.0
-chunk_size: 16
-```
+**[Đề xuất]** Runner phát lại log trên đồng hồ thời gian thực. Với chunk thứ k ≥ 1, robot không có action trong `max(0, delay_steps − buffer_level)` bước. Chunk 0 không tính, vì robot chưa chạy. Tổng số bước này lớn hơn `max_starved_steps` trong `configs/loop/eval.yaml` (mặc định 0) thì rollout hỏng ở chế độ `async`, dù sim báo thành công. `runner.json` giữ cả kết quả của sim (`adapter_sim_success`) và tóm tắt lịch (`rtc`: số chunk, độ trễ lớn nhất, số bước và số chunk bị cạn).
 
-Khi độ trễ được cấu hình bằng 0 (`fixed_delay_s = 0.0`), chế độ bất đồng bộ cho ra quỹ đạo và kết quả toán học hoàn toàn đồng nhất với chế độ đồng bộ trên cùng hạt giống ngẫu nhiên (seed parity).
+Hệ quả: client gửi request khi buffer đã hết (`refill_at = 0`) thì mọi độ trễ khác 0 đều làm robot dừng sau mỗi chunk. Muốn qua, client phải gửi request sớm, khi buffer còn ít nhất `delay_steps` action. Ví dụ: chunk 16, 50 Hz, trễ 160 ms (8 bước) thì cần gửi khi buffer còn 8.
+
+Với độ trễ bằng 0, log có `delay_steps = 0` ở mọi chunk, nên hai chế độ cho cùng kết quả trên cùng seed.
+
+Chèn độ trễ vào chính lúc bước sim (`timing` phía sim) thuộc story 3.1a. Khi có phần đó, `sim_success` của sim cũng phản ánh độ trễ, còn phép kiểm ở mục này vẫn giữ nguyên.
+
+## 4. Bộ đệm kết quả
+
+Runner dùng lại kết quả chỉ khi `runner.json` có cùng khóa và `infra_status = ok`. Khóa là hash của request (chế độ, seed, điều kiện, giới hạn bước), endpoint policy (chứa mã checkpoint), simulator, config eval, `hz`, kích thước chunk và nội dung file profile trễ. Khóa khác thì runner xóa thư mục job rồi chạy lại, vì client RTC ghi thêm vào `rtc.jsonl`.
+
+## 5. Cấu hình
+
+`configs/loop/eval.yaml` khai chế độ theo mục đích của RunPlan, `hz` và kích thước chunk dùng khi không có `PolicySpec`, các profile trễ, và `max_starved_steps`. Khóa lạ trong file bị từ chối.

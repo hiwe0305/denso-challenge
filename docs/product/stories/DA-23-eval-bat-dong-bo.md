@@ -29,7 +29,7 @@ Là người vận hành vòng, tôi muốn runner chạy closed-loop eval ở c
 
 - [ ] 1. Hai chế độ trong runner (AC 1)
 - [x] 2. Gom log RTC (AC 2)
-- [ ] 3. Demo với bộ giả có độ trễ (AC 3)
+- [x] 3. Demo với bộ giả có độ trễ (AC 3)
 - [ ] 4. Khai chế độ trong RunPlan (AC 4)
 - [ ] 5. Chạy với `SimpleSim` và Ψ₀ thật (AC 5)
 
@@ -70,12 +70,19 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 | 03/11/2026 | Triển khai runner hai chế độ sync/async, gom log RTC, demo bộ giả có độ trễ, cấu hình eval.yaml và tài liệu async-eval.md | Nguyễn Thăng Long |
 | 03/11/2026 | Sửa review của Hiếu trên PR #49: ngữ nghĩa bất đồng bộ thật, gom log RTC từ adapter, phân phối log-normal, bộ đọc eval.yaml, sửa boundary_jump float, dịch tài liệu sang tiếng Việt | Nguyễn Thăng Long |
+| 3/11/2026 | Làm lại theo lần soát thứ hai của PO: khóa bộ đệm theo mọi đầu vào; async bắt buộc có log RTC và kiểm theo nghĩa; runner phát lại lịch RTC để chấm async; bỏ `[x]` ở nhiệm vụ 1 và 4 | Hiếu (cùng Claude) |
 
 ## Ghi chép khi làm
 
 - Giờ thực: 5.5h
 - Công cụ AI đã dùng: Antigravity
 - Ghi chú hoàn thành: Đã hoàn thiện AC 1-4 với kiểm thử đơn vị và hợp đồng; AC 5 đợi adapter SimpleSim và checkpoint Ψ₀ hoàn chỉnh.
+- Làm lại 3/11/2026 (Hiếu cùng Claude, PR #49):
+  - Nhiệm vụ 2 và 3 xong, test chạy runner thật trên `FakeSim2D`, `FakePolicy` của testkit. `RTCLoggingSim` trong test chỉ ghi log như client RTC của DA-19.
+  - Nhiệm vụ 1 còn thiếu profile trễ dựng từ một `rtc.jsonl` thật (`LatencyProfile.from_log` đã đọc qua `RTCInferenceRecord`). Log thật đầu tiên sẽ có từ client DA-19 trên #66.
+  - Nhiệm vụ 4 còn thiếu chỗ RunPlan gọi `timing_for_purpose`: trên master chưa có schema RunPlan.
+  - Bản giả client RTC nên chuyển vào `flywheel.testkit` qua PR riêng cho Hiếu.
+  - Đề xuất hợp đồng cho Hiếu: `RolloutResult` chưa có trường cho kết luận async. Runner đang hạ `sim_success` khi buffer cạn và giữ kết quả của sim ở `runner.json` (`adapter_sim_success`, `rtc`). Một trường như `rtc_starved_steps` hoặc `timing_verdict` sẽ cho làn Đánh giá đọc được hai kết luận mà không cần file riêng của runner.
 - File đã tạo hoặc sửa:
   - packages/flywheel-loop/src/flywheel/loop/runner/latency.py
   - packages/flywheel-loop/src/flywheel/loop/runner/config.py
