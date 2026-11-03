@@ -204,7 +204,7 @@ def test_stats_cover_the_release_without_nan(exported: Path) -> None:
     assert all(math.isfinite(x) for x in flat)
     actions = np.concatenate([_column(t, "action") for t in _tables(exported)])
     # The script averages in float32 (1.9e-3 off the float64 mean over 148k rows
-    # of tray_s1_a1d856c052df), so recompute the same way.
+    # of tray_s1_0d84cc87b1e5), so recompute the same way.
     mean32 = actions.astype(np.float32).mean(axis=0)
     assert np.allclose(stats["action"]["mean"], mean32, atol=1e-5)
 
