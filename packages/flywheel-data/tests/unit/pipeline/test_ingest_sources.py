@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -12,6 +14,13 @@ from flywheel.data.ingest.sources import SourceRecord, register_source, to_episo
 from pydantic import ValidationError
 
 Dataset = tuple[Path, list[EpisodeFrames]]
+Flywheel = Callable[..., None]
+Block = dict[str, object]
+
+
+def s2_block(s1: Block) -> Block:
+    return {**s1, "source_detail": "teleop_pico", "synthetic_tier": "S2",
+            "generator_version": "da35-s2-1", "parent_episode": "ep_parent0001"}
 
 
 def test_register_source_hashes_every_file(dataset: Dataset) -> None:
@@ -78,8 +87,11 @@ def test_psi_data_episode_is_a_measured_human_teleop_root(dataset: Dataset) -> N
     assert episode.embodiment_id == "g1_sonic_dwbc@1"
 
 
-def test_tray_s1_episode_is_a_planned_synthetic_s1(dataset: Dataset) -> None:
+def test_tray_s1_episode_is_a_planned_synthetic_s1(
+    dataset: Dataset, flywheel: Flywheel, s1_block: Block
+) -> None:
     root, written = dataset
+    flywheel(root, 1, s1_block)
     source = register_source(root, "planner_wbc", "internal-generated", "public")
     episode = to_episode(written[1], source, "train")
     assert episode.source_kind == "synthetic"
@@ -92,8 +104,11 @@ def test_tray_s1_episode_is_a_planned_synthetic_s1(dataset: Dataset) -> None:
     assert episode.embodiment_id == "g1_sonic_dwbc@1"
 
 
-def test_tray_s2_episode_goes_through_the_pico_pipe(dataset: Dataset) -> None:
+def test_tray_s2_episode_goes_through_the_pico_pipe(
+    dataset: Dataset, flywheel: Flywheel, s1_block: Block
+) -> None:
     root, written = dataset
+    flywheel(root, 2, s2_block(s1_block))
     source = register_source(root, "teleop_pico", "internal-generated", "public")
     episode = to_episode(written[2], source, "train")
     assert episode.meta.source_detail == "teleop_pico"
@@ -165,3 +180,109 @@ def test_the_lane_api_exposes_ingest() -> None:
     assert api.register_source is register_source
     assert api.to_episode is to_episode
     assert api.SourceRecord is SourceRecord
+
+
+def test_generated_episode_keeps_seed_level_and_generator(
+    dataset: Dataset, flywheel: Flywheel, s1_block: Block
+) -> None:
+    # Review #69 point 3; 03 invariant 10.
+    root, written = dataset
+    flywheel(root, 0, s1_block)
+    flywheel(root, 1, {**s1_block, "seed": 1001})
+    source = register_source(root, "planner_wbc", "internal-generated", "public")
+    lineage = source.lineage[0]
+    assert (lineage.seed, lineage.level, lineage.split) == (1000, 1, "train")
+    assert lineage.generator_version == "da33-planner-4+cfg.815b822a"
+    assert lineage.task_uid == "g1_wholebody_tray_transfer_teleop"
+    first, second = (to_episode(f, source, "train") for f in written[:2])
+    assert first.condition_id.startswith("cond_") and "unknown" not in first.condition_id
+    assert first.condition_id != second.condition_id
+
+
+def test_same_scene_gives_the_same_condition_across_sources(
+    tmp_path: Path, dataset_factory: Callable[[Path, list[int]], list[EpisodeFrames]],
+    flywheel: Flywheel, s1_block: Block,
+) -> None:
+    ids = []
+    for name in ("a", "b"):
+        root = tmp_path / name
+        frames = dataset_factory(root, [3])[0]
+        flywheel(root, 0, s1_block)
+        ids.append(to_episode(frames, register_source(root, "planner_wbc", "x", "public"),
+                              "train").condition_id)
+    assert ids[0] == ids[1]
+
+
+def test_variant_keeps_parent_and_root(
+    dataset: Dataset, flywheel: Flywheel, s1_block: Block
+) -> None:
+    root, written = dataset
+    flywheel(root, 2, {**s2_block(s1_block), "root_episode": "ep_root0001"})
+    source = register_source(root, "teleop_pico", "internal-generated", "public")
+    episode = to_episode(written[2], source, "train")
+    assert episode.parent_id == "ep_parent0001"
+    assert episode.root_id == "ep_root0001"
+
+
+def test_variant_without_parent_is_refused(
+    dataset: Dataset, flywheel: Flywheel, s1_block: Block
+) -> None:
+    root, written = dataset
+    block = s2_block(s1_block)
+    del block["parent_episode"]
+    flywheel(root, 2, block)
+    source = register_source(root, "teleop_pico", "internal-generated", "public")
+    with pytest.raises(ValueError, match="variant without parent_episode"):
+        to_episode(written[2], source, "train")
+
+
+@pytest.mark.parametrize("drop", ["seed", "planner_version"])
+def test_machine_made_episode_without_seed_or_generator_is_refused(
+    dataset: Dataset, flywheel: Flywheel, s1_block: Block, drop: str
+) -> None:
+    root, written = dataset
+    del s1_block[drop]
+    flywheel(root, 0, s1_block)
+    source = register_source(root, "planner_wbc", "internal-generated", "public")
+    with pytest.raises(ValueError, match="invariant 10"):
+        to_episode(written[0], source, "train")
+
+
+def test_machine_made_episode_without_a_flywheel_block_is_refused(dataset: Dataset) -> None:
+    root, written = dataset
+    source = register_source(root, "planner_wbc", "internal-generated", "public")
+    with pytest.raises(ValueError, match="no seed and no generator version"):
+        to_episode(written[0], source, "train")
+
+
+@pytest.mark.parametrize(
+    "label, value",
+    [("source_kind", "teleop"), ("synthetic_tier", "S1"), ("data_class", "internal"),
+     ("source_detail", "virtual_teleop")],
+)
+def test_a_recorded_label_that_disagrees_with_the_source_is_refused(
+    dataset: Dataset, flywheel: Flywheel, s1_block: Block, label: str, value: str
+) -> None:
+    # Review #69 point 8: real PICO data (source_kind teleop) must not be labelled synthetic.
+    root, written = dataset
+    flywheel(root, 2, {**s2_block(s1_block), label: value})
+    source = register_source(root, "teleop_pico", "internal-generated", "public")
+    with pytest.raises(ValueError, match=f"recorded {label}='{value}'"):
+        to_episode(written[2], source, "train")
+
+
+def test_a_non_string_parent_is_refused_at_registration(
+    dataset: Dataset, flywheel: Flywheel, s1_block: Block
+) -> None:
+    root, _ = dataset
+    flywheel(root, 2, {**s2_block(s1_block), "parent_episode": 7})
+    with pytest.raises(ValueError, match="parent_episode 7 is not an episode id"):
+        register_source(root, "teleop_pico", "internal-generated", "public")
+
+
+def test_an_episode_of_another_dataset_is_refused(dataset: Dataset) -> None:
+    root, written = dataset
+    source = register_source(root, "psi_data", "unknown", "public")
+    stranger = replace(written[0], episode_index=42)
+    with pytest.raises(ValueError, match="episode 42 is not in source"):
+        to_episode(stranger, source, "train")

@@ -79,3 +79,39 @@ def dataset(tmp_path: Path) -> tuple[Path, list[EpisodeFrames]]:
 @pytest.fixture
 def dataset_factory() -> Callable[[Path, list[int]], list[EpisodeFrames]]:
     return make_dataset
+
+
+TRAY_UID = "g1_wholebody_tray_transfer_teleop"
+S1_BLOCK = {
+    "seed": 1000,
+    "level": 1,
+    "planner_version": "da33-planner-4+cfg.815b822a",
+    "source_kind": "synthetic",
+    "source_detail": "planner_wbc",
+    "synthetic_tier": "S1",
+    "action_quality": "planned",
+    "embodiment_id": "g1_sonic_dwbc@1",
+    "renderer": "mujoco",
+    "data_class": "public",
+    "split": "train",
+}
+
+
+def set_flywheel(root: Path, index: int, block: dict[str, object], uid: str = TRAY_UID) -> None:
+    """Put a recorder's flywheel block in an episode's environment_config, as SIMPLE does."""
+    meta = root / "meta" / "episodes.jsonl"
+    rows = [json.loads(line) for line in meta.read_text().splitlines()]
+    for row in rows:
+        if row["episode_index"] == index:
+            row["environment_config"] = json.dumps({"uid": uid, "flywheel": block})
+    meta.write_text("".join(json.dumps(r) + "\n" for r in rows))
+
+
+@pytest.fixture
+def flywheel() -> Callable[..., None]:
+    return set_flywheel
+
+
+@pytest.fixture
+def s1_block() -> dict[str, object]:
+    return dict(S1_BLOCK)
