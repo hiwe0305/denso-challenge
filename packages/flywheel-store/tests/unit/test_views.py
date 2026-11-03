@@ -162,3 +162,42 @@ def test_event_written_twice_is_one_row(tmp_path: Path) -> None:
     assert con.execute("SELECT count(*) FROM decision").fetchone() == (1,)
     assert con.execute("SELECT count(*), sum(usd_amount) FROM ledger_entry").fetchone() == (1, 0.2)
     con.close()
+
+
+def test_optional_fields_keep_their_sql_type(tmp_path: Path) -> None:
+    """`X | None` columns are typed, so rates and sums need no string casts."""
+    paths = StorePaths(root=tmp_path)
+    writer = TableWriter("score", paths=paths)
+    for episode, success, level in (("ep_1", True, 1), ("ep_2", False, 2)):
+        writer.append(
+            Score(
+                episode_id=episode,
+                task_id="two-table",
+                config_sha256="d" * 64,
+                trace_sha256=episode[-1] * 64,
+                success=success,
+                level=level,
+                first_failed_step=None if success else 2,
+            )
+        )
+    estimate = LedgerEntry(
+        activity="eval",
+        resource_type="gpu_hour_3060",
+        quantity=1.0,
+        unit="hour",
+        usd_amount=0.2,
+        measure_kind="estimated",
+        run_plan_id="rp_1",
+        job_id="job_1",
+    )
+    append_ledger_entry(estimate, paths=paths)
+
+    con = open_duckdb(paths=paths)
+    assert con.execute("SELECT avg(success::INT) FROM score").fetchone() == (0.5,)
+    assert con.execute("SELECT max(level), max(first_failed_step) FROM score").fetchone() == (2, 2)
+    assert con.execute("SELECT sum(usd_amount) FROM ledger_entry").fetchone() == (0.2,)
+    types = dict(con.execute("SELECT column_name, column_type FROM (DESCRIBE score)").fetchall())
+    assert types["success"] == "BOOLEAN"
+    assert types["level"] == "BIGINT"
+    assert types["first_failed_step"] == "BIGINT"
+    con.close()

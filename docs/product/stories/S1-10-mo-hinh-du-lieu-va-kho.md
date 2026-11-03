@@ -47,6 +47,8 @@ Là kỹ sư data, tôi muốn schema có phiên bản và kho lưu bất biến
   - [x] 8.4 Sổ chi phí từ chối dòng thực đo trỏ tới ước tính không có hoặc trỏ tới dòng thực đo; `reverses_entry_id` phải là dòng có thật
   - [x] 8.5 `blob_path` chỉ nhận sha256 64 ký tự hex, không thoát ra ngoài kho
   - [x] 8.6 Bốn file mẫu chung trong testkit: `Score.json`, `Cluster.json`, `Decision.json`, `LedgerEntry.json`
+  - [x] 8.7 Cột kiểu `X | None` trong view có kiểu SQL thật (`BOOLEAN`, `BIGINT`, …), không phải `VARCHAR`
+  - [ ] 8.8 `StorePaths` kiểm mọi đoạn đường dẫn (cả `.` và `site`); bảng ngoài danh sách catalog bị từ chối khi ghi
 
 ## Phạm vi file
 
