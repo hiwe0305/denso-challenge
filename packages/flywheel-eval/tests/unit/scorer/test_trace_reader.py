@@ -55,6 +55,35 @@ def test_a_gap_in_one_signal_stays_a_gap(
     assert trace.missing_signals == ()
 
 
+def test_a_value_that_is_not_finite_is_a_gap_not_a_number(
+    tmp_path: Path, task: TaskDefinition, make_rows: MakeRows
+) -> None:
+    # `json.loads` accepts NaN, and `nan < min_height` is false, so a NaN left
+    # in place clears every limit it is checked against (FR21).
+    rows = [{**row, "torso_height": float("nan")} for row in make_rows()]
+    path = write(tmp_path / "ep.jsonl", rows)
+
+    trace = read_trace(path, task)
+
+    assert trace.signals["torso_height"].to_pylist() == [None] * 20
+    assert trace.missing_signals == ()
+
+
+def test_the_trace_hash_names_the_bytes_that_were_read(
+    tmp_path: Path, task: TaskDefinition, make_rows: MakeRows
+) -> None:
+    # `Score.id` of 03 section 4.3 is built from it, so it has to be the hash of
+    # the file this score was computed from, not of the rows after parsing.
+    path = write(tmp_path / "ep.jsonl", make_rows())
+
+    first = read_trace(path, task).trace_sha256
+
+    assert len(first) == 64
+    assert read_trace(path, task).trace_sha256 == first
+    other = write(tmp_path / "other.jsonl", make_rows(steps=3))
+    assert read_trace(other, task).trace_sha256 != first
+
+
 def test_takes_the_episode_id_from_the_rows(
     tmp_path: Path, task: TaskDefinition, make_rows: MakeRows
 ) -> None:

@@ -80,6 +80,20 @@ def test_a_gap_in_a_balance_signal_is_unknown(make_rows: MakeRows, limits: Balan
     assert verdict.unknown_reason == "tín hiệu có khoảng trống: torso_height"
 
 
+def test_a_nan_in_a_balance_signal_is_unknown_not_upright(
+    make_rows: MakeRows, limits: BalanceLimits
+) -> None:
+    # `nan < min_height` and `abs(nan) > max_tilt` are both false, so a NaN that
+    # survived the read would clear both limits and report an episode nobody
+    # measured as one that stayed upright (FR21).
+    rows = [{**row, "torso_height": float("nan")} for row in make_rows()]
+
+    verdict = check_balance(read_signals(rows), limits)
+
+    assert verdict.violated is False
+    assert verdict.unknown_reason == "tín hiệu có khoảng trống: torso_height"
+
+
 def test_an_empty_trace_is_unknown(limits: BalanceLimits) -> None:
     assert check_balance(read_signals([]), limits).unknown is True
 
