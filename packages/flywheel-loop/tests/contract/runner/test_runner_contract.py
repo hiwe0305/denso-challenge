@@ -43,6 +43,7 @@ def test_runner_batch_eval_contract(tmp_path: Path) -> None:
 
     assert len(results) == 3
     for idx, res in enumerate(results):
+        assert res.timing_verdict is None  # sync
         assert res.job_id == f"batch-job-{idx}"
         assert res.sim_success is True
         assert res.trace_ref is not None
@@ -69,4 +70,4 @@ def test_async_on_a_simulator_without_rtc_log_does_not_pass(tmp_path: Path) -> N
         result = Runner(sim, tmp_path).run_rollout(request, endpoint)
 
     assert result.infra_status == "policy_error"
-    assert result.sim_success is None
+    assert result.timing_verdict == "not_checked"
