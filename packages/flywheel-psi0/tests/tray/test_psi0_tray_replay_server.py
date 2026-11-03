@@ -6,6 +6,7 @@ import json
 import threading
 import urllib.request
 from collections.abc import Iterator
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -17,6 +18,23 @@ def test_wire_format_round_trips() -> None:
     back = decode(json.loads(json.dumps(encode(value))))
     np.testing.assert_array_equal(back["a"], value["a"])
     assert back["b"] == [4] and back["c"] == "x"
+
+
+SAMPLE = Path(__file__).parent / "data" / "simple_client_sample.json"
+
+
+def test_reads_and_writes_what_simples_client_writes() -> None:
+    # Made by SIMPLE b75c678's own client.py (numpy 2.2.6, as CI): a request with an
+    # uint8 image and float32 states, a response of 24 x 36 float32, a float64 scalar.
+    sample = json.loads(SAMPLE.read_text())
+    request = decode(sample["request"])
+    assert request["image"]["rgb_head_stereo_left"].dtype == np.uint8
+    assert request["image"]["rgb_head_stereo_left"].shape == (2, 3, 3)
+    assert request["state"]["states"].dtype == np.float32
+    assert request["history"] == {"reset": True, "seed": 1001}
+    assert decode(sample["scalar"])["x"] == 0.5
+    for key in ("request", "response", "scalar"):
+        assert json.loads(json.dumps(encode(decode(sample[key])))) == sample[key]
 
 
 @pytest.fixture

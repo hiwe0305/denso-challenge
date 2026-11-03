@@ -10,7 +10,9 @@ the scorer agree: an episode the planner solved must still succeed (review of PR
 point 3).
 
 The wire format mirrors `simple.baselines.client` (numpy arrays as base64 with dtype
-and shape) without importing SIMPLE. A request whose `history` has `reset` starts the
+and shape) without importing SIMPLE. SIMPLE writes the dtype with numpy's
+`dtype_to_descr`, which for the unstructured dtypes it sends is `dtype.str` ("<f4",
+"|u1"); `np.dtype` reads that back. A request whose `history` has `reset` starts the
 next episode of the queue; after the last recorded frame the last action is held.
 
     python -m flywheel_psi0.tray.replay_server --release <release dir> \
@@ -29,7 +31,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from numpy.lib.format import descr_to_dtype, dtype_to_descr
 from numpy.typing import NDArray
 
 from flywheel_psi0.tray.demo_sets import EXPORT_META
@@ -44,10 +45,10 @@ def encode(value: Any) -> Any:
     if isinstance(value, list):
         return [encode(v) for v in value]
     if isinstance(value, (np.ndarray, np.generic)):
-        array = np.ascontiguousarray(value)
+        array = np.asarray(value)  # keeps a scalar 0-d; tobytes() is C order
         return {
             "__numpy__": b64encode(array.tobytes()).decode(),
-            "dtype": dtype_to_descr(array.dtype),
+            "dtype": array.dtype.str,  # = SIMPLE's dtype_to_descr for unstructured dtypes
             "shape": list(array.shape),
         }
     return value
@@ -56,7 +57,7 @@ def encode(value: Any) -> Any:
 def decode(value: Any) -> Any:
     if isinstance(value, dict):
         if "__numpy__" in value:
-            flat = np.frombuffer(b64decode(value["__numpy__"]), descr_to_dtype(value["dtype"]))
+            flat = np.frombuffer(b64decode(value["__numpy__"]), np.dtype(value["dtype"]))
             return flat.reshape(value["shape"]) if value["shape"] else flat[0]
         return {k: decode(v) for k, v in value.items()}
     if isinstance(value, list):
