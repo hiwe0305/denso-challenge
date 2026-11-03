@@ -18,11 +18,15 @@ from flywheel.data.ingest.lerobot import (
     read_info,
     write_episode,
 )
+from flywheel.data.ingest.sources import SourceRecord, register_source, to_episode
 
 __all__ = [
     "EpisodeFrames",
     "LeRobotFormatError",
+    "SourceRecord",
     "iter_episodes",
     "read_info",
+    "register_source",
+    "to_episode",
     "write_episode",
 ]
