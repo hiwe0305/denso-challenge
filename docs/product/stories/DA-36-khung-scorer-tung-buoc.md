@@ -34,6 +34,7 @@ Là kỹ sư đánh giá, tôi muốn một scorer độc lập chấm từng b�
 - [x] 4. Điều kiện chạy suốt episode (thăng bằng) và `L-BALANCE` ở bất kỳ bước nào (AC 1, 3)
 - [x] 5. `api.py`, lệnh `fw eval score` và artifact kết quả (AC 5)
 - [x] 6. Test một ca mỗi kiểu lỗi, ca thành công, ca thiếu tín hiệu (AC 6)
+- [ ] 7. Đổi `ScoreRecord` sang `Score` của `flywheel.contracts.entities` trong ngày #36 merge (AC 1; PO quyết ngày 3/11/2026 trên #58, issue #62 mục 2). Hai chỗ trong `api.py`; `ScoreRecord` xóa, không để lại lớp cũ
 
 ## Phạm vi file
 
@@ -76,6 +77,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 3/11/2026 | Sửa theo review PO trên #58: tín hiệu từng bước khai trong cấu hình nên thiếu tín hiệu ra "chưa rõ" bất kể vị từ trả gì (điểm 1, 7); giá trị không hữu hạn là khoảng trống (điểm 2); `L-COLLIDE`, `L-TIMEOUT` lấy lớp của bước hỏng k (điểm 3); kiểu lỗi không có bước trượt thì raise (điểm 4); CLI ra mã 2 kèm một dòng thay vì traceback, cấu hình mặc định tìm từ gốc repo (điểm 5, 6); `BalanceLimits` sang `config` và fixture dùng `h_place` của file (điểm 8). Theo quyết định PO: `L-BALANCE` chỉ dùng khi không bước nào trượt hay chưa rõ, episode đã có kiểu lỗi thì giữ kiểu và chỉ ghi `balance_violated`; thêm `trace_sha256` vào bản ghi; thêm nhiệm vụ 7. Đánh số bước (0 hay 1) chờ #62, chưa đổi | Châu |
 | 3/11/2026 | Mở issue #59 (Contract change cho Long): `Score` của S1-10 chưa merge, enum bốn trạng thái thay `stage_success: bool | None`, lý do "chưa rõ" có kiểu, `step_enter_s`/`step_exit_s`, và `from_failed_stage` cho `FailureKindSpec.failure_class` của L-COLLIDE, L-TIMEOUT. Kèm chỗ xin PO quyết về bốn mã task bê khay. AC 1 đạt một phần tới khi issue chốt | Châu |
 | 3/11/2026 | Làm xong 6 nhiệm vụ. Thêm `packages/flywheel-eval/pyproject.toml` và `uv.lock` vào Phạm vi file (R6, nêu trong PR). Hai điểm cần hợp đồng: `Score` của S1-10 (#36) chưa merge nên artifact là `ScoreRecord` trong làn, đúng từng trường của `Score`; thời điểm vào và ra từng bước, lý do "chưa rõ" có kiểu, và cách khai "lớp lỗi theo bước hỏng k" cho L-COLLIDE, L-TIMEOUT cần issue Contract change cho Long | Châu |
 | 3/11/2026 | Đặt mã DA-36 (DA-35 đã dùng cho #40); phụ thuộc S1-08, `Score` của S1-10 chưa merge; AC 1 ghi ra `Score`, trường thiếu qua issue Contract change; hạn 8/11 theo 07 mục 2.4; gộp người bình luận DA-32 vào Hiếu | PO (Hiếu) |
@@ -83,7 +85,9 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực: 13h (nhiệm vụ 1 2h, 2 2.5h, 3 2h, 4 1.5h, 5 2h, 6 3h)
+- Giờ thực: 21.5h (nhiệm vụ 1 2h, 2 2.5h, 3 2h, 4 1.5h, 5 2h, 6 3h; sửa theo review PO
+  3/11/2026: nhiệm vụ 1 0.5h, 2 3h, 4 0.5h, 5 1.5h, sổ sách 0.5h; nhiệm vụ 7 chưa làm,
+  chờ #36 merge)
 - Công cụ AI đã dùng: Claude Code (Opus 5)
 - Ghi chú hoàn thành:
   - Chấm là bước tính thuần: không mở file, không chạy sim, không gọi model, không đọc đồng hồ. Lớp đọc (`reader.py`) tách riêng; `score_episode` chỉ nhận bảng tín hiệu. Có test chấm hai lần so bản ghi từng byte (AC 5).
@@ -92,7 +96,11 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
   - "Chưa rõ" luôn kèm lý do; `StepScore` chặn trạng thái `unknown` không có lý do. Điều kiện thăng bằng không kiểm được thì episode sạch mất quyền "đạt" và ra `L-UNKNOWN`, không im lặng thành "đạt" (bài học DA-08).
   - Ngưỡng ở `configs/eval/scorer/two-table.yaml`, mọi số ghi rõ là **giả định**, hash đi theo mỗi bản ghi. Cấu hình viết cho task khác bị từ chối, không chấm bằng số sai.
   - `fw eval score --task module:Lớp` nạp định nghĩa task theo tên người dùng truyền, nên làn vẫn không import adapter nào (`lint-imports` xanh).
-  - Chưa làm, không thuộc story: hiệu chỉnh ngưỡng và đối chiếu cờ `check_success` của SIMPLE là DA-37; `Trace` thật của SIMPLE chưa có (hook của Hiếu, 8/11) nên mọi ca chạy trên trace tổng hợp dựng trong test, đúng AC 6.
+  - Sau review PO ngày 3/11/2026: quy ước "chưa rõ" không còn phụ thuộc vị từ của task. Mỗi bước khai tín hiệu nó được chấm trên trong `step_signals` của cấu hình, thiếu tín hiệu đó là "chưa rõ" dù `evaluate()` trả `True` hay `False`; có test với một task "ngây thơ" trả cứng cả hai chiều. Tín hiệu không thuộc bước nào (`collision`) nằm ở `episode_signals`: thiếu nó thì episode sạch mất quyền "đạt". Lý do chỉ kể tín hiệu của chính bước đó.
+  - `L-COLLIDE` và `L-TIMEOUT` lấy lớp lỗi chung của bước hỏng k qua `class_from_failed_step` của cấu hình (spec mục 5.2; 03 mục 4.3). Trước đó lấy lớp cố định của `FailureKindSpec` nên va chạm lúc đi bị ghi `approach`.
+  - `L-BALANCE` chỉ dùng khi không bước nào trượt và không bước nào chưa rõ (quyết định PO). Episode đã có kiểu lỗi giữ kiểu đó, cú ngã ghi ở `balance_violated` và dòng trace trong `meta`.
+  - Hai chỗ khai trong cấu hình (`step_signals`, `class_from_failed_step`) là cầu tạm: `StageSpec` chưa chở được danh sách tín hiệu và `FailureKindSpec.failure_class` chỉ chở được một giá trị. Đã bổ sung vào issue #59 (mục 5 và mục mới), xin Long đưa vào hợp đồng; khi có thì xóa hai khóa này khỏi file cấu hình.
+  - Chưa làm, không thuộc story: hiệu chỉnh ngưỡng và đối chiếu cờ `check_success` của SIMPLE là DA-37; `Trace` thật của SIMPLE chưa có (hook của Hiếu, 8/11) nên mọi ca chạy trên trace tổng hợp dựng trong test, đúng AC 6. Đánh số bước từ 0 hay từ 1 chờ #62, chưa đổi mã nào.
 - File đã tạo hoặc sửa:
   - `packages/flywheel-eval/src/flywheel/eval/scorer/`: `reader.py`, `status.py`, `steps.py`, `failure.py`, `balance.py`, `score.py`, `artifact.py`
   - `packages/flywheel-eval/src/flywheel/eval/`: `api.py`, `cli.py`, `config.py`
