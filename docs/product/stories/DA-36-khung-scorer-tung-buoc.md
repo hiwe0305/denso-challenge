@@ -28,7 +28,7 @@ Là kỹ sư đánh giá, tôi muốn một scorer độc lập chấm từng b�
 
 ## Nhiệm vụ
 
-- [ ] 1. Đọc `TaskDefinition` và trace tổng hợp qua contracts, lớp đọc tách khỏi phần chấm (AC 1, 5)
+- [x] 1. Đọc `TaskDefinition` và trace tổng hợp qua contracts, lớp đọc tách khỏi phần chấm (AC 1, 5)
 - [ ] 2. Chấm trạng thái từng bước, bốn trạng thái và hai quy ước của AC 2 (AC 1, 2)
 - [ ] 3. Bước hỏng đầu tiên k và kiểu lỗi từ `FailureKindSpec`, lớp lỗi chung (AC 3, 4)
 - [ ] 4. Điều kiện chạy suốt episode (thăng bằng) và `L-BALANCE` ở bất kỳ bước nào (AC 1, 3)
@@ -43,6 +43,8 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `packages/flywheel-eval/src/flywheel/eval/api.py`, `packages/flywheel-eval/src/flywheel/eval/cli.py`, `packages/flywheel-eval/src/flywheel/eval/config.py`
 - `packages/flywheel-eval/tests/unit/scorer/`, `packages/flywheel-eval/tests/contract/scorer/`
 - `configs/eval/scorer/`
+- `packages/flywheel-eval/pyproject.toml` (chủ package là Châu, 07 mục 2.1 luật 2): khai `pyarrow`, thư viện mà `TaskDefinition.evaluate()` nhận bảng tín hiệu bằng
+- `uv.lock` (file dùng chung, R6): chỉ ba dòng ghi lại `pyarrow` cho `flywheel-eval`; không thêm gói mới vào khóa, `pyarrow` đã có sẵn qua `flywheel-contracts`
 
 ## Chỗ cần PO quyết trước khi làm
 
