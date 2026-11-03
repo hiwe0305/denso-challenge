@@ -7,7 +7,8 @@ Bản v0.3. Tài liệu này là nguồn duy nhất cho tầng web: API, Postgre
 | Ngày | Bản | Nội dung | Người |
 |---|---|---|---|
 | 1/11/2026 | 0.2 | Bản BA viết lại từ v0.1: chia Postgres hai nửa, một đường ghi, 39 bảng | — |
-| 3/11/2026 | 0.3 | Ba chỗ sửa theo quyết định và mã đã merge trong ngày, xem bảng dưới. Số bảng 39 → 40 (thêm `system_diagnoses`), nhóm P 27 → 28. Thêm C17, C18. DDL chuyển thành khối SQL thật | Châu |
+| 3/11/2026 | 0.3 | Ba chỗ sửa theo quyết định và mã đã merge trong ngày, xem bảng dưới. Số bảng 39 → 41 (thêm `system_diagnoses` và `train_diagnosis_skips`), nhóm P 27 → 29. Thêm C17, C18, C19 và BR-12. DDL chuyển thành khối SQL thật | Châu |
+| 3/11/2026 | 0.3 | Dựng `web/schema/` theo tài liệu này: 9 file SQL, 41 bảng, 3 role, trigger C5–C9/C14/C19, 18 view, GRANT theo cột. `train_diagnosis_skips` là chỗ §4.4b để ngỏ tới M1, nay chốt | Châu |
 
 Ba chỗ sửa ở bản 0.3:
 
@@ -150,14 +151,14 @@ Lõi đã có kho append-only riêng (JSONL + DuckDB) và sổ chi phí riêng. 
 
 ## 4. Mô hình dữ liệu
 
-Schema có **40 bảng**, chia ba nhóm theo ai được ghi. File đầy đủ: `web/schema/schema.sql`.
+Schema có **41 bảng**, chia ba nhóm theo ai được ghi. File đầy đủ: `web/schema/schema.sql`, gọi 9 file đánh số theo thứ tự khoá ngoại.
 
 ### 4.1 Ba nhóm bảng
 
 | Nhóm | Số bảng | Bảng | Ai ghi |
 |---|---|---|---|
 | **W** · web tự quản | 9 | `app_users`, `agent_chat_sessions`, `agent_chat_messages`, `notifications`, `human_actions`, `job_requests`, `dataset_intakes`, `experiment_drafts`, `sync_runs` | `fw_api` (riêng `sync_runs` do `fw_sync` ghi) |
-| **P** · chiếu từ lõi | 28 | `sources`, `datasets`, `episodes`, `episode_qa_reports`, `pipeline_stage_defs`, `pipeline_stage_runs`, `releases`, `release_items`, `run_plans`, `experiments`, `experiment_datasets`, `model_checkpoints`, `training_metrics`, `train_diagnoses`, `probe_results`, `sim_evaluations`, `eval_episodes`, **`system_diagnoses`**, `failure_clusters`, `diagnostic_runs`, `interventions`, `fix_rate_events`, `repair_tickets`, `flywheel_recommendations`, `flywheel_algo_steps`, `decisions`, `cost_ledger_entries`, `price_books` | `fw_sync` |
+| **P** · chiếu từ lõi | 29 | `sources`, `datasets`, `episodes`, `episode_qa_reports`, `pipeline_stage_defs`, `pipeline_stage_runs`, `releases`, `release_items`, `run_plans`, `experiments`, `experiment_datasets`, `model_checkpoints`, `training_metrics`, `train_diagnoses`, **`train_diagnosis_skips`**, `probe_results`, `sim_evaluations`, `eval_episodes`, **`system_diagnoses`**, `failure_clusters`, `diagnostic_runs`, `interventions`, `fix_rate_events`, `repair_tickets`, `flywheel_recommendations`, `flywheel_algo_steps`, `decisions`, `cost_ledger_entries`, `price_books` | `fw_sync` |
 | **S** · bộ chấm, cách ly | 3 | `defect_manifests`, `defect_items`, `defect_scores` | `fw_sync`; `agent_ro` không đọc được |
 
 ### 4.2 So với bản BA cũ (19 bảng)
@@ -680,7 +681,9 @@ CREATE TABLE probe_results (
 );
 ```
 
-`train_diagnoses` không có cột `skipped`. Nguồn của nó, `TrainDiagnosis` của `flywheel.contracts.training`, mang một danh sách `skipped` và **phải nạp về**, cùng lý do như `system_diagnoses` ở trên — một checkpoint không có probe P4 thì T7 không chấm được, không phải không quên. Bộ nạp ghi danh sách đó vào `train_diagnosis_skips` (một bảng con, hoặc một cột `skipped JSONB` trên `train_diagnoses`); chốt khi dựng schema thật ở mốc M1.
+`train_diagnoses` là một dòng một mã **đã nổ**, nên không có chỗ treo danh sách `skipped` mà `TrainDiagnosis` của `flywheel.contracts.training` mang theo. Danh sách đó **phải nạp về**, cùng lý do như `system_diagnoses.skipped`: một checkpoint không có probe P4 thì T7 không chấm được, không phải không quên (BR-12).
+
+**Chốt ở M1 (3/11/2026):** một bảng riêng `train_diagnosis_skips`, khoá `(experiment_id, config_sha256, code)`. Không chọn cột `skipped JSONB` trên `train_diagnoses` vì danh sách đó thuộc về một *lần chạy*, không thuộc về một finding, nên đặt trên dòng finding sẽ lặp lại nó mỗi mã đã nổ và biến mất khi không mã nào nổ — đúng lúc nó cần thiết nhất.
 
 #### `price_books` và `cost_ledger_entries` (sửa)
 
@@ -1084,7 +1087,7 @@ Hôm nay 3/11/2026, demo 17/11/2026, còn 14 ngày. Châu làm cả FE, BE và b
 | Mốc | Hạn | Giao nộp | Nghiệm thu |
 |---|---|---|---|
 | M0 · Chốt hợp đồng | 4/11 | Enum (Phụ lục A) đối chiếu xong với `flywheel-contracts`; hình dạng response GET cho 5 màn hình lõi; bộ mock tối thiểu cho M7 | Test so enum xanh; MSW trả được mock M7 |
-| M1 · Schema và bộ nạp | 6/11 | `schema.sql` 40 bảng, migration Alembic, 3 role, `fwsync import` trên bộ mock, trigger và CHECK của mục 4.5 | Nạp mock hai lần cho cùng kết quả; mỗi luật một ca đúng và một ca sai; `fw_api` không ghi được bảng P |
+| M1 · Schema và bộ nạp | 6/11 | `schema.sql` 41 bảng, migration Alembic, 3 role, `fwsync import` trên bộ mock, trigger và CHECK của mục 4.5 | Nạp mock hai lần cho cùng kết quả; mỗi luật một ca đúng và một ca sai; `fw_api` không ghi được bảng P |
 | M2 · API đọc | 8/11 | Toàn bộ endpoint mục 7.1; SSE | Postman collection chạy hết |
 | M3 · 4 màn hình lõi | 10/11 | M7, M6, M2, M9 chạy trên API thật | Đi hết kịch bản demo bằng chuột, không chỗ nào trắng |
 | M4 · Hành động | 12/11 | Endpoint mục 7.2, `fwsync export`, `fwsync fake-core`, vòng đời hành động trên FE, chuông; chat chỉ đọc | Bấm duyệt → artifact trong outbox → lõi giả áp dụng → nạp lại thấy APPLIED |
