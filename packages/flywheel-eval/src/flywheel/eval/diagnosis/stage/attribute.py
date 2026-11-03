@@ -54,7 +54,7 @@ OUT_OF_DOMAIN = "out_of_domain"
 
 # What a rule says when the probe it needs is not there. A reason, not an empty
 # answer: a row nobody could judge must not read as a row that did not apply.
-NO_P1 = "không có kết quả probe P1 trên khung hình của lượt lỗi"
+NO_P1 = "không có kết quả probe P1 của checkpoint"
 NO_P3 = "không có kết quả probe P3 của checkpoint"
 NO_P4 = "không có kết quả probe P4 của checkpoint sau fine-tune"
 NO_GROUPS = "không biết nhóm action nào liên quan tới bước hỏng"
@@ -149,7 +149,14 @@ def _apply(evidence: str, inputs: StageInputs, cfg: StageThresholds) -> Verdict:
 
 
 def _p1_wrong(inputs: StageInputs, cfg: StageThresholds) -> Verdict:
-    """Row 1: P1 answered wrong on the frames of this very failure."""
+    """Row 1: P1 answered under the accuracy the table asks for.
+
+    The table asks for P1 wrong "on the frames of this very failure", but
+    `ProbeP1` is a score over a whole probe set (`dataset_sha256`) and knows
+    nothing of which frames a failure saw. The evidence says so - it names the
+    probe set, not frames - and a P1 scored per failure is a contract change
+    for P1 (issue #70), not something this rule can claim.
+    """
     if inputs.p1 is None:
         return NO_P1
     return _wrong_answers(inputs, cfg) or None
@@ -244,7 +251,7 @@ def _wrong_answers(inputs: StageInputs, cfg: StageThresholds) -> list[Evidence]:
     return [
         Evidence(
             probe="P1",
-            where=_where(inputs, kind),
+            where=_where(inputs.p1, kind),
             value=accuracy,
             threshold=cfg.p1_min_accuracy,
         )
@@ -267,9 +274,8 @@ def _hypothesis(row: StageRow, evidence: list[Evidence]) -> StageHypothesis:
     )
 
 
-def _where(inputs: StageInputs, question_kind: str) -> str:
-    frames = ", ".join(inputs.frames) if inputs.frames else "khung hình không ghi tên"
-    return f"câu hỏi `{question_kind}` trên {frames}"
+def _where(p1: ProbeP1, question_kind: str) -> str:
+    return f"câu hỏi `{question_kind}`, tập probe P1 `{p1.dataset_sha256}`"
 
 
 def _step_label(inputs: StageInputs) -> str:

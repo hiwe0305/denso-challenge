@@ -19,6 +19,9 @@ thresholds:
 
 rows:
   - row_id: stage1_perception
+    # Tên `evidence` giữ nguyên, nhưng `ProbeP1` hiện là số trên cả tập probe
+    # (`dataset_sha256`), không trên khung hình của chính lượt lỗi; bằng chứng
+    # ghi tập probe. P1 theo từng lượt là đề xuất hợp đồng cho P1 (issue #70).
     evidence: p1_wrong_on_failure_frames
     attribute_to: "Stage 1 · nhận thức"
     intervention: "Ghi nhận và báo cáo, không tiêu ngân sách: tăng cường thị giác đã cố định cho mọi nhánh (spec mục 7.3); synthetic S3 là hướng sau PoC"
