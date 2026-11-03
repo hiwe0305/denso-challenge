@@ -28,7 +28,7 @@ Là trưởng nhóm phụ trách Ψ₀, tôi muốn train cả 3 stage bằng co
 
 ## Nhiệm vụ
 
-- [ ] 1. Script đọc code, bảng log (AC 1)
+- [x] 1. Script đọc code, bảng log (AC 1)
 - [ ] 2. `Psi0Trainer` 3 stage (AC 2)
 - [ ] 3. Lớp bọc log, `metrics.jsonl` (AC 3)
 - [ ] 4. Client RTC và log inference (AC 4)
