@@ -39,3 +39,25 @@ def test_get_nonexistent_blob_raises(tmp_path: Path) -> None:
     paths = StorePaths(root=tmp_path)
     with pytest.raises(FileNotFoundError):
         get_blob("a" * 64, paths=paths)
+
+
+@pytest.mark.parametrize(
+    "bad_hash",
+    [
+        "../../../../etc/passwd",
+        "/./" + "a" * 61,
+        "ab/../../" + "0" * 55,
+        "A" * 64,
+        "a" * 63,
+        "",
+    ],
+)
+def test_blob_lookup_rejects_anything_but_a_sha256(tmp_path: Path, bad_hash: str) -> None:
+    """PO review 3/11 item 5: a hash from the caller cannot reach a file outside the store."""
+    paths = StorePaths(root=tmp_path)
+    with pytest.raises(ValueError, match="sha256"):
+        paths.blob_path(bad_hash)
+    with pytest.raises(ValueError, match="sha256"):
+        has_blob(bad_hash, paths=paths)
+    with pytest.raises(ValueError, match="sha256"):
+        get_blob(bad_hash, paths=paths)
