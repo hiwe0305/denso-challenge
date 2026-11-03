@@ -38,6 +38,7 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
   - [ ] 1.7 Sinh kho S1 seed 1000–1609 trên rtx3060, QA phát lại, release có hash, đo chất lượng cả kho
   - [ ] 1.8 Chọn tập lồng nhau 40 ⊂ 80 ⊂ 160 ⊂ 320 qua bộ lọc; RunPlan `he-tray-v2.yaml` (eval 270 điều kiện, C+ n_add 160), đóng băng; bản 1 ghi đã thay
   - [ ] 1.9 Cập nhật sổ chi phí theo bản 2 và giờ máy thực đo của lô sinh
+  - [x] 1.10 (quyết định của Hiếu 4/11/2026 ở S1-04 mục 4.1) Ghi đè `train.validation_steps: 2000` ở cấp plan, chung ba nhánh; `runplan check` chỉ cho ghi đè không đổi quá trình train; đóng băng lại bản 1 thành `rp_c49c99c8d8da`; sổ chi phí fine-tune sang Colab L4, 16,6 CU mỗi lần
 - [ ] 2. Fine-tune A, C, C-NOEGO (AC 2)
 - [ ] 3. Eval và bảng kết quả, video (AC 3, 4)
 - [ ] 4. Nhánh B khi có video (AC 5)
@@ -70,7 +71,8 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 3/11/2026 | Thêm AC 6 và nhiệm vụ 5: phần 6 của demo chạy hết vòng Failure → Data trên task khay, có nhánh C+ (design 28/10 mục 6.6) | PO (Hiếu) |
 | 3/11/2026 | DA-33 có release: viết nhiệm vụ con 1.1–1.5, trạng thái sang Đang làm | Claude cho Hiếu |
 | 3/11/2026 | Hiếu chốt tăng dữ liệu, chất lượng cao: thêm nhiệm vụ con 1.6–1.9 (N 320/160, lọc chất lượng, eval 270 điều kiện); nhiệm vụ 1 mở lại | PO (Hiếu) |
+| 4/11/2026 | Theo quyết định PO ở S1-04 (L4, validation mỗi 2.000 bước): thêm nhiệm vụ con 1.10; RunPlan bản 1 đóng băng lại thành `rp_c49c99c8d8da` | Claude cho Hiếu |
 
 ## Ghi chép khi làm
 
-- 3/11/2026 (nhiệm vụ 1): RunPlan `rp_59164e3970c4` đóng băng ([`he-tray.yaml`](../../../configs/runplans/tray/he-tray.yaml)); tập `A` = `94245f8d36ab…`, `C` = `5db98a38ed80…` ([`demo_sets.json`](../../../configs/runplans/tray/demo_sets.json)); quy tắc diễn giải ở [docs/he/tray.md](../../he/tray.md). Sổ ước lượng 4 lần fine-tune × 26 CU = 104 CU trong khoảng 162 CU còn lại. Rủi ro: con số giữ chỗ 1,0 s/bước của `psi0-stage3.yaml` cho 11,1 giờ và khoảng 75 CU mỗi lần, tức khoảng 300 CU cho 4 lần; cần số đo của S1-04 trước khi chạy nhiệm vụ 2. Tập con 40 và 80 chưa thành dataset LeRobot: Ψ₀ `LerobotDataConfig` không có bộ lọc episode, nên nhiệm vụ 2 phải dựng hai dataset con kèm `stats_psi0.json` riêng.
+- 3/11/2026 (nhiệm vụ 1): RunPlan `rp_59164e3970c4` đóng băng ([`he-tray.yaml`](../../../configs/runplans/tray/he-tray.yaml)); tập `A` = `94245f8d36ab…`, `C` = `5db98a38ed80…` ([`demo_sets.json`](../../../configs/runplans/tray/demo_sets.json)); quy tắc diễn giải ở [docs/he/tray.md](../../he/tray.md). Sổ ước lượng 4 lần fine-tune × 26 CU = 104 CU trong khoảng 162 CU còn lại. Rủi ro: con số giữ chỗ 1,0 s/bước của `psi0-stage3.yaml` cho 11,1 giờ và khoảng 75 CU mỗi lần, tức khoảng 300 CU cho 4 lần; cần số đo của S1-04 trước khi chạy nhiệm vụ 2. **4/11/2026:** S1-04 đã đo; Hiếu chốt Colab L4, recipe DA-19 không đổi, validation mỗi 2.000 bước: khoảng 8,5 giờ và 16,6 CU mỗi lần, 4 lần khoảng 66 CU (ước lượng). Bản 1 đóng băng lại thành `rp_c49c99c8d8da` vì thêm ghi đè này. Tập con 40 và 80 chưa thành dataset LeRobot: Ψ₀ `LerobotDataConfig` không có bộ lọc episode, nên nhiệm vụ 2 phải dựng hai dataset con kèm `stats_psi0.json` riêng.
