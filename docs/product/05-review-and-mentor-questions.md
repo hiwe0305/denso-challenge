@@ -11,6 +11,7 @@ _Ngày 22/10/2026. Vai trò: QA / Test Architect (Quinn) kiêm người phản b
 | 22/10/2026 | 0.1 | Bản đầu: phản biện, chiến lược kiểm thử, pre-mortem, sổ rủi ro, câu hỏi mentor, 10 sửa ưu tiên | QA |
 | 22/10/2026 | 0.2 | Ghi trạng thái áp dụng; đổi tên giả thuyết theo 06 (giữ mã đề); thêm cột "Đã áp" ở mục 7; thêm mục 6.6 câu hỏi mở sau vòng 1 (MO1–MO5); sửa trích dẫn trỏ sai (RL8, KT2, mục 5, mục 6) | SM theo 06 |
 | 23/10/2026 | 0.3 | Thêm mục 6.7: phản biện và câu hỏi cho spec v10.2 (robot DENSO, pipeline ba nguồn, NIM, probe theo stage, robot thay thế, tải người), MO6–MO13; thêm PM9 vào mục 4; ghi trạng thái áp dụng của MO4 | QA theo 06 mục 11 |
+| 3/11/2026 | 0.4 | SR3, PM7, R14, DS7: bỏ việc xin giấy phép PSI Lab theo quyết định PO 3/11/2026; `license = unknown` ghi là giới hạn, giữ ranh giới bàn giao; email PSI Lab chỉ còn Q0 | PO (Hiếu) |
 
 Quy ước: **Cao** là có thể làm sai kết luận HS, HT, HD hoặc lỡ cổng; **TB** là làm yếu claim hoặc tốn thêm 1–2 tuần; **Thấp** là cần sửa cho sạch. Mã tham chiếu: "spec 6.11" là mục 6.11 của spec v10; "01 §8.2" là mục 8.2 của brief; "02 · 6.5" là story 6.5 của PRD. Mã vấn đề của file này (TM, TH, DK, KT, AR, KD, SR) và mã câu hỏi mở (MO) không liên quan tới mã tính năng TN1–TN10 của brief. Tài liệu khác trích mã của file này bằng tiền tố đúng, ví dụ "05 TH12", không phải "05 TN12".
 
@@ -161,7 +162,7 @@ Công thức hiện hành: lợi ích ròng/đợt = 500 × r_demo + 400 × r_de
 |---|---|---|---|---|
 | SR1 | Dữ liệu sim cùng phân phối với môi trường test nên lợi ích của HS bị phóng đại; spec đã nêu nhưng không có cách ước lượng mức phóng đại | spec 1.2, 01 §9.1 dòng "Phân phối sim" | TB | Thêm biến thể rẻ "sim lệch": sinh dữ liệu B với tham số vật lý và hình ảnh lệch có chủ đích (ma sát, khối lượng, bộ texture rời với test), đo lợi ích còn lại. Làm trên ACT nếu thiếu ngân sách Ψ₀ |
 | SR2 | Giá trị chẩn đoán trên robot thật chưa được chứng minh: ba phép kiểm mạnh nhất (khả thi, khoanh vùng, thị giác) dựa vào khả năng chỉ sim có | spec 6.5–6.7; 03 §9.1 | TB | Nói thẳng trong pitch; đặt cổng L2 riêng có phép đo "mode lỗi chẩn đoán trong sim có khớp mode lỗi trên cell thật không" |
-| SR3 | psi-data và trọng số Ψ₀ không khai giấy phép, mặc nhiên là giữ mọi quyền; checkpoint fine-tune là sản phẩm phái sinh; mã Ψ₀ Apache 2.0 không phủ trọng số | 01 §9.1; 03 §3.2, §10.3 | TB | Email PSI Lab tuần 1 xin xác nhận bằng văn bản phạm vi dùng; bàn giao cho DENSO chỉ gồm SOP, báo cáo, mã của đội; dataset và checkpoint ghi là "chỉ nghiên cứu" |
+| SR3 | psi-data và trọng số Ψ₀ không khai giấy phép, mặc nhiên là giữ mọi quyền; checkpoint fine-tune là sản phẩm phái sinh; mã Ψ₀ Apache 2.0 không phủ trọng số | 01 §9.1; 03 §3.2, §10.3 | TB | Bản 0.4: không xin xác nhận của PSI Lab (PO, 3/11/2026); `license = unknown` ghi là giới hạn; bàn giao cho DENSO chỉ gồm SOP, báo cáo, mã của đội; dataset và checkpoint ghi là "chỉ nghiên cứu" |
 | SR4 | Tài sản cảnh: HSSD (03 ghi theo hiểu biết hiện tại là CC BY-NC 4.0) và Objaverse (giấy phép theo từng vật) có thể lan sang mọi rollout sim render từ chúng | 03 §10.3 | TB | Liệt kê tài sản task chính thật sự dùng; lan truyền giấy phép đã có trong 03 §10.3, cần test |
 | SR5 | Video công nhân DENSO qua V2D (sau PoC) là dữ liệu cá nhân, chịu Nghị định 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân và quy định nội bộ DENSO | spec 1.1 dòng "Sau PoC"; 01 §10.2 câu 4 | Thấp ở L0 | Ghi yêu cầu đồng thuận, làm mờ mặt, lưu tại site vào backlog L2 |
 | SR6 | Chưa rõ điều khoản sở hữu trí tuệ của cuộc thi với mã và kết quả | Không tài liệu nào nhắc | Thấp | Hỏi BTC trước G6 |
@@ -214,7 +215,7 @@ Nguyên tắc: kết quả flywheel chỉ đáng tin khi từng mắt xích đã
 | PM4 | **Nền tảng ăn hết thời gian.** Tuần 8 có catalog đẹp, 28 thực thể, nhưng chưa có trace SIMPLE nào qua scorer; chẩn đoán chỉ chạy trên bộ giả | Tuần 4 chưa có một trace thật đi trọn import → scorer | Lát dọc (walking skeleton) trên SIMPLE trước tuần 4; L0-lite (AR1) |
 | PM5 | **Trưởng nhóm thắt cổ chai.** Ốm 1 tuần ở tuần 7; mọi việc Ψ₀ dừng; buổi gặp DENSO bị hoãn | Story Robot Learning trễ > 3 ngày; card chờ duyệt tồn > 2 ngày | Đồng sở hữu Ψ₀ từ tuần 2; tài liệu chạy lại train và serve; giao việc đầu mối DENSO |
 | PM6 | **Chẩn đoán sai mà không ai biết.** Trễ camera bị gán KỸ NĂNG YẾU; C mua dữ liệu sai chỗ; HD cho thấy card nhanh hơn nhưng sai; giám khảo hỏi đúng chỗ này | Recall lỗi cấy theo lớp thấp; tỉ lệ ghi đè > 50%; nhiều cụm hòa phiếu | Bộ lỗi cấy chuẩn (mục 3), nghiệm thu theo lớp trước G4; thêm phép kiểm đồng bộ cảm biến |
-| PM7 | **Kết quả bị vô hiệu vì dữ liệu.** Giám khảo chỉ ra checkpoint gốc đã post-train trên dữ liệu sonic có task chính; hoặc PSI Lab không cho dùng psi-data ngoài nghiên cứu | Ψ₀ ở 10% dữ liệu cao bất thường; email PSI Lab không được trả lời sau 2 tuần | Provenance checkpoint ở G0; email tác giả tuần 1; ghi giới hạn trong báo cáo |
+| PM7 | **Kết quả bị vô hiệu vì dữ liệu.** Giám khảo chỉ ra checkpoint gốc đã post-train trên dữ liệu sonic có task chính; hoặc PSI Lab không cho dùng psi-data ngoài nghiên cứu | Ψ₀ ở 10% dữ liệu cao bất thường; email Q0 cho PSI Lab không được trả lời sau 2 tuần | Provenance checkpoint ở G0; email tác giả tuần 1 về Q0 (bản 0.4: không hỏi giấy phép); ghi giới hạn trong báo cáo, gồm `license = unknown` |
 | PM8 | **"Không mới, không phải của DENSO."** Mentor và giám khảo dẫn Mulligan, DISEIL; kinh tế có lãi chỉ nhờ r_debug tự đo; DENSO không thấy kỹ năng của mình | Phản hồi mentor ở buổi đầu; DENSO chưa gửi mô tả kỹ năng, layout ở tuần 4 | Định vị lại (mục 2.1); map tiêu chí BTC; dùng layout DENSO cho vector điều kiện |
 | PM9 | **Hai robot, nửa kết quả (bản 0.3).** Tuần 12 có pipeline đẹp và robot thay thế trong Isaac Sim, nhưng Ψ₀ trên robot DENSO chưa đủ tốt để có lỗi có nghĩa; G1 thì thiếu nhánh vì người đã dồn sang robot DENSO; không giả thuyết nào kết luận được | Cuối G2 chưa có episode robot thay thế nào chạy trọn task; k sau Sprint 1 > 1,2; Hưng và Long trễ cùng lúc | Giữ G1 là đường tới HS, HT, HD; robot DENSO đo theo MT8 chứ không gánh giả thuyết; chuyển phần trễ sang API sớm (04 mục 4.9); review G2 quyết dừng hay giữ nhánh nào |
 
@@ -237,7 +238,7 @@ Khả năng và tác động: Thấp, TB, Cao. Mảng phụ trách theo 02 §4; 
 | R11 | Nhiễu can thiệp làm C − B không diễn giải được | Cao | TB | C dùng tăng cường thị giác, loại demo | Chính sách tăng cường chung; B-fail; báo tách | Robot Learning |
 | R12 | Không có thiết bị teleop, planner không sinh được từ trạng thái giữa task | Cao | TB | Q6 âm; planner thất bại từ trạng thái lưu | Sinh kiểu IntervenGen; thu hẹp loại can thiệp | Simulation |
 | R13 | HD bị coi là thiên lệch, r_debug không được tin | Cao | TB | Không có người ngoài đội tham gia | Người ngoài; card sai cố ý; trình bày khoảng | Robot Learning |
-| R14 | Giấy phép psi-data, trọng số Ψ₀, HSSD chặn bàn giao | TB | TB | Không có trả lời của PSI Lab | Email tuần 1; ranh giới bàn giao | Trưởng nhóm |
+| R14 | Giấy phép psi-data, trọng số Ψ₀, HSSD chặn bàn giao | TB | TB | DENSO hoặc giám khảo hỏi quyền dùng dataset, checkpoint | Bản 0.4: không hỏi PSI Lab (PO, 3/11/2026); `license = unknown` ghi là giới hạn; ranh giới bàn giao | Trưởng nhóm |
 | R15 | Thông lượng rollout không đủ cho holdout tuần 11 | TB | Cao | t > 90 s hoặc W < 3 ở G0 | Holdout sớm, niêm phong; thuê máy sim tuần 11 | Simulation |
 | R16 | Máy 5090 hỏng hoặc mất `fwdata/` | Thấp | Cao | Không có bản backup nào | Backup hằng ngày; diễn tập khôi phục | Data-Platform |
 | R17 | Không map tiêu chí 3 cấp và nhầm mã đề (H1 hay H2) | TB | TB | Pitch vẫn dùng ngưỡng tự đặt | Bảng map; xác nhận với BTC | Trưởng nhóm |
@@ -282,7 +283,7 @@ Sprint theo 02 §9 và 04 mục 2.1: S1 = tuần 1–2 (G0), S2 = tuần 3–4 (
 | DS4 | Ledger nên đo GPU-giờ theo giờ tường của job, theo lấy mẫu pynvml hay theo hóa đơn? Phân bổ thế nào khi một máy chạy cả sim và server? | B_add và so sánh chi phí là số đo chính của BG1, BG3 | Cách `ledger.meter()` quy đổi | S2 |
 | DS5 | Chiến lược backup tối thiểu cho máy 5090 đang là điểm hỏng đơn lẻ? | Mất `fwdata/` là mất bằng chứng (AR3) | Quy trình vận hành | S1 |
 | DS6 | Để L1 gộp được tỉ lệ sửa được giữa task, có nên thêm ontology lỗi chung ngay từ L0? Mức chi tiết nào là đủ? | Tránh di trú schema ở L1 (AR5) | Trường trong FailureKindSpec | S3 |
-| DS7 | psi-data và trọng số Ψ₀ không ghi giấy phép: đội nên làm gì trong lúc chờ tác giả, và nên ghi ranh giới bàn giao cho DENSO thế nào? | Quyết định thứ gì được giao cho doanh nghiệp (SR3) | Danh mục bàn giao G6 | S0 |
+| DS7 | psi-data và trọng số Ψ₀ không ghi giấy phép, và đội không hỏi tác giả (bản 0.4, PO 3/11/2026): nên ghi giới hạn này và ranh giới bàn giao cho DENSO thế nào? | Quyết định thứ gì được giao cho doanh nghiệp (SR3) | Danh mục bàn giao G6 | S0 |
 
 ### 6.4 Thống kê và thiết kế thí nghiệm
 

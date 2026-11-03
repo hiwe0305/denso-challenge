@@ -4,6 +4,7 @@ _Ngày 22/10/2026. Vai trò BMAD: Product Owner (Sarah) viết mục 1; Scrum Ma
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 3/11/2026 | 1.1 | Mục 1.3 (giấy phép psi-data), 3.2 ý 1, 4.1 (việc ngoài story): bỏ việc xin giấy phép PSI Lab theo quyết định PO 3/11/2026; `license = unknown` ghi là giới hạn, `data_class = public` theo quyết định 2/11/2026; email PSI Lab chỉ còn Q0 | PO (Hiếu) |
 | 3/11/2026 | 1.0 | Mục 4.2: story 3.3 có file DA-36, story 3.5 có file DA-37 (07 bản 1.5) | PO (Hiếu) |
 | 28/10/2026 | 0.9 | Mục 3.2: chốt câu Q-E, Hiếu merge mọi PR bằng quyền admin (`--admin --rebase`) | PO (Hiếu) |
 | 28/10/2026 | 0.8 | Mục 3 và 4: ghi chú rằng vai, RACI, cột người của 4.2–4.6 và tải 4.7–4.8 còn theo phân công cũ, phân công hiện hành ở 07 mục 2.0–2.2; mục 4.1 điền người làm theo 07 bản 0.6, bỏ hỗ trợ S1-03 của Hưng và hẹn `contracts/base.py` của Thông | PO (Hiếu) |
@@ -97,10 +98,10 @@ Theo tinh thần PO master checklist của BMAD: (1) khởi tạo dự án và h
 
 **Giấy phép psi-data và trọng số Ψ₀** (chưa ghi giấy phép):
 
-- Mọi episode từ psi-data và mọi checkpoint dẫn xuất mang `license = unknown`, `data_class = restricted` cho tới khi có văn bản của tác giả.
+- Mọi episode từ psi-data và mọi checkpoint dẫn xuất mang `license = unknown`. Bản 1.1: `data_class = public` **[Đã chốt]** (Hiếu, 2/11/2026, design 27/10 mục 8.4), thay `restricted` của bản trước.
 - Chỉ dùng cho PoC. Không đăng lại dữ liệu, bản export hay checkpoint fine-tune lên kho công khai.
-- Bàn giao cho DENSO ở G6: mã của đội, SOP, báo cáo, video. Dataset và checkpoint dẫn xuất chỉ giao khi tác giả xác nhận.
-- Hiếu gửi email cho PSI Lab trong tuần 1, hỏi cả giấy phép và nguồn gốc checkpoint (Q0). Sau 2 tuần chưa có trả lời thì hỏi mentor (DS7) và BTC (05 SR6), ghi giới hạn vào báo cáo.
+- Bàn giao cho DENSO ở G6: mã của đội, SOP, báo cáo, video. Dataset và checkpoint dẫn xuất không giao, vì không có văn bản của tác giả.
+- Bản 1.1: đội không hỏi PSI Lab hay ai khác về giấy phép **[Đã chốt]** (Hiếu, 3/11/2026). `license = unknown` của psi-data và psi-model ghi là giới hạn trong báo cáo, cùng ranh giới bàn giao ở trên. Email PSI Lab chỉ hỏi nguồn gốc checkpoint (Q0); sau 2 tuần chưa có trả lời thì ghi giới hạn vào báo cáo.
 
 **Ngưỡng 8/10 lỗi cấy (02 · 6.5).** Duyệt 8/10, kèm hai điều kiện:
 
@@ -184,7 +185,7 @@ Châu dự phòng cho hai người. Bù bằng: runbook Ψ₀ (`packages/flywhee
 
 **Hiếu tự làm, không giao:**
 
-1. Đầu mối DENSO, BTC, mentor: hỏi kỹ năng và layout DENSO (05 DN1), ngân sách GPU, mã đề H1 hay H2 (05 R17); email PSI Lab về giấy phép và Q0.
+1. Đầu mối DENSO, BTC, mentor: hỏi kỹ năng và layout DENSO (05 DN1), ngân sách GPU, mã đề H1 hay H2 (05 R17); email PSI Lab về Q0.
 2. Chọn checkpoint gốc (Q0), cấu hình fine-tune Ψ₀ (02 · 1.3, 4.2).
 3. Chọn D\*, ρ, áp luật trần, sàn và luật MDE (02 · 4.4, 5.3).
 4. Duyệt hoặc ghi đè đề xuất trong vòng C (02 · 7.6, 7.7), vì đây là vai "kỹ sư robot learning" của spec 6.14.
@@ -286,7 +287,7 @@ Giờ trong bảng là ước lượng ở mục 0, cho **phạm vi mặc địn
 
 **Bản 0.7 (27/10/2026).** Theo [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 13: task chính là task hai bàn `G1WholebodyLocomotionPickBetweenTablesTeleop-v0`. S1-05 (sinh tự động cho task hai bàn), S1-07 (phân tích gói psi-data của task hai bàn) và S1-11 (V3 cho task hai bàn) **mở lại**; S1-02, S1-06, S1-09 về lại SIMPLE; S1-03, S1-04 thêm task hai bàn và thời gian eval ở `mujoco`, `mujoco_isaac`. Bản 0.8: người ở bảng trên theo 07 mục 2.0 bản 0.6; giờ ở bảng là bản 0.2, giờ mới ở 07 mục 2.3. Bản 0.4 (hủy S1-05, S1-11, đổi S1-07 sang dataset BTC, S1-09 sang task khay → máy) bị thay. Story DA của Sprint 1 ở mục 4.9.
 
-Việc ngoài story: Hiếu 10 giờ (DENSO DN1, ngân sách GPU, mã đề, email PSI Lab, buổi mentor đầu, rà claim theo 05 mục 2.1, chốt H thực từng người); Thông 4 giờ dựng bảng công việc.
+Việc ngoài story: Hiếu 10 giờ (DENSO DN1, ngân sách GPU, mã đề, email PSI Lab về Q0, buổi mentor đầu, rà claim theo 05 mục 2.1, chốt H thực từng người); Thông 4 giờ dựng bảng công việc.
 
 **Phụ thuộc.** Bước 1 của S1-11 (bảng đối chiếu) đọc cấu hình và mã SIMPLE nên bắt đầu ngày 1, không chờ S1-02; thử T1, T2 cần S1-02. S1-02 xong trong tuần 1 vì S1-03, S1-05, S1-06, S1-09, S1-11 cần môi trường SIMPLE. Phần serve Ψ₀ của S1-03 và toàn bộ S1-04 bắt đầu ngày 1. S1-08 và S1-10 cùng dùng `contracts` và cùng do Long làm. **Rủi ro.** V3 âm (05 R01); Isaac Sim hoặc flash-attn không chạy trên 5090 (R05); checkpoint gốc đã thấy dữ liệu task chính (R02); tranh máy 5090 giữa S1-03, S1-04 và T1, T2.
 

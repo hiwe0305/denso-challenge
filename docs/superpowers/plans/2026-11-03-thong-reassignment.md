@@ -100,6 +100,7 @@ Tổng khoảng 28,5 giờ ước lượng, so với khoảng 48 giờ còn lạ
 - [ ] 3 QA thật trên parquet: timestamp đơn điệu, không NaN hay Inf, độ dài trong khoảng, cờ thành công nếu có. Ra N_teleop của task hai bàn và của F1. Bỏ phần sinh 80 episode giả.
 - [ ] 4 Seed: dẫn `configs/splits/default.yaml`; seed của tập eval nếu không có trong gói thì ghi "không suy được".
 - [ ] 5 Giấy phép: `data_class = public`, `license = unknown`, ngày kiểm từng dòng; soạn thư hỏi PSI Lab cho Hiếu gửi.
+  - Ghi chú 3/11/2026: thư không gửi; PO bỏ mọi việc xin giấy phép, `license = unknown` ghi là giới hạn (PR S1-07 #55 đã merge, mục 5 của `docs/g0/psi-data.md` chỉ giữ hai câu về tập eval).
 - [ ] 6 Thống kê mô tả: độ dài, tỉ lệ thành công, phân bố vị trí vật và bàn (hoặc một câu "không có").
 - [ ] 7 `docs/g0/psi-data.md` có mục "Đề xuất cho 03 §3.3" (V1, V6, V9); mô tả PR ghi lệnh và output cho từng AC.
 
