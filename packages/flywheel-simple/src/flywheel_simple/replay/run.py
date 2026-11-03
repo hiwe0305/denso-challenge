@@ -4,7 +4,7 @@ Runs in the SIMPLE venv:
 
     MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/python \
         -m flywheel_simple.replay.run --data-dir <dataset> --env-id <env> \
-        --outcomes <file> --episode-start 0 --num-episodes 99 --save-dir <dir>
+        --outcomes <file> --episode-start 0 --num-episodes 99 --save-dir <dir> --clock wall
 
 SIMPLE's command is called as is (`simple.cli.replay_decoupled_wbc.main`, no
 recording); it already replays psi0 post-processed data (36-D action: upper
@@ -17,9 +17,15 @@ added around it:
   the episode's outcome (`compare.outcome`) to the --outcomes file. The
   stabilisation steps go to the unwrapped env and are not kept, as SIMPLE does
   not record them either;
-- the replay runs on sim time, as the tray replay does (D-24): the agent's and
-  the loop's `time` read `mjData.time` and never sleep, so a loaded machine
-  replays the same as an idle one.
+- with `--clock sim` (the default of `outcomes.replay_lerobot`) the replay runs
+  on sim time, as the tray replay does (D-24): the agent's and the loop's `time`
+  read `mjData.time` and never sleep, so a loaded machine replays the same as an
+  idle one. `--clock wall` leaves SIMPLE's clock alone. The agent reads
+  `time.monotonic()` once to time a goal and once to sample the WBC's
+  interpolation; on sim time the two are equal, on the wall clock their gap is
+  whatever the machine took in between. On psi-data e78fb93 neither clock
+  replays the task more often (docs/g0/replay.md section 3), so the
+  reproducible one is the default.
 
 SIMPLE writes `meta/replay.txt` into --data-dir; `outcomes.replay_lerobot`
 points it at a staged copy, never at the source dataset.
@@ -39,6 +45,7 @@ import numpy as np
 
 from flywheel_simple.replay.compare import joint_order, outcome
 
+CLOCKS = ("sim", "wall")
 SIM_TIME_MODULES = ("simple.agents.replay_decoupled_agent", "simple.cli.replay_decoupled_wbc")
 _live: Any = None  # the OutcomeRecorder of this process (one env per process)
 
@@ -124,6 +131,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--episode-start", type=int, required=True)
     ap.add_argument("--num-episodes", type=int, required=True)
     ap.add_argument("--save-dir", type=Path, required=True)
+    ap.add_argument("--clock", choices=CLOCKS, required=True)
     args = ap.parse_args(argv)
 
     from flywheel_simple.tray.export import state_names
@@ -133,7 +141,7 @@ def main(argv: list[str]) -> int:
         importlib.import_module("flywheel_simple.tray.run").prepare()  # registers the env id
     joints = importlib.import_module("simple.robots.g1_sonic").WHOLE_BODY_JOINTS
     names = state_names(joints)
-    for name in SIM_TIME_MODULES:
+    for name in SIM_TIME_MODULES if args.clock == "sim" else ():
         importlib.import_module(name).time = SimTime()  # type: ignore[attr-defined]
     gym = importlib.import_module("gymnasium")
     make, recorder = gym.make, recorder_class()

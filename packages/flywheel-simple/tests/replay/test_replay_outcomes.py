@@ -153,6 +153,7 @@ def test_replay_lerobot_merges_the_shards_in_order(tmp_path: Path) -> None:
     assert path.name == OUTCOMES and indices == [0, 1, 2, 3, 4]
     summary = json.loads((tmp_path / "work" / SUMMARY).read_text())
     assert summary["replayed"] == 5 and summary["workers"] == 2 and summary["env_id"] == ENV
+    assert summary["clock"] == "sim"
 
 
 def test_an_episode_without_outcome_raises_after_writing(tmp_path: Path) -> None:
