@@ -56,11 +56,10 @@ directory `<trace_id>/`, the one `TraceRef.uri` points at::
         steps.jsonl            # one TraceStep per control cycle
         camera_params.jsonl    # one CameraParams per line, each with trace_id;
                                # absent when the job had no pinned reference
-        rollout_result.json    # v0 RolloutResult (infra_status); proposed, not yet decided
+        rollout_result.json    # v0 RolloutResult (infra_status); decision G1b
 
-The file names are the constants below and nowhere else. `rollout_result.json`
-is the proposal awaiting the PO (G1b): if it lands elsewhere, `ROLLOUT_NAME` is
-the one line that changes. The RolloutResult is read through
+The file names are the constants below and nowhere else; `rollout_result.json`
+is decision G1b of the PO (3/11/2026). The RolloutResult is read through
 `flywheel.contracts.v0.RolloutResult`, so an `infra_status` outside the
 contract's `InfraStatus` is refused rather than read as a fault. Its
 `trace_ref` is checked against the directory it sits in, loudly: `trace_id`
@@ -258,7 +257,7 @@ class StageInputs:
 # one place the file names live: the checks, the CLI and the tests import them.
 STEPS_NAME = "steps.jsonl"  # in <trace_id>/
 CAMERA_NAME = "camera_params.jsonl"  # in <trace_id>/
-ROLLOUT_NAME = "rollout_result.json"  # in <trace_id>/; proposed, awaiting the PO
+ROLLOUT_NAME = "rollout_result.json"  # in <trace_id>/; Đã chốt 3/11/2026 [Hiếu] (G1b)
 RTC_NAME = "rtc.jsonl"  # in the job dir, the parent of <trace_id>/
 
 
