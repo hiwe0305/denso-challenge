@@ -17,6 +17,7 @@ from flywheel.data.ingest.sources import (
     HOLDOUT,
     SPLITS,
     SourceRecord,
+    deid_blocks_annotate,
     register_source,
     to_episode,
 )
@@ -356,3 +357,36 @@ def test_register_source_reports_index_findings(dataset: Dataset) -> None:
     pq.write_table(table.set_column(position, "index", pa.array(range(10, 17))), path)
     findings = register_source(root, "psi_data", "unknown", "public").index_findings
     assert [(f.episode_index, f.expected_first, f.found_first) for f in findings] == [(1, 5, 10)]
+
+
+@pytest.mark.parametrize("detail", ["psi_data", "planner_wbc", "teleop_pico"])
+def test_robot_episodes_pass_the_deid_gate(
+    dataset: Dataset, flywheel: Flywheel, s1_block: Block, detail: str
+) -> None:
+    # Q4, decided by the PO 3/11/2026: the raw-deid gate is for egocentric video only.
+    root, written = dataset
+    blocks = {"psi_data": {}, "planner_wbc": s1_block, "teleop_pico": s2_block(s1_block)}
+    flywheel(root, 0, blocks[detail])
+    episode = to_episode(written[0], register_source(root, detail, "unknown", "public"), "train")
+    assert episode.deid_status == "raw"
+    assert deid_blocks_annotate(episode) is False
+
+
+@pytest.mark.parametrize(
+    "status, blocked", [("raw", True), ("blurred", False), ("verified", False)]
+)
+def test_egocentric_episodes_are_gated_until_deidentified(
+    dataset: Dataset, status: str, blocked: bool
+) -> None:
+    root, written = dataset
+    robot = to_episode(written[0], register_source(root, "psi_data", "unknown", "public"), "train")
+    ego = robot.model_copy(
+        update={"source_kind": "egocentric", "action_quality": "pseudo", "deid_status": status}
+    )
+    assert deid_blocks_annotate(ego) is blocked
+
+
+def test_the_lane_api_exposes_the_deid_gate() -> None:
+    from flywheel.data import api
+
+    assert api.deid_blocks_annotate is deid_blocks_annotate

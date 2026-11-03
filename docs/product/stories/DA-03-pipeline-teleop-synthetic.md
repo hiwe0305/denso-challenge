@@ -40,7 +40,7 @@ PR 1 (hạn 5/11/2026):
   - [x] 2.1 Lineage: `parent_id`, `root_id`, seed và level của episode sinh ra lấy từ `environment_config.flywheel`; nhãn ghi theo từng episode phải khớp nguồn (review #69 mục 3, 8)
   - [x] 2.2 Kiểm `split`: từ chối `holdout` (chỉ nằm trong `vault/`, chỉ `gate` đọc) và tên lạ; đối chiếu split đã ghi trong episode (review #69 mục 4)
   - [x] 2.3 `bundle_uri` tương đối theo gốc kho (`$FW_ROOT`, mặc định `./fwdata`); dataset ngoài gốc kho bị từ chối (Q6, đã chốt 3/11 [Hiếu])
-  - [ ] 2.4 Chặn `deid_status = raw` ở Annotate chỉ áp cho `source_kind = egocentric`; dữ liệu robot, sim, teleop không bị chặn (Q4, đã chốt 3/11 [Hiếu])
+  - [x] 2.4 Chặn `deid_status = raw` ở Annotate chỉ áp cho `source_kind = egocentric`; dữ liệu robot, sim, teleop không bị chặn (Q4, đã chốt 3/11 [Hiếu])
   - [ ] 2.5 Ghi quyết định Q5 (id episode do bên ghi đặt, theo DA-25) và Q7 (đánh số lại `index` theo v2.1) vào mã và test (đã chốt 3/11 [Hiếu])
 
 PR 2 (hạn 9/11/2026):

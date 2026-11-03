@@ -21,7 +21,12 @@ from flywheel.data.ingest.lerobot import (
     read_info,
     write_episode,
 )
-from flywheel.data.ingest.sources import SourceRecord, register_source, to_episode
+from flywheel.data.ingest.sources import (
+    SourceRecord,
+    deid_blocks_annotate,
+    register_source,
+    to_episode,
+)
 
 __all__ = [
     "EpisodeFrames",
@@ -29,6 +34,7 @@ __all__ = [
     "LeRobotFormatError",
     "SourceRecord",
     "check_index",
+    "deid_blocks_annotate",
     "iter_episodes",
     "mp4_frame_count",
     "read_info",
