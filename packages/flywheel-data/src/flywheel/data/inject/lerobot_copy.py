@@ -160,13 +160,12 @@ def write_copy(
                 shutil.copyfile(src_root / src, out_root / dst)
     for template, ep in zip(frames, episodes, strict=True):
         write_episode(out_root, data_to_frames(ep, template))
-    _write_seeds(
-        out_root, {int(ep.episode_id.removeprefix("episode_")): ep.seed for ep in episodes}
-    )
     owners = {
         int(slot.removeprefix("episode_")): int(source.removeprefix("episode_"))
         for slot, source in duplicates.items()
     }
+    seeds = {int(ep.episode_id.removeprefix("episode_")): ep.seed for ep in episodes}
+    _write_rows(out_root, src_root, seeds, owners)
     write_stats(out_root, source=src_root, owners=owners)
     (out_root / "meta" / COPY_MARKER).write_text(json.dumps({"benchmark_copy_id": copy_id}))
     # One mtime for every file and directory, so write times point at no episode.
@@ -188,19 +187,26 @@ def _files(info: dict[str, Any], ref: str) -> list[str]:
     return paths
 
 
-def _write_seeds(root: Path, seeds: dict[int, int | None]) -> None:
-    """Put each changed seed into its row's `environment_config.flywheel` block."""
+def _write_rows(
+    root: Path, src_root: Path, seeds: dict[int, int | None], owners: dict[int, int]
+) -> None:
+    """Meta rows a real occurrence would also change.
+
+    A duplicate carries its source's environment_config (scene layout and all); a
+    changed seed goes into the row's `environment_config.flywheel` block.
+    """
+    source = {int(r["episode_index"]): r for r in read_episode_rows(src_root)}
     meta = root / "meta" / "episodes.jsonl"
     rows = [json.loads(line) for line in meta.read_text().splitlines() if line.strip()]
-    changed = False
     for row in rows:
-        seed = seeds.get(int(row["episode_index"]))
+        index = int(row["episode_index"])
+        if index in owners and "environment_config" in source[owners[index]]:
+            row["environment_config"] = source[owners[index]]["environment_config"]
+        seed = seeds.get(index)
         if seed is None or seed == row_seed(row):
             continue
         raw = row.get("environment_config") or {}
         config = json.loads(raw) if isinstance(raw, str) else dict(raw)
         config["flywheel"] = {**(config.get("flywheel") or {}), "seed": seed}
         row["environment_config"] = json.dumps(config) if isinstance(raw, str) else config
-        changed = True
-    if changed:
-        meta.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    meta.write_text("".join(json.dumps(r) + "\n" for r in rows))

@@ -91,6 +91,10 @@ def test_duplicate_copies_parquet_and_video_of_its_source(
         orig = int(str(d.parameters["original_id"]).removeprefix("episode_"))
         assert video_path(out, slot).read_bytes() == video_path(src, orig).read_bytes()
         assert video_path(out, orig).read_bytes() == video_path(src, orig).read_bytes()
+        # A real duplicate carries its source's meta row too, scene layout included.
+        rows = {int(r["episode_index"]): r for r in read_episode_rows(out)}
+        source_rows = {int(r["episode_index"]): r for r in read_episode_rows(src)}
+        assert rows[slot]["environment_config"] == source_rows[orig]["environment_config"]
 
 
 def test_leaked_seed_is_in_the_episode_flywheel_block(

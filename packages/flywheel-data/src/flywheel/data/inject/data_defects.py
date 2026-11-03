@@ -213,21 +213,26 @@ class DataDefectInjector:
         )
 
     def inject_corrupted_success_label(self, ep: EpisodeData) -> tuple[EpisodeData, Defect]:
-        # Design 9.2: a broken episode still labelled a success. Cut it before the task
-        # can finish and keep the label; psi-data's teleop demos are all labelled
-        # successful by being in the authors' training set.
+        # Design 9.2: a broken episode still labelled a success. The robot halts at the
+        # cut, action and state held to the end, before the task can finish; the episode
+        # keeps its length (and its video's frame count) and its success label. psi-data's
+        # teleop demos are all labelled successful by being in the authors' set.
         if ep.sim_success is not True:
             raise NotApplicable("corrupted_success_label needs an episode labelled a success")
         count = len(ep.actions)
         kept = max(1, math.floor(count * self.config.success_label_keep_fraction))
         if kept >= count:
-            raise NotApplicable("corrupted_success_label: episode too short to cut")
+            raise NotApplicable("corrupted_success_label: episode too short to halt")
         new_ep = copy.deepcopy(ep)
-        _keep_frames(new_ep, list(range(kept)))
+        for name in ("actions", "states"):
+            values = getattr(new_ep, name)
+            setattr(new_ep, name, values[:kept] + [list(values[kept - 1])] * (count - kept))
+        if (new_ep.actions, new_ep.states) == (ep.actions, ep.states):
+            raise NotApplicable("corrupted_success_label: the robot does not move after the cut")
         return new_ep, _defect(
             new_ep,
             "corrupted_success_label",
-            {"label": "success", "kept_frames": kept, "original_frames": count},
+            {"label": "success", "frozen_from": kept, "frames": count},
         )
 
     def inject_wrong_task_instruction(self, ep: EpisodeData) -> tuple[EpisodeData, Defect]:
