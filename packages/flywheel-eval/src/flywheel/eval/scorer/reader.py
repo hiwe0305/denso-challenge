@@ -16,11 +16,20 @@ the reason a step comes back "unknown", and it has to survive the read in a
 form the scorer can quote back, which is what `Trace.missing_signals` carries.
 A file that cannot be parsed at all is different: nothing was measured, so it
 raises rather than scoring as an episode with no signals.
+
+A value that is not finite is read as missing, not as a number. `json.loads`
+accepts `NaN`, and every comparison against a NaN is false, so a trace whose
+torso height is NaN on every row would pass every limit it was checked against
+and come back as an episode that stayed upright. That is the silent pass FR21
+forbids, so a NaN or an infinity becomes a gap here and reaches the scorer as
+one.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -40,6 +49,10 @@ class Trace:
     episode_id: str
     signals: pa.Table
     missing_signals: tuple[str, ...]
+    # The bytes this trace was read from. `Score.id` of 03 section 4.3 is
+    # `sc_<hash trace + scorer_version>`, so the hash is recorded now and the
+    # id can be built from the record once `Score` lands (Contract change #59).
+    trace_sha256: str
 
     @property
     def num_steps(self) -> int:
@@ -53,7 +66,8 @@ def read_trace(path: Path, task: TaskDefinition, episode_id: str | None = None) 
     is given no id falls back to the file stem, because a `Score` without an
     episode cannot be joined to anything later.
     """
-    rows = _read_rows(path)
+    data = _read_bytes(path)
+    rows = _read_rows(data, path)
     columns = _columns(rows, path)
     required = tuple(signal.name for signal in task.required_signals())
     missing = tuple(name for name in required if name not in columns)
@@ -61,6 +75,7 @@ def read_trace(path: Path, task: TaskDefinition, episode_id: str | None = None) 
         episode_id=episode_id or _episode_id(rows) or path.stem,
         signals=pa.table(columns) if columns else pa.table({}),
         missing_signals=missing,
+        trace_sha256=hashlib.sha256(data).hexdigest(),
     )
 
 
@@ -70,10 +85,17 @@ def read_signals(rows: list[dict[str, Any]]) -> pa.Table:
     return pa.table(_columns(rows, Path("<memory>")))
 
 
-def _read_rows(path: Path) -> list[dict[str, Any]]:
+def _read_bytes(path: Path) -> bytes:
     try:
-        text = path.read_text(encoding="utf-8")
+        return path.read_bytes()
     except OSError as error:
+        raise TraceError(f"`{path}` không đọc được: {error}") from error
+
+
+def _read_rows(data: bytes, path: Path) -> list[dict[str, Any]]:
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as error:
         raise TraceError(f"`{path}` không đọc được: {error}") from error
     rows: list[dict[str, Any]] = []
     for number, line in enumerate(text.splitlines(), start=1):
@@ -109,7 +131,10 @@ def _number(value: Any, name: str, path: Path) -> float | None:
     if isinstance(value, bool):
         return float(value)
     if isinstance(value, (int, float)):
-        return float(value)
+        # NaN and infinity are not measurements. Every comparison against a NaN
+        # is false, so one left in place would clear every limit it was checked
+        # against; as a gap it reaches the scorer as "chưa rõ" instead.
+        return float(value) if math.isfinite(value) else None
     raise TraceError(f"`{path}`: tín hiệu `{name}` phải là số hoặc null, gặp {value!r}")
 
 
