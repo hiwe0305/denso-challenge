@@ -2,6 +2,23 @@
 
 _Ngày 3/11/2026. Story [S1-07](../product/stories/S1-07-phan-tich-psi-data.md), cổng G0. Làm lại từ PR #24 của Thông (nhánh `S1-07-psi-data` @ `e96da77`): giữ cách đọc cấu trúc gói, bỏ mọi số gán cứng. Mọi số trong file này do [`scripts/g0/inspect_psi_data.py`](../../scripts/g0/inspect_psi_data.py) in ra, chạy trên máy `rtx3060`; bảng trong file là output của lệnh, chép nguyên. Số nào script không đo được thì ghi là giả định hoặc "không suy được"._
 
+## Kết luận
+
+- **Q1:** N_teleop của task hai bàn là **99**, cả 99 episode đạt QA sơ bộ; điểm cuối lưới HE giữ ở 80 demo. F1: `BendPickTeleop` N_teleop = 97, `BendPickMP` 100 episode sinh tự động. Gói không có cờ thành công (mục 3).
+- **V1:** LeRobot `v2.1`, 50 Hz, `action` **36 chiều thật, không chiều đệm, không khớp chân**; `states` 32 chiều, Ψ₀ đệm state lên 36 (chỉ số 32–35). Camera `observation.images.egocentric` 360×640. Bảng 36 dòng `index, name, group, masked` ở mục 2.
+- **V6:** episode ghi `layout`, `dr_cfgs` và `dr_state_dict` (vị trí ban đầu), không ghi seed. Dải seed của `simple-eval` không suy được số, nhưng ở mức 0 và 1 episode eval i có vị trí ban đầu trùng episode train i đến từng bit (mục 4). Dải của đội theo [`configs/splits/default.yaml`](../../configs/splits/default.yaml).
+- **V9:** psi-data và psi-model không ghi giấy phép (`license = unknown`); `data_class = public` theo quyết định của Hiếu ngày 2/11/2026. Cảnh HSSD và vật GraspNet trong video là phi thương mại (mục 5). Thư hỏi PSI Lab ở mục 5.
+
+Việc phát sinh cho người khác, Hiếu quyết:
+
+| # | Phát hiện | Ảnh hưởng | Ai |
+|---|---|---|---|
+| 1 | Chiều action 34 là `vyaw` liên tục trong `[-1, 1]`, không phải `turning_flag` 0/1 như chú thích Ψ₀ và comment 3/11 trên #24 | `configs/embodiments/g1.yaml`; T4, O4 của DA-08 | Hiếu (DA-01), Châu |
+| 2 | Chiều 31 (`base_height_command`) hằng số 0,74 trong gói hai bàn; F1 có 4–10 chiều hằng số | T5, T6 của DA-08 phải loại theo phương sai đích, không theo `masked` | Châu |
+| 3 | Tập eval trên `rtx3060:~/denso-s103` là bản ở `main` (`de140d6`, 4 mức, vị trí robot khác), không phải `e78fb93` | Số eval S1-03 so với gói train đã ghim | Hiếu chốt bản eval |
+| 4 | Eval mức 0, 1 dùng lại vị trí ban đầu của 10 episode train đầu | Số eval của tác giả không đo trên điều kiện mới; dev và holdout của đội rời cả hai | Hiếu, Châu |
+| 5 | HSSD CC-BY-NC-4.0 và GraspNet CC BY-NC-SA 4.0 nằm trong video psi-data | Rủi ro giấy phép nếu demo bị coi là dùng thương mại; khác với `data_class` | Hiếu |
+
 ## 1. Tải và sha256 (AC 1)
 
 Revision ghim: `USC-PSI-Lab/psi-data` @ `e78fb93cc28912a3031a10b8656d32d7f0a2b867` (commit ngày 14/09/2026). Script lấy kích thước và `lfs.oid` của từng file từ API cây thư mục của Hugging Face ở đúng revision này, tải file qua `resolve/<sha>/<đường dẫn>`, băm sha256 trong lúc tải rồi so với `lfs.oid`. Dữ liệu nằm ngoài git, ở `rtx3060:~/denso-s107/fwdata/psi-data/e78fb93/<đường dẫn trên HF>`; script ghi kết quả vào `fetch.json` cạnh đó.
@@ -388,3 +405,17 @@ Kết luận:
 - **Tỉ lệ thành công: không suy được từ gói.** Không có cờ thành công (mục 3); các episode là demo tác giả giữ lại sau khi thu. Tỉ lệ thật chỉ đo được bằng phát lại trong sim (DA-17). Bản #24 ghi 100 % là do mặc định `success = True` trong script cũ.
 - **Phân bố vị trí rất hẹp.** Task hai bàn: vật cần gắp chỉ dịch 2 cm theo x, 8 cm theo y; thùng 5 × 10 cm; robot 2 cm; cả hai bàn cố định (bàn 1 tâm `(0, 0,25, 0,6)`, bàn 2 `(−2,94, 0, 0,6)`). Mỗi episode cùng một vật (`cracker_box`), cùng một thùng (`brasket`), 4 vật gây nhiễu. Dải đo khớp `dr_cfgs.spatial` của gói (`target_region` x `[−0,33, −0,31]`, y `[−0,04, 0,04]`). Hệ quả cho lưới HE và cho việc tìm lỗi: điều kiện ngoài dải hẹp này là ngoài phân bố train của Ψ₀.
 - Độ dài: task hai bàn 9,6–25,0 s (trung vị 12,0 s); F1 teleop 2,7–5,8 s; F1 MP gần như cố định 3,1 s, đúng tính chất của quỹ đạo do bộ lập kế hoạch sinh.
+
+## 7. Kiểm lại
+
+- Chạy lại trên cùng revision: `fetch` (băm lại sáu file đã có) cho `fetch.json` giống từng byte; `qa` trên gói hai bàn cho JSON giống từng byte, cùng N_teleop = 99.
+- Kiểm tay 3 episode bằng `pyarrow` đọc thẳng từ zip, không qua script: episode 0, 49, 98 có 581, 544, 496 dòng (script: 581, 544, 496); `timestamp` từ 0 đến 11,6 s, 10,86 s, 9,9 s; `action` 36 cột, không NaN; chiều 34 có 482, 465, 413 giá trị khác nhau.
+- Tài nguyên: toàn bộ lệnh chạy trên `rtx3060` qua `systemd-run --user --scope -p MemoryMax=… -p MemorySwapMax=0`, một tiến trình, RSS đỉnh 204 MB; tổng thời gian máy dưới 1 phút. Sổ chi phí: [ledger/S1-07.csv](ledger/S1-07.csv).
+
+## Đề xuất cho 03 §3.3
+
+| Dòng | Câu trả lời đề xuất | Trạng thái | Bằng chứng |
+|---|---|---|---|
+| V1 | Gói psi-data của SIMPLE (task hai bàn và F1) là LeRobot `v2.1`, 50 Hz. `action` có 36 chiều thật theo `meta/modality.json`: tay 0–13, cánh tay 14–27, hông roll/pitch/yaw 28–30 (tuyệt đối), `base_height` 31, `vx`, `vy`, `vyaw` 32–34 (tương đối, `vyaw` liên tục), `target_yaw` 35. Không chiều nào là đệm, không có khớp chân. `states` 32 chiều, Ψ₀ đệm lên 36 (state 32–35). Camera `observation.images.egocentric` 360×640, một camera. `ActionLayout` của nguồn psi-data dùng đúng bảng mục 2 | có | Mục 2: `inspect_psi_data.py layout` trên ba gói ở `e78fb93`; `modality.json`; Ψ₀ `cda3fdf` |
+| V6 (phần dữ liệu) | Mỗi episode ghi `environment_config` với `layout`, `dr_cfgs`, `dr_state_dict`; không ghi seed. `simple-eval` ở `e78fb93`: 3 mức × 10 episode, 1 khung mỗi episode; ở mức 0, 1 vị trí ban đầu trùng 10 episode train đầu đến từng bit, nên seed eval suy ra là seed của các episode train đó, số cụ thể không suy được. Đội dùng một bảng seed chung [`configs/splits/default.yaml`](../../configs/splits/default.yaml) (train `[0, 10⁶)`, dev `[10⁶, 10⁶+1000)`, holdout `[2·10⁶, 2·10⁶+1000)`), không có split `gate`. Điều kiện của đội lưu như `dr_state_dict` để so trùng được | có, trừ số seed của tác giả (không suy được; đã hỏi PSI Lab) | Mục 4: `inspect_psi_data.py seeds` |
+| V9 | psi-data và psi-model: không ghi giấy phép trên HF (`license = unknown`), `data_class = public` **[Đã chốt]** 2/11/2026. Mã Ψ₀ Apache 2.0, SIMPLE MIT. Cảnh HSSD CC-BY-NC-4.0, vật GraspNet-1Billion CC BY-NC-SA 4.0 (có trong video); vMaterials 2 chưa kiểm được; Objaverse không dùng | tạm: chờ PSI Lab trả lời thư mục 5; Hiếu quyết rủi ro phi thương mại | Mục 5, kiểm ngày 3/11/2026 |
