@@ -1,0 +1,51 @@
+# Ngưỡng kiểm hệ thống F-SYS (R1-R6) của chuỗi chẩn đoán.
+# Nguồn định nghĩa: spec v10.5 mục 6.4 (thứ tự kiểm, cách hiệu chỉnh τ);
+# design 27/10/2026 mục 10 (bảng F-SYS). Story DA-13 AC 1, 2.
+#
+# Mọi dòng `# giả định` phải hiệu chỉnh lại trước cổng G4; cách hiệu chỉnh ghi
+# ngay trên dòng. Dòng `# chốt` là quyết định đã có, không phải số đo.
+#
+# Hai nguồn hiệu chỉnh của AC 2, không lẫn nhau:
+#   - τ_track, τ_sync: phân vị 99 trên **episode teleop thành công** (dữ liệu
+#     của tác giả, rồi teleop bàn phím của DA-16). Câu hỏi: controller và đồng
+#     hồ của lượt này có tệ hơn lúc người làm được việc không.
+#   - τ_lat: phân vị 99 trên **lần chạy chuẩn ở G0** (cùng máy, cùng cấu hình
+#     RTC). Câu hỏi: lượt này có chậm hơn máy vốn chạy được không.
+# Ngưỡng lấy từ nguồn nào thì ghi vào RunPlan của lần đo đó.
+#
+# Không có khóa nào là tùy chọn: thiếu một khóa là lỗi cấu hình, không phải
+# giá trị mặc định ngầm (DA-08 AC 3, cùng luật).
+
+signals:
+  max_gap_fraction: 0.0    # giả định; 0 nghĩa là một chu kỳ thiếu tín hiệu đã làm mã đó CHƯA RÕ. Hiệu chỉnh: tỉ lệ chu kỳ thiếu trên lần chạy chuẩn G0, nhân 2
+  max_dropped_frames: 0    # giả định; "camera mất khung" của spec mục 6.4. Hiệu chỉnh: số khung rơi lớn nhất trên lần chạy chuẩn G0
+  min_steps: 10            # chốt: phân vị trên dưới 10 chu kỳ không có nghĩa; trace ngắn hơn là CHƯA RÕ, không phải hệ thống chạy tốt
+
+r1:
+  tau_lat_s: 0.15          # giả định; độ trễ chu kỳ suy luận, đơn vị giây. Hiệu chỉnh: phân vị 99 của (chunk_received_s - observation_sent_s) trên lần chạy chuẩn G0
+  percentile: 99.0         # chốt theo spec mục 6.4 ("phân vị 99 độ trễ chu kỳ suy luận")
+
+r2:
+  min_buffer_level: 2      # giả định; số action còn trong buffer lúc chunk mới tới. Hiệu chỉnh: mức thấp nhất trên lần chạy chuẩn G0
+  max_underruns: 0         # giả định; một lần buffer cạn đã là một lần đứng máy nhìn thấy được
+
+r3:
+  tau_track_upper: 0.10    # giả định; chuẩn của (lệnh gửi - trạng thái đo) thân trên, đơn vị rad. Hiệu chỉnh: phân vị 99 trên episode teleop thành công
+  tau_track_lower: 0.15    # giả định; thân dưới (vận tốc gốc, chiều cao, hướng thân) có đơn vị khác thân trên nên ngưỡng riêng. Hiệu chỉnh: phân vị 99 trên episode teleop thành công
+  percentile: 99.0         # giả định; thống kê lấy trên các chu kỳ của episode. Ghi ra đây để hai lần đo khác thống kê không bị so với nhau
+
+r4:
+  tau_sync_s: 0.02         # giả định; lệch t_image và t_state, đơn vị giây. Hiệu chỉnh: phân vị 99 trên demo teleop thành công
+  # Thống kê là **lệch lớn nhất** trong episode, theo spec mục 6.4 ("lệch thời
+  # gian lớn nhất"), không phải phân vị 99 của episode. Hai phân vị khác nhau
+  # là có chủ ý: ngưỡng lấy từ dữ liệu tốt, phép đo là lúc tệ nhất của lượt này.
+
+r5:
+  reference_sha256: null   # chưa ghim: bản tham chiếu camera chốt ở G0 (spec mục 6.4 bước 5). Còn `null` thì R5 ra CHƯA RÕ, không phải đạt; đặt hash rồi khai `cameras` bên dưới
+  cameras: {}              # khai theo `uid` của CameraParams khi G0 chốt; giá trị lấy từ cấu hình camera của SIMPLE, không gõ tay
+  tolerance_intrinsics_px: 0.5    # giả định; fx, fy, cx, cy, đơn vị pixel
+  tolerance_position_m: 0.005     # giả định; vị trí camera so với thân gắn, đơn vị mét
+  tolerance_quaternion: 0.01      # giả định; thành phần quaternion, không đơn vị
+
+r6:
+  ok_statuses: ["ok"]      # chốt: `infra_status` của RolloutResult; mọi giá trị khác là lỗi hạ tầng, không tính là lỗi policy (03 mục 4.3 luật 8)

@@ -120,6 +120,13 @@ def check_r4(trace: TraceLog, cfg: R4Thresholds) -> CheckResult:
 
 def check_r5(cameras: tuple[CameraView, ...], cfg: R5Thresholds) -> CheckResult:
     """The camera parameters of the episode against the reference hashed at G0 (step 5)."""
+    if cfg.reference_sha256 is None:
+        # Nothing to compare against. Comparing the declared numbers instead
+        # would be judging an episode against a reference nobody has fixed,
+        # and passing it would be the silent pass FR21 forbids (AC 2).
+        return CheckResult(
+            skipped=[Skipped("R5", "bản tham chiếu camera chưa ghim ở G0 (`system.yaml`, r5)")]
+        )
     if not cameras:
         return CheckResult(
             skipped=[Skipped("R5", f"episode không có tham số camera (`{CAMERA_NAME}`)")]

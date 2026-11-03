@@ -318,9 +318,16 @@ class R5Thresholds:
     The tolerances are kept apart because the quantities are: pixels for the
     intrinsics, metres for the camera position, and a unitless quaternion
     component for its orientation.
+
+    `reference_sha256` is None until G0 pins the reference. R5 is then skipped
+    with that reason rather than compared against numbers nobody has measured:
+    a placeholder hash would make every episode a calibration fault, and
+    declared numbers behind an unpinned reference are not evidence. A skip is
+    the honest answer and `combine` keeps the episode from being cleared on it
+    (AC 2).
     """
 
-    reference_sha256: str
+    reference_sha256: str | None
     cameras: dict[str, CameraReference]
     tolerance_intrinsics_px: float
     tolerance_position_m: float
@@ -452,7 +459,7 @@ class SystemThresholds:
             ),
             r4=R4Thresholds(tau_sync_s=_number(r4, "tau_sync_s", "r4")),
             r5=R5Thresholds(
-                reference_sha256=_digest(r5, "reference_sha256", "r5"),
+                reference_sha256=_optional_digest(r5, "reference_sha256", "r5"),
                 cameras=_cameras(r5, "cameras", "r5"),
                 tolerance_intrinsics_px=_number(r5, "tolerance_intrinsics_px", "r5"),
                 tolerance_position_m=_number(r5, "tolerance_position_m", "r5"),
@@ -466,6 +473,16 @@ def load_scorer_config(path: Path) -> tuple[ScorerConfig, str]:
     """Read a scorer config; return it and the hash to record with every `Score`."""
     raw, parsed = _read_yaml(path)
     return ScorerConfig.from_mapping(parsed), _sha256(raw)
+
+
+def load_system_thresholds(path: Path) -> tuple[SystemThresholds, str]:
+    """Read `system.yaml`; return the thresholds and the hash to record with them.
+
+    One read serves both answers, so the hash in a record can only ever name
+    the file the checks actually ran on (DA-13 AC 2).
+    """
+    raw, parsed = _read_yaml(path)
+    return SystemThresholds.from_mapping(parsed), _sha256(raw)
 
 
 def load_train_thresholds(path: Path) -> tuple[TrainThresholds, str]:
@@ -555,20 +572,28 @@ def _steps(section: Mapping[str, Any], key: str, where: str) -> int:
     return value
 
 
-def _digest(section: Mapping[str, Any], key: str, where: str) -> str:
-    value = _text(section, key, where)
-    if len(value) != 64 or any(char not in "0123456789abcdef" for char in value):
-        raise ConfigError(f"`{where}.{key}` must be 64 lowercase hex characters, got {value!r}")
+def _optional_digest(section: Mapping[str, Any], key: str, where: str) -> str | None:
+    """A hash, or None where the thing it names has not been pinned yet.
+
+    The key must still be present: leaving it out would be an author who
+    forgot, and writing `null` is an author who means "not pinned".
+    """
+    value = _require(section, key, where)
+    if value is None:
+        return None
+    if not isinstance(value, str) or len(value) != 64:
+        raise ConfigError(f"`{where}.{key}` must be 64 hex characters or null, got {value!r}")
+    if any(char not in "0123456789abcdef" for char in value):
+        raise ConfigError(f"`{where}.{key}` must be lowercase hex, got {value!r}")
     return value
 
 
 def _cameras(section: Mapping[str, Any], key: str, where: str) -> dict[str, CameraReference]:
     """The reference calibration of each camera, keyed by `CameraParams.uid`."""
     value = _require(section, key, where)
-    if not isinstance(value, Mapping) or not value:
+    if not isinstance(value, Mapping):
         raise ConfigError(
-            f"`{where}.{key}` must be a non-empty mapping of camera uid to calibration, "
-            f"got {value!r}"
+            f"`{where}.{key}` must be a mapping of camera uid to calibration, got {value!r}"
         )
     cameras: dict[str, CameraReference] = {}
     for uid in value:
