@@ -7,6 +7,7 @@ number its author wrote and nobody uses.
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Any
 
@@ -50,10 +51,15 @@ def test_the_hash_is_of_the_bytes_that_were_parsed(tmp_path: Path, shipped) -> N
     assert load_system_thresholds(first)[1] != load_system_thresholds(second)[1]
 
 
-def test_the_camera_reference_ships_unpinned(shipped) -> None:
-    # Until G0 fixes the reference, R5 has nothing to compare against; a
-    # placeholder hash would make every episode a calibration fault.
-    assert shipped["r5"]["reference_sha256"] is None
+def test_the_camera_reference_ships_pinned_for_the_two_table_task(shipped) -> None:
+    # Pinned at G0 on 3/11/2026 for SIMPLE b75c678 (DA-38). Both head cameras
+    # render 640x360 at a 110 degree fov, so fx = 320 / tan(55 degrees).
+    r5 = SystemThresholds.from_mapping(shipped).r5
+    assert r5.reference_sha256 == "fc7f9c90ebbf8c4662fd70e58de5aed668c0fbc5ccfbbd951dce705729cdeea2"
+    assert sorted(r5.cameras) == ["head_stereo_left", "head_stereo_right"]
+    for camera in r5.cameras.values():
+        assert (camera.width, camera.height, camera.mount) == (640, 360, "eye_in_head")
+        assert camera.fx == pytest.approx(320 / math.tan(math.radians(55)))
 
 
 def test_a_missing_threshold_raises_rather_than_defaulting(shipped) -> None:

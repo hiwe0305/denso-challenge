@@ -329,7 +329,8 @@ class R5Thresholds:
     intrinsics, metres for the camera position, and a unitless quaternion
     component for its orientation.
 
-    `reference_sha256` is None until G0 pins the reference. R5 is then skipped
+    `reference_sha256` is None where no reference is pinned (`system.yaml`
+    ships the two-table task's, pinned at G0 on 3/11/2026). R5 is then skipped
     with that reason rather than compared against numbers nobody has measured:
     a placeholder hash would make every episode a calibration fault, and
     declared numbers behind an unpinned reference are not evidence. A skip is

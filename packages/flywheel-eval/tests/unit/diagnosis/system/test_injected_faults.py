@@ -40,6 +40,7 @@ CAMERA_REFERENCE: dict[str, Any] = {
     "pose": [0.0, 0.0, 1.5, 1.0, 0.0, 0.0, 0.0],
 }
 REFERENCE_SHA = "b" * 64
+DA38 = Path(__file__).parent / "data" / "da38"
 
 
 def _repo_root() -> Path:
@@ -77,7 +78,7 @@ def episode(tmp_path: Path, clean_rows, rtc_rows, camera_entry):
     def write(
         trace_rows: list[dict[str, Any]] | None = None,
         rtc: list[dict[str, Any]] | None = None,
-        camera: dict[str, Any] | None = None,
+        camera: dict[str, Any] | list[dict[str, Any]] | None = None,
         infra_status: str = "ok",
     ) -> Path:
         folder = tmp_path / f"ep_{len(list(tmp_path.iterdir()))}"
@@ -224,22 +225,54 @@ def test_an_episode_whose_trace_lacks_a_field_is_unknown_not_clean(episode, cfg,
     assert [skip.code for skip in verdict.skipped] == ["R4"]
 
 
-def test_the_shipped_config_leaves_calibration_unjudged(episode, clean_rows) -> None:
-    # What the team gets before G0 pins the reference: R5 unjudged, so a clean
-    # episode reads as UNKNOWN rather than as a calibration that was checked.
-    shipped = yaml.safe_load(
-        (_repo_root() / "configs" / "eval" / "diagnosis" / "system.yaml").read_text(
-            encoding="utf-8"
+def _shipped() -> SystemThresholds:
+    return SystemThresholds.from_mapping(
+        yaml.safe_load(
+            (_repo_root() / "configs" / "eval" / "diagnosis" / "system.yaml").read_text(
+                encoding="utf-8"
+            )
         )
     )
 
-    verdict = diagnose_system(
-        load_episode(episode()), SystemThresholds.from_mapping(shipped)
-    )
+
+def _hook_cameras() -> list[dict[str, Any]]:
+    # `camera_params.json` as the SimpleSim hook (DA-38 @ f94d5bc) writes it for
+    # the two-table task at SIMPLE b75c678: both head cameras, with the hash of
+    # the G0 reference copied from the job spec.
+    return json.loads((DA38 / "camera_params.json").read_text(encoding="utf-8"))
+
+
+def test_the_shipped_config_clears_the_cameras_the_hook_writes(episode) -> None:
+    # `system.yaml` as it ships, pinned at G0 for the two-table task: the
+    # cameras of a SIMPLE rollout are judged, and they match.
+    verdict = diagnose_system(load_episode(episode(camera=_hook_cameras())), _shipped())
+
+    assert verdict.diagnosis is Diagnosis.CLEAN
+    assert verdict.findings == []
+    assert verdict.skipped == []
+
+
+def test_the_shipped_config_catches_a_hook_camera_that_drifted(episode) -> None:
+    cameras = _hook_cameras()
+    cameras[1] = {**cameras[1], "fx": cameras[1]["fx"] + 2.0}
+
+    verdict = diagnose_system(load_episode(episode(camera=cameras)), _shipped())
+
+    assert verdict.diagnosis is Diagnosis.CALIBRATION
+    assert [(f.code, f.where) for f in verdict.findings] == [("R5", "head_stereo_right")]
+
+
+def test_an_episode_without_camera_params_is_unknown_on_the_shipped_config(episode) -> None:
+    # The hook writes no `camera_params.json` when the job had no pinned hash;
+    # R5 must then say CHƯA RÕ, not pass.
+    folder = episode(camera=_hook_cameras())
+    (folder / "camera_params.json").unlink()
+
+    verdict = diagnose_system(load_episode(folder), _shipped())
 
     assert verdict.diagnosis is Diagnosis.UNKNOWN
     assert [skip.code for skip in verdict.skipped] == ["R5"]
-    assert "chưa ghim ở G0" in verdict.skipped[0].reason
+    assert "camera_params.json" in verdict.skipped[0].reason
 
 
 def test_the_same_episode_scores_the_same_twice(episode, cfg) -> None:
