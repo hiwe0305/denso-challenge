@@ -23,7 +23,7 @@ import itertools
 import re
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -245,7 +245,6 @@ class _GymProxy:
     def __init__(self, gym: Any, env_class: type[Any]) -> None:
         self._gym = gym
         self._env_class = env_class
-        setattr(self, _PATCHED, True)
 
     def make(self, *args: Any, **kwargs: Any) -> Any:
         return self._env_class(self._gym.make(*args, **kwargs))
@@ -254,10 +253,27 @@ class _GymProxy:
         return getattr(self._gym, name)
 
 
+class _RecorderSlot:
+    """The recorder the patched code writes to; a later `install` swaps the target."""
+
+    def __init__(self, target: TraceRecorder) -> None:
+        self.target = target
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.target, name)
+
+
 def install(eval_module: Any, agent_module: Any, recorder: TraceRecorder) -> None:
-    """Patch SIMPLE's eval and psi0 agent modules once per process."""
-    if getattr(eval_module, _PATCHED, False):
+    """Patch SIMPLE's eval and psi0 agent modules once per process.
+
+    A second call patches nothing more; it sends later cycles to `recorder`.
+    """
+    slot = getattr(eval_module, _PATCHED, None)
+    if isinstance(slot, _RecorderSlot):
+        slot.target = recorder
         return
+    slot = _RecorderSlot(recorder)
+    recorder = cast(TraceRecorder, slot)
     gym = eval_module.gym
     eval_module.gym = _GymProxy(gym, traced_env_class(gym.Wrapper, recorder))
     agent_module.Psi0DecoupledWbcAgent = traced_agent_class(
@@ -272,4 +288,4 @@ def install(eval_module: Any, agent_module: Any, recorder: TraceRecorder) -> Non
             recorder.end_episode(parsed[0], success=parsed[1])
 
     eval_module._append_eval_stats_line = append_eval_stats_line
-    setattr(eval_module, _PATCHED, True)
+    setattr(eval_module, _PATCHED, slot)

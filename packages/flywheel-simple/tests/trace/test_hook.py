@@ -319,3 +319,17 @@ def test_install_patches_env_agent_and_stats_line_once() -> None:
     assert (ep.episode_id, ep.sim_success, len(ep.cycles)) == ("episode_4", True, 1)
     assert ag.Psi0DecoupledWbcAgent.__mro__[1] is FakePsi0Agent
     assert ev.gym.Wrapper is FakeWrapper  # only make is replaced
+
+
+def test_a_second_install_routes_cycles_to_the_new_recorder() -> None:
+    first, second = ListSink(), ListSink()
+    ev, ag, _ = fake_modules()
+    install(ev, ag, TraceRecorder(first, run_plan_id="a"))
+    install(ev, ag, TraceRecorder(second, run_plan_id="b"))
+    env = ev.gym.make("simple/X-v0")
+    agent = ag.Psi0DecoupledWbcAgent(fake_robot(), "h", 1, chunks=[np.ones((2, 36))])
+    env.reset()
+    agent.get_action({"joint_qpos": np.zeros(43)})
+    ev._append_eval_stats_line("/tmp/x", "episode_0: False \n")
+    assert first.episodes == []
+    assert [(e.run_plan_id, len(e.cycles)) for e in second.episodes] == [("b", 1)]
