@@ -244,6 +244,102 @@ class R3Thresholds:
 
 
 @dataclass(frozen=True)
+class R1Thresholds:
+    """Inference cycle latency: p99 over tau_lat is a runtime fault.
+
+    tau_lat is calibrated as the 99th percentile over the reference run at G0
+    (AC 2), so the question the check asks is whether this episode was slower
+    than the machine is known to be, not whether it was slower than some
+    absolute budget nobody measured.
+    """
+
+    tau_lat_s: float
+    percentile: float
+
+
+@dataclass(frozen=True)
+class R2Thresholds:
+    """Action buffer running dry: chunks whose buffer level is under the floor.
+
+    This is a count, not a percentile: one chunk arriving with nothing left to
+    execute is a visible stall, and what the threshold decides is how many of
+    those an episode may contain before the runtime, not the policy, is what
+    the engineer goes and fixes.
+    """
+
+    min_buffer_level: int
+    max_underruns: int
+
+
+@dataclass(frozen=True)
+class R4Thresholds:
+    """Image and state clocks drifting apart: the largest offset over tau_sync.
+
+    The statistic is the maximum over the episode, because spec section 6.4
+    says "lệch thời gian lớn nhất giữa khung ảnh và state"; tau_sync itself is
+    calibrated as the 99th percentile over successful teleop demonstrations
+    (AC 2). Those are two different percentiles on purpose: the threshold comes
+    from what good data looks like, the measurement is the worst moment of this
+    episode.
+    """
+
+    tau_sync_s: float
+
+
+@dataclass(frozen=True)
+class CameraReference:
+    """The hashed reference calibration of one camera (AC 2).
+
+    `pose` is [x, y, z, qw, qx, qy, qz] relative to the mount, the layout of
+    `CameraParams` in Contract change #31.
+    """
+
+    mount: str
+    width: int
+    height: int
+    fx: float
+    fy: float
+    cx: float
+    cy: float
+    pose: tuple[float, ...]
+
+
+@dataclass(frozen=True)
+class R5Thresholds:
+    """Camera calibration against the reference fixed at G0.
+
+    Two things can be wrong and they are different faults to report.
+    `reference_sha256` says which reference the episode was calibrated
+    against: an episode calibrated against another reference is not comparable
+    with the rest of the run even if its numbers happen to be close. The
+    numbers themselves are then compared within a tolerance, since a render
+    pipeline does not reproduce a float exactly.
+
+    The tolerances are kept apart because the quantities are: pixels for the
+    intrinsics, metres for the camera position, and a unitless quaternion
+    component for its orientation.
+    """
+
+    reference_sha256: str
+    cameras: dict[str, CameraReference]
+    tolerance_intrinsics_px: float
+    tolerance_position_m: float
+    tolerance_quaternion: float
+
+
+@dataclass(frozen=True)
+class R6Thresholds:
+    """Which `infra_status` values mean the infrastructure was fine.
+
+    R6 is not a statement about the policy (AC 1; 03 section 4.3, rule 8), so
+    there is no number here: there is a list of the statuses that count as
+    healthy, and anything else is the server, not the robot.
+    """
+
+    ok_statuses: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class ScorerConfig:
     """What `configs/eval/scorer/<task>.yaml` tells the scorer (DA-36 AC 5).
 
@@ -321,25 +417,48 @@ class SystemThresholds:
     """Every threshold the F-SYS checks of DA-13 read, from `system.yaml` (AC 2)."""
 
     signals: SignalLimits
+    r1: R1Thresholds
+    r2: R2Thresholds
     r3: R3Thresholds
+    r4: R4Thresholds
+    r5: R5Thresholds
+    r6: R6Thresholds
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> SystemThresholds:
         """Validate a parsed system-threshold mapping; raise on anything unclear."""
         _reject_unknown(data, tuple(cls.__dataclass_fields__), "system.yaml")
         signals = _section(data, "signals")
-        r3 = _section(data, "r3")
+        r1, r2, r3 = (_section(data, name) for name in ("r1", "r2", "r3"))
+        r4, r5, r6 = (_section(data, name) for name in ("r4", "r5", "r6"))
         return cls(
             signals=SignalLimits(
                 max_gap_fraction=_fraction(signals, "max_gap_fraction", "signals"),
                 max_dropped_frames=_steps(signals, "max_dropped_frames", "signals"),
                 min_steps=_steps(signals, "min_steps", "signals"),
             ),
+            r1=R1Thresholds(
+                tau_lat_s=_number(r1, "tau_lat_s", "r1"),
+                percentile=_percentile(r1, "percentile", "r1"),
+            ),
+            r2=R2Thresholds(
+                min_buffer_level=_steps(r2, "min_buffer_level", "r2"),
+                max_underruns=_steps(r2, "max_underruns", "r2"),
+            ),
             r3=R3Thresholds(
                 tau_track_upper=_number(r3, "tau_track_upper", "r3"),
                 tau_track_lower=_number(r3, "tau_track_lower", "r3"),
                 percentile=_percentile(r3, "percentile", "r3"),
             ),
+            r4=R4Thresholds(tau_sync_s=_number(r4, "tau_sync_s", "r4")),
+            r5=R5Thresholds(
+                reference_sha256=_digest(r5, "reference_sha256", "r5"),
+                cameras=_cameras(r5, "cameras", "r5"),
+                tolerance_intrinsics_px=_number(r5, "tolerance_intrinsics_px", "r5"),
+                tolerance_position_m=_number(r5, "tolerance_position_m", "r5"),
+                tolerance_quaternion=_number(r5, "tolerance_quaternion", "r5"),
+            ),
+            r6=R6Thresholds(ok_statuses=_name_list(r6, "ok_statuses", "r6")),
         )
 
 
@@ -436,6 +555,57 @@ def _steps(section: Mapping[str, Any], key: str, where: str) -> int:
     return value
 
 
+def _digest(section: Mapping[str, Any], key: str, where: str) -> str:
+    value = _text(section, key, where)
+    if len(value) != 64 or any(char not in "0123456789abcdef" for char in value):
+        raise ConfigError(f"`{where}.{key}` must be 64 lowercase hex characters, got {value!r}")
+    return value
+
+
+def _cameras(section: Mapping[str, Any], key: str, where: str) -> dict[str, CameraReference]:
+    """The reference calibration of each camera, keyed by `CameraParams.uid`."""
+    value = _require(section, key, where)
+    if not isinstance(value, Mapping) or not value:
+        raise ConfigError(
+            f"`{where}.{key}` must be a non-empty mapping of camera uid to calibration, "
+            f"got {value!r}"
+        )
+    cameras: dict[str, CameraReference] = {}
+    for uid in value:
+        name = _name(uid, f"{where}.{key}")
+        entry = value[uid]
+        if not isinstance(entry, Mapping):
+            raise ConfigError(f"`{where}.{key}.{name}` must be a mapping, got {entry!r}")
+        place = f"{where}.{key}.{name}"
+        _reject_unknown(entry, tuple(CameraReference.__dataclass_fields__), place)
+        pose = _numbers(entry, "pose", place)
+        if len(pose) != 7:
+            raise ConfigError(
+                f"`{place}.pose` must be 7 numbers [x, y, z, qw, qx, qy, qz], got {len(pose)}"
+            )
+        cameras[name] = CameraReference(
+            mount=_text(entry, "mount", place),
+            width=_steps(entry, "width", place),
+            height=_steps(entry, "height", place),
+            fx=_number(entry, "fx", place),
+            fy=_number(entry, "fy", place),
+            cx=_number(entry, "cx", place),
+            cy=_number(entry, "cy", place),
+            pose=pose,
+        )
+    return cameras
+
+
+def _numbers(section: Mapping[str, Any], key: str, where: str) -> tuple[float, ...]:
+    value = _require(section, key, where)
+    if not isinstance(value, list):
+        raise ConfigError(f"`{where}.{key}` must be a list of numbers, got {value!r}")
+    for item in value:
+        if isinstance(item, bool) or not isinstance(item, (int, float)):
+            raise ConfigError(f"`{where}.{key}` must hold numbers, got {item!r}")
+    return tuple(float(item) for item in value)
+
+
 def _fraction(section: Mapping[str, Any], key: str, where: str) -> float:
     value = _number(section, key, where)
     if not 0.0 <= value <= 1.0:
@@ -494,7 +664,12 @@ def _name(value: Any, where: str) -> str:
 _SECTION_FIELDS: dict[str, tuple[str, ...]] = {
     "balance": tuple(BalanceLimits.__dataclass_fields__),
     "signals": tuple(SignalLimits.__dataclass_fields__),
+    "r1": tuple(R1Thresholds.__dataclass_fields__),
+    "r2": tuple(R2Thresholds.__dataclass_fields__),
     "r3": tuple(R3Thresholds.__dataclass_fields__),
+    "r4": tuple(R4Thresholds.__dataclass_fields__),
+    "r5": tuple(R5Thresholds.__dataclass_fields__),
+    "r6": tuple(R6Thresholds.__dataclass_fields__),
     "t1": tuple(T1Thresholds.__dataclass_fields__),
     "t2": tuple(T2Thresholds.__dataclass_fields__),
     "t3": tuple(T3Thresholds.__dataclass_fields__),

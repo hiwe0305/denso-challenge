@@ -81,13 +81,21 @@ class SystemFinding:
 
     `where` is the trace row, the chunk index or the camera uid the measurement
     came from - the evidence AC 3 asks a hypothesis to carry.
+
+    `threshold` is None where the rule counts measurements rather than
+    comparing against a number, the same way `DiagnosisFinding.threshold` of
+    the contract is None for T1 on a loss that is not finite. A calibration
+    reference that does not match is such a rule: there is no number to be
+    over, so the count of cameras that disagree is the measurement and
+    `detail` says what disagreed.
     """
 
     code: str
     value: float
-    threshold: float
+    threshold: float | None
     part: str | None = None
     where: str | None = None
+    detail: str | None = None
 
     def __post_init__(self) -> None:
         if self.code not in SYSTEM_CODES:
