@@ -259,6 +259,9 @@ class Cluster(ContentEntity):
     parent_cluster_id: str | None = None
     representative_seed: int | None = None
     member_episode_ids: list[str] = Field(default_factory=list)
+    # Deprecated at L0-lite and not set: the field is part of the content id, so
+    # writing the card's path here would change the cluster's id. The path is
+    # derived from the id instead, by `StorePaths.card_path` (DA-39, PO P1).
     card_uri: str | None = None
 
 

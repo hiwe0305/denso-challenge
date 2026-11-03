@@ -1,0 +1,901 @@
+{
+  "$defs": {
+    "CheckResult": {
+      "additionalProperties": false,
+      "description": "One check of one representative, with what it was judged by.",
+      "properties": {
+        "check": {
+          "enum": [
+            "infra_status",
+            "tracking_error",
+            "latency_p99",
+            "buffer_underruns",
+            "sync_offset",
+            "camera_reference",
+            "camera_intrinsics_px",
+            "camera_position_m",
+            "camera_quaternion",
+            "planner_feasible",
+            "reset_success",
+            "nominal_visuals",
+            "in_train_domain",
+            "coverage_distance"
+          ],
+          "title": "Check",
+          "type": "string"
+        },
+        "part": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Part"
+        },
+        "outcome": {
+          "enum": [
+            "fired",
+            "not_fired",
+            "not_judged"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "threshold": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Threshold"
+        },
+        "n_success": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "N Success"
+        },
+        "n_runs": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "N Runs"
+        },
+        "skipped_reason": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Skipped Reason"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "check",
+        "outcome"
+      ],
+      "title": "CheckResult",
+      "type": "object"
+    },
+    "Cost": {
+      "additionalProperties": false,
+      "description": "Money and hours, estimated or measured, as the ledger rows add them up.",
+      "properties": {
+        "measure_kind": {
+          "enum": [
+            "estimated",
+            "measured"
+          ],
+          "title": "Measure Kind",
+          "type": "string"
+        },
+        "usd_amount": {
+          "minimum": 0,
+          "title": "Usd Amount",
+          "type": "number"
+        },
+        "human_hours": {
+          "default": 0.0,
+          "minimum": 0,
+          "title": "Human Hours",
+          "type": "number"
+        },
+        "ledger_entry_ids": {
+          "items": {
+            "pattern": "^led_[0-9A-HJKMNP-TV-Z]{26}$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Ledger Entry Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "measure_kind",
+        "usd_amount",
+        "ledger_entry_ids"
+      ],
+      "title": "Cost",
+      "type": "object"
+    },
+    "EngineerDecision": {
+      "additionalProperties": false,
+      "description": "Accept or override, as the `Decision` it is regenerated from (spec section 6.14).",
+      "properties": {
+        "verdict": {
+          "enum": [
+            "accept",
+            "override"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        },
+        "decision_id": {
+          "pattern": "^dec_[0-9A-HJKMNP-TV-Z]{26}$",
+          "title": "Decision Id",
+          "type": "string"
+        },
+        "signed_by": {
+          "minLength": 1,
+          "title": "Signed By",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "diagnosis": {
+          "anyOf": [
+            {
+              "enum": [
+                "unknown",
+                "infra",
+                "controller",
+                "runtime",
+                "sync",
+                "calibration",
+                "infeasible",
+                "bad_start_state",
+                "perception",
+                "out_of_domain",
+                "coverage_gap",
+                "weak_skill"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Diagnosis"
+        },
+        "intervention": {
+          "anyOf": [
+            {
+              "enum": [
+                "sim_s1",
+                "sim_s2",
+                "sim_s3",
+                "sim_s4",
+                "teleop_correction",
+                "recovery_data",
+                "repair_ticket",
+                "report_only"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Intervention"
+        }
+      },
+      "required": [
+        "verdict",
+        "decision_id",
+        "signed_by"
+      ],
+      "title": "EngineerDecision",
+      "type": "object"
+    },
+    "ExpectedGain": {
+      "additionalProperties": false,
+      "description": "g_j of spec section 6.11, in points of dev success.",
+      "properties": {
+        "n_failures": {
+          "minimum": 1,
+          "title": "N Failures",
+          "type": "integer"
+        },
+        "cap": {
+          "minimum": 1,
+          "title": "Cap",
+          "type": "integer"
+        },
+        "n_effective": {
+          "minimum": 1,
+          "title": "N Effective",
+          "type": "integer"
+        },
+        "n_dev": {
+          "minimum": 1,
+          "title": "N Dev",
+          "type": "integer"
+        },
+        "fix_rate_alpha": {
+          "exclusiveMinimum": 0,
+          "title": "Fix Rate Alpha",
+          "type": "number"
+        },
+        "fix_rate_beta": {
+          "exclusiveMinimum": 0,
+          "title": "Fix Rate Beta",
+          "type": "number"
+        },
+        "expected_gain_pp": {
+          "minimum": 0,
+          "title": "Expected Gain Pp",
+          "type": "number"
+        }
+      },
+      "required": [
+        "n_failures",
+        "cap",
+        "n_effective",
+        "n_dev",
+        "fix_rate_alpha",
+        "fix_rate_beta",
+        "expected_gain_pp"
+      ],
+      "title": "ExpectedGain",
+      "type": "object"
+    },
+    "InterventionProposal": {
+      "additionalProperties": false,
+      "description": "What the algorithm proposes for the cluster (spec sections 6.9-6.11).",
+      "properties": {
+        "kind": {
+          "enum": [
+            "sim_s1",
+            "sim_s2",
+            "sim_s3",
+            "sim_s4",
+            "teleop_correction",
+            "recovery_data",
+            "repair_ticket",
+            "report_only"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "consumes_budget": {
+          "title": "Consumes Budget",
+          "type": "boolean"
+        },
+        "quantity": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quantity"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        },
+        "gain": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExpectedGain"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "cost": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Cost"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "intervention_id": {
+          "anyOf": [
+            {
+              "pattern": "^iv_[0-9A-HJKMNP-TV-Z]{26}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Intervention Id"
+        }
+      },
+      "required": [
+        "kind",
+        "description",
+        "consumes_budget"
+      ],
+      "title": "InterventionProposal",
+      "type": "object"
+    },
+    "ProbeEvidence": {
+      "additionalProperties": false,
+      "description": "One probe measurement behind a stage hypothesis (`EvidenceRecord` of DA-13).",
+      "properties": {
+        "probe": {
+          "enum": [
+            "P1",
+            "P2",
+            "P3",
+            "P4",
+            "-"
+          ],
+          "title": "Probe",
+          "type": "string"
+        },
+        "where": {
+          "minLength": 1,
+          "title": "Where",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        },
+        "threshold": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Threshold"
+        }
+      },
+      "required": [
+        "probe",
+        "where",
+        "value"
+      ],
+      "title": "ProbeEvidence",
+      "type": "object"
+    },
+    "Representative": {
+      "additionalProperties": false,
+      "description": "One failure episode the expensive checks ran on (spec section 6.3).",
+      "properties": {
+        "episode_id": {
+          "minLength": 1,
+          "title": "Episode Id",
+          "type": "string"
+        },
+        "score_id": {
+          "pattern": "^sc_[0-9a-f]{16}$",
+          "title": "Score Id",
+          "type": "string"
+        },
+        "condition_seed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Condition Seed"
+        },
+        "trace_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Trace Sha256",
+          "type": "string"
+        },
+        "system_config_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "System Config Sha256",
+          "type": "string"
+        },
+        "stage_table_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stage Table Sha256"
+        },
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/CheckResult"
+          },
+          "title": "Checks",
+          "type": "array"
+        },
+        "stage_hypotheses": {
+          "items": {
+            "$ref": "#/$defs/StageHypothesis"
+          },
+          "title": "Stage Hypotheses",
+          "type": "array"
+        },
+        "stage_unavailable": {
+          "items": {
+            "$ref": "#/$defs/Unavailable"
+          },
+          "title": "Stage Unavailable",
+          "type": "array"
+        },
+        "diagnosis": {
+          "enum": [
+            "unknown",
+            "infra",
+            "controller",
+            "runtime",
+            "sync",
+            "calibration",
+            "infeasible",
+            "bad_start_state",
+            "perception",
+            "out_of_domain",
+            "coverage_gap",
+            "weak_skill"
+          ],
+          "title": "Diagnosis",
+          "type": "string"
+        }
+      },
+      "required": [
+        "episode_id",
+        "score_id",
+        "trace_sha256",
+        "system_config_sha256",
+        "checks",
+        "diagnosis"
+      ],
+      "title": "Representative",
+      "type": "object"
+    },
+    "RetrainResult": {
+      "additionalProperties": false,
+      "description": "Fix rate measured against the parent on new conditions (spec section 6.13).",
+      "properties": {
+        "parent_checkpoint_id": {
+          "minLength": 1,
+          "title": "Parent Checkpoint Id",
+          "type": "string"
+        },
+        "candidate_checkpoint_id": {
+          "minLength": 1,
+          "title": "Candidate Checkpoint Id",
+          "type": "string"
+        },
+        "n_conditions": {
+          "minimum": 1,
+          "title": "N Conditions",
+          "type": "integer"
+        },
+        "runs_per_condition": {
+          "minimum": 3,
+          "title": "Runs Per Condition",
+          "type": "integer"
+        },
+        "p_parent": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "P Parent",
+          "type": "number"
+        },
+        "p_candidate": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "P Candidate",
+          "type": "number"
+        },
+        "fixed": {
+          "minimum": 0,
+          "title": "Fixed",
+          "type": "integer"
+        },
+        "fix_rate_event_id": {
+          "anyOf": [
+            {
+              "pattern": "^fre_[0-9A-HJKMNP-TV-Z]{26}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fix Rate Event Id"
+        },
+        "gate_decision_id": {
+          "anyOf": [
+            {
+              "pattern": "^dec_[0-9A-HJKMNP-TV-Z]{26}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gate Decision Id"
+        },
+        "cost": {
+          "$ref": "#/$defs/Cost"
+        }
+      },
+      "required": [
+        "parent_checkpoint_id",
+        "candidate_checkpoint_id",
+        "n_conditions",
+        "runs_per_condition",
+        "p_parent",
+        "p_candidate",
+        "fixed",
+        "cost"
+      ],
+      "title": "RetrainResult",
+      "type": "object"
+    },
+    "StageHypothesis": {
+      "additionalProperties": false,
+      "description": "A row of the stage table that applied, as a proposal (spec section 6.4).",
+      "properties": {
+        "row_id": {
+          "enum": [
+            "stage1_perception",
+            "stage3_action_group",
+            "runtime_distribution_shift",
+            "stage3_forgetting",
+            "out_of_domain"
+          ],
+          "title": "Row Id",
+          "type": "string"
+        },
+        "attribute_to": {
+          "minLength": 1,
+          "title": "Attribute To",
+          "type": "string"
+        },
+        "intervention": {
+          "minLength": 1,
+          "title": "Intervention",
+          "type": "string"
+        },
+        "consumes_budget": {
+          "title": "Consumes Budget",
+          "type": "boolean"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/ProbeEvidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        }
+      },
+      "required": [
+        "row_id",
+        "attribute_to",
+        "intervention",
+        "consumes_budget"
+      ],
+      "title": "StageHypothesis",
+      "type": "object"
+    },
+    "Unavailable": {
+      "additionalProperties": false,
+      "description": "A stage row nobody could judge, and why.",
+      "properties": {
+        "row_id": {
+          "enum": [
+            "stage1_perception",
+            "stage3_action_group",
+            "runtime_distribution_shift",
+            "stage3_forgetting",
+            "out_of_domain"
+          ],
+          "title": "Row Id",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "row_id",
+        "reason"
+      ],
+      "title": "Unavailable",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One card per failure cluster (spec section 4.5). Not a catalog table.",
+  "properties": {
+    "schema_version": {
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "cluster_id": {
+      "pattern": "^clu_[0-9a-f]{16}$",
+      "title": "Cluster Id",
+      "type": "string"
+    },
+    "run_plan_id": {
+      "minLength": 1,
+      "title": "Run Plan Id",
+      "type": "string"
+    },
+    "task_id": {
+      "minLength": 1,
+      "title": "Task Id",
+      "type": "string"
+    },
+    "embodiment_id": {
+      "minLength": 1,
+      "title": "Embodiment Id",
+      "type": "string"
+    },
+    "level": {
+      "maximum": 2,
+      "minimum": 0,
+      "title": "Level",
+      "type": "integer"
+    },
+    "first_failed_step": {
+      "minimum": 1,
+      "title": "First Failed Step",
+      "type": "integer"
+    },
+    "failure_kind": {
+      "pattern": "^L-[A-Z][A-Z-]*$",
+      "title": "Failure Kind",
+      "type": "string"
+    },
+    "failure_class": {
+      "anyOf": [
+        {
+          "enum": [
+            "approach",
+            "grasp",
+            "carry",
+            "place",
+            "balance"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Failure Class"
+    },
+    "member_episode_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Member Episode Ids",
+      "type": "array"
+    },
+    "representative_seed": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Representative Seed"
+    },
+    "representatives": {
+      "items": {
+        "$ref": "#/$defs/Representative"
+      },
+      "minItems": 1,
+      "title": "Representatives",
+      "type": "array"
+    },
+    "diagnosis": {
+      "anyOf": [
+        {
+          "enum": [
+            "unknown",
+            "infra",
+            "controller",
+            "runtime",
+            "sync",
+            "calibration",
+            "infeasible",
+            "bad_start_state",
+            "perception",
+            "out_of_domain",
+            "coverage_gap",
+            "weak_skill"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Diagnosis"
+    },
+    "proposal": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/InterventionProposal"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "decision": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EngineerDecision"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "result": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RetrainResult"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "cluster_id",
+    "run_plan_id",
+    "task_id",
+    "embodiment_id",
+    "level",
+    "first_failed_step",
+    "failure_kind",
+    "member_episode_ids",
+    "representatives",
+    "diagnosis",
+    "proposal"
+  ],
+  "title": "EvidenceCard",
+  "type": "object"
+}
