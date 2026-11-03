@@ -29,7 +29,7 @@ Là người của mọi làn, tôi muốn một file `configs/embodiments/g1.ya
 ## Nhiệm vụ
 
 - [x] 1. Viết file story (AC 1–6)
-- [ ] 2. `action_layout` 36 chiều của G1 trong `configs/embodiments/g1.yaml`, trích nguồn theo commit (AC 1–4, 6)
+- [x] 2. `action_layout` 36 chiều của G1 trong `configs/embodiments/g1.yaml`, trích nguồn theo commit (AC 1–4, 6)
 - [ ] 3. `control_spec` theo decoupled WBC và test validate `ControlSpec` (AC 5)
 - [ ] 4. `segments.parquet` của bundle episode (07 mục 2.2 nhiệm vụ con gợi ý 3; chưa làm trong PR này)
 - [ ] 5. Test tính chất cho validate `Episode`, `ActionLayout` (07 mục 2.2 nhiệm vụ con gợi ý 4; chưa làm trong PR này)
@@ -49,6 +49,8 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 2. **Chú thích Ψ₀ đặt mốc `base_height` là 0,75 m**; dữ liệu psi-data và `height_cmd` của config WBC là 0,74 m. File ghi 0,74 là giá trị trên task hai bàn.
 3. **Tên ngón tay trái 3–6.** Chú thích Ψ₀ gọi 3:5 là `index`, 5:7 là `middle`; dữ liệu giữ `middle` ở 3–4, `index` ở 5–6 theo thứ tự của `postprocess_psi0_sonic.py` của SIMPLE ([psi-data](../../g0/psi-data.md) mục 2). Tên chiều trong `g1.yaml` theo SIMPLE.
 4. **Nhóm khác với export khay.** `meta/action_layout.json` của export khay DA-33 chia nhóm mịn hơn (`left_hand`, `right_hand`, `left_arm`, `right_arm`, `waist`, `base_height`, `navigate`) và không qua được seam của AC 2. `g1.yaml` dùng đúng tên nhóm DA-19 đang ghi trong `loss_by_group` (`hand`, `arm`, `torso_rpy`, `height`, `base_velocity`, `turn`, `target_yaw`). Đổi export cho khớp là việc của chủ `flywheel-simple` (Hiếu), PR riêng.
+
+5. **Dữ liệu chạm giới hạn khớp bằng sai số làm tròn.** Trong gói hai bàn, chiều 9–13 (tay phải) vượt cận 0 của MJCF một lượng cỡ 2,2e-16 (min, max ở [psi-data](../../g0/psi-data.md) mục 2). `g1.yaml` giữ đúng giới hạn MJCF; phép kiểm vượt giới hạn (D3 của DA-03, DA-17, O4 của DA-08 với `max_fraction: 0.0`) cần dung sai tuyệt đối, nếu không mọi episode psi-data đều bị báo lỗi. Đề xuất ghi dung sai trong cấu hình của từng phép kiểm, không nới giới hạn ở đây.
 
 ## Ghi chú cho người làm
 
