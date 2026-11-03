@@ -81,11 +81,14 @@ def check_balance(signals: pa.Table, limits: BalanceLimits) -> BalanceVerdict:
 def apply_balance(verdict: FailureVerdict, balance: BalanceVerdict) -> FailureVerdict:
     """Fold the whole-episode condition into the failure of the episode.
 
-    A violation names the episode `L-BALANCE` whatever the steps said, because
-    the body left its limits and everything measured after that happened to a
-    robot that was already falling. The failed step is kept where the task
-    reported one and stays unset where it did not: the violation is known by
-    its trace row, and turning a row into a step would be a guess.
+    A violation names the episode `L-BALANCE` only where the steps found
+    nothing else: spec section 5.2 reads `L-BALANCE` as the kind of an episode
+    that lost its balance, not as a kind that overwrites one already
+    established. An episode whose grasp failed at step 2 and which then fell
+    over is still a grasp failure, and renaming it would move the failure out
+    of the grasp cluster that DA-13 and the evidence cards are built from. The
+    fall is not lost by saying so: `Score.balance_violated` carries it, and the
+    row it was measured on is in the record (PO review of #58, 3/11/2026).
 
     A condition that could not be checked costs an otherwise clean episode its
     pass. Six steps passed with nobody watching the torso is not a successful
@@ -96,9 +99,11 @@ def apply_balance(verdict: FailureVerdict, balance: BalanceVerdict) -> FailureVe
     """
     if balance.violated:
         if balance.row is None:  # defended: a violation always carries its row
-            raise ScorerError("vi phạm thăng bằng không ghi được bước nào")
+            raise ScorerError("vi phạm thăng bằng không ghi được dòng trace nào")
+        if verdict.success is not True:
+            return verdict
         return FailureVerdict(
-            first_failed_step=verdict.first_failed_step,
+            first_failed_step=None,
             failure_kind=BALANCE_KIND,
             failure_class="balance",
         )

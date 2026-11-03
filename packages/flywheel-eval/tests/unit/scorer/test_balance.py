@@ -120,9 +120,13 @@ def test_a_violation_renames_a_passing_episode(
     assert folded.success is False
 
 
-def test_a_violation_renames_a_step_failure_and_keeps_its_step(
+def test_a_violation_leaves_a_named_failure_alone(
     make_rows: MakeRows, task: TaskDefinition, limits: BalanceLimits, sig: object
 ) -> None:
+    # The grasp slipped at step 2 and the robot then fell. It is still a slip:
+    # renaming it would move the episode out of the carry cluster DA-13 and the
+    # evidence cards are built from. `balance_violated` keeps the fall (PO
+    # decision of 3/11/2026).
     evaluation = StageEvaluation(
         stage_success=(True, True, False, False, False, False),
         first_failed_stage=2,
@@ -130,11 +134,28 @@ def test_a_violation_renames_a_step_failure_and_keeps_its_step(
         failure_class="carry",
     )
     rows = make_rows(torso_tilt=sig.const(0.8))  # type: ignore[attr-defined]
+    balance = check_balance(read_signals(rows), limits)
 
-    folded = apply_balance(verdict_for(evaluation, task), check_balance(read_signals(rows), limits))
+    folded = apply_balance(verdict_for(evaluation, task), balance)
 
-    assert folded.failure_kind == BALANCE_KIND
+    assert folded.failure_kind == "L-SLIP"
     assert folded.first_failed_step == 2
+    assert balance.violated is True
+
+
+def test_a_violation_on_an_unscorable_episode_stays_unknown(
+    make_rows: MakeRows, task: TaskDefinition, limits: BalanceLimits, sig: object
+) -> None:
+    # `L-BALANCE` says the fall is what went wrong, which is not known while a
+    # step could not be judged at all.
+    evaluation = StageEvaluation(stage_success=(None,) * 6)
+    rows = make_rows(torso_tilt=sig.const(0.8))  # type: ignore[attr-defined]
+
+    folded = apply_balance(
+        verdict_for(evaluation, task), check_balance(read_signals(rows), limits)
+    )
+
+    assert folded.failure_kind == UNKNOWN_KIND
 
 
 def test_an_uncheckable_condition_costs_a_clean_episode_its_pass(
