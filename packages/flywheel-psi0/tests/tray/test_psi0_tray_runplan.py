@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
@@ -13,6 +14,8 @@ from flywheel_psi0.tray.runplan import (
     TrayRunPlan,
     check,
     check_round,
+    freeze,
+    lock_path,
     recipe_sha256,
     run_plan_id,
 )
@@ -122,3 +125,18 @@ def test_cplus_slot_is_a_draft_on_branch_c() -> None:
     assert problems in ([], [f"{round_plan.inherits} is not frozen"])
     frozen = round_plan.model_copy(update={"status": "frozen"})
     assert any("n_add targeted seeds" in p for p in check_round(frozen))
+
+
+def test_plan_is_unchanged_since_it_was_frozen(plan: TrayRunPlan) -> None:
+    # Reading rules and branches are fixed before the first job (design 6.4). Changing
+    # the plan means a new RunPlan and a Decision, not an edit of this one.
+    lock = json.loads(lock_path(PLAN).read_text())
+    assert lock["plan"] == plan.model_dump(mode="json")
+    assert lock["run_plan_id"] == run_plan_id(plan)
+    assert (REPO / plan.interpretation.doc).is_file()
+
+
+def test_freeze_refuses_without_the_reading_rules(tmp_path: Path) -> None:
+    repo = _repo_copy(tmp_path)
+    with pytest.raises(ValueError, match="reading rules"):
+        freeze(repo / "configs/runplans/tray/he-tray.yaml", repo)
