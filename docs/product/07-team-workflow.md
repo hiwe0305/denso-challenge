@@ -4,6 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Đầu vào
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 3/11/2026 | 1.7 | Mục 3.2 luật 5: story thêm phụ thuộc ghi `uv.lock` vào Phạm vi file để pr-guard cho qua; chỉ nhận dòng do `uv lock` sinh, gói mới vào khóa thì nêu trong mô tả PR (chốt khi review #58) | PO (Hiếu) |
 | 3/11/2026 | 1.6 | Rút Thông khỏi S1-07, DA-02, DA-03, DA-17, DA-21, DA-27 và vai Scrum Master theo quyết định PO ([plan chia lại việc](../superpowers/plans/2026-11-03-thong-reassignment.md), Q1–Q6). Mục 2.0: việc của Thông sang Hiếu, `DefectManifest` đi tới Châu (DA-31, theo bản 1.0); mục 2.1: đường dẫn của Thông sang Hiếu; mục 2.2: chủ, phạm vi, giờ của DA-02, DA-03, DA-17, DA-27 theo plan mục 5, DA-21 chưa có chủ; mục 2.3, 2.4: tải và hạn mới; mục 4: bản tin tuần do Hiếu | PO (Hiếu) |
 | 3/11/2026 | 1.5 | Mục 2.2: thêm DA-35 (synthetic task khay, Hiếu), DA-36 (khung scorer, Châu, story 3.3) và DA-37 (hiệu chỉnh scorer, Châu, story 3.5) theo #30. Mục 2.4: gắn mã DA-36, DA-37 | PO (Hiếu) |
 | 3/11/2026 | 1.4 | Mục 2.4: phần 6 của demo chạy trên cả hai task; thêm dòng vòng Failure → Data trên task khay (DA-34, C+) hạn 12/11 | PO (Hiếu) |
@@ -234,7 +235,7 @@ File dùng chung: `contracts/`, schema trong `configs/`, `pyproject.toml` gốc,
 2. Chủ sở hữu (bản 0.7: Long giữ `flywheel-contracts`, `flywheel-testkit` theo mục 2.0, 2.1; Hiếu duyệt) làm một PR nhỏ chỉ đổi contract, kèm schema, file mẫu trong `flywheel-testkit` và test; nhánh `<story-id>-contract`.
 3. PR contract merge trước. Người cần dùng rebase lên `master` rồi làm tiếp.
 4. Bảng tổng hợp và sổ chi phí chung (bản 0.2): nhánh story không sửa 03 §3.3 hay một file sổ chi phí dùng chung. Story ghi kết quả và chi phí vào file của mình; chủ của bảng gom lại vào mốc cố định. Quy ước cho G0 ở [docs/g0/README.md](../g0/README.md).
-5. Thêm phụ thuộc Python: người cần thêm sửa `pyproject.toml` của package mình; `uv.lock` chỉ được tạo lại bằng `uv lock` sau khi rebase, không sửa tay; xung đột ở `uv.lock` thì lấy bản của `master` rồi chạy lại `uv lock`.
+5. Thêm phụ thuộc Python: người cần thêm sửa `pyproject.toml` của package mình; `uv.lock` chỉ được tạo lại bằng `uv lock` sau khi rebase, không sửa tay; xung đột ở `uv.lock` thì lấy bản của `master` rồi chạy lại `uv lock`. Bản 1.7: story có bước này ghi `uv.lock` vào "Phạm vi file" (pr-guard đọc mục đó), và người review chỉ nhận các dòng do `uv lock` sinh cho package của story. Phụ thuộc chỉ ghi lại gói đã có trong khóa thì không cần duyệt riêng; gói mới vào khóa hoặc đổi phiên bản thì nêu trong mô tả PR để Hiếu duyệt.
 
 ### 3.3 Vòng đời một story
 
