@@ -34,7 +34,7 @@ from flywheel.data.ingest.lerobot import (
 )
 from flywheel.data.inject.config import InjectConfig
 from flywheel.data.inject.data_defects import EpisodeData
-from flywheel.data.inject.dataset import create_defect_dataset
+from flywheel.data.inject.dataset import create_clean_dataset, create_defect_dataset
 
 COPY_MARKER = "benchmark_copy.json"
 
@@ -112,6 +112,27 @@ def inject_copy(
         if d.parameters["kind"] == "duplicate_episode"
     }
     write_copy(src_root, out_root, frames, injected, manifest.dataset_id, duplicates)
+    return manifest
+
+
+def clean_copy(
+    src_root: Path, out_root: Path, config: InjectConfig | None = None
+) -> DefectManifest:
+    """Copy the dataset at `src_root` to `out_root` with no defect, for the false alarm rate.
+
+    The clean copy is built from the source, never from the defect copy, and goes through
+    the same rewrite as the defect copy, so the two differ only by their defects. The
+    returned manifest is empty; that is what tells the scorer this copy is the clean one.
+    """
+    if out_root.exists():
+        raise FileExistsError(f"{out_root} exists; a benchmark copy is never overwritten")
+    cfg = config or InjectConfig()
+    fps = float(read_info(src_root)["fps"])
+    seeds = {int(r["episode_index"]): row_seed(r) for r in read_episode_rows(src_root)}
+    frames = list(iter_episodes(src_root))
+    originals = [frames_to_data(f, fps, seeds[f.episode_index]) for f in frames]
+    clean, manifest = create_clean_dataset(originals, config=cfg)
+    write_copy(src_root, out_root, frames, clean, manifest.dataset_id, {})
     return manifest
 
 

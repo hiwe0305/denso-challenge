@@ -39,6 +39,15 @@ Chỉ ghi lỗi đã cấy thật (DA-31 tính recall theo loại từ manifest)
 
 `flywheel.data.inject.lerobot_copy.inject_copy(src_root, out_root, cfg, layout)` đọc gói bằng bộ đọc của DA-03 (`iter_episodes`), chọn và cấy lỗi như trên, rồi ghi bản sao bằng `write_episode`; làn không có mã parquet riêng. Bản gốc không bị ghi. Mọi episode của bản sao được ghi lại theo thứ tự tăng dần, không chỉ episode có lỗi, vì bộ ghi đánh số lại `index` và ghi `meta/flywheel_lineage.jsonl`; ghi lại một phần sẽ làm lộ episode có lỗi. `duplicate_episode` nhận parquet và video của episode nguồn. Seed rò ghi vào `environment_config.flywheel.seed` của dòng `meta/episodes.jsonl`. Bản sao có `meta/benchmark_copy.json` (`benchmark_copy_id`); đáp án chỉ ở manifest trả về. Id episode trong manifest là tên file parquet (`episode_000012`).
 
+### Dựng hai bản sao và niêm phong
+
+```bash
+uv run python -m flywheel.data.inject.build --source <gốc LeRobot> --out fwdata/inject \
+    --layout configs/embodiments/g1.yaml --config configs/data/inject.yaml
+```
+
+Lệnh ghi `copies/<id>/` (bản cấy và bản sạch, id trung tính từ `copy_ids(seed)`), `answers/<id>/defect_manifest.json` và `.sha256` (chỉ bộ chấm đọc), `ledger.jsonl` (một dòng ước tính, một dòng thực đo trỏ về dòng ước tính), rồi in `DatasetRef`, đường dẫn và hash manifest của từng bản cho DA-31. Bản sạch chép từ bản gốc qua cùng đường ghi như bản cấy, nên hai bản chỉ khác nhau ở lỗi. Ingest một bản sao gọi `flywheel.data.inject.api.mark_copy_episode` để mọi `Episode` mang `benchmark_copy_id`. `ledger.jsonl` chưa ghi vào sổ của store vì `flywheel-data` chưa khai phụ thuộc `flywheel-store` (`pyproject.toml` thuộc DA-03).
+
 ---
 
 ## 3. Lỗi log huấn luyện (F-TRAIN) và log RTC (F-SYS)
@@ -60,6 +69,6 @@ Hỗ trợ sinh log giả định theo đúng schema của `FakeTrainer` và RTC
 
 ## 4. Kiểm thử và Nghiệm thu
 
-* **Unit tests:** 77 test case tự động tại `packages/flywheel-data/tests/unit/inject/`.
+* **Unit tests:** 83 test case tự động tại `packages/flywheel-data/tests/unit/inject/`.
 * **Độ bao phủ:** 100% các loại lỗi cấy đều có test kiểm chứng.
 * **Độc lập kiến trúc:** Không import vòng, tuân thủ nghiêm ngặt 3 hợp đồng kiến trúc của repo.
