@@ -9,7 +9,7 @@ _Kết quả của story [S1-03](../product/stories/S1-03-tai-tao-danh-gia-psi0.
 | 1.3 Câu hỏi provenance cho PSI Lab | Chưa |
 | 2.1–2.2 Môi trường và script serve | Xong 3/11/2026 trên máy 3060: serve checkpoint task hai bàn, smoke 30 lần `/act` đạt (mục 2.6) |
 | 2.3–5 Đo VRAM, độ trễ, đánh giá, độ không tất định | Chưa; cần máy 5090 |
-| 6 Task hai bàn ở `mujoco_isaac` (AC 9) | Chưa: server chuyển lên Colab (Hiếu chốt 3/11/2026, không thuê GPU; mục 3.4.1); lượt Isaac Level 0 cũ dừng sau 2/10 (đều hỏng, file task lỗi spawn); chưa chạy lại với file đã sửa |
+| 6 Task hai bàn ở `mujoco_isaac` (AC 9) | Đang chạy: Level 0 trên eval `e78fb93` 4/5 sau 5 episode (mục 3.6). Trước đó: server chuyển lên Colab (Hiếu chốt 3/11/2026, không thuê GPU; mục 3.4.1); lượt Isaac Level 0 cũ dừng sau 2/10 (đều hỏng, file task lỗi spawn); chưa chạy lại với file đã sửa |
 | 7 Task hai bàn ở `mujoco` (AC 10) | 0/90 cũ (file task `6d10628`, lỗi spawn) bị thay; chạy lại với file `b75c678`: Level 0 0/20 (3/11/2026, mục 3.2). Kết luận Q-27C tạm (mục 3.5) |
 | 8 Checkpoint ablation của HE (AC 11) | Liệt kê xong 3/11/2026 (mục 4); câu hỏi Q-27E chờ Hiếu gửi PSI Lab |
 
@@ -362,6 +362,8 @@ Fisher một phía: p = 0,043. Trong video, ở cả hai bộ tay phải đến 
 3. Phát lại mở vòng ngay trên tư thế train cũng chỉ đạt 4/10, vì sai lệch nhỏ của vật lý tích lũy dần; đây không phải mốc trên của policy có phản hồi.
 
 **[Đã chốt]** (Hiếu, 4/11/2026, 00:34): lượt Isaac của AC 9 chạy trên bộ eval `e78fb93` (robot trùng tư thế train), thay cho `de140d6` đã ghim ở PR #68. Lượt Isaac Level 0 trên `de140d6` với file đã sửa dừng sau 1 episode (hỏng). Từ 4/11/2026, đường dẫn kết quả có thêm `eval-<revision>`.
+
+**Isaac Level 0 trên `e78fb93`, file task `b75c678`, domain DDS 103 (kết quả tạm, 4/11/2026, 03:33).** Server Ψ₀ trên Colab A100, client Isaac trên máy 3060. Lượt chạy từ 00:35. Đã xong 5/10 episode: **4 đạt** (episode 0, 1, 2, 3), **1 hỏng** (episode 4). Đây là thành công đầu tiên của Ψ₀ trên task hai bàn trong pipeline của đội. Episode đạt mất khoảng 20–29 phút. Kết quả: `fwdata/simple/s103/runs/simple-b75c678/eval-e78fb93/mujoco_isaac/level-0/pass-1/ep0-9/` (`summary.json`, video trong `videos/`); log `/act`: `fwdata/isaac-fix/calls-e78fb93-l0p1.jsonl` trên máy 3060. Lượt tự chạy tiếp tới khoảng 05:00; một tiến trình trên laptop tự tắt phiên Colab và hai cổng chuyển tiếp khi lượt xong. Số cuối, CU và USD ghi ở lần cập nhật sau.
 
 **Giả thuyết cho 0%, theo bằng chứng** [Đề xuất]:
 
