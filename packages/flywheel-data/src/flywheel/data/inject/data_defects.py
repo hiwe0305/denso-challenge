@@ -34,8 +34,19 @@ class EpisodeData:
     images: list[str] = field(default_factory=list)
     instruction: str = "pick object from table 1 and place on table 2"
     sim_success: bool = True
-    seed: int = 1000
+    seed: int | None = 1000  # condition seed; psi-data records none
     meta: EpisodeMetadata = field(default_factory=EpisodeMetadata)
+
+
+# Per-frame lists of an episode: one entry per parquet row in LeRobot, where images
+# live in the video and a frame is a row (DA-03 reader).
+FRAME_FIELDS = ("timestamps_state", "timestamps_image", "states", "actions", "images")
+
+
+def _keep_frames(ep: EpisodeData, keep: list[int]) -> None:
+    for name in FRAME_FIELDS:
+        values = getattr(ep, name)
+        setattr(ep, name, [values[i] for i in keep])
 
 
 def _join(values: list[int]) -> str:
@@ -98,40 +109,29 @@ class DataDefectInjector:
         return self.rng.choice(eligible)
 
     def inject_drop_frames(self, ep: EpisodeData) -> tuple[EpisodeData, Defect]:
-        new_ep = copy.deepcopy(ep)
+        # A dropped frame is a missing row: every per-frame list loses it.
         rate = self.config.drop_frames_rate
-        kept_images = []
-        kept_ts = []
-        dropped_indices = []
-        for idx, (img, ts) in enumerate(zip(new_ep.images, new_ep.timestamps_image)):
-            if self.rng.random() >= rate or (idx == 0 and len(new_ep.images) > 1):
-                kept_images.append(img)
-                kept_ts.append(ts)
-            else:
-                dropped_indices.append(idx)
-        if not dropped_indices:
-            if len(new_ep.images) <= 2:
+        count = len(ep.images)
+        dropped = [i for i in range(1, count) if self.rng.random() < rate]
+        if not dropped:
+            if count <= 2:
                 raise NotApplicable("drop_frames needs more than two images")
-            dropped_indices.append(1)
-            kept_images.pop(1)
-            kept_ts.pop(1)
-        new_ep.images = kept_images
-        new_ep.timestamps_image = kept_ts
+            dropped = [1]
+        new_ep = copy.deepcopy(ep)
+        _keep_frames(new_ep, [i for i in range(count) if i not in set(dropped)])
         return new_ep, _defect(
             new_ep,
             "drop_frames",
-            {
-                "dropped_count": len(dropped_indices),
-                "indices": _join(dropped_indices[:5]),
-            },
+            {"dropped_count": len(dropped), "indices": _join(dropped[:5])},
         )
 
     def inject_timestamp_sync_offset(self, ep: EpisodeData) -> tuple[EpisodeData, Defect]:
-        if not ep.timestamps_image:
-            raise NotApplicable("timestamp_sync_offset needs image timestamps")
+        # Image times are fixed by the video; the state timestamp column moves.
+        if not ep.timestamps_state:
+            raise NotApplicable("timestamp_sync_offset needs state timestamps")
         new_ep = copy.deepcopy(ep)
         offset = self.config.timestamp_offset_seconds
-        new_ep.timestamps_image = [ts + offset for ts in new_ep.timestamps_image]
+        new_ep.timestamps_state = [ts + offset for ts in new_ep.timestamps_state]
         return new_ep, _defect(
             new_ep,
             "timestamp_sync_offset",
@@ -213,13 +213,21 @@ class DataDefectInjector:
         )
 
     def inject_corrupted_success_label(self, ep: EpisodeData) -> tuple[EpisodeData, Defect]:
+        # Design 9.2: a broken episode still labelled a success. Cut it before the task
+        # can finish and keep the label; psi-data's teleop demos are all labelled
+        # successful by being in the authors' training set.
+        if ep.sim_success is not True:
+            raise NotApplicable("corrupted_success_label needs an episode labelled a success")
+        count = len(ep.actions)
+        kept = max(1, math.floor(count * self.config.success_label_keep_fraction))
+        if kept >= count:
+            raise NotApplicable("corrupted_success_label: episode too short to cut")
         new_ep = copy.deepcopy(ep)
-        original_success = new_ep.sim_success
-        new_ep.sim_success = not original_success
+        _keep_frames(new_ep, list(range(kept)))
         return new_ep, _defect(
             new_ep,
             "corrupted_success_label",
-            {"original": original_success, "corrupted": new_ep.sim_success},
+            {"label": "success", "kept_frames": kept, "original_frames": count},
         )
 
     def inject_wrong_task_instruction(self, ep: EpisodeData) -> tuple[EpisodeData, Defect]:
@@ -246,7 +254,7 @@ class DataDefectInjector:
 
     def inject_holdout_seed_leak(self, ep: EpisodeData) -> tuple[EpisodeData, Defect]:
         low, high = self.config.holdout_seed_range
-        if low <= ep.seed <= high:
+        if ep.seed is not None and low <= ep.seed <= high:
             raise NotApplicable("holdout_seed_leak: seed is already in the holdout range")
         new_ep = copy.deepcopy(ep)
         leaked_seed = self.rng.randint(low, high)

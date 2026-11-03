@@ -2,11 +2,13 @@
 
 import math
 import statistics
+from pathlib import Path
 
 import pytest
+import yaml
 from flywheel.contracts.artifacts import ActionDimension, ActionLayout
 from flywheel.data.inject.applied import defect_applied
-from flywheel.data.inject.config import DataDefectConfig
+from flywheel.data.inject.config import DataDefectConfig, load_inject_config
 from flywheel.data.inject.data_defects import (
     ANGLE_ACTION_DIMS,
     JOINT_ACTION_DIMS,
@@ -14,6 +16,8 @@ from flywheel.data.inject.data_defects import (
     EpisodeData,
     NotApplicable,
 )
+
+REPO = Path(__file__).resolve().parents[5]
 
 
 def _make_dummy_episode() -> EpisodeData:
@@ -50,23 +54,28 @@ def test_injectors_never_write_the_answer_on_the_episode() -> None:
 
 
 def test_inject_drop_frames() -> None:
+    # LeRobot keeps images in the video, so a dropped frame is a missing row: every
+    # per-frame list loses the same frames and frame_index gets a gap.
     ep = _make_dummy_episode()
     injector = DataDefectInjector(DataDefectConfig(drop_frames_rate=0.5))
     mod, defect = injector.inject_drop_frames(ep)
     assert defect.code == "D2"
     assert defect.parameters["kind"] == "drop_frames"
-    assert len(mod.images) < len(ep.images)
-    assert len(mod.timestamps_image) == len(mod.images)
+    kept = [ep.images.index(i) for i in mod.images]
+    assert 0 < len(kept) < len(ep.images) and kept == sorted(kept)
+    for field in ("timestamps_state", "timestamps_image", "states", "actions"):
+        assert getattr(mod, field) == [getattr(ep, field)[k] for k in kept], field
 
 
 def test_inject_timestamp_sync_offset() -> None:
+    # The video fixes the image times; the state timestamp column is what moves.
     ep = _make_dummy_episode()
     injector = DataDefectInjector(DataDefectConfig(timestamp_offset_seconds=0.10))
     mod, defect = injector.inject_timestamp_sync_offset(ep)
     assert defect.code == "D2"
     assert defect.parameters["kind"] == "timestamp_sync_offset"
-    assert mod.timestamps_image[0] == 0.10
-    assert mod.timestamps_state[0] == 0.0
+    assert mod.timestamps_state == [t + 0.10 for t in ep.timestamps_state]
+    assert mod.timestamps_image == ep.timestamps_image
 
 
 def test_inject_joint_jump() -> None:
@@ -147,7 +156,8 @@ def test_action_sign_flip_needs_a_moving_dim() -> None:
 
 def test_drop_frames_needs_more_than_two_images() -> None:
     ep = _make_dummy_episode()
-    ep.images, ep.timestamps_image = ep.images[:2], ep.timestamps_image[:2]
+    for field in ("timestamps_state", "timestamps_image", "states", "actions", "images"):
+        setattr(ep, field, getattr(ep, field)[:2])
     with pytest.raises(NotApplicable):
         DataDefectInjector(DataDefectConfig(drop_frames_rate=0.0)).inject_drop_frames(ep)
 
@@ -169,12 +179,24 @@ def test_defect_applied_rejects_a_listed_but_unapplied_defect() -> None:
 
 
 def test_inject_corrupted_success_label() -> None:
+    # Design 9.2: a broken episode that is still labelled a success. The episode is cut
+    # before the task can finish; the success label stays.
     ep = _make_dummy_episode()
-    injector = DataDefectInjector()
+    injector = DataDefectInjector(DataDefectConfig(success_label_keep_fraction=0.4))
     mod, defect = injector.inject_corrupted_success_label(ep)
     assert defect.code == "D6"
     assert defect.parameters["kind"] == "corrupted_success_label"
-    assert mod.sim_success is False
+    assert mod.sim_success is True
+    assert (defect.parameters["kept_frames"], defect.parameters["original_frames"]) == (2, 5)
+    for field in ("timestamps_state", "timestamps_image", "states", "actions", "images"):
+        assert getattr(mod, field) == getattr(ep, field)[:2], field
+
+
+def test_corrupted_success_label_needs_a_success_label() -> None:
+    ep = _make_dummy_episode()
+    ep.sim_success = False
+    with pytest.raises(NotApplicable):
+        DataDefectInjector().inject_corrupted_success_label(ep)
 
 
 def test_inject_wrong_task_instruction() -> None:
@@ -201,7 +223,23 @@ def test_inject_holdout_seed_leak() -> None:
     mod, defect = injector.inject_holdout_seed_leak(ep)
     assert defect.code == "D5"
     assert defect.parameters["kind"] == "holdout_seed_leak"
-    assert 9000 <= mod.seed <= 9999
+    assert mod.seed is not None and 2_000_000 <= mod.seed <= 2_000_999
+
+
+def test_holdout_seed_leak_works_on_an_episode_without_a_seed() -> None:
+    # psi-data records no seed at all (S1-07); the leak gives it one from holdout.
+    ep = _make_dummy_episode()
+    ep.seed = None
+    mod, _ = DataDefectInjector().inject_holdout_seed_leak(ep)
+    assert mod.seed is not None and mod.seed >= 2_000_000
+
+
+def test_holdout_range_is_the_split_plan_holdout() -> None:
+    plan = yaml.safe_load((REPO / "configs/splits/default.yaml").read_text(encoding="utf-8"))
+    holdout = plan["seed_ranges"]["holdout"]
+    expected = (holdout["start"], holdout["stop"] - 1)
+    assert DataDefectConfig().holdout_seed_range == expected
+    assert load_inject_config().data.holdout_seed_range == expected
 
 
 def _layout() -> ActionLayout:

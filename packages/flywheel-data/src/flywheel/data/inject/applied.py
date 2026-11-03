@@ -59,20 +59,25 @@ def _action_column(before: EpisodeData, after: EpisodeData, d: Defect) -> bool:
     return _column(after, dim) != _column(before, dim)
 
 
+def _cut_but_labelled(before: EpisodeData, after: EpisodeData, d: Defect) -> bool:
+    kept = _int(d, "kept_frames")
+    return after.sim_success is True and len(after.actions) == kept < len(before.actions)
+
+
 def _seed_leak(before: EpisodeData, after: EpisodeData, d: Defect) -> bool:
     low, high = _int(d, "holdout_low"), _int(d, "holdout_high")
-    return after.seed != before.seed and low <= after.seed <= high
+    return after.seed is not None and after.seed != before.seed and low <= after.seed <= high
 
 
 CHECKS: dict[str, Callable[[EpisodeData, EpisodeData, Defect], bool]] = {
     "drop_frames": _drop_frames,
-    "timestamp_sync_offset": lambda b, a, d: a.timestamps_image != b.timestamps_image,
+    "timestamp_sync_offset": lambda b, a, d: a.timestamps_state != b.timestamps_state,
     "joint_jump": _joint_jump,
     "joint_limit_exceeded": _joint_limit,
     "nan_values": _nan,
     "unit_deg_rad": _action_column,
     "action_sign_flip": _action_column,
-    "corrupted_success_label": lambda b, a, d: a.sim_success != b.sim_success,
+    "corrupted_success_label": _cut_but_labelled,
     "wrong_task_instruction": lambda b, a, d: a.instruction != b.instruction,
     "holdout_seed_leak": _seed_leak,
 }
