@@ -6,7 +6,7 @@ Each shard gets shard-NN/replay/replay_qa.jsonl (one verdict per recorded
 episode); <out>/replay_summary.json has the pass rate and the error spread.
 
     MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/python \
-        scripts/g0/tray/replay_qa.py --out fwdata/simple/tray/gen/<run> --workers 22
+        scripts/g0/tray/replay_qa.py --out fwdata/simple/tray/gen/<run> --workers 14
 """
 
 from __future__ import annotations

@@ -4,6 +4,7 @@ _Ngày 22/10/2026. Vai trò BMAD: Product Owner (Sarah) viết mục 1; Scrum Ma
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 3/11/2026 | 1.0 | Mục 4.2: story 3.3 có file DA-36, story 3.5 có file DA-37 (07 bản 1.5) | PO (Hiếu) |
 | 28/10/2026 | 0.9 | Mục 3.2: chốt câu Q-E, Hiếu merge mọi PR bằng quyền admin (`--admin --rebase`) | PO (Hiếu) |
 | 28/10/2026 | 0.8 | Mục 3 và 4: ghi chú rằng vai, RACI, cột người của 4.2–4.6 và tải 4.7–4.8 còn theo phân công cũ, phân công hiện hành ở 07 mục 2.0–2.2; mục 4.1 điền người làm theo 07 bản 0.6, bỏ hỗ trợ S1-03 của Hưng và hẹn `contracts/base.py` của Thông | PO (Hiếu) |
 | 27/10/2026 | 0.7 | Theo spec v10.4 và [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md): mục 4.1 ghi story Sprint 1 mở lại hoặc về lại SIMPLE; mục 4.9 thay mục 4.9 và 4.10 cũ (robot DENSO trong Isaac Sim, robot DENSO trên MuJoCo): demo 17/11/2026 trên G1 + Ψ₀, ba loại dữ liệu, story DA giữ, sửa, xóa, mở lại DA-04, khôi phục DA-18, thêm DA-26 đến DA-29, giờ ước, điều kiện qua G0. Người làm của story mới và story đổi hướng chờ PO giao | PO (Hiếu) |
@@ -308,8 +309,8 @@ Việc ngoài story: Hiếu 10 giờ (DENSO DN1, ngân sách GPU, mã đề, ema
 | 5.5 phần 1 | Xây tuyến generator đã chọn (T1 hoặc T2) | [Adapter] | Hưng | 12 | S1-11, 3.1a |
 | 4.1 phần G1 | ACT, DP train thử từ export | [Adapter] | Châu | 4 | 2.6 |
 | 3.1b | `Psi0Policy`, contract test | [Adapter] | Châu | 8 | S1-03 |
-| 3.3 | Khung scorer từng bước, lớp lỗi chung | [Lõi] | Châu | 13 | S1-08 |
-| 3.5 | Hiệu chỉnh scorer, τ_track, τ_sync | [Lõi] | Châu | 12 | 3.2, 3.4; Hiếu gán nhãn |
+| 3.3 | Khung scorer từng bước, lớp lỗi chung ([DA-36](stories/DA-36-khung-scorer-tung-buoc.md), bản 1.0) | [Lõi] | Châu | 13 | S1-08 |
+| 3.5 | Hiệu chỉnh scorer, τ_track, τ_sync ([DA-37](stories/DA-37-hieu-chinh-scorer-va-nguong.md), bản 1.0) | [Lõi] | Châu | 12 | 3.2, 3.4; Hiếu gán nhãn |
 | 4.2 | TrainerAdapter Ψ₀, tăng cường thị giác cố định đọc từ RunPlan | [Adapter] | Hiếu | 17 | S1-04, 2.6 |
 
 Việc ngoài story: Hiếu 12 giờ (gán nhãn 20 lỗi cho 3.5, việc trưởng nhóm); Thông 3 giờ Scrum Master. Nếu S1-11 kết luận cùng bộ điều khiển hoặc có ánh xạ, 5.5 đóng "không cần"; 12 giờ của Hưng chuyển sang khung F1 (3.4) và đệm. **Rủi ro.** Tín hiệu thiếu khiến scorer nhiều "chưa rõ" (V7); dữ liệu psi-data không có hạt giống (V6) nên guard dựa trên `layout_hash` và khoảng cách (05 TH13); 5.5 kéo dài nếu tuyến là T2 hoặc T3.

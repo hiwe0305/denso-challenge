@@ -1,0 +1,77 @@
+# Psi0 stage 2: action-expert post-training on human egocentric data, VLM frozen
+# (DA-19 task 2). Read only for the demo (design section 8): no stage 2 job runs
+# before 17/11.
+#
+# Args of scripts/train/psi0/posttrain-he-psi0.sh at the pin cda3fdf, except the
+# per-job ones in `job_args`. Same encoding as psi0-stage3.yaml.
+stage: 2
+config_module: posttrain_he_psi0_config
+trainer_module: posttrain # selects psi.trainers.posttrain.PosttrainTrainer
+source: "scripts/train/psi0/posttrain-he-psi0.sh at cda3fdf"
+
+# Per-job args, filled by Psi0Trainer: {exp} {seed} {timestamp} {output_dir} come from
+# the TrainSpec and the job directory, {dataset_root} {dataset_name} from the dataset
+# URI, {vlm} {action_header} from `parents`. Resume (task 5): rerunning a job with the
+# same timestamp makes Psi0 pick up its latest ckpt_<step> and skip consumed batches.
+job_args:
+  exp: "{exp}"
+  seed: "{seed}"
+  timestamp: "{timestamp}"
+  train.output_dir: "{output_dir}"
+  train.resume_from_checkpoint: latest
+  train.skip_resumed_steps: true
+  data.root-dir: "{dataset_root}"
+  model.model_name_or_path: "{vlm}"
+
+args:
+  train.name: posttrain
+  train.data_parallel: ddp
+  train.mixed_precision: bf16
+  train.train_batch_size: 64
+  train.max_checkpoints_to_keep: 5
+  train.gradient_accumulation_steps: 1
+  train.learning_rate: 1e-4
+  train.max_training_steps: 1000000
+  train.warmup_ratio: "None"
+  train.warmup_steps: 1000
+  train.checkpointing_steps: 100
+  train.validation_steps: 1000
+  train.val_num_batches: 20
+  train.max_grad_norm: 1.0
+  train.lr_scheduler_type: constant
+  train.lr_scheduler_kwargs.betas: [0.9, 0.999]
+  train.lr_scheduler_kwargs.weight_decay: 0.0
+  train.lr_scheduler_kwargs.eps: 1e-8
+  log.report_to: wandb
+  data.use-delta-actions: true
+  data.transform.repack.action-chunk-size: 16
+  data.transform.repack.use-delta-actions: true
+  data.transform.repack.pad-action-dim: 36
+  data.transform.repack.pad-state-dim: 36
+  data.transform.field.action_norm_type: bounds_q99
+  data.transform.field.stat-path: assets/stats/he_raw_rel_stats_combined_no_static.json
+  data.transform.field.no-normalize-state: true
+  data.transform.field.pad-action-dim: 36
+  data.transform.field.pad-state-dim: 36
+  data.transform.model.resize.size: [240, 320]
+  data.transform.model.center_crop.size: [240, 320]
+  data.transform.model.no-img-aug: true
+  model.noise-scheduler: flow
+  model.n_conditions: 0
+  model.action-chunk-size: 16
+  model.action-dim: 36
+  model.action-exec-horizon: 16
+  model.observation-horizon: 1
+  model.odim: 36
+  model.view_feature_dim: 2048
+  model.no-tune-vlm: true
+  model.no-use_film: true
+  model.no-combined_temb: true
+
+# Stage 2 trains the action header from scratch on top of a stage 1 VLM.
+parents:
+  psi0-baseline-egodex-he:
+    model_name_or_path: cache/checkpoints/psi0/pre.fast.1by1.2601091803.ckpt.ego200k.he30k
+
+estimate:
+  seconds_per_step: 1.0 # assumption, not measured

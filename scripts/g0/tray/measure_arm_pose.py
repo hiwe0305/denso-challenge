@@ -8,7 +8,7 @@ Also counts the steps of APPROACH_A in which a hand or wrist touches table A (`t
 Writes one JSON row per episode to --out and prints a table per variant.
 
     MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/python \
-        scripts/g0/tray/measure_arm_pose.py --seeds 100-121 --workers 22 \
+        scripts/g0/tray/measure_arm_pose.py --seeds 100-121 --workers 14 \
         --variant base --variant elbow1:elbow_cost=1.0
 """
 

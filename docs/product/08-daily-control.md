@@ -4,6 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Trưởng n
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 3/11/2026 | 0.4 | Thông rút khỏi vai Scrum Master theo quyết định PO ([plan chia lại việc](../superpowers/plans/2026-11-03-thong-reassignment.md), Q1); vai SM và các việc của Thông ở R2, R4, R5, R8 (mục 3.2), nhịp thứ Sáu và review cổng G (mục 5), người viết file story (mục 2) chuyển sang Hiếu | PO (Hiếu) |
 | 3/11/2026 | 0.3 | Mục 3.2: R9 chỉ đếm dòng mã chạy và nâng ngưỡng từ 400 lên 1500 dòng; cả 6 PR gần nhất đều vượt 400 nên cờ `size:large` không còn phân biệt PR lớn thật | PO (Hiếu) |
 | 25/10/2026 | 0.2 | Theo design ngày 25/10/2026 (file đã xóa ngày 27/10/2026) mục 10: Hiếu là người duyệt và merge duy nhất, R2 đổi hành động (mục 3.2); thêm lịch tracking tự động và tổng kết cuối ngày (mục 5, 7) | PO (Hiếu) |
 | 23/10/2026 | 0.1 | Bản đầu: quy ước dữ liệu, chỉ số, 9 rule, phân loại lỗi, nhịp, sổ can thiệp, công cụ | SM, PO |
@@ -22,7 +23,7 @@ Mỗi ngày biết ba điều: đội đang đi nhanh hay chậm so với ước
 |---|---|---|
 | Nhánh | `<story-id>-<mô-tả>` (ví dụ `DA-03-teleop-pipeline`), hoặc `docs-…`, `chore-…`, `hotfix-…` cho việc ngoài story | Người làm |
 | Commit trên nhánh story | Dòng đầu `<story-id>/<nhiệm vụ con>: <việc đã làm>`; thân có dòng `Time-spent: 1.5h` (giờ tập trung thực, số thập phân) | Người làm |
-| File story | Bảng trạng thái có `Người làm` và `Ước lượng` (giờ); mục `## Phạm vi file` liệt kê đường dẫn tính từ gốc repo, mỗi dòng một đường dẫn trong dấu backtick; nhiệm vụ con là dòng `- [ ]` | SM viết, người làm đánh dấu |
+| File story | Bảng trạng thái có `Người làm` và `Ước lượng` (giờ); mục `## Phạm vi file` liệt kê đường dẫn tính từ gốc repo, mỗi dòng một đường dẫn trong dấu backtick; nhiệm vụ con là dòng `- [ ]` | SM viết (bản 0.4: Hiếu giữ vai SM), người làm đánh dấu |
 | Issue lỗi | Template "Lỗi"; label `type:bug` hoặc `type:incident`, một label `severity:*`, một label `cause:*` khi đã rõ nguyên nhân | Người phát hiện; người sửa gắn nguyên nhân |
 
 Ví dụ commit:
@@ -57,13 +58,13 @@ Time-spent: 2.5h
 | # | Điều kiện | Phát hiện bởi | Hành động | Ai |
 |---|---|---|---|---|
 | R1 | CI trên `master` đỏ | Báo cáo ngày | Ngừng merge; người gây lỗi sửa trong 4 giờ hoặc revert | Người gây lỗi; Long theo dõi |
-| R2 | PR chờ review quá 1 ngày làm việc | Báo cáo ngày, tracking tự động | Bản 0.2: Hiếu duyệt hoặc ghi lý do chờ dưới PR; tổng kết 21:30 xếp thứ tự duyệt, ưu tiên PR đang chặn người khác; quá 2 ngày thì nêu ở check-in. Không còn người review dự phòng | Hiếu; Thông |
+| R2 | PR chờ review quá 1 ngày làm việc | Báo cáo ngày, tracking tự động | Bản 0.2: Hiếu duyệt hoặc ghi lý do chờ dưới PR; tổng kết 21:30 xếp thứ tự duyệt, ưu tiên PR đang chặn người khác; quá 2 ngày thì nêu ở check-in. Không còn người review dự phòng | Hiếu |
 | R3 | Một người có quá 2 PR đang mở | Báo cáo ngày | Không mở story mới tới khi về ≤ 2 | Người làm |
-| R4 | Story đã bắt đầu, không có commit 2 ngày làm việc | Báo cáo ngày | Ghi vào issue của story đang bị chặn ở đâu; Thông gỡ hoặc báo Hiếu | Người làm; Thông |
-| R5 | k của một người (7 ngày) > 1,3 | Báo cáo ngày | Xét chuyển phần trễ sang API theo từng phần (06 mục 11.8); nếu không chuyển được, ước lại story | Hiếu, Thông |
+| R4 | Story đã bắt đầu, không có commit 2 ngày làm việc | Báo cáo ngày | Ghi vào issue của story đang bị chặn ở đâu; bản 0.4: Hiếu gỡ | Người làm; Hiếu |
+| R5 | k của một người (7 ngày) > 1,3 | Báo cáo ngày | Xét chuyển phần trễ sang API theo từng phần (06 mục 11.8); nếu không chuyển được, ước lại story | Hiếu |
 | R6 | PR sửa file ngoài "Phạm vi file", sai tên nhánh, commit sai định dạng hoặc thiếu `Time-spent` | `pr-guard` (chặn PR) | Sửa commit hoặc phạm vi; cần sửa file dùng chung thì theo 07 mục 3.2 | Người làm |
 | R7 | Issue `severity:high` đang mở (rò holdout, gửi dữ liệu `restricted` ra ngoài, sai kết luận HS/HT/HD, mất dữ liệu) | Báo cáo ngày | Đổi thành `type:incident`; postmortem 1 trang trong 2 ngày, ghi vào mục 6 | Người phát hiện; Hiếu |
-| R8 | Cùng một `cause:*` có ≥ 3 issue trong 7 ngày | Báo cáo ngày | Bắt buộc một can thiệp (rule, test, sửa CLAUDE.md hoặc template), ghi vào mục 6 | Thông chủ trì |
+| R8 | Cùng một `cause:*` có ≥ 3 issue trong 7 ngày | Báo cáo ngày | Bắt buộc một can thiệp (rule, test, sửa CLAUDE.md hoặc template), ghi vào mục 6 | Hiếu chủ trì (bản 0.4) |
 | R9 | PR > 1500 dòng mã (bản 0.3: không tính test, file `.md`, schema JSON sinh ra, fixture, `examples/` và lock file) | `pr-guard` (gắn `size:large`), báo cáo ngày | Đề nghị tách story; không chặn | Người làm, người review |
 
 Ngưỡng mặc định: k 1,3; chờ review 1 ngày làm việc; WIP 2; đứng yên 2 ngày làm việc; lặp nguyên nhân 3 lần trong 7 ngày; PR 1500 dòng mã (bản 0.3; trước là 400 dòng tính cả test và tài liệu).
@@ -95,10 +96,10 @@ Lỗi kỹ thuật của chính flywheel (D1–D8, T1–T8, O1–O4, R1–R6 ở
 | 9:00 giờ Việt Nam, thứ Hai đến thứ Sáu | Workflow `daily-report` đăng báo cáo vào issue có label `daily-report`; trang Tiến độ trên website cập nhật | Tự động |
 | Trước 10:00 | Mỗi người trả lời dưới báo cáo 3 dòng: **Xong**, **Tiếp theo**, **Bị chặn** | Cả đội |
 | Trong ngày | Xử lý rule đã kích hoạt theo cột "Hành động" | Theo cột "Ai" |
-| Thứ Sáu | Thông tổng hợp tuần: xu hướng k, top nguyên nhân lỗi, can thiệp mới ở mục 6, đề xuất chỉnh ngưỡng | Thông |
+| Thứ Sáu | Hiếu tổng hợp tuần (bản 0.4, thay Thông): xu hướng k, top nguyên nhân lỗi, can thiệp mới ở mục 6, đề xuất chỉnh ngưỡng | Hiếu |
 | 10:00, 14:00, 18:00 mỗi ngày (bản 0.2) | Tracking tự động trên máy của Hiếu (scheduled task `denso-tracking` của Claude desktop, chỉ đọc): chạy `daily_report.py`, `pr_guard.py` cho từng nhánh, liệt kê PR chờ Hiếu, ai bị chặn, vi phạm rule; ghi `~/denso-tracking/YYYY-MM-DD-HHMM.md` | Tự động |
 | 21:30 mỗi ngày (bản 0.2) | Tổng kết cuối ngày (`denso-cuoi-ngay`): việc đã xong, PR chờ duyệt kèm thứ tự đề xuất, rủi ro, câu hỏi cần Hiếu quyết; Hiếu và Claude thảo luận | Tự động, Hiếu |
-| Review mỗi cổng G | Xem lại ngưỡng và hệ số k của đội cho quyết định ở 04 mục 4.8–4.9 | Hiếu, Thông |
+| Review mỗi cổng G | Xem lại ngưỡng và hệ số k của đội cho quyết định ở 04 mục 4.8–4.9 | Hiếu |
 
 ## 6. Sổ can thiệp
 
