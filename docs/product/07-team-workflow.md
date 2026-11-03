@@ -4,6 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Đầu vào
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 4/11/2026 | 1.8 | Mục 2.2: thêm DA-39 (hợp đồng EvidenceCard, Hiếu, #82). Mục 2.4: thêm dòng DA-39, hạn 11/11 | PO (Hiếu) |
 | 3/11/2026 | 1.7 | Mục 3.2 luật 5: story thêm phụ thuộc ghi `uv.lock` vào Phạm vi file để pr-guard cho qua; chỉ nhận dòng do `uv lock` sinh, gói mới vào khóa thì nêu trong mô tả PR (chốt khi review #58) | PO (Hiếu) |
 | 3/11/2026 | 1.6 | Rút Thông khỏi S1-07, DA-02, DA-03, DA-17, DA-21, DA-27 và vai Scrum Master theo quyết định PO ([plan chia lại việc](../superpowers/plans/2026-11-03-thong-reassignment.md), Q1–Q6). Mục 2.0: việc của Thông sang Hiếu, `DefectManifest` đi tới Châu (DA-31, theo bản 1.0); mục 2.1: đường dẫn của Thông sang Hiếu; mục 2.2: chủ, phạm vi, giờ của DA-02, DA-03, DA-17, DA-27 theo plan mục 5, DA-21 chưa có chủ; mục 2.3, 2.4: tải và hạn mới; mục 4: bản tin tuần do Hiếu | PO (Hiếu) |
 | 3/11/2026 | 1.5 | Mục 2.2: thêm DA-35 (synthetic task khay, Hiếu), DA-36 (khung scorer, Châu, story 3.3) và DA-37 (hiệu chỉnh scorer, Châu, story 3.5) theo #30. Mục 2.4: gắn mã DA-36, DA-37 | PO (Hiếu) |
@@ -154,6 +155,7 @@ Chủ sở hữu không có nghĩa là người duy nhất được sửa. Ngư�
 | DA-35 | Synthetic cho task bê khay: teleop ảo qua ống PICO, rồi biến thể S2 (bản 1.5) | Mới | Hiếu | `flywheel-simple/tray/pico/`, `flywheel-simple/tray/s2/` | DA-32, DA-33 | 30–45 (ước lượng thô, chưa chốt) | S2 |
 | DA-36 | Khung scorer từng bước và lớp lỗi chung (story 3.3 của 04 mục 4.2; bản 1.5) | Mới | Châu | `flywheel-eval/scorer/`, `configs/eval/scorer/` | S1-08; `Score` của S1-10 | 13 | S2 |
 | DA-37 | Hiệu chỉnh scorer và ngưỡng τ_track, τ_sync (story 3.5 của 04 mục 4.2; bản 1.5) | Mới | Châu | `flywheel-eval/scorer/`, `configs/eval/diagnosis/system.yaml` | DA-36, 3.2, 3.4 | 12 | Sau 13/11 |
+| DA-39 | Hợp đồng EvidenceCard và file mẫu dùng chung, seam `6-EvidenceCard` (spec mục 4.5; 03 bản 1.2; bản 1.8) | Mới (4/11/2026, #82) | Hiếu | `flywheel-contracts/evidence` | S1-10, DA-13 | 4 (ước lượng) | S2 |
 
 File story nằm trong `docs/product/stories/`. Bản 1.6: DA-02, DA-03 có file từ 3/11/2026 (Hiếu viết cùng Claude theo plan chia lại việc); DA-08, DA-13 đã có file; DA-01 còn thiếu. Việc chưa có chủ: cập nhật website và Pitch khi chuẩn bị demo 17/11 [Đã chốt: chưa làm trước đó].
 
@@ -209,6 +211,7 @@ Hiếu phải hoàn thiện mọi thứ cho demo trước **13/11/2026**, nên h
 | Châu | DA-36: khung scorer từng bước (04 mục 4.2, story 3.3; bản 1.5) | S2 | 8/11 |
 | Châu | DA-13: kiểm hệ thống và quy lỗi về stage (phần 6 của demo); R3–R5 trên file mẫu trước, trên trace thật từ 8/11 | S3 | 10/11 |
 | Châu | DA-31: bộ chấm lỗi cấy (chuyển từ Hưng) | 13/11 | 11/11 |
+| Hiếu | DA-39: hợp đồng EvidenceCard và file mẫu, seam `6-EvidenceCard` qua (#82; bản 1.8) | — | 11/11 |
 | Sau 13/11 | DA-37 hiệu chỉnh scorer (story 3.5), DA-21 (v3, chưa có chủ), DA-17 nhiệm vụ 5, tầng normalize và cắt đoạn của DA-03, nguồn bàn phím (bản 1.6), DA-04 nhiệm vụ 5 và 7, DA-20 nhiệm vụ 6 và 7; của Hiếu (bản 1.2): S1-05, DA-29, S1-06, S1-09, S1-11, DA-16, DA-09, phần S1-02, S1-03, S1-04 mà DA-26 không cần | | sau demo |
 
 **Cắt phạm vi của Hiếu [Đã chốt 3/11/2026, bản 1.2].** Phần của Hiếu tới 13/11 dồn vào đường găng của demo: DA-19 (code train, `metrics.jsonl`) → DA-26 (HE sơ bộ); DA-33 → DA-34 (task khay); hook `SimpleSim`; DA-35. Dời sau 13/11: S1-05, DA-29, S1-06, S1-09, S1-11, DA-16, DA-09. S1-02, S1-03, S1-04 chỉ làm phần DA-26 cần. Hệ quả cho người khác:
