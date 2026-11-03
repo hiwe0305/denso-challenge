@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 from flywheel.contracts.base import new_ulid
+
+SHA256_REGEX = re.compile(r"^[0-9a-f]{64}$")
 
 
 def get_fw_root() -> Path:
@@ -40,8 +43,10 @@ class StorePaths:
 
     def blob_path(self, sha256_hash: str) -> Path:
         """Return blob file path: objects/sha256/ab/cd/<hash>."""
-        if len(sha256_hash) < 4:
-            raise ValueError(f"Invalid sha256 hash length: {len(sha256_hash)}")
+        # The hash comes from callers of get_blob/has_blob; anything but 64 hex
+        # characters could name a path outside the store ("/." resets the root).
+        if not SHA256_REGEX.fullmatch(sha256_hash):
+            raise ValueError(f"Invalid sha256 hash {sha256_hash!r}: expected 64 lowercase hex")
         ab = sha256_hash[:2]
         cd = sha256_hash[2:4]
         return self.objects_dir / ab / cd / sha256_hash
