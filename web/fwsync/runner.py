@@ -259,22 +259,81 @@ class SyncResult:
         }
 
 
-def run_import(source_dir: Path, sink: Sink) -> SyncResult:
+ORIGINS = ("core", "mock")
+
+
+@dataclass(frozen=True)
+class ExperimentLookup:
+    """Cách suy ra thí nghiệm của một dòng telemetry hay chẩn đoán train.
+
+    `TrainingMetric` và `TrainDiagnosis` của hợp đồng không nói thuộc thí
+    nghiệm nào, và hợp đồng cấm trường lạ, nên không thể bắt lõi gắn thêm một
+    `experiment_code`. Hai trường chúng có sẵn là đủ để tra:
+
+    * ``by_run_plan`` — ``TrainingMetric.run_plan_id`` → thí nghiệm. Một thí
+      nghiệm của nhánh là một RunPlan đóng băng (03 §4.3).
+    * ``by_checkpoint`` — ``checkpoint_id`` → thí nghiệm sinh ra checkpoint đó.
+
+    Giống `DatasetLookup` của W12: tra không ra thì từ chối dòng, không gán
+    vào một thí nghiệm mặc định.
+    """
+
+    by_run_plan: dict[str, str]
+    by_checkpoint: dict[str, str]
+
+    def for_metric(self, payload: Any, where: str) -> str:
+        run_plan = payload.get("run_plan_id") if isinstance(payload, dict) else None
+        checkpoint = payload.get("checkpoint_id") if isinstance(payload, dict) else None
+        if run_plan in self.by_run_plan:
+            return self.by_run_plan[run_plan]
+        if checkpoint in self.by_checkpoint:
+            return self.by_checkpoint[checkpoint]
+        raise MappingError(
+            f"{where}: không suy được thí nghiệm từ run_plan_id={run_plan!r} hay "
+            f"checkpoint_id={checkpoint!r}; cần experiments.jsonl và checkpoints.jsonl "
+            f"cùng thư mục"
+        )
+
+    def for_diagnosis(self, payload: Any, where: str) -> str:
+        checkpoint = payload.get("checkpoint_id") if isinstance(payload, dict) else None
+        if checkpoint in self.by_checkpoint:
+            return self.by_checkpoint[checkpoint]
+        raise MappingError(
+            f"{where}: không suy được thí nghiệm từ checkpoint_id={checkpoint!r}; "
+            f"cần checkpoints.jsonl cùng thư mục"
+        )
+
+
+@dataclass(frozen=True)
+class Lookups:
+    """Mọi bảng tra một lần nạp cần, dựng từ chính các artifact vừa đọc."""
+
+    dataset: DatasetLookup
+    experiment: ExperimentLookup
+
+
+def run_import(source_dir: Path, sink: Sink, origin: str = "core") -> SyncResult:
     """Nạp một thư mục artifact vào sink. Chạy lại cho cùng kết quả.
 
-    `dataset_id` của episode không có trong hợp đồng (W12), nên bảng tra được
-    dựng từ chính các artifact vừa đọc: `datasets.source_ref` → lô, và
-    `interventions.intervention_ref` → lô của can thiệp đó.
+    `origin` đóng dấu lên **mọi** dòng: `mock` cho bộ mock, `core` cho output
+    thật của lõi. Đó là thuộc tính của nguồn, không của từng artifact, nên nó
+    là tham số chứ không phải trường đọc từ file: một artifact thật lỡ mang
+    `origin: mock` không được làm FE dán nhãn sai (DESIGN.md §4.4b).
+
+    Hai thứ hợp đồng không mang được tra từ chính các artifact vừa đọc: lô
+    của một episode (W12) và thí nghiệm của một dòng telemetry.
     """
+    if origin not in ORIGINS:
+        raise ValueError(f"origin `{origin}` không có; chỉ {ORIGINS}")
     found: SourceScan = scan(source_dir)
     result = SyncResult(direction="import", source_dir=str(source_dir), ignored=found.ignored)
-    lookup = _dataset_lookup(found)
-    episode_refs: dict[str, str] = {}
+    lookups = Lookups(dataset=_dataset_lookup(found), experiment=_experiment_lookup(found))
+    loaded_episodes: set[str] = set()
 
     for table in _ordered(found.tables):
         for record in found.by_table(table):
             try:
-                rows = _map(record, lookup, episode_refs)
+                rows = _map(record, lookups, loaded_episodes)
             except (MappingError, ValueError) as error:
                 result.errors.append(_error(record, error))
                 if isinstance(sink, JsonlSink):
@@ -287,11 +346,13 @@ def run_import(source_dir: Path, sink: Sink) -> SyncResult:
                     for name in unknown:
                         if name not in result.unknown_fields[target]:
                             result.unknown_fields[target].append(name)
+                row["origin"] = origin
                 sink.write(target, row)
                 if target == "episodes":
-                    # Bản ghi QA trỏ episode bằng ref, nên bảng tra phải có
-                    # mặt trước khi tới `episode_qa_reports` trong IMPORT_ORDER.
-                    episode_refs[row["episode_ref"]] = row["episode_ref"]
+                    # Báo cáo QA chỉ nhận episode đã nạp thật, nên một episode
+                    # bị từ chối kéo theo báo cáo của nó thay vì để một dòng
+                    # QA trỏ vào khoảng trống.
+                    loaded_episodes.add(row["episode_ref"])
 
     sink.commit()
     result.counts = sink.counts()
@@ -305,37 +366,43 @@ def _ordered(tables: list[str]) -> list[str]:
 
 
 def _dataset_lookup(found: SourceScan) -> DatasetLookup:
-    by_source: dict[str, str] = {}
-    by_intervention: dict[str, str] = {}
-    for record in found.by_table("datasets"):
+    return DatasetLookup(
+        by_source=_pairs(found, "datasets", "source_ref", "dataset_code"),
+        by_intervention=_pairs(found, "interventions", "intervention_ref", "dataset_code"),
+    )
+
+
+def _experiment_lookup(found: SourceScan) -> ExperimentLookup:
+    return ExperimentLookup(
+        by_run_plan=_pairs(found, "experiments", "run_plan_ref", "experiment_code"),
+        by_checkpoint=_pairs(found, "model_checkpoints", "checkpoint_ref", "experiment_code"),
+    )
+
+
+def _pairs(found: SourceScan, table: str, key: str, value: str) -> dict[str, str]:
+    pairs: dict[str, str] = {}
+    for record in found.by_table(table):
         if isinstance(record.payload, dict):
-            code = record.payload.get("dataset_code")
-            source_ref = record.payload.get("source_ref")
-            if code and source_ref:
-                by_source[str(source_ref)] = str(code)
-    for record in found.by_table("interventions"):
-        if isinstance(record.payload, dict):
-            ref = record.payload.get("intervention_ref")
-            code = record.payload.get("dataset_code")
-            if ref and code:
-                by_intervention[str(ref)] = str(code)
-    return DatasetLookup(by_source=by_source, by_intervention=by_intervention)
+            left, right = record.payload.get(key), record.payload.get(value)
+            if left and right:
+                pairs[str(left)] = str(right)
+    return pairs
 
 
 def _map(
-    record: Record, lookup: DatasetLookup, episode_refs: dict[str, str]
+    record: Record, lookups: Lookups, loaded_episodes: set[str]
 ) -> list[tuple[str, dict[str, Any]]]:
     """Một artifact thành một hoặc nhiều dòng, kèm bảng đích của từng dòng."""
     table = record.table
     if table == "episodes":
-        return [("episodes", map_episode(record.payload, lookup))]
+        return [("episodes", map_episode(record.payload, lookups.dataset))]
     if table == "episode_qa_reports":
-        return [("episode_qa_reports", map_qa_report(record.payload, episode_refs))]
+        return [("episode_qa_reports", map_qa_report(record.payload, loaded_episodes))]
     if table == "training_metrics":
-        experiment = _required(record.payload, "experiment_code", record.where)
+        experiment = lookups.experiment.for_metric(record.payload, record.where)
         return [("training_metrics", map_training_metric(record.payload, experiment))]
     if table == "train_diagnoses":
-        experiment = _required(record.payload, "experiment_code", record.where)
+        experiment = lookups.experiment.for_diagnosis(record.payload, record.where)
         diagnosis = map_train_diagnosis(record.payload, experiment)
         return [(target, row) for target, rows in diagnosis.items() for row in rows]
     if table == "probe_results":
@@ -359,12 +426,6 @@ def _map(
             row["__unknown__"] = unknown
         return [(table, row)]
     raise MappingError(f"{record.where}: chưa có mapper cho bảng `{table}`")
-
-
-def _required(payload: Any, key: str, where: str) -> str:
-    if not isinstance(payload, dict) or not payload.get(key):
-        raise MappingError(f"{where}: thiếu `{key}`, không biết dòng này thuộc thí nghiệm nào")
-    return str(payload[key])
 
 
 def _error(record: Record, error: Exception) -> dict[str, Any]:

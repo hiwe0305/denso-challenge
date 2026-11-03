@@ -94,12 +94,20 @@ def import_(
         Path("fwdata/web-sink"), "--out", help="Thư mục ra của sink `jsonl`."
     ),
     dsn: str | None = typer.Option(None, "--dsn", help="Chuỗi kết nối cho sink `postgres`."),
+    origin: str = typer.Option(
+        "core",
+        "--origin",
+        help="`core` cho output thật của lõi, `mock` cho bộ mock. Đóng dấu lên mọi dòng.",
+    ),
 ) -> None:
     """Nạp artifact vào bảng nhóm P. Chạy lại từ đầu cho cùng kết quả."""
     use_utf8()
     try:
         target = _sink(sink, out, dsn)
-        result = run_import(source, target)
+        result = run_import(source, target, origin=origin)
+    except ValueError as error:
+        typer.echo(f"không nạp được: {error}", err=True)
+        raise typer.Exit(code=2) from error
     except SourceError as error:
         typer.echo(f"không nạp được: {error}", err=True)
         raise typer.Exit(code=2) from error
