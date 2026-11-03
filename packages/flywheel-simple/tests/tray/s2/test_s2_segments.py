@@ -6,7 +6,7 @@ import json
 
 import numpy as np
 import pytest
-from flywheel_simple.tray.s2.config import S2Config
+from flywheel_simple.tray.s2.config import S2Config, segment_with
 from flywheel_simple.tray.s2.parents import ParentDemo, hands_closed_from_action
 from flywheel_simple.tray.s2.segments import Segmentation, SegmentError, segment, walking_runs
 
@@ -30,11 +30,17 @@ def demo(
     for a, b in runs:
         nav[a:b, 0] = 0.3
     pose = np.tile([0.0, 0.0, 0.75, 1.0, 0.0, 0.0, 0.0], (frames, 1))
+    # Both wrists reach 0.4 m forward over frames 200-360 (the grasp flag), then stay.
+    eef = np.zeros((frames, 14))
+    reach = 0.4 * np.clip((np.arange(frames) - 200) / 160, 0.0, 1.0)
+    for k in (0, 7):
+        eef[:, k] = reach
+        eef[:, k + 3] = 1.0
     return ParentDemo(
         parent_id="test/shard-00/0",
         level=1,
         seed=100,
-        eef=np.zeros((frames, 14)),
+        eef=eef,
         navigate=nav,
         base_pose=pose,
         tray_pose=pose.copy(),
@@ -51,12 +57,18 @@ def test_cut_follows_the_flags() -> None:
     assert [cut.segment_of(f) for f in (0, 522, 523, 1065, 1066, FRAMES - 1)] == list("KKWWPP")
 
 
-def test_anchors_follow_walking() -> None:
+def test_walks_set_the_gates() -> None:
     cut = segment(demo())
     assert cut.walk_a_end == 279  # the corrective step 300-318 while reaching is too short
     assert cut.place_start == 1456  # standing at table B after the last step there
-    expected = {0: "robot", 278: "robot", 279: "tray", 522: "tray", 523: "robot",
-                1100: "robot", 1455: "robot", 1456: "target", 1674: "target"}  # fmt: skip
+
+
+def test_hands_follow_the_tray_while_reaching_and_grasping() -> None:
+    cut = segment(demo())
+    assert cut.reach_start == 260  # wrists within 0.25 m of their grasp pose from here
+    assert cut.grasp_end == 360 + 10  # grasp flag + 0.2 s
+    expected = {0: "robot", 259: "robot", 260: "tray", 369: "tray", 370: "robot",
+                522: "robot", 1455: "robot", 1456: "target", 1674: "target"}  # fmt: skip
     assert {f: cut.anchor_of(f) for f in expected} == expected
 
 
@@ -106,6 +118,7 @@ def test_hands_closed_from_dex3_targets() -> None:
 def test_config_loads() -> None:
     cfg = S2Config.load()
     assert cfg.hold_s == 0.5 and cfg.walk_min_s == 0.5
+    assert segment_with(demo(), cfg) == segment(demo())
 
 
 def test_parent_shapes_are_checked() -> None:

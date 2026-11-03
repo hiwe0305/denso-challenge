@@ -22,9 +22,9 @@ from typing import Any
 
 import numpy as np
 
-from flywheel_simple.tray.s2.config import S2Config
+from flywheel_simple.tray.s2.config import S2Config, segment_with
 from flywheel_simple.tray.s2.parents import load_parent, parent_dataset
-from flywheel_simple.tray.s2.segments import FPS, SegmentError, segment
+from flywheel_simple.tray.s2.segments import FPS, SegmentError
 
 SEGMENTS_FILE = "s2_segments.jsonl"
 
@@ -36,7 +36,7 @@ def cut_batch(parents: Path, cfg: S2Config) -> tuple[list[dict[str, Any]], list[
         parent_id = f"{parents.name}/{p['shard']}/{p['episode_index']}"
         demo = load_parent(parent_dataset(parents, p["shard"]), p["episode_index"], parent_id)
         try:
-            cut = segment(demo, hold_s=cfg.hold_s, walk_min_s=cfg.walk_min_s)
+            cut = segment_with(demo, cfg)
         except SegmentError as err:
             refused.append({"parent_id": parent_id, "reason": str(err)})
             continue
@@ -56,7 +56,9 @@ def cut_batch(parents: Path, cfg: S2Config) -> tuple[list[dict[str, Any]], list[
 
 
 def lengths(rows: list[dict[str, Any]]) -> dict[str, list[float]]:
-    spans: dict[str, list[float]] = {"K": [], "W": [], "P": [], "K_walk": [], "P_walk": []}
+    spans: dict[str, list[float]] = {
+        "K": [], "W": [], "P": [], "K_walk": [], "P_walk": [], "tray_anchor": []
+    }  # fmt: skip
     for row in rows:
         s = row["segmentation"]
         spans["K"].append(s["k_end"] / FPS)
@@ -64,6 +66,7 @@ def lengths(rows: list[dict[str, Any]]) -> dict[str, list[float]]:
         spans["P"].append((s["frames"] - s["w_end"]) / FPS)
         spans["K_walk"].append(s["walk_a_end"] / FPS)
         spans["P_walk"].append((s["place_start"] - s["w_end"]) / FPS)
+        spans["tray_anchor"].append((s["grasp_end"] - s["reach_start"]) / FPS)
     return {
         k: [round(float(x), 2) for x in np.percentile(v, [10, 50, 90])] for k, v in spans.items()
     }

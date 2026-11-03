@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Đang làm (PO duyệt bản teleop ảo cộng S2 và việc tải psi-data, 3/11/2026). Nhiệm vụ 1–9 xong; demo cha cho S2 đã có |
+| Trạng thái | Đang làm (PO duyệt bản teleop ảo cộng S2 và việc tải psi-data, 3/11/2026). Nhiệm vụ 1–10 xong; demo cha cho S2 đã có |
 | Người làm | Hiếu (đề xuất, PO giao) |
 | Làn | Adapter simulator (`flywheel-simple`) |
 | Story PRD | Story của [design 28/10/2026](../../superpowers/specs/2026-10-28-tray-transfer-he-design.md) mục 5 (dòng Synthetic S1, S2) · [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 5.3, 5.4 · spec mục 6.10, tuyến T2 ở mục 10 |
@@ -47,7 +47,7 @@ Kế hoạch ở mục "Kế hoạch teleop ảo" và "Kế hoạch generator S2
 - [x] 7. Sinh hàng loạt demo cha: ít nhất 100 đạt, sổ lượt, sổ chi phí (AC 3, 7). Đo: 129 demo cha đủ 7 cờ bước từ 160 lượt với planner D-25 (lô `parents-1103b`), 121 s worker mỗi demo cha, xem [virtual-teleop.md](../../g0/tray/virtual-teleop.md)
 - [x] 8. Cắt demo theo 7 bước (AC 4). Đo: 129/129 demo cha `parents-1103b` cắt được, ranh giới ở `s2_segments.jsonl` của lô, xem [s2.md](../../g0/tray/s2.md)
 - [x] 9. Streamer phát lại S2: phát lại demo không biến đổi qua ống teleop, đo tỉ lệ tái tạo (AC 5). Đo: 127/129 (98,4%) demo cha tái tạo đạt `check_success`, sau khi bù độ trễ của bản ghi (bàn tay 1 bước, cần gạt 1–2 bước), xem [s2.md](../../g0/tray/s2.md)
-- [ ] 10. Biến đổi theo khung khay và vùng đích, sinh lại đoạn đi, nối đoạn (AC 5)
+- [x] 10. Biến đổi theo khung khay và vùng đích, sinh lại đoạn đi, nối đoạn (AC 5). Đo: tất định theo (demo cha, điều kiện, seed sinh), kể cả khi job chạy sau job khác (sau khi sửa trạng thái hiệu chuẩn rò giữa các episode); tỉ lệ đạt thử 2–4/12 trên mức 1, xem [s2.md](../../g0/tray/s2.md)
 - [ ] 11. Lọc theo `check_success`, meta, lineage, sổ lượt sinh (AC 6)
 - [ ] 12. Đo tỉ lệ đạt và chi phí, chạy lô, release, bảng so chuyển động (AC 7, 8)
 
@@ -136,6 +136,6 @@ Rủi ro: điều kiện xa demo cha thì cầm trượt; đế trôi khi mang l
 ## Ghi chép khi làm
 
 - Giờ thực:
-- Công cụ AI đã dùng: Claude Code (nhiệm vụ 1–9)
+- Công cụ AI đã dùng: Claude Code (nhiệm vụ 1–10)
 - Ghi chú hoàn thành: Nhiệm vụ 2 (3/11/2026): wrapper, agent với streamer bất kỳ và vòng phiên; ghi được dataset LeRobot thật sau khi cài các gói ghi của [PR #27](https://github.com/hiwe0305/denso-challenge/pull/27) ([pico-teleop.md](../../g0/tray/pico-teleop.md) khoảng trống 11)
 - File đã tạo hoặc sửa: `configs/sim/tray_s2.yaml`, `configs/sim/tray_virtual_teleop.yaml`, `docs/g0/ledger/DA-35.csv`, `docs/g0/tray/pico-teleop.md`, `docs/g0/tray/s2.md`, `docs/g0/tray/virtual-teleop.md`, `packages/flywheel-simple/src/flywheel_simple/tray/pico/`, `packages/flywheel-simple/src/flywheel_simple/tray/s2/`, `packages/flywheel-simple/tests/tray/pico/`, `packages/flywheel-simple/tests/tray/s2/`, `scripts/g0/tray/pico/generate_parents.py`, `scripts/g0/tray/pico/measure_teleop_style.py`, `scripts/g0/tray/s2/`

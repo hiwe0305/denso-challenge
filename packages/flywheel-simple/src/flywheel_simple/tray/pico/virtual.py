@@ -200,6 +200,11 @@ class YawStick:
         self._pushing = False
         self._direction = 0.0
 
+    @property
+    def pushing(self) -> bool:
+        """The stick is held over: the lower body is turning (and stepping)."""
+        return self._pushing
+
     def reset(self) -> None:
         """PicoStreamer starts every episode at target yaw 0 (the robot spawns at yaw 0)."""
         self.target_yaw = 0.0

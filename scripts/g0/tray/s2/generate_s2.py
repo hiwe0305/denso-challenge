@@ -3,7 +3,10 @@
 Job lists:
 
 - `--replay`: every parent of `<parents>/s2_segments.jsonl` on its own condition,
-  untransformed (task 9: how well the pipeline reproduces a demo).
+  played as recorded (task 9: how well the pipeline reproduces a demo);
+- `--tracked`: the same jobs replayed closed loop as identity variants (task 10);
+- `--variants N`: N variants drawn from `--gen-base` (flywheel_simple.tray.s2.jobs
+  .sample_jobs): parents uniformly, conditions in the train domain (tasks 10-12).
 
 The jobs go round-robin to `--workers` processes; each worker is one
 `flywheel_simple.tray.s2.session` with its own env and LeRobot dataset under
@@ -31,6 +34,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from flywheel_simple.tray.s2.config import S2Config
+from flywheel_simple.tray.s2.jobs import sample_jobs
+
 JOB_KEYS = ("parent_id", "level", "seed", "gen_seed")
 
 
@@ -43,6 +49,15 @@ def replay_jobs(parents: Path) -> list[dict[str, Any]]:
     return [
         {"parent_id": p["parent_id"], "level": p["level"], "seed": p["seed"], "gen_seed": 0}
         for p in segments_of(parents)
+    ]
+
+
+def variant_jobs(parents: Path, count: int, gen_base: int, cfg: S2Config) -> list[dict[str, Any]]:
+    seeds = (cfg.cond_seed_min, cfg.cond_seed_max)
+    jobs = sample_jobs(segments_of(parents), count, gen_base, cfg.level1_share, seeds)
+    return [
+        {"parent_id": j.parent_id, "level": j.level, "seed": j.seed, "gen_seed": j.gen_seed}
+        for j in jobs
     ]
 
 
@@ -78,6 +93,7 @@ def launch(args: argparse.Namespace, jobs: list[dict[str, Any]]) -> list[subproc
             sys.executable, "-m", "flywheel_simple.tray.s2.session",
             "--parents", str(args.parents), "--jobs", str(jobs_file),
             "--session", f"{args.out.name}-{k:02d}", "--save-dir", str(shard),
+            "--mode", args.mode,
         ]  # fmt: skip
         log = (shard / "worker.log").open("ab")
         procs.append(subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT))
@@ -120,15 +136,24 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--parents", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--replay", action="store_true", help="each parent on its own condition")
+    jobs_from = parser.add_mutually_exclusive_group()
+    jobs_from.add_argument("--replay", action="store_true", help="parents as recorded")
+    jobs_from.add_argument("--tracked", action="store_true", help="parents closed loop")
+    jobs_from.add_argument("--variants", type=int, default=None, help="N drawn variants")
+    parser.add_argument("--gen-base", type=int, default=0, help="--variants: base of the draw")
     parser.add_argument("--limit", type=int, default=None, help="first N jobs only")
     parser.add_argument("--workers", type=int, default=12, help="team cap: <= 14 on rtx3060")
     parser.add_argument("--summarize", action="store_true", help="only rewrite summary.json")
     args = parser.parse_args(argv)
     if not args.summarize:
-        if not args.replay:
-            parser.error("choose a job list (--replay)")
-        jobs = replay_jobs(args.parents)[: args.limit]
+        if args.variants is not None:
+            jobs = variant_jobs(args.parents, args.variants, args.gen_base, S2Config.load())
+        elif args.replay or args.tracked:
+            jobs = replay_jobs(args.parents)
+        else:
+            parser.error("choose a job list (--replay, --tracked or --variants)")
+        jobs = jobs[: args.limit]
+        args.mode = "exact" if args.replay else "variant"
         args.out.mkdir(parents=True, exist_ok=True)
         (args.out / "jobs.jsonl").write_text("".join(json.dumps(j) + "\n" for j in jobs))
         t0 = time.monotonic()

@@ -36,6 +36,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", type=Path, default=None, help="tray_s2.yaml")
     parser.add_argument("--operator-config", type=Path, default=None)
     parser.add_argument("--keep-failed", action="store_true", help="also save failed attempts")
+    parser.add_argument(
+        "--mode", choices=["exact", "variant"], default="variant", help="exact: parent as recorded"
+    )
     args = parser.parse_args(argv)
 
     from flywheel_simple.tray.pico import agent as pico_agent
@@ -53,6 +56,7 @@ def main(argv: list[str] | None = None) -> int:
         ParentStore(args.parents, s2_cfg),
         OperatorConfig.load(args.operator_config),
         s2_cfg,
+        mode=args.mode,
     )
     agent = pico_agent.StreamerDecoupledAgent(env.unwrapped.task.robot, streamer, clock=SimClock())
     agent.num_episodes = len(jobs)
