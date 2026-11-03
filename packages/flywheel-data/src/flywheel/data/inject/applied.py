@@ -44,9 +44,9 @@ def _joint_jump(before: EpisodeData, after: EpisodeData, d: Defect) -> bool:
 
 
 def _joint_limit(before: EpisodeData, after: EpisodeData, d: Defect) -> bool:
-    dim, limit = _int(d, "dimension"), float(d.parameters["limit"])
+    dim, high = _int(d, "dimension"), float(d.parameters["limit_high"])
     col = _column(after, dim)
-    return col != _column(before, dim) and all(abs(v) > limit for v in col)
+    return col != _column(before, dim) and all(v > high for v in col)
 
 
 def _nan(before: EpisodeData, after: EpisodeData, d: Defect) -> bool:

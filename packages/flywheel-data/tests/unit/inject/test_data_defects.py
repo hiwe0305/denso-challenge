@@ -4,7 +4,7 @@ import math
 import statistics
 
 import pytest
-from flywheel.contracts.artifacts import InjectedDefect
+from flywheel.contracts.artifacts import ActionDimension, ActionLayout, InjectedDefect
 from flywheel.data.inject.applied import defect_applied
 from flywheel.data.inject.config import DataDefectConfig
 from flywheel.data.inject.data_defects import (
@@ -104,7 +104,7 @@ def test_inject_nan_values() -> None:
         code=defect.code, parameters=defect.parameters
     )
     step = defect.parameters["step"]
-    assert math.isnan(mod.actions[step][0])
+    assert math.isnan(mod.actions[step][int(defect.parameters["dimension"])])
 
 
 def test_inject_unit_deg_rad() -> None:
@@ -226,3 +226,56 @@ def test_inject_holdout_seed_leak() -> None:
         code=defect.code, parameters=defect.parameters
     )
     assert 9000 <= mod.seed <= 9999
+
+
+def _layout() -> ActionLayout:
+    # Arms 14-20 masked; joint limits only on 21-30; other dims unbounded.
+    dims = []
+    for d in range(36):
+        limited = 21 <= d <= 30
+        dims.append(
+            ActionDimension(
+                name=f"a{d}",
+                group="arm" if 14 <= d <= 27 else "other",
+                masked=14 <= d <= 20,
+                limit_low=-2.0 if limited else None,
+                limit_high=2.0 if limited else None,
+            )
+        )
+    return ActionLayout(dimensions=dims)
+
+
+def test_joint_limit_uses_the_layout_limit_of_the_chosen_dim() -> None:
+    ep = _make_dummy_episode()
+    injector = DataDefectInjector(
+        DataDefectConfig(joint_limit_excess_factor=1.25), layout=_layout()
+    )
+    mod, defect = injector.inject_joint_limit_exceeded(ep)
+    dim = int(defect.parameters["dimension"])
+    assert 21 <= dim <= 30
+    assert (defect.parameters["limit_low"], defect.parameters["limit_high"]) == (-2.0, 2.0)
+    # 25% of the joint range past the high limit
+    assert all(a[dim] == 2.0 + 0.25 * 4.0 for a in mod.actions)
+    assert defect_applied(ep, mod, defect)
+
+
+def test_joint_limit_without_layout_falls_back_to_pi() -> None:
+    ep = _make_dummy_episode()
+    _, defect = DataDefectInjector().inject_joint_limit_exceeded(ep)
+    assert (defect.parameters["limit_low"], defect.parameters["limit_high"]) == (-math.pi, math.pi)
+
+
+def test_action_defects_skip_masked_dims_of_the_layout() -> None:
+    for seed in range(30):
+        injector = DataDefectInjector(rng_seed=seed, layout=_layout())
+        for name in ("joint_jump", "unit_deg_rad", "action_sign_flip"):
+            _, defect = getattr(injector, f"inject_{name}")(_make_dummy_episode())
+            assert not 14 <= int(defect.parameters["dimension"]) <= 20, (seed, name)
+
+
+def test_layout_without_limited_joints_makes_joint_limit_not_applicable() -> None:
+    layout = ActionLayout(
+        dimensions=[ActionDimension(name=f"a{d}", group="g", masked=False) for d in range(36)]
+    )
+    with pytest.raises(NotApplicable):
+        DataDefectInjector(layout=layout).inject_joint_limit_exceeded(_make_dummy_episode())

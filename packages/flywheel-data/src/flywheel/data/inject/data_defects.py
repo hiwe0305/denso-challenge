@@ -7,7 +7,7 @@ import statistics
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from flywheel.contracts.artifacts import Defect, EpisodeMetadata, InjectedDefect
+from flywheel.contracts.artifacts import ActionLayout, Defect, EpisodeMetadata, InjectedDefect
 from flywheel.data.inject.codes import DATA_DEFECT_CODES
 from flywheel.data.inject.config import DataDefectConfig
 
@@ -62,20 +62,40 @@ class DataDefectInjector:
     An injector raises NotApplicable instead of listing a defect it cannot apply.
     """
 
-    def __init__(self, config: DataDefectConfig | None = None, rng_seed: int = 42):
+    def __init__(
+        self,
+        config: DataDefectConfig | None = None,
+        rng_seed: int = 42,
+        layout: ActionLayout | None = None,
+    ):
         self.config = config or DataDefectConfig()
         self.rng = random.Random(rng_seed)
+        # With a layout, action defects skip masked dims and dims the layout does not name.
+        self.layout = layout
+
+    def _limits(self, dim: int) -> tuple[float, float] | None:
+        """Joint limits of an action dim: from the layout, else +-pi without a layout."""
+        if self.layout is None:
+            return (-math.pi, math.pi)
+        d = self.layout.dimensions[dim]
+        if d.limit_low is None or d.limit_high is None:
+            return None
+        return (d.limit_low, d.limit_high)
 
     def _choose_dim(
         self,
         ep: EpisodeData,
         dims: tuple[int, ...],
         kind: str,
-        qualifies: Callable[[list[float]], bool] = lambda col: True,
+        qualifies: Callable[[int, list[float]], bool] = lambda dim, col: True,
     ) -> int:
         """Pick one action dim among `dims` that exists and qualifies on this episode."""
         width = len(ep.actions[0]) if ep.actions else 0
-        eligible = [d for d in dims if d < width and qualifies([a[d] for a in ep.actions])]
+        if self.layout is not None:
+            named = self.layout.dimensions
+            width = min(width, len(named))
+            dims = tuple(d for d in dims if d < width and not named[d].masked)
+        eligible = [d for d in dims if d < width and qualifies(d, [a[d] for a in ep.actions])]
         if not eligible:
             raise NotApplicable(f"{kind}: no eligible action dimension")
         return self.rng.choice(eligible)
@@ -134,24 +154,31 @@ class DataDefectInjector:
         )
 
     def inject_joint_limit_exceeded(self, ep: EpisodeData) -> tuple[EpisodeData, Defect]:
-        dim = self._choose_dim(ep, JOINT_ACTION_DIMS, "joint_limit_exceeded")
+        dim = self._choose_dim(
+            ep,
+            JOINT_ACTION_DIMS,
+            "joint_limit_exceeded",
+            lambda d, col: self._limits(d) is not None,
+        )
+        low, high = self._limits(dim) or (-math.pi, math.pi)
+        # Past the high limit by (factor - 1) of the joint range.
+        exceeded = high + (self.config.joint_limit_excess_factor - 1) * (high - low)
         new_ep = copy.deepcopy(ep)
-        factor = self.config.joint_limit_excess_factor
-        limit = math.pi
         for a in new_ep.actions:
-            a[dim] = limit * factor
+            a[dim] = exceeded
         return new_ep, _mark(
             new_ep,
             "joint_limit_exceeded",
-            {"dimension": dim, "limit": limit, "exceeded_value": limit * factor},
+            {"dimension": dim, "limit_low": low, "limit_high": high, "exceeded_value": exceeded},
         )
 
     def inject_nan_values(self, ep: EpisodeData) -> tuple[EpisodeData, Defect]:
-        if not ep.actions or not ep.actions[0]:
-            raise NotApplicable("nan_values needs actions")
+        width = len(ep.actions[0]) if ep.actions else 0
+        dim = self._choose_dim(
+            ep, tuple(range(width)), "nan_values", lambda d, col: not math.isnan(col[len(col) // 2])
+        )
         new_ep = copy.deepcopy(ep)
         step = len(new_ep.actions) // 2
-        dim = 0
         new_ep.actions[step][dim] = float("nan")
         return new_ep, _mark(
             new_ep,
@@ -162,7 +189,7 @@ class DataDefectInjector:
     def inject_unit_deg_rad(self, ep: EpisodeData) -> tuple[EpisodeData, Defect]:
         # Scaling a dim that is all zero changes nothing, so only nonzero angle dims qualify.
         dim = self._choose_dim(
-            ep, ANGLE_ACTION_DIMS, "unit_deg_rad", lambda col: any(v != 0 for v in col)
+            ep, ANGLE_ACTION_DIMS, "unit_deg_rad", lambda d, col: any(v != 0 for v in col)
         )
         new_ep = copy.deepcopy(ep)
         scale = self.config.unit_deg_rad_scale
@@ -177,7 +204,7 @@ class DataDefectInjector:
     def inject_action_sign_flip(self, ep: EpisodeData) -> tuple[EpisodeData, Defect]:
         width = len(ep.actions[0]) if ep.actions else 0
         dim = self._choose_dim(
-            ep, tuple(range(width)), "action_sign_flip", lambda col: statistics.pstdev(col) > 0
+            ep, tuple(range(width)), "action_sign_flip", lambda d, col: statistics.pstdev(col) > 0
         )
         new_ep = copy.deepcopy(ep)
         for a in new_ep.actions:

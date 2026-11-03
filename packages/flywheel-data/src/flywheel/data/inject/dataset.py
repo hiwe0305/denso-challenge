@@ -4,7 +4,7 @@ import copy
 import random
 from collections.abc import Sequence
 
-from flywheel.contracts.artifacts import Defect, DefectManifest
+from flywheel.contracts.artifacts import ActionLayout, Defect, DefectManifest
 from flywheel.contracts.v0 import DatasetRef
 from flywheel.data.inject.applied import content, defect_applied
 from flywheel.data.inject.codes import DATA_DEFECT_CODES
@@ -36,17 +36,19 @@ def create_defect_dataset(
     episodes: Sequence[EpisodeData],
     dataset_id: str | None = None,
     config: InjectConfig | None = None,
+    layout: ActionLayout | None = None,
 ) -> tuple[list[EpisodeData], DefectManifest]:
     """Create a defective benchmark dataset by injecting faults into an episode copy.
 
     Each data defect kind goes into exactly `episodes_per_kind` distinct episodes
     (PO decision 3/11/2026: 3 per kind, 33 of 99). Never modifies original episodes.
-    `dataset_id` defaults to the first of `copy_ids(seed)`.
+    `dataset_id` defaults to the first of `copy_ids(seed)`. With `layout`, action defects
+    skip masked dims and joint limits come from the layout.
     """
     cfg = config or InjectConfig()
     dataset_id = _neutral(dataset_id or copy_ids(cfg.seed)[0])
     rng = random.Random(cfg.seed)
-    injector = DataDefectInjector(cfg.data, rng_seed=cfg.seed)
+    injector = DataDefectInjector(cfg.data, rng_seed=cfg.seed, layout=layout)
 
     cloned_episodes = [copy.deepcopy(ep) for ep in episodes]
     total = len(cloned_episodes)
