@@ -5,7 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 22/10/2026; hủy 25/10/2026; mở lại 27/10/2026) |
-| Người làm | Hiếu, làm cùng Claude (từ 3/11/2026, thay Thông) |
+| Người làm | Hiếu |
 | Story PRD | 1.6 · Epic 1 |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:data` |
 | Sprint | S1, xong trong tuần 1 vì Q1 quyết định điểm cuối của lưới HE · **Lịch 3/11/2026:** nhánh mới `S1-07-psi-data-v2`, dùng lại số đúng của #24, merge trước **4/11/2026** |
@@ -76,7 +76,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Hủy: psi-data là dữ liệu của G1; dữ liệu chính chuyển sang dataset BTC | PO (Hiếu) theo design 25/10/2026 (đã xóa) |
 | 27/10/2026 | Mở lại cho task hai bàn: gói 203 MB và tập eval, N_teleop quyết định lưới HE, so với `action_layout`, dải hạt giống của `simple-eval`, thống kê cho báo cáo dataset; bỏ AC Q6 (đã trả lời); 12 → 10 giờ | PO (Hiếu) theo design 27/10/2026 |
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
-| 3/11/2026 | Người làm Thông → Hiếu theo quyết định PO (07 bản 1.5; [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) Q1, Q4): nhánh mới dùng lại số đúng của #24; ước lượng còn 3,5 giờ. AC không đổi | PO (Hiếu) |
+| 3/11/2026 | Người làm Thông → Hiếu theo quyết định PO (07 bản 1.6; [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) Q1, Q4): nhánh mới dùng lại số đúng của #24; ước lượng còn 3,5 giờ. AC không đổi | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
