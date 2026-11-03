@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 from flywheel.contracts import artifacts
 from flywheel.contracts.v0 import Condition, RolloutRequest, RolloutResult, TaskRef
 from flywheel.testkit.fakes.llm import FakeLLM
@@ -35,6 +36,23 @@ def test_examples_and_schema(model: type[artifacts.Artifact]) -> None:
         json.loads((SCHEMAS / f"{model.__name__}.json").read_text(encoding="utf-8"))
         == model.model_json_schema()
     )
+
+
+def test_action_dimension_constant_defaults_false_and_round_trips() -> None:
+    plain = artifacts.ActionDimension(name="arm_0", group="arm", masked=False)
+    assert plain.constant is False
+    height = artifacts.ActionDimension(name="height", group="height", masked=False, constant=True)
+    padding = artifacts.ActionDimension(name="pad", group="pad", masked=True, constant=True)
+    layout = artifacts.ActionLayout(dimensions=[plain, height, padding])
+    assert artifacts.ActionLayout.model_validate_json(layout.model_dump_json()) == layout
+    assert [d.constant for d in layout.dimensions] == [False, True, True]
+
+
+def test_g1_layout_declares_only_base_height_constant() -> None:
+    raw = yaml.safe_load((ROOT / "configs/embodiments/g1.yaml").read_text(encoding="utf-8"))
+    layout = artifacts.ActionLayout.model_validate(raw["action_layout"])
+    assert [i for i, d in enumerate(layout.dimensions) if d.constant] == [31]
+    assert layout.dimensions[31].name == "base_height_command"
 
 
 def test_invalid_qa_example_identifies_field() -> None:
