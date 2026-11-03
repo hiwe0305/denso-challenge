@@ -26,13 +26,13 @@ r1:
   percentile: 99.0         # chốt theo spec mục 6.4 ("phân vị 99 độ trễ chu kỳ suy luận")
 
 r2:
-  # Buffer cạn là chunk có `delay_steps > buffer_level` trong log RTC.
-  # `buffer_level` là số action còn trong buffer **lúc gửi request** (writer
-  # `RTCClient` của DA-19), `delay_steps` là số chu kỳ điều khiển trôi qua trong
-  # lúc suy luận; buffer cạn nghĩa là action còn lại không phủ hết thời gian chờ.
-  # Bỏ chunk đầu của mỗi trace (`chunk_index` 0): lúc đó chưa action nào chạy.
-  # Lượt khỏe không nổ khi `refill_at` của client không nhỏ hơn độ trễ (DA-19).
-  max_underruns: 0         # giả định; một lần buffer cạn đã là một lần đứng máy nhìn thấy được. Hiệu chỉnh: số lần lớn nhất trên lần chạy chuẩn G0
+  # Đứng máy là chunk có `delay_steps > max_delay_steps` trong log RTC.
+  # `delay_steps` = ceil(độ trễ × Hz) do `RTCClient` của DA-19 ghi: số chu kỳ
+  # điều khiển một vòng thời gian thực chạy trong lúc chờ chunk, tức d mà RTC
+  # phải che trên phần cứng. Không đọc `buffer_level`: đó là mức buffer lúc gửi
+  # request, luôn bằng 0 khi SIMPLE chỉ hỏi server lúc hàng đợi action rỗng.
+  max_delay_steps: 8       # chốt 3/11/2026: max_delay của Ψ₀ stage 3, theo docs/g0/psi0-logging.md và docstring flywheel_psi0/policy/rtc.py; kiểm lại ở config Ψ₀ khi đổi checkpoint
+  max_underruns: 0         # giả định; số chunk vượt max_delay_steps được phép, một lần đã là một lần đứng máy nhìn thấy được. Hiệu chỉnh: số lần lớn nhất trên lần chạy chuẩn G0
 
 r3:
   tau_track_upper: 0.10    # giả định; chuẩn của (lệnh gửi - trạng thái đo) thân trên, đơn vị rad. Hiệu chỉnh: phân vị 99 trên episode teleop thành công

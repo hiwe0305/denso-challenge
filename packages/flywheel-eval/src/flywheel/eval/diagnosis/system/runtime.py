@@ -9,10 +9,10 @@ twelve F-TRAIN codes.
   observation going out and the chunk coming back, which is what
   `RTCInferenceRecord` records.
 * **R2 buffer** (design section 10): chunks whose inference took more control
-  steps than the buffer had left when the request went out
-  (`delay_steps > buffer_level`, the two fields `RTCClient` of DA-19 writes).
-  Counted rather than averaged: a stall is a moment, and an average over a
-  long episode hides it.
+  steps than real-time chunking covers (`delay_steps > max_delay_steps`, the
+  model's `max_delay`, 8 for Ψ₀ stage 3). `delay_steps` is what `RTCClient`
+  of DA-19 writes as ceil(latency * hz). Counted rather than averaged: a stall
+  is a moment, and an average over a long episode hides it.
 * **R4 sync** (step 4): the largest |t_image - t_state| over the episode,
   against tau_sync. Spec asks for the largest offset, not a percentile of it,
   because one badly paired frame is enough to make the policy act on a stale
@@ -87,36 +87,32 @@ def check_r1(records: tuple[RTCInferenceRecord, ...], cfg: R1Thresholds) -> Chec
 
 
 def check_r2(records: tuple[RTCInferenceRecord, ...], cfg: R2Thresholds) -> CheckResult:
-    """Chunks whose inference outlasted the actions left in the buffer (design section 10).
+    """Chunks whose inference outlasted what RTC covers (design section 10).
 
-    `buffer_level` is the level when the request went out, not when the chunk
-    came back, so a low level is healthy as long as it covers `delay_steps`.
-    The first chunk of a trace is left out: the client asks for it with
-    nothing buffered, before any action ran, so its wait is the start of the
-    trace and not a stall - counting it would fire R2 on every episode.
+    `buffer_level` is not read: `RTCClient` records it when the request went
+    out, and under SIMPLE's refill-when-empty it is always 0, so it tells a
+    healthy chunk from a stall no better than a constant would. What RTC has
+    to cover on hardware is `delay_steps`, against the model's `max_delay`.
+
+    `value` is the number of chunks over the limit, against `max_underruns`;
+    `where` is the slowest of them.
     """
     if not records:
         return CheckResult(skipped=[Skipped("R2", _no_rtc_log())])
-    underruns = [
-        record
-        for record in records
-        if record.chunk_index > 0 and record.delay_steps > record.buffer_level
-    ]
-    if len(underruns) <= cfg.max_underruns:
+    slow = [record for record in records if record.delay_steps > cfg.max_delay_steps]
+    if len(slow) <= cfg.max_underruns:
         return CheckResult()
+    worst = max(slow, key=lambda record: record.delay_steps)
     return CheckResult(
         findings=[
             SystemFinding(
                 code="R2",
-                value=float(len(underruns)),
+                value=float(len(slow)),
                 threshold=float(cfg.max_underruns),
-                where=f"chunk {underruns[0].chunk_index}",
+                where=f"chunk {worst.chunk_index}",
                 detail=(
-                    f"{len(underruns)} chunk có delay_steps lớn hơn buffer_level lúc gửi "
-                    f"request, thiếu nhiều nhất "
-                    f"{max(record.delay_steps - record.buffer_level for record in underruns)}"
-                    f" action (chunk {underruns[0].chunk_index}: "
-                    f"buffer {underruns[0].buffer_level}, trễ {underruns[0].delay_steps})"
+                    f"{len(slow)} chunk có delay_steps trên max_delay {cfg.max_delay_steps}, "
+                    f"lớn nhất {worst.delay_steps} bước"
                 ),
             )
         ]
