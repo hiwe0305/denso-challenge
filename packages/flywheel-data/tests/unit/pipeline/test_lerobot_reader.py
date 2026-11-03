@@ -289,3 +289,68 @@ def test_the_lane_api_exposes_the_reader() -> None:
     assert api.write_episode is write_episode
     assert api.read_info is read_info
     assert api.EpisodeFrames is EpisodeFrames
+
+
+@pytest.mark.parametrize("column", ["action", "states"])
+def test_float64_values_that_float32_rounds_are_refused(
+    dataset: tuple[Path, list[EpisodeFrames]], column: str
+) -> None:
+    # Review #69 point 2: 0.1 read as float32 is 0.10000000149; never round silently.
+    root, _ = dataset
+    path = parquet(root, 0)
+    width = 36 if column == "action" else 32
+
+    def precise(table: pa.Table) -> pa.Table:
+        values = np.full((table.num_rows, width), 0.1).tolist()
+        position = table.schema.get_field_index(column)
+        return table.set_column(position, column, pa.array(values, pa.list_(pa.float64())))
+
+    _rewrite(path, precise)
+    with pytest.raises(LeRobotFormatError) as err:
+        list(iter_episodes(root))
+    message = str(err.value)
+    assert str(path) in message and f"'{column}'" in message
+    assert f"{5 * width} of {5 * width} values change" in message and "float32" in message
+
+
+def test_float64_values_exact_in_float32_read_unchanged(
+    dataset: tuple[Path, list[EpisodeFrames]],
+) -> None:
+    # psi-data and tray S1 store float32-exact values as float64 (rtx3060, 3/11).
+    root, written = dataset
+    path = parquet(root, 0)
+    table = pq.read_table(path)
+    position = table.schema.get_field_index("action")
+    wide = table.column("action").cast(pa.list_(pa.float64()))
+    pq.write_table(table.set_column(position, "action", wide), path)
+    np.testing.assert_array_equal(next(iter_episodes(root)).action, written[0].action)
+
+
+def test_nan_survives_the_cast_and_is_left_to_qa(
+    dataset: tuple[Path, list[EpisodeFrames]],
+) -> None:
+    root, _ = dataset
+    path = parquet(root, 0)
+
+    def with_nan(table: pa.Table) -> pa.Table:
+        values = np.zeros((table.num_rows, 36))
+        values[1, 3] = np.nan
+        position = table.schema.get_field_index("action")
+        nan = pa.array(values.tolist(), pa.list_(pa.float64()))
+        return table.set_column(position, "action", nan)
+
+    _rewrite(path, with_nan)
+    assert np.isnan(next(iter_episodes(root)).action[1, 3])
+
+
+def test_fractional_frame_index_is_refused(dataset: tuple[Path, list[EpisodeFrames]]) -> None:
+    root, _ = dataset
+    path = parquet(root, 2)
+
+    def fractional(table: pa.Table) -> pa.Table:
+        position = table.schema.get_field_index("frame_index")
+        return table.set_column(position, "frame_index", pa.array([0.0, 1.5, 2.0]))
+
+    _rewrite(path, fractional)
+    with pytest.raises(LeRobotFormatError, match="'frame_index'.*1 of 3 values change"):
+        list(iter_episodes(root))
