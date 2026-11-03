@@ -11,14 +11,21 @@ Job lists:
 The jobs go round-robin to `--workers` processes; each worker is one
 `flywheel_simple.tray.s2.session` with its own env and LeRobot dataset under
 `<out>/shard-NN/`. A rerun skips the jobs any shard has already logged, so the
-jobs of a killed worker run again (with any number of workers). At the end (or with --summarize) it writes
-`<out>/summary.json`: attempts, outcomes, failure labels, sim and machine time.
+jobs of a killed worker run again (with any number of workers). At the end (or
+with --summarize) it writes `<out>/summary.json`: attempts, outcomes, failure
+labels, sim and machine time.
 
-Run on the sim machine in the SIMPLE venv, detached:
+Every batch writes its two ledger rows through `flywheel.data.ledger.job_ledger`
+(estimate before the workers start: jobs x `--est-attempt-s` over the workers;
+measured wall seconds after), under `$FW_ROOT/runs/g0-DA-35-<date>/`. The launcher
+needs the workspace venv for that (pydantic); the workers run in the SIMPLE venv
+(`--worker-python`). Run on the sim machine, detached:
 
     MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src nohup setsid \\
-        fwdata/simple/.venv/bin/python scripts/g0/tray/s2/generate_s2.py \\
-        --parents fwdata/simple/tray/virtual/parents-1103b --out fwdata/simple/tray/s2/replay-1104 \\
+        .venv/bin/python scripts/g0/tray/s2/generate_s2.py \\
+        --worker-python fwdata/simple/.venv/bin/python \\
+        --parents fwdata/simple/tray/virtual/parents-1103b \\
+        --out fwdata/simple/tray/s2/replay-1104 \\
         --replay --workers 12 < /dev/null > replay.log 2>&1 &
 """
 
@@ -90,10 +97,11 @@ def launch(args: argparse.Namespace, jobs: list[dict[str, Any]]) -> list[subproc
         jobs_file = shard / "jobs.jsonl"
         jobs_file.write_text("".join(json.dumps(j) + "\n" for j in mine))
         cmd = [
-            sys.executable, "-m", "flywheel_simple.tray.s2.session",
+            args.worker_python, "-m", "flywheel_simple.tray.s2.session",
             "--parents", str(args.parents), "--jobs", str(jobs_file),
             "--session", f"{args.out.name}-{k:02d}", "--save-dir", str(shard),
             "--mode", args.mode,
+            *(["--config", str(args.config)] if args.config else []),
         ]  # fmt: skip
         log = (shard / "worker.log").open("ab")
         procs.append(subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT))
@@ -118,7 +126,9 @@ def summarize(out: Path, wall_s: float | None) -> dict[str, Any]:
         "by_level": {
             str(level): {
                 "attempts": sum(a["level"] == level for a in attempts),
-                "successes": sum(a["level"] == level and a["outcome"] == "success" for a in attempts),
+                "successes": sum(
+                    a["level"] == level and a["outcome"] == "success" for a in attempts
+                ),
             }
             for level in sorted({a["level"] for a in attempts})
         },  # fmt: skip
@@ -141,13 +151,20 @@ def main(argv: list[str] | None = None) -> int:
     jobs_from.add_argument("--tracked", action="store_true", help="parents closed loop")
     jobs_from.add_argument("--variants", type=int, default=None, help="N drawn variants")
     parser.add_argument("--gen-base", type=int, default=0, help="--variants: base of the draw")
+    parser.add_argument("--config", type=Path, default=None, help="tray_s2.yaml for the workers")
+    parser.add_argument("--worker-python", default=sys.executable, help="the SIMPLE venv's python")
+    parser.add_argument(
+        "--est-attempt-s", type=float, default=70.0,
+        help="ledger estimate: worker wall seconds per attempt (replay-1103: 68.7 per success)",
+    )  # fmt: skip
     parser.add_argument("--limit", type=int, default=None, help="first N jobs only")
     parser.add_argument("--workers", type=int, default=12, help="team cap: <= 14 on rtx3060")
     parser.add_argument("--summarize", action="store_true", help="only rewrite summary.json")
     args = parser.parse_args(argv)
     if not args.summarize:
         if args.variants is not None:
-            jobs = variant_jobs(args.parents, args.variants, args.gen_base, S2Config.load())
+            cfg = S2Config.load(args.config)
+            jobs = variant_jobs(args.parents, args.variants, args.gen_base, cfg)
         elif args.replay or args.tracked:
             jobs = replay_jobs(args.parents)
         else:
@@ -156,12 +173,31 @@ def main(argv: list[str] | None = None) -> int:
         args.mode = "exact" if args.replay else "variant"
         args.out.mkdir(parents=True, exist_ok=True)
         (args.out / "jobs.jsonl").write_text("".join(json.dumps(j) + "\n" for j in jobs))
-        t0 = time.monotonic()
-        procs = launch(args, jobs)
-        print(f"{len(procs)} workers started, {len(jobs)} jobs in the list", flush=True)
-        codes = [p.wait() for p in procs]
-        print(f"workers done, exit codes {Counter(codes)}", flush=True)
-        summary = summarize(args.out, time.monotonic() - t0)
+        from flywheel.data.ledger import job_ledger  # workspace venv only
+
+        todo = len(jobs) - len(
+            {logged_key(a) for shard in args.out.glob("shard-*") for a in attempts_of(shard)}
+        )
+        workers = max(1, min(args.workers, todo))
+        estimate = max(todo, 0) * args.est_attempt_s / workers
+        note = (
+            f"Assumption: {todo} S2 {args.mode} attempts x {args.est_attempt_s:g} s worker wall "
+            f"over {workers} workers on rtx3060; batch {args.out.name}"
+        )
+        activity = "replay" if args.replay else "data_generation"
+        command = f"da35_s2_{args.out.name}"
+        with job_ledger(activity, command, estimate, note=note, story="DA-35") as job:
+            t0 = time.monotonic()
+            procs = launch(args, jobs)
+            print(f"{len(procs)} workers started, {len(jobs)} jobs in the list", flush=True)
+            codes = [p.wait() for p in procs]
+            print(f"workers done, exit codes {Counter(codes)}", flush=True)
+            summary = summarize(args.out, time.monotonic() - t0)
+            job.notes.append(
+                f"{summary['attempts']} attempts, {summary['successes']} successes, "
+                f"{summary['worker_s']} worker-s, exit codes {dict(Counter(codes))}"
+            )
+        print(f"ledger: run plan {job.run_plan_id}, job {job.job_id}", flush=True)
     else:
         summary = summarize(args.out, None)
     print(json.dumps(summary, indent=1))

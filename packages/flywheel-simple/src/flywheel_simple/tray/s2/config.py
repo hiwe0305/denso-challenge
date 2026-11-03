@@ -26,6 +26,10 @@ class S2Config:
     settle_speed: float
     place_fix_max_m: float
     place_fix_max_deg: float
+    palm_gain: float
+    palm_max: float
+    palm_window: float
+    palm_still_speed: float
     gate_max_s: float
     nav_gain: float
     walk_ff_min: float

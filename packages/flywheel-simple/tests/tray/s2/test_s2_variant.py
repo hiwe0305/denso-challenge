@@ -260,11 +260,11 @@ def expected_tray(p: VariantPlan, i: int) -> np.ndarray:
 
 
 def play_to_place(p: VariantPlan, tray_offset: tuple[float, float]) -> ReplayOperator:
-    """Steps on the base reference up to place_start, the tray held `tray_offset` off."""
+    """Steps on the base reference past the gate at place_start, the tray held `tray_offset` off."""
     op, cal = operator(p), calibration()
     op.step(0.0, None, ref_pose(p, 0))
     t = 0.0
-    while op.ref < p.cut.place_start:
+    while op.ref <= p.cut.place_start:
         t += DT
         i = min(op.ref + 1, p.frames - 1)
         tray = expected_tray(p, i)
@@ -280,3 +280,23 @@ def test_placing_hands_take_up_where_the_held_tray_is_off() -> None:
     assert (op.place_fix.dx, op.place_fix.dy) == (pytest.approx(-0.02), pytest.approx(0.01))
     far = play_to_place(p, (0.30, 0.0)).place_fix
     assert far is not None and math.hypot(far.dx, far.dy) == pytest.approx(0.05)
+
+
+def test_sagging_palms_are_lifted_while_the_hands_follow_the_tray() -> None:
+    parent = walking_parent()
+    palms = np.stack([parent.base_pose[:, :3] + [0.3, s * 0.2, 0.0] for s in (1, -1)], axis=1)
+    parent = replace(parent, palms=palms)
+    old, new = samples()
+    p = plan_variant(parent, segment(parent), old, new, 0.5)
+    assert p.palm_world is not None
+    op, cal = operator(p), calibration()
+    op.step(0.0, None, ref_pose(p, 0))
+    t = 0.0
+    while op.ref < p.cut.grasp_end + 20:
+        t += DT
+        i = min(op.ref + 1, p.frames - 1)
+        sag = np.array([0.0, 0.0, -0.01])  # each palm 1 cm under where it should be
+        op.step(t, cal, ref_pose(p, i), None, (p.palm_world[i, 0] + sag, p.palm_world[i, 1] + sag))
+    for k in range(2):
+        assert op.palm_correction[k][2] == pytest.approx(0.05)  # integrated up to the cap
+        assert abs(op.palm_correction[k][:2]).max() < 1e-9

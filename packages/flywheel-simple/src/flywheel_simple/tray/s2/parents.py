@@ -42,6 +42,7 @@ NAV_LEAD = (2, 2, 1, 2)
 # (open) or a set of large angles (1-1.5 rad on the closing fingers).
 HAND_CLOSED_RAD = 0.3
 DATASET_ID = "G1WholebodyTrayTransferTeleop-v0"
+PALMS_FILE = "s2_palms.npz"  # the parents' palm points by FK (scripts/g0/tray/s2/parent_palms.py)
 
 
 @dataclass(frozen=True)
@@ -56,6 +57,7 @@ class ParentDemo:
     steps: NDArray[np.bool_]  # (T, 7)
     hands_closed: NDArray[np.bool_]  # (T, 2): left, right
     meta: Mapping[str, Any] = field(default_factory=dict)  # the episode's flywheel block
+    palms: Array | None = None  # (T, 2, 3): where the palms were (left, right; world)
 
     def __post_init__(self) -> None:
         n = len(self.eef)
@@ -70,6 +72,8 @@ class ParentDemo:
         for name, (value, width) in shapes.items():
             if value.shape != (n, width):
                 raise ValueError(f"{name} has shape {value.shape}, expected ({n}, {width})")
+        if self.palms is not None and self.palms.shape != (n, 2, 3):
+            raise ValueError(f"palms has shape {self.palms.shape}, expected ({n}, 2, 3)")
 
     @property
     def frames(self) -> int:
@@ -125,6 +129,19 @@ def load_parent(dataset_root: Path, episode_index: int, parent_id: str) -> Paren
         ),
         meta=block,
     )
+
+
+def palms_key(parent_id: str) -> str:
+    return parent_id.replace("/", "__")
+
+
+def load_palms(batch: Path) -> dict[str, Array]:
+    """The palm arrays of a batch by parent id; empty when parent_palms.py has not run."""
+    path = batch / PALMS_FILE
+    if not path.exists():
+        return {}
+    with np.load(path) as archive:
+        return {key.replace("__", "/"): archive[key] for key in archive.files}
 
 
 def parent_dataset(batch: Path, shard: str) -> Path:
