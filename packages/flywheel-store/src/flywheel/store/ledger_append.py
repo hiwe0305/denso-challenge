@@ -11,6 +11,9 @@ from flywheel.contracts.entities import LedgerEntry
 from flywheel.store.paths import StorePaths
 from flywheel.store.tables import complete_lines, refuse_reused_ids
 
+# Job directory of the estimates made for a whole run plan, before any job runs.
+RUN_PLAN_JOB = "_run_plan"
+
 
 def _ledger_files(paths: StorePaths) -> list[Path]:
     """Every job ledger of the site."""
@@ -66,9 +69,7 @@ def append_ledger_entry(
     _check_links(entry, paths)
     line = canonical_json(entry)
     refuse_reused_ids("ledger_entry", [json.loads(line)], _ledger_files(paths))
-    run_plan_id = entry.run_plan_id or "default"
-    job_id = entry.job_id or "default"
-    ledger_path = paths.job_ledger_path(run_plan_id, job_id)
+    ledger_path = paths.job_ledger_path(entry.run_plan_id, entry.job_id or RUN_PLAN_JOB)
 
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
     with open(ledger_path, "a", encoding="utf-8") as f:
