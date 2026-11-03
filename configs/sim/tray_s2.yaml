@@ -1,0 +1,9 @@
+# DA-35 S2 generator: how parent demos are cut, transformed and replayed.
+# Flat `key: number` lines only; read by flywheel_simple.tray.s2.config (same loader as
+# tray.yaml). Units: metres, seconds, m/s, rad/s, degrees.
+
+# Cut (task 8). K ends this long after the lift flag (the tray held up before walking);
+# walking runs shorter than walk_min_s before step 1 are corrective steps while reaching,
+# not the approach walk.
+hold_s: 0.5
+walk_min_s: 0.5
