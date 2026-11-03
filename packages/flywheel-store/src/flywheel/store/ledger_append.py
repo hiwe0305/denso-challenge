@@ -1,4 +1,4 @@
-"""Append-only cost ledger recording under runs/<run_plan_id>/<job_id>/ledger.jsonl (03 §7.2, AC 7)."""
+"""Append-only cost ledger recording under runs/<run_plan_id>/<job_id>/ledger.jsonl (03 §7.2)."""
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ def read_job_ledger(
         return []
 
     entries: list[dict[str, Any]] = []
-    with open(ledger_path, "r", encoding="utf-8") as f:
+    with open(ledger_path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line:

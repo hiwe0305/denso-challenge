@@ -39,6 +39,7 @@ Là kỹ sư data, tôi muốn schema có phiên bản và kho lưu bất biến
 - [x] 4. View DuckDB tự tạo khi mở và test xóa rồi mở lại (AC 6)
 - [x] 5. `ledger.append` và test (AC 7)
 - [x] 6. Xuất JSON Schema (AC 8)
+- [x] 7. Sửa feedback review PR #36 của Hiếu (AC 1, 2, 7, 8)
 
 ## Phạm vi file
 
@@ -85,12 +86,13 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 28/10/2026 | Sửa dòng Phụ thuộc: Long làm và giữ nhân, hạn PR `chore-restructure` mới | PO (Hiếu) |
 | 02/11/2026 | Hoàn thành toàn bộ AC 1–9, hoàn thành các nhiệm vụ con 1–6, cập nhật tiến độ | Nguyễn Thăng Long |
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
+| 03/11/2026 | Sửa 7 điểm feedback review của Hiếu trên PR #36: LedgerEntry hai dòng, tái sử dụng Episode/QAReport, kiểm tra schema, type action_layout, SplitPlanConfig | Nguyễn Thăng Long |
 
 ## Ghi chép khi làm
 
-- Giờ thực: 10h
+- Giờ thực: 11h
 - Công cụ AI đã dùng: Antigravity
-- Ghi chú hoàn thành: Đã hiện thực đầy đủ BaseRecord, 12 thực thể L0-lite, 4 cấu hình YAML, StorePaths, sha256 blobs, TableWriter, tự tạo view DuckDB khi kết nối, LedgerStore và xuất JSON Schema. Tất cả 51 test contracts và store đều đạt.
+- Ghi chú hoàn thành: Đã hiện thực đầy đủ BaseRecord, 12 thực thể L0-lite, 4 cấu hình YAML, StorePaths, sha256 blobs, TableWriter, tự tạo view DuckDB khi kết nối, LedgerStore và xuất JSON Schema. Sửa theo toàn bộ 7 mục góp ý của Hiếu trên PR #36. Tất cả test unit và e2e đều đạt.
 - File đã tạo hoặc sửa:
   - packages/flywheel-contracts/src/flywheel/contracts/base.py
   - packages/flywheel-contracts/src/flywheel/contracts/configs.py

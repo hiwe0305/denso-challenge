@@ -43,9 +43,15 @@ def test_views_reflect_data_and_persist_after_duckdb_deletion(tmp_path: Path) ->
     )
     src_writer.append(src)
 
+    query_cond = """
+        SELECT condition_seed, level, layout_hash
+        FROM condition
+        ORDER BY condition_seed
+    """
+
     # 2. Open DuckDB and verify query results
     con1 = open_duckdb(paths=paths)
-    rows_cond1 = con1.execute("SELECT condition_seed, level, layout_hash FROM condition ORDER BY condition_seed").fetchall()
+    rows_cond1 = con1.execute(query_cond).fetchall()
     rows_src1 = con1.execute("SELECT uri, sha256 FROM source").fetchall()
 
     assert len(rows_cond1) == 2
@@ -62,7 +68,7 @@ def test_views_reflect_data_and_persist_after_duckdb_deletion(tmp_path: Path) ->
 
     # 4. Reopen DuckDB: views should auto-recreate and yield identical results
     con2 = open_duckdb(paths=paths)
-    rows_cond2 = con2.execute("SELECT condition_seed, level, layout_hash FROM condition ORDER BY condition_seed").fetchall()
+    rows_cond2 = con2.execute(query_cond).fetchall()
     rows_src2 = con2.execute("SELECT uri, sha256 FROM source").fetchall()
 
     assert rows_cond2 == rows_cond1

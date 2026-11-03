@@ -5,9 +5,9 @@ from __future__ import annotations
 import hashlib
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
-
+from flywheel.contracts.artifacts import ActionLayout
 from flywheel.contracts.base import canonical_json
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ConfigArtifact(BaseModel):
@@ -37,7 +37,7 @@ class EmbodimentConfig(ConfigArtifact):
     domain: Literal["sim", "real"] = "sim"
     controller: str = "sonic_dwbc"
     camera_ref_hash: str | None = None
-    action_layout: dict[str, Any] | None = None
+    action_layout: ActionLayout | None = None
     meta: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -86,12 +86,19 @@ class TaskConfig(ConfigArtifact):
     meta: dict[str, Any] = Field(default_factory=dict)
 
 
+class SeedRange(ConfigArtifact):
+    """Half-open seed range [start, stop)."""
+
+    start: int
+    stop: int
+
+
 class SplitPlanConfig(ConfigArtifact):
     """Configuration for dataset split rules, seed ranges, and duplicate guards."""
 
-    name: str
-    version: str = "1.0.0"
-    seed_ranges: dict[str, list[int]] = Field(default_factory=dict)
+    name: str = "default"
+    version: int | str = 1
+    seed_ranges: dict[str, SeedRange | list[int]] = Field(default_factory=dict)
     author_ranges_to_avoid: list[list[int]] = Field(default_factory=list)
     near_duplicate_threshold_d_dup: float = 0.05
     meta: dict[str, Any] = Field(default_factory=dict)

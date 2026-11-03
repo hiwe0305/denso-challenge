@@ -63,7 +63,8 @@ def canonical_repr(data: Any) -> Any:
     if isinstance(data, BaseModel):
         return canonical_repr(data.model_dump(mode="json"))
     if isinstance(data, dict):
-        return {str(k): canonical_repr(v) for k, v in sorted(data.items(), key=lambda item: str(item[0]))}
+        sorted_items = sorted(data.items(), key=lambda item: str(item[0]))
+        return {str(k): canonical_repr(v) for k, v in sorted_items}
     if isinstance(data, (list, tuple)):
         return [canonical_repr(v) for v in data]
     if isinstance(data, datetime.datetime):

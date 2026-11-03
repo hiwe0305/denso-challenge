@@ -4,15 +4,23 @@ from __future__ import annotations
 
 from typing import Any, ClassVar, Literal
 
-from pydantic import Field, model_validator
-
+from flywheel.contracts.artifacts import (
+    Episode as ArtifactEpisode,
+)
+from flywheel.contracts.artifacts import (
+    QACheck,
+)
+from flywheel.contracts.artifacts import (
+    QAReport as ArtifactQAReport,
+)
 from flywheel.contracts.base import (
     BaseRecord,
     content_id,
     event_id,
-    is_valid_content_id,
     is_valid_event_id,
 )
+from pydantic import Field, model_validator
+from typing_extensions import Self
 
 
 class ContentEntity(BaseRecord):
@@ -21,18 +29,18 @@ class ContentEntity(BaseRecord):
     ID_PREFIX: ClassVar[str] = "obj"
     id: str = ""
 
-    @model_validator(mode="before")
-    @classmethod
-    def _populate_or_validate_id(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            existing_id = data.get("id")
-            if not existing_id:
-                data = dict(data)
-                data["id"] = content_id(cls.ID_PREFIX, data)
-            else:
-                if not is_valid_content_id(str(existing_id), cls.ID_PREFIX):
-                    raise ValueError(f"Invalid content ID '{existing_id}' for prefix '{cls.ID_PREFIX}'")
-        return data
+    @model_validator(mode="after")
+    def _compute_and_verify_id(self) -> Self:
+        expected_id = content_id(self.ID_PREFIX, self)
+        if self.id:
+            if self.id != expected_id:
+                raise ValueError(
+                    f"Content ID mismatch: provided '{self.id}', "
+                    f"expected '{expected_id}' based on content"
+                )
+        else:
+            object.__setattr__(self, "id", expected_id)
+        return self
 
 
 class EventEntity(BaseRecord):
@@ -41,18 +49,14 @@ class EventEntity(BaseRecord):
     ID_PREFIX: ClassVar[str] = "evt"
     id: str = ""
 
-    @model_validator(mode="before")
-    @classmethod
-    def _populate_or_validate_id(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            existing_id = data.get("id")
-            if not existing_id:
-                data = dict(data)
-                data["id"] = event_id(cls.ID_PREFIX)
-            else:
-                if not is_valid_event_id(str(existing_id), cls.ID_PREFIX):
-                    raise ValueError(f"Invalid event ID '{existing_id}' for prefix '{cls.ID_PREFIX}'")
-        return data
+    @model_validator(mode="after")
+    def _populate_or_validate_id(self) -> Self:
+        if not self.id:
+            object.__setattr__(self, "id", event_id(self.ID_PREFIX))
+        else:
+            if not is_valid_event_id(self.id, self.ID_PREFIX):
+                raise ValueError(f"Invalid event ID '{self.id}' for prefix '{self.ID_PREFIX}'")
+        return self
 
 
 # 1. Source (content)
@@ -85,7 +89,7 @@ class Condition(ContentEntity):
     values: dict[str, Any] = Field(default_factory=dict)
     vector: list[float] = Field(default_factory=list)
     layout_hash: str
-    split: Literal["train", "dev", "holdout"] = "train"
+    split: Literal["train", "dev"] = "train"
     origin: Literal["generated", "extracted_from_demo"] = "generated"
     set_id: str | None = None
     quarantined: bool = False
@@ -94,79 +98,60 @@ class Condition(ContentEntity):
 
 
 # 3. Episode (event)
-class Episode(EventEntity):
-    """Demonstration or rollout episode bundle."""
+class Episode(ArtifactEpisode):
+    """Demonstration or rollout episode bundle (reused from artifacts.py)."""
 
-    ID_PREFIX: ClassVar[str] = "ep"
+    episode_id: str = Field(default="")
+    site_id: str = "local"
+    task_id: str = "default"
+    schema_version: str = "1.0.0"
+    deid_status: Literal["raw", "blurred", "verified"] = "raw"
 
-    kind: Literal[
-        "teleop_demo",
-        "teleop_correction",
-        "recovery",
-        "sim_rollout",
-        "variant",
-        "eval_rollout",
-        "diag_rollout",
-        "ego_demo",
-    ]
-    operator_kind: Literal["human", "machine"]
-    is_root: bool = False
-    root_id: str | None = None
-    parent_id: str | None = None
-    condition_id: str | None = None
-    source_id: str | None = None
-    intervention_id: str | None = None
-    run_plan_id: str = "default"
-    bundle_uri: str
-    license: str = "unknown"
-    data_class: Literal["public", "internal", "restricted"] = "restricted"
-    split: Literal["train", "dev", "holdout"] = "train"
-    source_kind: Literal["teleop", "synthetic", "egocentric"] | None = None
-    action_quality: Literal["measured", "planned", "retargeted", "pseudo", "none"] = "measured"
-    deid_status: Literal["raw", "blurred", "verified"] = "verified"
+    @model_validator(mode="before")
+    @classmethod
+    def _populate_id_before(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            data = dict(data)
+            eid = data.get("episode_id") or data.get("id")
+            if not eid:
+                eid = event_id("ep")
+            elif not is_valid_event_id(str(eid), "ep"):
+                raise ValueError(f"Invalid event ID '{eid}' for prefix 'ep'")
+            data["episode_id"] = str(eid)
+        return data
 
-    # Trace attributes
-    checkpoint_id: str | None = None
-    rollout_seed: int | None = None
-    sim_success: bool | None = None
-    infra_status: str | None = None
-    camera_params_hash: str | None = None
-
-    # Video / sensory info
-    n_frames: int | None = None
-    fps: float | None = None
-    renderer: Literal["mujoco", "isaac"] | None = None
-    injected_defect: dict[str, Any] | None = None
-
-    @model_validator(mode="after")
-    def _validate_root_invariant(self) -> "Episode":
-        if self.is_root:
-            if self.operator_kind != "human" or self.kind not in {"teleop_demo", "teleop_correction", "recovery"}:
-                raise ValueError("is_root=True requires human operator and demonstration/correction/recovery kind")
-        return self
+    @property
+    def id(self) -> str:
+        return self.episode_id
 
 
 # 4. QAReport (event)
-class QAReport(EventEntity):
-    """Episode QA verification report."""
+class QAReport(ArtifactQAReport):
+    """Episode QA verification report (reused from artifacts.py)."""
 
-    ID_PREFIX: ClassVar[str] = "qa"
+    report_id: str = Field(default="")
+    site_id: str = "local"
+    task_id: str = "default"
+    embodiment_id: str = "default"
+    schema_version: str = "1.0.0"
+    meta: dict[str, Any] = Field(default_factory=dict)
 
-    episode_id: str
-    threshold_version: str = "v1"
-    decision: Literal["pass", "flag", "quarantine", "reject"]
-    reasons: list[str] = Field(default_factory=list)
-    checks: list[dict[str, Any]] | dict[str, Any] = Field(default_factory=dict)
-    reviewed_by: str | None = None
+    @model_validator(mode="before")
+    @classmethod
+    def _populate_id_before(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            data = dict(data)
+            rid = data.get("report_id") or data.get("id")
+            if not rid:
+                rid = event_id("qa")
+            elif not is_valid_event_id(str(rid), "qa"):
+                raise ValueError(f"Invalid event ID '{rid}' for prefix 'qa'")
+            data["report_id"] = str(rid)
+        return data
 
-
-# Aliases for catalog records to differentiate from cross-lane artifacts in schemas
-class CatalogEpisode(Episode):
-    """Catalog entity episode record."""
-
-
-class CatalogQAReport(QAReport):
-    """Catalog entity QA report record."""
+    @property
+    def id(self) -> str:
+        return self.report_id
 
 
 # 5. Release (content)
@@ -222,9 +207,6 @@ class RunPlan(ContentEntity):
         "round",
         "holdout",
         "hd",
-        "he",
-        "stage1",
-        "tray_he",
     ] = "round"
     branch: str = "main"
     method: Literal["psi0", "act", "dp"] = "psi0"
@@ -320,7 +302,8 @@ class LedgerEntry(EventEntity):
     pricebook_id: str = "default"
     usd_amount: float
     human_hours: float = 0.0
-    measure_kind: Literal["estimated", "measured"] = "measured"
+    measure_kind: Literal["estimated", "measured"]
+    estimate_entry_id: str | None = None
     branch: str | None = None
     run_plan_id: str | None = None
     cluster_id: str | None = None
@@ -329,6 +312,12 @@ class LedgerEntry(EventEntity):
     person_code: str | None = None
     reverses_entry_id: str | None = None
     note: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_estimate_entry_id(self) -> Self:
+        if self.measure_kind == "estimated" and self.estimate_entry_id is not None:
+            raise ValueError("estimated entry cannot have an estimate_entry_id")
+        return self
 
 
 # 12. Decision (event)
@@ -344,16 +333,33 @@ class Decision(EventEntity):
         "holdout",
         "milestone",
         "repair_ticket",
-        "stage_review",
-        "agent_report_review",
-        "v3_controller",
-        "scope_reduction",
     ]
     subject_kind: str
     subject_id: str
-    verdict: Literal["approved", "overridden", "rejected", "pass", "fail", "open", "closed", "recorded"] = "pass"
+    verdict: Literal[
+        "approved", "overridden", "rejected", "pass", "fail", "open", "closed", "recorded"
+    ] = "pass"
     metrics: dict[str, Any] = Field(default_factory=dict)
     criteria: dict[str, Any] = Field(default_factory=dict)
     signed_by: str
     reason: str
     supersedes_decision_id: str | None = None
+
+
+__all__ = [
+    "Checkpoint",
+    "Cluster",
+    "Condition",
+    "ContentEntity",
+    "Decision",
+    "Episode",
+    "EventEntity",
+    "FixRateEvent",
+    "LedgerEntry",
+    "QACheck",
+    "QAReport",
+    "Release",
+    "RunPlan",
+    "Score",
+    "Source",
+]

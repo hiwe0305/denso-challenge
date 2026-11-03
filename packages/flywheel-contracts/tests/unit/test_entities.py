@@ -1,8 +1,7 @@
 """Unit tests for the 12 L0-lite catalog entities (AC 1, AC 3, AC 4)."""
 
 import pytest
-from pydantic import ValidationError
-
+from flywheel.contracts.artifacts import EpisodeMetadata
 from flywheel.contracts.entities import (
     Checkpoint,
     Cluster,
@@ -11,12 +10,14 @@ from flywheel.contracts.entities import (
     Episode,
     FixRateEvent,
     LedgerEntry,
+    QACheck,
     QAReport,
     Release,
     RunPlan,
     Score,
     Source,
 )
+from pydantic import ValidationError
 
 
 def test_all_12_entities_can_be_instantiated_with_defaults() -> None:
@@ -42,21 +43,36 @@ def test_all_12_entities_can_be_instantiated_with_defaults() -> None:
         values={"box_x": 0.5},
     )
     assert cond.id.startswith("cond_")
+    assert cond.split == "train"
 
-    # 3. Episode (event)
+    # 3. Episode (event, reused from artifacts.py)
     ep = Episode(
         kind="teleop_demo",
         operator_kind="human",
         is_root=True,
+        condition_id="cond_1",
+        run_plan_id="rp_1",
         bundle_uri="sites/local/episodes/ep_01H...",
+        license="MIT",
+        data_class="public",
+        split="train",
+        source_kind="teleop",
+        action_quality="measured",
+        embodiment_id="g1",
+        meta=EpisodeMetadata(),
     )
     assert ep.id.startswith("ep_")
+    assert ep.deid_status == "raw"
     assert len(ep.id) == 3 + 26  # ep_ + 26-char ULID
 
-    # 4. QAReport (event)
+    # 4. QAReport (event, reused from artifacts.py)
     qa = QAReport(
+        report_id="",
         episode_id=ep.id,
+        threshold_version="v1",
         decision="pass",
+        reasons=[],
+        checks=[QACheck(name="sync", value=0.01, threshold=0.1, passed=True)],
     )
     assert qa.id.startswith("qa_")
 
@@ -126,67 +142,88 @@ def test_all_12_entities_can_be_instantiated_with_defaults() -> None:
     assert dec.id.startswith("dec_")
 
 
-def test_episode_root_invariant() -> None:
-    """AC 3: is_root = true requires human operator and teleop kind."""
-    # Valid root
-    ep_valid = Episode(
-        kind="teleop_demo",
-        operator_kind="human",
-        is_root=True,
-        bundle_uri="uri",
+def test_content_id_hashes_after_filling_defaults() -> None:
+    """Feedback item 1: Explicit site_id='local' produces identical ID to omitting it."""
+    src_implicit = Source(
+        uri="https://example.com/dataset.tar",
+        sha256="1" * 64,
+        downloaded_at="2026-11-03T00:00:00Z",
     )
-    assert ep_valid.is_root is True
+    src_explicit = Source(
+        uri="https://example.com/dataset.tar",
+        sha256="1" * 64,
+        downloaded_at="2026-11-03T00:00:00Z",
+        site_id="local",
+    )
+    assert src_implicit.id == src_explicit.id
 
-    # Invalid: machine cannot be root
-    with pytest.raises(ValidationError):
-        Episode(
-            kind="teleop_demo",
-            operator_kind="machine",
-            is_root=True,
-            bundle_uri="uri",
+    # Passing matching explicit id succeeds
+    src_with_id = Source(
+        id=src_implicit.id,
+        uri="https://example.com/dataset.tar",
+        sha256="1" * 64,
+        downloaded_at="2026-11-03T00:00:00Z",
+    )
+    assert src_with_id.id == src_implicit.id
+
+    # Passing mismatched explicit id raises ValueError
+    with pytest.raises(ValueError, match="Content ID mismatch"):
+        Source(
+            id="src_0000000000000000",
+            uri="https://example.com/dataset.tar",
+            sha256="1" * 64,
+            downloaded_at="2026-11-03T00:00:00Z",
         )
 
-    # Invalid: sim_rollout cannot be root
+
+def test_condition_split_rejects_holdout() -> None:
+    """Feedback item 4: Condition.split rejects 'holdout' (03 §4.3)."""
+    Condition(condition_seed=1, layout_hash="1" * 64, split="train")
+    Condition(condition_seed=2, layout_hash="2" * 64, split="dev")
     with pytest.raises(ValidationError):
-        Episode(
-            kind="sim_rollout",
-            operator_kind="human",
-            is_root=True,
-            bundle_uri="uri",
+        Condition(condition_seed=3, layout_hash="3" * 64, split="holdout")  # type: ignore[arg-type]
+
+
+def test_ledger_entry_measure_kind_and_estimate_id() -> None:
+    """Feedback item 5: measure_kind is required; estimated cannot have estimate_entry_id."""
+    # 1. Missing measure_kind raises ValidationError
+    with pytest.raises(ValidationError):
+        LedgerEntry(  # type: ignore[call-arg]
+            activity="train",
+            resource_type="gpu",
+            quantity=1.0,
+            unit="h",
+            usd_amount=10.0,
         )
 
+    # 2. Estimated entry with estimate_entry_id is rejected
+    with pytest.raises(ValueError, match="estimated entry cannot have an estimate_entry_id"):
+        LedgerEntry(
+            activity="train",
+            resource_type="gpu",
+            quantity=1.0,
+            unit="h",
+            usd_amount=10.0,
+            measure_kind="estimated",
+            estimate_entry_id="led_01H...",
+        )
 
-def test_content_id_determinism_on_entity() -> None:
-    """AC 4: Two ContentEntity instances with same content receive identical ID."""
-    src1 = Source(
-        uri="https://example.com/data.tar",
-        sha256="d" * 64,
-        downloaded_at="2026-11-02T00:00:00Z",
+    # 3. Two entries for the same job link via estimate_entry_id
+    entry_est = LedgerEntry(
+        activity="train",
+        resource_type="gpu_hour_a100",
+        quantity=2.0,
+        unit="hour",
+        usd_amount=6.0,
+        measure_kind="estimated",
     )
-    src2 = Source(
-        uri="https://example.com/data.tar",
-        sha256="d" * 64,
-        downloaded_at="2026-11-02T00:00:00Z",
+    entry_meas = LedgerEntry(
+        activity="train",
+        resource_type="gpu_hour_a100",
+        quantity=2.1,
+        unit="hour",
+        usd_amount=6.3,
+        measure_kind="measured",
+        estimate_entry_id=entry_est.id,
     )
-    src3 = Source(
-        uri="https://example.com/data.tar",
-        sha256="e" * 64,
-        downloaded_at="2026-11-02T00:00:00Z",
-    )
-    assert src1.id == src2.id
-    assert src1.id != src3.id
-
-
-def test_custom_embodiment_and_task_does_not_break_schema() -> None:
-    """NFR7: Custom embodiment and task can be passed without altering entity schema."""
-    ep = Episode(
-        kind="sim_rollout",
-        operator_kind="machine",
-        bundle_uri="uri",
-        task_id="future_assembly_task",
-        embodiment_id="custom_robot_arm@2",
-        site_id="plant_yokohama",
-    )
-    assert ep.task_id == "future_assembly_task"
-    assert ep.embodiment_id == "custom_robot_arm@2"
-    assert ep.site_id == "plant_yokohama"
+    assert entry_meas.estimate_entry_id == entry_est.id

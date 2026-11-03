@@ -4,7 +4,6 @@ import hashlib
 from pathlib import Path
 
 import pytest
-
 from flywheel.store.blobs import get_blob, has_blob, put_blob
 from flywheel.store.paths import StorePaths
 
@@ -22,7 +21,8 @@ def test_put_and_get_blob(tmp_path: Path) -> None:
     assert retrieved == content
 
     # Verify physical file location: objects/sha256/ab/cd/<hash>
-    expected_path = tmp_path / "sites" / "local" / "objects" / "sha256" / digest[:2] / digest[2:4] / digest
+    expected_dir = tmp_path / "sites" / "local" / "objects" / "sha256" / digest[:2] / digest[2:4]
+    expected_path = expected_dir / digest
     assert expected_path.is_file()
     assert expected_path.read_bytes() == content
 

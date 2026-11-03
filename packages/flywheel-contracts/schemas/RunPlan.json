@@ -45,10 +45,7 @@
         "aa_test",
         "round",
         "holdout",
-        "hd",
-        "he",
-        "stage1",
-        "tray_he"
+        "hd"
       ],
       "title": "Purpose",
       "type": "string"

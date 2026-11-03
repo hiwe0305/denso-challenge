@@ -5,7 +5,7 @@ from pathlib import Path
 
 from flywheel.contracts.entities import Condition
 from flywheel.store.paths import StorePaths
-from flywheel.store.tables import TableWriter, read_table_records, write_record
+from flywheel.store.tables import TableWriter, read_table_records
 
 
 def test_table_writer_append_and_read(tmp_path: Path) -> None:
