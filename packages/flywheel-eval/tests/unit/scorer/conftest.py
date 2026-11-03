@@ -181,12 +181,15 @@ class _Reader:
         return any(_on(value) for value in self.column(name))
 
     def stalled(self, entered: tuple[int | None, ...]) -> bool:
-        # Nothing progressed past the first quarter of the episode: the robot
-        # was moving nowhere, rather than failing at the step it got to. An
-        # episode that reached table B and then could not place the object has
-        # a place failure, not a timeout.
-        indices = [index for index in entered if index is not None]
-        return bool(indices) and max(indices) * 4 < self._signals.num_rows
+        # Spec section 5.2 reads L-TIMEOUT as time running out without changing
+        # step. So: no step entered at all, and the hand never moved either. A
+        # hand that closed on nothing is a reach failure, and an episode that
+        # got to table B and could not place the object is a place failure;
+        # neither is a robot standing still.
+        if any(index is not None for index in entered):
+            return False
+        measured = {value for value in self.column("hand_object_distance") if value is not None}
+        return len(measured) <= 1
 
 
 def _after(start: int | None, length: int, strictly: bool = False) -> Iterator[int]:
