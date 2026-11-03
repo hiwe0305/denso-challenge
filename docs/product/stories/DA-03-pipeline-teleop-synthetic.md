@@ -51,7 +51,7 @@ PR 2 (hạn 9/11/2026):
 - [x] 4. Release: chặn bản cấy lỗi, chặn hạt giống ngoài dải, manifest có hash (AC 4)
   - [x] 4.1 `build_release` từ chối cả release khi có bản sao chấm lỗi, hạt giống ngoài dải `train`, episode thiếu `QAReport` hoặc không thuộc split `train`
   - [x] 4.2 `Release` đóng băng có `manifest_sha256`, giữ episode bị loại cùng lý do; `ReleaseManifest` và file mẫu dùng chung trong testkit (mối nối `3-ReleaseManifest`)
-- [ ] 5. `DatasetReport` và trang HTML (AC 5)
+- [x] 5. `DatasetReport` và trang HTML (AC 5)
 - [ ] 6. Lệnh `fw data`; chạy trên psi-data và khay S1 trên `rtx3060` (AC 6)
   - [x] 6.1 `flywheel-data` phụ thuộc `flywheel-store`; mọi job ghi một dòng `LedgerEntry` ước tính và một dòng thực đo trỏ về nó (đã chốt 4/11 [Hiếu], "Cho phụ thuộc")
   - [ ] 6.2 `fw data ingest | qa | release | report`
