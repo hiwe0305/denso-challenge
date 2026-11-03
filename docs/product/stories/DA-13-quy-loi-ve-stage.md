@@ -44,6 +44,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `packages/flywheel-eval/src/flywheel/eval/diagnosis/system/`, `packages/flywheel-eval/src/flywheel/eval/diagnosis/stage/`
 - `packages/flywheel-eval/src/flywheel/eval/api.py`, `packages/flywheel-eval/src/flywheel/eval/cli.py`, `packages/flywheel-eval/src/flywheel/eval/config.py`
 - `packages/flywheel-eval/tests/unit/diagnosis/system/`, `packages/flywheel-eval/tests/unit/diagnosis/stage/`
+- `packages/flywheel-eval/tests/contract/diagnosis/system/` (thêm 3/11/2026 cùng nhiệm vụ con 7: lệnh `fw eval diag-system` phải có test lái qua CLI, như DA-36 có `tests/contract/scorer/`)
 - `configs/eval/diagnosis/system.yaml`, `configs/eval/diagnosis/stage.yaml`
 
 ## Ghi chú cho người làm
@@ -73,6 +74,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 | 3/11/2026 | Phụ thuộc: hợp đồng `TraceStep`, `CameraParams` (issue #31) và hook `SimpleSim`; nguồn tín hiệu R3–R5 trên psi-data | PO (Hiếu) theo issue #31 |
 | 3/11/2026 | DA-09 dời sau demo: probe của demo dùng file mẫu (07 mục 2.4, bản 1.2) | PO (Hiếu) |
+| 3/11/2026 | Phạm vi file: thêm `packages/flywheel-eval/tests/contract/diagnosis/system/` cho test lái lệnh `fw eval diag-system` của nhiệm vụ con 7 (pr-guard R6) | Châu |
 | 3/11/2026 | Thêm nhiệm vụ con 7 (`api.py`, `fw eval diag-system`, artifact) và 8 (issue Contract change cho bản ghi kết quả). Nhiệm vụ 1-6 không phủ `api.py`, `cli.py` dù hai file nằm trong phạm vi, và phần 6 của demo cần điểm vào. `TraceStep`, `CameraParams` (issue #31, PR #48) chưa merge nên bộ đọc giữ đúng tên trường của đề xuất, đổi sang contract khi #48 merge | Châu |
 
 ## Ghi chép khi làm
