@@ -140,10 +140,23 @@ class Dataset:
         return sorted(n for n in self.zf.namelist()
                       if n.startswith(self.root + "videos/") and n.endswith(".mp4"))
 
+    def has_videos(self, idx: int) -> bool:
+        """Whether every camera info.json declares has a non-empty video for episode idx.
+
+        Paths come from info.json's `video_path` template, as LeRobot v2.1 resolves them.
+        """
+        info = self.json("meta/info.json")
+        cameras = [k for k, v in info.get("features", {}).items() if v.get("dtype") == "video"]
+        chunk = idx // int(info.get("chunks_size", 1000))
+        names = [self.root + info["video_path"].format(
+                     episode_chunk=chunk, episode_index=idx, video_key=cam) for cam in cameras]
+        return bool(names) and all(
+            n in self.zf.NameToInfo and self.zf.getinfo(n).file_size > 0 for n in names)
+
     def episodes(self) -> Iterator[tuple[str, dict[str, Any]]]:
         """(member name, columns as numpy arrays) for every episode parquet."""
         import numpy as np
-        import pyarrow.parquet as pq
+        import pyarrow.parquet as pq  # type: ignore[import-untyped]
 
         for name in self.parquet_names():
             table = pq.read_table(io.BytesIO(self.zf.read(name)))
@@ -301,8 +314,9 @@ def cmd_layout(args: argparse.Namespace) -> int:
 
 # --- preliminary QA (AC 2, Q1) -----------------------------------------------------------
 
-QA_CHECKS = ("frames_match_meta", "frame_index_contiguous", "timestamp_monotonic",
-             "finite", "length_in_range", "done_at_last_frame_only", "video_present")
+QA_CHECKS = ("parquet_present", "frames_match_meta", "frame_index_contiguous",
+             "timestamp_monotonic", "finite", "length_in_range", "done_at_last_frame_only",
+             "video_present")
 SUCCESS_KEYS = re.compile(r"success|is_success|succeeded", re.IGNORECASE)
 
 
@@ -318,7 +332,7 @@ def qa_dataset(ds: Dataset, min_s: float, max_s: float) -> dict[str, Any]:
     info = ds.json("meta/info.json")
     fps = float(info["fps"])
     meta = {int(r["episode_index"]): r for r in ds.jsonl("meta/episodes.jsonl")}
-    videos = {Path(n).stem for n in ds.video_names()}
+    videos = ds.video_names()
     episodes: list[dict[str, Any]] = []
     columns: set[str] = set()
     for name, cols in ds.episodes():
@@ -336,8 +350,9 @@ def qa_dataset(ds: Dataset, min_s: float, max_s: float) -> dict[str, Any]:
             "finite": all(bool(np.isfinite(v).all()) for v in numeric),
             "length_in_range": min_s <= n / fps <= max_s,
             "done_at_last_frame_only": bool(n > 0 and done[-1] and not done[:-1].any()),
-            "video_present": f"episode_{idx:06d}" in videos,
+            "video_present": ds.has_videos(idx),
         }
+        checks = {"parquet_present": True, **checks}
         episodes.append({
             "episode_index": idx,
             "member": name,
@@ -347,15 +362,26 @@ def qa_dataset(ds: Dataset, min_s: float, max_s: float) -> dict[str, Any]:
             "checks": checks,
             "passed": all(checks.values()),
         })
+    # An episode listed in episodes.jsonl without a parquet fails every check instead of
+    # silently shrinking the denominator.
+    for idx in sorted(set(meta) - {e["episode_index"] for e in episodes}):
+        checks = dict.fromkeys(QA_CHECKS, False)
+        episodes.append({"episode_index": idx, "member": None, "frames": 0, "seconds": 0.0,
+                         "max_timestamp_drift_s": None, "checks": checks, "passed": False})
     flags = success_fields(ds, list(meta.values()), columns)
+    parquet = [e for e in episodes if e["checks"]["parquet_present"]]
+    totals_match = (int(info["total_episodes"]) == len(episodes) == len(meta)
+                    and int(info["total_frames"]) == sum(e["frames"] for e in parquet))
     counts = {c: sum(e["checks"][c] for e in episodes) for c in QA_CHECKS}
     return {
         "root": ds.root,
         "fps": fps,
         "info_total_episodes": info["total_episodes"],
         "info_total_frames": info["total_frames"],
-        "parquet_episodes": len(episodes),
-        "parquet_frames": sum(e["frames"] for e in episodes),
+        "parquet_episodes": len(parquet),
+        "parquet_frames": sum(e["frames"] for e in parquet),
+        "episodes_checked": len(episodes),
+        "totals_match": totals_match,
         "meta_episodes": len(meta),
         "videos": len(videos),
         "success_fields": flags,
@@ -375,7 +401,7 @@ def cmd_qa(args: argparse.Namespace) -> int:
     r = qa_dataset(ds, args.min_seconds, args.max_seconds)
     if args.json:
         args.json.write_text(json.dumps(r, indent=2) + "\n")
-    n = r["parquet_episodes"]
+    n = r["episodes_checked"]
     print(f"`{args.bundle.name}`: `info.json` {r['info_total_episodes']} episode, "
           f"{r['info_total_frames']:,} khung; parquet {n} episode, {r['parquet_frames']:,} khung; "
           f"`episodes.jsonl` {r['meta_episodes']} dòng; video {r['videos']}\n")
@@ -387,7 +413,8 @@ def cmd_qa(args: argparse.Namespace) -> int:
         "length_in_range": (f"Độ dài trong [{args.min_seconds:g} s, {args.max_seconds:g} s] "
                             "(ngưỡng giả định)"),
         "done_at_last_frame_only": "`next.done` chỉ đúng ở khung cuối",
-        "video_present": "Có file video của episode",
+        "parquet_present": "Episode trong `episodes.jsonl` có parquet",
+        "video_present": "Có file video khác rỗng cho mọi camera trong `info.json`",
     }
     print("| Phép kiểm | Đạt |\n|---|---|")
     for c in QA_CHECKS:
@@ -397,9 +424,86 @@ def cmd_qa(args: argparse.Namespace) -> int:
     print(f"| **Đạt mọi phép kiểm** | **{r['n_passed']}/{n}** |")
     print(f"\nLệch lớn nhất giữa `timestamp` và `frame_index / fps`: "
           f"{r['max_timestamp_drift_s']:.3g} s")
+    print(f"Tổng của `info.json` khớp parquet và `episodes.jsonl`: "
+          f"{'có' if r['totals_match'] else '**không**'}")
     if r["failed"]:
         print("\nEpisode trượt:", json.dumps(r["failed"]))
-    return 0
+    return 0 if r["totals_match"] and not r["failed"] else 1
+
+
+# --- self-test of the QA checks on a planted bundle ---------------------------------------
+
+# Episode index -> the one check its planted defect must fail (None: clean episode).
+PLANTED = {0: None, 1: "finite", 2: "timestamp_monotonic", 3: "length_in_range",
+           4: "done_at_last_frame_only", 5: "video_present", 6: "video_present",
+           7: "parquet_present"}
+
+
+def planted_bundle(path: Path, fps: int = 50, frames: int = 250) -> None:
+    """A LeRobot v2.1 zip of 8 short episodes, each with at most one planted defect."""
+    import numpy as np
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    root, camera = "planted/", "observation.images.egocentric"
+    lengths = {i: (fps if i == 3 else frames) for i in PLANTED}  # episode 3 lasts 1 s
+    with zipfile.ZipFile(path, "w") as zf:
+        info = {"fps": fps, "total_episodes": len(PLANTED), "total_frames": sum(lengths.values()),
+                "chunks_size": 1000,
+                "video_path": "videos/chunk-{episode_chunk:03d}/{video_key}/"
+                              "episode_{episode_index:06d}.mp4",
+                "features": {camera: {"dtype": "video"}, "action": {"dtype": "float32"}}}
+        zf.writestr(root + "meta/info.json", json.dumps(info))
+        zf.writestr(root + "meta/episodes.jsonl", "".join(
+            json.dumps({"episode_index": i, "length": n}) + "\n" for i, n in lengths.items()))
+        for i, n in lengths.items():
+            if i == 7:  # listed in episodes.jsonl, no parquet
+                continue
+            t = np.arange(n) / fps
+            action = np.zeros((n, 36))
+            done = np.zeros(n, dtype=bool)
+            done[-1] = True
+            if i == 1:
+                action[n // 2, 0] = np.nan
+            if i == 2:
+                t[n // 2] = t[n // 2 - 1] - 0.01
+            if i == 4:
+                done[n // 2] = True
+            table = pa.table({
+                "timestamp": t, "frame_index": np.arange(n), "episode_index": np.full(n, i),
+                "next.done": done, "action": [list(row) for row in action]})
+            buf = io.BytesIO()
+            pq.write_table(table, buf)
+            zf.writestr(f"{root}data/chunk-000/episode_{i:06d}.parquet", buf.getvalue())
+            if i != 5:  # episode 5 has no video, episode 6 an empty one
+                body = b"" if i == 6 else b"not a real mp4"
+                zf.writestr(f"{root}videos/chunk-000/{camera}/episode_{i:06d}.mp4", body)
+
+
+def cmd_selftest(args: argparse.Namespace) -> int:
+    """Each planted defect fails exactly its own check, and only the clean episode passes."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        bundle = Path(tmp) / "planted.zip"
+        planted_bundle(bundle)
+        r = qa_dataset(single_dataset(bundle), 2.0, 60.0)
+    failed = {f["episode_index"]: f["failed_checks"] for f in r["failed"]}
+    ok = True
+    print("| Episode | Lỗi cấy (phép kiểm phải trượt) | Phép kiểm trượt | Đúng |")
+    print("|---|---|---|---|")
+    for idx, want in PLANTED.items():
+        got = failed.get(idx, [])
+        right = (got == [] if want is None
+                 else want in got and (want == "parquet_present" or got == [want]))
+        ok &= right
+        print(f"| {idx} | {want or 'không cấy'} | {', '.join(got) or '—'} | "
+              f"{'có' if right else '**không**'} |")
+    # Episode 7 has no parquet, so info.json must disagree with what is on disk.
+    passed = r["n_passed"] == 1 and r["totals_match"] is False
+    print(f"\nĐạt mọi phép kiểm: {r['n_passed']}/{r['episodes_checked']}; "
+          f"tổng `info.json` khớp: {'có' if r['totals_match'] else 'không'}")
+    return 0 if ok and passed else 1
 
 
 # --- seeds and randomization (AC 4, V6) --------------------------------------------------
@@ -684,6 +788,9 @@ def main() -> int:
     p.add_argument("--max-seconds", type=float, required=True)
     p.add_argument("--json", type=Path)
     p.set_defaults(func=cmd_qa)
+
+    p = sub.add_parser("selftest", help="run the QA checks on a planted 8-episode bundle")
+    p.set_defaults(func=cmd_selftest)
 
     p = sub.add_parser("seeds", help="seed, layout and randomization fields (AC 4, V6)")
     p.add_argument("--train", type=Path, required=True, help="the task's train bundle")
