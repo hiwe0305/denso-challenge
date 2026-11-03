@@ -31,7 +31,7 @@ Là trưởng nhóm phụ trách Ψ₀, tôi muốn train cả 3 stage bằng co
 - [x] 1. Script đọc code, bảng log (AC 1)
 - [x] 2. `Psi0Trainer` 3 stage (AC 2)
 - [x] 3. Lớp bọc log, `metrics.jsonl` (AC 3)
-- [ ] 4. Client RTC và log inference (AC 4)
+- [x] 4. Client RTC và log inference (AC 4)
 - [x] 5. Colab, tiếp tục từ checkpoint, probe, sổ chi phí (AC 5, 6). Phần chạy probe P3, P4 trên checkpoint trung gian chờ DA-09 (Hiếu chốt 3/11/2026, xem Ghi chép khi làm)
 
 ## Phạm vi file

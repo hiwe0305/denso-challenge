@@ -152,3 +152,21 @@ python3 scripts/g0/read_psi0_logging.py --repo fwdata/psi0/Psi0 --commit <commit
 ```
 
 `--check docs/g0/psi0-logging.md` trả mã 1 nếu bảng không còn khớp code. Script chỉ dùng thư viện chuẩn và đọc file qua `git show`, nên clone không cần checkout ở commit ghim. Khi một trường đổi từ "có" sang "thiếu", sửa lớp bọc trước khi chạy job.
+
+## Log inference RTC (nhiệm vụ con 4)
+
+`flywheel_psi0.policy.Psi0Policy` phục vụ checkpoint bằng chính server của tác giả, `serve_psi0_simple --rtc` (module `psi.deploy.serve_psi0_simple`, lệnh S1-03 cũng dùng), và `RTCClient` nói chuyện với nó qua `POST /act` đúng định dạng của `psi.deploy.helpers` mà không import `psi`. RTC nằm ở server: server giữ chunk trước và đặt độ trễ suy luận theo cấu hình; client giữ đồng hồ điều khiển (50 Hz, theo `fps` của dữ liệu hai bàn), phát mỗi bước một action từ bộ đệm và xin chunk mới khi bộ đệm cạn.
+
+Mỗi lần xin chunk ghi một dòng `RTCInferenceRecord` (DA-25) vào `rtc.jsonl` của job:
+
+| Trường | Cách lấy |
+|---|---|
+| `observation_sent_s`, `chunk_received_s` | Đồng hồ của client, tính từ đầu trace |
+| `delay_steps` | `ceil(độ trễ × Hz)`: số bước điều khiển một vòng thời gian thực sẽ chạy trong lúc chờ. SIMPLE bước sim đồng bộ nên robot không đi trong lúc chờ; số này là d mà RTC phải che trên phần cứng, để so với `max_delay` (8 ở stage 3) |
+| `buffer_level` | Số action còn trong bộ đệm lúc gửi |
+| `chunk_index` | 0, 1, ... trong một trace |
+| `boundary_jump` | Thay đổi lớn nhất theo một chiều giữa action cuối của chunk cũ và action đầu của chunk mới, đơn vị đã khử chuẩn hóa (rad, m) |
+
+Server chỉ cho một client giữ "chunk trước" của RTC, nhận diện qua `history["session_id"]`; client gửi `session_id = trace_id` ở mọi request và `reset` ở request đầu của trace, như client eval của SIMPLE. Thiếu `session_id` thì server lấy host làm định danh, và hai rollout từ một máy sẽ nhận 409 hoặc chunk dựa trên chunk của nhau.
+
+Kiểm thử chạy trên CPU với một server giả có độ trễ, cùng định dạng và cùng route (`/health`, `/act`) qua HTTP thật. Chưa chạy với server Ψ₀ thật: việc đó đi cùng hook `SimpleSim` và eval HE (DA-26).
