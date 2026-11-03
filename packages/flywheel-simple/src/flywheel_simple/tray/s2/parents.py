@@ -32,6 +32,12 @@ from flywheel_simple.tray.predicates import STEP_NAMES
 
 Array = NDArray[np.float64]
 
+# Frames between the operator sending a signal and the recording showing it (measured by
+# replaying parents-1103b shard-00 episode 0, DA-35 task 9): a frame shows the wrist targets
+# sent that step, the hands and vyaw sent one step and vx, vy and the target yaw sent two
+# steps before.
+HAND_LEAD = 1
+NAV_LEAD = (2, 2, 1, 2)
 # PICO closes a Dex3 hand into a fixed grasp, so its joint targets are either all zero
 # (open) or a set of large angles (1-1.5 rad on the closing fingers).
 HAND_CLOSED_RAD = 0.3
