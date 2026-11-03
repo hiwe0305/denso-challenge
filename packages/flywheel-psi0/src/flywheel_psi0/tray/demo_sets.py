@@ -16,12 +16,19 @@ first seeds would mean taking the earliest shards; the hash ranking does not.
 names the content of the set, so the same episodes of the same release always
 give the same hash whatever the salt or order they were picked in.
 
-Run on a release directory (stdlib only, no simulator):
+With `--quality` (quality.py on the release's generate.py batch) and its two
+limits, only episodes under the limits are ranked; the quality file's sha256,
+the limits and the counts kept and dropped are recorded with the sets. The
+ranking key does not change, so dropping an episode never reorders the rest.
+
+Run on a release directory (no simulator):
 
     python -m flywheel_psi0.tray.demo_sets --release <release dir> \
         --size A=80 --size C=40 --out configs/runplans/tray/demo_sets.json
     python -m flywheel_psi0.tray.demo_sets --release <release dir> \
         --size A=80 --size C=40 --check configs/runplans/tray/demo_sets.json
+    python -m flywheel_psi0.tray.demo_sets --release <release dir> --quality quality.jsonl \
+        --max-tilt-carry-deg 10 --max-part-shift-end-mm 20 --size A=320 --size C=160 --out ...
 """
 
 from __future__ import annotations
@@ -35,6 +42,8 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from flywheel_psi0.tray.quality import QualityFilter, read_quality
 
 SALT = "DA-34/demo-sets/v1"
 MANIFEST = "release_manifest.json"  # written by flywheel_simple.tray.release
@@ -65,11 +74,19 @@ class DemoSet(_Frozen):
         return self
 
 
+class QualityPin(_Frozen):
+    file_sha256: str
+    filter: QualityFilter
+    kept: int
+    dropped: int
+
+
 class DemoSets(_Frozen):
     release_id: str
     release_hash: str
     salt: str
     sets: dict[str, DemoSet]
+    quality: QualityPin | None = None
 
 
 def canonical_sha256(value: Any) -> str:
@@ -100,8 +117,12 @@ def nested_sets(
     episodes: Sequence[ReleaseEpisode],
     sizes: Mapping[str, int],
     salt: str = SALT,
+    quality: QualityPin | None = None,
 ) -> DemoSets:
-    """One set per name, each the first n of `rank`, so every smaller set is in every larger."""
+    """One set per name, each the first n of `rank`, so every smaller set is in every larger.
+
+    `episodes` are the ones eligible for the sets (already quality-filtered).
+    """
     order = rank(release_hash, episodes, salt)
     too_big = {name: n for name, n in sizes.items() if n > len(order)}
     if too_big:
@@ -116,7 +137,27 @@ def nested_sets(
             seeds=seeds,
             episode_indices=sorted(index_of[s] for s in seeds),
         )
-    return DemoSets(release_id=release_id, release_hash=release_hash, salt=salt, sets=sets)
+    return DemoSets(
+        release_id=release_id, release_hash=release_hash, salt=salt, sets=sets, quality=quality
+    )
+
+
+def apply_quality(
+    episodes: Sequence[ReleaseEpisode], quality_file: Path, limits: QualityFilter
+) -> tuple[list[ReleaseEpisode], QualityPin]:
+    """The release episodes under the limits, and what to record about the filter."""
+    by_seed = {q.seed: q for q in read_quality(quality_file)}
+    missing = sorted(e.seed for e in episodes if e.seed not in by_seed)
+    if missing:
+        raise ValueError(f"{quality_file} has no row for seeds {missing[:10]}")
+    kept = [e for e in episodes if limits.passes(by_seed[e.seed])]
+    pin = QualityPin(
+        file_sha256=hashlib.sha256(quality_file.read_bytes()).hexdigest(),
+        filter=limits,
+        kept=len(kept),
+        dropped=len(episodes) - len(kept),
+    )
+    return kept, pin
 
 
 def read_release(release_root: Path) -> tuple[str, list[ReleaseEpisode]]:
@@ -151,13 +192,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--release", type=Path, required=True)
     parser.add_argument("--size", type=_size, action="append", required=True)
+    parser.add_argument("--quality", type=Path, help="quality.jsonl of the release's batch")
+    parser.add_argument("--max-tilt-carry-deg", type=float)
+    parser.add_argument("--max-part-shift-end-mm", type=float)
     target = parser.add_mutually_exclusive_group(required=True)
     target.add_argument("--out", type=Path, help="write the sets here")
     target.add_argument("--check", type=Path, help="exit 1 unless this file has the same sets")
     args = parser.parse_args(argv)
 
     release_hash, episodes = read_release(args.release)
-    sets = nested_sets(args.release.name, release_hash, episodes, dict(args.size))
+    pin = None
+    if args.quality is not None:
+        limits = QualityFilter(
+            max_tilt_carry_deg=args.max_tilt_carry_deg,
+            max_part_shift_end_mm=args.max_part_shift_end_mm,
+        )
+        episodes, pin = apply_quality(episodes, args.quality, limits)
+    sets = nested_sets(args.release.name, release_hash, episodes, dict(args.size), quality=pin)
     text = sets.model_dump_json(indent=1) + "\n"
     if args.out is not None:
         args.out.write_text(text, encoding="utf-8")
