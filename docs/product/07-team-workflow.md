@@ -4,6 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Đầu vào
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 3/11/2026 | 1.3 | Mục 3.4: ngưỡng kích thước PR theo R9 mới (08 bản 0.3): 1500 dòng mã | PO (Hiếu) |
 | 3/11/2026 | 1.2 | Mục 2.4: cắt phạm vi của Hiếu trước 13/11 (dời S1-05, DA-29, S1-06, S1-09, S1-11, DA-16, DA-09; S1-02, S1-03, S1-04 chỉ làm phần DA-26 cần) và thêm hạn cho việc của Hiếu trên đường găng | PO (Hiếu) |
 | 3/11/2026 | 1.1 | Mục 2.4: thêm PR hợp đồng `TraceStep`, `CameraParams` của Long (6/11) và hook `SimpleSim` của Hiếu (8/11) theo quyết định issue #31 (làm đủ R3–R5 cho demo) | PO (Hiếu) |
 | 3/11/2026 | 1.0 | Mục 2.0 (bảng dữ liệu đi giữa người): Hưng giao Long `AgentReport` thay `QAReport` (issue #34; 03 bản 0.8). Mục 2.2, DA-01: layout action G1 là 36 chiều thật của Ψ₀, không phải đệm (đối chiếu `src/psi/data/simple/__init__.py` ở `cda3fdf` và gói psi-data task hai bàn). Thêm mục 2.4 lịch hoàn thiện 13/11/2026; DA-31 và `agentqa/bench/` chuyển sang Châu (mục 2.1, 2.2) | PO (Hiếu) |
@@ -258,7 +259,7 @@ Dừng sau mỗi nhiệm vụ con giữ cho mỗi commit nhỏ, người làm xe
 ### 3.4 PR và merge
 
 - Một PR cho một story; tiêu đề `[DA-03] Teleop pipeline on psi-data`.
-- Kích thước: khoảng 400 dòng thay đổi trở xuống, không tính lock file và fixture sinh ra. Lớn hơn thì tách story.
+- Kích thước (bản 1.3): khoảng 1500 dòng mã trở xuống, không tính test, file `.md`, schema JSON sinh ra, fixture, `examples/` và lock file (R9 ở 08 bản 0.3). Lớn hơn thì tách story.
 - Review (bản 0.3, thay quy tắc cũ "Hiếu không là người review duy nhất"): **Hiếu là người duyệt và merge duy nhất** vào `master`. Chủ sở hữu đường dẫn và người ở cột thứ ba của mục 2.1 bình luận, không chặn merge. Trước khi xin duyệt, PR phải xanh ở `core` và `guard`. Lịch tracking tự động (10:00, 14:00, 18:00) liệt kê PR chờ Hiếu; tổng kết 21:30 đề xuất thứ tự duyệt, ưu tiên PR đang chặn người khác và PR sửa `contracts/`.
 - Không ai chờ PR của người khác để code tiếp: dùng schema trong `flywheel.contracts`, bản giả và file mẫu trong `flywheel.testkit` (trước PR restructure là `flywheel-fakes`); không tạo nhánh từ nhánh chưa merge.
 - Merge bằng **Rebase and merge** để giữ từng commit nhiệm vụ con trên `master`, lịch sử thẳng. Không dùng squash, vì squash gộp mất ranh giới nhiệm vụ con.

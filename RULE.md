@@ -94,7 +94,7 @@ Bảng đầy đủ: sở hữu đường dẫn ở [07 mục 2.1](docs/product/
    python3 scripts/repo/pr_guard.py --base origin/master --head HEAD --branch "$(git branch --show-current)"
    ```
 
-7. **Mở PR** tiêu đề `[DA-03] ...`, điền template (nhiệm vụ con, bằng chứng cho từng AC). PR nên ≤ 400 dòng.
+7. **Mở PR** tiêu đề `[DA-03] ...`, điền template (nhiệm vụ con, bằng chứng cho từng AC). PR nên ≤ 1500 dòng mã (không tính test, tài liệu, schema JSON sinh ra, fixture).
 8. **Review:** **Hiếu duyệt và merge, là người duy nhất.** Chủ sở hữu đường dẫn bình luận, không chặn merge. PR phải xanh ở `core` và `guard` trước khi xin duyệt. Merge bằng **Rebase and merge**, không squash. PR đã xanh mà vẫn hiện **BLOCKED** là bình thường: ruleset "Only Hiếu merges into master" chỉ cho vai Admin cập nhật `master`, nên Hiếu merge bằng `gh pr merge <số> --admin --rebase` sau khi đã xem diff và CI, gom vào các khung 10:00, 14:00, 18:00 và 21:30. Trong lúc chờ duyệt, làm tiếp nhiệm vụ con khác trên bản giả và file mẫu; không tạo nhánh mới từ nhánh chưa merge.
 9. **Dọn:** `git worktree remove ../denso-DA-03 && git branch -d DA-03-teleop-pipeline`.
 
@@ -116,7 +116,7 @@ Máy phát hiện (pr-guard hoặc báo cáo ngày); người làm theo cột "L
 | R6 | Sai tên nhánh, sai định dạng commit, thiếu `Time-spent`, sửa file ngoài phạm vi | pr-guard chặn PR; sửa rồi push lại |
 | R7 | Lỗi `severity:high` (rò holdout, gửi dữ liệu DENSO ra ngoài, sai kết luận, mất dữ liệu) | Đổi thành `type:incident`; postmortem 1 trang trong 2 ngày |
 | R8 | Cùng một nguyên nhân lỗi ≥ 3 lần trong 7 ngày | Thêm một can thiệp (rule, test, sửa CLAUDE.md), ghi vào sổ can thiệp |
-| R9 | PR > 400 dòng | Được gắn `size:large`; nên tách story |
+| R9 | PR > 1500 dòng mã (không tính test, tài liệu, schema sinh ra, fixture) | Được gắn `size:large`; nên tách story |
 
 ### 5.2 Không bao giờ được phá
 
