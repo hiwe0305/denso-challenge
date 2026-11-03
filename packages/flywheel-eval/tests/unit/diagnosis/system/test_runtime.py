@@ -219,6 +219,14 @@ def test_r5_fires_on_a_camera_that_moved(tmp_path, camera_entry) -> None:
     ]
 
 
+def test_r5_reads_q_and_minus_q_as_the_same_orientation(tmp_path, camera_entry) -> None:
+    # A unit quaternion and its negation are one rotation; a writer may emit
+    # either sign for the same camera.
+    flipped = {**camera_entry, "pose": [0.0, 0.0, 1.5, -1.0, 0.0, 0.0, 0.0]}
+
+    assert check_r5(_cameras(tmp_path, flipped), R5).findings == []
+
+
 def test_r5_fires_on_a_camera_that_turned(tmp_path, camera_entry) -> None:
     turned = {**camera_entry, "pose": [0.0, 0.0, 1.5, 0.9988, 0.05, 0.0, 0.0]}
 
