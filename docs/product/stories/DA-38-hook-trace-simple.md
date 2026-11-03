@@ -83,3 +83,35 @@ Ngoài phạm vi, làm PR docs riêng: dòng DA-38 trong 07 mục 2.2 và 2.4; �
 | 3/11/2026 | Tạo story cho phần hook của story 3.1a theo issue #31 và 07 mục 2.4 (bản 1.1) | PO (Hiếu) |
 
 ## Ghi chép khi làm
+
+### 3/11/2026 · Kiểm hai rủi ro của cách cài hook (trước nhiệm vụ 4)
+
+Probe chạy trên `rtx3060`, `~/denso-da38`, dùng venv SIMPLE của DA-33 (SIMPLE `6d10628`), mỗi lần bọc trong `systemd-run --scope -p MemoryMax=8G`. Script probe để ngoài repo.
+
+**Rủi ro 1 · các tên cần vá hoặc cần đọc có tồn tại ở SIMPLE đã ghim không.** Có, cả 22 tên đều có:
+- Trong `simple.cli.eval_decoupled_wbc`: `gym.make`, `_run_eval_worker`, `typer_main`.
+- Trong `simple.baselines.psi0_decoupled_wbc`: `Psi0DecoupledWbcAgent` cùng các method `get_action`, `queue_action`, `reset`, và `STATE_SLICES`. `snake_to_pascal("psi0_decoupled_wbc") + "Agent"` cho đúng tên class này.
+- Trong `simple.envs.sonic_loco_manip`: `SonicLocoManipEnv.step` và `_get_obs`.
+- `CameraCfg.fx`, `CameraCfg.fy`.
+- Thuộc tính đặt trong `__init__` (kiểm trong mã nguồn): `self._action_queue`, `self.client`, `self._success`, `self.mujoco`.
+
+Ba file `eval_decoupled_wbc.py`, `psi0_decoupled_wbc.py`, `sonic_loco_manip.py` trong image docker SIMPLE mà S1-03 dùng (`38a674039f41`) có md5 trùng với venv `6d10628`. Trace của DA-38 và eval của S1-03 vì vậy chạy cùng một vòng eval.
+
+Nhiệm vụ 4 sẽ chuyển kiểm này thành test `sim` trong `tests/trace/`, để khi nâng SIMPLE thì test báo lỗi thay vì hook im lặng không ghi.
+
+**Rủi ro 2 · bản vá có sang được worker không.**
+- `run_eval` chạy worker ngay trong tiến trình khi `num_workers == 1`.
+- Khi `num_workers > 1`, nó tạo tiến trình con bằng `mp.get_context("spawn")`. Tiến trình con import lại module chính dưới tên `__mp_main__`, nên chỉ chạy phần cấp module; không chạy `main()`.
+
+Kết quả đo:
+
+| Vá ở đâu | `num_workers` | Bản vá có chạy trong worker | Env khay có đăng ký trong worker |
+|---|---|---|---|
+| Cấp module | 2 | Có (2/2 worker, `__name__ == "__mp_main__"`) | **Không** |
+| Trong `main()` | 2 | **Không** (worker chạy `_run_eval_worker` gốc) | — |
+| Cấp module | 1 | Có (cùng tiến trình) | Có |
+
+Hệ quả:
+1. Hook phải cài ở cấp module của entry point, không cài trong `main()`.
+2. Tham số `agent_factory` của `run_eval` là tham số chết: nó chỉ được kiểm, không được truyền cho worker. Không dùng nó làm điểm gắn hook.
+3. **Lỗi tiềm ẩn ngoài phạm vi DA-38.** `flywheel_simple.tray.run` gọi `register()` trong `main()`, nên `eval-decoupled-wbc` trên task khay với `--num-workers > 1` sẽ không tìm thấy env trong mọi worker. Lỗi này chặn eval song song của DA-34. Entry point của DA-38 sẽ đăng ký task khay ở cấp module. Sửa `tray/run.py` cần PR riêng, trong phạm vi DA-32.
