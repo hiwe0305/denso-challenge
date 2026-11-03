@@ -8,6 +8,7 @@
 #       Serve the matching checkpoint first, e.g. RUN=<two-table run> serve_psi0.sh serve.
 #   bash scripts/g0/eval_psi0.sh openloop --data DIR --images real|gray|blur|shift   benchmark B4
 #   bash scripts/g0/eval_psi0.sh delay-proxy --listen P --delay S --log FILE        benchmark B3
+#   bash scripts/g0/eval_psi0.sh replay-server --train DIR [--first N] [--listen P]  benchmark B6
 #
 # smoke does not need SIMPLE: it sends zero images and zero state, so the actions are meaningless,
 # but it proves the checkpoint loads and that /act answers with an (exec horizon, action dim) chunk.
@@ -191,7 +192,8 @@ $others"
   [[ "$info" == *"${task_lc%-v0}"* ]] || die "server on $host:$PORT does not serve $TASK: $(head -c 200 <<<"$info")"
   local simple_tag="simple-${SIMPLE_FIX_COMMIT:0:7}"
   [[ "$SIMPLE_TASK_FIX" == on ]] || simple_tag="simple-6d10628"
-  local tag="$simple_tag/$sim_mode/level-$level/pass-$pass/ep$start-$((start + episodes - 1))"
+  # Runs before 4/11/2026 00:35 (all on de140d6) have no eval-<rev> component in their path.
+  local tag="$simple_tag/eval-${PSI_DATA_REV:0:7}/$sim_mode/level-$level/pass-$pass/ep$start-$((start + episodes - 1))"
   local out="$SIMPLE_DATA/runs/$tag"
   [[ -e "$out/eval_stats.txt" ]] && die "$out already has results; use another --pass"
   # Pre-create the read-only mount points, or dockerd creates them root-owned.
@@ -400,10 +402,83 @@ ThreadingHTTPServer(("127.0.0.1", listen), Relay).serve_forever()
 PY
 }
 
+# Benchmark B6 (docs/g0/psi0-eval.md): a stand-in for the Psi0 server that answers /act with the
+# recorded 36-D actions of train episodes, 24 per call (the served exec horizon), starting a new
+# episode at every reset (eval episode k replays train episode FIRST+k). The SIMPLE client then
+# drives the robot with ground-truth actions through the same mapping and WBC as with Psi0.
+# Needs pandas and pyarrow (PYTHON, e.g. the SIMPLE venv). Holds the last action after the end.
+cmd_replay_server() {
+  local train="" first=0 listen="$PORT"
+  while (( $# )); do
+    case "$1" in
+      --train) train="$2"; shift 2 ;;
+      --first) first="$2"; shift 2 ;;
+      --listen) listen="$2"; shift 2 ;;
+      *) die "unknown option $1" ;;
+    esac
+  done
+  [[ -d "$train/data" ]] || die "--train must be a LeRobot dataset dir (with data/)"
+  log "replaying $train from episode $first on 127.0.0.1:$listen"
+  exec "${PYTHON:-python3}" - "$train" "$first" "$listen" "$TASK" <<'PY'
+import base64, json, sys
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+train, first, listen, task = Path(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
+EXEC = 24
+state = {"episode": first - 1, "cursor": 0, "actions": None}
+
+def blob(a):
+    a = np.ascontiguousarray(a)
+    return {"__numpy__": base64.b64encode(a.tobytes()).decode(), "dtype": a.dtype.str, "shape": list(a.shape)}
+
+def load(ep):
+    df = pd.read_parquet(next(train.glob(f"data/chunk-*/episode_{ep:06d}.parquet")))
+    return np.stack(df["action"].to_numpy()).astype(np.float32)
+
+class Replay(BaseHTTPRequestHandler):
+    def reply(self, obj):
+        data = json.dumps(obj).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_GET(self):
+        if self.path == "/health":
+            return self.reply({"status": "ok"})
+        # The client checks that the server serves its task, and names its video dir after this.
+        self.reply({"policy": "replay", "timestamp": f"train-ep{state['episode']}",
+                    "run_dir": f"replay-of-{task.lower()}-{train.name}"})
+
+    def do_POST(self):
+        req = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        if (req.get("history") or {}).get("reset"):
+            state["episode"] += 1
+            state["cursor"] = 0
+            state["actions"] = load(state["episode"])
+            print(f"episode {state['episode']}: {len(state['actions'])} recorded actions", flush=True)
+        acts = state["actions"]
+        idx = np.minimum(np.arange(state["cursor"], state["cursor"] + EXEC), len(acts) - 1)
+        state["cursor"] += EXEC
+        self.reply({"action": blob(acts[idx]), "err": 0.0, "traj_image": blob(np.zeros((1, 1, 3), np.uint8))})
+
+    def log_message(self, *args):
+        pass
+
+ThreadingHTTPServer(("127.0.0.1", listen), Replay).serve_forever()
+PY
+}
+
 case "${1:-}" in
   smoke) shift; cmd_smoke "$@" ;;
+  replay-server) shift; cmd_replay_server "$@" ;;
   run) shift; cmd_run "$@" ;;
   openloop) shift; cmd_openloop "$@" ;;
   delay-proxy) shift; cmd_delay_proxy "$@" ;;
-  *) sed -n '2,13p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '2,14p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
