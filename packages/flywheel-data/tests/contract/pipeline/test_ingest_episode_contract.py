@@ -84,9 +84,7 @@ def test_ingested_episode_round_trips_as_the_contract(
     assert payload["meta"]["synthetic_tier"] == tier
     assert payload["meta"]["source_detail"] == detail
     assert payload["data_class"] == "public"
-    # No defect answer and no benchmark-copy marker under either contract version
-    # (injected_defect on master, benchmark_copy_id after #36); simplify after #36.
-    assert all(payload["meta"].get(k) is None for k in ("injected_defect", "benchmark_copy_id"))
+    assert payload["meta"]["benchmark_copy_id"] is None
     assert payload["parent_id"] == BLOCKS[detail].get("parent_episode")
     assert payload["bundle_uri"] == "data/chunk-000/episode_000000.parquet"
     assert ("unknown" in payload["condition_id"]) == ("seed" not in BLOCKS[detail])
