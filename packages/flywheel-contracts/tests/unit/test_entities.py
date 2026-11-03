@@ -1,5 +1,8 @@
 """Unit tests for the 12 L0-lite catalog entities (AC 1, AC 3, AC 4)."""
 
+import json
+from pathlib import Path
+
 import pytest
 from flywheel.contracts.artifacts import EpisodeMetadata
 from flywheel.contracts.entities import (
@@ -349,3 +352,21 @@ def test_score_carries_trace_sha256() -> None:
     rescored = Score.model_validate({**base, "trace_sha256": "f" * 64})
     assert first.trace_sha256 == "e" * 64
     assert first.id != rescored.id
+
+
+FIXTURES = (
+    Path(__file__).resolve().parents[4]
+    / "packages/flywheel-testkit/src/flywheel/testkit/fixtures/artifacts"
+)
+
+
+@pytest.mark.parametrize("model", [Score, Cluster, Decision, LedgerEntry])
+def test_shared_entity_example_round_trips(
+    model: type[Score | Cluster | Decision | LedgerEntry],
+) -> None:
+    """PO review 3/11: tests/e2e/test_demo_seams.py reads these four shared examples."""
+    example = (FIXTURES / f"{model.__name__}.json").read_text(encoding="utf-8")
+    value = model.model_validate_json(example)
+    assert model.model_validate_json(value.model_dump_json()) == value
+    # The id is in the file, so a reader sees the id the store will hold.
+    assert value.id == json.loads(example)["id"]
