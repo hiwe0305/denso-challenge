@@ -172,6 +172,8 @@ Quyết định **[Đề xuất]**:
 | Thêm `turn_rate` vào phong cách, dải 0,45–0,75 rad/s (người: 0,45–1,0) | Quay nhanh hơn làm nghiêng khay đang mang | |
 | Bấm nút đóng ngay khi planner đóng, không chờ tay bắt kịp | Phong cách tay đã tắt khi kẹp; bản chờ tay (tới 0,3 s) cho 7/16 đạt | |
 
+Giới hạn đã biết **[Đã chốt]** (PO duyệt 3/11/2026, giữ như trên): dữ liệu teleop ảo không có phong cách tay khi tay ở gần khay (REACH, GRASP, LIFT, mang khay, PLACE, RELEASE), nên chỉ phần nâng tay và hạ tay mang trễ, vọt lố, đường cong và rung của người; dải gia tốc cần trái (0,5–1,8 m/s²) và tốc độ quay (0,45–0,75 rad/s) hẹp hơn dải đo trên người (0,15–1,8 m/s² và 0,45–1,0 rad/s). So với người ở AC 8 (nhiệm vụ 12) cần tính hai giới hạn này.
+
 Chưa làm: lúc dừng giữa pha (0–3 lần mỗi episode ở người). Dừng tay khi planner đang chạy đồng hồ pha sẽ làm lệch các mốc giờ của planner; planner đã có các lúc chờ riêng (giữ khi kẹp, khi nâng, khi tới bàn B). So chuyển động với người (AC 8) để nhiệm vụ 12.
 
 ## Lô demo cha (nhiệm vụ 7)
@@ -185,7 +187,7 @@ MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src nohup setsid \
 
 `generate_parents.py` chia điều kiện xoay vòng cho các worker; mỗi worker là một phiên `--streamer virtual` với env và dataset LeRobot riêng ở `<out>/shard-NN/`. Chạy lại thì bỏ qua điều kiện shard đã ghi. Cuối lô ghi `<out>/summary.json`: số lượt, kết quả, nhãn lỗi, giây sim, giây worker, danh sách demo cha đủ 7 cờ bước (shard, chỉ số episode, level, seed, seed phong cách).
 
-Trong lúc làm nhiệm vụ 5–7, DA-33 merge vào master cách cầm ngửa lòng bàn tay dưới tay cầm (D-25, Hiếu chọn 3/11/2026), thay cho cách kẹp ngón D-19 mà nhiệm vụ 5, 6 đã chỉnh trên đó. Vì vậy có hai lô, cùng 160 điều kiện (mức 0 và 1, seed train 100–179, mỗi điều kiện một lượt, `style_base` 0, cùng seed phong cách), rtx3060, 3/11/2026. **Bộ demo cha cho S2 là `parents-1103b`**: cùng planner với mã đang commit và với S1 của DA-33.
+Trong lúc làm nhiệm vụ 5–7, DA-33 merge vào master cách cầm ngửa lòng bàn tay dưới tay cầm (D-25, Hiếu chọn 3/11/2026), thay cho cách kẹp ngón D-19 mà nhiệm vụ 5, 6 đã chỉnh trên đó. Vì vậy có hai lô, cùng 160 điều kiện (mức 0 và 1, seed train 100–179, mỗi điều kiện một lượt, `style_base` 0, cùng seed phong cách), rtx3060, 3/11/2026. **Bộ demo cha cho S2 là `parents-1103b`** **[Đã chốt]** (PO chọn 3/11/2026): cùng planner với mã đang commit và với S1 của DA-33, một kiểu cầm duy nhất. `parents-1103` (D-19) giữ để tham khảo, không trộn vào S2.
 
 | Đo | `parents-1103b` (D-25, mã hiện hành) | `parents-1103` (D-19, trước khi rebase) |
 |---|---|---|

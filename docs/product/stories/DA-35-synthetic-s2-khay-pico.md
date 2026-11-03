@@ -126,6 +126,7 @@ Rủi ro: điều kiện xa demo cha thì cầm trượt; đế trôi khi mang l
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 3/11/2026 | PO chốt: S2 chỉ dùng lô demo cha D-25 `parents-1103b` (129 demo), lô D-19 `parents-1103` giữ để tham khảo; nhận hai giới hạn phong cách (tay có phong cách chỉ khi xa khay, dải cần gạt hẹp hơn người) làm giới hạn đã biết ([virtual-teleop.md](../../g0/tray/virtual-teleop.md)) | PO (Hiếu) |
 | 3/11/2026 | PO chọn merge DA-33 và dùng lại `TrayPlanner` làm phần ý định của teleop ảo (thay cho chỉ chép số D-19); nhiệm vụ 5 trở đi phụ thuộc DA-33 đã merge | PO (Hiếu) |
 | 3/11/2026 | PO duyệt bản teleop ảo cộng S2 và việc tải hai file psi-data (322 MB) chỉ để đo phong cách | PO (Hiếu) |
 | 3/11/2026 | Viết lại theo hướng teleop ảo cộng S2 (PO chọn, vì đội không có kính PICO): AC 2, 3, 7, 8 mới, nhiệm vụ 3–12, thêm `configs/sim/tray_virtual_teleop.yaml` và `docs/g0/tray/virtual-teleop.md` vào Phạm vi file; demo PICO thật thành phần làm khi có kính | Claude |
