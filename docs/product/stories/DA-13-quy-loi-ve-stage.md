@@ -35,7 +35,7 @@ Là kỹ sư đánh giá, tôi muốn mỗi cụm lỗi closed-loop được ki�
 - [x] 5. Bảng quy lỗi về stage, bằng chứng gắn kèm (AC 3, 4)
 - [x] 6. Test trên lỗi cấy hệ thống và đối chứng sạch (AC 5, 6)
 - [x] 7. `api.py`, lệnh `fw eval diag-system` và artifact kết quả của hai bước (AC 1-4). Phạm vi file đã có `api.py`, `cli.py` nhưng không nhiệm vụ con nào dùng tới; phần 6 của demo cần một điểm vào
-- [ ] 8. Issue Contract change cho bản ghi kết quả: `DiagnosisFinding.code` của `flywheel.contracts.training` là `Literal` trên T1-T8, O1-O4 nên mã R không vào được `TrainDiagnosis`; 03 mục 4.3 để `CheckResult` trong `meta` của Cluster (Long giữ). Trong lúc chờ, bản ghi nằm trong làn như `ScoreRecord` của DA-36
+- [x] 8. Issue Contract change cho bản ghi kết quả (**issue #70**): `DiagnosisFinding.code` của `flywheel.contracts.training` là `Literal` trên T1-T8, O1-O4 nên mã R không vào được `TrainDiagnosis`; 03 mục 4.3 để `CheckResult` trong `meta` của Cluster (Long giữ). Trong lúc chờ, bản ghi nằm trong làn như `ScoreRecord` của DA-36
 
 ## Phạm vi file
 
