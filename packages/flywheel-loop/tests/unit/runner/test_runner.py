@@ -13,7 +13,7 @@ import math
 import random
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from flywheel.contracts.artifacts import RTCInferenceRecord
@@ -360,22 +360,31 @@ def _sync_and_async(
     return sync, async_
 
 
+def _entry(root: Path, job_id: str) -> dict[str, Any]:
+    text = (root / job_id / "runner.json").read_text(encoding="utf-8")
+    return cast(dict[str, Any], json.loads(text))
+
+
 def test_sync_passes_and_async_reveals_the_latency_failure(tmp_path: Path) -> None:
     sync, async_ = _sync_and_async(tmp_path, delay_s=0.34)
 
     assert sync.sim_success is True
+    # The sim's verdict stays the sim's; the latency failure is the timing verdict.
     assert async_.infra_status == "ok"
-    assert async_.sim_success is False
-    entry = json.loads((tmp_path / "async" / "runner.json").read_text(encoding="utf-8"))
-    assert entry["adapter_sim_success"] is True
-    # chunk size 1 at 10 Hz, refill when empty: each of chunks 1-4 leaves
-    # ceil(0.34 * 10) = 4 steps with no action.
+    assert async_.sim_success is True
+    entry = _entry(tmp_path, "async")
+    assert entry["timing_verdict"] == "starved"
+    # Chunk size 1 at 10 Hz: a hardware client asks with at most 1 action left
+    # (refill_level 8 capped at the chunk), so each of chunks 1-4 leaves
+    # ceil(0.34 * 10) - 1 = 3 steps with no action.
     assert entry["rtc"] == {
         "chunks": 5,
         "max_delay_steps": 4,
+        "refill_level": 1,
         "starved_chunks": 4,
-        "starved_steps": 16,
+        "starved_steps": 12,
     }
+    assert "timing_verdict" not in _entry(tmp_path, "sync")
 
 
 def test_zero_latency_async_matches_sync_on_the_same_seed(tmp_path: Path) -> None:
@@ -383,35 +392,47 @@ def test_zero_latency_async_matches_sync_on_the_same_seed(tmp_path: Path) -> Non
 
     assert async_.infra_status == sync.infra_status == "ok"
     assert async_.sim_success == sync.sim_success is True
+    assert _entry(tmp_path, "async")["timing_verdict"] == "pass"
     assert sync.trace_ref is not None and async_.trace_ref is not None
     assert load_trace(async_.trace_ref)["frames"] == load_trace(sync.trace_ref)["frames"]
 
 
 @pytest.mark.parametrize(
-    ("delay_s", "refill_at", "success"),
+    ("delay_s", "verdict", "starved_steps"),
     [
-        (0.16, 8, True),  # 8 steps of latency, 8 actions left when asking: covered
-        (0.20, 8, False),  # 10 steps of latency outrun the 8 actions left
-        (0.16, 0, False),  # asking only when empty stalls every chunk after the first
+        (0.06, "pass", 0),  # 3 steps of latency: covered by the 8 actions left
+        (0.18, "starved", 3),  # 9 steps: 1 step without an action on chunks 1-3
     ],
 )
-def test_buffer_left_at_request_decides_async_success(
-    tmp_path: Path, delay_s: float, refill_at: int, success: bool
+def test_refill_level_decides_starvation_on_rtc_client_shaped_logs(
+    tmp_path: Path, delay_s: float, verdict: str, starved_steps: int
 ) -> None:
-    sync, async_ = _sync_and_async(
-        tmp_path, delay_s, spec=PSI0_LIKE, refill_at=refill_at, max_steps=64
-    )
+    """Records as RTCClient writes them on SIMPLE: refill when empty, buffer_level 0."""
+    sync, async_ = _sync_and_async(tmp_path, delay_s, spec=PSI0_LIKE, max_steps=64)
 
-    assert sync.sim_success is True
-    assert async_.sim_success is success
+    lines = (tmp_path / "async" / "rtc.jsonl").read_text(encoding="utf-8").splitlines()
+    records = [RTCInferenceRecord.model_validate_json(line) for line in lines]
+    assert len(records) == 4
+    assert {r.buffer_level for r in records} == {0}
+    assert sync.sim_success is async_.sim_success is True
+    entry = _entry(tmp_path, "async")
+    assert entry["timing_verdict"] == verdict
+    assert entry["rtc"]["refill_level"] == 8
+    assert entry["rtc"]["starved_steps"] == starved_steps
 
 
-def test_starvation_limit_comes_from_the_eval_config(tmp_path: Path) -> None:
-    config = EvalConfig(max_starved_steps=16)
+def test_refill_level_and_starvation_limit_come_from_the_eval_config(tmp_path: Path) -> None:
+    config = EvalConfig(refill_level=10, max_starved_steps=0)
+    _, async_ = _sync_and_async(tmp_path, 0.18, spec=PSI0_LIKE, max_steps=64, config=config)
+    assert _entry(tmp_path, "async")["timing_verdict"] == "pass"
 
-    _, async_ = _sync_and_async(tmp_path, delay_s=0.34, config=config)
+    config = EvalConfig(max_starved_steps=12)
+    _sync_and_async(tmp_path / "limit", delay_s=0.34, config=config)
+    assert _entry(tmp_path / "limit", "async")["timing_verdict"] == "pass"
 
-    assert async_.sim_success is True
+
+def test_eval_yaml_sets_refill_level_to_psi0_max_delay() -> None:
+    assert load_eval_config().refill_level == 8
 
 
 # Latency profile and eval config

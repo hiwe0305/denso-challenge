@@ -9,7 +9,7 @@ Runner closed-loop eval của làn Vòng có hai chế độ định thời (DA-
 | Chế độ | Dùng cho | Chỉ số |
 |---|---|---|
 | `sync` | G0 (`g0_repro`) và HE (`he`), để so được với tác giả | `sim_success` của sim |
-| `async` | Các nhánh HS, HT (`branch_train`, `round`, `holdout`) | `sim_success` của sim, rồi xét lại bằng log RTC (mục 3) |
+| `async` | Các nhánh HS, HT (`branch_train`, `round`, `holdout`) | `sim_success` của sim và kết luận định thời từ log RTC (mục 3) |
 
 ## 2. Thư mục job và log RTC
 
@@ -37,9 +37,17 @@ Mỗi rollout có một thư mục job `<staging_root>/<job_id>/`. Simulator ada
 
 ## 3. Chấm ở chế độ bất đồng bộ
 
-**[Đề xuất]** Runner phát lại log trên đồng hồ thời gian thực. Với chunk thứ k ≥ 1, robot không có action trong `max(0, delay_steps − buffer_level)` bước. Chunk 0 không tính, vì robot chưa chạy. Tổng số bước này lớn hơn `max_starved_steps` trong `configs/loop/eval.yaml` (mặc định 0) thì rollout hỏng ở chế độ `async`, dù sim báo thành công. `runner.json` giữ cả kết quả của sim (`adapter_sim_success`) và tóm tắt lịch (`rtc`: số chunk, độ trễ lớn nhất, số bước và số chunk bị cạn).
+**[Đã chốt 3/11/2026]** Runner phát lại log trên đồng hồ thời gian thực. SIMPLE bước sim đồng bộ, và client RTC chỉ xin chunk khi buffer đã hết (`refill_at = 0`, giống code tác giả), nên `buffer_level` trong log luôn bằng 0 và không nói gì về phần cứng. Runner giả định một client phần cứng gửi request khi buffer còn `refill_level` action (`configs/loop/eval.yaml`, bằng 8, là `max_delay` của Ψ₀ stage 3 theo [psi0-logging.md](psi0-logging.md), cùng số DA-13 dùng cho R2), và chạy nốt số action đó trong lúc suy luận.
 
-Hệ quả: client gửi request khi buffer đã hết (`refill_at = 0`) thì mọi độ trễ khác 0 đều làm robot dừng sau mỗi chunk. Muốn qua, client phải gửi request sớm, khi buffer còn ít nhất `delay_steps` action. Ví dụ: chunk 16, 50 Hz, trễ 160 ms (8 bước) thì cần gửi khi buffer còn 8.
+| Đại lượng | Cách tính |
+|---|---|
+| Bước bị cạn ở chunk k ≥ 1 | `max(0, delay_steps − refill_level)`; `refill_level` không vượt kích thước chunk |
+| Chunk 0 | Không tính, vì robot chưa chạy |
+| Kết luận định thời | `starved` khi tổng số bước bị cạn lớn hơn `max_starved_steps` (mặc định 0); còn lại `pass` |
+
+Ví dụ: chunk 16, 50 Hz. Trễ 3 bước không làm cạn. Trễ 9 bước làm cạn 1 bước ở mỗi chunk từ chunk 1.
+
+`sim_success` trong `RolloutResult` luôn là kết luận của sim. Kết luận định thời (`timing_verdict`) và tóm tắt lịch (`rtc`: số chunk, độ trễ lớn nhất, `refill_level`, số bước và số chunk bị cạn) nằm trong `runner.json`. Khi PR hợp đồng thêm `RolloutResult.timing_verdict` được merge, runner sẽ ghi kết luận vào trường đó.
 
 Với độ trễ bằng 0, log có `delay_steps = 0` ở mọi chunk, nên hai chế độ cho cùng kết quả trên cùng seed.
 

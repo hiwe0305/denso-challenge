@@ -3,9 +3,10 @@
 An async rollout is only scored when the job directory holds the RTC log of the
 policy's client (DA-19) and that log describes this rollout; anything else is
 reported as `infra_status="policy_error"` with the reason in `runner.json`. The
-runner then replays the log on a real-time clock: a rollout whose robot would have
-run out of actions while a chunk was in flight fails in async mode, even though the
-synchronously stepped sim succeeded.
+runner then replays the log on a real-time clock and writes a timing verdict to
+`runner.json`: "starved" when the robot would have run out of actions while a chunk
+was in flight, even though the synchronously stepped sim succeeded. `sim_success`
+always stays the simulator's.
 """
 
 from __future__ import annotations
@@ -101,8 +102,13 @@ class Runner:
         # the rollout says nothing about latency and must not count as a pass.
         entry: dict[str, object] = {"key": key, "error": None}
         if request.timing == "async" and result.infra_status == "ok":
-            entry["adapter_sim_success"] = result.sim_success
-            result, entry["error"], entry["rtc"] = self._score_async(job_dir, result)
+            result, entry["error"], schedule = self._score_async(job_dir, result)
+            if schedule is not None:
+                starved = schedule["starved_steps"] > self.config.max_starved_steps
+                # Until RolloutResult.timing_verdict exists (contract PR), the verdict
+                # lives next to the result; sim_success stays the simulator's.
+                entry["timing_verdict"] = "starved" if starved else "pass"
+                entry["rtc"] = schedule
         entry["result"] = result.model_dump(mode="json")
         cache_path.write_text(json.dumps(entry, sort_keys=True), encoding="utf-8")
         return result
@@ -139,12 +145,10 @@ class Runner:
     def _score_async(
         self, job_dir: Path, result: RolloutResult
     ) -> tuple[RolloutResult, str | None, dict[str, int] | None]:
-        """Score an ok rollout in async mode from its RTC log.
+        """Check an ok async rollout's RTC log and replay its schedule.
 
-        Returns the result, why it could not be scored (then `policy_error`), and the
-        replayed schedule. The adapter steps synchronously, so its `sim_success` holds
-        only if the robot was never left without an action for more than
-        `max_starved_steps` control steps on a real-time clock.
+        Returns the result (`policy_error` when the log cannot be used), the reason it
+        cannot, and the replayed schedule.
         """
         if result.trace_ref is None:
             error = "async rollout returned no trace to tie the RTC log to"
@@ -160,9 +164,7 @@ class Runner:
             )
         except RTCLogError as error:
             return _unscored(result), str(error), None
-        schedule = replay_schedule(records)
-        if result.sim_success and schedule.starved_steps > self.config.max_starved_steps:
-            result = result.model_copy(update={"sim_success": False})
+        schedule = replay_schedule(records, self.config.refill_level, self.chunk_size)
         return result, None, asdict(schedule)
 
     def run_eval(

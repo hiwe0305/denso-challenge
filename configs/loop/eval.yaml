@@ -16,8 +16,13 @@ timing_by_purpose:
 control_hz: 50.0
 chunk_size: 16
 
-# Async: control steps the RTC log may leave the robot without an action before the
-# rollout counts as failed (docs/g0/async-eval.md section 3)
+# Async timing verdict (docs/g0/async-eval.md section 3).
+# refill_level: actions a hardware RTC client still holds when it asks for the next
+# chunk; 8 is the max_delay of Psi0 stage 3 (docs/g0/psi0-logging.md), the same
+# number DA-13 uses for R2. Chốt 3/11/2026.
+refill_level: 8
+# max_starved_steps: control steps without an action the replayed schedule may have
+# before the timing verdict is "starved".
 max_starved_steps: 0
 
 # Latency profile specifications
