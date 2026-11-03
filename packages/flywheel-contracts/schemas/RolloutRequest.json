@@ -148,7 +148,7 @@
     },
     "TraceRef": {
       "additionalProperties": false,
-      "description": "A rollout trace. `uri` names the directory `<trace_id>/` holding `steps.jsonl` and\n`camera_params.jsonl` (flywheel.contracts.trace; PO decision G1 on PR #48, 3/11/2026).",
+      "description": "A rollout trace (flywheel.contracts.trace; PO decisions G1, G1b on PR #48, 3/11/2026).\n\n`uri` names the directory `<trace_id>/` (its last path component is `trace_id`) holding\n`steps.jsonl`, `camera_params.jsonl` and `rollout_result.json`; `sha256` is the sha256\nof `steps.jsonl`.",
       "properties": {
         "trace_id": {
           "title": "Trace Id",

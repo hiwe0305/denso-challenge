@@ -6,11 +6,13 @@ sync), and frames lost in the cycle (missing-signal check). CameraParams records
 the intrinsics, render resolution, mount and pose of one camera of a trace (R5
 calibration).
 
-File layout (PO decision G1 on PR #48, 3/11/2026): `TraceRef.uri` names a
+File layout (PO decisions G1 and G1b on PR #48, 3/11/2026): `TraceRef.uri` names a
 directory `<trace_id>/` holding
 
     steps.jsonl          one TraceStep per line, in step order
     camera_params.jsonl  one CameraParams per line, one per camera the policy sees
+    rollout_result.json  the episode's v0 RolloutResult (infra_status, sim_success);
+                         its trace_ref.sha256 is the sha256 of steps.jsonl
 
 `fixtures/trace/README.md` in flywheel.testkit has the rest of the conventions.
 """
@@ -30,6 +32,7 @@ FloatOrNonFinite = float | NonFinite
 
 STEPS_NAME = "steps.jsonl"
 CAMERA_NAME = "camera_params.jsonl"
+RESULT_NAME = "rollout_result.json"
 
 # G1 36-D action (Psi0 ACTION_SLICES_36D, names as in docs/g0/psi-data.md and D-26):
 # the left hand goes thumb, middle, index; the right hand thumb, index, middle.
