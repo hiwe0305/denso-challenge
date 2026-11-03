@@ -1,0 +1,19 @@
+{
+  "job_id": "job_fixtures",
+  "trace_ref": {
+    "trace_id": "tr_missing",
+    "uri": "tr_missing",
+    "sha256": "8fd1f1f6c0b67cf87b357b52f0d0aa91e052cf4df898ebb31ebe2b47efa51d27"
+  },
+  "sim_success": false,
+  "infra_status": "ok",
+  "usage": {
+    "wall_seconds": 2.0,
+    "gpu_seconds": 0.0
+  },
+  "camera_params_hash": "fc7f9c90ebbf8c4662fd70e58de5aed668c0fbc5ccfbbd951dce705729cdeea2",
+  "adapter_info": {
+    "name": "flywheel-testkit.fixtures",
+    "version": "1"
+  }
+}

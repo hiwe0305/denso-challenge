@@ -1,0 +1,85 @@
+{
+  "additionalProperties": false,
+  "description": "One camera of a trace; one line of `camera_params.jsonl`.\n\n`fx`, `fy`, `cx`, `cy` are pixels at the render resolution `width` x `height`;\n`pose` is position (m) + MuJoCo quaternion (w, x, y, z) relative to the mount body.\n`reference_sha256` is the hash of the camera reference pinned at G0, copied from the\nRunPlan (PO decision Q3, 3/11/2026), never a hash of the episode's own cameras.",
+  "properties": {
+    "trace_id": {
+      "minLength": 1,
+      "title": "Trace Id",
+      "type": "string"
+    },
+    "episode_id": {
+      "minLength": 1,
+      "title": "Episode Id",
+      "type": "string"
+    },
+    "uid": {
+      "minLength": 1,
+      "title": "Uid",
+      "type": "string"
+    },
+    "mount": {
+      "minLength": 1,
+      "title": "Mount",
+      "type": "string"
+    },
+    "width": {
+      "exclusiveMinimum": 0,
+      "title": "Width",
+      "type": "integer"
+    },
+    "height": {
+      "exclusiveMinimum": 0,
+      "title": "Height",
+      "type": "integer"
+    },
+    "fx": {
+      "exclusiveMinimum": 0.0,
+      "title": "Fx",
+      "type": "number"
+    },
+    "fy": {
+      "exclusiveMinimum": 0.0,
+      "title": "Fy",
+      "type": "number"
+    },
+    "cx": {
+      "exclusiveMinimum": 0.0,
+      "title": "Cx",
+      "type": "number"
+    },
+    "cy": {
+      "exclusiveMinimum": 0.0,
+      "title": "Cy",
+      "type": "number"
+    },
+    "pose": {
+      "items": {
+        "type": "number"
+      },
+      "title": "Pose",
+      "type": "array"
+    },
+    "reference_sha256": {
+      "description": "Hash of the camera reference pinned at G0, copied from the RunPlan (PO decision Q3, 3/11/2026); not a hash of this camera. R5 compares these values against that reference.",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Reference Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "trace_id",
+    "episode_id",
+    "uid",
+    "mount",
+    "width",
+    "height",
+    "fx",
+    "fy",
+    "cx",
+    "cy",
+    "pose",
+    "reference_sha256"
+  ],
+  "title": "CameraParams",
+  "type": "object"
+}

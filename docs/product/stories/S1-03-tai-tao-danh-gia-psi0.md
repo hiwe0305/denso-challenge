@@ -35,7 +35,7 @@ Là kỹ sư robot learning, tôi muốn chạy checkpoint Ψ₀ công bố trê
 - [ ] 1. Q0 và chọn task tái tạo (AC 1, 6)
   - [ ] 1.1 Liệt kê checkpoint trong `psi0/` ở revision ghim; ghi tên, ngày, kích thước
   - [ ] 1.2 Chọn checkpoint gốc trong `pre.*` hoặc `postpre.*` và task tái tạo; ghi provenance vào Source; ghi rủi ro nếu chưa chắc (AC 6, 7)
-  - [ ] 1.3 Soạn câu hỏi provenance, gửi chung email giấy phép (việc trưởng nhóm)
+  - [ ] 1.3 Soạn câu hỏi provenance cho PSI Lab (việc trưởng nhóm)
 - [ ] 2. Serve Ψ₀ (AC 2, 4)
   - [ ] 2.1 Dựng môi trường Ψ₀ (Python 3.11, torch 2.7, flash-attn 2.7.4.post1) trong image riêng ở `docker/psi0/`, dùng chung với S1-04; ghi lỗi nếu flash-attn không chạy trên 5090
   - [ ] 2.2 `scripts/g0/serve_psi0.sh` với `--action-exec-horizon`, `--rtc` theo README Ψ₀
@@ -87,6 +87,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 24/10/2026 | Thêm mục Phạm vi file. AC 8: đề xuất dòng V2, V8 (phần suy luận) ghi trong file kết quả, Hiếu gom vào 03 §3.3 ở review G0; sổ chi phí riêng của story. Nhiệm vụ con 2.1 giữ image Ψ₀ ở `docker/psi0/` cho cả S1-04 | PO (Hiếu) |
 | 28/10/2026 | Bỏ phần việc của Hưng và Châu theo 07 mục 2.0 bản 0.6; dự phòng chưa giao | PO (Hiếu) |
 | 3/11/2026 | Cắt phạm vi trước 13/11/2026: chỉ làm phần DA-26 cần (07 mục 2.4, bản 1.2) | PO (Hiếu) |
+| 3/11/2026 | Nhiệm vụ 1.3: bỏ phần email giấy phép theo quyết định PO (không xin giấy phép; `license = unknown` ghi là giới hạn); câu hỏi provenance Q0 giữ | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

@@ -32,8 +32,16 @@ _Phạm vi 3/11/2026 (Q2, Q3): trước 13/11 làm tầng 1 (ingest), 4 (QA), 5 
 
 PR 1 (hạn 5/11/2026):
 
-- [ ] 1. Bộ đọc và ghi LeRobot v2.1, test trên dataset 3 episode sinh trong test (AC 1)
-- [ ] 2. `register_source`, `to_episode` cho ba nguồn (AC 2)
+- [x] 1. Bộ đọc và ghi LeRobot v2.1, test trên dataset 3 episode sinh trong test (AC 1)
+  - [x] 1.1 Không ép kiểu âm thầm: giá trị đổi khi đọc ra float32 (hay int64) thì báo lỗi có tên file, cột, số giá trị đổi (review #69 mục 2)
+  - [x] 1.2 Số khung video đọc từ box `stsz` của mp4, video giả trong test có số khung bằng số dòng; ghi lại meta giữ các khóa bộ ghi không sở hữu (review #69 mục 6, 7)
+  - [x] 1.3 Cột `index`: đánh số lại theo LeRobot v2.1 một cách tường minh, ghi dòng lineage, báo ở ingest, có test (review #69 mục 1; Q7 đã chốt 3/11 [Hiếu])
+- [x] 2. `register_source`, `to_episode` cho ba nguồn (AC 2)
+  - [x] 2.1 Lineage: `parent_id`, `root_id`, seed và level của episode sinh ra lấy từ `environment_config.flywheel`; nhãn ghi theo từng episode phải khớp nguồn (review #69 mục 3, 8)
+  - [x] 2.2 Kiểm `split`: từ chối `holdout` (chỉ nằm trong `vault/`, chỉ `gate` đọc) và tên lạ; đối chiếu split đã ghi trong episode (review #69 mục 4)
+  - [x] 2.3 `bundle_uri` tương đối theo gốc kho (`$FW_ROOT`, mặc định `./fwdata`); dataset ngoài gốc kho bị từ chối (Q6, đã chốt 3/11 [Hiếu])
+  - [x] 2.4 Chặn `deid_status = raw` ở Annotate chỉ áp cho `source_kind = egocentric`; dữ liệu robot, sim, teleop không bị chặn (Q4, đã chốt 3/11 [Hiếu])
+  - [x] 2.5 Ghi quyết định Q5 (id episode do bên ghi đặt, theo DA-25) và Q7 (đánh số lại `index` theo v2.1) vào mã và test (đã chốt 3/11 [Hiếu])
 
 PR 2 (hạn 9/11/2026):
 
@@ -118,6 +126,8 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 3/11/2026 | Thêm nhiệm vụ con 2.3–2.5 theo quyết định Q4–Q7 của PO ("Chốt theo đề xuất") | Claude, theo yêu cầu PO (Hiếu) |
+| 3/11/2026 | Thêm nhiệm vụ con 1.1–1.3, 2.1–2.2 theo review PR #69 của PO | Claude, theo yêu cầu PO (Hiếu) |
 | 3/11/2026 | Tạo file story theo 07 bản 1.6 và plan chia lại việc (Q2, Q3, Q5): ingest, QA, release, báo cáo cho psi-data, khay S1, khay S2; normalize, cắt đoạn, nguồn bàn phím sau 13/11; hai PR | PO (Hiếu) |
 
 ## Ghi chép khi làm

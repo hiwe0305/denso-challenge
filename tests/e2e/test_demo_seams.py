@@ -26,6 +26,7 @@ import pytest
 import yaml
 from flywheel.contracts.artifacts import ActionLayout
 from flywheel.contracts.training import TrainDiagnosis
+from flywheel.contracts.v0 import ControlSpec
 from flywheel.eval.api import diagnose_train
 from pydantic import BaseModel
 
@@ -189,6 +190,20 @@ def test_g1_action_layout_follows_psi0_slices() -> None:
     assert all(len(group) == 1 for group in groups), "one group per Psi0 slice"
     labels = [group.pop() for group in groups]
     assert all(a != b for a, b in zip(labels, labels[1:], strict=False)), "adjacent slices differ"
+
+
+@pytest.mark.e2e_fake
+def test_g1_control_spec_pairs_every_action_dim_once() -> None:
+    """Decoupled WBC channels (03 section 5.2, ADR-15): each action dim commanded once."""
+    layout = g1_layout()
+    raw = yaml.safe_load(G1_EMBODIMENT.read_text(encoding="utf-8"))
+    spec = ControlSpec.model_validate(raw["control_spec"])
+    assert spec.controller == "decoupled_wbc"
+    assert [group.name for group in spec.groups] == ["upper_body", "lower_body"]
+    for group in spec.groups:
+        assert len(group.command_channels) == len(group.state_channels), group.name
+    commands = [channel for group in spec.groups for channel in group.command_channels]
+    assert commands == [dim.name for dim in layout.dimensions]
 
 
 def job_dir(tmp_path: Path, log: Path, layout: ActionLayout) -> Path:

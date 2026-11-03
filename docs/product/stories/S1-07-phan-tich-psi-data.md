@@ -77,6 +77,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 27/10/2026 | Mở lại cho task hai bàn: gói 203 MB và tập eval, N_teleop quyết định lưới HE, so với `action_layout`, dải hạt giống của `simple-eval`, thống kê cho báo cáo dataset; bỏ AC Q6 (đã trả lời); 12 → 10 giờ | PO (Hiếu) theo design 27/10/2026 |
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 | 3/11/2026 | Người làm Thông → Hiếu theo quyết định PO (07 bản 1.6; [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) Q1, Q4): nhánh mới dùng lại số đúng của #24; ước lượng còn 3,5 giờ. AC không đổi | PO (Hiếu) |
+| 3/11/2026 | AC 5, nhiệm vụ 5: thư hỏi giấy phép cho PSI Lab không gửi; PO bỏ mọi việc xin giấy phép, `license = unknown` ghi là giới hạn. Mục 5 của `docs/g0/psi-data.md` chỉ giữ hai câu về tập eval, ngoài giấy phép. Nhiệm vụ 5 giữ `[x]` vì bảng giấy phép đã xong | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

@@ -1,0 +1,21 @@
+{
+  "site_id": "local",
+  "task_id": "two-table",
+  "embodiment_id": "g1",
+  "schema_version": "1.0.0",
+  "meta": {},
+  "id": "dec_01M6FB9801040G2081040G2081",
+  "kind": "dev_gate",
+  "subject_kind": "checkpoint",
+  "subject_id": "ckpt_1",
+  "verdict": "pass",
+  "metrics": {
+    "dev_success": 0.4
+  },
+  "criteria": {
+    "dev_success_min": 0.3
+  },
+  "signed_by": "hieu",
+  "reason": "Dev success above the gate threshold",
+  "supersedes_decision_id": null
+}

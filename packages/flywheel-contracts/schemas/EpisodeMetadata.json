@@ -1,41 +1,4 @@
 {
-  "$defs": {
-    "InjectedDefect": {
-      "additionalProperties": false,
-      "properties": {
-        "code": {
-          "minLength": 1,
-          "title": "Code",
-          "type": "string"
-        },
-        "parameters": {
-          "additionalProperties": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "number"
-              },
-              {
-                "type": "integer"
-              },
-              {
-                "type": "string"
-              }
-            ]
-          },
-          "title": "Parameters",
-          "type": "object"
-        }
-      },
-      "required": [
-        "code"
-      ],
-      "title": "InjectedDefect",
-      "type": "object"
-    }
-  },
   "additionalProperties": false,
   "properties": {
     "source_detail": {
@@ -91,16 +54,18 @@
       "default": null,
       "title": "Synthetic Tier"
     },
-    "injected_defect": {
+    "benchmark_copy_id": {
       "anyOf": [
         {
-          "$ref": "#/$defs/InjectedDefect"
+          "minLength": 1,
+          "type": "string"
         },
         {
           "type": "null"
         }
       ],
-      "default": null
+      "default": null,
+      "title": "Benchmark Copy Id"
     }
   },
   "title": "EpisodeMetadata",
