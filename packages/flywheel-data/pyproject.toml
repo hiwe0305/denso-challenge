@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "flywheel-data"
 version = "0.1.0"
 requires-python = ">=3.10"
-dependencies = ["flywheel-contracts", "numpy", "pyarrow", "pyyaml", "typer"]
+dependencies = ["flywheel-contracts", "flywheel-store", "numpy", "pyarrow", "pyyaml", "typer"]
 
 [project.optional-dependencies]
 egocentric = []
@@ -17,6 +17,7 @@ egocentric = "flywheel.data.egocentric_cli:app"
 
 [tool.uv.sources]
 flywheel-contracts = { workspace = true }
+flywheel-store = { workspace = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/flywheel"]
