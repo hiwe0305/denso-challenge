@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 from collections.abc import Sequence
@@ -18,6 +19,10 @@ from flywheel.contracts.v0 import (
     TraceRef,
 )
 from flywheel.loop.runner.config import EvalConfig, load_eval_config
+
+CACHE_FILE = "runner.json"
+# Bump when the runner changes what a cached result means.
+CACHE_VERSION = 1
 
 
 class Runner:
@@ -44,10 +49,16 @@ class Runner:
         policy: PolicyEndpoint,
         force_rerun: bool = False,
     ) -> RolloutResult:
-        """Run a rollout request with resume support and RTC log collection."""
-        job_dir = self.staging_root / request.job_id
-        result_path = job_dir / "result.json"
-        rtc_path = job_dir / "rtc.jsonl"
+        """Run a rollout request with resume support and RTC log collection.
+
+        `<staging_root>/<job_id>/` is the job directory shared with the simulator adapter
+        and the policy's RTC client. A result is reused only when `runner.json` holds the
+        same cache key and `infra_status == "ok"`; otherwise the directory is emptied
+        first, because the RTC client appends to `rtc.jsonl` and adapters may keep their
+        own per-job files.
+        """
+        job_dir = self._job_dir(request.job_id)
+        cache_path = job_dir / CACHE_FILE
 
         # Validate async profile existence up-front (no silent failure)
         if request.timing == "async" and request.latency_profile_ref:
@@ -58,17 +69,15 @@ class Runner:
                     f"{request.latency_profile_ref}"
                 )
 
-        # Resume support: only reuse if previously finished with infra_status == "ok"
-        if not force_rerun and result_path.is_file():
-            cached_result = RolloutResult.model_validate_json(
-                result_path.read_text(encoding="utf-8")
-            )
-            if cached_result.infra_status == "ok":
-                # For async, ensure rtc.jsonl is also present
-                if request.timing == "sync" or rtc_path.is_file():
-                    return cached_result
+        key = self.cache_key(request, policy)
+        if not force_rerun:
+            cached = _read_cache(cache_path, key)
+            if cached is not None:
+                return cached
 
-        job_dir.mkdir(parents=True, exist_ok=True)
+        if job_dir.exists():
+            shutil.rmtree(job_dir)
+        job_dir.mkdir(parents=True)
 
         # Call simulator rollout (timing and latency profile passed directly in request)
         result = self.simulator.rollout(request, policy)
@@ -76,16 +85,41 @@ class Runner:
         # Gom (collect) RTC log if executed in async mode
         if request.timing == "async":
             self._collect_rtc_log(job_dir, result)
-        else:
-            # Sync mode: ensure no stale delayed rtc.jsonl
-            if rtc_path.is_file():
-                rtc_path.unlink()
 
-        # Cache completed result if infra_status == "ok"
         if result.infra_status == "ok":
-            result_path.write_text(result.model_dump_json(), encoding="utf-8")
+            entry = {"key": key, "result": result.model_dump(mode="json")}
+            cache_path.write_text(json.dumps(entry, sort_keys=True), encoding="utf-8")
 
         return result
+
+    def cache_key(self, request: RolloutRequest, policy: PolicyEndpoint) -> str:
+        """Hash of everything that changes a rollout's result.
+
+        The request carries mode, seeds, condition and limits; the endpoint names the
+        checkpoint (`<checkpoint_id>@<device>`); the latency profile is hashed by content,
+        since a rewritten file keeps its path.
+        """
+        profile_sha256 = None
+        if request.latency_profile_ref is not None:
+            profile_bytes = Path(request.latency_profile_ref).read_bytes()
+            profile_sha256 = hashlib.sha256(profile_bytes).hexdigest()
+        payload = {
+            "version": CACHE_VERSION,
+            "request": request.model_dump(mode="json"),
+            "policy": policy.model_dump(mode="json"),
+            "simulator": self.simulator.info().model_dump(mode="json"),
+            "config": self.config.model_dump(mode="json"),
+            "control_hz": self.control_hz,
+            "chunk_size": self.chunk_size,
+            "latency_profile_sha256": profile_sha256,
+        }
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical.encode()).hexdigest()
+
+    def _job_dir(self, job_id: str) -> Path:
+        if job_id in ("", ".", "..") or Path(job_id).name != job_id:
+            raise ValueError(f"job_id must be a single path component, got {job_id!r}")
+        return self.staging_root / job_id
 
     def _collect_rtc_log(self, job_dir: Path, result: RolloutResult) -> Path:
         """Collect and validate RTC inference log emitted by simulator/client."""
@@ -131,6 +165,17 @@ class Runner:
     ) -> list[RolloutResult]:
         """Execute a batch of rollout requests sequentially with resume capability."""
         return [self.run_rollout(req, policy, force_rerun=force_rerun) for req in requests]
+
+
+def _read_cache(path: Path, key: str) -> RolloutResult | None:
+    """The cached result if `path` holds an ok result for exactly this key."""
+    if not path.is_file():
+        return None
+    entry = json.loads(path.read_text(encoding="utf-8"))
+    if entry.get("key") != key:
+        return None
+    result = RolloutResult.model_validate(entry["result"])
+    return result if result.infra_status == "ok" else None
 
 
 def load_trace(trace_ref: TraceRef) -> dict[str, object]:

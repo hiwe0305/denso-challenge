@@ -16,7 +16,7 @@ from flywheel.testkit.fakes import FakePolicy, FakeSim2D
 
 def test_runner_batch_eval_contract(tmp_path: Path) -> None:
     staging_root = tmp_path / "runs"
-    sim = FakeSim2D(staging_root / "sim")
+    sim = FakeSim2D(staging_root)
     policy = FakePolicy()
     runner = Runner(sim, staging_root)
 
@@ -50,4 +50,4 @@ def test_runner_batch_eval_contract(tmp_path: Path) -> None:
         assert res.sim_success is True
         assert res.trace_ref is not None
         job_dir = staging_root / f"batch-job-{idx}"
-        assert (job_dir / "result.json").is_file()
+        assert (job_dir / "runner.json").is_file()
