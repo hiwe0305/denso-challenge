@@ -1,9 +1,10 @@
-"""Train log defects T1-T8 and RTC log defects R1-R2 (story task 2, AC 2).
+"""Train log defects T1-T8 and RTC log defects R1-R2 (story task 2, AC 2), lane-local.
 
 The logs are written in the contract schemas the real ones use (`TrainingMetric`,
-`RTCInferenceRecord`, `ProbeP4`) and in the job layout the evaluation lane reads, so the
-evaluation lane's own detectors judge them here: an injected job must raise exactly its
-code, a clean job none (story: "cấy một lần, phép kiểm tương ứng bắt được").
+`RTCInferenceRecord`, `ProbeP4`). Here each injected job is compared with the clean job
+its id gives: the defect must change exactly its one signal, by the configured amount.
+That the evaluation lane's detectors then raise exactly that code is checked across the
+lanes, in tests/e2e/test_log_defects_detected.py.
 """
 
 import json
@@ -14,19 +15,20 @@ from typing import Any
 import pytest
 from flywheel.contracts.artifacts import ProbeP4, RTCInferenceRecord
 from flywheel.contracts.training import TrainingMetric
+from flywheel.data.inject.build import load_layout
 from flywheel.data.inject.codes import LOG_DEFECT_CODES
+from flywheel.data.inject.config import LogDefectConfig
 from flywheel.data.inject.dataset import copy_ids
-from flywheel.data.inject.log_defects import build_log_benchmark, main
+from flywheel.data.inject.log_defects import (
+    G1_LAYOUT,
+    build_log_benchmark,
+    clean_rtc_log,
+    clean_train_job,
+    main,
+)
 from flywheel.data.inject.manifest import ManifestLock, load_manifest
-from flywheel.eval.config import load_system_thresholds, load_train_thresholds
-from flywheel.eval.diagnosis.system.reader import read_rtc_log
-from flywheel.eval.diagnosis.system.runtime import check_r1, check_r2
-from flywheel.eval.diagnosis.train.artifact import diagnose_all, load_job
 
 REPO = Path(__file__).resolve().parents[5]
-TRAIN = load_train_thresholds(REPO / "configs/eval/diagnosis/train.yaml")[0]
-SYSTEM = load_system_thresholds(REPO / "configs/eval/diagnosis/system.yaml")[0]
-TRAIN_CODES = {f"T{i}" for i in range(1, 9)}
 WORDS = (b"inject", b"defect", b"duplicate", b"bench")
 
 
@@ -34,14 +36,6 @@ WORDS = (b"inject", b"defect", b"duplicate", b"bench")
 def built(tmp_path_factory: pytest.TempPathFactory) -> Any:
     out = tmp_path_factory.mktemp("logs") / "logs"
     return out, build_log_benchmark(out)
-
-
-def _codes(job: Path) -> set[str]:
-    if (job / "rtc.jsonl").is_file():
-        records = read_rtc_log(job / "rtc.jsonl")
-        found = check_r1(records, SYSTEM.r1).findings + check_r2(records, SYSTEM.r2).findings
-        return {f.code for f in found}
-    return {f.code for f in diagnose_all(load_job(job), TRAIN).findings} & TRAIN_CODES
 
 
 def _jobs(root: Path) -> list[Path]:
@@ -73,20 +67,118 @@ def test_three_jobs_per_kind_and_the_design_codes(built: Any) -> None:
     assert load_manifest(result.clean.manifest_path).defects == []
 
 
-def test_the_evaluation_detectors_find_exactly_the_injected_code(built: Any) -> None:
+CFG = LogDefectConfig()
+
+
+def _train_diff(job: Path) -> tuple[list[tuple[int, str, str]], bool, ProbeP4, ProbeP4]:
+    """(step, split, field) of every metric that differs from the clean job of this id."""
+    written = [
+        TrainingMetric.model_validate_json(x)
+        for x in (job / "metrics.jsonl").read_text().splitlines()
+    ]
+    clean, clean_child, clean_parent = clean_train_job(job.name, load_layout(G1_LAYOUT), CFG)
+    assert [(r.step, r.split) for r in written] == [(r.step, r.split) for r in clean]
+    changed = [
+        (w.step, w.split, name)
+        for w, c in zip(written, clean, strict=True)
+        for name in TrainingMetric.model_fields
+        if json.dumps(getattr(w, name)) != json.dumps(getattr(c, name))
+    ]
+    child = ProbeP4.model_validate_json((job / "probe_p4.json").read_text())
+    parent = ProbeP4.model_validate_json((job / "probe_p4_parent.json").read_text())
+    return changed, child != clean_child or parent != clean_parent, child, parent
+
+
+def test_each_defect_changes_exactly_its_signal_by_the_configured_amount(built: Any) -> None:
     _, result = built
     root = Path(result.defect.ref.uri)
-    expected = {d.target_ref: d.code for d in load_manifest(result.defect.manifest_path).defects}
-    for job in _jobs(root):
-        ref = job.relative_to(root).as_posix()
-        assert _codes(job) == ({expected[ref]} if ref in expected else set()), ref
+    kinds = {d.target_ref: d for d in load_manifest(result.defect.manifest_path).defects}
+    for job in sorted((root / "train").iterdir()):
+        changed, probes, child, parent = _train_diff(job)
+        fields = {name for _, _, name in changed}
+        defect = kinds.get(f"train/{job.name}")
+        kind = str(defect.parameters["kind"]) if defect else ""
+        expected = {
+            "": set(),
+            "T7_forgetting": set(),
+            "T1_divergence": {"loss"},
+            "T2_not_learning": {"loss", "loss_by_group"},
+            "T3_overfitting": {"loss"},
+            "T4_group_imbalance": {"loss_by_group"},
+            "T5_dead_dimension": {"pred_var_by_dim"},
+            "T6_mode_collapse": {"pred_std"},
+            "T8_gradient_anomaly": {"grad_norm_vlm"},
+        }[kind]
+        assert fields == expected, (job.name, kind, fields)
+        assert probes == (kind == "T7_forgetting"), (job.name, kind)
+        metrics = [
+            TrainingMetric.model_validate_json(x)
+            for x in (job / "metrics.jsonl").read_text().splitlines()
+        ]
+        if kind == "T1_divergence":
+            assert [
+                m.loss
+                for m in metrics
+                if m.step == defect.parameters["step"] and m.split == "train"
+            ] == ["NaN"]
+            assert len(changed) == 1
+        if kind == "T3_overfitting":
+            assert {split for _, split, _ in changed} == {"val"} and len(
+                changed
+            ) == CFG.t3_val_rises
+        if kind == "T6_mode_collapse":
+            late = [m for m in metrics if m.split == "train" and m.step > CFG.steps // 2]
+            assert all(
+                p == pytest.approx(CFG.t6_std_ratio * t)
+                for m in late
+                for p, t in zip(m.pred_std, m.target_std)
+            )
+        if kind == "T7_forgetting":
+            q = str(defect.parameters["question"])
+            assert child.p1.accuracy_by_question_type[q] == pytest.approx(
+                parent.p1.accuracy_by_question_type[q] * (1 - CFG.t7_p1_drop)
+            )
+        if kind == "T8_gradient_anomaly":
+            assert len(changed) == 1
+            assert [
+                m.grad_norm_vlm
+                for m in metrics
+                if m.step == defect.parameters["step"] and m.split == "train"
+            ] == [CFG.t8_frozen_grad]
+    for job in sorted((root / "rtc").iterdir()):
+        written = [
+            RTCInferenceRecord.model_validate_json(x)
+            for x in (job / "rtc.jsonl").read_text().splitlines()
+        ]
+        clean = clean_rtc_log(job.name, CFG)
+        off = [w for w, c in zip(written, clean, strict=True) if w != c]
+        defect = kinds.get(f"rtc/{job.name}")
+        kind = str(defect.parameters["kind"]) if defect else ""
+        latency = [w.chunk_received_s - w.observation_sent_s for w in off]
+        if kind == "R1_high_latency":
+            assert len(off) == round(CFG.r1_fraction * CFG.rtc_chunks)
+            assert latency == pytest.approx([CFG.r1_latency_s] * len(off)) and {
+                w.delay_steps for w in off
+            } == {8}
+        elif kind == "R2_buffer_depleted":
+            assert len(off) == 1 and latency == pytest.approx([CFG.r2_latency_s])
+            assert off[0].delay_steps == 12
+        else:
+            assert off == [], job.name
 
 
-def test_the_clean_copy_raises_nothing(built: Any) -> None:
+def test_the_clean_copy_is_the_clean_jobs(built: Any) -> None:
     _, result = built
     root = Path(result.clean.ref.uri)
-    for job in _jobs(root):
-        assert _codes(job) == set(), job.name
+    for job in sorted((root / "train").iterdir()):
+        changed, probes, _, _ = _train_diff(job)
+        assert changed == [] and not probes, job.name
+    for job in sorted((root / "rtc").iterdir()):
+        written = [
+            RTCInferenceRecord.model_validate_json(x)
+            for x in (job / "rtc.jsonl").read_text().splitlines()
+        ]
+        assert written == clean_rtc_log(job.name, CFG), job.name
 
 
 def test_both_copies_look_alike_and_keep_the_answer_outside(built: Any) -> None:
