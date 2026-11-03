@@ -5,11 +5,11 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 22/10/2026; hủy 25/10/2026; mở lại 27/10/2026) |
-| Người làm | Thông |
+| Người làm | Hiếu, làm cùng Claude (từ 3/11/2026, thay Thông) |
 | Story PRD | 1.6 · Epic 1 |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:data` |
-| Sprint | S1, xong trong tuần 1 vì Q1 quyết định điểm cuối của lưới HE · **Lịch 3/11/2026:** sửa layout action trên #24 và merge trước **4/11/2026** |
-| Ước lượng | 10 giờ (bản 22/10: 12 giờ; Q6 đã có trả lời) |
+| Sprint | S1, xong trong tuần 1 vì Q1 quyết định điểm cuối của lưới HE · **Lịch 3/11/2026:** nhánh mới `S1-07-psi-data-v2`, dùng lại số đúng của #24, merge trước **4/11/2026** |
+| Ước lượng | 3,5 giờ còn lại từ 3/11/2026 (bản 27/10: 10 giờ; bản 22/10: 12 giờ) |
 | Phụ thuộc | Không. Chặn DA-03, DA-26 (danh sách demo), DA-27 (dữ liệu gốc để cấy lỗi) |
 
 ## Story
@@ -54,6 +54,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - Quyết định của PO (04 mục 1.3): mọi episode từ psi-data mang `license = unknown`, `data_class = restricted` cho tới khi tác giả trả lời. Design 27/10 mục 8.4 đề xuất coi dữ liệu demo là `public` để lên Colab; nếu V9 chưa rõ thì báo Hiếu chốt.
 - Script chỉ đọc dữ liệu, không sửa gói gốc. Viết sao cho DA-03 dùng lại được phần đọc LeRobot.
 - Token Hugging Face để trong `.env`.
+- Từ 3/11/2026 ([plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) session 1): xuất phát từ `scripts/g0/inspect_psi_data.py` của nhánh `S1-07-psi-data` (#24 của Thông) và comment review của Hiếu ngày 3/11 trên #24; bỏ mọi số gán cứng (QA, hash F1, episode giả). Hiếu đóng #24 kèm lời cảm ơn sau khi PR mới mở.
 
 ## Kiểm thử
 
@@ -62,7 +63,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Người phụ trách
 
-- Làm: Dương Tiến Thông
+- Làm: Dương Đình Hiếu, cùng Claude (từ 3/11/2026; trước đó Dương Tiến Thông)
 - Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
 
 ## Change log
@@ -75,6 +76,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Hủy: psi-data là dữ liệu của G1; dữ liệu chính chuyển sang dataset BTC | PO (Hiếu) theo design 25/10/2026 (đã xóa) |
 | 27/10/2026 | Mở lại cho task hai bàn: gói 203 MB và tập eval, N_teleop quyết định lưới HE, so với `action_layout`, dải hạt giống của `simple-eval`, thống kê cho báo cáo dataset; bỏ AC Q6 (đã trả lời); 12 → 10 giờ | PO (Hiếu) theo design 27/10/2026 |
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
+| 3/11/2026 | Người làm Thông → Hiếu theo quyết định PO (07 bản 1.5; [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) Q1, Q4): nhánh mới dùng lại số đúng của #24; ước lượng còn 3,5 giờ. AC không đổi | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
