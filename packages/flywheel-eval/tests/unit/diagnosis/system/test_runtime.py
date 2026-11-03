@@ -18,6 +18,7 @@ from flywheel.eval.config import (
     CameraReference,
     R1Thresholds,
     R2Thresholds,
+    R3Thresholds,
     R4Thresholds,
     R5Thresholds,
     R6Thresholds,
@@ -28,6 +29,7 @@ from flywheel.eval.diagnosis.system.reader import (
     read_trace_log,
 )
 from flywheel.eval.diagnosis.system.runtime import check_r1, check_r2, check_r4, check_r5, check_r6
+from flywheel.eval.diagnosis.system.tracking import check_r3
 from flywheel.eval.diagnosis.system.verdict import Diagnosis, combine
 
 R1 = R1Thresholds(tau_lat_s=0.1, percentile=99.0)
@@ -255,12 +257,26 @@ def test_r6_fires_on_a_server_fault_and_says_it_is_not_the_policy() -> None:
     assert "không phải lỗi policy" in (result.findings[0].detail or "")
 
 
-def test_r6_is_the_label_only_where_nothing_else_fired() -> None:
+def test_r6_alone_is_an_infra_fault() -> None:
     infra = combine("ep_1", [check_r6("sim_crash", R6)], "sim_crash")
 
     assert infra.diagnosis is Diagnosis.INFRA
     assert infra.infra_status == "sim_crash"
     assert infra.blocks_policy_analysis
+
+
+def test_r6_outranks_every_other_code_and_the_rest_still_travel(row, write_trace) -> None:
+    # Decision Q1 of 3/11/2026: when the simulator or the server failed, the
+    # tracking error, latency and buffer are consequences of it, so the label
+    # is `infra` and never `controller`; the other findings are still shown.
+    off = read_trace_log(write_trace([row(step, meas_upper=[0.6, 0.2, 0.3]) for step in range(20)]))
+    r3 = R3Thresholds(tau_track_upper=0.1, tau_track_lower=0.15, percentile=99.0)
+    tracking = check_r3(off, r3)
+
+    verdict = combine("ep_1", [tracking, check_r6("sim_crash", R6)], "sim_crash")
+
+    assert verdict.diagnosis is Diagnosis.INFRA
+    assert [finding.code for finding in verdict.findings] == ["R6", "R3"]
 
 
 def test_an_episode_that_logged_no_infra_status_is_a_skip() -> None:

@@ -19,11 +19,13 @@ is the fault an engineer fixes first. Every other measurement still travels in
 tracking error that outranked it. Running every check costs nothing: they are
 pure arithmetic over arrays already in memory.
 
-**R6 is not a policy fault.** `infra_status` says the server, not the policy,
-is what failed (AC 1; 03 section 4.3, rule 8). It is recorded and it becomes
-the label only where nothing else fired, so an episode that crashed the
-simulator never counts as a controller fault and never counts as a clean run
-either.
+**R6 is not a policy fault, and it comes first.** `infra_status` says the
+simulator or the server, not the policy, is what failed (AC 1; design section
+10; 03 section 4.3, rule 8). When it did, the commands and measurements, the
+latency and the buffer are its consequences, so R6 outranks every other code:
+an episode that crashed the simulator is labelled `infra`, never `controller`,
+and never counts as a clean run either. The other codes that fired still
+travel in `findings` (decision Q1 of the PO, 3/11/2026).
 """
 
 from __future__ import annotations
@@ -33,9 +35,11 @@ from enum import Enum
 
 from flywheel.eval.diagnosis.train.finding import Skipped
 
-# R3 before R1 and R2 before R4 before R5: the order of spec section 6.4. R6 is
-# last because it is the one code that is not a statement about the policy.
-SYSTEM_CODES = ("R3", "R1", "R2", "R4", "R5", "R6")
+# R6 first: a failed simulator or server makes every other measurement a
+# consequence of it (decision Q1, 3/11/2026; spec section 6.4 does not place
+# R6 in its order). Then R3 before R1 and R2 before R4 before R5: the order of
+# spec section 6.4.
+SYSTEM_CODES = ("R6", "R3", "R1", "R2", "R4", "R5")
 
 
 class SystemError(ValueError):

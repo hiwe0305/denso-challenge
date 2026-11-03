@@ -184,6 +184,19 @@ def test_a_server_fault_is_recorded_and_is_not_a_policy_fault(episode, cfg) -> N
     assert [finding.code for finding in verdict.findings] == ["R6"]
 
 
+def test_a_crashed_simulator_is_never_a_controller_fault(episode, cfg, row) -> None:
+    # The PO reproduction of #71: `sim_crash` plus a tracking error came back
+    # `controller`. Commands and measurements after a crash are its consequence.
+    off = [row(step, meas_upper=[0.4, 0.2, 0.3]) for step in range(20)]
+
+    verdict = diagnose_system(
+        load_episode(episode(trace_rows=off, infra_status="sim_crash")), cfg
+    )
+
+    assert verdict.diagnosis is Diagnosis.INFRA
+    assert [finding.code for finding in verdict.findings] == ["R6", "R3"]
+
+
 def test_two_injected_faults_both_appear_and_the_first_one_is_the_label(
     episode, cfg, row, camera_entry
 ) -> None:
