@@ -1,12 +1,13 @@
 """Closed-loop evaluation runner supporting sync and async modes with RTC logging (DA-23).
 
 An async rollout is only scored when the job directory holds the RTC log of the
-policy's client (DA-19) and that log describes this rollout; anything else is
-reported as `infra_status="policy_error"` and `timing_verdict="not_checked"`, with the
-reason in `runner.json`. The runner then replays the log on a real-time clock and
-fills `RolloutResult.timing_verdict`: "starved" when the robot would have run out of
-actions while a chunk was in flight, even though the synchronously stepped sim
-succeeded. `sim_success` always stays the simulator's.
+policy's client (DA-19) and that log describes this rollout; anything else gives
+`timing_verdict="not_checked"`, with the reason in `runner.json`. The runner then
+replays the log on a real-time clock and fills `RolloutResult.timing_verdict`:
+"starved" when the robot would have run out of actions while a chunk was in flight,
+even though the synchronously stepped sim succeeded. `sim_success` and `infra_status`
+always stay the adapter's (decision E2, 3/11/2026): an unjudged timing is not an
+infrastructure failure.
 """
 
 from __future__ import annotations
@@ -69,7 +70,8 @@ class Runner:
 
         `<staging_root>/<job_id>/` is the job directory shared with the simulator adapter
         and the policy's RTC client. A result is reused only when `runner.json` holds the
-        same cache key and `infra_status == "ok"`; otherwise the directory is emptied
+        same cache key, `infra_status == "ok"` and a timing verdict other than
+        "not_checked"; otherwise the directory is emptied
         first, because the RTC client appends to `rtc.jsonl` and adapters may keep their
         own per-job files.
         """
@@ -105,7 +107,7 @@ class Runner:
         if request.timing == "async":
             schedule = None
             if result.infra_status == "ok":
-                result, entry["error"], schedule = self._score_async(job_dir, result)
+                entry["error"], schedule = self._score_async(job_dir, result)
             result = self._with_timing_verdict(result, schedule)
             # runner.json keeps its own copy of the verdict, for the record.
             entry["timing_verdict"] = result.timing_verdict
@@ -145,15 +147,14 @@ class Runner:
 
     def _score_async(
         self, job_dir: Path, result: RolloutResult
-    ) -> tuple[RolloutResult, str | None, dict[str, int] | None]:
+    ) -> tuple[str | None, dict[str, int] | None]:
         """Check an ok async rollout's RTC log and replay its schedule.
 
-        Returns the result (`policy_error` when the log cannot be used), the reason it
-        cannot, and the replayed schedule (None when there is none to replay).
+        Returns why the log cannot be used and the replayed schedule; exactly one of
+        the two is None.
         """
         if result.trace_ref is None:
-            error = "async rollout returned no trace to tie the RTC log to"
-            return _unscored(result), error, None
+            return "async rollout returned no trace to tie the RTC log to", None
         try:
             records = read_rtc_log(job_dir / RTC_LOG_FILE)
             check_rtc_log(
@@ -164,9 +165,9 @@ class Runner:
                 chunk_size=self.chunk_size,
             )
         except RTCLogError as error:
-            return _unscored(result), str(error), None
+            return str(error), None
         schedule = replay_schedule(records, self.config.refill_level, self.chunk_size)
-        return result, None, asdict(schedule)
+        return None, asdict(schedule)
 
     def _with_timing_verdict(
         self, result: RolloutResult, schedule: dict[str, int] | None
@@ -190,19 +191,17 @@ class Runner:
         return [self.run_rollout(req, policy, force_rerun=force_rerun) for req in requests]
 
 
-def _unscored(result: RolloutResult) -> RolloutResult:
-    return result.model_copy(update={"infra_status": "policy_error"})
-
-
 def _read_cache(path: Path, key: str) -> RolloutResult | None:
-    """The cached result if `path` holds an ok result for exactly this key."""
+    """The cached result if `path` holds an ok, judged result for exactly this key."""
     if not path.is_file():
         return None
     entry = json.loads(path.read_text(encoding="utf-8"))
     if entry.get("key") != key:
         return None
     result = RolloutResult.model_validate(entry["result"])
-    return result if result.infra_status == "ok" else None
+    if result.infra_status != "ok" or result.timing_verdict == "not_checked":
+        return None
+    return result
 
 
 def load_trace(trace_ref: TraceRef) -> dict[str, object]:

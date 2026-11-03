@@ -24,7 +24,7 @@ Mỗi rollout có một thư mục job `<staging_root>/<job_id>/`. Simulator ada
 | `buffer_level` | Số action còn trong buffer khi gửi request |
 | `boundary_jump` | Thay đổi lớn nhất theo từng chiều giữa action cuối của chunk cũ và action đầu của chunk mới |
 
-Ở chế độ `async`, runner kiểm log trước khi chấm. Log hỏng thì rollout bị báo `infra_status = policy_error` và `timing_verdict = not_checked`. `sim_success` vẫn là kết luận của sim. Lý do ghi vào `runner.json`, và lần chạy sau sẽ chạy lại. Log bị coi là hỏng khi:
+Ở chế độ `async`, runner kiểm log trước khi chấm. Log hỏng thì rollout có `timing_verdict = not_checked`. `sim_success` và `infra_status` vẫn là của adapter: sim và policy đã chạy đúng, chỉ phần định thời là không chấm được, nên rollout không bị tính là lỗi hạ tầng (R6 của DA-13). Lý do ghi vào `runner.json`, và lần chạy sau sẽ chạy lại. Log bị coi là hỏng khi:
 
 - không có file, file rỗng, hoặc có dòng không đúng schema;
 - `job_id` hoặc `trace_id` khác với rollout;
@@ -52,10 +52,11 @@ Kết quả nằm trong `RolloutResult` (03 bản 1.1, quyết định E2):
 | Trường | `sync` | `async`, log dùng được | `async`, không có log dùng được |
 |---|---|---|---|
 | `sim_success` | Kết luận của sim | Kết luận của sim | Kết luận của sim |
+| `infra_status` | Của adapter | Của adapter | Của adapter |
 | `timing_verdict` | `None` | `ok` hoặc `starved` | `not_checked` |
 | `starved_steps` | `None` | Tổng số bước bị cạn | `None` |
 
-"Không có log dùng được" gồm cả rollout mà chính adapter đã báo `infra_status` khác `ok`. `runner.json` giữ một bản sao của `timing_verdict` cùng tóm tắt lịch (`rtc`: số chunk, độ trễ lớn nhất, `refill_level`, số bước và số chunk bị cạn) để tra lại.
+"Không có log dùng được" gồm cả rollout mà chính adapter đã báo `infra_status` khác `ok`; runner giữ nguyên mã đó. `runner.json` giữ một bản sao của `timing_verdict` cùng tóm tắt lịch (`rtc`: số chunk, độ trễ lớn nhất, `refill_level`, số bước và số chunk bị cạn) để tra lại.
 
 Với độ trễ bằng 0, log có `delay_steps = 0` ở mọi chunk, nên hai chế độ cho cùng kết quả trên cùng seed.
 
@@ -63,7 +64,7 @@ Chèn độ trễ vào chính lúc bước sim (`timing` phía sim) thuộc stor
 
 ## 4. Bộ đệm kết quả
 
-Runner dùng lại kết quả chỉ khi `runner.json` có cùng khóa và `infra_status = ok`. Khóa là hash của request (chế độ, seed, điều kiện, giới hạn bước), endpoint policy (chứa mã checkpoint), simulator, config eval, `hz`, kích thước chunk và nội dung file profile trễ. Khóa khác thì runner xóa thư mục job rồi chạy lại, vì client RTC ghi thêm vào `rtc.jsonl`.
+Runner dùng lại kết quả chỉ khi `runner.json` có cùng khóa, `infra_status = ok` và `timing_verdict` khác `not_checked`. Khóa là hash của request (chế độ, seed, điều kiện, giới hạn bước), endpoint policy (chứa mã checkpoint), simulator, config eval, `hz`, kích thước chunk và nội dung file profile trễ. Khóa khác thì runner xóa thư mục job rồi chạy lại, vì client RTC ghi thêm vào `rtc.jsonl`.
 
 ## 5. Cấu hình
 

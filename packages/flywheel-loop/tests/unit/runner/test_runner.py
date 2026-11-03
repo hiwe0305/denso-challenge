@@ -226,13 +226,13 @@ def test_job_id_must_stay_inside_the_staging_root(tmp_path: Path) -> None:
 # RTC log in async mode (review findings 3 and 4)
 
 
-def test_async_without_rtc_log_is_a_reported_failure(tmp_path: Path) -> None:
+def test_async_without_rtc_log_is_not_checked(tmp_path: Path) -> None:
     sim = FakeSim2D(tmp_path)  # writes a trace but no rtc.jsonl
     runner = _runner(sim, tmp_path)
 
     result = runner.run_rollout(_async(sim, _profile(tmp_path / "z.json", 0.0)), _endpoint())
 
-    assert result.infra_status == "policy_error"
+    assert result.infra_status == "ok"  # the sim and the policy ran fine
     assert result.timing_verdict == "not_checked"
     assert result.starved_steps is None
     assert result.sim_success is True  # the simulator's verdict, untouched
@@ -241,15 +241,16 @@ def test_async_without_rtc_log_is_a_reported_failure(tmp_path: Path) -> None:
     assert entry["timing_verdict"] == "not_checked"
 
 
-def test_failed_async_rollout_is_retried_not_cached(tmp_path: Path) -> None:
+def test_not_checked_async_rollout_is_retried_not_cached(tmp_path: Path) -> None:
     sim = FakeSim2D(tmp_path)
     runner = _runner(sim, tmp_path)
     request = _async(sim, _profile(tmp_path / "z.json", 0.0))
-    runner.run_rollout(request, _endpoint())
+    first = runner.run_rollout(request, _endpoint())
+    assert first.timing_verdict == "not_checked"
 
     retry = _runner(RTCLoggingSim(tmp_path), tmp_path).run_rollout(request, _endpoint())
 
-    assert retry.infra_status == "ok"
+    assert retry.timing_verdict == "ok"
 
 
 def _set(field: str, value: object, index: int | None = None) -> Callable[..., Any]:
@@ -295,13 +296,13 @@ def test_async_rtc_log_is_checked_for_meaning(
 
     result = runner.run_rollout(_async(sim, _profile(tmp_path / "p.json", 0.1)), _endpoint())
 
-    assert result.infra_status == "policy_error"
+    assert result.infra_status == "ok"  # the sim and the policy ran fine
     assert result.timing_verdict == "not_checked"
     entry = json.loads((tmp_path / "job-1" / "runner.json").read_text(encoding="utf-8"))
     assert reason in entry["error"]
 
 
-def test_unreadable_rtc_log_is_a_reported_failure(tmp_path: Path) -> None:
+def test_unreadable_rtc_log_is_not_checked(tmp_path: Path) -> None:
     sim = RTCLoggingSim(tmp_path)
     runner = _runner(sim, tmp_path)
     request = _async(sim, _profile(tmp_path / "p.json", 0.1))
@@ -316,7 +317,7 @@ def test_unreadable_rtc_log_is_a_reported_failure(tmp_path: Path) -> None:
     sim.rollout = rollout  # type: ignore[method-assign]
     result = runner.run_rollout(request, _endpoint())
 
-    assert result.infra_status == "policy_error"
+    assert result.infra_status == "ok"  # the sim and the policy ran fine
     assert result.timing_verdict == "not_checked"
 
 

@@ -72,7 +72,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 03/11/2026 | Sửa review của Hiếu trên PR #49: ngữ nghĩa bất đồng bộ thật, gom log RTC từ adapter, phân phối log-normal, bộ đọc eval.yaml, sửa boundary_jump float, dịch tài liệu sang tiếng Việt | Nguyễn Thăng Long |
 | 3/11/2026 | Làm lại theo lần soát thứ hai của PO: khóa bộ đệm theo mọi đầu vào; async bắt buộc có log RTC và kiểm theo nghĩa; runner phát lại lịch RTC để chấm async; bỏ `[x]` ở nhiệm vụ 1 và 4 | Hiếu (cùng Claude) |
 | 3/11/2026 | Theo chốt của Hiếu: tính bước bị cạn theo `refill_level`; giữ `sim_success` của sim, ghi `timing_verdict` vào `runner.json` | Hiếu (cùng Claude) |
-| 4/11/2026 | Runner ghi `timing_verdict` (`ok`, `starved`, `not_checked`) và `starved_steps` vào `RolloutResult` theo hợp đồng #75; log hỏng không còn xóa `sim_success` | Hiếu (cùng Claude) |
+| 4/11/2026 | Runner ghi `timing_verdict` (`ok`, `starved`, `not_checked`) và `starved_steps` vào `RolloutResult` theo hợp đồng #75; log hỏng chỉ cho `not_checked`, giữ `sim_success` và `infra_status` của adapter | Hiếu (cùng Claude) |
 
 ## Ghi chép khi làm
 
