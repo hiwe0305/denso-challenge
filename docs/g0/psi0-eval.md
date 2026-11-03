@@ -13,6 +13,8 @@ _Kết quả của story [S1-03](../product/stories/S1-03-tai-tao-danh-gia-psi0.
 | 7 Task hai bàn ở `mujoco` (AC 10) | Chạy xong 3/11/2026: 0/30 ở mỗi mức (10 điều kiện × 3 lượt); open-loop xác nhận server đúng; kết luận Q-27C tạm (mục 3) |
 | 8 Checkpoint ablation của HE (AC 11) | Liệt kê xong 3/11/2026 (mục 4); câu hỏi Q-27E chờ Hiếu gửi PSI Lab |
 
+> **Cảnh báo (3/11/2026, 16:05).** Mọi lượt `mujoco` (0/90) và `mujoco_isaac` ở mục 3 chạy với file task hai bàn của SIMPLE `6d10628` (image ghim `38a6…`). Bản này spawn robot với cánh tay giơ lên; ngón tay chạm bàn 1 lúc WBC ổn định nên robot bị đẩy lùi 0,1–0,28 m. Tác giả sửa ở `b75c678` (PR #29, `77872fe`, 29/10/2026): `init_qpos` của hai tay về 0, như lúc thu dữ liệu. Hiếu chốt chuyển pin SIMPLE sang `b75c678` (PR #68). Vì vậy kết luận ở mục 3.5 **chưa dùng được** cho tới khi chạy lại với file đã sửa. Lượt Isaac Level 0 dừng sau 2/10 episode (cả hai hỏng); B3 chưa chạy. Việc tiếp theo ở mục "Tiếp tục từ đây" cuối file.
+
 ## 1. Q0 · Checkpoint trong `psi0/`
 
 ### 1.1 Revision ghim
@@ -343,3 +345,11 @@ Câu hỏi Q-27E gửi PSI Lab (Hiếu gửi, chung email giấy phép ở nhi�
 2. Ba `postpre.*` (`abl.only.he`, `abl.ego.10per`, `1by1.pad36…he30k`) có cùng recipe post-train action header không (dữ liệu, số bước, batch, lr)? `he30k` nghĩa là 30k bước trên HE?
 3. Sáu checkpoint này có train trên dữ liệu SIMPLE hoặc sonic không (điều kiện `clean_for_main_task` của AC 6)?
 4. (thêm 3/11/2026) Số 7/5/6 của `G1WholebodyLocomotionPickBetweenTablesTeleop-v0` đo trên bộ eval nào: bản tải lên 14/09/2026 (`e78fb93`), bản "eval-fixed" 02/11/2026 (`de140d6`), hay một bản trước đó? Checkpoint `…2604081126` train trên bản dữ liệu nào (bản gốc hay "data-fixed")? Ở `mujoco_isaac` có cần cờ hoặc cấu hình gì ngoài README không?
+
+## Tiếp tục từ đây (dừng 3/11/2026, 16:05)
+
+1. `eval_psi0.sh run`: mount file `src/simple/tasks/g1_wholebody_locomotion_pick_between_tables_teleop.py` của SIMPLE `b75c6786f87b4a7f43b52b0ac5b83a1d9ea62e11` (sha256 `51bce5d6c0311219d9a827b589910d915521dccc89b69a1ab20ff35081b6dc8f`) đè lên bản trong image, chỉ đọc. Bản trong image giống hệt `6d10628` (md5 `e116f9f3…`); `g1_sonic.py`, `psi0_decoupled_wbc.py`, `sonic_decoupled_wbc_agent.py` trong image giống `b75c678`, nên chỉ cần thay một file này. Ghi commit của file vào `summary.json`.
+2. Chạy lại `mujoco` Level 0, 10 episode, so với 0/30. Có cải thiện rõ thì chạy lại đủ 10 × 3 × 3 ở `mujoco`, rồi `mujoco_isaac`, và viết lại mục 3.5.
+3. Review PR #66: cache bộ eval theo revision và kiểm sha256 (`eval_psi0.sh` dòng 128–134); đo lại bảng mục 3.1 và đoạn so tư thế ở mục 3.5 theo S1-07 (so với train `e78fb93`: vật và khay trùng 10/10 ở Level 0/1 của cả hai bản eval; robot trùng 10/10 ở `e78fb93`, 0/10 ở `de140d6`, lùi 6,1 cm); sửa sổ chi phí (Time-spent cộng 6,75 h, dòng đo trỏ dòng ước tính, dòng chi phí Colab).
+4. B3 (độ trễ): runner `fwdata/logs/b3.sh` trên máy 3060; chạy sau bước 1 để dùng file task đã sửa.
+5. Server Colab: `colab new -s s103psi0 --gpu L4`, rồi `PSI0_ENV=image` setup như mục 3.4.1 (khoảng 8 phút), rồi mở lại hai cổng chuyển tiếp SSH.
