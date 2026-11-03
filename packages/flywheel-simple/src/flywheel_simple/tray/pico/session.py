@@ -276,6 +276,7 @@ def run_session(
                     "wall_s": round(time.monotonic() - attempt_start, 2),
                     "episode_index": episode_index,
                     "finished_at": datetime.now().isoformat(timespec="seconds"),
+                    **streamer_notes(agent),
                 }
             )
             if result.outcome == "interrupted":
@@ -296,6 +297,12 @@ def run_session(
     )
     AttemptLog(save_dir / "sessions.jsonl").append(asdict(summary))
     return summary
+
+
+def streamer_notes(agent: Any) -> dict[str, Any]:
+    """What a scripted streamer adds to the attempt log (the virtual operator's phases)."""
+    notes = getattr(getattr(agent, "_pico_streamer", None), "attempt_notes", None)
+    return dict(notes()) if callable(notes) else {}
 
 
 def _finish_episode(
@@ -334,7 +341,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--operator", required=True, help="pseudonym, e.g. op-01")
     parser.add_argument("--session", default=datetime.now().strftime("s-%Y%m%d-%H%M%S"))
     parser.add_argument("--save-dir", type=Path, default=DEFAULT_SAVE_DIR)
-    parser.add_argument("--streamer", choices=["pico", "scripted"], default="pico")
+    parser.add_argument("--streamer", choices=["pico", "scripted", "virtual"], default="pico")
     parser.add_argument("--max-attempts", type=int, default=3, help="per condition")
     parser.add_argument("--max-episode-steps", type=int, default=MAX_EPISODE_STEPS)
     parser.add_argument("--keep-failed", action="store_true", help="also save failed attempts")
@@ -347,10 +354,17 @@ def main(argv: list[str] | None = None) -> int:
     if args.streamer == "pico":
         agent = _mod("simple.agents.pico_decoupled_agent").PicoDecoupledAgent(robot)
     else:
-        from flywheel_simple.tray.pico.agent import ScriptedStreamer, StreamerDecoupledAgent
+        from flywheel_simple.tray.pico import agent as pico_agent
         from flywheel_simple.tray.pico.clock import SimClock
 
-        agent = StreamerDecoupledAgent(robot, ScriptedStreamer(), clock=SimClock())
+        streamer: Any = pico_agent.ScriptedStreamer()
+        if args.streamer == "virtual":
+            from flywheel_simple.tray.pico.operator import OperatorConfig, VirtualOperator
+            from flywheel_simple.tray.planner import PlannerConfig
+
+            operator = VirtualOperator(OperatorConfig.load())
+            streamer = pico_agent.VirtualPicoStreamer(env, operator, PlannerConfig.load())
+        agent = pico_agent.StreamerDecoupledAgent(robot, streamer, clock=SimClock())
     agent.num_episodes = len(conditions)
     try:
         summary = run_session(
@@ -360,7 +374,9 @@ def main(argv: list[str] | None = None) -> int:
             save_dir=args.save_dir,
             operator=args.operator,
             session=args.session,
-            source_detail=f"teleop_{args.streamer}",
+            source_detail="virtual_teleop"
+            if args.streamer == "virtual"
+            else f"teleop_{args.streamer}",
             keep_failed=args.keep_failed,
         )
     finally:

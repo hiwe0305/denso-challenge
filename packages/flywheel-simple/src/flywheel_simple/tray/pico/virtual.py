@@ -147,3 +147,73 @@ class JoystickShaper:
         limit = self.accel * self.dt
         self.value += float(np.clip(target - self.value, -limit, limit))
         return self.value
+
+
+TURN_FLAG = 0.1  # rad/s: G1GearWbcPolicy turns only while |vyaw| reaches this
+
+
+def _wrap(angle: float) -> float:
+    return math.atan2(math.sin(angle), math.cos(angle))
+
+
+class YawStick:
+    """The right stick's yaw as PICO turns it into `navigate_cmd[2:4]`, steered closed loop.
+
+    PicoStreamer integrates `target_yaw += vyaw * dt` from the stick, and the lower
+    body turns towards `target_yaw` only while |vyaw| >= TURN_FLAG. So the stick
+    cannot hold a heading by itself: the operator watches the body's yaw, pushes the
+    stick (at `gain` x error, between `rate_min` and `rate_max`) once it is more than
+    `engage` off the wanted heading, and lets go once it is within `release`.
+    """
+
+    def __init__(
+        self,
+        dt: float,
+        rate_max: float,
+        gain: float = 2.0,
+        rate_min: float = 0.12,
+        engage: float = math.radians(2.0),
+        release: float = math.radians(0.5),
+    ) -> None:
+        if rate_min < TURN_FLAG:
+            raise ValueError(f"rate_min {rate_min} would not raise the turn flag")
+        self.dt, self.rate_max, self.gain = dt, rate_max, gain
+        self.rate_min, self.engage, self.release = rate_min, engage, release
+        self.target_yaw = 0.0
+        self._pushing = False
+
+    def reset(self) -> None:
+        """PicoStreamer starts every episode at target yaw 0 (the robot spawns at yaw 0)."""
+        self.target_yaw = 0.0
+        self._pushing = False
+
+    def step(self, heading: float, yaw: float) -> tuple[float, float]:
+        """(vyaw, target_yaw) for this control step."""
+        error = _wrap(heading - yaw)
+        if self._pushing and abs(error) < self.release:
+            self._pushing = False
+        elif not self._pushing and abs(error) > self.engage:
+            self._pushing = True
+        vyaw = 0.0
+        if self._pushing:
+            vyaw = math.copysign(
+                min(self.rate_max, max(self.rate_min, self.gain * abs(error))), error
+            )
+        self.target_yaw = _wrap(self.target_yaw + vyaw * self.dt)
+        return vyaw, self.target_yaw
+
+
+# PICO closes a Dex3 hand in one of three fixed grasps (decoupled_wbc's
+# G1GripperInverseKinematicsSolver): trigger -> index, trigger + grip -> middle,
+# grip -> ring. PicoStreamer encodes the choice as one fingertip moved onto the thumb.
+GRASP_FINGERTIP = {"trigger": 9, "trigger_grip": 14, "grip": 19}
+THUMB_TIP = 4
+
+
+def pico_fingers(closed: bool, grasp: str = "trigger_grip") -> NDArray[np.float64]:
+    """PicoStreamer's 25 x 4 x 4 fingertip array: thumb open, `grasp`'s finger closed or not."""
+    tips = np.zeros((25, 4, 4))
+    tips[THUMB_TIP, 0, 3] = 1.0
+    if closed:
+        tips[GRASP_FINGERTIP[grasp], 0, 3] = 1.0
+    return tips
