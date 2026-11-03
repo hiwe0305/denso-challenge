@@ -84,6 +84,7 @@
       "title": "Path"
     },
     "sha256": {
+      "pattern": "^[0-9a-f]{64}$",
       "title": "Sha256",
       "type": "string"
     },

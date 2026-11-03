@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from flywheel.contracts.base import BaseRecord, canonical_json, new_ulid
+from flywheel.contracts.base import canonical_json, new_ulid
 from flywheel.store.paths import StorePaths
+from flywheel.store.views import TABLE_MODELS
+from pydantic import BaseModel
 
 
 class TableWriter:
@@ -28,17 +30,37 @@ class TableWriter:
     def _ensure_dir(self) -> None:
         self.table_dir.mkdir(parents=True, exist_ok=True)
 
-    def append(self, record: BaseRecord | dict[str, Any]) -> None:
+    def _validate_record(self, record: BaseModel | dict[str, Any]) -> BaseModel:
+        model_cls = TABLE_MODELS.get(self.table_name)
+        if model_cls is None:
+            if isinstance(record, BaseModel):
+                return record
+            raise ValueError(f"Unknown table '{self.table_name}' and record is not a BaseModel")
+
+        if isinstance(record, model_cls):
+            return record
+        if isinstance(record, dict):
+            return model_cls.model_validate(record)
+        if isinstance(record, BaseModel):
+            return model_cls.model_validate(record.model_dump(mode="json"))
+        raise ValueError(
+            f"Invalid record type for table '{self.table_name}': "
+            f"expected {model_cls.__name__} or dict, got {type(record)}"
+        )
+
+    def append(self, record: BaseModel | dict[str, Any]) -> None:
         """Append a single record as a JSON line to this partition file."""
-        line = canonical_json(record)
+        validated = self._validate_record(record)
+        line = canonical_json(validated)
         with open(self.part_path, "a", encoding="utf-8") as f:
             f.write(line + "\n")
 
-    def append_many(self, records: list[BaseRecord | dict[str, Any]]) -> None:
+    def append_many(self, records: list[BaseModel | dict[str, Any]]) -> None:
         """Append multiple records to this partition file."""
         if not records:
             return
-        lines = [canonical_json(r) for r in records]
+        validated_list = [self._validate_record(r) for r in records]
+        lines = [canonical_json(r) for r in validated_list]
         with open(self.part_path, "a", encoding="utf-8") as f:
             for line in lines:
                 f.write(line + "\n")
@@ -46,7 +68,7 @@ class TableWriter:
 
 def write_record(
     table_name: str,
-    record: BaseRecord | dict[str, Any],
+    record: BaseModel | dict[str, Any],
     paths: StorePaths | None = None,
 ) -> None:
     """Convenience helper to append a record to a new process partition."""

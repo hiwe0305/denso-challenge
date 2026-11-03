@@ -3,9 +3,11 @@
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+import pytest
 from flywheel.contracts.entities import Condition
 from flywheel.store.paths import StorePaths
-from flywheel.store.tables import TableWriter, read_table_records
+from flywheel.store.tables import TableWriter, read_table_records, write_record
+from pydantic import ValidationError
 
 
 def test_table_writer_append_and_read(tmp_path: Path) -> None:
@@ -22,6 +24,19 @@ def test_table_writer_append_and_read(tmp_path: Path) -> None:
     assert records[0]["condition_seed"] == 1
     assert records[1]["condition_seed"] == 2
     assert records[0]["site_id"] == "local"
+
+
+def test_table_writer_rejects_invalid_dict(tmp_path: Path) -> None:
+    """Feedback item 4: TableWriter validates records against table model, rejecting garbage."""
+    paths = StorePaths(root=tmp_path)
+    writer = TableWriter("episode", paths=paths)
+
+    # Raw garbage dict is rejected with ValidationError
+    with pytest.raises(ValidationError):
+        writer.append({"garbage": 1})
+
+    with pytest.raises(ValidationError):
+        write_record("episode", {"garbage": 1}, paths=paths)
 
 
 def test_concurrent_partition_writers(tmp_path: Path) -> None:

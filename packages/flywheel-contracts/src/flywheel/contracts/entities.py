@@ -70,7 +70,7 @@ class Source(ContentEntity):
     repo: str | None = None
     revision: str | None = None
     path: str | None = None
-    sha256: str
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     license: str = "unknown"
     data_class: Literal["public", "internal", "restricted"] = "restricted"
     clean_for_main_task: Literal["true", "false", "unknown"] = "unknown"
@@ -115,8 +115,10 @@ class Episode(ArtifactEpisode):
             eid = data.get("episode_id") or data.get("id")
             if not eid:
                 eid = event_id("ep")
-            elif not is_valid_event_id(str(eid), "ep"):
-                raise ValueError(f"Invalid event ID '{eid}' for prefix 'ep'")
+            else:
+                eid = str(eid).strip()
+                if not eid:
+                    raise ValueError("episode_id cannot be empty")
             data["episode_id"] = str(eid)
         return data
 
@@ -144,8 +146,10 @@ class QAReport(ArtifactQAReport):
             rid = data.get("report_id") or data.get("id")
             if not rid:
                 rid = event_id("qa")
-            elif not is_valid_event_id(str(rid), "qa"):
-                raise ValueError(f"Invalid event ID '{rid}' for prefix 'qa'")
+            else:
+                rid = str(rid).strip()
+                if not rid:
+                    raise ValueError("report_id cannot be empty")
             data["report_id"] = str(rid)
         return data
 
@@ -224,6 +228,8 @@ class Score(ContentEntity):
     ID_PREFIX: ClassVar[str] = "sc"
 
     episode_id: str
+    task_id: str = Field(default="default", min_length=1)
+    config_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     scorer_version: str = "1.0.0"
     success: bool | None = None
     step_status: list[str] = Field(default_factory=list)
@@ -314,9 +320,30 @@ class LedgerEntry(EventEntity):
     note: str | None = None
 
     @model_validator(mode="after")
-    def _validate_estimate_entry_id(self) -> Self:
-        if self.measure_kind == "estimated" and self.estimate_entry_id is not None:
-            raise ValueError("estimated entry cannot have an estimate_entry_id")
+    def _validate_ledger_entry(self) -> Self:
+        if self.measure_kind == "estimated":
+            if self.estimate_entry_id is not None:
+                raise ValueError("estimated entry cannot have an estimate_entry_id")
+        elif self.measure_kind == "measured":
+            if not self.estimate_entry_id:
+                raise ValueError("measured entry must have an estimate_entry_id")
+            if not is_valid_event_id(self.estimate_entry_id, "led"):
+                raise ValueError(
+                    f"Invalid estimate_entry_id '{self.estimate_entry_id}': "
+                    f"must be a valid 'led_' event ID"
+                )
+
+        if self.reverses_entry_id is None:
+            if self.quantity < 0:
+                raise ValueError(
+                    f"quantity cannot be negative ({self.quantity}) "
+                    "unless reverses_entry_id is set"
+                )
+            if self.usd_amount < 0:
+                raise ValueError(
+                    f"usd_amount cannot be negative ({self.usd_amount}) "
+                    "unless reverses_entry_id is set"
+                )
         return self
 
 

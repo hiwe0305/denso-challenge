@@ -94,6 +94,7 @@ def test_all_12_entities_can_be_instantiated_with_defaults() -> None:
     # 8. Score (content)
     sc = Score(
         episode_id=ep.id,
+        config_sha256="d" * 64,
         first_failed_step=2,
         failure_kind="L-GRASP",
         failure_class="grasp",
@@ -126,7 +127,7 @@ def test_all_12_entities_can_be_instantiated_with_defaults() -> None:
         quantity=2.5,
         unit="hour",
         usd_amount=7.50,
-        measure_kind="measured",
+        measure_kind="estimated",
     )
     assert led.id.startswith("led_")
 
@@ -227,3 +228,91 @@ def test_ledger_entry_measure_kind_and_estimate_id() -> None:
         estimate_entry_id=entry_est.id,
     )
     assert entry_meas.estimate_entry_id == entry_est.id
+
+    # 4. Measured entry missing estimate_entry_id is rejected
+    with pytest.raises(ValueError, match="measured entry must have an estimate_entry_id"):
+        LedgerEntry(
+            activity="train",
+            resource_type="gpu",
+            quantity=1.0,
+            unit="h",
+            usd_amount=10.0,
+            measure_kind="measured",
+        )
+
+    # 5. Measured entry with invalid estimate_entry_id format is rejected
+    with pytest.raises(ValueError, match="must be a valid 'led_' event ID"):
+        LedgerEntry(
+            activity="train",
+            resource_type="gpu",
+            quantity=1.0,
+            unit="h",
+            usd_amount=10.0,
+            measure_kind="measured",
+            estimate_entry_id="xyz",
+        )
+
+    # 6. Negative amounts rejected without reverses_entry_id
+    with pytest.raises(ValueError, match="quantity cannot be negative"):
+        LedgerEntry(
+            activity="train",
+            resource_type="gpu",
+            quantity=-1.0,
+            unit="h",
+            usd_amount=10.0,
+            measure_kind="estimated",
+        )
+    with pytest.raises(ValueError, match="usd_amount cannot be negative"):
+        LedgerEntry(
+            activity="train",
+            resource_type="gpu",
+            quantity=1.0,
+            unit="h",
+            usd_amount=-5.0,
+            measure_kind="estimated",
+        )
+
+    # 7. Negative amounts accepted when reverses_entry_id is set
+    rev = LedgerEntry(
+        activity="train",
+        resource_type="gpu",
+        quantity=-1.0,
+        unit="h",
+        usd_amount=-5.0,
+        measure_kind="estimated",
+        reverses_entry_id=entry_est.id,
+    )
+    assert rev.quantity == -1.0
+    assert rev.usd_amount == -5.0
+
+
+def test_source_sha256_must_be_hex() -> None:
+    """Feedback item 6: Source.sha256 requires 64-char lowercase hex."""
+    with pytest.raises(ValidationError):
+        Source(
+            uri="https://example.com/dataset",
+            sha256="not-a-valid-hex-sha256",
+            downloaded_at="2026-11-03T00:00:00Z",
+        )
+
+
+def test_episode_accepts_custom_episode_id() -> None:
+    """Feedback item 1 & PO decision: Catalog accepts any non-empty episode_id."""
+    ep = Episode(
+        episode_id="ep_1",
+        kind="teleop_demo",
+        operator_kind="human",
+        is_root=True,
+        condition_id="cond_1",
+        run_plan_id="rp_1",
+        bundle_uri="data/ep_1",
+        license="MIT",
+        data_class="public",
+        split="train",
+        source_kind="teleop",
+        action_quality="measured",
+        embodiment_id="g1",
+        meta=EpisodeMetadata(),
+    )
+    assert ep.id == "ep_1"
+    assert ep.episode_id == "ep_1"

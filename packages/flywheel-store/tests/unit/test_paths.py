@@ -37,3 +37,20 @@ def test_store_paths_layout(tmp_path: Path) -> None:
     expected_job = paths.runs_dir / "rp_1" / "job_1"
     assert paths.job_dir("rp_1", "job_1") == expected_job
     assert paths.job_ledger_path("rp_1", "job_1") == expected_job / "ledger.jsonl"
+
+
+def test_paths_rejects_path_traversal(tmp_path: Path) -> None:
+    """Feedback item 3: Prevent .. and / in job_dir and table_dir."""
+    paths = StorePaths(root=tmp_path)
+
+    with pytest.raises(ValueError, match="Invalid path segment"):
+        paths.job_dir("../../../escape", "job_1")
+
+    with pytest.raises(ValueError, match="Invalid path segment"):
+        paths.job_dir("rp_1", "../escape")
+
+    with pytest.raises(ValueError, match="Invalid path segment"):
+        paths.job_dir("nested/slash", "job_1")
+
+    with pytest.raises(ValueError, match="Invalid path segment"):
+        paths.table_dir("../escape")

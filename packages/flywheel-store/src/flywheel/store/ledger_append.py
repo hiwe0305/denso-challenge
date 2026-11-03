@@ -57,7 +57,12 @@ class LedgerStore:
     """Store interface for cost ledger operations."""
 
     def __init__(self, paths: StorePaths | None = None) -> None:
-        self.paths = paths or StorePaths()
+        self._paths = paths
+
+    @property
+    def paths(self) -> StorePaths:
+        """Dynamically resolve StorePaths if not explicitly provided."""
+        return self._paths if self._paths is not None else StorePaths()
 
     def append(self, entry: LedgerEntry) -> Path:
         """Append a LedgerEntry to the appropriate job ledger file."""
