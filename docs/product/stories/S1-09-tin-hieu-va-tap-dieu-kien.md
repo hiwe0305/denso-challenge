@@ -8,7 +8,7 @@
 | Người làm | Hiếu |
 | Story PRD | 1.8 (story mới do PO thêm) · Epic 1 |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:sim` · `spike` |
-| Sprint | S1, tuần 2 |
+| Sprint | S1, tuần 2 · **Lịch 3/11/2026:** dời sau 13/11/2026 (07 mục 2.4) |
 | Ước lượng | 8 giờ |
 | Phụ thuộc | S1-02. Là đầu vào cho scorer của task hai bàn và tập điều kiện ở S2, cho tập eval của HE (DA-26) |
 
@@ -71,6 +71,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Đổi sang task khay → máy trên MuJoCo; chuyển cho Hưng | PO (Hiếu) theo hai design 25/10/2026 (đã xóa) |
 | 27/10/2026 | Về lại SIMPLE trên task hai bàn: tín hiệu theo decoupled WBC, thăng bằng, vị trí so với hai bàn; đối chiếu `check_success`, `decompose()`, L-WALK; dải seed rời `simple-eval`; phụ thuộc S1-02; người làm chờ PO giao | PO (Hiếu) theo design 27/10/2026 |
 | 27/10/2026 | Giao cho Hiếu theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
+| 3/11/2026 | Dời sau 13/11/2026 khi cắt phạm vi của Hiếu (07 mục 2.4, bản 1.2) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

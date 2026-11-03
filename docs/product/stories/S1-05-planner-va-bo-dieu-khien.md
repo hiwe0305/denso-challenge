@@ -8,7 +8,7 @@
 | Người làm | Hiếu |
 | Story PRD | 1.5, phần Q2 (AC 1 và AC 4 cho cờ `plan`) · Epic 1; phần xây tuyến của 5.5 cho task hai bàn |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:sim` · `spike` |
-| Sprint | S1 tuần 2 đến S2 tuần 3; có ít nhất 50 episode sinh đạt trước 13/11/2026 cho demo |
+| Sprint | S1 tuần 2 đến S2 tuần 3; có ít nhất 50 episode sinh đạt trước 13/11/2026 cho demo · **Lịch 3/11/2026:** dời sau 13/11/2026 (07 mục 2.4). Episode synthetic S1 của demo lấy từ task khay (DA-33) |
 | Ước lượng | 20 giờ (bản 22/10: 6 giờ, chỉ trả lời Q2) |
 | Phụ thuộc | S1-02; tuyến chọn ở S1-11 (bắt đầu trên tuyến B trong lúc chờ, vì `datagen` có sẵn) |
 
@@ -75,6 +75,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Hủy: teleop, planner và policy chạy cùng bộ điều khiển trên MuJoCo | PO (Hiếu) theo design 25/10/2026 (đã xóa) |
 | 27/10/2026 | Mở lại thành sinh tự động cho task hai bàn: dựng tuyến S1-11 chọn, 50 lượt, xuất LeRobot có `meta`, 50 episode đạt cho demo; thêm `scripts/g0/autogen/`; người làm chờ PO giao; 6 → 20 giờ | PO (Hiếu) theo design 27/10/2026 |
 | 27/10/2026 | Giao cho Hiếu theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
+| 3/11/2026 | Dời sau 13/11/2026 khi cắt phạm vi của Hiếu (07 mục 2.4, bản 1.2) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

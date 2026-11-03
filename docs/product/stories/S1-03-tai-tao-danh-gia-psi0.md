@@ -8,7 +8,7 @@
 | Người làm | Hiếu |
 | Story PRD | 1.3 · Epic 1 |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:rl` |
-| Sprint | S1 (tuần 1–2) |
+| Sprint | S1 (tuần 1–2) · **Lịch 3/11/2026:** trước 8/11/2026 chỉ làm phần DA-26 cần: serve Ψ₀ (nhiệm vụ 2), mốc so task hai bàn (nhiệm vụ 6 hoặc 7), checkpoint ablation (nhiệm vụ 8); nhiệm vụ 3, 4, 5 sau 13/11 (07 mục 2.4) [Đề xuất] |
 | Ước lượng | 28 giờ (bản 22/10: 20 giờ; thêm task hai bàn và chế độ `mujoco`) |
 | Phụ thuộc | S1-02 cho phần chạy trong SIMPLE. Phần serve Ψ₀ và Q0 bắt đầu ngày 1 |
 
@@ -86,6 +86,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 27/10/2026 | Thêm AC 9–11 và nhiệm vụ con 6–8: tái tạo task hai bàn (mốc của HE), so `mujoco` với `mujoco_isaac`, Q0 cho checkpoint ablation; giữ số nhiệm vụ con cũ vì nhánh S1-03 đang mở; 20 → 28 giờ | PO (Hiếu) theo design 27/10/2026 |
 | 24/10/2026 | Thêm mục Phạm vi file. AC 8: đề xuất dòng V2, V8 (phần suy luận) ghi trong file kết quả, Hiếu gom vào 03 §3.3 ở review G0; sổ chi phí riêng của story. Nhiệm vụ con 2.1 giữ image Ψ₀ ở `docker/psi0/` cho cả S1-04 | PO (Hiếu) |
 | 28/10/2026 | Bỏ phần việc của Hưng và Châu theo 07 mục 2.0 bản 0.6; dự phòng chưa giao | PO (Hiếu) |
+| 3/11/2026 | Cắt phạm vi trước 13/11/2026: chỉ làm phần DA-26 cần (07 mục 2.4, bản 1.2) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

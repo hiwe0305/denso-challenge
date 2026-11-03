@@ -11,7 +11,7 @@
 | Nhãn | [Adapter] · `epic:9` · `gate:G1` · `area:rl` |
 | Sprint | S2–S3; lần chạy ngắn trên EgoDex trước 13/11/2026 cho demo; fine-tune trên video tự quay khi còn thời gian |
 | Ước lượng | 12 giờ người (khoảng 10–15, ước lượng); GPU-giờ ghi trong sổ |
-| Phụ thuộc | DA-18 (bản export stage 1), DA-19 (adapter train trên Colab), DA-09 (probe P1, P2, P4) |
+| Phụ thuộc | DA-18 (bản export stage 1), DA-19 (adapter train trên Colab), DA-09 (probe P1, P2, P4; **3/11/2026:** dời sau demo, lần chạy ngắn trước 13/11 báo loss và closed-loop, probe sau demo) |
 
 ## Story
 
@@ -59,6 +59,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 27/10/2026 | Tạo story, tách AC 3–5 từ DA-18 | PO (Hiếu) |
+| 3/11/2026 | DA-09 dời sau demo: lần chạy ngắn chưa có probe (07 mục 2.4, bản 1.2) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

@@ -9,7 +9,7 @@
 | Làn | Adapter simulator (`flywheel-simple`) |
 | Story PRD | 9.26 · Epic 9 · [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 5.4 · spec mục 6.10, tuyến T2 ở mục 10 |
 | Nhãn | [Adapter] · `epic:9` · `gate:G1` · `area:sim` |
-| Sprint | S2; ít nhất 30 biến thể đạt trước 13/11/2026 cho demo |
+| Sprint | S2; ít nhất 30 biến thể đạt trước 13/11/2026 cho demo · **Lịch 3/11/2026:** dời sau 13/11/2026 (07 mục 2.4). Biến thể S2 của demo lấy từ task khay (DA-35) |
 | Ước lượng | 18 giờ (khoảng 15–20, ước lượng) |
 | Phụ thuộc | S1-02 (SIMPLE), S1-06 (Q3, cho phần correction), DA-03 (đoạn teleop đã cắt theo bước). Trong lúc chờ DA-03: cắt tay vài đoạn psi-data |
 
@@ -65,6 +65,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 |---|---|---|
 | 27/10/2026 | Tạo story: trưởng nhóm chốt synthetic S1 và S2 trước demo | PO (Hiếu) |
 | 27/10/2026 | Giao cho Hiếu theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
+| 3/11/2026 | Dời sau 13/11/2026 khi cắt phạm vi của Hiếu (07 mục 2.4, bản 1.2) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

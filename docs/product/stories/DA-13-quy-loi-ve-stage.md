@@ -11,7 +11,7 @@
 | Nhãn | [Lõi] · `epic:9` · `gate:G4` · `area:core` |
 | Sprint | S3 · **Lịch 3/11/2026:** kéo lên S2: merge trước **10/11/2026** cho phần 6 của demo (thay S3) |
 | Ước lượng | 9 giờ (khoảng 8–10, 07 mục 2.2) |
-| Phụ thuộc | DA-25 (file mẫu probe, log RTC); DA-09 (probe P1–P4 thật); DA-08 (cờ T7); `Trace` từ SIMPLE (khoảng 6/11). **3/11/2026:** hợp đồng `TraceStep`, `CameraParams` và 4 file mẫu (issue #31, Long, 6/11); hook `SimpleSim` ghi trace thật (Hiếu, 8/11). Trên psi-data chỉ R3 thân trên tính được; R3 thân dưới, R4, R5 ra CHƯA RÕ vì gói không ghi tín hiệu đo. Trong lúc chờ code trên file mẫu |
+| Phụ thuộc | DA-25 (file mẫu probe, log RTC); DA-09 (probe P1–P4 thật; **3/11/2026:** dời sau demo, phần quy lỗi theo probe của demo chạy trên file mẫu probe của DA-25); DA-08 (cờ T7); `Trace` từ SIMPLE (khoảng 6/11). **3/11/2026:** hợp đồng `TraceStep`, `CameraParams` và 4 file mẫu (issue #31, Long, 6/11); hook `SimpleSim` ghi trace thật (Hiếu, 8/11). Trên psi-data chỉ R3 thân trên tính được; R3 thân dưới, R4, R5 ra CHƯA RÕ vì gói không ghi tín hiệu đo. Trong lúc chờ code trên file mẫu |
 
 ## Story
 
@@ -70,6 +70,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 30/10/2026 | Chốt bảng quy lỗi về stage theo spec v10.5 mục 6.4 (khớp design mục 10); sửa ghi chú cho người làm | PO (Hiếu) |
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 | 3/11/2026 | Phụ thuộc: hợp đồng `TraceStep`, `CameraParams` (issue #31) và hook `SimpleSim`; nguồn tín hiệu R3–R5 trên psi-data | PO (Hiếu) theo issue #31 |
+| 3/11/2026 | DA-09 dời sau demo: probe của demo dùng file mẫu (07 mục 2.4, bản 1.2) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

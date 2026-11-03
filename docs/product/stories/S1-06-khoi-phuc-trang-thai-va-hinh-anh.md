@@ -8,7 +8,7 @@
 | Người làm | Hiếu |
 | Story PRD | 1.5, phần Q3 và Q4 · Epic 1 |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:sim` · `spike` |
-| Sprint | S1. Câu trả lời ở G0 được phép là "tạm"; chốt cuối trong story 6.4 (S3) |
+| Sprint | S1. Câu trả lời ở G0 được phép là "tạm"; chốt cuối trong story 6.4 (S3) · **Lịch 3/11/2026:** dời sau 13/11/2026 (07 mục 2.4) |
 | Ước lượng | 8 giờ (bản 25/10: 4 giờ trên MuJoCo riêng) |
 | Phụ thuộc | S1-02 |
 
@@ -68,6 +68,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Đổi sang env MuJoCo của robot DENSO; 8 → 4 giờ; chuyển cho Hưng | PO (Hiếu) theo hai design 25/10/2026 (đã xóa) |
 | 27/10/2026 | Về lại SIMPLE trên task hai bàn; thêm AC 3 (tham số ngẫu nhiên hóa đổi được); phụ thuộc S1-02; người làm chờ PO giao; 4 → 8 giờ | PO (Hiếu) theo design 27/10/2026 |
 | 27/10/2026 | Giao cho Hiếu theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
+| 3/11/2026 | Dời sau 13/11/2026 khi cắt phạm vi của Hiếu (07 mục 2.4, bản 1.2) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

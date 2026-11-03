@@ -8,7 +8,7 @@
 | Người làm | Hiếu |
 | Story PRD | 1.9 · Epic 1 (story mới ở 02 bản 0.3, tách từ AC 5 cũ của 1.5) |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:sim` · `spike` |
-| Sprint | S1. **Bảng đối chiếu xong trước thứ Sáu 30/10/2026.** Chốt tuyến sinh tự động cuối tuần 2 ở review G0 |
+| Sprint | S1. **Bảng đối chiếu xong trước thứ Sáu 30/10/2026.** Chốt tuyến sinh tự động cuối tuần 2 ở review G0 · **Lịch 3/11/2026:** dời sau 13/11/2026 (07 mục 2.4) |
 | Ước lượng | 8 giờ (bản 22/10: 18 giờ gồm thử T1, T2; phần xây tuyến nay thuộc S1-05) |
 | Phụ thuộc | Bước 1 không cần S1-02 (đọc cấu hình, mã SIMPLE và metadata checkpoint). Bước 3 cần S1-02. Chặn S1-05 phần chọn tuyến, DA-03 phần trộn nguồn |
 
@@ -74,6 +74,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Hủy: không còn V3 vì teleop, planner và policy chạy cùng bộ điều khiển trên MuJoCo | PO (Hiếu) theo design 25/10/2026 (đã xóa) |
 | 27/10/2026 | Mở lại cho task hai bàn: bảng đối chiếu với task MP có đi bộ, đọc metadata ba checkpoint của tác giả, thử tuyến A và B, chọn tuyến; phần xây tuyến chuyển sang S1-05; người làm chờ PO giao; 18 → 8 giờ | PO (Hiếu) theo design 27/10/2026 |
 | 27/10/2026 | Giao cho Hiếu theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
+| 3/11/2026 | Dời sau 13/11/2026 khi cắt phạm vi của Hiếu (07 mục 2.4, bản 1.2) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

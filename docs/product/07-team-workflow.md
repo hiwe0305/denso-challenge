@@ -4,6 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Đầu vào
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 3/11/2026 | 1.2 | Mục 2.4: cắt phạm vi của Hiếu trước 13/11 (dời S1-05, DA-29, S1-06, S1-09, S1-11, DA-16, DA-09; S1-02, S1-03, S1-04 chỉ làm phần DA-26 cần) và thêm hạn cho việc của Hiếu trên đường găng | PO (Hiếu) |
 | 3/11/2026 | 1.1 | Mục 2.4: thêm PR hợp đồng `TraceStep`, `CameraParams` của Long (6/11) và hook `SimpleSim` của Hiếu (8/11) theo quyết định issue #31 (làm đủ R3–R5 cho demo) | PO (Hiếu) |
 | 3/11/2026 | 1.0 | Mục 2.0 (bảng dữ liệu đi giữa người): Hưng giao Long `AgentReport` thay `QAReport` (issue #34; 03 bản 0.8). Mục 2.2, DA-01: layout action G1 là 36 chiều thật của Ψ₀, không phải đệm (đối chiếu `src/psi/data/simple/__init__.py` ở `cda3fdf` và gói psi-data task hai bàn). Thêm mục 2.4 lịch hoàn thiện 13/11/2026; DA-31 và `agentqa/bench/` chuyển sang Châu (mục 2.1, 2.2) | PO (Hiếu) |
 | 28/10/2026 | 0.9 | Mục 3.4: lệnh merge chuẩn `--admin --rebase` và lý do PR xanh vẫn BLOCKED (ruleset "Only Hiếu merges into master") | PO (Hiếu) |
@@ -182,6 +183,11 @@ Hiếu phải hoàn thiện mọi thứ cho demo trước **13/11/2026**, nên h
 | Long | DA-01: `action_layout` G1 theo layout của Ψ₀ | S1 | 5/11 |
 | Long | PR hợp đồng `TraceStep`, `CameraParams` và 4 file mẫu (issue #31; bản 1.1) | — | 6/11 |
 | Hiếu | Hook trong `SimpleSim` ghi `TraceStep` và `CameraParams` từ MuJoCo (issue #31; bản 1.1) | — | 8/11 |
+| Hiếu | DA-19: đọc log, `Psi0Trainer` stage 3, lớp bọc log ra `metrics.jsonl`; fine-tune chạy được trên Colab (bản 1.2) | S1–S2 | `metrics.jsonl` đầu tiên 6/11; fine-tune 8/11 |
+| Hiếu | S1-03, S1-04: chỉ phần DA-26 cần (serve Ψ₀, mốc so task hai bàn, giờ fine-tune và eval; bản 1.2) | S1 | 8/11 |
+| Hiếu | DA-33 nhiệm vụ 8, 9: xuất sang định dạng Ψ₀, lô sản xuất, release có hash (nhiệm vụ 5–7 ở #39; bản 1.2) | 8/11 (M2) | 8/11 |
+| Hiếu | DA-35: demo cha teleop ảo, rồi lô S2 (nhiệm vụ 1–4 ở #40; bản 1.2) | — | demo cha 10/11; S2 13/11 |
+| Hiếu | DA-26: HE sơ bộ V-EGO, V-NOEGO ở N = 20, 80; DA-34: nhánh A, C, C-NOEGO; DA-30: lần chạy stage 1 ngắn trên EgoDex (bản 1.2) | S1–S3 | 12/11 |
 | Long | DA-23 runner eval; DA-28 lệnh và kịch bản demo | S2 | 10/11; chạy thử 12/11 |
 | Hưng | DA-04 nhiệm vụ 1, 2, 3, 4, 6 | 10/11 | 7/11 |
 | Hưng | DA-18: export EgoDex cho stage 1 (để Hiếu chạy DA-30) | 10/11 | 8/11 |
@@ -190,7 +196,15 @@ Hiếu phải hoàn thiện mọi thứ cho demo trước **13/11/2026**, nên h
 | Châu | Khung scorer từng bước (04 mục 4.2, story 3.3) | S2 | 8/11 |
 | Châu | DA-13: kiểm hệ thống và quy lỗi về stage (phần 6 của demo); R3–R5 trên file mẫu trước, trên trace thật từ 8/11 | S3 | 10/11 |
 | Châu | DA-31: bộ chấm lỗi cấy (chuyển từ Hưng) | 13/11 | 11/11 |
-| Sau 13/11 | Hiệu chỉnh scorer (story 3.5), DA-21 (v3), DA-04 nhiệm vụ 5 và 7, DA-20 nhiệm vụ 6 và 7 | | sau demo |
+| Sau 13/11 | Hiệu chỉnh scorer (story 3.5), DA-21 (v3), DA-04 nhiệm vụ 5 và 7, DA-20 nhiệm vụ 6 và 7; của Hiếu (bản 1.2): S1-05, DA-29, S1-06, S1-09, S1-11, DA-16, DA-09, phần S1-02, S1-03, S1-04 mà DA-26 không cần | | sau demo |
+
+**Cắt phạm vi của Hiếu [Đã chốt 3/11/2026, bản 1.2].** Phần của Hiếu tới 13/11 dồn vào đường găng của demo: DA-19 (code train, `metrics.jsonl`) → DA-26 (HE sơ bộ); DA-33 → DA-34 (task khay); hook `SimpleSim`; DA-35. Dời sau 13/11: S1-05, DA-29, S1-06, S1-09, S1-11, DA-16, DA-09. S1-02, S1-03, S1-04 chỉ làm phần DA-26 cần. Hệ quả cho người khác:
+
+- DA-28: synthetic S1 và S2 của demo lấy từ task khay (DA-33, DA-35) thay S1-05, DA-29; demo không có teleop bàn phím (DA-16).
+- DA-13: phần quy lỗi theo probe của demo chạy trên file mẫu probe của DA-25; probe thật (DA-09) sau demo. R1–R6 không đổi.
+- DA-30: lần chạy ngắn trước 13/11 báo loss và closed-loop, chưa có probe.
+
+Hạn các dòng Hiếu thêm ở bản 1.2 (DA-19, S1-03, S1-04, DA-26, DA-34, DA-30) là [Đề xuất] của Claude theo mốc có sẵn (`metrics.jsonl` 6/11, M2 8/11, M4 12/11); Hiếu chốt khi merge.
 
 Tải còn lại tới 11/11 theo ước lượng của mục 2.2 và file story (chỉ phần trong bảng; giả định, chưa trừ phần đã làm trên nhánh chưa merge): Hưng khoảng 50 giờ, Thông khoảng 48 giờ, Long khoảng 36 giờ, Châu khoảng 29 giờ, trong 9 ngày. DA-31 chuyển sang Châu để giảm tải cho Hưng. Ai thấy không kịp thì báo trong báo cáo ngày (issue #2) ngay khi biết, không đợi tới hạn.
 
