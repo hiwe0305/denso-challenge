@@ -28,6 +28,8 @@ Là kỹ sư duyệt một cụm lỗi ở phần 6 của demo, tôi muốn mộ
 7. Contract test: khứ hồi JSON, ghi đè thiếu lý do bị từ chối, phép kiểm thiếu ngưỡng hoặc thiếu lý do không chấm bị từ chối, schema khớp file đã commit.
 8. Seam `6-EvidenceCard` qua (không còn xfail); dòng seam ghi chủ, story và hạn.
 9. Card **không** là bảng catalog: không thêm vào `TABLE_MODELS` của store (03 mục 2.4: sinh lại từ Cluster và Decision, không có revision ở L0).
+10. (PO P1, 4/11/2026) Card ghi tại `runs/<run_plan_id>/cards/<cluster_id>/card.json`, HTML để cạnh. Quy tắc đường dẫn nằm ở một chỗ: `StorePaths.card_path` của `flywheel.store.paths`. `Cluster.card_uri` không được ghi (ghi vào thì đổi ID nội dung của cụm); có test chứng minh ID cụm không đổi khi card được ghi.
+11. (PO P4, 4/11/2026) Chẩn đoán hoặc can thiệp bị ghi đè nằm trong `Decision.criteria` dưới hai khóa `override.diagnosis`, `override.intervention`, khai bằng hằng số trong `flywheel.contracts.evidence`; có test khứ hồi từ `Decision` sang `EngineerDecision` của card.
 
 ## Nhiệm vụ
 
@@ -35,6 +37,8 @@ Là kỹ sư duyệt một cụm lỗi ở phần 6 của demo, tôi muốn mộ
 - [x] 2. JSON Schema và file mẫu dùng chung, kèm script sinh lại (AC 6)
 - [x] 3. Contract test (AC 7)
 - [x] 4. Dòng seam: vị trí hợp đồng, chủ, story, hạn (AC 8)
+- [x] 5. Đường dẫn card trong `StorePaths`, ghi chú `Cluster.card_uri` không dùng ở L0-lite, test ID cụm không đổi (AC 10)
+- [ ] 6. Khóa ghi đè trong `Decision.criteria` và `EngineerDecision.from_decision` (AC 11)
 
 ## Phạm vi file
 
@@ -45,12 +49,18 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `packages/flywheel-contracts/tests/test_evidence.py`, `packages/flywheel-contracts/tests/generate_evidence_card.py`
 - `packages/flywheel-testkit/src/flywheel/testkit/fixtures/artifacts/EvidenceCard.json`
 - `tests/e2e/test_demo_seams.py`: chỉ dòng seam `EvidenceCard`
+- `packages/flywheel-store/src/flywheel/store/paths.py`: chỉ `card_dir`, `card_path` (PO P1)
+- `packages/flywheel-store/tests/unit/test_card_paths.py`
+- `packages/flywheel-contracts/src/flywheel/contracts/entities.py`: chỉ ghi chú trên `Cluster.card_uri` (PO P1)
 
-## Chỗ cần PO quyết
+## Quyết định của PO
 
-1. **Card nằm ở đâu.** 03 mục 4.3 ghi CheckResult và EvidenceCard nằm trong `meta` của Cluster. Nhưng Cluster là thực thể địa chỉ hóa nội dung: `meta` nằm trong hash nên ghi card vào đó đổi ID cụm, và card lại chứa `cluster_id`, quyết định (Decision là sự kiện đến sau) và kết quả train lại. Story này giữ card là artifact không lưu trong catalog, sinh lại từ Cluster, Score, bản ghi chẩn đoán và Decision; đề xuất ghi file ở `Cluster.card_uri`. 03 không sửa trong story này.
-2. **Vị trí hợp đồng.** Dòng seam cũ ghi `entities:EvidenceCard`, nhưng `entities.py` là 12 thực thể catalog. Story đặt model ở `flywheel.contracts.evidence` và sửa dòng seam theo.
-3. **07 mục 2.2 và 2.4** chưa có dòng DA-39; PO thêm khi duyệt.
+PO chốt ngày 4/11/2026 trên #82 ("Chốt theo đề xuất"), kèm sửa ở P1:
+
+1. **[Đã chốt] P1 · Card nằm ở đâu.** 03 mục 4.3 ghi card nằm trong `meta` của Cluster, nhưng Cluster địa chỉ hóa nội dung: `meta` và cả `card_uri` đều nằm trong hash, nên ghi card hay đường dẫn của nó vào Cluster đều đổi ID cụm. Card ghi tại đường dẫn suy từ ID cụm, `runs/<run_plan_id>/cards/<cluster_id>/card.json` (AC 10); `Cluster.card_uri` để `None`. Dòng 03 mục 4.3 sửa ở PR tài liệu riêng.
+2. **[Đã chốt] P2 · Vị trí hợp đồng.** Giữ `flywheel.contracts.evidence`; dòng seam như đã sửa.
+3. **[Đã chốt] P3 · 07.** Đăng ký DA-39 trong 07 mục 2.2 và 2.4 ở PR tài liệu riêng, không trong story này.
+4. **[Đã chốt] P4 · Ghi đè trong Decision.** Khóa `override.diagnosis` và `override.intervention` của `Decision.criteria` (AC 11).
 
 ## Ghi chú cho người làm
 
@@ -74,3 +84,4 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 4/11/2026 | Tạo story theo yêu cầu của PO; mã DA-39 chưa dùng trong 07 và trên các nhánh | Hiếu |
+| 4/11/2026 | Ghi quyết định P1–P4 của PO; thêm AC 10, 11, nhiệm vụ 5, 6 và ba đường dẫn vào phạm vi file | Hiếu |

@@ -78,6 +78,22 @@ class StorePaths:
         """Return job cost ledger path: runs/<run_plan_id>/<job_id>/ledger.jsonl."""
         return self.job_dir(run_plan_id, job_id) / "ledger.jsonl"
 
+    def card_dir(self, run_plan_id: str, cluster_id: str) -> Path:
+        """Return evidence card directory: runs/<run_plan_id>/cards/<cluster_id>/.
+
+        The path is derived from the cluster id, never written into the Cluster:
+        `Cluster.card_uri` is part of its content id, so setting it after the card
+        is built would give the cluster a new id (DA-39, PO decision P1, 4/11/2026).
+        The HTML of the card goes beside card.json.
+        """
+        _validate_path_segment(run_plan_id, "run_plan_id")
+        _validate_path_segment(cluster_id, "cluster_id")
+        return self.runs_dir / run_plan_id / "cards" / cluster_id
+
+    def card_path(self, run_plan_id: str, cluster_id: str) -> Path:
+        """Return evidence card file path: runs/<run_plan_id>/cards/<cluster_id>/card.json."""
+        return self.card_dir(run_plan_id, cluster_id) / "card.json"
+
     def ensure_dirs(self) -> None:
         """Ensure standard directories exist on disk."""
         self.site_dir.mkdir(parents=True, exist_ok=True)
