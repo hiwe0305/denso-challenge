@@ -9,6 +9,7 @@ _Kết quả của story [S1-03](../product/stories/S1-03-tai-tao-danh-gia-psi0.
 | 1.3 Câu hỏi provenance cho PSI Lab | Chưa |
 | 2.1–2.2 Môi trường và script serve | Smoke không model đạt trên máy dev 24/10/2026; nạp model và `/act` chờ máy 5090 (mục 2) |
 | 2.3–5 Đo VRAM, độ trễ, đánh giá, độ không tất định | Chưa; cần máy 5090 |
+| 8 Checkpoint ablation của HE (AC 11) | Liệt kê xong 3/11/2026 (mục 4); câu hỏi Q-27E chờ Hiếu gửi PSI Lab |
 
 ## 1. Q0 · Checkpoint trong `psi0/`
 
@@ -170,3 +171,23 @@ bash scripts/g0/eval_psi0.sh smoke --calls 5
 ```
 
 Lệnh cuối chạy ở terminal khác, sau khi server in `Server listens on 0.0.0.0:22085`. Cần NVIDIA container toolkit trên máy 5090; nếu chưa có thì bỏ `PSI0_RUNTIME=docker` (venv) và ghi lại giới hạn ở mục 2.3 ý 2. Trước khi chạy, kiểm GPU không bị tiến trình khác chiếm (`nvidia-smi`). `check` trên 5090 phải báo `fits_gpu_bf16: true`. Smoke đạt thì mới chạy nhiệm vụ con 2.3 (VRAM, p99 độ trễ) và 3.
+
+## 4. Checkpoint ablation của thí nghiệm HE (AC 11, nhiệm vụ con 8)
+
+Kiểm ngày 3/11/2026. `psi-model` đã có revision mới `76febdc998e5d32a1ed978c286018752676fce64` (commit 02/11/2026). Sáu thư mục dưới đây giống hệt nhau ở revision ghim `cb1480f…` và ở `76febdc…`: cùng danh sách file, cùng sha256 của mọi file LFS. Vì vậy giữ revision ghim `cb1480f…` cho DA-26, không cần đổi.
+
+| Vai trò trong HE | VLM (`pre.*`) | sha256 `model.safetensors` | Action header (`postpre.*`) | sha256 `action_header.safetensors` |
+|---|---|---|---|---|
+| Chỉ HE, không EgoDex | `pre.abl.only.he.2512311516.48k` | `a2ae8c24f83c90dea78282defc6abbbd5475e77ede24e1538c9b3b38ec457f4e` | `postpre.abl.only.he.2602050012` | `9118bc03bebd53cbf3567c9e220618e90f8605a5cf4247aa878747b17de2a7e0` |
+| 10% EgoDex | `pre.abl.ego.10per.2602021632.46k` | `e84a51035b517c7729e78dcc5cebc8a7f758adf4cf7c161b515d8a46190c8655` | `postpre.abl.ego.10per.2602050006` | `921de23437374d996c3225e6be0bb7acf12bf3098152a596fea7664d778afdc4` |
+| Gốc EgoDex 200k + HE 30k | `pre.fast.1by1.2601091803.ckpt.ego200k.he30k` | `6e63da17bdd22430bc07c40e4b14ebb96c9d124d014c532449142862c186d3f9` | `postpre.1by1.pad36.2601131206.ckpt.he30k` | `238b4d95862b0eb44bffa75a2ae69e120aeda3d159fd6f29802dd9338019e14d` |
+
+Chung cho cả sáu: tải lên ngày 12/03/2026; mỗi `pre.*` có 12 file, 4,279 GB, VLM Qwen3-VL bf16, cùng `tokenizer.json` (sha256 `aeb13307a71acd8f…`); mỗi `postpre.*` chỉ có một file action header 1,991 GB. Không có file nào ghi số bước, dữ liệu hay recipe; các số `48k`, `46k`, `ego200k`, `he30k` chỉ là tên thư mục.
+
+Dữ kiện quan trọng cho DA-26: checkpoint task hai bàn của tác giả (`g1wholebodylocomotionpickbetweentablesteleop-v0…b64.gpus4.2604081126`, mục 3) được fine-tune từ đúng cặp "gốc" ở dòng thứ ba (`argv.txt`: `model_name_or_path` và `pretrained-action-header-path`), VLM đóng băng, 40 000 bước, batch 16 × 4 GPU. Như vậy mốc so ở mục 3 là nhánh "EgoDex + HE" của HE với recipe post-train đã biết; hai nhánh ablation chỉ khác cặp khởi tạo nếu PSI Lab xác nhận cùng recipe ở bước `postpre`.
+
+Câu hỏi Q-27E gửi PSI Lab (Hiếu gửi, chung email giấy phép ở nhiệm vụ con 1.3) [Đề xuất]:
+
+1. Số bước pretrain VLM thật của `pre.abl.only.he…48k` và `pre.abl.ego.10per…46k`: 48k, 46k là số bước hay số mẫu? Batch và dữ liệu (HE đủ, 10% EgoDex chọn thế nào)?
+2. Ba `postpre.*` (`abl.only.he`, `abl.ego.10per`, `1by1.pad36…he30k`) có cùng recipe post-train action header không (dữ liệu, số bước, batch, lr)? `he30k` nghĩa là 30k bước trên HE?
+3. Sáu checkpoint này có train trên dữ liệu SIMPLE hoặc sonic không (điều kiện `clean_for_main_task` của AC 6)?
