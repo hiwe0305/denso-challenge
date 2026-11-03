@@ -1,10 +1,19 @@
 """Unit and contract tests for TraceStep and CameraParams (Issue #31)."""
 
+import hashlib
 import json
+import math
 from pathlib import Path
 
 import pytest
-from flywheel.contracts.trace import LOWER_BODY, UPPER_BODY, CameraParams, TraceStep
+from flywheel.contracts.trace import (
+    CAMERA_NAME,
+    LOWER_BODY,
+    STEPS_NAME,
+    UPPER_BODY,
+    CameraParams,
+    TraceStep,
+)
 from pydantic import ValidationError
 
 FIXTURES_DIR = (
@@ -32,8 +41,8 @@ def test_valid_trace_step_fixture() -> None:
 def test_valid_camera_params_fixture() -> None:
     path = FIXTURES_DIR / "artifacts" / "CameraParams.json"
     cam = CameraParams.model_validate_json(path.read_text(encoding="utf-8"))
-    assert cam.width == 640
-    assert cam.height == 480
+    assert cam.trace_id == "tr_clean"
+    assert (cam.width, cam.height) == (640, 360)
     assert len(cam.pose) == 7
     assert CameraParams.model_validate_json(cam.model_dump_json()) == cam
 
@@ -113,8 +122,7 @@ def test_run_plan_id_refuses_a_malformed_g0_id(run_plan_id: str) -> None:
 
 
 def test_missing_signals_counts_dropped_frames_per_cycle() -> None:
-    path = FIXTURES_DIR / "trace" / "missing_signals.jsonl"
-    steps = [TraceStep.model_validate_json(line) for line in path.read_text().splitlines()]
+    steps = _steps("tr_missing")
     # a frame is due on even cycles (25 Hz camera, 50 Hz loop); from cycle 30 each is lost
     assert {s.dropped_frames for s in steps} == {0, 1}
     for s in steps:
@@ -125,10 +133,19 @@ def test_missing_signals_counts_dropped_frames_per_cycle() -> None:
     assert sum(s.dropped_frames for s in steps) == 35
 
 
+def test_camera_params_needs_its_trace_id() -> None:
+    row = json.loads((FIXTURES_DIR / "artifacts" / "CameraParams.json").read_text("utf-8"))
+    del row["trace_id"]
+    with pytest.raises(ValidationError) as exc:
+        CameraParams.model_validate(row)
+    assert "trace_id" in str(exc.value)
+
+
 def test_camera_params_pose_validation() -> None:
     # Invalid pose length (not 7)
     with pytest.raises(ValidationError) as exc1:
         CameraParams(
+            trace_id="tr1",
             episode_id="ep1",
             uid="cam1",
             mount="head",
@@ -146,6 +163,7 @@ def test_camera_params_pose_validation() -> None:
     # Unnormalized quaternion
     with pytest.raises(ValidationError) as exc2:
         CameraParams(
+            trace_id="tr1",
             episode_id="ep1",
             uid="cam1",
             mount="head",
@@ -161,28 +179,83 @@ def test_camera_params_pose_validation() -> None:
     assert "quaternion [qw, qx, qy, qz] must be normalized" in str(exc2.value)
 
 
-@pytest.mark.parametrize(
-    "trace_name",
-    ["clean.jsonl", "r4_sync_delay.jsonl", "r5_calibration_offset.jsonl", "missing_signals.jsonl"],
-)
-def test_trace_dataset_fixtures_loading(trace_name: str) -> None:
-    path = FIXTURES_DIR / "trace" / trace_name
-    assert path.is_file(), f"Missing trace fixture: {path}"
-    lines = [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
-    assert len(lines) == 100, f"Expected 100 cycles, got {len(lines)}"
-    for idx, line in enumerate(lines):
-        step = TraceStep.model_validate_json(line)
-        assert step.step == idx
+TRACE_DIR = FIXTURES_DIR / "trace"
+TRACES = ["tr_clean", "tr_sync_delay", "tr_calib_offset", "tr_missing"]
+# Two-table G0 camera reference (DA-38 docs/g0/camera-reference-two-table.yaml at f94d5bc)
+REFERENCE_SHA256 = "fc7f9c90ebbf8c4662fd70e58de5aed668c0fbc5ccfbbd951dce705729cdeea2"
 
 
-def test_camera_dataset_fixtures_loading() -> None:
-    for name in ["camera_clean.json", "camera_offset.json"]:
-        path = FIXTURES_DIR / "trace" / name
-        assert path.is_file(), f"Missing camera fixture: {path}"
-        cam = CameraParams.model_validate_json(path.read_text(encoding="utf-8"))
-        assert cam.width > 0
-        assert cam.height > 0
-        assert len(cam.pose) == 7
+def _steps(trace_id: str) -> list[TraceStep]:
+    text = (TRACE_DIR / trace_id / STEPS_NAME).read_text(encoding="utf-8")
+    return [TraceStep.model_validate_json(line) for line in text.splitlines()]
+
+
+def _cameras(trace_id: str) -> list[CameraParams]:
+    text = (TRACE_DIR / trace_id / CAMERA_NAME).read_text(encoding="utf-8")
+    return [CameraParams.model_validate_json(line) for line in text.splitlines()]
+
+
+def _pinned_hash(cameras: list[CameraParams]) -> str:
+    # The pinning rule of DA-38 (flywheel_simple.trace.camera.reference_sha256): sorted by
+    # uid, floats rounded to 1e-9, compact JSON with sorted keys.
+    records = [
+        {
+            "uid": c.uid,
+            "mount": c.mount,
+            "width": c.width,
+            "height": c.height,
+            **{k: round(getattr(c, k), 9) for k in ("fx", "fy", "cx", "cy")},
+            "pose": [round(v, 9) + 0.0 for v in c.pose],
+        }
+        for c in sorted(cameras, key=lambda c: c.uid)
+    ]
+    payload = json.dumps(records, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def test_every_trace_fixture_is_a_g1_directory() -> None:
+    assert sorted(p.name for p in TRACE_DIR.iterdir() if p.is_dir()) == sorted(TRACES)
+    for trace_id in TRACES:
+        assert sorted(p.name for p in (TRACE_DIR / trace_id).iterdir()) == [
+            CAMERA_NAME,
+            STEPS_NAME,
+        ]
+
+
+@pytest.mark.parametrize("trace_id", TRACES)
+def test_trace_steps_have_100_cycles_of_their_own_trace(trace_id: str) -> None:
+    steps = _steps(trace_id)
+    assert [s.step for s in steps] == list(range(100))
+    assert {s.trace_id for s in steps} == {trace_id}
+    assert len({s.episode_id for s in steps}) == 1
+
+
+@pytest.mark.parametrize("trace_id", TRACES)
+def test_trace_cameras_are_the_two_head_cameras_of_their_trace(trace_id: str) -> None:
+    cameras = _cameras(trace_id)
+    assert [c.uid for c in cameras] == ["head_stereo_left", "head_stereo_right"]
+    assert {c.trace_id for c in cameras} == {trace_id}
+    assert {c.episode_id for c in cameras} == {_steps(trace_id)[0].episode_id}
+    assert {c.reference_sha256 for c in cameras} == {REFERENCE_SHA256}
+
+
+@pytest.mark.parametrize("trace_id", ["tr_clean", "tr_sync_delay", "tr_missing"])
+def test_clean_cameras_are_the_pinned_reference(trace_id: str) -> None:
+    assert _pinned_hash(_cameras(trace_id)) == REFERENCE_SHA256
+
+
+def test_calibration_offset_moves_only_the_left_camera() -> None:
+    clean = {c.uid: c for c in _cameras("tr_clean")}
+    offset = {c.uid: c for c in _cameras("tr_calib_offset")}
+    assert _pinned_hash(list(offset.values())) != REFERENCE_SHA256
+    assert offset["head_stereo_right"].model_dump(exclude={"trace_id", "episode_id"}) == clean[
+        "head_stereo_right"
+    ].model_dump(exclude={"trace_id", "episode_id"})
+    left, ref = offset["head_stereo_left"], clean["head_stereo_left"]
+    assert left.fx == pytest.approx(ref.fx * 1.1)
+    # 15 degrees between the two orientations: |<q_ref, q>| = cos(7.5 deg)
+    dot = abs(sum(a * b for a, b in zip(left.pose[3:], ref.pose[3:], strict=True)))
+    assert dot == pytest.approx(math.cos(math.radians(7.5)))
 
 
 def test_schemas_match_committed_files() -> None:
