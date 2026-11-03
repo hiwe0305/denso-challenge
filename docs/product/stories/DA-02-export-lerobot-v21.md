@@ -29,7 +29,7 @@ _Phạm vi 3/11/2026 (Q2): bộ export đã có trong adapter (`flywheel-simple/
 
 - [x] 1. Điểm 1–6 của checklist trong làn (AC 1)
 - [x] 2. Điểm 7: contract test bằng loader Ψ₀ (AC 2)
-- [ ] 3. Chạy trên release khay S1 và psi-data, ghi kết quả (AC 3)
+- [x] 3. Chạy trên release khay S1 và psi-data, ghi kết quả (AC 3)
 
 ## Giao diện
 
@@ -76,7 +76,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
-- Ghi chú hoàn thành:
-- File đã tạo hoặc sửa:
+- Giờ thực: 5 giờ (nhiệm vụ 1: 2,5; 2: 1,5; 3: 1)
+- Công cụ AI đã dùng: Claude Code (Opus 5.5)
+- Ghi chú hoàn thành: cả hai dataset qua 17/18 phép kiểm của điểm 1–6 và qua điểm 7. Phép kiểm trượt duy nhất là `index` (Q7 của DA-03), và lỗi này không làm sai batch Ψ₀. Còn chờ PO: trường khai chiều hằng số trong `ActionLayout`; siết điểm 3 xuống 1e-4 s. Chi tiết ở [export-v21.md](../../g0/export-v21.md).
+- File đã tạo hoặc sửa: `packages/flywheel-data/src/flywheel/data/export/checklist.py`, `packages/flywheel-data/tests/unit/export/`, `packages/flywheel-psi0/tests/contract/test_loader_roundtrip.py`, `docs/g0/export-v21.md`
