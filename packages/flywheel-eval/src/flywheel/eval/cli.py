@@ -34,14 +34,19 @@ import typer
 from flywheel.contracts import TaskDefinition
 from flywheel.contracts.training import TrainDiagnosis
 from flywheel.eval.api import (
+    DEFAULT_SYSTEM_CONFIG,
     DEFAULT_TRAIN_CONFIG,
     SCORER_CONFIG_DIR,
+    diagnose_episode_system,
     diagnose_train,
     score_trace,
     store_score,
+    store_system_diagnosis,
     store_train_diagnosis,
 )
 from flywheel.eval.config import ConfigError
+from flywheel.eval.diagnosis.system.artifact import SystemDiagnosisRecord
+from flywheel.eval.diagnosis.system.reader import ReaderError as SystemReaderError
 from flywheel.eval.diagnosis.train.reader import ReaderError
 from flywheel.eval.scorer.reader import TraceError
 from flywheel.eval.scorer.score import EpisodeScore
@@ -50,6 +55,19 @@ from flywheel.eval.scorer.status import ScorerError, StepStatus
 app = typer.Typer()
 
 HEADER = f"{'code':<5} {'start_step':>10} {'group/dim':<28} {'value':>12} {'threshold':>12} stop"
+SYSTEM_HEADER = f"{'code':<5} {'value':>12} {'threshold':>12} {'where':<24} detail"
+
+# The names of spec section 6.4, for the engineer reading the table. The record
+# keeps the enum values, so it stays readable either way.
+DIAGNOSIS_NAMES: dict[str, str] = {
+    "clean": "không thấy lỗi hệ thống",
+    "unknown": "CHƯA RÕ",
+    "controller": "LỖI CONTROLLER",
+    "runtime": "LỖI RUNTIME",
+    "sync": "LỖI ĐỒNG BỘ",
+    "calibration": "LỖI CALIBRATION",
+    "infra": "LỖI HẠ TẦNG (không tính là lỗi policy)",
+}
 
 # The Vietnamese names of spec section 5.1, for the engineer reading the table.
 # The artifact keeps the enum values, so it stays readable either way.
@@ -96,6 +114,43 @@ def diag_train(
     _print(diagnosis)
     if store is not None:
         typer.echo(f"ghi vào: {store_train_diagnosis(diagnosis, store)}")
+
+
+@app.command("diag-system")
+def diag_system(
+    episode: Path = typer.Option(
+        ...,
+        "--episode",
+        help="Thư mục episode (trace.jsonl, rtc.jsonl, camera_params.json, episode.json), "
+        "hoặc chính file trace.",
+    ),
+    config: Path = typer.Option(
+        DEFAULT_SYSTEM_CONFIG,
+        "--config",
+        help="File ngưỡng; hash của nó được ghi cùng kết quả.",
+    ),
+    store: Path | None = typer.Option(
+        None, "--store", help="Thư mục store để ghi kết quả. Không có thì không ghi gì."
+    ),
+) -> None:
+    """Kiểm hệ thống F-SYS (R1-R6) trên một episode đã ghi."""
+    use_utf8()
+    try:
+        record = diagnose_episode_system(episode, config)
+    except (SystemReaderError, ConfigError) as error:
+        # A file that cannot be read is not a clean episode, so it must not
+        # leave a record behind or exit as though the episode were judged.
+        typer.echo(f"không kiểm được: {error}", err=True)
+        raise typer.Exit(code=2) from error
+    _print_system(record)
+    if store is None:
+        return
+    try:
+        written = store_system_diagnosis(record, store)
+    except OSError as error:
+        typer.echo(f"kiểm được nhưng không ghi được vào `{store}`: {error}", err=True)
+        raise typer.Exit(code=2) from error
+    typer.echo(f"ghi vào: {written}")
 
 
 @app.command("score")
@@ -192,6 +247,27 @@ def _config_for(task: TaskDefinition) -> Path:
         if (folder / ".git").exists():  # the repo root, in a clone or a worktree
             break
     return relative
+
+
+def _print_system(record: SystemDiagnosisRecord) -> None:
+    typer.echo(f"episode: {record.episode_id}")
+    typer.echo(f"config_sha256: {record.config_sha256}")
+    typer.echo(f"chẩn đoán: {DIAGNOSIS_NAMES.get(record.diagnosis, record.diagnosis)}")
+    if record.infra_status is not None:
+        typer.echo(f"infra_status: {record.infra_status}")
+    typer.echo(SYSTEM_HEADER)
+    for finding in record.findings:
+        where = finding.where or ""
+        if finding.part is not None:
+            where = f"{finding.part} {where}".strip()
+        threshold = "-" if finding.threshold is None else f"{finding.threshold:.6g}"
+        typer.echo(
+            f"{finding.code:<5} {finding.value:>12.6g} {threshold:>12} "
+            f"{where:<24} {finding.detail or ''}"
+        )
+    typer.echo(f"phát hiện: {len(record.findings)}; bỏ qua: {len(record.skipped)}")
+    for skip in record.skipped:
+        typer.echo(f"bỏ qua {skip.code}: {skip.reason}")
 
 
 def _print_score(score: EpisodeScore) -> None:
