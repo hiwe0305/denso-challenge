@@ -5,11 +5,11 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 25/10/2026; sửa 27/10/2026) |
-| Người làm | Hiếu, làm cùng Claude (từ 3/11/2026, thay Thông) |
+| Người làm | Hiếu |
 | Làn | Dữ liệu |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 6.3 · Epic 9 |
 | Nhãn | [Lõi] · `epic:9` · `gate:G1` · `area:data` |
-| Sprint | S1–S2 · **Lịch 3/11/2026:** merge trước **8/11/2026** (07 bản 1.5); AC 5 sau 13/11/2026 |
+| Sprint | S1–S2 · **Lịch 3/11/2026:** merge trước **8/11/2026** (07 bản 1.6); AC 5 sau 13/11/2026 |
 | Ước lượng | 5 giờ cho AC 1–4 (bản 3/11/2026; bản 27/10: 9 giờ, khoảng 7–11) |
 | Phụ thuộc | DA-25 (schema `ReplayReport`). Gọi `SimulatorAdapter.replay()` qua Protocol; hàm `replay()` của `SimpleSim` thuộc story 3.1a (adapter SIMPLE, S2); trong lúc chờ dùng simulator giả của testkit. Từ 3/11/2026: bộ đọc LeRobot v2.1 `EpisodeFrames` của DA-03 PR 1 (hạn 5/11). PR `chore-restructure` (07 mục 3.6; mở PR 28/10, merge 29/10/2026) tạo khung package `flywheel-data` |
 
@@ -71,7 +71,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 27/10/2026 | Đổi sang MuJoCo của SIMPLE trên task hai bàn; `replay()` thuộc story 3.1a; thêm nguồn AMO | PO (Hiếu) theo design 27/10/2026 |
 | 28/10/2026 | Sửa hạn PR `chore-restructure` theo 07 mục 3.6 bản 0.6: mở 28/10, merge 29/10 | PO (Hiếu) |
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
-| 3/11/2026 | Người làm Thông → Hiếu theo quyết định PO (07 bản 1.5; [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) Q1–Q3): hạn 8/11; AC 5 và nhiệm vụ 5 dời sau 13/11; phạm vi thêm adapter `flywheel_simple/replay/` và test; ước lượng 5 giờ cho AC 1–4 | PO (Hiếu) |
+| 3/11/2026 | Người làm Thông → Hiếu theo quyết định PO (07 bản 1.6; [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) Q1–Q3): hạn 8/11; AC 5 và nhiệm vụ 5 dời sau 13/11; phạm vi thêm adapter `flywheel_simple/replay/` và test; ước lượng 5 giờ cho AC 1–4 | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

@@ -5,7 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt hướng 27/10/2026) |
-| Người làm | Hiếu, làm cùng Claude (từ 3/11/2026, thay Thông; nhiệm vụ 1–5 là 5 commit của Thông, cherry-pick giữ tác giả) |
+| Người làm | Hiếu |
 | Làn | Dữ liệu |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 9.2 · Epic 9 · 03 ADR-26 |
 | Nhãn | [Lõi] · `epic:9` · `gate:G1` · `area:data` |
@@ -74,7 +74,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 27/10/2026 | Tạo story theo design 27/10/2026 mục 9.2 | PO (Hiếu) |
 | 27/10/2026 | Tách bộ chấm sang DA-31; giao cho Thông theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
-| 3/11/2026 | Người làm Thông → Hiếu theo quyết định PO (07 bản 1.5; [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) Q1, Q4, Q5): giữ 5 commit của Thông làm nhiệm vụ 1–5; thêm nhiệm vụ 6–10 (hợp đồng, mã lỗi D/T/R, parquet thật, niêm phong, `has_injected_defect`); AC 3, AC 5 ghi rõ theo Q5; bộ chấm DA-31 của Châu | PO (Hiếu) |
+| 3/11/2026 | Người làm Thông → Hiếu theo quyết định PO (07 bản 1.6; [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) Q1, Q4, Q5): giữ 5 commit của Thông làm nhiệm vụ 1–5; thêm nhiệm vụ 6–10 (hợp đồng, mã lỗi D/T/R, parquet thật, niêm phong, `has_injected_defect`); AC 3, AC 5 ghi rõ theo Q5; bộ chấm DA-31 của Châu | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
