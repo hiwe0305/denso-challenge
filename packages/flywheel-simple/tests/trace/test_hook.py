@@ -88,14 +88,14 @@ def cycle(rec: TraceRecorder, t: float, *, sent: bool) -> None:
 
 def test_recorder_numbers_cycles_and_keeps_t_image_only_when_a_frame_was_sent() -> None:
     sink = ListSink()
-    rec = TraceRecorder(sink, run_plan_id="g0-DA-38-test")
+    rec = TraceRecorder(sink, run_plan_id="g0-DA-38-20261104")
     rec.start_episode(cameras=[])
     cycle(rec, 1.00, sent=True)
     cycle(rec, 1.02, sent=False)
     rec.end_episode("episode_7", success=True)
     (ep,) = sink.episodes
     assert ep.episode_id == "episode_7" and ep.sim_success is True
-    assert ep.run_plan_id == "g0-DA-38-test"
+    assert ep.run_plan_id == "g0-DA-38-20261104"
     assert [c.step for c in ep.cycles] == [0, 1]
     assert [c.t_image for c in ep.cycles] == [1.00, None]
     assert ep.cycles[1].cmd_upper[0] == pytest.approx(1.02)
