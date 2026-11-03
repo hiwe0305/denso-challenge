@@ -39,7 +39,7 @@ def stats_block(arr: np.ndarray) -> dict[str, list[float]]:
 def copies(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, dict[str, Path]]:
     base = tmp_path_factory.mktemp("sym")
     make_dataset(base / "psi", count=40, length=8)
-    result = build_benchmark(base / "psi", base / "inject")
+    result = build_benchmark(base / "psi", base / "inject", store=base / "store")
     roots = {"defect": Path(result.defect.ref.uri), "clean": Path(result.clean.ref.uri)}
     return base / "inject", roots
 
@@ -206,7 +206,7 @@ def test_stats_the_lane_cannot_recompute_follow_the_episode_video(tmp_path: Path
     meta.joinpath("stats.json").write_text(
         json.dumps({"observation.images.egocentric": {"mean": [1.0]}})
     )
-    result = build_benchmark(src, tmp_path / "inject")
+    result = build_benchmark(src, tmp_path / "inject", store=tmp_path / "store")
     manifest = load_manifest(result.defect.manifest_path)
     duplicates = {
         int(d.target_ref.removeprefix("episode_")): int(
