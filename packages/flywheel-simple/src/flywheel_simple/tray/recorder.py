@@ -69,6 +69,8 @@ class FlywheelMeta:
     level: int
     planner_version: str
     visuals_revision: str
+    purpose: str = "coverage"  # "failure_targeted" for a Failure -> Data round (Task 10)
+    cluster_id: str | None = None  # failure cluster a targeted episode was generated for
     source_kind: str = "synthetic"
     source_detail: str = "planner_wbc"
     synthetic_tier: str = "S1"
