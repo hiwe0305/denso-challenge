@@ -76,6 +76,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 3/11/2026 | Mở issue #59 (Contract change cho Long): `Score` của S1-10 chưa merge, enum bốn trạng thái thay `stage_success: bool | None`, lý do "chưa rõ" có kiểu, `step_enter_s`/`step_exit_s`, và `from_failed_stage` cho `FailureKindSpec.failure_class` của L-COLLIDE, L-TIMEOUT. Kèm chỗ xin PO quyết về bốn mã task bê khay. AC 1 đạt một phần tới khi issue chốt | Châu |
 | 3/11/2026 | Làm xong 6 nhiệm vụ. Thêm `packages/flywheel-eval/pyproject.toml` và `uv.lock` vào Phạm vi file (R6, nêu trong PR). Hai điểm cần hợp đồng: `Score` của S1-10 (#36) chưa merge nên artifact là `ScoreRecord` trong làn, đúng từng trường của `Score`; thời điểm vào và ra từng bước, lý do "chưa rõ" có kiểu, và cách khai "lớp lỗi theo bước hỏng k" cho L-COLLIDE, L-TIMEOUT cần issue Contract change cho Long | Châu |
 | 3/11/2026 | Đặt mã DA-36 (DA-35 đã dùng cho #40); phụ thuộc S1-08, `Score` của S1-10 chưa merge; AC 1 ghi ra `Score`, trường thiếu qua issue Contract change; hạn 8/11 theo 07 mục 2.4; gộp người bình luận DA-32 vào Hiếu | PO (Hiếu) |
 | 2/11/2026 | Nháp story theo PRD 3.3, spec mục 5.1, 5.2 và 04 mục 4.2; nêu ba chỗ cần PO quyết | Châu (chờ SM, PO) |
