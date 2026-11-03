@@ -74,7 +74,7 @@ def write_trace(tmp_path: Path) -> Rows:
 
 @pytest.fixture
 def rtc_rows() -> list[dict[str, Any]]:
-    """An RTC log whose chunks arrive quickly and keep the buffer full."""
+    """An RTC log whose chunks arrive well inside the delay RTC covers (1 step)."""
     return [
         {
             "job_id": "job_1",

@@ -259,21 +259,23 @@ class R1Thresholds:
 
 @dataclass(frozen=True)
 class R2Thresholds:
-    """Action buffer running dry: chunks whose inference outlasted the buffer.
+    """Inference slower than real-time chunking can cover: delay_steps over max_delay.
 
-    `RTCClient` of DA-19 records `buffer_level` as the actions left when the
-    request went out and `delay_steps` as the control steps the inference
-    took, so a chunk with `delay_steps > buffer_level` is one where the robot
-    would have had nothing to execute before the new chunk came back. The
-    first chunk of a trace is left out, since nothing was executing yet. The
-    level alone says nothing: the client asks at `refill_at`, which is 0 by
-    default, so a level floor would count every healthy chunk.
+    `delay_steps` of `RTCInferenceRecord` is ceil(latency * hz), the control
+    steps a real-time loop would run while the chunk is computed (DA-19). RTC
+    covers up to the model's `max_delay` of them - 8 for Ψ₀ stage 3 - so a
+    chunk with `delay_steps > max_delay_steps` is one the robot would stall on
+    on hardware. `buffer_level` is not read: it is the level when the request
+    went out, which is always 0 under SIMPLE's refill-when-empty, so it says
+    nothing about a stall (decision Q2 as corrected, 3/11/2026).
 
-    This is a count, not a percentile: one stall is visible, and what the
-    threshold decides is how many of those an episode may contain before the
-    runtime, not the policy, is what the engineer goes and fixes.
+    `max_underruns` is how many such chunks an episode may contain before the
+    runtime, not the policy, is what the engineer goes and fixes. A count, not
+    a percentile: one stall is visible, and an average over a long episode
+    hides it.
     """
 
+    max_delay_steps: int
     max_underruns: int
 
 
@@ -539,7 +541,10 @@ class SystemThresholds:
                 tau_lat_s=_number(r1, "tau_lat_s", "r1"),
                 percentile=_percentile(r1, "percentile", "r1"),
             ),
-            r2=R2Thresholds(max_underruns=_steps(r2, "max_underruns", "r2")),
+            r2=R2Thresholds(
+                max_delay_steps=_steps(r2, "max_delay_steps", "r2"),
+                max_underruns=_steps(r2, "max_underruns", "r2"),
+            ),
             r3=R3Thresholds(
                 tau_track_upper=_number(r3, "tau_track_upper", "r3"),
                 tau_track_lower=_number(r3, "tau_track_lower", "r3"),

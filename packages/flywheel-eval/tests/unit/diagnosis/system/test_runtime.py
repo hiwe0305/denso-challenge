@@ -33,7 +33,7 @@ from flywheel.eval.diagnosis.system.tracking import check_r3
 from flywheel.eval.diagnosis.system.verdict import Diagnosis, combine
 
 R1 = R1Thresholds(tau_lat_s=0.1, percentile=99.0)
-R2 = R2Thresholds(max_underruns=0)
+R2 = R2Thresholds(max_delay_steps=8, max_underruns=0)
 R4 = R4Thresholds(tau_sync_s=0.01)
 R6 = R6Thresholds(ok_statuses=("ok",))
 
@@ -89,59 +89,58 @@ def test_r1_and_r2_without_an_rtc_log_are_skips_not_passes() -> None:
     assert check_r1((), R1).findings == []
 
 
-def test_r2_does_not_fire_on_a_buffer_that_stayed_full(rtc_rows) -> None:
+def test_r2_does_not_fire_on_inference_inside_the_delay_rtc_covers(rtc_rows) -> None:
     assert check_r2(_records(rtc_rows), R2).findings == []
 
 
-def test_r2_fires_on_a_buffer_that_ran_dry(rtc_rows) -> None:
-    rows = [dict(row) for row in rtc_rows]
-    rows[5]["buffer_level"] = 0
+def test_r2_does_not_fire_on_the_records_rtc_client_writes_for_a_healthy_run(rtc_rows) -> None:
+    # Shaped exactly as `RTCClient` of DA-19 writes them under SIMPLE's
+    # refill-when-empty (`refill_at=0`): every request goes out with the buffer
+    # at 0, and 50 ms of inference at 50 Hz is ceil(0.05 * 50) = 3 steps, under
+    # the max_delay of 8 that RTC covers on hardware. The buffer level says
+    # nothing here; reading it as a stall fired R2 on every chunk.
+    rows = [
+        dict(
+            row,
+            observation_sent_s=0.2 * index,
+            chunk_received_s=0.2 * index + 0.05,
+            buffer_level=0,
+            delay_steps=3,
+        )
+        for index, row in enumerate(rtc_rows)
+    ]
+
+    assert check_r2(_records(rows), R2).findings == []
+
+
+def test_r2_fires_on_a_chunk_slower_than_rtc_covers(rtc_rows) -> None:
+    rows = [dict(row, buffer_level=0, delay_steps=3) for row in rtc_rows]
+    rows[5]["delay_steps"] = 9
+    rows[7]["delay_steps"] = 12
 
     result = check_r2(_records(rows), R2)
 
     assert [finding.code for finding in result.findings] == ["R2"]
-    assert result.findings[0].value == pytest.approx(1.0)
-    assert "chunk 5" == result.findings[0].where
+    finding = result.findings[0]
+    assert finding.value == pytest.approx(2.0)
+    assert finding.threshold == pytest.approx(0.0)
+    assert finding.where == "chunk 7"
+    assert "12" in (finding.detail or "") and "8" in (finding.detail or "")
 
 
-def test_r2_tolerates_as_many_underruns_as_the_config_allows(rtc_rows) -> None:
+def test_r2_at_exactly_max_delay_is_covered(rtc_rows) -> None:
+    rows = [dict(row, delay_steps=8) for row in rtc_rows]
+
+    assert check_r2(_records(rows), R2).findings == []
+
+
+def test_r2_tolerates_as_many_slow_chunks_as_the_config_allows(rtc_rows) -> None:
     rows = [dict(row) for row in rtc_rows]
-    rows[5]["buffer_level"] = 0
+    rows[5]["delay_steps"] = 9
 
-    tolerant = R2Thresholds(max_underruns=1)
+    tolerant = R2Thresholds(max_delay_steps=8, max_underruns=1)
 
     assert check_r2(_records(rows), tolerant).findings == []
-
-
-def test_r2_does_not_fire_where_the_buffer_left_covers_the_delay(rtc_rows) -> None:
-    # `RTCClient` records the level when the request went out, so a low level
-    # is healthy as long as it outlasts the inference: one action left and one
-    # step of delay is no stall.
-    rows = [dict(row, buffer_level=1, delay_steps=1) for row in rtc_rows]
-
-    assert check_r2(_records(rows), R2).findings == []
-
-
-def test_r2_leaves_out_the_first_chunk_of_a_trace(rtc_rows) -> None:
-    # `RTCClient` sends the first request of a trace with nothing buffered, so
-    # chunk 0 always has `buffer_level = 0`; nothing was executing yet, so the
-    # wait is the start of the trace, not a stall. Counting it would make every
-    # healthy episode a runtime fault whatever `refill_at` is.
-    rows = [dict(row, buffer_level=3, delay_steps=3) for row in rtc_rows]
-    rows[0]["buffer_level"] = 0
-
-    assert check_r2(_records(rows), R2).findings == []
-
-
-def test_r2_fires_where_the_delay_outruns_the_buffer_left(rtc_rows) -> None:
-    rows = [dict(row) for row in rtc_rows]
-    rows[3].update(buffer_level=4, delay_steps=8)
-
-    result = check_r2(_records(rows), R2)
-
-    assert [finding.code for finding in result.findings] == ["R2"]
-    assert result.findings[0].where == "chunk 3"
-    assert "4" in (result.findings[0].detail or "")
 
 
 def test_r4_does_not_fire_when_the_clocks_stay_together(clean_rows, write_trace) -> None:
