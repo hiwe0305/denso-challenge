@@ -7,8 +7,10 @@
 #   bash scripts/g0/serve_psi0.sh serve                  start serve_psi0_simple (needs weights and a GPU)
 #
 # PSI0_RUNTIME=venv (default) runs in a uv env inside the Psi0 checkout; PSI0_RUNTIME=docker runs in
-# the pinned upstream image through docker/psi0/compose.yaml. Every pin below can be overridden from
-# the environment. Data stays outside git, under the main checkout's fwdata/ (shared by worktrees).
+# the pinned upstream image through docker/psi0/compose.yaml. With PSI0_RUNTIME=venv, PSI0_ENV=image
+# makes setup install that image's exact packages (docker/psi0/requirements-image.txt) instead of
+# re-resolving the broken upstream lock; use it where Docker is missing (Colab). Every pin below
+# can be overridden from the environment. Data stays outside git, under the main checkout's fwdata/ (shared by worktrees).
 set -euo pipefail
 
 REPO="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
@@ -74,6 +76,16 @@ cmd_setup() {
   local sync=(uv sync --frozen --group serve --group psi --index-strategy unsafe-best-match --active
               --no-install-package evdev)
   (cd "$PSI0_SRC" && uv venv --allow-existing .venv-psi --python 3.11)
+  if [[ "${PSI0_ENV:-lock}" == image ]]; then
+    # Where Docker is not available (Colab): install the exact package list of the pinned image,
+    # flash-attn wheel included, then psi itself editable. Same versions as PSI0_RUNTIME=docker.
+    # --python: Colab's uv otherwise targets the system interpreter.
+    (cd "$PSI0_SRC" && GIT_LFS_SKIP_SMUDGE=1 uv pip install --python "$PSI0_VENV/bin/python" \
+      -r "$REPO/docker/psi0/requirements-image.txt" \
+      && uv pip install --python "$PSI0_VENV/bin/python" --no-deps -e .)
+    psi_exec python -c "import psi, torch, flash_attn, diffusers; print('psi', psi.__version__, 'torch', torch.__version__, 'flash_attn', flash_attn.__version__, 'diffusers', diffusers.__version__)"
+    return
+  fi
   if ! (cd "$PSI0_SRC" && GIT_LFS_SKIP_SMUDGE=1 VIRTUAL_ENV="$PSI0_VENV" "${sync[@]}"); then
     # uv.lock at cda3fdf is a broken merge of two locks (pypi.org and a PyPI mirror: repeated
     # tables, packages listed twice), so uv cannot read it. Re-resolve from pyproject.toml, which
@@ -210,7 +222,7 @@ main() {
     fetch) cmd_fetch "$@" ;;
     check) cmd_check "$@" ;;
     serve) cmd_serve "$@" ;;
-    *) sed -n '2,11p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 2 ;;
+    *) sed -n '2,13p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 2 ;;
   esac
 }
 
