@@ -216,6 +216,15 @@ Mỗi lần chạy ghi `fwdata/simple/s103/runs/<mode>/level-<L>/pass-<K>/ep<S>-
 
 `psi-data` revision `de140d67ba77a541f2a58354f7edf4e2480b7c56`, file `simple-eval/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` (690 kB) có bốn thư mục LeRobot v2.1 `dr-level-0`, `dr-level-1`, `dr-level-2`, `dr-level-hard`, **mỗi thư mục 10 điều kiện**. Số công bố 7/5/6 là trên đúng 10 điều kiện này. **[Đã chốt]** (Hiếu, 3/11/2026): "30 lượt mỗi mức" của AC 9, 10 là **10 điều kiện × 3 lượt lặp** (`--pass 1..3`) trên đúng 10 điều kiện của bộ eval tác giả, không sinh điều kiện mới. Đây **không phải 30 điều kiện độc lập**: policy lấy mẫu flow nên mỗi lượt lặp có thể cho kết quả khác, nhưng ba lượt cùng một điều kiện tương quan với nhau, nên kiểm nhị thức trên n = 30 lạc quan về độ chắc. Ba lượt lặp dùng để báo độ không tất định: với mỗi điều kiện, ghi số lượt thành công trên 3 và tỉ lệ điều kiện mà ba lượt không cùng kết quả.
 
+**Phiên bản bộ eval.** Mọi lượt chạy của S1-03 dùng bản HF `main` lúc 3/11/2026, revision `de140d6` (zip 689 559 byte, sha256 `7d215cf3…`, bốn thư mục kể cả `dr-level-hard`, lấy từ đợt "eval-fixed" `38e43f2` ngày 02/11/2026). Revision ghim của đội `e78fb93` (zip 480 532 byte, sha256 `8a4b0ff7…`, ba mức, tải lên 14/09/2026) khác bản này:
+
+| Mức | Vật cần gắp, khay, hai bàn | Khác |
+|---|---|---|
+| 0, 1 | Giống hệt (10/10) | Chỉ domain randomization hình ảnh: vật liệu sàn, bàn, vật; loại và vị trí vật gây nhiễu; vị trí đèn (Level 1) |
+| 2 | Vị trí vật và khay khác (0/10 giống) | Như trên |
+
+Số công bố 7/5/6 có trước cả hai lần tải bộ eval lên HF (checkpoint train tháng 4/2026), nên không biết tác giả đo trên bản nào. Câu hỏi này đã thêm vào Q-27E (mục 4). So sánh ở mục 3.2 vì vậy chỉ chặt ở Level 0 và 1, nơi hai bản cùng điều kiện vật lý.
+
 ### 3.2 Kết quả `mujoco` (AC 10)
 
 | Mức | Thành công | Wilson 95% | Công bố (`mujoco_isaac`, 10 lượt) | p một phía, H0: p ≥ số công bố | Giờ máy |
@@ -257,7 +266,7 @@ Kết luận: trên máy 3060, server Ψ₀ và client Isaac không cùng chạy
 
 ### 3.4.1 Server Ψ₀ trên Colab, Isaac trên máy 3060 (3/11/2026)
 
-Hiếu chọn phương án (c), chạy qua Colab CLI trên laptop. Không mở tunnel công khai: server chỉ nghe trên VM Colab, đi tới máy 3060 bằng hai cổng chuyển tiếp SSH riêng: `colab ssh --proxy-mode` (laptop → Colab) và `ssh -R` (máy 3060 → laptop). Client SIMPLE vẫn gọi `http://127.0.0.1:22085`. Laptop phải bật suốt lúc eval; runtime Colab chỉ nhận một kết nối SSH, nên đọc log server bằng `colab exec`.
+**[Đã chốt]** (Hiếu, 3/11/2026): không thuê GPU; dùng Colab Pro cho server (dữ liệu demo là `public`), chạy qua Colab CLI trên laptop; sau này đội có thể chuyển sang máy chủ khác. Tunnel công khai (cloudflared) bị kiểm quyền của phiên Claude chặn, nên không dùng: server chỉ nghe trên VM Colab, đi tới máy 3060 bằng hai cổng chuyển tiếp SSH riêng: `colab ssh --proxy-mode` (laptop → Colab) và `ssh -R` (máy 3060 → laptop). Client SIMPLE vẫn gọi `http://127.0.0.1:22085`. Laptop phải bật suốt lúc eval; runtime Colab chỉ nhận một kết nối SSH, nên đọc log server bằng `colab exec`.
 
 ```bash
 colab new -s s103psi0 --gpu L4                      # 1,94 CU/giờ
@@ -277,11 +286,15 @@ Colab không chạy được Docker. `PSI0_ENV=image` cài đúng danh sách gó
 | Open-loop trên 3 episode train, so với server Docker trên 3060 | L1 overall 0,088 / 0,111 / 0,070 so với 0,105 / 0,123 / 0,072; từng nhóm lệch trong cỡ nhiễu lấy mẫu. RTT ấm 460 ms qua hai cổng chuyển tiếp (Docker cùng máy: 350 ms) |
 | Thử `mujoco_isaac` 1 episode (Level 0, episode 0) | Chạy hết, client thoát 0; 1 715 s tường, gồm khoảng 4 phút khởi động Isaac; RAM client đỉnh 11,5 GiB, VRAM 5,7 GB; 50 lần `/act`. Kết quả: hỏng, robot làm rơi hộp ở bàn 1 rồi đi sang bàn 2 tay không |
 
+**Độ trễ qua đường chuyển tiếp và ảnh hưởng tới kết quả.** RTT ấm mỗi lần `/act`: 460 ± 19 ms (open-loop, 3 × ~130 lần gọi), so với 350 ± 10 ms khi server Docker cùng máy; đường chuyển tiếp thêm khoảng 110 ms. Vòng eval của SIMPLE **chờ server**: `Psi0DecoupledWbcAgent.get_action` gọi `/act` đồng bộ khi hàng action rỗng (mỗi 24 bước), và mô phỏng không chạy trong lúc chờ. Độ trễ vì vậy chỉ thêm giờ tường. Chỗ duy nhất dính thời gian thật là bộ nội suy của WBC: mỗi bước đặt waypoint thân trên ở `t_now + 1/50 s` (`time.monotonic`) và đọc lệnh ở `t_now`. Khi khoảng cách giữa hai bước lớn hơn nhiều so với 20 ms, lệnh gần như bằng waypoint mới nhất. Ở `mujoco_isaac` mỗi bước đã mất khoảng 1 s vì render, nên thêm 0,1–0,5 s ở một bước trong 24 không đổi gì đáng kể. Eval Isaac của tác giả cũng chạy chậm hơn thời gian thật như vậy.
+
 Thời gian thật của `mujoco_isaac` trên máy 3060 là khoảng 25 phút mỗi episode, gấp 2,5–4 lần mức 6–10 phút của README. Ước lượng cho AC 9 đủ 10 × 3 × 3 = 90 episode: khoảng 38 giờ máy 3060 và 74 CU Colab; một lượt 10 episode Level 0: khoảng 4,5 giờ và 9 CU.
 
 ### 3.5 Trả lời Q-27C [Đề xuất, tạm]
 
-Không: ở `mujoco`, checkpoint của tác giả không giữ được thành công (0/90, mỗi mức 0/30, so với 7/5/6 công bố ở `mujoco_isaac`); lệch rõ ở cả ba mức. Kiểm open-loop cho thấy server đúng, nên nguyên nhân nhiều khả năng là khác biệt ảnh giữa render MuJoCo và Isaac. Đề xuất cho HE: giữ mặc định của design mục 4.2 (ảnh train và ảnh eval đều render Isaac; eval ở `mujoco_isaac`), không chuyển sang `mujoco`. Kết luận còn "tạm" cho tới khi có lượt `mujoco_isaac` của chính đội đạt gần 7/5/6 bằng cùng pipeline (mục 3.4); nếu lượt đó cũng hỏng thì lỗi ở phía client và kết luận trên phải xét lại.
+Không: ở `mujoco`, checkpoint của tác giả không giữ được thành công (0/90, mỗi mức 0/30, so với 7/5/6 công bố ở `mujoco_isaac`); lệch rõ ở cả ba mức. Kiểm open-loop cho thấy server đúng, nên nguyên nhân nhiều khả năng là khác biệt ảnh giữa render MuJoCo và Isaac.
+
+Thêm từ S1-07 (PR #55, `docs/g0/psi-data.md`): ở Level 0 và 1, tư thế robot, vật và khay của episode eval thứ i trùng từng bit với episode train thứ i của bộ train `de140d6`. Kiểm của S1-03 trên bộ train ghim `e78fb93` (bản dùng cho open-loop ở mục 3.3) thì vị trí vật và khay khác ở cả 10 episode, nên điều trùng này đúng với bộ train bản mới. Dù vậy, 0/30 ở Level 0 nghĩa là Ψ₀ hỏng cả trên điều kiện gần như chính điều kiện train. Điều này nghiêng về lỗi hệ thống (renderer khác hoặc lỗi phía client) hơn là policy yếu. Đề xuất cho HE: giữ mặc định của design mục 4.2 (ảnh train và ảnh eval đều render Isaac; eval ở `mujoco_isaac`), không chuyển sang `mujoco`. Kết luận còn "tạm" cho tới khi có lượt `mujoco_isaac` của chính đội đạt gần 7/5/6 bằng cùng pipeline (mục 3.4); nếu lượt đó cũng hỏng thì lỗi ở phía client và kết luận trên phải xét lại.
 
 Theo quyết định của Hiếu ngày 3/11/2026 ("chờ số mujoco"): vì `mujoco` lệch rõ, AC 9 cần chạy đủ ở `mujoco_isaac` trên một GPU 24 GB có RT core (phương án (b) mục 3.4); việc thuê máy chờ Hiếu duyệt.
 
@@ -304,3 +317,4 @@ Câu hỏi Q-27E gửi PSI Lab (Hiếu gửi, chung email giấy phép ở nhi�
 1. Số bước pretrain VLM thật của `pre.abl.only.he…48k` và `pre.abl.ego.10per…46k`: 48k, 46k là số bước hay số mẫu? Batch và dữ liệu (HE đủ, 10% EgoDex chọn thế nào)?
 2. Ba `postpre.*` (`abl.only.he`, `abl.ego.10per`, `1by1.pad36…he30k`) có cùng recipe post-train action header không (dữ liệu, số bước, batch, lr)? `he30k` nghĩa là 30k bước trên HE?
 3. Sáu checkpoint này có train trên dữ liệu SIMPLE hoặc sonic không (điều kiện `clean_for_main_task` của AC 6)?
+4. (thêm 3/11/2026) Số 7/5/6 của `G1WholebodyLocomotionPickBetweenTablesTeleop-v0` đo trên bộ eval nào: bản tải lên 14/09/2026 (`e78fb93`), bản "eval-fixed" 02/11/2026 (`de140d6`), hay một bản trước đó? Checkpoint `…2604081126` train trên bản dữ liệu nào (bản gốc hay "data-fixed")? Ở `mujoco_isaac` có cần cờ hoặc cấu hình gì ngoài README không?
