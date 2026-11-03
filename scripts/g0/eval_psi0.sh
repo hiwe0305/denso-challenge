@@ -6,6 +6,8 @@
 #       SIMPLE eval-decoupled-wbc of TASK (default the two-table task) on the published conditions
 #       of level L, in SIMPLE's image; results and pins in fwdata/simple/s103/runs/<M>/level-L/...
 #       Serve the matching checkpoint first, e.g. RUN=<two-table run> serve_psi0.sh serve.
+#   bash scripts/g0/eval_psi0.sh openloop --data DIR --images real|gray|blur|shift   benchmark B4
+#   bash scripts/g0/eval_psi0.sh delay-proxy --listen P --delay S --log FILE        benchmark B3
 #
 # smoke does not need SIMPLE: it sends zero images and zero state, so the actions are meaningless,
 # but it proves the checkpoint loads and that /act answers with an (exec horizon, action dim) chunk.
@@ -202,8 +204,147 @@ PY
   return "$status"
 }
 
+# Open-loop replay of train episodes (Psi0's mock_psi0_client_openloop) with the images swapped,
+# to measure how much the policy relies on them (benchmark B4 in docs/g0/psi0-eval.md):
+# real | gray (constant 128) | blur (Gaussian, radius 8) | shift (real frames of the same
+# episode, half an episode away in time).
+cmd_openloop() {
+  local images=real data="" host=127.0.0.1 eps="0 1 2" stride=5
+  while (( $# )); do
+    case "$1" in
+      --images) images="$2"; shift 2 ;;
+      --data) data="$2"; shift 2 ;;
+      --host) host="$2"; shift 2 ;;
+      --eps) eps="$2"; shift 2 ;;
+      --stride) stride="$2"; shift 2 ;;
+      *) die "unknown option $1" ;;
+    esac
+  done
+  [[ -d "$data" ]] || die "--data must be the dir holding the LeRobot train repo of the run"
+  local out="$PSI0_ROOT/openloop-images/$images"
+  mkdir -p "$out"
+  # shellcheck disable=SC2086
+  psi_exec env IMAGES="$images" MPLBACKEND=Agg python - --run-dir "$RUN_DIR" --host "$host" --port "$PORT" \
+    --eps-idx $eps --sequential --split train --stride "$stride" --root-dir "$data" \
+    --repo-id "$(basename "$(ls -d "$data"/*/ | head -1)")" --output-dir "$out" --tag "$images" <<'PY'
+import os, sys
+from PIL import ImageFilter
+
+import psi.deploy.mock_psi0_client_openloop as ol
+
+mode = os.environ["IMAGES"]
+replay = ol.replay_episode
+
+def swap(frames):
+    if mode == "real":
+        return frames
+    n = len(frames)
+    out = []
+    for k, f in enumerate(frames):
+        f = dict(f)
+        if mode == "gray":
+            f["observations"] = [img.point(lambda _: 128) for img in f["observations"]]
+        elif mode == "blur":
+            f["observations"] = [img.filter(ImageFilter.GaussianBlur(8)) for img in f["observations"]]
+        elif mode == "shift":
+            f["observations"] = frames[(k + n // 2) % n]["observations"]
+        else:
+            raise SystemExit(f"unknown --images {mode}")
+        out.append(f)
+    return out
+
+def patched(url, frames, *args, **kwargs):
+    return replay(url, swap(frames), *args, **kwargs)
+
+ol.replay_episode = patched
+sys.argv = ["mock_psi0_client_openloop", *sys.argv[1:]]
+ol.main()
+PY
+  log "open-loop reports: $out"
+}
+
+# Benchmark B3 (docs/g0/psi0-eval.md): relay 127.0.0.1:LISTEN -> 127.0.0.1:PORT, holding each reply
+# DELAY seconds, and log per call the robot state sent, an image hash and the action chunk returned.
+# Two runs of one episode against a freshly started server (same seed) then show whether the
+# delay changes the closed loop.
+cmd_delay_proxy() {
+  local listen=22087 delay=0 logf=""
+  while (( $# )); do
+    case "$1" in
+      --listen) listen="$2"; shift 2 ;;
+      --delay) delay="$2"; shift 2 ;;
+      --log) logf="$2"; shift 2 ;;
+      *) die "unknown option $1" ;;
+    esac
+  done
+  [[ -n "$logf" ]] || die "--log FILE is required"
+  log "127.0.0.1:$listen -> 127.0.0.1:$PORT, +${delay}s per call, log $logf"
+  exec python3 - "$listen" "$PORT" "$delay" "$logf" <<'PY'
+import base64, hashlib, http.client, json, sys, time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+listen, port, delay, logf = int(sys.argv[1]), int(sys.argv[2]), float(sys.argv[3]), sys.argv[4]
+log = open(logf, "a", buffering=1)
+
+def arrays(o, path=""):
+    """Yield (path, raw bytes, dtype, shape) of every Psi0-serialised numpy blob in a message."""
+    if isinstance(o, dict):
+        if "__numpy__" in o:
+            yield path, base64.b64decode(o["__numpy__"]), o["dtype"], o["shape"]
+        else:
+            for k, v in o.items():
+                yield from arrays(v, f"{path}/{k}")
+
+def floats(raw, dtype):
+    import array
+    a = array.array("f" if dtype == "<f4" else "d")
+    a.frombytes(raw)
+    return [round(x, 6) for x in a]
+
+class Relay(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
+    def relay(self):
+        body = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        c = http.client.HTTPConnection("127.0.0.1", port, timeout=600)
+        c.request(self.command, self.path, body=body or None,
+                  headers={"Content-Type": self.headers.get("Content-Type", "application/json")})
+        r = c.getresponse()
+        data = r.read()
+        if self.path == "/act":
+            time.sleep(delay)
+            req, rep = json.loads(body), json.loads(data)
+            rec = {"t": time.time(), "delay": delay}
+            for p, raw, dt, shape in arrays(req):
+                if p.startswith("/image"):
+                    rec["image_sha"] = hashlib.sha256(raw).hexdigest()[:16]
+                elif p == "/state/states":
+                    rec["state"] = floats(raw, dt)
+            for p, raw, dt, shape in arrays(rep):
+                if p == "/action":
+                    rec["action"] = floats(raw, dt)
+                    rec["action_shape"] = shape
+            rec["history"] = req.get("history")
+            log.write(json.dumps(rec) + "\n")
+        self.send_response(r.status)
+        self.send_header("Content-Type", r.getheader("Content-Type", "application/json"))
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    do_GET = do_POST = relay
+
+    def log_message(self, *args):
+        pass
+
+ThreadingHTTPServer(("127.0.0.1", listen), Relay).serve_forever()
+PY
+}
+
 case "${1:-}" in
   smoke) shift; cmd_smoke "$@" ;;
   run) shift; cmd_run "$@" ;;
-  *) sed -n '2,11p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  openloop) shift; cmd_openloop "$@" ;;
+  delay-proxy) shift; cmd_delay_proxy "$@" ;;
+  *) sed -n '2,13p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
