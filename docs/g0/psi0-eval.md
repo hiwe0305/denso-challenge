@@ -255,6 +255,30 @@ Theo thời gian, sai số gần 0 ở phần lớn episode và chỉ vọt lên
 
 Kết luận: trên máy 3060, server Ψ₀ và client Isaac không cùng chạy được. Cần một GPU có RT core và ≥ 16 GB (ví dụ 24 GB), hoặc tách server sang máy khác. Hiếu chọn [Đề xuất, theo thứ tự]: (a) máy 5090 của đội nếu còn; (b) thuê một GPU 24 GB có RT core (RTX 4090, L40S; A100 không có RT core nên Isaac không render được) chạy cả hai image; (c) server Ψ₀ trên Colab L4 hoặc A100 qua tunnel, client Isaac trên 3060 (dữ liệu demo là `public`, design mục 8.4). Ước lượng 90 episode × 6–10 phút (README Ψ₀) = 9–15 giờ máy, chưa đo.
 
+### 3.4.1 Server Ψ₀ trên Colab, Isaac trên máy 3060 (3/11/2026)
+
+Hiếu chọn phương án (c), chạy qua Colab CLI trên laptop. Không mở tunnel công khai: server chỉ nghe trên VM Colab, đi tới máy 3060 bằng hai cổng chuyển tiếp SSH riêng: `colab ssh --proxy-mode` (laptop → Colab) và `ssh -R` (máy 3060 → laptop). Client SIMPLE vẫn gọi `http://127.0.0.1:22085`. Laptop phải bật suốt lúc eval; runtime Colab chỉ nhận một kết nối SSH, nên đọc log server bằng `colab exec`.
+
+```bash
+colab new -s s103psi0 --gpu L4                      # 1,94 CU/giờ
+# trên VM: PSI0_ROOT=/content/psi0 PSI0_RUNTIME=venv PSI0_ENV=image RUN=<run hai bàn>
+#          bash scripts/g0/serve_psi0.sh setup && ... fetch --weights && ... check && ... serve
+ssh -N -o ProxyCommand="colab ssh --proxy-mode -s s103psi0" -L 127.0.0.1:22185:127.0.0.1:22085 root@colab
+ssh -N -R 127.0.0.1:22085:127.0.0.1:22185 rtx3060
+```
+
+Colab không chạy được Docker. `PSI0_ENV=image` cài đúng danh sách gói đọc từ image ghim (`docker/psi0/requirements-image.txt`: torch 2.7.0+cu126, flash-attn 2.7.4.post1 từ wheel chính thức, diffusers 0.37.0, transformers 4.57.0, lerobot ở commit `09929d8`), không giải lại lock hỏng của tác giả (mục 2.3).
+
+| Kiểm | Kết quả |
+|---|---|
+| `check` trên L4 | Đạt: L4 23 GB, flash-attn có, `problems` rỗng |
+| Trọng số | sha256 `c69c2ae8…` như mục 2.6 |
+| VRAM server | 6,2 GB |
+| Open-loop trên 3 episode train, so với server Docker trên 3060 | L1 overall 0,088 / 0,111 / 0,070 so với 0,105 / 0,123 / 0,072; từng nhóm lệch trong cỡ nhiễu lấy mẫu. RTT ấm 460 ms qua hai cổng chuyển tiếp (Docker cùng máy: 350 ms) |
+| Thử `mujoco_isaac` 1 episode (Level 0, episode 0) | Chạy hết, client thoát 0; 1 715 s tường, gồm khoảng 4 phút khởi động Isaac; RAM client đỉnh 11,5 GiB, VRAM 5,7 GB; 50 lần `/act`. Kết quả: hỏng, robot làm rơi hộp ở bàn 1 rồi đi sang bàn 2 tay không |
+
+Thời gian thật của `mujoco_isaac` trên máy 3060 là khoảng 25 phút mỗi episode, gấp 2,5–4 lần mức 6–10 phút của README. Ước lượng cho AC 9 đủ 10 × 3 × 3 = 90 episode: khoảng 38 giờ máy 3060 và 74 CU Colab; một lượt 10 episode Level 0: khoảng 4,5 giờ và 9 CU.
+
 ### 3.5 Trả lời Q-27C [Đề xuất, tạm]
 
 Không: ở `mujoco`, checkpoint của tác giả không giữ được thành công (0/90, mỗi mức 0/30, so với 7/5/6 công bố ở `mujoco_isaac`); lệch rõ ở cả ba mức. Kiểm open-loop cho thấy server đúng, nên nguyên nhân nhiều khả năng là khác biệt ảnh giữa render MuJoCo và Isaac. Đề xuất cho HE: giữ mặc định của design mục 4.2 (ảnh train và ảnh eval đều render Isaac; eval ở `mujoco_isaac`), không chuyển sang `mujoco`. Kết luận còn "tạm" cho tới khi có lượt `mujoco_isaac` của chính đội đạt gần 7/5/6 bằng cùng pipeline (mục 3.4); nếu lượt đó cũng hỏng thì lỗi ở phía client và kết luận trên phải xét lại.

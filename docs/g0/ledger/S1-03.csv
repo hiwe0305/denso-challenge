@@ -8,3 +8,6 @@ date,activity,resource_type,quantity,unit,unit_price_usd,amount_usd,estimated_or
 2026-11-03,psi0_repro,engineer_time,2.75,hour,0.0,0.0,measured,g0,0,job_s103_exec,eng_lead_01,Sum of Time-spent of subtasks 8; 2.1; 2.2; 7 committed on 3/11/2026; against job_s103_est
 2026-11-03,psi0_serve,gpu_local_rtx3060,0.7,hour,0.0,0.0,measured,g0,0,job_s103_serve2,eng_lead_01,Psi0 server restarted 12:50-13:32 for the extra mujoco passes
 2026-11-03,psi0_eval_two_table_mujoco,gpu_local_rtx3060,0.65,hour,0.0,0.0,measured,g0,0,job_s103_eval_mujoco2,eng_lead_01,40 more episodes mujoco (L1 and L2 passes 2-3) ~59 s each; 0/40 success; mujoco total 0/90
+2026-11-03,psi0_serve_colab,colab_l4,2.2,hour,0.0,0.0,measured,g0,0,job_s103_colab_serve,eng_lead_01,Colab L4 session s103psi0 from 13:52 (1.94 CU/h; ~4.3 CU so far); env setup + server + open-loop + 1 Isaac episode
+2026-11-03,psi0_eval_two_table_isaac_trials,gpu_local_rtx3060,0.5,hour,0.0,0.0,measured,g0,0,job_s103_isaac_trial4,eng_lead_01,1 mujoco_isaac episode L0 with the server on Colab: 1715 s wall; client peak 11.5 GiB RAM; 5.7 GB VRAM; failed; against job_s103_isaac_est
+2026-11-03,psi0_eval_two_table_isaac,gpu_local_rtx3060,38,hour,0.0,0.0,estimated,g0,0,job_s103_isaac_est2,eng_lead_01,Re-estimate from the measured ~25 min/episode: 90 episodes; plus ~74 CU of Colab L4 for the server; replaces job_s103_isaac_est (9-15 h)
