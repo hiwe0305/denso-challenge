@@ -21,11 +21,28 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from flywheel.eval.scorer.balance import BalanceLimits
 
 
 class ConfigError(ValueError):
     """A threshold file a detector must not run on."""
+
+
+@dataclass(frozen=True)
+class BalanceLimits:
+    """Which signals bound the body, and by how much (configured, never in code).
+
+    It lives in this module rather than beside the check that uses it so the
+    imports run one way only: every scorer module reads `config`, and `config`
+    reads no scorer module.
+    """
+
+    min_height: float
+    max_tilt: float
+    height_signal: str
+    tilt_signal: str
+
+    def signals(self) -> tuple[str, ...]:
+        return (self.height_signal, self.tilt_signal)
 
 
 @dataclass(frozen=True)
@@ -197,12 +214,37 @@ class ScorerConfig:
 
     `task_id` is checked against the task being scored, so a tray config cannot
     be used to score a two-table episode and quietly supply the wrong numbers.
+
+    `step_signals` says which signals each step is judged on, and it is what
+    lets the scorer hold the "chưa rõ" convention of AC 2 itself instead of
+    trusting the task to hold it. Without it, a task that returns `True` for a
+    step whose signal was never recorded scores as a pass and one that returns
+    `False` scores as a failure, and spec section 5.1 says neither. `StageSpec`
+    carries no signal list, so the declaration lives in config until it reaches
+    the contract (Contract change #59); either way it is per task, so no task's
+    steps are written in code.
+
+    `episode_signals` are the signals no single step owns - the collision flag
+    of the two-table task - and a missing one costs a clean episode its pass
+    rather than one step its verdict. `class_from_failed_step` names the kinds
+    whose shared class is the class of the failed step rather than one of their
+    own: `L-COLLIDE` and `L-TIMEOUT` of spec section 5.2.
     """
 
     task_id: str
     scorer_version: str
     thresholds: dict[str, float]
     balance: BalanceLimits
+    step_signals: dict[str, tuple[str, ...]]
+    episode_signals: tuple[str, ...]
+    class_from_failed_step: tuple[str, ...]
+
+    def declared_signals(self) -> frozenset[str]:
+        """Every signal the config accounts for, by step, by episode or by limit."""
+        names = set(self.episode_signals) | set(self.balance.signals())
+        for signals in self.step_signals.values():
+            names |= set(signals)
+        return frozenset(names)
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> ScorerConfig:
@@ -212,6 +254,12 @@ class ScorerConfig:
         thresholds = _number_map(data, "thresholds", "scorer config")
         if not thresholds:
             raise ConfigError("`thresholds` không được rỗng: task nào cũng có ngưỡng vị từ")
+        step_signals = _name_list_map(data, "step_signals", "scorer config")
+        if not step_signals:
+            raise ConfigError(
+                "`step_signals` không được rỗng: mỗi bước phải khai tín hiệu nó "
+                "được chấm trên, thiếu tín hiệu mà không khai thì thành đạt hoặc trượt (AC 2)"
+            )
         return cls(
             task_id=_text(data, "task_id", "scorer config"),
             scorer_version=_text(data, "scorer_version", "scorer config"),
@@ -222,6 +270,9 @@ class ScorerConfig:
                 height_signal=_text(balance, "height_signal", "balance"),
                 tilt_signal=_text(balance, "tilt_signal", "balance"),
             ),
+            step_signals=step_signals,
+            episode_signals=_name_list(data, "episode_signals", "scorer config"),
+            class_from_failed_step=_name_list(data, "class_from_failed_step", "scorer config"),
         )
 
 
@@ -318,6 +369,33 @@ def _number_map(section: Mapping[str, Any], key: str, where: str) -> dict[str, f
             raise ConfigError(f"`{where}.{key}.{name}` must be a number, got {number!r}")
         budgets[str(name)] = float(number)
     return budgets
+
+
+def _name_list(section: Mapping[str, Any], key: str, where: str) -> tuple[str, ...]:
+    value = _require(section, key, where)
+    if not isinstance(value, list):
+        raise ConfigError(f"`{where}.{key}` must be a list of names, got {value!r}")
+    names = tuple(_name(item, f"{where}.{key}") for item in value)
+    repeated = sorted({name for name in names if names.count(name) > 1})
+    if repeated:
+        raise ConfigError(f"`{where}.{key}` repeats {repeated}")
+    return names
+
+
+def _name_list_map(section: Mapping[str, Any], key: str, where: str) -> dict[str, tuple[str, ...]]:
+    value = _require(section, key, where)
+    if not isinstance(value, Mapping):
+        raise ConfigError(f"`{where}.{key}` must be a mapping of name to list, got {value!r}")
+    return {
+        _name(name, f"{where}.{key}"): _name_list(value, str(name), f"{where}.{key}")
+        for name in value
+    }
+
+
+def _name(value: Any, where: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError(f"`{where}` must hold non-empty names, got {value!r}")
+    return value
 
 
 _SECTION_FIELDS: dict[str, tuple[str, ...]] = {

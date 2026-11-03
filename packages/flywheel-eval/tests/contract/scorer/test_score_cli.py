@@ -28,7 +28,13 @@ def config(tmp_path: Path) -> Path:
         "scorer_version: '0.1.0'\n"
         "thresholds: {distance: 0.05}\n"
         "balance: {min_height: 0.5, max_tilt: 0.4, height_signal: torso_height, "
-        "tilt_signal: torso_tilt}\n",
+        "tilt_signal: torso_tilt}\n"
+        "step_signals:\n"
+        "  approach: [gripper_x, gripper_y, part_x, part_y]\n"
+        "  grasp: [gripper_x, gripper_y, part_x, part_y]\n"
+        "  place: [part_x, part_y, target_x, target_y]\n"
+        "episode_signals: []\n"
+        "class_from_failed_step: []\n",
         encoding="utf-8",
     )
     return path

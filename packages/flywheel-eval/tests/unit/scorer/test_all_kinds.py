@@ -21,6 +21,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from conftest import NaiveTask
 from flywheel.contracts import TaskDefinition
 from flywheel.eval.api import SCORER_CONFIG_DIR, score_trace
 from flywheel.eval.scorer.score import EpisodeScore
@@ -53,15 +54,47 @@ def test_a_successful_episode_has_no_failure_and_no_unknown(
     assert scored.missing_signals == ()
 
 
+def drop(signal: str, rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    return [{key: value for key, value in row.items() if key != signal} for row in rows]
+
+
+@pytest.mark.parametrize("answer", [True, False])
+def test_a_task_that_answers_anyway_cannot_make_a_missing_signal_a_verdict(
+    tmp_path: Path, make_rows: MakeRows, answer: bool
+) -> None:
+    # The case the review of 3/11/2026 asked for: a task whose predicates do
+    # not check whether the signal is there. `True` would be a pass nobody
+    # measured and `False` a reach failure nobody measured; the scorer holds
+    # the convention itself, so both come out unknown (AC 2, point 1).
+    rows = drop("hand_object_distance", make_rows())
+
+    scored = score(tmp_path, NaiveTask(verdict=answer), rows)
+
+    assert scored.steps[0].status is StepStatus.UNKNOWN
+    assert scored.steps[0].reason == "thiếu tín hiệu: hand_object_distance"
+    assert scored.success is None
+    assert scored.failure.failure_kind == "L-UNKNOWN"
+    assert scored.failure.first_failed_step is None
+
+
+def test_a_missing_episode_signal_costs_a_clean_episode_its_pass(
+    tmp_path: Path, task: TaskDefinition, make_rows: MakeRows
+) -> None:
+    # The collision flag belongs to no step, so every step stays judgeable and
+    # the episode does not: six steps passed with nobody watching for a
+    # collision is not a success (point 1, second case).
+    scored = score(tmp_path, task, drop("collision", make_rows()))
+
+    assert [step.status for step in scored.steps] == [StepStatus.PASSED] * 6
+    assert scored.success is None
+    assert scored.failure.failure_kind == "L-UNKNOWN"
+    assert "collision" in (scored.failure.reason or "")
+
+
 def test_a_missing_signal_is_unknown_not_clean(
     tmp_path: Path, task: TaskDefinition, make_rows: MakeRows
 ) -> None:
-    rows = [
-        {key: value for key, value in row.items() if key != "hand_object_contact"}
-        for row in make_rows()
-    ]
-
-    scored = score(tmp_path, task, rows)
+    scored = score(tmp_path, task, drop("hand_object_contact", make_rows()))
 
     assert scored.success is None
     assert scored.failure.failure_kind == "L-UNKNOWN"

@@ -61,7 +61,9 @@ def test_a_config_for_another_task_is_refused(
     other.write_text(
         "task_id: tray\nscorer_version: '0.1.0'\nthresholds: {r_reach: 0.08}\n"
         "balance: {min_height: 0.6, max_tilt: 0.3, height_signal: torso_height, "
-        "tilt_signal: torso_tilt}\n",
+        "tilt_signal: torso_tilt}\n"
+        "step_signals: {lift: [tray_tilt]}\nepisode_signals: []\n"
+        "class_from_failed_step: []\n",
         encoding="utf-8",
     )
 
@@ -92,15 +94,18 @@ def test_an_unknown_step_reaches_the_record_with_its_reason(
     tmp_path: Path, task: TaskDefinition, make_rows: MakeRows
 ) -> None:
     rows = [
-        {key: value for key, value in row.items() if key != "object_height"} for row in make_rows()
+        {key: value for key, value in row.items() if key != "hand_object_distance"}
+        for row in make_rows()
     ]
 
     record = build_record(score_trace(write(tmp_path / "ep.jsonl", rows), task, CONFIG))
 
     assert record.success is None
     assert record.failure_kind == "L-UNKNOWN"
-    assert record.meta["missing_signals"] == ["object_height"]
-    assert "object_height" in record.meta["unknown_steps"]["approach"]
+    assert record.meta["missing_signals"] == ["hand_object_distance"]
+    # Named after the signal that step is judged on, and no other.
+    assert "hand_object_distance" in record.meta["unknown_steps"]["approach"]
+    assert "hand_object_distance" not in record.meta["unknown_steps"].get("place", "")
 
 
 def test_a_balance_violation_reaches_the_record(

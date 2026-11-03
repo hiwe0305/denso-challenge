@@ -9,6 +9,12 @@ score both (AC 1, 4).
 
 Every threshold arrives through `ScorerParams`. None is written here, for the
 same reason none is written in the scorer.
+
+`NaiveTask` is the same task with its predicates replaced by a fixed answer.
+It is what the review of 3/11/2026 asked for: a task that answers `True` or
+`False` about a signal nobody recorded, so the tests can show the scorer
+holding the "chưa rõ" convention itself rather than inheriting it from a
+well-behaved task.
 """
 
 from __future__ import annotations
@@ -38,6 +44,17 @@ SIGNALS: tuple[tuple[str, str], ...] = (
     ("torso_tilt", "rad"),
     ("t", "s"),
 )
+
+# Which signals each step is judged on, the same declaration the shipped
+# config carries, so a test scoring by hand sees what `fw eval score` sees.
+BY_STEP: dict[str, tuple[str, ...]] = {
+    "approach": ("hand_object_distance",),
+    "grasp": ("hand_object_contact", "object_height"),
+    "walk": ("hand_object_contact", "torso_in_source_zone"),
+    "arrive": ("hand_object_contact", "torso_in_target_zone"),
+    "place": ("object_in_target_zone", "object_height"),
+    "release": ("hand_object_contact", "object_in_target_zone", "t"),
+}
 
 STEP_SIGNALS: tuple[str, ...] = (
     "hand_object_distance",
@@ -159,6 +176,22 @@ class TwoTableTask:
             first_failed_stage=failed,
             failure_kind=kind,
             failure_class=stage_class,
+        )
+
+
+class NaiveTask(TwoTableTask):
+    """A task that answers about signals it never saw (review of 3/11/2026)."""
+
+    def __init__(self, verdict: bool) -> None:
+        self._verdict = verdict
+
+    def evaluate(self, signals: pa.Table, params: ScorerParams) -> StageEvaluation:
+        if self._verdict:
+            return StageEvaluation(stage_success=(True,) * 6)
+        return StageEvaluation(
+            stage_success=(False,) * 6,
+            first_failed_stage=0,
+            failure_kind="L-REACH",
         )
 
 
@@ -308,7 +341,15 @@ def task() -> TwoTableTask:
 
 
 @pytest.fixture
+def step_signals() -> dict[str, tuple[str, ...]]:
+    return dict(BY_STEP)
+
+
+@pytest.fixture
 def params() -> ScorerParams:
+    # The numbers of `configs/eval/scorer/two-table.yaml`, so a test that
+    # evaluates the task by hand judges it against the shipped thresholds and
+    # not against looser ones of its own (review of 3/11/2026, point 8).
     return ScorerParams(
-        thresholds={"r_reach": 0.08, "h_grasp": 0.03, "h_place": 0.9, "T_stable": 0.5}
+        thresholds={"r_reach": 0.08, "h_grasp": 0.03, "h_place": 0.02, "T_stable": 0.5}
     )

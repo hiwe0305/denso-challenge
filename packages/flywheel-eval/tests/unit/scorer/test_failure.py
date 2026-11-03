@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from conftest import BY_STEP
 from flywheel.contracts import FailureKindSpec, StageEvaluation, StageSpec, TaskDefinition
 from flywheel.eval.scorer.failure import (
     NO_KIND_FROM_TASK,
@@ -19,14 +20,17 @@ def judge(
     task: TaskDefinition,
     missing: tuple[str, ...] = (),
     kinds: tuple[FailureKindSpec, ...] | None = None,
+    class_from_failed_step: tuple[str, ...] = (),
 ):  # noqa: ANN201 - the verdict type is an implementation detail of the module
     stages = tuple(task.stages())
-    steps = score_steps(evaluation, stages, missing)
+    steps = score_steps(evaluation, stages, missing, step_signals=BY_STEP)
     return judge_failure(
         evaluation,
         steps,
         kinds if kinds is not None else tuple(task.failure_kinds()),
         first_failed_step(evaluation),
+        stages,
+        class_from_failed_step,
     )
 
 
@@ -80,12 +84,46 @@ def test_the_episode_class_wins_over_the_declared_one(task: TaskDefinition) -> N
     assert verdict.failure_class == "place"
 
 
+@pytest.mark.parametrize(("step", "expected_class"), [(1, "grasp"), (2, "carry"), (4, "place")])
+def test_a_step_attached_kind_takes_the_class_of_the_failed_step(
+    task: TaskDefinition, step: int, expected_class: str
+) -> None:
+    # A collision during the walk is a carry failure, not an approach one: the
+    # class of `L-COLLIDE` is the class of step k (spec section 5.2), and the
+    # placeholder on its `FailureKindSpec` must not be what reaches the record
+    # (review of 3/11/2026, point 3).
+    verdict = judge(failed_at(step, "L-COLLIDE"), task, class_from_failed_step=("L-COLLIDE",))
+
+    assert verdict.failure_class == expected_class
+
+
+def test_a_kind_not_named_as_step_attached_keeps_its_declared_class(
+    task: TaskDefinition,
+) -> None:
+    verdict = judge(failed_at(2, "L-COLLIDE"), task)
+
+    # Nothing is guessed: with no declaration, the kind's own class is used.
+    assert verdict.failure_class == "approach"
+
+
+def test_a_kind_with_no_failed_step_is_a_contradiction(task: TaskDefinition) -> None:
+    # Every step passed and the task still named a kind. Dropping the kind
+    # would report the episode as a pass (review of 3/11/2026, point 4).
+    evaluation = StageEvaluation(stage_success=(True,) * 6, failure_kind="L-COLLIDE")
+
+    with pytest.raises(ScorerError, match="không có bước nào trượt"):
+        judge(evaluation, task)
+
+
 def test_an_unknown_step_gives_l_unknown_and_no_class(task: TaskDefinition) -> None:
-    verdict = judge(StageEvaluation(stage_success=(None,) * 6), task, ("object_height",))
+    verdict = judge(
+        StageEvaluation(stage_success=(None,) * 6), task, ("hand_object_distance",)
+    )
 
     assert verdict.failure_kind == UNKNOWN_KIND
     assert verdict.failure_class is None
-    assert verdict.reason == "thiếu tín hiệu: object_height"
+    # The reason is the first unknown step's own, which is the approach step's.
+    assert verdict.reason == "thiếu tín hiệu: hand_object_distance"
     # Not a pass and not a failure: nobody could tell.
     assert verdict.success is None
 
@@ -161,7 +199,11 @@ def test_a_seven_step_task_is_judged_the_same_way() -> None:
     )
 
     verdict = judge_failure(
-        evaluation, score_steps(evaluation, stages), kinds, first_failed_step(evaluation)
+        evaluation,
+        score_steps(evaluation, stages, step_signals={}),
+        kinds,
+        first_failed_step(evaluation),
+        stages,
     )
 
     assert verdict.first_failed_step == 5
