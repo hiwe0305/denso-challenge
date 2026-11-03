@@ -229,3 +229,50 @@ def test_stats_the_lane_cannot_recompute_follow_the_episode_video(tmp_path: Path
         dataset = json.loads((root / "meta/stats.json").read_text())
         assert list(dataset)[0] == "observation.images.egocentric"
         assert dataset["observation.images.egocentric"] == {"mean": [1.0]}
+
+
+def _footer(path: Path) -> tuple[object, ...]:
+    meta = pq.ParquetFile(path).metadata
+    group = meta.row_group(0)
+    codecs = sorted({group.column(i).compression for i in range(group.num_columns)})
+    schema = tuple(sorted((meta.metadata or {}).items()))
+    return (meta.created_by, meta.num_row_groups, tuple(codecs), meta.format_version, schema)
+
+
+def test_every_parquet_of_both_copies_has_one_footer(copies: tuple[Path, dict[str, Path]]) -> None:
+    # All episodes of both copies go through the same writer, so the file level (creator,
+    # codec, row groups, schema metadata) singles out no injected episode.
+    _, roots = copies
+    footers = {_footer(p) for r in roots.values() for p in r.glob("data/chunk-*/*.parquet")}
+    assert len(footers) == 1
+
+
+def test_videos_pass_through_and_only_a_frame_drop_changes_the_row_count(
+    copies: tuple[Path, dict[str, Path]],
+) -> None:
+    out, roots = copies
+    source = out.parent / "psi"
+    manifest = load_manifest(out / "answers" / roots["defect"].name / "defect_manifest.json")
+    owner = {
+        int(d.target_ref.removeprefix("episode_")): int(str(d.parameters["original_id"])[8:])
+        for d in manifest.defects
+        if d.parameters["kind"] == "duplicate_episode"
+    }
+    dropped = {
+        int(d.target_ref.removeprefix("episode_"))
+        for d in manifest.defects
+        if d.parameters["kind"] == "drop_frames"
+    }
+    for name, root in roots.items():
+        lengths = {int(r["episode_index"]): int(r["length"]) for r in read_episode_rows(root)}
+        off = set()
+        for f in iter_episodes(root):
+            i = f.episode_index
+            mine = root / f"videos/chunk-000/egocentric/episode_{i:06d}.mp4"
+            j = owner.get(i, i) if name == "defect" else i
+            theirs = source / f"videos/chunk-000/egocentric/episode_{j:06d}.mp4"
+            assert mine.read_bytes() == theirs.read_bytes(), (name, i)
+            assert lengths[i] == len(f.timestamp), (name, i)
+            if set(f.video_frames.values()) != {len(f.timestamp)}:
+                off.add(i)
+        assert off == (dropped if name == "defect" else set()), name
