@@ -22,7 +22,11 @@ checks:
   image_state_sync: {code: D2, threshold: 1, on_fail: reject}
   # Spec 4.4 row 3: finite values, joint limits of the action layout (G1 URDF) -> reject.
   finite_values: {code: D3, threshold: 0, on_fail: reject}
-  joint_limits: {code: D3, threshold: 0.0, on_fail: reject}  # rad past the limit
+  # rad past the limit. The G1 layout rounds URDF limits to 5-6 digits (wrist roll
+  # 1.97222); DA-33's planner clips at the URDF value, 1.0e-6 rad further, and
+  # psi-data holds -2.2e-16 against limits of 0, so a step under 1e-5 rad is no
+  # breach. Measured on psi-data e78fb93 and tray S1 0d84cc87b1e5, 4/11/2026.
+  joint_limits: {code: D3, threshold: 1.0e-5, on_fail: reject}
   # Spec 4.4 row 4: action jump above p99.9 of the teleop demos -> flag; thresholds below.
   action_jump: {code: D3, on_fail: flag}
   # Spec 4.4 row 6: lineage incomplete -> quarantine. Design 10 has no lineage code; D6
@@ -44,8 +48,9 @@ checks:
   # The tray S1 release holds only episodes DA-33's replay passed (102/102,
   # meta/batch_replay_summary.json), but per episode that is not a ReplayReport yet.
   replay_success: {code: D8, threshold: 0, on_fail: reject, when_missing: skip}
-  # Design 10 D4, per dataset: shipped stats against stats of the dataset's own frames.
-  # D4 blocks export (tier 6), not the release, so QA flags it in the dataset report.
+  # Design 10 D4, per dataset: shipped stats against stats of the dataset's own frames,
+  # computed in float32 as SIMPLE does. D4 blocks export (tier 6), not the release, so
+  # QA shows it in the dataset report.
   stats_json: {code: D4, threshold: 1.0e-5, on_fail: flag}
   episodes_stats: {code: D4, threshold: 1.0e-5, on_fail: flag}
 action_jump:

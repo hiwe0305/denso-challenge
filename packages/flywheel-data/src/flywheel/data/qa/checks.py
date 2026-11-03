@@ -168,42 +168,41 @@ def dataset_checks(
 ) -> list[DatasetFinding]:
     """The stats files the dataset at root ships, against stats of its own frames (D4).
 
-    `meta/stats.json` is compared for `states` and `action` over all frames,
-    `meta/episodes_stats.jsonl` for `action` and `timestamp` per episode; mean,
-    std, min and max only (quantiles depend on the method). A file the dataset does
-    not ship is not checked.
+    One finding per file and feature: `stats_json.states` and `stats_json.action`
+    over all frames, `episodes_stats.action` and `episodes_stats.timestamp` over
+    the episodes (the worst one named). Mean, std, min and max only, since
+    quantiles depend on the method; each is computed in the dtype the reader gives
+    (float32 states and action), as SIMPLE's `stats_block` computes them, so float32
+    rounding is not mistaken for a finding. A file the dataset does not ship, or a
+    feature it leaves out, is not checked.
     """
-    findings = []
+    findings: list[DatasetFinding] = []
+    if not episodes:
+        return findings
     stats_path = root / "meta" / "stats.json"
-    if stats_path.is_file() and episodes:
+    if stats_path.is_file():
         shipped = json.loads(stats_path.read_text())
-        computed = {
-            "states": np.concatenate([f.states for f in episodes]),
-            "action": np.concatenate([f.action for f in episodes]),
-        }
-        findings.append(_stats_finding("stats_json", shipped, computed, "", cfg))
+        for feature in ("states", "action"):
+            if isinstance(shipped.get(feature), dict):
+                values = np.concatenate([getattr(f, feature) for f in episodes])
+                findings.append(
+                    _stats_finding("stats_json", feature, {"": (shipped[feature], values)}, cfg)
+                )
     rows_path = root / "meta" / "episodes_stats.jsonl"
-    if rows_path.is_file() and episodes:
-        shipped_rows = {
+    if rows_path.is_file():
+        rows = {
             int(r["episode_index"]): r["stats"]
             for r in (json.loads(line) for line in rows_path.read_text().splitlines()
                       if line.strip())
         }
-        worst: DatasetFinding | None = None
-        for frames in episodes:
-            if frames.episode_index not in shipped_rows:
-                continue
-            finding = _stats_finding(
-                "episodes_stats",
-                shipped_rows[frames.episode_index],
-                {"action": frames.action, "timestamp": frames.timestamp},
-                f"episode {frames.episode_index} ",
-                cfg,
-            )
-            if worst is None or finding.check.value > worst.check.value:
-                worst = finding
-        if worst is not None:
-            findings.append(worst)
+        for feature in ("action", "timestamp"):
+            pairs = {
+                f"episode {f.episode_index} ": (rows[f.episode_index][feature], getattr(f, feature))
+                for f in episodes
+                if isinstance(rows.get(f.episode_index, {}).get(feature), dict)
+            }
+            if pairs:
+                findings.append(_stats_finding("episodes_stats", feature, pairs, cfg))
     return findings
 
 
@@ -337,17 +336,14 @@ def _report(episode: Episode, cfg: QAConfig, outcomes: list[Outcome]) -> QARepor
 
 def _stats_finding(
     name: str,
-    shipped: dict[str, Any],
-    computed: dict[str, NDArray[Any]],
-    where: str,
+    feature: str,
+    pairs: dict[str, tuple[dict[str, Any], NDArray[Any]]],
     cfg: QAConfig,
 ) -> DatasetFinding:
-    worst, at = 0.0, "nothing to compare"
-    for feature, values in computed.items():
-        block = shipped.get(feature)
-        if not isinstance(block, dict):
-            continue
-        data = np.asarray(values, dtype=np.float64).reshape(len(values), -1)
+    """The largest |shipped - recomputed| over `pairs` (where -> shipped block, values)."""
+    worst, at = 0.0, "every value equal"
+    for where, (block, values) in pairs.items():
+        data = np.asarray(values).reshape(len(values), -1)
         mine = {"mean": data.mean(0), "std": data.std(0), "min": data.min(0), "max": data.max(0)}
         for stat in STATS:
             if stat not in block:
@@ -356,12 +352,12 @@ def _stats_finding(
             if theirs.shape != mine[stat].shape:
                 worst, at = float("inf"), f"{where}{feature}.{stat} shape {theirs.shape}"
                 continue
-            gap = np.abs(theirs - mine[stat])
+            gap = np.abs(theirs - mine[stat].astype(np.float64))
             if float(gap.max()) > worst:
-                dim = int(gap.argmax())
-                worst, at = float(gap.max()), f"{where}{feature}.{stat}[{dim}]"
+                worst, at = float(gap.max()), f"{where}{feature}.{stat}[{int(gap.argmax())}]"
     rule = cfg.checks[name]
     value = worst if np.isfinite(worst) else 1e300  # QACheck holds finite numbers only
     passed = value <= rule.threshold
-    check = QACheck(name=name, value=value, threshold=rule.threshold, passed=passed)
+    check = QACheck(name=f"{name}.{feature}", value=value, threshold=rule.threshold,
+                    passed=passed)
     return DatasetFinding(check, rule.code, f"{DESCRIBE[name]}: {worst:g} at {at}")
