@@ -1,20 +1,23 @@
 # Checklist LeRobot v2.1 cho Ψ₀ trên khay S1 và psi-data
 
-_Ngày 4/11/2026. Story [DA-02](../product/stories/DA-02-export-lerobot-v21.md) nhiệm vụ 3. Checklist là 7 điểm của [design 27/10](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 6.4: điểm 1–6 do `flywheel.data.export.checklist` chạy trong làn, điểm 7 do contract test `packages/flywheel-psi0/tests/contract/test_loader_roundtrip.py` chạy trong image Ψ₀. Code ở commit `7c4cf92`, chạy trên máy `rtx3060`. Dữ liệu, batch mẫu và script chạy nằm ở `rtx3060:~/denso-da02/` và không commit._
+_Ngày 4/11/2026. Story [DA-02](../product/stories/DA-02-export-lerobot-v21.md) nhiệm vụ 3. Checklist là 7 điểm của [design 27/10](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 6.4: điểm 1–6 do `flywheel.data.export.checklist` chạy trong làn, điểm 7 do contract test `packages/flywheel-psi0/tests/contract/test_loader_roundtrip.py` chạy trong image Ψ₀. Code ở bản cuối của PR #91 (nhánh `DA-02-export-checklist`), chạy trên máy `rtx3060`. Dữ liệu, batch mẫu và script chạy nằm ở `rtx3060:~/denso-da02/` và không commit._
 
 ## Kết luận
 
-- **Cả hai dataset qua 17/18 phép kiểm của điểm 1–6.** Phép kiểm trượt duy nhất là `index` (điểm 2). Lỗi này đã biết: tác giả bắt đầu cột `index` của episode i ở 2 × `dataset_from_index` (Q7 của DA-03). Lỗi có ở cả psi-data lẫn khay S1, vì cả hai cùng đi qua `postprocess_psi0_sonic.py` của SIMPLE.
+- **Trên master hiện tại, cả hai dataset qua 16/18 phép kiểm của điểm 1–6.** Có hai phép kiểm trượt.
+  - `index` (điểm 2) đã biết: tác giả bắt đầu cột `index` của episode i ở 2 × `dataset_from_index` (Q7 của DA-03). Lỗi có ở cả hai dataset, vì cả hai cùng đi qua `postprocess_psi0_sonic.py` của SIMPLE.
+  - `stats.constant` (điểm 6, D4) trượt vì layout chưa khai chiều hằng số nào. **[Đã chốt]** Hiếu chọn phương án A ngày 4/11/2026: theo đúng D4, chiều hằng số không mask và không khai `constant` thì trượt. PR #89 thêm `ActionDimension.constant` và khai chiều 31 trong `g1.yaml`.
+- **Sau #89** (chạy thử với contract và `g1.yaml` của #89 ở `139985e`, mục 2): psi-data qua 17/18, chỉ còn `index` trượt. Khay S1 qua 16/18, vì `stats.constant` vẫn trượt ở 5 chiều `[0, 7, 28, 29, 30]` (`left_hand_thumb_0`, `right_hand_thumb_0`, ba khớp eo). Đây là phát hiện: không điều chỉnh để khay S1 qua (phát hiện 1).
 - **Điểm 7 qua trên cả hai dataset** (3/3 test mỗi dataset). Loader Ψ₀ ở `cda3fdf`, fork lerobot `09929d8`, đọc ra đúng giá trị parquet ở cả đầu và cuối episode. Loader tìm dòng theo vị trí và `episode_data_index`, không theo cột `index`, nên lỗi `index` ở trên **không làm sai batch Ψ₀ train**. Batch khớp batch mẫu đã lưu đến từng giá trị.
 - **`stats_psi0.json` của psi-data qua điểm 6.** File được tính trên đúng dữ liệu của gói, không NaN. Khoảng lệch DA-27 và DA-03 báo trước đây (`states.mean` lệch 3,63e-4 ở psi-data, 7,67e-4 ở khay S1) **không phải stats sai**. SIMPLE tính `states` bằng float64 và `action` bằng float32. Bản tính lại của làn dùng float32 cho cả hai, nên chính bản tính lại mới cộng dồn sai số. So với bản tính lại float64, `states` lệch 1,2e-7 (psi-data) và 1,8e-7 (khay S1); `action` lệch 0 so với bản float32; min và max lệch 0 (mục 4).
-- Chiều hằng số: psi-data có `[31]` (0,74 ở mọi khung); khay S1 có `[0, 7, 28, 29, 30, 31]`. Normalizer `bounds` của Ψ₀ giữ nguyên giá trị các chiều này. Test điểm 7 kiểm điều đó trên batch thật.
+- Chiều hằng số tìm theo đúng luật của Ψ₀ (`ill_mask` trong `ActionStateTransform` ở `cda3fdf`: `|max − min| < 1e-4·(|max| + |min|)`), đối chiếu với bản tính lại; không tìm theo std (mục 4). psi-data có `[31]` (0,74 ở mọi khung); khay S1 có `[0, 7, 28, 29, 30, 31]`. Normalizer `bounds` của Ψ₀ giữ nguyên giá trị các chiều này; test điểm 7 kiểm điều đó trên batch thật.
 - Chạy nhẹ: checklist mất 2,5 s (khay S1, 148.013 khung) và 1,4 s (psi-data, 62.764 khung), RSS đỉnh 462 MB cho cả hai trong một tiến trình. Mỗi lần chạy điểm 7 mất 25–35 s, container giới hạn 6 GB, 4 CPU, không GPU, không mạng.
 
 Việc phát sinh, Hiếu quyết:
 
 | # | Phát hiện | Ảnh hưởng | Đề xuất |
 |---|---|---|---|
-| 1 | `ActionLayout` không có trường khai một chiều là hằng số. Design 6.4 điểm 6 và D4 cần trường này; `g1.yaml` chỉ ghi chiều 31 hằng số trong comment | Checklist chưa phân biệt được "hằng số đã khai" với "chiều chết". Hiện chiều hằng số không mask chỉ được liệt kê, không bị đánh trượt (`UNDECLARED_CONSTANT_IS_ERROR = False`). Nếu đánh trượt, cả hai dataset trượt: psi-data ở chiều 31, khay S1 ở 6 chiều | **[Đề xuất]** PR hợp đồng thêm `ActionDimension.constant: bool = False` (Hiếu), rồi khai chiều 31 trong `g1.yaml` (Long, DA-01), rồi bật cờ. Khay S1 cần quyết riêng cho các chiều 0, 7, 28–30: planner không động tới các chiều này |
+| 1 | Khay S1 có 5 chiều action hằng số mà layout không khai: `[0, 7, 28, 29, 30]` (`left_hand_thumb_0_joint`, `right_hand_thumb_0_joint`, `waist_roll/pitch/yaw_joint`). Ở psi-data, các chiều này có biến thiên | Sau #89, khay S1 vẫn trượt điểm 6 (D4, chặn export). Hoặc planner DA-33 không bao giờ động tới các khớp này, hoặc đó là ý đồ của planner. Nếu là ý đồ, model fine-tune trên khay sẽ học các chiều này là hằng | DA-33 trả lời các chiều này có thật sự hằng không. Hiếu quyết: khai `constant` cho dữ liệu khay, hoặc sửa planner |
 | 2 | D4 trên `states` ở [data-pipeline.md](data-pipeline.md) phát hiện 2 và ở `test_source_stats.py` của DA-27 là dương tính giả do float32 (mục 4) | `dataset_checks` của DA-03 đánh `flag` cho `stats.json` của cả hai nguồn, dù stats đúng | **[Đề xuất]** DA-03 so trong cả float32 và float64 như `checklist.PRECISIONS`; DA-27 sửa lời giải thích "lấy trước khi downsample" |
 | 3 | Loader Ψ₀ đòi timestamp khớp trong 1e-4 s (`tolerance_s` của lerobot, dùng ở `check_timestamps_sync` và khi giải mã video). Design 6.4 điểm 3 chỉ đòi nửa chu kỳ (10 ms ở 50 Hz) | Dataset lệch từ 0,1 ms đến 10 ms qua điểm 3 nhưng loader Ψ₀ từ chối. Hai dataset hiện có lệch 2e-13 chu kỳ, không bị ảnh hưởng | **[Đề xuất]** Siết điểm 3 xuống 1e-4 s; việc này cần sửa design |
 | 4 | Cả hai `info.json` không khai tên từng chiều action (`shape [-1]`, không có `names`) và để trống `video_info`. Khay S1 có `meta/action_layout.json`; psi-data chỉ có nhóm trong `modality.json` | Điểm 1 kiểm được tên của khay S1, không kiểm được tên của psi-data. Điểm 4 không có codec khai báo để so | Ghi nhận. Checklist báo "không khai" ở chi tiết, không đánh trượt |
@@ -82,7 +85,13 @@ Kết quả. Một phép kiểm trượt khi `value > threshold`. Cột "Chi ti�
 | `v21.6.stats.file` | D4 | pass | pass | Có `states` và `action` (mean, std, min, max), đúng độ rộng |
 | `v21.6.stats.finite` | D4 | pass | pass | 0 NaN hoặc Inf |
 | `v21.6.stats.release` | D4 | pass 1,8e-7 | pass 1,2e-7 | Lệch lớn nhất so với bản tính lại gần nhất (float64, ở `states.mean[31]`); ngưỡng 1e-5 |
-| `v21.6.stats.constant` | D4 | pass | pass | Chiều hằng số `[0, 7, 28, 29, 30, 31]` / `[31]`, không chiều nào mask; 0 lỗi theo quy tắc hiện tại (phát hiện 1) |
+| `v21.6.stats.constant` | D4 | **FAIL** 6 | **FAIL** 1 | Chiều hằng số `[0, 7, 28, 29, 30, 31]` / `[31]`; trên master chưa chiều nào được mask hoặc khai `constant` |
+
+Chạy lại với contract và `g1.yaml` của PR #89 (`139985e`, chép tạm vào `~/denso-da02-pr89`, nạp qua `PYTHONPATH`; checklist đọc cờ bằng `getattr(dim, "constant", False)` cho tới khi #89 merge), chỉ `stats.constant` đổi:
+
+| Phép kiểm | Khay S1 | psi-data | Chi tiết |
+|---|---|---|---|
+| `v21.6.stats.constant` | **FAIL** 5 | pass | Khay: đã khai `[31]`, lỗi `[0, 7, 28, 29, 30]`. psi-data: đã khai `[31]`, không lỗi |
 
 ## 3. Điểm 7
 
@@ -134,4 +143,11 @@ Ngoài lane CI, module tự bỏ qua khi không import được `psi`: `uv run p
 | psi-data | `states` mean / std | 3,6e-4 / 3,6e-4 | 1,2e-7 / 1,2e-7 | khớp 0 |
 | psi-data | `action` mean / std | 0 / 0 | 3,6e-4 / 3,6e-4 | khớp 0 |
 
-SIMPLE tính mỗi khối theo dtype của nó lúc tính: `states` bằng float64, `action` bằng float32. Cộng dồn float32 qua 10⁵ khung dịch mean đi tới 7,7e-4. Vì thế `stats.release` coi một khối là "tính trên đúng release" khi khối đó khớp một trong hai bản tính lại. Ψ₀ chuẩn hóa bằng min và max (`bounds`), và min, max khớp 0 ở cả hai dataset. Cũng vì float32, std của chiều 31 trong psi-data là 3,6e-4 dù chiều này hằng 0,74. Do đó checklist tìm chiều hằng số bằng `max − min` (đúng `ill_mask` của Ψ₀), không bằng std.
+SIMPLE tính mỗi khối theo dtype của nó lúc tính: `states` bằng float64, `action` bằng float32. Cộng dồn float32 qua 10⁵ khung dịch mean đi tới 7,7e-4. Vì thế `stats.release` coi một khối là "tính trên đúng release" khi khối đó khớp một trong hai bản tính lại. Ψ₀ chuẩn hóa bằng min và max (`bounds`), và min, max khớp 0 ở cả hai dataset. Cũng vì float32, std của chiều 31 trong psi-data là 3,6e-4 dù chiều này hằng 0,74. Bản tính lại của làn ra đúng 3,6e-4, nên đây không phải lệch giữa stats ship và release. Do đó checklist tìm chiều hằng số bằng `max − min` (đúng `ill_mask` của Ψ₀), không bằng std.
+
+Dung sai của `stats.release` là 1e-5 (`STATS_TOLERANCE` trong `checklist.py`), bằng ngưỡng `stats_json` của `configs/data/qa.yaml` (DA-03). Lý do chọn 1e-5:
+- Lệch thật đo được khi so với bản tính lại cùng dtype là 1,8e-7 trở xuống. Đó là sai số làm tròn float32 của giá trị cỡ 1 (ulp ≈ 6e-8 đến 1,2e-7).
+- Một stats tính trên release khác, ví dụ thiếu hoặc thừa một episode, lệch ít nhất cỡ 1e-3 trên mean; test `test_stats_in_either_precision_count_as_computed_on_the_release` kiểm lệch 1e-3.
+- 1e-5 nằm giữa hai mức, cách mỗi mức hai bậc độ lớn.
+
+Hàm `check_lerobot_v21(root, layout)` không nhận config, nên dung sai là hằng số trong module. **[Đề xuất]** Nếu cần đưa dung sai vào config, thêm một khóa vào `qa.yaml` qua PR của DA-03.

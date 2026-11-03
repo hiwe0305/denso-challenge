@@ -76,7 +76,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực: 5 giờ (nhiệm vụ 1: 2,5; 2: 1,5; 3: 1)
+- Giờ thực: 5,5 giờ (nhiệm vụ 1: 3; 2: 1,5; 3: 1)
 - Công cụ AI đã dùng: Claude Code (Opus 5.5)
-- Ghi chú hoàn thành: cả hai dataset qua 17/18 phép kiểm của điểm 1–6 và qua điểm 7. Phép kiểm trượt duy nhất là `index` (Q7 của DA-03), và lỗi này không làm sai batch Ψ₀. Còn chờ PO: trường khai chiều hằng số trong `ActionLayout`; siết điểm 3 xuống 1e-4 s. Chi tiết ở [export-v21.md](../../g0/export-v21.md).
+- Ghi chú hoàn thành: hai dataset qua điểm 7. Ở điểm 1–6, cả hai trượt `index` (Q7 của DA-03); lỗi này không làm sai batch Ψ₀. Điểm 6 theo phương án A của PO (4/11/2026): chiều hằng số không mask, không khai `constant` thì trượt. Sau PR #89, psi-data qua; khay S1 trượt ở 5 chiều `[0, 7, 28, 29, 30]`, chờ DA-33 trả lời. Chuyển sang trường `constant` thật và thêm test khi #89 merge. Còn chờ PO: siết điểm 3 xuống 1e-4 s. Chi tiết ở [export-v21.md](../../g0/export-v21.md).
 - File đã tạo hoặc sửa: `packages/flywheel-data/src/flywheel/data/export/checklist.py`, `packages/flywheel-data/tests/unit/export/`, `packages/flywheel-psi0/tests/contract/test_loader_roundtrip.py`, `docs/g0/export-v21.md`
