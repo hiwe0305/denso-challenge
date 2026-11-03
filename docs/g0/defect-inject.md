@@ -7,7 +7,7 @@ Tài liệu kỹ thuật theo [design 27/10/2026](../superpowers/specs/2026-10-2
 ## 1. Mục tiêu và nguyên tắc thiết kế
 
 1. **Không sửa bản gốc:** Mọi thao tác cấy lỗi chỉ thực hiện trên bản sao (deep copy), bảo toàn toàn vẹn dữ liệu gốc của `psi-data`.
-2. **Khóa đáp án trước (Answer Key Lock):** Danh sách lỗi cấy và tham số được ghi vào `DefectManifest` của `flywheel.contracts` (mỗi lỗi là một `Defect`), băm SHA-256 lưu thành file `.sha256`. Agent QA/QC và bộ kiểm tra thông thường bị chặn không được đọc file đáp án này.
+2. **Khóa đáp án trước (Answer Key Lock):** Danh sách lỗi cấy và tham số được ghi vào `DefectManifest` của `flywheel.contracts` (mỗi lỗi là một `Defect`). `seal_manifest` ghi `defect_manifest.json` và `defect_manifest.sha256` ở thư mục đáp án riêng, và từ chối ghi vào bên trong thư mục bản sao mà agent đọc (`copy_roots`). Chỉ bộ chấm (`flywheel.eval.agentqa.bench`, DA-31) đọc file này; test `test_read_barrier.py` quét mã của agent (`flywheel.eval.agentqa`, trừ `bench/`) và của phép kiểm (`flywheel.data`, trừ `inject/`, `cli.py`, `api.py`) và đỏ nếu có chỗ nào nhắc tới `DefectManifest`, `defect_manifest` hay `load_manifest`.
 3. **Đối chứng sạch (Clean Baseline):** Luôn sinh kèm một tập sạch có kích thước tương đương để đo tỉ lệ báo nhầm (False Positive Rate). Bản sạch chép từ bản gốc, không từ bản cấy. Hai bản sao mang id trung tính cùng dạng `bench-<12 hex>` (`copy_ids(seed)`), không chứa chữ nào lộ vai trò như `clean`, `defect`; bản nào là bản sạch chỉ thấy trong `DefectManifest` (bản sạch có `defects` rỗng), file chỉ bộ chấm đọc.
 4. **Rào chắn Release (Release Barrier):** Bất kỳ episode nào mang `EpisodeMetadata.injected_defect` (`InjectedDefect` của hợp đồng) đều bị từ chối và chặn đứng hoàn toàn nếu cố tình đưa vào tập huấn luyện hoặc release chính thức.
 
@@ -56,6 +56,6 @@ Hỗ trợ sinh log giả định theo đúng schema của `FakeTrainer` và RTC
 
 ## 4. Kiểm thử và Nghiệm thu
 
-* **Unit tests:** 55 test case tự động tại `packages/flywheel-data/tests/unit/inject/`.
+* **Unit tests:** 59 test case tự động tại `packages/flywheel-data/tests/unit/inject/`.
 * **Độ bao phủ:** 100% các loại lỗi cấy đều có test kiểm chứng.
 * **Độc lập kiến trúc:** Không import vòng, tuân thủ nghiêm ngặt 3 hợp đồng kiến trúc của repo.
