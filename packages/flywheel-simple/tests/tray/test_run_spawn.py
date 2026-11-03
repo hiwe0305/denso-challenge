@@ -1,4 +1,4 @@
-"""The runner prepares workers that SIMPLE's eval spawns: tray env id, condition reader.
+"""The runner prepares workers that SIMPLE's eval spawns: env id, condition reader, eval patches.
 
 A spawned worker re-imports the runner as `__mp_main__` with
 `runpy.run_module(..., run_name="__mp_main__", alter_sys=True)` (multiprocessing.spawn's
@@ -24,6 +24,11 @@ from pathlib import Path
 import pytest
 
 RUN = "flywheel_simple.tray.run"
+EVAL_MODULES = (
+    "simple.cli.eval_decoupled_wbc",
+    "simple.baselines.psi0_decoupled_wbc",
+    "simple.agents.sonic_decoupled_wbc_agent",
+)
 ENV_ID = "simple/G1WholebodyTrayTransferTeleop-v0"
 
 
@@ -36,8 +41,14 @@ def simple_fakes(monkeypatch: pytest.MonkeyPatch) -> tuple[list[str], types.Modu
     calls: list[str] = []
     task = types.ModuleType("flywheel_simple.tray.simple_task")
     task.register = lambda: calls.append("register")  # type: ignore[attr-defined]
+    task.live_env = lambda: None  # type: ignore[attr-defined]
     lerobot = types.ModuleType("simple.datasets.lerobot")
-    for fake in (task, lerobot):
+    client = types.ModuleType("simple.baselines.client")
+    client.HttpActionClient = type(  # type: ignore[attr-defined]
+        "HttpActionClient", (), {"query_action": lambda self, *a, **k: None}
+    )
+    evals = [types.ModuleType(name) for name in EVAL_MODULES]
+    for fake in (task, lerobot, client, *evals):
         monkeypatch.setitem(sys.modules, fake.__name__, fake)
     monkeypatch.delitem(sys.modules, RUN, raising=False)
     monkeypatch.setattr(sys, "argv", ["eval-decoupled-wbc", ENV_ID, "--num-workers", "2"])
@@ -51,6 +62,9 @@ def test_spawned_worker_registers_the_env_and_reads_tray_conditions(
     worker = runpy.run_module(RUN, run_name="__mp_main__", alter_sys=True)
     assert calls == ["register"]
     assert lerobot.get_episode_lerobot is worker["get_episode_lerobot"]
+    assert all(isinstance(sys.modules[m].time, worker["SimTime"]) for m in EVAL_MODULES)
+    client = sys.modules["simple.baselines.client"].HttpActionClient
+    assert getattr(client.query_action, "flywheel_condition_seed", False)
 
 
 def test_plain_import_patches_nothing(simple_fakes: tuple[list[str], types.ModuleType]) -> None:
