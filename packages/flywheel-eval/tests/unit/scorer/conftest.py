@@ -181,10 +181,12 @@ class _Reader:
         return any(_on(value) for value in self.column(name))
 
     def stalled(self, entered: tuple[int | None, ...]) -> bool:
-        # No step entered after the first half of the episode: the robot was
-        # moving nowhere rather than failing at something in particular.
+        # Nothing progressed past the first quarter of the episode: the robot
+        # was moving nowhere, rather than failing at the step it got to. An
+        # episode that reached table B and then could not place the object has
+        # a place failure, not a timeout.
         indices = [index for index in entered if index is not None]
-        return bool(indices) and max(indices) * 2 < self._signals.num_rows
+        return bool(indices) and max(indices) * 4 < self._signals.num_rows
 
 
 def _after(start: int | None, length: int, strictly: bool = False) -> Iterator[int]:
