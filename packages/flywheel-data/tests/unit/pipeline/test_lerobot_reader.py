@@ -471,7 +471,7 @@ def test_renumbering_index_is_written_to_the_lineage_file(
             "rows": 7,
             "old_first": 10,
             "new_first": 5,
-            "decision": "Q7 proposal, pending PO",
+            "decision": "Q7, decided by the PO 3/11/2026",
         }
     ]
     assert check_index(root) == []

@@ -132,11 +132,13 @@ def write_episode(root: Path, frames: EpisodeFrames) -> None:
     The global `index` column starts after the episodes with a smaller index as
     the meta lists them now, so write a dataset in ascending episode order;
     changing the length of an earlier episode leaves later ones stale until they
-    are written again. Writing renumbers `index` to that rule (proposal Q7,
-    pending the PO): psi-data starts episode i at 2 x dataset_from_index in 95
-    of 99 episodes. The renumbering is never silent: when any kept row's index
-    changes, a row goes to `meta/flywheel_lineage.jsonl` with the old and new
-    first index and the number of rows changed, and `check_index` reports the
+    are written again. Writing renumbers `index` to that rule (Q7, decided by
+    the PO 3/11/2026): psi-data starts episode i at 2 x dataset_from_index in 95
+    of 99 episodes, tray S1 in 80 of 102, likely from SIMPLE's
+    postprocess_psi0_sonic.py both went through. The renumbering is never
+    silent: when any kept row's index changes, a row goes to
+    `meta/flywheel_lineage.jsonl` with the old and new first index and the
+    number of rows changed, and `check_index` reports the
     source's own mismatches at ingest.
     """
     info = read_info(root)
@@ -507,7 +509,7 @@ def _renumbering(
         "rows": len(after),
         "old_first": int(before[0]),
         "new_first": int(after[0]),
-        "decision": "Q7 proposal, pending PO",
+        "decision": "Q7, decided by the PO 3/11/2026",
     }
 
 

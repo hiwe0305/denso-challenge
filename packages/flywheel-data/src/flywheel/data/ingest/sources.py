@@ -175,7 +175,12 @@ def register_source(
 
 
 def to_episode(frames: EpisodeFrames, source: SourceRecord, split: str) -> Episode:
-    """The contract Episode of one episode of a registered source."""
+    """The contract Episode of one episode of a registered source.
+
+    The writer sets the episode id (DA-25; Q5, decided by the PO 3/11/2026):
+    `ep_` and the first 16 hex of sha256("<source_id>:<episode_index>"), so
+    ingesting the same source again gives the same ids. No ULID is required.
+    """
     profile = _profile(source.source_detail)
     index = frames.episode_index
     if index not in source.lineage:

@@ -390,3 +390,11 @@ def test_the_lane_api_exposes_the_deid_gate() -> None:
     from flywheel.data import api
 
     assert api.deid_blocks_annotate is deid_blocks_annotate
+
+
+def test_the_writer_sets_the_episode_id(dataset: Dataset) -> None:
+    # Q5, decided by the PO 3/11/2026: ids follow DA-25 (set by the writer), not ep_<ULID>.
+    root, written = dataset
+    source = register_source(root, "psi_data", "unknown", "public")
+    key = hashlib.sha256(f"{source.source_id}:1".encode()).hexdigest()[:16]
+    assert to_episode(written[1], source, "train").episode_id == f"ep_{key}"
