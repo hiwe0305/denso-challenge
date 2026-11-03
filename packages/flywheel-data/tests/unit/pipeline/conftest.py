@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import struct
 from collections.abc import Callable
 from pathlib import Path
 
@@ -57,16 +58,37 @@ def make_frames(index: int, length: int, task: str = TASK) -> EpisodeFrames:
     )
 
 
+def box(kind: bytes, payload: bytes = b"") -> bytes:
+    return struct.pack(">I4s", 8 + len(payload), kind) + payload
+
+
+def track(handler: bytes, samples: int) -> bytes:
+    hdlr = box(b"hdlr", bytes(8) + handler + bytes(12) + b"\0")
+    stsz = box(b"stsz", bytes(4) + struct.pack(">II", 0, samples) + bytes(4 * samples))
+    return box(b"trak", box(b"mdia", hdlr + box(b"minf", box(b"stbl", stsz))))
+
+
+def fake_mp4(path: Path, frames: int, audio: int | None = 7) -> None:
+    """An mp4 with no picture in it whose video track holds `frames` samples in stsz.
+
+    An audio track comes first, so the reader has to pick the track by handler.
+    """
+    tracks = (b"" if audio is None else track(b"soun", audio)) + track(b"vide", frames)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(box(b"ftyp", b"isom" + bytes(4)) + box(b"moov", tracks) + box(b"mdat"))
+
+
+def video_path(root: Path, index: int) -> Path:
+    return root / "videos" / "chunk-000" / "egocentric" / f"episode_{index:06d}.mp4"
+
+
 def make_dataset(root: Path, lengths: list[int]) -> list[EpisodeFrames]:
     (root / "meta").mkdir(parents=True)
     (root / "meta" / "info.json").write_text(json.dumps(psi0_info(), indent=4))
     episodes = [make_frames(i, n) for i, n in enumerate(lengths)]
     for frames in episodes:
         write_episode(root, frames)
-        name = f"episode_{frames.episode_index:06d}.mp4"
-        video = root / "videos" / "chunk-000" / "egocentric" / name
-        video.parent.mkdir(parents=True, exist_ok=True)
-        video.write_bytes(b"\x00not a real mp4")
+        fake_mp4(video_path(root, frames.episode_index), len(frames.timestamp))
     return episodes
 
 
@@ -115,3 +137,8 @@ def flywheel() -> Callable[..., None]:
 @pytest.fixture
 def s1_block() -> dict[str, object]:
     return dict(S1_BLOCK)
+
+
+@pytest.fixture
+def mp4() -> Callable[..., None]:
+    return fake_mp4
