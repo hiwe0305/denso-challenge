@@ -155,7 +155,7 @@ Mỗi bản có 30 job train (8 loại × 3, cộng 6 job sạch) và 10 job RTC
 | R1 | `R1_high_latency` | 5% chunk trễ 0,155 s (p99 trên 0,15 s; `delay_steps` 8, chưa vượt R2) |
 | R2 | `R2_buffer_depleted` | một chunk trễ 0,24 s (`delay_steps` 12, trên 8; p99 vẫn dưới 0,15 s) |
 
-Test chạy chính bộ phát hiện của làn Đánh giá trên từng job: job có lỗi ra đúng mã của nó và không mã nào khác, job sạch và bản sạch không ra mã nào. testkit chưa có bộ giả sinh metrics hay log RTC, nên bộ sinh ở đây thay cho `FakeTrainer` và log RTC giả của design 9.2. Hai bản có cùng hình dạng, id trung tính (`copy_ids(seed, namespace="logs")`), một mtime, `meta/benchmark_copy.json` ghi log là tổng hợp, không phải số đo.
+Test trong làn (`tests/unit/inject/test_log_defects.py`) so mỗi job với job sạch cùng id: lỗi đổi đúng một tín hiệu, đúng mức cấu hình. Test nối làn (`tests/e2e/test_log_defects_detected.py`) chạy bộ phát hiện của làn Đánh giá trên từng job: job có lỗi ra đúng mã của nó và không mã nào khác, job sạch và bản sạch không ra mã nào; T1–T8 qua `flywheel.eval.api.diagnose_train`, R1, R2 qua hàm nội bộ vì api chưa có hàm đọc riêng log RTC. testkit chưa có bộ giả sinh metrics hay log RTC, nên bộ sinh ở đây thay cho `FakeTrainer` và log RTC giả của design 9.2. Hai bản có cùng hình dạng, id trung tính (`copy_ids(seed, namespace="logs")`), một mtime, `meta/benchmark_copy.json` ghi log là tổng hợp, không phải số đo.
 
 ```bash
 uv run python -m flywheel.data.inject.log_defects --out fwdata/inject-logs
