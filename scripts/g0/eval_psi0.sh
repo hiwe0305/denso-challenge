@@ -119,6 +119,12 @@ SIMPLE_TASK_FIX="${SIMPLE_TASK_FIX:-on}"
 SIMPLE_FIX_COMMIT="${SIMPLE_FIX_COMMIT:-b75c6786f87b4a7f43b52b0ac5b83a1d9ea62e11}"
 SIMPLE_FIX_FILE=src/simple/tasks/g1_wholebody_locomotion_pick_between_tables_teleop.py
 SIMPLE_FIX_SHA256="${SIMPLE_FIX_SHA256:-51bce5d6c0311219d9a827b589910d915521dccc89b69a1ab20ff35081b6dc8f}"
+# DDS domain of the client. Every SIMPLE env calls ChannelFactoryInitialize(DOMAIN_ID); DOMAIN_ID
+# comes only from gear_sonic's wbc_configs/g1_29dof_sonic_model12.yaml (0; override_wbc_config does
+# not touch it, and eval passes no CLI args to SimLoopConfig), so every SIMPLE run on a box shares
+# domain 0. A non-zero value mounts a copy of that yaml with this DOMAIN_ID; 0 keeps the image's.
+SIMPLE_DDS_DOMAIN="${SIMPLE_DDS_DOMAIN:-103}"
+WBC_YAML=/workspace/simple/third_party/gear_sonic/utils/mujoco_sim/wbc_configs/g1_29dof_sonic_model12.yaml
 SIMPLE_DATA="${SIMPLE_DATA:-$MAIN_REPO/fwdata/simple/s103}"
 # A SIMPLE data/ tree with assets, robots and scenes already downloaded; mounted read-only.
 SIMPLE_ASSETS="${SIMPLE_ASSETS:-$MAIN_REPO/fwdata/simple/SIMPLE/data}"
@@ -161,6 +167,23 @@ cmd_run() {
     fix_mount=(-v "$fix:/workspace/simple/$SIMPLE_FIX_FILE:ro")
     task_file="SIMPLE ${SIMPLE_FIX_COMMIT:0:7} (sha256 ${SIMPLE_FIX_SHA256:0:12})"
   fi
+  local dds_mount=()
+  if [[ "$SIMPLE_DDS_DOMAIN" != 0 ]]; then
+    local yaml="$SIMPLE_DATA/patches/dds-$SIMPLE_DDS_DOMAIN/$(basename "$WBC_YAML")"
+    mkdir -p "$(dirname "$yaml")"
+    docker run --rm --entrypoint cat "$SIMPLE_IMAGE" "$WBC_YAML" \
+      | sed -E "s/^DOMAIN_ID: 0( |$)/DOMAIN_ID: $SIMPLE_DDS_DOMAIN\1/" > "$yaml"
+    grep -q "^DOMAIN_ID: $SIMPLE_DDS_DOMAIN\b" "$yaml" || die "could not set DOMAIN_ID in $yaml"
+    dds_mount=(-v "$yaml:$WBC_YAML:ro")
+  elif [[ "${SIMPLE_ALLOW_SHARED:-0}" != 1 ]]; then
+    # On domain 0, run alone. This eval path opens no DDS publisher or subscriber (SIMPLE b75c678),
+    # but teleop/replay/WBC runs of other stories do.
+    local others
+    others=$(ps -eo pid=,args= | grep -E "eval-decoupled-wbc|teleop-decoupled-wbc|replay-decoupled-wbc|flywheel_simple|gear_sonic|simple/\.venv/bin/python|pytest .*-m sim" \
+      | grep -v -E "grep|eval_psi0.sh" || true)
+    [[ -z "$others" ]] || die "other SIMPLE processes share DDS domain 0; wait, set SIMPLE_DDS_DOMAIN, or SIMPLE_ALLOW_SHARED=1:
+$others"
+  fi
   # The client trusts the server for run, checkpoint and RTC; check it serves this task.
   local info
   info=$(curl -sf "http://$host:$PORT/info") || die "no Psi0 server on $host:$PORT; run: serve_psi0.sh serve"
@@ -194,7 +217,7 @@ cmd_run() {
     -v "$SIMPLE_ASSETS/assets:/workspace/simple/data/assets:ro" \
     -v "$SIMPLE_ASSETS/robots:/workspace/simple/data/robots:ro" \
     -v "$SIMPLE_ASSETS/scenes:/workspace/simple/data/scenes:ro" \
-    "${fix_mount[@]}" \
+    "${fix_mount[@]}" "${dds_mount[@]}" \
     -w /workspace/simple --entrypoint /workspace/simple/.venv/bin/eval-decoupled-wbc "$SIMPLE_IMAGE" \
     "simple/$TASK" psi0_decoupled_wbc "dr-level-$level" \
     --host "$host" --port "$PORT" --sim-mode "$sim_mode" --headless \
@@ -212,13 +235,13 @@ cmd_run() {
   # Revisions and outcome in one file per invocation (story test: same config, recorded pins).
   python3 - "$out" "$status" "$((end - begin))" "$sim_mode" "$level" "$pass" "$start" "$episodes" \
     "$RUN" "$CKPT_STEP" "$PSI_MODEL_REV" "$PSI0_COMMIT" "$PSI_DATA_REV" "$SIMPLE_IMAGE" \
-    "$ACTION_EXEC_HORIZON" "$RTC_FLAG" "$host:$PORT" "$TASK" "$task_file" <<'PY'
+    "$ACTION_EXEC_HORIZON" "$RTC_FLAG" "$host:$PORT" "$TASK" "$task_file" "$SIMPLE_DDS_DOMAIN" <<'PY'
 import json, re, sys
 from pathlib import Path
 
 out = Path(sys.argv[1])
 (status, seconds, sim_mode, level, pass_, start, episodes, run, ckpt_step, model_rev, psi0_commit,
- data_rev, image, exec_h, rtc, server, task, task_file) = sys.argv[2:20]
+ data_rev, image, exec_h, rtc, server, task, task_file, dds_domain) = sys.argv[2:21]
 lines = (out / "eval_stats.txt").read_text().splitlines() if (out / "eval_stats.txt").exists() else []
 results = {m[1]: m[2] == "True" for l in lines if (m := re.match(r"(episode_\d+): (True|False)", l.strip()))}
 summary = {
@@ -229,7 +252,7 @@ summary = {
     "client_exit": int(status), "wall_seconds": int(seconds),
     "server": server, "run": run, "ckpt_step": int(ckpt_step), "psi_model_revision": model_rev,
     "psi0_commit": psi0_commit, "action_exec_horizon": int(exec_h), "rtc": rtc == "--rtc",
-    "psi_data_revision": data_rev, "simple_image": image, "simple_task_file": task_file,
+    "psi_data_revision": data_rev, "simple_image": image, "simple_task_file": task_file, "dds_domain": int(dds_domain),
     # What the server itself reports; the run/ckpt/horizon/rtc fields above are the client's env.
     "server_info": json.loads((out / "server_info.json").read_text()),
 }

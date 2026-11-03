@@ -10,10 +10,10 @@ _Kết quả của story [S1-03](../product/stories/S1-03-tai-tao-danh-gia-psi0.
 | 2.1–2.2 Môi trường và script serve | Xong 3/11/2026 trên máy 3060: serve checkpoint task hai bàn, smoke 30 lần `/act` đạt (mục 2.6) |
 | 2.3–5 Đo VRAM, độ trễ, đánh giá, độ không tất định | Chưa; cần máy 5090 |
 | 6 Task hai bàn ở `mujoco_isaac` (AC 9) | Chưa: server chuyển lên Colab (Hiếu chốt 3/11/2026, không thuê GPU; mục 3.4.1); lượt Isaac Level 0 cũ dừng sau 2/10 (đều hỏng, file task lỗi spawn); chưa chạy lại với file đã sửa |
-| 7 Task hai bàn ở `mujoco` (AC 10) | 0/90 cũ (file task `6d10628`, lỗi spawn) bị thay; chạy lại với file `b75c678`: Level 0 0/10 (3/11/2026, mục 3.2). Kết luận Q-27C tạm (mục 3.5) |
+| 7 Task hai bàn ở `mujoco` (AC 10) | 0/90 cũ (file task `6d10628`, lỗi spawn) bị thay; chạy lại với file `b75c678`: Level 0 0/20 (3/11/2026, mục 3.2). Kết luận Q-27C tạm (mục 3.5) |
 | 8 Checkpoint ablation của HE (AC 11) | Liệt kê xong 3/11/2026 (mục 4); câu hỏi Q-27E chờ Hiếu gửi PSI Lab |
 
-> **Cập nhật (3/11/2026, 23:20).** Các lượt `mujoco` 0/90 và hai episode Isaac đầu tiên chạy với file task hai bàn của SIMPLE `6d10628` (image ghim `38a6…`). Bản này spawn robot với cánh tay giơ; ngón chạm bàn 1 lúc WBC ổn định nên robot bị đẩy lùi 0,1–0,28 m. Tác giả sửa ở `b75c678` (PR #29, `77872fe`, 29/10/2026), và Hiếu chuyển pin SIMPLE sang đó (PR #68). Từ nay `eval_psi0.sh run` mount file `b75c678` vào image (mục 3). Kết quả cũ giữ nguyên trong bảng, đánh dấu "bị thay". Chạy lại `mujoco` Level 0 với file đã sửa: **0/10**. Lỗi spawn vì vậy không giải thích được việc `mujoco` hỏng.
+> **Cập nhật (3/11/2026, 23:20).** Các lượt `mujoco` 0/90 và hai episode Isaac đầu tiên chạy với file task hai bàn của SIMPLE `6d10628` (image ghim `38a6…`). Bản này spawn robot với cánh tay giơ; ngón chạm bàn 1 lúc WBC ổn định nên robot bị đẩy lùi 0,1–0,28 m. Tác giả sửa ở `b75c678` (PR #29, `77872fe`, 29/10/2026), và Hiếu chuyển pin SIMPLE sang đó (PR #68). Từ nay `eval_psi0.sh run` mount file `b75c678` vào image (mục 3). Kết quả cũ giữ nguyên trong bảng, đánh dấu "bị thay". Chạy lại `mujoco` Level 0 với file đã sửa: **0/20** (2 lượt; lượt 2 trên domain DDS riêng). Lỗi spawn vì vậy không giải thích được việc `mujoco` hỏng.
 
 ## 1. Q0 · Checkpoint trong `psi0/`
 
@@ -208,6 +208,15 @@ Chạy 3/11/2026 trên máy 3060. Server như mục 2.6. Client là `eval-decoup
 
 **File task đã sửa** (từ 3/11/2026, 23:00). `eval_psi0.sh run` mount `src/simple/tasks/g1_wholebody_locomotion_pick_between_tables_teleop.py` của SIMPLE `b75c6786f87b4a7f43b52b0ac5b83a1d9ea62e11` (sha256 `51bce5d6c0311219…`, kiểm trước khi mount) đè lên bản trong image, chỉ đọc. `SIMPLE_TASK_FIX=off` chạy lại đúng image cũ. Trong container đã kiểm: file nạp đúng đường dẫn đó, sha256 khớp. Ở lần gọi `/act` đầu tiên của một episode, state các khớp tay bằng 0 khi có bản sửa, lệch khoảng 0,015–0,018 khi không. Khớp cánh tay chỉ lệch dưới 0,008 rad, vì WBC đã đưa tay về tư thế mặc định trong lúc ổn định. Vị trí thân robot không có trong state, nên phép kiểm này không đo được độ lùi 0,1–0,28 m.
 
+**DDS và các lượt chạy song song** (3/11/2026, 23:35). Phiên DA-38 báo CycloneDDS bị trùng domain 0 khi S1-03 chạy. Đọc code SIMPLE `b75c678` cho thấy:
+
+- Mọi env SIMPLE gọi `ChannelFactoryInitialize(DOMAIN_ID)` (`envs/sonic_loco_manip.py`, dòng 45–49). `DOMAIN_ID` chỉ lấy từ `gear_sonic/utils/mujoco_sim/wbc_configs/g1_29dof_sonic_model12.yaml` (giá trị 0): `override_wbc_config` không ghi đè khóa này, và `eval_decoupled_wbc` gọi `SimLoopConfig` không kèm tham số. Vì vậy mọi lượt SIMPLE trên cùng máy dùng chung domain 0.
+- Đường `eval-decoupled-wbc` với agent `psi0_decoupled_wbc` không mở publisher hay subscriber DDS nào: `init_publisher` rỗng, `substep_callback` không được đặt, `G1Sonic.unitree_bridge` là `None`, còn WBC chạy ngay trong tiến trình qua `decoupled_wbc`. Các đường teleop, replay và WBC của story khác thì có dùng DDS (`UnitreeSdk2Bridge`).
+
+Từ nay `eval_psi0.sh run` cho client một domain riêng: mount bản sao của yaml đó với `DOMAIN_ID: 103` (`SIMPLE_DDS_DOMAIN`, mặc định 103; đặt 0 thì dùng yaml gốc). Ghi domain vào `summary.json`. Trong container đang chạy đã kiểm: `load_wbc_yaml()` trả `DOMAIN_ID 103`, `INTERFACE lo`. Khi domain là 0, script dừng nếu có tiến trình SIMPLE khác trên máy (`SIMPLE_ALLOW_SHARED=1` để bỏ qua).
+
+Lượt `mujoco` Level 0 đầu tiên với file task đã sửa (lượt 1, 23:02–23:18) chạy trên domain 0. Từ 23:12 đến 23:25 nó trùng giờ với các lượt sim của DA-38. Lượt 2 (23:37) chạy trên domain 103, song song với các batch của DA-34 và DA-35 trên domain 0.
+
 **Bộ eval** được cache theo revision (`evals/simple-eval-<7 ký tự đầu>/`), và zip được kiểm với `lfs.oid` của Hugging Face trước khi giải nén. Client đọc `/info` của server, dừng nếu server không serve đúng task, và ghi `/info` vào `server_info.json` cạnh `summary.json`.
 
 ```bash
@@ -239,12 +248,12 @@ Số công bố 7/5/6 có trước cả hai lần tải bộ eval lên HF (check
 
 | File task | Mức | Thành công | Wilson 95% | Công bố (`mujoco_isaac`, 10 lượt) | p một phía, H0: p ≥ số công bố | Giờ máy | Trạng thái |
 |---|---|---|---|---|---|---|---|
-| `b75c678` (đã sửa) | Level 0 | 0/10 (10 điều kiện × 1 lượt) | [0%, 28%] | 7/10 | 6 × 10⁻⁶ | 10 phút | Hiện hành (3/11/2026, 23:18) |
+| `b75c678` (đã sửa) | Level 0 | 0/20 (10 điều kiện × 2 lượt) | [0%, 16%] (theo 10 điều kiện: [0%, 28%]) | 7/10 | 3 × 10⁻¹¹ (theo 10 điều kiện: 6 × 10⁻⁶) | 23 phút | Hiện hành: lượt 1 domain 0 (23:18), lượt 2 domain DDS riêng 103 (23:50) |
 | `6d10628` (lỗi spawn) | Level 0 | 0/30 | [0%, 11%] | 7/10 | 2 × 10⁻¹⁶ | 30 phút | Bị thay: lỗi spawn |
 | `6d10628` (lỗi spawn) | Level 1 | 0/30 | [0%, 11%] | 5/10 | 9 × 10⁻¹⁰ | 30 phút | Bị thay: lỗi spawn |
 | `6d10628` (lỗi spawn) | Level 2 | 0/30 | [0%, 11%] | 6/10 | 1 × 10⁻¹² | 29 phút | Bị thay: lỗi spawn |
 
-Lượt đã sửa: `runs/simple-b75c678/mujoco/level-0/pass-1/ep0-9/`, client thoát 0, 628 s tường, server Docker cục bộ trên máy 3060 (bind 127.0.0.1). Hai episode kiểm thêm, có và không có bản sửa (mục 3, file task đã sửa), cũng hỏng. Level 1, 2 và lượt lặp 2, 3 chưa chạy lại với bản sửa.
+Lượt đã sửa: `runs/simple-b75c678/mujoco/level-0/pass-{1,2}/ep0-9/`, client thoát 0, 628 s và 761 s tường, server Docker cục bộ trên máy 3060 (bind 127.0.0.1). Lượt 2 chạy trên domain DDS riêng (mục 3, DDS) và cũng 0/10, nên việc trùng domain 0 với DA-38 ở lượt 1 không đổi kết quả. Cả 10 điều kiện đều 0/2; không điều kiện nào đổi kết quả giữa hai lượt. Hai episode kiểm thêm, có và không có bản sửa (mục 3, file task đã sửa), cũng hỏng. Level 1, 2 và lượt lặp 2, 3 chưa chạy lại với bản sửa.
 
 Với các lượt cũ, mỗi mức là 10 điều kiện × 3 lượt lặp (mục 3.1). Wilson tính trên n = 30 nên hẹp hơn thực; tính theo 10 điều kiện (0/10) thì cận trên là 28%, vẫn dưới cả ba số công bố. Kiểm Fisher một phía cho Level 0, 0/30 ở `mujoco` so với 7/10 công bố: p = 6 × 10⁻⁶.
 
@@ -305,13 +314,13 @@ Thời gian thật của `mujoco_isaac` trên máy 3060 là khoảng 25 phút m�
 
 ### 3.5 Trả lời Q-27C [Đề xuất, tạm]
 
-Không: ở `mujoco`, checkpoint của tác giả không giữ được thành công. Sau khi sửa lỗi spawn, Level 0 vẫn 0/10, so với 7/10 công bố ở `mujoco_isaac` (p = 6 × 10⁻⁶). Các lượt cũ (0/90, lỗi spawn) cùng chiều. Kiểm open-loop (mục 3.3) phù hợp với giả thuyết server đúng [Đề xuất]. Đây chưa phải chứng minh: mới 3 episode train, chưa có ngưỡng, và L1 của vyaw là 0,21–0,27. B4 cho thấy policy dựa vào ảnh. Nên nguyên nhân nhiều khả năng là khác biệt ảnh giữa render MuJoCo và Isaac, hoặc một lỗi phía client chưa tìm ra.
+Không: ở `mujoco`, checkpoint của tác giả không giữ được thành công. Sau khi sửa lỗi spawn, Level 0 vẫn 0/20 (10 điều kiện × 2 lượt, một lượt trên domain DDS riêng), so với 7/10 công bố ở `mujoco_isaac` (p = 6 × 10⁻⁶ tính theo 10 điều kiện). Các lượt cũ (0/90, lỗi spawn) cùng chiều. Kiểm open-loop (mục 3.3) phù hợp với giả thuyết server đúng [Đề xuất]. Đây chưa phải chứng minh: mới 3 episode train, chưa có ngưỡng, và L1 của vyaw là 0,21–0,27. B4 cho thấy policy dựa vào ảnh. Nên nguyên nhân nhiều khả năng là khác biệt ảnh giữa render MuJoCo và Isaac, hoặc một lỗi phía client chưa tìm ra.
 
-Ở Level 0 của bộ eval `de140d6`, vật và khay nằm đúng vị trí của episode train cùng chỉ số; chỉ robot khởi đầu lùi 6,1 cm (mục 3.1). Vậy 0/10 là trên chính vị trí vật đã thấy lúc train. Điều này nghiêng về lỗi hệ thống (renderer khác, hoặc lỗi phía client) hơn là policy yếu. Đề xuất cho HE: giữ mặc định của design mục 4.2 (ảnh train và ảnh eval đều render Isaac; eval ở `mujoco_isaac`), không chuyển sang `mujoco`. Kết luận còn "tạm" cho tới khi có lượt `mujoco_isaac` của chính đội, với file task đã sửa, đạt gần 7/5/6 (B5, mục 3.6). Nếu lượt đó cũng hỏng thì lỗi ở phía client và kết luận trên phải xét lại.
+Ở Level 0 của bộ eval `de140d6`, vật và khay nằm đúng vị trí của episode train cùng chỉ số; chỉ robot khởi đầu lùi 6,1 cm (mục 3.1). Vậy 0/20 là trên chính vị trí vật đã thấy lúc train. Điều này nghiêng về lỗi hệ thống (renderer khác, hoặc lỗi phía client) hơn là policy yếu. Đề xuất cho HE: giữ mặc định của design mục 4.2 (ảnh train và ảnh eval đều render Isaac; eval ở `mujoco_isaac`), không chuyển sang `mujoco`. Kết luận còn "tạm" cho tới khi có lượt `mujoco_isaac` của chính đội, với file task đã sửa, đạt gần 7/5/6 (B5, mục 3.6). Nếu lượt đó cũng hỏng thì lỗi ở phía client và kết luận trên phải xét lại.
 
 **[Đã chốt]** (Hiếu, 3/11/2026): không thuê GPU; AC 9 chạy với server Ψ₀ trên Colab và Isaac trên máy 3060 (mục 3.4.1).
 
-**Q8 · chờ chốt** [Đề xuất]: chấp nhận lệch của nhiệm vụ con 2.1 là khác biệt đã biết. Story đòi image Ψ₀ riêng trong `docker/psi0/` và ghi chú flash-attn trên máy 5090. PR này dùng image công bố của tác giả, ghim theo digest, trên máy 3060; trên Colab thì dùng đúng danh sách gói của image đó (`docker/psi0/requirements-image.txt`). Phía SIMPLE dùng image công bố ghim theo digest, cộng một file task của `b75c678` mount đè. Chờ Hiếu chốt; chốt xong thì ghi vào story.
+**Q8 · Đã chốt 3/11/2026 [Hiếu]** ("Chốt theo đề xuất"): chấp nhận lệch của nhiệm vụ con 2.1 là khác biệt đã biết. Story đòi image Ψ₀ riêng trong `docker/psi0/` và ghi chú flash-attn trên máy 5090. PR này dùng image công bố của tác giả, ghim theo digest, trên máy 3060; trên Colab thì dùng đúng danh sách gói của image đó (`docker/psi0/requirements-image.txt`). Phía SIMPLE dùng image công bố ghim theo digest, cộng một file task của `b75c678` mount đè. Đã ghi vào story (nhiệm vụ con 2.1).
 
 ### 3.6 Bộ benchmark chứng minh kết luận [Đề xuất]
 
@@ -323,7 +332,7 @@ Mỗi phép kiểm chỉ đổi một yếu tố, giữ nguyên mọi thứ khá
 | B2 | Server Colab giống server Docker | Máy chạy server | L1 hai bên chênh trong cỡ nhiễu lấy mẫu | Phù hợp: L1 lệch 0,002–0,017 mỗi episode; chưa ước lượng nhiễu lấy mẫu (mục 3.4.1) |
 | B3 | Độ trễ `/act` không đổi kết quả | Độ trễ: 0 s, 0 s, +2 s mỗi lần gọi | Lệch quỹ đạo của lượt +2 s không lớn hơn lệch giữa hai lượt 0 s | Chưa chạy (runner `fwdata/logs/b3.sh` trên máy 3060) |
 | B4 | Policy dựa vào ảnh | Ảnh: thật, xám, mờ, lệch thời gian | L1 tăng rõ khi ảnh sai | Đạt (dưới đây) |
-| B5 | `mujoco` hỏng vì renderer (file task `b75c678`) | Renderer: MuJoCo hay Isaac | Isaac không thấp hơn 7/5/6 có ý nghĩa (nhị thức một phía, α = 0,05) và Fisher `mujoco` so với `mujoco_isaac` có p < 0,05 | `mujoco` Level 0 0/10 (bản sửa); Isaac chưa chạy với bản sửa |
+| B5 | `mujoco` hỏng vì renderer (file task `b75c678`) | Renderer: MuJoCo hay Isaac | Isaac không thấp hơn 7/5/6 có ý nghĩa (nhị thức một phía, α = 0,05) và Fisher `mujoco` so với `mujoco_isaac` có p < 0,05 | `mujoco` Level 0 0/20 (bản sửa); Isaac chưa chạy với bản sửa |
 
 Cách đọc B5: Isaac gần 7/5/6 thì renderer là nguyên nhân và AC 9 đạt; Isaac cũng gần 0 thì lỗi ở phía client SIMPLE (B1 đã loại phía server); ở giữa thì chờ PSI Lab trả lời Q-27E.
 
@@ -361,8 +370,8 @@ Câu hỏi Q-27E gửi PSI Lab (Hiếu gửi, chung email giấy phép ở nhi�
 
 ## Tiếp tục từ đây (cập nhật 3/11/2026, 23:20)
 
-1. Xong: mount file task `b75c678`; cache bộ eval theo revision, kèm kiểm sha256; client kiểm `/info` của server; chạy lại `mujoco` Level 0 (0/10).
+1. Xong: mount file task `b75c678`; cache bộ eval theo revision, kèm kiểm sha256; client kiểm `/info` của server; client dùng domain DDS riêng; chạy lại `mujoco` Level 0 (0/20).
 2. `mujoco_isaac` với file đã sửa (B5, AC 9): server Ψ₀ trên Colab, theo mục 3.4.1 (`colab new -s s103psi0 --gpu L4`, `PSI0_ENV=image`, hai cổng chuyển tiếp SSH). Level 0 trước, 10 episode, khoảng 4,5 giờ. Laptop phải bật suốt thời gian chạy.
 3. B3 (độ trễ): runner `fwdata/logs/b3.sh` trên máy 3060; chạy được ngay với server cục bộ.
 4. Nếu Isaac cũng hỏng: phát lại action của episode train trên điều kiện eval cùng chỉ số, qua cùng client và WBC, để tìm lỗi phía client.
-5. Chờ Hiếu: Q8 (mục 3.5), Q-27E (mục 4).
+5. Chờ Hiếu gửi Q-27E (mục 4). Q8 đã chốt (mục 3.5).
