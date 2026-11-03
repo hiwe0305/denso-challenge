@@ -126,7 +126,15 @@ class TraceStep(Artifact):
             "heading frame, base yaw in the world frame."
         ),
     )
-    dropped_frames: int = Field(default=0, ge=0)
+    dropped_frames: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Camera frames due in this cycle that never reached the policy; a count for "
+            "this cycle, not a running total. Renders are synchronous in sim, so 0 there "
+            "is measured."
+        ),
+    )
 
     @model_validator(mode="after")
     def g0_run_plan_id(self) -> Self:

@@ -112,6 +112,19 @@ def test_run_plan_id_refuses_a_malformed_g0_id(run_plan_id: str) -> None:
     assert "g0-<story>-<yyyymmdd>" in str(exc.value)
 
 
+def test_missing_signals_counts_dropped_frames_per_cycle() -> None:
+    path = FIXTURES_DIR / "trace" / "missing_signals.jsonl"
+    steps = [TraceStep.model_validate_json(line) for line in path.read_text().splitlines()]
+    # a frame is due on even cycles (25 Hz camera, 50 Hz loop); from cycle 30 each is lost
+    assert {s.dropped_frames for s in steps} == {0, 1}
+    for s in steps:
+        lost = s.step % 2 == 0 and s.step >= 30
+        assert s.dropped_frames == int(lost)
+        if lost:
+            assert s.t_image is None
+    assert sum(s.dropped_frames for s in steps) == 35
+
+
 def test_camera_params_pose_validation() -> None:
     # Invalid pose length (not 7)
     with pytest.raises(ValidationError) as exc1:
