@@ -1,63 +1,29 @@
-"""Defect manifest model, hashing, and access barrier."""
+"""Hashing, sealing and access barrier for the shared DefectManifest contract."""
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+
+from flywheel.contracts.artifacts import DefectManifest
 
 
-@dataclass(frozen=True)
-class DefectRecord:
-    target_ref: str
-    code: str
-    parameters: dict[str, Any] = field(default_factory=dict)
+def manifest_sha256(manifest: DefectManifest) -> str:
+    """Hash the manifest content independently of key order and file formatting."""
+    serialized = json.dumps(manifest.model_dump(mode="json"), sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
-@dataclass(frozen=True)
-class DefectManifestRecord:
-    dataset_id: str
-    seed: int
-    defects: list[DefectRecord] = field(default_factory=list)
+def seal_manifest(manifest: DefectManifest, path: Path) -> str:
+    """Write the manifest and its companion `.sha256` lock file; return the hash."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(manifest.model_dump_json(indent=2), encoding="utf-8")
+    digest = manifest_sha256(manifest)
+    path.with_suffix(".sha256").write_text(digest, encoding="utf-8")
+    return digest
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "dataset_id": self.dataset_id,
-            "seed": self.seed,
-            "defects": [asdict(d) for d in self.defects],
-        }
 
-    def compute_sha256(self) -> str:
-        serialized = json.dumps(self.to_dict(), sort_keys=True, ensure_ascii=False)
-        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
-
-    def save_locked(self, path: Path) -> str:
-        """Save manifest and return its SHA-256 hash. Enforce read-only lock."""
-        path.parent.mkdir(parents=True, exist_ok=True)
-        content = json.dumps(self.to_dict(), indent=2, ensure_ascii=False)
-        path.write_text(content, encoding="utf-8")
-        h = self.compute_sha256()
-        # Save companion hash lock file
-        hash_file = path.with_suffix(".sha256")
-        hash_file.write_text(h, encoding="utf-8")
-        return h
-
-    @classmethod
-    def load(cls, path: Path) -> "DefectManifestRecord":
-        data = json.loads(path.read_text(encoding="utf-8"))
-        defects = [
-            DefectRecord(
-                target_ref=d["target_ref"],
-                code=d["code"],
-                parameters=d.get("parameters", {}),
-            )
-            for d in data.get("defects", [])
-        ]
-        return cls(
-            dataset_id=data["dataset_id"],
-            seed=data["seed"],
-            defects=defects,
-        )
+def load_manifest(path: Path) -> DefectManifest:
+    return DefectManifest.model_validate_json(path.read_text(encoding="utf-8"))
 
 
 class ManifestLock:
@@ -71,8 +37,7 @@ class ManifestLock:
         if not self.manifest_path.exists() or not hash_file.exists():
             return False
         expected = hash_file.read_text(encoding="utf-8").strip()
-        manifest = DefectManifestRecord.load(self.manifest_path)
-        return manifest.compute_sha256() == expected
+        return manifest_sha256(load_manifest(self.manifest_path)) == expected
 
     def can_agent_read(self, caller_role: str) -> bool:
         """Deny reading of the defect manifest if caller is an automated eval agent."""

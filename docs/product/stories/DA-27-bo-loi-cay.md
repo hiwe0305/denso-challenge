@@ -27,15 +27,15 @@ Là kỹ sư dữ liệu, tôi muốn một bộ dữ liệu và log thật đư
 
 ## Nhiệm vụ
 
-- [x] 1. Bộ cấy lỗi dữ liệu trên bản sao psi-data (AC 1)
+- [ ] 1. Bộ cấy lỗi dữ liệu trên bản sao psi-data (AC 1)
 - [x] 2. Log train và log RTC cấy lỗi từ bộ giả (AC 2)
-- [x] 3. `DefectManifest` có hash, chặn agent đọc (AC 3)
-- [x] 4. Bản sạch (AC 4)
-- [x] 5. Giao bản cấy và bản sạch, test chặn release (AC 5)
+- [ ] 3. `DefectManifest` có hash, chặn agent đọc (AC 3)
+- [ ] 4. Bản sạch (AC 4)
+- [ ] 5. Giao bản cấy và bản sạch, test chặn release (AC 5)
 
 Bản 3/11/2026 (nhiệm vụ 1–5 là 5 commit của Thông; [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) session 2):
 
-- [ ] 6. Thay bản ghi manifest riêng bằng `DefectManifest`, `Defect` của hợp đồng; episode cấy lỗi mang `EpisodeMetadata.injected_defect` (AC 3)
+- [x] 6. Thay bản ghi manifest riêng bằng `DefectManifest`, `Defect` của hợp đồng; episode cấy lỗi mang `EpisodeMetadata.injected_defect` (AC 3)
 - [ ] 7. Đổi mã lỗi theo design mục 10: rơi khung, lệch đồng bộ → D2; nhảy khớp, vượt giới hạn, NaN, sai đơn vị → D3; trùng episode, rò hạt giống → D5; nhãn thành công sai, câu lệnh sai → D6; đảo dấu một chiều action → D7 (AC 1, 3)
 - [ ] 8. Cấy lên bản sao parquet thật bằng bộ đọc và ghi của DA-03 PR 1, tỉ lệ 5–10%, hạt giống ghi trong manifest (AC 1)
 - [ ] 9. Bản sạch cùng số episode; `seal_manifest` ghi `defect_manifest.json` và `.sha256`; test agent không đọc được manifest (AC 3, 4)
@@ -82,3 +82,4 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - Công cụ AI đã dùng: Antigravity
 - Ghi chú hoàn thành: Đã cấy 11 loại lỗi dữ liệu, log train T1-T8, log RTC R1-R2, khóa DefectManifest và rào chắn release. 29/29 tests passed.
 - File đã tạo hoặc sửa: packages/flywheel-data/src/flywheel/data/inject/, packages/flywheel-data/tests/unit/inject/, configs/data/inject.yaml, docs/g0/defect-inject.md
+- 3/11/2026 (Hiếu và Claude, nhánh `DA-27-defect-inject`): bỏ dấu xong của nhiệm vụ 1, 3, 4, 5. Mã của Thông chỉ cấy trên `EpisodeData` trong bộ nhớ, chưa trên bản sao parquet của psi-data (AC 1); manifest chưa dùng `DefectManifest` của hợp đồng (AC 3); bản sạch sinh từ bản đã cấy nên vẫn mang lỗi (AC 4); chưa giao cho DA-31 (AC 5). Nhiệm vụ 1, 4, 5 chờ bộ đọc LeRobot (DA-03 PR 1) và `pyarrow`.
