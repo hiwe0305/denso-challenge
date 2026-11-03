@@ -11,7 +11,7 @@ Thiết kế đầy đủ: [DESIGN.md](DESIGN.md). File này chỉ nói cách ch
 | `contracts/` | Nguồn enum duy nhất (`enums.py`) và bộ sinh `enums.ts` |
 | `tests/` | Test chạy trong CI, không cần Postgres |
 | `api/` | FastAPI, SQLAlchemy, Alembic (chưa dựng) |
-| `fwsync/` | Bộ nạp import / export / verify / fake-core (chưa dựng) |
+| `fwsync/` | Bộ nạp: `source.py` đọc, `mapping.py` ánh xạ, `sink.py` ghi, `runner.py` bốn việc, `cli.py` lệnh |
 | `fe/` | React, Vite, MSW (chưa dựng; `package.json` theo §3.1) |
 
 ## Chạy test
@@ -35,6 +35,41 @@ uv run python -m web.contracts.generate_ts
 
 `web/tests/test_generated_ts.py` so file trên đĩa với bản sinh lại, nên quên
 chạy lệnh này là test đỏ.
+
+## Chạy bộ nạp
+
+Sink tách khỏi pipeline, nên bốn lệnh chạy được **khi chưa có Postgres**:
+
+```bash
+# nạp artifact vào sink JSONL
+uv run python -m web.fwsync.cli import --from mock/demo-17-11 --out fwdata/web-sink
+
+# xuất hành động đang chờ thành artifact trong outbox
+uv run python -m web.fwsync.cli export --actions actions.jsonl --to fwdata/outbox
+
+# lõi giả: đọc outbox, sinh kết quả mang source_action_id (mốc M4)
+uv run python -m web.fwsync.cli fake-core --outbox fwdata/outbox --to fwdata/inbox
+
+# so số dòng giữa nguồn và những gì đã nạp; báo chênh, không tự sửa
+uv run python -m web.fwsync.cli verify --from mock/demo-17-11 --loaded counts.json
+```
+
+Mã thoát: `0` khi sạch, `1` khi có dòng bị từ chối, `2` khi không đọc được
+nguồn. Thoát `0` khi có dòng bị từ chối là cách để lỗi đó không ai thấy trong
+cron, nên lệnh không làm vậy.
+
+`--sink jsonl` là mặc định. Nó **không phải một database**: nó không kiểm được
+CHECK, trigger hay quyền, nên nó không thay được nghiệm thu mốc M1. Nó chứng
+minh đường đọc và ánh xạ đúng. `--sink postgres` báo đúng ba thứ còn thiếu
+thay vì đổ `ModuleNotFoundError`.
+
+Hai mức khoan dung, khác nhau có chủ ý:
+
+- Bảng có model hợp đồng bị **từ chối** nếu sai schema.
+- Bảng chưa có file schema (`Source`, `Release`, `Decision`, … đều ở S1-10
+  #36) đi đường khoan dung: cột lạ bị bỏ **kèm log**, không im lặng. Phụ lục B
+  đòi như vậy tới khi #36 merge. Chuyển một bảng sang đường nghiêm là xoá một
+  dòng ở `TOLERANT_TABLES`.
 
 ## Dựng database
 
