@@ -30,7 +30,7 @@ _Mở lại ngày 27/10/2026 theo [design 27/10/2026](../../superpowers/specs/20
 
 ## Nhiệm vụ
 
-- [ ] 1. Tải và ghi hash (AC 1)
+- [x] 1. Tải và ghi hash (AC 1)
 - [ ] 2. Đọc cấu trúc LeRobot, ghi trường, so với `action_layout` (AC 3)
 - [ ] 3. Đếm N_teleop đạt QA sơ bộ cho task hai bàn và F1 (AC 2)
 - [ ] 4. Tìm layout, seed, tham số điều kiện; dải hạt giống của `simple-eval` (AC 4)
