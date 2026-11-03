@@ -109,18 +109,7 @@ Còn lại:
 
 ## 3. Lỗi log huấn luyện (F-TRAIN) và log RTC (F-SYS)
 
-Hỗ trợ sinh log giả định theo đúng schema của `FakeTrainer` và RTC log. `Defect.code` là mã T1–T8, R1–R2; `parameters["kind"]` giữ tên đầy đủ (ví dụ `T1_divergence`).
-
-* **T1 (Phân kỳ):** Loss NaN hoặc tăng đột biến $> 15\times$ mức cực tiểu.
-* **T2 (Không học):** Loss validation không giảm sau nhiều epoch.
-* **T3 (Quá khớp):** Loss train giảm liên tục trong khi loss validation tăng $M$ lần đo.
-* **T4 (Mất cân bằng nhóm):** Loss nhóm cánh tay phải đứng yên trong khi các nhóm khác giảm.
-* **T5 (Chiều chết):** Phương sai dự đoán của một chiều action bằng 0.
-* **T6 (Sụp mode):** Độ lệch chuẩn dự đoán $< 10^{-4}$.
-* **T7 (Quên):** Điểm đánh giá P4 giảm $> 40\%$ so với checkpoint cha.
-* **T8 (Gradient bất thường):** Gradient của VLM khác 0 khi đang khai báo đóng băng (frozen).
-* **R1 (Độ trễ cao):** Độ trễ p99 vượt quá 120ms (ngưỡng 40ms).
-* **R2 (Cạn buffer):** Bộ đệm lệnh rỗng (`buffer_level == 0`) trong 10 bước liên tiếp.
+Log train cấy lỗi T1–T8 và log RTC cấy lỗi R1, R2 (nhiệm vụ 2 của story) chuyển sang PR sau `DA-27-log-defects`, để PR này dưới ngưỡng R9 (quyết định PO 4/11/2026). Mã của Thông giữ nguyên trong lịch sử nhánh này và sẽ được cherry-pick, giữ tác giả.
 
 ---
 

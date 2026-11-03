@@ -28,7 +28,7 @@ Là kỹ sư dữ liệu, tôi muốn một bộ dữ liệu và log thật đư
 ## Nhiệm vụ
 
 - [ ] 1. Bộ cấy lỗi dữ liệu trên bản sao psi-data (AC 1)
-- [x] 2. Log train và log RTC cấy lỗi từ bộ giả (AC 2)
+- [ ] 2. Log train và log RTC cấy lỗi từ bộ giả (AC 2) · chuyển sang PR sau `DA-27-log-defects` (PO 4/11/2026)
 - [ ] 3. `DefectManifest` có hash, chặn agent đọc (AC 3)
 - [ ] 4. Bản sạch (AC 4)
 - [ ] 5. Giao bản cấy và bản sạch, test chặn release (AC 5)
@@ -76,6 +76,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 | 3/11/2026 | Người làm Thông → Hiếu theo quyết định PO (07 bản 1.6; [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) Q1, Q4, Q5): giữ 5 commit của Thông làm nhiệm vụ 1–5; thêm nhiệm vụ 6–10 (hợp đồng, mã lỗi D/T/R, parquet thật, niêm phong, `has_injected_defect`); AC 3, AC 5 ghi rõ theo Q5; bộ chấm DA-31 của Châu | PO (Hiếu) |
 | 3/11/2026 | AC 1: tỉ lệ cấy đổi từ khoảng 5–10% số episode sang mỗi loại 3 episode (33 trên 99), mỗi episode tối đa một lỗi; NaN giữ mã D1 theo design mục 9.2 | PO (Hiếu) |
+| 4/11/2026 | Tách vì R9: log train T1–T8 và log RTC R1, R2 (nhiệm vụ 2) chuyển sang PR sau `DA-27-log-defects`; phụ thuộc `flywheel-store` và ghi `LedgerEntry` vào store sang PR `DA-27-ledger-store`, cả hai làm sau khi PR này merge. Xác nhận của Châu cho nhiệm vụ 10 không chặn merge | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

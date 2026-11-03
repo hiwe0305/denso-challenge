@@ -38,29 +38,3 @@ data_defects:
   holdout_seed_leak:  # D5
     enabled: true
     holdout_seed_range: [2000000, 2000999]  # holdout của configs/splits/default.yaml
-
-# Lỗi log huấn luyện (F-TRAIN: T1-T8); mã là tiền tố của tên loại
-train_defects:
-  T1_divergence:
-    loss_multiplier: 15.0
-  T2_not_learning:
-    decay_rate: 0.001
-  T3_overfitting:
-    val_loss_increase_steps: 5
-  T4_group_imbalance:
-    frozen_group: "right_arm"
-  T5_dead_dimension:
-    dim: 12
-  T6_mode_collapse:
-    std_threshold: 1e-4
-  T7_forgetting:
-    drop_ratio: 0.40
-  T8_gradient_anomaly:
-    frozen_grad_norm: 2.5
-
-# Lỗi log inference thời gian thực (F-SYS: R1, R2)
-rtc_defects:
-  R1_high_latency:
-    p99_latency_ms: 120.0  # Vượt ngưỡng 40ms
-  R2_buffer_depleted:
-    depleted_steps: 10
