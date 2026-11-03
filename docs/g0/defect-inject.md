@@ -98,11 +98,11 @@ Bàn giao cho DA-31 (Châu), in ra từ lệnh trên, đường dẫn tính từ
 }
 ```
 
-Bộ chấm biết bản nào sạch qua manifest (`defects` rỗng); agent chỉ nhận `dataset_id` và `uri`. Đường dẫn khác plan 3/11 (`fwdata/inject/<dataset_id>/{injected,clean}`) vì tên `injected`, `clean` lộ vai trò.
+Bộ chấm biết bản nào sạch qua manifest (`defects` rỗng); agent chỉ nhận `dataset_id` và `uri`. Mỗi lượt chạy agent nhận đúng một `DatasetRef`, gắn chỉ đọc, không kèm đường tới bản gốc, bản sao kia hay `answers/` (quy tắc chạy ở dưới). Đường dẫn khác plan 3/11 (`fwdata/inject/<dataset_id>/{injected,clean}`) vì tên `injected`, `clean` lộ vai trò.
 
 Còn lại:
 
-- Agent chạy trên hai bản sao phải được tách riêng (DA-20, DA-31): so hai bản với nhau, hoặc với psi-data công khai, là thấy hết lỗi.
+- **Quy tắc chạy [Đã chốt 4/11/2026, Hiếu]:** mỗi lượt chạy Agent QA/QC (DA-20) và mỗi lượt QA của DA-31 gắn đúng một bản sao, chỉ đọc; không có đường tới psi-data gốc, tới bản sao kia, hay tới `answers/`. So hai bản với nhau, hoặc với bản gốc, là thấy hết lỗi; đọc `answers/` là thấy đáp án.
 - `ledger.jsonl` chưa vào sổ của store: cần thêm `"flywheel-store"` vào `dependencies` của `packages/flywheel-data/pyproject.toml` (và `uv lock`), thuộc DA-03; Hiếu quyết.
 
 ---
