@@ -35,7 +35,7 @@ Là người làm làn Đánh giá, tôi muốn mỗi rollout SIMPLE của độ
 - [x] 1. File story và phạm vi file
 - [x] 2. Vector lệnh và đo, intrinsics và pose camera từ mảng số, test CPU (AC 2, 3, 5)
 - [ ] 3. Dựng `TraceStep`, `CameraParams` và bộ ghi trace theo quy ước tệp của hợp đồng, kèm cờ `sim_success` (AC 1, 3, 4); chờ PR #48 merge
-- [ ] 4. Cài hook vào `eval-decoupled-wbc` (bọc env và agent), test `sim` (AC 1, 5)
+- [x] 4. Cài hook vào `eval-decoupled-wbc` (bọc env và agent), test `sim` (AC 1, 5)
 - [ ] 5. Lượt chạy thật task hai bàn trên `rtx3060`, ghi ledger (AC 6)
 - [ ] 6. Lượt chạy thật task khay trên `rtx3060`, ghi ledger (AC 6)
 - [ ] 7. Tài liệu `docs/g0/trace.md`: cách chạy, ý nghĩa trường, giới hạn ở sim (AC 1–6)
@@ -125,3 +125,32 @@ Hệ quả:
 - Nhánh camera có `sensor_size` là phép nghịch đảo đúng cách SIMPLE ghi `focal_pixel` và `principal_pixel`. Dấu của điểm chính theo trục y trong MuJoCo chưa kiểm bằng ảnh render. Cả hai task không dùng nhánh này. **[Đề xuất]**
 - `reference_sha256` là sha256 của tập camera đã chuẩn hóa: sắp theo `uid`, làm tròn 1e-9, JSON có khóa sắp xếp. Bản tham chiếu tính từ cấu hình của commit SIMPLE đã ghim ở nhiệm vụ 3. **[Đề xuất]**
 - `STATE_SLICES` chép từ SIMPLE `6d10628`. Nhiệm vụ 4 có test `sim` so bản chép này với SIMPLE.
+
+### 3/11/2026 · Nhiệm vụ 4: hook và test `sim`
+
+- Ba điểm gắn, đều là tên cấp module mà worker eval của SIMPLE tra lúc chạy:
+  - `eval_module.gym`, thay bằng proxy có `make` bọc env. Mỗi lần `reset` mở một episode và đọc camera.
+  - `Psi0DecoupledWbcAgent`, thay bằng lớp con. Mỗi lần `get_action` ghi một chu kỳ, kèm dòng action Ψ₀ mà agent lấy ra khỏi hàng đợi.
+  - `_append_eval_stats_line`. Dòng `episode_<i>: <bool>` của SIMPLE kết thúc episode và cho cờ `check_success`.
+- Các bước ổn định đầu episode gọi env gốc, không qua env đã bọc, nên không được ghi.
+- `t_state` và trạng thái đo được đọc ở đầu chu kỳ: `mjData` chưa đổi kể từ lần `step` trước, nên đây đúng là trạng thái policy dùng để ra quyết định.
+  - `cmd` của chu kỳ k so với `meas` của chu kỳ k là lệnh so với trạng thái lúc ra lệnh.
+  - Độ trễ bám lệnh, nếu cần, do DA-13 dịch trục khi đọc trace. **[Đề xuất]**
+- Test `sim` chạy vòng eval thật của SIMPLE: env, WBC và MuJoCo thật; server Ψ₀ được thay bằng stub trả chunk giữ nguyên tư thế (16 dòng), nên không cần GPU. Điều kiện chạy:
+  - Hai bàn: tập `simple-eval` dr-level-0 của psi-data (S1-03 đã tải, chỉ đọc).
+  - Khay: episode cha của DA-35 `parents-1103b/shard-00`.
+- **Phát hiện ngoài phạm vi (DA-34): eval khay chưa đọc được tập điều kiện LeRobot.**
+  - `simple/datasets/lerobot.py:get_episode_lerobot` (SIMPLE `6d10628`) có một dòng FIXME đòi `environment_config["dr_state_dict"]["scene"]["uid"]`.
+  - Dataset khay của DA-33 và DA-35 không có khóa này, nên `eval-decoupled-wbc --data-format lerobot` lỗi `KeyError` trên mọi episode khay.
+  - Test `sim` dùng một shim chỉ trong test: đọc episode như SIMPLE nhưng bỏ dòng đó. Env khay vốn dựng lại episode từ `seed` và `level`.
+  - Lượt chạy thật trên task khay (nhiệm vụ 6) cần PO chốt cách xử lý.
+- Kết quả test `sim` trên `rtx3060` (3/11/2026): **4 passed** trong 637 s.
+  - Episode hai bàn mất 27 s. Episode khay mất 605 s, phần lớn do `get_episode_lerobot` của SIMPLE giải mã toàn bộ khung video của episode điều kiện (khoảng 1600 khung).
+  - Mỗi task kiểm:
+    - 40 chu kỳ, `t_state` tăng đúng 0,02 s mỗi chu kỳ;
+    - `t_image` chỉ có ở chu kỳ 0, 16, 32 và bằng `t_state` ở đó;
+    - `cmd_upper` của chu kỳ 0 bằng `meas_upper` (stub giữ tư thế), tức thứ tự hai bên khớp nhau;
+    - trạng thái đo có thay đổi, chiều cao gốc trong khoảng 0,5–0,9 m;
+    - camera `head_stereo_left` 640×360 có fy khớp `CameraCfg` tới 1e-6, quaternion chuẩn hóa;
+    - `episode_0` và cờ `sim_success` khớp dòng trong `eval_stats.txt`.
+- Entry point cài hook ở cấp module (cho worker spawn) đi cùng bộ ghi hợp đồng ở nhiệm vụ 3 và lượt chạy thật ở nhiệm vụ 5.
