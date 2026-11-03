@@ -122,6 +122,17 @@ def test_r2_does_not_fire_where_the_buffer_left_covers_the_delay(rtc_rows) -> No
     assert check_r2(_records(rows), R2).findings == []
 
 
+def test_r2_leaves_out_the_first_chunk_of_a_trace(rtc_rows) -> None:
+    # `RTCClient` sends the first request of a trace with nothing buffered, so
+    # chunk 0 always has `buffer_level = 0`; nothing was executing yet, so the
+    # wait is the start of the trace, not a stall. Counting it would make every
+    # healthy episode a runtime fault whatever `refill_at` is.
+    rows = [dict(row, buffer_level=3, delay_steps=3) for row in rtc_rows]
+    rows[0]["buffer_level"] = 0
+
+    assert check_r2(_records(rows), R2).findings == []
+
+
 def test_r2_fires_where_the_delay_outruns_the_buffer_left(rtc_rows) -> None:
     rows = [dict(row) for row in rtc_rows]
     rows[3].update(buffer_level=4, delay_steps=8)

@@ -30,6 +30,7 @@ r2:
   # `buffer_level` là số action còn trong buffer **lúc gửi request** (writer
   # `RTCClient` của DA-19), `delay_steps` là số chu kỳ điều khiển trôi qua trong
   # lúc suy luận; buffer cạn nghĩa là action còn lại không phủ hết thời gian chờ.
+  # Bỏ chunk đầu của mỗi trace (`chunk_index` 0): lúc đó chưa action nào chạy.
   # Lượt khỏe không nổ khi `refill_at` của client không nhỏ hơn độ trễ (DA-19).
   max_underruns: 0         # giả định; một lần buffer cạn đã là một lần đứng máy nhìn thấy được. Hiệu chỉnh: số lần lớn nhất trên lần chạy chuẩn G0
 
