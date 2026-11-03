@@ -1,0 +1,192 @@
+{
+  "$defs": {
+    "AdapterInfo": {
+      "description": "Identity and reproducibility information reported by an adapter.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        },
+        "image_digest": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Image Digest"
+        },
+        "nondeterminism": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Nondeterminism",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "title": "AdapterInfo",
+      "type": "object"
+    },
+    "ResourceUsage": {
+      "additionalProperties": false,
+      "properties": {
+        "wall_seconds": {
+          "minimum": 0,
+          "title": "Wall Seconds",
+          "type": "number"
+        },
+        "gpu_seconds": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Gpu Seconds",
+          "type": "number"
+        }
+      },
+      "required": [
+        "wall_seconds"
+      ],
+      "title": "ResourceUsage",
+      "type": "object"
+    },
+    "TraceRef": {
+      "additionalProperties": false,
+      "properties": {
+        "trace_id": {
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "uri": {
+          "title": "Uri",
+          "type": "string"
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sha256"
+        }
+      },
+      "required": [
+        "trace_id",
+        "uri"
+      ],
+      "title": "TraceRef",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "job_id": {
+      "title": "Job Id",
+      "type": "string"
+    },
+    "trace_ref": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TraceRef"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "sim_success": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Sim Success"
+    },
+    "infra_status": {
+      "enum": [
+        "ok",
+        "simulator_error",
+        "policy_error",
+        "timeout",
+        "out_of_memory"
+      ],
+      "title": "Infra Status",
+      "type": "string"
+    },
+    "usage": {
+      "$ref": "#/$defs/ResourceUsage"
+    },
+    "camera_params_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Camera Params Hash"
+    },
+    "adapter_info": {
+      "$ref": "#/$defs/AdapterInfo"
+    },
+    "timing_verdict": {
+      "anyOf": [
+        {
+          "enum": [
+            "ok",
+            "starved",
+            "not_checked"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Timing Verdict"
+    },
+    "starved_steps": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Starved Steps"
+    }
+  },
+  "required": [
+    "job_id",
+    "trace_ref",
+    "sim_success",
+    "infra_status",
+    "usage",
+    "camera_params_hash",
+    "adapter_info"
+  ],
+  "title": "RolloutResult",
+  "type": "object"
+}

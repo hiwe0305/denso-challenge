@@ -122,6 +122,11 @@ class RolloutResult(V0Model):
     usage: ResourceUsage
     camera_params_hash: str | None
     adapter_info: AdapterInfo
+    # Async timing outcome, kept apart from sim_success (decision E2, 3/11/2026).
+    # None for sync rollouts and older producers; "not_checked" when an async
+    # rollout had no usable RTC log.
+    timing_verdict: Literal["ok", "starved", "not_checked"] | None = None
+    starved_steps: int | None = Field(default=None, ge=0)
 
 
 class PolicySpec(V0Model):
