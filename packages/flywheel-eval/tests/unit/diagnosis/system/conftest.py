@@ -20,9 +20,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from flywheel.eval.diagnosis.system.reader import SystemInputs, read_trace_log
 
 Row = Callable[..., dict[str, Any]]
 Rows = Callable[..., Path]
+Inputs = Callable[[list[dict[str, Any]]], SystemInputs]
 
 
 def _row(step: int, **overrides: Any) -> dict[str, Any]:
@@ -104,3 +106,13 @@ def camera_entry() -> dict[str, Any]:
         "pose": [0.0, 0.0, 1.5, 1.0, 0.0, 0.0, 0.0],
         "reference_sha256": "b" * 64,
     }
+
+
+@pytest.fixture
+def inputs_from(write_trace: Rows) -> Inputs:
+    """Rows as `SystemInputs` carrying the trace alone, for the trace-only checks."""
+
+    def build(rows: list[dict[str, Any]]) -> SystemInputs:
+        return SystemInputs(trace=read_trace_log(write_trace(rows)))
+
+    return build

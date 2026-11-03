@@ -204,6 +204,46 @@ class TrainThresholds:
 
 
 @dataclass(frozen=True)
+class SignalLimits:
+    """How incomplete a trace may be before the system check says CHƯA RÕ (DA-13 AC 1).
+
+    Spec section 6.4 puts "thiếu tín hiệu" first in the ordered check and gives
+    no number for it, so the numbers live here. A gap fraction of zero means
+    one null cycle costs that code its verdict; a real rollout may need more
+    room, and that is a calibration to make on the trace of SIMPLE rather than
+    a constant to bury in a detector.
+
+    `min_steps` exists because a percentile over three cycles is not a
+    percentile. A trace shorter than this is not judged at all, which is CHƯA
+    RÕ, not a system that behaved.
+    """
+
+    max_gap_fraction: float
+    max_dropped_frames: int
+    min_steps: int
+
+
+@dataclass(frozen=True)
+class R3Thresholds:
+    """Tracking error of the WBC, upper and lower body against their own limits.
+
+    Spec section 6.4 measures the norm of (command sent - state measured) and
+    keeps the two halves apart, because the upper body tracks joint targets and
+    the lower body tracks a base command: one threshold for both would hide a
+    fault in whichever half moves less.
+
+    `percentile` is the statistic taken over the cycles of the episode, written
+    down rather than implied, so a run under a different statistic cannot be
+    compared with this one by accident. `tau_track_*` is calibrated as the 99th
+    percentile over successful teleop episodes (AC 2).
+    """
+
+    tau_track_upper: float
+    tau_track_lower: float
+    percentile: float
+
+
+@dataclass(frozen=True)
 class ScorerConfig:
     """What `configs/eval/scorer/<task>.yaml` tells the scorer (DA-36 AC 5).
 
@@ -273,6 +313,33 @@ class ScorerConfig:
             step_signals=step_signals,
             episode_signals=_name_list(data, "episode_signals", "scorer config"),
             class_from_failed_step=_name_list(data, "class_from_failed_step", "scorer config"),
+        )
+
+
+@dataclass(frozen=True)
+class SystemThresholds:
+    """Every threshold the F-SYS checks of DA-13 read, from `system.yaml` (AC 2)."""
+
+    signals: SignalLimits
+    r3: R3Thresholds
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> SystemThresholds:
+        """Validate a parsed system-threshold mapping; raise on anything unclear."""
+        _reject_unknown(data, tuple(cls.__dataclass_fields__), "system.yaml")
+        signals = _section(data, "signals")
+        r3 = _section(data, "r3")
+        return cls(
+            signals=SignalLimits(
+                max_gap_fraction=_fraction(signals, "max_gap_fraction", "signals"),
+                max_dropped_frames=_steps(signals, "max_dropped_frames", "signals"),
+                min_steps=_steps(signals, "min_steps", "signals"),
+            ),
+            r3=R3Thresholds(
+                tau_track_upper=_number(r3, "tau_track_upper", "r3"),
+                tau_track_lower=_number(r3, "tau_track_lower", "r3"),
+                percentile=_percentile(r3, "percentile", "r3"),
+            ),
         )
 
 
@@ -369,6 +436,22 @@ def _steps(section: Mapping[str, Any], key: str, where: str) -> int:
     return value
 
 
+def _fraction(section: Mapping[str, Any], key: str, where: str) -> float:
+    value = _number(section, key, where)
+    if not 0.0 <= value <= 1.0:
+        raise ConfigError(f"`{where}.{key}` must be a fraction in [0, 1], got {value!r}")
+    return value
+
+
+def _percentile(section: Mapping[str, Any], key: str, where: str) -> float:
+    # The statistic a threshold is compared against; 0 or 100 would make the
+    # comparison the minimum or the maximum, which are both legitimate asks.
+    value = _number(section, key, where)
+    if not 0.0 <= value <= 100.0:
+        raise ConfigError(f"`{where}.{key}` must be a percentile in [0, 100], got {value!r}")
+    return value
+
+
 def _number_map(section: Mapping[str, Any], key: str, where: str) -> dict[str, float]:
     value = _require(section, key, where)
     if not isinstance(value, Mapping):
@@ -410,6 +493,8 @@ def _name(value: Any, where: str) -> str:
 
 _SECTION_FIELDS: dict[str, tuple[str, ...]] = {
     "balance": tuple(BalanceLimits.__dataclass_fields__),
+    "signals": tuple(SignalLimits.__dataclass_fields__),
+    "r3": tuple(R3Thresholds.__dataclass_fields__),
     "t1": tuple(T1Thresholds.__dataclass_fields__),
     "t2": tuple(T2Thresholds.__dataclass_fields__),
     "t3": tuple(T3Thresholds.__dataclass_fields__),
