@@ -215,7 +215,7 @@ def to_episode(frames: EpisodeFrames, source: SourceRecord, split: str) -> Episo
         split=split,
         source_kind=profile.source_kind,
         action_quality=profile.action_quality,
-        deid_status="raw",  # robot sim video: no person in it to blur
+        deid_status="raw",  # nothing blurred; only egocentric raw is gated (Q4)
         embodiment_id=profile.embodiment_id,
         meta=EpisodeMetadata(
             source_detail=cast(SourceDetail, source.source_detail),
@@ -223,6 +223,17 @@ def to_episode(frames: EpisodeFrames, source: SourceRecord, split: str) -> Episo
             synthetic_tier=profile.synthetic_tier,
         ),
     )
+
+
+def deid_blocks_annotate(episode: Episode) -> bool:
+    """Whether the raw-deid gate stops this episode from leaving Annotate (03 line 248).
+
+    Q4, decided by the PO 3/11/2026: the gate applies only to egocentric video,
+    which shows people. Robot, sim and teleop episodes keep deid_status "raw"
+    (nothing was blurred) and pass. Annotate and the catalog call this rather
+    than testing deid_status alone.
+    """
+    return episode.source_kind == "egocentric" and episode.deid_status == "raw"
 
 
 def _lineage(row: dict[str, Any]) -> EpisodeLineage:
