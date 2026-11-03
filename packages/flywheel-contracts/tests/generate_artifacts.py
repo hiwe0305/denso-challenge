@@ -127,7 +127,7 @@ request = RolloutRequest.model_validate(
 result = RolloutResult.model_validate(
     {
         "job_id": "job_1",
-        "trace_ref": {"trace_id": "trace_1", "uri": "traces/trace_1.json"},
+        "trace_ref": {"trace_id": "trace_1", "uri": "traces/trace_1"},
         "sim_success": True,
         "infra_status": "ok",
         "usage": {"wall_seconds": 12.5},
