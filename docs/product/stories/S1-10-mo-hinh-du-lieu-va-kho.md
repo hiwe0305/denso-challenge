@@ -8,7 +8,7 @@
 | Người làm | Long |
 | Story PRD | 2.1, phần a · Epic 2. Phần b (RunPlan, `fw plan freeze`, test NFR7) làm ở S3 |
 | Nhãn | [Lõi] · `epic:2` · `gate:G1` · `area:data` |
-| Sprint | S1, tuần 1–2 |
+| Sprint | S1, tuần 1–2 · **Lịch 3/11/2026:** sửa CI của #36 và merge trước **5/11/2026** |
 | Ước lượng | 10 giờ (bản 0.1: 14 giờ; L0-lite bớt phân vùng ngày, lệnh dựng lại chỉ mục, fsspec) |
 | Phụ thuộc | PR `chore-restructure` (07 mục 3.6; mở PR 28/10, merge 29/10/2026). Dùng chung `contracts` với S1-08, cùng người làm. Long làm và giữ nhân; Hiếu duyệt mọi thay đổi schema (07 mục 2.0) |
 
@@ -83,6 +83,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Đường dẫn theo nhân mới: `flywheel-contracts`, `flywheel-store`; hàm ghi sổ chi phí nằm trong kho vì mọi làn đều ghi; phân tích sổ chi phí thuộc làn Vòng (Long) | PO (Hiếu) theo design chia làn |
 | 27/10/2026 | Giao cho Long theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
 | 28/10/2026 | Sửa dòng Phụ thuộc: Long làm và giữ nhân, hạn PR `chore-restructure` mới | PO (Hiếu) |
+| 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

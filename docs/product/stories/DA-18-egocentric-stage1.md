@@ -9,7 +9,7 @@
 | Làn | Dữ liệu |
 | Story PRD | 9.25 · Epic 9 · [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 6.6, 7.8 |
 | Nhãn | [Adapter] · `epic:9` · `gate:G1` · `area:rl` |
-| Sprint | S2; bản export EgoDex đọc được bằng loader trước 10/11/2026 để DA-30 chạy kịp demo |
+| Sprint | S2; bản export EgoDex đọc được bằng loader trước 10/11/2026 để DA-30 chạy kịp demo · **Lịch 3/11/2026:** merge trước **8/11/2026** (thay 10/11) để DA-30 chạy |
 | Ước lượng | 8 giờ (khoảng 6–10, ước lượng; phần stage 1 tách sang DA-30) |
 | Phụ thuộc | DA-04 (đoạn egocentric đã qua QA). Trong lúc chờ: code export trên đoạn EgoDex mẫu của testkit. Chặn DA-30 |
 
@@ -60,6 +60,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Tạo story: video egocentric thô của nhà máy DENSO thành dữ liệu fine-tune stage 1 | PO (Hiếu) theo design 25/10/2026 (đã xóa) |
 | 27/10/2026 | Xóa cùng robot DENSO, rồi khôi phục cùng ngày với nội dung mới: nguồn là mẫu EgoDex và video đội tự quay; lần chạy ngắn trên EgoDex chứng minh đường đi; fine-tune thật chỉ trên video tự quay | PO (Hiếu) theo design 27/10/2026 |
 | 27/10/2026 | Tách phần chạy stage 1 sang DA-30; giao cho Hưng theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
+| 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

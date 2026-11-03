@@ -9,7 +9,7 @@
 | Làn | Đánh giá |
 | Story PRD | 9.13 · Epic 9 · FR55; [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 8.3, 10; spec mục 6.4 |
 | Nhãn | [Lõi] · `epic:9` · `gate:G4` · `area:core` |
-| Sprint | S3 |
+| Sprint | S3 · **Lịch 3/11/2026:** kéo lên S2: merge trước **10/11/2026** cho phần 6 của demo (thay S3) |
 | Ước lượng | 9 giờ (khoảng 8–10, 07 mục 2.2) |
 | Phụ thuộc | DA-25 (file mẫu probe, log RTC); DA-09 (probe P1–P4 thật); DA-08 (cờ T7); `Trace` từ SIMPLE (khoảng 6/11). Trong lúc chờ code trên file mẫu |
 
@@ -68,6 +68,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 28/10/2026 | Nháp story theo spec mục 6.4 và design 27/10 mục 10 | Châu (chờ SM, PO) |
 | 28/10/2026 | Đưa nháp của Châu (issue #6) vào repo; nhãn theo 02 bản 0.5 (story 9.13, Epic 9, cổng G4). Bảng quy lỗi về stage (spec 6.4 khác design mục 10) chưa chốt, để trong `stage.yaml` | PO (Hiếu) |
 | 30/10/2026 | Chốt bảng quy lỗi về stage theo spec v10.5 mục 6.4 (khớp design mục 10); sửa ghi chú cho người làm | PO (Hiếu) |
+| 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

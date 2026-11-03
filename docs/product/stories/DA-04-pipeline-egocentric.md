@@ -9,7 +9,7 @@
 | Làn | Dữ liệu |
 | Story PRD | 9.4 · Epic 9 · [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 5.0, 6.6 |
 | Nhãn | [Lõi] · `epic:9` · `gate:G1` · `area:data` |
-| Sprint | S1–S2; mẫu EgoDex qua đủ 6 tầng trước 10/11/2026 cho demo; video tự quay khi có |
+| Sprint | S1–S2; mẫu EgoDex qua đủ 6 tầng trước 10/11/2026 cho demo; video tự quay khi có · **Lịch 3/11/2026:** nhiệm vụ 1, 2, 3, 4, 6 merge trước **7/11/2026** (thay 10/11); nhiệm vụ 5, 7 sau 13/11/2026 |
 | Ước lượng | 30 giờ (khoảng 25–35, ước lượng) |
 | Phụ thuộc | DA-01 (trường `deid_status`, `source_kind = egocentric`), DA-25 (schema). PR `chore-restructure` tạo khung `flywheel-data`. Trong lúc chờ: code trên vài đoạn EgoDex mẫu trong testkit |
 
@@ -74,6 +74,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 |---|---|---|
 | 27/10/2026 | Tạo file story; trước đó DA-04 chỉ có trong bảng 07 mục 2.2. Mở lại theo quyết định ba loại dữ liệu (design 27/10 mục 1, câu 5–7) | PO (Hiếu) |
 | 27/10/2026 | Giao cho Hưng theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
+| 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

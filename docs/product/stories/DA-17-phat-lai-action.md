@@ -9,7 +9,7 @@
 | Làn | Dữ liệu |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 6.3 · Epic 9 |
 | Nhãn | [Lõi] · `epic:9` · `gate:G1` · `area:data` |
-| Sprint | S1–S2 |
+| Sprint | S1–S2 · **Lịch 3/11/2026:** merge trước **9/11/2026** |
 | Ước lượng | 9 giờ (khoảng 7–11, ước lượng của SM) |
 | Phụ thuộc | DA-25 (schema `ReplayReport`). Gọi `SimulatorAdapter.replay()` qua Protocol; hàm `replay()` của `SimpleSim` thuộc story 3.1a (adapter SIMPLE, S2); trong lúc chờ dùng simulator giả của testkit. PR `chore-restructure` (07 mục 3.6; mở PR 28/10, merge 29/10/2026) tạo khung package `flywheel-data` |
 
@@ -67,6 +67,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Chuyển sang làn Dữ liệu; hàm `replay()` thuộc DA-15 | PO (Hiếu) theo design chia làn (đã xóa) |
 | 27/10/2026 | Đổi sang MuJoCo của SIMPLE trên task hai bàn; `replay()` thuộc story 3.1a; thêm nguồn AMO | PO (Hiếu) theo design 27/10/2026 |
 | 28/10/2026 | Sửa hạn PR `chore-restructure` theo 07 mục 3.6 bản 0.6: mở 28/10, merge 29/10 | PO (Hiếu) |
+| 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

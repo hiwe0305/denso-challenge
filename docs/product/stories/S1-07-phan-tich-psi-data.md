@@ -8,7 +8,7 @@
 | Người làm | Thông |
 | Story PRD | 1.6 · Epic 1 |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:data` |
-| Sprint | S1, xong trong tuần 1 vì Q1 quyết định điểm cuối của lưới HE |
+| Sprint | S1, xong trong tuần 1 vì Q1 quyết định điểm cuối của lưới HE · **Lịch 3/11/2026:** sửa layout action trên #24 và merge trước **4/11/2026** |
 | Ước lượng | 10 giờ (bản 22/10: 12 giờ; Q6 đã có trả lời) |
 | Phụ thuộc | Không. Chặn DA-03, DA-26 (danh sách demo), DA-27 (dữ liệu gốc để cấy lỗi) |
 
@@ -74,6 +74,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 24/10/2026 | Thêm mục Phạm vi file. AC 7: đề xuất dòng V1, V6, V9 ghi trong file kết quả, Hiếu gom vào 03 §3.3 ở review G0 | PO (Hiếu) |
 | 25/10/2026 | Hủy: psi-data là dữ liệu của G1; dữ liệu chính chuyển sang dataset BTC | PO (Hiếu) theo design 25/10/2026 (đã xóa) |
 | 27/10/2026 | Mở lại cho task hai bàn: gói 203 MB và tập eval, N_teleop quyết định lưới HE, so với `action_layout`, dải hạt giống của `simple-eval`, thống kê cho báo cáo dataset; bỏ AC Q6 (đã trả lời); 12 → 10 giờ | PO (Hiếu) theo design 27/10/2026 |
+| 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

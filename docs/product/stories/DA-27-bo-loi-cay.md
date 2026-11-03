@@ -9,7 +9,7 @@
 | Làn | Dữ liệu |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 9.2 · Epic 9 · 03 ADR-26 |
 | Nhãn | [Lõi] · `epic:9` · `gate:G1` · `area:data` |
-| Sprint | S2; bộ lỗi dữ liệu xong trước 10/11/2026 để DA-20 chấm kịp demo |
+| Sprint | S2; bộ lỗi dữ liệu xong trước 10/11/2026 để DA-20 chấm kịp demo · **Lịch 3/11/2026:** mở PR và merge trước **6/11/2026** (thay 10/11) |
 | Ước lượng | 7 giờ (khoảng 6–8, ước lượng; bộ chấm tách sang DA-31) |
 | Phụ thuộc | DA-25 (schema `DefectManifest`, trường `injected_defect`), S1-07 (gói psi-data task hai bàn). Log train và log RTC cấy lỗi dựng trên `FakeTrainer` và log RTC giả của testkit cho tới khi có log thật |
 
@@ -64,6 +64,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 |---|---|---|
 | 27/10/2026 | Tạo story theo design 27/10/2026 mục 9.2 | PO (Hiếu) |
 | 27/10/2026 | Tách bộ chấm sang DA-31; giao cho Thông theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
+| 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

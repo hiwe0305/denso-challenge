@@ -9,7 +9,7 @@
 | Làn | Dữ liệu |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 6.4 · Epic 9 |
 | Nhãn | [Lõi] · `epic:9` · `area:data` |
-| Sprint | S2 |
+| Sprint | S2 · **Lịch 3/11/2026:** **sau 13/11/2026** (demo dùng LeRobot v2.1) |
 | Ước lượng | 5 giờ (khoảng 4–6, ước lượng của SM) |
 | Phụ thuộc | DA-02 (export v2.1, cùng người làm). Code trên dataset v2.1 mẫu của testkit. PR `chore-restructure` (07 mục 3.6; mở PR 28/10, merge 29/10/2026) tạo khung package `flywheel-data` |
 
@@ -61,6 +61,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Đường dẫn trong `flywheel-data` | PO (Hiếu) theo design chia làn (đã xóa) |
 | 27/10/2026 | Nguồn chuyển sang design 27/10; nội dung không đổi | PO (Hiếu) |
 | 28/10/2026 | Sửa hạn PR `chore-restructure` theo 07 mục 3.6 bản 0.6: mở 28/10, merge 29/10 | PO (Hiếu) |
+| 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

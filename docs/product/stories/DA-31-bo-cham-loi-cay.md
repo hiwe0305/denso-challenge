@@ -5,11 +5,11 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 27/10/2026) |
-| Người làm | Hưng |
+| Người làm | Châu (từ 3/11/2026; trước đó Hưng) |
 | Làn | Đánh giá |
 | Story PRD | 9.23 · Epic 9 · [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 9.2 · 03 ADR-26 |
 | Nhãn | [Lõi] · `epic:9` · `gate:G1` · `area:core` |
-| Sprint | S2; kết quả trước 13/11/2026 cho demo (DA-28) |
+| Sprint | S2; kết quả trước 13/11/2026 cho demo (DA-28) · **Lịch 3/11/2026:** merge trước **11/11/2026** (thay 13/11); chuyển từ Hưng sang Châu |
 | Ước lượng | 6 giờ (khoảng 5–8, ước lượng) |
 | Phụ thuộc | DA-25 (schema `DefectManifest`), DA-27 (bản cấy lỗi và bản sạch), DA-20 (báo cáo của agent). Trong lúc chờ: code trên file mẫu của testkit |
 
@@ -51,7 +51,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Người phụ trách
 
-- Làm: Trần Ngọc Hưng
+- Làm: Trần Trịnh Hoàng Châu (từ 3/11/2026; trước đó Trần Ngọc Hưng)
 - Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
 - Bình luận: Dương Tiến Thông (DA-27)
 
@@ -61,6 +61,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 |---|---|---|
 | 27/10/2026 | Tạo story, tách phần chấm từ DA-27 | PO (Hiếu) |
 | 3/11/2026 | AC 1: `AgentReport` thay `QAReport` của DA-20; AC 2: recall theo loại, precision theo mã (design mục 9.2) | PO (Hiếu) theo issue #34 |
+| 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4), người làm chuyển sang Châu | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
