@@ -18,6 +18,8 @@ from flywheel.data.ingest.sources import (
     SPLITS,
     SourceRecord,
     deid_blocks_annotate,
+    dump_source,
+    load_source,
     register_source,
     to_episode,
 )
@@ -398,3 +400,15 @@ def test_the_writer_sets_the_episode_id(dataset: Dataset) -> None:
     source = register_source(root, "psi_data", "unknown", "public")
     key = hashlib.sha256(f"{source.source_id}:1".encode()).hexdigest()[:16]
     assert to_episode(written[1], source, "train").episode_id == f"ep_{key}"
+
+
+def test_a_source_record_survives_its_json(
+    dataset: Dataset, flywheel: Flywheel, s1_block: Block
+) -> None:
+    root, _ = dataset
+    flywheel(root, 0, s1_block)
+    flywheel(root, 1, {**s1_block, "seed": 1001})
+    flywheel(root, 2, {**s1_block, "seed": 1002})
+    record = register_source(root, "planner_wbc", "unknown", "public")
+    assert record.lineage[1].seed == 1001 and record.index_findings == ()
+    assert load_source(dump_source(record)) == record

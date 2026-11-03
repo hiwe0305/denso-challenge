@@ -1,7 +1,8 @@
-"""Episodes, labels and config paths shared by the QA, release and report tests (DA-03 PR 2)."""
+"""Datasets, episodes, labels and config paths shared by the pipeline tests (DA-03)."""
 
 from __future__ import annotations
 
+import struct
 from pathlib import Path
 
 import numpy as np
@@ -12,6 +13,59 @@ from flywheel.data.ingest.sources import EpisodeLineage
 FPS = 50
 CAMERA = "observation.images.egocentric"
 TASK = "pick up the cracker box from table1, locomotion to table2, and place on table2."
+
+
+def psi0_info(fps: int = FPS) -> dict[str, object]:
+    """info.json as Psi0's postprocess writes it, minus the observation.* columns."""
+    scalar = {"shape": [1]}
+    return {
+        "codebase_version": "v2.1",
+        "robot_type": "g1",
+        "total_episodes": 0,
+        "total_frames": 0,
+        "total_tasks": 0,
+        "total_videos": 0,
+        "total_chunks": 1,
+        "chunks_size": 1000,
+        "fps": fps,
+        "data_path": "data/chunk-{episode_chunk:03d}/episode_{episode_index:06d}.parquet",
+        "video_path": "videos/chunk-{episode_chunk:03d}/egocentric/episode_{episode_index:06d}.mp4",
+        "features": {
+            CAMERA: {"dtype": "video", "shape": [360, 640, 3], "video_info": {}},
+            "states": {"dtype": "float32", "shape": [-1]},
+            "action": {"dtype": "float32", "shape": [-1]},
+            "timestamp": {"dtype": "float32", **scalar},
+            "frame_index": {"dtype": "int64", **scalar},
+            "episode_index": {"dtype": "int64", **scalar},
+            "index": {"dtype": "int64", **scalar},
+            "next.done": {"dtype": "bool", **scalar},
+            "task_index": {"dtype": "int64", **scalar},
+        },
+    }
+
+
+def box(kind: bytes, payload: bytes = b"") -> bytes:
+    return struct.pack(">I4s", 8 + len(payload), kind) + payload
+
+
+def track(handler: bytes, samples: int) -> bytes:
+    hdlr = box(b"hdlr", bytes(8) + handler + bytes(12) + b"\0")
+    stsz = box(b"stsz", bytes(4) + struct.pack(">II", 0, samples) + bytes(4 * samples))
+    return box(b"trak", box(b"mdia", hdlr + box(b"minf", box(b"stbl", stsz))))
+
+
+def fake_mp4(path: Path, frames: int, audio: int | None = 7) -> None:
+    """An mp4 with no picture in it whose video track holds `frames` samples in stsz.
+
+    An audio track comes first, so the reader has to pick the track by handler.
+    """
+    tracks = (b"" if audio is None else track(b"soun", audio)) + track(b"vide", frames)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(box(b"ftyp", b"isom" + bytes(4)) + box(b"moov", tracks) + box(b"mdat"))
+
+
+def video_path(root: Path, index: int) -> Path:
+    return root / "videos" / "chunk-000" / "egocentric" / f"episode_{index:06d}.mp4"
 
 
 REPO = Path(__file__).resolve().parents[5]
