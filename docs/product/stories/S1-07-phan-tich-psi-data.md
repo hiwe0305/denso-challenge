@@ -34,7 +34,7 @@ _Mở lại ngày 27/10/2026 theo [design 27/10/2026](../../superpowers/specs/20
 - [x] 2. Đọc cấu trúc LeRobot, ghi trường, so với `action_layout` (AC 3)
 - [x] 3. Đếm N_teleop đạt QA sơ bộ cho task hai bàn và F1 (AC 2)
 - [x] 4. Tìm layout, seed, tham số điều kiện; dải hạt giống của `simple-eval` (AC 4)
-- [ ] 5. Bảng giấy phép, soạn câu hỏi cho tác giả (AC 5)
+- [x] 5. Bảng giấy phép, soạn câu hỏi cho tác giả (AC 5)
 - [ ] 6. Thống kê mô tả (AC 6)
 - [ ] 7. Viết `docs/g0/psi-data.md` kèm đề xuất cho 03 §3.3 (AC 7)
 
