@@ -204,7 +204,9 @@ def test_two_injected_faults_both_appear_and_the_first_one_is_the_label(
 
 def test_an_episode_whose_trace_lacks_a_field_is_unknown_not_clean(episode, cfg, row) -> None:
     # The first step of spec section 6.4. The episode looks healthy on every
-    # code that could be judged, and it is still not cleared.
+    # code that could be judged, and it is still not cleared: with `t_image`
+    # left out, which `TraceStep` reads as "no new frame", R4 has nothing to
+    # measure.
     without = [row(step) for step in range(20)]
     for item in without:
         del item["t_image"]

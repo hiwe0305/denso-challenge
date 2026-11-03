@@ -6,27 +6,24 @@ decides whether the controller tracked its commands. Every check takes a
 `SystemInputs` and nothing else, so a field renamed in `flywheel.contracts`
 reaches this module and goes no further.
 
-**The trace log is read by field name, not through the contract yet.**
-`TraceStep` and `CameraParams` are proposed in Contract change #31 (Long, PR
-#48) and are not on master, so `TraceRow` and `CameraView` here hold exactly
-the fields of that proposal and nothing of their own. When #48 merges they are
-replaced by `flywheel.contracts.trace.TraceStep` and `CameraParams`, which is
-task 7 of the story - the same way DA-36 held `ScoreRecord` until `Score`
-landed. Nothing downstream reads these two classes, only the arrays they
-produce, so the swap does not reach the checks.
+**Every input is read through its contract.** A line of `steps.jsonl` is a
+`flywheel.contracts.trace.TraceStep` and a line of `camera_params.jsonl` a
+`CameraParams` (Contract change #31, merged as PR #79); the RTC log is
+`RTCInferenceRecord` and the probe results `ProbeP1`, `ProbeP3` and `ProbeP4`.
+A line the contract refuses - a field missing, a vector not 28 or 7 wide, a
+bare JSON `NaN` - raises here with its line number, so what the checks receive
+always has every field. Nothing downstream reads the contract types of the
+trace, only the arrays `TraceLog` makes of them, so a field renamed in the
+contract stops in this module.
 
-**The RTC log and the probe results do come through contracts.**
-`RTCInferenceRecord`, `ProbeP1`, `ProbeP3` and `ProbeP4` are on master, so R1,
-R2 and the stage attribution read the contract types directly.
-
-**A value that is not finite is read as missing, not as a number.** `json.loads`
-accepts `NaN`, and every comparison against a NaN is false, so a trace whose
-tracking error is NaN on every cycle would clear every threshold it was checked
-against and come back as a clean controller. That is the silent pass FR21
-forbids, so a NaN or an infinity - as a JSON number or as the strings `"NaN"`,
-`"Infinity"`, `"-Infinity"` the contract allows - becomes a gap here and
-reaches the checks as one, which is what makes the first step of spec section
-6.4, "thiếu tín hiệu → CHƯA RÕ", fire on it.
+**A value that is not finite is read as missing, not as a number.**
+`TraceStep` writes one as the string `"NaN"`, `"Infinity"` or `"-Infinity"`,
+and every comparison against a NaN is false, so a trace whose tracking error
+is NaN on every cycle would clear every threshold it was checked against and
+come back as a clean controller. That is the silent pass FR21 forbids, so
+each of the three strings becomes a gap here and reaches the checks as one,
+which is what makes the first step of spec section 6.4, "thiếu tín hiệu →
+CHƯA RÕ", fire on it.
 
 **`t_image: null` is not a gap.** The camera renders slower than the control
 loop runs, and `TraceStep` marks a cycle with no new frame by a null
@@ -58,18 +55,21 @@ directory `<trace_id>/`, the one `TraceRef.uri` points at::
                                # absent when the job had no pinned reference
         rollout_result.json    # v0 RolloutResult (infra_status); decision G1b
 
-The file names are the constants below and nowhere else; `rollout_result.json`
-is decision G1b of the PO (3/11/2026). The RolloutResult is read through
+The three names inside `<trace_id>/` are the contract's (`STEPS_NAME`,
+`CAMERA_NAME`, `RESULT_NAME` of `flywheel.contracts.trace`), re-exported below
+with the RTC log's, which is this lane's; `rollout_result.json` is decision G1b
+of the PO (3/11/2026). The RolloutResult is read through
 `flywheel.contracts.v0.RolloutResult`, so an `infra_status` outside the
 contract's `InfraStatus` is refused rather than read as a fault. Its
 `trace_ref` is checked against the directory it sits in, loudly: `trace_id`
 must be the steps' own, `uri` must name this `<trace_id>/` directory, and
 `sha256` - the hash of `steps.jsonl` as the hook wrote it - must be the hash of
 the steps read, so a result is never paired with steps it is not about. A
-camera line of another trace is refused the same way. Either the directory,
-the steps file or the RolloutResult file names a trace. The contract of #48
-and the SimpleSim hook (DA-38) are not merged yet, so this layout is the
-decision's word until a seam test in `tests/e2e/test_demo_seams.py` covers it.
+camera line or a step of another trace is refused the same way. Either the
+directory, the steps file or the RolloutResult file names a trace. A steps
+file with no step at all - a rollout cut off before its first cycle - is read
+as a trace of zero cycles named after its directory, so R6 still judges the
+RolloutResult beside it.
 """
 
 from __future__ import annotations
@@ -84,6 +84,14 @@ from typing import Any, TypeVar
 
 import numpy as np
 from flywheel.contracts.artifacts import ProbeP1, ProbeP3, ProbeP4, RTCInferenceRecord
+from flywheel.contracts.trace import CAMERA_NAME as CAMERA_NAME
+from flywheel.contracts.trace import (
+    RESULT_NAME,
+    CameraParams,
+    FloatOrNonFinite,
+    TraceStep,
+)
+from flywheel.contracts.trace import STEPS_NAME as STEPS_NAME
 from flywheel.contracts.v0 import RolloutResult
 from numpy.typing import NDArray
 from pydantic import ValidationError
@@ -91,9 +99,10 @@ from pydantic import ValidationError
 Values = NDArray[np.float64]
 
 _ARTIFACT = TypeVar("_ARTIFACT", ProbeP1, ProbeP3, ProbeP4)
+_LINE = TypeVar("_LINE", TraceStep, CameraParams, RTCInferenceRecord)
 
-# The fields of `TraceStep` (Contract change #31) each check needs. Named here
-# so a trace that lacks one is reported by the name the writer used.
+# The fields of `TraceStep` each check needs, named so a gap is reported by
+# the name the writer used.
 TRACK_FIELDS = ("cmd_upper", "meas_upper", "cmd_lower", "meas_lower")
 SYNC_FIELDS = ("t_state", "t_image")
 
@@ -103,64 +112,20 @@ class ReaderError(ValueError):
 
 
 @dataclass(frozen=True)
-class TraceRow:
-    """One control cycle, with the fields of `TraceStep` (Contract change #31).
-
-    A gap - a null or non-finite `t_state` or vector entry, a non-finite
-    `t_image` - is nan. `t_image` is None only where the writer logged null,
-    which `TraceStep` defines as "no new camera frame on this cycle" and which
-    is not a gap. A vector logged as null is the empty tuple; `_matrix` turns
-    it into a row of nan as wide as the others.
-    """
-
-    step: int
-    t_state: float
-    t_image: float | None
-    cmd_upper: tuple[float, ...]
-    meas_upper: tuple[float, ...]
-    cmd_lower: tuple[float, ...]
-    meas_lower: tuple[float, ...]
-    dropped_frames: int
-
-
-@dataclass(frozen=True)
-class CameraView:
-    """The calibration of one camera, with the fields of `CameraParams` (#31).
-
-    `reference_sha256` is the hash of the reference pinned at G0 that the
-    episode ran against, copied by the SimpleSim hook from the RunPlan
-    (decision Q3, 3/11/2026). It is not a hash of the values in this object;
-    if one is ever needed it is a different field.
-    """
-
-    uid: str
-    mount: str
-    width: int
-    height: int
-    fx: float
-    fy: float
-    cx: float
-    cy: float
-    pose: tuple[float, ...]
-    reference_sha256: str
-    trace_id: str
-
-
-@dataclass(frozen=True)
 class TraceLog:
     """One episode's control trace as arrays, plus what it does not carry.
 
-    `absent_fields` is what the writer never logged and `gap_counts` is what it
-    logged as null or as a value that is not finite. Both cost a check its
-    verdict, and both are reported in the words of the field, because "chẩn
-    đoán CHƯA RÕ, đề xuất thu thêm bằng chứng" is only actionable if it says
-    which evidence to collect (spec section 6.4, step 1).
+    `gap_counts` is, per field, the cycles the writer logged as a value that
+    is not finite. A gap costs a check its verdict and is reported in the words
+    of the field, because "chẩn đoán CHƯA RÕ, đề xuất thu thêm bằng chứng" is
+    only actionable if it says which evidence to collect (spec section 6.4,
+    step 1). `trace_id` is the steps' own, or the directory's name for a steps
+    file with no step in it.
     """
 
     episode_id: str
-    trace_id: str | None
-    rows: tuple[TraceRow, ...]
-    absent_fields: tuple[str, ...]
+    trace_id: str
+    rows: tuple[TraceStep, ...]
     gap_counts: dict[str, int]
     dropped_frames: int
     trace_sha256: str
@@ -181,11 +146,7 @@ class TraceLog:
         measured = _matrix(self.rows, f"meas_{part}")
         if commands.size == 0 or measured.size == 0:
             return np.empty(0, dtype=np.float64)
-        if commands.shape != measured.shape:
-            raise ReaderError(
-                f"`cmd_{part}` và `meas_{part}` khác số kênh ({commands.shape[1]} so với "
-                f"{measured.shape[1]}), không ghép được thành sai số bám lệnh"
-            )
+        # `TraceStep` fixes the width of both, so the two always line up.
         difference = commands - measured
         # A cycle missing one channel is a cycle nobody measured the error of.
         whole = np.isfinite(difference).all(axis=1)
@@ -221,7 +182,7 @@ class SystemInputs:
 
     trace: TraceLog
     rtc: tuple[RTCInferenceRecord, ...] = ()
-    cameras: tuple[CameraView, ...] = ()
+    cameras: tuple[CameraParams, ...] = ()
     infra_status: str | None = None
     has_rtc_log: bool = False
     has_camera_params: bool = False
@@ -254,10 +215,9 @@ class StageInputs:
 
 
 # The layout of a trace on disk (decision G1 on PR #48; module docstring). The
-# one place the file names live: the checks, the CLI and the tests import them.
-STEPS_NAME = "steps.jsonl"  # in <trace_id>/
-CAMERA_NAME = "camera_params.jsonl"  # in <trace_id>/
-ROLLOUT_NAME = "rollout_result.json"  # in <trace_id>/; Đã chốt 3/11/2026 [Hiếu] (G1b)
+# checks, the CLI and the tests import the names from here; the three inside
+# <trace_id>/ are the contract's.
+ROLLOUT_NAME = RESULT_NAME  # in <trace_id>/; Đã chốt 3/11/2026 [Hiếu] (G1b)
 RTC_NAME = "rtc.jsonl"  # in the job dir, the parent of <trace_id>/
 
 
@@ -282,10 +242,10 @@ def load_episode(path: Path) -> SystemInputs:
     camera_data = _read_bytes(camera_path) if camera_path.is_file() else None
     episode_data = _read_bytes(rollout_path) if rollout_path.is_file() else None
     rtc = () if rtc_data is None else _rtc_records(rtc_data, rtc_path)
-    cameras = () if camera_data is None else _camera_views(camera_data, camera_path)
+    cameras = () if camera_data is None else _camera_params(camera_data, camera_path)
     return SystemInputs(
         trace=trace,
-        rtc=_of_trace(rtc, trace, rtc_path),
+        rtc=_of_trace(rtc, trace),
         cameras=_cameras_of_trace(cameras, trace, camera_path),
         infra_status=(
             None
@@ -301,18 +261,20 @@ def load_episode(path: Path) -> SystemInputs:
 
 
 def read_trace_log(path: Path) -> TraceLog:
-    """Read a JSONL control trace, one `TraceStep` object per line."""
+    """Read a JSONL control trace, one `TraceStep` per line, all of one trace."""
     data = _read_bytes(path)
-    rows = _read_rows(data, path)
-    parsed = tuple(_trace_row(row, path, number) for number, row in enumerate(rows, start=1))
-    absent = _absent_fields(rows)
+    steps = _validated(_read_rows(data, path), path, TraceStep)
+    trace_ids = sorted({step.trace_id for step in steps})
+    if len(trace_ids) > 1:
+        raise ReaderError(
+            f"`{path}` có bước của {len(trace_ids)} trace {trace_ids}, không phải của một trace"
+        )
     return TraceLog(
-        episode_id=_first_text(rows, "episode_id") or _trace_name(path),
-        trace_id=_first_text(rows, "trace_id"),
-        rows=parsed,
-        absent_fields=absent,
-        gap_counts=_gap_counts(parsed, absent),
-        dropped_frames=sum(row.dropped_frames for row in parsed),
+        episode_id=steps[0].episode_id if steps else _trace_name(path),
+        trace_id=trace_ids[0] if trace_ids else _trace_name(path),
+        rows=steps,
+        gap_counts=_gap_counts(steps),
+        dropped_frames=sum(step.dropped_frames for step in steps),
         trace_sha256=_sha256(data),
     )
 
@@ -323,34 +285,38 @@ def read_rtc_log(path: Path) -> tuple[RTCInferenceRecord, ...]:
 
 
 def _rtc_records(data: bytes, path: Path) -> tuple[RTCInferenceRecord, ...]:
-    rows = _read_rows(data, path)
-    records = []
+    # a chunk the client never recorded is not a chunk that arrived on time
+    return _validated(_read_rows(data, path), path, RTCInferenceRecord)
+
+
+def _validated(rows: list[dict[str, Any]], path: Path, model: type[_LINE]) -> tuple[_LINE, ...]:
+    """Each line through its contract, refused with its line number when the contract says no."""
+    lines = []
     for number, row in enumerate(rows, start=1):
         try:
-            records.append(RTCInferenceRecord.model_validate(row))
+            lines.append(model.model_validate(row))
         except ValidationError as error:
             raise ReaderError(
-                f"`{path}` dòng {number} không phải RTCInferenceRecord: {error}"
+                f"`{path}` dòng {number} không phải {model.__name__}: {error}"
             ) from error
-        # a chunk the client never recorded is not a chunk that arrived on time
-    return tuple(records)
+    return tuple(lines)
 
 
-def read_camera_params(path: Path) -> tuple[CameraView, ...]:
+def read_camera_params(path: Path) -> tuple[CameraParams, ...]:
     """Read `camera_params.jsonl`: one `CameraParams` per line, one line per camera (R5)."""
-    return _camera_views(_read_bytes(path), path)
+    return _camera_params(_read_bytes(path), path)
 
 
-def _camera_views(data: bytes, path: Path) -> tuple[CameraView, ...]:
-    return tuple(_camera_view(entry, path) for entry in _read_rows(data, path))
+def _camera_params(data: bytes, path: Path) -> tuple[CameraParams, ...]:
+    return _validated(_read_rows(data, path), path, CameraParams)
 
 
 def _cameras_of_trace(
-    cameras: tuple[CameraView, ...], trace: TraceLog, path: Path
-) -> tuple[CameraView, ...]:
+    cameras: tuple[CameraParams, ...], trace: TraceLog, path: Path
+) -> tuple[CameraParams, ...]:
     """The cameras, refused if a line belongs to another trace than the steps beside it."""
-    others = sorted({camera.trace_id for camera in cameras} - {trace.trace_id or ""})
-    if trace.trace_id is not None and others:
+    others = sorted({camera.trace_id for camera in cameras} - {trace.trace_id})
+    if others:
         raise ReaderError(
             f"`{path}` có camera của trace {others}, không phải `{trace.trace_id}` "
             f"của `{STEPS_NAME}` bên cạnh"
@@ -359,7 +325,7 @@ def _cameras_of_trace(
 
 
 def _trace_name(path: Path) -> str:
-    """The name to fall back on for a trace that names no episode: its directory."""
+    """The name of a steps file with no step in it: its directory (decision G1)."""
     return path.parent.name if path.name == STEPS_NAME else path.stem
 
 
@@ -388,106 +354,55 @@ def percentile(values: Values, which: float) -> float:
     return float(np.percentile(finite, which))
 
 
-def _trace_row(row: dict[str, Any], path: Path, number: int) -> TraceRow:
-    t_state = _scalar(row.get("t_state"), "t_state", path, number)
-    return TraceRow(
-        step=_step(row, path, number),
-        t_state=math.nan if t_state is None else t_state,
-        t_image=_scalar(row.get("t_image"), "t_image", path, number),
-        cmd_upper=_vector(row.get("cmd_upper"), "cmd_upper", path, number),
-        meas_upper=_vector(row.get("meas_upper"), "meas_upper", path, number),
-        cmd_lower=_vector(row.get("cmd_lower"), "cmd_lower", path, number),
-        meas_lower=_vector(row.get("meas_lower"), "meas_lower", path, number),
-        dropped_frames=_dropped(row.get("dropped_frames"), path, number),
-    )
+def _gap_counts(steps: Iterable[TraceStep]) -> dict[str, int]:
+    """Steps whose value for a field is a gap: one of the non-finite strings.
 
-
-def _camera_view(entry: Any, path: Path) -> CameraView:
-    if not isinstance(entry, dict):
-        raise ReaderError(f"`{path}`: mỗi dòng phải là một đối tượng CameraParams")
-    pose = _vector(entry.get("pose"), "pose", path, 1)
-    if len(pose) != 7 or not all(math.isfinite(value) for value in pose):
-        raise ReaderError(
-            f"`{path}`: `pose` phải có 7 số hữu hạn [x, y, z, qw, qx, qy, qz], "
-            f"gặp {entry.get('pose')!r}"
-        )
-    return CameraView(
-        uid=_text(entry, "uid", path),
-        mount=_text(entry, "mount", path),
-        width=_dimension(entry, "width", path),
-        height=_dimension(entry, "height", path),
-        fx=_required_number(entry, "fx", path),
-        fy=_required_number(entry, "fy", path),
-        cx=_required_number(entry, "cx", path),
-        cy=_required_number(entry, "cy", path),
-        pose=pose,
-        reference_sha256=_text(entry, "reference_sha256", path),
-        trace_id=_text(entry, "trace_id", path),
-    )
-
-
-def _absent_fields(rows: list[dict[str, Any]]) -> tuple[str, ...]:
-    """Fields of `TraceStep` that no row of the file carries at all.
-
-    A field present on some rows and absent on others is a gap, counted by
-    `_gap_counts`; a field no row carries is the writer not logging it, which
-    is a different thing to tell the engineer to go and collect.
+    `t_image: null` is not one: `TraceStep` writes it on a cycle with no new
+    frame, which has no image to pair and so no offset to miss (module
+    docstring). Only a non-finite image timestamp is counted.
     """
-    present = {key for row in rows for key in row}
-    return tuple(name for name in (*TRACK_FIELDS, *SYNC_FIELDS) if name not in present)
-
-
-def _gap_counts(rows: Iterable[TraceRow], absent: tuple[str, ...]) -> dict[str, int]:
-    """Rows whose value for a logged field is a gap: null or not finite.
-
-    `t_image` is the exception: null there means no new frame (`TraceRow`),
-    so only a non-finite image timestamp is counted. A field in `absent` is
-    left out: it is not logged at all, which is already
-    reported, and counting it here as well would report the same gap twice
-    under two names and tell the engineer to collect it twice.
-    """
-    counts = {name: 0 for name in (*TRACK_FIELDS, *SYNC_FIELDS) if name not in absent}
-    for row in rows:
-        if "t_state" in counts and not math.isfinite(row.t_state):
+    counts = dict.fromkeys((*TRACK_FIELDS, *SYNC_FIELDS), 0)
+    for step in steps:
+        if not _finite(step.t_state):
             counts["t_state"] += 1
-        if "t_image" in counts and row.t_image is not None and not math.isfinite(row.t_image):
+        if step.t_image is not None and not _finite(step.t_image):
             counts["t_image"] += 1
         for name in TRACK_FIELDS:
-            if name not in counts:
-                continue
-            values = getattr(row, name)
-            if not values or not all(math.isfinite(value) for value in values):
+            if not all(_finite(value) for value in getattr(step, name)):
                 counts[name] += 1
     return {name: count for name, count in counts.items() if count}
 
 
-def _matrix(rows: Sequence[TraceRow], name: str) -> NDArray[np.float64]:
-    """One field of every row as a 2-D array, nan for a gap.
-
-    A vector logged as null (or empty) is a cycle with no measurement, so it
-    becomes a row of nan as wide as the others and `_gap_counts` has already
-    counted it; refusing it would stop the reader on exactly the traces a
-    `max_gap_fraction` above zero is meant to let through. Two rows of
-    different non-zero widths cannot be stacked, and a trace that changes its
-    channel count mid-episode is a trace nobody can compute a norm over, so
-    that still raises rather than being padded.
-    """
-    vectors = [getattr(row, name) for row in rows]
-    widths = {len(vector) for vector in vectors} - {0}
-    if not widths:
+def _matrix(steps: Sequence[TraceStep], name: str) -> NDArray[np.float64]:
+    """One vector field of every step as a 2-D array, nan for a gap."""
+    if not steps:
         return np.empty((0, 0), dtype=np.float64)
-    if len(widths) > 1:
-        raise ReaderError(f"`{name}` đổi số kênh giữa episode ({sorted(widths)})")
-    (width,) = widths
-    gap = (math.nan,) * width
-    return np.array([vector or gap for vector in vectors], dtype=np.float64)
+    return np.array(
+        [[_number(value) for value in getattr(step, name)] for step in steps], dtype=np.float64
+    )
 
 
-def _column(rows: Sequence[TraceRow], name: str) -> Values:
-    values = [getattr(row, name) for row in rows]
+def _column(steps: Sequence[TraceStep], name: str) -> Values:
+    """One timestamp of every step, nan for a gap and for a null `t_image`.
+
+    Empty when no step carries a value at all, the way a trace with no new
+    frame anywhere has no image clock to read.
+    """
+    values = [getattr(step, name) for step in steps]
     if not values or all(value is None for value in values):
         return np.empty(0, dtype=np.float64)
-    return np.array([np.nan if value is None else value for value in values], dtype=np.float64)
+    return np.array(
+        [np.nan if value is None else _number(value) for value in values], dtype=np.float64
+    )
+
+
+def _number(value: FloatOrNonFinite) -> float:
+    """A float, nan for the strings `TraceStep` writes a non-finite value as."""
+    return math.nan if isinstance(value, str) else value
+
+
+def _finite(value: FloatOrNonFinite) -> bool:
+    return not isinstance(value, str) and math.isfinite(value)
 
 
 def _read_bytes(path: Path) -> bytes:
@@ -556,7 +471,7 @@ def _infra_status(data: bytes, path: Path, trace: TraceLog, directory: Path) -> 
     ref = result.trace_ref
     if ref is None:
         return result.infra_status
-    if trace.trace_id is not None and ref.trace_id != trace.trace_id:
+    if ref.trace_id != trace.trace_id:
         raise ReaderError(
             f"`{path}` là RolloutResult của trace `{ref.trace_id}`, "
             f"không phải `{trace.trace_id}` của trace bên cạnh"
@@ -574,105 +489,13 @@ def _infra_status(data: bytes, path: Path, trace: TraceLog, directory: Path) -> 
     return result.infra_status
 
 
-def _first_text(rows: list[dict[str, Any]], key: str) -> str | None:
-    for row in rows:
-        value = row.get(key)
-        if isinstance(value, str) and value:
-            return value
-    return None
-
-
 def _of_trace(
-    records: tuple[RTCInferenceRecord, ...], trace: TraceLog, path: Path
+    records: tuple[RTCInferenceRecord, ...], trace: TraceLog
 ) -> tuple[RTCInferenceRecord, ...]:
     """The chunks of this trace in an RTC log that may hold a whole job.
 
     `RTCClient` of DA-19 writes one `rtc.jsonl` per job and tells the traces
     in it apart by `trace_id`, so the log beside a trace can carry the
-    latency of every other episode of the job too. A trace that names no
-    `trace_id` can only take a log that holds one trace; anything else would
-    be picking another episode's latency by guess.
+    latency of every other episode of the job too.
     """
-    if trace.trace_id is not None:
-        return tuple(record for record in records if record.trace_id == trace.trace_id)
-    traces = {record.trace_id for record in records}
-    if len(traces) > 1:
-        raise ReaderError(
-            f"`{path}` chứa log RTC của {len(traces)} trace mà trace không ghi `trace_id`, "
-            f"không biết chunk nào là của episode này"
-        )
-    return records
-
-
-def _step(row: dict[str, Any], path: Path, number: int) -> int:
-    value = row.get("step", number - 1)
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        raise ReaderError(
-            f"`{path}` dòng {number}: `step` phải là số nguyên không âm, gặp {value!r}"
-        )
-    return value
-
-
-def _dropped(value: Any, path: Path, number: int) -> int:
-    if value is None:
-        return 0
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        raise ReaderError(
-            f"`{path}` dòng {number}: `dropped_frames` phải là số nguyên không âm, gặp {value!r}"
-        )
-    return value
-
-
-# The strings `TraceStep` (Contract change #31) encodes a non-finite value as.
-NON_FINITE = ("NaN", "Infinity", "-Infinity")
-
-
-def _scalar(value: Any, name: str, path: Path, number: int) -> float | None:
-    """A number, nan for a non-finite one, or None for a null.
-
-    The two are kept apart because `t_image` gives them different meanings
-    (`TraceRow`); every other field treats both as a gap.
-    """
-    if value is None:
-        return None
-    if isinstance(value, str):
-        if value not in NON_FINITE:
-            raise ReaderError(
-                f"`{path}` dòng {number}: `{name}` phải là số, null hoặc "
-                f"{'/'.join(NON_FINITE)}, gặp {value!r}"
-            )
-        # not a measurement, so it becomes a gap rather than a number
-        return math.nan
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise ReaderError(f"`{path}` dòng {number}: `{name}` phải là số hoặc null, gặp {value!r}")
-    return float(value) if math.isfinite(value) else math.nan
-
-
-def _vector(value: Any, name: str, path: Path, number: int) -> tuple[float, ...]:
-    if value is None:
-        return ()
-    if not isinstance(value, list):
-        raise ReaderError(f"`{path}` dòng {number}: `{name}` phải là danh sách số, gặp {value!r}")
-    scalars = (_scalar(item, name, path, number) for item in value)
-    return tuple(math.nan if item is None else item for item in scalars)
-
-
-def _text(entry: dict[str, Any], key: str, path: Path) -> str:
-    value = entry.get(key)
-    if not isinstance(value, str) or not value.strip():
-        raise ReaderError(f"`{path}`: `{key}` phải là chuỗi khác rỗng, gặp {value!r}")
-    return value
-
-
-def _required_number(entry: dict[str, Any], key: str, path: Path) -> float:
-    value = entry.get(key)
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-        raise ReaderError(f"`{path}`: `{key}` phải là số hữu hạn, gặp {value!r}")
-    return float(value)
-
-
-def _dimension(entry: dict[str, Any], key: str, path: Path) -> int:
-    value = entry.get(key)
-    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-        raise ReaderError(f"`{path}`: `{key}` phải là số nguyên dương, gặp {value!r}")
-    return value
+    return tuple(record for record in records if record.trace_id == trace.trace_id)

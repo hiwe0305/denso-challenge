@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import numpy as np
 from flywheel.contracts.artifacts import RTCInferenceRecord
+from flywheel.contracts.trace import CameraParams
 from flywheel.eval.config import (
     CameraReference,
     R1Thresholds,
@@ -53,7 +54,6 @@ from flywheel.eval.config import (
 from flywheel.eval.diagnosis.system.reader import (
     CAMERA_NAME,
     RTC_NAME,
-    CameraView,
     TraceLog,
     percentile,
 )
@@ -154,7 +154,7 @@ def check_r4(trace: TraceLog, cfg: R4Thresholds) -> CheckResult:
     )
 
 
-def check_r5(cameras: tuple[CameraView, ...], cfg: R5Thresholds) -> CheckResult:
+def check_r5(cameras: tuple[CameraParams, ...], cfg: R5Thresholds) -> CheckResult:
     """The camera parameters of the episode against the reference pinned at G0 (step 5).
 
     The hash first, then the values within tolerance, both for every camera
@@ -221,7 +221,7 @@ def check_r6(infra_status: str | None, cfg: R6Thresholds) -> CheckResult:
 
 
 def _drifted(
-    camera: CameraView, reference: CameraReference, cfg: R5Thresholds
+    camera: CameraParams, reference: CameraReference, cfg: R5Thresholds
 ) -> list[SystemFinding]:
     """Parameters of one camera that moved further than their tolerance allows.
 

@@ -14,6 +14,7 @@ from typing import Any
 
 import pytest
 from flywheel.contracts.artifacts import RTCInferenceRecord
+from flywheel.contracts.trace import CameraParams
 from flywheel.eval.config import (
     CameraReference,
     R1Thresholds,
@@ -25,7 +26,6 @@ from flywheel.eval.config import (
 )
 from flywheel.eval.diagnosis.system.reader import (
     CAMERA_NAME,
-    CameraView,
     read_camera_params,
     read_trace_log,
 )
@@ -61,7 +61,7 @@ def _records(rows: list[dict[str, Any]]) -> tuple[RTCInferenceRecord, ...]:
     return tuple(RTCInferenceRecord.model_validate(row) for row in rows)
 
 
-def _cameras(tmp_path: Path, entry: dict[str, Any]) -> tuple[CameraView, ...]:
+def _cameras(tmp_path: Path, entry: dict[str, Any]) -> tuple[CameraParams, ...]:
     path = tmp_path / CAMERA_NAME
     path.write_text(json.dumps(entry), encoding="utf-8")
     return read_camera_params(path)
