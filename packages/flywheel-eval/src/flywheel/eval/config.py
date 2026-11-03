@@ -314,11 +314,13 @@ class R5Thresholds:
     """Camera calibration against the reference fixed at G0.
 
     Two things can be wrong and they are different faults to report.
-    `reference_sha256` says which reference the episode was calibrated
-    against: an episode calibrated against another reference is not comparable
+    `CameraParams.reference_sha256` is the hash of the G0-pinned reference the
+    episode ran against, copied by the hook from the RunPlan (decision Q3,
+    3/11/2026): an episode run against another reference is not comparable
     with the rest of the run even if its numbers happen to be close. The
-    numbers themselves are then compared within a tolerance, since a render
-    pipeline does not reproduce a float exactly.
+    numbers themselves are then compared with `cameras` within a tolerance,
+    whatever the hash said, since a render pipeline does not reproduce a
+    float exactly.
 
     The tolerances are kept apart because the quantities are: pixels for the
     intrinsics, metres for the camera position, and a unitless quaternion
