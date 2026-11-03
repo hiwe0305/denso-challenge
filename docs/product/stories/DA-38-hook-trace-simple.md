@@ -144,6 +144,7 @@ Hệ quả:
   - Dataset khay của DA-33 và DA-35 không có khóa này, nên `eval-decoupled-wbc --data-format lerobot` lỗi `KeyError` trên mọi episode khay.
   - Test `sim` dùng một shim chỉ trong test: đọc episode như SIMPLE nhưng bỏ dòng đó. Env khay vốn dựng lại episode từ `seed` và `level`.
   - Lượt chạy thật trên task khay (nhiệm vụ 6) cần PO chốt cách xử lý.
+  - **[Đã chốt 3/11/2026, PO]** Vá trong `tray/run.py`: thay `get_episode_lerobot` bằng bản bỏ qua dòng FIXME khi thiếu `dr_state_dict`, cài ở cấp module để có hiệu lực trong worker spawn. Làm bằng hotfix riêng sau PR #65. Nhiệm vụ 6 chạy sau khi hotfix đó merge; khi đó bỏ shim trong test `sim`.
 - Kết quả test `sim` trên `rtx3060` (3/11/2026): **4 passed** trong 637 s.
   - Episode hai bàn mất 27 s. Episode khay mất 605 s, phần lớn do `get_episode_lerobot` của SIMPLE giải mã toàn bộ khung video của episode điều kiện (khoảng 1600 khung).
   - Mỗi task kiểm:
