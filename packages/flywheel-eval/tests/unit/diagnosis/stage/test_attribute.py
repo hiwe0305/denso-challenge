@@ -36,13 +36,8 @@ def test_the_shipped_table_has_every_row_of_the_spec(table: StageTable) -> None:
 def test_p1_wrong_on_the_failure_frames_is_blamed_on_perception(
     table, p1_from, p3_from
 ) -> None:
-    inputs = StageInputs(
-        p1=p1_from(accuracy=0.4),
-        p3=p3_from({"arm": 0.05}),
-        failed_step=2,
-        action_groups=("arm",),
-        frames=("frame_17", "frame_18"),
-    )
+    p1 = p1_from(accuracy=0.4)
+    inputs = StageInputs(p1=p1, p3=p3_from({"arm": 0.05}), failed_step=2, action_groups=("arm",))
 
     attribution = attribute_stage(inputs, table)
 
@@ -50,7 +45,19 @@ def test_p1_wrong_on_the_failure_frames_is_blamed_on_perception(
     hypothesis = attribution.hypotheses[0]
     assert hypothesis.attribute_to == "Stage 1 · nhận thức"
     assert [(item.probe, item.value) for item in hypothesis.evidence] == [("P1", 0.4)]
-    assert "frame_17" in hypothesis.evidence[0].where
+
+
+def test_p1_evidence_names_the_probe_set_not_the_failure_frames(table, p1_from, p3_from) -> None:
+    # `ProbeP1` is a score over the whole probe set (`dataset_sha256`), not
+    # over the frames of this failure; the evidence must say which set it was
+    # and must not claim the probe ran on frames it never saw.
+    p1 = p1_from(accuracy=0.4)
+    inputs = StageInputs(p1=p1, p3=p3_from({"arm": 0.05}), action_groups=("arm",))
+
+    where = attribute_stage(inputs, table).hypotheses[0].evidence[0].where
+
+    assert p1.dataset_sha256 in where
+    assert "khung hình" not in where
 
 
 def test_the_perception_row_consumes_no_budget(table, p1_from, p3_from) -> None:

@@ -62,7 +62,7 @@ import hashlib
 import json
 import math
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -231,7 +231,6 @@ class StageInputs:
     closed_loop_failed: bool = True
     failed_step: int | None = None
     action_groups: tuple[str, ...] = ()
-    frames: tuple[str, ...] = field(default_factory=tuple)
 
 
 TRACE_NAME = "trace.jsonl"
