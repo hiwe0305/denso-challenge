@@ -1,22 +1,59 @@
 {
+  "$defs": {
+    "SeedRange": {
+      "additionalProperties": false,
+      "description": "Half-open seed range [start, stop).",
+      "properties": {
+        "start": {
+          "title": "Start",
+          "type": "integer"
+        },
+        "stop": {
+          "title": "Stop",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start",
+        "stop"
+      ],
+      "title": "SeedRange",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
   "description": "Configuration for dataset split rules, seed ranges, and duplicate guards.",
   "properties": {
     "name": {
+      "default": "default",
       "title": "Name",
       "type": "string"
     },
     "version": {
-      "default": "1.0.0",
-      "title": "Version",
-      "type": "string"
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "default": 1,
+      "title": "Version"
     },
     "seed_ranges": {
       "additionalProperties": {
-        "items": {
-          "type": "integer"
-        },
-        "type": "array"
+        "anyOf": [
+          {
+            "$ref": "#/$defs/SeedRange"
+          },
+          {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        ]
       },
       "title": "Seed Ranges",
       "type": "object"
@@ -42,9 +79,6 @@
       "type": "object"
     }
   },
-  "required": [
-    "name"
-  ],
   "title": "SplitPlanConfig",
   "type": "object"
 }

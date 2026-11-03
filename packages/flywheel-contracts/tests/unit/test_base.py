@@ -3,13 +3,9 @@
 import re
 from typing import Any
 
-import pytest
-from hypothesis import given
-from hypothesis import strategies as st
-
 from flywheel.contracts.base import (
-    BaseRecord,
     CROCKFORD_BASE32,
+    BaseRecord,
     canonical_json,
     content_id,
     event_id,
@@ -17,6 +13,8 @@ from flywheel.contracts.base import (
     is_valid_event_id,
     new_ulid,
 )
+from hypothesis import given
+from hypothesis import strategies as st
 
 
 def test_base_record_default_columns() -> None:
@@ -94,12 +92,17 @@ def test_content_id_ignores_existing_id() -> None:
 
 
 # Property-based testing with hypothesis
-json_primitives = st.none() | st.booleans() | st.integers(min_value=-10000, max_value=10000) | st.text(max_size=30)
+json_primitives = (
+    st.none()
+    | st.booleans()
+    | st.integers(min_value=-10000, max_value=10000)
+    | st.text(max_size=30)
+)
 
 
 @given(st.dictionaries(st.text(min_size=1, max_size=10), json_primitives, max_size=10))
 def test_hypothesis_canonical_json_permutation_invariant(d: dict[str, Any]) -> None:
-    """Hypothesis property: Permuting dictionary keys never changes canonical JSON or content ID."""
+    """Hypothesis property: Permuting dict keys never changes canonical JSON or content ID."""
     keys = list(d.keys())
     reversed_dict = {k: d[k] for k in reversed(keys)}
 

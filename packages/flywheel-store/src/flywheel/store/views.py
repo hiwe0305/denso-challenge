@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Sequence
+from collections.abc import Sequence
 
 import duckdb
-
 from flywheel.store.paths import StorePaths
 
 CATALOG_TABLES: Sequence[str] = (
@@ -40,7 +38,8 @@ def init_views(con: duckdb.DuckDBPyConnection, paths: StorePaths) -> None:
 
         pattern = (table_dir / "*.jsonl").as_posix()
         con.execute(
-            f"CREATE OR REPLACE VIEW {table_name} AS SELECT * FROM read_json('{pattern}', union_by_name=true)"
+            f"CREATE OR REPLACE VIEW {table_name} AS "
+            f"SELECT * FROM read_json('{pattern}', union_by_name=true)"
         )
 
     # 2. Cost ledger from runs/**/ledger*.jsonl
@@ -55,7 +54,8 @@ def init_views(con: duckdb.DuckDBPyConnection, paths: StorePaths) -> None:
 
     ledger_pattern = (runs_dir / "**/ledger*.jsonl").as_posix()
     con.execute(
-        f"CREATE OR REPLACE VIEW ledger_entry AS SELECT * FROM read_json('{ledger_pattern}', union_by_name=true)"
+        "CREATE OR REPLACE VIEW ledger_entry AS "
+        f"SELECT * FROM read_json('{ledger_pattern}', union_by_name=true)"
     )
 
 

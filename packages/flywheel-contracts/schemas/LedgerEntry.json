@@ -82,13 +82,24 @@
       "type": "number"
     },
     "measure_kind": {
-      "default": "measured",
       "enum": [
         "estimated",
         "measured"
       ],
       "title": "Measure Kind",
       "type": "string"
+    },
+    "estimate_entry_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Estimate Entry Id"
     },
     "branch": {
       "anyOf": [
@@ -192,7 +203,8 @@
     "resource_type",
     "quantity",
     "unit",
-    "usd_amount"
+    "usd_amount",
+    "measure_kind"
   ],
   "title": "LedgerEntry",
   "type": "object"

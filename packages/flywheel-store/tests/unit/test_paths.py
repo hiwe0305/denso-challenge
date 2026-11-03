@@ -1,10 +1,8 @@
 """Unit tests for StorePaths and store directory layout (AC 5)."""
 
-import os
 from pathlib import Path
 
 import pytest
-
 from flywheel.store.paths import StorePaths, get_fw_root
 
 

@@ -39,11 +39,7 @@
         "aa_test",
         "holdout",
         "milestone",
-        "repair_ticket",
-        "stage_review",
-        "agent_report_review",
-        "v3_controller",
-        "scope_reduction"
+        "repair_ticket"
       ],
       "title": "Kind",
       "type": "string"

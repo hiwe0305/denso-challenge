@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any
 
 from flywheel.contracts.base import BaseRecord, canonical_json, new_ulid
@@ -69,7 +68,7 @@ def read_table_records(
 
     records: list[dict[str, Any]] = []
     for file_path in sorted(table_dir.glob("part-*.jsonl")):
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if line:
