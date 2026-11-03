@@ -1,5 +1,6 @@
 """Unit tests for DefectManifest, clean dataset, and release barrier (AC 3, AC 4, AC 5)."""
 
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from flywheel.data.inject.codes import DATA_DEFECT_CODES
 from flywheel.data.inject.config import InjectConfig, load_inject_config
 from flywheel.data.inject.data_defects import EpisodeData
 from flywheel.data.inject.dataset import (
+    copy_ids,
     create_clean_dataset,
     create_defect_dataset,
     get_dataset_refs,
@@ -74,9 +76,10 @@ def test_create_defect_and_clean_dataset() -> None:
     injected_count = sum(1 for ep in injected if ep.meta.injected_defect is not None)
     assert injected_count == len(manifest.defects)
 
-    # Clean dataset has same size, no defect metadata
-    clean = create_clean_dataset(injected)
+    # Clean dataset is a fresh copy of the originals, same size, no defect metadata
+    clean, clean_manifest = create_clean_dataset(episodes)
     assert len(clean) == 20
+    assert clean_manifest.defects == []
     assert all(ep.meta.injected_defect is None for ep in clean)
 
 
@@ -89,7 +92,7 @@ def test_release_barrier_blocks_injected_episodes() -> None:
         verify_release_barrier(injected)
 
     # Clean dataset passes through barrier
-    clean = create_clean_dataset(injected)
+    clean, _ = create_clean_dataset(episodes)
     passed = verify_release_barrier(clean)
     assert len(passed) == 40
 
@@ -196,3 +199,33 @@ def test_too_few_eligible_episodes_names_the_kind() -> None:
         ep.actions = [[0.0] * 36 for _ in ep.actions]
     with pytest.raises(ValueError, match="unit_deg_rad"):
         create_defect_dataset(episodes)
+
+
+NEUTRAL_ID = re.compile(r"^bench-[0-9a-f]{12}$")
+
+
+def test_copy_ids_are_neutral_and_share_one_format() -> None:
+    defect_id, clean_id = copy_ids(42)
+    assert NEUTRAL_ID.match(defect_id) and NEUTRAL_ID.match(clean_id)
+    assert defect_id != clean_id
+    assert copy_ids(42) == (defect_id, clean_id)
+    assert copy_ids(43) != (defect_id, clean_id)
+
+
+def test_only_the_manifests_tell_the_copies_apart() -> None:
+    # The agent sees dataset ids; only the scorer reads which manifest has defects.
+    episodes = _make_episodes(40)
+    _, defect_manifest = create_defect_dataset(episodes)
+    _, clean_manifest = create_clean_dataset(episodes)
+    assert {defect_manifest.dataset_id, clean_manifest.dataset_id} == set(copy_ids(42))
+    assert defect_manifest.defects and not clean_manifest.defects
+    assert defect_manifest.seed == clean_manifest.seed == 42
+
+
+def test_revealing_dataset_ids_are_rejected() -> None:
+    episodes = _make_episodes(40)
+    for name in ("ds_psi_data_injected", "bench-Defect-1"):
+        with pytest.raises(ValueError, match="reveals"):
+            create_defect_dataset(episodes, dataset_id=name)
+    with pytest.raises(ValueError, match="reveals"):
+        create_clean_dataset(episodes, dataset_id="ds_psi_data_clean")
