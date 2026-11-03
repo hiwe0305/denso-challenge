@@ -12,18 +12,39 @@ from flywheel.data.inject.config import InjectConfig
 from flywheel.data.inject.data_defects import DataDefectInjector, EpisodeData, NotApplicable
 from flywheel.data.inject.manifest import manifest_sha256
 
+_REVEALING_WORDS = ("clean", "defect", "inject", "pristine", "dirty")
+
+
+def copy_ids(seed: int) -> tuple[str, str]:
+    """Neutral ids of the defect copy and the clean copy, in that order.
+
+    Both share one format so the agent under test cannot tell the copies apart; which id
+    holds defects is recorded only in the DefectManifest that the scorer reads.
+    """
+    rng = random.Random(f"benchmark-copy-ids:{seed}")
+    first, second = (f"bench-{rng.getrandbits(48):012x}" for _ in range(2))
+    return first, second
+
+
+def _neutral(dataset_id: str) -> str:
+    if any(word in dataset_id.lower() for word in _REVEALING_WORDS):
+        raise ValueError(f"dataset_id {dataset_id!r} reveals which benchmark copy it is")
+    return dataset_id
+
 
 def create_defect_dataset(
     episodes: Sequence[EpisodeData],
-    dataset_id: str = "ds_psi_data_injected",
+    dataset_id: str | None = None,
     config: InjectConfig | None = None,
 ) -> tuple[list[EpisodeData], DefectManifest]:
     """Create a defective benchmark dataset by injecting faults into an episode copy.
 
     Each data defect kind goes into exactly `episodes_per_kind` distinct episodes
     (PO decision 3/11/2026: 3 per kind, 33 of 99). Never modifies original episodes.
+    `dataset_id` defaults to the first of `copy_ids(seed)`.
     """
     cfg = config or InjectConfig()
+    dataset_id = _neutral(dataset_id or copy_ids(cfg.seed)[0])
     rng = random.Random(cfg.seed)
     injector = DataDefectInjector(cfg.data, rng_seed=cfg.seed)
 
@@ -95,13 +116,20 @@ def create_defect_dataset(
 
 def create_clean_dataset(
     episodes: Sequence[EpisodeData],
-    dataset_id: str = "ds_psi_data_clean",
-) -> list[EpisodeData]:
-    """Create a paired pristine clean dataset of identical size for false positive baseline."""
+    dataset_id: str | None = None,
+    config: InjectConfig | None = None,
+) -> tuple[list[EpisodeData], DefectManifest]:
+    """Create a paired pristine clean dataset of identical size for false positive baseline.
+
+    Pass the original episodes. The empty DefectManifest is what marks this copy as the
+    clean one for the scorer; `dataset_id` defaults to the second of `copy_ids(seed)`.
+    """
+    cfg = config or InjectConfig()
+    dataset_id = _neutral(dataset_id or copy_ids(cfg.seed)[1])
     clean = [copy.deepcopy(ep) for ep in episodes]
     for ep in clean:
         ep.meta = ep.meta.model_copy(update={"injected_defect": None})
-    return clean
+    return clean, DefectManifest(dataset_id=dataset_id, seed=cfg.seed, defects=[])
 
 
 def verify_release_barrier(episodes: Sequence[EpisodeData]) -> list[EpisodeData]:
