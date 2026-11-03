@@ -212,6 +212,51 @@ def test_load_episode_finds_the_files_beside_the_trace(
     assert inputs.infra_status == "ok"
 
 
+def _write_episode(folder: Path, trace_rows, rtc) -> None:
+    (folder / "trace.jsonl").write_text(
+        "".join(json.dumps(item) + "\n" for item in trace_rows), encoding="utf-8"
+    )
+    (folder / "rtc.jsonl").write_text(
+        "".join(json.dumps(item) + "\n" for item in rtc), encoding="utf-8"
+    )
+
+
+def test_a_job_wide_rtc_log_is_filtered_to_the_trace(tmp_path: Path, clean_rows, rtc_rows) -> None:
+    # `RTCClient` of DA-19 writes one `rtc.jsonl` per job for every trace in
+    # it; the latency of another episode is not this episode's latency.
+    other = [{**record, "trace_id": "trace_2", "chunk_received_s": 9.0} for record in rtc_rows]
+    _write_episode(tmp_path, clean_rows, [*rtc_rows, *other])
+
+    inputs = load_episode(tmp_path)
+
+    assert inputs.trace.trace_id == "trace_1"
+    assert len(inputs.rtc) == len(rtc_rows)
+    assert {record.trace_id for record in inputs.rtc} == {"trace_1"}
+
+
+def test_an_rtc_log_with_no_chunk_of_the_trace_costs_r1_and_r2(
+    tmp_path: Path, clean_rows, rtc_rows
+) -> None:
+    other = [{**record, "trace_id": "trace_2"} for record in rtc_rows]
+    _write_episode(tmp_path, clean_rows, other)
+
+    inputs = load_episode(tmp_path)
+
+    assert inputs.has_rtc_log
+    assert inputs.rtc == ()
+
+
+def test_a_trace_without_an_id_cannot_pick_from_a_job_wide_log(
+    tmp_path: Path, clean_rows, rtc_rows
+) -> None:
+    unnamed = [{key: item[key] for key in item if key != "trace_id"} for item in clean_rows]
+    other = [{**record, "trace_id": "trace_2"} for record in rtc_rows]
+    _write_episode(tmp_path, unnamed, [*rtc_rows, *other])
+
+    with pytest.raises(ReaderError, match="trace_id"):
+        load_episode(tmp_path)
+
+
 def test_an_episode_without_the_optional_files_still_loads(tmp_path: Path, clean_rows) -> None:
     (tmp_path / "trace.jsonl").write_text(
         "".join(json.dumps(item) + "\n" for item in clean_rows), encoding="utf-8"
