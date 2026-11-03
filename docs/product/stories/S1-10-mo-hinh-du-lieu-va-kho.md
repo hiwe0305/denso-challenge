@@ -103,10 +103,11 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 03/11/2026 | Sửa 7 điểm feedback review của Hiếu trên PR #36: LedgerEntry hai dòng, tái sử dụng Episode/QAReport, kiểm tra schema, type action_layout, SplitPlanConfig | Nguyễn Thăng Long |
 | 03/11/2026 | Sửa 2 lỗi chặn merge (episode_id catalog theo DA-25, DuckDB view khi kho rỗng) và hoàn thiện Issue #62 (benchmark_copy_id, Score task_id/config_sha256, path traversal guard, TableWriter validation) | Nguyễn Thăng Long |
 | 03/11/2026 | Thêm nhiệm vụ 8, sửa 6 điểm review PO sau `8458371`: `Score.task_id` bắt buộc, thêm `Score.trace_sha256`, view lọc trùng theo `id`, sổ chi phí kiểm dòng được trỏ tới, `blob_path` chỉ nhận sha256, bốn file mẫu chung; thêm 8.7 (kiểu cột `X \| None` của view) và 8.8 (kiểm đoạn đường dẫn, `site`, tên bảng). AC không đổi | Hiếu (cùng Claude) |
+| 03/11/2026 | Quyết định PO D1–D4 ("Chốt theo đề xuất"): D1, ghi lại một `id` với nội dung khác bị từ chối (8.9); D2, sổ chi phí tra dòng được trỏ tới trên cả site, không chỉ trong job (giữ như 8.4); D3, `Score.id` giữ là hash của cả bản ghi, gồm `config_sha256`; 03 mục 4.3 (`sc_<hash trace + scorer_version>`) sẽ sửa cho khớp ở một PR tài liệu riêng, story này không sửa 03; D4, `LedgerEntry.run_plan_id` luôn bắt buộc, dòng `measured` bắt buộc thêm `job_id` (8.10). AC không đổi | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
-- Giờ thực: 15.9h (12.5h của Long; 3.4h nhiệm vụ 8 do Hiếu cùng Claude làm ngày 3/11/2026)
+- Giờ thực: 17.1h (12.5h của Long; 4.6h nhiệm vụ 8 do Hiếu cùng Claude làm ngày 3/11/2026)
 - Công cụ AI đã dùng: Antigravity
 - Ghi chú hoàn thành: Đã hiện thực đầy đủ BaseRecord, 12 thực thể L0-lite, 4 cấu hình YAML, StorePaths, sha256 blobs, TableWriter, tự tạo view DuckDB khi kết nối, LedgerStore và xuất JSON Schema. Sửa theo toàn bộ 7 mục góp ý của Hiếu trên PR #36. Tất cả test unit và e2e đều đạt.
 - File đã tạo hoặc sửa:
