@@ -69,5 +69,5 @@ def test_async_on_a_simulator_without_rtc_log_does_not_pass(tmp_path: Path) -> N
     with FakePolicy().serve(CheckpointRef(checkpoint_id="base"), "cpu") as endpoint:
         result = Runner(sim, tmp_path).run_rollout(request, endpoint)
 
-    assert result.infra_status == "policy_error"
+    assert result.infra_status == "ok"  # the sim and the policy ran fine
     assert result.timing_verdict == "not_checked"
