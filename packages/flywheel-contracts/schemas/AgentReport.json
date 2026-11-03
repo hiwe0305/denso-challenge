@@ -108,7 +108,7 @@
           "type": "string"
         },
         "code": {
-          "minLength": 1,
+          "pattern": "^(D[1-8]|T[1-8]|O[1-4]|R[1-6])$",
           "title": "Code",
           "type": "string"
         },

@@ -15,6 +15,8 @@ from pydantic import Field, model_validator
 from typing_extensions import Self
 
 FACT_ID = r"^F[0-9]+$"
+# Error codes of design 27/10/2026 section 10 (issue #34): data, train, offline, runtime.
+FINDING_CODE = r"^(D[1-8]|T[1-8]|O[1-4]|R[1-6])$"
 _PLACEHOLDER = re.compile(r"\{(F[0-9]+)\}")
 
 Stage = Literal["dataset", "train", "stage1", "stage3", "inference", "eval"]
@@ -68,7 +70,7 @@ class AgentFinding(Artifact):
     """A specific problem or observation identified by the agent."""
 
     finding_id: str = Field(min_length=1)
-    code: str = Field(min_length=1)
+    code: str = Field(pattern=FINDING_CODE)
     rank: int = Field(ge=1)
     target_ref: str = Field(min_length=1)
     evidence: list[str] = Field(min_length=1)

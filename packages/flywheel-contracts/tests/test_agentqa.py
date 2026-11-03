@@ -117,6 +117,35 @@ def test_vault_isolation_checks() -> None:
     assert "vault" in str(exc2.value)
 
 
+@pytest.mark.parametrize("code", ["D1", "D8", "T1", "T8", "O1", "O4", "R1", "R6"])
+def test_finding_code_accepts_design_section_10_codes(code: str) -> None:
+    finding = AgentFinding(
+        finding_id="f1",
+        code=code,
+        rank=1,
+        target_ref="ep1",
+        evidence=["F1"],
+        insight="test",
+        suggestion="test",
+    )
+    assert finding.code == code
+
+
+@pytest.mark.parametrize("code", ["Z99", "D0", "D9", "T9", "O5", "R7", "d1", "D1 ", "D10", ""])
+def test_finding_code_refuses_codes_outside_design_section_10(code: str) -> None:
+    with pytest.raises(ValidationError) as exc:
+        AgentFinding(
+            finding_id="f1",
+            code=code,
+            rank=1,
+            target_ref="ep1",
+            evidence=["F1"],
+            insight="test",
+            suggestion="test",
+        )
+    assert "code" in str(exc.value)
+
+
 def test_estimate_ordering_check() -> None:
     with pytest.raises(ValidationError) as exc:
         AgentEstimate(
