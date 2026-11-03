@@ -33,6 +33,7 @@ from dataclasses import asdict, dataclass
 from typing import Any, Literal
 
 import numpy as np
+from numpy.typing import NDArray
 
 from flywheel_simple.tray.predicates import STEP_NAMES
 from flywheel_simple.tray.s2.parents import ParentDemo
@@ -91,7 +92,7 @@ class Segmentation:
         )
 
 
-def walking_runs(navigate: np.ndarray) -> tuple[tuple[int, int], ...]:
+def walking_runs(navigate: NDArray[np.float64]) -> tuple[tuple[int, int], ...]:
     """[start, end) frame runs in which the sticks keep the lower body walking."""
     moving = np.linalg.norm(navigate[:, :3], axis=1) >= WALK_FLAG
     edges = np.diff(np.r_[0, moving.astype(np.int8), 0])
@@ -99,7 +100,7 @@ def walking_runs(navigate: np.ndarray) -> tuple[tuple[int, int], ...]:
     return tuple((int(a), int(b)) for a, b in zip(starts, ends))
 
 
-def first_frames(steps: np.ndarray) -> tuple[int | None, ...]:
+def first_frames(steps: NDArray[np.bool_]) -> tuple[int | None, ...]:
     out: list[int | None] = []
     for k in range(steps.shape[1]):
         hits = np.flatnonzero(steps[:, k])
