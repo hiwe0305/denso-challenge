@@ -1,0 +1,8 @@
+date,activity,resource_type,quantity,unit,unit_price_usd,amount_usd,estimated_or_measured,branch,round,job,person,note
+2026-10-27,psi0_repro,engineer_time,28,hour,0.0,0.0,estimated,g0,0,job_s103_est,eng_lead_01,Story estimate for S1-03 (bản 27/10: 28 h)
+2026-11-03,psi0_eval_two_table_isaac,gpu_local_rtx3060,12,hour,0.0,0.0,estimated,g0,0,job_s103_isaac_est,eng_lead_01,90 episodes mujoco_isaac x 6-10 min (Psi0 README); range 9-15 h; needs a GPU >= 16 GB with RT cores
+2026-11-03,psi0_serve,gpu_local_rtx3060,2.3,hour,0.0,0.0,measured,g0,0,job_s103_serve,eng_lead_01,Psi0 server container 10:30-12:48 (two-table ckpt); 7.2 GB VRAM; ~6 GB RSS
+2026-11-03,psi0_eval_two_table_mujoco,gpu_local_rtx3060,0.83,hour,0.0,0.0,measured,g0,0,job_s103_eval_mujoco,eng_lead_01,50 episodes mujoco (L0 30; L1 10; L2 10) ~60 s each; client peak 3.3 GiB RAM; 0/50 success
+2026-11-03,psi0_eval_two_table_isaac_trials,gpu_local_rtx3060,0.4,hour,0.0,0.0,measured,g0,0,job_s103_isaac_trials,eng_lead_01,3 failed mujoco_isaac trials (Kit cache; RAM cap 20 GiB; Vulkan OOM with server on the same 12 GB card); against job_s103_isaac_est
+2026-11-03,psi0_openloop_check,gpu_local_rtx3060,0.05,hour,0.0,0.0,measured,g0,0,job_s103_openloop,eng_lead_01,mock_psi0_client_openloop on 3 train episodes; stride 5; 390 /act calls
+2026-11-03,psi0_repro,engineer_time,2.75,hour,0.0,0.0,measured,g0,0,job_s103_exec,eng_lead_01,Sum of Time-spent of subtasks 8; 2.1; 2.2; 7 committed on 3/11/2026; against job_s103_est

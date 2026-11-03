@@ -9,6 +9,8 @@ _Kết quả của story [S1-03](../product/stories/S1-03-tai-tao-danh-gia-psi0.
 | 1.3 Câu hỏi provenance cho PSI Lab | Chưa |
 | 2.1–2.2 Môi trường và script serve | Xong 3/11/2026 trên máy 3060: serve checkpoint task hai bàn, smoke 30 lần `/act` đạt (mục 2.6) |
 | 2.3–5 Đo VRAM, độ trễ, đánh giá, độ không tất định | Chưa; cần máy 5090 |
+| 6 Task hai bàn ở `mujoco_isaac` (AC 9) | Chưa: server Ψ₀ và Isaac Sim không cùng vừa card 12 GB; chờ Hiếu chọn GPU (mục 3.4) |
+| 7 Task hai bàn ở `mujoco` (AC 10) | Chạy xong 3/11/2026: 0/30 Level 0, 0/10 Level 1, 0/10 Level 2; open-loop xác nhận server đúng; kết luận Q-27C tạm (mục 3) |
 | 8 Checkpoint ablation của HE (AC 11) | Liệt kê xong 3/11/2026 (mục 4); câu hỏi Q-27E chờ Hiếu gửi PSI Lab |
 
 ## 1. Q0 · Checkpoint trong `psi0/`
@@ -197,6 +199,61 @@ bash scripts/g0/eval_psi0.sh smoke --calls 30
 | Độ trễ `/act` (ảnh và state bằng 0, cùng máy) | Lần đầu 2,46 s (khởi động); 29 lần sau: trung vị 0,41 s, lớn nhất 0,52 s |
 
 Độ trễ trên là của smoke, chưa phải chu kỳ thật trong SIMPLE; p99 cho τ_lat lấy từ lượt eval (nhiệm vụ con 2.3). Docker `mem_limit` của server đặt 16 GiB (`PSI0_MEM_LIMIT`): `systemd-run --scope` chỉ giới hạn tiến trình `docker` phía client, không giới hạn container chạy dưới `dockerd`.
+
+## 3. Task hai bàn `G1WholebodyLocomotionPickBetweenTablesTeleop-v0` (AC 9, 10)
+
+Chạy 3/11/2026 trên máy 3060. Server như mục 2.6. Client là `eval-decoupled-wbc` của SIMPLE, agent `psi0_decoupled_wbc`, chạy trong image công bố của SIMPLE ghim theo digest `ghcr.io/physical-superintelligence-lab/simple@sha256:38a674039f413ca171d5f8f841c2b9a9d67771fdaf7bcc73c4777fdfcb7a561f` (tag `latest` ngày 3/11/2026, dựng 30/08/2026). Image có Isaac Sim 4.5; `mujoco` và `mujoco_isaac` dùng cùng một bản SIMPLE. `eval_decoupled_wbc.py` và `psi0_decoupled_wbc.py` trong image giống hệt bản SIMPLE `6d10628` của đội (md5).
+
+```bash
+export FW_UID=$(id -u) FW_GID=$(id -g) RUN=<run hai bàn như mục 2.6>
+export SIMPLE_ASSETS=<thư mục data/ của SIMPLE có assets, robots, scenes>
+bash scripts/g0/eval_psi0.sh run --level 0 --sim-mode mujoco --episodes 10 --pass 1
+```
+
+Mỗi lần chạy ghi `fwdata/simple/s103/runs/<mode>/level-<L>/pass-<K>/ep<S>-<E>/` gồm `summary.json` (kết quả từng episode, revision checkpoint, commit Ψ₀, revision `psi-data`, digest image SIMPLE, exec horizon, RTC), `eval_stats.txt`, `client.log` và video camera đầu.
+
+### 3.1 Điều kiện eval công bố chỉ có 10 mỗi mức
+
+`psi-data` revision `de140d67ba77a541f2a58354f7edf4e2480b7c56`, file `simple-eval/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` (690 kB) có bốn thư mục LeRobot v2.1 `dr-level-0`, `dr-level-1`, `dr-level-2`, `dr-level-hard`, **mỗi thư mục 10 điều kiện**. Số công bố 7/5/6 là trên đúng 10 điều kiện này. "30 lượt mỗi mức" của AC 9, 10 vì vậy là 3 lượt lặp (`--pass 1..3`) trên cùng 10 điều kiện; policy lấy mẫu flow nên mỗi lượt lặp cho kết quả khác. Các lượt lặp không độc lập theo điều kiện, nên kiểm nhị thức dưới đây lạc quan về độ chắc [Đề xuất: Hiếu chọn giữ cách này hay sinh thêm 20 điều kiện mỗi mức bằng domain randomization của SIMPLE].
+
+### 3.2 Kết quả `mujoco` (AC 10)
+
+| Mức | Thành công | Wilson 95% | Công bố (`mujoco_isaac`, 10 lượt) | p một phía, H0: p ≥ số công bố | Giờ máy |
+|---|---|---|---|---|---|
+| Level 0 | 0/30 (3 lượt × 10 điều kiện) | [0%, 11%] | 7/10 | 2 × 10⁻¹⁶ | 30 phút |
+| Level 1 | 0/10 | [0%, 28%] | 5/10 | 0,001 | 10 phút |
+| Level 2 | 0/10 | [0%, 28%] | 6/10 | 0,0001 | 10 phút |
+
+Kiểm Fisher một phía cho Level 0, 0/30 ở `mujoco` so với 7/10 công bố: p = 6 × 10⁻⁶. Mỗi episode `mujoco` khoảng 60 s (1 200 bước, 50 lần `/act`); client dùng đỉnh 3,3 GiB RAM.
+
+Hình ảnh: ở `mujoco` cảnh là bàn xám, sàn ô bàn cờ, vật màu trắng không texture, khác xa ảnh Isaac của cảnh HSSD mà checkpoint được train. Trong video, robot vẫn đi giữa hai bàn và đưa tay về phía vật, nhưng không lần nào nắm được vật và mang sang bàn 2.
+
+### 3.3 Kiểm open-loop: server và checkpoint đúng
+
+Để tách "renderer khác" khỏi "pipeline hỏng", chạy `psi.deploy.mock_psi0_client_openloop` của Ψ₀ (cùng image, cùng server) trên ba episode train của `psi-data/simple/G1WholebodyLocomotionPickBetweenTablesTeleop-v0` (ảnh Isaac), mỗi 5 khung một lần, so chunk dự đoán với action ghi lại (L1 sau khi bỏ chuẩn hóa, bước đầu của chunk):
+
+| Episode | Khung | Tay | Cánh tay | Thân rpy | vx | vy | vyaw | RTT ấm |
+|---|---|---|---|---|---|---|---|---|
+| 0 | 117 | 0,080 | 0,096 | 0,042 | 0,070 | 0,036 | 0,274 | 358 ms |
+| 1 | 133 | 0,103 | 0,091 | 0,052 | 0,061 | 0,026 | 0,225 | 345 ms |
+| 2 | 140 | 0,063 | 0,065 | 0,042 | 0,058 | 0,025 | 0,213 | 345 ms |
+
+Theo thời gian, sai số gần 0 ở phần lớn episode và chỉ vọt lên ở các lúc chuyển pha (bắt đầu nắm, thả, bắt đầu và dừng đi); sai số tay bằng 0 suốt lúc giữ vật. Như vậy server, trọng số, chuẩn hóa và giao thức tái tạo đúng action của dữ liệu train khi ảnh là ảnh Isaac. Open-loop không kiểm phía client SIMPLE (ghép state, ánh xạ action, WBC); phần đó chỉ được kiểm khi có lượt `mujoco_isaac` đạt gần số công bố. Báo cáo: `fwdata/psi0/openloop/openloop_eps{0,1,2}_train.{json,png}` trên máy 3060.
+
+### 3.4 `mujoco_isaac` (AC 9): chưa chạy được trên card 12 GB
+
+| Thử | Kết quả |
+|---|---|
+| Client Isaac, container không root, không có thư mục cache của Kit | Treo sau `app ready`: Kit không tạo được cache shader trong venv của image. Sửa: `eval_psi0.sh` mount thư mục cache, data, log của Kit và `HOME` ra máy chủ |
+| Client Isaac, giới hạn RAM 20 GiB | Bị kill (mã 137) lúc nạp cảnh, RAM chạm 20 GiB |
+| Client Isaac, giới hạn RAM 32 GiB, cùng card với server Ψ₀ | Isaac báo `ERROR_OUT_OF_DEVICE_MEMORY` (Vulkan) khi card đã dùng 11,8 GB: server 7,2 GB, Isaac hơn 4,6 GB. RAM client 21,6 GiB. Không có lần `/act` nào |
+| Server Ψ₀ trên CPU để nhường GPU cho Isaac | Không được: `serve_psi0_simple` đòi CUDA, và VLM gọi thẳng `flash_attn` (không có kernel CPU). CPU Xeon E5-2697A v4 cũng không có bf16 |
+
+Kết luận: trên máy 3060, server Ψ₀ và client Isaac không cùng chạy được. Cần một GPU có RT core và ≥ 16 GB (ví dụ 24 GB), hoặc tách server sang máy khác. Hiếu chọn [Đề xuất, theo thứ tự]: (a) máy 5090 của đội nếu còn; (b) thuê một GPU 24 GB có RT core (RTX 4090, L40S; A100 không có RT core nên Isaac không render được) chạy cả hai image; (c) server Ψ₀ trên Colab L4 hoặc A100 qua tunnel, client Isaac trên 3060 (dữ liệu demo là `public`, design mục 8.4). Ước lượng 90 episode × 6–10 phút (README Ψ₀) = 9–15 giờ máy, chưa đo.
+
+### 3.5 Trả lời Q-27C [Đề xuất, tạm]
+
+Không: ở `mujoco`, checkpoint của tác giả không giữ được thành công (0/50 trên ba mức, so với 7/5/6 công bố ở `mujoco_isaac`). Kiểm open-loop cho thấy server đúng, nên nguyên nhân nhiều khả năng là khác biệt ảnh giữa render MuJoCo và Isaac. Đề xuất cho HE: giữ mặc định của design mục 4.2 (ảnh train và ảnh eval đều render Isaac; eval ở `mujoco_isaac`), không chuyển sang `mujoco`. Kết luận còn "tạm" cho tới khi có lượt `mujoco_isaac` của chính đội đạt gần 7/5/6 bằng cùng pipeline (mục 3.4); nếu lượt đó cũng hỏng thì lỗi ở phía client và kết luận trên phải xét lại.
 
 ## 4. Checkpoint ablation của thí nghiệm HE (AC 11, nhiệm vụ con 8)
 
