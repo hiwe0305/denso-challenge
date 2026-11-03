@@ -297,9 +297,19 @@ def _read_yaml(path: Path) -> tuple[bytes, Mapping[str, Any]]:
 
     One read serves both answers, so the hash in an artifact can only ever name
     the file that run actually read (AC 5; DA-08 AC 3, 4).
+
+    A file that is not there and a file that is not YAML both come back as a
+    `ConfigError`, so the command that asked for it can say what it could not
+    do rather than hand the engineer a traceback (review of #58, point 5).
     """
-    raw = path.read_bytes()
-    parsed = yaml.safe_load(raw.decode("utf-8"))
+    try:
+        raw = path.read_bytes()
+    except OSError as error:
+        raise ConfigError(f"`{path}` không đọc được: {error}") from error
+    try:
+        parsed = yaml.safe_load(raw.decode("utf-8"))
+    except (UnicodeDecodeError, yaml.YAMLError) as error:
+        raise ConfigError(f"`{path}` không phải YAML đọc được: {error}") from error
     if not isinstance(parsed, Mapping):
         kind = type(parsed).__name__
         raise ConfigError(f"`{path}` must hold a mapping of sections, got {kind}")
