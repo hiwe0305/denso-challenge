@@ -52,7 +52,7 @@ Khi tài liệu mâu thuẫn: spec và design thắng PRD (02); 03 thắng mọi
 - Dữ liệu `restricted` hoặc `internal` (mọi dữ liệu DENSO) **không bao giờ** gửi tới API hosted bên ngoài, kể cả Colab; chỉ NIM tự host. Dữ liệu của demo (psi-data, sim G1) là `public` (design mục 8.4).
 - Bản sao có lỗi cấy (`injected_defect`) không bao giờ vào release train; đáp án `DefectManifest` chỉ bộ chấm đọc.
 - Video egocentric phải qua bước che danh tính trước mọi bước xử lý khác.
-- Mọi job sinh `LedgerEntry`. Ước tính và thực đo là hai trường riêng.
+- Mọi job sinh `LedgerEntry`. Ước tính và thực đo là hai dòng riêng (`measure_kind`), không ghi đè nhau; dòng thực đo trỏ về dòng ước tính.
 
 ## Ngôn ngữ và văn phong
 
