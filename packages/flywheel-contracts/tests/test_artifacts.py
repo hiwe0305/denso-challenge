@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 from flywheel.contracts import artifacts
-from flywheel.contracts.v0 import Condition, RolloutRequest, TaskRef
+from flywheel.contracts.v0 import Condition, RolloutRequest, RolloutResult, TaskRef
 from flywheel.testkit.fakes.llm import FakeLLM
 from pydantic import ValidationError
 
@@ -67,6 +67,49 @@ def test_async_rollout_requires_latency_profile() -> None:
         json.loads((SCHEMAS / "RolloutRequest.json").read_text(encoding="utf-8"))
         == RolloutRequest.model_json_schema()
     )
+
+
+def _rollout_result(**timing: object) -> RolloutResult:
+    return RolloutResult.model_validate(
+        {
+            "job_id": "job",
+            "trace_ref": None,
+            "sim_success": True,
+            "infra_status": "ok",
+            "usage": {"wall_seconds": 1.0},
+            "camera_params_hash": None,
+            "adapter_info": {"name": "fake", "version": "0"},
+            **timing,
+        }
+    )
+
+
+def test_rollout_result_timing_verdict_round_trips_next_to_sim_success() -> None:
+    sample = (FIXTURES / "RolloutResult.json").read_text(encoding="utf-8")
+    value = RolloutResult.model_validate_json(sample)
+    assert value.sim_success is True
+    assert value.timing_verdict == "starved"
+    assert value.starved_steps == 3
+    assert RolloutResult.model_validate_json(value.model_dump_json()) == value
+    assert (
+        json.loads((SCHEMAS / "RolloutResult.json").read_text(encoding="utf-8"))
+        == RolloutResult.model_json_schema()
+    )
+
+
+def test_sync_rollout_result_leaves_timing_fields_unset() -> None:
+    result = _rollout_result()
+    assert result.timing_verdict is None
+    assert result.starved_steps is None
+    assert _rollout_result(timing_verdict=None, starved_steps=None) == result
+
+
+def test_rollout_result_refuses_negative_starved_steps_and_unknown_verdict() -> None:
+    with pytest.raises(ValidationError) as exc:
+        _rollout_result(timing_verdict="starved", starved_steps=-1)
+    assert exc.value.errors()[0]["loc"] == ("starved_steps",)
+    with pytest.raises(ValidationError):
+        _rollout_result(timing_verdict="late")
 
 
 def test_fake_llm_returns_scripted_responses_and_fails_when_exhausted() -> None:
