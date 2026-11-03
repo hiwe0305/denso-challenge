@@ -8,6 +8,7 @@ Bản v0.3. Tài liệu này là nguồn duy nhất cho tầng web: API, Postgre
 |---|---|---|---|
 | 1/11/2026 | 0.2 | Bản BA viết lại từ v0.1: chia Postgres hai nửa, một đường ghi, 39 bảng | — |
 | 3/11/2026 | 0.3 | Ba chỗ sửa theo quyết định và mã đã merge trong ngày, xem bảng dưới. Số bảng 39 → 41 (thêm `system_diagnoses` và `train_diagnosis_skips`), nhóm P 27 → 29. Thêm C17, C18, C19 và BR-12. DDL chuyển thành khối SQL thật | Châu |
+| 3/11/2026 | 0.3 | Bỏ `episodes.episode_index` và `UNIQUE (dataset_id, episode_index)`: hợp đồng không có trường nào như thế, nên bộ nạp sẽ phải tự phát số. `episode_ref` đã là khoá tự nhiên và đã UNIQUE. Thêm W12 (`Episode` không mang `dataset_id`) | Châu |
 | 3/11/2026 | 0.3 | Dựng `web/schema/` theo tài liệu này: 9 file SQL, 41 bảng, 3 role, trigger C5–C9/C14/C19, 18 view, GRANT theo cột. `train_diagnosis_skips` là chỗ §4.4b để ngỏ tới M1, nay chốt | Châu |
 
 Ba chỗ sửa ở bản 0.3:
@@ -1236,3 +1237,4 @@ Mọi bản ghi nạp từ thư mục này có `origin = 'mock'`.
 | W9 | `SystemDiagnosis` và `StageAttribution` trong `flywheel.contracts` | issue #70 đã mở (3/11) |
 | W10 | `Score` bốn trạng thái, lý do "chưa rõ" | issue #59 |
 | W11 | `benchmark_copy_id` thay `injected_defect` trong `Episode` | issue #62 |
+| W12 | `Episode` không mang `dataset_id`. Ở lõi một episode trỏ `source_id` hoặc `intervention_id` (03 §4.3 cũng vậy), còn "lô" là khái niệm của web, không có thực thể tương ứng ở L0-lite. Bộ nạp suy `episodes.dataset_id` qua hai đường đó và **từ chối** dòng không suy được, chứ không gán lô mặc định — gán sai lô làm sai báo cáo dataset, phân bổ chi phí (BR-05) và `r_demo` mà không gì báo. Cần Long và PO quyết: thêm `dataset_id` vào `Episode`, hay web nhận đây là phép suy chính thức | **phát hiện 3/11 lúc viết mapper**; chưa mở issue |
