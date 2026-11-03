@@ -8,9 +8,11 @@ twelve F-TRAIN codes.
   over tau_lat, measured from the RTC log. Latency is the interval between the
   observation going out and the chunk coming back, which is what
   `RTCInferenceRecord` records.
-* **R2 buffer** (design section 10): chunks arriving with the action buffer
-  under its floor. Counted rather than averaged: a stall is a moment, and an
-  average over a long episode hides it.
+* **R2 buffer** (design section 10): chunks whose inference took more control
+  steps than the buffer had left when the request went out
+  (`delay_steps > buffer_level`, the two fields `RTCClient` of DA-19 writes).
+  Counted rather than averaged: a stall is a moment, and an average over a
+  long episode hides it.
 * **R4 sync** (step 4): the largest |t_image - t_state| over the episode,
   against tau_sync. Spec asks for the largest offset, not a percentile of it,
   because one badly paired frame is enough to make the policy act on a stale
@@ -77,10 +79,14 @@ def check_r1(records: tuple[RTCInferenceRecord, ...], cfg: R1Thresholds) -> Chec
 
 
 def check_r2(records: tuple[RTCInferenceRecord, ...], cfg: R2Thresholds) -> CheckResult:
-    """Chunks arriving with the action buffer under its floor (design section 10)."""
+    """Chunks whose inference outlasted the actions left in the buffer (design section 10).
+
+    `buffer_level` is the level when the request went out, not when the chunk
+    came back, so a low level is healthy as long as it covers `delay_steps`.
+    """
     if not records:
         return CheckResult(skipped=[Skipped("R2", _no_rtc_log())])
-    underruns = [record for record in records if record.buffer_level < cfg.min_buffer_level]
+    underruns = [record for record in records if record.delay_steps > record.buffer_level]
     if len(underruns) <= cfg.max_underruns:
         return CheckResult()
     return CheckResult(
@@ -91,8 +97,11 @@ def check_r2(records: tuple[RTCInferenceRecord, ...], cfg: R2Thresholds) -> Chec
                 threshold=float(cfg.max_underruns),
                 where=f"chunk {underruns[0].chunk_index}",
                 detail=(
-                    f"{len(underruns)} chunk có buffer dưới {cfg.min_buffer_level}, "
-                    f"thấp nhất {min(record.buffer_level for record in underruns)}"
+                    f"{len(underruns)} chunk có delay_steps lớn hơn buffer_level lúc gửi "
+                    f"request, thiếu nhiều nhất "
+                    f"{max(record.delay_steps - record.buffer_level for record in underruns)}"
+                    f" action (chunk {underruns[0].chunk_index}: "
+                    f"buffer {underruns[0].buffer_level}, trễ {underruns[0].delay_steps})"
                 ),
             )
         ]
