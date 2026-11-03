@@ -25,7 +25,10 @@ CKPT_STEP="${CKPT_STEP:-40000}"
 PORT="${PORT:-22085}"
 DEVICE="${DEVICE:-cuda:0}"
 ACTION_EXEC_HORIZON="${ACTION_EXEC_HORIZON:-24}"
-RTC_FLAG="${RTC_FLAG:---rtc}"
+# Unset means --rtc; RTC_FLAG= (empty) serves without RTC.
+RTC_FLAG="${RTC_FLAG---rtc}"
+# /act has no auth and the container shares the host network: bind to loopback unless told otherwise.
+HOST="${HOST:-127.0.0.1}"
 PSI0_RUNTIME="${PSI0_RUNTIME:-venv}"
 
 PSI0_ROOT="${PSI0_ROOT:-$MAIN_REPO/fwdata/psi0}"
@@ -209,7 +212,7 @@ PY
 cmd_serve() {
   [[ -f "$WEIGHTS" ]] || die "no weights at $WEIGHTS; run: $0 fetch --weights"
   log "serving $RUN step $CKPT_STEP on :$PORT ($DEVICE, exec horizon $ACTION_EXEC_HORIZON, $RTC_FLAG)"
-  psi_exec serve_psi0_simple --policy psi0 --host 0.0.0.0 --port "$PORT" --device "$DEVICE" \
+  psi_exec serve_psi0_simple --policy psi0 --host "$HOST" --port "$PORT" --device "$DEVICE" \
     --run-dir "$RUN_DIR" --ckpt-step "$CKPT_STEP" \
     --action-exec-horizon "$ACTION_EXEC_HORIZON" "$RTC_FLAG"
 }

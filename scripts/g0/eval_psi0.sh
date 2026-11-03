@@ -108,8 +108,17 @@ PY
 # built 30/08/2026; its eval_decoupled_wbc.py and psi0_decoupled_wbc.py equal SIMPLE 6d10628.
 SIMPLE_IMAGE="${SIMPLE_IMAGE:-ghcr.io/physical-superintelligence-lab/simple@sha256:38a674039f413ca171d5f8f841c2b9a9d67771fdaf7bcc73c4777fdfcb7a561f}"
 TASK="${TASK:-G1WholebodyLocomotionPickBetweenTablesTeleop-v0}"
-# Published eval conditions: psi-data simple-eval/<TASK>.zip, one LeRobot dir per level.
+# Published eval conditions: psi-data simple-eval/<TASK>.zip, one LeRobot dir per level. Pinned by
+# revision (PO 3/11/2026, PR #68); the zip is checked against the LFS sha256 Hugging Face reports.
 PSI_DATA_REV="${PSI_DATA_REV:-de140d67ba77a541f2a58354f7edf4e2480b7c56}"
+# The image's two-table task file is SIMPLE 6d10628's, which spawns the arms raised (the fingers hit
+# table 1 and push the robot back 0.1-0.28 m). Mount the file from SIMPLE b75c678 (upstream 77872fe:
+# zero arm init_qpos, as in the data), the SIMPLE pin since PR #68. SIMPLE_TASK_FIX=off reproduces
+# the image as is. The image's robot, agent and policy files already equal b75c678.
+SIMPLE_TASK_FIX="${SIMPLE_TASK_FIX:-on}"
+SIMPLE_FIX_COMMIT="${SIMPLE_FIX_COMMIT:-b75c6786f87b4a7f43b52b0ac5b83a1d9ea62e11}"
+SIMPLE_FIX_FILE=src/simple/tasks/g1_wholebody_locomotion_pick_between_tables_teleop.py
+SIMPLE_FIX_SHA256="${SIMPLE_FIX_SHA256:-51bce5d6c0311219d9a827b589910d915521dccc89b69a1ab20ff35081b6dc8f}"
 SIMPLE_DATA="${SIMPLE_DATA:-$MAIN_REPO/fwdata/simple/s103}"
 # A SIMPLE data/ tree with assets, robots and scenes already downloaded; mounted read-only.
 SIMPLE_ASSETS="${SIMPLE_ASSETS:-$MAIN_REPO/fwdata/simple/SIMPLE/data}"
@@ -127,20 +136,44 @@ cmd_run() {
       *) die "unknown option $1" ;;
     esac
   done
-  local conds="$SIMPLE_DATA/evals/simple-eval/$TASK/dr-level-$level"
+  # One cache dir per revision, so another PSI_DATA_REV never reuses these conditions.
+  local evals="evals/simple-eval-${PSI_DATA_REV:0:7}"
+  local conds="$SIMPLE_DATA/$evals/$TASK/dr-level-$level" zip="$SIMPLE_DATA/$evals/$TASK.zip"
   if [[ ! -d "$conds" ]]; then
-    mkdir -p "$SIMPLE_DATA/evals/simple-eval"
-    curl -sfL -o "$SIMPLE_DATA/evals/simple-eval/$TASK.zip" \
-      "https://huggingface.co/datasets/USC-PSI-Lab/psi-data/resolve/$PSI_DATA_REV/simple-eval/$TASK.zip"
-    unzip -q -o "$SIMPLE_DATA/evals/simple-eval/$TASK.zip" -d "$SIMPLE_DATA/evals/simple-eval"
+    mkdir -p "$SIMPLE_DATA/$evals"
+    curl -sfL -o "$zip" "https://huggingface.co/datasets/USC-PSI-Lab/psi-data/resolve/$PSI_DATA_REV/simple-eval/$TASK.zip"
+    local want got
+    want=$(curl -sf "https://huggingface.co/api/datasets/USC-PSI-Lab/psi-data/paths-info/$PSI_DATA_REV" \
+      -d "paths=simple-eval/$TASK.zip&expand=true" | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['lfs']['oid'])")
+    got=$(sha256sum "$zip" | cut -d' ' -f1)
+    [[ -n "$want" && "$want" == "$got" ]] || die "eval zip sha256 $got != LFS oid ${want:-?} at $PSI_DATA_REV"
+    unzip -q -o "$zip" -d "$SIMPLE_DATA/$evals"
   fi
   [[ -d "$conds" ]] || die "no eval conditions at $conds"
-  local tag="$sim_mode/level-$level/pass-$pass/ep$start-$((start + episodes - 1))"
+  local fix_mount=() task_file="image (SIMPLE 6d10628)"
+  if [[ "$SIMPLE_TASK_FIX" == on ]]; then
+    local fix="$SIMPLE_DATA/patches/${SIMPLE_FIX_COMMIT:0:7}/$(basename "$SIMPLE_FIX_FILE")"
+    if [[ ! -f "$fix" ]]; then
+      mkdir -p "$(dirname "$fix")"
+      curl -sfL -o "$fix" "https://raw.githubusercontent.com/physical-superintelligence-lab/SIMPLE/$SIMPLE_FIX_COMMIT/$SIMPLE_FIX_FILE"
+    fi
+    [[ "$(sha256sum "$fix" | cut -d' ' -f1)" == "$SIMPLE_FIX_SHA256" ]] || die "task file $fix does not match SIMPLE_FIX_SHA256"
+    fix_mount=(-v "$fix:/workspace/simple/$SIMPLE_FIX_FILE:ro")
+    task_file="SIMPLE ${SIMPLE_FIX_COMMIT:0:7} (sha256 ${SIMPLE_FIX_SHA256:0:12})"
+  fi
+  # The client trusts the server for run, checkpoint and RTC; check it serves this task.
+  local info
+  info=$(curl -sf "http://$host:$PORT/info") || die "no Psi0 server on $host:$PORT; run: serve_psi0.sh serve"
+  local task_lc="${TASK,,}"
+  [[ "$info" == *"${task_lc%-v0}"* ]] || die "server on $host:$PORT does not serve $TASK: $(head -c 200 <<<"$info")"
+  local simple_tag="simple-${SIMPLE_FIX_COMMIT:0:7}"
+  [[ "$SIMPLE_TASK_FIX" == on ]] || simple_tag="simple-6d10628"
+  local tag="$simple_tag/$sim_mode/level-$level/pass-$pass/ep$start-$((start + episodes - 1))"
   local out="$SIMPLE_DATA/runs/$tag"
   [[ -e "$out/eval_stats.txt" ]] && die "$out already has results; use another --pass"
   # Pre-create the read-only mount points, or dockerd creates them root-owned.
   mkdir -p "$out" "$SIMPLE_DATA"/{assets,robots,scenes}
-  curl -sf "http://$host:$PORT/health" >/dev/null || die "no Psi0 server on $host:$PORT; run: serve_psi0.sh serve"
+  printf '%s\n' "$info" > "$out/server_info.json"
 
   # Isaac Sim (Kit) writes its shader, material and log caches under the image venv's omni/ dir,
   # which a non-root user cannot create; without them startup stalls after "app ready". Host dirs
@@ -161,10 +194,11 @@ cmd_run() {
     -v "$SIMPLE_ASSETS/assets:/workspace/simple/data/assets:ro" \
     -v "$SIMPLE_ASSETS/robots:/workspace/simple/data/robots:ro" \
     -v "$SIMPLE_ASSETS/scenes:/workspace/simple/data/scenes:ro" \
+    "${fix_mount[@]}" \
     -w /workspace/simple --entrypoint /workspace/simple/.venv/bin/eval-decoupled-wbc "$SIMPLE_IMAGE" \
     "simple/$TASK" psi0_decoupled_wbc "dr-level-$level" \
     --host "$host" --port "$PORT" --sim-mode "$sim_mode" --headless \
-    --data-format lerobot --data-dir "data/evals/simple-eval/$TASK/dr-level-$level" \
+    --data-format lerobot --data-dir "data/$evals/$TASK/dr-level-$level" \
     --episode-start "$start" --num-episodes "$episodes" --eval-dir "data/runs/$tag" \
     > "$out/client.log" 2>&1 || status=$?
   end=$(date +%s)
@@ -178,13 +212,13 @@ cmd_run() {
   # Revisions and outcome in one file per invocation (story test: same config, recorded pins).
   python3 - "$out" "$status" "$((end - begin))" "$sim_mode" "$level" "$pass" "$start" "$episodes" \
     "$RUN" "$CKPT_STEP" "$PSI_MODEL_REV" "$PSI0_COMMIT" "$PSI_DATA_REV" "$SIMPLE_IMAGE" \
-    "$ACTION_EXEC_HORIZON" "$RTC_FLAG" "$host:$PORT" "$TASK" <<'PY'
+    "$ACTION_EXEC_HORIZON" "$RTC_FLAG" "$host:$PORT" "$TASK" "$task_file" <<'PY'
 import json, re, sys
 from pathlib import Path
 
 out = Path(sys.argv[1])
 (status, seconds, sim_mode, level, pass_, start, episodes, run, ckpt_step, model_rev, psi0_commit,
- data_rev, image, exec_h, rtc, server, task) = sys.argv[2:19]
+ data_rev, image, exec_h, rtc, server, task, task_file) = sys.argv[2:20]
 lines = (out / "eval_stats.txt").read_text().splitlines() if (out / "eval_stats.txt").exists() else []
 results = {m[1]: m[2] == "True" for l in lines if (m := re.match(r"(episode_\d+): (True|False)", l.strip()))}
 summary = {
@@ -195,7 +229,9 @@ summary = {
     "client_exit": int(status), "wall_seconds": int(seconds),
     "server": server, "run": run, "ckpt_step": int(ckpt_step), "psi_model_revision": model_rev,
     "psi0_commit": psi0_commit, "action_exec_horizon": int(exec_h), "rtc": rtc == "--rtc",
-    "psi_data_revision": data_rev, "simple_image": image,
+    "psi_data_revision": data_rev, "simple_image": image, "simple_task_file": task_file,
+    # What the server itself reports; the run/ckpt/horizon/rtc fields above are the client's env.
+    "server_info": json.loads((out / "server_info.json").read_text()),
 }
 (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
 print(json.dumps({k: summary[k] for k in ("sim_mode", "level", "pass", "n", "successes", "client_exit", "wall_seconds")}))
