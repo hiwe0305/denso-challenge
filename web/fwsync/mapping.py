@@ -32,6 +32,8 @@ của M5.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
 from typing import Any, TypeVar
 
@@ -112,7 +114,7 @@ def map_episode(payload: Any, lookup: DatasetLookup) -> dict[str, Any]:
     meta = episode.meta
     row: dict[str, Any] = {
         "episode_ref": episode.episode_id,
-        "dataset_id": lookup.resolve(episode),
+        "dataset_code": lookup.resolve(episode),
         "kind": episode.kind,
         "source_kind": episode.source_kind,
         "source_detail": meta.source_detail,
@@ -174,10 +176,10 @@ def _reject_raw_egocentric(row: dict[str, Any]) -> None:
         )
 
 
-def map_qa_report(payload: Any, episode_ref_to_id: dict[str, str]) -> dict[str, Any]:
+def map_qa_report(payload: Any, known_episodes: set[str]) -> dict[str, Any]:
     """Một `QAReport` thành một dòng `episode_qa_reports` (append-only)."""
     report: QAReport = _validated(QAReport, payload, "qa report")
-    if report.episode_id not in episode_ref_to_id:
+    if report.episode_id not in known_episodes:
         raise MappingError(
             f"qa report `{report.report_id}` trỏ episode `{report.episode_id}` chưa nạp"
         )
@@ -187,7 +189,7 @@ def map_qa_report(payload: Any, episode_ref_to_id: dict[str, str]) -> dict[str, 
             f"qa report `{report.report_id}` kết luận `{report.decision}` mà không có lý do"
         )
     return {
-        "episode_id": episode_ref_to_id[report.episode_id],
+        "episode_ref": report.episode_id,
         "threshold_version": report.threshold_version,
         "decision": report.decision,
         "reasons": list(report.reasons),
@@ -195,12 +197,14 @@ def map_qa_report(payload: Any, episode_ref_to_id: dict[str, str]) -> dict[str, 
     }
 
 
-def map_training_metric(payload: Any, experiment_id: str) -> dict[str, Any]:
+def map_training_metric(payload: Any, experiment_code: str) -> dict[str, Any]:
     """Một `TrainingMetric` thành một dòng `training_metrics`."""
     metric: TrainingMetric = _validated(TrainingMetric, payload, "training metric")
     loss, loss_nonfinite = _split_non_finite(metric.loss)
     row = {
-        "experiment_id": experiment_id,
+        "experiment_code": experiment_code,
+        "run_plan_ref": metric.run_plan_id,
+        "release_ref": metric.release_id,
         "attempt": metric.attempt,
         "step": metric.step,
         "epoch": metric.epoch,
@@ -238,7 +242,9 @@ def _split_non_finite(value: float | str) -> tuple[float | None, str | None]:
     return float(value), None
 
 
-def map_train_diagnosis(payload: Any, experiment_id: str) -> dict[str, list[dict[str, Any]]]:
+def map_train_diagnosis(
+    payload: Any, experiment_code: str
+) -> dict[str, list[dict[str, Any]]]:
     """Một `TrainDiagnosis` thành dòng `train_diagnoses` **và** `train_diagnosis_skips`.
 
     Hai danh sách, không một. `findings` rỗng không mang được "không có gì để
@@ -251,7 +257,7 @@ def map_train_diagnosis(payload: Any, experiment_id: str) -> dict[str, list[dict
         value, value_nonfinite = _split_non_finite(finding.value)
         findings.append(
             {
-                "experiment_id": experiment_id,
+                "experiment_code": experiment_code,
                 "checkpoint_ref": diagnosis.checkpoint_id,
                 "config_sha256": diagnosis.config_sha256,
                 "code": finding.code,
@@ -266,7 +272,7 @@ def map_train_diagnosis(payload: Any, experiment_id: str) -> dict[str, list[dict
         )
     skips = [
         {
-            "experiment_id": experiment_id,
+            "experiment_code": experiment_code,
             "checkpoint_ref": diagnosis.checkpoint_id,
             "config_sha256": diagnosis.config_sha256,
             "code": skip.code,
@@ -328,6 +334,11 @@ def map_defect_manifest(payload: Any) -> dict[str, Any]:
             "manifest_ref": manifest.dataset_id,
             "dataset_ref": manifest.dataset_id,
             "seed": manifest.seed,
+            # Khoá đáp án (cột NOT NULL): hash của chính manifest, tính trên
+            # JSON chuẩn hoá để hai lần nạp cùng đáp án cho cùng hash.
+            "sha256": hashlib.sha256(
+                json.dumps(manifest.model_dump(), sort_keys=True, ensure_ascii=False).encode()
+            ).hexdigest(),
         },
         "items": [
             {

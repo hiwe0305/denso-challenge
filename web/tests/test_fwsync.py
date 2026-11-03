@@ -451,3 +451,117 @@ def test_an_append_only_table_grows_across_processes(source: Path, tmp_path: Pat
     run_import(source, JsonlSink(directory=out))
 
     assert len(_rows(out, "episode_qa_reports")) == 2
+
+
+# ---------------------------------------------------------------------------
+# telemetry và chẩn đoán train qua runner
+# ---------------------------------------------------------------------------
+# Bug đã có: runner đòi `experiment_code` trên payload, còn `TrainingMetric`
+# của hợp đồng cấm trường lạ, nên MỌI dòng telemetry bị từ chối. Các test dưới
+# đưa artifact đúng y hợp đồng, không thêm trường nào, và đòi nó vào được.
+
+METRIC: dict[str, Any] = {
+    "run_plan_id": "rp_A",
+    "job_id": "job_1",
+    "checkpoint_id": "ckpt_A",
+    "release_id": "rel_1",
+    "attempt": 0,
+    "step": 10,
+    "epoch": 0,
+    "split": "train",
+    "loss": 0.5,
+    "lr": 1e-4,
+    "vlm_frozen": True,
+    "wall_time_s": 1.0,
+}
+
+
+@pytest.fixture
+def training_source(tmp_path: Path) -> Path:
+    folder = tmp_path / "train-src"
+    _write_jsonl(
+        folder / "experiments.jsonl",
+        [{"experiment_code": "exp_A", "run_plan_ref": "rp_A", "task_id": "two_table",
+          "branch": "A", "method": "PSI0"}],
+    )
+    _write_jsonl(
+        folder / "checkpoints.jsonl",
+        [{"checkpoint_ref": "ckpt_A", "experiment_code": "exp_A", "method": "PSI0",
+          "weights_sha256": "b" * 64, "uri": "runs/a", "is_best": True, "is_latest": True}],
+    )
+    _write_jsonl(
+        folder / "training_metrics.jsonl",
+        [METRIC, {**METRIC, "split": "val", "loss": "NaN"}],
+    )
+    _write_jsonl(
+        folder / "train_diagnoses.jsonl",
+        [{"checkpoint_id": "ckpt_A", "config_sha256": "a" * 64,
+          "findings": [{"code": "T1", "start_step": 10, "value": "NaN", "stop_job": True}],
+          "skipped": [{"code": "T7", "reason": "job không có kết quả probe P4"}]}],
+    )
+    return folder
+
+
+def test_contract_exact_telemetry_loads_through_the_runner(
+    training_source: Path, tmp_path: Path
+) -> None:
+    sink = JsonlSink(directory=tmp_path / "sink")
+
+    result = run_import(training_source, sink)
+
+    assert result.status == "ok", result.errors
+    metrics = _rows(sink.directory, "training_metrics")
+    assert [row["experiment_code"] for row in metrics] == ["exp_A", "exp_A"]
+    assert metrics[1]["loss"] is None and metrics[1]["loss_nonfinite"] == "NaN"
+
+
+def test_a_train_diagnosis_finds_its_experiment_through_the_checkpoint(
+    training_source: Path, tmp_path: Path
+) -> None:
+    sink = JsonlSink(directory=tmp_path / "sink")
+
+    run_import(training_source, sink)
+
+    assert _rows(sink.directory, "train_diagnoses")[0]["experiment_code"] == "exp_A"
+    assert _rows(sink.directory, "train_diagnosis_skips")[0]["code"] == "T7"
+
+
+def test_telemetry_for_an_unknown_run_plan_is_refused(
+    training_source: Path, tmp_path: Path
+) -> None:
+    # Giống W12: tra không ra thì từ chối, không gán vào thí nghiệm mặc định.
+    _write_jsonl(
+        training_source / "training_metrics.jsonl",
+        [{**METRIC, "run_plan_id": "rp_khong_co", "checkpoint_id": "ckpt_khong_co"}],
+    )
+
+    result = run_import(training_source, JsonlSink(directory=tmp_path / "sink"))
+
+    assert "không suy được thí nghiệm" in result.errors[0]["message"]
+
+
+def test_every_row_carries_the_origin_of_its_source(source: Path, tmp_path: Path) -> None:
+    # `origin` là thuộc tính của nguồn: FE dán nhãn "mock" theo nó (§4.4b).
+    sink = JsonlSink(directory=tmp_path / "sink")
+
+    run_import(source, sink, origin="mock")
+
+    for table in ("datasets", "episodes", "episode_qa_reports"):
+        assert {row["origin"] for row in _rows(sink.directory, table)} == {"mock"}
+
+
+def test_an_artifact_cannot_relabel_itself_as_mock(source: Path, tmp_path: Path) -> None:
+    # Một artifact thật lỡ mang `origin: mock` không được làm FE dán nhãn sai:
+    # đường khoan dung bỏ trường đó, và runner đóng dấu theo nguồn.
+    _write_jsonl(source / "datasets.jsonl", [{**DATASET, "origin": "mock"}])
+    sink = JsonlSink(directory=tmp_path / "sink")
+
+    result = run_import(source, sink, origin="core")
+
+    assert _rows(sink.directory, "datasets")[0]["origin"] == "core"
+    assert result.unknown_fields["datasets"] == ["origin"]
+
+
+def test_an_unknown_origin_is_refused(source: Path, tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="origin"):
+        run_import(source, JsonlSink(directory=tmp_path / "sink"), origin="test")

@@ -70,7 +70,7 @@ def test_the_shipped_episode_fixture_maps(lookup: DatasetLookup) -> None:
     row = map_episode(payload, lookup)
 
     assert row["episode_ref"] == "ep_1"
-    assert row["dataset_id"] == DATASET_ID
+    assert row["dataset_code"] == DATASET_ID
     assert row["kind"] == "teleop_demo"
     assert row["source_detail"] == "psi_data"
     assert row["renderer"] == "mujoco"
@@ -120,7 +120,7 @@ def test_an_episode_resolves_through_its_intervention(lookup: DatasetLookup) -> 
     payload["intervention_id"] = "iv_1"
     payload["kind"] = "teleop_correction"
 
-    assert map_episode(payload, lookup)["dataset_id"] == DATASET_ID
+    assert map_episode(payload, lookup)["dataset_code"] == DATASET_ID
 
 
 def test_a_raw_egocentric_episode_with_a_split_is_refused(lookup: DatasetLookup) -> None:
@@ -157,16 +157,16 @@ def test_an_episode_that_is_not_an_episode_is_refused(lookup: DatasetLookup) -> 
 
 
 def test_the_shipped_qa_report_fixture_maps() -> None:
-    row = map_qa_report(_artifact("QAReport"), {"ep_1": "ep-uuid"})
+    row = map_qa_report(_artifact("QAReport"), {"ep_1"})
 
-    assert row["episode_id"] == "ep-uuid"
+    assert row["episode_ref"] == "ep_1"
     assert row["decision"] == "pass"
     assert row["checks"][0]["name"] == "sync"
 
 
 def test_a_qa_report_for_an_unknown_episode_is_refused() -> None:
     with pytest.raises(MappingError, match="chưa nạp"):
-        map_qa_report(_artifact("QAReport"), {})
+        map_qa_report(_artifact("QAReport"), set())
 
 
 def test_a_non_pass_verdict_without_a_reason_is_refused() -> None:
@@ -176,7 +176,7 @@ def test_a_non_pass_verdict_without_a_reason_is_refused() -> None:
     payload["reasons"] = []
 
     with pytest.raises(MappingError, match="không có lý do"):
-        map_qa_report(payload, {"ep_1": "ep-uuid"})
+        map_qa_report(payload, {"ep_1"})
 
 
 def test_the_invalid_qa_fixture_is_refused() -> None:
@@ -184,7 +184,7 @@ def test_the_invalid_qa_fixture_is_refused() -> None:
     payload = json.loads((ARTIFACTS / "invalid-QAReport.json").read_text(encoding="utf-8"))
 
     with pytest.raises(MappingError, match="không hợp schema QAReport"):
-        map_qa_report(payload, {"ep_1": "ep-uuid"})
+        map_qa_report(payload, {"ep_1"})
 
 
 # ---------------------------------------------------------------------------
@@ -286,7 +286,7 @@ def test_a_train_diagnosis_maps_findings_and_skips_together() -> None:
     assert finding["stop_job"] is True
     assert rows["train_diagnosis_skips"] == [
         {
-            "experiment_id": EXPERIMENT_ID,
+            "experiment_code": EXPERIMENT_ID,
             "checkpoint_ref": "ckpt_1",
             "config_sha256": "a" * 64,
             "code": "T7",
@@ -338,7 +338,16 @@ def test_the_shipped_defect_manifest_maps_into_group_s_only() -> None:
 
     # `manifest_ref` là mã bản sao chấm: hợp đồng không cho manifest một ID
     # riêng, và đây cũng là giá trị `benchmark_copy_id` khi #62 merge.
-    assert rows["manifest"] == {"manifest_ref": "ds_1", "dataset_ref": "ds_1", "seed": 5}
+    head = rows["manifest"]
+    assert {key: head[key] for key in ("manifest_ref", "dataset_ref", "seed")} == {
+        "manifest_ref": "ds_1",
+        "dataset_ref": "ds_1",
+        "seed": 5,
+    }
+    # Khoá đáp án là cột NOT NULL, tính trên JSON chuẩn hoá, nên nạp lại cùng
+    # đáp án cho cùng hash.
+    assert len(head["sha256"]) == 64
+    assert map_defect_manifest(_artifact("DefectManifest"))["manifest"]["sha256"] == head["sha256"]
     assert rows["items"] == [
         {"target_ref": "ep_1", "code": "D1", "parameters": {"frame": 1}}
     ]

@@ -167,3 +167,112 @@ def test_the_sink_upserts_each_owner_on_that_same_key(ref: str) -> None:
 
 def test_lookup_only_columns_are_declared_with_a_reason() -> None:
     assert all(reason.strip() for reason in LOOKUP_ONLY.values())
+
+
+# ---------------------------------------------------------------------------
+# Đường nghiêm: cột do mapper của hợp đồng ghi ra
+# ---------------------------------------------------------------------------
+# `TOLERANT_COLUMNS` là một danh sách nên kiểm được tĩnh. Mapper nghiêm thì
+# không có danh sách: cột của nó là khoá của dict nó trả về. Nên test chạy
+# mapper trên file mẫu thật của testkit rồi kiểm từng khoá theo cùng quy ước.
+# Đây là đúng chỗ bug cũ nằm: mapper đặt một mã chuỗi của lõi vào khoá
+# `dataset_id` và `episode_id`, mà một cột `*_id` là UUID web tự sinh.
+
+
+def _strict_rows() -> list[tuple[str, dict[str, object]]]:
+    import json
+
+    from web.fwsync.mapping import (
+        DatasetLookup,
+        map_defect_manifest,
+        map_episode,
+        map_probe_result,
+        map_qa_report,
+        map_train_diagnosis,
+        map_training_metric,
+    )
+
+    fixtures = (
+        Path(__file__).resolve().parents[2]
+        / "packages/flywheel-testkit/src/flywheel/testkit/fixtures/artifacts"
+    )
+
+    def load(name: str) -> dict[str, object]:
+        return json.loads((fixtures / f"{name}.json").read_text(encoding="utf-8"))
+
+    episode = load("Episode")
+    episode["source_id"] = "src_1"
+    rows: list[tuple[str, dict[str, object]]] = [
+        ("episodes", map_episode(episode, DatasetLookup({"src_1": "ds"}, {}))),
+        ("episode_qa_reports", map_qa_report(load("QAReport"), {"ep_1"})),
+        (
+            "training_metrics",
+            map_training_metric(
+                {
+                    "run_plan_id": "rp_1", "job_id": "j", "checkpoint_id": "c",
+                    "release_id": "r", "attempt": 0, "step": 1, "epoch": 0,
+                    "split": "val", "loss": 0.5, "lr": 1e-4, "vlm_frozen": True,
+                    "wall_time_s": 1.0,
+                },
+                "exp_A",
+            ),
+        ),
+    ]
+    diagnosis = map_train_diagnosis(
+        {
+            "checkpoint_id": "ckpt_1",
+            "config_sha256": "a" * 64,
+            "findings": [{"code": "T2", "start_step": 1, "value": 0.1, "threshold": 0.2}],
+            "skipped": [{"code": "T7", "reason": "thiếu P4"}],
+        },
+        "exp_A",
+    )
+    rows += [(table, row) for table, table_rows in diagnosis.items() for row in table_rows]
+    rows += [("probe_results", map_probe_result(load(f"ProbeP{i}"))) for i in (1, 2, 3, 4)]
+    manifest = map_defect_manifest(load("DefectManifest"))
+    rows.append(("defect_manifests", manifest["manifest"]))
+    rows += [("defect_items", item) for item in manifest["items"]]
+    return rows
+
+
+@pytest.mark.parametrize("table,row", _strict_rows(), ids=lambda value: str(value)[:24])
+def test_every_strict_mapper_column_has_a_place_in_the_table(
+    table: str, row: dict[str, object], schema: dict[str, set[str]]
+) -> None:
+    homeless = sorted(column for column in row if not _resolves(column, schema[table]))
+    assert not homeless, (
+        f"mapper ghi {homeless} vào `{table}`, nhưng bảng không có cột đó và không "
+        f"có cột `*_id` để tra ra"
+    )
+
+
+def _uuid_columns() -> dict[str, set[str]]:
+    """Cột có kiểu UUID của mọi bảng: đó là ID web tự sinh, mapper không biết."""
+    text = _code(
+        "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in sorted(SCHEMA_DIR.glob("*.sql"))
+            if path.name != "schema.sql"
+        )
+    )
+    tables: dict[str, set[str]] = {}
+    for name, body in re.findall(r"CREATE TABLE (\w+) \((.*?)\n\);", text, re.DOTALL):
+        tables[name] = {
+            match.group(1)
+            for line in body.splitlines()
+            if (match := re.match(r"\s*(\w+)\s+UUID\b", line))
+        }
+    return tables
+
+
+@pytest.mark.parametrize("table,row", _strict_rows(), ids=lambda value: str(value)[:24])
+def test_no_strict_mapper_writes_into_a_uuid_column(
+    table: str, row: dict[str, object]
+) -> None:
+    # Cột UUID là ID web tự sinh. Mapper không biết UUID đó, nên mọi khoá nó
+    # ghi vào một cột UUID là một mã chuỗi của lõi đặt nhầm chỗ, đúng bug cũ
+    # của `dataset_id` và `episode_id`. Quy tắc đọc kiểu cột từ schema thay vì
+    # một danh sách ngoại lệ viết tay: `embodiment_id` và `condition_id` là
+    # chuỗi của hợp đồng mang đuôi `_id`, và chúng là VARCHAR, nên tự qua.
+    offenders = sorted(column for column in row if column in _uuid_columns()[table])
+    assert not offenders, f"mapper của `{table}` ghi mã lõi vào cột UUID {offenders}"

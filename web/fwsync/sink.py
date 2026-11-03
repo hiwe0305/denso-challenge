@@ -40,7 +40,7 @@ NATURAL_KEY: dict[str, tuple[str, ...]] = {
     "run_plans": ("run_plan_ref",),
     "experiments": ("experiment_code",),
     "model_checkpoints": ("checkpoint_ref",),
-    "training_metrics": ("experiment_id", "attempt", "step", "split"),
+    "training_metrics": ("experiment_code", "attempt", "step", "split"),
     "probe_results": ("probe", "checkpoint_ref"),
     "sim_evaluations": ("evaluation_ref",),
     "eval_episodes": ("eval_episode_ref",),
