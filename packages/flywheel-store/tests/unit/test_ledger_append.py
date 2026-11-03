@@ -99,3 +99,70 @@ def test_ledger_entry_validations() -> None:
             measure_kind="estimated",
             estimate_entry_id="led_12345",
         )
+
+
+def _gpu_entry(**fields: object) -> LedgerEntry:
+    base: dict[str, object] = {
+        "activity": "eval",
+        "resource_type": "gpu_hour_3060",
+        "quantity": 1.0,
+        "unit": "hour",
+        "usd_amount": 0.2,
+        "run_plan_id": "rp_1",
+        "job_id": "job_1",
+    }
+    return LedgerEntry.model_validate({**base, **fields})
+
+
+def test_measured_entry_needs_an_estimate_that_exists(tmp_path: Path) -> None:
+    """PO review 3/11 item 4: a measured row must point at a ledger row that exists."""
+    store = LedgerStore(paths=StorePaths(root=tmp_path))
+    orphan = _gpu_entry(measure_kind="measured", estimate_entry_id="led_" + "0" * 26)
+    with pytest.raises(ValueError, match="does not exist"):
+        store.append(orphan)
+    assert store.read("rp_1", "job_1") == []
+
+
+def test_measured_entry_cannot_point_at_another_measured_entry(tmp_path: Path) -> None:
+    store = LedgerStore(paths=StorePaths(root=tmp_path))
+    estimate = _gpu_entry(measure_kind="estimated")
+    store.append(estimate)
+    measured = _gpu_entry(measure_kind="measured", estimate_entry_id=estimate.id)
+    store.append(measured)
+
+    chained = _gpu_entry(measure_kind="measured", estimate_entry_id=measured.id)
+    with pytest.raises(ValueError, match="not an estimated row"):
+        store.append(chained)
+    assert [row["id"] for row in store.read("rp_1", "job_1")] == [estimate.id, measured.id]
+
+
+def test_measured_entry_may_point_at_an_estimate_of_another_job(tmp_path: Path) -> None:
+    """The estimate can be written by the planning job, the measurement by the job that ran."""
+    store = LedgerStore(paths=StorePaths(root=tmp_path))
+    estimate = _gpu_entry(measure_kind="estimated", job_id="job_plan")
+    store.append(estimate)
+    store.append(_gpu_entry(measure_kind="measured", estimate_entry_id=estimate.id))
+    assert len(store.read("rp_1", "job_1")) == 1
+
+
+def test_reversal_must_point_at_an_entry_that_exists(tmp_path: Path) -> None:
+    store = LedgerStore(paths=StorePaths(root=tmp_path))
+    with pytest.raises(ValidationError):
+        _gpu_entry(measure_kind="estimated", quantity=-1.0, reverses_entry_id="whatever")
+    ghost = _gpu_entry(
+        measure_kind="estimated",
+        quantity=-1.0,
+        usd_amount=-0.2,
+        reverses_entry_id="led_" + "1" * 26,
+    )
+    with pytest.raises(ValueError, match="does not exist"):
+        store.append(ghost)
+
+    estimate = _gpu_entry(measure_kind="estimated")
+    store.append(estimate)
+    store.append(
+        _gpu_entry(
+            measure_kind="estimated", quantity=-1.0, usd_amount=-0.2, reverses_entry_id=estimate.id
+        )
+    )
+    assert len(store.read("rp_1", "job_1")) == 2

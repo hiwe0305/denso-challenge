@@ -338,6 +338,14 @@ class LedgerEntry(EventEntity):
                     f"must be a valid 'led_' event ID"
                 )
 
+        if self.reverses_entry_id is not None and not is_valid_event_id(
+            self.reverses_entry_id, "led"
+        ):
+            raise ValueError(
+                f"Invalid reverses_entry_id '{self.reverses_entry_id}': "
+                f"must be a valid 'led_' event ID"
+            )
+
         if self.reverses_entry_id is None:
             if self.quantity < 0:
                 raise ValueError(
