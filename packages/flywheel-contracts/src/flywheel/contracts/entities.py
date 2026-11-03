@@ -232,6 +232,9 @@ class Score(ContentEntity):
     # on, so the caller names it instead of inheriting "default" (PO, #62).
     task_id: str = Field(min_length=1)
     config_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    # sha256 of the trace file that was scored; with scorer_version it is what
+    # tells a re-score of the same episode apart (03 §4.3, #59 item 7).
+    trace_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     scorer_version: str = "1.0.0"
     success: bool | None = None
     step_status: list[str] = Field(default_factory=list)

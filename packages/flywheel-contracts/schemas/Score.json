@@ -41,6 +41,11 @@
       "title": "Config Sha256",
       "type": "string"
     },
+    "trace_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Trace Sha256",
+      "type": "string"
+    },
     "scorer_version": {
       "default": "1.0.0",
       "title": "Scorer Version",
@@ -129,7 +134,8 @@
   "required": [
     "task_id",
     "episode_id",
-    "config_sha256"
+    "config_sha256",
+    "trace_sha256"
   ],
   "title": "Score",
   "type": "object"
