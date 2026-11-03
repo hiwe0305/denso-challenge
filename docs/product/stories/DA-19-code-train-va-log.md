@@ -71,6 +71,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Bỏ khung package (chuyển vào PR restructure); thêm client RTC từ DA-23; recipe ở `configs/models/` | PO (Hiếu) theo design chia làn (đã xóa) |
 | 27/10/2026 | Bỏ phần robot DENSO; Colab nhận dữ liệu `public`; ưu tiên fine-tune stage 3 cho HE | PO (Hiếu) theo design 27/10/2026 |
 | 28/10/2026 | Sửa hạn PR `chore-restructure` theo 07 mục 3.6 bản 0.6: mở 28/10, merge 29/10 | PO (Hiếu) |
+| 3/11/2026 | AC 5: phần "checkpoint trung gian chạy P3, P4" chờ DA-09 (probe P1–P4 thuộc DA-09, mà 07 bản 1.2 dời sau 13/11); phía DA-19 đưa từng `ckpt_<step>` đã lưu xong lên Google Drive cho DA-09 chạy probe. Stage 3 gọi `scripts/train.py finetune_simple_psi0_config` vì `finetune-simple-psi0.sh` không còn ở commit ghim `cda3fdf` | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
