@@ -2,7 +2,7 @@
 # Cấu hình cấy lỗi cho story DA-27 (Design 27/10/2026 mục 9.2, 10)
 version: "1.0.0"
 seed: 42
-injection_rate: 0.08  # 8% (tiêu chí 5-10% số episode)
+episodes_per_kind: 3  # Mỗi loại lỗi dữ liệu cấy đúng 3 episode khác nhau (33 trên 99), quyết định PO 3/11/2026
 
 # 11 loại lỗi dữ liệu dồn vào 6 mã F-DATA (design mục 9.2, sửa 3/11/2026).
 # Mã ghi ở `Defect.code`, tên loại ở `parameters["kind"]` (flywheel.data.inject.codes).

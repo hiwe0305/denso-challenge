@@ -40,7 +40,7 @@ class RTCDefectConfig:
 class InjectConfig:
     version: str = "1.0.0"
     seed: int = 42
-    injection_rate: float = 0.08
+    episodes_per_kind: int = 3
     data: DataDefectConfig = field(default_factory=DataDefectConfig)
     train: TrainDefectConfig = field(default_factory=TrainDefectConfig)
     rtc: RTCDefectConfig = field(default_factory=RTCDefectConfig)
@@ -156,7 +156,7 @@ def load_inject_config(path: Path | None = None) -> InjectConfig:
     return InjectConfig(
         version=str(data.get("version", "1.0.0")),
         seed=int(data.get("seed", 42)),
-        injection_rate=float(data.get("injection_rate", 0.08)),
+        episodes_per_kind=int(data.get("episodes_per_kind", 3)),
         data=data_cfg,
         train=train_cfg,
         rtc=rtc_cfg,

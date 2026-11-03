@@ -6,6 +6,7 @@ from collections.abc import Sequence
 
 from flywheel.contracts.artifacts import Defect, DefectManifest
 from flywheel.contracts.v0 import DatasetRef
+from flywheel.data.inject.codes import DATA_DEFECT_CODES
 from flywheel.data.inject.config import InjectConfig
 from flywheel.data.inject.data_defects import DataDefectInjector, EpisodeData
 from flywheel.data.inject.manifest import manifest_sha256
@@ -18,7 +19,8 @@ def create_defect_dataset(
 ) -> tuple[list[EpisodeData], DefectManifest]:
     """Create a defective benchmark dataset by injecting faults into an episode copy.
 
-    Never modifies original episodes.
+    Each data defect kind goes into exactly `episodes_per_kind` distinct episodes
+    (PO decision 3/11/2026: 3 per kind, 33 of 99). Never modifies original episodes.
     """
     cfg = config or InjectConfig()
     rng = random.Random(cfg.seed)
@@ -26,29 +28,31 @@ def create_defect_dataset(
 
     cloned_episodes = [copy.deepcopy(ep) for ep in episodes]
     total = len(cloned_episodes)
-    num_to_inject = max(1, int(total * cfg.injection_rate))
+    kinds = list(DATA_DEFECT_CODES)
+    needed = len(kinds) * cfg.episodes_per_kind
+    # One defect per episode (the contract holds a single injected_defect), plus at least
+    # one untouched episode to serve as the source of the duplicates.
+    if total <= needed:
+        raise ValueError(
+            f"Injecting {cfg.episodes_per_kind} episodes per kind needs more than "
+            f"{needed} episodes, got {total}"
+        )
 
-    # All 11 data defect injection methods
-    inject_methods = [
-        injector.inject_drop_frames,
-        injector.inject_timestamp_sync_offset,
-        injector.inject_joint_jump,
-        injector.inject_joint_limit_exceeded,
-        injector.inject_nan_values,
-        injector.inject_unit_deg_rad,
-        injector.inject_action_sign_flip,
-        injector.inject_corrupted_success_label,
-        injector.inject_wrong_task_instruction,
-        injector.inject_duplicate_episode,
-        injector.inject_holdout_seed_leak,
-    ]
-
-    selected_indices = rng.sample(range(total), min(num_to_inject, total))
+    selected_indices = rng.sample(range(total), needed)
+    untouched = sorted(set(range(total)) - set(selected_indices))
     defects: list[Defect] = []
 
     for i, idx in enumerate(selected_indices):
-        method = inject_methods[i % len(inject_methods)]
-        modified_ep, defect = method(cloned_episodes[idx])
+        kind = kinds[i // cfg.episodes_per_kind]
+        if kind == "duplicate_episode":
+            # The slot becomes a copy of an untouched episode, so the set keeps its size
+            # and the original stays unmarked; only the copy counts as injected.
+            source = cloned_episodes[rng.choice(untouched)]
+            modified_ep, defect = injector.inject_duplicate_episode(
+                source, dup_id=cloned_episodes[idx].episode_id
+            )
+        else:
+            modified_ep, defect = getattr(injector, f"inject_{kind}")(cloned_episodes[idx])
         cloned_episodes[idx] = modified_ep
         defects.append(defect)
 

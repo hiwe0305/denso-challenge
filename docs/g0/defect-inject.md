@@ -17,6 +17,8 @@ Tài liệu kỹ thuật theo [design 27/10/2026](../superpowers/specs/2026-10-2
 
 Cấu hình tại `configs/data/inject.yaml`. Mã lỗi theo bảng ánh xạ của design mục 9.2 (sửa 3/11/2026, issue #34): `Defect.code` ghi mã mục 10, `parameters["kind"]` ghi tên loại. Recall của DA-31 tính theo loại, precision tính theo mã.
 
+Số episode cấy (quyết định PO 3/11/2026): mỗi loại đúng 3 episode khác nhau (`episodes_per_kind: 3`), tổng 33 trên 99; mỗi episode mang tối đa một lỗi vì hợp đồng chỉ có một `injected_defect`. Với `duplicate_episode`, chỗ được chọn bị ghi đè bằng bản sao của một episode không cấy; bản gốc giữ nguyên, chỉ bản sao tính là episode cấy. Cùng `seed` cho cùng manifest.
+
 | Mã | Loại (`kind`) | Tên lỗi | Mô tả cơ chế cấy | Tham số cấu hình |
 |---|---|---|---|---|
 | D1 | `nan_values` | Giá trị NaN/Inf | Gán giá trị NaN vào quan sát hoặc hành động | `nan_ratio: 0.05` |
@@ -52,6 +54,6 @@ Hỗ trợ sinh log giả định theo đúng schema của `FakeTrainer` và RTC
 
 ## 4. Kiểm thử và Nghiệm thu
 
-* **Unit tests:** 34 test case tự động tại `packages/flywheel-data/tests/unit/inject/`.
+* **Unit tests:** 38 test case tự động tại `packages/flywheel-data/tests/unit/inject/`.
 * **Độ bao phủ:** 100% các loại lỗi cấy đều có test kiểm chứng.
 * **Độc lập kiến trúc:** Không import vòng, tuân thủ nghiêm ngặt 3 hợp đồng kiến trúc của repo.
