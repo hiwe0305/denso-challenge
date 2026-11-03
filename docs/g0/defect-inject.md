@@ -71,7 +71,7 @@ uv run python -m flywheel.data.inject.build --source <gốc LeRobot> --out fwdat
     --layout configs/embodiments/g1.yaml --config configs/data/inject.yaml
 ```
 
-Lệnh ghi `copies/<id>/` (bản cấy và bản sạch, id trung tính từ `copy_ids(seed)`), `answers/<id>/defect_manifest.json` và `.sha256` (chỉ bộ chấm đọc), và hai dòng `LedgerEntry` của job (một dòng ước tính, một dòng thực đo trỏ về dòng ước tính) vào sổ của store qua `flywheel.data.ledger.job_ledger` (`runs/<run_plan_id>/<job_id>/ledger.jsonl` dưới gốc store, run plan `g0-DA-27-<yyyymmdd>`), rồi in `DatasetRef`, đường dẫn và hash manifest của từng bản cho DA-31. Bản sạch chép từ bản gốc qua cùng đường ghi như bản cấy, nên hai bản chỉ khác nhau ở lỗi. Ingest một bản sao gọi `flywheel.data.inject.api.mark_copy_episode` để mọi `Episode` mang `benchmark_copy_id`. `ledger.jsonl` chưa ghi vào sổ của store vì `flywheel-data` chưa khai phụ thuộc `flywheel-store` (`pyproject.toml` thuộc DA-03).
+Lệnh ghi `copies/<id>/` (bản cấy và bản sạch, id trung tính từ `copy_ids(seed)`), `answers/<id>/defect_manifest.json` và `.sha256` (chỉ bộ chấm đọc), và hai dòng `LedgerEntry` của job (một dòng ước tính, một dòng thực đo trỏ về dòng ước tính) vào sổ của store qua `flywheel.data.ledger.job_ledger` (`runs/<run_plan_id>/<job_id>/ledger.jsonl` dưới gốc store, run plan `g0-DA-27-<yyyymmdd>`), rồi in `DatasetRef`, đường dẫn và hash manifest của từng bản cho DA-31. Bản sạch chép từ bản gốc qua cùng đường ghi như bản cấy, nên hai bản chỉ khác nhau ở lỗi. Ingest một bản sao gọi `flywheel.data.inject.api.mark_copy_episode` để mọi `Episode` mang `benchmark_copy_id`.
 
 ### Chạy trên psi-data thật (4/11/2026)
 
