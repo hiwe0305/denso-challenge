@@ -200,3 +200,62 @@ Lệch lớn nhất giữa `timestamp` và `frame_index / fps`: 0 s
 **Kết luận cho lưới HE (design mục 7.3):** N_teleop của task hai bàn là 99 ≥ 80, nên điểm cuối của lưới giữ ở 80 demo; không cần báo động (< 40).
 
 Kiểm rằng phép kiểm không rỗng: một zip giả 5 episode cấy lần lượt NaN, `timestamp` lùi, episode 1 s, `next.done` giữa chừng và thiếu video. Script bắt đúng 4 episode lỗi, mỗi episode đúng phép kiểm đã cấy, và cho 1/5 đạt.
+
+## 4. Layout, seed và tham số ngẫu nhiên hóa (AC 4 · V6 phần dữ liệu)
+
+Lệnh `seeds` quét mọi file JSON và JSONL trong `meta/` của từng dataset (gồm cả chuỗi JSON `environment_config` lồng trong `episodes.jsonl`) để tìm khóa chứa `seed`, và quét tên cột parquet. Gói eval chứa nhiều dataset (mỗi mức một thư mục `dr-level-*`); script đọc từng cái. Bản eval ở `main` (`de140d6`) chép từ `~/denso-s103` để so.
+
+```bash
+python3 -I scripts/g0/inspect_psi_data.py seeds --train <gói train>.zip <gói eval>.zip ... --json seeds-<task>.json
+```
+
+Task hai bàn:
+
+| Gói (sha256) | Dataset | Episode | Khóa `seed` trong meta | Cột `seed` | `split` | `dr_level` | Có `layout` | Có `dr_state_dict` | `dr_cfgs` khác nhau |
+|---|---|---|---|---|---|---|---|---|---|
+| `e78fb93/simple/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` (`6cdf9022`) | `G1WholebodyLocomotionPickBetweenTablesTeleop-v0` | 99 | không | không | train | 0 | 99/99 | 99/99 | 2 |
+| `e78fb93/simple-eval/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` (`8a4b0ff7`) | `G1WholebodyLocomotionPickBetweenTablesTeleop-v0/dr-level-0` | 10 | không | không | train | 0 | 10/10 | 10/10 | 1 |
+| `e78fb93/simple-eval/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` (`8a4b0ff7`) | `G1WholebodyLocomotionPickBetweenTablesTeleop-v0/dr-level-1` | 10 | không | không | train | 0 | 10/10 | 10/10 | 1 |
+| `e78fb93/simple-eval/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` (`8a4b0ff7`) | `G1WholebodyLocomotionPickBetweenTablesTeleop-v0/dr-level-2` | 10 | không | không | train | 0 | 10/10 | 10/10 | 1 |
+| `main-de140d6/simple-eval/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` (`7d215cf3`) | `G1WholebodyLocomotionPickBetweenTablesTeleop-v0/dr-level-0` | 10 | không | không | train | 0 | 10/10 | 10/10 | 1 |
+| `main-de140d6/simple-eval/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` (`7d215cf3`) | `G1WholebodyLocomotionPickBetweenTablesTeleop-v0/dr-level-1` | 10 | không | không | train | 0 | 10/10 | 10/10 | 1 |
+| `main-de140d6/simple-eval/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` (`7d215cf3`) | `G1WholebodyLocomotionPickBetweenTablesTeleop-v0/dr-level-2` | 10 | không | không | train | 0 | 10/10 | 10/10 | 1 |
+| `main-de140d6/simple-eval/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` (`7d215cf3`) | `G1WholebodyLocomotionPickBetweenTablesTeleop-v0/dr-level-hard` | 10 | không | không | train | 0 | 10/10 | 10/10 | 1 |
+
+So với gói train `e78fb93/simple/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip`: số episode i có vị trí ban đầu trùng đúng từng số với episode i của train, theo từng vật có mặt ở mọi episode của `dr_state_dict.spatial` (vật gây nhiễu đổi theo episode nên không so).
+
+| Gói | Dataset | Episode | Vị trí trùng theo vật | `dr_state_dict` trùng cùng chỉ số | `dr_state_dict` có trong train |
+|---|---|---|---|---|---|
+| `e78fb93/simple-eval/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` | `G1WholebodyLocomotionPickBetweenTablesTeleop-v0/dr-level-0` | 10 | `0` 10, `container_0` 10, `g1_sonic` 10 | 0 | 0 |
+| `e78fb93/simple-eval/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` | `G1WholebodyLocomotionPickBetweenTablesTeleop-v0/dr-level-1` | 10 | `0` 10, `container_0` 10, `g1_sonic` 10 | 0 | 0 |
+| `e78fb93/simple-eval/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` | `G1WholebodyLocomotionPickBetweenTablesTeleop-v0/dr-level-2` | 10 | `0` 0, `container_0` 0, `g1_sonic` 10 | 0 | 0 |
+| `main-de140d6/simple-eval/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` | `G1WholebodyLocomotionPickBetweenTablesTeleop-v0/dr-level-0` | 10 | `0` 10, `container_0` 10, `g1_sonic` 0 | 0 | 0 |
+| `main-de140d6/simple-eval/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` | `G1WholebodyLocomotionPickBetweenTablesTeleop-v0/dr-level-1` | 10 | `0` 10, `container_0` 10, `g1_sonic` 0 | 0 | 0 |
+| `main-de140d6/simple-eval/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` | `G1WholebodyLocomotionPickBetweenTablesTeleop-v0/dr-level-2` | 10 | `0` 0, `container_0` 0, `g1_sonic` 0 | 0 | 0 |
+| `main-de140d6/simple-eval/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` | `G1WholebodyLocomotionPickBetweenTablesTeleop-v0/dr-level-hard` | 10 | `0` 0, `container_0` 0, `g1_sonic` 0 | 0 | 0 |
+
+F1 (`BendPickTeleop` so với eval của nó; `BendPickMP` so với eval của nó):
+
+So với gói train `e78fb93/simple/G1WholebodyBendPickTeleop-v0.zip`: số episode i có vị trí ban đầu trùng đúng từng số với episode i của train, theo từng vật có mặt ở mọi episode của `dr_state_dict.spatial` (vật gây nhiễu đổi theo episode nên không so).
+
+| Gói | Dataset | Episode | Vị trí trùng theo vật | `dr_state_dict` trùng cùng chỉ số | `dr_state_dict` có trong train |
+|---|---|---|---|---|---|
+| `e78fb93/simple-eval/G1WholebodyBendPickTeleop-v0.zip` | `G1WholebodyBendPickTeleop-v0/dr-level-0` | 10 | `0` 10, `g1_sonic` 10 | 0 | 0 |
+| `e78fb93/simple-eval/G1WholebodyBendPickTeleop-v0.zip` | `G1WholebodyBendPickTeleop-v0/dr-level-1` | 10 | `0` 10, `g1_sonic` 10 | 0 | 0 |
+| `e78fb93/simple-eval/G1WholebodyBendPickTeleop-v0.zip` | `G1WholebodyBendPickTeleop-v0/dr-level-2` | 10 | `0` 0, `g1_sonic` 10 | 0 | 0 |
+
+So với gói train `e78fb93/simple/G1WholebodyBendPickMP-v0.zip`: số episode i có vị trí ban đầu trùng đúng từng số với episode i của train, theo từng vật có mặt ở mọi episode của `dr_state_dict.spatial` (vật gây nhiễu đổi theo episode nên không so).
+
+| Gói | Dataset | Episode | Vị trí trùng theo vật | `dr_state_dict` trùng cùng chỉ số | `dr_state_dict` có trong train |
+|---|---|---|---|---|---|
+| `e78fb93/simple-eval/G1WholebodyBendPickMP-v0.zip` | `G1WholebodyBendPickMP-v0/dr-level-0` | 10 | `0` 10, `g1_wholebody` 10 | 0 | 0 |
+| `e78fb93/simple-eval/G1WholebodyBendPickMP-v0.zip` | `G1WholebodyBendPickMP-v0/dr-level-1` | 10 | `0` 10, `g1_wholebody` 10 | 0 | 0 |
+| `e78fb93/simple-eval/G1WholebodyBendPickMP-v0.zip` | `G1WholebodyBendPickMP-v0/dr-level-2` | 10 | `0` 0, `g1_wholebody` 10 | 0 | 0 |
+
+Kết luận:
+
+- **Episode có ghi layout và tham số ngẫu nhiên hóa, không ghi seed.** Mỗi dòng `episodes.jsonl` có `environment_config` gồm `dr_cfgs` (cấu hình bộ ngẫu nhiên hóa: vùng đặt robot, vật, thùng, vật gây nhiễu, ánh sáng, cảnh `hssd:scene6`), `dr_state_dict` (giá trị đã rút cho episode đó, gồm vị trí ban đầu) và `layout`. Không có khóa hay cột nào chứa `seed` trong mọi gói và mọi mức eval.
+- **Gói eval:** ở `e78fb93`, cả ba task có 3 mức (`dr-level-0`, `-1`, `-2`) × 10 episode; episode eval chỉ có 1 khung (trạng thái ban đầu để dựng điều kiện). Bản ở `main` của task hai bàn có thêm mức `dr-level-hard`, 4 × 10. Trường `metadata.split` ghi `train` và `metadata.dr_level` ghi `0` ở mọi mức, nên mức chỉ đọc được từ tên thư mục.
+- **Dải hạt giống của `simple-eval`: không suy được số.** Bản #24 ghi `0..24`; số đó gán cứng trong script cũ, không có trong gói. Điều suy được, **suy luận** từ bảng trên: ở mức 0 và 1, episode eval thứ i có vị trí ban đầu của robot, vật và thùng trùng đến từng bit với episode train thứ i (10/10 ở cả ba task); ở mức 2 chỉ vị trí robot còn trùng. SpatialDR rút vị trí theo một thứ tự cố định từ bộ sinh số ngẫu nhiên của episode, nên trùng đến từng bit nghĩa là episode eval i và episode train i bắt đầu từ cùng một luồng ngẫu nhiên, tức cùng seed. Hệ quả: ở mức 0 và 1, tập eval của tác giả đặt vật và thùng đúng chỗ như 10 demo train đầu tiên (vật gây nhiễu, ánh sáng, vật liệu khác). Số đo trên eval của tác giả vì vậy không phải số trên điều kiện mới; dải `dev` và `holdout` của đội phải rời cả train lẫn eval của tác giả.
+- **Dải hạt giống của đội** **[Đã chốt]** (Hiếu, 2/11/2026): một bảng chung cho mọi task và mọi nguồn, [`configs/splits/default.yaml`](../../configs/splits/default.yaml): `train` `[0, 1_000_000)`, `dev` `[1_000_000, 1_001_000)`, `holdout` `[2_000_000, 2_001_000)`; không có split `gate` riêng. Seed của tác giả, theo suy luận trên là số nhỏ quanh chỉ số episode, rơi vào `train`. Bản #24 đề xuất dải `1000..1999`, `2000..2999`, `9000..9999` và split `gate`; đã bỏ.
+- Hai bộ eval khác nhau: bản `main` mà S1-03 đang dùng có vị trí robot khác hẳn train (0/10) nhưng giữ vật và thùng (10/10 ở mức 0, 1). Báo Hiếu chốt bản eval nào là bản của đội: `e78fb93` (khớp gói train đã ghim) hay `main`.
