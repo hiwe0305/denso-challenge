@@ -57,7 +57,7 @@ Lệnh ghi `copies/<id>/` (bản cấy và bản sạch, id trung tính từ `co
 
 ### Chạy trên psi-data thật (4/11/2026)
 
-Nguồn: gói hai bàn `simple/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` của `USC-PSI-Lab/psi-data` @ `e78fb93`, bản S1-07 đã tải (`rtx3060:~/denso-s107/fwdata/psi-data/e78fb93/`, sha256 zip `6cdf9022…927586`, khớp `lfs.oid` của HF), giải nén vào `rtx3060:~/denso-da27/fwdata/psi-data/e78fb93/`: 99 episode, 62.764 khung, 207 file. Mã ở nhánh `DA-27-defect-inject` (`5635a97`, sau khi sửa stats và lineage), chép sang `~/denso-da27`; bản chạy đầu (`59793bd`, stats chép từ bản gốc, lineage nằm trong bản sao) giữ ở `fwdata/inject-superseded-1/`, không dùng.
+Nguồn: gói hai bàn `simple/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` của `USC-PSI-Lab/psi-data` @ `e78fb93`, bản S1-07 đã tải (`rtx3060:~/denso-s107/fwdata/psi-data/e78fb93/`, sha256 zip `6cdf9022…927586`, khớp `lfs.oid` của HF), giải nén vào `rtx3060:~/denso-da27/fwdata/psi-data/e78fb93/`: 99 episode, 62.764 khung, 207 file. Mã ở nhánh `DA-27-defect-inject` (`ee7d8cf`, sau khi sửa stats và lineage), chép sang `~/denso-da27`; lần chạy ở `5635a97` (`fwdata/inject-superseded-2/`) cho cùng hai sha256 cây; bản chạy đầu (`59793bd`, stats chép từ bản gốc, lineage nằm trong bản sao) giữ ở `fwdata/inject-superseded-1/`, không dùng.
 
 ```bash
 cd ~/denso-da27
@@ -72,15 +72,15 @@ Kết quả lần chạy 4/11/2026 (đo, một tiến trình CPU, máy đang ch�
 
 | Mục | Giá trị |
 |---|---|
-| Thời gian | 22,5 s wall; `LedgerEntry` ước tính 125,5 s (giả định 1 ms/khung/bản), thực đo 21,83 s |
-| RAM đỉnh | 645 MB (`Maximum resident set size` 660.120 kB) |
+| Thời gian | 26,9 s wall; `LedgerEntry` ước tính 125,5 s (giả định 1 ms/khung/bản), thực đo 25,86 s |
+| RAM đỉnh | 642 MB (`Maximum resident set size` 657.624 kB) |
 | Bản gốc | hash cây trước và sau bằng nhau (`35984186…958ce9`) |
 | Hai bản sao | `fwdata/inject/copies/bench-1e258c0a78ca` (sha256 cây `3e63671e…e7dc6fb`), `fwdata/inject/copies/bench-d19e112835e3` (sha256 cây `f18bcf1c…fc95c7e`), mỗi bản 99 episode, cùng 208 file, cùng một mtime |
 | Đáp án | `fwdata/inject/answers/<id>/defect_manifest.json` và `.sha256`; sha256 `8962a6cf…ea13a72` (`bench-1e258c0a78ca`), `0dc84b49…dc8bbc27` (`bench-d19e112835e3`) |
 
 Kiểm lại từ đĩa (`fwdata/verify_inject.py`, đọc bằng bộ đọc của DA-03): một bản có 33 lỗi, đủ 11 loại × 3 (D1 3, D2 6, D3 9, D5 6, D6 6, D7 3), mỗi dòng manifest qua `defect_applied`; 66 episode không cấy và cả 99 episode của bản kia trùng bản gốc; `joint_limit_exceeded` vượt đúng `limit_high` của `g1.yaml` (ví dụ `left_elbow_joint` 2,0944 → 2,8798, `waist_pitch_joint` 0,52 → 0,78); `unit_deg_rad` trên chiều góc (15, 16, 30); `action_sign_flip` trên chiều có độ lệch chuẩn khác 0 (19, 24); seed rò 2000124, 2000587, 2000692; `drop_frames` bỏ 90–93 dòng; `corrupted_success_label` cắt còn một nửa số khung.
 
-Kiểm đối xứng (cùng script): ở cả hai bản, `episodes_stats.jsonl`, `stats.json`, `stats_psi0.json` bằng stats tính lại từ dữ liệu đọc ngược; không bản nào có `meta/flywheel_lineage.jsonl` (95 và 98 dòng lineage nằm ở `answers/<id>/`); ngoài `meta/benchmark_copy.json`, không file nào chứa `inject`, `defect`, `duplicate`, `bench` nhiều hơn file cùng đường dẫn ở bản gốc (`allow_duplicates` có sẵn trong `environment_config` của psi-data, 99 lần ở cả ba).
+Kiểm đối xứng (cùng script): 66 episode không cấy có stats từng episode giống hệt nhau ở hai bản; ở cả hai bản, `episodes_stats.jsonl`, `stats.json`, `stats_psi0.json` bằng stats tính lại từ dữ liệu đọc ngược; không bản nào có `meta/flywheel_lineage.jsonl` (95 và 98 dòng lineage nằm ở `answers/<id>/`); ngoài `meta/benchmark_copy.json`, không file nào chứa `inject`, `defect`, `duplicate`, `bench` nhiều hơn file cùng đường dẫn ở bản gốc (`allow_duplicates` có sẵn trong `environment_config` của psi-data, 99 lần ở cả ba).
 
 Bàn giao cho DA-31 (Châu), in ra từ lệnh trên, đường dẫn tính từ `rtx3060:~/denso-da27/`; sha256 cây của bản sao (sha256 của danh sách `sha256  đường dẫn` đã sắp xếp) ở bảng trên:
 
