@@ -228,7 +228,9 @@ class Score(ContentEntity):
     ID_PREFIX: ClassVar[str] = "sc"
 
     episode_id: str
-    task_id: str = Field(default="default", min_length=1)
+    # No default: a score is only reproducible against the task it was scored
+    # on, so the caller names it instead of inheriting "default" (PO, #62).
+    task_id: str = Field(min_length=1)
     config_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     scorer_version: str = "1.0.0"
     success: bool | None = None
