@@ -16,6 +16,8 @@ class DataDefectConfig:
     corrupted_prompt: str = "move to random location and stop"
     # Inclusive holdout seeds of configs/splits/default.yaml ([2000000, 2001000)).
     holdout_seed_range: tuple[int, int] = (2_000_000, 2_000_999)
+    # Inclusive train seeds of the split plan ([0, 1000000)), for scaffold condition seeds.
+    scaffold_seed_range: tuple[int, int] = (0, 999_999)
     success_label_keep_fraction: float = 0.5
 
 

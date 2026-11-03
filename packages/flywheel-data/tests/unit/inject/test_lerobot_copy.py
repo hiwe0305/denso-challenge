@@ -10,6 +10,7 @@ from flywheel.contracts.artifacts import DefectManifest
 from flywheel.data.ingest.lerobot import EpisodeFrames, iter_episodes, read_episode_rows
 from flywheel.data.inject.applied import defect_applied
 from flywheel.data.inject.codes import DATA_DEFECT_CODES
+from flywheel.data.inject.config import InjectConfig
 from flywheel.data.inject.dataset import copy_ids
 from flywheel.data.inject.lerobot_copy import (
     COPY_MARKER,
@@ -17,6 +18,7 @@ from flywheel.data.inject.lerobot_copy import (
     frames_to_data,
     inject_copy,
     row_seed,
+    scaffold_seed,
 )
 from lerobot_data import FPS, make_dataset, tree_hashes, video_path
 
@@ -41,6 +43,17 @@ def _seeds(root: Path) -> dict[str, int | None]:
     return {episode_ref(int(r["episode_index"])): row_seed(r) for r in read_episode_rows(root)}
 
 
+def _source_seeds(root: Path) -> dict[str, int | None]:
+    """Seeds the injector starts from: the recorded one, else the scaffold seed."""
+    train = InjectConfig().data.scaffold_seed_range
+    return {
+        episode_ref(int(r["episode_index"])): row_seed(r)
+        if row_seed(r) is not None
+        else scaffold_seed(42, int(r["episode_index"]), train)
+        for r in read_episode_rows(root)
+    }
+
+
 def test_copy_holds_three_episodes_per_kind(built: tuple[Path, Path, DefectManifest]) -> None:
     _, out, manifest = built
     assert manifest.dataset_id == copy_ids(42)[0]
@@ -55,7 +68,7 @@ def test_every_defect_is_in_the_files_written(built: tuple[Path, Path, DefectMan
     # Read both datasets back from disk: the defect must be in what was written.
     src, out, manifest = built
     before, after = _episodes(src), _episodes(out)
-    seeds_before, seeds_after = _seeds(src), _seeds(out)
+    seeds_before, seeds_after = _source_seeds(src), _seeds(out)
     for d in manifest.defects:
         ref = d.target_ref
         old = frames_to_data(before[ref], FPS, seeds_before[ref])
@@ -94,26 +107,32 @@ def test_duplicate_copies_parquet_and_video_of_its_source(
         # A real duplicate carries its source's meta row too, scene layout included.
         rows = {int(r["episode_index"]): r for r in read_episode_rows(out)}
         source_rows = {int(r["episode_index"]): r for r in read_episode_rows(src)}
-        assert rows[slot]["environment_config"] == source_rows[orig]["environment_config"]
+        config = json.loads(rows[slot]["environment_config"])
+        assert config.pop("flywheel") == json.loads(rows[orig]["environment_config"])["flywheel"]
+        assert config == json.loads(source_rows[orig]["environment_config"])
 
 
 def test_leaked_seed_is_in_the_episode_flywheel_block(
     built: tuple[Path, Path, DefectManifest],
 ) -> None:
+    # Every episode carries a scaffold condition seed (PO 4/11/2026): train range, the
+    # same in both copies; only the leaked ones come from holdout.
     _, out, manifest = built
     seeds = _seeds(out)
     leaked = {d.target_ref for d in manifest.defects if d.parameters["kind"] == "holdout_seed_leak"}
     for ref, seed in seeds.items():
+        assert seed is not None, ref
         if ref in leaked:
-            assert seed is not None and 2_000_000 <= seed <= 2_000_999
+            assert 2_000_000 <= seed <= 2_000_999
         else:
-            assert seed is None
+            assert 0 <= seed < 1_000_000
 
 
 def test_copy_carries_its_neutral_marker(built: tuple[Path, Path, DefectManifest]) -> None:
     _, out, manifest = built
     marker = json.loads((out / "meta" / COPY_MARKER).read_text())
-    assert marker == {"benchmark_copy_id": manifest.dataset_id}
+    assert marker["benchmark_copy_id"] == manifest.dataset_id
+    assert "flywheel.seed" in marker["scaffolding"]
 
 
 def test_every_episode_is_rewritten_so_none_stands_out(

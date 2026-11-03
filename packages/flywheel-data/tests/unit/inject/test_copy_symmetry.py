@@ -276,3 +276,44 @@ def test_videos_pass_through_and_only_a_frame_drop_changes_the_row_count(
             if set(f.video_frames.values()) != {len(f.timestamp)}:
                 off.add(i)
         assert off == (dropped if name == "defect" else set()), name
+
+
+def test_every_episode_has_one_scaffold_seed_in_both_copies(
+    copies: tuple[Path, dict[str, Path]],
+) -> None:
+    out, roots = copies
+    manifest = load_manifest(out / "answers" / roots["defect"].name / "defect_manifest.json")
+    leaked = {
+        int(d.target_ref.removeprefix("episode_"))
+        for d in manifest.defects
+        if d.parameters["kind"] == "holdout_seed_leak"
+    }
+    blocks = {}
+    for name, root in roots.items():
+        rows = read_episode_rows(root)
+        blocks[name] = {
+            int(r["episode_index"]): json.loads(r["environment_config"])["flywheel"] for r in rows
+        }
+        assert {tuple(sorted(b)) for b in blocks[name].values()} == {("seed",)}, name
+    for index, clean in blocks["clean"].items():
+        defect = blocks["defect"][index]
+        if index in leaked:
+            assert 2_000_000 <= defect["seed"] <= 2_000_999
+            assert 0 <= clean["seed"] < 1_000_000
+        else:
+            assert 0 <= clean["seed"] < 1_000_000
+    targets = {int(d.target_ref.removeprefix("episode_")) for d in manifest.defects}
+    untouched = [i for i in blocks["clean"] if i not in targets]
+    assert all(blocks["defect"][i] == blocks["clean"][i] for i in untouched)
+    # An untouched episode's meta row is the same in both copies, but for the index range
+    # that a drop_frames episode before it shifts.
+    shifts = {"dataset_from_index", "dataset_to_index"}
+
+    def rows(root: Path) -> dict[int, dict[str, object]]:
+        return {
+            int(r["episode_index"]): {k: v for k, v in r.items() if k not in shifts}
+            for r in read_episode_rows(root)
+        }
+
+    defect_rows, clean_rows = rows(roots["defect"]), rows(roots["clean"])
+    assert all(defect_rows[i] == clean_rows[i] for i in untouched)
