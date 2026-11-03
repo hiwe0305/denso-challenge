@@ -76,11 +76,13 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 3/11/2026 | DA-09 dời sau demo: probe của demo dùng file mẫu (07 mục 2.4, bản 1.2) | PO (Hiếu) |
 | 3/11/2026 | Phạm vi file: thêm `packages/flywheel-eval/tests/contract/diagnosis/system/` cho test lái lệnh `fw eval diag-system` của nhiệm vụ con 7 (pr-guard R6) | Châu |
 | 3/11/2026 | Thêm nhiệm vụ con 7 (`api.py`, `fw eval diag-system`, artifact) và 8 (issue Contract change cho bản ghi kết quả). Nhiệm vụ 1-6 không phủ `api.py`, `cli.py` dù hai file nằm trong phạm vi, và phần 6 của demo cần điểm vào. `TraceStep`, `CameraParams` (issue #31, PR #48) chưa merge nên bộ đọc giữ đúng tên trường của đề xuất, đổi sang contract khi #48 merge | Châu |
+| 3/11/2026 | Sửa theo review PO của PR #71 (14 lỗi), theo quyết định Q1–Q3 của PO: R6 đứng đầu, nhãn `infra` khi `infra_status` khác `ok` (Q1); R2 đếm chunk có `delay_steps > buffer_level`, trừ chunk đầu của trace, bỏ `r2.min_buffer_level` (Q2); `CameraParams.reference_sha256` là hash bản tham chiếu ghim ở G0, R5 so hash rồi so giá trị trong dung sai (Q3). Bộ đọc coi `t_image: null` là không có khung mới, lọc `rtc.jsonl` theo `trace_id`, hash mọi file đầu vào; R3 bỏ qua theo nửa thân; `episode.json` ghi là tạm thời chờ hook DA-38. Test đọc 4 file mẫu trace của PR #48 (chép làm dữ liệu test của làn) | Hiếu, cùng Claude |
 
 ## Ghi chép khi làm
 
 - Giờ thực: 15h (nhiệm vụ 1-7; ước lượng story là 9h, vượt vì hai bộ ngưỡng và bảng quy lỗi đều phải có test đối chứng)
 - Công cụ AI đã dùng: Claude Code (Opus 5)
+- Ghi chú sau review PO (3/11/2026): với `refill_at=0` mặc định của `RTCClient` (DA-19), mọi chunk có `buffer_level = 0` và `delay_steps ≥ 1`, nên R2 vẫn nổ trên lượt thật cho tới khi DA-19 đặt `refill_at` không nhỏ hơn độ trễ dự kiến. Trên rollout SIMPLE, R4 luôn bằng 0 do sim chạy đồng bộ (`t_image = t_state`); "R4 sạch" trên sim không phải bằng chứng đã kiểm đồng bộ cảm biến. P1 hiện là số trên cả tập probe; P1 theo từng lượt là đề xuất hợp đồng (issue #70). Vế "lỗi mới sau fine-tune" của dòng 4 chưa kiểm.
 - Ghi chú hoàn thành: AC 1-6 đạt trên trace tổng hợp và file mẫu probe của testkit. Chưa chạy trên `Trace` thật của SIMPLE (hook của Hiếu, 8/11) và chưa chạy trên probe thật (DA-09 dời sau demo). R5 ra CHƯA RÕ tới khi G0 ghim bản tham chiếu camera; `reference_sha256` trong `system.yaml` còn `null`. Mọi ngưỡng trong hai file config là giả định, cách hiệu chỉnh ghi ngay trên dòng.
 - File đã tạo hoặc sửa:
   - `packages/flywheel-eval/src/flywheel/eval/diagnosis/system/`: `reader.py`, `verdict.py`, `signals.py`, `tracking.py`, `runtime.py`, `check.py`, `artifact.py`
