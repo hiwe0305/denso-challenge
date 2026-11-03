@@ -1,6 +1,6 @@
 # Pipeline dữ liệu: ingest, QA, release, báo cáo trên psi-data và khay S1
 
-_Ngày 4/11/2026. Story [DA-03](../product/stories/DA-03-pipeline-teleop-synthetic.md) nhiệm vụ 6.3, PR 2. Mọi số trong file này là output của `fw data` ở commit `e3aad54`, chạy trên máy `rtx3060`. Thời gian chạy và RSS đỉnh đo bằng `/usr/bin/time -v`. Dữ liệu và kết quả nằm ở `rtx3060:~/denso-da03-pr2/fwdata/` và không commit._
+_Ngày 4/11/2026. Story [DA-03](../product/stories/DA-03-pipeline-teleop-synthetic.md) nhiệm vụ 6.3, PR 2. Mọi số trong file này là output của `fw data`, chạy trên máy `rtx3060`: hai nguồn ở commit `e3aad54`, hai bản sao chấm lỗi của DA-27 (mục 3.5) ở commit `82e0752`, sau khi #53 merge. Thời gian chạy và RSS đỉnh đo bằng `/usr/bin/time -v`. Dữ liệu và kết quả nằm ở `rtx3060:~/denso-da03-pr2/fwdata/` và không commit._
 
 ## Kết luận
 
@@ -8,6 +8,7 @@ _Ngày 4/11/2026. Story [DA-03](../product/stories/DA-03-pipeline-teleop-synthet
 - **psi-data** (task hai bàn, 99 episode): 95 `pass`, 4 `flag`, không episode nào `reject`. Release `rel_24363158e44e66b4` có 99 episode.
 - **Khay S1** (DA-33, 102 episode): cả 102 episode bị `flag` vì `action_jump.arm`, không episode nào `reject`. Release `rel_9f32f33779c904f2` có 102 episode.
 - **D4 thật trên cả hai nguồn.** `meta/stats.json` ghi `states.mean` lệch so với frame: 3,63e-4 ở psi-data (chiều 31) và 7,67e-4 ở khay S1 (chiều 6). Phần `action` khớp đến từng bit.
+- **Bản sao chấm lỗi bị chặn.** Hai bản sao của DA-27 (#53) đi qua `ingest` và `qa`, nhưng `release` từ chối cả hai bằng `has_injected_defect` và trả mã 2 (mục 3.5).
 - Chưa chạy được ba phép kiểm phát lại (`replay_kinematic`, `replay_dynamic`, `replay_success`) vì chưa có `ReplayReport` của DA-17. `qa.yaml` cho phép bỏ qua khi thiếu đầu vào (`when_missing: skip`), và trang báo cáo ghi rõ phép kiểm nào chưa chạy.
 
 Việc phát sinh, Hiếu quyết:
@@ -98,11 +99,26 @@ Không suy được vì sao chỉ `states.mean` lệch còn `action` thì khớp
 
 `read_release` của cả hai thư mục đã tính lại hash của item và khớp với `manifest_sha256` và file `FROZEN`. Trang HTML nằm ở `fwdata/pipeline/<source_id>/report/index.html`.
 
+### 3.5 Bản sao chấm lỗi của DA-27
+
+Hai bản sao `bench-1e258c0a78ca` và `bench-d19e112835e3` được chép từ `rtx3060:~/denso-da27/fwdata/inject/copies/` vào `fwdata/sources/`. Mỗi bản chạy `ingest`, `qa`, `release` với `--source-detail psi_data`. Đáp án `DefectManifest` không được đọc (chỉ bộ chấm đọc). Bảng dưới chỉ là output QA của đội, không phải điểm recall của bộ lỗi cấy.
+
+| Trường | `bench-1e258c0a78ca` | `bench-d19e112835e3` |
+|---|---|---|
+| `source_id` | `src_921954c2d2c28a8f` | `src_d13edebf5b2fb3b8` |
+| Episode, frame | 99, 62 764 | 99, 62 643 |
+| `pass` / `flag` / `quarantine` / `reject` | 95 / 4 / 0 / 0 | 77 / 6 / 0 / 16 |
+| Phép kiểm trượt (số episode) | `action_jump` 4, như psi-data gốc | `joint_limits` 7; `finite_values`, `frame_index_contiguous`, `image_state_sync`, `split_seed`, `timestamp_step`, `video_rows_match` mỗi phép 3; `action_jump` 9 |
+| D4 (`stats.json`, `episodes_stats.jsonl`) | khớp (0) | khớp (0) |
+| `fw data release` | mã 2: 99 episode thuộc bản sao `bench-1e258c0a78ca` | mã 2: 99 episode thuộc bản sao `bench-d19e112835e3`, và 3 episode có seed 2000124, 2000587, 2000692 ngoài dải train (D5) |
+
+Release từ chối liệt kê mọi lý do cùng lúc và không ghi thư mục release nào. Dòng thực đo của job vẫn được ghi, với ghi chú `failed: ReleaseRefused`. Ở cả hai bản sao, `stats.json` khớp frame, vì DA-27 tính lại stats khi ghi bản sao (DA-27 nhiệm vụ 9.7).
+
 ## 4. Lần chạy đầu bị thay
 
 Lần chạy đầu (cùng ngày, trước commit `e3aad54`) cho psi-data 28 `reject` và khay S1 102 `reject`, tất cả do `joint_limits`. Mọi vi phạm đều nhỏ hơn hoặc bằng 1,02e-6 rad. Nguyên nhân có hai phần: sai số float, và `g1.yaml` làm tròn giới hạn URDF đến 5 chữ số (1,97222 so với 1,972222). Ngưỡng được đổi thành 1e-5 rad, kèm test `test_a_limit_rounded_in_the_layout_is_no_breach`. Cũng trong lần sửa đó, so sánh stats chuyển sang float32 vì float64 báo nhiễu 1,1e-5.
 
-Kết quả lần đầu đã chuyển sang `fwdata/superseded-1/`, gồm các release `rel_0c48621c43418b7f` và `rel_512c65ecf9d47c2d`. Sổ chi phí chỉ ghi thêm, nên 16 dòng của lần đầu vẫn nằm cùng 16 dòng của lần cuối trong `g0-DA-03-20261104`. Dòng chạy thử nằm ở `g0-DA-03-trial`.
+Kết quả lần đầu đã chuyển sang `fwdata/superseded-1/`, gồm các release `rel_0c48621c43418b7f` và `rel_512c65ecf9d47c2d`. Sổ chi phí chỉ ghi thêm. Vì vậy `g0-DA-03-20261104` có 44 dòng: 16 của lần đầu, 16 của lần cuối và 12 của hai bản sao ở mục 3.5. Dòng chạy thử nằm ở `g0-DA-03-trial`.
 
 ## 5. Khoảng trống của hợp đồng
 
