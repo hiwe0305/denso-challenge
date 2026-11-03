@@ -37,10 +37,11 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Literal, cast, get_args
 
 from flywheel.contracts.artifacts import Episode, EpisodeMetadata
+from flywheel.data.config import store_root
 from flywheel.data.ingest.lerobot import (
     EpisodeFrames,
     IndexFinding,
@@ -109,6 +110,7 @@ class EpisodeLineage:
 class SourceRecord:
     source_id: str  # src_<hash of detail, license, data_class and every file hash>
     root: str  # absolute path the dataset was registered from
+    store_path: str  # the same dataset, relative to the store root (posix)
     source_detail: str
     license: str
     data_class: DataClass
@@ -127,8 +129,15 @@ def register_source(
     source_detail: str,
     license: str,
     data_class: Literal["public", "internal", "restricted"],
+    *,
+    store: Path | None = None,
 ) -> SourceRecord:
-    """Hash every file of the LeRobot dataset at root and record where it came from."""
+    """Hash every file of the LeRobot dataset at root and record where it came from.
+
+    The dataset must sit under the store root (`store`, else $FW_ROOT, else
+    ./fwdata): Episodes point at it relative to that root, so a store copied to
+    another machine keeps working (Q6, decided by the PO 3/11/2026).
+    """
     _profile(source_detail)
     if data_class not in get_args(DataClass):
         raise ValueError(f"data_class {data_class!r} is not one of {get_args(DataClass)}")
@@ -136,6 +145,11 @@ def register_source(
         raise ValueError("license must be named; write 'unknown' when it is not known")
     info = read_info(root)
     root = root.resolve()
+    base = (store or store_root()).resolve()
+    if not root.is_relative_to(base):
+        raise ValueError(
+            f"{root} is not under the store root {base}; set FW_ROOT or pass store="
+        )
     files: dict[str, str] = {}
     total = 0
     for path in sorted(p for p in root.rglob("*") if p.is_file()):
@@ -147,6 +161,7 @@ def register_source(
     return SourceRecord(
         source_id=f"src_{identity.hexdigest()[:16]}",
         root=str(root),
+        store_path=root.relative_to(base).as_posix(),
         source_detail=source_detail,
         license=license,
         data_class=data_class,
@@ -181,7 +196,7 @@ def to_episode(frames: EpisodeFrames, source: SourceRecord, split: str) -> Episo
         raise ValueError(
             f"episode {index} of {source.source_id} is a variant without parent_episode"
         )
-    parquet = Path(source.root) / source.data_path.format(
+    parquet = PurePosixPath(source.store_path) / source.data_path.format(
         episode_chunk=index // source.chunks_size, episode_index=index
     )
     return Episode(
@@ -194,7 +209,7 @@ def to_episode(frames: EpisodeFrames, source: SourceRecord, split: str) -> Episo
         condition_id=_condition_id(lineage, key),
         source_id=source.source_id,
         run_plan_id=f"rp_ingest_{source.source_id}",
-        bundle_uri=parquet.as_uri(),
+        bundle_uri=parquet.as_posix(),  # relative to the store root (Q6)
         license=source.license,
         data_class=source.data_class,
         split=split,

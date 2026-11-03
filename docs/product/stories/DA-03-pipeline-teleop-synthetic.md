@@ -39,6 +39,9 @@ PR 1 (hạn 5/11/2026):
 - [x] 2. `register_source`, `to_episode` cho ba nguồn (AC 2)
   - [x] 2.1 Lineage: `parent_id`, `root_id`, seed và level của episode sinh ra lấy từ `environment_config.flywheel`; nhãn ghi theo từng episode phải khớp nguồn (review #69 mục 3, 8)
   - [x] 2.2 Kiểm `split`: từ chối `holdout` (chỉ nằm trong `vault/`, chỉ `gate` đọc) và tên lạ; đối chiếu split đã ghi trong episode (review #69 mục 4)
+  - [x] 2.3 `bundle_uri` tương đối theo gốc kho (`$FW_ROOT`, mặc định `./fwdata`); dataset ngoài gốc kho bị từ chối (Q6, đã chốt 3/11 [Hiếu])
+  - [ ] 2.4 Chặn `deid_status = raw` ở Annotate chỉ áp cho `source_kind = egocentric`; dữ liệu robot, sim, teleop không bị chặn (Q4, đã chốt 3/11 [Hiếu])
+  - [ ] 2.5 Ghi quyết định Q5 (id episode do bên ghi đặt, theo DA-25) và Q7 (đánh số lại `index` theo v2.1) vào mã và test (đã chốt 3/11 [Hiếu])
 
 PR 2 (hạn 9/11/2026):
 
@@ -123,6 +126,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 3/11/2026 | Thêm nhiệm vụ con 2.3–2.5 theo quyết định Q4–Q7 của PO ("Chốt theo đề xuất") | Claude, theo yêu cầu PO (Hiếu) |
 | 3/11/2026 | Thêm nhiệm vụ con 1.1–1.3, 2.1–2.2 theo review PR #69 của PO | Claude, theo yêu cầu PO (Hiếu) |
 | 3/11/2026 | Tạo file story theo 07 bản 1.6 và plan chia lại việc (Q2, Q3, Q5): ingest, QA, release, báo cáo cho psi-data, khay S1, khay S2; normalize, cắt đoạn, nguồn bàn phím sau 13/11; hai PR | PO (Hiếu) |
 

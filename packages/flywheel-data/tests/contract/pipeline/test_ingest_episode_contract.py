@@ -50,7 +50,8 @@ def set_block(root: Path, block: dict[str, object]) -> None:
 
 
 @pytest.fixture
-def frames(tmp_path: Path) -> tuple[Path, EpisodeFrames]:
+def frames(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, EpisodeFrames]:
+    monkeypatch.setenv("FW_ROOT", str(tmp_path))
     (tmp_path / "meta").mkdir()
     (tmp_path / "meta" / "info.json").write_text(json.dumps(INFO))
     one = EpisodeFrames(
@@ -85,4 +86,5 @@ def test_ingested_episode_round_trips_as_the_contract(
     assert payload["data_class"] == "public"
     assert payload["meta"]["injected_defect"] is None
     assert payload["parent_id"] == BLOCKS[detail].get("parent_episode")
+    assert payload["bundle_uri"] == "data/chunk-000/episode_000000.parquet"
     assert ("unknown" in payload["condition_id"]) == ("seed" not in BLOCKS[detail])
