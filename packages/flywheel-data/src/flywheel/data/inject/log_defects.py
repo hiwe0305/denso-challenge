@@ -7,8 +7,8 @@ import copy
 import random
 from typing import Any
 
+from flywheel.contracts.artifacts import Defect
 from flywheel.data.inject.config import RTCDefectConfig, TrainDefectConfig
-from flywheel.data.inject.manifest import DefectRecord
 
 
 class TrainLogDefectInjector:
@@ -46,14 +46,14 @@ class TrainLogDefectInjector:
 
     def inject_t1_divergence(
         self, logs: list[dict[str, Any]], target_job: str = "job_train_t1"
-    ) -> tuple[list[dict[str, Any]], DefectRecord]:
+    ) -> tuple[list[dict[str, Any]], Defect]:
         new_logs = copy.deepcopy(logs)
         mid = len(new_logs) // 2
         for i in range(mid, len(new_logs)):
             mult = self.config.t1_loss_multiplier
             val = float("nan") if i == mid + 2 else new_logs[i]["train_loss"] * mult
             new_logs[i]["train_loss"] = val
-        defect = DefectRecord(
+        defect = Defect(
             target_ref=target_job,
             code="T1_divergence",
             parameters={"step_started": mid, "multiplier": self.config.t1_loss_multiplier},
@@ -62,12 +62,12 @@ class TrainLogDefectInjector:
 
     def inject_t2_not_learning(
         self, logs: list[dict[str, Any]], target_job: str = "job_train_t2"
-    ) -> tuple[list[dict[str, Any]], DefectRecord]:
+    ) -> tuple[list[dict[str, Any]], Defect]:
         new_logs = copy.deepcopy(logs)
         initial_val = new_logs[0]["val_loss"]
         for entry in new_logs:
             entry["val_loss"] = initial_val - (entry["step"] * self.config.t2_decay_rate)
-        defect = DefectRecord(
+        defect = Defect(
             target_ref=target_job,
             code="T2_not_learning",
             parameters={"decay_rate": self.config.t2_decay_rate},
@@ -76,13 +76,13 @@ class TrainLogDefectInjector:
 
     def inject_t3_overfitting(
         self, logs: list[dict[str, Any]], target_job: str = "job_train_t3"
-    ) -> tuple[list[dict[str, Any]], DefectRecord]:
+    ) -> tuple[list[dict[str, Any]], Defect]:
         new_logs = copy.deepcopy(logs)
         start = max(1, len(new_logs) - self.config.t3_val_loss_steps)
         for i in range(start, len(new_logs)):
             new_logs[i]["train_loss"] *= 0.85
             new_logs[i]["val_loss"] = new_logs[i - 1]["val_loss"] * 1.15
-        defect = DefectRecord(
+        defect = Defect(
             target_ref=target_job,
             code="T3_overfitting",
             parameters={"consecutive_val_increases": self.config.t3_val_loss_steps},
@@ -91,12 +91,12 @@ class TrainLogDefectInjector:
 
     def inject_t4_group_imbalance(
         self, logs: list[dict[str, Any]], target_job: str = "job_train_t4"
-    ) -> tuple[list[dict[str, Any]], DefectRecord]:
+    ) -> tuple[list[dict[str, Any]], Defect]:
         new_logs = copy.deepcopy(logs)
         grp = self.config.t4_frozen_group
         for entry in new_logs:
             entry["loss_groups"][grp] = 1.85  # constant flat high loss
-        defect = DefectRecord(
+        defect = Defect(
             target_ref=target_job,
             code="T4_group_imbalance",
             parameters={"stuck_group": grp},
@@ -105,12 +105,12 @@ class TrainLogDefectInjector:
 
     def inject_t5_dead_dimension(
         self, logs: list[dict[str, Any]], target_job: str = "job_train_t5"
-    ) -> tuple[list[dict[str, Any]], DefectRecord]:
+    ) -> tuple[list[dict[str, Any]], Defect]:
         new_logs = copy.deepcopy(logs)
         dim = self.config.t5_dead_dim
         for entry in new_logs:
             entry["pred_variance"][dim] = 0.0
-        defect = DefectRecord(
+        defect = Defect(
             target_ref=target_job,
             code="T5_dead_dimension",
             parameters={"dead_dimension": dim},
@@ -119,12 +119,12 @@ class TrainLogDefectInjector:
 
     def inject_t6_mode_collapse(
         self, logs: list[dict[str, Any]], target_job: str = "job_train_t6"
-    ) -> tuple[list[dict[str, Any]], DefectRecord]:
+    ) -> tuple[list[dict[str, Any]], Defect]:
         new_logs = copy.deepcopy(logs)
         thresh = self.config.t6_std_threshold
         for entry in new_logs:
             entry["pred_std"] = thresh * 0.1
-        defect = DefectRecord(
+        defect = Defect(
             target_ref=target_job,
             code="T6_mode_collapse",
             parameters={"std_value": thresh * 0.1},
@@ -133,12 +133,12 @@ class TrainLogDefectInjector:
 
     def inject_t7_forgetting(
         self, logs: list[dict[str, Any]], target_job: str = "job_train_t7"
-    ) -> tuple[list[dict[str, Any]], DefectRecord]:
+    ) -> tuple[list[dict[str, Any]], Defect]:
         new_logs = copy.deepcopy(logs)
         drop = self.config.t7_drop_ratio
         for entry in new_logs[len(new_logs) // 2 :]:
             entry["p4_score"] = round(entry["p4_score"] * (1.0 - drop), 3)
-        defect = DefectRecord(
+        defect = Defect(
             target_ref=target_job,
             code="T7_forgetting",
             parameters={"score_drop_ratio": drop},
@@ -147,12 +147,12 @@ class TrainLogDefectInjector:
 
     def inject_t8_gradient_anomaly(
         self, logs: list[dict[str, Any]], target_job: str = "job_train_t8"
-    ) -> tuple[list[dict[str, Any]], DefectRecord]:
+    ) -> tuple[list[dict[str, Any]], Defect]:
         new_logs = copy.deepcopy(logs)
         norm = self.config.t8_frozen_grad_norm
         for entry in new_logs:
             entry["frozen_vlm_grad"] = norm
-        defect = DefectRecord(
+        defect = Defect(
             target_ref=target_job,
             code="T8_gradient_anomaly",
             parameters={"frozen_vlm_grad": norm},
@@ -188,14 +188,14 @@ class RTCLogDefectInjector:
 
     def inject_r1_high_latency(
         self, logs: list[dict[str, Any]], target_job: str = "job_rtc_r1"
-    ) -> tuple[list[dict[str, Any]], DefectRecord]:
+    ) -> tuple[list[dict[str, Any]], Defect]:
         new_logs = copy.deepcopy(logs)
         lat = self.config.r1_p99_latency_ms
         for entry in new_logs[len(new_logs) // 2 :]:
             entry["latency_ms"] = lat
             entry["chunk_received_s"] = entry["observation_sent_s"] + (lat / 1000.0)
             entry["delay_steps"] = 5
-        defect = DefectRecord(
+        defect = Defect(
             target_ref=target_job,
             code="R1_high_latency",
             parameters={"p99_latency_ms": lat},
@@ -204,12 +204,12 @@ class RTCLogDefectInjector:
 
     def inject_r2_buffer_depleted(
         self, logs: list[dict[str, Any]], target_job: str = "job_rtc_r2"
-    ) -> tuple[list[dict[str, Any]], DefectRecord]:
+    ) -> tuple[list[dict[str, Any]], Defect]:
         new_logs = copy.deepcopy(logs)
         depleted = self.config.r2_depleted_steps
         for entry in new_logs[-depleted:]:
             entry["buffer_level"] = 0
-        defect = DefectRecord(
+        defect = Defect(
             target_ref=target_job,
             code="R2_buffer_depleted",
             parameters={"depleted_steps": depleted},

@@ -25,8 +25,8 @@ def test_injector_preserves_original() -> None:
     injector = DataDefectInjector()
     modified, _ = injector.inject_drop_frames(original)
     assert len(original.images) == 5
-    assert "injected_defect" not in original.meta
-    assert "injected_defect" in modified.meta
+    assert original.meta.injected_defect is None
+    assert modified.meta.injected_defect is not None
 
 
 def test_inject_drop_frames() -> None:

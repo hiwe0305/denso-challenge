@@ -2,6 +2,7 @@
 
 import math
 
+from flywheel.contracts.artifacts import Defect
 from flywheel.data.inject.log_defects import RTCLogDefectInjector, TrainLogDefectInjector
 
 
@@ -102,3 +103,17 @@ def test_inject_r2_buffer_depleted() -> None:
     mod, defect = injector.inject_r2_buffer_depleted(logs)
     assert defect.code == "R2_buffer_depleted"
     assert mod[-1]["buffer_level"] == 0
+
+
+def test_log_defects_use_the_contract_defect() -> None:
+    train = TrainLogDefectInjector()
+    rtc = RTCLogDefectInjector()
+    logs = train.generate_clean_train_log(total_steps=10)
+    rtc_logs = rtc.generate_clean_rtc_log(total_chunks=10)
+    defects = [
+        train.inject_t1_divergence(logs)[1],
+        train.inject_t8_gradient_anomaly(logs)[1],
+        rtc.inject_r1_high_latency(rtc_logs)[1],
+        rtc.inject_r2_buffer_depleted(rtc_logs)[1],
+    ]
+    assert all(isinstance(d, Defect) for d in defects)
