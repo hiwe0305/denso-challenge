@@ -1,6 +1,6 @@
 # Phân tích gói psi-data (Q1, V1, V6, V9)
 
-_Ngày 3/11/2026. Story [S1-07](../product/stories/S1-07-phan-tich-psi-data.md), cổng G0. Làm lại từ PR #24 của Thông (nhánh `S1-07-psi-data` @ `e96da77`): giữ cách đọc cấu trúc gói, bỏ mọi số gán cứng. Mọi số trong file này do [`scripts/g0/inspect_psi_data.py`](../../scripts/g0/inspect_psi_data.py) in ra, chạy trên máy `rtx3060`; bảng trong file là output của lệnh, chép nguyên. Số nào script không đo được thì ghi là giả định hoặc "không suy được"._
+_Ngày 3/11/2026. Story [S1-07](../product/stories/S1-07-phan-tich-psi-data.md), cổng G0. Làm lại từ PR #24 của Thông (nhánh `S1-07-psi-data` @ `e96da77`): giữ cách đọc cấu trúc gói, bỏ mọi số gán cứng. Mọi số trong file này do [`scripts/g0/inspect_psi_data.py`](../../scripts/g0/inspect_psi_data.py) in ra, chạy trên máy `rtx3060`; bảng trong file là output của lệnh, chép nguyên. Ngoại lệ ghi rõ "đo ngoài script": ngày commit của revision (trang Hugging Face), thời gian chạy và RSS đỉnh (`/usr/bin/time -v`), và các số đo thêm khi review ngày 3/11/2026 (mục 2, ghi chú kèm lệnh). Số nào không đo được thì ghi là giả định hoặc "không suy được". Bảng QA ở mục 3 chạy lại ngày 3/11/2026 sau review, với 8 phép kiểm._
 
 ## Kết luận
 
@@ -18,10 +18,12 @@ Việc phát sinh cho người khác, Hiếu quyết:
 | 3 | Tập eval trên `rtx3060:~/denso-s103` là bản ở `main` (`de140d6`, 4 mức, vị trí robot khác), không phải `e78fb93` | Số eval S1-03 so với gói train đã ghim | Hiếu chốt bản eval |
 | 4 | Eval mức 0, 1 dùng lại vị trí ban đầu của 10 episode train đầu | Số eval của tác giả không đo trên điều kiện mới; dev và holdout của đội rời cả hai | Hiếu, Châu |
 | 5 | HSSD CC-BY-NC-4.0 và GraspNet CC BY-NC-SA 4.0 nằm trong video psi-data | Rủi ro giấy phép nếu demo bị coi là dùng thương mại; khác với `data_class` | Hiếu |
+| 6 | Design lệch dữ liệu ở ba chỗ: dòng 239 ("`action_layout` đệm 36 chiều như Ψ₀ (`pad36`), kèm mask": action không có chiều đệm, chỉ state đệm 32–35), dòng 537 ("34 cờ rẽ rời rạc": giá trị liên tục, WBC dùng ngưỡng 0,1), dòng 540 ("chiều 0–13 gần như luôn bằng 0": chỉ tay trái 0–6; tay phải 7–13 khác 0 ở 87% khung) | Design mục 6, 9.2; `g1.yaml` của DA-01; T4–T6, O4 của DA-08; `action_sign_flip` của DA-27 | Hiếu sửa design (cần change log) |
+| 7 | Parquet lưu `double`, `info.json` khai `float32` | Bộ đọc LeRobot của DA-03, export DA-02 | Hiếu (DA-02, DA-03) |
 
 ## 1. Tải và sha256 (AC 1)
 
-Revision ghim: `USC-PSI-Lab/psi-data` @ `e78fb93cc28912a3031a10b8656d32d7f0a2b867` (commit ngày 14/09/2026). Script lấy kích thước và `lfs.oid` của từng file từ API cây thư mục của Hugging Face ở đúng revision này, tải file qua `resolve/<sha>/<đường dẫn>`, băm sha256 trong lúc tải rồi so với `lfs.oid`. Dữ liệu nằm ngoài git, ở `rtx3060:~/denso-s107/fwdata/psi-data/e78fb93/<đường dẫn trên HF>`; script ghi kết quả vào `fetch.json` cạnh đó.
+Revision ghim: `USC-PSI-Lab/psi-data` @ `e78fb93cc28912a3031a10b8656d32d7f0a2b867` (commit ngày 14/09/2026, đo ngoài script). Script lấy kích thước và `lfs.oid` của từng file từ API cây thư mục của Hugging Face ở đúng revision này, tải file qua `resolve/<sha>/<đường dẫn>`, băm sha256 trong lúc tải rồi so với `lfs.oid`. Dữ liệu nằm ngoài git, ở `rtx3060:~/denso-s107/fwdata/psi-data/e78fb93/<đường dẫn trên HF>`; script ghi kết quả vào `fetch.json` cạnh đó.
 
 ```bash
 python3 -I scripts/g0/inspect_psi_data.py fetch --revision e78fb93 --out fwdata/psi-data/e78fb93 \
@@ -40,7 +42,7 @@ python3 -I scripts/g0/inspect_psi_data.py fetch --revision e78fb93 --out fwdata/
 | `simple-eval/G1WholebodyBendPickTeleop-v0.zip` | 382,543 | `b532ece10d05ef22c549006f936599fc0954e4eaac7c5d16cec3bc30e294f548` | có |
 | `simple-eval/G1WholebodyBendPickMP-v0.zip` | 1,630,050 | `6bcdb9ddfa1d3f851144f585bda19507ad9efb53e71514dad98836fcefadc5e2` | có |
 
-Sáu file, tổng 290.269.326 B trên đĩa. Tải và băm mất 16 s, RSS đỉnh 23 MB.
+Sáu file, tổng 290.254.498 B trên đĩa (tổng của cột kích thước; bản trước ghi 290.269.326 B là sai). Tải và băm mất 16 s, RSS đỉnh 23 MB (đo ngoài script).
 
 Ghi chú:
 
@@ -95,6 +97,8 @@ Kết quả cho gói hai bàn (output của lệnh, chép nguyên):
 | `next.done` | bool | [1] | None |
 | `task_index` | int64 | [1] | None |
 
+Cột dtype chép từ `info.json`. Parquet lưu `action`, `states`, các cột `observation.*` và `timestamp` dạng `double` (float64), không phải `float32` (đo ngoài script: `pyarrow` đọc schema của episode 0); vì vậy lệch `timestamp` ở mục 3 đúng bằng 0. Bộ đọc của DA-03 không được giả định float32.
+
 Đo trên parquet: `action` 36 chiều, `states` 32 chiều. Ψ₀ stage 3: pad-action-dim 36, pad-state-dim 36; chỉ số state được đệm: [32, 33, 34, 35].
 
 | index | name | group | masked | key `modality.json` | Ψ₀ `ACTION_SLICES_36D` | chú thích Ψ₀ | min | max | số giá trị khác nhau |
@@ -142,15 +146,15 @@ Kết luận:
 
 - **Action có 36 chiều thật, không chiều nào là đệm** (`masked = false` cả 36): parquet có đúng 36 chiều, bằng `pad-action-dim` của Ψ₀, nên `pad_to_len` không thêm gì. Không có khớp chân: thân dưới nhận lệnh qua chiều 31–35. Bảng này thay mục "pad36" của bản #24 (12 chân, 3 thắt lưng, 14 tay, 2 bàn tay, 5 đệm), vốn sai.
 - **4 chiều đệm là của state**: `states` có 32 chiều (`modality.json`: `left_hand` 0–6, `right_hand` 7–13, `left_arm` 14–20, `right_arm` 21–27, `rpy` 28–30, `height` 31), Ψ₀ đệm lên 36 nên chỉ số state 32–35 là đệm.
-- **Chiều 34 là `vyaw` liên tục, không phải cờ rời rạc.** Chú thích Ψ₀ ghi `turning_flag discrete (0/1)`, comment ngày 3/11 trên #24 cũng ghi vậy. Dữ liệu cho 51.104 giá trị khác nhau trong `[-1, 1]`, và `modality.json` gọi chiều này là `torso_vyaw`, tương đối. Khớp với ghi chú trong [export.py](../../packages/flywheel-simple/src/flywheel_simple/tray/export.py) của DA-33: bộ WBC đọc chiều này như cờ quay, còn PICO và bộ lập kế hoạch gửi `vyaw` (rad/s). Báo Hiếu: `configs/embodiments/g1.yaml` và DA-08 nên coi chiều 34 là liên tục.
+- **Chiều 34 là `vyaw` liên tục, không phải cờ rời rạc.** Chú thích Ψ₀ ghi `turning_flag discrete (0/1)`, comment ngày 3/11 trên #24 cũng ghi vậy. Dữ liệu cho 51.104 giá trị khác nhau trong `[-1, 1]`, và `modality.json` gọi chiều này là `torso_vyaw`, tương đối. Dù vậy WBC vẫn dùng chiều này như cờ: [`navigate.py`](../../packages/flywheel-simple/src/flywheel_simple/wbc/navigate.py) chỉ quay khi |vyaw| ≥ 0,1. Trong gói hai bàn 17% khung bằng đúng 0, 1,5% bằng đúng ±1 và 54% có |vyaw| < 0,1 (đo ngoài script khi review). Nên DA-08 (T4, O4) và `g1.yaml` coi chiều 34 là giá trị liên tục có **ngưỡng hành vi 0,1**, không phải cờ 0/1 và cũng không phải liên tục thuần. Khớp với ghi chú trong [export.py](../../packages/flywheel-simple/src/flywheel_simple/tray/export.py) của DA-33: bộ WBC đọc chiều này như cờ quay, còn PICO và bộ lập kế hoạch gửi `vyaw` (rad/s). Báo Hiếu: `configs/embodiments/g1.yaml` và DA-08 nên coi chiều 34 là liên tục.
 - **Chiều 3–6 của tay trái:** Ψ₀ gọi 3:5 là `index`, 5:7 là `middle`; tên của SIMPLE theo thứ tự `postprocess_psi0_sonic.py` là `middle` ở 3–4, `index` ở 5–6 (DA-33 đã ghi). Tay phải thứ tự cái, trỏ, giữa.
-- **Chiều hằng số không phải chiều đệm.** Gói hai bàn có chiều 31 (`base_height_command`) bằng 0,74 ở mọi khung; tay trái (0–6) chỉ có 6–7 giá trị, tức teleop gửi vài tư thế cố định. Với T5 và T6 của DA-08: phương sai đích bằng 0 ở chiều 31 là thật, không phải lỗi; cần loại theo phương sai đích, không theo `masked`.
+- **Chiều hằng số không phải chiều đệm.** Gói hai bàn có chiều 31 (`base_height_command`) bằng 0,74 ở mọi khung; tay trái (0–6) chỉ có 6–7 giá trị và khác 0 ở 99 trên 62.764 khung, chỉ trong 2 episode, tức gần như **không dùng**. Tay phải (7–13) thì khác 0 ở 87% số khung, độ lệch chuẩn 0,18–0,55 (đo ngoài script khi review), trái với design mục 9.2 "chiều 0–13 gần như luôn bằng 0": `action_sign_flip` của DA-27 chọn được chiều tay phải. Với T5 và T6 của DA-08: phương sai đích bằng 0 ở chiều 31 là thật, không phải lỗi; cần loại theo phương sai đích, không theo `masked`.
 - Đơn vị lấy từ chú thích Ψ₀, chưa kiểm độc lập: qpos theo rad, `base_height` theo m (mốc 0,75), `vx`, `vy` theo m/s trong hệ thân, `target_yaw` theo rad trong hệ thế giới. Giới hạn khớp không có trong gói; sẽ đến từ MJCF `g1_sonic` qua `configs/embodiments/g1.yaml` (DA-01), không áp cho chiều 32–34.
-- F1 cùng cấu trúc: cả hai gói `v2.1`, 50 Hz, `action` 36, `states` 32, camera 360×640, cùng `modality.json`. Chiều hằng số: `BendPickTeleop` 0–6 (tay trái không dùng), 32, 33, 35; `BendPickMP` 32–35 (không di chuyển thân). Bảng đầy đủ trong `layout-<gói>.md` trên `rtx3060`.
+- F1 cùng cấu trúc: cả hai gói `v2.1`, 50 Hz, `action` 36, `states` 32, camera 360×640, cùng `modality.json`. Chiều hằng số: `BendPickTeleop` 0–6 (tay trái không dùng), 32, 33, 35; `BendPickMP` 32–35 (không di chuyển thân). Bảng đầy đủ trong `layout-<gói>.md` trên `rtx3060` (chưa chép vào repo; người review trên laptop không kiểm lại được).
 
 ## 3. QA sơ bộ và N_teleop (AC 2 · Q1)
 
-Script đọc từng parquet trong zip và kiểm 7 phép trên mỗi episode. Ngưỡng độ dài 2–60 s là **giả định** của S1-07 (không có trong spec hay gói); độ dài thật nằm trong 9,6–25,0 s (mục 6), xa cả hai ngưỡng. Gói không có trường thành công nào (`episodes.jsonl` và các cột parquet đều được quét tìm `success`), nên phép kiểm cờ thành công không áp được; thành công thật chỉ kiểm được bằng phát lại (DA-17).
+Script đọc từng episode của `episodes.jsonl` và kiểm 8 phép. Episode có trong `episodes.jsonl` mà thiếu parquet trượt mọi phép, không bị bỏ khỏi mẫu số; video phải khác rỗng cho mọi camera `info.json` khai, theo mẫu `video_path`; tổng số episode và khung của `info.json` phải khớp. Lệnh trả mã 1 khi có episode trượt hoặc tổng không khớp. Ngưỡng độ dài 2–60 s là **giả định** của S1-07 (không có trong spec hay gói); độ dài thật nằm trong 9,6–25,0 s (mục 6), xa cả hai ngưỡng. Gói không có trường thành công nào (`episodes.jsonl` và các cột parquet đều được quét tìm `success`), nên phép kiểm cờ thành công không áp được; thành công thật chỉ kiểm được bằng phát lại (DA-17).
 
 ```bash
 python3 -I scripts/g0/inspect_psi_data.py qa <gói>.zip --min-seconds 2 --max-seconds 60 --json qa-<gói>.json
@@ -162,17 +166,19 @@ Gói hai bàn:
 
 | Phép kiểm | Đạt |
 |---|---|
+| Episode trong `episodes.jsonl` có parquet | 99/99 |
 | Số khung parquet = `length` trong `episodes.jsonl` | 99/99 |
 | `frame_index` = 0, 1, …, T−1 | 99/99 |
 | `timestamp` tăng nghiêm ngặt | 99/99 |
 | Không NaN hay Inf ở mọi cột số thực | 99/99 |
 | Độ dài trong [2 s, 60 s] (ngưỡng giả định) | 99/99 |
 | `next.done` chỉ đúng ở khung cuối | 99/99 |
-| Có file video của episode | 99/99 |
+| Có file video khác rỗng cho mọi camera trong `info.json` | 99/99 |
 | Cờ thành công | không có trường nào |
 | **Đạt mọi phép kiểm** | **99/99** |
 
 Lệch lớn nhất giữa `timestamp` và `frame_index / fps`: 0 s
+Tổng của `info.json` khớp parquet và `episodes.jsonl`: có
 
 Gói F1:
 
@@ -180,33 +186,37 @@ Gói F1:
 
 | Phép kiểm | Đạt |
 |---|---|
+| Episode trong `episodes.jsonl` có parquet | 97/97 |
 | Số khung parquet = `length` trong `episodes.jsonl` | 97/97 |
 | `frame_index` = 0, 1, …, T−1 | 97/97 |
 | `timestamp` tăng nghiêm ngặt | 97/97 |
 | Không NaN hay Inf ở mọi cột số thực | 97/97 |
 | Độ dài trong [2 s, 60 s] (ngưỡng giả định) | 97/97 |
 | `next.done` chỉ đúng ở khung cuối | 97/97 |
-| Có file video của episode | 97/97 |
+| Có file video khác rỗng cho mọi camera trong `info.json` | 97/97 |
 | Cờ thành công | không có trường nào |
 | **Đạt mọi phép kiểm** | **97/97** |
 
 Lệch lớn nhất giữa `timestamp` và `frame_index / fps`: 0 s
+Tổng của `info.json` khớp parquet và `episodes.jsonl`: có
 
 `G1WholebodyBendPickMP-v0.zip`: `info.json` 100 episode, 15,509 khung; parquet 100 episode, 15,509 khung; `episodes.jsonl` 100 dòng; video 100
 
 | Phép kiểm | Đạt |
 |---|---|
+| Episode trong `episodes.jsonl` có parquet | 100/100 |
 | Số khung parquet = `length` trong `episodes.jsonl` | 100/100 |
 | `frame_index` = 0, 1, …, T−1 | 100/100 |
 | `timestamp` tăng nghiêm ngặt | 100/100 |
 | Không NaN hay Inf ở mọi cột số thực | 100/100 |
 | Độ dài trong [2 s, 60 s] (ngưỡng giả định) | 100/100 |
 | `next.done` chỉ đúng ở khung cuối | 100/100 |
-| Có file video của episode | 100/100 |
+| Có file video khác rỗng cho mọi camera trong `info.json` | 100/100 |
 | Cờ thành công | không có trường nào |
 | **Đạt mọi phép kiểm** | **100/100** |
 
 Lệch lớn nhất giữa `timestamp` và `frame_index / fps`: 0 s
+Tổng của `info.json` khớp parquet và `episodes.jsonl`: có
 
 | Gói | Nguồn | N đạt QA sơ bộ |
 |---|---|---|
@@ -216,7 +226,24 @@ Lệch lớn nhất giữa `timestamp` và `frame_index / fps`: 0 s
 
 **Kết luận cho lưới HE (design mục 7.3):** N_teleop của task hai bàn là 99 ≥ 80, nên điểm cuối của lưới giữ ở 80 demo; không cần báo động (< 40).
 
-Kiểm rằng phép kiểm không rỗng: một zip giả 5 episode cấy lần lượt NaN, `timestamp` lùi, episode 1 s, `next.done` giữa chừng và thiếu video. Script bắt đúng 4 episode lỗi, mỗi episode đúng phép kiểm đã cấy, và cho 1/5 đạt.
+Kiểm rằng phép kiểm không rỗng: `inspect_psi_data.py selftest` dựng một gói giả 8 episode (1 sạch, 7 cấy lỗi) và kiểm từng lỗi rơi đúng phép kiểm. Bản trước ghi "5 episode cấy 5 lỗi, bắt 4, 1/5 đạt" là tự mâu thuẫn và không chạy lại được; bản này thay nó. Output:
+
+```bash
+python3 -I scripts/g0/inspect_psi_data.py selftest
+```
+
+| Episode | Lỗi cấy (phép kiểm phải trượt) | Phép kiểm trượt | Đúng |
+|---|---|---|---|
+| 0 | không cấy | — | có |
+| 1 | finite | finite | có |
+| 2 | timestamp_monotonic | timestamp_monotonic | có |
+| 3 | length_in_range | length_in_range | có |
+| 4 | done_at_last_frame_only | done_at_last_frame_only | có |
+| 5 | video_present | video_present | có |
+| 6 | video_present | video_present | có |
+| 7 | parquet_present | parquet_present, frames_match_meta, frame_index_contiguous, timestamp_monotonic, finite, length_in_range, done_at_last_frame_only, video_present | có |
+
+Đạt mọi phép kiểm: 1/8; tổng `info.json` khớp: không
 
 ## 4. Layout, seed và tham số ngẫu nhiên hóa (AC 4 · V6 phần dữ liệu)
 
