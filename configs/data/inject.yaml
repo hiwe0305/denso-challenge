@@ -29,6 +29,7 @@ data_defects:
     enabled: true         # Một chiều action có độ lệch chuẩn khác 0 trên episode (design 9.2)
   corrupted_success_label:  # D6
     enabled: true
+    keep_fraction: 0.5    # Cắt episode còn 50% khung, vẫn giữ nhãn thành công
   wrong_task_instruction:  # D6
     enabled: true
     corrupted_prompt: "move to random location and stop"
@@ -36,7 +37,7 @@ data_defects:
     enabled: true
   holdout_seed_leak:  # D5
     enabled: true
-    holdout_seed_range: [9000, 9999]
+    holdout_seed_range: [2000000, 2000999]  # holdout của configs/splits/default.yaml
 
 # Lỗi log huấn luyện (F-TRAIN: T1-T8); mã là tiền tố của tên loại
 train_defects:

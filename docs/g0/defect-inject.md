@@ -24,14 +24,14 @@ Chỉ ghi lỗi đã cấy thật (DA-31 tính recall theo loại từ manifest)
 | Mã | Loại (`kind`) | Tên lỗi | Mô tả cơ chế cấy | Tham số cấu hình |
 |---|---|---|---|---|
 | D1 | `nan_values` | Giá trị NaN/Inf | Gán giá trị NaN vào quan sát hoặc hành động | `nan_ratio: 0.05` |
-| D2 | `drop_frames` | Rơi khung ảnh | Loại bỏ ngẫu nhiên 10–20% khung hình ảnh | `drop_rate: 0.15` |
-| D2 | `timestamp_sync_offset` | Lệch đồng bộ camera và state | Dịch chuyển mốc thời gian của ảnh so với state | `offset_seconds: 0.08` (> τ_sync 0.033s) |
+| D2 | `drop_frames` | Rơi khung ảnh | Bỏ hẳn dòng parquet của 10–20% khung (state, action, timestamp cùng mất; `frame_index` có khoảng trống); video giữ nguyên nên dài hơn số dòng | `drop_rate: 0.15` |
+| D2 | `timestamp_sync_offset` | Lệch đồng bộ camera và state | Dịch cột `timestamp` (thời gian state) so với thời gian ảnh của video (`frame_index / fps`) | `offset_seconds: 0.08` (> τ_sync 0.033s) |
 | D3 | `joint_jump` | Nhảy khớp đột ngột | Cộng bước nhảy vào một chiều khớp (0–30) của action ở giữa episode | `jump_magnitude: 1.5` |
 | D3 | `joint_limit_exceeded` | Vượt giới hạn khớp | Đặt một chiều khớp (0–30) của action vượt `limit_high` của `ActionLayout` thêm 25% biên độ khớp; không có layout thì dùng ±π | `excess_factor: 1.25` |
 | D3 | `unit_deg_rad` | Sai đơn vị góc | Nhân một chiều góc (0–30, 35) của action, khác 0 trên episode, với $180/\pi$ | `scale: 57.2957795` |
 | D5 | `duplicate_episode` | Trùng lặp episode | Nhân bản episode với dữ liệu giống hệt | `dup_id` |
-| D5 | `holdout_seed_leak` | Rò hạt giống holdout | Gán seed ngẫu nhiên nằm trong dải bí mật holdout | `holdout_seed_range: [9000, 9999]` |
-| D6 | `corrupted_success_label` | Sai nhãn thành công | Đảo nhãn `sim_success` (thất bại gán thành công) | boolean flip |
+| D5 | `holdout_seed_leak` | Rò hạt giống holdout | Gán seed trong dải holdout của `configs/splits/default.yaml` | `holdout_seed_range: [2000000, 2000999]` |
+| D6 | `corrupted_success_label` | Episode hỏng nhưng gắn nhãn thành công | Cắt episode còn `keep_fraction` khung đầu, trước khi task xong; nhãn vẫn là thành công (demo teleop của psi-data mặc nhiên là thành công) | `keep_fraction: 0.5` |
 | D6 | `wrong_task_instruction` | Sai câu lệnh task | Đổi câu lệnh gốc thành câu lệnh sai lệch | `corrupted_prompt` |
 | D7 | `action_sign_flip` | Đảo dấu action | Đổi dấu một chiều action có độ lệch chuẩn khác 0 trên episode | chọn theo episode |
 
@@ -56,6 +56,6 @@ Hỗ trợ sinh log giả định theo đúng schema của `FakeTrainer` và RTC
 
 ## 4. Kiểm thử và Nghiệm thu
 
-* **Unit tests:** 66 test case tự động tại `packages/flywheel-data/tests/unit/inject/`.
+* **Unit tests:** 69 test case tự động tại `packages/flywheel-data/tests/unit/inject/`.
 * **Độ bao phủ:** 100% các loại lỗi cấy đều có test kiểm chứng.
 * **Độc lập kiến trúc:** Không import vòng, tuân thủ nghiêm ngặt 3 hợp đồng kiến trúc của repo.

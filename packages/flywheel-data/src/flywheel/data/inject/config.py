@@ -14,7 +14,9 @@ class DataDefectConfig:
     nan_ratio: float = 0.05
     unit_deg_rad_scale: float = 57.2957795
     corrupted_prompt: str = "move to random location and stop"
-    holdout_seed_range: tuple[int, int] = (9000, 9999)
+    # Inclusive holdout seeds of configs/splits/default.yaml ([2000000, 2001000)).
+    holdout_seed_range: tuple[int, int] = (2_000_000, 2_000_999)
+    success_label_keep_fraction: float = 0.5
 
 
 @dataclass(frozen=True)
@@ -125,9 +127,14 @@ def load_inject_config(path: Path | None = None) -> InjectConfig:
                 "corrupted_prompt", "move to random location and stop"
             )
         ),
+        success_label_keep_fraction=float(
+            dd_data.get("corrupted_success_label", {}).get("keep_fraction", 0.5)
+        ),
         holdout_seed_range=tuple(
             int(x)
-            for x in dd_data.get("holdout_seed_leak", {}).get("holdout_seed_range", [9000, 9999])
+            for x in dd_data.get("holdout_seed_leak", {}).get(
+                "holdout_seed_range", [2_000_000, 2_000_999]
+            )
         ),  # type: ignore[arg-type]
     )
 
