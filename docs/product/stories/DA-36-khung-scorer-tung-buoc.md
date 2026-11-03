@@ -1,18 +1,17 @@
-# DA-35 · Khung scorer từng bước và lớp lỗi chung
+# DA-36 · Khung scorer từng bước và lớp lỗi chung
 
 ## Trạng thái
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Nháp (Châu viết 2/11/2026, chờ SM đặt mã và PO duyệt) |
+| Trạng thái | Nháp (Châu viết 2/11/2026; PO đặt mã DA-36 ngày 3/11/2026) |
 | Người làm | Châu |
 | Làn | Đánh giá (`flywheel-eval`) |
-| Story PRD | 3.3 · Epic 3 · FR16, FR17; [spec v10.5](../../spec-v10-failure-to-data.md) mục 5.1, 5.2; [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 10 |
+| Story PRD | 3.3 · Epic 3 · FR16, FR17; [spec v10.5](../../spec-v10-failure-to-data.md) mục 5.1, 5.2; [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 3 (bảng 6 bước), mục 10 |
 | Nhãn | [Lõi] · `epic:3` · `gate:G1` · `area:core` |
-| Sprint | S2 |
+| Sprint | S2 · **Lịch 3/11/2026:** merge trước **8/11/2026** (07 mục 2.4) |
 | Ước lượng | 13 giờ (04 mục 4.2, ước lượng) |
-| Phụ thuộc | S1-10 và PR `chore-restructure` (đã merge); `StageSpec`, `FailureKindSpec`, `StageEvaluation` của `flywheel.contracts` (đã có trên master). Không chặn: `Trace` thật của SIMPLE — story chạy trên trace tổng hợp, xem AC 6 |
-| Mã đề xuất | **DA-35 là đề xuất**; DA-01…DA-34 đã dùng (07 mục 2.2). SM đặt mã chính thức |
+| Phụ thuộc | S1-08 (04 mục 4.2); `Score` nằm trong S1-10 (#36, **chưa merge**); `StageSpec`, `FailureKindSpec`, `StageEvaluation` của `flywheel.contracts` (đã có trên master). Không chặn: `Trace` thật của SIMPLE — story chạy trên trace tổng hợp, xem AC 6 |
 
 ## Story
 
@@ -20,7 +19,7 @@ Là kỹ sư đánh giá, tôi muốn một scorer độc lập chấm từng b�
 
 ## Tiêu chí chấp nhận
 
-1. Scorer nhận `TaskDefinition` (các bước, vị từ, điều kiện chạy suốt) và trả `StageEvaluation`: trạng thái mỗi bước là **đạt, trượt, chưa thử, chưa rõ**. Số bước lấy từ `TaskDefinition`, **không viết cứng trong mã**: task hai bàn có 6 bước (spec mục 5.1), task bê khay có 7 bước con (design 28/10 mục 3.2), và một scorer phải chấm được cả hai.
+1. Scorer nhận `TaskDefinition` (các bước, vị từ, điều kiện chạy suốt) và ghi ra **`Score`** (03 mục 4.3): trạng thái mỗi bước là **đạt, trượt, chưa thử, chưa rõ**. `StageEvaluation.stage_success` hiện là `bool | None` (3 trạng thái) và là output của `TaskDefinition.evaluate()`; trường còn thiếu (enum 4 trạng thái, lý do "chưa rõ", thời điểm vào và ra từng bước) đi qua issue Contract change cho Long, không thêm trong code làn. Số bước lấy từ `TaskDefinition`, **không viết cứng trong mã**: task hai bàn có 6 bước (spec mục 5.1), task bê khay có 7 bước con (design 28/10 mục 3.2), và một scorer phải chấm được cả hai.
 2. Quy ước trạng thái đúng spec mục 5.1, không được lẫn: bước chưa tới là **chưa thử**, không phải trượt; thiếu tín hiệu là **chưa rõ**, không phải đạt. Có test cho đúng hai ca lẫn này.
 3. Gán **bước hỏng đầu tiên k** và một kiểu lỗi của spec mục 5.2; thiếu tín hiệu thì `L-UNKNOWN` và không gán kiểu. Mỗi kiểu lỗi mang **lớp lỗi chung** (tiếp cận, gắp, mang, đặt, thăng bằng) để L1 gộp thống kê giữa task (06 mục 9); ở L0 trường này chỉ được ghi, không dùng để chọn can thiệp.
 4. Kiểu lỗi và lớp lỗi chung đọc từ `FailureKindSpec` của `TaskDefinition`, không viết cứng: bộ mã của task hai bàn và bộ mã của task bê khay khác nhau (xem "Chỗ cần PO quyết" mục 1).
@@ -69,12 +68,13 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 - Làm: Trần Trịnh Hoàng Châu
 - Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
-- Bình luận: Hiếu (vị từ task, `TaskDefinition`), Hưng (DA-32 vị từ task bê khay), Long (`Score` cho `decide`), Thông (mã story, mẫu story)
+- Bình luận: Hiếu (vị từ task, `TaskDefinition`, DA-32 vị từ task bê khay), Long (`Score` cho `decide`), Thông (mã story, mẫu story)
 
 ## Change log
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 3/11/2026 | Đặt mã DA-36 (DA-35 đã dùng cho #40); phụ thuộc S1-08, `Score` của S1-10 chưa merge; AC 1 ghi ra `Score`, trường thiếu qua issue Contract change; hạn 8/11 theo 07 mục 2.4; gộp người bình luận DA-32 vào Hiếu | PO (Hiếu) |
 | 2/11/2026 | Nháp story theo PRD 3.3, spec mục 5.1, 5.2 và 04 mục 4.2; nêu ba chỗ cần PO quyết | Châu (chờ SM, PO) |
 
 ## Ghi chép khi làm
