@@ -38,7 +38,7 @@ Là kỹ sư duyệt một cụm lỗi ở phần 6 của demo, tôi muốn mộ
 - [x] 3. Contract test (AC 7)
 - [x] 4. Dòng seam: vị trí hợp đồng, chủ, story, hạn (AC 8)
 - [x] 5. Đường dẫn card trong `StorePaths`, ghi chú `Cluster.card_uri` không dùng ở L0-lite, test ID cụm không đổi (AC 10)
-- [ ] 6. Khóa ghi đè trong `Decision.criteria` và `EngineerDecision.from_decision` (AC 11)
+- [x] 6. Khóa ghi đè trong `Decision.criteria` và `EngineerDecision.from_decision` (AC 11)
 
 ## Phạm vi file
 
