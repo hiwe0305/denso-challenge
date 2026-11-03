@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "flywheel-psi0"
 version = "0.1.0"
 requires-python = ">=3.10"
-dependencies = ["flywheel-contracts", "numpy"]
+dependencies = ["flywheel-contracts", "numpy", "pydantic", "pyyaml"]
 
 [project.optional-dependencies]
 test = ["flywheel-testkit"]

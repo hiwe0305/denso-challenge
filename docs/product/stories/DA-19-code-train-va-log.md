@@ -29,7 +29,7 @@ Là trưởng nhóm phụ trách Ψ₀, tôi muốn train cả 3 stage bằng co
 ## Nhiệm vụ
 
 - [x] 1. Script đọc code, bảng log (AC 1)
-- [ ] 2. `Psi0Trainer` 3 stage (AC 2)
+- [x] 2. `Psi0Trainer` 3 stage (AC 2)
 - [x] 3. Lớp bọc log, `metrics.jsonl` (AC 3)
 - [ ] 4. Client RTC và log inference (AC 4)
 - [ ] 5. Colab, tiếp tục từ checkpoint, probe, sổ chi phí (AC 5, 6)
