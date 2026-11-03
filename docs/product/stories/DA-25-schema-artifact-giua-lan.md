@@ -67,6 +67,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 27/10/2026 | Bỏ bảng topic MCAP; thêm `DatasetReport`, `DefectManifest`, trường Episode mới | PO (Hiếu) theo design 27/10/2026 |
 | 27/10/2026 | Giao cho Long theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
 | 03/11/2026 | Thêm schema AgentReport, AgentReview và file mẫu cho DA-20, DA-31 theo Issue #34 | Nguyễn Thăng Long |
+| 03/11/2026 | Sửa theo review PR #46: `AgentFinding.code` chỉ nhận mã mục 10 của design (D1–D8, T1–T8, O1–O4, R1–R6); datetime phải có múi giờ; `AgentReview.check_against` kiểm review chỉ trỏ tới phát hiện có trong báo cáo, file mẫu thêm `find_002`. PR #46 giữ AC 6 và nhiệm vụ 6; phần trace của PR #48 là AC 7 và nhiệm vụ 7 | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
