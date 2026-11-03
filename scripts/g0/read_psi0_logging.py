@@ -64,11 +64,17 @@ FIELD_SOURCES: list[tuple[str, str | None, str, str]] = [
     (
         "loss_by_group",
         "eval/**modality_metrics",
-        "val",
-        "MSE trên batch val theo nhóm của ActionLayout, đã chuẩn hóa. Ψ₀ chỉ có L1 "
-        "khử chuẩn hóa `eval/<dataset>/err_l1_<nhóm>`, không dùng",
+        BOTH,
+        "Train, mọi bước: tách chính loss flow matching (vận tốc) theo nhóm ActionLayout. "
+        "Val: MSE action trên batch val. Ψ₀ chỉ có L1 khử chuẩn hóa "
+        "`eval/<dataset>/err_l1_<nhóm>`, không dùng",
     ),
-    ("loss_by_chunk_pos", None, "val", "MSE trên batch val theo vị trí trong chunk"),
+    (
+        "loss_by_chunk_pos",
+        None,
+        BOTH,
+        "Như `loss_by_group`, theo vị trí trong chunk; loss train lấy trước mask RTC",
+    ),
     (
         "grad_norm_vlm",
         "train/grad_norm_vlm",
@@ -77,14 +83,33 @@ FIELD_SOURCES: list[tuple[str, str | None, str, str]] = [
         "(nhiệm vụ con 2) tự đo trong `clip_grad_norms()`, trước `zero_grad()`, để T8a kiểm được",
     ),
     ("grad_norm_action", "train/grad_norm_act", "train", "Grad norm của action header"),
-    ("pred_var_by_dim", None, "val", "Phương sai action dự đoán theo chiều, trên batch val"),
-    ("pred_std", None, "val", "Độ lệch chuẩn action dự đoán theo chiều, trên batch val"),
-    ("target_std", None, "val", "Độ lệch chuẩn action đích theo chiều, trên batch val"),
+    (
+        "pred_var_by_dim",
+        None,
+        BOTH,
+        "Phương sai action lấy mẫu theo chiều (val: batch val; "
+        "train: batch train ở bước validation)",
+    ),
+    (
+        "pred_std",
+        None,
+        BOTH,
+        "Độ lệch chuẩn action lấy mẫu theo chiều (val: batch val; "
+        "train: batch train ở bước validation)",
+    ),
+    (
+        "target_std",
+        None,
+        BOTH,
+        "Độ lệch chuẩn action đích theo chiều (val: batch val; "
+        "train: batch train ở bước validation)",
+    ),
     (
         "hand_open_hist",
         None,
-        "val",
-        "Độ mở mỗi tay (0 nắm hết cỡ, 1 mở) từ 14 chiều bàn tay (0–13), histogram 10 ngăn (DA-07)",
+        BOTH,
+        "Độ mở mỗi tay (0 nắm hết cỡ, 1 mở) từ 14 chiều bàn tay (0–13), "
+        "histogram 10 ngăn (DA-07); train: batch train ở bước validation",
     ),
     ("vram_gb", None, BOTH, "`torch.cuda.max_memory_allocated()`"),
     ("throughput", None, "train", "Batch toàn cục chia thời gian một bước; trống ngay sau eval"),

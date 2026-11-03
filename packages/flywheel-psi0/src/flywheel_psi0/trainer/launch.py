@@ -5,11 +5,16 @@ Psi0 repo root (the author's paths are relative to it):
 
     torchrun --nproc_per_node=N -m flywheel_psi0.trainer.launch <launch.json>
 
-It wraps three methods of the stage's trainer class, then executes `scripts/train.py`
-as `__main__` with the recipe's argv (docs/g0/psi0-logging.md):
+It wraps methods of the stage's trainer class, then executes `scripts/train.py` as
+`__main__` with the recipe's argv (docs/g0/psi0-logging.md):
 
-* `log` - every `train/*` and `eval/*` dict goes to `MetricsLog`;
-* `inference` - each val batch's predictions and targets go to `ValStats`;
+* `log` - every `train/*` and `eval/*` dict goes to `MetricsLog`; at a validation
+  step it first samples actions on that step's train batch, for the train line;
+* `inference` - each val batch's predictions and targets go to the val `ValStats`,
+  the sampled train batch's to the train one;
+* `training_step` - keeps the batch, and switches on `LossTap`, which stands in for
+  `torch.nn.functional` in the trainer's module and hands the per-element train
+  loss to `LossBreakdown`;
 * `clip_grad_norms` - with a frozen VLM Psi0 reports no VLM gradient norm, so it is
   measured here, after `backward` and before `zero_grad`, for DA-08 T8a.
 
@@ -20,6 +25,7 @@ on a CPU-only machine without Psi0.
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import importlib
 import json
@@ -28,6 +34,7 @@ import os
 import runpy
 import sys
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -37,7 +44,7 @@ from flywheel.contracts.v0 import InfraStatus
 from pydantic import BaseModel, ConfigDict
 
 from flywheel_psi0.trainer.metrics_log import JobIdentity, MetricsLog
-from flywheel_psi0.trainer.val_stats import ValStats
+from flywheel_psi0.trainer.val_stats import LossBreakdown, ValStats
 
 VLM_GROUPS = ("lang_backbone", "vision_tower", "mm_projector")
 
@@ -91,14 +98,80 @@ def _numpy(tensor: Any) -> Any:
     return tensor.detach().float().cpu().numpy()
 
 
-def _vram_gb() -> float | None:
+def _torch() -> Any | None:
     try:
-        torch = importlib.import_module("torch")
+        return importlib.import_module("torch")
     except ImportError:
         return None
-    if not torch.cuda.is_available():
+
+
+def _vram_gb() -> float | None:
+    torch = _torch()
+    if torch is None or not torch.cuda.is_available():
         return None
     return float(torch.cuda.max_memory_allocated()) / 1e9
+
+
+@dataclass
+class Sinks:
+    """Where each hook sends what it sees."""
+
+    log: MetricsLog
+    val: ValStats
+    train_sampled: ValStats
+    train_loss: LossBreakdown
+
+
+class LossTap:
+    """Stands in for `torch.nn.functional` in a Psi0 trainer module.
+
+    Everything is passed through; while `active` (inside `training_step`), the
+    result of `mse_loss(..., reduction="none")` - Psi0's per-element loss before it
+    masks and sums it - also goes to `sink`. `evaluate()` computes the val loss with
+    the same function, outside `training_step`, so it is not recorded.
+    """
+
+    def __init__(self, functional: Any, sink: Callable[[Any], None]) -> None:
+        self._functional = functional
+        self._sink = sink
+        self.active = False
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._functional, name)
+
+    def mse_loss(self, input: Any, target: Any, *args: Any, **kwargs: Any) -> Any:
+        loss = self._functional.mse_loss(input, target, *args, **kwargs)
+        if self.active and kwargs.get("reduction") == "none":
+            self._sink(loss)
+        return loss
+
+
+def _is_validation_step(trainer: Any) -> bool:
+    every = int(trainer.cfg.train.validation_steps)
+    return every > 0 and int(trainer.global_step) % every == 0
+
+
+def _sample_train_batch(trainer: Any) -> None:
+    """Sample actions on the step's train batch, as `evaluate()` does on val batches.
+
+    Only under ddp or one process: rank 0 runs the unwrapped model alone, which
+    under fsdp or deepspeed would wait on the other ranks.
+    """
+    batch = getattr(trainer, "_flywheel_batch", None)
+    if batch is None or trainer.cfg.train.data_parallel != "ddp":
+        return
+    torch = _torch()
+    context: Any = contextlib.nullcontext()
+    if torch is not None and torch.cuda.is_available():
+        context = torch.autocast(device_type="cuda", dtype=trainer.dtype)
+    trainer.set_eval()
+    trainer._flywheel_sampling_train = True
+    try:
+        with context:
+            trainer.inference(trainer.unwrap_model(), batch)
+    finally:
+        trainer._flywheel_sampling_train = False
+        trainer.set_train()
 
 
 def _vlm_grad_norm(trainer: Any) -> float:
@@ -111,11 +184,10 @@ def _vlm_grad_norm(trainer: Any) -> float:
     return math.sqrt(total)
 
 
-def install_hooks(
-    cls: type, log: MetricsLog, stats: ValStats, result: LaunchResult, result_path: Path
-) -> None:
+def install_hooks(cls: type, sinks: Sinks, result: LaunchResult, result_path: Path) -> None:
     """Wrap `cls`'s methods in place; subclasses and instances pick the wrappers up."""
     original_log: Callable[..., Any] = cls.log  # type: ignore[attr-defined]
+    original_step: Callable[..., Any] = cls.training_step  # type: ignore[attr-defined]
     original_inference: Callable[..., Any] = cls.inference  # type: ignore[attr-defined]
     original_clip: Callable[..., Any] | None = getattr(cls, "clip_grad_norms", None)
     original_save: Callable[..., Any] = cls.save_checkpoint  # type: ignore[attr-defined]
@@ -125,6 +197,8 @@ def install_hooks(
         returned = original_log(self, metrics, *args, **kwargs)
         if _is_rank_zero():
             values = _floats(metrics)
+            if "train/loss" in values and _is_validation_step(self):
+                _sample_train_batch(self)
             measured = getattr(self, "_flywheel_grad_norm_vlm", None)
             if (
                 "train/loss" in values
@@ -132,8 +206,31 @@ def install_hooks(
                 and measured is not None
             ):
                 values["train/grad_norm_vlm"] = measured
-            log.log(values, step=int(self.global_step))
+            sinks.log.log(values, step=int(self.global_step))
         return returned
+
+    def record_loss(loss: Any) -> None:
+        if _is_rank_zero():
+            sinks.train_loss.add(_numpy(loss))
+
+    # The trainer module's own `F` (`import torch.nn.functional as F`), if it has one.
+    module: Any = sys.modules[cls.__module__]
+    tap: LossTap | None = None
+    if hasattr(module, "F"):
+        tap = LossTap(module.F, record_loss)
+        module.F = tap
+
+    @functools.wraps(original_step)
+    def stepped(self: Any, batch: Any, *args: Any, **kwargs: Any) -> Any:
+        if _is_rank_zero():
+            self._flywheel_batch = batch
+        if tap is None:
+            return original_step(self, batch, *args, **kwargs)
+        tap.active = True
+        try:
+            return original_step(self, batch, *args, **kwargs)
+        finally:
+            tap.active = False
 
     @functools.wraps(original_inference)
     def inferred(
@@ -142,7 +239,12 @@ def install_hooks(
         predicted = original_inference(self, eval_model, batch, *args, **kwargs)
         if _is_rank_zero():
             chunk = predicted.shape[1]
-            stats.add(_numpy(predicted), _numpy(batch["actions"][:, :chunk]))
+            sampled = (
+                sinks.train_sampled
+                if getattr(self, "_flywheel_sampling_train", False)
+                else sinks.val
+            )
+            sampled.add(_numpy(predicted), _numpy(batch["actions"][:, :chunk]))
         return predicted
 
     @functools.wraps(original_save)
@@ -156,6 +258,7 @@ def install_hooks(
         return path
 
     cls.log = logged  # type: ignore[attr-defined]
+    cls.training_step = stepped  # type: ignore[attr-defined]
     cls.inference = inferred  # type: ignore[attr-defined]
     cls.save_checkpoint = saved  # type: ignore[attr-defined]
 
@@ -181,18 +284,21 @@ def run(spec: LaunchSpec) -> None:
     result_path = Path(spec.result_path)
     result = LaunchResult()
     identity = JobIdentity(**spec.identity)
-    stats = ValStats(
-        spec.layout,
-        hand_open_pose=None if spec.hand_open_pose is None else np.asarray(spec.hand_open_pose),
-    )
+    hand = None if spec.hand_open_pose is None else np.asarray(spec.hand_open_pose)
+    val = ValStats(spec.layout, hand_open_pose=hand)
+    train_sampled = ValStats(spec.layout, hand_open_pose=hand)
+    train_loss = LossBreakdown(spec.layout)
     log = MetricsLog(
         Path(spec.metrics_path),
         identity,
-        val_stats=stats,
+        val_stats=val,
+        train_loss=train_loss,
+        train_stats=train_sampled,
         global_batch_size=spec.global_batch_size,
         vram_gb=_vram_gb,
     )
-    install_hooks(_trainer_class(spec.trainer_module), log, stats, result, result_path)
+    sinks = Sinks(log=log, val=val, train_sampled=train_sampled, train_loss=train_loss)
+    install_hooks(_trainer_class(spec.trainer_module), sinks, result, result_path)
 
     train_py = root / "scripts" / "train.py"
     sys.argv = [str(train_py), *spec.argv]

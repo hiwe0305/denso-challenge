@@ -11,19 +11,21 @@ _Ngày 3/11/2026. Story [DA-19](../product/stories/DA-19-code-train-va-log.md) n
 
 ## Cách lớp bọc lấy phần thiếu mà không sửa code tác giả
 
-**[Đề xuất]** Lớp bọc là một launcher Python trong `flywheel_psi0.trainer`, chạy trong cùng tiến trình với `scripts/train.py` (qua `runpy`). Trước khi chạy, nó bọc ba phương thức của `FinetuneTrainer`:
+**[Đề xuất]** Lớp bọc là một launcher Python trong `flywheel_psi0.trainer`, chạy trong cùng tiến trình với `scripts/train.py` (qua `runpy`). Trước khi chạy, nó bọc các phương thức của `FinetuneTrainer`:
 
 | Phương thức | Bọc để | Ra trường |
 |---|---|---|
 | `Trainer.log(metrics)` | Chép mỗi dict `train/*`, `eval/*` thành một dòng `TrainingMetric` | `step`, `epoch`, `split`, `loss`, `lr`, `grad_norm_*`, `wall_time_s`, `vram_gb`, `throughput` |
 | `FinetuneTrainer.inference(eval_model, batch)` | Giữ action dự đoán `(B, Tp, Da)` và `batch["actions"]` của mỗi batch val | `loss_by_group`, `loss_by_chunk_pos`, `pred_var_by_dim`, `pred_std`, `target_std`, `hand_open_hist` |
+| `FinetuneTrainer.training_step(batch)` | Giữ batch train; trong lúc chạy, `LossTap` đứng thay `torch.nn.functional` của module trainer và chép kết quả `mse_loss(..., reduction="none")` | `loss_by_group`, `loss_by_chunk_pos` trên dòng train |
+| `Trainer.log` ở bước validation | Trước khi ghi dòng train, chạy `inference()` trên batch train của bước đó (chỉ khi `ddp` hoặc một tiến trình) | `pred_var_by_dim`, `pred_std`, `target_std`, `hand_open_hist` trên dòng train |
 | `FinetuneTrainer.clip_grad_norms()` | Gọi sau `backward`, trước `optimizer.step()` và `zero_grad()`. Khi Ψ₀ không có nhóm VLM trong kết quả, cộng bình phương norm gradient của mọi tham số ngoài `action_header.`; VLM đóng băng thì bằng 0. Không bọc `training_step`: lúc nó trả về, gradient đã bị xóa nên số đo luôn bằng 0 | `grad_norm_vlm` |
 
 `evaluate()` đã gọi `inference()` trên `val_num_batches` batch val (20 trong bộ tham số stage 3), nên phần tính thêm không chạy lại model. Phần tính số chỉ dùng mảng, kiểm được trên CPU với `FakeTrainer` (nhiệm vụ con 3).
 
 **Độ mở bàn tay** (DA-07, `flywheel_psi0.trainer.val_stats`). **[Đã chốt]** (Hiếu, 3/11/2026). Mốc mở là tư thế mở của SIMPLE, `init_qpos = 0` cho cả 7 khớp Dex3 mỗi tay (`simple/robots/g1_sonic.py`). Mốc nắm lấy từ dữ liệu: trong `stats_psi0.json` của task hai bàn, mọi khớp tay có một cận bằng 0, cận kia là lần nắm sâu nhất của người teleop, sâu hơn `close_qpos` của SIMPLE (ngón trỏ tới 1,5 rad so với 0,5). Độ mở của một khớp giảm tuyến tính từ 1 ở tư thế mở về 0 ở cận xa nhất; độ mở của một tay là trung bình 7 khớp. `hand_open_hist` là histogram 10 ngăn trên [0, 1], gộp hai tay. Tính trong không gian đã chuẩn hóa nên chỉ cần cận min/max của `stats_psi0.json`, không cần đổi về radian.
 
-**Dòng nào mang số đo val.** **[Đã chốt]** (Hiếu, 3/11/2026). Các trường tính trên batch val chỉ ghi lên dòng `split = "val"`. Reader DA-08 hiện lấy `loss_by_group`, `pred_var_by_dim`, `pred_std`, `target_std` từ dòng `train`, nên T4, T5, T6 bỏ qua cho tới khi reader đọc dòng `val`; đã báo Châu.
+**Dòng nào mang số đo nào.** **[Đã chốt]** (Hiếu, 3/11/2026; sửa cùng ngày từ "chỉ dòng val" thành "cả hai dòng"). Dòng `val` mang mọi số đo tính trên action lấy mẫu từ batch val. Dòng `train` mang `loss_by_group` và `loss_by_chunk_pos` ở **mọi bước**: đây là chính loss train của Ψ₀ (MSE vận tốc flow matching) tách theo nhóm và vị trí, lấy từ `F.mse_loss(..., reduction="none")` trước khi Ψ₀ cộng lại, nên không tốn thêm lần chạy model nào. Vì là không gian vận tốc, các giá trị này so được giữa các nhóm trong cùng dòng, không so được với dòng val. Mảng được lấy trước mask RTC, nên các vị trí dưới `--model.max-delay` (0–7) có cả bước loss thật bỏ qua. Ở mỗi bước validation, launcher còn lấy mẫu action trên batch train của bước đó (một lần `inference()` của tác giả, thêm khoảng 5% thời gian eval, ước lượng chưa đo), nên dòng train ở bước đó có thêm `pred_var_by_dim`, `pred_std`, `target_std`, `hand_open_hist`. Nhờ vậy reader DA-08 hiện tại chạy được T4, T5, T6 mà không phải sửa (issue #44 hết gấp); dòng val vẫn giữ để so train với val.
 
 Stage 1 và 2 chỉ đọc code (design mục 8): stage 1 log `action_accuracy`, `action_l1_loss` trên token FAST, không có loss flow; stage 2 log giống stage 3 trừ `state_drop_frac`.
 
@@ -92,14 +94,14 @@ Cột "Ψ₀ tự log" chỉ nói code tác giả có sẵn số đó hay không
 | `loss` | có | `train/loss` | train, val | `train/loss` và `eval/loss`; không hữu hạn ghi `"NaN"` |
 | `lr` | có | `train/lr_act` | train, val | LR nhóm action header; dòng val lấy LR gần nhất |
 | `vlm_frozen` | không | — | train, val | `model.tune_vlm` trong `run_config.json` (`--model.no-tune-vlm`) |
-| `loss_by_group` | một phần | `eval/**modality_metrics` | val | MSE trên batch val theo nhóm của ActionLayout, đã chuẩn hóa. Ψ₀ chỉ có L1 khử chuẩn hóa `eval/<dataset>/err_l1_<nhóm>`, không dùng |
-| `loss_by_chunk_pos` | không | — | val | MSE trên batch val theo vị trí trong chunk |
+| `loss_by_group` | một phần | `eval/**modality_metrics` | train, val | Train, mọi bước: tách chính loss flow matching (vận tốc) theo nhóm ActionLayout. Val: MSE action trên batch val. Ψ₀ chỉ có L1 khử chuẩn hóa `eval/<dataset>/err_l1_<nhóm>`, không dùng |
+| `loss_by_chunk_pos` | không | — | train, val | Như `loss_by_group`, theo vị trí trong chunk; loss train lấy trước mask RTC |
 | `grad_norm_vlm` | có | `train/grad_norm_vlm` | train | Ψ₀ chỉ log khi một nhóm VLM được train; stage 3 đóng băng VLM nên launcher (nhiệm vụ con 2) tự đo trong `clip_grad_norms()`, trước `zero_grad()`, để T8a kiểm được |
 | `grad_norm_action` | có | `train/grad_norm_act` | train | Grad norm của action header |
-| `pred_var_by_dim` | không | — | val | Phương sai action dự đoán theo chiều, trên batch val |
-| `pred_std` | không | — | val | Độ lệch chuẩn action dự đoán theo chiều, trên batch val |
-| `target_std` | không | — | val | Độ lệch chuẩn action đích theo chiều, trên batch val |
-| `hand_open_hist` | không | — | val | Độ mở mỗi tay (0 nắm hết cỡ, 1 mở) từ 14 chiều bàn tay (0–13), histogram 10 ngăn (DA-07) |
+| `pred_var_by_dim` | không | — | train, val | Phương sai action lấy mẫu theo chiều (val: batch val; train: batch train ở bước validation) |
+| `pred_std` | không | — | train, val | Độ lệch chuẩn action lấy mẫu theo chiều (val: batch val; train: batch train ở bước validation) |
+| `target_std` | không | — | train, val | Độ lệch chuẩn action đích theo chiều (val: batch val; train: batch train ở bước validation) |
+| `hand_open_hist` | không | — | train, val | Độ mở mỗi tay (0 nắm hết cỡ, 1 mở) từ 14 chiều bàn tay (0–13), histogram 10 ngăn (DA-07); train: batch train ở bước validation |
 | `vram_gb` | không | — | train, val | `torch.cuda.max_memory_allocated()` |
 | `throughput` | không | — | train | Batch toàn cục chia thời gian một bước; trống ngay sau eval |
 | `wall_time_s` | không | — | train, val | Số giây từ lúc lớp bọc khởi động |

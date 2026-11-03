@@ -67,9 +67,64 @@ def hand_openness(hand: Array, open_pose: Array) -> Array:
     return by_hand.ravel()
 
 
+def _groups(layout: ActionLayout) -> dict[str, list[int]]:
+    """Unmasked dimension indices by group, in layout order."""
+    groups: dict[str, list[int]] = {}
+    for index, dim in enumerate(layout.dimensions):
+        if not dim.masked:
+            groups.setdefault(dim.group, []).append(index)
+    return groups
+
+
+def error_split(squared: Array, layout: ActionLayout) -> dict[str, object]:
+    """`loss_by_group` and `loss_by_chunk_pos` of a `(batch, chunk, dims)` squared error."""
+    unmasked = np.array([not dim.masked for dim in layout.dimensions])
+    return {
+        "loss_by_group": {
+            name: float(squared[:, :, indices].mean()) for name, indices in _groups(layout).items()
+        },
+        "loss_by_chunk_pos": squared[:, :, unmasked].mean(axis=(0, 2)).tolist(),
+    }
+
+
+@dataclass
+class LossBreakdown:
+    """Splits the train loss itself by action group and chunk position.
+
+    Psi0 computes `F.mse_loss(..., reduction="none")`, a `(batch, chunk, dims)` error
+    on the flow-matching velocity, before masking and summing it; the launcher hands
+    that array here on every micro-batch. The split is in velocity space, so it is
+    comparable between groups of one train line, not with the val line's action
+    error. It is taken before Psi0's RTC mask, so chunk positions below
+    `--model.max-delay` include steps the loss leaves out for some samples.
+    """
+
+    layout: ActionLayout
+    _squared: list[Array] = field(default_factory=list)
+
+    def add(self, squared: NDArray[np.floating]) -> None:
+        array = np.asarray(squared, dtype=np.float64)
+        dims = len(self.layout.dimensions)
+        if array.ndim != 3 or array.shape[2] != dims:
+            raise ValueError(f"expected (batch, chunk, {dims}), got {array.shape}")
+        self._squared.append(array)
+
+    def summary(self) -> dict[str, object]:
+        """The split over the micro-batches added since the last summary."""
+        if not self._squared:
+            return {}
+        squared = np.concatenate(self._squared)
+        self._squared.clear()
+        return error_split(squared, self.layout)
+
+
 @dataclass
 class ValStats:
-    """Accumulates one evaluation's predictions, then reduces them to log fields."""
+    """Accumulates sampled actions and their targets, then reduces them to log fields.
+
+    The val split feeds it from `evaluate()`; a second instance takes the train batch
+    the launcher samples at each validation step.
+    """
 
     layout: ActionLayout
     # `normalised_open_pose` of the hand dims; without it no histogram is logged.
@@ -103,8 +158,12 @@ class ValStats:
     def __bool__(self) -> bool:
         return bool(self._predicted)
 
-    def summary(self) -> dict[str, object]:
-        """The `TrainingMetric` fields for the batches added since the last summary."""
+    def summary(self, errors: bool = True) -> dict[str, object]:
+        """The `TrainingMetric` fields for the batches added since the last summary.
+
+        `errors=False` leaves out `loss_by_group` and `loss_by_chunk_pos`, for a
+        train line whose split comes from `LossBreakdown` instead.
+        """
         if not self._predicted:
             return {}
         pred = np.concatenate(self._predicted)
@@ -112,20 +171,11 @@ class ValStats:
         self._predicted.clear()
         self._target.clear()
 
-        unmasked = np.array([not dim.masked for dim in self.layout.dimensions])
-        squared = (pred - tgt) ** 2
-        groups: dict[str, list[int]] = {}
-        for index, dim in enumerate(self.layout.dimensions):
-            if not dim.masked:
-                groups.setdefault(dim.group, []).append(index)
-
+        groups = _groups(self.layout)
         flat_pred = pred.reshape(-1, pred.shape[2])
         flat_tgt = tgt.reshape(-1, tgt.shape[2])
         fields: dict[str, object] = {
-            "loss_by_group": {
-                name: float(squared[:, :, indices].mean()) for name, indices in groups.items()
-            },
-            "loss_by_chunk_pos": squared[:, :, unmasked].mean(axis=(0, 2)).tolist(),
+            **(error_split((pred - tgt) ** 2, self.layout) if errors else {}),
             "pred_var_by_dim": flat_pred.var(axis=0).tolist(),
             "pred_std": flat_pred.std(axis=0).tolist(),
             "target_std": flat_tgt.std(axis=0).tolist(),
