@@ -66,12 +66,11 @@ action_layout:
     - {name: waist_roll_joint, group: torso_rpy, masked: false, limit_low: -0.52, limit_high: 0.52}
     - {name: waist_pitch_joint, group: torso_rpy, masked: false, limit_low: -0.52, limit_high: 0.52}
     - {name: waist_yaw_joint, group: torso_rpy, masked: false, limit_low: -2.618, limit_high: 2.618}
-    # 31 torso (base) height, absolute, m (Psi0 cda3fdf: "reference 0.75"). Constant 0.74
-    # in every frame of the two-table package (psi-data e78fb93), the `height_cmd: 0.74`
-    # of the WBC config (decoupled_wbc @ 5b304e4: control/main/teleop/configs/g1_29dof_gear_wbc.yaml
+    # 31 torso (base) height, absolute, m (Psi0 cda3fdf: "reference 0.75"). 0.74 in every
+    # frame of the two-table package (psi-data e78fb93), the `height_cmd: 0.74` of the WBC
+    # config (decoupled_wbc @ 5b304e4: control/main/teleop/configs/g1_29dof_gear_wbc.yaml
     # points to sim2mujoco/resources/robots/g1/g1_gear_wbc.yaml, line 38).
-    # Zero target variance here is real, not a dead dim: T5/T6 exclude it by target std.
-    - {name: base_height_command, group: height, masked: false}
+    - {name: base_height_command, group: height, masked: false, constant: true}
     # 32-33 vx, vy, relative, m/s in the base frame (Psi0 cda3fdf comment block); the WBC
     # copies them unchanged (g1_gear_wbc_policy.py @ 5b304e4, line 249). [-0.5, 0.5] in psi-data.
     - {name: navigate.vx, group: base_velocity, masked: false}
