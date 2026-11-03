@@ -332,6 +332,7 @@ Mỗi phép kiểm chỉ đổi một yếu tố, giữ nguyên mọi thứ khá
 | B2 | Server Colab giống server Docker | Máy chạy server | L1 hai bên chênh trong cỡ nhiễu lấy mẫu | Phù hợp: L1 lệch 0,002–0,017 mỗi episode; chưa ước lượng nhiễu lấy mẫu (mục 3.4.1) |
 | B3 | Độ trễ `/act` không đổi kết quả | Độ trễ: 0 s, 0 s, +2 s mỗi lần gọi | Lệch quỹ đạo của lượt +2 s không lớn hơn lệch giữa hai lượt 0 s | Chưa chạy (runner `fwdata/logs/b3.sh` trên máy 3060) |
 | B4 | Policy dựa vào ảnh | Ảnh: thật, xám, mờ, lệch thời gian | L1 tăng rõ khi ảnh sai | Đạt (dưới đây) |
+| B6 | Đường client SIMPLE (ánh xạ action, WBC) đúng; điều kiện khởi đầu ảnh hưởng | Nguồn action: action người teleop ghi trong train, phát lại qua cùng client; bộ eval `de140d6` hay `e78fb93` | Phát lại thành công trên điều kiện trùng train | Đạt một phần (dưới đây) |
 | B5 | `mujoco` hỏng vì renderer (file task `b75c678`) | Renderer: MuJoCo hay Isaac | Isaac không thấp hơn 7/5/6 có ý nghĩa (nhị thức một phía, α = 0,05) và Fisher `mujoco` so với `mujoco_isaac` có p < 0,05 | `mujoco` Level 0 0/20 (bản sửa); Isaac chưa chạy với bản sửa |
 
 Cách đọc B5: Isaac gần 7/5/6 thì renderer là nguyên nhân và AC 9 đạt; Isaac cũng gần 0 thì lỗi ở phía client SIMPLE (B1 đã loại phía server); ở giữa thì chờ PSI Lab trả lời Q-27E.
@@ -346,6 +347,35 @@ Cách đọc B5: Isaac gần 7/5/6 thì renderer là nguyên nhân và AC 9 đ�
 | Lệch thời gian (ảnh thật, cách nửa episode) | 0,231 (×2,6) | 0,130 | 0,126 | 0,045 | 0,234 | 0,033 | 0,534 |
 
 Policy dựa vào ảnh: chỉ làm mờ ảnh (giữ bố cục) đã tăng sai số 1,7 lần, chủ yếu ở lệnh đi (vx, vyaw) và cánh tay. Lệnh tay gần như không đổi khi ảnh xám hoặc mờ, nên đóng mở tay chủ yếu theo state; nó chỉ hỏng khi ảnh cho thấy sai pha (lệch thời gian). Ảnh MuJoCo (bàn xám, vật trắng, sàn ô bàn cờ) còn khác ảnh train nhiều hơn ảnh làm mờ, nên việc policy hỏng ở `mujoco` khớp với kết quả này. B4 chưa chứng minh riêng ảnh MuJoCo gây hỏng; B5 mới chứng minh điều đó.
+
+**B6 · Phát lại action thật qua client SIMPLE** (4/11/2026, 00:10–00:30, `eval_psi0.sh replay-server`, `mujoco`, file task `b75c678`, domain DDS 104, chạy song song với lượt Isaac trên domain 103). Server giả trả action 36 chiều đã ghi của episode train `e78fb93` thứ i (24 action mỗi lần `/act`), cho episode eval thứ i. Client và WBC giống hệt khi chạy Ψ₀. Phép này không dùng ảnh, nên dùng `mujoco` cho nhanh (khoảng 50 s mỗi episode).
+
+| Bộ eval Level 0 | Robot khởi đầu so với episode train cùng chỉ số | Thành công | Episode đạt |
+|---|---|---|---|
+| `de140d6` (đang ghim) | Lùi 6,1 cm (mục 3.1) | 0/10 | — |
+| `e78fb93` | Trùng | 4/10 | 0, 1, 4, 5 |
+
+Fisher một phía: p = 0,043. Trong video, ở cả hai bộ tay phải đến đúng chỗ trong khung hình và khép lại đúng lúc như trong train (khoảng 1,4 s). Ở `de140d6` tay khép hụt và hộp ở lại bàn 1. Kết luận [Đề xuất]:
+
+1. Đường client SIMPLE đúng: action người phát lại qua nó vẫn gắp và mang được hộp (4/10).
+2. Robot khởi đầu lùi 6,1 cm trong bộ `de140d6` đủ làm hỏng cả action của người. Ψ₀ khép tay theo đúng lịch như người (log `/act`: độ khép tay phải đạt 1,27 lúc 1,36 s, train 1,28 lúc 1,48 s), nên cũng hụt theo cách đó. Đây là giả thuyết mạnh nhất cho 0/20 và 0/90 ở `mujoco`.
+3. Phát lại mở vòng ngay trên tư thế train cũng chỉ đạt 4/10, vì sai lệch nhỏ của vật lý tích lũy dần; đây không phải mốc trên của policy có phản hồi.
+
+**[Đã chốt]** (Hiếu, 4/11/2026, 00:34): lượt Isaac của AC 9 chạy trên bộ eval `e78fb93` (robot trùng tư thế train), thay cho `de140d6` đã ghim ở PR #68. Lượt Isaac Level 0 trên `de140d6` với file đã sửa dừng sau 1 episode (hỏng). Từ 4/11/2026, đường dẫn kết quả có thêm `eval-<revision>`.
+
+**Giả thuyết cho 0%, theo bằng chứng** [Đề xuất]:
+
+| Giả thuyết | Bằng chứng | Mức |
+|---|---|---|
+| Robot khởi đầu lệch 6,1 cm ở bộ eval `de140d6` | B6: 0/10 so với 4/10, p = 0,043; Ψ₀ khép tay đúng lịch nhưng hụt | Mạnh |
+| Lỗi spawn của SIMPLE `6d10628` | Đã sửa (`b75c678`); `mujoco` vẫn 0/20 trên `de140d6` | Không đủ giải thích một mình |
+| Renderer MuJoCo khác ảnh train | B4: ảnh sai làm sai số tăng 1,7–2,6 lần; Isaac chưa có kết quả | Có ảnh hưởng, chưa đo riêng |
+| Camera hoặc khóa quan sát | Ảnh Isaac `head_stereo_left` khớp góc nhìn và FOV của video train `observation.images.egocentric` (camera `head_stereo` D435i, gắn đầu, 640 × 360) | Yếu |
+| Thứ tự action khác `configs/embodiments/g1.yaml` | `from_psi0_upper_joints` của SIMPLE khớp từng chiều (tay trái giữa 3–4, trỏ 5–6; eo 28–30 là roll/pitch/yaw); B6 gắp được với action thật | Loại |
+| Thống kê chuẩn hóa hoặc checkpoint | Open-loop khớp action train (B1); độ khép tay và lịch khép đúng | Yếu |
+| Trùng domain DDS với lượt khác | Đường eval không có publisher hay subscriber DDS; lượt trên domain riêng cũng 0/10 | Loại |
+
+Bước hỏng sớm nhất theo thứ tự bước của scorer (`configs/eval/scorer/two-table.yaml`: approach, grasp, walk, arrive, place, release) là **grasp**: tay tới vật và khép lại, nhưng hộp không vào tay. Chưa đo bằng tín hiệu của scorer (`hand_object_distance`, `object_height`); đây là đọc từ video và log `/act`.
 
 ## 4. Checkpoint ablation của thí nghiệm HE (AC 11, nhiệm vụ con 8)
 
