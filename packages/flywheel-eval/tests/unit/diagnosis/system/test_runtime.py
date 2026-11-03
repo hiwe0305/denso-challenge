@@ -245,3 +245,23 @@ def test_r6_is_the_label_only_where_nothing_else_fired() -> None:
 
 def test_an_episode_that_logged_no_infra_status_is_a_skip() -> None:
     assert [skip.code for skip in check_r6(None, R6).skipped] == ["R6"]
+
+
+def test_r5_without_a_pinned_reference_is_a_skip(tmp_path: Path, camera_entry) -> None:
+    # This is what `system.yaml` ships as until G0 fixes the reference. A skip
+    # keeps the episode from being cleared; a placeholder hash would instead
+    # make every episode a calibration fault.
+    unpinned = R5Thresholds(
+        reference_sha256=None,
+        cameras={},
+        tolerance_intrinsics_px=0.5,
+        tolerance_position_m=0.005,
+        tolerance_quaternion=0.01,
+    )
+
+    result = check_r5(_cameras(tmp_path, camera_entry), unpinned)
+
+    assert result.findings == []
+    assert [skip.code for skip in result.skipped] == ["R5"]
+    assert "chưa ghim ở G0" in result.skipped[0].reason
+    assert combine("ep_1", [result], "ok").diagnosis is Diagnosis.UNKNOWN
