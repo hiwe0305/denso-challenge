@@ -19,19 +19,21 @@ Cấu hình tại `configs/data/inject.yaml`. Mã lỗi theo bảng ánh xạ c�
 
 Số episode cấy (quyết định PO 3/11/2026): mỗi loại đúng 3 episode khác nhau (`episodes_per_kind: 3`), tổng 33 trên 99; mỗi episode mang tối đa một lỗi vì hợp đồng chỉ có một `injected_defect`. Với `duplicate_episode`, chỗ được chọn bị ghi đè bằng bản sao của một episode không cấy; bản gốc giữ nguyên, chỉ bản sao tính là episode cấy. Cùng `seed` cho cùng manifest.
 
+Chỉ ghi lỗi đã cấy thật (DA-31 tính recall theo loại từ manifest): episode không có gì để lỗi đó thay đổi (ví dụ mọi chiều góc của action bằng 0) bị bỏ qua, bộ cấy chọn episode khác; sau khi cấy, `flywheel.data.inject.applied.defect_applied` kiểm từng dòng manifest đúng là đã đổi dữ liệu ở chỗ nó ghi, sai thì dừng. Chiều action theo layout 36 chiều của G1 (design mục 9.2).
+
 | Mã | Loại (`kind`) | Tên lỗi | Mô tả cơ chế cấy | Tham số cấu hình |
 |---|---|---|---|---|
 | D1 | `nan_values` | Giá trị NaN/Inf | Gán giá trị NaN vào quan sát hoặc hành động | `nan_ratio: 0.05` |
 | D2 | `drop_frames` | Rơi khung ảnh | Loại bỏ ngẫu nhiên 10–20% khung hình ảnh | `drop_rate: 0.15` |
 | D2 | `timestamp_sync_offset` | Lệch đồng bộ camera và state | Dịch chuyển mốc thời gian của ảnh so với state | `offset_seconds: 0.08` (> τ_sync 0.033s) |
-| D3 | `joint_jump` | Nhảy khớp đột ngột | Cộng bước nhảy lớn vào giá trị khớp giữa episode | `jump_magnitude: 1.5` rad/s |
-| D3 | `joint_limit_exceeded` | Vượt giới hạn khớp | Nhân giá trị khớp vượt ngưỡng cơ học $>\pi$ | `excess_factor: 1.25` |
-| D3 | `unit_deg_rad` | Sai đơn vị góc | Nhân nhầm giữa độ (deg) và radian (rad) | `scale: 57.2957795` ($180/\pi$) |
+| D3 | `joint_jump` | Nhảy khớp đột ngột | Cộng bước nhảy vào một chiều khớp (0–30) của action ở giữa episode | `jump_magnitude: 1.5` |
+| D3 | `joint_limit_exceeded` | Vượt giới hạn khớp | Đặt một chiều khớp (0–30) của action vượt ngưỡng $>\pi$ | `excess_factor: 1.25` |
+| D3 | `unit_deg_rad` | Sai đơn vị góc | Nhân một chiều góc (0–30, 35) của action, khác 0 trên episode, với $180/\pi$ | `scale: 57.2957795` |
 | D5 | `duplicate_episode` | Trùng lặp episode | Nhân bản episode với dữ liệu giống hệt | `dup_id` |
 | D5 | `holdout_seed_leak` | Rò hạt giống holdout | Gán seed ngẫu nhiên nằm trong dải bí mật holdout | `holdout_seed_range: [9000, 9999]` |
 | D6 | `corrupted_success_label` | Sai nhãn thành công | Đảo nhãn `sim_success` (thất bại gán thành công) | boolean flip |
 | D6 | `wrong_task_instruction` | Sai câu lệnh task | Đổi câu lệnh gốc thành câu lệnh sai lệch | `corrupted_prompt` |
-| D7 | `action_sign_flip` | Đảo dấu action | Đổi dấu các chiều điều khiển (ví dụ cánh tay) | `dimensions: [0, 6]` |
+| D7 | `action_sign_flip` | Đảo dấu action | Đổi dấu một chiều action có độ lệch chuẩn khác 0 trên episode | chọn theo episode |
 
 ---
 
@@ -54,6 +56,6 @@ Hỗ trợ sinh log giả định theo đúng schema của `FakeTrainer` và RTC
 
 ## 4. Kiểm thử và Nghiệm thu
 
-* **Unit tests:** 38 test case tự động tại `packages/flywheel-data/tests/unit/inject/`.
+* **Unit tests:** 47 test case tự động tại `packages/flywheel-data/tests/unit/inject/`.
 * **Độ bao phủ:** 100% các loại lỗi cấy đều có test kiểm chứng.
 * **Độc lập kiến trúc:** Không import vòng, tuân thủ nghiêm ngặt 3 hợp đồng kiến trúc của repo.

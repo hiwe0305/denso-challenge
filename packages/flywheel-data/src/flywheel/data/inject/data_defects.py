@@ -3,6 +3,8 @@
 import copy
 import math
 import random
+import statistics
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from flywheel.contracts.artifacts import Defect, EpisodeMetadata, InjectedDefect
@@ -10,6 +12,16 @@ from flywheel.data.inject.codes import DATA_DEFECT_CODES
 from flywheel.data.inject.config import DataDefectConfig
 
 Parameters = dict[str, bool | float | int | str]
+
+# G1 36-D action of SIMPLE (ACTION_SLICES_36D of Psi0 at cda3fdf, design 9.2): 0-13 hands,
+# 14-27 arms, 28-30 waist are joints; 31 height (m), 32-33 velocities, 34 turn flag,
+# 35 heading (rad).
+JOINT_ACTION_DIMS = tuple(range(31))
+ANGLE_ACTION_DIMS = (*JOINT_ACTION_DIMS, 35)
+
+
+class NotApplicable(ValueError):
+    """The episode has nothing this defect kind can change; pick another episode."""
 
 
 @dataclass
@@ -45,11 +57,28 @@ def _mark(ep: EpisodeData, kind: str, parameters: Parameters) -> Defect:
 
 
 class DataDefectInjector:
-    """Injects 11 standardized data defects into episodes."""
+    """Injects 11 standardized data defects into episodes.
+
+    An injector raises NotApplicable instead of listing a defect it cannot apply.
+    """
 
     def __init__(self, config: DataDefectConfig | None = None, rng_seed: int = 42):
         self.config = config or DataDefectConfig()
         self.rng = random.Random(rng_seed)
+
+    def _choose_dim(
+        self,
+        ep: EpisodeData,
+        dims: tuple[int, ...],
+        kind: str,
+        qualifies: Callable[[list[float]], bool] = lambda col: True,
+    ) -> int:
+        """Pick one action dim among `dims` that exists and qualifies on this episode."""
+        width = len(ep.actions[0]) if ep.actions else 0
+        eligible = [d for d in dims if d < width and qualifies([a[d] for a in ep.actions])]
+        if not eligible:
+            raise NotApplicable(f"{kind}: no eligible action dimension")
+        return self.rng.choice(eligible)
 
     def inject_drop_frames(self, ep: EpisodeData) -> tuple[EpisodeData, Defect]:
         new_ep = copy.deepcopy(ep)
@@ -63,7 +92,9 @@ class DataDefectInjector:
                 kept_ts.append(ts)
             else:
                 dropped_indices.append(idx)
-        if not dropped_indices and len(new_ep.images) > 2:
+        if not dropped_indices:
+            if len(new_ep.images) <= 2:
+                raise NotApplicable("drop_frames needs more than two images")
             dropped_indices.append(1)
             kept_images.pop(1)
             kept_ts.pop(1)
@@ -79,6 +110,8 @@ class DataDefectInjector:
         )
 
     def inject_timestamp_sync_offset(self, ep: EpisodeData) -> tuple[EpisodeData, Defect]:
+        if not ep.timestamps_image:
+            raise NotApplicable("timestamp_sync_offset needs image timestamps")
         new_ep = copy.deepcopy(ep)
         offset = self.config.timestamp_offset_seconds
         new_ep.timestamps_image = [ts + offset for ts in new_ep.timestamps_image]
@@ -89,12 +122,11 @@ class DataDefectInjector:
         )
 
     def inject_joint_jump(self, ep: EpisodeData) -> tuple[EpisodeData, Defect]:
+        dim = self._choose_dim(ep, JOINT_ACTION_DIMS, "joint_jump")
         new_ep = copy.deepcopy(ep)
         mag = self.config.joint_jump_magnitude
-        step = len(new_ep.states) // 2 if len(new_ep.states) > 2 else 0
-        dim = 0
-        if new_ep.states:
-            new_ep.states[step][dim] += mag
+        step = len(new_ep.actions) // 2
+        new_ep.actions[step][dim] += mag
         return new_ep, _mark(
             new_ep,
             "joint_jump",
@@ -102,13 +134,12 @@ class DataDefectInjector:
         )
 
     def inject_joint_limit_exceeded(self, ep: EpisodeData) -> tuple[EpisodeData, Defect]:
+        dim = self._choose_dim(ep, JOINT_ACTION_DIMS, "joint_limit_exceeded")
         new_ep = copy.deepcopy(ep)
         factor = self.config.joint_limit_excess_factor
         limit = math.pi
-        dim = 1
-        for s in new_ep.states:
-            if len(s) > dim:
-                s[dim] = limit * factor
+        for a in new_ep.actions:
+            a[dim] = limit * factor
         return new_ep, _mark(
             new_ep,
             "joint_limit_exceeded",
@@ -116,11 +147,12 @@ class DataDefectInjector:
         )
 
     def inject_nan_values(self, ep: EpisodeData) -> tuple[EpisodeData, Defect]:
+        if not ep.actions or not ep.actions[0]:
+            raise NotApplicable("nan_values needs actions")
         new_ep = copy.deepcopy(ep)
-        step = len(new_ep.actions) // 2 if len(new_ep.actions) > 0 else 0
+        step = len(new_ep.actions) // 2
         dim = 0
-        if new_ep.actions and len(new_ep.actions[step]) > 0:
-            new_ep.actions[step][dim] = float("nan")
+        new_ep.actions[step][dim] = float("nan")
         return new_ep, _mark(
             new_ep,
             "nan_values",
@@ -128,12 +160,14 @@ class DataDefectInjector:
         )
 
     def inject_unit_deg_rad(self, ep: EpisodeData) -> tuple[EpisodeData, Defect]:
+        # Scaling a dim that is all zero changes nothing, so only nonzero angle dims qualify.
+        dim = self._choose_dim(
+            ep, ANGLE_ACTION_DIMS, "unit_deg_rad", lambda col: any(v != 0 for v in col)
+        )
         new_ep = copy.deepcopy(ep)
         scale = self.config.unit_deg_rad_scale
-        dim = 2
-        for s in new_ep.states:
-            if len(s) > dim:
-                s[dim] *= scale
+        for a in new_ep.actions:
+            a[dim] *= scale
         return new_ep, _mark(
             new_ep,
             "unit_deg_rad",
@@ -141,16 +175,17 @@ class DataDefectInjector:
         )
 
     def inject_action_sign_flip(self, ep: EpisodeData) -> tuple[EpisodeData, Defect]:
+        width = len(ep.actions[0]) if ep.actions else 0
+        dim = self._choose_dim(
+            ep, tuple(range(width)), "action_sign_flip", lambda col: statistics.pstdev(col) > 0
+        )
         new_ep = copy.deepcopy(ep)
-        dims = list(self.config.action_sign_flip_dims)
-        for act in new_ep.actions:
-            for d in dims:
-                if len(act) > d:
-                    act[d] = -act[d]
+        for a in new_ep.actions:
+            a[dim] = -a[dim]
         return new_ep, _mark(
             new_ep,
             "action_sign_flip",
-            {"dimensions": _join(dims)},
+            {"dimension": dim},
         )
 
     def inject_corrupted_success_label(self, ep: EpisodeData) -> tuple[EpisodeData, Defect]:
@@ -164,6 +199,8 @@ class DataDefectInjector:
         )
 
     def inject_wrong_task_instruction(self, ep: EpisodeData) -> tuple[EpisodeData, Defect]:
+        if ep.instruction == self.config.corrupted_prompt:
+            raise NotApplicable("wrong_task_instruction: episode already has the wrong prompt")
         new_ep = copy.deepcopy(ep)
         new_ep.instruction = self.config.corrupted_prompt
         return new_ep, _mark(
@@ -184,8 +221,10 @@ class DataDefectInjector:
         )
 
     def inject_holdout_seed_leak(self, ep: EpisodeData) -> tuple[EpisodeData, Defect]:
-        new_ep = copy.deepcopy(ep)
         low, high = self.config.holdout_seed_range
+        if low <= ep.seed <= high:
+            raise NotApplicable("holdout_seed_leak: seed is already in the holdout range")
+        new_ep = copy.deepcopy(ep)
         leaked_seed = self.rng.randint(low, high)
         new_ep.seed = leaked_seed
         return new_ep, _mark(
