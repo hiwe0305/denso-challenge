@@ -72,6 +72,75 @@ Lệnh: [`scripts/g0/colab_train_probe.sh`](../../scripts/g0/colab_train_probe.s
 
 So với môi trường DA-19 (`flywheel_psi0.trainer.colab setup`, giải lại lock của tác giả): cùng `torch`, `torchcodec`, `lerobot`, `numpy`; chỉ khác `transformers` 4.57.0 và 4.57.1 cùng vài gói serve, viz. Trên cùng VM A100, hai môi trường cho cùng tốc độ (0,470 và 0,477 s mỗi bước ở batch 16, mục 3.1).
 
+## 3. Đo stage 3 trên Colab (nhiệm vụ 6)
+
+_Thực đo ngày 3–4/11/2026 bằng `colab_train_probe.sh probe <batch> <bước> <chu kỳ> <bước ngắt>`. Hiếu duyệt trước khi chạy: A100 cộng H100, trần 14 CU; sau đó duyệt thêm L4 khoảng 1 CU thay cho H100. Recipe stage 3 của DA-19, cặp `psi0-baseline-egodex-he`, chỉ đổi batch, số bước, chu kỳ checkpoint và validation; validation giữ 20 batch của recipe._
+
+**H100 không chạy được**: `colab new --gpu H100` bị từ chối ("không có quota hoặc quyền cho accelerator này"). Phần ngân sách đó dùng cho L4.
+
+### 3.1 Số đo
+
+"s/bước" là trung vị khoảng cách giữa hai dòng train liền nhau trong `metrics.jsonl`, bỏ bước có checkpoint hoặc validation. VRAM: đỉnh `torch.cuda.max_memory_allocated` do launcher ghi, và đỉnh `memory.used` của `nvidia-smi` lấy mẫu mỗi giây.
+
+| Máy | Batch | Bước đo | s/bước (p90) | Mẫu/s | VRAM torch / nvidia-smi | GPU bận (trung vị) | Một lần val 20 batch |
+|---|---|---|---|---|---|---|---|
+| A100-SXM4-40GB | 16 | 445 (hai lần chạy) | 0,470 (0,49) | 34,1 | 16,2 / 17,7 GB | 37% | khoảng 50 s |
+| A100 | 32 | 148 | 0,644 (0,73) | 49,7 | 16,2 / 18,0 GB | 41% | khoảng 60 s |
+| A100 | 64 | 58 | 0,873 (0,94) | 73,3 | 18,8 / 19,6 GB | 30% | khoảng 75 s |
+| A100, môi trường DA-19 | 16 | 148 | 0,477 (0,51) | 33,5 | 16,2 / 17,3 GB | 38% | khoảng 57 s |
+| L4 24 GB | 16 | 148 | 0,710 (0,79) | 22,5 | 16,2 / 17,0 GB | 77% | khoảng 85 s |
+| L4 | 64 | 58 | 2,308 (2,32) | 27,7 | 18,8 / 19,2 GB | 78% | khoảng 100 s |
+
+Không cấu hình nào hết bộ nhớ. Batch toàn cục = batch mỗi GPU, vì một GPU và `gradient_accumulation_steps=1`.
+
+| Mục khác | Số đo |
+|---|---|
+| Khởi động tới bước đầu | 42–78 s (nạp checkpoint cha, dựng dataloader) |
+| Lưu một checkpoint | thêm khoảng 31 s mỗi lần trên A100 (9,5 GB mỗi `ckpt_<step>` theo DA-19) |
+| Ngắt và chạy lại (batch 16, 400 bước, checkpoint mỗi 200, giết ở bước 250) | Lần 1 bắt đầu đúng ở `ckpt_200`, chạy tới 400, `infra_status = ok`. Ở 51 bước trùng (200–250), loss hai lần trùng nhau đúng từng số |
+| Giá máy | A100 6,73 CU/giờ, L4 1,94 CU/giờ (độ tăng của `colab usage` khi mở phiên) |
+
+### 3.2 Vì sao chậm hơn số smoke của DA-19
+
+DA-19 đo 0,32 s/bước ở batch 16. Lần này, cùng môi trường DA-19 trên cùng VM, ra 0,477 s. Khác biệt không do môi trường. Trên A100, 12 vCPU chạy khoảng 95% (16 tiến trình `pt_data`, tiến trình chính 100%), GPU chỉ bận 20–60%: **job bị chặn ở khâu nạp dữ liệu** (giải mã video và tăng cường ảnh trên CPU), không phải ở GPU. Lần smoke DA-19 chỉ chạy 60 bước và dừng mỗi 20 bước để lưu checkpoint và val, nên worker kịp nạp sẵn batch trong lúc dừng; đây là giải thích hợp lý nhất, chưa kiểm riêng. Số dùng để ước là số 400 bước liên tục.
+
+Hệ quả: GPU mạnh hơn không giúp nhiều. L4 có cùng 12 vCPU, GPU bận 77%, chậm hơn A100 1,5 lần ở batch 16 nhưng rẻ hơn 3,5 lần mỗi giờ. Batch lớn hơn rẻ hơn theo mẫu (A100: 34 → 73 mẫu/s từ batch 16 lên 64).
+
+### 3.3 Chạy lại từ checkpoint tốn gì
+
+Ψ₀ ở `cda3fdf` khôi phục vị trí dữ liệu bằng cách đọc rồi bỏ từng batch qua dataloader (`scripts/train.py`, vòng `for local_step, batch in enumerate(trainer.train_dataloader)` với `skip_resumed_steps`), số batch bỏ là vị trí trong epoch hiện tại. Đo: bỏ 200 batch batch 16 thêm 74 s, khoảng 43 mẫu/s. Một lần chạy lại vì vậy tốn: dựng VM (8 phút) + kéo checkpoint từ Drive + tới một epoch đọc bỏ (62.764 khung / 43 mẫu/s ≈ 24 phút trên gói 99 episode; với N = 20 hay 80 episode thì ít hơn). Ước lượng, chưa đo trọn.
+
+## 4. Quy ra compute unit (nhiệm vụ 6)
+
+_Ước lượng từ số đo mục 3.1, chưa chạy trọn một lần 40.000 bước._ Mỗi lần fine-tune chạy trên một VM riêng: dựng VM 8 phút, khởi động 60 s, S bước × s/bước, validation ở bước 0 và mỗi chu kỳ, checkpoint mỗi 10.000 bước × 31 s. Không tính thời gian chạy lại (mục 3.3) và eval (mục 5).
+
+| Cấu hình | Mẫu thấy | Máy | Val mỗi 500 bước (recipe) | Val mỗi 2.000 bước |
+|---|---|---|---|---|
+| R1 · recipe DA-19 trên 1 GPU: batch 16 × 40.000 bước | 640.000 | A100 | 6,5 giờ, **44,0 CU** | 5,7 giờ, 38,3 CU |
+| R1 | | L4 | 9,9 giờ, 19,2 CU | **8,5 giờ, 16,6 CU** |
+| R2 · batch toàn cục của tác giả: 64 × 40.000 bước | 2.560.000 | A100 | 11,6 giờ, 77,9 CU | 10,3 giờ, 69,5 CU |
+| R2 | | L4 | 28,0 giờ, 54,3 CU (quá 24 giờ, phải chạy lại ít nhất một lần) | 26,4 giờ, 51,2 CU |
+| R3 · batch 64 × 10.000 bước | 640.000 | A100 | 3,0 giờ, 20,3 CU | 2,7 giờ, 18,2 CU |
+| R3 | | L4 | 7,1 giờ, 13,8 CU | 6,7 giờ, 13,1 CU |
+
+**8 lần fine-tune của demo** (DA-26 HE-1: V-EGO, V-NOEGO ở N = 20 và 80; DA-34: A, C, C-NOEGO, C+):
+
+| Cấu hình | A100, val mỗi 500 | L4, val mỗi 2.000 | Giờ máy L4 (tuần tự) |
+|---|---|---|---|
+| R1 | 352 CU | **133 CU** | 68 giờ |
+| R2 | 623 CU | 410 CU | 211 giờ |
+| R3 | 163 CU | 105 CU | 54 giờ |
+
+Số dư lúc 00:02 ngày 4/11/2026 là 140,81 CU, và đang giảm vì các phiên khác cùng tài khoản: `wam-audit-l4` (dự án khác, 1,94 CU/giờ, khoảng 47 CU mỗi ngày nếu để chạy) và `s103psi0` (A100 của S1-03, 6,73 CU/giờ). Ước 208 CU trước đây (8 × 26 CU từ smoke DA-19) thấp hơn R1 trên A100 khoảng 40%.
+
+### 4.1 Đề xuất [Đề xuất]
+
+1. **Máy: L4, không phải A100.** Job bị chặn ở CPU, nên L4 rẻ hơn A100 2,3 lần mỗi lần fine-tune R1. Colab cho chạy nhiều phiên cùng lúc (đã có 3 phiên song song ngày 3/11), nên 8 lần × 8,5 giờ chia 3 phiên song song xong trong khoảng một ngày rưỡi.
+2. **Recipe: R1 (giữ nguyên tham số DA-19).** R1 chỉ khác tác giả ở số GPU. R2 đúng batch của tác giả nhưng 8 lần cần 410 CU, gấp 3 lần số dư. R3 đúng batch toàn cục nhưng đổi số bước và lịch learning rate: là thay đổi recipe, cần Hiếu chốt và phải dùng chung cho mọi nhánh (spec 7.3).
+3. **Validation mỗi 2.000 bước thay vì 500**, giữ 20 batch. Validation không đổi quá trình train, nhưng ít điểm `val` hơn cho bộ kiểm DA-08 (21 điểm thay vì 81 mỗi lần). Tiết kiệm 2,6 CU mỗi lần trên L4.
+4. **Ngân sách**: R1 trên L4 cần khoảng 133 CU cho 8 lần, gần hết số dư, chưa tính chạy lại và eval. Hiếu cần chọn một trong: dừng các phiên không cần (`wam-audit-l4` của dự án khác), mua thêm CU (gói 100 CU giá khoảng 9,99 USD, giả định theo DA-19), hoặc chuyển sang R3 (105 CU).
+5. **Drive**: mỗi lần R1 để lại 4 checkpoint × 9,5 GB = 38 GB; 8 lần là 304 GB, quá 215 GB còn trống (DA-19). Chỉ giữ checkpoint cuối của mỗi lần trên Drive.
+
 ## Đề xuất cho 03 §3.3
 
 | Dòng | Câu trả lời đề xuất | Trạng thái | Bằng chứng |
