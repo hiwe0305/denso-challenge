@@ -522,6 +522,39 @@ def cmd_seeds(args: argparse.Namespace) -> int:
     return 0
 
 
+# --- asset sources (AC 5, V9) ------------------------------------------------------------
+
+
+def asset_refs(value: Any, out: dict[str, set[str]]) -> None:
+    """Collect res_id of assets, scene rooms and material libraries from an env config."""
+    if isinstance(value, dict):
+        if "res_id" in value and "uid" in value:
+            out.setdefault("res_id", set()).add(str(value["res_id"]))
+        for k, v in value.items():
+            if k == "room_choices":
+                out.setdefault("room", set()).update(map(str, v))
+            elif k == "path" and isinstance(v, str) and v.endswith(".mdl"):
+                out.setdefault("material", set()).add(v.split("/")[1] if "/" in v else v)
+            asset_refs(v, out)
+    elif isinstance(value, list):
+        for v in value:
+            asset_refs(v, out)
+
+
+def cmd_assets(args: argparse.Namespace) -> int:
+    print("| Gói | Dataset | `res_id` của vật | Cảnh (`room_choices`) | Thư viện vật liệu |")
+    print("|---|---|---|---|---|")
+    for bundle in args.bundles:
+        for ds in datasets(zipfile.ZipFile(bundle)):
+            refs: dict[str, set[str]] = {}
+            for row in ds.jsonl("meta/episodes.jsonl"):
+                asset_refs(json.loads(row.get("environment_config", "{}")), refs)
+            cells = [", ".join(f"`{x}`" for x in sorted(refs.get(k, ()))) or "—"
+                     for k in ("res_id", "room", "material")]
+            print(f"| `{label(bundle)}` | `{ds.root.rstrip('/')}` | " + " | ".join(cells) + " |")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -559,6 +592,10 @@ def main() -> int:
     p.add_argument("bundles", nargs="+", type=Path, help="eval or other bundles of the task")
     p.add_argument("--json", type=Path)
     p.set_defaults(func=cmd_seeds)
+
+    p = sub.add_parser("assets", help="asset sources the episodes reference (AC 5, V9)")
+    p.add_argument("bundles", nargs="+", type=Path)
+    p.set_defaults(func=cmd_assets)
 
     args = parser.parse_args()
     return int(args.func(args))
