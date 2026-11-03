@@ -10,14 +10,38 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pyarrow as pa  # type: ignore[import-untyped]
 import pytest
+from flywheel.contracts import ScorerParams, StageEvaluation
 from flywheel.eval.cli import app, load_task
 from flywheel.eval.scorer.artifact import STORE_RECORDS
 from flywheel.eval.scorer.status import ScorerError
+from flywheel.testkit.fakes.task import ToyPickPlace
 from typer.testing import CliRunner
 
 TOY_TASK = "flywheel.testkit.fakes.task:ToyPickPlace"
+THIS = "test_score_cli"
 runner = CliRunner()
+
+
+class RaisingTask(ToyPickPlace):
+    """A task whose predicates blow up, named on the command line like any other."""
+
+    def evaluate(self, signals: pa.Table, params: ScorerParams) -> StageEvaluation:
+        raise RuntimeError("vị từ hỏng")
+
+
+class TaskNeedingArguments(ToyPickPlace):
+    """A task that cannot be built by name alone."""
+
+    def __init__(self, calibration: str) -> None:
+        self.calibration = calibration
+
+
+class TwoTableByName(ToyPickPlace):
+    """Only its `task_id` matters: it is what the default config is named after."""
+
+    task_id = "two-table"
 
 
 @pytest.fixture
@@ -162,6 +186,9 @@ def test_an_episode_id_can_be_overridden(tmp_path: Path, config: Path) -> None:
         ["--trace", "absent.jsonl", "--task", TOY_TASK],
         ["--trace", "ep.jsonl", "--task", "flywheel.testkit.fakes.task:NoSuchTask"],
         ["--trace", "ep.jsonl", "--task", "not-a-reference"],
+        # Each of these exited 1 with a traceback before the review of #58.
+        ["--trace", "ep.jsonl", "--task", f"{THIS}:RaisingTask"],
+        ["--trace", "ep.jsonl", "--task", f"{THIS}:TaskNeedingArguments"],
     ],
 )
 def test_what_cannot_be_scored_exits_two_and_writes_nothing(
@@ -179,6 +206,67 @@ def test_what_cannot_be_scored_exits_two_and_writes_nothing(
     assert "không chấm được" in result.output
     # Nothing was scored, so nothing may be left behind looking like a score.
     assert not (store / STORE_RECORDS).exists()
+
+
+@pytest.mark.parametrize("body", [None, "task_id: [\n", "- a\n- b\n"])
+def test_a_config_that_is_absent_or_broken_exits_two(
+    tmp_path: Path, body: str | None
+) -> None:
+    trace = write(tmp_path / "ep.jsonl", toy_rows())
+    broken = tmp_path / "broken.yaml"
+    if body is not None:
+        broken.write_text(body, encoding="utf-8")
+
+    result = runner.invoke(
+        app, ["score", "--trace", str(trace), "--task", TOY_TASK, "--config", str(broken)]
+    )
+
+    assert result.exit_code == 2, result.output
+    assert "không chấm được" in result.output
+
+
+def test_a_store_that_cannot_be_written_exits_two_after_scoring(
+    tmp_path: Path, config: Path
+) -> None:
+    trace = write(tmp_path / "ep.jsonl", toy_rows())
+    # A file where the store directory would go: the episode scores, the write
+    # does not, and the engineer has to be told which of the two happened.
+    blocked = tmp_path / "store"
+    blocked.write_text("not a directory", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "score",
+            "--trace",
+            str(trace),
+            "--task",
+            TOY_TASK,
+            "--config",
+            str(config),
+            "--store",
+            str(blocked),
+        ],
+    )
+
+    assert result.exit_code == 2, result.output
+    assert "không ghi được" in result.output
+    # The score itself was printed: it is the writing that failed.
+    assert "thành công theo scorer: đạt" in result.output
+
+
+def test_the_default_config_is_found_from_the_repo_not_the_cwd(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # `fw eval score` run from a subdirectory used to look for `configs/` under
+    # that subdirectory and fail (review of #58, point 5).
+    from flywheel.eval.cli import _config_for
+
+    monkeypatch.chdir(Path(__file__).parent)
+    found = _config_for(TwoTableByName())
+
+    assert found.is_file()
+    assert found.name == "two-table.yaml"
 
 
 def test_a_class_that_is_not_a_task_definition_is_refused() -> None:

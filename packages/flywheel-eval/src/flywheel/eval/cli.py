@@ -10,6 +10,13 @@ skipped codes are what the job could not be judged on - a run that prints no
 finding and no skip is a clean checkpoint, and that difference has to be
 visible without opening the artifact.
 
+Nothing that stops a command halfway leaves a traceback behind. A trace that
+cannot be read, a config that is not there or is not YAML, a task that cannot
+be loaded or whose predicates blow up, and a store that cannot be written all
+exit 2 with one line saying what could not be done, because exit 1 with a
+traceback reads like a crash in the tool rather than an answer about the job
+(review of #58, point 5).
+
 The reasons a skip carries are Vietnamese, and the team runs this on Windows,
 where the console hands Python a cp1252 stream that cannot encode them. Every
 command therefore puts its streams on UTF-8 first: without it the command dies
@@ -123,8 +130,17 @@ def score(
         typer.echo(f"không chấm được: {error}", err=True)
         raise typer.Exit(code=2) from error
     _print_score(scored)
-    if store is not None:
-        typer.echo(f"ghi vào: {store_score(scored, store, level)}")
+    if store is None:
+        return
+    try:
+        written = store_score(scored, store, level)
+    except OSError as error:
+        # The episode was scored; what failed is the writing. Saying so and
+        # exiting 2 is the difference between a record that is missing and a
+        # record nobody knows is missing.
+        typer.echo(f"chấm được nhưng không ghi được vào `{store}`: {error}", err=True)
+        raise typer.Exit(code=2) from error
+    typer.echo(f"ghi vào: {written}")
 
 
 def load_task(reference: str) -> TaskDefinition:
@@ -144,14 +160,38 @@ def load_task(reference: str) -> TaskDefinition:
         factory = getattr(module, attribute)
     except (ImportError, AttributeError) as error:
         raise ScorerError(f"không nạp được task `{reference}`: {error}") from error
-    definition = factory() if isinstance(factory, type) else factory
+    try:
+        definition = factory() if isinstance(factory, type) else factory
+    except Exception as error:  # the task is somebody else's code
+        # A task that needs arguments cannot be named on a command line, and
+        # that is a thing to say, not a traceback to print.
+        raise ScorerError(
+            f"không dựng được task `{reference}`: {type(error).__name__}: {error}"
+        ) from error
     if not isinstance(definition, TaskDefinition):
         raise ScorerError(f"`{reference}` không phải `TaskDefinition` theo flywheel.contracts")
     return definition
 
 
 def _config_for(task: TaskDefinition) -> Path:
-    return SCORER_CONFIG_DIR / f"{task.task_id}.yaml"
+    """The default config of a task, found from the repo rather than from `cwd`.
+
+    `configs/` sits at the top of the repo, so resolving the default against
+    the current directory meant the command only worked when it was run from
+    there (review of #58, point 5). The walk stops at the repo root, so it
+    cannot reach a `configs/` tree belonging to something else, and where
+    nothing is found the repo-relative path is returned so the error names the
+    file the engineer expected.
+    """
+    relative = SCORER_CONFIG_DIR / f"{task.task_id}.yaml"
+    here = Path.cwd()
+    for folder in (here, *here.parents):
+        candidate = folder / relative
+        if candidate.is_file():
+            return candidate
+        if (folder / ".git").exists():  # the repo root, in a clone or a worktree
+            break
+    return relative
 
 
 def _print_score(score: EpisodeScore) -> None:
@@ -172,8 +212,11 @@ def _print_score(score: EpisodeScore) -> None:
         typer.echo(f"lý do không gán được kiểu: {score.failure.reason}")
     if score.balance.violated:
         balance = score.balance
+        # The row of the trace, not a step of the task: turning one into the
+        # other needs the per-step times `StageEvaluation` does not carry
+        # (review of #58, point 6).
         typer.echo(
-            f"thăng bằng: vi phạm ở bước {balance.row}, {balance.signal}="
+            f"thăng bằng: vi phạm ở dòng trace {balance.row}, {balance.signal}="
             f"{balance.value} (giới hạn {balance.limit})"
         )
     elif score.balance.unknown_reason is not None:
