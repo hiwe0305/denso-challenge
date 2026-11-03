@@ -9,10 +9,17 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import pytest
+import yaml
 from flywheel.data.ingest.lerobot import EpisodeFrames
-from flywheel.data.ingest.sources import SourceRecord, register_source, to_episode
-from pydantic import ValidationError
+from flywheel.data.ingest.sources import (
+    HOLDOUT,
+    SPLITS,
+    SourceRecord,
+    register_source,
+    to_episode,
+)
 
+REPO = Path(__file__).resolve().parents[5]
 Dataset = tuple[Path, list[EpisodeFrames]]
 Flywheel = Callable[..., None]
 Block = dict[str, object]
@@ -159,11 +166,36 @@ def test_condition_is_marked_unknown_per_episode(dataset: Dataset) -> None:
     assert all(c.startswith("cond_unknown_") for c in conditions)
 
 
-def test_an_empty_split_is_refused_by_the_contract(dataset: Dataset) -> None:
+@pytest.mark.parametrize("split", ["", "nonsense", "test", "gate"])
+def test_an_unknown_split_is_refused(dataset: Dataset, split: str) -> None:
     root, written = dataset
     source = register_source(root, "psi_data", "unknown", "public")
-    with pytest.raises(ValidationError):
-        to_episode(written[0], source, "")
+    with pytest.raises(ValueError, match="is not one of train, dev"):
+        to_episode(written[0], source, split)
+
+
+def test_holdout_is_never_ingested(dataset: Dataset) -> None:
+    # Review #69 point 4: holdout lives only in vault/, read only by gate.
+    root, written = dataset
+    source = register_source(root, "psi_data", "unknown", "public")
+    with pytest.raises(ValueError, match="holdout lives only in vault/"):
+        to_episode(written[0], source, "holdout")
+
+
+def test_a_split_other_than_the_recorded_one_is_refused(
+    dataset: Dataset, flywheel: Flywheel, s1_block: Block
+) -> None:
+    root, written = dataset
+    flywheel(root, 0, s1_block)
+    source = register_source(root, "planner_wbc", "internal-generated", "public")
+    assert to_episode(written[0], source, "train").split == "train"
+    with pytest.raises(ValueError, match="recorded in split 'train', not 'dev'"):
+        to_episode(written[0], source, "dev")
+
+
+def test_ingest_splits_are_the_split_plan_without_holdout() -> None:
+    plan = yaml.safe_load((REPO / "configs" / "splits" / "default.yaml").read_text())
+    assert set(SPLITS) == set(plan["seed_ranges"]) - {HOLDOUT}
 
 
 def test_to_episode_refuses_a_hand_made_record_without_a_profile(dataset: Dataset) -> None:
