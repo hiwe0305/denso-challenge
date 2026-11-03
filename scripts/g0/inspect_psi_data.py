@@ -298,6 +298,109 @@ def cmd_layout(args: argparse.Namespace) -> int:
     return 0
 
 
+# --- preliminary QA (AC 2, Q1) -----------------------------------------------------------
+
+QA_CHECKS = ("frames_match_meta", "frame_index_contiguous", "timestamp_monotonic",
+             "finite", "length_in_range", "done_at_last_frame_only", "video_present")
+SUCCESS_KEYS = re.compile(r"success|is_success|succeeded", re.IGNORECASE)
+
+
+def success_fields(ds: Dataset, meta_rows: list[dict[str, Any]], columns: set[str]) -> list[str]:
+    """Names of any per-episode success flag in episodes.jsonl or the parquet columns."""
+    keys = {k for row in meta_rows for k in row} | columns
+    return sorted(k for k in keys if SUCCESS_KEYS.search(k))
+
+
+def qa_dataset(ds: Dataset, min_s: float, max_s: float) -> dict[str, Any]:
+    import numpy as np
+
+    info = ds.json("meta/info.json")
+    fps = float(info["fps"])
+    meta = {int(r["episode_index"]): r for r in ds.jsonl("meta/episodes.jsonl")}
+    videos = {Path(n).stem for n in ds.video_names()}
+    episodes = []
+    columns: set[str] = set()
+    for name, cols in ds.episodes():
+        columns |= set(cols)
+        idx = int(cols["episode_index"][0])
+        t = cols["timestamp"]
+        n = len(t)
+        numeric = [v for k, v in cols.items() if v.dtype.kind == "f"]
+        done = cols["next.done"]
+        dt = np.diff(t)
+        checks = {
+            "frames_match_meta": idx in meta and int(meta[idx]["length"]) == n,
+            "frame_index_contiguous": bool(np.array_equal(cols["frame_index"], np.arange(n))),
+            "timestamp_monotonic": bool(n > 0 and np.all(dt > 0)),
+            "finite": all(bool(np.isfinite(v).all()) for v in numeric),
+            "length_in_range": min_s <= n / fps <= max_s,
+            "done_at_last_frame_only": bool(n > 0 and done[-1] and not done[:-1].any()),
+            "video_present": f"episode_{idx:06d}" in videos,
+        }
+        episodes.append({
+            "episode_index": idx,
+            "member": name,
+            "frames": n,
+            "seconds": n / fps,
+            "max_timestamp_drift_s": float(np.abs(t - np.arange(n) / fps).max()) if n else None,
+            "checks": checks,
+            "passed": all(checks.values()),
+        })
+    flags = success_fields(ds, list(meta.values()), columns)
+    counts = {c: sum(e["checks"][c] for e in episodes) for c in QA_CHECKS}
+    return {
+        "root": ds.root,
+        "fps": fps,
+        "info_total_episodes": info["total_episodes"],
+        "info_total_frames": info["total_frames"],
+        "parquet_episodes": len(episodes),
+        "parquet_frames": sum(e["frames"] for e in episodes),
+        "meta_episodes": len(meta),
+        "videos": len(videos),
+        "success_fields": flags,
+        "thresholds": {"min_seconds": min_s, "max_seconds": max_s},
+        "counts": counts,
+        "n_passed": sum(e["passed"] for e in episodes),
+        "max_timestamp_drift_s": max((e["max_timestamp_drift_s"] or 0.0) for e in episodes),
+        "failed": [{"episode_index": e["episode_index"],
+                    "failed_checks": [c for c, ok in e["checks"].items() if not ok]}
+                   for e in episodes if not e["passed"]],
+        "episodes": episodes,
+    }
+
+
+def cmd_qa(args: argparse.Namespace) -> int:
+    ds = single_dataset(args.bundle)
+    r = qa_dataset(ds, args.min_seconds, args.max_seconds)
+    if args.json:
+        args.json.write_text(json.dumps(r, indent=2) + "\n")
+    n = r["parquet_episodes"]
+    print(f"`{args.bundle.name}`: `info.json` {r['info_total_episodes']} episode, "
+          f"{r['info_total_frames']:,} khung; parquet {n} episode, {r['parquet_frames']:,} khung; "
+          f"`episodes.jsonl` {r['meta_episodes']} dòng; video {r['videos']}\n")
+    labels = {
+        "frames_match_meta": "Số khung parquet = `length` trong `episodes.jsonl`",
+        "frame_index_contiguous": "`frame_index` = 0, 1, …, T−1",
+        "timestamp_monotonic": "`timestamp` tăng nghiêm ngặt",
+        "finite": "Không NaN hay Inf ở mọi cột số thực",
+        "length_in_range": (f"Độ dài trong [{args.min_seconds:g} s, {args.max_seconds:g} s] "
+                            "(ngưỡng giả định)"),
+        "done_at_last_frame_only": "`next.done` chỉ đúng ở khung cuối",
+        "video_present": "Có file video của episode",
+    }
+    print("| Phép kiểm | Đạt |\n|---|---|")
+    for c in QA_CHECKS:
+        print(f"| {labels[c]} | {r['counts'][c]}/{n} |")
+    flag = ", ".join(f"`{f}`" for f in r["success_fields"]) or "không có trường nào"
+    print(f"| Cờ thành công | {flag} |")
+    print(f"| **Đạt mọi phép kiểm** | **{r['n_passed']}/{n}** |")
+    print(f"\nLệch lớn nhất giữa `timestamp` và `frame_index / fps`: "
+          f"{r['max_timestamp_drift_s']:.3g} s")
+    if r["failed"]:
+        print("\nEpisode trượt:", json.dumps(r["failed"]))
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -322,6 +425,13 @@ def main() -> int:
                    help="an ActionLayout JSON naming the 36 dims (SIMPLE g1_sonic joints)")
     p.add_argument("--json", type=Path)
     p.set_defaults(func=cmd_layout)
+
+    p = sub.add_parser("qa", help="preliminary QA per episode and N passing (AC 2, Q1)")
+    p.add_argument("bundle", type=Path)
+    p.add_argument("--min-seconds", type=float, required=True)
+    p.add_argument("--max-seconds", type=float, required=True)
+    p.add_argument("--json", type=Path)
+    p.set_defaults(func=cmd_qa)
 
     args = parser.parse_args()
     return int(args.func(args))
