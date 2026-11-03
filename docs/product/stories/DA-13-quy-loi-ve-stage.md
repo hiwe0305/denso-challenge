@@ -28,12 +28,16 @@ Là kỹ sư đánh giá, tôi muốn mỗi cụm lỗi closed-loop được ki�
 
 ## Nhiệm vụ
 
-- [ ] 1. Bộ đọc `Trace`, log RTC, kết quả probe qua contracts (AC 1, 3)
-- [ ] 2. Kiểm thiếu tín hiệu và R3 sai số bám lệnh (AC 1)
-- [ ] 3. R1, R2 độ trễ và buffer; R4 đồng bộ; R5 camera; R6 hạ tầng (AC 1)
-- [ ] 4. Cấu hình ngưỡng có hash (AC 2)
-- [ ] 5. Bảng quy lỗi về stage, bằng chứng gắn kèm (AC 3, 4)
-- [ ] 6. Test trên lỗi cấy hệ thống và đối chứng sạch (AC 5, 6)
+- [x] 1. Bộ đọc `Trace`, log RTC, kết quả probe qua contracts (AC 1, 3)
+- [x] 2. Kiểm thiếu tín hiệu và R3 sai số bám lệnh (AC 1)
+- [x] 3. R1, R2 độ trễ và buffer; R4 đồng bộ; R5 camera; R6 hạ tầng (AC 1)
+- [x] 4. Cấu hình ngưỡng có hash (AC 2)
+- [x] 5. Bảng quy lỗi về stage, bằng chứng gắn kèm (AC 3, 4)
+- [x] 6. Test trên lỗi cấy hệ thống và đối chứng sạch (AC 5, 6)
+- [x] 7. `api.py`, lệnh `fw eval diag-system` và artifact kết quả của hai bước (AC 1-4). Phạm vi file đã có `api.py`, `cli.py` nhưng không nhiệm vụ con nào dùng tới; phần 6 của demo cần một điểm vào
+- [x] 8. Issue Contract change cho bản ghi kết quả (**issue #70**): `DiagnosisFinding.code` của `flywheel.contracts.training` là `Literal` trên T1-T8, O1-O4 nên mã R không vào được `TrainDiagnosis`; 03 mục 4.3 để `CheckResult` trong `meta` của Cluster (Long giữ). Trong lúc chờ, bản ghi nằm trong làn như `ScoreRecord` của DA-36
+- [x] 9. Đổi bộ đọc sang `flywheel.contracts.trace.TraceStep`, `CameraParams` khi #48 merge (PR #79): bỏ `TraceRow`, `CameraView` của làn; test đọc file mẫu trace của testkit trên master thay cho bản chép (AC 1, 3)
+- [x] 10. R3 nửa dưới: so hướng thân `yaw` theo đường ngắn quanh vòng tròn (atan2(sin d, cos d)), để ±π không đọc thành gần 2π sai số; khớp hông không quấn vì là khớp có giới hạn (AC 1)
 
 ## Phạm vi file
 
@@ -42,6 +46,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `packages/flywheel-eval/src/flywheel/eval/diagnosis/system/`, `packages/flywheel-eval/src/flywheel/eval/diagnosis/stage/`
 - `packages/flywheel-eval/src/flywheel/eval/api.py`, `packages/flywheel-eval/src/flywheel/eval/cli.py`, `packages/flywheel-eval/src/flywheel/eval/config.py`
 - `packages/flywheel-eval/tests/unit/diagnosis/system/`, `packages/flywheel-eval/tests/unit/diagnosis/stage/`
+- `packages/flywheel-eval/tests/contract/diagnosis/system/` (thêm 3/11/2026 cùng nhiệm vụ con 7: lệnh `fw eval diag-system` phải có test lái qua CLI, như DA-36 có `tests/contract/scorer/`)
 - `configs/eval/diagnosis/system.yaml`, `configs/eval/diagnosis/stage.yaml`
 
 ## Ghi chú cho người làm
@@ -71,10 +76,28 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 | 3/11/2026 | Phụ thuộc: hợp đồng `TraceStep`, `CameraParams` (issue #31) và hook `SimpleSim`; nguồn tín hiệu R3–R5 trên psi-data | PO (Hiếu) theo issue #31 |
 | 3/11/2026 | DA-09 dời sau demo: probe của demo dùng file mẫu (07 mục 2.4, bản 1.2) | PO (Hiếu) |
+| 3/11/2026 | Phạm vi file: thêm `packages/flywheel-eval/tests/contract/diagnosis/system/` cho test lái lệnh `fw eval diag-system` của nhiệm vụ con 7 (pr-guard R6) | Châu |
+| 3/11/2026 | Thêm nhiệm vụ con 7 (`api.py`, `fw eval diag-system`, artifact) và 8 (issue Contract change cho bản ghi kết quả). Nhiệm vụ 1-6 không phủ `api.py`, `cli.py` dù hai file nằm trong phạm vi, và phần 6 của demo cần điểm vào. `TraceStep`, `CameraParams` (issue #31, PR #48) chưa merge nên bộ đọc giữ đúng tên trường của đề xuất, đổi sang contract khi #48 merge | Châu |
+| 3/11/2026 | Sửa theo review PO của PR #71 (14 lỗi), theo quyết định Q1–Q3 của PO: R6 đứng đầu, nhãn `infra` khi `infra_status` khác `ok` (Q1); R2 đếm chunk có `delay_steps > buffer_level`, bỏ `r2.min_buffer_level` (Q2, sau đó sửa, xem dòng dưới); `CameraParams.reference_sha256` là hash bản tham chiếu ghim ở G0, R5 so hash rồi so giá trị trong dung sai (Q3). Bộ đọc coi `t_image: null` là không có khung mới, lọc `rtc.jsonl` theo `trace_id`, hash mọi file đầu vào; R3 bỏ qua theo nửa thân; `episode.json` ghi là tạm thời chờ hook DA-38. Test đọc 4 file mẫu trace của PR #48 (chép làm dữ liệu test của làn) | Hiếu, cùng Claude |
+| 3/11/2026 | Q2 sửa lại, PO chốt: R2 đếm chunk có `delay_steps > max_delay_steps` (`r2.max_delay_steps: 8`, max_delay của Ψ₀ stage 3), không đọc `buffer_level` vì nó luôn bằng 0 khi SIMPLE hỏi server lúc hàng đợi rỗng; giữ `max_underruns` | Hiếu, cùng Claude |
+| 3/11/2026 | Theo hook SimpleSim (DA-38, nhánh `DA-38-trace-hook-v2` @ `f94d5bc`): ghim khối `r5` của `system.yaml` bằng bản tham chiếu G0 task hai bàn (`fc7f9c90…`, `head_stereo_left`/`right`); bộ đọc theo bố cục `<job>/rtc.jsonl` và `<job>/<episode>/`, đọc `episode.json` qua `RolloutResult` v0 | Hiếu, cùng Claude |
+| 3/11/2026 | Bộ đọc theo quyết định G1 của PO trên PR #48: trace là thư mục `<trace_id>/` gồm `steps.jsonl` và `camera_params.jsonl` (mỗi dòng một camera, có `trace_id`); `RolloutResult` đọc từ `<trace_id>/rollout_result.json` (đề xuất, chờ PO chốt); `rtc.jsonl` ở thư mục job. Tên file là hằng số trong `reader.py` | Hiếu, cùng Claude |
+| 3/11/2026 | Bộ đọc kiểm `trace_ref` của `RolloutResult` (đúng `trace_id`, `uri` trỏ đúng thư mục `<trace_id>/`, `sha256` khớp `steps.jsonl`), sai thì báo lỗi; nhận thư mục trace hoặc file `rollout_result.json` làm đầu vào. Test nối với đầu ra thật của hook DA-38 (`207e276`) | Hiếu, cùng Claude |
+| 3/11/2026 | PO chốt G1b: `RolloutResult` ở `<job_dir>/<trace_id>/rollout_result.json`; `ROLLOUT_NAME` của `reader.py` và ghi chú bố cục ghi là đã chốt | Hiếu, cùng Claude |
+| 4/11/2026 | Thêm nhiệm vụ con 9 và làm xong: #48 merge thành PR #79, bộ đọc nhận mỗi dòng `steps.jsonl` qua `TraceStep` và mỗi dòng `camera_params.jsonl` qua `CameraParams`; bỏ `TraceRow`, `CameraView`. Dòng hợp đồng từ chối (thiếu trường, vector khác 28/7 kênh, `NaN` trần của JSON, vector null) báo lỗi kèm số dòng; chuỗi `"NaN"`, `"Infinity"`, `"-Infinity"` vẫn là chỗ thiếu tín hiệu, `t_image: null` vẫn là không có khung mới. Tên file trong `<trace_id>/` lấy từ hợp đồng. Test đọc 4 file mẫu trace của testkit với `system.yaml` như khi phát hành; bỏ bản chép `data/trace_pr48/` | Hiếu, cùng Claude |
+| 4/11/2026 | Thêm nhiệm vụ con 10 và làm xong, theo kiểm tra đầu cuối của PO trên master + #71 + hook #80: lệnh `yaw` 3,13 rad với `yaw` đo -3,13 rad (lệch 0,023 rad) ra lỗi bộ điều khiển [R3] vì sai số trừ thẳng giá trị thô. Kênh có tính tuần hoàn chọn theo tên trong `LOWER_BODY` của hợp đồng (`PERIODIC_CHANNELS` trong `reader.py`); chỉ `yaw` (hướng thân, hệ thế giới). Khớp hông roll, pitch, yaw có giới hạn (±0,52; ±2,618 rad trong `configs/embodiments/g1.yaml`) nên không quấn: sai số trên π của khớp là khoảng khớp phải đi thật | Hiếu, cùng Claude |
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
-- Ghi chú hoàn thành:
+- Giờ thực: 15h (nhiệm vụ 1-7; ước lượng story là 9h, vượt vì hai bộ ngưỡng và bảng quy lỗi đều phải có test đối chứng)
+- Công cụ AI đã dùng: Claude Code (Opus 5)
+- Ghi chú sau review PO (3/11/2026): R2 không đọc `buffer_level`, vì SIMPLE chỉ hỏi server khi hàng đợi action rỗng nên mức này luôn bằng 0; R2 so `delay_steps` với `max_delay` của Ψ₀ (8 ở stage 3), kiểm lại khi đổi checkpoint. Trên rollout SIMPLE, R4 luôn bằng 0 do sim chạy đồng bộ (`t_image = t_state`); "R4 sạch" trên sim không phải bằng chứng đã kiểm đồng bộ cảm biến. P1 hiện là số trên cả tập probe; P1 theo từng lượt là đề xuất hợp đồng (issue #70). Vế "lỗi mới sau fine-tune" của dòng 4 chưa kiểm.
+- **Điểm mở cho Hiếu (4/11/2026):** `cmd_lower` của `yaw` là hướng đích của WBC (`target_yaw`), không phải hướng thân tức thời; khi robot đang quay bình thường, lệnh đi trước hướng đo, nên sai số bám lệnh nửa dưới lớn lên mà bộ điều khiển không hỏng. `tau_track_lower` vì vậy phải hiệu chỉnh trên các lượt chạy có quay (đoạn đi sang bàn kia), không chỉ trên lượt đứng yên; trước khi hiệu chỉnh, R3/lower trên lượt có quay có thể báo nhầm. Cần quyết định: hiệu chỉnh ngưỡng chung, hay tách `yaw` khỏi chuẩn chung của nửa dưới.
+- Bố cục trace mà `diagnosis/system` đọc (quyết định G1 trên PR #48; tên file lấy từ `flywheel.contracts.trace`, xuất lại trong `reader.py`): `<job_dir>/<trace_id>/steps.jsonl` (mỗi dòng một `TraceStep`), `<job_dir>/<trace_id>/camera_params.jsonl` (mỗi dòng một `CameraParams`, có `trace_id`; không có file thì R5 ra CHƯA RÕ), `<job_dir>/<trace_id>/rollout_result.json` (`RolloutResult` v0; tên file đã chốt 3/11/2026 [Hiếu], G1b) và `<job_dir>/rtc.jsonl` (DA-19, ghép theo `trace_id`). `trace_ref.uri` trỏ thư mục `<trace_id>/`, `trace_ref.sha256` là sha256 của `steps.jsonl`.
+- Ghi chú hoàn thành: AC 1-6 đạt trên trace tổng hợp và file mẫu probe của testkit. Chưa chạy trên `Trace` thật của SIMPLE (hook của Hiếu, 8/11) và chưa chạy trên probe thật (DA-09 dời sau demo). R5 dùng bản tham chiếu camera G0 của task hai bàn (SIMPLE `b75c678`, ghim 3/11/2026); task khác ra CHƯA RÕ cho tới khi được ghim. Mọi ngưỡng trong hai file config là giả định, cách hiệu chỉnh ghi ngay trên dòng.
 - File đã tạo hoặc sửa:
+  - `packages/flywheel-eval/src/flywheel/eval/diagnosis/system/`: `reader.py`, `verdict.py`, `signals.py`, `tracking.py`, `runtime.py`, `check.py`, `artifact.py`
+  - `packages/flywheel-eval/src/flywheel/eval/diagnosis/stage/`: `attribute.py`, `artifact.py`
+  - `packages/flywheel-eval/src/flywheel/eval/`: `config.py`, `api.py`, `cli.py`
+  - `configs/eval/diagnosis/system.yaml`, `configs/eval/diagnosis/stage.yaml`
+  - `packages/flywheel-eval/tests/unit/diagnosis/system/`, `packages/flywheel-eval/tests/unit/diagnosis/stage/`, `packages/flywheel-eval/tests/contract/diagnosis/system/`

@@ -1,0 +1,52 @@
+# Bảng quy lỗi về stage của Ψ₀.
+# Nguồn: spec v10.5 mục 6.4 (bước 4b) và design 27/10/2026 mục 10. Hai tài liệu
+# dùng **một bảng chung** từ 30/10/2026 [Đã chốt], nên file này chỉ có một bản
+# và không có khóa chọn biến thể. Story DA-13 AC 3, 4.
+#
+# Bảng để trong config để đổi cách diễn đạt, chỗ quy lỗi và can thiệp gợi ý mà
+# không phải sửa mã (quyết định 28/10/2026). `evidence` thì là mã:
+# `attribute.py` khai đúng 5 luật, và một dòng có `evidence` không khớp luật
+# nào bị từ chối lúc nạp, để không có dòng nằm trong bảng mà không bao giờ nổ.
+#
+# Giả thuyết ở đây là **đề xuất cho kỹ sư xác nhận** trên evidence card, không
+# tự thành can thiệp (AC 4; spec mục 6.4, 6.14).
+
+thresholds:
+  p1_min_accuracy: 0.9      # giả định; dưới mức này coi là P1 trả lời sai. Hiệu chỉnh: phân vị 5 của accuracy P1 trên khung hình của episode teleop thành công (DA-09 chạy probe thật)
+  p3_high_error: 0.3        # giả định; sai số action offline của nhóm liên quan, đơn vị của P3. Hiệu chỉnh: trung vị các nhóm trên checkpoint `postpre.*` nhân 2 (cùng cách o1 của DA-08)
+  p3_high_error_by_group: {}  # chốt: để rỗng tới khi có P3 thật của DA-09; nhóm không có ngưỡng rơi về `p3_high_error`
+  p3_low_error: 0.1         # giả định; dưới mức này là "P3 thấp" của dòng lệch phân phối. Hiệu chỉnh: phân vị 50 trên checkpoint đã fine-tune đạt ở offline
+
+rows:
+  - row_id: stage1_perception
+    # Tên `evidence` giữ nguyên, nhưng `ProbeP1` hiện là số trên cả tập probe
+    # (`dataset_sha256`), không trên khung hình của chính lượt lỗi; bằng chứng
+    # ghi tập probe. P1 theo từng lượt là đề xuất hợp đồng cho P1 (issue #70).
+    evidence: p1_wrong_on_failure_frames
+    attribute_to: "Stage 1 · nhận thức"
+    intervention: "Ghi nhận và báo cáo, không tiêu ngân sách: tăng cường thị giác đã cố định cho mọi nhánh (spec mục 7.3); synthetic S3 là hướng sau PoC"
+    consumes_budget: false    # chốt 30/10/2026: spec mục 7.3 cố định tăng cường thị giác cho mọi nhánh nên dòng này không còn can thiệp dữ liệu để xin
+
+  - row_id: stage3_action_group
+    evidence: p3_high_on_related_group
+    attribute_to: "Stage 3 · học action nhóm đó"
+    intervention: "Thêm demo hoặc dữ liệu sinh (S1, S2) cho bước k"
+    consumes_budget: true
+
+  - row_id: runtime_distribution_shift
+    evidence: p3_low_but_closed_loop_failed
+    attribute_to: "Lệch phân phối khi chạy"
+    intervention: "Correction từ trạng thái lỗi (spec mục 6.6, 6.8)"
+    consumes_budget: true
+
+  - row_id: stage3_forgetting
+    evidence: t7_after_finetune
+    attribute_to: "Stage 3 · quên"
+    intervention: "Giảm learning rate, tăng replay"
+    consumes_budget: true
+
+  - row_id: out_of_domain
+    evidence: out_of_domain
+    attribute_to: "Không phải lỗi stage"
+    intervention: "Chỉ báo cáo (NGOÀI MIỀN, spec mục 6.8)"
+    consumes_budget: false

@@ -4,6 +4,7 @@ _Vai trò: Architect (Winston), quy trình BMAD. Ngày 22/10/2026. Đầu vào: 
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 4/11/2026 | 1.2 | Mục 2.4, 4.3, 7.1, chốt khi review #82 (DA-39): EvidenceCard là artifact dẫn xuất theo hợp đồng `flywheel.contracts.evidence`, sinh lại từ Cluster, Score, bản ghi chẩn đoán hệ thống và Decision, lưu ở `runs/<run_plan_id>/cards/<cluster_id>/card.json`; không nằm trong `meta` của Cluster hay `Cluster.card_uri` (cả hai nằm trong hash nội dung), `Cluster.card_uri` bỏ dùng ở L0-lite; ghi đè chẩn đoán hoặc can thiệp của kỹ sư nằm trong `Decision.criteria` theo khóa của module EvidenceCard (P4), trường riêng để sau 17/11 | PO (Hiếu) |
 | 3/11/2026 | 1.1 | Mục 1.2, 4.1, 4.3, 4.4, 5.2, chốt khi review #36, #49, #69: ID của `Score` là hash của cả bản ghi, gồm `config_sha256` và `level` (D3); một ID dùng lại cho nội dung khác bị từ chối lúc ghi, view lọc trùng theo ID (D1); ID episode do bên ghi đặt, tất định, theo DA-25, bỏ `ep_<ULID>` bắt buộc (Q5); ledger tra dòng ước tính trên cả site (D2); `LedgerEntry` bắt buộc `run_plan_id`, dòng thực đo bắt buộc thêm `job_id` (D4); `RolloutResult.timing_verdict` tách khỏi `sim_success` (E2) | PO (Hiếu) |
 | 3/11/2026 | 1.0 | Mục 4.3: Episode `meta` bỏ `injected_defect` (đáp án lỗi cấy), thay bằng `benchmark_copy_id` gắn trên mọi episode của bản sao chấm Agent QA/QC; đáp án chỉ nằm trong `DefectManifest`; rào release chặn theo `benchmark_copy_id`. Theo design mục 6.1, 9.2 sửa cùng ngày | PO (Hiếu) |
 | 3/11/2026 | 0.9 | Mục 1.2 và 4.3: `LedgerEntry` ghi ước tính và thực đo thành hai dòng riêng (`measure_kind` bắt buộc), dòng thực đo có `estimate_entry_id`; chốt khi review #36 | PO (Hiếu) |
@@ -134,7 +135,7 @@ Mũi tên liền là luồng dữ liệu giữa module lõi; mũi tên chấm l�
 | Lưu trữ đối tượng | Đĩa cục bộ qua `pathlib`, địa chỉ hóa sha256 | fsspec, MinIO hoặc S3 ở L1 | Một máy chính |
 | Theo dõi thí nghiệm | `metrics.jsonl` trong thư mục job, đồ thị tĩnh trong `reports` | MLflow ở L1 nếu cần so nhiều run | Trùng vai trò với ledger và catalog |
 | Console HD | Lệnh Typer, card HTML tĩnh, Rerun cho chế độ đối chứng | Streamlit hoặc web ở L1+ | 02 §8 đã cho phép cắt |
-| Evidence card | Sinh lại từ Cluster và Decision, không có revision | Revision card ở L1 | Quyết định và lý do ghi đè đã nằm trong Decision |
+| Evidence card | Sinh lại từ Cluster và Decision, không có revision. Bản 1.2: artifact dẫn xuất theo hợp đồng `flywheel.contracts.evidence`, sinh lại từ Cluster, Score, bản ghi chẩn đoán hệ thống và Decision, không phải bảng catalog (mục 4.3) | Revision card ở L1 | Quyết định và lý do ghi đè đã nằm trong Decision |
 | Backup | Hằng ngày sang máy 3060, diễn tập trước G3 (mục 10.4) | Bản ngoài site ở L1 | 05 AR3 |
 
 Giữ nguyên 12 module và 6 package. Tên module là ranh giới trách nhiệm, chi phí chỉ là một thư mục; mỗi module ở L0 chỉ hiện thực phần story cần, theo thứ tự ở 04. Package adapter phải tách vì môi trường Python khác nhau (ADR-02).
@@ -241,7 +242,7 @@ Mười hai bảng catalog. Cột chung ở mục 4.1 không ghi lại.
 | Checkpoint | `ckpt_<hash>` | `method`, `branch`, `base_source_id`, `parent_checkpoint_id`, `release_id`, seed huấn luyện, hash trọng số, URI; `meta`: số bước, `train_job_id`, revision upstream | Bất biến |
 | RunPlan | `rp_<hash>` | `purpose` (g0_repro, e1, branch_train, aa_test, round, holdout, hd), `branch`, `method`, đường dẫn `runplan.lock.json`, thời điểm đóng băng | Đóng băng trước khi chạy (mục 8.1). Vòng flywheel là RunPlan `purpose = round` |
 | Score | `sc_<hash>` của cả bản ghi, gồm `scorer_version`, `config_sha256` và `level` (bản 1.1) | `episode_id`, `scorer_version`, thành công theo scorer, trạng thái 6 bước (đạt, trượt, chưa thử, chưa rõ, kèm t vào và t ra), bước hỏng k, kiểu lỗi (L-REACH…L-UNKNOWN), `failure_class`, mức; `meta`: sai số bám lệnh theo nhóm WBC, độ trễ p99, lệch đồng bộ p99, tín hiệu thiếu | Bất biến; chấm lại là bản mới. Bản 1.1: cùng trace chấm với hai cấu hình scorer ra hai Score, vì khác cấu hình là một điểm khác |
-| Cluster | `clu_<hash>` | `run_plan_id` của vòng, khóa (k, kiểu lỗi, mức), thành viên, đại diện và seed chọn, chẩn đoán cụm, `parent_cluster_id` khi tách theo chẩn đoán; `meta`: kết quả từng phép kiểm (giá trị, ngưỡng, số lượt, ID rollout đã dùng, `skipped` kèm lý do), đề xuất có g, c | Bất biến trong vòng; card HTML là bản dựng từ Cluster và Decision |
+| Cluster | `clu_<hash>` | `run_plan_id` của vòng, khóa (k, kiểu lỗi, mức), thành viên, đại diện và seed chọn, chẩn đoán cụm, `parent_cluster_id` khi tách theo chẩn đoán; `meta`: kết quả từng phép kiểm (giá trị, ngưỡng, số lượt, ID rollout đã dùng, `skipped` kèm lý do), đề xuất có g, c | Bất biến trong vòng; card HTML là bản dựng từ Cluster và Decision. Bản 1.2: `card_uri` bỏ dùng ở L0-lite, vì nằm trong hash nội dung; card lưu ở thư mục run (dòng CheckResult, EvidenceCard ở bảng gộp) |
 | FixRateEvent | `fre_<ULID>` | loại can thiệp, chẩn đoán, kiểu lỗi, `failure_class`, họ task, `cluster_id`, `intervention_id`, n điều kiện đo, p của cha, p của ứng viên, fixed_j | Append-only; posterior Beta là phép gộp lúc đọc |
 | LedgerEntry | `led_<ULID>` | hoạt động, loại tài nguyên, số lượng, đơn vị, `pricebook_id`, thành tiền, `measure_kind` (`estimated` hay `measured`, bắt buộc khai), `estimate_entry_id` (bản 0.9: dòng thực đo trỏ về dòng ước tính của cùng việc, để tính hệ số k; bản 1.1: tra trên sổ của cả site, nên dòng ước tính có thể nằm ở job khác), nhánh, `run_plan_id` (bản 1.1: bắt buộc), cụm, `intervention_id`, `job_id` (bản 1.1: bắt buộc với dòng thực đo), người (mã giả danh) | JSONL append-only; sửa sai bằng bút toán đảo |
 | Decision | `dec_<ULID>` | `kind` (plan_review, dev_gate, aa_test, holdout, milestone, repair_ticket), đối tượng (ID), số đo, tiêu chí đã chốt, kết luận, người ký, lý do; `meta`: với `plan_review` là danh sách can thiệp đã duyệt (`iv_<ULID>`, loại, cụm, số lượng, chi phí ước tính) và ghi đè; với `repair_ticket` là trạng thái và `rebaseline_required` | Append-only; trạng thái hiện hành là bản mới nhất cùng đối tượng |
@@ -258,7 +259,7 @@ Mười hai bảng catalog. Cột chung ở mục 4.1 không ghi lại.
 | Trace | Episode kind `eval_rollout` hoặc `diag_rollout` |
 | Job | Thư mục `runs/<run_plan_id>/<job_id>/`; view DuckDB đọc `job.json` và `result.json` |
 | StageResult, FailureRecord | Score |
-| CheckResult, EvidenceCard | `meta` của Cluster; card HTML sinh lại từ Cluster và Decision, không có revision |
+| CheckResult, EvidenceCard | Bản 1.2: artifact dẫn xuất theo hợp đồng `flywheel.contracts.evidence`, không phải bảng catalog. Card sinh lại từ Cluster, Score, bản ghi chẩn đoán hệ thống và Decision, lưu ở `runs/<run_plan_id>/cards/<cluster_id>/card.json`. Không ghi vào `meta` của Cluster hay `Cluster.card_uri`: cả hai nằm trong hash nội dung, ghi vào là đổi ID cụm. Ghi đè chẩn đoán hoặc can thiệp của kỹ sư nằm trong `Decision.criteria`, theo khóa do module EvidenceCard định nghĩa (P4); trường riêng để sau 17/11. Card HTML dựng từ `card.json`, không có revision |
 | Round | RunPlan `purpose = round` |
 | AcquisitionPlan, Intervention | `rounds/<run_plan_id>/plan.json` cộng Decision `plan_review`; mỗi can thiệp là một dòng có ID `iv_<ULID>`. Số lượng thực hiện đếm từ Episode theo `intervention_id`; chi phí thực cộng từ LedgerEntry |
 | GateDecision, RepairTicket | Decision với `kind` tương ứng |
@@ -601,7 +602,8 @@ $FW_ROOT/                         # mặc định ./fwdata (đưa vào .gitignor
     exports/<release_id>/<format>-<mix_hash>/   # LeRobot dựng lại được, xóa được
     plans/<run_plan_id>/          # runplan.yaml, runplan.lock.json
     runs/<run_plan_id>/<job_id>/  # job.json, result.json, logs.jsonl, ledger.jsonl, metrics.jsonl, staging/
-    rounds/<run_plan_id>/         # plan.json (can thiệp iv_), cards/<cluster_id>.html sinh lại được
+    runs/<run_plan_id>/cards/<cluster_id>/   # card.json (EvidenceCard, bản 1.2) và card HTML dựng từ đó, sinh lại được
+    rounds/<run_plan_id>/         # plan.json (can thiệp iv_)
     checkpoints/<checkpoint_id>/  # CHECKPOINT.json, trọng số hoặc URI ngoài
     refs/                         # con trỏ đổi được, kèm refs.log
     vault/holdout/                # conditions.parquet, conditions.sha256, locks/<checkpoint_id>.json, sealed/<run_plan_id>/

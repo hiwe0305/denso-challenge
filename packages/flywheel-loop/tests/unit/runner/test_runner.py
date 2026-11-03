@@ -226,27 +226,31 @@ def test_job_id_must_stay_inside_the_staging_root(tmp_path: Path) -> None:
 # RTC log in async mode (review findings 3 and 4)
 
 
-def test_async_without_rtc_log_is_a_reported_failure(tmp_path: Path) -> None:
+def test_async_without_rtc_log_is_not_checked(tmp_path: Path) -> None:
     sim = FakeSim2D(tmp_path)  # writes a trace but no rtc.jsonl
     runner = _runner(sim, tmp_path)
 
     result = runner.run_rollout(_async(sim, _profile(tmp_path / "z.json", 0.0)), _endpoint())
 
-    assert result.infra_status == "policy_error"
-    assert result.sim_success is None
+    assert result.infra_status == "ok"  # the sim and the policy ran fine
+    assert result.timing_verdict == "not_checked"
+    assert result.starved_steps is None
+    assert result.sim_success is True  # the simulator's verdict, untouched
     entry = json.loads((tmp_path / "job-1" / "runner.json").read_text(encoding="utf-8"))
     assert "rtc.jsonl" in entry["error"]
+    assert entry["timing_verdict"] == "not_checked"
 
 
-def test_failed_async_rollout_is_retried_not_cached(tmp_path: Path) -> None:
+def test_not_checked_async_rollout_is_retried_not_cached(tmp_path: Path) -> None:
     sim = FakeSim2D(tmp_path)
     runner = _runner(sim, tmp_path)
     request = _async(sim, _profile(tmp_path / "z.json", 0.0))
-    runner.run_rollout(request, _endpoint())
+    first = runner.run_rollout(request, _endpoint())
+    assert first.timing_verdict == "not_checked"
 
     retry = _runner(RTCLoggingSim(tmp_path), tmp_path).run_rollout(request, _endpoint())
 
-    assert retry.infra_status == "ok"
+    assert retry.timing_verdict == "ok"
 
 
 def _set(field: str, value: object, index: int | None = None) -> Callable[..., Any]:
@@ -292,12 +296,13 @@ def test_async_rtc_log_is_checked_for_meaning(
 
     result = runner.run_rollout(_async(sim, _profile(tmp_path / "p.json", 0.1)), _endpoint())
 
-    assert result.infra_status == "policy_error"
+    assert result.infra_status == "ok"  # the sim and the policy ran fine
+    assert result.timing_verdict == "not_checked"
     entry = json.loads((tmp_path / "job-1" / "runner.json").read_text(encoding="utf-8"))
     assert reason in entry["error"]
 
 
-def test_unreadable_rtc_log_is_a_reported_failure(tmp_path: Path) -> None:
+def test_unreadable_rtc_log_is_not_checked(tmp_path: Path) -> None:
     sim = RTCLoggingSim(tmp_path)
     runner = _runner(sim, tmp_path)
     request = _async(sim, _profile(tmp_path / "p.json", 0.1))
@@ -312,7 +317,8 @@ def test_unreadable_rtc_log_is_a_reported_failure(tmp_path: Path) -> None:
     sim.rollout = rollout  # type: ignore[method-assign]
     result = runner.run_rollout(request, _endpoint())
 
-    assert result.infra_status == "policy_error"
+    assert result.infra_status == "ok"  # the sim and the policy ran fine
+    assert result.timing_verdict == "not_checked"
 
 
 def test_valid_async_rtc_log_is_kept_in_the_job_dir(tmp_path: Path) -> None:
@@ -372,6 +378,9 @@ def test_sync_passes_and_async_reveals_the_latency_failure(tmp_path: Path) -> No
     # The sim's verdict stays the sim's; the latency failure is the timing verdict.
     assert async_.infra_status == "ok"
     assert async_.sim_success is True
+    assert async_.timing_verdict == "starved"
+    assert async_.starved_steps == 12
+    assert sync.timing_verdict is None and sync.starved_steps is None
     entry = _entry(tmp_path, "async")
     assert entry["timing_verdict"] == "starved"
     # Chunk size 1 at 10 Hz: a hardware client asks with at most 1 action left
@@ -392,7 +401,8 @@ def test_zero_latency_async_matches_sync_on_the_same_seed(tmp_path: Path) -> Non
 
     assert async_.infra_status == sync.infra_status == "ok"
     assert async_.sim_success == sync.sim_success is True
-    assert _entry(tmp_path, "async")["timing_verdict"] == "pass"
+    assert async_.timing_verdict == _entry(tmp_path, "async")["timing_verdict"] == "ok"
+    assert async_.starved_steps == 0
     assert sync.trace_ref is not None and async_.trace_ref is not None
     assert load_trace(async_.trace_ref)["frames"] == load_trace(sync.trace_ref)["frames"]
 
@@ -400,7 +410,7 @@ def test_zero_latency_async_matches_sync_on_the_same_seed(tmp_path: Path) -> Non
 @pytest.mark.parametrize(
     ("delay_s", "verdict", "starved_steps"),
     [
-        (0.06, "pass", 0),  # 3 steps of latency: covered by the 8 actions left
+        (0.06, "ok", 0),  # 3 steps of latency: covered by the 8 actions left
         (0.18, "starved", 3),  # 9 steps: 1 step without an action on chunks 1-3
     ],
 )
@@ -415,6 +425,8 @@ def test_refill_level_decides_starvation_on_rtc_client_shaped_logs(
     assert len(records) == 4
     assert {r.buffer_level for r in records} == {0}
     assert sync.sim_success is async_.sim_success is True
+    assert async_.timing_verdict == verdict
+    assert async_.starved_steps == starved_steps
     entry = _entry(tmp_path, "async")
     assert entry["timing_verdict"] == verdict
     assert entry["rtc"]["refill_level"] == 8
@@ -424,11 +436,29 @@ def test_refill_level_decides_starvation_on_rtc_client_shaped_logs(
 def test_refill_level_and_starvation_limit_come_from_the_eval_config(tmp_path: Path) -> None:
     config = EvalConfig(refill_level=10, max_starved_steps=0)
     _, async_ = _sync_and_async(tmp_path, 0.18, spec=PSI0_LIKE, max_steps=64, config=config)
-    assert _entry(tmp_path, "async")["timing_verdict"] == "pass"
+    assert async_.timing_verdict == "ok"
 
     config = EvalConfig(max_starved_steps=12)
-    _sync_and_async(tmp_path / "limit", delay_s=0.34, config=config)
-    assert _entry(tmp_path / "limit", "async")["timing_verdict"] == "pass"
+    _, async_ = _sync_and_async(tmp_path / "limit", delay_s=0.34, config=config)
+    # Within the limit the verdict is ok, but the starved steps are still reported.
+    assert async_.timing_verdict == "ok"
+    assert async_.starved_steps == 12
+
+
+def test_async_rollout_failed_by_the_adapter_is_not_checked(tmp_path: Path) -> None:
+    sim = RTCLoggingSim(tmp_path)
+    runner = _runner(sim, tmp_path)
+    original = sim.rollout
+
+    def rollout(req: RolloutRequest, policy: PolicyEndpoint) -> RolloutResult:
+        return original(req, policy).model_copy(update={"infra_status": "timeout"})
+
+    sim.rollout = rollout  # type: ignore[method-assign]
+    result = runner.run_rollout(_async(sim, _profile(tmp_path / "p.json", 0.0)), _endpoint())
+
+    assert result.infra_status == "timeout"
+    assert result.timing_verdict == "not_checked"
+    assert result.starved_steps is None
 
 
 def test_eval_yaml_sets_refill_level_to_psi0_max_delay() -> None:

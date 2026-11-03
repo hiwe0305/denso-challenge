@@ -1,0 +1,145 @@
+{
+ "frozen_at": "2026-11-03T17:43:01+00:00",
+ "plan": {
+  "branches": {
+   "A": {
+    "demo_set": "A",
+    "parent": "psi0-baseline-egodex-he",
+    "role": "baseline as in Psi0: all 80 demos"
+   },
+   "C": {
+    "demo_set": "C",
+    "parent": "psi0-baseline-egodex-he",
+    "role": "cut to 40 demos, nothing added; = C-EGO"
+   },
+   "C_NOEGO": {
+    "demo_set": "C",
+    "parent": "psi0-abl-he-only",
+    "role": "C on the checkpoint pretrained without EgoDex"
+   }
+  },
+  "code": {
+   "psi0": {
+    "commit": "cda3fdfafe47cb6fa75400d013de1bd36e3cea05",
+    "repo": "physical-superintelligence-lab/Psi0"
+   },
+   "simple": {
+    "commit": "b75c6786f87b4a7f43b52b0ac5b83a1d9ea62e11",
+    "repo": "physical-superintelligence-lab/SIMPLE"
+   }
+  },
+  "comparisons": [
+   {
+    "a": "C",
+    "b": "A",
+    "question": "how sensitive the tray task is to the number of robot demos"
+   },
+   {
+    "a": "C",
+    "b": "C_NOEGO",
+    "question": "does EgoDex in pretraining help at N_cut (not HE-T)"
+   }
+  ],
+  "demo_sets": {
+   "file": "configs/runplans/tray/demo_sets.json",
+   "hashes": {
+    "A": "94245f8d36abb425168cb7f4f333d68e2057800c9506e245c60ea8511efa861b",
+    "C": "5db98a38ed80d44b19d1b30304c6f4d96135a51a34dd5f2553ebb7effef8ea1e"
+   },
+   "salt": "DA-34/demo-sets/v1"
+  },
+  "embodiment": "g1_sonic_dwbc@1",
+  "eval": {
+   "cli": "eval-decoupled-wbc",
+   "condition_seeds": {
+    "start": 1000100,
+    "stop": 1000130
+   },
+   "episode_limit_s": 90.0,
+   "levels": [
+    0,
+    1,
+    2
+   ],
+   "renderer": "mujoco",
+   "rollout_replicates": 1,
+   "sim_mode": "mujoco",
+   "split": "dev",
+   "synchronous": true
+  },
+  "interpretation": {
+   "delta_pp": 10.0,
+   "doc": "docs/he/tray.md"
+  },
+  "metric": {
+   "failure_kinds": "design_3_3",
+   "per_stage": "scorer_7_steps",
+   "primary": "sim_success"
+  },
+  "name": "he-tray-psi0",
+  "parents": {
+   "psi0-abl-he-only": {
+    "action_header": {
+     "path": "psi0/postpre.abl.only.he.2602050012/action_header.safetensors",
+     "sha256": "9118bc03bebd53cbf3567c9e220618e90f8605a5cf4247aa878747b17de2a7e0"
+    },
+    "clean_for_main_task": true,
+    "note": "Authors' ablation without EgoDex: VLM on HE only, 48k steps. Differs from the baseline in pretraining steps too (design 27/10 section 7.2), a limit the report must state.",
+    "vlm": {
+     "path": "psi0/pre.abl.only.he.2512311516.48k/model.safetensors",
+     "sha256": "a2ae8c24f83c90dea78282defc6abbbd5475e77ede24e1538c9b3b38ec457f4e"
+    }
+   },
+   "psi0-baseline-egodex-he": {
+    "action_header": {
+     "path": "psi0/postpre.1by1.pad36.2601131206.ckpt.he30k/action_header.safetensors",
+     "sha256": "238b4d95862b0eb44bffa75a2ae69e120aeda3d159fd6f29802dd9338019e14d"
+    },
+    "clean_for_main_task": true,
+    "note": "Pretrained on EgoDex 200k + HE 30k steps; the pair the authors fine-tuned their SIMPLE checkpoints from. The tray task is new (DA-32), so no tray data is in pretraining. As base of A and C it makes C-EGO the same run as C (design 6.2).",
+    "vlm": {
+     "path": "psi0/pre.fast.1by1.2601091803.ckpt.ego200k.he30k/model.safetensors",
+     "sha256": "6e63da17bdd22430bc07c40e4b14ebb96c9d124d014c532449142862c186d3f9"
+    }
+   }
+  },
+  "pricebook": "assumption: Colab 100 CU pack, 0.0999 USD per CU (docs/g0/ledger/DA-19.csv)",
+  "psi_model": {
+   "repo": "USC-PSI-Lab/psi-model",
+   "revision": "cb1480f50d9764ab2f6261bc2e651a67ad54da17"
+  },
+  "purpose": "branch_train",
+  "recipe": {
+   "dataset_stats": "own_train_set",
+   "file": "configs/models/psi0-stage3.yaml",
+   "nproc_per_node": 1,
+   "overrides": {
+    "train.validation_steps": 2000
+   },
+   "sha256": "71ba5de8ef22a11432a829e86e93b7e662f5f38f453cca27f73d6fbe777a1dbd"
+  },
+  "release": {
+   "data_class": "public",
+   "id": "tray_s1_0d84cc87b1e5",
+   "location": "rtx3060:~/denso-da33/fwdata/releases/tray_s1_0d84cc87b1e5",
+   "release_hash": "0d84cc87b1e5e55db91cd13ca40bf07d24a560b83a4c8ebbd2111952dcdc18d6"
+  },
+  "site_id": "local",
+  "stats": {
+   "ci": 0.95,
+   "method": "bootstrap_by_condition",
+   "resamples": 10000,
+   "seed": 20261103
+  },
+  "story": "DA-34",
+  "task": {
+   "config": "configs/sim/tray.yaml",
+   "env_id": "simple/G1WholebodyTrayTransferTeleop-v0",
+   "id": "g1_wholebody_tray_transfer_teleop"
+  },
+  "train_seeds": [
+   0
+  ]
+ },
+ "run_plan_id": "rp_c49c99c8d8da"
+}
