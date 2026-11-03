@@ -26,6 +26,7 @@ from flywheel_simple.tray.pico.virtual import (
     YawStick,
     pico_fingers,
     sample_style,
+    style_seed_for,
     teleop_to_robot,
 )
 from flywheel_simple.tray.planner import Phase, PlannerCommand, TrayPlanner
@@ -43,8 +44,9 @@ def run_operator(
     world = ToyWorld(level, seed)
     cfg = OperatorConfig.load()
     style = None if style_seed is None else sample_style(style_seed)
-    operator = VirtualOperator(cfg, style=style, style_seed=style_seed or 0)
-    operator.reset(TrayPlanner(world.planner_cfg, world.cfg, world.sample))
+    operator = VirtualOperator(cfg)
+    planner = TrayPlanner(world.planner_cfg, world.cfg, world.sample)
+    operator.reset(planner, style=style, style_seed=style_seed or 0)
     calibration = Calibration(ee0=(world.start_wrists[0], world.start_wrists[1]), scale=SCALE)
     tracker = StepTracker(world.cfg, world.sample)
     state = world._state()
@@ -159,6 +161,15 @@ def test_style_changes_the_wrist_path_and_is_deterministic() -> None:
     assert np.abs(a[:n] - c[:n]).max() > 0.005
 
 
+@pytest.mark.parametrize("k", range(6))
+def test_styled_operator_succeeds(k: int) -> None:
+    # The planner's sag correction must not integrate the style's lag: it froze 4 cm
+    # of it in GRASP while the hands kept their style near the tray.
+    level, seed = k % 2, 20 + k
+    _, _, success = run_operator(level, seed, style_seed=style_seed_for(0, level, seed, 1))
+    assert success
+
+
 def test_yaw_stick_turns_and_lets_go() -> None:
     stick = YawStick(DT, rate_max=0.5)
     yaw, heading, out = 0.0, math.radians(90), []
@@ -170,6 +181,46 @@ def test_yaw_stick_turns_and_lets_go() -> None:
     assert abs(yaw - heading) < math.radians(2.0)
     assert max(out) == pytest.approx(0.5)
     assert out[-1] == 0.0  # let go once there
+
+
+def test_yaw_stick_keeps_the_target_next_to_the_heading() -> None:
+    # Level 1 seed 20 on the sim: steering by the body's error alone let target_yaw
+    # drift to -0.36 rad for a heading near -0.15, and the body never got there.
+    stick = YawStick(DT, rate_max=0.6)
+    stick.target_yaw = -0.36  # left behind on the far side
+    rng = np.random.default_rng(0)
+    yaw, heading, worst = -0.10, -0.15, 0.0
+    for k in range(1500):
+        vyaw, target = stick.step(heading, yaw)
+        if abs(vyaw) >= TURN_FLAG:
+            yaw += float(np.clip((target - yaw) / 0.5, -1, 1)) * DT
+        yaw += float(rng.normal(scale=0.002))  # the walk sways the heading
+        if k > 200:
+            worst = max(worst, abs(target - heading))
+    assert worst < 0.05
+    assert abs(yaw - heading) < math.radians(3.0)
+
+
+def test_yaw_stick_turns_half_round_one_way() -> None:
+    # The toy world's 180 degree turn: the wrapped error flipped sign with every
+    # wobble of the body, and the stick rocked in place.
+    stick = YawStick(DT, rate_max=0.5)
+    yaw, signs = 0.0, set()
+    for _ in range(600):
+        vyaw, target = stick.step(math.pi, yaw)
+        if math.cos(yaw) > -0.5:  # still more than 60 degrees from the heading
+            signs.add(float(np.sign(vyaw)))
+        if abs(vyaw) >= TURN_FLAG:
+            error = math.atan2(math.sin(target - yaw), math.cos(target - yaw))
+            yaw += float(np.clip(error / 0.5, -1, 1)) * DT
+    assert len(signs - {0.0}) == 1
+    assert abs(math.atan2(math.sin(math.pi - yaw), math.cos(math.pi - yaw))) < math.radians(2)
+
+
+def test_yaw_stick_lets_go_when_not_steering() -> None:
+    stick = YawStick(DT, rate_max=0.5)
+    stick.step(0.5, 0.0)
+    assert stick.step(0.5, 0.0, steer=False) == (0.0, stick.target_yaw)
 
 
 def test_yaw_stick_refuses_a_minimum_below_the_turn_flag() -> None:

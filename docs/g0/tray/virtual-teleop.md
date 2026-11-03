@@ -109,7 +109,7 @@ MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/py
 | Hai cổ tay, khung đế | Tư thế hai tay cầm: `robot_to_teleop` của mục tiêu (qua lớp phong cách nếu có), với `ctrl0` lúc kích hoạt và tư thế hiệu chuẩn đọc từ `WristsPreProcessor` |
 | Độ đóng bàn tay 0–1 | Từ 0,5 trở lên: cò cộng grip (kiểu đóng "middle" của PICO); dưới: mở |
 | `vx`, `vy` | Cần trái, giới hạn gia tốc (`JoystickShaper`) |
-| Hướng thân | Cần phải, vòng kín trên yaw thân đo được (`YawStick`); `target_yaw` là tích phân của cần như `PicoStreamer` |
+| Hướng thân | Cần phải, vòng kín trên yaw thân đo được (`YawStick`); `target_yaw` là tích phân của cần như `PicoStreamer`. Luật lái sửa ở nhiệm vụ 6 |
 | ABORT, hoặc DONE mà chưa đạt | Bỏ lượt bằng nút reset sau `give_up_s` hoặc `done_wait_s` |
 
 Một episode bắt đầu như với kính: robot đứng vững, người ảo bấm kích hoạt với tay cầm ở `ctrl0` (bộ tiền xử lý hiệu chuẩn lúc đó), giữ yên `engage_s` cho SIMPLE đưa tay về tư thế hiệu chuẩn, rồi chạy planner từ tư thế đó. Tham số ở `configs/sim/tray_virtual_teleop.yaml`; mỗi lượt ghi dòng thời gian pha và lý do abort vào `attempts.jsonl`.
@@ -119,8 +119,8 @@ Quyết định **[Đề xuất]**:
 | Quyết định | Lý do | Nếu sai |
 |---|---|---|
 | Bàn tay chỉ dùng ba mức đóng của PICO, chọn cò cộng grip; tư thế nghỉ (planner đóng 0,3) thành mở | Dữ liệu cùng dạng với PICO thật (story, mục Bàn tay). Kiểu "middle" không xoay ngón cái, gần cách kẹp ngón D-19 nhất. Đo: cầm và đặt được (bảng dưới), nên không cần hỏi PO về bàn tay đóng liên tục | Đổi `grasp` (0 cò, 2 grip) |
-| Yaw lái vòng kín: đẩy cần khi thân lệch hướng planner quá 2°, thả khi còn dưới 0,5°, tốc độ `yaw_gain` × sai số trong [0,12; 0,5] rad/s | Thân dưới chỉ quay khi \|vyaw\| ≥ 0,1, còn `PicoStreamer` tích phân `target_yaw` từ cần. Cờ giữ hướng 0,1 của S1 (D-10) với `target_yaw` đứng yên thì PICO không phát được | Chỉnh ngưỡng, hoặc quay về cờ giữ hướng (lệch khỏi dữ liệu PICO) |
-| Planner bắt đầu từ tư thế cổ tay hiệu chuẩn, không từ tư thế đứng | Lúc kích hoạt ống PICO đưa tay tới tư thế này; planner dùng nó làm tư thế nghỉ lúc đi và lúc xong | |
+| Yaw lái vòng kín (bản nhiệm vụ 5: đẩy cần theo sai số của thân; bản hiện hành ở nhiệm vụ 6) | Thân dưới chỉ quay khi \|vyaw\| ≥ 0,1, còn `PicoStreamer` tích phân `target_yaw` từ cần. Cờ giữ hướng 0,1 của S1 (D-10) với `target_yaw` đứng yên thì PICO không phát được | Chỉnh ngưỡng, hoặc quay về cờ giữ hướng (lệch khỏi dữ liệu PICO) |
+| Planner bắt đầu từ tư thế cổ tay hiệu chuẩn, không từ tư thế đứng (nhiệm vụ 6 lùi tư thế này 5 cm) | Lúc kích hoạt ống PICO đưa tay tới tư thế này; planner dùng nó làm tư thế nghỉ lúc đi và lúc xong | |
 | Người ảo bỏ lượt 1 s sau khi planner abort, 5 s sau DONE mà chưa đạt | Như người thu giữ hai grip để reset; không chạy hết 90 s | Chỉnh tham số |
 
 Số đo (rtx3060, 3/11/2026, chưa có lớp phong cách):
@@ -131,3 +131,45 @@ Số đo (rtx3060, 3/11/2026, chưa có lớp phong cách):
 | Một lượt mức 0 seed 0 qua phiên thu thật, ghi LeRobot | Đạt `check_success`, đủ 7 bước, 35,0 s sim, 1751 frame |
 | 8 lượt, mức 0 seed 1–4 và mức 1 seed 1–4, mỗi worker một lượt | 7/8 đạt (31,0–35,0 s sim). Mức 1 seed 4 hỏng `L-TRAY-TILT` lúc quay |
 | Thời gian máy | Chưa đo sạch: lúc đo, lô S1 của DA-33 (22 worker) chạy cùng máy, load 47–80. Một lượt một mình 144 s thực cho 35 s sim; profile 1000 bước: `env.step` 46 ms (render 31 ms), agent PICO 19 ms, vật lý 10 ms. Đo lại khi máy rảnh (nhiệm vụ 7) |
+
+## Phong cách mỗi episode (nhiệm vụ 6)
+
+Mỗi lượt thử rút một bộ phong cách từ seed `style_seed_for(style_base, level, seed, lần thử)` (`SeedSequence`): cùng điều kiện, cùng lần thử thì cùng phong cách; lần thử khác thì phong cách khác. `--style-base` đổi cả họ seed, `--no-style` chạy planner không phong cách. Episode lưu ghi khối `flywheel` theo AC 3, cùng tên trường với meta S1 của DA-33:
+
+| Trường | Giá trị |
+|---|---|
+| `source_kind`, `synthetic_tier`, `source_detail`, `action_quality` | `synthetic`, `S1`, `virtual_teleop`, `planned` |
+| `style_base`, `style_seed`, `style`, `condition_attempt` | Họ seed, seed của lượt, bộ tham số (7 số), lần thử |
+| `level`, `seed`, `split` | Điều kiện; chỉ seed train |
+| `operator_version` | `da35-virtual-1+cfg.<hash>`: hash của cấu hình người ảo, cấu hình planner và dải phong cách |
+| `wrapper_version`, `simple_commit`, `embodiment_id`, `renderer`, `data_class` | `da35-pico-2`, commit SIMPLE, `g1_sonic_dwbc@1`, `mujoco`, `public` |
+
+`attempts.jsonl` ghi thêm `style_seed`, dòng thời gian pha và lý do abort của mọi lượt.
+
+### Chỉnh để phong cách không làm hỏng task
+
+Đo trên cùng 16 điều kiện (mức 0 và 1, seed 12 và 20–26), rtx3060, 3/11/2026. "Đủ cờ" là lượt đạt có cả 7 cờ bước của `StepTracker`, cần để cắt demo ở nhiệm vụ 8.
+
+| Bản | Đạt | Đủ cờ | Hỏng chính |
+|---|---|---|---|
+| Không phong cách (luật cần gạt của nhiệm vụ 5) | 14 | 13 | |
+| Phong cách trên tay mọi pha | 9 | 3 | Bộ bù chùng tay của planner tích phân độ trễ của tay, rồi giữ nguyên trong GRASP: tay lệch tay cầm 4 cm (thế giới giả) |
+| Như trên, planner thấy tay "như người ảo định đặt" | 7–9 | 1–3 | Lòng bàn tay cách tâm tay cầm 10,3–11,3 cm khi kẹp, quá 10 cm (`r_reach`) nên cờ bước 1 không bật |
+| Tắt dần phong cách tay khi chạm khay | 13 | 3 | Như trên |
+| Chỉ cần gạt có phong cách (8 điều kiện hỏng ở bản trên) | 7/8 | 7/8 | Phong cách tay là nguyên nhân |
+| Tay có phong cách chỉ khi xa khay, bỏ "tay như định đặt" | 11 | 10 | Kẹt ở APPROACH_A, quá giờ ARRIVE_B |
+| Luật cần phải mới, kéo tay về sát người, buông cần khi planner không xin quay (bản hiện hành) | **16** | **16** | |
+
+Quyết định **[Đề xuất]**:
+
+| Quyết định | Lý do | Nếu sai |
+|---|---|---|
+| Phong cách tay (trễ, vọt lố, đường cong, rung) chỉ có khi tay ở xa khay: APPROACH_A (nâng tay khi đi tới) và RETREAT (hạ tay khi lùi); tắt và bật dần trong `style_fade_s` = 0,3 s. Cần gạt có phong cách suốt episode | Bảng trên: phong cách tay gần khay làm hỏng kẹp và đặt. Người thật cũng chậm lại khi chạm vật | Mở thêm pha trong `STYLED_PHASES` (`operator.py`) và đo lại |
+| Bỏ việc đưa planner lòng bàn tay "như người ảo định đặt" | Nó làm các kiểm tra an toàn của planner (tay đã cao hơn mặt bàn chưa, tay đã tới chưa) nhìn tay không có độ trễ, trong khi tay thật còn ở dưới | |
+| Cần phải lái `target_yaw` về hướng planner cộng phần đi trước `yaw_lead` × sai số (tối đa 2°), thả khi cả thân lẫn target tới nơi; giữ chiều quay khi còn cách hơn 90°; buông cần khi planner không gửi cờ quay | Đẩy cần theo sai số của thân làm `target_yaw` trôi khỏi hướng (−0,36 rad khi hướng là −0,15), rồi cờ quay kéo thân về phía target: mức 1 seed 20 không tiến được 10 s. Ở 180° sai số đổi dấu theo mỗi lần thân lắc nên cần rung tại chỗ. Giữ cần khi planner muốn đứng yên làm thân lắc 6°, trượt 5 cm, ARRIVE_B không ổn định | |
+| Sau kích hoạt, hai tay đi theo min-jerk từ tư thế hiệu chuẩn về tư thế nghỉ lùi 5 cm (`rest_dx`) trong `engage_s` | PICO không có bàn tay đóng một phần, nên ngón duỗi thẳng vươn xa hơn tư thế nghỉ co 30% của DA-33 (D-21) và chạm mép bàn A ngay trước điểm planner nâng tay (thân cách mép 0,41 m, xoay 8°). Khuỷu sát thân hơn | Chỉnh `rest_dx`, `rest_dz` |
+| Dải gia tốc cần trái 0,5–1,8 m/s² (người: 0,15–1,8) | Dưới 0,5 m/s², các bước chỉnh 0,12 m/s của planner ở bàn B lên tốc quá chậm | |
+| Thêm `turn_rate` vào phong cách, dải 0,45–0,75 rad/s (người: 0,45–1,0) | Quay nhanh hơn làm nghiêng khay đang mang | |
+| Bấm nút đóng ngay khi planner đóng, không chờ tay bắt kịp | Phong cách tay đã tắt khi kẹp; bản chờ tay (tới 0,3 s) cho 7/16 đạt | |
+
+Chưa làm: lúc dừng giữa pha (0–3 lần mỗi episode ở người). Dừng tay khi planner đang chạy đồng hồ pha sẽ làm lệch các mốc giờ của planner; planner đã có các lúc chờ riêng (giữ khi kẹp, khi nâng, khi tới bàn B). So chuyển động với người (AC 8) để nhiệm vụ 12.

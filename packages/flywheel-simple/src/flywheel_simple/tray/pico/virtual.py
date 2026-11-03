@@ -35,8 +35,13 @@ STYLE_RANGES: dict[str, tuple[float, float]] = {
     "zeta": (0.65, 1.0),  # damping: up to ~7 % overshoot, then a correction
     "curvature": (0.05, 0.4),  # bow per metre still to go
     "tremor_mm": (0.5, 2.0),  # amplitude of the 4-12 Hz tremor
-    "joystick_accel": (0.15, 1.8),  # m/s^2 of the walking command
+    # m/s^2 of the walking command: the human p10-p90 is 0.15-1.8; below 0.5 the
+    # planner's 0.12 m/s corrective steps at table B came too late (DA-35 task 6).
+    "joystick_accel": (0.5, 1.8),
     "arc_seed": (0.0, 2 * math.pi),  # direction of the bow around the motion
+    # rad/s of the right stick when turning: the human 0.45-1.0 capped at 0.75, as faster
+    # turns tilt the carried tray (DA-35 task 6). Drawn last, so earlier draws keep their values.
+    "turn_rate": (0.45, 0.75),
 }
 TREMOR_BAND = (5.0, 11.0)  # Hz, inside the measured 4-12 Hz band
 TREMOR_PARTIALS = 3
@@ -78,6 +83,12 @@ class Style:
     tremor_mm: float
     joystick_accel: float
     arc_seed: float
+    turn_rate: float
+
+
+def style_seed_for(base: int, level: int, seed: int, attempt: int) -> int:
+    """The style seed of one attempt: another style per attempt, the same on a rerun."""
+    return int(np.random.SeedSequence([base, level, seed, attempt]).generate_state(1)[0])
 
 
 def sample_style(seed: int) -> Style:
@@ -160,10 +171,15 @@ class YawStick:
     """The right stick's yaw as PICO turns it into `navigate_cmd[2:4]`, steered closed loop.
 
     PicoStreamer integrates `target_yaw += vyaw * dt` from the stick, and the lower
-    body turns towards `target_yaw` only while |vyaw| >= TURN_FLAG. So the stick
-    cannot hold a heading by itself: the operator watches the body's yaw, pushes the
-    stick (at `gain` x error, between `rate_min` and `rate_max`) once it is more than
-    `engage` off the wanted heading, and lets go once it is within `release`.
+    body turns towards `target_yaw` (not towards the operator's wish) only while
+    |vyaw| >= TURN_FLAG. Pushing the stick by the body's error let `target_yaw`
+    run away from the heading, after which pushing back turned the body the wrong
+    way (level 1 seed 20: no progress for 10 s). So once the body is `engage` off
+    the heading, the operator steers `target_yaw` to `lead` x error (at most
+    `engage`) beyond the heading, at `gain` x the gap, between `rate_min` and
+    `rate_max` (near the goal the stick dithers at `rate_min`, keeping the flag
+    up), and lets go once the body is within `release` and the target within
+    `engage` of its goal. `target_yaw` stays next to the heading.
     """
 
     def __init__(
@@ -174,31 +190,46 @@ class YawStick:
         rate_min: float = 0.12,
         engage: float = math.radians(2.0),
         release: float = math.radians(0.5),
+        lead: float = 0.5,
     ) -> None:
         if rate_min < TURN_FLAG:
             raise ValueError(f"rate_min {rate_min} would not raise the turn flag")
         self.dt, self.rate_max, self.gain = dt, rate_max, gain
-        self.rate_min, self.engage, self.release = rate_min, engage, release
+        self.rate_min, self.engage, self.release, self.lead = rate_min, engage, release, lead
         self.target_yaw = 0.0
         self._pushing = False
+        self._direction = 0.0
 
     def reset(self) -> None:
         """PicoStreamer starts every episode at target yaw 0 (the robot spawns at yaw 0)."""
         self.target_yaw = 0.0
         self._pushing = False
+        self._direction = 0.0
 
-    def step(self, heading: float, yaw: float) -> tuple[float, float]:
-        """(vyaw, target_yaw) for this control step."""
+    def step(self, heading: float, yaw: float, steer: bool = True) -> tuple[float, float]:
+        """(vyaw, target_yaw) for this control step; `steer` False lets go of the stick."""
+        if not steer:
+            self._pushing, self._direction = False, 0.0
+            return 0.0, self.target_yaw
         error = _wrap(heading - yaw)
-        if self._pushing and abs(error) < self.release:
+        lead = max(-self.engage, min(self.engage, self.lead * error))
+        gap = _wrap(heading + lead - self.target_yaw)
+        # Let go only with both the body and the target there: the body passes the
+        # heading on its way to a target left further out.
+        if self._pushing and abs(error) < self.release and abs(gap) < self.engage:
             self._pushing = False
         elif not self._pushing and abs(error) > self.engage:
             self._pushing = True
         vyaw = 0.0
         if self._pushing:
-            vyaw = math.copysign(
-                min(self.rate_max, max(self.rate_min, self.gain * abs(error))), error
-            )
+            # A turn near 180 degrees keeps the way it started: the wrapped gap
+            # flips sign with the body's first wobble.
+            if abs(gap) <= math.pi / 2 or self._direction == 0.0:
+                self._direction = math.copysign(1.0, gap)
+            speed = min(self.rate_max, max(self.rate_min, self.gain * abs(gap)))
+            vyaw = self._direction * speed
+        else:
+            self._direction = 0.0
         self.target_yaw = _wrap(self.target_yaw + vyaw * self.dt)
         return vyaw, self.target_yaw
 
