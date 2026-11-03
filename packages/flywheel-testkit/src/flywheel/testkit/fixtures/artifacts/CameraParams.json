@@ -1,0 +1,13 @@
+{
+  "episode_id": "ep_001",
+  "uid": "head_camera",
+  "mount": "head",
+  "width": 640,
+  "height": 480,
+  "fx": 525.0,
+  "fy": 525.0,
+  "cx": 320.0,
+  "cy": 240.0,
+  "pose": [0.05, 0.0, 0.15, 1.0, 0.0, 0.0, 0.0],
+  "reference_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+}
