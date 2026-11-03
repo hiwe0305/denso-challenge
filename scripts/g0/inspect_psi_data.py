@@ -522,6 +522,102 @@ def cmd_seeds(args: argparse.Namespace) -> int:
     return 0
 
 
+# --- descriptive statistics (AC 6) -------------------------------------------------------
+
+
+def describe(values: list[float]) -> dict[str, float]:
+    import numpy as np
+
+    a = np.asarray(values, dtype=float)
+    q = np.percentile(a, [0, 10, 50, 90, 100])
+    return {"n": int(a.size), "mean": float(a.mean()), "std": float(a.std()),
+            "min": float(q[0]), "p10": float(q[1]), "median": float(q[2]),
+            "p90": float(q[3]), "max": float(q[4])}
+
+
+def stats_dataset(ds: Dataset) -> dict[str, Any]:
+    info = ds.json("meta/info.json")
+    fps = float(info["fps"])
+    rows = ds.jsonl("meta/episodes.jsonl")
+    lengths = [int(r["length"]) for r in rows]
+    positions: dict[str, list[list[float]]] = {}
+    tables: dict[str, list[list[float]]] = {}
+    labels: dict[str, dict[str, int]] = {"target": {}, "container": {}}
+    distractors: list[int] = []
+    for r in rows:
+        env = json.loads(r["environment_config"])
+        dr = env.get("dr_state_dict", {})
+        spatial = dr.get("spatial", {})
+        robot = env["robot_cfg"]["uid"]
+        target = dr.get("target", {}).get("uid")
+        named = {"robot": spatial.get(robot), "target": spatial.get(str(target)),
+                 "container": spatial.get("container_0")}
+        for role, p in named.items():
+            if p is not None:
+                positions.setdefault(role, []).append(p["position"])
+        for role in labels:
+            if role in dr:
+                lab = dr[role]["label"]
+                labels[role][lab] = labels[role].get(lab, 0) + 1
+        distractors.append(len(dr.get("distractors", {})))
+        for name, actor in env.get("layout", {}).get("actors", {}).items():
+            if name.startswith("table"):
+                tables.setdefault(name, []).append(actor["pose"]["position"])
+    axes = "xyz"
+    pos_stats = {role: {axes[k]: describe([p[k] for p in ps]) for k in range(2)}
+                 for role, ps in positions.items()}
+    table_stats = {name: {axes[k]: describe([p[k] for p in ps]) for k in range(3)}
+                   for name, ps in tables.items()}
+    return {
+        "root": ds.root,
+        "episodes": len(rows),
+        "frames": sum(lengths),
+        "length_frames": describe(lengths),
+        "length_seconds": describe([n / fps for n in lengths]),
+        "success_rate": None,  # no success flag in the bundle (qa: success_fields == [])
+        "initial_xy": pos_stats,
+        "tables": table_stats,
+        "labels": labels,
+        "distractors_per_episode": describe(distractors),
+    }
+
+
+def cmd_stats(args: argparse.Namespace) -> int:
+    report = []
+    for bundle in args.bundles:
+        for ds in datasets(zipfile.ZipFile(bundle)):
+            report.append({"bundle": label(bundle), **stats_dataset(ds)})
+    if args.json:
+        args.json.write_text(json.dumps(report, indent=2) + "\n")
+    print("| Dataset | Episode | Khung | Độ dài (s): min · p10 · trung vị · p90 · max · TB ± ĐLC "
+          "| Tỉ lệ thành công |\n|---|---|---|---|---|")
+    for r in report:
+        s = r["length_seconds"]
+        print(f"| `{r['root'].rstrip('/')}` | {r['episodes']} | {r['frames']:,} "
+              f"| {s['min']:.2f} · {s['p10']:.2f} · {s['median']:.2f} · {s['p90']:.2f} "
+              f"· {s['max']:.2f} · {s['mean']:.2f} ± {s['std']:.2f} | không suy được |")
+    print("\nVị trí ban đầu (m, hệ thế giới, từ `dr_state_dict.spatial`): min … max (TB ± ĐLC)\n")
+    print("| Dataset | Vật | x | y |\n|---|---|---|---|")
+    for r in report:
+        for role, ax in r["initial_xy"].items():
+            cells = [f"{a['min']:.3f} … {a['max']:.3f} ({a['mean']:.3f} ± {a['std']:.3f})"
+                     for a in ax.values()]
+            print(f"| `{r['root'].rstrip('/')}` | {role} | " + " | ".join(cells) + " |")
+    print("\nBàn (tâm, m, từ `layout.actors`): min … max\n")
+    print("| Dataset | Bàn | x | y | z |\n|---|---|---|---|---|")
+    for r in report:
+        for name, ax in r["tables"].items():
+            cells = [f"{a['min']:.3f} … {a['max']:.3f}" for a in ax.values()]
+            print(f"| `{r['root'].rstrip('/')}` | `{name}` | " + " | ".join(cells) + " |")
+    print("\n| Dataset | Vật cần gắp | Thùng | Số vật gây nhiễu mỗi episode |\n|---|---|---|---|")
+    for r in report:
+        tgt = ", ".join(f"`{k}` {v}" for k, v in r["labels"]["target"].items()) or "—"
+        con = ", ".join(f"`{k}` {v}" for k, v in r["labels"]["container"].items()) or "—"
+        d = r["distractors_per_episode"]
+        print(f"| `{r['root'].rstrip('/')}` | {tgt} | {con} | {d['min']:.0f}–{d['max']:.0f} |")
+    return 0
+
+
 # --- asset sources (AC 5, V9) ------------------------------------------------------------
 
 
@@ -592,6 +688,11 @@ def main() -> int:
     p.add_argument("bundles", nargs="+", type=Path, help="eval or other bundles of the task")
     p.add_argument("--json", type=Path)
     p.set_defaults(func=cmd_seeds)
+
+    p = sub.add_parser("stats", help="descriptive statistics for the dataset report (AC 6)")
+    p.add_argument("bundles", nargs="+", type=Path)
+    p.add_argument("--json", type=Path)
+    p.set_defaults(func=cmd_stats)
 
     p = sub.add_parser("assets", help="asset sources the episodes reference (AC 5, V9)")
     p.add_argument("bundles", nargs="+", type=Path)

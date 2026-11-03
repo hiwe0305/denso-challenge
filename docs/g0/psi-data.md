@@ -341,3 +341,50 @@ Thank you for releasing Psi0, SIMPLE and the data.
 Best regards,
 <name>, on behalf of team ilovephysicalintelligence
 ```
+
+## 6. Thống kê mô tả (AC 6)
+
+Cho báo cáo dataset (design mục 6.5). Độ dài đọc từ `episodes.jsonl`, đã khớp với số dòng parquet ở mục 3. Vị trí ban đầu đọc từ `dr_state_dict.spatial`, là giá trị bộ ngẫu nhiên hóa đã rút cho episode; vị trí bàn đọc từ `layout.actors`. Robot là `robot_cfg.uid`, vật cần gắp là `dr_state_dict.target.uid`, thùng là `container_0`.
+
+```bash
+python3 -I scripts/g0/inspect_psi_data.py stats <gói hai bàn>.zip <F1 teleop>.zip <F1 MP>.zip --json stats.json
+```
+
+| Dataset | Episode | Khung | Độ dài (s): min · p10 · trung vị · p90 · max · TB ± ĐLC | Tỉ lệ thành công |
+|---|---|---|---|---|
+| `G1WholebodyLocomotionPickBetweenTablesTeleop-v0` | 99 | 62,764 | 9.64 · 10.88 · 11.96 · 15.05 · 24.96 · 12.68 ± 2.18 | không suy được |
+| `G1WholebodyBendPickTeleop-v0` | 97 | 17,623 | 2.70 · 2.94 · 3.50 · 4.41 · 5.78 · 3.63 ± 0.61 | không suy được |
+| `G1WholebodyBendPickMP-v0` | 100 | 15,509 | 3.08 · 3.10 · 3.10 · 3.12 · 3.14 · 3.10 ± 0.01 | không suy được |
+
+Vị trí ban đầu (m, hệ thế giới, từ `dr_state_dict.spatial`): min … max (TB ± ĐLC)
+
+| Dataset | Vật | x | y |
+|---|---|---|---|
+| `G1WholebodyLocomotionPickBetweenTablesTeleop-v0` | robot | -0.650 … -0.630 (-0.639 ± 0.005) | 0.000 … 0.000 (0.000 ± 0.000) |
+| `G1WholebodyLocomotionPickBetweenTablesTeleop-v0` | target | -0.329 … -0.310 (-0.319 ± 0.006) | -0.039 … 0.040 (-0.002 ± 0.025) |
+| `G1WholebodyLocomotionPickBetweenTablesTeleop-v0` | container | -2.500 … -2.450 (-2.472 ± 0.014) | 0.150 … 0.249 (0.199 ± 0.029) |
+| `G1WholebodyBendPickTeleop-v0` | robot | -0.660 … -0.602 (-0.630 ± 0.015) | 0.000 … 0.000 (0.000 ± 0.000) |
+| `G1WholebodyBendPickTeleop-v0` | target | -0.369 … -0.320 (-0.347 ± 0.015) | -0.080 … -0.041 (-0.061 ± 0.012) |
+| `G1WholebodyBendPickMP-v0` | robot | -0.659 … -0.600 (-0.628 ± 0.017) | 0.000 … 0.000 (0.000 ± 0.000) |
+| `G1WholebodyBendPickMP-v0` | target | -0.320 … -0.290 (-0.306 ± 0.009) | -0.080 … -0.040 (-0.060 ± 0.012) |
+
+Bàn (tâm, m, từ `layout.actors`): min … max
+
+| Dataset | Bàn | x | y | z |
+|---|---|---|---|---|
+| `G1WholebodyLocomotionPickBetweenTablesTeleop-v0` | `table` | 0.000 … 0.000 | 0.250 … 0.250 | 0.600 … 0.600 |
+| `G1WholebodyLocomotionPickBetweenTablesTeleop-v0` | `table2` | -2.940 … -2.940 | 0.000 … 0.000 | 0.600 … 0.600 |
+| `G1WholebodyBendPickTeleop-v0` | `table` | 0.200 … 0.200 | 0.000 … 0.000 | 0.350 … 0.350 |
+| `G1WholebodyBendPickMP-v0` | `table` | 0.300 … 0.300 | 0.000 … 0.000 | -0.050 … -0.050 |
+
+| Dataset | Vật cần gắp | Thùng | Số vật gây nhiễu mỗi episode |
+|---|---|---|---|
+| `G1WholebodyLocomotionPickBetweenTablesTeleop-v0` | `cracker_box` 99 | `brasket` 99 | 4–4 |
+| `G1WholebodyBendPickTeleop-v0` | `cracker_box` 97 | — | 2–2 |
+| `G1WholebodyBendPickMP-v0` | `cracker_box` 100 | — | 3–3 |
+
+Kết luận:
+
+- **Tỉ lệ thành công: không suy được từ gói.** Không có cờ thành công (mục 3); các episode là demo tác giả giữ lại sau khi thu. Tỉ lệ thật chỉ đo được bằng phát lại trong sim (DA-17). Bản #24 ghi 100 % là do mặc định `success = True` trong script cũ.
+- **Phân bố vị trí rất hẹp.** Task hai bàn: vật cần gắp chỉ dịch 2 cm theo x, 8 cm theo y; thùng 5 × 10 cm; robot 2 cm; cả hai bàn cố định (bàn 1 tâm `(0, 0,25, 0,6)`, bàn 2 `(−2,94, 0, 0,6)`). Mỗi episode cùng một vật (`cracker_box`), cùng một thùng (`brasket`), 4 vật gây nhiễu. Dải đo khớp `dr_cfgs.spatial` của gói (`target_region` x `[−0,33, −0,31]`, y `[−0,04, 0,04]`). Hệ quả cho lưới HE và cho việc tìm lỗi: điều kiện ngoài dải hẹp này là ngoài phân bố train của Ψ₀.
+- Độ dài: task hai bàn 9,6–25,0 s (trung vị 12,0 s); F1 teleop 2,7–5,8 s; F1 MP gần như cố định 3,1 s, đúng tính chất của quỹ đạo do bộ lập kế hoạch sinh.
