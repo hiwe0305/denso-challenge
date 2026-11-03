@@ -230,7 +230,11 @@ def _drifted(
     position = max(abs(got - want) for got, want in zip(camera.pose[:3], reference.pose[:3]))
     if position > cfg.tolerance_position_m:
         findings.append(_drift(camera.uid, "vị trí camera", position, cfg.tolerance_position_m))
-    orientation = max(abs(got - want) for got, want in zip(camera.pose[3:], reference.pose[3:]))
+    # q and -q are one rotation, so the deviation is the nearer of the two signs.
+    orientation = min(
+        max(abs(got - sign * want) for got, want in zip(camera.pose[3:], reference.pose[3:]))
+        for sign in (1.0, -1.0)
+    )
     if orientation > cfg.tolerance_quaternion:
         findings.append(_drift(camera.uid, "hướng camera", orientation, cfg.tolerance_quaternion))
     return findings

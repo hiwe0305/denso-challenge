@@ -49,7 +49,7 @@ r5:
   cameras: {}              # khai theo `uid` của CameraParams khi G0 chốt; giá trị lấy từ cấu hình camera của SIMPLE, không gõ tay
   tolerance_intrinsics_px: 0.5    # giả định; fx, fy, cx, cy, đơn vị pixel
   tolerance_position_m: 0.005     # giả định; vị trí camera so với thân gắn, đơn vị mét
-  tolerance_quaternion: 0.01      # giả định; thành phần quaternion, không đơn vị
+  tolerance_quaternion: 0.01      # giả định; thành phần quaternion, không đơn vị; q và -q là cùng một hướng nên so với dấu gần hơn
 
 r6:
   ok_statuses: ["ok"]      # chốt: `infra_status` của RolloutResult; mọi giá trị khác là lỗi hạ tầng, không tính là lỗi policy (03 mục 4.3 luật 8)
