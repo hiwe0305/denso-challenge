@@ -34,6 +34,8 @@ Là kỹ sư đánh giá, tôi muốn mỗi cụm lỗi closed-loop được ki�
 - [x] 4. Cấu hình ngưỡng có hash (AC 2)
 - [x] 5. Bảng quy lỗi về stage, bằng chứng gắn kèm (AC 3, 4)
 - [x] 6. Test trên lỗi cấy hệ thống và đối chứng sạch (AC 5, 6)
+- [x] 7. `api.py`, lệnh `fw eval diag-system` và artifact kết quả của hai bước (AC 1-4). Phạm vi file đã có `api.py`, `cli.py` nhưng không nhiệm vụ con nào dùng tới; phần 6 của demo cần một điểm vào
+- [ ] 8. Issue Contract change cho bản ghi kết quả: `DiagnosisFinding.code` của `flywheel.contracts.training` là `Literal` trên T1-T8, O1-O4 nên mã R không vào được `TrainDiagnosis`; 03 mục 4.3 để `CheckResult` trong `meta` của Cluster (Long giữ). Trong lúc chờ, bản ghi nằm trong làn như `ScoreRecord` của DA-36
 
 ## Phạm vi file
 
@@ -71,10 +73,16 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 | 3/11/2026 | Phụ thuộc: hợp đồng `TraceStep`, `CameraParams` (issue #31) và hook `SimpleSim`; nguồn tín hiệu R3–R5 trên psi-data | PO (Hiếu) theo issue #31 |
 | 3/11/2026 | DA-09 dời sau demo: probe của demo dùng file mẫu (07 mục 2.4, bản 1.2) | PO (Hiếu) |
+| 3/11/2026 | Thêm nhiệm vụ con 7 (`api.py`, `fw eval diag-system`, artifact) và 8 (issue Contract change cho bản ghi kết quả). Nhiệm vụ 1-6 không phủ `api.py`, `cli.py` dù hai file nằm trong phạm vi, và phần 6 của demo cần điểm vào. `TraceStep`, `CameraParams` (issue #31, PR #48) chưa merge nên bộ đọc giữ đúng tên trường của đề xuất, đổi sang contract khi #48 merge | Châu |
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
-- Ghi chú hoàn thành:
+- Giờ thực: 15h (nhiệm vụ 1-7; ước lượng story là 9h, vượt vì hai bộ ngưỡng và bảng quy lỗi đều phải có test đối chứng)
+- Công cụ AI đã dùng: Claude Code (Opus 5)
+- Ghi chú hoàn thành: AC 1-6 đạt trên trace tổng hợp và file mẫu probe của testkit. Chưa chạy trên `Trace` thật của SIMPLE (hook của Hiếu, 8/11) và chưa chạy trên probe thật (DA-09 dời sau demo). R5 ra CHƯA RÕ tới khi G0 ghim bản tham chiếu camera; `reference_sha256` trong `system.yaml` còn `null`. Mọi ngưỡng trong hai file config là giả định, cách hiệu chỉnh ghi ngay trên dòng.
 - File đã tạo hoặc sửa:
+  - `packages/flywheel-eval/src/flywheel/eval/diagnosis/system/`: `reader.py`, `verdict.py`, `signals.py`, `tracking.py`, `runtime.py`, `check.py`, `artifact.py`
+  - `packages/flywheel-eval/src/flywheel/eval/diagnosis/stage/`: `attribute.py`, `artifact.py`
+  - `packages/flywheel-eval/src/flywheel/eval/`: `config.py`, `api.py`, `cli.py`
+  - `configs/eval/diagnosis/system.yaml`, `configs/eval/diagnosis/stage.yaml`
+  - `packages/flywheel-eval/tests/unit/diagnosis/system/`, `packages/flywheel-eval/tests/unit/diagnosis/stage/`, `packages/flywheel-eval/tests/contract/diagnosis/system/`
