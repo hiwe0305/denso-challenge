@@ -46,9 +46,8 @@ PR 1 (hạn 5/11/2026):
 PR 2 (hạn 9/11/2026):
 
 - [ ] 3. QA: phép kiểm, ngưỡng, đọc `ReplayReport` (AC 3)
-  - [ ] 3.1 Ngưỡng và hành động khi trượt trong `configs/data/qa.yaml`, bộ nạp không có giá trị mặc định ngầm; ngưỡng bước nhảy action hiệu chỉnh trên psi-data
-  - [ ] 3.2 Bảy phép kiểm của spec mục 4.4 và phép kiểm riêng nguồn, mỗi phép kiểm mang một mã D của design mục 10; episode 0 hoặc 1 khung ra `reject`
-  - [ ] 3.3 Đọc `ReplayReport` (động học trượt thì `reject`, động lực học thì `flag`); kiểm stats của dataset (D4)
+  - [x] 3.1 Ngưỡng và hành động khi trượt trong `configs/data/qa.yaml`, bộ nạp không có giá trị mặc định ngầm; ngưỡng bước nhảy action hiệu chỉnh trên psi-data
+  - [ ] 3.2 Bảy phép kiểm của spec mục 4.4 và phép kiểm riêng nguồn, mỗi phép kiểm mang một mã D của design mục 10; episode 0 hoặc 1 khung ra `reject`; đọc `ReplayReport` (động học trượt thì `reject`, động lực học thì `flag`); kiểm stats của dataset (D4)
 - [ ] 4. Release: chặn bản cấy lỗi, chặn hạt giống ngoài dải, manifest có hash (AC 4)
   - [ ] 4.1 `build_release` từ chối cả release khi có bản sao chấm lỗi, hạt giống ngoài dải `train`, episode thiếu `QAReport` hoặc không thuộc split `train`
   - [ ] 4.2 `Release` đóng băng có `manifest_sha256`, giữ episode bị loại cùng lý do; `ReleaseManifest` và file mẫu dùng chung trong testkit (mối nối `3-ReleaseManifest`)
@@ -137,7 +136,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 | Ngày | Nội dung | Người |
 |---|---|---|
-| 4/11/2026 | Thêm nhiệm vụ con 3.1–6.3 cho PR 2; thêm vào phạm vi file `ledger.py`, `pyproject.toml` của `flywheel-data`, `uv.lock` (PO chốt 4/11 "Cho phụ thuộc": `flywheel-data` phụ thuộc `flywheel-store`, job ghi `LedgerEntry`) và file mẫu `ReleaseManifest.json` của testkit | Claude, theo yêu cầu PO (Hiếu) |
+| 4/11/2026 | Thêm nhiệm vụ con 3.1–3.2, 4.1–4.2, 6.1–6.3 cho PR 2; thêm vào phạm vi file `ledger.py`, `pyproject.toml` của `flywheel-data`, `uv.lock` (PO chốt 4/11 "Cho phụ thuộc": `flywheel-data` phụ thuộc `flywheel-store`, job ghi `LedgerEntry`) và file mẫu `ReleaseManifest.json` của testkit | Claude, theo yêu cầu PO (Hiếu) |
 | 3/11/2026 | Thêm nhiệm vụ con 2.3–2.5 theo quyết định Q4–Q7 của PO ("Chốt theo đề xuất") | Claude, theo yêu cầu PO (Hiếu) |
 | 3/11/2026 | Thêm nhiệm vụ con 1.1–1.3, 2.1–2.2 theo review PR #69 của PO | Claude, theo yêu cầu PO (Hiếu) |
 | 3/11/2026 | Tạo file story theo 07 bản 1.6 và plan chia lại việc (Q2, Q3, Q5): ingest, QA, release, báo cáo cho psi-data, khay S1, khay S2; normalize, cắt đoạn, nguồn bàn phím sau 13/11; hai PR | PO (Hiếu) |
