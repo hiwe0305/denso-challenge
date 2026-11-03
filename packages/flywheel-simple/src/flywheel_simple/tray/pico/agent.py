@@ -3,8 +3,9 @@
 `PicoDecoupledAgent` runs PicoStreamer -> TeleopPolicy (wrist pre-processor,
 TeleopRetargetingIK with the waist) -> G1DecoupledWholeBodyPolicy. Here the
 same pipeline reads a streamer we pass in: the scripted one below for tests
-without a headset, and later the S2 replay streamer (DA-35 task 6). No VR video
-server, no XRoboToolkit, no controller buttons.
+without a headset, the virtual operator, and the S2 replay streamer
+(flywheel_simple.tray.s2.streamer). No VR video server, no XRoboToolkit, no
+controller buttons.
 
 decoupled_wbc's own DummyStreamer cannot be used: it imports ROS for a keyboard
 listener. Only runs in the SIMPLE venv, with PyAV installed (SIMPLE's PICO
@@ -191,12 +192,7 @@ class VirtualPicoStreamer:
         return self._last is not None and self._last[1].reset
 
     def _calibration(self) -> Calibration | None:
-        pre = self._pre
-        if pre is None or not pre.robot_world_T_init_ee:
-            return None
-        frames = pre.robot.supplemental_info.hand_frame_names
-        ee0 = tuple(np.array(pre.robot_world_T_init_ee[frames[s]]) for s in ("left", "right"))
-        return Calibration(ee0=(ee0[0], ee0[1]), scale=float(pre.motion_scale))
+        return calibration_of(self._pre)
 
     def signal(self) -> PicoSignal:
         """This step's signal. TeleopPolicy reads the streamer twice in the activation step
@@ -221,24 +217,37 @@ class VirtualPicoStreamer:
         return signal
 
     def get(self) -> Any:
-        s = self.signal()
-        grasp = self.operator.cfg.grasp_name
-        return _streamer_output(
-            ik_data={
-                "left_wrist": s.controllers[0],
-                "right_wrist": s.controllers[1],
-                "left_fingers": {"position": pico_fingers(s.closed[0], grasp)},
-                "right_fingers": {"position": pico_fingers(s.closed[1], grasp)},
-            },
-            control_data={
-                "base_height_command": STANDING_HEIGHT,
-                "navigate_cmd": list(s.navigate_cmd),
-                "toggle_policy_action": False,
-            },
-            teleop_data={"toggle_activation": s.activate},
-            data_collection_data={"toggle_data_collection": False, "toggle_data_abort": False},
-            source="virtual",
-        )
+        return pico_output(self.signal(), self.operator.cfg.grasp_name, source="virtual")
+
+
+def calibration_of(pre_processor: Any) -> Calibration | None:
+    """What WristsPreProcessor fixed at activation, or None before it calibrated."""
+    pre = pre_processor
+    if pre is None or not pre.robot_world_T_init_ee:
+        return None
+    frames = pre.robot.supplemental_info.hand_frame_names
+    ee0 = tuple(np.array(pre.robot_world_T_init_ee[frames[s]]) for s in ("left", "right"))
+    return Calibration(ee0=(ee0[0], ee0[1]), scale=float(pre.motion_scale))
+
+
+def pico_output(s: PicoSignal, grasp: str, source: str) -> Any:
+    """One step of controller input packed as PicoStreamer's StreamerOutput."""
+    return _streamer_output(
+        ik_data={
+            "left_wrist": s.controllers[0],
+            "right_wrist": s.controllers[1],
+            "left_fingers": {"position": pico_fingers(s.closed[0], grasp)},
+            "right_fingers": {"position": pico_fingers(s.closed[1], grasp)},
+        },
+        control_data={
+            "base_height_command": STANDING_HEIGHT,
+            "navigate_cmd": list(s.navigate_cmd),
+            "toggle_policy_action": False,
+        },
+        teleop_data={"toggle_activation": s.activate},
+        data_collection_data={"toggle_data_collection": False, "toggle_data_abort": False},
+        source=source,
+    )
 
 
 def _install_clock(clock: SimClock) -> None:
