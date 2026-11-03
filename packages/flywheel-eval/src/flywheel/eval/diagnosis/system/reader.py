@@ -377,17 +377,23 @@ def _gap_counts(rows: Iterable[TraceRow], absent: tuple[str, ...]) -> dict[str, 
 def _matrix(rows: Sequence[TraceRow], name: str) -> NDArray[np.float64]:
     """One field of every row as a 2-D array, nan for a gap.
 
-    A row whose vector is a different length than the others cannot be stacked,
-    and a trace that changes its channel count mid-episode is a trace nobody
-    can compute a norm over, so it raises rather than being padded.
+    A vector logged as null (or empty) is a cycle with no measurement, so it
+    becomes a row of nan as wide as the others and `_gap_counts` has already
+    counted it; refusing it would stop the reader on exactly the traces a
+    `max_gap_fraction` above zero is meant to let through. Two rows of
+    different non-zero widths cannot be stacked, and a trace that changes its
+    channel count mid-episode is a trace nobody can compute a norm over, so
+    that still raises rather than being padded.
     """
     vectors = [getattr(row, name) for row in rows]
-    widths = {len(vector) for vector in vectors}
-    if not vectors or widths == {0}:
+    widths = {len(vector) for vector in vectors} - {0}
+    if not widths:
         return np.empty((0, 0), dtype=np.float64)
     if len(widths) > 1:
         raise ReaderError(f"`{name}` đổi số kênh giữa episode ({sorted(widths)})")
-    return np.array(vectors, dtype=np.float64)
+    (width,) = widths
+    gap = (math.nan,) * width
+    return np.array([vector or gap for vector in vectors], dtype=np.float64)
 
 
 def _column(rows: Sequence[TraceRow], name: str) -> Values:
