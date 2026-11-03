@@ -22,8 +22,9 @@ twelve F-TRAIN codes.
   even where its numbers are close, because the comparison with the rest of
   the run is what the hash protects.
 * **R6 infrastructure** (design section 10): `infra_status` that is not one of
-  the healthy values. It is recorded and it never counts as a policy fault
-  (AC 1; 03 section 4.3, rule 8).
+  the healthy values. It is recorded, it never counts as a policy fault
+  (AC 1; 03 section 4.3, rule 8), and it outranks every other code in the
+  label (`verdict.py`).
 
 What is absent is said, not assumed. An episode with no RTC log loses R1 and
 R2 by name, and one with no camera parameters loses R5, which is what keeps

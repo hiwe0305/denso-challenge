@@ -1,8 +1,10 @@
 """The whole system check of one episode, in the order of spec section 6.4 (DA-13 AC 1).
 
 This is where the six F-SYS codes become one answer about one episode. The
-order is the order of the spec: missing signal, tracking error, latency and
-buffer, sync offset, calibration, then infrastructure.
+order is infrastructure first (a crashed simulator or server makes every
+other measurement its consequence; decision Q1 of 3/11/2026), then the order
+of the spec: missing signal, tracking error, latency and buffer, sync offset,
+calibration.
 
 Every code is judged, not only the codes before the first fault. Running them
 all costs nothing - they are arithmetic over arrays already in memory - and an
