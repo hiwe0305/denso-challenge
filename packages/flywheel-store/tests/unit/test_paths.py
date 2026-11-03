@@ -54,3 +54,28 @@ def test_paths_rejects_path_traversal(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="Invalid path segment"):
         paths.table_dir("../escape")
+
+
+@pytest.mark.parametrize("segment", [".", "..", ".hidden", "", " ", "a b", "x\x00y", "C:"])
+def test_job_dir_rejects_segments_that_are_not_plain_names(tmp_path: Path, segment: str) -> None:
+    """PO review 3/11 item 6: job_dir(".", j) must not collapse into runs/<j>."""
+    paths = StorePaths(root=tmp_path)
+    with pytest.raises(ValueError, match="Invalid path segment"):
+        paths.job_dir(segment, "job_1")
+    with pytest.raises(ValueError, match="Invalid path segment"):
+        paths.job_dir("rp_1", segment)
+    with pytest.raises(ValueError, match="Invalid path segment"):
+        paths.table_dir(segment)
+
+
+@pytest.mark.parametrize("site", ["..", ".", "../other", "a/b", ""])
+def test_store_paths_rejects_a_site_that_is_not_a_plain_name(tmp_path: Path, site: str) -> None:
+    with pytest.raises(ValueError, match="Invalid path segment"):
+        StorePaths(root=tmp_path, site=site)
+
+
+def test_store_paths_accepts_the_ids_writers_use(tmp_path: Path) -> None:
+    paths = StorePaths(root=tmp_path, site="site-2")
+    assert paths.job_dir("rp_0123456789abcdef", "job_01H.retry-2").parent.name == (
+        "rp_0123456789abcdef"
+    )

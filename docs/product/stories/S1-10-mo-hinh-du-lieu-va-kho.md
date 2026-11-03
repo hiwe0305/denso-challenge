@@ -48,7 +48,7 @@ Là kỹ sư data, tôi muốn schema có phiên bản và kho lưu bất biến
   - [x] 8.5 `blob_path` chỉ nhận sha256 64 ký tự hex, không thoát ra ngoài kho
   - [x] 8.6 Bốn file mẫu chung trong testkit: `Score.json`, `Cluster.json`, `Decision.json`, `LedgerEntry.json`
   - [x] 8.7 Cột kiểu `X | None` trong view có kiểu SQL thật (`BOOLEAN`, `BIGINT`, …), không phải `VARCHAR`
-  - [ ] 8.8 `StorePaths` kiểm mọi đoạn đường dẫn (cả `.` và `site`); bảng ngoài danh sách catalog bị từ chối khi ghi
+  - [x] 8.8 `StorePaths` kiểm mọi đoạn đường dẫn (cả `.` và `site`); bảng ngoài danh sách catalog bị từ chối khi ghi
 
 ## Phạm vi file
 
@@ -100,11 +100,11 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 | 03/11/2026 | Sửa 7 điểm feedback review của Hiếu trên PR #36: LedgerEntry hai dòng, tái sử dụng Episode/QAReport, kiểm tra schema, type action_layout, SplitPlanConfig | Nguyễn Thăng Long |
 | 03/11/2026 | Sửa 2 lỗi chặn merge (episode_id catalog theo DA-25, DuckDB view khi kho rỗng) và hoàn thiện Issue #62 (benchmark_copy_id, Score task_id/config_sha256, path traversal guard, TableWriter validation) | Nguyễn Thăng Long |
-| 03/11/2026 | Thêm nhiệm vụ 8, sửa 6 điểm review PO sau `8458371`: `Score.task_id` bắt buộc, thêm `Score.trace_sha256`, view lọc trùng theo `id`, sổ chi phí kiểm dòng được trỏ tới, `blob_path` chỉ nhận sha256, bốn file mẫu chung. AC không đổi | Hiếu (cùng Claude) |
+| 03/11/2026 | Thêm nhiệm vụ 8, sửa 6 điểm review PO sau `8458371`: `Score.task_id` bắt buộc, thêm `Score.trace_sha256`, view lọc trùng theo `id`, sổ chi phí kiểm dòng được trỏ tới, `blob_path` chỉ nhận sha256, bốn file mẫu chung; thêm 8.7 (kiểu cột `X \| None` của view) và 8.8 (kiểm đoạn đường dẫn, `site`, tên bảng). AC không đổi | Hiếu (cùng Claude) |
 
 ## Ghi chép khi làm
 
-- Giờ thực: 15h (12.5h của Long; 2.5h nhiệm vụ 8 do Hiếu cùng Claude làm ngày 3/11/2026)
+- Giờ thực: 15.9h (12.5h của Long; 3.4h nhiệm vụ 8 do Hiếu cùng Claude làm ngày 3/11/2026)
 - Công cụ AI đã dùng: Antigravity
 - Ghi chú hoàn thành: Đã hiện thực đầy đủ BaseRecord, 12 thực thể L0-lite, 4 cấu hình YAML, StorePaths, sha256 blobs, TableWriter, tự tạo view DuckDB khi kết nối, LedgerStore và xuất JSON Schema. Sửa theo toàn bộ 7 mục góp ý của Hiếu trên PR #36. Tất cả test unit và e2e đều đạt.
 - File đã tạo hoặc sửa:

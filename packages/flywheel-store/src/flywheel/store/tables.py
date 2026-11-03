@@ -7,7 +7,7 @@ from typing import Any
 
 from flywheel.contracts.base import canonical_json, new_ulid
 from flywheel.store.paths import StorePaths
-from flywheel.store.views import TABLE_MODELS
+from flywheel.store.views import CATALOG_TABLES, TABLE_MODELS
 from pydantic import BaseModel
 
 
@@ -20,6 +20,15 @@ class TableWriter:
         paths: StorePaths | None = None,
         part_id: str | None = None,
     ) -> None:
+        if table_name not in CATALOG_TABLES:
+            hint = ""
+            if table_name == "ledger_entry":
+                # The ledger lives under runs/; a catalog part would never reach its view.
+                hint = " (write the cost ledger with ledger.append)"
+            raise ValueError(
+                f"'{table_name}' is not a catalog table{hint}; "
+                f"expected one of {', '.join(CATALOG_TABLES)}"
+            )
         self.table_name = table_name
         self.paths = paths or StorePaths()
         self.part_id = part_id or new_ulid()
@@ -31,12 +40,7 @@ class TableWriter:
         self.table_dir.mkdir(parents=True, exist_ok=True)
 
     def _validate_record(self, record: BaseModel | dict[str, Any]) -> BaseModel:
-        model_cls = TABLE_MODELS.get(self.table_name)
-        if model_cls is None:
-            if isinstance(record, BaseModel):
-                return record
-            raise ValueError(f"Unknown table '{self.table_name}' and record is not a BaseModel")
-
+        model_cls = TABLE_MODELS[self.table_name]
         if isinstance(record, model_cls):
             return record
         if isinstance(record, dict):
