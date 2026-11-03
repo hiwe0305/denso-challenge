@@ -2,7 +2,7 @@
   "job_id": "job_1",
   "trace_ref": {
     "trace_id": "trace_1",
-    "uri": "traces/trace_1.json",
+    "uri": "traces/trace_1",
     "sha256": null
   },
   "sim_success": true,
