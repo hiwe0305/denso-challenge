@@ -9,7 +9,7 @@
 | Làn | Đánh giá |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 9 · Epic 9 |
 | Nhãn | [Lõi] · `epic:9` · `area:core` |
-| Sprint | S2; kết quả trên bộ lỗi cấy trước 13/11/2026 cho demo (DA-28) |
+| Sprint | S2; kết quả trên bộ lỗi cấy trước 13/11/2026 cho demo (DA-28) · **Lịch 3/11/2026:** nhiệm vụ 1–5 merge trước **10/11/2026** (thay 13/11); nhiệm vụ 6, 7 sau 13/11/2026 |
 | Ước lượng | 25 giờ (khoảng 20–30, ước lượng của SM) |
 | Phụ thuộc | DA-25 (schema `QAReport`, `DatasetReport`, log RTC, kết quả probe), PR hợp đồng `AgentReport` và `AgentReview` của Long (issue #34, trước 6/11/2026; nhiệm vụ 1–3 không chờ), DA-27 (bộ lỗi cấy), DA-31 (bộ chấm, cùng người làm). Code trên file mẫu của testkit; log thật của DA-19 và report của DA-17 chỉ cần khi chạy thật. PR `chore-restructure` (07 mục 3.6; mở PR 28/10, merge 29/10/2026) tạo khung package `flywheel-eval` |
 
@@ -77,6 +77,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 27/10/2026 | Giao cho Hưng theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
 | 3/11/2026 | AC 5 và nhiệm vụ 4: `AgentReport`, `AgentReview` thay `QAReport`; phụ thuộc PR hợp đồng của issue #34; Q-M trả lời không, AC 7 hoãn | PO (Hiếu) theo issue #34 |
 | 28/10/2026 | Sửa hạn PR `chore-restructure` theo 07 mục 3.6 bản 0.6: mở 28/10, merge 29/10 | PO (Hiếu) |
+| 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

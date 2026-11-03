@@ -9,7 +9,7 @@
 | Làn | Vòng quyết định (ghép luồng); dùng lệnh của mọi làn qua `fw` |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 11 · Epic 9 |
 | Nhãn | [Lõi] · `epic:9` · `gate:G1` · `area:core` |
-| Sprint | S2; chạy thử toàn bộ ngày 16/11/2026 |
+| Sprint | S2; chạy thử toàn bộ ngày 16/11/2026 · **Lịch 3/11/2026:** lệnh và kịch bản demo trước **10/11/2026**; chạy thử toàn bộ **12/11/2026** (thay 16/11) |
 | Ước lượng | 10 giờ (khoảng 8–12, ước lượng) |
 | Phụ thuộc | S1-03, S1-05, DA-03, DA-04, DA-16, DA-18, DA-20, DA-26 (sơ bộ), DA-27, DA-29; một vòng Failure → Data cần scorer, chẩn đoán và evidence card của S2 |
 
@@ -23,14 +23,14 @@ Là trưởng nhóm, tôi muốn một kịch bản demo chạy lại được, 
 2. Mỗi phần một lệnh trong `scripts/demo/`, chạy được từ máy sạch theo `docs/demo/README.md`; phần cần GPU có bản ghi sẵn (video, báo cáo) để demo không phụ thuộc mạng.
 3. Mỗi con số trên màn hình demo trỏ tới file nguồn (báo cáo, sổ chi phí, RunPlan); số sơ bộ hoặc trên lỗi cấy ghi rõ như vậy.
 4. Mục "Chưa có ở demo" ghi thẳng: video egocentric đội tự quay, HE-2, S3, S4, HS, HT, HD, holdout.
-5. Chạy thử toàn bộ ngày 16/11/2026, ghi thời gian từng phần và lỗi gặp phải.
+5. Chạy thử toàn bộ ngày 12/11/2026 (lịch 3/11/2026, thay 16/11), ghi thời gian từng phần và lỗi gặp phải.
 
 ## Nhiệm vụ
 
 - [ ] 1. Viết kịch bản và danh sách lệnh (AC 1, 4)
 - [ ] 2. Script từng phần và bản ghi sẵn cho phần GPU (AC 2)
 - [ ] 3. Trỏ nguồn cho mọi con số (AC 3)
-- [ ] 4. Chạy thử 16/11, sửa, ghi kết quả (AC 5)
+- [ ] 4. Chạy thử 12/11, sửa, ghi kết quả (AC 5)
 
 ## Phạm vi file
 
@@ -61,6 +61,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 27/10/2026 | Tạo story theo design 27/10/2026 mục 11 | PO (Hiếu) |
 | 27/10/2026 | Thêm ba loại dữ liệu vào phần thu và pipeline (EgoDex, S2) | PO (Hiếu) |
 | 27/10/2026 | Giao cho Long theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
+| 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

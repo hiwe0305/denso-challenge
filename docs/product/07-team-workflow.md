@@ -4,7 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Đầu vào
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
-| 3/11/2026 | 1.0 | Mục 2.0 (bảng dữ liệu đi giữa người): Hưng giao Long `AgentReport` thay `QAReport` (issue #34; 03 bản 0.8). Mục 2.2, DA-01: layout action G1 là 36 chiều thật của Ψ₀, không phải đệm (đối chiếu `src/psi/data/simple/__init__.py` ở `cda3fdf` và gói psi-data task hai bàn) | PO (Hiếu) |
+| 3/11/2026 | 1.0 | Mục 2.0 (bảng dữ liệu đi giữa người): Hưng giao Long `AgentReport` thay `QAReport` (issue #34; 03 bản 0.8). Mục 2.2, DA-01: layout action G1 là 36 chiều thật của Ψ₀, không phải đệm (đối chiếu `src/psi/data/simple/__init__.py` ở `cda3fdf` và gói psi-data task hai bàn). Thêm mục 2.4 lịch hoàn thiện 13/11/2026; DA-31 và `agentqa/bench/` chuyển sang Châu (mục 2.1, 2.2) | PO (Hiếu) |
 | 28/10/2026 | 0.9 | Mục 3.4: lệnh merge chuẩn `--admin --rebase` và lý do PR xanh vẫn BLOCKED (ruleset "Only Hiếu merges into master") | PO (Hiếu) |
 | 28/10/2026 | 0.8 | Mục 2.2: thêm DA-32, DA-33, DA-34 (nhánh task bê khay của Hiếu, chạy song song, [design 28/10/2026](../superpowers/specs/2026-10-28-tray-transfer-he-design.md)) | PO (Hiếu) |
 | 28/10/2026 | 0.7 | Mục 3.2: chủ `flywheel-contracts`, `flywheel-testkit` là Long theo mục 2.0, thay ghi chú bản 0.4 | PO (Hiếu) |
@@ -87,7 +87,8 @@ Hưng không cần chạy SIMPLE: pipeline egocentric và Agent QA/QC code trên
 | `packages/flywheel-data/` trừ các đường dẫn egocentric dưới đây | Thông | Hưng |
 | `packages/flywheel-data/src/flywheel/data/ingest/egocentric/`, `annotate/deid/`, `qa/egocentric.py`, `export/egodex.py` và test tương ứng | Hưng | Thông |
 | `packages/flywheel-eval/` trừ `agentqa/` | Châu | Hưng |
-| `packages/flywheel-eval/src/flywheel/eval/agentqa/` (gồm `bench/`) và test tương ứng | Hưng | Châu |
+| `packages/flywheel-eval/src/flywheel/eval/agentqa/` trừ `bench/`, và test tương ứng | Hưng | Châu |
+| `packages/flywheel-eval/src/flywheel/eval/agentqa/bench/` và test tương ứng (DA-31, từ 3/11/2026) | Châu | Hưng |
 | `packages/flywheel-simple/`, `packages/flywheel-psi0/`, `packages/flywheel-lerobot/`, `packages/flywheel-nim/` | Hiếu | Long |
 | `configs/kernel/`, `configs/loop/` | Long | Hiếu |
 | `configs/runplans/` | Long viết công cụ, Hiếu viết và duyệt RunPlan | Châu |
@@ -139,7 +140,7 @@ Chủ sở hữu không có nghĩa là người duy nhất được sửa. Ngư�
 | DA-28 | Kịch bản demo 17/11/2026 chạy trọn luồng, mỗi phần một lệnh | Mới | Long | `scripts/demo/`, `docs/demo/` | Mọi story trên | 8–12 | S2 |
 | DA-29 | Synthetic S2: biến thể từ đoạn teleop kiểu MimicGen và correction từ trạng thái lỗi | Mới | Hiếu | `flywheel-simple/generators/variants/` | S1-02, S1-06 (Q3), DA-03 | 15–20 | S2 |
 | DA-30 | Stage 1 trên dữ liệu egocentric: lần chạy ngắn trên EgoDex, fine-tune trên video tự quay | Mới (tách từ DA-18) | Hiếu | `flywheel-psi0/stage1/`, `configs/runplans/stage1/`, `docs/he/stage1.md` | DA-18, DA-19 | 10–15 | S2–S3 |
-| DA-31 | Bộ chấm lỗi cấy: precision, recall theo loại, báo nhầm, tách phần code và phần agent | Mới (tách từ DA-27) | Hưng | `flywheel-eval/agentqa/bench/` | DA-27, DA-20 | 5–8 | S2 |
+| DA-31 | Bộ chấm lỗi cấy: precision, recall theo loại, báo nhầm, tách phần code và phần agent | Mới (tách từ DA-27) | Châu (từ 3/11/2026) | `flywheel-eval/agentqa/bench/` | DA-27, DA-20 | 5–8 | S2 |
 | DA-32 | Task bê khay trên SIMPLE ở `mujoco`: cảnh, task, ngẫu nhiên hóa, vị từ 7 bước, thành công (design 28/10/2026) | Mới | Hiếu | `flywheel-simple/tray/`, `configs/sim/tray.yaml` | PR restructure | 16–26 | S1–S2 |
 | DA-33 | Synthetic S1 cho task bê khay: cầm hai tay trong MP agent, `decompose()`, sinh hàng loạt, release | Mới | Hiếu | `flywheel-simple/tray/` | DA-32 | 15–30 | S2 |
 | DA-34 | Thí nghiệm egocentric trên task bê khay: nhánh A, C, C-NOEGO trước demo, B sau | Mới | Hiếu | `configs/runplans/tray/`, `flywheel-psi0/tray/`, `docs/he/tray.md` | DA-33, DA-19 | 15 | S2 |
@@ -165,6 +166,30 @@ File story nằm trong `docs/product/stories/`. DA-01, DA-02, DA-03, DA-08, DA-1
 | Hiếu | S1-02 14, S1-03 28, S1-04 20, S1-05 20, S1-06 8, S1-09 8, S1-11 8, DA-09 15, DA-16 12, DA-19 26, DA-26 20, DA-29 18, DA-30 12 | khoảng 209, cộng story 3.1a, ACT và DP, job GPU, duyệt PR |
 
 **Hiếu vẫn quá tải** (khoảng gấp ba người khác chỉ tính phần story DA và S1). Nếu Hưng có máy chạy được SIMPLE ở chế độ MuJoCo, chuyển S1-06, S1-09, DA-16 (khoảng 28 giờ) sang Hưng là bước giảm tải đầu tiên; mọi việc này nằm trong `flywheel-simple/` và `scripts/g0/`, không chạm phần của người khác. Quy tắc giữ từ 23/10/2026: giữ đủ phạm vi; đo k sau Sprint 1; vượt thì chuyển phần trễ sang API hoặc phần có sẵn trước, rồi mới cắt.
+
+### 2.4 Lịch hoàn thiện 13/11/2026 [Đã chốt 3/11/2026]
+
+Hiếu phải hoàn thiện mọi thứ cho demo trước **13/11/2026**, nên hạn của cả đội kéo lên. **11/11** là ngày merge cuối cho PR của đội; **12/11** chạy thử toàn bộ (DA-28, thay 16/11); **13/11** Hiếu hoàn thiện. "Hạn" là đã merge vào `master`, không phải mở PR. Bảng chỉ gồm phần việc cần cho demo; phần ghi "sau 13/11" không chặn demo.
+
+| Người | Việc | Hạn cũ | Hạn mới |
+|---|---|---|---|
+| Thông | S1-07: sửa layout action trên #24 | tuần 1 | 4/11 |
+| Thông | DA-27: bộ lỗi cấy (PR, năm lỗi đã nêu, chiều đảo dấu) | 10/11 | 6/11 |
+| Thông | DA-02 export LeRobot v2.1; DA-03 pipeline teleop và synthetic | S2 | 9/11 |
+| Thông | DA-17: phát lại action | S1–S2 | 9/11 |
+| Long | S1-10 (#36); PR hợp đồng `AgentReport`, `AgentReview` (issue #34) | 6/11 | 5/11 |
+| Long | DA-01: `action_layout` G1 theo layout của Ψ₀ | S1 | 5/11 |
+| Long | DA-23 runner eval; DA-28 lệnh và kịch bản demo | S2 | 10/11; chạy thử 12/11 |
+| Hưng | DA-04 nhiệm vụ 1, 2, 3, 4, 6 | 10/11 | 7/11 |
+| Hưng | DA-18: export EgoDex cho stage 1 (để Hiếu chạy DA-30) | 10/11 | 8/11 |
+| Hưng | DA-20 nhiệm vụ 1–5 | 13/11 | 10/11 |
+| Châu | #30: sửa hai story scorer | — | 4/11 |
+| Châu | Khung scorer từng bước (04 mục 4.2, story 3.3) | S2 | 8/11 |
+| Châu | DA-13: kiểm hệ thống và quy lỗi về stage (phần 6 của demo) | S3 | 10/11 |
+| Châu | DA-31: bộ chấm lỗi cấy (chuyển từ Hưng) | 13/11 | 11/11 |
+| Sau 13/11 | Hiệu chỉnh scorer (story 3.5), DA-21 (v3), DA-04 nhiệm vụ 5 và 7, DA-20 nhiệm vụ 6 và 7 | | sau demo |
+
+Tải còn lại tới 11/11 theo ước lượng của mục 2.2 và file story (chỉ phần trong bảng; giả định, chưa trừ phần đã làm trên nhánh chưa merge): Hưng khoảng 50 giờ, Thông khoảng 48 giờ, Long khoảng 36 giờ, Châu khoảng 29 giờ, trong 9 ngày. DA-31 chuyển sang Châu để giảm tải cho Hưng. Ai thấy không kịp thì báo trong báo cáo ngày (issue #2) ngay khi biết, không đợi tới hạn.
 
 ## 3. Quy trình git khi dùng Claude
 
