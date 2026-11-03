@@ -18,19 +18,40 @@ halfway through printing a diagnosis it already computed.
 
 from __future__ import annotations
 
+import importlib
 import sys
 from pathlib import Path
 from typing import TextIO
 
 import typer
+from flywheel.contracts import TaskDefinition
 from flywheel.contracts.training import TrainDiagnosis
-from flywheel.eval.api import DEFAULT_TRAIN_CONFIG, diagnose_train, store_train_diagnosis
+from flywheel.eval.api import (
+    DEFAULT_TRAIN_CONFIG,
+    SCORER_CONFIG_DIR,
+    diagnose_train,
+    score_trace,
+    store_score,
+    store_train_diagnosis,
+)
 from flywheel.eval.config import ConfigError
 from flywheel.eval.diagnosis.train.reader import ReaderError
+from flywheel.eval.scorer.reader import TraceError
+from flywheel.eval.scorer.score import EpisodeScore
+from flywheel.eval.scorer.status import ScorerError, StepStatus
 
 app = typer.Typer()
 
 HEADER = f"{'code':<5} {'start_step':>10} {'group/dim':<28} {'value':>12} {'threshold':>12} stop"
+
+# The Vietnamese names of spec section 5.1, for the engineer reading the table.
+# The artifact keeps the enum values, so it stays readable either way.
+STATUS_NAMES: dict[StepStatus, str] = {
+    StepStatus.PASSED: "đạt",
+    StepStatus.FAILED: "trượt",
+    StepStatus.NOT_ATTEMPTED: "chưa thử",
+    StepStatus.UNKNOWN: "chưa rõ",
+}
 
 
 @app.callback()
@@ -68,6 +89,97 @@ def diag_train(
     _print(diagnosis)
     if store is not None:
         typer.echo(f"ghi vào: {store_train_diagnosis(diagnosis, store)}")
+
+
+@app.command("score")
+def score(
+    trace: Path = typer.Option(..., "--trace", help="Trace đã ghi của một episode (JSONL)."),
+    task: str = typer.Option(
+        ...,
+        "--task",
+        help="Định nghĩa task, dạng `module:Lớp`, ví dụ `flywheel_simple.tray.task:TrayTask`.",
+    ),
+    config: Path | None = typer.Option(
+        None,
+        "--config",
+        help=f"File ngưỡng; mặc định `{SCORER_CONFIG_DIR}/<task_id>.yaml`.",
+    ),
+    episode_id: str | None = typer.Option(
+        None, "--episode-id", help="Ghi đè id episode lấy từ trace."
+    ),
+    level: int | None = typer.Option(None, "--level", help="Mức điều kiện của episode."),
+    store: Path | None = typer.Option(
+        None, "--store", help="Thư mục store để ghi `Score`. Không có thì không ghi gì."
+    ),
+) -> None:
+    """Chấm từng bước của một episode từ trace đã ghi."""
+    use_utf8()
+    try:
+        definition = load_task(task)
+        scored = score_trace(trace, definition, config or _config_for(definition), episode_id)
+    except (TraceError, ConfigError, ScorerError) as error:
+        # None of these is a verdict about the episode, so none may leave an
+        # artifact behind or exit as though the episode had been scored.
+        typer.echo(f"không chấm được: {error}", err=True)
+        raise typer.Exit(code=2) from error
+    _print_score(scored)
+    if store is not None:
+        typer.echo(f"ghi vào: {store_score(scored, store, level)}")
+
+
+def load_task(reference: str) -> TaskDefinition:
+    """Load a `TaskDefinition` named as `module:attribute` on the command line.
+
+    The task is named by the engineer and imported at that moment, so the lane
+    still imports no adapter of its own (03 section 7.3): scoring a tray
+    episode does not make `flywheel.eval` depend on `flywheel_simple`. What
+    comes back is checked against the protocol, because a class that is nearly
+    a task definition would otherwise fail somewhere less obvious.
+    """
+    module_name, _, attribute = reference.partition(":")
+    if not module_name or not attribute:
+        raise ScorerError(f"`--task {reference}` phải có dạng `module:Lớp`")
+    try:
+        module = importlib.import_module(module_name)
+        factory = getattr(module, attribute)
+    except (ImportError, AttributeError) as error:
+        raise ScorerError(f"không nạp được task `{reference}`: {error}") from error
+    definition = factory() if isinstance(factory, type) else factory
+    if not isinstance(definition, TaskDefinition):
+        raise ScorerError(f"`{reference}` không phải `TaskDefinition` theo flywheel.contracts")
+    return definition
+
+
+def _config_for(task: TaskDefinition) -> Path:
+    return SCORER_CONFIG_DIR / f"{task.task_id}.yaml"
+
+
+def _print_score(score: EpisodeScore) -> None:
+    typer.echo(f"episode: {score.episode_id}; task: {score.task_id} {score.scorer_version}")
+    typer.echo(f"config_sha256: {score.config_sha256}")
+    for index, step in enumerate(score.steps):
+        reason = f"  {step.reason}" if step.reason else ""
+        typer.echo(f"{index:>2} {step.name:<16} {STATUS_NAMES[step.status]:<10}{reason}")
+    verdict = {True: "đạt", False: "trượt", None: "chưa rõ"}[score.success]
+    typer.echo(f"thành công theo scorer: {verdict}")
+    if score.failure.failure_kind is not None:
+        failed = score.failure.first_failed_step
+        where = "không rõ bước" if failed is None else f"bước {failed}"
+        kind = score.failure.failure_kind
+        klass = score.failure.failure_class or "-"
+        typer.echo(f"kiểu lỗi: {kind} ({klass}); hỏng trước ở: {where}")
+    if score.failure.reason is not None:
+        typer.echo(f"lý do không gán được kiểu: {score.failure.reason}")
+    if score.balance.violated:
+        balance = score.balance
+        typer.echo(
+            f"thăng bằng: vi phạm ở bước {balance.row}, {balance.signal}="
+            f"{balance.value} (giới hạn {balance.limit})"
+        )
+    elif score.balance.unknown_reason is not None:
+        typer.echo(f"thăng bằng: chưa rõ, {score.balance.unknown_reason}")
+    if score.missing_signals:
+        typer.echo("thiếu tín hiệu: " + ", ".join(score.missing_signals))
 
 
 def use_utf8(*streams: TextIO) -> None:
