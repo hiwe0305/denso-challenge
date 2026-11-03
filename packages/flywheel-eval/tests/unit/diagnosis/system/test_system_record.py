@@ -1,6 +1,6 @@
 """The record of one system check names every file the verdict was read from (AC 1, 2).
 
-R1 and R2 read the RTC log, R5 the camera parameters and R6 `episode.json`,
+R1 and R2 read the RTC log, R5 the camera parameters and R6 the RolloutResult,
 not only the trace. A record that hashed the trace alone would let one trace
 with two different RTC logs give two different verdicts that nothing in the
 store tells apart.
@@ -16,6 +16,7 @@ from typing import Any
 
 import pytest
 from flywheel.eval.api import diagnose_episode_system
+from flywheel.eval.diagnosis.system.reader import CAMERA_NAME, ROLLOUT_NAME, RTC_NAME, STEPS_NAME
 
 
 def _repo_root() -> Path:
@@ -49,10 +50,10 @@ def episode(write_job, rollout_result, clean_rows, rtc_rows, camera_entry) -> Pa
 def test_the_record_hashes_every_file_the_verdict_read(episode: Path, config: Path) -> None:
     record = diagnose_episode_system(episode, config)
 
-    assert record.trace_sha256 == _sha(episode / "trace.jsonl")
-    assert record.rtc_sha256 == _sha(episode.parent / "rtc.jsonl")
-    assert record.camera_sha256 == _sha(episode / "camera_params.json")
-    assert record.infra_sha256 == _sha(episode / "episode.json")
+    assert record.trace_sha256 == _sha(episode / STEPS_NAME)
+    assert record.rtc_sha256 == _sha(episode.parent / RTC_NAME)
+    assert record.camera_sha256 == _sha(episode / CAMERA_NAME)
+    assert record.infra_sha256 == _sha(episode / ROLLOUT_NAME)
 
 
 def test_one_trace_with_two_rtc_logs_gives_two_distinguishable_records(
@@ -60,7 +61,7 @@ def test_one_trace_with_two_rtc_logs_gives_two_distinguishable_records(
 ) -> None:
     healthy = diagnose_episode_system(episode, config)
     slow = [{**row, "chunk_received_s": row["observation_sent_s"] + 0.4} for row in rtc_rows]
-    (episode.parent / "rtc.jsonl").write_text(_lines(slow), encoding="utf-8")
+    (episode.parent / RTC_NAME).write_text(_lines(slow), encoding="utf-8")
 
     stalled = diagnose_episode_system(episode, config)
 
@@ -70,8 +71,8 @@ def test_one_trace_with_two_rtc_logs_gives_two_distinguishable_records(
 
 
 def test_a_file_the_episode_lacks_is_hashed_as_none(episode: Path, config: Path) -> None:
-    (episode.parent / "rtc.jsonl").unlink()
-    for name in ("camera_params.json", "episode.json"):
+    (episode.parent / RTC_NAME).unlink()
+    for name in (CAMERA_NAME, ROLLOUT_NAME):
         (episode / name).unlink()
 
     record = diagnose_episode_system(episode, config)

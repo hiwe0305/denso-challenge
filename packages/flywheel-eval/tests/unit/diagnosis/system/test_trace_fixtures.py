@@ -28,7 +28,7 @@ import pytest
 import yaml
 from flywheel.eval.config import SystemThresholds
 from flywheel.eval.diagnosis.system.check import diagnose_system
-from flywheel.eval.diagnosis.system.reader import load_episode
+from flywheel.eval.diagnosis.system.reader import CAMERA_NAME, STEPS_NAME, load_episode
 from flywheel.eval.diagnosis.system.verdict import Diagnosis, SystemVerdict
 
 DATA = Path(__file__).parent / "data" / "trace_pr48"
@@ -62,11 +62,18 @@ def cfg() -> SystemThresholds:
 
 
 def _check(tmp_path: Path, trace: str, camera: str, cfg: SystemThresholds) -> SystemVerdict:
-    episode = tmp_path / Path(trace).stem
-    episode.mkdir()
-    shutil.copyfile(DATA / trace, episode / "trace.jsonl")
-    shutil.copyfile(DATA / camera, episode / "camera_params.json")
-    return diagnose_system(load_episode(episode), cfg)
+    # The copies predate decision G1 on #48 (one JSON camera object, no
+    # `trace_id`), so they are laid out here as G1 has it: `<trace_id>/` with
+    # the steps byte for byte and the camera as one line carrying the trace's id.
+    trace_id = json.loads((DATA / trace).read_text(encoding="utf-8").splitlines()[0])["trace_id"]
+    folder = tmp_path / "job" / trace_id
+    folder.mkdir(parents=True)
+    shutil.copyfile(DATA / trace, folder / STEPS_NAME)
+    entry = json.loads((DATA / camera).read_text(encoding="utf-8"))
+    (folder / CAMERA_NAME).write_text(
+        json.dumps({**entry, "trace_id": trace_id}) + "\n", encoding="utf-8"
+    )
+    return diagnose_system(load_episode(folder), cfg)
 
 
 def _skipped(verdict: SystemVerdict) -> set[str]:

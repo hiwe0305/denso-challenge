@@ -20,7 +20,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from flywheel.eval.diagnosis.system.reader import SystemInputs, read_trace_log
+from flywheel.eval.diagnosis.system.reader import (
+    CAMERA_NAME,
+    ROLLOUT_NAME,
+    RTC_NAME,
+    STEPS_NAME,
+    SystemInputs,
+    read_trace_log,
+)
 
 Row = Callable[..., dict[str, Any]]
 Rows = Callable[..., Path]
@@ -61,7 +68,7 @@ def clean_rows() -> list[dict[str, Any]]:
 def write_trace(tmp_path: Path) -> Rows:
     """Write rows as a JSONL trace and return the path."""
 
-    def write(rows: list[dict[str, Any]], name: str = "trace.jsonl") -> Path:
+    def write(rows: list[dict[str, Any]], name: str = STEPS_NAME) -> Path:
         path = tmp_path / name
         path.write_text(
             "".join(json.dumps(item) + "\n" for item in rows),
@@ -94,6 +101,7 @@ def rtc_rows() -> list[dict[str, Any]]:
 def camera_entry() -> dict[str, Any]:
     """Camera parameters matching the reference of `system.yaml` in the tests."""
     return {
+        "trace_id": "trace_1",
         "episode_id": "ep_1",
         "uid": "head",
         "mount": "head_link",
@@ -109,10 +117,10 @@ def camera_entry() -> dict[str, Any]:
 
 
 def _rollout_result(infra_status: str = "ok", trace_id: str = "trace_1") -> dict[str, Any]:
-    """`episode.json` as the SimpleSim hook (DA-38 @ f94d5bc) writes it: a v0 RolloutResult."""
+    """`rollout_result.json` of one trace: a v0 RolloutResult, as the SimpleSim hook fills it."""
     return {
         "job_id": "job_1",
-        "trace_ref": {"trace_id": trace_id, "uri": "ep_1/trace.jsonl", "sha256": None},
+        "trace_ref": {"trace_id": trace_id, "uri": trace_id, "sha256": None},
         "sim_success": infra_status == "ok",
         "infra_status": infra_status,
         "usage": {"wall_seconds": 12.0, "gpu_seconds": 0.0},
@@ -127,8 +135,12 @@ WriteJob = Callable[..., Path]
 
 @pytest.fixture
 def rollout_result() -> Result:
-    """`episode.json` of one episode, `infra_status` and `trace_id` replaced."""
+    """`rollout_result.json` of one trace, `infra_status` and `trace_id` replaced."""
     return _rollout_result
+
+
+def _jsonl(items: list[dict[str, Any]]) -> str:
+    return "".join(json.dumps(item) + "\n" for item in items)
 
 
 def write_job_episode(
@@ -137,27 +149,25 @@ def write_job_episode(
     rtc: list[dict[str, Any]] | None = None,
     camera: dict[str, Any] | list[dict[str, Any]] | None = None,
     result: dict[str, Any] | None = None,
-    episode_id: str = "ep_1",
+    trace_id: str = "trace_1",
 ) -> Path:
-    """Write one episode in the layout of the SimpleSim hook; return the episode dir.
+    """Write one trace in the layout of decision G1 on PR #48; return the trace dir.
 
-    <job>/rtc.jsonl is the job-wide RTC log of DA-19; <job>/<episode_id>/ holds
-    trace.jsonl, camera_params.json and episode.json. A file passed as None
-    is not written.
+    `<job>/rtc.jsonl` is the job-wide RTC log of DA-19; `<job>/<trace_id>/`
+    holds the steps, one camera per line of the camera file, and the
+    RolloutResult. The names are the reader's constants. A file passed as
+    None is not written.
     """
-    folder = job / episode_id
+    folder = job / trace_id
     folder.mkdir(parents=True)
-    (folder / "trace.jsonl").write_text(
-        "".join(json.dumps(item) + "\n" for item in trace_rows), encoding="utf-8"
-    )
+    (folder / STEPS_NAME).write_text(_jsonl(trace_rows), encoding="utf-8")
     if rtc is not None:
-        (job / "rtc.jsonl").write_text(
-            "".join(json.dumps(item) + "\n" for item in rtc), encoding="utf-8"
-        )
+        (job / RTC_NAME).write_text(_jsonl(rtc), encoding="utf-8")
     if camera is not None:
-        (folder / "camera_params.json").write_text(json.dumps(camera), encoding="utf-8")
+        cameras = camera if isinstance(camera, list) else [camera]
+        (folder / CAMERA_NAME).write_text(_jsonl(cameras), encoding="utf-8")
     if result is not None:
-        (folder / "episode.json").write_text(json.dumps(result), encoding="utf-8")
+        (folder / ROLLOUT_NAME).write_text(json.dumps(result), encoding="utf-8")
     return folder
 
 

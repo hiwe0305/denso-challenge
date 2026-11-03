@@ -17,6 +17,7 @@ import pytest
 import yaml
 from flywheel.eval.cli import app
 from flywheel.eval.diagnosis.system.artifact import SYSTEM_RECORDS
+from flywheel.eval.diagnosis.system.reader import CAMERA_NAME, ROLLOUT_NAME, RTC_NAME, STEPS_NAME
 from typer.testing import CliRunner
 
 CONFIGS = Path(__file__).resolve().parents[6] / "configs" / "eval" / "diagnosis"
@@ -26,10 +27,10 @@ REFERENCE_SHA = "b" * 64
 runner = CliRunner()
 
 
-# `episode.json` as the SimpleSim hook (DA-38 @ f94d5bc) writes it.
+# The RolloutResult of one trace, as the SimpleSim hook (DA-38 @ f94d5bc) fills it.
 ROLLOUT_RESULT: dict[str, Any] = {
     "job_id": "job_1",
-    "trace_ref": {"trace_id": "trace_1", "uri": "ep/trace.jsonl", "sha256": None},
+    "trace_ref": {"trace_id": "trace_1", "uri": "trace_1", "sha256": None},
     "sim_success": True,
     "infra_status": "ok",
     "usage": {"wall_seconds": 12.0, "gpu_seconds": 0.0},
@@ -83,20 +84,21 @@ def pinned_config(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def write_episode(tmp_path: Path):
-    """Write an episode in the SimpleSim hook's layout; `rows` replaces the healthy trace.
+    """Write a trace in the layout of decision G1 on #48; `rows` replaces the healthy trace.
 
-    <job>/rtc.jsonl is the job-wide RTC log of DA-19; <job>/<name>/ holds the
-    trace, the camera parameters and `episode.json`, a v0 RolloutResult.
+    `<job>/rtc.jsonl` is the job-wide RTC log of DA-19; `<job>/<trace_id>/`
+    holds the steps, one camera per line and the RolloutResult, under the
+    names the reader exports.
     """
 
-    def build(name: str = "ep", rows: list[dict[str, Any]] | None = None) -> Path:
+    def build(name: str = "trace_1", rows: list[dict[str, Any]] | None = None) -> Path:
         folder = tmp_path / "job" / name
         folder.mkdir(parents=True, exist_ok=True)
         trace = rows if rows is not None else [_trace_row(step) for step in range(20)]
-        (folder / "trace.jsonl").write_text(
+        (folder / STEPS_NAME).write_text(
             "".join(json.dumps(item) + "\n" for item in trace), encoding="utf-8"
         )
-        (folder.parent / "rtc.jsonl").write_text(
+        (folder.parent / RTC_NAME).write_text(
             "".join(
                 json.dumps(
                     {
@@ -115,9 +117,10 @@ def write_episode(tmp_path: Path):
             ),
             encoding="utf-8",
         )
-        (folder / "camera_params.json").write_text(
+        (folder / CAMERA_NAME).write_text(
             json.dumps(
                 {
+                    "trace_id": "trace_1",
                     "episode_id": "ep_cli",
                     "uid": "head",
                     "mount": "head_link",
@@ -133,7 +136,7 @@ def write_episode(tmp_path: Path):
             ),
             encoding="utf-8",
         )
-        (folder / "episode.json").write_text(json.dumps(ROLLOUT_RESULT), encoding="utf-8")
+        (folder / ROLLOUT_NAME).write_text(json.dumps(ROLLOUT_RESULT), encoding="utf-8")
         return folder
 
     return build

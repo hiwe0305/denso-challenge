@@ -42,27 +42,31 @@ None for it. A file that is there and cannot be parsed raises, because
 something was written and nobody knows what it says.
 
 **Every file a verdict is read from is hashed.** R1 and R2 read the RTC log,
-R5 the camera parameters and R6 `episode.json`, so `SystemInputs` carries the
+R5 the camera parameters and R6 the RolloutResult, so `SystemInputs` carries the
 SHA-256 of each beside the trace's; one trace with two RTC logs is then two
 records the store can tell apart. The RTC hash is of the whole file, before it
 is kept to this trace's chunks, because that is the file that was read.
 
-**The layout is the one the SimpleSim hook writes** (DA-38, branch
-`DA-38-trace-hook-v2` at `f94d5bc`, not merged yet)::
+**The layout is decision G1 of the PO on PR #48** (3/11/2026): a trace is a
+directory `<trace_id>/`, the one `TraceRef.uri` points at::
 
     <job_dir>/
-      rtc.jsonl              # RTCClient of DA-19, one per job, keyed by trace_id
-      <episode_id>/
-        trace.jsonl          # one TraceStep per control cycle
-        camera_params.json   # list of CameraParams; absent when no reference is pinned
-        episode.json         # v0 RolloutResult: infra_status "ok" or "simulator_error"
+      rtc.jsonl                # RTCClient of DA-19, one per job, keyed by trace_id
+      <trace_id>/
+        steps.jsonl            # one TraceStep per control cycle
+        camera_params.jsonl    # one CameraParams per line, each with trace_id;
+                               # absent when the job had no pinned reference
+        rollout_result.json    # v0 RolloutResult (infra_status); proposed, not yet decided
 
-`episode.json` is read through `flywheel.contracts.v0.RolloutResult`, so an
-`infra_status` outside the contract's `InfraStatus` is refused rather than
-read as a fault, and a `trace_ref` naming another trace is refused rather than
-paired with this one. Until the hook merges with a seam test in
-`tests/e2e/test_demo_seams.py`, this layout is the hook branch's word, not a
-contract.
+The file names are the constants below and nowhere else. `rollout_result.json`
+is the proposal awaiting the PO: if it lands elsewhere, `ROLLOUT_NAME` is the
+one line that changes. The RolloutResult is read through
+`flywheel.contracts.v0.RolloutResult`, so an `infra_status` outside the
+contract's `InfraStatus` is refused rather than read as a fault, and a
+`trace_ref` naming another trace is refused rather than paired with this one;
+a camera line of another trace is refused the same way. The contract of #48
+and the SimpleSim hook (DA-38) are not merged yet, so this layout is the
+decision's word until a seam test in `tests/e2e/test_demo_seams.py` covers it.
 """
 
 from __future__ import annotations
@@ -136,6 +140,7 @@ class CameraView:
     cy: float
     pose: tuple[float, ...]
     reference_sha256: str
+    trace_id: str
 
 
 @dataclass(frozen=True)
@@ -245,39 +250,41 @@ class StageInputs:
     action_groups: tuple[str, ...] = ()
 
 
-TRACE_NAME = "trace.jsonl"
-RTC_NAME = "rtc.jsonl"
-CAMERA_NAME = "camera_params.json"
-EPISODE_NAME = "episode.json"
+# The layout of a trace on disk (decision G1 on PR #48; module docstring). The
+# one place the file names live: the checks, the CLI and the tests import them.
+STEPS_NAME = "steps.jsonl"  # in <trace_id>/
+CAMERA_NAME = "camera_params.jsonl"  # in <trace_id>/
+ROLLOUT_NAME = "rollout_result.json"  # in <trace_id>/; proposed, awaiting the PO
+RTC_NAME = "rtc.jsonl"  # in the job dir, the parent of <trace_id>/
 
 
 def load_episode(path: Path) -> SystemInputs:
-    """Read an episode directory, or the trace inside one, off disk.
+    """Read a trace directory `<trace_id>/`, or the `steps.jsonl` inside one, off disk.
 
-    The layout is the hook's (module docstring): file names rather than a
-    manifest, because nothing in the contracts ties the files together yet.
-    The camera parameters and `episode.json` are beside the trace; the RTC log
-    is the job's, in the episode directory's parent, and is kept to the chunks
-    of this trace (`_of_trace`).
+    The layout is decision G1 (module docstring). The camera parameters and
+    the RolloutResult are beside the steps; the RTC log is the job's, in the
+    trace directory's parent, and is kept to the chunks of this trace
+    (`_of_trace`).
     """
-    trace_path = path if path.is_file() else path / TRACE_NAME
+    trace_path = path if path.is_file() else path / STEPS_NAME
     if not trace_path.is_file():
-        raise ReaderError(f"{path}: không tìm thấy {TRACE_NAME}")
+        raise ReaderError(f"{path}: không tìm thấy {STEPS_NAME}")
     directory = trace_path.parent
     rtc_path = directory.parent / RTC_NAME
     camera_path = directory / CAMERA_NAME
+    rollout_path = directory / ROLLOUT_NAME
     trace = read_trace_log(trace_path)
     rtc_data = _read_bytes(rtc_path) if rtc_path.is_file() else None
     camera_data = _read_bytes(camera_path) if camera_path.is_file() else None
-    episode_path = directory / EPISODE_NAME
-    episode_data = _read_bytes(episode_path) if episode_path.is_file() else None
+    episode_data = _read_bytes(rollout_path) if rollout_path.is_file() else None
     rtc = () if rtc_data is None else _rtc_records(rtc_data, rtc_path)
+    cameras = () if camera_data is None else _camera_views(camera_data, camera_path)
     return SystemInputs(
         trace=trace,
         rtc=_of_trace(rtc, trace, rtc_path),
-        cameras=() if camera_data is None else _camera_views(camera_data, camera_path),
+        cameras=_cameras_of_trace(cameras, trace, camera_path),
         infra_status=(
-            None if episode_data is None else _infra_status(episode_data, episode_path, trace)
+            None if episode_data is None else _infra_status(episode_data, rollout_path, trace)
         ),
         has_rtc_log=rtc_data is not None,
         has_camera_params=camera_data is not None,
@@ -294,7 +301,7 @@ def read_trace_log(path: Path) -> TraceLog:
     parsed = tuple(_trace_row(row, path, number) for number, row in enumerate(rows, start=1))
     absent = _absent_fields(rows)
     return TraceLog(
-        episode_id=_first_text(rows, "episode_id") or path.stem,
+        episode_id=_first_text(rows, "episode_id") or _trace_name(path),
         trace_id=_first_text(rows, "trace_id"),
         rows=parsed,
         absent_fields=absent,
@@ -324,14 +331,30 @@ def _rtc_records(data: bytes, path: Path) -> tuple[RTCInferenceRecord, ...]:
 
 
 def read_camera_params(path: Path) -> tuple[CameraView, ...]:
-    """Read the camera parameters of an episode: one object, or a list of them (R5)."""
+    """Read `camera_params.jsonl`: one `CameraParams` per line, one line per camera (R5)."""
     return _camera_views(_read_bytes(path), path)
 
 
 def _camera_views(data: bytes, path: Path) -> tuple[CameraView, ...]:
-    parsed = _parse_json(data, path)
-    entries = parsed if isinstance(parsed, list) else [parsed]
-    return tuple(_camera_view(entry, path) for entry in entries)
+    return tuple(_camera_view(entry, path) for entry in _read_rows(data, path))
+
+
+def _cameras_of_trace(
+    cameras: tuple[CameraView, ...], trace: TraceLog, path: Path
+) -> tuple[CameraView, ...]:
+    """The cameras, refused if a line belongs to another trace than the steps beside it."""
+    others = sorted({camera.trace_id for camera in cameras} - {trace.trace_id or ""})
+    if trace.trace_id is not None and others:
+        raise ReaderError(
+            f"`{path}` có camera của trace {others}, không phải `{trace.trace_id}` "
+            f"của `{STEPS_NAME}` bên cạnh"
+        )
+    return cameras
+
+
+def _trace_name(path: Path) -> str:
+    """The name to fall back on for a trace that names no episode: its directory."""
+    return path.parent.name if path.name == STEPS_NAME else path.stem
 
 
 def read_probe_p1(path: Path) -> ProbeP1:
@@ -375,7 +398,7 @@ def _trace_row(row: dict[str, Any], path: Path, number: int) -> TraceRow:
 
 def _camera_view(entry: Any, path: Path) -> CameraView:
     if not isinstance(entry, dict):
-        raise ReaderError(f"`{path}` phải là đối tượng CameraParams hoặc danh sách các đối tượng")
+        raise ReaderError(f"`{path}`: mỗi dòng phải là một đối tượng CameraParams")
     pose = _vector(entry.get("pose"), "pose", path, 1)
     if len(pose) != 7 or not all(math.isfinite(value) for value in pose):
         raise ReaderError(
@@ -393,6 +416,7 @@ def _camera_view(entry: Any, path: Path) -> CameraView:
         cy=_required_number(entry, "cy", path),
         pose=pose,
         reference_sha256=_text(entry, "reference_sha256", path),
+        trace_id=_text(entry, "trace_id", path),
     )
 
 
@@ -513,7 +537,7 @@ def _artifact(path: Path, model: type[_ARTIFACT]) -> _ARTIFACT:
 
 
 def _infra_status(data: bytes, path: Path, trace: TraceLog) -> str:
-    """`infra_status` of the episode, for R6, from the RolloutResult in `episode.json`."""
+    """`infra_status` of the episode, for R6, from the RolloutResult beside the steps."""
     try:
         result = RolloutResult.model_validate(_parse_json(data, path))
     except ValidationError as error:

@@ -24,6 +24,7 @@ from flywheel.eval.config import (
     R6Thresholds,
 )
 from flywheel.eval.diagnosis.system.reader import (
+    CAMERA_NAME,
     CameraView,
     read_camera_params,
     read_trace_log,
@@ -61,7 +62,7 @@ def _records(rows: list[dict[str, Any]]) -> tuple[RTCInferenceRecord, ...]:
 
 
 def _cameras(tmp_path: Path, entry: dict[str, Any]) -> tuple[CameraView, ...]:
-    path = tmp_path / "camera_params.json"
+    path = tmp_path / CAMERA_NAME
     path.write_text(json.dumps(entry), encoding="utf-8")
     return read_camera_params(path)
 
