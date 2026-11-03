@@ -35,7 +35,7 @@ Là người làm làn Đánh giá, tôi muốn mỗi rollout SIMPLE của độ
 - [x] 1. File story và phạm vi file
 - [x] 2. Vector lệnh và đo, intrinsics và pose camera từ mảng số, test CPU (AC 2, 3, 5)
 - [ ] 3. Dựng `TraceStep`, `CameraParams` và bộ ghi trace theo quy ước tệp của hợp đồng, kèm cờ `sim_success` (AC 1, 3, 4)
-  - [x] 3.1. Bộ ghi một thư mục mỗi episode (`trace.jsonl`, `camera_params.json`, `episode.json`), `trace_id` chung với client RTC, `reference_sha256` chép từ job spec (review PO 3/11/2026, B1)
+  - [x] 3.1. Bộ ghi một thư mục `<trace_id>/` mỗi episode (`steps.jsonl`, `camera_params.jsonl`, `RolloutResult`), `trace_id` chung với client RTC, `reference_sha256` chép từ job spec (review PO 3/11/2026, B1; layout theo G1 của PR #48)
   - [x] 3.2. Ghim bản tham chiếu camera G0 của task hai bàn ở SIMPLE `b75c678` (review PO 3/11/2026, B3)
   - [ ] 3.3. Entry module cài hook ở cấp module, đọc `job_id`, `run_plan_id`, thư mục job và bản tham chiếu từ job spec
   - [ ] 3.4. Đọc lại tệp qua `TraceStep`, `CameraParams` khi PR #48 merge (test đang skip hoặc xfail tới lúc đó)
@@ -165,26 +165,26 @@ Hệ quả:
 
 ### 3/11/2026 · Nhiệm vụ 3.1, 3.2: tệp của episode và bản tham chiếu camera (review PO, B1 và B3)
 
-**Layout tệp** (`flywheel_simple/trace/files.py`). Một lượt `eval-decoupled-wbc` là một job; mỗi episode một thư mục:
+**Layout tệp** (`flywheel_simple/trace/files.py`). Một lượt `eval-decoupled-wbc` là một job; mỗi episode là một trace, nằm trong thư mục mang tên `trace_id` của nó. **[Đã chốt 3/11/2026, PO, G1 trên PR #48]**: `TraceRef.uri` trỏ thư mục `<trace_id>/` gồm `steps.jsonl` và `camera_params.jsonl`; `CameraParams` có thêm `trace_id`.
 
 | Tệp | Nội dung | Ai đọc |
 |---|---|---|
-| `<job_dir>/<episode_id>/trace.jsonl` | Một `TraceStep` mỗi chu kỳ, có `trace_id` | DA-13 (R3, R4, thiếu tín hiệu) |
-| `<job_dir>/<episode_id>/camera_params.json` | Danh sách `CameraParams`, mỗi camera policy thấy một mục | DA-13 (R5) |
-| `<job_dir>/<episode_id>/episode.json` | Một `RolloutResult` (`flywheel.contracts.v0`): `sim_success`, `infra_status`, `trace_ref` (`trace_id`, đường dẫn và sha256 của `trace.jsonl`), `camera_params_hash` | DA-13 (R6 đọc `infra_status`), scorer |
+| `<job_dir>/<trace_id>/steps.jsonl` | Một `TraceStep` mỗi chu kỳ, có `trace_id` | DA-13 (R3, R4, thiếu tín hiệu) |
+| `<job_dir>/<trace_id>/camera_params.jsonl` | Một `CameraParams` mỗi dòng, mỗi camera policy thấy một dòng, có `trace_id` | DA-13 (R5) |
+| `<job_dir>/<trace_id>/rollout_result.json` | Một `RolloutResult` (`flywheel.contracts.v0`): `sim_success`, `infra_status`, `trace_ref` (`trace_id`, `uri` là thư mục `<trace_id>/`, sha256 của `steps.jsonl`), `camera_params_hash`. Tên tệp là **[Đề xuất]** đang chờ PO, giữ sau một hằng `RESULT_NAME` | DA-13 (R6 đọc `infra_status`), scorer |
 | `<job_dir>/rtc.jsonl` | `RTCInferenceRecord` của client RTC (DA-19), một tệp mỗi job, nối với trace qua `trace_id`. Hook không ghi tệp này | DA-13 (R1, R2) |
 
-- `infra_status` lấy theo `RolloutResult.infra_status`: `ok` khi SIMPLE ghi dòng `episode_<i>: <bool>` cho episode; `simulator_error` khi episode bị cắt trước dòng đó (tiến trình sim chết, env đóng giữa chừng). `episode.json` chính là `RolloutResult` của episode, nên DA-13 đọc tiếp `<episode_dir>/episode.json` như hiện nay. **[Đề xuất]**
-- **Việc cho DA-13:** reader của #71 tìm `rtc.jsonl` cạnh `trace.jsonl`. Với layout này, nó phải đọc `<job_dir>/rtc.jsonl` (thư mục cha) và lọc theo `trace_id` của trace.
-- **`trace_id`** là `<job_id>-<12 ký tự hex ngẫu nhiên>`, sinh lúc env `reset`, nên không trùng giữa các worker spawn của cùng job. SIMPLE reset env trước rồi mới reset agent, nên agent đã bọc có `fw_trace_id` của episode ngay lúc `reset`. Client RTC chạy trong agent (DA-23) phải gọi `RTCClient.reset(agent.fw_trace_id)`; khi đó `rtc.jsonl` và `trace.jsonl` cùng một `trace_id`. Hiện agent của SIMPLE chưa dùng client RTC, nên lượt chạy của nhiệm vụ 5, 6 chưa có `rtc.jsonl`.
-- **`reference_sha256`** (Q3): bộ ghi nhận hash đã ghim từ job spec và chép vào mọi `CameraParams` của episode, và vào `camera_params_hash` của `RolloutResult`. Không có hash thì không ghi `camera_params.json`, và R5 ra CHƯA RÕ. Bộ ghi từ chối chuỗi không phải sha256.
-- Tệp ghi bằng JSON thuần: venv SIMPLE không có gói `flywheel`. Test CPU đọc lại `episode.json` qua `RolloutResult`. Test cho `TraceStep` và `CameraParams` skip cho tới khi #48 merge. Chạy với `flywheel.contracts` của #48 (`5b373e2`) qua `PYTHONPATH`: `test_files.py` 9 passed, test seam e2e của hook 1 passed.
+- `infra_status` lấy theo `RolloutResult.infra_status`: `ok` khi SIMPLE ghi dòng `episode_<i>: <bool>` cho episode; `simulator_error` khi episode bị cắt trước dòng đó (tiến trình sim chết, env đóng giữa chừng). **[Đề xuất]**
+- **Việc cho DA-13:** reader của #71 đang tìm `trace.jsonl`, `camera_params.json`, `episode.json` và `rtc.jsonl` trong cùng một thư mục. Theo G1 nó phải đọc `steps.jsonl`, `camera_params.jsonl` (JSONL) và tệp `RolloutResult` trong `<trace_id>/`, và đọc `<job_dir>/rtc.jsonl` (thư mục cha) lọc theo `trace_id`.
+- **`trace_id`** là `<job_id>-<12 ký tự hex ngẫu nhiên>`, sinh lúc env `reset`, nên không trùng giữa các worker spawn của cùng job. SIMPLE reset env trước rồi mới reset agent, nên agent đã bọc có `fw_trace_id` của episode ngay lúc `reset`. Client RTC chạy trong agent (DA-23) phải gọi `RTCClient.reset(agent.fw_trace_id)`; khi đó `rtc.jsonl`, `steps.jsonl` và `camera_params.jsonl` cùng một `trace_id`. Hiện agent của SIMPLE chưa dùng client RTC, nên lượt chạy của nhiệm vụ 5, 6 chưa có `rtc.jsonl`.
+- **`reference_sha256`** (Q3): bộ ghi nhận hash đã ghim từ job spec và chép vào mọi `CameraParams` của episode, và vào `camera_params_hash` của `RolloutResult`. Không có hash thì không ghi `camera_params.jsonl`, và R5 ra CHƯA RÕ. Bộ ghi từ chối chuỗi không phải sha256.
+- Tệp ghi bằng JSON thuần: venv SIMPLE không có gói `flywheel`. Test CPU đọc lại tệp `RolloutResult` qua hợp đồng v0. Test cho `TraceStep` và `CameraParams` skip cho tới khi #48 merge. Chạy với `flywheel.contracts` của #48 (`5b373e2`) thêm trường `trace_id` của G1 vào `CameraParams` qua `PYTHONPATH`: `test_files.py` và test seam e2e của hook 10 passed. Với `5b373e2` chưa sửa, test `CameraParams` lỗi vì thừa `trace_id`, tức test sẽ báo nếu #48 merge thiếu G1.
 
 **Bản tham chiếu camera task hai bàn** (`docs/g0/camera-reference-two-table.yaml`, B3):
 - `scripts/g0/trace/pin_camera_reference.py` chạy vòng eval thật của SIMPLE `b75c678` một episode 2 bước, với server Ψ₀ thay bằng stub giữ tư thế. Script đọc camera bằng `camera_values` của hook và ghi YAML có dạng khối `r5` của `configs/eval/diagnosis/system.yaml`: `reference_sha256` và `cameras` theo `uid`.
 - Chạy trên `rtx3060` ngày 3/11/2026, 23:14–23:16, trong `~/denso-da38` (bản sao SIMPLE checkout ở `b75c678`, venv của DA-33), `systemd-run MemoryMax=12G`, không dùng GPU cho policy. Kết quả: 2 camera (`head_stereo_left`, `head_stereo_right`), 640×360, fx = fy = 224,0664, tâm (320, 180), gắn `eye_in_head`.
 - `reference_sha256 = fc7f9c90ebbf8c4662fd70e58de5aed668c0fbc5ccfbbd951dce705729cdeea2`. Test CPU tính lại hash từ file YAML và so với giá trị này.
 - Chạy lại sau khi thêm `trace_id` vào hook (23:20): script ghim ra đúng các giá trị cũ; test `sim` hai bàn ở `b75c678` 3 passed trong 49 s (task khay không chạy lại lần này).
-- Task khay chưa có bản tham chiếu; lượt chạy khay không có `camera_params.json` cho tới khi ghim.
+- Task khay chưa có bản tham chiếu; lượt chạy khay không có `camera_params.jsonl` cho tới khi ghim.
 - Không sửa `system.yaml`; phiên DA-13 chép khối này vào.
 - **Rủi ro cho khung 5/11:** CycloneDDS của SIMPLE dùng domain 0. Lượt ghim báo `Failed to find a free participant index for domain 0`, tức đang có tiến trình khác cùng máy giữ domain này. Hai lượt eval chạy cùng lúc trên `rtx3060` có thể nhận nhầm topic của nhau. Trước khi chạy nhiệm vụ 5, 6 cần kiểm xem lượt chạy có độc chiếm máy không, hoặc đặt `DOMAIN_ID` riêng. **[Đề xuất]**

@@ -86,11 +86,11 @@ SEAMS = tuple(Seam(*row) for row in (
      "training:TrainingMetric", "training/clean.jsonl", "DA-19", "6/11"),
     (6, "TrainDiagnosis", "Châu (DA-08)", "Long (decide), Hưng (DA-20)",
      "training:TrainDiagnosis", "training/diagnosis.json", "DA-08", "2/11"),
-    (6, "RolloutResult", "Hiếu (SimpleSim; DA-38 hook: episode.json)", "Châu (scorer, DA-13 R6)",
+    (6, "RolloutResult", "Hiếu (SimpleSim; DA-38 hook)", "Châu (scorer, DA-13 R6)",
      "v0:RolloutResult", "artifacts/RolloutResult.json", "DA-23", "10/11"),
-    (6, "TraceStep", "Hiếu (DA-38 hook: trace.jsonl)", "Châu (DA-13)",
+    (6, "TraceStep", "Hiếu (DA-38 hook: steps.jsonl)", "Châu (DA-13)",
      "trace:TraceStep", "artifacts/TraceStep.json", "#31", "6/11"),
-    (6, "CameraParams", "Hiếu (DA-38 hook: camera_params.json)", "Châu (DA-13)",
+    (6, "CameraParams", "Hiếu (DA-38 hook: camera_params.jsonl)", "Châu (DA-13)",
      "trace:CameraParams", "artifacts/CameraParams.json", "#31", "6/11"),
     (6, "Score", "Châu (scorer)", "Long (decide), Hưng",
      "entities:Score", "artifacts/Score.json", "scorer 3.3", "8/11"),
@@ -255,11 +255,12 @@ def seam_of(artifact: str) -> Seam:
 def test_simple_trace_hook_files_are_the_contracts_the_system_checks_read(tmp_path: Path) -> None:
     """DA-38's files of one episode, read through the contracts of DA-13's checks.
 
-    The layout is `<job>/<episode>/trace.jsonl, camera_params.json, episode.json`;
-    `rtc.jsonl` is per job and joins on `trace_id` (PO review 3/11/2026, B1).
+    The layout is `<job>/<trace_id>/steps.jsonl, camera_params.jsonl` (G1 on PR #48)
+    plus the episode's `RolloutResult` beside them; `rtc.jsonl` is per job and joins on
+    `trace_id` (PO review 3/11/2026, B1).
     """
     from flywheel_simple.trace.camera import CameraValues
-    from flywheel_simple.trace.files import EpisodeDirSink
+    from flywheel_simple.trace.files import CAMERA_NAME, RESULT_NAME, STEPS_NAME, EpisodeDirSink
     from flywheel_simple.trace.hook import CycleRecord, EpisodeTrace
 
     trace_step = resolve(seam_of("TraceStep"))
@@ -280,13 +281,17 @@ def test_simple_trace_hook_files_are_the_contracts_the_system_checks_read(tmp_pa
         tmp_path, job_id="job-seams", camera_reference_sha256="0" * 64, adapter_version="test"
     ).write(episode)
 
-    directory = tmp_path / "episode_0"
+    directory = tmp_path / episode.trace_id
     steps = [
         trace_step.model_validate_json(line)
-        for line in (directory / "trace.jsonl").read_text(encoding="utf-8").splitlines()
+        for line in (directory / STEPS_NAME).read_text(encoding="utf-8").splitlines()
     ]
-    for entry in json.loads((directory / "camera_params.json").read_text(encoding="utf-8")):
-        camera_params.model_validate(entry)
-    result = rollout_result.model_validate_json((directory / "episode.json").read_text())
-    assert {step.trace_id for step in steps} == {result.trace_ref.trace_id}  # type: ignore[attr-defined]
+    cameras = [
+        camera_params.model_validate_json(line)
+        for line in (directory / CAMERA_NAME).read_text(encoding="utf-8").splitlines()
+    ]
+    result = rollout_result.model_validate_json((directory / RESULT_NAME).read_text())
+    assert result.trace_ref.uri == directory.as_posix()  # type: ignore[attr-defined]
+    trace_ids = {step.trace_id for step in steps} | {cam.trace_id for cam in cameras}  # type: ignore[attr-defined]
+    assert trace_ids == {result.trace_ref.trace_id}  # type: ignore[attr-defined]
     assert result.infra_status == "ok"  # type: ignore[attr-defined]

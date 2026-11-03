@@ -48,17 +48,18 @@ def write(tmp_path: Path, ep: EpisodeTrace, reference: str | None = PINNED) -> P
     EpisodeDirSink(
         tmp_path, job_id="job-1", camera_reference_sha256=reference, adapter_version="b75c678"
     ).write(ep)
-    return tmp_path / ep.episode_id
+    return tmp_path / ep.trace_id
 
 
-def test_one_directory_per_episode_with_trace_cameras_and_result(tmp_path: Path) -> None:
+def test_one_trace_id_directory_per_episode_with_steps_cameras_and_result(tmp_path: Path) -> None:
     d = write(tmp_path, episode())
+    assert d.name == "job-1-0123456789ab"  # G1 on PR #48: <trace_id>/
     assert sorted(p.name for p in d.iterdir()) == [
-        "camera_params.json",
-        "episode.json",
-        "trace.jsonl",
+        "camera_params.jsonl",
+        "rollout_result.json",
+        "steps.jsonl",
     ]
-    rows = [json.loads(line) for line in (d / "trace.jsonl").read_text().splitlines()]
+    rows = [json.loads(line) for line in (d / "steps.jsonl").read_text().splitlines()]
     assert [r["step"] for r in rows] == [0, 1]
     assert {r["trace_id"] for r in rows} == {"job-1-0123456789ab"}
     assert rows[1]["t_image"] is None  # no new frame on that cycle
@@ -68,44 +69,46 @@ def test_one_directory_per_episode_with_trace_cameras_and_result(tmp_path: Path)
 def test_trace_lines_are_trace_steps(tmp_path: Path) -> None:
     trace = pytest.importorskip("flywheel.contracts.trace", reason="Contract change #31, PR #48")
     d = write(tmp_path, episode())
-    for line in (d / "trace.jsonl").read_text().splitlines():
+    for line in (d / "steps.jsonl").read_text().splitlines():
         trace.TraceStep.model_validate_json(line)
 
 
 def test_camera_params_carry_the_pinned_reference_not_their_own_hash(tmp_path: Path) -> None:
     ep = episode()
-    cams = json.loads((write(tmp_path, ep) / "camera_params.json").read_text())
+    lines = (write(tmp_path, ep) / "camera_params.jsonl").read_text().splitlines()
+    cams = [json.loads(line) for line in lines]
     assert [c["uid"] for c in cams] == ["head_stereo_left", "head_stereo_right"]
+    assert {c["trace_id"] for c in cams} == {ep.trace_id}
     assert {c["reference_sha256"] for c in cams} == {PINNED}
     assert PINNED != reference_sha256(ep.cameras)  # Q3: not a hash of the episode's cameras
 
 
 def test_camera_params_are_camera_params(tmp_path: Path) -> None:
     trace = pytest.importorskip("flywheel.contracts.trace", reason="Contract change #31, PR #48")
-    for entry in json.loads((write(tmp_path, episode()) / "camera_params.json").read_text()):
-        trace.CameraParams.model_validate(entry)
+    for line in (write(tmp_path, episode()) / "camera_params.jsonl").read_text().splitlines():
+        trace.CameraParams.model_validate_json(line)
 
 
-def test_episode_json_is_the_rollout_result_da13_reads_infra_status_from(tmp_path: Path) -> None:
+def test_rollout_result_points_at_the_trace_directory(tmp_path: Path) -> None:
     d = write(tmp_path, episode())
-    result = RolloutResult.model_validate_json((d / "episode.json").read_text())
+    result = RolloutResult.model_validate_json((d / "rollout_result.json").read_text())
     assert (result.sim_success, result.infra_status) == (True, "ok")
     assert result.trace_ref is not None
     assert result.trace_ref.trace_id == "job-1-0123456789ab"
-    assert result.trace_ref.uri == (d / "trace.jsonl").as_posix()
+    assert result.trace_ref.uri == d.as_posix()
     assert result.camera_params_hash == PINNED
 
 
 def test_an_episode_simple_never_reported_is_a_simulator_error(tmp_path: Path) -> None:
     d = write(tmp_path, episode(success=None))
-    result = RolloutResult.model_validate_json((d / "episode.json").read_text())
+    result = RolloutResult.model_validate_json((d / "rollout_result.json").read_text())
     assert (result.sim_success, result.infra_status) == (None, "simulator_error")
 
 
 def test_without_a_pinned_reference_no_camera_params_are_written(tmp_path: Path) -> None:
     d = write(tmp_path, episode(), reference=None)
-    assert not (d / "camera_params.json").exists()  # R5 then says CHƯA RÕ
-    result = RolloutResult.model_validate_json((d / "episode.json").read_text())
+    assert not (d / "camera_params.jsonl").exists()  # R5 then says CHƯA RÕ
+    result = RolloutResult.model_validate_json((d / "rollout_result.json").read_text())
     assert result.camera_params_hash is None
 
 
