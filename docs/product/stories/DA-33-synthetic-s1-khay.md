@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Đang làm. Nhiệm vụ 1–4 đã merge (PR #28, 2/11/2026); nhiệm vụ 5, 6, 7 đã merge (PR #39, 3/11/2026); nhiệm vụ 8 xong trên nhánh `DA-33-tray-release`. PO duyệt kế hoạch nhiệm vụ 5–9 và mặc định Q-33A, Q-33B, Q-33D (3/11/2026) |
+| Trạng thái | Đang làm. Nhiệm vụ 1–4 đã merge (PR #28, 2/11/2026); nhiệm vụ 5, 6, 7 đã merge (PR #39, 3/11/2026); nhiệm vụ 8, 9 xong trên nhánh `DA-33-tray-release`. PO duyệt kế hoạch nhiệm vụ 5–9 và mặc định Q-33A, Q-33B, Q-33D (3/11/2026) |
 | Người làm | Hiếu |
 | Làn | Adapter simulator (`flywheel-simple`) |
 | Story PRD | Story của [design 28/10/2026](../../superpowers/specs/2026-10-28-tray-transfer-he-design.md) mục 4, 5, 7 (M2) |
@@ -38,7 +38,7 @@ Kế hoạch chi tiết: [docs/superpowers/plans/2026-10-31-da33-tray-synthetic.
 - [x] 6. Sinh hàng loạt, sổ lượt sinh chỉ ghi thêm, QA tối thiểu (AC 4, 5)
 - [x] 7. QA bằng phát lại `replay-decoupled-wbc` ở `mujoco` (AC 4)
 - [x] 8. Xuất sang định dạng Ψ₀ (action 36, state 32, LeRobot v2.1), contract test (AC 4, 6)
-- [ ] 9. Chạy lô sản xuất, release có hash, `action_layout`, sổ chi phí (AC 4, 5, 6; M2 8/11/2026)
+- [x] 9. Chạy lô sản xuất, release có hash, `action_layout`, sổ chi phí (AC 4, 5, 6; M2 8/11/2026)
 
 ## Phạm vi file
 
@@ -76,3 +76,4 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 ## Ghi chép khi làm
 
 - 3/11/2026, nhiệm vụ 8: `tray/export.py` chọn episode qua cả QA tối thiểu và QA phát lại, dựng lại thành dataset bằng symlink rồi chạy nguyên `postprocess_psi0_sonic.py` của SIMPLE; thêm `meta/action_layout.json` và `meta/flywheel_export.json` (D-26). Cột 3:5 là khớp middle tay trái, 5:7 là index, ngược comment `ACTION_SLICES_36D` của Ψ₀; `index` toàn cục có khoảng hở như psi-data. Contract test 10/10 trên `rtx3060` (lô t7), features khớp psi-data, từng cột khớp cột cùng tên của dữ liệu gốc.
+- 3/11/2026, nhiệm vụ 9: lô `s1-prod-1103` trên `rtx3060` (mức 1, seed train 1000–1129, 22 worker, chạy trước quy tắc RAM 14 worker của Hiếu; 2 worker bị OOM kill lúc 09:50 rồi chạy tiếp, không mất episode): 130 lượt, 102 thành công, 102 qua QA tối thiểu, 102/102 qua QA phát lại. Release `tray_s1_0d84cc87b1e5` (102 episode, 148 013 frame, 0,90 GB), contract test 11/11 trên release ([synthetic-s1.md](../../g0/tray/synthetic-s1.md)). Release dựng đầu tiên ghi sai tên chiều trong `action_layout` nên đã bị thay (D-26).
