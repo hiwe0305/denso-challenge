@@ -52,10 +52,10 @@ PR 2 (hạn 9/11/2026):
   - [x] 4.1 `build_release` từ chối cả release khi có bản sao chấm lỗi, hạt giống ngoài dải `train`, episode thiếu `QAReport` hoặc không thuộc split `train`
   - [x] 4.2 `Release` đóng băng có `manifest_sha256`, giữ episode bị loại cùng lý do; `ReleaseManifest` và file mẫu dùng chung trong testkit (mối nối `3-ReleaseManifest`)
 - [x] 5. `DatasetReport` và trang HTML (AC 5)
-- [ ] 6. Lệnh `fw data`; chạy trên psi-data và khay S1 trên `rtx3060` (AC 6)
+- [x] 6. Lệnh `fw data`; chạy trên psi-data và khay S1 trên `rtx3060` (AC 6)
   - [x] 6.1 `flywheel-data` phụ thuộc `flywheel-store`; mọi job ghi một dòng `LedgerEntry` ước tính và một dòng thực đo trỏ về nó (đã chốt 4/11 [Hiếu], "Cho phụ thuộc")
   - [x] 6.2 `fw data ingest | qa | release | report`
-  - [ ] 6.3 Chạy trên psi-data và release khay S1 trên `rtx3060`, ghi số đo vào `docs/g0/data-pipeline.md`
+  - [x] 6.3 Chạy trên psi-data và release khay S1 trên `rtx3060`, ghi số đo vào `docs/g0/data-pipeline.md`
 
 ## Giao diện
 
@@ -143,7 +143,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
-- Ghi chú hoàn thành:
-- File đã tạo hoặc sửa:
+- Giờ thực: PR 2 khoảng 7,6 giờ tập trung (6.1 0,5; 3.1 1; 3.2 1,5 + 0,5 sửa sau lần chạy đầu; 4.1 1; 4.2 0,3; 5 0,8; 6.2 1,2; 6.3 0,8), so với ước lượng 6 giờ.
+- Công cụ AI đã dùng: Claude Code (Opus 5.5), một phiên do phiên của Hiếu giao.
+- Ghi chú hoàn thành: PR 2 chạy trên `rtx3060` ở commit `e3aad54`. psi-data: 95 `pass`, 4 `flag`, release `rel_24363158e44e66b4`. Khay S1: 102 `flag` (`action_jump.arm`), release `rel_9f32f33779c904f2`. D4 thật ở `states.mean` của cả hai gói. Số đo và việc phát sinh ở [data-pipeline.md](../../g0/data-pipeline.md). Phép kiểm phát lại chờ `ReplayReport` của DA-17. `has_injected_defect` và `mark_copy_episode` của DA-27 chờ #53; hai chỗ đánh dấu `TODO(#53)`.
+- File đã tạo hoặc sửa: PR 2 tạo `config.py` (phần QA), `ledger.py`, `qa/checks.py`, `release/`, `cli.py`, `configs/data/qa.yaml`, test trong `tests/unit/pipeline/` và `tests/contract/pipeline/`, file mẫu `ReleaseManifest.json`, `docs/g0/data-pipeline.md`; sửa `api.py`, `ingest/sources.py`, `pyproject.toml`, `uv.lock`.
