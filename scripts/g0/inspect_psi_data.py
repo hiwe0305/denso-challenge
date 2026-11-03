@@ -25,7 +25,7 @@ import re
 import sys
 import urllib.request
 import zipfile
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -101,7 +101,8 @@ def cmd_fetch(args: argparse.Namespace) -> int:
     print("| Đường dẫn trên HF | Kích thước (B) | sha256 | Khớp `lfs.oid` của HF |")
     print("|---|---|---|---|")
     for r in rows:
-        print(f"| `{r['path']}` | {r['size']:,} | `{r['sha256']}` | {'có' if r['match'] else 'KHÔNG'} |")
+        match = "có" if r["match"] else "KHÔNG"
+        print(f"| `{r['path']}` | {r['size']:,} | `{r['sha256']}` | {match} |")
     return 0 if all(r["match"] for r in rows) else 1
 
 
@@ -175,7 +176,7 @@ def psi0_slices(source: str) -> list[tuple[str, int, int]]:
         if isinstance(node, ast.Assign) and any(
             isinstance(t, ast.Name) and t.id == "ACTION_SLICES_36D" for t in node.targets
         ):
-            return [tuple(e) for e in ast.literal_eval(node.value)]  # type: ignore[misc]
+            return [(str(n), int(a), int(b)) for n, a, b in ast.literal_eval(node.value)]
     raise SystemExit("ACTION_SLICES_36D not found")
 
 
@@ -318,7 +319,7 @@ def qa_dataset(ds: Dataset, min_s: float, max_s: float) -> dict[str, Any]:
     fps = float(info["fps"])
     meta = {int(r["episode_index"]): r for r in ds.jsonl("meta/episodes.jsonl")}
     videos = {Path(n).stem for n in ds.video_names()}
-    episodes = []
+    episodes: list[dict[str, Any]] = []
     columns: set[str] = set()
     for name, cols in ds.episodes():
         columns |= set(cols)
@@ -508,7 +509,8 @@ def cmd_seeds(args: argparse.Namespace) -> int:
               f"| {r['with_layout']}/{r['episodes']} | {r['with_dr_state_dict']}/{r['episodes']} "
               f"| {r['distinct_dr_cfgs']} |")
     print(f"\nSo với gói train `{train['bundle']}`: số episode i có vị trí ban đầu trùng đúng "
-          "từng số với episode i của train, theo từng vật có mặt ở mọi episode của `dr_state_dict.spatial` (vật gây nhiễu đổi theo episode nên không so).\n")
+          "từng số với episode i của train, theo từng vật có mặt ở mọi episode của "
+          "`dr_state_dict.spatial` (vật gây nhiễu đổi theo episode nên không so).\n")
     print("| Gói | Dataset | Episode | Vị trí trùng theo vật | `dr_state_dict` trùng cùng chỉ số "
           "| `dr_state_dict` có trong train |\n|---|---|---|---|---|---|")
     for r in report[1:]:
@@ -525,7 +527,7 @@ def cmd_seeds(args: argparse.Namespace) -> int:
 # --- descriptive statistics (AC 6) -------------------------------------------------------
 
 
-def describe(values: list[float]) -> dict[str, float]:
+def describe(values: Sequence[float]) -> dict[str, float]:
     import numpy as np
 
     a = np.asarray(values, dtype=float)
