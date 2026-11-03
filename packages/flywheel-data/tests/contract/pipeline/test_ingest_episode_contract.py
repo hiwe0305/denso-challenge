@@ -1,0 +1,69 @@
+"""The Episode that ingest writes is the contract's Episode (DA-03 AC 2; 03 section 7.3).
+
+Other lanes read these records as JSON, never as lane objects, so the check is
+on the serialized form: it parses back to the same Episode, it has exactly the
+fields of the testkit example, and the three robot sources keep the labels the
+design gives them (design 27/10 section 6.1).
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import numpy as np
+import pytest
+from flywheel.contracts.artifacts import Episode
+from flywheel.data.api import EpisodeFrames, register_source, to_episode, write_episode
+
+ROOT = Path(__file__).resolve().parents[5]
+EXAMPLE = ROOT / "packages/flywheel-testkit/src/flywheel/testkit/fixtures/artifacts/Episode.json"
+INFO = {
+    "codebase_version": "v2.1",
+    "fps": 50,
+    "chunks_size": 1000,
+    "data_path": "data/chunk-{episode_chunk:03d}/episode_{episode_index:06d}.parquet",
+    "video_path": "videos/chunk-{episode_chunk:03d}/egocentric/episode_{episode_index:06d}.mp4",
+    "features": {"observation.images.egocentric": {"dtype": "video", "shape": [360, 640, 3]}},
+}
+LABELS = {
+    "psi_data": ("teleop", "measured", None),
+    "planner_wbc": ("synthetic", "planned", "S1"),
+    "teleop_pico": ("synthetic", "planned", "S2"),
+}
+
+
+@pytest.fixture
+def frames(tmp_path: Path) -> tuple[Path, EpisodeFrames]:
+    (tmp_path / "meta").mkdir()
+    (tmp_path / "meta" / "info.json").write_text(json.dumps(INFO))
+    one = EpisodeFrames(
+        episode_index=0,
+        task="pick up the cracker box from table1, locomotion to table2, and place on table2.",
+        timestamp=np.arange(4) / 50,
+        frame_index=np.arange(4, dtype=np.int64),
+        states=np.zeros((4, 32), dtype=np.float32),
+        action=np.zeros((4, 36), dtype=np.float32),
+        video_frames={"observation.images.egocentric": 4},
+    )
+    write_episode(tmp_path, one)
+    return tmp_path, one
+
+
+@pytest.mark.parametrize("detail", sorted(LABELS))
+def test_ingested_episode_round_trips_as_the_contract(
+    frames: tuple[Path, EpisodeFrames], detail: str
+) -> None:
+    root, one = frames
+    episode = to_episode(one, register_source(root, detail, "unknown", "public"), "train")
+    payload = json.loads(episode.model_dump_json())
+    assert Episode.model_validate(payload) == episode
+    example = json.loads(EXAMPLE.read_text(encoding="utf-8"))
+    assert payload.keys() == example.keys()
+    assert payload["meta"].keys() == example["meta"].keys()
+    kind, quality, tier = LABELS[detail]
+    assert (payload["source_kind"], payload["action_quality"]) == (kind, quality)
+    assert payload["meta"]["synthetic_tier"] == tier
+    assert payload["meta"]["source_detail"] == detail
+    assert payload["data_class"] == "public"
+    assert payload["meta"]["injected_defect"] is None
