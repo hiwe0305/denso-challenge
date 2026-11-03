@@ -23,7 +23,6 @@ train loss on both sides of the cut, so "bước và loss nối liền" can be r
 from __future__ import annotations
 
 import argparse
-import importlib
 import json
 import os
 import shutil
@@ -139,12 +138,17 @@ def repair_lock(text: str) -> str:
 
 
 def lock_constraints(lock: str) -> str:
-    """`name==version` for every registry package of a (repaired) `uv.lock`."""
-    # tomllib is 3.11+; the VM's python3 has it, the 3.10 floor of this package does not.
-    packages = importlib.import_module("tomllib").loads(lock)["package"]
-    return "".join(
-        f"{p['name']}=={p['version']}\n" for p in packages if "registry" in p.get("source", {})
-    )
+    """`name==version` for every registry package of a (repaired) `uv.lock`.
+
+    Read from the first lines of each `[[package]]` block, which `uv` always writes
+    as `name`, `version`, `source`, so no TOML parser is needed (tomllib is 3.11+).
+    """
+    constraints = []
+    for block in lock.split("\n[[package]]\n")[1:]:
+        name, version = _name_version(block)
+        if version and 'source = { registry = "' in block.split("\n")[2]:
+            constraints.append(f"{name}=={version}\n")
+    return "".join(constraints)
 
 
 def _name_version(block: str) -> tuple[str, str]:
