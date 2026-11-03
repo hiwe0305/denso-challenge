@@ -48,6 +48,37 @@ uv run python -m flywheel.data.inject.build --source <gốc LeRobot> --out fwdat
 
 Lệnh ghi `copies/<id>/` (bản cấy và bản sạch, id trung tính từ `copy_ids(seed)`), `answers/<id>/defect_manifest.json` và `.sha256` (chỉ bộ chấm đọc), `ledger.jsonl` (một dòng ước tính, một dòng thực đo trỏ về dòng ước tính), rồi in `DatasetRef`, đường dẫn và hash manifest của từng bản cho DA-31. Bản sạch chép từ bản gốc qua cùng đường ghi như bản cấy, nên hai bản chỉ khác nhau ở lỗi. Ingest một bản sao gọi `flywheel.data.inject.api.mark_copy_episode` để mọi `Episode` mang `benchmark_copy_id`. `ledger.jsonl` chưa ghi vào sổ của store vì `flywheel-data` chưa khai phụ thuộc `flywheel-store` (`pyproject.toml` thuộc DA-03).
 
+### Chạy trên psi-data thật (4/11/2026)
+
+Nguồn: gói hai bàn `simple/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` của `USC-PSI-Lab/psi-data` @ `e78fb93`, bản S1-07 đã tải (`rtx3060:~/denso-s107/fwdata/psi-data/e78fb93/`, sha256 zip `6cdf9022…927586`, khớp `lfs.oid` của HF), giải nén vào `rtx3060:~/denso-da27/fwdata/psi-data/e78fb93/`: 99 episode, 62.764 khung, 207 file. Mã ở nhánh `DA-27-defect-inject` (`59793bd`), chép sang `~/denso-da27`.
+
+```bash
+cd ~/denso-da27
+nohup setsid systemd-run --user --scope -p MemoryMax=8G -p MemorySwapMax=0 \
+  /usr/bin/time -v .venv/bin/python -m flywheel.data.inject.build \
+  --source fwdata/psi-data/e78fb93/G1WholebodyLocomotionPickBetweenTablesTeleop-v0 \
+  --out fwdata/inject --layout configs/embodiments/g1.yaml --config configs/data/inject.yaml \
+  > fwdata/inject-run.log 2>&1 < /dev/null &
+```
+
+Kết quả (đo, một tiến trình CPU, máy đang chạy job khác với load khoảng 49):
+
+| Mục | Giá trị |
+|---|---|
+| Thời gian | 21,7 s wall (24,5 s user); `LedgerEntry` ước tính 125,5 s (giả định 1 ms/khung/bản), thực đo 21,07 s |
+| RAM đỉnh | 640 MB (`Maximum resident set size` 654.804 kB) |
+| Bản gốc | hash cây trước và sau bằng nhau (`35984186…958ce9`) |
+| Hai bản sao | `fwdata/inject/copies/bench-1e258c0a78ca`, `fwdata/inject/copies/bench-d19e112835e3`, mỗi bản 99 episode |
+| Đáp án | `fwdata/inject/answers/<id>/defect_manifest.json` và `.sha256`; sha256 `8962a6cf…ea13a72` (`bench-1e258c0a78ca`), `0dc84b49…dc8bbc27` (`bench-d19e112835e3`) |
+
+Kiểm lại từ đĩa (`fwdata/verify_inject.py`, đọc bằng bộ đọc của DA-03): một bản có 33 lỗi, đủ 11 loại × 3 (D1 3, D2 6, D3 9, D5 6, D6 6, D7 3), mỗi dòng manifest qua `defect_applied`; 66 episode không cấy và cả 99 episode của bản kia trùng bản gốc; `joint_limit_exceeded` vượt đúng `limit_high` của `g1.yaml` (ví dụ `left_elbow_joint` 2,0944 → 2,8798, `waist_pitch_joint` 0,52 → 0,78); `unit_deg_rad` trên chiều góc (15, 16, 30); `action_sign_flip` trên chiều có độ lệch chuẩn khác 0 (19, 24); seed rò 2000124, 2000587, 2000692; `drop_frames` bỏ 90–93 dòng; `corrupted_success_label` cắt còn một nửa số khung.
+
+Còn lộ, cần PO quyết [Đề xuất]:
+
+- `meta/episodes_stats.jsonl` (và `stats.json`, `stats_psi0.json`) chép nguyên từ bản gốc. Tính lại stats của một episode rồi so với file là biết episode nào đã đổi, không cần phát hiện đúng loại lỗi. Hướng sửa: tính lại stats cho mọi episode của cả hai bản sao, hoặc bỏ các file này khỏi hai bản sao.
+- `meta/flywheel_lineage.jsonl` có 95 dòng ở bản sạch, 98 dòng ở bản cấy, vì episode bị cắt làm dời `index` của episode sau.
+- Agent chạy trên hai bản sao phải được tách riêng (DA-20, DA-31): so hai bản với nhau, hoặc với psi-data công khai, là thấy hết lỗi.
+
 ---
 
 ## 3. Lỗi log huấn luyện (F-TRAIN) và log RTC (F-SYS)
@@ -69,6 +100,6 @@ Hỗ trợ sinh log giả định theo đúng schema của `FakeTrainer` và RTC
 
 ## 4. Kiểm thử và Nghiệm thu
 
-* **Unit tests:** 83 test case tự động tại `packages/flywheel-data/tests/unit/inject/`.
+* **Unit tests:** 83 test case tự động; chạy thật trên psi-data ở trên tại `packages/flywheel-data/tests/unit/inject/`.
 * **Độ bao phủ:** 100% các loại lỗi cấy đều có test kiểm chứng.
 * **Độc lập kiến trúc:** Không import vòng, tuân thủ nghiêm ngặt 3 hợp đồng kiến trúc của repo.

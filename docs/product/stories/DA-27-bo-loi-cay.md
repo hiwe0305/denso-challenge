@@ -37,7 +37,7 @@ Bản 3/11/2026 (nhiệm vụ 1–5 là 5 commit của Thông; [plan chia lại 
 
 - [x] 6. Thay bản ghi manifest riêng bằng `DefectManifest`, `Defect` của hợp đồng; episode cấy lỗi mang `EpisodeMetadata.injected_defect` (AC 3)
 - [x] 7. Đổi mã lỗi theo design mục 10: NaN → D1; rơi khung, lệch đồng bộ → D2; nhảy khớp, vượt giới hạn, sai đơn vị → D3; trùng episode, rò hạt giống → D5; nhãn thành công sai, câu lệnh sai → D6; đảo dấu một chiều action → D7 (AC 1, 3)
-- [ ] 8. Cấy lên bản sao parquet thật bằng bộ đọc và ghi của DA-03 PR 1, mỗi loại 3 episode (33 trên 99), hạt giống ghi trong manifest (AC 1)
+- [x] 8. Cấy lên bản sao parquet thật bằng bộ đọc và ghi của DA-03 PR 1, mỗi loại 3 episode (33 trên 99), hạt giống ghi trong manifest (AC 1)
 - [ ] 9. Bản sạch cùng số episode; `seal_manifest` ghi `defect_manifest.json` và `.sha256`; test agent không đọc được manifest (AC 3, 4)
 - [ ] 10. `has_injected_defect` và test; chạy trên `rtx3060` ra `fwdata/inject/<dataset_id>/{injected,clean}`, gửi `DatasetRef` và đường dẫn manifest cho Châu (DA-31) (AC 5)
 
@@ -92,6 +92,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - 4/11/2026 (`DA-27/8.4`): nghĩa của lỗi khớp với LeRobot: `drop_frames` bỏ hẳn dòng; `timestamp_sync_offset` dịch cột `timestamp`; `corrupted_success_label` cắt episode và giữ nhãn thành công (design 9.2), thay vì đảo nhãn; `holdout_seed_leak` dùng dải holdout của `configs/splits/default.yaml` (2000000–2000999) thay 9000–9999 (vốn thuộc train).
 - 4/11/2026 (`DA-27/8.5`): `inject_copy` cấy trên bản sao LeRobot qua bộ đọc và ghi của DA-03 (#69), ghi lại mọi episode; test đọc ngược từ đĩa. Nhiệm vụ 8 đánh dấu xong khi chạy trên psi-data thật.
 - 4/11/2026 (`DA-27/9.3`): `clean_copy` từ bản gốc; `python -m flywheel.data.inject.build` dựng hai bản sao, niêm phong đáp án ở `answers/`, ghi `LedgerEntry` ước tính và thực đo, in `DatasetRef` cho DA-31; `api.mark_copy_episode` cho ingest bản sao.
+- 4/11/2026 (`DA-27/8.6`): chạy trên psi-data `e78fb93` ở `rtx3060` (`docs/g0/defect-inject.md`, mục "Chạy trên psi-data thật"): 99 episode, 33 lỗi đủ 11 × 3, kiểm lại từ đĩa đạt; 21,7 s, RAM đỉnh 640 MB. Nhiệm vụ 8 xong.
 - 3/11/2026 (`DA-27/9.2`): `seal_manifest` ghi `defect_manifest.json` và `.sha256`, từ chối ghi vào thư mục bản sao; test quét mã chặn agent (`flywheel.eval.agentqa` trừ `bench/`) và phép kiểm (`flywheel.data` trừ `inject/`) nhắc tới đáp án; bỏ `ManifestLock.can_agent_read` (chỉ so tên vai). Nhiệm vụ 9 còn mở tới khi bản sạch và niêm phong chạy trên parquet thật.
 - 3/11/2026 (`DA-27/10.1`): `flywheel.data.inject.api.has_injected_defect(episode: Episode) -> bool` cho `release` của DA-03, có test; theo hợp đồng hiện tại xét `meta.injected_defect`, đổi sang `benchmark_copy_id` khi #36 merge. Nhiệm vụ 10 còn mở (chạy trên `rtx3060`, giao DA-31).
 - 3/11/2026 (issue #62, sau khi #36 merge): episode không còn mang `injected_defect`; mọi episode của hai bản sao chấm mang `benchmark_copy_id` bằng `dataset_id` trung tính của bản sao; đáp án chỉ trong `DefectManifest`; rào release và `has_injected_defect` chặn theo `benchmark_copy_id` (design 6.1, 9.2; 03 bản 1.0 mục 4.3). Nhiệm vụ 6 làm lại theo hợp đồng mới ở `DA-27/6.1`.
