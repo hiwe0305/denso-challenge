@@ -66,13 +66,15 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Tạo story | PO (Hiếu) theo design chia làn (đã xóa) |
 | 27/10/2026 | Bỏ bảng topic MCAP; thêm `DatasetReport`, `DefectManifest`, trường Episode mới | PO (Hiếu) theo design 27/10/2026 |
 | 27/10/2026 | Giao cho Long theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
-| 03/11/2026 | Thêm schema AgentReport, AgentReview và file mẫu cho DA-20, DA-31 theo Issue #34 | Nguyễn Thăng Long |
-| 03/11/2026 | Sửa theo review PR #46: `AgentFinding.code` chỉ nhận mã mục 10 của design (D1–D8, T1–T8, O1–O4, R1–R6); datetime phải có múi giờ; `AgentReview.check_against` kiểm review chỉ trỏ tới phát hiện có trong báo cáo, file mẫu thêm `find_002`. PR #46 giữ AC 6 và nhiệm vụ 6; phần trace của PR #48 là AC 7 và nhiệm vụ 7 | PO (Hiếu) |
+| 03/11/2026 | Thêm AC 6 và nhiệm vụ 6 (PR #46: `AgentReport`, `AgentReview`, Issue #34), AC 7 và nhiệm vụ 7 (PR #48: `TraceStep`, `CameraParams`, 4 trace mẫu, Issue #31) | Nguyễn Thăng Long |
+| 03/11/2026 | Sửa theo review PO. PR #46: `AgentFinding.code` chỉ nhận mã mục 10 của design (D1–D8, T1–T8, O1–O4, R1–R6); datetime phải có múi giờ; `AgentReview.check_against` kiểm review chỉ trỏ tới phát hiện có trong báo cáo, file mẫu thêm `find_002`. PR #48: đúng 28 chiều thân trên và 7 chiều thân dưới, ghi thứ tự, đơn vị, hệ tọa độ (`UPPER_BODY`, `LOWER_BODY`); `run_plan_id` không có RunPlan là `g0-<story>-<yyyymmdd>` (G2); `dropped_frames` đếm theo chu kỳ; trace là thư mục `<trace_id>/` gồm `steps.jsonl` và `camera_params.jsonl`, `CameraParams` thêm `trace_id` (G1); `reference_sha256` là hash tham chiếu camera G0 đã ghim, chép từ RunPlan (Q3). PR #46 giữ AC 6 và nhiệm vụ 6, PR #48 là AC 7 và nhiệm vụ 7 | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
-- Giờ thực: 2h
-- Công cụ AI đã dùng: Antigravity
+### Nhiệm vụ 6 (PR #46)
+
+- Giờ thực: 2h (Long), 1.1h (sửa theo review PO)
+- Công cụ AI đã dùng: Antigravity; Claude Code
 - Ghi chú hoàn thành: Đã bổ sung hợp đồng AgentReport và AgentReview (agentqa.py) kèm validator kiểm tra tính nhất quán fact-placeholder (cả insight và suggestion), cách ly vault, trạng thái problem, lý do override; xuất JSON Schema và bổ sung đầy đủ file mẫu hợp lệ/bất hợp lệ trong testkit.
 - File đã tạo hoặc sửa:
   - packages/flywheel-contracts/src/flywheel/contracts/agentqa.py
