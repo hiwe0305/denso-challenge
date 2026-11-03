@@ -117,7 +117,7 @@ def first_frames(steps: NDArray[np.bool_]) -> tuple[int | None, ...]:
     return tuple(out)
 
 
-def wrist_positions(demo: ParentDemo) -> np.ndarray:
+def wrist_positions(demo: ParentDemo) -> NDArray[np.float64]:
     """(T, 2, 3) world positions of the wrist targets (robot frame = pelvis position and yaw)."""
     w, x, y, z = (demo.base_pose[:, k] for k in range(3, 7))
     yaw = np.arctan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))

@@ -42,6 +42,17 @@ step_stop: 0.01
 # transformed parent pose, at most place_fix_max_m and place_fix_max_deg.
 place_fix_max_m: 0.05
 place_fix_max_deg: 10.0
+# While the hands follow the tray, the measured palms are steered onto the parent's palms
+# (forward kinematics, scripts/g0/tray/s2/parent_palms.py) moved with the tray: palm_gain x
+# the error per step, capped at palm_max (m), as DA-33's planner corrects its own palms
+# (palm_correction_* in tray_planner.yaml). Only while the parent's palms stand still
+# (below palm_still_speed, m/s) and the error is within palm_window (m): with the planner's
+# 0.08 m window and no stillness check the correction took up the arm's lag while moving,
+# reached its cap and twisted the grip (task 10, 0/12).
+palm_gain: 0.1
+palm_max: 0.05
+palm_window: 0.04
+palm_still_speed: 0.05
 
 # Jobs (task 12): a level-1 condition with this probability, else level 0; condition seeds
 # drawn from [cond_seed_min, cond_seed_max] (train range, away from the parents' 100-179).

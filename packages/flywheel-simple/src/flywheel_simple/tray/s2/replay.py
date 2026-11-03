@@ -34,7 +34,9 @@ on the measured pelvis pose:
   base reference, in the body frame, rate-limited like a thumb;
 - right stick: the parent's vyaw plus the rate at which the transform turns, with
   the target yaw integrated from it as PICO does (an identity variant sends the
-  parent's stick unchanged, and the turns keep their direction);
+  parent's stick unchanged, and the turns keep their direction); once the body is
+  `gate_yaw_tol_deg` off its reference, `YawStick` steers it back as the virtual
+  operator does, and lets go a third of the way back;
 - gates: on reaching a gate frame (end of the walk to table A, end of the
   arrival at table B) the replay holds that frame and steps the base onto its
   reference (corrective steps of `step_speed_min`..`step_speed_max`; the right
@@ -122,6 +124,12 @@ def blend_pose(a: Array, b: Array, w: float) -> Array:
     return out
 
 
+def _shifted(pose: Array, shift: Array) -> Array:
+    out: Array = pose.copy()
+    out[:3, 3] = out[:3, 3] + shift
+    return out
+
+
 @dataclass(frozen=True)
 class ReplayPlan:
     """Exact replay: one parent's frames as recorded."""
@@ -166,6 +174,8 @@ class ReplayOperator:
         self._recent_xy: list[Array] = []  # pelvis xy over the last SETTLE_FRAMES steps
         self.place_fix: Planar | None = None  # tray-in-hand correction while placing
         self._place_fix_m = np.eye(4)
+        self.palm_correction = [np.zeros(3), np.zeros(3)]  # robot frame, added to the wrists
+        self.palm_error_max = 0.0  # largest palm error seen while correcting (m)
 
     def reset(
         self,
@@ -192,6 +202,8 @@ class ReplayOperator:
         self._gate, self._passed, self._stepping = None, set(), False
         self._recent_xy = []
         self.place_fix, self._place_fix_m = None, np.eye(4)
+        self.palm_correction = [np.zeros(3), np.zeros(3)]
+        self.palm_error_max = 0.0
 
     def step(
         self,
@@ -199,8 +211,10 @@ class ReplayOperator:
         calibration: Calibration | None,
         base: Array | None = None,
         tray: Array | None = None,
+        palms: tuple[Array, Array] | None = None,
     ) -> PicoSignal:
-        """This step's signal; variants need the measured pelvis and tray poses (7, world)."""
+        """This step's signal; variants need the measured pelvis and tray poses (7, world)
+        and, to correct the hands as DA-33's planner did, the measured palms (world)."""
         plan = self.plan
         assert plan is not None, "reset with a plan first"
         self.tau += 1
@@ -211,7 +225,10 @@ class ReplayOperator:
             assert base is not None, "a variant replays closed loop on the base pose"
             self._recent_xy = [*self._recent_xy[-(SETTLE_FRAMES - 1) :], base[:2].copy()]
             self._advance(t, base)
-            if self.ref >= plan.cut.place_start and self.place_fix is None and tray is not None:
+            # Measured once the gate at table B has let the base settle on its reference:
+            # earlier, the offset would also take up the base error the gate removes.
+            placing = self.ref >= plan.cut.place_start and self._gate is None
+            if placing and self.place_fix is None and tray is not None:
                 self._fix_place(plan, min(self.ref, plan.frames - 1), tray)
         else:
             self.ref = self.tau
@@ -240,6 +257,12 @@ class ReplayOperator:
                     blend_pose(targets[0], to_robot @ plan.wrist_world[ref, 0], w),
                     blend_pose(targets[1], to_robot @ plan.wrist_world[ref, 1], w),
                 )
+            if isinstance(plan, VariantPlan):
+                assert base is not None
+                if palms is not None and plan.palm_world is not None:
+                    self._correct_palms(plan, ref, base, palms)
+                corr = self.palm_correction
+                targets = (_shifted(targets[0], corr[0]), _shifted(targets[1], corr[1]))
             ee0, scale = calibration.ee0, calibration.scale
             controllers = (
                 robot_to_teleop(targets[0], ee0[0], self.ctrl0[0], scale),
@@ -322,6 +345,40 @@ class ReplayOperator:
         else:
             self._gate = (frame, since, settled, err_in, yaw_in)
 
+    def _correct_palms(
+        self, plan: VariantPlan, ref: int, base: Array, palms: tuple[Array, Array]
+    ) -> None:
+        """While the hands follow the tray, steer the measured palms onto the parent's
+        palms moved with it, as DA-33's planner did against its own targets.
+
+        The parent's wrist targets hold the planner's correction for the parent's arm
+        pose; moved a few centimetres, the arm sags differently (L-TRAY-TILT at the lift
+        with 2 cm offsets, task 10). The correction (robot frame) integrates `palm_gain`
+        x the error while the parent's palms stand still and the palm is within
+        `palm_window`, all axes until the grasp flag and height only while closing, capped
+        at `palm_max`, and stays on afterwards.
+        """
+        cfg, cut = self.cfg, plan.cut
+        assert cfg is not None and plan.palm_world is not None and plan.palm_speed is not None
+        if not cut.reach_start <= ref < cut.grasp_end:
+            return
+        # Only where the parent's palms stood (on the handles, closing): while they move, the
+        # error is mostly the arm still on its way, and integrating it twisted the grip.
+        if plan.palm_speed[ref] > cfg.palm_still_speed:
+            return
+        grasped = cut.step_frames[1] is not None and ref >= int(cut.step_frames[1])
+        axes = np.array([0.0, 0.0, 1.0]) if grasped else np.ones(3)
+        to_robot = base_frame(base)[:3, :3].T
+        for k in range(2):
+            error = axes * (to_robot @ (plan.palm_world[ref, k] - palms[k]))
+            norm = float(np.linalg.norm(error))
+            if norm > cfg.palm_window:
+                continue
+            self.palm_error_max = max(self.palm_error_max, norm)
+            corr = self.palm_correction[k] + cfg.palm_gain * error
+            size = float(np.linalg.norm(corr))
+            self.palm_correction[k] = corr if size <= cfg.palm_max else corr * cfg.palm_max / size
+
     def _fix_place(self, plan: VariantPlan, ref: int, tray: Array) -> None:
         """Move the placing hands by where the held tray is off its transformed parent pose.
 
@@ -350,6 +407,7 @@ class ReplayOperator:
         assert cfg is not None
         e_xy, e_yaw = self._error(plan, ref, base)
         held = self._gate is not None
+        v: Array
         if ended:
             v = np.zeros(2)
         elif held:
@@ -367,8 +425,12 @@ class ReplayOperator:
             v = ff + cfg.nav_gain * e_xy if walking else ff.copy()
         v = np.clip(v, -MAX_LINEAR_VEL, MAX_LINEAR_VEL)
         vx, vy = self._sticks[0].step(float(v[0])), self._sticks[1].step(float(v[1]))
-        if held:
-            # The right stick as the virtual operator steers it, from PICO's current target.
+        steering = self._yaw.pushing or abs(e_yaw) > math.radians(cfg.gate_yaw_tol_deg)
+        if held or (steering and not ended):
+            # The right stick as the virtual operator steers it, from PICO's current target,
+            # onto the base reference: at a gate, and whenever the body has turned off it.
+            # Moved hands load the body differently, and the parent's recorded taps on the
+            # stick do not bring it back (pelvis 14 degrees off while reaching, task 10).
             self._yaw.target_yaw = self._target_yaw
             vyaw, self._target_yaw = self._yaw.step(float(plan.base_ref[ref, 2]), yaw_of(base))
         else:

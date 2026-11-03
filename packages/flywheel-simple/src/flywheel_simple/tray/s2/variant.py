@@ -137,7 +137,7 @@ def _progress(base_xy: Array, start: int, end: int) -> Array:
     if end <= start:
         return np.ones(1)
     if total < 1e-6:
-        return np.linspace(0.0, 1.0, end - start + 1)
+        return np.linspace(0.0, 1.0, end - start + 1, dtype=np.float64)
     out: Array = np.r_[0.0, np.cumsum(steps)] / total
     return out
 
@@ -163,6 +163,8 @@ class VariantPlan:
     wrist_world: Array  # (T, 2, 4, 4): transformed world wrist targets
     world_weight: Array  # (T,): 0 robot-frame targets, 1 world targets
     yaw_rate: Array  # (T,): rad/s at which the transform turns (added to the parent's vyaw)
+    palm_world: Array | None  # (T, 2, 3): the parent's palms moved with the anchors, if known
+    palm_speed: Array | None  # (T,): the faster of the parent's two palms (m/s)
     gates: tuple[int, ...]  # frames at which the replay waits for the base
 
     @property
@@ -232,6 +234,16 @@ def plan_variant(
     )
     world_weight = np.maximum(world_weight, _ramp(n, cut.place_start, blend, up=True))
 
+    palm_world = None
+    if parent.palms is not None:
+        palm_world = np.stack(
+            [(anchors[i].matrix()[:3, :3] @ parent.palms[i].T).T + anchors[i].matrix()[:3, 3]
+             for i in range(n)]
+        )  # fmt: skip
+    palm_speed = None
+    if parent.palms is not None:
+        steps = np.linalg.norm(np.diff(parent.palms, axis=0), axis=2).max(axis=1) * FPS
+        palm_speed = np.r_[steps, steps[-1:]]
     yaws = np.array([tf.yaw for tf in transforms])
     yaw_rate = np.r_[np.diff(np.unwrap(yaws)), 0.0] * FPS
     return VariantPlan(
@@ -246,5 +258,7 @@ def plan_variant(
         wrist_world=wrist_world,
         world_weight=world_weight,
         yaw_rate=yaw_rate,
+        palm_world=palm_world,
+        palm_speed=palm_speed,
         gates=(cut.place_start,),
     )

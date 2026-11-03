@@ -30,7 +30,7 @@ from flywheel_simple.tray.pico.virtual import YawStick
 from flywheel_simple.tray.randomize import sample_episode
 from flywheel_simple.tray.s2.config import S2Config, segment_with
 from flywheel_simple.tray.s2.jobs import S2Job
-from flywheel_simple.tray.s2.parents import ParentDemo, load_parent, parent_dataset
+from flywheel_simple.tray.s2.parents import ParentDemo, load_palms, load_parent, parent_dataset
 from flywheel_simple.tray.s2.replay import ReplayOperator, ReplayPlan
 from flywheel_simple.tray.s2.segments import Segmentation
 from flywheel_simple.tray.s2.variant import (
@@ -59,6 +59,7 @@ class ParentStore:
         self.batch = batch
         self.cfg = cfg
         self._cache: dict[str, tuple[ParentDemo, Segmentation]] = {}
+        self._palms = load_palms(batch)
 
     def get(self, parent_id: str) -> tuple[ParentDemo, Segmentation]:
         if parent_id not in self._cache:
@@ -66,6 +67,8 @@ class ParentStore:
             if batch != self.batch.name:
                 raise KeyError(f"{parent_id} is not in batch {self.batch}")
             demo = load_parent(parent_dataset(self.batch, shard), int(index), parent_id)
+            if parent_id in self._palms:
+                demo = dataclasses.replace(demo, palms=self._palms[parent_id])
             cut = segment_with(demo, self.cfg)
             self._cache[parent_id] = (demo, cut)
         return self._cache[parent_id]
@@ -168,9 +171,16 @@ class S2Streamer:
             "transform": self.plan.meta() if isinstance(self.plan, VariantPlan) else None,
             "condition_distance": self.distance,
             "gate_waits": [list(g) for g in self.operator.gate_waits],
-            "place_fix": None
-            if self.operator.place_fix is None
-            else self.operator.place_fix.as_dict(),
+            **self._corrections(),
+        }
+
+    def _corrections(self) -> dict[str, Any]:
+        """What the closed-loop replay corrected: placing hands, palms (task 10)."""
+        op = self.operator
+        return {
+            "place_fix": None if op.place_fix is None else op.place_fix.as_dict(),
+            "palm_correction_m": [round(float(np.linalg.norm(c)), 4) for c in op.palm_correction],
+            "palm_error_max_m": round(op.palm_error_max, 4),
         }
 
     def attempt_notes(self) -> dict[str, Any]:
@@ -183,6 +193,7 @@ class S2Streamer:
             "s2_mode": self.mode,
             "condition_distance": self.distance,
             "gate_waits": [list(g) for g in self.operator.gate_waits],
+            **self._corrections(),
             "timeline": [list(entry) for entry in self.operator.timeline],
             "frames_played": self.operator.ref,
         }
@@ -201,7 +212,8 @@ class S2Streamer:
         state = tray_state(self.env.unwrapped.mjModel, data)
         tray = np.concatenate([state.tray_pos, state.tray_quat]).astype(np.float64)
         calibration = None if self._last is None else calibration_of(self._pre)
-        signal = self.operator.step(t, calibration, base, tray)
+        palms = (state.left_palm.copy(), state.right_palm.copy())
+        signal = self.operator.step(t, calibration, base, tray, palms)
         self._last = (t, signal)
         return signal
 
