@@ -38,6 +38,7 @@ Là kỹ sư robot learning, tôi muốn chạy checkpoint Ψ₀ công bố trê
   - [ ] 1.3 Soạn câu hỏi provenance cho PSI Lab (việc trưởng nhóm)
 - [ ] 2. Serve Ψ₀ (AC 2, 4)
   - [x] 2.1 Dựng môi trường Ψ₀ (Python 3.11, torch 2.7, flash-attn 2.7.4.post1) trong image riêng ở `docker/psi0/`, dùng chung với S1-04; ghi lỗi nếu flash-attn không chạy trên 5090
+    - Khác biệt đã biết, **Đã chốt 3/11/2026 [Hiếu]** (Q8): dùng image công bố của tác giả ghim theo digest (`docker/psi0/compose.yaml`) trên máy 3060 thay cho image riêng; trên Colab dùng đúng danh sách gói của image đó (`docker/psi0/requirements-image.txt`); flash-attn chạy trên 3060 và L4, chưa thử trên 5090.
   - [x] 2.2 `scripts/g0/serve_psi0.sh` với `--action-exec-horizon`, `--rtc` theo README Ψ₀
   - [ ] 2.3 Đo VRAM, độ trễ; ghi giao thức `act()`
 - [ ] 3. Chạy đánh giá 3 mức × 30 lượt, kiểm nhị thức một phía từng mức (AC 2, 3)
