@@ -4,6 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Đầu vào
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 3/11/2026 | 1.5 | Mục 2.2: thêm DA-35 (synthetic task khay, Hiếu), DA-36 (khung scorer, Châu, story 3.3) và DA-37 (hiệu chỉnh scorer, Châu, story 3.5) theo #30. Mục 2.4: gắn mã DA-36, DA-37 | PO (Hiếu) |
 | 3/11/2026 | 1.4 | Mục 2.4: phần 6 của demo chạy trên cả hai task; thêm dòng vòng Failure → Data trên task khay (DA-34, C+) hạn 12/11 | PO (Hiếu) |
 | 3/11/2026 | 1.3 | Mục 3.4: ngưỡng kích thước PR theo R9 mới (08 bản 0.3): 1500 dòng mã | PO (Hiếu) |
 | 3/11/2026 | 1.2 | Mục 2.4: cắt phạm vi của Hiếu trước 13/11 (dời S1-05, DA-29, S1-06, S1-09, S1-11, DA-16, DA-09; S1-02, S1-03, S1-04 chỉ làm phần DA-26 cần) và thêm hạn cho việc của Hiếu trên đường găng | PO (Hiếu) |
@@ -148,6 +149,9 @@ Chủ sở hữu không có nghĩa là người duy nhất được sửa. Ngư�
 | DA-32 | Task bê khay trên SIMPLE ở `mujoco`: cảnh, task, ngẫu nhiên hóa, vị từ 7 bước, thành công (design 28/10/2026) | Mới | Hiếu | `flywheel-simple/tray/`, `configs/sim/tray.yaml` | PR restructure | 16–26 | S1–S2 |
 | DA-33 | Synthetic S1 cho task bê khay: cầm hai tay trong MP agent, `decompose()`, sinh hàng loạt, release | Mới | Hiếu | `flywheel-simple/tray/` | DA-32 | 15–30 | S2 |
 | DA-34 | Thí nghiệm egocentric trên task bê khay: nhánh A, C, C-NOEGO trước demo, B sau | Mới | Hiếu | `configs/runplans/tray/`, `flywheel-psi0/tray/`, `docs/he/tray.md` | DA-33, DA-19 | 15 | S2 |
+| DA-35 | Synthetic cho task bê khay: teleop ảo qua ống PICO, rồi biến thể S2 (bản 1.5) | Mới | Hiếu | `flywheel-simple/tray/pico/`, `flywheel-simple/tray/s2/` | DA-32, DA-33 | 30–45 (ước lượng thô, chưa chốt) | S2 |
+| DA-36 | Khung scorer từng bước và lớp lỗi chung (story 3.3 của 04 mục 4.2; bản 1.5) | Mới | Châu | `flywheel-eval/scorer/`, `configs/eval/scorer/` | S1-08; `Score` của S1-10 | 13 | S2 |
+| DA-37 | Hiệu chỉnh scorer và ngưỡng τ_track, τ_sync (story 3.5 của 04 mục 4.2; bản 1.5) | Mới | Châu | `flywheel-eval/scorer/`, `configs/eval/diagnosis/system.yaml` | DA-36, 3.2, 3.4 | 12 | Sau 13/11 |
 
 File story nằm trong `docs/product/stories/`. DA-01, DA-02, DA-03, DA-08, DA-13 chưa có file; Thông viết ngày 28/10 theo mẫu story hiện có. Việc chưa có chủ: cập nhật website và Pitch khi chuẩn bị demo 17/11 [Đã chốt: chưa làm trước đó].
 
@@ -196,10 +200,10 @@ Hiếu phải hoàn thiện mọi thứ cho demo trước **13/11/2026**, nên h
 | Hưng | DA-18: export EgoDex cho stage 1 (để Hiếu chạy DA-30) | 10/11 | 8/11 |
 | Hưng | DA-20 nhiệm vụ 1–5 | 13/11 | 10/11 |
 | Châu | #30: sửa hai story scorer | — | 4/11 |
-| Châu | Khung scorer từng bước (04 mục 4.2, story 3.3) | S2 | 8/11 |
+| Châu | DA-36: khung scorer từng bước (04 mục 4.2, story 3.3; bản 1.5) | S2 | 8/11 |
 | Châu | DA-13: kiểm hệ thống và quy lỗi về stage (phần 6 của demo); R3–R5 trên file mẫu trước, trên trace thật từ 8/11 | S3 | 10/11 |
 | Châu | DA-31: bộ chấm lỗi cấy (chuyển từ Hưng) | 13/11 | 11/11 |
-| Sau 13/11 | Hiệu chỉnh scorer (story 3.5), DA-21 (v3), DA-04 nhiệm vụ 5 và 7, DA-20 nhiệm vụ 6 và 7; của Hiếu (bản 1.2): S1-05, DA-29, S1-06, S1-09, S1-11, DA-16, DA-09, phần S1-02, S1-03, S1-04 mà DA-26 không cần | | sau demo |
+| Sau 13/11 | DA-37 hiệu chỉnh scorer (story 3.5), DA-21 (v3), DA-04 nhiệm vụ 5 và 7, DA-20 nhiệm vụ 6 và 7; của Hiếu (bản 1.2): S1-05, DA-29, S1-06, S1-09, S1-11, DA-16, DA-09, phần S1-02, S1-03, S1-04 mà DA-26 không cần | | sau demo |
 
 **Cắt phạm vi của Hiếu [Đã chốt 3/11/2026, bản 1.2].** Phần của Hiếu tới 13/11 dồn vào đường găng của demo: DA-19 (code train, `metrics.jsonl`) → DA-26 (HE sơ bộ); DA-33 → DA-34 (task khay); hook `SimpleSim`; DA-35. Dời sau 13/11: S1-05, DA-29, S1-06, S1-09, S1-11, DA-16, DA-09. S1-02, S1-03, S1-04 chỉ làm phần DA-26 cần. Hệ quả cho người khác:
 
