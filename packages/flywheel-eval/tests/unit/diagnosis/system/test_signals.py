@@ -8,6 +8,7 @@ evidence to collect is not the answer spec section 6.4 asks for.
 
 from __future__ import annotations
 
+from flywheel.contracts.trace import LOWER_BODY
 from flywheel.eval.config import SignalLimits
 from flywheel.eval.diagnosis.system.signals import check_signals, unjudgeable_codes
 from flywheel.eval.diagnosis.system.verdict import Diagnosis, combine
@@ -19,7 +20,9 @@ def test_a_complete_trace_costs_no_code_its_verdict(clean_rows, inputs_from) -> 
     assert unjudgeable_codes(inputs_from(clean_rows), LIMITS) == {}
 
 
-def test_a_field_nobody_logged_costs_the_code_measured_on_it(row, inputs_from) -> None:
+def test_an_image_timestamp_nobody_logged_costs_r4(row, inputs_from) -> None:
+    # `TraceStep` reads a `t_image` left out as null, "no new frame", so a
+    # writer that never logs it leaves R4 no cycle to measure.
     rows = [row(step) for step in range(20)]
     for item in rows:
         del item["t_image"]
@@ -30,15 +33,13 @@ def test_a_field_nobody_logged_costs_the_code_measured_on_it(row, inputs_from) -
     assert "t_image" in reasons["R4"]
 
 
-def test_a_missing_command_field_costs_r3_not_r4(row, inputs_from) -> None:
-    rows = [row(step) for step in range(20)]
-    for item in rows:
-        del item["cmd_lower"]
+def test_a_lower_body_command_logged_as_nan_costs_r3_lower_only(row, inputs_from) -> None:
+    rows = [row(step, cmd_lower=["NaN"] * len(LOWER_BODY)) for step in range(20)]
 
     reasons = unjudgeable_codes(inputs_from(rows), LIMITS)
 
     assert set(reasons) == {"R3/lower"}
-    assert "cmd_lower" in reasons["R3/lower"]
+    assert "`cmd_lower (20/20 chu kỳ)`" in reasons["R3/lower"]
 
 
 def test_a_gap_over_the_allowance_costs_the_code(row, inputs_from) -> None:
@@ -53,7 +54,7 @@ def test_a_gap_over_the_allowance_costs_the_code(row, inputs_from) -> None:
 
     assert set(strict) == {"R4"}
     assert "1/20" in strict["R4"]
-    # One null cycle in twenty is under a 10% allowance, so the code keeps its
+    # One "NaN" cycle in twenty is under a 10% allowance, so the code keeps its
     # verdict; the allowance is what the calibration on real traces moves.
     assert tolerant == {}
 

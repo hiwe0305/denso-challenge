@@ -8,7 +8,7 @@ spec section 6.4 requires is CHƯA RÕ with a request for more evidence, and thi
 module is what produces it.
 
 It answers per code, not for the whole episode, and per half of the body for
-R3. A trace that logged no image timestamp cannot be judged on sync offset,
+R3. A trace with no new camera frame cannot be judged on sync offset,
 and saying so costs R4 its verdict and nothing else: the tracking error of the
 upper body was still measured, and hiding it would lose a fault somebody has
 to fix. A trace with no lower-body measurement costs `R3/lower` and leaves
@@ -16,14 +16,16 @@ to fix. A trace with no lower-body measurement costs `R3/lower` and leaves
 cost the episode is the clean verdict - `combine` turns "nothing fired and
 something went unjudged" into UNKNOWN, never into CLEAN (`verdict.py`).
 
-Three kinds of incompleteness, reported apart because they are collected apart:
+A step that lacks a field never gets here: `TraceStep` requires every field
+but `t_image`, and the reader refuses the line. What does get here comes in
+three kinds, reported apart because they are collected apart:
 
-* **A field no row carries.** The writer does not log it. Fixing it means
-  changing what the rollout records.
-* **A field logged as null or as a value that is not finite.** The writer logs
-  it and the measurement was not taken on those cycles. A null `t_image` is
-  not one of these: `TraceStep` writes it on every cycle with no new camera
-  frame. What costs R4 its verdict there is a trace with no frame at all.
+* **A field logged as a value that is not finite** (`"NaN"`, `"Infinity"`,
+  `"-Infinity"`). The writer logs it and the measurement was not taken on
+  those cycles; raw psi-data logs `meas_lower` this way on every cycle.
+* **No new frame anywhere.** A null `t_image` - or one left out, which
+  `TraceStep` reads as null - is a cycle with no new camera frame and costs
+  nothing, but a trace with no frame at all leaves R4 nothing to measure.
 * **Dropped camera frames.** "camera mất khung" of spec section 6.4, counted
   by `TraceStep.dropped_frames` rather than inferred from a gap.
 """
@@ -51,9 +53,9 @@ FIELDS_OF_CODE: dict[str, tuple[str, ...]] = {
 def unjudgeable_codes(inputs: SystemInputs, limits: SignalLimits) -> dict[str, str]:
     """Codes the trace cannot be judged on, each with the reason in the field's words.
 
-    A code appears here when a field it is measured on is absent, when too many
-    of its cycles are gaps, when the camera dropped more frames than allowed,
-    or when the trace is too short for the statistic to mean anything.
+    A code appears here when too many of its cycles are gaps, when it has no
+    cycle to measure, when the camera dropped more frames than allowed, or when
+    the trace is too short for the statistic to mean anything.
     """
     trace = inputs.trace
     reasons: dict[str, str] = {}
@@ -66,10 +68,6 @@ def unjudgeable_codes(inputs: SystemInputs, limits: SignalLimits) -> dict[str, s
         return {code: too_short for code in FIELDS_OF_CODE}
     dropped = trace.dropped_frames
     for code, fields in FIELDS_OF_CODE.items():
-        absent = [name for name in fields if name in trace.absent_fields]
-        if absent:
-            reasons[code] = f"trace không ghi {_names(absent)}"
-            continue
         gapped = [
             f"{name} ({trace.gap_counts[name]}/{steps} chu kỳ)"
             for name in fields

@@ -1,10 +1,11 @@
 """Synthetic traces for the F-SYS checks (DA-13 AC 6).
 
-Every trace here is built in the test, not recorded: the real `Trace` of SIMPLE
-arrives with the `SimpleSim` hook around 8/11/2026 and the checks must be
-testable on CPU before then (story, dependencies). The field names are those of
-`TraceStep` in Contract change #31, so a trace written by the hook reads
-without changing a test.
+Every trace here is built in the test, not recorded, so the checks are
+testable on CPU (story, dependencies). Each step is a whole
+`flywheel.contracts.trace.TraceStep` - 28 upper-body and 7 lower-body channels -
+so the reader takes it through the contract as it takes the hook's. The traces
+the writer side was built against are in testkit and read in
+`test_trace_fixtures.py`; the hook's own output is in `test_hook_seam.py`.
 
 `clean_rows` is the control: a trace that tracks its commands, answers in time,
 keeps its timestamps together and carries every field. Each fault fixture is
@@ -20,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from flywheel.contracts.trace import LOWER_BODY, UPPER_BODY
 from flywheel.eval.diagnosis.system.reader import (
     CAMERA_NAME,
     ROLLOUT_NAME,
@@ -34,8 +36,17 @@ Rows = Callable[..., Path]
 Inputs = Callable[[list[dict[str, Any]]], SystemInputs]
 
 
+UPPER = [0.1, 0.2, 0.3, *[0.0] * (len(UPPER_BODY) - 3)]
+LOWER = [0.5, *[0.0] * (len(LOWER_BODY) - 1)]
+
+
 def _row(step: int, **overrides: Any) -> dict[str, Any]:
-    """One control cycle that tracks its commands, with named fields replaced."""
+    """One control cycle that tracks its commands, with named fields replaced.
+
+    A vector shorter than the contract's width replaces the leading channels
+    and keeps the clean values in the rest, so `meas_upper=[0.4, 0.2, 0.3]` is
+    an error of 0.3 on the first upper-body joint and nothing else.
+    """
     base: dict[str, Any] = {
         "trace_id": "trace_1",
         "episode_id": "ep_1",
@@ -43,13 +54,17 @@ def _row(step: int, **overrides: Any) -> dict[str, Any]:
         "step": step,
         "t_state": 0.1 * step,
         "t_image": 0.1 * step + 0.002,
-        "cmd_upper": [0.1, 0.2, 0.3],
-        "meas_upper": [0.1, 0.2, 0.3],
-        "cmd_lower": [0.5, 0.0],
-        "meas_lower": [0.5, 0.0],
+        "cmd_upper": list(UPPER),
+        "meas_upper": list(UPPER),
+        "cmd_lower": list(LOWER),
+        "meas_lower": list(LOWER),
         "dropped_frames": 0,
     }
-    base.update(overrides)
+    for name, value in overrides.items():
+        clean = base.get(name)
+        if isinstance(value, list) and isinstance(clean, list):
+            value = [*value, *clean[len(value) :]]
+        base[name] = value
     return base
 
 

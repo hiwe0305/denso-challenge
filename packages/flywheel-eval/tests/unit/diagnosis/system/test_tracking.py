@@ -8,6 +8,7 @@ engineer to the wrong part of the WBC configuration.
 
 from __future__ import annotations
 
+from flywheel.contracts.trace import UPPER_BODY
 from flywheel.eval.config import R3Thresholds
 from flywheel.eval.diagnosis.system.reader import read_trace_log
 from flywheel.eval.diagnosis.system.tracking import check_r3
@@ -60,7 +61,7 @@ def test_both_halves_are_reported_when_both_are_off(row, write_trace) -> None:
 
 def test_the_finding_names_the_worst_cycle(row, write_trace) -> None:
     rows = [row(step) for step in range(20)]
-    rows[7]["meas_upper"] = [0.9, 0.2, 0.3]
+    rows[7] = row(7, meas_upper=[0.9, 0.2, 0.3])
     cfg = R3Thresholds(tau_track_upper=0.05, tau_track_lower=0.05, percentile=100.0)
 
     result = check_r3(read_trace_log(write_trace(rows)), cfg)
@@ -69,10 +70,11 @@ def test_the_finding_names_the_worst_cycle(row, write_trace) -> None:
 
 
 def test_a_half_nobody_measured_does_not_fire(row, write_trace) -> None:
-    # The upper body has no measurement on any cycle, so there is no statistic
-    # to compare. `signals.py` is what reports that; what must not happen here
-    # is a finding invented out of it, in either direction.
-    rows = [row(step, meas_upper=[None, None, None]) for step in range(20)]
+    # The upper body has no measurement on any cycle - `TraceStep` writes it as
+    # "NaN" - so there is no statistic to compare. `signals.py` is what reports
+    # that; what must not happen here is a finding invented out of it, in
+    # either direction.
+    rows = [row(step, meas_upper=["NaN"] * len(UPPER_BODY)) for step in range(20)]
 
     result = check_r3(read_trace_log(write_trace(rows)), CFG)
 

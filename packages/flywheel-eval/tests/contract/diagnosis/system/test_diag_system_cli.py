@@ -15,6 +15,7 @@ from typing import Any
 
 import pytest
 import yaml
+from flywheel.contracts.trace import LOWER_BODY, UPPER_BODY
 from flywheel.eval.cli import app
 from flywheel.eval.diagnosis.system.artifact import SYSTEM_RECORDS
 from flywheel.eval.diagnosis.system.reader import CAMERA_NAME, ROLLOUT_NAME, RTC_NAME, STEPS_NAME
@@ -47,10 +48,10 @@ def _trace_row(step: int, **overrides: Any) -> dict[str, Any]:
         "step": step,
         "t_state": 0.1 * step,
         "t_image": 0.1 * step + 0.002,
-        "cmd_upper": [0.1, 0.2, 0.3],
-        "meas_upper": [0.1, 0.2, 0.3],
-        "cmd_lower": [0.5, 0.0],
-        "meas_lower": [0.5, 0.0],
+        "cmd_upper": [0.1] * len(UPPER_BODY),
+        "meas_upper": [0.1] * len(UPPER_BODY),
+        "cmd_lower": [0.5] * len(LOWER_BODY),
+        "meas_lower": [0.5] * len(LOWER_BODY),
         "dropped_frames": 0,
     }
     row.update(overrides)
