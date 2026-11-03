@@ -59,9 +59,11 @@ def _action_column(before: EpisodeData, after: EpisodeData, d: Defect) -> bool:
     return _column(after, dim) != _column(before, dim)
 
 
-def _cut_but_labelled(before: EpisodeData, after: EpisodeData, d: Defect) -> bool:
-    kept = _int(d, "kept_frames")
-    return after.sim_success is True and len(after.actions) == kept < len(before.actions)
+def _halted_but_labelled(before: EpisodeData, after: EpisodeData, d: Defect) -> bool:
+    k = _int(d, "frozen_from")
+    held = all(a == after.actions[k - 1] for a in after.actions[k:])
+    moved = (after.actions, after.states) != (before.actions, before.states)
+    return after.sim_success is True and held and moved
 
 
 def _seed_leak(before: EpisodeData, after: EpisodeData, d: Defect) -> bool:
@@ -77,7 +79,7 @@ CHECKS: dict[str, Callable[[EpisodeData, EpisodeData, Defect], bool]] = {
     "nan_values": _nan,
     "unit_deg_rad": _action_column,
     "action_sign_flip": _action_column,
-    "corrupted_success_label": _cut_but_labelled,
+    "corrupted_success_label": _halted_but_labelled,
     "wrong_task_instruction": lambda b, a, d: a.instruction != b.instruction,
     "holdout_seed_leak": _seed_leak,
 }

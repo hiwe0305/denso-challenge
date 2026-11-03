@@ -179,17 +179,20 @@ def test_defect_applied_rejects_a_listed_but_unapplied_defect() -> None:
 
 
 def test_inject_corrupted_success_label() -> None:
-    # Design 9.2: a broken episode that is still labelled a success. The episode is cut
-    # before the task can finish; the success label stays.
+    # Design 9.2: a broken episode still labelled a success. The robot halts at the cut
+    # (action and state held) while the recording and the label go on, so the episode
+    # keeps its length and its video's frame count.
     ep = _make_dummy_episode()
     injector = DataDefectInjector(DataDefectConfig(success_label_keep_fraction=0.4))
     mod, defect = injector.inject_corrupted_success_label(ep)
     assert defect.code == "D6"
     assert defect.parameters["kind"] == "corrupted_success_label"
     assert mod.sim_success is True
-    assert (defect.parameters["kept_frames"], defect.parameters["original_frames"]) == (2, 5)
-    for field in ("timestamps_state", "timestamps_image", "states", "actions", "images"):
-        assert getattr(mod, field) == getattr(ep, field)[:2], field
+    assert (defect.parameters["frozen_from"], defect.parameters["frames"]) == (2, 5)
+    assert mod.actions == ep.actions[:2] + [ep.actions[1]] * 3
+    assert mod.states == ep.states[:2] + [ep.states[1]] * 3
+    for field in ("timestamps_state", "timestamps_image", "images"):
+        assert getattr(mod, field) == getattr(ep, field), field
 
 
 def test_corrupted_success_label_needs_a_success_label() -> None:
