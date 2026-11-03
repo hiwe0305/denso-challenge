@@ -1,0 +1,35 @@
+# Ngưỡng vị từ và điều kiện thăng bằng của scorer, task hai bàn (G1).
+# Nguồn định nghĩa: spec v10.5 mục 5.1 (6 bước, điều kiện chạy suốt episode);
+# design 27/10/2026 mục 3. Story DA-36 AC 1, AC 5.
+#
+# Mọi số dưới đây là **giả định**, chưa đo trên SIMPLE. Hiệu chỉnh là story
+# DA-37 (04 mục 4.2 story 3.5): τ lấy phân vị trên episode teleop thành công
+# hoặc lần chạy chuẩn G0, rồi đối chiếu với cờ `check_success` của SIMPLE.
+# Không dùng các số này để báo chỉ số chính ở holdout; chỉ số chính là
+# `sim_success` (03 ADR-14, FR39).
+#
+# Không có khóa nào là tùy chọn: thiếu một khóa là lỗi cấu hình, không phải
+# giá trị mặc định ngầm. Hash của file này đi theo mỗi `Score` (AC 5), nên một
+# số đổi ở đây là một `Score` khác, không phải cùng một kết quả.
+#
+# Mỗi task một file: task bê khay có 7 bước con và bộ mã riêng (design 28/10
+# mục 3.2, 3.3), nên dùng file của nó, không sửa file này.
+
+task_id: two-table   # phải trùng `TaskDefinition.task_id` của task được chấm
+scorer_version: 0.1.0  # tăng khi đổi cách chấm; `Score` cũ giữ nguyên (03 mục 4.3)
+
+# Ngưỡng vị từ, truyền nguyên vào `TaskDefinition.evaluate()` qua `ScorerParams`.
+# Scorer không đọc khóa nào trong đây: tên khóa là việc của task.
+thresholds:
+  r_reach: 0.08    # m; giả định; bán kính tay quanh vật ở bước 1 (spec mục 5.1)
+  h_grasp: 0.03    # m; giả định; vật rời mặt bàn nguồn quá mức này là đã gắp, bước 2
+  h_place: 0.02    # m; giả định; vật đã nằm trên bàn đích, bước 5
+  T_stable: 0.5    # s; giả định; vật đứng yên trong vùng đích trước khi kết, bước 6
+
+# Điều kiện chạy suốt episode (spec mục 5.1 dòng cuối). Vi phạm ở bất kỳ bước
+# nào là L-BALANCE (spec mục 5.2).
+balance:
+  height_signal: torso_height  # tên tín hiệu trong trace, không phải trong mã
+  tilt_signal: torso_tilt
+  min_height: 0.60  # m; giả định; thân G1 thấp hơn mức này coi như đã ngã
+  max_tilt: 0.35    # rad; giả định; khoảng 20 độ, lấy trị tuyệt đối

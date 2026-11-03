@@ -84,13 +84,13 @@ def judge_failure(
         # With a failed step as well, the reason is that the order is in doubt,
         # not whatever the unjudged step was missing.
         if failed is not None:
-            return _unknown(UNKNOWN_STEPS)
-        return _unknown(unknown.reason or UNKNOWN_STEPS)
+            return unknown_verdict(UNKNOWN_STEPS)
+        return unknown_verdict(unknown.reason or UNKNOWN_STEPS)
     if failed is None:
         return FailureVerdict(first_failed_step=None, failure_kind=None, failure_class=None)
     kind = evaluation.failure_kind
     if kind is None:
-        return _unknown(NO_KIND_FROM_TASK)
+        return unknown_verdict(NO_KIND_FROM_TASK)
     if kind not in declared:
         raise ScorerError(
             f"kiểu lỗi `{kind}` không có trong `failure_kinds()` của task; "
@@ -103,7 +103,8 @@ def judge_failure(
     )
 
 
-def _unknown(reason: str) -> FailureVerdict:
+def unknown_verdict(reason: str) -> FailureVerdict:
+    """`L-UNKNOWN` with the reason no kind could be named."""
     return FailureVerdict(
         first_failed_step=None,
         failure_kind=UNKNOWN_KIND,
