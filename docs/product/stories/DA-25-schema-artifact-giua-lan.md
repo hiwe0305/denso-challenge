@@ -24,14 +24,16 @@ Là người giữ nhân, tôi muốn có schema và file mẫu cho mọi artifa
 3. `RolloutRequest` thêm `timing` và `latency_profile_ref` (03 bản 0.5).
 4. Model giả cho endpoint LLM trong testkit (cho DA-20).
 5. Test: mọi file mẫu qua validate; mọi schema có trong JSON Schema xuất ra.
+6. Schema `AgentReport` và `AgentReview` cho Agent QA/QC theo Issue #34, kèm file mẫu và xuất JSON Schema.
 
 ## Nhiệm vụ
 
 - [x] 1. Schema `ReplayReport`, `DatasetReport`, `DefectManifest` (AC 1)
 - [x] 2. Schema log RTC, probe, `QAReport` (AC 1)
 - [x] 3. `RolloutRequest.timing` (AC 3)
-- [ ] 4. File mẫu và model giả trong testkit (AC 2, 4)
+- [x] 4. File mẫu và model giả trong testkit (AC 2, 4)
 - [x] 5. Test và JSON Schema (AC 5)
+- [x] 6. Schema và file mẫu AgentReport, AgentReview cho DA-20, DA-31 (Issue #34, AC 6)
 
 ## Phạm vi file
 
@@ -64,10 +66,22 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 25/10/2026 | Tạo story | PO (Hiếu) theo design chia làn (đã xóa) |
 | 27/10/2026 | Bỏ bảng topic MCAP; thêm `DatasetReport`, `DefectManifest`, trường Episode mới | PO (Hiếu) theo design 27/10/2026 |
 | 27/10/2026 | Giao cho Long theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
+| 03/11/2026 | Thêm schema AgentReport, AgentReview và file mẫu cho DA-20, DA-31 theo Issue #34 | Nguyễn Thăng Long |
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
-- Ghi chú hoàn thành:
+- Giờ thực: 2h
+- Công cụ AI đã dùng: Antigravity
+- Ghi chú hoàn thành: Đã bổ sung hợp đồng AgentReport và AgentReview (agentqa.py) kèm validator kiểm tra tính nhất quán fact-placeholder (cả insight và suggestion), cách ly vault, trạng thái problem, lý do override; xuất JSON Schema và bổ sung đầy đủ file mẫu hợp lệ/bất hợp lệ trong testkit.
 - File đã tạo hoặc sửa:
+  - packages/flywheel-contracts/src/flywheel/contracts/agentqa.py
+  - packages/flywheel-contracts/schemas/AgentReport.json
+  - packages/flywheel-contracts/schemas/AgentReview.json
+  - packages/flywheel-contracts/tests/test_agentqa.py
+  - packages/flywheel-testkit/src/flywheel/testkit/fixtures/artifacts/AgentReport.json
+  - packages/flywheel-testkit/src/flywheel/testkit/fixtures/artifacts/AgentReport-train.json
+  - packages/flywheel-testkit/src/flywheel/testkit/fixtures/artifacts/AgentReport-broken.json
+  - packages/flywheel-testkit/src/flywheel/testkit/fixtures/artifacts/invalid-AgentReport.json
+  - packages/flywheel-testkit/src/flywheel/testkit/fixtures/artifacts/AgentReview.json
+  - packages/flywheel-testkit/src/flywheel/testkit/fixtures/artifacts/invalid-AgentReview.json
+  - docs/product/stories/DA-25-schema-artifact-giua-lan.md

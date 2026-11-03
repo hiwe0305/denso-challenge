@@ -1,0 +1,59 @@
+{
+  "report_id": "rep_dataset_001",
+  "subject_ref": "releases/rel_001/dataset_report.json",
+  "stage": "dataset",
+  "created_at": "2026-11-03T10:00:00Z",
+  "model": {
+    "name": "nemotron-3.5-bolt-e4b",
+    "revision": "r1",
+    "temperature": 0.0,
+    "prompt_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  },
+  "inputs": [
+    {
+      "ref": "releases/rel_001/dataset_report.json",
+      "kind": "dataset_report",
+      "sha256": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+    }
+  ],
+  "facts": [
+    {
+      "fact_id": "F1",
+      "name": "drop_rate_pct",
+      "value": 4.5,
+      "unit": "%",
+      "source_ref": "releases/rel_001/dataset_report.json"
+    },
+    {
+      "fact_id": "F2",
+      "name": "dropped_frames_count",
+      "value": 12,
+      "unit": "frames",
+      "source_ref": "releases/rel_001/dataset_report.json"
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "find_001",
+      "code": "D2",
+      "rank": 1,
+      "target_ref": "episodes/ep_001",
+      "evidence": ["F1", "F2"],
+      "figures": ["figures/ep_001_drops.png"],
+      "insight": "High frame drop rate detected at {F1} with {F2} lost frames.",
+      "suggestion": "Re-record episode {F2} with higher sync margin."
+    }
+  ],
+  "estimates": [
+    {
+      "estimate_id": "est_001",
+      "quantity": "expected_recovery_time_s",
+      "low": 1.2,
+      "high": 3.5,
+      "unit": "s",
+      "basis": ["F1"]
+    }
+  ],
+  "status": "ok",
+  "problems": []
+}

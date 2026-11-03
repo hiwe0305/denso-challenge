@@ -1,0 +1,12 @@
+{
+  "report_id": "rep_dataset_001",
+  "reviewer": "long",
+  "decided_at": "2026-11-03T11:00:00Z",
+  "decisions": [
+    {
+      "finding_id": "find_002",
+      "decision": "override",
+      "reason": "   "
+    }
+  ]
+}

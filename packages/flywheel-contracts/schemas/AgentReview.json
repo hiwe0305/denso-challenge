@@ -1,0 +1,67 @@
+{
+  "$defs": {
+    "FindingDecision": {
+      "additionalProperties": false,
+      "description": "The engineer's review decision for a single finding.",
+      "properties": {
+        "finding_id": {
+          "minLength": 1,
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "decision": {
+          "enum": [
+            "agree",
+            "override"
+          ],
+          "title": "Decision",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "finding_id",
+        "decision"
+      ],
+      "title": "FindingDecision",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The engineer's answer to an AgentReport, recorded in fw review.",
+  "properties": {
+    "report_id": {
+      "minLength": 1,
+      "title": "Report Id",
+      "type": "string"
+    },
+    "reviewer": {
+      "minLength": 1,
+      "title": "Reviewer",
+      "type": "string"
+    },
+    "decided_at": {
+      "format": "date-time",
+      "title": "Decided At",
+      "type": "string"
+    },
+    "decisions": {
+      "items": {
+        "$ref": "#/$defs/FindingDecision"
+      },
+      "title": "Decisions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "report_id",
+    "reviewer",
+    "decided_at"
+  ],
+  "title": "AgentReview",
+  "type": "object"
+}

@@ -1,0 +1,50 @@
+{
+  "report_id": "rep_train_001",
+  "subject_ref": "runs/rp_example/job_example/metrics.jsonl",
+  "stage": "train",
+  "created_at": "2026-11-03T10:15:00Z",
+  "model": {
+    "name": "nemotron-3.5-bolt-e4b",
+    "revision": "r1",
+    "temperature": 0.0,
+    "prompt_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  },
+  "inputs": [
+    {
+      "ref": "runs/rp_example/job_example/metrics.jsonl",
+      "kind": "training_metrics",
+      "sha256": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+    }
+  ],
+  "facts": [
+    {
+      "fact_id": "F1",
+      "name": "divergent_step",
+      "value": 1,
+      "unit": "step",
+      "source_ref": "runs/rp_example/job_example/metrics.jsonl"
+    },
+    {
+      "fact_id": "F2",
+      "name": "divergent_loss_value",
+      "value": "NaN",
+      "unit": "loss",
+      "source_ref": "runs/rp_example/job_example/metrics.jsonl"
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "find_t1_001",
+      "code": "T1",
+      "rank": 1,
+      "target_ref": "runs/rp_example/job_example",
+      "evidence": ["F1", "F2"],
+      "figures": ["figures/loss_curve.png"],
+      "insight": "Loss diverged to {F2} at step {F1}.",
+      "suggestion": "Reduce initial learning rate and restart job from step 0."
+    }
+  ],
+  "estimates": [],
+  "status": "ok",
+  "problems": []
+}
