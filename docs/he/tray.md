@@ -15,7 +15,7 @@ Quy tắc ở mục 3–5 **không đổi sau khi thấy kết quả** (ghi chú
 | B (AC 5) | tập `C` | `pre.*` fine-tune thêm trên video bê khay | Sau khi có video; RunPlan riêng |
 
 - **Dữ liệu robot**: release synthetic S1 `tray_s1_0d84cc87b1e5` của DA-33 (102 episode, mức 1, seed train 1000–1129; [synthetic-s1.md](../g0/tray/synthetic-s1.md)). Tập `A` và `C` chọn tất định bằng `flywheel_psi0.tray.demo_sets`: xếp mọi episode theo sha256(muối | `release_hash` | seed), tập n là n episode đầu. Vì vậy `C` ⊂ `A`, và 40 episode A có thêm so với C là một lần rút đều từ 62 episode C bỏ ra. Hash ở [`demo_sets.json`](../../configs/runplans/tray/demo_sets.json): `A` = `94245f8d36ab…`, `C` = `5db98a38ed80…`. 22 episode còn lại của release không dùng.
-- **Recipe** chung cho mọi nhánh: [`psi0-stage3.yaml`](../../configs/models/psi0-stage3.yaml), 40.000 bước, batch 16 trên một GPU (tác giả dùng 8 × 16 = 128), lr 1e-4 cosine, VLM đóng băng, RTC. Ghi đè duy nhất, chung cho mọi nhánh (4/11/2026): `train.validation_steps: 2000` thay vì 500, theo quyết định của Hiếu ở [S1-04 mục 4.1](../g0/psi0-finetune-cost.md); validation không đổi quá trình train, chỉ ít điểm `val` hơn (21 thay vì 81 mỗi lần). `runplan check` từ chối mọi ghi đè khác. Máy: một Colab L4. Seed train 0. `stats_psi0.json` của mỗi nhánh tính trên chính tập train của nhánh đó [Đề xuất], như Ψ₀ làm khi fine-tune một dataset.
+- **Recipe** chung cho mọi nhánh: [`psi0-stage3.yaml`](../../configs/models/psi0-stage3.yaml), 40.000 bước, batch 16 trên một GPU (tác giả dùng 8 × 16 = 128), lr 1e-4 cosine, VLM đóng băng, RTC. Ghi đè duy nhất, chung cho mọi nhánh (4/11/2026): `train.validation_steps: 2000` thay vì 500, theo quyết định của Hiếu ở `docs/g0/psi0-finetune-cost.md` mục 4.1 (S1-04, PR #78); validation không đổi quá trình train, chỉ ít điểm `val` hơn (21 thay vì 81 mỗi lần). `runplan check` từ chối mọi ghi đè khác. Máy: một Colab L4. Seed train 0. `stats_psi0.json` của mỗi nhánh tính trên chính tập train của nhánh đó [Đề xuất], như Ψ₀ làm khi fine-tune một dataset.
 - **Eval**: 90 điều kiện dev, seed 1 000 100–1 000 129 ở mỗi mức 0, 1, 2, như nhau cho mọi nhánh; `eval-decoupled-wbc`, `sim_mode=mujoco`, đồng bộ, 1 lượt mỗi điều kiện, giới hạn 90 s. Mức 0 không ngẫu nhiên hóa, nên 30 điều kiện của mức 0 cùng một cảnh; khác nhau chỉ do lấy mẫu của policy và sim.
 - **Phân phối**: release chỉ có mức 1. Mức 0 là cảnh giữa của mức 1; mức 2 là dịch chuyển (khoảng cách bàn, chỗ đứng, khối lượng linh kiện, ánh sáng).
 
@@ -90,3 +90,53 @@ Theo design mục 6.6:
 | Eval | 30 seed × 3 mức = 90 điều kiện | **90 seed dev mỗi mức** (1 000 100–1 000 189) × 3 mức = **270 điều kiện**, 1 lượt mỗi điều kiện. Chọn nhiều điều kiện thay vì lặp lượt vì chưa kiểm hai lượt cùng điều kiện có khác nhau không. Mức 0 vẫn là một cảnh |
 
 Hệ quả: A thấy mỗi frame khoảng 1,4 lần (320 episode × khoảng 1.430 frame so với 640.000 mẫu), C khoảng 2,8 lần; đây là tính chất của recipe số bước cố định, như tác giả. Eval khoảng 270 episode mỗi nhánh, chỉ tốn giờ máy 3060.
+
+## 8. Kiểm tra trước khi chạy job (review của PO ngày 4/11/2026, PR #73)
+
+_Đo ngày 4/11/2026 trên `rtx3060`, không dùng GPU, không train. Bốn điểm của review [PR #73](https://github.com/hiwe0305/denso-challenge/pull/73#issuecomment-6611206593)._
+
+### 8.1 Cổng phát lại qua client eval (điểm 3)
+
+Cách làm: server Ψ₀ giả [`flywheel_psi0.tray.replay_server`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/replay_server.py) trả cột `action` 36 chiều của episode trong release (đúng thứ Ψ₀ học), 24 frame mỗi lần gọi, bỏ qua quan sát. Client là `eval-decoupled-wbc` của SIMPLE với policy `psi0_decoupled_wbc`, `sim_mode=mujoco`, không sửa SIMPLE. Ba episode S1 của tập `C` (seed 1001, 1003, 1008), mỗi episode chạy hai lượt, ở hai chế độ đồng hồ. Episode nào planner đã giải được thì phát lại phải thành công.
+
+| Đồng hồ | Thành công | Hai lượt cùng episode | Khay cuối so với lúc ghi |
+|---|---|---|---|
+| Thời gian sim (như QA phát lại của DA-33, D-24) | **6/6** | Giống hệt nhau đến từng bit (lệch 0,0 mm) | 2,6–16,4 mm, ≤ 1,2° |
+| Thời gian thật (SIMPLE như hiện có), máy tải khoảng 50 | **4/6**: 1001 lượt 2 `L-TRAY-TILT`, 1008 lượt 2 `L-PLACE-POSE` | Lệch nhau 7–43 mm | 16–31 mm, tới 8,2° |
+
+Kết luận:
+
+- **Chuỗi eval nối đúng.** Cách đọc bố cục action 36 chiều của export, cách client tách action, cảnh dựng lại từ `environment_config` và scorer khớp nhau: ở thời gian sim, cả 6 lượt phát lại đều thành công.
+- **Phải eval ở thời gian sim** [Đề xuất, cần Hiếu duyệt]. Agent `psi0_decoupled_wbc`, agent WBC sonic và vòng eval đọc `time.monotonic()`, nên WBC nội suy mục tiêu theo giờ tường. Trên máy tải nặng, cùng một chuỗi action cho kết quả khác nhau, và 2/6 lượt phát lại hoàn hảo bị chấm hỏng. Ở thời gian thật, tỉ lệ thành công của một nhánh lẫn cả tải của máy. Dữ liệu train ghi ở thời gian sim (D-24).
+- **`eval-decoupled-wbc` tại pin không đọc được episode khay.** `get_episode_lerobot` của SIMPLE cần `environment_config["dr_state_dict"]` (dòng `FIXME`), và giải mã mọi frame video của episode (khoảng 8 GB RAM mỗi episode). Cổng dùng một bộ nạp thay thế chỉ trả `environment_config`. Env khay dựng lại cảnh từ `tray.sample`. Hai việc, thời gian sim và bộ nạp, thuộc `flywheel_simple.tray.run`, ngoài phạm vi DA-34: cần PR riêng trước nhiệm vụ 3. Script của cổng và kết quả từng lượt nằm trong ghi chú dùng chung `DA-34-replay-gate/` của nhóm phiên.
+- Giả thuyết, chưa kiểm: số 0/20 của S1-03 trên task hai bàn ở `mujoco` chạy ở thời gian thật, nên có thể một phần do đồng hồ.
+
+### 8.2 Mức 0 có phải giả lặp (điểm 1)
+
+- Số đo S1-03, task hai bàn, mức 0, checkpoint của tác giả, thời gian thật, chạy lại hai lần. Cùng một episode: hai lượt trùng nhau trong 33–44 frame đầu, rồi tách ra. Ở frame cuối, ảnh lệch trung bình 38–50 mức xám. Hai episode khác nhau thì lệch ngay từ frame 0, vì bộ eval hai bàn có cảnh khác nhau ở mức 0. Mức 0 của task khay chỉ có một cảnh.
+- Nguồn ngẫu nhiên, đọc mã tại pin. Nhiễu flow-matching của Ψ₀ lấy `torch.randn` từ RNG toàn cục, gieo một lần khi server khởi động (`seed_everything(launch_config.seed or 42)`, `psi0_serve_simple.py`). Ở thời gian thật, độ trễ của máy cũng làm lượt chạy khác nhau (mục 8.1). Ở thời gian sim, chuỗi sim + WBC tất định (mục 8.1), nên chỉ còn nhiễu của server.
+
+Quy tắc cho bản 2, thay mục 2 (theo nhánh "khác nhau" của review):
+
+| Mục | Quy tắc |
+|---|---|
+| Mức 0 | Một cảnh. Các lượt ở mức 0 là **lượt lặp** (rollout replicate), không phải điều kiện. Báo p ở mức 0 riêng, CI bootstrap theo lượt, ghi rõ "1 cảnh × k lượt" |
+| Chỉ số chính, hiệu, HE-T | Gộp **mức 1 và 2**: mỗi seed là một cảnh khác. Bootstrap theo điều kiện trong từng mức, như mục 2. Luôn báo kèm theo từng mức |
+| Server khi eval | Một tiến trình server cho mỗi nhánh, gieo hạt 42, chạy các episode theo thứ tự cố định, không khởi động lại giữa các episode. Khởi động lại giữa các episode thì các lượt mức 0 sẽ trùng nhau. Ghi hạt giống và thứ tự vào kết quả |
+| Phân bổ 270 lượt [Đề xuất, cần Hiếu duyệt] | Mức 0: 30 lượt lặp. Mức 1 và 2: mỗi mức 120 seed dev (1 000 100–1 000 219). Tổng vẫn 270 episode mỗi nhánh, 240 cảnh khác nhau cho chỉ số chính. Nửa độ rộng CI ước lượng khoảng ±7,5 điểm (quy theo căn bậc hai từ số Monte Carlo ở mục 7, chưa chạy lại) |
+
+`he-tray-v2.yaml` chỉ đóng băng sau khi Hiếu chốt hai dòng [Đề xuất] (đồng hồ sim, phân bổ lượt).
+
+### 8.3 Cột `index` của release (điểm 2)
+
+Ψ₀ tại `cda3fdf` không đọc cột `index` khi train stage 3. Không cần đánh số lại trước khi train. Đường đọc (đọc mã tại pin):
+
+- `finetune_simple_psi0_config` → `LerobotDataConfig` → `LeRobotDatasetWrapper` → `LeRobotDataset` của fork `songlin/lerobot` tại `09929d8` (bản 0.3.3, ghim trong `uv.lock` của Ψ₀).
+- `__getitem__` lấy `hf_dataset[idx]` theo vị trí. Biên episode lấy từ độ dài trong `meta/episodes.jsonl` (`get_episode_data_index`). Frame lân cận lấy theo `idx + delta`. Mã chỉ đọc `episode_index`, `timestamp`, `task_index`.
+- Trong Ψ₀, chỉ bộ nạp `psi/data/gear` đọc `index`, và bộ nạp đó không nằm trên đường stage 3.
+
+Điều kiện đi kèm: các hàng parquet phải xếp theo episode, đúng thứ tự và độ dài trong `meta/episodes.jsonl`. Dataset con của nhiệm vụ 2 phải giữ điều kiện này.
+
+### 8.4 Bản 1 đã thay (điểm 4)
+
+Đầu file `he-tray.yaml` ghi dòng `SUPERSEDED - DO NOT RUN`. Bản 2 vào cùng PR #73 (nhiệm vụ con 1.8). Phần chú thích này không đổi plan đã parse, nên `rp_c49c99c8d8da` và lock giữ nguyên.
