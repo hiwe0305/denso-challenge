@@ -114,16 +114,9 @@
       "title": "Branch"
     },
     "run_plan_id": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Run Plan Id"
+      "minLength": 1,
+      "title": "Run Plan Id",
+      "type": "string"
     },
     "cluster_id": {
       "anyOf": [
@@ -152,6 +145,7 @@
     "job_id": {
       "anyOf": [
         {
+          "minLength": 1,
           "type": "string"
         },
         {
@@ -204,7 +198,8 @@
     "quantity",
     "unit",
     "usd_amount",
-    "measure_kind"
+    "measure_kind",
+    "run_plan_id"
   ],
   "title": "LedgerEntry",
   "type": "object"

@@ -128,6 +128,7 @@ def test_all_12_entities_can_be_instantiated_with_defaults() -> None:
     # 11. LedgerEntry (event)
     led = LedgerEntry(
         activity="train",
+        run_plan_id="rp_1",
         resource_type="gpu_hour_a100",
         quantity=2.5,
         unit="hour",
@@ -196,6 +197,7 @@ def test_ledger_entry_measure_kind_and_estimate_id() -> None:
     with pytest.raises(ValidationError):
         LedgerEntry(  # type: ignore[call-arg]
             activity="train",
+            run_plan_id="rp_1",
             resource_type="gpu",
             quantity=1.0,
             unit="h",
@@ -206,6 +208,7 @@ def test_ledger_entry_measure_kind_and_estimate_id() -> None:
     with pytest.raises(ValueError, match="estimated entry cannot have an estimate_entry_id"):
         LedgerEntry(
             activity="train",
+            run_plan_id="rp_1",
             resource_type="gpu",
             quantity=1.0,
             unit="h",
@@ -217,6 +220,7 @@ def test_ledger_entry_measure_kind_and_estimate_id() -> None:
     # 3. Two entries for the same job link via estimate_entry_id
     entry_est = LedgerEntry(
         activity="train",
+        run_plan_id="rp_1",
         resource_type="gpu_hour_a100",
         quantity=2.0,
         unit="hour",
@@ -225,6 +229,8 @@ def test_ledger_entry_measure_kind_and_estimate_id() -> None:
     )
     entry_meas = LedgerEntry(
         activity="train",
+        run_plan_id="rp_1",
+        job_id="job_1",
         resource_type="gpu_hour_a100",
         quantity=2.1,
         unit="hour",
@@ -238,6 +244,8 @@ def test_ledger_entry_measure_kind_and_estimate_id() -> None:
     with pytest.raises(ValueError, match="measured entry must have an estimate_entry_id"):
         LedgerEntry(
             activity="train",
+            run_plan_id="rp_1",
+            job_id="job_1",
             resource_type="gpu",
             quantity=1.0,
             unit="h",
@@ -249,6 +257,8 @@ def test_ledger_entry_measure_kind_and_estimate_id() -> None:
     with pytest.raises(ValueError, match="must be a valid 'led_' event ID"):
         LedgerEntry(
             activity="train",
+            run_plan_id="rp_1",
+            job_id="job_1",
             resource_type="gpu",
             quantity=1.0,
             unit="h",
@@ -261,6 +271,7 @@ def test_ledger_entry_measure_kind_and_estimate_id() -> None:
     with pytest.raises(ValueError, match="quantity cannot be negative"):
         LedgerEntry(
             activity="train",
+            run_plan_id="rp_1",
             resource_type="gpu",
             quantity=-1.0,
             unit="h",
@@ -270,6 +281,7 @@ def test_ledger_entry_measure_kind_and_estimate_id() -> None:
     with pytest.raises(ValueError, match="usd_amount cannot be negative"):
         LedgerEntry(
             activity="train",
+            run_plan_id="rp_1",
             resource_type="gpu",
             quantity=1.0,
             unit="h",
@@ -280,6 +292,7 @@ def test_ledger_entry_measure_kind_and_estimate_id() -> None:
     # 7. Negative amounts accepted when reverses_entry_id is set
     rev = LedgerEntry(
         activity="train",
+        run_plan_id="rp_1",
         resource_type="gpu",
         quantity=-1.0,
         unit="h",
@@ -370,3 +383,32 @@ def test_shared_entity_example_round_trips(
     assert model.model_validate_json(value.model_dump_json()) == value
     # The id is in the file, so a reader sees the id the store will hold.
     assert value.id == json.loads(example)["id"]
+
+
+def test_ledger_entry_requires_run_plan_id_and_a_measured_job_id() -> None:
+    """PO decision D4 (3/11): every row names its run plan; a measurement names its job."""
+    base = {
+        "activity": "eval",
+        "resource_type": "gpu_hour_rtx3060",
+        "quantity": 1.0,
+        "unit": "hour",
+        "usd_amount": 0.2,
+    }
+    with pytest.raises(ValidationError, match="run_plan_id"):
+        LedgerEntry.model_validate({**base, "measure_kind": "estimated"})
+    with pytest.raises(ValidationError, match="run_plan_id"):
+        LedgerEntry.model_validate({**base, "measure_kind": "estimated", "run_plan_id": ""})
+
+    estimate = LedgerEntry.model_validate(
+        {**base, "measure_kind": "estimated", "run_plan_id": "rp_1"}
+    )
+    assert estimate.job_id is None  # an estimate may be made for the whole run plan
+    with pytest.raises(ValidationError, match="job_id"):
+        LedgerEntry.model_validate(
+            {
+                **base,
+                "measure_kind": "measured",
+                "run_plan_id": "rp_1",
+                "estimate_entry_id": estimate.id,
+            }
+        )

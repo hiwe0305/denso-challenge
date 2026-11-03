@@ -82,6 +82,7 @@ def test_ledger_entry_validations() -> None:
     with pytest.raises(ValidationError):
         LedgerEntry(  # type: ignore[call-arg]
             activity="eval",
+            run_plan_id="rp_1",
             resource_type="gpu",
             quantity=1.0,
             unit="h",
@@ -92,6 +93,7 @@ def test_ledger_entry_validations() -> None:
     with pytest.raises(ValueError, match="estimated entry cannot have an estimate_entry_id"):
         LedgerEntry(
             activity="eval",
+            run_plan_id="rp_1",
             resource_type="gpu",
             quantity=1.0,
             unit="h",
@@ -179,3 +181,16 @@ def test_ledger_refuses_an_id_reused_with_other_content(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match=f"ledger_entry.*{estimate.id}"):
         store.append(inflated)
     assert [row["usd_amount"] for row in store.read("rp_1", "job_1")] == [0.2, 0.2]
+
+
+def test_run_plan_estimate_is_kept_under_its_run_plan(tmp_path: Path) -> None:
+    """PO decision D4: an estimate without a job sits under its run plan, not runs/default/."""
+    paths = StorePaths(root=tmp_path)
+    store = LedgerStore(paths=paths)
+    estimate = _gpu_entry(measure_kind="estimated", job_id=None)
+    path = store.append(estimate)
+    assert path == paths.runs_dir / "rp_1" / "_run_plan" / "ledger.jsonl"
+
+    measured = _gpu_entry(measure_kind="measured", estimate_entry_id=estimate.id)
+    assert store.append(measured) == paths.job_ledger_path("rp_1", "job_1")
+    assert not (paths.runs_dir / "default").exists()

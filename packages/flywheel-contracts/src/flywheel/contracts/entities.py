@@ -316,10 +316,12 @@ class LedgerEntry(EventEntity):
     measure_kind: Literal["estimated", "measured"]
     estimate_entry_id: str | None = None
     branch: str | None = None
-    run_plan_id: str | None = None
+    # Every job runs under a RunPlan, so every row names one (PO decision D4).
+    # job_id may be left out only on an estimate made for the whole run plan.
+    run_plan_id: str = Field(min_length=1)
     cluster_id: str | None = None
     intervention_id: str | None = None
-    job_id: str | None = None
+    job_id: str | None = Field(default=None, min_length=1)
     person_code: str | None = None
     reverses_entry_id: str | None = None
     note: str | None = None
@@ -330,6 +332,8 @@ class LedgerEntry(EventEntity):
             if self.estimate_entry_id is not None:
                 raise ValueError("estimated entry cannot have an estimate_entry_id")
         elif self.measure_kind == "measured":
+            if self.job_id is None:
+                raise ValueError("measured entry must have a job_id: it measures one job")
             if not self.estimate_entry_id:
                 raise ValueError("measured entry must have an estimate_entry_id")
             if not is_valid_event_id(self.estimate_entry_id, "led"):
