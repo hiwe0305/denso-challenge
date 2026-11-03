@@ -96,6 +96,7 @@ def test_all_12_entities_can_be_instantiated_with_defaults() -> None:
         episode_id=ep.id,
         task_id="two-table",
         config_sha256="d" * 64,
+        trace_sha256="e" * 64,
         first_failed_step=2,
         failure_kind="L-GRASP",
         failure_class="grasp",
@@ -183,7 +184,7 @@ def test_condition_split_rejects_holdout() -> None:
     Condition(condition_seed=1, layout_hash="1" * 64, split="train")
     Condition(condition_seed=2, layout_hash="2" * 64, split="dev")
     with pytest.raises(ValidationError):
-        Condition(condition_seed=3, layout_hash="3" * 64, split="holdout")  # type: ignore[arg-type]
+        Condition(condition_seed=3, layout_hash="3" * 64, split="holdout")
 
 
 def test_ledger_entry_measure_kind_and_estimate_id() -> None:
@@ -325,10 +326,26 @@ def test_score_requires_task_id() -> None:
         Score(  # type: ignore[call-arg]
             episode_id="ep_1",
             config_sha256="d" * 64,
+            trace_sha256="e" * 64,
         )
     with pytest.raises(ValidationError, match="task_id"):
         Score(
             episode_id="ep_1",
             task_id="",
             config_sha256="d" * 64,
+            trace_sha256="e" * 64,
         )
+
+
+def test_score_carries_trace_sha256() -> None:
+    """PO review 3/11 item 2: Score keeps the trace hash DA-36's ScoreRecord records."""
+    base = {"episode_id": "ep_1", "task_id": "two-table", "config_sha256": "d" * 64}
+    with pytest.raises(ValidationError, match="trace_sha256"):
+        Score.model_validate(base)
+    with pytest.raises(ValidationError, match="trace_sha256"):
+        Score.model_validate({**base, "trace_sha256": "nothex"})
+
+    first = Score.model_validate({**base, "trace_sha256": "e" * 64})
+    rescored = Score.model_validate({**base, "trace_sha256": "f" * 64})
+    assert first.trace_sha256 == "e" * 64
+    assert first.id != rescored.id
