@@ -189,6 +189,9 @@ def map_qa_report(payload: Any, known_episodes: set[str]) -> dict[str, Any]:
             f"qa report `{report.report_id}` kết luận `{report.decision}` mà không có lý do"
         )
     return {
+        # `report_id` là danh tính của lần chấm. Bỏ nó thì nạp lại cùng báo cáo
+        # không phân biệt được với một lần chấm mới.
+        "report_ref": report.report_id,
         "episode_ref": report.episode_id,
         "threshold_version": report.threshold_version,
         "decision": report.decision,

@@ -313,7 +313,7 @@ CREATE TABLE sync_runs (
   source_dir TEXT NOT NULL,
   started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   finished_at TIMESTAMPTZ,
-  counts JSONB NOT NULL DEFAULT '{}',   -- {bảng: {inserted, updated, rejected}}
+  counts JSONB NOT NULL DEFAULT '{}',   -- {bảng: {inserted, updated, unchanged, rejected}}
   errors JSONB NOT NULL DEFAULT '[]',   -- [{bảng, ref, code, message}]
   status VARCHAR(8) NOT NULL DEFAULT 'running'
     CHECK (status IN ('running','ok','partial','failed'))
@@ -510,7 +510,8 @@ CREATE TABLE failure_clusters (
   failure_code VARCHAR(32) NOT NULL,
   level SMALLINT NOT NULL,
   member_count INTEGER NOT NULL CHECK (member_count > 0),
-  representative_ids UUID[] NOT NULL CHECK (cardinality(representative_ids) <= 5),
+  representative_refs VARCHAR(64)[] NOT NULL
+    CHECK (cardinality(representative_refs) BETWEEN 1 AND 5),  -- ref eval_episode của lõi
   representative_seed BIGINT NOT NULL,
   diagnosis VARCHAR(32),
   diagnosis_source VARCHAR(20) CHECK (diagnosis_source IN ('auto','engineer_override')),

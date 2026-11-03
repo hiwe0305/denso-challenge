@@ -344,7 +344,10 @@ CREATE TABLE failure_clusters (
   failure_code VARCHAR(32) NOT NULL,
   level SMALLINT NOT NULL CHECK (level BETWEEN 0 AND 2),
   member_count INTEGER NOT NULL CHECK (member_count > 0),
-  representative_ids UUID[] NOT NULL CHECK (cardinality(representative_ids) <= 5),
+  -- Ref `eval_episode_ref` của lõi, không phải UUID: bộ nạp chỉ có ref, và
+  -- một mảng UUID không có khoá ngoại nào kiểm được từng phần tử.
+  representative_refs VARCHAR(64)[] NOT NULL
+    CHECK (cardinality(representative_refs) BETWEEN 1 AND 5),
   representative_seed BIGINT NOT NULL,
   diagnosis VARCHAR(32),
   diagnosis_source VARCHAR(20) CHECK (diagnosis_source IN ('auto','engineer_override')),

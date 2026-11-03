@@ -32,7 +32,7 @@ CREATE TABLE sync_runs (
   source_dir TEXT NOT NULL,
   started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   finished_at TIMESTAMPTZ,
-  -- {bảng: {inserted, updated, rejected}}
+  -- {bảng: {inserted, updated, unchanged, rejected}}; unchanged = dòng append-only đã có, bỏ qua không sửa
   counts JSONB NOT NULL DEFAULT '{}',
   -- [{bảng, ref, code, message}]. Một dòng artifact vi phạm bị từ chối và ghi
   -- vào đây; bộ nạp chạy tiếp các dòng khác (§2, lưới an toàn).
