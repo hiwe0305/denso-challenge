@@ -112,7 +112,13 @@ def check_r4(trace: TraceLog, cfg: R4Thresholds) -> CheckResult:
     """The largest offset between the image clock and the state clock (step 4)."""
     offset = trace.sync_offset()
     statistic = percentile(offset, 100.0)  # the largest offset, as spec 6.4 asks
-    if not np.isfinite(statistic) or statistic <= cfg.tau_sync_s:
+    if not np.isfinite(statistic):
+        # No cycle paired a frame with a state; `signals.py` normally says so
+        # first, and a direct caller must not read it as clocks that agreed.
+        return CheckResult(
+            skipped=[Skipped("R4", "không có chu kỳ nào có cả `t_image` và `t_state` hữu hạn")]
+        )
+    if statistic <= cfg.tau_sync_s:
         return CheckResult()
     return CheckResult(
         findings=[

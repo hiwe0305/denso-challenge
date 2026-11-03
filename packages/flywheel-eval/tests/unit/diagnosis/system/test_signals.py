@@ -43,7 +43,7 @@ def test_a_missing_command_field_costs_r3_not_r4(row, inputs_from) -> None:
 
 def test_a_gap_over_the_allowance_costs_the_code(row, inputs_from) -> None:
     rows = [row(step) for step in range(20)]
-    rows[4]["t_image"] = None
+    rows[4]["t_image"] = "NaN"
 
     strict = unjudgeable_codes(inputs_from(rows), LIMITS)
     tolerant = unjudgeable_codes(
@@ -96,3 +96,19 @@ def test_a_complete_trace_with_nothing_fired_is_clean(clean_rows, inputs_from) -
 
     assert verdict.diagnosis is Diagnosis.CLEAN
     assert not verdict.blocks_policy_analysis
+
+
+def test_null_image_timestamps_cost_r4_nothing(row, inputs_from) -> None:
+    # The writer's 25 Hz camera on a 50 Hz loop: every other `t_image` is null.
+    rows = [row(step, t_image=None if step % 2 else 0.1 * step) for step in range(20)]
+
+    assert unjudgeable_codes(inputs_from(rows), LIMITS) == {}
+
+
+def test_a_trace_with_no_new_frame_at_all_costs_r4(row, inputs_from) -> None:
+    rows = [row(step, t_image=None) for step in range(20)]
+
+    reasons = unjudgeable_codes(inputs_from(rows), LIMITS)
+
+    assert set(reasons) == {"R4"}
+    assert "khung ảnh" in reasons["R4"]

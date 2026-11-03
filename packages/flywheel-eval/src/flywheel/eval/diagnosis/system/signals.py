@@ -19,7 +19,9 @@ Three kinds of incompleteness, reported apart because they are collected apart:
 * **A field no row carries.** The writer does not log it. Fixing it means
   changing what the rollout records.
 * **A field logged as null or as a value that is not finite.** The writer logs
-  it and the measurement was not taken on those cycles.
+  it and the measurement was not taken on those cycles. A null `t_image` is
+  not one of these: `TraceStep` writes it on every cycle with no new camera
+  frame. What costs R4 its verdict there is a trace with no frame at all.
 * **Dropped camera frames.** "camera mất khung" of spec section 6.4, counted
   by `TraceStep.dropped_frames` rather than inferred from a gap.
 """
@@ -72,6 +74,10 @@ def unjudgeable_codes(inputs: SystemInputs, limits: SignalLimits) -> dict[str, s
                 f"thiếu tín hiệu quá mức cho phép ({limits.max_gap_fraction:.0%}): "
                 f"{_names(gapped)}"
             )
+            continue
+        if code == "R4" and trace.frame_cycles == 0:
+            # Every cycle said "no new frame": nothing to pair a state with.
+            reasons[code] = "trace không có chu kỳ nào có khung ảnh mới (`t_image` hữu hạn)"
             continue
         if code == "R4" and dropped > limits.max_dropped_frames:
             # "camera mất khung" of spec section 6.4: the image clock is what a

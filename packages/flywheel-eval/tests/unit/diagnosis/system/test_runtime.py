@@ -285,3 +285,12 @@ def test_r5_without_a_pinned_reference_is_a_skip(tmp_path: Path, camera_entry) -
     assert [skip.code for skip in result.skipped] == ["R5"]
     assert "chưa ghim ở G0" in result.skipped[0].reason
     assert combine("ep_1", [result], "ok").diagnosis is Diagnosis.UNKNOWN
+
+
+def test_r4_on_a_trace_with_no_frame_is_a_skip_not_a_pass(row, write_trace) -> None:
+    trace = read_trace_log(write_trace([row(step, t_image=None) for step in range(20)]))
+
+    result = check_r4(trace, R4)
+
+    assert result.findings == []
+    assert [skip.code for skip in result.skipped] == ["R4"]

@@ -47,7 +47,7 @@ def test_a_trace_naming_no_episode_falls_back_to_the_file_name(row, write_trace)
 def test_a_value_that_is_not_finite_is_a_gap_not_a_number(row, write_trace) -> None:
     # Every comparison against a NaN is false, so a NaN tracking error left in
     # place would clear tau_track and come back as a controller that tracked.
-    rows = [row(0), row(1, meas_upper=[float("nan"), 0.2, 0.3]), row(2, t_image=None)]
+    rows = [row(0), row(1, meas_upper=[float("nan"), 0.2, 0.3]), row(2, t_image="NaN")]
     path = write_trace(rows)
     path.write_text(
         "".join(json.dumps(item).replace("NaN", "NaN") + "\n" for item in rows),
@@ -60,6 +60,27 @@ def test_a_value_that_is_not_finite_is_a_gap_not_a_number(row, write_trace) -> N
     error = trace.tracking_error("upper")
     assert math.isnan(error[1])
     assert error[0] == pytest.approx(0.0)
+
+
+def test_a_null_image_timestamp_is_no_new_frame_not_a_gap(row, write_trace) -> None:
+    # `TraceStep` writes `t_image: null` on every cycle the camera did not
+    # render (25 Hz camera, 50 Hz control); counting those as gaps would cost
+    # R4 its verdict on every trace the writer produces.
+    rows = [row(step, t_image=None if step % 2 else 0.1 * step) for step in range(4)]
+
+    trace = read_trace_log(write_trace(rows))
+
+    assert trace.gap_counts == {}
+    assert trace.rows[1].t_image is None
+    assert trace.frame_cycles == 2
+    offset = trace.sync_offset()
+    assert offset[0] == pytest.approx(0.0)
+    assert math.isnan(offset[1])
+
+
+def test_a_string_the_contract_does_not_allow_is_refused(row, write_trace) -> None:
+    with pytest.raises(ReaderError, match="t_state"):
+        read_trace_log(write_trace([row(0, t_state="late")]))
 
 
 def test_a_field_no_row_carries_is_absent_not_a_gap(row, write_trace) -> None:
