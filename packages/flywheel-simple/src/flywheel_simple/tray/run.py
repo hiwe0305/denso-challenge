@@ -13,6 +13,12 @@ targets in that time, so the same recorded actions replayed differently on a
 loaded machine (D-17). Their `time` module is swapped for one whose `monotonic`
 is the live env's `mjData.time` and whose `sleep` returns at once, as
 StandWalkController's control clock does when recording.
+
+`eval-decoupled-wbc --num-workers N` starts its workers with the spawn context.
+A spawned worker imports this module as `__mp_main__` and never runs `main()`,
+so the env id is registered on that import too. The command is unknown there
+(runpy sets `sys.argv[0]` to this file while it runs the module); only eval
+starts workers, and it keeps the wall clock.
 """
 
 from __future__ import annotations
@@ -72,6 +78,11 @@ def main(argv: list[str]) -> int:
     importlib.import_module(COMMANDS[command]).typer_main()
     return 0
 
+
+if __name__ == "__mp_main__":
+    from flywheel_simple.tray.simple_task import register
+
+    register()
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))
