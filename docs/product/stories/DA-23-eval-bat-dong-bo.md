@@ -47,6 +47,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - Nguồn: design 27/10 mục 8.5; 03 mục 7.3, ADR-20.
 - Chỉ import nhân (`flywheel.contracts`, `flywheel.store`, `flywheel.testkit`); không import làn khác hay adapter (03 mục 7.3). Thiếu trường trong schema thì báo Hiếu mở PR hợp đồng, không thêm trường tạm.
 - `timing` phía sim (chèn độ trễ khi bước SIMPLE) thuộc story 3.1a (adapter SIMPLE); client RTC thuộc DA-19; dòng thời gian RTC dựng trong DA-20.
+- Ghi LedgerEntry cho eval job còn treo, đợi hợp đồng và kho lưu ở PR #36 merge vào master.
 
 ## Kiểm thử
 
@@ -68,14 +69,16 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 28/10/2026 | Sửa hạn PR `chore-restructure` theo 07 mục 3.6 bản 0.6: mở 28/10, merge 29/10 | PO (Hiếu) |
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 | 03/11/2026 | Triển khai runner hai chế độ sync/async, gom log RTC, demo bộ giả có độ trễ, cấu hình eval.yaml và tài liệu async-eval.md | Nguyễn Thăng Long |
+| 03/11/2026 | Sửa review của Hiếu trên PR #49: ngữ nghĩa bất đồng bộ thật, gom log RTC từ adapter, phân phối log-normal, bộ đọc eval.yaml, sửa boundary_jump float, dịch tài liệu sang tiếng Việt | Nguyễn Thăng Long |
 
 ## Ghi chép khi làm
 
-- Giờ thực: 4.0h
+- Giờ thực: 5.5h
 - Công cụ AI đã dùng: Antigravity
 - Ghi chú hoàn thành: Đã hoàn thiện AC 1-4 với kiểm thử đơn vị và hợp đồng; AC 5 đợi adapter SimpleSim và checkpoint Ψ₀ hoàn chỉnh.
 - File đã tạo hoặc sửa:
   - packages/flywheel-loop/src/flywheel/loop/runner/latency.py
+  - packages/flywheel-loop/src/flywheel/loop/runner/config.py
   - packages/flywheel-loop/src/flywheel/loop/runner/runner.py
   - packages/flywheel-loop/src/flywheel/loop/runner/__init__.py
   - packages/flywheel-loop/tests/unit/runner/test_runner.py

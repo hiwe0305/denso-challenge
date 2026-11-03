@@ -1,33 +1,35 @@
-# Closed-Loop Synchronous and Asynchronous Evaluation
+# Đánh giá vòng kín đồng bộ và bất đồng bộ
 
-Documenting the evaluation runner architecture and timing modes (DA-23, ADR-20).
+Tài liệu kiến trúc runner đánh giá vòng kín (closed-loop eval runner) và hai chế độ định thời (DA-23, 03 ADR-20).
 
-## 1. Overview and Rationale
+## 1. Bối cảnh và lý tưởng thiết kế
 
-In real robot deployments, neural policy inference consumes non-zero computation time (approximately 160 ms for $\Psi_0$ per inference call on standard hardware). Under real-time chunking (RTC), action chunks are streamed to the robot controller asynchronously while subsequent observation frames are processed concurrently.
+Khi triển khai robot thực tế, việc suy luận chính sách mạng nơ-ron (policy inference) tiêu tốn thời gian tính toán thực tế (khoảng 160 ms cho $\Psi_0$ mỗi lần gọi suy luận trên phần cứng chuẩn). Cơ chế Real-Time Chunking (RTC) truyền các đoạn hành động (action chunk) bất đồng bộ xuống bộ điều khiển robot, trong khi các khung quan sát tiếp theo được xử lý song song.
 
-Standard synchronous simulation pauses the simulator clock while computing policy outputs, masking latency-induced faults such as:
-- Buffer starvation and control jitter.
-- State-action divergence at chunk boundaries (boundary jumps).
-- Overshooting during high-velocity maneuvers due to delayed reaction times.
+Mô phỏng đồng bộ truyền thống tạm dừng đồng hồ môi trường mô phỏng trong lúc tính toán đầu ra của policy, dẫn tới việc che giấu các lỗi do độ trễ gây ra:
+- Cạn bộ đệm hành động (buffer starvation) và giật điều khiển.
+- Phân kỳ trạng thái - hành động tại ranh giới các chunk (boundary jump).
+- Vượt quá vị trí mục tiêu (overshooting) ở vận tốc cao do phản ứng chậm.
 
-To provide both reproducible baseline comparisons and rigorous real-world validation, the closed-loop evaluation runner supports two modes:
-1. **Synchronous Mode (`timing = "sync"`):** Simulator clock halts during inference. Used for G0 recipe reproduction (`g0_repro`) and Historical Experiments (`he`) to maintain parity with published author results.
-2. **Asynchronous Mode (`timing = "async"`):** Simulates realistic policy inference latency using profiles sampled from empirical runtime measurements. Used for primary metrics in all data flywheel branches (`branch_train`, `round`, `holdout`).
+Nhằm vừa đảm bảo khả năng đối sánh tái lập với kết quả công bố của tác giả, vừa phản ánh đúng kiểm thử hệ thống trong thực tế, runner hỗ trợ hai chế độ đánh giá:
+1. **Chế độ đồng bộ (`timing = "sync"`):** Đồng hồ mô phỏng dừng khi suy luận. Được dùng cho bài toán tái lập công thức G0 (`g0_repro`) và thử nghiệm lịch sử (`he`) để so sánh trực tiếp với bài báo gốc.
+2. **Chế độ bất đồng bộ (`timing = "async"`):** Mô phỏng độ trễ suy luận chính sách thực tế dựa trên profile đo đạc thực nghiệm từ log suy luận thật. Chế độ này cung cấp chỉ số chính cho toàn bộ các nhánh vòng dữ liệu (`branch_train`, `round`, `holdout`).
 
-## 2. Real-Time Chunking Inference Logging
+## 2. Gom log suy luận thời gian thực (RTC Logging)
 
-For every rollout execution, the runner records chunk-level inference telemetry into `<job_dir>/rtc.jsonl`:
-- `chunk_index`: Monotonically increasing chunk identifier.
-- `observation_sent_s`: Simulation timestamp when state/image was sampled.
-- `chunk_received_s`: Simulation timestamp when the action chunk arrived at the controller.
-- `delay_steps`: Latency measured in discrete control cycles ($\lceil \Delta t / dt \rceil$).
-- `buffer_level`: Remaining action buffer size at the controller.
-- `boundary_jump`: Flag indicating whether the action buffer depleted before the arrival of the new chunk.
+Trong chế độ bất đồng bộ, runner gom log viễn trắc suy luận của từng chunk vào `<job_dir>/rtc.jsonl`, tuân thủ hợp đồng `RTCInferenceRecord` và liên kết trực tiếp với `Trace`:
+- `job_id`: Mã định danh công việc đánh giá.
+- `trace_id`: Khóa liên kết với `TraceRef.trace_id` của bản ghi vết chuyển động.
+- `chunk_index`: Chỉ số tăng dần của đoạn hành động.
+- `observation_sent_s`: Mốc thời gian mô phỏng khi ảnh/trạng thái được chụp và gửi đi suy luận.
+- `chunk_received_s`: Mốc thời gian mô phỏng khi đoạn hành động đến bộ điều khiển robot.
+- `delay_steps`: Độ trễ tính theo số chu kỳ điều khiển rời rạc ($round(\text{delay\_s} \times \text{control\_hz})$).
+- `buffer_level`: Số lượng hành động còn lại trong hàng đợi bộ đệm tại thời điểm nhận chunk mới.
+- `boundary_jump`: Khoảng cách dịch chuyển thực tế giữa vị trí hiện tại và hành động đầu tiên của chunk mới (số thực $\ge 0.0$).
 
-## 3. Configuration and RunPlan Integration
+## 3. Cấu hình và tích hợp RunPlan
 
-Default settings and mappings are declared in `configs/loop/eval.yaml`:
+Cấu hình phân định chế độ được khai báo tập trung trong `configs/loop/eval.yaml`:
 
 ```yaml
 default_timing: async
@@ -38,6 +40,9 @@ timing_by_purpose:
   branch_train: async
   round: async
   holdout: async
+
+control_hz: 50.0
+chunk_size: 16
 ```
 
-With zero injected latency (`fixed_delay_s = 0.0`), synchronous and asynchronous modes produce mathematically identical trajectories on the same random seed.
+Khi độ trễ được cấu hình bằng 0 (`fixed_delay_s = 0.0`), chế độ bất đồng bộ cho ra quỹ đạo và kết quả toán học hoàn toàn đồng nhất với chế độ đồng bộ trên cùng hạt giống ngẫu nhiên (seed parity).

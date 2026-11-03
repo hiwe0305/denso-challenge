@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import random
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -17,7 +18,7 @@ class LatencyProfile:
     p95_ms: float = 190.0
     p99_ms: float = 230.0
     fixed_delay_s: float | None = None
-    samples_ms: list[float] = field(default_factory=list)
+    samples_s: list[float] = field(default_factory=list)
 
     @classmethod
     def zero(cls) -> LatencyProfile:
@@ -28,32 +29,95 @@ class LatencyProfile:
     def from_file(cls, path: str | Path) -> LatencyProfile:
         """Load latency profile from a JSON file."""
         file_path = Path(path)
+        if not file_path.is_file():
+            raise FileNotFoundError(f"Latency profile file does not exist: {file_path}")
         data = json.loads(file_path.read_text(encoding="utf-8"))
+        samples = [float(x) for x in data.get("samples_s", [])]
+        if not samples and "samples_ms" in data:
+            samples = [float(x) / 1000.0 for x in data["samples_ms"]]
         return cls(
             name=data.get("name", file_path.stem),
             p50_ms=float(data.get("p50_ms", 160.0)),
             p95_ms=float(data.get("p95_ms", 190.0)),
             p99_ms=float(data.get("p99_ms", 230.0)),
-            fixed_delay_s=float(data["fixed_delay_s"]) if "fixed_delay_s" in data else None,
-            samples_ms=[float(x) for x in data.get("samples_ms", [])],
+            fixed_delay_s=(
+                float(data["fixed_delay_s"])
+                if "fixed_delay_s" in data and data["fixed_delay_s"] is not None
+                else None
+            ),
+            samples_s=samples,
+        )
+
+    def to_file(self, path: str | Path) -> Path:
+        """Save profile to JSON file."""
+        file_path = Path(path)
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        data = {
+            "name": self.name,
+            "p50_ms": self.p50_ms,
+            "p95_ms": self.p95_ms,
+            "p99_ms": self.p99_ms,
+            "fixed_delay_s": self.fixed_delay_s,
+            "samples_s": self.samples_s,
+        }
+        file_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        return file_path
+
+    @classmethod
+    def from_log(cls, log_path: str | Path, name: str = "empirical") -> LatencyProfile:
+        """Extract empirical inference durations from an RTC or metrics jsonl log."""
+        file_path = Path(log_path)
+        if not file_path.is_file():
+            raise FileNotFoundError(f"Inference log not found: {file_path}")
+
+        samples: list[float] = []
+        for line in file_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            rec = json.loads(line)
+            if "observation_sent_s" in rec and "chunk_received_s" in rec:
+                dur = float(rec["chunk_received_s"]) - float(rec["observation_sent_s"])
+                if dur >= 0:
+                    samples.append(dur)
+            elif "latency_s" in rec:
+                samples.append(float(rec["latency_s"]))
+            elif "latency_ms" in rec:
+                samples.append(float(rec["latency_ms"]) / 1000.0)
+
+        if not samples:
+            return cls(name=name)
+
+        samples.sort()
+        n = len(samples)
+        p50 = samples[int(n * 0.50)] * 1000.0
+        p95 = samples[min(int(n * 0.95), n - 1)] * 1000.0
+        p99 = samples[min(int(n * 0.99), n - 1)] * 1000.0
+        return cls(
+            name=name,
+            p50_ms=round(p50, 2),
+            p95_ms=round(p95, 2),
+            p99_ms=round(p99, 2),
+            samples_s=samples,
         )
 
     def sample_delay_s(self, rng: random.Random | None = None) -> float:
         """Sample an inference delay in seconds."""
         if self.fixed_delay_s is not None:
-            return max(0.0, self.fixed_delay_s)
+            return max(0.0, float(self.fixed_delay_s))
 
-        if self.samples_ms:
-            if rng is not None:
-                val_ms = rng.choice(self.samples_ms)
-            else:
-                val_ms = random.choice(self.samples_ms)
-            return max(0.0, val_ms / 1000.0)
+        if self.samples_s:
+            picker = rng.choice if rng is not None else random.choice
+            return max(0.0, float(picker(self.samples_s)))
 
-        # Log-normal distribution fitted between p50 and p95
+        if self.p50_ms <= 0:
+            return 0.0
+
         if rng is None:
             rng = random.Random()
 
-        # Simple triangular approximation around p50, p95, p99
-        val_ms = rng.triangular(self.p50_ms * 0.8, self.p99_ms, self.p50_ms)
-        return max(0.0, val_ms / 1000.0)
+        # Log-normal distribution fitted to p50 and p95
+        mu = math.log(max(1e-4, self.p50_ms / 1000.0))
+        p95_s = max(1e-4, self.p95_ms / 1000.0)
+        sigma = max(1e-3, (math.log(p95_s) - mu) / 1.644853)
+        return max(0.0, rng.lognormvariate(mu, sigma))
