@@ -38,7 +38,7 @@ Là người làm làn Đánh giá, tôi muốn mỗi rollout SIMPLE của độ
   - [x] 3.1. Bộ ghi một thư mục `<trace_id>/` mỗi episode (`steps.jsonl`, `camera_params.jsonl`, `RolloutResult`), `trace_id` chung với client RTC, `reference_sha256` chép từ job spec (review PO 3/11/2026, B1; layout theo G1 của PR #48)
   - [x] 3.2. Ghim bản tham chiếu camera G0 của task hai bàn ở SIMPLE `b75c678` (review PO 3/11/2026, B3)
   - [ ] 3.3. Entry module cài hook ở cấp module, đọc `job_id`, `run_plan_id`, thư mục job và bản tham chiếu từ job spec
-  - [ ] 3.4. Đọc lại tệp qua `TraceStep`, `CameraParams` khi PR #48 merge (test đang skip hoặc xfail tới lúc đó)
+  - [x] 3.4. Đọc lại tệp qua `TraceStep`, `CameraParams` khi PR #48 merge (test đang skip hoặc xfail tới lúc đó)
 - [x] 4. Cài hook vào `eval-decoupled-wbc` (bọc env và agent), test `sim` (AC 1, 5)
 - [ ] 5. Lượt chạy thật task hai bàn trên `rtx3060`, ghi ledger (AC 6)
 - [ ] 6. Lượt chạy thật task khay trên `rtx3060`, ghi ledger (AC 6)
@@ -189,3 +189,9 @@ Hệ quả:
 - Task khay chưa có bản tham chiếu; lượt chạy khay không có `camera_params.jsonl` cho tới khi ghim.
 - Không sửa `system.yaml`; phiên DA-13 chép khối này vào.
 - **Rủi ro cho khung 5/11:** CycloneDDS của SIMPLE dùng domain 0. Lượt ghim báo `Failed to find a free participant index for domain 0`, tức đang có tiến trình khác cùng máy giữ domain này. Hai lượt eval chạy cùng lúc trên `rtx3060` có thể nhận nhầm topic của nhau. Trước khi chạy nhiệm vụ 5, 6 cần kiểm xem lượt chạy có độc chiếm máy không, hoặc đặt `DOMAIN_ID` riêng. **[Đề xuất]**
+
+### 4/11/2026 · Nhiệm vụ 3.4: đọc lại qua hợp đồng trên master
+
+- PR #48 merge thành #79 (master `3f02b1a`) với G1, G1b, `CameraParams.trace_id` và tên 28/7 chiều. Nhánh merge `origin/master` (không rebase, không force-push).
+- Hợp đồng trên master bắt `run_plan_id` bắt đầu bằng `g0-` theo G2 (`g0-<story>-<yyyymmdd>`). Hai id trong test (`g0-DA-38-test`, `g0-DA-38-seams`) bị từ chối; đổi sang `g0-DA-38-20261104`.
+- Kết quả: `test_files.py` không còn skip (mọi dòng `steps.jsonl` là `TraceStep`, mọi dòng `camera_params.jsonl` là `CameraParams`, `rollout_result.json` là `RolloutResult`); test seam của hook qua thay vì xfail.

@@ -36,7 +36,7 @@ def episode(success: bool | None = True) -> EpisodeTrace:
     return EpisodeTrace(
         trace_id="job-1-0123456789ab",
         episode_id="episode_3" if success is not None else "unfinished-0",
-        run_plan_id="g0-DA-38-test",
+        run_plan_id="g0-DA-38-20261104",
         cameras=[camera(), camera("head_stereo_right")],
         cycles=[cycle(0, 0.0, 0.1), cycle(1, None, float("nan"))],
         sim_success=success,

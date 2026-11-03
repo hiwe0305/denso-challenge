@@ -270,7 +270,7 @@ def test_simple_trace_hook_files_are_the_contracts_the_system_checks_read(tmp_pa
     episode = EpisodeTrace(
         trace_id="job-seams-0123456789ab",
         episode_id="episode_0",
-        run_plan_id="g0-DA-38-seams",
+        run_plan_id="g0-DA-38-20261104",
         cameras=[CameraValues("head_stereo_left", "eye_in_head", 640, 360, 224.0, 224.0,
                               320.0, 180.0, pose)],  # fmt: skip
         cycles=[CycleRecord(step, 0.02 * step, 0.0 if step == 0 else None, [0.0] * 28,
