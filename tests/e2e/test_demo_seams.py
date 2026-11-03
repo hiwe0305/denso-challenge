@@ -86,11 +86,11 @@ SEAMS = tuple(Seam(*row) for row in (
      "training:TrainingMetric", "training/clean.jsonl", "DA-19", "6/11"),
     (6, "TrainDiagnosis", "Châu (DA-08)", "Long (decide), Hưng (DA-20)",
      "training:TrainDiagnosis", "training/diagnosis.json", "DA-08", "2/11"),
-    (6, "RolloutResult", "Hiếu (SimpleSim)", "Châu (scorer)",
+    (6, "RolloutResult", "Hiếu (SimpleSim; DA-38 hook: episode.json)", "Châu (scorer, DA-13 R6)",
      "v0:RolloutResult", "artifacts/RolloutResult.json", "DA-23", "10/11"),
-    (6, "TraceStep", "Hiếu (hook SimpleSim)", "Châu (DA-13)",
+    (6, "TraceStep", "Hiếu (DA-38 hook: trace.jsonl)", "Châu (DA-13)",
      "trace:TraceStep", "artifacts/TraceStep.json", "#31", "6/11"),
-    (6, "CameraParams", "Hiếu (hook SimpleSim)", "Châu (DA-13)",
+    (6, "CameraParams", "Hiếu (DA-38 hook: camera_params.json)", "Châu (DA-13)",
      "trace:CameraParams", "artifacts/CameraParams.json", "#31", "6/11"),
     (6, "Score", "Châu (scorer)", "Long (decide), Hưng",
      "entities:Score", "artifacts/Score.json", "scorer 3.3", "8/11"),
@@ -245,3 +245,48 @@ def test_catalog_stores_the_shared_episode() -> None:
     catalog_episode = resolve(seam)
     example = json.loads((FIXTURES / seam.example).read_text(encoding="utf-8"))
     catalog_episode.model_validate(example)
+
+
+def seam_of(artifact: str) -> Seam:
+    return next(seam for seam in SEAMS if seam.artifact == artifact)
+
+
+@pytest.mark.e2e_fake
+def test_simple_trace_hook_files_are_the_contracts_the_system_checks_read(tmp_path: Path) -> None:
+    """DA-38's files of one episode, read through the contracts of DA-13's checks.
+
+    The layout is `<job>/<episode>/trace.jsonl, camera_params.json, episode.json`;
+    `rtc.jsonl` is per job and joins on `trace_id` (PO review 3/11/2026, B1).
+    """
+    from flywheel_simple.trace.camera import CameraValues
+    from flywheel_simple.trace.files import EpisodeDirSink
+    from flywheel_simple.trace.hook import CycleRecord, EpisodeTrace
+
+    trace_step = resolve(seam_of("TraceStep"))
+    camera_params = resolve(seam_of("CameraParams"))
+    rollout_result = resolve(seam_of("RolloutResult"))
+    pose = (0.06, 0.02, 0.43, 0.66, 0.26, -0.26, -0.66)
+    episode = EpisodeTrace(
+        trace_id="job-seams-0123456789ab",
+        episode_id="episode_0",
+        run_plan_id="g0-DA-38-seams",
+        cameras=[CameraValues("head_stereo_left", "eye_in_head", 640, 360, 224.0, 224.0,
+                              320.0, 180.0, pose)],  # fmt: skip
+        cycles=[CycleRecord(step, 0.02 * step, 0.0 if step == 0 else None, [0.0] * 28,
+                            [0.0] * 28, [0.0] * 7, [0.0] * 7) for step in range(3)],  # fmt: skip
+        sim_success=False,
+    )
+    EpisodeDirSink(
+        tmp_path, job_id="job-seams", camera_reference_sha256="0" * 64, adapter_version="test"
+    ).write(episode)
+
+    directory = tmp_path / "episode_0"
+    steps = [
+        trace_step.model_validate_json(line)
+        for line in (directory / "trace.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    for entry in json.loads((directory / "camera_params.json").read_text(encoding="utf-8")):
+        camera_params.model_validate(entry)
+    result = rollout_result.model_validate_json((directory / "episode.json").read_text())
+    assert {step.trace_id for step in steps} == {result.trace_ref.trace_id}  # type: ignore[attr-defined]
+    assert result.infra_status == "ok"  # type: ignore[attr-defined]

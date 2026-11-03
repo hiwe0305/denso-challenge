@@ -333,3 +333,21 @@ def test_a_second_install_routes_cycles_to_the_new_recorder() -> None:
     ev._append_eval_stats_line("/tmp/x", "episode_0: False \n")
     assert first.episodes == []
     assert [(e.run_plan_id, len(e.cycles)) for e in second.episodes] == [("b", 1)]
+
+
+def test_the_agent_sees_the_trace_id_of_the_episode_its_env_just_opened() -> None:
+    """An RTC client reset from the agent logs under the trace's own id (PO review B1.3)."""
+    sink = ListSink()
+    ev, ag, _ = fake_modules()
+    install(ev, ag, TraceRecorder(sink, run_plan_id="rp", job_id="job-7"))
+    env = ev.gym.make("simple/X-v0")
+    agent = ag.Psi0DecoupledWbcAgent(fake_robot(), "h", 1, chunks=[np.ones((2, 36))] * 2)
+    seen = []
+    for i in range(2):
+        env.reset()  # SIMPLE resets the env, then the agent
+        agent.reset()
+        seen.append(agent.fw_trace_id)
+        agent.get_action({"joint_qpos": np.zeros(43)})
+        ev._append_eval_stats_line("/tmp/x", f"episode_{i}: True \n")
+    assert seen == [e.trace_id for e in sink.episodes]
+    assert seen[0] != seen[1] and all(t.startswith("job-7-") for t in seen)

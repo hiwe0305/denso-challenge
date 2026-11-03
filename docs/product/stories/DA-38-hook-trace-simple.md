@@ -34,7 +34,11 @@ Là người làm làn Đánh giá, tôi muốn mỗi rollout SIMPLE của độ
 
 - [x] 1. File story và phạm vi file
 - [x] 2. Vector lệnh và đo, intrinsics và pose camera từ mảng số, test CPU (AC 2, 3, 5)
-- [ ] 3. Dựng `TraceStep`, `CameraParams` và bộ ghi trace theo quy ước tệp của hợp đồng, kèm cờ `sim_success` (AC 1, 3, 4); chờ PR #48 merge
+- [ ] 3. Dựng `TraceStep`, `CameraParams` và bộ ghi trace theo quy ước tệp của hợp đồng, kèm cờ `sim_success` (AC 1, 3, 4)
+  - [x] 3.1. Bộ ghi một thư mục mỗi episode (`trace.jsonl`, `camera_params.json`, `episode.json`), `trace_id` chung với client RTC, `reference_sha256` chép từ job spec (review PO 3/11/2026, B1)
+  - [ ] 3.2. Ghim bản tham chiếu camera G0 của task hai bàn ở SIMPLE `b75c678` (review PO 3/11/2026, B3)
+  - [ ] 3.3. Entry module cài hook ở cấp module, đọc `job_id`, `run_plan_id`, thư mục job và bản tham chiếu từ job spec
+  - [ ] 3.4. Đọc lại tệp qua `TraceStep`, `CameraParams` khi PR #48 merge (test đang skip hoặc xfail tới lúc đó)
 - [x] 4. Cài hook vào `eval-decoupled-wbc` (bọc env và agent), test `sim` (AC 1, 5)
 - [ ] 5. Lượt chạy thật task hai bàn trên `rtx3060`, ghi ledger (AC 6)
 - [ ] 6. Lượt chạy thật task khay trên `rtx3060`, ghi ledger (AC 6)
@@ -48,6 +52,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `packages/flywheel-simple/pyproject.toml` (thêm phụ thuộc `flywheel-contracts`, `numpy`, `pydantic`), `uv.lock` (PO cho phép 3/11/2026)
 - `scripts/g0/trace/`
 - `docs/g0/trace.md`, `docs/g0/ledger/DA-38.csv`
+- `docs/g0/camera-reference-two-table.yaml`, ghi chú bản tham chiếu camera trong `docs/g0/env-simple.md`, dòng seam của hook trong `tests/e2e/test_demo_seams.py` (PO yêu cầu ở review 3/11/2026, B1.4 và B3)
 
 Ngoài phạm vi, làm PR docs riêng: dòng DA-38 trong 07 mục 2.2 và 2.4; ánh xạ story 3.1a sang DA-38 trong 04.
 
@@ -81,6 +86,7 @@ Ngoài phạm vi, làm PR docs riêng: dòng DA-38 trong 07 mục 2.2 và 2.4; �
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 3/11/2026 | Tạo story cho phần hook của story 3.1a theo issue #31 và 07 mục 2.4 (bản 1.1) | PO (Hiếu) |
+| 3/11/2026 | Review PO: tách nhiệm vụ 3 thành 3.1–3.4; thêm bản tham chiếu camera, ghi chú `env-simple.md` và seam e2e vào phạm vi file (B1, B3) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
@@ -123,7 +129,7 @@ Hệ quả:
   - Lý do: khi `CameraCfg` không có `intrinsics` (cả hai task), SIMPLE đặt `fovy = 2·atan(H / 2fy)`. Ảnh render vì vậy có fx = fy = (H/2)/tan(fovy/2) và tâm ảnh ở giữa.
   - `CameraCfg.fx` lại tính từ chiều rộng, nên hai số chỉ trùng nhau qua cách SIMPLE dựng camera.
 - Nhánh camera có `sensor_size` là phép nghịch đảo đúng cách SIMPLE ghi `focal_pixel` và `principal_pixel`. Dấu của điểm chính theo trục y trong MuJoCo chưa kiểm bằng ảnh render. Cả hai task không dùng nhánh này. **[Đề xuất]**
-- `reference_sha256` là sha256 của tập camera đã chuẩn hóa: sắp theo `uid`, làm tròn 1e-9, JSON có khóa sắp xếp. Bản tham chiếu tính từ cấu hình của commit SIMPLE đã ghim ở nhiệm vụ 3. **[Đề xuất]**
+- `reference_sha256` là sha256 của tập camera đã chuẩn hóa: sắp theo `uid`, làm tròn 1e-9, JSON có khóa sắp xếp. Bản tham chiếu tính từ cấu hình của commit SIMPLE đã ghim ở nhiệm vụ 3. **[Đề xuất]** → **[Đã chốt 3/11/2026, PO, Q3]** hàm này chỉ dùng để ghim bản tham chiếu; `CameraParams.reference_sha256` của episode là hash đã ghim, chép từ job spec, không phải hash của bộ camera của chính episode.
 - `STATE_SLICES` chép từ SIMPLE `6d10628`. Nhiệm vụ 4 có test `sim` so bản chép này với SIMPLE.
 
 ### 3/11/2026 · Nhiệm vụ 4: hook và test `sim`
@@ -156,3 +162,21 @@ Hệ quả:
     - `episode_0` và cờ `sim_success` khớp dòng trong `eval_stats.txt`.
 - Entry point cài hook ở cấp module (cho worker spawn) đi cùng bộ ghi hợp đồng ở nhiệm vụ 3 và lượt chạy thật ở nhiệm vụ 5.
 - 3/11/2026, sau khi PR #67 merge: test `sim` bỏ shim, gọi `flywheel_simple.tray.run.prepare()` (đăng ký env khay và thay bộ đọc điều kiện của SIMPLE). Kết quả chạy lại trên `rtx3060`: 4 passed trong 495 s.
+
+### 3/11/2026 · Nhiệm vụ 3.1: tệp của episode (review PO, B1)
+
+**Layout tệp** (`flywheel_simple/trace/files.py`). Một lượt `eval-decoupled-wbc` là một job; mỗi episode một thư mục:
+
+| Tệp | Nội dung | Ai đọc |
+|---|---|---|
+| `<job_dir>/<episode_id>/trace.jsonl` | Một `TraceStep` mỗi chu kỳ, có `trace_id` | DA-13 (R3, R4, thiếu tín hiệu) |
+| `<job_dir>/<episode_id>/camera_params.json` | Danh sách `CameraParams`, mỗi camera policy thấy một mục | DA-13 (R5) |
+| `<job_dir>/<episode_id>/episode.json` | Một `RolloutResult` (`flywheel.contracts.v0`): `sim_success`, `infra_status`, `trace_ref` (`trace_id`, đường dẫn và sha256 của `trace.jsonl`), `camera_params_hash` | DA-13 (R6 đọc `infra_status`), scorer |
+| `<job_dir>/rtc.jsonl` | `RTCInferenceRecord` của client RTC (DA-19), một tệp mỗi job, nối với trace qua `trace_id`. Hook không ghi tệp này | DA-13 (R1, R2) |
+
+- `infra_status` lấy theo `RolloutResult.infra_status`: `ok` khi SIMPLE ghi dòng `episode_<i>: <bool>` cho episode; `simulator_error` khi episode bị cắt trước dòng đó (tiến trình sim chết, env đóng giữa chừng). `episode.json` chính là `RolloutResult` của episode, nên DA-13 đọc tiếp `<episode_dir>/episode.json` như hiện nay. **[Đề xuất]**
+- **Việc cho DA-13:** reader của #71 tìm `rtc.jsonl` cạnh `trace.jsonl`. Với layout này, nó phải đọc `<job_dir>/rtc.jsonl` (thư mục cha) và lọc theo `trace_id` của trace.
+- **`trace_id`** là `<job_id>-<12 ký tự hex ngẫu nhiên>`, sinh lúc env `reset`, nên không trùng giữa các worker spawn của cùng job. SIMPLE reset env trước rồi mới reset agent, nên agent đã bọc có `fw_trace_id` của episode ngay lúc `reset`. Client RTC chạy trong agent (DA-23) phải gọi `RTCClient.reset(agent.fw_trace_id)`; khi đó `rtc.jsonl` và `trace.jsonl` cùng một `trace_id`. Hiện agent của SIMPLE chưa dùng client RTC, nên lượt chạy của nhiệm vụ 5, 6 chưa có `rtc.jsonl`.
+- **`reference_sha256`** (Q3): bộ ghi nhận hash đã ghim từ job spec và chép vào mọi `CameraParams` của episode, và vào `camera_params_hash` của `RolloutResult`. Không có hash thì không ghi `camera_params.json`, và R5 ra CHƯA RÕ. Bộ ghi từ chối chuỗi không phải sha256.
+- Tệp ghi bằng JSON thuần: venv SIMPLE không có gói `flywheel`. Test CPU đọc lại `episode.json` qua `RolloutResult`. Test cho `TraceStep` và `CameraParams` skip cho tới khi #48 merge. Chạy với `flywheel.contracts` của #48 (`5b373e2`) qua `PYTHONPATH`: `test_files.py` 9 passed, test seam e2e của hook 1 passed.
+

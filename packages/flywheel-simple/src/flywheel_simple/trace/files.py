@@ -1,0 +1,116 @@
+"""Write each traced episode as the files DA-13 reads (DA-38 task 3; PO review 3/11/2026, B1).
+
+One SIMPLE eval run is one job; each of its episodes gets a directory:
+
+    <job_dir>/
+      rtc.jsonl               # DA-19's RTC client, one per job, keyed by trace_id; not written here
+      <episode_id>/
+        trace.jsonl           # one TraceStep per control cycle
+        camera_params.json    # list of CameraParams, one per camera the policy sees
+        episode.json          # RolloutResult of the episode: sim_success, infra_status, trace_ref
+
+Field names are those of `flywheel.contracts.trace` (Contract change #31, PR #48 at
+5b373e2) and `flywheel.contracts.v0.RolloutResult`. The writer runs inside SIMPLE's
+venv, which has no flywheel package, so it writes plain JSON and the tests validate
+it against the contracts.
+
+`CameraParams.reference_sha256` is the camera reference pinned at G0 for the task,
+handed in from the job spec (PO decision Q3, 3/11/2026). Without one there is no
+`camera_params.json`, so R5 says CHƯA RÕ instead of passing on a hash nobody pinned.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from pathlib import Path
+from typing import Any
+
+from flywheel_simple.trace.hook import EpisodeTrace
+from flywheel_simple.trace.signals import encode, encode_all
+
+TRACE_NAME = "trace.jsonl"
+CAMERA_NAME = "camera_params.json"
+EPISODE_NAME = "episode.json"
+
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+
+
+def _trace_step(episode: EpisodeTrace, cycle: Any) -> dict[str, Any]:
+    return {
+        "trace_id": episode.trace_id,
+        "episode_id": episode.episode_id,
+        "run_plan_id": episode.run_plan_id,
+        "step": cycle.step,
+        "t_state": encode(cycle.t_state),
+        "t_image": None if cycle.t_image is None else encode(cycle.t_image),
+        "cmd_upper": encode_all(cycle.cmd_upper),
+        "meas_upper": encode_all(cycle.meas_upper),
+        "cmd_lower": encode_all(cycle.cmd_lower),
+        "meas_lower": encode_all(cycle.meas_lower),
+        "dropped_frames": cycle.dropped_frames,
+    }
+
+
+class EpisodeDirSink:
+    """`TraceSink` writing one directory per episode under `job_dir`."""
+
+    def __init__(
+        self,
+        job_dir: Path,
+        *,
+        job_id: str,
+        camera_reference_sha256: str | None,
+        adapter_version: str,
+    ) -> None:
+        if camera_reference_sha256 is not None and not _SHA256.match(camera_reference_sha256):
+            raise ValueError(
+                f"camera reference must be a sha256 hex digest, got {camera_reference_sha256!r}"
+            )
+        self.job_dir = job_dir
+        self.job_id = job_id
+        self.camera_reference_sha256 = camera_reference_sha256
+        self.adapter_version = adapter_version
+
+    def write(self, episode: EpisodeTrace) -> None:
+        directory = self.job_dir / episode.episode_id
+        directory.mkdir(parents=True, exist_ok=True)
+        trace_path = directory / TRACE_NAME
+        lines = [json.dumps(_trace_step(episode, c), allow_nan=False) for c in episode.cycles]
+        data = "".join(line + "\n" for line in lines).encode("utf-8")
+        trace_path.write_bytes(data)
+        if self.camera_reference_sha256 is not None and episode.cameras:
+            cameras = [
+                {
+                    "episode_id": episode.episode_id,
+                    "uid": c.uid,
+                    "mount": c.mount,
+                    "width": c.width,
+                    "height": c.height,
+                    "fx": c.fx,
+                    "fy": c.fy,
+                    "cx": c.cx,
+                    "cy": c.cy,
+                    "pose": list(c.pose),
+                    "reference_sha256": self.camera_reference_sha256,
+                }
+                for c in episode.cameras
+            ]
+            (directory / CAMERA_NAME).write_text(json.dumps(cameras, indent=1), encoding="utf-8")
+        result = {
+            "job_id": self.job_id,
+            "trace_ref": {
+                "trace_id": episode.trace_id,
+                "uri": trace_path.as_posix(),
+                "sha256": hashlib.sha256(data).hexdigest(),
+            },
+            "sim_success": episode.sim_success,
+            # SIMPLE reports every episode it finishes; one it never reported was cut off
+            # by the simulator process (crash, or the env closed mid-episode)
+            "infra_status": "ok" if episode.sim_success is not None else "simulator_error",
+            "usage": {"wall_seconds": episode.wall_seconds, "gpu_seconds": 0.0},
+            "camera_params_hash": self.camera_reference_sha256,
+            "adapter_info": {"name": "flywheel-simple.trace", "version": self.adapter_version},
+        }
+        (directory / EPISODE_NAME).write_text(json.dumps(result, indent=1), encoding="utf-8")
