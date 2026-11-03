@@ -193,6 +193,7 @@ class Psi0Trainer:
             layout=self.layout,
             hand_open_pose=self.hand_open_pose(spec),
             global_batch_size=self.global_batch_size(),
+            rtc_prefix=self.recipe.rtc_prefix,
         )
 
     def train(self, spec: TrainSpec) -> TrainResult:

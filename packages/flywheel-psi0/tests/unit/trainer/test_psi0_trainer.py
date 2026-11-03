@@ -106,7 +106,8 @@ class FinetuneTrainer:
         # The velocity error grows along the chunk, as an untrained header's would.
         noise = np.linspace(0.1, 0.5, actions.shape[1])[None, :, None]
         loss = F.mse_loss(FakeTensor(actions.array + noise), actions, reduction="none")
-        return {"loss": float(loss.array.mean())}
+        # Like Psi0 with --model.rtc, positions below max-delay (8) stay out of the loss.
+        return {"loss": float(loss.array[:, 8:].mean())}
 
     def training_step(self, batch):
         losses = self.forward_and_loss(self.model, batch)
@@ -291,6 +292,7 @@ def test_command_runs_the_launcher_with_the_job_args(fake_psi0: Path, tmp_path: 
     assert launch.global_batch_size == 4
     assert launch.hand_open_pose is not None and len(launch.hand_open_pose) == 14
     assert launch.identity["vlm_frozen"] is True and launch.identity["attempt"] == 0
+    assert launch.rtc_prefix == 8  # --model.rtc with --model.max-delay=8
 
 
 def test_unknown_parent_is_refused(fake_psi0: Path, tmp_path: Path) -> None:
@@ -314,6 +316,7 @@ def test_train_writes_metrics_and_reports_the_checkpoint(fake_psi0: Path, tmp_pa
     assert len(val[0].hand_open_hist) == 10 and len(val[0].pred_std) == DIMS
     # Every train line splits its own loss; the fake's error grows along the chunk.
     assert all(set(r.loss_by_group) == set(GROUPS) for r in train)
+    assert len(train[0].loss_by_chunk_pos) == 30 - 8  # RTC prefix dropped
     assert train[0].loss_by_chunk_pos[-1] > train[0].loss_by_chunk_pos[0]
     assert train[0].loss == pytest.approx(
         sum(train[0].loss_by_chunk_pos) / len(train[0].loss_by_chunk_pos)

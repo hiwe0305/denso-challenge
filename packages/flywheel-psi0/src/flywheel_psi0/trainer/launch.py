@@ -63,6 +63,7 @@ class LaunchSpec(BaseModel):
     layout: ActionLayout
     hand_open_pose: list[float] | None = None
     global_batch_size: int | None = None
+    rtc_prefix: int = 0
 
 
 class LaunchResult(BaseModel):
@@ -287,7 +288,7 @@ def run(spec: LaunchSpec) -> None:
     hand = None if spec.hand_open_pose is None else np.asarray(spec.hand_open_pose)
     val = ValStats(spec.layout, hand_open_pose=hand)
     train_sampled = ValStats(spec.layout, hand_open_pose=hand)
-    train_loss = LossBreakdown(spec.layout)
+    train_loss = LossBreakdown(spec.layout, rtc_prefix=spec.rtc_prefix)
     log = MetricsLog(
         Path(spec.metrics_path),
         identity,

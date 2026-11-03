@@ -248,7 +248,7 @@ def test_committed_sample_matches_the_wrapper(tmp_path: Path) -> None:
         produced,
         fake_identity(tmp_path),
         val_stats=stats,
-        train_loss=LossBreakdown(g1_layout()),
+        train_loss=LossBreakdown(g1_layout(), rtc_prefix=8),
         train_stats=ValStats(g1_layout(), hand_open_pose=g1_open_pose()),
         global_batch_size=16,
         vram_gb=lambda: 21.5,
@@ -259,7 +259,7 @@ def test_committed_sample_matches_the_wrapper(tmp_path: Path) -> None:
     records = read(produced)
     train = [r for r in records if r.split == "train"]
     val = [r for r in records if r.split == "val"]
-    assert all(r.loss_by_group and len(r.loss_by_chunk_pos) == CHUNK for r in train)
+    assert all(r.loss_by_group and len(r.loss_by_chunk_pos) == CHUNK - 8 for r in train)
     assert [r.step for r in train if r.pred_std] == [0, 50, 100]
     assert len(val[0].hand_open_hist) == HAND_HIST_BINS
     assert sum(val[0].hand_open_hist) == pytest.approx(1.0)
@@ -267,3 +267,16 @@ def test_committed_sample_matches_the_wrapper(tmp_path: Path) -> None:
         SAMPLE.parent.mkdir(exist_ok=True)
         SAMPLE.write_text(produced.read_text())
     assert produced.read_text() == SAMPLE.read_text()
+
+
+def test_loss_breakdown_drops_the_rtc_prefix() -> None:
+    split = LossBreakdown(toy_layout(), rtc_prefix=8)
+    squared = np.ones((2, CHUNK, 3))
+    squared[:, :8] = 100.0  # positions RTC leaves out of the loss
+    split.add(squared)
+
+    summary = split.summary()
+    assert summary["loss_by_chunk_pos"] == [1.0] * (CHUNK - 8)
+    assert summary["loss_by_group"] == {"arm": 1.0, "pad": 1.0}
+    with pytest.raises(ValueError, match="nothing past 8"):
+        split.add(np.ones((2, 8, 3)))

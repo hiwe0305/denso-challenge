@@ -73,7 +73,8 @@ FIELD_SOURCES: list[tuple[str, str | None, str, str]] = [
         "loss_by_chunk_pos",
         None,
         BOTH,
-        "Như `loss_by_group`, theo vị trí trong chunk; loss train lấy trước mask RTC",
+        "Như `loss_by_group`, theo vị trí trong chunk; dòng train bỏ `max-delay` (8) vị trí "
+        "đầu bị mask RTC",
     ),
     (
         "grad_norm_vlm",
