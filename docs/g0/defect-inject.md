@@ -73,6 +73,24 @@ Kết quả (đo, một tiến trình CPU, máy đang chạy job khác với loa
 
 Kiểm lại từ đĩa (`fwdata/verify_inject.py`, đọc bằng bộ đọc của DA-03): một bản có 33 lỗi, đủ 11 loại × 3 (D1 3, D2 6, D3 9, D5 6, D6 6, D7 3), mỗi dòng manifest qua `defect_applied`; 66 episode không cấy và cả 99 episode của bản kia trùng bản gốc; `joint_limit_exceeded` vượt đúng `limit_high` của `g1.yaml` (ví dụ `left_elbow_joint` 2,0944 → 2,8798, `waist_pitch_joint` 0,52 → 0,78); `unit_deg_rad` trên chiều góc (15, 16, 30); `action_sign_flip` trên chiều có độ lệch chuẩn khác 0 (19, 24); seed rò 2000124, 2000587, 2000692; `drop_frames` bỏ 90–93 dòng; `corrupted_success_label` cắt còn một nửa số khung.
 
+Bàn giao cho DA-31 (Châu), in ra từ lệnh trên, đường dẫn tính từ `rtx3060:~/denso-da27/`:
+
+```json
+{
+  "copies": [
+    {"dataset_id": "bench-1e258c0a78ca", "uri": "fwdata/inject/copies/bench-1e258c0a78ca",
+     "manifest": "fwdata/inject/answers/bench-1e258c0a78ca/defect_manifest.json",
+     "manifest_sha256": "8962a6cf8281963fb190c570a6104bd51a543acfbf0d4209e4668e305ea13a72"},
+    {"dataset_id": "bench-d19e112835e3", "uri": "fwdata/inject/copies/bench-d19e112835e3",
+     "manifest": "fwdata/inject/answers/bench-d19e112835e3/defect_manifest.json",
+     "manifest_sha256": "0dc84b4954bbc3b4188610cd93a5041c72745a27cce2d6dad9dea585dc8bbc27"}
+  ],
+  "ledger": "fwdata/inject/ledger.jsonl"
+}
+```
+
+Bộ chấm biết bản nào sạch qua manifest (`defects` rỗng); agent chỉ nhận `dataset_id` và `uri`. Đường dẫn khác plan 3/11 (`fwdata/inject/<dataset_id>/{injected,clean}`) vì tên `injected`, `clean` lộ vai trò.
+
 Còn lộ, cần PO quyết [Đề xuất]:
 
 - `meta/episodes_stats.jsonl` (và `stats.json`, `stats_psi0.json`) chép nguyên từ bản gốc. Tính lại stats của một episode rồi so với file là biết episode nào đã đổi, không cần phát hiện đúng loại lỗi. Hướng sửa: tính lại stats cho mọi episode của cả hai bản sao, hoặc bỏ các file này khỏi hai bản sao.
