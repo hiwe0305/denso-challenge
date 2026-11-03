@@ -31,7 +31,7 @@ Chỉ ghi lỗi đã cấy thật (DA-31 tính recall theo loại từ manifest)
 | D3 | `unit_deg_rad` | Sai đơn vị góc | Nhân một chiều góc (0–30, 35) của action, khác 0 trên episode, với $180/\pi$ | `scale: 57.2957795` |
 | D5 | `duplicate_episode` | Trùng lặp episode | Nhân bản episode với dữ liệu giống hệt | `dup_id` |
 | D5 | `holdout_seed_leak` | Rò hạt giống holdout | Gán seed trong dải holdout của `configs/splits/default.yaml` | `holdout_seed_range: [2000000, 2000999]` |
-| D6 | `corrupted_success_label` | Episode hỏng nhưng gắn nhãn thành công | Cắt episode còn `keep_fraction` khung đầu, trước khi task xong; nhãn vẫn là thành công (demo teleop của psi-data mặc nhiên là thành công) | `keep_fraction: 0.5` |
+| D6 | `corrupted_success_label` | Episode hỏng nhưng gắn nhãn thành công | Robot dừng từ `keep_fraction` số khung (action và state giữ nguyên tới hết), trước khi task xong; số khung, video và nhãn thành công giữ nguyên (demo teleop của psi-data mặc nhiên là thành công) | `keep_fraction: 0.5` |
 | D6 | `wrong_task_instruction` | Sai câu lệnh task | Đổi câu lệnh gốc thành câu lệnh sai lệch | `corrupted_prompt` |
 | D7 | `action_sign_flip` | Đảo dấu action | Đổi dấu một chiều action có độ lệch chuẩn khác 0 trên episode | chọn theo episode |
 
@@ -45,6 +45,22 @@ Hai bản sao không được lộ đáp án qua thứ gì ngoài chính lỗi (
 - **Lineage của bộ ghi ở phía bộ chấm.** Mỗi dòng `meta/flywheel_lineage.jsonl` ghi `old_first` (index của bản gốc); từ đó suy ra độ dài episode gốc và lộ episode bị cắt, còn số dòng thì lộ bản nào sạch (95 so với 98 trên psi-data). Bản ghi vẫn giữ nguyên, append-only, nhưng chuyển sang `answers/<id>/flywheel_lineage.jsonl`. Hai bản sao có cùng tập file.
 - **Một mtime cho mọi file** của cả hai bản, nên thời điểm ghi không chỉ episode nào.
 - Ngoài `meta/benchmark_copy.json` (dấu bản sao, có ở cả hai), không file nào chứa chữ `inject`, `defect`, `duplicate`, `bench` (có test).
+- **Mức file đồng nhất.** Cả 99 episode của cả hai bản đi qua cùng bộ ghi, nên footer parquet (`created_by`, codec, số row group, schema metadata) giống hệt nhau trong và giữa hai bản; đo trên psi-data: một biến thể duy nhất, `parquet-cpp-arrow 26.0.0`, SNAPPY, 1 row group (bản gốc là 23.0.1). Video không mã hóa lại: mọi file trùng từng byte với video cùng đường dẫn của bản gốc, trừ bản trùng mang video của episode nguồn. `length` của `episodes.jsonl` bằng số dòng ở mọi episode (có test).
+
+Tín hiệu đổi theo từng loại, ngoài chính lỗi (giữ khi một lần xảy ra thật cũng tạo ra nó):
+
+| Loại | Tín hiệu đổi ngoài lỗi | Một lần xảy ra thật có tạo ra không |
+|---|---|---|
+| `nan_values` | stats của episode có NaN | có |
+| `timestamp_sync_offset` | stats `timestamp` của episode | có |
+| `drop_frames` | ít dòng hơn số khung video; `index` của các episode sau dời đi; stats | có: bộ ghi mất dòng thì video vẫn đủ khung |
+| `joint_jump`, `joint_limit_exceeded`, `unit_deg_rad`, `action_sign_flip` | stats action của episode | có |
+| `corrupted_success_label` | stats action và state | có. Bản trước cắt episode nên số dòng nhỏ hơn số khung video, điều mà một episode dừng sớm thật không có; nay robot dừng tại chỗ, số khung giữ nguyên |
+| `wrong_task_instruction` | thêm một dòng trong `tasks.jsonl`, `total_tasks` tăng | có |
+| `duplicate_episode` | parquet, video, stats và `environment_config` giống episode nguồn | có; trước đây `environment_config` còn là của chỗ bị ghi đè, nay chép theo nguồn |
+| `holdout_seed_leak` | chỉ 3 dòng `episodes.jsonl` có khối `flywheel` (psi-data không ghi seed) | **không**: dữ liệu thật có seed thì mọi episode đều có. Sửa cần gán seed train cho mọi episode của hai bản (bịa dữ liệu nguồn không có); để PO quyết |
+
+Mọi lỗi trên action và state còn lệch với video (video quay lần chạy gốc); đó là giới hạn chung của cấy lỗi vào dữ liệu đã ghi, chỉ phát lại hoặc nhìn ảnh mới thấy.
 
 ### Dựng hai bản sao và niêm phong
 
@@ -78,7 +94,7 @@ Kết quả lần chạy 4/11/2026 (đo, một tiến trình CPU, máy đang ch�
 | Hai bản sao | `fwdata/inject/copies/bench-1e258c0a78ca` (sha256 cây `3e63671e…e7dc6fb`), `fwdata/inject/copies/bench-d19e112835e3` (sha256 cây `f18bcf1c…fc95c7e`), mỗi bản 99 episode, cùng 208 file, cùng một mtime |
 | Đáp án | `fwdata/inject/answers/<id>/defect_manifest.json` và `.sha256`; sha256 `8962a6cf…ea13a72` (`bench-1e258c0a78ca`), `0dc84b49…dc8bbc27` (`bench-d19e112835e3`) |
 
-Kiểm lại từ đĩa (`fwdata/verify_inject.py`, đọc bằng bộ đọc của DA-03): một bản có 33 lỗi, đủ 11 loại × 3 (D1 3, D2 6, D3 9, D5 6, D6 6, D7 3), mỗi dòng manifest qua `defect_applied`; 66 episode không cấy và cả 99 episode của bản kia trùng bản gốc; `joint_limit_exceeded` vượt đúng `limit_high` của `g1.yaml` (ví dụ `left_elbow_joint` 2,0944 → 2,8798, `waist_pitch_joint` 0,52 → 0,78); `unit_deg_rad` trên chiều góc (15, 16, 30); `action_sign_flip` trên chiều có độ lệch chuẩn khác 0 (19, 24); seed rò 2000124, 2000587, 2000692; `drop_frames` bỏ 90–93 dòng; `corrupted_success_label` cắt còn một nửa số khung.
+Kiểm lại từ đĩa (`fwdata/verify_inject.py`, đọc bằng bộ đọc của DA-03): một bản có 33 lỗi, đủ 11 loại × 3 (D1 3, D2 6, D3 9, D5 6, D6 6, D7 3), mỗi dòng manifest qua `defect_applied`; 66 episode không cấy và cả 99 episode của bản kia trùng bản gốc; `joint_limit_exceeded` vượt đúng `limit_high` của `g1.yaml` (ví dụ `left_elbow_joint` 2,0944 → 2,8798, `waist_pitch_joint` 0,52 → 0,78); `unit_deg_rad` trên chiều góc (15, 16, 30); `action_sign_flip` trên chiều có độ lệch chuẩn khác 0 (19, 24); seed rò 2000124, 2000587, 2000692; `drop_frames` bỏ 90–93 dòng.
 
 Kiểm đối xứng (cùng script): 66 episode không cấy có stats từng episode giống hệt nhau ở hai bản; ở cả hai bản, `episodes_stats.jsonl`, `stats.json`, `stats_psi0.json` bằng stats tính lại từ dữ liệu đọc ngược; không bản nào có `meta/flywheel_lineage.jsonl` (95 và 98 dòng lineage nằm ở `answers/<id>/`); ngoài `meta/benchmark_copy.json`, không file nào chứa `inject`, `defect`, `duplicate`, `bench` nhiều hơn file cùng đường dẫn ở bản gốc (`allow_duplicates` có sẵn trong `environment_config` của psi-data, 99 lần ở cả ba).
 
