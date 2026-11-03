@@ -31,7 +31,7 @@ from flywheel.eval.diagnosis.system.runtime import check_r1, check_r2, check_r4,
 from flywheel.eval.diagnosis.system.verdict import Diagnosis, combine
 
 R1 = R1Thresholds(tau_lat_s=0.1, percentile=99.0)
-R2 = R2Thresholds(min_buffer_level=2, max_underruns=0)
+R2 = R2Thresholds(max_underruns=0)
 R4 = R4Thresholds(tau_sync_s=0.01)
 R6 = R6Thresholds(ok_statuses=("ok",))
 
@@ -106,9 +106,29 @@ def test_r2_tolerates_as_many_underruns_as_the_config_allows(rtc_rows) -> None:
     rows = [dict(row) for row in rtc_rows]
     rows[5]["buffer_level"] = 0
 
-    tolerant = R2Thresholds(min_buffer_level=2, max_underruns=1)
+    tolerant = R2Thresholds(max_underruns=1)
 
     assert check_r2(_records(rows), tolerant).findings == []
+
+
+def test_r2_does_not_fire_where_the_buffer_left_covers_the_delay(rtc_rows) -> None:
+    # `RTCClient` records the level when the request went out, so a low level
+    # is healthy as long as it outlasts the inference: one action left and one
+    # step of delay is no stall.
+    rows = [dict(row, buffer_level=1, delay_steps=1) for row in rtc_rows]
+
+    assert check_r2(_records(rows), R2).findings == []
+
+
+def test_r2_fires_where_the_delay_outruns_the_buffer_left(rtc_rows) -> None:
+    rows = [dict(row) for row in rtc_rows]
+    rows[3].update(buffer_level=4, delay_steps=8)
+
+    result = check_r2(_records(rows), R2)
+
+    assert [finding.code for finding in result.findings] == ["R2"]
+    assert result.findings[0].where == "chunk 3"
+    assert "4" in (result.findings[0].detail or "")
 
 
 def test_r4_does_not_fire_when_the_clocks_stay_together(clean_rows, write_trace) -> None:

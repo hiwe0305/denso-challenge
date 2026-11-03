@@ -26,8 +26,12 @@ r1:
   percentile: 99.0         # chốt theo spec mục 6.4 ("phân vị 99 độ trễ chu kỳ suy luận")
 
 r2:
-  min_buffer_level: 2      # giả định; số action còn trong buffer lúc chunk mới tới. Hiệu chỉnh: mức thấp nhất trên lần chạy chuẩn G0
-  max_underruns: 0         # giả định; một lần buffer cạn đã là một lần đứng máy nhìn thấy được
+  # Buffer cạn là chunk có `delay_steps > buffer_level` trong log RTC.
+  # `buffer_level` là số action còn trong buffer **lúc gửi request** (writer
+  # `RTCClient` của DA-19), `delay_steps` là số chu kỳ điều khiển trôi qua trong
+  # lúc suy luận; buffer cạn nghĩa là action còn lại không phủ hết thời gian chờ.
+  # Lượt khỏe không nổ khi `refill_at` của client không nhỏ hơn độ trễ (DA-19).
+  max_underruns: 0         # giả định; một lần buffer cạn đã là một lần đứng máy nhìn thấy được. Hiệu chỉnh: số lần lớn nhất trên lần chạy chuẩn G0
 
 r3:
   tau_track_upper: 0.10    # giả định; chuẩn của (lệnh gửi - trạng thái đo) thân trên, đơn vị rad. Hiệu chỉnh: phân vị 99 trên episode teleop thành công

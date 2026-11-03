@@ -259,15 +259,20 @@ class R1Thresholds:
 
 @dataclass(frozen=True)
 class R2Thresholds:
-    """Action buffer running dry: chunks whose buffer level is under the floor.
+    """Action buffer running dry: chunks whose inference outlasted the buffer.
 
-    This is a count, not a percentile: one chunk arriving with nothing left to
-    execute is a visible stall, and what the threshold decides is how many of
-    those an episode may contain before the runtime, not the policy, is what
-    the engineer goes and fixes.
+    `RTCClient` of DA-19 records `buffer_level` as the actions left when the
+    request went out and `delay_steps` as the control steps the inference
+    took, so a chunk with `delay_steps > buffer_level` is one where the robot
+    would have had nothing to execute before the new chunk came back. The
+    level alone says nothing: the client asks at `refill_at`, which is 0 by
+    default, so a level floor would count every healthy chunk.
+
+    This is a count, not a percentile: one stall is visible, and what the
+    threshold decides is how many of those an episode may contain before the
+    runtime, not the policy, is what the engineer goes and fixes.
     """
 
-    min_buffer_level: int
     max_underruns: int
 
 
@@ -531,10 +536,7 @@ class SystemThresholds:
                 tau_lat_s=_number(r1, "tau_lat_s", "r1"),
                 percentile=_percentile(r1, "percentile", "r1"),
             ),
-            r2=R2Thresholds(
-                min_buffer_level=_steps(r2, "min_buffer_level", "r2"),
-                max_underruns=_steps(r2, "max_underruns", "r2"),
-            ),
+            r2=R2Thresholds(max_underruns=_steps(r2, "max_underruns", "r2")),
             r3=R3Thresholds(
                 tau_track_upper=_number(r3, "tau_track_upper", "r3"),
                 tau_track_lower=_number(r3, "tau_track_lower", "r3"),
