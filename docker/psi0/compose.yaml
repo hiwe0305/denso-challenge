@@ -42,3 +42,7 @@ services:
         target: /workspace/.env
         read_only: true
     shm_size: "16gb"
+    # Hard RAM cap on a shared host (rtx3060 rule: team jobs <= 60 GB, no swap). systemd-run on the
+    # docker client would not cap the container, which runs under dockerd.
+    mem_limit: ${PSI0_MEM_LIMIT:-16g}
+    memswap_limit: ${PSI0_MEM_LIMIT:-16g}
