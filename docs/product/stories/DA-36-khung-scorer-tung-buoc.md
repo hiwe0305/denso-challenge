@@ -30,7 +30,7 @@ Là kỹ sư đánh giá, tôi muốn một scorer độc lập chấm từng b�
 
 - [x] 1. Đọc `TaskDefinition` và trace tổng hợp qua contracts, lớp đọc tách khỏi phần chấm (AC 1, 5)
 - [x] 2. Chấm trạng thái từng bước, bốn trạng thái và hai quy ước của AC 2 (AC 1, 2)
-- [ ] 3. Bước hỏng đầu tiên k và kiểu lỗi từ `FailureKindSpec`, lớp lỗi chung (AC 3, 4)
+- [x] 3. Bước hỏng đầu tiên k và kiểu lỗi từ `FailureKindSpec`, lớp lỗi chung (AC 3, 4)
 - [ ] 4. Điều kiện chạy suốt episode (thăng bằng) và `L-BALANCE` ở bất kỳ bước nào (AC 1, 3)
 - [ ] 5. `api.py`, lệnh `fw eval score` và artifact kết quả (AC 5)
 - [ ] 6. Test một ca mỗi kiểu lỗi, ca thành công, ca thiếu tín hiệu (AC 6)
