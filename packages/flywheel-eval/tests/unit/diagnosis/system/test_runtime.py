@@ -198,6 +198,23 @@ def test_r5_fires_on_a_camera_calibrated_against_another_reference(tmp_path, cam
     assert "bản tham chiếu" in (result.findings[0].detail or "")
 
 
+def test_r5_still_compares_the_values_of_a_camera_on_another_reference(
+    tmp_path, camera_entry
+) -> None:
+    # Decision Q3 of 3/11/2026: `reference_sha256` is the G0-pinned reference
+    # the hook copies from the RunPlan. A different hash is one finding; the
+    # values are then still compared within tolerance, so the tolerances are
+    # never dead code behind the hash.
+    entry = {**camera_entry, "reference_sha256": "c" * 64, "fx": 404.0}
+
+    result = check_r5(_cameras(tmp_path, entry), R5)
+
+    details = [finding.detail or "" for finding in result.findings]
+    assert len(details) == 2
+    assert "bản tham chiếu `cccccccccccc" in details[0]
+    assert details[1] == "`fx` lệch khỏi bản tham chiếu"
+
+
 def test_r5_fires_on_an_intrinsic_outside_its_tolerance(tmp_path, camera_entry) -> None:
     result = check_r5(_cameras(tmp_path, {**camera_entry, "fx": 404.0}), R5)
 

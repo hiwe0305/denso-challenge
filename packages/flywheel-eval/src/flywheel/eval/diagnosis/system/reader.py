@@ -94,7 +94,13 @@ class TraceRow:
 
 @dataclass(frozen=True)
 class CameraView:
-    """The calibration of one camera, with the fields of `CameraParams` (#31)."""
+    """The calibration of one camera, with the fields of `CameraParams` (#31).
+
+    `reference_sha256` is the hash of the reference pinned at G0 that the
+    episode ran against, copied by the SimpleSim hook from the RunPlan
+    (decision Q3, 3/11/2026). It is not a hash of the values in this object;
+    if one is ever needed it is a different field.
+    """
 
     uid: str
     mount: str

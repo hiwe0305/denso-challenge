@@ -18,9 +18,16 @@ twelve F-TRAIN codes.
   because one badly paired frame is enough to make the policy act on a stale
   image.
 * **R5 calibration** (step 5): the camera parameters against the reference
-  hashed at G0. An episode calibrated against another reference is reported
-  even where its numbers are close, because the comparison with the rest of
-  the run is what the hash protects.
+  pinned at G0, in two steps (decision Q3, 3/11/2026).
+  `CameraParams.reference_sha256` is the hash of the G0-pinned reference the
+  episode ran against, which the SimpleSim hook copies from the RunPlan - not
+  a hash of the camera values the episode happens to have. R5 first compares
+  that hash with `system.yaml`: an episode run against another reference is
+  reported even where its numbers are close, because the comparison with the
+  rest of the run is what the hash protects. It then compares the values
+  with the pinned ones within tolerance, whatever the hash said, so a camera
+  that drifted is caught on its numbers and the tolerances are never dead
+  code behind the hash.
 * **R6 infrastructure** (design section 10): `infra_status` that is not one of
   the healthy values. It is recorded, it never counts as a policy fault
   (AC 1; 03 section 4.3, rule 8), and it outranks every other code in the
@@ -135,7 +142,11 @@ def check_r4(trace: TraceLog, cfg: R4Thresholds) -> CheckResult:
 
 
 def check_r5(cameras: tuple[CameraView, ...], cfg: R5Thresholds) -> CheckResult:
-    """The camera parameters of the episode against the reference hashed at G0 (step 5)."""
+    """The camera parameters of the episode against the reference pinned at G0 (step 5).
+
+    The hash first, then the values within tolerance, both for every camera
+    the reference knows (decision Q3, 3/11/2026; module docstring).
+    """
     if cfg.reference_sha256 is None:
         # Nothing to compare against. Comparing the declared numbers instead
         # would be judging an episode against a reference nobody has fixed,
@@ -169,12 +180,11 @@ def check_r5(cameras: tuple[CameraView, ...], cfg: R5Thresholds) -> CheckResult:
                     threshold=None,
                     where=camera.uid,
                     detail=(
-                        f"hiệu chuẩn theo bản tham chiếu `{camera.reference_sha256[:12]}…`, "
+                        f"chạy theo bản tham chiếu `{camera.reference_sha256[:12]}…`, "
                         f"cấu hình ghim `{cfg.reference_sha256[:12]}…`"
                     ),
                 )
             )
-            continue
         findings.extend(_drifted(camera, reference, cfg))
     return CheckResult(findings=findings, skipped=skipped)
 

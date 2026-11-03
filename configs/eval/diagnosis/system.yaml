@@ -45,6 +45,10 @@ r4:
   # là có chủ ý: ngưỡng lấy từ dữ liệu tốt, phép đo là lúc tệ nhất của lượt này.
 
 r5:
+  # Hai bước (quyết định Q3, 3/11/2026): `CameraParams.reference_sha256` là hash
+  # của bản tham chiếu đã ghim ở G0, hook chép từ RunPlan, không phải hash của
+  # bộ camera đang có. R5 so hash đó với `reference_sha256` dưới đây, rồi so giá
+  # trị với `cameras` trong dung sai, dù hash khớp hay không.
   reference_sha256: null   # chưa ghim: bản tham chiếu camera chốt ở G0 (spec mục 6.4 bước 5). Còn `null` thì R5 ra CHƯA RÕ, không phải đạt; đặt hash rồi khai `cameras` bên dưới
   cameras: {}              # khai theo `uid` của CameraParams khi G0 chốt; giá trị lấy từ cấu hình camera của SIMPLE, không gõ tay
   tolerance_intrinsics_px: 0.5    # giả định; fx, fy, cx, cy, đơn vị pixel
