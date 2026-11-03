@@ -25,8 +25,7 @@ fails when its value is above its threshold, and carries the D-code of design 10
        stats.finite           D4  NaN or Inf numbers in those blocks
        stats.release          D4  largest |shipped - recomputed| of mean, std, min, max
        stats.constant         D4  constant action dims (Psi0 passes them through raw) that
-                                  are neither masked nor declared constant
-                                  (`UNDECLARED_CONSTANT_IS_ERROR`)
+                                  are neither masked nor declared `constant` in the layout
 
 Point 7 (Psi0's own loader reads a saved batch back) is a contract test in
 `flywheel-psi0`, since the lane never imports `lerobot` or `psi` (03 section 7.3).
@@ -421,14 +420,16 @@ def _stats_checks(
     value = worst if math.isfinite(worst) else 1e300  # QACheck holds finite numbers only
     findings.append(_finding(6, "D4", "stats.release", value, STATS_TOLERANCE,
                              f"largest |shipped - recomputed| {worst:g} at {at}"))
-    findings.append(_constant_check(shipped.get("action"), layout.dimensions))
+    action_stats = None if arrays["action"] is None else stats_block(arrays["action"])
+    findings.append(_constant_check(shipped.get("action"), action_stats, layout.dimensions))
     return findings
 
 
 def constant_dims(block: Any) -> list[int]:
     """Action dims Psi0's normalizer passes through raw: max - min under its ill mask.
 
-    Psi0 cda3fdf `ActionStateTransform` (bounds): |max - min| < 1e-4 (|max| + |min| + 1e-8).
+    The rule of Psi0 cda3fdf, src/psi/config/transform.py, `ActionStateTransform.__call__`
+    (`ill_mask`, action_norm_type bounds): |max - min| < 1e-4 (|max| + |min| + 1e-8).
     The `std` of the stats is no test: SIMPLE's float32 `stats_block` gives std 3.6e-4
     for psi-data's dim 31, which is 0.74 in every frame.
     """
@@ -440,26 +441,30 @@ def constant_dims(block: Any) -> list[int]:
             if abs(float(b) - float(a)) < 1e-4 * (abs(float(b)) + abs(float(a)) + 1e-8)]
 
 
-def _constant_check(block: Any, dims: Sequence[ActionDimension]) -> ChecklistFinding:
+def _constant_check(
+    block: Any, recomputed: dict[str, list[float]] | None, dims: Sequence[ActionDimension]
+) -> ChecklistFinding:
+    """D4: a constant dim that the layout neither masks nor declares `constant` fails.
+
+    Constant dims come from the shipped stats, cross-checked against the recompute; a
+    difference between the two is named here and fails `stats.release` as well.
+    """
     constant = constant_dims(block)
     if constant and max(constant) >= len(dims):
-        return _finding(6, "D4", "stats.constant", 0, 0, "action stats wider than the layout")
+        return _finding(6, "D4", "stats.constant", len(constant), 0,
+                        "action stats wider than the layout")
     errors = [i for i in constant if not _constant_allowed(dims[i])]
-    masked = [i for i in constant if dims[i].masked]
-    return _finding(6, "D4", "stats.constant", len(errors), 0,
-                    f"constant action dims {constant} (masked {masked}); errors {errors}")
-
-
-# D4 makes a zero-variance dim an error unless it is masked or the layout declares it
-# constant. ActionDimension has no field to declare that (g1.yaml says dim 31 is
-# constant in a comment only), so until it has, an unmasked constant dim is listed, not
-# failed: Psi0 passes it through raw. Asked of the PO 4/11/2026 (DA-02 PR).
-UNDECLARED_CONSTANT_IS_ERROR = False
+    declared = [i for i in constant if i not in errors]
+    detail = f"constant action dims {constant}; masked or declared {declared}; errors {errors}"
+    if recomputed is not None and constant_dims(recomputed) != constant:
+        detail += f"; the recompute finds {constant_dims(recomputed)}"
+    return _finding(6, "D4", "stats.constant", len(errors), 0, detail)
 
 
 def _constant_allowed(dim: ActionDimension) -> bool:
-    """Whether a constant action dim is no stats error (design 6.4 point 6, D4)."""
-    return dim.masked or not UNDECLARED_CONSTANT_IS_ERROR
+    """Whether a constant action dim is no stats error: masked or declared constant (D4)."""
+    # getattr until PR #89 adds ActionDimension.constant to master; then dim.constant.
+    return dim.masked or bool(getattr(dim, "constant", False))
 
 
 def _data_path(info: dict[str, Any], index: int) -> str:

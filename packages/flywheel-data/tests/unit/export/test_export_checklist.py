@@ -268,24 +268,35 @@ def test_a_masked_constant_dim_is_no_stats_error(tmp_path: Path) -> None:
     layout = ActionLayout(dimensions=dims)
     assert failed(root, layout) == []
     finding = {f.check.name: f for f in run_checklist(root, layout)}["v21.6.stats.constant"]
-    assert "constant action dims [5, 31] (masked [5])" in finding.detail
+    assert finding.detail == "constant action dims [5]; masked or declared [5]; errors []"
+    assert "v21.6.stats.constant" in failed(root)  # the same data, dim 5 unmasked
 
 
-def test_constant_dims_come_from_min_and_max_not_std(root: Path) -> None:
+def test_an_undeclared_constant_dim_fails(tmp_path: Path) -> None:
+    # Design 10 D4 (PO decision A, 4/11/2026): dim 31 at 0.74 everywhere, as in psi-data,
+    # fails until the layout declares it constant (PR #89).
+    root = make_tray_dataset(tmp_path / "height")
+    for index, length in enumerate((6, 9, 4)):
+        write_episode(root, frames_of(index, length, constant_height=True))
+    write_stats(root)
+    finding = {f.check.name: f for f in run_checklist(root, g1_layout())}["v21.6.stats.constant"]
+    assert not finding.check.passed
+    assert finding.check.value == 1
+    assert finding.detail == "constant action dims [31]; masked or declared []; errors [31]"
+    assert failed(root) == ["v21.6.stats.constant"]
+
+
+def test_constant_dims_come_from_min_and_max_not_std(tmp_path: Path) -> None:
     # Dim 31 is 0.74 in every frame, yet SIMPLE's float32 stats give it a std above 0
     # (3.6e-4 on psi-data e78fb93): only min == max tells, as Psi0's normalizer does.
+    root = make_tray_dataset(tmp_path / "height", lengths=(3000,))
+    write_episode(root, frames_of(0, 3000, constant_height=True))
+    write_stats(root)
     stats = json.loads((root / "meta/stats_psi0.json").read_text())["action"]
+    assert stats["std"][31] > 0
     assert checklist.constant_dims(stats) == [31]
     block = {"min": [0.0, 1.0, 0.74], "max": [0.5, 1.0, 0.74 + 1e-6]}
     assert checklist.constant_dims(block) == [1, 2]
-
-
-def test_an_unmasked_constant_dim_fails_once_undeclared_constants_are_errors(
-    root: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    assert checks(root)["v21.6.stats.constant"].passed
-    monkeypatch.setattr(checklist, "UNDECLARED_CONSTANT_IS_ERROR", True)
-    assert checks(root)["v21.6.stats.constant"].value == 1
 
 
 def test_stats_in_either_precision_count_as_computed_on_the_release(tmp_path: Path) -> None:
