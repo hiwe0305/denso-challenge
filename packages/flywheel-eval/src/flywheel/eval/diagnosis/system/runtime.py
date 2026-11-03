@@ -275,6 +275,6 @@ def _drift(uid: str, name: str, deviation: float, tolerance: float) -> SystemFin
 
 def _no_rtc_log() -> str:
     return (
-        f"episode không có bản ghi RTC nào (`{RTC_NAME}` thiếu, hoặc không có chunk của "
-        f"`trace_id` này), không đo được độ trễ và buffer"
+        f"episode không có bản ghi RTC nào (`{RTC_NAME}` của job thiếu, hoặc không có chunk "
+        f"của `trace_id` này), không đo được độ trễ"
     )

@@ -41,21 +41,16 @@ def config(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def episode(tmp_path: Path, clean_rows, rtc_rows, camera_entry) -> Path:
-    folder = tmp_path / "ep"
-    folder.mkdir()
-    (folder / "trace.jsonl").write_text(_lines(clean_rows), encoding="utf-8")
-    (folder / "rtc.jsonl").write_text(_lines(rtc_rows), encoding="utf-8")
-    (folder / "camera_params.json").write_text(json.dumps(camera_entry), encoding="utf-8")
-    (folder / "episode.json").write_text(json.dumps({"infra_status": "ok"}), encoding="utf-8")
-    return folder
+def episode(write_job, rollout_result, clean_rows, rtc_rows, camera_entry) -> Path:
+    # the hook's layout: the RTC log is the job's, one directory up
+    return write_job(clean_rows, rtc=rtc_rows, camera=camera_entry, result=rollout_result("ok"))
 
 
 def test_the_record_hashes_every_file_the_verdict_read(episode: Path, config: Path) -> None:
     record = diagnose_episode_system(episode, config)
 
     assert record.trace_sha256 == _sha(episode / "trace.jsonl")
-    assert record.rtc_sha256 == _sha(episode / "rtc.jsonl")
+    assert record.rtc_sha256 == _sha(episode.parent / "rtc.jsonl")
     assert record.camera_sha256 == _sha(episode / "camera_params.json")
     assert record.infra_sha256 == _sha(episode / "episode.json")
 
@@ -65,7 +60,7 @@ def test_one_trace_with_two_rtc_logs_gives_two_distinguishable_records(
 ) -> None:
     healthy = diagnose_episode_system(episode, config)
     slow = [{**row, "chunk_received_s": row["observation_sent_s"] + 0.4} for row in rtc_rows]
-    (episode / "rtc.jsonl").write_text(_lines(slow), encoding="utf-8")
+    (episode.parent / "rtc.jsonl").write_text(_lines(slow), encoding="utf-8")
 
     stalled = diagnose_episode_system(episode, config)
 
@@ -75,7 +70,8 @@ def test_one_trace_with_two_rtc_logs_gives_two_distinguishable_records(
 
 
 def test_a_file_the_episode_lacks_is_hashed_as_none(episode: Path, config: Path) -> None:
-    for name in ("rtc.jsonl", "camera_params.json", "episode.json"):
+    (episode.parent / "rtc.jsonl").unlink()
+    for name in ("camera_params.json", "episode.json"):
         (episode / name).unlink()
 
     record = diagnose_episode_system(episode, config)

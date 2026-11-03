@@ -26,6 +26,18 @@ REFERENCE_SHA = "b" * 64
 runner = CliRunner()
 
 
+# `episode.json` as the SimpleSim hook (DA-38 @ f94d5bc) writes it.
+ROLLOUT_RESULT: dict[str, Any] = {
+    "job_id": "job_1",
+    "trace_ref": {"trace_id": "trace_1", "uri": "ep/trace.jsonl", "sha256": None},
+    "sim_success": True,
+    "infra_status": "ok",
+    "usage": {"wall_seconds": 12.0, "gpu_seconds": 0.0},
+    "camera_params_hash": "b" * 64,
+    "adapter_info": {"name": "flywheel-simple.trace", "version": "0.1.0"},
+}
+
+
 def _trace_row(step: int, **overrides: Any) -> dict[str, Any]:
     row: dict[str, Any] = {
         "trace_id": "trace_1",
@@ -71,16 +83,20 @@ def pinned_config(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def write_episode(tmp_path: Path):
-    """Write an episode directory; `rows` replaces the healthy trace."""
+    """Write an episode in the SimpleSim hook's layout; `rows` replaces the healthy trace.
+
+    <job>/rtc.jsonl is the job-wide RTC log of DA-19; <job>/<name>/ holds the
+    trace, the camera parameters and `episode.json`, a v0 RolloutResult.
+    """
 
     def build(name: str = "ep", rows: list[dict[str, Any]] | None = None) -> Path:
-        folder = tmp_path / name
+        folder = tmp_path / "job" / name
         folder.mkdir(parents=True, exist_ok=True)
         trace = rows if rows is not None else [_trace_row(step) for step in range(20)]
         (folder / "trace.jsonl").write_text(
             "".join(json.dumps(item) + "\n" for item in trace), encoding="utf-8"
         )
-        (folder / "rtc.jsonl").write_text(
+        (folder.parent / "rtc.jsonl").write_text(
             "".join(
                 json.dumps(
                     {
@@ -117,9 +133,7 @@ def write_episode(tmp_path: Path):
             ),
             encoding="utf-8",
         )
-        (folder / "episode.json").write_text(
-            json.dumps({"infra_status": "ok"}), encoding="utf-8"
-        )
+        (folder / "episode.json").write_text(json.dumps(ROLLOUT_RESULT), encoding="utf-8")
         return folder
 
     return build

@@ -121,8 +121,8 @@ def diag_system(
     episode: Path = typer.Option(
         ...,
         "--episode",
-        help="Thư mục episode (trace.jsonl, rtc.jsonl, camera_params.json, episode.json), "
-        "hoặc chính file trace.",
+        help="Thư mục episode theo bố cục của hook SimpleSim (trace.jsonl, camera_params.json, "
+        "episode.json; rtc.jsonl của job ở thư mục cha), hoặc chính file trace.",
     ),
     config: Path = typer.Option(
         DEFAULT_SYSTEM_CONFIG,
