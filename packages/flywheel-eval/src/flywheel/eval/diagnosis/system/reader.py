@@ -86,7 +86,9 @@ import numpy as np
 from flywheel.contracts.artifacts import ProbeP1, ProbeP3, ProbeP4, RTCInferenceRecord
 from flywheel.contracts.trace import CAMERA_NAME as CAMERA_NAME
 from flywheel.contracts.trace import (
+    LOWER_BODY,
     RESULT_NAME,
+    UPPER_BODY,
     CameraParams,
     FloatOrNonFinite,
     TraceStep,
@@ -100,6 +102,18 @@ Values = NDArray[np.float64]
 
 _ARTIFACT = TypeVar("_ARTIFACT", ProbeP1, ProbeP3, ProbeP4)
 _LINE = TypeVar("_LINE", TraceStep, CameraParams, RTCInferenceRecord)
+
+# Channels whose value is a direction on the circle, by the contract's names:
+# the base heading `yaw` (rad, world frame), where +pi and -pi are one heading.
+# The waist joints are not on the list although they are angles too: they are
+# revolute joints with limits (G1: roll, pitch +-0.52, yaw +-2.618 rad in
+# `configs/embodiments/g1.yaml`), so a waist error over pi is a joint that has
+# to travel that far, and wrapping it would shrink a real fault.
+PERIODIC_CHANNELS = frozenset({"yaw"})
+_PERIODIC = {
+    part: np.array([name in PERIODIC_CHANNELS for name in names], dtype=bool)
+    for part, names in (("upper", UPPER_BODY), ("lower", LOWER_BODY))
+}
 
 # The fields of `TraceStep` each check needs, named so a gap is reported by
 # the name the writer used.
@@ -140,7 +154,10 @@ class TraceLog:
         Spec section 6.4 defines the measurement as the norm of the difference
         between the command sent and the state measured, upper and lower body
         apart. A cycle with a gap on either side is nan, not zero: a dropped
-        measurement is not a cycle that tracked perfectly.
+        measurement is not a cycle that tracked perfectly. On a periodic
+        channel (`PERIODIC_CHANNELS`) the difference is the shorter way round
+        the circle, atan2(sin d, cos d): a target heading of 3.13 rad and a
+        measured one of -3.13 rad are 0.023 rad apart, not 6.26.
         """
         commands = _matrix(self.rows, f"cmd_{part}")
         measured = _matrix(self.rows, f"meas_{part}")
@@ -148,6 +165,9 @@ class TraceLog:
             return np.empty(0, dtype=np.float64)
         # `TraceStep` fixes the width of both, so the two always line up.
         difference = commands - measured
+        periodic = _PERIODIC[part]
+        wrapped = difference[:, periodic]
+        difference[:, periodic] = np.arctan2(np.sin(wrapped), np.cos(wrapped))
         # A cycle missing one channel is a cycle nobody measured the error of.
         whole = np.isfinite(difference).all(axis=1)
         norms = np.sqrt(np.nansum(np.square(difference), axis=1))

@@ -8,7 +8,7 @@ engineer to the wrong part of the WBC configuration.
 
 from __future__ import annotations
 
-from flywheel.contracts.trace import UPPER_BODY
+from flywheel.contracts.trace import LOWER_BODY, UPPER_BODY
 from flywheel.eval.config import R3Thresholds
 from flywheel.eval.diagnosis.system.reader import read_trace_log
 from flywheel.eval.diagnosis.system.tracking import check_r3
@@ -87,3 +87,15 @@ def test_a_tracking_fault_is_a_controller_fault(row, write_trace) -> None:
     verdict = combine("ep_1", [check_r3(read_trace_log(write_trace(rows)), CFG)], None)
 
     assert verdict.diagnosis is Diagnosis.CONTROLLER
+
+
+def test_a_robot_facing_its_target_heading_across_pi_does_not_fire(row, write_trace) -> None:
+    # The end-to-end case of the PO check on hook #80: target yaw 3.13 rad,
+    # measured -3.13 rad on every cycle, 0.023 rad apart.
+    cmd = [0.5 if name == "base_height" else 0.0 for name in LOWER_BODY]
+    meas = list(cmd)
+    cmd[LOWER_BODY.index("yaw")], meas[LOWER_BODY.index("yaw")] = 3.13, -3.13
+    rows = [row(step, cmd_lower=cmd, meas_lower=meas) for step in range(20)]
+
+    assert check_r3(read_trace_log(write_trace(rows)), CFG).findings == []
+

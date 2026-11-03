@@ -19,6 +19,7 @@ import pytest
 from flywheel.contracts.trace import LOWER_BODY, UPPER_BODY
 from flywheel.eval.diagnosis.system.reader import (
     CAMERA_NAME,
+    PERIODIC_CHANNELS,
     RTC_NAME,
     STEPS_NAME,
     ReaderError,
@@ -152,6 +153,43 @@ def test_steps_of_two_traces_in_one_file_are_refused(row, write_trace) -> None:
 
     with pytest.raises(ReaderError, match="trace_9"):
         read_trace_log(write_trace(rows))
+
+
+def _lower(**channels: float) -> list[float]:
+    """A lower-body vector in the contract's order, named channels set, the rest 0."""
+    return [channels.get(name, 0.0) for name in LOWER_BODY]
+
+
+def test_a_heading_across_plus_minus_pi_is_the_short_way_round(row, write_trace) -> None:
+    # A target heading of 3.13 rad against a measured -3.13 rad is a robot
+    # facing almost exactly where it was told to; the raw difference, 6.26,
+    # would read as a turn the wrong way round and fire R3 on a healthy run.
+    rows = [row(0, cmd_lower=_lower(yaw=3.13), meas_lower=_lower(yaw=-3.13))]
+
+    error = read_trace_log(write_trace(rows)).tracking_error("lower")
+
+    assert error == pytest.approx([2 * math.pi - 6.26])
+
+
+def test_a_heading_error_inside_pi_is_still_counted(row, write_trace) -> None:
+    rows = [row(0, cmd_lower=_lower(yaw=0.0), meas_lower=_lower(yaw=0.5))]
+
+    assert read_trace_log(write_trace(rows)).tracking_error("lower") == pytest.approx([0.5])
+
+
+def test_a_waist_joint_is_not_wrapped(row, write_trace) -> None:
+    # The waist yaw is a limited joint (+-2.618 rad on G1), not a direction:
+    # from -2.6 it cannot reach 2.6 the short way, so the error is 5.2.
+    rows = [row(0, cmd_lower=_lower(waist_yaw=2.6), meas_lower=_lower(waist_yaw=-2.6))]
+
+    assert read_trace_log(write_trace(rows)).tracking_error("lower") == pytest.approx([5.2])
+
+
+def test_the_periodic_channels_are_named_in_the_contract() -> None:
+    # Found by name, so a rename in `LOWER_BODY` fails here instead of
+    # silently leaving the heading unwrapped.
+    assert PERIODIC_CHANNELS <= set(LOWER_BODY)
+    assert not PERIODIC_CHANNELS & set(UPPER_BODY)
 
 
 def test_sync_offset_is_the_absolute_difference_of_the_two_clocks(row, write_trace) -> None:
