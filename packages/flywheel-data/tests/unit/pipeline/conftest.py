@@ -9,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from flywheel.data.config import QAConfig, load_layout, load_qa_config
 from flywheel.data.ingest.lerobot import EpisodeFrames, write_episode
 
 FPS = 50
@@ -149,3 +150,12 @@ def store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Every test's datasets sit under tmp_path, which is the store root ($FW_ROOT)."""
     monkeypatch.setenv("FW_ROOT", str(tmp_path))
     return tmp_path
+
+
+
+@pytest.fixture
+def qa_config() -> QAConfig:
+    """configs/data/qa.yaml as the lane loads it, with G1's layout and the shared SplitPlan."""
+    from qa_data import G1_YAML, QA_YAML, SPLITS
+
+    return load_qa_config(QA_YAML, load_layout(G1_YAML), SPLITS)
