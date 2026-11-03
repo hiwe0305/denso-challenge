@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "Camera intrinsic and extrinsic parameters for an episode run.",
+  "description": "One camera of an episode run.\n\n`fx`, `fy`, `cx`, `cy` are pixels at the render resolution `width` x `height`;\n`pose` is position (m) + MuJoCo quaternion (w, x, y, z) relative to the mount body.",
   "properties": {
     "episode_id": {
       "minLength": 1,

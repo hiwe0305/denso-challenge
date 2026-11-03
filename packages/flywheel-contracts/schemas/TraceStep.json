@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "A single control cycle in a rollout trace.",
+  "description": "A single control cycle in a rollout trace.\n\nOne clock: MuJoCo simulation time `data.time`, in seconds. Non-finite values are\nwritten as the strings \"NaN\", \"Infinity\", \"-Infinity\" so the line stays JSON; a\ncheck that needs such a value says CHƯA RÕ instead of scoring it.",
   "properties": {
     "trace_id": {
       "minLength": 1,
@@ -13,6 +13,7 @@
       "type": "string"
     },
     "run_plan_id": {
+      "description": "RunPlan of the run; a run without one (G0, scripted eval) uses g0-<story>-<yyyymmdd>, for example g0-DA-38-20261103.",
       "minLength": 1,
       "title": "Run Plan Id",
       "type": "string"
@@ -36,6 +37,7 @@
           "type": "string"
         }
       ],
+      "description": "Simulation time the state was read, s.",
       "title": "T State"
     },
     "t_image": {
@@ -56,9 +58,11 @@
         }
       ],
       "default": null,
+      "description": "Simulation time of the frame fed to the policy in this cycle, s; null when the cycle has no new frame (not a repeat of the last one).",
       "title": "T Image"
     },
     "cmd_upper": {
+      "description": "Commanded joint angles, rad: action[0:28], in the order of UPPER_BODY.",
       "items": {
         "anyOf": [
           {
@@ -74,10 +78,13 @@
           }
         ]
       },
+      "maxItems": 28,
+      "minItems": 28,
       "title": "Cmd Upper",
       "type": "array"
     },
     "meas_upper": {
+      "description": "Measured joint angles, rad, in the order of UPPER_BODY.",
       "items": {
         "anyOf": [
           {
@@ -93,10 +100,13 @@
           }
         ]
       },
+      "maxItems": 28,
+      "minItems": 28,
       "title": "Meas Upper",
       "type": "array"
     },
     "cmd_lower": {
+      "description": "action[28:34] + action[35]: waist roll, pitch, yaw (rad), base_height (m), vx, vy (m/s, heading frame of the base), target_yaw (rad, world).",
       "items": {
         "anyOf": [
           {
@@ -112,10 +122,13 @@
           }
         ]
       },
+      "maxItems": 7,
+      "minItems": 7,
       "title": "Cmd Lower",
       "type": "array"
     },
     "meas_lower": {
+      "description": "Measured, same order: waist joint angles, base height, base velocity in the heading frame, base yaw in the world frame.",
       "items": {
         "anyOf": [
           {
@@ -131,6 +144,8 @@
           }
         ]
       },
+      "maxItems": 7,
+      "minItems": 7,
       "title": "Meas Lower",
       "type": "array"
     },
