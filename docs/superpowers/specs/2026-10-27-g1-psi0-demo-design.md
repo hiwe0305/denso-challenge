@@ -1,6 +1,6 @@
 # Design: demo G1 + Ψ₀ trên SIMPLE, thí nghiệm dữ liệu egocentric và data flywheel đầy đủ
 
-_Ngày 27/10/2026. Trạng thái: **đã duyệt hướng** (trưởng nhóm, 27/10/2026, sau buổi gặp DENSO), chưa có code. Tài liệu này là design hiện hành duy nhất. Nó thay ba design cũ (23/10 về pipeline dữ liệu và robot DENSO; 25/10 về MuJoCo và Agent QA/QC; 25/10 về chia làn); phần còn dùng được của ba tài liệu đó đã chép vào đây, phần còn lại bị bỏ (mục 14). Ba file cũ đã xóa khỏi repo; xem lại bằng `git log --all -- docs/superpowers/specs/`. Đã đưa vào spec v10.4, 01 bản 0.5, 02 bản 0.5, 03 bản 0.7, 04 bản 0.7, 07 bản 0.5, RULE, CLAUDE.md, README và file story ngày 27/10/2026. **Sửa cùng ngày** sau khi trưởng nhóm làm rõ: hệ thống có ba loại dữ liệu cố định (egocentric, teleop, synthetic); dataset của tác giả, bàn phím và sinh tự động chỉ là nguồn để test hiện giờ (mục 0 ý 3, mục 1, 2, 5, 6.6, 7.8, 11, 13). Thêm mục 6.7 (model phụ trợ, chép từ design chia làn 25/10/2026 đã xóa) và thông tin đầy đủ của model Agent QA/QC (mục 9.1, 9.4)._
+_Ngày 27/10/2026. Trạng thái: **đã duyệt hướng** (trưởng nhóm, 27/10/2026, sau buổi gặp DENSO), chưa có code. Tài liệu này là design hiện hành duy nhất. Nó thay ba design cũ (23/10 về pipeline dữ liệu và robot DENSO; 25/10 về MuJoCo và Agent QA/QC; 25/10 về chia làn); phần còn dùng được của ba tài liệu đó đã chép vào đây, phần còn lại bị bỏ (mục 14). Ba file cũ đã xóa khỏi repo; xem lại bằng `git log --all -- docs/superpowers/specs/`. Đã đưa vào spec v10.4, 01 bản 0.5, 02 bản 0.5, 03 bản 0.7, 04 bản 0.7, 07 bản 0.5, RULE, CLAUDE.md, README và file story ngày 27/10/2026. **Sửa cùng ngày** sau khi trưởng nhóm làm rõ: hệ thống có ba loại dữ liệu cố định (egocentric, teleop, synthetic); dataset của tác giả, bàn phím và sinh tự động chỉ là nguồn để test hiện giờ (mục 0 ý 3, mục 1, 2, 5, 6.6, 7.8, 11, 13). Thêm mục 6.7 (model phụ trợ, chép từ design chia làn 25/10/2026 đã xóa) và thông tin đầy đủ của model Agent QA/QC (mục 9.1, 9.4). **Sửa 3/11/2026** [Đã chốt, issue #34]: artifact `AgentReport`, `AgentReview` (mục 9.1); ánh xạ loại lỗi cấy sang mã và chiều action được cấy (mục 9.2); D2, D5, D7 (mục 10); trả lời Q-M, thêm Q-EGO-LIC (mục 14)._
 
 Quy ước: **[Đã chốt]** là quyết định của trưởng nhóm (Hiếu). **[Đề xuất]** là lựa chọn của người viết, cần duyệt. **[Option]** là nhiều phương án song song. Số liệu của tác giả paper ghi rõ là số tác giả báo; số chưa đo ghi là giả định hoặc ước lượng.
 
@@ -502,7 +502,7 @@ job dữ liệu / train / eval / infer ─► code tính số và dựng hình �
 | Không được | Đọc `vault/`; tự chạy job; tự chọn dữ liệu; đưa số không có trong đầu vào |
 | Số liệu | Mọi con số do code tính; agent diễn giải, xếp hạng, viết đề xuất và trích số |
 | Ước lượng | Có khoảng, được lưu; khi có kết quả đo thì so lại để biết agent đáng tin tới đâu |
-| Đầu ra | Báo cáo HTML tĩnh mỗi job: phát hiện, bằng chứng (đường dẫn hình và số), insight, đề xuất; kỹ sư ghi đồng ý hoặc ghi đè kèm lý do |
+| Đầu ra | Báo cáo HTML tĩnh mỗi job: phát hiện, bằng chứng (đường dẫn hình và số), insight, đề xuất; kỹ sư ghi đồng ý hoặc ghi đè kèm lý do. Sửa 3/11/2026 [Đã chốt, issue #34]: báo cáo máy đọc được là artifact `AgentReport`; quyết định của kỹ sư là artifact riêng `AgentReview`; HTML dựng từ `AgentReport`. `QAReport` vẫn là kết quả QA theo episode của làn Dữ liệu |
 
 Nemotron chỉ đọc chữ: agent đọc metadata, số và chú thích đi kèm hình do code dựng, không nhìn ảnh hay video. Qwen3.5-4B (Apache 2.0, nhận ảnh, bản lượng tử khoảng 2–3 GB) qua endpoint thứ hai là tùy chọn nếu trưởng nhóm muốn agent tự xem hình (câu Q-M), chấm bằng cùng bộ ca mẫu và bộ lỗi cấy.
 
@@ -512,16 +512,37 @@ Trưởng nhóm muốn Agent QA/QC có demo trên dữ liệu trước khi độ
 
 | Nhóm | Lỗi cấy | Mã lỗi (mục 10) |
 |---|---|---|
-| Dữ liệu | Rơi khung ảnh; lệch thời gian ảnh và state; nhảy khớp; vượt giới hạn khớp; NaN; sai đơn vị (độ thay radian); đảo dấu một chiều action; episode hỏng nhưng gắn nhãn thành công; sai câu lệnh task; trùng episode; rò hạt giống holdout | D1–D8 |
+| Dữ liệu | Rơi khung ảnh; lệch thời gian ảnh và state; nhảy khớp; vượt giới hạn khớp; NaN; sai đơn vị (độ thay radian); đảo dấu một chiều action; episode hỏng nhưng gắn nhãn thành công; sai câu lệnh task; trùng episode; rò hạt giống holdout | D1–D7, theo bảng ánh xạ dưới |
 | Log train | Phân kỳ; không học; quá khớp; một nhóm action không giảm; chiều chết; gradient VLM khác 0 khi khai đóng băng | T1–T8 |
 | Log inference | Độ trễ p99 vượt ngưỡng; buffer cạn; giật ở ranh giới chunk | R1, R2 |
 
 Log train và log inference cấy lỗi sinh từ `FakeTrainer` và log RTC giả của `flywheel-testkit` cho tới khi có log thật.
 
+**Ánh xạ loại lỗi dữ liệu sang mã mục 10** [Đã chốt 3/11/2026, issue #34]. 11 loại lỗi dữ liệu dồn vào 7 mã, nên không gộp được về mã khi chấm. `DefectManifest` ghi tên loại; phát hiện của QA và của agent ghi mã mục 10.
+
+| Loại (tên trong `DefectManifest`) | Lỗi cấy | Mã |
+|---|---|---|
+| `nan_values` | NaN | D1 |
+| `timestamp_sync_offset` | Lệch thời gian ảnh và state | D2 |
+| `drop_frames` | Rơi khung ảnh | D2 |
+| `joint_jump` | Nhảy khớp | D3 |
+| `joint_limit_exceeded` | Vượt giới hạn khớp | D3 |
+| `unit_deg_rad` | Sai đơn vị (độ thay radian) | D3 |
+| `holdout_seed_leak` | Rò hạt giống holdout | D5 |
+| `duplicate_episode` | Trùng episode | D5 |
+| `corrupted_success_label` | Episode hỏng nhưng gắn nhãn thành công | D6 |
+| `wrong_task_instruction` | Sai câu lệnh task | D6 |
+| `action_sign_flip` | Đảo dấu một chiều action | D7 |
+
+Lỗi cấy trên action chỉ đặt vào chiều có nghĩa với loại lỗi. Layout 36 chiều của G1 trong SIMPLE (`ACTION_SLICES_36D` của Ψ₀ ở commit `cda3fdf`): 0–13 bàn tay, 14–27 cánh tay, 28–30 hông, 31 chiều cao thân (m), 32–33 vận tốc tương đối, 34 cờ rẽ rời rạc, 35 hướng đích (rad).
+- `unit_deg_rad` chỉ nhân chiều góc (0–30, 35).
+- `joint_limit_exceeded` chỉ áp cho chiều khớp (0–30).
+- `action_sign_flip` phải chọn chiều có độ lệch chuẩn khác 0 trên episode được cấy. Trên task hai bàn, chiều 0–13 gần như luôn bằng 0.
+
 **Cách chấm**:
 
 - Tỉ lệ cấy mỗi loại khoảng 5–10% số episode [Đề xuất]; đáp án khóa trước (hash) trong một file mà agent và code phát hiện không đọc được.
-- **Precision và recall theo từng loại lỗi**, không gộp; **tỉ lệ báo nhầm** trên bản sạch (không cấy); thời gian từ lúc job xong tới lúc có báo cáo.
+- **Precision và recall theo từng loại lỗi**, không gộp; **tỉ lệ báo nhầm** trên bản sạch (không cấy); thời gian từ lúc job xong tới lúc có báo cáo. Sửa 3/11/2026 [Đã chốt]: recall tính theo loại (bắt đúng episode với đúng mã của loại đó); precision tính theo mã, vì một phát hiện chỉ mang mã.
 - Tách hai lớp: phép kiểm bằng code (QA tầng 4) bắt được gì, và agent thêm được gì (xếp hạng, giải thích, đề xuất đúng hay sai). Như vậy số đo không đổ công của code cho agent.
 - Báo rõ "trên lỗi cấy". Lỗi tự nhiên của dữ liệu thật báo riêng khi có.
 
@@ -548,13 +569,15 @@ Lỗi chia theo nguồn tín hiệu. Ngưỡng hiệu chỉnh từ episode thàn
 | Mã | Lỗi | Phát hiện | Xử lý |
 |---|---|---|---|
 | D1 | Sai schema | Thiếu cột của `action_layout` hoặc sai kiểu | Từ chối ingest |
-| D2 | Lệch đồng bộ | Lệch `t_image` và `t_state` p99 > τ_sync | Cách ly, sửa bộ đọc |
+| D2 | Lệch đồng bộ hoặc rơi khung | Lệch `t_image` và `t_state` p99 > τ_sync; khoảng trống trong `frame_index` hoặc `timestamp` | Cách ly, sửa bộ đọc |
 | D3 | Action ngoài giới hạn | Vượt giới hạn khớp, vận tốc, gia tốc | Cách ly |
 | D4 | Stats sai | `stats_psi0.json` không tính trên đúng release, hoặc chiều có độ lệch chuẩn 0 mà không mask | Chặn export |
-| D5 | Rò chia tập | Trùng hạt giống hoặc gần trùng với holdout | Chặn release |
+| D5 | Rò chia tập hoặc trùng episode | Trùng hạt giống hoặc gần trùng với holdout; hai episode trùng hoặc gần trùng trong cùng release | Chặn release |
 | D6 | Nhãn sai | Câu lệnh hoặc đoạn không khớp bước theo luật; nhãn thành công mâu thuẫn scorer | Đưa người duyệt |
-| D7 | Phát lại trượt | Phát lại động học trượt (loại) hoặc động lực học vượt ngưỡng (đánh dấu) | Theo mục 6.3 |
+| D7 | Phát lại trượt | Phát lại động học trượt (loại) hoặc động lực học vượt ngưỡng (đánh dấu); gồm cả action bị đảo dấu một chiều, khi phát lại lệch khỏi state đã ghi | Theo mục 6.3 |
 | D8 | Synthetic hỏng | Rollout lại không đạt | Loại, ghi lý do và chi phí |
+
+Sửa 3/11/2026 [Đã chốt, issue #34]: D2 thêm rơi khung, D5 thêm trùng episode trong cùng release, D7 thêm đảo dấu một chiều action, để mỗi loại lỗi cấy của mục 9.2 có một mã.
 
 **F-TRAIN · Động học train** (từ `metrics.jsonl`; đánh dấu checkpoint, chỉ T1 dừng job)
 
@@ -663,7 +686,8 @@ Người làm ở 07 mục 2.0, 2.2. Bảng dưới chỉ ghi việc.
 | Q-27F | Đội có mua bộ PICO không? | Hiếu | Nguồn teleop thứ hai (mục 4.4) |
 | Q-27G | Video egocentric tự quay: thiết bị nào (điện thoại, camera đội đầu, mượn Vision Pro), bao nhiêu giờ, mấy người? | Hiếu, mentor | Độ tin pose (E-A hay E-B), giá trị của fine-tune stage 1 (mục 7.8) |
 | Q-27H | Tập con EgoDex nào để test (task gần gắp và đặt), bao nhiêu giờ? | Người làm DA-04 | Thời gian chạy pipeline và lần chạy stage 1 ngắn |
-| Q-M | Agent QA/QC có cần tự nhìn hình không (thêm Qwen3.5-4B)? | Hiếu | Model và chi phí của Agent QA/QC (mục 9.1) |
+| Q-EGO-LIC | Giấy phép dữ liệu EgoDex là CC-BY-NC-ND (README của apple/ml-egodex). Dùng trong bối cảnh DENSO có ổn với điều khoản NC không? ND: không phát hành bản đã che danh tính, action 48 chiều hay đoạn cắt | Hiếu | DA-04, DA-18, DA-30; nội dung demo và website |
+| Q-M | Agent QA/QC có cần tự nhìn hình không (thêm Qwen3.5-4B)? | Hiếu | Model và chi phí của Agent QA/QC (mục 9.1). **Đã trả lời 3/11/2026: không** cho tới demo; xem lại sau demo |
 | Q-27I | Model che danh tính, hand pose và SLAM cụ thể cho video tự quay | Người làm DA-04 | Chất lượng pose E-A (mục 6.7.3) |
 | Q0 | Checkpoint `pre.*`, `postpre.*` nào đã xác nhận không thấy dữ liệu task hai bàn? | Hiếu hỏi PSI Lab | Ghi giới hạn cho HE và E1 (spec mục 2.4) |
 

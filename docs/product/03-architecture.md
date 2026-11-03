@@ -4,6 +4,7 @@ _Vai trò: Architect (Winston), quy trình BMAD. Ngày 22/10/2026. Đầu vào: 
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 3/11/2026 | 0.8 | Mục 7.3: `QAReport` là kết quả QA theo episode của làn Dữ liệu; báo cáo Agent QA/QC là artifact mới `AgentReport` của làn Đánh giá; quyết định của kỹ sư là `AgentReview` (issue #34) | PO (Hiếu) |
 | 27/10/2026 | 0.7 | Theo spec v10.4 và [design ngày 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md): bỏ robot DENSO, MuJoCo riêng và ROS 2 (mục 1.1, 2.1, 5.4, 7.1, 7.3); SIMPLE là simulator chính, thu và sinh dữ liệu ở `--sim-mode=mujoco` (mục 2.1, ADR-25); adapter `SimpleSim` có `replay()`, thiết bị bàn phím, hai tuyến sinh tự động S1 và biến thể S2, task hai bàn, nguồn egocentric EgoDex và video tự quay (mục 1.1, 5.4); Agent QA/QC đọc báo cáo dataset và chấm trên bộ lỗi cấy (mục 2.3, ADR-26); cây mã không ghi tên người, chủ ở 07 (mục 7.1); luật import và artifact giữa làn chép vào mục 7.3 vì design chia làn đã xóa; ADR-18, ADR-21, ADR-23 bị thay; ADR-24 cập nhật model phụ trợ cho ba loại dữ liệu | PO (Hiếu) |
 | 22/10/2026 | 0.1 | Bản đầu; đã đối chiếu repo SIMPLE, Ψ₀ và psi-data (mục 3.2) | Architect |
 | 22/10/2026 | 0.2 | Mục 1.1: B⁺ ghi là tùy chọn, khớp spec 7.2 và PRD 7.9 | PO |
@@ -648,7 +649,9 @@ Artifact giữa các làn (Pydantic model trong `flywheel.contracts`, lưu trong
 | `RunPlan`, `TrainSpec`, `RolloutRequest` | Vòng | Adapter |
 | `Trace`, `RolloutResult` | Adapter simulator | Đánh giá |
 | `Checkpoint`, `metrics.jsonl`, kết quả probe, log RTC | Adapter Ψ₀ | Đánh giá |
-| `Score`, `Cluster`, `EvidenceCard`, `QAReport` | Đánh giá | Vòng |
+| `QAReport` (kết quả QA theo episode) | Dữ liệu | Đánh giá, Vòng |
+| `Score`, `Cluster`, `EvidenceCard`, `AgentReport` (báo cáo Agent QA/QC theo job, bản 0.8) | Đánh giá | Vòng |
+| `AgentReview` (đồng ý hoặc ghi đè của kỹ sư trên `AgentReport`, ghi trong `fw review`, bản 0.8) | Vòng | Đánh giá (bộ chấm lỗi cấy) |
 | `Decision`, `LedgerEntry`, `FixRateEvent` | Vòng | Mọi làn |
 
 ## 8. Tái lập và theo dõi thí nghiệm
