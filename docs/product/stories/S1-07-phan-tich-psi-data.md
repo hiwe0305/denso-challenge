@@ -36,7 +36,7 @@ _Mở lại ngày 27/10/2026 theo [design 27/10/2026](../../superpowers/specs/20
 - [x] 4. Tìm layout, seed, tham số điều kiện; dải hạt giống của `simple-eval` (AC 4)
 - [x] 5. Bảng giấy phép, soạn câu hỏi cho tác giả (AC 5)
 - [x] 6. Thống kê mô tả (AC 6)
-- [ ] 7. Viết `docs/g0/psi-data.md` kèm đề xuất cho 03 §3.3 (AC 7)
+- [x] 7. Viết `docs/g0/psi-data.md` kèm đề xuất cho 03 §3.3 (AC 7)
 
 ## Phạm vi file
 
@@ -78,7 +78,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
-- Ghi chú hoàn thành:
-- File đã tạo hoặc sửa:
+- Giờ thực: 4,25 giờ (nhánh `S1-07-psi-data-v2`, 3/11/2026; Claude tự ghi theo cho phép của Hiếu). Bản #24 của Thông ghi 2,5 giờ.
+- Công cụ AI đã dùng: Claude Code (Opus 5.5), một phiên.
+- Ghi chú hoàn thành: làm lại từ #24 (`e96da77`), giữ phần cấu trúc gói, bỏ mọi số gán cứng. Dữ liệu và output của script ở `rtx3060:~/denso-s107/fwdata/psi-data/`. Năm việc phát sinh cho người khác ghi ở mục "Kết luận" của `docs/g0/psi-data.md`.
+- File đã tạo hoặc sửa: `scripts/g0/inspect_psi_data.py`, `docs/g0/psi-data.md`, `docs/g0/ledger/S1-07.csv`.
