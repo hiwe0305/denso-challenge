@@ -9,11 +9,11 @@ _Kết quả của story [S1-03](../product/stories/S1-03-tai-tao-danh-gia-psi0.
 | 1.3 Câu hỏi provenance cho PSI Lab | Chưa |
 | 2.1–2.2 Môi trường và script serve | Xong 3/11/2026 trên máy 3060: serve checkpoint task hai bàn, smoke 30 lần `/act` đạt (mục 2.6) |
 | 2.3–5 Đo VRAM, độ trễ, đánh giá, độ không tất định | Chưa; cần máy 5090 |
-| 6 Task hai bàn ở `mujoco_isaac` (AC 9) | Chưa: server Ψ₀ và Isaac Sim không cùng vừa card 12 GB; chờ Hiếu duyệt thuê GPU 24 GB có RT core (mục 3.4) |
-| 7 Task hai bàn ở `mujoco` (AC 10) | Chạy xong 3/11/2026: 0/30 ở mỗi mức (10 điều kiện × 3 lượt); open-loop xác nhận server đúng; kết luận Q-27C tạm (mục 3) |
+| 6 Task hai bàn ở `mujoco_isaac` (AC 9) | Chưa: server chuyển lên Colab (Hiếu chốt 3/11/2026, không thuê GPU; mục 3.4.1); lượt Isaac Level 0 cũ dừng sau 2/10 (đều hỏng, file task lỗi spawn); chưa chạy lại với file đã sửa |
+| 7 Task hai bàn ở `mujoco` (AC 10) | 0/90 cũ (file task `6d10628`, lỗi spawn) bị thay; chạy lại với file `b75c678`: Level 0 0/10 (3/11/2026, mục 3.2). Kết luận Q-27C tạm (mục 3.5) |
 | 8 Checkpoint ablation của HE (AC 11) | Liệt kê xong 3/11/2026 (mục 4); câu hỏi Q-27E chờ Hiếu gửi PSI Lab |
 
-> **Cảnh báo (3/11/2026, 16:05).** Mọi lượt `mujoco` (0/90) và `mujoco_isaac` ở mục 3 chạy với file task hai bàn của SIMPLE `6d10628` (image ghim `38a6…`). Bản này spawn robot với cánh tay giơ lên; ngón tay chạm bàn 1 lúc WBC ổn định nên robot bị đẩy lùi 0,1–0,28 m. Tác giả sửa ở `b75c678` (PR #29, `77872fe`, 29/10/2026): `init_qpos` của hai tay về 0, như lúc thu dữ liệu. Hiếu chốt chuyển pin SIMPLE sang `b75c678` (PR #68). Vì vậy kết luận ở mục 3.5 **chưa dùng được** cho tới khi chạy lại với file đã sửa. Lượt Isaac Level 0 dừng sau 2/10 episode (cả hai hỏng); B3 chưa chạy. Việc tiếp theo ở mục "Tiếp tục từ đây" cuối file.
+> **Cập nhật (3/11/2026, 23:20).** Các lượt `mujoco` 0/90 và hai episode Isaac đầu tiên chạy với file task hai bàn của SIMPLE `6d10628` (image ghim `38a6…`). Bản này spawn robot với cánh tay giơ; ngón chạm bàn 1 lúc WBC ổn định nên robot bị đẩy lùi 0,1–0,28 m. Tác giả sửa ở `b75c678` (PR #29, `77872fe`, 29/10/2026), và Hiếu chuyển pin SIMPLE sang đó (PR #68). Từ nay `eval_psi0.sh run` mount file `b75c678` vào image (mục 3). Kết quả cũ giữ nguyên trong bảng, đánh dấu "bị thay". Chạy lại `mujoco` Level 0 với file đã sửa: **0/10**. Lỗi spawn vì vậy không giải thích được việc `mujoco` hỏng.
 
 ## 1. Q0 · Checkpoint trong `psi0/`
 
@@ -204,7 +204,11 @@ bash scripts/g0/eval_psi0.sh smoke --calls 30
 
 ## 3. Task hai bàn `G1WholebodyLocomotionPickBetweenTablesTeleop-v0` (AC 9, 10)
 
-Chạy 3/11/2026 trên máy 3060. Server như mục 2.6. Client là `eval-decoupled-wbc` của SIMPLE, agent `psi0_decoupled_wbc`, chạy trong image công bố của SIMPLE ghim theo digest `ghcr.io/physical-superintelligence-lab/simple@sha256:38a674039f413ca171d5f8f841c2b9a9d67771fdaf7bcc73c4777fdfcb7a561f` (tag `latest` ngày 3/11/2026, dựng 30/08/2026). Image có Isaac Sim 4.5; `mujoco` và `mujoco_isaac` dùng cùng một bản SIMPLE. `eval_decoupled_wbc.py` và `psi0_decoupled_wbc.py` trong image giống hệt bản SIMPLE `6d10628` của đội (md5).
+Chạy 3/11/2026 trên máy 3060. Server như mục 2.6. Client là `eval-decoupled-wbc` của SIMPLE, agent `psi0_decoupled_wbc`, chạy trong image công bố của SIMPLE ghim theo digest `ghcr.io/physical-superintelligence-lab/simple@sha256:38a674039f413ca171d5f8f841c2b9a9d67771fdaf7bcc73c4777fdfcb7a561f` (tag `latest` ngày 3/11/2026, dựng 30/08/2026). Image có Isaac Sim 4.5; `mujoco` và `mujoco_isaac` dùng cùng một bản SIMPLE. Đã so md5 năm file với SIMPLE (chưa so cả image): `eval_decoupled_wbc.py`, `psi0_decoupled_wbc.py`, `g1_sonic.py`, `sonic_decoupled_wbc_agent.py` giống `6d10628` và `b75c678`; file task hai bàn giống `6d10628` (md5 `e116f9f3…`), tức bản có lỗi spawn.
+
+**File task đã sửa** (từ 3/11/2026, 23:00). `eval_psi0.sh run` mount `src/simple/tasks/g1_wholebody_locomotion_pick_between_tables_teleop.py` của SIMPLE `b75c6786f87b4a7f43b52b0ac5b83a1d9ea62e11` (sha256 `51bce5d6c0311219…`, kiểm trước khi mount) đè lên bản trong image, chỉ đọc. `SIMPLE_TASK_FIX=off` chạy lại đúng image cũ. Trong container đã kiểm: file nạp đúng đường dẫn đó, sha256 khớp. Ở lần gọi `/act` đầu tiên của một episode, state các khớp tay bằng 0 khi có bản sửa, lệch khoảng 0,015–0,018 khi không. Khớp cánh tay chỉ lệch dưới 0,008 rad, vì WBC đã đưa tay về tư thế mặc định trong lúc ổn định. Vị trí thân robot không có trong state, nên phép kiểm này không đo được độ lùi 0,1–0,28 m.
+
+**Bộ eval** được cache theo revision (`evals/simple-eval-<7 ký tự đầu>/`), và zip được kiểm với `lfs.oid` của Hugging Face trước khi giải nén. Client đọc `/info` của server, dừng nếu server không serve đúng task, và ghi `/info` vào `server_info.json` cạnh `summary.json`.
 
 ```bash
 export FW_UID=$(id -u) FW_GID=$(id -g) RUN=<run hai bàn như mục 2.6>
@@ -212,38 +216,45 @@ export SIMPLE_ASSETS=<thư mục data/ của SIMPLE có assets, robots, scenes>
 bash scripts/g0/eval_psi0.sh run --level 0 --sim-mode mujoco --episodes 10 --pass 1
 ```
 
-Mỗi lần chạy ghi `fwdata/simple/s103/runs/<mode>/level-<L>/pass-<K>/ep<S>-<E>/` gồm `summary.json` (kết quả từng episode, revision checkpoint, commit Ψ₀, revision `psi-data`, digest image SIMPLE, exec horizon, RTC), `eval_stats.txt`, `client.log` và video camera đầu.
+Mỗi lần chạy ghi `fwdata/simple/s103/runs/simple-<commit file task>/<mode>/level-<L>/pass-<K>/ep<S>-<E>/` (`simple-6d10628` cho các lượt cũ, `simple-b75c678` cho các lượt đã sửa) gồm `summary.json` (kết quả từng episode, revision checkpoint, commit Ψ₀, revision `psi-data`, digest image SIMPLE, exec horizon, RTC), `eval_stats.txt`, `client.log` và video camera đầu.
 
 ### 3.1 Điều kiện eval công bố chỉ có 10 mỗi mức
 
 `psi-data` revision `de140d67ba77a541f2a58354f7edf4e2480b7c56`, file `simple-eval/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` (690 kB) có bốn thư mục LeRobot v2.1 `dr-level-0`, `dr-level-1`, `dr-level-2`, `dr-level-hard`, **mỗi thư mục 10 điều kiện**. Số công bố 7/5/6 là trên đúng 10 điều kiện này. **[Đã chốt]** (Hiếu, 3/11/2026): "30 lượt mỗi mức" của AC 9, 10 là **10 điều kiện × 3 lượt lặp** (`--pass 1..3`) trên đúng 10 điều kiện của bộ eval tác giả, không sinh điều kiện mới. Đây **không phải 30 điều kiện độc lập**: policy lấy mẫu flow nên mỗi lượt lặp có thể cho kết quả khác, nhưng ba lượt cùng một điều kiện tương quan với nhau, nên kiểm nhị thức trên n = 30 lạc quan về độ chắc. Ba lượt lặp dùng để báo độ không tất định: với mỗi điều kiện, ghi số lượt thành công trên 3 và tỉ lệ điều kiện mà ba lượt không cùng kết quả.
 
-**Phiên bản bộ eval.** Mọi lượt chạy của S1-03 dùng bản HF `main` lúc 3/11/2026, revision `de140d6` (zip 689 559 byte, sha256 `7d215cf3…`, bốn thư mục kể cả `dr-level-hard`, lấy từ đợt "eval-fixed" `38e43f2` ngày 02/11/2026). Revision ghim của đội `e78fb93` (zip 480 532 byte, sha256 `8a4b0ff7…`, ba mức, tải lên 14/09/2026) khác bản này:
+**Phiên bản bộ eval.** Mọi lượt chạy của S1-03 dùng revision `de140d6` (bản HF `main` lúc 3/11/2026, zip 689 559 byte, sha256 `7d215cf3e9202b39…`, bốn thư mục kể cả `dr-level-hard`, lấy từ đợt "eval-fixed" `38e43f2` ngày 02/11/2026). **[Đã chốt]** (Hiếu, 3/11/2026, PR #68): eval ghim `de140d67ba77a541f2a58354f7edf4e2480b7c56` bằng hash; train giữ `e78fb93` tới sau 13/11. So với train `e78fb93`, đo bằng `scripts/g0/inspect_psi_data.py seeds` của master. Lệnh này so vị trí ban đầu do SpatialDR rút (`dr_state_dict.spatial`) ở cùng chỉ số episode:
 
-| Mức | Vật cần gắp, khay, hai bàn | Khác |
-|---|---|---|
-| 0, 1 | Giống hệt (10/10) | Chỉ domain randomization hình ảnh: vật liệu sàn, bàn, vật; loại và vị trí vật gây nhiễu; vị trí đèn (Level 1) |
-| 2 | Vị trí vật và khay khác (0/10 giống) | Như trên |
+| Bộ eval | Mức | Vật và khay trùng train | Robot `g1_sonic` trùng train |
+|---|---|---|---|
+| `e78fb93` (zip 480 532 byte, sha256 `8a4b0ff7…`) | 0, 1 | 10/10 | 10/10 |
+| `e78fb93` | 2 | 0/10 | 10/10 |
+| `de140d6` | 0, 1 | 10/10 | **0/10** (theo S1-07: lùi 6,1 cm, lệch 2 mm, xoay 0,17°, như nhau ở mọi episode) |
+| `de140d6` | 2, hard | 0/10 | 0/10 |
 
-Số công bố 7/5/6 có trước cả hai lần tải bộ eval lên HF (checkpoint train tháng 4/2026), nên không biết tác giả đo trên bản nào. Câu hỏi này đã thêm vào Q-27E (mục 4). So sánh ở mục 3.2 vì vậy chỉ chặt ở Level 0 và 1, nơi hai bản cùng điều kiện vật lý.
+Ngoài tư thế, hai bản còn khác domain randomization hình ảnh: vật liệu sàn, bàn và vật; loại và vị trí vật gây nhiễu; vị trí đèn. Bản trước của mục này ghi mức 0, 1 "chỉ khác hình ảnh" và vật, khay "khác train ở cả 10 episode". Hai ý đó sai: phép so lúc đó dùng `layout.actors.*.pose`, không phải vị trí SpatialDR rút.
+
+Số công bố 7/5/6 có trước cả hai lần tải bộ eval lên HF (checkpoint train tháng 4/2026), nên không biết tác giả đo trên bản nào. Câu hỏi này đã thêm vào Q-27E (mục 4). Ở Level 0 và 1, vật và khay của bộ eval `de140d6` nằm đúng vị trí của episode train cùng chỉ số; chỉ robot khởi đầu lùi 6,1 cm.
 
 ### 3.2 Kết quả `mujoco` (AC 10)
 
-| Mức | Thành công | Wilson 95% | Công bố (`mujoco_isaac`, 10 lượt) | p một phía, H0: p ≥ số công bố | Giờ máy |
-|---|---|---|---|---|---|
-| Level 0 | 0/30 | [0%, 11%] | 7/10 | 2 × 10⁻¹⁶ | 30 phút |
-| Level 1 | 0/30 | [0%, 11%] | 5/10 | 9 × 10⁻¹⁰ | 30 phút |
-| Level 2 | 0/30 | [0%, 11%] | 6/10 | 1 × 10⁻¹² | 29 phút |
+| File task | Mức | Thành công | Wilson 95% | Công bố (`mujoco_isaac`, 10 lượt) | p một phía, H0: p ≥ số công bố | Giờ máy | Trạng thái |
+|---|---|---|---|---|---|---|---|
+| `b75c678` (đã sửa) | Level 0 | 0/10 (10 điều kiện × 1 lượt) | [0%, 28%] | 7/10 | 6 × 10⁻⁶ | 10 phút | Hiện hành (3/11/2026, 23:18) |
+| `6d10628` (lỗi spawn) | Level 0 | 0/30 | [0%, 11%] | 7/10 | 2 × 10⁻¹⁶ | 30 phút | Bị thay: lỗi spawn |
+| `6d10628` (lỗi spawn) | Level 1 | 0/30 | [0%, 11%] | 5/10 | 9 × 10⁻¹⁰ | 30 phút | Bị thay: lỗi spawn |
+| `6d10628` (lỗi spawn) | Level 2 | 0/30 | [0%, 11%] | 6/10 | 1 × 10⁻¹² | 29 phút | Bị thay: lỗi spawn |
 
-Mỗi mức là 10 điều kiện × 3 lượt lặp (mục 3.1). Wilson tính trên n = 30 nên hẹp hơn thực; tính theo 10 điều kiện (0/10) thì cận trên là 28%, vẫn dưới cả ba số công bố. Kiểm Fisher một phía cho Level 0, 0/30 ở `mujoco` so với 7/10 công bố: p = 6 × 10⁻⁶.
+Lượt đã sửa: `runs/simple-b75c678/mujoco/level-0/pass-1/ep0-9/`, client thoát 0, 628 s tường, server Docker cục bộ trên máy 3060 (bind 127.0.0.1). Hai episode kiểm thêm, có và không có bản sửa (mục 3, file task đã sửa), cũng hỏng. Level 1, 2 và lượt lặp 2, 3 chưa chạy lại với bản sửa.
+
+Với các lượt cũ, mỗi mức là 10 điều kiện × 3 lượt lặp (mục 3.1). Wilson tính trên n = 30 nên hẹp hơn thực; tính theo 10 điều kiện (0/10) thì cận trên là 28%, vẫn dưới cả ba số công bố. Kiểm Fisher một phía cho Level 0, 0/30 ở `mujoco` so với 7/10 công bố: p = 6 × 10⁻⁶.
 
 Độ không tất định qua 3 lượt lặp: cả 30 điều kiện (3 mức × 10) đều 0/3, không điều kiện nào đổi kết quả giữa các lượt (tỉ lệ đổi chiều 0%). Con số này không nói gì về độ không tất định ở `mujoco_isaac`, nơi tỉ lệ thành công nằm giữa 0 và 1.
 
-Mỗi episode `mujoco` khoảng 60 s (1 200 bước, 50 lần `/act`); client dùng đỉnh 3,3 GiB RAM. Chạy server và client bên trong `systemd-run --user --scope -p MemoryMax=20G -p MemorySwapMax=0`, nhưng giới hạn RAM thật là `mem_limit` của Docker (16 GiB mỗi container), vì scope chỉ bọc tiến trình `docker` phía client (mục 2.6).
+Mỗi episode `mujoco` khoảng 60 s (1 200 bước, 50 lần `/act`); client dùng đỉnh 3,3 GiB RAM. Chạy server và client bên trong `systemd-run --user --scope -p MemoryMax=20G -p MemorySwapMax=0`, nhưng giới hạn RAM thật là giới hạn của Docker: server 16 GiB (`PSI0_MEM_LIMIT`), client `mujoco` 16 GiB (`SIMPLE_MEM_LIMIT=16g`; mặc định của script là 20g; lượt Isaac dùng 32g), vì scope chỉ bọc tiến trình `docker` phía client (mục 2.6).
 
 Hình ảnh: ở `mujoco` cảnh là bàn xám, sàn ô bàn cờ, vật màu trắng không texture, khác xa ảnh Isaac của cảnh HSSD mà checkpoint được train. Trong video, robot vẫn đi giữa hai bàn và đưa tay về phía vật, nhưng không lần nào nắm được vật và mang sang bàn 2.
 
-### 3.3 Kiểm open-loop: server và checkpoint đúng
+### 3.3 Kiểm open-loop: phù hợp với server và checkpoint đúng [Đề xuất]
 
 Để tách "renderer khác" khỏi "pipeline hỏng", chạy `psi.deploy.mock_psi0_client_openloop` của Ψ₀ (cùng image, cùng server) trên ba episode train của `psi-data/simple/G1WholebodyLocomotionPickBetweenTablesTeleop-v0` (ảnh Isaac), mỗi 5 khung một lần, so chunk dự đoán với action ghi lại (L1 sau khi bỏ chuẩn hóa, bước đầu của chunk):
 
@@ -253,7 +264,7 @@ Hình ảnh: ở `mujoco` cảnh là bàn xám, sàn ô bàn cờ, vật màu tr
 | 1 | 133 | 0,103 | 0,091 | 0,052 | 0,061 | 0,026 | 0,225 | 345 ms |
 | 2 | 140 | 0,063 | 0,065 | 0,042 | 0,058 | 0,025 | 0,213 | 345 ms |
 
-Theo thời gian, sai số gần 0 ở phần lớn episode và chỉ vọt lên ở các lúc chuyển pha (bắt đầu nắm, thả, bắt đầu và dừng đi); sai số tay bằng 0 suốt lúc giữ vật. Như vậy server, trọng số, chuẩn hóa và giao thức tái tạo đúng action của dữ liệu train khi ảnh là ảnh Isaac. Open-loop không kiểm phía client SIMPLE (ghép state, ánh xạ action, WBC); phần đó chỉ được kiểm khi có lượt `mujoco_isaac` đạt gần số công bố. Báo cáo: `fwdata/psi0/openloop/openloop_eps{0,1,2}_train.{json,png}` trên máy 3060.
+Theo thời gian, sai số gần 0 ở phần lớn episode và chỉ vọt lên ở các lúc chuyển pha (bắt đầu nắm, thả, bắt đầu và dừng đi); sai số tay bằng 0 suốt lúc giữ vật. Kết quả này phù hợp với việc server, trọng số, chuẩn hóa và giao thức tái tạo đúng action của dữ liệu train khi ảnh là ảnh Isaac [Đề xuất]; mới 3 episode, chưa có ngưỡng hay mốc so sánh, và L1 của vyaw là 0,21–0,27. Open-loop không kiểm phía client SIMPLE (ghép state, ánh xạ action, WBC); phần đó chỉ được kiểm khi có lượt `mujoco_isaac` đạt gần số công bố. Báo cáo: `fwdata/psi0/openloop/openloop_eps{0,1,2}_train.{json,png}` trên máy 3060.
 
 ### 3.4 `mujoco_isaac` (AC 9): chưa chạy được trên card 12 GB
 
@@ -285,20 +296,22 @@ Colab không chạy được Docker. `PSI0_ENV=image` cài đúng danh sách gó
 | `check` trên L4 | Đạt: L4 23 GB, flash-attn có, `problems` rỗng |
 | Trọng số | sha256 `c69c2ae8…` như mục 2.6 |
 | VRAM server | 6,2 GB |
-| Open-loop trên 3 episode train, so với server Docker trên 3060 | L1 overall 0,088 / 0,111 / 0,070 so với 0,105 / 0,123 / 0,072; từng nhóm lệch trong cỡ nhiễu lấy mẫu. RTT ấm 460 ms qua hai cổng chuyển tiếp (Docker cùng máy: 350 ms) |
+| Open-loop trên 3 episode train, so với server Docker trên 3060 | L1 overall 0,088 / 0,111 / 0,070 so với 0,105 / 0,123 / 0,072; từng nhóm lệch 0,002–0,017; chưa ước lượng nhiễu lấy mẫu để so. RTT ấm 460 ms qua hai cổng chuyển tiếp (Docker cùng máy: 350 ms) |
 | Thử `mujoco_isaac` 1 episode (Level 0, episode 0) | Chạy hết, client thoát 0; 1 715 s tường, gồm khoảng 4 phút khởi động Isaac; RAM client đỉnh 11,5 GiB, VRAM 5,7 GB; 50 lần `/act`. Kết quả: hỏng, robot làm rơi hộp ở bàn 1 rồi đi sang bàn 2 tay không |
 
 **Độ trễ qua đường chuyển tiếp và ảnh hưởng tới kết quả.** RTT ấm mỗi lần `/act`: 460 ± 19 ms (open-loop, 3 × ~130 lần gọi), so với 350 ± 10 ms khi server Docker cùng máy; đường chuyển tiếp thêm khoảng 110 ms. Vòng eval của SIMPLE **chờ server**: `Psi0DecoupledWbcAgent.get_action` gọi `/act` đồng bộ khi hàng action rỗng (mỗi 24 bước), và mô phỏng không chạy trong lúc chờ. Độ trễ vì vậy chỉ thêm giờ tường. Chỗ duy nhất dính thời gian thật là bộ nội suy của WBC: mỗi bước đặt waypoint thân trên ở `t_now + 1/50 s` (`time.monotonic`) và đọc lệnh ở `t_now`. Khi khoảng cách giữa hai bước lớn hơn nhiều so với 20 ms, lệnh gần như bằng waypoint mới nhất. Ở `mujoco_isaac` mỗi bước đã mất khoảng 1 s vì render, nên thêm 0,1–0,5 s ở một bước trong 24 không đổi gì đáng kể. Eval Isaac của tác giả cũng chạy chậm hơn thời gian thật như vậy.
 
-Thời gian thật của `mujoco_isaac` trên máy 3060 là khoảng 25 phút mỗi episode, gấp 2,5–4 lần mức 6–10 phút của README. Ước lượng cho AC 9 đủ 10 × 3 × 3 = 90 episode: khoảng 38 giờ máy 3060 và 74 CU Colab; một lượt 10 episode Level 0: khoảng 4,5 giờ và 9 CU.
+Thời gian thật của `mujoco_isaac` trên máy 3060 là khoảng 25 phút mỗi episode (đo trên 3 episode hỏng: lượt thử 1 715 s và hai episode đầu của lượt 1 khoảng 27 phút mỗi episode; episode thành công có thể ngắn hơn), gấp 2,5–4 lần mức 6–10 phút của README. Ước lượng cho AC 9 đủ 10 × 3 × 3 = 90 episode: khoảng 38 giờ máy 3060 và 74 CU Colab; một lượt 10 episode Level 0: khoảng 4,5 giờ và 9 CU.
 
 ### 3.5 Trả lời Q-27C [Đề xuất, tạm]
 
-Không: ở `mujoco`, checkpoint của tác giả không giữ được thành công (0/90, mỗi mức 0/30, so với 7/5/6 công bố ở `mujoco_isaac`); lệch rõ ở cả ba mức. Kiểm open-loop cho thấy server đúng, nên nguyên nhân nhiều khả năng là khác biệt ảnh giữa render MuJoCo và Isaac.
+Không: ở `mujoco`, checkpoint của tác giả không giữ được thành công. Sau khi sửa lỗi spawn, Level 0 vẫn 0/10, so với 7/10 công bố ở `mujoco_isaac` (p = 6 × 10⁻⁶). Các lượt cũ (0/90, lỗi spawn) cùng chiều. Kiểm open-loop (mục 3.3) phù hợp với giả thuyết server đúng [Đề xuất]. Đây chưa phải chứng minh: mới 3 episode train, chưa có ngưỡng, và L1 của vyaw là 0,21–0,27. B4 cho thấy policy dựa vào ảnh. Nên nguyên nhân nhiều khả năng là khác biệt ảnh giữa render MuJoCo và Isaac, hoặc một lỗi phía client chưa tìm ra.
 
-Thêm từ S1-07 (PR #55, `docs/g0/psi-data.md`): ở Level 0 và 1, tư thế robot, vật và khay của episode eval thứ i trùng từng bit với episode train thứ i của bộ train `de140d6`. Kiểm của S1-03 trên bộ train ghim `e78fb93` (bản dùng cho open-loop ở mục 3.3) thì vị trí vật và khay khác ở cả 10 episode, nên điều trùng này đúng với bộ train bản mới. Dù vậy, 0/30 ở Level 0 nghĩa là Ψ₀ hỏng cả trên điều kiện gần như chính điều kiện train. Điều này nghiêng về lỗi hệ thống (renderer khác hoặc lỗi phía client) hơn là policy yếu. Đề xuất cho HE: giữ mặc định của design mục 4.2 (ảnh train và ảnh eval đều render Isaac; eval ở `mujoco_isaac`), không chuyển sang `mujoco`. Kết luận còn "tạm" cho tới khi có lượt `mujoco_isaac` của chính đội đạt gần 7/5/6 bằng cùng pipeline (mục 3.4); nếu lượt đó cũng hỏng thì lỗi ở phía client và kết luận trên phải xét lại.
+Ở Level 0 của bộ eval `de140d6`, vật và khay nằm đúng vị trí của episode train cùng chỉ số; chỉ robot khởi đầu lùi 6,1 cm (mục 3.1). Vậy 0/10 là trên chính vị trí vật đã thấy lúc train. Điều này nghiêng về lỗi hệ thống (renderer khác, hoặc lỗi phía client) hơn là policy yếu. Đề xuất cho HE: giữ mặc định của design mục 4.2 (ảnh train và ảnh eval đều render Isaac; eval ở `mujoco_isaac`), không chuyển sang `mujoco`. Kết luận còn "tạm" cho tới khi có lượt `mujoco_isaac` của chính đội, với file task đã sửa, đạt gần 7/5/6 (B5, mục 3.6). Nếu lượt đó cũng hỏng thì lỗi ở phía client và kết luận trên phải xét lại.
 
-Theo quyết định của Hiếu ngày 3/11/2026 ("chờ số mujoco"): vì `mujoco` lệch rõ, AC 9 cần chạy đủ ở `mujoco_isaac` trên một GPU 24 GB có RT core (phương án (b) mục 3.4); việc thuê máy chờ Hiếu duyệt.
+**[Đã chốt]** (Hiếu, 3/11/2026): không thuê GPU; AC 9 chạy với server Ψ₀ trên Colab và Isaac trên máy 3060 (mục 3.4.1).
+
+**Q8 · chờ chốt** [Đề xuất]: chấp nhận lệch của nhiệm vụ con 2.1 là khác biệt đã biết. Story đòi image Ψ₀ riêng trong `docker/psi0/` và ghi chú flash-attn trên máy 5090. PR này dùng image công bố của tác giả, ghim theo digest, trên máy 3060; trên Colab thì dùng đúng danh sách gói của image đó (`docker/psi0/requirements-image.txt`). Phía SIMPLE dùng image công bố ghim theo digest, cộng một file task của `b75c678` mount đè. Chờ Hiếu chốt; chốt xong thì ghi vào story.
 
 ### 3.6 Bộ benchmark chứng minh kết luận [Đề xuất]
 
@@ -306,11 +319,11 @@ Mỗi phép kiểm chỉ đổi một yếu tố, giữ nguyên mọi thứ khá
 
 | # | Câu cần chứng minh | Chỉ đổi | Tiêu chí đạt | Kết quả |
 |---|---|---|---|---|
-| B1 | Server, trọng số, chuẩn hóa đúng | (không đổi; so action dự đoán với action ghi lại) | Sai số gần 0 ngoài lúc chuyển pha | Đạt (mục 3.3) |
-| B2 | Server Colab giống server Docker | Máy chạy server | L1 hai bên chênh trong cỡ nhiễu lấy mẫu | Đạt (mục 3.4.1) |
-| B3 | Độ trễ `/act` không đổi kết quả | Độ trễ: 0 s, 0 s, +2 s mỗi lần gọi | Lệch quỹ đạo của lượt +2 s không lớn hơn lệch giữa hai lượt 0 s | Chờ chạy (sau lượt Isaac Level 0) |
+| B1 | Server, trọng số, chuẩn hóa đúng | (không đổi; so action dự đoán với action ghi lại) | Sai số gần 0 ngoài lúc chuyển pha | Phù hợp [Đề xuất]: 3 episode, chưa có ngưỡng (mục 3.3) |
+| B2 | Server Colab giống server Docker | Máy chạy server | L1 hai bên chênh trong cỡ nhiễu lấy mẫu | Phù hợp: L1 lệch 0,002–0,017 mỗi episode; chưa ước lượng nhiễu lấy mẫu (mục 3.4.1) |
+| B3 | Độ trễ `/act` không đổi kết quả | Độ trễ: 0 s, 0 s, +2 s mỗi lần gọi | Lệch quỹ đạo của lượt +2 s không lớn hơn lệch giữa hai lượt 0 s | Chưa chạy (runner `fwdata/logs/b3.sh` trên máy 3060) |
 | B4 | Policy dựa vào ảnh | Ảnh: thật, xám, mờ, lệch thời gian | L1 tăng rõ khi ảnh sai | Đạt (dưới đây) |
-| B5 | `mujoco` hỏng vì renderer | Renderer: MuJoCo hay Isaac | Isaac không thấp hơn 7/5/6 có ý nghĩa (nhị thức một phía, α = 0,05) và Fisher `mujoco` so với `mujoco_isaac` có p < 0,05 | `mujoco` 0/90; Isaac đang chạy |
+| B5 | `mujoco` hỏng vì renderer (file task `b75c678`) | Renderer: MuJoCo hay Isaac | Isaac không thấp hơn 7/5/6 có ý nghĩa (nhị thức một phía, α = 0,05) và Fisher `mujoco` so với `mujoco_isaac` có p < 0,05 | `mujoco` Level 0 0/10 (bản sửa); Isaac chưa chạy với bản sửa |
 
 Cách đọc B5: Isaac gần 7/5/6 thì renderer là nguyên nhân và AC 9 đạt; Isaac cũng gần 0 thì lỗi ở phía client SIMPLE (B1 đã loại phía server); ở giữa thì chờ PSI Lab trả lời Q-27E.
 
@@ -346,10 +359,10 @@ Câu hỏi Q-27E gửi PSI Lab (Hiếu gửi, chung email giấy phép ở nhi�
 3. Sáu checkpoint này có train trên dữ liệu SIMPLE hoặc sonic không (điều kiện `clean_for_main_task` của AC 6)?
 4. (thêm 3/11/2026) Số 7/5/6 của `G1WholebodyLocomotionPickBetweenTablesTeleop-v0` đo trên bộ eval nào: bản tải lên 14/09/2026 (`e78fb93`), bản "eval-fixed" 02/11/2026 (`de140d6`), hay một bản trước đó? Checkpoint `…2604081126` train trên bản dữ liệu nào (bản gốc hay "data-fixed")? Ở `mujoco_isaac` có cần cờ hoặc cấu hình gì ngoài README không?
 
-## Tiếp tục từ đây (dừng 3/11/2026, 16:05)
+## Tiếp tục từ đây (cập nhật 3/11/2026, 23:20)
 
-1. `eval_psi0.sh run`: mount file `src/simple/tasks/g1_wholebody_locomotion_pick_between_tables_teleop.py` của SIMPLE `b75c6786f87b4a7f43b52b0ac5b83a1d9ea62e11` (sha256 `51bce5d6c0311219d9a827b589910d915521dccc89b69a1ab20ff35081b6dc8f`) đè lên bản trong image, chỉ đọc. Bản trong image giống hệt `6d10628` (md5 `e116f9f3…`); `g1_sonic.py`, `psi0_decoupled_wbc.py`, `sonic_decoupled_wbc_agent.py` trong image giống `b75c678`, nên chỉ cần thay một file này. Ghi commit của file vào `summary.json`.
-2. Chạy lại `mujoco` Level 0, 10 episode, so với 0/30. Có cải thiện rõ thì chạy lại đủ 10 × 3 × 3 ở `mujoco`, rồi `mujoco_isaac`, và viết lại mục 3.5.
-3. Review PR #66: cache bộ eval theo revision và kiểm sha256 (`eval_psi0.sh` dòng 128–134); đo lại bảng mục 3.1 và đoạn so tư thế ở mục 3.5 theo S1-07 (so với train `e78fb93`: vật và khay trùng 10/10 ở Level 0/1 của cả hai bản eval; robot trùng 10/10 ở `e78fb93`, 0/10 ở `de140d6`, lùi 6,1 cm); sửa sổ chi phí (Time-spent cộng 6,75 h, dòng đo trỏ dòng ước tính, dòng chi phí Colab).
-4. B3 (độ trễ): runner `fwdata/logs/b3.sh` trên máy 3060; chạy sau bước 1 để dùng file task đã sửa.
-5. Server Colab: `colab new -s s103psi0 --gpu L4`, rồi `PSI0_ENV=image` setup như mục 3.4.1 (khoảng 8 phút), rồi mở lại hai cổng chuyển tiếp SSH.
+1. Xong: mount file task `b75c678`; cache bộ eval theo revision, kèm kiểm sha256; client kiểm `/info` của server; chạy lại `mujoco` Level 0 (0/10).
+2. `mujoco_isaac` với file đã sửa (B5, AC 9): server Ψ₀ trên Colab, theo mục 3.4.1 (`colab new -s s103psi0 --gpu L4`, `PSI0_ENV=image`, hai cổng chuyển tiếp SSH). Level 0 trước, 10 episode, khoảng 4,5 giờ. Laptop phải bật suốt thời gian chạy.
+3. B3 (độ trễ): runner `fwdata/logs/b3.sh` trên máy 3060; chạy được ngay với server cục bộ.
+4. Nếu Isaac cũng hỏng: phát lại action của episode train trên điều kiện eval cùng chỉ số, qua cùng client và WBC, để tìm lỗi phía client.
+5. Chờ Hiếu: Q8 (mục 3.5), Q-27E (mục 4).
