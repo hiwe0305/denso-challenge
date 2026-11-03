@@ -36,7 +36,7 @@ Là người làm làn Đánh giá, tôi muốn mỗi rollout SIMPLE của độ
 - [x] 2. Vector lệnh và đo, intrinsics và pose camera từ mảng số, test CPU (AC 2, 3, 5)
 - [ ] 3. Dựng `TraceStep`, `CameraParams` và bộ ghi trace theo quy ước tệp của hợp đồng, kèm cờ `sim_success` (AC 1, 3, 4)
   - [x] 3.1. Bộ ghi một thư mục mỗi episode (`trace.jsonl`, `camera_params.json`, `episode.json`), `trace_id` chung với client RTC, `reference_sha256` chép từ job spec (review PO 3/11/2026, B1)
-  - [ ] 3.2. Ghim bản tham chiếu camera G0 của task hai bàn ở SIMPLE `b75c678` (review PO 3/11/2026, B3)
+  - [x] 3.2. Ghim bản tham chiếu camera G0 của task hai bàn ở SIMPLE `b75c678` (review PO 3/11/2026, B3)
   - [ ] 3.3. Entry module cài hook ở cấp module, đọc `job_id`, `run_plan_id`, thư mục job và bản tham chiếu từ job spec
   - [ ] 3.4. Đọc lại tệp qua `TraceStep`, `CameraParams` khi PR #48 merge (test đang skip hoặc xfail tới lúc đó)
 - [x] 4. Cài hook vào `eval-decoupled-wbc` (bọc env và agent), test `sim` (AC 1, 5)
@@ -163,7 +163,7 @@ Hệ quả:
 - Entry point cài hook ở cấp module (cho worker spawn) đi cùng bộ ghi hợp đồng ở nhiệm vụ 3 và lượt chạy thật ở nhiệm vụ 5.
 - 3/11/2026, sau khi PR #67 merge: test `sim` bỏ shim, gọi `flywheel_simple.tray.run.prepare()` (đăng ký env khay và thay bộ đọc điều kiện của SIMPLE). Kết quả chạy lại trên `rtx3060`: 4 passed trong 495 s.
 
-### 3/11/2026 · Nhiệm vụ 3.1: tệp của episode (review PO, B1)
+### 3/11/2026 · Nhiệm vụ 3.1, 3.2: tệp của episode và bản tham chiếu camera (review PO, B1 và B3)
 
 **Layout tệp** (`flywheel_simple/trace/files.py`). Một lượt `eval-decoupled-wbc` là một job; mỗi episode một thư mục:
 
@@ -180,3 +180,11 @@ Hệ quả:
 - **`reference_sha256`** (Q3): bộ ghi nhận hash đã ghim từ job spec và chép vào mọi `CameraParams` của episode, và vào `camera_params_hash` của `RolloutResult`. Không có hash thì không ghi `camera_params.json`, và R5 ra CHƯA RÕ. Bộ ghi từ chối chuỗi không phải sha256.
 - Tệp ghi bằng JSON thuần: venv SIMPLE không có gói `flywheel`. Test CPU đọc lại `episode.json` qua `RolloutResult`. Test cho `TraceStep` và `CameraParams` skip cho tới khi #48 merge. Chạy với `flywheel.contracts` của #48 (`5b373e2`) qua `PYTHONPATH`: `test_files.py` 9 passed, test seam e2e của hook 1 passed.
 
+**Bản tham chiếu camera task hai bàn** (`docs/g0/camera-reference-two-table.yaml`, B3):
+- `scripts/g0/trace/pin_camera_reference.py` chạy vòng eval thật của SIMPLE `b75c678` một episode 2 bước, với server Ψ₀ thay bằng stub giữ tư thế. Script đọc camera bằng `camera_values` của hook và ghi YAML có dạng khối `r5` của `configs/eval/diagnosis/system.yaml`: `reference_sha256` và `cameras` theo `uid`.
+- Chạy trên `rtx3060` ngày 3/11/2026, 23:14–23:16, trong `~/denso-da38` (bản sao SIMPLE checkout ở `b75c678`, venv của DA-33), `systemd-run MemoryMax=12G`, không dùng GPU cho policy. Kết quả: 2 camera (`head_stereo_left`, `head_stereo_right`), 640×360, fx = fy = 224,0664, tâm (320, 180), gắn `eye_in_head`.
+- `reference_sha256 = fc7f9c90ebbf8c4662fd70e58de5aed668c0fbc5ccfbbd951dce705729cdeea2`. Test CPU tính lại hash từ file YAML và so với giá trị này.
+- Chạy lại sau khi thêm `trace_id` vào hook (23:20): script ghim ra đúng các giá trị cũ; test `sim` hai bàn ở `b75c678` 3 passed trong 49 s (task khay không chạy lại lần này).
+- Task khay chưa có bản tham chiếu; lượt chạy khay không có `camera_params.json` cho tới khi ghim.
+- Không sửa `system.yaml`; phiên DA-13 chép khối này vào.
+- **Rủi ro cho khung 5/11:** CycloneDDS của SIMPLE dùng domain 0. Lượt ghim báo `Failed to find a free participant index for domain 0`, tức đang có tiến trình khác cùng máy giữ domain này. Hai lượt eval chạy cùng lúc trên `rtx3060` có thể nhận nhầm topic của nhau. Trước khi chạy nhiệm vụ 5, 6 cần kiểm xem lượt chạy có độc chiếm máy không, hoặc đặt `DOMAIN_ID` riêng. **[Đề xuất]**

@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 from flywheel_simple.trace.camera import CameraValues, reference_sha256
 from flywheel_simple.trace.files import EpisodeDirSink
 from flywheel_simple.trace.hook import CycleRecord, EpisodeTrace
@@ -17,6 +18,8 @@ from flywheel_simple.trace.hook import CycleRecord, EpisodeTrace
 # SIMPLE's venv, where the `sim` tests run, has no flywheel package
 RolloutResult = pytest.importorskip("flywheel.contracts.v0").RolloutResult
 
+ROOT = Path(__file__).resolve().parents[4]
+TWO_TABLE_REFERENCE = ROOT / "docs/g0/camera-reference-two-table.yaml"
 PINNED = "fc7f9c90ebbf8c4662fd70e58de5aed668c0fbc5ccfbbd951dce705729cdeea2"
 
 
@@ -110,3 +113,13 @@ def test_a_reference_that_is_not_a_sha256_is_refused(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="sha256"):
         write(tmp_path, episode(), reference="fake-camera-v0")
 
+
+def test_the_pinned_two_table_reference_hashes_to_its_own_digest() -> None:
+    doc = yaml.safe_load(TWO_TABLE_REFERENCE.read_text(encoding="utf-8"))
+    cams = [
+        CameraValues(uid, v["mount"], v["width"], v["height"], v["fx"], v["fy"], v["cx"], v["cy"],
+                     tuple(v["pose"]))  # fmt: skip
+        for uid, v in doc["cameras"].items()
+    ]
+    assert doc["simple_commit"] == "b75c6786f87b4a7f43b52b0ac5b83a1d9ea62e11"
+    assert reference_sha256(cams) == doc["reference_sha256"] == PINNED

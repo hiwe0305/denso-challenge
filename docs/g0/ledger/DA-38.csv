@@ -1,0 +1,6 @@
+date,activity,resource_type,quantity,unit,unit_price_usd,amount_usd,estimated_or_measured,branch,round,job,person,note
+2026-11-03,sim_trace_hook_build,engineer_time,14,hour,0.0,0.0,estimated,g0,0,job_da38_est,eng_lead_01,Story estimate for DA-38 (range 10-18 h)
+2026-11-03,sim_trace_hook_test,gpu_local_rtx3060,0.177,hour,0.0,0.0,measured,g0,0,job_da38_simtest_1,eng_lead_01,pytest -m sim on SIMPLE 6d10628: 4 passed in 637 s; hold-pose stub instead of the Psi0 server; one process; MemoryMax 12G
+2026-11-03,sim_trace_hook_test,gpu_local_rtx3060,0.137,hour,0.0,0.0,measured,g0,0,job_da38_simtest_2,eng_lead_01,pytest -m sim rerun after PR #67: 4 passed in 495 s; hold-pose stub; one process; MemoryMax 12G
+2026-11-03,sim_camera_reference_pin,gpu_local_rtx3060,0.025,hour,0.0,0.0,measured,g0,0,job_da38_pin_two_table,eng_lead_01,pin_camera_reference.py on SIMPLE b75c678 two-table: one 2-step episode with hold-pose stub; about 90 s wall incl. env start-up; MemoryMax 12G
+2026-11-03,sim_trace_hook_test,gpu_local_rtx3060,0.04,hour,0.0,0.0,measured,g0,0,job_da38_rerun_b75c678,eng_lead_01,SIMPLE b75c678 two-table: pin rerun (same values) about 90 s plus pytest -m sim 3 passed in 49 s; hold-pose stub; MemoryMax 12G
