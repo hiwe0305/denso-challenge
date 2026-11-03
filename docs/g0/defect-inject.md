@@ -41,7 +41,7 @@ Chỉ ghi lỗi đã cấy thật (DA-31 tính recall theo loại từ manifest)
 
 Hai bản sao không được lộ đáp án qua thứ gì ngoài chính lỗi (sửa 4/11/2026):
 
-- **Stats tính lại từ dữ liệu của bản sao.** `flywheel.data.inject.stats.write_stats` ghi `episodes_stats.jsonl`, `stats.json`, `stats_psi0.json`, `relative_stats.json` cho mọi episode của cả hai bản, theo đúng `stats_block` của `scripts/postprocess_psi0_sonic.py` (SIMPLE `6d10628`). Nếu chép stats của bản gốc, ai tính lại stats cũng liệt kê được đúng các episode đã đổi mà không cần phát hiện lỗi. `stats.json` của psi-data `e78fb93` không suy ra được từ parquet của chính nó ở cột `states` (lệch mean tới 3,6e-4), nên stats của bản gốc không dùng làm chuẩn.
+- **Stats tính lại từ dữ liệu của bản sao.** `flywheel.data.inject.stats.write_stats` ghi `episodes_stats.jsonl`, `stats.json`, `stats_psi0.json`, `relative_stats.json` cho mọi episode của cả hai bản, theo đúng `stats_block` của `scripts/postprocess_psi0_sonic.py` (SIMPLE `6d10628`). Nếu chép stats của bản gốc, ai tính lại stats cũng liệt kê được đúng các episode đã đổi mà không cần phát hiện lỗi. `stats.json` của psi-data `e78fb93` không suy ra được từ parquet của chính nó ở cột `states` (lệch mean tới 3,6e-4), nên stats của bản gốc không dùng làm chuẩn. Đo trên `e78fb93` (`tests/unit/inject/test_source_stats.py`, chạy với `DA27_PSI_DATA`): stats từng episode lệch tối đa 3e-8, stats toàn tập mọi cột trong 1e-6 trừ `states` (3,63e-4), một phát hiện D4 trên dữ liệu của tác giả. Stats không tính lại được (ảnh cần giải mã video) mang theo từ episode có video mà bản sao đang giữ, theo thứ tự feature của file gốc; psi-data không có stats ảnh.
 - **Lineage của bộ ghi ở phía bộ chấm.** Mỗi dòng `meta/flywheel_lineage.jsonl` ghi `old_first` (index của bản gốc); từ đó suy ra độ dài episode gốc và lộ episode bị cắt, còn số dòng thì lộ bản nào sạch (95 so với 98 trên psi-data). Bản ghi vẫn giữ nguyên, append-only, nhưng chuyển sang `answers/<id>/flywheel_lineage.jsonl`. Hai bản sao có cùng tập file.
 - **Một mtime cho mọi file** của cả hai bản, nên thời điểm ghi không chỉ episode nào.
 - Ngoài `meta/benchmark_copy.json` (dấu bản sao, có ở cả hai), không file nào chứa chữ `inject`, `defect`, `duplicate`, `bench` (có test).
@@ -126,6 +126,6 @@ Hỗ trợ sinh log giả định theo đúng schema của `FakeTrainer` và RTC
 
 ## 4. Kiểm thử và Nghiệm thu
 
-* **Unit tests:** 89 test case tự động; chạy thật trên psi-data ở trên tại `packages/flywheel-data/tests/unit/inject/`.
+* **Unit tests:** 92 test case tự động (một test chỉ chạy khi có `DA27_PSI_DATA`); chạy thật trên psi-data ở trên tại `packages/flywheel-data/tests/unit/inject/`.
 * **Độ bao phủ:** 100% các loại lỗi cấy đều có test kiểm chứng.
 * **Độc lập kiến trúc:** Không import vòng, tuân thủ nghiêm ngặt 3 hợp đồng kiến trúc của repo.

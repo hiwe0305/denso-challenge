@@ -163,7 +163,11 @@ def write_copy(
     _write_seeds(
         out_root, {int(ep.episode_id.removeprefix("episode_")): ep.seed for ep in episodes}
     )
-    write_stats(out_root)
+    owners = {
+        int(slot.removeprefix("episode_")): int(source.removeprefix("episode_"))
+        for slot, source in duplicates.items()
+    }
+    write_stats(out_root, source=src_root, owners=owners)
     (out_root / "meta" / COPY_MARKER).write_text(json.dumps({"benchmark_copy_id": copy_id}))
     # One mtime for every file and directory, so write times point at no episode.
     stamp = (src_root / "meta" / "info.json").stat().st_mtime

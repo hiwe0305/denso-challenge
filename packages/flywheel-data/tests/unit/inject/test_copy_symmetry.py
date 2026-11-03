@@ -168,3 +168,64 @@ def test_episode_meta_rows_have_the_same_keys(copies: tuple[Path, dict[str, Path
     _, roots = copies
     keys = [sorted({k for r in read_episode_rows(root) for k in r}) for root in roots.values()]
     assert keys[0] == keys[1]
+
+
+def test_untouched_episodes_have_the_same_stats_in_both_copies(
+    copies: tuple[Path, dict[str, Path]],
+) -> None:
+    out, roots = copies
+    manifest = load_manifest(out / "answers" / roots["defect"].name / "defect_manifest.json")
+    targets = {int(d.target_ref.removeprefix("episode_")) for d in manifest.defects}
+
+    def rows(root: Path) -> dict[int, str]:
+        lines = (root / "meta/episodes_stats.jsonl").read_text().splitlines()
+        return {json.loads(x)["episode_index"]: x for x in lines}
+
+    defect, clean = rows(roots["defect"]), rows(roots["clean"])
+    untouched = [i for i in clean if i not in targets]
+    assert len(untouched) == 7
+    assert all(defect[i] == clean[i] for i in untouched)
+
+
+def test_stats_the_lane_cannot_recompute_follow_the_episode_video(tmp_path: Path) -> None:
+    # Image stats need decoded video, which the lane never decodes: they are carried
+    # from the episode whose video the copy now holds, the source's for a duplicate.
+    src = tmp_path / "psi"
+    make_dataset(src, count=40, length=8)
+    meta = src / "meta"
+    image = {f"ep{i}": {"mean": [[[float(i)]]], "count": [8]} for i in range(40)}
+    meta.joinpath("episodes_stats.jsonl").write_text(
+        "".join(
+            json.dumps(
+                {"episode_index": i, "stats": {"observation.images.egocentric": image[f"ep{i}"]}}
+            )
+            + "\n"
+            for i in range(40)
+        )
+    )
+    meta.joinpath("stats.json").write_text(
+        json.dumps({"observation.images.egocentric": {"mean": [1.0]}})
+    )
+    result = build_benchmark(src, tmp_path / "inject")
+    manifest = load_manifest(result.defect.manifest_path)
+    duplicates = {
+        int(d.target_ref.removeprefix("episode_")): int(
+            str(d.parameters["original_id"]).removeprefix("episode_")
+        )
+        for d in manifest.defects
+        if d.parameters["kind"] == "duplicate_episode"
+    }
+    for root in (Path(result.defect.ref.uri), Path(result.clean.ref.uri)):
+        rows = [
+            json.loads(x) for x in (root / "meta/episodes_stats.jsonl").read_text().splitlines()
+        ]
+        for row in rows:
+            index = row["episode_index"]
+            owner = (
+                duplicates.get(index, index) if root.name == result.defect.ref.dataset_id else index
+            )
+            assert list(row["stats"]) == ["observation.images.egocentric", "action", "timestamp"]
+            assert row["stats"]["observation.images.egocentric"] == image[f"ep{owner}"]
+        dataset = json.loads((root / "meta/stats.json").read_text())
+        assert list(dataset)[0] == "observation.images.egocentric"
+        assert dataset["observation.images.egocentric"] == {"mean": [1.0]}
