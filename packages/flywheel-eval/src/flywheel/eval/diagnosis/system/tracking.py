@@ -28,16 +28,19 @@ from flywheel.eval.diagnosis.system.verdict import CheckResult, SystemFinding
 PARTS = ("upper", "lower")
 
 
-def check_r3(trace: TraceLog, cfg: R3Thresholds) -> CheckResult:
-    """Tracking error of both halves of the body against their own thresholds.
+def check_r3(
+    trace: TraceLog, cfg: R3Thresholds, parts: tuple[str, ...] = PARTS
+) -> CheckResult:
+    """Tracking error of each half of the body against its own threshold.
 
-    Both halves are always measured, so an episode where the arms tracked and
-    the legs did not comes back saying exactly that. A half whose statistic is
-    nan was not measured; `signals.py` has already said so by name, and
-    repeating it here would report the same gap twice.
+    `parts` is the halves the trace can be judged on; `diagnose_system` leaves
+    out a half `signals.py` has already skipped as `R3/upper` or `R3/lower`,
+    so an episode where the arms were measured and the legs were not still
+    has its arms judged. A half whose statistic is nan was not measured, and
+    `signals.py` has said so by name.
     """
     findings = []
-    for part in PARTS:
+    for part in parts:
         error = trace.tracking_error(part)
         statistic = percentile(error, cfg.percentile)
         threshold = _threshold(part, cfg)

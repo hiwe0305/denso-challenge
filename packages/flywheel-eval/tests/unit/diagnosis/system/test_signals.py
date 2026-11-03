@@ -37,8 +37,8 @@ def test_a_missing_command_field_costs_r3_not_r4(row, inputs_from) -> None:
 
     reasons = unjudgeable_codes(inputs_from(rows), LIMITS)
 
-    assert set(reasons) == {"R3"}
-    assert "cmd_lower" in reasons["R3"]
+    assert set(reasons) == {"R3/lower"}
+    assert "cmd_lower" in reasons["R3/lower"]
 
 
 def test_a_gap_over_the_allowance_costs_the_code(row, inputs_from) -> None:
@@ -73,8 +73,8 @@ def test_a_trace_too_short_for_a_percentile_costs_every_code(row, inputs_from) -
 
     reasons = unjudgeable_codes(inputs_from(rows), LIMITS)
 
-    assert set(reasons) == {"R3", "R4"}
-    assert "3 chu kỳ" in reasons["R3"]
+    assert set(reasons) == {"R3/upper", "R3/lower", "R4"}
+    assert "3 chu kỳ" in reasons["R3/upper"]
 
 
 def test_a_skipped_code_and_no_fault_is_unknown_not_clean(row, inputs_from) -> None:
