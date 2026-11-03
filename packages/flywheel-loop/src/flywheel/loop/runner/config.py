@@ -31,8 +31,10 @@ class EvalConfig(BaseModel):
     control_hz: float = 50.0
     chunk_size: int = 16
     latency_profiles: dict[str, Any] = Field(default_factory=dict)
-    # Async: control steps an RTC log may leave the robot without an action before the
-    # rollout counts as failed.
+    # Async: actions a hardware RTC client still holds when it asks for the next chunk
+    # (Psi0 stage 3 max_delay, chosen 3/11/2026), and the control steps without an
+    # action the replayed schedule may have before the timing verdict is "starved".
+    refill_level: int = Field(default=8, ge=0)
     max_starved_steps: int = Field(default=0, ge=0)
 
     def timing_for_purpose(self, purpose: str) -> Literal["sync", "async"]:

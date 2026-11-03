@@ -93,24 +93,31 @@ class RTCSchedule:
 
     chunks: int
     max_delay_steps: int
+    # Actions a hardware client still holds when it sends the next request.
+    refill_level: int
     # Control steps with no action to execute, summed over chunks.
     starved_steps: int
     starved_chunks: int
 
 
-def replay_schedule(records: Sequence[RTCInferenceRecord]) -> RTCSchedule:
+def replay_schedule(
+    records: Sequence[RTCInferenceRecord], refill_level: int, chunk_size: int
+) -> RTCSchedule:
     """Replay the log on a real-time clock (async eval, ADR-20, design 8.5).
 
-    SIMPLE steps the sim synchronously: nothing moves while the client waits for a
-    chunk, so the trace never shows a late one. On a real-time controller the robot
-    goes on executing the `buffer_level` actions left when the request went out, then
-    has nothing to execute for `delay_steps - buffer_level` steps. The first request
+    SIMPLE steps the sim synchronously and its client asks for a chunk only once the
+    buffer is empty, so the logged `buffer_level` is 0 and says nothing about hardware.
+    A hardware client sends the request while `refill_level` actions are left (capped
+    at the chunk size) and runs them during the inference; chunk k >= 1 then leaves the
+    robot without an action for `delay_steps - refill_level` steps. The first request
     is made before the robot moves, so its wait is not a stall.
     """
-    stalls = [max(0, r.delay_steps - r.buffer_level) for r in records[1:]]
+    level = min(refill_level, chunk_size)
+    stalls = [max(0, r.delay_steps - level) for r in records[1:]]
     return RTCSchedule(
         chunks=len(records),
         max_delay_steps=max((r.delay_steps for r in records), default=0),
+        refill_level=level,
         starved_steps=sum(stalls),
         starved_chunks=sum(1 for stall in stalls if stall > 0),
     )

@@ -71,6 +71,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 03/11/2026 | Triển khai runner hai chế độ sync/async, gom log RTC, demo bộ giả có độ trễ, cấu hình eval.yaml và tài liệu async-eval.md | Nguyễn Thăng Long |
 | 03/11/2026 | Sửa review của Hiếu trên PR #49: ngữ nghĩa bất đồng bộ thật, gom log RTC từ adapter, phân phối log-normal, bộ đọc eval.yaml, sửa boundary_jump float, dịch tài liệu sang tiếng Việt | Nguyễn Thăng Long |
 | 3/11/2026 | Làm lại theo lần soát thứ hai của PO: khóa bộ đệm theo mọi đầu vào; async bắt buộc có log RTC và kiểm theo nghĩa; runner phát lại lịch RTC để chấm async; bỏ `[x]` ở nhiệm vụ 1 và 4 | Hiếu (cùng Claude) |
+| 3/11/2026 | Theo chốt của Hiếu: tính bước bị cạn theo `refill_level`; giữ `sim_success` của sim, ghi `timing_verdict` vào `runner.json` | Hiếu (cùng Claude) |
 
 ## Ghi chép khi làm
 
@@ -81,8 +82,8 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
   - Nhiệm vụ 2 và 3 xong, test chạy runner thật trên `FakeSim2D`, `FakePolicy` của testkit. `RTCLoggingSim` trong test chỉ ghi log như client RTC của DA-19.
   - Nhiệm vụ 1 còn thiếu profile trễ dựng từ một `rtc.jsonl` thật (`LatencyProfile.from_log` đã đọc qua `RTCInferenceRecord`). Log thật đầu tiên sẽ có từ client DA-19 trên #66.
   - Nhiệm vụ 4 còn thiếu chỗ RunPlan gọi `timing_for_purpose`: trên master chưa có schema RunPlan.
-  - Bản giả client RTC nên chuyển vào `flywheel.testkit` qua PR riêng cho Hiếu.
-  - Đề xuất hợp đồng cho Hiếu: `RolloutResult` chưa có trường cho kết luận async. Runner đang hạ `sim_success` khi buffer cạn và giữ kết quả của sim ở `runner.json` (`adapter_sim_success`, `rtc`). Một trường như `rtc_starved_steps` hoặc `timing_verdict` sẽ cho làn Đánh giá đọc được hai kết luận mà không cần file riêng của runner.
+  - Bản giả client RTC chuyển vào `flywheel.testkit` sau 13/11/2026 (Hiếu chốt 3/11/2026).
+  - Hiếu chốt 3/11/2026: bước bị cạn tính theo `refill_level = 8` trong eval.yaml, không theo `buffer_level` của log; `sim_success` giữ kết luận của sim; kết luận định thời nằm trong `runner.json` cho tới khi PR hợp đồng thêm `RolloutResult.timing_verdict` được merge.
 - File đã tạo hoặc sửa:
   - packages/flywheel-loop/src/flywheel/loop/runner/latency.py
   - packages/flywheel-loop/src/flywheel/loop/runner/config.py
