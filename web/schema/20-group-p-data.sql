@@ -151,8 +151,11 @@ CREATE INDEX ON pipeline_stage_runs (status) WHERE status = 'PAUSED_FOR_REVIEW';
 CREATE TABLE episodes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   episode_ref VARCHAR(64) NOT NULL UNIQUE,     -- ep_<ULID> từ lõi
+  -- `Episode` của hợp đồng không mang `dataset_id` (03 §4.3 cũng không): ở lõi
+  -- một episode trỏ `source_id` hoặc `intervention_id`, còn "lô" là khái niệm
+  -- của web. Bộ nạp suy ra cột này qua hai đường đó và từ chối dòng nào không
+  -- suy được, ghi lý do vào sync_runs. Xem web/fwsync/mapping.py và W12.
   dataset_id UUID NOT NULL REFERENCES datasets(id),
-  episode_index INTEGER NOT NULL,
   kind VARCHAR(24) NOT NULL CHECK (kind IN (
     'teleop_demo','teleop_correction','recovery','sim_rollout','variant',
     'eval_rollout','diag_rollout')),
@@ -197,7 +200,12 @@ CREATE TABLE episodes (
   -- view. Issue #62.
   benchmark_copy_id VARCHAR(64),
   meta JSONB NOT NULL DEFAULT '{}',
-  UNIQUE (dataset_id, episode_index),
+  -- Không có `episode_index`. Bản 0.2 khai nó NOT NULL cùng
+  -- `UNIQUE (dataset_id, episode_index)`, nhưng hợp đồng không có trường nào
+  -- như thế, nên bộ nạp sẽ phải tự phát số — một số do web đặt ra, đổi theo
+  -- thứ tự đọc file, và không nối được về lõi. `episode_ref` đã là khoá tự
+  -- nhiên và đã UNIQUE, nên nó đủ. (`eval_episodes.episode_index` là chuyện
+  -- khác: đó là thứ tự trong một lượt eval, lõi có thật.)
   -- Episode gốc là demo do người làm. `r_demo` của M8 đếm đúng cờ này, nên
   -- một episode máy sinh mang is_root sẽ làm sai chỉ số chính của bài toán
   -- kinh tế.
