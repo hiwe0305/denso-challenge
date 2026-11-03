@@ -226,7 +226,7 @@ Bundle theo 03 mục 7.2 (`frames.parquet`, `signals.parquet`, `videos/`, `meta.
 | Nhóm state và action | `frames.parquet` | Cột theo `action_layout`, hậu tố `_cmd` (lệnh gửi) và `_meas` (đo được) |
 | Camera | `meta.json` | Nội và ngoại tham số, fps, `t_image` từng khung |
 | Ngôn ngữ | `segments.parquet` | Mỗi dòng một đoạn: `t_start`, `t_end`, `step_id`, mô tả, nguồn nhãn (`rule`, `human`, `model`) |
-| Lỗi cấy | Episode `meta` | `injected_defect` (mã lỗi, tham số) chỉ trên bản sao dùng để chấm Agent QA/QC; không bao giờ có trong release train |
+| Bản sao chấm lỗi cấy | Episode `meta` | `benchmark_copy_id` trên **mọi** episode của bản sao dùng để chấm Agent QA/QC, cả episode có lỗi lẫn episode sạch; bằng `dataset_id` của `DefectManifest`; không bao giờ có trong release train. Sửa 3/11/2026 [Đã chốt]: thay `injected_defect` (mã lỗi, tham số), vì trường đó để đáp án ngay trong dữ liệu agent đọc (mục 9.2) |
 
 Quy tắc: episode `planned` và `measured` khác `embodiment_id` không trộn trong một release nếu chưa có `Decision` của câu V3 (ADR-08 của 03). Episode `pseudo` hoặc `retargeted` không vào train nếu RunPlan không cho phép.
 
@@ -542,6 +542,7 @@ Lỗi cấy trên action chỉ đặt vào chiều có nghĩa với loại lỗi
 **Cách chấm**:
 
 - Tỉ lệ cấy mỗi loại khoảng 5–10% số episode [Đề xuất]; đáp án khóa trước (hash) trong một file mà agent và code phát hiện không đọc được.
+- Sửa 3/11/2026 [Đã chốt]: đáp án **chỉ** nằm trong `DefectManifest`, không ghi vào episode. Bản sao đánh dấu cả khối bằng `benchmark_copy_id` (mục 6.1), nên agent biết mình đang chạy trên bản sao nhưng không biết episode nào có lỗi; rào release chặn theo dấu này, nên episode sạch của bản sao cũng không vào release train.
 - **Precision và recall theo từng loại lỗi**, không gộp; **tỉ lệ báo nhầm** trên bản sạch (không cấy); thời gian từ lúc job xong tới lúc có báo cáo. Sửa 3/11/2026 [Đã chốt]: recall tính theo loại (bắt đúng episode với đúng mã của loại đó); precision tính theo mã, vì một phát hiện chỉ mang mã.
 - Tách hai lớp: phép kiểm bằng code (QA tầng 4) bắt được gì, và agent thêm được gì (xếp hạng, giải thích, đề xuất đúng hay sai). Như vậy số đo không đổ công của code cho agent.
 - Báo rõ "trên lỗi cấy". Lỗi tự nhiên của dữ liệu thật báo riêng khi có.
