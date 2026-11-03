@@ -33,8 +33,8 @@ Là người làm làn Đánh giá, tôi muốn mỗi rollout SIMPLE của độ
 ## Nhiệm vụ
 
 - [x] 1. File story và phạm vi file
-- [ ] 2. Dựng `TraceStep` và `CameraParams` từ mảng số, test CPU với bộ giả (AC 2, 3, 5)
-- [ ] 3. Bộ ghi trace theo quy ước tệp của hợp đồng, kèm cờ `sim_success` (AC 1, 4)
+- [x] 2. Vector lệnh và đo, intrinsics và pose camera từ mảng số, test CPU (AC 2, 3, 5)
+- [ ] 3. Dựng `TraceStep`, `CameraParams` và bộ ghi trace theo quy ước tệp của hợp đồng, kèm cờ `sim_success` (AC 1, 3, 4); chờ PR #48 merge
 - [ ] 4. Cài hook vào `eval-decoupled-wbc` (bọc env và agent), test `sim` (AC 1, 5)
 - [ ] 5. Lượt chạy thật task hai bàn trên `rtx3060`, ghi ledger (AC 6)
 - [ ] 6. Lượt chạy thật task khay trên `rtx3060`, ghi ledger (AC 6)
@@ -115,3 +115,13 @@ Hệ quả:
 1. Hook phải cài ở cấp module của entry point, không cài trong `main()`.
 2. Tham số `agent_factory` của `run_eval` là tham số chết: nó chỉ được kiểm, không được truyền cho worker. Không dùng nó làm điểm gắn hook.
 3. **Lỗi tiềm ẩn ngoài phạm vi DA-38.** `flywheel_simple.tray.run` gọi `register()` trong `main()`, nên `eval-decoupled-wbc` trên task khay với `--num-workers > 1` sẽ không tìm thấy env trong mọi worker. Lỗi này chặn eval song song của DA-34. Entry point của DA-38 sẽ đăng ký task khay ở cấp module. Sửa `tray/run.py` cần PR riêng, trong phạm vi DA-32.
+
+### 3/11/2026 · Nhiệm vụ 2
+
+- Phần dựng lớp `TraceStep`, `CameraParams` chuyển sang nhiệm vụ 3, vì phải chờ PR #48 merge. PO chốt Long sửa G1, G2 trong #48 trước khi merge. Nhiệm vụ 2 chỉ gồm phần tính toán thuần (`trace/signals.py`, `trace/camera.py`), không import `flywheel.contracts.trace`.
+- Intrinsics đọc từ model MuJoCo đã dựng (`cam_fovy`, `cam_sensorsize`, `cam_intrinsic`) cộng kích thước render, không chép từ `CameraCfg`.
+  - Lý do: khi `CameraCfg` không có `intrinsics` (cả hai task), SIMPLE đặt `fovy = 2·atan(H / 2fy)`. Ảnh render vì vậy có fx = fy = (H/2)/tan(fovy/2) và tâm ảnh ở giữa.
+  - `CameraCfg.fx` lại tính từ chiều rộng, nên hai số chỉ trùng nhau qua cách SIMPLE dựng camera.
+- Nhánh camera có `sensor_size` là phép nghịch đảo đúng cách SIMPLE ghi `focal_pixel` và `principal_pixel`. Dấu của điểm chính theo trục y trong MuJoCo chưa kiểm bằng ảnh render. Cả hai task không dùng nhánh này. **[Đề xuất]**
+- `reference_sha256` là sha256 của tập camera đã chuẩn hóa: sắp theo `uid`, làm tròn 1e-9, JSON có khóa sắp xếp. Bản tham chiếu tính từ cấu hình của commit SIMPLE đã ghim ở nhiệm vụ 3. **[Đề xuất]**
+- `STATE_SLICES` chép từ SIMPLE `6d10628`. Nhiệm vụ 4 có test `sim` so bản chép này với SIMPLE.
