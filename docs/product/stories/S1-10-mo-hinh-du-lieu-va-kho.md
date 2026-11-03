@@ -43,7 +43,7 @@ Là kỹ sư data, tôi muốn schema có phiên bản và kho lưu bất biến
 - [ ] 8. Sửa review PO ngày 3/11/2026 sau `8458371` trên PR #36 (AC 1, 5, 6, 7)
   - [x] 8.1 `Score.task_id` bắt buộc, không còn mặc định `"default"`
   - [x] 8.2 `Score` thêm `trace_sha256` để `ScoreRecord` của DA-36 chuyển sang `Score` không mất trường (#59 mục 7)
-  - [ ] 8.3 View DuckDB không đếm trùng: một `id` ra một dòng; kho vẫn append-only
+  - [x] 8.3 View DuckDB không đếm trùng: một `id` ra một dòng; kho vẫn append-only
   - [ ] 8.4 Sổ chi phí từ chối dòng thực đo trỏ tới ước tính không có hoặc trỏ tới dòng thực đo; `reverses_entry_id` phải là dòng có thật
   - [ ] 8.5 `blob_path` chỉ nhận sha256 64 ký tự hex, không thoát ra ngoài kho
   - [ ] 8.6 Bốn file mẫu chung trong testkit: `Score.json`, `Cluster.json`, `Decision.json`, `LedgerEntry.json`

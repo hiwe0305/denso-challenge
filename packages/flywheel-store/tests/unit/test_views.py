@@ -2,7 +2,8 @@
 
 from pathlib import Path
 
-from flywheel.contracts.entities import Condition, Source
+from flywheel.contracts.entities import Condition, Decision, LedgerEntry, Score, Source
+from flywheel.store.ledger_append import append_ledger_entry
 from flywheel.store.paths import StorePaths
 from flywheel.store.tables import TableWriter
 from flywheel.store.views import CATALOG_TABLES, open_duckdb
@@ -92,3 +93,72 @@ def test_views_reflect_data_and_persist_after_duckdb_deletion(tmp_path: Path) ->
     assert rows_cond2 == rows_cond1
     assert rows_src2 == rows_src1
     con2.close()
+
+
+def test_score_written_twice_is_one_row(tmp_path: Path) -> None:
+    """PO review 3/11 item 3: a re-run scorer on the same trace must not double-count."""
+    paths = StorePaths(root=tmp_path)
+    score = Score(
+        episode_id="ep_1",
+        task_id="two-table",
+        config_sha256="d" * 64,
+        trace_sha256="e" * 64,
+        success=True,
+    )
+    TableWriter("score", paths=paths).append(score)
+    TableWriter("score", paths=paths).append(score)  # second process, second part file
+    other = Score(
+        episode_id="ep_2",
+        task_id="two-table",
+        config_sha256="d" * 64,
+        trace_sha256="f" * 64,
+        success=False,
+    )
+    TableWriter("score", paths=paths).append(other)
+
+    con = open_duckdb(paths=paths)
+    assert con.execute("SELECT count(*), count(DISTINCT id) FROM score").fetchone() == (2, 2)
+    successes = con.execute("SELECT count(*) FILTER (WHERE success::BOOLEAN) FROM score")
+    assert successes.fetchone() == (1,)
+    # The store itself stays append-only: both copies are still on disk.
+    on_disk = [
+        line
+        for part in paths.table_dir("score").glob("part-*.jsonl")
+        for line in part.read_text(encoding="utf-8").splitlines()
+        if score.id in line
+    ]
+    assert len(on_disk) == 2
+    con.close()
+
+
+def test_event_written_twice_is_one_row(tmp_path: Path) -> None:
+    """The same event id appended twice (a retried write) is one event, not two."""
+    paths = StorePaths(root=tmp_path)
+    decision = Decision(
+        kind="dev_gate",
+        subject_kind="checkpoint",
+        subject_id="ckpt_1",
+        signed_by="hieu",
+        reason="dev gate",
+    )
+    writer = TableWriter("decision", paths=paths)
+    writer.append(decision)
+    writer.append(decision)
+
+    entry = LedgerEntry(
+        activity="eval",
+        resource_type="gpu_hour_3060",
+        quantity=1.0,
+        unit="hour",
+        usd_amount=0.2,
+        measure_kind="estimated",
+        run_plan_id="rp_1",
+        job_id="job_1",
+    )
+    append_ledger_entry(entry, paths=paths)
+    append_ledger_entry(entry, paths=paths)
+
+    con = open_duckdb(paths=paths)
+    assert con.execute("SELECT count(*) FROM decision").fetchone() == (1,)
+    assert con.execute("SELECT count(*), sum(usd_amount) FROM ledger_entry").fetchone() == (1, 0.2)
+    con.close()
