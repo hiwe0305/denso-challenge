@@ -7,7 +7,7 @@ _Ngày 3/11/2026. Story [DA-19](../product/stories/DA-19-code-train-va-log.md) n
 - **Script stage 3 không còn ở commit ghim.** `scripts/train/psi0/finetune-simple-psi0.sh` bị tác giả xóa ở commit `2830f93` (28/09/2026, "release sonic 1.1 checkpoint"), trước `cda3fdf`. Config `finetune_simple_psi0_config` và `scripts/train.py` vẫn còn. Script thay thế `finetune-sonic-simple-psi0.sh` dùng layout SONIC 78 chiều, không phải layout 36 chiều của task hai bàn. **[Đã chốt]** (Hiếu, 3/11/2026) `Psi0Trainer` gọi thẳng `scripts/train.py finetune_simple_psi0_config` qua `torchrun`, với bộ tham số lấy từ bản cuối của `finetune-simple-psi0.sh` (`git show 2830f93^:scripts/train/psi0/finetune-simple-psi0.sh`), ghi vào `configs/models/psi0-stage3.yaml`. Không sửa repo tác giả, không đổi commit ghim. 03 mục 7 và design còn viết "gọi `finetune-simple-psi0.sh`"; sửa hai tài liệu đó là việc của PO, ngoài phạm vi story này.
 - **Log có sẵn chỉ qua `accelerate` tới W&B.** Mọi số đi qua `Trainer.log()` → `accelerator.log(..., step=global_step)`. Không có file log cục bộ nào. Script của tác giả đặt `--log.report_to=wandb`; trên Colab không có khóa W&B thì phải đặt `WANDB_MODE=offline`.
 - **Có sẵn:** `train/loss`, `train/epoch`, `train/lr_act` cùng `lr_<nhóm>`, `train/grad_norm_act`, `train/grad_norm_vlm` (khi VLM được train), `eval/loss`, và sai số L1 theo 8 nhóm action trên val (`eval/<dataset>/err_l1_hand_joints`, `err_l1_arm_joints`, `err_l1_torso_rpy`, `err_l1_height`, `err_l1_vx`, `err_l1_vy`, `err_l1_vyaw`, `err_l1_target_yaw`). Phép chia nhóm này cứng cho layout 36 chiều (`src/psi/config/transform.py`, `ActionStateTransform.denormalize_L1_action_err`), khớp layout của design mục 9.
-- **Thiếu, lớp bọc phải tính:** loss theo vị trí trong chunk, phương sai và độ lệch chuẩn của action dự đoán, độ lệch chuẩn của action đích, phân bố độ mở bàn tay (DA-07), VRAM, throughput, thời gian chạy, và các mã định danh (`run_plan_id`, `job_id`, `checkpoint_id`, `release_id`, `attempt`).
+- **Thiếu, lớp bọc phải tính:** `grad_norm_vlm` khi VLM đóng băng (stage 3 dùng `--model.no-tune-vlm`, Ψ₀ khi đó không log trường này nên T8a của DA-08 không kiểm được), loss theo vị trí trong chunk, phương sai và độ lệch chuẩn của action dự đoán, độ lệch chuẩn của action đích, phân bố độ mở bàn tay (DA-07), VRAM, throughput, thời gian chạy, và các mã định danh (`run_plan_id`, `job_id`, `checkpoint_id`, `release_id`, `attempt`).
 
 ## Cách lớp bọc lấy phần thiếu mà không sửa code tác giả
 
@@ -17,9 +17,13 @@ _Ngày 3/11/2026. Story [DA-19](../product/stories/DA-19-code-train-va-log.md) n
 |---|---|---|
 | `Trainer.log(metrics)` | Chép mỗi dict `train/*`, `eval/*` thành một dòng `TrainingMetric` | `step`, `epoch`, `split`, `loss`, `lr`, `grad_norm_*`, `wall_time_s`, `vram_gb`, `throughput` |
 | `FinetuneTrainer.inference(eval_model, batch)` | Giữ action dự đoán `(B, Tp, Da)` và `batch["actions"]` của mỗi batch val | `loss_by_group`, `loss_by_chunk_pos`, `pred_var_by_dim`, `pred_std`, `target_std`, `hand_open_hist` |
-| `FinetuneTrainer.save_checkpoint(step)` | Biết `ckpt_<step>` mới nhất để đặt `checkpoint_id` | `checkpoint_id` |
+| `FinetuneTrainer.clip_grad_norms()` | Gọi sau `backward`, trước `optimizer.step()` và `zero_grad()`. Khi Ψ₀ không có nhóm VLM trong kết quả, cộng bình phương norm gradient của mọi tham số ngoài `action_header.`; VLM đóng băng thì bằng 0. Không bọc `training_step`: lúc nó trả về, gradient đã bị xóa nên số đo luôn bằng 0 | `grad_norm_vlm` |
 
 `evaluate()` đã gọi `inference()` trên `val_num_batches` batch val (20 trong bộ tham số stage 3), nên phần tính thêm không chạy lại model. Phần tính số chỉ dùng mảng, kiểm được trên CPU với `FakeTrainer` (nhiệm vụ con 3).
+
+**Độ mở bàn tay** (DA-07, `flywheel_psi0.trainer.val_stats`). **[Đã chốt]** (Hiếu, 3/11/2026). Mốc mở là tư thế mở của SIMPLE, `init_qpos = 0` cho cả 7 khớp Dex3 mỗi tay (`simple/robots/g1_sonic.py`). Mốc nắm lấy từ dữ liệu: trong `stats_psi0.json` của task hai bàn, mọi khớp tay có một cận bằng 0, cận kia là lần nắm sâu nhất của người teleop, sâu hơn `close_qpos` của SIMPLE (ngón trỏ tới 1,5 rad so với 0,5). Độ mở của một khớp giảm tuyến tính từ 1 ở tư thế mở về 0 ở cận xa nhất; độ mở của một tay là trung bình 7 khớp. `hand_open_hist` là histogram 10 ngăn trên [0, 1], gộp hai tay. Tính trong không gian đã chuẩn hóa nên chỉ cần cận min/max của `stats_psi0.json`, không cần đổi về radian.
+
+**Dòng nào mang số đo val.** **[Đã chốt]** (Hiếu, 3/11/2026). Các trường tính trên batch val chỉ ghi lên dòng `split = "val"`. Reader DA-08 hiện lấy `loss_by_group`, `pred_var_by_dim`, `pred_std`, `target_std` từ dòng `train`, nên T4, T5, T6 bỏ qua cho tới khi reader đọc dòng `val`; đã báo Châu.
 
 Stage 1 và 2 chỉ đọc code (design mục 8): stage 1 log `action_accuracy`, `action_l1_loss` trên token FAST, không có loss flow; stage 2 log giống stage 3 trừ `state_drop_frac`.
 
@@ -64,30 +68,32 @@ _Sinh bởi `scripts/g0/read_psi0_logging.py` từ commit `cda3fdfafe47cb6fa7540
 
 ### Trường `TrainingMetric` so với stage 3
 
-| Trường | Có sẵn | Nguồn trong Ψ₀ | Cách lấy |
-|---|---|---|---|
-| `run_plan_id` | thiếu | — | Lớp bọc nhận từ RunPlan |
-| `job_id` | thiếu | — | Lớp bọc nhận từ RunPlan |
-| `checkpoint_id` | thiếu | — | Lớp bọc đặt theo job và `ckpt_<step>` gần nhất |
-| `release_id` | thiếu | — | Lớp bọc nhận từ RunPlan |
-| `attempt` | thiếu | — | Lớp bọc đếm số lần chạy lại từ checkpoint |
-| `step` | có | `step=` | `accelerator.log(..., step=self.global_step)` |
-| `epoch` | có | `train/epoch` | Chép từ bản ghi train |
-| `split` | có | `train/loss` | Tiền tố `train/` thành `train`, `eval/` thành `val` |
-| `loss` | có | `train/loss` | `train/loss` và `eval/loss` |
-| `lr` | có | `train/lr_act` | LR nhóm action header; nhóm khác ở `lr_<nhóm>` |
-| `vlm_frozen` | thiếu | — | `model.tune_vlm` trong `run_config.json` (`--model.no-tune-vlm`) |
-| `loss_by_group` | một phần | `eval/**modality_metrics` | Val: `eval/<dataset>/err_l1_<nhóm>` (L1 đã khử chuẩn hóa, 8 nhóm của layout 36 chiều); train: lớp bọc tính theo nhóm của ActionLayout |
-| `loss_by_chunk_pos` | thiếu | — | Lớp bọc: cùng sai số đó theo vị trí trong chunk |
-| `grad_norm_vlm` | có | `train/grad_norm_vlm` | Chỉ có khi một nhóm VLM được train |
-| `grad_norm_action` | có | `train/grad_norm_act` | Grad norm của action header |
-| `pred_var_by_dim` | thiếu | — | Lớp bọc: phương sai action dự đoán theo chiều, trên batch val |
-| `pred_std` | thiếu | — | Lớp bọc: độ lệch chuẩn action dự đoán theo chiều |
-| `target_std` | thiếu | — | Lớp bọc: độ lệch chuẩn action đích theo chiều |
-| `hand_open_hist` | thiếu | — | Lớp bọc: histogram các chiều bàn tay (0–13) của action dự đoán (DA-07) |
-| `vram_gb` | thiếu | — | Lớp bọc: `torch.cuda.max_memory_allocated()` |
-| `throughput` | thiếu | — | Lớp bọc: batch toàn cục chia thời gian một bước |
-| `wall_time_s` | thiếu | — | Lớp bọc: số giây từ lúc job bắt đầu |
+Cột "Ψ₀ tự log" chỉ nói code tác giả có sẵn số đó hay không. Mọi trường đều có trong `metrics.jsonl`: phần Ψ₀ không có do lớp bọc `flywheel_psi0.trainer` bù, trên các dòng ghi ở cột "Dòng".
+
+| Trường | Ψ₀ tự log | Nguồn trong Ψ₀ | Dòng | Cách lớp bọc lấy |
+|---|---|---|---|---|
+| `run_plan_id` | không | — | train, val | Nhận từ RunPlan |
+| `job_id` | không | — | train, val | Nhận từ RunPlan |
+| `checkpoint_id` | không | — | train, val | Id của checkpoint job sẽ ra, như nhau trên mọi dòng |
+| `release_id` | không | — | train, val | Nhận từ RunPlan |
+| `attempt` | không | — | train, val | Đếm số lần chạy lại từ checkpoint |
+| `step` | có | `step=` | train, val | `accelerator.log(..., step=self.global_step)` |
+| `epoch` | có | `train/epoch` | train, val | Từ `train/epoch`; dòng val lấy epoch gần nhất |
+| `split` | có | `train/loss` | train, val | Tiền tố `train/` thành `train`, `eval/` thành `val` |
+| `loss` | có | `train/loss` | train, val | `train/loss` và `eval/loss`; không hữu hạn ghi `"NaN"` |
+| `lr` | có | `train/lr_act` | train, val | LR nhóm action header; dòng val lấy LR gần nhất |
+| `vlm_frozen` | không | — | train, val | `model.tune_vlm` trong `run_config.json` (`--model.no-tune-vlm`) |
+| `loss_by_group` | một phần | `eval/**modality_metrics` | val | MSE trên batch val theo nhóm của ActionLayout, đã chuẩn hóa. Ψ₀ chỉ có L1 khử chuẩn hóa `eval/<dataset>/err_l1_<nhóm>`, không dùng |
+| `loss_by_chunk_pos` | không | — | val | MSE trên batch val theo vị trí trong chunk |
+| `grad_norm_vlm` | có | `train/grad_norm_vlm` | train | Ψ₀ chỉ log khi một nhóm VLM được train; stage 3 đóng băng VLM nên launcher (nhiệm vụ con 2) tự đo trong `clip_grad_norms()`, trước `zero_grad()`, để T8a kiểm được |
+| `grad_norm_action` | có | `train/grad_norm_act` | train | Grad norm của action header |
+| `pred_var_by_dim` | không | — | val | Phương sai action dự đoán theo chiều, trên batch val |
+| `pred_std` | không | — | val | Độ lệch chuẩn action dự đoán theo chiều, trên batch val |
+| `target_std` | không | — | val | Độ lệch chuẩn action đích theo chiều, trên batch val |
+| `hand_open_hist` | không | — | val | Độ mở mỗi tay (0 nắm hết cỡ, 1 mở) từ 14 chiều bàn tay (0–13), histogram 10 ngăn (DA-07) |
+| `vram_gb` | không | — | train, val | `torch.cuda.max_memory_allocated()` |
+| `throughput` | không | — | train | Batch toàn cục chia thời gian một bước; trống ngay sau eval |
+| `wall_time_s` | không | — | train, val | Số giây từ lúc lớp bọc khởi động |
 
 ### Script train trong `scripts/train/psi0/`
 

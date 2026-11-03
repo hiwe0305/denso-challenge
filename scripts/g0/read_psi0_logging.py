@@ -44,41 +44,51 @@ CALL_NAMES = {"log", "init_trackers", "evaluate", "save_checkpoint", "save_state
 # Receivers whose `.log` is arithmetic, not telemetry.
 MATH_RECEIVERS = {"torch", "np", "numpy", "math"}
 
-# TrainingMetric field -> (Psi0 key that supplies it, or None; how the wrapper gets it).
-# A key starting with "train/" or "eval/" is looked up in the extracted metric keys; a
-# `**splat` key means the names are built at run time, so the field is only partly there.
-FIELD_SOURCES: list[tuple[str, str | None, str]] = [
-    ("run_plan_id", None, "Lớp bọc nhận từ RunPlan"),
-    ("job_id", None, "Lớp bọc nhận từ RunPlan"),
-    ("checkpoint_id", None, "Lớp bọc đặt theo job và `ckpt_<step>` gần nhất"),
-    ("release_id", None, "Lớp bọc nhận từ RunPlan"),
-    ("attempt", None, "Lớp bọc đếm số lần chạy lại từ checkpoint"),
-    ("step", "step=", "`accelerator.log(..., step=self.global_step)`"),
-    ("epoch", "train/epoch", "Chép từ bản ghi train"),
-    ("split", "train/loss", "Tiền tố `train/` thành `train`, `eval/` thành `val`"),
-    ("loss", "train/loss", "`train/loss` và `eval/loss`"),
-    ("lr", "train/lr_act", "LR nhóm action header; nhóm khác ở `lr_<nhóm>`"),
-    ("vlm_frozen", None, "`model.tune_vlm` trong `run_config.json` (`--model.no-tune-vlm`)"),
+# TrainingMetric field -> (Psi0 key that supplies it, or None; the metrics.jsonl lines
+# that carry it; how the wrapper gets it). A key starting with "train/" or "eval/" is
+# looked up in the extracted metric keys; a `**splat` key means the names are built at
+# run time, so the field is only partly there.
+BOTH = "train, val"
+FIELD_SOURCES: list[tuple[str, str | None, str, str]] = [
+    ("run_plan_id", None, BOTH, "Nhận từ RunPlan"),
+    ("job_id", None, BOTH, "Nhận từ RunPlan"),
+    ("checkpoint_id", None, BOTH, "Id của checkpoint job sẽ ra, như nhau trên mọi dòng"),
+    ("release_id", None, BOTH, "Nhận từ RunPlan"),
+    ("attempt", None, BOTH, "Đếm số lần chạy lại từ checkpoint"),
+    ("step", "step=", BOTH, "`accelerator.log(..., step=self.global_step)`"),
+    ("epoch", "train/epoch", BOTH, "Từ `train/epoch`; dòng val lấy epoch gần nhất"),
+    ("split", "train/loss", BOTH, "Tiền tố `train/` thành `train`, `eval/` thành `val`"),
+    ("loss", "train/loss", BOTH, '`train/loss` và `eval/loss`; không hữu hạn ghi `"NaN"`'),
+    ("lr", "train/lr_act", BOTH, "LR nhóm action header; dòng val lấy LR gần nhất"),
+    ("vlm_frozen", None, BOTH, "`model.tune_vlm` trong `run_config.json` (`--model.no-tune-vlm`)"),
     (
         "loss_by_group",
         "eval/**modality_metrics",
-        "Val: `eval/<dataset>/err_l1_<nhóm>` (L1 đã khử chuẩn hóa, 8 nhóm của layout 36 chiều); "
-        "train: lớp bọc tính theo nhóm của ActionLayout",
+        "val",
+        "MSE trên batch val theo nhóm của ActionLayout, đã chuẩn hóa. Ψ₀ chỉ có L1 "
+        "khử chuẩn hóa `eval/<dataset>/err_l1_<nhóm>`, không dùng",
     ),
-    ("loss_by_chunk_pos", None, "Lớp bọc: cùng sai số đó theo vị trí trong chunk"),
-    ("grad_norm_vlm", "train/grad_norm_vlm", "Chỉ có khi một nhóm VLM được train"),
-    ("grad_norm_action", "train/grad_norm_act", "Grad norm của action header"),
-    ("pred_var_by_dim", None, "Lớp bọc: phương sai action dự đoán theo chiều, trên batch val"),
-    ("pred_std", None, "Lớp bọc: độ lệch chuẩn action dự đoán theo chiều"),
-    ("target_std", None, "Lớp bọc: độ lệch chuẩn action đích theo chiều"),
+    ("loss_by_chunk_pos", None, "val", "MSE trên batch val theo vị trí trong chunk"),
+    (
+        "grad_norm_vlm",
+        "train/grad_norm_vlm",
+        "train",
+        "Ψ₀ chỉ log khi một nhóm VLM được train; stage 3 đóng băng VLM nên launcher "
+        "(nhiệm vụ con 2) tự đo trong `clip_grad_norms()`, trước `zero_grad()`, để T8a kiểm được",
+    ),
+    ("grad_norm_action", "train/grad_norm_act", "train", "Grad norm của action header"),
+    ("pred_var_by_dim", None, "val", "Phương sai action dự đoán theo chiều, trên batch val"),
+    ("pred_std", None, "val", "Độ lệch chuẩn action dự đoán theo chiều, trên batch val"),
+    ("target_std", None, "val", "Độ lệch chuẩn action đích theo chiều, trên batch val"),
     (
         "hand_open_hist",
         None,
-        "Lớp bọc: histogram các chiều bàn tay (0–13) của action dự đoán (DA-07)",
+        "val",
+        "Độ mở mỗi tay (0 nắm hết cỡ, 1 mở) từ 14 chiều bàn tay (0–13), histogram 10 ngăn (DA-07)",
     ),
-    ("vram_gb", None, "Lớp bọc: `torch.cuda.max_memory_allocated()`"),
-    ("throughput", None, "Lớp bọc: batch toàn cục chia thời gian một bước"),
-    ("wall_time_s", None, "Lớp bọc: số giây từ lúc job bắt đầu"),
+    ("vram_gb", None, BOTH, "`torch.cuda.max_memory_allocated()`"),
+    ("throughput", None, "train", "Batch toàn cục chia thời gian một bước; trống ngay sau eval"),
+    ("wall_time_s", None, BOTH, "Số giây từ lúc lớp bọc khởi động"),
 ]
 
 
@@ -302,20 +312,24 @@ def render(inventory: Inventory) -> str:
         "",
         "### Trường `TrainingMetric` so với stage 3",
         "",
-        "| Trường | Có sẵn | Nguồn trong Ψ₀ | Cách lấy |",
-        "|---|---|---|---|",
+        'Cột "Ψ₀ tự log" chỉ nói code tác giả có sẵn số đó hay không. Mọi trường đều '
+        "có trong `metrics.jsonl`: phần Ψ₀ không có do lớp bọc `flywheel_psi0.trainer` "
+        'bù, trên các dòng ghi ở cột "Dòng".',
+        "",
+        "| Trường | Ψ₀ tự log | Nguồn trong Ψ₀ | Dòng | Cách lớp bọc lấy |",
+        "|---|---|---|---|---|",
     ]
-    for name, source, how in FIELD_SOURCES:
+    for name, source, where, how in FIELD_SOURCES:
         if source is None:
-            status, shown = "thiếu", "—"
+            status, shown = "không", "—"
         elif source == "step=":
             status, shown = "có", "`step=`"
         elif source in available:
             status = "một phần" if "**" in source else "có"
             shown = f"`{source}`"
         else:
-            status, shown = "thiếu", f"`{source}` (không thấy)"
-        lines.append(f"| `{name}` | {status} | {shown} | {how} |")
+            status, shown = "không", f"`{source}` (không thấy)"
+        lines.append(f"| `{name}` | {status} | {shown} | {where} | {how} |")
 
     has_stage3 = STAGE3_SCRIPT in inventory.stage_scripts
     lines += [
