@@ -23,9 +23,18 @@ R2 and the stage attribution read the contract types directly.
 accepts `NaN`, and every comparison against a NaN is false, so a trace whose
 tracking error is NaN on every cycle would clear every threshold it was checked
 against and come back as a clean controller. That is the silent pass FR21
-forbids, so a NaN or an infinity becomes a gap here and reaches the checks as
-one - which is what makes the first step of spec section 6.4, "thiếu tín hiệu
-→ CHƯA RÕ", fire on it.
+forbids, so a NaN or an infinity - as a JSON number or as the strings `"NaN"`,
+`"Infinity"`, `"-Infinity"` the contract allows - becomes a gap here and
+reaches the checks as one, which is what makes the first step of spec section
+6.4, "thiếu tín hiệu → CHƯA RÕ", fire on it.
+
+**`t_image: null` is not a gap.** The camera renders slower than the control
+loop runs, and `TraceStep` marks a cycle with no new frame by a null
+`t_image` (README of the #31 fixtures; the SIMPLE hook of DA-38 sets it once
+per chunk). Such a cycle has no image to pair with its state, so it carries
+no sync offset and costs R4 nothing; only a non-finite `t_image` is a gap.
+Null and non-finite are therefore kept apart: a gap reads as nan, "no new
+frame" as None.
 
 **A file that is not there and a file that is corrupt are different.** An
 absent RTC log costs R1 and R2 their verdict, by name, and the loader returns
@@ -66,19 +75,20 @@ class ReaderError(ValueError):
 class TraceRow:
     """One control cycle, with the fields of `TraceStep` (Contract change #31).
 
-    Absent is None and so is a value that is not finite, which is what lets the
-    missing-signal check see the difference between "the writer logged no image
-    timestamp" and "the writer logged one and it was NaN" - the same gap, and
-    the same CHƯA RÕ verdict, reported either way.
+    A gap - a null or non-finite `t_state` or vector entry, a non-finite
+    `t_image` - is nan. `t_image` is None only where the writer logged null,
+    which `TraceStep` defines as "no new camera frame on this cycle" and which
+    is not a gap. A vector logged as null is the empty tuple; `_matrix` turns
+    it into a row of nan as wide as the others.
     """
 
     step: int
-    t_state: float | None
+    t_state: float
     t_image: float | None
-    cmd_upper: tuple[float | None, ...]
-    meas_upper: tuple[float | None, ...]
-    cmd_lower: tuple[float | None, ...]
-    meas_lower: tuple[float | None, ...]
+    cmd_upper: tuple[float, ...]
+    meas_upper: tuple[float, ...]
+    cmd_lower: tuple[float, ...]
+    meas_lower: tuple[float, ...]
     dropped_frames: int
 
 
@@ -144,12 +154,21 @@ class TraceLog:
         return np.where(whole, norms, np.nan)
 
     def sync_offset(self) -> Values:
-        """|t_image - t_state| per cycle (R4), nan where either timestamp is a gap."""
+        """|t_image - t_state| per cycle (R4).
+
+        nan where either timestamp is a gap and where the cycle has no new
+        frame: a cycle with no image has no offset to measure.
+        """
         state = _column(self.rows, "t_state")
         image = _column(self.rows, "t_image")
         if state.size == 0 or image.size == 0:
             return np.empty(0, dtype=np.float64)
         return np.abs(image - state)
+
+    @property
+    def frame_cycles(self) -> int:
+        """Cycles that carry a new frame with a finite timestamp on both clocks."""
+        return int(np.isfinite(self.sync_offset()).sum())
 
 
 @dataclass(frozen=True)
@@ -284,9 +303,10 @@ def percentile(values: Values, which: float) -> float:
 
 
 def _trace_row(row: dict[str, Any], path: Path, number: int) -> TraceRow:
+    t_state = _scalar(row.get("t_state"), "t_state", path, number)
     return TraceRow(
         step=_step(row, path, number),
-        t_state=_scalar(row.get("t_state"), "t_state", path, number),
+        t_state=math.nan if t_state is None else t_state,
         t_image=_scalar(row.get("t_image"), "t_image", path, number),
         cmd_upper=_vector(row.get("cmd_upper"), "cmd_upper", path, number),
         meas_upper=_vector(row.get("meas_upper"), "meas_upper", path, number),
@@ -300,7 +320,7 @@ def _camera_view(entry: Any, path: Path) -> CameraView:
     if not isinstance(entry, dict):
         raise ReaderError(f"`{path}` phải là đối tượng CameraParams hoặc danh sách các đối tượng")
     pose = _vector(entry.get("pose"), "pose", path, 1)
-    if len(pose) != 7 or any(value is None for value in pose):
+    if len(pose) != 7 or not all(math.isfinite(value) for value in pose):
         raise ReaderError(
             f"`{path}`: `pose` phải có 7 số hữu hạn [x, y, z, qw, qx, qy, qz], "
             f"gặp {entry.get('pose')!r}"
@@ -314,7 +334,7 @@ def _camera_view(entry: Any, path: Path) -> CameraView:
         fy=_required_number(entry, "fy", path),
         cx=_required_number(entry, "cx", path),
         cy=_required_number(entry, "cy", path),
-        pose=tuple(float(value) for value in pose if value is not None),
+        pose=pose,
         reference_sha256=_text(entry, "reference_sha256", path),
     )
 
@@ -331,22 +351,25 @@ def _absent_fields(rows: list[dict[str, Any]]) -> tuple[str, ...]:
 
 
 def _gap_counts(rows: Iterable[TraceRow], absent: tuple[str, ...]) -> dict[str, int]:
-    """Rows whose value for a logged field is null or not finite.
+    """Rows whose value for a logged field is a gap: null or not finite.
 
-    A field in `absent` is left out: it is not logged at all, which is already
+    `t_image` is the exception: null there means no new frame (`TraceRow`),
+    so only a non-finite image timestamp is counted. A field in `absent` is
+    left out: it is not logged at all, which is already
     reported, and counting it here as well would report the same gap twice
     under two names and tell the engineer to collect it twice.
     """
     counts = {name: 0 for name in (*TRACK_FIELDS, *SYNC_FIELDS) if name not in absent}
     for row in rows:
-        for name in SYNC_FIELDS:
-            if name in counts and getattr(row, name) is None:
-                counts[name] += 1
+        if "t_state" in counts and not math.isfinite(row.t_state):
+            counts["t_state"] += 1
+        if "t_image" in counts and row.t_image is not None and not math.isfinite(row.t_image):
+            counts["t_image"] += 1
         for name in TRACK_FIELDS:
             if name not in counts:
                 continue
             values = getattr(row, name)
-            if not values or any(value is None for value in values):
+            if not values or not all(math.isfinite(value) for value in values):
                 counts[name] += 1
     return {name: count for name, count in counts.items() if count}
 
@@ -364,10 +387,7 @@ def _matrix(rows: Sequence[TraceRow], name: str) -> NDArray[np.float64]:
         return np.empty((0, 0), dtype=np.float64)
     if len(widths) > 1:
         raise ReaderError(f"`{name}` đổi số kênh giữa episode ({sorted(widths)})")
-    return np.array(
-        [[np.nan if value is None else value for value in vector] for vector in vectors],
-        dtype=np.float64,
-    )
+    return np.array(vectors, dtype=np.float64)
 
 
 def _column(rows: Sequence[TraceRow], name: str) -> Values:
@@ -459,24 +479,38 @@ def _dropped(value: Any, path: Path, number: int) -> int:
     return value
 
 
+# The strings `TraceStep` (Contract change #31) encodes a non-finite value as.
+NON_FINITE = ("NaN", "Infinity", "-Infinity")
+
+
 def _scalar(value: Any, name: str, path: Path, number: int) -> float | None:
+    """A number, nan for a non-finite one, or None for a null.
+
+    The two are kept apart because `t_image` gives them different meanings
+    (`TraceRow`); every other field treats both as a gap.
+    """
     if value is None:
         return None
     if isinstance(value, str):
-        # The contract encodes a non-finite timestamp as a string; either way it
-        # is not a measurement, so it becomes a gap rather than raising.
-        return None
+        if value not in NON_FINITE:
+            raise ReaderError(
+                f"`{path}` dòng {number}: `{name}` phải là số, null hoặc "
+                f"{'/'.join(NON_FINITE)}, gặp {value!r}"
+            )
+        # not a measurement, so it becomes a gap rather than a number
+        return math.nan
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ReaderError(f"`{path}` dòng {number}: `{name}` phải là số hoặc null, gặp {value!r}")
-    return float(value) if math.isfinite(value) else None
+    return float(value) if math.isfinite(value) else math.nan
 
 
-def _vector(value: Any, name: str, path: Path, number: int) -> tuple[float | None, ...]:
+def _vector(value: Any, name: str, path: Path, number: int) -> tuple[float, ...]:
     if value is None:
         return ()
     if not isinstance(value, list):
         raise ReaderError(f"`{path}` dòng {number}: `{name}` phải là danh sách số, gặp {value!r}")
-    return tuple(_scalar(item, name, path, number) for item in value)
+    scalars = (_scalar(item, name, path, number) for item in value)
+    return tuple(math.nan if item is None else item for item in scalars)
 
 
 def _text(entry: dict[str, Any], key: str, path: Path) -> str:
