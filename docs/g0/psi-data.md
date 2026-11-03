@@ -37,3 +37,96 @@ Ghi chú:
 
   Tập eval S1-03 đang dùng trên `rtx3060` là bản mới hơn revision ghim. Mục 4 so hai bản.
 - `rtx3060:~/denso-da33/fwdata/psi-data/simple/G1WholebodyLocomotionPickBetweenTablesTeleop-v0/` chỉ có `meta/info.json`, không phải gói đầy đủ.
+
+## 2. Cấu trúc LeRobot và layout action 36 chiều (AC 3 · V1)
+
+```bash
+python3 -I scripts/g0/inspect_psi_data.py layout <gói>.zip \
+    --psi0-slices psi0_simple_init.py --psi0-stage3 finetune-simple-psi0.sh \
+    --names-from tray_s1_0d84cc87b1e5/meta/action_layout.json --json layout-<gói>.json
+```
+
+Đầu vào của bảng, mỗi cột một nguồn:
+
+| Cột | Nguồn |
+|---|---|
+| shape, dtype, names | `meta/info.json` của gói. `info.json` ghi `action` và `states` là shape `[-1]`, không đặt tên chiều; số chiều đo trên parquet |
+| key `modality.json`, abs/rel | `meta/modality.json` của gói: chỉ số đầu, cuối, cờ `absolute` của từng nhóm |
+| Ψ₀ `ACTION_SLICES_36D`, chú thích Ψ₀ | `src/psi/data/simple/__init__.py` của Ψ₀ @ `cda3fdf` (`git show`, sha256 file `ddb135a2…`): danh sách `ACTION_SLICES_36D` và khối chú thích layout ở đầu file |
+| pad-action-dim, pad-state-dim | bản cuối của `scripts/train/psi0/finetune-simple-psi0.sh` (`git show 2830f93^:…`, sha256 `729fd4b9…`; script bị xóa trước `cda3fdf`, xem [psi0-logging.md](psi0-logging.md)) |
+| name, group | `meta/action_layout.json` của release khay DA-33 `tray_s1_0d84cc87b1e5` (sha256 `29c2b281…`): tên khớp `WHOLE_BODY_JOINTS` của `g1_sonic` theo thứ tự của `postprocess_psi0_sonic.py` của SIMPLE, cùng script tác giả dùng để tạo gói psi-data. **Giả định:** gói psi-data đi qua đúng script đó; dữ liệu không mang tên chiều để kiểm trực tiếp |
+| min, max, số giá trị khác nhau | đo trên mọi khung của mọi episode |
+
+Kết quả cho gói hai bàn (output của lệnh, chép nguyên):
+
+`G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip`: codebase_version `v2.1`, fps 50, robot_type `g1`, 62,764 khung
+
+| Trường | dtype | shape trong `info.json` | names |
+|---|---|---|---|
+| `observation.images.egocentric` | video | [360, 640, 3] | ['height', 'width', 'channel'] |
+| `observation.hand_joints` | float32 | [14] | ['hand_joints'] |
+| `observation.arm_joints` | float32 | [14] | ['arm_joints'] |
+| `observation.leg_joints` | float32 | [15] | ['leg_joints'] |
+| `observation.prev_torso_rpy` | float32 | [3] | ['prev_roll', 'prev_pitch', 'prev_yaw'] |
+| `observation.prev_height` | float32 | [1] | ['prev_height'] |
+| `states` | float32 | [-1] | None |
+| `action` | float32 | [-1] | None |
+| `timestamp` | float32 | [1] | None |
+| `frame_index` | int64 | [1] | None |
+| `episode_index` | int64 | [1] | None |
+| `index` | int64 | [1] | None |
+| `next.done` | bool | [1] | None |
+| `task_index` | int64 | [1] | None |
+
+Đo trên parquet: `action` 36 chiều, `states` 32 chiều. Ψ₀ stage 3: pad-action-dim 36, pad-state-dim 36; chỉ số state được đệm: [32, 33, 34, 35].
+
+| index | name | group | masked | key `modality.json` | Ψ₀ `ACTION_SLICES_36D` | chú thích Ψ₀ | min | max | số giá trị khác nhau |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 | `left_hand_thumb_0_joint` | left_hand | false | `left_hand` (abs) | left_hand_thumb | hand qpos absolute (L_thumb 3, L_index 2, L_middle 2, R_hand 7) | 0 | 0.5 | 7 |
+| 1 | `left_hand_thumb_1_joint` | left_hand | false | `left_hand` (abs) | left_hand_thumb | hand qpos absolute (L_thumb 3, L_index 2, L_middle 2, R_hand 7) | 0 | 0.7 | 6 |
+| 2 | `left_hand_thumb_2_joint` | left_hand | false | `left_hand` (abs) | left_hand_thumb | hand qpos absolute (L_thumb 3, L_index 2, L_middle 2, R_hand 7) | 0 | 0.7 | 6 |
+| 3 | `left_hand_middle_0_joint` | left_hand | false | `left_hand` (abs) | left_hand_index | hand qpos absolute (L_thumb 3, L_index 2, L_middle 2, R_hand 7) | -1.5 | 0 | 6 |
+| 4 | `left_hand_middle_1_joint` | left_hand | false | `left_hand` (abs) | left_hand_index | hand qpos absolute (L_thumb 3, L_index 2, L_middle 2, R_hand 7) | -1.5 | 0 | 6 |
+| 5 | `left_hand_index_0_joint` | left_hand | false | `left_hand` (abs) | left_hand_middle | hand qpos absolute (L_thumb 3, L_index 2, L_middle 2, R_hand 7) | -0.6 | 0 | 6 |
+| 6 | `left_hand_index_1_joint` | left_hand | false | `left_hand` (abs) | left_hand_middle | hand qpos absolute (L_thumb 3, L_index 2, L_middle 2, R_hand 7) | -1.5 | 0 | 6 |
+| 7 | `right_hand_thumb_0_joint` | right_hand | false | `right_hand` (abs) | right_hand | hand qpos absolute (L_thumb 3, L_index 2, L_middle 2, R_hand 7) | -0.5 | 6.931e-19 | 2,066 |
+| 8 | `right_hand_thumb_1_joint` | right_hand | false | `right_hand` (abs) | right_hand | hand qpos absolute (L_thumb 3, L_index 2, L_middle 2, R_hand 7) | -0.7 | 1.108e-16 | 2,061 |
+| 9 | `right_hand_thumb_2_joint` | right_hand | false | `right_hand` (abs) | right_hand | hand qpos absolute (L_thumb 3, L_index 2, L_middle 2, R_hand 7) | -0.7 | 1.108e-16 | 2,061 |
+| 10 | `right_hand_index_0_joint` | right_hand | false | `right_hand` (abs) | right_hand | hand qpos absolute (L_thumb 3, L_index 2, L_middle 2, R_hand 7) | -2.217e-16 | 1.5 | 2,062 |
+| 11 | `right_hand_index_1_joint` | right_hand | false | `right_hand` (abs) | right_hand | hand qpos absolute (L_thumb 3, L_index 2, L_middle 2, R_hand 7) | -2.217e-16 | 1.5 | 2,060 |
+| 12 | `right_hand_middle_0_joint` | right_hand | false | `right_hand` (abs) | right_hand | hand qpos absolute (L_thumb 3, L_index 2, L_middle 2, R_hand 7) | -4.085e-18 | 1 | 2,040 |
+| 13 | `right_hand_middle_1_joint` | right_hand | false | `right_hand` (abs) | right_hand | hand qpos absolute (L_thumb 3, L_index 2, L_middle 2, R_hand 7) | -2.217e-16 | 1.5 | 2,060 |
+| 14 | `left_shoulder_pitch_joint` | left_arm | false | `left_arm` (abs) | left_arm | arm qpos absolute (L_arm 7, R_arm 7) | -0.4883 | 0.2558 | 62,728 |
+| 15 | `left_shoulder_roll_joint` | left_arm | false | `left_arm` (abs) | left_arm | arm qpos absolute (L_arm 7, R_arm 7) | 0.19 | 0.3588 | 22,699 |
+| 16 | `left_shoulder_yaw_joint` | left_arm | false | `left_arm` (abs) | left_arm | arm qpos absolute (L_arm 7, R_arm 7) | -0.5471 | 0.5091 | 62,696 |
+| 17 | `left_elbow_joint` | left_arm | false | `left_arm` (abs) | left_arm | arm qpos absolute (L_arm 7, R_arm 7) | -0.3432 | 0.1913 | 62,742 |
+| 18 | `left_wrist_roll_joint` | left_arm | false | `left_arm` (abs) | left_arm | arm qpos absolute (L_arm 7, R_arm 7) | -0.3595 | 0.2125 | 62,652 |
+| 19 | `left_wrist_pitch_joint` | left_arm | false | `left_arm` (abs) | left_arm | arm qpos absolute (L_arm 7, R_arm 7) | -0.353 | 0.3993 | 62,722 |
+| 20 | `left_wrist_yaw_joint` | left_arm | false | `left_arm` (abs) | left_arm | arm qpos absolute (L_arm 7, R_arm 7) | -0.447 | 0.4283 | 62,648 |
+| 21 | `right_shoulder_pitch_joint` | right_arm | false | `right_arm` (abs) | right_arm | arm qpos absolute (L_arm 7, R_arm 7) | -0.6371 | 0.1457 | 62,628 |
+| 22 | `right_shoulder_roll_joint` | right_arm | false | `right_arm` (abs) | right_arm | arm qpos absolute (L_arm 7, R_arm 7) | -0.7684 | -0.19 | 53,290 |
+| 23 | `right_shoulder_yaw_joint` | right_arm | false | `right_arm` (abs) | right_arm | arm qpos absolute (L_arm 7, R_arm 7) | -1.065 | 0.615 | 62,724 |
+| 24 | `right_elbow_joint` | right_arm | false | `right_arm` (abs) | right_arm | arm qpos absolute (L_arm 7, R_arm 7) | -0.8479 | 0.3547 | 62,660 |
+| 25 | `right_wrist_roll_joint` | right_arm | false | `right_arm` (abs) | right_arm | arm qpos absolute (L_arm 7, R_arm 7) | -1.03 | 0.8703 | 62,696 |
+| 26 | `right_wrist_pitch_joint` | right_arm | false | `right_arm` (abs) | right_arm | arm qpos absolute (L_arm 7, R_arm 7) | -0.4294 | 0.7532 | 62,724 |
+| 27 | `right_wrist_yaw_joint` | right_arm | false | `right_arm` (abs) | right_arm | arm qpos absolute (L_arm 7, R_arm 7) | -0.5148 | 0.9712 | 62,706 |
+| 28 | `waist_roll_joint` | waist | false | `rpy` (abs) | — | waist roll/pitch/yaw absolute | -0.1682 | 0.1399 | 62,726 |
+| 29 | `waist_pitch_joint` | waist | false | `rpy` (abs) | — | waist roll/pitch/yaw absolute | -0.04533 | 0.1569 | 62,574 |
+| 30 | `waist_yaw_joint` | waist | false | `rpy` (abs) | — | waist roll/pitch/yaw absolute | -0.1328 | 0.4661 | 62,735 |
+| 31 | `base_height_command` | base_height | false | `height` (abs) | — | base_height absolute (m; reference 0.75) | 0.74 | 0.74 | 1 |
+| 32 | `navigate.vx` | navigate | false | `torso_vx` (rel) | — | vx relative (m/s, base frame) | -0.5 | 0.5 | 3,987 |
+| 33 | `navigate.vy` | navigate | false | `torso_vy` (rel) | — | vy relative | -0.5 | 0.5 | 5,807 |
+| 34 | `navigate.vyaw` | navigate | false | `torso_vyaw` (rel) | — | turning_flag discrete (0/1) | -1 | 1 | 51,104 |
+| 35 | `navigate.target_yaw` | navigate | false | `target_yaw` (abs) | — | target_yaw absolute (world heading, rad) | -3.138 | 3.141 | 20,482 |
+
+Chiều action hằng số trên mọi khung (1 giá trị): [31]
+
+Kết luận:
+
+- **Action có 36 chiều thật, không chiều nào là đệm** (`masked = false` cả 36): parquet có đúng 36 chiều, bằng `pad-action-dim` của Ψ₀, nên `pad_to_len` không thêm gì. Không có khớp chân: thân dưới nhận lệnh qua chiều 31–35. Bảng này thay mục "pad36" của bản #24 (12 chân, 3 thắt lưng, 14 tay, 2 bàn tay, 5 đệm), vốn sai.
+- **4 chiều đệm là của state**: `states` có 32 chiều (`modality.json`: `left_hand` 0–6, `right_hand` 7–13, `left_arm` 14–20, `right_arm` 21–27, `rpy` 28–30, `height` 31), Ψ₀ đệm lên 36 nên chỉ số state 32–35 là đệm.
+- **Chiều 34 là `vyaw` liên tục, không phải cờ rời rạc.** Chú thích Ψ₀ ghi `turning_flag discrete (0/1)`, comment ngày 3/11 trên #24 cũng ghi vậy. Dữ liệu cho 51.104 giá trị khác nhau trong `[-1, 1]`, và `modality.json` gọi chiều này là `torso_vyaw`, tương đối. Khớp với ghi chú trong [export.py](../../packages/flywheel-simple/src/flywheel_simple/tray/export.py) của DA-33: bộ WBC đọc chiều này như cờ quay, còn PICO và bộ lập kế hoạch gửi `vyaw` (rad/s). Báo Hiếu: `configs/embodiments/g1.yaml` và DA-08 nên coi chiều 34 là liên tục.
+- **Chiều 3–6 của tay trái:** Ψ₀ gọi 3:5 là `index`, 5:7 là `middle`; tên của SIMPLE theo thứ tự `postprocess_psi0_sonic.py` là `middle` ở 3–4, `index` ở 5–6 (DA-33 đã ghi). Tay phải thứ tự cái, trỏ, giữa.
+- **Chiều hằng số không phải chiều đệm.** Gói hai bàn có chiều 31 (`base_height_command`) bằng 0,74 ở mọi khung; tay trái (0–6) chỉ có 6–7 giá trị, tức teleop gửi vài tư thế cố định. Với T5 và T6 của DA-08: phương sai đích bằng 0 ở chiều 31 là thật, không phải lỗi; cần loại theo phương sai đích, không theo `masked`.
+- Đơn vị lấy từ chú thích Ψ₀, chưa kiểm độc lập: qpos theo rad, `base_height` theo m (mốc 0,75), `vx`, `vy` theo m/s trong hệ thân, `target_yaw` theo rad trong hệ thế giới. Giới hạn khớp không có trong gói; sẽ đến từ MJCF `g1_sonic` qua `configs/embodiments/g1.yaml` (DA-01), không áp cho chiều 32–34.
+- F1 cùng cấu trúc: cả hai gói `v2.1`, 50 Hz, `action` 36, `states` 32, camera 360×640, cùng `modality.json`. Chiều hằng số: `BendPickTeleop` 0–6 (tay trái không dùng), 32, 33, 35; `BendPickMP` 32–35 (không di chuyển thân). Bảng đầy đủ trong `layout-<gói>.md` trên `rtx3060`.
