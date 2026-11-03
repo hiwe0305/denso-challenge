@@ -26,11 +26,27 @@ INFO = {
     "video_path": "videos/chunk-{episode_chunk:03d}/egocentric/episode_{episode_index:06d}.mp4",
     "features": {"observation.images.egocentric": {"dtype": "video", "shape": [360, 640, 3]}},
 }
+# The flywheel block each recorder writes (DA-33 FlywheelMeta, DA-35 flywheel_meta).
+BLOCKS: dict[str, dict[str, object]] = {
+    "psi_data": {},
+    "planner_wbc": {"seed": 7, "level": 0, "split": "train", "planner_version": "p-1",
+                    "source_kind": "synthetic", "synthetic_tier": "S1"},
+    "teleop_pico": {"seed": 8, "level": 1, "split": "train", "generator_version": "s2-1",
+                    "source_kind": "synthetic", "synthetic_tier": "S2",
+                    "parent_episode": "ep_parent"},
+}
 LABELS = {
     "psi_data": ("teleop", "measured", None),
     "planner_wbc": ("synthetic", "planned", "S1"),
     "teleop_pico": ("synthetic", "planned", "S2"),
 }
+
+
+def set_block(root: Path, block: dict[str, object]) -> None:
+    meta = root / "meta" / "episodes.jsonl"
+    row = json.loads(meta.read_text())
+    row["environment_config"] = json.dumps({"uid": "task", "flywheel": block})
+    meta.write_text(json.dumps(row) + "\n")
 
 
 @pytest.fixture
@@ -55,6 +71,7 @@ def test_ingested_episode_round_trips_as_the_contract(
     frames: tuple[Path, EpisodeFrames], detail: str
 ) -> None:
     root, one = frames
+    set_block(root, BLOCKS[detail])
     episode = to_episode(one, register_source(root, detail, "unknown", "public"), "train")
     payload = json.loads(episode.model_dump_json())
     assert Episode.model_validate(payload) == episode
@@ -67,3 +84,5 @@ def test_ingested_episode_round_trips_as_the_contract(
     assert payload["meta"]["source_detail"] == detail
     assert payload["data_class"] == "public"
     assert payload["meta"]["injected_defect"] is None
+    assert payload["parent_id"] == BLOCKS[detail].get("parent_episode")
+    assert ("unknown" in payload["condition_id"]) == ("seed" not in BLOCKS[detail])

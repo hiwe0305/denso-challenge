@@ -198,6 +198,12 @@ def write_episode(root: Path, frames: EpisodeFrames) -> None:
     (meta / "info.json").write_text(json.dumps(info, indent=4))
 
 
+def read_episode_rows(root: Path) -> list[dict[str, Any]]:
+    """Rows of `meta/episodes.jsonl` as written, in episode_index order."""
+    read_info(root)
+    return _read_episode_rows(root)
+
+
 def _episode_path(info: dict[str, Any], template: str, index: int, camera: str = "") -> str:
     chunk = index // int(info["chunks_size"])
     path: str = info[template].format(episode_chunk=chunk, episode_index=index, video_key=camera)
