@@ -5,7 +5,12 @@ into `<work>/report.json` for the cost ledger (docs/g0/ledger/DA-19.csv):
 
     python3 -m flywheel_psi0.trainer.colab setup   --work /content/da19
     .venv-psi/bin/python -m flywheel_psi0.trainer.colab smoke --work /content/da19
-    python3 -m flywheel_psi0.trainer.colab persist --work /content/da19 --to <durable dir>
+    python3 -m flywheel_psi0.trainer.colab persist --work /content/da19 [--watch 600 --pid P]
+    python3 -m flywheel_psi0.trainer.colab restore --work /content/da19   # on a fresh VM
+
+The durable store is Google Drive (Hiếu, 3/11/2026): mount it on each new VM with
+`colab drivemount -s <session> /content/drive` before `persist` or `restore`; the
+consent given once on 3/11 is remembered, so later mounts need no browser step.
 
 `setup` uses only the standard library (the VM's python3): it clones Psi0 at the
 pin, builds `.venv-psi` with the author's versions (see `repair_lock`), adds the
@@ -340,36 +345,98 @@ def smoke(work: Path, steps: int, every: int, kill_at: int) -> None:
     )
 
 
-def persist(work: Path, durable: Path) -> None:
-    """Copy the job directory (metrics, results, Psi0 checkpoints) to durable storage."""
+DRIVE = Path("/content/drive/MyDrive/denso/da19")
+
+
+def completed_checkpoints(job_dir: Path) -> list[Path]:
+    """Psi0's `ckpt_<step>` directories that are fully written.
+
+    The launcher rewrites `result.json` only after `save_checkpoint` returns, so a
+    directory whose step is above `checkpoint_step` there may still be mid-write;
+    copying it would hand a resumed run a broken "latest" checkpoint.
+    """
+    result = job_dir / "result.json"
+    done = json.loads(result.read_text()).get("checkpoint_step") if result.exists() else None
+    if done is None:
+        return []
+    found = sorted(job_dir.glob("psi0/*/*/checkpoints/ckpt_*"), key=lambda p: p.name)
+    return [path for path in found if int(path.name.split("_")[1]) <= int(done)]
+
+
+def sync_job(job_dir: Path, target: Path) -> None:
+    """rsync the job directory to `target`, checkpoints only once they are complete."""
+    target.mkdir(parents=True, exist_ok=True)
+    sh(f"rsync -a --exclude 'checkpoints/' {job_dir}/ {target}/")
+    for checkpoint in completed_checkpoints(job_dir):
+        relative = checkpoint.relative_to(job_dir)
+        (target / relative).parent.mkdir(parents=True, exist_ok=True)
+        sh(f"rsync -a --partial {checkpoint}/ {target / relative}/")
+
+
+def persist(work: Path, durable: Path, watch: float | None = None, pid: int | None = None) -> None:
+    """Copy the job directory (metrics, results, complete checkpoints) to durable storage.
+
+    With `--watch S --pid P` it syncs every S seconds while process P (the training
+    job) lives, then once more: checkpoints reach Drive as they are made, so a VM
+    lost mid-run costs at most the steps since the last one.
+    """
     start = time.monotonic()
-    target = durable / JOB_ID
-    shutil.copytree(work / "runs" / JOB_ID, target, dirs_exist_ok=True)
-    shutil.copy(work / "report.json", target / "report.json")
+    job_dir, target = work / "runs" / JOB_ID, durable / JOB_ID
+    while watch and pid and _alive(pid):
+        sync_job(job_dir, target)
+        time.sleep(watch)
+    sync_job(job_dir, target)
+    if (work / "report.json").exists():
+        shutil.copy(work / "report.json", target / "report.json")
     size = sum(path.stat().st_size for path in target.rglob("*") if path.is_file())
     Report(work).phase(
         "persist", time.monotonic() - start, target=str(target), gigabytes=round(size / 1e9, 2)
     )
 
 
+def restore(work: Path, durable: Path) -> None:
+    """Bring a job directory back from durable storage onto a fresh VM before resuming.
+
+    Psi0Trainer then finds the run folder and the next attempt number exactly as on
+    the VM that was lost.
+    """
+    start = time.monotonic()
+    job_dir = work / "runs" / JOB_ID
+    job_dir.mkdir(parents=True, exist_ok=True)
+    sh(f"rsync -a {durable / JOB_ID}/ {job_dir}/")
+    Report(work).phase("restore", time.monotonic() - start, source=str(durable / JOB_ID))
+
+
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
-    parser.add_argument("phase", choices=["setup", "smoke", "persist"])
+    parser.add_argument("phase", choices=["setup", "smoke", "persist", "restore"])
     parser.add_argument("--work", type=Path, default=Path("/content/da19"))
     parser.add_argument("--steps", type=int, default=60)
     parser.add_argument("--every", type=int, default=20)
     parser.add_argument("--kill-at", type=int, default=30)
-    parser.add_argument("--to", type=Path, help="durable directory for `persist`")
+    parser.add_argument(
+        "--to", type=Path, default=DRIVE, help="durable directory (Google Drive by default)"
+    )
+    parser.add_argument("--watch", type=float, help="`persist`: sync every N seconds")
+    parser.add_argument("--pid", type=int, help="`persist --watch`: until this process ends")
     args = parser.parse_args(argv)
     args.work.mkdir(parents=True, exist_ok=True)
     if args.phase == "setup":
         setup(args.work)
     elif args.phase == "smoke":
         smoke(args.work, args.steps, args.every, args.kill_at)
+    elif args.phase == "persist":
+        persist(args.work, args.to, args.watch, args.pid)
     else:
-        if args.to is None:
-            parser.error("persist needs --to")
-        persist(args.work, args.to)
+        restore(args.work, args.to)
 
 
 if __name__ == "__main__":

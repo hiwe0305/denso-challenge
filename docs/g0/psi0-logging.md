@@ -61,8 +61,13 @@ DA-08 trên log thật: T8 báo `grad_norm_action = 153,7` ở bước 0 (ngư�
 2. Colab đặt `UV_SYSTEM_PYTHON`, nên `uv` cài vào Python 3.13 của hệ thống; phải gỡ biến đó và chỉ định `--python .venv-psi/bin/python`.
 3. Qwen3-VL được nạp với `flash_attention_2`: không có flash-attn thì train không chạy (README chỉ nói fallback SDPA cho inference trên XPU). Cài `flash_attn 2.7.4.post1` từ wheel dựng sẵn `cu12torch2.7cxx11abiTRUE-cp311`, với `--no-config` để `uv` không đòi build theo `pyproject` của Ψ₀.
 
+**Kho bền là Google Drive.** **[Đã chốt]** (Hiếu, 3/11/2026). Mỗi VM mới gắn Drive bằng `colab drivemount -s <session> /content/drive`; Hiếu đã cấp quyền một lần ngày 3/11, lần gắn sau trên cùng tài khoản không cần trình duyệt (đã thử: gắn lại không hỏi, ghi được từ cả kernel lẫn shell `colab ssh`; Drive còn 215 GB trống). Thư mục đích mặc định `MyDrive/denso/da19/<job_id>`.
+
+- `persist --watch 600 --pid <PID của job>` chạy song song với job, `rsync` mỗi 10 phút: metrics, kết quả, và chỉ những `ckpt_<step>` đã lưu xong (bước không vượt `checkpoint_step` trong `result.json`, vì launcher chỉ ghi file đó sau khi `save_checkpoint` trả về). Checkpoint đang ghi dở không bao giờ lên Drive, nên lần chạy lại không gặp một "checkpoint mới nhất" hỏng.
+- Trên VM mới: `setup`, gắn Drive, `restore` (kéo thư mục job về), rồi chạy lại job như cũ; `Psi0Trainer` tự tìm checkpoint cuối và tăng `attempt`.
+- Dung lượng: mỗi checkpoint 9,5 GB; recipe stage 3 lưu mỗi 10000 bước nên một lần 40000 bước để lại 4 checkpoint, khoảng 38 GB trên Drive. 215 GB đủ khoảng 5 lần chạy; lưới của DA-26 cần dọn checkpoint không dùng (Drive không tự xóa, `persist` không dùng `--delete`).
+
 **Còn mở:**
-- Kho bền cho checkpoint: `colab drivemount` qua CLI mất kết nối kernel, chưa gắn được Google Drive; lần chạy thử không giữ checkpoint (9,5 GB, 60 bước, không dùng tiếp). Job thật cần chọn kho: Drive gắn một lần trên trình duyệt, hoặc kho khác.
 - Probe P3, P4 trên checkpoint trung gian (AC 5) chưa làm.
 - `colab exec` qua kernel hay treo sau khi khởi động lại kernel; điều khiển VM qua `colab ssh --proxy-mode` ổn định hơn.
 
