@@ -12,7 +12,10 @@
 set -euo pipefail
 
 SIMPLE_REPO="https://github.com/physical-superintelligence-lab/SIMPLE.git"
-SIMPLE_COMMIT="6d10628794d9c7de4596b4f2afb2c054a637c2bc"
+# b75c678 (29/10/2026) = 6d10628 plus upstream PR #29, which spawns the two-table
+# task with zero arm init_qpos (raised forearms pushed G1 0.1-0.28 m back from its
+# spawn point). Only that task file differs; submodule gitlinks are unchanged.
+SIMPLE_COMMIT="b75c6786f87b4a7f43b52b0ac5b83a1d9ea62e11"
 # Submodules for the *Teleop-v0 tasks: "path|HTTPS url|commit". Commits are the
 # gitlinks of SIMPLE_COMMIT; the URLs are HTTPS because SIMPLE's .gitmodules
 # lists two of them over SSH.

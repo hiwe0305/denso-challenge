@@ -14,7 +14,7 @@ Script tạo venv Python 3.10 ở `fwdata/simple/.venv` của checkout chính (m
 
 | Thành phần | Giá trị |
 |---|---|
-| SIMPLE | `6d10628794d9c7de4596b4f2afb2c054a637c2bc` (30/8/2026) |
+| SIMPLE | `b75c6786f87b4a7f43b52b0ac5b83a1d9ea62e11` (29/10/2026), từ 3/11/2026; trước đó `6d10628794d9c7de4596b4f2afb2c054a637c2bc` (30/8/2026). Xem ghi chú dưới bảng |
 | Python | 3.10.22 (SIMPLE yêu cầu `==3.10.*`) |
 | MuJoCo | 3.3.6 |
 | torch | 2.7.0+cu128 (bản CPU khi máy không có `nvidia-smi`) |
@@ -22,6 +22,8 @@ Script tạo venv Python 3.10 ở `fwdata/simple/.venv` của checkout chính (m
 | `gear_sonic` | `e61eeb1dec9678dcc02f97c5ac27ca6a4fe82128`; cấu hình và robot SONIC, kèm `tyro`, `pin` |
 | `decoupled_wbc` | `5b304e4d643fe89cd000068dcbba7e7519539caa`; GR00T decoupled WBC, policy RL `Balance.onnx`, `Walk.onnx` (1,9 MB mỗi file, file thật), kèm `onnxruntime`; `pin-pink==4.4.0` và `qpsolvers[quadprog]==4.13.0` cho IK cổ tay `TeleopRetargetingIK` (DA-33) |
 | Asset | SIMPLE tự tải từ Hugging Face `USC-PSI-Lab/SIMPLE` lần đầu dùng (`robots_g1.zip` 134 MB, `robots_g1_sonic.zip`, cảnh HSSD, `assets_objects.zip` …); 2,1 GB trong `fwdata/simple/SIMPLE/data/` sau khi chạy cả task MP và task hai bàn (`du`, 28/10) |
+
+**Đổi pin SIMPLE ngày 3/11/2026 [Đã chốt, Hiếu].** `b75c678` là `6d10628` cộng đúng một sửa của tác giả (PR #29, commit `77872fe`, 29/10/2026): task hai bàn khởi động G1 với tay ở tư thế 0. Ở `6d10628`, `g1_sonic` khởi động tay giơ (`init_qpos` cánh tay `[0.5, 0, ±0.2, 0.55, 0, 0, 0]`), ngón chạm bàn 1 trong lúc WBC ổn định nên robot bị đẩy lùi 0,1–0,28 m khỏi điểm xuất phát; theo commit, dữ liệu và checkpoint của task được thu với tay ở 0. Giữa hai commit chỉ đổi `src/simple/tasks/g1_wholebody_locomotion_pick_between_tables_teleop.py`; gitlink của mọi submodule và ba file LFS của AMO giữ nguyên (kiểm bằng `gh api` ngày 3/11/2026). Task khay (DA-32) có lớp task riêng trong `flywheel_simple.tray`, nên số đo và dữ liệu khay đã ghi với `6d10628` vẫn dùng được. Image Docker công bố của SIMPLE (build 30/8/2026) là bản trước sửa này: eval Ψ₀ của S1-03 phải vá file task hoặc ghi đè `init_qpos` cánh tay về 0.
 
 ## Khác với `pyproject.toml` của SIMPLE
 
