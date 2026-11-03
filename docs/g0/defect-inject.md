@@ -19,7 +19,7 @@ Cấu hình tại `configs/data/inject.yaml`. Mã lỗi theo bảng ánh xạ c�
 
 Số episode cấy (quyết định PO 3/11/2026): mỗi loại đúng 3 episode khác nhau (`episodes_per_kind: 3`), tổng 33 trên 99; mỗi episode mang tối đa một lỗi. Với `duplicate_episode`, chỗ được chọn bị ghi đè bằng bản sao của một episode không cấy; bản gốc giữ nguyên, chỉ bản sao tính là episode cấy. Cùng `seed` cho cùng manifest.
 
-Chỉ ghi lỗi đã cấy thật (DA-31 tính recall theo loại từ manifest): episode không có gì để lỗi đó thay đổi (ví dụ mọi chiều góc của action bằng 0) bị bỏ qua, bộ cấy chọn episode khác; sau khi cấy, `flywheel.data.inject.applied.defect_applied` kiểm từng dòng manifest đúng là đã đổi dữ liệu ở chỗ nó ghi, sai thì dừng. Chiều action theo layout 36 chiều của G1 (design mục 9.2). Khi truyền `ActionLayout` (ví dụ `meta/action_layout.json` của export), lỗi trên action bỏ qua chiều bị mask và chiều layout không có.
+Chỉ ghi lỗi đã cấy thật (DA-31 tính recall theo loại từ manifest): episode không có gì để lỗi đó thay đổi (ví dụ mọi chiều góc của action bằng 0) bị bỏ qua, bộ cấy chọn episode khác; sau khi cấy, `flywheel.data.inject.applied.defect_applied` kiểm từng dòng manifest đúng là đã đổi dữ liệu ở chỗ nó ghi, sai thì dừng. Chiều action theo layout 36 chiều của G1 (design mục 9.2). Khi truyền `ActionLayout` (ví dụ `meta/action_layout.json` của export), lỗi trên action bỏ qua chiều bị mask và chiều layout không có. `test_g1_layout.py` chạy bộ cấy trên `configs/embodiments/g1.yaml` thật (DA-01): `g1.yaml` đổi chiều, giới hạn hay mask thì test đỏ.
 
 | Mã | Loại (`kind`) | Tên lỗi | Mô tả cơ chế cấy | Tham số cấu hình |
 |---|---|---|---|---|
@@ -56,6 +56,6 @@ Hỗ trợ sinh log giả định theo đúng schema của `FakeTrainer` và RTC
 
 ## 4. Kiểm thử và Nghiệm thu
 
-* **Unit tests:** 62 test case tự động tại `packages/flywheel-data/tests/unit/inject/`.
+* **Unit tests:** 66 test case tự động tại `packages/flywheel-data/tests/unit/inject/`.
 * **Độ bao phủ:** 100% các loại lỗi cấy đều có test kiểm chứng.
 * **Độc lập kiến trúc:** Không import vòng, tuân thủ nghiêm ngặt 3 hợp đồng kiến trúc của repo.
