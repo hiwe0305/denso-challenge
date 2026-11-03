@@ -28,7 +28,7 @@ _Phạm vi 3/11/2026 (Q2): bộ export đã có trong adapter (`flywheel-simple/
 ## Nhiệm vụ
 
 - [x] 1. Điểm 1–6 của checklist trong làn (AC 1)
-- [ ] 2. Điểm 7: contract test bằng loader Ψ₀ (AC 2)
+- [x] 2. Điểm 7: contract test bằng loader Ψ₀ (AC 2)
 - [ ] 3. Chạy trên release khay S1 và psi-data, ghi kết quả (AC 3)
 
 ## Giao diện
