@@ -58,6 +58,7 @@ NO_P1 = "không có kết quả probe P1 của checkpoint"
 NO_P3 = "không có kết quả probe P3 của checkpoint"
 NO_P4 = "không có kết quả probe P4 của checkpoint sau fine-tune"
 NO_GROUPS = "không biết nhóm action nào liên quan tới bước hỏng"
+NO_T7 = "chưa có kết luận T7 của DA-08 cho checkpoint này"
 
 
 @dataclass(frozen=True)
@@ -223,10 +224,16 @@ def _forgetting(inputs: StageInputs) -> Verdict:
 
     T7 is passed in rather than recomputed. DA-08 owns the forgetting rule, and
     two stories computing it apart would eventually disagree about whether a
-    checkpoint forgot.
+    checkpoint forgot. None means the caller has not run DA-08, which is not
+    the same as T7 not firing, so it is unavailable rather than inapplicable.
+
+    The other half of the row, "a failure new after fine-tuning", needs the
+    failures of the parent checkpoint and is not checked here yet.
     """
     if inputs.p4 is None:
         return NO_P4
+    if inputs.t7 is None:
+        return NO_T7
     if not inputs.t7:
         return None
     return [

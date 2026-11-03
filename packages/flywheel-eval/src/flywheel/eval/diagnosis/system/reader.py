@@ -220,13 +220,15 @@ class StageInputs:
     Every field is optional: a hypothesis that has no probe behind it is not
     stated, and the row says which probe it was waiting for. `t7` is the
     forgetting finding of DA-08, passed in rather than recomputed, so the two
-    stories cannot disagree about whether a checkpoint forgot.
+    stories cannot disagree about whether a checkpoint forgot; None is "DA-08
+    has not been run", which leaves the forgetting row unavailable rather
+    than inapplicable.
     """
 
     p1: ProbeP1 | None = None
     p3: ProbeP3 | None = None
     p4: ProbeP4 | None = None
-    t7: bool = False
+    t7: bool | None = None
     out_of_domain: bool = False
     closed_loop_failed: bool = True
     failed_step: int | None = None
