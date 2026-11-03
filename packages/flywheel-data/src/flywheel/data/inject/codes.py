@@ -22,18 +22,3 @@ DATA_DEFECT_CODES: Mapping[str, str] = MappingProxyType(
         "action_sign_flip": "D7",
     }
 )
-
-LOG_DEFECT_CODES: Mapping[str, str] = MappingProxyType(
-    {
-        "T1_divergence": "T1",
-        "T2_not_learning": "T2",
-        "T3_overfitting": "T3",
-        "T4_group_imbalance": "T4",
-        "T5_dead_dimension": "T5",
-        "T6_mode_collapse": "T6",
-        "T7_forgetting": "T7",
-        "T8_gradient_anomaly": "T8",
-        "R1_high_latency": "R1",
-        "R2_buffer_depleted": "R2",
-    }
-)

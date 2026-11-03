@@ -11,7 +11,6 @@ from flywheel.data.inject.dataset import (
     create_defect_dataset,
     verify_release_barrier,
 )
-from flywheel.data.inject.log_defects import RTCLogDefectInjector, TrainLogDefectInjector
 from flywheel.data.inject.manifest import (
     MANIFEST_FILENAME,
     ManifestLock,
@@ -27,8 +26,6 @@ __all__ = [
     "EpisodeData",
     "InjectConfig",
     "ManifestLock",
-    "RTCLogDefectInjector",
-    "TrainLogDefectInjector",
     "copy_ids",
     "create_clean_dataset",
     "create_defect_dataset",
