@@ -223,6 +223,9 @@ CREATE INDEX ON episodes (dataset_id) WHERE is_root AND operator_kind = 'human';
 -- ---------------------------------------------------------------------------
 CREATE TABLE episode_qa_reports (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  -- `QAReport.report_id`: danh tính của một lần chấm. Append-only nghĩa là
+  -- không sửa dòng đã ghi, không có nghĩa là chèn lại cùng báo cáo.
+  report_ref VARCHAR(64) NOT NULL UNIQUE,
   episode_id UUID NOT NULL REFERENCES episodes(id),
   stage_run_id UUID REFERENCES pipeline_stage_runs(id),
   threshold_version VARCHAR(32) NOT NULL,

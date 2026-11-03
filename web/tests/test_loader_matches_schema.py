@@ -276,3 +276,31 @@ def test_no_strict_mapper_writes_into_a_uuid_column(
     # chuỗi của hợp đồng mang đuôi `_id`, và chúng là VARCHAR, nên tự qua.
     offenders = sorted(column for column in row if column in _uuid_columns()[table])
     assert not offenders, f"mapper của `{table}` ghi mã lõi vào cột UUID {offenders}"
+
+
+#: Cột UUID mà bộ nạp được ghi, vì giá trị là UUID **của chính web** do lõi
+#: chép lại nguyên văn khi trả lời một `human_actions` (W7). Mỗi dòng nói vì
+#: sao; một cột không có ở đây mà nhận giá trị từ lõi là một mã chuỗi đặt nhầm
+#: vào cột UUID.
+ECHOED_WEB_UUIDS: dict[tuple[str, str], str] = {
+    ("decisions", "source_action_id"): "id của human_actions mà quyết định này trả lời",
+    ("decisions", "target_id"): "UUID bản ghi đích web đã gửi trong hành động",
+}
+
+
+@pytest.mark.parametrize("table", sorted(TOLERANT_COLUMNS))
+def test_no_tolerant_column_lands_a_core_key_in_a_uuid_column(table: str) -> None:
+    uuid = _uuid_columns().get(table, set())
+    offenders = sorted(
+        column
+        for column in TOLERANT_COLUMNS[table]
+        if column in uuid and (table, column) not in ECHOED_WEB_UUIDS
+    )
+    assert not offenders, (
+        f"bộ nạp ghi {offenders} của `{table}` vào cột UUID; dùng `*_ref` để sink tra, "
+        f"hoặc khai vào ECHOED_WEB_UUIDS nếu đó là UUID web được lõi chép lại"
+    )
+
+
+def test_echoed_web_uuids_are_declared_with_a_reason() -> None:
+    assert all(reason.strip() for reason in ECHOED_WEB_UUIDS.values())

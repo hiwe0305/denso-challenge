@@ -174,19 +174,43 @@ def test_importing_twice_gives_the_same_result(source: Path, tmp_path: Path) -> 
 
     assert len(_rows(first.directory, "episodes")) == 1
     assert len(_rows(first.directory, "datasets")) == 1
-    assert first.counts()["episodes"] == {"inserted": 1, "updated": 1, "rejected": 0}
+    assert first.counts()["episodes"] == {
+        "inserted": 1, "updated": 1, "rejected": 0, "unchanged": 0
+    }
 
 
-def test_an_append_only_table_gains_a_row_on_a_second_import(
+def test_reimporting_the_same_qa_report_does_not_duplicate_it(
     source: Path, tmp_path: Path
 ) -> None:
-    # Hai lần chấm là hai số đo; ghi đè sẽ xoá mất số đã báo (03 §4.4).
+    # Cron chạy 5 phút một lần trên cùng artifact của lõi. Append-only nghĩa
+    # là không sửa dòng đã ghi, không có nghĩa là chèn lại cùng báo cáo; bản
+    # cũ của sink làm đúng điều sau và nhân đôi mọi báo cáo QA mỗi lần chạy.
     sink = JsonlSink(directory=tmp_path / "sink")
     run_import(source, sink)
     run_import(source, sink)
 
     assert "episode_qa_reports" in APPEND_ONLY
-    assert len(_rows(sink.directory, "episode_qa_reports")) == 2
+    assert len(_rows(sink.directory, "episode_qa_reports")) == 1
+    assert sink.counts()["episode_qa_reports"]["unchanged"] == 1
+
+
+def test_a_new_report_for_the_same_episode_is_a_second_row(
+    source: Path, tmp_path: Path
+) -> None:
+    # Hai lần chấm là hai số đo vì chúng có hai `report_id`, không phải vì
+    # cùng một báo cáo được nạp hai lần.
+    sink = JsonlSink(directory=tmp_path / "sink")
+    run_import(source, sink)
+    _write_jsonl(
+        source / "qa_reports.jsonl",
+        [QA_REPORT, {**QA_REPORT, "report_id": "qa_2", "threshold_version": "v2"}],
+    )
+    run_import(source, sink)
+
+    assert [row["report_ref"] for row in _rows(sink.directory, "episode_qa_reports")] == [
+        "qa_1",
+        "qa_2",
+    ]
 
 
 def test_one_bad_row_does_not_stop_the_import(source: Path, tmp_path: Path) -> None:
@@ -441,16 +465,58 @@ def test_a_second_import_in_a_new_process_still_upserts(source: Path, tmp_path: 
     second = JsonlSink(directory=out)
     run_import(source, second)
 
-    assert second.counts()["episodes"] == {"inserted": 0, "updated": 1, "rejected": 0}
+    assert second.counts()["episodes"] == {
+        "inserted": 0, "updated": 1, "rejected": 0, "unchanged": 0
+    }
     assert len(_rows(out, "episodes")) == 1
 
 
-def test_an_append_only_table_grows_across_processes(source: Path, tmp_path: Path) -> None:
+def test_an_append_only_table_does_not_grow_across_processes(
+    source: Path, tmp_path: Path
+) -> None:
     out = tmp_path / "sink"
     run_import(source, JsonlSink(directory=out))
     run_import(source, JsonlSink(directory=out))
 
-    assert len(_rows(out, "episode_qa_reports")) == 2
+    assert len(_rows(out, "episode_qa_reports")) == 1
+
+
+LEDGER_ENTRY: dict[str, Any] = {
+    "entry_ref": "led_1",
+    "entry_kind": "ENTRY",
+    "activity": "teleop",
+    "resource_type": "operator_minutes",
+    "quantity": 30,
+    "unit": "minute",
+    "price_book_name": "pitch_v10",
+    "measured_usd": 25.0,
+    "dataset_code": "ds_psi_teleop",
+}
+
+
+def test_a_ledger_entry_is_never_updated_by_a_reimport(source: Path, tmp_path: Path) -> None:
+    # R4: sổ chi phí chỉ được thêm, sửa sai bằng bút toán đảo. Bản cũ của
+    # sink upsert bảng này theo `entry_ref`, nên một artifact nạp lại với số
+    # khác sẽ âm thầm ghi đè số đã báo.
+    _write_jsonl(source / "ledger.jsonl", [LEDGER_ENTRY])
+    sink = JsonlSink(directory=tmp_path / "sink")
+    run_import(source, sink)
+    _write_jsonl(source / "ledger.jsonl", [{**LEDGER_ENTRY, "measured_usd": 999.0}])
+    run_import(source, sink)
+
+    rows = _rows(sink.directory, "cost_ledger_entries")
+    assert len(rows) == 1
+    assert rows[0]["measured_usd"] == 25.0
+    assert sink.counts()["cost_ledger_entries"]["updated"] == 0
+
+
+def test_every_table_the_loader_writes_has_a_natural_key() -> None:
+    # Không có khoá thì không phân biệt được "đã nạp" với "mới", và cron 5
+    # phút nhân đôi bảng đó. Bảng append-only cũng không được miễn.
+    writable = set(IMPORT_ORDER) | {"defect_items", "train_diagnosis_skips"}
+    missing = sorted(writable - set(NATURAL_KEY))
+    assert not missing, f"thiếu NATURAL_KEY cho {missing}"
+    assert APPEND_ONLY <= set(NATURAL_KEY)
 
 
 # ---------------------------------------------------------------------------

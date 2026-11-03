@@ -74,7 +74,8 @@ def _report(result: SyncResult) -> None:
         if any(counts.values()):
             typer.echo(
                 f"  {table:<28} thêm {counts['inserted']:>5}  "
-                f"sửa {counts['updated']:>5}  từ chối {counts['rejected']:>5}"
+                f"sửa {counts['updated']:>5}  đã có {counts.get('unchanged', 0):>5}  "
+                f"từ chối {counts['rejected']:>5}"
             )
     if result.ignored:
         typer.echo(f"bỏ qua {len(result.ignored)} file không nhận ra: {result.ignored[:5]}")

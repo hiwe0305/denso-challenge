@@ -15,9 +15,17 @@ Hai bản hiện thực:
   khởi tạo nó báo đúng thiếu gì và cần làm gì, thay vì đổ một
   `ModuleNotFoundError`.
 
-**Upsert theo ID nội dung** là điều kiện để `fwsync import` chạy lại từ đầu
-cho cùng kết quả (§5.5). `NATURAL_KEY` khai khoá tự nhiên của từng bảng; một
-bảng không có trong bảng này là bảng append-only, và dòng mới luôn được thêm.
+**Mọi bảng có khoá tự nhiên**, kể cả bảng append-only, vì đó là điều kiện để
+`fwsync import` chạy lại từ đầu cho cùng kết quả (§5.5). Cron chạy 5 phút một
+lần trên cùng artifact của lõi; không có khoá thì không phân biệt được "dòng
+này đã nạp" với "dòng mới".
+
+Hai cách ghi, khác nhau đúng ở chỗ có được sửa hay không:
+
+* Bảng thường: **upsert**. Gặp lại khoá thì cập nhật dòng cũ.
+* Bảng `APPEND_ONLY`: **chèn nếu chưa có, không bao giờ sửa**. Gặp lại khoá
+  thì bỏ qua và đếm là `unchanged`. Append-only nghĩa là không UPDATE một dòng
+  đã ghi (R4, 03 §4.4); nó không có nghĩa là chèn lại cùng một artifact.
 """
 
 from __future__ import annotations
@@ -54,13 +62,37 @@ NATURAL_KEY: dict[str, tuple[str, ...]] = {
     "defect_manifests": ("manifest_ref",),
     "defect_items": ("manifest_ref", "target_ref", "code"),
     "defect_scores": ("manifest_ref", "scorer_version", "detector", "code"),
+    "pipeline_stage_runs": ("dataset_code", "stage_number", "attempt_no"),
+    "experiment_datasets": ("experiment_code", "release_ref"),
+    "diagnostic_runs": ("cluster_ref", "step_no", "check_name"),
+    "repair_tickets": ("cluster_ref", "diagnosis"),
+    "flywheel_algo_steps": ("recommendation_ref", "step_no", "cluster_ref", "eval_episode_ref"),
+    # Bốn bảng append-only dưới cũng cần khoá: nó là danh tính của một lần
+    # đo, để nạp lại cùng lần đo không thành lần đo thứ hai.
+    "episode_qa_reports": ("report_ref",),
+    "train_diagnoses": (
+        "experiment_code", "checkpoint_ref", "config_sha256", "code",
+        "start_step", "group_name", "dim",
+    ),
+    "train_diagnosis_skips": ("experiment_code", "config_sha256", "code"),
+    "fix_rate_events": ("cluster_ref", "intervention_ref"),
 }
 
-#: Bảng chỉ được thêm, không upsert (luật R4 và quy ước append-only của
-#: 03 §4.4). Nạp lại cùng artifact vào đây sẽ thêm dòng thứ hai, và đó là
-#: đúng: hai lần chấm là hai số đo.
+#: Bảng chỉ được thêm (luật R4, 03 §4.4, trigger C8): chèn nếu chưa có,
+#: **không bao giờ sửa** dòng đã ghi. Hai lần chấm là hai số đo vì chúng có
+#: hai khoá khác nhau (`report_ref` khác, `config_sha256` khác), không phải vì
+#: cùng một artifact được nạp hai lần. `cost_ledger_entries` và
+#: `defect_scores` thuộc nhóm này: trước đây chúng được upsert, tức là nạp lại
+#: một bút toán sẽ UPDATE nó, đúng điều R4 cấm.
 APPEND_ONLY: frozenset[str] = frozenset(
-    {"episode_qa_reports", "train_diagnoses", "train_diagnosis_skips", "fix_rate_events"}
+    {
+        "episode_qa_reports",
+        "train_diagnoses",
+        "train_diagnosis_skips",
+        "fix_rate_events",
+        "cost_ledger_entries",
+        "defect_scores",
+    }
 )
 
 
@@ -71,12 +103,17 @@ class WriteCounts:
     inserted: int = 0
     updated: int = 0
     rejected: int = 0
+    # Dòng append-only đã có từ lần nạp trước, bỏ qua không sửa. Tách khỏi
+    # `updated` vì một bút toán sổ chi phí bị "updated" là một vi phạm R4,
+    # còn "unchanged" là đúng.
+    unchanged: int = 0
 
     def as_dict(self) -> dict[str, int]:
         return {
             "inserted": self.inserted,
             "updated": self.updated,
             "rejected": self.rejected,
+            "unchanged": self.unchanged,
         }
 
 
@@ -128,7 +165,9 @@ class JsonlSink:
 
     def write(self, table: str, row: dict[str, Any]) -> str:
         key = NATURAL_KEY.get(table)
-        if key is None or table in APPEND_ONLY:
+        if key is None:
+            # `test_every_table_the_loader_writes_has_a_natural_key` chặn
+            # chuyện này ở CI; ở đây chỉ để không mất dữ liệu nếu nó lọt.
             self.rows[table].append(row)
             self._counts[table].inserted += 1
             return "inserted"
@@ -137,6 +176,9 @@ class JsonlSink:
             self.rows[table].append(row)
             self._counts[table].inserted += 1
             return "inserted"
+        if table in APPEND_ONLY:
+            self._counts[table].unchanged += 1
+            return "unchanged"
         existing.update(row)
         self._counts[table].updated += 1
         return "updated"

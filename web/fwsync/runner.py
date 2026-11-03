@@ -42,6 +42,7 @@ IMPORT_ORDER: tuple[str, ...] = (
     "price_books",
     "run_plans",
     "datasets",
+    "pipeline_stage_runs",
     "releases",
     "episodes",
     "release_items",
@@ -90,6 +91,13 @@ TOLERANT_COLUMNS: dict[str, frozenset[str]] = {
             "release_ref", "name", "parent_release_ref", "split_plan_sha256",
             "status", "manifest_sha256", "manifest_uri", "license_summary",
             "frozen_at", "meta",
+        }
+    ),
+    "pipeline_stage_runs": frozenset(
+        {
+            "dataset_code", "stage_number", "attempt_no", "is_current", "status",
+            "qa_code_decision", "qa_agent_verdict", "qa_agent_report",
+            "started_at", "finished_at", "log_uri", "metrics",
         }
     ),
     "release_items": frozenset(
@@ -161,7 +169,7 @@ TOLERANT_COLUMNS: dict[str, frozenset[str]] = {
     "failure_clusters": frozenset(
         {
             "cluster_ref", "recommendation_ref", "failed_step", "failure_code", "level",
-            "member_count", "representative_ids", "representative_seed",
+            "member_count", "representative_refs", "representative_seed",
             "diagnosis", "diagnosis_source", "override_reason",
             "parent_cluster_ref", "checks", "card_uri",
         }

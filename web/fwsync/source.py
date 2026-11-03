@@ -37,6 +37,8 @@ FILE_TO_TABLE: dict[str, str] = {
     "sources": "sources",
     "datasets": "datasets",
     "episodes": "episodes",
+    "pipeline_stage_runs": "pipeline_stage_runs",
+    "stage_runs": "pipeline_stage_runs",
     "qa_reports": "episode_qa_reports",
     "episode_qa_reports": "episode_qa_reports",
     "releases": "releases",
@@ -78,6 +80,7 @@ TOLERANT_TABLES: frozenset[str] = frozenset(
     {
         "sources",
         "datasets",
+        "pipeline_stage_runs",
         "releases",
         "release_items",
         "run_plans",
