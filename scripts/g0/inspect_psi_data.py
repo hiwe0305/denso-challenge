@@ -401,6 +401,127 @@ def cmd_qa(args: argparse.Namespace) -> int:
     return 0
 
 
+# --- seeds and randomization (AC 4, V6) --------------------------------------------------
+
+SEED_KEY = re.compile(r"seed", re.IGNORECASE)
+
+
+def find_seed_keys(value: Any, path: str = "") -> list[tuple[str, Any]]:
+    """(json path, value) of every key matching 'seed', descending into JSON strings too."""
+    if isinstance(value, str) and value[:1] in "{[":
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return []
+    found: list[tuple[str, Any]] = []
+    if isinstance(value, dict):
+        for k, v in value.items():
+            if SEED_KEY.search(k):
+                found.append((f"{path}.{k}", v))
+            found += find_seed_keys(v, f"{path}.{k}")
+    elif isinstance(value, list):
+        for i, v in enumerate(value):
+            found += find_seed_keys(v, f"{path}[{i}]")
+    return found
+
+
+def canonical(value: Any) -> str:
+    return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
+
+
+def spatial_positions(env: dict[str, Any]) -> dict[str, list[float]]:
+    """Initial position of every actor drawn by SpatialDR (`dr_state_dict.spatial`)."""
+    return {k: v["position"] for k, v in env.get("dr_state_dict", {}).get("spatial", {}).items()}
+
+
+def seeds_dataset(ds: Dataset) -> dict[str, Any]:
+    meta_files = sorted(n[len(ds.root):] for n in ds.zf.namelist()
+                        if n.startswith(ds.root + "meta/") and n.endswith((".json", ".jsonl")))
+    seed_hits: list[tuple[str, Any]] = []
+    for rel in meta_files:
+        doc = ds.jsonl(rel) if rel.endswith(".jsonl") else ds.json(rel)
+        seed_hits += [(rel + p, v) for p, v in find_seed_keys(doc)]
+    columns = set(next(ds.episodes())[1]) if ds.parquet_names() else set()
+    rows = ds.jsonl("meta/episodes.jsonl")
+    envs = {int(r["episode_index"]): json.loads(r["environment_config"])
+            for r in rows if "environment_config" in r}
+    return {
+        "root": ds.root,
+        "episodes": len(rows),
+        "meta_files": meta_files,
+        "seed_keys": [{"path": p, "value": v} for p, v in seed_hits],
+        "seed_columns": sorted(c for c in columns if SEED_KEY.search(c)),
+        "split": sorted({str(e["metadata"].get("split")) for e in envs.values()}),
+        "dr_level": sorted({str(e["metadata"].get("dr_level")) for e in envs.values()}),
+        "with_layout": sum("layout" in e for e in envs.values()),
+        "with_dr_state_dict": sum("dr_state_dict" in e for e in envs.values()),
+        "distinct_dr_cfgs": len({canonical(e.get("dr_cfgs")) for e in envs.values()}),
+        "conditions": {i: canonical(e.get("dr_state_dict")) for i, e in envs.items()},
+        "spatial": {i: spatial_positions(e) for i, e in envs.items()},
+    }
+
+
+def same_index_matches(train: dict[str, Any], other: dict[str, Any]) -> dict[str, Any]:
+    """Per spatial actor: episodes i of `other` whose initial position equals train episode i's.
+
+    SpatialDR draws positions in a fixed order from the episode's RNG, so equal floats at the
+    same index mean the two episodes started from the same random stream (the same seed).
+    """
+    # Distractors are keyed by asset uid and change per episode; compare the actors every
+    # episode of both datasets has (robot, container, target).
+    common = set.intersection(*(set(p) for p in [*train["spatial"].values(),
+                                                  *other["spatial"].values()]))
+    actors = {a: 0 for a in sorted(common)}
+    for i, pos in other["spatial"].items():
+        ref = train["spatial"].get(i, {})
+        for actor in common:
+            actors[actor] += int(ref.get(actor) == pos[actor])
+    equal_condition = sum(train["conditions"].get(i) == h for i, h in other["conditions"].items())
+    any_condition = len(set(other["conditions"].values()) & set(train["conditions"].values()))
+    return {"actors": actors, "equal_condition_same_index": equal_condition,
+            "condition_in_train": any_condition}
+
+
+def label(bundle: Path) -> str:
+    return f"{bundle.parent.parent.name}/{bundle.parent.name}/{bundle.name}"
+
+
+def cmd_seeds(args: argparse.Namespace) -> int:
+    report = []
+    for bundle in [args.train, *args.bundles]:
+        for ds in datasets(zipfile.ZipFile(bundle)):
+            report.append({"bundle": label(bundle), "sha256": sha256_file(bundle),
+                           **seeds_dataset(ds)})
+    train = report[0]
+    for r in report[1:]:
+        r["vs_train"] = same_index_matches(train, r)
+    if args.json:
+        args.json.write_text(json.dumps(report, indent=2) + "\n")
+    print("| Gói (sha256) | Dataset | Episode | Khóa `seed` trong meta | Cột `seed` "
+          "| `split` | `dr_level` | Có `layout` | Có `dr_state_dict` | `dr_cfgs` khác nhau |")
+    print("|---|---|---|---|---|---|---|---|---|---|")
+    for r in report:
+        keys = len(r["seed_keys"]) or "không"
+        print(f"| `{r['bundle']}` (`{r['sha256'][:8]}`) | `{r['root'].rstrip('/')}` "
+              f"| {r['episodes']} | {keys} | {', '.join(r['seed_columns']) or 'không'} "
+              f"| {', '.join(r['split'])} | {', '.join(r['dr_level'])} "
+              f"| {r['with_layout']}/{r['episodes']} | {r['with_dr_state_dict']}/{r['episodes']} "
+              f"| {r['distinct_dr_cfgs']} |")
+    print(f"\nSo với gói train `{train['bundle']}`: số episode i có vị trí ban đầu trùng đúng "
+          "từng số với episode i của train, theo từng vật có mặt ở mọi episode của `dr_state_dict.spatial` (vật gây nhiễu đổi theo episode nên không so).\n")
+    print("| Gói | Dataset | Episode | Vị trí trùng theo vật | `dr_state_dict` trùng cùng chỉ số "
+          "| `dr_state_dict` có trong train |\n|---|---|---|---|---|---|")
+    for r in report[1:]:
+        v = r["vs_train"]
+        actors = ", ".join(f"`{a}` {n}" for a, n in v["actors"].items())
+        print(f"| `{r['bundle']}` | `{r['root'].rstrip('/')}` | {r['episodes']} | {actors} "
+              f"| {v['equal_condition_same_index']} | {v['condition_in_train']} |")
+    for r in report:
+        for k in r["seed_keys"][:20]:
+            print(f"- seed `{r['root']}{k['path']}` = {k['value']!r}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -432,6 +553,12 @@ def main() -> int:
     p.add_argument("--max-seconds", type=float, required=True)
     p.add_argument("--json", type=Path)
     p.set_defaults(func=cmd_qa)
+
+    p = sub.add_parser("seeds", help="seed, layout and randomization fields (AC 4, V6)")
+    p.add_argument("--train", type=Path, required=True, help="the task's train bundle")
+    p.add_argument("bundles", nargs="+", type=Path, help="eval or other bundles of the task")
+    p.add_argument("--json", type=Path)
+    p.set_defaults(func=cmd_seeds)
 
     args = parser.parse_args()
     return int(args.func(args))
