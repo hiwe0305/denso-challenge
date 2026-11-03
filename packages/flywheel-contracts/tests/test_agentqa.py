@@ -217,6 +217,27 @@ def test_invalid_agent_review_override_needs_reason() -> None:
     assert "an override needs a reason" in str(exc.value)
 
 
+@pytest.mark.parametrize("stamp", ["2026-11-03T10:00:00", "2026-11-03 10:00:00"])
+def test_datetimes_without_timezone_are_refused(stamp: str) -> None:
+    report = json.loads((FIXTURES_DIR / "AgentReport.json").read_text(encoding="utf-8"))
+    report["created_at"] = stamp
+    with pytest.raises(ValidationError) as exc1:
+        AgentReport.model_validate(report)
+    assert "timezone" in str(exc1.value)
+
+    review = json.loads((FIXTURES_DIR / "AgentReview.json").read_text(encoding="utf-8"))
+    review["decided_at"] = stamp
+    with pytest.raises(ValidationError) as exc2:
+        AgentReview.model_validate(review)
+    assert "timezone" in str(exc2.value)
+
+
+def test_datetimes_with_offset_are_accepted() -> None:
+    review = json.loads((FIXTURES_DIR / "AgentReview.json").read_text(encoding="utf-8"))
+    review["decided_at"] = "2026-11-03T18:00:00+07:00"
+    assert AgentReview.model_validate(review).decided_at.utcoffset() is not None
+
+
 def test_schemas_match_committed_files() -> None:
     for model in (AgentReport, AgentReview):
         schema_path = SCHEMAS_DIR / f"{model.__name__}.json"
