@@ -32,7 +32,7 @@ _Phạm vi 3/11/2026 (Q2, Q3): trước 13/11 làm tầng 1 (ingest), 4 (QA), 5 
 
 PR 1 (hạn 5/11/2026):
 
-- [ ] 1. Bộ đọc và ghi LeRobot v2.1, test trên dataset 3 episode sinh trong test (AC 1)
+- [x] 1. Bộ đọc và ghi LeRobot v2.1, test trên dataset 3 episode sinh trong test (AC 1)
 - [ ] 2. `register_source`, `to_episode` cho ba nguồn (AC 2)
 
 PR 2 (hạn 9/11/2026):
