@@ -1,0 +1,73 @@
+# DA-30 AC 1: a short Psi0 stage 1 run on EgoDex, from `pre.*`. A path proof (design
+# 27/10/2026 section 7.8), not an experiment: it shows that data in Psi0's EgoDex format
+# reaches the model, the loss goes down and `metrics.jsonl` is written. No probe (DA-09
+# moved after the demo).
+#
+# Checked, and its run_plan_id printed, by
+#   uv run python -m flywheel_psi0.stage1.runplan check configs/runplans/stage1/egodex-short.yaml
+# Run on a Colab VM by flywheel_psi0.stage1.colab (setup, run, repeat, persist).
+name: stage1-egodex-short
+story: DA-30
+
+code:
+  psi0: {repo: physical-superintelligence-lab/Psi0, commit: cda3fdfafe47cb6fa75400d013de1bd36e3cea05}
+
+# Revision pinned by S1-03 (as configs/runplans/tray/he-tray.yaml).
+psi_model: {repo: USC-PSI-Lab/psi-model, revision: cb1480f50d9764ab2f6261bc2e651a67ad54da17}
+
+recipe: configs/runplans/stage1/psi0-stage1-egodex.yaml
+
+# A key of `parents` in the recipe. sha256 = Hugging Face LFS oid at the revision.
+parent:
+  id: psi0-pre-egodex-390k
+  vlm:
+    path: psi0/pre.fast.2605160748.ckpt.ego390k/model.safetensors
+    sha256: b2ab7b3598b90e827c04f3f650e8187e5cc5167845ed7a1e0a65ca40fcc506f0
+
+# Stand-in until DA-18 (Hưng) merges its export: the first `episodes_per_task` episodes
+# of every task of Apple's EgoDex test set, read out of the zip by HTTP range requests,
+# put under part1/ (Psi0 trains on part1..5 and extra) and given `actions_48d` by the
+# authors' H-RDT script. Same format the DA-18 export must have (its AC 1), so the swap
+# is the `dataset` block only. Public data (design 8.4); licence CC-BY-NC-ND, question
+# Q-EGO-LIC open with Hiếu: used for training only, nothing derived is published.
+dataset:
+  id: egodex-test-first2
+  source:
+    url: https://ml-site.cdn-apple.com/datasets/egodex/test.zip
+    bytes: 17304529397
+    etag: '"05247067ba3bb80f61086e7c3ee205fe-258"'
+  episodes_per_task: 2
+  split_dir: part1
+  precompute: src/h_rdt/datasets/pretrain/precompute_48d_actions.py
+
+job:
+  id: da30-egodex-short
+  seed: 7 # the script's --seed
+  nproc_per_node: 1
+
+# Changes to the recipe for this plan; everything else is the authors' script.
+overrides:
+  train.max_training_steps: 200 # "a few hundred steps" (AC 1); the script: 1000000
+  train.checkpointing_steps: 200 # one checkpoint, at the end; the script: 5000
+  # No val: the stand-in has no test/ split, and a few hundred steps are too few to
+  # read anything from Psi0's generation-based val. The script: 1000.
+  train.validation_steps: 0
+  # One GPU instead of the authors' nodes: ZeRO-3 on one device does not shard, and a
+  # full fine-tune of the 2.1B VLM (bf16 weights, fp32 master and Adam) needs ~34 GB
+  # before activations, over an L4's 24 GB. The authors' own offload config, chosen
+  # through the script's DEEPSPEED_CONFIG hook, keeps optimizer and weights in host RAM
+  # (L4 VM: 52 GB).
+  train.deepspeed_config: scripts/deepspeed/zero3_offload.json
+
+compute:
+  gpu: L4
+  max_compute_units: 4.0 # stop and report above this; the estimate is in docs/g0/ledger/DA-30.csv
+
+# Fixed before the run. `loss_window` train lines at each end of the run are compared
+# by median: the run passes when the last window is lower. The rerun repeats the first
+# `repeat_steps` steps under another job id with the same seed; it passes when its first
+# train loss is within `first_loss_rtol` of the run's.
+criteria:
+  loss_window: 20
+  repeat_steps: 3
+  first_loss_rtol: 0.02
