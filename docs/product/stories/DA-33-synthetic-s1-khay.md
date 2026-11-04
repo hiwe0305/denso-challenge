@@ -40,6 +40,7 @@ Kế hoạch chi tiết: [docs/superpowers/plans/2026-10-31-da33-tray-synthetic.
 - [x] 8. Xuất sang định dạng Ψ₀ (action 36, state 32, LeRobot v2.1), contract test (AC 4, 6)
 - [x] 9. Chạy lô sản xuất, release có hash, `action_layout`, sổ chi phí (AC 4, 5, 6; M2 8/11/2026)
 - [x] 10. Sinh nhắm lỗi theo danh sách điều kiện: `generate.py --conditions` chọn seed train có cảnh gần điều kiện lỗi nhất, khối `flywheel` ghi `purpose` và `cluster_id` (vòng Failure → Data trên task khay, [design 28/10/2026](../../superpowers/specs/2026-10-28-tray-transfer-he-design.md) mục 6.6, DA-34 AC 6; hạn 11/11/2026)
+- [x] 11. Sửa bước nhảy action tay và crash x264 của bộ ghi theo [wrist-jump.md](../../g0/tray/wrist-jump.md): giới hạn vận tốc trong QP của IK tay (`arm_step_max` 0,08 rad/bước, `da33-planner-5`), `JoinedVideoWriter` trong `tray/recorder.py`, test sim (AC 4; PO chọn sinh lại 4/11/2026)
 
 ## Phạm vi file
 
@@ -75,6 +76,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 3/11/2026 | PO duyệt D-24: dữ liệu ghi lệnh đã gửi cho WBC, episode bắt đầu như eval của SIMPLE, QA bằng `replay-decoupled-wbc` ([decisions.md](../../g0/tray/decisions.md)) | PO (Hiếu) |
 | 3/11/2026 | Thêm nhiệm vụ 10: `generate.py` nhận danh sách điều kiện lỗi cho vòng Failure → Data trên task khay (design 28/10 mục 6.6) | PO (Hiếu) |
 | 4/11/2026 | Điều tra cờ `action_jump.arm` của QA DA-03 trên release S1 và crash x264 của bộ ghi ở lô pool v2; đề xuất sửa, chờ PO quyết sinh lại ([wrist-jump.md](../../g0/tray/wrist-jump.md)) | Claude, chờ PO (Hiếu) |
+| 4/11/2026 | PO merge #93 và chọn sửa rồi sinh lại thay vì che bước vọt khi train; thêm nhiệm vụ 11 (giới hạn vận tốc IK tay, `JoinedVideoWriter`) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
@@ -82,3 +84,4 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - 3/11/2026, nhiệm vụ 9: lô `s1-prod-1103` trên `rtx3060` (mức 1, seed train 1000–1129, 22 worker, chạy trước quy tắc RAM 14 worker của Hiếu; 2 worker bị OOM kill lúc 09:50 rồi chạy tiếp, không mất episode): 130 lượt, 102 thành công, 102 qua QA tối thiểu, 102/102 qua QA phát lại. Release `tray_s1_0d84cc87b1e5` (102 episode, 148 013 frame, 0,90 GB), contract test 11/11 trên release ([synthetic-s1.md](../../g0/tray/synthetic-s1.md)). Release dựng đầu tiên ghi sai tên chiều trong `action_layout` nên đã bị thay (D-26).
 - 3/11/2026, nhiệm vụ 10: `tray/targets.py` và `generate.py --conditions` chọn seed train có cảnh gần điều kiện lỗi nhất (D-27). Trên `rtx3060`, bọc `systemd-run` có `MemoryMax`: 21/21 test sim; lô thử 2 cụm cho 2/2 thành công, phát lại 2/2, episode xuất ra giữ `purpose` và `cluster_id`.
 - 4/11/2026, sau nhiệm vụ 9: QA của DA-03 gắn cờ `action_jump.arm` cho 102/102 episode. Nguyên nhân là IK, không phải planner Cartesian: tư thế đỡ ngửa (D-25) đặt `wrist_roll` ở giới hạn và `wrist_pitch` gần 90°, nên IK pink đổi cấu hình trong null space tới 14 rad/s ở REACH (cùng cơ chế ở APPROACH_A nâng tay và lúc RELEASE). Giới hạn vận tốc trong QP của IK 0,08 rad/bước: 39/40 thành công so với 36/40, hết bước vượt ngưỡng. Crash x264 ở lô pool v2 là tranh chấp luồng trong `VideoWriter` của decoupled_wbc, không gắn với seed 1349. Chi tiết và việc chờ PO ở [wrist-jump.md](../../g0/tray/wrist-jump.md).
+- 4/11/2026, nhiệm vụ 11: giới hạn vận tốc trong QP của IK tay (`arm_step_max` 0,08 rad/bước, `da33-planner-5`) và `JoinedVideoWriter` cho bộ ghi. Trên `rtx3060`: test sim 25/25; test bước tay mới bắt được lỗi khi tắt giới hạn (0,177 rad, 24 bước vượt ngưỡng) và qua khi bật (0,08); `generate.py` 6 seed cho kết quả trùng từng seed với lần thử, video đủ frame ([wrist-jump.md](../../g0/tray/wrist-jump.md)).

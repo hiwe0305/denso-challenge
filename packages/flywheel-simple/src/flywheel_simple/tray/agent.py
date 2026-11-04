@@ -52,7 +52,9 @@ class TrayAgent:
     def __init__(self, env: Any, planner_cfg: PlannerConfig) -> None:
         self.env = env
         self.planner_cfg = planner_cfg
-        self.ctrl = StandWalkController(env.unwrapped.task.robot)
+        self.ctrl = StandWalkController(
+            env.unwrapped.task.robot, max_joint_step=planner_cfg.arm_step_max
+        )
         self.nav = NavIntegrator(dt=CONTROL_DT)
         self.planner: TrayPlanner | None = None
         self.last_command: PlannerCommand | None = None

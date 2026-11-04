@@ -15,6 +15,13 @@ Its default target (zero pose, shoulder roll +-0.2) puts the round trip 0.056
 rad off the standing robot, so `reset` anchors the posture at the robot's
 current joints and warm-starts the solver there.
 
+The IK has no effective joint speed limit: pink's default `VelocityLimit` is the
+URDF's (22-37 rad/s, several radians per control step). Near the palm-up hold
+(wrist roll on its limit, pitch near 90 degrees) the arm then reconfigures in
+null space at up to 14 rad/s while the wrist poses stay on target, and those
+jumps are what the dataset records as `action` (DA-33, docs/g0/tray/wrist-jump.md).
+`max_joint_step` bounds each joint's move per control step inside the IK's QP.
+
 `decoupled_wbc` is imported inside functions so this module imports in the
 workspace, where it is absent.
 """
@@ -96,7 +103,7 @@ def _matrix(se3: Any) -> NDArray[np.float64]:
 class UpperBodyIK:
     """Two wrist poses (4 x 4, pelvis frame) to the decoupled WBC's upper-body target."""
 
-    def __init__(self, robot_model: Any) -> None:
+    def __init__(self, robot_model: Any, max_joint_step: float | None = None) -> None:
         instantiate_g1_hand_ik_solver = _mod(
             "decoupled_wbc.control.teleop.solver.hand.instantiation.g1_hand_ik_instantiation"
         ).instantiate_g1_hand_ik_solver
@@ -116,6 +123,22 @@ class UpperBodyIK:
             side: [upper.index(i) for i in robot_model.get_hand_actuated_joint_indices(side=side)]
             for side in ("left", "right")
         }
+        if max_joint_step is not None:
+            self._limit_joint_step(max_joint_step)
+
+    def _limit_joint_step(self, max_joint_step: float) -> None:
+        """Velocity limit of the IK's QP such that one control step moves a joint <= this (rad).
+
+        The solver runs `num_step_per_frame` QP steps of `dt` per control step and moves
+        `velocity * dt * amplify_factor` each; the URDF limit stays where it is lower.
+        pink reads the limit from the model, which persists across `reset`.
+        """
+        VelocityLimit = _mod("pink.limits").VelocityLimit
+        solver = self._ik.body_ik_solver
+        model = solver.configuration.model
+        per_step = solver.num_step_per_frame * solver.dt * solver.amplify_factor
+        speed = np.minimum(np.asarray(model.velocityLimit, float), max_joint_step / per_step)
+        model.velocity_limit = VelocityLimit(model, velocity_limit=speed)
 
     def reset(self, sim_obs: dict[str, Any]) -> None:
         """Warm-start the solver at the robot's joints and anchor its posture task there."""

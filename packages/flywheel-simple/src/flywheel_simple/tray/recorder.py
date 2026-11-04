@@ -13,15 +13,23 @@ TRAY_FEATURES instead of `observation.object_poses`. The names are those of
 DA-35's `tray/pico/recording.py`, so S1 and S2 episodes share one schema; import
 them from there once DA-35 is merged.
 
+Videos go through JoinedVideoWriter instead of decoupled_wbc's VideoWriter, whose
+`stop()` flushes the encoder from the caller's thread while its worker may still be
+encoding the last frame; under load that crashed or hung libx264 (DA-33, 4/11/2026,
+docs/g0/tray/wrist-jump.md). SIMPLE is not edited: the exporter is subclassed.
+
 `decoupled_wbc` and `simple` are imported inside functions so the meta helpers
 import in the workspace.
 """
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import importlib
 import json
+import queue
+import threading
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -59,6 +67,101 @@ TRAY_FEATURES: dict[str, dict[str, Any]] = {
 
 def _mod(name: str) -> Any:
     return importlib.import_module(name)
+
+
+class JoinedVideoWriter:
+    """decoupled_wbc VideoWriter's interface; the encoder is only ever used by one thread.
+
+    Frames go through a bounded queue to one worker thread, as in VideoWriter, so the
+    sim loop does not wait for x264. `stop()` and `cancel()` send a sentinel and join
+    the worker before the flush and close, and the joined worker no longer holds the
+    writer. An encoding error is kept, the queue still drained (so `add_frame` never
+    blocks on a dead worker), and raised by `stop()`.
+    """
+
+    def __init__(
+        self,
+        output_path: str | Path,
+        width: int,
+        height: int,
+        fps: float,
+        codec: str = "h264",
+        buffer_size: int = 50,
+    ) -> None:
+        self._av = _mod("av")
+        self.output_path = str(output_path)
+        Path(self.output_path).parent.mkdir(parents=True, exist_ok=True)
+        self.container = self._av.open(self.output_path, mode="w")
+        self.stream = self.container.add_stream(codec, rate=fps)
+        self.stream.width = width
+        self.stream.height = height
+        self.queue: queue.Queue[NDArray[np.uint8] | None] = queue.Queue(maxsize=buffer_size)
+        self._error: BaseException | None = None
+        self._thread = threading.Thread(target=self._worker, daemon=True)
+        self._thread.start()
+
+    def _encode(self, frame: Any) -> None:
+        for packet in self.stream.encode(frame):
+            self.container.mux(packet)
+
+    def _worker(self) -> None:
+        while (frame := self.queue.get()) is not None:
+            if self._error is None:
+                try:
+                    self._encode(self._av.VideoFrame.from_ndarray(frame, format="rgb24"))
+                except BaseException as exc:  # raised again by stop()
+                    self._error = exc
+
+    def _join(self) -> None:
+        if self._thread.is_alive():
+            self.queue.put(None)
+            self._thread.join()
+
+    def add_frame(self, frame: NDArray[np.uint8]) -> None:
+        if frame.shape[1] != self.stream.width or frame.shape[0] != self.stream.height:
+            raise ValueError(
+                f"frame {frame.shape[1]}x{frame.shape[0]}, "
+                f"video {self.stream.width}x{self.stream.height}"
+            )
+        self.queue.put(frame)
+
+    def stop(self) -> str:
+        """Encode every queued frame, flush, close; returns the video path."""
+        self._join()
+        if self._error is not None:
+            self.container.close()
+            raise RuntimeError(f"encoding {self.output_path} failed") from self._error
+        self._encode(None)
+        self.container.close()
+        return self.output_path
+
+    def cancel(self) -> None:
+        """Stop without flushing and delete the video."""
+        self._join()
+        self.container.close()
+        Path(self.output_path).unlink(missing_ok=True)
+
+
+def _create_video_writer(exporter: Any) -> dict[str, JoinedVideoWriter]:
+    """Gr00tDataExporter.create_video_writer with JoinedVideoWriter."""
+    index = exporter.episode_buffer["episode_index"]
+    return {
+        key: JoinedVideoWriter(
+            exporter.root / exporter.meta.get_video_file_path(index, key),
+            exporter.meta.shapes[key][1],
+            exporter.meta.shapes[key][0],
+            exporter.fps,
+            exporter.vcodec,
+        )
+        for key in exporter.meta.video_keys
+    }
+
+
+@functools.cache
+def _exporter_class() -> Any:
+    """decoupled_wbc's Gr00tDataExporter writing its videos through JoinedVideoWriter."""
+    base = _mod("decoupled_wbc.data.exporter").Gr00tDataExporter
+    return type("JoinedWriterExporter", (base,), {"create_video_writer": _create_video_writer})
 
 
 @dataclass(frozen=True)
@@ -188,7 +291,7 @@ class EpisodeRecorder:
         recording.validate_existing_ego_view_feature_shape(self.save_dir, ego_shape)
         features["observation.state"]["names"] = self.joint_names
         features.update({k: dict(v) for k, v in TRAY_FEATURES.items()})
-        return _mod("decoupled_wbc.data.exporter").Gr00tDataExporter.create(
+        return _exporter_class().create(
             save_root=self.save_dir,
             fps=FPS,
             features=features,
