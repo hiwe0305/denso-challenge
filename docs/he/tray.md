@@ -251,9 +251,32 @@ Mục 7 ghi kho dùng `da33-planner-4+cfg.815b822a`. Kho đã sinh lại trên `
 | Eval | 270 episode mỗi nhánh: mức 0 là 30 lượt lặp, mức 1 và 2 mỗi mức 120 seed dev, 240 cảnh cho chỉ số chính. Đồng hồ sim, nhiễu gieo theo episode (mục 8) |
 | Ngân sách | Trần 36 CU, cap 18 CU mỗi lần, `runs: [C]`, `round_runs: [C_PLUS]`; watcher là `scripts/colab/cu_watch.py session --cap 18` dưới một guard mỗi lô, một lô mỗi tài khoản |
 | Recipe | `psi0-stage3.yaml` như bản 1, ghi đè `train.validation_steps: 2000` |
-| Ghim thêm (review #116) | `interpretation.rules_sha256`: khối quy tắc mục 9 giữa hai dấu `tier2-rules`. `demo_sets.file_sha256`: cả file tập demo, nên sửa `episode_indices` cũng bị bắt; `check` còn tính lại `set_hash` từ seed. `pinned_files`: sha256 của `configs/sim/tray.yaml`, `configs/splits/default.yaml`, 9 file nguồn cảnh, scorer và vòng eval của `flywheel_simple/tray/` và 5 file `flywheel_simple/wbc/`. Ghim theo file thay vì commit repo vì plan không biết commit chứa chính nó, và `check` kiểm được trên CI không cần lịch sử git. Hệ quả: PR nào sửa một file trong số đó sẽ làm `runplan check` và test của bản 2 hỏng. Trước job đầu thì đóng băng lại; sau đó cần `Decision` |
-| Kiểm theo release | Trên `rtx3060`: `runplan check he-tray-v2.yaml --release <thư mục release>` đối chiếu `episode_indices` của từng tập với export của release. File tập demo chỉ có hai danh sách đã sắp xếp, nên chỉ release biết index nào của seed nào. Ngày 5/11: khớp; dời một index thì lệnh báo lỗi |
+| Ghim thêm (review #116) | `interpretation.rules_sha256`: khối quy tắc mục 9 giữa hai dấu `tier2-rules`. `demo_sets.file_sha256`: cả file tập demo, nên sửa `episode_indices` cũng bị bắt; `check` còn tính lại `set_hash` từ seed. `pinned_files`: sha256 của `configs/sim/tray.yaml`, `configs/splits/default.yaml`, 9 file nguồn cảnh, scorer và vòng eval của `flywheel_simple/tray/` và 5 file `flywheel_simple/wbc/`. Ghim theo file thay vì commit repo vì plan không biết commit chứa chính nó, và `check` kiểm được trên CI không cần lịch sử git. Kiểm lúc khởi chạy job, không chặn CI (quyết định bên dưới) |
+| Kiểm theo release | Trên `rtx3060`: `runplan check he-tray-v2.yaml --release <thư mục release>` (có trong `--launch`) đối chiếu `episode_indices` của từng tập với export của release. File tập demo chỉ có hai danh sách đã sắp xếp, nên chỉ release biết index nào của seed nào. Ngày 5/11: khớp; dời một index thì lệnh báo lỗi |
 | `delta_pp` | Bỏ ở bản 2. δ là biên của quy tắc HE-T (mục 4, cần nhánh B); quy tắc bậc 2 đọc CI, không dùng δ. Bản 1 giữ δ = 10 và id cũ |
+
+**[Đã chốt 5/11/2026, Hiếu] mã sim ghim kiểm lúc khởi chạy job, CI chỉ cảnh báo.** 16 sha256 của `pinned_files` vẫn nằm trong lock; id không đổi. Các file đó thuộc story khác và có thể đổi trên master sau khi đóng băng. Vì vậy:
+
+| Chế độ | Phần đầu vào riêng của DA-34 (khối quy tắc mục 9, hash tập tính lại từ seed, `demo_sets.file_sha256`, file chất lượng, report QA) | `pinned_files` (`configs/sim/tray.yaml`, split, `flywheel_simple/tray/*`, `wbc/*`) |
+|---|---|---|
+| CI: `runplan check <plan>` và `test_v2_matches_the_files_it_names` | Lỗi, mã thoát 1 | Chỉ cảnh báo (dòng `warning:` ở stderr, cảnh báo pytest), mã thoát 0 |
+| Khởi chạy job: `runplan check <plan> --release <thư mục release> --launch` | Lỗi | **Lỗi**, kèm "re-freeze or record a Decision"; `--launch` bắt buộc có `--release`, nên kiểm cả `episode_indices` |
+
+Mọi lần khởi chạy train hoặc eval của C và C+, kể cả launcher của nhiệm vụ 2, phải chạy lệnh `--launch` trước, và **từ chối chạy** khi lệnh thoát khác 0. Với C+, chạy lệnh đó trên `round-tray-cplus.yaml`: lệnh kiểm plan round và cả plan bản 2 mà nó kế thừa. Nếu lệnh báo lệch: trước job đầu tiên thì đóng băng lại bản 2; sau đó phải ghi một `Decision`, không sửa sha256 trong plan.
+
+Trình tự khởi chạy một job train hoặc eval (C, C+):
+
+```bash
+# 1. Trên máy có release (rtx3060), từ bản checkout master của repo:
+uv run python -m flywheel_psi0.tray.runplan check configs/runplans/tray/he-tray-v2.yaml \
+    --release ~/denso-da34-pool/fwdata/releases/tray_s1_f9433b028c52 --launch \
+  || { echo "runplan check --launch failed: do not launch"; exit 1; }
+# C+: thay he-tray-v2.yaml bằng round-tray-cplus.yaml (kiểm cả plan bản 2).
+# 2. Train trên Colab: guard rồi watcher của phiên, --cap 18, theo scripts/colab/cu_watch.py;
+#    chỉ bắt đầu job khi file .ready có và heartbeat của guard mới. Một lô mỗi tài khoản.
+# 3. Eval trên rtx3060: server qua scripts/g0/serve_psi0.sh serve (gieo nhiễu theo episode),
+#    client flywheel_simple.tray.run ở thời gian sim (mặc định).
+```
 
 Điều kiện trước khi chạy, vẫn còn mở:
 

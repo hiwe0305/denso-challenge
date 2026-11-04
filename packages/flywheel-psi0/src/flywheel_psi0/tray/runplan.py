@@ -10,6 +10,11 @@ seeds) and the dev split; for version 2 also the sha256 of the demo-set file, of
 the eval config and scene/scorer sources (`pinned_files`), and of the reading
 rules between the tier2-rules markers of the interpretation doc. With `--release`
 it also checks every set's episode indices against the release's own export.
+
+Pinned eval sources belong to other stories and may change on master after the
+freeze, so a drift there is a warning in a plain `check` (CI) and an error with
+`--launch` (Hiếu 5/11/2026, docs/he/tray.md section 11): every train or eval job
+of the plan runs `check --release <dir> --launch` first and refuses on exit 1.
 The only recipe override allowed is one that leaves training unchanged
 (`train.validation_steps`), set once for all branches.
 
@@ -24,7 +29,7 @@ draft until its targeted episodes exist.
 
     python -m flywheel_psi0.tray.runplan check configs/runplans/tray/he-tray.yaml
     python -m flywheel_psi0.tray.runplan check configs/runplans/tray/he-tray-v2.yaml \
-        --release ~/denso-da34-pool/fwdata/releases/tray_s1_f9433b028c52
+        --release ~/denso-da34-pool/fwdata/releases/tray_s1_f9433b028c52 --launch
     python -m flywheel_psi0.tray.runplan check configs/runplans/tray/round-tray-cplus.yaml
     python -m flywheel_psi0.tray.runplan freeze configs/runplans/tray/he-tray.yaml
 """
@@ -455,12 +460,6 @@ def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
         for rel in (plan.task["config"], SPLIT_FILE):
             if rel not in plan.pinned_files:
                 problems.append(f"pinned_files lacks {rel}, which the eval reads")
-        for rel, sha in plan.pinned_files.items():
-            path = repo / rel
-            if not path.is_file():
-                problems.append(f"pinned file {rel} is missing")
-            elif file_sha256(path) != sha:
-                problems.append(f"pinned file {rel} changed since the plan pinned it")
 
     split = yaml.safe_load((repo / SPLIT_FILE).read_text(encoding="utf-8"))
     dev = split["seed_ranges"][plan.eval.split]
@@ -471,6 +470,21 @@ def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
                 f" {plan.eval.split} range"
             )
     return problems
+
+
+def pinned_file_drift(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
+    """Pinned eval files that are missing or differ from their sha256 in the plan.
+
+    Not part of `check`: a warning on CI, an error at job launch (`main --launch`).
+    """
+    drift = []
+    for rel, sha in (plan.pinned_files or {}).items():
+        path = repo / rel
+        if not path.is_file():
+            drift.append(f"pinned file {rel} is missing")
+        elif file_sha256(path) != sha:
+            drift.append(f"pinned file {rel} changed since the plan pinned it")
+    return drift
 
 
 def check_release(plan: TrayRunPlan, release_root: Path, repo: Path = REPO) -> list[str]:
@@ -525,7 +539,7 @@ def check_round(round_plan: TrayRoundPlan, repo: Path = REPO) -> list[str]:
 
 def freeze(plan_path: Path, repo: Path = REPO) -> Path:
     plan = TrayRunPlan.load(plan_path)
-    problems = check(plan, repo)
+    problems = check(plan, repo) + pinned_file_drift(plan, repo)
     if plan.superseded_by is not None:
         problems.append(f"superseded by {plan.superseded_by}: freeze that plan instead")
     if not (repo / plan.interpretation.doc).is_file():
@@ -547,28 +561,49 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("action", choices=["check", "freeze"])
     parser.add_argument("plan", type=Path)
     parser.add_argument("--release", type=Path, help="check episode indices against it")
+    parser.add_argument(
+        "--launch",
+        action="store_true",
+        help="before a train or eval job: pinned-file drift fails; needs --release",
+    )
     args = parser.parse_args(argv)
     if args.action == "freeze":
         out = freeze(args.plan)
         print(f"wrote {out}: {json.loads(out.read_text())['run_plan_id']}")
         return 0
+    if args.launch and args.release is None:
+        parser.error("--launch needs --release: a job checks the episode indices too")
+    repo = REPO  # read at call time, so a test can point it at a copy
     raw = yaml.safe_load(args.plan.read_text(encoding="utf-8"))
+    plan: TrayRunPlan | None
     if raw.get("purpose") == "round":
         round_plan = TrayRoundPlan.model_validate(raw)
-        problems = check_round(round_plan)
+        problems = check_round(round_plan, repo)
         summary = f"{args.plan}: round {round_plan.status}, branch {round_plan.branch}"
+        # A C+ job runs on the frozen plan it inherits: launch checks that plan too.
+        plan = None
+        if args.launch or args.release is not None:
+            plan = TrayRunPlan.load(repo / round_plan.inherits)
+            problems += check(plan, repo)
     else:
         plan = TrayRunPlan.model_validate(raw)
-        problems = check(plan)
-        if args.release is not None:
-            problems += check_release(plan, args.release)
+        problems = check(plan, repo)
         summary = f"{args.plan}: {run_plan_id(plan)}, {len(plan.eval_conditions())} eval conditions"
         if plan.superseded_by is not None:
             problems.append(f"SUPERSEDED by {plan.superseded_by}: do not run this plan")
-    for problem in problems:
-        print(problem, file=sys.stderr)
+    warnings: list[str] = []
+    if plan is not None:
+        if args.release is not None:
+            problems += check_release(plan, args.release, repo)
+        drift = pinned_file_drift(plan, repo)
+        if args.launch:
+            problems += [f"{d}: re-freeze or record a Decision" for d in drift]
+        else:
+            warnings += [f"warning: {d} (fails with --launch)" for d in drift]
+    for line in [*problems, *warnings]:
+        print(line, file=sys.stderr)
     if not problems:
-        print(summary)
+        print(summary + (", launch OK" if args.launch else ""))
     return 1 if problems else 0
 
 
