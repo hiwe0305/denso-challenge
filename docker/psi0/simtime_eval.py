@@ -34,7 +34,8 @@ class SimTime:
     def monotonic(self) -> float:
         if not _envs:
             return time.monotonic()  # before the env exists, as in flywheel_simple.tray.run
-        return float(_envs[-1].mujoco.mjData.time)
+        data = getattr(_envs[-1].mujoco, "mjData", None)  # set on the first reset; the agent
+        return float(data.time) if data is not None else 0.0  # reads the clock before it
 
     def sleep(self, seconds: float) -> None:
         del seconds
