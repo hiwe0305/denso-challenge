@@ -1,7 +1,9 @@
 """S2 replays in SIMPLE's teleop pipeline on the tray env (DA-35 tasks 9-11).
 
-Needs the parent batch parents-1103b (fwdata/simple/tray/virtual/, or
-$S2_PARENTS); skips without it. Runs in the SIMPLE venv, about 4 min on rtx3060:
+Needs a parent batch recorded by the current virtual operator (default the
+da35-virtual-3 smoke batch parents-smoke-1104 in fwdata/simple/tray/virtual/, or
+$S2_PARENTS); skips without it. Parents are taken from its summary.json. Runs in
+the SIMPLE venv, about 4 min on rtx3060:
 
     MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src \
         fwdata/simple/.venv/bin/python -m pytest packages/flywheel-simple/tests/tray/s2 -m sim -v
@@ -20,12 +22,25 @@ import pytest
 
 pytestmark = pytest.mark.sim
 
-PARENTS = Path(os.environ.get("S2_PARENTS", "fwdata/simple/tray/virtual/parents-1103b"))
+PARENTS = Path(os.environ.get("S2_PARENTS", "fwdata/simple/tray/virtual/parents-smoke-1104"))
 SHORT_STEPS = 700  # 14 s: activation, the walk to table A and the reach
 ACTION_ARMS = [*range(15, 22), *range(29, 36)]  # arm joints of the 43-d action
-# Two parents of parents-1103b and level-1 conditions drawn by sample_jobs (gen base 900).
-X = {"parent_id": "parents-1103b/shard-10/0", "level": 1, "seed": 204275, "gen_seed": 129588076}
-Y = {"parent_id": "parents-1103b/shard-07/4", "level": 1, "seed": 423796, "gen_seed": 550757015}
+# Level-1 conditions and gen seeds once drawn by sample_jobs (gen base 900).
+X_CONDITION = {"level": 1, "seed": 204275, "gen_seed": 129588076}
+Y_CONDITION = {"level": 1, "seed": 423796, "gen_seed": 550757015}
+
+
+def parents() -> list[dict[str, Any]]:
+    """Parents of the batch as summary.json lists them, with their `parent_id`."""
+    rows = json.loads((PARENTS / "summary.json").read_text())["parents"]
+    return [{**p, "parent_id": f"{PARENTS.name}/{p['shard']}/{p['episode_index']}"} for p in rows]
+
+
+def variant_jobs() -> tuple[dict[str, Any], dict[str, Any]]:
+    """Two variant jobs on the batch's last two parents (any parent serves)."""
+    *_, y, x = parents()
+    x_job = {"parent_id": x["parent_id"], **X_CONDITION}
+    return x_job, {"parent_id": y["parent_id"], **Y_CONDITION}
 
 
 class MemoryExporter:
@@ -135,8 +150,10 @@ def run(
 def test_exact_replay_of_a_parent_reaches_check_success(
     pipeline: tuple[Any, Any, Any], tmp_path: Path
 ) -> None:
-    # Reproduced in the task-9 batch (replay-1103).
-    job = {"parent_id": "parents-1103b/shard-00/2", "level": 0, "seed": 116, "gen_seed": 0}
+    # The batch's first parent; the smoke's exact replay reproduced all 16 (replay-smoke-1104).
+    parent = parents()[0]
+    job = {"parent_id": parent["parent_id"], "level": parent["level"], "seed": parent["seed"]}
+    job["gen_seed"] = 0
     (attempt,), _, (block,) = run(pipeline, tmp_path, [job], mode="exact")
     assert attempt["outcome"] == "success", attempt
     assert (block["source_kind"], block["synthetic_tier"]) == ("synthetic", "S2")
@@ -146,6 +163,7 @@ def test_exact_replay_of_a_parent_reaches_check_success(
 def test_same_job_gives_the_same_variant_wherever_it_runs(
     pipeline: tuple[Any, Any, Any], tmp_path: Path
 ) -> None:
+    X, Y = variant_jobs()
     alone = run(pipeline, tmp_path / "a", [X], max_steps=SHORT_STEPS)[1][-1]
     attempts, saved, blocks = run(pipeline, tmp_path / "b", [Y, X], max_steps=SHORT_STEPS)
     after = saved[-1]

@@ -102,9 +102,10 @@ def run(
 def test_virtual_operator_episode_reaches_check_success(
     env_agent_streamer: tuple[Any, Any, Any], tmp_path: Path
 ) -> None:
-    # A condition that passed in the parent batch parents-1103b (episodes are
-    # deterministic); about one in five conditions fails with the D-25 hold.
-    (attempt,), (frames,), (block,) = run(env_agent_streamer, tmp_path, "0:100", style_base=0)
+    # A condition that passed with the waist locked (da35-virtual-3) in the smoke batch
+    # parents-smoke-1104 (episodes are deterministic); 0:100, used before, now tilts
+    # the tray at LIFT. About one in five conditions fails with the D-25 hold.
+    (attempt,), (frames,), (block,) = run(env_agent_streamer, tmp_path, "0:102", style_base=0)
     assert attempt["outcome"] == "success", attempt
     assert attempt["steps_reached"] == 7
     phases = [name for name, _ in attempt["timeline"]]
