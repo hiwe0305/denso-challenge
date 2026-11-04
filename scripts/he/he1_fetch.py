@@ -19,6 +19,9 @@ While training runs, a log the trainer wrote to after `stage` listed it is expec
     python3 scripts/he/he1_fetch.py follow --session S --registry R --dest fwdata/he/runs \
         --every 600 --stop-when-done
 
+`--remote-work` is the job's folder on the VM (default /content/da26, DA-26's); a
+job of another story passes its own, e.g. DA-34's `--remote-work /content/da34`.
+
 `once` is the CU watcher's soft-cap `--persist` hook. `follow` runs beside the job
 from launch: it pulls every new complete checkpoint as it appears, so the cap-time
 pull only has the last one left, and ends once training is done and its final
@@ -91,7 +94,7 @@ from cu_watch import LIVE_STATES, parse_sessions, parse_usage  # noqa: E402
 COLAB = Path(
     os.environ.get("COLAB_CLI", "~/project/wm-wam-review/.venv-colab-cli/bin/colab")
 ).expanduser()
-REMOTE_WORK = "/content/da26"
+REMOTE_WORK = "/content/da26"  # default of --remote-work
 SLOW_MB_S = 6.0  # 2.9 MB/s fills the ~36 min left at cap 18; 6 keeps the early-stop room
 # Recipe R1 (configs/models/psi0-stage3.yaml, checked by test_he1_fetch.py).
 TOTAL_STEPS, SAVE_EVERY = 40000, 10000
@@ -150,7 +153,8 @@ class Remote:
         return [*self.ssh, command]
 
     def stage(self) -> list[str]:
-        return self.shell(f"cd {self.work} && python3 fw/scripts/he/he1_colab.py stage")
+        work = shlex.quote(self.work)
+        return self.shell(f"cd {work} && python3 fw/scripts/he/he1_colab.py stage --work {work}")
 
 
 class LocalRemote(Remote):
@@ -503,8 +507,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--every", type=float, default=600.0, help="`follow`: seconds per pull")
     parser.add_argument("--stop-when-done", action="store_true", help="`follow`: then colab stop")
     parser.add_argument("--local-vm", type=Path, help="dry run: a VM work dir on this disk")
+    parser.add_argument(
+        "--remote-work",
+        default=REMOTE_WORK,
+        help="the job's folder on the VM (default: %(default)s)",
+    )
     args = parser.parse_args(argv)
-    remote = LocalRemote(args.local_vm) if args.local_vm else Remote(args.session, args.colab)
+    remote = (
+        LocalRemote(args.local_vm)
+        if args.local_vm
+        else Remote(args.session, args.colab, work=args.remote_work)
+    )
     args.dest.mkdir(parents=True, exist_ok=True)
     lock = (args.dest / f".{args.session}.lock").open("w")
     fcntl.flock(lock, fcntl.LOCK_EX)  # the soft-cap `once` waits for a `follow` pull
