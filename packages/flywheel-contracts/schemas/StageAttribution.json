@@ -1,0 +1,158 @@
+{
+  "$defs": {
+    "DiagnosisSkip": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "reason"
+      ],
+      "title": "DiagnosisSkip",
+      "type": "object"
+    },
+    "ProbeMeasurement": {
+      "additionalProperties": false,
+      "description": "A probe measurement supporting an attribution hypothesis.",
+      "properties": {
+        "probe": {
+          "minLength": 1,
+          "title": "Probe",
+          "type": "string"
+        },
+        "where": {
+          "minLength": 1,
+          "title": "Where",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        },
+        "threshold": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Threshold"
+        }
+      },
+      "required": [
+        "probe",
+        "where",
+        "value"
+      ],
+      "title": "ProbeMeasurement",
+      "type": "object"
+    },
+    "StageHypothesis": {
+      "additionalProperties": false,
+      "description": "A proposed attribution; confirmation belongs to the engineer.",
+      "properties": {
+        "row_id": {
+          "minLength": 1,
+          "title": "Row Id",
+          "type": "string"
+        },
+        "attribute_to": {
+          "minLength": 1,
+          "title": "Attribute To",
+          "type": "string"
+        },
+        "intervention": {
+          "minLength": 1,
+          "title": "Intervention",
+          "type": "string"
+        },
+        "consumes_budget": {
+          "title": "Consumes Budget",
+          "type": "boolean"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/ProbeMeasurement"
+          },
+          "title": "Evidence",
+          "type": "array"
+        }
+      },
+      "required": [
+        "row_id",
+        "attribute_to",
+        "intervention",
+        "consumes_budget"
+      ],
+      "title": "StageHypothesis",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Stage hypotheses and unavailable table rows for one failure.",
+  "properties": {
+    "episode_id": {
+      "minLength": 1,
+      "title": "Episode Id",
+      "type": "string"
+    },
+    "table_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Table Sha256",
+      "type": "string"
+    },
+    "failed_step": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Failed Step"
+    },
+    "hypotheses": {
+      "items": {
+        "$ref": "#/$defs/StageHypothesis"
+      },
+      "title": "Hypotheses",
+      "type": "array"
+    },
+    "unavailable": {
+      "items": {
+        "$ref": "#/$defs/DiagnosisSkip"
+      },
+      "title": "Unavailable",
+      "type": "array"
+    }
+  },
+  "required": [
+    "episode_id",
+    "table_sha256",
+    "hypotheses",
+    "unavailable"
+  ],
+  "title": "StageAttribution",
+  "type": "object"
+}

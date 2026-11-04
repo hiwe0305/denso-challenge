@@ -1,0 +1,212 @@
+{
+  "$defs": {
+    "DiagnosisSkip": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "reason"
+      ],
+      "title": "DiagnosisSkip",
+      "type": "object"
+    },
+    "SystemFinding": {
+      "additionalProperties": false,
+      "description": "One measured F-SYS fault; part identifies the body half for R3.",
+      "properties": {
+        "code": {
+          "enum": [
+            "R1",
+            "R2",
+            "R3",
+            "R4",
+            "R5",
+            "R6"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        },
+        "threshold": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Threshold"
+        },
+        "part": {
+          "anyOf": [
+            {
+              "enum": [
+                "upper",
+                "lower"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Part"
+        },
+        "where": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Where"
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Detail"
+        }
+      },
+      "required": [
+        "code",
+        "value"
+      ],
+      "title": "SystemFinding",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One episode's system verdict, with unjudged checks and input hashes.",
+  "properties": {
+    "episode_id": {
+      "minLength": 1,
+      "title": "Episode Id",
+      "type": "string"
+    },
+    "diagnosis": {
+      "enum": [
+        "clean",
+        "unknown",
+        "controller",
+        "runtime",
+        "sync",
+        "calibration",
+        "infra"
+      ],
+      "title": "Diagnosis",
+      "type": "string"
+    },
+    "config_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Config Sha256",
+      "type": "string"
+    },
+    "trace_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Trace Sha256",
+      "type": "string"
+    },
+    "rtc_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Rtc Sha256"
+    },
+    "camera_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Camera Sha256"
+    },
+    "infra_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Infra Sha256"
+    },
+    "infra_status": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Infra Status"
+    },
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/SystemFinding"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "skipped": {
+      "items": {
+        "$ref": "#/$defs/DiagnosisSkip"
+      },
+      "title": "Skipped",
+      "type": "array"
+    }
+  },
+  "required": [
+    "episode_id",
+    "diagnosis",
+    "config_sha256",
+    "trace_sha256",
+    "findings",
+    "skipped"
+  ],
+  "title": "SystemDiagnosis",
+  "type": "object"
+}
