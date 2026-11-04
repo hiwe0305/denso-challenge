@@ -126,6 +126,19 @@ def cut_problems(data: Path, plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
         problems.append("cut episodes are not set C's episode indices in the release")
     if [e["episode_index"] for e in marker.get("episodes", [])] != list(range(len(sources))):
         problems.append("cut episodes are not renumbered 0 .. n-1")
+    # the dataset Psi0 reads, not only the marker that describes it
+    info = data / "meta" / "info.json"
+    total = (
+        json.loads(info.read_text(encoding="utf-8")).get("total_episodes")
+        if info.is_file()
+        else None
+    )
+    if total != demo.n:
+        problems.append(f"cut meta/info.json total_episodes is {total!r}, set C has {demo.n}")
+    rows = data / "meta" / "episodes.jsonl"
+    lines = rows.read_text(encoding="utf-8").splitlines() if rows.is_file() else []
+    if [json.loads(line)["episode_index"] for line in lines if line.strip()] != list(range(demo.n)):
+        problems.append(f"cut meta/episodes.jsonl rows are not episodes 0 .. {demo.n - 1}")
     if not (data / "meta" / "stats_psi0.json").is_file():
         problems.append("cut has no meta/stats_psi0.json (own_train_set stats)")
     return problems
