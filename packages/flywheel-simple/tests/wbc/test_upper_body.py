@@ -161,3 +161,48 @@ def test_controller_ignores_wall_clock(make_standing: Any) -> None:
         return arm_q(driver)
 
     assert np.max(np.abs(reach(0.0) - reach(0.01))) < 1e-3
+
+
+class _VelocityLimit:
+    def __init__(self, model: Any, velocity_limit: np.ndarray) -> None:
+        self.model = model
+        self.velocity_limit = np.asarray(velocity_limit)
+
+
+@pytest.mark.parametrize("max_step", [0.08, 0.02])
+def test_max_joint_step_sets_the_ik_velocity_limit(
+    monkeypatch: pytest.MonkeyPatch, max_step: float
+) -> None:
+    # Pure: pink and decoupled_wbc are faked. The IK moves q by velocity * dt *
+    # amplify_factor in each of num_step_per_frame QP steps, so a velocity bounded by
+    # max_step / (3 * 0.05 * 1.0) moves a joint at most max_step per control step; the
+    # URDF limit stays where it is lower. The sim test of tests/tray/test_agent.py
+    # checks the recorded commands.
+    import sys
+    import types
+
+    from flywheel_simple.wbc.upper_body import UpperBodyIK
+
+    limits = types.ModuleType("pink.limits")
+    limits.VelocityLimit = _VelocityLimit  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "pink", types.ModuleType("pink"))
+    monkeypatch.setitem(sys.modules, "pink.limits", limits)
+    urdf = np.array([37.0, 22.0, 22.0, 0.1])
+    model = types.SimpleNamespace(velocityLimit=urdf)
+    solver = types.SimpleNamespace(
+        configuration=types.SimpleNamespace(model=model),
+        num_step_per_frame=3,
+        dt=0.05,
+        amplify_factor=1.0,
+    )
+    ik = UpperBodyIK.__new__(UpperBodyIK)
+    ik._ik = types.SimpleNamespace(body_ik_solver=solver)
+
+    ik._limit_joint_step(max_step)
+
+    speed = model.velocity_limit.velocity_limit
+    assert model.velocity_limit.model is model
+    np.testing.assert_allclose(speed, np.minimum(urdf, max_step / 0.15))
+    per_control_step = speed * solver.dt * solver.amplify_factor * solver.num_step_per_frame
+    assert per_control_step.max() <= max_step + 1e-12
+    assert per_control_step[3] == pytest.approx(0.1 * 0.15)  # URDF lower than the cap
