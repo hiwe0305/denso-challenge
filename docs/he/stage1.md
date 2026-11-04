@@ -12,7 +12,7 @@ _Bắt đầu 4/11/2026. Story [DA-30](../product/stories/DA-30-stage1-egocentri
 |---|---|---|
 | Recipe, RunPlan, launcher, driver Colab, test CPU | Xong | `uv run pytest packages/flywheel-psi0/tests/stage1`: 28 test qua (driver Colab chạy `run`, `repeat`, `persist` trên Ψ₀ giả). Bộ canh CU nằm ở script dùng chung (mục 1.6), test của nó ở PR #108 |
 | Loader của Ψ₀ đọc dữ liệu thay thế (CPU) | Xong, 4/11/2026: 20 episode, rồi cả 218 | Mục 1.5 |
-| Lần chạy trên Colab | **Đã duyệt CU, 4/11/2026** (tier 2). Hiếu miễn bước che danh tính cho mẫu EgoDex công bố ("Waive for EgoDex", 4/11/2026, mục 1.4). Chạy từ `master` sau khi PR merge, với bộ canh CU dùng chung (mục 1.6) | Ước lượng 2,3 CU trên một L4, trần 4 CU ([sổ chi phí](../g0/ledger/DA-30.csv)) |
+| Lần chạy trên Colab | **Lần 1 hỏng trước bước train đầu, 4/11/2026** (DeepSpeed `betas: "auto"`, mục 1.7); 0,46 CU thực đo. Đã duyệt CU (tier 2). Hiếu miễn bước che danh tính cho mẫu EgoDex công bố ("Waive for EgoDex", 4/11/2026, mục 1.4). Chạy từ `master` sau khi PR merge, với bộ canh CU dùng chung (mục 1.6) | Ước lượng 2,3 CU trên một L4, trần 4 CU ([sổ chi phí](../g0/ledger/DA-30.csv)) |
 
 **Quyết định [Đã chốt 4/11/2026, Hiếu]:** "Approve tier 2". Tier 2 gồm lần chạy ngắn này, ước lượng khoảng 2,3 CU, trần 4 CU. Trước đó cùng ngày Hiếu đã dừng mọi job Colab (số dư khoảng 101,8 CU). Lần chạy dùng code ở `master` sau khi PR của DA-30 được merge, không chạy từ nhánh.
 
@@ -141,11 +141,29 @@ python3 -m flywheel_psi0.stage1.colab persist --work /content/da30 --plan fw/con
 
 ### 1.7 Kết quả
 
-Chưa chạy. Ghi ở đây sau lần chạy: loss bước đầu và cuối, kết quả hai tiêu chí, s/bước, VRAM đỉnh, CU thực đo.
+**Lần 1, 4/11/2026: hỏng trước bước train đầu tiên.** Chạy từ `master` `52bbd45` trên một L4 (`gpu-l4-s-asso1c0-3nx0c41acx7rl`), một mình trên tài khoản, registry mới, guard chạy trước watcher (mục 1.6).
+
+| Giai đoạn | Thời gian | Ghi chú |
+|---|---|---|
+| Nhận VM đến khi `pipeline.sh` chạy | khoảng 3 phút | Tạo `/content/da30`, upload mã (`git archive` của `52bbd45`) |
+| `setup` (môi trường DA-19, `pre.*`) | 185 s | Môi trường 138 s, tải 47 s; Ψ₀ ở `cda3fdf` |
+| `setup_stage1` (mẫu EgoDex, `actions_48d`) | 270 s | Tải 208 s, precompute 32 s; 218 episode, 111 task, 2,17 GB, `layout_problems` rỗng |
+| `run` | 35 s | Nạp model xong, hỏng ở `accelerator.prepare` |
+| Dừng VM | 16:22:54Z | Tải log về trước khi `colab stop`; Drive chưa mount nên `persist` chỉ ghi lên đĩa VM |
+
+Lỗi: `ValueError: optimizer.params.betas not found in kwargs`. `zero3_offload.json` của tác giả có khối `optimizer` với `betas` và `eps` là `"auto"`, nên `PretrainTrainer.create_optimizer` tạo `DummyOptim`. `accelerate` 1.7.0 (bản ghim của Ψ₀) chỉ điền `lr` và `weight_decay` cho `DummyOptim` (`Accelerator._prepare_deepspeed`), còn `betas` và `eps` để nguyên `"auto"` và dừng. Đây là rủi ro đầu tiên của mục 1.8. Script của tác giả dùng `zero3.json`, file này không có khối `optimizer`.
+
+Không có bước train nào: không có loss, `metrics.jsonl`, s/bước hay VRAM đỉnh. Hai tiêu chí chốt trước chưa đánh giá được (`loss_decreased`: "0 train lines, need 40"). `result.json` ghi `policy_error` cho một lỗi cấu hình hạ tầng.
+
+CU thực đo: **0,46 CU**, so với ước lượng 2,3 CU ([sổ chi phí](../g0/ledger/DA-30.csv), dòng `measured`). Số dư giảm từ 101,77 xuống 101,31. Thời gian tính tiền là 14,3 phút × 1,94 CU/giờ = 0,46 CU, khớp với số dư giảm. Watcher thoát mã 0 (`ended`, sau 3 lần poll không thấy phiên), guard thoát mã 0, tài khoản còn 0 phiên.
+
+Phần cố định đo được ngắn hơn giả định của mục 1.9. Từ lúc nhận VM đến lúc nạp model xong mất khoảng 11 phút, giả định là khoảng 26 phút cho các bước tương ứng. Phần train vẫn chưa đo.
+
+Log tải về nằm ở `fwdata/colab/da30-results/`, không commit: `report.json`, `pipeline.log`, `runs/*/train.log`, `launch.json`, `result.json`.
 
 ### 1.8 Rủi ro đã biết
 
-- `zero3_offload.json` không được script nào của tác giả dùng ở `cda3fdf`; đường DeepSpeed với optimizer trong file cấu hình (`DummyOptim`, `DummyScheduler`) chưa chạy lần nào trong dự án. Nếu hỏng, phương án dự phòng là A100 40 GB với `zero3.json`, có thể hết VRAM (ước lượng ở mục 1.2); cần duyệt CU lại.
+- `zero3_offload.json` không được script nào của tác giả dùng ở `cda3fdf`; đường DeepSpeed với optimizer trong file cấu hình (`DummyOptim`, `DummyScheduler`) chưa chạy lần nào trong dự án. **Đã xảy ra ở lần 1, 4/11/2026** (mục 1.7). Nếu hỏng, phương án dự phòng là A100 40 GB với `zero3.json`, có thể hết VRAM (ước lượng ở mục 1.2); cần duyệt CU lại.
 - s/bước là giả định (9 s), chưa đo. Phần nạp dữ liệu đã đo khoảng 1 s (mục 1.5); phần còn lại là GPU, chuyển trọng số qua lại RAM và Adam trên CPU của offload.
 
 ### 1.9 Ước lượng CU
