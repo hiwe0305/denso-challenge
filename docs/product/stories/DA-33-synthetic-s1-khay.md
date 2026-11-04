@@ -86,3 +86,12 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - 4/11/2026, sau nhiệm vụ 9: QA của DA-03 gắn cờ `action_jump.arm` cho 102/102 episode. Nguyên nhân là IK, không phải planner Cartesian: tư thế đỡ ngửa (D-25) đặt `wrist_roll` ở giới hạn và `wrist_pitch` gần 90°, nên IK pink đổi cấu hình trong null space tới 14 rad/s ở REACH (cùng cơ chế ở APPROACH_A nâng tay và lúc RELEASE). Giới hạn vận tốc trong QP của IK 0,08 rad/bước: 39/40 thành công so với 36/40, hết bước vượt ngưỡng. Crash x264 ở lô pool v2 là tranh chấp luồng trong `VideoWriter` của decoupled_wbc, không gắn với seed 1349. Chi tiết và việc chờ PO ở [wrist-jump.md](../../g0/tray/wrist-jump.md).
 - 4/11/2026, nhiệm vụ 11: giới hạn vận tốc trong QP của IK tay (`arm_step_max` 0,08 rad/bước, `da33-planner-5`) và `JoinedVideoWriter` cho bộ ghi. Trên `rtx3060`: test sim 25/25; test bước tay mới bắt được lỗi khi tắt giới hạn (0,177 rad, 24 bước vượt ngưỡng) và qua khi bật (0,08); `generate.py` 6 seed cho kết quả trùng từng seed với lần thử, video đủ frame ([wrist-jump.md](../../g0/tray/wrist-jump.md)).
 - 4/11/2026, nhiệm vụ 11, kiểm chứng: 50 seed train mới (300040–300089), cùng mã, planner-5 so với planner-4 (`arm_step_max` 1000). DA-03 QA: planner-5 44 pass, 0 flag, 0 reject; planner-4 0 pass, 43 flag, 2 reject (`action_jump.arm` 45/45, `joint_mapping` 2). Thành công 44/50 so với 45/50; qua lọc đã chốt 32/44 so với 39/45, phần chênh ở lúc đặt khay ([wrist-jump.md](../../g0/tray/wrist-jump.md)).
+- 4/11/2026, nhiệm vụ 11, sau review độc lập:
+  - Sinh tiếp một lô chỉ so seed, nên planner-4 và planner-5 có thể lẫn vào một release mà không ai biết.
+  - Từ nay `generate()` và `scripts/g0/tray/generate.py` từ chối `--out` có dòng sổ của planner khác. Bước kiểm này chạy trước khi nạp sim.
+  - `export_psi0` (nên cả `release.py`) từ chối lô có episode đã ghi thuộc hai phiên bản planner.
+  - Có test CPU cho từng lần từ chối, và một test CPU cho thấy `EpisodeRecorder._open` dùng exporter ghi qua `JoinedVideoWriter`.
+  - QA phát lại không còn coi lỗi hạ tầng là trượt QA.
+    - CLI phát lại của SIMPLE nuốt lỗi framebuffer và thoát 0.
+    - Nay `replay_qa()` raise `ReplayIncomplete` khi có episode không có kết quả, và không ghi verdict.
+    - `scripts/g0/tray/replay_qa.py` thoát 1 và liệt kê `unjudged_shards`.
