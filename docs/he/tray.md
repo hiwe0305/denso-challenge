@@ -161,3 +161,29 @@ Cần hai thứ, đều ngoài phạm vi DA-34:
 2. **Server.** Một launcher bọc `Server.predict_action` của `serve_psi0_simple` (trước khi `run()` gắn route, giữ chữ ký cho FastAPI): khi request có `reset` và `seed` thì gọi `torch.manual_seed(seed)` và `torch.cuda.manual_seed_all(seed)`. Launcher chạy trong image Ψ₀ thay cho `serve_psi0_simple`, nên đổi đường serve của S1-03 (`scripts/g0/serve_psi0.sh`). Cần Hiếu chỉ người làm.
 
 Kiểm khi đã có cả hai, cần GPU nên do Hiếu chạy: cùng checkpoint, 3 điều kiện mức 0, mỗi điều kiện 2 lượt, ở thời gian sim, so trajectory. Kỳ vọng: hai lượt cùng seed giống nhau, các seed khác nhau thì khác nhau. Có thể còn sai khác nhỏ do kernel GPU không tất định; điều này chưa đo.
+
+## 9. Quyết định 4/11/2026: bậc 2, chỉ fine-tune C và C+
+
+**[Đã chốt]** Hiếu, 4/11/2026, nguyên văn: "Approve tier 2". Với DA-34, bậc 2 nghĩa là chỉ fine-tune hai nhánh **C** và **C+**, khoảng 33 CU (2 × 16,6 CU trên L4, ước lượng của S1-04, chưa đo trọn 40.000 bước). Bỏ **A** và **C-NOEGO**. Trần cứng 36 CU cho hai lần. Eval chạy `mujoco` trên `rtx3060`, 0 CU. Colab đang dừng cho cả tài khoản; hai lần train chạy từ master sau khi RunPlan bản 2 đóng băng và Hiếu merge.
+
+Phần này thay mục 3 và mục 5 cho bản 2. Mục 3 và 5 giữ nguyên chữ vì bản 1 đã đóng băng với chúng.
+
+| Mục | Trước (bản 2 theo mục 7–8) | Sau quyết định bậc 2 |
+|---|---|---|
+| Nhánh train | A (320), C (160), C-NOEGO (160), C+ (160 + 160 nhắm lỗi) | **C** (160) và **C+** (160 + 160 nhắm lỗi). `he-tray-v2.yaml` chỉ có nhánh C; C+ ở `round-tray-cplus.yaml` |
+| Tập demo | 40 ⊂ 80 ⊂ 160 ⊂ 320 | Vẫn chọn và ghim cả bốn tập, cùng thứ tự hash. Tập 320 không train ở bậc 2; giữ để A chạy được sau mà không chọn lại tập |
+| Checkpoint gốc | Baseline (EgoDex + HE) và ablation chỉ HE | Chỉ baseline. Ablation `psi0-abl-he-only` không vào bản 2 |
+| Ngân sách trong RunPlan | Không có | Trường `budget`: trần 36 CU; mỗi lần train dừng ở **18 CU** (2 × 18 = 36); `runs: [C, C_PLUS]`. `runplan check` từ chối khi tổng cap vượt trần, khi một nhánh không có lượt trong `runs`, và khi plan round đặt nhánh ngoài `runs` |
+| Watcher | | Mỗi job train có một watcher dừng phiên Colab khi phiên đã dùng 18 CU, kể cả khi chưa đủ 40.000 bước. Job dừng ở cap ghi dòng `measured` với số CU thật và số bước đã chạy |
+| Sổ chi phí | 4 dòng ước lượng 16,6 CU (A, C, C-NOEGO, C+) | Dòng ước lượng mới: C và C+ mỗi lần 16,6 CU, cap 18; A và C-NOEGO 0 CU, ghi "bỏ theo bậc 2". Dòng cũ giữ nguyên (append-only) |
+
+Quy tắc đọc kết quả cho bậc 2 **[Đề xuất]**, chờ Hiếu duyệt cùng PR đóng băng bản 2:
+
+| # | Điều kiện | Đọc là |
+|---|---|---|
+| 0 | p_C < 10% (chỉ số chính, mức 1–2) | Ψ₀ chưa học được task khay từ ảnh MuJoCo. Không chạy C+; kiểm pipeline ảnh, ghi `Decision`. Thay quy tắc 0 của mục 3, vốn đọc trên A |
+| 1 | C+ so với C | Báo ba số của mục 5 trên 240 điều kiện mức 1–2: hiệu C+ − C và CI bootstrap theo điều kiện; tỉ lệ C+ làm được trên điều kiện C hỏng; số hồi quy, kèm số lượt C hỏng mà C+ làm được. Mức 0 báo riêng theo mục 8.2 |
+| 2 | Giới hạn phải ghi cạnh mọi số C+ − C | C+ có 320 episode, C có 160. Hiệu C+ − C gộp hai tác động: **nhiều dữ liệu hơn** và **dữ liệu nhắm lỗi**. Không có A thì không tách được hai tác động. Vì vậy chỉ đọc "vòng Failure → Data sửa được lỗi của C hay không", không đọc "nhắm lỗi tốt hơn bổ sung đều" |
+| 3 | Câu hỏi bỏ ngỏ | Độ nhạy của task với số demo (C so với A, quy tắc 1–3 của mục 3) và EgoDex trong pretrain (C so với C-NOEGO, quy tắc 4–6) không trả lời ở bậc 2. Báo cáo ghi rõ hai câu này chưa đo |
+
+Nếu sau này có thêm CU, A chạy trên tập 320 đã ghim, cùng recipe và cùng điều kiện eval. Khi đó phép so C+ với A của mục 5 dùng lại được. Việc đó cần RunPlan mới hoặc một `Decision`; bản 2 không tự mở lại.
