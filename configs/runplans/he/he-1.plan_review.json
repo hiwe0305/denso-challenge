@@ -1,0 +1,29 @@
+{
+ "site_id": "local",
+ "task_id": "G1WholebodyLocomotionPickBetweenTablesTeleop-v0",
+ "embodiment_id": "g1_sonic_dwbc@1",
+ "schema_version": "1.0.0",
+ "meta": {
+  "plan": "configs/runplans/he/he-1.yaml",
+  "frozen_at": "2026-11-04T14:41:47+00:00"
+ },
+ "id": "dec_01M6KG4JFTRWGQ91CD3H1TC1XX",
+ "kind": "plan_review",
+ "subject_kind": "run_plan",
+ "subject_id": "rp_95c98a476499",
+ "verdict": "approved",
+ "metrics": {},
+ "criteria": {
+  "doc": "docs/he/he-1.md",
+  "min_n_levels": 2,
+  "floor_pp": 10.0,
+  "preliminary_test": {
+   "method": "fisher_exact_two_sided",
+   "alpha": 0.05,
+   "conditions_per_arm": 10
+  }
+ },
+ "signed_by": "Hiếu",
+ "reason": "Tier 2, Hiếu 4/11/2026: \"Approve tier 2\" (relayed by the session Công việc của Hiếu). Option F10: V-EGO and V-NOEGO at N20 seed 0 only; eval mujoco_isaac, sim clock, 10 Level 0 dev conditions per arm (b63acd59); DA-26 hard ceiling 52 CU, per-job caps in docs/g0/ledger/DA-26.csv; Q1 kept as proposed (episodes 0-9 excluded). Results labelled preliminary: with 10 per arm only gaps of about 50 pp or more can reach p < 0.05.",
+ "supersedes_decision_id": null
+}
