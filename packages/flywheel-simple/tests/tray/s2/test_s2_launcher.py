@@ -30,10 +30,10 @@ def job(i: int) -> dict[str, Any]:
     return {"parent_id": f"p/shard-00/{i}", "level": 1, "seed": 100 + i, "gen_seed": i}
 
 
-def log_attempt(shard: Path, j: dict[str, Any]) -> None:
+def log_attempt(shard: Path, j: dict[str, Any], outcome: str = "success") -> None:
     shard.mkdir(parents=True, exist_ok=True)
     row = {"parent_episode": j["parent_id"], "level": j["level"], "seed": j["seed"],
-           "gen_seed": j["gen_seed"], "outcome": "success", "failure": None,
+           "gen_seed": j["gen_seed"], "outcome": outcome, "failure": None,
            "wall_s": 90.0, "sim_s": 30.0}  # fmt: skip
     with (shard / "attempts.jsonl").open("a") as f:
         f.write(json.dumps(row) + "\n")
@@ -46,6 +46,15 @@ def parents(tmp_path: Path, count: int) -> Path:
             for j in map(job, range(count))]  # fmt: skip
     (path / "s2_segments.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
     return path
+
+
+def test_an_interrupted_job_is_still_pending(gen: ModuleType, tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    log_attempt(out / "shard-00", job(0))
+    log_attempt(out / "shard-00", job(1), outcome="interrupted")
+    log_attempt(out / "shard-00", job(2), outcome="failure")  # ran to an outcome: done
+    args = SimpleNamespace(out=out)
+    assert [j["gen_seed"] for j in gen.pending(args, [job(i) for i in range(3)])] == [1]
 
 
 def test_pending_ignores_logged_jobs_outside_the_list(gen: ModuleType, tmp_path: Path) -> None:
@@ -150,18 +159,23 @@ def saved_unlogged_episode(shard: Path) -> None:
 
 class FakeWorker:
     """Logs its jobs one per poll; `crash_after` ends it with -11 (`orphan`: leaving a saved,
-    unlogged episode), `quit_after` with 0, `hang_after` stops logging."""
+    unlogged episode), `quit_after` with 0, `interrupt_after` with 0 after logging the next
+    job as interrupted (a SIGINT'd session), `hang_after` stops logging."""
 
     def __init__(self, shard: Path, jobs: list[dict[str, Any]], crash_after: int | None = None,
                  quit_after: int | None = None, hang_after: int | None = None,
-                 orphan: bool = False) -> None:  # fmt: skip
+                 orphan: bool = False, interrupt_after: int | None = None) -> None:  # fmt: skip
         self.shard, self.jobs, self.done = shard, jobs, 0
         self.crash_after, self.quit_after, self.hang_after = crash_after, quit_after, hang_after
-        self.orphan, self.killed = orphan, False
+        self.orphan, self.interrupt_after, self.killed = orphan, interrupt_after, False
 
     def poll(self) -> int | None:
         if self.killed:
             return -9
+        if self.interrupt_after is not None and self.done == self.interrupt_after:
+            log_attempt(self.shard, self.jobs[self.done], outcome="interrupted")
+            self.interrupt_after = None
+            return 0
         if self.crash_after is not None and self.done == self.crash_after:
             if self.orphan and not (self.shard / "simple").exists():
                 saved_unlogged_episode(self.shard)
@@ -320,3 +334,14 @@ def test_a_kill_reaches_the_workers_process_group(gen: ModuleType) -> None:
     while not dead() and time.monotonic() < deadline:
         time.sleep(0.05)
     assert dead()
+
+
+def test_a_sigint_worker_restarts_on_the_job_it_was_interrupted_in(
+    gen: ModuleType, tmp_path: Path
+) -> None:
+    ends, started = run(gen, tmp_path, [{"interrupt_after": 2}])
+    assert ends == {0: [0, 0]}
+    assert [j["gen_seed"] for j in started[1]] == [2, 3, 4, 5]
+    outcomes = [json.loads(r)["outcome"] for r in
+                (tmp_path / "shard-00" / "attempts.jsonl").read_text().splitlines()]  # fmt: skip
+    assert outcomes.count("interrupted") == 1 and outcomes.count("success") == 6
