@@ -11,8 +11,11 @@ docs/g0/ledger/DA-30.csv:
 
 `setup` builds Psi0's environment with DA-19's `setup` (which also fetches the stage 3
 parents and the two-table data: a few minutes not needed here, kept to reuse it as
-is), downloads the plan's `pre.*` parent at the pinned revision, fetches the EgoDex
-stand-in and runs the authors' `actions_48d` script on it. `run` trains the plan's
+is), tries the plan's DeepSpeed config on a tiny model (`flywheel_psi0.stage1.preflight`:
+CPU Adam build, `accelerator.prepare`, two steps) so a config the pinned accelerate
+refuses fails in a minute instead of after the model load, downloads the plan's
+`pre.*` parent at the pinned revision, fetches the EgoDex stand-in and runs the
+authors' `actions_48d` script on it. `run` trains the plan's
 job; `repeat` reruns its first steps under another job id and checks the first loss;
 `persist` copies logs and metrics (not the weights) to Google Drive.
 """
@@ -41,13 +44,37 @@ def _plan(path: Path) -> Any:
     return Stage1Plan.load(path)
 
 
+def preflight_command(plan: Any, psi0: Path, repo: Path) -> str:
+    """The pre-flight's torchrun line, with the recipe's optimizer and batch values."""
+    recipe = plan.load_recipe(repo)
+    arg = recipe.args.get
+    betas = " ".join(str(b) for b in arg("train.lr_scheduler_kwargs.betas"))
+    return (
+        f"{psi0}/.venv-psi/bin/torchrun --nproc_per_node=1 -m flywheel_psi0.stage1.preflight "
+        f"{repo / plan.deepspeed_config} --lr {arg('train.learning_rate')} --betas {betas} "
+        f"--eps {arg('train.lr_scheduler_kwargs.eps')} "
+        f"--weight-decay {arg('train.lr_scheduler_kwargs.weight_decay')} "
+        f"--micro-batch {recipe.int_arg('train.train_batch_size', 0)} "
+        f"--accumulation {recipe.int_arg('train.gradient_accumulation_steps', 1)} "
+        f"--precision {arg('train.mixed_precision')} "
+        f"--total-steps {recipe.int_arg('train.max_training_steps', 0)}"
+    )
+
+
 def setup(work: Path, plan_path: Path) -> None:
     import yaml
 
-    _plan(plan_path)  # validates first: unmasked video only under the EgoDex waiver
+    plan = _plan(plan_path)  # validates first: unmasked video only under the EgoDex waiver
     raw = yaml.safe_load(plan_path.read_text(encoding="utf-8"))
     setup_psi0_env(work)
     psi0 = work / "Psi0"
+    start = time.monotonic()
+    try:
+        sh(preflight_command(plan, psi0, work / "fw"), cwd=psi0)
+    except subprocess.CalledProcessError as error:
+        Report(work).phase("preflight", time.monotonic() - start, error=str(error))
+        raise
+    Report(work).phase("preflight", time.monotonic() - start)
     start = time.monotonic()
     parent_dir = raw["parent"]["vlm"]["path"].rsplit("/", 1)[0]
     sh(
@@ -124,7 +151,7 @@ def train(work: Path, plan_path: Path, repeat: bool) -> None:
 
     plan = _plan(plan_path)
     repo = work / "fw"
-    overrides = dict(plan.overrides)
+    overrides = plan.overrides_at(repo)
     job_id = plan.job.id
     if repeat:
         job_id = plan.repeat_job_id
