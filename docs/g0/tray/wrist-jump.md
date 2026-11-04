@@ -243,3 +243,48 @@ Hiếu yêu cầu sửa dữ liệu tới khi đạt rồi mới train. Mẫu l�
   - `scripts/g0/tray/replay_qa.py` thoát 1 và ghi tên shard vào `unjudged_shards` của `replay_summary.json`.
 
 Chi phí: khoảng 13,4 giờ-worker (sinh 2,2; thử nghiệm không ghi 7,2; QA phát lại 2,4; chẩn đoán và kiểm 0,4; QA và lọc dưới 0,1). Kết quả thô ở `rtx3060:~/denso-da33-ikfix/val/` và `~/denso-da33-ikfix/fwroot/`.
+
+## Thử planner-6 (D-29, 5/11/2026): không đạt
+
+Planner-6 (`da33-planner-6+cfg.c39d02b1`, nhánh `DA-33-planner-6`, chưa merge) chạy cùng 50 seed train 300040–300089 với planner-5, mức 1, đồng hồ sim. Chuỗi kiểm giống hệt: sinh, QA phát lại, `fw data ingest`, phát lại động học DA-17, QA DA-03, quality. **Kết luận: trượt 2 trong 3 mức nhận của D-29, nên không nhận planner-6. Planner-5 v2 đóng băng như kế hoạch.** Không chạy thêm thử nghiệm nào sau khi biết kết quả.
+
+| Mức nhận (D-29) | planner-5 | planner-6 | Đạt |
+|---|---|---|---|
+| QA DA-03: 0 cờ, 0 reject | 44 pass | 36 pass, **2 reject** (`replay_kinematic`) | Không |
+| `check_success` ≥ 44/50 | 44/50 | **38/50** | Không |
+| Qua lọc đã chốt (nghiêng ≤ 10°, lệch ≤ 20 mm) ≥ 85 % số thành công | 32/44 (72,7 %) | 33/38 (86,8 %) | Có |
+
+Số đo khác (trung vị / p90 / lớn nhất trên các lượt thành công):
+
+| Số đo | planner-5 | planner-6 |
+|---|---|---|
+| Nghiêng khay lúc mang (°) | 6,99 / 10,96 / 14,00 | 7,96 / 9,94 / 12,40 |
+| Lệch vật cuối lượt (mm) | 10,87 / 20,32 / 25,66 | 9,37 / 15,38 / 23,93 |
+| `drop_vz_min` trung vị (m/s) | −0,459 | −0,402 |
+| Hỏng theo nhãn | `timeout:REACH` 2, `L-ONE-HAND` 1, `L-PLACE-POSE` 1, `L-TRAY-TILT` 1, `timeout:ARRIVE_B` 1 | `L-TRAY-TILT` 7, `L-PLACE-POSE` 2, `timeout:REACH` 2, `timeout:LOWER` 1 |
+| QA phát lại (sai số khay) | 44/44 (0,0 mm) | 38/38 (0,0 mm) |
+| Phát lại động học DA-17: số issue | 0 | 2: `joint_limit` 1, `joint_mapping` 1 |
+| `wrist_roll` đo vượt giới hạn URDF, lớn nhất | 0 (không lượt nào vượt) | 3,67 mrad (seed 300076; 4 lượt vượt > 0, 1 lượt vượt dung sai 1,93 mrad) |
+| Khoảng cách nhỏ nhất của `wrist_roll` tới giới hạn, trung vị theo lượt | 26,5 mrad | 17,4 mrad |
+
+Theo seed: 34 seed thành công ở cả hai. Planner-6 cứu được 4 seed mà planner-5 hỏng, gồm cả 2 lượt `timeout:REACH` của planner-5 (300041, 300044), nhưng làm hỏng 10 seed mà planner-5 làm được. Trong 34 seed chung, 7 seed chỉ planner-6 qua lọc, 4 seed chỉ planner-5 qua lọc.
+
+Hai lượt bị reject:
+
+- **seed 300076, `joint_limit`.** `right_wrist_roll_joint` đo vượt giới hạn 3,67 mrad ở khung 1267–1311 (25,3–26,2 s, lúc hạ khay), so với dung sai 1,93 mrad. Lời giải IK đích của đoạn chuyển khớp nằm đúng trên giới hạn `wrist_roll`, và PD bám theo thì vượt một chút. Test sim `test_posture_changes_go_through_joint_transits` cũng thấy điều này ở seed 1: đích nâng tay của tay trái có `roll_margin` 0 và sai số tư thế 0,0177 (ngưỡng của test 0,01). Test đó trượt, nhưng chuỗi vẫn chạy tiếp để có số đo.
+- **seed 300046, `joint_mapping`.** `right_hand_middle_0_joint` có tương quan action–state 0,441, dưới sàn 0,5. Đây là cùng kiểu lỗi ngón tay với 4 reject của pool planner-5; planner-6 không gây ra cũng không sửa nó.
+
+Cái được và cái mất:
+
+- **Được.** Đoạn REACH đi theo đường khớp nên không còn bò qua vùng cổ tay gần suy biến: 2 lượt `timeout:REACH` của planner-5 thành công. 2 lượt `timeout:REACH` mới (300087, 300088) hỏng ở 8,6 s, ngay trong đoạn chuyển khớp REACH, nên đường khớp cũng có lúc không xong trước `timeout_reach`.
+- **Mất.** 7 lượt `L-TRAY-TILT` (planner-5: 1), cả 7 đều dừng ở 25,7–30,0 s. Trên các lượt đã ghi, nghiêng lớn nhất lúc mang của cả hai planner rơi vào lúc `reach_b` đã đặt mà `place` chưa đặt (planner-5 39/44 lượt, planner-6 32/38), tức là lúc hạ khay xuống bàn B. Nghi vấn chính là LOWER mới (min-jerk rồi bò 0,02 m/s), vì nó giữ khay lâu hơn ở sát mặt bàn, chứ không phải đoạn chuyển khớp, vốn kết thúc trước khi nhấc khay. **Chưa kiểm**: muốn tách hai thay đổi thì phải chạy lại 50 seed với `lower_ease: 0` (đường chuyển khớp giữ nguyên). Không chạy, vì D-29 bảo trượt thì dừng.
+
+Nếu sau này vẫn muốn thử lại hướng này (Hiếu quyết, không phải bây giờ):
+
+1. Chạy ablation `lower_ease: 0` ở trên.
+2. Chọn đích IK có khoảng cách tối thiểu tới giới hạn `wrist_roll` (ví dụ 10 mrad), thay vì chấp nhận nghiệm nằm trên giới hạn khi không còn nhánh nào khác.
+3. Kéo dài `timeout_reach` theo số bước của đoạn chuyển khớp.
+
+Thêm nữa: `tray/pico/agent.py` của DA-35 dùng `TrayPlanner` với cùng YAML nhưng không có bộ chạy đoạn chuyển khớp. Nếu planner-6 được merge, nó sẽ nhận mục tiêu nâng tay và REACH không có blend, và hash `operator_version` của nó đổi theo khóa YAML mới. Phải xử lý chuyện này trước khi merge.
+
+Chi phí: khoảng 2,2 giờ-worker trên rtx3060 (test sim 0,2; sinh 1,14; QA phát lại khoảng 0,85; chuỗi QA dưới 0,1), so với ước tính 3,0. Chạy ở 4 worker do DA-34 cấp, trong scope `MemoryMax=24G`, 00:00–00:44 ngày 5/11/2026. Kết quả thô ở `rtx3060:~/denso-da33-p6/val/` (`compare.txt`, `gen.log`, `out/p6-*`) và `~/denso-da33-p6/fwroot/` (release `tray_s1_da70bfc2da60`). Script so sánh: `p6_compare.py`, `wrist_roll_limits.py`, `tilt_phase.py` cùng thư mục.
