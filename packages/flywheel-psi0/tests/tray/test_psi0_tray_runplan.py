@@ -27,6 +27,7 @@ from flywheel_psi0.tray.runplan import (
 REPO = Path(__file__).resolve().parents[4]
 PLANS = REPO / "configs" / "runplans" / "tray"
 PLAN = PLANS / "he-tray.yaml"
+PLAN_V2 = PLANS / "he-tray-v2.yaml"
 ROUND = PLANS / "round-tray-cplus.yaml"
 
 
@@ -42,6 +43,9 @@ def _repo_copy(tmp_path: Path) -> Path:
         "configs/splits/default.yaml",
         "configs/runplans/tray/demo_sets.json",
         "configs/runplans/tray/he-tray.yaml",
+        "configs/runplans/tray/demo_sets-v2.json",
+        "configs/runplans/tray/quality-s1-pool-1104.jsonl",
+        "configs/runplans/tray/he-tray-v2.yaml",
     ]:
         (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(REPO / rel, tmp_path / rel)
@@ -148,7 +152,8 @@ def test_check_catches_unknown_parent_and_branch(plan: TrayRunPlan) -> None:
 def test_cplus_slot_is_a_draft_on_branch_c() -> None:
     round_plan = TrayRoundPlan.load(ROUND)
     assert round_plan.status == "draft" and round_plan.base_branch == "C"
-    assert round_plan.targets.n_add == 40 and round_plan.targets.seeds == []
+    assert round_plan.inherits == "configs/runplans/tray/he-tray-v2.yaml"
+    assert round_plan.targets.n_add == 160 and round_plan.targets.seeds == []
     assert check_round(round_plan) == []
     # C+ has no recipe of its own: it trains with the frozen plan's, override included.
     inherited = TrayRunPlan.load(REPO / round_plan.inherits)
@@ -169,8 +174,8 @@ def test_plan_is_unchanged_since_it_was_frozen(plan: TrayRunPlan) -> None:
 def test_round_refuses_a_plan_edited_after_its_lock(tmp_path: Path) -> None:
     repo = _repo_copy(tmp_path)
     shutil.copy(ROUND, repo / "configs/runplans/tray/round-tray-cplus.yaml")
-    shutil.copy(lock_path(PLAN), lock_path(repo / "configs/runplans/tray/he-tray.yaml"))
-    plan_file = repo / "configs/runplans/tray/he-tray.yaml"
+    shutil.copy(lock_path(PLAN_V2), lock_path(repo / "configs/runplans/tray/he-tray-v2.yaml"))
+    plan_file = repo / "configs/runplans/tray/he-tray-v2.yaml"
     plan_file.write_text(plan_file.read_text().replace("delta_pp: 10}", "delta_pp: 5}"))
     round_plan = TrayRoundPlan.load(repo / "configs/runplans/tray/round-tray-cplus.yaml")
     assert any("changed since it was frozen" in p for p in check_round(round_plan, repo))
@@ -318,9 +323,9 @@ def test_budget_round_runs_count_and_must_not_be_branches() -> None:
 
 def test_round_needs_a_run_in_the_parents_budget(tmp_path: Path) -> None:
     repo = _repo_copy(tmp_path)
-    plan_file = repo / "configs/runplans/tray/he-tray.yaml"
+    plan_file = repo / "configs/runplans/tray/he-tray-v2.yaml"
     raw = yaml.safe_load(plan_file.read_text())
-    raw["budget"] = dict(TIER_2, ceiling_cu=54)  # no C_PLUS
+    raw["budget"]["round_runs"] = []  # no C_PLUS
     plan_file.write_text(yaml.safe_dump(raw))
     shutil.copy(ROUND, repo / "configs/runplans/tray/round-tray-cplus.yaml")
     round_plan = TrayRoundPlan.load(repo / "configs/runplans/tray/round-tray-cplus.yaml")
@@ -352,3 +357,57 @@ def test_check_catches_other_qa_reports(tmp_path: Path, plan: TrayRunPlan) -> No
     pins = plan.demo_sets.model_copy(update={"qa": QaRef(**dict(QA_PIN, reports_sha256="b" * 64))})
     problems = check(plan.model_copy(update={"demo_sets": pins}), repo)
     assert any("other DA-03 QA reports" in p for p in problems)
+
+
+# Version 2, frozen on the planner-5 release (docs/he/tray.md sections 7-10).
+DA03_REJECTS = {1072, 1097, 1153, 1166, 1358, 1372, 1431}  # tray.md section 10
+
+
+@pytest.fixture
+def plan_v2() -> TrayRunPlan:
+    return TrayRunPlan.load(PLAN_V2)
+
+
+def test_v2_matches_the_files_it_names(plan_v2: TrayRunPlan) -> None:
+    assert check(plan_v2) == []
+    assert main(["check", str(PLAN_V2)]) == 0
+
+
+def test_v2_is_unchanged_since_it_was_frozen(plan_v2: TrayRunPlan) -> None:
+    lock = json.loads(lock_path(PLAN_V2).read_text())
+    assert lock["plan"] == plan_json(plan_v2)
+    assert lock["run_plan_id"] == run_plan_id(plan_v2)
+    assert plan_v2.superseded_by is None
+
+
+def test_v2_replaces_v1_by_its_frozen_id(plan_v2: TrayRunPlan, plan: TrayRunPlan) -> None:
+    assert plan_v2.supersedes == json.loads(lock_path(PLAN).read_text())["run_plan_id"]
+    assert plan.superseded_by == str(PLAN_V2.relative_to(REPO))
+
+
+def test_v2_is_tier_2(plan_v2: TrayRunPlan) -> None:
+    # Hiếu, 4/11/2026: train only C here and C+ in the round, 18 CU each under 36.
+    assert set(plan_v2.branches) == {"C"} and set(plan_v2.parents) == {"psi0-baseline-egodex-he"}
+    budget = plan_v2.budget
+    assert budget is not None
+    assert (budget.ceiling_cu, budget.cap_cu_per_run) == (36, 18)
+    assert (budget.runs, budget.round_runs) == (["C"], ["C_PLUS"])
+    assert "scripts/colab/cu_watch.py" in budget.watcher
+    assert (REPO / "scripts/colab/cu_watch.py").is_file()
+    assert plan_v2.recipe.overrides == {"train.validation_steps": 2000}
+
+
+def test_v2_eval_is_the_decision_of_4_11(plan_v2: TrayRunPlan) -> None:
+    assert (plan_v2.eval.clock, plan_v2.eval.policy_noise) == ("sim", "per_episode_condition_seed")
+    assert len(plan_v2.eval_conditions()) == 270
+    assert len(plan_v2.headline_conditions()) == 240
+
+
+def test_v2_sets_leave_out_the_da03_rejects(plan_v2: TrayRunPlan) -> None:
+    sets = DemoSets.model_validate_json((REPO / plan_v2.demo_sets.file).read_text())
+    assert sets.qa is not None and sets.quality is not None
+    assert {e.seed for e in sets.qa.excluded} == DA03_REJECTS
+    assert {e.decision for e in sets.qa.excluded} == {"reject"}
+    assert sets.quality.kept == 429
+    assert {k: v.n for k, v in sets.sets.items()} == {"N40": 40, "N80": 80, "C": 160, "A": 320}
+    assert not DA03_REJECTS & set(sets.sets["A"].seeds)

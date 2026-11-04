@@ -1,0 +1,125 @@
+# DA-34 RunPlan version 2 of the tray experiment, subtasks 1.7-1.9. Replaces version 1
+# (rp_c49c99c8d8da, never run) before any job, by the decisions in docs/he/tray.md:
+#   section 7 (3/11/2026)  pool of 610 seeds, quality filter, nested 40 < 80 < 160 < 320;
+#   section 8 (4/11/2026)  eval in sim time, level 0 as 30 replicates, 120 + 120 headline
+#                          scenes, policy noise seeded per episode;
+#   section 9 (4/11/2026)  tier 2: train only C here and C+ in round-tray-cplus.yaml,
+#                          36 CU ceiling, 18 CU cap per run;
+#   section 10 (5/11/2026) planner-5 release, DA-03 QA rejects left out. Planner-6 missed
+#                          its bar (38/50 against 44/50), so v2 stays on planner-5.
+#
+# Frozen before the first job: he-tray-v2.lock.json holds run_plan_id and the plan as
+# JSON; a test fails if this file changes afterwards. Checked by
+#   uv run python -m flywheel_psi0.tray.runplan check configs/runplans/tray/he-tray-v2.yaml
+#
+# Recipe, train seed and eval conditions are plan-level, so C and C+ (which inherits
+# them) share recipe, steps, batch, learning rate, train seed and condition seeds.
+name: he-tray-psi0-v2
+purpose: branch_train
+story: DA-34
+site_id: local
+task:
+  id: g1_wholebody_tray_transfer_teleop # TASK_UID of flywheel_simple.tray.simple_task
+  env_id: simple/G1WholebodyTrayTransferTeleop-v0
+  config: configs/sim/tray.yaml
+embodiment: g1_sonic_dwbc@1
+
+code:
+  simple: {repo: physical-superintelligence-lab/SIMPLE, commit: b75c6786f87b4a7f43b52b0ac5b83a1d9ea62e11}
+  psi0: {repo: physical-superintelligence-lab/Psi0, commit: cda3fdfafe47cb6fa75400d013de1bd36e3cea05}
+
+# Revision pinned by S1-03 (docs/g0/psi0-eval.md 1.1), as in version 1.
+psi_model: {repo: USC-PSI-Lab/psi-model, revision: cb1480f50d9764ab2f6261bc2e651a67ad54da17}
+
+# Tier 2 keeps only the baseline; the HE-only ablation of version 1 is not trained.
+parents:
+  psi0-baseline-egodex-he:
+    vlm:
+      path: psi0/pre.fast.1by1.2601091803.ckpt.ego200k.he30k/model.safetensors
+      sha256: 6e63da17bdd22430bc07c40e4b14ebb96c9d124d014c532449142862c186d3f9
+    action_header:
+      path: psi0/postpre.1by1.pad36.2601131206.ckpt.he30k/action_header.safetensors
+      sha256: 238b4d95862b0eb44bffa75a2ae69e120aeda3d159fd6f29802dd9338019e14d
+    clean_for_main_task: true
+    note: >-
+      Pretrained on EgoDex 200k + HE 30k steps; the pair the authors fine-tuned their SIMPLE
+      checkpoints from. The tray task is new (DA-32), so no tray data is in pretraining.
+
+# 541 episodes of batch gen/s1-pool-1104 (seeds 1000-1609, level 1), every row planner
+# da33-planner-5+cfg.4e2a4505; replay QA 542/542 (docs/he/tray.md section 10).
+release:
+  id: tray_s1_f9433b028c52
+  release_hash: f9433b028c520b4fd78b34469b389862f7b34de0bb185840aa18143d2d5d8461
+  location: rtx3060:~/denso-da34-pool/fwdata/releases/tray_s1_f9433b028c52
+  data_class: public
+
+# A = 320 > C = 160 > N80 > N40, one hash order (flywheel_psi0.tray.demo_sets). The salt
+# is the module's one salt; the order is new because the release hash is. Cut after
+# DA-03 QA (7 rejects out) and then the quality filter fixed on 3/11: 429 of 541 kept.
+# Only C trains in tier 2; A, N80 and N40 are pinned so a later run needs no new cut.
+demo_sets:
+  file: configs/runplans/tray/demo_sets-v2.json
+  salt: DA-34/demo-sets/v1
+  hashes:
+    N40: 85278f2016d35e007f782520e124286afa8c67cd3c65143ffd37751874f0ab93
+    N80: fb28061125b8060e606c1d27dc5ca382488ba3aebf18fd5970f0e6270787ae3f
+    C: a202cc028a2e7c6cbd9ba99b609f0d54b41cdad7965ca3088eb4473681808766
+    A: b914d6412f59411ecb3e97f9ddeb8c476025b5617d2eda23debd4d8c6758ba4c
+  quality:
+    file: configs/runplans/tray/quality-s1-pool-1104.jsonl # per-seed measures, no episode data
+    sha256: 49c26d25418b448aec3d8dabbe0cb010e9c9a6c5e285fadeafeb09104bb8fa40
+    filter: {max_tilt_carry_deg: 10.0, max_part_shift_end_mm: 20.0}
+  qa: # rtx3060:~/denso-da34-pool/fwdata/pipeline/src_297dedb9d3d39a72/qa/reports.jsonl
+    reports_sha256: fb402300863e3ce07c61e07db7d7e00c5d8dc12ed257e9c9f45dc01f63e0c44c
+    threshold_version: qa-1@fb6ddaf9f48c
+
+recipe:
+  file: configs/models/psi0-stage3.yaml # 40k steps, batch 16, lr 1e-4 cosine, VLM frozen, RTC
+  sha256: 71ba5de8ef22a11432a829e86e93b7e662f5f38f453cca27f73d6fbe777a1dbd # recipe_sha256, no `estimate`
+  overrides: # PO 4/11/2026 (S1-04 4.1): val every 2000 steps, does not change training
+    train.validation_steps: 2000
+  nproc_per_node: 1 # one Colab GPU: global batch 16, not the authors' 16 x 4 GPUs = 64 (S1-04 section 1.4)
+  dataset_stats: own_train_set # each branch's stats_psi0.json is computed on its own episodes
+train_seeds: [0] # one seed per branch for the preliminary result (design 6.3)
+
+branches:
+  C: {demo_set: C, parent: psi0-baseline-egodex-he, role: "160 demos, nothing added; base of C+"}
+
+# 270 episodes per branch (docs/he/tray.md 8.2). Level 0 has one scene: 30 replicates,
+# reported apart. Levels 1 and 2: 120 dev seeds each, 240 scenes pooled into the primary
+# metric. [1000000, 1000100) is left out: tests and view_scene use seeds there.
+# Needs flywheel_simple.tray.run in sim time and sending the condition seed on reset,
+# with the seeding server launcher (tray.md 8.1, 8.5): outside DA-34, before task 3.
+eval:
+  cli: eval-decoupled-wbc
+  sim_mode: mujoco
+  renderer: mujoco
+  synchronous: true
+  split: dev
+  clock: sim
+  policy_noise: per_episode_condition_seed
+  by_level:
+    - {level: 0, seeds: {start: 1000100, stop: 1000130}, unit: replicate, headline: false}
+    - {level: 1, seeds: {start: 1000100, stop: 1000220}, unit: condition, headline: true}
+    - {level: 2, seeds: {start: 1000100, stop: 1000220}, unit: condition, headline: true}
+  episode_limit_s: 90.0 # configs/sim/tray.yaml episode_limit_s
+
+metric: {primary: sim_success, per_stage: scorer_7_steps, failure_kinds: design_3_3}
+stats: {method: bootstrap_by_condition, resamples: 10000, seed: 20261103, ci: 0.95}
+
+# One branch here, so no comparison inside this plan: C+ vs C is read by the round plan
+# under the tier 2 rules of docs/he/tray.md section 9.
+comparisons: []
+
+interpretation: {doc: docs/he/tray.md, delta_pp: 10}
+pricebook: "assumption: Colab 100 CU pack, 0.0999 USD per CU (docs/g0/ledger/DA-19.csv)"
+
+# Tier 2 (Hiếu, 4/11/2026, "Approve tier 2"): C here and C+ of the round, 18 CU each.
+budget:
+  ceiling_cu: 36
+  cap_cu_per_run: 18
+  runs: [C]
+  round_runs: [C_PLUS]
+  watcher: "scripts/colab/cu_watch.py session --cap 18, under one guard per batch; one batch per account"
+
+supersedes: rp_c49c99c8d8da

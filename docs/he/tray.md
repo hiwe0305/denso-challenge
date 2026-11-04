@@ -1,6 +1,6 @@
 # Thí nghiệm egocentric trên task bê khay: thiết lập và quy tắc diễn giải (DA-34)
 
-_Chốt ngày 3/11/2026, trước khi chạy job nào. Story [DA-34](../product/stories/DA-34-thi-nghiem-egocentric-khay.md) nhiệm vụ 1; [design 28/10/2026](../superpowers/specs/2026-10-28-tray-transfer-he-design.md) mục 6.2–6.4 và 6.6. RunPlan: [`he-tray.yaml`](../../configs/runplans/tray/he-tray.yaml), đóng băng ở [`he-tray.lock.json`](../../configs/runplans/tray/he-tray.lock.json)._
+_Chốt ngày 3/11/2026, trước khi chạy job nào. Story [DA-34](../product/stories/DA-34-thi-nghiem-egocentric-khay.md) nhiệm vụ 1; [design 28/10/2026](../superpowers/specs/2026-10-28-tray-transfer-he-design.md) mục 6.2–6.4 và 6.6. RunPlan bản 1: [`he-tray.yaml`](../../configs/runplans/tray/he-tray.yaml), đóng băng ở [`he-tray.lock.json`](../../configs/runplans/tray/he-tray.lock.json), đã thay. RunPlan bản 2: [`he-tray-v2.yaml`](../../configs/runplans/tray/he-tray-v2.yaml), đóng băng ngày 5/11/2026 ở [`he-tray-v2.lock.json`](../../configs/runplans/tray/he-tray-v2.lock.json) (mục 11)._
 
 Quy tắc ở mục 3–5 **không đổi sau khi thấy kết quả** (ghi chú của story). Muốn đổi thì viết RunPlan mới kèm `Decision`, và báo cáo kết quả theo cả quy tắc cũ lẫn quy tắc mới. Test `test_psi0_tray_runplan.py` báo lỗi nếu `he-tray.yaml` khác bản đã đóng băng.
 
@@ -220,7 +220,7 @@ Cách đọc, là giả định, chưa lần theo từng frame:
 - `joint_limit` là khớp đo được, không phải lệnh. Tư thế đỡ ngửa (D-25) giữ `wrist_roll` ở giới hạn, và khớp đo vượt quá dung sai dưới 1 mrad.
 - `joint_mapping` là cùng kiểu ngón giữa tay phải mà DA-33 thấy ở planner-4 (2/50) và ở seed 1098 của release cũ; ở đây là 4/541 (0,7 %).
 
-Planner-6 của DA-33 (D-29) giải IK xa giới hạn `wrist_roll`. Nếu Hiếu nhận planner-6, kho sinh lại trên planner-6 và phải kiểm lại xem 3 ca `joint_limit` có hết không. RunPlan bản 2 chưa đóng băng: chờ kết quả planner-6, khoảng 12:00 ngày 5/11/2026. C và C+ phải dùng chung một planner.
+Planner-6 của DA-33 (D-29) giải IK xa giới hạn `wrist_roll`. Nếu Hiếu nhận planner-6, kho sinh lại trên planner-6 và phải kiểm lại xem 3 ca `joint_limit` có hết không. RunPlan bản 2 chờ kết quả planner-6, khoảng 12:00 ngày 5/11/2026. C và C+ phải dùng chung một planner. Planner-6 không đạt (mục 11), nên bản 2 đóng băng trên release planner-5 này.
 
 Kết quả thô ở `rtx3060:~/denso-da34-pool/fwdata/` (không commit):
 
@@ -228,3 +228,28 @@ Kết quả thô ở `rtx3060:~/denso-da34-pool/fwdata/` (không commit):
 - release `releases/tray_s1_f9433b028c52`;
 - thư mục QA `pipeline/src_297dedb9d3d39a72`;
 - report DA-17 `reports/tray-p5-1104`.
+
+## 11. Đóng băng bản 2 trên planner-5 (5/11/2026)
+
+**Planner-6 không đạt.** Thử nghiệm 50 seed của DA-33 cho 38/50 thành công, dưới ngưỡng 44/50; planner-5 đạt 44/50. Planner-6 gỡ được 2 ca timeout `REACH` của planner-5, nhưng thêm 7 ca hủy vì nghiêng khay ở cuối, so với 1 ca của planner-5. Theo quy tắc Hiếu đặt trước khi có kết quả (nhận planner-6 chỉ khi 0 cờ QA, thành công ≥ 44/50 và qua bộ lọc ≥ 85 %), bản 2 đóng băng trên release planner-5 `tray_s1_f9433b028c52` của mục 10. Ba ca `joint_limit` không kiểm lại: việc đó chỉ cần khi nhận planner-6. Số của planner-6 lấy theo báo cáo của DA-33 qua phiên điều phối; file này không chạy lại.
+
+Mục 7 ghi kho dùng `da33-planner-4+cfg.815b822a`. Kho đã sinh lại trên `da33-planner-5+cfg.4e2a4505` theo quyết định trên #93 và #103 (mục 10). Mọi số khác của mục 7 giữ nguyên: seed 1000–1609, mức 1, bộ lọc nghiêng ≤ 10° và xê dịch ≤ 20 mm, cỡ tập 320 / 160.
+
+| Mục | Giá trị |
+|---|---|
+| RunPlan | [`he-tray-v2.yaml`](../../configs/runplans/tray/he-tray-v2.yaml), **`rp_301f08e73358`**, lock [`he-tray-v2.lock.json`](../../configs/runplans/tray/he-tray-v2.lock.json). `supersedes: rp_c49c99c8d8da` (bản 1, chưa chạy) |
+| Nhánh | Chỉ **C** (160 episode) trên `psi0-baseline-egodex-he`. C+ ở [`round-tray-cplus.yaml`](../../configs/runplans/tray/round-tray-cplus.yaml), kế thừa bản 2, `n_add` = 160 |
+| Release | `tray_s1_f9433b028c52`, 541 episode, một planner (mục 10) |
+| Chọn tập | Bỏ 7 reject của DA-03, rồi qua bộ lọc: còn 429 episode. Tập lồng nhau cùng một thứ tự hash, ở [`demo_sets-v2.json`](../../configs/runplans/tray/demo_sets-v2.json) |
+| Hash tập | `N40` = `85278f2016d3…`, `N80` = `fb28061125b8…`, **`C` = `a202cc028a2e…`**, `A` = `b914d6412f59…`. Muối `DA-34/demo-sets/v1` là muối duy nhất của module; thứ tự mới vì `release_hash` mới |
+| Ghim chất lượng | [`quality-s1-pool-1104.jsonl`](../../configs/runplans/tray/quality-s1-pool-1104.jsonl), sha256 `49c26d25…`: số đo theo seed (nghiêng, xê dịch, độ rơi), không có dữ liệu episode. Commit vào repo để `runplan check` chạy được trên CI mà không cần `rtx3060` |
+| Ghim QA | sha256 của `qa/reports.jsonl` = `fb402300…`, ngưỡng `qa-1@fb6ddaf9f48c` |
+| Eval | 270 episode mỗi nhánh: mức 0 là 30 lượt lặp, mức 1 và 2 mỗi mức 120 seed dev, 240 cảnh cho chỉ số chính. Đồng hồ sim, nhiễu gieo theo episode (mục 8) |
+| Ngân sách | Trần 36 CU, cap 18 CU mỗi lần, `runs: [C]`, `round_runs: [C_PLUS]`; watcher là `scripts/colab/cu_watch.py session --cap 18` dưới một guard mỗi lô, một lô mỗi tài khoản |
+| Recipe | `psi0-stage3.yaml` như bản 1, ghi đè `train.validation_steps: 2000` |
+
+Điều kiện trước khi chạy, vẫn còn mở:
+
+- Fine-tune C chỉ chạy từ master sau khi PR đóng băng này được merge, và sau lô của DA-26 (một lô mỗi tài khoản).
+- Eval cần `flywheel_simple.tray.run` chạy ở thời gian sim và gửi seed điều kiện lúc reset, cùng launcher gieo nhiễu phía server (mục 8.1, 8.5). Việc này ngoài phạm vi DA-34 và phải xong trước nhiệm vụ 3.
+- Quy tắc đọc bậc 2 ở mục 9 vẫn là **[Đề xuất]**, chờ Hiếu duyệt cùng PR này.
