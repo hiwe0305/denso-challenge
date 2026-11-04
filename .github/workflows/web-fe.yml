@@ -1,0 +1,47 @@
+name: Web FE
+
+on:
+  push:
+    paths:
+      - "web/**"
+      - "mock/**"
+      - "packages/flywheel-contracts/schemas/**"
+      - ".github/workflows/web-fe.yml"
+  pull_request:
+    paths:
+      - "web/**"
+      - "mock/**"
+      - "packages/flywheel-contracts/schemas/**"
+      - ".github/workflows/web-fe.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  fe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web/fe
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/fe/package-lock.json
+      - name: Install
+        run: npm ci --no-audit --no-fund
+      - name: Contract types are current
+        run: npm run check:types
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npm run build
