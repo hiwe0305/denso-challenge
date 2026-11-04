@@ -12,7 +12,10 @@ person at the headset) and adds what the tray task needs:
 - scripted streamers run on a SimClock: one tick per step, no pacing, so an
   episode is the same on every run and faster than real time;
 - only successful attempts are saved, unless `keep_failed`; an attempt ends at
-  success, the first StepTracker failure label, time out or operator reset.
+  success, the first StepTracker failure label, time out or operator reset;
+- videos go through DA-33's JoinedVideoWriter (`tray/recorder.py`), not
+  decoupled_wbc's VideoWriter, whose `stop()` raced its encoder thread and crashed
+  or hung S2 workers under load.
 
 Run in the SIMPLE venv (PyAV and, for PICO, xrobotoolkit_sdk installed):
 
@@ -34,6 +37,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from flywheel_simple.tray import recorder
 from flywheel_simple.tray.pico.conditions import Condition, ConditionQueue, parse_conditions
 from flywheel_simple.tray.pico.recording import (
     TRAY_FEATURES,
@@ -105,7 +109,7 @@ def simple_commit() -> str:
 
 
 def init_exporter(save_root: Path, env: Any, agent: Any, ego_view_shape: Any) -> Any:
-    """SIMPLE's `_init_exporter` plus TRAY_FEATURES; resumes an existing dataset."""
+    """SIMPLE's `_init_exporter` plus TRAY_FEATURES and JoinedVideoWriter; resumes a dataset."""
     utils = _mod("decoupled_wbc.data.utils")
     rec = _mod("simple.cli._decoupled_wbc_recording")
     robot_model = agent._dwbc_robot_model
@@ -114,7 +118,7 @@ def init_exporter(save_root: Path, env: Any, agent: Any, ego_view_shape: Any) ->
     rec.validate_existing_ego_view_feature_shape(str(save_root), ego_view_shape)
     features["observation.state"]["names"] = env.unwrapped.task.robot.joint_names
     features.update(TRAY_FEATURES)
-    return _mod("decoupled_wbc.data.exporter").Gr00tDataExporter.create(
+    return recorder._exporter_class().create(
         save_root=str(save_root),
         fps=FPS,
         features=features,
