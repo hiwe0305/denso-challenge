@@ -200,26 +200,36 @@ def deepspeed_problems(config: dict[str, Any], recipe: Psi0Recipe) -> list[str]:
         not isinstance(betas, list)
         or not isinstance(have_betas, list)
         or len(betas) != len(have_betas)
-        or not all(
-            math.isclose(float(a), float(b)) for a, b in zip(have_betas, betas, strict=True)
-        )
+        or not all(math.isclose(float(a), float(b)) for a, b in zip(have_betas, betas, strict=True))
     ):
         problems.append(f"optimizer.params.betas is {have_betas!r}, the recipe has {betas!r}")
     # Psi0 groups the vision tower and the projector at their own lr. WarmupLR sets one
     # lr for every group and starts it at 0; WarmupCosineLR scales each group's own lr,
-    # by 1.0 here. Built at iteration -1 it writes lr 0 into the first group before the
-    # first step (DeepSpeed 0.17.1), so it starts at 0.
+    # by 1.0 here. It must start at iteration -1: only then does DeepSpeed 0.17.1 set
+    # `_last_lr` in __init__, and Psi0 reads `get_last_lr()` on every micro-step, before
+    # the first scheduler step at the accumulation boundary. The price: lr 0 for the
+    # first group's first update.
     scheduler = config.get("scheduler", {})
     sparams = scheduler.get("params", {})
     if recipe.args.get("train.lr_scheduler_type") == "constant" and (
         scheduler.get("type") != "WarmupCosineLR"
         or sparams.get("warmup_min_ratio") != 1.0
         or sparams.get("cos_min_ratio") != 1.0
-        or sparams.get("last_batch_iteration") != 0
+        or sparams.get("last_batch_iteration", -1) != -1
     ):
         problems.append(
             "the recipe's lr is constant per group: scheduler must be WarmupCosineLR "
-            "with warmup_min_ratio and cos_min_ratio 1.0 and last_batch_iteration 0"
+            "with warmup_min_ratio and cos_min_ratio 1.0, from last_batch_iteration -1"
+        )
+    # Psi0 does not clip under DeepSpeed (pretrain.py:246); the config's clip is the only one.
+    clip, max_norm = (
+        _number(config.get("gradient_clipping")),
+        _number(recipe.args.get("train.max_grad_norm")),
+    )
+    if clip is None or max_norm is None or not math.isclose(clip, max_norm):
+        problems.append(
+            f"gradient_clipping is {config.get('gradient_clipping')!r}, "
+            f"the recipe's max_grad_norm is {recipe.args.get('train.max_grad_norm')!r}"
         )
     return problems
 

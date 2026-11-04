@@ -34,6 +34,7 @@ from typing import Any
 from flywheel_psi0.stage1.egodex_sample import fetch, layout_problems
 from flywheel_psi0.trainer.colab import Report, sh
 from flywheel_psi0.trainer.colab import setup as setup_psi0_env
+from flywheel_psi0.trainer.psi0_trainer import _src_dir
 
 DRIVE = Path("/content/drive/MyDrive/denso/da30")
 
@@ -61,6 +62,15 @@ def preflight_command(plan: Any, psi0: Path, repo: Path) -> str:
     )
 
 
+def preflight_env() -> dict[str, str]:
+    """PYTHONPATH with the flywheel sources as absolute paths, as `Psi0Trainer.environment`."""
+    paths = [_src_dir("flywheel_psi0"), _src_dir("flywheel.contracts")]
+    existing = os.environ.get("PYTHONPATH")
+    return {
+        "PYTHONPATH": os.pathsep.join([*dict.fromkeys(paths), *([existing] if existing else [])])
+    }
+
+
 def setup(work: Path, plan_path: Path) -> None:
     import yaml
 
@@ -70,7 +80,7 @@ def setup(work: Path, plan_path: Path) -> None:
     psi0 = work / "Psi0"
     start = time.monotonic()
     try:
-        sh(preflight_command(plan, psi0, work / "fw"), cwd=psi0)
+        sh(preflight_command(plan, psi0, work / "fw"), cwd=psi0, env=preflight_env())
     except subprocess.CalledProcessError as error:
         Report(work).phase("preflight", time.monotonic() - start, error=str(error))
         raise

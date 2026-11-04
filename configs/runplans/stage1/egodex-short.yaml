@@ -58,9 +58,13 @@ job:
 # `runplan check`:
 # - optimizer.params set from the recipe: accelerate 1.7.0 leaves betas and eps at
 #   "auto" for a DummyOptim, which stopped run 1 (docs/he/stage1.md 1.7);
-# - WarmupCosineLR at ratio 1.0, started at iteration 0, instead of WarmupLR, which
-#   puts every group at lr 0 for the first steps and then the vision tower and
-#   projector at the base lr instead of their own 1e-5.
+# - WarmupCosineLR at ratio 1.0 instead of WarmupLR, which puts every group at lr 0
+#   for the first steps and then the vision tower and projector at the base lr
+#   instead of their own 1e-5. Started at iteration -1 (DeepSpeed sets `_last_lr`
+#   only then; Psi0 reads it every micro-step), so the first group's first update is
+#   at lr 0.
+# - gradient_clipping 1.0, the recipe's max_grad_norm: Psi0 does not clip under
+#   DeepSpeed, so this is the only clip.
 # Passed to Psi0 as an absolute path (Stage1Plan.overrides_at).
 deepspeed_config: configs/runplans/stage1/zero3_offload.json
 
