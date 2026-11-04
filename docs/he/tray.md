@@ -187,3 +187,44 @@ Quy tắc đọc kết quả cho bậc 2 **[Đề xuất]**, chờ Hiếu duyệ
 | 3 | Câu hỏi bỏ ngỏ | Độ nhạy của task với số demo (C so với A, quy tắc 1–3 của mục 3) và EgoDex trong pretrain (C so với C-NOEGO, quy tắc 4–6) không trả lời ở bậc 2. Báo cáo ghi rõ hai câu này chưa đo |
 
 Nếu sau này có thêm CU, A chạy trên tập 320 đã ghim, cùng recipe và cùng điều kiện eval. Khi đó phép so C+ với A của mục 5 dùng lại được. Việc đó cần RunPlan mới hoặc một `Decision`; bản 2 không tự mở lại.
+
+## 10. Kho planner-5 và release `tray_s1_f9433b028c52` (4–5/11/2026)
+
+Kho sinh lại theo quyết định của Hiếu trên #93 và #103: planner `da33-planner-5` có giới hạn vận tốc trong IK (D-28 của DA-33). Lô cũ `s1-pool-1103` (planner-4, dừng ở 322/610) ghi đã thay và giữ nguyên, không xóa.
+
+| Bước | Kết quả |
+|---|---|
+| Sinh, `rtx3060`, lô `s1-pool-1104` | 610 lượt, seed 1000–1609, mức 1, 14 worker, 1,29 giờ. Cả 610 dòng ghi `da33-planner-5+cfg.4e2a4505`. 542 thành công và được ghi; 541 qua QA tối thiểu (1 `phases_incomplete`). Không shard nào chết hay khởi động lại, không crash x264 |
+| Hỏng | `L-ONE-HAND` 18, `L-TRAY-TILT` 16, `L-PLACE-POSE` 15, timeout 19 (`LIFT` 7, `REACH` 5, `RELEASE` 5, `ARRIVE_B` 2) |
+| QA phát lại (D-24), master `3e45bb6` (có #105) | 542/542 đạt, lệch khay 0,0 mm, 0 shard hỏng hay chưa chấm |
+| Release | `tray_s1_f9433b028c52`, `release_hash` `f9433b028c520b4fd78b34469b389862f7b34de0bb185840aa18143d2d5d8461`, 541 episode, 4,5 GB, một phiên bản planner |
+| QA của DA-03 (`qa-1@fb6ddaf9f48c`) cùng phát lại động học của DA-17 (`replay-1@cf2515483a8c`) | **534 pass, 0 flag, 7 reject.** Không có cờ `action_jump.arm`; bước tay lớn nhất 0,080 rad |
+| Cấp dataset | `stats_json.states` D4 (lệch 0,0058 ở `states.mean[25]`): lỗi đã biết của script tác giả, việc của DA-02. Cột `index` lệch LeRobot v2.1 ở 527 episode (Q7); Ψ₀ không đọc cột này (mục 8.3) |
+| Chất lượng 541 episode | Nghiêng khi mang: trung vị 7,05°, p90 10,34°, tối đa 14,78°. Linh kiện xê dịch lúc cuối: 10,35 / 19,57 / 37,66 mm. Khay rơi khi nhả: trung vị −0,45 m/s (−0,18 đến −0,85) |
+| Bộ lọc đã chốt (nghiêng ≤ 10°, xê dịch ≤ 20 mm) | 436/541 đạt (80,6 %): 56 hỏng vì nghiêng, 42 vì xê dịch, 7 cả hai. Cả 7 reject đều qua bộ lọc, nên sau khi loại reject còn **429** episode, đủ cho tập 320. Không cần sinh thêm từ seed 1610 |
+
+**[Đã chốt 5/11/2026, Hiếu] loại 7 reject DA-03 khỏi tập demo.** `flywheel_psi0.tray.demo_sets --qa-work` đọc report QA của DA-03 và bỏ episode `reject` (và `quarantine`) trước bộ lọc chất lượng. Lệnh dừng với lỗi nếu thư mục QA không phải của release này, hoặc thiếu report cho một episode. File tập demo ghi lại từng episode bị loại; RunPlan ghim sha256 của report QA. Bảy episode bị loại, đều do phép phát lại động học của DA-17 (D7):
+
+| Episode | Seed | Mã | Chi tiết |
+|---|---|---|---|
+| `ep_423b9d7b6f87d3ca` | 1072 | `joint_mapping` | Tương quan action–state của `right_hand_middle_0_joint` 0,431 (sàn 0,5) |
+| `ep_6a3e45cee41460f3` | 1358 | `joint_mapping` | Cùng khớp, 0,407 |
+| `ep_d3a1cefb8fbe676c` | 1166 | `joint_mapping` | Cùng khớp, 0,463 |
+| `ep_d5afb36303be4d5d` | 1153 | `joint_mapping` | Cùng khớp, 0,191 |
+| `ep_76f4f4bcc93e4024` | 1372 | `joint_limit` | State `left_wrist_roll_joint` vượt giới hạn URDF 2,8 mrad (dung sai 1,93 mrad), frame 533–539 và 1063–1094 |
+| `ep_099f1666df886001` | 1431 | `joint_limit` | State `right_wrist_roll_joint` vượt 2,39 mrad, frame 380–473 |
+| `ep_54dd2d921f64c2a9` | 1097 | `joint_limit` | State `right_wrist_roll_joint` vượt 2,03 mrad, frame 515–516 |
+
+Cách đọc, là giả định, chưa lần theo từng frame:
+
+- `joint_limit` là khớp đo được, không phải lệnh. Tư thế đỡ ngửa (D-25) giữ `wrist_roll` ở giới hạn, và khớp đo vượt quá dung sai dưới 1 mrad.
+- `joint_mapping` là cùng kiểu ngón giữa tay phải mà DA-33 thấy ở planner-4 (2/50) và ở seed 1098 của release cũ; ở đây là 4/541 (0,7 %).
+
+Planner-6 của DA-33 (D-29) giải IK xa giới hạn `wrist_roll`. Nếu Hiếu nhận planner-6, kho sinh lại trên planner-6 và phải kiểm lại xem 3 ca `joint_limit` có hết không. RunPlan bản 2 chưa đóng băng: chờ kết quả planner-6, khoảng 12:00 ngày 5/11/2026. C và C+ phải dùng chung một planner.
+
+Kết quả thô ở `rtx3060:~/denso-da34-pool/fwdata/` (không commit):
+
+- lô `gen/s1-pool-1104` và `quality.jsonl` (sha256 `49c26d25…`);
+- release `releases/tray_s1_f9433b028c52`;
+- thư mục QA `pipeline/src_297dedb9d3d39a72`;
+- report DA-17 `reports/tray-p5-1104`.
