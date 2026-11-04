@@ -2,7 +2,9 @@
 """Stop paid Colab sessions before they pass their CU cap: one watcher per session.
 
 Two kinds of process, on the laptop whose `colab` CLI owns the sessions, sharing one
-registry directory per batch:
+fresh registry directory per batch. One batch per account at a time: the guard stops
+every assignment its registry does not know, so it refuses to start while another
+guard holds `~/.cache/cu_watch/guard.lock` ($CU_WATCH_LOCK).
 
 - `session`: one per Colab session. It creates (`--new`) or takes over (`--attach`)
   one session, meters it, and stops it at its cap. One session's slow `new` or stuck
@@ -11,10 +13,10 @@ registry directory per batch:
   real balance falls to `--floor`, and any assignment (named or `[?]`) whose endpoint
   no live session watcher has registered, after `--grace-polls` polls.
 
-Launch the guard first, then each session watcher; start a job only once its
-`.ready` file exists (the watcher removes a stale one when it starts):
+Launch the guard first, then each session watcher, in a new registry; start a job only
+once its `.ready` file exists and the guard's heartbeat is younger than two polls:
 
-    R=fwdata/colab/batch; mkdir -p $R; rm -f $R/da30-stage1.ready
+    R=fwdata/colab/batch-$(date +%Y%m%d-%H%M%S); mkdir -p fwdata/colab && mkdir $R
     nohup setsid bash -c 'trap "" TERM HUP INT
         python3 scripts/colab/cu_watch.py guard --registry "$0" --floor 14 \\
             --log "$0/guard.jsonl"; echo "exit $?"' $R < /dev/null > $R/guard.out 2>&1 &
@@ -24,9 +26,15 @@ Launch the guard first, then each session watcher; start a job only once its
             --persist "colab exec -s da30-stage1 -f p.py" \\
             --log "$0/da30-stage1.jsonl"; echo "exit $?"' $R \\
         < /dev/null > $R/da30-stage1.out 2>&1 &
-    until [ -f $R/da30-stage1.ready ]; do
-        grep -q '^exit ' $R/da30-stage1.out && exit 1; sleep 5; done
-    # only now start the job on the VM
+    ( until [ -f $R/da30-stage1.ready ]; do
+          grep -q '^exit ' $R/da30-stage1.out && exit 1; sleep 5; done
+      [ -f $R/guard.beat ] && [ $(( $(date +%s) - $(stat -c %Y $R/guard.beat) )) -lt 120 ]
+    ) && echo READY || echo "NOT READY: do not start the job"
+    # only after READY start the job on the VM
+
+A session added later (DA-26's eval server) gets its own `session` watcher in the
+same registry; if the guard has exited meanwhile, start a new one there first (a
+guard counts only entries that beat after it started).
 
 The `trap` keeps each wrapper alive when its process group is killed, so it still
 writes "exit N"; Python installs its own handlers over the inherited ignore.
@@ -35,8 +43,10 @@ Identity. A session is tracked by its endpoint, never by its name alone: the CLI
 names only locally and lists a session whose name it lost as `[?] <endpoint>`. With
 `--new`, the watcher takes a trusted listing, runs `colab new` in the background while
 holding `<registry>/new.lock` (so no two watchers create at once), and binds the
-endpoint that appears in the listings, named or `[?]`. If `new` fails, times out or
-is interrupted, every assignment that appeared meanwhile is stopped. `--attach` finds
+endpoint that appears in the listings under its own name or as `[?]`; a session that
+appears under another name is never its own. If `new` fails, times out or is
+interrupted, every such assignment that appeared meanwhile is stopped. A name already
+watched by a live watcher in the registry is refused. `--attach` finds
 the session by `--endpoint` or by name, and needs its start time (`--started` ISO
 8601, or `--started-min-ago`). Stops go through the CLI's own client by endpoint
 (`colab stop` needs the local name).
@@ -45,20 +55,23 @@ Trust. A listing counts only when `colab usage` succeeded in the same cycle, `co
 sessions` exited 0, every line parses, and it lists at least as many assignments as
 `usage` counts: on an auth failure the CLI prints "No active sessions" and exits 0. A
 session has ended only after 3 trusted listings in a row without its endpoint, and is
-then stopped by endpoint anyway. A stop counts after 2 trusted listings without the
+then stopped by endpoint anyway; when the guard stopped it, the watcher says so and
+exits 3 (floor) or 6. A stop counts after 2 trusted listings without the
 endpoint; until then it is retried every poll, with STOP_FAILED on stderr from the
 third try, until it works or a signal says to give up (exit 5).
 
-Meter. The larger of two. (1) Wall clock: `time.time()` since the session started (a
-high-water mark, so a clock set back does not lower it) times its GPU's rate (`RATES`);
-it keeps counting through a laptop suspend, as Colab's billing does. (2) Balance:
+Meter. The larger of two. (1) Wall clock: `time.time()` since the session started,
+counting only forward moves (a clock set back neither lowers it nor stalls it), times
+its GPU's rate (`RATES`); it keeps counting through a laptop suspend, as Colab's
+billing does. The `new` and persist timeouts use the same clock. (2) Balance:
 each drop of `colab usage`'s balance, in full while the account has one assignment,
 in proportion to the session's rate over the account's usage rate while more run.
 A session is stopped when spend + rate x margin reaches its cap (`Timing.margin`: a
 poll, its two CLI calls, and an unassign that works on its second try). Its
 `--persist` command runs in the background at `--persist-at` of the cap, or earlier so
-it has `persist_timeout` to finish, and is killed after that. Use `colab exec -s NAME
--f ...` there, never `colab ssh`: `ssh -s NAME` creates the session again.
+it has `persist_timeout` to finish; its whole process group is killed after that. Use
+`colab exec -s NAME -f ...` there, never `colab ssh`: `ssh -s NAME` creates the
+session again.
 
 Fail closed. A GPU type is checked against `RATES` before any `new` (the CLI maps an
 unknown `--gpu` to A100), and the listed `Hardware:` must match the plan. An exception
@@ -109,6 +122,9 @@ MISSES_TO_END = 3
 CONFIRM_ABSENT = 2  # trusted listings without the endpoint that confirm a stop
 LOUD_AFTER = 3  # stop rounds before STOP_FAILED is raised on stderr
 LIVE_STATES = ("starting", "running")
+GUARD_LOCK = Path(
+    os.environ.get("CU_WATCH_LOCK", Path.home() / ".cache" / "cu_watch" / "guard.lock")
+)
 
 # Unassign an endpoint with the CLI's own client: `colab stop` needs a local name.
 UNASSIGN = "import sys; from colab_cli.common import state; state.client.unassign(sys.argv[1])"
@@ -144,6 +160,14 @@ class Capped(WatchError):
 
 class WrongGpu(WatchError):
     code = EXIT_WRONG_GPU
+
+
+class GuardStopped(WatchError):
+    """The guard unassigned the session: at the floor (3) or with no live watcher (6)."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(f"the guard stopped the session: {reason}")
+        self.code = EXIT_CAPPED if reason == "floor" else EXIT_CRASHED
 
 
 class Interrupted(BaseException):
@@ -365,10 +389,13 @@ class Watcher:
     clock: Callable[[], float] = time.time
     sleep: Callable[[float], None] = time.sleep
     spawn: Spawn | None = None
+    alive: Callable[[int], bool] = field(default=lambda pid: pid_alive(pid))
+    registered: bool = False
     started: float | None = None
     endpoint: str | None = None
     claimed: set[str] = field(default_factory=set)  # every assignment this watcher stops
-    wall_high: float = 0.0
+    ticks: float = 0.0  # what now() returns
+    last_clock: float | None = None
     last_balance: float | None = None
     start_balance: float | None = None
     balance_cu: float = 0.0
@@ -379,11 +406,22 @@ class Watcher:
 
     # -- meter ---------------------------------------------------------------------------
 
+    def now(self) -> float:
+        """Wall time that only moves forward: each reading adds what the clock moved on
+        since the last one, and nothing when it was set back. A suspend still counts, as
+        Colab still bills it."""
+        reading = self.clock()
+        if self.last_clock is None:
+            self.ticks = reading  # starts as the clock, so --started compares with it
+        else:
+            self.ticks += max(0.0, reading - self.last_clock)
+        self.last_clock = reading
+        return self.ticks
+
     def wall_cu(self) -> float:
         if self.started is None:
             return 0.0
-        self.wall_high = max(self.wall_high, self.clock())
-        return max(0.0, self.wall_high - self.started) / 3600 * self.spec.rate
+        return max(0.0, self.now() - self.started) / 3600 * self.spec.rate
 
     def meter(self, usage: Usage | None) -> float:
         """Charge this session its share of the balance drop; return its spend."""
@@ -409,6 +447,7 @@ class Watcher:
     # -- registry ------------------------------------------------------------------------
 
     def register(self, state: str) -> None:
+        self.registered = True
         write_entry(
             self.registry,
             self.spec.name,
@@ -471,7 +510,7 @@ class Watcher:
                 raise WatchError("no trusted listing before `colab new`; nothing created")
             usage, before = found
             known = {s.endpoint for s in before.listed}
-            self.started = self.clock()
+            self.started = self.now()
             self.last_balance = self.start_balance = usage.balance
             argv = [str(self.cli.colab), "new", "-s", self.spec.name, "--gpu", self.spec.gpu]
             process = (self.spawn or spawn_process)(argv)
@@ -487,7 +526,11 @@ class Watcher:
                 raise
 
     def take_fresh(self, snap: Snapshot, known: set[str]) -> None:
-        fresh = [s for s in snap.listed if s.endpoint not in known]
+        """Claim what appeared since `known` under this name or as `[?]`; never a
+        session another process named."""
+        fresh = [
+            s for s in snap.listed if s.endpoint not in known and s.name in (self.spec.name, "?")
+        ]
         if not fresh:
             return
         new = {s.endpoint for s in fresh} - self.claimed
@@ -520,7 +563,7 @@ class Watcher:
             self.check_floor(usage)
             if self.over(spent):
                 raise Capped(f"{self.spec.name} reached its cap during `colab new`")
-            if self.clock() >= deadline:
+            if self.now() >= deadline:
                 raise WatchError(f"colab new did not finish in {self.timing.new_timeout:.0f} s")
             self.sleep(self.timing.new_poll)
 
@@ -562,6 +605,9 @@ class Watcher:
             )
             self.check_gpu(listed)
             if self.misses >= MISSES_TO_END:
+                note = self.registry / f"guard-stopped-{self.endpoint}"
+                if note.exists():
+                    raise GuardStopped(note.read_text(encoding="utf-8").strip())
                 self.cli.log("ended", session=self.spec.name, spent=round(spent, 3))
                 return
             self.check_floor(usage)
@@ -577,7 +623,7 @@ class Watcher:
             if code is not None:
                 self.persist_done = True
                 self.cli.log("persisted", session=self.spec.name, code=code)
-            elif self.clock() - self.persist_started > self.timing.persist_timeout:
+            elif self.now() - self.persist_started > self.timing.persist_timeout:
                 self.persist.kill()
                 self.persist_done = True
                 self.cli.log("ALERT", message=f"{self.spec.name}: persist killed at its timeout")
@@ -586,7 +632,7 @@ class Watcher:
             spent, self.timing.persist_timeout
         ):
             self.persist = (self.spawn or spawn_process)(["bash", "-c", self.spec.persist])
-            self.persist_started = self.clock()
+            self.persist_started = self.now()
             self.cli.log("persist", session=self.spec.name, spent=round(spent, 3))
 
     def stop(self, reason: str, deferred: _Deferred) -> bool:
@@ -617,10 +663,18 @@ class Watcher:
         self.cli.log("stopped", session=self.spec.name, reason=reason, endpoints=list(absent))
         return True
 
-    def watch(self) -> int:
-        code, reason = EXIT_OK, "ended"
+    def refuse_duplicate(self) -> None:
+        entries, _ = read_entries(self.registry)
+        for e in entries:
+            if e.name == self.spec.name and e.state in LIVE_STATES and self.alive(e.pid):
+                raise NothingWatched(f"{e.name} is already watched by pid {e.pid}")
+
+    def run(self, outcome: list[Any]) -> None:
+        """The watch; each handler records its exit code first, so a signal that lands
+        inside a handler cannot replace it."""
         try:
             self.registry.mkdir(parents=True, exist_ok=True)
+            self.refuse_duplicate()
             (self.registry / f"{self.spec.name}.ready").unlink(missing_ok=True)
             self.register("starting")
             self.cli.log("start", session=self.spec.name, margin_s=self.timing.margin)
@@ -629,17 +683,25 @@ class Watcher:
             self.ready()
             self.loop()
         except Interrupted as stop:
+            outcome[:] = [EXIT_CRASHED, "signal"]
             self.cli.log("signal", signum=stop.signum)
-            code, reason = EXIT_CRASHED, "signal"
         except WatchError as error:
+            outcome[:] = [error.code, type(error).__name__]
             self.cli.log("error", kind=type(error).__name__, message=str(error))
-            code, reason = error.code, type(error).__name__
         except BaseException as error:  # fail closed on anything
+            outcome[:] = [EXIT_CRASHED, "crash"]
             self.cli.log("error", kind=type(error).__name__, message=repr(error))
-            code, reason = EXIT_CRASHED, "crash"
+
+    def watch(self) -> int:
+        outcome: list[Any] = [EXIT_OK, "ended"]
+        try:
+            self.run(outcome)
+        except BaseException as late:  # a signal inside a handler: keep its code
+            if outcome[0] == EXIT_OK:
+                outcome[:] = [EXIT_CRASHED, type(late).__name__]
         finally:
             with _Deferred() as deferred:
-                code = self.finish(code, reason, deferred)
+                code = self.finish(outcome[0], outcome[1], deferred)
         return code
 
     def finish(self, code: int, reason: str, deferred: _Deferred) -> int:
@@ -653,7 +715,8 @@ class Watcher:
         if not confirmed:
             code = EXIT_STOP_FAILED
         try:
-            self.register("stopped" if confirmed else "stop_failed")
+            if self.registered:  # a refused duplicate leaves the other watcher's entry
+                self.register("stopped" if confirmed else "stop_failed")
             usage = self.cli.usage()
             self.cli.log(
                 "exit",
@@ -691,9 +754,11 @@ class Guard:
     clock: Callable[[], float] = time.time
     sleep: Callable[[float], None] = time.sleep
     alive: Callable[[int], bool] = pid_alive
+    lock_path: Path = GUARD_LOCK
     unregistered: dict[str, int] = field(default_factory=dict)
     watchers_seen: bool = False
     floored: bool = False
+    started_at: float = 0.0
 
     def allowed(self) -> tuple[set[str], bool]:
         """Endpoints of live watchers, and whether any watcher is live."""
@@ -706,10 +771,13 @@ class Guard:
             for e in entries
             if e.state in LIVE_STATES and self.alive(e.pid) and now - e.beat <= self.stale
         ]
-        self.watchers_seen = self.watchers_seen or bool(entries)
+        # an entry left from an earlier run is no watcher of this guard's
+        self.watchers_seen = self.watchers_seen or any(e.beat >= self.started_at for e in entries)
         return {e.endpoint for e in live if e.endpoint} | set(self.allow), bool(live)
 
     def cycle(self) -> int | None:
+        self.registry.mkdir(parents=True, exist_ok=True)
+        (self.registry / "guard.beat").write_text(f"{self.clock()}\n", encoding="utf-8")
         usage, snap = self.cli.snapshot()
         if usage is None or snap is None:
             self.cli.log("untrusted", usage=usage is not None)
@@ -731,8 +799,10 @@ class Guard:
                     self.unregistered[endpoint] = self.unregistered.get(endpoint, 0) + 1
             targets = sorted(e for e, n in self.unregistered.items() if n > self.grace)
         for endpoint in targets:
-            message = f"stopping {listed[endpoint].name} {endpoint}: floor or no live watcher"
+            why = "floor" if self.floored else "no live watcher"
+            message = f"stopping {listed[endpoint].name} {endpoint}: {why}"
             self.cli.log("ALERT", endpoint=endpoint, message=message)
+            (self.registry / f"guard-stopped-{endpoint}").write_text(why + "\n", encoding="utf-8")
             self.cli.unassign(endpoint)
         self.cli.log(
             "poll",
@@ -748,21 +818,39 @@ class Guard:
             return EXIT_OK
         return None
 
-    def watch(self) -> int:
+    def run(self, outcome: list[int]) -> None:
         try:
-            self.registry.mkdir(parents=True, exist_ok=True)
-            self.cli.log("start", floor=self.floor, grace=self.grace, allow=sorted(self.allow))
-            while (code := self.cycle()) is None:
-                self.sleep(self.timing.poll)
+            self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+            with self.lock_path.open("a") as lock:
+                try:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    outcome[0] = EXIT_NOTHING
+                    self.cli.log("error", message=f"another guard holds {self.lock_path}")
+                    return
+                self.registry.mkdir(parents=True, exist_ok=True)
+                self.started_at = self.clock()
+                self.cli.log("start", floor=self.floor, grace=self.grace, allow=sorted(self.allow))
+                while (code := self.cycle()) is None:
+                    self.sleep(self.timing.poll)
+                outcome[0] = code
         except Interrupted as stop:
+            outcome[0] = EXIT_CRASHED
             self.cli.log("signal", signum=stop.signum)
-            code = EXIT_CRASHED
         except BaseException as error:
+            outcome[0] = EXIT_CRASHED
             self.cli.log("error", kind=type(error).__name__, message=repr(error))
-            code = EXIT_CRASHED
-        with _Deferred():
-            self.cli.log("exit", code=code)
-        return code
+
+    def watch(self) -> int:
+        outcome = [EXIT_CRASHED]
+        try:
+            self.run(outcome)
+        except BaseException:  # a signal inside a handler: keep its code
+            pass
+        finally:
+            with _Deferred():
+                self.cli.log("exit", code=outcome[0])
+        return outcome[0]
 
 
 # -- process plumbing --------------------------------------------------------------------
@@ -821,8 +909,26 @@ def subprocess_runner(argv: Sequence[str], timeout: float) -> tuple[int, str]:
     return done.returncode, done.stdout + done.stderr
 
 
+class _Group:
+    """A child in its own process group; kill() takes the whole group (bash and the
+    `colab exec` it started)."""
+
+    def __init__(self, argv: Sequence[str]) -> None:
+        self.popen = subprocess.Popen(list(argv), stdin=subprocess.DEVNULL, start_new_session=True)
+
+    def poll(self) -> int | None:
+        return self.popen.poll()
+
+    def kill(self) -> None:
+        try:
+            os.killpg(self.popen.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        self.popen.poll()
+
+
 def spawn_process(argv: Sequence[str]) -> Process:
-    return subprocess.Popen(list(argv), stdin=subprocess.DEVNULL)
+    return _Group(argv)
 
 
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
@@ -877,8 +983,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ValueError as error:
         print(f"cu_watch: {error}", file=sys.stderr)
         return EXIT_NOTHING
-    if not args.colab.exists():
-        print(f"cu_watch: no colab CLI at {args.colab}; pass --colab", file=sys.stderr)
+    if not args.colab.exists() or not (args.colab.parent / "python").exists():
+        print(f"cu_watch: no colab CLI or python beside it at {args.colab}", file=sys.stderr)
         return EXIT_NOTHING
     if not args.no_inhibit and os.environ.get("CU_WATCH_INHIBITED") != "1":
         inhibit = shutil.which("systemd-inhibit")
