@@ -6,9 +6,11 @@ other label, and qa.yaml runs the same source checks for planner_wbc and teleop_
 For the gate only, a copy of the Psi0 export in a scratch store is relabelled and
 ingested as planner_wbc; each relabelled episode records `gate_relabel`. The
 recordings and any release are never relabelled: the missing profile is DA-03's
-(notes for the PO, 4/11/2026).
+(notes for the PO, 4/11/2026). The S2 variants record `s2`, which fits
+teleop_pico (synthetic, planned, S2, parent_episode required) in every other
+label, so their gate copy is relabelled `s2` -> `teleop_pico` the same way.
 
-The script refuses anything but that one relabel, inside a scratch root that holds
+The script refuses anything but those two relabels, inside a scratch root that holds
 a `.gate-scratch` marker and lies outside every `fwdata` directory and outside an
 unmarked $FW_ROOT:
 
@@ -25,7 +27,7 @@ import os
 from pathlib import Path
 
 MARKER = ".gate-scratch"
-ALLOWED = {("virtual_teleop", "planner_wbc")}
+ALLOWED = {("virtual_teleop", "planner_wbc"), ("s2", "teleop_pico")}
 
 
 class Refused(ValueError):
