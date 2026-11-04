@@ -1,70 +1,83 @@
 #!/usr/bin/env python3
-"""Watch a batch of Colab sessions and stop each before it passes its CU cap.
+"""Stop paid Colab sessions before they pass their CU cap: one watcher per session.
 
-One process supervises every session of a batch (tier 2: DA-26's three sessions and
-DA-30's one) on the laptop that has the `colab` CLI and created the sessions (`colab
-stop` only finds names in that CLI's local state). It merges DA-26's fail-closed
-single-session watcher (2408e45, scripts/he/cu_watch.py) with DA-30's batch one.
+Two kinds of process, on the laptop whose `colab` CLI owns the sessions, sharing one
+registry directory per batch:
 
-    nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py --floor 14 \\
-        --new da30-stage1:L4:4 --persist "da30-stage1=colab exec -s da30-stage1 -f p.py" \\
-        --ready-dir fwdata/colab/ready --inbox fwdata/colab/inbox \\
-        --log fwdata/colab/cu_watch.jsonl; echo "exit $?"' \\
-        < /dev/null >> fwdata/colab/cu_watch.out 2>&1 &
-    until [ -f fwdata/colab/ready/da30-stage1.ready ]; do
-        grep -q '^exit ' fwdata/colab/cu_watch.out && exit 1; sleep 5; done
+- `session`: one per Colab session. It creates (`--new`) or takes over (`--attach`)
+  one session, meters it, and stops it at its cap. One session's slow `new` or stuck
+  stop never delays another session's cap check.
+- `guard`: one per batch, the backstop. It stops every session when the account's
+  real balance falls to `--floor`, and any assignment (named or `[?]`) whose endpoint
+  no live session watcher has registered, after `--grace-polls` polls.
+
+Launch the guard first, then each session watcher; start a job only once its
+`.ready` file exists (the watcher removes a stale one when it starts):
+
+    R=fwdata/colab/batch; mkdir -p $R; rm -f $R/da30-stage1.ready
+    nohup setsid bash -c 'trap "" TERM HUP INT
+        python3 scripts/colab/cu_watch.py guard --registry "$0" --floor 14 \\
+            --log "$0/guard.jsonl"; echo "exit $?"' $R < /dev/null > $R/guard.out 2>&1 &
+    nohup setsid bash -c 'trap "" TERM HUP INT
+        python3 scripts/colab/cu_watch.py session --registry "$0" --new \\
+            --name da30-stage1 --gpu L4 --cap 4 --floor 14 \\
+            --persist "colab exec -s da30-stage1 -f p.py" \\
+            --log "$0/da30-stage1.jsonl"; echo "exit $?"' $R \\
+        < /dev/null > $R/da30-stage1.out 2>&1 &
+    until [ -f $R/da30-stage1.ready ]; do
+        grep -q '^exit ' $R/da30-stage1.out && exit 1; sleep 5; done
     # only now start the job on the VM
 
-The `trap` keeps the wrapper alive when the process group is killed, so it still
+The `trap` keeps each wrapper alive when its process group is killed, so it still
 writes "exit N"; Python installs its own handlers over the inherited ignore.
 
-Sessions. `--new NAME:GPU:CAP` runs `colab new -s NAME --gpu GPU` and meters from
-just before it; `--attach NAME:GPU:CAP[:STARTED]` takes over a running session
-(STARTED in ISO 8601, default now). A session added later goes into `--inbox` as a
-file of such lines (`new ...`, `attach ...`, `persist NAME=COMMAND`), read at each
-poll and renamed `.taken` or `.rejected`: stopping the watcher to restart it would
-stop every session. `<ready-dir>/<NAME>.ready` is written once the session is seen
-on its planned accelerator; start the job only after it exists.
+Identity. A session is tracked by its endpoint, never by its name alone: the CLI keeps
+names only locally and lists a session whose name it lost as `[?] <endpoint>`. With
+`--new`, the watcher takes a trusted listing, runs `colab new` in the background while
+holding `<registry>/new.lock` (so no two watchers create at once), and binds the
+endpoint that appears in the listings, named or `[?]`. If `new` fails, times out or
+is interrupted, every assignment that appeared meanwhile is stopped. `--attach` finds
+the session by `--endpoint` or by name, and needs its start time (`--started` ISO
+8601, or `--started-min-ago`). Stops go through the CLI's own client by endpoint
+(`colab stop` needs the local name).
 
-Meter. The larger of two, per session. (1) Wall clock: `time.time()` since the
-session started times its GPU's rate (`RATES`); wall time keeps counting through a
-laptop suspend, as Colab's billing does (monotonic time does not). (2) Balance: each
-drop of `colab usage`'s balance is charged in full while the account has one active
-assignment, and in proportion to the session's rate over the account's usage rate
-while more run, so a parallel session does not trip this one's cap. `--floor` stops
-every session when the account's real balance would fall below it.
+Trust. A listing counts only when `colab usage` succeeded in the same cycle, `colab
+sessions` exited 0, every line parses, and it lists at least as many assignments as
+`usage` counts: on an auth failure the CLI prints "No active sessions" and exits 0. A
+session has ended only after 3 trusted listings in a row without its endpoint, and is
+then stopped by endpoint anyway. A stop counts after 2 trusted listings without the
+endpoint; until then it is retried every poll, with STOP_FAILED on stderr from the
+third try, until it works or a signal says to give up (exit 5).
 
-A session is stopped when spend + rate x margin reaches its cap: one poll, the two
-CLI timeouts of a cycle and the time a stop with one retry can take. At `--persist-at`
-of the cap (or earlier, so it has `persist_timeout` to run) its `--persist` command
-runs once on the laptop, so logs survive a cap stop. Use `colab exec -s NAME -f ...`
-there, never `colab ssh`: `ssh -s NAME` creates the session again when it is gone.
+Meter. The larger of two. (1) Wall clock: `time.time()` since the session started (a
+high-water mark, so a clock set back does not lower it) times its GPU's rate (`RATES`);
+it keeps counting through a laptop suspend, as Colab's billing does. (2) Balance:
+each drop of `colab usage`'s balance, in full while the account has one assignment,
+in proportion to the session's rate over the account's usage rate while more run.
+A session is stopped when spend + rate x margin reaches its cap (`Timing.margin`: a
+poll, its two CLI calls, and an unassign that works on its second try). Its
+`--persist` command runs in the background at `--persist-at` of the cap, or earlier so
+it has `persist_timeout` to finish, and is killed after that. Use `colab exec -s NAME
+-f ...` there, never `colab ssh`: `ssh -s NAME` creates the session again.
 
-Fail closed. Every GPU type is checked against `RATES` before any `new` (the CLI maps
-an unknown `--gpu` to A100). The `Hardware:` of each session in `colab sessions` must
-match its plan, or it is stopped and the watch ends. A `new` that fails or times out
-is followed by a look at `colab sessions`: a session listed under its name is
-attached, an unnamed `[?]` assignment that appeared meanwhile is unassigned through
-the CLI's own client. An exception from a CLI call is a failed call. Any other
-exception, SIGTERM, SIGINT or SIGHUP ends in a `finally` that stops every supervised
-session; only the first signal raises. `colab stop` exits 0 even when it did nothing,
-so a stop counts only after two successful listings without the name or endpoint;
-it is retried with backoff and an unassign. A session has ended by itself only after
-3 successful listings in a row without it; a failed call, output that cannot be
-parsed, or an empty list while `colab usage` counts assignments is no listing. CLI
-output is decoded with `errors="replace"`; a log that cannot be written goes to
-stderr and the guard goes on.
+Fail closed. A GPU type is checked against `RATES` before any `new` (the CLI maps an
+unknown `--gpu` to A100), and the listed `Hardware:` must match the plan. An exception
+from a CLI call is a failed call. Any other exception, and the first SIGTERM, SIGINT
+or SIGHUP, ends in a `finally` that stops the session; later signals are deferred.
+CLI output is decoded with `errors="replace"`; a log that cannot be written goes to
+stderr.
 
-Exit codes: 0 every session ended by itself; 2 nothing watched (bad arguments, no
-CLI, an attached session not listed); 3 a cap or the floor stopped a session; 4 a
-session ran on the wrong accelerator and was stopped; 5 STOP_FAILED, a session may
-still be billing (also on stderr; check `colab sessions` now); 6 a crash, signal or
-failed `new`, every session stopped.
+Exit codes: 0 the session ended (or, for the guard, the batch is done); 2 nothing
+watched (bad arguments, no CLI, an attached session not listed); 3 a cap or the floor
+stopped it; 4 it ran on the wrong accelerator and was stopped; 5 STOP_FAILED, it may
+still be billing (check `colab sessions` now); 6 a crash, a signal or a failed `new`,
+and every assignment it made was stopped.
 """
 
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import re
@@ -73,8 +86,9 @@ import signal
 import subprocess
 import sys
 import time
-from collections.abc import Callable, Sequence
-from dataclasses import asdict, dataclass, field
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol
@@ -92,7 +106,9 @@ EXIT_OK, EXIT_NOTHING, EXIT_CAPPED, EXIT_WRONG_GPU = 0, 2, 3, 4
 EXIT_STOP_FAILED, EXIT_CRASHED = 5, 6
 TIMEOUT = 124  # returncode of a call that timed out
 MISSES_TO_END = 3
-CONFIRM_ABSENT = 2  # listings without the session that confirm a stop
+CONFIRM_ABSENT = 2  # trusted listings without the endpoint that confirm a stop
+LOUD_AFTER = 3  # stop rounds before STOP_FAILED is raised on stderr
+LIVE_STATES = ("starting", "running")
 
 # Unassign an endpoint with the CLI's own client: `colab stop` needs a local name.
 UNASSIGN = "import sys; from colab_cli.common import state; state.client.unassign(sys.argv[1])"
@@ -106,11 +122,9 @@ class Process(Protocol):
     def kill(self) -> None: ...
 
 
-Spawn = Callable[[str], Process]
+Spawn = Callable[[Sequence[str]], Process]
 
-_LINE = re.compile(
-    r"^\[(?P<name>[^\]]*)\] (?P<endpoint>\S+) \| Hardware: (?P<hardware>[^|]+?) \|", re.M
-)
+_LINE = re.compile(r"^\[(?P<name>[^\]]*)\] (?P<endpoint>\S+) \| Hardware: (?P<hardware>[^|]+?) \|")
 _BALANCE = re.compile(r"Current balance:\s*([\d.]+)")
 _RATE = re.compile(r"Usage rate:\s*([\d.]+)")
 _ASSIGNMENTS = re.compile(r"Active assignments:\s*(\d+)")
@@ -124,89 +138,43 @@ class NothingWatched(WatchError):
     code = EXIT_NOTHING
 
 
+class Capped(WatchError):
+    code = EXIT_CAPPED
+
+
 class WrongGpu(WatchError):
     code = EXIT_WRONG_GPU
 
 
 class Interrupted(BaseException):
-    """Raised by SIGTERM, SIGHUP or SIGINT so the watcher stops its sessions first."""
+    """Raised by SIGTERM, SIGHUP or SIGINT so the watcher stops its session first."""
 
     def __init__(self, signum: int) -> None:
         super().__init__(signal.Signals(signum).name)
         self.signum = signum
 
 
-@dataclass(frozen=True)
-class Spec:
-    name: str
-    gpu: str
-    cap: float
-    attach: bool = False
-    started: float | None = None  # epoch seconds, --attach only
-    persist: str | None = None
-
-    @property
-    def rate(self) -> float:
-        return RATES[self.gpu]
-
-
-def parse_spec(text: str, attach: bool) -> Spec:
-    """`NAME:GPU:CAP[:STARTED]`; an unknown GPU is an error here, before any `new`."""
-    parts = text.split(":", 3)
-    if len(parts) < 3:
-        raise ValueError(f"{text!r}: expected NAME:GPU:CAP")
-    name, gpu, cap, *rest = parts
-    gpu = gpu.upper()
-    if gpu not in RATES:
-        raise ValueError(f"{name}: unknown GPU {gpu!r}; rates are known for {sorted(RATES)}")
-    if not re.fullmatch(r"[\w.-]+", name):
-        raise ValueError(f"{name!r}: session names are letters, digits, '.', '_', '-'")
-    if float(cap) <= 0:
-        raise ValueError(f"{name}: the cap must be positive")
-    started = None
-    if rest:
-        if not attach:
-            raise ValueError(f"{name}: a start time is for --attach only")
-        started = datetime.fromisoformat(rest[0]).timestamp()
-    return Spec(name, gpu, float(cap), attach, started)
-
-
-def build_specs(new: Sequence[str], attach: Sequence[str], persist: Sequence[str]) -> list[Spec]:
-    specs = [parse_spec(t, attach=False) for t in new]
-    specs += [parse_spec(t, attach=True) for t in attach]
-    names = [s.name for s in specs]
-    if len(set(names)) != len(names):
-        raise ValueError(f"a session is given twice: {names}")
-    if bad := [item for item in persist if "=" not in item]:
-        raise ValueError(f"persist takes NAME=COMMAND: {bad}")
-    commands = dict(item.split("=", 1) for item in persist)
-    if unknown := set(commands) - set(names):
-        raise ValueError(f"persist for sessions not given: {sorted(unknown)}")
-    return [Spec(s.name, s.gpu, s.cap, s.attach, s.started, commands.get(s.name)) for s in specs]
-
-
-def parse_inbox(text: str) -> list[Spec]:
-    """Lines `new NAME:GPU:CAP`, `attach NAME:GPU:CAP[:STARTED]`, `persist NAME=CMD`."""
-    found: dict[str, list[str]] = {"new": [], "attach": [], "persist": []}
-    for line in text.splitlines():
-        line = line.strip()
-        if line and not line.startswith("#"):
-            kind, _, value = line.partition(" ")
-            if kind not in found:
-                raise ValueError(f"unknown inbox line {line!r}")
-            found[kind].append(value.strip())
-    return build_specs(found["new"], found["attach"], found["persist"])
+# -- what the CLI prints -----------------------------------------------------------------
 
 
 @dataclass(frozen=True)
 class Listed:
-    name: str
+    name: str  # "?" when the CLI lost the local name
     endpoint: str
     hardware: str
 
 
-def parse_sessions(text: str) -> list[Listed]:
-    return [Listed(m["name"], m["endpoint"], m["hardware"].strip()) for m in _LINE.finditer(text)]
+def parse_sessions(text: str) -> list[Listed] | None:
+    """`colab sessions`, or None for an output this parser does not know."""
+    listed, empty = [], False
+    for line in filter(None, (raw.strip() for raw in text.splitlines())):
+        if match := _LINE.match(line):
+            listed.append(Listed(match["name"], match["endpoint"], match["hardware"].strip()))
+        elif line.startswith("[colab]"):
+            empty = empty or "No active sessions" in line
+        else:
+            return None
+    return listed if listed or empty else None
 
 
 @dataclass(frozen=True)
@@ -225,113 +193,70 @@ def parse_usage(text: str) -> Usage | None:
 
 
 @dataclass(frozen=True)
+class Snapshot:
+    """A listing that can be trusted, with the usage read in the same cycle."""
+
+    usage: Usage
+    listed: list[Listed]
+
+    def find(self, endpoint: str | None) -> Listed | None:
+        return next((s for s in self.listed if s.endpoint == endpoint), None)
+
+
+@dataclass(frozen=True)
 class Timing:
     poll: float = 60.0
     cli_timeout: float = 60.0
     new_timeout: float = 900.0
-    stop_backoff: tuple[float, ...] = (5.0, 15.0, 30.0)  # waits after attempts 1, 2, 3
-    confirm_polls: int = 4  # listings tried after each stop attempt
-    confirm_wait: float = 10.0
+    new_poll: float = 15.0  # listings while `colab new` runs
+    confirm_wait: float = 10.0  # between the first stop rounds; later ones wait a poll
     persist_timeout: float = 600.0
-
-    def attempt_s(self, unassign: bool) -> float:
-        """One stop attempt that succeeds: stop, maybe unassign, two confirming listings."""
-        calls = 1 + unassign + CONFIRM_ABSENT
-        return calls * self.cli_timeout + (CONFIRM_ABSENT - 1) * self.confirm_wait
-
-    @property
-    def stop_delay(self) -> float:
-        """A stop that works on its first retry; a later one may pass the cap."""
-        return self.attempt_s(False) + self.stop_backoff[0] + self.attempt_s(True)
 
     @property
     def margin(self) -> float:
-        """Seconds a session can keep spending after a poll found it under its cap."""
-        return self.poll + 2 * self.cli_timeout + self.stop_delay
+        """Seconds a session can keep billing after a cycle found it under its cap: the
+        poll and its usage + sessions calls, an unassign, and one more round of the three
+        in case the first unassign did not take."""
+        cycle = 3 * self.cli_timeout
+        return self.poll + cycle + self.confirm_wait + cycle
 
 
 @dataclass
-class Session:
-    spec: Spec
-    started: float
-    last_balance: float | None = None
-    balance_cu: float = 0.0
-    endpoint: str | None = None
-    misses: int = 0
-    ended: bool = False  # gone from the server, by itself or stopped and confirmed
-    stopped_by: str | None = None  # "cap", "floor", "wrong_gpu", "cleanup"
-    unconfirmed: bool = False
-    persist: Process | None = None
-    persist_done: bool = False
-
-    def wall_cu(self, now: float) -> float:
-        return max(0.0, now - self.started) / 3600 * self.spec.rate
-
-    def update(self, usage: Usage | None) -> None:
-        """Charge this session its share of the balance drop since the last reading."""
-        if usage is None:
-            return
-        if self.last_balance is not None and usage.balance < self.last_balance:
-            share = 1.0  # alone: the whole drop is ours (fail closed)
-            if usage.assignments > 1 and usage.rate > self.spec.rate:
-                share = self.spec.rate / usage.rate
-            self.balance_cu += (self.last_balance - usage.balance) * share
-        self.last_balance = usage.balance
-
-    def spent(self, now: float) -> float:
-        return max(self.wall_cu(now), self.balance_cu)
-
-
-@dataclass
-class Watcher:
-    specs: list[Spec]
-    floor: float | None
-    log_path: Path
+class Cli:
     run: Run
+    log_path: Path
     colab: Path = COLAB
-    timing: Timing = field(default_factory=Timing)
-    persist_at: float = 0.9
-    ready_dir: Path | None = None
-    inbox: Path | None = None
-    clock: Callable[[], float] = time.time
-    sleep: Callable[[float], None] = time.sleep
-    spawn: Spawn | None = None
-    sessions: list[Session] = field(default_factory=list)
-    start_balance: float | None = None
-    balance: float | None = None  # the latest reading
+    timeout: float = 60.0
 
-    # -- CLI -----------------------------------------------------------------------
-
-    def call(self, argv: Sequence[str], timeout: float) -> tuple[int, str]:
+    def call(self, argv: Sequence[str], timeout: float | None = None) -> tuple[int, str]:
         """A CLI call; an exception from the runner is a failed call, not a crash."""
         try:
-            return self.run(argv, timeout)
+            return self.run(argv, timeout or self.timeout)
         except Exception as error:
             return 1, f"cli_error {type(error).__name__}: {error}"
 
-    def colab_call(self, *args: str, timeout: float | None = None) -> tuple[int, str]:
-        return self.call([str(self.colab), *args], timeout or self.timing.cli_timeout)
-
     def usage(self) -> Usage | None:
-        code, text = self.colab_call("usage")
-        usage = parse_usage(text) if code == 0 else None
-        if usage is not None:
-            self.balance = usage.balance
-        return usage
+        code, text = self.call([str(self.colab), "usage"])
+        return parse_usage(text) if code == 0 else None
 
-    def listing(self, usage: Usage | None = None) -> list[Listed] | None:
-        """The server's sessions, or None when the answer cannot be trusted."""
-        code, text = self.colab_call("sessions")
-        if code != 0:
-            return None
-        listed = parse_sessions(text)
-        if not listed and "No active sessions" not in text:
-            return None  # an output this parser does not know
-        if not listed and usage is not None and usage.assignments > 0:
-            return None  # an empty list while assignments are counted (auth glitch)
-        return listed
+    def snapshot(self) -> tuple[Usage | None, Snapshot | None]:
+        """The usage, and a trusted listing or None."""
+        usage = self.usage()
+        if usage is None:
+            return None, None  # without usage an empty listing may be an auth failure
+        code, text = self.call([str(self.colab), "sessions"])
+        listed = parse_sessions(text) if code == 0 else None
+        if listed is None or len(listed) < usage.assignments:
+            return usage, None
+        return usage, Snapshot(usage, listed)
 
-    def log(self, event: str, **fields: Any) -> dict[str, Any]:
+    def unassign(self, endpoint: str) -> int:
+        python = self.colab.parent / "python"
+        code, text = self.call([str(python), "-c", UNASSIGN, endpoint])
+        self.log("unassign", endpoint=endpoint, code=code, output=text[-300:])
+        return code
+
+    def log(self, event: str, **fields: Any) -> None:
         record = {
             "time": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "event": event,
@@ -347,274 +272,506 @@ class Watcher:
             print(f"log write failed: {error}; {line}", file=sys.stderr, flush=True)
         if event in ("STOP_FAILED", "ALERT"):
             print(f"{event}: {fields.get('message', '')}", file=sys.stderr, flush=True)
-        return record
 
-    # -- adding sessions -------------------------------------------------------------
 
-    def start(self) -> None:
-        usage = self.usage()
-        self.start_balance = usage.balance if usage else None
-        self.log(
-            "start",
-            balance=self.start_balance,
-            assignments=usage.assignments if usage else None,
-            floor=self.floor,
-            margin_s=self.timing.margin,
-            sessions=[asdict(s) for s in self.specs],
-        )
-        self.add(self.specs)
+# -- registry: what the guard may leave running ---------------------------------------
 
-    def add(self, specs: Sequence[Spec]) -> None:
-        taken = {s.spec.name for s in self.sessions if not s.ended}
-        if clash := taken & {s.name for s in specs}:
-            raise NothingWatched(f"already watched: {sorted(clash)}")
-        for spec in specs:
-            if spec.attach:
-                self.attach(spec)
-            else:
-                self.new(spec)
 
-    def attach(self, spec: Spec) -> None:
-        listed = self.listing()
-        match = next((s for s in listed or [] if s.name == spec.name), None)
-        if match is None:
-            raise NothingWatched(f"{spec.name} is not listed by `colab sessions`")
-        started = spec.started or self.clock()
-        session = Session(spec, started, self.balance, endpoint=match.endpoint)
-        self.sessions.append(session)
-        self.log("attach", session=spec.name, endpoint=match.endpoint, started=started)
-        self.check_gpu(session, match)
-        self.ready(session)
+@dataclass(frozen=True)
+class Entry:
+    name: str
+    pid: int
+    endpoint: str | None
+    state: str  # starting, running, stopping, stopped, stop_failed
+    beat: float  # the watcher's clock at its last heartbeat
 
-    def new(self, spec: Spec) -> None:
-        before = self.listing()
-        known = {s.endpoint for s in before or []}
-        session = Session(spec, self.clock(), self.balance)
-        self.sessions.append(session)  # supervised from now: `finally` stops it
-        code, text = self.colab_call(
-            "new", "-s", spec.name, "--gpu", spec.gpu, timeout=self.timing.new_timeout
-        )
-        self.log("new", session=spec.name, code=code, output=text[-500:])
-        listed = self.listing()
-        match = next((s for s in listed or [] if s.name == spec.name), None)
-        if match is not None:
-            session.endpoint = match.endpoint
-            if code != 0:
-                self.log("new_failed_but_listed", session=spec.name, endpoint=match.endpoint)
-            self.check_gpu(session, match)
-            self.ready(session)
+
+def write_entry(registry: Path, name: str, **fields: Any) -> None:
+    tmp = registry / f".{name}.json.tmp"
+    tmp.write_text(json.dumps({"name": name, **fields}), encoding="utf-8")
+    os.replace(tmp, registry / f"{name}.json")
+
+
+def read_entries(registry: Path) -> tuple[list[Entry], list[str]]:
+    """The entries, and the files that could not be read."""
+    entries, bad = [], []
+    for path in sorted(registry.glob("*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            entries.append(
+                Entry(
+                    str(data["name"]),
+                    int(data["pid"]),
+                    data.get("endpoint"),
+                    str(data["state"]),
+                    float(data["beat"]),
+                )
+            )
+        except (OSError, ValueError, KeyError, TypeError):
+            bad.append(path.name)
+    return entries, bad
+
+
+def pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+# -- one session -------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Spec:
+    name: str
+    gpu: str
+    cap: float
+    attach: bool = False
+    started: float | None = None  # epoch seconds, --attach only
+    endpoint: str | None = None  # --attach only
+    persist: str | None = None
+
+    @property
+    def rate(self) -> float:
+        return RATES[self.gpu]
+
+
+def check_spec(spec: Spec) -> None:
+    """Refuse a plan before anything is created or watched."""
+    if spec.gpu not in RATES:
+        raise ValueError(f"unknown GPU {spec.gpu!r}; rates are known for {sorted(RATES)}")
+    if not re.fullmatch(r"[\w.-]+", spec.name):
+        raise ValueError(f"{spec.name!r}: session names are letters, digits, '.', '_', '-'")
+    if spec.cap <= 0:
+        raise ValueError("the cap must be positive")
+    if spec.attach and spec.started is None:
+        raise ValueError("--attach needs --started or --started-min-ago: spend before it counts")
+    if not spec.attach and (spec.started is not None or spec.endpoint is not None):
+        raise ValueError("--started, --started-min-ago and --endpoint are for --attach")
+
+
+@dataclass
+class Watcher:
+    spec: Spec
+    cli: Cli
+    registry: Path
+    floor: float | None = None
+    timing: Timing = field(default_factory=Timing)
+    persist_at: float = 0.9
+    clock: Callable[[], float] = time.time
+    sleep: Callable[[float], None] = time.sleep
+    spawn: Spawn | None = None
+    started: float | None = None
+    endpoint: str | None = None
+    claimed: set[str] = field(default_factory=set)  # every assignment this watcher stops
+    wall_high: float = 0.0
+    last_balance: float | None = None
+    balance_cu: float = 0.0
+    misses: int = 0
+    persist: Process | None = None
+    persist_started: float = 0.0
+    persist_done: bool = False
+
+    # -- meter ---------------------------------------------------------------------------
+
+    def wall_cu(self) -> float:
+        if self.started is None:
+            return 0.0
+        self.wall_high = max(self.wall_high, self.clock())
+        return max(0.0, self.wall_high - self.started) / 3600 * self.spec.rate
+
+    def meter(self, usage: Usage | None) -> float:
+        """Charge this session its share of the balance drop; return its spend."""
+        if usage is not None:
+            if self.last_balance is not None and usage.balance < self.last_balance:
+                share = 1.0  # alone: the whole drop is ours (fail closed)
+                if usage.assignments > 1 and usage.rate > self.spec.rate:
+                    share = self.spec.rate / usage.rate
+                self.balance_cu += (self.last_balance - usage.balance) * share
+            self.last_balance = usage.balance
+        return max(self.wall_cu(), self.balance_cu)
+
+    def over(self, spent: float, lead_s: float = 0.0) -> bool:
+        return spent + self.spec.rate * (self.timing.margin + lead_s) / 3600 >= self.spec.cap
+
+    def check_floor(self, usage: Usage | None) -> None:
+        if self.floor is None or usage is None:
             return
-        orphans = [s for s in listed or [] if s.name == "?" and s.endpoint not in known]
-        for orphan in orphans:
-            self.log("orphan", session=spec.name, endpoint=orphan.endpoint)
-            self.unassign(orphan.endpoint)
-        if listed is None or not all(self.confirmed_gone(o.endpoint, None) for o in orphans):
-            session.unconfirmed = True
-            self.log("STOP_FAILED", message=f"{spec.name}: an assignment from `new` may bill")
-        else:
-            session.ended = True
-        raise WatchError(f"colab new -s {spec.name} failed (code {code}): {text[-300:]}")
+        rate = max(usage.rate, self.spec.rate)
+        if usage.balance - rate * self.timing.margin / 3600 <= self.floor:
+            raise Capped(f"balance {usage.balance} is at the floor {self.floor}")
 
-    def check_gpu(self, session: Session, listed: Listed) -> None:
-        if listed.hardware != session.spec.gpu:
-            message = f"{session.spec.name} runs on {listed.hardware}, planned {session.spec.gpu}"
-            self.log("wrong_gpu", session=session.spec.name, message=message)
-            self.stop(session, "wrong_gpu")
-            raise WrongGpu(message)
+    # -- registry ------------------------------------------------------------------------
 
-    def ready(self, session: Session) -> None:
-        if self.ready_dir is not None:
-            self.ready_dir.mkdir(parents=True, exist_ok=True)
-            path = self.ready_dir / f"{session.spec.name}.ready"
-            path.write_text(f"{session.spec.name} {session.spec.gpu}\n", encoding="utf-8")
+    def register(self, state: str) -> None:
+        write_entry(
+            self.registry,
+            self.spec.name,
+            pid=os.getpid(),
+            endpoint=self.endpoint,
+            state=state,
+            beat=self.clock(),
+            gpu=self.spec.gpu,
+            cap=self.spec.cap,
+        )
 
-    def read_inbox(self) -> None:
-        if self.inbox is None or not self.inbox.is_dir():
-            return
-        waiting = [p for p in self.inbox.iterdir() if p.suffix not in (".taken", ".rejected")]
-        for path in sorted(waiting):
+    @contextmanager
+    def new_lock(self) -> Iterator[None]:
+        with (self.registry / "new.lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
             try:
-                specs = parse_inbox(path.read_text(encoding="utf-8", errors="replace"))
-            except ValueError as error:
-                path.rename(path.with_name(path.name + ".rejected"))
-                self.log("ALERT", message=f"inbox {path.name} rejected: {error}")
-                continue
-            path.rename(path.with_name(path.name + ".taken"))
-            self.log("inbox", file=path.name, sessions=[asdict(s) for s in specs])
-            self.add(specs)
+                yield
+            finally:
+                fcntl.flock(lock, fcntl.LOCK_UN)
 
-    # -- stop ------------------------------------------------------------------------
+    # -- start -----------------------------------------------------------------------------
 
-    def confirmed_gone(self, endpoint: str | None, name: str | None) -> bool:
-        """Two successful listings without the session; a listing with it ends the wait."""
-        absent = 0
-        for poll in range(self.timing.confirm_polls):
-            if poll:
-                self.sleep(self.timing.confirm_wait)
-            listed = self.listing()
-            if listed is None:
-                continue
-            if any(s.endpoint == endpoint or (name and s.name == name) for s in listed):
-                return False
-            absent += 1
-            if absent == CONFIRM_ABSENT:
-                return True
-        return False
+    def trusted(self) -> tuple[Usage, Snapshot] | None:
+        for attempt in range(3):
+            if attempt:
+                self.sleep(self.timing.new_poll)
+            usage, snap = self.cli.snapshot()
+            if usage is not None and snap is not None:
+                return usage, snap
+        return None
 
-    def unassign(self, endpoint: str) -> None:
-        python = self.colab.parent / "python"
-        code, text = self.call([str(python), "-c", UNASSIGN, endpoint], self.timing.cli_timeout)
-        self.log("unassign", endpoint=endpoint, code=code, output=text[-300:])
+    def check_gpu(self, listed: Listed | None) -> None:
+        if listed is not None and listed.hardware != self.spec.gpu:
+            raise WrongGpu(f"{self.spec.name} runs on {listed.hardware}, planned {self.spec.gpu}")
 
-    def stop(self, session: Session, reason: str) -> bool:
-        name = session.spec.name
-        for attempt, pause in enumerate(self.timing.stop_backoff, start=1):
-            code, text = self.colab_call("stop", "-s", name)
-            if session.endpoint and attempt > 1:
-                self.unassign(session.endpoint)  # the named stop did not take
-            if self.confirmed_gone(session.endpoint, name):
-                session.ended, session.stopped_by = True, reason
-                self.log("stopped", session=name, reason=reason, attempt=attempt, code=code)
-                return True
-            self.log("stop_unconfirmed", session=name, attempt=attempt, output=text[-300:])
-            self.sleep(pause)
-        session.unconfirmed = True
-        self.log("STOP_FAILED", session=name, message=f"{name} may still be billing: stop it")
-        return False
+    def attach(self) -> None:
+        found = self.trusted()
+        if found is None:
+            raise NothingWatched("no trusted listing to attach from")
+        usage, snap = found
+        spec = self.spec
+        matches = [
+            s
+            for s in snap.listed
+            if (s.endpoint == spec.endpoint if spec.endpoint else s.name == spec.name)
+        ]
+        if len(matches) != 1:
+            raise NothingWatched(f"{spec.name}: {len(matches)} listed sessions match")
+        self.endpoint = matches[0].endpoint
+        self.claimed.add(self.endpoint)
+        self.started, self.last_balance = spec.started, usage.balance
+        self.cli.log("attach", session=spec.name, endpoint=self.endpoint, started=self.started)
+        self.check_gpu(matches[0])
 
-    # -- poll ------------------------------------------------------------------------
+    def create(self) -> None:
+        with self.new_lock():
+            found = self.trusted()
+            if found is None:  # without it every old `[?]` would look like ours
+                raise WatchError("no trusted listing before `colab new`; nothing created")
+            usage, before = found
+            known = {s.endpoint for s in before.listed}
+            self.started, self.last_balance = self.clock(), usage.balance
+            argv = [str(self.cli.colab), "new", "-s", self.spec.name, "--gpu", self.spec.gpu]
+            process = (self.spawn or spawn_process)(argv)
+            self.cli.log("new", session=self.spec.name, known=sorted(known))
+            try:
+                code = self.await_new(process, known)
+                if code != 0 or self.endpoint is None:
+                    raise WatchError(f"colab new exited {code}, endpoint {self.endpoint}")
+            except BaseException:
+                if process.poll() is None:
+                    process.kill()
+                self.claim_fresh(known)  # still under the lock: what appears now is ours
+                raise
 
-    def live(self) -> list[Session]:
-        return [s for s in self.sessions if not s.ended and not s.unconfirmed]
-
-    def cycle(self) -> None:
-        now, usage = self.clock(), self.usage()
-        listed = self.listing(usage)
-        margin_h = self.timing.margin / 3600
-        report: dict[str, Any] = {
-            "balance": usage.balance if usage else None,
-            "rate": usage.rate if usage else None,
-            "assignments": usage.assignments if usage else None,
-        }
-        for session in self.live():
-            name = session.spec.name
-            session.update(usage)
-            spent = session.spent(now)
-            match = None if listed is None else next((s for s in listed if s.name == name), None)
-            if listed is not None:
-                session.misses = 0 if match else session.misses + 1
-            report[name] = {
-                "elapsed_s": round(now - session.started),
-                "spent": round(spent, 3),
-                "wall_cu": round(session.wall_cu(now), 3),
-                "balance_cu": round(session.balance_cu, 3),
-                "cap": session.spec.cap,
-                "listed": None if listed is None else match is not None,
-                "misses": session.misses,
-            }
-            if match is not None:
-                session.endpoint = session.endpoint or match.endpoint
-                self.check_gpu(session, match)
-            if session.misses >= MISSES_TO_END:
-                session.ended = True
-                self.log("ended", session=name, spent=round(spent, 3))
-                continue
-            self.persist_step(session, spent)
-            if spent + session.spec.rate * margin_h >= session.spec.cap:
-                self.log("cap", session=name, spent=round(spent, 3), cap=session.spec.cap)
-                self.stop(session, "cap")
-        self.log("poll", **report)
-        self.check_floor(usage, margin_h)
-
-    def check_floor(self, usage: Usage | None, margin_h: float) -> None:
-        live = self.live()
-        if self.floor is None or usage is None or not live:
+    def take_fresh(self, snap: Snapshot, known: set[str]) -> None:
+        fresh = [s for s in snap.listed if s.endpoint not in known]
+        if not fresh:
             return
-        rate = max(usage.rate, sum(s.spec.rate for s in live))
-        if usage.balance - rate * margin_h <= self.floor:
-            self.log("floor", balance=usage.balance, floor=self.floor, rate=rate)
-            for session in live:
-                self.stop(session, "floor")
+        new = {s.endpoint for s in fresh} - self.claimed
+        if new:
+            self.claimed |= new
+            self.cli.log("claimed", session=self.spec.name, endpoints=sorted(new))
+        if self.endpoint is None:
+            named = [s for s in fresh if s.name == self.spec.name]
+            pick = named[0] if named else fresh[0] if len(fresh) == 1 else None
+            if pick is not None:
+                self.endpoint = pick.endpoint
+                self.cli.log("bound", session=self.spec.name, endpoint=pick.endpoint)
+                self.register("starting")
 
-    def persist_step(self, session: Session, spent: float) -> None:
-        spec = session.spec
-        if spec.persist is None or session.persist_done:
-            return
-        if session.persist is not None:
-            code = session.persist.poll()
+    def await_new(self, process: Process, known: set[str]) -> int:
+        assert self.started is not None
+        deadline, exited = self.started + self.timing.new_timeout, 0
+        while True:
+            code = process.poll()
+            usage, snap = self.cli.snapshot()
+            spent = self.meter(usage)
+            self.register("starting")
+            if snap is not None:
+                self.take_fresh(snap, known)
+                self.check_gpu(snap.find(self.endpoint))
             if code is not None:
-                session.persist_done = True
-                self.log("persisted", session=spec.name, code=code)
+                exited += 1
+                if self.endpoint is not None or exited > MISSES_TO_END:
+                    return code
+            self.check_floor(usage)
+            if self.over(spent):
+                raise Capped(f"{self.spec.name} reached its cap during `colab new`")
+            if self.clock() >= deadline:
+                raise WatchError(f"colab new did not finish in {self.timing.new_timeout:.0f} s")
+            self.sleep(self.timing.new_poll)
+
+    def claim_fresh(self, known: set[str]) -> None:
+        """After a failed `new`: look for assignments that landed late."""
+        for look in range(CONFIRM_ABSENT + 1):
+            if look:
+                self.sleep(self.timing.new_poll)
+            _, snap = self.cli.snapshot()
+            if snap is not None:
+                self.take_fresh(snap, known)
+
+    def ready(self) -> None:
+        path = self.registry / f"{self.spec.name}.ready"
+        path.write_text(f"{self.spec.name} {self.spec.gpu} {self.endpoint}\n", encoding="utf-8")
+
+    # -- watch ---------------------------------------------------------------------------
+
+    def loop(self) -> None:
+        """Poll until the session has ended; a cap, the floor or a wrong GPU raises."""
+        while True:
+            self.sleep(self.timing.poll)
+            usage, snap = self.cli.snapshot()
+            spent = self.meter(usage)
+            self.register("running")
+            listed = None if snap is None else snap.find(self.endpoint)
+            if snap is not None:
+                self.misses = 0 if listed else self.misses + 1
+            self.cli.log(
+                "poll",
+                session=self.spec.name,
+                spent=round(spent, 3),
+                wall_cu=round(self.wall_cu(), 3),
+                balance_cu=round(self.balance_cu, 3),
+                cap=self.spec.cap,
+                balance=usage.balance if usage else None,
+                listed=None if snap is None else listed is not None,
+                misses=self.misses,
+            )
+            self.check_gpu(listed)
+            if self.misses >= MISSES_TO_END:
+                self.cli.log("ended", session=self.spec.name, spent=round(spent, 3))
+                return
+            self.check_floor(usage)
+            self.persist_step(spent)
+            if self.over(spent):
+                raise Capped(f"{self.spec.name} reached its cap at {spent:.3f} CU")
+
+    def persist_step(self, spent: float) -> None:
+        if self.spec.persist is None or self.persist_done:
             return
-        lead_h = (self.timing.margin + self.timing.persist_timeout) / 3600
-        if spent >= self.persist_at * spec.cap or spent + spec.rate * lead_h >= spec.cap:
-            session.persist = (self.spawn or _spawn_shell)(spec.persist)
-            self.log("persist", session=spec.name, spent=round(spent, 3), command=spec.persist)
+        if self.persist is not None:
+            code = self.persist.poll()
+            if code is not None:
+                self.persist_done = True
+                self.cli.log("persisted", session=self.spec.name, code=code)
+            elif self.clock() - self.persist_started > self.timing.persist_timeout:
+                self.persist.kill()
+                self.persist_done = True
+                self.cli.log("ALERT", message=f"{self.spec.name}: persist killed at its timeout")
+            return
+        if spent >= self.persist_at * self.spec.cap or self.over(
+            spent, self.timing.persist_timeout
+        ):
+            self.persist = (self.spawn or spawn_process)(["bash", "-c", self.spec.persist])
+            self.persist_started = self.clock()
+            self.cli.log("persist", session=self.spec.name, spent=round(spent, 3))
 
-    # -- whole run -------------------------------------------------------------------
-
-    def cleanup(self) -> None:
-        for session in self.live():
-            self.stop(session, "cleanup")
-        for session in self.sessions:
-            if session.persist is not None and session.persist.poll() is None:
-                session.persist.kill()
+    def stop(self, reason: str, deferred: _Deferred) -> bool:
+        """Unassign every claimed endpoint until trusted listings confirm it is gone."""
+        if not self.claimed:
+            return True
+        absent = dict.fromkeys(sorted(self.claimed), 0)
+        rounds = 0
+        while True:
+            for endpoint, count in absent.items():
+                if count == 0:
+                    self.cli.unassign(endpoint)
+            rounds += 1
+            self.sleep(self.timing.confirm_wait if rounds < LOUD_AFTER else self.timing.poll)
+            _, snap = self.cli.snapshot()
+            if snap is not None:
+                for endpoint in absent:
+                    absent[endpoint] = 0 if snap.find(endpoint) else absent[endpoint] + 1
+            self.register("stopping")
+            if all(count >= CONFIRM_ABSENT for count in absent.values()):
+                break
+            if rounds >= LOUD_AFTER:
+                left = [e for e, count in absent.items() if count < CONFIRM_ABSENT]
+                message = f"{self.spec.name}: {left} may still be billing; stop it by hand"
+                self.cli.log("STOP_FAILED", rounds=rounds, message=message)
+                if deferred.count:  # a signal now means: give up, a human takes over
+                    return False
+        self.cli.log("stopped", session=self.spec.name, reason=reason, endpoints=list(absent))
+        return True
 
     def watch(self) -> int:
-        code = EXIT_OK
+        code, reason = EXIT_OK, "ended"
         try:
-            self.start()
-            while self.live():
-                self.sleep(self.timing.poll)
-                self.cycle()
-                self.read_inbox()
+            self.registry.mkdir(parents=True, exist_ok=True)
+            (self.registry / f"{self.spec.name}.ready").unlink(missing_ok=True)
+            self.register("starting")
+            self.cli.log("start", session=self.spec.name, margin_s=self.timing.margin)
+            self.attach() if self.spec.attach else self.create()
+            self.register("running")
+            self.ready()
+            self.loop()
         except Interrupted as stop:
-            self.log("signal", signum=stop.signum)
-            code = EXIT_CRASHED
+            self.cli.log("signal", signum=stop.signum)
+            code, reason = EXIT_CRASHED, "signal"
         except WatchError as error:
-            self.log("error", kind=type(error).__name__, message=str(error))
-            code = error.code
-        except BaseException as error:  # fail closed on anything: the finally stops sessions
-            self.log("error", kind=type(error).__name__, message=repr(error))
-            code = EXIT_CRASHED
+            self.cli.log("error", kind=type(error).__name__, message=str(error))
+            code, reason = error.code, type(error).__name__
+        except BaseException as error:  # fail closed on anything
+            self.cli.log("error", kind=type(error).__name__, message=repr(error))
+            code, reason = EXIT_CRASHED, "crash"
         finally:
-            with _SignalsIgnored():
-                self.cleanup()
-        usage = self.usage()
-        if any(s.unconfirmed for s in self.sessions):
+            with _Deferred() as deferred:
+                code = self.finish(code, reason, deferred)
+        return code
+
+    def finish(self, code: int, reason: str, deferred: _Deferred) -> int:
+        confirmed = False
+        try:
+            confirmed = self.stop(reason, deferred)
+            if self.persist is not None and self.persist.poll() is None:
+                self.persist.kill()
+        except BaseException as error:
+            self.cli.log("error", kind=type(error).__name__, message=repr(error))
+        if not confirmed:
             code = EXIT_STOP_FAILED
-        elif code == EXIT_OK and any(s.stopped_by in ("cap", "floor") for s in self.sessions):
-            code = EXIT_CAPPED
-        drop = None
-        if usage is not None and self.start_balance is not None:
-            drop = round(self.start_balance - usage.balance, 3)
-        now = self.clock()
-        self.log(
-            "exit",
-            code=code,
-            balance=usage.balance if usage else None,
-            balance_drop=drop,
-            sessions={
-                s.spec.name: {
-                    "stopped_by": s.stopped_by,
-                    "unconfirmed": s.unconfirmed,
-                    "spent": round(s.spent(now), 3),
-                    "wall_cu": round(s.wall_cu(now), 3),
-                    "balance_cu": round(s.balance_cu, 3),
-                }
-                for s in self.sessions
-            },
-        )
+        try:
+            self.register("stopped" if confirmed else "stop_failed")
+            usage = self.cli.usage()
+            self.cli.log(
+                "exit",
+                session=self.spec.name,
+                code=code,
+                reason=reason,
+                endpoint=self.endpoint,
+                spent=round(self.meter(usage), 3),
+                wall_cu=round(self.wall_cu(), 3),
+                balance_cu=round(self.balance_cu, 3),
+                balance=usage.balance if usage else None,
+            )
+        except BaseException as error:
+            print(f"cu_watch: exit log failed: {error!r}", file=sys.stderr, flush=True)
         return code
 
 
-class _SignalsIgnored:
-    """Let cleanup finish: a second SIGTERM must not cut a stop in half."""
+# -- the batch guard ---------------------------------------------------------------------
+
+
+@dataclass
+class Guard:
+    cli: Cli
+    registry: Path
+    floor: float | None
+    allow: frozenset[str] = frozenset()
+    grace: int = 2
+    stale: float = 600.0
+    timing: Timing = field(default_factory=Timing)
+    clock: Callable[[], float] = time.time
+    sleep: Callable[[float], None] = time.sleep
+    alive: Callable[[int], bool] = pid_alive
+    unregistered: dict[str, int] = field(default_factory=dict)
+    watchers_seen: bool = False
+    floored: bool = False
+
+    def allowed(self) -> tuple[set[str], bool]:
+        """Endpoints of live watchers, and whether any watcher is live."""
+        entries, bad = read_entries(self.registry)
+        for name in bad:
+            self.cli.log("ALERT", message=f"registry file {name} unreadable: not allowed")
+        now = self.clock()
+        live = [
+            e
+            for e in entries
+            if e.state in LIVE_STATES and self.alive(e.pid) and now - e.beat <= self.stale
+        ]
+        self.watchers_seen = self.watchers_seen or bool(entries)
+        return {e.endpoint for e in live if e.endpoint} | set(self.allow), bool(live)
+
+    def cycle(self) -> int | None:
+        usage, snap = self.cli.snapshot()
+        if usage is None or snap is None:
+            self.cli.log("untrusted", usage=usage is not None)
+            return None
+        allowed, any_live = self.allowed()
+        listed = {s.endpoint: s for s in snap.listed}
+        for gone in set(self.unregistered) - set(listed):
+            del self.unregistered[gone]
+        margin_h = self.timing.margin / 3600
+        if self.floor is not None and usage.balance - usage.rate * margin_h <= self.floor:
+            self.floored = True
+            targets = sorted(listed)
+            self.cli.log("floor", balance=usage.balance, floor=self.floor)
+        else:
+            for endpoint in listed:
+                if endpoint in allowed:
+                    self.unregistered.pop(endpoint, None)
+                else:
+                    self.unregistered[endpoint] = self.unregistered.get(endpoint, 0) + 1
+            targets = sorted(e for e, n in self.unregistered.items() if n > self.grace)
+        for endpoint in targets:
+            message = f"stopping {listed[endpoint].name} {endpoint}: floor or no live watcher"
+            self.cli.log("ALERT", endpoint=endpoint, message=message)
+            self.cli.unassign(endpoint)
+        self.cli.log(
+            "poll",
+            balance=usage.balance,
+            rate=usage.rate,
+            listed=sorted(listed),
+            allowed=sorted(allowed),
+            unregistered=self.unregistered,
+        )
+        if self.floored and not listed:
+            return EXIT_CAPPED
+        if self.watchers_seen and not any_live and not listed:
+            return EXIT_OK
+        return None
+
+    def watch(self) -> int:
+        try:
+            self.registry.mkdir(parents=True, exist_ok=True)
+            self.cli.log("start", floor=self.floor, grace=self.grace, allow=sorted(self.allow))
+            while (code := self.cycle()) is None:
+                self.sleep(self.timing.poll)
+        except Interrupted as stop:
+            self.cli.log("signal", signum=stop.signum)
+            code = EXIT_CRASHED
+        except BaseException as error:
+            self.cli.log("error", kind=type(error).__name__, message=repr(error))
+            code = EXIT_CRASHED
+        with _Deferred():
+            self.cli.log("exit", code=code)
+        return code
+
+
+# -- process plumbing --------------------------------------------------------------------
+
+
+class _Deferred:
+    """Signals during cleanup are counted, not raised, so a stop is never cut in half."""
 
     SIGNALS = (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)
 
-    def __enter__(self) -> None:
-        self.saved = [signal.signal(s, signal.SIG_IGN) for s in self.SIGNALS]
+    def __enter__(self) -> _Deferred:
+        self.count = 0
+        self.saved = [signal.signal(s, self._count) for s in self.SIGNALS]
+        return self
+
+    def _count(self, signum: int, frame: object) -> None:
+        self.count += 1
 
     def __exit__(self, *exc: object) -> None:
         for sig, handler in zip(self.SIGNALS, self.saved):
@@ -635,7 +792,7 @@ def _raise_interrupted(signum: int, frame: object) -> None:
 
 
 def install_signal_handlers() -> None:
-    for sig in _SignalsIgnored.SIGNALS:
+    for sig in _Deferred.SIGNALS:
         signal.signal(sig, _raise_interrupted)
 
 
@@ -656,35 +813,59 @@ def subprocess_runner(argv: Sequence[str], timeout: float) -> tuple[int, str]:
     return done.returncode, done.stdout + done.stderr
 
 
-def _spawn_shell(command: str) -> Process:
-    return subprocess.Popen(command, shell=True)
+def spawn_process(argv: Sequence[str]) -> Process:
+    return subprocess.Popen(list(argv), stdin=subprocess.DEVNULL)
 
 
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
-    parser.add_argument("--new", action="append", default=[], metavar="NAME:GPU:CAP")
-    parser.add_argument("--attach", action="append", default=[], metavar="NAME:GPU:CAP[:START]")
-    parser.add_argument("--persist", action="append", default=[], metavar="NAME=COMMAND")
-    parser.add_argument("--persist-at", type=float, default=0.9, help="fraction of the cap")
-    parser.add_argument("--floor", type=float, help="stop everything below this balance")
-    parser.add_argument("--ready-dir", type=Path, help="<NAME>.ready once on the right GPU")
-    parser.add_argument("--inbox", type=Path, help="directory read for sessions added later")
-    parser.add_argument("--log", type=Path, required=True, help="JSON lines, one per event")
-    parser.add_argument("--colab", type=Path, default=COLAB, help="the colab CLI ($COLAB_CLI)")
-    parser.add_argument("--poll", type=float, default=60.0, help="seconds between polls")
-    parser.add_argument("--no-inhibit", action="store_true", help="do not hold off suspend")
+    sub = parser.add_subparsers(dest="command", required=True)
+    session = sub.add_parser("session", help="watch one Colab session")
+    guard = sub.add_parser("guard", help="the batch backstop: floor and unregistered sessions")
+    for each in (session, guard):
+        each.add_argument("--registry", type=Path, required=True, help="one per batch")
+        each.add_argument("--log", type=Path, required=True, help="JSON lines, one per event")
+        each.add_argument("--colab", type=Path, default=COLAB, help="the colab CLI ($COLAB_CLI)")
+        each.add_argument("--poll", type=float, default=60.0, help="seconds between polls")
+        each.add_argument("--floor", type=float, help="stop below this account balance")
+        each.add_argument("--no-inhibit", action="store_true", help="do not hold off suspend")
+    mode = session.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--new", action="store_true", help="run `colab new` and watch it")
+    mode.add_argument("--attach", action="store_true", help="watch a running session")
+    session.add_argument("--name", required=True)
+    session.add_argument("--gpu", required=True, type=str.upper)
+    session.add_argument("--cap", required=True, type=float, help="CU")
+    session.add_argument("--started", help="--attach: start time, ISO 8601")
+    session.add_argument("--started-min-ago", type=float, help="--attach: minutes since start")
+    session.add_argument("--endpoint", help="--attach: match this endpoint, not the name")
+    session.add_argument("--persist", help="shell command run once before the cap")
+    session.add_argument("--persist-at", type=float, default=0.9, help="fraction of the cap")
+    guard.add_argument("--allow", action="append", default=[], help="an endpoint to leave")
+    guard.add_argument("--grace-polls", type=int, default=2)
+    guard.add_argument("--stale", type=float, default=600.0, help="seconds without heartbeat")
     return parser.parse_args(argv)
+
+
+def build_spec(args: argparse.Namespace, now: float) -> Spec:
+    if args.started is not None and args.started_min_ago is not None:
+        raise ValueError("pass --started or --started-min-ago, not both")
+    started = None
+    if args.started is not None:
+        started = datetime.fromisoformat(args.started).timestamp()
+    elif args.started_min_ago is not None:
+        started = now - args.started_min_ago * 60
+    if not 0 < args.persist_at <= 1:
+        raise ValueError("--persist-at is a fraction of the cap, in (0, 1]")
+    spec = Spec(args.name, args.gpu, args.cap, args.attach, started, args.endpoint, args.persist)
+    check_spec(spec)
+    return spec
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     args = parse_args(argv)
     try:
-        specs = build_specs(args.new, args.attach, args.persist)
-        if not specs:
-            raise ValueError("nothing to watch: pass --new or --attach")
-        if not 0 < args.persist_at <= 1:
-            raise ValueError("--persist-at is a fraction of the cap, in (0, 1]")
+        spec = build_spec(args, time.time()) if args.command == "session" else None
     except ValueError as error:
         print(f"cu_watch: {error}", file=sys.stderr)
         return EXIT_NOTHING
@@ -710,18 +891,21 @@ def main(argv: Sequence[str] | None = None) -> int:
             ],
         )
     install_signal_handlers()
-    watcher = Watcher(
-        specs,
-        args.floor,
-        args.log,
-        subprocess_runner,
-        colab=args.colab,
-        timing=Timing(poll=args.poll),
-        persist_at=args.persist_at,
-        ready_dir=args.ready_dir,
-        inbox=args.inbox,
-    )
-    return watcher.watch()
+    cli = Cli(subprocess_runner, args.log, colab=args.colab)
+    timing = Timing(poll=args.poll)
+    if spec is None:
+        return Guard(
+            cli,
+            args.registry,
+            args.floor,
+            frozenset(args.allow),
+            grace=args.grace_polls,
+            stale=args.stale,
+            timing=timing,
+        ).watch()
+    return Watcher(
+        spec, cli, args.registry, args.floor, timing=timing, persist_at=args.persist_at
+    ).watch()
 
 
 if __name__ == "__main__":
