@@ -132,6 +132,19 @@ Số đo (rtx3060, 3/11/2026, chưa có lớp phong cách):
 | 8 lượt, mức 0 seed 1–4 và mức 1 seed 1–4, mỗi worker một lượt | 7/8 đạt (31,0–35,0 s sim). Mức 1 seed 4 hỏng `L-TRAY-TILT` lúc quay |
 | Thời gian máy | Chưa đo sạch: lúc đo, lô S1 của DA-33 (22 worker) chạy cùng máy, load 47–80. Một lượt một mình 144 s thực cho 35 s sim; profile 1000 bước: `env.step` 46 ms (render 31 ms), agent PICO 19 ms, vật lý 10 ms. Đo lại khi máy rảnh (nhiệm vụ 7) |
 
+### Giới hạn bước khớp của IK
+
+**[Đã chốt]** (PO, 4/11/2026, sau [wrist-jump.md](wrist-jump.md)): IK retargeting của ống PICO không cho khớp nào đi quá `arm_step_max` = 0,08 rad trong một bước điều khiển (`tray_virtual_teleop.yaml`, `flywheel_simple.tray.pico.ik_limit`). Cách làm giống DA-33 làm cho IK của planner (D-28). Giới hạn vận tốc trong QP của pink là `min(URDF, 0,08 / (num_step_per_frame · dt · amplify_factor))`. Bản sửa này phải làm riêng ở đây, vì `tray/pico/agent.py` dùng thẳng `TeleopRetargetingIK` của decoupled_wbc: bản sửa `UpperBodyIK` của DA-33 không chạm tới ống PICO. Đổi planner (planner-5) một mình không sửa được demo cha, vì trong teleop ảo planner chỉ cho mục tiêu cổ tay.
+
+Lý do: không có giới hạn này, tư thế ngửa lòng bàn tay cho phép cánh tay đổi cấu hình trong một bước trong khi cổ tay vẫn bám mục tiêu. Đo trên rtx3060 ngày 4/11/2026, trên dataset đã lưu, bước lớn nhất của 14 khớp tay trong `action`:
+
+| Lô | Episode có bước > 0,0869 (ngưỡng `action_jump.arm` của DA-03) | Trung vị của bước lớn nhất mỗi episode | Lớn nhất |
+|---|---|---|---|
+| `parents-1104` | 105/122 | 0,099 | 0,181 |
+| `measure-1104` (S2) | 18/19 | 0,102 | 0,206 |
+
+Phiên bản người điều khiển đổi sang `da35-virtual-2`; hash cấu hình (`operator_version`) đổi theo `arm_step_max`. Test CPU `test_ik_limit.py` kiểm phép tính giới hạn. Test sim `test_virtual_operator_episode_reaches_check_success` kiểm rằng không bước tay nào của `action` vượt 0,08 trong cả episode, kể cả lúc kích hoạt.
+
 ## Phong cách mỗi episode (nhiệm vụ 6)
 
 Mỗi lượt thử rút một bộ phong cách từ seed `style_seed_for(style_base, level, seed, lần thử)` (`SeedSequence`): cùng điều kiện, cùng lần thử thì cùng phong cách; lần thử khác thì phong cách khác. `--style-base` đổi cả họ seed, `--no-style` chạy planner không phong cách. Episode lưu ghi khối `flywheel` theo AC 3, cùng tên trường với meta S1 của DA-33:
@@ -187,7 +200,7 @@ MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src nohup setsid \
 
 `generate_parents.py` chia điều kiện xoay vòng cho các worker; mỗi worker là một phiên `--streamer virtual` với env và dataset LeRobot riêng ở `<out>/shard-NN/`. Chạy lại thì bỏ qua điều kiện shard đã ghi. Cuối lô ghi `<out>/summary.json`: số lượt, kết quả, nhãn lỗi, giây sim, giây worker, danh sách demo cha đủ 7 cờ bước (shard, chỉ số episode, level, seed, seed phong cách).
 
-Trong lúc làm nhiệm vụ 5–7, DA-33 merge vào master cách cầm ngửa lòng bàn tay dưới tay cầm (D-25, Hiếu chọn 3/11/2026), thay cho cách kẹp ngón D-19 mà nhiệm vụ 5, 6 đã chỉnh trên đó. Vì vậy có hai lô, cùng 160 điều kiện (mức 0 và 1, seed train 100–179, mỗi điều kiện một lượt, `style_base` 0, cùng seed phong cách), rtx3060, 3/11/2026. **Bộ demo cha cho S2 là `parents-1103b`** **[Đã chốt]** (PO chọn 3/11/2026): cùng planner với mã đang commit và với S1 của DA-33, một kiểu cầm duy nhất. `parents-1103` (D-19) giữ để tham khảo, không trộn vào S2. Cả hai lô đã bị thay thế (PO review PR #84, 4/11/2026): chúng chạy khi trạng thái hiệu chuẩn của decoupled_wbc còn rò giữa các episode, và sẽ được sinh lại sau bản sửa ở nhiệm vụ 10 của DA-35 ([s2.md](s2.md)).
+Trong lúc làm nhiệm vụ 5–7, DA-33 merge vào master cách cầm ngửa lòng bàn tay dưới tay cầm (D-25, Hiếu chọn 3/11/2026), thay cho cách kẹp ngón D-19 mà nhiệm vụ 5, 6 đã chỉnh trên đó. Vì vậy có hai lô, cùng 160 điều kiện (mức 0 và 1, seed train 100–179, mỗi điều kiện một lượt, `style_base` 0, cùng seed phong cách), rtx3060, 3/11/2026. **Bộ demo cha cho S2 là `parents-1103b`** **[Đã chốt]** (PO chọn 3/11/2026): cùng planner với mã đang commit và với S1 của DA-33, một kiểu cầm duy nhất. `parents-1103` (D-19) giữ để tham khảo, không trộn vào S2. Cả hai lô đã bị thay thế (PO review PR #84, 4/11/2026): chúng chạy khi trạng thái hiệu chuẩn của decoupled_wbc còn rò giữa các episode, và sẽ được sinh lại sau bản sửa ở nhiệm vụ 10 của DA-35 ([s2.md](s2.md)). Mọi lô ghi trước phiên bản người điều khiển `da35-virtual-2` cũng không có giới hạn bước khớp của IK (mục dưới), nên không lô nào trong số đó được vào release.
 
 | Đo | `parents-1103b` (D-25, mã hiện hành) | `parents-1103` (D-19, trước khi rebase) |
 |---|---|---|

@@ -50,15 +50,12 @@ def main(argv: list[str] | None = None) -> int:
 
     jobs = read_jobs(args.jobs)
     s2_cfg = S2Config.load(args.config)
+    op_cfg = OperatorConfig.load(args.operator_config)
     env = make_teleop_env(jobs[0].level if jobs else 0, headless=True)
-    streamer = S2Streamer(
-        env,
-        ParentStore(args.parents, s2_cfg),
-        OperatorConfig.load(args.operator_config),
-        s2_cfg,
-        mode=args.mode,
+    streamer = S2Streamer(env, ParentStore(args.parents, s2_cfg), op_cfg, s2_cfg, mode=args.mode)
+    agent = pico_agent.StreamerDecoupledAgent(
+        env.unwrapped.task.robot, streamer, clock=SimClock(), max_joint_step=op_cfg.arm_step_max
     )
-    agent = pico_agent.StreamerDecoupledAgent(env.unwrapped.task.robot, streamer, clock=SimClock())
     agent.num_episodes = len(jobs)
     try:
         summary = run_session(

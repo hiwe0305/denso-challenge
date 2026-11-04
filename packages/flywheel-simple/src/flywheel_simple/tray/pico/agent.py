@@ -32,6 +32,7 @@ from simple.agents.pico_decoupled_agent import (  # type: ignore[import-not-foun
 from flywheel_simple.tray.geometry import Pose2D
 from flywheel_simple.tray.pico.clock import ClockedTime, SimClock
 from flywheel_simple.tray.pico.conditions import Condition
+from flywheel_simple.tray.pico.ik_limit import limit_joint_step
 from flywheel_simple.tray.pico.operator import (
     Calibration,
     PicoSignal,
@@ -267,15 +268,25 @@ class StreamerDecoupledAgent(PicoDecoupledAgent):  # type: ignore[misc]
     """PicoDecoupledAgent reading `streamer` instead of the PICO headset.
 
     With `clock`, the pipeline runs on simulated time (see flywheel_simple.tray.pico.clock);
-    the session ticks it once per env step. Without, it keeps the wall clock.
+    the session ticks it once per env step. Without, it keeps the wall clock. With
+    `max_joint_step` (rad per control step), the retargeting IK moves no joint further
+    than that per step (`limit_joint_step`); without, it keeps the URDF limits.
     """
 
-    def __init__(self, robot: Any, streamer: Any, clock: SimClock | None = None) -> None:
+    def __init__(
+        self,
+        robot: Any,
+        streamer: Any,
+        clock: SimClock | None = None,
+        max_joint_step: float | None = None,
+    ) -> None:
         self._external_streamer = streamer
         self.clock = clock
         if clock is not None:
             _install_clock(clock)
         super().__init__(robot)
+        if max_joint_step is not None:
+            limit_joint_step(self._teleop_policy.retargeting_ik.body_ik_solver, max_joint_step)
 
     def _init_pico_streamer(self) -> None:
         # No TCP server for the headset's video stream.
