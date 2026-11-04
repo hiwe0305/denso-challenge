@@ -80,6 +80,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 4/11/2026 | Nhiệm vụ 2, 3: driver Colab `scripts/he/he1_colab.py` (kiểm sha256 trên VM train, cắt tập demo bằng `scripts/he/demo_subset.py`, train, persist lên Drive), ô persist cho watcher chung, cách chạy ở `docs/he/he-1.md` mục 7. Chưa chạy | Hiếu (soạn với Claude) |
 | 4/11/2026 | Nhiệm vụ 3: bản bền trên laptop khi chưa mount được Drive, `scripts/he/he1_fetch.py` (rsync qua `colab ssh --proxy-mode`, kiểm sha256, `follow` cạnh mỗi phiên, `once` ở mốc mềm); `persist` từ chối khi Drive chưa mount. Chưa chạy | Hiếu (soạn với Claude) |
 | 4/11/2026 | Review #109: `setup` không tải hai lần; đo tốc độ proxy trước `setup`; dừng sớm bắt buộc (tự động trong `he1_fetch.py follow`, ngưỡng ghi ở `docs/he/he-1.md` mục 7); dừng phiên ngay khi có `ckpt_40000`; lệnh watcher server eval đủ đối số; bỏ ô persist kernel. Chưa chạy | Hiếu (soạn với Claude) |
+| 5/11/2026 | Review lại #109: train hỏng không còn bị báo là xong (thoát 5, dừng phiên); tốc độ và `ALERT` chỉ tính trên checkpoint; `ready` chặn được bước sau; mọi lần dừng có xác nhận (thoát 6 nếu không), mọi lệnh có thời hạn; dự báo dừng sớm tính thêm độ trễ lượt cuối và thời gian băm, bảng ngưỡng tính lại. Chưa chạy | Hiếu (soạn với Claude) |
 
 ## Ghi chép khi làm
 
