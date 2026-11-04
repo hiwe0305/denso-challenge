@@ -10,7 +10,7 @@ _Kết quả của story [S1-03](../product/stories/S1-03-tai-tao-danh-gia-psi0.
 | 2.1–2.2 Môi trường và script serve | Xong 3/11/2026 trên máy 3060: serve checkpoint task hai bàn, smoke 30 lần `/act` đạt (mục 2.6) |
 | 2.3–5 Đo VRAM, độ trễ, đánh giá, độ không tất định | Chưa; cần máy 5090 |
 | 6 Task hai bàn ở `mujoco_isaac` (AC 9) | Level 0 trên eval `e78fb93`, file task `b75c678`: **6/10** (4/11/2026; công bố 7/10, không thấp hơn có ý nghĩa, mục 3.6). Chưa chạy: lượt lặp 2, 3, Level 1, Level 2 |
-| 7 Task hai bàn ở `mujoco` (AC 10) | 0/90 cũ (file task `6d10628`, lỗi spawn) bị thay; chạy lại với file `b75c678`: Level 0 0/20 (3/11/2026, mục 3.2). Kết luận Q-27C tạm (mục 3.5) |
+| 7 Task hai bàn ở `mujoco` (AC 10) | Trên `e78fb93`, file `b75c678`: Level 0 2/10 giờ tường, 1/10 thời gian sim (4/11/2026), so với Isaac 6/10: renderer là nguyên nhân (mục 3.6). Trước đó, trên `de140d6`: 0/20; 0/90 cũ (file `6d10628`) bị thay. Kết luận Q-27C tạm (mục 3.5) |
 | 8 Checkpoint ablation của HE (AC 11) | Liệt kê xong 3/11/2026 (mục 4); câu hỏi Q-27E chờ Hiếu gửi PSI Lab |
 
 > **Cập nhật (3/11/2026, 23:20).** Các lượt `mujoco` 0/90 và hai episode Isaac đầu tiên chạy với file task hai bàn của SIMPLE `6d10628` (image ghim `38a6…`). Bản này spawn robot với cánh tay giơ; ngón chạm bàn 1 lúc WBC ổn định nên robot bị đẩy lùi 0,1–0,28 m. Tác giả sửa ở `b75c678` (PR #29, `77872fe`, 29/10/2026), và Hiếu chuyển pin SIMPLE sang đó (PR #68). Từ nay `eval_psi0.sh run` mount file `b75c678` vào image (mục 3). Kết quả cũ giữ nguyên trong bảng, đánh dấu "bị thay". Chạy lại `mujoco` Level 0 với file đã sửa: **0/20** (2 lượt; lượt 2 trên domain DDS riêng). Lỗi spawn vì vậy không giải thích được việc `mujoco` hỏng.
@@ -314,7 +314,7 @@ Thời gian thật của `mujoco_isaac` trên máy 3060 là khoảng 25 phút m�
 
 ### 3.5 Trả lời Q-27C [Đề xuất, tạm]
 
-Cập nhật 4/11/2026. Ở `mujoco_isaac` trên bộ eval `e78fb93`, Level 0 đạt 6/10, không thấp hơn 7/10 công bố có ý nghĩa (p = 0,35). Vậy pipeline của đội (server, client, file task đã sửa) tái tạo được Ψ₀ ở mức công bố trong Isaac. Ở `mujoco`, Level 0 là 0/20, nhưng các lượt đó chạy trên bộ eval `de140d6`. Ở bộ đó, ngay cả action thật của người phát lại cũng 0/10 (B6). Vì vậy câu hỏi renderer **chưa tách riêng được**: còn thiếu lượt Ψ₀ ở `mujoco` trên bộ `e78fb93`, khoảng 10 phút máy, không tốn CU nếu dùng server cục bộ. B4 cho thấy policy phụ thuộc ảnh, nên vẫn có khả năng `mujoco` thấp hơn Isaac. Đề xuất giữ nguyên cho HE: render Isaac (design mục 4.2) [Đề xuất, tạm].
+Cập nhật 4/11/2026, tối. Trên cùng 10 điều kiện mức 0 của `e78fb93`, file task `b75c678`: Isaac đạt 6/10, ngang số công bố 7/10 (p = 0,35); `mujoco` đạt 2/10 ở giờ tường và 1/10 ở thời gian sim. Isaac so với `mujoco` gộp 3/30: Fisher p = 0,003. Đồng hồ không đổi kết quả đáng kể (2/10 so với 1/10). Kết luận [Đề xuất]: `mujoco` không giữ được tỉ lệ thành công của Isaac, và nguyên nhân là renderer, không phải đồng hồ. HE eval ở `mujoco_isaac` (render Isaac), như design mục 4.2. Ảnh train của HE cũng cần render Isaac.
 
 Ở Level 0 của bộ eval `de140d6`, vật và khay nằm đúng vị trí của episode train cùng chỉ số; chỉ robot khởi đầu lùi 6,1 cm (mục 3.1). Vậy 0/20 là trên chính vị trí vật đã thấy lúc train. Điều này nghiêng về lỗi hệ thống (renderer khác, hoặc lỗi phía client) hơn là policy yếu. Đề xuất cho HE: giữ mặc định của design mục 4.2 (ảnh train và ảnh eval đều render Isaac; eval ở `mujoco_isaac`), không chuyển sang `mujoco`. Kết luận còn "tạm" cho tới khi có lượt `mujoco_isaac` của chính đội, với file task đã sửa, đạt gần 7/5/6 (B5, mục 3.6). Nếu lượt đó cũng hỏng thì lỗi ở phía client và kết luận trên phải xét lại.
 
@@ -385,6 +385,24 @@ Cả bốn episode hỏng đều gắp và mang được hộp sang bàn 2. Chú
 
 Trong thư mục `episode_0/` của lượt này từng có thêm hai file `*_failed.mp4` lúc 00:31. Đó là video của lượt `de140d6` đã dừng, vì hai lượt ghi cùng một thư mục video. Đã chuyển hai file đó về lượt `runs/simple-b75c678/mujoco_isaac/level-0/pass-1/`.
 
+**Ψ₀ ở `mujoco` trên `e78fb93`, đồng hồ thật và đồng hồ sim (4/11/2026, 18:25–19:23).** Cùng checkpoint, cùng 10 điều kiện mức 0 như lượt Isaac, file task `b75c678`, domain DDS 103. Server Docker cục bộ trên máy 3060, không tốn CU. Cả hai lượt chạy qua `docker/psi0/simtime_eval.py`, nên chỉ khác đồng hồ. Với `--clock sim`, `time.monotonic()` trong vòng eval, `psi0_decoupled_wbc` và agent WBC sonic là thời gian MuJoCo của env (`mjData.time`), còn `sleep()` trả về ngay. Wrapper `flywheel_simple.tray.run` (#90) không dùng được cho task này: đồng hồ sim của nó đọc env khay, nên với task hai bàn nó rơi về giờ tường.
+
+| Renderer | Đồng hồ | Thành công | Điều kiện đạt | Giờ tường | Tải máy lúc chạy |
+|---|---|---|---|---|---|
+| Isaac (`mujoco_isaac`) | Giờ tường | **6/10** | 0, 1, 2, 3, 7, 8 | 5,5 giờ | Batch DA-34, DA-35 |
+| MuJoCo | Giờ tường | **2/10** | 6, 9 | 1 293 s | Tải khoảng 50 |
+| MuJoCo | Sim | **1/10** | 7 | 671 s | Tải khoảng 25–33 |
+| MuJoCo | Giờ tường, qua wrapper #90 (đổi cả bộ đọc điều kiện) | 0/10 | — | 1 909 s | Tải khoảng 55–65 |
+
+- **Renderer là yếu tố chính.** Isaac 6/10 so với `mujoco` 3/30 (gộp ba lượt `mujoco`): Fisher một phía p = 0,003. So riêng với lượt sim 1/10: p = 0,029.
+- **Đồng hồ không phải yếu tố chính ở task này.** Giờ tường 2/10, sim 1/10, khác biệt trong nhiễu (p = 0,5). Giả thuyết của DA-34 (một phần 0/20 cũ của `mujoco` do đồng hồ) không thấy trong số đo. Phần lớn 0/20 cũ là do robot khởi đầu lệch ở bộ `de140d6` (B6).
+- **Q-27C [Đề xuất, đã tách được]:** ở `mujoco`, checkpoint của tác giả mất phần lớn tỉ lệ thành công so với Isaac trên cùng điều kiện, kể cả khi chạy ở thời gian sim. HE giữ render Isaac cho eval (design mục 4.2).
+
+Các lần thử hỏng trước lượt trên vẫn giữ trên máy 3060:
+- `pass-1-cuda-oom-1708`: card đầy vì job khác, server hết bộ nhớ ở lần `/act` đầu.
+- `pass-1-not-sim-time-1800`: wrapper #90, chưa phải thời gian sim.
+- `pass-1-crash-no-mjdata-1847`: agent đọc đồng hồ trước lần reset đầu; đã sửa.
+
 **Giả thuyết cho 0%, theo bằng chứng** [Đề xuất]:
 
 | Giả thuyết | Bằng chứng | Mức |
@@ -423,7 +441,7 @@ Câu hỏi Q-27E gửi PSI Lab (Hiếu gửi, chung email giấy phép ở nhi�
 ## Tiếp tục từ đây (cập nhật 4/11/2026)
 
 1. Xong: file task `b75c678`; cache bộ eval theo revision, kèm kiểm sha256; domain DDS riêng; B4, B6; Isaac Level 0 trên `e78fb93` 6/10. Phiên Colab và cổng chuyển tiếp đã tắt.
-2. Chưa làm: Ψ₀ ở `mujoco` trên `e78fb93` Level 0 (10 episode, server cục bộ, không tốn CU), để tách câu hỏi renderer (Q-27C).
+2. Xong 4/11/2026: Ψ₀ ở `mujoco` trên `e78fb93` Level 0, giờ tường 2/10, sim 1/10. Q-27C đã tách được: renderer.
 3. Chưa làm: B3 (độ trễ; runner `fwdata/logs/b3.sh` trên máy 3060, server cục bộ).
 4. Chưa làm: lượt lặp 2, 3 của Isaac Level 0, rồi Level 1, Level 2. Mỗi lượt 10 episode Isaac khoảng 5,5 giờ máy 3060 và tới 6,7 CU mỗi giờ trên A100. Chưa chạy job Colab mới khi Hiếu chưa duyệt CU: ngân sách đang căng, S1-04 ước khoảng 133 CU, số dư khoảng 100 CU.
 5. Cân nhắc lại việc ghim bộ eval `de140d6` (PR #68), vì robot khởi đầu lùi 6,1 cm so với train (B6), và ghi quyết định vào `docs/g0/psi-data.md`.
