@@ -20,6 +20,8 @@ from test_pico_session_sim import MemoryExporter
 pytestmark = pytest.mark.sim
 
 SHORT_STEPS = 700  # 14 s: stabilise, activate, walk to table A and start reaching
+# Arm joints in SIMPLE's 43-d action (left then right arm, 7 each).
+ACTION_ARMS = [*range(15, 22), *range(29, 36)]
 
 
 @pytest.fixture(scope="module")
@@ -36,9 +38,11 @@ def env_agent_streamer() -> Iterator[tuple[Any, Any, Any]]:
     current = pico_decoupled_agent.time
     clock = current.clock if isinstance(current, ClockedTime) else SimClock()
     env = make_teleop_env(level=0, headless=True)
-    operator = VirtualOperator(OperatorConfig.load())
-    streamer = VirtualPicoStreamer(env, operator, PlannerConfig.load())
-    agent = StreamerDecoupledAgent(env.unwrapped.task.robot, streamer, clock=clock)
+    cfg = OperatorConfig.load()
+    streamer = VirtualPicoStreamer(env, VirtualOperator(cfg), PlannerConfig.load())
+    agent = StreamerDecoupledAgent(
+        env.unwrapped.task.robot, streamer, clock=clock, max_joint_step=cfg.arm_step_max
+    )
     yield env, agent, streamer
     agent.close()
     env.close()
@@ -107,6 +111,11 @@ def test_virtual_operator_episode_reaches_check_success(
     assert (block["source_detail"], block["action_quality"]) == ("virtual_teleop", "planned")
     assert block["style_seed"] == attempt["style_seed"] and block["style"]["omega"] > 0
     assert block["operator_version"].startswith("da35-virtual-")
+    # The retargeting IK's step limit (arm_step_max 0.08) holds over the whole episode,
+    # activation included: DA-03 QA flags an arm step over 0.0869 (action_jump.arm).
+    arms = np.stack([f["action"] for f in frames])[:, ACTION_ARMS]
+    steps = np.abs(np.diff(arms, axis=0))
+    assert steps.max() <= 0.08 + 1e-6, (steps.max(), np.unravel_index(steps.argmax(), steps.shape))
 
 
 def test_same_condition_and_style_seed_give_the_same_episode(

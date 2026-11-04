@@ -51,7 +51,7 @@ from flywheel_simple.tray.predicates import StepReport, TrayState
 Array = NDArray[np.float64]
 
 OPERATOR_CONFIG_RELPATH = Path("configs/sim/tray_virtual_teleop.yaml")
-OPERATOR_VERSION = "da35-virtual-1"
+OPERATOR_VERSION = "da35-virtual-2"  # 2: retargeting IK joint step limit (arm_step_max)
 # Phases in which the hands carry the episode's style: away from the tray, raising them
 # on the way to table A and lowering them after placing. Measured on 16 conditions
 # (DA-35 task 6): plain hands 14 of 16 passed (13 with all seven step flags); styled
@@ -84,6 +84,7 @@ class OperatorConfig:
     done_wait_s: float
     rest_dx: float
     rest_dz: float
+    arm_step_max: float  # rad per control step, for the retargeting IK (agent.limit_joint_step)
 
     @staticmethod
     def default_path() -> Path:

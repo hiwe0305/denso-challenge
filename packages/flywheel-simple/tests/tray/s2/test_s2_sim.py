@@ -74,10 +74,12 @@ def pipeline() -> Iterator[tuple[Any, Any, Any]]:
 
     current = pico_decoupled_agent.time
     clock = current.clock if isinstance(current, ClockedTime) else SimClock()
-    cfg = S2Config.load()
+    cfg, op_cfg = S2Config.load(), OperatorConfig.load()
     env = make_teleop_env(level=1, headless=True)
-    streamer = S2Streamer(env, ParentStore(PARENTS, cfg), OperatorConfig.load(), cfg)
-    agent = StreamerDecoupledAgent(env.unwrapped.task.robot, streamer, clock=clock)
+    streamer = S2Streamer(env, ParentStore(PARENTS, cfg), op_cfg, cfg)
+    agent = StreamerDecoupledAgent(
+        env.unwrapped.task.robot, streamer, clock=clock, max_joint_step=op_cfg.arm_step_max
+    )
     yield env, agent, streamer
     agent.close()
     env.close()

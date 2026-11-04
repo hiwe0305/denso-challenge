@@ -376,20 +376,24 @@ def main(argv: list[str] | None = None) -> int:
     else:
         from flywheel_simple.tray.pico import agent as pico_agent
         from flywheel_simple.tray.pico.clock import SimClock
+        from flywheel_simple.tray.pico.operator import OperatorConfig
 
+        operator_cfg = OperatorConfig.load(args.operator_config)
         streamer: Any = pico_agent.ScriptedStreamer()
         if args.streamer == "virtual":
-            from flywheel_simple.tray.pico.operator import OperatorConfig, VirtualOperator
+            from flywheel_simple.tray.pico.operator import VirtualOperator
             from flywheel_simple.tray.planner import PlannerConfig
 
-            operator = VirtualOperator(OperatorConfig.load(args.operator_config))
+            operator = VirtualOperator(operator_cfg)
             streamer = pico_agent.VirtualPicoStreamer(
                 env,
                 operator,
                 PlannerConfig.load(),
                 style_base=None if args.no_style else args.style_base,
             )
-        agent = pico_agent.StreamerDecoupledAgent(robot, streamer, clock=SimClock())
+        agent = pico_agent.StreamerDecoupledAgent(
+            robot, streamer, clock=SimClock(), max_joint_step=operator_cfg.arm_step_max
+        )
     agent.num_episodes = len(conditions)
     try:
         summary = run_session(
