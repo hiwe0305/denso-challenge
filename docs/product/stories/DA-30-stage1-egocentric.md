@@ -28,7 +28,8 @@ Là kỹ sư robot learning, tôi muốn chạy stage 1 của Ψ₀ trên dữ l
 - [ ] 1. Lần chạy stage 1 ngắn trên EgoDex (AC 1)
   - [x] 1.1 Recipe `pretrain-egodex-psi0-fast.sh`, RunPlan, launcher stage 1, dữ liệu thay thế EgoDex, driver Colab, test CPU
   - [x] 1.2 Loader check của Ψ₀ trên dữ liệu thay thế, chỉ CPU ([stage1.md](../../he/stage1.md) mục 1.5)
-  - [ ] 1.3 Chạy trên Colab sau khi Hiếu duyệt CU; ghi loss, `metrics.jsonl`, dòng `measured` của sổ chi phí
+  - [x] 1.3 Chuẩn bị chạy sau khi Hiếu duyệt CU (4/11/2026): ghi quyết định, bộ canh CU dừng phiên ở trần (dùng chung, PR #108), lệnh `persist` ở trần mềm
+  - [ ] 1.4 Chạy trên Colab khi Hiếu miễn bước che danh tính; ghi loss, `metrics.jsonl`, dòng `measured` của sổ chi phí
 - [ ] 2. RunPlan fine-tune stage 1 trên video tự quay (AC 2)
 - [ ] 3. Fine-tune, probe, closed-loop, báo cáo (AC 2, 3)
 

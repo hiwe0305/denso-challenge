@@ -10,9 +10,9 @@ _Bắt đầu 4/11/2026. Story [DA-30](../product/stories/DA-30-stage1-egocentri
 
 | Bước | Trạng thái | Bằng chứng |
 |---|---|---|
-| Recipe, RunPlan, launcher, driver Colab, bộ canh CU, test CPU | Xong | `uv run pytest packages/flywheel-psi0/tests/stage1`: 34 test qua (driver Colab chạy `run`, `repeat`, `persist` trên Ψ₀ giả; bộ canh CU dừng phiên trước trần trên CLI `colab` giả) |
+| Recipe, RunPlan, launcher, driver Colab, test CPU | Xong | `uv run pytest packages/flywheel-psi0/tests/stage1`: 25 test qua (driver Colab chạy `run`, `repeat`, `persist` trên Ψ₀ giả). Bộ canh CU nằm ở script dùng chung (mục 1.6), test của nó ở PR #108 |
 | Loader của Ψ₀ đọc dữ liệu thay thế (CPU) | Xong, 4/11/2026: 20 episode, rồi cả 218 | Mục 1.5 |
-| Lần chạy trên Colab | **Đã duyệt CU, 4/11/2026** (tier 2). Chạy từ `master` sau khi PR merge, với bộ canh CU (mục 1.6) | Ước lượng 2,3 CU trên một L4, trần 4 CU ([sổ chi phí](../g0/ledger/DA-30.csv)) |
+| Lần chạy trên Colab | **Đã duyệt CU, 4/11/2026** (tier 2). **Còn chờ Hiếu quyết miễn bước che danh tính** cho dữ liệu thay thế (mục 1.4); không chạy khi chưa có quyết định. Chạy từ `master` sau khi PR merge, với bộ canh CU dùng chung (mục 1.6) | Ước lượng 2,3 CU trên một L4, trần 4 CU ([sổ chi phí](../g0/ledger/DA-30.csv)) |
 
 **Quyết định [Đã chốt 4/11/2026, Hiếu]:** "Approve tier 2". Tier 2 gồm lần chạy ngắn này, ước lượng khoảng 2,3 CU, trần 4 CU. Trước đó cùng ngày Hiếu đã dừng mọi job Colab (số dư khoảng 101,8 CU). Lần chạy dùng code ở `master` sau khi PR của DA-30 được merge, không chạy từ nhánh.
 
@@ -49,7 +49,7 @@ Bản export EgoDex của DA-18 (Hưng, hạn 8/11/2026) chưa có. Trong lúc c
 - Đổi sang bản export của DA-18 khi merge: chỉ đổi khối `dataset` của RunPlan.
 - Loader của Ψ₀ coi mỗi episode là một mẫu và bốc một khung ngẫu nhiên mỗi lần: 218 episode với batch 16 là 13 batch mỗi epoch; 200 bước × 2 batch là khoảng 31 epoch. Loss giảm phần lớn do học thuộc tập nhỏ; đúng với mục đích chứng minh đường đi, không nói gì về chất lượng model.
 - Dữ liệu `public` (design mục 8.4). Giấy phép EgoDex là CC-BY-NC-ND; câu hỏi Q-EGO-LIC (design mục 14) vẫn mở với Hiếu. Lần chạy chỉ dùng để train, không phát hành gì suy ra từ dữ liệu.
-- Che danh tính: video EgoDex là góc nhìn Vision Pro xuống mặt bàn, do Apple công bố. Dữ liệu thay thế đi thẳng vào stage 1, chưa qua bước che danh tính của pipeline (DA-04, DA-18). Bản export của DA-18 sẽ có bước đó; cần Hiếu xác nhận dùng mẫu công bố chưa che cho lần chạy ngắn [Đề xuất].
+- Che danh tính: video EgoDex là góc nhìn Vision Pro xuống mặt bàn, do Apple công bố. Dữ liệu thay thế đi thẳng vào stage 1, chưa qua bước che danh tính của pipeline (DA-04, DA-18). Bản export của DA-18 sẽ có bước đó; cần Hiếu xác nhận dùng mẫu công bố chưa che cho lần chạy ngắn [Đề xuất]. CLAUDE.md ghi bước che danh tính là bất biến ("trước mọi bước xử lý khác"), nên lần chạy cần Hiếu miễn rõ ràng; ngày 4/11/2026 đã hỏi, chưa có trả lời.
 
 ### 1.5 Loader check trên CPU (4/11/2026)
 
@@ -88,15 +88,15 @@ RunPlan [`egodex-short.yaml`](../../configs/runplans/stage1/egodex-short.yaml) (
 - **Loss giảm**: trung vị 20 dòng train cuối thấp hơn trung vị 20 dòng đầu (mỗi dòng một batch, nên so trung vị của cửa sổ, không so hai bước).
 - **Chạy lại**: chạy lại 3 bước đầu dưới job id khác (`da30-egodex-short-repeat`), cùng seed 7; loss bước đầu lệch không quá 2%. Seed cố định thứ tự dữ liệu (generator của DataLoader và seed của worker lấy từ seed của cấu hình).
 
-**Bộ canh CU** ([`cu_watch.py`](../../packages/flywheel-psi0/src/flywheel_psi0/stage1/cu_watch.py)) chạy trên laptop, nơi có CLI `colab`, suốt lần chạy. Bộ canh tự mở phiên (`colab new -s da30-stage1 --gpu L4`) để ghi số dư và mốc thời gian đúng lúc phiên bắt đầu; không mở phiên bằng tay. Mỗi phút bộ canh ước phần đã tiêu theo hai cách và lấy số lớn hơn:
+**Bộ canh CU** là script dùng chung `scripts/colab/cu_watch.py` (PR #108, phải merge trước PR này). Một tiến trình trên laptop, nơi có CLI `colab`, canh mọi phiên của tier 2. Cách đo, biên và các đường fail closed ghi trong docstring của script. Với DA-30:
 
-- thời gian × 1,94 CU/giờ của L4;
-- số dư của `colab usage` giảm bao nhiêu so với lúc đầu, chỉ khi phiên này là assignment duy nhất của tài khoản. Số dư tính chung cả tài khoản, nên job khác của tier 2 chạy cùng lúc sẽ bị cộng nhầm vào DA-30.
-
-Khi lần đo tiếp theo sẽ vượt 4 CU (`compute.max_compute_units` của RunPlan), bộ canh chạy `colab stop -s da30-stage1`. Lệnh `colab` lỗi chỉ được ghi lại, không làm bộ canh dừng. Bộ canh thoát khi phiên mất hai lần đo liền: tên phiên không còn trong `colab sessions`, hoặc tài khoản không còn assignment. Dòng cuối của log có số dư giảm, là số liệu cho dòng `measured` của sổ chi phí. Mã thoát 3 nghĩa là bộ canh đã dừng phiên ở trần.
+- Bộ canh tự mở phiên (`--new da30-stage1:L4:4`), nên số dư và mốc thời gian được ghi đúng lúc phiên bắt đầu; không mở phiên bằng tay. Nếu bộ canh đang chạy cho phiên của DA-26 thì dừng nó và chạy lại với cả hai phiên (`--attach` cho phiên đang chạy, kèm giờ bắt đầu).
+- Trần cứng 4 CU (`compute.max_compute_units` của RunPlan); sàn `--floor 14` theo số dư thật của cả tài khoản (101,8 − 88 của tier 2).
+- Ở khoảng 90% trần, bộ canh chạy `persist` của driver trong kernel của phiên ([`persist_cell.py`](../../configs/runplans/stage1/persist_cell.py)), để log và `metrics.jsonl` còn lại sau khi phiên bị dừng ở trần. Vì vậy lệnh train phải chạy trong shell SSH, không qua `colab exec`, để kernel rảnh; và Drive phải được mount (`colab drivemount -s da30-stage1 /content/drive`) ngay sau `setup`.
+- Dòng `exit` cuối của log có `balance_drop` và `by_time` của từng phiên, là số liệu cho dòng `measured` của sổ chi phí. Mã thoát 3 là bộ canh đã dừng phiên ở trần hoặc ở sàn; 4 là phiên có thể vẫn chạy, phải xem `colab sessions` ngay.
 
 ```bash
-mkdir -p fwdata/da30 && nohup setsid uv run python -m flywheel_psi0.stage1.cu_watch --plan configs/runplans/stage1/egodex-short.yaml --session da30-stage1 --log fwdata/da30/cu_watch.jsonl > fwdata/da30/cu_watch.out 2>&1 &
+mkdir -p fwdata/colab && nohup setsid python3 scripts/colab/cu_watch.py --floor 14 --new da30-stage1:L4:4 --persist 'da30-stage1=colab exec -s da30-stage1 -f configs/runplans/stage1/persist_cell.py' --log fwdata/colab/cu_watch.jsonl < /dev/null > /dev/null 2>&1 &
 ```
 
 Lệnh trên Colab (L4, phiên `da30-stage1` do bộ canh mở), theo thứ tự, từ bản sao repo ở `/content/da30/fw` với `PYTHONPATH` gồm `packages/flywheel-psi0/src` và `packages/flywheel-contracts/src` như DA-19:
@@ -128,7 +128,7 @@ Chưa chạy. Ghi ở đây sau lần chạy: loss bước đầu và cuối, k�
 
 ### 1.9 Ước lượng CU
 
-Giả định, chưa đo. Một VM L4 ở 1,94 CU/giờ (S1-04). Phần cố định khoảng 38 phút: setup môi trường của DA-19 khoảng 10 phút; tải `pre.*` 4,3 GB và mẫu EgoDex 2,17 GB khoảng 8 phút; `actions_48d` và loader check khoảng 5 phút (đo trên laptop và `rtx3060`: 34 s và dưới 1 phút); nạp model khoảng 3 phút; checkpoint cuối khoảng 4 phút; chạy lại 3 bước khoảng 7 phút; persist khoảng 1 phút. Cộng 200 bước train:
+Giả định, chưa đo. Một VM L4 ở 1,94 CU/giờ (S1-04). **Hơn một nửa của 2,3 CU là phần cố định** (38 trong 68 phút, khoảng 1,2 CU), không phụ thuộc số bước. Phần train dùng 9 s/bước, cũng là giả định cho fine-tune toàn bộ VLM với ZeRO-3 offload trên một L4, chưa đo trong dự án; recipe ghi cùng số này (`estimate.seconds_per_step`). Phần cố định khoảng 38 phút: setup môi trường của DA-19 khoảng 10 phút; tải `pre.*` 4,3 GB và mẫu EgoDex 2,17 GB khoảng 8 phút; `actions_48d` và loader check khoảng 5 phút (đo trên laptop và `rtx3060`: 34 s và dưới 1 phút); nạp model khoảng 3 phút; checkpoint cuối khoảng 4 phút; chạy lại 3 bước khoảng 7 phút; persist khoảng 1 phút. Cộng 200 bước train:
 
 | s/bước | Train | Tổng | CU |
 |---|---|---|---|
@@ -137,4 +137,4 @@ Giả định, chưa đo. Một VM L4 ở 1,94 CU/giờ (S1-04). Phần cố đ�
 | 15 | 50 phút | 88 phút | 2,8 |
 | 26 | 86 phút | 124 phút | 4,0 (trần của RunPlan) |
 
-Quy tắc dừng [Đề xuất]: đọc s/bước trong `train.log` sau 20 bước; quá 25 s thì dừng VM và báo Hiếu trước khi chạy tiếp, để không vượt trần 4 CU. Bộ canh CU (mục 1.6) là chốt chặn cuối: phiên tự dừng ở 4 CU dù không ai đọc log.
+Quy tắc dừng [Đề xuất]: đọc s/bước trong `train.log` sau 20 bước; quá 20 s thì dừng VM và báo Hiếu trước khi chạy tiếp, trước khi bộ canh tự dừng ở khoảng 22 s (dưới đây). Bộ canh CU (mục 1.6) là chốt chặn cuối: phiên tự dừng trước 4 CU dù không ai đọc log. Biên của bộ canh là 770 s, khoảng 0,41 CU ở L4, nên phiên dừng ở khoảng 3,6 CU; theo bảng trên, tức là khi s/bước vượt khoảng 22 s.

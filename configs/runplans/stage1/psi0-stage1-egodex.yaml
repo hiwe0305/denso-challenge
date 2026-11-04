@@ -81,4 +81,4 @@ parents:
     model_name_or_path: cache/checkpoints/psi0/pre.fast.egodex.2512241941.ckpt200k
 
 estimate:
-  seconds_per_step: 6.0 # assumption for one L4 with ZeRO-3 CPU offload, not measured
+  seconds_per_step: 9.0 # assumption for one L4, full VLM with ZeRO-3 CPU offload, not measured (ledger DA-30)
