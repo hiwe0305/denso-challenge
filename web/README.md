@@ -10,7 +10,7 @@ Thiết kế đầy đủ: [DESIGN.md](DESIGN.md). File này chỉ nói cách ch
 | `schema/` | 9 file SQL đánh số theo thứ tự khoá ngoại; `schema.sql` gọi cả chín |
 | `contracts/` | Nguồn enum duy nhất (`enums.py`) và bộ sinh `enums.ts` |
 | `tests/` | Test chạy trong CI, không cần Postgres |
-| `api/` | FastAPI, SQLAlchemy, Alembic (chưa dựng) |
+| `api/` | FastAPI: `app.py` các route §7, `readmodel.py` lớp đọc (sink JSONL hôm nay, Postgres sau), `actions.py` ghi `human_actions.jsonl`. Chưa có SQLAlchemy, Alembic |
 | `fwsync/` | Bộ nạp: `source.py` đọc, `mapping.py` ánh xạ, `sink.py` ghi, `runner.py` bốn việc, `cli.py` lệnh |
 | `mock/` | Generator của bộ mock; output ở `mock/demo-17-11/` ngoài thư mục `web/` |
 | `fe/` | React, Vite, TanStack Query, Tailwind, MSW. `src/api/types.ts` là hình dạng response (DESIGN.md §7.4); `src/mocks/` dựng response từ `mock/demo-17-11/`; `src/contracts/schemas/` sinh từ hợp đồng. Màn hình đã dựng: M7 |
@@ -67,6 +67,38 @@ uv run python -m web.fwsync.cli import --from mock/demo-17-11 --origin mock
 ```
 
 Luôn nạp với `--origin mock`, để FE dán nhãn "mock" lên từng bản ghi.
+
+## Chạy API
+
+API đọc thư mục JSONL mà `fwsync import` ghi, nên **chạy được khi chưa có
+Postgres**. Một lệnh nạp bộ mock rồi mở API ở cổng 8000:
+
+```bash
+uv run python -m web.api --import-from mock/demo-17-11 --origin mock --sink fwdata/web-sink
+# http://127.0.0.1:8000/docs  ·  http://127.0.0.1:8000/api/recommendations
+```
+
+FE gọi API thật thay cho MSW:
+
+```bash
+cd web/fe && VITE_API_MODE=real npm run dev   # Vite chuyển /api sang cổng 8000
+```
+
+Bấm nút ghi trên FE thì API ghi một dòng vào `fwdata/web-state/human_actions.jsonl`,
+và chính file đó là đầu vào của `fwsync export --actions`.
+
+Hai bản của lớp đọc, cùng một tập route:
+
+- `SinkReadModel` tính từng view của `schema/70-views.sql` bằng Python trên các
+  bảng JSONL. Đây cũng là phương án dự phòng của DESIGN.md §9.4 nếu ADR-13 giữ
+  Postgres ngoài L0.
+- `PostgresReadModel` sẽ `SELECT` thẳng từ view. Chưa dựng; khởi tạo nó báo đúng
+  ba thứ còn thiếu (Postgres 16, `psycopg`, W8).
+
+`web/tests/test_api.py` gửi 38 request ghi trong `web/tests/fixtures/api_parity.json`
+tới FastAPI và so với những gì MSW trả cho FE. File đó do
+`web/fe/src/mocks/parity.test.ts` sinh; đổi response có chủ ý thì chạy
+`npx vitest run -u` trong `web/fe` và commit cùng thay đổi backend.
 
 ## Chạy bộ nạp
 
@@ -140,7 +172,7 @@ thật của trigger là mốc M1 trên Postgres thật, mỗi luật một ca �
 
 | Mã | Việc | Chặn gì |
 |---|---|---|
-| W8 | 03 §2.4 (ADR-13) xếp "Streamlit hoặc web" vào hàng hoãn tới L1+, và CLAUDE.md cấm thêm DB server ở L0. Cần PO đổi ADR-13 hoặc khoanh web ra ngoài L0 | Dựng Postgres và FastAPI thật (mốc M1) |
+| W8 | 03 §2.4 (ADR-13) xếp "Streamlit hoặc web" vào hàng hoãn tới L1+, và CLAUDE.md cấm thêm DB server ở L0. Cần PO đổi ADR-13 hoặc khoanh web ra ngoài L0 | Dựng Postgres (mốc M1). FastAPI trên sink JSONL đã chạy trước khi có quyết định này, theo yêu cầu của Châu 5/11 |
 | W1 | Postgres chia hai nửa, hay web ghi thẳng | Hình dạng schema; bản này viết theo phương án chia hai nửa |
 | W7 | `source_action_id` trên artifact lõi, và artifact `JobStatus` | Vòng ghi end-to-end (mốc M4) |
 

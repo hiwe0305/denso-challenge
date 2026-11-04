@@ -1,0 +1,2 @@
+# Written by vitest (toMatchFileSnapshot), compared byte for byte: keep LF on every OS.
+*.json text eol=lf

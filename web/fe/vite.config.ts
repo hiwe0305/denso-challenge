@@ -9,7 +9,12 @@ const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 
 export default defineConfig({
   plugins: [react()],
-  server: { fs: { allow: [repoRoot] } },
+  // In mock mode MSW answers /api before the request leaves the browser; with
+  // VITE_API_MODE=real the request reaches this proxy and `python -m web.api`.
+  server: {
+    fs: { allow: [repoRoot] },
+    proxy: { "/api": "http://127.0.0.1:8000" },
+  },
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
