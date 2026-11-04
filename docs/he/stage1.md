@@ -96,13 +96,14 @@ RunPlan [`egodex-short.yaml`](../../configs/runplans/stage1/egodex-short.yaml) (
 
 **Bộ canh CU** là script dùng chung `scripts/colab/cu_watch.py` (PR #108, phải merge trước PR này). Một tiến trình trên laptop, nơi có CLI `colab`, canh mọi phiên của tier 2. Cách đo, biên và các đường fail closed ghi trong docstring của script. Với DA-30:
 
-- Bộ canh tự mở phiên (`--new da30-stage1:L4:4`), nên số dư và mốc thời gian được ghi đúng lúc phiên bắt đầu; không mở phiên bằng tay. Nếu bộ canh đang chạy cho phiên của DA-26 thì dừng nó và chạy lại với cả hai phiên (`--attach` cho phiên đang chạy, kèm giờ bắt đầu).
+- Bộ canh tự mở phiên (`--new da30-stage1:L4:4`), nên số dư và mốc thời gian được ghi đúng lúc phiên bắt đầu; không mở phiên bằng tay. Nếu bộ canh của tier 2 đã chạy (phiên của DA-26), **không dừng nó**, vì dừng bộ canh sẽ dừng mọi phiên. Thay vào đó, thả vào thư mục `--inbox` của nó một file có hai dòng `new da30-stage1:L4:4` và `persist da30-stage1=colab exec -s da30-stage1 -f configs/runplans/stage1/persist_cell.py`.
 - Trần cứng 4 CU (`compute.max_compute_units` của RunPlan); sàn `--floor 14` theo số dư thật của cả tài khoản (101,8 − 88 của tier 2).
 - Ở khoảng 90% trần, bộ canh chạy `persist` của driver trong kernel của phiên ([`persist_cell.py`](../../configs/runplans/stage1/persist_cell.py)), để log và `metrics.jsonl` còn lại sau khi phiên bị dừng ở trần. Vì vậy lệnh train phải chạy trong shell SSH, không qua `colab exec`, để kernel rảnh; và Drive phải được mount (`colab drivemount -s da30-stage1 /content/drive`) ngay sau `setup`.
-- Dòng `exit` cuối của log có `balance_drop` và `by_time` của từng phiên, là số liệu cho dòng `measured` của sổ chi phí. Mã thoát 3 là bộ canh đã dừng phiên ở trần hoặc ở sàn; 4 là phiên có thể vẫn chạy, phải xem `colab sessions` ngay.
+- Chỉ bắt đầu train khi đã có file `fwdata/colab/ready/da30-stage1.ready`, nghĩa là phiên đã chạy đúng L4.
+- Dòng `exit` cuối của log có `balance_drop` của tài khoản, cùng `spent`, `wall_cu` và `balance_cu` của từng phiên: đây là số liệu cho dòng `measured` của sổ chi phí. Mã thoát: 3 là đã dừng ở trần hoặc ở sàn; 4 là sai loại GPU; 5 là `STOP_FAILED`, phiên có thể vẫn tính tiền, phải xem `colab sessions` ngay; 6 là crash, tín hiệu hoặc `new` lỗi, mọi phiên đã dừng.
 
 ```bash
-mkdir -p fwdata/colab && nohup setsid python3 scripts/colab/cu_watch.py --floor 14 --new da30-stage1:L4:4 --persist 'da30-stage1=colab exec -s da30-stage1 -f configs/runplans/stage1/persist_cell.py' --log fwdata/colab/cu_watch.jsonl < /dev/null > /dev/null 2>&1 &
+mkdir -p fwdata/colab/inbox && nohup setsid bash -c 'python3 scripts/colab/cu_watch.py --floor 14 --new da30-stage1:L4:4 --persist "da30-stage1=colab exec -s da30-stage1 -f configs/runplans/stage1/persist_cell.py" --ready-dir fwdata/colab/ready --inbox fwdata/colab/inbox --log fwdata/colab/cu_watch.jsonl; echo "exit $?"' < /dev/null >> fwdata/colab/cu_watch.out 2>&1 &
 ```
 
 Lệnh trên Colab (L4, phiên `da30-stage1` do bộ canh mở), theo thứ tự, từ bản sao repo ở `/content/da30/fw` với `PYTHONPATH` gồm `packages/flywheel-psi0/src` và `packages/flywheel-contracts/src` như DA-19:
@@ -143,4 +144,4 @@ Giả định, chưa đo. Một VM L4 ở 1,94 CU/giờ (S1-04). **Hơn một n�
 | 15 | 50 phút | 88 phút | 2,8 |
 | 26 | 86 phút | 124 phút | 4,0 (trần của RunPlan) |
 
-Quy tắc dừng [Đề xuất]: đọc s/bước trong `train.log` sau 20 bước; quá 20 s thì dừng VM và báo Hiếu trước khi chạy tiếp, trước khi bộ canh tự dừng ở khoảng 22 s (dưới đây). Bộ canh CU (mục 1.6) là chốt chặn cuối: phiên tự dừng trước 4 CU dù không ai đọc log. Biên của bộ canh là 770 s, khoảng 0,41 CU ở L4, nên phiên dừng ở khoảng 3,6 CU; theo bảng trên, tức là khi s/bước vượt khoảng 22 s.
+Quy tắc dừng [Đề xuất]: đọc s/bước trong `train.log` sau 20 bước; quá 20 s thì dừng VM và báo Hiếu trước khi chạy tiếp, trước khi bộ canh tự dừng ở khoảng 23 s (dưới đây). Bộ canh CU (mục 1.6) là chốt chặn cuối: phiên tự dừng trước 4 CU dù không ai đọc log. Biên của bộ canh là 625 s, khoảng 0,34 CU ở L4, nên phiên dừng ở khoảng 3,7 CU; theo bảng trên, tức là khi s/bước vượt khoảng 23 s.
