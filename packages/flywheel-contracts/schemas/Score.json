@@ -65,10 +65,88 @@
     },
     "step_status": {
       "items": {
+        "enum": [
+          "pass",
+          "fail",
+          "not_attempted",
+          "unknown"
+        ],
         "type": "string"
       },
       "title": "Step Status",
       "type": "array"
+    },
+    "unknown_reason": {
+      "anyOf": [
+        {
+          "items": {
+            "anyOf": [
+              {
+                "enum": [
+                  "missing_signal",
+                  "signal_all_null",
+                  "step_not_in_trace",
+                  "no_verdict"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Unknown Reason"
+    },
+    "step_enter_s": {
+      "anyOf": [
+        {
+          "items": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Step Enter S"
+    },
+    "step_exit_s": {
+      "anyOf": [
+        {
+          "items": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Step Exit S"
     },
     "first_failed_step": {
       "anyOf": [

@@ -19,6 +19,7 @@ from flywheel.contracts.v0 import (
     ControlSpec,
     DatasetRef,
     EpisodeRef,
+    FailureClassRule,
     FailureKindSpec,
     FaultSpec,
     GenerationRequest,
@@ -39,6 +40,7 @@ from flywheel.contracts.v0 import (
     StageEvaluation,
     StageSpec,
     StateRef,
+    StepStatus,
     TaskRef,
     TeleopRequest,
     TeleopResult,
@@ -46,6 +48,7 @@ from flywheel.contracts.v0 import (
     TraceRef,
     TrainResult,
     TrainSpec,
+    UnknownReason,
     VisualOverride,
 )
 
@@ -59,6 +62,7 @@ __all__ = [
     "DatasetRef",
     "EpisodeRef",
     "FailureKindSpec",
+    "FailureClassRule",
     "FaultSpec",
     "GenCapabilities",
     "GenerationRequest",
@@ -82,6 +86,7 @@ __all__ = [
     "SimulatorAdapter",
     "StageEvaluation",
     "StageSpec",
+    "StepStatus",
     "StateRef",
     "TaskRef",
     "TaskDefinition",
@@ -92,6 +97,7 @@ __all__ = [
     "TraceRef",
     "TrainResult",
     "TrainSpec",
+    "UnknownReason",
     "TrainerAdapter",
     "VisualOverride",
 ]

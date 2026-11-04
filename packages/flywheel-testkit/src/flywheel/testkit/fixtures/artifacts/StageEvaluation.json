@@ -1,0 +1,30 @@
+{
+  "stage_success": [
+    true,
+    null,
+    false
+  ],
+  "stage_status": [
+    "pass",
+    "unknown",
+    "not_attempted"
+  ],
+  "unknown_reason": [
+    null,
+    "missing_signal",
+    null
+  ],
+  "step_enter_s": [
+    0.0,
+    1.0,
+    null
+  ],
+  "step_exit_s": [
+    1.0,
+    2.0,
+    null
+  ],
+  "first_failed_stage": null,
+  "failure_kind": null,
+  "failure_class": null
+}

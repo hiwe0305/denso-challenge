@@ -119,9 +119,7 @@ def judge_failure(
     )
 
 
-def apply_episode_signals(
-    verdict: FailureVerdict, missing: Sequence[str]
-) -> FailureVerdict:
+def apply_episode_signals(verdict: FailureVerdict, missing: Sequence[str]) -> FailureVerdict:
     """Take a clean episode's pass away when a signal no step owns is missing.
 
     The collision flag of the two-table task belongs to no single step, so a
@@ -146,9 +144,10 @@ def _failure_class(
 ) -> FailureClass | None:
     if evaluation.failure_class is not None:
         return evaluation.failure_class
-    if kind in class_from_failed_step and failed < len(stages):
-        return stages[failed].failure_class
-    return declared[kind].failure_class
+    rule = declared[kind].failure_class
+    if rule == "from_failed_stage" or kind in class_from_failed_step:
+        return stages[failed].failure_class if 0 <= failed < len(stages) else None
+    return rule
 
 
 def unknown_verdict(reason: str) -> FailureVerdict:
