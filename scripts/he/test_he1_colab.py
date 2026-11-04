@@ -10,7 +10,7 @@ import pytest
 from demo_subset import MARKER, build_subset
 from flywheel.data.ingest.lerobot import EpisodeFrames, iter_episodes, write_episode
 from flywheel_psi0.tray.demo_sets import DemoSet, DemoSets, set_hash
-from he1_colab import PLAN, hash_problems, job_id, load_point, persist
+from he1_colab import PLAN, hash_problems, job_id, load_point, persist, unmounted_drive
 
 TASK = "pick up the box"
 RELEASE = "a" * 64
@@ -136,3 +136,12 @@ def test_persist_copies_complete_checkpoints_only(tmp_path: Path) -> None:
     assert (copied / "metrics.jsonl").is_file()
     assert (copied / "psi0/run/x/checkpoints/ckpt_10000/model.safetensors").is_file()
     assert not (copied / "psi0/run/x/checkpoints/ckpt_20000").exists()
+
+
+def test_persist_refuses_an_unmounted_drive(tmp_path: Path) -> None:
+    drive = Path("/content/drive/MyDrive/denso/da26")
+    assert unmounted_drive(drive, mounted=lambda path: False)
+    assert not unmounted_drive(drive, mounted=lambda path: path == "/content/drive")
+    assert not unmounted_drive(tmp_path / "drive", mounted=lambda path: False)
+    with pytest.raises(SystemExit, match="not mounted"):
+        persist(tmp_path / "work", drive)
