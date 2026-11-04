@@ -324,6 +324,13 @@ Số công bố 7/5/6 có trước cả hai bản (checkpoint train tháng 4/202
 - **SIMPLE:** chuyển pin lên `b75c678` ([env-simple.md](env-simple.md)); không liên quan đến bản dữ liệu nhưng ảnh hưởng trực tiếp tới eval task hai bàn.
 - Dev và holdout của đội vẫn theo [`configs/splits/default.yaml`](../../configs/splits/default.yaml), rời cả hai bản eval công bố.
 
+**Cập nhật [Đã chốt 4/11/2026, Hiếu]: eval tái tạo task hai bàn chạy trên bản A `e78fb93`, không trên `de140d6`.** Phạm vi: phép tái tạo của S1-03 (AC 9, so với số công bố 7/5/6) và các lượt Isaac của nó. Ghim `de140d6` ngày 3/11 không còn dùng cho phép này. Các eval khác của đội dùng bản nào thì Hiếu xét riêng. Bằng chứng, ở `docs/g0/psi0-eval.md` mục 3.6 (file đến cùng PR #66):
+
+- B6: phát lại action thật của 10 episode train (bản A) qua đúng client SIMPLE và WBC, file task `b75c678`, `mujoco`, mức 0. Trên điều kiện `de140d6` (robot lùi 6,1 cm): 0/10. Trên điều kiện `e78fb93` (robot trùng train): 4/10. Fisher một phía p = 0,043. Robot lùi 6,1 cm đủ làm action của người khép tay hụt hộp.
+- Ψ₀ ở `mujoco_isaac`, mức 0, trên `e78fb93`: 6/10 (điều kiện 0, 1, 2, 3, 7, 8), không thấp hơn 7/10 công bố có ý nghĩa (p = 0,35). Trên `de140d6`, mọi lượt trước đó đều 0.
+
+Lý do giữ `de140d6` hôm 3/11 (mức 0, 1 của bản A là điều kiện train, nên chỉ đo khả năng nhớ) vẫn đúng với eval của đội. Nhưng để so với số công bố, tư thế robot phải khớp lúc train, nên phép tái tạo dùng bản A.
+
 ## 5. Giấy phép (AC 5 · V9)
 
 Tài sản mà gói thật sự dùng, đọc từ `environment_config` của mọi episode:
