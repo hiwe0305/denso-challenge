@@ -286,12 +286,12 @@ uv run python -m flywheel_psi0.tray.runplan check configs/runplans/tray/he-tray-
 
 ## 12. Nhiệm vụ 2: chạy fine-tune C trên Colab (soạn 5/11/2026, chưa chạy)
 
-Một phiên Colab L4 cho một lần train: nhánh C của `rp_a04c14e79dfd`, job `da34-t2-ft-c-s0`, cap 18 CU. Mã phía VM là [`flywheel_psi0.tray.colab_train`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/colab_train.py). Hai pha `setup` và `train` tự từ chối nếu plan không phải `rp_a04c14e79dfd`, nếu `runplan check` không qua, nếu một file của `pinned_files` lệch, hoặc nếu bản cắt C tải lên không khớp tập C (marker, `set_hash`, `release_hash`, n, index nguồn, `stats_psi0.json` riêng). Phần sau train dùng lại của DA-26, không sửa: `scripts/he/he1_colab.py stage` và `persist`, `scripts/he/he1_fetch.py` (kéo checkpoint bằng rsync qua `colab ssh --proxy-mode`, kiểm sha256, quy tắc dừng sớm). `he1_fetch` chạy lệnh trong `/content/da26`, nên trên VM riêng của C, `/content/da26` là liên kết tới `/content/da34`.
+Một phiên Colab L4 cho một lần train: nhánh C của `rp_a04c14e79dfd`, job `da34-t2-ft-c-s0`, cap 18 CU. Mã phía VM là [`flywheel_psi0.tray.colab_train`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/colab_train.py). Hai pha `setup` và `train` tự từ chối nếu plan không phải `rp_a04c14e79dfd`, nếu `runplan check` không qua, nếu một file của `pinned_files` lệch, hoặc nếu bản cắt C tải lên không khớp tập C (marker, `set_hash`, `release_hash`, n, index nguồn, `stats_psi0.json` riêng). Phần sau train dùng lại của DA-26: `scripts/he/he1_colab.py stage` và `persist`, `scripts/he/he1_fetch.py` (kéo checkpoint bằng rsync qua `colab ssh --proxy-mode`, kiểm sha256, quy tắc dừng sớm). Mọi lệnh `he1_fetch` của C truyền `--remote-work /content/da34`; tùy chọn này và bản cắt theo seed đến từ PR #121 (`chore-demo-subset-tray-seeds`, phạm vi DA-26, Hiếu cho phép 5/11/2026).
 
 **Điều kiện trước khi chạy.**
 
 1. PR này đã merge; mọi lệnh chạy từ bản checkout `master`.
-2. Bản cắt C dựng được. `scripts/he/demo_subset.py` ở master hiện từ chối tập khay: nó kiểm `set_hash` trên `episode_indices`, đúng cho HE-1 (seed = index) nhưng tập khay băm trên seed. Cần một PR riêng sửa file đó (phạm vi DA-26), đang chờ quyết định.
+2. PR #121 đã merge. Trước #121, `scripts/he/demo_subset.py` từ chối tập khay vì kiểm `set_hash` trên `episode_indices`; #121 kiểm trên seed và lấy index của từng seed từ `meta/flywheel_export.json` của bản phát hành, còn `he1_fetch.py` có thêm `--remote-work`. #121 chỉ merge sau khi các phiên DA-26 chạy lại đã qua setup. Bản cắt thử bằng mã của #121 trên rtx3060 qua `cut_problems` (5/11/2026, đã xóa sau khi kiểm).
 3. Lô của DA-26 đã xong và guard của nó đã thoát; `colab sessions` trống (một lô mỗi tài khoản). Hiếu cho chạy.
 4. Số dư ít nhất 32 CU: sàn 14 cộng cap 18.
 5. Laptop thức suốt lần chạy.
@@ -319,7 +319,7 @@ colab sessions; colab usage
 S=da34-t2-ft-c-s0
 R=fwdata/colab/batch-$(date +%Y%m%d-%H%M%S); mkdir -p fwdata/colab && mkdir $R && git rev-parse HEAD > $R/master.sha
 nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py guard --registry "$0" --floor 14 --log "$0/guard.jsonl"; echo "exit $?"' $R < /dev/null > $R/guard.out 2>&1 &
-nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py session --registry "$0" --new --name "$1" --gpu L4 --cap 18 --floor 14 --persist "python3 scripts/he/he1_fetch.py once --session $1 --registry $0 --dest fwdata/tray/runs" --log "$0/$1.jsonl"; echo "exit $?"' $R $S < /dev/null > $R/$S.out 2>&1 &
+nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py session --registry "$0" --new --name "$1" --gpu L4 --cap 18 --floor 14 --persist "python3 scripts/he/he1_fetch.py once --session $1 --registry $0 --dest fwdata/tray/runs --remote-work /content/da34" --log "$0/$1.jsonl"; echo "exit $?"' $R $S < /dev/null > $R/$S.out 2>&1 &
 ```
 
 `ready` và `vm` như ở [he-1.md](he-1.md) mục 7: `ready` chặn bước sau khi watcher chưa thấy L4 hoặc heartbeat của guard cũ hơn 120 s; `vm` chỉ SSH khi watcher còn sống và phiên còn trong danh sách.
@@ -333,12 +333,11 @@ vm() { grep -q '^exit ' $R/$1.out && { echo "$1: watcher exited, no ssh"; return
   ssh -o ProxyCommand="colab ssh --proxy-mode -s $1" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@colab "${@:2}"; }
 ```
 
-**Phiên C.** Mỗi bước chỉ chạy khi bước trước đã xong. Liên kết `/content/da26` phải có trước `probe`, vì `probe` tạo thư mục đó nếu chưa có.
+**Phiên C.** Mỗi bước chỉ chạy khi bước trước đã xong. `probe` tạo `/content/da34` trên VM.
 
 ```bash
-ready $S && vm $S 'mkdir -p /content/da34 && ln -sfn /content/da34 /content/da26 && [ "$(readlink /content/da26)" = /content/da34 ]' \
-  && python3 scripts/he/he1_fetch.py probe --session $S --registry $R --dest fwdata/tray/runs \
-  || { colab stop -s $S; echo "$S: not ready, no link or proxy too slow, session stopped"; }
+ready $S && python3 scripts/he/he1_fetch.py probe --session $S --registry $R --dest fwdata/tray/runs --remote-work /content/da34 \
+  || { colab stop -s $S; echo "$S: not ready or proxy too slow, session stopped"; }
 git archive --format=tar.gz HEAD | vm $S 'mkdir -p /content/da34/fw && tar -xz -C /content/da34/fw'
 rsync -a --partial-dir=.rsync-partial -e "ssh -o ProxyCommand='colab ssh --proxy-mode -s $S' -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
   fwdata/tray/cut-c/sets/ root@colab:/content/da34/sets/
@@ -348,7 +347,7 @@ vm $S "cd /content/da34 && PYTHONPATH=$VMPP python3 -m flywheel_psi0.tray.colab_
 vm $S "cd /content/da34; nohup setsid bash -c 'PYTHONPATH=$VMPP python3 -m flywheel_psi0.tray.colab_train setup; echo setup exit \$?' > setup.log 2>&1 < /dev/null &"
 vm $S 'tail -2 /content/da34/setup.log'   # chờ "setup exit 0"
 vm $S "cd /content/da34; nohup setsid bash -c 'PYTHONPATH=$VMPP Psi0/.venv-psi/bin/python -m flywheel_psi0.tray.colab_train train; echo train exit \$?' > train.log 2>&1 < /dev/null &"
-nohup setsid bash -c 'python3 scripts/he/he1_fetch.py follow --session "$1" --registry "$0" --dest fwdata/tray/runs --every 600 --stop-when-done; echo "exit $?"' $R $S < /dev/null > $R/$S.fetch.log 2>&1 &
+nohup setsid bash -c 'python3 scripts/he/he1_fetch.py follow --session "$1" --registry "$0" --dest fwdata/tray/runs --remote-work /content/da34 --every 600 --stop-when-done; echo "exit $?"' $R $S < /dev/null > $R/$S.fetch.log 2>&1 &
 ```
 
 Khi đã mount được Drive, thêm sau `setup`: `colab drivemount -s $S /content/drive`, rồi `persist` của he1_colab với `--work /content/da34 --to /content/drive/MyDrive/denso/da34`.

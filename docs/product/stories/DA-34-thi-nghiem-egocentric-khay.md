@@ -43,7 +43,7 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
   - [x] 1.12 (sau review, 4/11/2026) Ghi Decision của Hiếu (eval ở thời gian sim; mức 0 là lượt lặp, phân bổ 30 / 120 / 120, nhiễu gieo theo episode) ở `docs/he/tray.md` mục 8; kiểm gieo nhiễu theo episode tại `cda3fdf` (mục 8.5); bản 1 có trường `superseded_by` (không vào id); `runplan check` nhận plan round; sửa batch toàn cục của tác giả thành 16 × 4 = 64 (S1-04)
 - [ ] 2. Fine-tune A, C, C-NOEGO (AC 2) · **4/11/2026, bậc 2:** chỉ C (C+ ở nhiệm vụ 5), trần 36 CU, cap 18 CU mỗi lần, có watcher; A và C-NOEGO bỏ ([tray.md](../../he/tray.md) mục 9)
   - [x] 2.1 (5/11/2026) Mã phía VM `flywheel_psi0.tray.colab_train` (setup, train, check) cho nhánh C của `rp_a04c14e79dfd`: từ chối plan khác, lệch `pinned_files`, bản cắt sai; dùng lại `he1_colab.py stage`/`persist` và `he1_fetch.py` của DA-26; runbook ở tray.md mục 12; dòng ước lượng
-  - [ ] 2.2 Dựng bản cắt C trên rtx3060 (`demo_subset.py`, cần PR sửa cho tập khay), `colab_train check` qua
+  - [ ] 2.2 Dựng bản cắt C trên rtx3060 (`demo_subset.py` sau khi PR #121 merge), `colab_train check` qua
   - [ ] 2.3 Chạy C trên Colab theo runbook, sau lô của DA-26 và khi Hiếu cho chạy; checkpoint về laptop
   - [ ] 2.4 Dòng `measured` của `job_da34_ft_C` (CU, bước, giờ)
 - [ ] 3. Eval và bảng kết quả, video (AC 3, 4)
