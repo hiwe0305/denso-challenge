@@ -6,7 +6,7 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
-from cu_watch import balance, must_stop, watch
+from cu_watch import balance, colab_runner, main, must_stop, watch
 
 
 class FakeColab:
@@ -87,3 +87,10 @@ def test_cap_arithmetic() -> None:
     assert must_stop(9.0 * 3600, 1.94, 17.5, 120)  # 17.46 CU + two minutes passes 17.5
     assert balance("Current balance: 101.77 compute units") == 101.77
     assert balance("garbage") is None
+
+
+def test_a_missing_cli_is_refused_not_crashed(tmp_path: Path) -> None:
+    log = tmp_path / "cu.jsonl"
+    args = ["--session", "s", "--cap-cu", "1", "--log", str(log), "--colab", "/nonexistent/colab"]
+    assert main(args) == 2
+    assert colab_runner("/nonexistent/colab")(["sessions"])[0] == 1
