@@ -56,9 +56,13 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-from flywheel_simple.tray.geometry import Pose2D
 from flywheel_simple.tray.pico.operator import MAX_LINEAR_VEL, Calibration, PicoSignal
-from flywheel_simple.tray.pico.virtual import JoystickShaper, YawStick, robot_to_teleop
+from flywheel_simple.tray.pico.virtual import (
+    TURN_FLAG,
+    JoystickShaper,
+    YawStick,
+    robot_to_teleop,
+)
 from flywheel_simple.tray.predicates import quat_to_mat
 from flywheel_simple.tray.s2.config import S2Config
 from flywheel_simple.tray.s2.parents import HAND_LEAD, NAV_LEAD, ParentDemo
@@ -386,19 +390,26 @@ class ReplayOperator:
         off its place in the parent's hands would be put down that far off the zone.
         Like MimicGen's object-centric step for the object in hand, the hands of P move
         by the planar offset between the expected and the measured tray, capped.
+
+        `place_fix` is that offset at the tray (shift of its centre, turn about it). The
+        hands move by turning about the held tray and shifting it: as a world motion
+        about the origin, 1-2 m away, a few degrees of turn came with a shift of
+        several centimetres, and capping that shift alone left the hands off by the
+        rest (task 12, measure-1104: the cap was reached in 63 of the 73 variants that got there).
         """
         cfg = self.cfg
         assert cfg is not None
         expected = pose_matrix(plan.parent.tray_pose[ref])
         expected = plan.anchors[ref].matrix() @ expected
-        want = Pose2D(float(expected[0, 3]), float(expected[1, 3]), yaw_of_matrix(expected))
-        have = Pose2D(float(tray[0]), float(tray[1]), yaw_of(tray))
-        fix = Planar.between(have, want)
-        dist = math.hypot(fix.dx, fix.dy)
+        dx, dy = float(expected[0, 3] - tray[0]), float(expected[1, 3] - tray[1])
+        dist = math.hypot(dx, dy)
         scale = min(1.0, cfg.place_fix_max_m / dist) if dist > 0 else 1.0
         cap = math.radians(cfg.place_fix_max_deg)
-        self.place_fix = Planar(fix.dx * scale, fix.dy * scale, max(-cap, min(cap, fix.yaw)))
-        self._place_fix_m = self.place_fix.matrix()
+        turn = max(-cap, min(cap, wrap(yaw_of_matrix(expected) - yaw_of(tray))))
+        self.place_fix = Planar(dx * scale, dy * scale, turn)
+        at = Planar(float(tray[0]), float(tray[1])).matrix()  # the held tray's centre
+        shift, spin = Planar(dx * scale, dy * scale).matrix(), Planar(yaw=turn).matrix()
+        self._place_fix_m = shift @ at @ spin @ np.linalg.inv(at)
 
     def _navigate(
         self, plan: VariantPlan, ref: int, base: Array, ended: bool
@@ -425,8 +436,13 @@ class ReplayOperator:
             v = ff + cfg.nav_gain * e_xy if walking else ff.copy()
         v = np.clip(v, -MAX_LINEAR_VEL, MAX_LINEAR_VEL)
         vx, vy = self._sticks[0].step(float(v[0])), self._sticks[1].step(float(v[1]))
+        # While the parent turns the body itself, its turn is played: YawStick starts
+        # from its rate_min and is capped below the parent's turn rate, so it lagged a
+        # 180-degree turn by 25-30 degrees all the way (task 12). It steers the rest
+        # off once the parent's stick is idle again.
+        parent_turning = abs(float(self._lead(plan, ref)[2])) >= TURN_FLAG
         steering = self._yaw.pushing or abs(e_yaw) > math.radians(cfg.gate_yaw_tol_deg)
-        if held or (steering and not ended):
+        if held or (steering and not ended and not parent_turning):
             # The right stick as the virtual operator steers it, from PICO's current target,
             # onto the base reference: at a gate, and whenever the body has turned off it.
             # Moved hands load the body differently, and the parent's recorded taps on the
@@ -436,6 +452,7 @@ class ReplayOperator:
         else:
             # The parent's stick, plus the transform's turn: PICO integrates both into the
             # target yaw, and the lower body turns to it whenever the stick is pushed.
+            self._yaw.step(0.0, 0.0, steer=False)  # let go of the steering, if pushed
             vyaw = 0.0 if ended else float(self._lead(plan, ref)[2] + plan.yaw_rate[ref])
             self._target_yaw = wrap(self._target_yaw + vyaw * self.dt)
         return (vx, vy, vyaw, self._target_yaw)

@@ -253,6 +253,36 @@ def test_an_identity_variant_sends_the_parent_sticks() -> None:
         assert math.isclose(s.navigate_cmd[3], integral, abs_tol=1e-12)
 
 
+def test_the_parents_turn_is_played_while_the_body_is_off_its_heading() -> None:
+    # The body 5 degrees off its reference: the stick steers it back while the parent
+    # stands, but the parent's own turn is played as recorded. YawStick, capped below
+    # the parent's turn rate and starting from rate_min, lagged a 180-degree turn by
+    # 25-30 degrees all the way while carrying (task 12, parents-1104/shard-00/15).
+    old, _ = samples()
+    p, cal = plan(new=old), calibration()
+    op = operator(p)
+    off = math.radians(5.0)
+
+    def turned(i: int) -> np.ndarray:
+        pose = ref_pose(p, i)
+        yaw = p.base_ref[i, 2] + off
+        pose[3], pose[6] = math.cos(yaw / 2), math.sin(yaw / 2)
+        return pose
+
+    op.step(0.0, None, turned(0))
+    t, steered, played = 0.0, 0, 0
+    while op.ref < 750:
+        t += DT
+        s = op.step(t, cal, turned(min(op.ref + 1, p.frames - 1)))
+        parent = op._lead(p, op.ref)[2]
+        if 610 <= op.ref < 750:
+            assert s.navigate_cmd[2] == pytest.approx(parent + p.yaw_rate[op.ref])
+            played += 1
+        elif 300 <= op.ref < 590 and abs(parent) < 0.1 and s.navigate_cmd[2] != 0.0:
+            steered += 1
+    assert played > 100 and steered > 0
+
+
 def expected_tray(p: VariantPlan, i: int) -> np.ndarray:
     m = p.anchors[i].matrix() @ pose_matrix(p.parent.tray_pose[i])
     yaw = math.atan2(m[1, 0], m[0, 0])
@@ -280,6 +310,36 @@ def test_placing_hands_take_up_where_the_held_tray_is_off() -> None:
     assert (op.place_fix.dx, op.place_fix.dy) == (pytest.approx(-0.02), pytest.approx(0.01))
     far = play_to_place(p, (0.30, 0.0)).place_fix
     assert far is not None and math.hypot(far.dx, far.dy) == pytest.approx(0.05)
+
+
+def play_to_place_turned(p: VariantPlan, yaw_deg: float) -> tuple[ReplayOperator, np.ndarray]:
+    """As play_to_place, the tray held on its place but turned by `yaw_deg`; and that tray."""
+    op, cal = operator(p), calibration()
+    op.step(0.0, None, ref_pose(p, 0))
+    t, tray = 0.0, np.zeros(7)
+    while op.ref <= p.cut.place_start:
+        t += DT
+        i = min(op.ref + 1, p.frames - 1)
+        tray = expected_tray(p, i)
+        yaw = 2 * math.atan2(tray[6], tray[3]) + math.radians(yaw_deg)
+        tray[3:] = [math.cos(yaw / 2), 0.0, 0.0, math.sin(yaw / 2)]
+        op.step(t, cal, ref_pose(p, i), tray)
+    return op, tray
+
+
+@pytest.mark.parametrize(("turned", "fixed"), [(3.0, 3.0), (15.0, 10.0)])
+def test_a_turned_tray_is_turned_back_where_it_is(turned: float, fixed: float) -> None:
+    # The fix turns the hands about the held tray, not about the world origin: the
+    # tray stands 1-2 m from it, so a turn about the origin also shifted it, and
+    # capping that shift at place_fix_max_m left the hands off by the rest (DA-35
+    # task 12: the cap was reached in 63 of the 73 variants of measure-1104 that got there).
+    p = plan()
+    op, held = play_to_place_turned(p, turned)
+    assert op.place_fix is not None
+    assert math.degrees(op.place_fix.yaw) == pytest.approx(-fixed)
+    moved = op._place_fix_m @ pose_matrix(held)
+    np.testing.assert_allclose(moved[:2, 3], held[:2], atol=1e-9)
+    assert (op.place_fix.dx, op.place_fix.dy) == (pytest.approx(0.0), pytest.approx(0.0))
 
 
 def test_sagging_palms_are_lifted_while_the_hands_follow_the_tray() -> None:
