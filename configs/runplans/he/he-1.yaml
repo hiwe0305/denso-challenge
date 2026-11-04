@@ -124,16 +124,31 @@ points:
   - {variant: V-EGO10, demo_set: N40, seed: 0, phase: full}
   - {variant: V-EGO10, demo_set: N80, seed: 0, phase: full}
 
-# The authors' eval set at e78fb93 (Hiếu, 4/11/2026, S1-03 3.6: robot starts as in
-# train; de140d6 starts it 6.1 cm back and fails even replayed human actions). It has
-# 10 conditions per level, so "30 dev conditions x 3 levels" of AC 1 cannot be met
-# with it; see docs/he/he-1.md section 1. Renderer per S1-03's tentative answer to
-# Q-27C (mujoco_isaac); a switch to mujoco is a Decision before the freeze.
+# Main eval: 30 conditions at each of levels 0, 1, 2 from the team's dev seeds (PO
+# 4/11/2026: dev range, not the authors' set), built by scripts/he/dev_eval_set.py the
+# way SIMPLE's dr-decoupled-wbc built simple-eval, but from a fresh dev-seeded scene
+# instead of a train episode. Levels keep the authors' meaning: 0 redraws distractors
+# and materials, 1 lighting too, 2 object and tray poses too (robot pose kept).
+# `eval-decoupled-wbc --data-format lerobot` resets from the stored config, so the
+# scene is fixed by the file (90/90 reloads identical). Mode and clock wait for S1-03's
+# mujoco run on e78fb93 (Q-27C); `freeze` refuses while either is pending.
 eval:
   cli: eval-decoupled-wbc
-  sim_mode: mujoco_isaac
+  sim_mode: pending
+  clock: pending
   synchronous: true
-  eval_set:
+  main:
+    generator: scripts/he/dev_eval_set.py
+    salt: DA-26/he-1/dev-eval/v1
+    simple_commit: 6d10628794d9c7de4596b4f2afb2c054a637c2bc # b75c678 only changes the arm spawn, not DR
+    seeds: {start: 1000100, stop: 1000130}
+    levels: [0, 1, 2]
+    conditions_sha256: b8dec7545a7664296f84a93275369edf884d14e23557ef290e0c61b84003fe25
+    location: hiwe-laptop:~/project/denso-challenge/fwdata/he/dev-eval-v1
+  # Secondary: the authors' set at e78fb93 (S1-03 3.6: robot starts as in train), for
+  # the baseline and the published 7/5/6 only. Its levels 0 and 1 are train scenes of
+  # episodes 0-9, so no HE number is read on it.
+  authors_set:
     repo: USC-PSI-Lab/psi-data
     kind: datasets
     revision: e78fb93cc28912a3031a10b8656d32d7f0a2b867
@@ -141,10 +156,11 @@ eval:
     sha256: 8a4b0ff7d068967dac8baec2c4a4deca4f644215a1ee15e921739f3dfe90e7e0
     levels: [0, 1, 2]
     conditions_per_level: 10
-  passes: {preliminary: 1, full: 3} # pass 1 is common to every point
+  passes: {preliminary: 1, full: 1} # 90 independent conditions, one rollout each
 
 # AC 3: the authors' two-table checkpoint (from V-EGO's parents, 16 x 4 GPUs, 40k
-# steps, all 99 episodes), on the same eval; taken from S1-03 if run on the same set.
+# steps, all 99 episodes), run on the main dev set like every point; S1-03's numbers
+# on the authors' set are reported beside it, not instead of it.
 baseline:
   weights:
     repo: USC-PSI-Lab/psi-model

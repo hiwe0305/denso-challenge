@@ -72,13 +72,14 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 27/10/2026 | Tạo story theo design 27/10/2026 mục 7 | PO (Hiếu) |
 | 27/10/2026 | Giao cho Hiếu theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
 | 4/11/2026 | Nhiệm vụ 1, 2: RunPlan nháp `he-1.yaml`, tập demo, quy tắc diễn giải `docs/he/he-1.md`, kiểm checkpoint; chờ Hiếu chốt Q1–Q4 và ký `plan_review` | Hiếu (soạn với Claude) |
+| 4/11/2026 | Eval chính chuyển sang bộ dev 30 × 3 do đội dựng (Hiếu chốt) | Hiếu (soạn với Claude) |
 
 ## Ghi chép khi làm
 
 - Giờ thực:
 - Công cụ AI đã dùng: Claude Code (Opus 5.5)
 - Ghi chú hoàn thành:
-  - 4/11/2026, nhiệm vụ 1: RunPlan nháp [`he-1.yaml`](../../../configs/runplans/he/he-1.yaml) (`rp_cd8eae02f0a9` khi chưa đóng băng), tập demo N10 ⊂ N20 ⊂ N40 ⊂ N80 dùng lại `flywheel_psi0.tray.demo_sets` của DA-34, khóa theo `episode_index`, loại episode 0–9 vì bộ eval `e78fb93` dùng lại điều kiện của chúng. Quy tắc ở [docs/he/he-1.md](../../he/he-1.md). Chưa đánh dấu xong: chờ Hiếu chốt Q1–Q4 (mục 5 của file đó) và ký `plan_review` bằng `he1_plan.py freeze`.
+  - 4/11/2026, nhiệm vụ 1: RunPlan nháp [`he-1.yaml`](../../../configs/runplans/he/he-1.yaml) (`rp_876918a5356b` khi chưa đóng băng; bản đầu `rp_cd8eae02f0a9`), tập demo N10 ⊂ N20 ⊂ N40 ⊂ N80 dùng lại `flywheel_psi0.tray.demo_sets` của DA-34, khóa theo `episode_index`, loại episode 0–9 vì bộ eval `e78fb93` dùng lại điều kiện của chúng. Quy tắc ở [docs/he/he-1.md](../../he/he-1.md). Chưa đánh dấu xong: chờ Hiếu chốt Q1–Q4 (mục 5 của file đó) và ký `plan_review` bằng `he1_plan.py freeze`.
   - 4/11/2026, nhiệm vụ 2: `he1_plan.py parents` khớp sha256 LFS của 6 file trọng số ablation, checkpoint mốc so, gói train và gói eval với RunPlan; ba cặp có cùng bố cục tensor và `config.json`. `finetune-simple-psi0.sh` không còn ở `cda3fdf`, nên kiểm theo đường `scripts/train.py` của DA-19. Chưa đánh dấu xong: tải đủ file và băm lại trên máy train làm ở bước đầu của job nhiệm vụ 3.
-  - AC 1 "30 điều kiện dev × 3 mức" không đáp ứng được với bộ eval của tác giả (10 điều kiện mỗi mức); đề xuất ghi `Decision` (câu Q2).
-- File đã tạo hoặc sửa: `configs/runplans/he/`, `scripts/he/he1_plan.py`, `scripts/he/test_he1_plan.py`, `docs/he/he-1.md`, `docs/g0/ledger/DA-26.csv`
+  - 4/11/2026, AC 1 "30 điều kiện dev × 3 mức": Hiếu chốt eval chính trên dải dev của đội. SIMPLE không sinh được điều kiện hai bàn theo seed, nên `scripts/he/dev_eval_set.py` dựng 90 điều kiện (seed 1 000 100–1 000 129, mức 0–2) theo cách tác giả dựng `simple-eval`, chỉ thay episode train bằng cảnh rút từ seed dev. Bộ của tác giả thành bộ phụ cho mốc so. Chế độ và đồng hồ eval chờ S1-03.
+- File đã tạo hoặc sửa: `configs/runplans/he/`, `scripts/he/he1_plan.py`, `scripts/he/dev_eval_set.py`, `scripts/he/test_he1_plan.py`, `docs/he/he-1.md`, `docs/g0/ledger/DA-26.csv`
