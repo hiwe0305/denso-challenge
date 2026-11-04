@@ -10,9 +10,11 @@ _Bắt đầu 4/11/2026. Story [DA-30](../product/stories/DA-30-stage1-egocentri
 
 | Bước | Trạng thái | Bằng chứng |
 |---|---|---|
-| Recipe, RunPlan, launcher, driver Colab, test CPU | Xong | `uv run pytest packages/flywheel-psi0/tests/stage1`: 25 test qua (driver Colab chạy `run`, `repeat`, `persist` trên Ψ₀ giả) |
+| Recipe, RunPlan, launcher, driver Colab, bộ canh CU, test CPU | Xong | `uv run pytest packages/flywheel-psi0/tests/stage1`: 34 test qua (driver Colab chạy `run`, `repeat`, `persist` trên Ψ₀ giả; bộ canh CU dừng phiên trước trần trên CLI `colab` giả) |
 | Loader của Ψ₀ đọc dữ liệu thay thế (CPU) | Xong, 4/11/2026: 20 episode, rồi cả 218 | Mục 1.5 |
-| Lần chạy trên Colab | **Chờ Hiếu duyệt CU.** Hiếu dừng mọi job Colab ngày 4/11/2026 (số dư khoảng 101,8 CU) | Ước lượng 2,3 CU trên một L4, trần 4 CU ([sổ chi phí](../g0/ledger/DA-30.csv)) |
+| Lần chạy trên Colab | **Đã duyệt CU, 4/11/2026** (tier 2). Chạy từ `master` sau khi PR merge, với bộ canh CU (mục 1.6) | Ước lượng 2,3 CU trên một L4, trần 4 CU ([sổ chi phí](../g0/ledger/DA-30.csv)) |
+
+**Quyết định [Đã chốt 4/11/2026, Hiếu]:** "Approve tier 2". Tier 2 gồm lần chạy ngắn này, ước lượng khoảng 2,3 CU, trần 4 CU. Trước đó cùng ngày Hiếu đã dừng mọi job Colab (số dư khoảng 101,8 CU). Lần chạy dùng code ở `master` sau khi PR của DA-30 được merge, không chạy từ nhánh.
 
 ### 1.2 Recipe
 
@@ -86,7 +88,18 @@ RunPlan [`egodex-short.yaml`](../../configs/runplans/stage1/egodex-short.yaml) (
 - **Loss giảm**: trung vị 20 dòng train cuối thấp hơn trung vị 20 dòng đầu (mỗi dòng một batch, nên so trung vị của cửa sổ, không so hai bước).
 - **Chạy lại**: chạy lại 3 bước đầu dưới job id khác (`da30-egodex-short-repeat`), cùng seed 7; loss bước đầu lệch không quá 2%. Seed cố định thứ tự dữ liệu (generator của DataLoader và seed của worker lấy từ seed của cấu hình).
 
-Lệnh trên Colab (L4), theo thứ tự, từ bản sao repo ở `/content/da30/fw` với `PYTHONPATH` gồm `packages/flywheel-psi0/src` và `packages/flywheel-contracts/src` như DA-19:
+**Bộ canh CU** ([`cu_watch.py`](../../packages/flywheel-psi0/src/flywheel_psi0/stage1/cu_watch.py)) chạy trên laptop, nơi có CLI `colab`, suốt lần chạy. Bộ canh tự mở phiên (`colab new -s da30-stage1 --gpu L4`) để ghi số dư và mốc thời gian đúng lúc phiên bắt đầu; không mở phiên bằng tay. Mỗi phút bộ canh ước phần đã tiêu theo hai cách và lấy số lớn hơn:
+
+- thời gian × 1,94 CU/giờ của L4;
+- số dư của `colab usage` giảm bao nhiêu so với lúc đầu, chỉ khi phiên này là assignment duy nhất của tài khoản. Số dư tính chung cả tài khoản, nên job khác của tier 2 chạy cùng lúc sẽ bị cộng nhầm vào DA-30.
+
+Khi lần đo tiếp theo sẽ vượt 4 CU (`compute.max_compute_units` của RunPlan), bộ canh chạy `colab stop -s da30-stage1`. Lệnh `colab` lỗi chỉ được ghi lại, không làm bộ canh dừng. Bộ canh thoát khi phiên mất hai lần đo liền: tên phiên không còn trong `colab sessions`, hoặc tài khoản không còn assignment. Dòng cuối của log có số dư giảm, là số liệu cho dòng `measured` của sổ chi phí. Mã thoát 3 nghĩa là bộ canh đã dừng phiên ở trần.
+
+```bash
+mkdir -p fwdata/da30 && nohup setsid uv run python -m flywheel_psi0.stage1.cu_watch --plan configs/runplans/stage1/egodex-short.yaml --session da30-stage1 --log fwdata/da30/cu_watch.jsonl > fwdata/da30/cu_watch.out 2>&1 &
+```
+
+Lệnh trên Colab (L4, phiên `da30-stage1` do bộ canh mở), theo thứ tự, từ bản sao repo ở `/content/da30/fw` với `PYTHONPATH` gồm `packages/flywheel-psi0/src` và `packages/flywheel-contracts/src` như DA-19:
 
 ```bash
 python3 -m flywheel_psi0.stage1.colab setup --work /content/da30 --plan fw/configs/runplans/stage1/egodex-short.yaml
@@ -124,4 +137,4 @@ Giả định, chưa đo. Một VM L4 ở 1,94 CU/giờ (S1-04). Phần cố đ�
 | 15 | 50 phút | 88 phút | 2,8 |
 | 26 | 86 phút | 124 phút | 4,0 (trần của RunPlan) |
 
-Quy tắc dừng [Đề xuất]: đọc s/bước trong `train.log` sau 20 bước; quá 25 s thì dừng VM và báo Hiếu trước khi chạy tiếp, để không vượt trần 4 CU.
+Quy tắc dừng [Đề xuất]: đọc s/bước trong `train.log` sau 20 bước; quá 25 s thì dừng VM và báo Hiếu trước khi chạy tiếp, để không vượt trần 4 CU. Bộ canh CU (mục 1.6) là chốt chặn cuối: phiên tự dừng ở 4 CU dù không ai đọc log.

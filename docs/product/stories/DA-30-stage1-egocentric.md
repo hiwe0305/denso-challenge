@@ -63,6 +63,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 |---|---|---|
 | 27/10/2026 | Tạo story, tách AC 3–5 từ DA-18 | PO (Hiếu) |
 | 3/11/2026 | DA-09 dời sau demo: lần chạy ngắn chưa có probe (07 mục 2.4, bản 1.2) | PO (Hiếu) |
+| 4/11/2026 | Duyệt CU cho lần chạy ngắn (tier 2: "Approve tier 2"), ước lượng khoảng 2,3 CU, trần 4 CU; chạy từ `master` sau merge, có bộ canh CU | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
