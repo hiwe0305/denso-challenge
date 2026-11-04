@@ -170,6 +170,24 @@ def test_no_benchmark_copy_episode_enters_a_release(data: dict[str, Any]) -> Non
     assert not bench & {item["episode_ref"] for item in data["release_items.jsonl"]}
 
 
+def test_exactly_the_benchmark_copy_carries_its_copy_id(data: dict[str, Any]) -> None:
+    # #62: mọi episode của bản sao, kể cả episode sạch, mang mã bản sao, và
+    # mã đó là `dataset_id` của manifest. Không episode nào khác mang nó.
+    copy_id = data["defect_manifest.json"]["dataset_id"]
+    tagged = {
+        e["episode_id"] for e in data["episodes.jsonl"] if e["meta"]["benchmark_copy_id"]
+    }
+    bench = {
+        e["episode_id"] for e in data["episodes.jsonl"] if e["source_id"] == "src_bench_kbd"
+    }
+    assert tagged == bench
+    assert {
+        e["meta"]["benchmark_copy_id"]
+        for e in data["episodes.jsonl"]
+        if e["episode_id"] in bench
+    } == {copy_id}
+
+
 def test_the_frozen_release_hash_names_its_items(data: dict[str, Any]) -> None:
     frozen = next(r for r in data["releases.jsonl"] if r["status"] == "frozen")
     refs = sorted(

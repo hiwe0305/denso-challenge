@@ -10,6 +10,7 @@ Bản v0.3. Tài liệu này là nguồn duy nhất cho tầng web: API, Postgre
 | 3/11/2026 | 0.3 | Ba chỗ sửa theo quyết định và mã đã merge trong ngày, xem bảng dưới. Số bảng 39 → 41 (thêm `system_diagnoses` và `train_diagnosis_skips`), nhóm P 27 → 29. Thêm C17, C18, C19 và BR-12. DDL chuyển thành khối SQL thật | Châu |
 | 3/11/2026 | 0.3 | Bỏ `episodes.episode_index` và `UNIQUE (dataset_id, episode_index)`: hợp đồng không có trường nào như thế, nên bộ nạp sẽ phải tự phát số. `episode_ref` đã là khoá tự nhiên và đã UNIQUE. Thêm W12 (`Episode` không mang `dataset_id`) | Châu |
 | 3/11/2026 | 0.3 | Dựng `web/schema/` theo tài liệu này: 9 file SQL, 41 bảng, 3 role, trigger C5–C9/C14/C19, 18 view, GRANT theo cột. `train_diagnosis_skips` là chỗ §4.4b để ngỏ tới M1, nay chốt | Châu |
+| 5/11/2026 | 0.3 | W11 đóng: hợp đồng đã có `EpisodeMetadata.benchmark_copy_id` (#62), bộ nạp map nó vào `episodes.benchmark_copy_id` thay vì để NULL, và bộ mock gắn nó cho 10 episode của bản sao chấm | Châu |
 
 Ba chỗ sửa ở bản 0.3:
 
@@ -1183,7 +1184,7 @@ Nguồn duy nhất cho cả BE và FE là `web/fe/src/contracts/enums.ts` và `w
 
 | Bảng / thành phần web | Artifact nguồn | File schema | Trạng thái 3/11 |
 |---|---|---|---|
-| `episodes` | `Episode`, `EpisodeMetadata` | `Episode.json`, `EpisodeMetadata.json` | **có**; `EpisodeMetadata.json` còn trường `injected_defect` mà #62 sẽ bỏ, nên **bộ nạp phải bỏ trường đó**, không map vào cột nào |
+| `episodes` | `Episode`, `EpisodeMetadata` | `Episode.json`, `EpisodeMetadata.json` | **có**; từ S1-10/7 (#62) `EpisodeMetadata` có `benchmark_copy_id`, bộ nạp map thẳng vào cột cùng tên. Artifact còn mang `injected_defect` bị model hợp đồng từ chối, nên không cột nào nhận được nó |
 | `episode_qa_reports` | `QAReport` | `QAReport.json` | có |
 | `training_metrics` | `TrainingMetric` | `TrainingMetric.json` | có |
 | `train_diagnoses` | `TrainDiagnosis` | `TrainDiagnosis.json` | có; `skipped` của nó phải nạp về, xem mục 4.4b |
@@ -1246,5 +1247,5 @@ Mọi bản ghi nạp từ thư mục này có `origin = 'mock'`.
 | W8 | ADR-13: web và DB server ở L0 hay L1+ | **chưa có**, chặn mốc M1 |
 | W9 | `SystemDiagnosis` và `StageAttribution` trong `flywheel.contracts` | issue #70 đã mở (3/11) |
 | W10 | `Score` bốn trạng thái, lý do "chưa rõ" | issue #59 |
-| W11 | `benchmark_copy_id` thay `injected_defect` trong `Episode` | issue #62 |
+| W11 | `benchmark_copy_id` thay `injected_defect` trong `Episode` | **đã merge** (S1-10/7, PR #36, 3/11); bộ nạp dùng từ 5/11 |
 | W12 | `Episode` không mang `dataset_id`. Ở lõi một episode trỏ `source_id` hoặc `intervention_id` (03 §4.3 cũng vậy), còn "lô" là khái niệm của web, không có thực thể tương ứng ở L0-lite. Bộ nạp suy `episodes.dataset_id` qua hai đường đó và **từ chối** dòng không suy được, chứ không gán lô mặc định — gán sai lô làm sai báo cáo dataset, phân bổ chi phí (BR-05) và `r_demo` mà không gì báo. Cần Long và PO quyết: thêm `dataset_id` vào `Episode`, hay web nhận đây là phép suy chính thức | **phát hiện 3/11 lúc viết mapper**; chưa mở issue |

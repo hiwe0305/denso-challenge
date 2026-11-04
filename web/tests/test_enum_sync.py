@@ -163,26 +163,15 @@ def test_step_status_is_the_four_strings_the_scorer_ships() -> None:
     assert SPEC["step_status"] == tuple(status.value for status in StepStatus)
 
 
-#: Kiểm hệ thống của DA-13 chưa có trên master (PR #71, Châu, hạn 10/11). Hai
-#: test dưới đọc thẳng enum của làn nên chúng chỉ chạy được sau khi #71 merge;
-#: để xfail không strict thì chúng tự lật sang pass đúng lúc đó, thay vì bị xoá
-#: đi và không ai nối lại. Cùng cách `tests/e2e/test_demo_seams.py` ghi các
-#: mối nối chưa có.
-needs_da13 = pytest.mark.xfail(
-    raises=ModuleNotFoundError,
-    strict=False,
-    reason="`flywheel.eval.diagnosis.system` nằm ở DA-13 (PR #71), chưa merge",
-)
+#: Hai test dưới đọc thẳng enum kiểm hệ thống của DA-13 (PR #71, đã merge).
 
 
-@needs_da13
 def test_the_system_diagnoses_are_the_ones_da13_ships() -> None:
     from flywheel.eval.diagnosis.system.verdict import Diagnosis
 
     assert set(SPEC["system_diagnosis"]) == {item.value for item in Diagnosis}
 
 
-@needs_da13
 def test_the_system_fault_codes_are_the_ones_da13_checks() -> None:
     from flywheel.eval.diagnosis.system.verdict import SYSTEM_CODES
 

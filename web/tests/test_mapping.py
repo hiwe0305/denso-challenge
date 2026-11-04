@@ -78,27 +78,41 @@ def test_the_shipped_episode_fixture_maps(lookup: DatasetLookup) -> None:
 
 
 def test_the_answer_key_never_reaches_a_group_p_row(lookup: DatasetLookup) -> None:
-    # Luật R8, và chỗ sửa quan trọng nhất của bản 0.3. File schema JSON còn
-    # trường này, nên mapper phải bỏ nó chủ động; map nó vào `meta` sẽ đưa đáp
-    # án vào một bảng mà agent_ro đọc được qua view.
+    # Luật R8, và chỗ sửa quan trọng nhất của bản 0.3. Từ #62 hợp đồng không
+    # còn `injected_defect`: episode mang nó bị từ chối, không lọt vào `meta`
+    # của một bảng mà agent_ro đọc được qua view.
     payload = _artifact("Episode")
     payload["source_id"] = "src_1"
     payload["meta"]["injected_defect"] = {"code": "D4", "parameters": {"dim": 31}}
 
+    with pytest.raises(MappingError, match="injected_defect"):
+        map_episode(payload, lookup)
+
+
+def test_a_benchmark_copy_episode_keeps_its_copy_id(lookup: DatasetLookup) -> None:
+    # C19: mọi episode của bản sao, kể cả episode sạch, mang mã bản sao để
+    # trigger chặn nó khỏi release. Mã đó nói "thuộc bản sao nào", không nói
+    # "lỗi gì", nên được ở nhóm P.
+    payload = _artifact("EpisodeBenchmarkCopy")
+    payload["source_id"] = "src_1"
+
     row = map_episode(payload, lookup)
 
-    assert "injected_defect" not in row
-    assert "injected_defect" not in row["meta"]
-    assert "D4" not in json.dumps(row, default=str)
-    # Và không suy ra `benchmark_copy_id` từ nó: suy như vậy bỏ sót đúng các
-    # episode sạch của bản sao, mà C19 phải chặn cả chúng.
-    assert row["benchmark_copy_id"] is None
+    assert row["benchmark_copy_id"] == "benchmark_manifest_copy_1"
 
 
-def test_the_dropped_field_is_declared_with_a_reason() -> None:
+def test_a_plain_episode_has_no_copy_id(lookup: DatasetLookup) -> None:
+    payload = _artifact("Episode")
+    payload["source_id"] = "src_1"
+
+    assert map_episode(payload, lookup)["benchmark_copy_id"] is None
+
+
+def test_every_dropped_field_is_declared_with_a_reason() -> None:
     # Một trường bị bỏ âm thầm là một trường không ai review được.
-    assert "EpisodeMetadata.injected_defect" in DROPPED_FIELDS
-    assert "R8" in DROPPED_FIELDS["EpisodeMetadata.injected_defect"]
+    assert all(reason.strip() for reason in DROPPED_FIELDS.values())
+    # `injected_defect` đã ra khỏi hợp đồng; nó không được quay lại danh sách.
+    assert "EpisodeMetadata.injected_defect" not in DROPPED_FIELDS
 
 
 def test_an_episode_whose_dataset_cannot_be_resolved_is_refused(
@@ -337,7 +351,7 @@ def test_the_shipped_defect_manifest_maps_into_group_s_only() -> None:
     rows = map_defect_manifest(_artifact("DefectManifest"))
 
     # `manifest_ref` là mã bản sao chấm: hợp đồng không cho manifest một ID
-    # riêng, và đây cũng là giá trị `benchmark_copy_id` khi #62 merge.
+    # riêng, và đây cũng là `benchmark_copy_id` của episode trong bản sao (#62).
     head = rows["manifest"]
     assert {key: head[key] for key in ("manifest_ref", "dataset_ref", "seed")} == {
         "manifest_ref": "ds_1",
