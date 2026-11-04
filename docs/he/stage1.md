@@ -10,9 +10,9 @@ _Bắt đầu 4/11/2026. Story [DA-30](../product/stories/DA-30-stage1-egocentri
 
 | Bước | Trạng thái | Bằng chứng |
 |---|---|---|
-| Recipe, RunPlan, launcher, test CPU | Xong | `uv run pytest packages/flywheel-psi0/tests/stage1`: 21 test qua |
-| Loader của Ψ₀ đọc dữ liệu thay thế (CPU) | Xong, 4/11/2026 | Mục 1.5 |
-| Lần chạy trên Colab | **Chờ Hiếu duyệt CU** | Ước lượng 2,3 CU, trần 4 CU ([sổ chi phí](../g0/ledger/DA-30.csv)) |
+| Recipe, RunPlan, launcher, driver Colab, test CPU | Xong | `uv run pytest packages/flywheel-psi0/tests/stage1`: 25 test qua (driver Colab chạy `run`, `repeat`, `persist` trên Ψ₀ giả) |
+| Loader của Ψ₀ đọc dữ liệu thay thế (CPU) | Xong, 4/11/2026: 20 episode, rồi cả 218 | Mục 1.5 |
+| Lần chạy trên Colab | **Chờ Hiếu duyệt CU.** Hiếu dừng mọi job Colab ngày 4/11/2026 (số dư khoảng 101,8 CU) | Ước lượng 2,3 CU trên một L4, trần 4 CU ([sổ chi phí](../g0/ledger/DA-30.csv)) |
 
 ### 1.2 Recipe
 
@@ -67,6 +67,18 @@ Chạy trong image Docker Ψ₀ của tác giả (`psi0@sha256:0d58…80b2`) tr�
 
 `actions_48d`: script của tác giả chạy 3 s cho 20 file trên laptop, mọi file có khóa `actions_48d` kích thước N × 48.
 
+Lần 2, cùng ngày, **cả 218 episode**, 12 worker như run thật, container giới hạn 12 CPU (như VM Colab), 12 GB RAM và `--shm-size 4g`. Lần đầu với `/dev/shm` mặc định 64 MB của Docker, worker chết vì `Bus error`; đó là giới hạn của container, VM Colab không có giới hạn này.
+
+| Mục | Kết quả |
+|---|---|
+| Một epoch | 13 batch × 16 = 208 mẫu (`drop_last`), `problems` rỗng |
+| `input_ids` | 189–220 token mỗi batch |
+| Token action FAST mỗi mẫu | 1–43; không mẫu nào bằng 0 (một mẫu chỉ có 1 token, chắc là action gần đứng yên) |
+| Ảnh, action | lưới 16 × 30 mọi batch; action 1 × 48 |
+| Thời gian | batch đầu 5,8 s (12 worker khởi động và nạp song song), cả epoch khoảng 7,2 s, tức khoảng 30 mẫu/s **dù máy đang tải nặng** (load 67 trên 64 CPU) |
+
+Ở tốc độ đó, nạp dữ liệu tốn khoảng 1 s cho mỗi bước 32 mẫu, nhỏ so với giả định 9 s/bước (mục 1.8). Phần chưa biết vẫn là GPU và offload.
+
 ### 1.6 Chạy lại được
 
 RunPlan [`egodex-short.yaml`](../../configs/runplans/stage1/egodex-short.yaml) (`run_plan_id` `rp_9ff69c9f4645`) chốt trước lần chạy:
@@ -99,4 +111,17 @@ Chưa chạy. Ghi ở đây sau lần chạy: loss bước đầu và cuối, k�
 ### 1.8 Rủi ro đã biết
 
 - `zero3_offload.json` không được script nào của tác giả dùng ở `cda3fdf`; đường DeepSpeed với optimizer trong file cấu hình (`DummyOptim`, `DummyScheduler`) chưa chạy lần nào trong dự án. Nếu hỏng, phương án dự phòng là A100 40 GB với `zero3.json`, có thể hết VRAM (ước lượng ở mục 1.2); cần duyệt CU lại.
-- s/bước là giả định (9 s), chưa đo: stage 1 giải mã khung video 1080p trên CPU và chuyển trọng số qua lại RAM mỗi bước.
+- s/bước là giả định (9 s), chưa đo. Phần nạp dữ liệu đã đo khoảng 1 s (mục 1.5); phần còn lại là GPU, chuyển trọng số qua lại RAM và Adam trên CPU của offload.
+
+### 1.9 Ước lượng CU
+
+Giả định, chưa đo. Một VM L4 ở 1,94 CU/giờ (S1-04). Phần cố định khoảng 38 phút: setup môi trường của DA-19 khoảng 10 phút; tải `pre.*` 4,3 GB và mẫu EgoDex 2,17 GB khoảng 8 phút; `actions_48d` và loader check khoảng 5 phút (đo trên laptop và `rtx3060`: 34 s và dưới 1 phút); nạp model khoảng 3 phút; checkpoint cuối khoảng 4 phút; chạy lại 3 bước khoảng 7 phút; persist khoảng 1 phút. Cộng 200 bước train:
+
+| s/bước | Train | Tổng | CU |
+|---|---|---|---|
+| 5 | 17 phút | 55 phút | 1,8 |
+| 9 (giả định chính) | 30 phút | 68 phút | 2,2–2,3 |
+| 15 | 50 phút | 88 phút | 2,8 |
+| 26 | 86 phút | 124 phút | 4,0 (trần của RunPlan) |
+
+Quy tắc dừng [Đề xuất]: đọc s/bước trong `train.log` sau 20 bước; quá 25 s thì dừng VM và báo Hiếu trước khi chạy tiếp, để không vượt trần 4 CU.
