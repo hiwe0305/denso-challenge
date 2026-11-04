@@ -55,6 +55,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `scripts/g0/serve_psi0.sh`, `scripts/g0/eval_psi0.sh`
 - `docs/g0/psi0-eval.md`
 - `docs/g0/ledger/S1-03.csv`
+- `tests/g0/test_serve_psi0_seeded.py`: test CPU của launcher gieo nhiễu theo episode (thêm 4/11/2026, Hiếu giao việc launcher, docs/he/tray.md mục 8.5)
 
 ## Ghi chú cho người làm
 
@@ -88,6 +89,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 28/10/2026 | Bỏ phần việc của Hưng và Châu theo 07 mục 2.0 bản 0.6; dự phòng chưa giao | PO (Hiếu) |
 | 3/11/2026 | Cắt phạm vi trước 13/11/2026: chỉ làm phần DA-26 cần (07 mục 2.4, bản 1.2) | PO (Hiếu) |
 | 3/11/2026 | Nhiệm vụ 1.3: bỏ phần email giấy phép theo quyết định PO (không xin giấy phép; `license = unknown` ghi là giới hạn); câu hỏi provenance Q0 giữ | PO (Hiếu) |
+| 4/11/2026 | Thêm launcher `docker/psi0/serve_psi0_seeded.py`: gieo nhiễu Ψ₀ theo seed điều kiện khi `reset` (docs/he/tray.md mục 8.5); thêm test CPU vào Phạm vi file | PO (Hiếu) giao |
 
 ## Ghi chép khi làm
 
