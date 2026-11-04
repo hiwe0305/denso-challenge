@@ -80,6 +80,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 5/11/2026 | Kho planner-5 và release `tray_s1_f9433b028c52`; Hiếu chốt loại 7 reject DA-03 khỏi tập demo (tray.md mục 10). Bản 2 chờ kết quả planner-6 của DA-33 | PO (Hiếu) |
 | 5/11/2026 | Planner-6 không đạt (38/50, ngưỡng 44/50); bản 2 đóng băng trên planner-5, chỉ nhánh C; C+ kế thừa bản 2 với `n_add` 160. Nhiệm vụ con 1.7–1.9 xong (tray.md mục 11) | Claude cho Hiếu |
 | 5/11/2026 | Hiếu duyệt nguyên văn quy tắc đọc bậc 2 (tray.md mục 9, **[Đã chốt]**). Sau review #116: khối quy tắc, file tập demo, config eval, split và mã cảnh/scorer được ghim bằng sha256; bản 2 đóng băng lại thành `rp_a04c14e79dfd` (thay `rp_301f08e73358`, chưa job nào chạy) | PO (Hiếu) |
+| 5/11/2026 | Hiếu chốt: mã sim ghim (`pinned_files`) kiểm lúc khởi chạy job (`runplan check --release … --launch`), CI chỉ cảnh báo; id `rp_a04c14e79dfd` không đổi (tray.md mục 11) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

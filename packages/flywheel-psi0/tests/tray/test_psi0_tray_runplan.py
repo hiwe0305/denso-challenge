@@ -5,11 +5,13 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+import warnings
 from pathlib import Path
 
 import pytest
 import yaml
 from flywheel_psi0.trainer.recipe import Psi0Recipe
+from flywheel_psi0.tray import runplan
 from flywheel_psi0.tray.demo_sets import (
     EXPORT_META,
     MANIFEST,
@@ -29,6 +31,7 @@ from flywheel_psi0.tray.runplan import (
     freeze,
     lock_path,
     main,
+    pinned_file_drift,
     plan_json,
     recipe_sha256,
     rules_block,
@@ -380,7 +383,14 @@ def plan_v2() -> TrayRunPlan:
 
 
 def test_v2_matches_the_files_it_names(plan_v2: TrayRunPlan) -> None:
+    # Strict for DA-34's own frozen inputs: rules, set hashes, demo-set, quality and QA
+    # pins. Pinned eval sources of other stories only warn here; a job launch fails on
+    # them (Hiếu 5/11/2026, docs/he/tray.md section 11).
     assert check(plan_v2) == []
+    for drift in pinned_file_drift(plan_v2):
+        warnings.warn(
+            f"he-tray-v2: {drift}; re-freeze or record a Decision before a job", stacklevel=1
+        )
     assert main(["check", str(PLAN_V2)]) == 0
 
 
@@ -497,8 +507,9 @@ def test_check_catches_a_changed_pinned_file(tmp_path: Path, plan_v2: TrayRunPla
     repo = _repo_copy(tmp_path)
     (repo / "configs/sim").mkdir(parents=True)
     (repo / "configs/sim/tray.yaml").write_text("episode_limit_s: 120.0\n")
-    problems = check(plan_v2, repo)
-    assert "pinned file configs/sim/tray.yaml changed since the plan pinned it" in problems
+    drift = "pinned file configs/sim/tray.yaml changed since the plan pinned it"
+    assert drift in pinned_file_drift(plan_v2, repo)
+    assert drift not in check(plan_v2, repo)  # CI does not fail on it
     unpinned = {
         k: v for k, v in (plan_v2.pinned_files or {}).items() if k != "configs/sim/tray.yaml"
     }
@@ -538,3 +549,38 @@ def test_check_release_ties_indices_to_seeds(tmp_path: Path, plan_v2: TrayRunPla
     problems = check_release(other_plan, other, repo)
     assert any("episode_indices are not its seeds'" in p for p in problems)
     assert any("not" in p for p in check_release(plan_v2, tmp_path / "release", repo))
+
+
+def test_pinned_file_drift_warns_on_ci_and_fails_at_launch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    repo = _with_doc(tmp_path)
+    plan = TrayRunPlan.load(repo / "configs/runplans/tray/he-tray-v2.yaml")
+    for rel in plan.pinned_files or {}:
+        (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(REPO / rel, repo / rel)
+    run_py = repo / "packages/flywheel-simple/src/flywheel_simple/tray/run.py"
+    run_py.write_text(run_py.read_text() + "# edited on master after the freeze\n")
+    monkeypatch.setattr(runplan, "REPO", repo)
+    monkeypatch.setattr(runplan, "check_release", lambda *args: [])  # tested above
+    plan_arg = str(repo / "configs/runplans/tray/he-tray-v2.yaml")
+
+    assert main(["check", plan_arg]) == 0
+    out = capsys.readouterr()
+    assert (
+        "warning: pinned file packages/flywheel-simple/src/flywheel_simple/tray/run.py" in out.err
+    )
+    assert "rp_" in out.out
+
+    assert main(["check", plan_arg, "--release", str(tmp_path), "--launch"]) == 1
+    err = capsys.readouterr().err
+    assert "tray/run.py changed since the plan pinned it: re-freeze or record a Decision" in err
+
+    shutil.copy(REPO / "packages/flywheel-simple/src/flywheel_simple/tray/run.py", run_py)
+    assert main(["check", plan_arg, "--release", str(tmp_path), "--launch"]) == 0
+    assert "launch OK" in capsys.readouterr().out
+
+
+def test_launch_needs_the_release() -> None:
+    with pytest.raises(SystemExit):
+        main(["check", str(PLAN_V2), "--launch"])
