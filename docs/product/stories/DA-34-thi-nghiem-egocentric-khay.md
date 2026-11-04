@@ -36,12 +36,12 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
   - [x] 1.5 Sổ chi phí ước lượng `docs/g0/ledger/DA-34.csv` (dòng `estimated`: fine-tune A, C, C-NOEGO, C+ và eval)
   - [x] 1.6 (bản 2, quyết định của Hiếu 3/11/2026: tăng dữ liệu, chất lượng cao) Đo chất lượng episode (`flywheel_psi0.tray.quality`), bộ lọc chất lượng trong chọn tập; chốt cỡ tập 320/160, ngưỡng lọc, kho seed 1000–1609 và eval 270 điều kiện ở `docs/he/tray.md` mục 7, trước khi sinh kho
   - [ ] 1.7 Sinh kho S1 seed 1000–1609 trên rtx3060, QA phát lại, release có hash, đo chất lượng cả kho
-  - [ ] 1.8 Chọn tập lồng nhau 40 ⊂ 80 ⊂ 160 ⊂ 320 qua bộ lọc; RunPlan `he-tray-v2.yaml` (eval 270 điều kiện, C+ n_add 160), đóng băng; bản 1 ghi đã thay
+  - [ ] 1.8 Chọn tập lồng nhau 40 ⊂ 80 ⊂ 160 ⊂ 320 qua bộ lọc; RunPlan `he-tray-v2.yaml` (eval 270 điều kiện, C+ n_add 160), đóng băng; bản 1 ghi đã thay; theo bậc 2 chỉ nhánh C, có trường `budget` (36 CU, 18 CU mỗi lần)
   - [ ] 1.9 Cập nhật sổ chi phí theo bản 2 và giờ máy thực đo của lô sinh
   - [x] 1.10 (quyết định của Hiếu 4/11/2026 ở S1-04 mục 4.1) Ghi đè `train.validation_steps: 2000` ở cấp plan, chung ba nhánh; `runplan check` chỉ cho ghi đè không đổi quá trình train; đóng băng lại bản 1 thành `rp_c49c99c8d8da`; sổ chi phí fine-tune sang Colab L4, 16,6 CU mỗi lần
   - [x] 1.11 (review của PO 4/11/2026) Kiểm trước khi chạy job: cổng phát lại 3 episode S1 qua `eval-decoupled-wbc` (server giả `flywheel_psi0.tray.replay_server`); mức 0 có phải giả lặp; Ψ₀ tại `cda3fdf` có đọc cột `index` không; ghi bản 1 đã thay. Kết quả và quy tắc bản 2 ở `docs/he/tray.md` mục 8
   - [x] 1.12 (sau review, 4/11/2026) Ghi Decision của Hiếu (eval ở thời gian sim; mức 0 là lượt lặp, phân bổ 30 / 120 / 120, nhiễu gieo theo episode) ở `docs/he/tray.md` mục 8; kiểm gieo nhiễu theo episode tại `cda3fdf` (mục 8.5); bản 1 có trường `superseded_by` (không vào id); `runplan check` nhận plan round; sửa batch toàn cục của tác giả thành 16 × 4 = 64 (S1-04)
-- [ ] 2. Fine-tune A, C, C-NOEGO (AC 2)
+- [ ] 2. Fine-tune A, C, C-NOEGO (AC 2) · **4/11/2026, bậc 2:** chỉ C (C+ ở nhiệm vụ 5), trần 36 CU, cap 18 CU mỗi lần, có watcher; A và C-NOEGO bỏ ([tray.md](../../he/tray.md) mục 9)
 - [ ] 3. Eval và bảng kết quả, video (AC 3, 4)
 - [ ] 4. Nhánh B khi có video (AC 5)
 - [ ] 5. Vòng Failure → Data trên lỗi của C: chẩn đoán, sinh nhắm lỗi, fine-tune và eval C+ (AC 6; trước 12/11/2026)
@@ -76,7 +76,9 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 4/11/2026 | Theo quyết định PO ở S1-04 (L4, validation mỗi 2.000 bước): thêm nhiệm vụ con 1.10; RunPlan bản 1 đóng băng lại thành `rp_c49c99c8d8da` | Claude cho Hiếu |
 | 4/11/2026 | Review của PO trên PR #73: thêm nhiệm vụ con 1.11 (cổng phát lại, mức 0, cột `index`, bản 1 đã thay) | Claude cho Hiếu |
 | 4/11/2026 | Hiếu chốt eval ở thời gian sim và cách đếm mức 0 (30 / 120 / 120, gieo nhiễu theo episode): thêm nhiệm vụ con 1.12 | PO (Hiếu) |
+| 4/11/2026 | Hiếu duyệt bậc 2 ("Approve tier 2"): chỉ fine-tune C và C+, khoảng 33 CU, trần 36 CU; bỏ A và C-NOEGO; eval mujoco trên rtx3060, 0 CU. Ghi ở tray.md mục 9; AC 1, 2 và 6 đọc theo mục này | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
 - 3/11/2026 (nhiệm vụ 1): RunPlan `rp_59164e3970c4` đóng băng ([`he-tray.yaml`](../../../configs/runplans/tray/he-tray.yaml)); tập `A` = `94245f8d36ab…`, `C` = `5db98a38ed80…` ([`demo_sets.json`](../../../configs/runplans/tray/demo_sets.json)); quy tắc diễn giải ở [docs/he/tray.md](../../he/tray.md). Sổ ước lượng 4 lần fine-tune × 26 CU = 104 CU trong khoảng 162 CU còn lại. Rủi ro: con số giữ chỗ 1,0 s/bước của `psi0-stage3.yaml` cho 11,1 giờ và khoảng 75 CU mỗi lần, tức khoảng 300 CU cho 4 lần; cần số đo của S1-04 trước khi chạy nhiệm vụ 2. **4/11/2026:** S1-04 đã đo; Hiếu chốt Colab L4, recipe DA-19 không đổi, validation mỗi 2.000 bước: khoảng 8,5 giờ và 16,6 CU mỗi lần, 4 lần khoảng 66 CU (ước lượng). Bản 1 đóng băng lại thành `rp_c49c99c8d8da` vì thêm ghi đè này. **4/11/2026 (review PO):** phát lại action S1 qua `eval-decoupled-wbc` thành công 6/6 ở thời gian sim, nhưng 4/6 ở thời gian thật trên máy tải nặng. Vì vậy eval phải chạy ở thời gian sim, và `eval-decoupled-wbc` cần bộ nạp episode khay: hai việc này thuộc `flywheel_simple.tray.run`, cần PR riêng trước nhiệm vụ 3. Ψ₀ không đọc cột `index`. Mức 0 tính là lượt lặp của một cảnh (tray.md mục 8). Tập con 40 và 80 chưa thành dataset LeRobot: Ψ₀ `LerobotDataConfig` không có bộ lọc episode, nên nhiệm vụ 2 phải dựng hai dataset con kèm `stats_psi0.json` riêng.
+- 4/11/2026 (bậc 2): Hiếu duyệt "Approve tier 2". Bản 2 chỉ train C (tập 160) và C+; vẫn ghim bốn tập 40/80/160/320 để A chạy được sau. RunPlan có trường `budget` (trần 36 CU, cap 18 CU mỗi lần, watcher dừng phiên ở cap) mà `runplan check` kiểm. Giới hạn mới: không có A nên C+ − C gộp tác động của nhiều dữ liệu hơn và của dữ liệu nhắm lỗi (tray.md mục 9, quy tắc đọc **[Đề xuất]** chờ Hiếu duyệt).
