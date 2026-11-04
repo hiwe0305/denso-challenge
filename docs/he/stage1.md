@@ -43,6 +43,7 @@ Bản export EgoDex của DA-18 (Hưng, hạn 8/11/2026) chưa có. Trong lúc c
 
 - Nguồn: tập test của EgoDex (`test.zip`, 17,3 GB, 111 task, 3243 episode; Apple). Lấy 2 episode số nhỏ nhất của mỗi task: **218 episode, 2,17 GB**. Chỉ tải các file đã chọn bằng HTTP range, không tải cả zip ([`egodex_sample.py`](../../packages/flywheel-psi0/src/flywheel_psi0/stage1/egodex_sample.py)); `manifest.json` ghi tên, cỡ và CRC-32 của từng file.
 - Đặt dưới `part1/<task>/<i>.hdf5|mp4` (loader của Ψ₀ train trên `part1`–`part5` và `extra`), rồi thêm `actions_48d` bằng script H-RDT của tác giả (`src/h_rdt/datasets/pretrain/precompute_48d_actions.py`).
+- Đo trên laptop ngày 4/11/2026: tải 218 episode mất khoảng 12 phút (1–7 MB/s qua Range); lần đầu đứt kết nối ở file 428/436 (`IncompleteRead`), nên mỗi request giờ thử lại tối đa 6 lần, và chạy lại `fetch` giữ các file đã đủ (lần chạy lại lấy nốt 8 file trong 16 s). Script `actions_48d` chạy 34 s với 8 tiến trình; cả 218 file có `actions_48d`, tổng 90.906 khung.
 - Đổi sang bản export của DA-18 khi merge: chỉ đổi khối `dataset` của RunPlan.
 - Loader của Ψ₀ coi mỗi episode là một mẫu và bốc một khung ngẫu nhiên mỗi lần: 218 episode với batch 16 là 13 batch mỗi epoch; 200 bước × 2 batch là khoảng 31 epoch. Loss giảm phần lớn do học thuộc tập nhỏ; đúng với mục đích chứng minh đường đi, không nói gì về chất lượng model.
 - Dữ liệu `public` (design mục 8.4). Giấy phép EgoDex là CC-BY-NC-ND; câu hỏi Q-EGO-LIC (design mục 14) vẫn mở với Hiếu. Lần chạy chỉ dùng để train, không phát hành gì suy ra từ dữ liệu.

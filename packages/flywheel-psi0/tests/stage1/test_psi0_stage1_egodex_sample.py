@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import http.client
 import io
 import json
 import urllib.request
@@ -95,3 +96,19 @@ def test_layout_problems_name_missing_videos(tmp_path: Path) -> None:
     (tmp_path / "part1" / "pour").mkdir(parents=True)
     (tmp_path / "part1" / "pour" / "0.hdf5").write_bytes(b"")
     assert layout_problems(tmp_path, "part1") == [f"{tmp_path / 'part1/pour/0.hdf5'} has no .mp4"]
+
+
+def test_a_dropped_range_request_is_retried(
+    tmp_path: Path, served: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    serve = egodex_sample.urllib.request.urlopen
+    drops = iter([True, False])
+
+    def flaky(request: urllib.request.Request, timeout: float = 0) -> Any:
+        if request.get_method() != "HEAD" and next(drops, False):
+            raise http.client.IncompleteRead(b"", 4194304)
+        return serve(request, timeout)
+
+    monkeypatch.setattr(egodex_sample.urllib.request, "urlopen", flaky)
+    monkeypatch.setattr(egodex_sample.time, "sleep", lambda seconds: None)
+    assert fetch(URL, tmp_path, "part1", 1, None)["episodes"] == 3

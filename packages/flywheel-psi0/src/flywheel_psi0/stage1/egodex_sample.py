@@ -16,16 +16,24 @@ lowest episode numbers that have both files. `manifest.json` records what was ta
 from __future__ import annotations
 
 import argparse
+import http.client
 import io
 import json
 import re
 import sys
+import time
+import urllib.error
 import urllib.request
 import zipfile
 from collections import defaultdict
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
+
+# A dropped connection mid-request (seen on 4/11/2026 after ~1.5 GB) is retried with
+# backoff; a whole `fetch` can also be rerun, it keeps the files already written.
+RETRIES = 6
+_TRANSIENT = (http.client.HTTPException, urllib.error.URLError, OSError)
 
 _EPISODE = re.compile(r"^[^/]+/(?P<task>[^/]+)/(?P<index>\d+)\.(?P<ext>hdf5|mp4)$")
 
@@ -65,8 +73,18 @@ class RangeReader(io.RawIOBase):
             return 0
         headers = {"Range": f"bytes={self._pos}-{self._pos + count - 1}"}
         request = urllib.request.Request(self.url, headers=headers)
-        with urllib.request.urlopen(request, timeout=300) as response:
-            data = response.read()
+        for attempt in range(RETRIES):
+            try:
+                with urllib.request.urlopen(request, timeout=300) as response:
+                    data = response.read()
+                if len(data) == count:
+                    break
+            except _TRANSIENT:
+                if attempt == RETRIES - 1:
+                    raise
+            time.sleep(min(2**attempt, 30))
+        else:
+            raise OSError(f"{self.url}: {len(data)} of {count} bytes after {RETRIES} tries")
         buffer[: len(data)] = data
         self._pos += len(data)
         return len(data)
