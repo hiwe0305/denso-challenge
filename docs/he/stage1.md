@@ -108,7 +108,7 @@ RunPlan [`egodex-short.yaml`](../../configs/runplans/stage1/egodex-short.yaml) (
 
 - **Một đợt một lúc.** Quy tắc vận hành từ review PR #108 (4/11/2026): guard dừng mọi assignment không đăng ký trên tài khoản, nên mỗi lúc tài khoản chỉ chạy một đợt; guard từ chối chạy khi đã có guard khác. Lần chạy ngắn 4 CU của DA-30 đi trước, rồi mới đến đợt của DA-26. `colab sessions` phải trống trước khi bắt đầu.
 - Watcher tự mở phiên (`session --new --name da30-stage1 --gpu L4 --cap 4`), nên số dư và mốc thời gian được ghi đúng lúc phiên bắt đầu. Không mở phiên bằng tay.
-- Trần cứng 4 CU (`compute.max_compute_units` của RunPlan). Mức duyệt 4 CU tính chung cho mọi lần chạy, nên **lần chạy 2 dùng `--cap 3.5`** (4 trừ 0,46 CU của lần chạy 1, làm tròn xuống), như lệnh dưới [Đề xuất, 4/11/2026]. Sàn `--floor 14` theo số dư thật của cả tài khoản (101,8 − 88 của tier 2), đặt ở cả guard lẫn watcher.
+- Trần cứng 4 CU (`compute.max_compute_units` của RunPlan). Mức duyệt 4 CU tính chung cho mọi lần chạy, nên **lần chạy 2 dùng `--cap 3.5`** (4 trừ 0,46 CU của lần chạy 1, làm tròn xuống), như lệnh dưới **[Đã chốt 4/11/2026]**: chặt hơn mức đã duyệt, nên không cần quyết định mới. Sàn `--floor 14` theo số dư thật của cả tài khoản (101,8 − 88 của tier 2), đặt ở cả guard lẫn watcher.
 - Khi chi tiêu tới khoảng 3,45 CU, watcher chạy `persist` của driver trong kernel của phiên ([`persist_cell.py`](../../configs/runplans/stage1/persist_cell.py)), để log và `metrics.jsonl` còn lại sau khi phiên bị dừng ở trần. Mốc này sớm hơn 90% trần để `persist` có đủ 600 s trước khi dừng. Vì vậy:
   - lệnh train phải chạy trong shell SSH, không qua `colab exec`, để kernel rảnh;
   - Drive phải được mount (`colab drivemount -s da30-stage1 /content/drive`) ngay sau `setup`.
