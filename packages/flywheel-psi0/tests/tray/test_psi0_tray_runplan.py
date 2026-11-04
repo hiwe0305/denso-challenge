@@ -269,3 +269,41 @@ def test_check_catches_level_seeds_outside_dev() -> None:
     raw = _v2_eval(yaml.safe_load(PLAN.read_text()))
     raw["eval"]["by_level"][2]["seeds"] = {"start": 2_000_000, "stop": 2_000_120}
     assert any("level 2" in p and "dev range" in p for p in check(TrayRunPlan.model_validate(raw)))
+
+
+TIER_2 = {
+    "ceiling_cu": 36,
+    "cap_cu_per_run": 18,
+    "runs": ["A", "C", "C_NOEGO"],
+    "watcher": "stop the run when its Colab session has used cap_cu_per_run",
+}
+
+
+def test_budget_holds_when_every_run_fits_under_the_ceiling() -> None:
+    raw = yaml.safe_load(PLAN.read_text())
+    raw["budget"] = dict(TIER_2, ceiling_cu=54)
+    assert not any("budget" in p for p in check(TrayRunPlan.model_validate(raw)))
+
+
+def test_budget_refuses_caps_over_the_ceiling() -> None:
+    raw = yaml.safe_load(PLAN.read_text())
+    raw["budget"] = TIER_2  # 3 runs x 18 CU = 54 > 36
+    assert any("54 CU over the ceiling of 36" in p for p in check(TrayRunPlan.model_validate(raw)))
+
+
+def test_budget_must_cover_every_branch() -> None:
+    raw = yaml.safe_load(PLAN.read_text())
+    raw["budget"] = dict(TIER_2, runs=["C"])
+    problems = check(TrayRunPlan.model_validate(raw))
+    assert any("branch A has no run in the budget" in p for p in problems)
+
+
+def test_round_needs_a_run_in_the_parents_budget(tmp_path: Path) -> None:
+    repo = _repo_copy(tmp_path)
+    plan_file = repo / "configs/runplans/tray/he-tray.yaml"
+    raw = yaml.safe_load(plan_file.read_text())
+    raw["budget"] = dict(TIER_2, ceiling_cu=54)  # no C_PLUS
+    plan_file.write_text(yaml.safe_dump(raw))
+    shutil.copy(ROUND, repo / "configs/runplans/tray/round-tray-cplus.yaml")
+    round_plan = TrayRoundPlan.load(repo / "configs/runplans/tray/round-tray-cplus.yaml")
+    assert any("C_PLUS has no run in the budget" in p for p in check_round(round_plan, repo))
