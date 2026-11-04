@@ -31,8 +31,8 @@ Là người của mọi làn, tôi muốn một file `configs/embodiments/g1.ya
 - [x] 1. Viết file story (AC 1–6)
 - [x] 2. `action_layout` 36 chiều của G1 trong `configs/embodiments/g1.yaml`, trích nguồn theo commit (AC 1–4, 6)
 - [x] 3. `control_spec` theo decoupled WBC và test validate `ControlSpec` (AC 5)
-- [ ] 4. `segments.parquet` của bundle episode (07 mục 2.2 nhiệm vụ con gợi ý 3; chưa làm trong PR này)
-- [ ] 5. Test tính chất cho validate `Episode`, `ActionLayout` (07 mục 2.2 nhiệm vụ con gợi ý 4; chưa làm trong PR này)
+- [x] 4. `segments.parquet` của bundle episode (07 mục 2.2 nhiệm vụ con gợi ý 3)
+- [x] 5. Test tính chất cho validate `Episode`, `ActionLayout` (07 mục 2.2 nhiệm vụ con gợi ý 4)
 
 Nhiệm vụ con gợi ý 1 và 2 của 07 mục 2.2 (schema Episode có trường mới, schema `action_layout` và mask) đã có trên master qua DA-25, nên không lặp lại ở đây.
 
@@ -42,6 +42,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 - `configs/embodiments/`
 - `tests/e2e/test_demo_seams.py`: chỉ thêm test `control_spec` của AC 5 cạnh hai seam đã có
+- `packages/flywheel-contracts/src/flywheel/contracts/segments.py`, `packages/flywheel-contracts/tests/`: hợp đồng và kiểm thử nhiệm vụ 4–5.
 
 ## Chỗ cần PO quyết hoặc biết
 
@@ -79,3 +80,5 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 ## Ghi chép khi làm
 
 - Giờ thực: xem `Time-spent` của từng commit.
+- Nhiệm vụ 4–5: `segments.py` khai báo schema Parquet và đọc/ghi có kiểm tra; test bao gồm file rỗng, dữ liệu sai, và tính chất của episode gốc và tên chiều action. Giả định để Hiếu review: timestamp là giây từ đầu episode, `step_id` là chuỗi, đoạn có thời lượng dương; tên cột văn bản là `description` và `label_source`.
+- Kiểm tra trên Windows: 5 test mới qua; ruff và mypy cho file mới qua. Toàn bộ test contracts: 202 qua, 4 lỗi hash fixture trace do checkout CRLF (hash sau chuẩn hóa LF khớp giá trị fixture).
