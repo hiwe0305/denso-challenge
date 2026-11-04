@@ -205,7 +205,8 @@ class Budget(_Frozen):
 
     ceiling_cu: float = Field(gt=0)  # hard ceiling over every run in `runs`
     cap_cu_per_run: float = Field(gt=0)  # the watcher stops a run here
-    runs: list[str] = Field(min_length=1)  # branches of the plan and of its round plan
+    runs: list[str] = Field(min_length=1)  # exactly the branches of this plan
+    round_runs: list[str] = Field(default_factory=list)  # branches of round plans on it
     watcher: str  # what stops a run at its cap
 
 
@@ -380,15 +381,22 @@ def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
 
     budget = plan.budget
     if budget is not None:
-        total = budget.cap_cu_per_run * len(budget.runs)
+        count = len(budget.runs) + len(budget.round_runs)
+        total = budget.cap_cu_per_run * count
         if total > budget.ceiling_cu:
             problems.append(
-                f"budget: {len(budget.runs)} runs x {budget.cap_cu_per_run:g} CU = {total:g} CU"
+                f"budget: {count} runs x {budget.cap_cu_per_run:g} CU = {total:g} CU"
                 f" over the ceiling of {budget.ceiling_cu:g}"
             )
         for name in plan.branches:
             if name not in budget.runs:
                 problems.append(f"budget: branch {name} has no run in the budget")
+        for name in budget.runs:
+            if name not in plan.branches:
+                problems.append(f"budget: run {name} is not a branch of this plan")
+        for name in budget.round_runs:
+            if name in plan.branches:
+                problems.append(f"budget: round run {name} is a branch of this plan")
 
     split = yaml.safe_load((repo / "configs/splits/default.yaml").read_text(encoding="utf-8"))
     dev = split["seed_ranges"][plan.eval.split]
@@ -410,9 +418,9 @@ def check_round(round_plan: TrayRoundPlan, repo: Path = REPO) -> list[str]:
         problems.append(f"branch {round_plan.branch} already exists in {round_plan.inherits}")
     if round_plan.targets.from_failures_of != round_plan.base_branch:
         problems.append("targets must come from the failures of the base branch")
-    if parent.budget is not None and round_plan.branch not in parent.budget.runs:
+    if parent.budget is not None and round_plan.branch not in parent.budget.round_runs:
         problems.append(
-            f"budget: {round_plan.branch} has no run in the budget of {round_plan.inherits}"
+            f"budget: {round_plan.branch} has no round run in the budget of {round_plan.inherits}"
         )
     lock = lock_path(repo / round_plan.inherits)
     if not lock.is_file():

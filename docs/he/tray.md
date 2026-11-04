@@ -173,7 +173,7 @@ Phần này thay mục 3 và mục 5 cho bản 2. Mục 3 và 5 giữ nguyên ch
 | Nhánh train | A (320), C (160), C-NOEGO (160), C+ (160 + 160 nhắm lỗi) | **C** (160) và **C+** (160 + 160 nhắm lỗi). `he-tray-v2.yaml` chỉ có nhánh C; C+ ở `round-tray-cplus.yaml` |
 | Tập demo | 40 ⊂ 80 ⊂ 160 ⊂ 320 | Vẫn chọn và ghim cả bốn tập, cùng thứ tự hash. Tập 320 không train ở bậc 2; giữ để A chạy được sau mà không chọn lại tập |
 | Checkpoint gốc | Baseline (EgoDex + HE) và ablation chỉ HE | Chỉ baseline. Ablation `psi0-abl-he-only` không vào bản 2 |
-| Ngân sách trong RunPlan | Không có | Trường `budget`: trần 36 CU; mỗi lần train dừng ở **18 CU** (2 × 18 = 36); `runs: [C, C_PLUS]`. `runplan check` từ chối khi tổng cap vượt trần, khi một nhánh không có lượt trong `runs`, và khi plan round đặt nhánh ngoài `runs` |
+| Ngân sách trong RunPlan | Không có | Trường `budget`: trần 36 CU; mỗi lần train dừng ở **18 CU** (2 × 18 = 36); `runs: [C]` là đúng các nhánh của plan, `round_runs: [C_PLUS]` là nhánh của plan round. `runplan check` từ chối khi tổng cap vượt trần, khi một nhánh không có lượt trong `runs`, khi `runs` có tên không phải nhánh, khi `round_runs` trùng nhánh của plan, và khi plan round đặt nhánh ngoài `round_runs` |
 | Watcher | | Mỗi job train có một watcher dừng phiên Colab khi phiên đã dùng 18 CU, kể cả khi chưa đủ 40.000 bước. Job dừng ở cap ghi dòng `measured` với số CU thật và số bước đã chạy |
 | Sổ chi phí | 4 dòng ước lượng 16,6 CU (A, C, C-NOEGO, C+) | Dòng ước lượng mới: C và C+ mỗi lần 16,6 CU, cap 18; A và C-NOEGO 0 CU, ghi "bỏ theo bậc 2". Dòng cũ giữ nguyên (append-only) |
 
@@ -196,14 +196,14 @@ Kho sinh lại theo quyết định của Hiếu trên #93 và #103: planner `da
 |---|---|
 | Sinh, `rtx3060`, lô `s1-pool-1104` | 610 lượt, seed 1000–1609, mức 1, 14 worker, 1,29 giờ. Cả 610 dòng ghi `da33-planner-5+cfg.4e2a4505`. 542 thành công và được ghi; 541 qua QA tối thiểu (1 `phases_incomplete`). Không shard nào chết hay khởi động lại, không crash x264 |
 | Hỏng | `L-ONE-HAND` 18, `L-TRAY-TILT` 16, `L-PLACE-POSE` 15, timeout 19 (`LIFT` 7, `REACH` 5, `RELEASE` 5, `ARRIVE_B` 2) |
-| QA phát lại (D-24), master `3e45bb6` (có #105) | 542/542 đạt, lệch khay 0,0 mm, 0 shard hỏng hay chưa chấm |
+| QA phát lại (D-24), master `3e45bb6` (có #105) | 542/542 đạt, lệch khay 0,0 mm, 0 shard hỏng hay chưa chấm. Chạy 22:31–23:59 ngày 4/11/2026; dòng thực đo `job_da34_pool_v2_replay` trong sổ ghi ngày 5/11 là ngày ghi sổ, không phải ngày chạy (sổ append-only nên không sửa) |
 | Release | `tray_s1_f9433b028c52`, `release_hash` `f9433b028c520b4fd78b34469b389862f7b34de0bb185840aa18143d2d5d8461`, 541 episode, 4,5 GB, một phiên bản planner |
 | QA của DA-03 (`qa-1@fb6ddaf9f48c`) cùng phát lại động học của DA-17 (`replay-1@cf2515483a8c`) | **534 pass, 0 flag, 7 reject.** Không có cờ `action_jump.arm`; bước tay lớn nhất 0,080 rad |
 | Cấp dataset | `stats_json.states` D4 (lệch 0,0058 ở `states.mean[25]`): lỗi đã biết của script tác giả, việc của DA-02. Cột `index` lệch LeRobot v2.1 ở 527 episode (Q7); Ψ₀ không đọc cột này (mục 8.3) |
 | Chất lượng 541 episode | Nghiêng khi mang: trung vị 7,05°, p90 10,34°, tối đa 14,78°. Linh kiện xê dịch lúc cuối: 10,35 / 19,57 / 37,66 mm. Khay rơi khi nhả: trung vị −0,45 m/s (−0,18 đến −0,85) |
 | Bộ lọc đã chốt (nghiêng ≤ 10°, xê dịch ≤ 20 mm) | 436/541 đạt (80,6 %): 56 hỏng vì nghiêng, 42 vì xê dịch, 7 cả hai. Cả 7 reject đều qua bộ lọc, nên sau khi loại reject còn **429** episode, đủ cho tập 320. Không cần sinh thêm từ seed 1610 |
 
-**[Đã chốt 5/11/2026, Hiếu] loại 7 reject DA-03 khỏi tập demo.** `flywheel_psi0.tray.demo_sets --qa-work` đọc report QA của DA-03 và bỏ episode `reject` (và `quarantine`) trước bộ lọc chất lượng. Lệnh dừng với lỗi nếu thư mục QA không phải của release này, hoặc thiếu report cho một episode. File tập demo ghi lại từng episode bị loại; RunPlan ghim sha256 của report QA. Bảy episode bị loại, đều do phép phát lại động học của DA-17 (D7):
+**[Đã chốt 5/11/2026, Hiếu] loại 7 reject DA-03 khỏi tập demo.** `flywheel_psi0.tray.demo_sets --qa-work` đọc report QA của DA-03 và bỏ episode `reject` và `quarantine` trước bộ lọc chất lượng. Episode `flag` được giữ, đúng như release của DA-03 giữ (`INCLUDED` của `flywheel.data.release.build`); lô này không có episode `flag` nào. Lệnh dừng với lỗi nếu thư mục QA không phải của release này, nếu một episode thiếu report hoặc có hai report, hoặc nếu một dòng không đọc được thành `QAReport` (ví dụ quyết định lạ). File tập demo ghi lại từng episode bị loại; RunPlan ghim sha256 của report QA. Bảy episode bị loại, đều do phép phát lại động học của DA-17 (D7):
 
 | Episode | Seed | Mã | Chi tiết |
 |---|---|---|---|

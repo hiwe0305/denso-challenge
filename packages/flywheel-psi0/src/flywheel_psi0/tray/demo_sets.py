@@ -23,9 +23,10 @@ ranking key does not change, so dropping an episode never reorders the rest.
 
 With `--qa-work` (the `fw data ingest` work directory of this release after
 `fw data qa`), episodes DA-03's QA rejected or quarantined are left out before
-the quality filter, and listed with their reasons (decision of 5/11/2026). It
-fails closed: the work directory must be of this export and every episode needs
-a report.
+the quality filter, and listed with their reasons (decision of 5/11/2026);
+`flag` is kept, as DA-03's release keeps it. It fails closed: the work directory
+must be of this export, every episode needs exactly one report and each report
+must parse as a `QAReport`.
 
 Run on a release directory (no simulator):
 
@@ -50,13 +51,15 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from flywheel.contracts.artifacts import QAReport
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from flywheel_psi0.tray.quality import QualityFilter, read_quality
 
 SALT = "DA-34/demo-sets/v1"
 MANIFEST = "release_manifest.json"  # written by flywheel_simple.tray.release
 EXPORT_META = "meta/flywheel_export.json"  # written by flywheel_simple.tray.export
+KEPT_DECISIONS = ("pass", "flag")  # = INCLUDED of DA-03's flywheel.data.release.build
 
 
 class _Frozen(BaseModel):
@@ -197,8 +200,10 @@ def apply_qa(
     `qa_work` is the directory `fw data ingest` printed for this release, after
     `fw data qa`. Its `source.json` must list this release's export metadata, every
     episode needs a report (fails closed), and all reports share one threshold
-    version. Quarantined episodes are left out with the rejected ones: neither is
-    cleared for training.
+    version. Each line must parse as a `QAReport`, so an unknown decision fails, and
+    an episode may have only one report. `pass` and `flag` are kept, as DA-03's
+    release keeps them (`flywheel.data.release.build.INCLUDED`); `reject` and
+    `quarantine` are left out: neither is cleared for training.
     """
     listed = json.loads((qa_work / "source.json").read_text(encoding="utf-8"))["files"]
     export_sha = hashlib.sha256((release_root / EXPORT_META).read_bytes()).hexdigest()
@@ -206,23 +211,33 @@ def apply_qa(
         raise ValueError(f"{qa_work} is the QA of another export than {release_root}")
     index = json.loads((qa_work / "episode_index.json").read_text(encoding="utf-8"))
     reports_file = qa_work / "qa" / "reports.jsonl"
-    reports = [json.loads(line) for line in reports_file.read_text().splitlines() if line]
-    by_index = {index[r["episode_id"]]: r for r in reports}
+    by_index: dict[int, QAReport] = {}
+    for n, line in enumerate(reports_file.read_text().splitlines(), 1):
+        if not line:
+            continue
+        try:
+            report = QAReport.model_validate_json(line)
+        except ValidationError as error:
+            raise ValueError(f"{reports_file} line {n} is not a QAReport: {error}") from error
+        position = index[report.episode_id]
+        if position in by_index:
+            raise ValueError(f"{reports_file} has two DA-03 QA reports for {report.episode_id}")
+        by_index[position] = report
     missing = sorted(e.seed for e in episodes if e.episode_index not in by_index)
     if missing:
         raise ValueError(f"no DA-03 QA report in {reports_file} for seeds {missing[:10]}")
-    versions = sorted({r["threshold_version"] for r in reports})
+    versions = sorted({r.threshold_version for r in by_index.values()})
     if len(versions) != 1:
         raise ValueError(f"{reports_file} mixes threshold versions {versions}")
     excluded = [
         QaExclusion(
             seed=e.seed,
-            episode_id=by_index[e.episode_index]["episode_id"],
-            decision=by_index[e.episode_index]["decision"],
-            reasons=list(by_index[e.episode_index]["reasons"]),
+            episode_id=by_index[e.episode_index].episode_id,
+            decision=by_index[e.episode_index].decision,
+            reasons=list(by_index[e.episode_index].reasons),
         )
         for e in sorted(episodes, key=lambda e: e.seed)
-        if by_index[e.episode_index]["decision"] in ("reject", "quarantine")
+        if by_index[e.episode_index].decision not in KEPT_DECISIONS
     ]
     left_out = {x.seed for x in excluded}
     pin = QaPin(
