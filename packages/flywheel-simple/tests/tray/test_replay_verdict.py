@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import math
+from pathlib import Path
 
 import pytest
+from flywheel_simple.tray import replay_qa as rq
 from flywheel_simple.tray.replay_qa import TRAY_TOL_M, verdict, yaw_gap_deg
 
 RECORDED = [-1.2, 0.05, 0.85, 1.0, 0.0, 0.0, 0.0]  # pos xyz, quat wxyz (yaw 0)
@@ -40,3 +43,41 @@ def test_half_turn_counts_as_the_same_pose() -> None:
 def test_failures_name_their_reason(outcome: dict | None, reason: str) -> None:  # type: ignore[type-arg]
     v = verdict(0, 1, RECORDED, outcome)
     assert not v.passed and v.reason == reason
+
+
+def _replay(monkeypatch: pytest.MonkeyPatch, work: Path, seeds: list[int], log: str) -> None:
+    """Two recorded episodes (seeds 101, 102); the replay returns outcomes for `seeds`."""
+
+    def run_replay(raw_root: Path, work: Path) -> Path:
+        work.mkdir(parents=True, exist_ok=True)
+        (work / "replay.log").write_text(log)
+        out = work / "replay_outcomes.jsonl"
+        out.write_text("".join(json.dumps({"seed": s, **_outcome()}) + "\n" for s in seeds))
+        return out
+
+    monkeypatch.setattr(rq, "run_replay", run_replay)
+    monkeypatch.setattr(rq, "recorded_finals", lambda raw: {0: (101, RECORDED), 1: (102, RECORDED)})
+
+
+def test_a_crashed_replay_writes_no_verdicts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # SIMPLE's replay CLI prints the error and exits 0; the missing outcome must not
+    # read as a QA miss.
+    work = tmp_path / "replay"
+    work.mkdir()
+    (work / "replay_qa.jsonl").write_text("stale\n")
+    crash = "Episodes: 0/2\nAn error occurred: Offscreen framebuffer is not complete\n"
+    _replay(monkeypatch, work, [101], crash)
+    with pytest.raises(rq.ReplayIncomplete, match=r"1/2 episodes \[1\].*framebuffer"):
+        rq.replay_qa(tmp_path / "raw", work)
+    assert not (work / "replay_qa.jsonl").exists()
+
+
+def test_a_full_replay_writes_one_verdict_per_episode(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _replay(monkeypatch, tmp_path / "replay", [101, 102], "")
+    verdicts = rq.replay_qa(tmp_path / "raw", tmp_path / "replay")
+    assert [v.reason for v in verdicts] == ["pass", "pass"]
+    assert len((tmp_path / "replay" / "replay_qa.jsonl").read_text().splitlines()) == 2
