@@ -42,7 +42,9 @@ from flywheel_simple.tray.s2.variant import (
 
 Mode = Literal["exact", "variant"]
 
-GENERATOR_VERSION = "da35-s2-2"  # 2: place fix about the held tray, parent turns played (fc03aae)
+# 2: place fix about the held tray, parent turns played (fc03aae);
+# 3: waist locked in replay, as the da35-virtual-3 parents were recorded
+GENERATOR_VERSION = "da35-s2-3"
 
 
 def generator_version(s2_cfg: S2Config, op_cfg: OperatorConfig) -> str:

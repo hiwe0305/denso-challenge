@@ -11,7 +11,9 @@ or not, gets one line in an append-only log for the cost ledger.
 from __future__ import annotations
 
 import json
+import os
 import re
+from collections import Counter
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
@@ -124,6 +126,59 @@ def flywheel_block(
     if clash:
         raise ValueError(f"extra meta would overwrite {clash}")
     return {**block, **(extra or {})}
+
+
+def atomic_write_text(path: Path, text: str) -> None:
+    """Write `path` through a temporary file beside it and a rename.
+
+    A crash or kill mid-write leaves the old file or the new one, never part of it
+    (LeRobot's `meta/episodes.jsonl` above all, which every resume reads).
+    """
+    tmp = path.with_name(f".{path.name}.tmp-{os.getpid()}")
+    tmp.write_text(text)
+    os.replace(tmp, path)
+
+
+def shard_mismatches(save_dir: Path) -> list[str]:
+    """Where a shard's saved episodes and its attempts log disagree; empty if they agree.
+
+    A session saves an episode, then writes its flywheel block, then logs the attempt
+    with the episode's index. A crash or a stall-kill between those steps leaves an
+    episode that no attempt names, or one without its block, and a resumed session
+    would run that job again and save it twice. So a shard must hold one dataset
+    whose episodes are exactly the logged `episode_index` values, each once, each
+    with a flywheel block, before a session resumes it or a release reads it.
+    Datasets set aside as `*.empty-*` hold no episode and are skipped.
+    """
+    datasets = [
+        meta.parent.parent
+        for meta in sorted(save_dir.rglob("meta/info.json"))  # <shard>/simple/<env>/meta
+        if ".empty-" not in meta.parent.parent.name
+    ]
+    logged = Counter(
+        a["episode_index"]
+        for a in AttemptLog(save_dir / "attempts.jsonl").read()
+        if a.get("episode_index") is not None
+    )
+    problems = [f"episode {i} logged by {n} attempts" for i, n in sorted(logged.items()) if n > 1]
+    if len(datasets) > 1:
+        return [*problems, f"{len(datasets)} datasets: {[d.name for d in datasets]}"]
+    rows = AttemptLog(datasets[0] / "meta" / "episodes.jsonl").read() if datasets else []
+    saved = {int(r["episode_index"]) for r in rows}
+    unlogged = sorted(saved - logged.keys())
+    missing = sorted(logged.keys() - saved)
+    if unlogged:
+        problems.append(f"episodes {unlogged} saved but no attempt logs them")
+    if missing:
+        problems.append(f"episodes {missing} logged but not in the dataset")
+    no_block = sorted(
+        int(r["episode_index"])
+        for r in rows
+        if "flywheel" not in json.loads(r.get("environment_config") or "{}")
+    )
+    if no_block:
+        problems.append(f"episodes {no_block} have no flywheel block")
+    return problems
 
 
 class AttemptLog:

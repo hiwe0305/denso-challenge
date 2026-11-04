@@ -15,14 +15,23 @@ jobs of a killed worker run again (with any number of workers). At the end (or
 with --summarize) it writes `<out>/summary.json`: attempts, outcomes, failure
 labels, sim and machine time.
 
-The launcher supervises its workers (task 12, faults of `measure-1104`): a worker
-that exits non-zero, or logs nothing for `--stall-s` (the video writer's hang), is
-killed and started again on its shard's jobs not yet logged, at most
+The launcher supervises its workers (task 12, faults of `measure-1104`). Each
+worker runs in its own process group, so a kill reaches its children. A worker
+that ends while its shard still has jobs not logged (any exit code, 0 included:
+an interrupted session exits 0), or logs no attempt for `--stall-s` (the video
+writer's hang), is killed and started again on those jobs, at most
 `--max-restarts` times per shard; every restart is a line of
-`<out>/supervisor.jsonl`. The launcher exits 1 if a shard's last worker still failed. Before a worker starts, a dataset of its shard that never
-saved an episode is renamed `<name>.empty-<stamp>` (kept, not deleted): LeRobot
-cannot resume a dataset with no `meta/episodes.jsonl`, so the worker opens a fresh
-one.
+`<out>/supervisor.jsonl`. A worker that stalls after logging all its jobs ends
+`stalled-done`, which counts as done. A shard whose saved episodes do not match
+its attempts log (`shard_mismatches`: a worker died between saving an episode
+and logging it) is never resumed: the launcher refuses to start on it and stops
+supervising it, and summary.json lists it under `shard_mismatches`.
+
+The launcher exits 1 if a shard's last worker failed, a shard mismatches, or any
+job of the list is still not logged. Before a worker starts, a dataset of its
+shard that never saved an episode is renamed `<name>.empty-<stamp>` (kept, not
+deleted): LeRobot cannot resume a dataset with no `meta/episodes.jsonl`, so the
+worker opens a fresh one.
 
 Every batch writes its two ledger rows through `flywheel.data.ledger.job_ledger`
 (estimate before the workers start: jobs x `--est-attempt-s` over the workers;
@@ -41,7 +50,10 @@ needs the workspace venv for that (pydantic); the workers run in the SIMPLE venv
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
+import os
+import signal
 import subprocess
 import sys
 import time
@@ -51,10 +63,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol
 
+from flywheel_simple.tray.pico.recording import shard_mismatches
 from flywheel_simple.tray.s2.config import S2Config
 from flywheel_simple.tray.s2.jobs import sample_jobs
 
 JOB_KEYS = ("parent_id", "level", "seed", "gen_seed")
+DONE = (0, "stalled-done")  # how a shard's last worker may end
 
 
 def segments_of(parents: Path) -> list[dict[str, Any]]:
@@ -131,6 +145,23 @@ class Worker(Protocol):
     def wait(self) -> int: ...
 
 
+class GroupWorker:
+    """A worker in its own session: a kill reaches the whole group (the video writer too)."""
+
+    def __init__(self, proc: subprocess.Popen[bytes]) -> None:
+        self.proc = proc
+
+    def poll(self) -> int | None:
+        return self.proc.poll()
+
+    def kill(self) -> None:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(self.proc.pid, signal.SIGKILL)
+
+    def wait(self) -> int:
+        return self.proc.wait()
+
+
 def start_worker(args: argparse.Namespace, k: int, jobs: list[dict[str, Any]]) -> Worker:
     """One `tray.s2.session` process on shard k with these jobs."""
     shard = args.out / f"shard-{k:02d}"
@@ -145,8 +176,9 @@ def start_worker(args: argparse.Namespace, k: int, jobs: list[dict[str, Any]]) -
         "--mode", args.mode,
         *(["--config", str(args.config)] if args.config else []),
     ]  # fmt: skip
-    log = (shard / "worker.log").open("ab")
-    return subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT)
+    with (shard / "worker.log").open("ab") as log:
+        proc = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+    return GroupWorker(proc)
 
 
 def launch(
@@ -161,9 +193,16 @@ def launch(
 
 
 def last_progress(shard: Path, since: float) -> float:
-    """Wall time of the shard's latest attempt or log line, not before `since`."""
-    files = [shard / "attempts.jsonl", shard / "worker.log"]
-    return max([since, *(f.stat().st_mtime for f in files if f.exists())])
+    """Wall time of the shard's latest logged attempt, not before `since`.
+
+    The attempts log only: a hung worker can keep writing its log (warnings).
+    """
+    log = shard / "attempts.jsonl"
+    return max(since, log.stat().st_mtime) if log.exists() else since
+
+
+def mismatched_shards(out: Path) -> dict[str, list[str]]:
+    return {s.name: p for s in sorted(out.glob("shard-*")) if (p := shard_mismatches(s))}
 
 
 def supervise(
@@ -173,40 +212,53 @@ def supervise(
     now: Callable[[], float] = time.time,
     sleep: Callable[[float], None] = time.sleep,
 ) -> dict[int, list[int | str]]:
-    """Wait for the workers; restart one that dies or stalls on its pending jobs."""
+    """Wait for the workers; restart one that ends or stalls with jobs not logged.
+
+    A shard's ends list each worker's exit code or "stalled"; "stalled-done" when it
+    hung after logging all its jobs, and a last "mismatch" when its dataset and
+    attempts log disagree (it is not restarted).
+    """
     ends: dict[int, list[int | str]] = {k: [] for k in procs}
     started = {k: now() for k in procs}
     restarts: Counter[int] = Counter()
-    while procs:
-        sleep(args.poll_s)
-        for k, proc in list(procs.items()):
-            shard = args.out / f"shard-{k:02d}"
-            end: int | str | None = proc.poll()
-            if end is None:
-                if now() - last_progress(shard, started[k]) <= args.stall_s:
+    try:
+        while procs:
+            sleep(args.poll_s)
+            for k, proc in list(procs.items()):
+                shard = args.out / f"shard-{k:02d}"
+                end: int | str | None = proc.poll()
+                if end is None:
+                    if now() - last_progress(shard, started[k]) <= args.stall_s:
+                        continue
+                    proc.kill()
+                    proc.wait()
+                    end = "stalled"
+                left = pending_jobs(shard)
+                ends[k].append("stalled-done" if end == "stalled" and not left else end)
+                if problems := shard_mismatches(shard):
+                    ends[k].append("mismatch")
+                    print(f"shard {k:02d} mismatch, not resumed: {'; '.join(problems)}", flush=True)
+                if not left or ends[k][-1] == "mismatch" or restarts[k] >= args.max_restarts:
+                    del procs[k]
                     continue
-                proc.kill()
-                proc.wait()
-                end = "stalled"
-            ends[k].append(end)
-            left = pending_jobs(shard)
-            if end == 0 or not left or restarts[k] >= args.max_restarts:
-                del procs[k]
-                continue
-            restarts[k] += 1
-            event = {"at": datetime.now().isoformat(timespec="seconds"), "shard": k,
-                     "end": end, "restart": restarts[k], "pending": len(left)}  # fmt: skip
-            with (args.out / "supervisor.jsonl").open("a") as log:
-                log.write(json.dumps(event) + "\n")
-            print(f"shard {k:02d} ended {end}; restart {restarts[k]}, {len(left)} jobs", flush=True)
-            procs[k] = start(args, k, left)
-            started[k] = now()
+                restarts[k] += 1
+                event = {"at": datetime.now().isoformat(timespec="seconds"), "shard": k,
+                         "end": end, "restart": restarts[k], "pending": len(left)}  # fmt: skip
+                with (args.out / "supervisor.jsonl").open("a") as log:
+                    log.write(json.dumps(event) + "\n")
+                print(f"shard {k:02d} ended {end}; restart {restarts[k]}, {len(left)} jobs", flush=True)
+                procs[k] = start(args, k, left)
+                started[k] = now()
+    except BaseException:  # interrupted launcher: its workers sit in their own sessions
+        for proc in procs.values():
+            proc.kill()
+        raise
     return ends
 
 
 def exit_status(codes: list[int | str]) -> int:
-    """1 if any shard's last worker failed (after its restarts): its jobs may be missing."""
-    return 1 if any(code != 0 for code in codes) else 0
+    """1 if any shard's last worker failed (after its restarts) or the shard mismatches."""
+    return 1 if any(code not in DONE for code in codes) else 0
 
 
 def summarize(out: Path, wall_s: float | None) -> dict[str, Any]:
@@ -239,6 +291,7 @@ def summarize(out: Path, wall_s: float | None) -> dict[str, Any]:
         "batch_wall_s": None if wall_s is None else round(wall_s, 1),
         "generator_versions": sorted({a.get("generator_version") or "" for a in attempts}),
         "worker_restarts": len(jsonl_rows(out / "supervisor.jsonl")),
+        "shard_mismatches": mismatched_shards(out),
     }
     (out / "summary.json").write_text(json.dumps(summary, indent=1) + "\n")
     return summary
@@ -283,6 +336,9 @@ def main(argv: list[str] | None = None) -> int:
         (args.out / "jobs.jsonl").write_text("".join(json.dumps(j) + "\n" for j in jobs))
         from flywheel.data.ledger import job_ledger  # workspace venv only
 
+        if mismatched := mismatched_shards(args.out):
+            print(f"refused: shards do not reconcile, set them aside first: {mismatched}")
+            return 1
         todo = len(pending(args, jobs))
         workers = max(1, min(args.workers, todo))
         estimate = max(todo, 0) * args.est_attempt_s / workers
@@ -301,18 +357,23 @@ def main(argv: list[str] | None = None) -> int:
             last = [shard_ends[-1] for shard_ends in ends.values() if shard_ends]
             print(f"workers done, ends {Counter(codes)}", flush=True)
             summary = summarize(args.out, time.monotonic() - t0)
+            missing = len(pending(args, jobs))
             job.notes.append(
                 f"{summary['attempts']} attempts, {summary['successes']} successes, "
                 f"{summary['worker_s']} worker-s, worker ends {dict(Counter(codes))}, "
-                f"{summary['worker_restarts']} restarts"
+                f"{summary['worker_restarts']} restarts, {missing} jobs not logged, "
+                f"{len(summary['shard_mismatches'])} shards mismatched"
             )
         print(f"ledger: run plan {job.run_plan_id}, job {job.job_id}", flush=True)
     else:
-        last, summary = [], summarize(args.out, None)
+        last, missing, summary = [], 0, summarize(args.out, None)
     print(json.dumps(summary, indent=1))
-    if exit_status(last):
-        print(f"{sum(c != 0 for c in last)} shards failed: rerun to finish the batch", flush=True)
-    return exit_status(last)
+    failed = sum(c not in DONE for c in last)
+    if summary["shard_mismatches"]:
+        print(f"shards {sorted(summary['shard_mismatches'])} mismatch: set them aside, then rerun")
+    if failed or missing:
+        print(f"{failed} shards failed, {missing} jobs not logged: rerun to finish the batch")
+    return 1 if exit_status(last) or missing or summary["shard_mismatches"] else 0
 
 
 if __name__ == "__main__":
