@@ -386,6 +386,18 @@ def test_another_storys_job_names_its_own_vm_folder(
     assert da34.stage()[-1].startswith("cd /content/da34 && ")
 
 
+@pytest.mark.parametrize("work", ["content/da34", "/content/da 34", "/content/$(id)", "/x;y"])
+def test_only_a_plain_absolute_remote_work_is_taken(
+    work: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(ValueError, match="plain absolute path"):
+        Remote(JOB, Path("/x/colab"), work=work)
+    argv = ["probe", "--session", JOB, "--registry", "/r", "--dest", str(tmp_path)]
+    with pytest.raises(SystemExit):
+        he1_fetch.main([*argv, "--remote-work", work])
+    assert "plain absolute path" in capsys.readouterr().err
+
+
 def test_a_failed_pull_is_never_counted_as_fetched(tmp_path: Path) -> None:
     vm = fake_vm(tmp_path / "vm", saved=(40000,), complete=40000, train_done=True)
 

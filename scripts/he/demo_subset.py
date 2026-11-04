@@ -70,6 +70,10 @@ def source_indices(src: Path, sets: DemoSets, name: str, demo: DemoSet) -> list[
     if release_hash != sets.release_hash:
         raise ValueError(f"{src} is release {release_hash}, not {sets.release_hash}")
     index_of = {e.seed: e.episode_index for e in episodes}
+    if len(index_of) != len(episodes):
+        raise ValueError(f"{src}/{EXPORT_META} lists a seed twice")
+    if len(set(index_of.values())) != len(episodes):
+        raise ValueError(f"{src}/{EXPORT_META} gives two seeds one episode index")
     missing = [seed for seed in demo.seeds if seed not in index_of]
     if missing:
         raise ValueError(f"{name}: seeds {missing[:5]} are not in {src}/{EXPORT_META}")
@@ -129,7 +133,12 @@ def build_subset(src: Path, out: Path, sets: DemoSets, name: str) -> dict[str, A
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
-    parser.add_argument("--src", type=Path, required=True, help="the unzipped psi-data dataset")
+    parser.add_argument(
+        "--src",
+        type=Path,
+        required=True,
+        help="the unzipped psi-data dataset, or a tray release (DA-34)",
+    )
     parser.add_argument("--sets", type=Path, required=True, help="demo_sets.json of the plan")
     parser.add_argument("--set", required=True, help="e.g. N20")
     parser.add_argument("--out", type=Path, required=True)
