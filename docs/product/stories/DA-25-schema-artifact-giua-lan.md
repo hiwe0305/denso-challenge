@@ -45,6 +45,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `packages/flywheel-contracts/schemas/`, `packages/flywheel-contracts/tests/`
 - `packages/flywheel-testkit/src/flywheel/testkit/`
 - `packages/flywheel-testkit/tests/`
+- `tests/e2e/test_diagnosis_contract_seam.py`: kiểm tương thích bản ghi DA-13 và contract của issue #70.
 
 ## Ghi chú cho người làm
 
@@ -72,6 +73,11 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 03/11/2026 | Sửa theo review PO. PR #46: `AgentFinding.code` chỉ nhận mã mục 10 của design (D1–D8, T1–T8, O1–O4, R1–R6); datetime phải có múi giờ; `AgentReview.check_against` kiểm review chỉ trỏ tới phát hiện có trong báo cáo, file mẫu thêm `find_002`. PR #48: đúng 28 chiều thân trên và 7 chiều thân dưới, ghi thứ tự, đơn vị, hệ tọa độ (`UPPER_BODY`, `LOWER_BODY`); `run_plan_id` không có RunPlan là `g0-<story>-<yyyymmdd>` (G2); `dropped_frames` đếm theo chu kỳ; trace là thư mục `<trace_id>/` gồm `steps.jsonl` và `camera_params.jsonl`, `CameraParams` thêm `trace_id` (G1); `reference_sha256` là hash tham chiếu camera G0 đã ghim, chép từ RunPlan (Q3). PR #46 giữ AC 6 và nhiệm vụ 6, PR #48 là AC 7 và nhiệm vụ 7 | PO (Hiếu) |
 
 ## Ghi chép khi làm
+
+### Issue #70 · contract chẩn đoán DA-13
+
+- Đề xuất hai bản ghi `SystemDiagnosis`, `StageAttribution` trong `flywheel.contracts.diagnosis`, dùng lại `DiagnosisSkip`. Các hash RTC, camera và hạ tầng được giữ theo bản ghi DA-13 để phân biệt đầu vào; `skipped` và `unavailable` bắt buộc hiện diện, kết luận `clean` không nhận danh sách lỗi hoặc kiểm tra bị bỏ qua.
+- Schema và file mẫu đi cùng contract; test seam kiểm bản ghi làn Đánh giá validate và giữ nguyên dữ liệu. Việc đổi DA-13 sang contract thuộc nhiệm vụ 8 của DA-13; cách nhúng vào `Cluster.meta` vẫn cần Hiếu duyệt, không tự thay cấu trúc cluster trong PR này.
 
 ### Nhiệm vụ 6 (PR #46)
 

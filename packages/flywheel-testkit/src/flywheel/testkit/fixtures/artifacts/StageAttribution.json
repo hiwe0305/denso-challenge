@@ -1,0 +1,28 @@
+{
+  "episode_id": "ep_1",
+  "table_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "failed_step": 2,
+  "hypotheses": [
+    {
+      "row_id": "stage3_action_group",
+      "attribute_to": "stage3",
+      "intervention": "collect arm demonstrations",
+      "consumes_budget": true,
+      "confirmed": false,
+      "evidence": [
+        {
+          "probe": "P3",
+          "where": "arm",
+          "value": 0.9,
+          "threshold": 0.5
+        }
+      ]
+    }
+  ],
+  "unavailable": [
+    {
+      "code": "stage1_perception",
+      "reason": "P1 unavailable"
+    }
+  ]
+}
