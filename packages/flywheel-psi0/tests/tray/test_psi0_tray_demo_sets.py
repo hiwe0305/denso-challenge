@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from flywheel_psi0.tray.demo_sets import (
@@ -135,6 +137,7 @@ def test_cli_writes_then_checks(tmp_path: Path) -> None:
 
 # DA-03 QA rejects left out of the demo sets (decision of 5/11/2026).
 REJECTED = {3: "replay_kinematic (D7): joint_mapping", 7: "replay_kinematic (D7): joint_limit"}
+FLAGGED = {5: "action_jump.hand"}  # kept, as DA-03's release keeps `flag`
 
 
 def _write_qa_work(work: Path, release: Path, episodes: list[ReleaseEpisode]) -> None:
@@ -146,10 +149,12 @@ def _write_qa_work(work: Path, release: Path, episodes: list[ReleaseEpisode]) ->
     (work / "episode_index.json").write_text(json.dumps(index))
     rows = [
         {
+            "report_id": f"qa_{i:04d}",
             "episode_id": episode_id,
             "threshold_version": "qa-1@test",
-            "decision": "reject" if i in REJECTED else "pass",
-            "reasons": [REJECTED[i]] if i in REJECTED else [],
+            "decision": "reject" if i in REJECTED else "flag" if i in FLAGGED else "pass",
+            "reasons": [REJECTED[i]] if i in REJECTED else [FLAGGED[i]] if i in FLAGGED else [],
+            "checks": [],
         }
         for episode_id, i in index.items()
     ]
@@ -227,3 +232,49 @@ def test_cli_records_the_qa_exclusions(
     assert main([*argv, "--check", str(out)]) == 0
     release_hash, all_episodes = read_release(root)
     assert sets.sets["A"] != nested_sets("r", release_hash, all_episodes, {"A": 80}).sets["A"]
+
+
+def _edit_reports(work: Path, edit: Callable[[list[dict[str, Any]]], None]) -> None:
+    reports = work / "qa" / "reports.jsonl"
+    rows = [json.loads(line) for line in reports.read_text().splitlines()]
+    edit(rows)
+    reports.write_text("".join(json.dumps(r) + "\n" for r in rows))
+
+
+def test_quarantine_is_left_out_and_flag_is_kept(
+    release: tuple[Path, Path, list[ReleaseEpisode]],
+) -> None:
+    root, work, episodes = release
+
+    def quarantine_first(rows: list[dict[str, Any]]) -> None:
+        rows[0]["decision"] = "quarantine"
+
+    _edit_reports(work, quarantine_first)
+    kept, pin = apply_qa(episodes, work, root)
+    seeds = {e.seed for e in kept}
+    assert episodes[0].seed not in seeds and episodes[5].seed in seeds
+    assert [x.decision for x in pin.excluded] == ["quarantine", "reject", "reject"]
+
+
+def test_an_unknown_decision_fails(release: tuple[Path, Path, list[ReleaseEpisode]]) -> None:
+    root, work, episodes = release
+
+    def unknown(rows: list[dict[str, Any]]) -> None:
+        rows[1]["decision"] = "ok"
+
+    _edit_reports(work, unknown)
+    with pytest.raises(ValueError, match="decision"):
+        apply_qa(episodes, work, root)
+
+
+def test_two_reports_for_one_episode_are_refused(
+    release: tuple[Path, Path, list[ReleaseEpisode]],
+) -> None:
+    root, work, episodes = release
+
+    def duplicate(rows: list[dict[str, Any]]) -> None:
+        rows.append(dict(rows[3], report_id="qa_dup", decision="pass", reasons=[]))
+
+    _edit_reports(work, duplicate)
+    with pytest.raises(ValueError, match="two DA-03 QA reports"):
+        apply_qa(episodes, work, root)

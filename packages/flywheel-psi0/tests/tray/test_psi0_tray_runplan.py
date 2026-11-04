@@ -277,6 +277,7 @@ TIER_2 = {
     "ceiling_cu": 36,
     "cap_cu_per_run": 18,
     "runs": ["A", "C", "C_NOEGO"],
+    "round_runs": [],
     "watcher": "stop the run when its Colab session has used cap_cu_per_run",
 }
 
@@ -300,6 +301,21 @@ def test_budget_must_cover_every_branch() -> None:
     assert any("branch A has no run in the budget" in p for p in problems)
 
 
+def test_budget_refuses_a_run_of_no_branch() -> None:
+    raw = yaml.safe_load(PLAN.read_text())
+    raw["budget"] = dict(TIER_2, ceiling_cu=72, runs=["A", "C", "C_NOEGO", "C_PLSU"])
+    problems = check(TrayRunPlan.model_validate(raw))
+    assert any("run C_PLSU is not a branch of this plan" in p for p in problems)
+
+
+def test_budget_round_runs_count_and_must_not_be_branches() -> None:
+    raw = yaml.safe_load(PLAN.read_text())
+    raw["budget"] = dict(TIER_2, ceiling_cu=54, round_runs=["C"])  # 4 runs x 18 = 72
+    problems = check(TrayRunPlan.model_validate(raw))
+    assert any("72 CU over the ceiling of 54" in p for p in problems)
+    assert any("round run C is a branch of this plan" in p for p in problems)
+
+
 def test_round_needs_a_run_in_the_parents_budget(tmp_path: Path) -> None:
     repo = _repo_copy(tmp_path)
     plan_file = repo / "configs/runplans/tray/he-tray.yaml"
@@ -308,7 +324,7 @@ def test_round_needs_a_run_in_the_parents_budget(tmp_path: Path) -> None:
     plan_file.write_text(yaml.safe_dump(raw))
     shutil.copy(ROUND, repo / "configs/runplans/tray/round-tray-cplus.yaml")
     round_plan = TrayRoundPlan.load(repo / "configs/runplans/tray/round-tray-cplus.yaml")
-    assert any("C_PLUS has no run in the budget" in p for p in check_round(round_plan, repo))
+    assert any("C_PLUS has no round run in the budget" in p for p in check_round(round_plan, repo))
 
 
 QA_PIN = {"reports_sha256": "a" * 64, "threshold_version": "qa-1@fb6ddaf9f48c"}
