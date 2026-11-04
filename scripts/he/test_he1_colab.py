@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -9,7 +10,7 @@ import numpy as np
 import pytest
 from demo_subset import MARKER, build_subset
 from flywheel.data.ingest.lerobot import EpisodeFrames, iter_episodes, write_episode
-from flywheel_psi0.tray.demo_sets import DemoSet, DemoSets, set_hash
+from flywheel_psi0.tray.demo_sets import EXPORT_META, MANIFEST, DemoSet, DemoSets, set_hash
 from he1_colab import PLAN, hash_problems, job_id, load_point, persist, unmounted_drive
 
 TASK = "pick up the box"
@@ -98,6 +99,89 @@ def test_a_cut_is_never_written_over(tmp_path: Path) -> None:
     (tmp_path / "out").mkdir()
     with pytest.raises(FileExistsError):
         build_subset(src, tmp_path / "out", demo_sets([0, 1]), "N2")
+
+
+def digest(root: Path) -> str:
+    """One sha256 over every file's path and bytes."""
+    rows = sorted(
+        f"{p.relative_to(root)} {hashlib.sha256(p.read_bytes()).hexdigest()}"
+        for p in root.rglob("*")
+        if p.is_file()
+    )
+    return hashlib.sha256("\n".join(rows).encode()).hexdigest()
+
+
+def test_an_he1_cut_is_byte_identical_to_the_cut_before_seeds(tmp_path: Path) -> None:
+    # Pinned from master 5fe3d0b's demo_subset.py, which hashed episode indices, on
+    # this fixture (pyarrow of uv.lock); psi-data's seeds are its indices, no export.
+    src = fake_dataset(tmp_path / "src", [3, 4, 5, 6, 7])
+    build_subset(src, tmp_path / "out", demo_sets([1, 3]), "N2")
+    assert digest(tmp_path / "out") == (
+        "a4842e184071a4bb07a83d541d78e3644380cbafc74a61133b1e8adc34cb8449"
+    )
+
+
+def test_without_an_export_the_indices_must_be_the_seeds(tmp_path: Path) -> None:
+    src = fake_dataset(tmp_path / "src", [3, 4, 5])
+    sets = demo_sets([0, 1])
+    moved = sets.sets["N2"].model_copy(update={"episode_indices": [0, 2]})
+    with pytest.raises(ValueError, match="indices are not the seeds"):
+        build_subset(src, tmp_path / "out", sets.model_copy(update={"sets": {"N2": moved}}), "N2")
+
+
+SEEDS = [1000, 1003, 1004, 1009, 1010]  # episode i of the release has seed SEEDS[i]
+
+
+def tray_release(root: Path) -> str:
+    """fake_dataset plus the export and manifest of a tray release; its release hash."""
+    fake_dataset(root, [3, 4, 5, 6, 7])
+    rows = [{"episode_index": i, "seed": seed} for i, seed in enumerate(SEEDS)]
+    (root / EXPORT_META).write_text(json.dumps({"episodes": rows}))
+    files = [
+        {
+            "path": EXPORT_META,
+            "sha256": hashlib.sha256((root / EXPORT_META).read_bytes()).hexdigest(),
+        }
+    ]
+    release_hash = hashlib.sha256(
+        json.dumps(files, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    (root / MANIFEST).write_text(json.dumps({"release_hash": release_hash, "files": files}))
+    return release_hash
+
+
+def tray_sets(release_hash: str, seeds: list[int], indices: list[int]) -> DemoSets:
+    demo = DemoSet(
+        n=len(seeds), set_hash=set_hash(release_hash, seeds), seeds=seeds, episode_indices=indices
+    )
+    return DemoSets(release_id="tray@test", release_hash=release_hash, salt="t", sets={"C": demo})
+
+
+def test_a_tray_cut_takes_each_seeds_index_from_the_release_export(tmp_path: Path) -> None:
+    release_hash = tray_release(tmp_path / "src")
+    # the file's indices are not read: the export says seed 1003 is 1, 1009 is 3
+    sets = tray_sets(release_hash, [1003, 1009], [0, 4])
+    marker = build_subset(tmp_path / "src", tmp_path / "C", sets, "C")
+    assert marker["set_hash"] == set_hash(release_hash, [1003, 1009])
+    assert [e["source_episode_index"] for e in marker["episodes"]] == [1, 3]
+    assert [float(e.action[0, 0]) for e in iter_episodes(tmp_path / "C")] == [1.0, 3.0]
+    assert not (tmp_path / "C" / EXPORT_META).exists()  # the release's numbering stays out
+
+
+def test_a_tray_cut_refuses_another_release_or_a_seed_it_lacks(tmp_path: Path) -> None:
+    release_hash = tray_release(tmp_path / "src")
+    other = tray_sets("b" * 64, [1003, 1009], [1, 3])
+    with pytest.raises(ValueError, match="is release"):
+        build_subset(tmp_path / "src", tmp_path / "a", other, "C")
+    lacking = tray_sets(release_hash, [1003, 1005], [1, 2])
+    with pytest.raises(ValueError, match=r"seeds \[1005\] are not in"):
+        build_subset(tmp_path / "src", tmp_path / "b", lacking, "C")
+    sets = tray_sets(release_hash, [1003, 1009], [1, 3])
+    forged = sets.sets["C"].model_copy(update={"seeds": [1003, 1010]})  # hash kept
+    with pytest.raises(ValueError, match="seeds do not give the set hash"):
+        build_subset(
+            tmp_path / "src", tmp_path / "c", sets.model_copy(update={"sets": {"C": forged}}), "C"
+        )
 
 
 def test_only_the_preliminary_points_of_the_frozen_plan_run() -> None:

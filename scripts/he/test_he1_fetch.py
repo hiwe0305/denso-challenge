@@ -360,8 +360,30 @@ def test_the_real_transport_is_rsync_over_the_colab_proxy() -> None:
     remote = Remote(JOB, Path("/x/colab"))
     assert remote.ssh[:3] == ["ssh", "-o", f"ProxyCommand=/x/colab ssh --proxy-mode -s {JOB}"]
     assert remote.ssh[-1] == "root@colab" and "root@colab" not in remote.rsh
-    assert remote.stage()[-1] == "cd /content/da26 && python3 fw/scripts/he/he1_colab.py stage"
+    stage = "cd /content/da26 && python3 fw/scripts/he/he1_colab.py stage --work /content/da26"
+    assert remote.stage()[-1] == stage
     assert remote.source == "root@colab:/content/da26/runs"
+
+
+def test_another_storys_job_names_its_own_vm_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    made: list[Remote] = []
+
+    def stop_at_probe(remote: Remote, dest: Path) -> float:
+        made.append(remote)
+        return 2 * he1_fetch.SLOW_MB_S
+
+    monkeypatch.setattr(he1_fetch, "probe", stop_at_probe)
+    monkeypatch.setattr(he1_fetch, "session_state", lambda *a, **k: "running")
+    common = ["probe", "--session", JOB, "--registry", "/nonexistent", "--colab", "/x/colab"]
+    for dest, extra in (("a", []), ("b", ["--remote-work", "/content/da34"])):
+        assert he1_fetch.main([*common, "--dest", str(tmp_path / dest), *extra]) == 0
+    default, da34 = made
+    assert (default.work, default.source) == ("/content/da26", "root@colab:/content/da26/runs")
+    assert (da34.work, da34.source) == ("/content/da34", "root@colab:/content/da34/runs")
+    assert da34.stage()[-1].endswith("he1_colab.py stage --work /content/da34")
+    assert da34.stage()[-1].startswith("cd /content/da34 && ")
 
 
 def test_a_failed_pull_is_never_counted_as_fetched(tmp_path: Path) -> None:

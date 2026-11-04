@@ -17,6 +17,11 @@ which need decoded video, are carried from each episode's own source row.
 `meta/flywheel_subset.json` maps every new index to its source index and pins the
 set hash, which is recomputed from the source here and must match the plan's.
 
+The set hash is over seeds. In psi-data a seed is its episode index. A tray release
+(DA-34) has `meta/flywheel_export.json`: there each seed's episode index comes from
+that export, checked against the release manifest, and the file's `episode_indices`
+are not used.
+
     python scripts/he/demo_subset.py --src <dataset dir> --sets configs/runplans/he/demo_sets.json \
         --set N20 --out <work>/sets/N20/G1WholebodyLocomotionPickBetweenTablesTeleop-v0
 """
@@ -34,7 +39,7 @@ from typing import Any
 
 from flywheel.data.ingest.lerobot import iter_episodes, read_episode_rows, read_info, write_episode
 from flywheel.data.inject.stats import write_stats
-from flywheel_psi0.tray.demo_sets import DemoSets, set_hash
+from flywheel_psi0.tray.demo_sets import EXPORT_META, DemoSet, DemoSets, read_release, set_hash
 
 MARKER = "flywheel_subset.json"
 
@@ -51,14 +56,34 @@ def episode_files(info: dict[str, Any], index: int) -> list[str]:
     return paths
 
 
+def source_indices(src: Path, sets: DemoSets, name: str, demo: DemoSet) -> list[int]:
+    """Episode indices of the set's seeds in `src`, ascending.
+
+    A tray release maps seeds to indices in its own export. Without an export (psi-data)
+    the seed is the index, so the file must list the same numbers twice.
+    """
+    if not (src / EXPORT_META).is_file():
+        if demo.episode_indices != demo.seeds:
+            raise ValueError(f"{name}: no {EXPORT_META} in {src}, and indices are not the seeds")
+        return list(demo.seeds)
+    release_hash, episodes = read_release(src)
+    if release_hash != sets.release_hash:
+        raise ValueError(f"{src} is release {release_hash}, not {sets.release_hash}")
+    index_of = {e.seed: e.episode_index for e in episodes}
+    missing = [seed for seed in demo.seeds if seed not in index_of]
+    if missing:
+        raise ValueError(f"{name}: seeds {missing[:5]} are not in {src}/{EXPORT_META}")
+    return sorted(index_of[seed] for seed in demo.seeds)
+
+
 def build_subset(src: Path, out: Path, sets: DemoSets, name: str) -> dict[str, Any]:
     """Write demo set `name` of `sets` as its own LeRobot dataset at `out`; return the marker."""
     if out.exists():
         raise FileExistsError(f"{out} exists; a demo set dataset is never overwritten")
     demo = sets.sets[name]
-    kept = sorted(demo.episode_indices)
-    if set_hash(sets.release_hash, kept) != demo.set_hash:
-        raise ValueError(f"{name}: episode indices do not give the set hash {demo.set_hash}")
+    if set_hash(sets.release_hash, demo.seeds) != demo.set_hash:
+        raise ValueError(f"{name}: seeds do not give the set hash {demo.set_hash}")
+    kept = source_indices(src, sets, name, demo)
     info = read_info(src)
     rows = {int(r["episode_index"]): r for r in read_episode_rows(src)}
     missing = [i for i in kept if i not in rows]
@@ -69,6 +94,8 @@ def build_subset(src: Path, out: Path, sets: DemoSets, name: str) -> dict[str, A
     # meta first (lang_map, modality and the rest are per dataset, not per episode),
     # then the kept rows under their new index; write_episode recounts the totals.
     shutil.copytree(src / "meta", out / "meta")
+    # a release's export lists its own numbering; the cut's map is the marker below
+    (out / EXPORT_META).unlink(missing_ok=True)
     (out / "meta" / "info.json").write_text(
         json.dumps({**info, "splits": {"train": f"0:{len(kept)}"}}, indent=4)
     )
