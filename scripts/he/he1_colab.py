@@ -57,6 +57,7 @@ REPO = Path(__file__).resolve().parents[2]
 PLAN = REPO / "configs/runplans/he/he-1.yaml"
 DRIVE = Path("/content/drive/MyDrive/denso/da26")
 FROZEN = "rp_95c98a476499"  # he-1.lock.json, signed by Hiếu 4/11/2026 (tier 2)
+TOTAL_STEPS = 40000  # recipe R1 train.max_training_steps, checked by the tests
 for package in ("flywheel-psi0", "flywheel-contracts", "flywheel-data"):
     if str(REPO / "packages" / package / "src") not in sys.path:
         sys.path.insert(0, str(REPO / "packages" / package / "src"))
@@ -341,13 +342,31 @@ def stage(work: Path) -> dict[str, Any]:
             {
                 "job": job.name,
                 "checkpoint": complete[-1].name if complete else None,
-                "train_done": trained.get("job_id") == job.name,
+                "train": train_state(trained, job.name, work / "train.log"),
                 "progress": progress(job / "metrics.jsonl"),
                 "files": entries,
             }
         )
     cache_path.write_text(json.dumps(cache))
     return {"jobs": staged}
+
+
+def train_state(trained: dict[str, Any], job: str, log: Path) -> str:
+    """`done`, `failed` or `running`.
+
+    `done` only when the train phase of this job ended ok at the plan's last step:
+    `train` writes its phase before it raises, so a crash at 25k with ckpt_20000 on
+    disk also has one. A `train exit` line in the launch log with no such phase is a
+    failure too (the process died before writing it).
+    """
+    if trained.get("job_id") == job:
+        ok = trained.get("infra_status") == "ok"
+        return "done" if ok and trained.get("checkpoint_step") == TOTAL_STEPS else "failed"
+    if log.is_file() and any(
+        line.startswith("train exit ") for line in log.read_text().splitlines()
+    ):
+        return "failed"
+    return "running"
 
 
 def progress(metrics: Path, skip: int = 200) -> dict[str, Any]:
@@ -359,8 +378,11 @@ def progress(metrics: Path, skip: int = 200) -> dict[str, Any]:
     rows = []
     if metrics.exists():
         for line in metrics.read_text().splitlines():
-            row = json.loads(line) if line.strip() else {}
-            if row.get("split") == "train":
+            try:
+                row = json.loads(line)
+            except ValueError:  # the trainer is mid-way through writing the last line
+                continue
+            if isinstance(row, dict) and row.get("split") == "train":
                 rows.append(row)
     if rows:
         last = rows[-1].get("attempt")
