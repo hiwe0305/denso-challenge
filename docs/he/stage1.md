@@ -28,8 +28,17 @@ Khác với script, kèm lý do:
 | `train.max_training_steps` | 1.000.000 | 200 | "vài trăm bước" |
 | `train.checkpointing_steps` | 5000 | 200 | một checkpoint ở cuối |
 | `train.validation_steps` | 1000 | 0 | dữ liệu thay thế không có split `test/`; vài trăm bước không đủ để đọc val dạng sinh token |
-| `train.deepspeed_config` | `zero3.json` (mặc định của biến `DEEPSPEED_CONFIG` trong script) | `zero3_offload.json` (file của tác giả) | một GPU: ZeRO-3 trên một thiết bị không chia; fine-tune toàn bộ VLM 2,1 tỉ tham số cần khoảng 34 GB (trọng số bf16, master fp32, Adam) trước activation, quá 24 GB của L4. Offload đưa optimizer và trọng số sang RAM (VM L4: 52 GB) |
+| `train.deepspeed_config` | `zero3.json` (mặc định của biến `DEEPSPEED_CONFIG` trong script) | [`zero3_offload.json`](../../configs/runplans/stage1/zero3_offload.json) của repo này (từ 4/11/2026, sau lần chạy 1), dựa trên file cùng tên của tác giả | một GPU: ZeRO-3 trên một thiết bị không chia; fine-tune toàn bộ VLM 2,1 tỉ tham số cần khoảng 34 GB (trọng số bf16, master fp32, Adam) trước activation, quá 24 GB của L4. Offload đưa optimizer và trọng số sang RAM (VM L4: 52 GB) |
 | `seed`, `exp`, `timestamp`, `train.output_dir`, `data.root-dir` | của tác giả | theo job | `Psi0Trainer` điền |
+
+**File DeepSpeed của repo [Đề xuất, 4/11/2026].** File `zero3_offload.json` của tác giả không script nào dùng ở `cda3fdf`, và lần chạy 1 hỏng ở `accelerator.prepare` (mục 1.7). File của repo giữ nguyên phần ZeRO-3 và offload, chỉ đổi hai khối:
+
+| Khối | File của tác giả | File của repo | Lý do |
+|---|---|---|---|
+| `optimizer.params` | `lr`, `betas`, `eps`, `weight_decay` đều là `"auto"` | 1e-4, [0,9; 0,999], 1e-8, 0,0, đúng giá trị của recipe | `accelerate` 1.7.0 chỉ điền `lr` và `weight_decay` cho `DummyOptim`; `betas` và `eps` để `"auto"` thì dừng (lỗi của lần chạy 1). Ghi đủ cả bốn để file nói rõ optimizer chạy với giá trị nào |
+| `scheduler` | `WarmupLR`, mọi tham số `"auto"` | `WarmupCosineLR`, `warmup_min_ratio` và `cos_min_ratio` 1,0, `last_batch_iteration` 0 | Ψ₀ cho vision tower và projector lr riêng 1e-5. `WarmupLR` đặt một lr chung cho mọi nhóm, nên hai nhóm đó lên 1e-4, và hai bước đầu chạy ở lr 0. `WarmupCosineLR` nhân lr riêng của từng nhóm với một tỉ lệ, ở đây luôn là 1,0, nên lr hằng số như recipe (`constant`). Dựng ở bước −1, nó ghi lr 0 vào nhóm đầu trước bước đầu tiên (DeepSpeed 0.17.1); bắt đầu ở bước 0 thì không ghi |
+
+`runplan check` so file với recipe: không giá trị nào của `optimizer.params` là `"auto"`; mọi `"auto"` còn lại là khóa mà `accelerate` 1.7.0 điền cho đường này (`FILLED_BY_ACCELERATE`); `lr`, `betas`, `eps`, `weight_decay` bằng recipe; scheduler hằng số theo nhóm. Đã thử trên laptop, trong môi trường Ψ₀, chỉ bước điền `"auto"` của `accelerate` (không cần DeepSpeed): file của tác giả báo đúng lỗi của lần chạy 1, file của repo điền hết. Chạy `WarmupCosineLR` của DeepSpeed 0.17.1 trên optimizer hai nhóm: lr giữ 1e-4 và 1e-5 từ bước đầu đến hết, cả 200 bước lẫn 3 bước.
 
 Giữ nguyên: batch 16 mỗi GPU, tích lũy gradient 2 (batch toàn cục 32 trên một GPU; tác giả chạy nhiều node), lr 1e-4 hằng số, ảnh 270×480, `chunk_size` 1, `upsample_rate` 3, delta action, tokenizer FAST `egodex-rel-50w-1x48-v2048-s100`, stats `egodex_stat_all.json`, train cả LLM, vision và projector.
 
@@ -89,7 +98,7 @@ Lần 2, cùng ngày, **cả 218 episode**, 12 worker như run thật, container
 
 ### 1.6 Chạy lại được
 
-RunPlan [`egodex-short.yaml`](../../configs/runplans/stage1/egodex-short.yaml) (`run_plan_id` `rp_45304b9931c3`) chốt trước lần chạy:
+RunPlan [`egodex-short.yaml`](../../configs/runplans/stage1/egodex-short.yaml) (`run_plan_id` `rp_6c8cf029703b` từ lần chạy 2; lần chạy 1 là `rp_45304b9931c3`) chốt trước lần chạy:
 
 - **Loss giảm**: trung vị 20 dòng train cuối thấp hơn trung vị 20 dòng đầu (mỗi dòng một batch, nên so trung vị của cửa sổ, không so hai bước).
 - **Chạy lại**: chạy lại 3 bước đầu dưới job id khác (`da30-egodex-short-repeat`), cùng seed 7; loss bước đầu lệch không quá 2%. Seed cố định thứ tự dữ liệu (generator của DataLoader và seed của worker lấy từ seed của cấu hình).
@@ -121,7 +130,9 @@ nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py se
   [ -f $R/guard.beat ] && [ $(( $(date +%s) - $(stat -c %Y $R/guard.beat) )) -lt 120 ] ) && echo READY || echo "NOT READY: do not start the job"
 ```
 
-Lệnh trên Colab (L4, phiên `da30-stage1` do bộ canh mở), theo thứ tự, từ bản sao repo ở `/content/da30/fw` với `PYTHONPATH` gồm `packages/flywheel-psi0/src` và `packages/flywheel-contracts/src` như DA-19:
+Lệnh trên Colab (L4, phiên `da30-stage1` do bộ canh mở), theo thứ tự, từ bản sao repo ở `/content/da30/fw` với `PYTHONPATH` gồm `packages/flywheel-psi0/src` và `packages/flywheel-contracts/src` như DA-19.
+
+`setup` chạy **pre-flight** (`flywheel_psi0.stage1.preflight`) ngay sau khi dựng môi trường Ψ₀, trước mọi lần tải. Pre-flight build CPU Adam của DeepSpeed, rồi dựng `Accelerator`, `DummyOptim` và `DummyScheduler` như `scripts/train.py` và `PretrainTrainer` của Ψ₀, với file DeepSpeed và các giá trị của recipe. Sau đó nó `prepare` một model nhỏ hai nhóm tham số và chạy hai bước optimizer. Nó dừng `setup` nếu `prepare` lỗi, hoặc nếu một nhóm không ở đúng lr riêng của nó. Kết quả ghi vào `report.json`, mục `preflight`. Một lỗi như lần chạy 1 vì thế tốn vài phút setup, không tốn thêm phần tải và nạp model. Thời gian của pre-flight chưa đo; build CPU Adam lần đầu có thể mất một đến hai phút.
 
 ```bash
 python3 -m flywheel_psi0.stage1.colab setup --work /content/da30 --plan fw/configs/runplans/stage1/egodex-short.yaml
