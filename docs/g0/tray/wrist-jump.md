@@ -143,6 +143,7 @@ Hiện tượng (sổ của DA-34, `s1-pool-1103/supervise.log`):
 | Bản sao đó, bỏ file mp4 còn sót | Không crash. |
 | Kích thước frame, số frame | 360 × 640 như psi-data; 1758 frame không có gì đặc biệt. Không phải ca biên của encoder. |
 | `video_writer_race.py`, `VideoWriter` gốc, 50 frame mỗi video rồi `stop()` ngay | 3/3 lần chạy SIGSEGV trước video thứ 20. faulthandler cho thấy hai luồng cùng ở trong `stream.encode` của một encoder: luồng nền ở `video_writer.py:71` (frame cuối) và luồng chính ở `stop() → _flush_stream()` (dòng 76). |
+| Một lần chạy `VideoWriter` gốc khác của cùng test | Treo: process đứng ở `futex_wait` 14 giờ, không ghi thêm video (thấy và dừng lúc 16:46 ngày 4/11). Cùng kiểu treo với shard 1 của DA-34. |
 | Cùng test, `JoinedVideoWriter` (bản sửa) | 200/200 video, không lần gọi chồng nào, RSS tăng 66 MB. |
 | Cùng test, `SyncVideoWriter` (encode ngay trong luồng sim) | 200/200 video, RSS tăng 69 MB; frame thật tốn 9,9 ms mỗi frame dưới tải 41, tức khoảng +20 % thời gian mỗi bước. |
 
@@ -190,3 +191,21 @@ Kết quả thô (không commit) ở `rtx3060:~/denso-da33-wristjump/`: `out/` (
 1. Nhận bản sửa giới hạn vận tốc trong IK (0,08 rad/bước) và sinh lại release S1 cùng lô pool v2, hay train DA-34 trên dữ liệu hiện tại với nhãn có bước vọt.
 2. Nhận bản sửa `JoinedVideoWriter` cho bộ ghi (DA-33, và DA-35 nếu dùng chung).
 3. Giao DA-35 đặt cùng giới hạn vận tốc cho IK của operator ảo trước lô S2 production.
+
+## Quyết định và bản sửa (4/11/2026)
+
+**[Đã chốt]** Hiếu merge #93 và chọn sửa rồi sinh lại, không che bước vọt khi train. Nhiệm vụ 11 của DA-33 làm theo hai đề xuất ở trên:
+
+- `UpperBodyIK(robot_model, max_joint_step)` và `StandWalkController(robot, max_joint_step)` đặt `VelocityLimit` cho QP của IK: min(URDF, `max_joint_step` / (`num_step_per_frame` · `dt` · `amplify_factor`)). Không truyền thì giữ hành vi cũ, nên các đường khác (test WBC, script đo) không đổi.
+- `TrayAgent` truyền `arm_step_max: 0.08` từ `tray_planner.yaml`; `PLANNER_VERSION` lên `da33-planner-5` (cấu hình hiện tại ghi `da33-planner-5+cfg.4e2a4505`).
+- `tray/recorder.py` ghi video qua `JoinedVideoWriter`, gắn vào exporter bằng lớp con của `Gr00tDataExporter`; không sửa SIMPLE.
+
+Bằng chứng trên `rtx3060` (bản sao nhánh ở `~/denso-da33-ikfix`, scope `MemoryMax`):
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Test sim (`test_video_writer.py`, `test_agent.py`, `test_recorder.py`, `tests/wbc`) | 25/25 qua |
+| Test mới `test_arm_commands_move_at_most_arm_step_max_per_step`, seed 1 mức 1, có và không có giới hạn | Không giới hạn: bước tay lớn nhất 0,177, 24 bước vượt 0,0869, nên test bắt được lỗi. Có giới hạn: 0,08, không bước nào vượt. Cả hai đều thành công. |
+| `generate.py` 6 lượt, seed 300000–300005, 2 worker | 5/6 thành công, 5/5 qua QA tối thiểu, hỏng 1 `L-ONE-HAND` (300004). Kết quả và số bước từng seed trùng lần thử `ik_velocity` ở trên. Mỗi episode ghi có số frame video bằng số dòng parquet; bước tay lớn nhất trong `action` đã ghi là 0,08. |
+
+Việc còn lại, sau khi PR được merge: sinh lại release S1 (130 lượt, seed 1000–1129) và lô pool của DA-34 (610 lượt, seed 1000–1609), rồi chạy lại QA của DA-03. Quyết định 3 (giới hạn cho IK của operator ảo DA-35) chưa có câu trả lời ghi lại; `tray/pico/session.py` của DA-35 vẫn dùng writer gốc.
