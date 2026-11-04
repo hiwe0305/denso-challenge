@@ -253,6 +253,12 @@ def test_a_missing_stats_file_or_block_fails(root: Path) -> None:
     assert failed(root) == ["v21.6.stats.file"]
 
 
+def with_dim(layout: ActionLayout, index: int, **change: bool) -> ActionLayout:
+    dims = list(layout.dimensions)
+    dims[index] = dims[index].model_copy(update=change)
+    return ActionLayout(dimensions=dims)
+
+
 def test_a_masked_constant_dim_is_no_stats_error(tmp_path: Path) -> None:
     # Plan 3/11 section 7: a masked action dim with std 0 gives no stats error.
     root = make_tray_dataset(tmp_path / "masked")
@@ -263,35 +269,38 @@ def test_a_masked_constant_dim_is_no_stats_error(tmp_path: Path) -> None:
     write_stats(root)
     stats = json.loads((root / "meta/stats_psi0.json").read_text())["action"]
     assert stats["std"][5] == 0.0
-    dims = list(g1_layout().dimensions)
-    dims[5] = dims[5].model_copy(update={"masked": True})
-    layout = ActionLayout(dimensions=dims)
+    layout = with_dim(g1_layout(), 5, masked=True)
     assert failed(root, layout) == []
     finding = {f.check.name: f for f in run_checklist(root, layout)}["v21.6.stats.constant"]
-    assert finding.detail == "constant action dims [5]; masked or declared [5]; errors []"
+    assert finding.detail == "constant action dims [5, 31]; masked or declared [5, 31]; errors []"
     assert "v21.6.stats.constant" in failed(root)  # the same data, dim 5 unmasked
 
 
-def test_an_undeclared_constant_dim_fails(tmp_path: Path) -> None:
-    # Design 10 D4 (PO decision A, 4/11/2026): dim 31 at 0.74 everywhere, as in psi-data,
-    # fails until the layout declares it constant (PR #89).
-    root = make_tray_dataset(tmp_path / "height")
-    for index, length in enumerate((6, 9, 4)):
-        write_episode(root, frames_of(index, length, constant_height=True))
-    write_stats(root)
-    finding = {f.check.name: f for f in run_checklist(root, g1_layout())}["v21.6.stats.constant"]
+def test_a_declared_constant_dim_passes_and_the_same_dim_undeclared_fails(root: Path) -> None:
+    # Design 10 D4 (PO decision A, 4/11/2026): dim 31 is 0.74 in every frame, min == max,
+    # as in psi-data. g1.yaml declares it constant (PR #89), so it passes; without the
+    # flag the same unmasked dim fails point 6.
+    layout = g1_layout()
+    assert layout.dimensions[31].constant and not layout.dimensions[31].masked
+    stats = json.loads((root / "meta/stats_psi0.json").read_text())["action"]
+    assert stats["min"][31] == stats["max"][31]
+    findings = {f.check.name: f for f in run_checklist(root, layout)}
+    assert findings["v21.6.stats.constant"].check.passed
+    assert findings["v21.6.stats.constant"].detail == (
+        "constant action dims [31]; masked or declared [31]; errors []"
+    )
+    undeclared = with_dim(layout, 31, constant=False)
+    finding = {f.check.name: f for f in run_checklist(root, undeclared)}["v21.6.stats.constant"]
     assert not finding.check.passed
     assert finding.check.value == 1
     assert finding.detail == "constant action dims [31]; masked or declared []; errors [31]"
-    assert failed(root) == ["v21.6.stats.constant"]
+    assert failed(root, undeclared) == ["v21.6.stats.constant"]
 
 
 def test_constant_dims_come_from_min_and_max_not_std(tmp_path: Path) -> None:
     # Dim 31 is 0.74 in every frame, yet SIMPLE's float32 stats give it a std above 0
     # (3.6e-4 on psi-data e78fb93): only min == max tells, as Psi0's normalizer does.
     root = make_tray_dataset(tmp_path / "height", lengths=(3000,))
-    write_episode(root, frames_of(0, 3000, constant_height=True))
-    write_stats(root)
     stats = json.loads((root / "meta/stats_psi0.json").read_text())["action"]
     assert stats["std"][31] > 0
     assert checklist.constant_dims(stats) == [31]
