@@ -1,13 +1,13 @@
 {
  "site_id": "local",
  "task_id": "G1WholebodyLocomotionPickBetweenTablesTeleop-v0",
- "embodiment_id": "default",
+ "embodiment_id": "g1_sonic_dwbc@1",
  "schema_version": "1.0.0",
  "meta": {
   "plan": "configs/runplans/he/he-1.yaml",
-  "frozen_at": "2026-11-04T14:28:09+00:00"
+  "frozen_at": "2026-11-04T14:41:47+00:00"
  },
- "id": "dec_01M6KFBKA53VKDNVS74WN0MSPP",
+ "id": "dec_01M6KG4JFTRWGQ91CD3H1TC1XX",
  "kind": "plan_review",
  "subject_kind": "run_plan",
  "subject_id": "rp_95c98a476499",

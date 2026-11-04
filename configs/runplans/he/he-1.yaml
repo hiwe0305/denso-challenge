@@ -2,8 +2,9 @@
 # two-table task (design 27/10/2026 section 7; spec sections 3 and 7.9; shape of 03
 # section 8.1). Reading rules in docs/he/he-1.md, fixed before any run.
 #
-# Not frozen yet: `he-1.lock.json` and the signing Decision `he-1.plan_review.json`
-# are written by `freeze` once Hiếu signs. After that a changed plan fails `check`.
+# Frozen 4/11/2026 (tier 2, Hiếu "Approve tier 2"): `he-1.lock.json` holds
+# rp_95c98a476499 and `he-1.plan_review.json` the signing Decision. A changed plan
+# now fails `check`; a new plan version needs a new freeze and Decision.
 #   uv run python scripts/he/he1_plan.py check configs/runplans/he/he-1.yaml
 #   uv run python scripts/he/he1_plan.py parents configs/runplans/he/he-1.yaml  # HF API
 #
