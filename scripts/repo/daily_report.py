@@ -1,4 +1,4 @@
-"""Build the daily control report of docs/product/08-daily-control.md (rules R1-R5, R7-R9).
+"""Build the daily control report of docs/product/08-daily-control.md (rules R1-R5, R7-R10).
 
 Reads git history, story files and, when GITHUB_TOKEN is set, the GitHub API. Writes a Markdown
 report and a JSON file for website/dist/progress.html. Each section is collected on its own, so a
@@ -17,11 +17,17 @@ import urllib.parse
 import urllib.request
 from collections import Counter, defaultdict
 
-from storylib import PR_SIZE_LIMIT, ROOT, STORY_ID, counts_toward_size, load_stories
+from storylib import PR_SIZE_LIMIT, ROOT, STORY_ID, Story, counts_toward_size, load_stories
 
 ICT = dt.timezone(dt.timedelta(hours=7))
 SUBJECT = re.compile(rf"^({STORY_ID})/(\d+(?:\.\d+)*): (.+)$")
 TRAILER = re.compile(r"^Time-spent:\s*(\d+(?:\.\d+)?)\s*h\s*$", re.MULTILINE | re.IGNORECASE)
+TEAM_WORKFLOW = ROOT / "docs" / "product" / "07-team-workflow.md"
+DEADLINE_HEADING = "### 2.4 "
+# A story ID that names the work of a row: at the start of the cell or after "; " or ", ". IDs inside
+# prose ("sinh nhắm lỗi bằng DA-33") are dependencies, not the work, and are left out.
+ROW_STORY = re.compile(rf"(?:^|[;,] )({STORY_ID})\b")
+DAY_MONTH = re.compile(r"\b(\d{1,2})/(\d{1,2})(?:/(\d{4}))?\b")
 
 # Default thresholds, section 3.2 of docs/product/08-daily-control.md.
 K_LIMIT = 1.3
@@ -29,6 +35,7 @@ REVIEW_WAIT_DAYS = 1
 WIP_LIMIT = 2
 STALE_DAYS = 2
 CAUSE_REPEAT = 3
+UNSTARTED_DAYS = 3  # R10, version 0.5 of 08: [Đề xuất], Hiếu sets it on merge.
 
 
 def git(*args: str) -> str:
@@ -42,6 +49,56 @@ def business_days(start: dt.datetime, end: dt.datetime) -> int:
         day += dt.timedelta(days=1)
         count += day.weekday() < 5
     return count
+
+
+def internal_deadlines(text: str, year: int) -> dict[str, dt.date]:
+    """Earliest "Hạn mới" of each story in the table of 07 section 2.4.
+
+    A story can sit on several rows (DA-03 PR 1 and PR 2); its first part must be merged by the
+    earliest one, so that is the date R10 counts down to. Rows without a date ("sau demo") are skipped.
+    """
+    start = text.find(DEADLINE_HEADING)
+    if start < 0:
+        raise ValueError(f"không thấy mục `{DEADLINE_HEADING.strip()}` trong {TEAM_WORKFLOW.name}")
+    deadlines: dict[str, dt.date] = {}
+    for line in text[start:].splitlines()[1:]:
+        if line.startswith("#"):
+            break
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if not line.startswith("|") or len(cells) != 4:
+            continue
+        dates = [dt.date(int(y or year), int(m), int(d)) for d, m, y in DAY_MONTH.findall(cells[3])]
+        if not dates:
+            continue
+        for story_id in ROW_STORY.findall(cells[1]):
+            deadlines[story_id] = min(deadlines.get(story_id, dates[0]), min(dates))
+    return deadlines
+
+
+def unstarted_days_left(story: Story, started: bool, due: dt.date | None, today: dt.date) -> int | None:
+    """Days left before the internal deadline when R10 fires, else None (negative when overdue)."""
+    if started or story.finished or due is None:
+        return None
+    left = (due - today).days
+    return left if left <= UNSTARTED_DAYS else None
+
+
+def by_author(commits, stories: dict[str, Story]) -> dict[str, dict]:
+    """Group subtask commits by git author; each item names the story owner, who may be someone else."""
+    people: dict[str, dict] = defaultdict(lambda: {"subtasks": [], "hours": 0.0})
+    for commit in commits:
+        story = stories.get(commit["story"])
+        owner = short_owner(story.owner) if story else "?"
+        people[commit["author"]]["subtasks"].append(
+            f"{commit['story']}/{commit['subtask']}: {commit['title']} (story của {owner})"
+        )
+        people[commit["author"]]["hours"] += commit["hours"]
+    return dict(people)
+
+
+def short_owner(owner: str) -> str:
+    """'Long (chủ story, 07 mục 2.2); ...' -> 'Long'."""
+    return re.split(r"\s*[(;]", owner, maxsplit=1)[0].strip() or owner
 
 
 def subtask_commits(ref: str, since: dt.datetime | None = None):
@@ -119,12 +176,7 @@ def collect(now: dt.datetime) -> dict:
     report["window"] = {"from": window_start.isoformat(), "to": now.isoformat()}
 
     def yesterday():
-        people = defaultdict(lambda: {"subtasks": [], "hours": 0.0})
-        for commit in subtask_commits("HEAD", window_start):
-            owner = stories[commit["story"]].owner if commit["story"] in stories else "?"
-            people[owner]["subtasks"].append(f"{commit['story']}/{commit['subtask']}: {commit['title']}")
-            people[owner]["hours"] += commit["hours"]
-        report["yesterday"] = dict(people)
+        report["yesterday"] = by_author(subtask_commits("HEAD", window_start), stories)
 
     def k_factor():
         totals = defaultdict(lambda: {"hours": 0.0, "earned": 0.0})
@@ -146,17 +198,31 @@ def collect(now: dt.datetime) -> dict:
             {"id": s.id, "owner": s.owner, "done": s.done, "total": s.total, "status": s.status}
             for s in stories.values()
         ]
-        report["stale"] = []
+        report["stale"], report["unstarted"] = [], []
+        today = now.astimezone(ICT).date()
+        try:  # a broken table in 07 must not hide R4 and the story table
+            deadlines = internal_deadlines(TEAM_WORKFLOW.read_text(encoding="utf-8"), today.year)
+        except (OSError, ValueError) as error:
+            report["errors"].append(f"deadlines (R10): {error}")
+            deadlines = {}
         for story in stories.values():
             if story.finished:
                 continue
             last = git("log", "--all", "-1", "--format=%ct", f"--grep=^{story.id}/", "-E").strip()
+            due = deadlines.get(story.id)
+            left = unstarted_days_left(story, bool(last), due, today)
+            if left is not None and due is not None:
+                owner = short_owner(story.owner)
+                report["unstarted"].append({"id": story.id, "owner": owner, "due": due.isoformat(), "days_left": left})
+                when = f"còn {left} ngày" if left >= 0 else f"đã quá {-left} ngày"
+                rule("R10", f"{story.id} ({owner}) chưa có commit nào; hạn nội bộ {due:%d/%m} {when} (07 mục 2.4).")
             if not last:
                 continue
             idle = business_days(dt.datetime.fromtimestamp(int(last), dt.timezone.utc), now)
             if idle >= STALE_DAYS:
-                report["stale"].append({"id": story.id, "owner": story.owner, "idle_days": idle})
-                rule("R4", f"{story.id} ({story.owner}) không có commit {idle} ngày làm việc.")
+                owner = short_owner(story.owner)
+                report["stale"].append({"id": story.id, "owner": owner, "idle_days": idle})
+                rule("R4", f"{story.id} ({owner}) không có commit {idle} ngày làm việc.")
 
     section("yesterday", yesterday)
     section("k", k_factor)
@@ -228,10 +294,10 @@ def render(report: dict) -> str:
     out = [f"# Báo cáo ngày {local:%d/%m/%Y}", "", f"Sinh lúc {local:%H:%M} giờ Việt Nam. Rule và ngưỡng: docs/product/08-daily-control.md.", ""]
     out += ["## Rule kích hoạt", ""]
     out += [f"- **{r['rule']}** · {r['text']}" for r in report["rules"]] or ["- Không có."]
-    out += ["", "## Hôm qua theo người", ""]
+    out += ["", "## Hôm qua theo người", "", "Theo tác giả git của commit (08 bản 0.5); ngoặc là chủ story.", ""]
     yesterday = report.get("yesterday", {})
-    for owner, value in sorted(yesterday.items()):
-        out.append(f"- **{owner}**: {len(value['subtasks'])} nhiệm vụ con, {value['hours']:g} giờ")
+    for author, value in sorted(yesterday.items()):
+        out.append(f"- **{author}**: {len(value['subtasks'])} nhiệm vụ con, {value['hours']:g} giờ")
         out += [f"  - {item}" for item in value["subtasks"]]
     if not yesterday:
         out.append("- Chưa có nhiệm vụ con nào vào master.")
