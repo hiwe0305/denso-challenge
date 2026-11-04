@@ -92,6 +92,19 @@ def kept_episodes(shard: Path) -> list[int]:
     return sorted(e for e in gen_ok if verdicts[e])
 
 
+def check_one_planner_version(shards: Sequence[Path]) -> str:
+    """The one planner_version of the recorded episodes; a mixed batch is refused (D-28)."""
+    versions = {
+        str(r["planner_version"])
+        for shard in shards
+        for r in read_log(shard / LOG_NAME)
+        if r["recorded"]
+    }
+    if len(versions) > 1:
+        raise ValueError(f"recorded episodes mix planner versions {sorted(versions)}")
+    return versions.pop() if versions else ""
+
+
 def _episode_file(root: Path, index: int, kind: str) -> Path:
     chunk = f"chunk-{index // 1000:03d}"
     if kind == "data":
@@ -157,6 +170,7 @@ def export_psi0(
         raise FileExistsError(f"{out} is not empty")
     simple = simple or simple_root()
     shards = [s for s in sorted(batch.glob("shard-*")) if (s / LOG_NAME).exists()]
+    check_one_planner_version(shards)
     exported: list[ExportedEpisode] = []
     out.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=out.parent, prefix=f".{out.name}.stage-") as tmp:

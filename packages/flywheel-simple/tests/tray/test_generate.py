@@ -9,6 +9,8 @@ import pytest
 from flywheel_simple.tray.generate import (
     AttemptRow,
     append_attempt,
+    batch_planner_versions,
+    check_planner_version,
     episode_qa,
     logged_seeds,
     next_seeds,
@@ -68,6 +70,30 @@ def test_logged_seeds_cover_every_shard(tmp_path: Path) -> None:
     append_attempt(shard_dir(tmp_path, 0) / "gen_log.jsonl", ROW)
     append_attempt(shard_dir(tmp_path, 3) / "gen_log.jsonl", replace(ROW, seed=7, shard=3))
     assert logged_seeds(tmp_path) == {0, 7}
+
+
+def test_a_batch_of_another_planner_version_is_refused(tmp_path: Path) -> None:
+    check_planner_version(tmp_path, "p")  # a new batch
+    append_attempt(shard_dir(tmp_path, 0) / "gen_log.jsonl", ROW)
+    check_planner_version(tmp_path, "p")  # resuming the same planner
+    append_attempt(shard_dir(tmp_path, 3) / "gen_log.jsonl",
+                   replace(ROW, seed=7, shard=3, planner_version="old", recorded=False))
+    assert batch_planner_versions(tmp_path) == {"p", "old"}
+    with pytest.raises(RuntimeError, match=r"\['old'\].*new --out"):
+        check_planner_version(tmp_path, "p")
+
+
+def test_generate_refuses_a_batch_of_another_planner_before_any_attempt(tmp_path: Path) -> None:
+    # Resume goes by seed only: without this check a planner-5 run would top up a
+    # planner-4 batch and the release would mix them (D-28). The check runs before the
+    # simulator imports, so this needs no SIMPLE venv.
+    from flywheel_simple.tray import generate as gen
+
+    append_attempt(shard_dir(tmp_path, 0) / "gen_log.jsonl", replace(ROW, planner_version="old"))
+    before = (shard_dir(tmp_path, 0) / "gen_log.jsonl").read_bytes()
+    with pytest.raises(RuntimeError, match="generated with planner"):
+        gen.generate(tmp_path, 1, level=1, seed_start=100, allow_plain=True)
+    assert (shard_dir(tmp_path, 0) / "gen_log.jsonl").read_bytes() == before
 
 
 @pytest.mark.parametrize(

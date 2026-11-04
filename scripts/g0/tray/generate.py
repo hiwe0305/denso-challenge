@@ -35,12 +35,15 @@ from pathlib import Path
 
 from flywheel_simple.tray.generate import (
     LOG_NAME,
+    check_planner_version,
     generate,
     read_log,
     shard_dir,
     split_attempts,
     summarize,
 )
+from flywheel_simple.tray.planner import PlannerConfig
+from flywheel_simple.tray.recorder import planner_version
 
 
 def main() -> int:
@@ -73,6 +76,8 @@ def main() -> int:
         print(json.dumps({"shard": args.shard, **summary.__dict__}))
         return 0
 
+    # Refuse before starting workers; each worker checks again (generate()).
+    check_planner_version(args.out, planner_version(PlannerConfig.load()))
     env = dict(os.environ)
     for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
         env.setdefault(var, "1")
