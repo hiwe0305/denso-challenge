@@ -125,11 +125,12 @@ SIMPLE_FIX_SHA256="${SIMPLE_FIX_SHA256:-51bce5d6c0311219d9a827b589910d915521dccc
 # not touch it, and eval passes no CLI args to SimLoopConfig), so every SIMPLE run on a box shares
 # domain 0. A non-zero value mounts a copy of that yaml with this DOMAIN_ID; 0 keeps the image's.
 SIMPLE_DDS_DOMAIN="${SIMPLE_DDS_DOMAIN:-103}"
-# Clock of the eval loop. Unset: the image's eval-decoupled-wbc as SIMPLE ships, on wall clock.
-# sim | wall: run it through flywheel_simple.tray.run (#90) from FLYWHEEL_SRC (a checkout's packages/
-# dir), which swaps `time` for sim time in the eval loop, psi0_decoupled_wbc and the sonic WBC agent
-# (sim), or keeps the wall clock (wall). DA-34 found the wall clock changes outcomes on a loaded box
-# (docs/he/tray.md 8.1).
+# Clock of the eval loop. Unset: the image's eval-decoupled-wbc as SIMPLE ships (wall clock).
+# sim | wall: run it through docker/psi0/simtime_eval.py, mounted into the image; sim makes
+# time.monotonic() the MuJoCo time of the evaluated env and sleep() return at once in the eval loop,
+# psi0_decoupled_wbc and the sonic WBC agent; wall changes nothing on the same code path. DA-34
+# found the wall clock changes outcomes on a loaded box (docs/he/tray.md 8.1). flywheel_simple's
+# tray wrapper (#90) is not used: its sim clock reads the tray env and is wall time for this task.
 SIMPLE_EVAL_CLOCK="${SIMPLE_EVAL_CLOCK:-}"
 WBC_YAML=/workspace/simple/third_party/gear_sonic/utils/mujoco_sim/wbc_configs/g1_29dof_sonic_model12.yaml
 SIMPLE_DATA="${SIMPLE_DATA:-$MAIN_REPO/fwdata/simple/s103}"
@@ -166,12 +167,9 @@ cmd_run() {
   local entry=(--entrypoint /workspace/simple/.venv/bin/eval-decoupled-wbc) clock_args=() clock="image"
   if [[ -n "$SIMPLE_EVAL_CLOCK" ]]; then
     [[ "$SIMPLE_EVAL_CLOCK" == sim || "$SIMPLE_EVAL_CLOCK" == wall ]] || die "SIMPLE_EVAL_CLOCK must be sim or wall"
-    [[ -f "${FLYWHEEL_SRC:-}/flywheel-simple/src/flywheel_simple/tray/run.py" ]] \
-      || die "FLYWHEEL_SRC must be a packages/ dir with flywheel-simple (#90)"
     entry=(--entrypoint /workspace/simple/.venv/bin/python)
-    clock_args=(-v "$FLYWHEEL_SRC:$FLYWHEEL_SRC:ro" -e "PYTHONPATH=$FLYWHEEL_SRC/flywheel-simple/src"
-                -e "FLYWHEEL_TRAY_EVAL_CLOCK=$SIMPLE_EVAL_CLOCK")
-    clock="$SIMPLE_EVAL_CLOCK (flywheel_simple.tray.run)"
+    clock_args=(-v "$REPO/docker/psi0/simtime_eval.py:/opt/s103/simtime_eval.py:ro")
+    clock="$SIMPLE_EVAL_CLOCK (docker/psi0/simtime_eval.py)"
   fi
   local fix_mount=() task_file="image (SIMPLE 6d10628)"
   if [[ "$SIMPLE_TASK_FIX" == on ]]; then
@@ -237,7 +235,7 @@ $others"
     -v "$SIMPLE_ASSETS/scenes:/workspace/simple/data/scenes:ro" \
     "${fix_mount[@]}" "${dds_mount[@]}" \
     "${clock_args[@]}" -w /workspace/simple "${entry[@]}" "$SIMPLE_IMAGE" \
-    ${SIMPLE_EVAL_CLOCK:+-m flywheel_simple.tray.run eval-decoupled-wbc} \
+    ${SIMPLE_EVAL_CLOCK:+/opt/s103/simtime_eval.py --clock "$SIMPLE_EVAL_CLOCK"} \
     "simple/$TASK" psi0_decoupled_wbc "dr-level-$level" \
     --host "$host" --port "$PORT" --sim-mode "$sim_mode" --headless \
     --data-format lerobot --data-dir "data/$evals/$TASK/dr-level-$level" \
