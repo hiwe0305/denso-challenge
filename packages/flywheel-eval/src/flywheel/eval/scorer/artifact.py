@@ -1,29 +1,27 @@
 """The record one scoring run leaves behind (DA-36 AC 1, 5).
 
-`Score` of 03 section 4.3 is what `decide` of the Vòng lane and the Agent QA/QC
-of the egocentric lane read. It lives in S1-10 (#36), which has not merged, and
-`ScoreRecord` below is that model field for field - `episode_id`,
-`scorer_version`, `success`, `step_status`, `first_failed_step`,
-`failure_kind`, `failure_class`, `level`, `balance_violated` - so that the
-switch is an import change and the deletion of one class, with no field name
-and no stored file changing shape. It is written here rather than added to
-`flywheel.contracts` because `Score` arrives there with the whole entity layer
-of #36 behind it, and a second copy of that layer would be a merge conflict
-rather than a dependency. The PR records this as an R6 note for the PO.
+The record is `Score` of `flywheel.contracts.entities` (03 section 4.3), the
+artifact `decide` of the Vòng lane and the Agent QA/QC of the egocentric lane
+read. Until S1-10 (#36) merged it was a lane-local `ScoreRecord` with the same
+fields; task 7 replaced it with the contract model and deleted the copy, so no
+field name and no stored line changed shape. `Score` is content-addressed: its
+`id` is `sc_<hash>` of everything else in the record, `trace_sha256` and
+`scorer_version` included, so a re-score of the same trace under the same
+scorer and config gets the same id and a changed one does not.
 
-Two fields of 03 section 4.3 are not in either model: the time each step was
+Two fields of 03 section 4.3 are not in the model: the time each step was
 entered and left. Nothing in `StageEvaluation` carries them, and a field
-invented in lane code is a field no other lane can read, so they go in the
-Contract change issue for Long together with a typed reason for an unknown
-step (AC 1).
+invented in lane code is a field no other lane can read, so they stay in the
+Contract change issue for Long (#59) together with a typed reason for an
+unknown step (AC 1).
 
 `meta` holds what this run measured and the next reader would otherwise have to
 re-derive: the signals the trace was missing, the reason behind every unknown
-step, and where the balance condition broke. It does not go into the contract:
-the PO review of 3/11/2026 asks for whatever has to survive to be named as a
-typed field in #62 instead. The per-group tracking error and
-the p99 latencies that 03 section 4.3 also lists are measured by the system
-check of DA-13, not here, and are left out rather than filled with zeros.
+step, and where the balance condition broke. The PO review of 3/11/2026 asks
+for whatever has to survive to be named as a typed field in #62 instead. The
+per-group tracking error and the p99 latencies that 03 section 4.3 also lists
+are measured by the system check of DA-13, not here, and are left out rather
+than filled with zeros.
 
 The store is append-only. Scoring the same episode again appends a second
 record; `scorer_version` and `config_sha256` are what tell them apart, so a
@@ -34,49 +32,22 @@ re-score never silently replaces a number somebody has already reported
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
+from flywheel.contracts.entities import Score
 from flywheel.eval.scorer.score import EpisodeScore
-from pydantic import BaseModel, ConfigDict, Field
 
 STORE_RECORDS = Path("scorer") / "score.jsonl"
 
-FailureClassName = Literal["approach", "grasp", "carry", "place", "balance"]
 
-
-class ScoreRecord(BaseModel):
-    """One episode as scored, in the field layout of `Score` (03 section 4.3)."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    episode_id: str
-    scorer_version: str
-    success: bool | None = None
-    step_status: list[str] = Field(default_factory=list)
-    first_failed_step: int | None = None
-    failure_kind: str | None = None
-    failure_class: FailureClassName | None = None
-    level: int | None = None
-    balance_violated: bool = False
-    # Not in `Score`: the scorer's own provenance and measurements. `task_id`
-    # and `config_sha256` are what make a record reproducible, and the artifact
-    # is useless without them. `trace_sha256` is what `Score.id` is built from
-    # (03 section 4.3: `sc_<hash trace + scorer_version>`), recorded now so the
-    # switch to `Score` stays a rename; all three are in #62.
-    task_id: str
-    config_sha256: str
-    trace_sha256: str
-    meta: dict[str, Any] = Field(default_factory=dict)
-
-
-def build_record(score: EpisodeScore, level: int | None = None) -> ScoreRecord:
+def build_record(score: EpisodeScore, level: int | None = None) -> Score:
     """The record of one scoring run.
 
     `level` is the condition level of the episode (Level 1 or Level 2 of the
     demo). The scorer does not know it from a trace, so the caller passes it
     and it stays unset otherwise rather than defaulting to a level.
     """
-    return ScoreRecord(
+    return Score(
         episode_id=score.episode_id,
         scorer_version=score.scorer_version,
         success=score.success,
@@ -93,7 +64,7 @@ def build_record(score: EpisodeScore, level: int | None = None) -> ScoreRecord:
     )
 
 
-def write_record(record: ScoreRecord, store_path: Path) -> Path:
+def write_record(record: Score, store_path: Path) -> Path:
     """Append the record to the store and return the file it went into."""
     path = store_path / STORE_RECORDS
     path.parent.mkdir(parents=True, exist_ok=True)

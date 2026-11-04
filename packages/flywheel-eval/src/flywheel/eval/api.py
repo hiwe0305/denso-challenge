@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from flywheel.contracts import TaskDefinition
+from flywheel.contracts.entities import Score
 from flywheel.contracts.training import TrainDiagnosis
 from flywheel.eval.config import (
     load_scorer_config,
@@ -40,7 +41,7 @@ from flywheel.eval.diagnosis.train.artifact import (
     load_job,
     write_artifact,
 )
-from flywheel.eval.scorer.artifact import ScoreRecord, build_record, write_record
+from flywheel.eval.scorer.artifact import build_record, write_record
 from flywheel.eval.scorer.reader import read_trace
 from flywheel.eval.scorer.score import EpisodeScore, score_episode
 
@@ -103,7 +104,7 @@ def store_score(score: EpisodeScore, store_path: Path, level: int | None = None)
     return write_record(build_record(score, level), store_path)
 
 
-def score_record(score: EpisodeScore, level: int | None = None) -> ScoreRecord:
+def score_record(score: EpisodeScore, level: int | None = None) -> Score:
     """The record of a score without writing it, for callers that keep their own store."""
     return build_record(score, level)
 
