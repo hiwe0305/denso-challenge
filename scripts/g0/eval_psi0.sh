@@ -125,6 +125,12 @@ SIMPLE_FIX_SHA256="${SIMPLE_FIX_SHA256:-51bce5d6c0311219d9a827b589910d915521dccc
 # not touch it, and eval passes no CLI args to SimLoopConfig), so every SIMPLE run on a box shares
 # domain 0. A non-zero value mounts a copy of that yaml with this DOMAIN_ID; 0 keeps the image's.
 SIMPLE_DDS_DOMAIN="${SIMPLE_DDS_DOMAIN:-103}"
+# Clock of the eval loop. Unset: the image's eval-decoupled-wbc as SIMPLE ships, on wall clock.
+# sim | wall: run it through flywheel_simple.tray.run (#90) from FLYWHEEL_SRC (a checkout's packages/
+# dir), which swaps `time` for sim time in the eval loop, psi0_decoupled_wbc and the sonic WBC agent
+# (sim), or keeps the wall clock (wall). DA-34 found the wall clock changes outcomes on a loaded box
+# (docs/he/tray.md 8.1).
+SIMPLE_EVAL_CLOCK="${SIMPLE_EVAL_CLOCK:-}"
 WBC_YAML=/workspace/simple/third_party/gear_sonic/utils/mujoco_sim/wbc_configs/g1_29dof_sonic_model12.yaml
 SIMPLE_DATA="${SIMPLE_DATA:-$MAIN_REPO/fwdata/simple/s103}"
 # A SIMPLE data/ tree with assets, robots and scenes already downloaded; mounted read-only.
@@ -157,6 +163,16 @@ cmd_run() {
     unzip -q -o "$zip" -d "$SIMPLE_DATA/$evals"
   fi
   [[ -d "$conds" ]] || die "no eval conditions at $conds"
+  local entry=(--entrypoint /workspace/simple/.venv/bin/eval-decoupled-wbc) clock_args=() clock="image"
+  if [[ -n "$SIMPLE_EVAL_CLOCK" ]]; then
+    [[ "$SIMPLE_EVAL_CLOCK" == sim || "$SIMPLE_EVAL_CLOCK" == wall ]] || die "SIMPLE_EVAL_CLOCK must be sim or wall"
+    [[ -f "${FLYWHEEL_SRC:-}/flywheel-simple/src/flywheel_simple/tray/run.py" ]] \
+      || die "FLYWHEEL_SRC must be a packages/ dir with flywheel-simple (#90)"
+    entry=(--entrypoint /workspace/simple/.venv/bin/python)
+    clock_args=(-v "$FLYWHEEL_SRC:$FLYWHEEL_SRC:ro" -e "PYTHONPATH=$FLYWHEEL_SRC/flywheel-simple/src"
+                -e "FLYWHEEL_TRAY_EVAL_CLOCK=$SIMPLE_EVAL_CLOCK")
+    clock="$SIMPLE_EVAL_CLOCK (flywheel_simple.tray.run)"
+  fi
   local fix_mount=() task_file="image (SIMPLE 6d10628)"
   if [[ "$SIMPLE_TASK_FIX" == on ]]; then
     local fix="$SIMPLE_DATA/patches/${SIMPLE_FIX_COMMIT:0:7}/$(basename "$SIMPLE_FIX_FILE")"
@@ -190,7 +206,7 @@ $others"
   info=$(curl -sf "http://$host:$PORT/info") || die "no Psi0 server on $host:$PORT; run: serve_psi0.sh serve"
   local task_lc="${TASK,,}"
   [[ "$info" == *"${task_lc%-v0}"* ]] || die "server on $host:$PORT does not serve $TASK: $(head -c 200 <<<"$info")"
-  local simple_tag="simple-${SIMPLE_FIX_COMMIT:0:7}"
+  local simple_tag="simple-${SIMPLE_FIX_COMMIT:0:7}${SIMPLE_EVAL_CLOCK:+-clock-$SIMPLE_EVAL_CLOCK}"
   [[ "$SIMPLE_TASK_FIX" == on ]] || simple_tag="simple-6d10628"
   # Runs before 4/11/2026 00:35 (all on de140d6) have no eval-<rev> component in their path.
   local tag="$simple_tag/eval-${PSI_DATA_REV:0:7}/$sim_mode/level-$level/pass-$pass/ep$start-$((start + episodes - 1))"
@@ -220,7 +236,8 @@ $others"
     -v "$SIMPLE_ASSETS/robots:/workspace/simple/data/robots:ro" \
     -v "$SIMPLE_ASSETS/scenes:/workspace/simple/data/scenes:ro" \
     "${fix_mount[@]}" "${dds_mount[@]}" \
-    -w /workspace/simple --entrypoint /workspace/simple/.venv/bin/eval-decoupled-wbc "$SIMPLE_IMAGE" \
+    "${clock_args[@]}" -w /workspace/simple "${entry[@]}" "$SIMPLE_IMAGE" \
+    ${SIMPLE_EVAL_CLOCK:+-m flywheel_simple.tray.run eval-decoupled-wbc} \
     "simple/$TASK" psi0_decoupled_wbc "dr-level-$level" \
     --host "$host" --port "$PORT" --sim-mode "$sim_mode" --headless \
     --data-format lerobot --data-dir "data/$evals/$TASK/dr-level-$level" \
@@ -237,13 +254,13 @@ $others"
   # Revisions and outcome in one file per invocation (story test: same config, recorded pins).
   python3 - "$out" "$status" "$((end - begin))" "$sim_mode" "$level" "$pass" "$start" "$episodes" \
     "$RUN" "$CKPT_STEP" "$PSI_MODEL_REV" "$PSI0_COMMIT" "$PSI_DATA_REV" "$SIMPLE_IMAGE" \
-    "$ACTION_EXEC_HORIZON" "$RTC_FLAG" "$host:$PORT" "$TASK" "$task_file" "$SIMPLE_DDS_DOMAIN" <<'PY'
+    "$ACTION_EXEC_HORIZON" "$RTC_FLAG" "$host:$PORT" "$TASK" "$task_file" "$SIMPLE_DDS_DOMAIN" "$clock" <<'PY'
 import json, re, sys
 from pathlib import Path
 
 out = Path(sys.argv[1])
 (status, seconds, sim_mode, level, pass_, start, episodes, run, ckpt_step, model_rev, psi0_commit,
- data_rev, image, exec_h, rtc, server, task, task_file, dds_domain) = sys.argv[2:21]
+ data_rev, image, exec_h, rtc, server, task, task_file, dds_domain, clock) = sys.argv[2:22]
 lines = (out / "eval_stats.txt").read_text().splitlines() if (out / "eval_stats.txt").exists() else []
 results = {m[1]: m[2] == "True" for l in lines if (m := re.match(r"(episode_\d+): (True|False)", l.strip()))}
 summary = {
@@ -254,7 +271,7 @@ summary = {
     "client_exit": int(status), "wall_seconds": int(seconds),
     "server": server, "run": run, "ckpt_step": int(ckpt_step), "psi_model_revision": model_rev,
     "psi0_commit": psi0_commit, "action_exec_horizon": int(exec_h), "rtc": rtc == "--rtc",
-    "psi_data_revision": data_rev, "simple_image": image, "simple_task_file": task_file, "dds_domain": int(dds_domain),
+    "psi_data_revision": data_rev, "simple_image": image, "simple_task_file": task_file, "dds_domain": int(dds_domain), "eval_clock": clock,
     # What the server itself reports; the run/ckpt/horizon/rtc fields above are the client's env.
     "server_info": json.loads((out / "server_info.json").read_text()),
 }
