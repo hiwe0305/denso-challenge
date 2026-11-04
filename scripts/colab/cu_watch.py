@@ -370,6 +370,7 @@ class Watcher:
     claimed: set[str] = field(default_factory=set)  # every assignment this watcher stops
     wall_high: float = 0.0
     last_balance: float | None = None
+    start_balance: float | None = None
     balance_cu: float = 0.0
     misses: int = 0
     persist: Process | None = None
@@ -458,7 +459,8 @@ class Watcher:
             raise NothingWatched(f"{spec.name}: {len(matches)} listed sessions match")
         self.endpoint = matches[0].endpoint
         self.claimed.add(self.endpoint)
-        self.started, self.last_balance = spec.started, usage.balance
+        self.started = spec.started
+        self.last_balance = self.start_balance = usage.balance
         self.cli.log("attach", session=spec.name, endpoint=self.endpoint, started=self.started)
         self.check_gpu(matches[0])
 
@@ -469,7 +471,8 @@ class Watcher:
                 raise WatchError("no trusted listing before `colab new`; nothing created")
             usage, before = found
             known = {s.endpoint for s in before.listed}
-            self.started, self.last_balance = self.clock(), usage.balance
+            self.started = self.clock()
+            self.last_balance = self.start_balance = usage.balance
             argv = [str(self.cli.colab), "new", "-s", self.spec.name, "--gpu", self.spec.gpu]
             process = (self.spawn or spawn_process)(argv)
             self.cli.log("new", session=self.spec.name, known=sorted(known))
@@ -662,6 +665,11 @@ class Watcher:
                 wall_cu=round(self.wall_cu(), 3),
                 balance_cu=round(self.balance_cu, 3),
                 balance=usage.balance if usage else None,
+                balance_drop=(
+                    round(self.start_balance - usage.balance, 3)
+                    if usage is not None and self.start_balance is not None
+                    else None
+                ),
             )
         except BaseException as error:
             print(f"cu_watch: exit log failed: {error!r}", file=sys.stderr, flush=True)

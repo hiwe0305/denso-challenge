@@ -280,6 +280,8 @@ def test_a_new_session_is_stopped_inside_its_cap(tmp_path: Path) -> None:
     assert 1.0 - L4 * (MARGIN_H + 2 * 60 / 3600) <= billed <= 1.0
     assert events(tmp_path / "da30.jsonl", "stopped")[0]["reason"] == "Capped"
     assert json.loads((tmp_path / "reg" / "da30.json").read_text())["state"] == "stopped"
+    (done,) = events(tmp_path / "da30.jsonl", "exit")
+    assert abs(done["balance_drop"] - billed) <= 0.02  # the CLI rounds the balance
 
 
 def test_a_frozen_clock_is_caught_by_the_balance(tmp_path: Path) -> None:
