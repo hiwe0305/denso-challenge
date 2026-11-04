@@ -19,10 +19,10 @@ checks the uploaded cut (`cut_problems`). `train` runs Psi0Trainer with the plan
 recipe and override, the parent of branch C and the plan's train seed, and writes
 the `train` phase of `<work>/report.json` the way he1_colab does.
 
-What happens after is DA-26's, unchanged: `scripts/he/he1_colab.py stage` and
+What happens after is DA-26's code: `scripts/he/he1_colab.py stage` and
 `persist` read only `<work>/runs`, `report.json` and `train.log`, and
-`scripts/he/he1_fetch.py` pulls the checkpoints to the laptop. he1_fetch runs its
-commands in `/content/da26`, so C's own VM links that path to `<work>`.
+`scripts/he/he1_fetch.py --remote-work /content/da34` pulls the checkpoints to the
+laptop.
 """
 
 from __future__ import annotations
