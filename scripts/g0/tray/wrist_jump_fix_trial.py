@@ -10,8 +10,12 @@ Runs tray episodes (no recording) with the planner and WBC of the batch:
   model) such that its `num_step_per_frame` steps of `dt` move a joint at most
   `--max-step` rad per control step; the goal is the IK solution as before.
 
-One JSON line per episode: success, failure, phases, and the largest per-step move
-of the recorded arm goal.
+One JSON line per episode: success, failure, phases, the largest per-step move
+of the recorded arm goal, and the tray's fastest downward speed (`drop_vz_min`, as
+flywheel_psi0.tray.quality). Since planner-5 the TrayAgent applies `arm_step_max`
+itself, so `baseline` is planner-5; `--set arm_step_max=1000` (the URDF limits, pink's
+default) reproduces planner-4, and `--set lower_tray_clear=0.015` tries another
+planner value on the same seeds.
 
     MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/python \
         scripts/g0/tray/wrist_jump_fix_trial.py --variant rate_limit --seeds 300000 300001 \
@@ -60,7 +64,7 @@ def install_ik_velocity_limit(max_step: float) -> None:
 
     init = upper_body.UpperBodyIK.__init__
 
-    def limited_init(self: Any, robot_model: Any) -> None:
+    def limited_init(self: Any, robot_model: Any, max_joint_step: float | None = None) -> None:
         init(self, robot_model)
         solver = self._ik.body_ik_solver
         model = solver.configuration.model
@@ -79,11 +83,16 @@ def main() -> None:
     parser.add_argument("--seeds", type=int, nargs="+", required=True)
     parser.add_argument("--level", type=int, default=1)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--set", nargs="*", default=[], metavar="KEY=VALUE",
+                        help="PlannerConfig overrides")
     args = parser.parse_args()
+    overrides = {k: float(v) for k, v in (item.split("=", 1) for item in args.set)}
     if args.variant == "rate_limit":
         install_rate_limit(args.max_step)
     if args.variant == "ik_velocity":
         install_ik_velocity_limit(args.max_step)
+
+    from dataclasses import replace
 
     from flywheel_simple.tray.agent import TrayAgent, run_episode
     from flywheel_simple.tray.planner import PlannerConfig
@@ -94,24 +103,27 @@ def main() -> None:
         done = {json.loads(line)["seed"] for line in args.out.read_text().splitlines() if line}
     args.out.parent.mkdir(parents=True, exist_ok=True)
     env = make_env(seed=args.seeds[0], level=args.level)
-    agent = TrayAgent(env, PlannerConfig.load())
+    agent = TrayAgent(env, replace(PlannerConfig.load(), **overrides))
     for seed in args.seeds:
         if seed in done:
             continue
         goals: list[np.ndarray] = []
+        tray_z: list[float] = []
 
         def on_frame(obs: dict[str, Any], info: dict[str, Any], record: dict[str, Any]) -> None:
             goals.append(np.asarray(record["goal_upper_body"], float)[ARM_SLOTS])
+            tray_z.append(float(info["privileged"]["tray_pos"][2]))
 
         result = run_episode(env, agent, seed=seed, level=args.level, on_frame=on_frame)
         jumps = np.abs(np.diff(np.array(goals), axis=0)).max(axis=1)
-        row = {"variant": args.variant, "max_step": args.max_step, "seed": seed,
+        row = {"variant": args.variant, "max_step": args.max_step, "set": overrides, "seed": seed,
                "level": args.level, "success": result.success, "failure": result.failure,
                "abort_reason": result.abort_reason, "phases": result.phases,
                "steps": result.steps, "wall_s": result.wall_s,
                "arm_jump_max": float(jumps.max()),
                "arm_jump_p999": float(np.quantile(jumps, 0.999)),
-               "steps_over_0.0869": int((jumps > 0.0869346).sum())}
+               "steps_over_0.0869": int((jumps > 0.0869346).sum()),
+               "drop_vz_min": float(np.diff(tray_z).min() * 50)}
         with args.out.open("a") as f:
             f.write(json.dumps(row) + "\n")
         print(json.dumps(row), flush=True)
