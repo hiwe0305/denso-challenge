@@ -169,11 +169,12 @@ def test_replay_kinematic_off_rejects_dynamic_off_flags(qa_config: QAConfig) -> 
     assert (dynamic.decision, failed(dynamic)) == ("flag", {"replay_dynamic"})
 
 
-def test_a_failed_replay_is_no_positive_sample(qa_config: QAConfig) -> None:
+def test_a_failed_dynamic_replay_only_flags(qa_config: QAConfig) -> None:
+    # DA-17 AC 3, PO 4/11/2026: open-loop replay success is no quality label.
     teleop = qa(clean_frames(), qa_config, replay=replay("dynamic", success=False))
-    assert (teleop.decision, failed(teleop)) == ("reject", {"task_success"})
+    assert (teleop.decision, failed(teleop)) == ("flag", {"task_success"})
     generated = qa(clean_frames(), qa_config, S1, replay=replay("dynamic", success=False))
-    assert (generated.decision, failed(generated)) == ("reject", {"replay_success"})
+    assert (generated.decision, failed(generated)) == ("flag", {"replay_success"})
     assert generated.reasons[0].startswith("replay_success (D8)")
 
 
