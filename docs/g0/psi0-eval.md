@@ -9,7 +9,7 @@ _Kết quả của story [S1-03](../product/stories/S1-03-tai-tao-danh-gia-psi0.
 | 1.3 Câu hỏi provenance cho PSI Lab | Chưa |
 | 2.1–2.2 Môi trường và script serve | Xong 3/11/2026 trên máy 3060: serve checkpoint task hai bàn, smoke 30 lần `/act` đạt (mục 2.6) |
 | 2.3–5 Đo VRAM, độ trễ, đánh giá, độ không tất định | Chưa; cần máy 5090 |
-| 6 Task hai bàn ở `mujoco_isaac` (AC 9) | Đang chạy: Level 0 trên eval `e78fb93` 4/5 sau 5 episode (mục 3.6). Trước đó: server chuyển lên Colab (Hiếu chốt 3/11/2026, không thuê GPU; mục 3.4.1); lượt Isaac Level 0 cũ dừng sau 2/10 (đều hỏng, file task lỗi spawn); chưa chạy lại với file đã sửa |
+| 6 Task hai bàn ở `mujoco_isaac` (AC 9) | Level 0 trên eval `e78fb93`, file task `b75c678`: **6/10** (4/11/2026; công bố 7/10, không thấp hơn có ý nghĩa, mục 3.6). Chưa chạy: lượt lặp 2, 3, Level 1, Level 2 |
 | 7 Task hai bàn ở `mujoco` (AC 10) | 0/90 cũ (file task `6d10628`, lỗi spawn) bị thay; chạy lại với file `b75c678`: Level 0 0/20 (3/11/2026, mục 3.2). Kết luận Q-27C tạm (mục 3.5) |
 | 8 Checkpoint ablation của HE (AC 11) | Liệt kê xong 3/11/2026 (mục 4); câu hỏi Q-27E chờ Hiếu gửi PSI Lab |
 
@@ -314,7 +314,7 @@ Thời gian thật của `mujoco_isaac` trên máy 3060 là khoảng 25 phút m�
 
 ### 3.5 Trả lời Q-27C [Đề xuất, tạm]
 
-Không: ở `mujoco`, checkpoint của tác giả không giữ được thành công. Sau khi sửa lỗi spawn, Level 0 vẫn 0/20 (10 điều kiện × 2 lượt, một lượt trên domain DDS riêng), so với 7/10 công bố ở `mujoco_isaac` (p = 6 × 10⁻⁶ tính theo 10 điều kiện). Các lượt cũ (0/90, lỗi spawn) cùng chiều. Kiểm open-loop (mục 3.3) phù hợp với giả thuyết server đúng [Đề xuất]. Đây chưa phải chứng minh: mới 3 episode train, chưa có ngưỡng, và L1 của vyaw là 0,21–0,27. B4 cho thấy policy dựa vào ảnh. Nên nguyên nhân nhiều khả năng là khác biệt ảnh giữa render MuJoCo và Isaac, hoặc một lỗi phía client chưa tìm ra.
+Cập nhật 4/11/2026. Ở `mujoco_isaac` trên bộ eval `e78fb93`, Level 0 đạt 6/10, không thấp hơn 7/10 công bố có ý nghĩa (p = 0,35). Vậy pipeline của đội (server, client, file task đã sửa) tái tạo được Ψ₀ ở mức công bố trong Isaac. Ở `mujoco`, Level 0 là 0/20, nhưng các lượt đó chạy trên bộ eval `de140d6`. Ở bộ đó, ngay cả action thật của người phát lại cũng 0/10 (B6). Vì vậy câu hỏi renderer **chưa tách riêng được**: còn thiếu lượt Ψ₀ ở `mujoco` trên bộ `e78fb93`, khoảng 10 phút máy, không tốn CU nếu dùng server cục bộ. B4 cho thấy policy phụ thuộc ảnh, nên vẫn có khả năng `mujoco` thấp hơn Isaac. Đề xuất giữ nguyên cho HE: render Isaac (design mục 4.2) [Đề xuất, tạm].
 
 Ở Level 0 của bộ eval `de140d6`, vật và khay nằm đúng vị trí của episode train cùng chỉ số; chỉ robot khởi đầu lùi 6,1 cm (mục 3.1). Vậy 0/20 là trên chính vị trí vật đã thấy lúc train. Điều này nghiêng về lỗi hệ thống (renderer khác, hoặc lỗi phía client) hơn là policy yếu. Đề xuất cho HE: giữ mặc định của design mục 4.2 (ảnh train và ảnh eval đều render Isaac; eval ở `mujoco_isaac`), không chuyển sang `mujoco`. Kết luận còn "tạm" cho tới khi có lượt `mujoco_isaac` của chính đội, với file task đã sửa, đạt gần 7/5/6 (B5, mục 3.6). Nếu lượt đó cũng hỏng thì lỗi ở phía client và kết luận trên phải xét lại.
 
@@ -363,7 +363,27 @@ Fisher một phía: p = 0,043. Trong video, ở cả hai bộ tay phải đến 
 
 **[Đã chốt]** (Hiếu, 4/11/2026, 00:34): lượt Isaac của AC 9 chạy trên bộ eval `e78fb93` (robot trùng tư thế train), thay cho `de140d6` đã ghim ở PR #68. Lượt Isaac Level 0 trên `de140d6` với file đã sửa dừng sau 1 episode (hỏng). Từ 4/11/2026, đường dẫn kết quả có thêm `eval-<revision>`.
 
-**Isaac Level 0 trên `e78fb93`, file task `b75c678`, domain DDS 103 (kết quả tạm, 4/11/2026, 03:33).** Server Ψ₀ trên Colab A100, client Isaac trên máy 3060. Lượt chạy từ 00:35. Đã xong 5/10 episode: **4 đạt** (episode 0, 1, 2, 3), **1 hỏng** (episode 4). Đây là thành công đầu tiên của Ψ₀ trên task hai bàn trong pipeline của đội. Episode đạt mất khoảng 20–29 phút. Kết quả: `fwdata/simple/s103/runs/simple-b75c678/eval-e78fb93/mujoco_isaac/level-0/pass-1/ep0-9/` (`summary.json`, video trong `videos/`); log `/act`: `fwdata/isaac-fix/calls-e78fb93-l0p1.jsonl` trên máy 3060. Lượt tự chạy tiếp tới khoảng 05:00; một tiến trình trên laptop tự tắt phiên Colab và hai cổng chuyển tiếp khi lượt xong. Số cuối, CU và USD ghi ở lần cập nhật sau.
+**Isaac Level 0 trên `e78fb93`, file task `b75c678`, domain DDS 103 (4/11/2026, 00:35–06:06): 6/10.** Server Ψ₀ trên Colab A100 (phiên `s103psi0`), client Isaac trên máy 3060, cùng checkpoint, cùng image như mọi lượt trước. Đây là kết quả `mujoco_isaac` đầu tiên của đội với file task đã sửa.
+
+| Điều kiện | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Kết quả | đạt | đạt | đạt | đạt | hỏng | hỏng | hỏng | đạt | đạt | hỏng |
+| Độ dài video (s) | 12,0 | 12,7 | 13,7 | 14,0 | 24,0 | 24,0 | 24,0 | 11,5 | 13,1 | 24,0 |
+
+| Chỉ số | Giá trị |
+|---|---|
+| Thành công | 6/10, Wilson 95% [31%, 83%] |
+| So với 7/10 công bố | Không thấp hơn có ý nghĩa: p một phía P(X ≤ 6 \| n = 10, p = 0,7) = 0,35 |
+| Client | Thoát 0; 19 837 s tường (5,5 giờ, trung bình 33 phút mỗi episode khi máy chạy chung với batch của DA-34 và DA-35); RAM đỉnh 15,75 GiB theo `docker stats` (gồm page cache), cap 20 GiB |
+| Kiểm trong container | sha256 file task `51bce5d6…`; `DOMAIN_ID: 103`; khớp tay ở lần gọi `/act` đầu bằng 0 |
+| Colab | A100 chạy từ 23:59 ngày 3/11 tới 06:06 ngày 4/11 (6,1 giờ, tự tắt khi lượt xong). Số dư tài khoản giảm 141,32 → 101,77 CU (39,55 CU) trong cùng khoảng, gồm cả phiên của người khác; vậy phần của S1-03 nhiều nhất 39,6 CU, tức nhiều nhất khoảng 3,95 USD (Colab Pro 100 CU = 9,99 USD) |
+
+Cả bốn episode hỏng đều gắp và mang được hộp sang bàn 2. Chúng hỏng ở bước **place**: episode 4, 5 và 6 thả hộp cạnh giỏ, episode 9 không dừng đúng ở bàn 2 nên hộp rơi trước giỏ. Video chọn cho phần 1 của demo (`fwdata/simple/s103/runs/simple-b75c678/eval-e78fb93/mujoco_isaac/level-0/pass-1/ep0-9/videos/` trên máy 3060):
+
+- Đạt: `episode_7/head_stereo_left_success.mp4`, 11,5 s. Gắp hộp, đi sang bàn 2, đặt hộp vào giỏ.
+- Hỏng: `episode_4/head_stereo_left_failed.mp4`, 24 s. Gắp và mang hộp tới bàn 2 rồi thả hộp lệch khỏi giỏ.
+
+Trong thư mục `episode_0/` của lượt này từng có thêm hai file `*_failed.mp4` lúc 00:31. Đó là video của lượt `de140d6` đã dừng, vì hai lượt ghi cùng một thư mục video. Đã chuyển hai file đó về lượt `runs/simple-b75c678/mujoco_isaac/level-0/pass-1/`.
 
 **Giả thuyết cho 0%, theo bằng chứng** [Đề xuất]:
 
@@ -400,10 +420,11 @@ Câu hỏi Q-27E gửi PSI Lab (Hiếu gửi, chung email giấy phép ở nhi�
 3. Sáu checkpoint này có train trên dữ liệu SIMPLE hoặc sonic không (điều kiện `clean_for_main_task` của AC 6)?
 4. (thêm 3/11/2026) Số 7/5/6 của `G1WholebodyLocomotionPickBetweenTablesTeleop-v0` đo trên bộ eval nào: bản tải lên 14/09/2026 (`e78fb93`), bản "eval-fixed" 02/11/2026 (`de140d6`), hay một bản trước đó? Checkpoint `…2604081126` train trên bản dữ liệu nào (bản gốc hay "data-fixed")? Ở `mujoco_isaac` có cần cờ hoặc cấu hình gì ngoài README không?
 
-## Tiếp tục từ đây (cập nhật 3/11/2026, 23:20)
+## Tiếp tục từ đây (cập nhật 4/11/2026)
 
-1. Xong: mount file task `b75c678`; cache bộ eval theo revision, kèm kiểm sha256; client kiểm `/info` của server; client dùng domain DDS riêng; chạy lại `mujoco` Level 0 (0/20).
-2. `mujoco_isaac` với file đã sửa (B5, AC 9): server Ψ₀ trên Colab, theo mục 3.4.1 (`colab new -s s103psi0 --gpu L4`, `PSI0_ENV=image`, hai cổng chuyển tiếp SSH). Level 0 trước, 10 episode, khoảng 4,5 giờ. Laptop phải bật suốt thời gian chạy.
-3. B3 (độ trễ): runner `fwdata/logs/b3.sh` trên máy 3060; chạy được ngay với server cục bộ.
-4. Nếu Isaac cũng hỏng: phát lại action của episode train trên điều kiện eval cùng chỉ số, qua cùng client và WBC, để tìm lỗi phía client.
-5. Chờ Hiếu gửi Q-27E (mục 4). Q8 đã chốt (mục 3.5).
+1. Xong: file task `b75c678`; cache bộ eval theo revision, kèm kiểm sha256; domain DDS riêng; B4, B6; Isaac Level 0 trên `e78fb93` 6/10. Phiên Colab và cổng chuyển tiếp đã tắt.
+2. Chưa làm: Ψ₀ ở `mujoco` trên `e78fb93` Level 0 (10 episode, server cục bộ, không tốn CU), để tách câu hỏi renderer (Q-27C).
+3. Chưa làm: B3 (độ trễ; runner `fwdata/logs/b3.sh` trên máy 3060, server cục bộ).
+4. Chưa làm: lượt lặp 2, 3 của Isaac Level 0, rồi Level 1, Level 2. Mỗi lượt 10 episode Isaac khoảng 5,5 giờ máy 3060 và tới 6,7 CU mỗi giờ trên A100. Chưa chạy job Colab mới khi Hiếu chưa duyệt CU: ngân sách đang căng, S1-04 ước khoảng 133 CU, số dư khoảng 100 CU.
+5. Cân nhắc lại việc ghim bộ eval `de140d6` (PR #68), vì robot khởi đầu lùi 6,1 cm so với train (B6), và ghi quyết định vào `docs/g0/psi-data.md`.
+6. Chờ Hiếu gửi Q-27E (mục 4). Q8 đã chốt (mục 3.5).
