@@ -15,6 +15,15 @@ jobs of a killed worker run again (with any number of workers). At the end (or
 with --summarize) it writes `<out>/summary.json`: attempts, outcomes, failure
 labels, sim and machine time.
 
+The launcher supervises its workers (task 12, faults of `measure-1104`): a worker
+that exits non-zero, or logs nothing for `--stall-s` (the video writer's hang), is
+killed and started again on its shard's jobs not yet logged, at most
+`--max-restarts` times per shard; every restart is a line of
+`<out>/supervisor.jsonl`. The launcher exits 1 if a shard's last worker still failed. Before a worker starts, a dataset of its shard that never
+saved an episode is renamed `<name>.empty-<stamp>` (kept, not deleted): LeRobot
+cannot resume a dataset with no `meta/episodes.jsonl`, so the worker opens a fresh
+one.
+
 Every batch writes its two ledger rows through `flywheel.data.ledger.job_ledger`
 (estimate before the workers start: jobs x `--est-attempt-s` over the workers;
 measured wall seconds after), under `$FW_ROOT/runs/g0-DA-35-<date>/`. The launcher
@@ -37,9 +46,10 @@ import subprocess
 import sys
 import time
 from collections import Counter
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from flywheel_simple.tray.s2.config import S2Config
 from flywheel_simple.tray.s2.jobs import sample_jobs
@@ -72,11 +82,14 @@ def job_key(row: dict[str, Any]) -> tuple[Any, ...]:
     return tuple(row[k] for k in JOB_KEYS)
 
 
-def attempts_of(shard: Path) -> list[dict[str, Any]]:
-    path = shard / "attempts.jsonl"
+def jsonl_rows(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
     return [json.loads(line) for line in path.read_text().splitlines() if line]
+
+
+def attempts_of(shard: Path) -> list[dict[str, Any]]:
+    return jsonl_rows(shard / "attempts.jsonl")
 
 
 def logged_key(attempt: dict[str, Any]) -> tuple[Any, ...]:
@@ -89,32 +102,110 @@ def pending(args: argparse.Namespace, jobs: list[dict[str, Any]]) -> list[dict[s
     return [j for j in jobs if job_key(j) not in done]
 
 
-def launch(args: argparse.Namespace, jobs: list[dict[str, Any]]) -> list[subprocess.Popen[bytes]]:
+def set_aside_empty_datasets(shard: Path, stamp: str) -> list[Path]:
+    """Rename the shard's datasets that saved no episode, so the worker opens a fresh one."""
+    moved = []
+    for info in sorted(shard.rglob("meta/info.json")):
+        root = info.parent.parent
+        if ".empty-" in root.name or (root / "meta" / "episodes.jsonl").exists():
+            continue
+        target = root.with_name(f"{root.name}.empty-{stamp}")
+        root.rename(target)
+        moved.append(target)
+    return moved
+
+
+def pending_jobs(shard: Path) -> list[dict[str, Any]]:
+    """The shard's jobs that its attempts log does not have yet."""
+    path = shard / "jobs.jsonl"
+    if not path.exists():
+        return []
+    logged = {logged_key(a) for a in attempts_of(shard)}
+    jobs = [json.loads(line) for line in path.read_text().splitlines() if line]
+    return [j for j in jobs if job_key(j) not in logged]
+
+
+class Worker(Protocol):
+    def poll(self) -> int | None: ...
+    def kill(self) -> None: ...
+    def wait(self) -> int: ...
+
+
+def start_worker(args: argparse.Namespace, k: int, jobs: list[dict[str, Any]]) -> Worker:
+    """One `tray.s2.session` process on shard k with these jobs."""
+    shard = args.out / f"shard-{k:02d}"
+    shard.mkdir(parents=True, exist_ok=True)
+    set_aside_empty_datasets(shard, datetime.now().strftime("%m%dT%H%M%S"))
+    jobs_file = shard / "jobs.jsonl"
+    jobs_file.write_text("".join(json.dumps(j) + "\n" for j in jobs))
+    cmd = [
+        args.worker_python, "-m", "flywheel_simple.tray.s2.session",
+        "--parents", str(args.parents), "--jobs", str(jobs_file),
+        "--session", f"{args.out.name}-{k:02d}", "--save-dir", str(shard),
+        "--mode", args.mode,
+        *(["--config", str(args.config)] if args.config else []),
+    ]  # fmt: skip
+    log = (shard / "worker.log").open("ab")
+    return subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT)
+
+
+def launch(
+    args: argparse.Namespace,
+    jobs: list[dict[str, Any]],
+    start: Callable[[argparse.Namespace, int, list[dict[str, Any]]], Worker] = start_worker,
+) -> dict[int, Worker]:
     """One worker per shard; jobs any shard has logged are not run again."""
     todo = pending(args, jobs)
-    procs = []
-    for k in range(args.workers):
-        shard = args.out / f"shard-{k:02d}"
-        mine = todo[k :: args.workers]
-        if not mine:
-            continue
-        shard.mkdir(parents=True, exist_ok=True)
-        jobs_file = shard / "jobs.jsonl"
-        jobs_file.write_text("".join(json.dumps(j) + "\n" for j in mine))
-        cmd = [
-            args.worker_python, "-m", "flywheel_simple.tray.s2.session",
-            "--parents", str(args.parents), "--jobs", str(jobs_file),
-            "--session", f"{args.out.name}-{k:02d}", "--save-dir", str(shard),
-            "--mode", args.mode,
-            *(["--config", str(args.config)] if args.config else []),
-        ]  # fmt: skip
-        log = (shard / "worker.log").open("ab")
-        procs.append(subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT))
-    return procs
+    shares = {k: todo[k :: args.workers] for k in range(args.workers)}
+    return {k: start(args, k, mine) for k, mine in shares.items() if mine}
 
 
-def exit_status(codes: list[int]) -> int:
-    """1 if any worker failed: its jobs are missing from the batch until a rerun."""
+def last_progress(shard: Path, since: float) -> float:
+    """Wall time of the shard's latest attempt or log line, not before `since`."""
+    files = [shard / "attempts.jsonl", shard / "worker.log"]
+    return max([since, *(f.stat().st_mtime for f in files if f.exists())])
+
+
+def supervise(
+    args: argparse.Namespace,
+    procs: dict[int, Worker],
+    start: Callable[[argparse.Namespace, int, list[dict[str, Any]]], Worker] = start_worker,
+    now: Callable[[], float] = time.time,
+    sleep: Callable[[float], None] = time.sleep,
+) -> dict[int, list[int | str]]:
+    """Wait for the workers; restart one that dies or stalls on its pending jobs."""
+    ends: dict[int, list[int | str]] = {k: [] for k in procs}
+    started = {k: now() for k in procs}
+    restarts: Counter[int] = Counter()
+    while procs:
+        sleep(args.poll_s)
+        for k, proc in list(procs.items()):
+            shard = args.out / f"shard-{k:02d}"
+            end: int | str | None = proc.poll()
+            if end is None:
+                if now() - last_progress(shard, started[k]) <= args.stall_s:
+                    continue
+                proc.kill()
+                proc.wait()
+                end = "stalled"
+            ends[k].append(end)
+            left = pending_jobs(shard)
+            if end == 0 or not left or restarts[k] >= args.max_restarts:
+                del procs[k]
+                continue
+            restarts[k] += 1
+            event = {"at": datetime.now().isoformat(timespec="seconds"), "shard": k,
+                     "end": end, "restart": restarts[k], "pending": len(left)}  # fmt: skip
+            with (args.out / "supervisor.jsonl").open("a") as log:
+                log.write(json.dumps(event) + "\n")
+            print(f"shard {k:02d} ended {end}; restart {restarts[k]}, {len(left)} jobs", flush=True)
+            procs[k] = start(args, k, left)
+            started[k] = now()
+    return ends
+
+
+def exit_status(codes: list[int | str]) -> int:
+    """1 if any shard's last worker failed (after its restarts): its jobs may be missing."""
     return 1 if any(code != 0 for code in codes) else 0
 
 
@@ -147,6 +238,7 @@ def summarize(out: Path, wall_s: float | None) -> dict[str, Any]:
         "worker_s_per_success": round(worker_s / successes, 1) if successes else None,
         "batch_wall_s": None if wall_s is None else round(wall_s, 1),
         "generator_versions": sorted({a.get("generator_version") or "" for a in attempts}),
+        "worker_restarts": len(jsonl_rows(out / "supervisor.jsonl")),
     }
     (out / "summary.json").write_text(json.dumps(summary, indent=1) + "\n")
     return summary
@@ -170,6 +262,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, default=None, help="first N jobs only")
     parser.add_argument("--workers", type=int, default=12, help="team cap: <= 14 on rtx3060")
     parser.add_argument("--summarize", action="store_true", help="only rewrite summary.json")
+    parser.add_argument("--poll-s", type=float, default=30.0, help="supervisor: poll period")
+    parser.add_argument(
+        "--stall-s", type=float, default=1800.0,
+        help="supervisor: kill a worker that logs nothing this long (attempts take ~100-500 s)",
+    )  # fmt: skip
+    parser.add_argument("--max-restarts", type=int, default=3, help="supervisor: per shard")
     args = parser.parse_args(argv)
     if not args.summarize:
         if args.variants is not None:
@@ -198,20 +296,23 @@ def main(argv: list[str] | None = None) -> int:
             t0 = time.monotonic()
             procs = launch(args, jobs)
             print(f"{len(procs)} workers started, {len(jobs)} jobs in the list", flush=True)
-            codes = [p.wait() for p in procs]
-            print(f"workers done, exit codes {Counter(codes)}", flush=True)
+            ends = supervise(args, procs)
+            codes = [e for shard_ends in ends.values() for e in shard_ends]
+            last = [shard_ends[-1] for shard_ends in ends.values() if shard_ends]
+            print(f"workers done, ends {Counter(codes)}", flush=True)
             summary = summarize(args.out, time.monotonic() - t0)
             job.notes.append(
                 f"{summary['attempts']} attempts, {summary['successes']} successes, "
-                f"{summary['worker_s']} worker-s, exit codes {dict(Counter(codes))}"
+                f"{summary['worker_s']} worker-s, worker ends {dict(Counter(codes))}, "
+                f"{summary['worker_restarts']} restarts"
             )
         print(f"ledger: run plan {job.run_plan_id}, job {job.job_id}", flush=True)
     else:
-        codes, summary = [], summarize(args.out, None)
+        last, summary = [], summarize(args.out, None)
     print(json.dumps(summary, indent=1))
-    if exit_status(codes):
-        print(f"{sum(c != 0 for c in codes)} workers failed: rerun to finish the batch", flush=True)
-    return exit_status(codes)
+    if exit_status(last):
+        print(f"{sum(c != 0 for c in last)} shards failed: rerun to finish the batch", flush=True)
+    return exit_status(last)
 
 
 if __name__ == "__main__":
