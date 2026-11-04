@@ -104,7 +104,7 @@ Lặp lại được: liệt kê bằng API cây thư mục của Hugging Face `
 | `bash scripts/g0/serve_psi0.sh setup [--flash-attn]` | Clone Ψ₀ ở commit ghim `cda3fdfafe47cb6fa75400d013de1bd36e3cea05`, dựng môi trường |
 | `bash scripts/g0/serve_psi0.sh fetch [--weights]` | Tải run dir ở revision `cb1480f…` của `psi-model`; không có `--weights` thì chỉ tải `argv.txt`, `run_config.json`, `envs.txt` |
 | `bash scripts/g0/serve_psi0.sh check` | Smoke không model: làm mọi bước của `Server.__init__` trong `serve_psi0_simple` trừ nạp trọng số, kiểm `--help` của server, ghi giao thức và phần cứng |
-| `bash scripts/g0/serve_psi0.sh serve` | Chạy `serve_psi0_simple --policy psi0 --port 22085 --action-exec-horizon 24 --rtc` |
+| `bash scripts/g0/serve_psi0.sh serve` | Chạy `serve_psi0_simple --policy psi0 --port 22085 --action-exec-horizon 24 --rtc`. Từ 4/11/2026, nếu checkout có `docker/psi0/serve_psi0_seeded.py` (PR #97) thì chạy qua launcher đó: mỗi request `reset` có `history.seed` thì gieo lại nhiễu policy (docs/he/tray.md mục 8.5); `PSI0_SEEDED=0` quay về đường cũ. Server nghe 127.0.0.1 (`HOST`) |
 | `bash scripts/g0/eval_psi0.sh smoke [--calls N]` | Gọi `/health`, `/info` và N lần `/act` với ảnh, state bằng 0; kiểm action có kích thước (24, 36) và hữu hạn |
 
 `PSI0_RUNTIME=venv` (mặc định) dùng env uv trong bản clone; `PSI0_RUNTIME=docker` dùng image của tác giả ghim theo digest qua `docker/psi0/compose.yaml`. Dữ liệu nằm ở `fwdata/psi0/` của checkout chính, ngoài git. Mọi giá trị ghim đổi được bằng biến môi trường cùng tên trong script.
