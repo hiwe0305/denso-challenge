@@ -9,6 +9,7 @@ of DA-19's driver) for the measured rows of docs/g0/ledger/DA-26.csv:
     Psi0/.venv-psi/bin/python fw/scripts/he/he1_colab.py train --point V-EGO/N20/0
     python3 fw/scripts/he/he1_colab.py persist [--watch 600 --pid P]
     python3 fw/scripts/he/he1_colab.py restore --point V-EGO/N20/0  # on a fresh VM
+    python3 fw/scripts/he/he1_colab.py stage   # JSON for scripts/he/he1_fetch.py
 
 Every phase loads `configs/runplans/he/he-1.yaml` and refuses to go on unless it is
 the frozen plan (`he-1.lock.json`, rp_95c98a476499) and the point is one of its
@@ -27,9 +28,16 @@ point's demo set (scripts/he/demo_subset.py) into `<work>/sets/<N>/<task>`.
 the point's parent and train seed. `persist` copies every job of `<work>/runs`
 (metrics, results and complete checkpoints, the weights included since eval needs
 them) to Google Drive; with `--watch S --pid P` it syncs every S seconds while the
-training process lives. `configs/runplans/he/persist_cell.py` runs it once in the
-kernel when the CU watcher reaches its soft cap. Drive is mounted from the laptop
-right after setup: `colab drivemount -s <session> /content/drive`.
+training process lives. Once Drive is mounted, `configs/runplans/he/persist_cell.py`
+runs it in the kernel when the CU watcher reaches its soft cap. Drive is mounted from the laptop
+right after setup: `colab drivemount -s <session> /content/drive`; `persist` refuses a
+target under /content/drive that is not a mount, which would fill the VM disk instead.
+
+Until Drive is mounted (it needs Hiếu's browser consent, DA-30 4/11/2026) the
+durable copy is the laptop: `stage` prints, as JSON, what eval needs from each job
+(every file outside `checkpoints/`, and the latest complete `ckpt_<step>` without
+its optimizer state) with sizes and sha256, and scripts/he/he1_fetch.py pulls those
+files over `colab ssh --proxy-mode` and checks them against it.
 """
 
 from __future__ import annotations
@@ -40,8 +48,9 @@ import json
 import os
 import sys
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Any
 
 REPO = Path(__file__).resolve().parents[2]
 PLAN = REPO / "configs/runplans/he/he-1.yaml"
@@ -54,6 +63,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from flywheel_psi0.trainer.colab import (  # noqa: E402
     PSI0_COMMIT,
     Report,
+    completed_checkpoints,
     sh,
     sync_job,
 )
@@ -225,8 +235,15 @@ def train(work: Path, point_text: str) -> None:
         raise SystemExit(f"train ended {result.infra_status}: {launched.get('error')}")
 
 
+def unmounted_drive(durable: Path, mounted: Callable[[str], bool] = os.path.ismount) -> bool:
+    """A target under /content/drive with no Drive mounted there: it would be VM disk."""
+    return durable.is_relative_to("/content/drive") and not mounted("/content/drive")
+
+
 def persist(work: Path, durable: Path, watch: float | None = None, pid: int | None = None) -> None:
     """Copy every job of `<work>/runs` to durable storage, as DA-19's `persist` does one."""
+    if unmounted_drive(durable):
+        raise SystemExit(f"{durable}: Drive is not mounted; fetch to the laptop (he1_fetch.py)")
     start = time.monotonic()
     while watch and pid and alive(pid):
         for job in jobs(work):
@@ -249,6 +266,49 @@ def persist(work: Path, durable: Path, watch: float | None = None, pid: int | No
         target=str(durable),
         gigabytes=round(size / 1e9, 2),
     )
+
+
+def stage(work: Path) -> dict[str, Any]:
+    """What the laptop fetches from each job, with sizes and sha256 (cached by mtime).
+
+    Every file outside `checkpoints/` (metrics, results, the run's argv and config)
+    and, of the latest complete `ckpt_<step>`, every file but the optimizer state:
+    eval serves `model.safetensors`, and a resume is not paid for in tier 2.
+    """
+    cache_path = work / "stage_cache.json"
+    cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
+    report = (
+        json.loads((work / "report.json").read_text()) if (work / "report.json").exists() else {}
+    )
+    trained = report.get("phases", {}).get("train", {})
+    staged = []
+    for job in jobs(work):
+        complete = completed_checkpoints(job)
+        files = [p for p in job.rglob("*") if p.is_file() and "checkpoints" not in p.parts]
+        if complete:
+            files += [
+                p
+                for p in complete[-1].rglob("*")
+                if p.is_file() and not p.name.startswith("optimizer")
+            ]
+        entries = []
+        for path in sorted(files):
+            info = path.stat()
+            key = str(path)
+            if cache.get(key, {}).get("stamp") != [info.st_size, info.st_mtime]:
+                cache[key] = {"stamp": [info.st_size, info.st_mtime], "sha256": sha256(path)}
+            rel = str(path.relative_to(job))
+            entries.append({"path": rel, "size": info.st_size, "sha256": cache[key]["sha256"]})
+        staged.append(
+            {
+                "job": job.name,
+                "checkpoint": complete[-1].name if complete else None,
+                "train_done": trained.get("job_id") == job.name,
+                "files": entries,
+            }
+        )
+    cache_path.write_text(json.dumps(cache))
+    return {"jobs": staged}
 
 
 def jobs(work: Path) -> list[Path]:
@@ -275,7 +335,7 @@ def restore(work: Path, durable: Path, point_text: str) -> None:
 
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
-    parser.add_argument("phase", choices=["setup", "train", "persist", "restore"])
+    parser.add_argument("phase", choices=["setup", "train", "persist", "restore", "stage"])
     parser.add_argument("--work", type=Path, default=Path("/content/da26"))
     parser.add_argument("--point", help="VARIANT/SET/SEED of a preliminary point, e.g. V-EGO/N20/0")
     parser.add_argument("--to", type=Path, default=DRIVE, help="durable directory (Drive)")
@@ -292,6 +352,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         train(args.work, args.point)
     elif args.phase == "persist":
         persist(args.work, args.to, args.watch, args.pid)
+    elif args.phase == "stage":
+        print(json.dumps(stage(args.work)))
     else:
         restore(args.work, args.to, args.point)
 
