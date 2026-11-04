@@ -202,3 +202,70 @@ def test_freeze_refuses_without_the_reading_rules(tmp_path: Path) -> None:
     repo = _repo_copy(tmp_path)
     with pytest.raises(ValueError, match="reading rules"):
         freeze(repo / "configs/runplans/tray/he-tray.yaml", repo)
+
+
+def _v2_eval(raw: dict) -> dict:
+    """v1's plan with the eval of the 4/11/2026 decision (docs/he/tray.md 8.2)."""
+    for key in ("levels", "condition_seeds", "rollout_replicates"):
+        raw["eval"].pop(key)
+    raw["eval"].update(
+        clock="sim",
+        policy_noise="per_episode_condition_seed",
+        by_level=[
+            {
+                "level": 0,
+                "seeds": {"start": 1_000_100, "stop": 1_000_130},
+                "unit": "replicate",
+                "headline": False,
+            },
+            {
+                "level": 1,
+                "seeds": {"start": 1_000_100, "stop": 1_000_220},
+                "unit": "condition",
+                "headline": True,
+            },
+            {
+                "level": 2,
+                "seeds": {"start": 1_000_100, "stop": 1_000_220},
+                "unit": "condition",
+                "headline": True,
+            },
+        ],
+    )
+    return raw
+
+
+def test_v2_eval_is_30_replicates_and_240_headline_scenes() -> None:
+    plan = TrayRunPlan.model_validate(_v2_eval(yaml.safe_load(PLAN.read_text())))
+    conditions = plan.eval_conditions()
+    assert len(conditions) == len(set(conditions)) == 270
+    assert sum(level == 0 for level, _ in conditions) == 30
+    assert len(plan.headline_conditions()) == 240
+    assert not any(p for p in check(plan) if "dev range" in p)
+
+
+def test_level_0_cannot_count_as_scenes() -> None:
+    raw = _v2_eval(yaml.safe_load(PLAN.read_text()))
+    raw["eval"]["by_level"][0].update(unit="condition", headline=True)
+    with pytest.raises(ValueError, match="level 0 has one scene"):
+        TrayRunPlan.model_validate(raw)
+
+
+def test_v2_eval_needs_the_clock_and_the_noise_seeding() -> None:
+    raw = _v2_eval(yaml.safe_load(PLAN.read_text()))
+    del raw["eval"]["policy_noise"]
+    with pytest.raises(ValueError, match="clock and policy_noise"):
+        TrayRunPlan.model_validate(raw)
+
+
+def test_eval_takes_one_shape_not_both() -> None:
+    raw = _v2_eval(yaml.safe_load(PLAN.read_text()))
+    raw["eval"]["condition_seeds"] = {"start": 1_000_100, "stop": 1_000_130}
+    with pytest.raises(ValueError, match="either by_level or"):
+        TrayRunPlan.model_validate(raw)
+
+
+def test_check_catches_level_seeds_outside_dev() -> None:
+    raw = _v2_eval(yaml.safe_load(PLAN.read_text()))
+    raw["eval"]["by_level"][2]["seeds"] = {"start": 2_000_000, "stop": 2_000_120}
+    assert any("level 2" in p and "dev range" in p for p in check(TrayRunPlan.model_validate(raw)))

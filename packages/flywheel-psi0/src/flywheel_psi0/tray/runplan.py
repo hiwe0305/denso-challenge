@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from flywheel_psi0.trainer.recipe import Psi0Recipe
 from flywheel_psi0.tray.demo_sets import DemoSets, canonical_sha256
@@ -113,16 +113,67 @@ class SeedRange(_Frozen):
     stop: int
 
 
+class LevelConditions(_Frozen):
+    """Eval episodes at one level: one per seed of `seeds`."""
+
+    level: Literal[0, 1, 2]
+    seeds: SeedRange
+    # condition: each seed is a scene. replicate: the level has one scene, so its seeds
+    # only vary the policy noise (level 0 of the tray task, docs/he/tray.md 8.2).
+    unit: Literal["condition", "replicate"]
+    headline: bool  # pooled into the primary metric and the comparisons
+
+
 class Eval(_Frozen):
+    """Version 1: `levels` x `condition_seeds` x `rollout_replicates`, all levels alike.
+
+    Version 2 (decision of 4/11/2026): `by_level`, with the eval clock and how the
+    policy noise is seeded. Unset fields are left out of the id, so v1 keeps its id.
+    """
+
     cli: Literal["eval-decoupled-wbc"]
     sim_mode: Literal["mujoco"]
     renderer: Literal["mujoco"]
     synchronous: bool
     split: Literal["dev"]
-    levels: list[Literal[0, 1, 2]]
-    condition_seeds: SeedRange  # the same seeds at every level
-    rollout_replicates: int = Field(ge=1)
+    levels: list[Literal[0, 1, 2]] | None = None
+    condition_seeds: SeedRange | None = None  # the same seeds at every level
+    rollout_replicates: int | None = Field(default=None, ge=1)
+    by_level: list[LevelConditions] | None = None
+    clock: Literal["sim", "wall"] | None = None  # FLYWHEEL_TRAY_EVAL_CLOCK of tray.run
+    # per_episode_condition_seed: the client sends the condition seed on reset and the
+    # server reseeds torch with it (docs/he/tray.md 8.5).
+    policy_noise: Literal["per_episode_condition_seed"] | None = None
     episode_limit_s: float = Field(gt=0)
+
+    @model_validator(mode="after")
+    def _one_shape(self) -> Eval:
+        v1 = (self.levels, self.condition_seeds, self.rollout_replicates)
+        if self.by_level is None:
+            if None in v1:
+                raise ValueError("eval needs levels, condition_seeds and rollout_replicates")
+            return self
+        if any(field is not None for field in v1):
+            raise ValueError("eval takes either by_level or levels/condition_seeds, not both")
+        if self.clock is None or self.policy_noise is None:
+            raise ValueError("eval by_level states its clock and policy_noise")
+        levels = [c.level for c in self.by_level]
+        if len(set(levels)) != len(levels):
+            raise ValueError(f"eval by_level repeats a level: {levels}")
+        for c in self.by_level:
+            if c.level == 0 and (c.unit != "replicate" or c.headline):
+                raise ValueError("level 0 has one scene: its seeds are replicates, not headline")
+            if c.unit == "replicate" and c.headline:
+                raise ValueError(f"level {c.level}: replicates of one scene cannot be headline")
+        if not any(c.headline for c in self.by_level):
+            raise ValueError("eval by_level has no headline level")
+        return self
+
+    def seed_ranges(self) -> list[tuple[int, SeedRange]]:
+        if self.by_level is not None:
+            return [(c.level, c.seeds) for c in self.by_level]
+        assert self.levels is not None and self.condition_seeds is not None
+        return [(level, self.condition_seeds) for level in self.levels]
 
 
 class Stats(_Frozen):
@@ -174,9 +225,19 @@ class TrayRunPlan(_Frozen):
         return cls.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
 
     def eval_conditions(self) -> list[tuple[int, int]]:
-        """(level, seed) of every eval condition; the same list for every branch."""
-        seeds = range(self.eval.condition_seeds.start, self.eval.condition_seeds.stop)
-        return [(level, seed) for level in self.eval.levels for seed in seeds]
+        """(level, seed) of every eval episode; the same list for every branch."""
+        return [
+            (level, seed)
+            for level, seeds in self.eval.seed_ranges()
+            for seed in range(seeds.start, seeds.stop)
+        ]
+
+    def headline_conditions(self) -> list[tuple[int, int]]:
+        """The (level, seed) pooled into the primary metric: all of them in v1."""
+        if self.eval.by_level is None:
+            return self.eval_conditions()
+        headline = {c.level for c in self.eval.by_level if c.headline}
+        return [(level, seed) for level, seed in self.eval_conditions() if level in headline]
 
 
 class RoundTargets(_Frozen):
@@ -291,11 +352,12 @@ def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
 
     split = yaml.safe_load((repo / "configs/splits/default.yaml").read_text(encoding="utf-8"))
     dev = split["seed_ranges"][plan.eval.split]
-    seeds = plan.eval.condition_seeds
-    if not dev["start"] <= seeds.start < seeds.stop <= dev["stop"]:
-        problems.append(
-            f"eval seeds [{seeds.start}, {seeds.stop}) leave the {plan.eval.split} range"
-        )
+    for level, seeds in plan.eval.seed_ranges():
+        if not dev["start"] <= seeds.start < seeds.stop <= dev["stop"]:
+            problems.append(
+                f"eval seeds of level {level} [{seeds.start}, {seeds.stop}) leave the"
+                f" {plan.eval.split} range"
+            )
     return problems
 
 
