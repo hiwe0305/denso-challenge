@@ -28,6 +28,7 @@ import functools
 import hashlib
 import importlib
 import json
+import os
 import queue
 import threading
 from collections.abc import Mapping, Sequence
@@ -337,4 +338,8 @@ class EpisodeRecorder:
         meta_file = self.save_dir / "meta" / "episodes.jsonl"
         lines = [json.loads(line) for line in meta_file.read_text().splitlines() if line]
         lines[index]["environment_config"] = json.dumps(dict(config), cls=encoder)
-        meta_file.write_text("".join(json.dumps(entry) + "\n" for entry in lines))
+        # Through a temporary file and a rename: a crash mid-write leaves the old file whole
+        # (every resume and release reads it), as DA-35's pico recording does.
+        tmp = meta_file.with_name(f".{meta_file.name}.tmp-{os.getpid()}")
+        tmp.write_text("".join(json.dumps(entry) + "\n" for entry in lines))
+        os.replace(tmp, meta_file)
