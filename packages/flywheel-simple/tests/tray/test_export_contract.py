@@ -45,8 +45,10 @@ def exported(tmp_path_factory: pytest.TempPathFactory) -> Path:
         from flywheel_simple.tray.generate import generate, shard_dir
         from flywheel_simple.tray.replay_qa import replay_qa
 
-        summary = generate(work / "gen", n_attempts=N, level=1, seed_start=1)
-        assert summary.qa_pass == N, summary
+        # A few spare attempts: which seeds succeed moves with the planner (seed 2 fails
+        # L-PLACE-POSE with da33-planner-5, passed with planner-4), so need N of them.
+        summary = generate(work / "gen", n_attempts=N + 2, level=1, seed_start=1)
+        assert summary.qa_pass >= N, summary
         shard = shard_dir(work / "gen", 0)
         replay_qa(shard / "raw", shard / "replay")
         batch = str(work / "gen")

@@ -158,3 +158,42 @@ def test_add_frame_rejects_a_frame_of_the_wrong_size(fake_av: Any, tmp_path: Pat
     with pytest.raises(ValueError, match="frame"):
         w.add_frame(np.zeros((HEIGHT + 1, WIDTH, 3), np.uint8))
     w.cancel()
+
+
+def test_the_recorder_opens_an_exporter_that_writes_through_joined_writers(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # The fix lives in EpisodeRecorder._open: a plain Gr00tDataExporter would bring
+    # back decoupled_wbc's VideoWriter and its flush race.
+    from flywheel_simple.tray import recorder
+
+    class FakeExporter:
+        kwargs: dict[str, Any]
+
+        @classmethod
+        def create(cls, **kwargs: Any) -> Any:
+            made = cls.__new__(cls)
+            made.kwargs = kwargs
+            return made
+
+    fakes = {
+        "decoupled_wbc.data.exporter": types.SimpleNamespace(Gr00tDataExporter=FakeExporter),
+        "decoupled_wbc.data.utils": types.SimpleNamespace(
+            get_dataset_features=lambda model: {"observation.state": {}},
+            get_modality_config=lambda model: {},
+        ),
+        "simple.cli._decoupled_wbc_recording": types.SimpleNamespace(
+            set_ego_view_feature_shape=lambda features, shape: None,
+            validate_existing_ego_view_feature_shape=lambda root, shape: None,
+        ),
+    }
+    monkeypatch.setattr(recorder, "_mod", fakes.__getitem__)
+    recorder._exporter_class.cache_clear()
+    try:
+        rec = recorder.EpisodeRecorder(tmp_path, None, ["j"], "t")
+        exporter = rec._open((HEIGHT, WIDTH, 3))
+    finally:
+        recorder._exporter_class.cache_clear()
+    assert isinstance(exporter, FakeExporter)
+    assert vars(type(exporter))["create_video_writer"] is recorder._create_video_writer
+    assert exporter.kwargs["save_root"] == tmp_path

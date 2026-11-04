@@ -34,9 +34,12 @@ def test_two_recorded_episodes_replay_with_the_same_outcome(tmp_path: Path) -> N
     from flywheel_simple.tray.generate import generate, read_log, shard_dir
     from flywheel_simple.tray.replay_qa import replay_qa
 
-    summary = generate(tmp_path / "gen", n_attempts=2, level=1, seed_start=1)
-    assert summary.recorded == 2, read_log(shard_dir(tmp_path / "gen", 0) / "gen_log.jsonl")
+    # Spare attempts: which seeds succeed moves with the planner (seed 2 fails
+    # L-PLACE-POSE with da33-planner-5), and only successes are recorded.
+    summary = generate(tmp_path / "gen", n_attempts=4, level=1, seed_start=1)
+    log = read_log(shard_dir(tmp_path / "gen", 0) / "gen_log.jsonl")
+    assert summary.recorded >= 2, log
     verdicts = replay_qa(shard_dir(tmp_path / "gen", 0) / "raw", tmp_path / "replay")
-    assert [v.seed for v in verdicts] == [1, 2]
+    assert [v.seed for v in verdicts] == [r["seed"] for r in log if r["recorded"]]
     assert all(v.passed for v in verdicts), verdicts
     assert all(v.tray_error_m is not None and v.tray_error_m < 0.02 for v in verdicts)
