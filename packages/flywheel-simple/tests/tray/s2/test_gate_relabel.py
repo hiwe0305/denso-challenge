@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
@@ -92,4 +93,22 @@ def test_the_cli_refuses_another_label_pair(
     before = (copy / "meta" / "episodes.jsonl").read_text()
     argv = ["--scratch-root", str(tmp_path / "gate"), str(copy), "s2", "planner_wbc"]
     assert load().main(argv) == 2
+    assert (copy / "meta" / "episodes.jsonl").read_text() == before
+
+
+def test_a_kill_before_the_rename_leaves_the_episodes_whole(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("FW_ROOT", raising=False)
+    copy = gate_copy(tmp_path / "gate")
+    before = (copy / "meta" / "episodes.jsonl").read_text()
+    module = load()
+
+    def killed(*_: object) -> None:
+        raise OSError("killed before the rename")
+
+    monkeypatch.setattr(module, "os", SimpleNamespace(replace=killed, getpid=os.getpid,
+                                                     environ=os.environ))  # fmt: skip
+    with pytest.raises(OSError, match="killed"):
+        module.relabel(copy, "virtual_teleop", "planner_wbc", tmp_path / "gate")
     assert (copy / "meta" / "episodes.jsonl").read_text() == before

@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from flywheel_simple.tray.pico import session
+from flywheel_simple.tray.pico import recording, session
 from flywheel_simple.tray.pico.recording import atomic_write_text, shard_mismatches
 
 ENV_ID = "simple/G1WholebodyTrayTransferTeleop-v0"
@@ -69,6 +70,70 @@ def test_a_dataset_set_aside_as_empty_is_not_counted(tmp_path: Path) -> None:
     empty.mkdir(parents=True)
     (empty / "info.json").write_text("{}")
     assert shard_mismatches(root) == []
+
+
+def test_a_shard_with_two_live_datasets_is_found(tmp_path: Path) -> None:
+    root = shard(tmp_path, [0], [0])
+    other = root / "simple" / "G1WholebodyTrayTransferTeleop-v1" / "meta"
+    other.mkdir(parents=True)
+    (other / "info.json").write_text("{}")
+    assert shard_mismatches(root) == [
+        "2 datasets: ['G1WholebodyTrayTransferTeleop-v0', 'G1WholebodyTrayTransferTeleop-v1']"
+    ]
+
+
+def crash_at_rename(monkeypatch: pytest.MonkeyPatch, module: object) -> None:
+    """A kill between writing the temporary file and renaming it over the target."""
+
+    def killed(*_: object) -> None:
+        raise OSError("killed before the rename")
+
+    monkeypatch.setattr(module, "os", SimpleNamespace(replace=killed, getpid=os.getpid))
+
+
+def test_a_kill_before_the_rename_leaves_the_old_file_whole(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "episodes.jsonl"
+    path.write_text("old\n")
+    crash_at_rename(monkeypatch, recording)
+    with pytest.raises(OSError, match="killed"):
+        atomic_write_text(path, "new\n")
+    assert path.read_text() == "old\n"
+
+
+def flywheel_episodes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, object]:
+    """A dataset of two saved episodes, and an exporter and task as a session holds them."""
+    meta = tmp_path / "meta"
+    meta.mkdir()
+    rows = [{"episode_index": i, "environment_config": "{}"} for i in (0, 1)]
+    (meta / "episodes.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+    monkeypatch.setattr(session, "_mod", lambda _: SimpleNamespace(NumpyArrayEncoder=None))
+    return meta / "episodes.jsonl", SimpleNamespace(root=str(tmp_path))
+
+
+def test_the_flywheel_block_is_written_into_its_episode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path, exporter = flywheel_episodes(tmp_path, monkeypatch)
+    task = SimpleNamespace(state_dict=lambda: {"uid": "tray"})
+    session.write_environment_config(exporter, task, 1, {"seed": 7})
+    rows = [json.loads(x) for x in path.read_text().splitlines()]
+    assert rows[0]["environment_config"] == "{}"
+    assert json.loads(rows[1]["environment_config"]) == {"uid": "tray", "flywheel": {"seed": 7}}
+    assert [p.name for p in path.parent.iterdir()] == ["episodes.jsonl"]
+
+
+def test_a_kill_while_writing_the_flywheel_block_leaves_episodes_jsonl_whole(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path, exporter = flywheel_episodes(tmp_path, monkeypatch)
+    before = path.read_text()
+    crash_at_rename(monkeypatch, recording)
+    task = SimpleNamespace(state_dict=lambda: {"uid": "tray"})
+    with pytest.raises(OSError, match="killed"):
+        session.write_environment_config(exporter, task, 1, {"seed": 7})
+    assert path.read_text() == before
 
 
 def test_atomic_write_replaces_the_file_and_leaves_no_temporary(tmp_path: Path) -> None:
