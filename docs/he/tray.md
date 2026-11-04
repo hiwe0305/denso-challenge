@@ -177,7 +177,9 @@ Phần này thay mục 3 và mục 5 cho bản 2. Mục 3 và 5 giữ nguyên ch
 | Watcher | | Mỗi job train có một watcher dừng phiên Colab khi phiên đã dùng 18 CU, kể cả khi chưa đủ 40.000 bước. Job dừng ở cap ghi dòng `measured` với số CU thật và số bước đã chạy |
 | Sổ chi phí | 4 dòng ước lượng 16,6 CU (A, C, C-NOEGO, C+) | Dòng ước lượng mới: C và C+ mỗi lần 16,6 CU, cap 18; A và C-NOEGO 0 CU, ghi "bỏ theo bậc 2". Dòng cũ giữ nguyên (append-only) |
 
-Quy tắc đọc kết quả cho bậc 2 **[Đề xuất]**, chờ Hiếu duyệt cùng PR đóng băng bản 2:
+Quy tắc đọc kết quả cho bậc 2 **[Đã chốt 5/11/2026, Hiếu]**, duyệt nguyên văn cùng PR đóng băng bản 2. Khối giữa hai dấu `tier2-rules` (chú thích HTML, không hiện khi đọc) được ghim bằng sha256 ở `interpretation.rules_sha256` của RunPlan bản 2. Sửa một ký tự trong khối thì `runplan check` báo lỗi; nhãn này nằm ngoài khối.
+
+<!-- tier2-rules -->
 
 | # | Điều kiện | Đọc là |
 |---|---|---|
@@ -187,6 +189,8 @@ Quy tắc đọc kết quả cho bậc 2 **[Đề xuất]**, chờ Hiếu duyệ
 | 3 | Câu hỏi bỏ ngỏ | Độ nhạy của task với số demo (C so với A, quy tắc 1–3 của mục 3) và EgoDex trong pretrain (C so với C-NOEGO, quy tắc 4–6) không trả lời ở bậc 2. Báo cáo ghi rõ hai câu này chưa đo |
 
 Nếu sau này có thêm CU, A chạy trên tập 320 đã ghim, cùng recipe và cùng điều kiện eval. Khi đó phép so C+ với A của mục 5 dùng lại được. Việc đó cần RunPlan mới hoặc một `Decision`; bản 2 không tự mở lại.
+
+<!-- /tier2-rules -->
 
 ## 10. Kho planner-5 và release `tray_s1_f9433b028c52` (4–5/11/2026)
 
@@ -237,7 +241,7 @@ Mục 7 ghi kho dùng `da33-planner-4+cfg.815b822a`. Kho đã sinh lại trên `
 
 | Mục | Giá trị |
 |---|---|
-| RunPlan | [`he-tray-v2.yaml`](../../configs/runplans/tray/he-tray-v2.yaml), **`rp_301f08e73358`**, lock [`he-tray-v2.lock.json`](../../configs/runplans/tray/he-tray-v2.lock.json). `supersedes: rp_c49c99c8d8da` (bản 1, chưa chạy) |
+| RunPlan | [`he-tray-v2.yaml`](../../configs/runplans/tray/he-tray-v2.yaml), **`rp_a04c14e79dfd`**, lock [`he-tray-v2.lock.json`](../../configs/runplans/tray/he-tray-v2.lock.json). `supersedes: rp_c49c99c8d8da` (bản 1, chưa chạy). Lần đóng băng đầu `rp_301f08e73358` bị thay sau review #116, trước mọi job |
 | Nhánh | Chỉ **C** (160 episode) trên `psi0-baseline-egodex-he`. C+ ở [`round-tray-cplus.yaml`](../../configs/runplans/tray/round-tray-cplus.yaml), kế thừa bản 2, `n_add` = 160 |
 | Release | `tray_s1_f9433b028c52`, 541 episode, một planner (mục 10) |
 | Chọn tập | Bỏ 7 reject của DA-03, rồi qua bộ lọc: còn 429 episode. Tập lồng nhau cùng một thứ tự hash, ở [`demo_sets-v2.json`](../../configs/runplans/tray/demo_sets-v2.json) |
@@ -247,9 +251,12 @@ Mục 7 ghi kho dùng `da33-planner-4+cfg.815b822a`. Kho đã sinh lại trên `
 | Eval | 270 episode mỗi nhánh: mức 0 là 30 lượt lặp, mức 1 và 2 mỗi mức 120 seed dev, 240 cảnh cho chỉ số chính. Đồng hồ sim, nhiễu gieo theo episode (mục 8) |
 | Ngân sách | Trần 36 CU, cap 18 CU mỗi lần, `runs: [C]`, `round_runs: [C_PLUS]`; watcher là `scripts/colab/cu_watch.py session --cap 18` dưới một guard mỗi lô, một lô mỗi tài khoản |
 | Recipe | `psi0-stage3.yaml` như bản 1, ghi đè `train.validation_steps: 2000` |
+| Ghim thêm (review #116) | `interpretation.rules_sha256`: khối quy tắc mục 9 giữa hai dấu `tier2-rules`. `demo_sets.file_sha256`: cả file tập demo, nên sửa `episode_indices` cũng bị bắt; `check` còn tính lại `set_hash` từ seed. `pinned_files`: sha256 của `configs/sim/tray.yaml`, `configs/splits/default.yaml`, 9 file nguồn cảnh, scorer và vòng eval của `flywheel_simple/tray/` và 5 file `flywheel_simple/wbc/`. Ghim theo file thay vì commit repo vì plan không biết commit chứa chính nó, và `check` kiểm được trên CI không cần lịch sử git. Hệ quả: PR nào sửa một file trong số đó sẽ làm `runplan check` và test của bản 2 hỏng. Trước job đầu thì đóng băng lại; sau đó cần `Decision` |
+| Kiểm theo release | Trên `rtx3060`: `runplan check he-tray-v2.yaml --release <thư mục release>` đối chiếu `episode_indices` của từng tập với export của release. File tập demo chỉ có hai danh sách đã sắp xếp, nên chỉ release biết index nào của seed nào. Ngày 5/11: khớp; dời một index thì lệnh báo lỗi |
+| `delta_pp` | Bỏ ở bản 2. δ là biên của quy tắc HE-T (mục 4, cần nhánh B); quy tắc bậc 2 đọc CI, không dùng δ. Bản 1 giữ δ = 10 và id cũ |
 
 Điều kiện trước khi chạy, vẫn còn mở:
 
 - Fine-tune C chỉ chạy từ master sau khi PR đóng băng này được merge, và sau lô của DA-26 (một lô mỗi tài khoản).
-- Eval cần `flywheel_simple.tray.run` chạy ở thời gian sim và gửi seed điều kiện lúc reset, cùng launcher gieo nhiễu phía server (mục 8.1, 8.5). Việc này ngoài phạm vi DA-34 và phải xong trước nhiệm vụ 3.
-- Quy tắc đọc bậc 2 ở mục 9 vẫn là **[Đề xuất]**, chờ Hiếu duyệt cùng PR này.
+- Eval ở thời gian sim, seed điều kiện gửi lúc reset và bộ nạp giải mã frame khi đọc **đã có trên master** (hotfix `ee02e0b`, `flywheel_simple/tray/run.py`). Server gieo nhiễu theo episode cũng đã có: `docker/psi0/serve_psi0_seeded.py` (#97), và `scripts/g0/serve_psi0.sh serve` dùng nó (`3fc46c5`). Chỉ còn mở phép kiểm tất định trên GPU của mục 8.5 (cùng checkpoint, 3 điều kiện mức 0, mỗi điều kiện 2 lượt), cần GPU nên do Hiếu chạy.
+- Quy tắc đọc bậc 2 ở mục 9: **[Đã chốt 5/11/2026, Hiếu]**, khối quy tắc ghim bằng `interpretation.rules_sha256`.

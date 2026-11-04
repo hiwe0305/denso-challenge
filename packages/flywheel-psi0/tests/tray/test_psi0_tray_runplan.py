@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 from pathlib import Path
@@ -9,18 +10,28 @@ from pathlib import Path
 import pytest
 import yaml
 from flywheel_psi0.trainer.recipe import Psi0Recipe
-from flywheel_psi0.tray.demo_sets import DemoSets, QaPin
+from flywheel_psi0.tray.demo_sets import (
+    EXPORT_META,
+    MANIFEST,
+    DemoSets,
+    QaPin,
+    ReleaseEpisode,
+    canonical_sha256,
+    nested_sets,
+)
 from flywheel_psi0.tray.runplan import (
     QaRef,
     TrayRoundPlan,
     TrayRunPlan,
     check,
+    check_release,
     check_round,
     freeze,
     lock_path,
     main,
     plan_json,
     recipe_sha256,
+    rules_block,
     run_plan_id,
 )
 
@@ -176,7 +187,7 @@ def test_round_refuses_a_plan_edited_after_its_lock(tmp_path: Path) -> None:
     shutil.copy(ROUND, repo / "configs/runplans/tray/round-tray-cplus.yaml")
     shutil.copy(lock_path(PLAN_V2), lock_path(repo / "configs/runplans/tray/he-tray-v2.yaml"))
     plan_file = repo / "configs/runplans/tray/he-tray-v2.yaml"
-    plan_file.write_text(plan_file.read_text().replace("delta_pp: 10}", "delta_pp: 5}"))
+    plan_file.write_text(plan_file.read_text().replace("resamples: 10000", "resamples: 20000"))
     round_plan = TrayRoundPlan.load(repo / "configs/runplans/tray/round-tray-cplus.yaml")
     assert any("changed since it was frozen" in p for p in check_round(round_plan, repo))
 
@@ -411,3 +422,119 @@ def test_v2_sets_leave_out_the_da03_rejects(plan_v2: TrayRunPlan) -> None:
     assert sets.quality.kept == 429
     assert {k: v.n for k, v in sets.sets.items()} == {"N40": 40, "N80": 80, "C": 160, "A": 320}
     assert not DA03_REJECTS & set(sets.sets["A"].seeds)
+
+
+# Review of #116: what `check` recomputes instead of trusting the files.
+SETS_V2 = "configs/runplans/tray/demo_sets-v2.json"
+
+
+def test_check_recomputes_set_hashes_from_the_seeds(tmp_path: Path, plan_v2: TrayRunPlan) -> None:
+    # One seed of C swapped for one outside A, every hash in the file kept.
+    repo = _repo_copy(tmp_path)
+    raw = json.loads((repo / SETS_V2).read_text())
+    seeds = raw["sets"]["C"]["seeds"]
+    outside = next(s for s in range(seeds[0] - 1, 0, -1) if s not in raw["sets"]["A"]["seeds"])
+    raw["sets"]["C"]["seeds"] = sorted([outside, *seeds[1:]])
+    (repo / SETS_V2).write_text(json.dumps(raw))
+    unpinned = plan_v2.demo_sets.model_copy(update={"file_sha256": None})
+    problems = check(plan_v2.model_copy(update={"demo_sets": unpinned}), repo)
+    assert any(p.startswith("demo set C: its seeds hash to") for p in problems)
+
+
+def test_check_pins_the_demo_set_file(tmp_path: Path, plan_v2: TrayRunPlan) -> None:
+    # Episode indices are not in any set hash; the file hash covers them.
+    repo = _repo_copy(tmp_path)
+    assert not any("demo-set file" in p for p in check(plan_v2, repo))
+    raw = json.loads((repo / SETS_V2).read_text())
+    raw["sets"]["C"]["episode_indices"][0] += 1
+    (repo / SETS_V2).write_text(json.dumps(raw, indent=1))
+    assert any("not the demo-set file the plan pins" in p for p in check(plan_v2, repo))
+
+
+def _with_doc(tmp_path: Path) -> Path:
+    repo = _repo_copy(tmp_path)
+    (repo / "docs/he").mkdir(parents=True)
+    shutil.copy(REPO / "docs/he/tray.md", repo / "docs/he/tray.md")
+    return repo
+
+
+def test_one_edited_character_of_the_rules_fails(tmp_path: Path, plan_v2: TrayRunPlan) -> None:
+    repo = _with_doc(tmp_path)
+    assert not any("reading rules" in p for p in check(plan_v2, repo))
+    doc = repo / "docs/he/tray.md"
+    text = doc.read_text()
+    block = rules_block(text)
+    i = block.index("p_C < 10%")
+    doc.write_text(text.replace(block, block[:i] + "p_C < 20%" + block[i + 9 :]))
+    assert any("reading rules in docs/he/tray.md changed" in p for p in check(plan_v2, repo))
+
+
+def test_the_label_outside_the_rules_block_may_change(tmp_path: Path, plan_v2: TrayRunPlan) -> None:
+    repo = _with_doc(tmp_path)
+    doc = repo / "docs/he/tray.md"
+    doc.write_text(doc.read_text().replace("[Đã chốt 5/11/2026, Hiếu]", "[Đề xuất]", 1))
+    assert not any("reading rules" in p for p in check(plan_v2, repo))
+
+
+def test_rules_need_one_pair_of_markers() -> None:
+    with pytest.raises(ValueError, match="exactly one"):
+        rules_block("no markers")
+    with pytest.raises(ValueError, match="comes before"):
+        rules_block("<!-- /tier2-rules --> x <!-- tier2-rules -->")
+
+
+def test_v2_pins_the_eval_config_split_and_tray_sources(plan_v2: TrayRunPlan) -> None:
+    pinned = plan_v2.pinned_files
+    assert pinned is not None
+    assert {plan_v2.task["config"], "configs/splits/default.yaml"} <= set(pinned)
+    tray = "packages/flywheel-simple/src/flywheel_simple/tray/"
+    for module in ("simple_task", "predicates", "randomize", "mjcf", "run"):
+        assert f"{tray}{module}.py" in pinned
+    assert plan_v2.interpretation.delta_pp is None  # no HE-T rule reads it in tier 2
+
+
+def test_check_catches_a_changed_pinned_file(tmp_path: Path, plan_v2: TrayRunPlan) -> None:
+    repo = _repo_copy(tmp_path)
+    (repo / "configs/sim").mkdir(parents=True)
+    (repo / "configs/sim/tray.yaml").write_text("episode_limit_s: 120.0\n")
+    problems = check(plan_v2, repo)
+    assert "pinned file configs/sim/tray.yaml changed since the plan pinned it" in problems
+    unpinned = {
+        k: v for k, v in (plan_v2.pinned_files or {}).items() if k != "configs/sim/tray.yaml"
+    }
+    problems = check(plan_v2.model_copy(update={"pinned_files": unpinned}), repo)
+    assert "pinned_files lacks configs/sim/tray.yaml, which the eval reads" in problems
+
+
+def _fake_release(root: Path, episodes: list[ReleaseEpisode]) -> str:
+    """A release directory with the manifest and export meta read_release checks."""
+    (root / "meta").mkdir(parents=True)
+    (root / EXPORT_META).write_text(json.dumps({"episodes": [e.model_dump() for e in episodes]}))
+    meta = root / EXPORT_META
+    files = [{"path": EXPORT_META, "sha256": hashlib.sha256(meta.read_bytes()).hexdigest()}]
+    release_hash = canonical_sha256(files)
+    (root / MANIFEST).write_text(json.dumps({"release_hash": release_hash, "files": files}))
+    return release_hash
+
+
+def test_check_release_ties_indices_to_seeds(tmp_path: Path, plan_v2: TrayRunPlan) -> None:
+    # Export order is not seed order, so the sorted index list depends on the pairing.
+    episodes = [ReleaseEpisode(episode_index=i, seed=2000 + (i * 7) % 30) for i in range(30)]
+    release_hash = _fake_release(tmp_path / "release", episodes)
+    sets = nested_sets("tray_fake", release_hash, episodes, {"C": 10, "A": 20})
+    repo = tmp_path / "repo"
+    (repo / "configs/runplans/tray").mkdir(parents=True)
+    (repo / SETS_V2).write_text(sets.model_dump_json())
+    release = plan_v2.release.model_copy(update={"release_hash": release_hash})
+    plan = plan_v2.model_copy(update={"release": release})
+    assert check_release(plan, tmp_path / "release", repo) == []
+    swapped = [ReleaseEpisode(episode_index=e.seed % 30, seed=e.seed) for e in episodes]
+    other = tmp_path / "other"
+    other_plan = plan.model_copy(
+        update={
+            "release": release.model_copy(update={"release_hash": _fake_release(other, swapped)})
+        }
+    )
+    problems = check_release(other_plan, other, repo)
+    assert any("episode_indices are not its seeds'" in p for p in problems)
+    assert any("not" in p for p in check_release(plan_v2, tmp_path / "release", repo))

@@ -5,7 +5,11 @@
 and eval conditions sit once at plan level and a branch can only pick a demo
 set and a parent checkpoint, so "same recipe, same steps, same condition seeds"
 holds by construction. `check` ties the plan to the files it names: the recipe
-hash, the parent paths of the recipe, the demo-set hashes and the dev split.
+hash, the parent paths of the recipe, the demo-set hashes (recomputed from the
+seeds) and the dev split; for version 2 also the sha256 of the demo-set file, of
+the eval config and scene/scorer sources (`pinned_files`), and of the reading
+rules between the tier2-rules markers of the interpretation doc. With `--release`
+it also checks every set's episode indices against the release's own export.
 The only recipe override allowed is one that leaves training unchanged
 (`train.validation_steps`), set once for all branches.
 
@@ -19,6 +23,8 @@ before the first job (design 6.4) cannot drift silently.
 draft until its targeted episodes exist.
 
     python -m flywheel_psi0.tray.runplan check configs/runplans/tray/he-tray.yaml
+    python -m flywheel_psi0.tray.runplan check configs/runplans/tray/he-tray-v2.yaml \
+        --release ~/denso-da34-pool/fwdata/releases/tray_s1_f9433b028c52
     python -m flywheel_psi0.tray.runplan check configs/runplans/tray/round-tray-cplus.yaml
     python -m flywheel_psi0.tray.runplan freeze configs/runplans/tray/he-tray.yaml
 """
@@ -38,7 +44,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from flywheel_psi0.trainer.recipe import Psi0Recipe
-from flywheel_psi0.tray.demo_sets import DemoSets, canonical_sha256
+from flywheel_psi0.tray.demo_sets import DemoSets, canonical_sha256, read_release, set_hash
 from flywheel_psi0.tray.quality import QualityFilter
 
 REPO = Path(__file__).resolve().parents[5]
@@ -46,6 +52,10 @@ REPO = Path(__file__).resolve().parents[5]
 # not the weights (PO 4/11/2026, docs/g0/psi0-finetune-cost.md 4.1 on S1-04).
 TRAINING_NEUTRAL_OVERRIDES = frozenset({"train.validation_steps"})
 STATUS_FIELDS = {"superseded_by"}
+# The block of the interpretation doc that `Interpretation.rules_sha256` pins; the
+# label above it ([Đề xuất], [Đã chốt]) stays outside, so approving it keeps the id.
+RULES_MARKERS = ("<!-- tier2-rules -->", "<!-- /tier2-rules -->")
+SPLIT_FILE = "configs/splits/default.yaml"
 
 
 class _Frozen(BaseModel):
@@ -94,6 +104,7 @@ class QaRef(_Frozen):
 
 class DemoSetPins(_Frozen):
     file: str  # repo-relative
+    file_sha256: str | None = Field(default=None, min_length=64, max_length=64)  # v2
     salt: str
     hashes: dict[str, str]
     quality: QualityRef | None = None
@@ -197,7 +208,8 @@ class Comparison(_Frozen):
 
 class Interpretation(_Frozen):
     doc: str  # repo-relative
-    delta_pp: float = Field(gt=0)
+    delta_pp: float | None = Field(default=None, gt=0)  # delta of the HE-T rules (branch B)
+    rules_sha256: str | None = Field(default=None, min_length=64, max_length=64)
 
 
 class Budget(_Frozen):
@@ -232,6 +244,9 @@ class TrayRunPlan(_Frozen):
     interpretation: Interpretation
     pricebook: str
     budget: Budget | None = None
+    # Repo-relative path -> sha256 of files the eval reads but no other pin covers:
+    # the task config, the split and the scene, scorer and eval-loop sources.
+    pinned_files: dict[str, str] | None = None
     supersedes: str | None = None  # run_plan_id of a plan this one replaces before it ran
     # Repo path of the plan that replaced this one. Set after the freeze, so it is left
     # out of the id and the lock (STATUS_FIELDS): it says whether to run, not what runs.
@@ -303,6 +318,25 @@ def lock_path(plan_path: Path) -> Path:
     return plan_path.with_name(plan_path.name.removesuffix(".yaml") + ".lock.json")
 
 
+def rules_block(text: str) -> str:
+    """The text between the tier2-rules markers: exactly one pair, in order."""
+    begin, end = RULES_MARKERS
+    if text.count(begin) != 1 or text.count(end) != 1:
+        raise ValueError(f"needs exactly one {begin} ... {end} block")
+    start, stop = text.index(begin) + len(begin), text.index(end)
+    if stop < start:
+        raise ValueError(f"{end} comes before {begin}")
+    return text[start:stop]
+
+
+def rules_sha256(text: str) -> str:
+    return hashlib.sha256(rules_block(text).encode("utf-8")).hexdigest()
+
+
+def file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
     """Everything wrong between the plan and the files it names; empty when it holds."""
     problems: list[str] = []
@@ -334,7 +368,11 @@ def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
         if not parent.clean_for_main_task:
             problems.append(f"parent {name} is not clean for the main task (Q0)")
 
-    sets = DemoSets.model_validate_json((repo / plan.demo_sets.file).read_text(encoding="utf-8"))
+    sets_path = repo / plan.demo_sets.file
+    sets = DemoSets.model_validate_json(sets_path.read_text(encoding="utf-8"))
+    pinned_file = plan.demo_sets.file_sha256
+    if pinned_file is not None and file_sha256(sets_path) != pinned_file:
+        problems.append(f"{plan.demo_sets.file} is not the demo-set file the plan pins")
     if (sets.release_id, sets.release_hash) != (plan.release.id, plan.release.release_hash):
         problems.append(f"{plan.demo_sets.file} is for another release: {sets.release_id}")
     if sets.salt != plan.demo_sets.salt:
@@ -343,6 +381,8 @@ def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
         got = sets.sets.get(name)
         if got is None or got.set_hash != pinned:
             problems.append(f"demo set {name}: file has {got and got.set_hash}, plan pins {pinned}")
+        elif (seeds_hash := set_hash(sets.release_hash, got.seeds)) != pinned:
+            problems.append(f"demo set {name}: its seeds hash to {seeds_hash}, plan pins {pinned}")
     pinned_q, used_q = plan.demo_sets.quality, sets.quality
     if (pinned_q is None) != (used_q is None):
         problems.append("plan and demo-set file disagree on whether a quality filter was used")
@@ -368,6 +408,8 @@ def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
     for small, large in zip(ordered, ordered[1:]):
         if not set(small.seeds) <= set(large.seeds):
             problems.append(f"demo set of {small.n} is not inside the set of {large.n}")
+        if not set(small.episode_indices) <= set(large.episode_indices):
+            problems.append(f"episode indices of the set of {small.n} are not inside {large.n}'s")
 
     for name, branch in plan.branches.items():
         if branch.demo_set not in plan.demo_sets.hashes:
@@ -398,7 +440,29 @@ def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
             if name in plan.branches:
                 problems.append(f"budget: round run {name} is a branch of this plan")
 
-    split = yaml.safe_load((repo / "configs/splits/default.yaml").read_text(encoding="utf-8"))
+    rules = plan.interpretation.rules_sha256
+    if rules is not None:
+        doc = plan.interpretation.doc
+        try:
+            actual = rules_sha256((repo / doc).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
+            problems.append(f"{doc}: {error}")
+        else:
+            if actual != rules:
+                problems.append(f"the reading rules in {doc} changed since the plan pinned them")
+
+    if plan.pinned_files is not None:
+        for rel in (plan.task["config"], SPLIT_FILE):
+            if rel not in plan.pinned_files:
+                problems.append(f"pinned_files lacks {rel}, which the eval reads")
+        for rel, sha in plan.pinned_files.items():
+            path = repo / rel
+            if not path.is_file():
+                problems.append(f"pinned file {rel} is missing")
+            elif file_sha256(path) != sha:
+                problems.append(f"pinned file {rel} changed since the plan pinned it")
+
+    split = yaml.safe_load((repo / SPLIT_FILE).read_text(encoding="utf-8"))
     dev = split["seed_ranges"][plan.eval.split]
     for level, seeds in plan.eval.seed_ranges():
         if not dev["start"] <= seeds.start < seeds.stop <= dev["stop"]:
@@ -406,6 +470,30 @@ def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
                 f"eval seeds of level {level} [{seeds.start}, {seeds.stop}) leave the"
                 f" {plan.eval.split} range"
             )
+    return problems
+
+
+def check_release(plan: TrayRunPlan, release_root: Path, repo: Path = REPO) -> list[str]:
+    """Every set's episode indices against the release's own export (needs the release).
+
+    The demo-set file lists seeds and episode indices as two ascending lists, so only
+    the release says which index is which seed's; `check` alone cannot.
+    """
+    try:
+        release_hash, episodes = read_release(release_root)
+    except (OSError, ValueError, KeyError) as error:
+        return [f"{release_root}: {error}"]
+    if release_hash != plan.release.release_hash:
+        return [f"{release_root} is release {release_hash}, not {plan.release.release_hash}"]
+    index_of = {e.seed: e.episode_index for e in episodes}
+    sets = DemoSets.model_validate_json((repo / plan.demo_sets.file).read_text(encoding="utf-8"))
+    problems = []
+    for name, demo_set in sets.sets.items():
+        missing = [seed for seed in demo_set.seeds if seed not in index_of]
+        if missing:
+            problems.append(f"demo set {name}: seeds {missing[:5]} are not in the release")
+        elif sorted(index_of[seed] for seed in demo_set.seeds) != demo_set.episode_indices:
+            problems.append(f"demo set {name}: episode_indices are not its seeds' in the release")
     return problems
 
 
@@ -458,6 +546,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("action", choices=["check", "freeze"])
     parser.add_argument("plan", type=Path)
+    parser.add_argument("--release", type=Path, help="check episode indices against it")
     args = parser.parse_args(argv)
     if args.action == "freeze":
         out = freeze(args.plan)
@@ -471,6 +560,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         plan = TrayRunPlan.model_validate(raw)
         problems = check(plan)
+        if args.release is not None:
+            problems += check_release(plan, args.release)
         summary = f"{args.plan}: {run_plan_id(plan)}, {len(plan.eval_conditions())} eval conditions"
         if plan.superseded_by is not None:
             problems.append(f"SUPERSEDED by {plan.superseded_by}: do not run this plan")
