@@ -176,17 +176,14 @@ Câu hỏi gửi Hiếu: "Approve CU for tier 2, with DA-26 on reduced Isaac eva
 | AC 6 | Không đủ: thiếu N = 80. Đây là giảm phạm vi có `Decision` (AC 8) |
 | Chạy | Chỉ chạy từ `master` sau khi Hiếu merge PR này; không chạy từ nhánh chưa merge |
 
-**Trần CU từng job** (ước lượng, chưa chạy; dòng `estimated` trong [`ledger/DA-26.csv`](../g0/ledger/DA-26.csv)). Mỗi phiên Colab chạy kèm [`scripts/he/cu_watch.py`](../../scripts/he/cu_watch.py) trên laptop (lệnh chạy trong docstring của script). Script làm theo nguyên tắc hỏng thì dừng:
+**Trần CU từng job** (ước lượng, chưa chạy; dòng `estimated` trong [`ledger/DA-26.csv`](../g0/ledger/DA-26.csv)).
 
-- **Chi tiêu**: lấy số lớn hơn của hai đồng hồ.
-  - Số dư `colab usage` tụt bao nhiêu thì tính hết cho phiên khi phiên chạy một mình. Khi phiên của story khác cùng chạy, chỉ tính phần theo tỉ lệ tốc độ của phiên.
-  - Giờ tường `time.time()` nhân 1,94 CU/giờ. Giờ tường vẫn đếm khi laptop ngủ.
-- **Loại GPU**: GPU không phải L4 thì dừng ngay (A100 khoảng 6,7 CU/giờ).
-- **Điểm dừng**: dừng khi chi tiêu cộng biên (poll + 2 × 120 s + 270 s, khoảng 0,31 CU) chạm trần. Mỗi job vì vậy dừng ở khoảng trần − 0,3 CU.
-- **Xác nhận dừng**: `colab stop` được thử lại với thời gian chờ tăng dần, rồi xác nhận bằng `colab sessions`. Dừng không được thì thoát mã 5 và ghi `STOP_FAILED`.
-- **Kết thúc**: cần 3 lần poll liên tiếp không thấy phiên mới coi là phiên đã kết thúc.
-- **Bắt đầu**: job chỉ bắt đầu khi watcher đã thấy phiên trên L4 và ghi file `--ready-file`.
-- **Laptop phải thức suốt lúc chạy** (chạy watcher dưới `systemd-inhibit`); laptop ngủ thì không có gì dừng phiên.
+**Watcher chung** **[Đã chốt]** (4/11/2026): DA-26 chạy bằng watcher chung `scripts/colab/cu_watch.py`. DA-30 làm watcher này trong PR riêng `chore-colab-cu-watch`, chưa merge.
+
+- Watcher giám sát cùng lúc ba phiên của DA-26 (hai fine-tune, một server eval). Mỗi phiên có trần riêng: **17,5 / 17,5 / 17,0 CU**. Cả lô có sàn số dư thật của tài khoản **`--floor 14`**, vì ba phiên dùng chung số dư với DA-34 và DA-30.
+- Watcher kiểm loại GPU (L4) và dừng có xác nhận.
+- **Laptop phải thức suốt lúc chạy**: laptop ngủ thì không có gì dừng phiên.
+- **Không chạy job nào** cho tới khi watcher chung được merge và #99 được kiểm lại. Bản watcher riêng trước đây trong `scripts/he/` đã bỏ khỏi PR này.
 
 | Job | Ước lượng | Trần |
 |---|---|---|
@@ -206,3 +203,4 @@ Câu hỏi gửi Hiếu: "Approve CU for tier 2, with DA-26 on reduced Isaac eva
 | 4/11/2026 | Q3: ghi kết quả Q-27C của S1-03; RunPlan đề xuất `mujoco_isaac`, giờ sim, chờ ký (`eval.awaiting`); phương án A ghi là yếu; thêm mục 6.1 phương án F (Isaac, mức 0, N = 20, 10 hoặc 30 điều kiện) với CU, giờ và độ nhạy Fisher | Hiếu (soạn với Claude) |
 | 4/11/2026 | Tier 2 (Hiếu: "Approve tier 2"): mục 6.2 quyết định và trần CU từng job; eval chính còn 10 điều kiện mức 0 (`b63acd59…`), `mujoco_isaac`, giờ sim; sơ bộ chỉ N = 20; quy tắc đọc sơ bộ theo Fisher và độ nhạy 10 mỗi nhánh; Q3, Q4 đã chốt; đóng băng | Hiếu (soạn với Claude) |
 | 4/11/2026 | Review của #99: đầu file ghi đã chốt; mốc so không chạy trên bộ dev ở tier 2 (mục 1); mục 6.2 tả watcher mới (hai đồng hồ, kiểm L4, dừng có xác nhận, laptop phải thức); `Decision` ghi lại với `embodiment_id` `g1_sonic_dwbc@1` (`dec_01M6KG4JFTRWGQ91CD3H1TC1XX`, cùng `rp_95c98a476499`) | Hiếu (soạn với Claude) |
+| 4/11/2026 | Mục 6.2: chạy bằng watcher chung `scripts/colab/cu_watch.py` (trần 17,5 / 17,5 / 17,0 CU, `--floor 14`); bỏ watcher riêng của DA-26 | Hiếu (soạn với Claude) |
