@@ -13,9 +13,11 @@ sets of `flywheel_psi0.tray.demo_sets`, and the pins, recipe hash and
 `run_plan_id` of `flywheel_psi0.tray.runplan`. Two things differ from the tray
 plan. The robot data is psi-data, whose episodes carry no seed (S1-07, V6), so an
 episode is keyed by its `episode_index` inside the pinned zip: `seeds` in the
-demo-set file are episode indices. And the eval conditions are the authors'
-`simple-eval` set (10 per level, S1-03 section 3.1), not seeds of the team's dev
-split; the plan pins that zip by its sha256.
+demo-set file are episode indices. And the main eval set is not a seed range the
+sim lays out at eval time: SIMPLE's two-table eval reads its conditions from a
+dataset, so scripts/he/dev_eval_set.py draws them from the team's dev seeds and the
+plan pins the sha256 of their env configs. The authors' `simple-eval` set (10 per
+level, levels 0 and 1 are train scenes) stays as a secondary set for the baseline.
 
 `check` recomputes the demo sets from the plan alone (episode count, exclusions,
 salt, dataset hash) and compares them with the file. `parents` asks the Hugging
@@ -55,6 +57,7 @@ from flywheel_psi0.tray.runplan import (
     Pin,
     PsiModel,
     Recipe,
+    SeedRange,
     Stats,
     lock_path,
     plan_json,
@@ -113,11 +116,26 @@ class EvalSet(HfFile):
     conditions_per_level: int = Field(gt=0)
 
 
+class DevEvalSet(_Frozen):
+    """Conditions drawn from the team's dev seeds by scripts/he/dev_eval_set.py."""
+
+    generator: str  # repo-relative
+    salt: str
+    simple_commit: str = Field(min_length=40, max_length=40)  # whose DR drew the scenes
+    seeds: SeedRange  # the same seeds at every level
+    levels: list[int]
+    conditions_sha256: str = Field(min_length=64, max_length=64)
+    location: str
+
+
 class Eval(_Frozen):
     cli: Literal["eval-decoupled-wbc"]
-    sim_mode: Literal["mujoco", "mujoco_isaac"]
+    # "pending" until S1-03 settles the eval mode; `freeze` refuses a pending field.
+    sim_mode: Literal["mujoco", "mujoco_isaac", "pending"]
+    clock: Literal["sim", "wall", "pending"]
     synchronous: bool
-    eval_set: EvalSet
+    main: DevEvalSet  # every HE number is read on this set
+    authors_set: EvalSet  # secondary: baseline and the published numbers only
     passes: dict[Literal["preliminary", "full"], int]  # rollouts per condition
 
 
@@ -160,9 +178,16 @@ class He1RunPlan(_Frozen):
         return cls.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
 
     def eval_conditions(self) -> list[tuple[int, int]]:
-        """(level, condition index) of every eval condition; the same for every point."""
-        es = self.eval.eval_set
-        return [(level, i) for level in es.levels for i in range(es.conditions_per_level)]
+        """(level, seed) of every main eval condition; the same for every point."""
+        dev = self.eval.main
+        seeds = range(dev.seeds.start, dev.seeds.stop)
+        return [(level, seed) for level in dev.levels for seed in seeds]
+
+
+def open_items(plan: He1RunPlan) -> list[str]:
+    """Fields still waiting for a decision; a plan with any of them is not frozen."""
+    pending = [name for name in ("sim_mode", "clock") if getattr(plan.eval, name) == "pending"]
+    return [f"eval.{name} is pending (S1-03)" for name in pending]
 
 
 def demo_sets_from_plan(plan: He1RunPlan) -> DemoSets:
@@ -257,8 +282,15 @@ def check(plan: He1RunPlan, repo: Path = REPO) -> list[str]:
         for side in (comparison["a"], comparison["b"]):
             if side not in plan.variants:
                 problems.append(f"comparison names unknown variant {side}")
-    if not plan.eval.eval_set.levels:
-        problems.append("eval set uses no level")
+    main = plan.eval.main
+    if not main.levels or not plan.eval.authors_set.levels:
+        problems.append("an eval set uses no level")
+    if not (repo / main.generator).is_file():
+        problems.append(f"{main.generator} is missing")
+    split = yaml.safe_load((repo / "configs/splits/default.yaml").read_text(encoding="utf-8"))
+    dev = split["seed_ranges"]["dev"]
+    if not dev["start"] <= main.seeds.start < main.seeds.stop <= dev["stop"]:
+        problems.append(f"eval seeds [{main.seeds.start}, {main.seeds.stop}) leave the dev range")
     return problems
 
 
@@ -307,7 +339,7 @@ def check_parents(plan: He1RunPlan) -> dict[str, Any]:
     rev = plan.psi_model.revision
     files: list[tuple[str, HfFile]] = [
         ("dataset", plan.dataset),
-        ("eval_set", plan.eval.eval_set),
+        ("authors_eval_set", plan.eval.authors_set),
         ("baseline", plan.baseline.weights),
     ]
     for name, parent in plan.parents.items():
@@ -360,7 +392,7 @@ def check_parents(plan: He1RunPlan) -> dict[str, Any]:
 def freeze(plan_path: Path, signed_by: str, reason: str, repo: Path = REPO) -> tuple[Path, Path]:
     """Write `<plan>.lock.json` and the signing `Decision` (kind plan_review) beside the plan."""
     plan = He1RunPlan.load(plan_path)
-    problems = check(plan, repo)
+    problems = check(plan, repo) + open_items(plan)
     if not (repo / plan.interpretation.doc).is_file():
         problems.append(f"{plan.interpretation.doc} is missing: fix the reading rules first")
     if lock_path(plan_path).is_file():
@@ -446,6 +478,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     problems = check(plan) + check_lock(plan, args.plan)
     for problem in problems:
         print(problem, file=sys.stderr)
+    for item in open_items(plan):
+        print(f"open: {item}")
     if not problems:
         preliminary = sum(p.phase == "preliminary" for p in plan.points)
         print(
