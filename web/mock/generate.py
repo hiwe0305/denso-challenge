@@ -261,7 +261,13 @@ class Mock:
             "action_quality": "measured",
             "deid_status": "verified",
             "embodiment_id": "g1_sonic_dwbc@1",
-            "meta": {"source_detail": spec["detail"], "renderer": "mujoco", "synthetic_tier": None},
+            "meta": {
+                "source_detail": spec["detail"],
+                "renderer": "mujoco",
+                "synthetic_tier": None,
+                # C19: mọi episode của bản sao chấm, kể cả episode sạch (#62).
+                "benchmark_copy_id": code if spec.get("seeded") else None,
+            },
         }
         if code == "ds_psi_teleop":
             row["split"] = "train" if index < 64 else "dev"
@@ -417,7 +423,7 @@ class Mock:
         return "ckpt_" + experiment.removeprefix("exp_")
 
     def run_plans(self) -> None:
-        rows = [
+        rows: list[Row] = [
             {"run_plan_ref": rp, "purpose": "branch_train", "branch": branch, "method": "PSI0",
              "task_id": TASK, "lock_uri": f"mock://runs/{rp}/runplan.lock.json",
              "config_sha256": hx(f"runplan:{rp}"), "frozen_at": ts(3, 12),
@@ -437,7 +443,9 @@ class Mock:
         self.files["run_plans.jsonl"] = rows
 
     def experiments(self) -> None:
-        experiments, links, checkpoints = [], [], []
+        experiments: list[Row] = []
+        links: list[Row] = []
+        checkpoints: list[Row] = []
         used = sum(1 for item in self.release_items if not item["excluded"])
         for seed, (code, branch, hypothesis, rp, parent) in enumerate(self.EXPERIMENTS):
             params: Row = {"lr": 1e-4, "steps": 2000}
@@ -778,7 +786,8 @@ class Mock:
         if ref == "clu_1":
             return []  # hệ thống trước, dữ liệu sau: cụm hệ thống không đi tiếp (§5.3)
         first = group[0]["eval_episode_ref"]
-        plan = {
+        # (bước, phép kiểm, kết quả, số rollout, giá trị, lý do bỏ qua)
+        plans: dict[str, list[tuple[int, str, str, int, float | None, str | None]]] = {
             "clu_2": [(5, "feasibility", "passed", 5, 1.0, None),
                       (6, "localize", "skipped", 0, None,
                        "không khôi phục được trạng thái ở đầu bước 3 từ trace"),
@@ -789,7 +798,8 @@ class Mock:
             "clu_4": [(5, "feasibility", "passed", 5, 1.0, None),
                       (6, "localize", "failed", 10, 0.3, None),
                       (7, "visual", "passed", 5, 0.7, None)],
-        }[ref]
+        }
+        plan = plans[ref]
         return [
             {"cluster_ref": ref, "step_no": step, "check_name": name,
              "representative_episode_ref": first, "rollout_count": rollouts,
@@ -882,7 +892,7 @@ class Mock:
         )
         # Ước tính của bốn can thiệp: cùng dòng với cột thực đo để trống (R5),
         # và gắn khuyến nghị lẫn can thiệp (C10).
-        for intervention in self.files["interventions.jsonl"]:  # type: ignore[union-attr]
+        for intervention in self.files["interventions.jsonl"]:
             assert isinstance(intervention, dict)
             rows.append(
                 {"entry_ref": f"led_est_{intervention['intervention_ref']}", "entry_kind": "ENTRY",

@@ -66,7 +66,7 @@ EPISODE: dict[str, Any] = {
         "source_detail": "psi_data",
         "renderer": "mujoco",
         "synthetic_tier": None,
-        "injected_defect": None,
+        "benchmark_copy_id": None,
     },
 }
 
@@ -266,16 +266,19 @@ def test_an_episode_whose_dataset_is_absent_is_refused(tmp_path: Path) -> None:
 
 
 def test_the_answer_key_never_lands_in_the_sink(source: Path, tmp_path: Path) -> None:
-    # Luật R8 end-to-end, không chỉ ở mapper.
+    # Luật R8 end-to-end, không chỉ ở mapper. Từ #62 hợp đồng không còn
+    # `injected_defect`, nên episode mang nó bị từ chối cả dòng, có lý do.
     payload = {**EPISODE, "meta": {**EPISODE["meta"], "injected_defect": {"code": "D4"}}}
     _write_jsonl(source / "episodes.jsonl", [payload])
     sink = JsonlSink(directory=tmp_path / "sink")
 
-    run_import(source, sink)
+    result = run_import(source, sink)
 
-    written = (sink.directory / "episodes.jsonl").read_text(encoding="utf-8")
-    assert "injected_defect" not in written
-    assert "D4" not in written
+    # Báo cáo QA của episode đó bị từ chối theo, vì nó trỏ episode chưa nạp.
+    assert [error["table"] for error in result.errors] == ["episodes", "episode_qa_reports"]
+    assert "injected_defect" in result.errors[0]["message"]
+    written = sink.directory / "episodes.jsonl"
+    assert not written.exists() or "D4" not in written.read_text(encoding="utf-8")
 
 
 def test_an_unknown_field_on_a_tolerant_table_is_dropped_and_reported(

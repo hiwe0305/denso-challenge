@@ -13,11 +13,12 @@ từ chối ở đây kèm lý do, và `fwsync` ghi lý do đó vào `sync_runs.
 chạy tiếp dòng khác (§2, lưới an toàn) — không dừng cả lần nạp.
 
 **Trường hợp đồng có mà schema web không có thì bỏ, có chủ ý.**
-`EpisodeMetadata.injected_defect` là trường duy nhất như vậy, và nó bị bỏ
-**bắt buộc**: 03 bản 1.0 đã bỏ nó khỏi Episode (issue #62), file schema JSON
-thì chưa cập nhật, và map nó vào bất cứ cột nào sẽ đưa đáp án lỗi cấy vào
-bảng mà `agent_ro` đọc được (luật R8). `DROPPED_FIELDS` liệt kê nó để test
-kiểm được, chứ không im lặng.
+`DROPPED_FIELDS` liệt kê từng trường như vậy kèm lý do để test kiểm được,
+chứ không im lặng. Hiện danh sách rỗng: `EpisodeMetadata.injected_defect`,
+trường duy nhất từng ở đây, đã ra khỏi hợp đồng (issue #62, S1-10/7), và
+`benchmark_copy_id` thay nó đi thẳng vào cột cùng tên. Artifact còn mang
+`injected_defect` giờ bị chính model hợp đồng từ chối (`extra="forbid"`),
+nên đáp án lỗi cấy không tới được bảng mà `agent_ro` đọc (luật R8).
 
 **Trường schema web cần mà hợp đồng không có thì nói rõ, không tự phát.**
 `Episode` không mang `dataset_id`: ở lõi một episode trỏ `source_id` hoặc
@@ -51,13 +52,8 @@ from pydantic import BaseModel, ValidationError
 
 #: Trường của hợp đồng bị bỏ có chủ ý, và lý do. Test kiểm danh sách này, nên
 #: một trường bị bỏ âm thầm sẽ không lọt.
-DROPPED_FIELDS: dict[str, str] = {
-    "EpisodeMetadata.injected_defect": (
-        "đáp án lỗi cấy; 03 bản 1.0 đã bỏ khỏi Episode (issue #62). Map nó vào "
-        "cột nào cũng đưa đáp án vào bảng mà agent_ro đọc được (luật R8). "
-        "Thay bằng `benchmark_copy_id` khi #62 merge."
-    ),
-}
+#: Khoá là `<Model>.<trường>`; mapper bỏ trường đó khỏi mọi cột và `meta`.
+DROPPED_FIELDS: dict[str, str] = {}
 
 NON_FINITE = ("NaN", "Infinity", "-Infinity")
 
@@ -139,10 +135,9 @@ def map_episode(payload: Any, lookup: DatasetLookup) -> dict[str, Any]:
         "sim_success": episode.sim_success,
         "infra_status": episode.infra_status,
         "camera_params_hash": episode.camera_params_hash,
-        # `benchmark_copy_id` chưa có trong hợp đồng (issue #62). Để None
-        # thay vì suy từ `injected_defect`: suy như vậy sẽ bỏ sót đúng các
-        # episode **sạch** của bản sao, mà C19 phải chặn cả chúng.
-        "benchmark_copy_id": None,
+        # Mọi episode của bản sao chấm mang mã bản sao, kể cả episode
+        # **sạch**, nên C19 chặn được cả chúng khỏi release (issue #62).
+        "benchmark_copy_id": meta.benchmark_copy_id,
         # Phần còn lại của `meta` đi nguyên khối, trừ trường bị bỏ.
         "meta": _episode_meta(meta),
     }
@@ -153,7 +148,10 @@ def map_episode(payload: Any, lookup: DatasetLookup) -> dict[str, Any]:
 def _episode_meta(meta: BaseModel) -> dict[str, Any]:
     """`meta` của episode, đã bỏ trường trong `DROPPED_FIELDS`."""
     dumped: dict[str, Any] = meta.model_dump()
-    dumped.pop("injected_defect", None)
+    prefix = f"{type(meta).__name__}."
+    for field in DROPPED_FIELDS:
+        if field.startswith(prefix):
+            dumped.pop(field.removeprefix(prefix), None)
     return dumped
 
 
@@ -332,8 +330,8 @@ def map_defect_manifest(payload: Any) -> dict[str, Any]:
     return {
         "manifest": {
             # Hợp đồng không cho manifest một ID riêng; danh tính của nó là
-            # mã bản sao chấm, cũng là giá trị `benchmark_copy_id` của mọi
-            # episode trong bản sao (#62).
+            # mã bản sao chấm, cũng là `EpisodeMetadata.benchmark_copy_id`
+            # của mọi episode trong bản sao (#62).
             "manifest_ref": manifest.dataset_id,
             "dataset_ref": manifest.dataset_id,
             "seed": manifest.seed,
