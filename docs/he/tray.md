@@ -283,3 +283,77 @@ uv run python -m flywheel_psi0.tray.runplan check configs/runplans/tray/he-tray-
 - Fine-tune C chỉ chạy từ master sau khi PR đóng băng này được merge, và sau lô của DA-26 (một lô mỗi tài khoản).
 - Eval ở thời gian sim, seed điều kiện gửi lúc reset và bộ nạp giải mã frame khi đọc **đã có trên master** (hotfix `ee02e0b`, `flywheel_simple/tray/run.py`). Server gieo nhiễu theo episode cũng đã có: `docker/psi0/serve_psi0_seeded.py` (#97), và `scripts/g0/serve_psi0.sh serve` dùng nó (`3fc46c5`). Chỉ còn mở phép kiểm tất định trên GPU của mục 8.5 (cùng checkpoint, 3 điều kiện mức 0, mỗi điều kiện 2 lượt), cần GPU nên do Hiếu chạy.
 - Quy tắc đọc bậc 2 ở mục 9: **[Đã chốt 5/11/2026, Hiếu]**, khối quy tắc ghim bằng `interpretation.rules_sha256`.
+
+## 12. Nhiệm vụ 2: chạy fine-tune C trên Colab (soạn 5/11/2026, chưa chạy)
+
+Một phiên Colab L4 cho một lần train: nhánh C của `rp_a04c14e79dfd`, job `da34-t2-ft-c-s0`, cap 18 CU. Mã phía VM là [`flywheel_psi0.tray.colab_train`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/colab_train.py). Hai pha `setup` và `train` tự từ chối nếu plan không phải `rp_a04c14e79dfd`, nếu `runplan check` không qua, nếu một file của `pinned_files` lệch, hoặc nếu bản cắt C tải lên không khớp tập C (marker, `set_hash`, `release_hash`, n, index nguồn, `stats_psi0.json` riêng). Phần sau train dùng lại của DA-26, không sửa: `scripts/he/he1_colab.py stage` và `persist`, `scripts/he/he1_fetch.py` (kéo checkpoint bằng rsync qua `colab ssh --proxy-mode`, kiểm sha256, quy tắc dừng sớm). `he1_fetch` chạy lệnh trong `/content/da26`, nên trên VM riêng của C, `/content/da26` là liên kết tới `/content/da34`.
+
+**Điều kiện trước khi chạy.**
+
+1. PR này đã merge; mọi lệnh chạy từ bản checkout `master`.
+2. Bản cắt C dựng được. `scripts/he/demo_subset.py` ở master hiện từ chối tập khay: nó kiểm `set_hash` trên `episode_indices`, đúng cho HE-1 (seed = index) nhưng tập khay băm trên seed. Cần một PR riêng sửa file đó (phạm vi DA-26), đang chờ quyết định.
+3. Lô của DA-26 đã xong và guard của nó đã thoát; `colab sessions` trống (một lô mỗi tài khoản). Hiếu cho chạy.
+4. Số dư ít nhất 32 CU: sàn 14 cộng cap 18.
+5. Laptop thức suốt lần chạy.
+
+**rtx3060: kiểm lúc khởi chạy và dựng bản cắt** (0 CU; `D` là bản `master` mới, ví dụ `~/denso-da34-master-<sha>`):
+
+```bash
+cd $D && export PYTHONPATH=$(ls -d $PWD/packages/*/src | paste -sd:)
+PY=~/denso-da34-pool/.venv/bin/python
+REL=~/denso-da34-pool/fwdata/releases/tray_s1_f9433b028c52
+CUT=~/denso-da34-pool/fwdata/cut-c-rp_a04c14e79dfd
+$PY -m flywheel_psi0.tray.runplan check configs/runplans/tray/he-tray-v2.yaml --release $REL --launch \
+  || { echo "runplan check --launch failed: do not launch"; exit 1; }
+$PY scripts/he/demo_subset.py --src $REL --sets configs/runplans/tray/demo_sets-v2.json --set C \
+  --out $CUT/sets/C/G1WholebodyTrayTransferTeleop-v0
+$PY -m flywheel_psi0.tray.colab_train check --work $CUT   # "cut and plan hold", exit 0
+```
+
+**Laptop: kéo bản cắt, rồi guard và watcher** (thư mục gốc là bản checkout `master`):
+
+```bash
+rsync -a --partial-dir=.rsync-partial rtx3060:denso-da34-pool/fwdata/cut-c-rp_a04c14e79dfd/ fwdata/tray/cut-c/
+export PATH=~/project/wm-wam-review/.venv-colab-cli/bin:$PATH
+colab sessions; colab usage
+S=da34-t2-ft-c-s0
+R=fwdata/colab/batch-$(date +%Y%m%d-%H%M%S); mkdir -p fwdata/colab && mkdir $R && git rev-parse HEAD > $R/master.sha
+nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py guard --registry "$0" --floor 14 --log "$0/guard.jsonl"; echo "exit $?"' $R < /dev/null > $R/guard.out 2>&1 &
+nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py session --registry "$0" --new --name "$1" --gpu L4 --cap 18 --floor 14 --persist "python3 scripts/he/he1_fetch.py once --session $1 --registry $0 --dest fwdata/tray/runs" --log "$0/$1.jsonl"; echo "exit $?"' $R $S < /dev/null > $R/$S.out 2>&1 &
+```
+
+`ready` và `vm` như ở [he-1.md](he-1.md) mục 7: `ready` chặn bước sau khi watcher chưa thấy L4 hoặc heartbeat của guard cũ hơn 120 s; `vm` chỉ SSH khi watcher còn sống và phiên còn trong danh sách.
+
+```bash
+ready() { if ( until [ -f $R/$1.ready ]; do grep -q '^exit ' $R/$1.out && exit 1; sleep 5; done
+  [ -f $R/guard.beat ] && [ $(( $(date +%s) - $(stat -c %Y $R/guard.beat) )) -lt 120 ] )
+  then echo "$1 READY"; else echo "$1 NOT READY: do not start the job"; return 1; fi; }
+vm() { grep -q '^exit ' $R/$1.out && { echo "$1: watcher exited, no ssh"; return 1; }
+  colab sessions | grep -q "^\[$1\]" || { echo "$1: not listed, no ssh"; return 1; }
+  ssh -o ProxyCommand="colab ssh --proxy-mode -s $1" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@colab "${@:2}"; }
+```
+
+**Phiên C.** Mỗi bước chỉ chạy khi bước trước đã xong. Liên kết `/content/da26` phải có trước `probe`, vì `probe` tạo thư mục đó nếu chưa có.
+
+```bash
+ready $S && vm $S 'mkdir -p /content/da34 && ln -sfn /content/da34 /content/da26 && [ "$(readlink /content/da26)" = /content/da34 ]' \
+  && python3 scripts/he/he1_fetch.py probe --session $S --registry $R --dest fwdata/tray/runs \
+  || { colab stop -s $S; echo "$S: not ready, no link or proxy too slow, session stopped"; }
+git archive --format=tar.gz HEAD | vm $S 'mkdir -p /content/da34/fw && tar -xz -C /content/da34/fw'
+rsync -a --partial-dir=.rsync-partial -e "ssh -o ProxyCommand='colab ssh --proxy-mode -s $S' -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+  fwdata/tray/cut-c/sets/ root@colab:/content/da34/sets/
+VMPP=fw/packages/flywheel-psi0/src:fw/packages/flywheel-contracts/src
+vm $S "cd /content/da34 && PYTHONPATH=$VMPP python3 -m flywheel_psi0.tray.colab_train check" \
+  || { colab stop -s $S; echo "$S: cut or plan does not hold on the VM, session stopped"; }
+vm $S "cd /content/da34; nohup setsid bash -c 'PYTHONPATH=$VMPP python3 -m flywheel_psi0.tray.colab_train setup; echo setup exit \$?' > setup.log 2>&1 < /dev/null &"
+vm $S 'tail -2 /content/da34/setup.log'   # chờ "setup exit 0"
+vm $S "cd /content/da34; nohup setsid bash -c 'PYTHONPATH=$VMPP Psi0/.venv-psi/bin/python -m flywheel_psi0.tray.colab_train train; echo train exit \$?' > train.log 2>&1 < /dev/null &"
+nohup setsid bash -c 'python3 scripts/he/he1_fetch.py follow --session "$1" --registry "$0" --dest fwdata/tray/runs --every 600 --stop-when-done; echo "exit $?"' $R $S < /dev/null > $R/$S.fetch.log 2>&1 &
+```
+
+Khi đã mount được Drive, thêm sau `setup`: `colab drivemount -s $S /content/drive`, rồi `persist` của he1_colab với `--work /content/da34 --to /content/drive/MyDrive/denso/da34`.
+
+**Trong và sau lúc chạy.** Quy tắc dừng sớm, `ALERT` và các mã thoát là của `he1_fetch` ([he-1.md](he-1.md) mục 7): dự kiến CU khi `ckpt_40000` đã về laptop, tính từ bước 2 200. Watcher dừng phiên ở cap 18 CU kể cả khi chưa đủ 40.000 bước. Khi xong, ghi dòng `measured` cho `job_da34_ft_C`: CU thật theo `colab usage`, số bước, giờ, trỏ về dòng ước lượng. Checkpoint về `fwdata/tray/runs/da34-t2-ft-c-s0/` trên laptop (không commit). Eval của nhiệm vụ 3 chạy trên `rtx3060`.
+
+Giả định của ước lượng, chưa đo: tải bản cắt lên VM (khoảng 1,3 GB, 160/541 của 4,5 GB) với tốc độ không dưới 6 MB/s của `probe`, tức tối đa khoảng 4 phút. Tốc độ tải lên chưa đo; `probe` chỉ đo chiều kéo về.
+
