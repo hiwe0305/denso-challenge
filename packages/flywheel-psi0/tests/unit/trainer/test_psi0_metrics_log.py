@@ -241,14 +241,27 @@ def test_open_pose_passes_through_on_dims_psi0_leaves_unnormalised() -> None:
     # Psi0 passes those raw values through instead of dividing by a zero range.
     low = np.array([0.0, 0.0, 0.0, -1.5, 0.3])
     high = np.array([0.0, 0.7, 0.0, 0.0, 0.3])
-    open_pose = normalised_open_pose(low, high)
-    assert open_pose.tolist() == [0.0, -1.0, 0.0, 1.0, 0.0]
+    assert normalised_open_pose(low, high).tolist() == [0.0, -1.0, 0.0, 1.0, 0.0]
 
     n20 = normalised_open_pose(
         np.array([0.0] * 7 + HAND_LOW[7:]), np.array([0.0] * 7 + HAND_HIGH[7:])
     )
     assert np.isfinite(n20).all()
     assert hand_openness(n20[None, :], n20).tolist() == [1.0, 1.0]
+
+
+def test_open_pose_uses_psi0s_tolerance_and_clip() -> None:
+    # 1e-5 is inside the 1e-4 * (|hi| + |lo|) tolerance at 1.0, 1e-3 is outside it.
+    inside, outside = normalised_open_pose(
+        np.array([1.0, 1.0]), np.array([1.0 + 1e-5, 1.0 + 1e-3]), 1.0
+    )
+    assert inside == 1.0  # raw passthrough
+    assert outside == -1.0  # normalised: open_qpos sits on the low bound
+    # Psi0 clips after the passthrough, so a raw open pose outside [-1, 1] lands on +-1;
+    # an ordinary dim whose bounds exclude the open pose is clipped the same way.
+    clipped = normalised_open_pose(np.array([0.0, 2.0]), np.array([0.0, 3.0]), open_qpos=1.5)
+    assert normalised_open_pose(np.array([0.0]), np.array([0.0]), open_qpos=-2.0).tolist() == [-1.0]
+    assert clipped.tolist() == [1.0, -1.0]
 
 
 def test_hand_open_pose_must_cover_the_hand_dims() -> None:
