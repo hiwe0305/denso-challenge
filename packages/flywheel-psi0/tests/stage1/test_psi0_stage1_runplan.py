@@ -139,3 +139,39 @@ def test_first_loss_matches_within_tolerance(rerun: float, passed: bool) -> None
     result = first_loss_matches([2.0, 1.9], [rerun, 1.9], rtol=0.02)
     assert result["passed"] is passed
     assert not first_loss_matches([], [2.0], rtol=0.02)["passed"]
+
+
+def with_dataset(**changes: object) -> dict[str, object]:
+    raw = yaml.safe_load(PLAN.read_text())
+    source = changes.pop("source", None)
+    raw["dataset"].update(changes)
+    if source is not None:
+        raw["dataset"]["source"]["name"] = source
+    return raw  # type: ignore[no-any-return]
+
+
+def test_the_egodex_waiver_covers_only_public_egodex() -> None:
+    assert not Stage1Plan.load(PLAN).dataset.identity_masked  # the plan relies on it
+    for source, data_class in [
+        ("team_ego", "internal"),
+        ("team_ego", "public"),
+        ("egodex", "internal"),
+        ("egodex", "restricted"),
+    ]:
+        raw = with_dataset(source=source, data_class=data_class)
+        with pytest.raises(ValueError, match="must pass identity masking"):
+            Stage1Plan.model_validate(raw)
+
+
+def test_any_source_passes_once_masked() -> None:
+    raw = with_dataset(source="team_ego", data_class="internal", identity_masked=True)
+    assert Stage1Plan.model_validate(raw).dataset.source.name == "team_ego"
+
+
+def test_the_sample_fetch_refuses_an_unwaived_source(tmp_path: Path) -> None:
+    from flywheel_psi0.stage1.egodex_sample import main as sample_main
+
+    plan = tmp_path / "plan.yaml"
+    plan.write_text(yaml.safe_dump(with_dataset(source="team_ego", data_class="internal")))
+    assert sample_main(["fetch", "--plan", str(plan), "--out", str(tmp_path / "data")]) == 2
+    assert not (tmp_path / "data").exists()

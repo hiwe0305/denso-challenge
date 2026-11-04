@@ -44,6 +44,7 @@ def _plan(path: Path) -> Any:
 def setup(work: Path, plan_path: Path) -> None:
     import yaml
 
+    _plan(plan_path)  # validates first: unmasked video only under the EgoDex waiver
     raw = yaml.safe_load(plan_path.read_text(encoding="utf-8"))
     setup_psi0_env(work)
     psi0 = work / "Psi0"

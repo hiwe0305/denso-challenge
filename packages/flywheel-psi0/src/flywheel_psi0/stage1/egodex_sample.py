@@ -35,6 +35,16 @@ from typing import Any
 RETRIES = 6
 _TRANSIENT = (http.client.HTTPException, urllib.error.URLError, OSError)
 
+# Hiếu, 4/11/2026: "Waive for EgoDex". Apple's published EgoDex sample may skip the
+# identity-masking step in DA-30's stage 1 runs; every other egocentric source, the
+# team's own recordings first, must pass it before anything else (docs/he/stage1.md 1.4).
+MASKING_WAIVED = frozenset({("egodex", "public")})
+
+
+def masking_waived(source: str, data_class: str) -> bool:
+    return (source.lower(), data_class) in MASKING_WAIVED
+
+
 _EPISODE = re.compile(r"^[^/]+/(?P<task>[^/]+)/(?P<index>\d+)\.(?P<ext>hdf5|mp4)$")
 
 
@@ -179,6 +189,12 @@ def main(argv: list[str] | None = None) -> int:
     import yaml
 
     dataset = yaml.safe_load(args.plan.read_text(encoding="utf-8"))["dataset"]
+    source = dataset["source"].get("name", "")
+    if dataset.get("identity_masked") is not True and not masking_waived(
+        source, dataset.get("data_class", "")
+    ):
+        print(f"FAIL {source!r} is not masked and not under the EgoDex waiver", file=sys.stderr)
+        return 2
     if args.command == "fetch":
         manifest = fetch(
             dataset["source"]["url"],

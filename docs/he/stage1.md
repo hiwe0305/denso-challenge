@@ -10,9 +10,9 @@ _Bắt đầu 4/11/2026. Story [DA-30](../product/stories/DA-30-stage1-egocentri
 
 | Bước | Trạng thái | Bằng chứng |
 |---|---|---|
-| Recipe, RunPlan, launcher, driver Colab, test CPU | Xong | `uv run pytest packages/flywheel-psi0/tests/stage1`: 25 test qua (driver Colab chạy `run`, `repeat`, `persist` trên Ψ₀ giả). Bộ canh CU nằm ở script dùng chung (mục 1.6), test của nó ở PR #108 |
+| Recipe, RunPlan, launcher, driver Colab, test CPU | Xong | `uv run pytest packages/flywheel-psi0/tests/stage1`: 28 test qua (driver Colab chạy `run`, `repeat`, `persist` trên Ψ₀ giả). Bộ canh CU nằm ở script dùng chung (mục 1.6), test của nó ở PR #108 |
 | Loader của Ψ₀ đọc dữ liệu thay thế (CPU) | Xong, 4/11/2026: 20 episode, rồi cả 218 | Mục 1.5 |
-| Lần chạy trên Colab | **Đã duyệt CU, 4/11/2026** (tier 2). **Còn chờ Hiếu quyết miễn bước che danh tính** cho dữ liệu thay thế (mục 1.4); không chạy khi chưa có quyết định. Chạy từ `master` sau khi PR merge, với bộ canh CU dùng chung (mục 1.6) | Ước lượng 2,3 CU trên một L4, trần 4 CU ([sổ chi phí](../g0/ledger/DA-30.csv)) |
+| Lần chạy trên Colab | **Đã duyệt CU, 4/11/2026** (tier 2). Hiếu miễn bước che danh tính cho mẫu EgoDex công bố ("Waive for EgoDex", 4/11/2026, mục 1.4). Chạy từ `master` sau khi PR merge, với bộ canh CU dùng chung (mục 1.6) | Ước lượng 2,3 CU trên một L4, trần 4 CU ([sổ chi phí](../g0/ledger/DA-30.csv)) |
 
 **Quyết định [Đã chốt 4/11/2026, Hiếu]:** "Approve tier 2". Tier 2 gồm lần chạy ngắn này, ước lượng khoảng 2,3 CU, trần 4 CU. Trước đó cùng ngày Hiếu đã dừng mọi job Colab (số dư khoảng 101,8 CU). Lần chạy dùng code ở `master` sau khi PR của DA-30 được merge, không chạy từ nhánh.
 
@@ -49,7 +49,13 @@ Bản export EgoDex của DA-18 (Hưng, hạn 8/11/2026) chưa có. Trong lúc c
 - Đổi sang bản export của DA-18 khi merge: chỉ đổi khối `dataset` của RunPlan.
 - Loader của Ψ₀ coi mỗi episode là một mẫu và bốc một khung ngẫu nhiên mỗi lần: 218 episode với batch 16 là 13 batch mỗi epoch; 200 bước × 2 batch là khoảng 31 epoch. Loss giảm phần lớn do học thuộc tập nhỏ; đúng với mục đích chứng minh đường đi, không nói gì về chất lượng model.
 - Dữ liệu `public` (design mục 8.4). Giấy phép EgoDex là CC-BY-NC-ND; câu hỏi Q-EGO-LIC (design mục 14) vẫn mở với Hiếu. Lần chạy chỉ dùng để train, không phát hành gì suy ra từ dữ liệu.
-- Che danh tính: video EgoDex là góc nhìn Vision Pro xuống mặt bàn, do Apple công bố. Dữ liệu thay thế đi thẳng vào stage 1, chưa qua bước che danh tính của pipeline (DA-04, DA-18). Bản export của DA-18 sẽ có bước đó; cần Hiếu xác nhận dùng mẫu công bố chưa che cho lần chạy ngắn [Đề xuất]. CLAUDE.md ghi bước che danh tính là bất biến ("trước mọi bước xử lý khác"), nên lần chạy cần Hiếu miễn rõ ràng; ngày 4/11/2026 đã hỏi, chưa có trả lời.
+- Che danh tính: video EgoDex là góc nhìn Vision Pro xuống mặt bàn, do Apple công bố. Dữ liệu thay thế đi thẳng vào stage 1, chưa qua bước che danh tính của pipeline (DA-04, DA-18). CLAUDE.md ghi bước che danh tính là bất biến ("trước mọi bước xử lý khác"), nên lần chạy cần Hiếu miễn rõ ràng.
+
+**Quyết định [Đã chốt 4/11/2026, Hiếu]:** "Waive for EgoDex", trả lời câu hỏi có miễn bước che danh tính cho mẫu EgoDex công bố trong lần chạy ngắn của DA-30 không. Phạm vi hẹp:
+
+- Chỉ áp cho mẫu EgoDex công bố (`data_class` `public`) trong các lần chạy stage 1 của DA-30.
+- Không áp cho video egocentric đội tự quay: video đó vẫn phải qua bước che danh tính trước mọi bước khác, như CLAUDE.md yêu cầu. Mọi nguồn egocentric khác cũng vậy.
+- Chốt trong mã: khối `dataset` của RunPlan ghi `source.name`, `data_class` và `identity_masked`. Một RunPlan có `identity_masked: false` chỉ nạp được khi nguồn là `egodex` và `data_class` là `public` (`masking_waived` trong `stage1/egodex_sample.py`). Nguồn khác, hoặc EgoDex với `data_class` khác, bị từ chối khi nạp plan, khi `setup` của driver và khi chạy `egodex_sample fetch`. Test: `test_the_egodex_waiver_covers_only_public_egodex`, `test_the_sample_fetch_refuses_an_unwaived_source`.
 
 ### 1.5 Loader check trên CPU (4/11/2026)
 
@@ -83,7 +89,7 @@ Lần 2, cùng ngày, **cả 218 episode**, 12 worker như run thật, container
 
 ### 1.6 Chạy lại được
 
-RunPlan [`egodex-short.yaml`](../../configs/runplans/stage1/egodex-short.yaml) (`run_plan_id` `rp_9ff69c9f4645`) chốt trước lần chạy:
+RunPlan [`egodex-short.yaml`](../../configs/runplans/stage1/egodex-short.yaml) (`run_plan_id` `rp_45304b9931c3`) chốt trước lần chạy:
 
 - **Loss giảm**: trung vị 20 dòng train cuối thấp hơn trung vị 20 dòng đầu (mỗi dòng một batch, nên so trung vị của cửa sổ, không so hai bước).
 - **Chạy lại**: chạy lại 3 bước đầu dưới job id khác (`da30-egodex-short-repeat`), cùng seed 7; loss bước đầu lệch không quá 2%. Seed cố định thứ tự dữ liệu (generator của DataLoader và seed của worker lấy từ seed của cấu hình).
