@@ -211,3 +211,30 @@ Bằng chứng trên `rtx3060` (bản sao nhánh ở `~/denso-da33-ikfix`, scope
 | `generate.py` 6 lượt, seed 300000–300005, 2 worker | 5/6 thành công, 5/5 qua QA tối thiểu, hỏng 1 `L-ONE-HAND` (300004). Kết quả và số bước từng seed trùng lần thử `ik_velocity` ở trên. Mỗi episode ghi có số frame video bằng số dòng parquet; bước tay lớn nhất trong `action` đã ghi là 0,08. |
 
 Việc còn lại là bước 2–4 của mục "Việc tiếp theo" ở trên. `tray/pico/session.py` của DA-35 vẫn ghi qua writer gốc; dùng `JoinedVideoWriter` ở đó là việc của DA-35.
+
+## Kiểm chứng planner-5 trên 50 seed mới (4/11/2026)
+
+Hiếu yêu cầu sửa dữ liệu tới khi đạt rồi mới train. Mẫu là 50 seed train chưa dùng ở đâu (300040–300089), mức 1, đồng hồ sim, trên `rtx3060`, chạy bằng mã của PR này. "planner-4" là cùng mã với `arm_step_max` 1000: giới hạn khi đó là giới hạn URDF, đúng `VelocityLimit` mặc định của pink. Kiểm lại: seed 1000 và 1022 chạy như vậy cho 1423 và 1358 bước, trùng sổ của release planner-4. Mỗi bản sinh 50 lượt (`generate.py`, 6 worker), QA phát lại, release, `fw data ingest`, report phát lại động học của DA-17 (`replay-1@cf2515483a8c`), `fw data qa --replay` (`qa-1@fb6ddaf9f48c`) và `flywheel_psi0.tray.quality`.
+
+| Đo | planner-4 | planner-5 |
+|---|---|---|
+| Thành công (`check_success`), cùng 50 seed | 45/50 | 44/50 |
+| Hỏng | 2 `L-ONE-HAND`, 1 `L-PLACE-POSE`, 1 `timeout:LIFT`, 1 `timeout:ARRIVE_B` | 2 `timeout:REACH`, 1 `L-ONE-HAND`, 1 `L-PLACE-POSE`, 1 `L-TRAY-TILT`, 1 `timeout:ARRIVE_B` |
+| QA phát lại (D-24) | 45/45, lệch khay 0,0 mm | 44/44, lệch khay 0,0 mm |
+| DA-17, phát lại động học | 2 episode có issue `joint_mapping`, cả hai ở `right_hand_middle_0_joint` (0,455 và −0,112, sàn 0,5) | 0 issue |
+| DA-03 QA | 0 pass, 43 flag, 2 reject; `action_jump.arm` ở 45/45 | **44 pass, 0 flag, 0 reject** |
+| Nghiêng khay khi mang, độ (trung vị / p90 / max) | 7,51 / 10,02 / 12,95 | 6,99 / 10,96 / 14,00 |
+| Linh kiện trôi cuối episode, mm (trung vị / p90 / max) | 11,19 / 17,14 / 24,64 | 10,87 / 20,32 / 25,66 |
+| Qua bộ lọc đã chốt (nghiêng ≤ 10°, trôi ≤ 20 mm) | 39/45 (87 %) | 32/44 (73 %) |
+| Khay rơi khi nhả, m/s (trung vị / chậm nhất / nhanh nhất) | −0,47 / −0,25 / −0,72 | −0,46 / −0,20 / −0,76 |
+
+Đọc bảng:
+
+- **Dữ liệu planner-5 đạt QA.** Không còn cờ `action_jump.arm`, không reject, không còn cờ nào cần giải thích. Cùng seed với planner-4 thì cả 45 episode bị cờ. Dòng `stats_json.states` (D4, lệch 4,3e-4 ở `states.mean[2]`) là lỗi cấp dataset đã biết của `stats.json` từ script của tác giả, có cả ở psi-data và release cũ, việc của DA-02 ([data-pipeline.md](../data-pipeline.md) mục 3.3).
+- **Thành công ngang nhau.** 44 so với 45; 4 seed chỉ thành công với planner-5, 5 seed chỉ với planner-4. Hai lỗi mới là `timeout:REACH` (300041, 300044): với giới hạn, lời giải IK của tay trái lệch đích 80–110 mm suốt 5 s của REACH, còn pitch cổ tay phải dao động 0,70 ↔ 1,10 rad. Cánh tay đi chậm qua đúng vùng gần suy biến mà bản cũ nhảy qua trong vài bước, và không về kịp. Lỗi này chỉ làm mất lượt sinh, không đưa lỗi vào dữ liệu. Lần thử trên 40 seed trước (300000–300039) không có ca nào như vậy.
+- **Hiệu suất lọc thấp hơn: 73 % so với 87 %.** Trên 40 seed mà cả hai bản cùng thành công, 11 seed chỉ qua lọc với planner-4 và 4 seed chỉ qua với planner-5; kiểm định dấu cho p ≈ 0,12, nên chưa chắc là thật. Phần chênh nằm ở lúc đặt khay, không phải lúc mang. Trước giây cuối của cửa sổ mang, planner-5 còn ổn hơn (nghiêng p90 7,1° so với 8,1°). Trong giây cuối (khay chạm bàn B), p90 là 11,0° so với 9,9°, 6 so với 4 episode vượt 10°. Độ trôi cuối episode cũng tăng ở đuôi: 6 so với 1 episode vượt 20 mm. **[Giả định]** Khi hạ khay, hai tay bị giới hạn tốc độ nên không xuống đều nhau. Ngưỡng lọc giữ nguyên như đã chốt. Theo tỉ lệ của mẫu này, lô 610 lượt cho khoảng 610 × 0,88 × 0,73 ≈ 390 episode qua lọc, so với khoảng 470 nếu giữ tỉ lệ của planner-4 (ước lượng).
+- **Khay rơi khi nhả không đổi.** Đây là thiết kế của D-25: nhả khi khay còn cách bàn 3,5 cm. Thử hạ sát hơn (`lower_tray_clear` 0,015) trên cùng seed thì tốc độ rơi trung vị giảm còn −0,32 m/s, nhưng thành công giảm từ 42/48 xuống 40/48 và thêm 2 `timeout:LOWER`. Như vậy không an toàn, nên giữ nguyên. Lý do cũ của D-25 vẫn đúng: hạ sát hơn thì cổ tay dưới gờ chạm bàn trước khay.
+- **Episode kiểu `ep_7f0a5ca73db8348e` không còn trong mẫu.** Đó là seed 1098 của release cũ, với tương quan 0,349 ở `right_hand_middle_0_joint`. Release cũ có 1/102 episode dưới 0,5 và 2/102 dưới 0,7; mẫu planner-5 thấp nhất là 0,752. Cùng 50 seed, planner-4 sinh 2 episode như vậy, planner-5 không sinh episode nào. Bản thân seed 1098 với planner-5 hỏng `L-ONE-HAND`, nên không còn episode đó.
+- **Hạ tầng.** Một shard của lần sinh planner-5 bị khởi động lại vì `EGL_NOT_INITIALIZED` (D-23). Ba shard của QA phát lại bị lỗi `Offscreen framebuffer is not complete` khi GPU 12 GB đã đầy 11,6 GB (do job khác), phải chạy lại. Lỗi này ghi thành `not_replayed` với mã thoát 0, nên trông như QA trượt. DA-34 nên kiểm `reasons` của `replay_summary.json` trước khi release lô lớn. Không lần nào crash x264.
+
+Chi phí: khoảng 13,4 giờ-worker (sinh 2,2; thử nghiệm không ghi 7,2; QA phát lại 2,4; chẩn đoán và kiểm 0,4; QA và lọc dưới 0,1). Kết quả thô ở `rtx3060:~/denso-da33-ikfix/val/` và `~/denso-da33-ikfix/fwroot/`.
