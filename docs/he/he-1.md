@@ -210,9 +210,9 @@ Chưa chạy. Mỗi điểm một phiên Colab L4, một watcher `session` riên
 | V-NOEGO/N20/0 | `da26-t2-ft-vnoego-n20-s0` | `job_da26_t2_ft_vnoego_n20_s0` | 17,5 CU |
 | Server eval (sau) | `da26-t2-eval-n20` | `job_da26_t2_eval_isaac_n20` | 17,0 CU |
 
-**Trên VM**, `scripts/he/he1_colab.py` chạy theo ba pha. Pha nào cũng từ chối chạy nếu `he-1.yaml` khác bản đã đóng băng (`rp_95c98a476499`), hoặc nếu điểm không thuộc phần sơ bộ.
+**Trên VM**, `scripts/he/he1_colab.py` chạy theo các pha dưới đây. Pha nào cũng từ chối chạy trong ba trường hợp: `he-1.yaml` khác bản đã đóng băng; khóa không phải `rp_95c98a476499` (giá trị này ghi cứng trong code); điểm không thuộc phần sơ bộ.
 
-- `setup`: dựng môi trường Ψ₀ bằng `setup` của DA-19, như DA-30 đã làm. Sau đó tải đúng bản ghim: cặp checkpoint cha của điểm ở `psi-model@cb1480f`, zip hai bàn ở `psi-data@e78fb93`. Kiểm sha256 của hai safetensors, của zip và của `episodes.jsonl` với RunPlan; lệch một file là dừng, không train. Phần kiểm này là "tải và kiểm trên VM train" của nhiệm vụ 2. Cuối cùng cắt tập demo.
+- `setup`: dựng môi trường Ψ₀ bằng đúng các lệnh môi trường trong `setup` của DA-19, không chạy phần tải của nó (`install_env`). Phần tải của DA-19 lấy cặp cha baseline và zip hiện hành, không ghim; với V-NOEGO là khoảng 6 GB không dùng mà vẫn tính CU. Sau đó tải đúng bản ghim: cặp checkpoint cha của điểm ở `psi-model@cb1480f`, zip hai bàn ở `psi-data@e78fb93`. Kiểm sha256 của hai safetensors, của zip và của `episodes.jsonl` với RunPlan; lệch một file là dừng, không train. Phần kiểm này là "tải và kiểm trên VM train" của nhiệm vụ 2. Cuối cùng cắt tập demo.
 - `train`: chạy `Psi0Trainer` với recipe R1 và override của RunPlan (`train.validation_steps: 2000`), parent của biến thể, seed của điểm.
 - `persist`: chép metrics, kết quả và các checkpoint đã ghi xong lên Drive. Phải chép cả trọng số, vì eval cần chúng. Lệnh `persist --watch 600 --pid <train>` chạy cạnh lúc train. `persist` từ chối chạy khi `/content/drive` chưa được mount; nếu không, nó sẽ ghi vào đĩa VM mà vẫn báo xong.
 - `stage`: in JSON liệt kê những gì eval cần, kèm kích thước và sha256: mọi file ngoài `checkpoints/`, cùng `ckpt_<step>` mới nhất đã ghi xong (trừ trạng thái optimizer).
@@ -226,7 +226,7 @@ Chưa chạy. Mỗi điểm một phiên Colab L4, một watcher `session` riên
 - Trước mỗi lần SSH, script kiểm watcher còn sống và `colab sessions` còn liệt kê phiên.
 - Mốc thời gian: mốc mềm (0,9 × 17,5 = 15,75 CU, khoảng 8,1 giờ) đến trước khi train xong (16,6 CU). Sau khi train xong còn khoảng 18 phút trước lệnh dừng ở trần (khoảng 17,2 CU). 6,25 GB trong 18 phút cần ít nhất 6 MB/s. Tốc độ qua proxy Colab chưa đo. `follow` ghi `ALERT` khi một lượt trên 1 GB chậm hơn 6 MB/s. Lượt đầu là `ckpt_10000`, khoảng 2,2 giờ sau khi bắt đầu; nếu gặp `ALERT` khi đó thì báo ngay (mount Drive, hoặc Hiếu quyết định).
 - Dung lượng laptop: 2 job × 4 checkpoint × 6,25 GB, khoảng 50 GB; đĩa còn 506 GB. Kéo lại cho server eval cũng đi rsync qua proxy, không dùng `colab upload`, vì lệnh này dùng cùng API contents.
-- Thử khô trên laptop ngày 4/11/2026, VM giả trên đĩa, rsync thật, không qua SSH: [`test_he1_fetch.py`](../../scripts/he/test_he1_fetch.py) có 7 test. Chạy tay `once` và `follow` với file 2 GB: lấy lần lượt `ckpt_10000` đến `ckpt_40000`, thoát 0, `final: true`. Đường SSH thật chỉ được thử ở lượt kéo đầu của đợt chạy, vài phút sau khi train bắt đầu.
+- Thử khô trên laptop ngày 4/11/2026, VM giả trên đĩa, rsync thật, không qua SSH: [`test_he1_fetch.py`](../../scripts/he/test_he1_fetch.py) có 13 test (gồm `probe`, phép tính dừng sớm và dừng sớm của `follow`). Chạy tay `once` và `follow` với file 2 GB: lấy lần lượt `ckpt_10000` đến `ckpt_40000`, thoát 0, `final: true`. Đường SSH thật chỉ được thử ở lượt kéo đầu của đợt chạy, vài phút sau khi train bắt đầu.
 
 **Tập demo của từng điểm** (`scripts/he/demo_subset.py`). Ψ₀ ở `cda3fdf` train trên mọi episode của dataset, không lọc được. Vì vậy mỗi điểm có dataset riêng, dựng như sau:
 
@@ -273,8 +273,12 @@ vm() { grep -q '^exit ' $R/$1.out && { echo "$1: watcher exited, no ssh"; return
 
 **Mỗi phiên**, ví dụ V-EGO; với V-NOEGO thay `S` và `P`. Mỗi bước chỉ chạy khi bước trước đã xong.
 
+Đo tốc độ trước, ngay sau `ready`, trước cả `setup`. `probe` kéo 1 GB từ VM về, mất vài phút, khoảng 0,1 CU. Kết quả ghi vào `$R/$S.probe.json`, và `follow` dùng nó cho quy tắc dừng sớm. Dưới 6 MB/s thì `probe` thoát 4: không chạy tiếp, dừng phiên và báo.
+
 ```bash
-S=da26-t2-ft-vego-n20-s0; P=V-EGO/N20/0; ready $S
+S=da26-t2-ft-vego-n20-s0; P=V-EGO/N20/0
+ready $S && python3 scripts/he/he1_fetch.py probe --session $S --registry $R --dest fwdata/he/runs \
+  || { colab stop -s $S; echo "$S: not ready or proxy too slow, session stopped"; }
 git archive --format=tar.gz HEAD | vm $S 'mkdir -p /content/da26/fw && tar -xz -C /content/da26/fw'
 vm $S "cd /content/da26; nohup setsid bash -c 'python3 fw/scripts/he/he1_colab.py setup --point $P; echo setup exit \$?' > setup.log 2>&1 < /dev/null &"
 vm $S 'tail -2 /content/da26/setup.log'   # chờ "setup exit 0"
@@ -292,14 +296,39 @@ vm $S "cd /content/da26; nohup setsid python3 fw/scripts/he/he1_colab.py persist
 **Trong lúc chạy.**
 
 - Xem tiến độ bằng `vm $S 'tail -1 /content/da26/runs/*/metrics.jsonl'`, `tail -1 $R/$S.jsonl` và `tail -2 $R/$S.fetch.log`.
-- **Quy tắc dừng sớm** **[Đề xuất]**: số đo S1-04 là 0,71 s/bước trên L4. Sau 2 000 bước, tính thời gian dự kiến cho 40 000 bước, cộng thời gian đã dùng. Nếu tổng vượt khoảng 17,2 CU, phiên sẽ chạm trần trước `ckpt_40000`. Khi đó dừng phiên và báo; không tự xin thêm CU.
+- **Quy tắc dừng sớm, bắt buộc** (review #109). `follow` tự áp dụng; không cần người theo dõi.
+  - Khi nào: mỗi lượt từ bước 2 200 tới trước `ckpt_10000`. Từ bước 2 200, cửa sổ đo đã có một lượt validation (bước 2 000).
+  - Tính gì: CU dự kiến đã dùng khi `ckpt_40000` ghi xong và đã kéo về laptop:
+    `spent + 1,94 × (bước còn lại × s/bước + số lần lưu còn lại × 60 s + 6,25 GB / MB/s) / 3600 + 0,1`.
+  - Số liệu: `spent` là dòng `poll` cuối của watcher. s/bước đo từ bước 200 của lần chạy hiện tại. MB/s lấy từ `probe`, rồi thay bằng lượt kéo trên 1 GB gần nhất. 60 s mỗi lần lưu là giả định; trên A100 là 31 s.
+  - Ngưỡng: vượt dòng dừng của watcher, `17,5 − 1,94 × 430 / 3600 = 17,27` CU, thì `follow` gọi `colab stop -s $S`, ghi `EARLY_STOP` kèm các số, và thoát 3. Dừng ở bước 2 200 tốn khoảng 1,3 CU. Để chạm trần thì tốn khoảng 17 CU mà chỉ được `ckpt_30000`, plan không dùng tới.
+  - Mức s/bước tối đa để chạy hết. Giả định dựng VM cộng `probe` mất 11 phút và lưu 4 lần, mỗi lần 60 s:
+
+    | Tốc độ kéo về | Thời gian kéo `ckpt_40000` | s/bước tối đa |
+    |---|---|---|
+    | 6 MB/s | 17,4 phút | 0,748 |
+    | 10 MB/s | 10,4 phút | 0,758 |
+    | 20 MB/s | 5,2 phút | 0,766 |
+    | 50 MB/s | 2,1 phút | 0,771 |
+    | Drive đã mount (kéo khoảng 0) | — | 0,774 |
+
+  - Đối chiếu S1-04: ước lượng 8,5 giờ ứng với khoảng 0,753 s/bước khi tính cả validation. Mức này chỉ qua được nếu kéo về từ khoảng 8 MB/s; ở 6 MB/s dự kiến 17,38 CU. Trần 17,5 vì vậy sát nút. **[Option]** cho Hiếu, chưa áp dụng:
+    - (a) chia lại trần trong 52 CU: 18,0 / 18,0 / 16,0. Eval ước lượng 16,2 nên còn ít chỗ;
+    - (b) nâng trần cứng của DA-26 thêm khoảng 1 CU;
+    - (c) lưu mỗi 5 000 bước. Đây là override đổi `rp_95c98a476499`, nên phải đóng băng lại và có `Decision` mới do Hiếu ký. Phương án này chỉ làm phần mất ít đi, khi chạm trần còn `ckpt_35000`, không làm cho lần chạy vừa trần;
+    - (d) giữ nguyên, để quy tắc này dừng sớm khi không vừa.
 - Mã thoát của watcher và guard theo docstring của `scripts/colab/cu_watch.py`. Gặp mã 5 (`STOP_FAILED`) thì xem `colab sessions` ngay.
 
 **Sau mỗi phiên.**
 
 - `fwdata/he/runs/$S/fetched.json` phải có `"final": true`, tức `ckpt_40000` đã kiểm sha256 trên laptop. Nếu Drive đã mount, trên Drive cũng phải có bản này.
+- **Dừng phiên ngay sau đó**, không chờ trần. `follow --stop-when-done` tự gọi `colab stop -s $S`; dừng sớm cũng gọi lệnh này. Kiểm lại: `grep '^exit' $R/$S.out` phải có dòng `exit` (watcher thấy phiên mất, mã 0), và `colab sessions` không còn `$S`. Nếu `follow` thoát mà phiên vẫn chạy (mã 1 hoặc 2, hoặc đã thấy `"final": true` mà phiên chưa dừng), thì chạy `colab stop -s $S` bằng tay rồi kiểm lại như trên. Nếu sau một vòng poll watcher vẫn chưa thoát, gửi SIGTERM cho tiến trình watcher: nó dừng phiên có xác nhận rồi thoát mã 6.
 - Dòng `exit` cuối của `$R/$S.jsonl` cho `balance_drop`, `spent`, `wall_cu`. Các số này vào dòng `measured` của [`ledger/DA-26.csv`](../g0/ledger/DA-26.csv), trỏ về dòng `estimated` cùng job.
-- Server eval mở sau, trong cùng `$R`: một watcher `session --new --name da26-t2-eval-n20 --cap 17 --floor 14`. Nếu guard đã thoát, chạy lại guard ở `$R` trước.
+- Server eval mở sau, trong cùng `$R`, theo đúng dạng lệnh của watcher (`--gpu L4`, `--log` và `--persist` đều bắt buộc theo quy ước). Nếu guard đã thoát, chạy lại dòng guard ở trên với `$R` trước. Lệnh dưới giả định driver eval, viết ở PR eval, ghi log server vào `/content/da26/runs/da26-t2-eval-n20/`, để `once` kéo về được.
+
+```bash
+nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py session --registry "$0" --new --name "$1" --gpu L4 --cap 17 --floor 14 --persist "python3 scripts/he/he1_fetch.py once --session $1 --registry $0 --dest fwdata/he/runs" --log "$0/$1.jsonl"; echo "exit $?"' $R da26-t2-eval-n20 < /dev/null > $R/da26-t2-eval-n20.out 2>&1 &
+```
 
 ## Change log
 
@@ -314,3 +343,4 @@ vm $S "cd /content/da26; nohup setsid python3 fw/scripts/he/he1_colab.py persist
 | 4/11/2026 | Mục 6.2: watcher chung đổi thiết kế (#108): mỗi phiên một watcher theo endpoint, một guard cho đợt; một đợt một lúc trên tài khoản, DA-30 chạy trước rồi đến DA-26 | Review #108 |
 | 4/11/2026 | Mục 7: cách chạy hai fine-tune N20 của tier 2. Driver VM `scripts/he/he1_colab.py` kiểm sha256 của cha, zip và `episodes.jsonl` trước khi train; tập demo riêng có stats riêng, dựng bằng `scripts/he/demo_subset.py` (đã kiểm trên zip thật); khối lệnh laptop gồm guard, hai watcher (17,5 / 17,5 CU, `--floor 14`) và `ready`, `vm`; quy tắc dừng sớm đề xuất. Chưa chạy | Hiếu (soạn với Claude) |
 | 4/11/2026 | Mục 7: bản bền trên laptop khi chưa mount được Drive (`scripts/he/he1_fetch.py`: rsync qua `colab ssh --proxy-mode`, kiểm sha256; `follow` cạnh mỗi phiên, `once` ở mốc mềm). Lý do không dùng `colab download`; `persist` từ chối khi Drive chưa mount; ngưỡng tốc độ 6 MB/s và `ALERT`; kết quả thử khô | Hiếu (soạn với Claude) |
+| 4/11/2026 | Mục 7, theo review #109: `setup` chỉ dựng môi trường, không tải hai lần; đo tốc độ proxy (`probe`) trước `setup`; quy tắc dừng sớm thành bắt buộc, `follow` tự áp dụng, có bảng ngưỡng s/bước theo MB/s và đối chiếu S1-04; bốn **[Option]** về trần cho Hiếu; dừng phiên ngay khi có `ckpt_40000`; lệnh watcher của server eval đủ `--gpu`, `--log`, `--persist`; `rp_95c98a476499` ghi cứng trong driver; bỏ ô persist kernel | Hiếu (soạn với Claude) |
