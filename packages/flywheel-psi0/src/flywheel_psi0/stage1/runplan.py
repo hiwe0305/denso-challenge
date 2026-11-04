@@ -23,11 +23,12 @@ import statistics
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from flywheel_psi0.stage1.egodex_sample import masking_waived
 from flywheel_psi0.trainer.recipe import ArgValue, Psi0Recipe
 from flywheel_psi0.tray.runplan import Pin, PsiModel, Weights, run_plan_id
 
@@ -48,6 +49,7 @@ class Parent(_Frozen):
 
 
 class Source(_Frozen):
+    name: str  # the egocentric source, e.g. "egodex"
     url: str
     bytes: int = Field(gt=0)
     etag: str
@@ -59,6 +61,18 @@ class Dataset(_Frozen):
     episodes_per_task: int = Field(gt=0)
     split_dir: str  # where Psi0's EgoDexDataset looks for train episodes
     precompute: str  # the authors' script that adds `actions_48d`, relative to Psi0
+    data_class: Literal["public", "internal", "restricted"]
+    identity_masked: bool  # went through the pipeline's identity-masking step
+
+    @model_validator(mode="after")
+    def _masked_unless_waived(self) -> Dataset:
+        if not self.identity_masked and not masking_waived(self.source.name, self.data_class):
+            raise ValueError(
+                f"{self.id}: egocentric video must pass identity masking first (CLAUDE.md); "
+                f"the waiver covers only source 'egodex' with data_class 'public', "
+                f"not {self.source.name!r} with {self.data_class!r}"
+            )
+        return self
 
 
 class Job(_Frozen):

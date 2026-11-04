@@ -29,7 +29,7 @@ Là kỹ sư robot learning, tôi muốn chạy stage 1 của Ψ₀ trên dữ l
   - [x] 1.1 Recipe `pretrain-egodex-psi0-fast.sh`, RunPlan, launcher stage 1, dữ liệu thay thế EgoDex, driver Colab, test CPU
   - [x] 1.2 Loader check của Ψ₀ trên dữ liệu thay thế, chỉ CPU ([stage1.md](../../he/stage1.md) mục 1.5)
   - [x] 1.3 Chuẩn bị chạy sau khi Hiếu duyệt CU (4/11/2026): ghi quyết định, bộ canh CU dừng phiên ở trần (dùng chung, PR #108), lệnh `persist` ở trần mềm
-  - [ ] 1.4 Chạy trên Colab khi Hiếu miễn bước che danh tính; ghi loss, `metrics.jsonl`, dòng `measured` của sổ chi phí
+  - [ ] 1.4 Chạy trên Colab (Hiếu đã miễn bước che danh tính cho mẫu EgoDex công bố, 4/11/2026); ghi loss, `metrics.jsonl`, dòng `measured` của sổ chi phí
 - [ ] 2. RunPlan fine-tune stage 1 trên video tự quay (AC 2)
 - [ ] 3. Fine-tune, probe, closed-loop, báo cáo (AC 2, 3)
 
@@ -65,6 +65,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 27/10/2026 | Tạo story, tách AC 3–5 từ DA-18 | PO (Hiếu) |
 | 3/11/2026 | DA-09 dời sau demo: lần chạy ngắn chưa có probe (07 mục 2.4, bản 1.2) | PO (Hiếu) |
 | 4/11/2026 | Duyệt CU cho lần chạy ngắn (tier 2: "Approve tier 2"), ước lượng khoảng 2,3 CU, trần 4 CU; chạy từ `master` sau merge, có bộ canh CU | PO (Hiếu) |
+| 4/11/2026 | Miễn bước che danh tính ("Waive for EgoDex") chỉ cho mẫu EgoDex công bố (`public`) trong các lần chạy stage 1 của DA-30; video tự quay và mọi nguồn egocentric khác vẫn phải che trước. RunPlan chặn mọi nguồn khác ([stage1.md](../../he/stage1.md) mục 1.4) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

@@ -33,12 +33,17 @@ parent:
 dataset:
   id: egodex-test-first2
   source:
+    name: egodex
     url: https://ml-site.cdn-apple.com/datasets/egodex/test.zip
     bytes: 17304529397
     etag: '"05247067ba3bb80f61086e7c3ee205fe-258"'
   episodes_per_task: 2
   split_dir: part1
   precompute: src/h_rdt/datasets/pretrain/precompute_48d_actions.py
+  # Apple's published sample, not masked: allowed only for egodex + public, by Hiếu's
+  # waiver of 4/11/2026 (docs/he/stage1.md 1.4); the loader refuses any other source.
+  data_class: public
+  identity_masked: false
 
 job:
   id: da30-egodex-short
