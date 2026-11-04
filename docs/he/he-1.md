@@ -22,7 +22,7 @@ uv run pytest scripts/he -q
 - **Tập demo** lồng nhau N10 ⊂ N20 ⊂ N40 ⊂ N80, chọn tất định bằng `flywheel_psi0.tray.demo_sets` của DA-34: xếp episode theo sha256(muối | sha256 của zip | `episode_index`), tập n là n episode đầu. Gói không có seed (S1-07, V6), nên khóa là `episode_index` trong zip đã ghim. Hash: N10 `53b361e2…`, N20 `cf4d6e2c…`, N40 `a88f9b6f…`, N80 `3bfc858b…`. Mọi biến thể dùng cùng tập ở cùng N.
 - **Loại episode 0–9 khỏi kho chọn** [Đề xuất]. Bộ eval `e78fb93` của tác giả đặt robot, vật và khay của điều kiện i đúng như episode train i ở mức 0, 1, và robot như episode train i ở mức 2 ([S1-03](../product/stories/S1-03-tai-tao-danh-gia-psi0.md) mục 3.1 của `psi0-eval.md`, S1-07 mục 4). Eval chính của HE nay là bộ dev (mục 1.2), không dính chuyện này. Nhưng bộ của tác giả vẫn dùng làm bộ phụ (mốc so, video). Nếu để 0–9 trong kho, N80 dễ chứa điều kiện của bộ phụ hơn N20. Kho còn 89 episode, vẫn ≥ 80, nên loại không tốn gì.
 - **Recipe** chung: [`psi0-stage3.yaml`](../../configs/models/psi0-stage3.yaml) (40.000 bước, batch 16 trên một GPU, lr 1e-4 cosine, VLM đóng băng, RTC), ghi đè duy nhất `train.validation_steps: 2000` theo quyết định của Hiếu ở [S1-04 mục 4.1](../g0/psi0-finetune-cost.md). Máy: một Colab L4. Seed train 0 (seed 1 chỉ ở đủ lưới). `stats_psi0.json` của mỗi điểm tính trên chính N episode của điểm đó [Đề xuất], như DA-34. Ψ₀ ở `cda3fdf` không lọc episode, nên mỗi tập cần một dataset LeRobot con (việc của nhiệm vụ 3).
-- **Eval chính**: 30 điều kiện × 3 mức từ dải dev của đội, seed 1 000 100–1 000 129, như nhau cho mọi điểm (Hiếu chốt 4/11/2026: dùng dải dev, không dùng bộ của tác giả). Cách dựng ở mục 1.2. `eval-decoupled-wbc`, đồng bộ (design mục 8.5), 1 lượt mỗi điều kiện, 90 episode mỗi điểm. Chế độ (`mujoco` hay `mujoco_isaac`) và đồng hồ (giờ sim hay giờ tường) để "pending" cho tới khi S1-03 chạy Ψ₀ ở `mujoco` trên `e78fb93` (Q-27C); `freeze` từ chối khi còn trường pending (câu Q3).
+- **Eval chính**: 30 điều kiện × 3 mức từ dải dev của đội, seed 1 000 100–1 000 129, như nhau cho mọi điểm (Hiếu chốt 4/11/2026: dùng dải dev, không dùng bộ của tác giả). Cách dựng ở mục 1.2. `eval-decoupled-wbc`, đồng bộ (design mục 8.5), 1 lượt mỗi điều kiện, 90 episode mỗi điểm. Chế độ `mujoco_isaac`, đồng hồ giờ sim: S1-03 đề xuất sau Q-27C, Hiếu chưa ký. RunPlan ghi hai giá trị này kèm `eval.awaiting`; `freeze` từ chối khi trường đó còn (câu Q3). Isaac không chạy nổi đủ 90 điều kiện, nên số điều kiện là quyết định ngân sách của Hiếu (mục 6).
 - **Bộ phụ**: `simple-eval` của tác giả ở `e78fb93` (sha256 `8a4b0ff7…`), 10 điều kiện mỗi mức. Chỉ dùng cho mốc so và để đối chiếu số công bố 7/5/6. Không đọc số HE nào trên bộ này.
 - **Mốc so (AC 3)**: checkpoint hai bàn của tác giả `…betweentablesteleop-v0…b64.gpus4.2604081126/ckpt_40000` (sha256 `c69c2ae8…`), fine-tune từ cặp của V-EGO trên cả 99 episode, 16 × 4 GPU. Eval trên bộ dev như mọi điểm. Số của S1-03 trên bộ của tác giả (Isaac mức 0: 6/10, công bố 7/10) báo bên cạnh, không thay thế.
 
@@ -105,7 +105,7 @@ Kiểm theo thứ tự; quy tắc 0 chặn mọi quy tắc sau.
 |---|---|---|
 | Q1 | Loại episode 0–9 khỏi kho chọn demo? | [Đề xuất] Có (mục 1) |
 | Q2 | Bộ eval chính | **[Đã chốt]** (Hiếu, 4/11/2026): dải dev của đội; bộ của tác giả chỉ là bộ phụ. Đã dựng (mục 1.2) |
-| Q3 | Chế độ eval (`mujoco` hay `mujoco_isaac`) và đồng hồ (giờ sim hay giờ tường) | Chờ lượt Ψ₀ ở `mujoco` trên `e78fb93` của S1-03 (Q-27C). Ở `mujoco_isaac`, mức 0 của S1-03 đạt 6/10, công bố 7/10. Với 90 điều kiện mỗi điểm, Isaac không vừa (mục 6) |
+| Q3 | Chế độ eval (`mujoco` hay `mujoco_isaac`) và đồng hồ (giờ sim hay giờ tường) | S1-03 đã trả lời Q-27C (4/11/2026, `docs/g0/psi0-eval.md` mục 3.5–3.6 ở PR #66, đầu `3d30874`, chưa merge). Checkpoint của tác giả trên `e78fb93` mức 0, cùng 10 điều kiện: `mujoco` 2/10 (giờ tường) và 1/10 (giờ sim), `mujoco_isaac` 6/10. Fisher Isaac so với `mujoco` gộp 3/30: p = 0,003. Renderer gây chênh lệch, đồng hồ thì không. Ảnh của psi-data là ảnh Isaac, nên eval `mujoco` sẽ đặt mọi biến thể gần sàn 10%. Giờ sim của task hai bàn chạy qua `docker/psi0/simtime_eval.py`; đồng hồ sim của #90 chỉ phủ env khay. S1-03 đề xuất `mujoco_isaac`, giờ sim, và giữ eval ở `e78fb93`: ở `de140d6` robot bắt đầu lùi 6,1 cm và cả action teleop phát lại cũng 0/10. RunPlan ghi đề xuất này, chưa ký. Còn lại là quyết định ngân sách của Hiếu: Isaac chạy bao nhiêu điều kiện (mục 6, phương án F) |
 | Q4 | Ngân sách CU và số lần fine-tune | Hiếu đang quyết; mọi Colab đã dừng, số dư khoảng 101,8 CU |
 
 Khi Q1, Q3, Q4 xong: sửa RunPlan nếu cần, rồi
@@ -127,13 +127,41 @@ _Ước lượng từ số đo S1-04 và S1-03, chưa chạy._
 
 | Phương án | Fine-tune | Eval | Tổng CU | Đáp ứng AC 6 |
 |---|---|---|---|---|
-| A · 4 lần R1, eval dev ở `mujoco` | 66 CU | 8–11 giờ `rtx3060`, 0 CU | **66** | Có, nếu Q3 cho phép `mujoco` |
+| A · 4 lần R1, eval dev ở `mujoco` | 66 CU | 8–11 giờ `rtx3060`, 0 CU | **66** | Về hình thức có; về kỹ thuật yếu: Q-27C cho thấy `mujoco` đặt policy gần sàn 10% (mục 5, Q3) |
 | B · như A, cộng video Isaac (design 7.6: vài điều kiện, ba cột, hai mức N) | 66 CU | thêm khoảng 10 episode, 4 giờ, 8 CU | **74** | Có |
 | C · 4 lần R1, eval dev ở `mujoco_isaac` | 66 CU | khoảng 185 giờ, 360 CU | **426** | Không vừa cả giờ lẫn CU |
 | D · chỉ N = 80 (2 lần R1), eval `mujoco` | 33 CU | 0 CU | **33** | Không: AC 6 cần N = 20 và 80 |
 | E · 4 lần, 20.000 bước | khoảng 35 CU | như A | **35** | Có, nhưng đổi recipe mà Hiếu đã chốt R1 |
 
-Số dư khoảng 101,8 CU (4/11/2026). Fine-tune của DA-34 (khoảng 66 CU) dùng chung số dư này, và Hiếu đang quyết cắt bớt số lần fine-tune. [Đề xuất] Eval dev chỉ khả thi ở `mujoco`. Nếu Q3 cho thấy `mujoco` thấp hơn Isaac nhiều, eval chính phải giảm số điều kiện hoặc dời sang sau demo; quyết định đó ghi `Decision` (AC 8).
+Số dư khoảng 101,8 CU (4/11/2026). Fine-tune của DA-34 (khoảng 66 CU) dùng chung số dư này, và Hiếu đang quyết cắt bớt số lần fine-tune. Q-27C đã cho thấy `mujoco` thấp hơn Isaac nhiều (mục 5, Q3): A yếu về kỹ thuật, C không vừa. Phương án F dưới đây là thẻ cho Hiếu chọn; mọi cắt giảm ghi `Decision` (AC 8).
+
+### 6.1 Phương án F: eval Isaac trên bộ rút gọn
+
+_Ước lượng, chưa chạy. Chưa ký; không có job Colab nào chạy cho tới khi Hiếu duyệt CU._
+
+Chữ F vì E đã dùng ở bảng trên. Chỉ chạy N = 20, hai biến thể (V-EGO, V-NOEGO), eval `mujoco_isaac` giờ sim trên các điều kiện **mức 0** của bộ dev: 10 điều kiện là seed 1 000 100–1 000 109, 30 điều kiện là cả 1 000 100–1 000 129. Episode chạy trên `rtx3060`, server Ψ₀ trên Colab L4: khoảng 25 phút và 0,8 CU mỗi episode (S1-04 mục 5.1: 24,6 phút, 1,94 CU/giờ). Fine-tune: 2 lần R1 ở N = 20, 2 × 16,6 = 33 CU, 17 giờ.
+
+| Điều kiện mỗi biến thể | Episode | Giờ eval | CU eval | Tổng CU (cả fine-tune) | Thêm mốc so của tác giả trên cùng bộ |
+|---|---|---|---|---|---|
+| F10 · 10 | 20 | khoảng 8 giờ | 16 | **49** | +10 episode, 4 giờ, 8 CU |
+| F30 · 30 | 60 | khoảng 25 giờ | 48 | **81** | +30 episode, 12,5 giờ, 24 CU |
+
+Cả hai vừa số dư 101,8 CU nếu chỉ HE dùng; F30 cộng mốc so (105 CU) thì không vừa. Fine-tune DA-34 dùng chung số dư, nên tổng thực tế là quyết định của Hiếu.
+
+**Mỗi cỡ bộ phát hiện được gì.** Fisher chính xác hai phía, α = 0,05, hai biến thể độc lập, n điều kiện mỗi biến thể (tính 4/11/2026 bằng scipy, liệt kê đủ mọi kết quả). Ghép cặp theo điều kiện (McNemar) có thể nhạy hơn một chút; các số dưới đây theo Fisher như S1-03 dùng.
+
+| n mỗi biến thể | Chênh nhỏ nhất có thể có ý nghĩa (nhánh kém → nhánh tốt) | MDE ở power 80% | Power khi chênh thật 30 điểm % |
+|---|---|---|---|
+| 10 | 0/10 → 5/10; 1/10 → 7/10; 3/10 → 9/10; 5/10 → 10/10 | khoảng 65–68 điểm % khi nhánh kém ở 10–30%; không đạt 80% khi nhánh kém ở 50% | 12–15% |
+| 30 | 0/30 → 6/30; 1/30 → 8/30; 3/30 → 11/30; 5/30 → 13/30 | khoảng 34–39 điểm % khi nhánh kém ở 10–50% | 56–71% |
+
+Đọc kết quả của F:
+
+- F chỉ có một mức N và một mức DR. Vì vậy quy tắc 1 (≥ 2 mức N) không đọc được, và F **không đáp ứng đủ AC 6** (thiếu N = 80). Chọn F cần một `Decision` ghi việc giảm phạm vi.
+- Kết quả F chỉ là "sơ bộ, một N" ở mọi bảng và slide. Fisher có ý nghĩa thì báo là chênh lệch quan sát được ở N = 20, mức 0; không gọi là HE đạt.
+- F10 chỉ thấy được chênh lệch rất lớn (cỡ 50 điểm % trở lên), hợp cho video và minh họa demo hơn là đo. F30 thấy được chênh lệch cỡ 35–40 điểm % với power 80%; chênh 30 điểm % thì khoảng hai phần ba khả năng không thấy.
+- Quy tắc 0 vẫn áp: cả hai biến thể dưới 10% thì không so. Có mốc so của tác giả trên cùng bộ giúp phân biệt "renderer/pipeline hỏng" với "N = 20 quá ít".
+- RunPlan giữ 90 điều kiện cho tới khi Hiếu chọn. Chọn F thì sửa `eval.main.levels` thành `[0]`, `seeds` theo cỡ bộ, `points` sơ bộ chỉ còn N20, rồi xóa `eval.awaiting` và ký.
 
 ## Change log
 
@@ -141,3 +169,4 @@ Số dư khoảng 101,8 CU (4/11/2026). Fine-tune của DA-34 (khoảng 66 CU) d
 |---|---|---|
 | 4/11/2026 | Bản nháp: thiết lập, kiểm checkpoint, ước lượng, quy tắc diễn giải, câu hỏi chốt và chi phí | Hiếu (soạn với Claude) |
 | 4/11/2026 | Eval chính chuyển sang bộ dev 30 × 3 (Hiếu chốt); thêm mục 1.2 cách dựng và kiểm; chế độ và đồng hồ chờ S1-03; chi phí theo 90 episode mỗi điểm, số dư 101,8 CU | Hiếu (soạn với Claude) |
+| 4/11/2026 | Q3: ghi kết quả Q-27C của S1-03; RunPlan đề xuất `mujoco_isaac`, giờ sim, chờ ký (`eval.awaiting`); phương án A ghi là yếu; thêm mục 6.1 phương án F (Isaac, mức 0, N = 20, 10 hoặc 30 điều kiện) với CU, giờ và độ nhạy Fisher | Hiếu (soạn với Claude) |

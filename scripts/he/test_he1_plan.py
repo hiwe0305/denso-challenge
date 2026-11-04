@@ -78,9 +78,9 @@ def test_freeze_writes_lock_and_decision_then_detects_drift(tmp_path: Path) -> N
     plan_path = tmp_path / "configs/runplans/he/he-1.yaml"
     raw = yaml.safe_load(plan_path.read_text(encoding="utf-8"))
     if open_items(He1RunPlan.model_validate(raw)):
-        with pytest.raises(ValueError, match="pending"):
+        with pytest.raises(ValueError, match="awaits|pending"):
             freeze(plan_path, "tester", "test", repo=tmp_path)
-        raw["eval"].update(sim_mode="mujoco", clock="sim")
+        raw["eval"].update(sim_mode="mujoco_isaac", clock="sim", awaiting=None)
         plan_path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
     lock, decision = freeze(plan_path, "tester", "test", repo=tmp_path)
     plan = He1RunPlan.load(plan_path)
