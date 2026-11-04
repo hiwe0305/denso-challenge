@@ -134,8 +134,12 @@ points:
 # mujoco run on e78fb93 (Q-27C); `freeze` refuses while either is pending.
 eval:
   cli: eval-decoupled-wbc
-  sim_mode: pending
-  clock: pending
+  # S1-03 (Q-27C, #66 3d30874): the authors' ckpt on e78fb93 Level 0 scores 6/10 in
+  # mujoco_isaac and 2/10 (wall) or 1/10 (sim) in mujoco; the renderer drives the gap.
+  # Proposed by S1-03, not signed: Isaac cannot run all 90 conditions (he-1.md 6).
+  sim_mode: mujoco_isaac
+  clock: sim
+  awaiting: "Q3/Q4: Hiếu picks the Isaac eval set size and the CU (he-1.md 5-6)"
   synchronous: true
   main:
     generator: scripts/he/dev_eval_set.py

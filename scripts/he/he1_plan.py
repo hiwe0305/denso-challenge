@@ -133,6 +133,8 @@ class Eval(_Frozen):
     # "pending" until S1-03 settles the eval mode; `freeze` refuses a pending field.
     sim_mode: Literal["mujoco", "mujoco_isaac", "pending"]
     clock: Literal["sim", "wall", "pending"]
+    # A proposed mode or set size still waiting for a signature; `freeze` refuses it too.
+    awaiting: str | None = None
     synchronous: bool
     main: DevEvalSet  # every HE number is read on this set
     authors_set: EvalSet  # secondary: baseline and the published numbers only
@@ -187,7 +189,10 @@ class He1RunPlan(_Frozen):
 def open_items(plan: He1RunPlan) -> list[str]:
     """Fields still waiting for a decision; a plan with any of them is not frozen."""
     pending = [name for name in ("sim_mode", "clock") if getattr(plan.eval, name) == "pending"]
-    return [f"eval.{name} is pending (S1-03)" for name in pending]
+    items = [f"eval.{name} is pending (S1-03)" for name in pending]
+    if plan.eval.awaiting:
+        items.append(f"eval awaits: {plan.eval.awaiting}")
+    return items
 
 
 def demo_sets_from_plan(plan: He1RunPlan) -> DemoSets:
