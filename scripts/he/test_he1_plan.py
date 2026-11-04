@@ -38,15 +38,15 @@ def test_sets_are_nested_and_skip_the_eval_episodes(plan: He1RunPlan) -> None:
     assert not n80 & set(range(10))
 
 
-def test_preliminary_points_are_the_four_of_ac6(plan: He1RunPlan) -> None:
+def test_preliminary_points_are_the_two_of_tier_2(plan: He1RunPlan) -> None:
     prelim = {(p.variant, p.demo_set, p.seed) for p in plan.points if p.phase == "preliminary"}
-    assert prelim == {(v, n, 0) for v in ("V-EGO", "V-NOEGO") for n in ("N20", "N80")}
+    assert prelim == {(v, "N20", 0) for v in ("V-EGO", "V-NOEGO")}
 
 
-def test_main_eval_is_30_dev_seeds_at_three_levels(plan: He1RunPlan) -> None:
+def test_main_eval_is_10_dev_seeds_at_level_0(plan: He1RunPlan) -> None:
     conditions = plan.eval_conditions()
-    assert len(conditions) == 90
-    assert all(1_000_000 <= seed < 1_001_000 for _, seed in conditions)
+    assert conditions == [(0, seed) for seed in range(1_000_100, 1_000_110)]
+    assert plan.eval.sim_mode == "mujoco_isaac" and plan.eval.clock == "sim"
     raw = yaml.safe_load(PLAN.read_text(encoding="utf-8"))
     raw["eval"]["main"]["seeds"] = {"start": 0, "stop": 30}
     assert any("dev range" in p for p in check(He1RunPlan.model_validate(raw)))
@@ -62,6 +62,9 @@ def test_check_catches_a_changed_pin(plan: He1RunPlan) -> None:
     raw = yaml.safe_load(PLAN.read_text(encoding="utf-8"))
     raw["recipe"]["overrides"]["train.max_training_steps"] = 20000
     assert any("changes training" in p for p in check(He1RunPlan.model_validate(raw)))
+    raw = yaml.safe_load(PLAN.read_text(encoding="utf-8"))
+    raw["preliminary_test"]["conditions_per_arm"] = 30
+    assert any("per arm" in p for p in check(He1RunPlan.model_validate(raw)))
 
 
 def test_freeze_writes_lock_and_decision_then_detects_drift(tmp_path: Path) -> None:
@@ -77,11 +80,15 @@ def test_freeze_writes_lock_and_decision_then_detects_drift(tmp_path: Path) -> N
         shutil.copy(REPO / rel, tmp_path / rel)
     plan_path = tmp_path / "configs/runplans/he/he-1.yaml"
     raw = yaml.safe_load(plan_path.read_text(encoding="utf-8"))
-    if open_items(He1RunPlan.model_validate(raw)):
+    assert open_items(He1RunPlan.model_validate(raw)) == []
+    for open_eval in ({"clock": "pending"}, {"awaiting": "Q3"}):
+        plan_path.write_text(
+            yaml.safe_dump({**raw, "eval": {**raw["eval"], **open_eval}}, sort_keys=False),
+            encoding="utf-8",
+        )
         with pytest.raises(ValueError, match="awaits|pending"):
             freeze(plan_path, "tester", "test", repo=tmp_path)
-        raw["eval"].update(sim_mode="mujoco_isaac", clock="sim", awaiting=None)
-        plan_path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+    plan_path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
     lock, decision = freeze(plan_path, "tester", "test", repo=tmp_path)
     plan = He1RunPlan.load(plan_path)
     assert check_lock(plan, plan_path) == []

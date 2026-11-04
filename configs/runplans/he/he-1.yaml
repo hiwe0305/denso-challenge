@@ -104,13 +104,14 @@ variants:
   V-NOEGO: {parent: psi0-abl-he-only, role: "HE only, no EgoDex"}
   V-EGO10: {parent: psi0-abl-egodex-10pct, role: "10% EgoDex", optional: true}
 
-# Preliminary (AC 6, before 13/11/2026): V-EGO and V-NOEGO at N20 and N80, seed 0.
-# Full (after the demo): the rest of the grid and the second seed at N20, N40.
+# Preliminary, tier 2 (Hiếu, 4/11/2026, "Approve tier 2"; he-1.md 6.2): V-EGO and
+# V-NOEGO at N20 only, seed 0. N80 moves to the full grid (after the demo) with the rest
+# of the grid and the second seed at N20, N40; that needs a new plan version and CU.
 points:
   - {variant: V-EGO, demo_set: N20, seed: 0, phase: preliminary}
-  - {variant: V-EGO, demo_set: N80, seed: 0, phase: preliminary}
+  - {variant: V-EGO, demo_set: N80, seed: 0, phase: full}
   - {variant: V-NOEGO, demo_set: N20, seed: 0, phase: preliminary}
-  - {variant: V-NOEGO, demo_set: N80, seed: 0, phase: preliminary}
+  - {variant: V-NOEGO, demo_set: N80, seed: 0, phase: full}
   - {variant: V-EGO, demo_set: N10, seed: 0, phase: full}
   - {variant: V-EGO, demo_set: N40, seed: 0, phase: full}
   - {variant: V-NOEGO, demo_set: N10, seed: 0, phase: full}
@@ -124,31 +125,31 @@ points:
   - {variant: V-EGO10, demo_set: N40, seed: 0, phase: full}
   - {variant: V-EGO10, demo_set: N80, seed: 0, phase: full}
 
-# Main eval: 30 conditions at each of levels 0, 1, 2 from the team's dev seeds (PO
-# 4/11/2026: dev range, not the authors' set), built by scripts/he/dev_eval_set.py the
+# Main eval, tier 2 (Hiếu, 4/11/2026): the first 10 Level 0 conditions of the team's dev
+# seeds (PO 4/11/2026: dev range, not the authors' set), built by scripts/he/dev_eval_set.py the
 # way SIMPLE's dr-decoupled-wbc built simple-eval, but from a fresh dev-seeded scene
 # instead of a train episode. Levels keep the authors' meaning: 0 redraws distractors
 # and materials, 1 lighting too, 2 object and tray poses too (robot pose kept).
 # `eval-decoupled-wbc --data-format lerobot` resets from the stored config, so the
-# scene is fixed by the file (90/90 reloads identical). Mode and clock wait for S1-03's
-# mujoco run on e78fb93 (Q-27C); `freeze` refuses while either is pending.
+# scene is fixed by the file (90/90 reloads identical). These 10 rows are the first 10
+# of Level 0 in the 90-condition build b8dec754... (same sha256 from a fresh build).
 eval:
   cli: eval-decoupled-wbc
   # S1-03 (Q-27C, #66 3d30874): the authors' ckpt on e78fb93 Level 0 scores 6/10 in
   # mujoco_isaac and 2/10 (wall) or 1/10 (sim) in mujoco; the renderer drives the gap.
-  # Proposed by S1-03, not signed: Isaac cannot run all 90 conditions (he-1.md 6).
+  # S1-03's recommendation, signed by Hiếu with tier 2 (4/11/2026). Two-table sim
+  # clock via docker/psi0/simtime_eval.py; Psi0 server on Colab L4, Isaac on rtx3060.
   sim_mode: mujoco_isaac
   clock: sim
-  awaiting: "Q3/Q4: Hiếu picks the Isaac eval set size and the CU (he-1.md 5-6)"
   synchronous: true
   main:
     generator: scripts/he/dev_eval_set.py
     salt: DA-26/he-1/dev-eval/v1
     simple_commit: 6d10628794d9c7de4596b4f2afb2c054a637c2bc # b75c678 only changes the arm spawn, not DR
-    seeds: {start: 1000100, stop: 1000130}
-    levels: [0, 1, 2]
-    conditions_sha256: b8dec7545a7664296f84a93275369edf884d14e23557ef290e0c61b84003fe25
-    location: hiwe-laptop:~/project/denso-challenge/fwdata/he/dev-eval-v1
+    seeds: {start: 1000100, stop: 1000110}
+    levels: [0]
+    conditions_sha256: b63acd59ea619faf253c2ea9681fdda0ef852c8082abc584f42ee347a2b32e17
+    location: hiwe-laptop:~/project/denso-challenge/fwdata/he/dev-eval-v1-l0n10
   # Secondary: the authors' set at e78fb93 (S1-03 3.6: robot starts as in train), for
   # the baseline and the published 7/5/6 only. Its levels 0 and 1 are train scenes of
   # episodes 0-9, so no HE number is read on it.
@@ -160,11 +161,11 @@ eval:
     sha256: 8a4b0ff7d068967dac8baec2c4a4deca4f644215a1ee15e921739f3dfe90e7e0
     levels: [0, 1, 2]
     conditions_per_level: 10
-  passes: {preliminary: 1, full: 1} # 90 independent conditions, one rollout each
+  passes: {preliminary: 1, full: 1} # 10 independent conditions, one rollout each
 
 # AC 3: the authors' two-table checkpoint (from V-EGO's parents, 16 x 4 GPUs, 40k
-# steps, all 99 episodes), run on the main dev set like every point; S1-03's numbers
-# on the authors' set are reported beside it, not instead of it.
+# steps, all 99 episodes). Not run on the dev set in tier 2 (no CU for it); S1-03's
+# 6/10 on the authors' Level 0 (Isaac) is the sanity reference, reported beside.
 baseline:
   weights:
     repo: USC-PSI-Lab/psi-model
@@ -176,6 +177,9 @@ baseline:
 
 metric: {primary: sim_success, per_level: sim_success, secondary: scorer_steps, n50: log2_linear}
 stats: {method: bootstrap_by_condition, resamples: 10000, seed: 20261104, ci: 0.95}
+# Tier 2 preliminary test (he-1.md 6.2): with 10 per arm only gaps of about 50 pp or more
+# can reach p < 0.05 (0/10 vs 5/10, 1/10 vs 7/10); MDE at 80% power about 65-68 pp.
+preliminary_test: {method: fisher_exact_two_sided, alpha: 0.05, conditions_per_arm: 10}
 
 comparisons:
   - {a: V-EGO, b: V-NOEGO, question: "does EgoDex in pretraining raise success at the same N (HE)"}
