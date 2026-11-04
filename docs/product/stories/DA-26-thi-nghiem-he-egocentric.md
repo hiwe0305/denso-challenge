@@ -77,6 +77,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 4/11/2026 | Tier 2 (Hiếu: "Approve tier 2"): sơ bộ chỉ N = 20, eval Isaac giờ sim trên 10 điều kiện dev mức 0, trần 52 CU; RunPlan đóng băng `rp_95c98a476499`; nhiệm vụ 1 xong | Hiếu (soạn với Claude) |
 | 4/11/2026 | Review #99: watcher CU viết lại theo nguyên tắc hỏng thì dừng; `Decision` ghi lại với `embodiment_id` đúng, cùng `rp_95c98a476499` | Hiếu (soạn với Claude) |
 | 4/11/2026 | Bỏ watcher riêng; chạy bằng watcher chung `scripts/colab/cu_watch.py` của DA-30 (trần 17,5 / 17,5 / 17,0 CU, `--floor 14`) | Hiếu (soạn với Claude) |
+| 4/11/2026 | Nhiệm vụ 2, 3: driver Colab `scripts/he/he1_colab.py` (kiểm sha256 trên VM train, cắt tập demo bằng `scripts/he/demo_subset.py`, train, persist lên Drive), ô persist cho watcher chung, cách chạy ở `docs/he/he-1.md` mục 7. Chưa chạy | Hiếu (soạn với Claude) |
 
 ## Ghi chép khi làm
 

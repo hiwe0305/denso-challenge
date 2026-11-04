@@ -200,6 +200,88 @@ Câu hỏi gửi Hiếu: "Approve CU for tier 2, with DA-26 on reduced Isaac eva
 
 [Đề xuất] Eval chạy xen kẽ hai biến thể theo điều kiện (hai server trên cùng L4, mỗi server khoảng 6,2 GB VRAM; hoặc đổi checkpoint giữa các episode). Nếu phiên chạm trần giữa chừng, hai nhánh vẫn có cùng số điều kiện để so. Chạm trần thì báo số episode đã xong; chạy thêm cần Hiếu duyệt CU mới. Hai fine-tune chạy song song trên hai phiên L4, khoảng 8,5 giờ tường. Eval cần `rtx3060` khoảng 8,3 giờ; đặt máy với DA-34 và DA-35 khi fine-tune xong.
 
+## 7. Chạy tier 2: hai fine-tune N20 (nhiệm vụ 2, 3)
+
+Chưa chạy. Mỗi điểm một phiên Colab L4, một watcher `session` riêng, chung một guard trong một registry mới. Tên phiên cũng là job id của Ψ₀ và thư mục trên Drive (`MyDrive/denso/da26/<tên>`).
+
+| Điểm | Phiên | Dòng sổ chi phí | Trần |
+|---|---|---|---|
+| V-EGO/N20/0 | `da26-t2-ft-vego-n20-s0` | `job_da26_t2_ft_vego_n20_s0` | 17,5 CU |
+| V-NOEGO/N20/0 | `da26-t2-ft-vnoego-n20-s0` | `job_da26_t2_ft_vnoego_n20_s0` | 17,5 CU |
+| Server eval (sau) | `da26-t2-eval-n20` | `job_da26_t2_eval_isaac_n20` | 17,0 CU |
+
+**Trên VM**, `scripts/he/he1_colab.py` chạy theo ba pha. Pha nào cũng từ chối chạy nếu `he-1.yaml` khác bản đã đóng băng (`rp_95c98a476499`), hoặc nếu điểm không thuộc phần sơ bộ.
+
+- `setup`: dựng môi trường Ψ₀ bằng `setup` của DA-19, như DA-30 đã làm. Sau đó tải đúng bản ghim: cặp checkpoint cha của điểm ở `psi-model@cb1480f`, zip hai bàn ở `psi-data@e78fb93`. Kiểm sha256 của hai safetensors, của zip và của `episodes.jsonl` với RunPlan; lệch một file là dừng, không train. Phần kiểm này là "tải và kiểm trên VM train" của nhiệm vụ 2. Cuối cùng cắt tập demo.
+- `train`: chạy `Psi0Trainer` với recipe R1 và override của RunPlan (`train.validation_steps: 2000`), parent của biến thể, seed của điểm.
+- `persist`: chép metrics, kết quả và các checkpoint đã ghi xong lên Drive. Phải chép cả trọng số, vì eval cần chúng. Lệnh `persist --watch 600 --pid <train>` chạy cạnh lúc train.
+
+**Tập demo của từng điểm** (`scripts/he/demo_subset.py`). Ψ₀ ở `cda3fdf` train trên mọi episode của dataset, không lọc được. Vì vậy mỗi điểm có dataset riêng, dựng như sau:
+
+- lấy các episode của tập (khóa `episode_index` của zip) và đánh số lại 0..n−1 theo thứ tự nguồn;
+- ghi qua bộ đọc/ghi DA-03; `index` đổi số được ghi vào `flywheel_lineage.jsonl`;
+- tính stats từ chính các episode của tập (`own_train_set`), cùng cách SIMPLE tính khi xuất;
+- `meta/flywheel_subset.json` ghi chỉ số nguồn của từng episode và set hash, tính lại từ zip.
+
+Kiểm trên zip thật ngày 4/11/2026, trên laptop:
+
+| Tập | Kết quả |
+|---|---|
+| N20 (6 s) | 20 episode, 12 367 khung. `action`, `states`, task và số khung video của mỗi episode trùng episode nguồn. `check_index` sạch, giữ đủ 14 cột |
+| Cắt đủ 99 episode | `action` trùng `stats_psi0.json` của tác giả tuyệt đối. `states` lệch tối đa 3,6e-4, đúng phát hiện D4 đã biết về stats của nguồn |
+
+**Điều kiện trước khi chạy.**
+
+1. PR của driver đã merge. Chạy từ bản checkout `master`; registry ghi SHA của bản đó.
+2. Phiên chính báo DA-30 đã xong và guard của DA-30 đã thoát. `colab sessions` trống.
+3. Số dư ít nhất 66 CU: sàn 14, cộng hai trần fine-tune 35, cộng trần eval 17. Như vậy không job nào chạm sàn trước trần của nó.
+4. Laptop thức suốt đợt. Watcher tự giữ `systemd-inhibit`; bật thêm chế độ giữ thức của app.
+
+**Laptop: guard và hai watcher** (thư mục gốc là bản checkout `master`):
+
+```bash
+export PATH=~/project/wm-wam-review/.venv-colab-cli/bin:$PATH
+colab sessions; colab usage
+R=fwdata/colab/batch-$(date +%Y%m%d-%H%M%S); mkdir -p fwdata/colab && mkdir $R && git rev-parse HEAD > $R/master.sha
+nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py guard --registry "$0" --floor 14 --log "$0/guard.jsonl"; echo "exit $?"' $R < /dev/null > $R/guard.out 2>&1 &
+for S in da26-t2-ft-vego-n20-s0 da26-t2-ft-vnoego-n20-s0; do
+  nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py session --registry "$0" --new --name "$1" --gpu L4 --cap 17.5 --floor 14 --persist "colab exec -s $1 --timeout 590 -f configs/runplans/he/persist_cell.py" --log "$0/$1.jsonl"; echo "exit $?"' $R $S < /dev/null > $R/$S.out 2>&1 &
+done
+```
+
+Hai hàm dùng trong cả đợt. `ready` in `READY` chỉ khi watcher đã thấy L4 và heartbeat của guard mới hơn 120 s. `vm` chạy một lệnh SSH trên VM của phiên, chỉ khi watcher còn sống và phiên còn trong danh sách: `colab ssh -s` tự mở phiên mới nếu tên không còn. Runtime chỉ nhận một kết nối SSH mỗi lúc, nên mọi job dài chạy tách khỏi shell.
+
+```bash
+ready() { ( until [ -f $R/$1.ready ]; do grep -q '^exit ' $R/$1.out && exit 1; sleep 5; done
+  [ -f $R/guard.beat ] && [ $(( $(date +%s) - $(stat -c %Y $R/guard.beat) )) -lt 120 ] ) && echo "$1 READY" || echo "$1 NOT READY: do not start the job"; }
+vm() { grep -q '^exit ' $R/$1.out && { echo "$1: watcher exited, no ssh"; return 1; }
+  colab sessions | grep -q "^\[$1\]" || { echo "$1: not listed, no ssh"; return 1; }
+  ssh -o ProxyCommand="colab ssh --proxy-mode -s $1" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@colab "${@:2}"; }
+```
+
+**Mỗi phiên**, ví dụ V-EGO; với V-NOEGO thay `S` và `P`. Mỗi bước chỉ chạy khi bước trước đã xong.
+
+```bash
+S=da26-t2-ft-vego-n20-s0; P=V-EGO/N20/0; ready $S
+git archive --format=tar.gz HEAD | vm $S 'mkdir -p /content/da26/fw && tar -xz -C /content/da26/fw'
+vm $S "cd /content/da26; nohup setsid bash -c 'python3 fw/scripts/he/he1_colab.py setup --point $P; echo setup exit \$?' > setup.log 2>&1 < /dev/null &"
+vm $S 'tail -2 /content/da26/setup.log'   # chờ "setup exit 0"
+colab drivemount -s $S /content/drive
+vm $S "cd /content/da26; nohup setsid bash -c 'Psi0/.venv-psi/bin/python fw/scripts/he/he1_colab.py train --point $P; echo train exit \$?' > train.log 2>&1 < /dev/null & echo \$! > train.pid; nohup setsid python3 fw/scripts/he/he1_colab.py persist --watch 600 --pid \$(cat train.pid) > persist.log 2>&1 < /dev/null &"
+```
+
+**Trong lúc chạy.**
+
+- Xem tiến độ bằng `vm $S 'tail -1 /content/da26/runs/*/metrics.jsonl'` và `tail -1 $R/$S.jsonl`.
+- **Quy tắc dừng sớm** **[Đề xuất]**: số đo S1-04 là 0,71 s/bước trên L4. Sau 2 000 bước, tính thời gian dự kiến cho 40 000 bước, cộng thời gian đã dùng. Nếu tổng vượt khoảng 17,2 CU, phiên sẽ chạm trần trước `ckpt_40000`. Khi đó dừng phiên và báo; không tự xin thêm CU.
+- Mã thoát của watcher và guard theo docstring của `scripts/colab/cu_watch.py`. Gặp mã 5 (`STOP_FAILED`) thì xem `colab sessions` ngay.
+
+**Sau mỗi phiên.**
+
+- Trên Drive phải có `ckpt_40000` và `metrics.jsonl`.
+- Dòng `exit` cuối của `$R/$S.jsonl` cho `balance_drop`, `spent`, `wall_cu`. Các số này vào dòng `measured` của [`ledger/DA-26.csv`](../g0/ledger/DA-26.csv), trỏ về dòng `estimated` cùng job.
+- Server eval mở sau, trong cùng `$R`: một watcher `session --new --name da26-t2-eval-n20 --cap 17 --floor 14`. Nếu guard đã thoát, chạy lại guard ở `$R` trước.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -211,3 +293,4 @@ Câu hỏi gửi Hiếu: "Approve CU for tier 2, with DA-26 on reduced Isaac eva
 | 4/11/2026 | Review của #99: đầu file ghi đã chốt; mốc so không chạy trên bộ dev ở tier 2 (mục 1); mục 6.2 tả watcher mới (hai đồng hồ, kiểm L4, dừng có xác nhận, laptop phải thức); `Decision` ghi lại với `embodiment_id` `g1_sonic_dwbc@1` (`dec_01M6KG4JFTRWGQ91CD3H1TC1XX`, cùng `rp_95c98a476499`) | Hiếu (soạn với Claude) |
 | 4/11/2026 | Mục 6.2: chạy bằng watcher chung `scripts/colab/cu_watch.py` (trần 17,5 / 17,5 / 17,0 CU, `--floor 14`); bỏ watcher riêng của DA-26 | Hiếu (soạn với Claude) |
 | 4/11/2026 | Mục 6.2: watcher chung đổi thiết kế (#108): mỗi phiên một watcher theo endpoint, một guard cho đợt; một đợt một lúc trên tài khoản, DA-30 chạy trước rồi đến DA-26 | Review #108 |
+| 4/11/2026 | Mục 7: cách chạy hai fine-tune N20 của tier 2. Driver VM `scripts/he/he1_colab.py` kiểm sha256 của cha, zip và `episodes.jsonl` trước khi train; tập demo riêng có stats riêng, dựng bằng `scripts/he/demo_subset.py` (đã kiểm trên zip thật); khối lệnh laptop gồm guard, hai watcher (17,5 / 17,5 CU, `--floor 14`) và `ready`, `vm`; quy tắc dừng sớm đề xuất. Chưa chạy | Hiếu (soạn với Claude) |
