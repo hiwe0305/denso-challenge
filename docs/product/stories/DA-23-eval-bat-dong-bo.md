@@ -76,6 +76,8 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
+- Tiếp tục nhiệm vụ 4: `Runner.run_plan_eval` nhận `RunPlan`, chọn timing theo `purpose` trong `EvalConfig`, và yêu cầu đường dẫn profile khi chạy async; test trên simulator giả chứng minh hai chế độ. Nhiệm vụ 4 vẫn chưa xong: hợp đồng `RunPlan` hiện chưa khai timing/profile trong nội dung đóng băng, và `purpose` chưa có `he`. Cần thống nhất hợp đồng trước khi khẳng định AC 4 và khả năng tái lập.
+- Nhiệm vụ 1 và 5 vẫn chờ log RTC thật và `SimpleSim`/Ψ₀ thật; không dùng profile giả làm bằng chứng nghiệm thu.
 - Giờ thực: 5.5h
 - Công cụ AI đã dùng: Antigravity
 - Ghi chú hoàn thành: Đã hoàn thiện AC 1-4 với kiểm thử đơn vị và hợp đồng; AC 5 đợi adapter SimpleSim và checkpoint Ψ₀ hoàn chỉnh.

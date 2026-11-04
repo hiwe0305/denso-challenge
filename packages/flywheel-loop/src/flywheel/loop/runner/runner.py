@@ -20,6 +20,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Literal, cast
 
+from flywheel.contracts.entities import RunPlan
 from flywheel.contracts.protocols import SimulatorAdapter
 from flywheel.contracts.v0 import (
     PolicyEndpoint,
@@ -189,6 +190,35 @@ class Runner:
     ) -> list[RolloutResult]:
         """Execute a batch of rollout requests sequentially with resume capability."""
         return [self.run_rollout(req, policy, force_rerun=force_rerun) for req in requests]
+
+    def run_plan_eval(
+        self,
+        plan: RunPlan,
+        requests: Sequence[RolloutRequest],
+        policy: PolicyEndpoint,
+        *,
+        latency_profile_ref: str | None = None,
+        force_rerun: bool = False,
+    ) -> list[RolloutResult]:
+        """Apply the configured mode for a RunPlan before executing its requests.
+
+        Async callers supply a profile derived from a real RTC log. The RunPlan
+        contract does not yet persist the chosen timing or profile in its lock.
+        """
+        timing = self.config.timing_for_purpose(plan.purpose)
+        if timing == "async" and not latency_profile_ref:
+            raise ValueError("async RunPlan evaluation requires a latency profile")
+        prepared = [
+            RolloutRequest.model_validate(
+                {
+                    **request.model_dump(),
+                    "timing": timing,
+                    "latency_profile_ref": latency_profile_ref if timing == "async" else None,
+                }
+            )
+            for request in requests
+        ]
+        return self.run_eval(prepared, policy, force_rerun=force_rerun)
 
 
 def _read_cache(path: Path, key: str) -> RolloutResult | None:

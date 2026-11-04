@@ -17,6 +17,7 @@ from typing import Any, cast
 
 import pytest
 from flywheel.contracts.artifacts import RTCInferenceRecord
+from flywheel.contracts.entities import RunPlan
 from flywheel.contracts.v0 import (
     CheckpointRef,
     PolicyEndpoint,
@@ -125,6 +126,28 @@ def _endpoint(checkpoint: str = "base") -> PolicyEndpoint:
 
 def _runner(sim: FakeSim2D, root: Path, config: EvalConfig | None = None) -> Runner:
     return Runner(sim, root, config=config or EvalConfig(), policy_spec=SPEC)
+
+
+def test_run_plan_eval_selects_timing_and_requires_profile(tmp_path: Path) -> None:
+    sim = RTCLoggingSim(tmp_path)
+    runner = _runner(sim, tmp_path)
+    request = _request(sim)
+    g0 = RunPlan(name="baseline", purpose="g0_repro")
+    round_plan = RunPlan(name="round", purpose="round")
+
+    sync = runner.run_plan_eval(g0, [request], _endpoint())
+    assert sync[0].timing_verdict is None
+    with pytest.raises(ValueError, match="requires a latency profile"):
+        runner.run_plan_eval(round_plan, [request], _endpoint())
+    assert sim.calls == 1
+
+    profile = _profile(tmp_path / "zero.json", 0.0)
+    asynchronous = runner.run_plan_eval(
+        round_plan, [request], _endpoint(), latency_profile_ref=str(profile)
+    )
+    assert asynchronous[0].timing_verdict == "ok"
+    assert sim.calls == 2
+    assert request.timing == "sync"
 
 
 # Result cache (review finding 2)

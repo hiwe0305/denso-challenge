@@ -11,6 +11,8 @@ Runner closed-loop eval của làn Vòng có hai chế độ định thời (DA-
 | `sync` | G0 (`g0_repro`) và HE (`he`), để so được với tác giả | `sim_success` của sim |
 | `async` | Các nhánh HS, HT (`branch_train`, `round`, `holdout`) | `sim_success` của sim và kết luận định thời từ log RTC (mục 3) |
 
+`Runner.run_plan_eval` chọn chế độ từ `RunPlan.purpose` qua `EvalConfig` và yêu cầu `latency_profile_ref` khi chọn `async`; profile nghiệm thu phải lấy từ log RTC thật. Hàm tạo request mới và giữ nguyên request đầu vào. Hiện contract `RunPlan` chưa lưu timing và profile trong bản đóng băng, cũng chưa có purpose `he`; vì vậy API này chưa thay thế việc chốt contract để tái lập và chưa hoàn tất AC 4.
+
 ## 2. Thư mục job và log RTC
 
 Mỗi rollout có một thư mục job `<staging_root>/<job_id>/`. Simulator adapter và client RTC của policy (DA-19, `flywheel_psi0/policy/rtc.py`) phải dùng chung thư mục này. Client ghi thêm (append) một `RTCInferenceRecord` cho mỗi chunk vào `<job_dir>/rtc.jsonl`. Làn Vòng chỉ đọc log qua hợp đồng `RTCInferenceRecord`, không import adapter.
