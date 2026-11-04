@@ -178,6 +178,29 @@ def minimal_qa(dataset_root: Path, index: int, phases: Sequence[str]) -> str:
     )
 
 
+def batch_planner_versions(out: Path) -> set[str]:
+    """planner_version of every attempt logged in any shard of the batch."""
+    return {
+        str(row["planner_version"])
+        for log in sorted(Path(out).glob(f"shard-*/{LOG_NAME}"))
+        for row in read_log(log)
+    }
+
+
+def check_planner_version(out: Path, version: str) -> None:
+    """A batch holds one planner version: resuming it with another would mix their episodes.
+
+    Planner-4 batches have arm action jumps that planner-5 removes (D-28), and resume
+    goes by seed only, so the release would silently carry both.
+    """
+    others = sorted(batch_planner_versions(out) - {version})
+    if others:
+        raise RuntimeError(
+            f"{out} was generated with planner {others}, this code is {version}; "
+            "generate into a new --out"
+        )
+
+
 def gpu_name() -> str:
     try:
         out = subprocess.run(
@@ -219,14 +242,15 @@ def generate(
     (targets.write_targets): shard k takes rows k, k + W, ... not yet logged, and
     `level` / `seed_start` are ignored.
     """
-    from flywheel_simple.tray.agent import EpisodeResult, TrayAgent, run_episode
     from flywheel_simple.tray.planner import PlannerConfig
-    from flywheel_simple.tray.recorder import (
-        EpisodeRecorder,
-        FlywheelMeta,
-        planner_version,
-        visuals_revision,
-    )
+    from flywheel_simple.tray.recorder import planner_version
+
+    cfg = PlannerConfig.load()
+    version = planner_version(cfg)
+    check_planner_version(out, version)  # before the simulator loads
+
+    from flywheel_simple.tray.agent import EpisodeResult, TrayAgent, run_episode
+    from flywheel_simple.tray.recorder import EpisodeRecorder, FlywheelMeta, visuals_revision
     from flywheel_simple.tray.simple_task import make_env
 
     manifest = default_manifest_path()
@@ -247,8 +271,6 @@ def generate(
     if not jobs:
         return GenSummary(0, 0, 0, 0)
 
-    cfg = PlannerConfig.load()
-    version = planner_version(cfg)
     gpu = gpu_name()
     env = make_env(seed=jobs[0][0], level=jobs[0][1])
     agent = TrayAgent(env, cfg)
