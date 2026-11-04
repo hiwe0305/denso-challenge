@@ -15,29 +15,30 @@ Every phase loads `configs/runplans/he/he-1.yaml` and refuses to go on unless it
 the frozen plan (`he-1.lock.json`, rp_95c98a476499) and the point is one of its
 `preliminary` points: tier 2 (Hiếu, 4/11/2026) pays for those only.
 
-`setup` builds Psi0's environment with DA-19's `setup`, as DA-30 does (which also
-fetches the baseline parents and psi-data's current two-table zip: a few minutes
-not needed here, kept to reuse it as is). Then it downloads what the plan pins, at
-the plan's revisions: the point's parent pair from psi-model and the two-table zip
-from psi-data. Each file's sha256 must equal the plan's (the parents' Hugging Face
-LFS oid, the zip's and its `episodes.jsonl`'s), or setup stops before any training:
-that is the "download and check on the training VM" of task 2. Last it cuts the
+`setup` builds Psi0's environment with the steps of DA-19's `setup` up to, not
+including, its downloads (`install_env`: DA-19's downloads are the baseline parents
+and psi-data's current zip, unpinned; on V-NOEGO about 6 GB never used, on the
+meter). Then it downloads what the plan pins, at the plan's revisions: the point's
+parent pair from psi-model and the two-table zip from psi-data. Each file's sha256
+must equal the plan's (the parents' Hugging Face LFS oid, the zip's and its
+`episodes.jsonl`'s), or setup stops before any training: that is the "download and
+check on the training VM" of task 2. Last it cuts the
 point's demo set (scripts/he/demo_subset.py) into `<work>/sets/<N>/<task>`.
 
 `train` runs Psi0Trainer (DA-19) with the plan's recipe and overrides on that cut,
 the point's parent and train seed. `persist` copies every job of `<work>/runs`
 (metrics, results and complete checkpoints, the weights included since eval needs
 them) to Google Drive; with `--watch S --pid P` it syncs every S seconds while the
-training process lives. Once Drive is mounted, `configs/runplans/he/persist_cell.py`
-runs it in the kernel when the CU watcher reaches its soft cap. Drive is mounted from the laptop
-right after setup: `colab drivemount -s <session> /content/drive`; `persist` refuses a
-target under /content/drive that is not a mount, which would fill the VM disk instead.
+training process lives. Drive is mounted from the laptop right after setup:
+`colab drivemount -s <session> /content/drive`; `persist` refuses a target under
+/content/drive that is not a mount, which would fill the VM disk instead.
 
 Until Drive is mounted (it needs Hiếu's browser consent, DA-30 4/11/2026) the
 durable copy is the laptop: `stage` prints, as JSON, what eval needs from each job
 (every file outside `checkpoints/`, and the latest complete `ckpt_<step>` without
 its optimizer state) with sizes and sha256, and scripts/he/he1_fetch.py pulls those
-files over `colab ssh --proxy-mode` and checks them against it.
+files over `colab ssh --proxy-mode` and checks them against it. `stage` also gives
+the training progress (last step, seconds per step) the fetcher's early stop reads.
 """
 
 from __future__ import annotations
@@ -55,19 +56,23 @@ from typing import Any
 REPO = Path(__file__).resolve().parents[2]
 PLAN = REPO / "configs/runplans/he/he-1.yaml"
 DRIVE = Path("/content/drive/MyDrive/denso/da26")
+FROZEN = "rp_95c98a476499"  # he-1.lock.json, signed by Hiếu 4/11/2026 (tier 2)
 for package in ("flywheel-psi0", "flywheel-contracts", "flywheel-data"):
     if str(REPO / "packages" / package / "src") not in sys.path:
         sys.path.insert(0, str(REPO / "packages" / package / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from flywheel_psi0.trainer.colab import (  # noqa: E402
+    FLASH_ATTN_WHEEL,
     PSI0_COMMIT,
+    PSI0_REPO,
     Report,
     completed_checkpoints,
+    lock_constraints,
+    repair_lock,
     sh,
     sync_job,
 )
-from flywheel_psi0.trainer.colab import setup as setup_psi0_env  # noqa: E402
 from flywheel_psi0.tray.runplan import lock_path  # noqa: E402
 from he1_plan import He1RunPlan, Point, check, check_lock  # noqa: E402
 
@@ -81,6 +86,9 @@ def load_point(text: str, plan_path: Path = PLAN) -> tuple[He1RunPlan, Point, st
         problems.append(f"{lock} missing: the plan is not frozen")
     if problems:
         raise SystemExit("plan does not hold:\n  " + "\n  ".join(problems))
+    frozen = json.loads(lock.read_text(encoding="utf-8"))["run_plan_id"]
+    if frozen != FROZEN:
+        raise SystemExit(f"{lock} holds {frozen}; tier 2 approved {FROZEN} only")
     variant, demo_set, seed = text.split("/")
     for point in plan.points:
         if (point.variant, point.demo_set, point.seed) == (variant, demo_set, int(seed)):
@@ -88,7 +96,7 @@ def load_point(text: str, plan_path: Path = PLAN) -> tuple[He1RunPlan, Point, st
                 raise SystemExit(
                     f"{text} is a {point.phase} point; tier 2 pays for preliminary only"
                 )
-            return plan, point, json.loads(lock.read_text(encoding="utf-8"))["run_plan_id"]
+            return plan, point, frozen
     raise SystemExit(f"{text} is not a point of {plan_path}")
 
 
@@ -120,9 +128,38 @@ def dataset_dir(work: Path, plan: He1RunPlan, point: Point) -> Path:
     return work / "sets" / point.demo_set / plan.task["id"]
 
 
+def install_env(work: Path) -> float:
+    """DA-19 `setup`'s environment steps, the same commands, without its downloads."""
+    start = time.monotonic()
+    psi0 = work / "Psi0"
+    if not (psi0 / ".git").exists():
+        sh(f"git clone --filter=blob:none {PSI0_REPO} {psi0}")
+    sh(f"git checkout -q {PSI0_COMMIT}", cwd=psi0)
+    sh("pip install -q uv")
+    if not (psi0 / ".venv-psi").exists():
+        sh("env -u UV_SYSTEM_PYTHON uv venv .venv-psi --python 3.11", cwd=psi0)
+    constraints = work / "psi0-constraints.txt"
+    constraints.write_text(lock_constraints(repair_lock((psi0 / "uv.lock").read_text())))
+    sh(
+        f"env -u UV_SYSTEM_PYTHON uv pip install --python .venv-psi/bin/python "
+        f"-e . --group psi -c {constraints}",
+        cwd=psi0,
+        env={"GIT_LFS_SKIP_SMUDGE": "1"},
+    )
+    sh(
+        f"env -u UV_SYSTEM_PYTHON uv pip install --no-config "
+        f"--python {psi0}/.venv-psi/bin/python --no-deps '{FLASH_ATTN_WHEEL}'",
+        cwd=work,
+    )
+    (psi0 / ".env").write_text(
+        f"HF_HOME={work}/hf\nTOKENIZERS_PARALLELISM=false\nWANDB_MODE=offline\n"
+    )
+    return time.monotonic() - start
+
+
 def setup(work: Path, point_text: str) -> None:
     plan, point, _ = load_point(point_text)
-    setup_psi0_env(work)
+    env_seconds = install_env(work)
     psi0, python = work / "Psi0", work / "Psi0" / ".venv-psi" / "bin" / "python"
     start = time.monotonic()
     parent = plan.parents[plan.variants[point.variant].parent]
@@ -176,9 +213,10 @@ def setup(work: Path, point_text: str) -> None:
     )
     Report(work).phase(
         "setup_he1",
-        download_seconds + time.monotonic() - start,
+        env_seconds + download_seconds + time.monotonic() - start,
         point=point_text,
         job_id=job_id(point),
+        env_seconds=round(env_seconds, 1),
         download_seconds=round(download_seconds, 1),
         sha256_checked={str(p.relative_to(work)): h for p, h in pinned.items()},
         demo_set_hash=plan.demo_sets.hashes[point.demo_set],
@@ -304,11 +342,35 @@ def stage(work: Path) -> dict[str, Any]:
                 "job": job.name,
                 "checkpoint": complete[-1].name if complete else None,
                 "train_done": trained.get("job_id") == job.name,
+                "progress": progress(job / "metrics.jsonl"),
                 "files": entries,
             }
         )
     cache_path.write_text(json.dumps(cache))
     return {"jobs": staged}
+
+
+def progress(metrics: Path, skip: int = 200) -> dict[str, Any]:
+    """Last train step and seconds per step since step `skip` of the latest attempt.
+
+    The window holds the validation passes it spans, so the rate is what the
+    remaining steps will cost, not the bare optimiser step.
+    """
+    rows = []
+    if metrics.exists():
+        for line in metrics.read_text().splitlines():
+            row = json.loads(line) if line.strip() else {}
+            if row.get("split") == "train":
+                rows.append(row)
+    if rows:
+        last = rows[-1].get("attempt")
+        rows = [r for r in rows if r.get("attempt") == last]
+    window = [r for r in rows if r["step"] >= skip]
+    rate = None
+    if len(window) > 1 and window[-1]["step"] > window[0]["step"]:
+        elapsed = window[-1]["wall_time_s"] - window[0]["wall_time_s"]
+        rate = elapsed / (window[-1]["step"] - window[0]["step"])
+    return {"step": rows[-1]["step"] if rows else None, "s_per_step": rate}
 
 
 def jobs(work: Path) -> list[Path]:
