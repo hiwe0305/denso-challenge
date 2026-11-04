@@ -98,6 +98,7 @@ Kiểm theo thứ tự; quy tắc 0 chặn mọi quy tắc sau.
 - Batch toàn cục 16 trên một GPU, so với 64 của checkpoint tác giả (S1-04 mục 1.4); số tuyệt đối của điểm HE vì vậy có thể thấp hơn mốc so.
 - Bộ eval chính là điều kiện mới, rút từ cùng phân phối DR với dữ liệu train. Nó đo tổng quát hóa trong phân phối, khác bộ của tác giả (mức 0, 1 là cảnh train). Vì vậy số của mốc so trên bộ dev không so thẳng được với 7/5/6 công bố.
 - Kết quả trong sim; không suy ra số trên robot thật.
+- Ở N = 20, một bàn tay không cử động trong cả 20 episode: chiều action 0–6 có min = max = 0 trong `stats_psi0.json` của tập cắt, còn ở bộ đầy đủ các chiều này có biên khác 0. Psi0 để nguyên các chiều này, không chuẩn hóa. Vì vậy ở N20 không arm nào học được cử động của bàn tay đó, và so V-EGO với V-NOEGO ở N20 không nói gì về bàn tay này. Báo cáo kết quả N20 phải ghi rõ giới hạn này. Lần chạy b2 (5/11/2026) hỏng vì lỗi NaN ở `hand_open_pose`; bản sửa ở PR #118.
 
 ## 5. Việc cần Hiếu chốt trước khi đóng băng
 
@@ -356,3 +357,4 @@ nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py se
 | 5/11/2026 | Mục 7, theo review lại #109: train chỉ `done` khi `ok` ở bước 40 000, `failed` dừng phiên và thoát 5; tốc độ và `ALERT` chỉ tính trên file checkpoint, log được ghi thêm là `grown`; `ready` trả 1 khi chưa sẵn sàng; mọi lần dừng có xác nhận (thử lại, SIGTERM, thoát 6), mọi lệnh có thời hạn; dự báo tính thêm khoảng cách lượt cuối và thời gian băm, bảng ngưỡng tính lại, từ bước 38 000 mỗi lượt cách 60 s; không tính được dự báo thì `ALERT` mỗi lượt, sau `ckpt_10000` chỉ `ALERT`; file `probe` ra khỏi `$R` | Hiếu (soạn với Claude) |
 | 5/11/2026 | Mục 6.2, 7: **[Đã chốt 5/11/2026, Hiếu]** caps 18/18/16 (cùng 52 CU). Lệnh watcher `--cap 18` / `--cap 18` / `--cap 16`. Bảng ngưỡng tính lại ở trần 18. Số dư tối thiểu vẫn 66 CU. Ghi chú: trần eval 16 thấp hơn ước lượng 16,2; **[Đã chốt 5/11/2026, Hiếu]** eval xen kẽ hai arm theo điều kiện | Hiếu (soạn với Claude) |
 | 5/11/2026 | Mục 7, theo review lại lần hai #109: `stage` có trạng thái cho cả lần chạy, nên train chết trước khi có `runs/<job>` là `failed` (thoát 5); lần liệt kê phiên chỉ tính khi tin được như `cu_watch.py`, lỗi xác thực không còn được coi là đã dừng; SIGTERM chỉ tới tiến trình `cu_watch.py` còn sống; dòng `follow` ghi `exit N` vào `$R/$S.fetch.log` | Hiếu (soạn với Claude) |
+| 5/11/2026 | Mục 4: thêm giới hạn của N20, một bàn tay (chiều action 0–6) không cử động. Ghi số đo của lần chạy b2 bị hủy vào sổ chi phí | Hiếu (soạn với Claude) |
