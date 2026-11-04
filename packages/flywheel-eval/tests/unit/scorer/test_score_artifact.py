@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 from flywheel.contracts import TaskDefinition
+from flywheel.contracts.entities import Score
 from flywheel.eval.api import SCORER_CONFIG_DIR, score_record, score_trace, store_score
 from flywheel.eval.scorer.artifact import STORE_RECORDS, build_record
 from flywheel.eval.scorer.status import ScorerError
@@ -148,3 +149,36 @@ def test_the_record_rejects_a_field_nobody_declared(
         record.model_copy(update={"nhan_xet": "tốt"}).model_validate(
             {**record.model_dump(), "nhan_xet": "tốt"}
         )
+
+
+def test_the_record_is_the_contract_score(
+    tmp_path: Path, task: TaskDefinition, make_rows: MakeRows, sig: object
+) -> None:
+    rows = make_rows(object_in_target_zone=sig.const(0.0))  # type: ignore[attr-defined]
+    score = score_trace(write(tmp_path / "ep.jsonl", rows), task, CONFIG)
+
+    record = score_record(score, level=1)
+
+    # Task 7: the lane writes the contract model, not a copy of it, so `decide`
+    # and Agent QA/QC read it with `Score` and nothing else.
+    assert type(record) is Score
+    assert record.id.startswith("sc_")
+    assert record.trace_sha256 == score.trace_sha256
+
+    stored = store_score(score, tmp_path / "store", level=1)
+    line = stored.read_text(encoding="utf-8").strip()
+    # The id is checked against the content on the way back in, so a stored
+    # line that drifted from its id would fail here rather than downstream.
+    assert Score.model_validate_json(line) == record
+
+
+def test_a_changed_trace_is_a_different_score(
+    tmp_path: Path, task: TaskDefinition, make_rows: MakeRows, sig: object
+) -> None:
+    clean = score_record(score_trace(write(tmp_path / "a.jsonl", make_rows()), task, CONFIG))
+    rows = make_rows(object_in_target_zone=sig.const(0.0))  # type: ignore[attr-defined]
+    failed = score_record(score_trace(write(tmp_path / "b.jsonl", rows), task, CONFIG))
+
+    # 03 section 4.3: the id is built from the trace hash with the scorer
+    # version, so two scorings of different traces never share an id.
+    assert clean.id != failed.id

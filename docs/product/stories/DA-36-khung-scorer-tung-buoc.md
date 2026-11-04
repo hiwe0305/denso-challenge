@@ -11,7 +11,7 @@
 | Nhãn | [Lõi] · `epic:3` · `gate:G1` · `area:core` |
 | Sprint | S2 · **Lịch 3/11/2026:** merge trước **8/11/2026** (07 mục 2.4) |
 | Ước lượng | 13 giờ (04 mục 4.2, ước lượng) |
-| Phụ thuộc | S1-08 (04 mục 4.2); `Score` nằm trong S1-10 (#36, **chưa merge**); `StageSpec`, `FailureKindSpec`, `StageEvaluation` của `flywheel.contracts` (đã có trên master). Không chặn: `Trace` thật của SIMPLE — story chạy trên trace tổng hợp, xem AC 6 |
+| Phụ thuộc | S1-08 (04 mục 4.2); `Score` nằm trong S1-10 (#36, đã merge); `StageSpec`, `FailureKindSpec`, `StageEvaluation` của `flywheel.contracts` (đã có trên master). Không chặn: `Trace` thật của SIMPLE — story chạy trên trace tổng hợp, xem AC 6 |
 
 ## Story
 
@@ -34,7 +34,7 @@ Là kỹ sư đánh giá, tôi muốn một scorer độc lập chấm từng b�
 - [x] 4. Điều kiện chạy suốt episode (thăng bằng) và `L-BALANCE` ở bất kỳ bước nào (AC 1, 3)
 - [x] 5. `api.py`, lệnh `fw eval score` và artifact kết quả (AC 5)
 - [x] 6. Test một ca mỗi kiểu lỗi, ca thành công, ca thiếu tín hiệu (AC 6)
-- [ ] 7. Đổi `ScoreRecord` sang `Score` của `flywheel.contracts.entities` trong ngày #36 merge (AC 1; PO quyết ngày 3/11/2026 trên #58, issue #62 mục 2). Hai chỗ trong `api.py`; `ScoreRecord` xóa, không để lại lớp cũ
+- [x] 7. Đổi `ScoreRecord` sang `Score` của `flywheel.contracts.entities` trong ngày #36 merge (AC 1; PO quyết ngày 3/11/2026 trên #58, issue #62 mục 2). Hai chỗ trong `api.py`; `ScoreRecord` xóa, không để lại lớp cũ
 
 ## Phạm vi file
 
@@ -77,6 +77,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 5/11/2026 | Nhiệm vụ 7: `ScoreRecord` xóa, `build_record`, `score_record` và `write_record` dùng `Score` của `flywheel.contracts.entities`; tên trường và dòng trong `scorer/score.jsonl` giữ nguyên, thêm `id` `sc_…` theo nội dung. Đánh số bước (0 hay 1) vẫn chờ #62, chưa đổi | Châu |
 | 3/11/2026 | Sửa theo review PO trên #58: tín hiệu từng bước khai trong cấu hình nên thiếu tín hiệu ra "chưa rõ" bất kể vị từ trả gì (điểm 1, 7); giá trị không hữu hạn là khoảng trống (điểm 2); `L-COLLIDE`, `L-TIMEOUT` lấy lớp của bước hỏng k (điểm 3); kiểu lỗi không có bước trượt thì raise (điểm 4); CLI ra mã 2 kèm một dòng thay vì traceback, cấu hình mặc định tìm từ gốc repo (điểm 5, 6); `BalanceLimits` sang `config` và fixture dùng `h_place` của file (điểm 8). Theo quyết định PO: `L-BALANCE` chỉ dùng khi không bước nào trượt hay chưa rõ, episode đã có kiểu lỗi thì giữ kiểu và chỉ ghi `balance_violated`; thêm `trace_sha256` vào bản ghi; thêm nhiệm vụ 7. Đánh số bước (0 hay 1) chờ #62, chưa đổi | Châu |
 | 3/11/2026 | Mở issue #59 (Contract change cho Long): `Score` của S1-10 chưa merge, enum bốn trạng thái thay `stage_success: bool | None`, lý do "chưa rõ" có kiểu, `step_enter_s`/`step_exit_s`, và `from_failed_stage` cho `FailureKindSpec.failure_class` của L-COLLIDE, L-TIMEOUT. Kèm chỗ xin PO quyết về bốn mã task bê khay. AC 1 đạt một phần tới khi issue chốt | Châu |
 | 3/11/2026 | Làm xong 6 nhiệm vụ. Thêm `packages/flywheel-eval/pyproject.toml` và `uv.lock` vào Phạm vi file (R6, nêu trong PR). Hai điểm cần hợp đồng: `Score` của S1-10 (#36) chưa merge nên artifact là `ScoreRecord` trong làn, đúng từng trường của `Score`; thời điểm vào và ra từng bước, lý do "chưa rõ" có kiểu, và cách khai "lớp lỗi theo bước hỏng k" cho L-COLLIDE, L-TIMEOUT cần issue Contract change cho Long | Châu |
@@ -85,9 +86,9 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực: 21.5h (nhiệm vụ 1 2h, 2 2.5h, 3 2h, 4 1.5h, 5 2h, 6 3h; sửa theo review PO
-  3/11/2026: nhiệm vụ 1 0.5h, 2 3h, 4 0.5h, 5 1.5h, sổ sách 0.5h; nhiệm vụ 7 chưa làm,
-  chờ #36 merge)
+- Giờ thực: 23h (nhiệm vụ 1 2h, 2 2.5h, 3 2h, 4 1.5h, 5 2h, 6 3h; sửa theo review PO
+  3/11/2026: nhiệm vụ 1 0.5h, 2 3h, 4 0.5h, 5 1.5h, sổ sách 0.5h; nhiệm vụ 7 1.5h,
+  5/11/2026)
 - Công cụ AI đã dùng: Claude Code (Opus 5)
 - Ghi chú hoàn thành:
   - Chấm là bước tính thuần: không mở file, không chạy sim, không gọi model, không đọc đồng hồ. Lớp đọc (`reader.py`) tách riêng; `score_episode` chỉ nhận bảng tín hiệu. Có test chấm hai lần so bản ghi từng byte (AC 5).
