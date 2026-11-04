@@ -20,11 +20,14 @@ jobs:
           fetch-depth: 0
       - name: Check branch, commits and file scope
         id: guard
+        # Judge the PR against the current tip of its base branch, as the local command does.
+        # The event's base SHA can stay on an old ancestor after a rebase (seen on PR #91),
+        # which counts the base branch's newer commits and files as the PR's.
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: origin/${{ github.base_ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           BRANCH: ${{ github.head_ref }}
-        run: python3 scripts/repo/pr_guard.py --base "$BASE_SHA" --head "$HEAD_SHA" --branch "$BRANCH"
+        run: python3 scripts/repo/pr_guard.py --base "$BASE_REF" --head "$HEAD_SHA" --branch "$BRANCH"
       - name: Label large PR
         if: always() && steps.guard.outputs.size_large == 'true'
         env:
