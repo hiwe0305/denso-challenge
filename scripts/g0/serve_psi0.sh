@@ -4,7 +4,8 @@
 #   bash scripts/g0/serve_psi0.sh setup [--flash-attn]   clone Psi0 at the pinned commit, build its env
 #   bash scripts/g0/serve_psi0.sh fetch [--weights]      download the run dir (configs; weights with --weights)
 #   bash scripts/g0/serve_psi0.sh check                  smoke check without loading the model
-#   bash scripts/g0/serve_psi0.sh serve                  start serve_psi0_simple (needs weights and a GPU)
+#   bash scripts/g0/serve_psi0.sh serve                  start the server (needs weights and a GPU); seeds
+#                                                        per episode via docker/psi0/serve_psi0_seeded.py
 #
 # PSI0_RUNTIME=venv (default) runs in a uv env inside the Psi0 checkout; PSI0_RUNTIME=docker runs in
 # the pinned upstream image through docker/psi0/compose.yaml. With PSI0_RUNTIME=venv, PSI0_ENV=image
@@ -211,10 +212,19 @@ PY
 
 cmd_serve() {
   [[ -f "$WEIGHTS" ]] || die "no weights at $WEIGHTS; run: $0 fetch --weights"
-  log "serving $RUN step $CKPT_STEP on :$PORT ($DEVICE, exec horizon $ACTION_EXEC_HORIZON, $RTC_FLAG)"
-  psi_exec serve_psi0_simple --policy psi0 --host "$HOST" --port "$PORT" --device "$DEVICE" \
+  # docker/psi0/serve_psi0_seeded.py (PR #97) wraps serve_psi0_simple and reseeds the policy noise
+  # from history.seed on each reset (docs/he/tray.md 8.5); requests without a seed are unchanged.
+  # It is copied under PSI0_ROOT, which every runtime sees at the same path. PSI0_SEEDED=0, or a
+  # checkout without the launcher, serves with plain serve_psi0_simple.
+  local launcher="$REPO/docker/psi0/serve_psi0_seeded.py" entry=(serve_psi0_simple)
+  if [[ "${PSI0_SEEDED:-1}" != 0 && -f "$launcher" ]]; then
+    cp "$launcher" "$PSI0_ROOT/serve_psi0_seeded.py"
+    entry=(python "$PSI0_ROOT/serve_psi0_seeded.py")
+  fi
+  log "serving $RUN step $CKPT_STEP on $HOST:$PORT ($DEVICE, exec horizon $ACTION_EXEC_HORIZON, ${RTC_FLAG:-no RTC}) via ${entry[*]}"
+  psi_exec "${entry[@]}" --policy psi0 --host "$HOST" --port "$PORT" --device "$DEVICE" \
     --run-dir "$RUN_DIR" --ckpt-step "$CKPT_STEP" \
-    --action-exec-horizon "$ACTION_EXEC_HORIZON" "$RTC_FLAG"
+    --action-exec-horizon "$ACTION_EXEC_HORIZON" ${RTC_FLAG:+"$RTC_FLAG"}
 }
 
 main() {
@@ -225,7 +235,7 @@ main() {
     fetch) cmd_fetch "$@" ;;
     check) cmd_check "$@" ;;
     serve) cmd_serve "$@" ;;
-    *) sed -n '2,13p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 2 ;;
+    *) sed -n '2,14p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 2 ;;
   esac
 }
 
