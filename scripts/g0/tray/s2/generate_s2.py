@@ -8,6 +8,17 @@ Job lists:
 - `--variants N`: N variants drawn from `--gen-base` (flywheel_simple.tray.s2.jobs
   .sample_jobs): parents uniformly, conditions in the train domain (tasks 10-12).
 
+Parents DA-03's QA rejected never seed a job (decision of 5/11/2026, as DA-34's
+pool): with `--qa-work` (the `fw data ingest` work directory of the parents'
+Psi0 export, after `fw data qa`) and `--qa-export` (that export), parents whose
+report is `reject` or `quarantine` are left out of every job list; `pass` and
+`flag` stay, as DA-03's release keeps them (`flywheel.data.release.build
+.INCLUDED`). It fails closed: the work directory must be of that export, every
+parent needs exactly one export episode and one report, and the reports share
+one threshold version. `<out>/qa_parents.json` records the reports' sha256, the
+threshold version and the parents left out with their reasons. `--variants`
+needs the filter; `--no-qa` skips it for diagnostics only.
+
 The jobs go round-robin to `--workers` processes; each worker is one
 `flywheel_simple.tray.s2.session` with its own env and LeRobot dataset under
 `<out>/shard-NN/`. A rerun skips the jobs any shard has already logged, so the
@@ -52,6 +63,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import json
 import os
 import signal
@@ -79,20 +91,92 @@ def segments_of(parents: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text().splitlines() if line]
 
 
-def replay_jobs(parents: Path) -> list[dict[str, Any]]:
+def replay_jobs(segments: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
         {"parent_id": p["parent_id"], "level": p["level"], "seed": p["seed"], "gen_seed": 0}
-        for p in segments_of(parents)
+        for p in segments
     ]
 
 
-def variant_jobs(parents: Path, count: int, gen_base: int, cfg: S2Config) -> list[dict[str, Any]]:
+def variant_jobs(
+    segments: list[dict[str, Any]], count: int, gen_base: int, cfg: S2Config
+) -> list[dict[str, Any]]:
     seeds = (cfg.cond_seed_min, cfg.cond_seed_max)
-    jobs = sample_jobs(segments_of(parents), count, gen_base, cfg.level1_share, seeds)
+    jobs = sample_jobs(segments, count, gen_base, cfg.level1_share, seeds)
     return [
         {"parent_id": j.parent_id, "level": j.level, "seed": j.seed, "gen_seed": j.gen_seed}
         for j in jobs
     ]
+
+
+def sha256_of(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def qa_filter(
+    segments: list[dict[str, Any]], qa_work: Path, export: Path
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """The parents DA-03's QA kept, and a record of the ones it left out (fails closed).
+
+    A parent is found in the export by its recording session (`<batch>-<NN>` for
+    `shard-NN`), level and seed: one attempt per condition, so the key is unique.
+    """
+    from flywheel.contracts.artifacts import QAReport  # workspace venv only
+    from flywheel.data.release.build import INCLUDED
+    from pydantic import ValidationError
+
+    meta = export / "meta" / "episodes.jsonl"
+    listed = json.loads((qa_work / "source.json").read_text())["files"]
+    if listed.get("meta/episodes.jsonl") != sha256_of(meta):
+        raise ValueError(f"{qa_work} is the QA of another export than {export}")
+    position_of = json.loads((qa_work / "episode_index.json").read_text())
+    positions: dict[tuple[str, int, int], list[int]] = {}
+    for n, row in enumerate(jsonl_rows(meta)):
+        block = json.loads(row["environment_config"])["flywheel"]
+        positions.setdefault((block["session"], block["level"], block["seed"]), []).append(n)
+    reports_file = qa_work / "qa" / "reports.jsonl"
+    reports: dict[int, Any] = {}
+    for n, line in enumerate(reports_file.read_text().splitlines(), 1):
+        if not line:
+            continue
+        try:
+            report = QAReport.model_validate_json(line)
+        except ValidationError as error:
+            raise ValueError(f"{reports_file} line {n} is not a QAReport: {error}") from error
+        if (at := position_of[report.episode_id]) in reports:
+            raise ValueError(f"{reports_file} has two DA-03 QA reports for {report.episode_id}")
+        reports[at] = report
+    versions = sorted({r.threshold_version for r in reports.values()})
+    if len(versions) != 1:
+        raise ValueError(f"{reports_file} mixes threshold versions {versions}")
+    kept, excluded = [], []
+    for seg in segments:
+        batch, shard, _ = seg["parent_id"].split("/")
+        key = (f"{batch}-{shard.removeprefix('shard-')}", seg["level"], seg["seed"])
+        found = positions.get(key, [])
+        if len(found) != 1:
+            raise ValueError(f"{len(found)} export episodes for parent {seg['parent_id']} {key}")
+        if found[0] not in reports:
+            raise ValueError(f"no DA-03 QA report in {reports_file} for {seg['parent_id']}")
+        report = reports[found[0]]
+        if report.decision in INCLUDED:
+            kept.append(seg)
+        else:
+            excluded.append({"parent_id": seg["parent_id"], "level": seg["level"],
+                             "seed": seg["seed"], "episode_id": report.episode_id,
+                             "decision": report.decision,
+                             "reasons": list(report.reasons)})  # fmt: skip
+    record = {
+        "qa_work": str(qa_work),
+        "export": str(export),
+        "export_meta_sha256": sha256_of(meta),
+        "reports_sha256": sha256_of(reports_file),
+        "threshold_version": versions[0],
+        "parents": len(segments),
+        "kept": len(kept),
+        "excluded": excluded,
+    }
+    return kept, record
 
 
 def job_key(row: dict[str, Any]) -> tuple[Any, ...]:
@@ -329,18 +413,37 @@ def main(argv: list[str] | None = None) -> int:
         help="supervisor: kill a worker that logs nothing this long (attempts take ~100-500 s)",
     )  # fmt: skip
     parser.add_argument("--max-restarts", type=int, default=3, help="supervisor: per shard")
+    parser.add_argument("--qa-work", type=Path, help="parents: `fw data ingest` work dir after QA")
+    parser.add_argument("--qa-export", type=Path, help="parents: the Psi0 export it ingested")
+    parser.add_argument("--no-qa", action="store_true", help="no DA-03 filter (diagnostics)")
     args = parser.parse_args(argv)
     if not args.summarize:
+        if (args.qa_work is None) != (args.qa_export is None):
+            parser.error("--qa-work and --qa-export go together")
+        if args.variants is not None and args.qa_work is None and not args.no_qa:
+            parser.error("--variants needs the DA-03 filter (--qa-work, --qa-export) or --no-qa")
+        segments = segments_of(args.parents)
+        qa_record = None
+        if args.qa_work is not None:
+            try:
+                segments, qa_record = qa_filter(segments, args.qa_work, args.qa_export)
+            except (ValueError, KeyError, OSError) as error:
+                print(f"refused: DA-03 QA filter: {error}")
+                return 1
         if args.variants is not None:
             cfg = S2Config.load(args.config)
-            jobs = variant_jobs(args.parents, args.variants, args.gen_base, cfg)
+            jobs = variant_jobs(segments, args.variants, args.gen_base, cfg)
         elif args.replay or args.tracked:
-            jobs = replay_jobs(args.parents)
+            jobs = replay_jobs(segments)
         else:
             parser.error("choose a job list (--replay, --tracked or --variants)")
         jobs = jobs[: args.limit]
         args.mode = "exact" if args.replay else "variant"
         args.out.mkdir(parents=True, exist_ok=True)
+        if qa_record is not None:
+            (args.out / "qa_parents.json").write_text(json.dumps(qa_record, indent=1) + "\n")
+            print(f"DA-03 QA: {qa_record['kept']}/{qa_record['parents']} parents kept "
+                  f"({qa_record['threshold_version']})", flush=True)  # fmt: skip
         (args.out / "jobs.jsonl").write_text("".join(json.dumps(j) + "\n" for j in jobs))
         from flywheel.data.ledger import job_ledger  # workspace venv only
 
