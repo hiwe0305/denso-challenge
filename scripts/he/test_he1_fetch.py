@@ -8,11 +8,13 @@ from __future__ import annotations
 import json
 import signal
 import subprocess
+import sys
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from types import FrameType
+from typing import Any
 
 import he1_colab
 import he1_fetch
@@ -24,11 +26,14 @@ from he1_fetch import (
     Remote,
     fetch_once,
     judge,
+    listed,
     main,
+    pause,
     probe,
     projected_cu,
     run,
     session_running,
+    session_state,
     stop_line,
     stop_session,
     watcher_meter,
@@ -208,26 +213,54 @@ def test_a_log_written_to_during_the_pull_is_grown_not_bad(tmp_path: Path) -> No
     assert status["mb_per_s"] is not None and status["checkpoint_pulled_bytes"] == 4001
 
 
-def listing(text: str, code: int = 0) -> subprocess.CompletedProcess[str]:
-    return subprocess.CompletedProcess(["colab", "sessions"], code, text, "")
-
-
 LINE = f"[{JOB}] gpu-l4-s-abc | Hardware: L4 | Shape: Standard | Variant: GPU"
+LOST = "[?] gpu-l4-s-abc | Hardware: L4 | Shape: Standard | Variant: GPU"  # name lost
+EMPTY = "[colab] No active sessions"
+
+
+def cli(sessions: str, assignments: int = 1, codes: tuple[int, int] = (0, 0)) -> he1_fetch.Run:
+    """A fake `colab` that answers `usage` and `sessions` as the real CLI prints them."""
+
+    def runner(argv: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        if argv[1] == "usage":
+            text = f"Current balance: 80.0\nUsage rate: 1.94\nActive assignments: {assignments}\n"
+            return subprocess.CompletedProcess(argv, codes[0], text, "")
+        return subprocess.CompletedProcess(argv, codes[1], sessions + "\n", "")
+
+    return runner
 
 
 def test_no_ssh_once_the_watcher_exited_or_the_session_is_gone(tmp_path: Path) -> None:
     out = tmp_path / f"{JOB}.out"
     out.write_text("")
-    assert session_running(JOB, tmp_path, Path("colab"), lambda argv: listing(LINE))
-    assert not session_running(JOB, tmp_path, Path("colab"), lambda argv: listing("[other] x"))
-    assert not session_running(JOB, tmp_path, Path("colab"), lambda argv: listing(LINE, 1))
+    (tmp_path / f"{JOB}.json").write_text(json.dumps({"name": JOB, "endpoint": "gpu-l4-s-abc"}))
+    assert session_running(JOB, tmp_path, Path("colab"), cli(LINE))
+    assert session_running(JOB, tmp_path, Path("colab"), cli(LOST))  # found by endpoint
+    assert session_state(JOB, tmp_path, Path("colab"), cli(EMPTY, 0)) == "gone"
+    assert not session_running(JOB, tmp_path, Path("colab"), cli(LINE, codes=(0, 1)))
     out.write_text("exit 3\n")
-    assert not session_running(JOB, tmp_path, Path("colab"), lambda argv: listing(LINE))
-    assert not session_running("missing", tmp_path, Path("colab"), lambda argv: listing(LINE))
+    assert session_state(JOB, tmp_path, Path("colab"), cli(LINE)) == "gone"
+    assert not session_running("missing", tmp_path, Path("colab"), cli(LINE))
 
 
-def colab_cli(listed_after: int) -> tuple[list[list[str]], he1_fetch.Run]:
-    """A fake `colab`: `sessions` lists the job until `stop` has run `listed_after` times."""
+def test_an_auth_failure_listing_is_not_trusted(tmp_path: Path) -> None:
+    # On an auth failure `sessions` prints "No active sessions" and exits 0.
+    assert listed(JOB, Path("colab"), cli(EMPTY, assignments=1)) is None
+    assert listed(JOB, Path("colab"), cli(LINE, codes=(1, 0))) is None  # usage failed
+    assert listed(JOB, Path("colab"), cli("garbled output")) is None
+    assert listed(JOB, Path("colab"), cli(EMPTY, assignments=0)) is False
+    (tmp_path / f"{JOB}.out").write_text("")
+    assert session_state(JOB, tmp_path, Path("colab"), cli(EMPTY, 1)) == "unknown"
+
+
+def colab_cli(
+    listed_after: int, sessions_fail: bool = False
+) -> tuple[list[list[str]], he1_fetch.Run]:
+    """A fake `colab`: the job stays listed until `stop` has run `listed_after` times.
+
+    `sessions_fail`: once stopped, `sessions` says "No active sessions" while `usage`
+    still counts the assignment (the auth failure of cu_watch.py's docstring).
+    """
     calls: list[list[str]] = []
 
     def runner(argv: Sequence[str]) -> subprocess.CompletedProcess[str]:
@@ -235,32 +268,92 @@ def colab_cli(listed_after: int) -> tuple[list[list[str]], he1_fetch.Run]:
         stops = sum(1 for c in calls if c[1] == "stop")
         if argv[1] == "stop":
             return subprocess.CompletedProcess(argv, 1 if stops < listed_after else 0, "", "")
-        return listing("" if stops >= listed_after else LINE)
+        if stops >= listed_after:
+            return cli(EMPTY, 0)(argv)
+        return cli(EMPTY if sessions_fail else LINE, 1)(argv)
 
     return calls, runner
 
 
-def test_a_stop_is_retried_until_the_session_is_gone(tmp_path: Path) -> None:
+def no_wait(seconds: float) -> None:
+    pass
+
+
+def fake_watcher(registry: Path, state: str = "running", script: str = "cu_watch.py") -> Any:
+    """A live process whose command line names `script`, registered as the watcher."""
+    proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)", script])
+    entry = {"name": JOB, "pid": proc.pid, "state": state, "endpoint": "gpu-l4-s-abc"}
+    (registry / f"{JOB}.json").write_text(json.dumps(entry))
+    return proc
+
+
+def test_once_retries_an_untrusted_listing_then_refuses(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    states = iter(["unknown", "unknown", "unknown"])
+    monkeypatch.setattr(he1_fetch, "session_state", lambda *a, **k: next(states))
+    monkeypatch.setattr(he1_fetch, "UNTRUSTED_RETRY_S", 0.0)
+    args = ["once", "--session", JOB, "--registry", str(tmp_path), "--dest", str(tmp_path / "l")]
+    with deadline(30):
+        assert main(args) == 2  # three untrusted listings, never an ssh
+    states = iter(["unknown", "gone"])
+    with deadline(30):
+        assert main(args) == 2
+
+
+def test_a_stop_is_retried_until_two_trusted_listings_lack_the_session(tmp_path: Path) -> None:
     calls, runner = colab_cli(listed_after=2)
-    assert stop_session(JOB, tmp_path, Path("colab"), runner, sleep=lambda s: None)
-    assert [c[1] for c in calls] == ["stop", "sessions", "stop", "sessions"]
+    assert stop_session(JOB, tmp_path, Path("colab"), runner, sleep=no_wait)
+    assert [c[1] for c in calls].count("stop") == 2
+    assert [c[1] for c in calls][-4:] == ["usage", "sessions", "usage", "sessions"]
+
+
+def test_a_stop_is_not_confirmed_by_an_untrusted_listing(tmp_path: Path) -> None:
+    calls, runner = colab_cli(listed_after=99, sessions_fail=True)
+    assert not stop_session(JOB, tmp_path, Path("colab"), runner, sleep=no_wait, term_wait=60)
+    assert [c[1] for c in calls].count("stop") == 3
 
 
 def test_a_stop_that_never_confirms_signals_the_watcher_then_says_so(tmp_path: Path) -> None:
-    watcher = subprocess.Popen(["sleep", "60"])
-    (tmp_path / f"{JOB}.json").write_text(json.dumps({"name": JOB, "pid": watcher.pid}))
+    watcher = fake_watcher(tmp_path)
     calls, runner = colab_cli(listed_after=99)
-    ok = stop_session(JOB, tmp_path, Path("colab"), runner, sleep=lambda s: None, term_wait=90)
+    ok = stop_session(JOB, tmp_path, Path("colab"), runner, sleep=no_wait, term_wait=90)
     assert not ok and watcher.wait(timeout=10) == -signal.SIGTERM
     assert sum(1 for c in calls if c[1] == "stop") == 3
-    (tmp_path / f"{JOB}.json").unlink()  # no registry entry: no watcher to signal
+
+
+@pytest.mark.parametrize(
+    ("state", "script"), [("stopped", "cu_watch.py"), ("running", "other.py"), (None, None)]
+)
+def test_sigterm_only_reaches_a_live_cu_watch_process(
+    tmp_path: Path, state: str | None, script: str | None
+) -> None:
+    proc = None
+    if state is None:  # a null pid in the entry
+        (tmp_path / f"{JOB}.json").write_text(json.dumps({"name": JOB, "pid": None}))
+    else:
+        proc = fake_watcher(tmp_path, state=state, script=script or "")
     _, runner = colab_cli(listed_after=99)
-    assert not stop_session(JOB, tmp_path, Path("colab"), runner, sleep=lambda s: None)
+    assert not stop_session(JOB, tmp_path, Path("colab"), runner, sleep=no_wait)
+    if proc is not None:
+        assert proc.poll() is None  # not signalled: a reused pid, or no live watcher
+        proc.kill()
+        proc.wait()
 
 
 def test_hung_commands_end_as_timeouts(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(he1_fetch, "TIMEOUT_S", 0.2)
     assert run(["sleep", "5"]).returncode == 124
+    limits: list[float] = []
+
+    def spy(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        limits.append(kwargs["timeout"])
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    monkeypatch.setattr(subprocess, "run", spy)
+    run(["rsync", "-a", "a", "b"])
+    run(["ssh", "root@colab", "true"])
+    assert limits == [he1_fetch.PULL_TIMEOUT_S, 0.2]
 
 
 def test_the_real_transport_is_rsync_over_the_colab_proxy() -> None:
@@ -326,16 +419,17 @@ def running(step: int, rate: float | None) -> dict[str, object]:
     }
 
 
-def test_the_s104_estimate_fits_only_with_a_fast_pull() -> None:
+def test_the_s104_estimate_at_cap_18_needs_only_a_slow_pull() -> None:
     # Step 2200 at S1-04's 8.5 h run: 0.753 s/step with validation, 8 min of setup.
+    # At cap 18 (Hiếu 5/11) 6 MB/s is enough; a pull of 3 MB/s is not.
     spent = 1.94 * (8 * 60 + 2200 * 0.753) / 3600
-    slow = projected_cu(spent, 2200, 0.753, 6.0, 6.25e9)
-    fast = projected_cu(spent, 2200, 0.753, 30.0, 6.25e9)
-    assert slow > stop_line(17.5) > fast
-    assert judge(running(2200, 0.753), (spent, 17.5), 6.0)["verdict"] == "stop"  # type: ignore[index]
-    assert judge(running(2200, 0.753), (spent, 17.5), 30.0)["verdict"] == "ok"  # type: ignore[index]
-    assert judge(running(2100, 0.753), (spent, 17.5), 6.0) is None  # before the window
-    late = judge(running(12000, 2.0), (spent, 17.5), 6.0)
+    slow = projected_cu(spent, 2200, 0.753, 3.0, 6.25e9)
+    enough = projected_cu(spent, 2200, 0.753, 6.0, 6.25e9)
+    assert slow > stop_line(18.0) > enough
+    assert judge(running(2200, 0.753), (spent, 18.0), 3.0)["verdict"] == "stop"  # type: ignore[index]
+    assert judge(running(2200, 0.753), (spent, 18.0), 6.0)["verdict"] == "ok"  # type: ignore[index]
+    assert judge(running(2100, 0.753), (spent, 18.0), 3.0) is None  # before the window
+    late = judge(running(12000, 2.0), (spent, 18.0), 6.0)
     assert late is not None and late["verdict"] == "late"  # past ckpt_10000: ALERT only
 
 
@@ -414,6 +508,71 @@ def test_a_stop_that_is_not_confirmed_exits_6(
 def test_follow_stops_a_run_that_cannot_finish(tmp_path: Path) -> None:
     with deadline(60):
         assert main(slow_run(tmp_path)) == 3
+
+
+@pytest.mark.parametrize("code", [1, 0])
+def test_a_train_that_died_before_its_job_dir_has_failed(tmp_path: Path, code: int) -> None:
+    # No .env, a failed import or a refused hash: `train` exits before runs/<job>.
+    vm = tmp_path / "vm"
+    vm.mkdir()
+    (vm / "train.log").write_text(f"Traceback ...\ntrain exit {code}\n")
+    args = ["--session", JOB, "--registry", str(tmp_path), "--dest", str(tmp_path / "l")]
+    assert main(["once", *args, "--local-vm", str(vm)]) == 5
+    with deadline(60):
+        assert main(["follow", *args, "--every", "0", "--local-vm", str(vm)]) == 5
+    with pytest.raises(he1_fetch.TrainFailed):
+        fetch_once(LocalRemote(vm), tmp_path / "l")
+
+
+def test_before_train_exits_an_empty_stage_is_not_a_failure(tmp_path: Path) -> None:
+    vm = tmp_path / "vm"
+    vm.mkdir()  # setup done, train not yet started
+    assert fetch_once(LocalRemote(vm), tmp_path / "l") == []
+
+
+def test_a_log_that_differs_after_training_ended_is_bad(tmp_path: Path) -> None:
+    vm = fake_vm(tmp_path / "vm", saved=(40000,), complete=40000, train_done=True)
+    metrics = vm / "runs" / JOB / "metrics.jsonl"
+
+    def late_write(argv: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        if argv[0] == "rsync":
+            metrics.write_text('{"step": 3}\n')
+        return run(argv)
+
+    (status,) = fetch_once(LocalRemote(vm), tmp_path / "l", runner=late_write)
+    assert status["bad_or_missing"] == ["metrics.jsonl"] and status["grown"] == []
+    assert not status["final"]
+
+
+def test_a_checkpoint_that_changed_mid_pull_is_bad_not_grown(tmp_path: Path) -> None:
+    vm = fake_vm(tmp_path / "vm", saved=(10000,), complete=10000)
+    model = vm / "runs" / JOB / MODEL.format(10000)
+
+    def rewrite(argv: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        if argv[0] == "rsync":
+            model.write_bytes(b"\1" * model.stat().st_size)
+        return run(argv)
+
+    (status,) = fetch_once(LocalRemote(vm), tmp_path / "l", runner=rewrite)
+    assert MODEL.format(10000) in status["bad_or_missing"]
+    assert status["grown"] == [] and status["mb_per_s"] is None
+
+
+def test_the_rate_counts_checkpoint_bytes_only(tmp_path: Path) -> None:
+    vm = fake_vm(tmp_path / "vm", saved=(10000,), complete=10000)
+    (vm / "runs" / JOB / "metrics.jsonl").write_text("x" * 1_000_000)  # a big log
+    ticks = iter([0.0, 0.001])
+    (status,) = fetch_once(LocalRemote(vm), tmp_path / "l", clock=lambda: next(ticks))
+    assert status["checkpoint_pulled_bytes"] == 4001
+    assert status["mb_per_s"] == round(4001 / 1e6 / 0.001, 2)
+
+
+def test_passes_come_every_minute_near_the_end() -> None:
+    going = [{"train": "running"}]
+    assert pause(600, 37999, going) == 600
+    assert pause(600, 38000, going) == 60
+    assert pause(600, 5000, [{"train": "done"}]) == 60
+    assert pause(30, 39000, going) == 30
 
 
 def test_probe_times_a_pull_and_cleans_both_ends(tmp_path: Path) -> None:
