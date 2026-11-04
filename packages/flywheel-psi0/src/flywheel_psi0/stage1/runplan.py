@@ -12,6 +12,11 @@ is read:
 
 `run_plan_id` is computed as for the tray plans (`rp_` + sha256 of the plan's JSON).
 
+The plan's DeepSpeed config is a file of this repo, not of Psi0: the authors'
+`zero3_offload.json` leaves `optimizer.params.betas` and `eps` at "auto", which the
+pinned accelerate (1.7.0) does not fill for a `DummyOptim` (run 1, 4/11/2026,
+docs/he/stage1.md 1.7). `deepspeed_problems` checks the file against the recipe.
+
     python -m flywheel_psi0.stage1.runplan check configs/runplans/stage1/egodex-short.yaml
 """
 
@@ -19,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import statistics
 import sys
 from collections.abc import Sequence
@@ -33,6 +39,31 @@ from flywheel_psi0.trainer.recipe import ArgValue, Psi0Recipe
 from flywheel_psi0.tray.runplan import Pin, PsiModel, Weights, run_plan_id
 
 REPO = Path(__file__).resolve().parents[5]
+
+# The "auto" entries accelerate 1.7.0 fills when Psi0 prepares a model with a
+# `DummyOptim` and a `DummyScheduler` and sets `train_micro_batch_size_per_gpu` itself
+# (`Accelerator._prepare_deepspeed`, `DeepSpeedPlugin.set_mixed_precision`). Any other
+# "auto" stops `accelerator.prepare` with "not found in kwargs".
+FILLED_BY_ACCELERATE = frozenset(
+    {
+        "fp16.enabled",
+        "bf16.enabled",
+        "gradient_accumulation_steps",
+        "gradient_clipping",
+        "train_batch_size",
+        "train_micro_batch_size_per_gpu",
+        "zero_optimization.reduce_bucket_size",
+        "zero_optimization.stage3_prefetch_bucket_size",
+        "zero_optimization.stage3_param_persistence_threshold",
+        "zero_optimization.stage3_gather_16bit_weights_on_model_save",
+        "optimizer.params.lr",
+        "optimizer.params.weight_decay",
+        "scheduler.params.warmup_min_lr",
+        "scheduler.params.warmup_max_lr",
+        "scheduler.params.warmup_num_steps",
+        "scheduler.params.total_num_steps",
+    }
+)
 
 
 class _Frozen(BaseModel):
@@ -101,6 +132,7 @@ class Stage1Plan(_Frozen):
     parent: Parent
     dataset: Dataset
     job: Job
+    deepspeed_config: str  # path from the repo root; replaces the recipe's
     overrides: dict[str, ArgValue]
     compute: Compute
     criteria: Criteria
@@ -109,12 +141,87 @@ class Stage1Plan(_Frozen):
     def load(cls, path: Path) -> Stage1Plan:
         return cls.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
 
+    def overrides_at(self, repo: Path = REPO) -> dict[str, ArgValue]:
+        """The overrides with the plan's DeepSpeed config as an absolute path in `repo`."""
+        return {**self.overrides, "train.deepspeed_config": str(repo / self.deepspeed_config)}
+
     def load_recipe(self, repo: Path = REPO) -> Psi0Recipe:
-        return Psi0Recipe.load(repo / self.recipe).with_overrides(self.overrides)
+        return Psi0Recipe.load(repo / self.recipe).with_overrides(self.overrides_at(repo))
 
     @property
     def repeat_job_id(self) -> str:
         return f"{self.job.id}-repeat"
+
+
+def _leaves(config: dict[str, Any], prefix: str = "") -> dict[str, Any]:
+    leaves: dict[str, Any] = {}
+    for key, value in config.items():
+        if isinstance(value, dict):
+            leaves.update(_leaves(value, f"{prefix}{key}."))
+        else:
+            leaves[f"{prefix}{key}"] = value
+    return leaves
+
+
+def _number(value: ArgValue | None) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def deepspeed_problems(config: dict[str, Any], recipe: Psi0Recipe) -> list[str]:
+    """What in a DeepSpeed config would stop `accelerator.prepare` or change the recipe."""
+    leaves = _leaves(config)
+    problems = [
+        f"{key} is 'auto' and accelerate 1.7.0 does not fill it"
+        for key, value in leaves.items()
+        if value == "auto" and key not in FILLED_BY_ACCELERATE
+    ]
+    # Set here, not by accelerate, so the file states what the optimizer runs with.
+    params = config.get("optimizer", {}).get("params", {})
+    problems += [f"optimizer.params.{key} is 'auto'" for key, v in params.items() if v == "auto"]
+    expected: dict[str, ArgValue | None] = {
+        "lr": recipe.args.get("train.learning_rate"),
+        "eps": recipe.args.get("train.lr_scheduler_kwargs.eps"),
+        "weight_decay": recipe.args.get("train.lr_scheduler_kwargs.weight_decay"),
+    }
+    for key, want in expected.items():
+        have, wanted = _number(params.get(key)), _number(want)
+        if have is None or wanted is None or not math.isclose(have, wanted):
+            problems.append(
+                f"optimizer.params.{key} is {params.get(key)!r}, the recipe has {want!r}"
+            )
+    betas = recipe.args.get("train.lr_scheduler_kwargs.betas")
+    have_betas = params.get("betas")
+    if (
+        not isinstance(betas, list)
+        or not isinstance(have_betas, list)
+        or len(betas) != len(have_betas)
+        or not all(
+            math.isclose(float(a), float(b)) for a, b in zip(have_betas, betas, strict=True)
+        )
+    ):
+        problems.append(f"optimizer.params.betas is {have_betas!r}, the recipe has {betas!r}")
+    # Psi0 groups the vision tower and the projector at their own lr. WarmupLR sets one
+    # lr for every group and starts it at 0; WarmupCosineLR scales each group's own lr,
+    # by 1.0 here. Built at iteration -1 it writes lr 0 into the first group before the
+    # first step (DeepSpeed 0.17.1), so it starts at 0.
+    scheduler = config.get("scheduler", {})
+    sparams = scheduler.get("params", {})
+    if recipe.args.get("train.lr_scheduler_type") == "constant" and (
+        scheduler.get("type") != "WarmupCosineLR"
+        or sparams.get("warmup_min_ratio") != 1.0
+        or sparams.get("cos_min_ratio") != 1.0
+        or sparams.get("last_batch_iteration") != 0
+    ):
+        problems.append(
+            "the recipe's lr is constant per group: scheduler must be WarmupCosineLR "
+            "with warmup_min_ratio and cos_min_ratio 1.0 and last_batch_iteration 0"
+        )
+    return problems
 
 
 def check(plan: Stage1Plan, repo: Path = REPO) -> list[str]:
@@ -125,6 +232,10 @@ def check(plan: Stage1Plan, repo: Path = REPO) -> list[str]:
     unknown = sorted(set(plan.overrides) - set(Psi0Recipe.load(repo / plan.recipe).args))
     if unknown:
         problems.append(f"overrides {unknown} are not args of the recipe")
+    if "train.deepspeed_config" in plan.overrides:
+        problems.append("set the DeepSpeed config by `deepspeed_config`, not in overrides")
+    if not (repo / plan.deepspeed_config).exists():
+        return [*problems, f"deepspeed_config {plan.deepspeed_config} not found"]
     try:
         recipe = plan.load_recipe(repo)
     except ValueError as error:
@@ -145,6 +256,8 @@ def check(plan: Stage1Plan, repo: Path = REPO) -> list[str]:
         problems.append(f"{steps} steps leave no room for two loss windows")
     if plan.criteria.repeat_steps >= steps:
         problems.append("the rerun must be shorter than the run")
+    config = json.loads((repo / plan.deepspeed_config).read_text(encoding="utf-8"))
+    problems += [f"{plan.deepspeed_config}: {p}" for p in deepspeed_problems(config, recipe)]
     return problems
 
 

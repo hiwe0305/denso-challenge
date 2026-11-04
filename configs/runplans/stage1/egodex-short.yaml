@@ -50,6 +50,20 @@ job:
   seed: 7 # the script's --seed
   nproc_per_node: 1
 
+# One GPU instead of the authors' nodes: ZeRO-3 on one device does not shard, and a
+# full fine-tune of the 2.1B VLM (bf16 weights, fp32 master and Adam) needs ~34 GB
+# before activations, over an L4's 24 GB. Offload keeps optimizer and weights in host
+# RAM (L4 VM: 52 GB). The file is the authors' `scripts/deepspeed/zero3_offload.json`
+# (used by none of their scripts) with two changes, checked against the recipe by
+# `runplan check`:
+# - optimizer.params set from the recipe: accelerate 1.7.0 leaves betas and eps at
+#   "auto" for a DummyOptim, which stopped run 1 (docs/he/stage1.md 1.7);
+# - WarmupCosineLR at ratio 1.0, started at iteration 0, instead of WarmupLR, which
+#   puts every group at lr 0 for the first steps and then the vision tower and
+#   projector at the base lr instead of their own 1e-5.
+# Passed to Psi0 as an absolute path (Stage1Plan.overrides_at).
+deepspeed_config: configs/runplans/stage1/zero3_offload.json
+
 # Changes to the recipe for this plan; everything else is the authors' script.
 overrides:
   train.max_training_steps: 200 # "a few hundred steps" (AC 1); the script: 1000000
@@ -57,12 +71,6 @@ overrides:
   # No val: the stand-in has no test/ split, and a few hundred steps are too few to
   # read anything from Psi0's generation-based val. The script: 1000.
   train.validation_steps: 0
-  # One GPU instead of the authors' nodes: ZeRO-3 on one device does not shard, and a
-  # full fine-tune of the 2.1B VLM (bf16 weights, fp32 master and Adam) needs ~34 GB
-  # before activations, over an L4's 24 GB. The authors' own offload config, chosen
-  # through the script's DEEPSPEED_CONFIG hook, keeps optimizer and weights in host RAM
-  # (L4 VM: 52 GB).
-  train.deepspeed_config: scripts/deepspeed/zero3_offload.json
 
 compute:
   gpu: L4
