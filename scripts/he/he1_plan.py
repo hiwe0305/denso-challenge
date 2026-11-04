@@ -152,6 +152,14 @@ class Interpretation(_Frozen):
     floor_pp: float = Field(gt=0)  # below this at every point nothing is compared
 
 
+class PreliminaryTest(_Frozen):
+    """The test the preliminary result is read with (he-1.md 6.2)."""
+
+    method: Literal["fisher_exact_two_sided"]
+    alpha: float = Field(gt=0, lt=1)
+    conditions_per_arm: int = Field(gt=0)
+
+
 class He1RunPlan(_Frozen):
     name: str
     purpose: Literal["he_grid"]
@@ -171,6 +179,7 @@ class He1RunPlan(_Frozen):
     baseline: Baseline
     metric: dict[str, str]
     stats: Stats
+    preliminary_test: PreliminaryTest
     comparisons: list[dict[str, str]]
     interpretation: Interpretation
     pricebook: str
@@ -292,6 +301,12 @@ def check(plan: He1RunPlan, repo: Path = REPO) -> list[str]:
         problems.append("an eval set uses no level")
     if not (repo / main.generator).is_file():
         problems.append(f"{main.generator} is missing")
+    per_arm = len(plan.eval_conditions()) * plan.eval.passes["preliminary"]
+    if plan.preliminary_test.conditions_per_arm != per_arm:
+        problems.append(
+            f"preliminary_test reads {plan.preliminary_test.conditions_per_arm} per arm, "
+            f"the main eval gives {per_arm}"
+        )
     split = yaml.safe_load((repo / "configs/splits/default.yaml").read_text(encoding="utf-8"))
     dev = split["seed_ranges"]["dev"]
     if not dev["start"] <= main.seeds.start < main.seeds.stop <= dev["stop"]:
@@ -395,7 +410,10 @@ def check_parents(plan: He1RunPlan) -> dict[str, Any]:
 
 
 def freeze(plan_path: Path, signed_by: str, reason: str, repo: Path = REPO) -> tuple[Path, Path]:
-    """Write `<plan>.lock.json` and the signing `Decision` (kind plan_review) beside the plan."""
+    """Write `<plan>.lock.json` and the signing `Decision` (kind plan_review) beside the plan.
+
+    Nothing is written unless both files can be: the Decision is built first."""
+    plan_path, repo = plan_path.resolve(), repo.resolve()
     plan = He1RunPlan.load(plan_path)
     problems = check(plan, repo) + open_items(plan)
     if not (repo / plan.interpretation.doc).is_file():
@@ -407,8 +425,6 @@ def freeze(plan_path: Path, signed_by: str, reason: str, repo: Path = REPO) -> t
     plan_id = run_plan_id(plan)
     now = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
     lock = {"run_plan_id": plan_id, "frozen_at": now, "plan": plan_json(plan)}
-    out = lock_path(plan_path)
-    out.write_text(json.dumps(lock, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     decision = Decision(
         kind="plan_review",
         subject_kind="run_plan",
@@ -422,9 +438,12 @@ def freeze(plan_path: Path, signed_by: str, reason: str, repo: Path = REPO) -> t
             "doc": plan.interpretation.doc,
             "min_n_levels": plan.interpretation.min_n_levels,
             "floor_pp": plan.interpretation.floor_pp,
+            "preliminary_test": plan.preliminary_test.model_dump(),
         },
         meta={"plan": str(plan_path.relative_to(repo)), "frozen_at": now},
     )
+    out = lock_path(plan_path)
+    out.write_text(json.dumps(lock, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     decision_path = plan_path.with_name(plan_path.name.removesuffix(".yaml") + ".plan_review.json")
     decision_path.write_text(decision.model_dump_json(indent=1) + "\n", encoding="utf-8")
     return out, decision_path
