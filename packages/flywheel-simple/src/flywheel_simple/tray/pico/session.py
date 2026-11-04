@@ -43,8 +43,10 @@ from flywheel_simple.tray.pico.recording import (
     TRAY_FEATURES,
     AttemptLog,
     Outcome,
+    atomic_write_text,
     episode_outcome,
     flywheel_block,
+    shard_mismatches,
     tray_frame,
 )
 
@@ -130,13 +132,13 @@ def init_exporter(save_root: Path, env: Any, agent: Any, ego_view_shape: Any) ->
 def write_environment_config(
     exporter: Any, task: Any, episode_index: int, flywheel: dict[str, Any]
 ) -> None:
-    """SIMPLE's `_save_episode_env_config` with the flywheel block added."""
+    """SIMPLE's `_save_episode_env_config` with the flywheel block added, written atomically."""
     encoder = _mod("simple.utils").NumpyArrayEncoder
     meta_file = Path(exporter.root) / "meta" / "episodes.jsonl"
     lines = [json.loads(line) for line in meta_file.read_text().splitlines()]
     config = {**task.state_dict(), "flywheel": flywheel}
     lines[episode_index]["environment_config"] = json.dumps(config, cls=encoder)
-    meta_file.write_text("".join(json.dumps(entry) + "\n" for entry in lines))
+    atomic_write_text(meta_file, "".join(json.dumps(entry) + "\n" for entry in lines))
 
 
 def on_episode_reset(robot: Any, agent: Any) -> None:
@@ -218,6 +220,10 @@ def run_attempt(env: Any, agent: Any, exporter: Any, obs: Any, info: Any, realti
             time.sleep(max(0.0, CONTROL_DT - (time.monotonic() - step_start)))
 
 
+class ShardMismatch(RuntimeError):
+    """The shard's datasets and attempts log disagree (`shard_mismatches`): not resumed."""
+
+
 def run_session(
     env: Any,
     agent: Any,
@@ -237,6 +243,9 @@ def run_session(
     exporter; tests pass an in-memory one with the same methods.
     """
     task, robot = env.unwrapped.task, env.unwrapped.task.robot
+    if (save_dir / env.unwrapped.spec.id).exists() and (problems := shard_mismatches(save_dir)):
+        # A crash between saving an episode and logging it; resuming would save it twice.
+        raise ShardMismatch(f"{save_dir}: {'; '.join(problems)}")
     attempts_log = AttemptLog(save_dir / "attempts.jsonl")
     commit = simple_commit()
     started_at, t0 = datetime.now().isoformat(timespec="seconds"), time.monotonic()

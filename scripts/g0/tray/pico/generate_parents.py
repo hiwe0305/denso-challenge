@@ -6,7 +6,12 @@ env and its own LeRobot dataset under `<out>/shard-NN/`. A rerun skips the
 conditions a shard has already logged, so a killed worker resumes. At the end
 (or with --summarize) it writes `<out>/summary.json`: attempts, successes,
 successes with all seven step flags (the parents S2 can cut), failure labels,
-sim and machine time, and the parent list.
+sim and machine time, the parent list, and the shards whose saved episodes do not
+match their attempts log (`shard_mismatches`; such a shard is never resumed).
+
+Each worker runs in its own process group. The launcher exits 1 if a worker
+exited non-zero (parents-1104 lost one to -9), a condition is still not logged,
+or a shard mismatches; an interrupted launcher kills its workers' groups.
 
 Every batch writes its two ledger rows through `flywheel.data.ledger.job_ledger`
 (estimate before the workers start, measured wall seconds after; DA-35 PO review
@@ -23,7 +28,10 @@ SIMPLE venv (`--worker-python`). Run on the sim machine, detached:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
+import os
+import signal
 import subprocess
 import sys
 import time
@@ -31,6 +39,8 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from flywheel_simple.tray.pico.recording import shard_mismatches
 
 STEPS = 7
 
@@ -44,6 +54,21 @@ def attempts_of(shard: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
     return [json.loads(line) for line in path.read_text().splitlines() if line]
+
+
+def pending(args: argparse.Namespace) -> list[tuple[int, int]]:
+    """The conditions no shard has logged yet."""
+    done = {(a["level"], a["seed"]) for s in args.out.glob("shard-*") for a in attempts_of(s)}
+    return [c for c in conditions(args.levels, args.seeds) if c not in done]
+
+
+def mismatched_shards(out: Path) -> dict[str, list[str]]:
+    return {s.name: p for s in sorted(out.glob("shard-*")) if (p := shard_mismatches(s))}
+
+
+def kill_group(proc: subprocess.Popen[bytes]) -> None:
+    with contextlib.suppress(ProcessLookupError):
+        os.killpg(proc.pid, signal.SIGKILL)
 
 
 def launch(args: argparse.Namespace) -> list[subprocess.Popen[bytes]]:
@@ -63,8 +88,9 @@ def launch(args: argparse.Namespace) -> list[subprocess.Popen[bytes]]:
             "--max-attempts", str(args.max_attempts), "--style-base", str(args.style_base),
             "--session", f"{args.out.name}-{k:02d}", "--save-dir", str(shard),
         ]  # fmt: skip
-        log = (shard / "worker.log").open("ab")
-        procs.append(subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT))
+        with (shard / "worker.log").open("ab") as log:
+            procs.append(subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT,
+                                          start_new_session=True))  # fmt: skip
     return procs
 
 
@@ -108,6 +134,7 @@ def summarize(out: Path, wall_s: float | None) -> dict[str, Any]:
         "worker_s": round(sum(a["wall_s"] for a in attempts), 1),
         "batch_wall_s": None if wall_s is None else round(wall_s, 1),
         "parents": parents,
+        "shard_mismatches": mismatched_shards(out),
     }
     (out / "summary.json").write_text(json.dumps(summary, indent=1) + "\n")
     return summary
@@ -137,8 +164,10 @@ def main(argv: list[str] | None = None) -> int:
     if not args.summarize:
         from flywheel.data.ledger import job_ledger  # workspace venv only
 
-        done = {(a["level"], a["seed"]) for s in args.out.glob("shard-*") for a in attempts_of(s)}
-        todo = [c for c in conditions(args.levels, args.seeds) if c not in done]
+        if mismatched := mismatched_shards(args.out):
+            print(f"refused: shards do not reconcile, set them aside first: {mismatched}")
+            return 1
+        todo = pending(args)
         workers = max(1, min(args.workers, len(todo)))
         note = (
             f"Assumption: {len(todo)} virtual-teleop attempts x {args.est_attempt_s:g} s worker "
@@ -150,18 +179,30 @@ def main(argv: list[str] | None = None) -> int:
             t0 = time.monotonic()
             procs = launch(args)
             print(f"{len(procs)} workers started", flush=True)
-            codes = [p.wait() for p in procs]
+            try:
+                codes = [p.wait() for p in procs]
+            except BaseException:  # the workers sit in their own sessions
+                for p in procs:
+                    kill_group(p)
+                raise
             print(f"workers done, exit codes {Counter(codes)}", flush=True)
             summary = summarize(args.out, time.monotonic() - t0)
+            left = len(pending(args))
             job.notes.append(
                 f"{summary['attempts']} attempts, {summary['parents_all_steps']} parents with "
-                f"seven flags, {summary['worker_s']} worker-s, exit codes {dict(Counter(codes))}"
+                f"seven flags, {summary['worker_s']} worker-s, exit codes {dict(Counter(codes))}, "
+                f"{left} conditions not logged, {len(summary['shard_mismatches'])} shards mismatched"
             )
         print(f"ledger: run plan {job.run_plan_id}, job {job.job_id}", flush=True)
     else:
-        summary = summarize(args.out, None)
+        codes, left, summary = [], 0, summarize(args.out, None)
     print(json.dumps({k: v for k, v in summary.items() if k != "parents"}, indent=1))
-    return 0
+    failed = sum(c != 0 for c in codes)
+    if summary["shard_mismatches"]:
+        print(f"shards {sorted(summary['shard_mismatches'])} mismatch: set them aside, then rerun")
+    if failed or left:
+        print(f"{failed} workers failed, {left} conditions not logged: rerun to finish the batch")
+    return 1 if failed or left or summary["shard_mismatches"] else 0
 
 
 if __name__ == "__main__":
