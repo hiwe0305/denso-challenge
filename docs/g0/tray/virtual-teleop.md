@@ -155,7 +155,7 @@ Mỗi lượt thử rút một bộ phong cách từ seed `style_seed_for(style_
 | `style_base`, `style_seed`, `style`, `condition_attempt` | Họ seed, seed của lượt, bộ tham số (7 số), lần thử |
 | `level`, `seed`, `split` | Điều kiện; chỉ seed train |
 | `operator_version` | `da35-virtual-1+cfg.<hash>`: hash của cấu hình người ảo, cấu hình planner và dải phong cách |
-| `wrapper_version`, `simple_commit`, `embodiment_id`, `renderer`, `data_class` | `da35-pico-2`, commit SIMPLE, `g1_sonic_dwbc@1`, `mujoco`, `public` |
+| `wrapper_version`, `simple_commit`, `embodiment_id`, `renderer`, `data_class` | `da35-pico-3` (từ 4/11/2026: video ghi qua `JoinedVideoWriter` của DA-33; lô ghi bằng `da35-pico-2` dùng `VideoWriter` của decoupled_wbc, có thể crash hay treo khi máy tải nặng), commit SIMPLE, `g1_sonic_dwbc@1`, `mujoco`, `public` |
 
 `attempts.jsonl` ghi thêm `style_seed`, dòng thời gian pha và lý do abort của mọi lượt.
 

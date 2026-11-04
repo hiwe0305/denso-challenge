@@ -23,7 +23,7 @@ from flywheel_simple.tray.pico.conditions import Condition
 from flywheel_simple.tray.predicates import STEP_NAMES, StepReport
 from flywheel_simple.tray.randomize import split_of
 
-WRAPPER_VERSION = "da35-pico-2"
+WRAPPER_VERSION = "da35-pico-3"  # 3: videos through JoinedVideoWriter (tray/recorder.py)
 STORY = "DA-35"
 SOURCE_KINDS = ("teleop", "synthetic")
 EMBODIMENT_ID = "g1_sonic_dwbc@1"  # as DA-33's S1 episodes
