@@ -434,6 +434,7 @@ def freeze(plan_path: Path, signed_by: str, reason: str, repo: Path = REPO) -> t
         reason=reason,
         task_id=plan.task["id"],
         site_id=plan.site_id,
+        embodiment_id=plan.embodiment,
         criteria={
             "doc": plan.interpretation.doc,
             "min_n_levels": plan.interpretation.min_n_levels,

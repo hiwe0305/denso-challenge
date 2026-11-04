@@ -1,6 +1,6 @@
 # HE-1: prior egocentric và số demo robot trên task hai bàn (DA-26)
 
-_Bản nháp 4/11/2026, **chưa chốt**: chốt khi Hiếu ký `Decision` `plan_review` (mục 5). Eval chính là bộ dev của đội (mục 1.2). Story [DA-26](../product/stories/DA-26-thi-nghiem-he-egocentric.md) nhiệm vụ 1, 2; [design 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 7; [spec](../spec-v10-failure-to-data.md) mục 3 (HE), 7.5, 7.9. RunPlan: [`he-1.yaml`](../../configs/runplans/he/he-1.yaml); tập demo: [`demo_sets.json`](../../configs/runplans/he/demo_sets.json)._
+_**Đã chốt** 4/11/2026: Hiếu duyệt tier 2, RunPlan đóng băng `rp_95c98a476499`, `Decision` `plan_review` trong `he-1.plan_review.json` (mục 5, 6.2). Eval chính là bộ dev của đội (mục 1.2). Story [DA-26](../product/stories/DA-26-thi-nghiem-he-egocentric.md) nhiệm vụ 1, 2; [design 27/10/2026](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 7; [spec](../spec-v10-failure-to-data.md) mục 3 (HE), 7.5, 7.9. RunPlan: [`he-1.yaml`](../../configs/runplans/he/he-1.yaml); tập demo: [`demo_sets.json`](../../configs/runplans/he/demo_sets.json)._
 
 Quy tắc ở mục 2–3 **không đổi sau khi thấy kết quả** (ghi chú của story). Muốn đổi thì viết RunPlan mới kèm `Decision`, và báo kết quả theo cả quy tắc cũ lẫn mới. Sau khi đóng băng, `he1_plan.py check` báo lỗi nếu `he-1.yaml` khác bản trong `he-1.lock.json`.
 
@@ -24,7 +24,7 @@ uv run pytest scripts/he -q
 - **Recipe** chung: [`psi0-stage3.yaml`](../../configs/models/psi0-stage3.yaml) (40.000 bước, batch 16 trên một GPU, lr 1e-4 cosine, VLM đóng băng, RTC), ghi đè duy nhất `train.validation_steps: 2000` theo quyết định của Hiếu ở [S1-04 mục 4.1](../g0/psi0-finetune-cost.md). Máy: một Colab L4. Seed train 0 (seed 1 chỉ ở đủ lưới). `stats_psi0.json` của mỗi điểm tính trên chính N episode của điểm đó [Đề xuất], như DA-34. Ψ₀ ở `cda3fdf` không lọc episode, nên mỗi tập cần một dataset LeRobot con (việc của nhiệm vụ 3).
 - **Eval chính** **[Đã chốt]** (Hiếu, 4/11/2026, tier 2, mục 6.2): 10 điều kiện mức 0 từ dải dev của đội, seed 1 000 100–1 000 109, như nhau cho mọi điểm (dải dev, không dùng bộ của tác giả). `conditions_sha256` `b63acd59…`: đúng 10 dòng mức 0 đầu của bản dựng 90 điều kiện `b8dec754…`, và một lần dựng lại riêng cho cùng sha256. Cách dựng ở mục 1.2. `eval-decoupled-wbc`, đồng bộ (design mục 8.5), chế độ `mujoco_isaac`, đồng hồ giờ sim (đề xuất của S1-03 sau Q-27C), 1 lượt mỗi điều kiện, 10 episode mỗi điểm. Mức 1, 2 và bộ 30 × 3 để cho đủ lưới sau demo.
 - **Bộ phụ**: `simple-eval` của tác giả ở `e78fb93` (sha256 `8a4b0ff7…`), 10 điều kiện mỗi mức. Chỉ dùng cho mốc so và để đối chiếu số công bố 7/5/6. Không đọc số HE nào trên bộ này.
-- **Mốc so (AC 3)**: checkpoint hai bàn của tác giả `…betweentablesteleop-v0…b64.gpus4.2604081126/ckpt_40000` (sha256 `c69c2ae8…`), fine-tune từ cặp của V-EGO trên cả 99 episode, 16 × 4 GPU. Eval trên bộ dev như mọi điểm. Số của S1-03 trên bộ của tác giả (Isaac mức 0: 6/10, công bố 7/10) báo bên cạnh, không thay thế.
+- **Mốc so (AC 3)**: checkpoint hai bàn của tác giả `…betweentablesteleop-v0…b64.gpus4.2604081126/ckpt_40000` (sha256 `c69c2ae8…`), fine-tune từ cặp của V-EGO trên cả 99 episode, 16 × 4 GPU. Ở tier 2 không eval trên bộ dev, vì không có CU (mục 6.2); số của S1-03 trên bộ của tác giả (Isaac mức 0: 6/10, công bố 7/10) báo bên cạnh để soát. Eval mốc so trên bộ dev chờ đủ lưới.
 
 ### 1.1 Kiểm checkpoint (nhiệm vụ 2)
 
@@ -176,7 +176,17 @@ Câu hỏi gửi Hiếu: "Approve CU for tier 2, with DA-26 on reduced Isaac eva
 | AC 6 | Không đủ: thiếu N = 80. Đây là giảm phạm vi có `Decision` (AC 8) |
 | Chạy | Chỉ chạy từ `master` sau khi Hiếu merge PR này; không chạy từ nhánh chưa merge |
 
-**Trần CU từng job** (ước lượng, chưa chạy; dòng `estimated` trong [`ledger/DA-26.csv`](../g0/ledger/DA-26.csv)). Mỗi phiên Colab chạy kèm [`scripts/he/cu_watch.py`](../../scripts/he/cu_watch.py) trên laptop. Script tính chi tiêu bằng giờ tường từ lúc mở phiên nhân 1,94 CU/giờ, vì số dư dùng chung với phiên của story khác. Nó dừng phiên (`colab stop`) trước khi chạm trần và ghi số dư `colab usage` mỗi phút cho dòng thực đo.
+**Trần CU từng job** (ước lượng, chưa chạy; dòng `estimated` trong [`ledger/DA-26.csv`](../g0/ledger/DA-26.csv)). Mỗi phiên Colab chạy kèm [`scripts/he/cu_watch.py`](../../scripts/he/cu_watch.py) trên laptop (lệnh chạy trong docstring của script). Script làm theo nguyên tắc hỏng thì dừng:
+
+- **Chi tiêu**: lấy số lớn hơn của hai đồng hồ.
+  - Số dư `colab usage` tụt bao nhiêu thì tính hết cho phiên khi phiên chạy một mình. Khi phiên của story khác cùng chạy, chỉ tính phần theo tỉ lệ tốc độ của phiên.
+  - Giờ tường `time.time()` nhân 1,94 CU/giờ. Giờ tường vẫn đếm khi laptop ngủ.
+- **Loại GPU**: GPU không phải L4 thì dừng ngay (A100 khoảng 6,7 CU/giờ).
+- **Điểm dừng**: dừng khi chi tiêu cộng biên (poll + 2 × 120 s + 270 s, khoảng 0,31 CU) chạm trần. Mỗi job vì vậy dừng ở khoảng trần − 0,3 CU.
+- **Xác nhận dừng**: `colab stop` được thử lại với thời gian chờ tăng dần, rồi xác nhận bằng `colab sessions`. Dừng không được thì thoát mã 5 và ghi `STOP_FAILED`.
+- **Kết thúc**: cần 3 lần poll liên tiếp không thấy phiên mới coi là phiên đã kết thúc.
+- **Bắt đầu**: job chỉ bắt đầu khi watcher đã thấy phiên trên L4 và ghi file `--ready-file`.
+- **Laptop phải thức suốt lúc chạy** (chạy watcher dưới `systemd-inhibit`); laptop ngủ thì không có gì dừng phiên.
 
 | Job | Ước lượng | Trần |
 |---|---|---|
@@ -195,3 +205,4 @@ Câu hỏi gửi Hiếu: "Approve CU for tier 2, with DA-26 on reduced Isaac eva
 | 4/11/2026 | Eval chính chuyển sang bộ dev 30 × 3 (Hiếu chốt); thêm mục 1.2 cách dựng và kiểm; chế độ và đồng hồ chờ S1-03; chi phí theo 90 episode mỗi điểm, số dư 101,8 CU | Hiếu (soạn với Claude) |
 | 4/11/2026 | Q3: ghi kết quả Q-27C của S1-03; RunPlan đề xuất `mujoco_isaac`, giờ sim, chờ ký (`eval.awaiting`); phương án A ghi là yếu; thêm mục 6.1 phương án F (Isaac, mức 0, N = 20, 10 hoặc 30 điều kiện) với CU, giờ và độ nhạy Fisher | Hiếu (soạn với Claude) |
 | 4/11/2026 | Tier 2 (Hiếu: "Approve tier 2"): mục 6.2 quyết định và trần CU từng job; eval chính còn 10 điều kiện mức 0 (`b63acd59…`), `mujoco_isaac`, giờ sim; sơ bộ chỉ N = 20; quy tắc đọc sơ bộ theo Fisher và độ nhạy 10 mỗi nhánh; Q3, Q4 đã chốt; đóng băng | Hiếu (soạn với Claude) |
+| 4/11/2026 | Review của #99: đầu file ghi đã chốt; mốc so không chạy trên bộ dev ở tier 2 (mục 1); mục 6.2 tả watcher mới (hai đồng hồ, kiểm L4, dừng có xác nhận, laptop phải thức); `Decision` ghi lại với `embodiment_id` `g1_sonic_dwbc@1` (`dec_01M6KG4JFTRWGQ91CD3H1TC1XX`, cùng `rp_95c98a476499`) | Hiếu (soạn với Claude) |

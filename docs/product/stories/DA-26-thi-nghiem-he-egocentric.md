@@ -75,6 +75,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 4/11/2026 | Eval chính chuyển sang bộ dev 30 × 3 do đội dựng (Hiếu chốt) | Hiếu (soạn với Claude) |
 | 4/11/2026 | Q3: kết quả Q-27C của S1-03; RunPlan đề xuất `mujoco_isaac`, giờ sim, chờ ký; thêm phương án F (Isaac, mức 0, N = 20) | Hiếu (soạn với Claude) |
 | 4/11/2026 | Tier 2 (Hiếu: "Approve tier 2"): sơ bộ chỉ N = 20, eval Isaac giờ sim trên 10 điều kiện dev mức 0, trần 52 CU; RunPlan đóng băng `rp_95c98a476499`; nhiệm vụ 1 xong | Hiếu (soạn với Claude) |
+| 4/11/2026 | Review #99: watcher CU viết lại theo nguyên tắc hỏng thì dừng; `Decision` ghi lại với `embodiment_id` đúng, cùng `rp_95c98a476499` | Hiếu (soạn với Claude) |
 
 ## Ghi chép khi làm
 
@@ -92,5 +93,5 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
     - Mốc so (nhiệm vụ 4) không chạy trên bộ dev ở tier 2.
     - Kết quả gắn nhãn "sơ bộ". Với 10 điều kiện mỗi nhánh, chỉ chênh lệch từ khoảng 50 điểm % trở lên mới có thể có ý nghĩa (Fisher hai phía α 0,05; MDE 80% khoảng 65–68 điểm %).
     - Chi tiết ở `docs/he/he-1.md` mục 6.2.
-  - 4/11/2026, nhiệm vụ 1 xong: `he1_plan.py freeze` ghi `he-1.lock.json` (`rp_95c98a476499`) và `he-1.plan_review.json` (`Decision` `dec_01M6KFBKA53VKDNVS74WN0MSPP`, ký Hiếu theo câu duyệt trên). Q1 (loại episode 0–9) giữ như đề xuất. Job chỉ chạy từ `master` sau khi PR được merge.
+  - 4/11/2026, nhiệm vụ 1 xong: `he1_plan.py freeze` ghi `he-1.lock.json` (`rp_95c98a476499`) và `he-1.plan_review.json` (`Decision` `dec_01M6KG4JFTRWGQ91CD3H1TC1XX`, ký Hiếu theo câu duyệt trên). Q1 (loại episode 0–9) giữ như đề xuất. Job chỉ chạy từ `master` sau khi PR được merge.
 - File đã tạo hoặc sửa: `configs/runplans/he/`, `scripts/he/he1_plan.py`, `scripts/he/dev_eval_set.py`, `scripts/he/test_he1_plan.py`, `scripts/he/cu_watch.py`, `scripts/he/test_cu_watch.py`, `docs/he/he-1.md`, `docs/g0/ledger/DA-26.csv`
