@@ -1,6 +1,6 @@
 # Web Humanoid Data Flywheel · thiết kế
 
-Bản v0.3. Tài liệu này là nguồn duy nhất cho tầng web: API, Postgres, bộ nạp `fwsync` và FE. Lõi `flywheel` vẫn là nơi duy nhất chạy pipeline, train, eval và engine Failure → Data.
+Bản v0.4. Tài liệu này là nguồn duy nhất cho tầng web: API, Postgres, bộ nạp `fwsync` và FE. Lõi `flywheel` vẫn là nơi duy nhất chạy pipeline, train, eval và engine Failure → Data.
 
 ## Change log
 
@@ -11,6 +11,7 @@ Bản v0.3. Tài liệu này là nguồn duy nhất cho tầng web: API, Postgre
 | 3/11/2026 | 0.3 | Bỏ `episodes.episode_index` và `UNIQUE (dataset_id, episode_index)`: hợp đồng không có trường nào như thế, nên bộ nạp sẽ phải tự phát số. `episode_ref` đã là khoá tự nhiên và đã UNIQUE. Thêm W12 (`Episode` không mang `dataset_id`) | Châu |
 | 3/11/2026 | 0.3 | Dựng `web/schema/` theo tài liệu này: 9 file SQL, 41 bảng, 3 role, trigger C5–C9/C14/C19, 18 view, GRANT theo cột. `train_diagnosis_skips` là chỗ §4.4b để ngỏ tới M1, nay chốt | Châu |
 | 5/11/2026 | 0.3 | W11 đóng: hợp đồng đã có `EpisodeMetadata.benchmark_copy_id` (#62), bộ nạp map nó vào `episodes.benchmark_copy_id` thay vì để NULL, và bộ mock gắn nó cho 10 episode của bản sao chấm | Châu |
+| 5/11/2026 | 0.4 | Mốc M0 xong phần FE: thêm §7.4 hình dạng response cho 5 màn hình lõi (nguồn là `fe/src/api/types.ts`); §7.1 thêm `GET /recommendations` và `GET /evaluations/{id}`; quy ước trang, header vai tạm `X-Fw-Role`, id trong mock là mã `*_ref`. Dựng `fe/`: Vite, MSW đọc thẳng `mock/demo-17-11/`, type hợp đồng sinh bằng `json-schema-to-typescript`, màn hình M7 | Châu |
 
 Ba chỗ sửa ở bản 0.3:
 
@@ -984,7 +985,7 @@ Năm màn hình **lõi** (M2, M6, M7, M8, M9) là kế hoạch chính. Năm màn
 ### 6.4 Quy ước FE
 
 - **Mock ở tầng mạng.** MSW chặn đúng các endpoint ở mục 7, trả dữ liệu dựng từ `mock/demo-17-11/`. Component luôn gọi API thật; tắt MSW là chuyển sang BE.
-- **Type sinh từ contract** bằng `json-schema-to-typescript`, chạy lại mỗi khi `flywheel-contracts` đổi.
+- **Type sinh từ contract** bằng `json-schema-to-typescript`, chạy lại mỗi khi `flywheel-contracts` đổi: `npm run gen:types`; CI chạy `npm run check:types` và đỏ khi file sinh ra cũ hơn hợp đồng. Type của response API xem §7.4.
 - **Sau khi bấm nút ghi**, không cập nhật lạc quan. Hiện `ActionStatus` và chờ SSE `fw_changed`.
 - **`Idempotency-Key`** sinh một lần cho mỗi lần bấm, giữ nguyên khi retry.
 - **Biểu đồ train** luôn gọi kèm `?every=` để lấy mẫu thưa.
@@ -1003,8 +1004,8 @@ Năm màn hình **lõi** (M2, M6, M7, M8, M9) là kế hoạch chính. Năm màn
 | Lỗi cấy | `GET /defects/scoreboard`, `/defects/scores` |
 | Release | `GET /releases`, `/releases/{id}/items` |
 | Huấn luyện | `GET /experiments`, `/experiment-drafts`, `/experiments/{id}/metrics?split=&every=`, `/experiments/{id}/diagnoses`, `/experiments/{id}/probes`, `/experiments/{id}/checkpoints` |
-| Đánh giá | `GET /evaluations`, `/evaluations/{id}/episodes`, `/evaluations/{id}/funnel`, `/evaluations/{id}/failures`, `/evaluations/{id}/system-checks` |
-| Flywheel | `GET /recommendations/{id}`, `/recommendations/{id}/steps`, `/recommendations/{id}/clusters`, `/clusters/{id}/card`, `/repair-tickets`, `/fix-rates` |
+| Đánh giá | `GET /evaluations`, `/evaluations/{id}`, `/evaluations/{id}/episodes`, `/evaluations/{id}/funnel`, `/evaluations/{id}/failures`, `/evaluations/{id}/system-checks` |
+| Flywheel | `GET /recommendations`, `/recommendations/{id}`, `/recommendations/{id}/steps`, `/recommendations/{id}/clusters`, `/clusters/{id}/card`, `/repair-tickets`, `/fix-rates` |
 | Chi phí | `GET /cost/ledger`, `/cost/by-branch`, `/cost/by-intervention`, `/cost/sensitivity?price_book=` |
 | Kết quả | `GET /results/branches?task_id=`, `/results/he-curve`, `/results/e1-curve` |
 | Hệ thống | `GET /actions/{id}`, `/actions?sync_status=`, `/notifications/stream` (SSE), `/sync/runs`, `/decisions` |
@@ -1057,6 +1058,30 @@ Idempotency-Key: 9f2c4a10-...
 → 202 {"action_id": "e4...", "sync_status": "PENDING"}
 ```
 
+### 7.4 Hình dạng response (bản 0.4)
+
+Nguồn duy nhất là [`fe/src/api/types.ts`](fe/src/api/types.ts). Mỗi kiểu ứng với đúng một view hoặc bảng ở `schema/70-views.sql`, cột nào ra trường nấy, để tầng FastAPI (mốc M2) trả dòng view mà không đổi tên. Bộ handler MSW ở `fe/src/mocks/` dựng đúng các hình dạng này từ `mock/demo-17-11/`, và `fe/src/mocks/handlers.test.ts` là nghiệm thu của M0.
+
+| Màn hình | Endpoint | Kiểu trả về | Ghi chú |
+|---|---|---|---|
+| M7 | `GET /recommendations` | `RecommendationSummary[]` | Mới ở 0.4: M7 cần biết lượt nào đang mở trước khi có id |
+| M7 | `GET /recommendations/{id}` | `Recommendation` | Mang luôn **ba trần ngân sách** (`used`, `proposed`, `remaining`) và **can thiệp xếp theo g/c**, vì cột phải cần cả hai trong một lần đọc |
+| M7 | `/steps`, `/clusters`, `/clusters/{id}/card` | `AlgoStep[]`, `ClusterBoardRow[]`, `ClusterCard` | Card gộp mã không chấm được từ **ba nguồn** (bước thuật toán, phép kiểm chẩn đoán, kiểm hệ thống từng episode) vào một `skipped` |
+| M7 | `/repair-tickets?recommendation_id=`, `/fix-rates` | `RepairTicket[]`, `FixRate[]` | Loại can thiệp không có dòng `FixRate` chỉ có prior Beta(1, 1) |
+| M6 | `GET /evaluations`, `GET /evaluations/{id}` | `Page<EvaluationSummary>`, `EvaluationSummary` | `GET /evaluations/{id}` mới ở 0.4. Mang `step_names` để phễu có đúng số bước của task |
+| M6 | `/episodes`, `/funnel`, `/system-checks` | `Page<EvalEpisodeRow>`, `FunnelRow[]`, `SystemCheckRow[]` | |
+| M6 | `/failures` | `FailureBoard` | Năm họ, mỗi họ có `status`: `not_run` khi không ai sinh họ đó cho lượt eval này, khác với `ok` mà không có dòng nào |
+| M2 | `GET /datasets`, `/{id}`, `/{id}/stages`, `/{id}/episodes`, `/{id}/report`, `/intakes` | `Page<DatasetRow>`, `DatasetRow`, `PipelineView`, `Page<EpisodeRow>`, `DatasetReport`, `Page<…>` | `PipelineView` có cả stepper hiện hành lẫn mọi attempt |
+| M9 | `/results/branches?task_id=`, `/results/he-curve`, `/results/e1-curve` | `BranchComparisonRow[]`, `HeCurvePoint[]`, `E1CurvePoint[]` | Thiếu `task_id` → 400 |
+| M8 | `/cost/ledger`, `/cost/by-branch`, `/cost/by-intervention`, `/cost/sensitivity` | `Page<LedgerRow>`, `CostByBranch`, `InterventionRow[]`, `SensitivityRow[]` | `CostByBranch` mang luôn `r_demo`. Độ nhạy định giá lại từng bút toán theo tỉ lệ giá của bảng mới so với bảng đã ghi |
+
+Bốn quy ước thêm ở bản 0.4:
+
+- Trang danh sách là `{items, next_cursor, total}`.
+- Trước khi có phiên đăng nhập, vai lấy từ header `X-Fw-Role` (mặc định `ML_ENGINEER`). Chỉ MSW và môi trường dev dùng header này; API thật lấy vai từ phiên.
+- Trong bộ mock, id là chính mã `*_ref` của file (`clu_1`, `ev_B_dev`); trong DB là UUID. FE không được suy gì từ hình dạng của id.
+- Type của artifact **hợp đồng** sinh bằng `json-schema-to-typescript` vào `fe/src/contracts/schemas/` (§6.4). Type của **response** viết tay ở `types.ts`, vì API trả dòng view chứ không trả artifact; tên trường vẫn lấy từ hợp đồng (§1 điểm 5).
+
 ## 8. Business rules
 
 | Mã | Luật | Cưỡng chế |
@@ -1097,6 +1122,8 @@ Hôm nay 3/11/2026, demo 17/11/2026, còn 14 ngày. Châu làm cả FE, BE và b
 | M5 · Màn hình còn lại | 14/11 | M8 đầy đủ; M1, M3, M4, M5, M10 ít nhất bản tối thiểu | Danh sách mục 1.1 không còn dòng nào thiếu màn hình |
 | M6 · Ghép dữ liệu thật | 15/11 | `fwsync` trỏ sang output thật của lõi; phần chưa có giữ mock, FE dán nhãn theo `origin` | Ít nhất pipeline và một lượt eval là dữ liệu thật |
 | M7 · Tổng duyệt | 16/11 | Chạy trọn kịch bản hai lần liên tiếp; công tắc chuyển sang mock dự phòng | Hai lần không lỗi |
+
+**Trạng thái 5/11/2026.** M0 đạt: test so enum xanh, và MSW trả bộ mock của cả 5 màn hình lõi (`fe/src/mocks/handlers.test.ts`, 18 ca), trễ 1 ngày so với hạn. M1 mới đạt phần không cần database: 41 bảng, 3 role, trigger, `fwsync import` nạp hai lần cho cùng kết quả trên sink JSONL. Còn thiếu migration Alembic, ca đúng/ca sai của từng luật trên Postgres thật, và kiểm `fw_api` không ghi được bảng P; cả ba chờ Postgres 16 và W8. Màn hình M7 đã chạy trên MSW, đi trước phần FE của M3.
 
 ### 9.3 Môi trường cần có
 
