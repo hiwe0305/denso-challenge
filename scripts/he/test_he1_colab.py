@@ -132,10 +132,14 @@ def test_without_an_export_the_indices_must_be_the_seeds(tmp_path: Path) -> None
 SEEDS = [1000, 1003, 1004, 1009, 1010]  # episode i of the release has seed SEEDS[i]
 
 
-def tray_release(root: Path) -> str:
-    """fake_dataset plus the export and manifest of a tray release; its release hash."""
+def tray_release(root: Path, pairs: list[tuple[int, int]] | None = None) -> str:
+    """fake_dataset plus the export and manifest of a tray release; its release hash.
+
+    `pairs` are the export's (episode_index, seed) rows, by default SEEDS in order.
+    """
     fake_dataset(root, [3, 4, 5, 6, 7])
-    rows = [{"episode_index": i, "seed": seed} for i, seed in enumerate(SEEDS)]
+    pairs = pairs if pairs is not None else list(enumerate(SEEDS))
+    rows = [{"episode_index": i, "seed": seed} for i, seed in pairs]
     (root / EXPORT_META).write_text(json.dumps({"episodes": rows}))
     files = [
         {
@@ -166,6 +170,21 @@ def test_a_tray_cut_takes_each_seeds_index_from_the_release_export(tmp_path: Pat
     assert [e["source_episode_index"] for e in marker["episodes"]] == [1, 3]
     assert [float(e.action[0, 0]) for e in iter_episodes(tmp_path / "C")] == [1.0, 3.0]
     assert not (tmp_path / "C" / EXPORT_META).exists()  # the release's numbering stays out
+
+
+def test_a_tray_cut_refuses_an_export_listing_a_seed_twice(tmp_path: Path) -> None:
+    rows = [(0, 1000), (1, 1003), (2, 1003)]  # seed 1003 at 1 and 2: which one?
+    release_hash = tray_release(tmp_path / "src", rows)
+    with pytest.raises(ValueError, match="lists a seed twice"):
+        build_subset(tmp_path / "src", tmp_path / "C", tray_sets(release_hash, [1003], [1]), "C")
+
+
+def test_a_tray_cut_refuses_an_export_giving_two_seeds_one_index(tmp_path: Path) -> None:
+    rows = [(0, 1000), (1, 1003), (1, 1009)]  # would put episode 1 in the cut twice
+    release_hash = tray_release(tmp_path / "src", rows)
+    sets = tray_sets(release_hash, [1003, 1009], [1, 1])
+    with pytest.raises(ValueError, match="two seeds one episode index"):
+        build_subset(tmp_path / "src", tmp_path / "C", sets, "C")
 
 
 def test_a_tray_cut_refuses_another_release_or_a_seed_it_lacks(tmp_path: Path) -> None:

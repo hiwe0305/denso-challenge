@@ -78,6 +78,7 @@ import fcntl
 import hashlib
 import json
 import os
+import re
 import shlex
 import signal
 import subprocess
@@ -95,6 +96,8 @@ COLAB = Path(
     os.environ.get("COLAB_CLI", "~/project/wm-wam-review/.venv-colab-cli/bin/colab")
 ).expanduser()
 REMOTE_WORK = "/content/da26"  # default of --remote-work
+# rsync >= 3.2.4 passes a remote path as is, so it is never shell-quoted: only plain paths
+PLAIN_PATH = re.compile(r"/[A-Za-z0-9._/-]+")
 SLOW_MB_S = 6.0  # 2.9 MB/s fills the ~36 min left at cap 18; 6 keeps the early-stop room
 # Recipe R1 (configs/models/psi0-stage3.yaml, checked by test_he1_fetch.py).
 TOTAL_STEPS, SAVE_EVERY = 40000, 10000
@@ -140,6 +143,8 @@ class Remote:
     """The VM of one session: a shell command and an rsync source, both over SSH."""
 
     def __init__(self, session: str, colab: Path = COLAB, work: str = REMOTE_WORK) -> None:
+        if not PLAIN_PATH.fullmatch(work):
+            raise ValueError(f"remote work {work!r} is not a plain absolute path")
         self.session, self.work = session, work
         proxy = f"ProxyCommand={colab} ssh --proxy-mode -s {session}"
         options = ["-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"]
@@ -292,16 +297,15 @@ def fetch_once(
 def probe(remote: Remote, dest: Path, megabytes: int = 1000, runner: Run = run) -> float:
     """MB/s of one rsync of `megabytes` of random data from the VM to `dest`."""
     remote_file, local = f"{remote.work}/probe.bin", dest / ".probe.bin"
-    made = runner(
-        remote.shell(f"mkdir -p {remote.work} && head -c {megabytes}M /dev/urandom > {remote_file}")
-    )
+    work, quoted = shlex.quote(remote.work), shlex.quote(remote_file)
+    made = runner(remote.shell(f"mkdir -p {work} && head -c {megabytes}M /dev/urandom > {quoted}"))
     if made.returncode != 0:
         raise RuntimeError(f"probe file not made: {made.stderr[-300:]}")
     argv = ["rsync", "-a", *(["-e", remote.rsh] if remote.rsh else [])]
     start = time.monotonic()
     pulled = runner([*argv, f"{remote.host}{remote_file}", str(local)])
     seconds = time.monotonic() - start
-    runner(remote.shell(f"rm -f {remote_file}"))
+    runner(remote.shell(f"rm -f {quoted}"))
     size = local.stat().st_size if local.is_file() else 0
     local.unlink(missing_ok=True)
     if pulled.returncode != 0 or size != megabytes * 1024 * 1024:
@@ -497,6 +501,12 @@ def no_session(argv: Sequence[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.CompletedProcess(list(argv), 0, out, "")
 
 
+def remote_work(text: str) -> str:
+    if not PLAIN_PATH.fullmatch(text):
+        raise argparse.ArgumentTypeError(f"{text!r} is not a plain absolute path")
+    return text
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     parser.add_argument("mode", choices=["once", "follow", "probe"])
@@ -510,7 +520,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--remote-work",
         default=REMOTE_WORK,
-        help="the job's folder on the VM (default: %(default)s)",
+        type=remote_work,
+        help="the job's folder on the VM, a plain absolute path (default: %(default)s)",
     )
     args = parser.parse_args(argv)
     remote = (
