@@ -348,7 +348,27 @@ def stage(work: Path) -> dict[str, Any]:
             }
         )
     cache_path.write_text(json.dumps(cache))
-    return {"jobs": staged}
+    return {"train": run_state(work / "train.log", staged), "jobs": staged}
+
+
+def train_exit(log: Path) -> int | None:
+    """N of the last `train exit N` the runbook's launch line wrote, or None."""
+    lines = log.read_text().splitlines() if log.is_file() else []
+    codes = [line.removeprefix("train exit ").strip() for line in lines]
+    codes = [c for c, line in zip(codes, lines, strict=True) if line.startswith("train exit ")]
+    return int(codes[-1]) if codes and codes[-1].isdigit() else (1 if codes else None)
+
+
+def run_state(log: Path, staged: list[dict[str, Any]]) -> str:
+    """The launch as a whole: `failed` when `train` exited nonzero, or exited with no job.
+
+    A train that dies before Psi0Trainer makes `runs/<job>` (no .env, a failed import,
+    a refused hash or marker) leaves no job to carry a state; this one still says so.
+    """
+    code = train_exit(log)
+    if code is None:
+        return "running"
+    return "failed" if code != 0 or not staged else "ended"
 
 
 def train_state(trained: dict[str, Any], job: str, log: Path) -> str:
@@ -362,9 +382,7 @@ def train_state(trained: dict[str, Any], job: str, log: Path) -> str:
     if trained.get("job_id") == job:
         ok = trained.get("infra_status") == "ok"
         return "done" if ok and trained.get("checkpoint_step") == TOTAL_STEPS else "failed"
-    if log.is_file() and any(
-        line.startswith("train exit ") for line in log.read_text().splitlines()
-    ):
+    if train_exit(log) is not None:
         return "failed"
     return "running"
 

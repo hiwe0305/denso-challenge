@@ -49,14 +49,20 @@ whose watcher stopped beating). A stop at step 2200 costs about 1.3 CU; letting 
 cap stop it costs about 17 CU for a ckpt_30000 the plan has no use for.
 
 A train that ended without ckpt_40000 (`stage` says `failed`) is pulled as far as it
-got, then its session is stopped (exit 5). Every stop is confirmed: `colab stop` up to
-three times until `colab sessions` no longer lists the session, then SIGTERM to its
-watcher (which stops the session itself, exit 6 in its `.out`); a stop not confirmed
+got, then its session is stopped (exit 5); so is a train that died before it made
+`runs/<job>` (`stage`'s top-level `train`). Every stop is confirmed: `colab stop` up
+to three times until two trusted listings in a row lack the session, then SIGTERM to
+its watcher, only if the registry entry is starting or running and the pid's command
+line is cu_watch.py (the watcher stops the session itself); a stop not confirmed
 exits 6 with an ALERT on stderr: the session may still bill.
 
 Never ssh to a session that is not running: `colab ssh -s NAME` creates a session
 when NAME is missing. Each pull first checks that the session's watcher is alive (no
-`exit` line in `<registry>/<session>.out`) and that `colab sessions` lists the name.
+`exit` line in `<registry>/<session>.out`) and that a trusted listing has it, by name
+or by the endpoint of its registry entry. Trusted as cu_watch.py counts it: on an
+auth failure `colab sessions` prints "No active sessions" and exits 0, so an
+untrusted listing is neither running nor gone. `follow` skips that pass (ALERT from
+the third in a row); `once` retries three times, then exits 2.
 Exit codes: 0 every job's final checkpoint verified here; 1 not (yet); 2 refused;
 3 stopped early; 4 probe under SLOW_MB_S; 5 train failed, session stopped; 6 a stop
 not confirmed.
@@ -79,6 +85,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "colab"))
+from cu_watch import LIVE_STATES, parse_sessions, parse_usage  # noqa: E402
+
 COLAB = Path(
     os.environ.get("COLAB_CLI", "~/project/wm-wam-review/.venv-colab-cli/bin/colab")
 ).expanduser()
@@ -98,6 +107,7 @@ DECIDE_FROM = 2200  # first pass whose rate window spans the validation at step 
 METER_STALE_S = 300.0  # the watcher polls every 60 s
 TIMEOUT_S = 300.0  # any command but a pull
 PULL_TIMEOUT_S = 3600.0  # 6.25 GB at 2 MB/s; a cut pull resumes from --partial-dir
+UNTRUSTED_RETRY_S = 20.0  # `once` retries an untrusted listing three times
 
 Run = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
 
@@ -193,19 +203,31 @@ def in_checkpoint(f: dict[str, Any]) -> bool:
     return "/checkpoints/" in f["path"]
 
 
-def fetch_once(remote: Remote, dest_root: Path, runner: Run = run) -> list[dict[str, Any]]:
+class TrainFailed(Exception):
+    """`train` exited before it made a job dir: no job carries the failure."""
+
+
+def fetch_once(
+    remote: Remote,
+    dest_root: Path,
+    runner: Run = run,
+    clock: Callable[[], float] = time.monotonic,
+) -> list[dict[str, Any]]:
     """Pull what `stage` lists and is not here yet; return one status per job."""
     staged = runner(remote.stage())
     if staged.returncode != 0:
         raise RuntimeError(f"stage failed ({staged.returncode}): {staged.stderr[-500:]}")
+    listing = json.loads(staged.stdout)
+    if listing.get("train") == "failed" and not listing["jobs"]:
+        raise TrainFailed("train exited before it made runs/<job>; see train.log on the VM")
     statuses = []
-    for job in json.loads(staged.stdout)["jobs"]:
+    for job in listing["jobs"]:
         dest = dest_root / job["job"]
         dest.mkdir(parents=True, exist_ok=True)
         files, running = job["files"], job["train"] == "running"
         have = verified(dest, files, fresh=not running)
         wanted = [f for f in files if have.get(f["path"]) != f["sha256"]]
-        start, size = time.monotonic(), sum(f["size"] for f in wanted)
+        start, size = clock(), sum(f["size"] for f in wanted)
         ckpt_size = sum(f["size"] for f in wanted if in_checkpoint(f))
         if wanted:
             for f in wanted:  # a wrong copy keeps size and mtime: rsync would skip it
@@ -223,7 +245,7 @@ def fetch_once(remote: Remote, dest_root: Path, runner: Run = run) -> list[dict[
                     code=pulled.returncode,
                     stderr=pulled.stderr[-500:],
                 )
-        seconds = time.monotonic() - start
+        seconds = clock() - start
         have = verified(dest, files, fresh=not running)
         bad, grown = [], []
         for f in files:
@@ -347,20 +369,64 @@ def judge(
     }
 
 
-def listed(session: str, colab: Path, runner: Run = run) -> bool | None:
-    """Whether `colab sessions` lists the session; None when the call fails."""
-    out = runner([str(colab), "sessions"])
-    if out.returncode != 0:
+def watcher_entry(registry: Path, session: str) -> dict[str, Any]:
+    """The watcher's registry entry `<registry>/<session>.json`, or {}."""
+    try:
+        entry = json.loads((registry / f"{session}.json").read_text())
+    except (OSError, ValueError):
+        return {}
+    return entry if isinstance(entry, dict) else {}
+
+
+def listed(
+    session: str, colab: Path, runner: Run = run, endpoint: str | None = None
+) -> bool | None:
+    """Whether a trusted `colab sessions` lists the session; None when it is not trusted.
+
+    Trusted as cu_watch.py counts it: `colab usage` and `colab sessions` both exit 0,
+    every line parses, and the listing has at least as many sessions as usage has
+    assignments (on an auth failure the CLI prints "No active sessions", exit 0). The
+    session is its name, or its endpoint when the CLI lost the name (`[?]`).
+    """
+    usage_out = runner([str(colab), "usage"])
+    usage = parse_usage(usage_out.stdout) if usage_out.returncode == 0 else None
+    if usage is None:
         return None
-    return any(line.startswith(f"[{session}]") for line in out.stdout.splitlines())
+    out = runner([str(colab), "sessions"])
+    sessions = parse_sessions(out.stdout) if out.returncode == 0 else None
+    if sessions is None or len(sessions) < usage.assignments:
+        return None
+    return any(s.name == session or (endpoint and s.endpoint == endpoint) for s in sessions)
+
+
+def session_state(session: str, registry: Path, colab: Path, runner: Run = run) -> str:
+    """`running` (ssh is safe), `gone` (watcher exited or a trusted listing lacks it)
+    or `unknown` (the listing could not be trusted this time)."""
+    out = registry / f"{session}.out"
+    if not out.is_file() or any(line.startswith("exit ") for line in out.read_text().splitlines()):
+        return "gone"
+    endpoint = watcher_entry(registry, session).get("endpoint")
+    found = listed(session, colab, runner, endpoint)
+    return "unknown" if found is None else ("running" if found else "gone")
 
 
 def session_running(session: str, registry: Path, colab: Path, runner: Run = run) -> bool:
-    """Its watcher is alive and `colab sessions` lists it: only then is ssh safe."""
-    out = registry / f"{session}.out"
-    if not out.is_file() or any(line.startswith("exit ") for line in out.read_text().splitlines()):
-        return False
-    return listed(session, colab, runner) is True
+    """Its watcher is alive and a trusted `colab sessions` lists it: only then is ssh safe."""
+    return session_state(session, registry, colab, runner) == "running"
+
+
+def watcher_pid(registry: Path, session: str) -> int | None:
+    """The pid of the session's live watcher, or None: the entry must be starting or
+    running, and the process must be cu_watch.py (a pid may have been reused)."""
+    entry = watcher_entry(registry, session)
+    pid = entry.get("pid")
+    if not isinstance(pid, int) or entry.get("state") not in LIVE_STATES:
+        return None
+    try:
+        cmdline = Path(f"/proc/{pid}/cmdline").read_bytes()
+    except OSError:
+        return None
+    return pid if b"cu_watch.py" in cmdline else None
 
 
 def stop_session(
@@ -378,31 +444,53 @@ def stop_session(
     `colab stop` up to `tries` times; then SIGTERM to the session's watcher (pid in
     its registry entry), which stops the session with confirmation and exits 6.
     """
+    endpoint = watcher_entry(registry, session).get("endpoint")
+
+    def gone() -> bool:
+        """Two trusted listings in a row without it, as cu_watch.py counts a stop."""
+        if listed(session, colab, runner, endpoint) is not False:
+            return False
+        sleep(wait)
+        return listed(session, colab, runner, endpoint) is False
+
     for attempt in range(1, tries + 1):
         code = runner([str(colab), "stop", "-s", session]).returncode
         sleep(wait)
-        gone = listed(session, colab, runner) is False
-        log(event="stop", session=session, attempt=attempt, code=code, gone=gone)
-        if gone:
+        confirmed = gone()
+        log(event="stop", session=session, attempt=attempt, code=code, gone=confirmed)
+        if confirmed:
             return True
-    try:
-        pid = int(json.loads((registry / f"{session}.json").read_text())["pid"])
-        os.kill(pid, signal.SIGTERM)
-        log(event="stop_sigterm", session=session, pid=pid)
-    except (OSError, ValueError, KeyError) as error:
-        alert(f"{session}: colab stop not confirmed and no watcher to signal ({error})")
+    pid = watcher_pid(registry, session)
+    if pid is None:
+        alert(f"{session}: colab stop not confirmed and no live cu_watch.py watcher to signal")
         return False
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except OSError as error:
+        alert(f"{session}: colab stop not confirmed; SIGTERM to {pid} failed ({error})")
+        return False
+    log(event="stop_sigterm", session=session, pid=pid)
     for _ in range(max(1, int(term_wait // wait))):
         sleep(wait)
-        if listed(session, colab, runner) is False:
+        if gone():
             return True
     alert(f"{session}: stop not confirmed after SIGTERM to pid {pid}; it may still bill")
     return False
 
 
+def pause(every: float, last_step: int, statuses: list[dict[str, Any]]) -> float:
+    """Seconds to the next pass: FINAL_EVERY_S from NEAR_END or once training ended."""
+    ending = last_step >= NEAR_END or any(s["train"] != "running" for s in statuses)
+    return min(every, FINAL_EVERY_S) if ending else every
+
+
 def no_session(argv: Sequence[str]) -> subprocess.CompletedProcess[str]:
-    """`colab` of a dry run: every stop works and `sessions` lists nothing."""
-    return subprocess.CompletedProcess(list(argv), 0, "", "")
+    """`colab` of a dry run: every stop works and a trusted listing shows nothing."""
+    out = {
+        "usage": "Current balance: 100.0\nUsage rate: 0.0\nActive assignments: 0\n",
+        "sessions": "[colab] No active sessions\n",
+    }.get(argv[1], "")
+    return subprocess.CompletedProcess(list(argv), 0, out, "")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -421,8 +509,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     lock = (args.dest / f".{args.session}.lock").open("w")
     fcntl.flock(lock, fcntl.LOCK_EX)  # the soft-cap `once` waits for a `follow` pull
 
-    def running() -> bool:
-        return bool(args.local_vm) or session_running(args.session, args.registry, args.colab)
+    def state() -> str:
+        return (
+            "running" if args.local_vm else session_state(args.session, args.registry, args.colab)
+        )
+
+    def wait(seconds: float) -> None:
+        fcntl.flock(lock, fcntl.LOCK_UN)
+        time.sleep(seconds)
+        fcntl.flock(lock, fcntl.LOCK_EX)
 
     def stopped(code: int) -> int:
         """`code` once the session is confirmed stopped, else 6."""
@@ -436,7 +531,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     probe_file = args.dest / f".{args.session}.probe.json"
     if args.mode == "probe":
-        if not running():
+        if state() != "running":
             log(event="refused", session=args.session, reason="watcher exited or not listed")
             return 2
         mb_s = probe(remote, args.dest)
@@ -447,14 +542,28 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 4
         return 0
     mb_s = json.loads(probe_file.read_text())["mb_per_s"] if probe_file.is_file() else SLOW_MB_S
-    last_step = 0
+    last_step, untrusted = 0, 0
 
     while True:
-        if not running():
+        now = state()
+        if now == "gone":
             log(event="refused", session=args.session, reason="watcher exited or not listed")
             return 2
+        if now == "unknown":  # no ssh on a listing that may be an auth failure
+            untrusted += 1
+            log(event="untrusted_listing", session=args.session, count=untrusted)
+            if untrusted >= 3:
+                alert(f"{args.session}: {untrusted} untrusted listings in a row; check colab")
+                if args.mode == "once":
+                    return 2
+            wait(UNTRUSTED_RETRY_S if args.mode == "once" else pause(args.every, last_step, []))
+            continue
+        untrusted = 0
         try:
             statuses = fetch_once(remote, args.dest)
+        except TrainFailed as error:
+            alert(f"{args.session}: {error}")
+            return stopped(5) if args.mode == "follow" else 5
         except (RuntimeError, ValueError, OSError) as error:
             log(event="fetch_error", session=args.session, error=str(error)[-500:])
             if args.mode == "follow" and last_step >= DECIDE_FROM:
@@ -483,10 +592,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return stopped(0)
         if done or args.mode == "once":
             return 0 if done else 1
-        ending = last_step >= NEAR_END or any(s["train"] != "running" for s in statuses)
-        fcntl.flock(lock, fcntl.LOCK_UN)
-        time.sleep(min(args.every, FINAL_EVERY_S) if ending else args.every)
-        fcntl.flock(lock, fcntl.LOCK_EX)
+        wait(pause(args.every, last_step, statuses))
 
 
 if __name__ == "__main__":
