@@ -37,6 +37,16 @@ in human reaching); the targets' continuous motion passes through unchanged (D-2
 The arms keep the robot's standing pose (from `start`) while walking to table A and
 go back to it at the end, fingers slightly curled (D-21).
 
+Planner-6 (trial, D-29): the two posture changes, raising the hands in APPROACH_A
+and turning the wrists to the palm-up pose in REACH, are not blended here. Their
+commands carry `transit` (the segment's name) and the nominal targets; TrayAgent
+solves those once and moves the arms along a joint-space quintic
+(`flywheel_simple.wbc.transit`), then `hold_arrival_until` keeps REACH from
+ending before the path does. `transit_step_max` 0 keeps planner-5's blends. LOWER
+goes down along a minimum-jerk profile to `lower_ease` past the release height,
+peaking at `lower_speed`, then creeps at `lower_creep`; `lower_ease` 0 keeps the
+constant `lower_speed`.
+
 Pure numpy: runs in the workspace.
 """
 
@@ -54,11 +64,12 @@ from flywheel_simple.tray.config import TrayConfig, find_config, load_flat_confi
 from flywheel_simple.tray.geometry import Pose2D, scene_geometry_with_gap
 from flywheel_simple.tray.predicates import StepReport, TrayState, yaw_error
 from flywheel_simple.tray.randomize import EpisodeSample
+from flywheel_simple.wbc.transit import PEAK_SPEED
 
 PLANNER_CONFIG_RELPATH = Path("configs/sim/tray_planner.yaml")
 # Bump when the phase logic changes; config values are hashed into the recorded
 # planner_version separately (recorder.planner_version).
-PLANNER_VERSION = "da33-planner-5"
+PLANNER_VERSION = "da33-planner-6"
 MIRROR = np.diag([1.0, -1.0, 1.0])  # left <-> right across the xz plane
 # Measured-palm correction per phase: axes it acts on. GRASP and LIFT correct height
 # only: across the handles the squeezing hands are blocked on purpose.
@@ -69,6 +80,8 @@ CORRECTED = {
     "GRASP": np.array([0.0, 0.0, 1.0]),
     "LIFT": np.array([0.0, 0.0, 1.0]),
 }
+# Posture changes that go through a joint-space transit (D-29), as (phase name, segment).
+TRANSITS = {("APPROACH_A", 1), ("REACH", 0)}
 
 
 class Phase(Enum):
@@ -174,6 +187,9 @@ class PlannerConfig:
     smooth_min_s: float
     hand_close_s: float
     arm_step_max: float  # rad per control step, for the arm IK (StandWalkController)
+    transit_step_max: float  # rad per control step on a joint-space transit; 0: blends (D-29)
+    lower_ease: float  # m past the release height that LOWER's min-jerk ends at; 0: linear
+    lower_creep: float  # m/s down after the min-jerk profile, until release
 
     @staticmethod
     def default_path() -> Path:
@@ -231,6 +247,7 @@ class PlannerCommand:
     right_wrist: NDArray[np.float64]
     hand_closure: tuple[float, float]
     abort_reason: str | None
+    transit: str | None = None  # "PHASE.segment" of a joint-space transit (D-29), else None
 
 
 def rpy_matrix(roll: float, pitch: float, yaw: float) -> NDArray[np.float64]:
@@ -407,6 +424,8 @@ class TrayPlanner:
     _stepped_back: bool = False  # RETREAT has walked back `retreat`
     _wrist_blends: list[_Blend] = field(default_factory=list)
     _hand_blends: list[_Blend] = field(default_factory=list)
+    _transit_until: float = -math.inf  # REACH may not arrive before the arm's transit ends
+    _lower_plan: tuple[float, float] | None = None  # LOWER: min-jerk depth (m), duration (s)
 
     def __post_init__(self) -> None:
         geo = scene_geometry_with_gap(self.tray_cfg, self.sample.table_gap)
@@ -426,6 +445,16 @@ class TrayPlanner:
         self._nominal = (None, palms, rots)
         self._rest = ([p.copy() for p in palms], [r.copy() for r in rots])
         self._hand = 0.0
+
+    def hold_arrival_until(self, t: float) -> None:
+        """A joint-space transit of the arms ends at sim time t: REACH arrives after it."""
+        self._transit_until = t
+
+    def transit_key(self, segment: int = 0) -> str | None:
+        """The transit name of the current phase's `segment`, if it is one and transits are on."""
+        if self.cfg.transit_step_max > 0 and (self.phase.name, segment) in TRANSITS:
+            return f"{self.phase.name}.{segment}"
+        return None
 
     def step(self, state: TrayState, base: Pose2D, report: StepReport) -> PlannerCommand:
         """One command for this control step."""
@@ -634,7 +663,7 @@ class TrayPlanner:
                 self._place_shift = error
             elif state.tray_on_table == "none":
                 self._place_shift = self._capped(self._place_shift + cfg.place_gain * error)
-            down = np.array([0.0, 0.0, cfg.lower_speed * (state.t - self._entered_t)])
+            down = np.array([0.0, 0.0, self._lowered_by(state, state.t - self._entered_t)])
             move = self._place_shift - down
             palms = (carry.palms[0] + move, carry.palms[1] + move)
             # Release only once the tray sits flat: a corner touching first counted as
@@ -732,6 +761,24 @@ class TrayPlanner:
         )
         rotations = (self._wrist_rotation(0, state, base), self._wrist_rotation(1, state, base))
         return _Carry(palms, rotations, heading, goal)
+
+    def _lowered_by(self, state: TrayState, dt: float) -> float:
+        """How far LOWER has taken the palms down after dt (m).
+
+        Linear at `lower_speed` with `lower_ease` 0. Otherwise a minimum-jerk profile
+        over the depth that brings the tray to the release height (`lower_tray_clear`
+        above B) plus `lower_ease`, peaking at `lower_speed`, then `lower_creep`: the
+        hands slow down as the tray nears the table, and still go on if it has not.
+        """
+        cfg = self.cfg
+        if cfg.lower_ease <= 0:
+            return cfg.lower_speed * dt
+        if self._lower_plan is None:
+            above = float(state.tray_pos[2]) - self.tray_cfg.table_height
+            depth = max(above - max(cfg.lower_tray_clear, 0.0), 0.0) + cfg.lower_ease
+            self._lower_plan = (depth, PEAK_SPEED * depth / cfg.lower_speed)
+        depth, duration = self._lower_plan
+        return depth * min_jerk(dt / duration) + cfg.lower_creep * max(0.0, dt - duration)
 
     def _place_error(self, state: TrayState, base: Pose2D) -> NDArray[np.float64]:
         """Tray-to-target xy error in the base frame, capped at `place_shift_max`.
@@ -904,6 +951,7 @@ class TrayPlanner:
             right_wrist=wrists[1],
             hand_closure=closures,
             abort_reason=None,
+            transit=self.transit_key(segment),
         )
         self._hold = cmd
         return cmd
@@ -924,7 +972,12 @@ class TrayPlanner:
         Blends add up, so a new jump while one decays keeps position and speed continuous.
         """
         cfg = self.cfg
-        if self._nominal is not None and self._nominal[0] != key:
+        transit = self.transit_key(key[1]) is not None and key[0] is self.phase
+        if transit and self._nominal is not None and self._nominal[0] != key:
+            # The agent moves the arms there in joint space (D-29): no Cartesian blend,
+            # and none left from before, so the targets are the nominal ones at once.
+            self._wrist_blends = []
+        elif self._nominal is not None and self._nominal[0] != key:
             _, before, before_rots = self._nominal
             offset = np.array(
                 [[before[k] - palms[k], _rotvec(rots[k].T @ before_rots[k])] for k in range(2)]
@@ -1022,7 +1075,11 @@ class TrayPlanner:
         pre-grasp pose while the commanded ones were still on the way (seed 22, level 1:
         REACH ended after 0.16 s and the hands cut down onto the handles).
         """
-        return not self._wrist_blends and self._palms_at(state, base, palms)
+        return (
+            not self._wrist_blends
+            and state.t >= self._transit_until
+            and self._palms_at(state, base, palms)
+        )
 
     def _held(self, condition: bool, t: float, duration: float) -> bool:
         if not condition:

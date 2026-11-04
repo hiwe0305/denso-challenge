@@ -2,7 +2,11 @@
 
 TrayAgent turns each step's scene state into a PlannerCommand and that into a
 decoupled-WBC ActionCmd: wrists and hands through StandWalkController, base
-through NavIntegrator (`limit_yaw` = the command's heading). run_episode resets
+through NavIntegrator (`limit_yaw` = the command's heading). A command that
+carries `transit` (planner-6, D-29) starts a joint-space transit: the arms' IK
+goal for its wrists is solved once (`UpperBodyIK.goal`) and the arms follow a
+quintic to it, no joint faster than `transit_step_max` per step, before the
+per-step IK takes over on the chosen branch. run_episode resets
 the env and starts an episode as SIMPLE's eval-decoupled-wbc and
 replay-decoupled-wbc do (D-24): no elastic band, the WBC holds its standing pose
 until `robot.stabilized` (at most STABILIZE_MAX_STEPS steps). Recorded episodes
@@ -14,6 +18,7 @@ Only runs in the SIMPLE venv.
 
 from __future__ import annotations
 
+import math
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -24,6 +29,7 @@ from flywheel_simple.tray.planner import Phase, PlannerCommand, PlannerConfig, T
 from flywheel_simple.tray.simple_task import tray_state
 from flywheel_simple.wbc import NavIntegrator, StandWalkController
 from flywheel_simple.wbc.drive import pelvis_pose
+from flywheel_simple.wbc.transit import JointPath
 
 CONTROL_DT = 1.0 / 50
 STABILIZE_MAX_STEPS = 300  # eval_decoupled_wbc's cap
@@ -58,6 +64,10 @@ class TrayAgent:
         self.nav = NavIntegrator(dt=CONTROL_DT)
         self.planner: TrayPlanner | None = None
         self.last_command: PlannerCommand | None = None
+        self._path: JointPath | None = None
+        self._path_step = 0
+        self._transit: str | None = None  # name of the last transit planned
+        self.transits: list[dict[str, Any]] = []  # one per transit: name, steps, branch choice
 
     def reset(self) -> None:
         """New planner for the task's current episode sample; fresh WBC pipeline."""
@@ -65,6 +75,8 @@ class TrayAgent:
         self.planner = TrayPlanner(self.planner_cfg, task.cfg, task.sample)
         self.ctrl.reset()
         self.last_command = None
+        self._path, self._path_step, self._transit = None, 0, None
+        self.transits = []
 
     def start(self) -> None:
         """Begin planning from the robot's heading and wrists now (after the band is released)."""
@@ -90,7 +102,36 @@ class TrayAgent:
             navigate_cmd=navigate,
             wrist_pose=(cmd.left_wrist, cmd.right_wrist),
             hand_closure=cmd.hand_closure,
+            arm_q=self._transit_q(cmd, float(sim.mjData.time)),
         )
+
+    def _transit_q(self, cmd: PlannerCommand, now: float) -> Any:
+        """This step's arm joints on a joint-space transit (D-29), or None for the IK."""
+        ik = self.ctrl.ik
+        if cmd.transit is None or not self.ctrl.ik_anchored:
+            if self._path is not None:  # the phase moved on before the path ended
+                ik.settle(ik.solver_q())
+                self._path = None
+            return None
+        if cmd.transit != self._transit:
+            assert self.planner is not None
+            start = ik.solver_q()
+            goal, choice = ik.goal(cmd.left_wrist, cmd.right_wrist)
+            min_steps = math.ceil(self.planner_cfg.smooth_min_s / CONTROL_DT)
+            self._path = JointPath.plan(start, goal, self.planner_cfg.transit_step_max, min_steps)
+            self._path_step, self._transit = 0, cmd.transit
+            self.planner.hold_arrival_until(now + self._path.steps * CONTROL_DT)
+            self.transits.append(
+                {"transit": cmd.transit, "t": round(now, 2), "steps": self._path.steps, **choice}
+            )
+        if self._path is None:
+            return None  # this transit has ended: the IK holds its branch
+        self._path_step += 1
+        q = self._path.at(self._path_step)
+        if self._path_step >= self._path.steps:
+            ik.settle(self._path.goal)
+            self._path = None
+        return q
 
 
 def stabilize(env: Any, agent: TrayAgent) -> tuple[dict[str, Any], dict[str, Any], int]:

@@ -344,3 +344,73 @@ def test_release_pulls_the_hands_back_as_they_move_out() -> None:
     for side in (0, 1):
         path = palm_path(world, records, side)[1:]
         assert path[-1, 0] - path[0, 0] == pytest.approx(-0.05, abs=0.005)  # base x: back
+
+
+# -- planner-6 (D-29): joint-space transits and the eased set-down ------------------
+
+
+@pytest.mark.parametrize(("level", "seed"), [(0, 0), (1, 1), (1, 2)])
+def test_toy_episode_succeeds_with_transits(level: int, seed: int) -> None:
+    records = ToyWorld(level=level, seed=seed, transits=True).run()
+    assert records[-1].cmd.phase is Phase.DONE and records[-1].report.success
+
+
+def test_only_the_raise_and_reach_are_transits() -> None:
+    world = ToyWorld(level=1, seed=1, transits=True)
+    records = world.run()
+    named = {(r.cmd.phase, r.cmd.transit) for r in records if r.cmd.transit is not None}
+    assert named == {(Phase.APPROACH_A, "APPROACH_A.1"), (Phase.REACH, "REACH.0")}
+    # Walking to the table with the arms down (segment 0) is not one, nor anything after REACH.
+    first_raise = next(i for i, r in enumerate(records) if r.cmd.transit == "APPROACH_A.1")
+    assert all(r.cmd.transit is None for r in records[:first_raise])
+    assert all(r.cmd.transit is None for r in records if r.cmd.phase.value > Phase.REACH.value)
+    # The planner leaves the move to the agent: REACH's first command is the nominal
+    # pre-grasp target already, not a blend from the ready pose.
+    from flywheel_simple.tray.planner import grasp_palms_world, tray_yaw_of
+
+    cfg = world.planner_cfg
+    first = next(r for r in records if r.cmd.phase is Phase.REACH)
+    state = first.state
+    outside = grasp_palms_world(
+        cfg, world.cfg, state.tray_pos, tray_yaw_of(state.tray_quat), cfg.pregrasp_offset
+    )
+    above = np.array([0.0, 0.0, cfg.pregrasp_dz])
+    for palm, target in zip(commanded_palms_world(world, first), outside):
+        assert float(np.linalg.norm(palm - (target + above))) < 0.03  # base moved a step
+
+
+def test_reach_waits_for_the_end_of_its_transit() -> None:
+    world = ToyWorld(level=1, seed=1, transits=True)
+    records = world.run()
+    reach_end = dict(world.transit_ends)["REACH.0"]
+    grasp_t = next(r.state.t for r in records if r.cmd.phase is Phase.GRASP)
+    assert grasp_t >= reach_end - 1e-9
+
+
+def test_transits_off_keep_the_cartesian_blends() -> None:
+    from dataclasses import replace
+
+    cfg = replace(PlannerConfig.load(), transit_step_max=0.0)
+    records = ToyWorld(level=1, seed=1, planner_cfg=cfg, transits=True).run()
+    assert all(r.cmd.transit is None for r in records)
+    assert records[-1].report.success
+
+
+def lowering_speeds(cfg: PlannerConfig) -> tuple[np.ndarray, PlannerConfig]:
+    """Commanded palm descent speed (m/s) per LOWER step, left hand, base frame."""
+    world = ToyWorld(level=0, seed=0, planner_cfg=cfg)
+    records = world.run()
+    lower = [r for r in records if r.cmd.phase is Phase.LOWER]
+    z = np.array([float((r.cmd.left_wrist @ np.r_[cfg.palm_offsets[0], 1.0])[2]) for r in lower])
+    return -np.diff(z) / 0.02, cfg
+
+
+def test_lowering_eases_into_the_release() -> None:
+    from dataclasses import replace
+
+    eased, cfg = lowering_speeds(replace(PlannerConfig.load(), lower_ease=0.01))
+    assert eased[0] < 0.1 * cfg.lower_speed  # starts from rest
+    assert eased.max() <= cfg.lower_speed + 1e-6  # peaks at lower_speed
+    assert eased[-1] < 0.8 * cfg.lower_speed  # and slows down before letting go
+    linear, cfg = lowering_speeds(replace(PlannerConfig.load(), lower_ease=0.0))
+    assert np.allclose(linear, cfg.lower_speed, atol=1e-6)  # planner-5: constant speed

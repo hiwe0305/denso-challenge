@@ -68,3 +68,19 @@ def test_arm_commands_move_at_most_arm_step_max_per_step(env: Any) -> None:
     steps = np.abs(np.diff(np.array(goals), axis=0))
     assert len(arms) == 14 and len(goals) > 500
     assert steps.max() <= cfg.arm_step_max + 1e-6, (steps.max(), np.argmax(steps.max(axis=1)))
+
+
+def test_posture_changes_go_through_joint_transits(env: Any) -> None:
+    # Planner-6 (D-29): the raise and the turn to the palm-up pose each solve one IK goal
+    # and follow a quintic to it; the goal's wrists are on the commanded targets.
+    from flywheel_simple.tray.agent import TrayAgent, run_episode
+    from flywheel_simple.tray.planner import PlannerConfig
+
+    agent = TrayAgent(env, PlannerConfig.load())
+    result = run_episode(env, agent, seed=1, level=1)
+    assert [t["transit"] for t in agent.transits] == ["APPROACH_A.1", "REACH.0"], agent.transits
+    for t in agent.transits:
+        assert t["steps"] >= 30  # smooth_min_s at 50 Hz
+        for side in ("left", "right"):
+            assert t[side]["error"] < 0.01, t  # m + 0.1 m/rad
+    assert result.success, result

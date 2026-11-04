@@ -22,6 +22,13 @@ null space at up to 14 rad/s while the wrist poses stay on target, and those
 jumps are what the dataset records as `action` (DA-33, docs/g0/tray/wrist-jump.md).
 `max_joint_step` bounds each joint's move per control step inside the IK's QP.
 
+For a posture change whose end is known (D-29), `goal` solves that end once,
+converged and without the step limit, from several seeds of `wrist_roll`, and
+keeps per arm the solution furthest from the roll limit (`transit.choose_branch`).
+`follow` then commands joints directly (a `transit.JointPath`) and keeps the
+solver's warm start on them; `settle` also anchors the posture task there, so
+the per-step IK that takes over stays on the chosen branch.
+
 `decoupled_wbc` is imported inside functions so this module imports in the
 workspace, where it is absent.
 """
@@ -37,6 +44,8 @@ from typing import Any, Literal
 import numpy as np
 from numpy.typing import NDArray
 
+from flywheel_simple.wbc.transit import choose_branch, roll_margin
+
 HAND_JOINTS = ("thumb_0", "thumb_1", "thumb_2", "index_0", "index_1", "middle_0", "middle_1")
 # Flexion end of each Dex3 joint in natural order (thumb, index, middle), from
 # g1_sonic's MJCF ranges. decoupled_wbc's robot model gives the right hand the
@@ -47,6 +56,13 @@ _FLEXION_END = {
     "right": np.array([0.0, -1.047, -1.745, 1.571, 1.745, 1.571, 1.745]),
 }
 CLOSED_FRACTION = 0.8
+# `goal` (D-29): wrist_roll seeds as fractions of its range, solver frames per seed (3 QP
+# steps each, unlimited speed), and how much worse than the best solution a pose error
+# may be (m + ROT_WEIGHT * rad) for the branch with more roll margin to win.
+ROLL_SEEDS = (0.2, 0.5, 0.8)
+GOAL_FRAMES = 60
+GOAL_ERROR_TOL = 0.005
+ROT_WEIGHT = 0.1  # m per rad: 1 degree weighs as 1.7 mm
 
 Side = Literal["left", "right"]
 
@@ -98,6 +114,13 @@ def _matrix(se3: Any) -> NDArray[np.float64]:
     pose[:3, :3] = se3.rotation
     pose[:3, 3] = se3.translation
     return pose
+
+
+def _pose_error(pose: NDArray[np.float64], target: NDArray[np.float64]) -> float:
+    """Position error (m) plus ROT_WEIGHT times the rotation error (rad) of a wrist pose."""
+    c = (float(np.trace(pose[:3, :3].T @ target[:3, :3])) - 1.0) / 2.0
+    angle = float(np.arccos(np.clip(c, -1.0, 1.0)))
+    return float(np.linalg.norm(pose[:3, 3] - target[:3, 3])) + ROT_WEIGHT * angle
 
 
 class UpperBodyIK:
@@ -163,6 +186,115 @@ class UpperBodyIK:
         )
         left, right = (_matrix(body.frame_placement(f)) for f in self.frames)
         return left, right
+
+    def solver_q(self) -> NDArray[np.float64]:
+        """The IK's current solution (reduced configuration): what the last step commanded."""
+        return np.array(self._ik.body_ik_solver.configuration.q, dtype=float)
+
+    def upper_of(self, q: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Upper-body target (`upper_body` group order) of a reduced configuration, as `solve`."""
+        ik = self._ik
+        full = ik.body.reduced_to_full_configuration(np.asarray(q, float))
+        upper: NDArray[np.float64] = np.array(
+            full[ik.full_robot.get_joint_group_indices("upper_body")], dtype=float
+        )
+        return upper
+
+    def wrists_of(
+        self, q: NDArray[np.float64]
+    ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """Both wrist poses (pelvis frame) of a reduced configuration."""
+        body = self._ik.body
+        body.cache_forward_kinematics(np.asarray(q, float))
+        left, right = (_matrix(body.frame_placement(f)) for f in self.frames)
+        return left, right
+
+    def follow(self, q: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Command `q` directly and warm-start the next solve there; its upper-body target."""
+        conf = self._ik.body_ik_solver.configuration
+        conf.q = np.asarray(q, float).copy()
+        conf.update()
+        return self.upper_of(q)
+
+    def settle(self, q: NDArray[np.float64]) -> None:
+        """End of a transit: warm start and posture anchor at `q`, so `solve` keeps its branch."""
+        self.follow(q)
+        self._ik.body_ik_solver.tasks["posture"].set_target(np.asarray(q, float).copy())
+
+    def arm_dofs(self, side: Side) -> list[int]:
+        """Indices of one arm's joints in the reduced configuration."""
+        index = self._ik.body.joint_to_dof_index
+        return sorted(i for name, i in index.items() if name.startswith(f"{side}_"))
+
+    def goal(
+        self,
+        left: NDArray[np.float64],
+        right: NDArray[np.float64],
+        roll_seeds: tuple[float, ...] = ROLL_SEEDS,
+        frames: int = GOAL_FRAMES,
+        error_tol: float = GOAL_ERROR_TOL,
+    ) -> tuple[NDArray[np.float64], dict[str, dict[str, float]]]:
+        """Converged IK for both wrist poses, the branch picked per arm; (q, choice per side).
+
+        Seeds: the current solution, and that with each `wrist_roll` at the fractions
+        `roll_seeds` of its range. Each runs `frames` solver frames without the step
+        limit, posture anchored at the seed; the solver's state is restored after.
+        """
+        ik = self._ik
+        solver = ik.body_ik_solver
+        conf = solver.configuration
+        model = conf.model
+        posture = solver.tasks["posture"]
+        saved_q, saved_target = conf.q.copy(), np.array(posture.target_q, dtype=float)
+        saved_limit = model.velocity_limit
+        body = ik.body
+        root = conf.q.size - np.asarray(body.lower_joint_limits).size
+        rolls = {s: body.joint_to_dof_index[f"{s}_wrist_roll_joint"] for s in ("left", "right")}
+        low = {s: float(body.lower_joint_limits[i - root]) for s, i in rolls.items()}
+        high = {s: float(body.upper_joint_limits[i - root]) for s, i in rolls.items()}
+        start = saved_q.copy()
+        seeds = [start]
+        for f in roll_seeds:
+            seed = start.copy()
+            for s, i in rolls.items():
+                seed[i] = low[s] + f * (high[s] - low[s])
+            seeds.append(seed)
+        targets = {self.frames[0]: left, self.frames[1]: right}
+        solutions = []
+        try:
+            model.velocity_limit = _mod("pink.limits").VelocityLimit(model)  # URDF only
+            for seed in seeds:
+                conf.q = seed.copy()
+                conf.update()
+                posture.set_target(seed.copy())
+                q = seed
+                for _ in range(frames):
+                    q = solver(targets)
+                solutions.append(np.array(q, dtype=float))
+        finally:
+            model.velocity_limit = saved_limit
+            conf.q = saved_q
+            conf.update()
+            posture.set_target(saved_target)
+        out = start.copy()
+        choice: dict[str, dict[str, float]] = {}
+        for k, side in enumerate(("left", "right")):
+            dofs = self.arm_dofs(side)  # type: ignore[arg-type]
+            errors = [_pose_error(self.wrists_of(q)[k], targets[self.frames[k]]) for q in solutions]
+            margins = [roll_margin(float(q[rolls[side]]), low[side], high[side]) for q in solutions]
+            dists = [float(np.max(np.abs(q[dofs] - start[dofs]))) for q in solutions]
+            pick = choose_branch(errors, margins, dists, error_tol)
+            out[dofs] = solutions[pick][dofs]
+            choice[side] = {
+                "seed": float(pick),
+                "error": round(errors[pick], 5),
+                "roll_margin": round(margins[pick], 4),
+                "start_margin": round(
+                    roll_margin(float(start[rolls[side]]), low[side], high[side]), 4
+                ),
+                "span": round(dists[pick], 4),
+            }
+        return out, choice
 
     def solve(self, left: NDArray[np.float64], right: NDArray[np.float64]) -> NDArray[np.float64]:
         """Upper-body target (`upper_body` joint group order) reaching both wrist poses."""

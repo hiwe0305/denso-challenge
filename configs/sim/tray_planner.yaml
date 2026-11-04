@@ -182,6 +182,15 @@ hand_close_s: 0.5
 # steps over psi-data's p99.9 (0.087). Over 40 paired seeds (300000-300039, level 1):
 # none 36/40, 0.08 39/40 with no step over 0.087 (docs/g0/tray/wrist-jump.md).
 arm_step_max: 0.08
+# Planner-6 trial (D-29). Raising the hands (APPROACH_A) and turning the wrists to the
+# palm-up pose (REACH) go along a joint-space quintic to one IK goal chosen away from the
+# wrist_roll limit, no joint faster than transit_step_max (rad per step); 0 keeps
+# planner-5's Cartesian blends. LOWER goes down along a minimum-jerk profile peaking at
+# lower_speed to lower_ease (m) past the release height, then on at lower_creep (m/s);
+# lower_ease 0 keeps the constant lower_speed.
+transit_step_max: 0.08
+lower_ease: 0.01
+lower_creep: 0.02
 
 # Abort when the tray is below this height (on the floor).
 abort_tray_z: 0.4

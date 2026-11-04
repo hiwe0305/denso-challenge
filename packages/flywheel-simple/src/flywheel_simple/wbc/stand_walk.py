@@ -94,6 +94,11 @@ class StandWalkController:
         return self._model
 
     @property
+    def ik_anchored(self) -> bool:
+        """The IK has been anchored at the robot's joints since `reset` (first wrist command)."""
+        return self._ik_anchored
+
+    @property
     def lower_body(self) -> Any:
         """GR00T's G1GearWbcPolicy (Balance/Walk ONNX) inside the decoupled WBC."""
         return self._policy.lower_body_policy
@@ -117,26 +122,33 @@ class StandWalkController:
         navigate_cmd: Sequence[float] | NDArray[np.float64] = (0.0, 0.0, 0.0, 0.0),
         wrist_pose: tuple[NDArray[np.float64], NDArray[np.float64]] | None = None,
         hand_closure: tuple[float, float] = (0.0, 0.0),
+        arm_q: NDArray[np.float64] | None = None,
     ) -> Any:
         """One `decoupled_wbc` ActionCmd; the first call ramps to the target over 2 s.
 
         `wrist_pose` is (left, right) as 4 x 4 poses in the pelvis frame; None holds
         the WBC default upper-body pose. The first call with wrist targets after
-        `reset` anchors the IK at the robot's current joints. `hand_closure` is
-        (left, right), 0 open to 1 closed (`hand_q`).
+        `reset` anchors the IK at the robot's current joints. `arm_q` (the IK's reduced
+        configuration, a joint-space transit) replaces the IK for this step; its wrist
+        poses are recorded. `hand_closure` is (left, right), 0 open to 1 closed (`hand_q`).
         """
         base_height = _mod("decoupled_wbc.control.main.constants").DEFAULT_BASE_HEIGHT
         ActionCmd = _mod("simple.core.action").ActionCmd
 
-        if wrist_pose is None:
+        if wrist_pose is None and arm_q is None:
             upper = np.asarray(self._model.get_initial_upper_body_pose(), dtype=float).copy()
             eef = self.ik.current_wrists(sim_obs)
         else:
             if not self._ik_anchored:
                 self.ik.reset(sim_obs)
                 self._ik_anchored = True
-            upper = self.ik.solve(*wrist_pose)
-            eef = wrist_pose
+            if arm_q is not None:
+                upper = self.ik.follow(arm_q)
+                eef = self.ik.wrists_of(arm_q)
+            else:
+                assert wrist_pose is not None
+                upper = self.ik.solve(*wrist_pose)
+                eef = wrist_pose
         for side, closure in zip(("left", "right"), hand_closure):
             upper[self.ik.hand_slots[side]] = hand_q(side, closure)  # type: ignore[arg-type]
 

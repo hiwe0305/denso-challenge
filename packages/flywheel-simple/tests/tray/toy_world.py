@@ -10,12 +10,19 @@ spreading them releases it as opening does; while both grip, the tray moves
 rigidly with the palms. Released over a table, the tray rests on it; elsewhere it falls to the
 floor. DA-32's StepTracker scores every step. The arms start hanging at rest
 (`start_wrists`), where the planner's first targets start from.
+
+The toy has no arm joints, so it runs the planner with its Cartesian blends
+(`transit_step_max` 0) unless `transits` is set. Then it stands in for
+TrayAgent's joint-space transit (D-29): on a command with a new `transit` the
+wrists go from where they are to that command's targets along the quintic, over
+as many steps as a joint path of `transit_step_max` would take for a
+TOY_RAD_PER_M rad per metre arm, and the planner holds REACH's arrival until then.
 """
 
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 import numpy as np
@@ -31,12 +38,14 @@ from flywheel_simple.tray.planner import (
 )
 from flywheel_simple.tray.predicates import StepReport, StepTracker, TrayState
 from flywheel_simple.tray.randomize import sample_episode
+from flywheel_simple.wbc.transit import PEAK_SPEED, quintic
 
 DT = 0.02
 PELVIS_Z = 0.75
 CONTACT_R = 0.03
 SLACK = 0.02
 LINGER_S = 2.0  # keep stepping after DONE or ABORT so success can register
+TOY_RAD_PER_M = 8.0  # joint travel per metre of palm travel, for the transit stand-in
 
 
 @dataclass(frozen=True)
@@ -55,9 +64,15 @@ class ToyWorld:
         palm_sag: float = 0.0,
         vy_scale: float = 1.0,
         planner_cfg: PlannerConfig | None = None,
+        transits: bool = False,
     ) -> None:
         self.cfg = TrayConfig.load()
-        self.planner_cfg = planner_cfg or PlannerConfig.load()
+        cfg = planner_cfg or PlannerConfig.load()
+        self.planner_cfg = cfg if transits else replace(cfg, transit_step_max=0.0)
+        self.transits = transits
+        # (name, wrists at the start, steps, steps done) of the transit stand-in
+        self._transit: tuple[str, list[np.ndarray], int, int] | None = None
+        self.transit_ends: list[tuple[str, float]] = []  # (name, toy time the path ended)
         self.vy_scale = vy_scale  # 0 blocks sideways steps, leaving a lateral error
         self.sample = sample_episode(self.cfg, level, seed)
         self.geo = scene_geometry_with_gap(self.cfg, self.sample.table_gap)
@@ -81,6 +96,7 @@ class ToyWorld:
         self.grip_width = 0.0
         self.blocked = False
         self.drop_left_in: Phase | None = None
+        self._wrists = list(self.start_wrists)
         self.left_dropped = False
         self.t = 0.0
 
@@ -105,7 +121,7 @@ class ToyWorld:
         while self.t < max_s and linger < LINGER_S:
             base = self.base
             cmd = planner.step(state, base, report)
-            self._apply(cmd)
+            self._apply(cmd, self._arm(cmd, planner))
             state = self._state()
             report = tracker.update(state)
             records.append(Record(cmd, state, base, report))
@@ -113,7 +129,32 @@ class ToyWorld:
                 linger += DT
         return records
 
-    def _apply(self, cmd: PlannerCommand) -> None:
+    def _arm(self, cmd: PlannerCommand, planner: TrayPlanner) -> list[np.ndarray]:
+        """Wrists the arms reach this step: the command's, or the transit stand-in's."""
+        goal = [cmd.left_wrist, cmd.right_wrist]
+        name = cmd.transit if self.transits else None
+        if name is None:
+            self._transit = None
+            self._wrists = goal
+            return goal
+        if self._transit is None or self._transit[0] != name:
+            start = self._wrists
+            travel = max(float(np.linalg.norm(g[:3, 3] - w[:3, 3])) for g, w in zip(goal, start))
+            steps = max(
+                math.ceil(self.planner_cfg.smooth_min_s / DT),
+                math.ceil(PEAK_SPEED * TOY_RAD_PER_M * travel / self.planner_cfg.transit_step_max),
+            )
+            self._transit = (name, start, steps, 0)
+            planner.hold_arrival_until(self.t + steps * DT)
+            self.transit_ends.append((name, self.t + steps * DT))
+        name, start, steps, done = self._transit
+        done = min(done + 1, steps)
+        self._transit = (name, start, steps, done)
+        w = quintic(done / steps)
+        self._wrists = [(1 - w) * a + w * b for a, b in zip(start, goal)]
+        return self._wrists
+
+    def _apply(self, cmd: PlannerCommand, wrists: list[np.ndarray] | None = None) -> None:
         self.t += DT
         vx, vy, vyaw = cmd.nav
         yaw = self.base.yaw
@@ -130,7 +171,8 @@ class ToyWorld:
 
         world = base_transform(self.base, PELVIS_Z)
         offsets = self.planner_cfg.palm_offsets
-        for k, (wrist, off) in enumerate(zip((cmd.left_wrist, cmd.right_wrist), offsets)):
+        reached = wrists if wrists is not None else [cmd.left_wrist, cmd.right_wrist]
+        for k, (wrist, off) in enumerate(zip(reached, offsets)):
             palm = (world @ wrist @ np.r_[off, 1.0])[:3]
             self.palms[k] = palm - np.array([0.0, 0.0, self.palm_sag])
 
