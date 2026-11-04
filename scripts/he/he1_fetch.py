@@ -83,7 +83,7 @@ COLAB = Path(
     os.environ.get("COLAB_CLI", "~/project/wm-wam-review/.venv-colab-cli/bin/colab")
 ).expanduser()
 REMOTE_WORK = "/content/da26"
-SLOW_MB_S = 6.0  # below this a 6.25 GB checkpoint misses the ~18 min left before the cap
+SLOW_MB_S = 6.0  # 2.9 MB/s fills the ~36 min left at cap 18; 6 keeps the early-stop room
 # Recipe R1 (configs/models/psi0-stage3.yaml, checked by test_he1_fetch.py).
 TOTAL_STEPS, SAVE_EVERY = 40000, 10000
 RATE_CU_H = 1.94  # L4 (docs/g0/psi0-finetune-cost.md section 3)

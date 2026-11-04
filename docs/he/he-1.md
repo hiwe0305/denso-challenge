@@ -180,7 +180,8 @@ Câu hỏi gửi Hiếu: "Approve CU for tier 2, with DA-26 on reduced Isaac eva
 
 **Watcher chung** **[Đã chốt]** (4/11/2026): DA-26 chạy bằng watcher chung `scripts/colab/cu_watch.py` (PR #108, thiết kế lại sau review).
 
-- Mỗi phiên Colab một tiến trình `session`. Tiến trình này theo dõi phiên theo endpoint, tự mở phiên (`--new`) và dừng phiên ở trần riêng của nó: **17,5 / 17,5 / 17,0 CU** cho hai fine-tune và server eval.
+- Mỗi phiên Colab một tiến trình `session`. Tiến trình này theo dõi phiên theo endpoint, tự mở phiên (`--new`) và dừng phiên ở trần riêng của nó: **18,0 / 18,0 / 16,0 CU** cho hai fine-tune và server eval.
+- **`Decision`** Hiếu 4/11: caps 18/18/16. Cùng tổng 52 CU, trong tier 2 đã duyệt; thay 17,5 / 17,5 / 17,0 vì trần fine-tune 17,5 quá sát với tốc độ của S1-04 (mục 7, quy tắc dừng sớm). Trần không nằm trong RunPlan, nên `rp_95c98a476499` không đổi.
 - Cả đợt có thêm một tiến trình `guard` trong một thư mục registry mới:
   - dừng mọi phiên khi số dư thật xuống tới **`--floor 14`**;
   - dừng mọi assignment mà không watcher sống nào đăng ký.
@@ -193,10 +194,12 @@ Câu hỏi gửi Hiếu: "Approve CU for tier 2, with DA-26 on reduced Isaac eva
 
 | Job | Ước lượng | Trần |
 |---|---|---|
-| `job_da26_t2_ft_vego_n20_s0` | 8,5 giờ, 16,6 CU (S1-04 mục 4, gồm dựng VM 8 phút) | 17,5 CU (9,0 giờ) |
-| `job_da26_t2_ft_vnoego_n20_s0` | 8,5 giờ, 16,6 CU | 17,5 CU (9,0 giờ) |
-| `job_da26_t2_eval_isaac_n20`: một phiên server cho cả hai checkpoint | 20 episode × 24,6 phút + dựng VM 8 phút ≈ 8,3 giờ, 16,2 CU | 17,0 CU (8,8 giờ) |
+| `job_da26_t2_ft_vego_n20_s0` | 8,5 giờ, 16,6 CU (S1-04 mục 4, gồm dựng VM 8 phút) | 18,0 CU (9,3 giờ) |
+| `job_da26_t2_ft_vnoego_n20_s0` | 8,5 giờ, 16,6 CU | 18,0 CU (9,3 giờ) |
+| `job_da26_t2_eval_isaac_n20`: một phiên server cho cả hai checkpoint | 20 episode × 24,6 phút + dựng VM 8 phút ≈ 8,3 giờ, 16,2 CU | 16,0 CU (8,2 giờ) |
 | **Tổng** | **49,4 CU** | **52,0 CU** |
+
+Trần eval 16,0 thấp hơn ước lượng 16,2. Watcher dừng ở `16 − 1,94 × 430 / 3600 = 15,77` CU, tức khoảng 8,1 giờ. Ở 24,6 phút mỗi episode, đủ cho khoảng 19,5 trên 20 episode. Số 24,6 phút đo trên episode thất bại (S1-03); episode thành công kết thúc sớm hơn, nên ước lượng 16,2 có thể cao. **[Đề xuất]** Driver eval chạy hai arm xen kẽ theo điều kiện, để nếu thiếu thì thiếu đều ở cả hai arm.
 
 [Đề xuất] Eval chạy xen kẽ hai biến thể theo điều kiện (hai server trên cùng L4, mỗi server khoảng 6,2 GB VRAM; hoặc đổi checkpoint giữa các episode). Nếu phiên chạm trần giữa chừng, hai nhánh vẫn có cùng số điều kiện để so. Chạm trần thì báo số episode đã xong; chạy thêm cần Hiếu duyệt CU mới. Hai fine-tune chạy song song trên hai phiên L4, khoảng 8,5 giờ tường. Eval cần `rtx3060` khoảng 8,3 giờ; đặt máy với DA-34 và DA-35 khi fine-tune xong.
 
@@ -206,9 +209,9 @@ Chưa chạy. Mỗi điểm một phiên Colab L4, một watcher `session` riên
 
 | Điểm | Phiên | Dòng sổ chi phí | Trần |
 |---|---|---|---|
-| V-EGO/N20/0 | `da26-t2-ft-vego-n20-s0` | `job_da26_t2_ft_vego_n20_s0` | 17,5 CU |
-| V-NOEGO/N20/0 | `da26-t2-ft-vnoego-n20-s0` | `job_da26_t2_ft_vnoego_n20_s0` | 17,5 CU |
-| Server eval (sau) | `da26-t2-eval-n20` | `job_da26_t2_eval_isaac_n20` | 17,0 CU |
+| V-EGO/N20/0 | `da26-t2-ft-vego-n20-s0` | `job_da26_t2_ft_vego_n20_s0` | 18,0 CU |
+| V-NOEGO/N20/0 | `da26-t2-ft-vnoego-n20-s0` | `job_da26_t2_ft_vnoego_n20_s0` | 18,0 CU |
+| Server eval (sau) | `da26-t2-eval-n20` | `job_da26_t2_eval_isaac_n20` | 16,0 CU |
 
 **Trên VM**, `scripts/he/he1_colab.py` chạy theo các pha dưới đây. Pha nào cũng từ chối chạy trong ba trường hợp: `he-1.yaml` khác bản đã đóng băng; khóa không phải `rp_95c98a476499` (giá trị này ghi cứng trong code); điểm không thuộc phần sơ bộ.
 
@@ -225,7 +228,7 @@ Chưa chạy. Mỗi điểm một phiên Colab L4, một watcher `session` riên
 - Mọi lần dừng đều có xác nhận. `colab stop` tối đa 3 lần, mỗi lần chờ 30 s, tới khi `colab sessions` không còn phiên. Nếu vẫn còn, gửi SIGTERM cho watcher (pid trong `$R/$S.json`); watcher tự dừng phiên có xác nhận. Không xác nhận được thì `follow` ghi `ALERT` ra stderr và thoát 6: phiên có thể vẫn đang tính tiền. Mỗi lệnh có thời hạn: 300 s, riêng rsync 3600 s (lượt kéo dở nối lại ở lượt sau).
 - `once` là `--persist` của watcher, chạy ở mốc mềm. Hai lệnh dùng chung một khóa, nên `once` chờ lượt kéo đang chạy của `follow`.
 - Trước mỗi lần SSH, script kiểm watcher còn sống và `colab sessions` còn liệt kê phiên.
-- Mốc thời gian: mốc mềm (0,9 × 17,5 = 15,75 CU, khoảng 8,1 giờ) đến trước khi train xong (16,6 CU). Sau khi train xong còn khoảng 18 phút trước lệnh dừng ở trần (khoảng 17,2 CU). 6,25 GB trong 18 phút cần ít nhất 6 MB/s. Tốc độ qua proxy Colab chưa đo. `follow` ghi `ALERT` khi một lượt kéo checkpoint trên 1 GB chậm hơn 6 MB/s. Lượt đầu là `ckpt_10000`, khoảng 2,2 giờ sau khi bắt đầu; nếu gặp `ALERT` khi đó thì báo ngay (mount Drive, hoặc Hiếu quyết định).
+- Mốc thời gian: mốc mềm (0,9 × 18 = 16,2 CU, khoảng 8,35 giờ) đến trước khi train xong (16,6 CU). Sau khi train xong còn khoảng 36 phút trước lệnh dừng ở trần (17,77 CU). 6,25 GB trong 36 phút cần ít nhất 2,9 MB/s. Ngưỡng `probe` và `ALERT` vẫn giữ 6 MB/s, để còn chỗ cho quy tắc dừng sớm. Tốc độ qua proxy Colab chưa đo. `follow` ghi `ALERT` khi một lượt kéo checkpoint trên 1 GB chậm hơn 6 MB/s. Lượt đầu là `ckpt_10000`, khoảng 2,2 giờ sau khi bắt đầu; nếu gặp `ALERT` khi đó thì báo ngay (mount Drive, hoặc Hiếu quyết định).
 - Dung lượng laptop: 2 job × 4 checkpoint × 6,25 GB, khoảng 50 GB; đĩa còn 506 GB. Kéo lại cho server eval cũng đi rsync qua proxy, không dùng `colab upload`, vì lệnh này dùng cùng API contents.
 - Thử khô trên laptop ngày 4/11/2026, VM giả trên đĩa, rsync thật, không qua SSH: [`test_he1_fetch.py`](../../scripts/he/test_he1_fetch.py) có 26 test (cả thư mục 39), gồm:
   - `probe`, phép tính dừng sớm và dừng sớm của `follow`;
@@ -252,7 +255,7 @@ Kiểm trên zip thật ngày 4/11/2026, trên laptop:
 
 1. PR của driver đã merge. Chạy từ bản checkout `master`; registry ghi SHA của bản đó.
 2. Phiên chính báo DA-30 đã xong và guard của DA-30 đã thoát. `colab sessions` trống.
-3. Số dư ít nhất 66 CU: sàn 14, cộng hai trần fine-tune 35, cộng trần eval 17. Như vậy không job nào chạm sàn trước trần của nó.
+3. Số dư ít nhất 66 CU: sàn 14, cộng hai trần fine-tune 36, cộng trần eval 16. Như vậy không job nào chạm sàn trước trần của nó.
 4. Laptop thức suốt đợt. Watcher tự giữ `systemd-inhibit`; bật thêm chế độ giữ thức của app.
 
 **Laptop: guard và hai watcher** (thư mục gốc là bản checkout `master`):
@@ -263,7 +266,7 @@ colab sessions; colab usage
 R=fwdata/colab/batch-$(date +%Y%m%d-%H%M%S); mkdir -p fwdata/colab && mkdir $R && git rev-parse HEAD > $R/master.sha
 nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py guard --registry "$0" --floor 14 --log "$0/guard.jsonl"; echo "exit $?"' $R < /dev/null > $R/guard.out 2>&1 &
 for S in da26-t2-ft-vego-n20-s0 da26-t2-ft-vnoego-n20-s0; do
-  nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py session --registry "$0" --new --name "$1" --gpu L4 --cap 17.5 --floor 14 --persist "python3 scripts/he/he1_fetch.py once --session $1 --registry $0 --dest fwdata/he/runs" --log "$0/$1.jsonl"; echo "exit $?"' $R $S < /dev/null > $R/$S.out 2>&1 &
+  nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py session --registry "$0" --new --name "$1" --gpu L4 --cap 18 --floor 14 --persist "python3 scripts/he/he1_fetch.py once --session $1 --registry $0 --dest fwdata/he/runs" --log "$0/$1.jsonl"; echo "exit $?"' $R $S < /dev/null > $R/$S.out 2>&1 &
 done
 ```
 
@@ -310,22 +313,18 @@ vm $S "cd /content/da26; nohup setsid python3 fw/scripts/he/he1_colab.py persist
   - Hai số 60 s: khoảng cách lượt cuối (từ bước 38 000), và thời gian băm sha256 checkpoint cuối trên VM rồi trên laptop. Số thứ hai là giả định.
   - Số liệu: `spent` là dòng `poll` cuối của watcher, chỉ khi mới hơn 300 s. s/bước đo từ bước 200 của lần chạy hiện tại. MB/s lấy từ `probe`, rồi thay bằng lượt kéo checkpoint trên 1 GB gần nhất. 60 s mỗi lần lưu là giả định; trên A100 là 31 s.
   - Không tính được (không có `poll` mới, không có s/bước, `stage` hoặc rsync lỗi): `follow` ghi `ALERT` ra stderr mỗi lượt, và **không** dừng. Dừng mù làm mất phần đã tiêu, trong khi trần của watcher vẫn giới hạn chi phí. Nếu watcher ngừng đập nhịp, guard dừng phiên.
-  - Ngưỡng: vượt dòng dừng của watcher, `17,5 − 1,94 × 430 / 3600 = 17,27` CU, thì `follow` ghi `EARLY_STOP` kèm các số, dừng phiên có xác nhận, và thoát 3 (6 nếu không xác nhận được). Dừng ở bước 2 200 tốn khoảng 1,3 CU. Để chạm trần thì tốn khoảng 17 CU mà chỉ được `ckpt_30000`, plan không dùng tới.
-  - Mức s/bước tối đa để chạy hết. Giả định dựng VM cộng `probe` mất 11 phút, lưu 4 lần mỗi lần 60 s, cộng 2 × 60 s ở trên:
+  - Ngưỡng: vượt dòng dừng của watcher, `trần − 1,94 × 430 / 3600`, tức `18 − 0,232 = 17,77` CU. `trần` lấy từ dòng `poll` của chính watcher, không ghi cứng trong `he1_fetch.py`. Vượt ngưỡng thì `follow` ghi `EARLY_STOP` kèm các số, dừng phiên có xác nhận, và thoát 3 (6 nếu không xác nhận được). Dừng ở bước 2 200 tốn khoảng 1,3 CU. Để chạm trần thì tốn khoảng 18 CU mà chỉ được `ckpt_30000`, plan không dùng tới.
+  - Mức s/bước tối đa để chạy hết ở trần 18. Giả định dựng VM cộng `probe` mất 11 phút, lưu 4 lần mỗi lần 60 s, cộng 2 × 60 s ở trên:
 
     | Tốc độ kéo về | Thời gian kéo `ckpt_40000` | s/bước tối đa |
     |---|---|---|
-    | 6 MB/s | 17,4 phút | 0,745 |
-    | 10 MB/s | 10,4 phút | 0,755 |
-    | 20 MB/s | 5,2 phút | 0,763 |
-    | 50 MB/s | 2,1 phút | 0,768 |
-    | Drive đã mount (kéo khoảng 0) | — | 0,771 |
+    | 6 MB/s | 17,4 phút | 0,768 |
+    | 10 MB/s | 10,4 phút | 0,779 |
+    | 20 MB/s | 5,2 phút | 0,786 |
+    | 50 MB/s | 2,1 phút | 0,791 |
+    | Drive đã mount (kéo khoảng 0) | — | 0,794 |
 
-  - Đối chiếu S1-04: 0,710 s/bước là trung vị đo được, không tính validation và lưu. Ước lượng 8,5 giờ suy ra khoảng 0,753 s/bước khi tính cả validation; `progress` cũng đo trung bình có validation, nên 0,753 là đầu vào sát thực tế. Mức này chỉ qua được nếu kéo về từ khoảng 8,7 MB/s; ở 6 MB/s dự kiến 17,44 CU. Trần 17,5 vì vậy sát nút. **[Option]** cho Hiếu, chưa áp dụng:
-    - (a) chia lại trần trong 52 CU: 18,0 / 18,0 / 16,0. Eval ước lượng 16,2 nên còn ít chỗ;
-    - (b) nâng trần cứng của DA-26 thêm khoảng 1 CU;
-    - (c) lưu mỗi 5 000 bước. Đây là override đổi `rp_95c98a476499`, nên phải đóng băng lại và có `Decision` mới do Hiếu ký. Phương án này chỉ làm phần mất ít đi, khi chạm trần còn `ckpt_35000`, không làm cho lần chạy vừa trần;
-    - (d) giữ nguyên, để quy tắc này dừng sớm khi không vừa.
+  - Đối chiếu S1-04: 0,710 s/bước là trung vị đo được, không tính validation và lưu. Ước lượng 8,5 giờ suy ra khoảng 0,753 s/bước khi tính cả validation; `progress` cũng đo trung bình có validation, nên 0,753 là đầu vào sát thực tế. Ở 6 MB/s dự kiến 17,44 CU, dưới ngưỡng 17,77; mức này qua được từ khoảng 3,8 MB/s. Ở trần cũ 17,5 thì cần từ 8,7 MB/s. Bốn phương án đã đưa Hiếu (chia lại trần, nâng trần cứng, lưu mỗi 5 000 bước, giữ nguyên). **[Đã chốt]** Hiếu chọn chia lại trần: 18,0 / 18,0 / 16,0 (mục 6.2).
 - Mã thoát của watcher và guard theo docstring của `scripts/colab/cu_watch.py`. Gặp mã 5 (`STOP_FAILED`) thì xem `colab sessions` ngay.
 
 **Sau mỗi phiên.**
@@ -336,7 +335,7 @@ vm $S "cd /content/da26; nohup setsid python3 fw/scripts/he/he1_colab.py persist
 - Server eval mở sau, trong cùng `$R`, theo đúng dạng lệnh của watcher (`--gpu L4`, `--log` và `--persist` đều bắt buộc theo quy ước). Nếu guard đã thoát, chạy lại dòng guard ở trên với `$R` trước. Lệnh dưới giả định driver eval, viết ở PR eval, ghi log server vào `/content/da26/runs/da26-t2-eval-n20/`, để `once` kéo về được.
 
 ```bash
-nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py session --registry "$0" --new --name "$1" --gpu L4 --cap 17 --floor 14 --persist "python3 scripts/he/he1_fetch.py once --session $1 --registry $0 --dest fwdata/he/runs" --log "$0/$1.jsonl"; echo "exit $?"' $R da26-t2-eval-n20 < /dev/null > $R/da26-t2-eval-n20.out 2>&1 &
+nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py session --registry "$0" --new --name "$1" --gpu L4 --cap 16 --floor 14 --persist "python3 scripts/he/he1_fetch.py once --session $1 --registry $0 --dest fwdata/he/runs" --log "$0/$1.jsonl"; echo "exit $?"' $R da26-t2-eval-n20 < /dev/null > $R/da26-t2-eval-n20.out 2>&1 &
 ```
 
 ## Change log
@@ -354,3 +353,4 @@ nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py se
 | 4/11/2026 | Mục 7: bản bền trên laptop khi chưa mount được Drive (`scripts/he/he1_fetch.py`: rsync qua `colab ssh --proxy-mode`, kiểm sha256; `follow` cạnh mỗi phiên, `once` ở mốc mềm). Lý do không dùng `colab download`; `persist` từ chối khi Drive chưa mount; ngưỡng tốc độ 6 MB/s và `ALERT`; kết quả thử khô | Hiếu (soạn với Claude) |
 | 4/11/2026 | Mục 7, theo review #109: `setup` chỉ dựng môi trường, không tải hai lần; đo tốc độ proxy (`probe`) trước `setup`; quy tắc dừng sớm thành bắt buộc, `follow` tự áp dụng, có bảng ngưỡng s/bước theo MB/s và đối chiếu S1-04; bốn **[Option]** về trần cho Hiếu; dừng phiên ngay khi có `ckpt_40000`; lệnh watcher của server eval đủ `--gpu`, `--log`, `--persist`; `rp_95c98a476499` ghi cứng trong driver; bỏ ô persist kernel | Hiếu (soạn với Claude) |
 | 5/11/2026 | Mục 7, theo review lại #109: train chỉ `done` khi `ok` ở bước 40 000, `failed` dừng phiên và thoát 5; tốc độ và `ALERT` chỉ tính trên file checkpoint, log được ghi thêm là `grown`; `ready` trả 1 khi chưa sẵn sàng; mọi lần dừng có xác nhận (thử lại, SIGTERM, thoát 6), mọi lệnh có thời hạn; dự báo tính thêm khoảng cách lượt cuối và thời gian băm, bảng ngưỡng tính lại, từ bước 38 000 mỗi lượt cách 60 s; không tính được dự báo thì `ALERT` mỗi lượt, sau `ckpt_10000` chỉ `ALERT`; file `probe` ra khỏi `$R` | Hiếu (soạn với Claude) |
+| 5/11/2026 | Mục 6.2, 7: `Decision` Hiếu 4/11: caps 18/18/16 (cùng 52 CU). Lệnh watcher `--cap 18` / `--cap 18` / `--cap 16`. Bảng ngưỡng tính lại ở trần 18. Số dư tối thiểu vẫn 66 CU. Ghi chú: trần eval 16 thấp hơn ước lượng 16,2 | Hiếu (soạn với Claude) |

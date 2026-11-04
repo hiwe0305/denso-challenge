@@ -339,6 +339,17 @@ def test_the_s104_estimate_fits_only_with_a_fast_pull() -> None:
     assert late is not None and late["verdict"] == "late"  # past ckpt_10000: ALERT only
 
 
+def test_the_stop_line_follows_the_watchers_cap() -> None:
+    # Hiếu 4/11: caps 18/18/16. The cap comes from the watcher's poll line, not a constant.
+    assert stop_line(18.0) == pytest.approx(17.768, abs=1e-3)
+    assert stop_line(16.0) == pytest.approx(15.768, abs=1e-3)
+    spent = 1.94 * (8 * 60 + 2200 * 0.753) / 3600
+    s104 = running(2200, 0.753)
+    assert judge(s104, (spent, 17.5), 6.0)["verdict"] == "stop"  # type: ignore[index]
+    assert judge(s104, (spent, 18.0), 6.0)["verdict"] == "ok"  # type: ignore[index]
+    assert judge(s104, (spent, 18.0), 3.0)["verdict"] == "stop"  # type: ignore[index]
+
+
 def test_a_pass_that_cannot_project_is_blind_not_ok() -> None:
     blind = judge(running(2500, 0.75), None, 30.0)
     assert blind is not None and blind["verdict"] == "blind"
