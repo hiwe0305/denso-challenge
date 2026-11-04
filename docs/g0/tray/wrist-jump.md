@@ -120,12 +120,12 @@ Sửa đề xuất **[Đề xuất]**:
 
 Đường PICO ảo của DA-35 (`tray/pico/agent.py`) gọi thẳng `TeleopRetargetingIK`, không đi qua `UpperBodyIK`, nên bản sửa này không đổi dữ liệu S2. Nhưng S2 cũng có lỗi này: operator ảo cầm khay bằng cùng tư thế đỡ ngửa. Trong tập cha `parents-1103b` (129 episode), 111 episode vượt 0,0869; trung vị của bước tay lớn nhất mỗi episode là 0,099 rad, tối đa 0,181 (nhẹ hơn S1). Đặt cùng giới hạn vận tốc cho IK của `tray/pico/agent.py` là việc của DA-35.
 
-Khi Hiếu đồng ý, việc tiếp theo:
+Việc tiếp theo, theo quyết định ngày 4/11/2026 (mục cuối):
 
-1. Sửa mã như trên trong một PR của DA-33.
-2. Sinh lại release S1: 130 lượt mức 1, seed 1000–1129. Lô cũ chạy 20 phút với 22 worker, nên với 14 worker theo quy tắc RAM ước khoảng 30 phút.
-3. Sinh lại lô pool v2 của DA-34 bằng planner mới: 610 lượt, seed 1000–1609. Lô cũ dừng ở 316/610.
-4. QA phát lại, release mới, chạy lại QA của DA-03 để xác nhận hết cờ `action_jump.arm`.
+1. Sửa mã như trên trong một PR của DA-33 (nhiệm vụ 11).
+2. Sau khi PR được merge: chạy smoke khoảng 20 seed train trên `rtx3060` bằng mã đã merge, rồi chạy QA của DA-03. Đạt khi không còn cờ `action_jump.arm` và tỉ lệ thành công tương đương 39/40 của lần thử.
+3. Chỉ một lô: DA-34 sinh lại kho bằng supervisor của nó, 610 lượt, mức 1, seed 1000–1609. Release S1 cắt từ kho này, không sinh lô 130 lượt riêng: [tray.md](../../he/tray.md) mục 7 đã gộp seed 1000–1129 vào kho ("cả kho là một lô, một release"), và sim cùng WBC tất định (mục 8.1).
+4. QA phát lại, lọc, release, rồi chạy lại QA của DA-03. Nghiệm thu: không còn cờ `action_jump.arm`. Ngưỡng lọc giữ nguyên như đã chốt (nghiêng ≤ 10°, trôi ≤ 20 mm), không chỉnh lại trên kho mới.
 
 ## Lỗi x264 của bộ ghi (seed 1349, lô pool v2)
 
@@ -186,15 +186,17 @@ fwdata/simple/.venv/bin/python -X faulthandler scripts/g0/tray/video_writer_race
 
 Kết quả thô (không commit) ở `rtx3060:~/denso-da33-wristjump/`: `out/` (phân tích 102 episode), `sim/` (log pha seed 1000 và 1022), `trial/` (120 lượt thử), `race-*.log`, `x264/` (các bản sao tái hiện seed 1349).
 
-## Hiếu cần quyết
+## Đã chốt 4/11/2026
 
-1. Nhận bản sửa giới hạn vận tốc trong IK (0,08 rad/bước) và sinh lại release S1 cùng lô pool v2, hay train DA-34 trên dữ liệu hiện tại với nhãn có bước vọt.
-2. Nhận bản sửa `JoinedVideoWriter` cho bộ ghi (DA-33, và DA-35 nếu dùng chung).
-3. Giao DA-35 đặt cùng giới hạn vận tốc cho IK của operator ảo trước lô S2 production.
+Hiếu nhận cả ba đề xuất (D-28 trong [decisions.md](decisions.md)):
+
+1. Nhận giới hạn vận tốc trong IK (0,08 rad/bước) và sinh lại; không train trên dữ liệu có bước vọt, không che bước vọt khi train.
+2. Nhận `JoinedVideoWriter` cho bộ ghi.
+3. DA-35 tự đặt cùng giới hạn cho IK của operator ảo, gộp vào nhiệm vụ 10 của DA-35; DA-33 không sửa `tray/pico/`.
 
 ## Quyết định và bản sửa (4/11/2026)
 
-**[Đã chốt]** Hiếu merge #93 và chọn sửa rồi sinh lại, không che bước vọt khi train. Nhiệm vụ 11 của DA-33 làm theo hai đề xuất ở trên:
+Nhiệm vụ 11 của DA-33 làm theo đề xuất 1 và 2:
 
 - `UpperBodyIK(robot_model, max_joint_step)` và `StandWalkController(robot, max_joint_step)` đặt `VelocityLimit` cho QP của IK: min(URDF, `max_joint_step` / (`num_step_per_frame` · `dt` · `amplify_factor`)). Không truyền thì giữ hành vi cũ, nên các đường khác (test WBC, script đo) không đổi.
 - `TrayAgent` truyền `arm_step_max: 0.08` từ `tray_planner.yaml`; `PLANNER_VERSION` lên `da33-planner-5` (cấu hình hiện tại ghi `da33-planner-5+cfg.4e2a4505`).
@@ -208,4 +210,4 @@ Bằng chứng trên `rtx3060` (bản sao nhánh ở `~/denso-da33-ikfix`, scope
 | Test mới `test_arm_commands_move_at_most_arm_step_max_per_step`, seed 1 mức 1, có và không có giới hạn | Không giới hạn: bước tay lớn nhất 0,177, 24 bước vượt 0,0869, nên test bắt được lỗi. Có giới hạn: 0,08, không bước nào vượt. Cả hai đều thành công. |
 | `generate.py` 6 lượt, seed 300000–300005, 2 worker | 5/6 thành công, 5/5 qua QA tối thiểu, hỏng 1 `L-ONE-HAND` (300004). Kết quả và số bước từng seed trùng lần thử `ik_velocity` ở trên. Mỗi episode ghi có số frame video bằng số dòng parquet; bước tay lớn nhất trong `action` đã ghi là 0,08. |
 
-Việc còn lại, sau khi PR được merge: sinh lại release S1 (130 lượt, seed 1000–1129) và lô pool của DA-34 (610 lượt, seed 1000–1609), rồi chạy lại QA của DA-03. Quyết định 3 (giới hạn cho IK của operator ảo DA-35) chưa có câu trả lời ghi lại; `tray/pico/session.py` của DA-35 vẫn dùng writer gốc.
+Việc còn lại là bước 2–4 của mục "Việc tiếp theo" ở trên. `tray/pico/session.py` của DA-35 vẫn ghi qua writer gốc; dùng `JoinedVideoWriter` ở đó là việc của DA-35.
