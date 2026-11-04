@@ -8,8 +8,10 @@ from pathlib import Path
 import pytest
 import yaml
 from flywheel_psi0.stage1.runplan import (
+    FILLED_BY_ACCELERATE,
     Stage1Plan,
     check,
+    deepspeed_problems,
     first_loss_matches,
     loss_decreased,
     main,
@@ -78,13 +80,84 @@ def test_the_plan_overrides_only_length_val_and_deepspeed() -> None:
     rendered = argv()
     assert "--train.max_training_steps=200" in rendered
     assert "--train.validation_steps=0" in rendered
-    assert "--train.deepspeed_config=scripts/deepspeed/zero3_offload.json" in rendered
+    config = REPO / "configs" / "runplans" / "stage1" / "zero3_offload.json"
+    assert f"--train.deepspeed_config={config}" in rendered  # absolute: Psi0 runs elsewhere
     assert set(plan().overrides) == {
         "train.max_training_steps",
         "train.checkpointing_steps",
         "train.validation_steps",
-        "train.deepspeed_config",
     }
+    vm = plan().overrides_at(Path("/content/da30/fw"))
+    assert vm["train.deepspeed_config"] == "/content/da30/fw/" + plan().deepspeed_config
+
+
+# `scripts/deepspeed/zero3_offload.json` at cda3fdf, the blocks run 1 (4/11/2026) used.
+AUTHORS_OPTIMIZER = {
+    "type": "AdamW",
+    "params": {"lr": "auto", "betas": "auto", "eps": "auto", "weight_decay": "auto"},
+}
+AUTHORS_SCHEDULER = {
+    "type": "WarmupLR",
+    "params": {"warmup_min_lr": "auto", "warmup_max_lr": "auto", "warmup_num_steps": "auto"},
+}
+
+
+def deepspeed_config() -> dict[str, object]:
+    path = REPO / plan().deepspeed_config
+    return json.loads(path.read_text())  # type: ignore[no-any-return]
+
+
+def test_no_optimizer_param_is_auto_and_accelerate_fills_every_other_auto() -> None:
+    config = deepspeed_config()
+    assert "auto" not in config["optimizer"]["params"].values()  # type: ignore[index]
+    assert deepspeed_problems(config, plan().load_recipe(REPO)) == []
+
+    def autos(node: object, prefix: str = "") -> set[str]:
+        if not isinstance(node, dict):
+            return set()
+        found = {prefix + key for key, value in node.items() if value == "auto"}
+        for key, value in node.items():
+            found |= autos(value, f"{prefix}{key}.")
+        return found
+
+    assert autos(config) <= FILLED_BY_ACCELERATE
+
+
+def test_the_authors_offload_config_is_refused_as_run_1_was() -> None:
+    config = {**deepspeed_config(), "optimizer": AUTHORS_OPTIMIZER, "scheduler": AUTHORS_SCHEDULER}
+    problems = deepspeed_problems(config, plan().load_recipe(REPO))
+    assert any("optimizer.params.betas is 'auto' and accelerate" in p for p in problems)
+    assert any("optimizer.params.eps is 'auto' and accelerate" in p for p in problems)
+    assert any("WarmupCosineLR" in p for p in problems)
+
+
+@pytest.mark.parametrize(
+    ("block", "key", "value", "expected"),
+    [
+        ("optimizer", "lr", 1e-5, "optimizer.params.lr"),
+        ("optimizer", "betas", [0.9, 0.95], "optimizer.params.betas"),
+        ("optimizer", "eps", 1e-6, "optimizer.params.eps"),
+        ("optimizer", "weight_decay", 0.1, "optimizer.params.weight_decay"),
+        ("scheduler", "cos_min_ratio", 0.0001, "WarmupCosineLR"),
+        ("scheduler", "last_batch_iteration", -1, "WarmupCosineLR"),
+    ],
+)
+def test_a_config_that_drifts_from_the_recipe_is_refused(
+    block: str, key: str, value: object, expected: str
+) -> None:
+    config = deepspeed_config()
+    config[block] = {**config[block], "params": {**config[block]["params"], key: value}}  # type: ignore[dict-item]
+    problems = deepspeed_problems(config, plan().load_recipe(REPO))
+    assert len(problems) == 1 and expected in problems[0]
+
+
+def test_check_wants_the_config_by_its_own_key(tmp_path: Path) -> None:
+    raw = yaml.safe_load(PLAN.read_text())
+    raw["overrides"]["train.deepspeed_config"] = "scripts/deepspeed/zero3_offload.json"
+    raw["deepspeed_config"] = "configs/runplans/stage1/missing.json"
+    problems = check(Stage1Plan.model_validate(raw), REPO)
+    assert any("not in overrides" in p for p in problems)
+    assert any("missing.json not found" in p for p in problems)
 
 
 def test_check_rejects_a_bad_plan(tmp_path: Path) -> None:

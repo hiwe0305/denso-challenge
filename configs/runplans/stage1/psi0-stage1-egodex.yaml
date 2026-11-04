@@ -34,8 +34,8 @@ positional: ["model.action-tokenizer:fast"]
 args:
   train.name: pretrain
   train.data_parallel: deepspeed
-  # The script reads ${DEEPSPEED_CONFIG:-scripts/deepspeed/zero3.json}; a RunPlan sets
-  # the same choice through an override.
+  # The script reads ${DEEPSPEED_CONFIG:-scripts/deepspeed/zero3.json}; a stage 1
+  # RunPlan replaces it by its `deepspeed_config` (Stage1Plan.overrides_at).
   train.deepspeed_config: scripts/deepspeed/zero3.json
   train.mixed_precision: bf16
   train.train_batch_size: 16
