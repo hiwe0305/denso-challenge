@@ -1201,23 +1201,32 @@ Các thực thể còn lại (`Source`, `Condition`, `Release`, `Checkpoint`, `R
 
 ## Phụ lục C · Bộ mock kịch bản demo
 
-Một thư mục, nạp bằng `fwsync import --from mock/demo-17-11/`. FE dùng cùng thư mục này để dựng handler MSW, nên hai bên nhìn thấy cùng một bộ số.
+Một thư mục, nạp bằng `fwsync import --from mock/demo-17-11 --origin mock`. FE dùng cùng thư mục này để dựng handler MSW, nên hai bên nhìn thấy cùng một bộ số.
+
+**Đã dựng (4/11/2026).** Thư mục **sinh ra** bằng `uv run python -m web.mock.generate` với một seed cố định, không gõ tay, vì nó phải nhất quán với chính nó: số thành viên của một cụm bằng đúng số episode lỗi mang khoá của cụm, bút toán đảo mang đúng số đối của bút toán gốc. `web/tests/test_mock.py` so thư mục với bản sinh lại và kiểm các bất biến đó. Mọi số là bịa; `mock/demo-17-11/README.md` nói rõ, kèm bốn giả định riêng của bộ mock.
+
+Bảng dưới là file **thật** của thư mục. Nó khác bản 0.2 ở hai chỗ: bộ nạp đọc một bảng một file, nên `recommendation.json` của bản 0.2 tách ra thành file cụm, can thiệp, bước, phiếu sửa; và thêm những bảng mà các bảng kia trỏ tới (nguồn, RunPlan, checkpoint, tầng pipeline).
 
 | File | Nội dung |
 |---|---|
-| `datasets.jsonl` | 4 lô: psi-data teleop, teleop bàn phím, synthetic S1, mẫu EgoDex |
-| `episodes.jsonl` | Khoảng 200 episode, đủ bốn nguồn, `is_root` đúng |
-| `qa_reports.jsonl` | pass / flag / quarantine / reject theo tỉ lệ thật; một lô dính lỗi cấy dừng ở tầng 4 |
-| `defect_manifest.json` | 10 lỗi cấy: 4 ở tầng 2, 3 ở tầng 4, 3 trong log train |
-| `defect_scores.jsonl` | Hai bộ: code và agent |
-| `releases.jsonl` | 1 release đóng băng, 1 release nháp |
-| `experiments.jsonl` | 4 nhánh: A, A₀.₇, B, B-fail, cộng 3 điểm HE |
-| `training_metrics.jsonl` | 2 run, có cả train và val; một run có T3 |
-| `evaluations.jsonl`, `eval_episodes.jsonl` | 90 episode × 2 nhánh, đủ ba mức, có 4 episode lỗi hạ tầng |
-| `system_diagnoses.jsonl` | Kiểm hệ thống của các episode lỗi: có ca `controller`, ca `sync`, **ca `unknown` vì thiếu log RTC**, và ca `clean` (bản 0.3) |
-| `recommendation.json` | 1 lượt 12 bước, 4 cụm: HE_THONG_CONTROLLER, NGOAI_MIEN, THIEU_VUNG_PHU, KY_NANG_YEU |
-| `ledger.jsonl` | Bút toán đủ loại, có 1 bút toán đảo |
+| `sources.jsonl`, `run_plans.jsonl` | 6 nguồn (`repo: mock://…`), 9 RunPlan |
+| `datasets.jsonl` | 5 lô: psi-data teleop, teleop bàn phím, synthetic S1, mẫu EgoDex, **và bản sao chấm** có lỗi cấy |
+| `pipeline_stage_runs.jsonl` | 33 lần chạy tầng: psi tầng 4 `OVERRIDDEN`, bàn phím tầng 4 có hai attempt, bản sao dừng ở tầng 4 |
+| `episodes.jsonl` | 210 episode, đủ bốn nguồn; 10 episode egocentric còn `raw` nằm ở `unassigned` |
+| `qa_reports.jsonl` | 200 báo cáo (egocentric raw chưa qua tầng 4); flag, quarantine, reject đều có lý do |
+| `releases.jsonl`, `release_items.jsonl` | 1 release đóng băng có hash (166 item, 2 item bị loại kèm lý do), 1 release nháp |
+| `experiments.jsonl`, `experiment_datasets.jsonl`, `checkpoints.jsonl` | 4 nhánh A, A_07, B, B_FAIL cộng 3 điểm HE |
+| `training_metrics.jsonl`, `train_diagnoses.jsonl` | 2 run, train và val; B_FAIL có T3; cả hai bỏ qua T7 kèm lý do |
+| `probes.jsonl` | P1, P3 của hai checkpoint; P4 của B so với cha A |
+| `evaluations.jsonl`, `eval_episodes.jsonl` | 2 lượt dev × 90 episode, đủ ba mức, 4 episode lỗi hạ tầng; 1 holdout niêm phong tới 20/11 |
+| `system_diagnoses.jsonl` | 27 episode lỗi của B: `controller`, `sync`, **`unknown` vì thiếu log RTC**, `clean` |
+| `recommendation.json`, `failure_clusters.jsonl` | 1 lượt, 4 cụm: HE_THONG_CONTROLLER, NGOAI_MIEN, THIEU_VUNG_PHU, KY_NANG_YEU |
+| `flywheel_algo_steps.jsonl`, `diagnostic_runs.jsonl` | 12 bước; rollout chẩn đoán của ba cụm, một phép kiểm `skipped` kèm lý do |
+| `interventions.jsonl`, `repair_tickets.jsonl` | 4 can thiệp, chỉ trên hai cụm dữ liệu; 1 phiếu sửa cho cụm hệ thống |
+| `decisions.jsonl` | 2 quyết định duyệt tầng: FORCE_CONTINUE, APPLY_FIX_AND_RETRY |
+| `ledger.jsonl` | 14 bút toán: thực đo, ước tính của 4 can thiệp, 1 bút toán đảo |
 | `price_books.jsonl` | 4 bảng giá cho bảng độ nhạy |
+| `defect_manifest.json`, `defect_scores.jsonl` | 10 lỗi cấy (7 dữ liệu, 3 log train); code bắt 6/10, agent bắt thêm 2 |
 
 Bốn cụm với bốn chẩn đoán khác nhau là cố ý: nó cho phép demo nói câu quan trọng nhất — *"hai cụm này là lỗi hệ thống và ngoài miền, không tốn một đồng dữ liệu nào; chỉ hai cụm còn lại mới cần thu thêm"*.
 

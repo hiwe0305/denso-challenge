@@ -12,6 +12,7 @@ Thiết kế đầy đủ: [DESIGN.md](DESIGN.md). File này chỉ nói cách ch
 | `tests/` | Test chạy trong CI, không cần Postgres |
 | `api/` | FastAPI, SQLAlchemy, Alembic (chưa dựng) |
 | `fwsync/` | Bộ nạp: `source.py` đọc, `mapping.py` ánh xạ, `sink.py` ghi, `runner.py` bốn việc, `cli.py` lệnh |
+| `mock/` | Generator của bộ mock; output ở `mock/demo-17-11/` ngoài thư mục `web/` |
 | `fe/` | React, Vite, MSW (chưa dựng; `package.json` theo §3.1) |
 
 ## Chạy test
@@ -35,6 +36,19 @@ uv run python -m web.contracts.generate_ts
 
 `web/tests/test_generated_ts.py` so file trên đĩa với bản sinh lại, nên quên
 chạy lệnh này là test đỏ.
+
+## Bộ mock
+
+`mock/demo-17-11/` là dữ liệu mẫu của kịch bản demo 17/11 (DESIGN.md Phụ lục C):
+210 episode, 180 episode eval, một lượt Failure → Data với bốn cụm. **Mọi số là
+bịa.** Thư mục sinh ra, không sửa tay:
+
+```bash
+uv run python -m web.mock.generate          # ghi lại mock/demo-17-11/
+uv run python -m web.fwsync.cli import --from mock/demo-17-11 --origin mock
+```
+
+Luôn nạp với `--origin mock`, để FE dán nhãn "mock" lên từng bản ghi.
 
 ## Chạy bộ nạp
 
