@@ -10,17 +10,20 @@ of the world carry the parent over:
 - `T_P = T_target_new * T_target_parent^-1` for segment P, relative to the
   target zone.
 
-One transform per frame moves both the parent's base path and its wrists in the
-world. It is the identity until the parent starts walking to table A, grows to
-`T_K` along that walk (by the share of the path walked), stays `T_K` through K,
-turns into `T_P` along the carry to table B, and stays `T_P` through P. The base
-reference is the transformed base path; the lower body is steered onto it
-(flywheel_simple.tray.s2.replay). The wrists keep the parent's robot-frame
-targets while the robot walks and follow the transformed world targets while
-the hands reach for and grasp the tray, or place it (the anchors of
-flywheel_simple.tray.s2.segments);
-at every change of anchor they blend over `stitch_s` (position interpolated,
-rotation slerped) so the switch from one frame to the other is smooth.
+One transform per frame moves the parent's base path in the world. Through K
+(up to `k_end`) it is the identity: the body walks the parent's own path and
+only the hands follow the moved tray. From the lift on, the tray sits off the
+parent's grip by a fixed amount (`C = B_lift^-1 T_K^-1 B_lift` in the robot
+frame), so along the carry to table B the transform blends from the identity to
+`T_P * B_i C B_i^-1` (by the share of the carry path walked) and stays there
+through P: the body arrives where the held tray comes down on the moved target.
+The base reference is the transformed base path; the lower body is steered onto
+it (flywheel_simple.tray.s2.replay). The wrists keep the parent's robot-frame
+targets while the robot walks and follow world targets anchored by `T_K` while
+the hands reach for and grasp the tray, and by `T_P` while they place it (the
+anchors of flywheel_simple.tray.s2.segments); at every change of anchor they
+blend over `stitch_s` (position interpolated, rotation slerped) so the switch
+from one frame to the other is smooth.
 
 Pure numpy: runs in the workspace.
 """

@@ -22,6 +22,7 @@ pytestmark = pytest.mark.sim
 
 PARENTS = Path(os.environ.get("S2_PARENTS", "fwdata/simple/tray/virtual/parents-1103b"))
 SHORT_STEPS = 700  # 14 s: activation, the walk to table A and the reach
+ACTION_ARMS = [*range(15, 22), *range(29, 36)]  # arm joints of the 43-d action
 # Two parents of parents-1103b and level-1 conditions drawn by sample_jobs (gen base 900).
 X = {"parent_id": "parents-1103b/shard-10/0", "level": 1, "seed": 204275, "gen_seed": 129588076}
 Y = {"parent_id": "parents-1103b/shard-07/4", "level": 1, "seed": 423796, "gen_seed": 550757015}
@@ -157,6 +158,9 @@ def test_same_job_gives_the_same_variant_wherever_it_runs(
     assert block["generator_version"].startswith("da35-s2-") and block["transform"]["t_p"]
     assert block["split"] == "train" and block["level"] == X["level"]
     assert len(alone) == len(after) > 0
+    # The retargeting IK's joint step limit (arm_step_max) holds in the variant too.
+    arms = np.stack([f["action"] for f in after])[:, ACTION_ARMS]
+    assert np.abs(np.diff(arms, axis=0)).max() <= 0.08 + 1e-6
     for key in ("action", "action.eef", "observation.state", "teleop.navigate_command"):
         np.testing.assert_array_equal(
             np.stack([f[key] for f in alone]), np.stack([f[key] for f in after]), err_msg=key

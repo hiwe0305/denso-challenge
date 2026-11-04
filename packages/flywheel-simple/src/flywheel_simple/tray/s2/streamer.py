@@ -42,7 +42,7 @@ from flywheel_simple.tray.s2.variant import (
 
 Mode = Literal["exact", "variant"]
 
-GENERATOR_VERSION = "da35-s2-1"
+GENERATOR_VERSION = "da35-s2-2"  # 2: place fix about the held tray, parent turns played (fc03aae)
 
 
 def generator_version(s2_cfg: S2Config, op_cfg: OperatorConfig) -> str:
@@ -109,7 +109,10 @@ class S2Streamer:
     def reset_status(self) -> None:
         """New episode (SIMPLE's teleop reset): the plan of the current job."""
         task = self.env.unwrapped.task
-        if self._job is not None and getattr(task, "sample", None) is not None:
+        if self._job is not None and getattr(task, "sample", None) is None:
+            # The plan is built from the sampled scene: without one it would stay the last job's.
+            raise RuntimeError(f"S2 job {self._job} on a task with no sampled condition")
+        if self._job is not None:
             demo, cut = self.parents.get(self._job.parent_id)
             parent_sample = sample_episode(task.cfg, demo.level, demo.seed)
             self.distance = condition_distance(parent_sample, task.sample)
@@ -202,10 +205,10 @@ class S2Streamer:
         }
 
     def signal(self) -> PicoSignal:
-        from flywheel_simple.tray.simple_task import tray_state  # SIMPLE venv
-
         """This step's signal; a second read at the same sim time repeats the first
         without the activation edge (TeleopPolicy reads twice when activating)."""
+        from flywheel_simple.tray.simple_task import tray_state  # SIMPLE venv
+
         data = self.env.unwrapped.mjData
         t = float(data.time)
         if self._last is not None and self._last[0] == t:
