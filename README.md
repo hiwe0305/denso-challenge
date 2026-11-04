@@ -13,7 +13,7 @@ Trạng thái: đề xuất PoC, chưa chạy Ψ₀ hoặc robot thật. Số li
 | [docs/spec-v10-failure-to-data.md](docs/spec-v10-failure-to-data.md) | Đặc tả hiện hành (v10.4): giả thuyết HS, HTa, HTb, HD, HE, thuật toán Failure → Data 12 bước, PoC với các nhánh A, A₀.₇, B, B-fail, C, thí nghiệm HE, sổ chi phí, lộ trình 12 tuần, glossary |
 | [docs/superpowers/specs/](docs/superpowers/specs/2026-10-27-g1-psi0-demo-design.md) | Design ngày 27/10/2026 (hiện hành duy nhất): task hai bàn, simulator, teleop bàn phím, sinh tự động, pipeline 6 tầng, thí nghiệm HE, Agent QA/QC và bộ lỗi cấy, bảng lỗi, kịch bản demo 17/11 |
 | [docs/product/](docs/product/README.md) | Hồ sơ sản phẩm theo BMAD: brief, PRD, kiến trúc lõi flywheel, kế hoạch chia việc 5 người, phản biện và câu hỏi cho mentor, story Sprint 1 |
-| [RULE.md](RULE.md) | **Đọc đầu tiên nếu bạn là thành viên đội:** công việc của từng người, một ngày làm việc, cách làm một story, rule R1–R9, điều không được phá, hỏi ai |
+| [RULE.md](RULE.md) | **Đọc đầu tiên nếu bạn là thành viên đội:** công việc của từng người, một ngày làm việc, cách làm một story, rule R1–R10, điều không được phá, hỏi ai |
 | [CLAUDE.md](CLAUDE.md) | Quy tắc chung cho mọi phiên Claude Code và cho người: đọc gì trước, phạm vi file, quy ước nhánh và commit, bất biến kiến trúc. Có thêm [docs/CLAUDE.md](docs/CLAUDE.md) và [website/CLAUDE.md](website/CLAUDE.md) |
 | [scripts/repo/](scripts/repo) | `check_links.py` kiểm liên kết nội bộ; `progress.py` in tiến độ theo story; `pr_guard.py` và `daily_report.py` cho rule kiểm soát theo ngày ([08](docs/product/08-daily-control.md)); `setup_labels.sh` tạo label GitHub |
 | [docs/challenge/](docs/challenge/README.md) | Đề bài của BTC, kèm tiêu chí 3 cấp |
