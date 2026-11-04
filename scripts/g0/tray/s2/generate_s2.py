@@ -83,10 +83,15 @@ def logged_key(attempt: dict[str, Any]) -> tuple[Any, ...]:
     return (attempt["parent_episode"], attempt["level"], attempt["seed"], attempt["gen_seed"])
 
 
+def pending(args: argparse.Namespace, jobs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The jobs of the list that no shard has logged yet."""
+    done = {logged_key(a) for shard in args.out.glob("shard-*") for a in attempts_of(shard)}
+    return [j for j in jobs if job_key(j) not in done]
+
+
 def launch(args: argparse.Namespace, jobs: list[dict[str, Any]]) -> list[subprocess.Popen[bytes]]:
     """One worker per shard; jobs any shard has logged are not run again."""
-    done = {logged_key(a) for shard in args.out.glob("shard-*") for a in attempts_of(shard)}
-    todo = [j for j in jobs if job_key(j) not in done]
+    todo = pending(args, jobs)
     procs = []
     for k in range(args.workers):
         shard = args.out / f"shard-{k:02d}"
@@ -106,6 +111,11 @@ def launch(args: argparse.Namespace, jobs: list[dict[str, Any]]) -> list[subproc
         log = (shard / "worker.log").open("ab")
         procs.append(subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT))
     return procs
+
+
+def exit_status(codes: list[int]) -> int:
+    """1 if any worker failed: its jobs are missing from the batch until a rerun."""
+    return 1 if any(code != 0 for code in codes) else 0
 
 
 def summarize(out: Path, wall_s: float | None) -> dict[str, Any]:
@@ -175,9 +185,7 @@ def main(argv: list[str] | None = None) -> int:
         (args.out / "jobs.jsonl").write_text("".join(json.dumps(j) + "\n" for j in jobs))
         from flywheel.data.ledger import job_ledger  # workspace venv only
 
-        todo = len(jobs) - len(
-            {logged_key(a) for shard in args.out.glob("shard-*") for a in attempts_of(shard)}
-        )
+        todo = len(pending(args, jobs))
         workers = max(1, min(args.workers, todo))
         estimate = max(todo, 0) * args.est_attempt_s / workers
         note = (
@@ -199,9 +207,11 @@ def main(argv: list[str] | None = None) -> int:
             )
         print(f"ledger: run plan {job.run_plan_id}, job {job.job_id}", flush=True)
     else:
-        summary = summarize(args.out, None)
+        codes, summary = [], summarize(args.out, None)
     print(json.dumps(summary, indent=1))
-    return 0
+    if exit_status(codes):
+        print(f"{sum(c != 0 for c in codes)} workers failed: rerun to finish the batch", flush=True)
+    return exit_status(codes)
 
 
 if __name__ == "__main__":
