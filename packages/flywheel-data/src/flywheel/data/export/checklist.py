@@ -463,8 +463,7 @@ def _constant_check(
 
 def _constant_allowed(dim: ActionDimension) -> bool:
     """Whether a constant action dim is no stats error: masked or declared constant (D4)."""
-    # getattr until PR #89 adds ActionDimension.constant to master; then dim.constant.
-    return dim.masked or bool(getattr(dim, "constant", False))
+    return dim.masked or dim.constant
 
 
 def _data_path(info: dict[str, Any], index: int) -> str:

@@ -65,13 +65,13 @@ def tray_info() -> dict[str, object]:
     }
 
 
-def frames_of(index: int, length: int, constant_height: bool = False) -> EpisodeFrames:
-    """An episode with varied action and states. States dim 31 (previous base height) is
-    0.74 in every frame as in G1 data; action dim 31 varies around it, since the layout
-    cannot declare it constant before PR #89 (`constant_height` gives the G1 case)."""
+def frames_of(index: int, length: int) -> EpisodeFrames:
+    """An episode with varied action and states, dim 31 (base height command, and the
+    previous one in states) at 0.74 in every frame as in G1 data; g1.yaml declares
+    action dim 31 `constant`."""
     rng = np.random.default_rng(index)
     action = rng.uniform(-0.1, 0.1, (length, 36)).astype(np.float32)
-    action[:, 31] = np.float32(0.74) if constant_height else 0.74 + action[:, 31] / 10
+    action[:, 31] = np.float32(0.74)
     states = rng.standard_normal((length, 32)).astype(np.float32)
     states[:, 31] = np.float32(0.74)
     return EpisodeFrames(
