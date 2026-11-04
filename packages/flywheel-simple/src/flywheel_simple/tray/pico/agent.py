@@ -32,7 +32,7 @@ from simple.agents.pico_decoupled_agent import (  # type: ignore[import-not-foun
 from flywheel_simple.tray.geometry import Pose2D
 from flywheel_simple.tray.pico.clock import ClockedTime, SimClock
 from flywheel_simple.tray.pico.conditions import Condition
-from flywheel_simple.tray.pico.ik_limit import limit_joint_step
+from flywheel_simple.tray.pico.ik_limit import arms_only, limit_joint_step
 from flywheel_simple.tray.pico.operator import (
     Calibration,
     PicoSignal,
@@ -270,7 +270,9 @@ class StreamerDecoupledAgent(PicoDecoupledAgent):  # type: ignore[misc]
     With `clock`, the pipeline runs on simulated time (see flywheel_simple.tray.pico.clock);
     the session ticks it once per env step. Without, it keeps the wall clock. With
     `max_joint_step` (rad per control step), the retargeting IK moves no joint further
-    than that per step (`limit_joint_step`); without, it keeps the URDF limits.
+    than that per step (`limit_joint_step`); without, it keeps the URDF limits. With
+    `lock_waist`, the retargeting IK solves the arms alone and the waist command stays
+    at zero (`arms_only`); without, it moves the waist as SIMPLE's PICO agent does.
     """
 
     def __init__(
@@ -279,8 +281,10 @@ class StreamerDecoupledAgent(PicoDecoupledAgent):  # type: ignore[misc]
         streamer: Any,
         clock: SimClock | None = None,
         max_joint_step: float | None = None,
+        lock_waist: bool = False,
     ) -> None:
         self._external_streamer = streamer
+        self._lock_waist = lock_waist
         self.clock = clock
         if clock is not None:
             _install_clock(clock)
@@ -300,7 +304,13 @@ class StreamerDecoupledAgent(PicoDecoupledAgent):  # type: ignore[misc]
         _stub_ik_visualizer()
         teleop_policy = importlib.import_module("decoupled_wbc.control.policy.teleop_policy")
         offline = functools.partial(teleop_policy.TeleopPolicy, enable_real_device=False)
-        with mock.patch.object(teleop_policy, "TeleopPolicy", offline):
+        ik_module = importlib.import_module("decoupled_wbc.control.teleop.teleop_retargeting_ik")
+        ik_class = ik_module.TeleopRetargetingIK
+        ik = arms_only(ik_class) if self._lock_waist else ik_class
+        with (
+            mock.patch.object(teleop_policy, "TeleopPolicy", offline),
+            mock.patch.object(ik_module, "TeleopRetargetingIK", ik),
+        ):
             super()._init_decoupled_policy()
         streamer = self._teleop_policy.teleop_streamer
         if streamer.body_pre_processor is None:

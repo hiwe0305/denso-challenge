@@ -380,7 +380,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         from flywheel_simple.tray.pico import agent as pico_agent
         from flywheel_simple.tray.pico.clock import SimClock
-        from flywheel_simple.tray.pico.operator import OperatorConfig
+        from flywheel_simple.tray.pico.operator import LOCK_WAIST, OperatorConfig
 
         operator_cfg = OperatorConfig.load(args.operator_config)
         streamer: Any = pico_agent.ScriptedStreamer()
@@ -396,7 +396,11 @@ def main(argv: list[str] | None = None) -> int:
                 style_base=None if args.no_style else args.style_base,
             )
         agent = pico_agent.StreamerDecoupledAgent(
-            robot, streamer, clock=SimClock(), max_joint_step=operator_cfg.arm_step_max
+            robot,
+            streamer,
+            clock=SimClock(),
+            max_joint_step=operator_cfg.arm_step_max,
+            lock_waist=LOCK_WAIST,
         )
     agent.num_episodes = len(conditions)
     try:

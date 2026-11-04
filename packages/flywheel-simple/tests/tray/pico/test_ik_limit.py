@@ -1,4 +1,7 @@
-"""The retargeting IK's joint step limit (DA-35 task 10), with pink and the solver faked."""
+"""The retargeting IK's joint step limit and waist lock (DA-35 task 10, 12), on CPU.
+
+pink, the solver and TeleopRetargetingIK are faked.
+"""
 
 from __future__ import annotations
 
@@ -8,8 +11,8 @@ from typing import Any
 
 import numpy as np
 import pytest
-from flywheel_simple.tray.pico.ik_limit import limit_joint_step
-from flywheel_simple.tray.pico.operator import OperatorConfig
+from flywheel_simple.tray.pico.ik_limit import arms_only, limit_joint_step
+from flywheel_simple.tray.pico.operator import LOCK_WAIST, OPERATOR_VERSION, OperatorConfig
 
 
 class _VelocityLimit:
@@ -58,3 +61,27 @@ def test_no_joint_moves_more_than_max_step_per_control_step(
 def test_the_operator_config_caps_arm_steps_below_the_qa_threshold() -> None:
     # DA-03's action_jump.arm flags a step over 0.0869 rad (psi-data's p99.9).
     assert OperatorConfig.load().arm_step_max == 0.08
+
+
+class _RetargetingIK:
+    """TeleopRetargetingIK's constructor as SIMPLE's PICO agent calls it."""
+
+    def __init__(self, robot_model: Any, *, body_active_joint_groups: Any = None) -> None:
+        self.robot_model = robot_model
+        self.body_active_joint_groups = body_active_joint_groups
+
+
+def test_a_locked_waist_builds_the_ik_on_the_arms_alone() -> None:
+    # SIMPLE asks for the upper_body groups (waist included); the lock replaces them.
+    model = object()
+    ik = arms_only(_RetargetingIK)(model, body_active_joint_groups=["upper_body"])
+    assert ik.robot_model is model
+    assert ik.body_active_joint_groups == ["arms"]
+    again = arms_only(_RetargetingIK)(model, body_active_joint_groups=["upper_body"])
+    assert again.body_active_joint_groups is not ik.body_active_joint_groups  # not shared
+
+
+def test_the_virtual_operator_locks_the_waist() -> None:
+    # PO 4/11/2026: DA-17 rejected every parent on the waist; batches before are virtual-2.
+    assert LOCK_WAIST is True
+    assert OPERATOR_VERSION == "da35-virtual-3"

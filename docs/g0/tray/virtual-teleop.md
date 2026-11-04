@@ -145,6 +145,26 @@ Lý do: không có giới hạn này, tư thế ngửa lòng bàn tay cho phép 
 
 Phiên bản người điều khiển đổi sang `da35-virtual-2`; hash cấu hình (`operator_version`) đổi theo `arm_step_max`. Test CPU `test_ik_limit.py` kiểm phép tính giới hạn. Test sim `test_virtual_operator_episode_reaches_check_success` kiểm rằng không bước tay nào của `action` vượt 0,08 trong cả episode, kể cả lúc kích hoạt.
 
+### Khóa eo của người điều khiển ảo
+
+**Decision [Đã chốt, Hiếu, 4/11/2026]:** người điều khiển ảo chạy IK retargeting của ống PICO với eo khóa, như IK của planner DA-33 (D-12 trong [decisions.md](decisions.md)). Câu hỏi: "Lock the waist for the virtual operator (da35-virtual-3)?". Hiếu trả lời: "Lock the waist".
+
+- **Cách làm:** `StreamerDecoupledAgent(lock_waist=True)` dựng `TeleopRetargetingIK` trên nhóm khớp `arms` thay cho `upper_body` (`flywheel_simple.tray.pico.ik_limit.arms_only`). Mô hình rút gọn giữ eo ở 0, nên `target_waist` gửi cho thân dưới, và cũng là eo trong `action`, luôn bằng 0. Phiên teleop ảo và phiên S2 bật khóa này qua `LOCK_WAIST` (`operator.py`). Teleop PICO thật vẫn để eo cử động.
+- **Phiên bản:** người điều khiển đổi sang `da35-virtual-3`. Mọi demo cha và biến thể S2 ghi trước đó (`da35-virtual-1`, `da35-virtual-2`) không vào release.
+- **Lý do:** chạy thử cổng QA trên 17 demo cha của `parents-1104/shard-00` (chưa có giới hạn IK) cho 17/17 bị loại. Phép phát lại động học của DA-17 (D7) báo `joint_mapping` ở eo: robot không theo lệnh eo của IK.
+
+  | Đo | Demo cha của ta | psi-data (8 episode đầu) |
+  |---|---|---|
+  | Tương quan lệnh và trạng thái, `waist_roll` | 0,00–0,16 | 0,98–0,99 |
+  | Tương quan lệnh và trạng thái, `waist_pitch` | 0,37–0,74 | 0,80–0,92 |
+  | Tương quan lệnh và trạng thái, `waist_yaw` | 0,73–0,88 | 0,98–0,99 |
+  | `unit_deg_rad` (std lệnh / std trạng thái, ngưỡng 1,315) | 10/17 episode vượt, 1,34–1,74 lần ở pitch và yaw | không vượt |
+
+  Sàn tương quan của DA-17 là 0,5. Lệnh pitch khoảng −0,06 đến −0,15 rad (ngả ra sau), trạng thái đo được +0,05 đến +0,09 rad. Roll không bám ở độ trễ nào trong 0–40 frame, và làm trơn lệnh 0,5 s cũng không làm tương quan tăng, nên không phải do rung tay. Bộ ghi giống `_build_frame` của SIMPLE (eo của `action` là `target_waist` của IK), nên lỗi nằm ở chỗ thân dưới không đạt được eo mà IK đòi khi đang bê khay. Giới hạn bước khớp (`da35-virtual-2`) không đổi điều này.
+- **Giá phải trả:** dữ liệu không có chuyển động eo kiểu teleop PICO (psi-data có). S1 của DA-33 cũng khóa eo, nên S1 và S2 cùng dạng eo.
+- **Nếu sai:** mở lại nhóm `upper_body` (`lock_waist=False`) và tìm cách cho eo bám (trọng số posture của eo trong IK, hay giới hạn lệnh eo). Việc này chưa rõ nguyên nhân gốc nên chưa ước lượng được thời gian.
+- **Test:** test CPU `test_ik_limit.py` kiểm `arms_only` thay nhóm khớp mà SIMPLE truyền vào, và kiểm `LOCK_WAIST`, `OPERATOR_VERSION`. Test sim `test_virtual_operator_episode_reaches_check_success` kiểm eo của `action` bằng 0 trong cả episode.
+
 ## Phong cách mỗi episode (nhiệm vụ 6)
 
 Mỗi lượt thử rút một bộ phong cách từ seed `style_seed_for(style_base, level, seed, lần thử)` (`SeedSequence`): cùng điều kiện, cùng lần thử thì cùng phong cách; lần thử khác thì phong cách khác. `--style-base` đổi cả họ seed, `--no-style` chạy planner không phong cách. Episode lưu ghi khối `flywheel` theo AC 3, cùng tên trường với meta S1 của DA-33:
@@ -154,7 +174,7 @@ Mỗi lượt thử rút một bộ phong cách từ seed `style_seed_for(style_
 | `source_kind`, `synthetic_tier`, `source_detail`, `action_quality` | `synthetic`, `S1`, `virtual_teleop`, `planned` |
 | `style_base`, `style_seed`, `style`, `condition_attempt` | Họ seed, seed của lượt, bộ tham số (7 số), lần thử |
 | `level`, `seed`, `split` | Điều kiện; chỉ seed train |
-| `operator_version` | `da35-virtual-1+cfg.<hash>`: hash của cấu hình người ảo, cấu hình planner và dải phong cách |
+| `operator_version` | `da35-virtual-<n>+cfg.<hash>` (`da35-virtual-3` từ 4/11/2026, eo khóa): hash của cấu hình người ảo, cấu hình planner và dải phong cách |
 | `wrapper_version`, `simple_commit`, `embodiment_id`, `renderer`, `data_class` | `da35-pico-3` (từ 4/11/2026: video ghi qua `JoinedVideoWriter` của DA-33; lô ghi bằng `da35-pico-2` dùng `VideoWriter` của decoupled_wbc, có thể crash hay treo khi máy tải nặng), commit SIMPLE, `g1_sonic_dwbc@1`, `mujoco`, `public` |
 
 `attempts.jsonl` ghi thêm `style_seed`, dòng thời gian pha và lý do abort của mọi lượt.
