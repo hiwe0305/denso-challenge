@@ -26,6 +26,19 @@ uv run pytest scripts/he -q
 - **Lệch so với AC 1** ("30 điều kiện dev × 3 mức có hạt giống"): bộ eval của tác giả chỉ có 10 điều kiện mỗi mức, và đội chưa có công cụ sinh điều kiện dev mới cho task hai bàn; sinh thêm thì mất phép so với mốc của tác giả. Ghi thành `Decision` (mục 5, câu Q2).
 - **Mốc so (AC 3)**: checkpoint hai bàn của tác giả `…betweentablesteleop-v0…b64.gpus4.2604081126/ckpt_40000` (sha256 `c69c2ae8…`), fine-tune từ cặp của V-EGO trên cả 99 episode, 16 × 4 GPU. Lấy từ S1-03 nếu cùng bộ eval, cùng renderer, cùng file task SIMPLE `b75c678`. Checkpoint này đã thấy episode 0–9, nên ở mức 0, 1 nó được eval trên điều kiện đã thấy; điểm HE thì không.
 
+### 1.1 Kiểm checkpoint (nhiệm vụ 2)
+
+`he1_plan.py parents` (4/11/2026) hỏi API cây thư mục của Hugging Face ở revision ghim và đọc header safetensors bằng hai yêu cầu range, không tải trọng số:
+
+| Kiểm | Kết quả |
+|---|---|
+| sha256 LFS của 6 file trọng số ablation, checkpoint mốc so, gói train, gói eval | Khớp RunPlan, `problems` rỗng |
+| Header safetensors của VLM | Cả ba biến thể: 625 tensor, cùng tên, dtype, shape |
+| Header safetensors của action header | Cả ba: 181 tensor, cùng tên, dtype, shape |
+| `config.json` của VLM | Giống từng byte ở cả ba |
+
+`finetune-simple-psi0.sh` không còn ở Ψ₀ `cda3fdf`; `Psi0Trainer` của DA-19 gọi `scripts/train.py finetune_simple_psi0_config` với tham số của bản cuối (Hiếu chốt 3/11/2026). Smoke của DA-19 trên Colab đã nạp và train cặp V-EGO qua đường này. Hai cặp ablation có cùng bố cục tensor và cùng cấu hình, nên đi cùng đường nạp. Phần còn lại, tải đủ file và băm lại sha256 trên máy train, làm ở bước đầu của mỗi job nhiệm vụ 3; job dừng nếu sha256 khác RunPlan.
+
 ## 2. Ước lượng
 
 - Thành công của điểm X (biến thể, N, seed) ở điều kiện i, lượt r: s_X,i,r ∈ {0, 1}, theo cờ `check_success` của SIMPLE.
