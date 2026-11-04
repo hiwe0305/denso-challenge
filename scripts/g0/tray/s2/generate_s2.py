@@ -18,7 +18,8 @@ labels, sim and machine time.
 The launcher supervises its workers (task 12, faults of `measure-1104`). Each
 worker runs in its own process group, so a kill reaches its children. A worker
 that ends while its shard still has jobs not logged (any exit code, 0 included:
-an interrupted session exits 0), or logs no attempt for `--stall-s` (the video
+an interrupted session exits 0; the attempt it logs as `interrupted` leaves its
+job pending), or logs no attempt for `--stall-s` (the video
 writer's hang), is killed and started again on those jobs, at most
 `--max-restarts` times per shard; every restart is a line of
 `<out>/supervisor.jsonl`. A worker that stalls after logging all its jobs ends
@@ -69,6 +70,8 @@ from flywheel_simple.tray.s2.jobs import sample_jobs
 
 JOB_KEYS = ("parent_id", "level", "seed", "gen_seed")
 DONE = (0, "stalled-done")  # how a shard's last worker may end
+# A SIGINT'd session logs its attempt as interrupted and stops: the job did not run.
+NOT_RUN = ("interrupted",)
 
 
 def segments_of(parents: Path) -> list[dict[str, Any]]:
@@ -110,9 +113,14 @@ def logged_key(attempt: dict[str, Any]) -> tuple[Any, ...]:
     return (attempt["parent_episode"], attempt["level"], attempt["seed"], attempt["gen_seed"])
 
 
+def done_keys(shard: Path) -> set[tuple[Any, ...]]:
+    """The jobs the shard ran to an outcome (an interrupted attempt is not one)."""
+    return {logged_key(a) for a in attempts_of(shard) if a["outcome"] not in NOT_RUN}
+
+
 def pending(args: argparse.Namespace, jobs: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """The jobs of the list that no shard has logged yet."""
-    done = {logged_key(a) for shard in args.out.glob("shard-*") for a in attempts_of(shard)}
+    """The jobs of the list that no shard has run yet."""
+    done = {key for shard in args.out.glob("shard-*") for key in done_keys(shard)}
     return [j for j in jobs if job_key(j) not in done]
 
 
@@ -130,11 +138,11 @@ def set_aside_empty_datasets(shard: Path, stamp: str) -> list[Path]:
 
 
 def pending_jobs(shard: Path) -> list[dict[str, Any]]:
-    """The shard's jobs that its attempts log does not have yet."""
+    """The shard's jobs that its attempts log has no outcome for yet."""
     path = shard / "jobs.jsonl"
     if not path.exists():
         return []
-    logged = {logged_key(a) for a in attempts_of(shard)}
+    logged = done_keys(shard)
     jobs = [json.loads(line) for line in path.read_text().splitlines() if line]
     return [j for j in jobs if job_key(j) not in logged]
 

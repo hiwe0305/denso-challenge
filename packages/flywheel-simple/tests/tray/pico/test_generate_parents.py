@@ -25,9 +25,9 @@ def gen() -> ModuleType:
     return module
 
 
-def log_attempt(shard: Path, level: int, seed: int) -> None:
+def log_attempt(shard: Path, level: int, seed: int, outcome: str = "failure") -> None:
     shard.mkdir(parents=True, exist_ok=True)
-    row = {"level": level, "seed": seed, "outcome": "failure", "failure": "L-TRAY-TILT",
+    row = {"level": level, "seed": seed, "outcome": outcome, "failure": "L-TRAY-TILT",
            "steps_reached": 3, "sim_s": 20.0, "wall_s": 60.0, "episode_index": None}  # fmt: skip
     with (shard / "attempts.jsonl").open("a") as f:
         f.write(json.dumps(row) + "\n")
@@ -62,6 +62,22 @@ def test_a_batch_passes_only_when_every_condition_is_logged_by_a_clean_worker(
     monkeypatch.setattr(gen, "launch", launch)
     argv = ["--out", str(tmp_path), "--levels", "0", "--seeds", "100-101", "--workers", "2"]
     assert gen.main(argv) == status
+
+
+@pytest.mark.usefixtures("no_ledger")
+def test_an_interrupted_condition_fails_the_batch_and_runs_again(
+    gen: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def launch(args: Any) -> list[Any]:
+        log_attempt(args.out / "shard-00", 0, 100)
+        log_attempt(args.out / "shard-01", 0, 101, outcome="interrupted")  # SIGINT, exit 0
+        return [SimpleNamespace(wait=lambda: 0), SimpleNamespace(wait=lambda: 0)]
+
+    monkeypatch.setattr(gen, "launch", launch)
+    argv = ["--out", str(tmp_path), "--levels", "0", "--seeds", "100-101", "--workers", "2"]
+    assert gen.main(argv) == 1
+    args = SimpleNamespace(out=tmp_path, levels=[0], seeds=range(100, 102))
+    assert gen.pending(args) == [(0, 101)]
 
 
 @pytest.mark.usefixtures("no_ledger")

@@ -9,9 +9,11 @@ successes with all seven step flags (the parents S2 can cut), failure labels,
 sim and machine time, the parent list, and the shards whose saved episodes do not
 match their attempts log (`shard_mismatches`; such a shard is never resumed).
 
-Each worker runs in its own process group. The launcher exits 1 if a worker
-exited non-zero (parents-1104 lost one to -9), a condition is still not logged,
-or a shard mismatches; an interrupted launcher kills its workers' groups.
+Each worker runs in its own process group. An attempt logged as `interrupted`
+(a SIGINT'd session, which exits 0) leaves its condition pending. The launcher
+exits 1 if a worker exited non-zero (parents-1104 lost one to -9), a condition
+is still not logged, or a shard mismatches; an interrupted launcher kills its
+workers' groups.
 
 Every batch writes its two ledger rows through `flywheel.data.ledger.job_ledger`
 (estimate before the workers start, measured wall seconds after; DA-35 PO review
@@ -43,6 +45,8 @@ from typing import Any
 from flywheel_simple.tray.pico.recording import shard_mismatches
 
 STEPS = 7
+# A SIGINT'd session logs its attempt as interrupted and stops: the condition did not run.
+NOT_RUN = ("interrupted",)
 
 
 def conditions(levels: list[int], seeds: range) -> list[tuple[int, int]]:
@@ -57,8 +61,8 @@ def attempts_of(shard: Path) -> list[dict[str, Any]]:
 
 
 def pending(args: argparse.Namespace) -> list[tuple[int, int]]:
-    """The conditions no shard has logged yet."""
-    done = {(a["level"], a["seed"]) for s in args.out.glob("shard-*") for a in attempts_of(s)}
+    """The conditions no shard has run yet."""
+    done = {c for s in args.out.glob("shard-*") for c in done_conditions(s)}
     return [c for c in conditions(args.levels, args.seeds) if c not in done]
 
 
@@ -71,12 +75,17 @@ def kill_group(proc: subprocess.Popen[bytes]) -> None:
         os.killpg(proc.pid, signal.SIGKILL)
 
 
+def done_conditions(shard: Path) -> set[tuple[int, int]]:
+    """The conditions the shard ran to an outcome (an interrupted attempt is not one)."""
+    return {(a["level"], a["seed"]) for a in attempts_of(shard) if a["outcome"] not in NOT_RUN}
+
+
 def launch(args: argparse.Namespace) -> list[subprocess.Popen[bytes]]:
     todo = conditions(args.levels, args.seeds)
     procs = []
     for k in range(args.workers):
         shard = args.out / f"shard-{k:02d}"
-        done = {(a["level"], a["seed"]) for a in attempts_of(shard)}
+        done = done_conditions(shard)
         mine = [c for c in todo[k :: args.workers] if c not in done]
         if not mine:
             continue
