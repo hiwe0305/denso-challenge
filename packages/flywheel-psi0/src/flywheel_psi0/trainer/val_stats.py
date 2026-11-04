@@ -45,11 +45,19 @@ def normalised_open_pose(
     """Where the open hand pose lands after Psi0's bounds normalisation, per hand dim.
 
     `low` and `high` are the action `min` and `max` of `stats_psi0.json` for the
-    hand dims; Psi0 maps `q` to `2 * (q - low) / (high - low) - 1`.
+    hand dims; Psi0 maps `q` to `2 * (q - low) / (high - low) - 1`. A dim whose
+    range Psi0 calls ill, `|high - low| < 1e-4 * (|high| + |low| + 1e-8)`, it does
+    not normalise: it passes the raw value (src/psi/config/transform.py at
+    cda3fdf). There the open pose is `open_qpos` itself. A demo subset can have
+    such dims: in DA-26's N20 one hand never moves, so its 7 joints have
+    min = max = 0, and the division above gave NaN.
     """
     lo = np.asarray(low, dtype=np.float64)
     hi = np.asarray(high, dtype=np.float64)
-    return 2 * (open_qpos - lo) / (hi - lo) - 1
+    ill = np.abs(hi - lo) < 1e-4 * (np.abs(hi) + np.abs(lo) + 1e-8)
+    span = np.where(ill, 1.0, hi - lo)
+    pose: Array = np.where(ill, open_qpos, 2 * (open_qpos - lo) / span - 1)
+    return pose
 
 
 def hand_openness(hand: Array, open_pose: Array) -> Array:
