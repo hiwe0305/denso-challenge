@@ -236,6 +236,21 @@ def test_hand_openness_is_one_at_the_open_pose_and_zero_at_the_far_bound() -> No
     assert openness.tolist() == [1.0, 1.0, 0.0, 0.0, 1.0, 0.0]  # (left, right) per sample
 
 
+def test_open_pose_passes_through_on_dims_psi0_leaves_unnormalised() -> None:
+    # DA-26's N20 cut: one hand never moves, so min = max = 0 on its joints, and
+    # Psi0 passes those raw values through instead of dividing by a zero range.
+    low = np.array([0.0, 0.0, 0.0, -1.5, 0.3])
+    high = np.array([0.0, 0.7, 0.0, 0.0, 0.3])
+    open_pose = normalised_open_pose(low, high)
+    assert open_pose.tolist() == [0.0, -1.0, 0.0, 1.0, 0.0]
+
+    n20 = normalised_open_pose(
+        np.array([0.0] * 7 + HAND_LOW[7:]), np.array([0.0] * 7 + HAND_HIGH[7:])
+    )
+    assert np.isfinite(n20).all()
+    assert hand_openness(n20[None, :], n20).tolist() == [1.0, 1.0]
+
+
 def test_hand_open_pose_must_cover_the_hand_dims() -> None:
     with pytest.raises(ValueError, match="14 hand dims"):
         ValStats(g1_layout(), hand_open_pose=np.zeros(7))
