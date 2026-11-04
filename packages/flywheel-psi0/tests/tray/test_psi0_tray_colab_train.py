@@ -47,7 +47,7 @@ def _repo_copy(tmp_path: Path, plan: TrayRunPlan) -> Path:
 
 
 def _write_cut(data: Path, plan: TrayRunPlan, **override: Any) -> None:
-    """A cut as scripts/he/demo_subset.py marks it: only the meta files the VM checks."""
+    """A cut as scripts/he/demo_subset.py writes it: only the meta files the VM checks."""
     sets = DemoSets.model_validate_json((REPO / plan.demo_sets.file).read_text())
     demo = sets.sets["C"]
     marker = {
@@ -65,6 +65,9 @@ def _write_cut(data: Path, plan: TrayRunPlan, **override: Any) -> None:
     (data / "meta").mkdir(parents=True)
     (data / "meta" / colab_train.MARKER).write_text(json.dumps(marker))
     (data / "meta" / "stats_psi0.json").write_text("{}")
+    (data / "meta" / "info.json").write_text(json.dumps({"total_episodes": demo.n}))
+    rows = "".join(json.dumps({"episode_index": i, "length": 9}) + "\n" for i in range(demo.n))
+    (data / "meta" / "episodes.jsonl").write_text(rows)
 
 
 def test_the_frozen_v2_plan_loads(plan: TrayRunPlan) -> None:
@@ -84,6 +87,15 @@ def test_a_drifted_pinned_file_stops_the_vm(tmp_path: Path, plan: TrayRunPlan) -
     run_py = repo / "packages/flywheel-simple/src/flywheel_simple/tray/run.py"
     run_py.write_text(run_py.read_text() + "# edited after the freeze\n")
     with pytest.raises(SystemExit, match="tray/run.py changed.*re-freeze or record a Decision"):
+        load_plan(repo)
+
+
+def test_an_edited_tier_2_rule_stops_the_vm(tmp_path: Path, plan: TrayRunPlan) -> None:
+    # only runplan check sees it: the rules block is not a pinned file and the plan is unchanged
+    repo = _repo_copy(tmp_path, plan)
+    doc = repo / "docs/he/tray.md"
+    doc.write_text(doc.read_text().replace("p_C < 10%", "p_C < 20%", 1))
+    with pytest.raises(SystemExit, match=r"(?s)plan does not hold.*reading rules in docs/he/tray"):
         load_plan(repo)
 
 
@@ -143,6 +155,30 @@ def test_a_cut_without_its_own_stats_is_refused(plan: TrayRunPlan, tmp_path: Pat
     (tmp_path / "meta/stats_psi0.json").unlink()
     assert any("stats_psi0.json" in p for p in cut_problems(tmp_path, plan))
     assert cut_problems(tmp_path / "nowhere", plan)[0].endswith("not a demo-set cut")
+
+
+def test_the_cut_psi0_reads_must_be_set_c_too(plan: TrayRunPlan, tmp_path: Path) -> None:
+    _write_cut(tmp_path, plan)
+    (tmp_path / "meta/info.json").write_text(json.dumps({"total_episodes": 161}))
+    with (tmp_path / "meta/episodes.jsonl").open("a") as rows:
+        rows.write(json.dumps({"episode_index": 160}) + "\n")  # a stale file mixed in
+    problems = cut_problems(tmp_path, plan)
+    assert "cut meta/info.json total_episodes is 161, set C has 160" in problems
+    assert "cut meta/episodes.jsonl rows are not episodes 0 .. 159" in problems
+    (tmp_path / "meta/info.json").unlink()
+    assert "cut meta/info.json total_episodes is None, set C has 160" in cut_problems(
+        tmp_path, plan
+    )
+
+
+def test_setup_refuses_a_wrong_cut_before_any_install(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    installs: list[Path] = []
+    monkeypatch.setattr(colab_train, "install_env", lambda work: installs.append(work) or 0.0)
+    with pytest.raises(SystemExit, match="cut does not hold"):
+        colab_train.setup(tmp_path)  # nothing uploaded
+    assert installs == []
 
 
 class _FakeTrainer:

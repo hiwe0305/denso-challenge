@@ -313,7 +313,7 @@ $PY -m flywheel_psi0.tray.colab_train check --work $CUT   # "cut and plan hold",
 **Laptop: kéo bản cắt, rồi guard và watcher** (thư mục gốc là bản checkout `master`):
 
 ```bash
-rsync -a --partial-dir=.rsync-partial rtx3060:denso-da34-pool/fwdata/cut-c-rp_a04c14e79dfd/ fwdata/tray/cut-c/
+rsync -a --delete --partial-dir=.rsync-partial rtx3060:denso-da34-pool/fwdata/cut-c-rp_a04c14e79dfd/ fwdata/tray/cut-c/   # --delete: no stale file mixes in
 export PATH=~/project/wm-wam-review/.venv-colab-cli/bin:$PATH
 colab sessions; colab usage
 S=da34-t2-ft-c-s0
@@ -329,7 +329,7 @@ ready() { if ( until [ -f $R/$1.ready ]; do grep -q '^exit ' $R/$1.out && exit 1
   [ -f $R/guard.beat ] && [ $(( $(date +%s) - $(stat -c %Y $R/guard.beat) )) -lt 120 ] )
   then echo "$1 READY"; else echo "$1 NOT READY: do not start the job"; return 1; fi; }
 vm() { grep -q '^exit ' $R/$1.out && { echo "$1: watcher exited, no ssh"; return 1; }
-  colab sessions | grep -q "^\[$1\]" || { echo "$1: not listed, no ssh"; return 1; }
+  colab sessions < /dev/null | grep -q "^\[$1\]" || { echo "$1: not listed, no ssh"; return 1; }
   ssh -o ProxyCommand="colab ssh --proxy-mode -s $1" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@colab "${@:2}"; }
 ```
 
@@ -353,6 +353,18 @@ nohup setsid bash -c 'python3 scripts/he/he1_fetch.py follow --session "$1" --re
 Khi đã mount được Drive, thêm sau `setup`: `colab drivemount -s $S /content/drive`, rồi `persist` của he1_colab với `--work /content/da34 --to /content/drive/MyDrive/denso/da34`.
 
 **Trong và sau lúc chạy.** Quy tắc dừng sớm, `ALERT` và các mã thoát là của `he1_fetch` ([he-1.md](he-1.md) mục 7): dự kiến CU khi `ckpt_40000` đã về laptop, tính từ bước 2 200. Watcher dừng phiên ở cap 18 CU kể cả khi chưa đủ 40.000 bước. Khi xong, ghi dòng `measured` cho `job_da34_ft_C`: CU thật theo `colab usage`, số bước, giờ, trỏ về dòng ước lượng. Checkpoint về `fwdata/tray/runs/da34-t2-ft-c-s0/` trên laptop (không commit). Eval của nhiệm vụ 3 chạy trên `rtx3060`.
+
+**Chuyển checkpoint sang rtx3060 cho eval (nhiệm vụ 3).** Chỉ chuyển khi `fetched.json` báo `final` (đủ `ckpt_40000`, sha256 trên laptop đã khớp VM). Danh sách sha256 lập trên laptop, rồi kiểm lại trên rtx3060 sau khi chép; lệch một file thì không eval.
+
+```bash
+J=fwdata/tray/runs/da34-t2-ft-c-s0
+python3 -c 'import json, sys; sys.exit(0 if json.load(open(sys.argv[1]))["final"] else 1)' $J/fetched.json \
+  || { echo "not final: no hand-off"; exit 1; }
+(cd $J && find . -type f -not -path '*/.*' -print0 | sort -z | xargs -0 sha256sum) > $J.sha256
+rsync -a --partial-dir=.rsync-partial --exclude='.*' $J/ rtx3060:denso-da34-pool/fwdata/tray/runs/da34-t2-ft-c-s0/
+ssh rtx3060 'cd denso-da34-pool/fwdata/tray/runs/da34-t2-ft-c-s0 && sha256sum -c --quiet' < $J.sha256 \
+  && echo "hand-off OK" || echo "hand-off FAILED: do not eval"
+```
 
 Giả định của ước lượng, chưa đo: tải bản cắt lên VM (khoảng 1,3 GB, 160/541 của 4,5 GB) với tốc độ không dưới 6 MB/s của `probe`, tức tối đa khoảng 4 phút. Tốc độ tải lên chưa đo; `probe` chỉ đo chiều kéo về.
 
