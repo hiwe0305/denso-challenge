@@ -46,17 +46,19 @@ def normalised_open_pose(
 
     `low` and `high` are the action `min` and `max` of `stats_psi0.json` for the
     hand dims; Psi0 maps `q` to `2 * (q - low) / (high - low) - 1`. A dim whose
-    range Psi0 calls ill, `|high - low| < 1e-4 * (|high| + |low| + 1e-8)`, it does
-    not normalise: it passes the raw value (src/psi/config/transform.py at
-    cda3fdf). There the open pose is `open_qpos` itself. A demo subset can have
-    such dims: in DA-26's N20 one hand never moves, so its 7 joints have
-    min = max = 0, and the division above gave NaN.
+    range Psi0 calls ill, `|high - low| < 1e-4 * (|high| + |low| + 1e-8)` in float32,
+    it does not normalise: it passes the raw value through. Then it clips every dim to
+    [-1, 1] (src/psi/config/transform.py at cda3fdf), and the pose returned here is
+    where the model's targets land. A demo subset can have ill dims: in DA-26's N20
+    one hand never moves, so its 7 joints have min = max = 0, and the division gave
+    NaN. (Psi0 sets ill *state* dims to 0 instead; this helper reads action bounds.)
     """
     lo = np.asarray(low, dtype=np.float64)
     hi = np.asarray(high, dtype=np.float64)
-    ill = np.abs(hi - lo) < 1e-4 * (np.abs(hi) + np.abs(lo) + 1e-8)
+    lo32, hi32 = lo.astype(np.float32), hi.astype(np.float32)
+    ill = np.abs(hi32 - lo32) < 1e-4 * (np.abs(hi32) + np.abs(lo32) + 1e-8)
     span = np.where(ill, 1.0, hi - lo)
-    pose: Array = np.where(ill, open_qpos, 2 * (open_qpos - lo) / span - 1)
+    pose: Array = np.clip(np.where(ill, open_qpos, 2 * (open_qpos - lo) / span - 1), -1, 1)
     return pose
 
 

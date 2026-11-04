@@ -19,7 +19,7 @@ from flywheel.contracts.artifacts import ActionDimension, ActionLayout
 from flywheel.contracts.protocols import TrainerAdapter
 from flywheel.contracts.training import TrainingMetric
 from flywheel_psi0.trainer import Psi0Recipe, Psi0Trainer
-from flywheel_psi0.trainer.launch import LossTap
+from flywheel_psi0.trainer.launch import LaunchSpec, LossTap
 from flywheel_psi0.trainer.launch import main as launch_main
 
 REPO = Path(__file__).resolve().parents[5]
@@ -293,6 +293,24 @@ def test_command_runs_the_launcher_with_the_job_args(fake_psi0: Path, tmp_path: 
     assert launch.hand_open_pose is not None and len(launch.hand_open_pose) == 14
     assert launch.identity["vlm_frozen"] is True and launch.identity["attempt"] == 0
     assert launch.rtc_prefix == 8  # --model.rtc with --model.max-delay=8
+
+
+def test_a_hand_that_never_moves_still_gives_a_finite_open_pose(
+    fake_psi0: Path, tmp_path: Path
+) -> None:
+    # DA-26's N20 cut: hand dims 0-6 have min = max = 0 in stats_psi0.json.
+    job = spec(tmp_path)  # writes the dataset's stats_psi0.json
+    stats = Path(job.dataset.uri) / "meta" / "stats_psi0.json"
+    bounds = json.loads(stats.read_text())["action"]
+    bounds["min"][:7] = bounds["max"][:7] = [0.0] * 7
+    stats.write_text(json.dumps({"action": bounds}))
+    launch = trainer(fake_psi0, tmp_path).launch_spec(job)
+    assert launch.hand_open_pose is not None and launch.hand_open_pose[:7] == [0.0] * 7
+
+    # A NaN reaches the launcher as null; the error names the dims.
+    broken = launch.model_dump(mode="json") | {"hand_open_pose": [None, 0.0, float("nan")]}
+    with pytest.raises(ValueError, match=r"hand dims \[0, 2\]: ill range in stats_psi0\?"):
+        LaunchSpec.model_validate(broken)
 
 
 def test_unknown_parent_is_refused(fake_psi0: Path, tmp_path: Path) -> None:
