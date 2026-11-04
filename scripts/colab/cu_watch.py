@@ -1,33 +1,41 @@
 #!/usr/bin/env python3
 """Watch a batch of Colab sessions and stop each before it passes its CU cap.
 
-One process supervises every session of a batch (DA-26, DA-30 under tier 2). Run it
-on the laptop that has the `colab` CLI, detached, for the whole batch:
+One process supervises every session of a batch (tier 2: DA-26's three sessions and
+DA-30's one) on the laptop that has the `colab` CLI and created the sessions (`colab
+stop` only finds names in that CLI's local state). It merges DA-26's fail-closed
+single-session watcher (2408e45, scripts/he/cu_watch.py) with DA-30's batch one.
 
-    nohup setsid python3 scripts/colab/cu_watch.py --floor 14 \\
-        --new da30-stage1:L4:4 --persist 'da30-stage1=colab exec -s da30-stage1 -f p.py' \\
-        --attach da26-ft-vego-n20:L4:17.5:2026-11-04T21:00+07:00 \\
-        --log fwdata/colab/cu_watch.jsonl < /dev/null > /dev/null 2>&1 &
+    nohup setsid bash -c 'python3 scripts/colab/cu_watch.py --floor 14 \\
+        --new da30-stage1:L4:4 --persist "da30-stage1=colab exec -s da30-stage1 -f p.py" \\
+        --ready-dir fwdata/colab/ready --inbox fwdata/colab/inbox \\
+        --log fwdata/colab/cu_watch.jsonl; echo "exit $?"' \\
+        < /dev/null >> fwdata/colab/cu_watch.out 2>&1 &
+    until [ -f fwdata/colab/ready/da30-stage1.ready ]; do
+        grep -q '^exit ' fwdata/colab/cu_watch.out && exit 1; sleep 5; done
+    # only now start the job on the VM
 
-`--new NAME:GPU:CAP` creates the session (`colab new -s NAME --gpu GPU`);
-`--attach NAME:GPU:CAP[:STARTED]` takes over one already running (STARTED is ISO 8601,
-default now). The process re-executes itself under `systemd-inhibit --what=sleep` so
-the laptop does not suspend while sessions are paid for (`--no-inhibit` skips that).
+Sessions. `--new NAME:GPU:CAP` runs `colab new -s NAME --gpu GPU` and meters from
+just before it; `--attach NAME:GPU:CAP[:STARTED]` takes over a running session
+(STARTED in ISO 8601, default now). A session added later goes into `--inbox` as a
+file of such lines (`new ...`, `attach ...`, `persist NAME=COMMAND`), read at each
+poll and renamed `.taken` or `.rejected`: stopping the watcher to restart it would
+stop every session. `<ready-dir>/<NAME>.ready` is written once the session is seen
+on its planned accelerator; start the job only after it exists.
 
-Meter. A session's spend is wall-clock time since it started (`time.time()`, which
-keeps counting through a suspend, unlike `time.monotonic`) times its GPU's rate
-(`RATES`). While it is the batch's only session and the account's only assignment,
-the real balance drop from `colab usage` is counted too and the larger of the two is
-taken. The balance is per account, so once several assignments share it the
-per-session spend is the time estimate only; `--floor` uses the real balance: below
-it, every session is stopped.
+Meter. The larger of two, per session. (1) Wall clock: `time.time()` since the
+session started times its GPU's rate (`RATES`); wall time keeps counting through a
+laptop suspend, as Colab's billing does (monotonic time does not). (2) Balance: each
+drop of `colab usage`'s balance is charged in full while the account has one active
+assignment, and in proportion to the session's rate over the account's usage rate
+while more run, so a parallel session does not trip this one's cap. `--floor` stops
+every session when the account's real balance would fall below it.
 
-A session is stopped when spend + rate x margin reaches its cap, the margin being one
-poll, the CLI timeouts of a cycle and the time a stop with its retries can take.
-Before that, at `--soft` of the cap (or earlier, so it has `persist_timeout` to run),
-its `--persist` command runs once on the laptop, so logs survive a cap stop. Use
-`colab exec -s NAME -f ...` there, never `colab ssh`: `ssh -s NAME` creates the
-session again when it is gone.
+A session is stopped when spend + rate x margin reaches its cap: one poll, the two
+CLI timeouts of a cycle and the time a stop with one retry can take. At `--persist-at`
+of the cap (or earlier, so it has `persist_timeout` to run) its `--persist` command
+runs once on the laptop, so logs survive a cap stop. Use `colab exec -s NAME -f ...`
+there, never `colab ssh`: `ssh -s NAME` creates the session again when it is gone.
 
 Fail closed. Every GPU type is checked against `RATES` before any `new` (the CLI maps
 an unknown `--gpu` to A100). The `Hardware:` of each session in `colab sessions` must
@@ -35,17 +43,19 @@ match its plan, or it is stopped and the watch ends. A `new` that fails or times
 is followed by a look at `colab sessions`: a session listed under its name is
 attached, an unnamed `[?]` assignment that appeared meanwhile is unassigned through
 the CLI's own client. Any exception, SIGTERM, SIGINT or SIGHUP ends in a `finally`
-that stops every supervised session. `colab stop` returns 0 even for a missing
-session, so a stop counts only once `colab sessions` lists neither the name nor the
-endpoint; it is retried with backoff. A session has ended by itself only after 3
-polls in a row that list the server's sessions without it; a failed call, or an empty
-list while `colab usage` still counts assignments, is not a miss.
+that stops every supervised session. `colab stop` exits 0 even when it did nothing,
+so a stop counts only after two successful listings without the name or endpoint;
+it is retried with backoff and an unassign. A session has ended by itself only after
+3 successful listings in a row without it; a failed call, output that cannot be
+parsed, or an empty list while `colab usage` counts assignments is no listing. CLI
+output is decoded with `errors="replace"`; a log that cannot be written goes to
+stderr and the guard goes on.
 
-Each event is a JSON line in `--log` (and on stdout); ALERT lines also go to stderr.
-Exit codes: 0 every session ended by itself; 1 unexpected error (sessions stopped);
-2 bad arguments, nothing started; 3 a cap or the floor stopped a session; 4 a stop
-was not confirmed, a session may still be running (check `colab sessions` now);
-5 wrong GPU; 6 `new` failed; 128 + N on signal N.
+Exit codes: 0 every session ended by itself; 2 nothing watched (bad arguments, no
+CLI, an attached session not listed); 3 a cap or the floor stopped a session; 4 a
+session ran on the wrong accelerator and was stopped; 5 STOP_FAILED, a session may
+still be billing (also on stderr; check `colab sessions` now); 6 a crash, signal or
+failed `new`, every session stopped.
 """
 
 from __future__ import annotations
@@ -74,10 +84,11 @@ COLAB = Path(
 # CU per hour: the rise of `colab usage` when a session opens (docs/g0/psi0-finetune-cost.md).
 RATES = {"L4": 1.94, "A100": 6.73}
 
-EXIT_OK, EXIT_ERROR, EXIT_USAGE, EXIT_CAPPED = 0, 1, 2, 3
-EXIT_STILL_RUNNING, EXIT_WRONG_GPU, EXIT_NEW_FAILED = 4, 5, 6
+EXIT_OK, EXIT_NOTHING, EXIT_CAPPED, EXIT_WRONG_GPU = 0, 2, 3, 4
+EXIT_STOP_FAILED, EXIT_CRASHED = 5, 6
 TIMEOUT = 124  # returncode of a call that timed out
 MISSES_TO_END = 3
+CONFIRM_ABSENT = 2  # listings without the session that confirm a stop
 
 # Unassign an endpoint with the CLI's own client: `colab stop` needs a local name.
 UNASSIGN = "import sys; from colab_cli.common import state; state.client.unassign(sys.argv[1])"
@@ -102,15 +113,15 @@ _ASSIGNMENTS = re.compile(r"Active assignments:\s*(\d+)")
 
 
 class WatchError(Exception):
-    code = EXIT_ERROR
+    code = EXIT_CRASHED
+
+
+class NothingWatched(WatchError):
+    code = EXIT_NOTHING
 
 
 class WrongGpu(WatchError):
     code = EXIT_WRONG_GPU
-
-
-class NewFailed(WatchError):
-    code = EXIT_NEW_FAILED
 
 
 class Interrupted(Exception):
@@ -154,6 +165,33 @@ def parse_spec(text: str, attach: bool) -> Spec:
     return Spec(name, gpu, float(cap), attach, started)
 
 
+def build_specs(new: Sequence[str], attach: Sequence[str], persist: Sequence[str]) -> list[Spec]:
+    specs = [parse_spec(t, attach=False) for t in new]
+    specs += [parse_spec(t, attach=True) for t in attach]
+    names = [s.name for s in specs]
+    if len(set(names)) != len(names):
+        raise ValueError(f"a session is given twice: {names}")
+    if bad := [item for item in persist if "=" not in item]:
+        raise ValueError(f"persist takes NAME=COMMAND: {bad}")
+    commands = dict(item.split("=", 1) for item in persist)
+    if unknown := set(commands) - set(names):
+        raise ValueError(f"persist for sessions not given: {sorted(unknown)}")
+    return [Spec(s.name, s.gpu, s.cap, s.attach, s.started, commands.get(s.name)) for s in specs]
+
+
+def parse_inbox(text: str) -> list[Spec]:
+    """Lines `new NAME:GPU:CAP`, `attach NAME:GPU:CAP[:STARTED]`, `persist NAME=CMD`."""
+    found: dict[str, list[str]] = {"new": [], "attach": [], "persist": []}
+    for line in text.splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            kind, _, value = line.partition(" ")
+            if kind not in found:
+                raise ValueError(f"unknown inbox line {line!r}")
+            found[kind].append(value.strip())
+    return build_specs(found["new"], found["attach"], found["persist"])
+
+
 @dataclass(frozen=True)
 class Listed:
     name: str
@@ -185,24 +223,33 @@ class Timing:
     poll: float = 60.0
     cli_timeout: float = 60.0
     new_timeout: float = 900.0
-    stop_backoff: tuple[float, ...] = (5.0, 15.0, 30.0)
+    stop_backoff: tuple[float, ...] = (5.0, 15.0, 30.0)  # waits after attempts 1, 2, 3
+    confirm_polls: int = 4  # listings tried after each stop attempt
+    confirm_wait: float = 10.0
     persist_timeout: float = 600.0
 
+    def attempt_s(self, unassign: bool) -> float:
+        """One stop attempt that succeeds: stop, maybe unassign, two confirming listings."""
+        calls = 1 + unassign + CONFIRM_ABSENT
+        return calls * self.cli_timeout + (CONFIRM_ABSENT - 1) * self.confirm_wait
+
     @property
-    def stop_budget(self) -> float:
-        """A stop with every retry: stop, unassign and confirm calls, then the backoff."""
-        return sum(3 * self.cli_timeout + pause for pause in self.stop_backoff)
+    def stop_delay(self) -> float:
+        """A stop that works on its first retry; a later one may pass the cap."""
+        return self.attempt_s(False) + self.stop_backoff[0] + self.attempt_s(True)
 
     @property
     def margin(self) -> float:
         """Seconds a session can keep spending after a poll found it under its cap."""
-        return self.poll + 2 * self.cli_timeout + self.stop_budget
+        return self.poll + 2 * self.cli_timeout + self.stop_delay
 
 
 @dataclass
 class Session:
     spec: Spec
     started: float
+    last_balance: float | None = None
+    balance_cu: float = 0.0
     endpoint: str | None = None
     misses: int = 0
     ended: bool = False  # gone from the server, by itself or stopped and confirmed
@@ -211,8 +258,22 @@ class Session:
     persist: Process | None = None
     persist_done: bool = False
 
-    def by_time(self, now: float) -> float:
+    def wall_cu(self, now: float) -> float:
         return max(0.0, now - self.started) / 3600 * self.spec.rate
+
+    def update(self, usage: Usage | None) -> None:
+        """Charge this session its share of the balance drop since the last reading."""
+        if usage is None:
+            return
+        if self.last_balance is not None and usage.balance < self.last_balance:
+            share = 1.0  # alone: the whole drop is ours (fail closed)
+            if usage.assignments > 1 and usage.rate > self.spec.rate:
+                share = self.spec.rate / usage.rate
+            self.balance_cu += (self.last_balance - usage.balance) * share
+        self.last_balance = usage.balance
+
+    def spent(self, now: float) -> float:
+        return max(self.wall_cu(now), self.balance_cu)
 
 
 @dataclass
@@ -223,13 +284,15 @@ class Watcher:
     run: Run
     colab: Path = COLAB
     timing: Timing = field(default_factory=Timing)
-    soft: float = 0.9
+    persist_at: float = 0.9
+    ready_dir: Path | None = None
+    inbox: Path | None = None
     clock: Callable[[], float] = time.time
     sleep: Callable[[float], None] = time.sleep
     spawn: Spawn | None = None
     sessions: list[Session] = field(default_factory=list)
     start_balance: float | None = None
-    shared: bool = False  # the balance has counted more than one assignment
+    balance: float | None = None  # the latest reading
 
     # -- CLI -----------------------------------------------------------------------
 
@@ -238,7 +301,10 @@ class Watcher:
 
     def usage(self) -> Usage | None:
         code, text = self.colab_call("usage")
-        return parse_usage(text) if code == 0 else None
+        usage = parse_usage(text) if code == 0 else None
+        if usage is not None:
+            self.balance = usage.balance
+        return usage
 
     def listing(self, usage: Usage | None = None) -> list[Listed] | None:
         """The server's sessions, or None when the answer cannot be trusted."""
@@ -258,22 +324,23 @@ class Watcher:
             "event": event,
             **fields,
         }
-        line = json.dumps(record)
-        self.log_path.parent.mkdir(parents=True, exist_ok=True)
-        with self.log_path.open("a", encoding="utf-8") as sink:
-            sink.write(line + "\n")
+        line = json.dumps(record, ensure_ascii=False)
         print(line, flush=True)
-        if event == "ALERT":
-            print(f"ALERT {fields.get('message', '')}", file=sys.stderr, flush=True)
+        try:
+            self.log_path.parent.mkdir(parents=True, exist_ok=True)
+            with self.log_path.open("a", encoding="utf-8") as sink:
+                sink.write(line + "\n")
+        except OSError as error:  # the guard goes on without its log
+            print(f"log write failed: {error}; {line}", file=sys.stderr, flush=True)
+        if event in ("STOP_FAILED", "ALERT"):
+            print(f"{event}: {fields.get('message', '')}", file=sys.stderr, flush=True)
         return record
 
-    # -- start -----------------------------------------------------------------------
+    # -- adding sessions -------------------------------------------------------------
 
     def start(self) -> None:
         usage = self.usage()
         self.start_balance = usage.balance if usage else None
-        if usage is not None and usage.assignments > sum(s.attach for s in self.specs):
-            self.shared = True  # something outside the batch already draws on the balance
         self.log(
             "start",
             balance=self.start_balance,
@@ -282,7 +349,13 @@ class Watcher:
             margin_s=self.timing.margin,
             sessions=[asdict(s) for s in self.specs],
         )
-        for spec in self.specs:
+        self.add(self.specs)
+
+    def add(self, specs: Sequence[Spec]) -> None:
+        taken = {s.spec.name for s in self.sessions if not s.ended}
+        if clash := taken & {s.name for s in specs}:
+            raise NothingWatched(f"already watched: {sorted(clash)}")
+        for spec in specs:
             if spec.attach:
                 self.attach(spec)
             else:
@@ -292,16 +365,18 @@ class Watcher:
         listed = self.listing()
         match = next((s for s in listed or [] if s.name == spec.name), None)
         if match is None:
-            raise WatchError(f"{spec.name} is not listed by `colab sessions`; nothing to attach")
-        session = Session(spec, spec.started or self.clock(), endpoint=match.endpoint)
+            raise NothingWatched(f"{spec.name} is not listed by `colab sessions`")
+        started = spec.started or self.clock()
+        session = Session(spec, started, self.balance, endpoint=match.endpoint)
         self.sessions.append(session)
-        self.log("attach", session=spec.name, endpoint=match.endpoint, started=session.started)
+        self.log("attach", session=spec.name, endpoint=match.endpoint, started=started)
         self.check_gpu(session, match)
+        self.ready(session)
 
     def new(self, spec: Spec) -> None:
         before = self.listing()
         known = {s.endpoint for s in before or []}
-        session = Session(spec, self.clock())
+        session = Session(spec, self.clock(), self.balance)
         self.sessions.append(session)  # supervised from now: `finally` stops it
         code, text = self.colab_call(
             "new", "-s", spec.name, "--gpu", spec.gpu, timeout=self.timing.new_timeout
@@ -314,32 +389,64 @@ class Watcher:
             if code != 0:
                 self.log("new_failed_but_listed", session=spec.name, endpoint=match.endpoint)
             self.check_gpu(session, match)
+            self.ready(session)
             return
         orphans = [s for s in listed or [] if s.name == "?" and s.endpoint not in known]
         for orphan in orphans:
             self.log("orphan", session=spec.name, endpoint=orphan.endpoint)
             self.unassign(orphan.endpoint)
-        if listed is None or not all(self.gone(o.endpoint) for o in orphans):
+        if listed is None or not all(self.confirmed_gone(o.endpoint, None) for o in orphans):
             session.unconfirmed = True
-            self.log("ALERT", message=f"{spec.name}: an assignment from `new` may be running")
+            self.log("STOP_FAILED", message=f"{spec.name}: an assignment from `new` may bill")
         else:
             session.ended = True
-        raise NewFailed(f"colab new -s {spec.name} failed (code {code}): {text[-300:]}")
+        raise WatchError(f"colab new -s {spec.name} failed (code {code}): {text[-300:]}")
 
     def check_gpu(self, session: Session, listed: Listed) -> None:
         if listed.hardware != session.spec.gpu:
             message = f"{session.spec.name} runs on {listed.hardware}, planned {session.spec.gpu}"
-            self.log("ALERT", message=message)
+            self.log("wrong_gpu", session=session.spec.name, message=message)
             self.stop(session, "wrong_gpu")
             raise WrongGpu(message)
 
+    def ready(self, session: Session) -> None:
+        if self.ready_dir is not None:
+            self.ready_dir.mkdir(parents=True, exist_ok=True)
+            path = self.ready_dir / f"{session.spec.name}.ready"
+            path.write_text(f"{session.spec.name} {session.spec.gpu}\n", encoding="utf-8")
+
+    def read_inbox(self) -> None:
+        if self.inbox is None or not self.inbox.is_dir():
+            return
+        waiting = [p for p in self.inbox.iterdir() if p.suffix not in (".taken", ".rejected")]
+        for path in sorted(waiting):
+            try:
+                specs = parse_inbox(path.read_text(encoding="utf-8", errors="replace"))
+            except ValueError as error:
+                path.rename(path.with_name(path.name + ".rejected"))
+                self.log("ALERT", message=f"inbox {path.name} rejected: {error}")
+                continue
+            path.rename(path.with_name(path.name + ".taken"))
+            self.log("inbox", file=path.name, sessions=[asdict(s) for s in specs])
+            self.add(specs)
+
     # -- stop ------------------------------------------------------------------------
 
-    def gone(self, endpoint: str | None, name: str | None = None) -> bool:
-        listed = self.listing()
-        if listed is None:
-            return False
-        return not any(s.endpoint == endpoint or (name and s.name == name) for s in listed)
+    def confirmed_gone(self, endpoint: str | None, name: str | None) -> bool:
+        """Two successful listings without the session; a listing with it ends the wait."""
+        absent = 0
+        for poll in range(self.timing.confirm_polls):
+            if poll:
+                self.sleep(self.timing.confirm_wait)
+            listed = self.listing()
+            if listed is None:
+                continue
+            if any(s.endpoint == endpoint or (name and s.name == name) for s in listed):
+                return False
+            absent += 1
+            if absent == CONFIRM_ABSENT:
+                return True
+        return False
 
     def unassign(self, endpoint: str) -> None:
         python = self.colab.parent / "python"
@@ -348,19 +455,18 @@ class Watcher:
 
     def stop(self, session: Session, reason: str) -> bool:
         name = session.spec.name
-        attempts = len(self.timing.stop_backoff)
         for attempt, pause in enumerate(self.timing.stop_backoff, start=1):
             code, text = self.colab_call("stop", "-s", name)
             if session.endpoint and attempt > 1:
                 self.unassign(session.endpoint)  # the named stop did not take
-            if self.gone(session.endpoint, name):
+            if self.confirmed_gone(session.endpoint, name):
                 session.ended, session.stopped_by = True, reason
                 self.log("stopped", session=name, reason=reason, attempt=attempt, code=code)
                 return True
             self.log("stop_unconfirmed", session=name, attempt=attempt, output=text[-300:])
             self.sleep(pause)
         session.unconfirmed = True
-        self.log("ALERT", message=f"{name} still listed after {attempts} stops: stop it by hand")
+        self.log("STOP_FAILED", session=name, message=f"{name} may still be billing: stop it")
         return False
 
     # -- poll ------------------------------------------------------------------------
@@ -368,35 +474,27 @@ class Watcher:
     def live(self) -> list[Session]:
         return [s for s in self.sessions if not s.ended and not s.unconfirmed]
 
-    def by_balance(self, usage: Usage | None) -> float | None:
-        """The balance drop, while it can only be this batch's single session."""
-        if self.shared or usage is None or self.start_balance is None:
-            return None
-        return self.start_balance - usage.balance if len(self.sessions) == 1 else None
-
     def cycle(self) -> None:
         now, usage = self.clock(), self.usage()
-        if usage is not None and usage.assignments > 1:
-            self.shared = True
         listed = self.listing(usage)
         margin_h = self.timing.margin / 3600
-        by_balance = self.by_balance(usage)
         report: dict[str, Any] = {
             "balance": usage.balance if usage else None,
+            "rate": usage.rate if usage else None,
             "assignments": usage.assignments if usage else None,
-            "shared": self.shared,
         }
         for session in self.live():
             name = session.spec.name
-            spent = max(session.by_time(now), by_balance or 0.0)
+            session.update(usage)
+            spent = session.spent(now)
             match = None if listed is None else next((s for s in listed if s.name == name), None)
             if listed is not None:
                 session.misses = 0 if match else session.misses + 1
             report[name] = {
                 "elapsed_s": round(now - session.started),
                 "spent": round(spent, 3),
-                "by_time": round(session.by_time(now), 3),
-                "by_balance": None if by_balance is None else round(by_balance, 3),
+                "wall_cu": round(session.wall_cu(now), 3),
+                "balance_cu": round(session.balance_cu, 3),
                 "cap": session.spec.cap,
                 "listed": None if listed is None else match is not None,
                 "misses": session.misses,
@@ -436,7 +534,7 @@ class Watcher:
                 self.log("persisted", session=spec.name, code=code)
             return
         lead_h = (self.timing.margin + self.timing.persist_timeout) / 3600
-        if spent >= self.soft * spec.cap or spent + spec.rate * lead_h >= spec.cap:
+        if spent >= self.persist_at * spec.cap or spent + spec.rate * lead_h >= spec.cap:
             session.persist = (self.spawn or _spawn_shell)(spec.persist)
             self.log("persist", session=spec.name, spent=round(spent, 3), command=spec.persist)
 
@@ -456,37 +554,40 @@ class Watcher:
             while self.live():
                 self.sleep(self.timing.poll)
                 self.cycle()
+                self.read_inbox()
         except Interrupted as stop:
             self.log("signal", signum=stop.signum)
-            code = 128 + stop.signum
+            code = EXIT_CRASHED
         except WatchError as error:
             self.log("error", kind=type(error).__name__, message=str(error))
             code = error.code
-        except Exception as error:  # fail closed on anything: the finally stops sessions
+        except BaseException as error:  # fail closed on anything: the finally stops sessions
             self.log("error", kind=type(error).__name__, message=repr(error))
-            code = EXIT_ERROR
+            code = EXIT_CRASHED
         finally:
             with _SignalsIgnored():
                 self.cleanup()
         usage = self.usage()
         if any(s.unconfirmed for s in self.sessions):
-            code = EXIT_STILL_RUNNING
+            code = EXIT_STOP_FAILED
         elif code == EXIT_OK and any(s.stopped_by in ("cap", "floor") for s in self.sessions):
             code = EXIT_CAPPED
         drop = None
         if usage is not None and self.start_balance is not None:
             drop = round(self.start_balance - usage.balance, 3)
+        now = self.clock()
         self.log(
             "exit",
             code=code,
             balance=usage.balance if usage else None,
             balance_drop=drop,
-            shared=self.shared,
             sessions={
                 s.spec.name: {
                     "stopped_by": s.stopped_by,
                     "unconfirmed": s.unconfirmed,
-                    "by_time": round(s.by_time(self.clock()), 3),
+                    "spent": round(s.spent(now), 3),
+                    "wall_cu": round(s.wall_cu(now), 3),
+                    "balance_cu": round(s.balance_cu, 3),
                 }
                 for s in self.sessions
             },
@@ -518,10 +619,17 @@ def install_signal_handlers() -> None:
 
 def subprocess_runner(argv: Sequence[str], timeout: float) -> tuple[int, str]:
     try:
-        done = subprocess.run(list(argv), capture_output=True, text=True, timeout=timeout)
-    except subprocess.TimeoutExpired as error:
-        return TIMEOUT, f"timed out after {timeout:.0f} s: {error.output or ''}"
-    except OSError as error:
+        done = subprocess.run(
+            list(argv),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",  # the CLI can print bytes that are not UTF-8
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return TIMEOUT, f"timed out after {timeout:.0f} s"
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
         return 1, f"{type(error).__name__}: {error}"
     return done.returncode, done.stdout + done.stderr
 
@@ -535,8 +643,10 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser.add_argument("--new", action="append", default=[], metavar="NAME:GPU:CAP")
     parser.add_argument("--attach", action="append", default=[], metavar="NAME:GPU:CAP[:START]")
     parser.add_argument("--persist", action="append", default=[], metavar="NAME=COMMAND")
+    parser.add_argument("--persist-at", type=float, default=0.9, help="fraction of the cap")
     parser.add_argument("--floor", type=float, help="stop everything below this balance")
-    parser.add_argument("--soft", type=float, default=0.9, help="fraction of the cap for persist")
+    parser.add_argument("--ready-dir", type=Path, help="<NAME>.ready once on the right GPU")
+    parser.add_argument("--inbox", type=Path, help="directory read for sessions added later")
     parser.add_argument("--log", type=Path, required=True, help="JSON lines, one per event")
     parser.add_argument("--colab", type=Path, default=COLAB, help="the colab CLI ($COLAB_CLI)")
     parser.add_argument("--poll", type=float, default=60.0, help="seconds between polls")
@@ -544,44 +654,32 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def build_specs(args: argparse.Namespace) -> list[Spec]:
-    specs = [parse_spec(t, attach=False) for t in args.new]
-    specs += [parse_spec(t, attach=True) for t in args.attach]
-    if not specs:
-        raise ValueError("nothing to watch: pass --new or --attach")
-    names = [s.name for s in specs]
-    if len(set(names)) != len(names):
-        raise ValueError(f"a session is given twice: {names}")
-    if bad := [item for item in args.persist if "=" not in item]:
-        raise ValueError(f"--persist takes NAME=COMMAND: {bad}")
-    persist = dict(item.split("=", 1) for item in args.persist)
-    if unknown := set(persist) - set(names):
-        raise ValueError(f"--persist for sessions not in the batch: {sorted(unknown)}")
-    return [Spec(s.name, s.gpu, s.cap, s.attach, s.started, persist.get(s.name)) for s in specs]
-
-
 def main(argv: Sequence[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     args = parse_args(argv)
     try:
-        specs = build_specs(args)
+        specs = build_specs(args.new, args.attach, args.persist)
+        if not specs:
+            raise ValueError("nothing to watch: pass --new or --attach")
+        if not 0 < args.persist_at <= 1:
+            raise ValueError("--persist-at is a fraction of the cap, in (0, 1]")
     except ValueError as error:
         print(f"cu_watch: {error}", file=sys.stderr)
-        return EXIT_USAGE
+        return EXIT_NOTHING
     if not args.colab.exists():
         print(f"cu_watch: no colab CLI at {args.colab}; pass --colab", file=sys.stderr)
-        return EXIT_USAGE
+        return EXIT_NOTHING
     if not args.no_inhibit and os.environ.get("CU_WATCH_INHIBITED") != "1":
         inhibit = shutil.which("systemd-inhibit")
         if inhibit is None:
             print("cu_watch: no systemd-inhibit; pass --no-inhibit to run anyway", file=sys.stderr)
-            return EXIT_USAGE
+            return EXIT_NOTHING
         os.environ["CU_WATCH_INHIBITED"] = "1"
         os.execv(
             inhibit,
             [
                 inhibit,
-                "--what=sleep",
+                "--what=sleep:idle:handle-lid-switch",
                 "--who=cu_watch",
                 "--why=Colab sessions are paid while they run",
                 sys.executable,
@@ -597,7 +695,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         subprocess_runner,
         colab=args.colab,
         timing=Timing(poll=args.poll),
-        soft=args.soft,
+        persist_at=args.persist_at,
+        ready_dir=args.ready_dir,
+        inbox=args.inbox,
     )
     return watcher.watch()
 
