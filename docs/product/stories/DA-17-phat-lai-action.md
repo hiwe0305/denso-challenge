@@ -19,9 +19,9 @@ Là kỹ sư dữ liệu, tôi muốn mọi episode có action robot (psi-data, 
 
 ## Tiêu chí chấp nhận
 
-1. Gọi `replay()` chế độ động học: liệt kê khung sai ánh xạ khớp, sai đơn vị, vượt giới hạn khớp, tự va chạm, ảnh lệch thời gian với state.
+1. Gọi `replay()` chế độ động học: liệt kê khung sai ánh xạ khớp, sai đơn vị, vượt giới hạn khớp, tự va chạm, ảnh lệch thời gian với state. **Phần tự va chạm dời sau 13/11/2026** (PO 4/11/2026): phép kiểm này cần hình học của robot, nên AC 1 còn mở phần đó.
 2. Gọi `replay()` chế độ động lực học qua decoupled WBC: sai lệch state theo thời gian và theo nhóm action, thời điểm đóng mở bàn tay, `check_success` khi phát lại.
-3. Ngưỡng hiệu chỉnh từ episode thành công (phân vị 99) trong `configs/data/replay.yaml`; trượt động học thì loại, trượt động lực học thì đánh dấu cho kỹ sư.
+3. Ngưỡng hiệu chỉnh từ episode thành công (phân vị 99) trong `configs/data/replay.yaml`; trượt động học thì loại, trượt động lực học thì đánh dấu cho kỹ sư. Phát lại động lực học không đạt `check_success` cũng chỉ đánh dấu, với mọi nguồn (`task_success`, `replay_success` trong `configs/data/qa.yaml`; PO 4/11/2026).
 4. Ra `ReplayReport` đúng schema; bước QA của release đọc report này.
 5. Phát lại được action dự đoán của policy từ cùng state đầu (đầu vào cho Agent QA/QC); video ghép cạnh nhau ngoài git. **Dời sau 13/11/2026** (Q3 của [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md)); không chặn demo.
 
@@ -40,6 +40,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `packages/flywheel-data/src/flywheel/data/replay_check/`
 - `packages/flywheel-data/tests/unit/replay_check/`, `packages/flywheel-data/tests/contract/replay_check/`
 - `configs/data/replay.yaml`
+- `configs/data/qa.yaml` và `packages/flywheel-data/tests/unit/pipeline/test_qa_checks.py`, chỉ mức `on_fail` của các phép kiểm đọc report động lực học (PO 4/11/2026; file của DA-03, Hiếu giữ cả hai story)
 - `docs/g0/replay.md`
 - `packages/flywheel-simple/src/flywheel_simple/replay/`
 - `packages/flywheel-simple/tests/replay/`
@@ -72,10 +73,11 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 28/10/2026 | Sửa hạn PR `chore-restructure` theo 07 mục 3.6 bản 0.6: mở 28/10, merge 29/10 | PO (Hiếu) |
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 | 3/11/2026 | Người làm Thông → Hiếu theo quyết định PO (07 bản 1.6; [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) Q1–Q3): hạn 8/11; AC 5 và nhiệm vụ 5 dời sau 13/11; phạm vi thêm adapter `flywheel_simple/replay/` và test; ước lượng 5 giờ cho AC 1–4 | PO (Hiếu) |
+| 4/11/2026 | PO: phát lại động lực học trượt → `flag`, với mọi nguồn (`task_success`, `replay_success` trong `qa.yaml`); thêm `qa.yaml` và test của nó vào phạm vi file; phần tự va chạm của AC 1 dời sau 13/11/2026 | PO (Hiếu) theo PR #92 |
 
 ## Ghi chép khi làm
 
 - Giờ thực: 6 giờ cho nhiệm vụ 1–4 (mỗi nhiệm vụ 1,5 giờ, theo `Time-spent` của commit); ước lượng là 5 giờ.
 - Công cụ AI đã dùng: Claude Code (Opus 5.5), một phiên trong worktree `DA-17-replay-check`.
-- Ghi chú hoàn thành: AC 1–4 xong, AC 5 dời sau 13/11/2026. Số đo và việc phát sinh cho Hiếu nằm ở [docs/g0/replay.md](../../g0/replay.md). Ba điểm chính: chỉ 26/99 episode psi-data đạt `check_success` khi phát lại, dù các khớp được tái tạo tốt; không kiểm tự va chạm (AC 1 còn thiếu phần này); khay S1 có 1/102 episode bị loại do `joint_mapping`.
-- File đã tạo hoặc sửa: `packages/flywheel-data/src/flywheel/data/replay_check/` (`kinematic.py`, `dynamic.py`, `thresholds.py`, `cli.py`, `__main__.py`); `packages/flywheel-simple/src/flywheel_simple/replay/` (`compare.py`, `run.py`, `outcomes.py`); test trong `packages/flywheel-data/tests/unit/replay_check/` và `packages/flywheel-simple/tests/replay/`; `configs/data/replay.yaml`; `docs/g0/replay.md`.
+- Ghi chú hoàn thành: AC 1–4 xong, AC 5 dời sau 13/11/2026. Số đo và việc phát sinh cho Hiếu nằm ở [docs/g0/replay.md](../../g0/replay.md). Ba điểm chính: chỉ 26/99 episode psi-data đạt `check_success` khi phát lại, dù các khớp được tái tạo tốt, nên phát lại động lực học trượt chỉ đánh dấu (PO 4/11/2026); tự va chạm dời sau 13/11/2026; khay S1 có 1/102 episode bị loại do `joint_mapping`.
+- File đã tạo hoặc sửa: `packages/flywheel-data/src/flywheel/data/replay_check/` (`kinematic.py`, `dynamic.py`, `thresholds.py`, `cli.py`, `__main__.py`); `packages/flywheel-simple/src/flywheel_simple/replay/` (`compare.py`, `run.py`, `outcomes.py`); test trong `packages/flywheel-data/tests/unit/replay_check/` và `packages/flywheel-simple/tests/replay/`; `configs/data/replay.yaml`; `docs/g0/replay.md`; mức `on_fail` của `task_success` và `replay_success` trong `configs/data/qa.yaml`, cùng test trong `tests/unit/pipeline/test_qa_checks.py`.

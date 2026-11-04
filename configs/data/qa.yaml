@@ -41,13 +41,18 @@ checks:
   # Design 6.3, psi-data: video frames equal rows; every episode has its task sentence.
   video_rows_match: {code: D2, threshold: 0, on_fail: reject}
   task_instruction: {code: D6, threshold: 0, on_fail: flag}
-  # Spec 4.4 row 5: a failed task is no positive sample, kept as evidence -> reject.
+  # task_success, replay_success: sim_success of a dynamic ReplayReport (DA-17), i.e.
+  # whether the recorded actions, replayed open loop through the WBC, redo the task.
+  # DA-17 AC 3 and PO 4/11/2026: a dynamic replay that fails flags, for every source,
+  # and never rejects. Open-loop replay of a locomotion task is no quality label:
+  # 26/99 psi-data episodes pass, and which ones shifts with the clock (sim 6/26,
+  # wall 4/26; docs/g0/replay.md section 3.2).
   # psi-data has no success field (docs/g0/psi-data.md section 3): only a replay tells.
-  task_success: {code: D6, threshold: 0, on_fail: reject, when_missing: skip}
-  # Design 6.3, generated data: the rollout replayed in sim succeeds (D8) -> reject.
-  # The tray S1 release holds only episodes DA-33's replay passed (102/102,
-  # meta/batch_replay_summary.json), but per episode that is not a ReplayReport yet.
-  replay_success: {code: D8, threshold: 0, on_fail: reject, when_missing: skip}
+  task_success: {code: D6, threshold: 0, on_fail: flag, when_missing: skip}
+  # Design 6.3, generated data: the rollout replayed in sim succeeds (D8). DA-33's own
+  # replay at generation time is not this check: the tray S1 release holds only the
+  # episodes it passed (102/102, meta/batch_replay_summary.json).
+  replay_success: {code: D8, threshold: 0, on_fail: flag, when_missing: skip}
   # Design 10 D4, per dataset: shipped stats against stats of the dataset's own frames,
   # computed in float32 as SIMPLE does. D4 blocks export (tier 6), not the release, so
   # QA shows it in the dataset report.

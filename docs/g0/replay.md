@@ -1,6 +1,6 @@
 # Phát lại action: ngưỡng hiệu chỉnh trên psi-data và report cho QA
 
-_Ngày 4/11/2026. Story [DA-17](../product/stories/DA-17-phat-lai-action.md) nhiệm vụ 3 và 4. Mọi số trong file này là output của `python -m flywheel.data.replay_check` và `fw data qa`, chạy trên máy `rtx3060` với code của nhánh `DA-17-replay-check`. SIMPLE ở commit `b75c678` (bản sửa spawn và tay khởi đầu bằng 0). Thời gian chạy và RSS đỉnh đo bằng `/usr/bin/time -v`. Dữ liệu và kết quả nằm ở `rtx3060:~/denso-da17/fwdata/` và không commit._
+_Ngày 4/11/2026. Story [DA-17](../product/stories/DA-17-phat-lai-action.md) nhiệm vụ 3, 4 và 4.1. Mọi số trong file này là output của `python -m flywheel.data.replay_check` và `fw data qa`, chạy trên máy `rtx3060` với code của nhánh `DA-17-replay-check`. SIMPLE ở commit `b75c678` (bản sửa spawn và tay khởi đầu bằng 0). Thời gian chạy và RSS đỉnh đo bằng `/usr/bin/time -v`. Dữ liệu và kết quả nằm ở `rtx3060:~/denso-da17/fwdata/` và không commit._
 
 ## Kết luận
 
@@ -8,20 +8,25 @@ _Ngày 4/11/2026. Story [DA-17](../product/stories/DA-17-phat-lai-action.md) nhi
 - **Chỉ 26/99 episode đạt `check_success` khi phát lại.** Khớp lại được tái tạo tốt như nhau ở episode đạt và episode trượt: trung vị sai lệch cánh tay là 0,049 rad ở episode đạt và 0,046 rad ở episode trượt. Vậy lý do trượt không nằm ở các khớp đã ghi. **[Giả định]** Nguyên nhân là đế robot trôi khi đi giữa hai bàn, vì psi-data không ghi tư thế đế để so sánh (mục 3.2).
 - **Ngưỡng ghi ở `configs/data/replay.yaml`, phiên bản `replay-1@cf2515483a8c`.** Ngưỡng động học lấy giá trị lớn nhất của 99 episode sạch. Ngưỡng động lực học lấy p99 của 26 episode phát lại đạt (design 6.3).
 - **Ba lỗi cấy đều bị bắt, episode sạch không bị đánh dấu.** Test chạy trên CPU với simulator giả, không cần MuJoCo (mục 4).
-- **QA đọc được report.** psi-data chỉ có report động học: 95 `pass`, 4 `flag`, 0 `reject`, giống hệt kết quả không có report. Khay S1 chỉ có report động học: 101 `flag` (đều do `action_jump.arm` của DA-03) và 1 `reject` do `replay_kinematic`.
-- **Lần hiệu chỉnh đầu bị thay** vì nó loại cả 102 episode khay S1 (mục 5).
+- **Phát lại động lực học trượt chỉ đánh dấu, với mọi nguồn** **[Đã chốt]** (PO 4/11/2026, DA-17 AC 3). Lý do: phát lại vòng hở action đã ghi trên task đi lại không tái tạo được thành công. Chỉ 26/99 episode đạt, và episode nào đạt còn đổi theo đồng hồ. Trong `qa.yaml`, `task_success` và `replay_success` chuyển từ `reject` sang `flag`.
+- **QA đọc được report.** Với `qa-1@fb6ddaf9f48c`:
+  - psi-data có cả report động học và động lực học: 21 `pass`, 78 `flag`, 0 `reject`.
+  - psi-data chỉ có report động học: 95 `pass`, 4 `flag`, 0 `reject`.
+  - Khay S1 chỉ có report động học: 101 `flag` và 1 `reject` do `replay_kinematic` (mục 3.3).
+- **Khay S1 thô hơn psi-data thật sự.** Đây là phát hiện cho DA-33, không phải lỗi của ngưỡng (mục 5). Lần hiệu chỉnh đầu loại cả 102 episode khay; ngưỡng động học đã được nới ở hai chỗ để khay không bị loại hết.
 
 Việc phát sinh, Hiếu quyết:
 
 | # | Phát hiện | Ảnh hưởng | Ai |
 |---|---|---|---|
-| 1 | Chỉ 26/99 episode psi-data đạt `check_success` khi phát lại, dù khớp được tái tạo tốt (mục 3.2) | Nếu đưa report động lực học vào QA, `task_success` (mức `reject`) loại 73 episode psi-data. **[Đề xuất]** Với psi-data, chỉ đưa report động học vào QA (`reports` không có `--outcomes`), hoặc đổi `task_success` sang `flag` trong `qa.yaml` (PR riêng cho người giữ `qa.yaml`) | Hiếu |
+| 1 | Chỉ 26/99 episode psi-data đạt `check_success` khi phát lại, dù khớp được tái tạo tốt (mục 3.2) | **[Đã chốt]** PO 4/11/2026: `task_success` và `replay_success` chỉ `flag`. psi-data có report động lực học giờ cho 0 `reject` và 78 `flag` (73 episode trượt `task_success`) | Đã làm trong PR này |
 | 2 | Episode `ep_7f0a5ca73db8348e` của khay S1 bị loại: tương quan giữa action và state của `right_hand_middle_0_joint` là 0,349, dưới sàn 0,5 | Chưa biết đây là lỗi thật hay planner ra lệnh cho tay khi tay bị vật chặn. Tỉ lệ loại là 1/102 | DA-33 xem episode này |
 | 3 | Sàn tương quan của `right_hand_thumb_1_joint` (−0,53) và `left_shoulder_roll_joint` (−0,12) âm ngay trên dữ liệu sạch | Đảo dấu ở hai khớp này chỉ bị bắt khi tương quan sạch của episode đó cao hơn trị tuyệt đối của sàn. Phát lại động lực học vẫn thấy lỗi qua `state_error` | Giữ như vậy |
-| 4 | Không kiểm tự va chạm (AC 1), vì phép kiểm này cần hình học của robot | Một phần của AC 1 chưa làm | Hiếu: làm trong adapter sau 13/11, hoặc bỏ khỏi AC |
-| 5 | Đảo dấu ở các chiều lệnh 31–35 (chiều cao, vận tốc, cờ rẽ, hướng) không bị phép kiểm động học bắt, vì các chiều này không phải khớp và state không có cột tương ứng | Chỉ phát lại động lực học thấy được, qua việc task trượt | Giữ như vậy |
-| 6 | `FakeSim2D` của `flywheel.testkit` không mô phỏng được G1. Test của làn dùng một WBC giả riêng trong `tests/unit/replay_check/test_replay_faults.py` | Không ảnh hưởng | Không cần làm gì |
-| 7 | `check_kinematic` nhận `episode_id` và `fps` qua tham số từ khóa, vì `EpisodeFrames` không chứa hai trường này | Không đổi hợp đồng | Không cần làm gì |
+| 4 | Không kiểm tự va chạm (AC 1), vì phép kiểm này cần hình học của robot | **[Đã chốt]** Dời sau 13/11/2026; AC 1 còn mở phần này (ghi trong story) | Hiếu, sau 13/11 |
+| 5 | Khay S1 thô hơn psi-data: bước nhảy state cánh tay lớn nhất là 0,080 rad, so với 0,056 rad ở psi-data. `action_jump.arm` của QA đánh dấu 101/102 episode. 36 episode có tương quan action–state thấp hơn mức thấp nhất của psi-data (mục 5) | Ngưỡng nới (không còn `joint_jump` trên state, sàn tương quan không quá 0,5) chỉ để khay không bị loại cả lô. Độ thô vẫn còn trong dữ liệu, và Ψ₀ sẽ học theo | DA-33 xem planner (giống phát hiện 1 của [data-pipeline.md](data-pipeline.md)) |
+| 6 | Đảo dấu ở các chiều lệnh 31–35 (chiều cao, vận tốc, cờ rẽ, hướng) không bị phép kiểm động học bắt, vì các chiều này không phải khớp và state không có cột tương ứng | Chỉ phát lại động lực học thấy được, qua việc task trượt | Giữ như vậy |
+| 7 | `FakeSim2D` của `flywheel.testkit` không mô phỏng được G1. Test của làn dùng một WBC giả riêng trong `tests/unit/replay_check/test_replay_faults.py` | Không ảnh hưởng | Không cần làm gì |
+| 8 | `check_kinematic` nhận `episode_id` và `fps` qua tham số từ khóa, vì `EpisodeFrames` không chứa hai trường này | Không đổi hợp đồng | Không cần làm gì |
 
 ## 1. Lệnh
 
@@ -85,13 +90,15 @@ Mọi episode đều phát lại đủ số frame đã ghi. Sai lệch khớp kh
 
 ### 3.3 Report và QA
 
-| Bộ report | Report có issue | `fw data qa --replay` |
-|---|---|---|
-| psi-data, động học và động lực học | động học 0, động lực học 76 | 21 `pass`, 5 `flag`, 73 `reject` (`task_success` 73, `replay_dynamic` 76) |
-| psi-data, chỉ động học | 0 | 95 `pass`, 4 `flag`, 0 `reject`, giống [data-pipeline.md](data-pipeline.md) mục 3.1 |
-| khay S1, chỉ động học | 1 (`joint_mapping`) | 0 `pass`, 101 `flag` (`action_jump.arm`), 1 `reject` (`replay_kinematic`) |
+| Bộ report | Report có issue | `fw data qa --replay`, `qa-1@fb6ddaf9f48c` | Trước quyết định 4/11, `qa-1@95fbc11570b7` |
+|---|---|---|---|
+| psi-data, động học và động lực học | động học 0, động lực học 76 | 21 `pass`, 78 `flag`, **0 `reject`** (`replay_dynamic` 76, `task_success` 73, `action_jump` 4) | 21 `pass`, 5 `flag`, 73 `reject` (`task_success`) |
+| psi-data, chỉ động học | 0 | 95 `pass`, 4 `flag`, 0 `reject`, giống [data-pipeline.md](data-pipeline.md) mục 3.1 | giống |
+| khay S1, chỉ động học | 1 (`joint_mapping`) | 0 `pass`, 101 `flag` (`action_jump.arm` ở cả 102 episode), 1 `reject` (`replay_kinematic`) | giống |
 
-Ngưỡng QA là `qa-1@95fbc11570b7`. Khay S1 không có report động lực học, vì DA-33 đã phát lại khay trong quá trình sinh dữ liệu (102/102 đạt).
+Quyết định PO 4/11/2026 **[Đã chốt]**: phát lại động lực học trượt chỉ đánh dấu, với mọi nguồn (DA-17 AC 3). `qa.yaml` đổi `task_success` (D6) và `replay_success` (D8) từ `reject` sang `flag`. Đây là hai phép kiểm duy nhất ngoài `replay_dynamic` đọc report động lực học: cả hai đọc `sim_success`, mà chỉ report động lực học mới có. Phép phát lại lúc sinh dữ liệu của DA-33 không phải phép kiểm QA và không đổi; release khay vẫn chỉ gồm episode đã qua phép đó.
+
+Mỗi lần `qa` chạy 1,7–2,6 s, RSS đỉnh dưới 0,5 GB. Khay S1 không có report động lực học, vì DA-33 đã phát lại khay trong quá trình sinh dữ liệu (102/102 đạt).
 
 ## 4. Lỗi cấy
 
@@ -104,7 +111,7 @@ Ngưỡng QA là `qa-1@95fbc11570b7`. Khay S1 không có report động lực h�
 | Action `right_elbow_joint` ghi bằng độ | `unit_deg_rad`, `joint_limit` | (test không kiểm) | `reject` |
 | Timestamp lệch 2 frame | `timestamp_offset` | không có (đồng hồ không phải khớp) | `reject` |
 
-## 5. Lần hiệu chỉnh đầu bị thay
+## 5. Lần hiệu chỉnh đầu bị thay, và độ thô của khay S1
 
 Lần hiệu chỉnh đầu (`replay-1@782d018c60ef`) có thêm hai điều kiện:
 
@@ -115,5 +122,15 @@ Với ngưỡng này, cả 102 episode khay S1 đều bị loại. Lý do: `join
 
 - **Bỏ `joint_jump` khỏi phát lại.** Design 6.3 không liệt kê phép kiểm này cho chế độ động học. Nhảy khớp là D3, và `action_jump` của QA đã đánh dấu nó (mức `flag`, DA-03).
 - **Sàn tương quan không cao hơn 0,5.** Một khớp bị đảo dấu cho tương quan âm, nên sàn cao hơn 0,5 không bắt thêm được lỗi nào mà chỉ loại nguồn bám kém hơn psi-data một chút.
+
+**Khay S1 thô hơn psi-data thật sự, và đây là phát hiện cho DA-33.** Ngưỡng nới chỉ để phát lại không loại cả lô; nó không giải thích được độ thô.
+
+| Đo trên state và action đã ghi | psi-data (99 episode người) | khay S1 (102 episode planner) |
+|---|---|---|
+| Bước nhảy state cánh tay lớn nhất | 0,056 rad | 0,080 rad |
+| Episode trượt `action_jump.arm` (p99,9 của psi-data) | 1 | 102 |
+| Episode có một khớp với tương quan action–state dưới mức thấp nhất của psi-data | 0 (theo cách lấy ngưỡng) | 36 |
+
+Các bước nhảy nằm quanh bước 25–40, 205–223 và 1295–1329 của episode (ví dụ `ep_00393522d8b4c69e`). Vùng 205–223 trùng với các bước 205–211 mà [data-pipeline.md](data-pipeline.md) mục 3.2 đã thấy ở action cổ tay. Ψ₀ sẽ học theo phân bố này.
 
 Kết quả lần đầu nằm ở `rtx3060:~/denso-da17/fwdata/superseded-1/`. Sổ chi phí chỉ ghi thêm, nên `g0-DA-17-20261104` giữ cả các job của lần đầu. Hai lần chạy phát lại một phần (giờ mô phỏng 40 episode, giờ thật 26 episode) đã bị dừng, nhưng dòng thực đo của chúng vẫn được ghi.
