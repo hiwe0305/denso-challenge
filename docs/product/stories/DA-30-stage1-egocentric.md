@@ -66,6 +66,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 3/11/2026 | DA-09 dời sau demo: lần chạy ngắn chưa có probe (07 mục 2.4, bản 1.2) | PO (Hiếu) |
 | 4/11/2026 | Duyệt CU cho lần chạy ngắn (tier 2: "Approve tier 2"), ước lượng khoảng 2,3 CU, trần 4 CU; chạy từ `master` sau merge, có bộ canh CU | PO (Hiếu) |
 | 4/11/2026 | Miễn bước che danh tính ("Waive for EgoDex") chỉ cho mẫu EgoDex công bố (`public`) trong các lần chạy stage 1 của DA-30; video tự quay và mọi nguồn egocentric khác vẫn phải che trước. RunPlan chặn mọi nguồn khác ([stage1.md](../../he/stage1.md) mục 1.4) | PO (Hiếu) |
+| 4/11/2026 | Bộ canh CU dùng chung đổi thiết kế (PR #108): mỗi phiên một watcher theo endpoint, cộng một guard cho cả đợt; DA-26 và DA-30 không chạy cùng lúc, DA-30 chạy trước, một mình ([stage1.md](../../he/stage1.md) mục 1.6) | Review PR #108 |
 
 ## Ghi chép khi làm
 

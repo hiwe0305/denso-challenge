@@ -94,16 +94,29 @@ RunPlan [`egodex-short.yaml`](../../configs/runplans/stage1/egodex-short.yaml) (
 - **Loss giảm**: trung vị 20 dòng train cuối thấp hơn trung vị 20 dòng đầu (mỗi dòng một batch, nên so trung vị của cửa sổ, không so hai bước).
 - **Chạy lại**: chạy lại 3 bước đầu dưới job id khác (`da30-egodex-short-repeat`), cùng seed 7; loss bước đầu lệch không quá 2%. Seed cố định thứ tự dữ liệu (generator của DataLoader và seed của worker lấy từ seed của cấu hình).
 
-**Bộ canh CU** là script dùng chung `scripts/colab/cu_watch.py` (PR #108, phải merge trước PR này). Một tiến trình trên laptop, nơi có CLI `colab`, canh mọi phiên của tier 2. Cách đo, biên và các đường fail closed ghi trong docstring của script. Với DA-30:
+**Bộ canh CU** là script dùng chung `scripts/colab/cu_watch.py` (PR #108, phải merge trước PR này). Mỗi phiên Colab có một tiến trình `session`, theo dõi phiên theo endpoint chứ không theo tên. Cả đợt có thêm một tiến trình `guard` làm lưới an toàn: dừng mọi phiên ở sàn, và dừng mọi assignment không có watcher sống đăng ký. Cách đo, biên và các đường fail closed ghi trong docstring của script. Với DA-30:
 
-- Bộ canh tự mở phiên (`--new da30-stage1:L4:4`), nên số dư và mốc thời gian được ghi đúng lúc phiên bắt đầu; không mở phiên bằng tay. Nếu bộ canh của tier 2 đã chạy (phiên của DA-26), **không dừng nó**, vì dừng bộ canh sẽ dừng mọi phiên. Thay vào đó, thả vào thư mục `--inbox` của nó một file có hai dòng `new da30-stage1:L4:4` và `persist da30-stage1=colab exec -s da30-stage1 -f configs/runplans/stage1/persist_cell.py`.
-- Trần cứng 4 CU (`compute.max_compute_units` của RunPlan); sàn `--floor 14` theo số dư thật của cả tài khoản (101,8 − 88 của tier 2).
-- Ở khoảng 90% trần, bộ canh chạy `persist` của driver trong kernel của phiên ([`persist_cell.py`](../../configs/runplans/stage1/persist_cell.py)), để log và `metrics.jsonl` còn lại sau khi phiên bị dừng ở trần. Vì vậy lệnh train phải chạy trong shell SSH, không qua `colab exec`, để kernel rảnh; và Drive phải được mount (`colab drivemount -s da30-stage1 /content/drive`) ngay sau `setup`.
-- Chỉ bắt đầu train khi đã có file `fwdata/colab/ready/da30-stage1.ready`, nghĩa là phiên đã chạy đúng L4.
-- Dòng `exit` cuối của log có `balance_drop` của tài khoản, cùng `spent`, `wall_cu` và `balance_cu` của từng phiên: đây là số liệu cho dòng `measured` của sổ chi phí. Mã thoát: 3 là đã dừng ở trần hoặc ở sàn; 4 là sai loại GPU; 5 là `STOP_FAILED`, phiên có thể vẫn tính tiền, phải xem `colab sessions` ngay; 6 là crash, tín hiệu hoặc `new` lỗi, mọi phiên đã dừng.
+- **Chạy một mình.** Quy tắc vận hành từ review PR #108 (4/11/2026): DA-26 và DA-30 không chạy cùng lúc, và lần chạy 4 CU của DA-30 đi trước, một mình. `colab sessions` phải trống trước khi bắt đầu, vì guard dừng mọi assignment không đăng ký trên tài khoản.
+- Watcher tự mở phiên (`session --new --name da30-stage1 --gpu L4 --cap 4`), nên số dư và mốc thời gian được ghi đúng lúc phiên bắt đầu. Không mở phiên bằng tay.
+- Trần cứng 4 CU (`compute.max_compute_units` của RunPlan). Sàn `--floor 14` theo số dư thật của cả tài khoản (101,8 − 88 của tier 2), đặt ở cả guard lẫn watcher.
+- Khi chi tiêu tới khoảng 3,45 CU, watcher chạy `persist` của driver trong kernel của phiên ([`persist_cell.py`](../../configs/runplans/stage1/persist_cell.py)), để log và `metrics.jsonl` còn lại sau khi phiên bị dừng ở trần. Mốc này sớm hơn 90% trần để `persist` có đủ 600 s trước khi dừng. Vì vậy:
+  - lệnh train phải chạy trong shell SSH, không qua `colab exec`, để kernel rảnh;
+  - Drive phải được mount (`colab drivemount -s da30-stage1 /content/drive`) ngay sau `setup`.
+- Chỉ bắt đầu train khi đã có file `fwdata/colab/da30/da30-stage1.ready`, nghĩa là phiên đã chạy đúng L4.
+- Dòng `exit` cuối của `da30-stage1.jsonl` có `balance_drop` của tài khoản, cùng `spent`, `wall_cu` và `balance_cu` của phiên. Đây là số liệu cho dòng `measured` của sổ chi phí.
+- Mã thoát:
+  - 0: phiên tự kết thúc;
+  - 3: đã dừng ở trần hoặc ở sàn;
+  - 4: sai loại GPU;
+  - 5: `STOP_FAILED`, phiên có thể vẫn tính tiền. Guard tiếp tục dừng nó, nhưng vẫn phải xem `colab sessions` ngay;
+  - 6: crash, tín hiệu hoặc `new` lỗi; mọi assignment nó tạo đã dừng.
 
 ```bash
-mkdir -p fwdata/colab/inbox && nohup setsid bash -c 'python3 scripts/colab/cu_watch.py --floor 14 --new da30-stage1:L4:4 --persist "da30-stage1=colab exec -s da30-stage1 -f configs/runplans/stage1/persist_cell.py" --ready-dir fwdata/colab/ready --inbox fwdata/colab/inbox --log fwdata/colab/cu_watch.jsonl; echo "exit $?"' < /dev/null >> fwdata/colab/cu_watch.out 2>&1 &
+export PATH=~/project/wm-wam-review/.venv-colab-cli/bin:$PATH
+R=fwdata/colab/da30; mkdir -p $R; rm -f $R/da30-stage1.ready
+nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py guard --registry "$0" --floor 14 --log "$0/guard.jsonl"; echo "exit $?"' $R < /dev/null > $R/guard.out 2>&1 &
+nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py session --registry "$0" --new --name da30-stage1 --gpu L4 --cap 4 --floor 14 --persist "colab exec -s da30-stage1 -f configs/runplans/stage1/persist_cell.py" --log "$0/da30-stage1.jsonl"; echo "exit $?"' $R < /dev/null > $R/da30-stage1.out 2>&1 &
+until [ -f $R/da30-stage1.ready ]; do grep -q '^exit ' $R/da30-stage1.out && exit 1; sleep 5; done
 ```
 
 Lệnh trên Colab (L4, phiên `da30-stage1` do bộ canh mở), theo thứ tự, từ bản sao repo ở `/content/da30/fw` với `PYTHONPATH` gồm `packages/flywheel-psi0/src` và `packages/flywheel-contracts/src` như DA-19:
@@ -144,4 +157,4 @@ Giả định, chưa đo. Một VM L4 ở 1,94 CU/giờ (S1-04). **Hơn một n�
 | 15 | 50 phút | 88 phút | 2,8 |
 | 26 | 86 phút | 124 phút | 4,0 (trần của RunPlan) |
 
-Quy tắc dừng [Đề xuất]: đọc s/bước trong `train.log` sau 20 bước; quá 20 s thì dừng VM và báo Hiếu trước khi chạy tiếp, trước khi bộ canh tự dừng ở khoảng 23 s (dưới đây). Bộ canh CU (mục 1.6) là chốt chặn cuối: phiên tự dừng trước 4 CU dù không ai đọc log. Biên của bộ canh là 625 s, khoảng 0,34 CU ở L4, nên phiên dừng ở khoảng 3,7 CU; theo bảng trên, tức là khi s/bước vượt khoảng 23 s.
+Quy tắc dừng [Đề xuất]: đọc s/bước trong `train.log` sau 20 bước; quá 20 s thì dừng VM và báo Hiếu trước khi chạy tiếp, trước khi bộ canh tự dừng ở khoảng 24 s (dưới đây). Bộ canh CU (mục 1.6) là chốt chặn cuối: phiên tự dừng trước 4 CU dù không ai đọc log. Biên của bộ canh là 430 s, khoảng 0,23 CU ở L4, nên phiên dừng ở khoảng 3,77 CU, tức khoảng 117 phút. Trừ 38 phút cố định, còn khoảng 79 phút train, tức khi s/bước vượt khoảng 24 s.
