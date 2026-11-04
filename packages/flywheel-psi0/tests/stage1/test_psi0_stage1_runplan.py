@@ -139,7 +139,8 @@ def test_the_authors_offload_config_is_refused_as_run_1_was() -> None:
         ("optimizer", "eps", 1e-6, "optimizer.params.eps"),
         ("optimizer", "weight_decay", 0.1, "optimizer.params.weight_decay"),
         ("scheduler", "cos_min_ratio", 0.0001, "WarmupCosineLR"),
-        ("scheduler", "last_batch_iteration", -1, "WarmupCosineLR"),
+        # 0 leaves `_last_lr` unset: Psi0's first get_last_lr() fails (review of PR #112)
+        ("scheduler", "last_batch_iteration", 0, "WarmupCosineLR"),
     ],
 )
 def test_a_config_that_drifts_from_the_recipe_is_refused(
@@ -149,6 +150,17 @@ def test_a_config_that_drifts_from_the_recipe_is_refused(
     config[block] = {**config[block], "params": {**config[block]["params"], key: value}}  # type: ignore[dict-item]
     problems = deepspeed_problems(config, plan().load_recipe(REPO))
     assert len(problems) == 1 and expected in problems[0]
+
+
+@pytest.mark.parametrize("clip", [0.5, "auto", None])
+def test_gradient_clipping_must_be_the_recipes_max_grad_norm(clip: object) -> None:
+    config = deepspeed_config()
+    if clip is None:
+        del config["gradient_clipping"]
+    else:
+        config["gradient_clipping"] = clip
+    problems = deepspeed_problems(config, plan().load_recipe(REPO))
+    assert len(problems) == 1 and "max_grad_norm" in problems[0]
 
 
 def test_check_wants_the_config_by_its_own_key(tmp_path: Path) -> None:

@@ -7,6 +7,7 @@ the shell faked: the DeepSpeed pre-flight comes before any download.
 from __future__ import annotations
 
 import json
+import os
 import shlex
 import subprocess
 from pathlib import Path
@@ -98,8 +99,11 @@ def test_setup_runs_the_preflight_before_any_download(
     (work / "fw").symlink_to(REPO)
     commands: list[str] = []
 
-    def sh(command: str, cwd: Path | None = None) -> None:
+    envs: list[dict[str, str] | None] = []
+
+    def sh(command: str, cwd: Path | None = None, env: dict[str, str] | None = None) -> None:
         commands.append(command)
+        envs.append(env)
         if preflight_fails and "stage1.preflight" in command:
             raise subprocess.CalledProcessError(1, command)
 
@@ -115,6 +119,9 @@ def test_setup_runs_the_preflight_before_any_download(
     with pytest.raises(subprocess.CalledProcessError if preflight_fails else Fetched):
         colab.setup(work, PLAN)
     assert "stage1.preflight" in commands[0]
+    pythonpath = (envs[0] or {})["PYTHONPATH"].split(os.pathsep)
+    assert str(REPO / "packages" / "flywheel-psi0" / "src") in pythonpath
+    assert all(Path(entry).is_absolute() for entry in pythonpath[:2])
     report = phases(work)["preflight"]
     if preflight_fails:
         assert commands == commands[:1] and "error" in report  # no parent download

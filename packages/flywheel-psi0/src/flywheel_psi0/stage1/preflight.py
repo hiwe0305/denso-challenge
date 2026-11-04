@@ -11,8 +11,17 @@ Psi0's environment, on the plan's config:
 It builds DeepSpeed's CPU Adam (a JIT build on first use), then builds the
 Accelerator, `DummyOptim` and `DummyScheduler` as Psi0's `scripts/train.py` and
 `PretrainTrainer` do, prepares a two-group model (the second group at its own lr, as
-Psi0's vision tower) and takes optimizer steps. It fails when the config does not
-prepare, or when a group is at another lr than its own after `prepare` or the steps.
+Psi0's vision tower) and runs two optimizer steps of micro-steps in the order of
+`PretrainTrainer.training_step`, reading `lr_scheduler.get_last_lr()[0]` after each
+micro-step as it does. DeepSpeed steps the scheduler only at the accumulation
+boundary, so the first read comes before any scheduler step: with
+`last_batch_iteration` 0 it fails there, after the model load (review of PR #112).
+
+It fails when the config does not prepare, when a read fails, or when the groups are
+not at the lrs DeepSpeed 0.17.1 gives them: after `prepare`, the first group at 0
+(`WarmupCosineLR` built at iteration -1 writes lr 0 into the first group only, so
+the first update of that group is at lr 0) and the second at its own; after the
+first optimizer step, both at their own.
 """
 
 from __future__ import annotations
@@ -22,6 +31,7 @@ import importlib
 import json
 import math
 import time
+from collections.abc import Callable
 from types import SimpleNamespace
 from typing import Any
 
@@ -41,6 +51,22 @@ def _tiny_model(torch: Any) -> Any:
             return self.head(torch.relu(self.body(x)))
 
     return Tiny()
+
+
+def micro_steps(
+    accelerator: Any, model: Any, optimizer: Any, scheduler: Any, batch: Callable[[], Any], n: int
+) -> list[float]:
+    """`n` micro-steps in `PretrainTrainer.training_step`'s order; the lr each one logs."""
+    logged: list[float] = []
+    for _ in range(n):
+        with accelerator.autocast():
+            loss = model(batch()).float().pow(2).mean()
+        accelerator.backward(loss)
+        optimizer.step()
+        scheduler.step()
+        optimizer.zero_grad()
+        logged.append(float(scheduler.get_last_lr()[0]))  # pretrain.py:317 at cda3fdf
+    return logged
 
 
 def _check_lrs(optimizer: Any, want: list[float], when: str) -> list[float]:
@@ -87,23 +113,20 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         optimizer, total_num_steps=args.total_steps, warmup_num_steps=0
     )
     model, optimizer, scheduler = accelerator.prepare(model, optimizer, scheduler)
-    want = [args.lr, group_lr]
-    _check_lrs(optimizer, want, "after prepare")
+    _check_lrs(optimizer, [0.0, group_lr], "after prepare")
     dtype = {"bf16": torch.bfloat16, "fp16": torch.float16}.get(args.precision, torch.float32)
-    for _ in range(2 * args.accumulation):
-        with accelerator.accumulate(model):
-            x = torch.randn(args.micro_batch, HIDDEN, device=accelerator.device, dtype=dtype)
-            loss = model(x).float().pow(2).mean()
-            accelerator.backward(loss)
-            optimizer.step()
-            scheduler.step()
-            optimizer.zero_grad()
-    lrs = _check_lrs(optimizer, want, "after two steps")
+
+    def batch() -> Any:
+        return torch.randn(args.micro_batch, HIDDEN, device=accelerator.device, dtype=dtype)
+
+    logged = micro_steps(accelerator, model, optimizer, scheduler, batch, 2 * args.accumulation)
+    lrs = _check_lrs(optimizer, [args.lr, group_lr], "after two steps")
     return {
         "cpu_adam_seconds": round(cpu_adam_seconds, 1),
         "prepare_and_steps_seconds": round(time.monotonic() - start, 1),
         "optimizer": type(getattr(optimizer, "optimizer", optimizer)).__name__,
         "group_lrs": lrs,
+        "logged_lrs": logged,
     }
 
 

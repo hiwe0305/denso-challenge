@@ -29,7 +29,7 @@
       "warmup_num_steps": "auto",
       "warmup_min_ratio": 1.0,
       "cos_min_ratio": 1.0,
-      "last_batch_iteration": 0
+      "last_batch_iteration": -1
     }
   },
   "zero_optimization": {
@@ -53,7 +53,7 @@
     "gather_16bit_weights_on_model_save": true
   },
   "gradient_accumulation_steps": "auto",
-  "gradient_clipping": "auto",
+  "gradient_clipping": 1.0,
   "train_batch_size": "auto",
   "train_micro_batch_size_per_gpu": "auto",
   "steps_per_print": 100000.0,
