@@ -1,5 +1,6 @@
 """The gate copy's relabel touches source_detail only, marks what it changed, and refuses
-anything but virtual_teleop->planner_wbc in a marked scratch root (DA-35 task 12)."""
+anything but virtual_teleop->planner_wbc and s2->teleop_pico in a marked scratch root
+(DA-35 task 12)."""
 
 from __future__ import annotations
 
@@ -112,3 +113,15 @@ def test_a_kill_before_the_rename_leaves_the_episodes_whole(
     with pytest.raises(OSError, match="killed"):
         module.relabel(copy, "virtual_teleop", "planner_wbc", tmp_path / "gate")
     assert (copy / "meta" / "episodes.jsonl").read_text() == before
+
+
+def test_the_s2_variants_relabel_to_teleop_pico(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("FW_ROOT", raising=False)
+    copy = gate_copy(tmp_path / "gate")  # episode 0 virtual_teleop, 1 s2
+    assert load().relabel(copy, "s2", "teleop_pico", tmp_path / "gate") == (1, 2)
+    rows = [json.loads(x) for x in (copy / "meta" / "episodes.jsonl").read_text().splitlines()]
+    blocks = [json.loads(r["environment_config"])["flywheel"] for r in rows]
+    assert [b["source_detail"] for b in blocks] == ["virtual_teleop", "teleop_pico"]
+    assert blocks[1]["gate_relabel"] == "s2->teleop_pico"
