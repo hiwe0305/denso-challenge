@@ -12,15 +12,20 @@ Start it on the laptop right after `colab new`, detached like every long job:
     nohup setsid python3 scripts/he/cu_watch.py --session da26-ft-vego-n20 --cap-cu 17.5 \\
         --log fwdata/he/cu/da26-ft-vego-n20.jsonl < /dev/null > /dev/null 2>&1 &
 
+The CLI is `$COLAB_CLI` or `--colab` (on the team laptop it is not on PATH:
+~/project/wm-wam-review/.venv-colab-cli/bin/colab).
+
 Exit codes: 0 the session ended by itself, 3 the watcher stopped it at the cap,
-2 the session was not listed at start (nothing is watched; fix the name first).
+2 the CLI is missing or the session was not listed at start (nothing is watched).
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -28,15 +33,23 @@ from collections.abc import Callable, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 
-COLAB = "colab"
+COLAB = os.environ.get("COLAB_CLI", "colab")
 L4_CU_PER_HOUR = 1.94
 
 Run = Callable[[Sequence[str]], tuple[int, str]]
 
 
-def run_colab(args: Sequence[str]) -> tuple[int, str]:
-    done = subprocess.run([COLAB, *args], capture_output=True, text=True, timeout=120, check=False)
-    return done.returncode, done.stdout + done.stderr
+def colab_runner(cli: str) -> Run:
+    def run(args: Sequence[str]) -> tuple[int, str]:
+        try:
+            done = subprocess.run(
+                [cli, *args], capture_output=True, text=True, timeout=120, check=False
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            return 1, f"{type(error).__name__}: {error}"
+        return done.returncode, done.stdout + done.stderr
+
+    return run
 
 
 def spent_cu(elapsed_s: float, rate_cu_per_hour: float) -> float:
@@ -65,10 +78,11 @@ def watch(
     session: str,
     cap_cu: float,
     log: Path,
+    *,
+    run: Run,
     rate: float = L4_CU_PER_HOUR,
     poll_s: float = 60.0,
     started_s_ago: float = 0.0,
-    run: Run = run_colab,
     clock: Callable[[], float] = time.monotonic,
     sleep: Callable[[float], None] = time.sleep,
 ) -> int:
@@ -112,6 +126,7 @@ def watch(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--session", required=True)
+    parser.add_argument("--colab", default=COLAB, help="Colab CLI (default $COLAB_CLI or colab)")
     parser.add_argument("--cap-cu", type=float, required=True)
     parser.add_argument("--log", type=Path, required=True)
     parser.add_argument("--rate", type=float, default=L4_CU_PER_HOUR, help="CU per hour")
@@ -123,6 +138,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.cap_cu <= 0:
         print("--cap-cu must be positive", file=sys.stderr)
         return 2
+    if shutil.which(args.colab) is None:
+        print(f"Colab CLI {args.colab} not found; pass --colab or set COLAB_CLI", file=sys.stderr)
+        return 2
     return watch(
         args.session,
         args.cap_cu,
@@ -130,6 +148,7 @@ def main(argv: list[str] | None = None) -> int:
         rate=args.rate,
         poll_s=args.poll,
         started_s_ago=args.started_min_ago * 60,
+        run=colab_runner(args.colab),
     )
 
 
