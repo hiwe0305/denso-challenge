@@ -1,112 +1,27 @@
 """`Stage1Trainer` and the stage 1 launcher end to end on CPU against a fake Psi0.
 
-The fake `psi.trainers.pretrain.PretrainTrainer` has the pin's `create_dataloaders`
-shape - `shuffle` assigned only in the mixture branch, read in the other - so the
-test fails the way the real run would if the launcher did not restore it. Its
-`log` adds `train/grad_norm_vlm` in place, as Psi0's does.
+The fake repo (`fake_psi0`, `in_process`) is in this directory's conftest.py.
 """
 
 from __future__ import annotations
 
 import json
 import sys
-from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 
 import pytest
 from flywheel.contracts import CheckpointRef, DatasetRef, TrainSpec
 from flywheel.contracts.training import TrainingMetric
-from flywheel_psi0.stage1.launch import main as launch_main
 from flywheel_psi0.stage1.patches import SHUFFLE_READ, restore_shuffle
 from flywheel_psi0.stage1.runplan import Stage1Plan
 from flywheel_psi0.stage1.trainer import Stage1Trainer, egodex_layout
+from flywheel_psi0.trainer.psi0_trainer import Runner
 
 REPO = Path(__file__).resolve().parents[4]
 PLAN = REPO / "configs" / "runplans" / "stage1" / "egodex-short.yaml"
 
-FAKE_PRETRAIN = """
-from __future__ import annotations
 
-import os
-
-
-class PretrainTrainer:
-    def __init__(self, output_dir, mixed):
-        self.project_dir = os.path.join(output_dir, "pretrain", "run.job")
-        self.global_step = 0
-        self.mixed = mixed
-
-    def create_dataloaders(self, train_dataset, val_dataset) -> tuple[dict, None]:
-        if self.mixed:
-            g = shuffle = batch_size = drop_last = None
-        else:
-            batch_size = 16
-            drop_last = True
-        train_dataloader_kwargs = {"drop_last": drop_last}
-        if not self.mixed:
-            train_dataloader_kwargs["shuffle"] = shuffle
-        return train_dataloader_kwargs, None
-
-    def log(self, metrics, start_time=None):
-        metrics.update({"train/grad_norm_vlm": 0.7})
-
-    def save_checkpoint(self, global_step):
-        path = os.path.join(self.project_dir, "checkpoints", f"ckpt_{global_step}")
-        os.makedirs(path, exist_ok=True)
-        return path
-"""
-
-FAKE_TRAIN_PY = """
-import json
-import sys
-from psi.trainers.pretrain import PretrainTrainer
-
-args = dict(a[2:].split("=", 1) for a in sys.argv[2:] if a.startswith("--") and "=" in a)
-assert sys.argv[1] == "pretrain_egodex_qwen3vl_config"
-trainer = PretrainTrainer(args["train.output_dir"], mixed=False)
-loader, _ = trainer.create_dataloaders(None, None)
-assert loader["shuffle"] is True
-steps = int(args["train.max_training_steps"])
-for step in range(steps):
-    trainer.global_step = step
-    trainer.log({"train/loss": 3.0 - 0.01 * step, "train/action_accuracy": 0.2,
-                 "train/lr": 1e-4, "train/epoch": 0})
-    if (step + 1) % int(args["train.checkpointing_steps"]) == 0 or step + 1 == steps:
-        trainer.save_checkpoint(step + 1)
-"""
-
-
-@pytest.fixture
-def fake_psi0(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
-    root = tmp_path / "Psi0"
-    (root / "scripts").mkdir(parents=True)
-    (root / "scripts" / "train.py").write_text(FAKE_TRAIN_PY)
-    trainers = root / "src" / "psi" / "trainers"
-    trainers.mkdir(parents=True)
-    (root / "src" / "psi" / "__init__.py").write_text("")
-    (trainers / "__init__.py").write_text("")
-    (trainers / "pretrain.py").write_text(FAKE_PRETRAIN)
-    (root / ".env").write_text("")
-    monkeypatch.syspath_prepend(str(root / "src"))
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("RANK", raising=False)
-    yield root
-    for name in [m for m in sys.modules if m == "psi" or m.startswith("psi.")]:
-        del sys.modules[name]
-
-
-def in_process(command: Sequence[str], cwd: Path, env: Mapping[str, str]) -> int:
-    """What `torchrun -m flywheel_psi0.stage1.launch <spec>` would do, on one rank."""
-    assert command[-3:-1] == ["-m", "flywheel_psi0.stage1.launch"]
-    assert env["WANDB_MODE"] == "offline"
-    try:
-        launch_main([command[-1]])
-    except Exception:
-        return 1
-    return 0
-
-
-def trainer(fake_root: Path, tmp_path: Path) -> Stage1Trainer:
+def trainer(fake_root: Path, tmp_path: Path, runner: Runner) -> Stage1Trainer:
     plan = Stage1Plan.load(PLAN)
     return Stage1Trainer(
         plan.load_recipe(REPO).with_overrides(
@@ -119,7 +34,7 @@ def trainer(fake_root: Path, tmp_path: Path) -> Stage1Trainer:
         release_id=plan.dataset.id,
         psi0_commit=plan.code.psi0.commit,
         python_bin=Path("/psi/venv/bin"),
-        runner=in_process,
+        runner=runner,
     )
 
 
@@ -135,10 +50,10 @@ def spec(tmp_path: Path) -> TrainSpec:
 
 
 def test_run_writes_metrics_and_checkpoint_with_shuffle_restored(
-    fake_psi0: Path, tmp_path: Path
+    fake_psi0: Path, tmp_path: Path, in_process: Runner
 ) -> None:
     job = spec(tmp_path)
-    result = trainer(fake_psi0, tmp_path).train(job)
+    result = trainer(fake_psi0, tmp_path, in_process).train(job)
 
     assert result.infra_status == "ok"
     assert result.checkpoint is not None
@@ -161,8 +76,10 @@ def test_run_writes_metrics_and_checkpoint_with_shuffle_restored(
     assert f"--data.root-dir={Path(job.dataset.uri).resolve()}" in argv
 
 
-def test_a_global_batch_counts_accumulation(fake_psi0: Path, tmp_path: Path) -> None:
-    assert trainer(fake_psi0, tmp_path).global_batch_size() == 32
+def test_a_global_batch_counts_accumulation(
+    fake_psi0: Path, tmp_path: Path, in_process: Runner
+) -> None:
+    assert trainer(fake_psi0, tmp_path, in_process).global_batch_size() == 32
 
 
 def test_egodex_layout_is_48_dims_with_masked_padding() -> None:
@@ -182,9 +99,9 @@ def module_with(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, body: str) -> t
 
 
 def test_restore_shuffle_leaves_a_fixed_version_alone(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, pretrain_source: str
 ) -> None:
-    fixed = FAKE_PRETRAIN.replace(
+    fixed = pretrain_source.replace(
         "drop_last = True", "drop_last = True\n            shuffle = True"
     )
     cls = module_with(tmp_path, monkeypatch, fixed)
@@ -194,9 +111,9 @@ def test_restore_shuffle_leaves_a_fixed_version_alone(
 
 
 def test_restore_shuffle_refuses_an_unknown_variant(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, pretrain_source: str
 ) -> None:
-    twice = FAKE_PRETRAIN.replace(
+    twice = pretrain_source.replace(
         "        return train_dataloader_kwargs, None",
         "            " + SHUFFLE_READ + "\n        return train_dataloader_kwargs, None",
     )
@@ -206,9 +123,9 @@ def test_restore_shuffle_refuses_an_unknown_variant(
 
 
 def test_restore_shuffle_keeps_line_numbers(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, pretrain_source: str
 ) -> None:
-    cls = module_with(tmp_path, monkeypatch, FAKE_PRETRAIN)
+    cls = module_with(tmp_path, monkeypatch, pretrain_source)
     line = cls.create_dataloaders.__code__.co_firstlineno  # type: ignore[attr-defined]
     assert restore_shuffle(cls) is True
     patched = cls.create_dataloaders  # type: ignore[attr-defined]

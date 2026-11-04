@@ -150,7 +150,9 @@ def train(work: Path, plan_path: Path, repeat: bool) -> None:
     )
     start = time.monotonic()
     result = trainer.train(spec)
-    launched = json.loads((runs / job_id / "result.json").read_text(encoding="utf-8"))
+    # No result.json when the launcher died before writing one; TrainResult says so.
+    result_path = runs / job_id / "result.json"
+    launched = json.loads(result_path.read_text(encoding="utf-8")) if result_path.exists() else {}
     metrics = runs / job_id / "metrics.jsonl"
     lines = metrics.read_text(encoding="utf-8").splitlines() if metrics.exists() else []
     losses = train_losses(metrics) if lines else []
