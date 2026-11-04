@@ -1,0 +1,27 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "title": "Kind",
+      "type": "string"
+    },
+    "failure_class": {
+      "enum": [
+        "approach",
+        "grasp",
+        "carry",
+        "place",
+        "balance",
+        "from_failed_stage"
+      ],
+      "title": "Failure Class",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "failure_class"
+  ],
+  "title": "FailureKindSpec",
+  "type": "object"
+}

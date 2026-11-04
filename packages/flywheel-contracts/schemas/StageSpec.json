@@ -1,0 +1,41 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "failure_class": {
+      "enum": [
+        "approach",
+        "grasp",
+        "carry",
+        "place",
+        "balance"
+      ],
+      "title": "Failure Class",
+      "type": "string"
+    },
+    "signals": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Signals"
+    }
+  },
+  "required": [
+    "name",
+    "failure_class"
+  ],
+  "title": "StageSpec",
+  "type": "object"
+}

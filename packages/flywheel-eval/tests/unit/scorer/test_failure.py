@@ -84,6 +84,15 @@ def test_the_episode_class_wins_over_the_declared_one(task: TaskDefinition) -> N
     assert verdict.failure_class == "place"
 
 
+@pytest.mark.parametrize(("step", "expected"), [(1, "grasp"), (2, "carry"), (4, "place")])
+def test_contract_rule_selects_failed_stage_class(
+    task: TaskDefinition, step: int, expected: str
+) -> None:
+    kinds = (FailureKindSpec(kind="L-COLLIDE", failure_class="from_failed_stage"),)
+    verdict = judge(failed_at(step, "L-COLLIDE"), task, kinds=kinds)
+    assert verdict.failure_class == expected
+
+
 @pytest.mark.parametrize(("step", "expected_class"), [(1, "grasp"), (2, "carry"), (4, "place")])
 def test_a_step_attached_kind_takes_the_class_of_the_failed_step(
     task: TaskDefinition, step: int, expected_class: str
@@ -116,9 +125,7 @@ def test_a_kind_with_no_failed_step_is_a_contradiction(task: TaskDefinition) -> 
 
 
 def test_an_unknown_step_gives_l_unknown_and_no_class(task: TaskDefinition) -> None:
-    verdict = judge(
-        StageEvaluation(stage_success=(None,) * 6), task, ("hand_object_distance",)
-    )
+    verdict = judge(StageEvaluation(stage_success=(None,) * 6), task, ("hand_object_distance",))
 
     assert verdict.failure_kind == UNKNOWN_KIND
     assert verdict.failure_class is None
