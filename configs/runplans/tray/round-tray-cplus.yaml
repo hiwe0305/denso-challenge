@@ -1,9 +1,12 @@
 # DA-34 AC 6 (task 5): slot for branch C+ of the Failure -> Data round on the tray task
 # (design 28/10/2026 section 6.6). Draft: filled in task 5, not by task 1.
 #
-# C+ = the 40 demos of C plus n_add episodes S1 targeted at C's failures. Recipe, train
-# seed, parent checkpoint and eval conditions are those of `inherits` (frozen), so C+ vs A
-# compares "targeted" with "evenly added" (A minus C is a uniform draw) at the same count.
+# C+ = the 160 demos of C plus n_add episodes S1 targeted at C's failures. Recipe, train
+# seed, parent checkpoint and eval conditions are those of `inherits` (frozen). Tier 2
+# (docs/he/tray.md section 9) trains no A, so C+ vs C mixes more data with targeted data;
+# A on the pinned 320 set would split the two later, under a new plan or a Decision.
+# Version 2 (5/11/2026): inherits he-tray-v2.yaml (was he-tray.yaml, superseded) and C+
+# is one of its budget's round_runs (18 CU cap).
 #
 # Task 5 fills `targets.seeds` and `targets.set_hash` from DA-33's
 # `generate.py --conditions` run on the clusters DA-13 finds in C's eval, after QA and
@@ -12,12 +15,12 @@ name: round-tray-cplus-psi0
 purpose: round
 story: DA-34
 status: draft
-inherits: configs/runplans/tray/he-tray.yaml
+inherits: configs/runplans/tray/he-tray-v2.yaml
 branch: C_PLUS
 base_branch: C
 max_rounds: 1
 targets:
-  n_add: 40 # = the demos cut from A (design 6.6 step 3)
+  n_add: 160 # = N_full - N_cut = 320 - 160 (docs/he/tray.md section 7)
   from_failures_of: C
   generator: "flywheel_simple.tray.targets via scripts/g0/tray/generate.py --conditions"
   seeds: []
