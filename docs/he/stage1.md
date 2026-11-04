@@ -96,13 +96,13 @@ RunPlan [`egodex-short.yaml`](../../configs/runplans/stage1/egodex-short.yaml) (
 
 **Bộ canh CU** là script dùng chung `scripts/colab/cu_watch.py` (PR #108, phải merge trước PR này). Mỗi phiên Colab có một tiến trình `session`, theo dõi phiên theo endpoint chứ không theo tên. Cả đợt có thêm một tiến trình `guard` làm lưới an toàn: dừng mọi phiên ở sàn, và dừng mọi assignment không có watcher sống đăng ký. Cách đo, biên và các đường fail closed ghi trong docstring của script. Với DA-30:
 
-- **Chạy một mình.** Quy tắc vận hành từ review PR #108 (4/11/2026): DA-26 và DA-30 không chạy cùng lúc, và lần chạy 4 CU của DA-30 đi trước, một mình. `colab sessions` phải trống trước khi bắt đầu, vì guard dừng mọi assignment không đăng ký trên tài khoản.
+- **Một đợt một lúc.** Quy tắc vận hành từ review PR #108 (4/11/2026): guard dừng mọi assignment không đăng ký trên tài khoản, nên mỗi lúc tài khoản chỉ chạy một đợt; guard từ chối chạy khi đã có guard khác. Lần chạy ngắn 4 CU của DA-30 đi trước, rồi mới đến đợt của DA-26. `colab sessions` phải trống trước khi bắt đầu.
 - Watcher tự mở phiên (`session --new --name da30-stage1 --gpu L4 --cap 4`), nên số dư và mốc thời gian được ghi đúng lúc phiên bắt đầu. Không mở phiên bằng tay.
 - Trần cứng 4 CU (`compute.max_compute_units` của RunPlan). Sàn `--floor 14` theo số dư thật của cả tài khoản (101,8 − 88 của tier 2), đặt ở cả guard lẫn watcher.
 - Khi chi tiêu tới khoảng 3,45 CU, watcher chạy `persist` của driver trong kernel của phiên ([`persist_cell.py`](../../configs/runplans/stage1/persist_cell.py)), để log và `metrics.jsonl` còn lại sau khi phiên bị dừng ở trần. Mốc này sớm hơn 90% trần để `persist` có đủ 600 s trước khi dừng. Vì vậy:
   - lệnh train phải chạy trong shell SSH, không qua `colab exec`, để kernel rảnh;
   - Drive phải được mount (`colab drivemount -s da30-stage1 /content/drive`) ngay sau `setup`.
-- Chỉ bắt đầu train khi đã có file `fwdata/colab/da30/da30-stage1.ready`, nghĩa là phiên đã chạy đúng L4.
+- Chỉ bắt đầu train khi lệnh dưới in `READY`. Điều kiện: đã có file `$R/da30-stage1.ready` (phiên đã chạy đúng L4) và heartbeat của guard (`$R/guard.beat`) mới hơn 120 s. Mỗi lần chạy dùng một registry mới `$R`.
 - Dòng `exit` cuối của `da30-stage1.jsonl` có `balance_drop` của tài khoản, cùng `spent`, `wall_cu` và `balance_cu` của phiên. Đây là số liệu cho dòng `measured` của sổ chi phí.
 - Mã thoát:
   - 0: phiên tự kết thúc;
@@ -110,13 +110,15 @@ RunPlan [`egodex-short.yaml`](../../configs/runplans/stage1/egodex-short.yaml) (
   - 4: sai loại GPU;
   - 5: `STOP_FAILED`, phiên có thể vẫn tính tiền. Guard tiếp tục dừng nó, nhưng vẫn phải xem `colab sessions` ngay;
   - 6: crash, tín hiệu hoặc `new` lỗi; mọi assignment nó tạo đã dừng.
+  - Khi chính guard dừng phiên, log có `GuardStopped`: mã 3 nếu do sàn, mã 6 nếu guard không thấy watcher sống.
 
 ```bash
 export PATH=~/project/wm-wam-review/.venv-colab-cli/bin:$PATH
-R=fwdata/colab/da30; mkdir -p $R; rm -f $R/da30-stage1.ready
+R=fwdata/colab/da30-$(date +%Y%m%d-%H%M%S); mkdir -p fwdata/colab && mkdir $R
 nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py guard --registry "$0" --floor 14 --log "$0/guard.jsonl"; echo "exit $?"' $R < /dev/null > $R/guard.out 2>&1 &
 nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py session --registry "$0" --new --name da30-stage1 --gpu L4 --cap 4 --floor 14 --persist "colab exec -s da30-stage1 -f configs/runplans/stage1/persist_cell.py" --log "$0/da30-stage1.jsonl"; echo "exit $?"' $R < /dev/null > $R/da30-stage1.out 2>&1 &
-until [ -f $R/da30-stage1.ready ]; do grep -q '^exit ' $R/da30-stage1.out && exit 1; sleep 5; done
+( until [ -f $R/da30-stage1.ready ]; do grep -q '^exit ' $R/da30-stage1.out && exit 1; sleep 5; done
+  [ -f $R/guard.beat ] && [ $(( $(date +%s) - $(stat -c %Y $R/guard.beat) )) -lt 120 ] ) && echo READY || echo "NOT READY: do not start the job"
 ```
 
 Lệnh trên Colab (L4, phiên `da30-stage1` do bộ canh mở), theo thứ tự, từ bản sao repo ở `/content/da30/fw` với `PYTHONPATH` gồm `packages/flywheel-psi0/src` và `packages/flywheel-contracts/src` như DA-19:
