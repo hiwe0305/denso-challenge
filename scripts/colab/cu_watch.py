@@ -6,7 +6,7 @@ DA-30's one) on the laptop that has the `colab` CLI and created the sessions (`c
 stop` only finds names in that CLI's local state). It merges DA-26's fail-closed
 single-session watcher (2408e45, scripts/he/cu_watch.py) with DA-30's batch one.
 
-    nohup setsid bash -c 'python3 scripts/colab/cu_watch.py --floor 14 \\
+    nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py --floor 14 \\
         --new da30-stage1:L4:4 --persist "da30-stage1=colab exec -s da30-stage1 -f p.py" \\
         --ready-dir fwdata/colab/ready --inbox fwdata/colab/inbox \\
         --log fwdata/colab/cu_watch.jsonl; echo "exit $?"' \\
@@ -14,6 +14,9 @@ single-session watcher (2408e45, scripts/he/cu_watch.py) with DA-30's batch one.
     until [ -f fwdata/colab/ready/da30-stage1.ready ]; do
         grep -q '^exit ' fwdata/colab/cu_watch.out && exit 1; sleep 5; done
     # only now start the job on the VM
+
+The `trap` keeps the wrapper alive when the process group is killed, so it still
+writes "exit N"; Python installs its own handlers over the inherited ignore.
 
 Sessions. `--new NAME:GPU:CAP` runs `colab new -s NAME --gpu GPU` and meters from
 just before it; `--attach NAME:GPU:CAP[:STARTED]` takes over a running session
@@ -42,8 +45,9 @@ an unknown `--gpu` to A100). The `Hardware:` of each session in `colab sessions`
 match its plan, or it is stopped and the watch ends. A `new` that fails or times out
 is followed by a look at `colab sessions`: a session listed under its name is
 attached, an unnamed `[?]` assignment that appeared meanwhile is unassigned through
-the CLI's own client. Any exception, SIGTERM, SIGINT or SIGHUP ends in a `finally`
-that stops every supervised session. `colab stop` exits 0 even when it did nothing,
+the CLI's own client. An exception from a CLI call is a failed call. Any other
+exception, SIGTERM, SIGINT or SIGHUP ends in a `finally` that stops every supervised
+session; only the first signal raises. `colab stop` exits 0 even when it did nothing,
 so a stop counts only after two successful listings without the name or endpoint;
 it is retried with backoff and an unassign. A session has ended by itself only after
 3 successful listings in a row without it; a failed call, output that cannot be
@@ -124,9 +128,11 @@ class WrongGpu(WatchError):
     code = EXIT_WRONG_GPU
 
 
-class Interrupted(Exception):
+class Interrupted(BaseException):
+    """Raised by SIGTERM, SIGHUP or SIGINT so the watcher stops its sessions first."""
+
     def __init__(self, signum: int) -> None:
-        super().__init__(f"signal {signum}")
+        super().__init__(signal.Signals(signum).name)
         self.signum = signum
 
 
@@ -296,8 +302,15 @@ class Watcher:
 
     # -- CLI -----------------------------------------------------------------------
 
+    def call(self, argv: Sequence[str], timeout: float) -> tuple[int, str]:
+        """A CLI call; an exception from the runner is a failed call, not a crash."""
+        try:
+            return self.run(argv, timeout)
+        except Exception as error:
+            return 1, f"cli_error {type(error).__name__}: {error}"
+
     def colab_call(self, *args: str, timeout: float | None = None) -> tuple[int, str]:
-        return self.run([str(self.colab), *args], timeout or self.timing.cli_timeout)
+        return self.call([str(self.colab), *args], timeout or self.timing.cli_timeout)
 
     def usage(self) -> Usage | None:
         code, text = self.colab_call("usage")
@@ -450,7 +463,7 @@ class Watcher:
 
     def unassign(self, endpoint: str) -> None:
         python = self.colab.parent / "python"
-        code, text = self.run([str(python), "-c", UNASSIGN, endpoint], self.timing.cli_timeout)
+        code, text = self.call([str(python), "-c", UNASSIGN, endpoint], self.timing.cli_timeout)
         self.log("unassign", endpoint=endpoint, code=code, output=text[-300:])
 
     def stop(self, session: Session, reason: str) -> bool:
@@ -608,7 +621,16 @@ class _SignalsIgnored:
             signal.signal(sig, handler)
 
 
+_signalled = False
+
+
 def _raise_interrupted(signum: int, frame: object) -> None:
+    """The first signal raises; later ones are ignored so they cannot cut a stop short
+    (from DA-26, 3539f09)."""
+    global _signalled
+    if _signalled:
+        return
+    _signalled = True
     raise Interrupted(signum)
 
 

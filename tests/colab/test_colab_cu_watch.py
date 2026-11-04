@@ -125,11 +125,11 @@ class FakeColab:
                 return cw.TIMEOUT, "timed out"
             return 0, "[colab] Session READY."
         if command == "stop":
-            endpoint = self.named(args[1])
-            if endpoint is None:
+            found = self.named(args[1])
+            if found is None:
                 return 0, f"[colab] Session '{args[1]}' not found."
             if self.stop_mode == "ok":
-                del self.assigned[endpoint]
+                del self.assigned[found]
             elif self.stop_mode == "flicker_once":
                 self.flicker, self.stop_mode = 1, "ok"  # one listing hides it, still billing
             return 0, "[colab] Session terminated."  # also when it did nothing
@@ -163,8 +163,9 @@ def stop_calls(colab: FakeColab, name: str) -> int:
 
 
 @pytest.fixture
-def handlers() -> Iterator[None]:
+def handlers(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     saved = {s: signal.getsignal(s) for s in cw._SignalsIgnored.SIGNALS}
+    monkeypatch.setattr(cw, "_signalled", False)
     yield
     for sig, handler in saved.items():
         signal.signal(sig, handler)
@@ -335,15 +336,22 @@ def test_an_orphan_from_a_timed_out_new_is_unassigned(tmp_path: Path) -> None:
     assert [r["endpoint"] for r in events(tmp_path, "unassign")] == ["gpu-l4-s-1"]
 
 
-def test_an_exception_in_the_runner_mid_loop_stops_every_session(tmp_path: Path) -> None:
+def test_an_exception_from_the_cli_is_a_failed_call(tmp_path: Path) -> None:
     colab = FakeColab()
 
-    def crash(argv: list[str]) -> None:
-        if colab.sleeps == 3 and argv[1:] == ["usage"]:
-            colab.sleeps += 1  # once
+    def broken(argv: list[str]) -> None:
+        if 3 <= colab.sleeps <= 6 and argv[1:] in (["usage"], ["sessions"]):
             raise RuntimeError("CLI wrapper broke")
 
-    colab.on_call = crash
+    colab.on_call = broken
+    code = watcher(colab, tmp_path, ["a:L4:4", "b:L4:4"]).watch()
+    assert code == cw.EXIT_CAPPED and colab.alive() == []
+    assert {r["reason"] for r in events(tmp_path, "stopped")} == {"cap"}
+
+
+def test_a_crash_mid_loop_stops_every_session(tmp_path: Path) -> None:
+    colab = FakeColab()
+    colab.on_sleep = lambda n: (_ for _ in ()).throw(RuntimeError("boom")) if n == 3 else None
     code = watcher(colab, tmp_path, ["a:L4:4", "b:L4:4"]).watch()
     assert code == cw.EXIT_CRASHED and colab.alive() == []
     assert {r["reason"] for r in events(tmp_path, "stopped")} == {"cleanup"}
@@ -376,6 +384,30 @@ def test_sigterm_stops_every_session(tmp_path: Path, handlers: None) -> None:
     code = watcher(colab, tmp_path, ["a:L4:4", "b:L4:4"]).watch()
     assert code == cw.EXIT_CRASHED and colab.alive() == []
     assert events(tmp_path, "signal")[0]["signum"] == signal.SIGTERM
+
+
+def test_a_signal_during_a_cli_call_is_not_taken_for_a_failed_call(
+    tmp_path: Path, handlers: None
+) -> None:
+    colab = FakeColab()
+    cw.install_signal_handlers()
+    assert signal.getsignal(signal.SIGTERM) is cw._raise_interrupted
+
+    def kill(argv: list[str]) -> None:
+        if colab.sleeps == 2 and argv[1:] == ["usage"]:
+            os.kill(os.getpid(), signal.SIGTERM)
+
+    colab.on_call = kill
+    code = watcher(colab, tmp_path, ["da30:L4:4"]).watch()
+    assert code == cw.EXIT_CRASHED and colab.alive() == []
+    assert events(tmp_path, "signal")[0]["signum"] == signal.SIGTERM
+    assert {r["reason"] for r in events(tmp_path, "stopped")} == {"cleanup"}
+
+
+def test_only_the_first_signal_raises(handlers: None) -> None:
+    with pytest.raises(cw.Interrupted):
+        cw._raise_interrupted(signal.SIGTERM, None)
+    cw._raise_interrupted(signal.SIGHUP, None)  # a second kill must not cut the stop short
 
 
 def test_a_stop_that_does_not_take_is_retried_through_unassign(tmp_path: Path) -> None:
