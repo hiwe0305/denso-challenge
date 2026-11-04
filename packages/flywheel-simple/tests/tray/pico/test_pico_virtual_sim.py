@@ -22,13 +22,14 @@ pytestmark = pytest.mark.sim
 SHORT_STEPS = 700  # 14 s: stabilise, activate, walk to table A and start reaching
 # Arm joints in SIMPLE's 43-d action (left then right arm, 7 each).
 ACTION_ARMS = [*range(15, 22), *range(29, 36)]
+ACTION_WAIST = [12, 13, 14]  # waist yaw, roll, pitch of the 43-d action
 
 
 @pytest.fixture(scope="module")
 def env_agent_streamer() -> Iterator[tuple[Any, Any, Any]]:
     from flywheel_simple.tray.pico.agent import StreamerDecoupledAgent, VirtualPicoStreamer
     from flywheel_simple.tray.pico.clock import ClockedTime, SimClock
-    from flywheel_simple.tray.pico.operator import OperatorConfig, VirtualOperator
+    from flywheel_simple.tray.pico.operator import LOCK_WAIST, OperatorConfig, VirtualOperator
     from flywheel_simple.tray.pico.session import make_teleop_env
     from flywheel_simple.tray.planner import PlannerConfig
     from simple.agents import pico_decoupled_agent
@@ -41,7 +42,11 @@ def env_agent_streamer() -> Iterator[tuple[Any, Any, Any]]:
     cfg = OperatorConfig.load()
     streamer = VirtualPicoStreamer(env, VirtualOperator(cfg), PlannerConfig.load())
     agent = StreamerDecoupledAgent(
-        env.unwrapped.task.robot, streamer, clock=clock, max_joint_step=cfg.arm_step_max
+        env.unwrapped.task.robot,
+        streamer,
+        clock=clock,
+        max_joint_step=cfg.arm_step_max,
+        lock_waist=LOCK_WAIST,
     )
     yield env, agent, streamer
     agent.close()
@@ -116,6 +121,10 @@ def test_virtual_operator_episode_reaches_check_success(
     arms = np.stack([f["action"] for f in frames])[:, ACTION_ARMS]
     steps = np.abs(np.diff(arms, axis=0))
     assert steps.max() <= 0.08 + 1e-6, (steps.max(), np.unravel_index(steps.argmax(), steps.shape))
+    # The waist is locked (LOCK_WAIST, da35-virtual-3): the IK's waist command stays at
+    # zero, so DA-17's waist mapping check has no command the robot fails to follow.
+    waist = np.stack([f["action"] for f in frames])[:, ACTION_WAIST]
+    assert np.abs(waist).max() < 1e-9, np.abs(waist).max(axis=0)
 
 
 def test_same_condition_and_style_seed_give_the_same_episode(

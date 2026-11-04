@@ -67,7 +67,7 @@ def pipeline() -> Iterator[tuple[Any, Any, Any]]:
         pytest.skip(f"parent batch {PARENTS} not here")
     from flywheel_simple.tray.pico.agent import StreamerDecoupledAgent
     from flywheel_simple.tray.pico.clock import ClockedTime, SimClock
-    from flywheel_simple.tray.pico.operator import OperatorConfig
+    from flywheel_simple.tray.pico.operator import LOCK_WAIST, OperatorConfig
     from flywheel_simple.tray.pico.session import make_teleop_env
     from flywheel_simple.tray.s2.config import S2Config
     from flywheel_simple.tray.s2.streamer import ParentStore, S2Streamer
@@ -79,7 +79,11 @@ def pipeline() -> Iterator[tuple[Any, Any, Any]]:
     env = make_teleop_env(level=1, headless=True)
     streamer = S2Streamer(env, ParentStore(PARENTS, cfg), op_cfg, cfg)
     agent = StreamerDecoupledAgent(
-        env.unwrapped.task.robot, streamer, clock=clock, max_joint_step=op_cfg.arm_step_max
+        env.unwrapped.task.robot,
+        streamer,
+        clock=clock,
+        max_joint_step=op_cfg.arm_step_max,
+        lock_waist=LOCK_WAIST,
     )
     yield env, agent, streamer
     agent.close()

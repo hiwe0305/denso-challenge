@@ -43,7 +43,7 @@ def main(argv: list[str] | None = None) -> int:
 
     from flywheel_simple.tray.pico import agent as pico_agent
     from flywheel_simple.tray.pico.clock import SimClock
-    from flywheel_simple.tray.pico.operator import OperatorConfig
+    from flywheel_simple.tray.pico.operator import LOCK_WAIST, OperatorConfig
     from flywheel_simple.tray.pico.session import make_teleop_env, run_session
     from flywheel_simple.tray.s2.config import S2Config
     from flywheel_simple.tray.s2.streamer import ParentStore, S2Streamer
@@ -54,7 +54,11 @@ def main(argv: list[str] | None = None) -> int:
     env = make_teleop_env(jobs[0].level if jobs else 0, headless=True)
     streamer = S2Streamer(env, ParentStore(args.parents, s2_cfg), op_cfg, s2_cfg, mode=args.mode)
     agent = pico_agent.StreamerDecoupledAgent(
-        env.unwrapped.task.robot, streamer, clock=SimClock(), max_joint_step=op_cfg.arm_step_max
+        env.unwrapped.task.robot,
+        streamer,
+        clock=SimClock(),
+        max_joint_step=op_cfg.arm_step_max,
+        lock_waist=LOCK_WAIST,  # as the parents were recorded
     )
     agent.num_episodes = len(jobs)
     try:
