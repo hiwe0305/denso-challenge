@@ -12,6 +12,7 @@ from flywheel_psi0.tray.demo_sets import (
     MANIFEST,
     DemoSets,
     ReleaseEpisode,
+    apply_qa,
     main,
     nested_sets,
     rank,
@@ -130,3 +131,99 @@ def test_cli_writes_then_checks(tmp_path: Path) -> None:
     assert main([*argv, "--check", str(out)]) == 0
     other = ["--release", str(root), "--size", "A=80", "--size", "C=41"]
     assert main([*other, "--check", str(out)]) == 1
+
+
+# DA-03 QA rejects left out of the demo sets (decision of 5/11/2026).
+REJECTED = {3: "replay_kinematic (D7): joint_mapping", 7: "replay_kinematic (D7): joint_limit"}
+
+
+def _write_qa_work(work: Path, release: Path, episodes: list[ReleaseEpisode]) -> None:
+    """A `fw data ingest` work directory of `release` after `fw data qa`, as DA-03 writes it."""
+    (work / "qa").mkdir(parents=True)
+    export_sha = hashlib.sha256((release / EXPORT_META).read_bytes()).hexdigest()
+    (work / "source.json").write_text(json.dumps({"files": {EXPORT_META: export_sha}}))
+    index = {f"ep_{e.episode_index:04d}": e.episode_index for e in episodes}
+    (work / "episode_index.json").write_text(json.dumps(index))
+    rows = [
+        {
+            "episode_id": episode_id,
+            "threshold_version": "qa-1@test",
+            "decision": "reject" if i in REJECTED else "pass",
+            "reasons": [REJECTED[i]] if i in REJECTED else [],
+        }
+        for episode_id, i in index.items()
+    ]
+    (work / "qa" / "reports.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+
+
+@pytest.fixture
+def release(tmp_path: Path) -> tuple[Path, Path, list[ReleaseEpisode]]:
+    episodes = _episodes()
+    root = tmp_path / "tray_s1_test"
+    _write_release(root, episodes)
+    work = tmp_path / "work"
+    _write_qa_work(work, root, episodes)
+    return root, work, episodes
+
+
+def test_rejects_are_left_out_and_listed(release: tuple[Path, Path, list[ReleaseEpisode]]) -> None:
+    root, work, episodes = release
+    kept, pin = apply_qa(episodes, work, root)
+    rejected_seeds = {episodes[i].seed for i in REJECTED}
+    assert {e.seed for e in kept} == {e.seed for e in episodes} - rejected_seeds
+    assert [x.seed for x in pin.excluded] == sorted(rejected_seeds)
+    assert pin.excluded[0].reasons == [REJECTED[3]] and pin.threshold_version == "qa-1@test"
+    reports = (work / "qa" / "reports.jsonl").read_bytes()
+    assert pin.reports_sha256 == hashlib.sha256(reports).hexdigest()
+
+
+def test_dropping_a_reject_keeps_the_order_of_the_rest(
+    release: tuple[Path, Path, list[ReleaseEpisode]],
+) -> None:
+    root, work, episodes = release
+    kept, _ = apply_qa(episodes, work, root)
+    full = [s for s in rank("h", episodes) if s in {e.seed for e in kept}]
+    assert rank("h", kept) == full
+
+
+def test_a_missing_report_fails_closed(release: tuple[Path, Path, list[ReleaseEpisode]]) -> None:
+    root, work, episodes = release
+    reports = work / "qa" / "reports.jsonl"
+    reports.write_text("".join(reports.read_text().splitlines(keepends=True)[1:]))
+    with pytest.raises(ValueError, match="no DA-03 QA report"):
+        apply_qa(episodes, work, root)
+
+
+def test_qa_of_another_export_is_refused(
+    release: tuple[Path, Path, list[ReleaseEpisode]],
+) -> None:
+    root, work, episodes = release
+    (work / "source.json").write_text(json.dumps({"files": {EXPORT_META: "0" * 64}}))
+    with pytest.raises(ValueError, match="another export"):
+        apply_qa(episodes, work, root)
+
+
+def test_mixed_qa_versions_are_refused(release: tuple[Path, Path, list[ReleaseEpisode]]) -> None:
+    root, work, episodes = release
+    reports = work / "qa" / "reports.jsonl"
+    rows = [json.loads(line) for line in reports.read_text().splitlines()]
+    rows[0]["threshold_version"] = "qa-0@old"
+    reports.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    with pytest.raises(ValueError, match="threshold versions"):
+        apply_qa(episodes, work, root)
+
+
+def test_cli_records_the_qa_exclusions(
+    tmp_path: Path, release: tuple[Path, Path, list[ReleaseEpisode]]
+) -> None:
+    root, work, episodes = release
+    out = tmp_path / "demo_sets.json"
+    argv = ["--release", str(root), "--qa-work", str(work), "--size", "A=80", "--size", "C=40"]
+    assert main([*argv, "--out", str(out)]) == 0
+    sets = DemoSets.model_validate_json(out.read_text())
+    rejected = {episodes[i].seed for i in REJECTED}
+    assert sets.qa is not None and {x.seed for x in sets.qa.excluded} == rejected
+    assert not rejected & set(sets.sets["A"].seeds)
+    assert main([*argv, "--check", str(out)]) == 0
+    release_hash, all_episodes = read_release(root)
+    assert sets.sets["A"] != nested_sets("r", release_hash, all_episodes, {"A": 80}).sets["A"]

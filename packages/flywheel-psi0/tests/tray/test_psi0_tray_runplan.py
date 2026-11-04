@@ -9,7 +9,9 @@ from pathlib import Path
 import pytest
 import yaml
 from flywheel_psi0.trainer.recipe import Psi0Recipe
+from flywheel_psi0.tray.demo_sets import DemoSets, QaPin
 from flywheel_psi0.tray.runplan import (
+    QaRef,
     TrayRoundPlan,
     TrayRunPlan,
     check,
@@ -307,3 +309,30 @@ def test_round_needs_a_run_in_the_parents_budget(tmp_path: Path) -> None:
     shutil.copy(ROUND, repo / "configs/runplans/tray/round-tray-cplus.yaml")
     round_plan = TrayRoundPlan.load(repo / "configs/runplans/tray/round-tray-cplus.yaml")
     assert any("C_PLUS has no run in the budget" in p for p in check_round(round_plan, repo))
+
+
+QA_PIN = {"reports_sha256": "a" * 64, "threshold_version": "qa-1@fb6ddaf9f48c"}
+
+
+def _with_qa_sets(tmp_path: Path) -> Path:
+    """A repo copy whose demo-set file says its sets left out DA-03 rejects."""
+    repo = _repo_copy(tmp_path)
+    sets_file = repo / "configs/runplans/tray/demo_sets.json"
+    sets = DemoSets.model_validate_json(sets_file.read_text())
+    qa = QaPin(**QA_PIN, excluded=[])
+    sets_file.write_text(sets.model_copy(update={"qa": qa}).model_dump_json(indent=1))
+    return repo
+
+
+def test_check_needs_the_qa_pin_of_sets_cut_after_qa(tmp_path: Path, plan: TrayRunPlan) -> None:
+    repo = _with_qa_sets(tmp_path)
+    assert any("DA-03 QA" in p for p in check(plan, repo))
+    pins = plan.demo_sets.model_copy(update={"qa": QaRef(**QA_PIN)})
+    assert check(plan.model_copy(update={"demo_sets": pins}), repo) == []
+
+
+def test_check_catches_other_qa_reports(tmp_path: Path, plan: TrayRunPlan) -> None:
+    repo = _with_qa_sets(tmp_path)
+    pins = plan.demo_sets.model_copy(update={"qa": QaRef(**dict(QA_PIN, reports_sha256="b" * 64))})
+    problems = check(plan.model_copy(update={"demo_sets": pins}), repo)
+    assert any("other DA-03 QA reports" in p for p in problems)

@@ -87,11 +87,17 @@ class QualityRef(_Frozen):
     filter: QualityFilter
 
 
+class QaRef(_Frozen):
+    reports_sha256: str = Field(min_length=64, max_length=64)  # DA-03 qa/reports.jsonl
+    threshold_version: str
+
+
 class DemoSetPins(_Frozen):
     file: str  # repo-relative
     salt: str
     hashes: dict[str, str]
     quality: QualityRef | None = None
+    qa: QaRef | None = None  # the sets left out DA-03 rejects (decision of 5/11/2026)
 
 
 class Recipe(_Frozen):
@@ -345,6 +351,18 @@ def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
             problems.append(f"{pinned_q.file} is not the quality file the sets were cut from")
         if pinned_q.filter != used_q.filter:
             problems.append("plan pins other quality limits than the demo sets used")
+    pinned_qa, used_qa = plan.demo_sets.qa, sets.qa
+    if (pinned_qa is None) != (used_qa is None):
+        problems.append("plan and demo-set file disagree on whether DA-03 QA rejects were left out")
+    elif (
+        pinned_qa is not None
+        and used_qa is not None
+        and (
+            pinned_qa.reports_sha256 != used_qa.reports_sha256
+            or pinned_qa.threshold_version != used_qa.threshold_version
+        )
+    ):
+        problems.append("plan pins other DA-03 QA reports than the demo sets were cut after")
     ordered = sorted(sets.sets.values(), key=lambda s: s.n)
     for small, large in zip(ordered, ordered[1:]):
         if not set(small.seeds) <= set(large.seeds):
