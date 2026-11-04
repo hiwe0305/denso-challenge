@@ -178,12 +178,18 @@ Câu hỏi gửi Hiếu: "Approve CU for tier 2, with DA-26 on reduced Isaac eva
 
 **Trần CU từng job** (ước lượng, chưa chạy; dòng `estimated` trong [`ledger/DA-26.csv`](../g0/ledger/DA-26.csv)).
 
-**Watcher chung** **[Đã chốt]** (4/11/2026): DA-26 chạy bằng watcher chung `scripts/colab/cu_watch.py`. DA-30 làm watcher này trong PR riêng `chore-colab-cu-watch`, chưa merge.
+**Watcher chung** **[Đã chốt]** (4/11/2026): DA-26 chạy bằng watcher chung `scripts/colab/cu_watch.py` (PR #108, thiết kế lại sau review).
 
-- Watcher giám sát cùng lúc ba phiên của DA-26 (hai fine-tune, một server eval). Mỗi phiên có trần riêng: **17,5 / 17,5 / 17,0 CU**. Cả lô có sàn số dư thật của tài khoản **`--floor 14`**, vì ba phiên dùng chung số dư với DA-34 và DA-30.
-- Watcher kiểm loại GPU (L4) và dừng có xác nhận.
+- Mỗi phiên Colab một tiến trình `session`. Tiến trình này theo dõi phiên theo endpoint, tự mở phiên (`--new`) và dừng phiên ở trần riêng của nó: **17,5 / 17,5 / 17,0 CU** cho hai fine-tune và server eval.
+- Cả đợt có thêm một tiến trình `guard` trong một thư mục registry mới:
+  - dừng mọi phiên khi số dư thật xuống tới **`--floor 14`**;
+  - dừng mọi assignment mà không watcher sống nào đăng ký.
+  - Watcher cũng đặt `--floor 14`.
+- **Một đợt một lúc** trên tài khoản, vì guard dừng mọi assignment ngoài registry của nó. Guard từ chối chạy khi đã có guard khác. Thứ tự: lần chạy ngắn 4 CU của DA-30 trước, rồi mới đến đợt của DA-26.
+- Phiên server eval mở sau fine-tune: chạy một watcher `session --new` mới trong cùng registry. Nếu guard đã thoát (mọi watcher trước đã xong), chạy lại guard ở registry đó trước.
+- Watcher kiểm loại GPU (L4) và dừng có xác nhận. Job chỉ bắt đầu khi đã có file `.ready` của phiên và heartbeat của guard còn mới. Lệnh chạy ở đầu docstring của script.
 - **Laptop phải thức suốt lúc chạy**: laptop ngủ thì không có gì dừng phiên.
-- **Không chạy job nào** cho tới khi watcher chung được merge và #99 được kiểm lại. Bản watcher riêng trước đây trong `scripts/he/` đã bỏ khỏi PR này.
+- **Không chạy job nào** cho tới khi #108 được merge và lần chạy ngắn của DA-30 đã xong.
 
 | Job | Ước lượng | Trần |
 |---|---|---|
@@ -204,3 +210,4 @@ Câu hỏi gửi Hiếu: "Approve CU for tier 2, with DA-26 on reduced Isaac eva
 | 4/11/2026 | Tier 2 (Hiếu: "Approve tier 2"): mục 6.2 quyết định và trần CU từng job; eval chính còn 10 điều kiện mức 0 (`b63acd59…`), `mujoco_isaac`, giờ sim; sơ bộ chỉ N = 20; quy tắc đọc sơ bộ theo Fisher và độ nhạy 10 mỗi nhánh; Q3, Q4 đã chốt; đóng băng | Hiếu (soạn với Claude) |
 | 4/11/2026 | Review của #99: đầu file ghi đã chốt; mốc so không chạy trên bộ dev ở tier 2 (mục 1); mục 6.2 tả watcher mới (hai đồng hồ, kiểm L4, dừng có xác nhận, laptop phải thức); `Decision` ghi lại với `embodiment_id` `g1_sonic_dwbc@1` (`dec_01M6KG4JFTRWGQ91CD3H1TC1XX`, cùng `rp_95c98a476499`) | Hiếu (soạn với Claude) |
 | 4/11/2026 | Mục 6.2: chạy bằng watcher chung `scripts/colab/cu_watch.py` (trần 17,5 / 17,5 / 17,0 CU, `--floor 14`); bỏ watcher riêng của DA-26 | Hiếu (soạn với Claude) |
+| 4/11/2026 | Mục 6.2: watcher chung đổi thiết kế (#108): mỗi phiên một watcher theo endpoint, một guard cho đợt; một đợt một lúc trên tài khoản, DA-30 chạy trước rồi đến DA-26 | Review #108 |

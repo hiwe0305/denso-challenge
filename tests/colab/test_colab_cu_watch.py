@@ -8,12 +8,15 @@ Assignments bill the balance at their real rate as fake time passes.
 
 from __future__ import annotations
 
+import fcntl
 import importlib.util
 import json
 import os
 import signal
 import stat
+import subprocess
 import sys
+import time
 from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
 from typing import Any
@@ -51,6 +54,7 @@ class NewProc:
         self.t0 = fake.real
         self.assign_s, self.save_s, self.exit_s, self.exit_code = self.MODES[mode]
         self.endpoint: str | None = None
+        self.saved = False
         self.killed = False
         self.code: int | None = None
 
@@ -62,8 +66,9 @@ class NewProc:
                 self.endpoint = self.fake.assign(self.fake.hardware or self.gpu)
         if self.killed:
             return
-        if self.save_s is not None and age >= self.save_s and self.endpoint:
+        if self.save_s is not None and age >= self.save_s and self.endpoint and not self.saved:
             self.fake.local[self.name] = self.endpoint
+            self.saved = True
         if self.exit_s is not None and age >= self.exit_s and self.code is None:
             self.code = self.exit_code
 
@@ -78,16 +83,16 @@ class NewProc:
 class PersistProc:
     def __init__(self, fake: FakeColab, seconds: float | None) -> None:
         self.fake, self.t0, self.seconds = fake, fake.real, seconds
-        self.killed = False
+        self.killed_at: float | None = None
 
     def poll(self) -> int | None:
-        if self.killed:
+        if self.killed_at is not None:
             return -9
         done = self.seconds is not None and self.fake.real - self.t0 >= self.seconds
         return 0 if done else None
 
     def kill(self) -> None:
-        self.killed = True
+        self.killed_at = self.fake.real
 
 
 class FakeColab:
@@ -109,6 +114,8 @@ class FakeColab:
         self.local: dict[str, str] = {}  # the CLI's local names: name -> endpoint
         self.billed: dict[str, float] = {}
         self.procs: list[NewProc] = []
+        self.persists: list[PersistProc] = []
+        self.unassigned_at: list[float] = []
         self.calls: list[list[str]] = []
         self.usage_down = 0  # next `usage` calls that fail
         self.sessions_empty = 0  # next `sessions` calls that print no sessions, exit 0
@@ -159,7 +166,8 @@ class FakeColab:
     def spawn(self, argv: Sequence[str]) -> Any:
         self.calls.append(list(argv))
         if argv[0] == "bash":
-            return PersistProc(self, self.persist_s)
+            self.persists.append(PersistProc(self, self.persist_s))
+            return self.persists[-1]
         proc = NewProc(self, argv[3], argv[5], self.new_mode)
         self.procs.append(proc)
         return proc
@@ -170,6 +178,7 @@ class FakeColab:
             self.on_call(list(argv))
         if argv[0].endswith("python"):  # UNASSIGN through the CLI's client
             self.unassigns += 1
+            self.unassigned_at.append(self.real)
             if self.unassign_fails:
                 self.unassign_fails -= 1 if self.unassign_fails > 0 else 0
                 return 1, "ColabRequestError"
@@ -236,6 +245,7 @@ def watcher(
 def guard(fake: FakeColab, tmp_path: Path, floor: float | None = None, **kw: Any) -> Any:
     cli = cw.Cli(fake, tmp_path / "guard.jsonl", colab=COLAB)
     kw.setdefault("alive", lambda pid: True)
+    kw.setdefault("lock_path", tmp_path / "guard.lock")
     return cw.Guard(cli, tmp_path / "reg", floor, clock=fake.clock, sleep=fake.sleep, **kw)
 
 
@@ -334,9 +344,17 @@ def test_the_floor_stops_the_session_on_the_real_balance(tmp_path: Path) -> None
 def test_a_session_whose_name_is_lost_is_still_capped_by_endpoint(tmp_path: Path) -> None:
     """B1: the CLI lists it as `[?]`; it has not ended, and it is stopped at its cap."""
     fake = FakeColab()
-    fake.on_sleep = lambda n: fake.local.clear() if n == 6 else None
+    names: list[str] = []
+
+    def lose(n: int) -> None:
+        if n == 6:
+            fake.local.clear()
+        if n > 6 and fake.assigned:
+            names.extend(fake.name_of(e) for e in fake.assigned)
+
+    fake.on_sleep = lose
     assert watcher(fake, tmp_path).watch() == cw.EXIT_CAPPED
-    assert fake.assigned == {}
+    assert fake.assigned == {} and len(names) > 10 and set(names) == {"?"}
     assert not events(tmp_path / "da30.jsonl", "ended")
 
 
@@ -381,6 +399,24 @@ def test_a_session_listed_as_unnamed_is_registered_before_its_name(tmp_path: Pat
     fake.on_sleep = lambda n: g.cycle()
     assert watcher(fake, tmp_path).watch() == cw.EXIT_CAPPED
     assert not events(tmp_path / "guard.jsonl", "ALERT")
+
+
+def test_a_session_another_process_named_is_never_claimed(tmp_path: Path) -> None:
+    """Concurrent batches: an A100 named da26-x that appears during our `new` is not ours."""
+    fake = FakeColab()
+    foreign: list[str] = []
+    fake.on_sleep = lambda n: foreign.append(fake.assign("A100", name="da26-x")) if n == 1 else None
+    assert watcher(fake, tmp_path).watch() == cw.EXIT_CAPPED
+    assert list(fake.assigned) == foreign
+
+
+def test_a_name_watched_by_a_live_watcher_is_refused(tmp_path: Path) -> None:
+    fake = FakeColab()
+    entry(tmp_path, "da30", "gpu-l4-s-7", fake.clock())
+    w = watcher(fake, tmp_path, alive=lambda pid: pid == 4242)
+    assert w.watch() == cw.EXIT_NOTHING and fake.procs == []
+    left = json.loads((tmp_path / "reg" / "da30.json").read_text())
+    assert (left["pid"], left["state"]) == (4242, "running")
 
 
 def test_a_refused_new_stops_nothing(tmp_path: Path) -> None:
@@ -438,6 +474,31 @@ def test_a_persist_that_hangs_is_killed_and_the_cap_still_holds(tmp_path: Path) 
     killed = [r for r in events(log, "ALERT") if "persist" in r["message"]]
     assert killed and max(fake.billed.values()) <= 4.0
     assert started["spent"] >= 2.0
+    (proc,) = fake.persists
+    assert proc.killed_at is not None and proc.killed_at < fake.unassigned_at[0]
+    assert proc.killed_at - proc.t0 <= 600 + 60
+
+
+def test_a_clock_set_back_does_not_delay_the_persist_timeout(tmp_path: Path) -> None:
+    fake = FakeColab(persist_s=None)
+    w = watcher(fake, tmp_path, cap=4.0, persist="colab exec -s da30 -f p.py", persist_at=0.5)
+
+    def back(n: int) -> None:
+        if fake.persists and fake.offset == 0:
+            fake.offset = -3600.0
+
+    fake.on_sleep = back
+    assert w.watch() == cw.EXIT_CAPPED
+    (proc,) = fake.persists
+    # the poll in which the clock went back counts nothing, then one poll of rounding
+    assert proc.killed_at is not None and proc.killed_at - proc.t0 <= 600 + 2 * 60
+
+
+def test_a_clock_set_back_does_not_delay_the_new_timeout(tmp_path: Path) -> None:
+    fake = FakeColab(new_mode="slow")
+    fake.on_sleep = lambda n: setattr(fake, "offset", -3600.0) if n == 2 else None
+    w = watcher(fake, tmp_path, cap=1.5, timing=cw.Timing(new_timeout=300))
+    assert w.watch() == cw.EXIT_CRASHED and fake.assigned == {}
 
 
 def test_persist_runs_before_the_cap(tmp_path: Path) -> None:
@@ -562,6 +623,36 @@ def test_sigterm_stops_the_session(tmp_path: Path, handlers: None) -> None:
     assert events(tmp_path / "da30.jsonl", "signal")[0]["signum"] == signal.SIGTERM
 
 
+def test_a_signal_inside_a_handler_keeps_the_real_exit_code(tmp_path: Path, handlers: None) -> None:
+    fake = FakeColab(hardware="A100")
+    w = watcher(fake, tmp_path)
+    log = w.cli.log
+
+    def log_then_kill(event: str, **fields: Any) -> None:
+        log(event, **fields)
+        if event == "error":
+            kill_self()
+
+    w.cli.log = log_then_kill
+    assert w.watch() == cw.EXIT_WRONG_GPU and fake.assigned == {}
+
+
+def test_a_signal_inside_the_guards_handler_is_no_crash_out(tmp_path: Path, handlers: None) -> None:
+    fake = FakeColab()
+    g = guard(fake, tmp_path)
+    g.cycle = lambda: (_ for _ in ()).throw(RuntimeError("boom"))
+    log = g.cli.log
+
+    def log_then_kill(event: str, **fields: Any) -> None:
+        log(event, **fields)
+        if event == "error":
+            kill_self()
+
+    g.cli.log = log_then_kill
+    assert g.watch() == cw.EXIT_CRASHED
+    assert events(tmp_path / "guard.jsonl", "exit")[0]["code"] == cw.EXIT_CRASHED
+
+
 def test_only_the_first_signal_raises(handlers: None) -> None:
     with pytest.raises(cw.Interrupted):
         cw._raise_interrupted(signal.SIGTERM, None)
@@ -637,6 +728,35 @@ def test_a_stale_ready_file_is_removed_at_start(tmp_path: Path) -> None:
     assert not (tmp_path / "reg" / "da30.ready").exists()
 
 
+def test_main_needs_the_python_beside_the_colab_cli(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(cw.Guard, "watch", lambda self: pytest.fail("the guard started"))
+    colab_cli = tmp_path / "colab"
+    colab_cli.write_text("")
+    argv = ["guard", "--registry", str(tmp_path), "--log", str(tmp_path / "g.jsonl")]
+    assert cw.main([*argv, "--colab", str(colab_cli), "--no-inhibit"]) == cw.EXIT_NOTHING
+
+
+def test_killing_a_spawned_command_kills_its_whole_group(tmp_path: Path) -> None:
+    pidfile = tmp_path / "child.pid"
+    proc = cw.spawn_process(["bash", "-c", f"sleep 30 & echo $! > {pidfile}; wait"])
+    for _ in range(100):
+        if pidfile.exists() and pidfile.read_text().strip():
+            break
+        time.sleep(0.05)
+    child = int(pidfile.read_text())
+    proc.kill()
+    for _ in range(100):
+        if subprocess.run(
+            ["ps", "-o", "stat=", "-p", str(child)], capture_output=True, text=True
+        ).stdout.strip() in ("", "Z"):
+            break
+        time.sleep(0.05)
+    else:
+        pytest.fail("the grandchild survived the kill")
+
+
 def test_an_unknown_gpu_is_refused_before_any_new(tmp_path: Path) -> None:
     colab_cli = tmp_path / "colab"
     colab_cli.write_text("")
@@ -693,8 +813,49 @@ def test_the_guard_does_nothing_on_an_untrusted_listing(tmp_path: Path) -> None:
 
 def test_the_guard_ends_when_every_watcher_is_done(tmp_path: Path) -> None:
     fake = FakeColab()
-    entry(tmp_path, "da30", "gpu-l4-s-9", fake.clock(), state="stopped")
-    assert guard(fake, tmp_path).watch() == cw.EXIT_OK
+    g = guard(fake, tmp_path)
+    fake.on_sleep = lambda n: entry(tmp_path, "da30", "gpu-l4-s-9", fake.clock(), "stopped")
+    assert g.watch() == cw.EXIT_OK and fake.sleeps == 1
+
+
+def test_a_guard_in_a_reused_registry_ignores_old_entries(tmp_path: Path) -> None:
+    fake = FakeColab()
+    entry(tmp_path, "da30", "gpu-l4-s-9", fake.clock() - 3600, state="stopped")
+    g = guard(fake, tmp_path)
+    g.started_at = fake.clock()
+    assert g.cycle() is None
+
+
+def test_a_second_guard_on_the_account_is_refused(tmp_path: Path) -> None:
+    fake = FakeColab()
+    stray = fake.assign("L4", name="da26-ft")
+    with (tmp_path / "guard.lock").open("a") as held:
+        fcntl.flock(held, fcntl.LOCK_EX)
+        assert guard(fake, tmp_path, grace=0).watch() == cw.EXIT_NOTHING
+    assert stray in fake.assigned and fake.unassigns == 0
+
+
+def test_the_guard_writes_its_heartbeat_every_cycle(tmp_path: Path) -> None:
+    fake = FakeColab()
+    fake.usage_down = 1  # even an untrusted cycle beats
+    g = guard(fake, tmp_path)
+    g.cycle()
+    beat = tmp_path / "reg" / "guard.beat"
+    assert float(beat.read_text()) == fake.clock() and time.time() - beat.stat().st_mtime < 60
+
+
+@pytest.mark.parametrize(("balance", "code"), [(14.5, cw.EXIT_CAPPED), (101.8, cw.EXIT_CRASHED)])
+def test_a_session_the_guard_stopped_is_reported_not_ended(
+    tmp_path: Path, balance: float, code: int
+) -> None:
+    fake = FakeColab(balance=balance)
+    g = guard(fake, tmp_path, floor=14.0, grace=0)
+    if balance > 50:  # far from the floor: the guard finds the watcher dead
+        g.alive = lambda pid: False
+    fake.on_sleep = lambda n: g.cycle() if n > 4 else None
+    assert watcher(fake, tmp_path, cap=4.0).watch() == code
+    assert events(tmp_path / "da30.jsonl", "error")[0]["kind"] == "GuardStopped"
+    assert not events(tmp_path / "da30.jsonl", "ended")
 
 
 def test_the_guard_treats_an_unreadable_entry_as_no_watcher(tmp_path: Path) -> None:
@@ -752,6 +913,7 @@ def test_main_runs_itself_under_systemd_inhibit(
 ) -> None:
     colab_cli = tmp_path / "colab"
     colab_cli.write_text("")
+    (tmp_path / "python").write_text("")
     seen: list[list[str]] = []
     monkeypatch.delenv("CU_WATCH_INHIBITED", raising=False)
     monkeypatch.setattr(cw.shutil, "which", lambda name: "/usr/bin/systemd-inhibit")
