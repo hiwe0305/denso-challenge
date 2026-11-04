@@ -12,6 +12,12 @@ The CLI runs in a subprocess on sim time (`flywheel_simple.tray.run`, D-24),
 without recording a new dataset: the release exports the raw episodes that pass
 (D-24). The tray env appends each replayed episode's outcome to the file named
 by OUTCOMES_ENV; SIMPLE's own `meta/replay.txt` only has success per episode.
+
+SIMPLE's replay CLI catches every exception, prints "An error occurred" and exits
+0 (an EGL or offscreen framebuffer failure when the GPU is full), so a crashed
+replay leaves recorded episodes without an outcome. Those are not QA verdicts:
+`replay_qa` then raises ReplayIncomplete and writes no replay_qa.jsonl, so the
+export refuses the shard until its replay runs again.
 """
 
 from __future__ import annotations
@@ -35,6 +41,10 @@ ENV_ID = "simple/G1WholebodyTrayTransferTeleop-v0"
 OUTCOMES_ENV = "FLYWHEEL_TRAY_OUTCOMES"  # = simple_task.OUTCOMES_ENV (that module needs SIMPLE)
 TRAY_TOL_M = 0.02
 YAW_TOL_DEG = 3.0
+
+
+class ReplayIncomplete(RuntimeError):
+    """The replay produced no outcome for some recorded episodes: a harness failure."""
 
 
 @dataclass(frozen=True)
@@ -111,10 +121,19 @@ def run_replay(raw_root: Path, work: Path, python: str = sys.executable) -> Path
 
 def replay_qa(raw_root: Path, work: Path) -> list[ReplayVerdict]:
     """Replay raw_root and judge each recorded episode; writes work/replay_qa.jsonl."""
+    (work / "replay_qa.jsonl").unlink(missing_ok=True)
     outcomes = {int(o["seed"]): o for o in read_log(run_replay(raw_root, work))}
     verdicts = [
         verdict(index, seed, pose, outcomes.get(seed))
         for index, (seed, pose) in sorted(recorded_finals(raw_root).items())
     ]
+    missing = [v.episode for v in verdicts if v.reason == "not_replayed"]
+    if missing:
+        log = work / "replay.log"
+        errors = [line for line in log.read_text().splitlines() if "An error occurred" in line]
+        raise ReplayIncomplete(
+            f"no replay outcome for {len(missing)}/{len(verdicts)} episodes {missing[:10]}"
+            f" of {raw_root}: {errors[-1] if errors else 'see ' + str(log)}; replay the shard again"
+        )
     (work / "replay_qa.jsonl").write_text("".join(json.dumps(v.__dict__) + "\n" for v in verdicts))
     return verdicts

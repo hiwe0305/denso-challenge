@@ -3,7 +3,8 @@
 One process per shard (one live env per process), started --stagger seconds
 apart with one BLAS/OpenMP thread each, as scripts/g0/tray/generate.py runs them.
 Each shard gets shard-NN/replay/replay_qa.jsonl (one verdict per recorded
-episode); <out>/replay_summary.json has the pass rate and the error spread.
+episode); <out>/replay_summary.json has the pass rate and the error spread, and
+names the shards whose replay crashed (`unjudged_shards`, exit 1).
 
     MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/python \
         scripts/g0/tray/replay_qa.py --out fwdata/simple/tray/gen/<run> --workers 14
@@ -79,7 +80,13 @@ def main() -> int:
             cmd = [sys.executable, __file__, "--out", str(args.out), "--shard", str(shard)]
             running.append(subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=env))
     failed += [p.args for p in running if p.wait() != 0]
-    summary = {**summarize(args.out), "failed_shards": len(failed)}
+    # A failed shard has no verdicts (ReplayIncomplete, in its worker.log); the export
+    # refuses it until it is replayed again.
+    summary = {
+        **summarize(args.out),
+        "failed_shards": len(failed),
+        "unjudged_shards": sorted(Path(cmd[-1]).name for cmd in failed),
+    }
     (args.out / "replay_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     print(json.dumps(summary))
     return 1 if failed else 0
