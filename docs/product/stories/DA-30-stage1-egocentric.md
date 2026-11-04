@@ -67,6 +67,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 4/11/2026 | Duyệt CU cho lần chạy ngắn (tier 2: "Approve tier 2"), ước lượng khoảng 2,3 CU, trần 4 CU; chạy từ `master` sau merge, có bộ canh CU | PO (Hiếu) |
 | 4/11/2026 | Miễn bước che danh tính ("Waive for EgoDex") chỉ cho mẫu EgoDex công bố (`public`) trong các lần chạy stage 1 của DA-30; video tự quay và mọi nguồn egocentric khác vẫn phải che trước. RunPlan chặn mọi nguồn khác ([stage1.md](../../he/stage1.md) mục 1.4) | PO (Hiếu) |
 | 4/11/2026 | Bộ canh CU dùng chung đổi thiết kế (PR #108): mỗi phiên một watcher theo endpoint, cộng một guard cho cả đợt; một đợt một lúc trên tài khoản, DA-30 chạy trước rồi đến DA-26 ([stage1.md](../../he/stage1.md) mục 1.6) | Review PR #108 |
+| 4/11/2026 | Lần chạy 1 hỏng ở `accelerator.prepare` (`betas: "auto"` trong `zero3_offload.json` của tác giả). RunPlan dùng file DeepSpeed của repo, khớp recipe và giữ lr riêng của từng nhóm; `setup` chạy pre-flight DeepSpeed trên model nhỏ trước mọi lần tải ([stage1.md](../../he/stage1.md) mục 1.2, 1.6) | Lần chạy 1 |
 
 ## Ghi chép khi làm
 
