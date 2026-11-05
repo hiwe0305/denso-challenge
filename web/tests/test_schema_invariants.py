@@ -246,7 +246,7 @@ def test_every_view_the_document_promises_exists() -> None:
         "v_pipeline_current", "v_dataset_report", "v_defect_detection",
         "v_eval_funnel", "v_system_check", "v_branch_comparison", "v_he_curve",
         "v_cluster_board", "v_cost_by_branch", "v_cost_by_intervention",
-        "v_r_demo", "v_action_status", "v_sync_health",
+        "v_cost_data_allocation", "v_r_demo", "v_action_status", "v_sync_health",
     }
     created = set(_created_views(_all_sql()))
     assert promised <= created, f"thiếu view: {sorted(promised - created)}"

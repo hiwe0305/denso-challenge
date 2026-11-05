@@ -1,6 +1,7 @@
 // Ten screens in flywheel order (DESIGN.md §6). Screens not built yet say so
 // with their milestone instead of rendering an empty page.
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { Cost } from "./screens/Cost";
 import { DataPipeline } from "./screens/DataPipeline";
 import { Evaluation } from "./screens/Evaluation";
 import { FailureToData } from "./screens/FailureToData";
@@ -23,7 +24,7 @@ export const screens: Screen[] = [
   { code: "M5", path: "/huan-luyen", title: "Huấn luyện", milestone: "M5 (14/11)" },
   { code: "M6", path: "/danh-gia", title: "Đánh giá", element: <Evaluation />, milestone: "M3 (10/11)" },
   { code: "M7", path: "/failure-to-data", title: "Failure→Data", element: <FailureToData />, milestone: "M3 (10/11)" },
-  { code: "M8", path: "/chi-phi", title: "Chi phí", milestone: "M5 (14/11)" },
+  { code: "M8", path: "/chi-phi", title: "Chi phí", element: <Cost />, milestone: "M5 (14/11)" },
   { code: "M9", path: "/ket-qua", title: "Kết quả", element: <Results />, milestone: "M3 (10/11)" },
   { code: "M10", path: "/kiem-toan", title: "Kiểm toán", milestone: "M5 (14/11)" },
 ];

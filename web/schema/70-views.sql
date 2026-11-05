@@ -320,13 +320,21 @@ JOIN flywheel_recommendations fr ON fr.id = fc.recommendation_id;
 CREATE VIEW v_cost_by_branch AS
 SELECT
   l.branch,
-  e.task_id,
+  -- Nhánh luôn đi kèm task (§6.4). Bút toán eval hay chẩn đoán không gắn thí
+  -- nghiệm, nên task lấy theo thứ tự thí nghiệm → lượt eval → khuyến nghị;
+  -- chỉ lấy từ thí nghiệm thì nhánh B tách làm hai dòng (bản 0.4).
+  COALESCE(e.task_id, ev.task_id, fr.task_id)  AS task_id,
   l.price_book_id,
   pb.name             AS price_book_name,
   count(*)                                     AS entry_count,
   sum(l.estimated_usd)                         AS estimated_usd,
   sum(l.measured_usd)                          AS measured_usd,
-  sum(l.measured_usd) - sum(l.estimated_usd)   AS usd_forecast_error,
+  -- Sai số dự báo chỉ trên dòng có cả ước tính lẫn thực đo: hiệu của một
+  -- dòng thiếu một cột là NULL và sum bỏ qua nó. Trừ hai tổng (bản 0.3) lấy
+  -- ước tính của can thiệp chưa làm trừ vào thực đo của việc khác (bản 0.4).
+  sum(l.measured_usd - l.estimated_usd)        AS usd_forecast_error,
+  count(*) FILTER (WHERE l.measured_usd IS NOT NULL
+                     AND l.estimated_usd IS NOT NULL) AS forecast_pairs,
   sum(l.estimated_human_minutes)               AS estimated_human_minutes,
   sum(l.measured_human_minutes)                AS measured_human_minutes,
   sum(l.estimated_gpu_hours)                   AS estimated_gpu_hours,
@@ -335,8 +343,54 @@ SELECT
   l.origin
 FROM cost_ledger_entries l
 LEFT JOIN experiments e ON e.id = l.experiment_id
+LEFT JOIN sim_evaluations ev ON ev.id = l.evaluation_id
+LEFT JOIN flywheel_recommendations fr ON fr.id = l.recommendation_id
 LEFT JOIN price_books pb ON pb.id = l.price_book_id
-GROUP BY l.branch, e.task_id, l.price_book_id, pb.name, l.origin;
+GROUP BY l.branch, COALESCE(e.task_id, ev.task_id, fr.task_id), l.price_book_id, pb.name,
+         l.origin;
+
+-- ---------------------------------------------------------------------------
+-- v_cost_data_allocation · BR-05, chi phí dữ liệu chia cho thí nghiệm (M8)
+-- ---------------------------------------------------------------------------
+-- Chi phí dữ liệu ghi một lần theo lô lúc nạp. Một thí nghiệm chịu phần
+-- (episode của lô nó dùng ÷ episode của lô). Chỉ chia số thực đo; một dòng
+-- cho mỗi (thí nghiệm, lô) để M8 hiện được phần chia từ đâu ra (bản 0.4).
+CREATE VIEW v_cost_data_allocation AS
+WITH used AS (
+  SELECT ed.experiment_id, ep.dataset_id, count(DISTINCT ep.id) AS episodes_used
+    FROM experiment_datasets ed
+    JOIN release_items ri ON ri.release_id = ed.release_id AND NOT ri.excluded
+    JOIN episodes ep ON ep.id = ri.episode_id
+   GROUP BY ed.experiment_id, ep.dataset_id
+), cost AS (
+  SELECT dataset_id,
+         sum(measured_usd)           AS usd,
+         sum(measured_human_minutes) AS human_minutes,
+         sum(measured_gpu_hours)     AS gpu_hours
+    FROM cost_ledger_entries
+   WHERE dataset_id IS NOT NULL
+   GROUP BY dataset_id
+)
+SELECT
+  x.id                AS experiment_id,
+  x.task_id,
+  x.branch,
+  x.method,
+  x.hypothesis,
+  u.dataset_id,
+  d.dataset_code,
+  u.episodes_used,
+  d.episode_count     AS dataset_episodes,
+  u.episodes_used::numeric / NULLIF(d.episode_count, 0)            AS share,
+  c.usd * u.episodes_used / NULLIF(d.episode_count, 0)             AS allocated_usd,
+  c.human_minutes * u.episodes_used / NULLIF(d.episode_count, 0)   AS allocated_human_minutes,
+  c.gpu_hours * u.episodes_used / NULLIF(d.episode_count, 0)       AS allocated_gpu_hours,
+  x.origin
+FROM used u
+JOIN experiments x ON x.id = u.experiment_id
+JOIN datasets d ON d.id = u.dataset_id
+LEFT JOIN cost c ON c.dataset_id = u.dataset_id
+WHERE NOT x.is_deleted;
 
 CREATE VIEW v_cost_by_intervention AS
 SELECT
@@ -382,6 +436,8 @@ JOIN episodes ep ON ep.id = ri.episode_id
 WHERE NOT e.is_deleted
   AND ep.is_root
   AND ep.operator_kind = 'human'
+  -- Điểm HE chung một nhánh; số demo của chúng ở v_he_curve (bản 0.4).
+  AND e.hypothesis NOT IN ('HE','HE_T')
 GROUP BY e.task_id, e.branch, e.method, e.origin;
 
 -- ---------------------------------------------------------------------------

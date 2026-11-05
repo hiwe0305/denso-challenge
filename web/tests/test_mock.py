@@ -270,6 +270,24 @@ def test_branch_b_beats_branch_a_on_dev(data: dict[str, Any]) -> None:
     assert rates["ev_BFAIL_dev"] < rates["ev_A_dev"]
 
 
+def test_a07_trains_on_seventy_percent_of_every_source(data: dict[str, Any]) -> None:
+    """A_07 is A on 70% of the data; human demos shrink too, or r_demo cannot tell them apart."""
+    items: dict[str, set[str]] = {}
+    for item in data["release_items.jsonl"]:
+        if not item["excluded"]:
+            items.setdefault(item["release_ref"], set()).add(item["episode_ref"])
+    full, part = items["rel_two_table_v1"], items["rel_two_table_a07"]
+    assert part < full
+    episodes = {e["episode_id"]: e for e in data["episodes.jsonl"]}
+
+    def humans(refs: set[str]) -> int:
+        return sum(
+            1 for r in refs if episodes[r]["is_root"] and episodes[r]["operator_kind"] == "human"
+        )
+
+    assert humans(part) == round(0.7 * 64) + round(0.7 * 30)
+
+
 def test_each_he_point_trains_on_exactly_n_human_root_demos(data: dict[str, Any]) -> None:
     """v_he_curve counts N from the release; the mock must make that count true."""
     episodes = {e["episode_id"]: e for e in data["episodes.jsonl"]}

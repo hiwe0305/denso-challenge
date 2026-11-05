@@ -9,6 +9,9 @@ import type {
   E1CurvePoint,
   HeCurvePoint,
   ClusterCard,
+  CostByBranch,
+  LedgerRow,
+  SensitivityRow,
   DatasetReport,
   DatasetRow,
   EpisodeRow,
@@ -61,6 +64,11 @@ export const useBranches = (task: string) =>
   useGet<BranchComparisonRow[]>(`/results/branches?task_id=${task}`);
 export const useHeCurve = () => useGet<HeCurvePoint[]>("/results/he-curve");
 export const useE1Curve = () => useGet<E1CurvePoint[]>("/results/e1-curve");
+
+// ---------------------------------------------------------------- M8
+export const useLedger = () => useGet<Page<LedgerRow>>("/cost/ledger?limit=500");
+export const useCostByBranch = () => useGet<CostByBranch>("/cost/by-branch");
+export const useSensitivity = () => useGet<SensitivityRow[]>("/cost/sensitivity");
 
 // ---------------------------------------------------------------- M6
 export const useEvaluations = () => useGet<Page<EvaluationSummary>>("/evaluations?limit=500");

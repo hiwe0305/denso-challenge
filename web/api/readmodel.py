@@ -950,25 +950,46 @@ class SinkReadModel:
             for e in self.t("cost_ledger_entries")
         ]
 
+    def _ledger_task(self, entry: Row) -> str | None:
+        """v_cost_by_branch: task from the experiment, else the evaluation, else the round."""
+        code = entry.get("experiment_code")
+        if code:
+            x = next((x for x in self.t("experiments") if x["experiment_code"] == code), None)
+            if x:
+                return str(x["task_id"])
+        ev_ref = entry.get("evaluation_ref")
+        if ev_ref:
+            ev = next((v for v in self.t("sim_evaluations") if v["evaluation_ref"] == ev_ref),
+                      None)
+            if ev:
+                return str(ev["task_id"])
+        rec_ref = entry.get("recommendation_ref")
+        if rec_ref:
+            rec = self._rec(rec_ref)
+            if rec:
+                return str(rec["task_id"])
+        return None
+
     def cost_by_branch(self) -> Row:
-        """v_cost_by_branch and v_r_demo."""
-        task_of = {x["experiment_code"]: x["task_id"] for x in self.t("experiments")}
+        """v_cost_by_branch, v_r_demo and v_cost_data_allocation (BR-05)."""
         groups: dict[tuple[Any, Any, Any], list[Row]] = {}
         for e in self.t("cost_ledger_entries"):
-            code = e.get("experiment_code")
-            key = (e.get("branch"), task_of.get(code) if code else None, e.get("price_book_name"))
+            key = (e.get("branch"), self._ledger_task(e), e.get("price_book_name"))
             groups.setdefault(key, []).append(e)
         rows = []
         for (branch, task, book), entries in groups.items():
-            est = _sum_or_none(e.get("estimated_usd") for e in entries)
-            meas = _sum_or_none(e.get("measured_usd") for e in entries)
+            # Forecast error only on rows carrying both an estimate and a measurement.
+            paired = [e for e in entries
+                      if e.get("measured_usd") is not None and e.get("estimated_usd") is not None]
             rows.append({
                 "branch": branch, "task_id": task, "price_book_name": book,
                 "entry_count": len(entries),
-                "estimated_usd": est, "measured_usd": meas,
-                "usd_forecast_error": (
-                    js_round(meas - est) if est is not None and meas is not None else None
+                "estimated_usd": _sum_or_none(e.get("estimated_usd") for e in entries),
+                "measured_usd": _sum_or_none(e.get("measured_usd") for e in entries),
+                "usd_forecast_error": _sum_or_none(
+                    e["measured_usd"] - e["estimated_usd"] for e in paired
                 ),
+                "forecast_pairs": len(paired),
                 "estimated_human_minutes": _sum_or_none(
                     e.get("estimated_human_minutes") for e in entries
                 ),
@@ -980,15 +1001,70 @@ class SinkReadModel:
                 "reversal_count": sum(1 for e in entries if e["entry_kind"] == "REVERSAL"),
                 "origin": entries[0]["origin"],
             })
+        # v_r_demo: one row per (task, branch, method); HE points live in v_he_curve.
+        demo_groups: dict[tuple[str, str, str], tuple[set[str], str]] = {}
+        for x in self.t("experiments"):
+            if x["hypothesis"] in ("HE", "HE_T"):
+                continue
+            demo_key = (x["task_id"], x["branch"], x["method"])
+            seen, origin = demo_groups.get(demo_key, (set(), x["origin"]))
+            demo_groups[demo_key] = (
+                seen | self._human_root_episodes(x["experiment_code"]), origin
+            )
         r_demo = [
-            {
-                "task_id": x["task_id"], "branch": x["branch"], "method": x["method"],
-                "human_root_episodes": n, "origin": x["origin"],
-            }
-            for x in self.t("experiments")
-            if (n := len(self._human_root_episodes(x["experiment_code"]))) > 0
+            {"task_id": t, "branch": b, "method": m, "human_root_episodes": len(seen),
+             "origin": origin}
+            for (t, b, m), (seen, origin) in demo_groups.items() if seen
         ]
-        return {"rows": rows, "r_demo": r_demo}
+        return {"rows": rows, "r_demo": r_demo, "data_allocation": self._data_allocation()}
+
+    def _data_allocation(self) -> list[Row]:
+        """v_cost_data_allocation: each dataset's measured cost, shared by episodes used."""
+        cost: dict[str, dict[str, float | None]] = {}
+        for e in self.t("cost_ledger_entries"):
+            code = e.get("dataset_code")
+            if not code:
+                continue
+            c = cost.setdefault(code, {"usd": None, "human_minutes": None, "gpu_hours": None})
+            for k in ("usd", "human_minutes", "gpu_hours"):
+                v = e.get(f"measured_{k}")
+                if v is not None:
+                    c[k] = (c[k] or 0) + v
+        dataset_of = {e["episode_ref"]: e.get("dataset_code") for e in self.t("episodes")}
+        datasets = {d["dataset_code"]: d for d in self.t("datasets")}
+        out = []
+        for x in self.t("experiments"):
+            releases = {
+                ed["release_ref"] for ed in self.t("experiment_datasets")
+                if ed["experiment_code"] == x["experiment_code"]
+            }
+            used: dict[str, set[str]] = {}
+            for ri in self.t("release_items"):
+                if ri["release_ref"] in releases and not ri["excluded"]:
+                    code = dataset_of.get(ri["episode_ref"])
+                    if code:
+                        used.setdefault(code, set()).add(ri["episode_ref"])
+            for d in self.t("datasets"):
+                code = d["dataset_code"]
+                if code not in used:
+                    continue
+                n, total = len(used[code]), datasets[code]["episode_count"]
+                c = cost.get(code, {"usd": None, "human_minutes": None, "gpu_hours": None})
+
+                def part(v: float | None, n: int = n, total: int = total) -> float | None:
+                    return v * n / total if v is not None and total else None
+
+                out.append({
+                    "experiment_id": x["experiment_code"], "task_id": x["task_id"],
+                    "branch": x["branch"], "method": x["method"], "hypothesis": x["hypothesis"],
+                    "dataset_id": code, "episodes_used": n, "dataset_episodes": total,
+                    "share": n / total if total else None,
+                    "allocated_usd": part(c["usd"]),
+                    "allocated_human_minutes": part(c["human_minutes"]),
+                    "allocated_gpu_hours": part(c["gpu_hours"]),
+                    "origin": x["origin"],
+                })
+        return out
 
     def cost_by_intervention(self) -> list[Row]:
         rec = self._rec_row()
