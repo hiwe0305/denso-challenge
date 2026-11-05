@@ -28,6 +28,7 @@ from he1_colab import job_id, load_point, refresh_vm_logs, serve, upload_problem
 from he1_eval import (
     ACT_IDLE_S,
     CAP,
+    CLIENT_PORT,
     END_S,
     EXIT_WAIT_S,
     FIRST_ACT_S,
@@ -44,6 +45,7 @@ from he1_eval import (
     Slot,
     client_command,
     config_sha256,
+    container_stop_command,
     dead_or_late,
     expected,
     forward,
@@ -867,6 +869,7 @@ class Box:
         self.on_prepare: Any = None
         self.jobs = "---\n---\n"
         self.on_mem: Any = None
+        self.on_container_stop: Any = None
 
     def __call__(self, argv: Any) -> subprocess.CompletedProcess[str]:
         argv = list(argv)
@@ -880,6 +883,11 @@ class Box:
                 (dest / "eval_stats.txt").write_text(
                     "".join(f"episode_{k}: {k % 3 == 0} \n" for k in range(4))
                 )
+            return ok
+        if command == container_stop_command():  # a CU refusal: the container alone
+            self.calls.append("container stop")
+            if self.on_container_stop:
+                self.on_container_stop()
             return ok
         if "docker stop" in command:  # stop_command: the launcher's group, then the container
             assert "kill -TERM --" in command and "client-" in command
@@ -1331,3 +1339,144 @@ def test_the_launch_returns_at_once_while_the_client_keeps_running(tmp_path: Pat
         ["bash", "-c", client_command("tg", 20)], env=gone, capture_output=True, timeout=10
     )
     assert failed.returncode == 1
+
+
+# --- eval attempt 3: a CU refusal stops the container alone, the client moves its files ---
+
+
+def test_a_cu_refusal_stops_only_the_container_and_ends_clean(tmp_path: Path) -> None:
+    """Pair 1's gate refuses: the router's stop is container_stop_command, never the
+    launcher's group kill, and the run ends 3 with both episodes of pair 0 scored."""
+    args, env, box, calls, servers, order = eval_setup(tmp_path)
+    spent = {"cu": 1.0}
+    fake_now = env.clock
+    env.reading = lambda: (fake_now() - 20, spent["cu"], CAP)
+    done = threading.Event()
+    refused: list[int] = []
+
+    def client() -> None:  # pair 0 runs; at pair 1's first reset the meter is past the line
+        for _ in range(2):
+            post(env.route_port, reset())
+            post(env.route_port, {"history": {}})
+        spent["cu"] = 17.0
+        refused.append(post(env.route_port, reset())[0])
+
+    def container_stopped() -> None:  # SIMPLE's container is gone; the script writes `exit`
+        box.exit = "143"
+        done.set()
+
+    box.on_launch = lambda: threading.Thread(target=client, daemon=True).start()
+    box.on_container_stop = container_stopped
+    fake_sleep = env.sleep  # the fake clock still runs: a stop with no `exit` is bounded
+    env.sleep = lambda s: (done.wait(10), fake_sleep(s)) if s == POLL_S else None
+    try:
+        assert run_eval(args, env) == 3
+    finally:
+        [s.shutdown() for s in servers]
+    assert refused == [503]
+    assert "container stop" in calls and "docker stop" not in calls
+    job = args.dest / "da26-t2-eval-n20"
+    scored = [json.loads(x) for x in (job / "results.jsonl").read_text().splitlines()]
+    assert [(r["episode"], r["complete_pair"]) for r in scored] == [(0, True), (1, True)]
+
+
+def test_after_the_refusal_stop_the_real_client_moves_its_files(tmp_path: Path) -> None:
+    """The real launcher and he1_client.sh, then the command a CU refusal sends. Shims:
+    awk (95 GB MemAvailable), systemd-run (runs the command), sha256sum (the pinned task
+    file), docker, whose `run` of the client is SIMPLE mid-episode: eval_stats.txt and a
+    video written, then running until `docker stop` or a signal kills it, as the real
+    docker CLI dies with its container. Attempt 3's stop killed the launcher's group,
+    he1_client.sh with it, and `exit` was 1 with nothing moved (5/11/2026)."""
+    home, shims = tmp_path / "home", tmp_path / "bin"
+    work = home / "denso-da26"
+    out = work / "runs/da26-t2-eval-n20"
+    out.mkdir(parents=True)
+    (work / "fw/scripts/he").mkdir(parents=True)
+    (work / "fw/scripts/he/he1_client.sh").write_text(
+        (REPO / "scripts/he/he1_client.sh").read_text()
+    )
+    (work / f"sets/interleaved/simple/{TASK}/dr-level-0").mkdir(parents=True)
+    (work / "sets/interleaved/order.json").write_text("{}\n")
+    assets = tmp_path / "assets"
+    for d in ("assets", "robots", "scenes"):
+        (assets / d).mkdir(parents=True)
+    task_file = "g1_wholebody_locomotion_pick_between_tables_teleop.py"
+    (work / "simple/patches/b75c678").mkdir(parents=True)
+    (work / "simple/patches/b75c678" / task_file).write_text("# the b75c678 task file\n")
+    pid_file = tmp_path / "container.pid"
+    shims.mkdir()
+    real = {
+        tool: subprocess.run(
+            ["bash", "-c", f"command -v {tool}"], capture_output=True, text=True
+        ).stdout.strip()
+        for tool in ("awk", "sha256sum")
+    }
+    (shims / "awk").write_text(
+        '#!/bin/bash\n[[ "$*" == *MemAvailable* ]] && { echo 99614720; exit 0; }\n'
+        f'exec {real["awk"]} "$@"\n'
+    )
+    (shims / "sha256sum").write_text(
+        f'#!/bin/bash\n[[ "$1" == *{task_file} ]] && '
+        '{ echo "51bce5d6c0311219d9a827b589910d915521dccc89b69a1ab20ff35081b6dc8f  $1"; exit 0; }\n'
+        f'exec {real["sha256sum"]} "$@"\n'
+    )
+    (shims / "systemd-run").write_text(
+        '#!/bin/bash\nwhile [ "$1" != bash ]; do shift; done\nexec "$@"\n'
+    )
+    (shims / "docker").write_text(
+        f"""#!/bin/bash
+echo "$*" >> {tmp_path}/docker.calls
+if [[ "$1" == stop ]]; then
+  pid=$(cat {pid_file}) && kill -TERM "$pid"
+  while kill -0 "$pid" 2>/dev/null; do sleep 0.05; done
+  exit 0
+fi
+[[ "$*" == *"--entrypoint cat"* ]] && {{ echo "DOMAIN_ID: 0"; exit 0; }}
+args=("$@")
+for i in "${{!args[@]}}"; do
+  case "${{args[$i]}}" in
+    *:/workspace/simple/data) data="${{args[$i]%:/workspace/simple/data}}" ;;
+    data/runs/*) tag="${{args[$i]#data/runs/}}" ;;
+  esac
+done
+ep="$data/evals/psi0_decoupled_wbc/psi0-x.{TASK}/dr-level-0/episode_0"
+mkdir -p "$data/runs/$tag" "$ep"
+printf 'episode_0: False \\n' > "$data/runs/$tag/eval_stats.txt"
+echo frames > "$ep/head_stereo_left.mp4"
+echo $$ > {pid_file}
+exec sleep 300
+"""
+    )
+    for shim in shims.iterdir():
+        shim.chmod(0o755)
+    info = info_server((HERE / "testdata/server-da26-t2-ft-vego-n20-s0.info.json").read_bytes())
+    environ = {
+        **os.environ,
+        "HOME": str(home),
+        "PATH": f"{shims}:{os.environ['PATH']}",
+        "SIMPLE_ASSETS": str(assets),
+    }
+    launch = client_command("tg", 1).replace(
+        f"--port {CLIENT_PORT}", f"--port {info.server_address[1]}"
+    )
+    try:
+        subprocess.run(["bash", "-c", launch], env=environ, check=True, timeout=10)
+        deadline = time.monotonic() + 30
+        while not pid_file.is_file() and time.monotonic() < deadline:
+            assert not (out / "exit").exists(), (out / "client-launch-tg.log").read_text()
+            time.sleep(0.05)
+        assert pid_file.is_file(), "the client never reached its docker run"
+        subprocess.run(["bash", "-c", container_stop_command()], env=environ, timeout=30)
+        deadline = time.monotonic() + 30
+        while not (out / "exit").is_file() and time.monotonic() < deadline:
+            time.sleep(0.05)
+    finally:
+        info.shutdown()
+        if (out / "client-tg.pgid").is_file():
+            pgid = (out / "client-tg.pgid").read_text().strip()
+            subprocess.run(["pkill", "-g", pgid], check=False)
+    assert (out / "exit").read_text().strip() == "143"
+    assert (out / "eval/tg/eval_stats.txt").read_text() == "episode_0: False \n"
+    assert (out / "videos/tg/episode_0/head_stereo_left.mp4").is_file()
+    summary = json.loads((out / "summary-tg.json").read_text())
+    assert summary["client_exit"] == 143 and summary["clock"] == "sim"
