@@ -198,13 +198,12 @@ def test_the_shipped_config_is_the_one_the_tests_score_against() -> None:
     assert set(config.thresholds) == {"r_reach", "h_grasp", "h_place", "T_stable"}
     assert config.balance.height_signal == "torso_height"
     assert config.episode_signals == ("collision",)
-    assert config.class_from_failed_step == ("L-COLLIDE", "L-TIMEOUT")
     assert len(digest) == 64
     assert load_scorer_config(CONFIG)[1] == digest
 
 
 BALANCE_SECTION = "balance: {min_height: 0.6, max_tilt: 0.3, height_signal: h, tilt_signal: t}\n"
-STEP_SECTION = "episode_signals: []\nclass_from_failed_step: []\n"
+STEP_SECTION = "episode_signals: []\n"
 HEAD = "task_id: t\nscorer_version: '1'\nthresholds: {a: 1}\n"
 
 
@@ -230,20 +229,14 @@ HEAD = "task_id: t\nscorer_version: '1'\nthresholds: {a: 1}\n"
         # The sections of the review fixes are not optional either: a config
         # without them cannot keep a missing signal from scoring as a pass, so
         # it is refused rather than defaulted.
-        (HEAD + BALANCE_SECTION + "class_from_failed_step: []\n", "episode_signals"),
-        (HEAD + BALANCE_SECTION + "episode_signals: []\n", "class_from_failed_step"),
-        (
-            HEAD + BALANCE_SECTION + "episode_signals: a\nclass_from_failed_step: []\n",
-            "must be a list of names",
-        ),
-        (
-            HEAD + BALANCE_SECTION + "episode_signals: [a, a]\nclass_from_failed_step: []\n",
-            "repeats",
-        ),
-        # Step signals live on `StageSpec` since #101: a config still carrying
-        # the old key is a config written for the old scorer, and is refused
-        # rather than half-read.
+        (HEAD + BALANCE_SECTION, "episode_signals"),
+        (HEAD + BALANCE_SECTION + "episode_signals: a\n", "must be a list of names"),
+        (HEAD + BALANCE_SECTION + "episode_signals: [a, a]\n", "repeats"),
+        # Step signals and the failed-step class rule live on the task since
+        # #101: a config still carrying either old key is a config written for
+        # the old scorer, and is refused rather than half-read.
         (HEAD + BALANCE_SECTION + "step_signals: {s0: [a]}\n" + STEP_SECTION, "unknown key"),
+        (HEAD + BALANCE_SECTION + "class_from_failed_step: []\n" + STEP_SECTION, "unknown key"),
     ],
 )
 def test_a_config_that_cannot_be_trusted_raises(tmp_path: Path, body: str, fragment: str) -> None:

@@ -64,8 +64,7 @@ def test_a_config_for_another_task_is_refused(
         "task_id: tray\nscorer_version: '0.1.0'\nthresholds: {r_reach: 0.08}\n"
         "balance: {min_height: 0.6, max_tilt: 0.3, height_signal: torso_height, "
         "tilt_signal: torso_tilt}\n"
-        "episode_signals: []\n"
-        "class_from_failed_step: []\n",
+        "episode_signals: []\n",
         encoding="utf-8",
     )
 

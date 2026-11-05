@@ -35,12 +35,9 @@ thresholds:
 # và quyết định kiểu lỗi, không quyết định bước nào đạt.
 episode_signals: [collision]
 
-# Kiểu lỗi lấy lớp lỗi chung theo bước hỏng k thay vì lớp riêng của mình
-# (spec mục 5.2; 03 mục 4.3 dòng "StageSpec có lớp mặc định"). Khai ở đây vì
-# `FailureKindSpec.failure_class` chỉ chở được một giá trị cố định (issue #59
-# mục 5). Kiểu nào không khai thì lấy lớp của `FailureKindSpec`; lớp do
-# `evaluate()` điền cho từng episode luôn thắng cả hai.
-class_from_failed_step: [L-COLLIDE, L-TIMEOUT]
+# Kiểu lỗi lấy lớp lỗi chung theo bước hỏng k (L-COLLIDE, L-TIMEOUT; spec mục
+# 5.2) khai ở `FailureKindSpec.failure_class: from_failed_stage` của task
+# (#101), không khai ở đây. Lớp do `evaluate()` điền cho từng episode luôn thắng.
 
 # Điều kiện chạy suốt episode (spec mục 5.1 dòng cuối). Vi phạm ở bất kỳ bước
 # nào là L-BALANCE (spec mục 5.2), khi không bước nào trượt và không bước nào
