@@ -30,6 +30,9 @@ _Phạm vi 3/11/2026 (Q2): bộ export đã có trong adapter (`flywheel-simple/
 - [x] 1. Điểm 1–6 của checklist trong làn (AC 1)
 - [x] 2. Điểm 7: contract test bằng loader Ψ₀ (AC 2)
 - [x] 3. Chạy trên release khay S1 và psi-data, ghi kết quả (AC 3)
+- [ ] 4. Điểm 6 nhận chiều hằng số khai theo task (quyết định PO 5/11/2026, phát hiện 1 của [export-v21.md](../../g0/export-v21.md))
+  - [x] 4.1. `configs/data/export_checklist.yaml` khai `[0, 7, 28, 29, 30]` cho task khay; `load_task_constants` và điểm 6 đọc file; test với dataset giả
+  - [ ] 4.2. Chạy lại trên release planner-5 và psi-data ở `rtx3060`, ghi `export-v21.md`
 
 ## Giao diện
 
@@ -48,6 +51,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `packages/flywheel-data/tests/unit/export/`
 - `packages/flywheel-psi0/tests/contract/test_loader_roundtrip.py`
 - `docs/g0/export-v21.md`
+- `configs/data/export_checklist.yaml` (thêm 5/11/2026 cho nhiệm vụ 4: chiều hằng số khai theo task)
 
 ## Ghi chú cho người làm
 
@@ -72,6 +76,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 5/11/2026 | Thêm nhiệm vụ 4 theo quyết định PO "khai theo task": điểm 6 nhận chiều hằng số khai cho task trong `configs/data/export_checklist.yaml`; thêm file đó vào phạm vi | PO (Hiếu), Claude |
 | 3/11/2026 | Tạo file story theo 07 bản 1.6 và plan chia lại việc (Q2): checklist v2.1 điểm 1–6 phía làn, điểm 7 bằng loader Ψ₀; bộ export dùng lại của DA-33 | PO (Hiếu) |
 
 ## Ghi chép khi làm

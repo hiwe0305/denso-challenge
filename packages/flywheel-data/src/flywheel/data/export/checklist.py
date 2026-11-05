@@ -26,6 +26,8 @@ fails when its value is above its threshold, and carries the D-code of design 10
        stats.release          D4  largest |shipped - recomputed| of mean, std, min, max
        stats.constant         D4  constant action dims (Psi0 passes them through raw) that
                                   are neither masked nor declared `constant` in the layout
+                                  nor for every task of the dataset (`TaskConstants`), plus
+                                  task-declared dims that are not constant (stale)
 
 Point 7 (Psi0's own loader reads a saved batch back) is a contract test in
 `flywheel-psi0`, since the lane never imports `lerobot` or `psi` (03 section 7.3).
@@ -45,10 +47,11 @@ in the finding's detail and does not fail: there is nothing to disagree with.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import struct
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -56,6 +59,7 @@ from typing import Any
 import numpy as np
 import pyarrow.parquet as pq  # type: ignore[import-untyped]
 from flywheel.contracts.artifacts import ActionDimension, ActionLayout, QACheck
+from flywheel.data.config import ConfigError, _exact_keys, _mapping, _parse, _read, _text
 from flywheel.data.ingest.lerobot import (
     CODEBASE_VERSION,
     EpisodeFrames,
@@ -69,6 +73,8 @@ from flywheel.data.ingest.lerobot import (
 from flywheel.data.inject.stats import stats_block
 
 STATS_FILE = "meta/stats_psi0.json"
+# Action dims declared constant per task (point 6; PO decision 5/11/2026).
+TASK_CONSTANTS_YAML = Path("configs/data/export_checklist.yaml")
 STATS = ("mean", "std", "min", "max")
 STAT_FEATURES = ("states", "action")
 # Half a control period (design 6.4 point 3).
@@ -91,6 +97,40 @@ CODECS = {
 
 
 @dataclass(frozen=True)
+class TaskConstants:
+    """Action dims declared constant per task UID, from `TASK_CONSTANTS_YAML` (point 6).
+
+    `version` is the file's version@<first 12 hex of the sha256 of its bytes>, as the
+    QA configs of the lane carry it; `dims` maps a task UID to its declared dim indices.
+    """
+
+    version: str
+    dims: Mapping[str, tuple[int, ...]]
+
+
+def load_task_constants(path: Path, layout: ActionLayout) -> TaskConstants:
+    """The per-task constant dims at path; a missing key, or an index whose name is not
+    the layout's, raises ConfigError."""
+    raw = _read(path)
+    data = _mapping(_parse(raw, path), str(path))
+    _exact_keys(data, ("version", "constant_action_dims"), str(path))
+    version = _text(data["version"], f"{path}: version")
+    names = [d.name for d in layout.dimensions]
+    dims: dict[str, tuple[int, ...]] = {}
+    for task, entries in _mapping(data["constant_action_dims"], "constant_action_dims").items():
+        where = f"constant_action_dims.{task}"
+        for index, name in _mapping(entries, where).items():
+            if isinstance(index, bool) or not isinstance(index, int):
+                raise ConfigError(f"{where}: key {index!r} is not an action dim index")
+            if not 0 <= index < len(names) or names[index] != name:
+                found = names[index] if 0 <= index < len(names) else None
+                raise ConfigError(f"{where}.{index}: {name!r}, the layout has {found!r}")
+        dims[_text(task, where)] = tuple(sorted(entries))
+    digest = hashlib.sha256(raw).hexdigest()[:12]
+    return TaskConstants(f"{version}@{digest}", dims)
+
+
+@dataclass(frozen=True)
 class ChecklistFinding:
     """One checklist check as run: the contract's QACheck, its point, D-code and detail."""
 
@@ -100,12 +140,19 @@ class ChecklistFinding:
     detail: str
 
 
-def check_lerobot_v21(root: Path, layout: ActionLayout) -> list[QACheck]:
-    """Points 1-6 of the design 6.4 checklist on the LeRobot v2.1 dataset at root."""
-    return [finding.check for finding in run_checklist(root, layout)]
+def check_lerobot_v21(
+    root: Path, layout: ActionLayout, constants: TaskConstants | None = None
+) -> list[QACheck]:
+    """Points 1-6 of the design 6.4 checklist on the LeRobot v2.1 dataset at root.
+
+    Without `constants` no dim is declared for a task, the strict reading of point 6.
+    """
+    return [finding.check for finding in run_checklist(root, layout, constants)]
 
 
-def run_checklist(root: Path, layout: ActionLayout) -> list[ChecklistFinding]:
+def run_checklist(
+    root: Path, layout: ActionLayout, constants: TaskConstants | None = None
+) -> list[ChecklistFinding]:
     """The checks of `check_lerobot_v21`, each with its point, D-code and what it found."""
     info_path = root / "meta" / "info.json"
     info: dict[str, Any] = json.loads(info_path.read_text())
@@ -122,7 +169,7 @@ def run_checklist(root: Path, layout: ActionLayout) -> list[ChecklistFinding]:
     findings.append(_timestamp_check(info, episodes))
     findings += _video_checks(root, info, episodes)
     findings.append(_task_check(root, info, rows))
-    findings += _stats_checks(root, layout, episodes)
+    findings += _stats_checks(root, layout, episodes, _task_uids(rows), constants)
     return findings
 
 
@@ -371,8 +418,27 @@ def _task_check(root: Path, info: dict[str, Any], rows: list[dict[str, Any]]) ->
                     + (f" (first {missing[0]})" if missing else ""))
 
 
+def _task_uids(rows: list[dict[str, Any]]) -> list[str | None]:
+    """The task UID of each episode, `environment_config.uid` in meta/episodes.jsonl."""
+    uids: list[str | None] = []
+    for row in rows:
+        config = row.get("environment_config")
+        if isinstance(config, str):
+            try:
+                config = json.loads(config)
+            except json.JSONDecodeError:
+                config = None
+        uid = config.get("uid") if isinstance(config, dict) else None
+        uids.append(uid if isinstance(uid, str) and uid else None)
+    return uids
+
+
 def _stats_checks(
-    root: Path, layout: ActionLayout, episodes: list[EpisodeFrames]
+    root: Path,
+    layout: ActionLayout,
+    episodes: list[EpisodeFrames],
+    tasks: list[str | None],
+    constants: TaskConstants | None,
 ) -> list[ChecklistFinding]:
     path = root / STATS_FILE
     if not path.is_file():
@@ -421,7 +487,8 @@ def _stats_checks(
     findings.append(_finding(6, "D4", "stats.release", value, STATS_TOLERANCE,
                              f"largest |shipped - recomputed| {worst:g} at {at}"))
     action_stats = None if arrays["action"] is None else stats_block(arrays["action"])
-    findings.append(_constant_check(shipped.get("action"), action_stats, layout.dimensions))
+    findings.append(_constant_check(shipped.get("action"), action_stats, layout.dimensions,
+                                    tasks, constants))
     return findings
 
 
@@ -442,23 +509,50 @@ def constant_dims(block: Any) -> list[int]:
 
 
 def _constant_check(
-    block: Any, recomputed: dict[str, list[float]] | None, dims: Sequence[ActionDimension]
+    block: Any,
+    recomputed: dict[str, list[float]] | None,
+    dims: Sequence[ActionDimension],
+    tasks: list[str | None],
+    constants: TaskConstants | None,
 ) -> ChecklistFinding:
-    """D4: a constant dim that the layout neither masks nor declares `constant` fails.
+    """D4: a constant dim that the layout neither masks nor declares `constant`, and that
+    `constants` does not declare for every task of the dataset, fails.
 
-    Constant dims come from the shipped stats, cross-checked against the recompute; a
-    difference between the two is named here and fails `stats.release` as well.
+    A dim `constants` declares for every task but the data does not hold constant fails
+    too (stale): the declaration then says something about the data that is not true.
+    A dim declared for some of the tasks only is no declaration for the dataset, whose
+    stats are computed over all of them. Constant dims come from the shipped stats,
+    cross-checked against the recompute; a difference between the two is named here and
+    fails `stats.release` as well.
     """
     constant = constant_dims(block)
     if constant and max(constant) >= len(dims):
         return _finding(6, "D4", "stats.constant", len(constant), 0,
                         "action stats wider than the layout")
-    errors = [i for i in constant if not _constant_allowed(dims[i])]
+    by_task = _declared_for_every_task(tasks, constants)
+    errors = [i for i in constant if not (_constant_allowed(dims[i]) or i in by_task)]
     declared = [i for i in constant if i not in errors]
+    stale = [i for i in by_task if i not in constant]
     detail = f"constant action dims {constant}; masked or declared {declared}; errors {errors}"
+    if constants is not None:
+        present = sorted({t or "<no uid>" for t in tasks})
+        detail += f"; {constants.version} declares {by_task} for tasks {present}"
+    if stale:
+        detail += f"; stale {stale} (declared for the task, not constant in the data)"
     if recomputed is not None and constant_dims(recomputed) != constant:
         detail += f"; the recompute finds {constant_dims(recomputed)}"
-    return _finding(6, "D4", "stats.constant", len(errors), 0, detail)
+    return _finding(6, "D4", "stats.constant", len(errors) + len(stale), 0, detail)
+
+
+def _declared_for_every_task(
+    tasks: list[str | None], constants: TaskConstants | None
+) -> list[int]:
+    """Dims `constants` declares for every episode's task; none when an episode has no
+    task UID or the dataset has no episode."""
+    if constants is None or not tasks or None in tasks:
+        return []
+    sets = [set(constants.dims.get(t, ())) for t in set(tasks) if t is not None]
+    return sorted(set.intersection(*sets))
 
 
 def _constant_allowed(dim: ActionDimension) -> bool:
