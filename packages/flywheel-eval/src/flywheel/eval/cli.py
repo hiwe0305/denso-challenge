@@ -281,7 +281,7 @@ def _print_score(score: EpisodeScore) -> None:
     typer.echo(f"episode: {score.episode_id}; task: {score.task_id} {score.scorer_version}")
     typer.echo(f"config_sha256: {score.config_sha256}")
     for index, step in enumerate(score.steps):
-        reason = f"  {step.reason}" if step.reason else ""
+        reason = f"  {step.detail or step.reason}" if step.reason else ""
         typer.echo(f"{index:>2} {step.name:<16} {STATUS_NAMES[step.status]:<10}{reason}")
     verdict = {True: "đạt", False: "trượt", None: "chưa rõ"}[score.success]
     typer.echo(f"thành công theo scorer: {verdict}")
@@ -296,8 +296,8 @@ def _print_score(score: EpisodeScore) -> None:
     if score.balance.violated:
         balance = score.balance
         # The row of the trace, not a step of the task: turning one into the
-        # other needs the per-step times `StageEvaluation` does not carry
-        # (review of #58, point 6).
+        # other needs per-step times, which no task reports yet (review of
+        # #58, point 6).
         typer.echo(
             f"thăng bằng: vi phạm ở dòng trace {balance.row}, {balance.signal}="
             f"{balance.value} (giới hạn {balance.limit})"

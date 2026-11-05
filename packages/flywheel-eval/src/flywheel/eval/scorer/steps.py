@@ -18,7 +18,17 @@ step's state is, and it is the only place the two conventions of spec section
   step's missing signals and no others - a step is never told it is unknown
   because of a signal it does not use. Which signals are a step's own is
   `StageSpec.signals` (#101); a stage that leaves it `None` has not said, and
-  is refused rather than scored as a step that needs nothing.
+  is refused rather than scored as a step that needs nothing. A signal whose
+  column is there but holds nothing except null is no signal either: the
+  predicates read it as "never happened", which would turn the step into a
+  failure nobody measured, so it is unknown as well (`signal_all_null`).
+
+Each unknown carries a typed `UnknownReason` (#101): `step_not_in_trace` for a
+trace with no rows at all, `missing_signal` and `signal_all_null` for a step
+whose own signals are absent or empty, and otherwise whatever the task gave,
+`no_verdict` if it gave nothing. A step judged `pass` or `fail` keeps the enter
+and exit times the task reported for it; an unknown or unattempted step keeps
+none, since a time measured on signals that were not there is not a time.
 
 What the task said about each step is read from `StageEvaluation.stage_status`
 when the task sends it, and recovered from `stage_success` when it does not.
@@ -38,22 +48,28 @@ the tray task has seven, or which signal any step is judged on.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 from flywheel.contracts import StageEvaluation, StageSpec
-from flywheel.eval.scorer.status import ScorerError, StepScore, StepStatus
+from flywheel.eval.scorer.status import ScorerError, StepScore, StepStatus, UnknownReason
 
 NO_VERDICT = "vị từ của task không kết luận được trên tín hiệu đã ghi"
+EMPTY_TRACE = "trace không có dòng nào"
 
 
 def score_steps(
     evaluation: StageEvaluation,
     stages: Sequence[StageSpec],
     missing_signals: Sequence[str] = (),
+    null_signals: Sequence[str] = (),
+    *,
+    empty: bool = False,
 ) -> tuple[StepScore, ...]:
     """State every step of the task, in the order the task declares them.
 
-    A step whose `StageSpec.signals` the trace does not have comes back unknown
-    however the task's predicate answered for it.
+    A step whose `StageSpec.signals` the trace does not have, or has only as
+    nulls, comes back unknown however the task's predicate answered for it;
+    `empty` says the trace has no rows, which leaves every step unknown.
     """
     outcomes = evaluation.stage_success
     if len(outcomes) != len(stages):
@@ -63,13 +79,22 @@ def score_steps(
     for stage in stages:
         step_signals(stage)  # refused up front, not only when a signal is missing
     failed = first_failed_step(evaluation)
+    reasons = evaluation.unknown_reason or (None,) * len(stages)
+    enters = evaluation.step_enter_s or (None,) * len(stages)
+    exits = evaluation.step_exit_s or (None,) * len(stages)
     return tuple(
         _step(
             stage.name,
             reported,
             index,
             failed,
-            missing_for_step(stage, missing_signals),
+            _Gaps(
+                empty=empty,
+                missing=missing_for_step(stage, missing_signals),
+                null=missing_for_step(stage, null_signals),
+            ),
+            reasons[index],
+            (enters[index], exits[index]),
         )
         for index, (stage, reported) in enumerate(
             zip(stages, task_statuses(evaluation), strict=True)
@@ -89,9 +114,9 @@ def task_statuses(evaluation: StageEvaluation) -> tuple[StepStatus, ...]:
     return tuple(legacy[outcome] for outcome in evaluation.stage_success)
 
 
-def missing_for_step(stage: StageSpec, missing_signals: Sequence[str]) -> tuple[str, ...]:
-    """The signals this step is judged on that the trace does not have."""
-    return tuple(signal for signal in missing_signals if signal in step_signals(stage))
+def missing_for_step(stage: StageSpec, signals: Sequence[str]) -> tuple[str, ...]:
+    """Those of `signals` this step is judged on."""
+    return tuple(signal for signal in signals if signal in step_signals(stage))
 
 
 def step_signals(stage: StageSpec) -> tuple[str, ...]:
@@ -137,11 +162,13 @@ def first_failed_step(evaluation: StageEvaluation) -> int | None:
     return found
 
 
-def unknown_reason(missing_signals: Sequence[str] = ()) -> str:
-    """Why a step is unknown, in the words the engineer reading it needs."""
-    if missing_signals:
-        return "thiếu tín hiệu: " + ", ".join(missing_signals)
-    return NO_VERDICT
+@dataclass(frozen=True)
+class _Gaps:
+    """What the trace lacks for one step."""
+
+    empty: bool
+    missing: tuple[str, ...]
+    null: tuple[str, ...]
 
 
 def _step(
@@ -149,16 +176,31 @@ def _step(
     reported: StepStatus,
     index: int,
     failed: int | None,
-    missing: Sequence[str],
+    gaps: _Gaps,
+    task_reason: UnknownReason | None,
+    times: tuple[float | None, float | None],
 ) -> StepScore:
     if failed is not None and index > failed:
         # Reached after the task had already stopped: not attempted, whatever
         # the predicate chain reported for it.
         return StepScore(name=name, status="not_attempted")
-    if missing:
-        # The predicate may well have answered; it answered about a signal
-        # nobody recorded, which is not a verdict (AC 2, FR21).
-        return StepScore(name=name, status="unknown", reason=unknown_reason(missing))
+    # The predicate may well have answered; it answered about a signal nobody
+    # recorded, which is not a verdict (AC 2, FR21).
+    if gaps.empty:
+        return _unknown(name, "step_not_in_trace", EMPTY_TRACE)
+    if gaps.missing:
+        return _unknown(name, "missing_signal", "thiếu tín hiệu: " + ", ".join(gaps.missing))
+    if gaps.null:
+        return _unknown(name, "signal_all_null", "tín hiệu toàn null: " + ", ".join(gaps.null))
     if reported == "unknown":
-        return StepScore(name=name, status="unknown", reason=NO_VERDICT)
-    return StepScore(name=name, status=reported)
+        reason = task_reason or "no_verdict"
+        return _unknown(name, reason, NO_VERDICT if reason == "no_verdict" else None)
+    if reported == "not_attempted":
+        # After an unknown step the task stopped without a failure; the step
+        # was not judged, so it keeps no time.
+        return StepScore(name=name, status=reported)
+    return StepScore(name=name, status=reported, enter_s=times[0], exit_s=times[1])
+
+
+def _unknown(name: str, reason: UnknownReason, detail: str | None) -> StepScore:
+    return StepScore(name=name, status="unknown", reason=reason, detail=detail)

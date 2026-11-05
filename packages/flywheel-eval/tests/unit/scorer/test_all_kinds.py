@@ -70,7 +70,7 @@ def test_a_task_that_answers_anyway_cannot_make_a_missing_signal_a_verdict(
     scored = score(tmp_path, NaiveTask(verdict=answer), rows)
 
     assert scored.steps[0].status == "unknown"
-    assert scored.steps[0].reason == "thiếu tín hiệu: hand_object_distance"
+    assert scored.steps[0].detail == "thiếu tín hiệu: hand_object_distance"
     assert scored.success is None
     assert scored.failure.failure_kind == "L-UNKNOWN"
     assert scored.failure.first_failed_step is None

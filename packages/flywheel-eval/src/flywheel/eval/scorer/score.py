@@ -46,6 +46,11 @@ class EpisodeScore:
     failure: FailureVerdict
     balance: BalanceVerdict
     missing_signals: tuple[str, ...]
+    null_signals: tuple[str, ...] = ()
+    # One entry per step where the task reported times, `None` where it did
+    # not: the scorer never makes a time up (03 section 4.3).
+    step_enter_s: tuple[float | None, ...] | None = None
+    step_exit_s: tuple[float | None, ...] | None = None
 
     @property
     def success(self) -> bool | None:
@@ -76,7 +81,13 @@ def score_episode(
     _check_config_fits(task, stages, config)
 
     evaluation = _evaluate(trace, task, config)
-    steps = score_steps(evaluation, stages, trace.missing_signals)
+    steps = score_steps(
+        evaluation,
+        stages,
+        trace.missing_signals,
+        trace.null_signals,
+        empty=trace.num_steps == 0,
+    )
     failure = judge_failure(
         evaluation,
         steps,
@@ -86,7 +97,9 @@ def score_episode(
     )
     balance = check_balance(trace.signals, config.balance)
     episode_gaps = tuple(
-        signal for signal in trace.missing_signals if signal in config.episode_signals
+        signal
+        for signal in (*trace.missing_signals, *trace.null_signals)
+        if signal in config.episode_signals
     )
     return EpisodeScore(
         episode_id=trace.episode_id,
@@ -98,7 +111,19 @@ def score_episode(
         failure=apply_episode_signals(apply_balance(failure, balance), episode_gaps),
         balance=balance,
         missing_signals=tuple(trace.missing_signals),
+        null_signals=tuple(trace.null_signals),
+        step_enter_s=_times(evaluation.step_enter_s, steps, "enter_s"),
+        step_exit_s=_times(evaluation.step_exit_s, steps, "exit_s"),
     )
+
+
+def _times(
+    reported: Sequence[float | None] | None, steps: Sequence[StepScore], which: str
+) -> tuple[float | None, ...] | None:
+    """The times the task reported, blanked for steps that were not judged."""
+    if reported is None:
+        return None
+    return tuple(getattr(step, which) for step in steps)
 
 
 def _evaluate(trace: Trace, task: TaskDefinition, config: ScorerConfig) -> StageEvaluation:

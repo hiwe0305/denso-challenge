@@ -9,15 +9,16 @@ field name and no stored line changed shape. `Score` is content-addressed: its
 `scorer_version` included, so a re-score of the same trace under the same
 scorer and config gets the same id and a changed one does not.
 
-Two fields of 03 section 4.3 are not in the model: the time each step was
-entered and left. Nothing in `StageEvaluation` carries them, and a field
-invented in lane code is a field no other lane can read, so they stay in the
-Contract change issue for Long (#59) together with a typed reason for an
-unknown step (AC 1).
+Since #101 (issue #59) the record carries the typed reason of every unknown
+step in `unknown_reason` and the time each step was entered and left in
+`step_enter_s` and `step_exit_s`, the fields DA-36 had kept out of the record
+until the contract held them. Adding them changed the record's shape, so the
+scorer version went from 0.1.0 to 0.2.0 (task 8.4); records already in the
+store keep their version and are not rewritten.
 
 `meta` holds what this run measured and the next reader would otherwise have to
-re-derive: the signals the trace was missing, the reason behind every unknown
-step, and where the balance condition broke. The PO review of 3/11/2026 asks
+re-derive: the signals the trace was missing or had only as nulls, and where
+the balance condition broke. The PO review of 3/11/2026 asks
 for whatever has to survive to be named as a typed field in #62 instead. The
 per-group tracking error and the p99 latencies that 03 section 4.3 also lists
 are measured by the system check of DA-13, not here, and are left out rather
@@ -52,6 +53,9 @@ def build_record(score: EpisodeScore, level: int | None = None) -> Score:
         scorer_version=score.scorer_version,
         success=score.success,
         step_status=[step.status for step in score.steps],
+        unknown_reason=[step.reason for step in score.steps],
+        step_enter_s=_listed(score.step_enter_s),
+        step_exit_s=_listed(score.step_exit_s),
         first_failed_step=score.failure.first_failed_step,
         failure_kind=score.failure.failure_kind,
         failure_class=score.failure.failure_class,
@@ -73,14 +77,17 @@ def write_record(record: Score, store_path: Path) -> Path:
     return path
 
 
+def _listed(values: tuple[float | None, ...] | None) -> list[float | None] | None:
+    return None if values is None else list(values)
+
+
 def _meta(score: EpisodeScore) -> dict[str, Any]:
     meta: dict[str, Any] = {
         "step_names": [step.name for step in score.steps],
         "missing_signals": list(score.missing_signals),
     }
-    unknown = {step.name: step.reason for step in score.unknown_steps if step.reason}
-    if unknown:
-        meta["unknown_steps"] = unknown
+    if score.null_signals:
+        meta["null_signals"] = list(score.null_signals)
     if score.failure.reason is not None:
         meta["no_kind_reason"] = score.failure.reason
     if score.balance.unknown_reason is not None:

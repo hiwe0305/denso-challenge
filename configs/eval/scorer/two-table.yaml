@@ -16,7 +16,7 @@
 # mục 3.2, 3.3), nên dùng file của nó, không sửa file này.
 
 task_id: two-table   # phải trùng `TaskDefinition.task_id` của task được chấm
-scorer_version: 0.1.0  # tăng khi đổi cách chấm; `Score` cũ giữ nguyên (03 mục 4.3)
+scorer_version: 0.2.0  # tăng khi đổi cách chấm; `Score` cũ giữ nguyên (03 mục 4.3)
 
 # Ngưỡng vị từ, truyền nguyên vào `TaskDefinition.evaluate()` qua `ScorerParams`.
 # Scorer không đọc khóa nào trong đây: tên khóa là việc của task.

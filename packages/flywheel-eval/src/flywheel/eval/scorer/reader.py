@@ -49,10 +49,12 @@ class Trace:
     episode_id: str
     signals: pa.Table
     missing_signals: tuple[str, ...]
-    # The bytes this trace was read from. `Score.id` of 03 section 4.3 is
-    # `sc_<hash trace + scorer_version>`, so the hash is recorded now and the
-    # id can be built from the record once `Score` lands (Contract change #59).
+    # The bytes this trace was read from; `Score.id` of 03 section 4.3 is
+    # `sc_<hash trace + scorer_version + ...>`, so it travels with the record.
     trace_sha256: str
+    # Signals the task asked for whose column is there and holds nothing but
+    # null: present by name, absent in fact.
+    null_signals: tuple[str, ...] = ()
 
     @property
     def num_steps(self) -> int:
@@ -71,11 +73,17 @@ def read_trace(path: Path, task: TaskDefinition, episode_id: str | None = None) 
     columns = _columns(rows, path)
     required = tuple(signal.name for signal in task.required_signals())
     missing = tuple(name for name in required if name not in columns)
+    empty = tuple(
+        name
+        for name in required
+        if name in columns and columns[name] and all(value is None for value in columns[name])
+    )
     return Trace(
         episode_id=episode_id or _episode_id(rows) or path.stem,
         signals=pa.table(columns) if columns else pa.table({}),
         missing_signals=missing,
         trace_sha256=hashlib.sha256(data).hexdigest(),
+        null_signals=empty,
     )
 
 

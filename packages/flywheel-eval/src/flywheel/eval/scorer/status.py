@@ -14,8 +14,11 @@ step with no signal behind it as `None` with nothing to say why. Spec section
 5.1 is explicit about both: a step the robot never got to is "chưa thử", not
 "trượt", and a step with no signal is "chưa rõ", not "đạt". `steps.py`
 recovers the fourth state from the first failed step, or reads it from
-`StageEvaluation.stage_status` when the task sends one; the reason behind an
-unknown is carried here.
+`StageEvaluation.stage_status` when the task sends one. The reason behind an
+unknown is carried here as `UnknownReason` of `flywheel.contracts`, the typed
+code `Score.unknown_reason` holds, with the signal names an engineer needs
+beside it as `detail`; and the time each step was entered and left, where the
+task reported one, as `enter_s` and `exit_s`.
 
 The status strings are what goes into `Score.step_status`. The Vietnamese names
 of spec section 5.1 are what the CLI prints; they are a display concern, kept
@@ -27,9 +30,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from flywheel.contracts import StepStatus
+from flywheel.contracts import StepStatus, UnknownReason
 
-__all__ = ["ScorerError", "StepScore", "StepStatus"]
+__all__ = ["ScorerError", "StepScore", "StepStatus", "UnknownReason"]
 
 
 class ScorerError(ValueError):
@@ -38,17 +41,32 @@ class ScorerError(ValueError):
 
 @dataclass(frozen=True)
 class StepScore:
-    """One step's state, and why it is unknown when it is."""
+    """One step's state, why it is unknown when it is, and when it ran."""
 
     name: str
     status: StepStatus
-    # Set on UNKNOWN and only there. An unknown without a reason is the silent
-    # pass FR21 forbids, one indirection further along.
-    reason: str | None = None
+    # Set on `unknown` and only there. An unknown without a reason is the
+    # silent pass FR21 forbids, one indirection further along.
+    reason: UnknownReason | None = None
+    # The words behind the code - which signals were missing or empty - for
+    # the CLI and `meta`; never set without a reason.
+    detail: str | None = None
+    # Seconds into the episode, as the task reported them; only a step that
+    # was judged (`pass` or `fail`) carries a time.
+    enter_s: float | None = None
+    exit_s: float | None = None
 
     def __post_init__(self) -> None:
         if (self.status == "unknown") != (self.reason is not None):
             raise ScorerError(
                 f"bước `{self.name}`: trạng thái `{self.status}` và lý do "
                 f"{self.reason!r} không khớp; chỉ `unknown` mang lý do"
+            )
+        if self.detail is not None and self.reason is None:
+            raise ScorerError(f"bước `{self.name}`: có `detail` mà không có lý do")
+        timed = self.enter_s is not None or self.exit_s is not None
+        if timed and self.status not in ("pass", "fail"):
+            raise ScorerError(
+                f"bước `{self.name}`: trạng thái `{self.status}` không mang thời điểm "
+                "vào hay ra; chỉ bước đã chấm được mới có"
             )
