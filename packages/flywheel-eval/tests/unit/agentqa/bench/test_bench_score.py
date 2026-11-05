@@ -122,3 +122,26 @@ def test_a_clean_report_on_no_unit_counts_as_a_false_alarm() -> None:
     assert (agent.false_alarm.hit, agent.false_alarm.total) == (2, 10)
     assert agent.false_alarm.value == 0.2
     assert ("dataset", "T2") in agent.clean_reports
+
+
+def test_recall_on_the_unmasked_part_leaves_masked_defects_out_of_both_sides() -> None:
+    defects = [
+        _defect("e5", "D6", "corrupted_success_label"),
+        _defect("e6", "D6", "corrupted_success_label"),
+        _defect("e7", "D6", "corrupted_success_label"),
+        _defect("e4", "D5", "duplicate_episode", original_id="e0"),
+    ]
+    injected = _copy(INJECTED, defects, code=[("e5", "D6"), ("e6", "D6"), ("e4", "D5")],
+                     agent=[])
+    clean = _copy(CLEAN, [], code=[("e5", "D6"), ("e0", "D5")], agent=[])
+    code = score_group(GroupResult("data", injected, clean)).layers["code"]
+    # e5 fires on both copies: masked. e6 caught, e7 missed: 1/3 overall, 1/(3 - 1) unmasked.
+    label = code.recall_by_kind["corrupted_success_label"]
+    unmasked = code.recall_unmasked_by_kind["corrupted_success_label"]
+    assert (label.hit, label.total, code.masked_by_kind["corrupted_success_label"]) == (1, 3, 1)
+    assert (unmasked.hit, unmasked.total, unmasked.value) == (1, 2, 0.5)
+    # The duplicate is caught on slot e4 but masked on its source e0: it stays out of the
+    # unmasked part, so 0/0 there rather than 1/0.
+    dup = code.recall_unmasked_by_kind["duplicate_episode"]
+    assert code.recall_by_kind["duplicate_episode"].hit == 1
+    assert (dup.hit, dup.total, dup.value) == (0, 0, None)

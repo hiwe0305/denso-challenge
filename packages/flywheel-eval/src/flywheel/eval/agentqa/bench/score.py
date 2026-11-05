@@ -3,14 +3,18 @@
 Rules of design 27/10/2026 section 9.2 (decided 3/11/2026, issue #34):
 
 - Recall is per defect kind, never pooled: a defect counts as caught when the
-  layer reports its target with the defect's code.
+  layer reports its target with the defect's code. Next to it, recall on the
+  unmasked part: of the defects of the kind that are not masked (below), the
+  share caught, `hit / (total - masked)`.
 - Precision is per code, since a finding carries a code and not a kind: of the
   (target, code) pairs the layer reported on the copy with defects, the share that
   match a defect.
 - False alarm rate is on the clean copy: units (episodes or jobs) with at least
   one report, over all units. A target that names no unit (the agent writes
   `dataset`, or a path outside the copy) is a report too: each such target adds
-  one to the count, the units stay the denominator.
+  one to the count, the units stay the denominator. The rate is an upper bound:
+  the clean copy still holds the real data's own defects, and a report of one
+  of them counts here as false.
 - Time to report: from when the job finished to when the layer's report existed.
 
 Two rules of this scorer, written down because the design leaves them open:
@@ -19,7 +23,8 @@ Two rules of this scorer, written down because the design leaves them open:
   defects, so a (target, code) a layer reports on both copies is about the data
   itself, not about an injected defect: the check would have fired anyway. It is
   listed as natural and left out of precision and recall; a defect whose own
-  (target, code) is natural is counted as masked, never as caught. On psi-data
+  (target, code) is natural is counted as masked, never as caught, and stays in
+  the denominator of recall (the unmasked recall leaves it out). On psi-data
   this matters: DA-17 found 73 of 99 episodes fail their replay, which a QA check
   reports as D6 on both copies.
 - **Duplicates.** A `duplicate_episode` defect writes a copy of episode A over
@@ -67,6 +72,7 @@ class LayerScore:
     layer: Layer
     recall_by_kind: Mapping[str, Rate]
     masked_by_kind: Mapping[str, int]
+    recall_unmasked_by_kind: Mapping[str, Rate]
     precision_by_code: Mapping[str, Rate]
     false_alarm: Rate
     not_a_unit: tuple[str, ...]  # clean-copy targets that name no unit, in `false_alarm`
@@ -142,6 +148,15 @@ def score_layer(group: GroupResult, layer: Layer) -> LayerScore:
     masked_by_kind = {
         kind: sum(1 for i in masked if kind_of(defects[i]) == kind) for kind in kinds
     }
+    # A duplicate caught on one slot and masked on the other stays out, as masked.
+    unmasked = [i for i in range(len(defects)) if i not in masked]
+    recall_unmasked = {
+        kind: Rate(
+            hit=sum(1 for i in unmasked if kind_of(defects[i]) == kind and i in caught),
+            total=sum(1 for i in unmasked if kind_of(defects[i]) == kind),
+        )
+        for kind in kinds
+    }
     labels: dict[tuple[str, str], str] = {}
     for v in verdicts:
         pair = (v.detection.target, v.detection.code)
@@ -163,6 +178,7 @@ def score_layer(group: GroupResult, layer: Layer) -> LayerScore:
         layer=layer,
         recall_by_kind=recall,
         masked_by_kind=masked_by_kind,
+        recall_unmasked_by_kind=recall_unmasked,
         precision_by_code=precision,
         false_alarm=Rate(len(flagged) + len(not_a_unit), len(clean_run.units)),
         not_a_unit=not_a_unit,

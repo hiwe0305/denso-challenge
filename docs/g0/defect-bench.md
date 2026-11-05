@@ -43,11 +43,12 @@ Theo design mục 9.2 (đã chốt 3/11/2026, issue #34):
 | Số đo | Cách tính |
 |---|---|
 | Recall theo loại | Lỗi của loại đó được bắt / số lỗi cấy của loại đó. Bắt = lớp báo đúng target với đúng mã của lỗi. Không gộp các loại cùng mã |
+| Recall trên phần không bị che | Lỗi không bị che được bắt / (số lỗi cấy − số lỗi bị che), đặt cạnh recall theo loại. Lỗi bị che là lỗi tự nhiên (quy tắc 1 dưới); recall theo loại vẫn giữ nó ở mẫu số. Một lỗi `duplicate_episode` bắt được ở chỗ B nhưng bị che ở episode gốc A vẫn tính là bị che, nên nằm ngoài cả tử lẫn mẫu |
 | Precision theo mã | Trong các cặp (target, mã) khác nhau lớp báo trên bản có lỗi, phần khớp một lỗi cấy |
-| Báo nhầm | Trên bản sạch: (số episode hoặc job có ít nhất một báo cáo + số target không gắn đơn vị nào) / tổng số episode hoặc job. Target không gắn đơn vị là target không quy được về episode hay job của bản (agent ghi `dataset`, hay một đường dẫn ngoài bản); mỗi target như thế tính một lần dù báo nhiều mã, và ghi riêng ở dòng "không gắn đơn vị" (`false_alarm_not_a_unit`). Mẫu số vẫn là số đơn vị, để hai lớp so được với nhau; vì thế về lý thuyết tỉ lệ có thể vượt 100% |
+| Báo nhầm | Trên bản sạch: (số episode hoặc job có ít nhất một báo cáo + số target không gắn đơn vị nào) / tổng số episode hoặc job. Target không gắn đơn vị là target không quy được về episode hay job của bản (agent ghi `dataset`, hay một đường dẫn ngoài bản); mỗi target như thế tính một lần dù báo nhiều mã, và ghi riêng ở dòng "không gắn đơn vị" (`false_alarm_not_a_unit`). Mẫu số vẫn là số đơn vị, để hai lớp so được với nhau; vì thế về lý thuyết tỉ lệ có thể vượt 100%. Số này là **cận trên** của tỉ lệ báo nhầm thật: bản sạch vẫn mang lỗi thật của dữ liệu, nên báo đúng một lỗi thật cũng tính là báo nhầm. Trên psi-data, DA-17 đo 73/99 episode phát lại không thành công, nên D6 báo trên bản sạch |
 | Thời gian | Từ lúc job xong (`job_finished_at` trong spec) tới lúc có báo cáo (mtime của `qa/reports.jsonl`, lúc chạy xong bộ phát hiện log, `created_at` muộn nhất của `AgentReport`). Thiếu một trong hai mốc thì ghi "chưa đo" |
 
-Hai quy tắc design để ngỏ, bộ chấm chọn như sau **[Đề xuất]**, cần Hiếu duyệt:
+Hai quy tắc design để ngỏ, bộ chấm chọn như sau. **[Đã chốt]** Hiếu, 5/11/2026 (review #132): giữ cả hai như viết; báo nhầm trên bản sạch ghi là cận trên và thêm recall trên phần không bị che (bảng trên).
 
 1. **Lỗi tự nhiên.** Bản sạch là cùng dữ liệu không có lỗi cấy. Cặp (target, mã) mà một lớp báo trên cả hai bản là chuyện của dữ liệu, không phải của lỗi cấy: phép kiểm vẫn sẽ báo dù không cấy. Cặp đó ghi là lỗi tự nhiên, bỏ khỏi precision và recall; lỗi cấy trùng cặp đó tính là **bị che**, không tính là bắt được. Trên psi-data điều này quan trọng: DA-17 đo 73/99 episode phát lại không thành công, nên kiểm `task_success` (D6) báo ở cả hai bản.
 2. **Trùng episode.** `duplicate_episode` chép episode A đè lên chỗ B; bộ phát hiện trùng có thể chỉ A hoặc B, nên báo A hoặc B với mã D5 đều tính là bắt.
@@ -98,7 +99,18 @@ File spec (đường dẫn tính từ thư mục của spec) không chứa đư�
 }
 ```
 
-Đầu ra trong `--out`: `bench_result.json`, `bench_result.sha256`, `index.html` (tiêu đề và đầu trang ghi "trên lỗi cấy"). Mỗi lần chạy ghi hai dòng `LedgerEntry` (`agent_qa`, `cpu_seconds`) vào sổ của store: dòng ước tính trước khi chạy (giả định 0,05 s mỗi đơn vị × 200 đơn vị mỗi bản), dòng thực đo sau, trỏ về dòng ước tính; chạy hỏng vẫn ghi dòng thực đo với `failed`. Run plan mặc định `g0-DA-31-<yyyymmdd>`.
+Đầu ra trong `--out`: `bench_result.json`, `bench_result.sha256`, `index.html` (tiêu đề và đầu trang ghi "trên lỗi cấy"; bảng báo nhầm ghi "cận trên"). Mỗi lần chạy ghi hai dòng `LedgerEntry` (`agent_qa`, `cpu_seconds`) vào sổ của store: dòng ước tính trước khi chạy (giả định 0,05 s mỗi đơn vị × 200 đơn vị mỗi bản), dòng thực đo sau, trỏ về dòng ước tính; chạy hỏng vẫn ghi dòng thực đo với `failed`. Run plan mặc định `g0-DA-31-<yyyymmdd>`.
+
+Dạng `bench_result.json` đổi từ `bench_version` `da31-1` sang `da31-2` (hotfix 5/11/2026 sau review #132). Mọi khóa cũ giữ nguyên tên và nghĩa, trừ con số báo nhầm (giờ tính cả target không gắn đơn vị); thêm:
+
+| Khóa | Ở đâu | Nghĩa |
+|---|---|---|
+| `false_alarm_on_clean` | Gốc | Chuỗi ghi báo nhầm trên bản sạch là cận trên, và vì sao |
+| `false_alarm_on_clean.bound` | Mỗi lớp | `"upper (cận trên)"`, cạnh `hit`, `total`, `value` |
+| `false_alarm_not_a_unit` | Mỗi lớp | Các target trên bản sạch không gắn đơn vị nào, đã tính trong `false_alarm_on_clean.hit` |
+| `recall_unmasked_by_kind` | Mỗi lớp | `{hit, total, value}` theo loại, trên phần không bị che |
+
+Hash và hai dòng ledger không đổi cách làm: hash là sha256 của đúng chuỗi JSON đã ghi, trang HTML dựng từ JSON đó.
 
 ## 6. Lần chạy 5/11/2026 trên bộ log cấy
 
@@ -113,7 +125,7 @@ Dựng lại bộ log của DA-27 trên laptop (Windows, CPU) bằng `flywheel.d
 | Lỗi tự nhiên | không có (log tổng hợp) |
 | Thời gian tới báo cáo | chưa đo: log tổng hợp không có thời điểm job xong |
 | Thời gian chạy bộ chấm | 0,59 s wall (dòng thực đo của ledger); ước tính 20 s |
-| Hash kết quả | `dd8104cc…ba86dfe9` |
+| Hash kết quả | `dd8104cc…ba86dfe9` (dạng `da31-1`; số của lần này không đổi ở `da31-2`, vì bản sạch không có báo cáo nào và không lỗi nào bị che) |
 
 Kết quả khớp test nối làn của DA-27 (`tests/e2e/test_log_defects_detected.py`): mỗi job cấy ra đúng mã của nó, bản sạch không ra mã nào.
 
@@ -123,5 +135,4 @@ Kết quả khớp test nối làn của DA-27 (`tests/e2e/test_log_defects_dete
 |---|---|---|
 | Chạy trên hai bản sao psi-data | Máy `rtx3060` | Bản sao và đáp án ở `rtx3060:~/denso-da27/fwdata/inject/` (bàn giao của DA-27). Cần `fw data ingest` rồi `fw data qa` trên mỗi bản (mỗi lượt gắn đúng một bản), rồi chạy lệnh ở mục 5. Laptop không vào được máy này |
 | Cột agent thật | DA-20 (Hưng) | Bộ chấm đã nhận `AgentReport` và `AgentReview`; chỉ cần thay báo cáo đứng tạm bằng báo cáo thật |
-| Hai quy tắc ở mục 2 | Hiếu duyệt | Lỗi tự nhiên và trùng episode |
 | Chấm riêng giải thích và đề xuất | Đổi hợp đồng `FindingDecision` nếu cần | Mục 3 |

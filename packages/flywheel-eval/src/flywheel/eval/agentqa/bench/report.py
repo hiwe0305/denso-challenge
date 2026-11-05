@@ -30,6 +30,11 @@ RESULT = "bench_result.json"
 RESULT_LOCK = "bench_result.sha256"
 PAGE = "index.html"
 LABEL = "on injected defects (trên lỗi cấy)"
+BOUND = "upper (cận trên)"
+FALSE_ALARM_NOTE = (
+    "upper bound (cận trên): the clean copy still holds the real data's own defects,"
+    " and a report of one of them counts as a false alarm"
+)
 
 
 @dataclass(frozen=True)
@@ -50,6 +55,7 @@ def bench_result(
     return {
         "bench_version": BENCH_VERSION,
         "measured_on": "injected defects (DA-27), not natural defects",
+        "false_alarm_on_clean": FALSE_ALARM_NOTE,
         "created_at": created_at.isoformat(),
         "manifest_sha256": dict(sorted(manifest_sha256.items())),
         "inputs": dict(inputs),
@@ -98,8 +104,9 @@ def _group_json(report: GroupReport) -> dict[str, Any]:
         layers[layer] = {
             "recall_by_kind": {k: _rate(r) for k, r in s.recall_by_kind.items()},
             "masked_by_kind": dict(s.masked_by_kind),
+            "recall_unmasked_by_kind": {k: _rate(r) for k, r in s.recall_unmasked_by_kind.items()},
             "precision_by_code": {c: _rate(r) for c, r in s.precision_by_code.items()},
-            "false_alarm_on_clean": _rate(s.false_alarm),
+            "false_alarm_on_clean": {**_rate(s.false_alarm), "bound": BOUND},
             "false_alarm_not_a_unit": list(s.not_a_unit),
             "clean_reports": [list(p) for p in s.clean_reports],
             "natural": [list(p) for p in s.natural],
@@ -154,10 +161,14 @@ def _group_html(group: Mapping[str, Any]) -> str:
     def masked(kind: str) -> str:
         return f"{code['masked_by_kind'].get(kind, 0)} / {agent['masked_by_kind'].get(kind, 0)}"
 
+    def unmasked(layer: Mapping[str, Any], kind: str) -> str:
+        return _shown(layer["recall_unmasked_by_kind"].get(kind))
+
     split_rows = [
         [r["kind"], r["code"], r["injected"], _frac(r["by_code"], r["injected"]),
-         _frac(r["agent_adds"], r["injected"]), _frac(r["together"], r["injected"]),
-         _frac(r["agent_alone"], r["injected"]), masked(r["kind"])]
+         unmasked(code, r["kind"]), _frac(r["agent_adds"], r["injected"]),
+         _frac(r["together"], r["injected"]), _frac(r["agent_alone"], r["injected"]),
+         unmasked(agent, r["kind"]), masked(r["kind"])]
         for r in group["split"]
     ]
     codes = sorted(set(code["precision_by_code"]) | set(agent["precision_by_code"]))
@@ -198,13 +209,17 @@ def _group_html(group: Mapping[str, Any]) -> str:
     return "".join([
         f"<h2>{_e(title)}</h2>",
         _table("Recall per kind: what code catches, what the agent adds",
-               ["kind", "code", "injected", "by code", "agent adds", "together", "agent alone",
-                "masked code / agent"], split_rows),
+               ["kind", "code", "injected", "by code", "by code, unmasked", "agent adds",
+                "together", "agent alone", "agent alone, unmasked", "masked code / agent"],
+               split_rows),
+        "<p class=none>unmasked = hit / (injected - masked): the defects whose own"
+        " (target, code) also fires on the clean copy are left out of both sides.</p>",
         _table("Precision per code (natural findings left out)",
                ["code", "code checks", "Agent QA/QC"], precision_rows),
-        _table("False alarms on the clean copy ((units reported + targets that name no unit)"
-               " / units)",
+        _table("False alarms on the clean copy, upper bound (cận trên):"
+               " (units reported + targets that name no unit) / units",
                ["layer", "rate", "not a unit (không gắn đơn vị)", "reports"], alarm_rows),
+        f"<p class=none>{_e(FALSE_ALARM_NOTE[0].upper() + FALSE_ALARM_NOTE[1:])}.</p>",
         _table("Time from job end to report", ["layer", "copy", "time"], time_rows),
         f"<h3>Agent QA/QC: ranking {_e(_shown(quality['ranking']))}"
         " (true finding ranked above false, pairs within a report)</h3>",
