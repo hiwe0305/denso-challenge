@@ -86,3 +86,9 @@ def joint_order(qpos_names: Sequence[str], state_names: Sequence[str]) -> list[i
     if missing:
         raise KeyError(f"sim joints lack {missing}; it has {list(qpos_names)}")
     return [position[n] for n in state_names[:JOINTS]]
+
+
+def base_yaw(quat_wxyz: Sequence[float] | NDArray[np.floating[Any]]) -> float:
+    """Yaw about world z of a MuJoCo `xquat` (w, x, y, z), in rad."""
+    w, x, y, z = (float(v) for v in np.asarray(quat_wxyz, dtype=np.float64)[:4])
+    return float(np.arctan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z)))
