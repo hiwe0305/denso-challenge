@@ -73,7 +73,7 @@ Giá trị không hữu hạn (NaN, ±inf) ghi theo tên của hợp đồng (`"
 - Agent của SIMPLE chỉ gửi ảnh tới server khi hàng đợi action rỗng, tức mỗi chunk một lần. Phần lớn dòng vì vậy có `t_image = null`.
 - `cmd_*` là action của Ψ₀, không phải `target_q` sau WBC. Khoảng cách giữa `cmd_upper` và `meas_upper` gồm cả sai số bám của bộ điều khiển.
 - Client RTC của DA-19 không nằm trên đường eval này, nên job thường không có `rtc.jsonl`, và R1, R2 bị bỏ qua.
-- Trace chỉ có tín hiệu điều khiển. Tín hiệu task mà scorer hai bàn cần (khoảng cách tay–vật, tiếp xúc, chiều cao vật, vùng đích, va chạm, thăng bằng thân; xem `configs/eval/scorer/two-table.yaml`) không có trong `TraceStep`. Hook không ghi các tín hiệu này, và master chưa có `TaskDefinition` của task hai bàn, nên `fw eval score` chưa chạy được trên trace này. Ai làm phần này đang chờ PO quyết (story DA-38, ghi chép nhiệm vụ 5).
+- Trace chỉ có tín hiệu điều khiển. Tín hiệu task mà scorer hai bàn cần (khoảng cách tay–vật, tiếp xúc, chiều cao vật, vùng đích, va chạm, thăng bằng thân; xem `configs/eval/scorer/two-table.yaml`) không có trong `TraceStep`. Hook không ghi các tín hiệu này. `fw eval score` đọc một artifact khác (trace tín hiệu task, dòng V7 của 03 mục 4.2), nên không nhận `steps.jsonl` làm đầu vào. `TaskDefinition` hai bàn và tín hiệu của nó thuộc story 3.4 **[Đã chốt 5/11/2026, Hiếu]**; bảng tín hiệu thiếu ở story DA-38, ghi chép nhiệm vụ 5.
 - Chạy nhiều job SIMPLE cùng lúc trên một máy có thể dùng chung domain 0 của CycloneDDS (story DA-38, ghi chép 3.1/3.2).
 - Mỗi episode khay mất khoảng 10 phút, phần lớn do SIMPLE giải mã mọi khung video của episode điều kiện.
 - Hook ghi tệp lúc episode kết thúc. Job bị giết giữa episode thì episode đó không để lại thư mục nào.
@@ -93,5 +93,6 @@ Số đo của một lần chạy; chi tiết ở story DA-38, ghi chép nhiệm
 | Kênh có phương sai khác 0 | 28/28 thân trên, 7/7 thân dưới |
 | `sim_success` | False, False; khớp `eval_stats.txt` của SIMPLE |
 | Thời gian client | 147 s cho 2 episode, 1 worker |
+| `fw eval score` | `steps.jsonl`: không đọc được (khác artifact). Tệp V7 tạm chỉ có `t`: đọc được, cả 6 bước "chưa rõ" |
 | `fw eval diag-system` | Đọc được, mã 0; LỖI CONTROLLER (R3 thân trên 2,57 và 2,65; thân dưới 1,75 và 0,82; ngưỡng giả định); R1, R2 bỏ qua |
 
