@@ -1,9 +1,10 @@
 # Checklist LeRobot v2.1 cho Ψ₀ trên khay S1 và psi-data
 
-_Ngày 4/11/2026. Story [DA-02](../product/stories/DA-02-export-lerobot-v21.md) nhiệm vụ 3. Checklist là 7 điểm của [design 27/10](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 6.4: điểm 1–6 do `flywheel.data.export.checklist` chạy trong làn, điểm 7 do contract test `packages/flywheel-psi0/tests/contract/test_loader_roundtrip.py` chạy trong image Ψ₀. Code ở bản cuối của PR #91 (nhánh `DA-02-export-checklist`, rebase lên master `7d73f1e`, đã có PR #89), chạy trên máy `rtx3060`. Dữ liệu, batch mẫu và script chạy nằm ở `rtx3060:~/denso-da02/` và không commit._
+_Ngày 4/11/2026. Story [DA-02](../product/stories/DA-02-export-lerobot-v21.md) nhiệm vụ 3. Checklist là 7 điểm của [design 27/10](../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 6.4: điểm 1–6 do `flywheel.data.export.checklist` chạy trong làn, điểm 7 do contract test `packages/flywheel-psi0/tests/contract/test_loader_roundtrip.py` chạy trong image Ψ₀. Code ở bản cuối của PR #91 (nhánh `DA-02-export-checklist`, rebase lên master `7d73f1e`, đã có PR #89), chạy trên máy `rtx3060`. Dữ liệu, batch mẫu và script chạy nằm ở `rtx3060:~/denso-da02/` và không commit. Lần chạy lại ngày 5/11/2026 trên release planner-5, sau quyết định "khai theo task", ở mục 5._
 
 ## Kết luận
 
+- **Từ 5/11/2026 (mục 5): release khay planner-5 qua 17/18, psi-data vẫn 17/18; cả hai chỉ trượt `index`.** Điểm 6 nhận 5 chiều `[0, 7, 28, 29, 30]` của khay vì `configs/data/export_checklist.yaml` khai chúng cho task khay. Các ý dưới đây là lần chạy 4/11/2026 trên release 102 episode.
 - **psi-data qua 17/18 phép kiểm của điểm 1–6; khay S1 qua 16/18.**
   - `index` (điểm 2) trượt ở cả hai. Lỗi này đã biết: tác giả bắt đầu cột `index` của episode i ở 2 × `dataset_from_index` (Q7 của DA-03). Cả hai dataset cùng đi qua `postprocess_psi0_sonic.py` của SIMPLE.
   - `stats.constant` (điểm 6, D4) trượt ở khay S1, trên 5 chiều `[0, 7, 28, 29, 30]` (`left_hand_thumb_0`, `right_hand_thumb_0`, ba khớp eo). Đây là phát hiện, không điều chỉnh để khay S1 qua (phát hiện 1).
@@ -17,7 +18,7 @@ Việc phát sinh, Hiếu quyết:
 
 | # | Phát hiện | Ảnh hưởng | Đề xuất |
 |---|---|---|---|
-| 1 | Khay S1 có 5 chiều action hằng số mà layout không khai: `[0, 7, 28, 29, 30]` (`left_hand_thumb_0_joint`, `right_hand_thumb_0_joint`, `waist_roll/pitch/yaw_joint`). Ở psi-data, các chiều này có biến thiên | Khay S1 trượt điểm 6 (D4, chặn export). Hoặc planner và IK `upper_body` của DA-33 không bao giờ động tới các khớp này, hoặc đó là ý đồ của planner. Nếu là ý đồ, model fine-tune trên khay sẽ học các chiều này là hằng. DA-33 đang soát action tay của chính release này ([wrist-jump.md](tray/wrist-jump.md), commit `7d73f1e`), cùng đường planner → IK → `action` | DA-33 trả lời các chiều này có thật sự hằng không. Hiếu quyết: khai `constant` cho dữ liệu khay, hoặc sửa planner |
+| 1 | **[Đã chốt]** Hiếu chọn "khai theo task" ngày 5/11/2026 (mục 5). Khay S1 có 5 chiều action hằng số mà layout không khai: `[0, 7, 28, 29, 30]` (`left_hand_thumb_0_joint`, `right_hand_thumb_0_joint`, `waist_roll/pitch/yaw_joint`). Ở psi-data, các chiều này có biến thiên | Khay S1 trượt điểm 6 (D4, chặn export). Hoặc planner và IK `upper_body` của DA-33 không bao giờ động tới các khớp này, hoặc đó là ý đồ của planner. Nếu là ý đồ, model fine-tune trên khay sẽ học các chiều này là hằng. DA-33 đang soát action tay của chính release này ([wrist-jump.md](tray/wrist-jump.md), commit `7d73f1e`), cùng đường planner → IK → `action` | Đã làm: các chiều này hằng 0 theo thiết kế (D-13 giữ `thumb_0` ở 0, D-12 khóa eo trong IK của planner; [decisions.md](tray/decisions.md)). Khai riêng cho task `g1_wholebody_tray_transfer_teleop` trong `configs/data/export_checklist.yaml`, không khai `constant` trong `g1.yaml` vì psi-data có biến thiên ở các chiều này. Không đổi hợp đồng |
 | 2 | D4 trên `states` ở [data-pipeline.md](data-pipeline.md) phát hiện 2 và ở `test_source_stats.py` của DA-27 là dương tính giả do float32 (mục 4) | `dataset_checks` của DA-03 đánh `flag` cho `stats.json` của cả hai nguồn, dù stats đúng | **[Đề xuất]** DA-03 so trong cả float32 và float64 như `checklist.PRECISIONS`; DA-27 sửa lời giải thích "lấy trước khi downsample" |
 | 3 | Loader Ψ₀ đòi timestamp khớp trong 1e-4 s (`tolerance_s` của lerobot, dùng ở `check_timestamps_sync` và khi giải mã video). Design 6.4 điểm 3 chỉ đòi nửa chu kỳ (10 ms ở 50 Hz) | Dataset lệch từ 0,1 ms đến 10 ms qua điểm 3 nhưng loader Ψ₀ từ chối. Hai dataset hiện có lệch 2e-13 chu kỳ, không bị ảnh hưởng | **[Đề xuất]** Siết điểm 3 xuống 1e-4 s; việc này cần sửa design |
 | 4 | Cả hai `info.json` không khai tên từng chiều action (`shape [-1]`, không có `names`) và để trống `video_info`. Khay S1 có `meta/action_layout.json`; psi-data chỉ có nhóm trong `modality.json` | Điểm 1 kiểm được tên của khay S1, không kiểm được tên của psi-data. Điểm 4 không có codec khai báo để so | Ghi nhận. Checklist báo "không khai" ở chi tiết, không đánh trượt |
@@ -27,7 +28,8 @@ Việc phát sinh, Hiếu quyết:
 | Dataset | Đường dẫn trên `rtx3060` | Kiểm danh tính |
 |---|---|---|
 | Khay S1 (DA-33) | `~/denso-da33/fwdata/releases/tray_s1_0d84cc87b1e5` | 217/217 file khớp sha256 trong `release_manifest.json` |
-| psi-data `e78fb93`, task hai bàn | `~/denso-da03-smoke/fwdata/psi-data/G1WholebodyLocomotionPickBetweenTablesTeleop-v0` | 207/207 file khớp CRC32 trong zip `simple/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` (sha256 `6cdf9022…927586`, [psi-data.md](psi-data.md) mục 1), không thừa file |
+| Khay planner-5 (DA-34, 5/11/2026) | `~/denso-da34-pool/fwdata/releases/tray_s1_f9433b028c52` | 541 episode, 769.340 khung; không kiểm lại sha256 |
+| psi-data `e78fb93`, task hai bàn | `~/denso-da03-smoke/fwdata/psi-data/G1WholebodyLocomotionPickBetweenTablesTeleop-v0` (đã xóa; lần chạy 5/11 dùng bản `e78fb93` ở `~/denso-da27/fwdata/psi-data/e78fb93/`, cùng 99 episode, 62.764 khung) | 207/207 file khớp CRC32 trong zip `simple/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip` (sha256 `6cdf9022…927586`, [psi-data.md](psi-data.md) mục 1), không thừa file |
 
 Ở cả hai dataset, `meta/stats.json` và `meta/stats_psi0.json` giống hệt nhau.
 
@@ -147,3 +149,31 @@ Dung sai của `stats.release` là 1e-5 (`STATS_TOLERANCE` trong `checklist.py`)
 - 1e-5 nằm giữa hai mức, cách mỗi mức hai bậc độ lớn.
 
 Hàm `check_lerobot_v21(root, layout)` không nhận config, nên dung sai là hằng số trong module. **[Đề xuất]** Nếu cần đưa dung sai vào config, thêm một khóa vào `qa.yaml` qua PR của DA-03.
+
+## 5. Release planner-5 và chiều hằng số khai theo task (5/11/2026)
+
+Release `tray_s1_f9433b028c52` là dữ liệu DA-34 đang fine-tune nhánh C: 541 episode, 769.340 khung, sinh bằng planner-5. Stats của release tính trên chính tập train đó, nên Ψ₀ tự giữ nguyên các chiều hằng số khi train; việc huấn luyện không bị ảnh hưởng. Chỉ checklist đánh trượt.
+
+**[Đã chốt]** Hiếu chọn phương án "khai theo task" ngày 5/11/2026 cho phát hiện 1:
+- `configs/data/export_checklist.yaml` (mới, `version: checklist-1`) khai chiều hằng số theo UID của task. Task khay `g1_wholebody_tray_transfer_teleop` khai `0: left_hand_thumb_0_joint`, `7: right_hand_thumb_0_joint`, `28–30: waist_roll/pitch/yaw_joint`. Bộ nạp `load_task_constants` từ chối file nếu tên khác tên trong layout ở cùng chỉ số, để layout đổi thứ tự không làm lệch khai báo sang khớp khác.
+- Task của dataset là `environment_config.uid` của từng dòng `meta/episodes.jsonl`. Điểm 6 cho qua một chiều hằng số khi layout mask nó, `g1.yaml` khai `constant`, hoặc file trên khai nó cho **mọi** task có trong dataset. Stats tính trên mọi episode, nên một task không khai (hoặc episode không có UID) thì chiều đó coi như không khai.
+- Chiều khai cho mọi task của dataset mà dữ liệu không hằng thì **trượt** (khai báo cũ, cộng vào `value` của `stats.constant`). Lý do: khai báo nói một điều về dữ liệu mà dữ liệu không còn đúng, ví dụ IK của planner lại cho eo chuyển động thì D-12 không còn giữ. Dataset vẫn dùng được để train, nhưng sửa file config chỉ mất một dòng, còn để khai báo sai thì lần sau một chiều hằng thật có thể qua mà không ai xem lại.
+- Không truyền `constants` thì điểm 6 giữ như cũ (chặt nhất). Không đổi hợp đồng `flywheel.contracts`.
+
+Chạy trên `rtx3060`, chỉ CPU, một tiến trình (`systemd-run --user --scope -p MemoryMax=4G`), python của `~/denso-da34-pool/.venv`. Code ở nhánh `DA-02-constant-per-task`, chép vào `~/denso-da02-p5-fix/`. Script `run_checklist.py` như mục 2, thêm `load_task_constants(TASK_CONSTANTS_YAML, layout)` và truyền vào `run_checklist`. Lần trước sửa chạy code của master `383bc86` ở `~/denso-da02-p5/`.
+
+| Phép kiểm | Khay planner-5, trước sửa (master `383bc86`) | Khay planner-5, sau sửa | psi-data, sau sửa |
+|---|---|---|---|
+| `v21.2.index.index` | **FAIL** 749.717 / 769.340 dòng | **FAIL** 749.717 | **FAIL** 60.023 / 62.764 |
+| `v21.6.stats.release` | pass 6,0e-7 | pass 6,0e-7 | pass 1,2e-7 |
+| `v21.6.stats.constant` | **FAIL** 5: chiều hằng `[0, 7, 28, 29, 30, 31]`, lỗi `[0, 7, 28, 29, 30]` | pass 0: `checklist-1@de34c8b2e0f7` khai `[0, 7, 28, 29, 30]` cho task khay, lỗi `[]` | pass 0: chiều hằng `[31]`, file khai `[]` cho task hai bàn |
+| Tổng điểm 1–6 | 16/18 | **17/18** | 17/18 (như 4/11) |
+
+Mọi phép kiểm khác qua ở cả ba lần chạy. min và max của 5 chiều trong `stats_psi0.json` của release đều đúng 0. Khay mất 50 s (máy chung, tải ~33), psi-data 2,5 s, RSS đỉnh 1.079 MB.
+
+## Change log
+
+| Ngày | Nội dung | Người |
+|---|---|---|
+| 5/11/2026 | Thêm mục 5: release planner-5 (541 episode, 769.340 khung) trước sửa 16/18, sau sửa 17/18; phát hiện 1 đã chốt "khai theo task"; psi-data chạy lại từ bản `e78fb93` của DA-27 | Hiếu, Claude |
+| 4/11/2026 | Tạo file: điểm 1–7 trên khay S1 102 episode và psi-data | Hiếu, Claude |

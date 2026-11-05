@@ -30,9 +30,9 @@ _Phạm vi 3/11/2026 (Q2): bộ export đã có trong adapter (`flywheel-simple/
 - [x] 1. Điểm 1–6 của checklist trong làn (AC 1)
 - [x] 2. Điểm 7: contract test bằng loader Ψ₀ (AC 2)
 - [x] 3. Chạy trên release khay S1 và psi-data, ghi kết quả (AC 3)
-- [ ] 4. Điểm 6 nhận chiều hằng số khai theo task (quyết định PO 5/11/2026, phát hiện 1 của [export-v21.md](../../g0/export-v21.md))
+- [x] 4. Điểm 6 nhận chiều hằng số khai theo task (quyết định PO 5/11/2026, phát hiện 1 của [export-v21.md](../../g0/export-v21.md))
   - [x] 4.1. `configs/data/export_checklist.yaml` khai `[0, 7, 28, 29, 30]` cho task khay; `load_task_constants` và điểm 6 đọc file; test với dataset giả
-  - [ ] 4.2. Chạy lại trên release planner-5 và psi-data ở `rtx3060`, ghi `export-v21.md`
+  - [x] 4.2. Chạy lại trên release planner-5 và psi-data ở `rtx3060`, ghi `export-v21.md`
 
 ## Giao diện
 
@@ -81,8 +81,8 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực: 6 giờ (nhiệm vụ 1: 3,5; 2: 1,5; 3: 1)
+- Giờ thực: 8 giờ (nhiệm vụ 1: 3,5; 2: 1,5; 3: 1; 4: 2)
 - Công cụ AI đã dùng: Claude Code (Opus 5.5)
-- Ghi chú hoàn thành: hai dataset qua điểm 7. Ở điểm 1–6, cả hai trượt `index` (Q7 của DA-03); lỗi này không làm sai batch Ψ₀. Điểm 6 theo phương án A của PO (4/11/2026): chiều hằng số không mask, không khai `constant` thì trượt. PR #89 đã merge: checklist đọc trường `constant`; psi-data qua, khay S1 trượt ở 5 chiều `[0, 7, 28, 29, 30]`, chờ DA-33 trả lời. Còn chờ PO: siết điểm 3 xuống 1e-4 s. Chi tiết ở [export-v21.md](../../g0/export-v21.md).
+- Ghi chú hoàn thành: hai dataset qua điểm 7. Ở điểm 1–6, cả hai trượt `index` (Q7 của DA-03); lỗi này không làm sai batch Ψ₀. Điểm 6 theo phương án A của PO (4/11/2026): chiều hằng số không mask, không khai `constant` thì trượt. PR #89 đã merge: checklist đọc trường `constant`; psi-data qua, khay S1 trượt ở 5 chiều `[0, 7, 28, 29, 30]`, chờ DA-33 trả lời. 5/11/2026, nhiệm vụ 4 (PO chọn "khai theo task"): `configs/data/export_checklist.yaml` khai 5 chiều đó cho task khay; release planner-5 qua 17/18, psi-data giữ 17/18. Còn chờ PO: siết điểm 3 xuống 1e-4 s. Chi tiết ở [export-v21.md](../../g0/export-v21.md).
 - PR: #91 (nhánh `DA-02-export-checklist`, rebase lên master `7d73f1e`)
-- File đã tạo hoặc sửa: `packages/flywheel-data/src/flywheel/data/export/checklist.py`, `packages/flywheel-data/tests/unit/export/{checklist_data.py,test_export_checklist.py}`, `packages/flywheel-psi0/tests/contract/test_loader_roundtrip.py`, `docs/g0/export-v21.md`, file story này
+- File đã tạo hoặc sửa: `packages/flywheel-data/src/flywheel/data/export/checklist.py`, `packages/flywheel-data/tests/unit/export/{checklist_data.py,test_export_checklist.py,test_checklist_task_constants.py}`, `configs/data/export_checklist.yaml`, `packages/flywheel-psi0/tests/contract/test_loader_roundtrip.py`, `docs/g0/export-v21.md`, file story này
