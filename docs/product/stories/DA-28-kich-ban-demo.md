@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt hướng 27/10/2026) |
+| Trạng thái | Đang làm (PO duyệt hướng 27/10/2026) |
 | Người làm | Long |
 | Làn | Vòng quyết định (ghép luồng); dùng lệnh của mọi làn qua `fw` |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 11 · Epic 9 |
@@ -64,10 +64,11 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 | 3/11/2026 | Phụ thuộc: synthetic S1, S2 lấy từ DA-33, DA-35 thay S1-05, DA-29; bỏ DA-16 khỏi demo (07 mục 2.4, bản 1.2) | PO (Hiếu) |
 | 3/11/2026 | Phần 6 chạy trên cả hai task; task khay chạy hết vòng (design 27/10 mục 11, design 28/10 mục 6.6) | PO (Hiếu) |
+| 5/11/2026 | Dựng bản đề xuất kịch bản, manifest bằng chứng và sáu lệnh trình chiếu ngoại tuyến; chờ bàn giao dữ liệu và chạy thử | Nguyễn Thăng Long |
 
 ## Ghi chép khi làm
 
 - Giờ thực:
 - Công cụ AI đã dùng:
-- Ghi chú hoàn thành:
-- File đã tạo hoặc sửa:
+- Ghi chú tiến độ: `docs/demo/README.md` và `scripts/demo/demo.py` dựng phần trình chiếu ngoại tuyến, kiểm vai trò, SHA-256 và nhãn sơ bộ/lỗi cấy; test `scripts/demo/test_demo.py` kiểm bằng dữ liệu giả. Chưa có bundle thật đủ sáu phần, video GPU, kiểm nội dung/số liệu và chạy thử với người khác. Không đánh dấu xong nhiệm vụ 1–4 cho tới khi có bằng chứng nghiệm thu tương ứng.
+- File đã tạo hoặc sửa: `docs/demo/README.md`, `scripts/demo/demo.py`, `scripts/demo/test_demo.py`.
