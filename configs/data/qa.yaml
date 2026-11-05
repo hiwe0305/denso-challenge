@@ -21,7 +21,9 @@ checks:
   # per-frame image time, so the offset is the video frame count against the rows.
   image_state_sync: {code: D2, threshold: 1, on_fail: reject}
   # Spec 4.4 row 3: finite values, joint limits of the action layout (G1 URDF) -> reject.
-  finite_values: {code: D3, threshold: 0, on_fail: reject}
+  # NaN is D1, not D3: design 9.2 maps `nan_values` to D1 (closed 3/11/2026, issue #34),
+  # and the DA-31 scorer matches a finding to an injected defect by that code.
+  finite_values: {code: D1, threshold: 0, on_fail: reject}
   # rad past the limit. The G1 layout rounds URDF limits to 5-6 digits (wrist roll
   # 1.97222); DA-33's planner clips at the URDF value, 1.0e-6 rad further, and
   # psi-data holds -2.2e-16 against limits of 0, so a step under 1e-5 rad is no
