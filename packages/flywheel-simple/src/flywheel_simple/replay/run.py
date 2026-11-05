@@ -31,6 +31,15 @@ With `--trace <file.jsonl>` (DA-17 task 6) the recorder also writes, per
 episode, a row right after `reset` (step -1) and one after every recorded
 action; `trace_row` says what each row holds. Without it nothing else changes.
 
+With `--hold-steps N` (default 0) the replay keeps the last recorded command N
+steps longer before `_success` is read: SIMPLE's agent already pads 10 frames
+past the data with the last row as the WBC goal (`ReplayDecoupledAgent`
+`num_pad_frames`), and `hold_agent_class` makes that 10 + N. The WBC keeps
+balancing on that goal; the joint targets are not frozen. The outcome line then
+also holds `hold_steps` and `success_at_step` (index of the step at which
+`_success` first read true, as the trace counts steps, or null); with N = 0 it
+is the line of today's replay, which `replay_check` reads.
+
 SIMPLE writes `meta/replay.txt` into --data-dir; `outcomes.replay_lerobot`
 points it at a staged copy, never at the source dataset.
 """
@@ -157,6 +166,19 @@ def reset_row(
     return row
 
 
+def hold_agent_class(base: type, steps: int) -> type:
+    """`base` (SIMPLE's ReplayDecoupledAgent) padding `steps` more frames, or base itself."""
+    if steps <= 0:
+        return base
+
+    class HoldLastCommand(base):  # type: ignore[misc]
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            super().__init__(*args, **kwargs)
+            self._num_pad_frames += steps
+
+    return HoldLastCommand
+
+
 def recorder_class(base: type | None = None) -> type:
     """OutcomeRecorder on top of `base` (gymnasium.Wrapper unless a test passes one)."""
     wrapper = base or importlib.import_module("gymnasium").Wrapper
@@ -166,12 +188,13 @@ def recorder_class(base: type | None = None) -> type:
 
         def __init__(
             self, env: Any, data_dir: Path, out: Path, state_names: list[str],
-            trace: Path | None = None,
+            trace: Path | None = None, hold_steps: int = 0,
         ) -> None:  # fmt: skip
             global _live
             super().__init__(env)
             self.data_dir, self.out, self.state_names = data_dir, out, state_names
-            self.trace = trace
+            self.trace, self.hold_steps = trace, hold_steps
+            self.success_at: int | None = None
             self.uids = dataset_uids(data_dir) if trace is not None else {}
             self.episode: int | None = None
             self.rows: list[Any] = []
@@ -198,6 +221,8 @@ def recorder_class(base: type | None = None) -> type:
                 self.order = joint_order(list(qpos), self.state_names)
             values = np.asarray(list(qpos.values()), dtype=np.float64)
             self.rows.append(values[self.order])
+            if self.success_at is None and getattr(self.env.unwrapped, "_success", False):
+                self.success_at = len(self.rows) - 1
             if self.trace is not None and self.episode is not None:
                 self.trace_rows.append(
                     trace_row(self.env.unwrapped, self.episode, len(self.rows) - 1)
@@ -215,12 +240,14 @@ def recorder_class(base: type | None = None) -> type:
                     self.episode, read_states(self.data_dir, self.episode),
                     np.stack(self.rows), success,
                 )
+                if self.hold_steps > 0:
+                    line.update(hold_steps=self.hold_steps, success_at_step=self.success_at)
                 with self.out.open("a") as f:
                     f.write(json.dumps(line) + "\n")
             if self.trace is not None and self.trace_rows:
                 with self.trace.open("a") as f:
                     f.writelines(json.dumps(r) + "\n" for r in self.trace_rows)
-            self.episode, self.rows, self.trace_rows = None, [], []
+            self.episode, self.rows, self.trace_rows, self.success_at = None, [], [], None
 
     return OutcomeRecorder
 
@@ -235,6 +262,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--save-dir", type=Path, required=True)
     ap.add_argument("--clock", choices=CLOCKS, required=True)
     ap.add_argument("--trace", type=Path, help="per-step trace, one JSON row per step")
+    ap.add_argument("--hold-steps", type=int, default=0, help="extra steps on the last command")
     args = ap.parse_args(argv)
 
     from flywheel_simple.tray.export import state_names
@@ -250,10 +278,13 @@ def main(argv: list[str]) -> int:
     make, recorder = gym.make, recorder_class()
 
     def wrapped_make(*a: Any, **kw: Any) -> Any:
-        return recorder(make(*a, **kw), args.data_dir, args.outcomes, names, trace=args.trace)
+        env = make(*a, **kw)
+        return recorder(env, args.data_dir, args.outcomes, names, args.trace, args.hold_steps)
 
     setattr(gym, "make", wrapped_make)  # the CLI looks gym.make up when it calls it
     cli = importlib.import_module("simple.cli.replay_decoupled_wbc")
+    agent = hold_agent_class(getattr(cli, "ReplayDecoupledAgent"), args.hold_steps)
+    setattr(cli, "ReplayDecoupledAgent", agent)  # the CLI builds its agent from this name
     cli.main(
         env_id=args.env_id,
         data_dir=str(args.data_dir),

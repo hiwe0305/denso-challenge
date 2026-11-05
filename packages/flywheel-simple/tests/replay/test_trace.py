@@ -1,4 +1,4 @@
-"""The replay's per-step trace, on a fake sim (DA-17 task 6)."""
+"""The replay's per-step trace and its last-command hold, on a fake sim (DA-17 task 6)."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
-from flywheel_simple.replay.run import recorder_class
+from flywheel_simple.replay.run import hold_agent_class, recorder_class
 
 UID = "g1_wholebody_locomotion_pick_between_tables_teleop"
 NAMES = [f"j{i}" for i in range(32)]
@@ -122,13 +122,13 @@ def dataset(root: Path, uid: str = UID) -> Path:
 
 def replay(
     tmp_path: Path, trace: Path | None, *, uid: str = UID, success_at: int | None = 4,
-    steps: int = STEPS,
+    hold_steps: int = 0, steps: int = STEPS,
 ) -> tuple[dict[str, Any], FakeSim]:
     """What SIMPLE's CLI does with the env: the uid override, reset, `steps` steps, close."""
     data = dataset(tmp_path / "data", uid)
     out = tmp_path / "outcomes.jsonl"
     sim = FakeSim(success_at)
-    env = recorder_class(Wrapper)(sim, data, out, NAMES, trace=trace)
+    env = recorder_class(Wrapper)(sim, data, out, NAMES, trace=trace, hold_steps=hold_steps)
     conf = env_conf(uid)
     conf["uid"] = UID  # the CLI overrides a mismatched uid before reset
     env.reset(options={"state_dict": conf, "task_id": "episode_0", "dr_level": None})
@@ -178,3 +178,43 @@ def test_trace_flags_a_dataset_uid_the_cli_overrode(tmp_path: Path) -> None:
     trace = tmp_path / "t.trace.jsonl"
     replay(tmp_path, trace, uid="g1_wholebody_old_uid")
     assert json.loads(trace.read_text().splitlines()[0])["uid_overridden"] is True
+
+
+class FakeAgent:
+    """ReplayDecoupledAgent's padding: past the data it keeps the last row's goal."""
+
+    def __init__(self, robot: Any, sonic_config: dict[str, Any], num_pad_frames: int = 10) -> None:
+        self._num_pad_frames = num_pad_frames
+        self.rows: list[int] = []
+        self.index = 0
+
+    def get_action(self, observation: Any) -> int:
+        if self.index >= len(self.rows) + self._num_pad_frames:
+            raise StopIteration("Episode data exhausted")
+        action = self.rows[min(self.index, len(self.rows) - 1)]
+        self.index += 1
+        return action
+
+
+def test_hold_steps_zero_is_the_current_replay(tmp_path: Path) -> None:
+    assert hold_agent_class(FakeAgent, 0) is FakeAgent
+    line, _ = replay(tmp_path, None, hold_steps=0)
+    assert "hold_steps" not in line and "success_at_step" not in line
+
+
+def test_hold_steps_repeats_the_last_action_then_reads_success(tmp_path: Path) -> None:
+    agent = hold_agent_class(FakeAgent, 5)(None, {})
+    agent.rows = [7, 8, 9]
+    actions = []
+    while True:
+        try:
+            actions.append(agent.get_action(None))
+        except StopIteration:
+            break
+    assert actions == [7, 8, 9] + [9] * 15  # SIMPLE's 10 pad frames, then 5 more
+
+    line, _ = replay(tmp_path, None, success_at=STEPS + 3, hold_steps=5, steps=STEPS + 5)
+    assert line["success"] is True
+    assert line["hold_steps"] == 5 and line["success_at_step"] == STEPS + 2  # 0-based, as the trace
+    line, _ = replay(tmp_path / "never", None, success_at=None, hold_steps=5, steps=STEPS + 5)
+    assert line["success"] is False and line["success_at_step"] is None
