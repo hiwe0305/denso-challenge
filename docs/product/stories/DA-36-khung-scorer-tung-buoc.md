@@ -42,9 +42,9 @@ Là kỹ sư đánh giá, tôi muốn một scorer độc lập chấm từng b�
   - [x] 8.2 Tín hiệu từng bước đọc từ `StageSpec.signals`; xóa khóa `step_signals` khỏi `two-table.yaml` và `ScorerConfig`. Bước có `signals=None` thì từ chối (`ScorerError`), `()` là bước không cần tín hiệu. Task giả hai bàn trong test khai `signals` cho 6 bước
   - [x] 8.3 Lớp lỗi "theo bước hỏng k" chỉ đọc từ `FailureKindSpec.failure_class == "from_failed_stage"`; xóa khóa `class_from_failed_step` khỏi `two-table.yaml`, `ScorerConfig` và `judge_failure`. Task giả hai bàn khai L-COLLIDE, L-TIMEOUT là `from_failed_stage`
   - [x] 8.4 `Score` ghi `unknown_reason` có kiểu (`missing_signal`, `signal_all_null`, `step_not_in_trace`, `no_verdict`) thay `meta["unknown_steps"]`, và `step_enter_s`, `step_exit_s` chép từ `StageEvaluation` (bỏ trống cho bước chưa thử và chưa rõ; task không gửi thì để `None`, scorer không tự đoán). Tín hiệu có cột nhưng toàn null là chưa rõ (`signal_all_null`), không thành đạt. `scorer_version` 0.1.0 lên 0.2.0; `fw eval score` chạy qua test hợp đồng CLI
-- [ ] 9. Cấu hình scorer task bê khay (AC 8)
+- [x] 9. Cấu hình scorer task bê khay (AC 8)
   - [x] 9.1 `configs/eval/scorer/tray.yaml`: `task_id: tray` (giả định, tới khi `TaskDefinition` thật của task bê khay có trong `flywheel-simple`), ngưỡng chép từ `configs/sim/tray.yaml` ghi giả định, thăng bằng theo `pelvis_height` và `fall_height`, `episode_signals: [collision]`; test so từng ngưỡng với `configs/sim/tray.yaml`
-  - [ ] 9.2 Task bê khay giả trong test (7 bước có `signals`, `FailureKindSpec` theo spec v10.6 mục 5.2) và test qua `tray.yaml`: mỗi mã của task bê khay một ca kiểm lớp chung; L-TRAY-TILT, L-COLLIDE, L-TIMEOUT ở ít nhất ba bước khác lớp; ca thành công, ca thiếu tín hiệu; `fw eval score` với `tray.yaml`
+  - [x] 9.2 Task bê khay giả trong test (7 bước có `signals`, `FailureKindSpec` theo spec v10.6 mục 5.2) và test qua `tray.yaml`: mỗi mã của task bê khay một ca kiểm lớp chung; L-TRAY-TILT, L-COLLIDE, L-TIMEOUT ở ít nhất ba bước khác lớp; ca thành công, ca thiếu tín hiệu; `fw eval score` với `tray.yaml`
 
 ## Phạm vi file
 
@@ -101,7 +101,7 @@ Nhiệm vụ 8, 9 (5/11/2026) nằm trong các đường dẫn trên: `configs/e
 
 - Giờ thực: 23h (nhiệm vụ 1 2h, 2 2.5h, 3 2h, 4 1.5h, 5 2h, 6 3h; sửa theo review PO
   3/11/2026: nhiệm vụ 1 0.5h, 2 3h, 4 0.5h, 5 1.5h, sổ sách 0.5h; nhiệm vụ 7 1.5h,
-  5/11/2026)
+  5/11/2026); nhiệm vụ 8, 9 (Hiếu, 5/11/2026): 5h (8 0.5h, 8.1 0.7h, 8.2 0.8h, 8.3 0.4h, 8.4 1.2h, 9.1 0.5h, 9.2 0.9h)
 - Công cụ AI đã dùng: Claude Code (Opus 5)
 - Ghi chú hoàn thành:
   - Chấm là bước tính thuần: không mở file, không chạy sim, không gọi model, không đọc đồng hồ. Lớp đọc (`reader.py`) tách riêng; `score_episode` chỉ nhận bảng tín hiệu. Có test chấm hai lần so bản ghi từng byte (AC 5).
@@ -114,11 +114,14 @@ Nhiệm vụ 8, 9 (5/11/2026) nằm trong các đường dẫn trên: `configs/e
   - `L-COLLIDE` và `L-TIMEOUT` lấy lớp lỗi chung của bước hỏng k qua `class_from_failed_step` của cấu hình (spec mục 5.2; 03 mục 4.3). Trước đó lấy lớp cố định của `FailureKindSpec` nên va chạm lúc đi bị ghi `approach`.
   - `L-BALANCE` chỉ dùng khi không bước nào trượt và không bước nào chưa rõ (quyết định PO). Episode đã có kiểu lỗi giữ kiểu đó, cú ngã ghi ở `balance_violated` và dòng trace trong `meta`.
   - Hai chỗ khai trong cấu hình (`step_signals`, `class_from_failed_step`) là cầu tạm: `StageSpec` chưa chở được danh sách tín hiệu và `FailureKindSpec.failure_class` chỉ chở được một giá trị. Đã bổ sung vào issue #59 (mục 5 và mục mới), xin Long đưa vào hợp đồng; khi có thì xóa hai khóa này khỏi file cấu hình.
+  - Nhiệm vụ 8 (5/11/2026, sau #101): không còn cầu tạm nào trong làn. Trạng thái là `StepStatus` của hợp đồng; khi task gửi `stage_status`, bước hỏng k là bước `fail` đầu tiên (một bước `not_attempted` sau bước chưa rõ cũng là `False` trong `stage_success`, đọc nhầm thì k sai). Tín hiệu từng bước từ `StageSpec.signals`, task chưa khai (`None`) bị từ chối. Lớp theo bước hỏng k từ `from_failed_stage`. `Score.unknown_reason` có kiểu, chữ giải thích (tín hiệu nào) ở `StepScore.detail` cho CLI. Cột có tên mà toàn null là chưa rõ (`signal_all_null`), không còn thành đạt hay trượt; cột va chạm toàn null làm episode sạch mất quyền đạt. Thời điểm vào, ra chép từ `StageEvaluation` cho bước đạt hoặc trượt; chưa task nào gửi nên hiện là `None`. `scorer_version` 0.2.0.
+  - Nhiệm vụ 9: `tray.yaml` chép 10 ngưỡng của `configs/sim/tray.yaml`, test giữ khớp từng số (thử đổi `r_reach` thì test đỏ). Bảng mã và lớp lỗi chung chỉ là chú thích trong file; scorer đọc từ `FailureKindSpec` của task (AC 4). Chưa có `TaskDefinition` thật của task bê khay nên `task_id: tray` và tên tín hiệu là giả định; task giả `tests/unit/scorer/tray_fake.py` theo thứ tự lỗi của `flywheel_simple.tray.predicates` và không điền `failure_class`, nên lớp chung ra từ scorer. Đã thử: đổi L-TRAY-TILT sang lớp cố định thì ca nhấc và ca đặt đổi lớp.
+  - Việc tiếp theo, không thuộc story: `ToyPickPlace` của `flywheel.testkit` chưa khai `StageSpec.signals` (test CLI dùng lớp con `ToyWithSignals`); `TaskDefinition` thật của task hai bàn và task bê khay phải khai `signals` và `from_failed_stage` thì `fw eval score` mới chấm được; lý do "chưa rõ" ở mức episode (thăng bằng, tín hiệu của episode) chưa có trường có kiểu, vẫn là chữ trong `meta`.
   - Chưa làm, không thuộc story: hiệu chỉnh ngưỡng và đối chiếu cờ `check_success` của SIMPLE là DA-37; `Trace` thật của SIMPLE chưa có (hook của Hiếu, 8/11) nên mọi ca chạy trên trace tổng hợp dựng trong test, đúng AC 6. Đánh số bước từ 0 hay từ 1 chờ #62, chưa đổi mã nào.
 - File đã tạo hoặc sửa:
   - `packages/flywheel-eval/src/flywheel/eval/scorer/`: `reader.py`, `status.py`, `steps.py`, `failure.py`, `balance.py`, `score.py`, `artifact.py`
   - `packages/flywheel-eval/src/flywheel/eval/`: `api.py`, `cli.py`, `config.py`
-  - `packages/flywheel-eval/tests/unit/scorer/`: `conftest.py`, `test_trace_reader.py`, `test_steps.py`, `test_failure.py`, `test_balance.py`, `test_score_artifact.py`, `test_all_kinds.py`
+  - `packages/flywheel-eval/tests/unit/scorer/`: `conftest.py`, `test_trace_reader.py`, `test_steps.py`, `test_failure.py`, `test_balance.py`, `test_score_artifact.py`, `test_all_kinds.py`; nhiệm vụ 8, 9: `test_contract_fields.py`, `tray_fake.py`, `test_tray_scorer.py`, `test_tray_scorer_config.py`
   - `packages/flywheel-eval/tests/contract/scorer/test_score_cli.py`
-  - `configs/eval/scorer/two-table.yaml`
+  - `configs/eval/scorer/two-table.yaml`, `configs/eval/scorer/tray.yaml` (nhiệm vụ 9)
   - `packages/flywheel-eval/pyproject.toml`, `uv.lock` (R6)
