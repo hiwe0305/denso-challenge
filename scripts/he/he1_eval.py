@@ -704,7 +704,8 @@ def other_jobs(runner: Run = run) -> tuple[list[str], list[str]] | None:
 
 
 def stop_command(tag: str) -> str:
-    """Stop this run's client on rtx3060, wherever it is.
+    """Stop this run's client on rtx3060, wherever it is: a client dead, late or still
+    running at teardown, which may hang anywhere (a CU refusal: container_stop_command).
 
     setsid made the launcher a process group leader and it wrote its pgid (`$$`, kept
     through the execs) to client-<tag>.pgid. That group is killed only while it still
@@ -719,6 +720,16 @@ def stop_command(tag: str) -> str:
         'then kill -TERM -- "-$pg"; fi; '
         "docker stop -t 30 da26-eval-client"
     )
+
+
+def container_stop_command() -> str:
+    """Stop only the client's container, after a CU refusal: SIMPLE is mid-episode and
+    he1_client.sh healthy, and once its `docker run` returns the script moves
+    eval_stats.txt and the videos, writes its summary and `exit`. stop_command's group
+    kill took the script down with the container and none of that ran (eval attempt 3,
+    5/11/2026). If the stop fails: wait_client's EXIT_WAIT_S, then teardown's
+    stop_command."""
+    return "docker stop -t 30 da26-eval-client"
 
 
 def route_log_problem(dest: Path) -> str | None:
@@ -1023,11 +1034,15 @@ def run_eval(args: argparse.Namespace, env: Env | None = None) -> int:
                 rtx(stop_command(tag), env.runner)
                 stopped.set()
 
+            def stop_container() -> None:
+                rtx(container_stop_command(), env.runner)
+                stopped.set()
+
             routers[0] = Router(
                 order,
                 waiting_gate(env.reading, env.clock, env.sleep),
                 write,
-                lambda: threading.Thread(target=stop_client, daemon=True).start(),
+                lambda: threading.Thread(target=stop_container, daemon=True).start(),
                 clock=env.clock,
             )
             code = drive(args, env, order, routers[0], write, tag, stopped, stop_client, state)
@@ -1164,7 +1179,7 @@ def wait_client(
     """Wait for the client's `exit` file on rtx3060; returns (code, exit seen).
 
     The client is stopped when `dead_or_late` says so (then 5), or by the router when
-    the CU rule refuses a pair (0, a clean end). Either way he1_client.sh then has
+    the CU rule refuses a pair (0, a clean end; its container only). Either way he1_client.sh then has
     EXIT_WAIT_S to move its files and write `exit`; the container going away is not
     the end. Without an `exit` by then: 5. A nonzero client exit: 5."""
     path = f"~/{RTX_WORK}/runs/{EVAL_JOB}/exit"
