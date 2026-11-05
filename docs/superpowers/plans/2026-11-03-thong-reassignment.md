@@ -12,6 +12,8 @@
 
 _Ngày 3/11/2026. Trạng thái: [Đã chốt 3/11/2026] Hiếu chốt Q1–Q6 ở mục 3; lịch và giờ ở mục 5, 6 là ước lượng. Session 0 cập nhật 07 (bản 1.6), 08 (bản 0.4), RULE.md, CLAUDE.md gốc và file story._
 
+_Cập nhật 5/11/2026: session 0–5 đã merge (mục 5, cột PR); còn lại sau 13/11: DA-17 nhiệm vụ 5 và phần tự va chạm của AC 1, DA-03 normalize/cắt đoạn/bàn phím, DA-21._
+
 ## 1. Lý do
 
 Số liệu tới 3/11/2026, kể từ khi giao việc ngày 27/10/2026:
@@ -63,14 +65,14 @@ Số liệu tới 3/11/2026, kể từ khi giao việc ngày 27/10/2026:
 
 ## 5. Các session
 
-| Session | Nhánh | Việc | Hạn merge | Cần trước | Giờ (ước lượng) |
-|---|---|---|---|---|---|
-| 0 | `docs-reassign-thong`, `chore-data-pyarrow` | Tài liệu chia lại việc; thêm `pyarrow`, `numpy` cho `flywheel-data` | 3/11 | Q1–Q6 (đã chốt) | 1,5 |
-| 1 | `S1-07-psi-data-v2` | S1-07 | 4/11 | — | 3,5 |
-| 2 | `DA-27-defect-inject` | DA-27 | 6/11 | Session 0 (pyarrow), session 3 PR 1 (bộ đọc) cho nhiệm vụ 4 | 5 |
-| 3 | `DA-03-data-pipeline` | DA-03, hai PR | PR 1: 5/11; PR 2: 9/11 | Session 0 | 10 |
-| 4 | `DA-17-replay-check` | DA-17 | 8/11 | Session 3 PR 1 | 5 |
-| 5 | `DA-02-export-checklist` | DA-02 | 9/11 | Session 3 PR 1 | 3,5 |
+| Session | Nhánh | Việc | Hạn merge | Cần trước | Giờ (ước lượng) | PR |
+|---|---|---|---|---|---|---|
+| 0 | `docs-reassign-thong`, `chore-data-pyarrow` | Tài liệu chia lại việc; thêm `pyarrow`, `numpy` cho `flywheel-data` | 3/11 | Q1–Q6 (đã chốt) | 1,5 | #52, #54 |
+| 1 | `S1-07-psi-data-v2` | S1-07 | 4/11 | — | 3,5 | #55 |
+| 2 | `DA-27-defect-inject` | DA-27 | 6/11 | Session 0 (pyarrow), session 3 PR 1 (bộ đọc) cho nhiệm vụ 4 | 5 | #53, #85, #87 |
+| 3 | `DA-03-data-pipeline` | DA-03, hai PR | PR 1: 5/11; PR 2: 9/11 | Session 0 | 10 | #69, #86 |
+| 4 | `DA-17-replay-check` | DA-17 | 8/11 | Session 3 PR 1 | 5 | #92 |
+| 5 | `DA-02-export-checklist` | DA-02 | 9/11 | Session 3 PR 1 | 3,5 | #91, #125 |
 
 Tổng khoảng 28,5 giờ ước lượng, so với khoảng 48 giờ còn lại của Thông theo 07 mục 2.4.
 
@@ -81,11 +83,11 @@ Tổng khoảng 28,5 giờ ước lượng, so với khoảng 48 giờ còn lạ
 - [x] 0.1 Sửa 07: mục 2.0 (vai của Thông), 2.1 (chủ đường dẫn theo Q6), 2.2 (cột Chủ, Giờ của DA-02, DA-03, DA-17, DA-21, DA-27), 2.3, 2.4 (hạn mới theo bảng trên); tăng bản, thêm change log.
 - [x] 0.2 Sửa file story S1-07, DA-17, DA-21, DA-27: "Người làm", "Người phụ trách", phạm vi theo Q2–Q5, change log. DA-17 thêm vào phạm vi `packages/flywheel-simple/src/flywheel_simple/replay/` và test tương ứng.
 - [x] 0.3 Viết file story DA-02, DA-03 theo mẫu, có "Phạm vi file" (mục 2.2 của 07 và session 3, 5 dưới đây).
-- [ ] 0.4 `python3 scripts/repo/check_links.py`, `pr_guard.py`, mở PR.
+- [x] 0.4 `python3 scripts/repo/check_links.py`, `pr_guard.py`, mở PR.
 
 **PR `chore-data-pyarrow`:**
 
-- [ ] 0.5 Thêm `numpy`, `pyarrow` vào `dependencies` của `packages/flywheel-data/pyproject.toml`; `uv lock`; `uv run pytest` xanh; mở PR.
+- [x] 0.5 Thêm `numpy`, `pyarrow` vào `dependencies` của `packages/flywheel-data/pyproject.toml`; `uv lock`; `uv run pytest` xanh; mở PR.
 
 **Việc của Hiếu, không giao Claude:** báo Thông; đóng #24 sau khi PR của session 1 mở; merge.
 
@@ -95,14 +97,15 @@ Tổng khoảng 28,5 giờ ước lượng, so với khoảng 48 giờ còn lạ
 
 **Phạm vi file:** `docs/g0/psi-data.md`, `docs/g0/ledger/S1-07.csv`, `scripts/g0/inspect_psi_data.py`.
 
-- [ ] 1 Tải gói F1 (`BendPickTeleop`, `BendPickMP`) ở revision `e78fb93`; băm sha256 mọi file, gồm cả hai gói đã có; ghi đường dẫn đầy đủ. Kích thước gói eval là 480.532 B.
-- [ ] 2 Bảng 36 dòng `index, name, group, masked` lấy từ `meta/info.json` và `ACTION_SLICES_36D` của Ψ₀ @ `cda3fdf`. Action có 36 chiều thật; 4 chiều đệm là của state.
-- [ ] 3 QA thật trên parquet: timestamp đơn điệu, không NaN hay Inf, độ dài trong khoảng, cờ thành công nếu có. Ra N_teleop của task hai bàn và của F1. Bỏ phần sinh 80 episode giả.
-- [ ] 4 Seed: dẫn `configs/splits/default.yaml`; seed của tập eval nếu không có trong gói thì ghi "không suy được".
+- [x] 1 Tải gói F1 (`BendPickTeleop`, `BendPickMP`) ở revision `e78fb93`; băm sha256 mọi file, gồm cả hai gói đã có; ghi đường dẫn đầy đủ. Kích thước gói eval là 480.532 B.
+- [x] 2 Bảng 36 dòng `index, name, group, masked` lấy từ `meta/info.json` và `ACTION_SLICES_36D` của Ψ₀ @ `cda3fdf`. Action có 36 chiều thật; 4 chiều đệm là của state.
+- [x] 3 QA thật trên parquet: timestamp đơn điệu, không NaN hay Inf, độ dài trong khoảng, cờ thành công nếu có. Ra N_teleop của task hai bàn và của F1. Bỏ phần sinh 80 episode giả.
+- [x] 4 Seed: dẫn `configs/splits/default.yaml`; seed của tập eval nếu không có trong gói thì ghi "không suy được".
 - [ ] 5 Giấy phép: `data_class = public`, `license = unknown`, ngày kiểm từng dòng; soạn thư hỏi PSI Lab cho Hiếu gửi.
   - Ghi chú 3/11/2026: thư không gửi; PO bỏ mọi việc xin giấy phép, `license = unknown` ghi là giới hạn (PR S1-07 #55 đã merge, mục 5 của `docs/g0/psi-data.md` chỉ giữ hai câu về tập eval).
-- [ ] 6 Thống kê mô tả: độ dài, tỉ lệ thành công, phân bố vị trí vật và bàn (hoặc một câu "không có").
-- [ ] 7 `docs/g0/psi-data.md` có mục "Đề xuất cho 03 §3.3" (V1, V6, V9); mô tả PR ghi lệnh và output cho từng AC.
+  - Ghi chú 5/11/2026: **bỏ** phần thư theo quyết định 3/11 (PR #77), nên bước này không tick; bảng giấy phép đã có ở PR #55 (nhiệm vụ 5 của story S1-07 giữ `[x]`).
+- [x] 6 Thống kê mô tả: độ dài, tỉ lệ thành công, phân bố vị trí vật và bàn (hoặc một câu "không có").
+- [x] 7 `docs/g0/psi-data.md` có mục "Đề xuất cho 03 §3.3" (V1, V6, V9); mô tả PR ghi lệnh và output cho từng AC.
 
 **Xong khi:** 7 AC có bằng chứng là output lệnh; không còn số nào gán cứng trong script.
 
@@ -121,12 +124,12 @@ def seal_manifest(manifest: DefectManifest, path: Path) -> str: ...  # trả sha
 def has_injected_defect(episode: Episode) -> bool: ...
 ```
 
-- [ ] 1 Cherry-pick 5 commit của Thông lên `origin/master`, giữ tác giả; chạy lại 29 test.
-- [ ] 2 Thay `DefectManifestRecord`, `DefectRecord` bằng `DefectManifest`, `Defect` của hợp đồng; episode cấy lỗi mang `EpisodeMetadata.injected_defect`.
-- [ ] 3 Đổi mã lỗi theo design: rơi khung và lệch đồng bộ → D2; nhảy khớp, vượt giới hạn, NaN, sai đơn vị → D3; trùng episode, rò hạt giống → D5; nhãn thành công sai, câu lệnh sai → D6; đảo dấu một chiều action → D7; tên cũ giữ trong `parameters["kind"]`. Log giữ T1–T8, R1–R2.
-- [ ] 4 Cấy lên bản sao parquet thật (đọc bằng bộ đọc của session 3 PR 1, ghi lại cùng layout), tỉ lệ 5–10%, hạt giống ghi trong manifest.
-- [ ] 5 Bản sạch cùng số episode; `seal_manifest` ghi `defect_manifest.json` và `.sha256`; test agent không đọc được manifest.
-- [ ] 6 `has_injected_defect` và test; chạy trên `rtx3060` ra `fwdata/inject/<dataset_id>/{injected,clean}`, gửi `DatasetRef` và đường dẫn manifest cho Châu (DA-31).
+- [x] 1 Cherry-pick 5 commit của Thông lên `origin/master`, giữ tác giả; chạy lại 29 test.
+- [x] 2 Thay `DefectManifestRecord`, `DefectRecord` bằng `DefectManifest`, `Defect` của hợp đồng; ~~episode cấy lỗi mang `EpisodeMetadata.injected_defect`~~ mọi episode của bản sao chấm mang `EpisodeMetadata.benchmark_copy_id` (PR #36).
+- [x] 3 Đổi mã lỗi theo design: rơi khung và lệch đồng bộ → D2; nhảy khớp, vượt giới hạn, NaN, sai đơn vị → D3; trùng episode, rò hạt giống → D5; nhãn thành công sai, câu lệnh sai → D6; đảo dấu một chiều action → D7; tên cũ giữ trong `parameters["kind"]`. Log giữ T1–T8, R1–R2.
+- [x] 4 Cấy lên bản sao parquet thật (đọc bằng bộ đọc của session 3 PR 1, ghi lại cùng layout), ~~tỉ lệ 5–10%~~ mỗi loại 3 episode, 33/99 (PO 3/11/2026; đổi), hạt giống ghi trong manifest.
+- [x] 5 Bản sạch cùng số episode; `seal_manifest` ghi `defect_manifest.json` và `.sha256`; test agent không đọc được manifest.
+- [x] 6 `has_injected_defect` và test; chạy trên `rtx3060` ra `fwdata/inject/<dataset_id>/{injected,clean}`, gửi `DatasetRef` và đường dẫn manifest cho Châu (DA-31).
 
 **Xong khi:** mỗi loại lỗi có một test cấy và kiểm; bản cấy lỗi và bản sạch có trên `rtx3060`; Châu xác nhận đọc được.
 
@@ -156,8 +159,8 @@ def register_source(root: Path, source_detail: str, license: str,
 def to_episode(frames: EpisodeFrames, source: SourceRecord, split: str) -> Episode: ...
 ```
 
-- [ ] 1 Viết bộ đọc LeRobot v2.1 và test trên một dataset 3 episode sinh trong test.
-- [ ] 2 `register_source` ghi sha256 từng file và `SourceRecord`; `to_episode` ra `Episode` đúng hợp đồng cho ba nguồn: psi-data (`teleop`, `measured`), khay S1 (`synthetic`, `planned`, `S1`), khay S2 (`teleop_pico`).
+- [x] 1 Viết bộ đọc LeRobot v2.1 và test trên một dataset 3 episode sinh trong test.
+- [x] 2 `register_source` ghi sha256 từng file và `SourceRecord`; `to_episode` ra `Episode` đúng hợp đồng cho ba nguồn: psi-data (`teleop`, `measured`), khay S1 (`synthetic`, `planned`, `S1`), khay S2 (`teleop_pico`).
 
 **PR 2 (hạn 9/11): QA, release, báo cáo.**
 
@@ -171,10 +174,10 @@ def dataset_report(dataset_id: str, episodes: Sequence[Episode],
 def render_html(report: DatasetReport, out: Path) -> Path: ...
 ```
 
-- [ ] 3 QA: 7 phép kiểm của spec mục 4.4 và phép kiểm riêng nguồn của design mục 6.3; ngưỡng trong `configs/data/qa.yaml`; đọc `ReplayReport` nếu có (`decision` theo AC 3 của DA-17: trượt động học thì `reject`, trượt động lực học thì `flag`).
-- [ ] 4 Release: chặn episode `has_injected_defect`, chặn hạt giống ngoài dải của `configs/splits/default.yaml`, manifest đóng băng có hash.
-- [ ] 5 `DatasetReport` và trang HTML tĩnh: số episode theo nguồn, pass/flag/reject theo phép kiểm, độ dài, stats theo nhóm action.
-- [ ] 6 Lệnh `fw data ingest | qa | release | report` trong `cli.py`; chạy trên psi-data và release khay S1 trên `rtx3060`.
+- [x] 3 QA: 7 phép kiểm của spec mục 4.4 và phép kiểm riêng nguồn của design mục 6.3; ngưỡng trong `configs/data/qa.yaml`; đọc `ReplayReport` nếu có (`decision` theo AC 3 của DA-17: trượt động học thì `reject`, trượt động lực học thì `flag`).
+- [x] 4 Release: chặn episode `has_injected_defect`, chặn hạt giống ngoài dải của `configs/splits/default.yaml`, manifest đóng băng có hash.
+- [x] 5 `DatasetReport` và trang HTML tĩnh: số episode theo nguồn, pass/flag/reject theo phép kiểm, độ dài, stats theo nhóm action.
+- [x] 6 Lệnh `fw data ingest | qa | release | report` trong `cli.py`; chạy trên psi-data và release khay S1 trên `rtx3060`.
 
 **Phạm vi file:** `flywheel-data/ingest/` (trừ `egocentric/`), `qa/` (trừ `egocentric.py`), `release/`, `api.py`, `cli.py`, `config.py`, test tương ứng, `configs/data/qa.yaml`, `docs/g0/data-pipeline.md`.
 
@@ -197,11 +200,11 @@ def replay_lerobot(root: Path, work: Path, workers: int) -> Path: ...  # ghi rep
 
 `ReplayOutcome` là một dòng của `replay_outcomes.jsonl`: `episode_index`, `success`, `state_error_by_group`, `hand_event_offset_steps`. Làn chỉ đọc JSON, không import adapter.
 
-- [ ] 1 Động học: vượt giới hạn khớp (`ActionDimension.limit_low/high`), nghi sai độ/radian, nhảy khớp, lệch `timestamp` so với `frame_index / fps`; ra danh sách khung lỗi.
-- [ ] 2 Động lực học: `replay_lerobot` dùng lại cách chạy của `tray/replay_qa.py` cho mọi dataset LeRobot của SIMPLE; `report_from_outcome` ra `error_by_group`, `hand_event_offset_steps`, `sim_success`.
-- [ ] 3 Ngưỡng: chạy trên 99 episode psi-data trên `rtx3060`, `calibrate` ra phân vị 99, ghi `configs/data/replay.yaml` có hash.
-- [ ] 4 Test với 3 lỗi cấy (đảo dấu một khớp, độ thay radian, lệch 2 khung) trên dữ liệu sinh trong test và sim giả của testkit; episode sạch không bị đánh dấu.
-- [ ] 5 (dời sau 13/11 nếu Q3 được chốt) phát lại action dự đoán, video.
+- [x] 1 Động học: vượt giới hạn khớp (`ActionDimension.limit_low/high`), nghi sai độ/radian, nhảy khớp, lệch `timestamp` so với `frame_index / fps`; ra danh sách khung lỗi.
+- [x] 2 Động lực học: `replay_lerobot` dùng lại cách chạy của `tray/replay_qa.py` cho mọi dataset LeRobot của SIMPLE; `report_from_outcome` ra `error_by_group`, `hand_event_offset_steps`, `sim_success`.
+- [x] 3 Ngưỡng: chạy trên 99 episode psi-data trên `rtx3060`, `calibrate` ra phân vị 99, ghi `configs/data/replay.yaml` có hash.
+- [x] 4 Test với 3 lỗi cấy (đảo dấu một khớp, độ thay radian, lệch 2 khung) trên dữ liệu sinh trong test và sim giả của testkit; episode sạch không bị đánh dấu.
+- [ ] 5 (dời sau 13/11 nếu Q3 được chốt) phát lại action dự đoán, video. Ghi chú 5/11/2026: dời sau 13/11 (Q3 đã chốt 3/11).
 
 Giới hạn khớp lấy từ `meta/action_layout.json` của export khay cho tới khi DA-01 (Long, hạn 5/11) điền `configs/embodiments/g1.yaml`.
 
@@ -214,9 +217,10 @@ Giới hạn khớp lấy từ `meta/action_layout.json` của export khay cho t
 def check_lerobot_v21(root: Path, layout: ActionLayout) -> list[QACheck]: ...  # điểm 1–6 của design 6.4
 ```
 
-- [ ] 1 Điểm 1–6 của checklist design mục 6.4 trong làn (pyarrow, json; điểm 4 đọc số khung từ meta, không giải mã video trong làn).
-- [ ] 2 Điểm 7 trong `flywheel-psi0`: contract test đọc lại một batch bằng loader Ψ₀ @ `cda3fdf`, so với batch mẫu đã lưu; chạy trong venv Ψ₀.
-- [ ] 3 Chạy checklist trên release khay S1 và trên psi-data; ghi output vào `docs/g0/export-v21.md`.
+- [x] 1 Điểm 1–6 của checklist design mục 6.4 trong làn (pyarrow, json; điểm 4 đọc số khung từ meta, không giải mã video trong làn).
+- [x] 2 Điểm 7 trong `flywheel-psi0`: contract test đọc lại một batch bằng loader Ψ₀ @ `cda3fdf`, so với batch mẫu đã lưu; chạy trong venv Ψ₀.
+- [x] 3 Chạy checklist trên release khay S1 và trên psi-data; ghi output vào `docs/g0/export-v21.md`.
+- [x] 4 (thêm 5/11) Chiều hằng số khai theo task (PR #125).
 
 **Phạm vi file:** `flywheel-data/export/` (trừ `egodex.py`), test tương ứng, `packages/flywheel-psi0/tests/contract/test_loader_roundtrip.py`, `docs/g0/export-v21.md`.
 
