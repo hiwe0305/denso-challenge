@@ -152,8 +152,10 @@ Mỗi bản có 30 job train (8 loại × 3, cộng 6 job sạch) và 10 job RTC
 | T6 | `T6_mode_collapse` | `pred_std` bằng 0,1 × `target_std` nửa sau job (dưới 0,30) |
 | T7 | `T7_forgetting` | P1 của checkpoint con giảm 25% một loại câu hỏi so với cha (trên 10%) |
 | T8 | `T8_gradient_anomaly` | gradient VLM 0,5 ở một bước khi khai đóng băng |
-| R1 | `R1_high_latency` | 5% chunk trễ 0,155 s (p99 trên 0,15 s; `delay_steps` 8, chưa vượt R2) |
-| R2 | `R2_buffer_depleted` | một chunk trễ 0,24 s (`delay_steps` 12, trên 8; p99 vẫn dưới 0,15 s) |
+| R1 | `R1_high_latency` | 5% chunk trễ 0,11 s (p99 trên τ_lat 0,10 s; `delay_steps` 6, bằng d = 6 của server nên chưa là R2) |
+| R2 | `R2_buffer_depleted` | một chunk trễ 0,24 s (`delay_steps` 12, trên d = 6; p99 vẫn dưới 0,10 s) |
+
+**Sửa 5/11/2026** (DA-13 nhiệm vụ con 11.3, quyết định (b) của PO): R2 so `delay_steps` với độ trễ RTC d của server (6 với cờ serve của đội, cách tính ở `configs/eval/diagnosis/system.yaml` khối `r2`), không với max_delay 8 của checkpoint; R1, R2 bỏ chunk 0. Vì trễ trên d / hz = 0,12 s đã là R2, lỗi R1 chỉ tách khỏi R2 khi τ_lat ≤ 0,12 s: τ_lat đổi 0,15 → 0,10 s (giả định) và độ trễ cấy của R1 đổi 0,155 → 0,11 s. Cả hai loại không bao giờ cấy ở chunk 0, vì kiểm hệ thống không đọc chunk đó. Chunk bị chọn đổi theo nên bản log dựng trước 5/11/2026 khác hash, phải dựng lại; với ngưỡng mới, lỗi R1 cũ (`delay_steps` 8) ra cả R1 lẫn R2. Đã kiểm trên bản dựng lại: lớp mã của bench DA-31 (`agentqa/bench/logs.py`) ra đúng 6 phát hiện RTC trên 6 đáp án của bản có lỗi, không thừa không sót, và 0 trên bản sạch.
 
 Test trong làn (`tests/unit/inject/test_log_defects.py`) so mỗi job với job sạch cùng id: lỗi đổi đúng một tín hiệu, đúng mức cấu hình. Test nối làn (`tests/e2e/test_log_defects_detected.py`) chạy bộ phát hiện của làn Đánh giá trên từng job: job có lỗi ra đúng mã của nó và không mã nào khác, job sạch và bản sạch không ra mã nào; T1–T8 qua `flywheel.eval.api.diagnose_train`, R1, R2 qua hàm nội bộ vì api chưa có hàm đọc riêng log RTC. testkit chưa có bộ giả sinh metrics hay log RTC, nên bộ sinh ở đây thay cho `FakeTrainer` và log RTC giả của design 9.2. Hai bản có cùng hình dạng, id trung tính (`copy_ids(seed, namespace="logs")`), một mtime, `meta/benchmark_copy.json` ghi log là tổng hợp, không phải số đo.
 

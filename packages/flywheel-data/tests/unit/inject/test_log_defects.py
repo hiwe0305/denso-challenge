@@ -159,12 +159,14 @@ def test_each_defect_changes_exactly_its_signal_by_the_configured_amount(built: 
         latency = [w.chunk_received_s - w.observation_sent_s for w in off]
         if kind == "R1_high_latency":
             assert len(off) == round(CFG.r1_fraction * CFG.rtc_chunks)
+            # d of the server is 6 (system.yaml, r2): R1 stays within it
             assert latency == pytest.approx([CFG.r1_latency_s] * len(off)) and {
                 w.delay_steps for w in off
-            } == {8}
+            } == {6}
+            assert all(w.chunk_index > 0 for w in off)
         elif kind == "R2_buffer_depleted":
             assert len(off) == 1 and latency == pytest.approx([CFG.r2_latency_s])
-            assert off[0].delay_steps == 12
+            assert off[0].delay_steps == 12 and off[0].chunk_index > 0
         else:
             assert off == [], job.name
 
