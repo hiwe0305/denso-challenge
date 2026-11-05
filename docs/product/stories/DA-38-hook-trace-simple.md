@@ -42,7 +42,7 @@ Là người làm làn Đánh giá, tôi muốn mỗi rollout SIMPLE của độ
 - [x] 4. Cài hook vào `eval-decoupled-wbc` (bọc env và agent), test `sim` (AC 1, 5)
 - [x] 5. Lượt chạy thật task hai bàn trên `rtx3060`, ghi ledger (AC 6)
 - [ ] 6. Lượt chạy thật task khay trên `rtx3060`, ghi ledger (AC 6)
-- [ ] 7. Tài liệu `docs/g0/trace.md`: cách chạy, ý nghĩa trường, giới hạn ở sim (AC 1–6)
+- [x] 7. Tài liệu `docs/g0/trace.md`: cách chạy, ý nghĩa trường, giới hạn ở sim (AC 1–6)
 
 ## Phạm vi file
 
