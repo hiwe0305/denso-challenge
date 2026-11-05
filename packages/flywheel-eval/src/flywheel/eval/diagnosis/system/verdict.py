@@ -26,12 +26,25 @@ latency and the buffer are its consequences, so R6 outranks every other code:
 an episode that crashed the simulator is labelled `infra`, never `controller`,
 and never counts as a clean run either. The other codes that fired still
 travel in `findings` (decision Q1 of the PO, 3/11/2026).
+
+**On a synchronous rollout R1 and R2 are recorded, not counted** (decision
+(a) of the PO, 5/11/2026). SIMPLE waits for the server before it steps the
+sim, so however slow the inference was, nothing moved while it ran: latency
+cannot be what made a sim episode fail, the same reason R4 is 0 by
+construction there. R1 and R2 are still measured, because the numbers say
+what the robot would meet on hardware, but they go into `recorded` (and a
+missing RTC log into `recorded_skipped`), which neither clears an episode nor
+keeps it from the data attribution. Only an asynchronous rollout (DA-23)
+counts them. A rollout whose mode nobody wrote down is not taken for a
+synchronous one: R1 and R2 count, and their detail says the mode was unknown
+(FR21).
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
+from typing import Literal
 
 from flywheel.eval.diagnosis.train.finding import Skipped
 
@@ -40,6 +53,20 @@ from flywheel.eval.diagnosis.train.finding import Skipped
 # R6 in its order). Then R3 before R1 and R2 before R4 before R5: the order of
 # spec section 6.4.
 SYSTEM_CODES = ("R6", "R3", "R1", "R2", "R4", "R5")
+
+# Codes a synchronous rollout records without counting (decision (a), 5/11/2026).
+RECORDED_ON_SYNC = ("R1", "R2")
+
+Timing = Literal["sync", "async"]
+
+_SYNC_NOTE = (
+    "rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được "
+    "episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)"
+)
+_UNKNOWN_NOTE = (
+    "không rõ rollout đồng bộ hay bất đồng bộ (RolloutResult không ghi), "
+    "nên tính như bất đồng bộ"
+)
 
 
 class SystemError(ValueError):
@@ -119,7 +146,11 @@ class SystemVerdict:
     """The whole system check of one episode (AC 1).
 
     `diagnosis` is the label, `findings` and `skipped` are the evidence behind
-    it, and `infra_status` is recorded whether or not R6 fired.
+    it, and `infra_status` is recorded whether or not R6 fired. `recorded` and
+    `recorded_skipped` are what a synchronous rollout measured on R1 and R2
+    without counting it (module docstring); they never touch the label.
+    `timing` is the rollout's mode as the inputs stated it, None where they
+    did not.
 
     `blocks_policy_analysis` is what a caller asks instead of reading the label
     and deciding for itself. An episode is not usable as evidence about the
@@ -133,22 +164,55 @@ class SystemVerdict:
     findings: list[SystemFinding] = field(default_factory=list)
     skipped: list[Skipped] = field(default_factory=list)
     infra_status: str | None = None
+    recorded: list[SystemFinding] = field(default_factory=list)
+    recorded_skipped: list[Skipped] = field(default_factory=list)
+    timing: Timing | None = None
 
     @property
     def blocks_policy_analysis(self) -> bool:
         return self.diagnosis is not Diagnosis.CLEAN
 
 
-def combine(episode_id: str, results: list[CheckResult], infra_status: str | None) -> SystemVerdict:
+def combine(
+    episode_id: str,
+    results: list[CheckResult],
+    infra_status: str | None,
+    timing: Timing | None = None,
+) -> SystemVerdict:
     """Fold every check of one episode into one verdict, in the order of spec 6.4.
 
     The label is the first code to fire in `SYSTEM_CODES` order. Where nothing
     fired but something went unjudged the label is UNKNOWN rather than CLEAN:
     "no fault found" and "no fault looked for" are different answers, and only
     one of them clears an episode (AC 1, first step of the ordered check).
+
+    On a synchronous rollout R1 and R2 are set aside into `recorded` first, so
+    they decide neither way; with `timing` None they count, and say why.
     """
     findings = [finding for result in results for finding in result.findings]
     skipped = [skip for result in results for skip in result.skipped]
+    recorded: list[SystemFinding] = []
+    recorded_skipped: list[Skipped] = []
+    if timing == "sync":
+        recorded = [
+            replace(finding, detail=_noted(finding.detail, _SYNC_NOTE))
+            for finding in findings
+            if finding.code in RECORDED_ON_SYNC
+        ]
+        recorded_skipped = [
+            Skipped(skip.code, _noted(skip.reason, _SYNC_NOTE))
+            for skip in skipped
+            if skip.code in RECORDED_ON_SYNC
+        ]
+        findings = [finding for finding in findings if finding.code not in RECORDED_ON_SYNC]
+        skipped = [skip for skip in skipped if skip.code not in RECORDED_ON_SYNC]
+    elif timing is None:
+        findings = [
+            replace(finding, detail=_noted(finding.detail, _UNKNOWN_NOTE))
+            if finding.code in RECORDED_ON_SYNC
+            else finding
+            for finding in findings
+        ]
     fired = {finding.code for finding in findings}
     diagnosis = Diagnosis.CLEAN
     for code in SYSTEM_CODES:
@@ -164,7 +228,14 @@ def combine(episode_id: str, results: list[CheckResult], infra_status: str | Non
         findings=_in_order(findings),
         skipped=skipped,
         infra_status=infra_status,
+        recorded=_in_order(recorded),
+        recorded_skipped=recorded_skipped,
+        timing=timing,
     )
+
+
+def _noted(text: str | None, note: str) -> str:
+    return note if not text else f"{text}; {note}"
 
 
 def _in_order(findings: list[SystemFinding]) -> list[SystemFinding]:
