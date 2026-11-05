@@ -375,9 +375,9 @@ class ScorerConfig:
 
     `episode_signals` are the signals no single step owns - the collision flag
     of the two-table task - and a missing one costs a clean episode its pass
-    rather than one step its verdict. `class_from_failed_step` names the kinds
-    whose shared class is the class of the failed step rather than one of their
-    own: `L-COLLIDE` and `L-TIMEOUT` of spec section 5.2.
+    rather than one step its verdict. Which kinds take the class of the failed
+    step is not here either: it is `FailureKindSpec.failure_class ==
+    "from_failed_stage"` of the task (#101).
     """
 
     task_id: str
@@ -385,7 +385,6 @@ class ScorerConfig:
     thresholds: dict[str, float]
     balance: BalanceLimits
     episode_signals: tuple[str, ...]
-    class_from_failed_step: tuple[str, ...]
 
     def declared_signals(self) -> frozenset[str]:
         """Every signal the config accounts for, by episode or by limit."""
@@ -410,7 +409,6 @@ class ScorerConfig:
                 tilt_signal=_text(balance, "tilt_signal", "balance"),
             ),
             episode_signals=_name_list(data, "episode_signals", "scorer config"),
-            class_from_failed_step=_name_list(data, "class_from_failed_step", "scorer config"),
         )
 
 

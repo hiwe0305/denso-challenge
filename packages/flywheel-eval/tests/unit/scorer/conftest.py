@@ -97,11 +97,10 @@ class TwoTableTask:
             FailureKindSpec(kind="L-PLACE", failure_class="place"),
             FailureKindSpec(kind="L-RELEASE", failure_class="place"),
             FailureKindSpec(kind="L-BALANCE", failure_class="balance"),
-            # The declared class is a placeholder for the next two: spec
-            # section 5.2 gives them the class of the failed step, which only
-            # the episode knows, so `evaluate` fills `failure_class` instead.
-            FailureKindSpec(kind="L-COLLIDE", failure_class="approach"),
-            FailureKindSpec(kind="L-TIMEOUT", failure_class="approach"),
+            # Spec section 5.2 gives the next two the class of the failed step
+            # k, which the contract declares as `from_failed_stage` (#101).
+            FailureKindSpec(kind="L-COLLIDE", failure_class="from_failed_stage"),
+            FailureKindSpec(kind="L-TIMEOUT", failure_class="from_failed_stage"),
         )
 
     def condition_schema(self) -> ConditionSchema:

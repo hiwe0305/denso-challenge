@@ -71,8 +71,7 @@ def config(tmp_path: Path) -> Path:
         "thresholds: {distance: 0.05}\n"
         "balance: {min_height: 0.5, max_tilt: 0.4, height_signal: torso_height, "
         "tilt_signal: torso_tilt}\n"
-        "episode_signals: []\n"
-        "class_from_failed_step: []\n",
+        "episode_signals: []\n",
         encoding="utf-8",
     )
     return path

@@ -22,17 +22,16 @@ states still show the failure, so nothing is hidden by saying so.
 not decided here, in three places in this order: what `evaluate()` put in
 `StageEvaluation.failure_class`, because that is the only value that can depend
 on the episode; the `failure_class` of the failed step's own `StageSpec` where
-the kind is one config names as taking its class from the failed step; and the
-`failure_class` of the kind's own `FailureKindSpec` otherwise.
+the kind's `FailureKindSpec.failure_class` is `"from_failed_stage"`; and the
+kind's own `FailureKindSpec.failure_class` otherwise.
 
-The middle one is what spec section 5.2 asks for: `L-COLLIDE` and `L-TIMEOUT`
-take the class of the failed step rather than a class of their own, and 03
-section 4.3 reads `StageSpec.failure_class` as exactly that default. Because
-`FailureKindSpec.failure_class` is a single required value, a task cannot
-declare "theo bước hỏng k" statically, so which kinds behave that way is named
-in config per task until the contract can carry it (Contract change #59).
-Reading it off the kind instead - what this module did before the PO review of
-3/11/2026 - filed a collision during the walk under `approach`.
+The middle one is what spec section 5.2 asks for: `L-COLLIDE`, `L-TIMEOUT` and,
+for the tray task, `L-TRAY-TILT` take the class of the failed step rather than
+a class of their own, and 03 section 4.3 reads `StageSpec.failure_class` as
+exactly that default. The task declares it on the kind (#101, issue #59);
+until #101 it was a per-task list in config, and before the PO review of
+3/11/2026 the kind's own class was used, which filed a collision during the
+walk under `approach`.
 
 At L0 the class is recorded and nothing reads it to choose an intervention
 (AC 3); it is there so L1 can add failures up across tasks (FR17).
@@ -80,7 +79,6 @@ def judge_failure(
     kinds: Sequence[FailureKindSpec],
     failed: int | None,
     stages: Sequence[StageSpec] = (),
-    class_from_failed_step: Sequence[str] = (),
 ) -> FailureVerdict:
     """Name the failure of one episode from its already-scored steps."""
     declared = _declared(kinds)
@@ -113,9 +111,7 @@ def judge_failure(
     return FailureVerdict(
         first_failed_step=failed,
         failure_kind=kind,
-        failure_class=_failure_class(
-            evaluation, kind, declared, failed, stages, class_from_failed_step
-        ),
+        failure_class=_failure_class(evaluation, declared[kind], failed, stages),
     )
 
 
@@ -136,18 +132,15 @@ def apply_episode_signals(verdict: FailureVerdict, missing: Sequence[str]) -> Fa
 
 def _failure_class(
     evaluation: StageEvaluation,
-    kind: str,
-    declared: dict[str, FailureKindSpec],
+    spec: FailureKindSpec,
     failed: int,
     stages: Sequence[StageSpec],
-    class_from_failed_step: Sequence[str],
 ) -> FailureClass | None:
     if evaluation.failure_class is not None:
         return evaluation.failure_class
-    rule = declared[kind].failure_class
-    if rule == "from_failed_stage" or kind in class_from_failed_step:
+    if spec.failure_class == "from_failed_stage":
         return stages[failed].failure_class if 0 <= failed < len(stages) else None
-    return rule
+    return spec.failure_class
 
 
 def unknown_verdict(reason: str) -> FailureVerdict:

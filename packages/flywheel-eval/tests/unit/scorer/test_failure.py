@@ -19,7 +19,6 @@ def judge(
     task: TaskDefinition,
     missing: tuple[str, ...] = (),
     kinds: tuple[FailureKindSpec, ...] | None = None,
-    class_from_failed_step: tuple[str, ...] = (),
 ):  # noqa: ANN201 - the verdict type is an implementation detail of the module
     stages = tuple(task.stages())
     steps = score_steps(evaluation, stages, missing)
@@ -29,7 +28,6 @@ def judge(
         kinds if kinds is not None else tuple(task.failure_kinds()),
         first_failed_step(evaluation),
         stages,
-        class_from_failed_step,
     )
 
 
@@ -83,34 +81,25 @@ def test_the_episode_class_wins_over_the_declared_one(task: TaskDefinition) -> N
     assert verdict.failure_class == "place"
 
 
-@pytest.mark.parametrize(("step", "expected"), [(1, "grasp"), (2, "carry"), (4, "place")])
-def test_contract_rule_selects_failed_stage_class(
-    task: TaskDefinition, step: int, expected: str
-) -> None:
-    kinds = (FailureKindSpec(kind="L-COLLIDE", failure_class="from_failed_stage"),)
-    verdict = judge(failed_at(step, "L-COLLIDE"), task, kinds=kinds)
-    assert verdict.failure_class == expected
-
-
 @pytest.mark.parametrize(("step", "expected_class"), [(1, "grasp"), (2, "carry"), (4, "place")])
 def test_a_step_attached_kind_takes_the_class_of_the_failed_step(
     task: TaskDefinition, step: int, expected_class: str
 ) -> None:
     # A collision during the walk is a carry failure, not an approach one: the
     # class of `L-COLLIDE` is the class of step k (spec section 5.2), and the
-    # placeholder on its `FailureKindSpec` must not be what reaches the record
-    # (review of 3/11/2026, point 3).
-    verdict = judge(failed_at(step, "L-COLLIDE"), task, class_from_failed_step=("L-COLLIDE",))
+    # kind declares `from_failed_stage` on its `FailureKindSpec` (#101) rather
+    # than a class of its own (review of 3/11/2026, point 3).
+    verdict = judge(failed_at(step, "L-COLLIDE"), task)
 
     assert verdict.failure_class == expected_class
 
 
-def test_a_kind_not_named_as_step_attached_keeps_its_declared_class(
-    task: TaskDefinition,
-) -> None:
-    verdict = judge(failed_at(2, "L-COLLIDE"), task)
+def test_a_kind_with_a_fixed_class_keeps_it_at_any_step(task: TaskDefinition) -> None:
+    kinds = (FailureKindSpec(kind="L-COLLIDE", failure_class="approach"),)
 
-    # Nothing is guessed: with no declaration, the kind's own class is used.
+    verdict = judge(failed_at(2, "L-COLLIDE"), task, kinds=kinds)
+
+    # Nothing is guessed: a kind that declares its own class keeps it.
     assert verdict.failure_class == "approach"
 
 

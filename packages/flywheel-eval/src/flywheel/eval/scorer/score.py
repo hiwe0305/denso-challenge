@@ -14,8 +14,7 @@ take away a pass the steps appeared to earn.
 Before any of it, the task and the config are checked against each other:
 every stage has to declare its signals, those signals have to be ones the task
 asks for, every signal the task asks for has to be watched by some step, by
-the episode or by a limit, and a kind the config marks as taking its class
-from the failed step has to be a kind the task declares. A config that
+the episode or by a limit. A config that
 does not line up is a config written for another task, and scoring with it
 would produce a `Score` that looks like a result.
 """
@@ -84,7 +83,6 @@ def score_episode(
         tuple(task.failure_kinds()),
         first_failed_step(evaluation),
         stages,
-        config.class_from_failed_step,
     )
     balance = check_balance(trace.signals, config.balance)
     episode_gaps = tuple(
@@ -144,11 +142,4 @@ def _check_config_fits(
         raise ScorerError(
             f"`StageSpec.signals` khai tín hiệu {invented} mà `required_signals()` của "
             "task không có"
-        )
-    kinds = {spec.kind for spec in task.failure_kinds()}
-    undeclared = sorted(set(config.class_from_failed_step) - kinds)
-    if undeclared:
-        raise ScorerError(
-            f"`class_from_failed_step` khai kiểu lỗi {undeclared} mà `failure_kinds()` "
-            "của task không có"
         )
