@@ -454,6 +454,29 @@ class Mock:
                      "seed_range": "[2000,2090)", "meta": {"round_no": 1}})
         self.files["run_plans.jsonl"] = rows
 
+    def _a07_release(self) -> tuple[str, int]:
+        """Branch A_07: 70% of every source of A's release, human demos included."""
+        ref = "rel_two_table_a07"
+        kept = [item for item in self.release_items
+                if item["release_ref"] == "rel_two_table_v1" and not item["excluded"]]
+        source_of = {e["episode_id"]: code for code, rows in self.episodes_by_dataset.items()
+                     for e in rows}
+        by_source: dict[str, list[str]] = {}
+        for item in kept:
+            by_source.setdefault(source_of[item["episode_ref"]], []).append(item["episode_ref"])
+        chosen = [ref_ for refs in by_source.values() for ref_ in refs[: round(0.7 * len(refs))]]
+        items = [{"release_ref": ref, "episode_ref": e, "sample_weight": 1.0, "excluded": False,
+                  "exclude_reason": None} for e in chosen]
+        self.he_release_items += items
+        self.he_releases.append(
+            {"release_ref": ref, "name": "two_table v1 · 70%",
+             "parent_release_ref": "rel_two_table_v1", "split_plan_sha256": hx("split-plan-v1"),
+             "status": "frozen", "manifest_sha256": hx(",".join(sorted(chosen))),
+             "manifest_uri": "mock://releases/a07/items.parquet", "license_summary": LICENSE,
+             "frozen_at": ts(3, 11), "meta": {"items": len(items), "fraction": 0.7}}
+        )
+        return ref, len(items)
+
     def _he_release(self, variant: str, n: int) -> tuple[str, int]:
         """A frozen release of N human root demos plus the variant's egocentric clips."""
         ref = f"rel_he_{variant.lower()}_{n}"
@@ -491,6 +514,8 @@ class Mock:
         for seed, (code, branch, hypothesis, rp, parent) in enumerate(self.EXPERIMENTS):
             params: Row = {"lr": 1e-4, "steps": 2000}
             release, episodes_used = "rel_two_table_v1", used
+            if branch == "A_07":
+                release, episodes_used = self._a07_release()
             if hypothesis == "HE":
                 variant, n = code.removeprefix("exp_HE_").rsplit("_", 1)
                 params.update(he_variant=variant, n_demos=int(n))

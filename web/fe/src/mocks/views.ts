@@ -15,6 +15,7 @@ import type {
   CostByBranchRow,
   DatasetReport,
   DatasetReportRow,
+  DataAllocationRow,
   DatasetRow,
   DiagnosticRun,
   E1CurvePoint,
@@ -60,6 +61,7 @@ import {
   type StageRunStatus,
   type StepStatus,
   type SystemDiagnosis,
+  type TaskId,
   type UserRole,
 } from "../contracts/enums";
 import type {
@@ -856,20 +858,35 @@ export class MockViews {
     }));
   }
 
-  /** v_cost_by_branch and v_r_demo. */
+  /** v_cost_by_branch: task from the experiment, else the evaluation, else the round. */
+  private ledgerTask(l: RawLedger): TaskId | null {
+    if (l.experiment_code) {
+      const x = this.d.experiments.find((e) => e.experiment_code === l.experiment_code);
+      if (x) return x.task_id;
+    }
+    if (l.evaluation_ref) {
+      const ev = this.d.evaluations.find((e) => e.evaluation_ref === l.evaluation_ref);
+      if (ev) return ev.task_id;
+    }
+    if (l.recommendation_ref && this.d.recommendation.recommendation_ref === l.recommendation_ref) {
+      return this.d.recommendation.task_id;
+    }
+    return null;
+  }
+
+  /** v_cost_by_branch, v_r_demo and v_cost_data_allocation (BR-05). */
   costByBranch(): CostByBranch {
-    const taskOf = new Map(this.d.experiments.map((e) => [e.experiment_code, e.task_id]));
     const groups = new Map<string, { row: CostByBranchRow; entries: RawLedger[] }>();
     for (const l of this.d.ledger) {
       const branch = l.branch ?? null;
-      const task = l.experiment_code ? (taskOf.get(l.experiment_code) ?? null) : null;
+      const task = this.ledgerTask(l);
       const key = `${branch}:${task}:${l.price_book_name}`;
       let g = groups.get(key);
       if (!g) {
         g = {
           row: {
             branch, task_id: task, price_book_name: l.price_book_name, entry_count: 0,
-            estimated_usd: null, measured_usd: null, usd_forecast_error: null,
+            estimated_usd: null, measured_usd: null, usd_forecast_error: null, forecast_pairs: 0,
             estimated_human_minutes: null, measured_human_minutes: null,
             estimated_gpu_hours: null, measured_gpu_hours: null, reversal_count: 0, origin: ORIGIN,
           },
@@ -880,14 +897,17 @@ export class MockViews {
       g.entries.push(l);
     }
     const rows = [...groups.values()].map(({ row, entries }) => {
-      const est = sumOrNull(entries.map((l) => l.estimated_usd));
-      const meas = sumOrNull(entries.map((l) => l.measured_usd));
+      // Forecast error only on rows carrying both an estimate and a measurement.
+      const paired = entries.filter(
+        (l) => l.measured_usd != null && l.estimated_usd != null,
+      );
       return {
         ...row,
         entry_count: entries.length,
-        estimated_usd: est,
-        measured_usd: meas,
-        usd_forecast_error: est !== null && meas !== null ? round(meas - est) : null,
+        estimated_usd: sumOrNull(entries.map((l) => l.estimated_usd)),
+        measured_usd: sumOrNull(entries.map((l) => l.measured_usd)),
+        usd_forecast_error: sumOrNull(paired.map((l) => (l.measured_usd as number) - (l.estimated_usd as number))),
+        forecast_pairs: paired.length,
         estimated_human_minutes: sumOrNull(entries.map((l) => l.estimated_human_minutes)),
         measured_human_minutes: sumOrNull(entries.map((l) => l.measured_human_minutes)),
         estimated_gpu_hours: sumOrNull(entries.map((l) => l.estimated_gpu_hours)),
@@ -895,13 +915,73 @@ export class MockViews {
         reversal_count: entries.filter((l) => l.entry_kind === "REVERSAL").length,
       };
     });
-    const rDemo: RDemoRow[] = this.d.experiments
-      .map((x) => ({
-        task_id: x.task_id, branch: x.branch, method: x.method,
-        human_root_episodes: this.humanRootEpisodes(x.experiment_code).size, origin: ORIGIN,
-      }))
-      .filter((r) => r.human_root_episodes > 0);
-    return { rows, r_demo: rDemo };
+    // v_r_demo: one row per (task, branch, method); HE points live in v_he_curve.
+    const demoGroups = new Map<string, RDemoRow & { seen: Set<string> }>();
+    for (const x of this.d.experiments) {
+      if (x.hypothesis === "HE" || x.hypothesis === "HE_T") continue;
+      const key = `${x.task_id}:${x.branch}:${x.method}`;
+      const g = demoGroups.get(key) ?? {
+        task_id: x.task_id, branch: x.branch, method: x.method, human_root_episodes: 0,
+        origin: ORIGIN, seen: new Set<string>(),
+      };
+      for (const e of this.humanRootEpisodes(x.experiment_code)) g.seen.add(e);
+      demoGroups.set(key, g);
+    }
+    const rDemo: RDemoRow[] = [...demoGroups.values()]
+      .filter((g) => g.seen.size > 0)
+      .map(({ seen, ...g }) => ({ ...g, human_root_episodes: seen.size }));
+    return { rows, r_demo: rDemo, data_allocation: this.dataAllocation() };
+  }
+
+  /** v_cost_data_allocation: each dataset's measured cost, shared by episodes used. */
+  private dataAllocation(): DataAllocationRow[] {
+    type Cost = { usd: number | null; human_minutes: number | null; gpu_hours: number | null };
+    const cost = new Map<string, Cost>();
+    for (const l of this.d.ledger) {
+      if (!l.dataset_code) continue;
+      const c = cost.get(l.dataset_code) ?? { usd: null, human_minutes: null, gpu_hours: null };
+      if (l.measured_usd != null) c.usd = (c.usd ?? 0) + l.measured_usd;
+      if (l.measured_human_minutes != null) c.human_minutes = (c.human_minutes ?? 0) + l.measured_human_minutes;
+      if (l.measured_gpu_hours != null) c.gpu_hours = (c.gpu_hours ?? 0) + l.measured_gpu_hours;
+      cost.set(l.dataset_code, c);
+    }
+    // Episode → dataset the way fwsync resolves it (W12): by source.
+    const bySource = new Map(this.d.datasets.map((d) => [d.source_ref, d.dataset_code]));
+    const datasetOf = new Map(
+      this.d.episodes.map((e) => [e.episode_id, e.source_id ? (bySource.get(e.source_id) ?? null) : null]),
+    );
+    const out: DataAllocationRow[] = [];
+    for (const x of this.d.experiments) {
+      const releases = new Set(
+        this.d.experimentDatasets.filter((ed) => ed.experiment_code === x.experiment_code)
+          .map((ed) => ed.release_ref),
+      );
+      const used = new Map<string, Set<string>>();
+      for (const ri of this.d.releaseItems) {
+        if (!releases.has(ri.release_ref) || ri.excluded) continue;
+        const code = datasetOf.get(ri.episode_ref);
+        if (!code) continue;
+        const set = used.get(code) ?? new Set<string>();
+        set.add(ri.episode_ref);
+        used.set(code, set);
+      }
+      for (const d of this.d.datasets) {
+        const eps = used.get(d.dataset_code);
+        if (!eps) continue;
+        const n = eps.size;
+        const total = d.episode_count;
+        const c = cost.get(d.dataset_code) ?? { usd: null, human_minutes: null, gpu_hours: null };
+        const part = (v: number | null) => (v !== null && total ? (v * n) / total : null);
+        out.push({
+          experiment_id: x.experiment_code, task_id: x.task_id, branch: x.branch,
+          method: x.method, hypothesis: x.hypothesis, dataset_id: d.dataset_code,
+          episodes_used: n, dataset_episodes: total, share: total ? n / total : null,
+          allocated_usd: part(c.usd), allocated_human_minutes: part(c.human_minutes),
+          allocated_gpu_hours: part(c.gpu_hours), origin: ORIGIN,
+        });
+      }
+    }
+    return out;
   }
 
   /**

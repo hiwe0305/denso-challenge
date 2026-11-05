@@ -569,7 +569,10 @@ export interface CostByBranchRow {
   entry_count: number;
   estimated_usd: number | null;
   measured_usd: number | null;
+  /** measured − estimated, summed only over rows that carry both; null when none does. */
   usd_forecast_error: number | null;
+  /** How many rows carry both an estimate and a measurement. */
+  forecast_pairs: number;
   estimated_human_minutes: number | null;
   measured_human_minutes: number | null;
   estimated_gpu_hours: number | null;
@@ -587,10 +590,31 @@ export interface RDemoRow {
   origin: Origin;
 }
 
+/**
+ * v_cost_data_allocation (BR-05): a dataset's measured cost, shared by the
+ * experiments that trained on it in proportion to the episodes they used.
+ */
+export interface DataAllocationRow {
+  experiment_id: string;
+  task_id: TaskId;
+  branch: string;
+  method: string;
+  hypothesis: string;
+  dataset_id: string;
+  episodes_used: number;
+  dataset_episodes: number;
+  share: number | null;
+  allocated_usd: number | null;
+  allocated_human_minutes: number | null;
+  allocated_gpu_hours: number | null;
+  origin: Origin;
+}
+
 /** GET /cost/by-branch. */
 export interface CostByBranch {
   rows: CostByBranchRow[];
   r_demo: RDemoRow[];
+  data_allocation: DataAllocationRow[];
 }
 
 /** GET /cost/sensitivity?price_book= · the ledger repriced under each price book. */

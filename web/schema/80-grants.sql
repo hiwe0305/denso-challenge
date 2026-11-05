@@ -64,7 +64,8 @@ REVOKE ALL ON defect_manifests, defect_items FROM fw_api;
 GRANT SELECT ON
   v_pipeline_current, v_dataset_report, v_defect_detection, v_eval_funnel,
   v_eval_summary, v_system_check, v_branch_comparison, v_he_curve,
-  v_cluster_board, v_cost_by_branch, v_cost_by_intervention, v_r_demo,
+  v_cluster_board, v_cost_by_branch, v_cost_by_intervention, v_cost_data_allocation,
+  v_r_demo,
   v_fix_rate, v_action_status, v_sync_health, failure_records
 TO fw_api;
 

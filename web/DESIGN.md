@@ -14,6 +14,7 @@ Bản v0.4. Tài liệu này là nguồn duy nhất cho tầng web: API, Postgre
 | 5/11/2026 | 0.4 | Mốc M0 xong phần FE: thêm §7.4 hình dạng response cho 5 màn hình lõi (nguồn là `fe/src/api/types.ts`); §7.1 thêm `GET /recommendations` và `GET /evaluations/{id}`; quy ước trang, header vai tạm `X-Fw-Role`, id trong mock là mã `*_ref`. Dựng `fe/`: Vite, MSW đọc thẳng `mock/demo-17-11/`, type hợp đồng sinh bằng `json-schema-to-typescript`, màn hình M7 | Châu |
 | 5/11/2026 | 0.4 | Dựng `api/` trước khi có Postgres: FastAPI với mọi endpoint đọc của §7.1 và hai endpoint ghi của M7, trên lớp đọc thay được (`SinkReadModel` đọc sink JSONL của `fwsync`; `PostgresReadModel` chờ M1). Hành động ghi vào `human_actions.jsonl`, đầu vào của `fwsync export`. Test đối chiếu 38 request với response của MSW. Đi trước W8: thêm một dịch vụ ở L0, chờ PO | Châu |
 | 5/11/2026 | 0.4 | Hai view sửa: `v_branch_comparison` bỏ thí nghiệm HE và HE_T (mọi điểm HE chung một nhánh, nên `DISTINCT ON` sẽ lấy một điểm bất kỳ làm "nhánh"); `v_he_curve` thêm cột `he_variant` để vẽ một đường cho mỗi biến thể. Bộ mock thêm lượt eval cho A_07, B_FAIL và lưới HE; M9 vẽ đường cong HE có khoảng tin cậy Wilson 95% và N₅₀ | Châu |
+| 5/11/2026 | 0.4 | M8 làm lộ ba lỗi view, sửa cả ở SQL lẫn hai lớp đọc: `v_cost_by_branch` lấy task theo thí nghiệm → lượt eval → khuyến nghị (trước đó bút toán eval của B mất task và B tách làm hai dòng); sai số dự báo chỉ tính trên dòng có cả ước tính lẫn thực đo, kèm cột `forecast_pairs` (trước đó trừ hai tổng, lấy ước tính của can thiệp chưa làm trừ vào thực đo của việc khác); `v_r_demo` bỏ HE. Thêm `v_cost_data_allocation` hiện thực BR-05. Bộ mock: A_07 có release riêng 70% mỗi nguồn | Châu |
 
 Ba chỗ sửa ở bản 0.3:
 
@@ -804,7 +805,8 @@ Cột `detector` cho phép M3 nói "code bắt được 6/10, agent bắt thêm 
 | `v_he_curve` | Tỉ lệ thành công theo (biến thể, N, seed) | M9 |
 | `v_cluster_board` | Cụm, chẩn đoán, số thành viên, có tiêu ngân sách hay không, link card | M7 |
 | `v_cost_by_branch`, `v_cost_by_intervention` | Chi phí ước tính và thực đo; phút người và GPU-giờ tách riêng | M8 |
-| `v_r_demo` | Số demo người theo nhánh: đếm episode `is_root AND operator_kind='human'` | M8 |
+| `v_cost_data_allocation` | BR-05: chi phí thực đo của mỗi lô chia cho thí nghiệm theo episode đã dùng, một dòng cho mỗi (thí nghiệm, lô) (bản 0.4) | M8 |
+| `v_r_demo` | Số demo người theo nhánh: đếm episode `is_root AND operator_kind='human'`; không gồm điểm HE (bản 0.4) | M8 |
 | `v_action_status` | Mỗi `human_actions` kèm trạng thái hiện tại của bản ghi đích | Mọi màn hình có nút |
 | `v_sync_health` | Lần import gần nhất, độ trễ, số dòng bị từ chối | M1, M10 |
 
@@ -1075,7 +1077,7 @@ Nguồn duy nhất là [`fe/src/api/types.ts`](fe/src/api/types.ts). Mỗi kiể
 | M6 | `/failures` | `FailureBoard` | Năm họ, mỗi họ có `status`: `not_run` khi không ai sinh họ đó cho lượt eval này, khác với `ok` mà không có dòng nào |
 | M2 | `GET /datasets`, `/{id}`, `/{id}/stages`, `/{id}/episodes`, `/{id}/report`, `/intakes` | `Page<DatasetRow>`, `DatasetRow`, `PipelineView`, `Page<EpisodeRow>`, `DatasetReport`, `Page<…>` | `PipelineView` có cả stepper hiện hành lẫn mọi attempt |
 | M9 | `/results/branches?task_id=`, `/results/he-curve`, `/results/e1-curve` | `BranchComparisonRow[]`, `HeCurvePoint[]`, `E1CurvePoint[]` | Thiếu `task_id` → 400 |
-| M8 | `/cost/ledger`, `/cost/by-branch`, `/cost/by-intervention`, `/cost/sensitivity` | `Page<LedgerRow>`, `CostByBranch`, `InterventionRow[]`, `SensitivityRow[]` | `CostByBranch` mang luôn `r_demo`. Độ nhạy định giá lại từng bút toán theo tỉ lệ giá của bảng mới so với bảng đã ghi |
+| M8 | `/cost/ledger`, `/cost/by-branch`, `/cost/by-intervention`, `/cost/sensitivity` | `Page<LedgerRow>`, `CostByBranch`, `InterventionRow[]`, `SensitivityRow[]` | `CostByBranch` mang luôn `r_demo` và `data_allocation` (BR-05). Độ nhạy định giá lại từng bút toán theo tỉ lệ giá của bảng mới so với bảng đã ghi |
 
 Bốn quy ước thêm ở bản 0.4:
 
@@ -1092,7 +1094,7 @@ Bốn quy ước thêm ở bản 0.4:
 | BR-02 | Chạy lại tầng k sinh attempt mới cho k..6; attempt cũ giữ làm lịch sử | Lõi thực hiện; web gửi `STAGE_REVIEW`; C2, C3 là lưới an toàn |
 | BR-03 | Bản nháp thí nghiệm chỉ sửa khi DRAFT; nộp cần ≥ 1 release và tổng tỉ trọng bằng 1 | C5, C6 |
 | BR-04 | `FORCE_CONTINUE` bắt buộc ghi chú và sinh một `Decision` | API kiểm payload; lõi sinh `Decision` |
-| BR-05 | Chi phí dữ liệu ghi một lần theo dataset lúc nạp. Chi phí một thí nghiệm = chi phí dataset × (episode dùng ÷ tổng episode) | C10, C11; view `v_cost_by_branch` |
+| BR-05 | Chi phí dữ liệu ghi một lần theo dataset lúc nạp. Chi phí một thí nghiệm = chi phí dataset × (episode dùng ÷ tổng episode) | C10, C11; view `v_cost_data_allocation` (bản 0.4) |
 | BR-06 | Sổ chỉ được thêm; sửa sai bằng bút toán đảo mang số âm | C8, C9 |
 | BR-07 | Ngân sách một vòng có ba trần song song: USD, phút người, GPU-giờ. Chỉ `TRANG_THAI_DAU_XAU`, `THIEU_VUNG_PHU`, `KY_NANG_YEU` được tiêu ngân sách dữ liệu | Cột sinh `consumes_data_budget`; API chặn duyệt vượt trần |
 | BR-08 | Lô có lỗi cấy phải khai đủ trong `defect_items`; agent không đọc được đáp án; mỗi lần chấm là một dòng mới. **Đáp án không bao giờ nằm trên `episodes`** | Role `agent_ro`; `defect_scores` append-only; C19 |
@@ -1125,7 +1127,7 @@ Hôm nay 3/11/2026, demo 17/11/2026, còn 14 ngày. Châu làm cả FE, BE và b
 | M6 · Ghép dữ liệu thật | 15/11 | `fwsync` trỏ sang output thật của lõi; phần chưa có giữ mock, FE dán nhãn theo `origin` | Ít nhất pipeline và một lượt eval là dữ liệu thật |
 | M7 · Tổng duyệt | 16/11 | Chạy trọn kịch bản hai lần liên tiếp; công tắc chuyển sang mock dự phòng | Hai lần không lỗi |
 
-**Trạng thái 5/11/2026.** M0 đạt: test so enum xanh, và MSW trả bộ mock của cả 5 màn hình lõi (`fe/src/mocks/handlers.test.ts`, 18 ca), trễ 1 ngày so với hạn. M1 mới đạt phần không cần database: 41 bảng, 3 role, trigger, `fwsync import` nạp hai lần cho cùng kết quả trên sink JSONL. Còn thiếu migration Alembic, ca đúng/ca sai của từng luật trên Postgres thật, và kiểm `fw_api` không ghi được bảng P; cả ba chờ Postgres 16 và W8. Màn hình M7 đã chạy trên MSW, đi trước phần FE của M3. M2 (API đọc) đạt trên sink JSONL: mọi endpoint §7.1 trả đúng response MSW trả (`tests/test_api.py`, 38 ca đối chiếu); còn thiếu SSE và bản Postgres. Bốn màn lõi của M3 (M7, M6, M2, M9) đã chạy, cả trên MSW lẫn trên API sink; bộ mock nay có đủ bốn nhánh và lưới HE 3 biến thể × N ∈ {10, 20, 40, 80}, nên M9 vẽ được cả bảng nhánh lẫn đường cong HE.
+**Trạng thái 5/11/2026.** M0 đạt: test so enum xanh, và MSW trả bộ mock của cả 5 màn hình lõi (`fe/src/mocks/handlers.test.ts`, 18 ca), trễ 1 ngày so với hạn. M1 mới đạt phần không cần database: 41 bảng, 3 role, trigger, `fwsync import` nạp hai lần cho cùng kết quả trên sink JSONL. Còn thiếu migration Alembic, ca đúng/ca sai của từng luật trên Postgres thật, và kiểm `fw_api` không ghi được bảng P; cả ba chờ Postgres 16 và W8. Màn hình M7 đã chạy trên MSW, đi trước phần FE của M3. M2 (API đọc) đạt trên sink JSONL: mọi endpoint §7.1 trả đúng response MSW trả (`tests/test_api.py`, 38 ca đối chiếu); còn thiếu SSE và bản Postgres. Bốn màn lõi của M3 (M7, M6, M2, M9) đã chạy, cả trên MSW lẫn trên API sink; bộ mock nay có đủ bốn nhánh và lưới HE 3 biến thể × N ∈ {10, 20, 40, 80}, nên M9 vẽ được cả bảng nhánh lẫn đường cong HE. M8 đã chạy: đủ năm màn lõi. Trong bốn chỉ số của M8, bộ mock cho số thật ở hai chỉ số (demo người để đạt 50%, phút operator mỗi điểm %); hai chỉ số còn lại hiện "chưa có" vì chưa có nhánh C và chưa bút toán nào có cả ước tính lẫn thực đo.
 
 ### 9.3 Môi trường cần có
 
@@ -1244,7 +1246,7 @@ Bảng dưới là file **thật** của thư mục. Nó khác bản 0.2 ở hai
 | `pipeline_stage_runs.jsonl` | 33 lần chạy tầng: psi tầng 4 `OVERRIDDEN`, bàn phím tầng 4 có hai attempt, bản sao dừng ở tầng 4 |
 | `episodes.jsonl` | 210 episode, đủ bốn nguồn; 10 episode egocentric còn `raw` nằm ở `unassigned` |
 | `qa_reports.jsonl` | 200 báo cáo (egocentric raw chưa qua tầng 4); flag, quarantine, reject đều có lý do |
-| `releases.jsonl`, `release_items.jsonl` | 1 release đóng băng có hash (166 item, 2 item bị loại kèm lý do), 1 release nháp, và 12 release HE: mỗi release đúng N demo gốc của người cộng 20 / 10 / 0 clip egocentric theo biến thể |
+| `releases.jsonl`, `release_items.jsonl` | 1 release đóng băng có hash (166 item, 2 item bị loại kèm lý do), 1 release nháp, 12 release HE: mỗi release đúng N demo gốc của người cộng 20 / 10 / 0 clip egocentric theo biến thể, và release của A_07: 70% mỗi nguồn của v1 (66 demo người so với 94) |
 | `experiments.jsonl`, `experiment_datasets.jsonl`, `checkpoints.jsonl` | 4 nhánh A, A_07, B, B_FAIL cộng lưới HE 3 biến thể (V_EGO, V_EGO10, V_NOEGO) × N ∈ {10, 20, 40, 80} |
 | `training_metrics.jsonl`, `train_diagnoses.jsonl` | 2 run, train và val; B_FAIL có T3; cả hai bỏ qua T7 kèm lý do |
 | `probes.jsonl` | P1, P3 của hai checkpoint; P4 của B so với cha A |
