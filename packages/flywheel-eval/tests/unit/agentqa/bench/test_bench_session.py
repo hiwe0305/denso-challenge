@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import timedelta
 from pathlib import Path
 
@@ -156,3 +157,15 @@ def test_a_group_needs_one_clean_and_one_injected_copy(tmp_path: Path, qa_work: 
         bench.record(agent_run([report(f"r-{copy_id}", [])], copy_id, code.units, code.aliases))
     with pytest.raises(AnswerKeyError, match="2 copies with defects and 0 clean"):
         bench.open_answers()
+
+
+def test_an_episode_missing_from_the_index_is_a_clear_input_error(
+    tmp_path: Path, qa_work: QAWork
+) -> None:
+    work = qa_work(tmp_path, INJECTED, 3, {})
+    index = json.loads((work / "episode_index.json").read_text())
+    missing = next(k for k, v in index.items() if v == 1)
+    del index[missing]
+    (work / "episode_index.json").write_text(json.dumps(index))
+    with pytest.raises(BenchInputError, match=f"episode {missing} .*episode_index.json"):
+        read_qa_work(work, INJECTED)
