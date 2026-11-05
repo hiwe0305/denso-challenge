@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt 25/10/2026; sửa 27/10/2026) |
+| Trạng thái | Xong nhiệm vụ 1–4 (PR #92, 4/11/2026); nhiệm vụ 5 và phần tự va chạm của AC 1 dời sau 13/11/2026; PO duyệt 25/10/2026; sửa 27/10/2026 |
 | Người làm | Hiếu |
 | Làn | Dữ liệu |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 6.3 · Epic 9 |
@@ -74,6 +74,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 | 3/11/2026 | Người làm Thông → Hiếu theo quyết định PO (07 bản 1.6; [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) Q1–Q3): hạn 8/11; AC 5 và nhiệm vụ 5 dời sau 13/11; phạm vi thêm adapter `flywheel_simple/replay/` và test; ước lượng 5 giờ cho AC 1–4 | PO (Hiếu) |
 | 4/11/2026 | PO: phát lại động lực học trượt → `flag`, với mọi nguồn (`task_success`, `replay_success` trong `qa.yaml`); thêm `qa.yaml` và test của nó vào phạm vi file; phần tự va chạm của AC 1 dời sau 13/11/2026 | PO (Hiếu) theo PR #92 |
+| 5/11/2026 | Trạng thái → Xong nhiệm vụ 1–4 theo PR #92 (merge 4/11/2026); nhiệm vụ 5 và phần tự va chạm của AC 1 vẫn dời sau 13/11/2026 | Hiếu, cùng Claude |
 
 ## Ghi chép khi làm
 

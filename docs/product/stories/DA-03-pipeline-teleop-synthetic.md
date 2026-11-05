@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO chốt phạm vi 3/11/2026, [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) Q2, Q3) |
+| Trạng thái | Xong phần trước 13/11/2026 (PR #69, #86, 4/11/2026); normalize, cắt đoạn, nguồn bàn phím dời sau 13/11/2026 (Q3); PO chốt phạm vi 3/11/2026, [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) Q2, Q3 |
 | Người làm | Hiếu |
 | Làn | Dữ liệu |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 6 · Epic 9 |
@@ -136,6 +136,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 5/11/2026 | Trạng thái → Xong phần trước 13/11/2026 theo PR #69 và #86 (merge 4/11/2026); normalize, cắt đoạn, nguồn bàn phím vẫn dời sau 13/11/2026 | Hiếu, cùng Claude |
 | 4/11/2026 | Thêm nhiệm vụ con 3.1–3.2, 4.1–4.2, 6.1–6.3 cho PR 2; thêm vào phạm vi file `ledger.py`, `pyproject.toml` của `flywheel-data`, `uv.lock` (PO chốt 4/11 "Cho phụ thuộc": `flywheel-data` phụ thuộc `flywheel-store`, job ghi `LedgerEntry`) và file mẫu `ReleaseManifest.json` của testkit | Claude, theo yêu cầu PO (Hiếu) |
 | 3/11/2026 | Thêm nhiệm vụ con 2.3–2.5 theo quyết định Q4–Q7 của PO ("Chốt theo đề xuất") | Claude, theo yêu cầu PO (Hiếu) |
 | 3/11/2026 | Thêm nhiệm vụ con 1.1–1.3, 2.1–2.2 theo review PR #69 của PO | Claude, theo yêu cầu PO (Hiếu) |

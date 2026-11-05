@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO chốt phạm vi 3/11/2026, [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) Q2) |
+| Trạng thái | Xong (PR #91, 4/11/2026; nhiệm vụ 4: PR #125, 5/11/2026; PO chốt phạm vi 3/11/2026, [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) Q2) |
 | Người làm | Hiếu |
 | Làn | Dữ liệu |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 6.4 · Epic 9 |
@@ -76,6 +76,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 5/11/2026 | Trạng thái → Xong theo PR #91 (merge 4/11/2026) và PR #125 (nhiệm vụ 4, merge 5/11/2026) | Hiếu, cùng Claude |
 | 5/11/2026 | Thêm nhiệm vụ 4 theo quyết định PO "khai theo task": điểm 6 nhận chiều hằng số khai cho task trong `configs/data/export_checklist.yaml`; thêm file đó vào phạm vi | PO (Hiếu), Claude |
 | 3/11/2026 | Tạo file story theo 07 bản 1.6 và plan chia lại việc (Q2): checklist v2.1 điểm 1–6 phía làn, điểm 7 bằng loader Ψ₀; bộ export dùng lại của DA-33 | PO (Hiếu) |
 
