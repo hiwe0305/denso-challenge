@@ -27,6 +27,10 @@ added around it:
   replays the task more often (docs/g0/replay.md section 3), so the
   reproducible one is the default.
 
+With `--trace <file.jsonl>` (DA-17 task 6) the recorder also writes, per
+episode, a row right after `reset` (step -1) and one after every recorded
+action; `trace_row` says what each row holds. Without it nothing else changes.
+
 SIMPLE writes `meta/replay.txt` into --data-dir; `outcomes.replay_lerobot`
 points it at a staged copy, never at the source dataset.
 """
@@ -43,7 +47,7 @@ from typing import Any
 
 import numpy as np
 
-from flywheel_simple.replay.compare import joint_order, outcome
+from flywheel_simple.replay.compare import base_yaw, joint_order, outcome
 
 CLOCKS = ("sim", "wall")
 SIM_TIME_MODULES = ("simple.agents.replay_decoupled_agent", "simple.cli.replay_decoupled_wbc")
@@ -75,18 +79,103 @@ def read_states(root: Path, episode: int) -> Any:
     return np.asarray(pq.read_table(path, columns=["states"]).column("states").to_pylist())
 
 
-def recorder_class() -> type:
-    gym = importlib.import_module("gymnasium")
+def dataset_uids(root: Path) -> dict[int, str | None]:
+    """episode_index -> `uid` of its environment_config, before the CLI overrides it."""
+    uids: dict[int, str | None] = {}
+    for line in (root / "meta" / "episodes.jsonl").read_text().splitlines():
+        if line.strip():
+            row = json.loads(line)
+            conf = row.get("environment_config")
+            conf = json.loads(conf) if isinstance(conf, str) else conf or {}
+            uids[int(row["episode_index"])] = conf.get("uid")
+    return uids
 
-    class OutcomeRecorder(gym.Wrapper):  # type: ignore[misc, name-defined]
+
+def _xyz(values: Any) -> list[float]:
+    return [round(float(v), 5) for v in np.asarray(values, dtype=np.float64)[:3]]
+
+
+def trace_row(sim: Any, episode: int, step: int) -> dict[str, Any]:
+    """Base, object and grasp of SIMPLE's two-table task, read from the live env.
+
+    Names as in SIMPLE b75c678 `tasks/g1_wholebody_locomotion_pick_between_tables_
+    teleop.py` and `engines/mujoco.py`: the base is MuJoCo body `pelvis`; the
+    object and the container are `mujoco.mj_objects["target"]` and `["container"]`
+    (bodies named after `task.target.asset.label`, `task.container.asset.label`).
+    The contacts are read the way the task's `check_hand_object_contact` and
+    `check_object_in_container` read them: a body name holding the target's label
+    against one holding `left_hand` / `right_hand` (the task only asks for "hand"),
+    the container's label, or `table2`. `reward` is `task.reward`, which the task
+    raises by 0.02 per call while the object is on the container and no hand
+    touches it; SIMPLE's env calls it twice per step and succeeds at 0.4.
+    """
+    data, model, task = sim.mjData, sim.mjModel, sim.task
+    pelvis = data.body("pelvis")
+    target = str(task.target.asset.label)
+    container = str(task.container.asset.label)
+    touching: list[str] = []
+    for k in range(int(data.ncon)):
+        contact = data.contact[k]
+        names = [str(model.body(model.geom(g).bodyid).name) for g in (contact.geom1, contact.geom2)]
+        if target in names[0]:
+            touching.append(names[1])
+        elif target in names[1]:
+            touching.append(names[0])
+    objects = sim.mujoco.mj_objects
+    return {
+        "episode": episode,
+        "step": step,
+        "base_xyz": _xyz(pelvis.xpos),
+        "base_yaw": round(base_yaw(pelvis.xquat), 5),
+        "object_xyz": _xyz(objects["target"].xpos),
+        "container_xyz": _xyz(objects["container"].xpos),
+        "grasp": {side: any(f"{side}_hand" in n for n in touching) for side in ("left", "right")},
+        "on_container": any(container in n for n in touching),
+        "on_table2": any("table2" in n for n in touching),
+        "reward": round(float(getattr(task, "reward", 0.0)), 5),
+        "success": bool(getattr(sim, "_success", False)),
+    }
+
+
+def reset_row(
+    sim: Any, episode: int, options: dict[str, Any], dataset_uid: str | None
+) -> dict[str, Any]:
+    """trace_row at step -1, plus the object pose and DR level the reset was asked for.
+
+    `env_conf_object_xyz` is `dr_state_dict.spatial[<target uid>]` of the episode's
+    environment_config: with `dr_level` None (the CLI's default) SIMPLE's
+    `DRManager.load_state_dict` restores every randomizer from it, spatial poses
+    included. (The config's `layout` holds the poses at the end of the recording.)
+    """
+    row = trace_row(sim, episode, -1)
+    conf = options.get("state_dict") or {}
+    dr = conf.get("dr_state_dict") or {}
+    pose = (dr.get("spatial") or {}).get(str((dr.get("target") or {}).get("uid"))) or {}
+    row["env_conf_object_xyz"] = _xyz(pose["position"]) if "position" in pose else None
+    row["dr_level"] = options.get("dr_level")
+    row["uid_overridden"] = dataset_uid != sim.task.uid
+    return row
+
+
+def recorder_class(base: type | None = None) -> type:
+    """OutcomeRecorder on top of `base` (gymnasium.Wrapper unless a test passes one)."""
+    wrapper = base or importlib.import_module("gymnasium").Wrapper
+
+    class OutcomeRecorder(wrapper):  # type: ignore[misc, valid-type]
         """Keeps the state joints after each data step and writes one outcome per episode."""
 
-        def __init__(self, env: Any, data_dir: Path, out: Path, state_names: list[str]) -> None:
+        def __init__(
+            self, env: Any, data_dir: Path, out: Path, state_names: list[str],
+            trace: Path | None = None,
+        ) -> None:  # fmt: skip
             global _live
             super().__init__(env)
             self.data_dir, self.out, self.state_names = data_dir, out, state_names
+            self.trace = trace
+            self.uids = dataset_uids(data_dir) if trace is not None else {}
             self.episode: int | None = None
             self.rows: list[Any] = []
+            self.trace_rows: list[dict[str, Any]] = []
             self.order: list[int] | None = None
             _live = self
 
@@ -94,7 +183,13 @@ def recorder_class() -> type:
             self.flush()
             task_id = str((options or {}).get("task_id", ""))
             self.episode = int(task_id[8:]) if task_id.startswith("episode_") else None
-            return self.env.reset(seed=seed, options=options)
+            result = self.env.reset(seed=seed, options=options)
+            if self.trace is not None and self.episode is not None:
+                row = reset_row(
+                    self.env.unwrapped, self.episode, options or {}, self.uids.get(self.episode)
+                )
+                self.trace_rows.append(row)
+            return result
 
         def step(self, action: Any) -> Any:
             result = self.env.step(action)
@@ -103,6 +198,10 @@ def recorder_class() -> type:
                 self.order = joint_order(list(qpos), self.state_names)
             values = np.asarray(list(qpos.values()), dtype=np.float64)
             self.rows.append(values[self.order])
+            if self.trace is not None and self.episode is not None:
+                self.trace_rows.append(
+                    trace_row(self.env.unwrapped, self.episode, len(self.rows) - 1)
+                )
             return result
 
         def close(self) -> Any:
@@ -118,7 +217,10 @@ def recorder_class() -> type:
                 )
                 with self.out.open("a") as f:
                     f.write(json.dumps(line) + "\n")
-            self.episode, self.rows = None, []
+            if self.trace is not None and self.trace_rows:
+                with self.trace.open("a") as f:
+                    f.writelines(json.dumps(r) + "\n" for r in self.trace_rows)
+            self.episode, self.rows, self.trace_rows = None, [], []
 
     return OutcomeRecorder
 
@@ -132,6 +234,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--num-episodes", type=int, required=True)
     ap.add_argument("--save-dir", type=Path, required=True)
     ap.add_argument("--clock", choices=CLOCKS, required=True)
+    ap.add_argument("--trace", type=Path, help="per-step trace, one JSON row per step")
     args = ap.parse_args(argv)
 
     from flywheel_simple.tray.export import state_names
@@ -147,7 +250,7 @@ def main(argv: list[str]) -> int:
     make, recorder = gym.make, recorder_class()
 
     def wrapped_make(*a: Any, **kw: Any) -> Any:
-        return recorder(make(*a, **kw), args.data_dir, args.outcomes, names)
+        return recorder(make(*a, **kw), args.data_dir, args.outcomes, names, trace=args.trace)
 
     setattr(gym, "make", wrapped_make)  # the CLI looks gym.make up when it calls it
     cli = importlib.import_module("simple.cli.replay_decoupled_wbc")

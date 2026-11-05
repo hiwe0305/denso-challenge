@@ -33,6 +33,7 @@ Là kỹ sư dữ liệu, tôi muốn mọi episode có action robot (psi-data, 
 - [x] 4. `ReplayReport` và nối vào QA (AC 4)
 - [ ] 5. Phát lại action dự đoán, video (AC 5; sau 13/11/2026)
 - [ ] 6. Tìm nguyên nhân 26/99 episode psi-data đạt khi phát lại (phát hiện 1 của [replay.md](../../g0/replay.md); PO 5/11/2026)
+  - [x] 6.1. Cờ `--trace` ghi tư thế đế, vật và trạng thái nắm theo từng bước
 
 ## Phạm vi file
 
