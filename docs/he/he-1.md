@@ -334,11 +334,78 @@ vm $S "cd /content/da26; nohup setsid python3 fw/scripts/he/he1_colab.py persist
 - `fwdata/he/runs/$S/fetched.json` phải có `"final": true`, tức `ckpt_40000` đã kiểm sha256 trên laptop. Nếu Drive đã mount, trên Drive cũng phải có bản này.
 - **Dừng phiên ngay sau đó**, không chờ trần. `follow --stop-when-done` tự gọi `colab stop -s $S`; dừng sớm cũng gọi lệnh này. Kiểm lại: `grep '^exit' $R/$S.out` phải có dòng `exit` (watcher thấy phiên mất, mã 0), và `colab sessions` không còn `$S`. Mã thoát của `follow` là dòng cuối của `$R/$S.fetch.log` (`tail -1 $R/$S.fetch.log`, dạng `exit N`): 0 xong, 3 dừng sớm, 5 train `failed` (phiên đã dừng), 6 dừng không xác nhận được (xem `colab sessions` ngay). Nếu `follow` thoát mà phiên vẫn chạy (mã 1, 2 hoặc 6, hoặc đã thấy `"final": true` mà phiên chưa dừng), thì chạy `colab stop -s $S` bằng tay rồi kiểm lại như trên. Nếu sau một vòng poll watcher vẫn chưa thoát, gửi SIGTERM cho tiến trình watcher: nó dừng phiên có xác nhận rồi thoát mã 6.
 - Dòng `exit` cuối của `$R/$S.jsonl` cho `balance_drop`, `spent`, `wall_cu`. Các số này vào dòng `measured` của [`ledger/DA-26.csv`](../g0/ledger/DA-26.csv), trỏ về dòng `estimated` cùng job.
-- Server eval mở sau, trong cùng `$R`, theo đúng dạng lệnh của watcher (`--gpu L4`, `--log` và `--persist` đều bắt buộc theo quy ước). Nếu guard đã thoát, chạy lại dòng guard ở trên với `$R` trước. Lệnh dưới giả định driver eval, viết ở PR eval, ghi log server vào `/content/da26/runs/da26-t2-eval-n20/`, để `once` kéo về được.
+- Server eval mở sau, trong cùng `$R`, theo đúng dạng lệnh của watcher (`--gpu L4`, `--log` và `--persist` đều bắt buộc theo quy ước). Nếu guard đã thoát, chạy lại dòng guard ở trên với `$R` trước. Driver eval ghi log server vào `/content/da26/runs/da26-t2-eval-n20/`, để `once` kéo về được (mục 7.1).
 
 ```bash
 nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py session --registry "$0" --new --name "$1" --gpu L4 --cap 16 --floor 14 --persist "python3 scripts/he/he1_fetch.py once --session $1 --registry $0 --dest fwdata/he/runs" --log "$0/$1.jsonl"; echo "exit $?"' $R da26-t2-eval-n20 < /dev/null > $R/da26-t2-eval-n20.out 2>&1 &
 ```
+
+### 7.1 Eval tier 2: hai fine-tune N20 trên 10 điều kiện dev (F10, nhiệm vụ 3)
+
+Chưa chạy. Chờ đợt C của DA-34 dừng và được xác nhận (một đợt một lúc trên tài khoản), và lệnh chạy của phiên chính. Driver: [`scripts/he/he1_eval.py`](../../scripts/he/he1_eval.py) trên laptop, pha `serve-setup` và `serve` của `he1_colab.py` trên VM, [`scripts/he/he1_client.sh`](../../scripts/he/he1_client.sh) trên rtx3060.
+
+**Cách chạy.**
+
+- Một phiên Colab L4 `da26-t2-eval-n20`, trần 16 CU, dòng dừng của watcher 15,77 CU. Hai server Ψ₀ trên VM, cổng 22085 (V-EGO) và 22086 (V-NOEGO), khoảng 6,2 GB VRAM mỗi server trên card 23 GB (S1-03). Cờ server như S1-03: `--action-exec-horizon 24 --rtc`.
+- Client Isaac chạy một lần trên rtx3060, trên bản xen kẽ của bộ dev. **[Đã chốt 5/11/2026, Hiếu]** Xen kẽ theo điều kiện: episode 2i là điều kiện i cho V-EGO, 2i + 1 là cùng điều kiện cho V-NOEGO. Thứ tự arm là thứ tự các điểm `preliminary` trong RunPlan, giống nhau ở mọi điều kiện (`pair_order`, có test). Một lần chạy chỉ khởi động Isaac một lần (khoảng 4 phút), thay vì 20 lần.
+- Client chỉ nhận một host và cổng, nên `route` trên laptop (127.0.0.1:22185) chọn server cho từng episode. SIMPLE gọi `agent.reset` một lần mỗi episode; `/act` kế tiếp có `history.reset`. Lần reset thứ n là episode n của bộ xen kẽ, nên `route` gửi nó và mọi `/act` sau nó tới arm của episode đó. rtx3060 tới `route` qua `ssh -R 127.0.0.1:22095` (không dùng 22085 trên rtx3060 vì story khác đang dùng). Laptop tới hai server qua một kết nối `ssh -L` (22285, 22286), vì runtime chỉ nhận một kết nối SSH mỗi lúc.
+- **Quy tắc CU theo cặp.** Trước episode đầu của mỗi cặp, `route` tính CU dự kiến khi cặp đó và phần kết thúc đã xong:
+  `spent + 1,94 × (tuổi số đo + 2 × episode_s + 300 s) / 3600 + 0,1`.
+  - Chỉ bắt đầu cặp khi số này không vượt dòng dừng 15,77 CU. Không bao giờ dừng giữa cặp: cặp đã bắt đầu luôn vừa, kể cả khi cả hai episode hỏng.
+  - `episode_s` là số lớn nhất giữa 24,6 phút (một episode hỏng chạy hết ngân sách bước, S1-03) và mọi episode đã thấy. Episode nhanh hơn tiết kiệm CU nhưng không nới quy tắc.
+  - `spent` là dòng `poll` cuối của watcher, chỉ khi mới hơn 300 s; nếu cũ thì chờ tối đa 600 s, rồi từ chối. 300 s cho phần kết thúc là giả định: đóng forward, kéo log, dừng phiên có xác nhận.
+  - Bị từ chối thì `route` trả 503, dừng container client (`docker stop da26-eval-client`), `run` thoát 3. Các cặp trước đó đều đủ.
+- **Tải lên chỉ những gì server đọc**: `argv.txt`, `run_config.json` (chứa sẵn cận chuẩn hóa) và `ckpt_40000/model.safetensors`, 2 × 6,25 GB = 12,5 GB, kèm `expected.json` là sha256 đã kiểm trên laptop. `serve` kiểm lại sha256 trên VM trước khi nạp; lệch một file là không chạy server nào. Tải lên chạy song song với `serve-setup` (tách khỏi shell). `probe` đo cả tốc độ kéo về (1 GB) và đẩy lên (256 MB).
+- **Log cho Agent QA/QC từ đầu**, tất cả trong `fwdata/he/runs/da26-t2-eval-n20/`:
+  - `route.jsonl`: mọi request (episode, arm, reset, thời gian, mã trả về), mọi lần chấm cặp với các số của nó, số RAM rtx3060, các lần tunnel khởi động lại;
+  - `client/`: `client.log`, `eval/<tag>/eval_stats.txt`, video, `summary.json`, `server_info.json`, `exit`;
+  - `server-<job>.log`, `server-<job>.info.json` (log server trên VM, kéo bằng `once`);
+  - `vm-logs/`: `serve-setup.log`, `serve.log`, `report.json`, `launch-env.txt` (chỉ khóa trong allowlist, không bao giờ có khóa bí mật), `pip-freeze-serve.txt`, `nvidia-smi-q.txt`, `df-h.txt`, `free-m.txt`. Với hai fine-tune, `stage` cũng làm mới `vm-logs/` mỗi lượt, nên việc tay của đợt b3 nay là một bước của script;
+  - `results.jsonl`: mỗi episode đã bắt đầu, thành công theo `eval_stats.txt`, số lần `/act`, trung vị và tối đa thời gian `/act`, `complete_pair`. Chỉ cặp đủ mới vào so sánh.
+- **rtx3060.** Thư mục `~/denso-da26` (không dùng `~/denso-challenge`). Client là container ảnh SIMPLE của S1-03 (cùng digest, cùng file task `b75c678` kiểm sha256, có test so với `eval_psi0.sh`), DDS domain 126, `--memory 20g`. Lệnh chạy dưới `nohup setsid` và `systemd-run --user --scope -p MemoryMax=24G -p MemorySwapMax=0`. Trước khi chạy, `run` và client cùng kiểm MemAvailable ≥ 20 + 16 = 36 GB; thiếu thì không chạy gì, thoát 4. Tiến trình `pol.train_stage_a` 10 GB là dự án khác của Hiếu, không động vào. Giờ chạy hẹn với DA-35 qua phiên chính.
+
+**Mấy cặp vừa trần 16** (`he1_eval.py fit`, có test). Số đo đang có: kéo về 11,0–11,25 MB/s (`probe` và lượt kéo `ckpt_40000` của b3); một episode hỏng 24,6 phút (S1-03). Tốc độ đẩy lên chưa đo; bảng giả định bằng tốc độ kéo về. Trước lần reset đầu khoảng 1,0 CU (ước lượng, khoảng 31 phút): watcher và `probe` 4 phút, triển khai 0,5 phút, tải lên 12,5 GB ở 11 MB/s 19 phút (`serve-setup` khoảng 8 phút chạy song song), nạp hai server 3 phút, khởi động Isaac 4 phút. Mỗi cặp hai episode hỏng 1,59 CU.
+
+| CU đã dùng ở lần reset đầu | Mọi episode 24,6 phút (hỏng) | 22,5 phút | 22 phút | 20 phút |
+|---|---|---|---|---|
+| 0,6 | 9 | 10 | 10 | 10 |
+| 0,9 | 9 | 9 | 10 | 10 |
+| 1,0 (dự kiến) | **9** | 9 | 10 | 10 |
+| 1,2 | 8 | 9 | 9 | 10 |
+
+- **Ở số đo hiện có chỉ 9 cặp vừa trần 16, không phải 10.** Ngay cả khi không tốn gì trước episode đầu, 20 episode hỏng là 8,2 giờ, 15,9 CU, đã vượt dòng dừng 15,77. Cặp thứ 10 chỉ chạy được khi trung bình mỗi episode từ 22,2 phút trở xuống (ở 1,0 CU trước reset đầu), tức phải có episode thành công sớm. Với N20 thì khó, vì một bàn tay không cử động (mục 4).
+- Còn 9 cặp khi phần trước reset đầu dưới 1,19 CU (36,8 phút); chậm hơn, ví dụ đẩy lên dưới khoảng 8 MB/s, là 8 cặp. Máy rtx3060 bận như lần 10 episode của S1-03 (33 phút mỗi episode) thì chỉ còn 6 cặp.
+- **[Option]** cho Hiếu: (a) giữ trần 16, chạy 9 cặp, sơ bộ là 9 điều kiện mỗi arm, độ nhạy còn kém hơn bảng ở mục 6.1; (b) nâng trần eval để đủ 10 cặp: 17,5 vừa khi phần trước reset đầu khoảng 1,0 CU, 18 còn dư tới 1,2 CU; (c) giữ trần 16, bớt 1 điều kiện khỏi RunPlan. Phiên chính không đổi trần; đây là quyết định của Hiếu.
+
+**Lệnh** (thư mục gốc là bản checkout `master`, `ready` và `vm` như trên, `S=da26-t2-eval-n20`). Guard và watcher như khối ở trên, `--cap 16`. Số dư cần ít nhất sàn 14 + trần 16 = 30 CU.
+
+```bash
+S=da26-t2-eval-n20
+python3 scripts/he/he1_eval.py interleave --src fwdata/he/dev-eval-v1-l0n10 --out fwdata/he/eval-n20-interleaved
+ready $S && python3 scripts/he/he1_eval.py probe --session $S --registry $R --dest fwdata/he/runs \
+  || { colab stop -s $S; echo "$S: not ready or probe failed, session stopped"; }
+git archive --format=tar.gz HEAD | vm $S 'mkdir -p /content/da26/fw && tar -xz -C /content/da26/fw'
+vm $S "cd /content/da26; nohup setsid bash -c 'python3 fw/scripts/he/he1_colab.py serve-setup; echo serve-setup exit \$?' > serve-setup.log 2>&1 < /dev/null &"
+python3 scripts/he/he1_eval.py upload --session $S --registry $R --runs fwdata/he/runs   # song song với serve-setup
+vm $S 'tail -1 /content/da26/serve-setup.log'   # chờ "serve-setup exit 0"
+vm $S "cd /content/da26; nohup setsid bash -c 'python3 fw/scripts/he/he1_colab.py serve; echo serve exit \$?' > serve.log 2>&1 < /dev/null &"
+vm $S 'tail -1 /content/da26/serve.log'   # chờ "serve exit 0": hai server trả /health
+```
+
+rtx3060 (chỉ chạy khi đã có lệnh của phiên chính; kiểm lại RAM ngay trước):
+
+```bash
+git archive --format=tar.gz HEAD | ssh rtx3060 'mkdir -p ~/denso-da26/fw && tar -xz -C ~/denso-da26/fw'
+rsync -a fwdata/he/eval-n20-interleaved/ rtx3060:denso-da26/sets/interleaved/
+ssh rtx3060 'grep MemAvailable /proc/meminfo; docker ps --format "{{.Names}} {{.Status}}"'
+nohup setsid bash -c 'python3 scripts/he/he1_eval.py run --session "$1" --registry "$0" --dest fwdata/he/runs --set fwdata/he/eval-n20-interleaved; echo "exit $?"' $R $S < /dev/null > $R/$S.eval.log 2>&1 &
+```
+
+- `run` tự làm phần còn lại, không cần người: chờ client xong, đóng forward, kéo `client/` từ rtx3060, kéo log VM bằng `once`, ghi `results.jsonl`, dừng phiên có xác nhận. Mã thoát (dòng cuối `$R/$S.eval.log`): 0 đủ mọi cặp; 3 một cặp bị quy tắc CU từ chối; 4 rtx3060 thiếu RAM; 5 client hoặc forward lỗi; 6 dừng phiên không xác nhận được (xem `colab sessions` ngay).
+- Trong lúc eval, forward giữ kết nối SSH duy nhất, nên lượt `--persist` của watcher ở mốc mềm có thể bị từ chối (HTTP 429). Không sao: `run` kéo log sau khi đóng forward.
+- Xem tiến độ: `tail -3 fwdata/he/runs/da26-t2-eval-n20/route.jsonl`, `tail -1 $R/$S.jsonl`.
+- Bộ xen kẽ dựng ngày 5/11/2026 từ bộ dev thật: 20 episode, `order.json` sha256 `6d764478…`; test kiểm từng episode trùng điều kiện của nó (`environment_config`) và hash điều kiện của RunPlan.
+- Thử khô trên laptop, CPU, không Colab, không ghi gì lên rtx3060: [`test_he1_eval.py`](../../scripts/he/test_he1_eval.py) có 17 test (cả thư mục 83): thứ tự xen kẽ; bộ xen kẽ trên bộ giả và trên bộ dev thật; quy tắc CU (vừa, vượt, episode chậm nâng cận, số đo cũ hay thiếu); mấy cặp vừa; `route` qua HTTP với hai server giả (đúng arm, log mọi request, 503 sau khi từ chối); tải lên và kiểm sha256 trên VM giả; `serve` với launcher giả; `vm-logs` (hard link, log lõi W&B ngoài thư mục, link lại khi file bị thay, `launch-env.txt` không có khóa bí mật); ghim của client trùng `eval_psi0.sh`.
 
 ## Change log
 
@@ -358,3 +425,4 @@ nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py se
 | 5/11/2026 | Mục 6.2, 7: **[Đã chốt 5/11/2026, Hiếu]** caps 18/18/16 (cùng 52 CU). Lệnh watcher `--cap 18` / `--cap 18` / `--cap 16`. Bảng ngưỡng tính lại ở trần 18. Số dư tối thiểu vẫn 66 CU. Ghi chú: trần eval 16 thấp hơn ước lượng 16,2; **[Đã chốt 5/11/2026, Hiếu]** eval xen kẽ hai arm theo điều kiện | Hiếu (soạn với Claude) |
 | 5/11/2026 | Mục 7, theo review lại lần hai #109: `stage` có trạng thái cho cả lần chạy, nên train chết trước khi có `runs/<job>` là `failed` (thoát 5); lần liệt kê phiên chỉ tính khi tin được như `cu_watch.py`, lỗi xác thực không còn được coi là đã dừng; SIGTERM chỉ tới tiến trình `cu_watch.py` còn sống; dòng `follow` ghi `exit N` vào `$R/$S.fetch.log` | Hiếu (soạn với Claude) |
 | 5/11/2026 | Mục 4: thêm giới hạn của N20, một bàn tay (chiều action 0–6) không cử động. Ghi số đo của lần chạy b2 bị hủy vào sổ chi phí | Hiếu (soạn với Claude) |
+| 5/11/2026 | Mục 7.1: cách chạy eval tier 2. Xen kẽ hai arm theo điều kiện (`he1_eval.py`, `route` chọn server theo lần reset); quy tắc CU theo cặp, không dừng giữa cặp; chỉ tải lên file server đọc, kiểm sha256 trên VM; log cho Agent QA/QC trong `runs/da26-t2-eval-n20/`; `vm-logs` thành bước của script; client rtx3060 dưới `systemd-run` MemoryMax. Ở số đo hiện có chỉ 9 cặp vừa trần 16; ba **[Option]** cho Hiếu. Chưa chạy | Hiếu (soạn với Claude) |
