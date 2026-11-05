@@ -78,10 +78,10 @@ DIAGNOSIS_NAMES: dict[str, str] = {
 # The Vietnamese names of spec section 5.1, for the engineer reading the table.
 # The artifact keeps the enum values, so it stays readable either way.
 STATUS_NAMES: dict[StepStatus, str] = {
-    StepStatus.PASSED: "đạt",
-    StepStatus.FAILED: "trượt",
-    StepStatus.NOT_ATTEMPTED: "chưa thử",
-    StepStatus.UNKNOWN: "chưa rõ",
+    "pass": "đạt",
+    "fail": "trượt",
+    "not_attempted": "chưa thử",
+    "unknown": "chưa rõ",
 }
 
 

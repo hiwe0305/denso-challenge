@@ -29,7 +29,7 @@ from flywheel.eval.config import ScorerConfig
 from flywheel.eval.scorer.balance import BalanceVerdict, apply_balance, check_balance
 from flywheel.eval.scorer.failure import FailureVerdict, apply_episode_signals, judge_failure
 from flywheel.eval.scorer.reader import Trace
-from flywheel.eval.scorer.status import ScorerError, StepScore, StepStatus
+from flywheel.eval.scorer.status import ScorerError, StepScore
 from flywheel.eval.scorer.steps import first_failed_step, score_steps
 
 
@@ -58,7 +58,7 @@ class EpisodeScore:
 
     @property
     def unknown_steps(self) -> tuple[StepScore, ...]:
-        return tuple(step for step in self.steps if step.status is StepStatus.UNKNOWN)
+        return tuple(step for step in self.steps if step.status == "unknown")
 
 
 def score_episode(
@@ -76,9 +76,7 @@ def score_episode(
     _check_config_fits(task, stages, config)
 
     evaluation = _evaluate(trace, task, config)
-    steps = score_steps(
-        evaluation, stages, trace.missing_signals, step_signals=config.step_signals
-    )
+    steps = score_steps(evaluation, stages, trace.missing_signals, step_signals=config.step_signals)
     failure = judge_failure(
         evaluation,
         steps,
@@ -149,8 +147,7 @@ def _check_config_fits(
     )
     if invented:
         raise ScorerError(
-            f"`step_signals` khai tín hiệu {invented} mà `required_signals()` của task "
-            "không có"
+            f"`step_signals` khai tín hiệu {invented} mà `required_signals()` của task không có"
         )
     kinds = {spec.kind for spec in task.failure_kinds()}
     undeclared = sorted(set(config.class_from_failed_step) - kinds)

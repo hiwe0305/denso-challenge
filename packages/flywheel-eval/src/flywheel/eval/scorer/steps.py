@@ -18,6 +18,16 @@ step's state is, and it is the only place the two conventions of spec section
   step's missing signals and no others - a step is never told it is unknown
   because of a signal it does not use.
 
+What the task said about each step is read from `StageEvaluation.stage_status`
+when the task sends it, and recovered from `stage_success` when it does not.
+The difference matters for k: in `stage_success` a step the task marked
+`not_attempted` is `False` like a failed one, so the first `False` of a task
+that stopped after an unknown step is not a failure at all. With a four-state
+answer, k is the first `fail`. A `not_attempted` step with neither a failure
+nor an unknown step before it is a contradiction - the task stopped without
+saying where it broke - and raises rather than scoring as an episode that
+simply passed.
+
 The number of steps comes from `stages()` and the signals of each step come
 from config; nothing here knows that the two-table task has six steps, that
 the tray task has seven, or which signal any step is judged on.
@@ -57,13 +67,27 @@ def score_steps(
     return tuple(
         _step(
             stage.name,
-            outcome,
+            reported,
             index,
             failed,
             missing_for_step(stage.name, step_signals, missing_signals),
         )
-        for index, (stage, outcome) in enumerate(zip(stages, outcomes, strict=True))
+        for index, (stage, reported) in enumerate(
+            zip(stages, task_statuses(evaluation), strict=True)
+        )
     )
+
+
+def task_statuses(evaluation: StageEvaluation) -> tuple[StepStatus, ...]:
+    """What the task itself said about each step, in the four states.
+
+    `stage_status` when the task sent one; otherwise read off `stage_success`,
+    where `False` can only mean `fail` because nothing else is said.
+    """
+    if evaluation.stage_status is not None:
+        return evaluation.stage_status
+    legacy: dict[bool | None, StepStatus] = {True: "pass", False: "fail", None: "unknown"}
+    return tuple(legacy[outcome] for outcome in evaluation.stage_success)
 
 
 def missing_for_step(
@@ -85,8 +109,17 @@ def first_failed_step(evaluation: StageEvaluation) -> int | None:
     the disagreement raises: a `Score` whose failed step is not the step marked
     failed would point every later step of the diagnosis at the wrong place.
     """
-    outcomes = evaluation.stage_success
-    found = next((index for index, outcome in enumerate(outcomes) if outcome is False), None)
+    statuses = task_statuses(evaluation)
+    found = next((index for index, status in enumerate(statuses) if status == "fail"), None)
+    skipped = next(
+        (index for index, status in enumerate(statuses) if status == "not_attempted"), None
+    )
+    stopped = found is not None and found < (skipped or 0)
+    if skipped is not None and not stopped and "unknown" not in statuses[:skipped]:
+        raise ScorerError(
+            f"`stage_status` ghi bước {skipped} chưa thử mà không có bước trượt hay "
+            "chưa rõ nào trước nó; task dừng ở đâu thì bước đó phải là `fail`"
+        )
     declared = evaluation.first_failed_stage
     if declared is not None and declared != found:
         raise ScorerError(
@@ -105,7 +138,7 @@ def unknown_reason(missing_signals: Sequence[str] = ()) -> str:
 
 def _step(
     name: str,
-    outcome: bool | None,
+    reported: StepStatus,
     index: int,
     failed: int | None,
     missing: Sequence[str],
@@ -113,13 +146,11 @@ def _step(
     if failed is not None and index > failed:
         # Reached after the task had already stopped: not attempted, whatever
         # the predicate chain reported for it.
-        return StepScore(name=name, status=StepStatus.NOT_ATTEMPTED)
+        return StepScore(name=name, status="not_attempted")
     if missing:
         # The predicate may well have answered; it answered about a signal
         # nobody recorded, which is not a verdict (AC 2, FR21).
-        return StepScore(name=name, status=StepStatus.UNKNOWN, reason=unknown_reason(missing))
-    if outcome is None:
-        return StepScore(name=name, status=StepStatus.UNKNOWN, reason=NO_VERDICT)
-    if outcome:
-        return StepScore(name=name, status=StepStatus.PASSED)
-    return StepScore(name=name, status=StepStatus.FAILED)
+        return StepScore(name=name, status="unknown", reason=unknown_reason(missing))
+    if reported == "unknown":
+        return StepScore(name=name, status="unknown", reason=NO_VERDICT)
+    return StepScore(name=name, status=reported)

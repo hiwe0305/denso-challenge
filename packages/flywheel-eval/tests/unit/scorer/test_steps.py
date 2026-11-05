@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from conftest import BY_STEP
 from flywheel.contracts import StageEvaluation, StageSpec, TaskDefinition
-from flywheel.eval.scorer.status import ScorerError, StepStatus
+from flywheel.eval.scorer.status import ScorerError
 from flywheel.eval.scorer.steps import NO_VERDICT, first_failed_step, score_steps
 
 NO_SIGNALS: dict[str, tuple[str, ...]] = {}
@@ -14,16 +14,13 @@ NO_SIGNALS: dict[str, tuple[str, ...]] = {}
 def states(
     evaluation: StageEvaluation, stages: tuple[StageSpec, ...], missing: tuple[str, ...] = ()
 ) -> list[str]:
-    return [
-        step.status.value
-        for step in score_steps(evaluation, stages, missing, step_signals=BY_STEP)
-    ]
+    return [step.status for step in score_steps(evaluation, stages, missing, step_signals=BY_STEP)]
 
 
 def test_a_full_run_passes_every_step(task: TaskDefinition) -> None:
     evaluation = StageEvaluation(stage_success=(True,) * 6)
 
-    assert states(evaluation, tuple(task.stages())) == [StepStatus.PASSED.value] * 6
+    assert states(evaluation, tuple(task.stages())) == ["pass"] * 6
 
 
 def test_a_step_never_reached_is_not_attempted(task: TaskDefinition) -> None:
@@ -49,12 +46,10 @@ def test_a_step_with_no_signal_is_unknown_not_passed(task: TaskDefinition) -> No
     # nobody could measure must never read as one that went well.
     evaluation = StageEvaluation(stage_success=(True, None, None, None, None, None))
 
-    steps = score_steps(
-        evaluation, tuple(task.stages()), ("object_height",), step_signals=BY_STEP
-    )
+    steps = score_steps(evaluation, tuple(task.stages()), ("object_height",), step_signals=BY_STEP)
 
-    assert [step.status for step in steps[1:]] == [StepStatus.UNKNOWN] * 5
-    assert all(step.status is not StepStatus.PASSED for step in steps[1:])
+    assert [step.status for step in steps[1:]] == ["unknown"] * 5
+    assert all(step.status != "pass" for step in steps[1:])
     assert steps[1].reason == "thiếu tín hiệu: object_height"
 
 
@@ -79,7 +74,7 @@ def test_a_step_is_unknown_whatever_the_task_answered(task: TaskDefinition) -> N
         evaluation = StageEvaluation(stage_success=outcomes)
         steps = score_steps(evaluation, stages, missing, step_signals=BY_STEP)
 
-        assert steps[0].status is StepStatus.UNKNOWN
+        assert steps[0].status == "unknown"
         assert steps[0].reason == "thiếu tín hiệu: hand_object_distance"
 
 
@@ -94,7 +89,7 @@ def test_a_step_is_not_unknown_for_a_signal_it_does_not_use(task: TaskDefinition
         step_signals=BY_STEP,
     )
 
-    assert steps[0].status is StepStatus.PASSED  # approach never reads it
+    assert steps[0].status == "pass"  # approach never reads it
     assert steps[4].reason == "thiếu tín hiệu: object_in_target_zone"
     assert steps[5].reason == "thiếu tín hiệu: object_in_target_zone"
 
@@ -146,9 +141,7 @@ def test_the_step_count_comes_from_the_task(task: TaskDefinition) -> None:
     # Seven steps scored by the same code, as the tray task needs (AC 1).
     seven = tuple(StageSpec(name=f"s{index}", failure_class="carry") for index in range(7))
 
-    scored = score_steps(
-        StageEvaluation(stage_success=(True,) * 7), seven, step_signals=NO_SIGNALS
-    )
+    scored = score_steps(StageEvaluation(stage_success=(True,) * 7), seven, step_signals=NO_SIGNALS)
 
     assert len(scored) == 7
 
@@ -160,3 +153,34 @@ def test_an_evaluation_that_does_not_fit_the_task_raises(task: TaskDefinition) -
             tuple(task.stages()),
             step_signals=BY_STEP,
         )
+
+
+def four_states(*statuses: str) -> StageEvaluation:
+    """An evaluation from a task that sends `stage_status` (#101)."""
+    legacy = {"pass": True, "fail": False, "not_attempted": False, "unknown": None}
+    return StageEvaluation.model_validate(
+        {"stage_success": [legacy[s] for s in statuses], "stage_status": list(statuses)}
+    )
+
+
+def test_the_task_s_four_states_are_read_when_sent(task: TaskDefinition) -> None:
+    evaluation = four_states("pass", "fail", *["not_attempted"] * 4)
+
+    assert first_failed_step(evaluation) == 1
+    assert states(evaluation, tuple(task.stages())) == ["pass", "fail"] + ["not_attempted"] * 4
+
+
+def test_not_attempted_after_an_unknown_step_is_not_a_failure(task: TaskDefinition) -> None:
+    # In `stage_success` the third step is `False`, so a scorer reading only
+    # the booleans would put k at 2. The task said it never got there.
+    evaluation = four_states("pass", "unknown", *["not_attempted"] * 4)
+
+    assert first_failed_step(evaluation) is None
+    assert states(evaluation, tuple(task.stages())) == ["pass", "unknown"] + ["not_attempted"] * 4
+
+
+def test_not_attempted_with_nothing_before_it_raises(task: TaskDefinition) -> None:
+    evaluation = four_states("pass", "pass", *["not_attempted"] * 4)
+
+    with pytest.raises(ScorerError, match="bước 2 chưa thử"):
+        first_failed_step(evaluation)
