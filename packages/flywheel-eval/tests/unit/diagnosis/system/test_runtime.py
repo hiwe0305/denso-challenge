@@ -34,7 +34,8 @@ from flywheel.eval.diagnosis.system.tracking import check_r3
 from flywheel.eval.diagnosis.system.verdict import Diagnosis, combine
 
 R1 = R1Thresholds(tau_lat_s=0.1, percentile=99.0)
-R2 = R2Thresholds(max_delay_steps=8, max_underruns=0)
+# d of the server with the team's serve flags (`system.yaml`, r2)
+R2 = R2Thresholds(rtc_inference_delay_steps=6, max_underruns=0)
 R4 = R4Thresholds(tau_sync_s=0.01)
 R6 = R6Thresholds(ok_statuses=("ok",))
 
@@ -82,6 +83,7 @@ def test_r1_fires_on_the_percentile_and_names_the_worst_chunk(rtc_rows) -> None:
     assert result.findings[0].value == pytest.approx(0.4)
     assert result.findings[0].threshold == pytest.approx(0.1)
     assert result.findings[0].where is not None
+    assert result.findings[0].where != "chunk 0"
 
 
 def test_r1_and_r2_without_an_rtc_log_are_skips_not_passes() -> None:
@@ -98,7 +100,7 @@ def test_r2_does_not_fire_on_the_records_rtc_client_writes_for_a_healthy_run(rtc
     # Shaped exactly as `RTCClient` of DA-19 writes them under SIMPLE's
     # refill-when-empty (`refill_at=0`): every request goes out with the buffer
     # at 0, and 50 ms of inference at 50 Hz is ceil(0.05 * 50) = 3 steps, under
-    # the max_delay of 8 that RTC covers on hardware. The buffer level says
+    # the d of 6 that the server's RTC covers on hardware. The buffer level says
     # nothing here; reading it as a stall fired R2 on every chunk.
     rows = [
         dict(
@@ -126,20 +128,49 @@ def test_r2_fires_on_a_chunk_slower_than_rtc_covers(rtc_rows) -> None:
     assert finding.value == pytest.approx(2.0)
     assert finding.threshold == pytest.approx(0.0)
     assert finding.where == "chunk 7"
-    assert "12" in (finding.detail or "") and "8" in (finding.detail or "")
+    assert "12" in (finding.detail or "") and "d = 6" in (finding.detail or "")
 
 
-def test_r2_at_exactly_max_delay_is_covered(rtc_rows) -> None:
-    rows = [dict(row, delay_steps=8) for row in rtc_rows]
+def test_r2_at_exactly_the_server_delay_is_covered(rtc_rows) -> None:
+    rows = [dict(row, delay_steps=6) for row in rtc_rows]
 
     assert check_r2(_records(rows), R2).findings == []
+
+
+def test_r2_fires_one_step_past_the_server_delay_under_max_delay(rtc_rows) -> None:
+    # 7 is under the checkpoint's max_delay of 8 but past the d = 6 the server
+    # actually runs with: the robot would stall on it, which the old limit missed.
+    rows = [dict(row) for row in rtc_rows]
+    rows[3]["delay_steps"] = 7
+
+    assert [finding.code for finding in check_r2(_records(rows), R2).findings] == ["R2"]
+
+
+def test_a_slow_first_chunk_alone_fires_nothing(rtc_rows) -> None:
+    # Chunk 0 is asked for before any action ran, on a cold model: 2 s and 100
+    # steps there is the start of the trace, not a stall or a slow loop.
+    rows = [dict(row) for row in rtc_rows]
+    rows[0]["chunk_received_s"] = rows[0]["observation_sent_s"] + 2.0
+    rows[0]["delay_steps"] = 100
+    records = _records(rows)
+
+    for result in (check_r1(records, R1), check_r2(records, R2)):
+        assert result.findings == [] and result.skipped == []
+
+
+def test_an_rtc_log_with_only_chunk_0_is_a_skip_not_a_pass(rtc_rows) -> None:
+    records = _records(rtc_rows[:1])
+
+    assert [skip.code for skip in check_r1(records, R1).skipped] == ["R1"]
+    assert [skip.code for skip in check_r2(records, R2).skipped] == ["R2"]
+    assert check_r1(records, R1).findings == check_r2(records, R2).findings == []
 
 
 def test_r2_tolerates_as_many_slow_chunks_as_the_config_allows(rtc_rows) -> None:
     rows = [dict(row) for row in rtc_rows]
     rows[5]["delay_steps"] = 9
 
-    tolerant = R2Thresholds(max_delay_steps=8, max_underruns=1)
+    tolerant = R2Thresholds(rtc_inference_delay_steps=6, max_underruns=1)
 
     assert check_r2(_records(rows), tolerant).findings == []
 
