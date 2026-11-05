@@ -1287,3 +1287,47 @@ def test_the_client_setup_accepts_the_real_servers_info(tmp_path: Path) -> None:
     assert f"ERROR: no {tmp_path}/no-assets/assets" in done.stderr, done.stderr
     assert (out / "server_info-tg.json").read_bytes() == infos[0] + b"\n"
     assert (out / "exit").read_text().strip() == "1"
+
+
+def test_the_launch_returns_at_once_while_the_client_keeps_running(tmp_path: Path) -> None:
+    """The real launch command, run as ssh runs it: `bash -c` with stdout and stderr on
+    pipes that the caller reads to EOF. A client still running must not hold them. With
+    `cd X && nohup ... &` the backgrounded list kept them and waited for the client, and
+    the launch ssh hit its 20 s timeout (eval attempt 2, 5/11/2026)."""
+    home, shims = tmp_path / "home", tmp_path / "bin"
+    work = home / "denso-da26"
+    (work / "runs/da26-t2-eval-n20").mkdir(parents=True)
+    (work / "fw/scripts/he").mkdir(parents=True)
+    shims.mkdir()
+    (shims / "systemd-run").write_text(
+        '#!/bin/bash\nwhile [ "$1" != bash ]; do shift; done\nexec "$@"\n'
+    )
+    (shims / "systemd-run").chmod(0o755)
+    (work / "fw/scripts/he/he1_client.sh").write_text("exec sleep 30\n")
+    environ = {**os.environ, "HOME": str(home), "PATH": f"{shims}:{os.environ['PATH']}"}
+    start = time.monotonic()
+    done = subprocess.run(
+        ["bash", "-c", client_command("tg", 20)],
+        env=environ,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        timeout=10,
+    )
+    took = time.monotonic() - start
+    pgid_file = work / "runs/da26-t2-eval-n20/client-tg.pgid"
+    deadline = time.monotonic() + 5
+    while not pgid_file.is_file() and time.monotonic() < deadline:
+        time.sleep(0.05)
+    pgid = int(pgid_file.read_text())
+    try:
+        assert done.returncode == 0 and took < 3, (done.returncode, took)
+        alive = subprocess.run(["pgrep", "-g", str(pgid), "-a"], capture_output=True, text=True)
+        assert "sleep 30" in alive.stdout
+    finally:
+        subprocess.run(["pkill", "-g", str(pgid)], check=False)
+    # a missing work dir fails the launch instead of starting anything
+    gone = {**environ, "HOME": str(tmp_path / "nobody")}
+    failed = subprocess.run(
+        ["bash", "-c", client_command("tg", 20)], env=gone, capture_output=True, timeout=10
+    )
+    assert failed.returncode == 1
