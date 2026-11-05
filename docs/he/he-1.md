@@ -203,7 +203,8 @@ Câu hỏi gửi Hiếu: "Approve CU for tier 2, with DA-26 on reduced Isaac eva
 | `job_da26_t2_eval_isaac_n20`: một phiên server cho cả hai checkpoint | 20 episode × 24,6 phút + khoảng 1,0 CU trước episode đầu + 0,16 CU kết thúc ≈ 17,1 CU (mục 7.1) | ~~16,0~~ 18,0 CU (9,3 giờ) |
 | `job_da26_t2_eval_isaac_n20`, lần 1 (hỏng, không có episode) | — | đã đo 1,692 CU |
 | `job_da26_t2_eval_isaac_n20`, lần 2 (hỏng, không có episode) | — | đã đo 0,767 CU |
-| **Tổng** | **50,3 CU** | **52,0 CU** theo trần ban đầu; theo số đã đo: 33,85 + 18 = 51,85 CU; sau lần eval 1: 33,85 + 1,692 + 18 = 53,54 CU; sau lần eval 2: 33,85 + 1,692 + 0,767 + 18 = **54,31 CU** (trần cứng hiện hành) |
+| `job_da26_t2_eval_isaac_n20`, lần 3 (2 cặp đủ, dừng theo luật CU) | 16,8 CU, 8,7 giờ | đã đo 12,402 CU (trần 18) |
+| **Tổng** | **50,3 CU** | **52,0 CU** theo trần ban đầu; theo số đã đo: 33,85 + 18 = 51,85 CU; sau lần eval 1: 33,85 + 1,692 + 18 = 53,54 CU; sau lần eval 2: 33,85 + 1,692 + 0,767 + 18 = **54,31 CU** (trần cứng hiện hành). Sau lần eval 3, đã đo tất cả: 33,85 + 1,692 + 0,767 + 12,402 = 48,71 CU |
 
 (Lịch sử, trước khi nâng trần.) Trần eval 16,0 thấp hơn ước lượng 16,2. Watcher dừng ở `16 − 1,94 × 430 / 3600 = 15,77` CU, tức khoảng 8,1 giờ. Ở 24,6 phút mỗi episode, đủ cho khoảng 19,5 trên 20 episode. Số 24,6 phút đo trên episode thất bại (S1-03); episode thành công kết thúc sớm hơn, nên ước lượng 16,2 có thể cao. **[Đã chốt 5/11/2026, Hiếu]** Driver eval chạy hai arm xen kẽ theo điều kiện (V-EGO rồi V-NOEGO ở mỗi điều kiện), để nếu thiếu thì thiếu đều ở cả hai arm. Phần này làm trong PR driver eval.
 
@@ -351,6 +352,21 @@ nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py se
 
 **Lần 2 (5/11/2026), không có episode nào.** Phiên `da26-t2-eval-n20` từ master `18d2066e`. `probe` đo đẩy lên 20,4 MB/s, tải lên 9 phút; hai server nạp xong, `run_dir` đúng arm. `run` bắt đầu 13:15:27Z; client chạy tới "app ready" của Isaac, nhưng lệnh ssh khởi động client không trả về: `client_command` chạy nền cả `cd ~/denso-da26 && nohup …`, nên bash tạo một subshell giữ stdout và stderr của ssh và chờ client. Sau 20 s, `timeout` trả 124; `run` dừng client, thoát 5, phiên dừng có xác nhận 13:18:07Z. Đo: 0,767 CU theo đồng hồ watcher, số dư giảm 0,52 CU. Đã sửa: chỉ `nohup` chạy nền (`cd … || exit 1; nohup setsid … &`); test chạy lệnh thật qua pipe như ssh, đòi trả về ngay trong khi client còn chạy. Các lệnh `nohup setsid … &` khác (VM, laptop) đã kiểm: không có dạng `cd … &&` trước `nohup`. Đồng hồ rtx3060 chạy nhanh hơn laptop 32,9 s; mọi dòng của `route.jsonl` dùng giờ laptop. **[Đã chốt 5/11/2026, Hiếu]** "Nâng trần lên 54,31, giữ cap 18 (Recommended)" (mục 6.2). Ước lượng lần 3: phần trước reset đầu phụ thuộc tốc độ đẩy lên của VM, lần 1 là 5–6 MB/s (khoảng 1,6 CU), lần 2 là 20–26 MB/s (khoảng 0,6–0,9 CU, tính tới lúc Isaac sẵn sàng). Ở 0,75 CU: 10 cặp nếu episode 24,6 phút (9 ở 27 phút, 7 ở 33 phút), khoảng 0,75 + 10 × 1,59 + 0,16 = 16,8 CU, 8,7 giờ. Ở 1,6 CU: 9 cặp (8, 7), khoảng 16,1 CU, 8,3 giờ. Chạm dòng dừng thì 9,2 giờ. Chạy lại chỉ khi PR sửa đã merge, `preflight` sạch, và có lệnh chạy của phiên chính sau khi merge. Driver: [`scripts/he/he1_eval.py`](../../scripts/he/he1_eval.py) trên laptop, pha `serve-setup` và `serve` của `he1_colab.py` trên VM, [`scripts/he/he1_client.sh`](../../scripts/he/he1_client.sh) trên rtx3060.
 
+**Lần 3 (5/11/2026): 2 cặp đủ, kết quả sơ bộ.** Phiên `da26-t2-eval-n20` từ master `e1b70379`, registry `batch-20261105-203743`; tải lên hai checkpoint ở 22,2 và 25,6 MB/s. Client khởi động 14:07:48–14:08:06Z (mã 0); episode 0 bắt đầu 14:24:17Z, lúc đã tiêu 1,48 CU. Cổng cặp 1 lúc 17:11:09Z: đã tiêu 6,90, dự báo 13,69, chạy. Cổng cặp 2 lúc 19:58:01Z: đã tiêu 12,29, dự báo 19,1 > 17,77, từ chối. `run` thoát 3 (dừng sạch theo luật CU), phiên dừng có xác nhận 19:59:16Z. Đo: 12,402 CU theo đồng hồ watcher, số dư giảm 11,65 CU (50,07 → 38,42); client chạy 5,83 giờ trên rtx3060.
+
+Kết quả **sơ bộ** (4 episode, 2 điều kiện; quá ít để kết luận gì):
+
+| Cặp | Seed | V-EGO | V-NOEGO |
+|---|---|---|---|
+| 0 | 1000100 | thất bại | thất bại |
+| 1 | 1000101 | thất bại | thất bại |
+
+V-EGO 0/2, V-NOEGO 0/2. Cả bốn episode chạy hết 1 200 bước (50 lần `/act` × 24); server trả lời p50 0,65–0,68 s, chậm nhất 2,5 s, không có lỗi.
+
+Episode dài 4 966, 5 046, 4 952 và 5 060 s, tức khoảng 83 phút, trong khi kế hoạch là 24,6 phút. Số 24,6 phút lấy từ lần chạy một episode nhanh nhất của S1-03. Trong lần chạy 10 episode của S1-03 (cùng image, task file, horizon 24, đồng hồ wall, máy dùng chung với DA-34 và DA-35), episode thất bại dài 42–52 phút, episode thành công 18–29 phút. So cùng loại episode, lần 3 chậm hơn S1-03 khoảng 1,6–2,0 lần. Mỗi episode mất khoảng 9,5 phút đầu để nạp cảnh và ổn định robot, rồi mỗi `/act` cách nhau 85 s, khoảng 3,5 s cho một bước điều khiển. GPU bận 100 % bởi client (SM 83 %), không hạ xung, chỉ dùng 64 trên 170 W; client dùng khoảng 5 lõi CPU; các app desktop dùng 0 % GPU. Cấu hình chỉ khác S1-03 ở `--clock sim`. Theo mã của image, vòng episode không có `sleep`, và số lần render cố định theo fps của bộ (50), nên đồng hồ sim không thêm bước hay render; nhưng Isaac chạy đồng hồ sim chưa từng được đo. **[Câu hỏi mở]** Episode chậm vì `--clock sim` hay vì điều kiện máy? Muốn biết chắc cần một episode Isaac chạy đồng hồ wall; Hiếu quyết.
+
+Kết quả bị mất lúc dừng, rồi được khôi phục. Khi luật CU từ chối, `stop_command` gửi TERM cho cả nhóm tiến trình, nên `he1_client.sh` chết cùng container. Trap EXIT vẫn ghi `exit` = 1, nhưng các bước chuyển `eval_stats.txt`, chuyển video và ghi `summary-<tag>.json` không chạy, nên `results.jsonl` ghi `success` null cho cả bốn episode. Bảng trên lấy lại từ `eval_stats.txt` gốc trên rtx3060. Bản sao có hash nằm ở `fwdata/he/runs/da26-t2-eval-n20/client/raw-<tag>/`; `MANIFEST.md` cùng thư mục liệt kê các bất thường cho Agent QA/QC: lúc khởi động có job của DA-38 chạy chồng (14:08–14:18Z), video của cả hai nhánh nằm trong thư mục mang tên V-EGO (SIMPLE đặt tên theo `/info` của nhánh đầu), episode 4 dở bị loại. Đã sửa: khi luật CU từ chối, router chỉ dừng container (`docker stop`); giết cả nhóm chỉ còn dùng cho client chết, im lặng hay còn chạy lúc kết thúc. `he1_fetch once --no-checkpoint` cho job eval không còn trả 1 khi đã kéo đủ. Hiếu quyết sau có chạy thêm điều kiện hay không.
+
 **Cách chạy.**
 
 - Một phiên Colab L4 `da26-t2-eval-n20`, trần 18 CU (**[Đã chốt 5/11/2026, Hiếu]**, mục 6.2), dòng dừng của watcher 17,77 CU. Hai server Ψ₀ trên VM, cổng 22085 (V-EGO) và 22086 (V-NOEGO), khoảng 6,2 GB VRAM mỗi server trên card 23 GB (S1-03). Cờ server như S1-03: `--action-exec-horizon 24 --rtc`.
@@ -431,10 +447,11 @@ nohup setsid bash -c 'python3 scripts/he/he1_eval.py run --session "$1" --regist
   - `vm-logs`, `serve` với launcher giả, ghim của client trùng `eval_psi0.sh`;
   - sau lần 1: `he1_client.sh` thật, sau `route` thật, với `/info` thật của hai server, qua bước kiểm `/info` (bản cũ thì hỏng đúng lỗi của lần 1); `results` đọc `eval_stats.txt` thật của S1-03, và dòng có lý do kết thúc của `sonic_wbc.py`;
   - sau lần 2: lệnh khởi động client thật, chạy bằng `bash -c` với stdout và stderr qua pipe như ssh, trả về trong 3 s trong khi client giả còn chạy; thư mục thiếu thì thoát 1 (bản cũ thì quá thời hạn).
+  - sau lần 3: một lượt `run` có cổng cặp 1 từ chối chỉ gửi lệnh dừng container, thoát 3 và chấm cặp 0; launcher và `he1_client.sh` thật (`docker` giả đóng vai SIMPLE giữa episode, chết khi nhận TERM như CLI thật), rồi lệnh dừng của luật CU: `exit` là 143, `eval_stats.txt`, video và `summary-<tag>.json` được chuyển. `he1_fetch once --no-checkpoint` trả 0 cho job không có train, VM trống thì vẫn 1.
 
   - review lại #129: `SystemExit` và log cũ không giữ được vẫn dừng phiên; tín hiệu thứ hai không cắt bước kết thúc; SIGHUP bỏ qua sẵn giữ nguyên; lần chạy không tới client giữ kết quả cũ; lệnh dừng thật (chạy ở máy này với `HOME` tạm, `systemd-run` và `docker` giả) giết nhóm của launcher đang ở bước chuẩn bị và không đụng nhóm khác.
 
-  Kiểm đột biến: bỏ sửa định dạng cache, trả về khi container mất, bỏ bước kết thúc khi thiếu RAM, bắt `Exception` thay vì `BaseException`, ghi đè SIGHUP đã bỏ qua, bỏ lệnh giết nhóm, cho tín hiệu thứ hai cắt ngang. Mỗi đột biến làm test hỏng.
+  Kiểm đột biến: bỏ sửa định dạng cache, trả về khi container mất, bỏ bước kết thúc khi thiếu RAM, bắt `Exception` thay vì `BaseException`, ghi đè SIGHUP đã bỏ qua, bỏ lệnh giết nhóm, cho tín hiệu thứ hai cắt ngang, cho luật CU dùng lại lệnh giết nhóm (`run` thoát 5; client thật có `exit` 1 và không chuyển gì, đúng như lần 3). Mỗi đột biến làm test hỏng.
 
 ## Change log
 
@@ -462,3 +479,4 @@ nohup setsid bash -c 'python3 scripts/he/he1_eval.py run --session "$1" --regist
 | 5/11/2026 | Mục 6.2, 7.1: **[Đã chốt 5/11/2026, Hiếu]** "Nâng trần cứng, giữ cap 18 (Recommended)": trần cứng DA-26 từ 52 lên 53,54 CU (33,85 + 1,692 lần eval 1 + 18); lần chạy lại giữ trần 18, quy tắc theo cặp và thứ tự xen kẽ; ước lượng khoảng 16,1 CU (9 cặp ở 24,6 phút) | Hiếu (soạn với Claude) |
 | 5/11/2026 | Mục 7.1: lần eval 2 dừng vì lệnh ssh khởi động client không trả về (`cd … && nohup … &` giữ pipe của ssh), 0,767 CU; chỉ `nohup` chạy nền; bỏ câu cũ "Chờ đợt C của DA-34…" | Hiếu (soạn với Claude) |
 | 5/11/2026 | Mục 6.2, 7.1: **[Đã chốt 5/11/2026, Hiếu]** "Nâng trần lên 54,31, giữ cap 18 (Recommended)": trần cứng DA-26 54,31 CU (33,85 + 1,692 + 0,767 + 18); lần 3 giữ trần 18, quy tắc theo cặp và thứ tự xen kẽ; ước lượng 16,1–16,8 CU (9–10 cặp ở 24,6 phút, trước reset đầu 1,6 hay 0,75 CU) | Hiếu (soạn với Claude) |
+| 6/11/2026 | Mục 6.2, 7.1: lần eval 3, 2 cặp đủ rồi dừng theo luật CU, 12,402 CU; kết quả sơ bộ V-EGO 0/2, V-NOEGO 0/2, khôi phục từ `eval_stats.txt` gốc. Episode khoảng 83 phút, kế hoạch 24,6; so với S1-03 (thất bại 42–52 phút); câu hỏi mở về `--clock sim`. Luật CU chỉ dừng container; `he1_fetch once --no-checkpoint` cho job eval | Hiếu (soạn với Claude) |
