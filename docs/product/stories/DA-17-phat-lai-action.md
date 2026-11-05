@@ -32,6 +32,7 @@ Là kỹ sư dữ liệu, tôi muốn mọi episode có action robot (psi-data, 
 - [x] 3. Ngưỡng hiệu chỉnh và cấu hình (AC 3)
 - [x] 4. `ReplayReport` và nối vào QA (AC 4)
 - [ ] 5. Phát lại action dự đoán, video (AC 5; sau 13/11/2026)
+- [ ] 6. Tìm nguyên nhân 26/99 episode psi-data đạt khi phát lại (phát hiện 1 của [replay.md](../../g0/replay.md); PO 5/11/2026)
 
 ## Phạm vi file
 
@@ -44,6 +45,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `docs/g0/replay.md`
 - `packages/flywheel-simple/src/flywheel_simple/replay/`
 - `packages/flywheel-simple/tests/replay/`
+- `docs/g0/ledger/DA-17.csv` (sổ chi phí của nhiệm vụ 6; PO 5/11/2026)
 
 ## Ghi chú cho người làm
 
@@ -75,6 +77,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 3/11/2026 | Người làm Thông → Hiếu theo quyết định PO (07 bản 1.6; [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) Q1–Q3): hạn 8/11; AC 5 và nhiệm vụ 5 dời sau 13/11; phạm vi thêm adapter `flywheel_simple/replay/` và test; ước lượng 5 giờ cho AC 1–4 | PO (Hiếu) |
 | 4/11/2026 | PO: phát lại động lực học trượt → `flag`, với mọi nguồn (`task_success`, `replay_success` trong `qa.yaml`); thêm `qa.yaml` và test của nó vào phạm vi file; phần tự va chạm của AC 1 dời sau 13/11/2026 | PO (Hiếu) theo PR #92 |
 | 5/11/2026 | Trạng thái → Xong nhiệm vụ 1–4 theo PR #92 (merge 4/11/2026); nhiệm vụ 5 và phần tự va chạm của AC 1 vẫn dời sau 13/11/2026 | Hiếu, cùng Claude |
+| 5/11/2026 | Thêm nhiệm vụ 6 (vì sao phát lại psi-data chỉ đạt 26/99) và `docs/g0/ledger/DA-17.csv` vào phạm vi file | Hiếu, cùng Claude |
 
 ## Ghi chép khi làm
 
