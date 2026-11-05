@@ -1,6 +1,6 @@
 # Spec v10.5: thuật toán Failure → Data và PoC đối chứng
 
-_Trạng thái: đặc tả đề xuất, chưa thực nghiệm. Ngày 27/10/2026, sửa 30/10/2026. Phiên bản v10.5: bảng quy lỗi về stage ở mục 6.4 thống nhất với design mục 10. Phiên bản v10.4: demo ngày 17/11/2026 và mọi thí nghiệm chạy trên G1 trong SIMPLE với Ψ₀; task chính là task hai bàn; thêm giả thuyết HE về dữ liệu egocentric; bỏ robot DENSO; theo [design ngày 27/10/2026](superpowers/specs/2026-10-27-g1-psi0-demo-design.md), là design hiện hành duy nhất. Đọc mục 0 phần "Cập nhật v10.4" trước. Các bản v10.2 (robot DENSO trong Isaac Sim) và v10.3 (robot DENSO trên MuJoCo) đã bị thay; xem mục 14. Bản v10.1 đã áp dụng [quyết định phản biện vòng 1](product/06-review-round-1-decisions.md). Áp dụng cho recipe Ψ₀ + SIMPLE / G1 của [Pitch v10](../deliverables/DENSO-ilovephysicalintelligence-1.pptx). Tài liệu này là đặc tả canonical cho thuật toán flywheel và thiết kế đánh giá. Hồ sơ của recipe cũ FluxVLA / GR00T N1.5 / GR1 (docs 01–14, idea v3) nằm trong tag git `archive/v3`; các quy tắc dữ liệu cần dùng đã được đưa vào mục 4. Thuật ngữ được định nghĩa ở mục 12._
+_Trạng thái: đặc tả đề xuất, chưa thực nghiệm. Ngày 27/10/2026, sửa 5/11/2026. Phiên bản v10.6: bốn kiểu lỗi của task bê khay vào bảng mục 5.2, kèm lớp lỗi chung. Phiên bản v10.5: bảng quy lỗi về stage ở mục 6.4 thống nhất với design mục 10. Phiên bản v10.4: demo ngày 17/11/2026 và mọi thí nghiệm chạy trên G1 trong SIMPLE với Ψ₀; task chính là task hai bàn; thêm giả thuyết HE về dữ liệu egocentric; bỏ robot DENSO; theo [design ngày 27/10/2026](superpowers/specs/2026-10-27-g1-psi0-demo-design.md), là design hiện hành duy nhất. Đọc mục 0 phần "Cập nhật v10.4" trước. Các bản v10.2 (robot DENSO trong Isaac Sim) và v10.3 (robot DENSO trên MuJoCo) đã bị thay; xem mục 14. Bản v10.1 đã áp dụng [quyết định phản biện vòng 1](product/06-review-round-1-decisions.md). Áp dụng cho recipe Ψ₀ + SIMPLE / G1 của [Pitch v10](../deliverables/DENSO-ilovephysicalintelligence-1.pptx). Tài liệu này là đặc tả canonical cho thuật toán flywheel và thiết kế đánh giá. Hồ sơ của recipe cũ FluxVLA / GR00T N1.5 / GR1 (docs 01–14, idea v3) nằm trong tag git `archive/v3`; các quy tắc dữ liệu cần dùng đã được đưa vào mục 4. Thuật ngữ được định nghĩa ở mục 12._
 
 ## 0. Đọc nhanh
 
@@ -244,10 +244,14 @@ Vị từ dưới đây là đề xuất; cần đối chiếu với định ngh
 | L-PLACE | Đặt lệch | Đặt | Vật ngoài vùng đích ở bước 5 hoặc 6 |
 | L-RELEASE | Nhả sai lúc | Đặt | Nhả quá sớm hoặc không nhả |
 | L-BALANCE | Mất thăng bằng | Thăng bằng | Vi phạm giới hạn thân ở bất kỳ bước nào |
+| L-PART-DROP (v10.6) | Linh kiện rơi khỏi khay | Mang | Ít hơn 6 linh kiện trong khay, task bê khay |
+| L-ONE-HAND (v10.6) | Mất tiếp xúc một tay | Mang | Một bàn tay rời tay cầm khay khi mang, task bê khay |
+| L-TRAY-TILT (v10.6) | Khay nghiêng quá ngưỡng | Theo bước hỏng k | Góc nghiêng khay vượt θ_tilt, task bê khay |
+| L-PLACE-POSE (v10.6) | Đặt khay ngoài dung sai | Đặt | Khay trên bàn B nhưng ngoài dung sai vị trí hoặc góc của vùng đích, task bê khay |
 | L-TIMEOUT | Đứng yên, không tiến triển | Theo bước hỏng k | Hết giờ mà không chuyển bước, không thuộc các kiểu trên |
 | L-UNKNOWN | Thiếu tín hiệu | Không gán | Không đủ dữ liệu để gán kiểu |
 
-**Lớp lỗi chung** (tiếp cận, gắp, mang, đặt, thăng bằng) là trường dùng chung giữa các task, để L1 gộp được thống kê lỗi và tỉ lệ sửa được giữa task. "Theo bước hỏng k": bước 1 là tiếp cận, bước 2 là gắp, bước 3–4 là mang, bước 5–6 là đặt. Ở L0 trường này chỉ được ghi, chưa dùng để chọn can thiệp.
+**Lớp lỗi chung** (tiếp cận, gắp, mang, đặt, thăng bằng) là trường dùng chung giữa các task, để L1 gộp được thống kê lỗi và tỉ lệ sửa được giữa task. "Theo bước hỏng k": bước 1 là tiếp cận, bước 2 là gắp, bước 3–4 là mang, bước 5–6 là đặt. Task bê khay có 7 bước scorer ([design 28/10/2026](superpowers/specs/2026-10-28-tray-transfer-he-design.md) mục 3.2) (v10.6): bước 1 (tiếp cận A) là tiếp cận, bước 2–3 (cầm, nhấc) là gắp, bước 4–5 (mang, tới B) là mang, bước 6–7 (đặt, nhả và đứng) là đặt. L-TRAY-TILT lấy lớp theo bước hỏng vì khay nghiêng cả lúc nhấc, lúc mang và lúc hạ xuống bàn B [Đã chốt 5/11/2026, issue #59]. Ở L0 trường này chỉ được ghi, chưa dùng để chọn can thiệp.
 
 ### 5.3 Hiệu chỉnh scorer
 
@@ -890,6 +894,7 @@ Hồ sơ cũ không còn trong thư mục làm việc. Xem lại một file bằ
 
 | Ngày | Phiên bản | Nội dung | Người sửa |
 |---|---|---|---|
+| 5/11/2026 | v10.6 | Bảng kiểu lỗi (mục 5.2) thêm bốn mã của task bê khay: L-PART-DROP và L-ONE-HAND lớp mang, L-PLACE-POSE lớp đặt, L-TRAY-TILT theo bước hỏng k; thêm cách quy 7 bước của task bê khay về lớp lỗi chung. Quyết định PO trên issue #59, phương án (a) | Trưởng nhóm |
 | 30/10/2026 | v10.5 | Bảng quy lỗi về stage (mục 6.4) theo design mục 10: P3 cao quy về Stage 3, "Lệch phân phối khi chạy" thay "Lỗi tích lũy", dòng quên dựa trên T7, thêm dòng ngoài miền train. Can thiệp của dòng Stage 1 đổi từ synthetic S3 sang chỉ ghi nhận (mục 6.7, 7.3; S3 là hướng sau PoC); design mục 10 sửa dòng này cho khớp. Quyết định khi duyệt PR #18 (plan DA-08, DA-13) | Trưởng nhóm |
 | 27/10/2026 | v10.4 | Bỏ robot DENSO (v10.2, v10.3); một sân G1 trong SIMPLE với Ψ₀ (mục 0, 1.1, 2.5); task chính đổi sang task hai bàn `G1WholebodyLocomotionPickBetweenTablesTeleop-v0` (mục 2.3, 5.1, 5.2 thêm L-WALK, 7.1); ba loại dữ liệu egocentric, teleop, synthetic với nguồn test từng loại, synthetic S1 và S2 trước demo (mục 0, 2.5, 6.10); Q6 trả lời bằng teleop bàn phím, ba nguồn dữ liệu robot và quy tắc renderer (mục 2.4, 2.5); QA thêm phát lại action (mục 4.4); giả thuyết HE và thí nghiệm 7.9; lộ trình theo demo 17/11/2026, V3 quay lại G0 (mục 9); rủi ro GPU, eval Isaac chậm, bàn phím, nhiễu của HE, khác renderer (mục 10); glossary và nguồn (mục 12, 13). Theo design ngày 27/10/2026 | Trưởng nhóm |
 | 25/10/2026 | v10.3 | Thí nghiệm có đối chứng chuyển sang robot DENSO trên MuJoCo, SIMPLE chỉ còn G0, bảng ánh xạ G1 → DENSO (mục 0); đầu ra demo trên MuJoCo (mục 0); simulator của robot DENSO (mục 2.5); thiết kế PoC trên MuJoCo, eval bất đồng bộ (mục 7); lộ trình một sân, G0 bỏ V3 và T1–T4 (mục 9); rủi ro GPU, Colab và dữ liệu DENSO, demo bàn phím, môi trường dễ hơn task thật, lỗi bất đồng bộ, Agent QA/QC (mục 10); glossary và nguồn (mục 12, 13). Theo design ngày 25/10/2026 | Trưởng nhóm |
