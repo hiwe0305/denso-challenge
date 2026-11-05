@@ -59,7 +59,8 @@ pulls the client folder from rtx3060 (no CU) and writes `results.jsonl`. Everyth
 for Agent QA/QC lands in `<dest>/da26-t2-eval-n20/`: route.jsonl (every request:
 episode, arm, latency, reply; every row tagged with the run; an earlier run's log is
 kept as route-<run>.jsonl), client/ (client-<run>.log, eval/<run>/eval_stats.txt,
-videos/<run>/, exit), server-*.log, vm-logs/, results.jsonl (the last run only).
+videos/<run>/, exit), server-*.log, vm-logs/, results-<run>.jsonl and results.jsonl
+(the last run that launched a client).
 
 Exit codes of `run`: 0 every planned pair ran; 3 a pair refused by the CU rule (the
 pairs before it are complete); 4 rtx3060 short of RAM, client not started; 5 the
@@ -669,9 +670,10 @@ def client_command(tag: str, episodes: int) -> str:
     The scope caps the launcher; the container runs under dockerd, outside it, and has
     its own cap (docker --memory, he1_client.sh)."""
     inner = (
-        f"systemd-run --user --scope --quiet -p MemoryMax={CLIENT_GB + 4}G -p MemorySwapMax=0 "
-        f"bash fw/scripts/he/he1_client.sh --set sets/interleaved --tag {shlex.quote(tag)} "
-        f"--episodes {episodes} --port {CLIENT_PORT}"
+        f"echo $$ > runs/{EVAL_JOB}/client-{tag}.pgid; "
+        f"exec systemd-run --user --scope --quiet -p MemoryMax={CLIENT_GB + 4}G "
+        f"-p MemorySwapMax=0 bash fw/scripts/he/he1_client.sh --set sets/interleaved "
+        f"--tag {tag} --episodes {episodes} --port {CLIENT_PORT}"
     )
     return (
         f"cd ~/{RTX_WORK} && nohup setsid bash -c {shlex.quote(inner)} "
@@ -699,7 +701,34 @@ def other_jobs(runner: Run = run) -> tuple[list[str], list[str]] | None:
     return denso + pol, noted
 
 
-def preflight(set_dir: Path, runner: Run = run) -> int:
+def stop_command(tag: str) -> str:
+    """Stop this run's client on rtx3060, wherever it is.
+
+    setsid made the launcher a process group leader and it wrote its pgid (`$$`, kept
+    through the execs) to client-<tag>.pgid. That group is killed only while it still
+    holds he1_client.sh, so a reused pgid is never signalled; this stops the script
+    even in setup, before any container exists, and the docker CLI, which passes the
+    signal to the container. Then the container is stopped by name (no-op if gone).
+    he1_client.sh's EXIT trap still writes `exit`."""
+    base = f"~/{RTX_WORK}/runs/{EVAL_JOB}"
+    return (
+        f"pg=$(cat {base}/client-{tag}.pgid 2>/dev/null); "
+        'if [ -n "$pg" ] && pgrep -g "$pg" -f \'[h]e1_client[.]sh\' > /dev/null; '
+        'then kill -TERM -- "-$pg"; fi; '
+        "docker stop -t 30 da26-eval-client"
+    )
+
+
+def route_log_problem(dest: Path) -> str | None:
+    """Why open_route_log would refuse, checked before the session starts."""
+    path = dest / EVAL_JOB / "route.jsonl"
+    if not path.exists():
+        return None
+    kept = kept_route_log(path)
+    return f"{kept} exists; move it away before a new run" if kept.exists() else None
+
+
+def preflight(set_dir: Path, runner: Run = run, dest: Path | None = None) -> int:
     """Read-only check that rtx3060 can take the client; run it before the eval session.
 
     0 ready; 4 MemAvailable under client + 16 GB (Hiếu's rule); 6 another job on the box
@@ -730,6 +759,8 @@ def preflight(set_dir: Path, runner: Run = run) -> int:
             problems.append("a da26-eval-client container is running")
     if others is None:
         problems.append("could not list rtx3060's other jobs")
+    if dest is not None and (why := route_log_problem(dest)):
+        problems.append(why)
     busy, noted = others or ([], [])
     log(
         event="preflight",
@@ -809,23 +840,32 @@ def open_route_log(job: Path, tag: str) -> JsonLog:
     as route-<its run>.jsonl, so two runs never share one log."""
     path = job / "route.jsonl"
     if path.exists():
-        first = path.read_text().split("\n", 1)[0]
-        try:
-            earlier = str(json.loads(first).get("run") or "")
-        except ValueError:
-            earlier = ""
-        kept = job / f"route-{earlier or int(path.stat().st_mtime)}.jsonl"
-        if kept.exists():
-            raise SystemExit(f"{kept} exists; move it away before a new run")
+        kept = kept_route_log(path)
+        if kept.exists():  # preflight --dest refuses this before the session starts
+            raise FileExistsError(f"{kept} exists; move it away before a new run")
         path.rename(kept)
     return JsonLog(path, run=tag)
 
 
-def results(dest: Path) -> list[dict[str, Any]]:
-    """One row per episode of the last client run: its tag's rows and files only."""
+def kept_route_log(path: Path) -> Path:
+    """Where an earlier run's route.jsonl is kept: route-<its run>.jsonl."""
+    first = path.read_text().split("\n", 1)[0]
+    try:
+        earlier = str(json.loads(first).get("run") or "")
+    except (ValueError, AttributeError):
+        earlier = ""
+    return path.with_name(f"route-{earlier or int(path.stat().st_mtime)}.jsonl")
+
+
+def results(dest: Path, route: Path | None = None) -> list[dict[str, Any]]:
+    """One row per episode of the last client run: its tag's rows and files only.
+
+    Written to results-<tag>.jsonl and copied to results.jsonl. A route.jsonl with no
+    client launch (a run that stopped before it) writes nothing, so an earlier run's
+    results stay; that run's log is route-<tag>.jsonl (`--route` reads it)."""
     job = dest / EVAL_JOB
     order = [Slot(**s) for s in json.loads((job / "order.json").read_text())["slots"]]
-    route = job / "route.jsonl"
+    route = route or job / "route.jsonl"
     events = [json.loads(x) for x in route.read_text().splitlines() if x.strip()]
     launches = [e for e in events if e["event"] == "client_launch"]
     rows: list[dict[str, Any]] = []
@@ -861,7 +901,10 @@ def results(dest: Path) -> list[dict[str, Any]]:
                     "complete_pair": all(o.episode in stats for o in order if o.pair == slot.pair),
                 }
             )
-    (job / "results.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+    if launches:
+        text = "".join(json.dumps(r) + "\n" for r in rows)
+        (job / f"results-{launches[-1]['tag']}.jsonl").write_text(text)
+        (job / "results.jsonl").write_text(text)
     return rows
 
 
@@ -904,15 +947,44 @@ class Interrupted(Exception):
     """SIGTERM, SIGINT or SIGHUP during `run`: the session is stopped all the same."""
 
 
-def on_signal(signum: int, frame: Any) -> None:
-    raise Interrupted(signal.Signals(signum).name)
+class SignalGuard:
+    """Turns the first signal into Interrupted while armed; any later one, or one after
+    `disarm`, is only noted, so the shutdown is never cut short by a second signal."""
+
+    def __init__(self) -> None:
+        self.armed, self.fired = True, False
+        self.noted: list[str] = []
+        self.previous: dict[int, Any] = {}
+
+    def install(self) -> None:
+        for s in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+            old = signal.getsignal(s)
+            if old == signal.SIG_IGN:  # nohup's ignored SIGHUP stays ignored
+                continue
+            self.previous[s] = old
+            signal.signal(s, self)
+
+    def __call__(self, signum: int, frame: Any) -> None:
+        name = signal.Signals(signum).name
+        if self.armed and not self.fired:
+            self.fired = True
+            raise Interrupted(name)
+        self.noted.append(name)
+
+    def disarm(self) -> None:
+        self.armed = False
+
+    def restore(self) -> None:
+        for s, old in self.previous.items():
+            signal.signal(s, old)
 
 
 def run_eval(args: argparse.Namespace, env: Env | None = None) -> int:
     """The eval, from a running session with both servers up to a confirmed stop.
 
-    Once the session is seen running, every way out (a refusal, a failure, an
-    exception, a signal) goes through `finish`, which stops the session."""
+    Once the session is seen running, every way out goes through `teardown` and
+    `finish` (which stops the session): a refusal, a failure, any exception (SystemExit
+    too), a signal, a second signal while the first is handled."""
     env = env or session_env(args)
     plan = load_plan()
     order = [Slot(**s) for s in json.loads((args.set / "order.json").read_text())["slots"]]
@@ -923,47 +995,56 @@ def run_eval(args: argparse.Namespace, env: Env | None = None) -> int:
     job = args.dest / EVAL_JOB
     job.mkdir(parents=True, exist_ok=True)
     tag = f"{EVAL_JOB}-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime(env.clock()))}"
-    signals = {s: signal.getsignal(s) for s in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)}
-    for s in signals:
-        signal.signal(s, on_signal)
-    state: dict[str, Any] = {"server": None, "tunnels": [], "launched": False, "exited": False}
-    write = JsonLog(job / "route.jsonl")  # replaced at once below
-    router = Router(order, lambda s, seen: {"verdict": "refuse"}, write, lambda: None)
+    state: dict[str, Any] = {
+        "server": None,
+        "tunnels": [],
+        "launched": False,
+        "exited": False,
+        "tag": tag,
+    }
+    log_box: list[Callable[[dict[str, Any]], None]] = [JsonLog(job / f"route-{tag}.early.jsonl")]
+    router = Router(order, lambda s, seen: {"verdict": "refuse"}, log_box[0], lambda: None)
+    routers = [router]
+    guard = SignalGuard()
     code = 5
     try:
-        write = open_route_log(job, tag)
-        shutil.copyfile(args.set / "order.json", job / "order.json")
-        stopped = threading.Event()
+        try:
+            guard.install()
+            log_box[0] = open_route_log(job, tag)
+            write = log_box[0]
+            shutil.copyfile(args.set / "order.json", job / "order.json")
+            stopped = threading.Event()
 
-        def stop_client() -> None:
-            rtx("docker stop -t 30 da26-eval-client", env.runner)
-            stopped.set()
+            def stop_client() -> None:
+                rtx(stop_command(tag), env.runner)
+                stopped.set()
 
-        router = Router(
-            order,
-            waiting_gate(env.reading, env.clock, env.sleep),
-            write,
-            lambda: threading.Thread(target=stop_client, daemon=True).start(),
-            clock=env.clock,
-        )
-        code = drive(args, env, order, router, write, tag, stopped, stop_client, state)
+            routers[0] = Router(
+                order,
+                waiting_gate(env.reading, env.clock, env.sleep),
+                write,
+                lambda: threading.Thread(target=stop_client, daemon=True).start(),
+                clock=env.clock,
+            )
+            code = drive(args, env, order, routers[0], write, tag, stopped, stop_client, state)
+        finally:
+            guard.disarm()  # from here no signal raises: the stop below runs to its end
     except Interrupted as why:
         alert(f"run interrupted by {why}; stopping the client and the session")
-        write({"event": "interrupted", "signal": str(why)})
+        log_box[0]({"event": "interrupted", "signal": str(why)})
         code = 7
-    except Exception as error:  # noqa: BLE001 - whatever failed, the session is stopped
+    except BaseException as error:  # noqa: BLE001 - SystemExit too: the session is stopped
         alert(f"run failed: {error!r}; stopping the client and the session")
-        write({"event": "error", "error": repr(error)})
+        log_box[0]({"event": "error", "error": repr(error)})
         code = 5
-    finally:
-        for s in signals:  # the stop below runs to its end
-            signal.signal(s, signal.SIG_IGN)
-        teardown(env, write, state)
     try:
-        return finish(args, env, write, router, code)
+        teardown(env, log_box[0], state)
+        code = finish(args, env, log_box[0], routers[0], code)
+        if guard.noted:
+            log_box[0]({"event": "signals_during_shutdown", "signals": guard.noted})
+        return code
     finally:
-        for s, old in signals.items():
-            signal.signal(s, old)
+        guard.restore()
 
 
 def drive(
@@ -1124,7 +1205,7 @@ def teardown(env: Env, write: Callable[[dict[str, Any]], None], state: dict[str,
         steps.append(("route", state["server"].shutdown))
     steps += [(f"tunnel {t.name}", t.stop) for t in state["tunnels"]]
     if state["launched"] and not state["exited"]:
-        steps.append(("client", lambda: rtx("docker stop -t 30 da26-eval-client", env.runner)))
+        steps.append(("client", lambda: rtx(stop_command(state["tag"]), env.runner)))
     for name, step in steps:
         try:
             done = step()
@@ -1155,13 +1236,16 @@ def finish(
         alert(f"{args.session}: stop raised {error!r}; it may still bill")
         confirmed = False
     write({"event": "session_stop", "confirmed": confirmed})
-    pulled = env.runner(
-        [
-            *("rsync", "-a", "--timeout=120", "-e", " ".join(RTX_SSH)),
-            *(f"{RTX}:{RTX_WORK}/runs/{EVAL_JOB}/", f"{job}/client/"),
-        ]
-    )
-    write({"event": "client_pulled", "code": pulled.returncode})
+    try:
+        pulled = env.runner(
+            [
+                *("rsync", "-a", "--timeout=120", "-e", " ".join(RTX_SSH)),
+                *(f"{RTX}:{RTX_WORK}/runs/{EVAL_JOB}/", f"{job}/client/"),
+            ]
+        )
+        write({"event": "client_pulled", "code": pulled.returncode})
+    except Exception as error:  # noqa: BLE001
+        write({"event": "client_pull_failed", "error": repr(error)})
     try:
         rows = results(args.dest)
         complete = {r["pair"] for r in rows if r["complete_pair"]}
@@ -1187,6 +1271,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--src", type=Path)
     parser.add_argument("--out", type=Path)
     parser.add_argument("--set", type=Path)
+    parser.add_argument("--route", type=Path, help="`results`: an earlier run's route-<tag>.jsonl")
     parser.add_argument("--colab", type=Path, default=COLAB)
     parser.add_argument("--spent", type=float, help="`fit`: CU spent when the first pair starts")
     parser.add_argument("--episode-s", type=float, default=PRIOR_EPISODE_S)
@@ -1196,12 +1281,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps({"episodes": len(order), "out": str(args.out)}))
         return 0
     if args.mode == "preflight":
-        return preflight(args.set)
+        return preflight(args.set, dest=args.dest)
     if args.mode == "fit":
         print(pairs_that_fit(args.spent, args.episode_s, most=len(pair_order(load_plan())) // 2))
         return 0
     if args.mode == "results":
-        rows = results(args.dest)
+        rows = results(args.dest, args.route)
         print(
             json.dumps(
                 {
