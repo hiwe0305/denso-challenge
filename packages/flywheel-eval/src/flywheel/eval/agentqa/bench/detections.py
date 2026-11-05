@@ -155,6 +155,12 @@ def read_qa_work(work: Path, dataset_id: str) -> LayerRun:
             f"{work}: {len(wrong)} episode(s) are not of copy {dataset_id}, e.g. {wrong[0]}"
         )
     aliases = {episode_id: _episode_ref(i) for episode_id, i in index.items()}
+    unindexed = [e.episode_id for e in episodes if e.episode_id not in aliases]
+    if unindexed:
+        raise BenchInputError(
+            f"{work}: episode {unindexed[0]} of {EPISODES} has no entry in {EPISODE_INDEX}"
+            f" ({len(unindexed)} such); rerun `fw data ingest` on the copy"
+        )
     units = tuple(sorted(aliases[e.episode_id] for e in episodes))
     reports = [QAReport.model_validate_json(line) for line in _lines(reports_path)]
     detections: list[Detection] = []

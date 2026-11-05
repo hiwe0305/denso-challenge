@@ -46,7 +46,7 @@ Theo design mục 9.2 (đã chốt 3/11/2026, issue #34):
 | Recall trên phần không bị che | Lỗi không bị che được bắt / (số lỗi cấy − số lỗi bị che), đặt cạnh recall theo loại. Lỗi bị che là lỗi tự nhiên (quy tắc 1 dưới); recall theo loại vẫn giữ nó ở mẫu số. Một lỗi `duplicate_episode` bắt được ở chỗ B nhưng bị che ở episode gốc A vẫn tính là bị che, nên nằm ngoài cả tử lẫn mẫu |
 | Precision theo mã | Trong các cặp (target, mã) khác nhau lớp báo trên bản có lỗi, phần khớp một lỗi cấy |
 | Báo nhầm | Trên bản sạch: (số episode hoặc job có ít nhất một báo cáo + số target không gắn đơn vị nào) / tổng số episode hoặc job. Target không gắn đơn vị là target không quy được về episode hay job của bản (agent ghi `dataset`, hay một đường dẫn ngoài bản); mỗi target như thế tính một lần dù báo nhiều mã, và ghi riêng ở dòng "không gắn đơn vị" (`false_alarm_not_a_unit`). Mẫu số vẫn là số đơn vị, để hai lớp so được với nhau; vì thế về lý thuyết tỉ lệ có thể vượt 100%. Số này là **cận trên** của tỉ lệ báo nhầm thật: bản sạch vẫn mang lỗi thật của dữ liệu, nên báo đúng một lỗi thật cũng tính là báo nhầm. Trên psi-data, DA-17 đo 73/99 episode phát lại không thành công, nên D6 báo trên bản sạch |
-| Thời gian | Từ lúc job xong (`job_finished_at` trong spec) tới lúc có báo cáo (mtime của `qa/reports.jsonl`, lúc chạy xong bộ phát hiện log, `created_at` muộn nhất của `AgentReport`). Thiếu một trong hai mốc thì ghi "chưa đo" |
+| Thời gian | Từ lúc job xong (`job_finished_at` trong spec) tới lúc có báo cáo (mtime của `qa/reports.jsonl`, lúc chạy xong bộ phát hiện log, `created_at` muộn nhất của `AgentReport`). Thiếu một trong hai mốc thì ghi "chưa đo". Hai mốc báo cáo của lớp code là xấp xỉ, xem mục 7 |
 
 Hai quy tắc design để ngỏ, bộ chấm chọn như sau. **[Đã chốt]** Hiếu, 5/11/2026 (review #132): giữ cả hai như viết; báo nhầm trên bản sạch ghi là cận trên và thêm recall trên phần không bị che (bảng trên).
 
@@ -129,7 +129,16 @@ Dựng lại bộ log của DA-27 trên laptop (Windows, CPU) bằng `flywheel.d
 
 Kết quả khớp test nối làn của DA-27 (`tests/e2e/test_log_defects_detected.py`): mỗi job cấy ra đúng mã của nó, bản sạch không ra mã nào.
 
-## 7. Còn lại
+## 7. Giới hạn đã biết
+
+| Giới hạn | Hệ quả | Cách đọc số |
+|---|---|---|
+| Thời gian tới báo cáo của lớp code là xấp xỉ | Mốc báo cáo trên bản sao dữ liệu là mtime của `qa/reports.jsonl`: lần ghi cuối của file, không phải lúc QA ra quyết định; chép work dir mà không giữ thời gian (`cp` không `-p`, `scp` không `-p`) hay `touch` đều đổi mốc. Trên bản sao log, mốc là `datetime.now()` lúc bộ chấm chạy bộ phát hiện, tức là thời điểm chạy bộ chấm, không phải lúc phát hiện chạy trong job thật | Cho tới khi spec có `job_finished_at` của một job thật, cột thời gian ghi "chưa đo" và không phải số đo. Có `job_finished_at` rồi thì vẫn ghi là ước lượng cho lớp code |
+| QA không kiểm trùng theo từng episode | Mã D5 của QA chỉ có phép kiểm `split_seed` (bắt `holdout_seed_leak`); không phép kiểm nào so một episode với các episode khác. Trên bản sao psi-data, `duplicate_episode` dự kiến 0/3 ở lớp code | Đây là khoảng trống của phép kiểm, không phải lỗi của bộ chấm; báo cáo ghi rõ như vậy. Bộ chấm vẫn đếm đúng: một phép kiểm trùng sau này báo A hoặc B với mã D5 đều tính là bắt (mục 2) |
+| Báo nhầm trên bản sạch là cận trên | Bản sạch vẫn mang lỗi thật của dữ liệu | Mục 2 |
+| Work dir thiếu `episode_index.json` cho một episode | Bộ chấm dừng với `BenchInputError` nêu id episode (mã thoát 2), không chấm | Chạy lại `fw data ingest` trên bản đó |
+
+## 8. Còn lại
 
 | Việc | Chờ | Ghi chú |
 |---|---|---|
