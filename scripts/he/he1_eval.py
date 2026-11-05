@@ -668,7 +668,9 @@ def client_command(tag: str, episodes: int) -> str:
     """Start the client on rtx3060, detached, in a MemoryMax scope.
 
     The scope caps the launcher; the container runs under dockerd, outside it, and has
-    its own cap (docker --memory, he1_client.sh)."""
+    its own cap (docker --memory, he1_client.sh). Only `nohup` is backgrounded: in
+    `cd X && nohup ... &` the whole list runs in a subshell that keeps ssh's stdout and
+    stderr and waits for the client, so the launch ssh never returns (eval attempt 2)."""
     inner = (
         f"echo $$ > runs/{EVAL_JOB}/client-{tag}.pgid; "
         f"exec systemd-run --user --scope --quiet -p MemoryMax={CLIENT_GB + 4}G "
@@ -676,7 +678,7 @@ def client_command(tag: str, episodes: int) -> str:
         f"--tag {tag} --episodes {episodes} --port {CLIENT_PORT}"
     )
     return (
-        f"cd ~/{RTX_WORK} && nohup setsid bash -c {shlex.quote(inner)} "
+        f"cd ~/{RTX_WORK} || exit 1; nohup setsid bash -c {shlex.quote(inner)} "
         f"< /dev/null > runs/{EVAL_JOB}/client-launch-{shlex.quote(tag)}.log 2>&1 &"
     )
 
