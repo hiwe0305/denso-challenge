@@ -13,7 +13,7 @@ Thiết kế đầy đủ: [DESIGN.md](DESIGN.md). File này chỉ nói cách ch
 | `api/` | FastAPI: `app.py` các route §7, `readmodel.py` lớp đọc (sink JSONL hôm nay, Postgres sau), `actions.py` ghi `human_actions.jsonl`. Chưa có SQLAlchemy, Alembic |
 | `fwsync/` | Bộ nạp: `source.py` đọc, `mapping.py` ánh xạ, `sink.py` ghi, `runner.py` bốn việc, `cli.py` lệnh |
 | `mock/` | Generator của bộ mock; output ở `mock/demo-17-11/` ngoài thư mục `web/` |
-| `fe/` | React, Vite, TanStack Query, Tailwind, MSW. `src/api/types.ts` là hình dạng response (DESIGN.md §7.4); `src/mocks/` dựng response từ `mock/demo-17-11/`; `src/contracts/schemas/` sinh từ hợp đồng. Màn hình đã dựng: M7 |
+| `fe/` | React, Vite, TanStack Query, Tailwind, MSW. `src/api/types.ts` là hình dạng response (DESIGN.md §7.4); `src/mocks/` dựng response từ `mock/demo-17-11/`; `src/contracts/schemas/` sinh từ hợp đồng. Màn hình đã dựng: M2, M6, M7, M9 (bốn màn lõi của mốc M3) |
 
 ## Chạy test
 
@@ -37,7 +37,7 @@ bộ mock `mock/demo-17-11/`, nên không cần backend.
 cd web/fe
 npm ci
 npm run dev            # http://localhost:5173, dữ liệu mock
-npm test               # vitest: hình dạng response M0 và màn hình M7
+npm test               # vitest: hình dạng response M0 và bốn màn M2, M6, M7, M9
 npm run typecheck && npm run lint && npm run build
 npm run gen:types      # sinh lại type từ packages/flywheel-contracts/schemas/
 ```
