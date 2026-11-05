@@ -10,6 +10,8 @@ of DA-19's driver) for the measured rows of docs/g0/ledger/DA-26.csv:
     python3 fw/scripts/he/he1_colab.py persist [--watch 600 --pid P]
     python3 fw/scripts/he/he1_colab.py restore --point V-EGO/N20/0  # on a fresh VM
     python3 fw/scripts/he/he1_colab.py stage   # JSON for scripts/he/he1_fetch.py
+    python3 fw/scripts/he/he1_colab.py serve-setup   # eval session (he1_eval.py)
+    python3 fw/scripts/he/he1_colab.py serve
 
 Every phase loads `configs/runplans/he/he-1.yaml` and refuses to go on unless it is
 the frozen plan (`he-1.lock.json`, rp_95c98a476499) and the point is one of its
@@ -39,6 +41,13 @@ durable copy is the laptop: `stage` prints, as JSON, what eval needs from each j
 its optimizer state) with sizes and sha256, and scripts/he/he1_fetch.py pulls those
 files over `colab ssh --proxy-mode` and checks them against it. `stage` also gives
 the training progress (last step, seconds per step) the fetcher's early stop reads.
+Each pass also refreshes `runs/<job>/vm-logs/` (`refresh_vm_logs`): hard links of the
+work-root logs and of W&B's core log, and the GPU, disk and memory facts, for Agent
+QA/QC; `train` and `serve` write their allowlisted environment there.
+
+The eval session (F10, scripts/he/he1_eval.py) runs `serve-setup`, the serving env of
+S1-03's Colab server, and `serve`, which checks the uploaded checkpoints against the
+laptop's sha256 and starts one Psi0 server per preliminary point.
 """
 
 from __future__ import annotations
@@ -255,6 +264,7 @@ def train(work: Path, point_text: str) -> None:
         nproc_per_node=plan.recipe.nproc_per_node,
         overrides=dict(plan.recipe.overrides),
     )
+    write_launch_env(work / "runs" / spec.job_id / "vm-logs", "train")
     start = time.monotonic()
     result = trainer.train(spec)
     launched = json.loads((work / "runs" / spec.job_id / "result.json").read_text())
@@ -331,6 +341,7 @@ def stage(work: Path) -> dict[str, Any]:
     trained = report.get("phases", {}).get("train", {})
     staged = []
     for job in jobs(work):
+        refresh_vm_logs(work, job)
         complete = completed_checkpoints(job)
         inside = job.resolve()
         outside = sorted(
@@ -430,6 +441,248 @@ def progress(metrics: Path, skip: int = 200) -> dict[str, Any]:
     return {"step": rows[-1]["step"] if rows else None, "s_per_step": rate}
 
 
+# --- eval server (DA-26 task 3, F10; he1_eval.py drives it from the laptop) ---------
+
+EVAL_JOB = "da26-t2-eval-n20"
+SERVE_PORTS = (22085, 22086)  # he1_eval.py VM_PORTS: one server per preliminary point
+SERVE_ARGS = ("--action-exec-horizon", "24", "--rtc")  # serve_psi0.sh defaults (S1-03)
+# Environment keys copied into vm-logs/launch-env.txt: an allowlist, never credentials.
+ENV_KEYS = ("CUDA_VISIBLE_DEVICES", "OMP_NUM_THREADS", "WANDB_MODE", "PYTHONHASHSEED", "HF_HOME")
+SECRET = ("TOKEN", "KEY", "SECRET", "PASS")
+
+
+def serve_setup(work: Path) -> None:
+    """Psi0's serving environment as `serve_psi0.sh setup` builds it with
+    PSI0_RUNTIME=venv PSI0_ENV=image (S1-03's Colab server, docs/g0/psi0-eval.md 3.4.1):
+    the pinned image's exact package list, then psi editable without dependencies.
+    serve_psi0.sh itself needs a git checkout of this repo; fw/ is a `git archive`."""
+    start = time.monotonic()
+    src = work / "serve" / "Psi0"
+    lfs = {"GIT_LFS_SKIP_SMUDGE": "1"}
+    if not (src / ".git").exists():
+        sh(f"git clone --filter=blob:none --no-checkout {PSI0_REPO} {src}", env=lfs)
+    sh(f"git -c advice.detachedHead=false checkout --quiet {PSI0_COMMIT}", cwd=src, env=lfs)
+    if not (src / ".env").is_file() or not (src / ".env").read_text().strip():
+        (src / ".env").write_text(f"PSI_HOME={work / 'serve'}\n")  # serve asserts load_dotenv()
+    requirements = REPO / "docker/psi0/requirements-image.txt"
+    sh("pip install -q uv")
+    sh("env -u UV_SYSTEM_PYTHON uv venv --allow-existing .venv-psi --python 3.11", cwd=src)
+    pip = "env -u UV_SYSTEM_PYTHON uv pip install --python .venv-psi/bin/python"
+    sh(f"{pip} -r {requirements}", cwd=src, env=lfs)
+    sh(f"{pip} --no-deps -e .", cwd=src)
+    sh(
+        ".venv-psi/bin/python -c 'import psi, torch, flash_attn, diffusers; "
+        "print(psi.__version__, torch.__version__, flash_attn.__version__)'",
+        cwd=src,
+    )
+    Report(work).phase(
+        "serve_setup",
+        time.monotonic() - start,
+        psi0_commit=PSI0_COMMIT,
+        requirements_sha256=sha256(requirements),
+    )
+
+
+def eval_jobs() -> list[str]:
+    """The fine-tunes the eval serves: the frozen plan's preliminary points, in order."""
+    plan = He1RunPlan.load(PLAN)
+    points = [p for p in plan.points if p.phase == "preliminary"]
+    return [job_id(load_point(f"{p.variant}/{p.demo_set}/{p.seed}")[1]) for p in points]
+
+
+def upload_problems(work: Path, jobs_: Sequence[str]) -> list[str]:
+    """Every uploaded file whose sha256 is not the laptop's (`serve/<job>/expected.json`)."""
+    problems = []
+    for job in jobs_:
+        want_path = work / "serve" / job / "expected.json"
+        if not want_path.is_file():
+            problems.append(f"{want_path} missing: run he1_eval.py upload")
+            continue
+        want = json.loads(want_path.read_text())
+        base = work / "serve" / job / want["run"]
+        problems += hash_problems({base / rel: digest for rel, digest in want["files"].items()})
+    return problems
+
+
+def healthy(port: int) -> bool:
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=5) as reply:
+            return bool(reply.status == 200 and b"ok" in reply.read())
+    except OSError:
+        return False
+
+
+def serve(
+    work: Path,
+    jobs_: Sequence[str] | None = None,
+    ports: Sequence[int] = SERVE_PORTS,
+    python: str | None = None,
+    launcher: Path = REPO / "docker/psi0/serve_psi0_seeded.py",
+    deadline_s: float = 900.0,
+) -> None:
+    """Check every uploaded file, then start one server per fine-tune, one after the
+    other (each loads 6.25 GB), each in its own session so it outlives this phase.
+    Logs go to `runs/da26-t2-eval-n20/server-<job>.log`, inside what `stage` lists."""
+    import subprocess
+
+    start = time.monotonic()
+    jobs_ = list(jobs_ if jobs_ is not None else eval_jobs())
+    problems = upload_problems(work, jobs_)
+    if problems:
+        raise SystemExit("uploaded files differ, nothing served:\n  " + "\n  ".join(problems))
+    out = work / "runs" / EVAL_JOB
+    (out / "vm-logs").mkdir(parents=True, exist_ok=True)
+    write_launch_env(out / "vm-logs", "serve")
+    src = work / "serve" / "Psi0"
+    python = python or str(src / ".venv-psi" / "bin" / "python")
+    servers = []
+    for job, port in zip(jobs_, ports, strict=True):
+        want = json.loads((work / "serve" / job / "expected.json").read_text())
+        argv = [
+            python,
+            str(launcher),
+            "--policy",
+            "psi0",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port),
+            "--device",
+            "cuda:0",
+            "--run-dir",
+            str(work / "serve" / job / want["run"]),
+            "--ckpt-step",
+            str(TOTAL_STEPS),
+            *SERVE_ARGS,
+        ]
+        with (out / f"server-{job}.log").open("ab") as log_file:
+            proc = subprocess.Popen(
+                argv,
+                cwd=src if src.is_dir() else work,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        loaded = time.monotonic()
+        while not healthy(port):
+            if proc.poll() is not None or time.monotonic() - loaded > deadline_s:
+                raise SystemExit(f"server of {job} on {port} did not come up; see server-{job}.log")
+            time.sleep(5)
+        import urllib.request
+
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/info", timeout=30) as reply:
+            (out / f"server-{job}.info.json").write_bytes(reply.read())
+        servers.append(
+            {
+                "job": job,
+                "port": port,
+                "pid": proc.pid,
+                "run": want["run"],
+                "load_seconds": round(time.monotonic() - loaded, 1),
+                "argv": argv[1:],
+            }
+        )
+        print(json.dumps(servers[-1]), flush=True)
+    Report(work).phase(
+        "serve",
+        time.monotonic() - start,
+        servers=servers,
+        sha256_checked={
+            job: json.loads((work / "serve" / job / "expected.json").read_text())["files"]
+            for job in jobs_
+        },
+    )
+
+
+def write_launch_env(dest: Path, phase: str) -> None:
+    """The allowlisted environment of this process (never a credential) and its argv."""
+    dest.mkdir(parents=True, exist_ok=True)
+    keys = [k for k in ENV_KEYS if k in os.environ and not any(s in k for s in SECRET)]
+    lines = [f"# {phase}: {' '.join(sys.argv)}", f"# python {sys.executable}"]
+    lines += [f"{k}={os.environ[k]}" for k in keys]
+    (dest / "launch-env.txt").write_text("\n".join(lines) + "\n")
+
+
+def refresh_vm_logs(work: Path, job: Path) -> None:
+    """`runs/<job>/vm-logs/`: the work-root logs and the W&B core log, for Agent QA/QC.
+
+    Hard links where the file lives on, so `stage` lists its current content: the
+    launch logs at the work root and every log a link in the job dir points to outside
+    it (W&B's `logs/debug-core.log`, which `stage` skips). A link replaced by a new
+    file at the source (another inode) is linked again; on another filesystem it is
+    copied whenever it changed. GPU, disk and memory facts are written once.
+    """
+    import shutil
+    import subprocess
+
+    dest = job / "vm-logs"
+    dest.mkdir(exist_ok=True)
+    inside = job.resolve()
+    sources = [
+        work / n
+        for n in (
+            "train.log",
+            "report.json",
+            "setup.log",
+            "serve-setup.log",
+            "serve.log",
+            "psi0-constraints.txt",
+        )
+    ]
+    sources += [
+        p.resolve()
+        for p in job.rglob("*")
+        if p.is_symlink() and p.is_file() and not p.resolve().is_relative_to(inside)
+    ]
+    for src in sources:
+        if not src.is_file():
+            continue
+        target = dest / src.name
+        if target.exists():
+            same = os.path.samefile(src, target)
+            stale = not same and (target.stat().st_size, target.stat().st_mtime) != (
+                src.stat().st_size,
+                src.stat().st_mtime,
+            )
+            if same or not stale:
+                continue
+            target.unlink()
+        try:
+            os.link(src, target)
+        except OSError:
+            shutil.copy2(src, target)
+    facts = {
+        "nvidia-smi-q.txt": ["nvidia-smi", "-q"],
+        "df-h.txt": ["df", "-h"],
+        "free-m.txt": ["free", "-m"],
+    }
+    for name, argv in facts.items():
+        if not (dest / name).exists():
+            try:
+                text = subprocess.run(argv, capture_output=True, text=True, timeout=60).stdout
+            except (OSError, subprocess.TimeoutExpired) as error:
+                text = f"{' '.join(argv)}: {error}\n"
+            (dest / name).write_text(text)
+    for venv in (work / "Psi0" / ".venv-psi", work / "serve" / "Psi0" / ".venv-psi"):
+        frozen = dest / f"pip-freeze-{venv.parents[1].name}.txt"
+        if (venv / "bin" / "python").exists() and not frozen.exists():
+            listing = subprocess.run(
+                [
+                    str(venv / "bin" / "python"),
+                    "-c",
+                    "import importlib.metadata as m; print('\\n'.join(sorted("
+                    "f'{d.metadata[\"Name\"]}=={d.version}' for d in m.distributions())))",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            frozen.write_text(listing.stdout)
+
+
 def jobs(work: Path) -> list[Path]:
     return sorted(p for p in (work / "runs").glob("*") if p.is_dir())
 
@@ -454,7 +707,8 @@ def restore(work: Path, durable: Path, point_text: str) -> None:
 
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
-    parser.add_argument("phase", choices=["setup", "train", "persist", "restore", "stage"])
+    phases = ["setup", "train", "persist", "restore", "stage", "serve-setup", "serve"]
+    parser.add_argument("phase", choices=phases)
     parser.add_argument("--work", type=Path, default=Path("/content/da26"))
     parser.add_argument("--point", help="VARIANT/SET/SEED of a preliminary point, e.g. V-EGO/N20/0")
     parser.add_argument("--to", type=Path, default=DRIVE, help="durable directory (Drive)")
@@ -473,6 +727,10 @@ def main(argv: Sequence[str] | None = None) -> None:
         persist(args.work, args.to, args.watch, args.pid)
     elif args.phase == "stage":
         print(json.dumps(stage(args.work)))
+    elif args.phase == "serve-setup":
+        serve_setup(args.work)
+    elif args.phase == "serve":
+        serve(args.work)
     else:
         restore(args.work, args.to, args.point)
 

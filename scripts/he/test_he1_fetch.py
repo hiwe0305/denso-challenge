@@ -124,7 +124,9 @@ def test_the_final_pull_takes_only_what_is_new_and_ends_the_job(tmp_path: Path) 
     fake_vm(vm, saved=(40000,), complete=40000, train_done=True)
     (status,) = fetch_once(LocalRemote(vm), tmp_path / "laptop")
     assert status["checkpoint"] == "ckpt_40000" and status["train"] == "done" and status["final"]
-    assert status["pulled_bytes"] == 4000 + 1 + len('{"checkpoint_step": 40000}')
+    # new: the checkpoint, result.json, and the train phase in vm-logs/report.json
+    report = (vm / "report.json").stat().st_size
+    assert status["pulled_bytes"] == 4000 + 1 + len('{"checkpoint_step": 40000}') + report
     assert status["checkpoint_pulled_bytes"] == 4000 + 1
 
 
