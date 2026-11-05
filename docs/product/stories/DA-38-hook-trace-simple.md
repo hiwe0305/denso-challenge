@@ -220,7 +220,26 @@ Hệ quả:
   - R3 thân dưới 1,75 và 0,82 (ngưỡng giả định 0,15): `yaw` đo bám `target_yaw` trễ khoảng 40 chu kỳ khi robot quay sang bàn đích, rồi hội tụ. Đây là sai số bám thật, không phải lỗi quấn góc (R3 đã quấn `yaw`).
   - R1, R2 bỏ qua vì không có `rtc.jsonl`.
   - Ngưỡng R3 là việc của DA-13 và DA-37; trace này là dữ liệu thật đầu tiên để hiệu chỉnh.
-- `fw eval score` (config `two-table.yaml`) chưa chạy được. Master chưa có `TaskDefinition` của task hai bàn. Trace cũng không có tín hiệu task mà config cần (khoảng cách tay–vật, tiếp xúc, chiều cao vật, vùng, va chạm, thăng bằng thân): hook chỉ ghi `TraceStep`. Đã hỏi Hiếu ai làm phần này (qua phiên "Công việc của Hiếu (todo)", 5/11). **[Chờ quyết]**
+- **Phạm vi `fw eval score` [Đã chốt 5/11/2026, Hiếu]:** "(b) Giữ DA-38, giao cho 3.4 (Recommended)" (chuyển qua phiên "Công việc của Hiếu (todo)"). `TaskDefinition` hai bàn và tín hiệu vật, tiếp xúc của nó thuộc story 3.4 (Hưng), như DA-37 đã ghi phụ thuộc. DA-38 không sửa hợp đồng hay config.
+- Kết quả chạy `fw eval score` với một task giả (không commit; khai 6 bước và tín hiệu của `two-table.yaml`, `evaluate()` không phán bước nào):
+  - Trên `steps.jsonl` của hook: **không đọc được**, mã 2: `tín hiệu trace_id phải là số hoặc null`. Reader của scorer (`flywheel.eval.scorer.reader`) đọc trace tín hiệu task (dòng V7 của 03 mục 4.2, mỗi dòng một object JSON phẳng toàn số), và docstring của nó ghi rõ không phải log `TraceStep` của DA-13. Hai trace là hai artifact khác nhau, nên `steps.jsonl` không thể là đầu vào của `fw eval score`.
+  - Trên một tệp V7 tạm dựng từ `steps.jsonl` thật (chỉ `episode_id` và `t = t_state`): đọc được, mã 0. Cả 6 bước "chưa rõ", thành công "chưa rõ", kiểu lỗi `L-UNKNOWN`, thăng bằng "chưa rõ". Như vậy, khi có tệp V7, scorer chạy được trên episode thật; thứ còn thiếu là tín hiệu.
+- Khoảng trống tín hiệu, theo `configs/eval/scorer/two-table.yaml`:
+
+| Tín hiệu config cần | Dùng ở | Trace DA-38 có không |
+|---|---|---|
+| `hand_object_distance` | bước approach | Không |
+| `hand_object_contact` | grasp, walk, arrive, release | Không |
+| `object_height` | grasp, place | Không |
+| `torso_in_source_zone` | walk | Không |
+| `torso_in_target_zone` | arrive | Không |
+| `object_in_target_zone` | place, release | Không |
+| `t` | release | Có, là `t_state` |
+| `collision` | cả episode | Không |
+| `torso_height` | thăng bằng | Gần đúng: `meas_lower` có `base_height` (chiều cao gốc); chưa rõ có trùng định nghĩa "torso" của config không |
+| `torso_tilt` | thăng bằng | Không (`TraceStep` không mang hướng của gốc ngoài yaw) |
+
+  Ai ghi tệp V7 (hook này, hay lớp task của 3.4 đọc từ MuJoCo) là việc của 3.4. Hook DA-38 chạy trong cùng vòng eval, nên có thể thêm một bộ ghi V7 nếu 3.4 chọn vậy.
 - SIMPLE `b75c678` có lỗi ở cuối `run_eval`: với 1 worker và thanh tiến trình, nó `console.print` vào luồng đã đóng nên thoát mã 1, sau khi mọi episode đã ghi xong. Đặt `DEBUG=1` (như `eval_psi0.sh` của S1-03) thì tránh được.
 - DDS: lúc chạy có client Isaac của DA-26 trên cùng máy, nhưng DA-26 dùng `DOMAIN_ID: 126`, còn lượt này dùng 0, nên không lẫn topic. Server Ψ₀ của lượt này (7,25 GB VRAM) đã dừng sớm để nhường GPU cho Isaac của DA-26.
 
