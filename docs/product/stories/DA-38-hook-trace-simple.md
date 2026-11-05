@@ -40,7 +40,7 @@ Là người làm làn Đánh giá, tôi muốn mỗi rollout SIMPLE của độ
   - [x] 3.3. Entry module cài hook ở cấp module, đọc `job_id`, `run_plan_id`, thư mục job và bản tham chiếu từ job spec
   - [x] 3.4. Đọc lại tệp qua `TraceStep`, `CameraParams` khi PR #48 merge (test đang skip hoặc xfail tới lúc đó)
 - [x] 4. Cài hook vào `eval-decoupled-wbc` (bọc env và agent), test `sim` (AC 1, 5)
-- [ ] 5. Lượt chạy thật task hai bàn trên `rtx3060`, ghi ledger (AC 6)
+- [x] 5. Lượt chạy thật task hai bàn trên `rtx3060`, ghi ledger (AC 6)
 - [ ] 6. Lượt chạy thật task khay trên `rtx3060`, ghi ledger (AC 6)
 - [ ] 7. Tài liệu `docs/g0/trace.md`: cách chạy, ý nghĩa trường, giới hạn ở sim (AC 1–6)
 
@@ -204,3 +204,23 @@ Hệ quả:
 - Kiểm tận nguồn thứ tự 28 chiều: `STATE_SLICES` lấy từ `WHOLE_BODY_JOINTS` của `g1_sonic` (SIMPLE `b75c678`) đúng các khớp của `UPPER_BODY`, theo đúng thứ tự (tay trái thumb, middle, index; tay phải thumb, index, middle), và `WAIST_RPY` là roll, pitch, yaw. Có test `sim` cho điều này.
 - Test `sim` mới chạy entry module trong vòng eval thật (stub thay server Ψ₀). Kết quả: đúng một thư mục `<trace_id>/` với 40 dòng `steps.jsonl`, hai camera mang hash đã ghim, `trace_ref.uri` là thư mục đó, `infra_status` là `ok`. Trên `rtx3060` 4/11/2026 00:34, SIMPLE `b75c678`, task hai bàn: 5 passed, 2 skipped (khay chưa đặt dữ liệu; test hợp đồng vì venv không có `flywheel`) trong 53 s.
 - Chưa chạy với `--num-workers > 1`; lượt chạy thật của nhiệm vụ 5 sẽ chạy.
+
+### 5/11/2026 · Nhiệm vụ 5: lượt chạy thật task hai bàn
+
+- Chạy trên `rtx3060` lúc 21:12–21:15, trong `~/denso-da38`:
+  - SIMPLE `b75c678`, `--sim-mode mujoco`, tập điều kiện `e78fb93` mức 0, episode 0 và 1, 1 worker, `systemd-run MemoryMax=12G`.
+  - Server Ψ₀ ở image ghim, checkpoint hai bàn `ckpt_40000`, cổng `127.0.0.1:22195`, chạy bằng `compose run -d` (`mem_limit 16g`).
+  - Cổng chọn ban đầu, 22095, đang là tunnel tới server Colab của DA-26: container đầu không nghe được trên cổng đó, còn `/info` trả về server của DA-26. Lượt này không gửi `/act` nào tới đó. Phải kiểm `ss -ltn` trước khi chọn cổng.
+- Kết quả: hai thư mục `<trace_id>/`, mỗi thư mục có `steps.jsonl`, `camera_params.jsonl`, `rollout_result.json`. Mọi dòng đọc được qua `TraceStep`, `CameraParams`, `RolloutResult`.
+  - 1200 chu kỳ mỗi episode, `t_state` cách nhau đúng 0,02 s; 50 khung ảnh, mỗi chunk 24 bước một khung.
+  - Cả 28 kênh thân trên và 7 kênh thân dưới có phương sai khác 0.
+  - `sim_success` False, False, khớp `eval_stats.txt` của SIMPLE. `infra_status` là `ok`. `camera_params_hash` là hash đã ghim.
+- `fw eval diag-system --episode <trace_id>/` đọc được cả hai trace, mã thoát 0, chẩn đoán LỖI CONTROLLER:
+  - R3 thân trên 2,57 và 2,65 (ngưỡng giả định 0,1): ngón `index_0`, `middle_0` tay phải lệch lệnh khoảng 0,9 rad (trung vị), nghĩa là ngón bị chặn khi chạm bàn hoặc vật. Các khớp cánh tay và tay trái lệch dưới 0,2 rad.
+  - R3 thân dưới 1,75 và 0,82 (ngưỡng giả định 0,15): `yaw` đo bám `target_yaw` trễ khoảng 40 chu kỳ khi robot quay sang bàn đích, rồi hội tụ. Đây là sai số bám thật, không phải lỗi quấn góc (R3 đã quấn `yaw`).
+  - R1, R2 bỏ qua vì không có `rtc.jsonl`.
+  - Ngưỡng R3 là việc của DA-13 và DA-37; trace này là dữ liệu thật đầu tiên để hiệu chỉnh.
+- `fw eval score` (config `two-table.yaml`) chưa chạy được. Master chưa có `TaskDefinition` của task hai bàn. Trace cũng không có tín hiệu task mà config cần (khoảng cách tay–vật, tiếp xúc, chiều cao vật, vùng, va chạm, thăng bằng thân): hook chỉ ghi `TraceStep`. Đã hỏi Hiếu ai làm phần này (qua phiên "Công việc của Hiếu (todo)", 5/11). **[Chờ quyết]**
+- SIMPLE `b75c678` có lỗi ở cuối `run_eval`: với 1 worker và thanh tiến trình, nó `console.print` vào luồng đã đóng nên thoát mã 1, sau khi mọi episode đã ghi xong. Đặt `DEBUG=1` (như `eval_psi0.sh` của S1-03) thì tránh được.
+- DDS: lúc chạy có client Isaac của DA-26 trên cùng máy, nhưng DA-26 dùng `DOMAIN_ID: 126`, còn lượt này dùng 0, nên không lẫn topic. Server Ψ₀ của lượt này (7,25 GB VRAM) đã dừng sớm để nhường GPU cho Isaac của DA-26.
+
