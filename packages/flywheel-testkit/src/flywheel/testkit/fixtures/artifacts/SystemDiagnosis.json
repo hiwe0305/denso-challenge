@@ -1,0 +1,26 @@
+{
+  "episode_id": "ep_1",
+  "diagnosis": "controller",
+  "config_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "trace_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "rtc_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "camera_sha256": null,
+  "infra_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "infra_status": "ok",
+  "findings": [
+    {
+      "code": "R3",
+      "value": 0.2,
+      "threshold": 0.1,
+      "part": "upper",
+      "where": null,
+      "detail": null
+    }
+  ],
+  "skipped": [
+    {
+      "code": "R5",
+      "reason": "camera reference unavailable"
+    }
+  ]
+}

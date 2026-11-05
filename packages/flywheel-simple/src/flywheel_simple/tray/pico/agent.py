@@ -3,8 +3,9 @@
 `PicoDecoupledAgent` runs PicoStreamer -> TeleopPolicy (wrist pre-processor,
 TeleopRetargetingIK with the waist) -> G1DecoupledWholeBodyPolicy. Here the
 same pipeline reads a streamer we pass in: the scripted one below for tests
-without a headset, and later the S2 replay streamer (DA-35 task 6). No VR video
-server, no XRoboToolkit, no controller buttons.
+without a headset, the virtual operator, and the S2 replay streamer
+(flywheel_simple.tray.s2.streamer). No VR video server, no XRoboToolkit, no
+controller buttons.
 
 decoupled_wbc's own DummyStreamer cannot be used: it imports ROS for a keyboard
 listener. Only runs in the SIMPLE venv, with PyAV installed (SIMPLE's PICO
@@ -31,6 +32,7 @@ from simple.agents.pico_decoupled_agent import (  # type: ignore[import-not-foun
 from flywheel_simple.tray.geometry import Pose2D
 from flywheel_simple.tray.pico.clock import ClockedTime, SimClock
 from flywheel_simple.tray.pico.conditions import Condition
+from flywheel_simple.tray.pico.ik_limit import arms_only, limit_joint_step
 from flywheel_simple.tray.pico.operator import (
     Calibration,
     PicoSignal,
@@ -191,12 +193,7 @@ class VirtualPicoStreamer:
         return self._last is not None and self._last[1].reset
 
     def _calibration(self) -> Calibration | None:
-        pre = self._pre
-        if pre is None or not pre.robot_world_T_init_ee:
-            return None
-        frames = pre.robot.supplemental_info.hand_frame_names
-        ee0 = tuple(np.array(pre.robot_world_T_init_ee[frames[s]]) for s in ("left", "right"))
-        return Calibration(ee0=(ee0[0], ee0[1]), scale=float(pre.motion_scale))
+        return calibration_of(self._pre)
 
     def signal(self) -> PicoSignal:
         """This step's signal. TeleopPolicy reads the streamer twice in the activation step
@@ -221,24 +218,37 @@ class VirtualPicoStreamer:
         return signal
 
     def get(self) -> Any:
-        s = self.signal()
-        grasp = self.operator.cfg.grasp_name
-        return _streamer_output(
-            ik_data={
-                "left_wrist": s.controllers[0],
-                "right_wrist": s.controllers[1],
-                "left_fingers": {"position": pico_fingers(s.closed[0], grasp)},
-                "right_fingers": {"position": pico_fingers(s.closed[1], grasp)},
-            },
-            control_data={
-                "base_height_command": STANDING_HEIGHT,
-                "navigate_cmd": list(s.navigate_cmd),
-                "toggle_policy_action": False,
-            },
-            teleop_data={"toggle_activation": s.activate},
-            data_collection_data={"toggle_data_collection": False, "toggle_data_abort": False},
-            source="virtual",
-        )
+        return pico_output(self.signal(), self.operator.cfg.grasp_name, source="virtual")
+
+
+def calibration_of(pre_processor: Any) -> Calibration | None:
+    """What WristsPreProcessor fixed at activation, or None before it calibrated."""
+    pre = pre_processor
+    if pre is None or not pre.robot_world_T_init_ee:
+        return None
+    frames = pre.robot.supplemental_info.hand_frame_names
+    ee0 = tuple(np.array(pre.robot_world_T_init_ee[frames[s]]) for s in ("left", "right"))
+    return Calibration(ee0=(ee0[0], ee0[1]), scale=float(pre.motion_scale))
+
+
+def pico_output(s: PicoSignal, grasp: str, source: str) -> Any:
+    """One step of controller input packed as PicoStreamer's StreamerOutput."""
+    return _streamer_output(
+        ik_data={
+            "left_wrist": s.controllers[0],
+            "right_wrist": s.controllers[1],
+            "left_fingers": {"position": pico_fingers(s.closed[0], grasp)},
+            "right_fingers": {"position": pico_fingers(s.closed[1], grasp)},
+        },
+        control_data={
+            "base_height_command": STANDING_HEIGHT,
+            "navigate_cmd": list(s.navigate_cmd),
+            "toggle_policy_action": False,
+        },
+        teleop_data={"toggle_activation": s.activate},
+        data_collection_data={"toggle_data_collection": False, "toggle_data_abort": False},
+        source=source,
+    )
 
 
 def _install_clock(clock: SimClock) -> None:
@@ -258,15 +268,29 @@ class StreamerDecoupledAgent(PicoDecoupledAgent):  # type: ignore[misc]
     """PicoDecoupledAgent reading `streamer` instead of the PICO headset.
 
     With `clock`, the pipeline runs on simulated time (see flywheel_simple.tray.pico.clock);
-    the session ticks it once per env step. Without, it keeps the wall clock.
+    the session ticks it once per env step. Without, it keeps the wall clock. With
+    `max_joint_step` (rad per control step), the retargeting IK moves no joint further
+    than that per step (`limit_joint_step`); without, it keeps the URDF limits. With
+    `lock_waist`, the retargeting IK solves the arms alone and the waist command stays
+    at zero (`arms_only`); without, it moves the waist as SIMPLE's PICO agent does.
     """
 
-    def __init__(self, robot: Any, streamer: Any, clock: SimClock | None = None) -> None:
+    def __init__(
+        self,
+        robot: Any,
+        streamer: Any,
+        clock: SimClock | None = None,
+        max_joint_step: float | None = None,
+        lock_waist: bool = False,
+    ) -> None:
         self._external_streamer = streamer
+        self._lock_waist = lock_waist
         self.clock = clock
         if clock is not None:
             _install_clock(clock)
         super().__init__(robot)
+        if max_joint_step is not None:
+            limit_joint_step(self._teleop_policy.retargeting_ik.body_ik_solver, max_joint_step)
 
     def _init_pico_streamer(self) -> None:
         # No TCP server for the headset's video stream.
@@ -280,7 +304,13 @@ class StreamerDecoupledAgent(PicoDecoupledAgent):  # type: ignore[misc]
         _stub_ik_visualizer()
         teleop_policy = importlib.import_module("decoupled_wbc.control.policy.teleop_policy")
         offline = functools.partial(teleop_policy.TeleopPolicy, enable_real_device=False)
-        with mock.patch.object(teleop_policy, "TeleopPolicy", offline):
+        ik_module = importlib.import_module("decoupled_wbc.control.teleop.teleop_retargeting_ik")
+        ik_class = ik_module.TeleopRetargetingIK
+        ik = arms_only(ik_class) if self._lock_waist else ik_class
+        with (
+            mock.patch.object(teleop_policy, "TeleopPolicy", offline),
+            mock.patch.object(ik_module, "TeleopRetargetingIK", ik),
+        ):
             super()._init_decoupled_policy()
         streamer = self._teleop_policy.teleop_streamer
         if streamer.body_pre_processor is None:
@@ -291,6 +321,29 @@ class StreamerDecoupledAgent(PicoDecoupledAgent):  # type: ignore[misc]
         bind = getattr(self._external_streamer, "bind", None)
         if bind is not None:
             bind(streamer.body_pre_processor)
+
+    def reset_policy(self) -> None:
+        """SIMPLE's reset, plus the calibration decoupled_wbc keeps across episodes.
+
+        TeleopStreamer stays `is_calibrated` after the first activation, so in every
+        later episode of a process the activation step already maps the controllers
+        with the old calibration, and WristsPreProcessor appends its hands to
+        `ee_name_list` again at every calibration. An episode then differed from
+        the same episode run first in a fresh process from the activation step on
+        (DA-35 task 10: identical up to step 165, apart after). Reset both to how a
+        new pipeline starts.
+        """
+        super().reset_policy()
+        streamer = self._teleop_policy.teleop_streamer
+        streamer.is_calibrated = False
+        pre = streamer.body_pre_processor
+        if pre is not None:
+            pre.calibration_ee_pose = {}
+            pre.ee_name_list = []
+            pre.robot_world_T_init_ee = {}
+            pre.init_teleop_T_teleop_world = {}
+            pre.init_teleop_T_init_ee = {}
+            pre.latest_data = None
 
     def _poll_pico_buttons(self) -> None:
         # No controller buttons; a streamer that gives up (the virtual operator) asks

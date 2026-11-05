@@ -1,0 +1,61 @@
+# DA-35 S2 generator: how parent demos are cut, transformed and replayed.
+# Flat `key: number` lines only; read by flywheel_simple.tray.s2.config (same loader as
+# tray.yaml). Units: metres, seconds, m/s, rad/s, degrees.
+
+# Cut (task 8). K ends this long after the lift flag (the tray held up before walking);
+# walking runs shorter than walk_min_s before step 1 are corrective steps while reaching,
+# not the approach walk.
+hold_s: 0.5
+walk_min_s: 0.5
+# The hands follow the tray from when both wrist targets stay within reach_radius (m) of
+# their pose at the grasp flag until grasp_hold_s after it (task 10): on parents-1103b
+# they come that close 2-3 s before the grasp, while still walking at some.
+reach_radius: 0.25
+grasp_hold_s: 0.2
+
+# Variants (task 10). Anchor switches blend the wrists over stitch_s, drawn per variant from
+# its generation seed in [stitch_min_s, stitch_max_s] (position interpolated, rotation slerped).
+stitch_min_s: 0.4
+stitch_max_s: 0.6
+# Gates (end of the walk to table A, end of the arrival at table B): the replay holds the
+# parent's frame until the pelvis stands (slower than settle_speed, m/s, no corrective step
+# or turn under way) within gate_pos_tol (m) and gate_yaw_tol_deg of its reference for
+# gate_hold_s, or gate_max_s has passed. DA-33's planner stands within 2-3 cm (keep_tol,
+# carry_tol, arrive_lat_tol). With a 0.3 s hold and no stillness check the body still swayed
+# 2-3 cm and 2-4 degrees from its last corrective step while the hands closed; at 0.03 m/s
+# frame to frame most gates never settled (task 10). Speed is measured over 0.2 s.
+gate_pos_tol: 0.02
+gate_yaw_tol_deg: 3.0
+gate_hold_s: 0.5
+settle_speed: 0.05
+gate_max_s: 5.0
+# Left stick while walking: the parent's (vx, vy) plus nav_gain x the base error (body
+# frame, m -> m/s), applied while the parent's stick is at least walk_ff_min. At a gate:
+# corrective steps of nav_gain x error between step_speed_min (the walking policy needs
+# |cmd| >= 0.1) and step_speed_max, until the error is below step_stop.
+nav_gain: 1.0
+walk_ff_min: 0.05
+step_speed_min: 0.12
+step_speed_max: 0.25
+step_stop: 0.01
+# On reaching place_start the hands of P move by the planar offset of the held tray from its
+# transformed parent pose, at most place_fix_max_m and place_fix_max_deg.
+place_fix_max_m: 0.05
+place_fix_max_deg: 10.0
+# While the hands follow the tray, the measured palms are steered onto the parent's palms
+# (forward kinematics, scripts/g0/tray/s2/parent_palms.py) moved with the tray: palm_gain x
+# the error per step, capped at palm_max (m), as DA-33's planner corrects its own palms
+# (palm_correction_* in tray_planner.yaml). Only while the parent's palms stand still
+# (below palm_still_speed, m/s) and the error is within palm_window (m): with the planner's
+# 0.08 m window and no stillness check the correction took up the arm's lag while moving,
+# reached its cap and twisted the grip (task 10, 0/12).
+palm_gain: 0.1
+palm_max: 0.05
+palm_window: 0.04
+palm_still_speed: 0.05
+
+# Jobs (task 12): a level-1 condition with this probability, else level 0; condition seeds
+# drawn from [cond_seed_min, cond_seed_max] (train range, away from the parents' 100-179).
+level1_share: 0.8
+cond_seed_min: 200000
+cond_seed_max: 999999

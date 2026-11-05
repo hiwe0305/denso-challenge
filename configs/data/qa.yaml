@@ -1,0 +1,90 @@
+# QA thresholds of the robot sources (DA-03 AC 3; spec 4.4, design 6.3, codes of design 10).
+#
+# Every key is required: `flywheel.data.config.load_qa_config` has no defaults and refuses
+# a missing or unknown key. Each QAReport records `threshold_version` = version@<first 12
+# hex of the sha256 of this file>, so changing a byte here changes the version.
+#
+# A check fails when its value is above `threshold`; `on_fail` is what the episode gets
+# then (flag, quarantine, reject). The decision of an episode is the worst action among
+# its failed checks. Replay checks need a ReplayReport (DA-17); `when_missing` says what
+# happens without one: skip leaves the check out of the report, flag fails it.
+version: qa-1
+# Story AC 3: an episode of 0 or 1 frame is rejected with the reason, nothing raises.
+min_frames: 2
+checks:
+  # Spec 4.4 row 1: timestamp increases, step even within one control period -> reject.
+  timestamp_monotonic: {code: D2, threshold: 0, on_fail: reject}
+  timestamp_step: {code: D2, threshold: 1.0, on_fail: reject}  # |dt*fps - 1|, periods
+  # Design 10 D2: a gap in frame_index is a dropped frame -> quarantine.
+  frame_index_contiguous: {code: D2, threshold: 0, on_fail: quarantine}
+  # Spec 4.4 row 2: images and state within 1 frame -> reject. LeRobot v2.1 keeps no
+  # per-frame image time, so the offset is the video frame count against the rows.
+  image_state_sync: {code: D2, threshold: 1, on_fail: reject}
+  # Spec 4.4 row 3: finite values, joint limits of the action layout (G1 URDF) -> reject.
+  # NaN is D1, not D3: design 9.2 maps `nan_values` to D1 (closed 3/11/2026, issue #34),
+  # and the DA-31 scorer matches a finding to an injected defect by that code.
+  finite_values: {code: D1, threshold: 0, on_fail: reject}
+  # rad past the limit. The G1 layout rounds URDF limits to 5-6 digits (wrist roll
+  # 1.97222); DA-33's planner clips at the URDF value, 1.0e-6 rad further, and
+  # psi-data holds -2.2e-16 against limits of 0, so a step under 1e-5 rad is no
+  # breach. Measured on psi-data e78fb93 and tray S1 0d84cc87b1e5, 4/11/2026.
+  joint_limits: {code: D3, threshold: 1.0e-5, on_fail: reject}
+  # Spec 4.4 row 4: action jump above p99.9 of the teleop demos -> flag; thresholds below.
+  action_jump: {code: D3, on_fail: flag}
+  # Spec 4.4 row 6: lineage incomplete -> quarantine. Design 10 has no lineage code; D6
+  # (wrong labels) is the nearest. Fields per source in lineage_required.
+  lineage: {code: D6, threshold: 0, on_fail: quarantine}
+  # Spec 4.4 row 7 (v10.4), design 6.3: kinematic replay off -> reject, dynamic -> flag.
+  replay_kinematic: {code: D7, threshold: 0, on_fail: reject, when_missing: skip}
+  replay_dynamic: {code: D7, threshold: 0, on_fail: flag, when_missing: skip}
+  # Spec 4.4 row 8: condition seed outside train. build_release refuses the whole
+  # release as well; QA marks the episode so the report shows which one.
+  split_seed: {code: D5, threshold: 0, on_fail: reject}
+  # Design 6.3, psi-data: video frames equal rows; every episode has its task sentence.
+  video_rows_match: {code: D2, threshold: 0, on_fail: reject}
+  task_instruction: {code: D6, threshold: 0, on_fail: flag}
+  # task_success, replay_success: sim_success of a dynamic ReplayReport (DA-17), i.e.
+  # whether the recorded actions, replayed open loop through the WBC, redo the task.
+  # DA-17 AC 3 and PO 4/11/2026: a dynamic replay that fails flags, for every source,
+  # and never rejects. Open-loop replay of a locomotion task is no quality label:
+  # 26/99 psi-data episodes pass, and which ones shifts with the clock (sim 6/26,
+  # wall 4/26; docs/g0/replay.md section 3.2).
+  # psi-data has no success field (docs/g0/psi-data.md section 3): only a replay tells.
+  task_success: {code: D6, threshold: 0, on_fail: flag, when_missing: skip}
+  # Design 6.3, generated data: the rollout replayed in sim succeeds (D8). DA-33's own
+  # replay at generation time is not this check: the tray S1 release holds only the
+  # episodes it passed (102/102, meta/batch_replay_summary.json).
+  replay_success: {code: D8, threshold: 0, on_fail: flag, when_missing: skip}
+  # Design 10 D4, per dataset: shipped stats against stats of the dataset's own frames,
+  # computed in float32 as SIMPLE does. D4 blocks export (tier 6), not the release, so
+  # QA shows it in the dataset report.
+  stats_json: {code: D4, threshold: 1.0e-5, on_fail: flag}
+  episodes_stats: {code: D4, threshold: 1.0e-5, on_fail: flag}
+action_jump:
+  # Per group: the quantile over clean teleop demos of each episode's largest
+  # |a[t+1] - a[t]| (spec 4.4 "p99.9 of the teleop demos"; with 99 demos it sits
+  # between the two largest). Measured by `fw data qa --calibrate` on the source named
+  # in `calibration`; tray S1 is judged against the same human demos.
+  quantile: 0.999
+  calibration: psi-data e78fb93 two-table teleop, 99 episodes, 4/11/2026
+  # Angles: the step goes the short way round the circle (a heading crossing +-pi
+  # read as a 6.27 rad jump: median 6.24 over the 99 psi-data episodes before this).
+  wrapped: [target_yaw]
+  thresholds:
+    hand: 1.5
+    arm: 0.0869346
+    torso_rpy: 0.0766609
+    height: 0  # constant in psi-data (dim 31, design 10 D4)
+    base_velocity: 0.5
+    turn: 1.96845
+    target_yaw: 2.31864
+source_checks:
+  psi_data: [video_rows_match, task_instruction, task_success]
+  planner_wbc: [task_instruction, replay_success]
+  teleop_pico: [task_instruction, replay_success]
+# Spec 4.4 row 6. psi-data records no seed anywhere (docs/g0/psi-data.md section 4) and
+# no generator: its episodes are human demos, so only source and license are required.
+lineage_required:
+  psi_data: [source_id, license]
+  planner_wbc: [source_id, license, seed, generator_version]
+  teleop_pico: [source_id, license, seed, generator_version, parent_id]

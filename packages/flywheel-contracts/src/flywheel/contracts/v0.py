@@ -11,6 +11,9 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 FailureClass = Literal["approach", "grasp", "carry", "place", "balance"]
+FailureClassRule = Literal["approach", "grasp", "carry", "place", "balance", "from_failed_stage"]
+StepStatus = Literal["pass", "fail", "not_attempted", "unknown"]
+UnknownReason = Literal["missing_signal", "signal_all_null", "step_not_in_trace", "no_verdict"]
 InfraStatus = Literal["ok", "simulator_error", "policy_error", "timeout", "out_of_memory"]
 Scalar = bool | float | int | str
 
@@ -129,6 +132,11 @@ class RolloutResult(V0Model):
     usage: ResourceUsage
     camera_params_hash: str | None
     adapter_info: AdapterInfo
+    # Async timing outcome, kept apart from sim_success (decision E2, 3/11/2026).
+    # None for sync rollouts and older producers; "not_checked" when an async
+    # rollout had no usable RTC log.
+    timing_verdict: Literal["ok", "starved", "not_checked"] | None = None
+    starved_steps: int | None = Field(default=None, ge=0)
 
 
 class PolicySpec(V0Model):
@@ -216,11 +224,13 @@ class TeleopResult(V0Model):
 class StageSpec(V0Model):
     name: str
     failure_class: FailureClass
+    # None means an older task has not declared its signals; () means none are needed.
+    signals: tuple[str, ...] | None = None
 
 
 class FailureKindSpec(V0Model):
     kind: str
-    failure_class: FailureClass
+    failure_class: FailureClassRule
 
 
 class ConditionSchema(V0Model):
@@ -237,10 +247,52 @@ class ScorerParams(V0Model):
 
 
 class StageEvaluation(V0Model):
+    # Legacy task producers keep reporting booleans. When a four-state result is
+    # provided it must agree for attempted steps; not_attempted maps to False.
     stage_success: tuple[bool | None, ...]
+    stage_status: tuple[StepStatus, ...] | None = None
+    unknown_reason: tuple[UnknownReason | None, ...] | None = None
+    step_enter_s: tuple[float | None, ...] | None = None
+    step_exit_s: tuple[float | None, ...] | None = None
     first_failed_stage: int | None = Field(default=None, ge=0)
     failure_kind: str | None = None
     failure_class: FailureClass | None = None
+
+    @model_validator(mode="after")
+    def validate_step_details(self) -> StageEvaluation:
+        import math
+
+        n = len(self.stage_success)
+        for name in ("stage_status", "unknown_reason", "step_enter_s", "step_exit_s"):
+            values = getattr(self, name)
+            if values is not None and len(values) != n:
+                raise ValueError(f"{name} must have one entry per stage")
+        if self.stage_status is not None:
+            legacy = {"pass": True, "fail": False, "not_attempted": False, "unknown": None}
+            if any(
+                legacy[status] is not outcome
+                for status, outcome in zip(self.stage_status, self.stage_success, strict=True)
+            ):
+                raise ValueError("stage_status must agree with stage_success")
+            if self.unknown_reason is not None and any(
+                (status == "unknown") != (reason is not None)
+                for status, reason in zip(self.stage_status, self.unknown_reason, strict=True)
+            ):
+                raise ValueError("unknown_reason must be set only for unknown stages")
+        elif self.unknown_reason is not None:
+            raise ValueError("unknown_reason requires stage_status")
+        for values in (self.step_enter_s, self.step_exit_s):
+            if values is not None and any(
+                value is not None and (not math.isfinite(value) or value < 0) for value in values
+            ):
+                raise ValueError("stage timestamps must be finite nonnegative seconds")
+        if self.step_enter_s is not None and self.step_exit_s is not None:
+            if any(
+                start is not None and end is not None and end < start
+                for start, end in zip(self.step_enter_s, self.step_exit_s, strict=True)
+            ):
+                raise ValueError("stage exit cannot precede entry")
+        return self
 
 
 from flywheel.contracts.protocols import AdapterInfo  # noqa: E402

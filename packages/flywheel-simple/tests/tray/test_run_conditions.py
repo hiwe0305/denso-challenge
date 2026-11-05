@@ -20,7 +20,10 @@ class FakeDataset:
             episodes=[{"environment_config": json.dumps(c)} for c in conditions]
         )
 
+        self.reads: list[int] = []
+
     def __getitem__(self, i: int) -> dict[str, int]:
+        self.reads.append(i)
         return {"index": i}
 
 
@@ -29,7 +32,7 @@ def test_tray_condition_without_dr_state_dict_is_read_as_recorded() -> None:
 
     env_conf, frames = get_episode_lerobot(FakeDataset([{}, TRAY_CONDITION]), 1)
     assert env_conf == TRAY_CONDITION
-    assert frames == [{"index": 3}, {"index": 4}]
+    assert list(frames) == [{"index": 3}, {"index": 4}]
 
 
 def test_condition_with_dr_state_dict_gets_simples_scene_uid_rewrite() -> None:
@@ -38,7 +41,7 @@ def test_condition_with_dr_state_dict_gets_simples_scene_uid_rewrite() -> None:
     hssd = {"uid": "two_table", "dr_state_dict": {"scene": {"uid": "hssd:102344280"}}}
     env_conf, frames = get_episode_lerobot(FakeDataset([hssd, {}]), 0)
     assert env_conf["dr_state_dict"]["scene"]["uid"] == "hssd:scene3"
-    assert frames == [{"index": 0}, {"index": 1}, {"index": 2}]
+    assert list(frames) == [{"index": 0}, {"index": 1}, {"index": 2}]
 
 
 def test_plain_int_index_is_accepted() -> None:
@@ -47,3 +50,13 @@ def test_plain_int_index_is_accepted() -> None:
     dataset = FakeDataset([TRAY_CONDITION, {}])
     dataset.episode_data_index = {"from": [0, 3], "to": [3, 5]}  # type: ignore[dict-item]
     assert len(get_episode_lerobot(dataset, 0)[1]) == 3
+
+
+def test_frames_are_decoded_only_when_read() -> None:
+    from flywheel_simple.tray.run import get_episode_lerobot
+
+    dataset = FakeDataset([{}, TRAY_CONDITION])
+    _, frames = get_episode_lerobot(dataset, 1)
+    assert dataset.reads == [] and len(frames) == 2
+    assert frames[-1] == {"index": 4} and frames[0:1] == [{"index": 3}]
+    assert dataset.reads == [4, 3]

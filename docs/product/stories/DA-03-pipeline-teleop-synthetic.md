@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO chốt phạm vi 3/11/2026, [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) Q2, Q3) |
+| Trạng thái | Xong phần trước 13/11/2026 (PR #69, #86, 4/11/2026); normalize, cắt đoạn, nguồn bàn phím dời sau 13/11/2026 (Q3); PO chốt phạm vi 3/11/2026, [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) Q2, Q3 |
 | Người làm | Hiếu |
 | Làn | Dữ liệu |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 6 · Epic 9 |
@@ -45,10 +45,17 @@ PR 1 (hạn 5/11/2026):
 
 PR 2 (hạn 9/11/2026):
 
-- [ ] 3. QA: phép kiểm, ngưỡng, đọc `ReplayReport` (AC 3)
-- [ ] 4. Release: chặn bản cấy lỗi, chặn hạt giống ngoài dải, manifest có hash (AC 4)
-- [ ] 5. `DatasetReport` và trang HTML (AC 5)
-- [ ] 6. Lệnh `fw data`; chạy trên psi-data và khay S1 trên `rtx3060` (AC 6)
+- [x] 3. QA: phép kiểm, ngưỡng, đọc `ReplayReport` (AC 3)
+  - [x] 3.1 Ngưỡng và hành động khi trượt trong `configs/data/qa.yaml`, bộ nạp không có giá trị mặc định ngầm; ngưỡng bước nhảy action hiệu chỉnh trên psi-data
+  - [x] 3.2 Bảy phép kiểm của spec mục 4.4 và phép kiểm riêng nguồn, mỗi phép kiểm mang một mã D của design mục 10; episode 0 hoặc 1 khung ra `reject`; đọc `ReplayReport` (động học trượt thì `reject`, động lực học thì `flag`); kiểm stats của dataset (D4)
+- [x] 4. Release: chặn bản cấy lỗi, chặn hạt giống ngoài dải, manifest có hash (AC 4)
+  - [x] 4.1 `build_release` từ chối cả release khi có bản sao chấm lỗi, hạt giống ngoài dải `train`, episode thiếu `QAReport` hoặc không thuộc split `train`
+  - [x] 4.2 `Release` đóng băng có `manifest_sha256`, giữ episode bị loại cùng lý do; `ReleaseManifest` và file mẫu dùng chung trong testkit (mối nối `3-ReleaseManifest`)
+- [x] 5. `DatasetReport` và trang HTML (AC 5)
+- [x] 6. Lệnh `fw data`; chạy trên psi-data và khay S1 trên `rtx3060` (AC 6)
+  - [x] 6.1 `flywheel-data` phụ thuộc `flywheel-store`; mọi job ghi một dòng `LedgerEntry` ước tính và một dòng thực đo trỏ về nó (đã chốt 4/11 [Hiếu], "Cho phụ thuộc")
+  - [x] 6.2 `fw data ingest | qa | release | report`
+  - [x] 6.3 Chạy trên psi-data và release khay S1 trên `rtx3060`, ghi số đo vào `docs/g0/data-pipeline.md`
 
 ## Giao diện
 
@@ -95,6 +102,9 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `packages/flywheel-data/src/flywheel/data/qa/checks.py`
 - `packages/flywheel-data/src/flywheel/data/release/`
 - `packages/flywheel-data/src/flywheel/data/api.py`, `packages/flywheel-data/src/flywheel/data/cli.py`, `packages/flywheel-data/src/flywheel/data/config.py`
+- `packages/flywheel-data/src/flywheel/data/ledger.py` (dòng `LedgerEntry` của mọi job, 4/11/2026)
+- `packages/flywheel-data/pyproject.toml`, `uv.lock` (chỉ thêm `flywheel-store`, 4/11/2026)
+- `packages/flywheel-testkit/src/flywheel/testkit/fixtures/artifacts/ReleaseManifest.json` (file mẫu của mối nối `3-ReleaseManifest`, 4/11/2026)
 - `packages/flywheel-data/tests/unit/pipeline/`, `packages/flywheel-data/tests/contract/pipeline/`
 - `configs/data/qa.yaml`
 - `docs/g0/data-pipeline.md`
@@ -126,13 +136,15 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 5/11/2026 | Trạng thái → Xong phần trước 13/11/2026 theo PR #69 và #86 (merge 4/11/2026); normalize, cắt đoạn, nguồn bàn phím vẫn dời sau 13/11/2026 | Hiếu, cùng Claude |
+| 4/11/2026 | Thêm nhiệm vụ con 3.1–3.2, 4.1–4.2, 6.1–6.3 cho PR 2; thêm vào phạm vi file `ledger.py`, `pyproject.toml` của `flywheel-data`, `uv.lock` (PO chốt 4/11 "Cho phụ thuộc": `flywheel-data` phụ thuộc `flywheel-store`, job ghi `LedgerEntry`) và file mẫu `ReleaseManifest.json` của testkit | Claude, theo yêu cầu PO (Hiếu) |
 | 3/11/2026 | Thêm nhiệm vụ con 2.3–2.5 theo quyết định Q4–Q7 của PO ("Chốt theo đề xuất") | Claude, theo yêu cầu PO (Hiếu) |
 | 3/11/2026 | Thêm nhiệm vụ con 1.1–1.3, 2.1–2.2 theo review PR #69 của PO | Claude, theo yêu cầu PO (Hiếu) |
 | 3/11/2026 | Tạo file story theo 07 bản 1.6 và plan chia lại việc (Q2, Q3, Q5): ingest, QA, release, báo cáo cho psi-data, khay S1, khay S2; normalize, cắt đoạn, nguồn bàn phím sau 13/11; hai PR | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
-- Ghi chú hoàn thành:
-- File đã tạo hoặc sửa:
+- Giờ thực: PR 2 khoảng 8,2 giờ tập trung (6.1 0,5; 3.1 1; 3.2 1,5 + 0,5 sửa sau lần chạy đầu; 4.1 1 + 0,3 chuyển sang hàm của DA-27; 4.2 0,3; 5 0,8; 6.2 1,2; 6.3 0,8 + 0,3 bản sao chấm lỗi), so với ước lượng 6 giờ.
+- Công cụ AI đã dùng: Claude Code (Opus 5.5), một phiên do phiên của Hiếu giao.
+- Ghi chú hoàn thành: PR 2 chạy trên `rtx3060` ở commit `e3aad54`. psi-data: 95 `pass`, 4 `flag`, release `rel_24363158e44e66b4`. Khay S1: 102 `flag` (`action_jump.arm`), release `rel_9f32f33779c904f2`. D4 thật ở `states.mean` của cả hai gói. Số đo và việc phát sinh ở [data-pipeline.md](../../g0/data-pipeline.md). Phép kiểm phát lại chờ `ReplayReport` của DA-17. Sau khi #53 merge, release gọi `has_injected_defect` và ingest gọi `mark_copy_episode` của DA-27; cả hai bản sao chấm lỗi bị `fw data release` từ chối trên `rtx3060`.
+- File đã tạo hoặc sửa: PR 2 tạo `config.py` (phần QA), `ledger.py`, `qa/checks.py`, `release/`, `cli.py`, `configs/data/qa.yaml`, test trong `tests/unit/pipeline/` và `tests/contract/pipeline/`, file mẫu `ReleaseManifest.json`, `docs/g0/data-pipeline.md`; sửa `api.py`, `ingest/sources.py`, `pyproject.toml`, `uv.lock`.

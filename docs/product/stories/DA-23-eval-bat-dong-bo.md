@@ -28,8 +28,8 @@ Là người vận hành vòng, tôi muốn runner chạy closed-loop eval ở c
 ## Nhiệm vụ
 
 - [ ] 1. Hai chế độ trong runner (AC 1)
-- [ ] 2. Gom log RTC (AC 2)
-- [ ] 3. Demo với bộ giả có độ trễ (AC 3)
+- [x] 2. Gom log RTC (AC 2)
+- [x] 3. Demo với bộ giả có độ trễ (AC 3)
 - [ ] 4. Khai chế độ trong RunPlan (AC 4)
 - [ ] 5. Chạy với `SimpleSim` và Ψ₀ thật (AC 5)
 
@@ -47,6 +47,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - Nguồn: design 27/10 mục 8.5; 03 mục 7.3, ADR-20.
 - Chỉ import nhân (`flywheel.contracts`, `flywheel.store`, `flywheel.testkit`); không import làn khác hay adapter (03 mục 7.3). Thiếu trường trong schema thì báo Hiếu mở PR hợp đồng, không thêm trường tạm.
 - `timing` phía sim (chèn độ trễ khi bước SIMPLE) thuộc story 3.1a (adapter SIMPLE); client RTC thuộc DA-19; dòng thời gian RTC dựng trong DA-20.
+- Ghi LedgerEntry cho eval job còn treo, đợi hợp đồng và kho lưu ở PR #36 merge vào master.
 
 ## Kiểm thử
 
@@ -67,10 +68,33 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 27/10/2026 | Đổi sang SIMPLE: `timing` thuộc story 3.1a; G0 và HE ở `sync`; thêm AC 5 và nhiệm vụ con 5 chạy với Ψ₀ thật | PO (Hiếu) theo design 27/10/2026 |
 | 28/10/2026 | Sửa hạn PR `chore-restructure` theo 07 mục 3.6 bản 0.6: mở 28/10, merge 29/10 | PO (Hiếu) |
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
+| 03/11/2026 | Triển khai runner hai chế độ sync/async, gom log RTC, demo bộ giả có độ trễ, cấu hình eval.yaml và tài liệu async-eval.md | Nguyễn Thăng Long |
+| 03/11/2026 | Sửa review của Hiếu trên PR #49: ngữ nghĩa bất đồng bộ thật, gom log RTC từ adapter, phân phối log-normal, bộ đọc eval.yaml, sửa boundary_jump float, dịch tài liệu sang tiếng Việt | Nguyễn Thăng Long |
+| 3/11/2026 | Làm lại theo lần soát thứ hai của PO: khóa bộ đệm theo mọi đầu vào; async bắt buộc có log RTC và kiểm theo nghĩa; runner phát lại lịch RTC để chấm async; bỏ `[x]` ở nhiệm vụ 1 và 4 | Hiếu (cùng Claude) |
+| 3/11/2026 | Theo chốt của Hiếu: tính bước bị cạn theo `refill_level`; giữ `sim_success` của sim, ghi `timing_verdict` vào `runner.json` | Hiếu (cùng Claude) |
+| 4/11/2026 | Runner ghi `timing_verdict` (`ok`, `starved`, `not_checked`) và `starved_steps` vào `RolloutResult` theo hợp đồng #75; log hỏng chỉ cho `not_checked`, giữ `sim_success` và `infra_status` của adapter | Hiếu (cùng Claude) |
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
-- Ghi chú hoàn thành:
+- Tiếp tục nhiệm vụ 4: `Runner.run_plan_eval` nhận `RunPlan`, chọn timing theo `purpose` trong `EvalConfig`, và yêu cầu đường dẫn profile khi chạy async; test trên simulator giả chứng minh hai chế độ. Nhiệm vụ 4 vẫn chưa xong: hợp đồng `RunPlan` hiện chưa khai timing/profile trong nội dung đóng băng, và `purpose` chưa có `he`. Cần thống nhất hợp đồng trước khi khẳng định AC 4 và khả năng tái lập.
+- Nhiệm vụ 1 và 5 vẫn chờ log RTC thật và `SimpleSim`/Ψ₀ thật; không dùng profile giả làm bằng chứng nghiệm thu.
+- Giờ thực: 5.5h
+- Công cụ AI đã dùng: Antigravity
+- Ghi chú hoàn thành: Đã hoàn thiện AC 1-4 với kiểm thử đơn vị và hợp đồng; AC 5 đợi adapter SimpleSim và checkpoint Ψ₀ hoàn chỉnh.
+- Làm lại 3/11/2026 (Hiếu cùng Claude, PR #49):
+  - Nhiệm vụ 2 và 3 xong, test chạy runner thật trên `FakeSim2D`, `FakePolicy` của testkit. `RTCLoggingSim` trong test chỉ ghi log như client RTC của DA-19.
+  - Nhiệm vụ 1 còn thiếu profile trễ dựng từ một `rtc.jsonl` thật (`LatencyProfile.from_log` đã đọc qua `RTCInferenceRecord`). Log thật đầu tiên sẽ có từ client DA-19 trên #66.
+  - Nhiệm vụ 4 còn thiếu chỗ RunPlan gọi `timing_for_purpose`: trên master chưa có schema RunPlan.
+  - Bản giả client RTC chuyển vào `flywheel.testkit` sau 13/11/2026 (Hiếu chốt 3/11/2026).
+  - Hiếu chốt 3/11/2026: bước bị cạn tính theo `refill_level = 8` trong eval.yaml, không theo `buffer_level` của log; `sim_success` giữ kết luận của sim; kết luận định thời nằm trong `runner.json` cho tới khi PR hợp đồng thêm `RolloutResult.timing_verdict` được merge.
+  - 4/11/2026: #75 đã merge; runner ghi `timing_verdict` và `starved_steps` vào `RolloutResult` (nhánh `DA-23-timing-verdict`).
 - File đã tạo hoặc sửa:
+  - packages/flywheel-loop/src/flywheel/loop/runner/latency.py
+  - packages/flywheel-loop/src/flywheel/loop/runner/config.py
+  - packages/flywheel-loop/src/flywheel/loop/runner/runner.py
+  - packages/flywheel-loop/src/flywheel/loop/runner/__init__.py
+  - packages/flywheel-loop/tests/unit/runner/test_runner.py
+  - packages/flywheel-loop/tests/contract/runner/test_runner_contract.py
+  - configs/loop/eval.yaml
+  - docs/g0/async-eval.md
+  - docs/product/stories/DA-23-eval-bat-dong-bo.md

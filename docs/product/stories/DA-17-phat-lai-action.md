@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt 25/10/2026; sửa 27/10/2026) |
+| Trạng thái | Xong nhiệm vụ 1–4 (PR #92, 4/11/2026); nhiệm vụ 6: PR #130, 5/11/2026; nhiệm vụ 5 và phần tự va chạm của AC 1 dời sau 13/11/2026; PO duyệt 25/10/2026; sửa 27/10/2026 |
 | Người làm | Hiếu |
 | Làn | Dữ liệu |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 6.3 · Epic 9 |
@@ -19,19 +19,23 @@ Là kỹ sư dữ liệu, tôi muốn mọi episode có action robot (psi-data, 
 
 ## Tiêu chí chấp nhận
 
-1. Gọi `replay()` chế độ động học: liệt kê khung sai ánh xạ khớp, sai đơn vị, vượt giới hạn khớp, tự va chạm, ảnh lệch thời gian với state.
+1. Gọi `replay()` chế độ động học: liệt kê khung sai ánh xạ khớp, sai đơn vị, vượt giới hạn khớp, tự va chạm, ảnh lệch thời gian với state. **Phần tự va chạm dời sau 13/11/2026** (PO 4/11/2026): phép kiểm này cần hình học của robot, nên AC 1 còn mở phần đó.
 2. Gọi `replay()` chế độ động lực học qua decoupled WBC: sai lệch state theo thời gian và theo nhóm action, thời điểm đóng mở bàn tay, `check_success` khi phát lại.
-3. Ngưỡng hiệu chỉnh từ episode thành công (phân vị 99) trong `configs/data/replay.yaml`; trượt động học thì loại, trượt động lực học thì đánh dấu cho kỹ sư.
+3. Ngưỡng hiệu chỉnh từ episode thành công (phân vị 99) trong `configs/data/replay.yaml`; trượt động học thì loại, trượt động lực học thì đánh dấu cho kỹ sư. Phát lại động lực học không đạt `check_success` cũng chỉ đánh dấu, với mọi nguồn (`task_success`, `replay_success` trong `configs/data/qa.yaml`; PO 4/11/2026).
 4. Ra `ReplayReport` đúng schema; bước QA của release đọc report này.
 5. Phát lại được action dự đoán của policy từ cùng state đầu (đầu vào cho Agent QA/QC); video ghép cạnh nhau ngoài git. **Dời sau 13/11/2026** (Q3 của [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md)); không chặn demo.
 
 ## Nhiệm vụ
 
-- [ ] 1. Động học và danh sách khung lỗi (AC 1)
-- [ ] 2. Động lực học và sai lệch theo nhóm (AC 2)
-- [ ] 3. Ngưỡng hiệu chỉnh và cấu hình (AC 3)
-- [ ] 4. `ReplayReport` và nối vào QA (AC 4)
+- [x] 1. Động học và danh sách khung lỗi (AC 1)
+- [x] 2. Động lực học và sai lệch theo nhóm (AC 2)
+- [x] 3. Ngưỡng hiệu chỉnh và cấu hình (AC 3)
+- [x] 4. `ReplayReport` và nối vào QA (AC 4)
 - [ ] 5. Phát lại action dự đoán, video (AC 5; sau 13/11/2026)
+- [x] 6. Tìm nguyên nhân 26/99 episode psi-data đạt khi phát lại (phát hiện 1 của [replay.md](../../g0/replay.md); PO 5/11/2026)
+  - [x] 6.1. Cờ `--trace` ghi tư thế đế, vật và trạng thái nắm theo từng bước
+  - [x] 6.2. Cờ `--hold-steps N` giữ lệnh cuối thêm N bước trước khi đọc `_success`
+  - [x] 6.3. Đo trên `rtx3060` và ghi kết luận ([replay.md](../../g0/replay.md) mục 6)
 
 ## Phạm vi file
 
@@ -40,9 +44,11 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `packages/flywheel-data/src/flywheel/data/replay_check/`
 - `packages/flywheel-data/tests/unit/replay_check/`, `packages/flywheel-data/tests/contract/replay_check/`
 - `configs/data/replay.yaml`
+- `configs/data/qa.yaml` và `packages/flywheel-data/tests/unit/pipeline/test_qa_checks.py`, chỉ mức `on_fail` của các phép kiểm đọc report động lực học (PO 4/11/2026; file của DA-03, Hiếu giữ cả hai story)
 - `docs/g0/replay.md`
 - `packages/flywheel-simple/src/flywheel_simple/replay/`
 - `packages/flywheel-simple/tests/replay/`
+- `docs/g0/ledger/DA-17.csv` (sổ chi phí của nhiệm vụ 6; PO 5/11/2026)
 
 ## Ghi chú cho người làm
 
@@ -72,10 +78,15 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 28/10/2026 | Sửa hạn PR `chore-restructure` theo 07 mục 3.6 bản 0.6: mở 28/10, merge 29/10 | PO (Hiếu) |
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 | 3/11/2026 | Người làm Thông → Hiếu theo quyết định PO (07 bản 1.6; [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) Q1–Q3): hạn 8/11; AC 5 và nhiệm vụ 5 dời sau 13/11; phạm vi thêm adapter `flywheel_simple/replay/` và test; ước lượng 5 giờ cho AC 1–4 | PO (Hiếu) |
+| 4/11/2026 | PO: phát lại động lực học trượt → `flag`, với mọi nguồn (`task_success`, `replay_success` trong `qa.yaml`); thêm `qa.yaml` và test của nó vào phạm vi file; phần tự va chạm của AC 1 dời sau 13/11/2026 | PO (Hiếu) theo PR #92 |
+| 5/11/2026 | Trạng thái → Xong nhiệm vụ 1–4 theo PR #92 (merge 4/11/2026); nhiệm vụ 5 và phần tự va chạm của AC 1 vẫn dời sau 13/11/2026 | Hiếu, cùng Claude |
+| 5/11/2026 | Thêm nhiệm vụ 6 (vì sao phát lại psi-data chỉ đạt 26/99) và `docs/g0/ledger/DA-17.csv` vào phạm vi file | Hiếu, cùng Claude |
+| 5/11/2026 | Nhiệm vụ 6 xong: bản ghi psi-data dừng ngay sau khi thả vật; giữ lệnh cuối 50 bước cho 44/99; 12/99 lệch thật ([replay.md](../../g0/replay.md) mục 6; commit `DA-17/6.1`–`6.3`) | Hiếu, cùng Claude |
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
-- Ghi chú hoàn thành:
-- File đã tạo hoặc sửa:
+- Giờ thực: 6 giờ cho nhiệm vụ 1–4 (mỗi nhiệm vụ 1,5 giờ, theo `Time-spent` của commit); ước lượng là 5 giờ.
+- Công cụ AI đã dùng: Claude Code (Opus 5.5), một phiên trong worktree `DA-17-replay-check`.
+- Ghi chú hoàn thành: AC 1–4 xong, AC 5 dời sau 13/11/2026. Số đo và việc phát sinh cho Hiếu nằm ở [docs/g0/replay.md](../../g0/replay.md). Ba điểm chính: chỉ 26/99 episode psi-data đạt `check_success` khi phát lại, dù các khớp được tái tạo tốt, nên phát lại động lực học trượt chỉ đánh dấu (PO 4/11/2026); tự va chạm dời sau 13/11/2026; khay S1 có 1/102 episode bị loại do `joint_mapping`.
+- File đã tạo hoặc sửa: `packages/flywheel-data/src/flywheel/data/replay_check/` (`kinematic.py`, `dynamic.py`, `thresholds.py`, `cli.py`, `__main__.py`); `packages/flywheel-simple/src/flywheel_simple/replay/` (`compare.py`, `run.py`, `outcomes.py`); test trong `packages/flywheel-data/tests/unit/replay_check/` và `packages/flywheel-simple/tests/replay/`; `configs/data/replay.yaml`; `docs/g0/replay.md`; mức `on_fail` của `task_success` và `replay_success` trong `configs/data/qa.yaml`, cùng test trong `tests/unit/pipeline/test_qa_checks.py`.
+- Nhiệm vụ 6 (5/11/2026): 3,6 giờ tập trung theo `Time-spent` (6: 0,1; 6.1: 1 + 0,1; 6.2: 0,5; 6.3: 1,9), trong hộp 4 giờ. Máy `rtx3060`: 0,85 giờ wall, 2,9 giờ worker (sổ ở `docs/g0/ledger/DA-17.csv`). Một phiên Claude Code (Opus 5.5) trong worktree nhánh `DA-17-replay-26-of-99`. Nguyên nhân và số đo ở [replay.md](../../g0/replay.md) mục 6; script đo nằm ngoài repo ở `rtx3060:~/denso-da17-26of99/`.

@@ -1,0 +1,161 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "stage_success": {
+      "items": {
+        "anyOf": [
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "title": "Stage Success",
+      "type": "array"
+    },
+    "stage_status": {
+      "anyOf": [
+        {
+          "items": {
+            "enum": [
+              "pass",
+              "fail",
+              "not_attempted",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Stage Status"
+    },
+    "unknown_reason": {
+      "anyOf": [
+        {
+          "items": {
+            "anyOf": [
+              {
+                "enum": [
+                  "missing_signal",
+                  "signal_all_null",
+                  "step_not_in_trace",
+                  "no_verdict"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Unknown Reason"
+    },
+    "step_enter_s": {
+      "anyOf": [
+        {
+          "items": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Step Enter S"
+    },
+    "step_exit_s": {
+      "anyOf": [
+        {
+          "items": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Step Exit S"
+    },
+    "first_failed_stage": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "First Failed Stage"
+    },
+    "failure_kind": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Failure Kind"
+    },
+    "failure_class": {
+      "anyOf": [
+        {
+          "enum": [
+            "approach",
+            "grasp",
+            "carry",
+            "place",
+            "balance"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Failure Class"
+    }
+  },
+  "required": [
+    "stage_success"
+  ],
+  "title": "StageEvaluation",
+  "type": "object"
+}

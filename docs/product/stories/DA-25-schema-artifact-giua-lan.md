@@ -45,6 +45,8 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `packages/flywheel-contracts/schemas/`, `packages/flywheel-contracts/tests/`
 - `packages/flywheel-testkit/src/flywheel/testkit/`
 - `packages/flywheel-testkit/tests/`
+- `tests/e2e/test_diagnosis_contract_seam.py`: kiểm tương thích bản ghi DA-13 và contract của issue #70.
+- `packages/flywheel-eval/src/flywheel/eval/scorer/failure.py`, `packages/flywheel-eval/tests/unit/scorer/test_failure.py`: cầu tương thích cho quy tắc lớp lỗi của issue #59; Châu review.
 
 ## Ghi chú cho người làm
 
@@ -72,6 +74,17 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 03/11/2026 | Sửa theo review PO. PR #46: `AgentFinding.code` chỉ nhận mã mục 10 của design (D1–D8, T1–T8, O1–O4, R1–R6); datetime phải có múi giờ; `AgentReview.check_against` kiểm review chỉ trỏ tới phát hiện có trong báo cáo, file mẫu thêm `find_002`. PR #48: đúng 28 chiều thân trên và 7 chiều thân dưới, ghi thứ tự, đơn vị, hệ tọa độ (`UPPER_BODY`, `LOWER_BODY`); `run_plan_id` không có RunPlan là `g0-<story>-<yyyymmdd>` (G2); `dropped_frames` đếm theo chu kỳ; trace là thư mục `<trace_id>/` gồm `steps.jsonl` và `camera_params.jsonl`, `CameraParams` thêm `trace_id` (G1); `reference_sha256` là hash tham chiếu camera G0 đã ghim, chép từ RunPlan (Q3). PR #46 giữ AC 6 và nhiệm vụ 6, PR #48 là AC 7 và nhiệm vụ 7 | PO (Hiếu) |
 
 ## Ghi chép khi làm
+
+### Issue #70 · contract chẩn đoán DA-13
+
+- Đề xuất hai bản ghi `SystemDiagnosis`, `StageAttribution` trong `flywheel.contracts.diagnosis`, dùng lại `DiagnosisSkip`. Các hash RTC, camera và hạ tầng được giữ theo bản ghi DA-13 để phân biệt đầu vào; `skipped` và `unavailable` bắt buộc hiện diện, kết luận `clean` không nhận danh sách lỗi hoặc kiểm tra bị bỏ qua.
+- Schema và file mẫu đi cùng contract; test seam kiểm bản ghi làn Đánh giá validate và giữ nguyên dữ liệu. Việc đổi DA-13 sang contract thuộc nhiệm vụ 8 của DA-13; cách nhúng vào `Cluster.meta` vẫn cần Hiếu duyệt, không tự thay cấu trúc cluster trong PR này.
+
+### Issue #59 · contract trạng thái bước
+
+- Đề xuất `not_attempted` theo scorer đã có (thay `not_reached` trong issue); `no_verdict` bổ sung cho trường hợp task không kết luận dù không thiếu tín hiệu. Giữ `stage_success` cũ, kiểm tra nhất quán nếu cung cấp `stage_status`. Tín hiệu `None` là chưa khai, khác `()` là khai không cần tín hiệu.
+- `Score` giữ ID cũ khi ba trường mới đều null; một bản ghi có chi tiết mới có ID theo nội dung mới. Các thời điểm là giây hữu hạn từ đầu episode. Scorer nhận `from_failed_stage`; Châu cần chuyển các cầu tạm và phần đọc/ghi sang contract trong story DA-36.
+- Phân loại bốn mã task khay và quyết định cuối cho contract vẫn cần Hiếu duyệt; không tự chốt trong PR này.
 
 ### Nhiệm vụ 6 (PR #46)
 

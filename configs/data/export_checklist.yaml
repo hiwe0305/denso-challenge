@@ -1,0 +1,26 @@
+# Action dims declared constant for one task: point 6 of the LeRobot v2.1 checklist
+# (DA-02; design 27/10 section 6.4, code D4 of design 10). PO decision 5/11/2026 (Hiếu,
+# "declare per task"): a dim that is constant by design for one task, but varies in
+# other G1 data (psi-data), is declared here instead of `constant` in
+# configs/embodiments/g1.yaml, which holds for every G1 dataset.
+#
+# Loaded by `flywheel.data.export.checklist.load_task_constants`; every key is required.
+# A task is the `uid` of `environment_config` in meta/episodes.jsonl. Under the task,
+# each entry is <action dim index>: <its name in the layout>; the loader refuses a name
+# that differs, so a reordered layout cannot shift a declaration onto another joint.
+#
+# `v21.6.stats.constant` passes a constant dim that the layout masks, that g1.yaml
+# declares `constant`, or that this file declares for every task of the dataset. A dim
+# declared for every task of the dataset but not constant in its stats fails the same
+# check: the declaration no longer says what the data does.
+version: checklist-1
+constant_action_dims:
+  # Planner-made tray data (DA-33): D-13 keeps thumb_0 at 0 in the grasp pose, D-12 holds
+  # the waist at 0 in the planner IK (docs/g0/tray/decisions.md). All five are exactly 0
+  # in tray_s1_f9433b028c52 (541 episodes, rtx3060, 5/11/2026).
+  g1_wholebody_tray_transfer_teleop:
+    0: left_hand_thumb_0_joint
+    7: right_hand_thumb_0_joint
+    28: waist_roll_joint
+    29: waist_pitch_joint
+    30: waist_yaw_joint

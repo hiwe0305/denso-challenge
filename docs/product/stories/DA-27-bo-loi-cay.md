@@ -4,14 +4,14 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt hướng 27/10/2026) |
+| Trạng thái | Xong (PR #53; log T/R: PR #85; ledger: PR #87; cùng 4/11/2026); chờ Châu xác nhận đã nhận bản cấy (nhiệm vụ 10.2, không chặn merge theo PO 4/11/2026); PO duyệt hướng 27/10/2026 |
 | Người làm | Hiếu |
 | Làn | Dữ liệu |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 9.2 · Epic 9 · 03 ADR-26 |
 | Nhãn | [Lõi] · `epic:9` · `gate:G1` · `area:data` |
 | Sprint | S2; bộ lỗi dữ liệu xong trước 10/11/2026 để DA-20 chấm kịp demo · **Lịch 3/11/2026:** mở PR và merge trước **6/11/2026** (thay 10/11) |
 | Ước lượng | 5 giờ cho nhiệm vụ 6–10 (bản 3/11/2026; bản 27/10: 7 giờ, khoảng 6–8; bộ chấm tách sang DA-31) |
-| Phụ thuộc | DA-25 (schema `DefectManifest`, trường `injected_defect`), S1-07 (gói psi-data task hai bàn). Log train và log RTC cấy lỗi dựng trên `FakeTrainer` và log RTC giả của testkit cho tới khi có log thật. Từ 3/11/2026: bộ đọc và ghi LeRobot v2.1 của DA-03 PR 1 (hạn 5/11) cho nhiệm vụ 8 |
+| Phụ thuộc | DA-25 (schema `DefectManifest`, trường `benchmark_copy_id`, đổi tên từ `injected_defect` ở PR #36), S1-07 (gói psi-data task hai bàn). Log train và log RTC cấy lỗi dựng trên `FakeTrainer` và log RTC giả của testkit cho tới khi có log thật. Từ 3/11/2026: bộ đọc và ghi LeRobot v2.1 của DA-03 PR 1 (hạn 5/11) cho nhiệm vụ 8 |
 
 ## Story
 
@@ -19,33 +19,37 @@ Là kỹ sư dữ liệu, tôi muốn một bộ dữ liệu và log thật đư
 
 ## Tiêu chí chấp nhận
 
-1. Bộ cấy chạy trên bản sao của gói psi-data task hai bàn (không sửa bản gốc): mỗi loại lỗi dữ liệu ở design mục 9.2 (rơi khung ảnh; lệch thời gian ảnh và state; nhảy khớp; vượt giới hạn khớp; NaN; sai đơn vị độ và radian; đảo dấu một chiều action; episode hỏng gắn nhãn thành công; sai câu lệnh task; trùng episode; rò hạt giống holdout) có tham số, tỉ lệ cấy khoảng 5–10% số episode, hạt giống ghi lại.
+1. Bộ cấy chạy trên bản sao của gói psi-data task hai bàn (không sửa bản gốc): mỗi loại lỗi dữ liệu ở design mục 9.2 (rơi khung ảnh; lệch thời gian ảnh và state; nhảy khớp; vượt giới hạn khớp; NaN; sai đơn vị độ và radian; đảo dấu một chiều action; episode hỏng gắn nhãn thành công; sai câu lệnh task; trùng episode; rò hạt giống holdout) có tham số, mỗi loại 3 episode (33 trên 99), quyết định PO 3/11/2026; mỗi episode mang tối đa một lỗi, hạt giống ghi lại.
 2. Log train cấy lỗi T1–T8 và log RTC cấy lỗi R1, R2 sinh từ bộ giả, cùng schema với log thật.
-3. Đáp án ghi vào `DefectManifest`, hash khóa trước khi chạy QA và agent; agent và phép kiểm không đọc được file này (có test). Bản 3/11/2026: dùng `DefectManifest`, `Defect` của `flywheel.contracts`, không định nghĩa bản ghi riêng; mã lỗi theo design 27/10 mục 10 (D2, D3, D5, D6, D7; log giữ T1–T8, R1–R2), tên lỗi cũ giữ trong `parameters["kind"]`; episode cấy lỗi mang `EpisodeMetadata.injected_defect`.
+3. Đáp án ghi vào `DefectManifest`, hash khóa trước khi chạy QA và agent; agent và phép kiểm không đọc được file này (có test). Bản 3/11/2026: dùng `DefectManifest`, `Defect` của `flywheel.contracts`, không định nghĩa bản ghi riêng; mã lỗi theo design 27/10 mục 10 (D1, D2, D3, D5, D6, D7; log giữ T1–T8, R1–R2), tên lỗi cũ giữ trong `parameters["kind"]`; episode cấy lỗi mang `EpisodeMetadata.injected_defect`.
 4. Một bản sạch (không cấy) cùng kích thước để đo báo nhầm.
 5. Bản cấy lỗi và bản sạch giao cho DA-31 qua `DatasetRef` và `DefectManifest`; bản cấy lỗi không vào release train (có test). Bản 3/11/2026 (Q5): story này xuất `has_injected_defect(episode) -> bool` trong `flywheel.data.inject.api`; `release` của DA-03 gọi hàm này để chặn; mỗi bên có test riêng.
 
 ## Nhiệm vụ
 
-- [ ] 1. Bộ cấy lỗi dữ liệu trên bản sao psi-data (AC 1)
-- [ ] 2. Log train và log RTC cấy lỗi từ bộ giả (AC 2)
-- [ ] 3. `DefectManifest` có hash, chặn agent đọc (AC 3)
-- [ ] 4. Bản sạch (AC 4)
-- [ ] 5. Giao bản cấy và bản sạch, test chặn release (AC 5)
+- [ ] 1. Bộ cấy lỗi dữ liệu trên bản sao psi-data (AC 1) · thay bằng nhiệm vụ 8 bản 3/11/2026
+- [x] 2. Log train và log RTC cấy lỗi từ bộ giả (AC 2) · PR `DA-27-log-defects`
+- [ ] 3. `DefectManifest` có hash, chặn agent đọc (AC 3) · thay bằng nhiệm vụ 6, 9 bản 3/11/2026
+- [ ] 4. Bản sạch (AC 4) · thay bằng nhiệm vụ 9 bản 3/11/2026
+- [ ] 5. Giao bản cấy và bản sạch, test chặn release (AC 5) · thay bằng nhiệm vụ 10 bản 3/11/2026
 
 Bản 3/11/2026 (nhiệm vụ 1–5 là 5 commit của Thông; [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) session 2):
 
-- [ ] 6. Thay bản ghi manifest riêng bằng `DefectManifest`, `Defect` của hợp đồng; episode cấy lỗi mang `EpisodeMetadata.injected_defect` (AC 3)
-- [ ] 7. Đổi mã lỗi theo design mục 10: rơi khung, lệch đồng bộ → D2; nhảy khớp, vượt giới hạn, NaN, sai đơn vị → D3; trùng episode, rò hạt giống → D5; nhãn thành công sai, câu lệnh sai → D6; đảo dấu một chiều action → D7 (AC 1, 3)
-- [ ] 8. Cấy lên bản sao parquet thật bằng bộ đọc và ghi của DA-03 PR 1, tỉ lệ 5–10%, hạt giống ghi trong manifest (AC 1)
-- [ ] 9. Bản sạch cùng số episode; `seal_manifest` ghi `defect_manifest.json` và `.sha256`; test agent không đọc được manifest (AC 3, 4)
-- [ ] 10. `has_injected_defect` và test; chạy trên `rtx3060` ra `fwdata/inject/<dataset_id>/{injected,clean}`, gửi `DatasetRef` và đường dẫn manifest cho Châu (DA-31) (AC 5)
+- [x] 6. Thay bản ghi manifest riêng bằng `DefectManifest`, `Defect` của hợp đồng; mọi episode của hai bản sao chấm mang `EpisodeMetadata.benchmark_copy_id` (trường đổi tên ở PR #36, thay `injected_defect`) (AC 3)
+- [x] 7. Đổi mã lỗi theo design mục 10: NaN → D1; rơi khung, lệch đồng bộ → D2; nhảy khớp, vượt giới hạn, sai đơn vị → D3; trùng episode, rò hạt giống → D5; nhãn thành công sai, câu lệnh sai → D6; đảo dấu một chiều action → D7 (AC 1, 3)
+- [x] 8. Cấy lên bản sao parquet thật bằng bộ đọc và ghi của DA-03 PR 1, mỗi loại 3 episode (33 trên 99), hạt giống ghi trong manifest (AC 1)
+- [x] 9. Bản sạch cùng số episode; `seal_manifest` ghi `defect_manifest.json` và `.sha256`; test agent không đọc được manifest (AC 3, 4)
+- [x] 10. `has_injected_defect` và test; chạy trên `rtx3060` ra `fwdata/inject/<dataset_id>/{injected,clean}`, gửi `DatasetRef` và đường dẫn manifest cho Châu (DA-31) (AC 5)
+  - [x] 10.1. `has_injected_defect` cho cổng release của DA-03 (`a135912`)
+  - [x] 10.2. Ghi bàn giao hai bản sao cho DA-31 (`418a19c`); Châu chưa xác nhận (không chặn, PO 4/11/2026)
+  - [x] 10.3. Mỗi lượt agent gắn đúng một bản sao (`cc69311`)
 
 ## Phạm vi file
 
 Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
 
 - `packages/flywheel-data/src/flywheel/data/inject/`, `packages/flywheel-data/tests/unit/inject/`
+- `tests/e2e/test_log_defects_detected.py` (test nối làn Dữ liệu và làn Đánh giá, 03 mục 7.3)
 - `configs/data/inject.yaml`
 - `docs/g0/defect-inject.md`
 
@@ -53,7 +57,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 - Nguồn: design 27/10 mục 9.2, 10 (mã lỗi D, T, R); spec mục 7.6 (lỗi cấy cho HD dùng cùng ý tưởng); 03 mục 7.3 (artifact), ADR-26.
 - Phần chấm là DA-31 (Châu từ 3/11/2026, làn Đánh giá); hai phần chỉ nối qua `DefectManifest` trong `flywheel.contracts`, không import nhau.
-- Bản sao cấy lỗi không bao giờ vào release train (có test chặn theo `injected_defect`).
+- Bản sao cấy lỗi không bao giờ vào release train (có test chặn theo `benchmark_copy_id`, trường đổi tên ở PR #36; hàm chặn vẫn tên `has_injected_defect`).
 - Dữ liệu cấy lỗi để trong `fwdata/`, không commit; chỉ commit cấu hình và mã.
 - Từ 3/11/2026: nhiệm vụ 1–5 là 5 commit của Thông trên nhánh `DA-27-bo-loi-cay` (`6b4e327`), cherry-pick lên nhánh mới và giữ tác giả Thông. Giao diện xuất ở `flywheel.data.inject.api`: `inject_copy`, `clean_copy`, `seal_manifest`, `has_injected_defect` ([plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) session 2).
 
@@ -75,10 +79,41 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 27/10/2026 | Tách bộ chấm sang DA-31; giao cho Thông theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 | 3/11/2026 | Người làm Thông → Hiếu theo quyết định PO (07 bản 1.6; [plan chia lại việc](../../superpowers/plans/2026-11-03-thong-reassignment.md) Q1, Q4, Q5): giữ 5 commit của Thông làm nhiệm vụ 1–5; thêm nhiệm vụ 6–10 (hợp đồng, mã lỗi D/T/R, parquet thật, niêm phong, `has_injected_defect`); AC 3, AC 5 ghi rõ theo Q5; bộ chấm DA-31 của Châu | PO (Hiếu) |
+| 3/11/2026 | AC 1: tỉ lệ cấy đổi từ khoảng 5–10% số episode sang mỗi loại 3 episode (33 trên 99), mỗi episode tối đa một lỗi; NaN giữ mã D1 theo design mục 9.2 | PO (Hiếu) |
+| 4/11/2026 | Tách vì R9: log train T1–T8 và log RTC R1, R2 (nhiệm vụ 2) chuyển sang PR sau `DA-27-log-defects`; phụ thuộc `flywheel-store` và ghi `LedgerEntry` vào store sang PR `DA-27-ledger-store`, cả hai làm sau khi PR này merge. Xác nhận của Châu cho nhiệm vụ 10 không chặn merge | PO (Hiếu) |
+| 5/11/2026 | Trạng thái → Xong theo PR #53, #85, #87 (merge 4/11/2026); xác nhận của Châu cho nhiệm vụ 10.2 vẫn chờ. Nhiệm vụ 10 tick với 10.1 `a135912`, 10.2 `418a19c`, 10.3 `cc69311`; nhiệm vụ 1, 3, 4, 5 giữ `[ ]`, ghi nhiệm vụ thay thế; `injected_defect` → `benchmark_copy_id` (PR #36) ở nhiệm vụ 6, "Phụ thuộc", "Ghi chú cho người làm"; thêm giờ thực nhiệm vụ 6–10 | Hiếu, cùng Claude |
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
-- Ghi chú hoàn thành:
-- File đã tạo hoặc sửa:
+- Giờ thực: 6.5h
+- Công cụ AI đã dùng: Antigravity
+- Ghi chú hoàn thành: Đã cấy 11 loại lỗi dữ liệu, log train T1-T8, log RTC R1-R2, khóa DefectManifest và rào chắn release. 29/29 tests passed.
+- File đã tạo hoặc sửa: packages/flywheel-data/src/flywheel/data/inject/, packages/flywheel-data/tests/unit/inject/, configs/data/inject.yaml, docs/g0/defect-inject.md
+- 3/11/2026 (Hiếu và Claude, nhánh `DA-27-defect-inject`): bỏ dấu xong của nhiệm vụ 1, 3, 4, 5. Mã của Thông chỉ cấy trên `EpisodeData` trong bộ nhớ, chưa trên bản sao parquet của psi-data (AC 1); manifest chưa dùng `DefectManifest` của hợp đồng (AC 3); bản sạch sinh từ bản đã cấy nên vẫn mang lỗi (AC 4); chưa giao cho DA-31 (AC 5). Nhiệm vụ 1, 4, 5 chờ bộ đọc LeRobot (DA-03 PR 1) và `pyarrow`.
+- 3/11/2026: mã lỗi theo design mục 9.2 và 10 (sửa 3/11): `Defect.code` là D1, D2, D3, D5, D6, D7 cho dữ liệu và T1–T8, R1–R2 cho log; tên loại giữ trong `parameters["kind"]`. Nhiệm vụ 2 giữ dấu xong.
+- 3/11/2026 (`DA-27/8.2`): manifest chỉ ghi lỗi đã cấy thật. Lỗi trên action theo chiều của design 9.2 (`unit_deg_rad` chiều góc 0–30, 35 khác 0; `joint_jump`, `joint_limit_exceeded` chiều khớp 0–30; `action_sign_flip` một chiều có độ lệch chuẩn khác 0); episode không cấy được thì chọn episode khác; mỗi dòng manifest được kiểm đã đổi dữ liệu. Nhiệm vụ 8 còn mở tới khi cấy trên parquet thật.
+- 3/11/2026 (`DA-27/9.1`): bản cấy và bản sạch mang id trung tính cùng dạng `bench-<12 hex>`, không lộ vai trò; bản sạch chép từ bản gốc và có `DefectManifest` với `defects` rỗng, nên chỉ bộ chấm biết bản nào sạch. Nhiệm vụ 9 còn mở (niêm phong, test agent không đọc manifest).
+- 3/11/2026 (`DA-27/8.3`): `create_defect_dataset(..., layout=ActionLayout)`; `joint_limit_exceeded` vượt `limit_high` của chiều được chọn, lỗi trên action bỏ qua chiều bị mask.
+- 4/11/2026 (`DA-27/8.3`, tiếp): test trên `configs/embodiments/g1.yaml` thật: mọi dòng manifest đã cấy; `joint_limit_exceeded` chỉ chọn chiều 0–30 và vượt `limit_high` của chiều đó; `unit_deg_rad`, `action_sign_flip` chỉ đổi đúng một chiều design 9.2 cho phép.
+- 4/11/2026 (`DA-27/8.4`): nghĩa của lỗi khớp với LeRobot: `drop_frames` bỏ hẳn dòng; `timestamp_sync_offset` dịch cột `timestamp`; `corrupted_success_label` cắt episode và giữ nhãn thành công (design 9.2), thay vì đảo nhãn; `holdout_seed_leak` dùng dải holdout của `configs/splits/default.yaml` (2000000–2000999) thay 9000–9999 (vốn thuộc train).
+- 4/11/2026 (`DA-27/8.5`): `inject_copy` cấy trên bản sao LeRobot qua bộ đọc và ghi của DA-03 (#69), ghi lại mọi episode; test đọc ngược từ đĩa. Nhiệm vụ 8 đánh dấu xong khi chạy trên psi-data thật.
+- 4/11/2026 (`DA-27/9.3`): `clean_copy` từ bản gốc; `python -m flywheel.data.inject.build` dựng hai bản sao, niêm phong đáp án ở `answers/`, ghi `LedgerEntry` ước tính và thực đo, in `DatasetRef` cho DA-31; `api.mark_copy_episode` cho ingest bản sao.
+- 4/11/2026 (`DA-27/8.6`): chạy trên psi-data `e78fb93` ở `rtx3060` (`docs/g0/defect-inject.md`, mục "Chạy trên psi-data thật"): 99 episode, 33 lỗi đủ 11 × 3, kiểm lại từ đĩa đạt; 21,7 s, RAM đỉnh 640 MB. Nhiệm vụ 8 xong.
+- 4/11/2026 (`DA-27/9.4`): trên psi-data thật, bản sạch `bench-1e258c0a78ca` có 99 episode, trùng bản gốc; hai manifest niêm phong ở `fwdata/inject/answers/<id>/` (ngoài hai bản sao), `ManifestLock.verify_integrity` đạt; `test_read_barrier.py` chặn agent và phép kiểm đọc đáp án. Nhiệm vụ 9 xong.
+- 4/11/2026 (`DA-27/10.2`): bàn giao cho DA-31 ghi ở `docs/g0/defect-inject.md` (hai `DatasetRef`, đường dẫn và sha256 manifest trên `rtx3060:~/denso-da27/fwdata/inject/`). Nhiệm vụ 10 còn mở tới khi Châu xác nhận đọc được; xác nhận này không chặn merge (Hiếu, 4/11/2026).
+- 4/11/2026 (`DA-27/9.5`): sửa hai chỗ lộ đáp án do Orchestration chỉ ra: stats của hai bản sao tính lại từ dữ liệu của chính bản đó (theo `postprocess_psi0_sonic.py`); lineage của bộ ghi chuyển sang `answers/<id>/`; một mtime cho mọi file; test so stats, tập file, chữ đánh dấu, mtime giữa hai bản.
+- 4/11/2026 (`DA-27/9.6`): chạy lại trên psi-data ở `rtx3060`: hai bản cùng 208 file, cùng mtime, stats khớp dữ liệu từng bản, không chữ đánh dấu nào thêm vào; sha256 cây `3e63671e…` và `f18bcf1c…`, manifest không đổi.
+- 4/11/2026 (`DA-27/9.7`): stats không tính lại được (ảnh cần giải mã video) mang theo từ episode có video mà bản sao đang giữ (episode nguồn với `duplicate_episode`), giữ thứ tự feature của file gốc; `index` đọc qua `check_index` của DA-03. Tính lại trên psi-data gốc khớp stats phát hành trong 1e-6, trừ `states` (mean, std lệch tới 3,6e-4): phát hiện D4 trên dữ liệu của tác giả.
+- 4/11/2026 (`DA-27/10.3`): quy tắc chạy trong `docs/g0/defect-inject.md` và phần bàn giao DA-31: mỗi lượt Agent QA/QC gắn đúng một bản sao, chỉ đọc, không có đường tới psi-data gốc, bản sao kia hay `answers/`.
+- 4/11/2026 (`DA-27/9.8`): chạy lại trên psi-data ở `rtx3060` với `ee7d8cf`: 33 lỗi đủ 11 × 3, mọi dòng qua `defect_applied`, 66 + 99 episode trùng bản gốc, stats khớp dữ liệu từng bản, 66 episode không cấy cùng stats ở hai bản, không lineage trong bản sao; sha256 cây và manifest không đổi.
+- 4/11/2026 (`DA-27/8.7`, `9.9`): soát kênh phụ theo Orchestration: `corrupted_success_label` cho robot dừng tại chỗ thay vì cắt episode (số khung giữ nguyên); bản trùng mang `environment_config` của episode nguồn; test footer parquet một biến thể, video đi qua nguyên vẹn, chỉ `drop_frames` lệch số dòng với video; bảng tín hiệu theo loại ở `docs/g0/defect-inject.md`. `holdout_seed_leak` còn một tín hiệu thừa, để PO quyết.
+- 4/11/2026 (`DA-27/9.10`): chạy lại trên psi-data ở `rtx3060` với `c2e0b23`: mọi kiểm tra đạt (33 lỗi đủ 11 × 3, footer một biến thể, video đi qua nguyên vẹn, stats khớp, không lineage trong bản sao); sha256 manifest bản cấy `e41e8d49…`, cây `4efe79fa…`; bản sạch không đổi.
+- 4/11/2026 (`DA-27/9.11`): theo quyết định của Hiếu, mọi episode của cả hai bản sao có seed điều kiện dàn dựng (dải train, cùng giá trị ở hai bản), riêng 3 episode `holdout_seed_leak` mang seed holdout; `meta/benchmark_copy.json` ghi đây là dàn dựng, không phải dữ liệu của tác giả.
+- 4/11/2026 (`DA-27/9.12`): chạy lại trên psi-data ở `rtx3060` với `5f8d6bd`: mọi kiểm tra đạt, gồm seed dàn dựng; manifest không đổi (`8962a6cf…`, `e41e8d49…`); sha256 cây mới `62f48eaf…` (bản sạch), `3a5630f7…` (bản cấy).
+- 4/11/2026 (`DA-27/2.2`, PR `DA-27-log-defects`): log train T1–T8 và log RTC R1, R2 viết lại trên hợp đồng (`TrainingMetric`, `RTCInferenceRecord`, `ProbeP4`) theo layout làn Đánh giá đọc; mỗi loại 3 job, bản sạch cùng hình dạng, đáp án niêm phong; bộ phát hiện của DA-08 và DA-13 bắt đúng mã từng job, không báo nhầm trên job sạch. Sửa `InjectConfig.default_path` (trỏ nhầm `packages/`, nên `configs/data/inject.yaml` chưa bao giờ được đọc). Nhiệm vụ 2 xong.
+- 4/11/2026 (`DA-27/2.3`): test nối làn chuyển ra `tests/e2e/test_log_defects_detected.py` (bộ phát hiện của làn Đánh giá bắt đúng mã, job sạch không báo; bản yếu hơn ngưỡng T6 không bị bắt); test trong làn chỉ kiểm mỗi lỗi đổi đúng một tín hiệu với đúng mức cấu hình.
+- 4/11/2026 (`DA-27/9.13`, PR `DA-27-ledger-store`): hai lệnh dựng (bản sao dữ liệu, bản sao log) ghi dòng `LedgerEntry` ước tính và thực đo qua `flywheel.data.ledger.job_ledger` của DA-03 vào sổ của store (run plan `g0-DA-27-<yyyymmdd>`, dòng thực đo trỏ về dòng ước tính); bỏ `ledger.jsonl` cạnh đầu ra và hàm `ledger_rows`. Phụ thuộc `flywheel-store` đã có từ DA-03 (`372610d`), không sửa `pyproject.toml`, `uv.lock`.
+- 3/11/2026 (`DA-27/9.2`): `seal_manifest` ghi `defect_manifest.json` và `.sha256`, từ chối ghi vào thư mục bản sao; test quét mã chặn agent (`flywheel.eval.agentqa` trừ `bench/`) và phép kiểm (`flywheel.data` trừ `inject/`) nhắc tới đáp án; bỏ `ManifestLock.can_agent_read` (chỉ so tên vai). Nhiệm vụ 9 còn mở tới khi bản sạch và niêm phong chạy trên parquet thật.
+- 3/11/2026 (`DA-27/10.1`): `flywheel.data.inject.api.has_injected_defect(episode: Episode) -> bool` cho `release` của DA-03, có test; theo hợp đồng hiện tại xét `meta.injected_defect`, đổi sang `benchmark_copy_id` khi #36 merge. Nhiệm vụ 10 còn mở (chạy trên `rtx3060`, giao DA-31).
+- 3/11/2026 (issue #62, sau khi #36 merge): episode không còn mang `injected_defect`; mọi episode của hai bản sao chấm mang `benchmark_copy_id` bằng `dataset_id` trung tính của bản sao; đáp án chỉ trong `DefectManifest`; rào release và `has_injected_defect` chặn theo `benchmark_copy_id` (design 6.1, 9.2; 03 bản 1.0 mục 4.3). Nhiệm vụ 6 làm lại theo hợp đồng mới ở `DA-27/6.1`.
+- 5/11/2026 (Hiếu và Claude): giờ thực nhiệm vụ 6–10 là 16,3 giờ, tổng `Time-spent` của 28 commit `DA-27/6`–`DA-27/10` trên `master` (PR #53, #87), so với ước lượng 5 giờ. Công cụ AI: Claude Code (Opus 5.5). Dòng "Giờ thực: 6.5h" ở đầu mục là của Thông, cho nhiệm vụ 1–5.

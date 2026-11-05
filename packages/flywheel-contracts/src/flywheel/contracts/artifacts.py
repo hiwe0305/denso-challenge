@@ -66,6 +66,14 @@ class ActionDimension(Artifact):
     name: str = Field(min_length=1)
     group: str = Field(min_length=1)
     masked: bool
+    constant: bool = Field(
+        default=False,
+        description=(
+            "The value never varies in valid data (G1 dim 31: base height 0.74 in psi-data). "
+            "A std of 0 here is expected, not a stats defect (design D4); the normalizer "
+            "must keep the value unchanged. A masked dim may also be constant."
+        ),
+    )
     limit_low: float | None = None
     limit_high: float | None = None
 

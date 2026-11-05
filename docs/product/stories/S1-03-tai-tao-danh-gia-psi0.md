@@ -33,12 +33,13 @@ Là kỹ sư robot learning, tôi muốn chạy checkpoint Ψ₀ công bố trê
 ## Nhiệm vụ
 
 - [ ] 1. Q0 và chọn task tái tạo (AC 1, 6)
-  - [ ] 1.1 Liệt kê checkpoint trong `psi0/` ở revision ghim; ghi tên, ngày, kích thước
+  - [x] 1.1 Liệt kê checkpoint trong `psi0/` ở revision ghim; ghi tên, ngày, kích thước
   - [ ] 1.2 Chọn checkpoint gốc trong `pre.*` hoặc `postpre.*` và task tái tạo; ghi provenance vào Source; ghi rủi ro nếu chưa chắc (AC 6, 7)
   - [ ] 1.3 Soạn câu hỏi provenance cho PSI Lab (việc trưởng nhóm)
 - [ ] 2. Serve Ψ₀ (AC 2, 4)
-  - [ ] 2.1 Dựng môi trường Ψ₀ (Python 3.11, torch 2.7, flash-attn 2.7.4.post1) trong image riêng ở `docker/psi0/`, dùng chung với S1-04; ghi lỗi nếu flash-attn không chạy trên 5090
-  - [ ] 2.2 `scripts/g0/serve_psi0.sh` với `--action-exec-horizon`, `--rtc` theo README Ψ₀
+  - [x] 2.1 Dựng môi trường Ψ₀ (Python 3.11, torch 2.7, flash-attn 2.7.4.post1) trong image riêng ở `docker/psi0/`, dùng chung với S1-04; ghi lỗi nếu flash-attn không chạy trên 5090
+    - Khác biệt đã biết, **Đã chốt 3/11/2026 [Hiếu]** (Q8): dùng image công bố của tác giả ghim theo digest (`docker/psi0/compose.yaml`) trên máy 3060 thay cho image riêng; trên Colab dùng đúng danh sách gói của image đó (`docker/psi0/requirements-image.txt`); flash-attn chạy trên 3060 và L4, chưa thử trên 5090.
+  - [x] 2.2 `scripts/g0/serve_psi0.sh` với `--action-exec-horizon`, `--rtc` theo README Ψ₀
   - [ ] 2.3 Đo VRAM, độ trễ; ghi giao thức `act()`
 - [ ] 3. Chạy đánh giá 3 mức × 30 lượt, kiểm nhị thức một phía từng mức (AC 2, 3)
 - [ ] 4. Đo độ không tất định trên 20 điều kiện (AC 5)
@@ -55,6 +56,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `scripts/g0/serve_psi0.sh`, `scripts/g0/eval_psi0.sh`
 - `docs/g0/psi0-eval.md`
 - `docs/g0/ledger/S1-03.csv`
+- `tests/g0/test_serve_psi0_seeded.py`: test CPU của launcher gieo nhiễu theo episode (thêm 4/11/2026, Hiếu giao việc launcher, docs/he/tray.md mục 8.5)
 
 ## Ghi chú cho người làm
 
@@ -88,6 +90,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 28/10/2026 | Bỏ phần việc của Hưng và Châu theo 07 mục 2.0 bản 0.6; dự phòng chưa giao | PO (Hiếu) |
 | 3/11/2026 | Cắt phạm vi trước 13/11/2026: chỉ làm phần DA-26 cần (07 mục 2.4, bản 1.2) | PO (Hiếu) |
 | 3/11/2026 | Nhiệm vụ 1.3: bỏ phần email giấy phép theo quyết định PO (không xin giấy phép; `license = unknown` ghi là giới hạn); câu hỏi provenance Q0 giữ | PO (Hiếu) |
+| 4/11/2026 | Thêm launcher `docker/psi0/serve_psi0_seeded.py`: gieo nhiễu Ψ₀ theo seed điều kiện khi `reset` (docs/he/tray.md mục 8.5); thêm test CPU vào Phạm vi file | PO (Hiếu) giao |
 
 ## Ghi chép khi làm
 

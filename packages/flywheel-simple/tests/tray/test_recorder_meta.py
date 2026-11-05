@@ -58,3 +58,50 @@ def test_tray_frame_matches_the_declared_features() -> None:
         assert len(spec["names"]) == spec["shape"][0]
     assert not frame["observation.tray_steps"].any()
     assert len(STEP_NAMES) == TRAY_FEATURES["observation.tray_steps"]["shape"][0]
+
+
+def _meta_dir(tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
+    """A recorder over a dataset whose episodes.jsonl holds two episodes; no simulator."""
+    import json
+    import types
+
+    from flywheel_simple.tray import recorder as rec
+
+    encoder = types.SimpleNamespace(NumpyArrayEncoder=json.JSONEncoder)
+    monkeypatch.setattr(rec, "_mod", lambda name: encoder)
+    meta = tmp_path / "ds" / "meta"
+    meta.mkdir(parents=True)
+    old = "".join(json.dumps({"episode_index": i, "length": 10}) + "\n" for i in range(2))
+    (meta / "episodes.jsonl").write_text(old)
+    recorder = rec.EpisodeRecorder(
+        tmp_path / "ds", robot_model=None, joint_names=[], task_prompt="x"
+    )
+    return recorder, meta / "episodes.jsonl", old
+
+
+def test_environment_config_lands_on_its_episode(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    import json
+
+    recorder, meta_file, _ = _meta_dir(tmp_path, monkeypatch)
+    recorder._write_environment_config(1, {"flywheel": {"seed": 7}})
+    rows = [json.loads(line) for line in meta_file.read_text().splitlines()]
+    assert "environment_config" not in rows[0]
+    assert json.loads(rows[1]["environment_config"]) == {"flywheel": {"seed": 7}}
+    assert sorted(p.name for p in meta_file.parent.iterdir()) == ["episodes.jsonl"]  # no temp left
+
+
+def test_a_crash_mid_write_leaves_episodes_jsonl_whole(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    from pathlib import Path
+
+    recorder, meta_file, old = _meta_dir(tmp_path, monkeypatch)
+    real_write = Path.write_text
+
+    def dies_halfway(self: Path, text: str, *args, **kwargs) -> int:  # type: ignore[no-untyped-def]
+        real_write(self, text[: len(text) // 2], *args, **kwargs)  # the part a kill leaves
+        raise OSError("killed mid-write")
+
+    monkeypatch.setattr(Path, "write_text", dies_halfway)
+    with pytest.raises(OSError, match="mid-write"):
+        recorder._write_environment_config(0, {"flywheel": {"seed": 7}})
+    monkeypatch.undo()
+    assert meta_file.read_text() == old

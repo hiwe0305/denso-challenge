@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Any
 
+import numpy as np
 import pytest
 
 pytestmark = pytest.mark.sim
@@ -44,3 +45,26 @@ def test_planner_succeeds_on_most_level1_train_seeds(env: Any) -> None:
     # fails, a seed swapping outcome with another does not.
     results = {seed: run(env, seed=seed, level=1) for seed in range(1, 7)}
     assert sum(r.success for r in results.values()) >= 4, results
+
+
+def test_arm_commands_move_at_most_arm_step_max_per_step(env: Any) -> None:
+    # Without the IK's velocity limit the palm-up hold (D-25) made the arm action jump up
+    # to 0.28 rad in one step at REACH (docs/g0/tray/wrist-jump.md); a whole episode,
+    # anchoring the IK included, must now stay within arm_step_max.
+    from flywheel_simple.tray.agent import TrayAgent, run_episode
+    from flywheel_simple.tray.planner import PlannerConfig
+
+    cfg = PlannerConfig.load()
+    agent = TrayAgent(env, cfg)
+    model = agent.ctrl.model
+    upper = list(model.get_joint_group_indices("upper_body"))
+    arms = [upper.index(i) for i in model.get_joint_group_indices("arms")]
+    goals: list[Any] = []
+
+    def on_frame(obs: Any, info: Any, record: dict[str, Any]) -> None:
+        goals.append(np.asarray(record["goal_upper_body"], float)[arms])
+
+    run_episode(env, agent, seed=1, level=1, on_frame=on_frame)
+    steps = np.abs(np.diff(np.array(goals), axis=0))
+    assert len(arms) == 14 and len(goals) > 500
+    assert steps.max() <= cfg.arm_step_max + 1e-6, (steps.max(), np.argmax(steps.max(axis=1)))

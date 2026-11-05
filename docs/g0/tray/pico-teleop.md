@@ -6,7 +6,7 @@
 
 Đường teleop PICO của SIMPLE cắm được vào env khay mà không fork SIMPLE: `flywheel_simple.tray.run teleop-decoupled-wbc` (DA-32/4) đăng ký env rồi giao cho CLI của SIMPLE. Chưa chạy được với kính thật vì ba thứ: (1) venv SIMPLE thiếu `xrobotoolkit_sdk`, máy sim chưa cài XRoboToolkit PC service (PyAV, `pyzmq` và bộ ghi LeRobot đã có từ PR #27); (2) chưa có kính PICO; (3) recorder của SIMPLE không ghi trạng thái khay và không chọn được seed, cần một wrapper nhỏ của đội (nhiệm vụ 2).
 
-Đường decoupled WBC của SIMPLE điều khiển cả eo (`enable_waist = True` trong cấu hình sonic, đo được): IK tính eo từ tư thế hai tay rồi đưa cho policy thân dưới. Vì thế demo PICO có nghiêng eo như video teleop G1, điều planner S1 của DA-33 không có (eo khóa, D-12 trên nhánh DA-33).
+Đường decoupled WBC của SIMPLE điều khiển cả eo (`enable_waist = True` trong cấu hình sonic, đo được): IK tính eo từ tư thế hai tay rồi đưa cho policy thân dưới. Vì thế demo PICO có nghiêng eo như video teleop G1, điều planner S1 của DA-33 không có (eo khóa, D-12 trên nhánh DA-33). Từ 4/11/2026 người điều khiển ảo và S2 khóa eo như planner (`da35-virtual-3`, [virtual-teleop.md](virtual-teleop.md) mục "Khóa eo của người điều khiển ảo"): robot không theo lệnh eo của IK khi đang bê khay, và DA-17 loại mọi demo cha vì lý do đó. Teleop PICO thật vẫn để eo cử động.
 
 ## Lệnh dự kiến
 

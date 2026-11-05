@@ -20,13 +20,16 @@ from test_pico_session_sim import MemoryExporter
 pytestmark = pytest.mark.sim
 
 SHORT_STEPS = 700  # 14 s: stabilise, activate, walk to table A and start reaching
+# Arm joints in SIMPLE's 43-d action (left then right arm, 7 each).
+ACTION_ARMS = [*range(15, 22), *range(29, 36)]
+ACTION_WAIST = [12, 13, 14]  # waist yaw, roll, pitch of the 43-d action
 
 
 @pytest.fixture(scope="module")
 def env_agent_streamer() -> Iterator[tuple[Any, Any, Any]]:
     from flywheel_simple.tray.pico.agent import StreamerDecoupledAgent, VirtualPicoStreamer
     from flywheel_simple.tray.pico.clock import ClockedTime, SimClock
-    from flywheel_simple.tray.pico.operator import OperatorConfig, VirtualOperator
+    from flywheel_simple.tray.pico.operator import LOCK_WAIST, OperatorConfig, VirtualOperator
     from flywheel_simple.tray.pico.session import make_teleop_env
     from flywheel_simple.tray.planner import PlannerConfig
     from simple.agents import pico_decoupled_agent
@@ -36,9 +39,15 @@ def env_agent_streamer() -> Iterator[tuple[Any, Any, Any]]:
     current = pico_decoupled_agent.time
     clock = current.clock if isinstance(current, ClockedTime) else SimClock()
     env = make_teleop_env(level=0, headless=True)
-    operator = VirtualOperator(OperatorConfig.load())
-    streamer = VirtualPicoStreamer(env, operator, PlannerConfig.load())
-    agent = StreamerDecoupledAgent(env.unwrapped.task.robot, streamer, clock=clock)
+    cfg = OperatorConfig.load()
+    streamer = VirtualPicoStreamer(env, VirtualOperator(cfg), PlannerConfig.load())
+    agent = StreamerDecoupledAgent(
+        env.unwrapped.task.robot,
+        streamer,
+        clock=clock,
+        max_joint_step=cfg.arm_step_max,
+        lock_waist=LOCK_WAIST,
+    )
     yield env, agent, streamer
     agent.close()
     env.close()
@@ -93,9 +102,10 @@ def run(
 def test_virtual_operator_episode_reaches_check_success(
     env_agent_streamer: tuple[Any, Any, Any], tmp_path: Path
 ) -> None:
-    # A condition that passed in the parent batch parents-1103b (episodes are
-    # deterministic); about one in five conditions fails with the D-25 hold.
-    (attempt,), (frames,), (block,) = run(env_agent_streamer, tmp_path, "0:100", style_base=0)
+    # A condition that passed with the waist locked (da35-virtual-3) in the smoke batch
+    # parents-smoke-1104 (episodes are deterministic); 0:100, used before, now tilts
+    # the tray at LIFT. About one in five conditions fails with the D-25 hold.
+    (attempt,), (frames,), (block,) = run(env_agent_streamer, tmp_path, "0:102", style_base=0)
     assert attempt["outcome"] == "success", attempt
     assert attempt["steps_reached"] == 7
     phases = [name for name, _ in attempt["timeline"]]
@@ -107,6 +117,15 @@ def test_virtual_operator_episode_reaches_check_success(
     assert (block["source_detail"], block["action_quality"]) == ("virtual_teleop", "planned")
     assert block["style_seed"] == attempt["style_seed"] and block["style"]["omega"] > 0
     assert block["operator_version"].startswith("da35-virtual-")
+    # The retargeting IK's step limit (arm_step_max 0.08) holds over the whole episode,
+    # activation included: DA-03 QA flags an arm step over 0.0869 (action_jump.arm).
+    arms = np.stack([f["action"] for f in frames])[:, ACTION_ARMS]
+    steps = np.abs(np.diff(arms, axis=0))
+    assert steps.max() <= 0.08 + 1e-6, (steps.max(), np.unravel_index(steps.argmax(), steps.shape))
+    # The waist is locked (LOCK_WAIST, da35-virtual-3): the IK's waist command stays at
+    # zero, so DA-17's waist mapping check has no command the robot fails to follow.
+    waist = np.stack([f["action"] for f in frames])[:, ACTION_WAIST]
+    assert np.abs(waist).max() < 1e-9, np.abs(waist).max(axis=0)
 
 
 def test_same_condition_and_style_seed_give_the_same_episode(

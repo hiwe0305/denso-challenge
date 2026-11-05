@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, cast, get_args
 
@@ -329,3 +329,21 @@ def _sha256(path: Path) -> str:
         while chunk := f.read(CHUNK):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def dump_source(record: SourceRecord) -> str:
+    """The record as JSON, for the commands that run after ingest (`fw data qa`, ...)."""
+    data = asdict(record)
+    data["lineage"] = {str(k): v for k, v in data["lineage"].items()}
+    return json.dumps(data, indent=2, sort_keys=True)
+
+
+def load_source(text: str) -> SourceRecord:
+    """The SourceRecord `dump_source` wrote."""
+    data = json.loads(text)
+    data["lineage"] = {
+        int(k): EpisodeLineage(**{**v, "labels": tuple(tuple(p) for p in v["labels"])})
+        for k, v in data["lineage"].items()
+    }
+    data["index_findings"] = tuple(IndexFinding(**f) for f in data["index_findings"])
+    return SourceRecord(**data)

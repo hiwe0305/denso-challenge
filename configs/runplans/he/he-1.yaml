@@ -1,0 +1,190 @@
+# DA-26 AC 1: RunPlan of HE-1, egocentric prior vs number of robot demos on the
+# two-table task (design 27/10/2026 section 7; spec sections 3 and 7.9; shape of 03
+# section 8.1). Reading rules in docs/he/he-1.md, fixed before any run.
+#
+# Frozen 4/11/2026 (tier 2, Hiếu "Approve tier 2"): `he-1.lock.json` holds
+# rp_95c98a476499 and `he-1.plan_review.json` the signing Decision. A changed plan
+# now fails `check`; a new plan version needs a new freeze and Decision.
+#   uv run python scripts/he/he1_plan.py check configs/runplans/he/he-1.yaml
+#   uv run python scripts/he/he1_plan.py parents configs/runplans/he/he-1.yaml  # HF API
+#
+# Recipe, demo sets, eval set and stats are plan-level: a point only picks a variant,
+# a demo set and a train seed, so every point shares recipe, steps, batch, learning
+# rate and eval conditions by construction.
+name: he-1-psi0
+purpose: he_grid
+story: DA-26
+site_id: local
+task:
+  id: G1WholebodyLocomotionPickBetweenTablesTeleop-v0
+  env_id: simple/G1WholebodyLocomotionPickBetweenTablesTeleop-v0
+embodiment: g1_sonic_dwbc@1
+
+code:
+  simple: {repo: physical-superintelligence-lab/SIMPLE, commit: b75c6786f87b4a7f43b52b0ac5b83a1d9ea62e11}
+  psi0: {repo: physical-superintelligence-lab/Psi0, commit: cda3fdfafe47cb6fa75400d013de1bd36e3cea05}
+
+# Revision pinned by S1-03 (docs/g0/psi0-eval.md 1.1). sha256 = Hugging Face LFS oid
+# at that revision, checked by `parents` on 4/11/2026. Names are the keys of `parents`
+# in configs/models/psi0-stage3.yaml. The three pairs have the same tensor names,
+# dtypes and shapes and the same config.json (`parents`, 4/11/2026).
+psi_model: {repo: USC-PSI-Lab/psi-model, revision: cb1480f50d9764ab2f6261bc2e651a67ad54da17}
+parents:
+  psi0-baseline-egodex-he:
+    vlm:
+      path: psi0/pre.fast.1by1.2601091803.ckpt.ego200k.he30k/model.safetensors
+      sha256: 6e63da17bdd22430bc07c40e4b14ebb96c9d124d014c532449142862c186d3f9
+    action_header:
+      path: psi0/postpre.1by1.pad36.2601131206.ckpt.he30k/action_header.safetensors
+      sha256: 238b4d95862b0eb44bffa75a2ae69e120aeda3d159fd6f29802dd9338019e14d
+    clean_for_main_task: true
+    note: >-
+      EgoDex 200k + HE 30k steps; the pair the authors fine-tuned their two-table
+      checkpoint from (argv.txt of the baseline below).
+  psi0-abl-he-only:
+    vlm:
+      path: psi0/pre.abl.only.he.2512311516.48k/model.safetensors
+      sha256: a2ae8c24f83c90dea78282defc6abbbd5475e77ede24e1538c9b3b38ec457f4e
+    action_header:
+      path: psi0/postpre.abl.only.he.2602050012/action_header.safetensors
+      sha256: 9118bc03bebd53cbf3567c9e220618e90f8605a5cf4247aa878747b17de2a7e0
+    clean_for_main_task: true
+    note: >-
+      Authors' ablation without EgoDex: VLM on HE only, 48k steps, its own action
+      header. Differs from the baseline in pretraining steps too (design 7.2).
+  psi0-abl-egodex-10pct:
+    vlm:
+      path: psi0/pre.abl.ego.10per.2602021632.46k/model.safetensors
+      sha256: e84a51035b517c7729e78dcc5cebc8a7f758adf4cf7c161b515d8a46190c8655
+    action_header:
+      path: psi0/postpre.abl.ego.10per.2602050006/action_header.safetensors
+      sha256: 921de23437374d996c3225e6be0bb7acf12bf3098152a596fea7664d778afdc4
+    clean_for_main_task: true
+    note: Authors' ablation with 10% of EgoDex, 46k steps, its own action header.
+
+# Train data: the authors' teleop package of the two-table task, version A (train
+# stays on e78fb93 until after 13/11/2026, docs/g0/psi-data.md 4.1). 99 episodes, all
+# pass S1-07's QA (N_teleop = 99 >= 80, so the grid ends at 80).
+dataset:
+  repo: USC-PSI-Lab/psi-data
+  kind: datasets
+  revision: e78fb93cc28912a3031a10b8656d32d7f0a2b867
+  path: simple/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip
+  sha256: 6cdf9022c23649f68d2faf418a97c47c01aca9d1fac27e9af366116d69927586
+  episodes_jsonl_sha256: f71ebef96f817fb4068b0b6ec333638ab3af88116ccbf106f8195f38a3ce0bbd
+  n_episodes: 99
+  data_class: public
+  location: rtx3060:~/denso-s107/fwdata/psi-data/e78fb93/simple/
+
+# N10 < N20 < N40 < N80, every smaller set inside every larger (hash ranking of
+# flywheel_psi0.tray.demo_sets, keyed by episode_index). Episodes 0-9 are left out:
+# the eval set below starts robot, object and tray of its condition i at train
+# episode i at levels 0 and 1, and the robot at level 2 (S1-03 3.1, S1-07 4).
+demo_sets:
+  file: configs/runplans/he/demo_sets.json
+  salt: DA-26/he-1/demo-sets/v1
+  exclude: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+  exclude_reason: train episodes 0-9 start at the eval conditions of simple-eval e78fb93
+  sizes: {N10: 10, N20: 20, N40: 40, N80: 80}
+  hashes:
+    N10: 53b361e2805736d4bade1cae510b1dd081ee6b736d83a831e721f480152791fd
+    N20: cf4d6e2c73e17d1497aac50bcf98289c904329539b6b2a0df37bd8b71814d3ac
+    N40: a88f9b6f4f9b2e47b6e0e283badf8c08ae9cda6257f0947549eb1eeaca38820a
+    N80: 3bfc858ba4912fd190f903f44e6682bd273c94fc311c02f73ff712e409d9c175
+
+recipe:
+  file: configs/models/psi0-stage3.yaml # 40k steps, batch 16, lr 1e-4 cosine, VLM frozen, RTC
+  sha256: 71ba5de8ef22a11432a829e86e93b7e662f5f38f453cca27f73d6fbe777a1dbd
+  overrides: # PO 4/11/2026 (S1-04 4.1): val every 2000 steps, does not change training
+    train.validation_steps: 2000
+  nproc_per_node: 1 # one Colab L4: global batch 16; the authors' baseline used 16 x 4 = 64
+  dataset_stats: own_train_set # each point's stats_psi0.json from its own N episodes
+
+variants:
+  V-EGO: {parent: psi0-baseline-egodex-he, role: "EgoDex + HE; shared with E1 of spec 7.1"}
+  V-NOEGO: {parent: psi0-abl-he-only, role: "HE only, no EgoDex"}
+  V-EGO10: {parent: psi0-abl-egodex-10pct, role: "10% EgoDex", optional: true}
+
+# Preliminary, tier 2 (Hiếu, 4/11/2026, "Approve tier 2"; he-1.md 6.2): V-EGO and
+# V-NOEGO at N20 only, seed 0. N80 moves to the full grid (after the demo) with the rest
+# of the grid and the second seed at N20, N40; that needs a new plan version and CU.
+points:
+  - {variant: V-EGO, demo_set: N20, seed: 0, phase: preliminary}
+  - {variant: V-EGO, demo_set: N80, seed: 0, phase: full}
+  - {variant: V-NOEGO, demo_set: N20, seed: 0, phase: preliminary}
+  - {variant: V-NOEGO, demo_set: N80, seed: 0, phase: full}
+  - {variant: V-EGO, demo_set: N10, seed: 0, phase: full}
+  - {variant: V-EGO, demo_set: N40, seed: 0, phase: full}
+  - {variant: V-NOEGO, demo_set: N10, seed: 0, phase: full}
+  - {variant: V-NOEGO, demo_set: N40, seed: 0, phase: full}
+  - {variant: V-EGO, demo_set: N20, seed: 1, phase: full}
+  - {variant: V-EGO, demo_set: N40, seed: 1, phase: full}
+  - {variant: V-NOEGO, demo_set: N20, seed: 1, phase: full}
+  - {variant: V-NOEGO, demo_set: N40, seed: 1, phase: full}
+  - {variant: V-EGO10, demo_set: N10, seed: 0, phase: full}
+  - {variant: V-EGO10, demo_set: N20, seed: 0, phase: full}
+  - {variant: V-EGO10, demo_set: N40, seed: 0, phase: full}
+  - {variant: V-EGO10, demo_set: N80, seed: 0, phase: full}
+
+# Main eval, tier 2 (Hiếu, 4/11/2026): the first 10 Level 0 conditions of the team's dev
+# seeds (PO 4/11/2026: dev range, not the authors' set), built by scripts/he/dev_eval_set.py the
+# way SIMPLE's dr-decoupled-wbc built simple-eval, but from a fresh dev-seeded scene
+# instead of a train episode. Levels keep the authors' meaning: 0 redraws distractors
+# and materials, 1 lighting too, 2 object and tray poses too (robot pose kept).
+# `eval-decoupled-wbc --data-format lerobot` resets from the stored config, so the
+# scene is fixed by the file (90/90 reloads identical). These 10 rows are the first 10
+# of Level 0 in the 90-condition build b8dec754... (same sha256 from a fresh build).
+eval:
+  cli: eval-decoupled-wbc
+  # S1-03 (Q-27C, #66 3d30874): the authors' ckpt on e78fb93 Level 0 scores 6/10 in
+  # mujoco_isaac and 2/10 (wall) or 1/10 (sim) in mujoco; the renderer drives the gap.
+  # S1-03's recommendation, signed by Hiếu with tier 2 (4/11/2026). Two-table sim
+  # clock via docker/psi0/simtime_eval.py; Psi0 server on Colab L4, Isaac on rtx3060.
+  sim_mode: mujoco_isaac
+  clock: sim
+  synchronous: true
+  main:
+    generator: scripts/he/dev_eval_set.py
+    salt: DA-26/he-1/dev-eval/v1
+    simple_commit: 6d10628794d9c7de4596b4f2afb2c054a637c2bc # b75c678 only changes the arm spawn, not DR
+    seeds: {start: 1000100, stop: 1000110}
+    levels: [0]
+    conditions_sha256: b63acd59ea619faf253c2ea9681fdda0ef852c8082abc584f42ee347a2b32e17
+    location: hiwe-laptop:~/project/denso-challenge/fwdata/he/dev-eval-v1-l0n10
+  # Secondary: the authors' set at e78fb93 (S1-03 3.6: robot starts as in train), for
+  # the baseline and the published 7/5/6 only. Its levels 0 and 1 are train scenes of
+  # episodes 0-9, so no HE number is read on it.
+  authors_set:
+    repo: USC-PSI-Lab/psi-data
+    kind: datasets
+    revision: e78fb93cc28912a3031a10b8656d32d7f0a2b867
+    path: simple-eval/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip
+    sha256: 8a4b0ff7d068967dac8baec2c4a4deca4f644215a1ee15e921739f3dfe90e7e0
+    levels: [0, 1, 2]
+    conditions_per_level: 10
+  passes: {preliminary: 1, full: 1} # 10 independent conditions, one rollout each
+
+# AC 3: the authors' two-table checkpoint (from V-EGO's parents, 16 x 4 GPUs, 40k
+# steps, all 99 episodes). Not run on the dev set in tier 2 (no CU for it); S1-03's
+# 6/10 on the authors' Level 0 (Isaac) is the sanity reference, reported beside.
+baseline:
+  weights:
+    repo: USC-PSI-Lab/psi-model
+    kind: models
+    revision: cb1480f50d9764ab2f6261bc2e651a67ad54da17
+    path: psi0/simple-checkpoints/g1wholebodylocomotionpickbetweentablesteleop-v0.simple.flow1000.cosine.lr1.0e-04.b64.gpus4.2604081126/checkpoints/ckpt_40000/model.safetensors
+    sha256: c69c2ae866cdff4c51aee3aa2948b6400e8f001e73d38cbff2b364e41b4cf07b
+  note: trained on episodes 0-9 too, so its levels 0-1 are seen conditions
+
+metric: {primary: sim_success, per_level: sim_success, secondary: scorer_steps, n50: log2_linear}
+stats: {method: bootstrap_by_condition, resamples: 10000, seed: 20261104, ci: 0.95}
+# Tier 2 preliminary test (he-1.md 6.2): with 10 per arm only gaps of about 50 pp or more
+# can reach p < 0.05 (0/10 vs 5/10, 1/10 vs 7/10); MDE at 80% power about 65-68 pp.
+preliminary_test: {method: fisher_exact_two_sided, alpha: 0.05, conditions_per_arm: 10}
+
+comparisons:
+  - {a: V-EGO, b: V-NOEGO, question: "does EgoDex in pretraining raise success at the same N (HE)"}
+  - {a: V-EGO10, b: V-NOEGO, question: "does 10% of EgoDex already help (full grid only)"}
+
+interpretation: {doc: docs/he/he-1.md, min_n_levels: 2, floor_pp: 10}
+pricebook: "assumption: Colab 100 CU pack, 0.0999 USD per CU (docs/g0/ledger/DA-19.csv)"

@@ -1,0 +1,7 @@
+{
+  "name": "walk",
+  "failure_class": "carry",
+  "signals": [
+    "base_pose"
+  ]
+}

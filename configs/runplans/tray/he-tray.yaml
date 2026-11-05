@@ -1,0 +1,116 @@
+# SUPERSEDED - DO NOT RUN. Version 1 (80/40 demos, 90 conditions), frozen as rp_c49c99c8d8da
+# and never run. Replaced by he-tray-v2.yaml (320/160 quality-filtered demos, 270
+# conditions; decision of 3/11/2026, docs/he/tray.md section 7), subtask 1.8 of DA-34, in
+# the PR that freezes v2. Kept so the ids already cited stay checkable; field superseded_by
+# says the same to `runplan check`, which then exits 1.
+#
+# DA-34 AC 1: RunPlan of the tray experiment before the demo, branches A, C and C-NOEGO
+# (design 28/10/2026 sections 6.2-6.4; shape of 03 section 8.1). Branch B waits for the
+# team's egocentric video (AC 5); branch C+ of the Failure -> Data round is the separate
+# plan round-tray-cplus.yaml (AC 6).
+#
+# Frozen before the first job: he-tray.lock.json holds run_plan_id and the plan as JSON;
+# a test fails if this file changes afterwards. Checked by
+#   uv run python -m flywheel_psi0.tray.runplan check configs/runplans/tray/he-tray.yaml
+#
+# Recipe, train seed and eval conditions are plan-level: a branch only picks a demo set
+# and a parent checkpoint, so the three branches share recipe, steps, batch, learning
+# rate, train seed and condition seeds by construction.
+name: he-tray-psi0
+purpose: branch_train
+story: DA-34
+site_id: local
+task:
+  id: g1_wholebody_tray_transfer_teleop # TASK_UID of flywheel_simple.tray.simple_task
+  env_id: simple/G1WholebodyTrayTransferTeleop-v0
+  config: configs/sim/tray.yaml
+embodiment: g1_sonic_dwbc@1
+
+code:
+  simple: {repo: physical-superintelligence-lab/SIMPLE, commit: b75c6786f87b4a7f43b52b0ac5b83a1d9ea62e11}
+  psi0: {repo: physical-superintelligence-lab/Psi0, commit: cda3fdfafe47cb6fa75400d013de1bd36e3cea05}
+
+# Revision pinned by S1-03 (docs/g0/psi0-eval.md 1.1). On 3/11/2026 the four folders
+# below were file-for-file the same at main 76febdc (HF tree API, LFS oids).
+psi_model: {repo: USC-PSI-Lab/psi-model, revision: cb1480f50d9764ab2f6261bc2e651a67ad54da17}
+
+# sha256 = Hugging Face LFS oid of the weight file at that revision. Names are the keys of
+# `parents` in configs/models/psi0-stage3.yaml.
+parents:
+  psi0-baseline-egodex-he:
+    vlm:
+      path: psi0/pre.fast.1by1.2601091803.ckpt.ego200k.he30k/model.safetensors
+      sha256: 6e63da17bdd22430bc07c40e4b14ebb96c9d124d014c532449142862c186d3f9
+    action_header:
+      path: psi0/postpre.1by1.pad36.2601131206.ckpt.he30k/action_header.safetensors
+      sha256: 238b4d95862b0eb44bffa75a2ae69e120aeda3d159fd6f29802dd9338019e14d
+    clean_for_main_task: true
+    note: >-
+      Pretrained on EgoDex 200k + HE 30k steps; the pair the authors fine-tuned their SIMPLE
+      checkpoints from. The tray task is new (DA-32), so no tray data is in pretraining.
+      As base of A and C it makes C-EGO the same run as C (design 6.2).
+  psi0-abl-he-only:
+    vlm:
+      path: psi0/pre.abl.only.he.2512311516.48k/model.safetensors
+      sha256: a2ae8c24f83c90dea78282defc6abbbd5475e77ede24e1538c9b3b38ec457f4e
+    action_header:
+      path: psi0/postpre.abl.only.he.2602050012/action_header.safetensors
+      sha256: 9118bc03bebd53cbf3567c9e220618e90f8605a5cf4247aa878747b17de2a7e0
+    clean_for_main_task: true
+    note: >-
+      Authors' ablation without EgoDex: VLM on HE only, 48k steps. Differs from the baseline
+      in pretraining steps too (design 27/10 section 7.2), a limit the report must state.
+
+release:
+  id: tray_s1_0d84cc87b1e5
+  release_hash: 0d84cc87b1e5e55db91cd13ca40bf07d24a560b83a4c8ebbd2111952dcdc18d6
+  location: rtx3060:~/denso-da33/fwdata/releases/tray_s1_0d84cc87b1e5 # docs/g0/tray/synthetic-s1.md
+  data_class: public
+
+# A = N_full = 80, C = N_cut = 40, C inside A (flywheel_psi0.tray.demo_sets).
+demo_sets:
+  file: configs/runplans/tray/demo_sets.json
+  salt: DA-34/demo-sets/v1
+  hashes:
+    A: 94245f8d36abb425168cb7f4f333d68e2057800c9506e245c60ea8511efa861b
+    C: 5db98a38ed80d44b19d1b30304c6f4d96135a51a34dd5f2553ebb7effef8ea1e
+
+recipe:
+  file: configs/models/psi0-stage3.yaml # 40k steps, batch 16, lr 1e-4 cosine, VLM frozen, RTC
+  sha256: 71ba5de8ef22a11432a829e86e93b7e662f5f38f453cca27f73d6fbe777a1dbd # recipe_sha256, no `estimate`
+  overrides: # PO 4/11/2026 (S1-04 4.1): val every 2000 steps, does not change training
+    train.validation_steps: 2000
+  nproc_per_node: 1 # one Colab GPU: global batch 16, not the authors' 16 x 4 GPUs = 64 (S1-04 section 1.4)
+  dataset_stats: own_train_set # each branch's stats_psi0.json is computed on its own episodes
+train_seeds: [0] # one seed per branch for the preliminary result (design 6.3)
+
+branches:
+  A: {demo_set: A, parent: psi0-baseline-egodex-he, role: "baseline as in Psi0: all 80 demos"}
+  C: {demo_set: C, parent: psi0-baseline-egodex-he, role: "cut to 40 demos, nothing added; = C-EGO"}
+  C_NOEGO: {demo_set: C, parent: psi0-abl-he-only, role: "C on the checkpoint pretrained without EgoDex"}
+
+eval:
+  cli: eval-decoupled-wbc
+  sim_mode: mujoco
+  renderer: mujoco
+  synchronous: true
+  split: dev
+  levels: [0, 1, 2]
+  # 30 seeds at each level = 90 conditions, the same for every branch. [1000000, 1000100)
+  # is left out: tests and view_scene already use seeds there. Level 0 has no randomisation,
+  # so its 30 conditions share one scene.
+  condition_seeds: {start: 1000100, stop: 1000130}
+  rollout_replicates: 1
+  episode_limit_s: 90.0 # configs/sim/tray.yaml episode_limit_s
+
+metric: {primary: sim_success, per_stage: scorer_7_steps, failure_kinds: design_3_3}
+stats: {method: bootstrap_by_condition, resamples: 10000, seed: 20261103, ci: 0.95}
+
+# Declared before any run; reading rules in docs/he/tray.md.
+comparisons:
+  - {a: C, b: A, question: "how sensitive the tray task is to the number of robot demos"}
+  - {a: C, b: C_NOEGO, question: "does EgoDex in pretraining help at N_cut (not HE-T)"}
+
+interpretation: {doc: docs/he/tray.md, delta_pp: 10}
+pricebook: "assumption: Colab 100 CU pack, 0.0999 USD per CU (docs/g0/ledger/DA-19.csv)"
+superseded_by: configs/runplans/tray/he-tray-v2.yaml # not part of the id (runplan.STATUS_FIELDS)

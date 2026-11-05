@@ -41,7 +41,7 @@ from typing import Any
 import numpy as np
 from flywheel.contracts.artifacts import ActionLayout
 from flywheel.contracts.v0 import InfraStatus
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from flywheel_psi0.trainer.metrics_log import JobIdentity, MetricsLog
 from flywheel_psi0.trainer.val_stats import LossBreakdown, ValStats
@@ -64,6 +64,21 @@ class LaunchSpec(BaseModel):
     hand_open_pose: list[float] | None = None
     global_batch_size: int | None = None
     rtc_prefix: int = 0
+
+    @field_validator("hand_open_pose", mode="before")
+    @classmethod
+    def _finite_open_pose(cls, value: Any) -> Any:
+        # NaN becomes null in JSON, so name the dims instead of failing on a None.
+        if value is None:
+            return value
+        bad = [
+            i for i, v in enumerate(value) if not isinstance(v, int | float) or not math.isfinite(v)
+        ]
+        if bad:
+            raise ValueError(
+                f"hand_open_pose is not finite on hand dims {bad}: ill range in stats_psi0?"
+            )
+        return value
 
 
 class LaunchResult(BaseModel):

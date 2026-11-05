@@ -48,3 +48,10 @@ yaw_lead: 0.5
 # done without check_success (which needs the tray still for its T_stable).
 give_up_s: 1.0
 done_wait_s: 5.0
+
+# Largest move of one joint per control step (rad, 50 Hz) in the PICO pipeline's
+# retargeting IK (flywheel_simple.tray.pico.agent.limit_joint_step), DA-33's arm_step_max
+# for its own IK (tray_planner.yaml). Without it the palm-up hold let the arm reconfigure
+# in one step: 105/122 parents of parents-1104 had an arm action step over the QA
+# threshold 0.0869 (median of the per-episode max 0.099, max 0.181; PO 4/11/2026).
+arm_step_max: 0.08

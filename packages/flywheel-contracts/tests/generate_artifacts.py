@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from flywheel.contracts import artifacts as a
-from flywheel.contracts.v0 import RolloutRequest
+from flywheel.contracts.v0 import RolloutRequest, RolloutResult
 
 root = Path(__file__).resolve().parents[3]
 schemas = root / "packages/flywheel-contracts/schemas"
@@ -123,4 +123,23 @@ request = RolloutRequest.model_validate(
 )
 (schemas / "RolloutRequest.json").write_text(
     json.dumps(RolloutRequest.model_json_schema(), indent=2) + "\n", encoding="utf-8"
+)
+result = RolloutResult.model_validate(
+    {
+        "job_id": "job_1",
+        "trace_ref": {"trace_id": "trace_1", "uri": "traces/trace_1"},
+        "sim_success": True,
+        "infra_status": "ok",
+        "usage": {"wall_seconds": 12.5},
+        "camera_params_hash": None,
+        "adapter_info": {"name": "simple", "version": "0.1.0"},
+        "timing_verdict": "starved",
+        "starved_steps": 3,
+    }
+)
+(fixtures / "RolloutResult.json").write_text(
+    result.model_dump_json(indent=2) + "\n", encoding="utf-8"
+)
+(schemas / "RolloutResult.json").write_text(
+    json.dumps(RolloutResult.model_json_schema(), indent=2) + "\n", encoding="utf-8"
 )

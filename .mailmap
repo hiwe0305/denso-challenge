@@ -1,0 +1,5 @@
+# Canonical author for commits made under a wrong local identity.
+# 5/11/2026: a trial merge set `user.name trial` in the shared .git/config, so five
+# commits by hiwe0305 reached master as `trial <trial@local>` (92526397, 3f436633,
+# e6d7fae9, 76575589, 18d2066e). git log, shortlog and blame read this file.
+hiwe0305 <hieuai0305@gmail.com> trial <trial@local>

@@ -175,6 +175,13 @@ smooth_rot_speed_deg: 60.0
 smooth_min_s: 0.6
 # Hand closure changes ramp along a min-jerk profile over this many seconds.
 hand_close_s: 0.5
+# Largest move of one arm joint per control step (rad, 50 Hz), a velocity limit inside the
+# arm IK's QP (DA-33, 4/11/2026). Without it, the palm-up hold's wrist (roll on its limit,
+# pitch near 90 deg) let the IK reconfigure the arm at up to 14 rad/s while the wrist
+# targets moved at 2 rad/s: every episode of release tray_s1_0d84cc87b1e5 had arm action
+# steps over psi-data's p99.9 (0.087). Over 40 paired seeds (300000-300039, level 1):
+# none 36/40, 0.08 39/40 with no step over 0.087 (docs/g0/tray/wrist-jump.md).
+arm_step_max: 0.08
 
 # Abort when the tray is below this height (on the floor).
 abort_tray_z: 0.4

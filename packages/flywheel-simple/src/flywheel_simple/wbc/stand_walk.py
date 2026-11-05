@@ -56,7 +56,7 @@ def make_sonic_env(env_id: str, seed: int | None = None, **kwargs: Any) -> Any:
 class StandWalkController:
     """Decoupled WBC holding the default upper-body pose: PicoDecoupledAgent minus PICO."""
 
-    def __init__(self, robot: Any) -> None:
+    def __init__(self, robot: Any, max_joint_step: float | None = None) -> None:
         ControlLoopConfig = _mod(
             "decoupled_wbc.control.main.teleop.configs.configs"
         ).ControlLoopConfig
@@ -83,7 +83,7 @@ class StandWalkController:
             "g1", self._model, wbc_cfg, init_time=loop_cfg.upper_body_joint_speed
         )
         self._control_frequency = loop_cfg.control_frequency
-        self.ik = UpperBodyIK(self._model)
+        self.ik = UpperBodyIK(self._model, max_joint_step=max_joint_step)
         self._started = False
         self._ik_anchored = False
         self.last_record: dict[str, NDArray[np.float64]] = {}

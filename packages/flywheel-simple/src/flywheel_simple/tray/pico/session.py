@@ -12,7 +12,10 @@ person at the headset) and adds what the tray task needs:
 - scripted streamers run on a SimClock: one tick per step, no pacing, so an
   episode is the same on every run and faster than real time;
 - only successful attempts are saved, unless `keep_failed`; an attempt ends at
-  success, the first StepTracker failure label, time out or operator reset.
+  success, the first StepTracker failure label, time out or operator reset;
+- videos go through DA-33's JoinedVideoWriter (`tray/recorder.py`), not
+  decoupled_wbc's VideoWriter, whose `stop()` raced its encoder thread and crashed
+  or hung S2 workers under load.
 
 Run in the SIMPLE venv (PyAV and, for PICO, xrobotoolkit_sdk installed):
 
@@ -34,13 +37,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from flywheel_simple.tray import recorder
 from flywheel_simple.tray.pico.conditions import Condition, ConditionQueue, parse_conditions
 from flywheel_simple.tray.pico.recording import (
     TRAY_FEATURES,
     AttemptLog,
     Outcome,
+    atomic_write_text,
     episode_outcome,
     flywheel_block,
+    shard_mismatches,
     tray_frame,
 )
 
@@ -105,7 +111,7 @@ def simple_commit() -> str:
 
 
 def init_exporter(save_root: Path, env: Any, agent: Any, ego_view_shape: Any) -> Any:
-    """SIMPLE's `_init_exporter` plus TRAY_FEATURES; resumes an existing dataset."""
+    """SIMPLE's `_init_exporter` plus TRAY_FEATURES and JoinedVideoWriter; resumes a dataset."""
     utils = _mod("decoupled_wbc.data.utils")
     rec = _mod("simple.cli._decoupled_wbc_recording")
     robot_model = agent._dwbc_robot_model
@@ -114,7 +120,7 @@ def init_exporter(save_root: Path, env: Any, agent: Any, ego_view_shape: Any) ->
     rec.validate_existing_ego_view_feature_shape(str(save_root), ego_view_shape)
     features["observation.state"]["names"] = env.unwrapped.task.robot.joint_names
     features.update(TRAY_FEATURES)
-    return _mod("decoupled_wbc.data.exporter").Gr00tDataExporter.create(
+    return recorder._exporter_class().create(
         save_root=str(save_root),
         fps=FPS,
         features=features,
@@ -126,13 +132,13 @@ def init_exporter(save_root: Path, env: Any, agent: Any, ego_view_shape: Any) ->
 def write_environment_config(
     exporter: Any, task: Any, episode_index: int, flywheel: dict[str, Any]
 ) -> None:
-    """SIMPLE's `_save_episode_env_config` with the flywheel block added."""
+    """SIMPLE's `_save_episode_env_config` with the flywheel block added, written atomically."""
     encoder = _mod("simple.utils").NumpyArrayEncoder
     meta_file = Path(exporter.root) / "meta" / "episodes.jsonl"
     lines = [json.loads(line) for line in meta_file.read_text().splitlines()]
     config = {**task.state_dict(), "flywheel": flywheel}
     lines[episode_index]["environment_config"] = json.dumps(config, cls=encoder)
-    meta_file.write_text("".join(json.dumps(entry) + "\n" for entry in lines))
+    atomic_write_text(meta_file, "".join(json.dumps(entry) + "\n" for entry in lines))
 
 
 def on_episode_reset(robot: Any, agent: Any) -> None:
@@ -214,6 +220,10 @@ def run_attempt(env: Any, agent: Any, exporter: Any, obs: Any, info: Any, realti
             time.sleep(max(0.0, CONTROL_DT - (time.monotonic() - step_start)))
 
 
+class ShardMismatch(RuntimeError):
+    """The shard's datasets and attempts log disagree (`shard_mismatches`): not resumed."""
+
+
 def run_session(
     env: Any,
     agent: Any,
@@ -233,6 +243,9 @@ def run_session(
     exporter; tests pass an in-memory one with the same methods.
     """
     task, robot = env.unwrapped.task, env.unwrapped.task.robot
+    if (save_dir / env.unwrapped.spec.id).exists() and (problems := shard_mismatches(save_dir)):
+        # A crash between saving an episode and logging it; resuming would save it twice.
+        raise ShardMismatch(f"{save_dir}: {'; '.join(problems)}")
     attempts_log = AttemptLog(save_dir / "attempts.jsonl")
     commit = simple_commit()
     started_at, t0 = datetime.now().isoformat(timespec="seconds"), time.monotonic()
@@ -376,20 +389,28 @@ def main(argv: list[str] | None = None) -> int:
     else:
         from flywheel_simple.tray.pico import agent as pico_agent
         from flywheel_simple.tray.pico.clock import SimClock
+        from flywheel_simple.tray.pico.operator import LOCK_WAIST, OperatorConfig
 
+        operator_cfg = OperatorConfig.load(args.operator_config)
         streamer: Any = pico_agent.ScriptedStreamer()
         if args.streamer == "virtual":
-            from flywheel_simple.tray.pico.operator import OperatorConfig, VirtualOperator
+            from flywheel_simple.tray.pico.operator import VirtualOperator
             from flywheel_simple.tray.planner import PlannerConfig
 
-            operator = VirtualOperator(OperatorConfig.load(args.operator_config))
+            operator = VirtualOperator(operator_cfg)
             streamer = pico_agent.VirtualPicoStreamer(
                 env,
                 operator,
                 PlannerConfig.load(),
                 style_base=None if args.no_style else args.style_base,
             )
-        agent = pico_agent.StreamerDecoupledAgent(robot, streamer, clock=SimClock())
+        agent = pico_agent.StreamerDecoupledAgent(
+            robot,
+            streamer,
+            clock=SimClock(),
+            max_joint_step=operator_cfg.arm_step_max,
+            lock_waist=LOCK_WAIST,
+        )
     agent.num_episodes = len(conditions)
     try:
         summary = run_session(

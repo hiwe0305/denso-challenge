@@ -132,6 +132,39 @@ Số đo (rtx3060, 3/11/2026, chưa có lớp phong cách):
 | 8 lượt, mức 0 seed 1–4 và mức 1 seed 1–4, mỗi worker một lượt | 7/8 đạt (31,0–35,0 s sim). Mức 1 seed 4 hỏng `L-TRAY-TILT` lúc quay |
 | Thời gian máy | Chưa đo sạch: lúc đo, lô S1 của DA-33 (22 worker) chạy cùng máy, load 47–80. Một lượt một mình 144 s thực cho 35 s sim; profile 1000 bước: `env.step` 46 ms (render 31 ms), agent PICO 19 ms, vật lý 10 ms. Đo lại khi máy rảnh (nhiệm vụ 7) |
 
+### Giới hạn bước khớp của IK
+
+**[Đã chốt]** (PO, 4/11/2026, sau [wrist-jump.md](wrist-jump.md)): IK retargeting của ống PICO không cho khớp nào đi quá `arm_step_max` = 0,08 rad trong một bước điều khiển (`tray_virtual_teleop.yaml`, `flywheel_simple.tray.pico.ik_limit`). Cách làm giống DA-33 làm cho IK của planner (D-28). Giới hạn vận tốc trong QP của pink là `min(URDF, 0,08 / (num_step_per_frame · dt · amplify_factor))`. Bản sửa này phải làm riêng ở đây, vì `tray/pico/agent.py` dùng thẳng `TeleopRetargetingIK` của decoupled_wbc: bản sửa `UpperBodyIK` của DA-33 không chạm tới ống PICO. Đổi planner (planner-5) một mình không sửa được demo cha, vì trong teleop ảo planner chỉ cho mục tiêu cổ tay.
+
+Lý do: không có giới hạn này, tư thế ngửa lòng bàn tay cho phép cánh tay đổi cấu hình trong một bước trong khi cổ tay vẫn bám mục tiêu. Đo trên rtx3060 ngày 4/11/2026, trên dataset đã lưu, bước lớn nhất của 14 khớp tay trong `action`:
+
+| Lô | Episode có bước > 0,0869 (ngưỡng `action_jump.arm` của DA-03) | Trung vị của bước lớn nhất mỗi episode | Lớn nhất |
+|---|---|---|---|
+| `parents-1104` | 105/122 | 0,099 | 0,181 |
+| `measure-1104` (S2) | 18/19 | 0,102 | 0,206 |
+
+Phiên bản người điều khiển đổi sang `da35-virtual-2`; hash cấu hình (`operator_version`) đổi theo `arm_step_max`. Test CPU `test_ik_limit.py` kiểm phép tính giới hạn. Test sim `test_virtual_operator_episode_reaches_check_success` kiểm rằng không bước tay nào của `action` vượt 0,08 trong cả episode, kể cả lúc kích hoạt.
+
+### Khóa eo của người điều khiển ảo
+
+**Decision [Đã chốt, Hiếu, 4/11/2026]:** người điều khiển ảo chạy IK retargeting của ống PICO với eo khóa, như IK của planner DA-33 (D-12 trong [decisions.md](decisions.md)). Câu hỏi: "Lock the waist for the virtual operator (da35-virtual-3)?". Hiếu trả lời: "Lock the waist".
+
+- **Cách làm:** `StreamerDecoupledAgent(lock_waist=True)` dựng `TeleopRetargetingIK` trên nhóm khớp `arms` thay cho `upper_body` (`flywheel_simple.tray.pico.ik_limit.arms_only`). Mô hình rút gọn giữ eo ở 0, nên `target_waist` gửi cho thân dưới, và cũng là eo trong `action`, luôn bằng 0. Phiên teleop ảo và phiên S2 bật khóa này qua `LOCK_WAIST` (`operator.py`). Teleop PICO thật vẫn để eo cử động.
+- **Phiên bản:** người điều khiển đổi sang `da35-virtual-3`. Mọi demo cha và biến thể S2 ghi trước đó (`da35-virtual-1`, `da35-virtual-2`) không vào release.
+- **Lý do:** chạy thử cổng QA trên 17 demo cha của `parents-1104/shard-00` (chưa có giới hạn IK) cho 17/17 bị loại. Phép phát lại động học của DA-17 (D7) báo `joint_mapping` ở eo: robot không theo lệnh eo của IK.
+
+  | Đo | Demo cha của ta | psi-data (8 episode đầu) |
+  |---|---|---|
+  | Tương quan lệnh và trạng thái, `waist_roll` | 0,00–0,16 | 0,98–0,99 |
+  | Tương quan lệnh và trạng thái, `waist_pitch` | 0,37–0,74 | 0,80–0,92 |
+  | Tương quan lệnh và trạng thái, `waist_yaw` | 0,73–0,88 | 0,98–0,99 |
+  | `unit_deg_rad` (std lệnh / std trạng thái, ngưỡng 1,315) | 10/17 episode vượt, 1,34–1,74 lần ở pitch và yaw | không vượt |
+
+  Sàn tương quan của DA-17 là 0,5. Lệnh pitch khoảng −0,06 đến −0,15 rad (ngả ra sau), trạng thái đo được +0,05 đến +0,09 rad. Roll không bám ở độ trễ nào trong 0–40 frame, và làm trơn lệnh 0,5 s cũng không làm tương quan tăng, nên không phải do rung tay. Bộ ghi giống `_build_frame` của SIMPLE (eo của `action` là `target_waist` của IK), nên lỗi nằm ở chỗ thân dưới không đạt được eo mà IK đòi khi đang bê khay. Giới hạn bước khớp (`da35-virtual-2`) không đổi điều này.
+- **Giá phải trả:** dữ liệu không có chuyển động eo kiểu teleop PICO (psi-data có). S1 của DA-33 cũng khóa eo, nên S1 và S2 cùng dạng eo.
+- **Nếu sai:** mở lại nhóm `upper_body` (`lock_waist=False`) và tìm cách cho eo bám (trọng số posture của eo trong IK, hay giới hạn lệnh eo). Việc này chưa rõ nguyên nhân gốc nên chưa ước lượng được thời gian.
+- **Test:** test CPU `test_ik_limit.py` kiểm `arms_only` thay nhóm khớp mà SIMPLE truyền vào, và kiểm `LOCK_WAIST`, `OPERATOR_VERSION`. Test sim `test_virtual_operator_episode_reaches_check_success` kiểm eo của `action` bằng 0 trong cả episode.
+
 ## Phong cách mỗi episode (nhiệm vụ 6)
 
 Mỗi lượt thử rút một bộ phong cách từ seed `style_seed_for(style_base, level, seed, lần thử)` (`SeedSequence`): cùng điều kiện, cùng lần thử thì cùng phong cách; lần thử khác thì phong cách khác. `--style-base` đổi cả họ seed, `--no-style` chạy planner không phong cách. Episode lưu ghi khối `flywheel` theo AC 3, cùng tên trường với meta S1 của DA-33:
@@ -141,8 +174,8 @@ Mỗi lượt thử rút một bộ phong cách từ seed `style_seed_for(style_
 | `source_kind`, `synthetic_tier`, `source_detail`, `action_quality` | `synthetic`, `S1`, `virtual_teleop`, `planned` |
 | `style_base`, `style_seed`, `style`, `condition_attempt` | Họ seed, seed của lượt, bộ tham số (7 số), lần thử |
 | `level`, `seed`, `split` | Điều kiện; chỉ seed train |
-| `operator_version` | `da35-virtual-1+cfg.<hash>`: hash của cấu hình người ảo, cấu hình planner và dải phong cách |
-| `wrapper_version`, `simple_commit`, `embodiment_id`, `renderer`, `data_class` | `da35-pico-2`, commit SIMPLE, `g1_sonic_dwbc@1`, `mujoco`, `public` |
+| `operator_version` | `da35-virtual-<n>+cfg.<hash>` (`da35-virtual-3` từ 4/11/2026, eo khóa): hash của cấu hình người ảo, cấu hình planner và dải phong cách |
+| `wrapper_version`, `simple_commit`, `embodiment_id`, `renderer`, `data_class` | `da35-pico-3` (từ 4/11/2026: video ghi qua `JoinedVideoWriter` của DA-33; lô ghi bằng `da35-pico-2` dùng `VideoWriter` của decoupled_wbc, có thể crash hay treo khi máy tải nặng), commit SIMPLE, `g1_sonic_dwbc@1`, `mujoco`, `public` |
 
 `attempts.jsonl` ghi thêm `style_seed`, dòng thời gian pha và lý do abort của mọi lượt.
 
@@ -187,7 +220,7 @@ MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src nohup setsid \
 
 `generate_parents.py` chia điều kiện xoay vòng cho các worker; mỗi worker là một phiên `--streamer virtual` với env và dataset LeRobot riêng ở `<out>/shard-NN/`. Chạy lại thì bỏ qua điều kiện shard đã ghi. Cuối lô ghi `<out>/summary.json`: số lượt, kết quả, nhãn lỗi, giây sim, giây worker, danh sách demo cha đủ 7 cờ bước (shard, chỉ số episode, level, seed, seed phong cách).
 
-Trong lúc làm nhiệm vụ 5–7, DA-33 merge vào master cách cầm ngửa lòng bàn tay dưới tay cầm (D-25, Hiếu chọn 3/11/2026), thay cho cách kẹp ngón D-19 mà nhiệm vụ 5, 6 đã chỉnh trên đó. Vì vậy có hai lô, cùng 160 điều kiện (mức 0 và 1, seed train 100–179, mỗi điều kiện một lượt, `style_base` 0, cùng seed phong cách), rtx3060, 3/11/2026. **Bộ demo cha cho S2 là `parents-1103b`** **[Đã chốt]** (PO chọn 3/11/2026): cùng planner với mã đang commit và với S1 của DA-33, một kiểu cầm duy nhất. `parents-1103` (D-19) giữ để tham khảo, không trộn vào S2.
+Trong lúc làm nhiệm vụ 5–7, DA-33 merge vào master cách cầm ngửa lòng bàn tay dưới tay cầm (D-25, Hiếu chọn 3/11/2026), thay cho cách kẹp ngón D-19 mà nhiệm vụ 5, 6 đã chỉnh trên đó. Vì vậy có hai lô, cùng 160 điều kiện (mức 0 và 1, seed train 100–179, mỗi điều kiện một lượt, `style_base` 0, cùng seed phong cách), rtx3060, 3/11/2026. **Bộ demo cha cho S2 là `parents-1103b`** **[Đã chốt]** (PO chọn 3/11/2026): cùng planner với mã đang commit và với S1 của DA-33, một kiểu cầm duy nhất. `parents-1103` (D-19) giữ để tham khảo, không trộn vào S2. Cả hai lô đã bị thay thế (PO review PR #84, 4/11/2026): chúng chạy khi trạng thái hiệu chuẩn của decoupled_wbc còn rò giữa các episode, và sẽ được sinh lại sau bản sửa ở nhiệm vụ 10 của DA-35 ([s2.md](s2.md)). Mọi lô ghi trước phiên bản người điều khiển `da35-virtual-2` cũng không có giới hạn bước khớp của IK (mục dưới), nên không lô nào trong số đó được vào release.
 
 | Đo | `parents-1103b` (D-25, mã hiện hành) | `parents-1103` (D-19, trước khi rebase) |
 |---|---|---|

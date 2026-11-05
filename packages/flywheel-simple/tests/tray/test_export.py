@@ -9,6 +9,8 @@ from typing import Any
 import pytest
 from flywheel_simple.tray.export import (
     action_layout,
+    check_one_planner_version,
+    export_psi0,
     kept_episodes,
     stage_shard,
     state_names,
@@ -34,17 +36,44 @@ def _jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     path.write_text("".join(json.dumps(r) + "\n" for r in rows))
 
 
-def _shard(root: Path, gen: list[tuple[int, str]], replay: list[tuple[int, bool]] | None) -> Path:
+def _shard(
+    root: Path,
+    gen: list[tuple[int, str]],
+    replay: list[tuple[int, bool]] | None,
+    name: str = "shard-00",
+    planner: str = "p5",
+) -> Path:
     """A shard whose log records episodes with these minimal-QA results and replay verdicts."""
-    shard = root / "shard-00"
+    shard = root / name
+    row = {"recorded": True, "planner_version": planner}
     _jsonl(shard / "gen_log.jsonl", [
-        {"seed": 100 + e, "recorded": True, "episode_index": e, "qa": qa} for e, qa in gen
-    ] + [{"seed": 99, "recorded": False, "episode_index": None, "qa": "not_recorded"}])
+        {**row, "seed": 100 + e, "episode_index": e, "qa": qa} for e, qa in gen
+    ] + [{"seed": 99, "recorded": False, "episode_index": None, "qa": "not_recorded",
+          "planner_version": "unrecorded"}])
     if replay is not None:
         _jsonl(shard / "replay" / "replay_qa.jsonl", [
             {"episode": e, "seed": 100 + e, "passed": ok} for e, ok in replay
         ])
     return shard
+
+
+def test_one_planner_version_per_release(tmp_path: Path) -> None:
+    a = _shard(tmp_path, [(0, "pass")], [(0, True)])
+    b = _shard(tmp_path, [(0, "pass")], [(0, True)], name="shard-01")
+    # the unrecorded attempts carry another version: they are not released
+    assert check_one_planner_version([a, b]) == "p5"
+    c = _shard(tmp_path, [(0, "pass")], [(0, True)], name="shard-02", planner="p4")
+    with pytest.raises(ValueError, match=r"\['p4', 'p5'\]"):
+        check_one_planner_version([a, b, c])
+
+
+def test_export_refuses_a_batch_of_two_planner_versions_before_staging(tmp_path: Path) -> None:
+    batch = tmp_path / "batch"
+    _shard(batch, [(0, "pass")], [(0, True)], planner="p4")
+    _shard(batch, [(0, "pass")], [(0, True)], name="shard-01")
+    with pytest.raises(ValueError, match="mix planner versions"):
+        export_psi0(batch, tmp_path / "out", simple=tmp_path / "simple")
+    assert list(tmp_path.iterdir()) == [batch]  # no staging dir, no out
 
 
 def test_kept_episodes_need_both_qa_steps(tmp_path: Path) -> None:

@@ -30,7 +30,7 @@ Là trưởng nhóm, tôi muốn đo Ψ₀ có và không có prior egocentric �
 
 ## Nhiệm vụ
 
-- [ ] 1. RunPlan HE-1, danh sách demo lồng nhau, Hiếu ký (AC 1)
+- [x] 1. RunPlan HE-1, danh sách demo lồng nhau, Hiếu ký (AC 1)
 - [ ] 2. Tải và kiểm sáu checkpoint ablation chạy được với `finetune-simple-psi0.sh` (AC 1)
 - [ ] 3. Fine-tune và eval điểm sơ bộ V-EGO, V-NOEGO ở N = 20, 80 (AC 2, 6)
 - [ ] 4. Eval mốc so (AC 3)
@@ -71,10 +71,34 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 |---|---|---|
 | 27/10/2026 | Tạo story theo design 27/10/2026 mục 7 | PO (Hiếu) |
 | 27/10/2026 | Giao cho Hiếu theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
+| 4/11/2026 | Nhiệm vụ 1, 2: RunPlan nháp `he-1.yaml`, tập demo, quy tắc diễn giải `docs/he/he-1.md`, kiểm checkpoint; chờ Hiếu chốt Q1–Q4 và ký `plan_review` | Hiếu (soạn với Claude) |
+| 4/11/2026 | Eval chính chuyển sang bộ dev 30 × 3 do đội dựng (Hiếu chốt) | Hiếu (soạn với Claude) |
+| 4/11/2026 | Q3: kết quả Q-27C của S1-03; RunPlan đề xuất `mujoco_isaac`, giờ sim, chờ ký; thêm phương án F (Isaac, mức 0, N = 20) | Hiếu (soạn với Claude) |
+| 4/11/2026 | Tier 2 (Hiếu: "Approve tier 2"): sơ bộ chỉ N = 20, eval Isaac giờ sim trên 10 điều kiện dev mức 0, trần 52 CU; RunPlan đóng băng `rp_95c98a476499`; nhiệm vụ 1 xong | Hiếu (soạn với Claude) |
+| 4/11/2026 | Review #99: watcher CU viết lại theo nguyên tắc hỏng thì dừng; `Decision` ghi lại với `embodiment_id` đúng, cùng `rp_95c98a476499` | Hiếu (soạn với Claude) |
+| 4/11/2026 | Bỏ watcher riêng; chạy bằng watcher chung `scripts/colab/cu_watch.py` của DA-30 (trần 17,5 / 17,5 / 17,0 CU, `--floor 14`) | Hiếu (soạn với Claude) |
+| 4/11/2026 | Nhiệm vụ 2, 3: driver Colab `scripts/he/he1_colab.py` (kiểm sha256 trên VM train, cắt tập demo bằng `scripts/he/demo_subset.py`, train, persist lên Drive), ô persist cho watcher chung, cách chạy ở `docs/he/he-1.md` mục 7. Chưa chạy | Hiếu (soạn với Claude) |
+| 4/11/2026 | Nhiệm vụ 3: bản bền trên laptop khi chưa mount được Drive, `scripts/he/he1_fetch.py` (rsync qua `colab ssh --proxy-mode`, kiểm sha256, `follow` cạnh mỗi phiên, `once` ở mốc mềm); `persist` từ chối khi Drive chưa mount. Chưa chạy | Hiếu (soạn với Claude) |
+| 4/11/2026 | Review #109: `setup` không tải hai lần; đo tốc độ proxy trước `setup`; dừng sớm bắt buộc (tự động trong `he1_fetch.py follow`, ngưỡng ghi ở `docs/he/he-1.md` mục 7); dừng phiên ngay khi có `ckpt_40000`; lệnh watcher server eval đủ đối số; bỏ ô persist kernel. Chưa chạy | Hiếu (soạn với Claude) |
+| 5/11/2026 | Review lại #109: train hỏng không còn bị báo là xong (thoát 5, dừng phiên); tốc độ và `ALERT` chỉ tính trên checkpoint; `ready` chặn được bước sau; mọi lần dừng có xác nhận (thoát 6 nếu không), mọi lệnh có thời hạn; dự báo dừng sớm tính thêm độ trễ lượt cuối và thời gian băm, bảng ngưỡng tính lại. Chưa chạy | Hiếu (soạn với Claude) |
+| 5/11/2026 | `Decision` Hiếu 4/11: caps 18/18/16 (cùng 52 CU, trong tier 2). Lệnh watcher, bảng ngưỡng ở `docs/he/he-1.md` mục 7 và dòng ước tính mới trong `ledger/DA-26.csv` (append, trỏ về dòng cũ). Chưa chạy | Hiếu (soạn với Claude) |
+| 5/11/2026 | Review lại lần hai #109: train chết trước khi có `runs/<job>` là `failed` (thoát 5); lần liệt kê phiên chỉ tính khi tin được như `cu_watch.py`; SIGTERM chỉ tới watcher `cu_watch.py` còn sống; mã thoát của `follow` ghi vào log. Chưa chạy | Hiếu (soạn với Claude) |
 
 ## Ghi chép khi làm
 
 - Giờ thực:
-- Công cụ AI đã dùng:
+- Công cụ AI đã dùng: Claude Code (Opus 5.5)
 - Ghi chú hoàn thành:
-- File đã tạo hoặc sửa:
+  - 4/11/2026, nhiệm vụ 1: RunPlan nháp [`he-1.yaml`](../../../configs/runplans/he/he-1.yaml) (`rp_876918a5356b`, nay `rp_ae67d4ffc5ab`, khi chưa đóng băng; bản đầu `rp_cd8eae02f0a9`), tập demo N10 ⊂ N20 ⊂ N40 ⊂ N80 dùng lại `flywheel_psi0.tray.demo_sets` của DA-34, khóa theo `episode_index`, loại episode 0–9 vì bộ eval `e78fb93` dùng lại điều kiện của chúng. Quy tắc ở [docs/he/he-1.md](../../he/he-1.md). Chưa đánh dấu xong: chờ Hiếu chốt Q1–Q4 (mục 5 của file đó) và ký `plan_review` bằng `he1_plan.py freeze`.
+  - 4/11/2026, nhiệm vụ 2: `he1_plan.py parents` khớp sha256 LFS của 6 file trọng số ablation, checkpoint mốc so, gói train và gói eval với RunPlan; ba cặp có cùng bố cục tensor và `config.json`. `finetune-simple-psi0.sh` không còn ở `cda3fdf`, nên kiểm theo đường `scripts/train.py` của DA-19. Chưa đánh dấu xong: tải đủ file và băm lại trên máy train làm ở bước đầu của job nhiệm vụ 3.
+  - 4/11/2026, AC 1 "30 điều kiện dev × 3 mức": Hiếu chốt eval chính trên dải dev của đội. SIMPLE không sinh được điều kiện hai bàn theo seed, nên `scripts/he/dev_eval_set.py` dựng 90 điều kiện (seed 1 000 100–1 000 129, mức 0–2) theo cách tác giả dựng `simple-eval`, chỉ thay episode train bằng cảnh rút từ seed dev. Bộ của tác giả thành bộ phụ cho mốc so. Chế độ và đồng hồ eval chờ S1-03.
+  - 4/11/2026, Q3: S1-03 trả lời Q-27C. Checkpoint của tác giả ở mức 0 đạt 6/10 ở `mujoco_isaac`, 2/10 và 1/10 ở `mujoco` (giờ tường, giờ sim); renderer gây chênh lệch. RunPlan (`rp_ae67d4ffc5ab`) ghi `mujoco_isaac`, giờ sim theo đề xuất của S1-03, kèm `eval.awaiting` để `freeze` từ chối cho tới khi Hiếu ký. Isaac không chạy đủ 90 điều kiện; `docs/he/he-1.md` mục 6.1 có phương án F (N = 20, hai biến thể, 10 hoặc 30 điều kiện mức 0: 49 hoặc 81 CU) kèm độ nhạy Fisher.
+  - 4/11/2026, **Decision tier 2 [Đã chốt]**: câu hỏi "Approve CU for tier 2, with DA-26 on reduced Isaac eval (~84 CU)?", Hiếu trả lời "Approve tier 2". Với DA-26:
+    - Chỉ còn 2 lần fine-tune: V-EGO và V-NOEGO, đều ở N = 20. N = 80 sang sau demo, nên AC 6 chưa đủ.
+    - Eval chạy `mujoco_isaac`, giờ sim, trên 10 điều kiện dev mức 0 mỗi biến thể (`b63acd59…`).
+    - Ước lượng khoảng 49 CU, trần cứng 52 CU. Trần từng job ghi trong [ledger](../../g0/ledger/DA-26.csv) và do watcher chung `scripts/colab/cu_watch.py` giữ (PR của DA-30, `--floor 14`); không chạy job trước khi nó merge.
+    - Mốc so (nhiệm vụ 4) không chạy trên bộ dev ở tier 2.
+    - Kết quả gắn nhãn "sơ bộ". Với 10 điều kiện mỗi nhánh, chỉ chênh lệch từ khoảng 50 điểm % trở lên mới có thể có ý nghĩa (Fisher hai phía α 0,05; MDE 80% khoảng 65–68 điểm %).
+    - Chi tiết ở `docs/he/he-1.md` mục 6.2.
+  - 4/11/2026, nhiệm vụ 1 xong: `he1_plan.py freeze` ghi `he-1.lock.json` (`rp_95c98a476499`) và `he-1.plan_review.json` (`Decision` `dec_01M6KG4JFTRWGQ91CD3H1TC1XX`, ký Hiếu theo câu duyệt trên). Q1 (loại episode 0–9) giữ như đề xuất. Job chỉ chạy từ `master` sau khi PR được merge.
+- File đã tạo hoặc sửa: `configs/runplans/he/`, `scripts/he/he1_plan.py`, `scripts/he/dev_eval_set.py`, `scripts/he/test_he1_plan.py`, `docs/he/he-1.md`, `docs/g0/ledger/DA-26.csv`

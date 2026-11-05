@@ -84,10 +84,13 @@ class ToyPickPlace:
         for index, passed in enumerate(outcomes):
             if not passed:
                 failure = self.failure_kinds()[index]
+                failure_class = failure.failure_class
+                if failure_class == "from_failed_stage":
+                    failure_class = self.stages()[index].failure_class
                 return StageEvaluation(
                     stage_success=outcomes,
                     first_failed_stage=index,
                     failure_kind=failure.kind,
-                    failure_class=failure.failure_class,
+                    failure_class=failure_class,
                 )
         return StageEvaluation(stage_success=outcomes)

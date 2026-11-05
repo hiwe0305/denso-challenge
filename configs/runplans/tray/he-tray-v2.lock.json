@@ -1,0 +1,178 @@
+{
+ "frozen_at": "2026-11-04T17:55:29+00:00",
+ "plan": {
+  "branches": {
+   "C": {
+    "demo_set": "C",
+    "parent": "psi0-baseline-egodex-he",
+    "role": "160 demos, nothing added; base of C+"
+   }
+  },
+  "budget": {
+   "cap_cu_per_run": 18.0,
+   "ceiling_cu": 36.0,
+   "round_runs": [
+    "C_PLUS"
+   ],
+   "runs": [
+    "C"
+   ],
+   "watcher": "scripts/colab/cu_watch.py session --cap 18, under one guard per batch; one batch per account"
+  },
+  "code": {
+   "psi0": {
+    "commit": "cda3fdfafe47cb6fa75400d013de1bd36e3cea05",
+    "repo": "physical-superintelligence-lab/Psi0"
+   },
+   "simple": {
+    "commit": "b75c6786f87b4a7f43b52b0ac5b83a1d9ea62e11",
+    "repo": "physical-superintelligence-lab/SIMPLE"
+   }
+  },
+  "comparisons": [],
+  "demo_sets": {
+   "file": "configs/runplans/tray/demo_sets-v2.json",
+   "file_sha256": "b2cafa8f835b07ccaf9565b34b82f9864c08b5586a50a6e7ca5d7eeba6fb9d5a",
+   "hashes": {
+    "A": "b914d6412f59411ecb3e97f9ddeb8c476025b5617d2eda23debd4d8c6758ba4c",
+    "C": "a202cc028a2e7c6cbd9ba99b609f0d54b41cdad7965ca3088eb4473681808766",
+    "N40": "85278f2016d35e007f782520e124286afa8c67cd3c65143ffd37751874f0ab93",
+    "N80": "fb28061125b8060e606c1d27dc5ca382488ba3aebf18fd5970f0e6270787ae3f"
+   },
+   "qa": {
+    "reports_sha256": "fb402300863e3ce07c61e07db7d7e00c5d8dc12ed257e9c9f45dc01f63e0c44c",
+    "threshold_version": "qa-1@fb6ddaf9f48c"
+   },
+   "quality": {
+    "file": "configs/runplans/tray/quality-s1-pool-1104.jsonl",
+    "filter": {
+     "max_part_shift_end_mm": 20.0,
+     "max_tilt_carry_deg": 10.0
+    },
+    "sha256": "49c26d25418b448aec3d8dabbe0cb010e9c9a6c5e285fadeafeb09104bb8fa40"
+   },
+   "salt": "DA-34/demo-sets/v1"
+  },
+  "embodiment": "g1_sonic_dwbc@1",
+  "eval": {
+   "by_level": [
+    {
+     "headline": false,
+     "level": 0,
+     "seeds": {
+      "start": 1000100,
+      "stop": 1000130
+     },
+     "unit": "replicate"
+    },
+    {
+     "headline": true,
+     "level": 1,
+     "seeds": {
+      "start": 1000100,
+      "stop": 1000220
+     },
+     "unit": "condition"
+    },
+    {
+     "headline": true,
+     "level": 2,
+     "seeds": {
+      "start": 1000100,
+      "stop": 1000220
+     },
+     "unit": "condition"
+    }
+   ],
+   "cli": "eval-decoupled-wbc",
+   "clock": "sim",
+   "episode_limit_s": 90.0,
+   "policy_noise": "per_episode_condition_seed",
+   "renderer": "mujoco",
+   "sim_mode": "mujoco",
+   "split": "dev",
+   "synchronous": true
+  },
+  "interpretation": {
+   "doc": "docs/he/tray.md",
+   "rules_sha256": "eec2222c148bf46d0d6ca9e88eb7fc8bc302223e248c8e1033630e56a9cf78b8"
+  },
+  "metric": {
+   "failure_kinds": "design_3_3",
+   "per_stage": "scorer_7_steps",
+   "primary": "sim_success"
+  },
+  "name": "he-tray-psi0-v2",
+  "parents": {
+   "psi0-baseline-egodex-he": {
+    "action_header": {
+     "path": "psi0/postpre.1by1.pad36.2601131206.ckpt.he30k/action_header.safetensors",
+     "sha256": "238b4d95862b0eb44bffa75a2ae69e120aeda3d159fd6f29802dd9338019e14d"
+    },
+    "clean_for_main_task": true,
+    "note": "Pretrained on EgoDex 200k + HE 30k steps; the pair the authors fine-tuned their SIMPLE checkpoints from. The tray task is new (DA-32), so no tray data is in pretraining.",
+    "vlm": {
+     "path": "psi0/pre.fast.1by1.2601091803.ckpt.ego200k.he30k/model.safetensors",
+     "sha256": "6e63da17bdd22430bc07c40e4b14ebb96c9d124d014c532449142862c186d3f9"
+    }
+   }
+  },
+  "pinned_files": {
+   "configs/sim/tray.yaml": "89ad4e8d381005cf7b642cc17b323f3f2c13cf39dc7aefe98e9843f2d5efc245",
+   "configs/splits/default.yaml": "081a3ee7eba6f7487ede965dae63dfaaffdce0bfae12d35d343fe305d07bf855",
+   "packages/flywheel-simple/src/flywheel_simple/tray/__init__.py": "5ce7ac61af2a0386989fbfc4ec1e810fcdd5d32088c1e68525b6a08e691db74b",
+   "packages/flywheel-simple/src/flywheel_simple/tray/config.py": "9f9d0ddd38014b2fa804b48940073c351926b40e4c6148bec18705e2319d226a",
+   "packages/flywheel-simple/src/flywheel_simple/tray/geometry.py": "abda4691c69f63cd7fffc1f2fb3d53a706e7206d7282155c131af9d1c82c10a8",
+   "packages/flywheel-simple/src/flywheel_simple/tray/mjcf.py": "ad89e2086693b56464f2bad338ff4790cb626966c392f854fc22ba27319e64ae",
+   "packages/flywheel-simple/src/flywheel_simple/tray/predicates.py": "057b70222c31ad7a4240556b5136fecaa1c8f9147a87b3b7c9b6a1c5c7ddfe53",
+   "packages/flywheel-simple/src/flywheel_simple/tray/randomize.py": "9927c81cdd84742f772313180100c27cdb565e5f96c59e03ec634294d27bae37",
+   "packages/flywheel-simple/src/flywheel_simple/tray/run.py": "f6d9a690a47654cbc5ade1cc04bbbeb8cd68f5b12d97cd4a22f351c46b580b68",
+   "packages/flywheel-simple/src/flywheel_simple/tray/simple_task.py": "9e302f1ce92c946925d6ffbef1c9548ab1f04dc4df10d3e38cdabf9028c924b9",
+   "packages/flywheel-simple/src/flywheel_simple/tray/visuals.py": "931e5c09633887859309fbd10103c4ad3c01a24454223a3de2e2e4b98c6f1f3f",
+   "packages/flywheel-simple/src/flywheel_simple/wbc/__init__.py": "75b21319e28f898050c2a07777064c106f697d67c402609880e25234a52d62de",
+   "packages/flywheel-simple/src/flywheel_simple/wbc/drive.py": "ed9ed9126663a6ae3d94a87c2bb8262e00de0b0df50a0d4459f38e10e5b55341",
+   "packages/flywheel-simple/src/flywheel_simple/wbc/navigate.py": "01c2c2b319da68d26e8ced80dbbe04f4209cff340b387ea140ec62e2dfa73958",
+   "packages/flywheel-simple/src/flywheel_simple/wbc/stand_walk.py": "bc0ebcf99e30b0aedf74ff3d352d5e1eab672837fd435be9a3a598e26e206508",
+   "packages/flywheel-simple/src/flywheel_simple/wbc/upper_body.py": "9df557733d15a7b93c285364e732a50f6710701defc700680caf1efe339db132"
+  },
+  "pricebook": "assumption: Colab 100 CU pack, 0.0999 USD per CU (docs/g0/ledger/DA-19.csv)",
+  "psi_model": {
+   "repo": "USC-PSI-Lab/psi-model",
+   "revision": "cb1480f50d9764ab2f6261bc2e651a67ad54da17"
+  },
+  "purpose": "branch_train",
+  "recipe": {
+   "dataset_stats": "own_train_set",
+   "file": "configs/models/psi0-stage3.yaml",
+   "nproc_per_node": 1,
+   "overrides": {
+    "train.validation_steps": 2000
+   },
+   "sha256": "71ba5de8ef22a11432a829e86e93b7e662f5f38f453cca27f73d6fbe777a1dbd"
+  },
+  "release": {
+   "data_class": "public",
+   "id": "tray_s1_f9433b028c52",
+   "location": "rtx3060:~/denso-da34-pool/fwdata/releases/tray_s1_f9433b028c52",
+   "release_hash": "f9433b028c520b4fd78b34469b389862f7b34de0bb185840aa18143d2d5d8461"
+  },
+  "site_id": "local",
+  "stats": {
+   "ci": 0.95,
+   "method": "bootstrap_by_condition",
+   "resamples": 10000,
+   "seed": 20261103
+  },
+  "story": "DA-34",
+  "supersedes": "rp_c49c99c8d8da",
+  "task": {
+   "config": "configs/sim/tray.yaml",
+   "env_id": "simple/G1WholebodyTrayTransferTeleop-v0",
+   "id": "g1_wholebody_tray_transfer_teleop"
+  },
+  "train_seeds": [
+   0
+  ]
+ },
+ "run_plan_id": "rp_a04c14e79dfd"
+}

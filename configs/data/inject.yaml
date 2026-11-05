@@ -1,0 +1,45 @@
+# configs/data/inject.yaml
+# Cấu hình cấy lỗi cho story DA-27 (Design 27/10/2026 mục 9.2, 10)
+version: "1.0.0"
+seed: 42
+episodes_per_kind: 3  # Mỗi loại lỗi dữ liệu cấy đúng 3 episode khác nhau (33 trên 99), quyết định PO 3/11/2026
+
+# 11 loại lỗi dữ liệu dồn vào 6 mã F-DATA (design mục 9.2, sửa 3/11/2026).
+# Mã ghi ở `Defect.code`, tên loại ở `parameters["kind"]` (flywheel.data.inject.codes).
+data_defects:
+  drop_frames:  # D2
+    enabled: true
+    drop_rate: 0.15
+  timestamp_sync_offset:  # D2
+    enabled: true
+    offset_seconds: 0.08  # Vượt ngưỡng tau_sync (0.033s)
+  joint_jump:  # D3 · chiều khớp 0–30 của action
+    enabled: true
+    jump_magnitude: 1.5   # rad/s spike
+  joint_limit_exceeded:  # D3 · chỉ chiều khớp 0–30 của action (design 9.2)
+    enabled: true
+    excess_factor: 1.25   # Vượt giới hạn 25%
+  nan_values:  # D1
+    enabled: true
+    nan_ratio: 0.05
+  unit_deg_rad:  # D3 · chỉ chiều góc 0–30, 35 của action, khác 0 trên episode (design 9.2)
+    enabled: true
+    scale: 57.2957795     # 180 / pi
+  action_sign_flip:  # D7
+    enabled: true         # Một chiều action có độ lệch chuẩn khác 0 trên episode (design 9.2)
+  corrupted_success_label:  # D6
+    enabled: true
+    keep_fraction: 0.5    # Cắt episode còn 50% khung, vẫn giữ nhãn thành công
+  wrong_task_instruction:  # D6
+    enabled: true
+    corrupted_prompt: "move to random location and stop"
+  duplicate_episode:  # D5
+    enabled: true
+  holdout_seed_leak:  # D5
+    enabled: true
+    holdout_seed_range: [2000000, 2000999]  # holdout của configs/splits/default.yaml
+
+# Lỗi log train (T1-T8) và log RTC (R1, R2): mỗi loại 3 job; mức cấy đặt vượt ngưỡng của
+# configs/eval/diagnosis/{train,system}.yaml (xem LogDefectConfig)
+log_defects:
+  jobs_per_kind: 3

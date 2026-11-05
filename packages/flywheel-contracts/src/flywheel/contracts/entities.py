@@ -19,6 +19,7 @@ from flywheel.contracts.base import (
     event_id,
     is_valid_event_id,
 )
+from flywheel.contracts.v0 import StepStatus, UnknownReason
 from pydantic import Field, model_validator
 from typing_extensions import Self
 
@@ -237,12 +238,40 @@ class Score(ContentEntity):
     trace_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     scorer_version: str = "1.0.0"
     success: bool | None = None
-    step_status: list[str] = Field(default_factory=list)
+    step_status: list[StepStatus] = Field(default_factory=list)
+    unknown_reason: list[UnknownReason | None] | None = None
+    step_enter_s: list[float | None] | None = None
+    step_exit_s: list[float | None] | None = None
     first_failed_step: int | None = None
     failure_kind: str | None = None
     failure_class: Literal["approach", "grasp", "carry", "place", "balance"] | None = None
     level: int | None = None
     balance_violated: bool = False
+
+    @model_validator(mode="after")
+    def _compute_and_verify_id(self) -> Self:
+        """Keep existing score IDs stable when the new optional fields are absent."""
+        from flywheel.contracts.v0 import StageEvaluation
+
+        legacy = {"pass": True, "fail": False, "not_attempted": False, "unknown": None}
+        StageEvaluation.model_validate(
+            {
+                "stage_success": [legacy[status] for status in self.step_status],
+                "stage_status": self.step_status,
+                "unknown_reason": self.unknown_reason,
+                "step_enter_s": self.step_enter_s,
+                "step_exit_s": self.step_exit_s,
+            }
+        )
+        payload = self.model_dump(mode="json")
+        for field in ("unknown_reason", "step_enter_s", "step_exit_s"):
+            if payload[field] is None:
+                del payload[field]
+        expected_id = content_id(self.ID_PREFIX, payload)
+        if self.id and self.id != expected_id:
+            raise ValueError(f"Content ID mismatch: provided '{self.id}', expected '{expected_id}'")
+        object.__setattr__(self, "id", expected_id)
+        return self
 
 
 # 9. Cluster (content)
@@ -259,6 +288,9 @@ class Cluster(ContentEntity):
     parent_cluster_id: str | None = None
     representative_seed: int | None = None
     member_episode_ids: list[str] = Field(default_factory=list)
+    # Deprecated at L0-lite and not set: the field is part of the content id, so
+    # writing the card's path here would change the cluster's id. The path is
+    # derived from the id instead, by `StorePaths.card_path` (DA-39, PO P1).
     card_uri: str | None = None
 
 
@@ -353,8 +385,7 @@ class LedgerEntry(EventEntity):
         if self.reverses_entry_id is None:
             if self.quantity < 0:
                 raise ValueError(
-                    f"quantity cannot be negative ({self.quantity}) "
-                    "unless reverses_entry_id is set"
+                    f"quantity cannot be negative ({self.quantity}) unless reverses_entry_id is set"
                 )
             if self.usd_amount < 0:
                 raise ValueError(
