@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from conftest import BY_STEP
 from flywheel.contracts import FailureKindSpec, StageEvaluation, StageSpec, TaskDefinition
 from flywheel.eval.scorer.failure import (
     NO_KIND_FROM_TASK,
@@ -23,7 +22,7 @@ def judge(
     class_from_failed_step: tuple[str, ...] = (),
 ):  # noqa: ANN201 - the verdict type is an implementation detail of the module
     stages = tuple(task.stages())
-    steps = score_steps(evaluation, stages, missing, step_signals=BY_STEP)
+    steps = score_steps(evaluation, stages, missing)
     return judge_failure(
         evaluation,
         steps,
@@ -197,7 +196,9 @@ def test_a_task_may_not_declare_l_unknown(task: TaskDefinition) -> None:
 
 
 def test_a_seven_step_task_is_judged_the_same_way() -> None:
-    stages = tuple(StageSpec(name=f"s{index}", failure_class="carry") for index in range(7))
+    stages = tuple(
+        StageSpec(name=f"s{index}", failure_class="carry", signals=()) for index in range(7)
+    )
     kinds = (FailureKindSpec(kind="L-PART-DROP", failure_class="carry"),)
     evaluation = StageEvaluation(
         stage_success=tuple(index < 5 for index in range(7)),
@@ -207,7 +208,7 @@ def test_a_seven_step_task_is_judged_the_same_way() -> None:
 
     verdict = judge_failure(
         evaluation,
-        score_steps(evaluation, stages, step_signals={}),
+        score_steps(evaluation, stages),
         kinds,
         first_failed_step(evaluation),
         stages,

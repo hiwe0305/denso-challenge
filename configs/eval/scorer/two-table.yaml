@@ -26,22 +26,9 @@ thresholds:
   h_place: 0.02    # m; giả định; vật đã nằm trên bàn đích, bước 5
   T_stable: 0.5    # s; giả định; vật đứng yên trong vùng đích trước khi kết, bước 6
 
-# Tín hiệu mỗi bước được chấm trên. Thiếu một tín hiệu khai ở đây thì bước đó
-# là "chưa rõ", bất kể vị từ của task trả gì (AC 2, FR21): vị từ hỏi về tín
-# hiệu không ai ghi vẫn trả True hoặc False, và cả hai đều là kết luận không
-# ai đo. Tên bước phải trùng `StageSpec.name` của task; scorer từ chối cấu
-# hình khai bước hoặc tín hiệu task không có.
-#
-# Chỗ này nằm trong cấu hình vì `StageSpec` chưa chở được danh sách tín hiệu
-# của bước (issue #59 mục 5 xin thêm); là cấu hình theo task nên không có bước
-# nào của task nào viết cứng trong mã.
-step_signals:
-  approach: [hand_object_distance]
-  grasp: [hand_object_contact, object_height]
-  walk: [hand_object_contact, torso_in_source_zone]
-  arrive: [hand_object_contact, torso_in_target_zone]
-  place: [object_in_target_zone, object_height]
-  release: [hand_object_contact, object_in_target_zone, t]
+# Tín hiệu mỗi bước được chấm trên là `StageSpec.signals` của task (#101,
+# issue #59), không khai ở đây; thiếu một tín hiệu của bước thì bước đó là
+# "chưa rõ", bất kể vị từ của task trả gì (AC 2, FR21).
 
 # Tín hiệu không thuộc bước nào: thiếu nó thì episode sạch mất quyền "đạt" và
 # ra L-UNKNOWN, chứ không phải một bước mất kết luận. Va chạm đo suốt episode

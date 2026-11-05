@@ -45,8 +45,8 @@ SIGNALS: tuple[tuple[str, str], ...] = (
     ("t", "s"),
 )
 
-# Which signals each step is judged on, the same declaration the shipped
-# config carries, so a test scoring by hand sees what `fw eval score` sees.
+# Which signals each step is judged on, declared on the task's own `StageSpec`
+# (#101), so a test scoring by hand sees what `fw eval score` sees.
 BY_STEP: dict[str, tuple[str, ...]] = {
     "approach": ("hand_object_distance",),
     "grasp": ("hand_object_contact", "object_height"),
@@ -78,12 +78,12 @@ class TwoTableTask:
 
     def stages(self) -> tuple[StageSpec, ...]:
         return (
-            StageSpec(name="approach", failure_class="approach"),
-            StageSpec(name="grasp", failure_class="grasp"),
-            StageSpec(name="walk", failure_class="carry"),
-            StageSpec(name="arrive", failure_class="carry"),
-            StageSpec(name="place", failure_class="place"),
-            StageSpec(name="release", failure_class="place"),
+            StageSpec(name="approach", failure_class="approach", signals=BY_STEP["approach"]),
+            StageSpec(name="grasp", failure_class="grasp", signals=BY_STEP["grasp"]),
+            StageSpec(name="walk", failure_class="carry", signals=BY_STEP["walk"]),
+            StageSpec(name="arrive", failure_class="carry", signals=BY_STEP["arrive"]),
+            StageSpec(name="place", failure_class="place", signals=BY_STEP["place"]),
+            StageSpec(name="release", failure_class="place", signals=BY_STEP["release"]),
         )
 
     def failure_kinds(self) -> tuple[FailureKindSpec, ...]:
