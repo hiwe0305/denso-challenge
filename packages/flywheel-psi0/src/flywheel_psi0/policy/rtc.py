@@ -1,8 +1,12 @@
 """RTC client for a served Psi0 policy, with one `RTCInferenceRecord` per chunk (DA-19 AC 4).
 
 `serve_psi0_simple --rtc` keeps real-time chunking on the server: it remembers the
-previous chunk and conditions the next one on its tail with a fixed
-`inference_delay = Tp - Ta`. The client's job is the control clock: hand out one
+previous chunk and conditions the next one on it, freezing the first d rows of the
+new chunk to the old plan. With a checkpoint trained with `--model.rtc` and no
+`--rtc-inference-delay`, d = max(1, min(Ta // 2, Tp - s, max_delay - 1)), s being
+`--min-exec-horizon` (default Ta); 6 with the team's `--action-exec-horizon 24`,
+Tp 30, max_delay 8 (Psi0 cda3fdf, serve_psi0_simple.py:161-171). The server reports
+it on `/info` as `rtc_inference_delay`. The client's job is the control clock: hand out one
 action per control step from a buffer, ask the server for the next chunk when the
 buffer runs low, and record what that cost. Per request it logs (DA-25 schema):
 
@@ -10,7 +14,7 @@ buffer runs low, and record what that cost. Per request it logs (DA-25 schema):
 * `delay_steps` (d) - control steps a real-time loop at `hz` would run during the
   inference, `ceil(latency * hz)`. SIMPLE steps the sim synchronously, so nothing
   moves while it waits; d is what RTC would have to cover on hardware, to compare
-  with the model's `max_delay` (8 for stage 3);
+  with the server's `rtc_inference_delay` (R2 of DA-13), not the model's `max_delay`;
 * `buffer_level` - actions left in the buffer when the request went out;
 * `chunk_index` - 0, 1, ... within the trace;
 * `boundary_jump` - the largest per-dimension change between the last action
