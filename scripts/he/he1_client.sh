@@ -56,8 +56,9 @@ done
 
 free_gb=$(( $(awk '/MemAvailable/ {print $2}' /proc/meminfo) / 1024 / 1024 ))
 (( free_gb >= NEED_GB )) || { status=4; die "MemAvailable ${free_gb} GB < ${NEED_GB} GB"; }
+# Liveness only: he1_eval.py run has already checked each arm's /info run_dir (a fine-tune
+# run dir, which does not name the task as S1-03's did) before it started this script.
 info=$(curl -sf "http://127.0.0.1:$port/info") || die "no router on 127.0.0.1:$port"
-[[ "$info" == *g1wholebodylocomotionpickbetweentablesteleop* ]] || die "router does not serve $TASK"
 printf '%s\n' "$info" > "$OUT/server_info-$tag.json"
 
 DATA="$ROOT/simple"

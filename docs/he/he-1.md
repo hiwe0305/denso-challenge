@@ -264,7 +264,7 @@ Kiểm trên zip thật ngày 4/11/2026, trên laptop:
 **Laptop: guard và hai watcher** (thư mục gốc là bản checkout `master`):
 
 ```bash
-export PATH=~/project/wm-wam-review/.venv-colab-cli/bin:$PATH
+export PATH=$PATH:~/project/wm-wam-review/.venv-colab-cli/bin   # để cuối: python3 của venv này không có PyYAML
 colab sessions; colab usage
 R=fwdata/colab/batch-$(date +%Y%m%d-%H%M%S); mkdir -p fwdata/colab && mkdir $R && git rev-parse HEAD > $R/master.sha
 nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py guard --registry "$0" --floor 14 --log "$0/guard.jsonl"; echo "exit $?"' $R < /dev/null > $R/guard.out 2>&1 &
@@ -343,7 +343,9 @@ nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py se
 
 ### 7.1 Eval tier 2: hai fine-tune N20 trên 10 điều kiện dev (F10, nhiệm vụ 3)
 
-Chưa chạy. Chờ đợt C của DA-34 dừng và được xác nhận (một đợt một lúc trên tài khoản), và lệnh chạy của phiên chính. Driver: [`scripts/he/he1_eval.py`](../../scripts/he/he1_eval.py) trên laptop, pha `serve-setup` và `serve` của `he1_colab.py` trên VM, [`scripts/he/he1_client.sh`](../../scripts/he/he1_client.sh) trên rtx3060.
+**Lần 1 (5/11/2026), không có episode nào.** Phiên `da26-t2-eval-n20` từ master `92526397`. Hai server nạp xong (sha256 đã kiểm, `run_dir` đúng arm). `run` bắt đầu 12:23:14Z; client thoát 1 sau 70 s, ở bước chuẩn bị, trước Isaac: `he1_client.sh` còn giữ phép kiểm của S1-03 là `/info` phải chứa tên task, mà `run_dir` của fine-tune (`fw-da26-t2-ft-…`) không chứa. `run` thoát 5, phiên dừng có xác nhận 12:26:28Z. Đo: 1,692 CU theo đồng hồ watcher, số dư giảm 1,53 CU. `probe` đo đẩy lên 5,06 MB/s (bảng dưới giả định 11 MB/s); tải lên 12,5 GB mất 37 phút, nên trước reset đầu khoảng 1,6 CU thay vì 1,0. Đã sửa: client chỉ kiểm `/info` còn trả lời (laptop đã kiểm `run_dir` của từng arm); test chạy `he1_client.sh` thật với `/info` thật của hai server (`scripts/he/testdata/`). Lần chạy lại chờ Hiếu duyệt số CU.
+
+Chờ đợt C của DA-34 dừng và được xác nhận (một đợt một lúc trên tài khoản), và lệnh chạy của phiên chính. Driver: [`scripts/he/he1_eval.py`](../../scripts/he/he1_eval.py) trên laptop, pha `serve-setup` và `serve` của `he1_colab.py` trên VM, [`scripts/he/he1_client.sh`](../../scripts/he/he1_client.sh) trên rtx3060.
 
 **Cách chạy.**
 
@@ -391,7 +393,7 @@ Trước khi mở phiên, dựng bộ xen kẽ, chép lên rtx3060 và kiểm rt
 ```bash
 S=da26-t2-eval-n20
 python3 scripts/he/he1_eval.py interleave --src fwdata/he/dev-eval-v1-l0n10 --out fwdata/he/eval-n20-interleaved
-git archive --format=tar.gz HEAD | ssh rtx3060 'mkdir -p ~/denso-da26/fw && tar -xz -C ~/denso-da26/fw'
+git archive --format=tar.gz HEAD | ssh rtx3060 'mkdir -p ~/denso-da26/fw ~/denso-da26/sets && tar -xz -C ~/denso-da26/fw'
 rsync -a fwdata/he/eval-n20-interleaved/ rtx3060:denso-da26/sets/interleaved/
 python3 scripts/he/he1_eval.py preflight --set fwdata/he/eval-n20-interleaved --dest fwdata/he/runs
 ```
@@ -415,14 +417,15 @@ nohup setsid bash -c 'python3 scripts/he/he1_eval.py run --session "$1" --regist
 - Trong lúc eval, forward giữ kết nối SSH duy nhất, nên lượt `--persist` của watcher ở mốc mềm có thể bị từ chối (HTTP 429). Không sao: `run` kéo log VM sau khi đóng forward.
 - Xem tiến độ: `tail -3 fwdata/he/runs/da26-t2-eval-n20/route.jsonl`, `tail -1 $R/$S.jsonl`.
 - Bộ xen kẽ dựng ngày 5/11/2026 từ bộ dev thật: 20 episode, `order.json` sha256 `6d764478…`; test kiểm từng episode trùng điều kiện của nó (`environment_config`) và hash điều kiện của RunPlan.
-- Thử khô trên laptop, CPU, không Colab, không ghi gì lên rtx3060: [`test_he1_eval.py`](../../scripts/he/test_he1_eval.py) có 46 test, gồm:
+- Thử khô trên laptop, CPU, không Colab, không ghi gì lên rtx3060: [`test_he1_eval.py`](../../scripts/he/test_he1_eval.py) có 48 test, gồm:
   - thứ tự xen kẽ; bộ xen kẽ trên bộ giả và trên bộ dev thật;
   - quy tắc CU (vừa, vượt, episode chậm nâng cận, số đo cũ hay thiếu, trần của watcher khác 16); cổng chờ số đo; đọc dòng `poll`; mấy cặp vừa;
   - `route` qua HTTP với hai server giả; thử lại lỗi kết nối;
   - tải lên với cache `.hashes.json` đúng định dạng của `he1_fetch`, và `serve` chấp nhận nó; cache cũ hay sai định dạng thì tính lại;
   - `run` trên đồ giả: thiếu RAM, ngoại lệ, SIGTERM, server sai arm, chạy client lỗi, dừng không xác nhận, và một lượt đủ (log theo tag, giữ log cũ, kết quả chỉ của lượt cuối). Mọi trường hợp đều dừng phiên, theo thứ tự log VM, dừng phiên, rồi rtx3060;
   - client không gọi, im lặng, máy không tới được, quá dòng CU; sau khi bị từ chối vẫn chờ `exit`; `preflight` chỉ đọc; rtx3060 còn job denso hay `pol.train_stage_a` thì không chạy (`preflight` 6, `run` 8), container khác chỉ ghi log;
-  - `vm-logs`, `serve` với launcher giả, ghim của client trùng `eval_psi0.sh`.
+  - `vm-logs`, `serve` với launcher giả, ghim của client trùng `eval_psi0.sh`;
+  - sau lần 1: `he1_client.sh` thật, sau `route` thật, với `/info` thật của hai server, qua bước kiểm `/info` (bản cũ thì hỏng đúng lỗi của lần 1); `results` đọc `eval_stats.txt` thật của S1-03, và dòng có lý do kết thúc của `sonic_wbc.py`.
 
   - review lại #129: `SystemExit` và log cũ không giữ được vẫn dừng phiên; tín hiệu thứ hai không cắt bước kết thúc; SIGHUP bỏ qua sẵn giữ nguyên; lần chạy không tới client giữ kết quả cũ; lệnh dừng thật (chạy ở máy này với `HOME` tạm, `systemd-run` và `docker` giả) giết nhóm của launcher đang ở bước chuẩn bị và không đụng nhóm khác.
 
@@ -450,3 +453,4 @@ nohup setsid bash -c 'python3 scripts/he/he1_eval.py run --session "$1" --regist
 | 5/11/2026 | Mục 7.1, theo review #129: cache sha256 đọc đúng định dạng của `he1_fetch`; phiên luôn được dừng (thiếu RAM, ngoại lệ, tín hiệu), `preflight` kiểm rtx3060 trước khi mở phiên; client chết hay treo thì dừng, có hạn chờ; cận episode 33 phút hoặc 1,2 × dài nhất; kết thúc theo thứ tự log VM, dừng phiên, rtx3060; thử lại lỗi kết nối 180 s; chạy lại an toàn theo tag; kiểm `/info` của hai server. Trần 16 còn 6–8 cặp; bốn **[Option]** cho Hiếu. Chưa chạy | Hiếu (soạn với Claude) |
 | 5/11/2026 | Mục 6.2, 7, 7.1: **[Đã chốt 5/11/2026, Hiếu]** "Nâng lên 18 + giữ rtx3060": trần eval 18 (dòng dừng 17,77), watcher `--cap 18`, tổng DA-26 nhiều nhất 33,85 + 18 = 51,85 CU; rtx3060 chỉ chạy client trong khung giờ eval (`preflight` thoát 6, `run` thoát 8 khi còn job denso hay `pol.train_stage_a`). Bảng cặp tính lại ở trần 18: 10 cặp ở 24,6 phút, biên mỏng (cần ≤ 1,055 CU trước reset đầu). Quy tắc cặp giữ nguyên | Hiếu (soạn với Claude) |
 | 5/11/2026 | Mục 7.1, theo review lại #129: bước kết thúc (dừng phiên) chạy cả khi `SystemExit` hay tín hiệu thứ hai; `preflight --dest` kiểm log cũ trước khi mở phiên; `results-<tag>.jsonl`, lần chạy không tới client không ghi đè kết quả; SIGHUP bỏ qua sẵn giữ nguyên; lệnh dừng giết nhóm tiến trình của launcher (pgid) rồi mới `docker stop` | Hiếu (soạn với Claude) |
+| 5/11/2026 | Mục 7, 7.1: lần eval 1 dừng ở bước chuẩn bị của client (phép kiểm tên task trên `/info` chép từ S1-03), 1,692 CU; bỏ phép kiểm đó; `mkdir -p ~/denso-da26/sets` trước rsync; venv của CLI `colab` để cuối `PATH`; `results` chỉ đọc chữ đầu của kết quả episode | Hiếu (soạn với Claude) |

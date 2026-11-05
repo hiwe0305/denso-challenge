@@ -879,7 +879,9 @@ def results(dest: Path, route: Path | None = None) -> list[dict[str, Any]]:
         for line in stats_files[0].read_text().splitlines() if stats_files else []:
             name, _, value = line.strip().partition(": ")
             if name.startswith("episode_"):
-                stats[int(name.removeprefix("episode_"))] = value.strip() == "True"
+                # eval_decoupled_wbc writes "episode_N: True "; SIMPLE's sonic_wbc eval adds
+                # " (<termination reason>)". Only the first word counts, as in eval_psi0.sh.
+                stats[int(name.removeprefix("episode_"))] = value.split()[:1] == ["True"]
         starts = {e["episode"]: e["time"] for e in events if e["event"] == "episode_start"}
         acts: dict[int, list[float]] = {}
         for e in events:
