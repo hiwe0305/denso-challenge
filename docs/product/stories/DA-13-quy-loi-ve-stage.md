@@ -25,6 +25,7 @@ Là kỹ sư đánh giá, tôi muốn mỗi cụm lỗi closed-loop được ki�
 4. Giả thuyết là đề xuất cho kỹ sư xác nhận trên evidence card; không tự chuyển thành can thiệp.
 5. Trên bộ lỗi cấy hệ thống: trễ camera ra LỖI ĐỒNG BỘ, lệch calibration ra LỖI CALIBRATION; episode sạch không bị báo lỗi hệ thống (spec mục 7.6).
 6. Chạy trên CPU với `Trace` và kết quả probe mẫu của testkit.
+7. (Thêm 5/11/2026, quyết định (a), (b) của PO.) R1, R2 đo theo RTC thật của Ψ₀ trên cấu hình serve của đội: R2 so `delay_steps` với độ trễ RTC d của server, ghi trong `system.yaml` kèm nguồn; chunk 0 của trace không tính vào R1 lẫn R2. Trên rollout đồng bộ, R1, R2 vẫn đo và ghi nhưng là **ghi nhận, không quy lỗi**: không chặn quy lỗi về dữ liệu. Chỉ rollout bất đồng bộ (DA-23) tính R1, R2 là lỗi hệ thống. Episode không rõ chế độ không được coi là đồng bộ (FR21). Trên bộ lỗi cấy DA-27, lỗi R1 chỉ ra R1, lỗi R2 chỉ ra R2.
 
 ## Nhiệm vụ
 
@@ -38,6 +39,11 @@ Là kỹ sư đánh giá, tôi muốn mỗi cụm lỗi closed-loop được ki�
 - [x] 8. Issue Contract change cho bản ghi kết quả (**issue #70**): `DiagnosisFinding.code` của `flywheel.contracts.training` là `Literal` trên T1-T8, O1-O4 nên mã R không vào được `TrainDiagnosis`; 03 mục 4.3 để `CheckResult` trong `meta` của Cluster (Long giữ). Trong lúc chờ, bản ghi nằm trong làn như `ScoreRecord` của DA-36
 - [x] 9. Đổi bộ đọc sang `flywheel.contracts.trace.TraceStep`, `CameraParams` khi #48 merge (PR #79): bỏ `TraceRow`, `CameraView` của làn; test đọc file mẫu trace của testkit trên master thay cho bản chép (AC 1, 3)
 - [x] 10. R3 nửa dưới: so hướng thân `yaw` theo đường ngắn quanh vòng tròn (atan2(sin d, cos d)), để ±π không đọc thành gần 2π sai số; khớp hông không quấn vì là khớp có giới hạn (AC 1)
+- [ ] 11. R1, R2 theo RTC thật của Ψ₀ (review PO 5/11/2026; quyết định (a), (b) của PO) (AC 7)
+  - [ ] 11.1 R2 so `delay_steps` với d của server: khóa `r2.rtc_inference_delay_steps: 6` trong `system.yaml`, comment dẫn `serve_psi0_simple.py:161-171` ở Ψ₀ `cda3fdf` và cờ serve `--action-exec-horizon 24 --rtc` (Tp 30, s = Ta = 24, max_delay 8, nên d = max(1, min(24 // 2, 30 - 24, 8 - 1)) = 6); đứng máy là `delay_steps > d`. Chunk 0 ra khỏi R2 và khỏi phân vị của R1; test: chỉ chunk 0 chậm thì không ra mã nào
+  - [ ] 11.2 Rollout đồng bộ: R1, R2 cho kết quả ghi nhận, không chặn (`verdict.py`), detail tiếng Việt nói lý do; rollout bất đồng bộ tính như cũ. Chế độ lấy từ hợp đồng (`RolloutRequest.timing`, `RolloutResult.timing_verdict`); không rõ chế độ thì không coi là đồng bộ. Nếu hợp đồng chưa có trường để phân biệt: dừng, viết đề xuất hợp đồng cho Long, Hiếu, không thêm trường trong code làn
+  - [ ] 11.3 DA-27: lỗi cấy R1 và R2 tách được theo luật mới. R1 trễ kéo dài mà không chunk nào vượt d, nên τ_lat ≤ d / hz = 0,12 s (đề xuất τ_lat 0,10 s, giả định; độ trễ cấy 0,11 s, `delay_steps` 6); R2 không cấy ở chunk 0. Cập nhật `docs/g0/defect-inject.md`; kiểm `agentqa/bench/logs.py` của DA-31 (nhánh `DA-31-defect-bench-scorer`, chỉ đọc) không đếm chéo
+  - [ ] 11.4 Sửa câu `inference_delay = Tp - Ta` và câu so với `max_delay` trong docstring `flywheel_psi0/policy/rtc.py`; thêm một dòng ở design 27/10 mục 10 kèm ghi chú sửa
 
 ## Phạm vi file
 
@@ -48,6 +54,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `packages/flywheel-eval/tests/unit/diagnosis/system/`, `packages/flywheel-eval/tests/unit/diagnosis/stage/`
 - `packages/flywheel-eval/tests/contract/diagnosis/system/` (thêm 3/11/2026 cùng nhiệm vụ con 7: lệnh `fw eval diag-system` phải có test lái qua CLI, như DA-36 có `tests/contract/scorer/`)
 - `configs/eval/diagnosis/system.yaml`, `configs/eval/diagnosis/stage.yaml`
+- Thêm 5/11/2026 cho nhiệm vụ con 11: bộ cấy lỗi RTC của DA-27 `packages/flywheel-data/src/flywheel/data/inject/config.py`, `packages/flywheel-data/src/flywheel/data/inject/log_defects.py`, `packages/flywheel-data/tests/unit/inject/test_log_defects.py`, `tests/e2e/test_log_defects_detected.py`, `docs/g0/defect-inject.md`; docstring `packages/flywheel-psi0/src/flywheel_psi0/policy/rtc.py`; một dòng mục 10 và ghi chú sửa của `docs/superpowers/specs/2026-10-27-g1-psi0-demo-design.md`
 
 ## Ghi chú cho người làm
 
@@ -86,6 +93,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 3/11/2026 | PO chốt G1b: `RolloutResult` ở `<job_dir>/<trace_id>/rollout_result.json`; `ROLLOUT_NAME` của `reader.py` và ghi chú bố cục ghi là đã chốt | Hiếu, cùng Claude |
 | 4/11/2026 | Thêm nhiệm vụ con 9 và làm xong: #48 merge thành PR #79, bộ đọc nhận mỗi dòng `steps.jsonl` qua `TraceStep` và mỗi dòng `camera_params.jsonl` qua `CameraParams`; bỏ `TraceRow`, `CameraView`. Dòng hợp đồng từ chối (thiếu trường, vector khác 28/7 kênh, `NaN` trần của JSON, vector null) báo lỗi kèm số dòng; chuỗi `"NaN"`, `"Infinity"`, `"-Infinity"` vẫn là chỗ thiếu tín hiệu, `t_image: null` vẫn là không có khung mới. Tên file trong `<trace_id>/` lấy từ hợp đồng. Test đọc 4 file mẫu trace của testkit với `system.yaml` như khi phát hành; bỏ bản chép `data/trace_pr48/` | Hiếu, cùng Claude |
 | 4/11/2026 | Thêm nhiệm vụ con 10 và làm xong, theo kiểm tra đầu cuối của PO trên master + #71 + hook #80: lệnh `yaw` 3,13 rad với `yaw` đo -3,13 rad (lệch 0,023 rad) ra lỗi bộ điều khiển [R3] vì sai số trừ thẳng giá trị thô. Kênh có tính tuần hoàn chọn theo tên trong `LOWER_BODY` của hợp đồng (`PERIODIC_CHANNELS` trong `reader.py`); chỉ `yaw` (hướng thân, hệ thế giới). Khớp hông roll, pitch, yaw có giới hạn (±0,52; ±2,618 rad trong `configs/embodiments/g1.yaml`) nên không quấn: sai số trên π của khớp là khoảng khớp phải đi thật | Hiếu, cùng Claude |
+| 5/11/2026 | Thêm AC 7 và nhiệm vụ con 11, theo review PO trên Ψ₀ `cda3fdf`: độ trễ `/act` đo được 350 ms (máy) và 460 ms (qua tunnel), `delay_steps` khoảng 18 ở 50 Hz, nên R1 và R2 bắn trên mọi episode thật, trong khi SIMPLE bước sim đồng bộ nên độ trễ không gây được hỏng trong sim (như R4). R2 so với d = 6 của server, không với max_delay 8 (đúng ra là `d < max_delay` và sai đại lượng); `7226dc78` làm mất phần bỏ chunk 0 của `48486ede`. Quyết định (a): trên rollout đồng bộ R1, R2 ghi nhận, không quy lỗi; (b): ngưỡng của R2 là d của server, ghi trong config cùng nguồn, kiểm với `/info` lúc serve nếu làm được. Phạm vi file thêm bộ cấy lỗi RTC của DA-27, docstring `rtc.py` và một dòng design mục 10 | Hiếu, cùng Claude |
 
 ## Ghi chép khi làm
 
