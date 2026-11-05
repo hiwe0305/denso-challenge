@@ -5,7 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Nháp (Châu viết 2/11/2026; PO đặt mã DA-36 ngày 3/11/2026) |
-| Người làm | Châu |
+| Người làm | Châu (nhiệm vụ 1–7); Hiếu (nhiệm vụ 8, 9, từ 5/11/2026) |
 | Làn | Đánh giá (`flywheel-eval`) |
 | Story PRD | 3.3 · Epic 3 · FR16, FR17; [spec v10.5](../../spec-v10-failure-to-data.md) mục 5.1, 5.2; [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 3 (bảng 6 bước), mục 10 |
 | Nhãn | [Lõi] · `epic:3` · `gate:G1` · `area:core` |
@@ -25,6 +25,8 @@ Là kỹ sư đánh giá, tôi muốn một scorer độc lập chấm từng b�
 4. Kiểu lỗi và lớp lỗi chung đọc từ `FailureKindSpec` của `TaskDefinition`, không viết cứng: bộ mã của task hai bàn và bộ mã của task bê khay khác nhau (xem "Chỗ cần PO quyết" mục 1).
 5. Scorer là **bước tính thuần**: cùng một trace vào thì cùng một kết quả ra, không chạy simulator, không gọi model, không đọc đồng hồ (NFR1, 04 mục 9.3). Chạy lại cho kết quả trùng, có test.
 6. Chạy trên CPU với trace tổng hợp dựng trong test, một ca cho **mỗi** kiểu lỗi của bộ mã đang khai, cộng một ca thành công và một ca thiếu tín hiệu. Không cần `Trace` thật của SIMPLE để đạt AC này; hiệu chỉnh với cờ `check_success` của SIMPLE là story 3.5, không thuộc story này.
+7. (Thêm 5/11/2026, sau #101) Scorer chỉ dùng trường hợp đồng của #101 (DA-25, issue #59), không còn cầu tạm nào trong làn: trạng thái bước là `StepStatus` của `flywheel.contracts`; tín hiệu từng bước đọc từ `StageSpec.signals`; lớp "theo bước hỏng k" đọc từ `FailureKindSpec.failure_class == "from_failed_stage"`; `Score` ghi `unknown_reason` có kiểu (`UnknownReason`) và `step_enter_s`, `step_exit_s`. Hai khóa `step_signals`, `class_from_failed_step` bị xóa khỏi cấu hình và `ScorerConfig`; `meta["unknown_steps"]` bị xóa. Hình dạng bản ghi đổi nên `scorer_version` tăng lên 0.2.0; bản ghi cũ giữ nguyên trong sổ (append-only). `fw eval score` vẫn chạy. Task chưa khai `StageSpec.signals` (giá trị `None`) bị từ chối, không chấm thiếu quy ước của AC 2.
+8. (Thêm 5/11/2026) Có `configs/eval/scorer/tray.yaml` cho task bê khay: ngưỡng lấy từ `configs/sim/tray.yaml` của DA-32 và ghi là giả định, có test giữ hai file khớp số. Bảng mã và lớp lỗi chung theo spec v10.6 mục 5.2 (quyết định PO trên #59, phương án a): L-PART-DROP và L-ONE-HAND lớp mang, L-PLACE-POSE lớp đặt, L-TRAY-TILT, L-COLLIDE, L-TIMEOUT theo bước hỏng k; 7 bước scorer quy về lớp: bước 1 tiếp cận, bước 2–3 gắp, bước 4–5 mang, bước 6–7 đặt. Mã và lớp đọc từ `FailureKindSpec` của task (AC 4), file cấu hình không khai lại. Có test chấm task bê khay giả, mỗi mã một ca kiểm lớp chung, mã "theo bước hỏng k" kiểm ở các bước khác lớp.
 
 ## Nhiệm vụ
 
@@ -35,6 +37,14 @@ Là kỹ sư đánh giá, tôi muốn một scorer độc lập chấm từng b�
 - [x] 5. `api.py`, lệnh `fw eval score` và artifact kết quả (AC 5)
 - [x] 6. Test một ca mỗi kiểu lỗi, ca thành công, ca thiếu tín hiệu (AC 6)
 - [x] 7. Đổi `ScoreRecord` sang `Score` của `flywheel.contracts.entities` trong ngày #36 merge (AC 1; PO quyết ngày 3/11/2026 trên #58, issue #62 mục 2). Hai chỗ trong `api.py`; `ScoreRecord` xóa, không để lại lớp cũ
+- [ ] 8. Chuyển scorer sang các trường của #101 (AC 7; Hiếu làm thay Châu, 5/11/2026)
+  - [ ] 8.1 Bỏ enum bốn trạng thái của làn trong `scorer/status.py`, dùng `StepStatus` của `flywheel.contracts`. Khi task gửi `StageEvaluation.stage_status`, đọc trạng thái đó; bước hỏng k là bước `fail` đầu tiên, không phải bước `not_attempted` (cả hai đều là `False` trong `stage_success`). Task cũ chỉ gửi `stage_success` vẫn chấm như trước
+  - [ ] 8.2 Tín hiệu từng bước đọc từ `StageSpec.signals`; xóa khóa `step_signals` khỏi `two-table.yaml` và `ScorerConfig`. Bước có `signals=None` thì từ chối (`ScorerError`), `()` là bước không cần tín hiệu. Task giả hai bàn trong test khai `signals` cho 6 bước
+  - [ ] 8.3 Lớp lỗi "theo bước hỏng k" chỉ đọc từ `FailureKindSpec.failure_class == "from_failed_stage"`; xóa khóa `class_from_failed_step` khỏi `two-table.yaml`, `ScorerConfig` và `judge_failure`. Task giả hai bàn khai L-COLLIDE, L-TIMEOUT là `from_failed_stage`
+  - [ ] 8.4 `Score` ghi `unknown_reason` có kiểu (`missing_signal`, `signal_all_null`, `step_not_in_trace`, `no_verdict`) thay `meta["unknown_steps"]`, và `step_enter_s`, `step_exit_s` chép từ `StageEvaluation` (bỏ trống cho bước chưa thử và chưa rõ; task không gửi thì để `None`, scorer không tự đoán). Tín hiệu có cột nhưng toàn null là chưa rõ (`signal_all_null`), không thành đạt. `scorer_version` 0.1.0 lên 0.2.0; `fw eval score` chạy qua test hợp đồng CLI
+- [ ] 9. Cấu hình scorer task bê khay (AC 8)
+  - [ ] 9.1 `configs/eval/scorer/tray.yaml`: `task_id: tray` (giả định, tới khi `TaskDefinition` thật của task bê khay có trong `flywheel-simple`), ngưỡng chép từ `configs/sim/tray.yaml` ghi giả định, thăng bằng theo `pelvis_height` và `fall_height`, `episode_signals: [collision]`; test so từng ngưỡng với `configs/sim/tray.yaml`
+  - [ ] 9.2 Task bê khay giả trong test (7 bước có `signals`, `FailureKindSpec` theo spec v10.6 mục 5.2) và test qua `tray.yaml`: mỗi mã của task bê khay một ca kiểm lớp chung; L-TRAY-TILT, L-COLLIDE, L-TIMEOUT ở ít nhất ba bước khác lớp; ca thành công, ca thiếu tín hiệu; `fw eval score` với `tray.yaml`
 
 ## Phạm vi file
 
@@ -46,6 +56,8 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `configs/eval/scorer/`
 - `packages/flywheel-eval/pyproject.toml` (chủ package là Châu, 07 mục 2.1 luật 2): khai `pyarrow`, thư viện mà `TaskDefinition.evaluate()` nhận bảng tín hiệu bằng
 - `uv.lock` (file dùng chung, R6): chỉ ba dòng ghi lại `pyarrow` cho `flywheel-eval`; không thêm gói mới vào khóa, `pyarrow` đã có sẵn qua `flywheel-contracts`
+
+Nhiệm vụ 8, 9 (5/11/2026) nằm trong các đường dẫn trên: `configs/eval/scorer/tray.yaml` thuộc `configs/eval/scorer/`, task bê khay giả nằm trong `tests/unit/scorer/`. Chỉ **đọc**, không sửa: `configs/sim/tray.yaml` (DA-32, test so ngưỡng), `flywheel.contracts` (#101). Không chạm: `packages/flywheel-contracts/`, `packages/flywheel-testkit/`, `packages/flywheel-simple/`, `agentqa/` (gồm `agentqa/bench/` của PR #132).
 
 ## Chỗ cần PO quyết trước khi làm
 
@@ -77,6 +89,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 5/11/2026 | Thêm AC 7, 8 và nhiệm vụ 8 (chuyển sang trường của #101: `StepStatus`, `StageSpec.signals`, `from_failed_stage`, `unknown_reason`, `step_enter_s`/`step_exit_s`; xóa `step_signals`, `class_from_failed_step`; `scorer_version` 0.2.0) và nhiệm vụ 9 (cấu hình scorer task bê khay theo spec v10.6 mục 5.2, quyết định PO trên #59 phương án a). Hiếu làm thay Châu để kịp demo 17/11 | PO (Hiếu) |
 | 5/11/2026 | Nhiệm vụ 7: `ScoreRecord` xóa, `build_record`, `score_record` và `write_record` dùng `Score` của `flywheel.contracts.entities`; tên trường và dòng trong `scorer/score.jsonl` giữ nguyên, thêm `id` `sc_…` theo nội dung. Đánh số bước (0 hay 1) vẫn chờ #62, chưa đổi | Châu |
 | 3/11/2026 | Sửa theo review PO trên #58: tín hiệu từng bước khai trong cấu hình nên thiếu tín hiệu ra "chưa rõ" bất kể vị từ trả gì (điểm 1, 7); giá trị không hữu hạn là khoảng trống (điểm 2); `L-COLLIDE`, `L-TIMEOUT` lấy lớp của bước hỏng k (điểm 3); kiểu lỗi không có bước trượt thì raise (điểm 4); CLI ra mã 2 kèm một dòng thay vì traceback, cấu hình mặc định tìm từ gốc repo (điểm 5, 6); `BalanceLimits` sang `config` và fixture dùng `h_place` của file (điểm 8). Theo quyết định PO: `L-BALANCE` chỉ dùng khi không bước nào trượt hay chưa rõ, episode đã có kiểu lỗi thì giữ kiểu và chỉ ghi `balance_violated`; thêm `trace_sha256` vào bản ghi; thêm nhiệm vụ 7. Đánh số bước (0 hay 1) chờ #62, chưa đổi | Châu |
 | 3/11/2026 | Mở issue #59 (Contract change cho Long): `Score` của S1-10 chưa merge, enum bốn trạng thái thay `stage_success: bool | None`, lý do "chưa rõ" có kiểu, `step_enter_s`/`step_exit_s`, và `from_failed_stage` cho `FailureKindSpec.failure_class` của L-COLLIDE, L-TIMEOUT. Kèm chỗ xin PO quyết về bốn mã task bê khay. AC 1 đạt một phần tới khi issue chốt | Châu |
