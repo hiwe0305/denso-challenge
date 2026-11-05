@@ -4,9 +4,22 @@ import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "./client";
 import type {
   AlgoStep,
+  BranchComparisonRow,
   ClusterBoardRow,
+  E1CurvePoint,
+  HeCurvePoint,
   ClusterCard,
+  DatasetReport,
+  DatasetRow,
+  EpisodeRow,
+  EvalEpisodeRow,
+  PipelineView,
+  EvaluationSummary,
+  FailureBoard,
   FixRate,
+  FunnelRow,
+  Page,
+  SystemCheckRow,
   Recommendation,
   RecommendationSummary,
   RepairTicket,
@@ -31,3 +44,31 @@ export const useClusterCard = (clusterId: string | null) =>
 export const useRepairTickets = (id: string | null) =>
   useGet<RepairTicket[]>(id ? `/repair-tickets?recommendation_id=${id}` : null);
 export const useFixRates = () => useGet<FixRate[]>("/fix-rates");
+
+// ---------------------------------------------------------------- M2
+export const useDatasets = () => useGet<Page<DatasetRow>>("/datasets?limit=500");
+export const useIntakes = () => useGet<Page<Record<string, unknown>>>("/intakes");
+export const useStages = (id: string | null) =>
+  useGet<PipelineView>(id ? `/datasets/${id}/stages` : null);
+export const useDatasetReport = (id: string | null) =>
+  useGet<DatasetReport>(id ? `/datasets/${id}/report` : null);
+export const useDatasetEpisodes = (id: string | null) =>
+  useGet<Page<EpisodeRow>>(id ? `/datasets/${id}/episodes?limit=500` : null);
+
+// ---------------------------------------------------------------- M9
+// The branch is meaningless without its task, so task_id is in the key (§6.4).
+export const useBranches = (task: string) =>
+  useGet<BranchComparisonRow[]>(`/results/branches?task_id=${task}`);
+export const useHeCurve = () => useGet<HeCurvePoint[]>("/results/he-curve");
+export const useE1Curve = () => useGet<E1CurvePoint[]>("/results/e1-curve");
+
+// ---------------------------------------------------------------- M6
+export const useEvaluations = () => useGet<Page<EvaluationSummary>>("/evaluations?limit=500");
+export const useFunnel = (id: string | null) =>
+  useGet<FunnelRow[]>(id ? `/evaluations/${id}/funnel` : null);
+export const useFailures = (id: string | null) =>
+  useGet<FailureBoard>(id ? `/evaluations/${id}/failures` : null);
+export const useSystemChecks = (id: string | null) =>
+  useGet<SystemCheckRow[]>(id ? `/evaluations/${id}/system-checks` : null);
+export const useEvalEpisodes = (id: string | null) =>
+  useGet<Page<EvalEpisodeRow>>(id ? `/evaluations/${id}/episodes?limit=500` : null);

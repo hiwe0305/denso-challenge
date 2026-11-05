@@ -1,7 +1,10 @@
 // Ten screens in flywheel order (DESIGN.md §6). Screens not built yet say so
 // with their milestone instead of rendering an empty page.
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { DataPipeline } from "./screens/DataPipeline";
+import { Evaluation } from "./screens/Evaluation";
 import { FailureToData } from "./screens/FailureToData";
+import { Results } from "./screens/Results";
 import { EmptyState } from "./ui/components";
 
 interface Screen {
@@ -14,14 +17,14 @@ interface Screen {
 
 export const screens: Screen[] = [
   { code: "M1", path: "/tong-quan", title: "Tổng quan", milestone: "M5 (14/11)" },
-  { code: "M2", path: "/du-lieu", title: "Dữ liệu", milestone: "M3 (10/11)" },
+  { code: "M2", path: "/du-lieu", title: "Dữ liệu", element: <DataPipeline />, milestone: "M3 (10/11)" },
   { code: "M3", path: "/agent-qa", title: "Agent QA/QC", milestone: "M5 (14/11)" },
   { code: "M4", path: "/release", title: "Release", milestone: "M5 (14/11)" },
   { code: "M5", path: "/huan-luyen", title: "Huấn luyện", milestone: "M5 (14/11)" },
-  { code: "M6", path: "/danh-gia", title: "Đánh giá", milestone: "M3 (10/11)" },
+  { code: "M6", path: "/danh-gia", title: "Đánh giá", element: <Evaluation />, milestone: "M3 (10/11)" },
   { code: "M7", path: "/failure-to-data", title: "Failure→Data", element: <FailureToData />, milestone: "M3 (10/11)" },
   { code: "M8", path: "/chi-phi", title: "Chi phí", milestone: "M5 (14/11)" },
-  { code: "M9", path: "/ket-qua", title: "Kết quả", milestone: "M3 (10/11)" },
+  { code: "M9", path: "/ket-qua", title: "Kết quả", element: <Results />, milestone: "M3 (10/11)" },
   { code: "M10", path: "/kiem-toan", title: "Kiểm toán", milestone: "M5 (14/11)" },
 ];
 

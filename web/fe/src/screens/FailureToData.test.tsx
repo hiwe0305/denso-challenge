@@ -1,24 +1,13 @@
 // M7 renders from MSW with nothing blank: four clusters, the free-cluster
 // sentence of the demo, the skipped codes with reasons, and a decision that
 // ends in an action status rather than an optimistic update.
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { App } from "../App";
 import type { Recommendation } from "../api/types";
+import { renderApp as renderAt } from "../test/renderApp";
 import { liveBudget } from "./FailureToData";
 
-function renderApp(path = "/failure-to-data") {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[path]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <App apiMode="mock" />
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
-}
+const renderApp = (path = "/failure-to-data") => renderAt(path);
 
 describe("M7 screen", () => {
   it("shows four clusters and says two of them cost no data", async () => {
