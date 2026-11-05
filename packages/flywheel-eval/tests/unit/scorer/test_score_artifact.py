@@ -28,7 +28,7 @@ def test_a_clean_episode_scores_as_a_pass(
     score = score_trace(write(tmp_path / "ep.jsonl", make_rows()), task, CONFIG)
 
     assert score.success is True
-    assert [step.status.value for step in score.steps] == ["pass"] * 6
+    assert [step.status for step in score.steps] == ["pass"] * 6
     # The control of AC 6: no failure *and* nothing unknown.
     assert score.unknown_steps == ()
     assert score.failure.failure_kind is None

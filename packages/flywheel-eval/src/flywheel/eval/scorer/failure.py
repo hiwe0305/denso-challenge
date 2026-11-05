@@ -48,7 +48,7 @@ from flywheel.contracts import FailureKindSpec, StageEvaluation, StageSpec
 # `flywheel.contracts` does not re-export the alias from its package root, and
 # widening that export is a contract change, so it is taken from its module.
 from flywheel.contracts.v0 import FailureClass
-from flywheel.eval.scorer.status import ScorerError, StepScore, StepStatus
+from flywheel.eval.scorer.status import ScorerError, StepScore
 
 UNKNOWN_KIND = "L-UNKNOWN"
 NO_KIND_FROM_TASK = "task báo bước hỏng nhưng không gán kiểu lỗi"
@@ -84,7 +84,7 @@ def judge_failure(
 ) -> FailureVerdict:
     """Name the failure of one episode from its already-scored steps."""
     declared = _declared(kinds)
-    unknown = next((step for step in steps if step.status is StepStatus.UNKNOWN), None)
+    unknown = next((step for step in steps if step.status == "unknown"), None)
     if unknown is not None:
         # With a failed step as well, the reason is that the order is in doubt,
         # not whatever the unjudged step was missing.

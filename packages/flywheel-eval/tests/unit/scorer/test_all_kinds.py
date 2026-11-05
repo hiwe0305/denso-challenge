@@ -25,7 +25,6 @@ from conftest import NaiveTask
 from flywheel.contracts import TaskDefinition
 from flywheel.eval.api import SCORER_CONFIG_DIR, score_trace
 from flywheel.eval.scorer.score import EpisodeScore
-from flywheel.eval.scorer.status import StepStatus
 
 MakeRows = Callable[..., list[dict[str, object]]]
 CONFIG = SCORER_CONFIG_DIR / "two-table.yaml"
@@ -70,7 +69,7 @@ def test_a_task_that_answers_anyway_cannot_make_a_missing_signal_a_verdict(
 
     scored = score(tmp_path, NaiveTask(verdict=answer), rows)
 
-    assert scored.steps[0].status is StepStatus.UNKNOWN
+    assert scored.steps[0].status == "unknown"
     assert scored.steps[0].reason == "thiếu tín hiệu: hand_object_distance"
     assert scored.success is None
     assert scored.failure.failure_kind == "L-UNKNOWN"
@@ -85,7 +84,7 @@ def test_a_missing_episode_signal_costs_a_clean_episode_its_pass(
     # collision is not a success (point 1, second case).
     scored = score(tmp_path, task, drop("collision", make_rows()))
 
-    assert [step.status for step in scored.steps] == [StepStatus.PASSED] * 6
+    assert [step.status for step in scored.steps] == ["pass"] * 6
     assert scored.success is None
     assert scored.failure.failure_kind == "L-UNKNOWN"
     assert "collision" in (scored.failure.reason or "")
@@ -100,7 +99,7 @@ def test_a_missing_signal_is_unknown_not_clean(
     assert scored.failure.failure_kind == "L-UNKNOWN"
     assert scored.failure.failure_class is None
     assert scored.failure.first_failed_step is None
-    assert [step.status for step in scored.steps] == [StepStatus.UNKNOWN] * 6
+    assert [step.status for step in scored.steps] == ["unknown"] * 6
     assert scored.missing_signals == ("hand_object_contact",)
 
 
@@ -157,8 +156,8 @@ def test_one_case_for_each_declared_kind(
     assert scored.success is False
     # Nothing unknown: the kind was established on signals that were all there.
     assert scored.unknown_steps == ()
-    assert scored.steps[failed_step].status is StepStatus.FAILED
-    assert all(step.status is StepStatus.NOT_ATTEMPTED for step in scored.steps[failed_step + 1 :])
+    assert scored.steps[failed_step].status == "fail"
+    assert all(step.status == "not_attempted" for step in scored.steps[failed_step + 1 :])
 
 
 def test_a_fall_after_a_step_failure_keeps_the_step_failure(
@@ -194,7 +193,7 @@ def test_balance_is_the_kind_at_any_step(
     assert scored.failure.failure_class == "balance"
     assert scored.balance.violated is True
     assert scored.balance.row == 19
-    assert [step.status for step in scored.steps] == [StepStatus.PASSED] * 6
+    assert [step.status for step in scored.steps] == ["pass"] * 6
 
 
 def test_every_declared_kind_has_a_case(task: TaskDefinition) -> None:
