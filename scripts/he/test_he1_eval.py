@@ -42,6 +42,7 @@ from he1_eval import (
     JsonLog,
     Router,
     Slot,
+    client_command,
     config_sha256,
     dead_or_late,
     expected,
@@ -57,6 +58,7 @@ from he1_eval import (
     results,
     run_eval,
     serve_routes,
+    stop_command,
     stop_line,
     upload,
     wait_client,
@@ -841,6 +843,7 @@ class Box:
         self.on_launch: Any = None
         self.on_prepare: Any = None
         self.jobs = "---\n---\n"
+        self.on_mem: Any = None
 
     def __call__(self, argv: Any) -> subprocess.CompletedProcess[str]:
         argv = list(argv)
@@ -855,7 +858,13 @@ class Box:
                     "".join(f"episode_{k}: {k % 3 == 0} \n" for k in range(4))
                 )
             return ok
+        if "docker stop" in command:  # stop_command: the launcher's group, then the container
+            assert "kill -TERM --" in command and "client-" in command
+            self.calls.append("docker stop")
+            return ok
         if "MemAvailable" in command:
+            if self.on_mem:
+                self.on_mem()
             return subprocess.CompletedProcess(
                 argv, 0, f"MemAvailable: {self.mem_gb << 20} kB\n", ""
             )
@@ -871,9 +880,6 @@ class Box:
             self.calls.append("prepare")
             if self.on_prepare:
                 self.on_prepare()
-            return ok
-        if "docker stop" in command:
-            self.calls.append("docker stop")
             return ok
         if "cat " in command:
             return subprocess.CompletedProcess(argv, 0, (self.exit or "") + "\n1\n", "")
@@ -1025,3 +1031,148 @@ def test_a_full_run_routes_logs_and_scores_its_own_episodes(tmp_path: Path) -> N
         (2, False, True),
         (3, True, True),
     ]
+
+
+# --- re-review of #129: shutdown on every way out, results kept, SIGHUP, the launcher ------
+
+
+def test_a_route_log_that_cannot_be_kept_still_stops_the_session(tmp_path: Path) -> None:
+    args, env, box, calls, servers, _ = eval_setup(tmp_path)
+    job = args.dest / "da26-t2-eval-n20"
+    job.mkdir(parents=True)
+    (job / "route.jsonl").write_text(json.dumps({"run": "x", "event": "y"}) + "\n")
+    (job / "route-x.jsonl").write_text("kept earlier\n")
+    try:
+        assert run_eval(args, env) == 5
+    finally:
+        [s.shutdown() for s in servers]
+    assert calls == ["fetch", "stop", "rsync"]
+    assert (job / "route-x.jsonl").read_text() == "kept earlier\n"
+    # and preflight --dest refuses it before any session is started
+    (tmp_path / "set2").mkdir()
+    (tmp_path / "set2/order.json").write_text("{}")
+    digest = __import__("hashlib").sha256(b"{}").hexdigest()
+
+    def ready(argv: Any) -> subprocess.CompletedProcess[str]:
+        command = argv[-1]
+        out = (
+            "MemAvailable: 41943040 kB\n"
+            if "MemAvailable" in command
+            else ("---\n---\n" if "pgrep" in command else f"client\n{digest}\n0\n")
+        )
+        return subprocess.CompletedProcess(argv, 0, out, "")
+
+    assert preflight(tmp_path / "set2", ready, dest=args.dest) == 5
+    assert preflight(tmp_path / "set2", ready) == 0
+
+
+def test_a_system_exit_inside_the_run_still_stops_the_session(tmp_path: Path) -> None:
+    args, env, box, calls, servers, _ = eval_setup(tmp_path)
+
+    def bail() -> None:
+        raise SystemExit("deep inside")
+
+    box.on_prepare = bail
+    try:
+        assert run_eval(args, env) == 5
+    finally:
+        [s.shutdown() for s in servers]
+    assert calls == ["prepare", "fetch", "stop", "rsync"]
+
+
+def test_a_second_signal_during_the_shutdown_does_not_cut_it_short(tmp_path: Path) -> None:
+    args, env, box, calls, servers, _ = eval_setup(tmp_path)
+    box.on_prepare = lambda: os.kill(os.getpid(), signal.SIGTERM)
+    fetch = env.fetch
+
+    def fetch_signalled() -> subprocess.CompletedProcess[str]:
+        os.kill(os.getpid(), signal.SIGINT)  # a second one, while the VM logs are pulled
+        return fetch()
+
+    env.fetch = fetch_signalled
+    try:
+        assert run_eval(args, env) == 7
+    finally:
+        [s.shutdown() for s in servers]
+    assert calls == ["prepare", "fetch", "stop", "rsync"]
+    rows = [
+        json.loads(x) for x in (args.dest / "da26-t2-eval-n20/route.jsonl").read_text().splitlines()
+    ]
+    assert {"event", "signals"} <= rows[-1].keys() and rows[-1]["signals"] == ["SIGINT"]
+
+
+def test_an_inherited_ignored_sighup_stays_ignored(tmp_path: Path) -> None:
+    args, env, box, calls, servers, _ = eval_setup(tmp_path)
+    box.mem_gb = 30
+    seen: list[Any] = []
+    box.on_mem = lambda: seen.append(signal.getsignal(signal.SIGHUP))
+    before = signal.signal(signal.SIGHUP, signal.SIG_IGN)
+    try:
+        assert run_eval(args, env) == 4
+        assert seen == [signal.SIG_IGN] and signal.getsignal(signal.SIGHUP) == signal.SIG_IGN
+    finally:
+        signal.signal(signal.SIGHUP, before)
+        [s.shutdown() for s in servers]
+
+
+def test_a_run_that_never_launched_keeps_the_earlier_results(tmp_path: Path) -> None:
+    job = tmp_path / "da26-t2-eval-n20"
+    order = pair_order(load_plan())
+    (job / "client/eval/old/x").mkdir(parents=True)
+    (job / "order.json").write_text(json.dumps({"slots": [asdict(s) for s in order]}))
+    (job / "client/eval/old/x/eval_stats.txt").write_text("episode_0: True \nepisode_1: True \n")
+    old = [{"run": "old", "event": "client_launch", "tag": "old"}]
+    old += [{"run": "old", "event": "episode_start", "episode": k, "time": "t"} for k in range(2)]
+    (job / "route-old.jsonl").write_text("".join(json.dumps(e) + "\n" for e in old))
+    assert len(results(tmp_path, job / "route-old.jsonl")) == 2  # an earlier run, again
+    assert (job / "results-old.jsonl").read_text() == (job / "results.jsonl").read_text()
+    kept = (job / "results.jsonl").read_text()
+    (job / "route.jsonl").write_text(json.dumps({"run": "new", "event": "rtx_mem"}) + "\n")
+    assert results(tmp_path) == [] and (job / "results.jsonl").read_text() == kept
+
+
+def test_the_stop_kills_our_launcher_even_before_its_container_exists(tmp_path: Path) -> None:
+    """The real launcher and stop commands, run here with HOME at tmp_path: a fake
+    systemd-run (runs the command), a he1_client.sh still in setup (sleeping), a fake
+    docker. The stop kills the launcher's group; the EXIT trap writes `exit`."""
+    home, shims = tmp_path / "home", tmp_path / "bin"
+    work = home / "denso-da26"
+    (work / "runs/da26-t2-eval-n20").mkdir(parents=True)
+    (work / "fw/scripts/he").mkdir(parents=True)
+    shims.mkdir()
+    (shims / "systemd-run").write_text(
+        '#!/bin/bash\nwhile [ "$1" != bash ]; do shift; done\nexec "$@"\n'
+    )
+    (shims / "docker").write_text(f'#!/bin/bash\necho "$*" >> {tmp_path}/docker.calls\n')
+    for shim in shims.iterdir():
+        shim.chmod(0o755)
+    (work / "fw/scripts/he/he1_client.sh").write_text(
+        "status=1\ntrap 'echo \"$status\" > runs/da26-t2-eval-n20/exit' EXIT\nsleep 60 & wait\n"
+    )
+    environ = {**os.environ, "HOME": str(home), "PATH": f"{shims}:{os.environ['PATH']}"}
+    subprocess.run(["bash", "-c", client_command("tg", 20)], env=environ, check=True)
+    pgid_file = work / "runs/da26-t2-eval-n20/client-tg.pgid"
+    deadline = time.monotonic() + 10
+    while not pgid_file.is_file() and time.monotonic() < deadline:
+        time.sleep(0.05)
+    pgid = int(pgid_file.read_text())
+    time.sleep(0.3)
+    group = subprocess.run(
+        ["pgrep", "-g", str(pgid), "-af", "he1_client"], capture_output=True, text=True
+    )
+    assert "he1_client.sh --set sets/interleaved --tag tg --episodes 20" in group.stdout
+    # a stranger in another group is never signalled, whatever the pgid file says
+    stranger = subprocess.Popen(["setsid", "sleep", "30"])
+    time.sleep(0.2)
+    other = work / "runs/da26-t2-eval-n20/client-zz.pgid"
+    other.write_text(str(stranger.pid))
+    subprocess.run(["bash", "-c", stop_command("zz")], env=environ, check=False)
+    assert stranger.poll() is None
+    stranger.kill()
+    subprocess.run(["bash", "-c", stop_command("tg")], env=environ, check=False)
+    deadline = time.monotonic() + 10
+    while subprocess.run(["pgrep", "-g", str(pgid)], capture_output=True).returncode == 0:
+        assert time.monotonic() < deadline, "the launcher's group survived the stop"
+        time.sleep(0.05)
+    assert (work / "runs/da26-t2-eval-n20/exit").read_text().strip() == "1"
+    assert "stop -t 30 da26-eval-client" in (tmp_path / "docker.calls").read_text()

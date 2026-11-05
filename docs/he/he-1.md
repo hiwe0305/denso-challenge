@@ -357,9 +357,9 @@ Chưa chạy. Chờ đợt C của DA-34 dừng và được xác nhận (một 
   - `episode_s` là số lớn hơn giữa 33 phút và 1,2 × episode dài nhất đã thấy. 33 phút là trung bình của lần chạy 10 episode của S1-03 trên rtx3060 khi máy chạy chung với DA-34 và DA-35 ([psi0-eval.md](../g0/psi0-eval.md)); một episode hỏng trên máy rảnh mất 24,6 phút. Giữ 33 phút cho tới khi đo được trên chính máy này lúc chạy (review #129). Episode nhanh hơn tiết kiệm CU nhưng không nới quy tắc.
   - `spent` là dòng `poll` cuối của watcher, chỉ khi mới hơn 300 s; nếu cũ thì chờ tối đa 600 s, rồi từ chối. 300 s cho phần kết thúc là giả định: đóng forward, kéo log VM, dừng phiên có xác nhận.
   - Bị từ chối thì `route` trả 503, dừng container client (`docker stop da26-eval-client`), `run` thoát 3. Các cặp trước đó đều đủ.
-- **Phiên luôn được dừng.** Khi đã thấy phiên chạy, mọi đường ra của `run` đều qua cùng một bước kết thúc: bị từ chối, client lỗi, thiếu RAM, server sai arm, ngoại lệ, hay SIGTERM, SIGINT, SIGHUP. Bước kết thúc làm theo thứ tự: kéo log VM bằng `once`, dừng phiên có xác nhận (khoản CU cuối), rồi mới kéo `client/` từ rtx3060 (không tốn CU, rsync có `ConnectTimeout` và `--timeout=120`) và ghi `results.jsonl`. Lỗi ở một bước không chặn bước sau.
-- **Client chết hay treo.** Trong lúc chờ, `run` dừng client khi không có request 30 phút sau khi chạy (copy cache kit, ảnh, khởi động Isaac khoảng 4 phút), hay 15 phút sau request cuối (lớn hơn reset cộng 600 s chờ số đo). Nó cũng dừng client khi số đo cho thấy phần kết thúc sẽ vượt dòng dừng (chốt chặn; quy tắc cặp lẽ ra không để xảy ra), hay khi đã chạy lâu hơn thời gian trần 18 cho phép. Sau mỗi lần dừng, `he1_client.sh` có 600 s để chuyển file và ghi `exit`; container mất không coi là xong. Không có `exit` thì `run` vẫn kết thúc và dừng phiên.
-- **Chạy lại an toàn.** Mỗi lần `run` có một tag. Mọi dòng của `route.jsonl` mang tag đó; `route.jsonl` của lần trước được giữ thành `route-<tag cũ>.jsonl`. File của client theo tag: `client-<tag>.log`, `eval/<tag>/`, `videos/<tag>/`, `summary-<tag>.json`. `results.jsonl` chỉ đọc lần `client_launch` cuối và file của đúng tag đó.
+- **Phiên luôn được dừng.** Khi đã thấy phiên chạy, mọi đường ra của `run` đều qua cùng một bước kết thúc: bị từ chối, client lỗi, thiếu RAM, server sai arm, mọi ngoại lệ (cả `SystemExit`), SIGTERM, SIGINT, SIGHUP. Tín hiệu thứ hai trong lúc đang kết thúc chỉ được ghi lại, không cắt bước kết thúc. SIGHUP đã bị bỏ qua sẵn (do `nohup`) thì vẫn bỏ qua. Bước kết thúc làm theo thứ tự: kéo log VM bằng `once`, dừng phiên có xác nhận (khoản CU cuối), rồi mới kéo `client/` từ rtx3060 (không tốn CU, rsync có `ConnectTimeout` và `--timeout=120`) và ghi `results.jsonl`. Lỗi ở một bước không chặn bước sau.
+- **Client chết hay treo.** Trong lúc chờ, `run` dừng client khi không có request 30 phút sau khi chạy (copy cache kit, ảnh, khởi động Isaac khoảng 4 phút), hay 15 phút sau request cuối (lớn hơn reset cộng 600 s chờ số đo). Nó cũng dừng client khi số đo cho thấy phần kết thúc sẽ vượt dòng dừng (chốt chặn; quy tắc cặp lẽ ra không để xảy ra), hay khi đã chạy lâu hơn thời gian trần 18 cho phép. Lệnh dừng giết cả nhóm tiến trình của launcher (`setsid` ghi pgid vào `client-<tag>.pgid`; chỉ giết khi nhóm đó còn chứa `he1_client.sh`), nên client đang ở bước chuẩn bị, chưa có container, cũng dừng; sau đó mới `docker stop`. Sau mỗi lần dừng, `he1_client.sh` có 600 s để chuyển file và ghi `exit` (trap EXIT vẫn chạy khi bị SIGTERM); container mất không coi là xong. Không có `exit` thì `run` vẫn kết thúc và dừng phiên.
+- **Chạy lại an toàn.** Mỗi lần `run` có một tag. Mọi dòng của `route.jsonl` mang tag đó; `route.jsonl` của lần trước được giữ thành `route-<tag cũ>.jsonl`. File của client theo tag: `client-<tag>.log`, `eval/<tag>/`, `videos/<tag>/`, `summary-<tag>.json`. `results.jsonl` chỉ đọc lần `client_launch` cuối và file của đúng tag đó; mỗi lần ghi thêm `results-<tag>.jsonl`. Một lần `run` không chạy tới client (ví dụ thiếu RAM) không ghi đè kết quả cũ; kết quả của lần trước dựng lại được bằng `results --route route-<tag>.jsonl`. `preflight --dest` từ chối trước khi mở phiên nếu log cũ không giữ được.
 - **Tải lên chỉ những gì server đọc**: `argv.txt`, `run_config.json` (chứa sẵn cận chuẩn hóa) và `ckpt_40000/model.safetensors`, 2 × 6,25 GB = 12,5 GB. Kèm theo là `expected.json`, ghi sha256 đã kiểm trên laptop: lấy từ cache `.hashes.json` của `he1_fetch` khi stamp (kích thước, mtime) còn khớp, không thì tính lại. Psi0 ở `cda3fdf` không đọc gì khác của run dir (không cần `*_norm_stats.json`, đã kiểm trong mã nguồn). `serve` kiểm lại sha256 trên VM trước khi nạp; lệch một file là không chạy server nào. Tải lên chạy song song với `serve-setup` (tách khỏi shell). `probe` đo cả tốc độ kéo về (1 GB) và đẩy lên (256 MB).
 - **Log cho Agent QA/QC từ đầu**, tất cả trong `fwdata/he/runs/da26-t2-eval-n20/`:
   - `route.jsonl`: mọi request (episode, arm, reset, thời gian, mã trả về), mọi lần chấm cặp với các số của nó, `/info` của hai server, số RAM rtx3060, các lần tunnel khởi động lại, lý do dừng client, kết quả bước kết thúc;
@@ -393,7 +393,7 @@ S=da26-t2-eval-n20
 python3 scripts/he/he1_eval.py interleave --src fwdata/he/dev-eval-v1-l0n10 --out fwdata/he/eval-n20-interleaved
 git archive --format=tar.gz HEAD | ssh rtx3060 'mkdir -p ~/denso-da26/fw && tar -xz -C ~/denso-da26/fw'
 rsync -a fwdata/he/eval-n20-interleaved/ rtx3060:denso-da26/sets/interleaved/
-python3 scripts/he/he1_eval.py preflight --set fwdata/he/eval-n20-interleaved
+python3 scripts/he/he1_eval.py preflight --set fwdata/he/eval-n20-interleaved --dest fwdata/he/runs
 ```
 
 Sau đó guard và watcher như khối ở trên, `--cap 18`, rồi:
@@ -407,7 +407,7 @@ python3 scripts/he/he1_eval.py upload --session $S --registry $R --runs fwdata/h
 vm $S 'tail -1 /content/da26/serve-setup.log'   # chờ "serve-setup exit 0"
 vm $S "cd /content/da26; nohup setsid bash -c 'python3 fw/scripts/he/he1_colab.py serve; echo serve exit \$?' > serve.log 2>&1 < /dev/null &"
 vm $S 'tail -1 /content/da26/serve.log'   # chờ "serve exit 0": hai server trả /health
-python3 scripts/he/he1_eval.py preflight --set fwdata/he/eval-n20-interleaved   # kiểm lại RAM và job khác ngay trước
+python3 scripts/he/he1_eval.py preflight --set fwdata/he/eval-n20-interleaved --dest fwdata/he/runs   # kiểm lại RAM và job khác ngay trước
 nohup setsid bash -c 'python3 scripts/he/he1_eval.py run --session "$1" --registry "$0" --dest fwdata/he/runs --set fwdata/he/eval-n20-interleaved; echo "exit $?"' $R $S < /dev/null > $R/$S.eval.log 2>&1 &
 ```
 
@@ -415,7 +415,7 @@ nohup setsid bash -c 'python3 scripts/he/he1_eval.py run --session "$1" --regist
 - Trong lúc eval, forward giữ kết nối SSH duy nhất, nên lượt `--persist` của watcher ở mốc mềm có thể bị từ chối (HTTP 429). Không sao: `run` kéo log VM sau khi đóng forward.
 - Xem tiến độ: `tail -3 fwdata/he/runs/da26-t2-eval-n20/route.jsonl`, `tail -1 $R/$S.jsonl`.
 - Bộ xen kẽ dựng ngày 5/11/2026 từ bộ dev thật: 20 episode, `order.json` sha256 `6d764478…`; test kiểm từng episode trùng điều kiện của nó (`environment_config`) và hash điều kiện của RunPlan.
-- Thử khô trên laptop, CPU, không Colab, không ghi gì lên rtx3060: [`test_he1_eval.py`](../../scripts/he/test_he1_eval.py) có 40 test, gồm:
+- Thử khô trên laptop, CPU, không Colab, không ghi gì lên rtx3060: [`test_he1_eval.py`](../../scripts/he/test_he1_eval.py) có 46 test, gồm:
   - thứ tự xen kẽ; bộ xen kẽ trên bộ giả và trên bộ dev thật;
   - quy tắc CU (vừa, vượt, episode chậm nâng cận, số đo cũ hay thiếu, trần của watcher khác 16); cổng chờ số đo; đọc dòng `poll`; mấy cặp vừa;
   - `route` qua HTTP với hai server giả; thử lại lỗi kết nối;
@@ -424,7 +424,9 @@ nohup setsid bash -c 'python3 scripts/he/he1_eval.py run --session "$1" --regist
   - client không gọi, im lặng, máy không tới được, quá dòng CU; sau khi bị từ chối vẫn chờ `exit`; `preflight` chỉ đọc; rtx3060 còn job denso hay `pol.train_stage_a` thì không chạy (`preflight` 6, `run` 8), container khác chỉ ghi log;
   - `vm-logs`, `serve` với launcher giả, ghim của client trùng `eval_psi0.sh`.
 
-  Kiểm đột biến: bỏ sửa định dạng cache, trả về khi container mất, bỏ bước kết thúc khi thiếu RAM. Mỗi đột biến làm test hỏng.
+  - review lại #129: `SystemExit` và log cũ không giữ được vẫn dừng phiên; tín hiệu thứ hai không cắt bước kết thúc; SIGHUP bỏ qua sẵn giữ nguyên; lần chạy không tới client giữ kết quả cũ; lệnh dừng thật (chạy ở máy này với `HOME` tạm, `systemd-run` và `docker` giả) giết nhóm của launcher đang ở bước chuẩn bị và không đụng nhóm khác.
+
+  Kiểm đột biến: bỏ sửa định dạng cache, trả về khi container mất, bỏ bước kết thúc khi thiếu RAM, bắt `Exception` thay vì `BaseException`, ghi đè SIGHUP đã bỏ qua, bỏ lệnh giết nhóm, cho tín hiệu thứ hai cắt ngang. Mỗi đột biến làm test hỏng.
 
 ## Change log
 
@@ -447,3 +449,4 @@ nohup setsid bash -c 'python3 scripts/he/he1_eval.py run --session "$1" --regist
 | 5/11/2026 | Mục 7.1: cách chạy eval tier 2. Xen kẽ hai arm theo điều kiện (`he1_eval.py`, `route` chọn server theo lần reset); quy tắc CU theo cặp, không dừng giữa cặp; chỉ tải lên file server đọc, kiểm sha256 trên VM; log cho Agent QA/QC trong `runs/da26-t2-eval-n20/`; `vm-logs` thành bước của script; client rtx3060 dưới `systemd-run` MemoryMax. Ở số đo hiện có chỉ 9 cặp vừa trần 16; ba **[Option]** cho Hiếu. Chưa chạy | Hiếu (soạn với Claude) |
 | 5/11/2026 | Mục 7.1, theo review #129: cache sha256 đọc đúng định dạng của `he1_fetch`; phiên luôn được dừng (thiếu RAM, ngoại lệ, tín hiệu), `preflight` kiểm rtx3060 trước khi mở phiên; client chết hay treo thì dừng, có hạn chờ; cận episode 33 phút hoặc 1,2 × dài nhất; kết thúc theo thứ tự log VM, dừng phiên, rtx3060; thử lại lỗi kết nối 180 s; chạy lại an toàn theo tag; kiểm `/info` của hai server. Trần 16 còn 6–8 cặp; bốn **[Option]** cho Hiếu. Chưa chạy | Hiếu (soạn với Claude) |
 | 5/11/2026 | Mục 6.2, 7, 7.1: **[Đã chốt 5/11/2026, Hiếu]** "Nâng lên 18 + giữ rtx3060": trần eval 18 (dòng dừng 17,77), watcher `--cap 18`, tổng DA-26 nhiều nhất 33,85 + 18 = 51,85 CU; rtx3060 chỉ chạy client trong khung giờ eval (`preflight` thoát 6, `run` thoát 8 khi còn job denso hay `pol.train_stage_a`). Bảng cặp tính lại ở trần 18: 10 cặp ở 24,6 phút, biên mỏng (cần ≤ 1,055 CU trước reset đầu). Quy tắc cặp giữ nguyên | Hiếu (soạn với Claude) |
+| 5/11/2026 | Mục 7.1, theo review lại #129: bước kết thúc (dừng phiên) chạy cả khi `SystemExit` hay tín hiệu thứ hai; `preflight --dest` kiểm log cũ trước khi mở phiên; `results-<tag>.jsonl`, lần chạy không tới client không ghi đè kết quả; SIGHUP bỏ qua sẵn giữ nguyên; lệnh dừng giết nhóm tiến trình của launcher (pgid) rồi mới `docker stop` | Hiếu (soạn với Claude) |
