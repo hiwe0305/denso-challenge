@@ -10,6 +10,7 @@ import type { BranchComparisonRow, EvalEpisodeRow } from "../api/types";
 import { taskId as taskIds, type TaskId } from "../contracts/enums";
 import { EmptyState, ErrorBox, Loading, MockBadge, Panel, SealedLock } from "../ui/components";
 import { fmt } from "../ui/labels";
+import { HeCurve } from "./HeCurve";
 
 /** Target of the demo: Level 1 and Level 2 each at or above 70% (design 27/10). */
 export const LEVEL_TARGET = 0.7;
@@ -175,19 +176,7 @@ function Curves() {
           <EmptyState title="HE chưa có điểm nào được đánh giá">
             V-EGO, V-EGO10, V-NOEGO theo N ∈ {"{10, 20, 40, 80}"} sẽ hiện khi checkpoint của các điểm HE có lượt eval.
           </EmptyState>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs text-slate-500"><tr><th>Nhánh</th><th className="text-right">N demo</th><th className="text-right">Thành công</th><th /></tr></thead>
-            <tbody>
-              {he.data?.map((p, i) => (
-                <tr key={i} className="border-t border-slate-100">
-                  <td>{p.branch} · {p.hypothesis}</td><td className="text-right">{p.n_demos}</td>
-                  <td className="text-right">{pct(p.sim_success_rate)}</td><td>{p.is_sealed ? <SealedLock until={null} /> : null}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        ) : <HeCurve points={he.data ?? []} />}
       </div>
     </Panel>
   );

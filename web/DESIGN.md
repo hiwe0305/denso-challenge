@@ -13,6 +13,7 @@ Bản v0.4. Tài liệu này là nguồn duy nhất cho tầng web: API, Postgre
 | 5/11/2026 | 0.3 | W11 đóng: hợp đồng đã có `EpisodeMetadata.benchmark_copy_id` (#62), bộ nạp map nó vào `episodes.benchmark_copy_id` thay vì để NULL, và bộ mock gắn nó cho 10 episode của bản sao chấm | Châu |
 | 5/11/2026 | 0.4 | Mốc M0 xong phần FE: thêm §7.4 hình dạng response cho 5 màn hình lõi (nguồn là `fe/src/api/types.ts`); §7.1 thêm `GET /recommendations` và `GET /evaluations/{id}`; quy ước trang, header vai tạm `X-Fw-Role`, id trong mock là mã `*_ref`. Dựng `fe/`: Vite, MSW đọc thẳng `mock/demo-17-11/`, type hợp đồng sinh bằng `json-schema-to-typescript`, màn hình M7 | Châu |
 | 5/11/2026 | 0.4 | Dựng `api/` trước khi có Postgres: FastAPI với mọi endpoint đọc của §7.1 và hai endpoint ghi của M7, trên lớp đọc thay được (`SinkReadModel` đọc sink JSONL của `fwsync`; `PostgresReadModel` chờ M1). Hành động ghi vào `human_actions.jsonl`, đầu vào của `fwsync export`. Test đối chiếu 38 request với response của MSW. Đi trước W8: thêm một dịch vụ ở L0, chờ PO | Châu |
+| 5/11/2026 | 0.4 | Hai view sửa: `v_branch_comparison` bỏ thí nghiệm HE và HE_T (mọi điểm HE chung một nhánh, nên `DISTINCT ON` sẽ lấy một điểm bất kỳ làm "nhánh"); `v_he_curve` thêm cột `he_variant` để vẽ một đường cho mỗi biến thể. Bộ mock thêm lượt eval cho A_07, B_FAIL và lưới HE; M9 vẽ đường cong HE có khoảng tin cậy Wilson 95% và N₅₀ | Châu |
 
 Ba chỗ sửa ở bản 0.3:
 
@@ -1124,7 +1125,7 @@ Hôm nay 3/11/2026, demo 17/11/2026, còn 14 ngày. Châu làm cả FE, BE và b
 | M6 · Ghép dữ liệu thật | 15/11 | `fwsync` trỏ sang output thật của lõi; phần chưa có giữ mock, FE dán nhãn theo `origin` | Ít nhất pipeline và một lượt eval là dữ liệu thật |
 | M7 · Tổng duyệt | 16/11 | Chạy trọn kịch bản hai lần liên tiếp; công tắc chuyển sang mock dự phòng | Hai lần không lỗi |
 
-**Trạng thái 5/11/2026.** M0 đạt: test so enum xanh, và MSW trả bộ mock của cả 5 màn hình lõi (`fe/src/mocks/handlers.test.ts`, 18 ca), trễ 1 ngày so với hạn. M1 mới đạt phần không cần database: 41 bảng, 3 role, trigger, `fwsync import` nạp hai lần cho cùng kết quả trên sink JSONL. Còn thiếu migration Alembic, ca đúng/ca sai của từng luật trên Postgres thật, và kiểm `fw_api` không ghi được bảng P; cả ba chờ Postgres 16 và W8. Màn hình M7 đã chạy trên MSW, đi trước phần FE của M3. M2 (API đọc) đạt trên sink JSONL: mọi endpoint §7.1 trả đúng response MSW trả (`tests/test_api.py`, 38 ca đối chiếu); còn thiếu SSE và bản Postgres. Bốn màn lõi của M3 (M7, M6, M2, M9) đã chạy, cả trên MSW lẫn trên API sink; bộ mock chưa có lượt eval cho A_07, B_FAIL và ba điểm HE, nên đường cong HE của M9 còn trống.
+**Trạng thái 5/11/2026.** M0 đạt: test so enum xanh, và MSW trả bộ mock của cả 5 màn hình lõi (`fe/src/mocks/handlers.test.ts`, 18 ca), trễ 1 ngày so với hạn. M1 mới đạt phần không cần database: 41 bảng, 3 role, trigger, `fwsync import` nạp hai lần cho cùng kết quả trên sink JSONL. Còn thiếu migration Alembic, ca đúng/ca sai của từng luật trên Postgres thật, và kiểm `fw_api` không ghi được bảng P; cả ba chờ Postgres 16 và W8. Màn hình M7 đã chạy trên MSW, đi trước phần FE của M3. M2 (API đọc) đạt trên sink JSONL: mọi endpoint §7.1 trả đúng response MSW trả (`tests/test_api.py`, 38 ca đối chiếu); còn thiếu SSE và bản Postgres. Bốn màn lõi của M3 (M7, M6, M2, M9) đã chạy, cả trên MSW lẫn trên API sink; bộ mock nay có đủ bốn nhánh và lưới HE 3 biến thể × N ∈ {10, 20, 40, 80}, nên M9 vẽ được cả bảng nhánh lẫn đường cong HE.
 
 ### 9.3 Môi trường cần có
 
@@ -1243,11 +1244,11 @@ Bảng dưới là file **thật** của thư mục. Nó khác bản 0.2 ở hai
 | `pipeline_stage_runs.jsonl` | 33 lần chạy tầng: psi tầng 4 `OVERRIDDEN`, bàn phím tầng 4 có hai attempt, bản sao dừng ở tầng 4 |
 | `episodes.jsonl` | 210 episode, đủ bốn nguồn; 10 episode egocentric còn `raw` nằm ở `unassigned` |
 | `qa_reports.jsonl` | 200 báo cáo (egocentric raw chưa qua tầng 4); flag, quarantine, reject đều có lý do |
-| `releases.jsonl`, `release_items.jsonl` | 1 release đóng băng có hash (166 item, 2 item bị loại kèm lý do), 1 release nháp |
-| `experiments.jsonl`, `experiment_datasets.jsonl`, `checkpoints.jsonl` | 4 nhánh A, A_07, B, B_FAIL cộng 3 điểm HE |
+| `releases.jsonl`, `release_items.jsonl` | 1 release đóng băng có hash (166 item, 2 item bị loại kèm lý do), 1 release nháp, và 12 release HE: mỗi release đúng N demo gốc của người cộng 20 / 10 / 0 clip egocentric theo biến thể |
+| `experiments.jsonl`, `experiment_datasets.jsonl`, `checkpoints.jsonl` | 4 nhánh A, A_07, B, B_FAIL cộng lưới HE 3 biến thể (V_EGO, V_EGO10, V_NOEGO) × N ∈ {10, 20, 40, 80} |
 | `training_metrics.jsonl`, `train_diagnoses.jsonl` | 2 run, train và val; B_FAIL có T3; cả hai bỏ qua T7 kèm lý do |
 | `probes.jsonl` | P1, P3 của hai checkpoint; P4 của B so với cha A |
-| `evaluations.jsonl`, `eval_episodes.jsonl` | 2 lượt dev × 90 episode, đủ ba mức, 4 episode lỗi hạ tầng; 1 holdout niêm phong tới 20/11 |
+| `evaluations.jsonl`, `eval_episodes.jsonl` | 4 lượt dev × 90 episode (A, A_07, B, B_FAIL), đủ ba mức, 2 episode lỗi hạ tầng mỗi lượt; 12 lượt dev chỉ có số tổng cho điểm HE (V_EGO chạm 50% ở N = 20, hai biến thể kia ở N = 40); 1 holdout niêm phong tới 20/11 |
 | `system_diagnoses.jsonl` | 27 episode lỗi của B: `controller`, `sync`, **`unknown` vì thiếu log RTC**, `clean` |
 | `recommendation.json`, `failure_clusters.jsonl` | 1 lượt, 4 cụm: HE_THONG_CONTROLLER, NGOAI_MIEN, THIEU_VUNG_PHU, KY_NANG_YEU |
 | `flywheel_algo_steps.jsonl`, `diagnostic_runs.jsonl` | 12 bước; rollout chẩn đoán của ba cụm, một phép kiểm `skipped` kèm lý do |

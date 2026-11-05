@@ -15,6 +15,7 @@ import type {
   DeidStatus,
   EvalMode,
   FailureClass,
+  HeVariant,
   InfraStatus,
   InterventionKind,
   Origin,
@@ -510,6 +511,8 @@ export interface HeCurvePoint {
   task_id: TaskId;
   branch: string;
   hypothesis: string;
+  /** One curve per variant (design 27/10 §7.2). */
+  he_variant: HeVariant | null;
   n_demos: number;
   train_seed: number | null;
   level: number | null;

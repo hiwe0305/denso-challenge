@@ -837,7 +837,8 @@ class SinkReadModel:
         """v_branch_comparison: latest unsealed dev eval of each branch's best checkpoint."""
         rows = []
         for x in self.t("experiments"):
-            if x["task_id"] != task_id:
+            # HE points share one branch; they have their own view (v_he_curve).
+            if x["task_id"] != task_id or x["hypothesis"] in ("HE", "HE_T"):
                 continue
             ckpt = self._best_checkpoint(x["experiment_code"])
             if ckpt is None:
@@ -903,6 +904,7 @@ class SinkReadModel:
                 scored = ev["total_episodes"] - ev["infra_failed_count"]
                 points.append({
                     "task_id": x["task_id"], "branch": x["branch"], "hypothesis": x["hypothesis"],
+                    "he_variant": (x.get("hyperparams") or {}).get("he_variant"),
                     "n_demos": len(self._human_root_episodes(x["experiment_code"])),
                     "train_seed": x.get("train_seed"), "level": ev.get("level"),
                     "sim_success_rate": (

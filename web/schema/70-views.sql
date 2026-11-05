@@ -206,7 +206,9 @@ WHERE NOT ev.is_deleted;
 -- v_branch_comparison · tỉ lệ thành công cạnh chi phí (M1, M9)
 -- ---------------------------------------------------------------------------
 -- "Mới nhất" nghĩa là eval của checkpoint is_best, split = dev, chưa niêm
--- phong. Nhánh luôn đi kèm task_id.
+-- phong. Nhánh luôn đi kèm task_id. Thí nghiệm HE không vào đây: mọi điểm HE
+-- mang chung một nhánh, nên DISTINCT ON sẽ chọn một điểm bất kỳ làm "nhánh";
+-- HE có view riêng là v_he_curve (bản 0.4).
 CREATE VIEW v_branch_comparison AS
 SELECT
   x.task_id,
@@ -235,6 +237,7 @@ FROM (
      AND NOT ev.is_deleted
      AND ev.split = 'dev'
      AND (ev.sealed_until IS NULL OR ev.sealed_until <= now())
+     AND e.hypothesis NOT IN ('HE','HE_T')
    ORDER BY e.task_id, e.branch, e.method, ev.level, ev.finished_at DESC
 ) x
 LEFT JOIN LATERAL (
@@ -254,6 +257,8 @@ SELECT
   e.task_id,
   e.branch,
   e.hypothesis,
+  -- Biến thể HE (V_EGO, V_EGO10, V_NOEGO); một đường cong cho mỗi biến thể.
+  e.hyperparams->>'he_variant'                                AS he_variant,
   -- Số demo robot của nhánh: đếm episode gốc do người làm, không nhập tay.
   (SELECT count(*)
      FROM experiment_datasets ed
