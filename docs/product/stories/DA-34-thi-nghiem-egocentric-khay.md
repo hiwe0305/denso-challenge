@@ -44,7 +44,7 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
 - [ ] 2. Fine-tune A, C, C-NOEGO (AC 2) · **4/11/2026, bậc 2:** chỉ C (C+ ở nhiệm vụ 5), trần 36 CU, cap 18 CU mỗi lần, có watcher; A và C-NOEGO bỏ ([tray.md](../../he/tray.md) mục 9)
   - [x] 2.1 (5/11/2026) Mã phía VM `flywheel_psi0.tray.colab_train` (setup, train, check) cho nhánh C của `rp_a04c14e79dfd`: từ chối plan khác, lệch `pinned_files`, bản cắt sai; dùng lại `he1_colab.py stage`/`persist` và `he1_fetch.py` của DA-26; runbook ở tray.md mục 12; dòng ước lượng
   - [x] 2.2 (5/11/2026) Dựng bản cắt C trên rtx3060 (`demo_subset.py` ở master a5e863f, sau PR #121), `colab_train check` qua: `cut_problems` rỗng, n = 160, `set_hash` a202cc02… tính lại từ seed của bản cắt, tree sha256 6db888a1…; ở `~/denso-da34-pool/fwdata/cut-c-rp_a04c14e79dfd`
-  - [ ] 2.3 Chạy C trên Colab theo runbook, sau lô của DA-26 và khi Hiếu cho chạy; checkpoint về laptop
+  - [x] 2.3 (5/11/2026) Chạy C trên Colab L4 theo runbook, từ master 5632c74, phiên `da34-t2-ft-c-s0` (03:08–11:24Z): đủ 40.000 bước, `result.json` ok, `train exit 0`; `ckpt_10000`…`ckpt_40000` về laptop, sha256 khớp VM. `follow` thoát 5 do race của `stage` (đã kiểm, không phải lỗi train); hai listing sau khi dừng: 0 assignment. MANIFEST.md (435 mục, 25,47 GB) cho Agent QA/QC; bản chép sang rtx3060 ở `~/denso-da34-pool/fwdata/tray/runs/da34-t2-ft-c-s0`
   - [ ] 2.4 Dòng `measured` của `job_da34_ft_C` (CU, bước, giờ)
 - [ ] 3. Eval và bảng kết quả, video (AC 3, 4)
 - [ ] 4. Nhánh B khi có video (AC 5)
