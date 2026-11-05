@@ -17,7 +17,8 @@ REASON = "finite_values (D3): NaN or Inf values = 4 > 0"
 
 
 def _bench(tmp_path: Path, qa_work: QAWork, report: Report, seal: Seal,
-           agent_reports: bool = True) -> tuple[Path, Path]:
+           agent_reports: bool = True,
+           clean_findings: tuple[tuple[str, str], ...] = ()) -> tuple[Path, Path]:
     answers = tmp_path / "answers"
     seal(answers, INJECTED, [
         Defect(target_ref="episode_000001", code="D3", parameters={"kind": "nan_values"}),
@@ -29,7 +30,7 @@ def _bench(tmp_path: Path, qa_work: QAWork, report: Report, seal: Seal,
     copies = []
     for copy_id, reasons, findings in (
         (INJECTED, {1: [REASON]}, [("episode_000002", "D7"), ("episode_000000", "D2")]),
-        (CLEAN, {}, []),
+        (CLEAN, {}, list(clean_findings)),
     ):
         work = qa_work(spec_dir, copy_id, 4, reasons)
         name = f"agent-{copy_id}.jsonl"
@@ -100,3 +101,20 @@ def test_without_the_agent_run_the_command_stops_before_the_answer(
     rows = [json.loads(line) for p in (tmp_path / "store").rglob("ledger.jsonl")
             for line in p.read_text().splitlines()]
     assert rows[-1]["note"].startswith("wall seconds of the DA-31 bench, failed")
+
+
+def test_a_clean_agent_report_on_the_dataset_is_a_false_alarm(
+    tmp_path: Path, qa_work: QAWork, report: Report, seal: Seal
+) -> None:
+    spec, answers = _bench(tmp_path, qa_work, report, seal,
+                           clean_findings=(("dataset", "T2"),))
+    out = tmp_path / "out"
+    run_bench(spec, [answers], out, store=tmp_path / "store")
+    (group,) = json.loads((out / "bench_result.json").read_text(encoding="utf-8"))["groups"]
+    agent = group["layers"]["agent"]
+    assert agent["false_alarm_on_clean"] == {"hit": 1, "total": 4, "value": 0.25}
+    assert agent["false_alarm_not_a_unit"] == ["dataset"]
+    assert agent["clean_reports"] == [["dataset", "T2"]]
+    assert group["layers"]["code"]["false_alarm_not_a_unit"] == []
+    page = (out / "index.html").read_text(encoding="utf-8")
+    assert "không gắn đơn vị" in page and "1 (dataset)" in page

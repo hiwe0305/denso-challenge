@@ -110,3 +110,15 @@ def test_time_to_report_runs_from_job_end_and_is_unknown_without_it() -> None:
     unknown = CopyResult("data", CLEAN, None, group.clean.runs, group.clean.manifest)
     later = score_group(GroupResult("data", group.injected, unknown)).layers
     assert later["code"].seconds_to_report[CLEAN] is None
+
+
+def test_a_clean_report_on_no_unit_counts_as_a_false_alarm() -> None:
+    group = _group()
+    clean = _copy(CLEAN, [], code=[("e5", "D6"), ("e8", "D6")],
+                  agent=[("dataset", "T2"), ("dataset", "D6"), ("e4", "D1")])
+    agent = score_group(GroupResult("data", group.injected, clean)).layers["agent"]
+    # e4 is a unit; "dataset" is not, and counts once for its two codes: (1 + 1) / 10
+    assert agent.not_a_unit == ("dataset",)
+    assert (agent.false_alarm.hit, agent.false_alarm.total) == (2, 10)
+    assert agent.false_alarm.value == 0.2
+    assert ("dataset", "T2") in agent.clean_reports

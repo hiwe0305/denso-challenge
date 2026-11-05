@@ -25,7 +25,7 @@ from flywheel.eval.agentqa.bench.detections import LAYERS
 from flywheel.eval.agentqa.bench.layers import AgentQuality, KindSplit
 from flywheel.eval.agentqa.bench.score import GroupScore, Rate
 
-BENCH_VERSION = "da31-1"
+BENCH_VERSION = "da31-2"
 RESULT = "bench_result.json"
 RESULT_LOCK = "bench_result.sha256"
 PAGE = "index.html"
@@ -100,6 +100,7 @@ def _group_json(report: GroupReport) -> dict[str, Any]:
             "masked_by_kind": dict(s.masked_by_kind),
             "precision_by_code": {c: _rate(r) for c, r in s.precision_by_code.items()},
             "false_alarm_on_clean": _rate(s.false_alarm),
+            "false_alarm_not_a_unit": list(s.not_a_unit),
             "clean_reports": [list(p) for p in s.clean_reports],
             "natural": [list(p) for p in s.natural],
             "seconds_to_report": dict(s.seconds_to_report),
@@ -166,6 +167,7 @@ def _group_html(group: Mapping[str, Any]) -> str:
     ]
     alarm_rows = [
         [layer, _shown(layers[layer]["false_alarm_on_clean"]),
+         _listed(layers[layer]["false_alarm_not_a_unit"]),
          ", ".join(f"{t} {c}" for t, c in layers[layer]["clean_reports"]) or "none"]
         for layer in LAYERS
     ]
@@ -200,8 +202,9 @@ def _group_html(group: Mapping[str, Any]) -> str:
                 "masked code / agent"], split_rows),
         _table("Precision per code (natural findings left out)",
                ["code", "code checks", "Agent QA/QC"], precision_rows),
-        _table("False alarms on the clean copy (units reported / units)",
-               ["layer", "rate", "reports"], alarm_rows),
+        _table("False alarms on the clean copy ((units reported + targets that name no unit)"
+               " / units)",
+               ["layer", "rate", "not a unit (không gắn đơn vị)", "reports"], alarm_rows),
         _table("Time from job end to report", ["layer", "copy", "time"], time_rows),
         f"<h3>Agent QA/QC: ranking {_e(_shown(quality['ranking']))}"
         " (true finding ranked above false, pairs within a report)</h3>",
@@ -214,6 +217,10 @@ def _group_html(group: Mapping[str, Any]) -> str:
         _table("Failures without a code (not counted)", ["layer", "copy", "reason"],
                uncoded_rows),
     ])
+
+
+def _listed(names: Sequence[str]) -> str:
+    return f"{len(names)} ({', '.join(names)})" if names else "0"
 
 
 def _frac(hit: int, total: int) -> str:
