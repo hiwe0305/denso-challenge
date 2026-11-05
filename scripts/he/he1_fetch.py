@@ -66,7 +66,8 @@ or by the endpoint of its registry entry. Trusted as cu_watch.py counts it: on a
 auth failure `colab sessions` prints "No active sessions" and exits 0, so an
 untrusted listing is neither running nor gone. `follow` skips that pass (ALERT from
 the third in a row); `once` retries three times, then exits 2.
-Exit codes: 0 every job's final checkpoint verified here; 1 not (yet); 2 refused;
+Exit codes: 0 every job's final checkpoint verified here (`--no-checkpoint`, for the
+eval's job: every job pulled); 1 not (yet); 2 refused;
 3 stopped early; 4 probe under SLOW_MB_S; 5 train failed, session stopped; 6 a stop
 not confirmed.
 """
@@ -517,6 +518,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--colab", type=Path, default=COLAB)
     parser.add_argument("--every", type=float, default=600.0, help="`follow`: seconds per pull")
     parser.add_argument("--stop-when-done", action="store_true", help="`follow`: then colab stop")
+    parser.add_argument(
+        "--no-checkpoint",
+        action="store_true",
+        help="`once`: a job with no train (the eval), done once a pass pulled it",
+    )
     parser.add_argument("--local-vm", type=Path, help="dry run: a VM work dir on this disk")
     parser.add_argument(
         "--remote-work",
@@ -612,7 +618,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     log(event="EARLY_STOP", session=args.session, **verdict)
                     return stopped(3)
                 alert(f"{args.session}: early-stop projection {verdict['verdict']}", **verdict)
-        done = bool(statuses) and all(s["final"] for s in statuses)
+        done = bool(statuses) and all(s["final"] or args.no_checkpoint for s in statuses)
         if done and args.mode == "follow" and args.stop_when_done:
             return stopped(0)
         if done or args.mode == "once":

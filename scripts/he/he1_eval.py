@@ -943,7 +943,7 @@ def session_env(args: argparse.Namespace) -> Env:
     def fetch() -> subprocess.CompletedProcess[str]:
         return run(
             [
-                *(sys.executable, str(HERE / "he1_fetch.py"), "once"),
+                *(sys.executable, str(HERE / "he1_fetch.py"), "once", "--no-checkpoint"),
                 *("--session", args.session, "--registry", str(args.registry)),
                 *("--dest", str(args.dest), "--colab", str(args.colab)),
             ]

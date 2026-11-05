@@ -167,6 +167,20 @@ def test_once_reports_not_done_then_done_only_at_the_last_step(tmp_path: Path) -
     assert main([*args, "--local-vm", str(vm)]) == 0
 
 
+def test_once_for_a_job_with_no_train_is_done_when_pulled(tmp_path: Path) -> None:
+    """The eval's job: servers, logs, no train and no checkpoint. Without the flag
+    `once` said 1 (not yet) after a full pull, and he1_eval logged vm_pulled code 1
+    (eval attempt 3, 5/11/2026). A pass that pulls nothing is still 1."""
+    vm = fake_vm(tmp_path / "vm", saved=(), complete=0)
+    args = ["once", "--session", JOB, "--registry", str(tmp_path), "--dest", str(tmp_path / "l")]
+    assert main([*args, "--local-vm", str(vm)]) == 1
+    assert main([*args, "--no-checkpoint", "--local-vm", str(vm)]) == 0
+    assert (tmp_path / "l" / JOB / "metrics.jsonl").is_file()
+    empty = tmp_path / "empty-vm"
+    empty.mkdir()
+    assert main([*args, "--no-checkpoint", "--local-vm", str(empty)]) == 1
+
+
 @pytest.mark.parametrize(
     ("infra_status", "complete"), [("failed", 20000), ("ok", 20000), ("failed", 40000)]
 )
