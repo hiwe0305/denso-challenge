@@ -1,0 +1,60 @@
+# Ngưỡng vị từ và điều kiện thăng bằng của scorer, task bê khay (G1, DA-32).
+# Nguồn định nghĩa: design 28/10/2026 mục 3.2 (7 bước scorer), 3.3 (kiểu lỗi),
+# 3.4 (điều kiện thành công); spec v10.6 mục 5.2 (lớp lỗi chung của mã khay).
+# Story DA-36 AC 8, nhiệm vụ 9.
+#
+# Mọi số dưới đây là **giả định**: chép từ `configs/sim/tray.yaml` của DA-32,
+# chưa đo trên episode thật. Test `test_tray_scorer_config.py` giữ từng số khớp với
+# file đó, nên đổi ngưỡng của task thì đổi ở `configs/sim/tray.yaml` trước rồi
+# chép sang đây. Hiệu chỉnh là việc của DA-37. Không dùng các số này để báo
+# chỉ số chính; chỉ số chính là `sim_success` (03 ADR-14, FR39).
+#
+# Không có khóa nào là tùy chọn, như `two-table.yaml`. Hash của file này đi
+# theo mỗi `Score` (AC 5).
+#
+# Bảng mã và lớp lỗi chung **không** khai ở đây: scorer đọc chúng từ
+# `FailureKindSpec` của task (AC 4), tín hiệu từng bước từ `StageSpec.signals`
+# (#101). Để người đọc file này đối chiếu, theo spec v10.6 mục 5.2 (quyết định
+# PO 5/11/2026 trên #59, phương án a):
+#
+#   Bước scorer (design 3.2)            Lớp lỗi chung
+#   1 approach_a (tiếp cận A)           approach
+#   2 grasp (cầm), 3 lift (nhấc)        grasp
+#   4 carry (mang), 5 reach_b (tới B)   carry
+#   6 place (đặt), 7 release_stand      place
+#
+#   L-PART-DROP, L-ONE-HAND, L-WALK     carry
+#   L-PLACE-POSE                        place
+#   L-BALANCE                           balance
+#   L-TRAY-TILT, L-COLLIDE, L-TIMEOUT   theo bước hỏng k (`from_failed_stage`)
+
+task_id: tray   # giả định: chưa có `TaskDefinition` thật của task bê khay; phải trùng `task_id` của nó
+scorer_version: 0.2.0  # cùng phiên bản scorer với `two-table.yaml`; `Score` cũ giữ nguyên
+
+# Ngưỡng vị từ, truyền nguyên vào `TaskDefinition.evaluate()` qua `ScorerParams`.
+# Tên khóa trùng tên trong `configs/sim/tray.yaml`, để vị từ của DA-32 và vị từ
+# chấm từ trace đọc cùng một số.
+thresholds:
+  r_reach: 0.10             # m; giả định; hai bàn tay quanh hai tay cầm, bước 1
+  approach_zone: 0.6        # m; giả định; thân trong vùng trước cạnh bàn, bước 1, 4, 5
+  h_lift: 0.03              # m; giả định; khay rời mặt bàn A quá mức này, bước 3
+  tilt_max_deg: 15.0        # độ; giả định; θ_tilt, khay nghiêng quá là L-TRAY-TILT
+  contact_grace: 0.2        # s; giả định; mất một tay lâu hơn khi mang là L-ONE-HAND
+  target_pos_tol: 0.05      # m; giả định; dung sai vị trí vùng đích trên bàn B, bước 6
+  target_yaw_tol_deg: 10.0  # độ; giả định; dung sai góc vùng đích, bước 6
+  still_speed: 0.01         # m/s; giả định; khay chậm hơn mức này là đứng yên, bước 7
+  t_stable: 1.0             # s; giả định; T_stable, khay đứng yên trước khi kết, bước 7
+  episode_limit_s: 90.0     # s; giả định; hết giờ là L-TIMEOUT
+
+# Tín hiệu không thuộc bước nào: thiếu nó thì episode sạch mất quyền "đạt".
+# Va chạm quyết định L-COLLIDE, không quyết định bước nào đạt. Giả định: hook
+# trace của task bê khay ghi cờ va chạm với tên này.
+episode_signals: [collision]
+
+# Điều kiện chạy suốt episode (design 3.4: robot vẫn đứng), như task hai bàn:
+# vi phạm là L-BALANCE khi không bước nào trượt và không bước nào chưa rõ.
+balance:
+  height_signal: pelvis_height  # tên tín hiệu trong trace, theo `TrayState.pelvis_height`
+  tilt_signal: torso_tilt
+  min_height: 0.5   # m; giả định; = `fall_height` của `configs/sim/tray.yaml`
+  max_tilt: 0.35    # rad; giả định; `configs/sim/tray.yaml` không có ngưỡng nghiêng thân, lấy số của `two-table.yaml`
