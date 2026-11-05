@@ -12,6 +12,7 @@ import pytest
 from flywheel.contracts.artifacts import QAReport, ReplayIssue, ReplayReport
 from flywheel.data.config import QAConfig
 from flywheel.data.ingest.lerobot import EpisodeFrames
+from flywheel.data.inject.codes import DATA_DEFECT_CODES
 from flywheel.data.qa.checks import (
     calibrate_action_jump,
     dataset_checks,
@@ -96,7 +97,7 @@ def broken(name: str) -> EpisodeFrames:
         ("timestamp_monotonic", "D2", "reject"),
         ("timestamp_step", "D2", "reject"),
         ("frame_index_contiguous", "D2", "quarantine"),
-        ("finite_values", "D3", "reject"),
+        ("finite_values", "D1", "reject"),
         ("joint_limits", "D3", "reject"),
         ("action_jump.arm", "D3", "flag"),
         ("task_instruction", "D6", "flag"),
@@ -109,6 +110,26 @@ def test_each_check_catches_its_defect(
     assert failed(report) == {name}
     assert report.decision == decision
     assert len(report.reasons) == 1 and report.reasons[0].startswith(f"{name} ({code}): ")
+
+
+@pytest.mark.parametrize(
+    ("check", "kind"),
+    [
+        ("finite_values", "nan_values"),
+        ("frame_index_contiguous", "drop_frames"),
+        ("joint_limits", "joint_limit_exceeded"),
+        ("action_jump", "joint_jump"),
+        ("split_seed", "holdout_seed_leak"),
+        ("task_instruction", "wrong_task_instruction"),
+        ("task_success", "corrupted_success_label"),
+    ],
+)
+def test_a_check_reports_the_code_of_the_defect_it_catches(
+    qa_config: QAConfig, check: str, kind: str
+) -> None:
+    # DA-31 matches a QA finding to an injected defect by code (design 9.2): a check
+    # coded apart from the kind it catches would score 0 recall on that kind.
+    assert qa_config.checks[check].code == DATA_DEFECT_CODES[kind]
 
 
 def test_a_limit_rounded_in_the_layout_is_no_breach(qa_config: QAConfig) -> None:

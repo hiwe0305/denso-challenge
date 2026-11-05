@@ -9,7 +9,7 @@ failure belongs to, and every threshold and every action on failure comes from
     timestamp_step          D2  largest |dt * fps - 1|, in control periods
     frame_index_contiguous  D2  rows whose frame_index is not 0, 1, ..., T-1
     image_state_sync        D2  largest |video frames - rows| over the cameras
-    finite_values           D3  NaN or Inf values in timestamp, states, action
+    finite_values           D1  NaN or Inf values in timestamp, states, action
     joint_limits            D3  largest step past a joint limit of the action layout (rad)
     action_jump.<group>     D3  largest |a[t+1] - a[t]| of the group, against a clean demo
     lineage                 D6  lineage fields the source needs that the episode lacks
