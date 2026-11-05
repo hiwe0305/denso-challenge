@@ -272,6 +272,16 @@ export interface RawLedger {
   note?: string | null;
 }
 
+export interface RawDecision {
+  decision_ref: string;
+  kind: string | null;
+  target_kind: string | null;
+  target_id: string | null;
+  conclusion: string | null;
+  reason: string | null;
+  source_action_id: string | null;
+}
+
 export interface RawPriceBook {
   name: string;
   sha256: string;
@@ -307,6 +317,7 @@ export interface MockData {
   ledger: RawLedger[];
   priceBooks: RawPriceBook[];
   trainDiagnoses: RawTrainDiagnosis[];
+  decisions: RawDecision[];
 }
 
 export function loadMockData(): MockData {
@@ -331,5 +342,6 @@ export function loadMockData(): MockData {
     ledger: table("ledger"),
     priceBooks: table("price_books"),
     trainDiagnoses: table("train_diagnoses"),
+    decisions: table("decisions"),
   };
 }

@@ -363,8 +363,10 @@ def test_the_write_loop_closes_through_the_fake_core(tmp_path: Path) -> None:
     result = run_fake_core(outbox, inbox)
 
     assert result.status == "ok", result.errors
-    replies = list(inbox.glob("*.jsonl"))
+    # The core's layout, `<table>/part-<id>.jsonl`, so `fwsync import` sees the table.
+    replies = list(inbox.rglob("*.jsonl"))
     assert len(replies) == 1
+    assert replies[0].parent.name == "decisions"
     reply = json.loads(replies[0].read_text(encoding="utf-8"))
     assert reply["source_action_id"] == ACTION["id"]
     assert reply["kind"] == "plan_review"

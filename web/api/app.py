@@ -14,6 +14,8 @@ Conventions of §7.3 kept here:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, FastAPI, Header, Request
@@ -23,12 +25,29 @@ from fastapi.responses import JSONResponse
 from web.api.actions import ActionStore
 from web.api.readmodel import ReadModel
 from web.contracts.enums import ALL
+from web.fwsync import actions as action_log
+from web.fwsync.runner import run_cycle
+from web.fwsync.sink import JsonlSink
 
 API_PREFIX = "/api"
 DEFAULT_ROLE = "ML_ENGINEER"
 USER_ROLES = ALL["user_role"]
 CLUSTER_DIAGNOSES = ALL["cluster_diagnosis"]
 INTERVENTION_DECISIONS = ALL["intervention_decision"]
+SYNC_STATUSES = ALL["sync_status"]
+#: §7.2: `POST /sync/run` is for ADMIN and LEAD only.
+SYNC_ROLES = ("ADMIN", "LEAD")
+
+
+@dataclass(frozen=True)
+class SyncConfig:
+    """Where one sync pass reads and writes in sink mode (`POST /sync/run`)."""
+
+    outbox: Path
+    inbox: Path
+    sink: Path
+    fake_core: bool
+    origin: str = "core"
 
 
 class ApiError(Exception):
@@ -67,7 +86,9 @@ def _require_key(key: str | None) -> str:
     return key
 
 
-def create_app(model: ReadModel, actions: ActionStore) -> FastAPI:
+def create_app(
+    model: ReadModel, actions: ActionStore, sync: SyncConfig | None = None
+) -> FastAPI:
     app = FastAPI(
         title="Humanoid Data Flywheel · web API",
         version="0.4.0",
@@ -204,9 +225,53 @@ def create_app(model: ReadModel, actions: ActionStore) -> FastAPI:
         return model.sensitivity(price_book)
 
     # ------------------------------------------------------------ actions
+    @r.get("/actions")
+    def action_list(sync_status: str | None = None, cursor: str | None = None,
+                    limit: int | None = None) -> Any:
+        if sync_status is not None and sync_status not in SYNC_STATUSES:
+            raise ApiError(422, "BAD_SYNC_STATUS", f"sync_status {sync_status} không hợp lệ")
+        return _page(actions.list_actions(sync_status), cursor, limit)
+
     @r.get("/actions/{action_id}")
     def action(action_id: str) -> Any:
         return _found(actions.status(action_id), "hành động")
+
+    @r.get("/decisions")
+    def decisions(cursor: str | None = None, limit: int | None = None) -> Any:
+        return _page(model.decisions(), cursor, limit)
+
+    @r.get("/sync/runs")
+    def sync_runs() -> Any:
+        return actions.runs()
+
+    @r.post("/sync/run")
+    def sync_run(x_fw_role: str | None = Role) -> Any:
+        """One pass of §5.5 in sink mode: export → (fake core) → import → APPLIED."""
+        if _role(x_fw_role) not in SYNC_ROLES:
+            raise ApiError(403, "ROLE", "chỉ ADMIN và LEAD được chạy đồng bộ (§7.2)")
+        if sync is None:
+            raise ApiError(409, "SYNC_NOT_CONFIGURED", "API chạy không kèm thư mục đồng bộ",
+                           "khởi động lại với --outbox và --inbox")
+        started = action_log.now_iso()
+        result = run_cycle(actions.path, sync.outbox, sync.inbox,
+                           JsonlSink(directory=sync.sink), fake_core=sync.fake_core,
+                           origin=sync.origin)
+        model.refresh()
+        return actions.add_run({
+            "id": f"sync_{len(actions.runs()) + 1:04d}",
+            "direction": "cycle",
+            "status": result.status,
+            "started_at": started,
+            "finished_at": action_log.now_iso(),
+            "exported": result.exported,
+            "applied": result.applied,
+            "fake_core": sync.fake_core,
+            "errors": [
+                *result.export.errors,
+                *(result.fake_core.errors if result.fake_core else []),
+                *(result.imported.errors if result.imported else []),
+            ],
+        })
 
     @r.post("/recommendations/{rec_id}/decision", status_code=202)
     def decide(rec_id: str, body: dict[str, Any], idempotency_key: str | None = Key) -> Any:

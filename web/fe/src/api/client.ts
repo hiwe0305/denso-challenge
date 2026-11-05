@@ -1,5 +1,6 @@
 // The one fetch wrapper. Every component goes through it, so switching MSW off
 // (VITE_API_MODE=real) points the FE at the backend without other changes.
+import { role } from "./role";
 import type { ActionAccepted, ApiError } from "./types";
 
 export const API_BASE = "/api";
@@ -24,8 +25,11 @@ async function parse<T>(response: Response): Promise<T> {
   throw new ApiRequestError(response.status, body);
 }
 
+/** Every request says who is asking (§7.4); the API filters sealed rows by it (BR-10). */
+const baseHeaders = (): Record<string, string> => ({ Accept: "application/json", "X-Fw-Role": role() });
+
 export async function apiGet<T>(path: string): Promise<T> {
-  return parse<T>(await fetch(`${API_BASE}${path}`, { headers: { Accept: "application/json" } }));
+  return parse<T>(await fetch(`${API_BASE}${path}`, { headers: baseHeaders() }));
 }
 
 /**
@@ -40,10 +44,15 @@ export async function apiAction(
   return parse<ActionAccepted>(
     await fetch(`${API_BASE}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+      headers: { ...baseHeaders(), "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
       body: JSON.stringify(body),
     }),
   );
+}
+
+/** POST that is not a human action, e.g. `POST /sync/run` (§7.2, no action_kind). */
+export async function apiPost<T>(path: string): Promise<T> {
+  return parse<T>(await fetch(`${API_BASE}${path}`, { method: "POST", headers: baseHeaders() }));
 }
 
 export const newIdempotencyKey = (): string => crypto.randomUUID();

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import math
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -24,7 +25,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from web.api.actions import ActionStore
-from web.api.app import create_app
+from web.api.app import SyncConfig, create_app
 from web.api.readmodel import PostgresReadModel, SinkReadModel, SinkTables, js_round
 from web.fwsync.runner import run_export, run_import
 from web.fwsync.sink import JsonlSink
@@ -94,7 +95,7 @@ def test_parity_covers_every_read_endpoint_of_7_1(client: TestClient) -> None:
     """A read route nobody compares is a route that can drift; list them all."""
     paths = client.get("/openapi.json").json()["paths"]
     routes = {path for path, ops in paths.items() if "get" in ops and path.startswith("/api")}
-    assert len(routes) == 27
+    assert len(routes) == 30
     covered = set()
     for line in PARITY_CASES:
         path = line.split(" ", 1)[1].split("?")[0]
@@ -204,3 +205,59 @@ def test_js_round_rounds_half_up_like_the_fe() -> None:
     assert js_round(0.5, 0) == 1.0  # Python's round(0.5) is 0
     assert js_round(2.5, 0) == 3.0
     assert js_round(-2.5, 0) == -2.0  # Math.round(-2.5) === -2
+
+
+# ---------------------------------------------------------------- M4 over HTTP
+
+
+def _sync_client(sink: Path, tmp_path: Path, *, fake_core: bool = True) -> TestClient:
+    """A client on its own copy of the sink: a sync run writes into the sink."""
+    own = tmp_path / "sink"
+    shutil.copytree(sink, own)
+    config = SyncConfig(outbox=tmp_path / "outbox", inbox=tmp_path / "inbox", sink=own,
+                        fake_core=fake_core, origin="mock")
+    model = SinkReadModel(SinkTables(own), now=lambda: DEMO_DAY)
+    return TestClient(create_app(model, ActionStore(tmp_path / "state"), config))
+
+
+def test_sync_run_is_for_admin_and_lead_only(sink: Path, tmp_path: Path) -> None:
+    client = _sync_client(sink, tmp_path)
+    assert client.post("/api/sync/run").status_code == 403
+    assert client.post("/api/sync/run", headers={"X-Fw-Role": "LEAD"}).status_code == 200
+
+
+def test_sync_run_without_folders_says_so(client: TestClient) -> None:
+    response = client.post("/api/sync/run", headers={"X-Fw-Role": "ADMIN"})
+    assert response.status_code == 409
+    assert response.json()["code"] == "SYNC_NOT_CONFIGURED"
+
+
+def test_click_to_applied(sink: Path, tmp_path: Path) -> None:
+    """DESIGN.md §9.2 M4: approve → outbox → fake core applies → re-import sees APPLIED."""
+    client = _sync_client(sink, tmp_path)
+    action_id = client.post("/api/recommendations/rec_round1/decision", json=APPROVE_ALL,
+                            headers={"Idempotency-Key": "m4"}).json()["action_id"]
+    assert client.get(f"/api/actions/{action_id}").json()["sync_status"] == "PENDING"
+    assert [a["action_id"] for a in
+            client.get("/api/actions?sync_status=PENDING").json()["items"]] == [action_id]
+
+    run = client.post("/api/sync/run", headers={"X-Fw-Role": "ADMIN"}).json()
+
+    assert run["status"] == "ok" and run["applied"] == [action_id]
+    status = client.get(f"/api/actions/{action_id}").json()
+    assert status["sync_status"] == "APPLIED" and status["exported_at"] and status["applied_at"]
+    answers = [d for d in client.get("/api/decisions").json()["items"]
+               if d["source_action_id"] == action_id]
+    assert len(answers) == 1
+    assert client.get("/api/sync/runs").json()[0]["id"] == run["id"]
+    # A second run finds nothing to do and changes nothing.
+    again = client.post("/api/sync/run", headers={"X-Fw-Role": "ADMIN"}).json()
+    assert again["exported"] == [] and again["applied"] == []
+
+
+def test_without_the_fake_core_the_action_waits(sink: Path, tmp_path: Path) -> None:
+    client = _sync_client(sink, tmp_path, fake_core=False)
+    action_id = client.post("/api/recommendations/rec_round1/decision", json=APPROVE_ALL,
+                            headers={"Idempotency-Key": "m4b"}).json()["action_id"]
+    client.post("/api/sync/run", headers={"X-Fw-Role": "ADMIN"})
+    assert client.get(f"/api/actions/{action_id}").json()["sync_status"] == "EXPORTED"

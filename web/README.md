@@ -74,7 +74,7 @@ API đọc thư mục JSONL mà `fwsync import` ghi, nên **chạy được khi 
 Postgres**. Một lệnh nạp bộ mock rồi mở API ở cổng 8000:
 
 ```bash
-uv run python -m web.api --import-from mock/demo-17-11 --origin mock --sink fwdata/web-sink
+uv run python -m web.api --import-from mock/demo-17-11 --origin mock --sink fwdata/web-sink --fake-core
 # http://127.0.0.1:8000/docs  ·  http://127.0.0.1:8000/api/recommendations
 ```
 
@@ -89,8 +89,31 @@ FE gọi API thật thay cho MSW:
 cd web/fe && VITE_API_MODE=real npm run dev   # Vite chuyển /api sang cổng 8000
 ```
 
-Bấm nút ghi trên FE thì API ghi một dòng vào `fwdata/web-state/human_actions.jsonl`,
-và chính file đó là đầu vào của `fwsync export --actions`.
+### Vòng ghi (mốc M4)
+
+Bấm nút ghi trên FE thì API ghi một dòng PENDING vào
+`fwdata/web-state/human_actions.jsonl`. File chỉ được thêm: mỗi lần đổi trạng
+thái là một dòng mới (`web/fwsync/actions.py`), trạng thái chỉ đi tới
+PENDING → EXPORTED → APPLIED.
+
+Một lượt đồng bộ là `POST /api/sync/run` (chỉ ADMIN, LEAD; trên FE là nút "Chạy
+đồng bộ" ở M10, đổi vai ở thanh trên cùng). Nó chạy `export` → lõi giả (nếu API
+mở với `--fake-core`) → `import` thư mục inbox vào sink → đánh dấu APPLIED mọi
+hành động có `source_action_id` quay về. Không có `--fake-core` thì hành động
+dừng ở EXPORTED cho tới khi lõi thật ghi kết quả vào `fwdata/inbox`.
+
+Cùng vòng đó bằng tay, từng lệnh:
+
+```bash
+uv run python -m web.fwsync.cli export --actions fwdata/web-state/human_actions.jsonl --to fwdata/outbox
+uv run python -m web.fwsync.cli fake-core --outbox fwdata/outbox --to fwdata/inbox
+uv run python -m web.fwsync.cli import --from fwdata/inbox --out fwdata/web-sink --origin mock \
+  --actions fwdata/web-state/human_actions.jsonl
+```
+
+Lõi giả ghi theo bố cục của lõi, `<bảng>/part-<id>.jsonl`, vì bộ nạp nhận bảng
+qua tên thư mục. Bản trước ghi `decisions-<id>.jsonl` ở gốc inbox, bộ nạp bỏ qua
+file đó, nên vòng ghi chưa bao giờ khép.
 
 Hai bản của lớp đọc, cùng một tập route:
 
@@ -113,8 +136,8 @@ Sink tách khỏi pipeline, nên bốn lệnh chạy được **khi chưa có Po
 # nạp artifact vào sink JSONL
 uv run python -m web.fwsync.cli import --from mock/demo-17-11 --out fwdata/web-sink
 
-# xuất hành động đang chờ thành artifact trong outbox
-uv run python -m web.fwsync.cli export --actions actions.jsonl --to fwdata/outbox
+# xuất hành động PENDING thành artifact trong outbox, đánh dấu EXPORTED
+uv run python -m web.fwsync.cli export --actions fwdata/web-state/human_actions.jsonl --to fwdata/outbox
 
 # lõi giả: đọc outbox, sinh kết quả mang source_action_id (mốc M4)
 uv run python -m web.fwsync.cli fake-core --outbox fwdata/outbox --to fwdata/inbox

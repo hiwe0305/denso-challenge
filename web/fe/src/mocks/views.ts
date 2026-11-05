@@ -17,6 +17,7 @@ import type {
   DatasetReportRow,
   DataAllocationRow,
   DatasetRow,
+  DecisionRow,
   DiagnosticRun,
   E1CurvePoint,
   EpisodeRow,
@@ -107,6 +108,20 @@ export class MockViews {
     private readonly d: MockData,
     private readonly now: () => Date = () => new Date(),
   ) {}
+
+  /** `decisions`, newest first (M10). */
+  decisions(): DecisionRow[] {
+    return [...this.d.decisions].reverse().map((d) => ({
+      id: d.decision_ref,
+      kind: d.kind ?? null,
+      target_kind: d.target_kind ?? null,
+      target_id: d.target_id ?? null,
+      conclusion: d.conclusion ?? null,
+      reason: d.reason ?? null,
+      source_action_id: d.source_action_id ?? null,
+      origin: ORIGIN,
+    }));
+  }
 
   // ============================================================== M7
 

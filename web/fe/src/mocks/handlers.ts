@@ -8,10 +8,12 @@ import type {
   ActionStatusRow,
   ApiError,
   Page,
+  SyncRunRow,
 } from "../api/types";
 import {
   clusterDiagnosis,
   interventionDecision,
+  syncStatus,
   userRole,
   type UserRole,
 } from "../contracts/enums";
@@ -81,6 +83,35 @@ class ActionStore {
   get(id: string) {
     return this.rows.get(id) ?? null;
   }
+
+  /** Newest first, like the API. */
+  list(syncStatus: string | null) {
+    const rows = [...this.rows.values()].reverse();
+    return syncStatus ? rows.filter((r) => r.sync_status === syncStatus) : rows;
+  }
+
+  /**
+   * One pass of `POST /sync/run` with the fake core: every PENDING action is
+   * exported and answered at once, so it ends APPLIED, as in sink mode.
+   */
+  cycle(): SyncRunRow {
+    const at = new Date().toISOString();
+    const moved = [...this.rows.values()].filter((r) => r.sync_status === "PENDING");
+    for (const r of moved) {
+      r.sync_status = "APPLIED";
+      r.exported_at = at;
+      r.applied_at = at;
+    }
+    const ids = moved.map((r) => r.action_id);
+    const run: SyncRunRow = {
+      id: `sync_${String(this.runs.length + 1).padStart(4, "0")}`, direction: "cycle", status: "ok",
+      started_at: at, finished_at: at, exported: ids, applied: ids, fake_core: true, errors: [],
+    };
+    this.runs.unshift(run);
+    return run;
+  }
+
+  runs: SyncRunRow[] = [];
 }
 
 interface DecisionItem {
@@ -169,8 +200,24 @@ export function createHandlers(views = new MockViews(loadMockData())) {
     }),
 
     // ------------------------------------------------------------ actions
+    http.get(url("/actions"), ({ request }) => {
+      const status = new URL(request.url).searchParams.get("sync_status");
+      if (status !== null && !(syncStatus as readonly string[]).includes(status)) {
+        return error(422, "BAD_SYNC_STATUS", `sync_status ${status} không hợp lệ`);
+      }
+      return HttpResponse.json(page(actions.list(status), request));
+    }),
     http.get(url("/actions/:id"), ({ params }) =>
       json(actions.get(String(params.id)), "hành động")),
+    http.get(url("/decisions"), ({ request }) => HttpResponse.json(page(views.decisions(), request))),
+    http.get(url("/sync/runs"), () => HttpResponse.json(actions.runs)),
+    http.post(url("/sync/run"), ({ request }) => {
+      const role = roleOf(request);
+      if (role !== "ADMIN" && role !== "LEAD") {
+        return error(403, "ROLE", "chỉ ADMIN và LEAD được chạy đồng bộ (§7.2)");
+      }
+      return HttpResponse.json(actions.cycle());
+    }),
 
     http.post(url("/recommendations/:id/decision"), async ({ params, request }) => {
       const key = request.headers.get("idempotency-key");

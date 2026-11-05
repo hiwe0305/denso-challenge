@@ -24,6 +24,7 @@ from typing import TextIO
 
 import typer
 
+from web.fwsync import actions as action_log
 from web.fwsync.runner import (
     SyncResult,
     digest_of,
@@ -33,7 +34,7 @@ from web.fwsync.runner import (
     run_verify,
 )
 from web.fwsync.sink import JsonlSink, PostgresSink, Sink
-from web.fwsync.source import SourceError
+from web.fwsync.source import SourceError, scan
 
 app = typer.Typer(help="Bộ nạp giữa lõi flywheel và tầng web.")
 
@@ -100,6 +101,12 @@ def import_(
         "--origin",
         help="`core` cho output thật của lõi, `mock` cho bộ mock. Đóng dấu lên mọi dòng.",
     ),
+    actions: Path | None = typer.Option(
+        None,
+        "--actions",
+        help="File `human_actions.jsonl`: hành động có `source_action_id` trong artifact "
+        "vừa nạp được đánh dấu APPLIED.",
+    ),
 ) -> None:
     """Nạp artifact vào bảng nhóm P. Chạy lại từ đầu cho cùng kết quả."""
     use_utf8()
@@ -116,6 +123,11 @@ def import_(
         typer.echo(f"sink chưa dựng: {error}", err=True)
         raise typer.Exit(code=2) from error
     _report(result)
+    if actions is not None:
+        applied = action_log.mark(
+            actions, action_log.answered_ids(scan(source).records), "APPLIED"
+        )
+        typer.echo(f"hành động APPLIED: {len(applied)} {applied[:5]}")
     raise typer.Exit(code=EXIT_CODE[result.status])
 
 
@@ -126,19 +138,21 @@ def export(
     ),
     outbox: Path = typer.Option(..., "--to", help="Thư mục outbox cho lõi."),
 ) -> None:
-    """Xuất hành động đang chờ thành artifact mang `source_action_id`."""
+    """Xuất hành động PENDING thành artifact mang `source_action_id`, đánh dấu EXPORTED."""
     use_utf8()
     try:
-        rows = [
-            json.loads(line)
-            for line in actions.read_text(encoding="utf-8").splitlines()
-            if line.strip()
-        ]
+        rows = action_log.pending(actions)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         typer.echo(f"không đọc được `{actions}`: {error}", err=True)
         raise typer.Exit(code=2) from error
     result = run_export(rows, outbox)
+    written = [
+        str(row["id"]) for row in rows
+        if (outbox / f"{str(row['action_kind']).lower()}-{row['id']}.json").exists()
+    ]
+    marked = action_log.mark(actions, written, "EXPORTED")
     _report(result)
+    typer.echo(f"hành động EXPORTED: {len(marked)}")
     raise typer.Exit(code=EXIT_CODE[result.status])
 
 
