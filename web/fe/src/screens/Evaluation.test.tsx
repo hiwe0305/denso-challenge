@@ -10,10 +10,11 @@ import { funnelSteps } from "./Evaluation";
 describe("M6 screen", () => {
   it("lists only unsealed evaluations of the task and opens the first", async () => {
     renderApp("/danh-gia");
-    const picker = await screen.findByTestId("evaluation-picker");
-    expect(within(picker).getByText("ev_A_dev")).toBeTruthy();
-    expect(within(picker).getByText("ev_B_dev")).toBeTruthy();
-    expect(within(picker).queryByText("ev_B_holdout")).toBeNull();
+    const picker = (await screen.findByTestId("evaluation-picker")) as HTMLSelectElement;
+    const ids = [...picker.options].map((o) => o.value);
+    expect(ids).toContain("ev_A_dev");
+    expect(ids).toContain("ev_BFAIL_dev");
+    expect(ids).not.toContain("ev_B_holdout");
     const headline = await screen.findByTestId("eval-headline");
     expect(headline.textContent).toContain("60,2%");
   });
@@ -27,7 +28,7 @@ describe("M6 screen", () => {
 
   it("shows a family nobody produced as not run, and skipped system codes with reasons", async () => {
     renderApp("/danh-gia");
-    fireEvent.click(within(await screen.findByTestId("evaluation-picker")).getByText("ev_B_dev"));
+    fireEvent.change(await screen.findByTestId("evaluation-picker"), { target: { value: "ev_B_dev" } });
     await waitFor(() => expect(screen.getByTestId("eval-headline").textContent).toContain("69,3%"));
     const train = await screen.findByTestId("family-F-TRAIN");
     expect(train.textContent).toContain("chưa chạy");
@@ -38,7 +39,7 @@ describe("M6 screen", () => {
 
   it("keeps infra failures out and shows the system check of a failed episode", async () => {
     renderApp("/danh-gia");
-    fireEvent.click(within(await screen.findByTestId("evaluation-picker")).getByText("ev_B_dev"));
+    fireEvent.change(await screen.findByTestId("evaluation-picker"), { target: { value: "ev_B_dev" } });
     expect((await screen.findByTestId("infra-excluded")).textContent).toContain("2 episode");
     const table = await screen.findByTestId("failed-episodes");
     fireEvent.click(within(table).getByText("ee_B_dev_30"));

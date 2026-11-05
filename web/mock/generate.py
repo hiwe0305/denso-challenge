@@ -23,8 +23,10 @@ Câu chuyện bộ mock kể, đúng điều Phụ lục C cần cho demo:
 
 * Năm lô, trong đó một bản sao cấy 10 lỗi, dừng ở tầng 4. Code bắt 6/10,
   agent bắt thêm 2 (M3).
-* Bốn thí nghiệm nhánh A, A_07, B, B_FAIL cộng ba điểm HE; B_FAIL có T3.
-* Hai lượt eval dev 90 episode, có 4 episode lỗi hạ tầng bị loại khỏi mẫu số.
+* Bốn thí nghiệm nhánh A, A_07, B, B_FAIL; B_FAIL có T3. Lưới HE 3 biến thể
+  × N ∈ {10, 20, 40, 80}, mỗi điểm một release đúng N demo gốc của người.
+* Bốn lượt eval dev 90 episode (A, A_07, B, B_FAIL), mỗi lượt 2 episode lỗi
+  hạ tầng bị loại khỏi mẫu số; 12 lượt eval dev chỉ có số tổng cho điểm HE.
 * Một lượt Failure → Data trên checkpoint B với **bốn cụm, bốn chẩn đoán**:
   lỗi controller, ngoài miền, thiếu vùng phủ, kỹ năng yếu. Chỉ hai cụm sau
   tiêu ngân sách dữ liệu — câu quan trọng nhất của demo.
@@ -46,6 +48,13 @@ LICENSE = "mock-public"
 TASK = "two_table"
 SCORER = "scorer-0.1"
 STEP_NAMES = ["tiếp cận", "gắp", "đi", "tới bàn đích", "đặt", "nhả và ổn định"]
+HE_VARIANTS = ("V_EGO", "V_EGO10", "V_NOEGO")
+HE_SIZES = (10, 20, 40, 80)
+#: Egocentric clips each HE variant adds on top of its N robot demos.
+HE_EGO_CLIPS = {"V_EGO": 20, "V_EGO10": 10, "V_NOEGO": 0}
+#: Invented dev success rate of an HE point: grows with N, egocentric helps.
+HE_BASE_RATE = {10: 0.30, 20: 0.42, 40: 0.55, 80: 0.63}
+HE_VARIANT_LIFT = {"V_EGO": 0.10, "V_EGO10": 0.04, "V_NOEGO": 0.0}
 STEP_CLASS = {1: "approach", 2: "grasp", 3: "carry", 4: "carry", 5: "place", 6: "place"}
 CODE_CLASS = {
     "L-GRASP": "grasp",
@@ -413,9 +422,12 @@ class Mock:
         ("exp_A07", "A_07", "HTa", "rp_A07", None),
         ("exp_B", "B", "HT", "rp_B", "ckpt_A"),
         ("exp_BFAIL", "B_FAIL", "HTb", "rp_BFAIL", None),
-        ("exp_HE_V_EGO_10", "C", "HE", "rp_HE_10", None),
-        ("exp_HE_V_EGO_20", "C", "HE", "rp_HE_20", None),
-        ("exp_HE_V_EGO_40", "C", "HE", "rp_HE_40", None),
+    ] + [
+        # HE (design 27/10 §7.2): three variants × N demos. Each point trains on
+        # its own release holding exactly N human root demos, so v_he_curve
+        # counts N from the data instead of reading a typed-in number.
+        (f"exp_HE_{variant}_{n}", "C", "HE", f"rp_HE_{variant}_{n}", None)
+        for variant in HE_VARIANTS for n in HE_SIZES
     ]
 
     @staticmethod
@@ -442,31 +454,65 @@ class Mock:
                      "seed_range": "[2000,2090)", "meta": {"round_no": 1}})
         self.files["run_plans.jsonl"] = rows
 
+    def _he_release(self, variant: str, n: int) -> tuple[str, int]:
+        """A frozen release of N human root demos plus the variant's egocentric clips."""
+        ref = f"rel_he_{variant.lower()}_{n}"
+        kept = [item for item in self.release_items
+                if item["release_ref"] == "rel_two_table_v1" and not item["excluded"]]
+        episodes = {e["episode_id"]: e for rows in self.episodes_by_dataset.values()
+                    for e in rows}
+        demos = [i["episode_ref"] for i in kept
+                 if episodes[i["episode_ref"]]["is_root"]
+                 and episodes[i["episode_ref"]]["operator_kind"] == "human"][:n]
+        ego = [i["episode_ref"] for i in kept
+               if episodes[i["episode_ref"]]["source_kind"] == "egocentric"
+               ][:HE_EGO_CLIPS[variant]]
+        assert len(demos) == n, f"chỉ có {len(demos)} demo người cho {ref}"
+        items = [{"release_ref": ref, "episode_ref": e, "sample_weight": 1.0, "excluded": False,
+                  "exclude_reason": None} for e in demos + ego]
+        self.he_release_items += items
+        self.he_releases.append(
+            {"release_ref": ref, "name": f"HE {variant} N={n}",
+             "parent_release_ref": "rel_two_table_v1", "split_plan_sha256": hx("split-plan-v1"),
+             "status": "frozen", "manifest_sha256": hx(",".join(sorted(demos + ego))),
+             "manifest_uri": f"mock://releases/he/{variant}_{n}.parquet",
+             "license_summary": LICENSE, "frozen_at": ts(3, 11),
+             "meta": {"items": len(items), "he_variant": variant, "n_demos": n}}
+        )
+        return ref, len(items)
+
     def experiments(self) -> None:
         experiments: list[Row] = []
         links: list[Row] = []
         checkpoints: list[Row] = []
         used = sum(1 for item in self.release_items if not item["excluded"])
+        self.he_releases: list[Row] = []
+        self.he_release_items: list[Row] = []
         for seed, (code, branch, hypothesis, rp, parent) in enumerate(self.EXPERIMENTS):
             params: Row = {"lr": 1e-4, "steps": 2000}
+            release, episodes_used = "rel_two_table_v1", used
             if hypothesis == "HE":
-                params.update(he_variant="V_EGO", n_demos=int(code.rsplit("_", 1)[1]))
+                variant, n = code.removeprefix("exp_HE_").rsplit("_", 1)
+                params.update(he_variant=variant, n_demos=int(n))
+                release, episodes_used = self._he_release(variant, int(n))
             experiments.append(
                 {"experiment_code": code, "run_plan_ref": rp, "task_id": TASK, "branch": branch,
                  "method": "PSI0", "hypothesis": hypothesis, "base_source_ref": "src_psi0_ckpt",
                  "status": "DONE", "train_seed": 100 + seed, "hyperparams": params,
                  "started_at": ts(4, 8), "finished_at": ts(5, 8)}
             )
-            links.append({"experiment_code": code, "release_ref": "rel_two_table_v1",
-                          "mix_weight": 1.0, "episodes_used": used})
+            links.append({"experiment_code": code, "release_ref": release,
+                          "mix_weight": 1.0, "episodes_used": episodes_used})
             checkpoints.append(
                 {"checkpoint_ref": self.ckpt(code), "experiment_code": code,
-                 "parent_checkpoint_ref": parent, "release_ref": "rel_two_table_v1",
+                 "parent_checkpoint_ref": parent, "release_ref": release,
                  "method": "PSI0", "step": 2000, "weights_sha256": hx(f"weights:{code}"),
                  "uri": f"mock://checkpoints/{code}", "is_best": True, "is_latest": True,
                  "train_seed": 100 + seed, "meta": {}}
             )
         self.files["experiments.jsonl"] = experiments
+        self.files["releases.jsonl"] = [*self.files["releases.jsonl"], *self.he_releases]
+        self.files["release_items.jsonl"] = [*self.release_items, *self.he_release_items]
         self.files["experiment_datasets.jsonl"] = links
         self.files["checkpoints.jsonl"] = checkpoints
 
@@ -552,19 +598,42 @@ class Mock:
             1: [(7, "L-GRASP", 2), (9, "L-PLACE", 5)],
             2: [(6, "L-WALK", 3), (8, "L-SLIP", 4), (2, "L-COLLIDE", 3), (1, None, None)],
         },
+        # A_07: the recipe of A on 70% of the data, a little worse everywhere.
+        "A_07": {
+            0: [(3, "L-GRASP", 2), (1, "L-TIMEOUT", 6), (1, None, None)],
+            1: [(8, "L-GRASP", 2), (10, "L-PLACE", 5)],
+            2: [(7, "L-WALK", 3), (9, "L-SLIP", 4), (2, "L-COLLIDE", 3), (1, None, None)],
+        },
+        # B_FAIL: data collected without the failure analysis; worse than A.
+        "B_FAIL": {
+            0: [(3, "L-GRASP", 2), (2, "L-TIMEOUT", 6), (1, None, None)],
+            1: [(9, "L-GRASP", 2), (11, "L-PLACE", 5), (1, "L-RELEASE", 6)],
+            2: [(8, "L-WALK", 3), (10, "L-SLIP", 4), (2, "L-BALANCE", 3), (1, None, None)],
+        },
     }
 
     def evaluations(self) -> None:
         evaluations, episodes = [], []
         self.eval_failures: dict[str, list[Row]] = {}
-        for branch in ("A", "B"):
-            ref = f"ev_{branch}_dev"
+        for branch, code in (("A", "A"), ("B", "B"), ("A_07", "A07"), ("B_FAIL", "BFAIL")):
+            ref = f"ev_{code}_dev"
             rows = self._eval_episodes(ref, branch)
             episodes += rows
             self.eval_failures[branch] = [
                 row for row in rows if row["infra_status"] == "ok" and not row["sim_success"]
             ]
-            evaluations.append(self._evaluation(ref, f"ckpt_{branch}", "dev", rows))
+            evaluations.append(self._evaluation(ref, f"ckpt_{code}", "dev", rows))
+        # HE points: only the summary. The curve needs one rate per point, not
+        # the 90 episodes behind it, and 12 x 90 rows would bury the rest.
+        for variant in HE_VARIANTS:
+            for n in HE_SIZES:
+                he = self._evaluation(f"ev_HE_{variant}_{n}_dev", f"ckpt_HE_{variant}_{n}",
+                                      "dev", [])
+                scored = 90 - 1
+                rate = HE_BASE_RATE[n] + HE_VARIANT_LIFT[variant]
+                he.update(total_episodes=90, infra_failed_count=1,
+                          success_count=round(scored * rate))
+                evaluations.append(he)
         holdout = self._evaluation("ev_B_holdout", "ckpt_B", "holdout", [])
         # Holdout niêm phong: chỉ ADMIN xem tới khi mở (BR-10). Số đếm của nó
         # bịa như mọi số khác; nó có mặt để FE vẽ ổ khoá, không để đọc.
@@ -578,7 +647,7 @@ class Mock:
     def _evaluation(self, ref: str, ckpt: str, split: str, rows: list[Row]) -> Row:
         return {
             "evaluation_ref": ref, "checkpoint_ref": ckpt,
-            "run_plan_ref": "rp_round1" if ckpt == "ckpt_B" else "rp_A",
+            "run_plan_ref": "rp_round1" if ckpt == "ckpt_B" else "rp_" + ckpt.removeprefix("ckpt_"),
             "task_id": TASK, "condition_set_id": f"{split}90_two_table", "split": split,
             "level": None, "renderer": "mujoco", "eval_mode": "sync", "scorer_version": SCORER,
             "total_episodes": len(rows),
@@ -957,9 +1026,14 @@ với bản sinh lại và đỏ nếu lệch.
 - Năm lô: psi-data teleop, teleop bàn phím, synthetic S1, mẫu EgoDex, và một
   bản sao chấm Agent QA/QC có 10 lỗi cấy, dừng ở tầng 4. Code bắt 6/10, agent
   bắt thêm 2.
-- Bốn thí nghiệm nhánh A, A_07, B, B_FAIL cộng ba điểm HE. B_FAIL có T3.
-- Hai lượt eval dev, mỗi lượt 90 episode, cộng 4 episode lỗi hạ tầng bị loại
-  khỏi mẫu số. Một holdout niêm phong tới 20/11.
+- Bốn thí nghiệm nhánh A, A_07, B, B_FAIL. B_FAIL có T3. B tốt nhất, B_FAIL
+  kém hơn A.
+- Lưới HE: V_EGO, V_EGO10, V_NOEGO × N ∈ {10, 20, 40, 80}. Mỗi điểm train
+  trên release riêng có đúng N demo gốc của người (cộng 20, 10 hoặc 0 clip
+  egocentric), nên `n_demos` đếm được từ dữ liệu. Lượt eval của điểm HE chỉ
+  có số tổng, không có episode.
+- Bốn lượt eval dev có episode (A, A_07, B, B_FAIL), mỗi lượt 90 episode, 2
+  episode lỗi hạ tầng bị loại khỏi mẫu số. Một holdout niêm phong tới 20/11.
 - Một lượt Failure → Data trên checkpoint B: bốn cụm, bốn chẩn đoán. Hai cụm là
   lỗi hệ thống và ngoài miền, không tốn ngân sách dữ liệu; hai cụm còn lại mới
   cần thu thêm.

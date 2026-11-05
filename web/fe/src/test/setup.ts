@@ -8,6 +8,13 @@ import { MockViews } from "../mocks/views";
 /** Tests run on demo day, so the holdout sealed until 20/11 stays sealed whenever CI runs. */
 export const DEMO_DAY = new Date("2026-11-17T09:00:00Z");
 
+// jsdom has no ResizeObserver; Recharts' ResponsiveContainer needs one to mount.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+
 // jsdom's fetch needs absolute URLs; the app calls relative `/api/...`.
 const origin = "http://localhost";
 const realFetch = globalThis.fetch;

@@ -139,17 +139,19 @@ export function Evaluation() {
         </EmptyState>
       ) : (
         <>
-          <div className="flex flex-wrap gap-2" data-testid="evaluation-picker">
-            {evaluations.map((e) => (
-              <button key={e.evaluation_id} type="button" onClick={() => setChosen(e.evaluation_id)}
-                className={`rounded border px-3 py-1.5 text-left text-sm ${e.evaluation_id === current?.evaluation_id
-                  ? "border-slate-900 bg-white shadow" : "border-slate-200 bg-slate-50 text-slate-600"}`}>
-                <span className="font-mono text-xs">{e.evaluation_id}</span>
-                <span className="ml-2">nhánh {e.branch ?? "—"} · {e.split} · {e.renderer} · {e.eval_mode}</span>
-                {e.is_sealed ? <span className="ml-2"><SealedLock until={e.sealed_until} /></span> : null}
-              </button>
-            ))}
-          </div>
+          <label className="flex flex-wrap items-center gap-2 text-sm">
+            Lượt eval
+            <select className={`${select} min-w-[22rem]`} data-testid="evaluation-picker" aria-label="lượt eval"
+              value={current?.evaluation_id ?? ""} onChange={(e) => setChosen(e.target.value)}>
+              {evaluations.map((e) => (
+                <option key={e.evaluation_id} value={e.evaluation_id}>
+                  {e.evaluation_id} · nhánh {e.branch ?? "—"} · {e.split} · {e.renderer} · {e.eval_mode}
+                  {e.is_sealed ? " · niêm phong" : ""}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-slate-500">{evaluations.length} lượt</span>
+          </label>
           {current ? <EvaluationDetail ev={current} level={level} setLevel={setLevel} /> : null}
         </>
       )}

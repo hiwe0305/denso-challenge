@@ -78,6 +78,11 @@ uv run python -m web.api --import-from mock/demo-17-11 --origin mock --sink fwda
 # http://127.0.0.1:8000/docs  ·  http://127.0.0.1:8000/api/recommendations
 ```
 
+**Đổi bộ mock thì xoá sink trước** (`rm -rf fwdata/web-sink`). Bộ nạp upsert
+theo khoá tự nhiên và không bao giờ xoá dòng, vì artifact của lõi là append-only;
+nạp một bộ mock đã đổi vào sink cũ sẽ giữ cả dòng cũ lẫn dòng mới. Ví dụ dòng
+`experiment_datasets` cũ trỏ release v1 làm `n_demos` của điểm HE thành 94.
+
 FE gọi API thật thay cho MSW:
 
 ```bash

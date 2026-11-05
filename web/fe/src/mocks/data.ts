@@ -179,6 +179,7 @@ export interface RawExperiment {
   experiment_code: string;
   branch: string;
   hypothesis: string;
+  hyperparams: { he_variant?: string; n_demos?: number };
   method: string;
   task_id: "two_table" | "tray";
   train_seed: number | null;

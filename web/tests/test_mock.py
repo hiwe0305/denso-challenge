@@ -230,7 +230,7 @@ def _eval_rows(data: dict[str, Any], evaluation: str) -> list[dict[str, Any]]:
     return [row for row in data["eval_episodes.jsonl"] if row["evaluation_ref"] == evaluation]
 
 
-@pytest.mark.parametrize("evaluation", ["ev_A_dev", "ev_B_dev"])
+@pytest.mark.parametrize("evaluation", ["ev_A_dev", "ev_B_dev", "ev_A07_dev", "ev_BFAIL_dev"])
 def test_evaluation_counts_match_their_episodes(data: dict[str, Any], evaluation: str) -> None:
     rows = _eval_rows(data, evaluation)
     summary = next(e for e in data["evaluations.jsonl"] if e["evaluation_ref"] == evaluation)
@@ -239,14 +239,15 @@ def test_evaluation_counts_match_their_episodes(data: dict[str, Any], evaluation
     assert summary["infra_failed_count"] == sum(1 for row in rows if row["infra_status"] != "ok")
 
 
-def test_four_infra_failures_carry_no_policy_verdict(data: dict[str, Any]) -> None:
+def test_infra_failures_carry_no_policy_verdict(data: dict[str, Any]) -> None:
     # 03 §4.3 luật 8: simulator sập không bao giờ là sim_success = FALSE.
+    # Hai episode lỗi hạ tầng trong mỗi lượt eval có episode.
     infra = [row for row in data["eval_episodes.jsonl"] if row["infra_status"] != "ok"]
-    assert len(infra) == 4
+    assert len(infra) == 2 * 4
     assert all(row["sim_success"] is None and row["scorer_success"] is None for row in infra)
 
 
-@pytest.mark.parametrize("evaluation", ["ev_A_dev", "ev_B_dev"])
+@pytest.mark.parametrize("evaluation", ["ev_A_dev", "ev_B_dev", "ev_A07_dev", "ev_BFAIL_dev"])
 def test_the_scorer_stays_within_five_points_of_the_simulator(
     data: dict[str, Any], evaluation: str
 ) -> None:
@@ -264,7 +265,40 @@ def test_branch_b_beats_branch_a_on_dev(data: dict[str, Any]) -> None:
         for e in data["evaluations.jsonl"]
         if e["split"] == "dev"
     }
-    assert rates["ev_B_dev"] > rates["ev_A_dev"]
+    assert rates["ev_B_dev"] > rates["ev_A_dev"] > rates["ev_A07_dev"]
+    # B_FAIL is the control: data collected without the failure analysis.
+    assert rates["ev_BFAIL_dev"] < rates["ev_A_dev"]
+
+
+def test_each_he_point_trains_on_exactly_n_human_root_demos(data: dict[str, Any]) -> None:
+    """v_he_curve counts N from the release; the mock must make that count true."""
+    episodes = {e["episode_id"]: e for e in data["episodes.jsonl"]}
+    items: dict[str, list[str]] = {}
+    for item in data["release_items.jsonl"]:
+        if not item["excluded"]:
+            items.setdefault(item["release_ref"], []).append(item["episode_ref"])
+    links = {link["experiment_code"]: link["release_ref"]
+             for link in data["experiment_datasets.jsonl"]}
+    he = [x for x in data["experiments.jsonl"] if x["hypothesis"] == "HE"]
+    assert len(he) == 12
+    for x in he:
+        refs = items[links[x["experiment_code"]]]
+        roots = [r for r in refs
+                 if episodes[r]["is_root"] and episodes[r]["operator_kind"] == "human"]
+        assert len(roots) == x["hyperparams"]["n_demos"], x["experiment_code"]
+        assert all(episodes[r]["split"] == "train" for r in refs)
+
+
+def test_the_he_curve_rises_with_n_and_egocentric_helps(data: dict[str, Any]) -> None:
+    rate = {
+        e["evaluation_ref"]: e["success_count"] / (e["total_episodes"] - e["infra_failed_count"])
+        for e in data["evaluations.jsonl"] if e["evaluation_ref"].startswith("ev_HE_")
+    }
+    for variant in ("V_EGO", "V_EGO10", "V_NOEGO"):
+        curve = [rate[f"ev_HE_{variant}_{n}_dev"] for n in (10, 20, 40, 80)]
+        assert curve == sorted(curve)
+    for n in (10, 20, 40, 80):
+        assert rate[f"ev_HE_V_EGO_{n}_dev"] > rate[f"ev_HE_V_NOEGO_{n}_dev"]
 
 
 def test_an_unknown_failure_has_neither_a_step_nor_a_class(data: dict[str, Any]) -> None:

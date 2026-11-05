@@ -17,9 +17,14 @@ với bản sinh lại và đỏ nếu lệch.
 - Năm lô: psi-data teleop, teleop bàn phím, synthetic S1, mẫu EgoDex, và một
   bản sao chấm Agent QA/QC có 10 lỗi cấy, dừng ở tầng 4. Code bắt 6/10, agent
   bắt thêm 2.
-- Bốn thí nghiệm nhánh A, A_07, B, B_FAIL cộng ba điểm HE. B_FAIL có T3.
-- Hai lượt eval dev, mỗi lượt 90 episode, cộng 4 episode lỗi hạ tầng bị loại
-  khỏi mẫu số. Một holdout niêm phong tới 20/11.
+- Bốn thí nghiệm nhánh A, A_07, B, B_FAIL. B_FAIL có T3. B tốt nhất, B_FAIL
+  kém hơn A.
+- Lưới HE: V_EGO, V_EGO10, V_NOEGO × N ∈ {10, 20, 40, 80}. Mỗi điểm train
+  trên release riêng có đúng N demo gốc của người (cộng 20, 10 hoặc 0 clip
+  egocentric), nên `n_demos` đếm được từ dữ liệu. Lượt eval của điểm HE chỉ
+  có số tổng, không có episode.
+- Bốn lượt eval dev có episode (A, A_07, B, B_FAIL), mỗi lượt 90 episode, 2
+  episode lỗi hạ tầng bị loại khỏi mẫu số. Một holdout niêm phong tới 20/11.
 - Một lượt Failure → Data trên checkpoint B: bốn cụm, bốn chẩn đoán. Hai cụm là
   lỗi hệ thống và ngoài miền, không tốn ngân sách dữ liệu; hai cụm còn lại mới
   cần thu thêm.

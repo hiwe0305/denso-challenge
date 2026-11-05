@@ -50,6 +50,7 @@ import {
   type DataClass,
   type DeidStatus,
   type FailureClass,
+  type HeVariant,
   type InfraStatus,
   type InterventionKind,
   type QaAgentVerdict,
@@ -753,7 +754,11 @@ export class MockViews {
   /** v_branch_comparison: latest unsealed dev eval of each branch's best checkpoint. */
   branches(taskId: string): BranchComparisonRow[] {
     const rows: BranchComparisonRow[] = [];
-    for (const x of this.d.experiments.filter((e) => e.task_id === taskId)) {
+    // HE points share one branch; they have their own view (v_he_curve).
+    const branchExperiments = this.d.experiments.filter(
+      (e) => e.task_id === taskId && e.hypothesis !== "HE" && e.hypothesis !== "HE_T",
+    );
+    for (const x of branchExperiments) {
       const ckpt = this.bestCheckpointOf(x.experiment_code);
       if (!ckpt) continue;
       const evs = this.d.evaluations
@@ -806,6 +811,7 @@ export class MockViews {
         const scored = ev.total_episodes - ev.infra_failed_count;
         points.push({
           task_id: x.task_id, branch: x.branch, hypothesis: x.hypothesis,
+          he_variant: (x.hyperparams.he_variant ?? null) as HeVariant | null,
           n_demos: this.humanRootEpisodes(x.experiment_code).size, train_seed: x.train_seed,
           level: ev.level, sim_success_rate: scored > 0 ? round(ev.success_count / scored) : null,
           n_scored: scored, is_sealed: isSealed(ev, this.now()), origin: ORIGIN,
