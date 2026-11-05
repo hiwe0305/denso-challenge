@@ -83,7 +83,7 @@ Bước 1 của spec (quan sát) không có vị từ riêng.
 
 ### 3.3 Kiểu lỗi mới
 
-Thêm vào bảng lỗi của spec mục 5.2 và design 27/10 mục 10 [Đề xuất]: **L-PART-DROP** (linh kiện rơi khỏi khay), **L-TRAY-TILT** (khay nghiêng quá θ_tilt khi mang), **L-ONE-HAND** (mất tiếp xúc một tay khi mang), **L-PLACE-POSE** (đặt ngoài dung sai). Giữ L-WALK và L-BALANCE.
+Thêm vào bảng lỗi của spec mục 5.2 và design 27/10 mục 10 [Đã chốt 5/11/2026, spec v10.6; lớp lỗi chung của từng mã ở spec mục 5.2]: **L-PART-DROP** (linh kiện rơi khỏi khay), **L-TRAY-TILT** (khay nghiêng quá θ_tilt khi mang), **L-ONE-HAND** (mất tiếp xúc một tay khi mang), **L-PLACE-POSE** (đặt ngoài dung sai). Giữ L-WALK và L-BALANCE.
 
 ### 3.4 Điều kiện thành công [Đã chốt theo spec gốc]
 
