@@ -70,6 +70,15 @@ directory, the steps file or the RolloutResult file names a trace. A steps
 file with no step at all - a rollout cut off before its first cycle - is read
 as a trace of zero cycles named after its directory, so R6 still judges the
 RolloutResult beside it.
+
+**The rollout's mode comes from the contract or not at all.** R1 and R2 count
+only on an asynchronous rollout (`verdict.py`), and the contract does not yet
+say which a rollout was: `RolloutResult.timing_verdict` is None both for a
+synchronous rollout and for a producer that never wrote it, and the SimpleSim
+hook writes `rollout_result.json` before the runner of DA-23 fills it. So a
+`timing_verdict` that is set reads as async, and everything else as unknown,
+never as sync (FR21). The contract field that would say "sync" is a proposal
+to Long and Hiếu (DA-13 task 11.2); `_timing` is the one place that reads it.
 """
 
 from __future__ import annotations
@@ -80,7 +89,7 @@ import math
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar
 
 import numpy as np
 from flywheel.contracts.artifacts import ProbeP1, ProbeP3, ProbeP4, RTCInferenceRecord
@@ -204,6 +213,8 @@ class SystemInputs:
     rtc: tuple[RTCInferenceRecord, ...] = ()
     cameras: tuple[CameraParams, ...] = ()
     infra_status: str | None = None
+    # "async", "sync" or None where nothing said (module docstring)
+    timing: Literal["sync", "async"] | None = None
     has_rtc_log: bool = False
     has_camera_params: bool = False
     # SHA-256 of the bytes each optional input was read from, None where absent
@@ -263,15 +274,17 @@ def load_episode(path: Path) -> SystemInputs:
     episode_data = _read_bytes(rollout_path) if rollout_path.is_file() else None
     rtc = () if rtc_data is None else _rtc_records(rtc_data, rtc_path)
     cameras = () if camera_data is None else _camera_params(camera_data, camera_path)
+    result = (
+        None
+        if episode_data is None
+        else _rollout_result(episode_data, rollout_path, trace, directory)
+    )
     return SystemInputs(
         trace=trace,
         rtc=_of_trace(rtc, trace),
         cameras=_cameras_of_trace(cameras, trace, camera_path),
-        infra_status=(
-            None
-            if episode_data is None
-            else _infra_status(episode_data, rollout_path, trace, directory)
-        ),
+        infra_status=None if result is None else result.infra_status,
+        timing=None if result is None else _timing(result),
         has_rtc_log=rtc_data is not None,
         has_camera_params=camera_data is not None,
         rtc_sha256=_digest(rtc_data),
@@ -477,8 +490,13 @@ def _artifact(path: Path, model: type[_ARTIFACT]) -> _ARTIFACT:
         raise ReaderError(f"`{path}` không phải {model.__name__}: {error}") from error
 
 
-def _infra_status(data: bytes, path: Path, trace: TraceLog, directory: Path) -> str:
-    """`infra_status` of the episode, for R6, from the RolloutResult beside the steps.
+def _timing(result: RolloutResult) -> Literal["sync", "async"] | None:
+    """The rollout's mode as the contract states it: only a timing verdict says async."""
+    return "async" if result.timing_verdict is not None else None
+
+
+def _rollout_result(data: bytes, path: Path, trace: TraceLog, directory: Path) -> RolloutResult:
+    """The RolloutResult beside the steps: `infra_status` for R6, the mode for R1 and R2.
 
     The result's `trace_ref` must be about these steps (module docstring); a
     mismatch raises, because pairing an infra status with the wrong steps is
@@ -490,7 +508,7 @@ def _infra_status(data: bytes, path: Path, trace: TraceLog, directory: Path) -> 
         raise ReaderError(f"`{path}` không phải RolloutResult: {error}") from error
     ref = result.trace_ref
     if ref is None:
-        return result.infra_status
+        return result
     if ref.trace_id != trace.trace_id:
         raise ReaderError(
             f"`{path}` là RolloutResult của trace `{ref.trace_id}`, "
@@ -506,7 +524,7 @@ def _infra_status(data: bytes, path: Path, trace: TraceLog, directory: Path) -> 
             f"`{path}`: `trace_ref.sha256` là `{ref.sha256}` nhưng `{STEPS_NAME}` có sha256 "
             f"`{trace.trace_sha256}`; steps đã đổi sau khi rollout ghi kết quả"
         )
-    return result.infra_status
+    return result
 
 
 def _of_trace(

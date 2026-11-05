@@ -34,7 +34,8 @@ def diagnose_system(inputs: SystemInputs, cfg: SystemThresholds) -> SystemVerdic
     The episode is cleared only when every code was judged and none fired.
     Anything else - a fault, or a code nobody could judge - keeps the episode
     out of the policy analysis, because spec section 6.4 fixes system faults
-    first and re-runs the baseline afterwards.
+    first and re-runs the baseline afterwards. On a synchronous rollout R1
+    and R2 are recorded beside the verdict and decide nothing (`verdict.py`).
     """
     unjudgeable = unjudgeable_codes(inputs, cfg.signals)
     results: list[CheckResult] = [check_signals(inputs, cfg.signals)]
@@ -47,4 +48,4 @@ def diagnose_system(inputs: SystemInputs, cfg: SystemThresholds) -> SystemVerdic
         results.append(check_r4(inputs.trace, cfg.r4))
     results.append(check_r5(inputs.cameras, cfg.r5))
     results.append(check_r6(inputs.infra_status, cfg.r6))
-    return combine(inputs.trace.episode_id, results, inputs.infra_status)
+    return combine(inputs.trace.episode_id, results, inputs.infra_status, inputs.timing)

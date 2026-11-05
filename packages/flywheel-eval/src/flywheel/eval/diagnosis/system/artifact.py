@@ -26,6 +26,15 @@ diagnosis and an opinion:
   Without them one trace with two RTC logs gives two verdicts nothing tells
   apart.
 
+What this record cannot hold yet is a synchronous rollout's R1 and R2, which
+are recorded without counting (`verdict.py`, decision (a) of 5/11/2026). The
+shared `SystemDiagnosis` has no field for the rollout's mode or for findings
+that do not count, and refuses `clean` beside any finding, so they have no
+place in it; DA-13 task 11.2 proposes the contract change. Until then
+`build_system_record` refuses such a verdict rather than drop what it
+measured. The reader never states "sync" today, so no episode read from disk
+reaches that refusal.
+
 The stage attribution has its own record beside this one, in
 `diagnosis/stage/artifact.py`, because it is answered per failure while this
 is answered per episode.
@@ -36,7 +45,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from flywheel.eval.diagnosis.system.reader import SystemInputs
-from flywheel.eval.diagnosis.system.verdict import SystemVerdict
+from flywheel.eval.diagnosis.system.verdict import SystemError, SystemVerdict
 from pydantic import BaseModel, ConfigDict, Field
 
 SYSTEM_RECORDS = Path("diagnosis") / "system.jsonl"
@@ -86,7 +95,19 @@ class SystemDiagnosisRecord(BaseModel):
 def build_system_record(
     verdict: SystemVerdict, config_sha256: str, inputs: SystemInputs
 ) -> SystemDiagnosisRecord:
-    """The record of one system check: both lists, and the hash of every input."""
+    """The record of one system check: both lists, and the hash of every input.
+
+    Raises `SystemError` on a verdict holding R1 or R2 recorded on a
+    synchronous rollout: the contract has nowhere to put them (module
+    docstring), and leaving them out would be a record that says less than
+    the check measured.
+    """
+    if verdict.recorded or verdict.recorded_skipped:
+        raise SystemError(
+            f"episode `{verdict.episode_id}`: R1, R2 của rollout đồng bộ được ghi nhận, "
+            f"không quy lỗi, nhưng `SystemDiagnosis` chưa có trường cho chúng (đề xuất "
+            f"hợp đồng, DA-13 nhiệm vụ con 11.2); không ghi bản ghi thiếu"
+        )
     return SystemDiagnosisRecord(
         episode_id=verdict.episode_id,
         diagnosis=verdict.diagnosis.value,
