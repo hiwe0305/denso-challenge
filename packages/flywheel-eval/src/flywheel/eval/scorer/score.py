@@ -11,10 +11,11 @@ steps, then fold in the two things no single step answers - the balance
 condition, and the signals no step owns. Those come last because either can
 take away a pass the steps appeared to earn.
 
-Before any of it, the config is checked against the task: the steps it names
-have to be the task's steps, every signal the task asks for has to be watched
-by some step, by the episode or by a limit, and a kind it marks as taking its
-class from the failed step has to be a kind the task declares. A config that
+Before any of it, the task and the config are checked against each other:
+every stage has to declare its signals, those signals have to be ones the task
+asks for, every signal the task asks for has to be watched by some step, by
+the episode or by a limit, and a kind the config marks as taking its class
+from the failed step has to be a kind the task declares. A config that
 does not line up is a config written for another task, and scoring with it
 would produce a `Score` that looks like a result.
 """
@@ -30,7 +31,7 @@ from flywheel.eval.scorer.balance import BalanceVerdict, apply_balance, check_ba
 from flywheel.eval.scorer.failure import FailureVerdict, apply_episode_signals, judge_failure
 from flywheel.eval.scorer.reader import Trace
 from flywheel.eval.scorer.status import ScorerError, StepScore
-from flywheel.eval.scorer.steps import first_failed_step, score_steps
+from flywheel.eval.scorer.steps import first_failed_step, score_steps, step_signals
 
 
 @dataclass(frozen=True)
@@ -76,7 +77,7 @@ def score_episode(
     _check_config_fits(task, stages, config)
 
     evaluation = _evaluate(trace, task, config)
-    steps = score_steps(evaluation, stages, trace.missing_signals, step_signals=config.step_signals)
+    steps = score_steps(evaluation, stages, trace.missing_signals)
     failure = judge_failure(
         evaluation,
         steps,
@@ -121,33 +122,28 @@ def _evaluate(trace: Trace, task: TaskDefinition, config: ScorerConfig) -> Stage
 def _check_config_fits(
     task: TaskDefinition, stages: Sequence[StageSpec], config: ScorerConfig
 ) -> None:
-    """Refuse a config whose steps, signals or kinds are not this task's."""
+    """Refuse a task without step signals, or a config that is not this task's."""
     names = [stage.name for stage in stages]
     repeated = sorted({name for name in names if names.count(name) > 1})
     if repeated:
         raise ScorerError(
-            f"`stages()` của task khai trùng tên bước {repeated}; tín hiệu từng bước "
-            "đánh theo tên nên tên phải phân biệt được"
+            f"`stages()` của task khai trùng tên bước {repeated}; bản ghi gọi bước "
+            "theo tên nên tên phải phân biệt được"
         )
-    if set(config.step_signals) != set(names):
-        raise ScorerError(
-            f"`step_signals` khai các bước {sorted(config.step_signals)} nhưng task có "
-            f"{sorted(names)}"
-        )
+    by_step = {signal for stage in stages for signal in step_signals(stage)}
     required = {signal.name for signal in task.required_signals()}
-    unwatched = sorted(required - config.declared_signals())
+    unwatched = sorted(required - by_step - config.declared_signals())
     if unwatched:
         raise ScorerError(
-            f"tín hiệu {unwatched} task có đòi mà cấu hình không khai ở bước nào, ở "
-            "`episode_signals` hay ở `balance`; thiếu chúng thì không bước nào thành "
-            "chưa rõ được (AC 2)"
+            f"tín hiệu {unwatched} task có đòi mà không bước nào khai trong "
+            "`StageSpec.signals`, cấu hình cũng không khai ở `episode_signals` hay "
+            "`balance`; thiếu chúng thì không bước nào thành chưa rõ được (AC 2)"
         )
-    invented = sorted(
-        {signal for signals in config.step_signals.values() for signal in signals} - required
-    )
+    invented = sorted(by_step - required)
     if invented:
         raise ScorerError(
-            f"`step_signals` khai tín hiệu {invented} mà `required_signals()` của task không có"
+            f"`StageSpec.signals` khai tín hiệu {invented} mà `required_signals()` của "
+            "task không có"
         )
     kinds = {spec.kind for spec in task.failure_kinds()}
     undeclared = sorted(set(config.class_from_failed_step) - kinds)

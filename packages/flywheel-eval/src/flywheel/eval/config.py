@@ -369,14 +369,9 @@ class ScorerConfig:
     `task_id` is checked against the task being scored, so a tray config cannot
     be used to score a two-table episode and quietly supply the wrong numbers.
 
-    `step_signals` says which signals each step is judged on, and it is what
-    lets the scorer hold the "chưa rõ" convention of AC 2 itself instead of
-    trusting the task to hold it. Without it, a task that returns `True` for a
-    step whose signal was never recorded scores as a pass and one that returns
-    `False` scores as a failure, and spec section 5.1 says neither. `StageSpec`
-    carries no signal list, so the declaration lives in config until it reaches
-    the contract (Contract change #59); either way it is per task, so no task's
-    steps are written in code.
+    Which signals each step is judged on is not here: it is `StageSpec.signals`
+    of the task (#101, issue #59), so the step list and its signals come from
+    one place and a config cannot name a step the task does not have.
 
     `episode_signals` are the signals no single step owns - the collision flag
     of the two-table task - and a missing one costs a clean episode its pass
@@ -389,16 +384,12 @@ class ScorerConfig:
     scorer_version: str
     thresholds: dict[str, float]
     balance: BalanceLimits
-    step_signals: dict[str, tuple[str, ...]]
     episode_signals: tuple[str, ...]
     class_from_failed_step: tuple[str, ...]
 
     def declared_signals(self) -> frozenset[str]:
-        """Every signal the config accounts for, by step, by episode or by limit."""
-        names = set(self.episode_signals) | set(self.balance.signals())
-        for signals in self.step_signals.values():
-            names |= set(signals)
-        return frozenset(names)
+        """Every signal the config accounts for, by episode or by limit."""
+        return frozenset(self.episode_signals) | frozenset(self.balance.signals())
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> ScorerConfig:
@@ -408,12 +399,6 @@ class ScorerConfig:
         thresholds = _number_map(data, "thresholds", "scorer config")
         if not thresholds:
             raise ConfigError("`thresholds` không được rỗng: task nào cũng có ngưỡng vị từ")
-        step_signals = _name_list_map(data, "step_signals", "scorer config")
-        if not step_signals:
-            raise ConfigError(
-                "`step_signals` không được rỗng: mỗi bước phải khai tín hiệu nó "
-                "được chấm trên, thiếu tín hiệu mà không khai thì thành đạt hoặc trượt (AC 2)"
-            )
         return cls(
             task_id=_text(data, "task_id", "scorer config"),
             scorer_version=_text(data, "scorer_version", "scorer config"),
@@ -424,7 +409,6 @@ class ScorerConfig:
                 height_signal=_text(balance, "height_signal", "balance"),
                 tilt_signal=_text(balance, "tilt_signal", "balance"),
             ),
-            step_signals=step_signals,
             episode_signals=_name_list(data, "episode_signals", "scorer config"),
             class_from_failed_step=_name_list(data, "class_from_failed_step", "scorer config"),
         )
@@ -800,16 +784,6 @@ def _name_list(section: Mapping[str, Any], key: str, where: str) -> tuple[str, .
     if repeated:
         raise ConfigError(f"`{where}.{key}` repeats {repeated}")
     return names
-
-
-def _name_list_map(section: Mapping[str, Any], key: str, where: str) -> dict[str, tuple[str, ...]]:
-    value = _require(section, key, where)
-    if not isinstance(value, Mapping):
-        raise ConfigError(f"`{where}.{key}` must be a mapping of name to list, got {value!r}")
-    return {
-        _name(name, f"{where}.{key}"): _name_list(value, str(name), f"{where}.{key}")
-        for name in value
-    }
 
 
 def _name(value: Any, where: str) -> str:

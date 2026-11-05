@@ -7,7 +7,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from flywheel.contracts import TaskDefinition
+from conftest import TwoTableTask
+from flywheel.contracts import StageSpec, TaskDefinition
 from flywheel.contracts.entities import Score
 from flywheel.eval.api import SCORER_CONFIG_DIR, score_record, score_trace, store_score
 from flywheel.eval.scorer.artifact import STORE_RECORDS, build_record
@@ -63,7 +64,7 @@ def test_a_config_for_another_task_is_refused(
         "task_id: tray\nscorer_version: '0.1.0'\nthresholds: {r_reach: 0.08}\n"
         "balance: {min_height: 0.6, max_tilt: 0.3, height_signal: torso_height, "
         "tilt_signal: torso_tilt}\n"
-        "step_signals: {lift: [tray_tilt]}\nepisode_signals: []\n"
+        "episode_signals: []\n"
         "class_from_failed_step: []\n",
         encoding="utf-8",
     )
@@ -182,3 +183,18 @@ def test_a_changed_trace_is_a_different_score(
     # 03 section 4.3: the id is built from the trace hash with the scorer
     # version, so two scorings of different traces never share an id.
     assert clean.id != failed.id
+
+
+class InventsASignal(TwoTableTask):
+    """A task whose step names a signal it never asks the trace for."""
+
+    def stages(self) -> tuple[StageSpec, ...]:
+        first, *rest = super().stages()
+        return (first.model_copy(update={"signals": (*(first.signals or ()), "hand_speed")}), *rest)
+
+
+def test_a_step_signal_the_task_does_not_require_is_refused(
+    tmp_path: Path, make_rows: MakeRows
+) -> None:
+    with pytest.raises(ScorerError, match="hand_speed"):
+        score_trace(write(tmp_path / "ep.jsonl", make_rows()), InventsASignal(), CONFIG)

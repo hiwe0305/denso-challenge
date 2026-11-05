@@ -16,7 +16,9 @@ step's state is, and it is the only place the two conventions of spec section
   verdict nobody measured. A step whose own signals are missing is therefore
   unknown whatever `evaluate()` returned for it, and the reason names that
   step's missing signals and no others - a step is never told it is unknown
-  because of a signal it does not use.
+  because of a signal it does not use. Which signals are a step's own is
+  `StageSpec.signals` (#101); a stage that leaves it `None` has not said, and
+  is refused rather than scored as a step that needs nothing.
 
 What the task said about each step is read from `StageEvaluation.stage_status`
 when the task sends it, and recovered from `stage_success` when it does not.
@@ -28,14 +30,14 @@ nor an unknown step before it is a contradiction - the task stopped without
 saying where it broke - and raises rather than scoring as an episode that
 simply passed.
 
-The number of steps comes from `stages()` and the signals of each step come
-from config; nothing here knows that the two-table task has six steps, that
+The number of steps and the signals of each step come from `stages()`;
+nothing here knows that the two-table task has six steps, that
 the tray task has seven, or which signal any step is judged on.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 
 from flywheel.contracts import StageEvaluation, StageSpec
 from flywheel.eval.scorer.status import ScorerError, StepScore, StepStatus
@@ -47,22 +49,19 @@ def score_steps(
     evaluation: StageEvaluation,
     stages: Sequence[StageSpec],
     missing_signals: Sequence[str] = (),
-    *,
-    step_signals: Mapping[str, Sequence[str]],
 ) -> tuple[StepScore, ...]:
     """State every step of the task, in the order the task declares them.
 
-    `step_signals` maps a step name onto the signals that step is judged on, so
-    a step whose signals the trace does not have comes back unknown however the
-    task's predicate answered for it. It is keyword-only and has no default:
-    a scorer that could be called without it is a scorer that can be called
-    without the convention of AC 2.
+    A step whose `StageSpec.signals` the trace does not have comes back unknown
+    however the task's predicate answered for it.
     """
     outcomes = evaluation.stage_success
     if len(outcomes) != len(stages):
         raise ScorerError(
             f"`evaluate()` trả {len(outcomes)} bước, `stages()` khai {len(stages)} bước"
         )
+    for stage in stages:
+        step_signals(stage)  # refused up front, not only when a signal is missing
     failed = first_failed_step(evaluation)
     return tuple(
         _step(
@@ -70,7 +69,7 @@ def score_steps(
             reported,
             index,
             failed,
-            missing_for_step(stage.name, step_signals, missing_signals),
+            missing_for_step(stage, missing_signals),
         )
         for index, (stage, reported) in enumerate(
             zip(stages, task_statuses(evaluation), strict=True)
@@ -90,14 +89,23 @@ def task_statuses(evaluation: StageEvaluation) -> tuple[StepStatus, ...]:
     return tuple(legacy[outcome] for outcome in evaluation.stage_success)
 
 
-def missing_for_step(
-    name: str,
-    step_signals: Mapping[str, Sequence[str]],
-    missing_signals: Sequence[str],
-) -> tuple[str, ...]:
+def missing_for_step(stage: StageSpec, missing_signals: Sequence[str]) -> tuple[str, ...]:
     """The signals this step is judged on that the trace does not have."""
-    declared = set(step_signals.get(name, ()))
-    return tuple(signal for signal in missing_signals if signal in declared)
+    return tuple(signal for signal in missing_signals if signal in step_signals(stage))
+
+
+def step_signals(stage: StageSpec) -> tuple[str, ...]:
+    """`StageSpec.signals`, refusing a stage that never declared them.
+
+    `None` is a task written before #101; scoring it as `()` would let every
+    step of it pass on signals nobody recorded, which is AC 2 undone.
+    """
+    if stage.signals is None:
+        raise ScorerError(
+            f"bước `{stage.name}` chưa khai `StageSpec.signals`; thiếu nó thì không "
+            "bước nào thành chưa rõ được khi thiếu tín hiệu (AC 2)"
+        )
+    return stage.signals
 
 
 def first_failed_step(evaluation: StageEvaluation) -> int | None:

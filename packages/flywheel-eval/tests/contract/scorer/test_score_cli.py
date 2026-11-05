@@ -2,7 +2,9 @@
 
 The command is driven over the task definition the testkit ships, not the one
 the unit tests build, so what is exercised here is the path an engineer takes:
-name a task on the command line, point at a trace, read the table.
+name a task on the command line, point at a trace, read the table. The testkit
+task predates `StageSpec.signals` (#101), which the scorer now requires, so it
+is named through `ToyWithSignals`, the same task with its step signals declared.
 """
 
 from __future__ import annotations
@@ -12,19 +14,35 @@ from pathlib import Path
 
 import pyarrow as pa  # type: ignore[import-untyped]
 import pytest
-from flywheel.contracts import ScorerParams, StageEvaluation
+from flywheel.contracts import ScorerParams, StageEvaluation, StageSpec
 from flywheel.eval.cli import app, load_task
 from flywheel.eval.scorer.artifact import STORE_RECORDS
 from flywheel.eval.scorer.status import ScorerError
 from flywheel.testkit.fakes.task import ToyPickPlace
 from typer.testing import CliRunner
 
-TOY_TASK = "flywheel.testkit.fakes.task:ToyPickPlace"
 THIS = "test_score_cli"
+TOY_TASK = f"{THIS}:ToyWithSignals"
 runner = CliRunner()
 
+TOY_SIGNALS: dict[str, tuple[str, ...]] = {
+    "approach": ("gripper_x", "gripper_y", "part_x", "part_y"),
+    "grasp": ("gripper_x", "gripper_y", "part_x", "part_y"),
+    "place": ("part_x", "part_y", "target_x", "target_y"),
+}
 
-class RaisingTask(ToyPickPlace):
+
+class ToyWithSignals(ToyPickPlace):
+    """The testkit task with the step signals #101 lets a stage declare."""
+
+    def stages(self) -> tuple[StageSpec, ...]:
+        return tuple(
+            stage.model_copy(update={"signals": TOY_SIGNALS[stage.name]})
+            for stage in super().stages()
+        )
+
+
+class RaisingTask(ToyWithSignals):
     """A task whose predicates blow up, named on the command line like any other."""
 
     def evaluate(self, signals: pa.Table, params: ScorerParams) -> StageEvaluation:
@@ -53,10 +71,6 @@ def config(tmp_path: Path) -> Path:
         "thresholds: {distance: 0.05}\n"
         "balance: {min_height: 0.5, max_tilt: 0.4, height_signal: torso_height, "
         "tilt_signal: torso_tilt}\n"
-        "step_signals:\n"
-        "  approach: [gripper_x, gripper_y, part_x, part_y]\n"
-        "  grasp: [gripper_x, gripper_y, part_x, part_y]\n"
-        "  place: [part_x, part_y, target_x, target_y]\n"
         "episode_signals: []\n"
         "class_from_failed_step: []\n",
         encoding="utf-8",
@@ -209,9 +223,7 @@ def test_what_cannot_be_scored_exits_two_and_writes_nothing(
 
 
 @pytest.mark.parametrize("body", [None, "task_id: [\n", "- a\n- b\n"])
-def test_a_config_that_is_absent_or_broken_exits_two(
-    tmp_path: Path, body: str | None
-) -> None:
+def test_a_config_that_is_absent_or_broken_exits_two(tmp_path: Path, body: str | None) -> None:
     trace = write(tmp_path / "ep.jsonl", toy_rows())
     broken = tmp_path / "broken.yaml"
     if body is not None:
