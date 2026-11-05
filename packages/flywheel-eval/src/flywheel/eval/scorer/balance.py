@@ -36,8 +36,9 @@ class BalanceVerdict:
 
     violated: bool
     # The trace row the violation was first measured on, not a step of the
-    # task: mapping a row onto a step needs the per-step enter and exit times
-    # that `StageEvaluation` does not carry (AC 1, Contract change #59).
+    # task. Since #101 a task may report per-step enter and exit times, but
+    # none does yet and a row has no time of its own here, so the row is not
+    # mapped onto a step.
     row: int | None = None
     signal: str | None = None
     value: float | None = None

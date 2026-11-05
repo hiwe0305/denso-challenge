@@ -88,7 +88,7 @@ def judge_failure(
         # not whatever the unjudged step was missing.
         if failed is not None:
             return unknown_verdict(UNKNOWN_STEPS)
-        return unknown_verdict(unknown.reason or UNKNOWN_STEPS)
+        return unknown_verdict(unknown.detail or unknown.reason or UNKNOWN_STEPS)
     if failed is None:
         if evaluation.failure_kind is not None:
             # Two answers that contradict each other: no step failed and yet a

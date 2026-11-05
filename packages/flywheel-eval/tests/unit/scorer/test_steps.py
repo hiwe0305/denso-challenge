@@ -47,7 +47,7 @@ def test_a_step_with_no_signal_is_unknown_not_passed(task: TaskDefinition) -> No
 
     assert [step.status for step in steps[1:]] == ["unknown"] * 5
     assert all(step.status != "pass" for step in steps[1:])
-    assert steps[1].reason == "thiếu tín hiệu: object_height"
+    assert steps[1].detail == "thiếu tín hiệu: object_height"
 
 
 def test_an_unknown_without_a_missing_signal_still_says_why(task: TaskDefinition) -> None:
@@ -55,7 +55,7 @@ def test_an_unknown_without_a_missing_signal_still_says_why(task: TaskDefinition
 
     steps = score_steps(evaluation, tuple(task.stages()))
 
-    assert steps[0].reason == NO_VERDICT
+    assert steps[0].detail == NO_VERDICT
 
 
 def test_a_step_is_unknown_whatever_the_task_answered(task: TaskDefinition) -> None:
@@ -72,7 +72,7 @@ def test_a_step_is_unknown_whatever_the_task_answered(task: TaskDefinition) -> N
         steps = score_steps(evaluation, stages, missing)
 
         assert steps[0].status == "unknown"
-        assert steps[0].reason == "thiếu tín hiệu: hand_object_distance"
+        assert steps[0].detail == "thiếu tín hiệu: hand_object_distance"
 
 
 def test_a_step_is_not_unknown_for_a_signal_it_does_not_use(task: TaskDefinition) -> None:
@@ -86,8 +86,8 @@ def test_a_step_is_not_unknown_for_a_signal_it_does_not_use(task: TaskDefinition
     )
 
     assert steps[0].status == "pass"  # approach never reads it
-    assert steps[4].reason == "thiếu tín hiệu: object_in_target_zone"
-    assert steps[5].reason == "thiếu tín hiệu: object_in_target_zone"
+    assert steps[4].detail == "thiếu tín hiệu: object_in_target_zone"
+    assert steps[5].detail == "thiếu tín hiệu: object_in_target_zone"
 
 
 def test_an_unknown_before_the_failure_stays_unknown(task: TaskDefinition) -> None:

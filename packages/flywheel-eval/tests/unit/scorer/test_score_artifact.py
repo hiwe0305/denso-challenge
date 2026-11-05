@@ -104,9 +104,10 @@ def test_an_unknown_step_reaches_the_record_with_its_reason(
     assert record.success is None
     assert record.failure_kind == "L-UNKNOWN"
     assert record.meta["missing_signals"] == ["hand_object_distance"]
-    # Named after the signal that step is judged on, and no other.
-    assert "hand_object_distance" in record.meta["unknown_steps"]["approach"]
-    assert "hand_object_distance" not in record.meta["unknown_steps"].get("place", "")
+    # The step judged on that signal is unknown for the missing signal; the
+    # others are unknown because the task could not judge them without it.
+    assert record.unknown_reason == ["missing_signal"] + ["no_verdict"] * 5
+    assert "unknown_steps" not in record.meta
 
 
 def test_a_balance_violation_reaches_the_record(
