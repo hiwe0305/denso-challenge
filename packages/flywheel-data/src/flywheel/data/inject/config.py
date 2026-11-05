@@ -39,9 +39,11 @@ class LogDefectConfig:
     t8_frozen_grad: float = 0.5  # over t8.frozen_tolerance 0
     rtc_chunks: int = 200
     control_hz: float = 50.0
-    r1_latency_s: float = 0.155  # over r1.tau_lat_s 0.15; ceil(0.155 * 50) = 8, not over r2
+    # r1 over r1.tau_lat_s 0.10 but ceil(0.11 * 50) = 6, not over the server's
+    # d = r2.rtc_inference_delay_steps 6: R1 without R2
+    r1_latency_s: float = 0.11
     r1_fraction: float = 0.05  # enough chunks to lift the 99th percentile
-    r2_latency_s: float = 0.24  # one chunk, delay 12 over r2.max_delay_steps 8
+    r2_latency_s: float = 0.24  # one chunk, delay 12 over d 6; p99 stays under tau_lat
 
 
 @dataclass(frozen=True)

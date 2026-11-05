@@ -238,7 +238,7 @@ def inject_train(
 
 
 def clean_rtc_log(job_id: str, cfg: LogDefectConfig) -> list[RTCInferenceRecord]:
-    """A healthy RTC client: latency well under tau_lat, no stall past max_delay."""
+    """A healthy RTC client: latency well under tau_lat, no stall past the server's d."""
     rng = random.Random(job_id)
     trace = f"tr-{job_id[4:]}"
     return [
@@ -266,12 +266,17 @@ def _chunk(
 def inject_rtc(
     kind: str, log: list[RTCInferenceRecord], cfg: LogDefectConfig, rng: random.Random
 ) -> tuple[list[RTCInferenceRecord], Params]:
-    """R1: sustained latency just past tau_lat; R2: one stall past max_delay."""
+    """R1: sustained latency past tau_lat within d; R2: one stall past the server's d.
+
+    Chunk 0 is never picked: the system check leaves it out of R1 and R2 (the
+    client asks for it before any action ran), so a defect there would be one
+    nobody can detect.
+    """
     count = max(1, round(cfg.r1_fraction * len(log))) if kind == "R1_high_latency" else 1
     latency = cfg.r1_latency_s if kind == "R1_high_latency" else cfg.r2_latency_s
     if kind not in ("R1_high_latency", "R2_buffer_depleted"):
         raise ValueError(f"{kind} is not an RTC log defect")
-    picked = set(rng.sample(range(len(log)), count))
+    picked = set(rng.sample([r.chunk_index for r in log if r.chunk_index > 0], count))
     log = [
         _chunk(r.job_id, r.trace_id, r.chunk_index, latency, r.boundary_jump, cfg)
         if r.chunk_index in picked
