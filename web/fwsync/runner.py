@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from web.fwsync import actions as log
 from web.fwsync.mapping import (
     DatasetLookup,
     MappingError,
@@ -595,7 +596,12 @@ def run_fake_core(outbox: Path, destination: Path) -> SyncResult:
             "conclusion": f"lõi giả đã áp dụng {kind}",
             "reason": artifact.get("reason"),
         }
-        (destination / f"{target}-{action_id}.jsonl").write_text(
+        # Same layout as the core, `<table>/part-<id>.jsonl`: `table_of` reads the
+        # table from the folder. A flat `decisions-<id>.jsonl` matched no table,
+        # so `fwsync import` skipped every reply and nothing became APPLIED.
+        folder = destination / target
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / f"part-{action_id}.jsonl").write_text(
             json.dumps(reply, ensure_ascii=False, default=str) + "\n",
             encoding="utf-8",
             newline="\n",
@@ -605,6 +611,54 @@ def run_fake_core(outbox: Path, destination: Path) -> SyncResult:
         "decisions": {"inserted": written, "updated": 0, "rejected": len(result.errors)}
     }
     return result
+
+
+@dataclass
+class CycleResult:
+    """One pass of the write loop in sink mode (`POST /sync/run`, §5.5)."""
+
+    exported: list[str]
+    applied: list[str]
+    export: SyncResult
+    fake_core: SyncResult | None
+    imported: SyncResult | None
+
+    @property
+    def status(self) -> str:
+        parts = [r for r in (self.export, self.fake_core, self.imported) if r is not None]
+        if all(r.status == "ok" for r in parts):
+            return "ok"
+        return "partial" if self.exported or self.applied else "failed"
+
+
+def run_cycle(
+    actions: Path,
+    outbox: Path,
+    inbox: Path,
+    sink: Sink,
+    *,
+    fake_core: bool,
+    origin: str = "core",
+) -> CycleResult:
+    """export → (fake core) → import the inbox → mark what came back APPLIED.
+
+    Without the fake core this exports and imports whatever the real core has
+    put in the inbox; with it the loop closes on one machine (Appendix C).
+    """
+    waiting = log.pending(actions)
+    export = run_export(waiting, outbox)
+    written = {
+        str(row["id"]) for row in waiting
+        if (outbox / f"{str(row['action_kind']).lower()}-{row['id']}.json").exists()
+    }
+    exported = log.mark(actions, sorted(written), "EXPORTED")
+    replies = run_fake_core(outbox, inbox) if fake_core else None
+    imported: SyncResult | None = None
+    applied: list[str] = []
+    if inbox.is_dir():
+        imported = run_import(inbox, sink, origin=origin)
+        applied = log.mark(actions, log.answered_ids(scan(inbox).records), "APPLIED")
+    return CycleResult(exported, applied, export, replies, imported)
 
 
 def _decision_kind(action_kind: str) -> str:

@@ -68,6 +68,8 @@ class ReadModel(Protocol):
     def cost_by_branch(self) -> Row: ...
     def cost_by_intervention(self) -> list[Row]: ...
     def sensitivity(self, price_book: str | None) -> list[Row]: ...
+    def decisions(self) -> list[Row]: ...
+    def refresh(self) -> None: ...
 
 
 # ---------------------------------------------------------------- helpers
@@ -110,6 +112,10 @@ class SinkTables:
                 self._cache[table] = [json.loads(line) for line in lines if line.strip()]
         return self._cache[table]
 
+    def invalidate(self) -> None:
+        """Forget every table; the next read sees what `fwsync import` just wrote."""
+        self._cache.clear()
+
 
 class SinkReadModel:
     """Each view of 70-views.sql, computed over the sink tables."""
@@ -121,6 +127,27 @@ class SinkReadModel:
     ) -> None:
         self.t = tables
         self.now = now
+
+    def refresh(self) -> None:
+        invalidate = getattr(self.t, "invalidate", None)
+        if callable(invalidate):
+            invalidate()
+
+    def decisions(self) -> list[Row]:
+        """`decisions`, newest last as loaded; M10 shows them newest first."""
+        return [
+            {
+                "id": d["decision_ref"],
+                "kind": d.get("kind"),
+                "target_kind": d.get("target_kind"),
+                "target_id": d.get("target_id"),
+                "conclusion": d.get("conclusion"),
+                "reason": d.get("reason"),
+                "source_action_id": d.get("source_action_id"),
+                "origin": d["origin"],
+            }
+            for d in reversed(self.t("decisions"))
+        ]
 
     # ------------------------------------------------------------ common
 

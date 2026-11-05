@@ -3,8 +3,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "./client";
 import type {
+  ActionStatusRow,
   AlgoStep,
   BranchComparisonRow,
+  DecisionRow,
+  SyncRunRow,
   ClusterBoardRow,
   E1CurvePoint,
   HeCurvePoint,
@@ -64,6 +67,18 @@ export const useBranches = (task: string) =>
   useGet<BranchComparisonRow[]>(`/results/branches?task_id=${task}`);
 export const useHeCurve = () => useGet<HeCurvePoint[]>("/results/he-curve");
 export const useE1Curve = () => useGet<E1CurvePoint[]>("/results/e1-curve");
+
+// ---------------------------------------------------------------- M10 and the bell
+/** Actions are polled: their status is set by fwsync, in another process (§6.4). */
+export const useActions = () =>
+  useQuery({
+    queryKey: ["/actions?limit=500"],
+    queryFn: () => apiGet<Page<ActionStatusRow>>("/actions?limit=500"),
+    refetchInterval: 10_000,
+  });
+export const useDecisions = () => useGet<Page<DecisionRow>>("/decisions?limit=500");
+export const useSyncRuns = () => useGet<SyncRunRow[]>("/sync/runs");
+export const useRepairTicketsAll = () => useGet<RepairTicket[]>("/repair-tickets");
 
 // ---------------------------------------------------------------- M8
 export const useLedger = () => useGet<Page<LedgerRow>>("/cost/ledger?limit=500");

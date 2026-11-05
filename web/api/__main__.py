@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 from web.api.actions import ActionStore
-from web.api.app import create_app
+from web.api.app import SyncConfig, create_app
 from web.api.readmodel import SinkReadModel, SinkTables
 
 
@@ -29,6 +29,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--import-from", type=Path, default=None,
                         help="chạy `fwsync import` từ thư mục này vào --sink trước khi mở API")
     parser.add_argument("--origin", choices=("core", "mock"), default="core")
+    parser.add_argument("--outbox", type=Path, default=Path("fwdata/outbox"),
+                        help="nơi `POST /sync/run` xuất hành động cho lõi")
+    parser.add_argument("--inbox", type=Path, default=Path("fwdata/inbox"),
+                        help="nơi lõi (hoặc lõi giả) ghi kết quả để nạp lại")
+    parser.add_argument("--fake-core", action="store_true",
+                        help="để lõi giả trả lời outbox ngay trong `POST /sync/run` (mốc M4)")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args(argv)
@@ -49,7 +55,9 @@ def main(argv: list[str] | None = None) -> int:
 
     import uvicorn
 
-    app = create_app(SinkReadModel(SinkTables(args.sink)), ActionStore(args.state))
+    sync = SyncConfig(outbox=args.outbox, inbox=args.inbox, sink=args.sink,
+                      fake_core=args.fake_core, origin=args.origin)
+    app = create_app(SinkReadModel(SinkTables(args.sink)), ActionStore(args.state), sync)
     uvicorn.run(app, host=args.host, port=args.port)
     return 0
 

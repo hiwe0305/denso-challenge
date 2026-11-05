@@ -10023,5 +10023,37 @@
    ],
    "total_usd": 524.12
   }
- ]
+ ],
+ "- /actions": {
+  "items": [],
+  "next_cursor": null,
+  "total": 0
+ },
+ "- /decisions": {
+  "items": [
+   {
+    "id": "dec_kbd_stage4",
+    "kind": "stage_review",
+    "target_kind": "pipeline_stage_runs",
+    "target_id": null,
+    "conclusion": "APPLY_FIX_AND_RETRY: sửa giới hạn vận tốc trong bộ đọc, chạy lại từ tầng 4",
+    "reason": null,
+    "source_action_id": null,
+    "origin": "mock"
+   },
+   {
+    "id": "dec_psi_stage4",
+    "kind": "stage_review",
+    "target_kind": "pipeline_stage_runs",
+    "target_id": null,
+    "conclusion": "FORCE_CONTINUE: 4 episode flag là lệch đồng bộ gần ngưỡng, đã xem tay",
+    "reason": "lệch dưới τ_sync của bản cứng hơn; không phải lỗi bộ đọc",
+    "source_action_id": null,
+    "origin": "mock"
+   }
+  ],
+  "next_cursor": null,
+  "total": 2
+ },
+ "- /sync/runs": []
 }

@@ -1,25 +1,24 @@
 """`human_actions` in sink mode (DESIGN.md §4.4a, §7.2, §7.3).
 
-Until Postgres exists the API writes every human action as one line of
-``<state>/human_actions.jsonl``. That file is exactly what
-``fwsync export --actions`` reads, so the write loop of milestone M4
-(click → outbox → core → re-import) runs end to end without a database.
-
-Two rules carried over from the schema:
+Until Postgres exists the API writes every human action as one creation line
+of ``<state>/human_actions.jsonl``; ``fwsync`` appends the status lines
+(``web/fwsync/actions.py`` describes the format). The API never edits a line,
+and it reads status by folding the file, so a status written by ``fwsync`` in
+another process shows up on the next read.
 
 * The same ``Idempotency-Key`` returns the same ``action_id`` (C16), also
-  across a restart, because the store is reloaded from the file.
-* The file is append-only. A later status change is a new line, never an edit.
+  across a restart, because the keys are rebuilt from the file.
+* Each sync run is one line of ``<state>/sync_runs.jsonl`` (table ``sync_runs``).
 """
 
 from __future__ import annotations
 
-import json
 import threading
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from web.fwsync import actions as log
 
 Row = dict[str, Any]
 
@@ -27,23 +26,21 @@ Row = dict[str, Any]
 @dataclass
 class ActionStore:
     directory: Path
-    _rows: dict[str, Row] = field(default_factory=dict)
-    _by_key: dict[str, str] = field(default_factory=dict)
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
     def __post_init__(self) -> None:
         self.directory.mkdir(parents=True, exist_ok=True)
-        if self.path.exists():
-            for line in self.path.read_text(encoding="utf-8").splitlines():
-                if line.strip():
-                    row = json.loads(line)
-                    self._rows[row["id"]] = row
-                    if row.get("idempotency_key"):
-                        self._by_key[row["idempotency_key"]] = row["id"]
 
     @property
     def path(self) -> Path:
         return self.directory / "human_actions.jsonl"
+
+    @property
+    def runs_path(self) -> Path:
+        return self.directory / "sync_runs.jsonl"
+
+    def _state(self) -> dict[str, Row]:
+        return log.fold(log.read_lines(self.path))
 
     def record(
         self,
@@ -55,11 +52,12 @@ class ActionStore:
         reason: str | None,
     ) -> Row:
         with self._lock:
-            existing = self._by_key.get(key)
-            if existing is not None:
-                return self._rows[existing]
+            state = self._state()
+            for existing in state.values():
+                if existing.get("idempotency_key") == key:
+                    return existing
             row: Row = {
-                "id": f"act_{len(self._rows) + 1:04d}",
+                "id": f"act_{len(state) + 1:04d}",
                 "action_kind": kind,
                 "target_kind": target_kind,
                 "target_id": target_id,
@@ -68,30 +66,43 @@ class ActionStore:
                 "sync_status": "PENDING",
                 "reject_reason": None,
                 "idempotency_key": key,
-                "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "created_at": log.now_iso(),
                 "exported_at": None,
                 "applied_at": None,
             }
-            with self.path.open("a", encoding="utf-8", newline="\n") as handle:
-                handle.write(json.dumps(row, ensure_ascii=False) + "\n")
-            self._rows[row["id"]] = row
-            self._by_key[key] = row["id"]
+            log.append(self.path, [row])
             return row
 
-    def status(self, action_id: str) -> Row | None:
+    @staticmethod
+    def _view(row: Row) -> Row:
         """v_action_status, without the user and job columns sink mode has no table for."""
-        row = self._rows.get(action_id)
-        if row is None:
-            return None
         return {
             "action_id": row["id"],
             "action_kind": row["action_kind"],
-            "target_kind": row["target_kind"],
-            "target_id": row["target_id"],
+            "target_kind": row.get("target_kind"),
+            "target_id": row.get("target_id"),
             "sync_status": row["sync_status"],
-            "reason": row["reason"],
-            "reject_reason": row["reject_reason"],
-            "created_at": row["created_at"],
-            "exported_at": row["exported_at"],
-            "applied_at": row["applied_at"],
+            "reason": row.get("reason"),
+            "reject_reason": row.get("reject_reason"),
+            "created_at": row.get("created_at"),
+            "exported_at": row.get("exported_at"),
+            "applied_at": row.get("applied_at"),
         }
+
+    def status(self, action_id: str) -> Row | None:
+        row = self._state().get(action_id)
+        return self._view(row) if row else None
+
+    def list_actions(self, sync_status: str | None) -> list[Row]:
+        """Newest first, the order the bell and M10 read them in."""
+        rows = [self._view(r) for r in self._state().values()]
+        if sync_status:
+            rows = [r for r in rows if r["sync_status"] == sync_status]
+        return list(reversed(rows))
+
+    def add_run(self, run: Row) -> Row:
+        log.append(self.runs_path, [run])
+        return run
+
+    def runs(self) -> list[Row]:
+        return list(reversed(log.read_lines(self.runs_path)))

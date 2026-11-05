@@ -47,6 +47,9 @@ export const PARITY_REQUESTS = [
   "- /cost/by-branch",
   "- /cost/by-intervention",
   "- /cost/sensitivity",
+  "- /actions",
+  "- /decisions",
+  "- /sync/runs",
 ];
 
 it("records the MSW responses the backend must match", async () => {

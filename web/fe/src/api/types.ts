@@ -68,6 +68,32 @@ export interface ActionStatusRow {
   applied_at: string | null;
 }
 
+/** GET /decisions · `decisions`, newest first. */
+export interface DecisionRow {
+  id: string;
+  kind: string | null;
+  target_kind: string | null;
+  target_id: string | null;
+  conclusion: string | null;
+  reason: string | null;
+  /** Set when the decision answers a web action (W7). */
+  source_action_id: string | null;
+  origin: Origin;
+}
+
+/** GET /sync/runs · one pass of `POST /sync/run` (table `sync_runs`). */
+export interface SyncRunRow {
+  id: string;
+  direction: string;
+  status: "ok" | "partial" | "failed";
+  started_at: string;
+  finished_at: string;
+  exported: string[];
+  applied: string[];
+  fake_core: boolean;
+  errors: Array<Record<string, unknown>>;
+}
+
 /**
  * A check that did not run, with its reason (BR-12).
  * `source` says where the skip came from, so the FE can phrase the code:
