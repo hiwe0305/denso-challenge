@@ -272,6 +272,7 @@ def fetch_once(
             "files": len(files),
             "bad_or_missing": bad,
             "grown": grown,
+            "skipped": job.get("skipped", []),  # links out of the job dir, not pulled
             "pulled_bytes": size if wanted and not bad else None,
             "checkpoint_pulled_bytes": ckpt_size if ckpt_ok else None,
             "seconds": round(seconds, 1),

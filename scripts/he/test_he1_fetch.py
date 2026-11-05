@@ -564,6 +564,50 @@ def test_before_train_exits_an_empty_stage_is_not_a_failure(tmp_path: Path) -> N
     assert fetch_once(LocalRemote(vm), tmp_path / "l") == []
 
 
+def test_a_run_that_ends_while_stage_hashes_is_running_then_done(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # DA-26 b3, V-EGO: the phase and the `train exit 0` landed while `stage` hashed
+    # ckpt_40000; a report read before and a log read after made the job "failed".
+    vm = fake_vm(tmp_path / "vm", saved=(40000,), complete=40000)
+    phase = {"job_id": JOB, "infra_status": "ok", "checkpoint_step": 40000}
+    hash_file = he1_colab.sha256
+
+    def run_ends(path: Path) -> str:
+        if not (vm / "train.log").exists():
+            (vm / "report.json").write_text(json.dumps({"phases": {"train": phase}}))
+            (vm / "train.log").write_text("train exit 0\n")
+        return hash_file(path)
+
+    monkeypatch.setattr(he1_colab, "sha256", run_ends)
+    assert he1_colab.stage(vm)["jobs"][0]["train"] == "running"
+    listing = he1_colab.stage(vm)
+    assert listing["jobs"][0]["train"] == "done" and listing["train"] == "ended"
+
+
+def test_a_link_out_of_the_job_dir_is_skipped_not_bad(tmp_path: Path) -> None:
+    vm = fake_vm(tmp_path / "vm", saved=(40000,), complete=40000, train_done=True)
+    logs = vm / "runs" / JOB / "wandb/offline-run/logs"
+    logs.mkdir(parents=True)
+    cache = tmp_path / "root-cache" / "core-debug.log"  # W&B's link target
+    cache.parent.mkdir()
+    cache.write_text("core\n")
+    (logs / "debug-core.log").symlink_to(cache)
+    (logs / "debug.log").write_text("debug\n")
+    (logs.parent.parent / "debug.log").symlink_to("offline-run/logs/debug.log")  # stays inside
+
+    def laptop_lacks_the_cache(argv: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        done = run(argv)
+        if argv[0] == "rsync":  # the VM and the "laptop" share this disk here
+            cache.unlink(missing_ok=True)
+        return done
+
+    (status,) = fetch_once(LocalRemote(vm), tmp_path / "l", runner=laptop_lacks_the_cache)
+    assert status["skipped"] == ["wandb/offline-run/logs/debug-core.log"]
+    assert status["bad_or_missing"] == [] and status["final"]
+    assert (tmp_path / "l" / JOB / "wandb/debug.log").read_text() == "debug\n"
+
+
 def test_a_log_that_differs_after_training_ended_is_bad(tmp_path: Path) -> None:
     vm = fake_vm(tmp_path / "vm", saved=(40000,), complete=40000, train_done=True)
     metrics = vm / "runs" / JOB / "metrics.jsonl"

@@ -313,9 +313,18 @@ def stage(work: Path) -> dict[str, Any]:
     Every file outside `checkpoints/` (metrics, results, the run's argv and config)
     and, of the latest complete `ckpt_<step>`, every file but the optimizer state:
     eval serves `model.safetensors`, and a resume is not paid for in tier 2.
+
+    The launch log's `train exit` is read once, before `report.json`: `train` writes
+    its phase before the launch line appends the exit, so the pair read in this order
+    never shows an exit without the phase of a run that ended ok (DA-26 b3: the exit
+    landed while the new checkpoint was being hashed, and the job read as failed).
+    A symlink that resolves outside the job dir is not listed but named in `skipped`:
+    rsync copies the link, which dangles on the laptop and could never verify (W&B's
+    `logs/debug-core.log` points into `/root/.cache`).
     """
     cache_path = work / "stage_cache.json"
     cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
+    exit_code = train_exit(work / "train.log")
     report = (
         json.loads((work / "report.json").read_text()) if (work / "report.json").exists() else {}
     )
@@ -323,7 +332,15 @@ def stage(work: Path) -> dict[str, Any]:
     staged = []
     for job in jobs(work):
         complete = completed_checkpoints(job)
-        files = [p for p in job.rglob("*") if p.is_file() and "checkpoints" not in p.parts]
+        inside = job.resolve()
+        outside = sorted(
+            p for p in job.rglob("*") if p.is_symlink() and not p.resolve().is_relative_to(inside)
+        )
+        files = [
+            p
+            for p in job.rglob("*")
+            if p.is_file() and "checkpoints" not in p.parts and p not in outside
+        ]
         if complete:
             files += [
                 p
@@ -342,13 +359,14 @@ def stage(work: Path) -> dict[str, Any]:
             {
                 "job": job.name,
                 "checkpoint": complete[-1].name if complete else None,
-                "train": train_state(trained, job.name, work / "train.log"),
+                "train": train_state(trained, job.name, exit_code),
                 "progress": progress(job / "metrics.jsonl"),
                 "files": entries,
+                "skipped": [str(p.relative_to(job)) for p in outside],
             }
         )
     cache_path.write_text(json.dumps(cache))
-    return {"train": run_state(work / "train.log", staged), "jobs": staged}
+    return {"train": run_state(exit_code, staged), "jobs": staged}
 
 
 def train_exit(log: Path) -> int | None:
@@ -359,19 +377,18 @@ def train_exit(log: Path) -> int | None:
     return int(codes[-1]) if codes and codes[-1].isdigit() else (1 if codes else None)
 
 
-def run_state(log: Path, staged: list[dict[str, Any]]) -> str:
+def run_state(code: int | None, staged: list[dict[str, Any]]) -> str:
     """The launch as a whole: `failed` when `train` exited nonzero, or exited with no job.
 
     A train that dies before Psi0Trainer makes `runs/<job>` (no .env, a failed import,
     a refused hash or marker) leaves no job to carry a state; this one still says so.
     """
-    code = train_exit(log)
     if code is None:
         return "running"
     return "failed" if code != 0 or not staged else "ended"
 
 
-def train_state(trained: dict[str, Any], job: str, log: Path) -> str:
+def train_state(trained: dict[str, Any], job: str, exit_code: int | None) -> str:
     """`done`, `failed` or `running`.
 
     `done` only when the train phase of this job ended ok at the plan's last step:
@@ -382,7 +399,7 @@ def train_state(trained: dict[str, Any], job: str, log: Path) -> str:
     if trained.get("job_id") == job:
         ok = trained.get("infra_status") == "ok"
         return "done" if ok and trained.get("checkpoint_step") == TOTAL_STEPS else "failed"
-    if train_exit(log) is not None:
+    if exit_code is not None:
         return "failed"
     return "running"
 
