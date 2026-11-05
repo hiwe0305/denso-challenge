@@ -44,7 +44,7 @@ Theo design mục 9.2 (đã chốt 3/11/2026, issue #34):
 |---|---|
 | Recall theo loại | Lỗi của loại đó được bắt / số lỗi cấy của loại đó. Bắt = lớp báo đúng target với đúng mã của lỗi. Không gộp các loại cùng mã |
 | Precision theo mã | Trong các cặp (target, mã) khác nhau lớp báo trên bản có lỗi, phần khớp một lỗi cấy |
-| Báo nhầm | Trên bản sạch: số episode hoặc job có ít nhất một báo cáo / tổng số |
+| Báo nhầm | Trên bản sạch: (số episode hoặc job có ít nhất một báo cáo + số target không gắn đơn vị nào) / tổng số episode hoặc job. Target không gắn đơn vị là target không quy được về episode hay job của bản (agent ghi `dataset`, hay một đường dẫn ngoài bản); mỗi target như thế tính một lần dù báo nhiều mã, và ghi riêng ở dòng "không gắn đơn vị" (`false_alarm_not_a_unit`). Mẫu số vẫn là số đơn vị, để hai lớp so được với nhau; vì thế về lý thuyết tỉ lệ có thể vượt 100% |
 | Thời gian | Từ lúc job xong (`job_finished_at` trong spec) tới lúc có báo cáo (mtime của `qa/reports.jsonl`, lúc chạy xong bộ phát hiện log, `created_at` muộn nhất của `AgentReport`). Thiếu một trong hai mốc thì ghi "chưa đo" |
 
 Hai quy tắc design để ngỏ, bộ chấm chọn như sau **[Đề xuất]**, cần Hiếu duyệt:

@@ -8,7 +8,9 @@ Rules of design 27/10/2026 section 9.2 (decided 3/11/2026, issue #34):
   (target, code) pairs the layer reported on the copy with defects, the share that
   match a defect.
 - False alarm rate is on the clean copy: units (episodes or jobs) with at least
-  one report, over all units.
+  one report, over all units. A target that names no unit (the agent writes
+  `dataset`, or a path outside the copy) is a report too: each such target adds
+  one to the count, the units stay the denominator.
 - Time to report: from when the job finished to when the layer's report existed.
 
 Two rules of this scorer, written down because the design leaves them open:
@@ -67,6 +69,7 @@ class LayerScore:
     masked_by_kind: Mapping[str, int]
     precision_by_code: Mapping[str, Rate]
     false_alarm: Rate
+    not_a_unit: tuple[str, ...]  # clean-copy targets that name no unit, in `false_alarm`
     clean_reports: tuple[tuple[str, str], ...]
     natural: tuple[tuple[str, str], ...]
     seconds_to_report: Mapping[str, float | None]
@@ -153,13 +156,16 @@ def score_layer(group: GroupResult, layer: Layer) -> LayerScore:
         for code in codes
     }
     clean_run = clean.runs[layer]
-    flagged = {d.target for d in clean_run.detections} & set(clean_run.units)
+    targets = {d.target for d in clean_run.detections}
+    flagged = targets & set(clean_run.units)
+    not_a_unit = tuple(sorted(targets - flagged))
     return LayerScore(
         layer=layer,
         recall_by_kind=recall,
         masked_by_kind=masked_by_kind,
         precision_by_code=precision,
-        false_alarm=Rate(len(flagged), len(clean_run.units)),
+        false_alarm=Rate(len(flagged) + len(not_a_unit), len(clean_run.units)),
+        not_a_unit=not_a_unit,
         clean_reports=tuple(sorted(_pairs(clean_run.detections))),
         natural=tuple(sorted(p for p, lab in labels.items() if lab == "natural")),
         seconds_to_report={c.dataset_id: _seconds(c, layer) for c in (injected, clean)},
