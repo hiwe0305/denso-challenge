@@ -1,0 +1,27 @@
+# Endpoint cục bộ của Agent QA/QC: Nemotron 3.5 Bolt E4B 4GB (DA-20 AC 1).
+# Nguồn: design 27/10/2026 mục 9.1 (service `llm-serve` trên máy 3060, API kiểu OpenAI,
+# ghim revision [Đề xuất]); story DA-20 ghi chú cho người làm.
+#
+# Hiếu serve model trên máy 3060. Story ghi endpoint khai trong `configs/models/`, nhưng
+# thư mục đó của Hiếu và không thuộc "Phạm vi file" của DA-20; file này là chỗ tạm trong
+# phạm vi của story, và `load_endpoint` nhận đường dẫn tùy ý nên đổi chỗ không đổi mã.
+#
+# Mọi số dưới đây là **giả định** chưa đo, trừ khi ghi khác. Hiệu chỉnh khi chạy Nemotron
+# thật trên máy Hiếu (nhiệm vụ 5). Không có khóa nào là tùy chọn: thiếu một khóa là lỗi
+# cấu hình, không phải giá trị mặc định ngầm. Hash của file này đi theo mỗi lượt chạy.
+
+# Chỉ máy cục bộ: loopback, địa chỉ mạng riêng, hoặc tên máy khai ở `local_hosts`. Một địa
+# chỉ khác bị từ chối khi nạp, để dữ liệu `restricted` và `internal` không bao giờ ra API
+# hosted (CLAUDE.md, bất biến kiến trúc).
+base_url: http://127.0.0.1:8000/v1   # giả định: cổng của llm-serve, Hiếu chốt khi serve
+local_hosts: []                      # ví dụ ["rtx3060"] nếu Hiếu serve qua tên máy trong LAN
+
+model: nemotron-3.5-bolt-e4b         # tên model gửi cho server
+revision: unpinned                   # giả định: Hiếu ghim revision khi serve; đi vào AgentModel.revision
+temperature: 0.0                     # báo cáo phải lặp lại được
+max_tokens: 2048                     # giả định: độ dài tối đa của một lượt trả lời
+timeout_s: 120.0                     # giả định: bản Q4 trên 3060 chưa đo độ trễ
+
+# Vòng hội thoại dùng tool (agentqa/dialogue.py).
+max_turns: 8                         # giả định: số lượt tối đa gồm cả lượt gọi tool và lượt nhắc sửa
+max_prompt_chars: 150000             # giả định: ngữ cảnh 64K token (NVIDIA) ở khoảng 3 ký tự/token; chưa đo
