@@ -241,5 +241,15 @@ Hệ quả:
 
   Ai ghi tệp V7 (hook này, hay lớp task của 3.4 đọc từ MuJoCo) là việc của 3.4. Hook DA-38 chạy trong cùng vòng eval, nên có thể thêm một bộ ghi V7 nếu 3.4 chọn vậy.
 - SIMPLE `b75c678` có lỗi ở cuối `run_eval`: với 1 worker và thanh tiến trình, nó `console.print` vào luồng đã đóng nên thoát mã 1, sau khi mọi episode đã ghi xong. Đặt `DEBUG=1` (như `eval_psi0.sh` của S1-03) thì tránh được.
-- DDS: lúc chạy có client Isaac của DA-26 trên cùng máy, nhưng DA-26 dùng `DOMAIN_ID: 126`, còn lượt này dùng 0, nên không lẫn topic. Server Ψ₀ của lượt này (7,25 GB VRAM) đã dừng sớm để nhường GPU cho Isaac của DA-26.
+- **Chồng lấn với eval HE-1 của DA-26, cho QA/QC.** Hiếu đã giữ `rtx3060` cho eval này từ khoảng 14:00Z. Phiên DA-38 không biết điều đó khi chạy.
+  - Cửa sổ chồng lấn là 14:06–14:18Z (giờ máy là UTC+7):
+    - server Ψ₀ `da38-psi0`: container đầu chạy 84 s; container thứ hai, chạy tách, từ khoảng 14:09Z;
+    - client hai bàn: 14:12–14:15Z;
+    - client khay: từ khoảng 14:15Z, bị dừng trước khi xong episode nào.
+  - Lệnh `docker pull` image Ψ₀ chạy từ 13:54Z, xong lúc khoảng 14:05Z.
+  - VRAM đỉnh là 11,5/12,3 GB, gồm 7,25 GB của server DA-38 và 3,3 GB của client Isaac DA-26 lúc đang nạp cảnh.
+  - Lúc 14:18Z, khi thấy client của DA-26, phiên DA-38 dừng client khay và server. Client DA-26 vẫn chạy tiếp (5,5 GB VRAM lúc 14:20Z).
+  - Hai lần gọi `/health` và `/info` tới `127.0.0.1:22095` đi qua reverse tunnel của eval DA-26, tới server Colab của nó. Không có lần gọi `/act` nào.
+  - DDS không lẫn: DA-26 dùng `DOMAIN_ID: 126`, DA-38 dùng 0.
+  - Bài học: trước khi chạy trên máy dùng chung, kiểm lịch giữ máy của đội, `nvidia-smi`, `docker ps` và `ss -ltn`. Khởi chạy theo dạng `cd … || exit 1; nohup setsid … &`; dạng `cd … && nohup setsid … &` giữ phiên ssh mở tới khi tiến trình thoát.
 
