@@ -1,0 +1,13 @@
+================
+run: simple/G1WholebodyLocomotionPickBetweenTablesTeleop-v0 - psi0_decoupled_wbc
+episode_0: False 
+episode_1: False 
+episode_2: False 
+episode_3: False 
+episode_4: False 
+episode_5: False 
+episode_6: False 
+episode_7: True 
+episode_8: False 
+episode_9: False 
+success rate: 0.10 

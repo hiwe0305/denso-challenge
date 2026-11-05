@@ -67,6 +67,7 @@ from he1_eval import (
 from he1_fetch import LocalRemote, verified
 
 REPO = Path(__file__).resolve().parents[2]
+HERE = Path(__file__).resolve().parent
 TASK = "G1WholebodyLocomotionPickBetweenTablesTeleop-v0"
 DEV_SET = Path.home() / "project/denso-challenge/fwdata/he/dev-eval-v1-l0n10"
 
@@ -408,6 +409,28 @@ def test_results_keep_only_complete_pairs_as_complete(tmp_path: Path) -> None:
     ]
     assert (rows[0]["act_calls"], rows[0]["act_p50_s"], rows[0]["act_max_s"]) == (3, 0.5, 2.0)
     assert {r["run"] for r in rows} == {"new"} and rows[0]["started"] == "t0"
+
+
+def test_results_read_simples_real_eval_stats(tmp_path: Path) -> None:
+    """testdata/s1-03-eval_stats.txt is S1-03's mujoco level-0 pass-1 run (b75c678, clock
+    sim, rtx3060), as eval_decoupled_wbc wrote it: a header, then "episode_N: True "."""
+    job = tmp_path / "da26-t2-eval-n20"
+    order = pair_order(load_plan())
+    (job / "client/eval/tg/x").mkdir(parents=True)
+    (job / "order.json").write_text(json.dumps({"slots": [s.__dict__ for s in order]}))
+    stats = (HERE / "testdata/s1-03-eval_stats.txt").read_text()
+    (job / "client/eval/tg/x/eval_stats.txt").write_text(stats)
+    events = [{"run": "tg", "event": "client_launch", "tag": "tg"}]
+    events += [
+        {"run": "tg", "event": "episode_start", "episode": k, "time": "t"} for k in range(10)
+    ]
+    (job / "route.jsonl").write_text("".join(json.dumps(e) + "\n" for e in events))
+    assert [r["success"] for r in results(tmp_path)] == [k == 7 for k in range(10)]
+    # sonic_wbc.py's line at the pinned image: f"episode_{i}: {success} ({reason})"
+    (job / "client/eval/tg/x/eval_stats.txt").write_text(
+        "episode_0: True (success)\nepisode_1: False (timeout)\n"
+    )
+    assert [r["success"] for r in results(tmp_path)][:2] == [True, False]
 
 
 def fake_runs(runs: Path, job: str) -> Path:
@@ -1176,3 +1199,91 @@ def test_the_stop_kills_our_launcher_even_before_its_container_exists(tmp_path: 
         time.sleep(0.05)
     assert (work / "runs/da26-t2-eval-n20/exit").read_text().strip() == "1"
     assert "stop -t 30 da26-eval-client" in (tmp_path / "docker.calls").read_text()
+
+
+def info_server(payload: bytes) -> ThreadingHTTPServer:
+    """A server that answers GET /info with the bytes a real Psi0 server sent."""
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def log_message(self, *args: Any) -> None:
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+def test_the_client_setup_accepts_the_real_servers_info(tmp_path: Path) -> None:
+    """The real he1_client.sh, up to the step after its /info check, behind the real
+    router and the /info bytes both fine-tune servers sent on 5/11/2026 (testdata/,
+    copied from fwdata/he/runs/da26-t2-eval-n20/). Their run dirs do not name the task;
+    the check copied from S1-03 refused them and the run exited 5 with no episode. Shims:
+    awk reports 95 GB MemAvailable; SIMPLE_ASSETS is missing, so the script stops at its
+    next check, before docker."""
+    infos = [
+        (HERE / f"testdata/server-{job}.info.json").read_bytes()
+        for job in ("da26-t2-ft-vego-n20-s0", "da26-t2-ft-vnoego-n20-s0")
+    ]
+    for payload in infos:
+        assert TASK.lower().removesuffix("-v0") not in payload.decode()
+    work, shims = tmp_path / "denso-da26", tmp_path / "bin"
+    (work / "fw/scripts/he").mkdir(parents=True)
+    (work / "fw/scripts/he/he1_client.sh").write_text(
+        (REPO / "scripts/he/he1_client.sh").read_text()
+    )
+    (work / f"sets/interleaved/simple/{TASK}/dr-level-0").mkdir(parents=True)
+    (work / "sets/interleaved/order.json").write_text("{}\n")
+    shims.mkdir()
+    real_awk = subprocess.run(["bash", "-c", "command -v awk"], capture_output=True, text=True)
+    (shims / "awk").write_text(
+        '#!/bin/bash\n[[ "$*" == *MemAvailable* ]] && { echo 99614720; exit 0; }\n'
+        f'exec {real_awk.stdout.strip()} "$@"\n'
+    )
+    (shims / "awk").chmod(0o755)
+    servers = [info_server(p) for p in infos]
+    write = JsonLog(tmp_path / "route.jsonl")
+    router = Router(
+        pair_order(load_plan()), lambda s, seen: {"verdict": "start"}, write, lambda: None
+    )
+    listen = free_port()
+    ports = {VM_PORTS[i]: s.server_address[1] for i, s in enumerate(servers)}
+    route = serve_routes(router, ports, listen, write)
+    threading.Thread(target=route.serve_forever, daemon=True).start()
+    try:
+        done = subprocess.run(
+            [
+                "bash",
+                "fw/scripts/he/he1_client.sh",
+                "--set",
+                "sets/interleaved",
+                "--tag",
+                "tg",
+                "--episodes",
+                "20",
+                "--port",
+                str(listen),
+            ],
+            cwd=work,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env={
+                **os.environ,
+                "PATH": f"{shims}:{os.environ['PATH']}",
+                "SIMPLE_ASSETS": str(tmp_path / "no-assets"),
+            },
+        )
+    finally:
+        for s in (route, *servers):
+            s.shutdown()
+    out = work / "runs/da26-t2-eval-n20"
+    assert "does not serve" not in done.stderr
+    assert f"ERROR: no {tmp_path}/no-assets/assets" in done.stderr, done.stderr
+    assert (out / "server_info-tg.json").read_bytes() == infos[0] + b"\n"
+    assert (out / "exit").read_text().strip() == "1"
