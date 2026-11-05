@@ -18,8 +18,8 @@ the CU the session will have used once that pair and the shutdown are done:
 
     spent + rate x (meter age + 2 x episode_s + END_S) / 3600 + SAFETY_CU
 
-and starts the pair only if that stays under the watcher's stop line (16 - 1.94 x
-430 / 3600 = 15.77 CU). `spent` is the watcher's last `poll` (fresh within 300 s;
+and starts the pair only if that stays under the watcher's stop line (18 - 1.94 x
+430 / 3600 = 17.77 CU). `spent` is the watcher's last `poll` (fresh within 300 s;
 otherwise it waits for one, then refuses). episode_s is PRIOR_EPISODE_S (33 min, the
 mean of S1-03's 10-episode run on a shared rtx3060; one failed episode on an idle box
 took 24.6 min) or 1.2 x the longest episode seen, whichever is more. Inside a pair
@@ -41,7 +41,9 @@ the normalisation bounds are inside run_config.json) with an `expected.json` of 
 laptop's verified sha256; `he1_colab.py serve` checks them before it loads anything.
 
 `preflight` checks rtx3060 read-only before the session starts (MemAvailable >= client +
-16 GB, Hiếu's rule; fw/ and the same interleaved set in place; no client running).
+16 GB, Hiếu's rule; fw/ and the same interleaved set in place; no client running; and
+the box reserved for the eval, Hiếu 5/11/2026: no other denso process and no
+`pol.train_stage_a`, see `other_jobs`).
 
 `run` holds the session's single SSH connection for the forward (laptop 22285, 22286
 to the VM's servers), checks that each server's /info run_dir is its arm's fine-tune,
@@ -62,8 +64,8 @@ videos/<run>/, exit), server-*.log, vm-logs/, results.jsonl (the last run only).
 Exit codes of `run`: 0 every planned pair ran; 3 a pair refused by the CU rule (the
 pairs before it are complete); 4 rtx3060 short of RAM, client not started; 5 the
 client, a server or a forward failed, or the run raised; 6 the session stop was not
-confirmed (it may still bill); 7 a signal ended the run. The session is stopped in
-every case but 6.
+confirmed (it may still bill); 7 a signal ended the run; 8 rtx3060 runs another job,
+client not started. The session is stopped in every case but 6.
 """
 
 from __future__ import annotations
@@ -108,7 +110,7 @@ from he1_fetch import (  # noqa: E402
 REPO = HERE.parents[1]
 PLAN = REPO / "configs/runplans/he/he-1.yaml"
 EVAL_JOB = "da26-t2-eval-n20"  # Colab session, runs/<job>; ledger job_da26_t2_eval_isaac_n20
-CAP = 16.0  # Hiếu 5/11/2026: caps 18/18/16, the eval's is fixed
+CAP = 18.0  # Hiếu 5/11/2026: "Nâng lên 18 + giữ rtx3060" (was 16; stop line 17.77)
 VM_PORTS = (22085, 22086)  # one Psi0 server per arm on the VM, in arm order
 LAPTOP_PORTS = (22285, 22286)  # laptop ends of the forward to VM_PORTS
 ROUTE_PORT = 22185  # `route` on the laptop
@@ -677,13 +679,35 @@ def client_command(tag: str, episodes: int) -> str:
     )
 
 
+def other_jobs(runner: Run = run) -> tuple[list[str], list[str]] | None:
+    """What else runs on rtx3060: (blocking, noted), or None when it cannot be read.
+
+    The box is reserved for the eval's client (Hiếu 5/11/2026): any other denso process
+    blocks, and so does `pol.train_stage_a` (Hiếu's other project; the parent session
+    asks him). Containers that are not the client are noted, not blocking. The patterns
+    are bracketed so the remote shell running them does not match itself."""
+    out = rtx(
+        "pgrep -af '[d]enso'; echo ---; pgrep -af '[p]ol[.]train_stage_a'; echo ---; "
+        "docker ps --format '{{.Names}}'",
+        runner,
+    )
+    parts = out.stdout.split("---\n")
+    if out.returncode != 0 or len(parts) != 3:
+        return None
+    denso, pol, containers = ([x for x in part.splitlines() if x.strip()] for part in parts)
+    noted = [f"container {c}" for c in containers if c != "da26-eval-client"]
+    return denso + pol, noted
+
+
 def preflight(set_dir: Path, runner: Run = run) -> int:
     """Read-only check that rtx3060 can take the client; run it before the eval session.
 
-    0 ready; 4 MemAvailable under client + 16 GB (Hiếu's rule); 5 anything else: box
-    unreachable, no ~/denso-da26/fw, a different interleaved set, a client still running."""
+    0 ready; 4 MemAvailable under client + 16 GB (Hiếu's rule); 6 another job on the box
+    (`other_jobs`); 5 anything else: box unreachable, no ~/denso-da26/fw, a different
+    interleaved set, a client still running."""
     need = CLIENT_GB + RAM_MARGIN_GB
     free = mem_available_gb(runner)
+    others = other_jobs(runner)
     base = f"~/{RTX_WORK}"
     out = rtx(
         f"test -f {base}/fw/scripts/he/he1_client.sh && echo client; "
@@ -704,11 +728,25 @@ def preflight(set_dir: Path, runner: Run = run) -> int:
             problems.append(f"{base}/sets/interleaved/order.json is not {set_dir}/order.json")
         if lines[-1:] != ["0"]:
             problems.append("a da26-eval-client container is running")
-    log(event="preflight", mem_available_gb=free, need_gb=need, problems=problems)
-    for problem in problems:
+    if others is None:
+        problems.append("could not list rtx3060's other jobs")
+    busy, noted = others or ([], [])
+    log(
+        event="preflight",
+        mem_available_gb=free,
+        need_gb=need,
+        problems=problems,
+        other_jobs=busy,
+        noted=noted,
+    )
+    for problem in problems + [f"rtx3060 is not reserved: {job}" for job in busy]:
         alert(f"preflight: {problem}")
+    for note in noted:
+        alert(f"preflight: also on rtx3060 (not blocking): {note}")
     if free is not None and free < need:
         return 4
+    if busy:
+        return 6
     return 5 if problems else 0
 
 
@@ -946,6 +984,22 @@ def drive(
     if free is None or free < need:
         alert(f"rtx3060 MemAvailable {free} GB < {need} GB; client not started")
         return 4
+    others = other_jobs(env.runner)
+    write(
+        {
+            "event": "rtx_jobs",
+            "other_jobs": None if others is None else others[0],
+            "noted": None if others is None else others[1],
+        }
+    )
+    if others is None:
+        alert("could not list rtx3060's other jobs; client not started")
+        return 5
+    if others[0]:
+        alert(f"rtx3060 is not reserved ({len(others[0])} other jobs); client not started")
+        return 8
+    for note in others[1]:
+        alert(f"also on rtx3060 (not blocking): {note}")
     remote = Remote(args.session, args.colab)
     forwards = [
         f"-L127.0.0.1:{lp}:127.0.0.1:{vp}"

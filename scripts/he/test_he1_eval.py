@@ -49,6 +49,7 @@ from he1_eval import (
     interleave,
     load_plan,
     meter,
+    other_jobs,
     pair_order,
     pair_verdict,
     pairs_that_fit,
@@ -205,23 +206,25 @@ def test_a_stale_or_missing_meter_never_starts_a_pair() -> None:
 
 def test_the_line_is_the_drivers_cap_never_the_watchers_row() -> None:
     at, spent, _ = reading(1.0)
-    verdict = pair_verdict((at, spent, 18.0), 10_000.0, [])
-    assert verdict["verdict"] == "refuse" and "18.0" in verdict["why"]
+    verdict = pair_verdict((at, spent, 16.0), 10_000.0, [])
+    assert verdict["verdict"] == "refuse" and "16.0" in verdict["why"]
 
 
 def test_how_many_pairs_fit_under_the_cap() -> None:
-    # the numbers of the PR and he-1.md 7.1; spent at the first pair start, about 1.0 CU
-    # (probe, deploy, 12.5 GB upload at 11 MB/s, two server loads, Isaac start)
+    # the numbers of the PR and he-1.md 7.1 at cap 18 (Hiếu 5/11/2026); spent at the first
+    # pair start, about 1.0 CU (probe, deploy, 12.5 GB upload at 11 MB/s, loads, Isaac)
     assert PRIOR_EPISODE_S == 33 * 60  # S1-03's 10-episode run on a shared rtx3060
-    assert [pairs_that_fit(1.0, m * 60) for m in (33, 27, 24.6, 22, 20)] == [6, 8, 8, 9, 10]
-    assert [pairs_that_fit(0.6, m * 60) for m in (33, 27, 24.6, 22, 20)] == [6, 8, 9, 9, 10]
-    assert [pairs_that_fit(1.2, m * 60) for m in (33, 27, 24.6, 22, 20)] == [6, 7, 8, 9, 10]
-    assert pairs_that_fit(1.0, 21.2 * 60) == 10 and pairs_that_fit(1.0, 21.3 * 60) == 9
-    # other caps, for Hiếu: at 24.6 and at 33 min per episode
-    assert [pairs_that_fit(1.0, 1476, cap=c) for c in (17.0, 18.0)] == [9, 10]
-    assert [pairs_that_fit(1.0, 1980, cap=c) for c in (18.0, 19.0)] == [7, 8]
+    assert [pairs_that_fit(1.0, m * 60) for m in (33, 27, 24.6, 22, 20)] == [7, 9, 10, 10, 10]
+    assert [pairs_that_fit(0.6, m * 60) for m in (33, 27, 24.6, 22, 20)] == [7, 9, 10, 10, 10]
+    assert [pairs_that_fit(1.2, m * 60) for m in (33, 27, 24.6, 22, 20)] == [7, 9, 9, 10, 10]
+    assert [pairs_that_fit(1.5, m * 60) for m in (33, 27, 24.6, 22, 20)] == [7, 8, 9, 10, 10]
+    # the margin of the tenth pair: before-reset spend and episode length
+    assert pairs_that_fit(1.05, 1476) == 10 and pairs_that_fit(1.06, 1476) == 9
+    assert pairs_that_fit(1.0, 24.6 * 60) == 10 and pairs_that_fit(1.0, 24.8 * 60) == 9
+    # the old cap 16, for the record: 8 pairs at 24.6 min, 6 at 33
+    assert [pairs_that_fit(1.0, m, cap=16.0) for m in (1476, 1980)] == [8, 6]
     # fast episodes spend less, but the gate still projects a slow one
-    assert pairs_that_fit(1.0, 600, most=20) == 20 and pairs_that_fit(13.5, 600) == 0
+    assert pairs_that_fit(1.0, 600, most=20) == 20 and pairs_that_fit(15.5, 600) == 0
 
 
 class Recorder:
@@ -527,7 +530,10 @@ def test_the_client_pins_are_s1_03s() -> None:
 
 def test_the_eval_cap_is_the_decided_one() -> None:
     runbook = (REPO / "docs/he/he-1.md").read_text()
-    assert CAP == 16.0 and "--cap 16" in runbook
+    watcher = [
+        x for x in runbook.splitlines() if "cu_watch.py session" in x and "da26-t2-eval" in x
+    ]
+    assert CAP == 18.0 and len(watcher) == 1 and "--cap 18 " in watcher[0]
 
 
 # --- review of #129: the hash cache, the session always stopped, a dead client ----------
@@ -768,12 +774,14 @@ def test_preflight_checks_rtx3060_read_only(tmp_path: Path) -> None:
     (tmp_path / "order.json").write_text("{}")
     digest = __import__("hashlib").sha256(b"{}").hexdigest()
 
-    def box(mem_kb: int, out: str) -> Any:
+    def box(mem_kb: int, out: str, jobs: str = "---\n---\n") -> Any:
         def runner(argv: Any) -> subprocess.CompletedProcess[str]:
             command = argv[-1]
             assert not any(w in command for w in ("rm ", "mkdir", "docker run", "docker stop"))
             if "MemAvailable" in command:
                 return subprocess.CompletedProcess(argv, 0, f"MemAvailable: {mem_kb} kB\n", "")
+            if "pgrep" in command:
+                return subprocess.CompletedProcess(argv, 0, jobs, "")
             return subprocess.CompletedProcess(argv, 0, out, "")
 
         return runner
@@ -784,6 +792,29 @@ def test_preflight_checks_rtx3060_read_only(tmp_path: Path) -> None:
     assert preflight(tmp_path, box(40 * gb, f"client\n{'b' * 64}\n0\n")) == 5
     assert preflight(tmp_path, box(40 * gb, f"{digest}\n0\n")) == 5
     assert preflight(tmp_path, box(40 * gb, f"client\n{digest}\n1\n")) == 5
+    # the box is reserved for the eval (Hiếu 5/11/2026); what rtx3060 ran on 5/11:
+    ready = f"client\n{digest}\n0\n"
+    da35 = "2757013 /usr/bin/bash /home/ubuntu/denso-da35-s2fix/prod-1105.sh\n"
+    pol = "3161441 .venv-policy/bin/python -m pol.train_stage_a --variant POLV\n"
+    hsk = "hsk_worker\nhsk_api\nhsk_redis\n"
+    assert preflight(tmp_path, box(40 * gb, ready, f"{da35}---\n---\n")) == 6
+    assert preflight(tmp_path, box(40 * gb, ready, f"---\n{pol}---\n")) == 6
+    assert preflight(tmp_path, box(40 * gb, ready, f"---\n---\n{hsk}")) == 0  # noted only
+    assert preflight(tmp_path, box(40 * gb, ready, "garbled")) == 5
+
+
+def test_the_job_listing_does_not_match_its_own_shell() -> None:
+    import re
+
+    seen: list[str] = []
+
+    def runner(argv: Any) -> subprocess.CompletedProcess[str]:
+        seen.append(argv[-1])
+        return subprocess.CompletedProcess(argv, 0, "---\n---\n", "")
+
+    assert other_jobs(runner) == ([], [])
+    # pgrep -f matches the remote `bash -c <command>` line too; the brackets keep it out
+    assert not re.search("denso", seen[0]) and not re.search("pol[.]train_stage_a", seen[0])
 
 
 # --- run_eval end to end, on fakes ------------------------------------------------------
@@ -809,6 +840,7 @@ class Box:
         self.exit: str | None = None
         self.on_launch: Any = None
         self.on_prepare: Any = None
+        self.jobs = "---\n---\n"
 
     def __call__(self, argv: Any) -> subprocess.CompletedProcess[str]:
         argv = list(argv)
@@ -827,6 +859,8 @@ class Box:
             return subprocess.CompletedProcess(
                 argv, 0, f"MemAvailable: {self.mem_gb << 20} kB\n", ""
             )
+        if "pgrep" in command:
+            return subprocess.CompletedProcess(argv, 0, self.jobs, "")
         if "he1_client.sh" in command:
             self.calls.append("launch")
             self.tag = command.split("--tag ")[1].split()[0]
@@ -886,6 +920,16 @@ def test_run_short_of_ram_on_rtx3060_still_stops_the_session(tmp_path: Path) -> 
     finally:
         [s.shutdown() for s in servers]
     assert calls == ["fetch", "stop", "rsync"]  # VM logs, the stop, then rtx3060 (no CU)
+
+
+def test_run_on_a_box_that_is_not_reserved_starts_no_client(tmp_path: Path) -> None:
+    args, env, box, calls, servers, _ = eval_setup(tmp_path)
+    box.jobs = "2757013 /usr/bin/bash /home/ubuntu/denso-da35-s2fix/prod-1105.sh\n---\n---\n"
+    try:
+        assert run_eval(args, env) == 8
+    finally:
+        [s.shutdown() for s in servers]
+    assert calls == ["fetch", "stop", "rsync"]
 
 
 def test_run_that_raises_still_stops_the_session(tmp_path: Path) -> None:
