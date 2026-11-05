@@ -27,7 +27,7 @@ Là AI Engineer, tôi muốn chấm phép kiểm QA và Agent QA/QC trên bộ l
 ## Nhiệm vụ
 
 - [x] 1. Đọc kết quả và mở đáp án đúng lúc (AC 1)
-- [ ] 2. Precision, recall, báo nhầm, thời gian (AC 2)
+- [x] 2. Precision, recall, báo nhầm, thời gian (AC 2)
 - [ ] 3. Tách phần code và phần agent (AC 3)
 - [ ] 4. Báo cáo (AC 4)
 
