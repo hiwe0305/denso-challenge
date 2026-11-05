@@ -69,8 +69,15 @@ def test_one_run_writes_a_hashed_result_a_labelled_page_and_two_ledger_rows(
                                                                    "value": 0.0}
     assert group["layers"]["code"]["seconds_to_report"][INJECTED] is not None
     assert group["agent_quality"]["reviews"]["hit"] == {"agree": 1}
+    # Two defects, none masked: recall on the unmasked part is the plain recall.
+    assert group["layers"]["code"]["recall_unmasked_by_kind"] == {
+        "nan_values": {"hit": 1, "total": 1, "value": 1.0},
+        "action_sign_flip": {"hit": 0, "total": 1, "value": 0.0},
+    }
+    assert result["false_alarm_on_clean"].startswith("upper bound (cận trên)")
     page = (out / "index.html").read_text(encoding="utf-8")
     assert "trên lỗi cấy" in page and "<title>" in page and digest in page
+    assert "cận trên" in page and "by code, unmasked" in page
     rows = [json.loads(line) for p in store.rglob("ledger.jsonl")
             for line in p.read_text().splitlines()]
     assert [r["measure_kind"] for r in rows] == ["estimated", "measured"]
@@ -112,7 +119,8 @@ def test_a_clean_agent_report_on_the_dataset_is_a_false_alarm(
     run_bench(spec, [answers], out, store=tmp_path / "store")
     (group,) = json.loads((out / "bench_result.json").read_text(encoding="utf-8"))["groups"]
     agent = group["layers"]["agent"]
-    assert agent["false_alarm_on_clean"] == {"hit": 1, "total": 4, "value": 0.25}
+    assert agent["false_alarm_on_clean"] == {"hit": 1, "total": 4, "value": 0.25,
+                                             "bound": "upper (cận trên)"}
     assert agent["false_alarm_not_a_unit"] == ["dataset"]
     assert agent["clean_reports"] == [["dataset", "T2"]]
     assert group["layers"]["code"]["false_alarm_not_a_unit"] == []
