@@ -29,7 +29,7 @@ Là AI Engineer, tôi muốn chấm phép kiểm QA và Agent QA/QC trên bộ l
 - [x] 1. Đọc kết quả và mở đáp án đúng lúc (AC 1)
 - [x] 2. Precision, recall, báo nhầm, thời gian (AC 2)
 - [x] 3. Tách phần code và phần agent (AC 3)
-- [ ] 4. Báo cáo (AC 4)
+- [x] 4. Báo cáo (AC 4)
 
 ## Phạm vi file
 
@@ -62,10 +62,12 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 27/10/2026 | Tạo story, tách phần chấm từ DA-27 | PO (Hiếu) |
 | 3/11/2026 | AC 1: `AgentReport` thay `QAReport` của DA-20; AC 2: recall theo loại, precision theo mã (design mục 9.2) | PO (Hiếu) theo issue #34 |
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4), người làm chuyển sang Châu | PO (Hiếu) |
+| 5/11/2026 | Nhiệm vụ 1–4 xong trên nhánh `DA-31-defect-bench-scorer`; hai quy tắc chấm chờ PO duyệt (`docs/g0/defect-bench.md` mục 2) | Châu, cùng Claude |
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
-- Ghi chú hoàn thành:
-- File đã tạo hoặc sửa:
+- Giờ thực: 6h (nhiệm vụ 1: 1,5h; 2: 1,5h; 3: 1h; 4: 2h)
+- Công cụ AI đã dùng: Claude Code
+- Ghi chú hoàn thành: bộ chấm chạy trọn từ file spec tới `bench_result.json`, hash và `index.html` ghi "trên lỗi cấy", kèm hai dòng ledger. Chạy 5/11/2026 trên bộ log cấy dựng lại tại chỗ: lớp code bắt 30/30 lỗi (10 loại × 3), precision 3/3 mọi mã, báo nhầm 0/40 job trên bản sạch; lớp agent là báo cáo rỗng đứng tạm vì DA-20 chưa có (`docs/g0/defect-bench.md` mục 6). Chưa chạy trên hai bản sao psi-data: chúng ở `rtx3060`, laptop không vào được; nên xác nhận nhiệm vụ 10.2 của DA-27 cũng còn chờ.
+- Chờ PO: (1) lỗi tự nhiên, cặp (target, mã) có ở cả hai bản, bỏ khỏi precision và recall, lỗi cấy trùng cặp đó tính là bị che; (2) `duplicate_episode` bắt được khi báo chỗ bị ghi đè hoặc episode nguồn. Hợp đồng `FindingDecision` có một quyết định mỗi phát hiện nên giải thích và đề xuất chấm chung.
+- File đã tạo hoặc sửa: `packages/flywheel-eval/src/flywheel/eval/agentqa/bench/` (`__init__.py`, `__main__.py`, `answers.py`, `detections.py`, `layers.py`, `logs.py`, `report.py`, `run.py`, `score.py`, `session.py`), `packages/flywheel-eval/tests/unit/agentqa/bench/` (`conftest.py`, `test_bench_barrier.py`, `test_bench_layers.py`, `test_bench_logs.py`, `test_bench_report.py`, `test_bench_score.py`, `test_bench_session.py`), `docs/g0/defect-bench.md`, file story này.
