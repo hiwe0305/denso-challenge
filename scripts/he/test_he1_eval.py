@@ -5,14 +5,18 @@ Run: uv run pytest scripts/he -q
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import re
+import signal
 import socket
 import subprocess
 import sys
 import threading
+import time
 import urllib.request
+from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -22,28 +26,42 @@ import pyarrow.parquet as pq
 import pytest
 from he1_colab import job_id, load_point, refresh_vm_logs, serve, upload_problems, write_launch_env
 from he1_eval import (
+    ACT_IDLE_S,
     CAP,
     END_S,
+    EXIT_WAIT_S,
+    FIRST_ACT_S,
+    METER_WAIT_S,
+    POLL_S,
     PRIOR_EPISODE_S,
     RATE_CU_H,
     SAFETY_CU,
     SERVED,
     VM_PORTS,
+    Env,
     JsonLog,
     Router,
     Slot,
     config_sha256,
+    dead_or_late,
+    expected,
+    forward,
     interleave,
     load_plan,
+    meter,
     pair_order,
     pair_verdict,
     pairs_that_fit,
+    preflight,
     results,
+    run_eval,
     serve_routes,
     stop_line,
     upload,
+    wait_client,
+    waiting_gate,
 )
-from he1_fetch import LocalRemote
+from he1_fetch import LocalRemote, verified
 
 REPO = Path(__file__).resolve().parents[2]
 TASK = "G1WholebodyLocomotionPickBetweenTablesTeleop-v0"
@@ -185,18 +203,25 @@ def test_a_stale_or_missing_meter_never_starts_a_pair() -> None:
     assert pair_verdict(reading(1.0, age=301), 10_000.0, [])["verdict"] == "blind"
 
 
+def test_the_line_is_the_drivers_cap_never_the_watchers_row() -> None:
+    at, spent, _ = reading(1.0)
+    verdict = pair_verdict((at, spent, 18.0), 10_000.0, [])
+    assert verdict["verdict"] == "refuse" and "18.0" in verdict["why"]
+
+
 def test_how_many_pairs_fit_under_the_cap() -> None:
-    # every number below is for the PR and he-1.md; spent at the first pair start
-    assert pairs_that_fit(0.6, PRIOR_EPISODE_S) == 9
-    assert pairs_that_fit(0.9, PRIOR_EPISODE_S) == 9
-    assert pairs_that_fit(0.6, 33 * 60) == 6  # S1-03's 10-episode run on a busy box
-    assert pairs_that_fit(0.6, 22 * 60) == 10
-    # about 1.0 CU before the first reset (probe, deploy, 12.5 GB upload at 11 MB/s, loads)
-    assert pairs_that_fit(1.0, PRIOR_EPISODE_S) == 9
-    assert pairs_that_fit(1.0, 22.1 * 60) == 10 and pairs_that_fit(1.0, 22.3 * 60) == 9
-    assert pairs_that_fit(1.18, PRIOR_EPISODE_S) == 9 and pairs_that_fit(1.2, PRIOR_EPISODE_S) == 8
-    # fast episodes spend less, but the gate still projects a full-budget failure
-    assert pairs_that_fit(1.0, 600, most=20) == 20 and pairs_that_fit(14.0, 600) == 0
+    # the numbers of the PR and he-1.md 7.1; spent at the first pair start, about 1.0 CU
+    # (probe, deploy, 12.5 GB upload at 11 MB/s, two server loads, Isaac start)
+    assert PRIOR_EPISODE_S == 33 * 60  # S1-03's 10-episode run on a shared rtx3060
+    assert [pairs_that_fit(1.0, m * 60) for m in (33, 27, 24.6, 22, 20)] == [6, 8, 8, 9, 10]
+    assert [pairs_that_fit(0.6, m * 60) for m in (33, 27, 24.6, 22, 20)] == [6, 8, 9, 9, 10]
+    assert [pairs_that_fit(1.2, m * 60) for m in (33, 27, 24.6, 22, 20)] == [6, 7, 8, 9, 10]
+    assert pairs_that_fit(1.0, 21.2 * 60) == 10 and pairs_that_fit(1.0, 21.3 * 60) == 9
+    # other caps, for Hiếu: at 24.6 and at 33 min per episode
+    assert [pairs_that_fit(1.0, 1476, cap=c) for c in (17.0, 18.0)] == [9, 10]
+    assert [pairs_that_fit(1.0, 1980, cap=c) for c in (18.0, 19.0)] == [7, 8]
+    # fast episodes spend less, but the gate still projects a slow one
+    assert pairs_that_fit(1.0, 600, most=20) == 20 and pairs_that_fit(13.5, 600) == 0
 
 
 class Recorder:
@@ -218,19 +243,24 @@ def reset(seed: int = 0) -> dict[str, Any]:
 def test_each_reset_is_the_next_episode_and_its_arm_serves_it() -> None:
     order = pair_order(load_plan())
     log, gates = Recorder(), []
-    clock = iter(float(t) for t in range(0, 10_000, 100))
+    now = [0.0]
     router = Router(
         order,
         lambda s, seen: gates.append((s.pair, list(seen))) or {"verdict": "start"},
         log,
         log.refuse,
-        clock=lambda: next(clock),
+        clock=lambda: now[0],
     )
-    assert router.slot(reset()) == order[0]
-    assert router.slot({"history": {}}) == order[0]
-    assert router.slot(reset()) == order[1]
-    assert router.slot({}) == order[1]
-    assert router.slot(reset()) == order[2]
+
+    def at(t: float, body: dict[str, Any]) -> Any:
+        now[0] = t
+        return router.slot(body)
+
+    assert at(0, reset()) == order[0] and router.last_request == 0
+    assert at(50, {"history": {}}) == order[0] and router.last_request == 50
+    assert at(100, reset()) == order[1]
+    assert at(150, {}) == order[1]
+    assert at(200, reset()) == order[2]
     # gated at pair starts only, with the length of every episode before it
     assert gates == [(0, []), (1, [100.0, 100.0])]
     assert [r["job"] for r in log.rows if r["event"] == "episode_start"] == [
@@ -270,7 +300,7 @@ def free_port() -> int:
         return int(s.getsockname()[1])
 
 
-def fake_psi0(name: str) -> ThreadingHTTPServer:
+def fake_psi0(name: str, run_dir: str = "") -> ThreadingHTTPServer:
     class Handler(BaseHTTPRequestHandler):
         def reply(self, body: dict[str, Any]) -> None:
             data = json.dumps(body).encode()
@@ -280,7 +310,7 @@ def fake_psi0(name: str) -> ThreadingHTTPServer:
             self.wfile.write(data)
 
         def do_GET(self) -> None:  # noqa: N802
-            self.reply({"status": "ok", "server": name})
+            self.reply({"status": "ok", "server": name, "run_dir": run_dir})
 
         def do_POST(self) -> None:  # noqa: N802
             self.rfile.read(int(self.headers["Content-Length"]))
@@ -346,21 +376,33 @@ def test_the_router_forwards_each_episode_to_its_server_and_logs_every_call(tmp_
 def test_results_keep_only_complete_pairs_as_complete(tmp_path: Path) -> None:
     job = tmp_path / "da26-t2-eval-n20"
     order = pair_order(load_plan())
-    (job / "client/eval/t").mkdir(parents=True)
+    (job / "order.json").parent.mkdir(parents=True)
     (job / "order.json").write_text(json.dumps({"slots": [s.__dict__ for s in order]}))
-    (job / "client/eval/t/eval_stats.txt").write_text(
-        "episode_0: True \nepisode_1: False \nepisode_2: True \n"
-    )
-    events = [{"event": "episode_start", "episode": k, "time": f"t{k}"} for k in range(3)]
-    events += [{"event": "act", "episode": 0, "seconds": s} for s in (0.4, 0.5, 2.0)]
+    for tag, text in (
+        ("old", "episode_0: False \nepisode_1: True \n"),
+        ("new", "episode_0: True \nepisode_1: False \nepisode_2: True \n"),
+    ):
+        (job / f"client/eval/{tag}/x").mkdir(parents=True)
+        (job / f"client/eval/{tag}/x/eval_stats.txt").write_text(text)
+    events = [{"run": "old", "event": "client_launch", "tag": "old"}]
+    events += [
+        {"run": "old", "event": "episode_start", "episode": k, "time": "o"} for k in range(4)
+    ]
+    events += [{"run": "old", "event": "act", "episode": 0, "seconds": 9.0}]
+    events += [{"run": "new", "event": "client_launch", "tag": "new"}]
+    events += [
+        {"run": "new", "event": "episode_start", "episode": k, "time": f"t{k}"} for k in range(3)
+    ]
+    events += [{"run": "new", "event": "act", "episode": 0, "seconds": s} for s in (0.4, 0.5, 2.0)]
     (job / "route.jsonl").write_text("".join(json.dumps(e) + "\n" for e in events))
-    rows = results(tmp_path)
+    rows = results(tmp_path)  # the last launch's rows and files, never the old run's
     assert [(r["episode"], r["success"], r["complete_pair"]) for r in rows] == [
         (0, True, True),
         (1, False, True),
         (2, True, False),
     ]
     assert (rows[0]["act_calls"], rows[0]["act_p50_s"], rows[0]["act_max_s"]) == (3, 0.5, 2.0)
+    assert {r["run"] for r in rows} == {"new"} and rows[0]["started"] == "t0"
 
 
 def fake_runs(runs: Path, job: str) -> Path:
@@ -391,6 +433,7 @@ def test_upload_sends_what_a_server_reads_and_serve_checks_it(tmp_path: Path) ->
 
 FAKE_SERVER = """
 import json, sys
+from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, HTTPServer
 port = int(sys.argv[sys.argv.index("--port") + 1])
 run_dir = sys.argv[sys.argv.index("--run-dir") + 1]
@@ -485,3 +528,456 @@ def test_the_client_pins_are_s1_03s() -> None:
 def test_the_eval_cap_is_the_decided_one() -> None:
     runbook = (REPO / "docs/he/he-1.md").read_text()
     assert CAP == 16.0 and "--cap 16" in runbook
+
+
+# --- review of #129: the hash cache, the session always stopped, a dead client ----------
+
+
+def test_expected_reads_he1_fetchs_real_cache_and_serve_accepts_the_upload(tmp_path: Path) -> None:
+    jobs = [s.job for s in pair_order(load_plan())[:2]]
+    runs, vm = tmp_path / "runs", tmp_path / "vm"
+    for job in jobs:
+        src = fake_runs(runs, job)
+        rels = [str((src / rel).relative_to(runs / job)) for rel in SERVED]
+        # the cache as he1_fetch writes it: path -> {"stamp": [size, mtime], "sha256": hex}
+        verified(runs / job, [{"path": r, "size": (runs / job / r).stat().st_size} for r in rels])
+        cache = json.loads((runs / job / ".hashes.json").read_text())
+        assert all(isinstance(cache[r], dict) for r in rels)
+    upload(LocalRemote(vm), runs, jobs)
+    assert upload_problems(vm, jobs) == []
+    want = json.loads((vm / "serve" / jobs[0] / "expected.json").read_text())["files"]
+    assert all(isinstance(v, str) and len(v) == 64 for v in want.values())
+
+
+def test_expected_trusts_a_cache_entry_only_while_its_stamp_is_the_files(tmp_path: Path) -> None:
+    job = pair_order(load_plan())[0].job
+    runs = tmp_path / "runs"
+    src = fake_runs(runs, job)
+    weights = src / SERVED[2]
+    rel = str(weights.relative_to(runs / job))
+    stamp = [weights.stat().st_size, weights.stat().st_mtime]
+    (runs / job / ".hashes.json").write_text(
+        json.dumps({rel: {"stamp": stamp, "sha256": "a" * 64}})
+    )
+    assert expected(runs, job)["files"][SERVED[2]] == "a" * 64
+    weights.write_text("changed since it was verified")
+    assert expected(runs, job)["files"][SERVED[2]] != "a" * 64
+    (runs / job / ".hashes.json").write_text(json.dumps({rel: "a" * 64}))  # not the format
+    assert expected(runs, job)["files"][SERVED[2]] != "a" * 64
+
+
+def test_meter_takes_the_last_well_formed_poll(tmp_path: Path) -> None:
+    assert meter(tmp_path, "s") is None
+    rows = [
+        {"time": "2026-11-04T18:31:00+00:00", "event": "poll", "spent": 0.044, "cap": 16.0},
+        {"time": "2026-11-04T18:32:00+00:00", "event": "poll", "spent": 0.08, "cap": 16.0},
+        {"time": "2026-11-04T18:33:00+00:00", "event": "poll", "cap": 16.0},  # no spent
+        {"time": "2026-11-04T18:34:00+00:00", "event": "exit", "spent": 9.0},
+    ]
+    (tmp_path / "s.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows) + "{cut")
+    at, spent, cap = meter(tmp_path, "s") or (0.0, 0.0, 0.0)
+    assert (spent, cap) == (0.08, 16.0) and at == 1793817120.0
+    (tmp_path / "t.jsonl").write_text(json.dumps(rows[3]) + "\n")
+    assert meter(tmp_path, "t") is None
+
+
+class FakeTime:
+    def __init__(self, start: float = 1_000_000.0) -> None:
+        self.now = start
+        self.hooks: list[Any] = []
+
+    def clock(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.now += seconds
+        for hook in list(self.hooks):
+            hook(self)
+
+
+def test_the_gate_waits_for_a_fresh_meter_then_refuses() -> None:
+    fake = FakeTime()
+    readings = iter([None, None, (fake.now + 30, 1.0, CAP)])
+    verdict = waiting_gate(lambda: next(readings), fake.clock, fake.sleep)(
+        pair_order(load_plan())[0], []
+    )
+    assert verdict["verdict"] == "start" and fake.now == 1_000_030.0
+    blind = waiting_gate(lambda: None, fake.clock, fake.sleep)(pair_order(load_plan())[0], [])
+    assert blind["verdict"] == "blind" and fake.now > 1_000_030.0 + METER_WAIT_S
+
+
+def test_forward_retries_connection_errors_until_the_server_is_back() -> None:
+    port = free_port()
+    started: list[ThreadingHTTPServer] = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            self.send_response(200)
+            self.send_header("Content-Length", "2")
+            self.end_headers()
+            self.wfile.write(b"ok")
+
+        def log_message(self, *args: Any) -> None:
+            pass
+
+    def sleep(_: float) -> None:  # the second retry finds the server up
+        if not started:
+            started.append(ThreadingHTTPServer(("127.0.0.1", port), Handler))
+            threading.Thread(target=started[0].serve_forever, daemon=True).start()
+
+    assert forward(port, "GET", "/health", None, retry_s=30, sleep=sleep) == (200, b"ok")
+    started[0].shutdown()
+    started[0].server_close()
+    with pytest.raises(ConnectionError):  # a port nobody answers: no retry left
+        forward(port, "GET", "/health", None, retry_s=0)
+
+
+def test_a_dead_or_late_client_is_named() -> None:
+    t0 = 1_000_000.0
+    fresh = (t0 + 100, 1.0, CAP)
+    assert dead_or_late(None, t0, t0 + FIRST_ACT_S - 1, fresh) is None
+    assert "after launch" in (dead_or_late(None, t0, t0 + FIRST_ACT_S + 1, None) or "")
+    assert dead_or_late(t0 + 10, t0, t0 + 10 + ACT_IDLE_S - 1, None) is None
+    assert "no request for" in (dead_or_late(t0 + 10, t0, t0 + 11 + ACT_IDLE_S, None) or "")
+    near = (t0 + 100, stop_line(CAP) - 0.1, CAP)
+    assert "stop line" in (dead_or_late(t0 + 100, t0, t0 + 120, near) or "")
+    assert "longer than cap" in (
+        dead_or_late(t0 + 9e9, t0, t0 + CAP / RATE_CU_H * 3600 + 1, None) or ""
+    )
+
+
+class Rtx:
+    """rtx3060 over ssh, scripted: `exit` appears once `ready` says so."""
+
+    def __init__(self, exit_code: str | None = None, containers: str = "1") -> None:
+        self.exit_code, self.containers = exit_code, containers
+        self.calls: list[str] = []
+        self.reachable = True
+
+    def __call__(self, argv: Any) -> subprocess.CompletedProcess[str]:
+        command = " ".join(argv)
+        self.calls.append(command)
+        if not self.reachable:
+            return subprocess.CompletedProcess(argv, 255, "", "unreachable")
+        if "cat " in command and "/exit" in command:
+            out = ([self.exit_code] if self.exit_code is not None else []) + [self.containers]
+            return subprocess.CompletedProcess(argv, 0, "\n".join(out) + "\n", "")
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+
+def waiting_env(rtx: Rtx, fake: FakeTime, reading: Any = None) -> Env:
+    return Env(
+        runner=rtx,
+        running=lambda: True,
+        stop=lambda: True,
+        fetch=lambda: subprocess.CompletedProcess([], 0, "", ""),
+        reading=reading or (lambda: None),
+        sleep=fake.sleep,
+        clock=fake.clock,
+    )
+
+
+def idle_router(fake: FakeTime) -> Router:
+    return Router(
+        pair_order(load_plan()),
+        lambda s, seen: {"verdict": "start"},
+        lambda row: None,
+        lambda: None,
+        clock=fake.clock,
+    )
+
+
+def test_a_client_that_never_calls_is_stopped_and_its_exit_awaited() -> None:
+    fake, rtx, stops = FakeTime(), Rtx(containers="0"), []
+    stopped = threading.Event()
+
+    def stop() -> None:
+        stops.append(fake.now)
+        fake.hooks.append(
+            lambda f: setattr(rtx, "exit_code", "137") if f.now > stops[0] + 120 else None
+        )
+
+    code, seen = wait_client(idle_router(fake), Recorder(), stopped, stop, waiting_env(rtx, fake))
+    assert (code, seen) == (5, True) and len(stops) == 1
+    assert FIRST_ACT_S < stops[0] - 1_000_000.0 <= FIRST_ACT_S + POLL_S
+
+
+def test_a_client_gone_quiet_is_stopped_and_bounded_without_an_exit() -> None:
+    fake, rtx, stops = FakeTime(), Rtx(), []
+    router = idle_router(fake)
+    router.slot(reset())  # one episode started, then nothing
+    code, seen = wait_client(
+        router, Recorder(), threading.Event(), lambda: stops.append(1), waiting_env(rtx, fake)
+    )
+    assert (code, seen) == (5, False) and stops == [1]
+    assert fake.now - 1_000_000.0 <= ACT_IDLE_S + EXIT_WAIT_S + 3 * POLL_S
+
+
+def test_an_unreachable_box_does_not_hold_the_session_past_the_stop() -> None:
+    fake, rtx = FakeTime(), Rtx()
+    rtx.reachable = False
+    code, seen = wait_client(
+        idle_router(fake), Recorder(), threading.Event(), lambda: None, waiting_env(rtx, fake)
+    )
+    assert (code, seen) == (5, False)
+    assert fake.now - 1_000_000.0 <= FIRST_ACT_S + EXIT_WAIT_S + 3 * POLL_S
+
+
+def test_after_a_cu_refusal_the_client_gets_time_to_write_its_files() -> None:
+    fake, rtx = FakeTime(), Rtx(containers="0")  # container already gone, files not moved
+    router = idle_router(fake)
+    stopped = threading.Event()
+    router.refused = {"reason": "cu_rule", "pair": 4}
+    router.last_request = fake.now
+    stopped.set()
+    fake.hooks.append(lambda f: setattr(rtx, "exit_code", "1") if f.now > 1_000_000 + 300 else None)
+    code, seen = wait_client(router, Recorder(), stopped, lambda: None, waiting_env(rtx, fake))
+    assert (code, seen) == (0, True) and fake.now > 1_000_300
+
+
+def test_the_client_exit_code_decides_a_normal_end() -> None:
+    for exit_code, want in (("0", 0), ("1", 5)):
+        fake = FakeTime()
+        router = idle_router(fake)
+        router.last_request = fake.now
+        got = wait_client(
+            router, Recorder(), threading.Event(), lambda: None, waiting_env(Rtx(exit_code), fake)
+        )
+        assert got == (want, True)
+
+
+def test_the_cu_line_stops_a_pair_that_overran() -> None:
+    fake, stops = FakeTime(), []
+    router = idle_router(fake)
+    router.last_request = fake.now
+    fake.hooks.append(lambda f: setattr(router, "last_request", f.now))  # still calling
+    near = lambda: (fake.now - 30, stop_line(CAP) - 0.05, CAP)  # noqa: E731
+    rtx = Rtx()
+
+    def stop() -> None:
+        stops.append(1)
+        rtx.exit_code = "137"
+
+    assert wait_client(
+        router, Recorder(), threading.Event(), stop, waiting_env(rtx, fake, near)
+    ) == (5, True)
+    assert stops == [1]
+
+
+def test_preflight_checks_rtx3060_read_only(tmp_path: Path) -> None:
+    (tmp_path / "order.json").write_text("{}")
+    digest = __import__("hashlib").sha256(b"{}").hexdigest()
+
+    def box(mem_kb: int, out: str) -> Any:
+        def runner(argv: Any) -> subprocess.CompletedProcess[str]:
+            command = argv[-1]
+            assert not any(w in command for w in ("rm ", "mkdir", "docker run", "docker stop"))
+            if "MemAvailable" in command:
+                return subprocess.CompletedProcess(argv, 0, f"MemAvailable: {mem_kb} kB\n", "")
+            return subprocess.CompletedProcess(argv, 0, out, "")
+
+        return runner
+
+    gb = 1024 * 1024
+    assert preflight(tmp_path, box(40 * gb, f"client\n{digest}\n0\n")) == 0
+    assert preflight(tmp_path, box(30 * gb, f"client\n{digest}\n0\n")) == 4
+    assert preflight(tmp_path, box(40 * gb, f"client\n{'b' * 64}\n0\n")) == 5
+    assert preflight(tmp_path, box(40 * gb, f"{digest}\n0\n")) == 5
+    assert preflight(tmp_path, box(40 * gb, f"client\n{digest}\n1\n")) == 5
+
+
+# --- run_eval end to end, on fakes ------------------------------------------------------
+
+
+class DummyTunnel:
+    def __init__(self, argv: list[str], write: Any, name: str) -> None:
+        self.name, self.stopped = name, False
+
+    def start(self) -> None:
+        pass
+
+    def stop(self) -> None:
+        self.stopped = True
+
+
+class Box:
+    """rtx3060 for run_eval: RAM, the launch, the exit file, and the pull of its files."""
+
+    def __init__(self, calls: list[str], mem_gb: int = 40, launch_code: int = 0) -> None:
+        self.calls, self.mem_gb, self.launch_code = calls, mem_gb, launch_code
+        self.tag: str | None = None
+        self.exit: str | None = None
+        self.on_launch: Any = None
+        self.on_prepare: Any = None
+
+    def __call__(self, argv: Any) -> subprocess.CompletedProcess[str]:
+        argv = list(argv)
+        command = argv[-1]
+        ok = subprocess.CompletedProcess(argv, 0, "", "")
+        if argv[0] == "rsync":
+            self.calls.append("rsync")
+            if self.tag:
+                dest = Path(argv[-1]) / "eval" / self.tag / "x"
+                dest.mkdir(parents=True, exist_ok=True)
+                (dest / "eval_stats.txt").write_text(
+                    "".join(f"episode_{k}: {k % 3 == 0} \n" for k in range(4))
+                )
+            return ok
+        if "MemAvailable" in command:
+            return subprocess.CompletedProcess(
+                argv, 0, f"MemAvailable: {self.mem_gb << 20} kB\n", ""
+            )
+        if "he1_client.sh" in command:
+            self.calls.append("launch")
+            self.tag = command.split("--tag ")[1].split()[0]
+            if self.on_launch:
+                self.on_launch()
+            return subprocess.CompletedProcess(argv, self.launch_code, "", "")
+        if command.startswith("mkdir -p"):
+            self.calls.append("prepare")
+            if self.on_prepare:
+                self.on_prepare()
+            return ok
+        if "docker stop" in command:
+            self.calls.append("docker stop")
+            return ok
+        if "cat " in command:
+            return subprocess.CompletedProcess(argv, 0, (self.exit or "") + "\n1\n", "")
+        return ok
+
+
+def eval_setup(tmp_path: Path, jobs_served: list[str] | None = None) -> tuple[Any, ...]:
+    order = pair_order(load_plan())
+    sets = tmp_path / "set"
+    sets.mkdir()
+    (sets / "order.json").write_text(json.dumps({"slots": [asdict(s) for s in order]}))
+    jobs = jobs_served or [order[0].job, order[1].job]
+    servers = [fake_psi0(j, f"/content/da26/serve/{j}/fw-{j}.run") for j in jobs]
+    args = argparse.Namespace(
+        set=sets,
+        dest=tmp_path / "runs",
+        session="da26-t2-eval-n20",
+        registry=tmp_path / "reg",
+        colab=Path("colab"),
+    )
+    calls: list[str] = []
+    fake = FakeTime(time.time())
+    box = Box(calls)
+    env = Env(
+        runner=box,
+        running=lambda: True,
+        stop=lambda: calls.append("stop") or True,
+        fetch=lambda: calls.append("fetch") or subprocess.CompletedProcess([], 0, "", ""),
+        reading=lambda: (fake.now - 20, 1.0, CAP),
+        tunnel=DummyTunnel,
+        sleep=fake.sleep,
+        clock=fake.clock,
+        laptop_ports=tuple(s.server_address[1] for s in servers),
+        route_port=free_port(),
+    )
+    return args, env, box, calls, servers, order
+
+
+def test_run_short_of_ram_on_rtx3060_still_stops_the_session(tmp_path: Path) -> None:
+    args, env, box, calls, servers, _ = eval_setup(tmp_path)
+    box.mem_gb = 30
+    try:
+        assert run_eval(args, env) == 4
+    finally:
+        [s.shutdown() for s in servers]
+    assert calls == ["fetch", "stop", "rsync"]  # VM logs, the stop, then rtx3060 (no CU)
+
+
+def test_run_that_raises_still_stops_the_session(tmp_path: Path) -> None:
+    args, env, box, calls, servers, _ = eval_setup(tmp_path)
+
+    def broken(*a: Any) -> Any:
+        raise RuntimeError("ssh exploded")
+
+    env.tunnel = broken
+    try:
+        assert run_eval(args, env) == 5
+    finally:
+        [s.shutdown() for s in servers]
+    assert calls == ["fetch", "stop", "rsync"]
+    rows = [
+        json.loads(x) for x in (args.dest / "da26-t2-eval-n20/route.jsonl").read_text().splitlines()
+    ]
+    assert any(r["event"] == "error" and "ssh exploded" in r["error"] for r in rows)
+
+
+def test_run_signalled_stops_the_session_and_restores_the_handlers(tmp_path: Path) -> None:
+    args, env, box, calls, servers, _ = eval_setup(tmp_path)
+    before = signal.getsignal(signal.SIGTERM)
+    box.on_prepare = lambda: os.kill(os.getpid(), signal.SIGTERM)
+    try:
+        assert run_eval(args, env) == 7
+    finally:
+        [s.shutdown() for s in servers]
+    assert calls == ["prepare", "fetch", "stop", "rsync"]
+    assert signal.getsignal(signal.SIGTERM) == before
+
+
+def test_run_refuses_servers_that_are_not_their_arms(tmp_path: Path) -> None:
+    order = pair_order(load_plan())
+    args, env, box, calls, servers, _ = eval_setup(tmp_path, [order[1].job, order[0].job])
+    try:
+        assert run_eval(args, env) == 5
+    finally:
+        [s.shutdown() for s in servers]
+    assert "launch" not in calls and calls[-3:] == ["fetch", "stop", "rsync"]
+
+
+def test_a_failed_launch_does_not_wait_and_stops_what_may_have_started(tmp_path: Path) -> None:
+    args, env, box, calls, servers, _ = eval_setup(tmp_path)
+    box.launch_code = 124
+    try:
+        assert run_eval(args, env) == 5
+    finally:
+        [s.shutdown() for s in servers]
+    assert calls == ["prepare", "launch", "docker stop", "fetch", "stop", "rsync"]
+
+
+def test_an_unconfirmed_stop_is_exit_6(tmp_path: Path) -> None:
+    args, env, box, calls, servers, _ = eval_setup(tmp_path)
+    box.mem_gb = 30
+    env.stop = lambda: False
+    try:
+        assert run_eval(args, env) == 6
+    finally:
+        [s.shutdown() for s in servers]
+
+
+def test_a_full_run_routes_logs_and_scores_its_own_episodes(tmp_path: Path) -> None:
+    args, env, box, calls, servers, order = eval_setup(tmp_path)
+    job = args.dest / "da26-t2-eval-n20"
+    job.mkdir(parents=True)
+    (job / "route.jsonl").write_text(json.dumps({"run": "earlier", "event": "x"}) + "\n")
+    done = threading.Event()
+
+    def client() -> None:  # what SIMPLE's client sends: 2 pairs, 2 /act per episode
+        for _ in range(4):
+            post(env.route_port, reset())
+            post(env.route_port, {"history": {}})
+        box.exit = "0"
+        done.set()
+
+    box.on_launch = lambda: threading.Thread(target=client, daemon=True).start()
+    env.sleep = lambda s: done.wait(10) if s == POLL_S else None
+    try:
+        assert run_eval(args, env) == 0
+    finally:
+        [s.shutdown() for s in servers]
+    assert calls == ["prepare", "launch", "fetch", "stop", "rsync"]
+    assert (job / "route-earlier.jsonl").is_file()  # the earlier run's log is kept apart
+    rows = [json.loads(x) for x in (job / "route.jsonl").read_text().splitlines()]
+    assert {r["run"] for r in rows} == {box.tag}
+    acts = [r for r in rows if r["event"] == "act"]
+    assert [(r["episode"], r["job"]) for r in acts[::2]] == [(k, order[k].job) for k in range(4)]
+    scored = [json.loads(x) for x in (job / "results.jsonl").read_text().splitlines()]
+    assert [(r["episode"], r["success"], r["complete_pair"]) for r in scored] == [
+        (0, True, True),
+        (1, False, True),
+        (2, False, True),
+        (3, True, True),
+    ]

@@ -20,13 +20,14 @@ the CU the session will have used once that pair and the shutdown are done:
 
 and starts the pair only if that stays under the watcher's stop line (16 - 1.94 x
 430 / 3600 = 15.77 CU). `spent` is the watcher's last `poll` (fresh within 300 s;
-otherwise it waits for one, then refuses). episode_s is the longest of PRIOR_EPISODE_S
-(24.6 min, a failed episode, which runs the whole step budget; S1-03) and every
-episode seen so far, so a pair once started always fits, even if both fail. Inside a
-pair nothing is refused. A refused pair stops the client container and ends the run.
+otherwise it waits for one, then refuses). episode_s is PRIOR_EPISODE_S (33 min, the
+mean of S1-03's 10-episode run on a shared rtx3060; one failed episode on an idle box
+took 24.6 min) or 1.2 x the longest episode seen, whichever is more. Inside a pair
+nothing is refused. A refused pair stops the client container and ends the run.
 
     python3 scripts/he/he1_eval.py interleave --src fwdata/he/dev-eval-v1-l0n10 \
         --out fwdata/he/eval-n20-interleaved
+    python3 scripts/he/he1_eval.py preflight --set fwdata/he/eval-n20-interleaved
     python3 scripts/he/he1_eval.py probe  --session S --registry R --dest fwdata/he/runs
     python3 scripts/he/he1_eval.py upload --session S --registry R --runs fwdata/he/runs
     python3 scripts/he/he1_eval.py run    --session S --registry R --dest fwdata/he/runs \
@@ -39,20 +40,30 @@ sends what a server reads (`argv.txt`, `run_config.json`, `ckpt_40000/model.safe
 the normalisation bounds are inside run_config.json) with an `expected.json` of the
 laptop's verified sha256; `he1_colab.py serve` checks them before it loads anything.
 
+`preflight` checks rtx3060 read-only before the session starts (MemAvailable >= client +
+16 GB, Hiếu's rule; fw/ and the same interleaved set in place; no client running).
+
 `run` holds the session's single SSH connection for the forward (laptop 22285, 22286
-to the VM's servers), forwards rtx3060's CLIENT_PORT back to `route` (ssh -R), checks
-rtx3060's MemAvailable (client + 16 GB, Hiếu's rule), starts the client there under
-nohup setsid and a systemd-run MemoryMax scope (scripts/he/he1_client.sh; docker
---memory is the real cap of the container), and waits for it. Then, without a person:
-it closes the forwards, pulls the client folder from rtx3060, pulls the VM's eval job
-(server logs, vm-logs) with `he1_fetch.py once`, writes `results.jsonl`, and stops the
-session with confirmation. Everything for Agent QA/QC lands in
-`<dest>/da26-t2-eval-n20/`: route.jsonl (every request: episode, arm, latency, reply),
-client/ (client.log, eval_stats.txt, videos, exit), server-*.log, vm-logs/, results.jsonl.
+to the VM's servers), checks that each server's /info run_dir is its arm's fine-tune,
+forwards rtx3060's CLIENT_PORT back to `route` (ssh -R), checks rtx3060's MemAvailable
+again, starts the client there under nohup setsid and a systemd-run MemoryMax scope
+(scripts/he/he1_client.sh; docker --memory is the real cap of the container), and
+waits for it. It stops the client itself when no request comes (FIRST_ACT_S after the
+launch, ACT_IDLE_S after the last one) or the meter nears the stop line. Then, on
+every way out once the session was seen running (refusal, failure, exception,
+SIGTERM/SIGINT/SIGHUP): it closes the forwards, pulls the VM's eval job (server logs,
+vm-logs) with `he1_fetch.py once`, stops the session with confirmation, and only then
+pulls the client folder from rtx3060 (no CU) and writes `results.jsonl`. Everything
+for Agent QA/QC lands in `<dest>/da26-t2-eval-n20/`: route.jsonl (every request:
+episode, arm, latency, reply; every row tagged with the run; an earlier run's log is
+kept as route-<run>.jsonl), client/ (client-<run>.log, eval/<run>/eval_stats.txt,
+videos/<run>/, exit), server-*.log, vm-logs/, results.jsonl (the last run only).
 
 Exit codes of `run`: 0 every planned pair ran; 3 a pair refused by the CU rule (the
-pairs before it are complete); 4 rtx3060 short of RAM, nothing started; 5 the client
-or a forward failed; 6 the session stop was not confirmed (it may still bill).
+pairs before it are complete); 4 rtx3060 short of RAM, client not started; 5 the
+client, a server or a forward failed, or the run raised; 6 the session stop was not
+confirmed (it may still bill); 7 a signal ended the run. The session is stopped in
+every case but 6.
 """
 
 from __future__ import annotations
@@ -64,6 +75,7 @@ import json
 import os
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -101,9 +113,17 @@ VM_PORTS = (22085, 22086)  # one Psi0 server per arm on the VM, in arm order
 LAPTOP_PORTS = (22285, 22286)  # laptop ends of the forward to VM_PORTS
 ROUTE_PORT = 22185  # `route` on the laptop
 CLIENT_PORT = 22095  # rtx3060 end of the reverse forward; 22085 is other stories' local server
-PRIOR_EPISODE_S = 1476.0  # 24.6 min: a failed mujoco_isaac episode, rtx3060 (S1-03 3.4.1)
-END_S = 300.0  # assumption: client exit, forward close, log pulls, a confirmed stop
+# 33 min: S1-03's 10-episode mujoco_isaac run on rtx3060 shared with DA-34 and DA-35
+# (docs/g0/psi0-eval.md); one failed episode on an idle box took 24.6 min (S1-03 3.4.1).
+PRIOR_EPISODE_S = 1980.0
+BOUND_FACTOR = 1.2  # an episode may take this much longer than the longest seen
+END_S = 300.0  # assumption: client exit, forward close, VM log pull, a confirmed stop
 METER_WAIT_S = 600.0  # a pair start waits this long for a fresh watcher poll, then refuses
+POLL_S = 60.0  # wait_client: one look at rtx3060 per minute
+FIRST_ACT_S = 1800.0  # launch to first request: kit cache copy, image, Isaac start (~4 min)
+ACT_IDLE_S = 900.0  # no request this long once running: hung (> reset + METER_WAIT_S)
+EXIT_WAIT_S = 600.0  # after a stop, how long he1_client.sh has to move files and write `exit`
+RETRY_S = 180.0  # `forward` retries connection errors this long: a tunnel restart + connect
 PUSH_MB = 256  # upload probe
 CLIENT_GB = 20  # docker --memory of the client (S1-03: peak 15.75 GiB with page cache)
 RAM_MARGIN_GB = 16  # Hiếu 3/11/2026: MemAvailable >= job + 16 GB before starting
@@ -274,8 +294,8 @@ def meter(registry: Path, session: str) -> tuple[float, float, float] | None:
 
 
 def episode_bound(seen: Sequence[float]) -> float:
-    """Seconds one episode may take: the longest of a full-budget failure and all seen."""
-    return max([PRIOR_EPISODE_S, *seen])
+    """Seconds one episode may take: PRIOR_EPISODE_S, or more after a slow episode."""
+    return max(PRIOR_EPISODE_S, BOUND_FACTOR * max(seen, default=0.0))
 
 
 def pair_verdict(
@@ -285,9 +305,11 @@ def pair_verdict(
     if reading is None or now - reading[0] > METER_STALE_S:
         return {"verdict": "blind", "meter_age_s": None if reading is None else now - reading[0]}
     at, spent, cap = reading
+    if cap != CAP:  # the line is this driver's cap, never the watcher's row
+        return {"verdict": "refuse", "why": f"watcher cap {cap} is not {CAP}", "cap": cap}
     pair_s = 2 * episode_bound(seen)
     projected = spent + RATE_CU_H * (max(0.0, now - at) + pair_s + END_S) / 3600 + SAFETY_CU
-    line = stop_line(cap)
+    line = stop_line(CAP)
     return {
         "verdict": "start" if projected <= line else "refuse",
         "spent": spent,
@@ -313,6 +335,24 @@ def pairs_that_fit(
     return n
 
 
+def waiting_gate(
+    reading: Callable[[], tuple[float, float, float] | None],
+    clock: Callable[[], float] = time.time,
+    sleep: Callable[[float], None] = time.sleep,
+) -> Callable[[Slot, Sequence[float]], dict[str, Any]]:
+    """`pair_verdict` on the watcher's meter; a blind meter is waited for METER_WAIT_S."""
+
+    def gate(slot: Slot, seen: Sequence[float]) -> dict[str, Any]:
+        end = clock() + METER_WAIT_S
+        while True:
+            verdict = pair_verdict(reading(), clock(), seen)
+            if verdict["verdict"] != "blind" or clock() > end:
+                return verdict
+            sleep(15)
+
+    return gate
+
+
 # --- route -------------------------------------------------------------------
 
 
@@ -332,7 +372,11 @@ class Router:
         self.episode = -1  # no reset seen yet
         self.started: list[float] = []
         self.refused: dict[str, Any] | None = None
+        self.last_request: float | None = None  # wait_client's liveness signal
         self.lock = threading.Lock()
+
+    def touch(self) -> None:
+        self.last_request = self.clock()
 
     def seen(self) -> list[float]:
         return [b - a for a, b in zip(self.started, self.started[1:], strict=False)]
@@ -340,6 +384,7 @@ class Router:
     def slot(self, body: dict[str, Any]) -> Slot | None:
         """The slot this `/act` belongs to, or None when it must not be served."""
         with self.lock:
+            self.touch()
             if self.refused is not None:
                 return None
             reset = bool((body.get("history") or {}).get("reset"))
@@ -386,23 +431,32 @@ class Router:
 
 
 def forward(
-    port: int, method: str, path: str, body: bytes | None, tries: int = 3
+    port: int,
+    method: str,
+    path: str,
+    body: bytes | None,
+    retry_s: float = RETRY_S,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> tuple[int, bytes]:
-    """One request to a server on the laptop's forward; retried while ssh reconnects."""
-    for attempt in range(tries):
+    """One request to a server on the laptop's forward.
+
+    Connection errors (refused, reset, closed: the ssh forward restarting) are retried
+    for `retry_s`; SIMPLE's client raises on any reply but 200 and has no retry of its
+    own. A timeout is not retried: the server got the request and did not answer."""
+    end = time.monotonic() + retry_s
+    while True:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=600)
         try:
-            conn = http.client.HTTPConnection("127.0.0.1", port, timeout=600)
             headers = {"Content-Type": "application/json"} if body is not None else {}
             conn.request(method, path, body=body, headers=headers)
             reply = conn.getresponse()
-            data = reply.read()
+            return reply.status, reply.read()
+        except (ConnectionError, http.client.HTTPException) as error:
+            if time.monotonic() >= end:
+                raise ConnectionError(f"127.0.0.1:{port} {method} {path}: {error!r}") from error
+            sleep(5)
+        finally:
             conn.close()
-            return reply.status, data
-        except OSError:
-            if attempt == tries - 1:
-                raise
-            time.sleep(10)
-    raise AssertionError("unreachable")
 
 
 def serve_routes(
@@ -445,6 +499,8 @@ def serve_routes(
                 write({"event": "upstream_error", "episode": slot.episode, "error": str(error)})
                 self.reply(502, json.dumps({"status": f"upstream: {error}"}).encode())
                 return
+            finally:
+                router.touch()
             has_action = b'"action"' in reply[:4096]
             write(
                 {
@@ -468,13 +524,19 @@ def serve_routes(
 
 
 class JsonLog:
-    def __init__(self, path: Path) -> None:
+    """Append-only JSON lines; with `run`, every row carries that run id."""
+
+    def __init__(self, path: Path, run: str | None = None) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        self.path, self.lock = path, threading.Lock()
+        self.path, self.run, self.lock = path, run, threading.Lock()
 
     def __call__(self, row: dict[str, Any]) -> None:
+        head = {
+            "time": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            **({"run": self.run} if self.run else {}),
+        }
         with self.lock, self.path.open("a") as f:
-            f.write(json.dumps({"time": time.strftime("%Y-%m-%dT%H:%M:%S"), **row}) + "\n")
+            f.write(json.dumps({**head, **row}) + "\n")
 
 
 # --- probe, upload -----------------------------------------------------------
@@ -515,16 +577,24 @@ def file_sha256(path: Path) -> str:
 
 
 def expected(runs: Path, job: str) -> dict[str, Any]:
-    """What `serve` checks: each served file's sha256, from he1_fetch's verified cache."""
+    """What `serve` checks: each served file's sha256.
+
+    From he1_fetch's verified cache (`.hashes.json`: path -> {"stamp": [size, mtime],
+    "sha256": hex}) when the entry's stamp is the file's; computed here otherwise."""
     src = run_dir(runs, job)
     cache_path = runs / job / ".hashes.json"
     cache = json.loads(cache_path.read_text()) if cache_path.is_file() else {}
     files = {}
     for rel in SERVED:
-        key = str((src / rel).relative_to(runs / job))
-        files[rel] = cache.get(key) or file_sha256(src / rel)
-        if cache.get(key) is None:
+        path = src / rel
+        entry = cache.get(str(path.relative_to(runs / job)))
+        entry = entry if isinstance(entry, dict) else {}
+        stamp = [path.stat().st_size, path.stat().st_mtime]
+        digest = entry.get("sha256")
+        if not isinstance(digest, str) or len(digest) != 64 or entry.get("stamp") != stamp:
+            digest = file_sha256(path)
             log(event="hash_computed", job=job, file=rel)
+        files[rel] = digest
     return {"job": job, "run": src.name, "files": files}
 
 
@@ -575,10 +645,11 @@ def upload(
 # --- run ---------------------------------------------------------------------
 
 
+RTX_SSH = ("ssh", "-o", "ConnectTimeout=20", "-o", "ServerAliveInterval=15")
+
+
 def rtx(command: str, runner: Run = run) -> subprocess.CompletedProcess[str]:
-    done: subprocess.CompletedProcess[str] = runner(
-        ["ssh", "-o", "ConnectTimeout=20", RTX, command]
-    )
+    done: subprocess.CompletedProcess[str] = runner([*RTX_SSH, RTX, command])
     return done
 
 
@@ -602,8 +673,43 @@ def client_command(tag: str, episodes: int) -> str:
     )
     return (
         f"cd ~/{RTX_WORK} && nohup setsid bash -c {shlex.quote(inner)} "
-        f"< /dev/null > runs/{EVAL_JOB}/client-launch.log 2>&1 &"
+        f"< /dev/null > runs/{EVAL_JOB}/client-launch-{shlex.quote(tag)}.log 2>&1 &"
     )
+
+
+def preflight(set_dir: Path, runner: Run = run) -> int:
+    """Read-only check that rtx3060 can take the client; run it before the eval session.
+
+    0 ready; 4 MemAvailable under client + 16 GB (Hiếu's rule); 5 anything else: box
+    unreachable, no ~/denso-da26/fw, a different interleaved set, a client still running."""
+    need = CLIENT_GB + RAM_MARGIN_GB
+    free = mem_available_gb(runner)
+    base = f"~/{RTX_WORK}"
+    out = rtx(
+        f"test -f {base}/fw/scripts/he/he1_client.sh && echo client; "
+        f"sha256sum {base}/sets/interleaved/order.json 2>/dev/null | cut -d' ' -f1; "
+        "docker ps -q -f name=da26-eval-client | wc -l",
+        runner,
+    )
+    lines = out.stdout.split() if out.returncode == 0 else []
+    problems = []
+    if free is None or out.returncode != 0:
+        problems.append("rtx3060 unreachable")
+    else:
+        if free < need:
+            problems.append(f"MemAvailable {free:.1f} GB < {need} GB")
+        if "client" not in lines:
+            problems.append(f"no {base}/fw/scripts/he/he1_client.sh (git archive of master)")
+        if file_sha256(set_dir / "order.json") not in lines:
+            problems.append(f"{base}/sets/interleaved/order.json is not {set_dir}/order.json")
+        if lines[-1:] != ["0"]:
+            problems.append("a da26-eval-client container is running")
+    log(event="preflight", mem_available_gb=free, need_gb=need, problems=problems)
+    for problem in problems:
+        alert(f"preflight: {problem}")
+    if free is not None and free < need:
+        return 4
+    return 5 if problems else 0
 
 
 class Tunnel:
@@ -633,195 +739,381 @@ class Tunnel:
             self.proc.terminate()
 
 
-def wait_health(port: int, deadline_s: float = 120.0) -> bool:
-    end = time.monotonic() + deadline_s
-    while time.monotonic() < end:
+def wait_health(
+    port: int,
+    deadline_s: float = 120.0,
+    sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
+) -> bool:
+    end = clock() + deadline_s
+    while clock() < end:
         try:
-            status, data = forward(port, "GET", "/health", None, tries=1)
+            status, data = forward(port, "GET", "/health", None, retry_s=0)
             if status == 200 and b"ok" in data:
                 return True
         except OSError:
             pass
-        time.sleep(5)
+        sleep(5)
     return False
 
 
+def served_run_dir(port: int) -> str | None:
+    """The run_dir the server behind a laptop port reports (`GET /info`), or None."""
+    try:
+        status, data = forward(port, "GET", "/info", None, retry_s=0)
+        return str(json.loads(data)["run_dir"]) if status == 200 else None
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def open_route_log(job: Path, tag: str) -> JsonLog:
+    """route.jsonl of this run, every row tagged with it; an earlier run's file is kept
+    as route-<its run>.jsonl, so two runs never share one log."""
+    path = job / "route.jsonl"
+    if path.exists():
+        first = path.read_text().split("\n", 1)[0]
+        try:
+            earlier = str(json.loads(first).get("run") or "")
+        except ValueError:
+            earlier = ""
+        kept = job / f"route-{earlier or int(path.stat().st_mtime)}.jsonl"
+        if kept.exists():
+            raise SystemExit(f"{kept} exists; move it away before a new run")
+        path.rename(kept)
+    return JsonLog(path, run=tag)
+
+
 def results(dest: Path) -> list[dict[str, Any]]:
-    """One row per episode the client finished: slot, success, timing, /act counts."""
+    """One row per episode of the last client run: its tag's rows and files only."""
     job = dest / EVAL_JOB
     order = [Slot(**s) for s in json.loads((job / "order.json").read_text())["slots"]]
-    stats = {}
-    stats_files = sorted((job / "client").rglob("eval_stats.txt"))
-    for line in stats_files[0].read_text().splitlines() if stats_files else []:
-        name, _, value = line.strip().partition(": ")
-        if name.startswith("episode_"):
-            stats[int(name.removeprefix("episode_"))] = value.strip() == "True"
-    events = [json.loads(line) for line in (job / "route.jsonl").read_text().splitlines()]
-    starts = {e["episode"]: e["time"] for e in events if e["event"] == "episode_start"}
-    acts: dict[int, list[float]] = {}
-    for e in events:
-        if e["event"] == "act":
-            acts.setdefault(e["episode"], []).append(e["seconds"])
-    rows = []
-    for slot in order:
-        if slot.episode not in starts:
-            continue
-        latency = sorted(acts.get(slot.episode, []))
-        rows.append(
-            {
-                **asdict(slot),
-                "success": stats.get(slot.episode),
-                "started": starts[slot.episode],
-                "act_calls": len(latency),
-                "act_p50_s": latency[len(latency) // 2] if latency else None,
-                "act_max_s": latency[-1] if latency else None,
-                "complete_pair": all(o.episode in stats for o in order if o.pair == slot.pair),
-            }
-        )
+    route = job / "route.jsonl"
+    events = [json.loads(x) for x in route.read_text().splitlines() if x.strip()]
+    launches = [e for e in events if e["event"] == "client_launch"]
+    rows: list[dict[str, Any]] = []
+    if launches:
+        tag = launches[-1]["tag"]
+        events = [e for e in events if e.get("run", tag) == tag]
+        stats_files = sorted((job / "client" / "eval" / tag).rglob("eval_stats.txt"))
+        if len(stats_files) > 1:
+            raise SystemExit(f"{len(stats_files)} eval_stats.txt under client/eval/{tag}")
+        stats = {}
+        for line in stats_files[0].read_text().splitlines() if stats_files else []:
+            name, _, value = line.strip().partition(": ")
+            if name.startswith("episode_"):
+                stats[int(name.removeprefix("episode_"))] = value.strip() == "True"
+        starts = {e["episode"]: e["time"] for e in events if e["event"] == "episode_start"}
+        acts: dict[int, list[float]] = {}
+        for e in events:
+            if e["event"] == "act":
+                acts.setdefault(e["episode"], []).append(e["seconds"])
+        for slot in order:
+            if slot.episode not in starts:
+                continue
+            latency = sorted(acts.get(slot.episode, []))
+            rows.append(
+                {
+                    **asdict(slot),
+                    "run": tag,
+                    "success": stats.get(slot.episode),
+                    "started": starts[slot.episode],
+                    "act_calls": len(latency),
+                    "act_p50_s": latency[len(latency) // 2] if latency else None,
+                    "act_max_s": latency[-1] if latency else None,
+                    "complete_pair": all(o.episode in stats for o in order if o.pair == slot.pair),
+                }
+            )
     (job / "results.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
     return rows
 
 
-def run_eval(args: argparse.Namespace) -> int:
+@dataclass
+class Env:
+    """What `run_eval` reaches outside this process; the tests replace each part."""
+
+    runner: Run  # ssh to rtx3060, rsync from it
+    running: Callable[[], bool]  # the watcher is alive and lists the session
+    stop: Callable[[], bool]  # stop the session; True once confirmed
+    fetch: Callable[[], subprocess.CompletedProcess[str]]  # he1_fetch.py once
+    reading: Callable[[], tuple[float, float, float] | None]  # the watcher's meter
+    tunnel: Callable[[list[str], Callable[[dict[str, Any]], None], str], Any] = Tunnel
+    sleep: Callable[[float], None] = time.sleep
+    clock: Callable[[], float] = time.time
+    laptop_ports: tuple[int, ...] = LAPTOP_PORTS
+    route_port: int = ROUTE_PORT
+
+
+def session_env(args: argparse.Namespace) -> Env:
+    def fetch() -> subprocess.CompletedProcess[str]:
+        return run(
+            [
+                *(sys.executable, str(HERE / "he1_fetch.py"), "once"),
+                *("--session", args.session, "--registry", str(args.registry)),
+                *("--dest", str(args.dest), "--colab", str(args.colab)),
+            ]
+        )
+
+    return Env(
+        runner=run,
+        running=lambda: session_running(args.session, args.registry, args.colab),
+        stop=lambda: stop_session(args.session, args.registry, args.colab),
+        fetch=fetch,
+        reading=lambda: meter(args.registry, args.session),
+    )
+
+
+class Interrupted(Exception):
+    """SIGTERM, SIGINT or SIGHUP during `run`: the session is stopped all the same."""
+
+
+def on_signal(signum: int, frame: Any) -> None:
+    raise Interrupted(signal.Signals(signum).name)
+
+
+def run_eval(args: argparse.Namespace, env: Env | None = None) -> int:
+    """The eval, from a running session with both servers up to a confirmed stop.
+
+    Once the session is seen running, every way out (a refusal, a failure, an
+    exception, a signal) goes through `finish`, which stops the session."""
+    env = env or session_env(args)
     plan = load_plan()
-    order_doc = json.loads((args.set / "order.json").read_text())
-    order = [Slot(**s) for s in order_doc["slots"]]
+    order = [Slot(**s) for s in json.loads((args.set / "order.json").read_text())["slots"]]
     if order != pair_order(plan):
         raise SystemExit(f"{args.set}/order.json is not this plan's pair order")
+    if not env.running():
+        raise SystemExit(f"{args.session}: watcher gone or not listed; nothing started")
     job = args.dest / EVAL_JOB
     job.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(args.set / "order.json", job / "order.json")
-    write = JsonLog(job / "route.jsonl")
-    if not session_running(args.session, args.registry, args.colab):
-        raise SystemExit(f"{args.session}: watcher gone or not listed; nothing started")
-    free = mem_available_gb()
-    write({"event": "rtx_mem", "mem_available_gb": free, "need_gb": CLIENT_GB + RAM_MARGIN_GB})
-    if free is None or free < CLIENT_GB + RAM_MARGIN_GB:
-        alert(
-            f"rtx3060 MemAvailable {free} GB < {CLIENT_GB + RAM_MARGIN_GB} GB; client not started"
+    tag = f"{EVAL_JOB}-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime(env.clock()))}"
+    signals = {s: signal.getsignal(s) for s in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)}
+    for s in signals:
+        signal.signal(s, on_signal)
+    state: dict[str, Any] = {"server": None, "tunnels": [], "launched": False, "exited": False}
+    write = JsonLog(job / "route.jsonl")  # replaced at once below
+    router = Router(order, lambda s, seen: {"verdict": "refuse"}, write, lambda: None)
+    code = 5
+    try:
+        write = open_route_log(job, tag)
+        shutil.copyfile(args.set / "order.json", job / "order.json")
+        stopped = threading.Event()
+
+        def stop_client() -> None:
+            rtx("docker stop -t 30 da26-eval-client", env.runner)
+            stopped.set()
+
+        router = Router(
+            order,
+            waiting_gate(env.reading, env.clock, env.sleep),
+            write,
+            lambda: threading.Thread(target=stop_client, daemon=True).start(),
+            clock=env.clock,
         )
+        code = drive(args, env, order, router, write, tag, stopped, stop_client, state)
+    except Interrupted as why:
+        alert(f"run interrupted by {why}; stopping the client and the session")
+        write({"event": "interrupted", "signal": str(why)})
+        code = 7
+    except Exception as error:  # noqa: BLE001 - whatever failed, the session is stopped
+        alert(f"run failed: {error!r}; stopping the client and the session")
+        write({"event": "error", "error": repr(error)})
+        code = 5
+    finally:
+        for s in signals:  # the stop below runs to its end
+            signal.signal(s, signal.SIG_IGN)
+        teardown(env, write, state)
+    try:
+        return finish(args, env, write, router, code)
+    finally:
+        for s, old in signals.items():
+            signal.signal(s, old)
+
+
+def drive(
+    args: argparse.Namespace,
+    env: Env,
+    order: Sequence[Slot],
+    router: Router,
+    write: Callable[[dict[str, Any]], None],
+    tag: str,
+    stopped: threading.Event,
+    stop_client: Callable[[], None],
+    state: dict[str, Any],
+) -> int:
+    """RAM, forwards, servers, client launch, wait. Returns run's exit code."""
+    need = CLIENT_GB + RAM_MARGIN_GB
+    free = mem_available_gb(env.runner)
+    write({"event": "rtx_mem", "mem_available_gb": free, "need_gb": need})
+    if free is None or free < need:
+        alert(f"rtx3060 MemAvailable {free} GB < {need} GB; client not started")
         return 4
     remote = Remote(args.session, args.colab)
     forwards = [
-        f"-L127.0.0.1:{lp}:127.0.0.1:{vp}" for lp, vp in zip(LAPTOP_PORTS, VM_PORTS, strict=True)
+        f"-L127.0.0.1:{lp}:127.0.0.1:{vp}"
+        for lp, vp in zip(env.laptop_ports, VM_PORTS, strict=True)
     ]
-    vm_tunnel = Tunnel(
-        [*remote.ssh[:-1], "-N", "-o", "ExitOnForwardFailure=yes", *forwards, "root@colab"],
-        write,
-        "vm",
-    )
-    rtx_tunnel = Tunnel(
-        [
-            "ssh",
-            "-N",
-            "-o",
-            "ExitOnForwardFailure=yes",
-            "-o",
-            "ServerAliveInterval=30",
-            f"-R127.0.0.1:{CLIENT_PORT}:127.0.0.1:{ROUTE_PORT}",
-            RTX,
-        ],
-        write,
-        "rtx3060",
-    )
-    tag = f"{EVAL_JOB}-{time.strftime('%Y%m%dT%H%M%S')}"
-    stopped = threading.Event()
-
-    def stop_client() -> None:
-        rtx("docker stop -t 30 da26-eval-client")
-        stopped.set()
-
-    def gate(slot: Slot, seen: Sequence[float]) -> dict[str, Any]:
-        end = time.time() + METER_WAIT_S
-        while True:
-            verdict = pair_verdict(meter(args.registry, args.session), time.time(), seen)
-            if verdict["verdict"] != "blind" or time.time() > end:
-                return verdict
-            time.sleep(15)
-
-    router = Router(order, gate, write, lambda: threading.Thread(target=stop_client).start())
-    server = serve_routes(router, dict(zip(VM_PORTS, LAPTOP_PORTS, strict=True)), ROUTE_PORT, write)
+    argv = [*remote.ssh[:-1], "-N", "-o", "ExitOnForwardFailure=yes", *forwards, "root@colab"]
+    state["tunnels"].append(env.tunnel(argv, write, "vm"))
+    state["tunnels"][-1].start()
+    if not all(wait_health(p, 300, env.sleep, env.clock) for p in env.laptop_ports):
+        alert("a Psi0 server does not answer /health through the forward; client not started")
+        return 5
+    for slot, port in zip(order[: len(VM_PORTS)], env.laptop_ports, strict=True):
+        served = served_run_dir(port)
+        write({"event": "server_info", "job": slot.job, "port": port, "run_dir": served})
+        if served is None or f"/serve/{slot.job}/" not in served:
+            alert(f"laptop port {port} serves {served}, not {slot.job}; client not started")
+            return 5
+    ports = dict(zip(VM_PORTS, env.laptop_ports, strict=True))
+    server = serve_routes(router, ports, env.route_port, write)
+    state["server"] = server
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    code = 0
-    try:
-        vm_tunnel.start()
-        if not all(wait_health(p, 300) for p in LAPTOP_PORTS):
-            alert("a Psi0 server does not answer /health through the forward; client not started")
-            code = 5
-        else:
-            rtx_tunnel.start()
-            time.sleep(10)
-            # an `exit` left by an earlier attempt would end wait_client at once
-            rtx(f"mkdir -p ~/{RTX_WORK}/runs/{EVAL_JOB} && rm -f ~/{RTX_WORK}/runs/{EVAL_JOB}/exit")
-            launched = rtx(client_command(tag, len(order)), lambda a: run(["timeout", "20", *a]))
-            write({"event": "client_launch", "tag": tag, "code": launched.returncode})
-            code = wait_client(write, stopped)
-            router.finish()
-    finally:
-        server.shutdown()
-        vm_tunnel.stop()
-        rtx_tunnel.stop()
-    return finish(args, write, router, code)
+    reverse = f"-R127.0.0.1:{CLIENT_PORT}:127.0.0.1:{env.route_port}"
+    argv = [*RTX_SSH, "-N", "-o", "ExitOnForwardFailure=yes", reverse, RTX]
+    state["tunnels"].append(env.tunnel(argv, write, "rtx3060"))
+    state["tunnels"][-1].start()
+    env.sleep(10)
+    out = f"~/{RTX_WORK}/runs/{EVAL_JOB}"
+    # an `exit` left by an earlier attempt would end wait_client at once
+    prepared = rtx(f"mkdir -p {out} && rm -f {out}/exit", env.runner)
+    if prepared.returncode != 0:
+        alert(f"rtx3060: could not prepare {out}; client not started")
+        return 5
+    state["launched"] = True
+    launched = env.runner(["timeout", "20", *RTX_SSH, RTX, client_command(tag, len(order))])
+    write({"event": "client_launch", "tag": tag, "code": launched.returncode})
+    if launched.returncode != 0:
+        alert(f"client launch on rtx3060 exited {launched.returncode}")
+        return 5
+    code, state["exited"] = wait_client(router, write, stopped, stop_client, env)
+    router.finish()
+    return code
 
 
-def wait_client(write: Callable[[dict[str, Any]], None], stopped: threading.Event) -> int:
-    """Block until the client's exit file appears on rtx3060: 0 if it ended 0 or was
-    stopped by the CU rule, 5 otherwise (also after 30 min with neither an exit file
-    nor a container: the launch died before he1_client.sh could write one)."""
+def dead_or_late(
+    last_request: float | None,
+    launched: float,
+    now: float,
+    reading: tuple[float, float, float] | None,
+) -> str | None:
+    """Why the client must be stopped now, or None.
+
+    No request FIRST_ACT_S after launch, or ACT_IDLE_S after the last one: the client
+    or its tunnel is dead (a gate holds a request at most METER_WAIT_S). The CU line:
+    the fresh meter says the session reaches the stop line before the shutdown is done
+    (the pair rule should never let it; a backstop). The wall clock: the session cannot
+    run longer than the cap allows at the meter's rate."""
+    if last_request is None and now - launched > FIRST_ACT_S:
+        return f"no request {now - launched:.0f} s after launch"
+    if last_request is not None and now - last_request > ACT_IDLE_S:
+        return f"no request for {now - last_request:.0f} s"
+    if reading is not None and now - reading[0] <= METER_STALE_S:
+        at, spent, _ = reading
+        if spent + RATE_CU_H * (now - at + END_S) / 3600 + SAFETY_CU > stop_line(CAP):
+            return f"spent {spent} CU: the shutdown would cross the stop line"
+    if now - launched > CAP / RATE_CU_H * 3600:
+        return f"{now - launched:.0f} s since launch: longer than cap {CAP} lasts"
+    return None
+
+
+def wait_client(
+    router: Router,
+    write: Callable[[dict[str, Any]], None],
+    stopped: threading.Event,
+    stop_client: Callable[[], None],
+    env: Env,
+) -> tuple[int, bool]:
+    """Wait for the client's `exit` file on rtx3060; returns (code, exit seen).
+
+    The client is stopped when `dead_or_late` says so (then 5), or by the router when
+    the CU rule refuses a pair (0, a clean end). Either way he1_client.sh then has
+    EXIT_WAIT_S to move its files and write `exit`; the container going away is not
+    the end. Without an `exit` by then: 5. A nonzero client exit: 5."""
     path = f"~/{RTX_WORK}/runs/{EVAL_JOB}/exit"
-    misses = idle = 0
+    launched = env.clock()
+    stop_at: float | None = None
+    why: str | None = None
+    misses = 0
     while True:
-        time.sleep(60)
-        out = rtx(f"cat {path} 2>/dev/null; docker ps -q -f name=da26-eval-client | wc -l")
-        if out.returncode != 0:
-            misses += 1
-            if misses % 10 == 0:
-                alert(f"rtx3060 unreachable {misses} min in a row while the client runs")
-            continue
-        misses = 0
-        lines = out.stdout.split()
+        env.sleep(POLL_S)
+        now = env.clock()
+        if stop_at is None and stopped.is_set():
+            stop_at = now
+        if stop_at is None:
+            why = dead_or_late(router.last_request, launched, now, env.reading())
+            if why:
+                alert(f"stopping the client: {why}")
+                write({"event": "client_stop", "why": why})
+                stop_client()
+                stop_at = now
+        out = rtx(
+            f"cat {path} 2>/dev/null; docker ps -q -f name=da26-eval-client | wc -l", env.runner
+        )
+        misses = 0 if out.returncode == 0 else misses + 1
+        if misses and misses % 10 == 0:
+            alert(f"rtx3060 unreachable {misses} polls in a row while the client runs")
+        lines = out.stdout.split() if out.returncode == 0 else []
+        cu = router.refused is not None and router.refused.get("reason") == "cu_rule"
         if len(lines) == 2:
-            write({"event": "client_exit", "code": int(lines[0]), "refused": stopped.is_set()})
-            return 0 if lines[0] == "0" or stopped.is_set() else 5
-        idle = idle + 1 if lines == ["0"] else 0
-        if idle and stopped.is_set():
-            write({"event": "client_exit", "code": None, "refused": True})
-            return 0
-        if idle >= 30:
-            alert("no client container and no exit file on rtx3060 for 30 min")
-            write({"event": "client_exit", "code": None, "refused": False})
-            return 5
-        if idle >= 30:
-            alert("no client container and no exit file on rtx3060 for 30 min")
-            return 5
+            code = int(lines[0]) if lines[0].lstrip("-").isdigit() else -1
+            write({"event": "client_exit", "code": code, "refused": cu, "stopped_for": why})
+            return (0 if (code == 0 or cu) and why is None else 5), True
+        if stop_at is not None and now - stop_at > EXIT_WAIT_S:
+            alert(f"no exit file on rtx3060 {now - stop_at:.0f} s after the client stop")
+            write({"event": "client_exit", "code": None, "refused": cu, "stopped_for": why})
+            return 5, False
+
+
+def teardown(env: Env, write: Callable[[dict[str, Any]], None], state: dict[str, Any]) -> None:
+    """Close what `drive` opened; a client still running is stopped. Never raises."""
+    steps: list[tuple[str, Callable[[], Any]]] = []
+    if state["server"] is not None:
+        steps.append(("route", state["server"].shutdown))
+    steps += [(f"tunnel {t.name}", t.stop) for t in state["tunnels"]]
+    if state["launched"] and not state["exited"]:
+        steps.append(("client", lambda: rtx("docker stop -t 30 da26-eval-client", env.runner)))
+    for name, step in steps:
+        try:
+            done = step()
+            if isinstance(done, subprocess.CompletedProcess):
+                write({"event": "client_stopped", "code": done.returncode})
+        except Exception as error:  # noqa: BLE001 - the session stop comes next regardless
+            write({"event": "teardown_failed", "step": name, "error": repr(error)})
 
 
 def finish(
-    args: argparse.Namespace, write: Callable[[dict[str, Any]], None], router: Router, code: int
+    args: argparse.Namespace,
+    env: Env,
+    write: Callable[[dict[str, Any]], None],
+    router: Router,
+    code: int,
 ) -> int:
+    """VM logs first, then the confirmed stop (the last CU), then rtx3060's files (no CU)
+    and results. Each step runs whatever the one before it did."""
     job = args.dest / EVAL_JOB
-    pulled = run(["rsync", "-a", f"{RTX}:{RTX_WORK}/runs/{EVAL_JOB}/", f"{job}/client/"])
-    write({"event": "client_pulled", "code": pulled.returncode})
-    fetched = run(
+    try:
+        fetched = env.fetch()
+        write({"event": "vm_pulled", "code": fetched.returncode, "tail": fetched.stdout[-500:]})
+    except Exception as error:  # noqa: BLE001
+        write({"event": "vm_pull_failed", "error": repr(error)})
+    try:
+        confirmed = env.stop()
+    except Exception as error:  # noqa: BLE001
+        alert(f"{args.session}: stop raised {error!r}; it may still bill")
+        confirmed = False
+    write({"event": "session_stop", "confirmed": confirmed})
+    pulled = env.runner(
         [
-            sys.executable,
-            str(HERE / "he1_fetch.py"),
-            "once",
-            "--session",
-            args.session,
-            "--registry",
-            str(args.registry),
-            "--dest",
-            str(args.dest),
-            "--colab",
-            str(args.colab),
+            *("rsync", "-a", "--timeout=120", "-e", " ".join(RTX_SSH)),
+            *(f"{RTX}:{RTX_WORK}/runs/{EVAL_JOB}/", f"{job}/client/"),
         ]
     )
-    write({"event": "vm_pulled", "code": fetched.returncode, "tail": fetched.stdout[-500:]})
-    rows = results(args.dest) if (job / "order.json").exists() else []
-    complete = {r["pair"] for r in rows if r["complete_pair"]}
-    write({"event": "results", "episodes": len(rows), "complete_pairs": len(complete)})
-    confirmed = stop_session(args.session, args.registry, args.colab)
+    write({"event": "client_pulled", "code": pulled.returncode})
+    try:
+        rows = results(args.dest)
+        complete = {r["pair"] for r in rows if r["complete_pair"]}
+        write({"event": "results", "episodes": len(rows), "complete_pairs": len(complete)})
+    except (Exception, SystemExit) as error:  # noqa: BLE001
+        write({"event": "results_failed", "error": repr(error)})
     if not confirmed:
         return 6
     if code:
@@ -831,7 +1123,9 @@ def finish(
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
-    parser.add_argument("mode", choices=["interleave", "probe", "upload", "run", "results", "fit"])
+    parser.add_argument(
+        "mode", choices=["interleave", "preflight", "probe", "upload", "run", "results", "fit"]
+    )
     parser.add_argument("--session", default=EVAL_JOB)
     parser.add_argument("--registry", type=Path)
     parser.add_argument("--dest", type=Path, default=REPO / "fwdata/he/runs")
@@ -847,6 +1141,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         order = interleave(args.src, args.out, load_plan())
         print(json.dumps({"episodes": len(order), "out": str(args.out)}))
         return 0
+    if args.mode == "preflight":
+        return preflight(args.set)
     if args.mode == "fit":
         print(pairs_that_fit(args.spent, args.episode_s, most=len(pair_order(load_plan())) // 2))
         return 0

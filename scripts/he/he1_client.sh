@@ -10,8 +10,9 @@
 # sim clock (docker/psi0/simtime_eval.py), mujoco_isaac. It talks to he1_eval.py's router on
 # 127.0.0.1:PORT (ssh -R from the laptop), which picks the server of each episode. Layout of
 # ~/denso-da26: fw/ (git archive of master), sets/interleaved/, simple/ (SIMPLE's data/: kit
-# caches, patches, eval outputs), runs/da26-t2-eval-n20/ (what the laptop pulls: client.log,
-# eval/<tag>/eval_stats.txt, videos/, summary.json, and `exit`, written on every way out).
+# caches, patches, eval outputs), runs/da26-t2-eval-n20/ (what the laptop pulls; one set of
+# files per run tag: client-<tag>.log, eval/<tag>/eval_stats.txt, videos/<tag>/,
+# summary-<tag>.json, server_info-<tag>.json; and `exit`, written last on every way out).
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
@@ -57,7 +58,7 @@ free_gb=$(( $(awk '/MemAvailable/ {print $2}' /proc/meminfo) / 1024 / 1024 ))
 (( free_gb >= NEED_GB )) || { status=4; die "MemAvailable ${free_gb} GB < ${NEED_GB} GB"; }
 info=$(curl -sf "http://127.0.0.1:$port/info") || die "no router on 127.0.0.1:$port"
 [[ "$info" == *g1wholebodylocomotionpickbetweentablesteleop* ]] || die "router does not serve $TASK"
-printf '%s\n' "$info" > "$OUT/server_info.json"
+printf '%s\n' "$info" > "$OUT/server_info-$tag.json"
 
 DATA="$ROOT/simple"
 for d in assets robots scenes; do [[ -d "$SIMPLE_ASSETS/$d" ]] || die "no $SIMPLE_ASSETS/$d"; done
@@ -102,13 +103,13 @@ docker run --rm --name da26-eval-client --runtime nvidia --network host \
   --host 127.0.0.1 --port "$port" --sim-mode "$SIM_MODE" --headless \
   --data-format lerobot --data-dir "data/$evals" \
   --episode-start 0 --num-episodes "$episodes" --eval-dir "data/runs/$tag" \
-  > "$OUT/client.log" 2>&1 || code=$?
+  > "$OUT/client-$tag.log" 2>&1 || code=$?
 end=$(date +%s)
 
-mkdir -p "$OUT/eval" "$OUT/videos"
+mkdir -p "$OUT/eval" "$OUT/videos/$tag"
 [[ -d "$DATA/runs/$tag" ]] && mv "$DATA/runs/$tag" "$OUT/eval/$tag"
 for ep in "$DATA"/evals/psi0_decoupled_wbc/*."$TASK"/dr-level-0/episode_*; do
-  [[ -d "$ep" ]] && mv "$ep" "$OUT/videos/"
+  [[ -d "$ep" ]] && mv "$ep" "$OUT/videos/$tag/"
 done
 python3 - "$OUT" "$code" "$((end - begin))" "$tag" "$SIMPLE_IMAGE" "$SIMPLE_FIX_SHA256" \
   "$DDS_DOMAIN" "$SIM_MODE" "$CLOCK" "$episodes" "$(sha256sum "$set_dir/order.json" | cut -d' ' -f1)" <<'PY'
@@ -121,7 +122,7 @@ keys = ["client_exit", "wall_seconds", "tag", "simple_image", "simple_task_file_
 summary = dict(zip(keys, sys.argv[2:]))
 for k in ("client_exit", "wall_seconds", "dds_domain", "episodes_requested"):
     summary[k] = int(summary[k])
-(out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+(out / f"summary-{summary['tag']}.json").write_text(json.dumps(summary, indent=2) + "\n")
 PY
 status=$code
 log "client exit $code after $((end - begin)) s; results in $OUT"
