@@ -22,17 +22,32 @@ signals:
   min_steps: 10            # chốt: phân vị trên dưới 10 chu kỳ không có nghĩa; trace ngắn hơn là CHƯA RÕ, không phải hệ thống chạy tốt
 
 r1:
-  tau_lat_s: 0.15          # giả định; độ trễ chu kỳ suy luận, đơn vị giây. Hiệu chỉnh: phân vị 99 của (chunk_received_s - observation_sent_s) trên lần chạy chuẩn G0
+  tau_lat_s: 0.15          # giả định; độ trễ chu kỳ suy luận, đơn vị giây, chunk 0 không tính. Hiệu chỉnh: phân vị 99 của (chunk_received_s - observation_sent_s) trên lần chạy chuẩn G0
   percentile: 99.0         # chốt theo spec mục 6.4 ("phân vị 99 độ trễ chu kỳ suy luận")
 
 r2:
-  # Đứng máy là chunk có `delay_steps > max_delay_steps` trong log RTC.
-  # `delay_steps` = ceil(độ trễ × Hz) do `RTCClient` của DA-19 ghi: số chu kỳ
-  # điều khiển một vòng thời gian thực chạy trong lúc chờ chunk, tức d mà RTC
-  # phải che trên phần cứng. Không đọc `buffer_level`: đó là mức buffer lúc gửi
-  # request, luôn bằng 0 khi SIMPLE chỉ hỏi server lúc hàng đợi action rỗng.
-  max_delay_steps: 8       # chốt 3/11/2026: max_delay của Ψ₀ stage 3, theo docs/g0/psi0-logging.md và docstring flywheel_psi0/policy/rtc.py; kiểm lại ở config Ψ₀ khi đổi checkpoint
-  max_underruns: 0         # giả định; số chunk vượt max_delay_steps được phép, một lần đã là một lần đứng máy nhìn thấy được. Hiệu chỉnh: số lần lớn nhất trên lần chạy chuẩn G0
+  # Đứng máy là chunk có `delay_steps > rtc_inference_delay_steps` trong log
+  # RTC. `delay_steps` = ceil(độ trễ × Hz) do `RTCClient` của DA-19 ghi: số chu
+  # kỳ điều khiển một vòng thời gian thực chạy trong lúc chờ chunk. RTC của
+  # server chỉ che d hàng đầu của chunk mới (tiếp kế hoạch cũ), nên chunk chờ
+  # quá d chu kỳ là chunk robot đứng máy trên phần cứng. Không đọc
+  # `buffer_level`: đó là mức buffer lúc gửi request, luôn bằng 0 khi SIMPLE
+  # chỉ hỏi server lúc hàng đợi action rỗng. Chunk 0 không tính: client hỏi nó
+  # trước khi robot chạy action nào, chờ lúc đó là lúc bắt đầu, không phải đứng
+  # máy (`runtime.py`).
+  #
+  # d là `rtc_inference_delay` của server, không phải max_delay của checkpoint.
+  # Ψ₀ cda3fdf, src/psi/deploy/serve_psi0_simple.py:161-171: rtc_mode train
+  # (checkpoint train với --model.rtc, chọn tự động khi serve --rtc) mà không
+  # có --rtc-inference-delay thì d = max(1, min(Ta // 2, Tp - s, max_delay - 1)),
+  # s = --min-exec-horizon, mặc định exec_shift = Ta; dòng 210 từ chối
+  # d >= max_delay. Cờ serve của đội (scripts/g0/serve_psi0.sh):
+  # --action-exec-horizon 24 --rtc, Tp = action-chunk-size 30, max_delay 8
+  # (docs/g0/psi0-eval.md, checkpoint G1WholebodyXMoveBendPickTeleop), nên
+  # d = max(1, min(12, 6, 7)) = 6. Server báo d trên `/info`
+  # (`rtc_inference_delay`); đổi cờ serve hoặc checkpoint thì tính lại.
+  rtc_inference_delay_steps: 6  # chốt 5/11/2026 [Hiếu], quyết định (b): d của server, nguồn ngay trên
+  max_underruns: 0         # giả định; số chunk (trừ chunk 0) vượt d được phép, một lần đã là một lần đứng máy nhìn thấy được. Hiệu chỉnh: số lần lớn nhất trên lần chạy chuẩn G0
 
 r3:
   tau_track_upper: 0.10    # giả định; chuẩn của (lệnh gửi - trạng thái đo) thân trên, đơn vị rad. Hiệu chỉnh: phân vị 99 trên episode teleop thành công

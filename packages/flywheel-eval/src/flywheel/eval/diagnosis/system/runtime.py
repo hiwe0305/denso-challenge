@@ -9,10 +9,17 @@ twelve F-TRAIN codes.
   observation going out and the chunk coming back, which is what
   `RTCInferenceRecord` records.
 * **R2 buffer** (design section 10): chunks whose inference took more control
-  steps than real-time chunking covers (`delay_steps > max_delay_steps`, the
-  model's `max_delay`, 8 for Ψ₀ stage 3). `delay_steps` is what `RTCClient`
-  of DA-19 writes as ceil(latency * hz). Counted rather than averaged: a stall
-  is a moment, and an average over a long episode hides it.
+  steps than real-time chunking covers (`delay_steps > rtc_inference_delay_steps`,
+  the server's RTC delay d, 6 with the team's serve flags; `system.yaml` has
+  the derivation). `delay_steps` is what `RTCClient` of DA-19 writes as
+  ceil(latency * hz). Counted rather than averaged: a stall is a moment, and
+  an average over a long episode hides it.
+
+Both leave chunk 0 out. The client asks for it before any action ran, with
+nothing buffered and the model cold, so its wait is the start of the trace,
+not a stall and not the latency of the running loop; counting it fired R2 on
+every episode (`48486ede`, lost in `7226dc78`) and lets one cold start lift
+R1's percentile on a short trace.
 * **R4 sync** (step 4): the largest |t_image - t_state| over the episode,
   against tau_sync. Spec asks for the largest offset, not a percentile of it,
   because one badly paired frame is enough to make the policy act on a stale
@@ -62,9 +69,12 @@ from flywheel.eval.diagnosis.train.finding import Skipped
 
 
 def check_r1(records: tuple[RTCInferenceRecord, ...], cfg: R1Thresholds) -> CheckResult:
-    """Inference cycle latency against tau_lat (spec section 6.4, step 3)."""
+    """Inference cycle latency against tau_lat (spec section 6.4, step 3), chunk 0 aside."""
     if not records:
         return CheckResult(skipped=[Skipped("R1", _no_rtc_log())])
+    records = _after_start(records)
+    if not records:
+        return CheckResult(skipped=[Skipped("R1", _only_chunk_0())])
     latency = np.array(
         [record.chunk_received_s - record.observation_sent_s for record in records],
         dtype=np.float64,
@@ -92,14 +102,18 @@ def check_r2(records: tuple[RTCInferenceRecord, ...], cfg: R2Thresholds) -> Chec
     `buffer_level` is not read: `RTCClient` records it when the request went
     out, and under SIMPLE's refill-when-empty it is always 0, so it tells a
     healthy chunk from a stall no better than a constant would. What RTC has
-    to cover on hardware is `delay_steps`, against the model's `max_delay`.
+    to cover on hardware is `delay_steps`, against the server's d.
 
     `value` is the number of chunks over the limit, against `max_underruns`;
     `where` is the slowest of them.
     """
     if not records:
         return CheckResult(skipped=[Skipped("R2", _no_rtc_log())])
-    slow = [record for record in records if record.delay_steps > cfg.max_delay_steps]
+    records = _after_start(records)
+    if not records:
+        return CheckResult(skipped=[Skipped("R2", _only_chunk_0())])
+    limit = cfg.rtc_inference_delay_steps
+    slow = [record for record in records if record.delay_steps > limit]
     if len(slow) <= cfg.max_underruns:
         return CheckResult()
     worst = max(slow, key=lambda record: record.delay_steps)
@@ -111,8 +125,8 @@ def check_r2(records: tuple[RTCInferenceRecord, ...], cfg: R2Thresholds) -> Chec
                 threshold=float(cfg.max_underruns),
                 where=f"chunk {worst.chunk_index}",
                 detail=(
-                    f"{len(slow)} chunk có delay_steps trên max_delay {cfg.max_delay_steps}, "
-                    f"lớn nhất {worst.delay_steps} bước"
+                    f"{len(slow)} chunk (trừ chunk 0) có delay_steps trên d = {limit} "
+                    f"mà RTC của server che, lớn nhất {worst.delay_steps} bước"
                 ),
             )
         ]
@@ -270,6 +284,18 @@ def _drift(uid: str, name: str, deviation: float, tolerance: float) -> SystemFin
         threshold=tolerance,
         where=uid,
         detail=f"`{name}` lệch khỏi bản tham chiếu",
+    )
+
+
+def _after_start(records: tuple[RTCInferenceRecord, ...]) -> tuple[RTCInferenceRecord, ...]:
+    """The chunks of a running loop: every chunk but the first of the trace (module docstring)."""
+    return tuple(record for record in records if record.chunk_index > 0)
+
+
+def _only_chunk_0() -> str:
+    return (
+        "log RTC của trace chỉ có chunk 0, lúc bắt đầu trước khi robot chạy, "
+        "không đo được độ trễ của vòng đang chạy"
     )
 
 

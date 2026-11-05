@@ -259,15 +259,19 @@ class R1Thresholds:
 
 @dataclass(frozen=True)
 class R2Thresholds:
-    """Inference slower than real-time chunking can cover: delay_steps over max_delay.
+    """Inference slower than real-time chunking covers: delay_steps over the server's d.
 
     `delay_steps` of `RTCInferenceRecord` is ceil(latency * hz), the control
-    steps a real-time loop would run while the chunk is computed (DA-19). RTC
-    covers up to the model's `max_delay` of them - 8 for Ψ₀ stage 3 - so a
-    chunk with `delay_steps > max_delay_steps` is one the robot would stall on
-    on hardware. `buffer_level` is not read: it is the level when the request
-    went out, which is always 0 under SIMPLE's refill-when-empty, so it says
-    nothing about a stall (decision Q2 as corrected, 3/11/2026).
+    steps a real-time loop would run while the chunk is computed (DA-19). What
+    RTC covers is the server's inference delay d: the first d rows of a new
+    chunk continue the previous plan, so a chunk with `delay_steps > d` is one
+    the robot would stall on on hardware. d is not the model's `max_delay`:
+    `serve_psi0_simple` sets d = max(1, min(Ta // 2, Tp - s, max_delay - 1))
+    and refuses d >= max_delay, which is 6 with the team's serve flags
+    (`system.yaml`, r2; decision (b) of the PO, 5/11/2026). `buffer_level` is
+    not read: it is the level when the request went out, which is always 0
+    under SIMPLE's refill-when-empty, so it says nothing about a stall
+    (decision Q2 as corrected, 3/11/2026).
 
     `max_underruns` is how many such chunks an episode may contain before the
     runtime, not the policy, is what the engineer goes and fixes. A count, not
@@ -275,7 +279,7 @@ class R2Thresholds:
     hides it.
     """
 
-    max_delay_steps: int
+    rtc_inference_delay_steps: int
     max_underruns: int
 
 
@@ -525,7 +529,7 @@ class SystemThresholds:
                 percentile=_percentile(r1, "percentile", "r1"),
             ),
             r2=R2Thresholds(
-                max_delay_steps=_steps(r2, "max_delay_steps", "r2"),
+                rtc_inference_delay_steps=_steps(r2, "rtc_inference_delay_steps", "r2"),
                 max_underruns=_steps(r2, "max_underruns", "r2"),
             ),
             r3=R3Thresholds(
