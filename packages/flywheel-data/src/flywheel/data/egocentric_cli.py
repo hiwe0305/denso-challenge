@@ -93,6 +93,19 @@ def ingest(
     _say(f"ledger: {job.run_plan_id}/{job.job_id}")
 
 
+@app.command()
+def pose(work: Work, run_plan_id: RunPlan = None) -> None:
+    """E-B from the tracking of every EgoDex episode: pose.npz."""
+
+    with _refusals():
+        frames = _frames(work)
+        with _job("pose", frames, run_plan_id) as job:
+            message = f"E-B pose of {api.write_eb_poses(work)} episodes"
+            job.notes.append(message)
+    _say(message)
+    _say(f"ledger: {job.run_plan_id}/{job.job_id}")
+
+
 @contextmanager
 def _refusals() -> Iterator[None]:
     """A refusal of a command: one line on stderr, exit 2. The gate's DeidBlocked and

@@ -19,11 +19,16 @@ from flywheel.contracts.artifacts import Episode
 from flywheel.data.annotate.deid.gate import annotate_allowed, require_annotate
 from flywheel.data.ingest.egocentric.config import EgoConfig
 from flywheel.data.ingest.egocentric.episodes import (
+    POSE,
+    bundle_dir,
     make_bundle,
+    read_bundle,
+    read_episodes,
     to_episode,
     write_bundle,
     write_episodes,
 )
+from flywheel.data.ingest.egocentric.pose import read_egodex_pose, save_pose
 from flywheel.data.ingest.egocentric.source import (
     EgoSourceRecord,
     changed_files,
@@ -71,5 +76,18 @@ def gate_open(episode: Episode, source: EgoSourceRecord) -> bool:
 
 def require_gate(episode: Episode, source: EgoSourceRecord) -> None:
     require_annotate(episode, source.source_detail, source.data_class, source.deid_waiver)
+
+
+def write_eb_poses(work: Path) -> int:
+    """E-B: pose.npz of every tracked episode, read from its HDF5."""
+    check_unchanged(read_source(work))
+    count = 0
+    for episode in read_episodes(work):
+        bundle = read_bundle(work, episode.episode_id)
+        if bundle.hdf5 is None:
+            continue
+        save_pose(read_egodex_pose(Path(bundle.hdf5)), bundle_dir(work, bundle.episode_id) / POSE)
+        count += 1
+    return count
 
 
