@@ -550,18 +550,18 @@ Chung cho T1 và T2:
 - **Mốc.** Rollout eval C trên đúng 20 điều kiện này (lô `l1-000`, `l1-010`), ghép cặp theo điều kiện.
 - **Kiểm tại nguồn** (Psi0 `cda3fdf`, SIMPLE `6d10628`):
   - Số action thực thi mỗi lần gọi đặt ở **server**: `psi0_serve_simple.py` trả `pred_actions[:Ta]`, với `Ta` = `--action-exec-horizon`. Client `psi0_decoupled_wbc` đưa mọi action nhận được vào hàng đợi, rồi mới hỏi lại.
-  - Eval C chạy với `Ta = 24` và `--rtc`, theo mặc định của `scripts/g0/serve_psi0.sh`, không phải 30.
+  - Eval C chạy với `--action-exec-horizon 24 --rtc`, theo mặc định của `scripts/g0/serve_psi0.sh`, không phải 30. Khi đó `inference_delay` của RTC cố định bằng `Tp − Ta` = 6.
   - Khi bật RTC, server assert `Tp − Ta ≤ max_delay`. Checkpoint C có chunk `Tp = 30` và `max_delay = 8`, nên `Ta` phải ≥ 22.
   - **Vì vậy Ta = 10 với RTC bật không chạy được** nếu không sửa Psi0.
   - Tắt RTC không cần sửa Psi0: `RTC_FLAG=` (rỗng) trong `serve_psi0.sh`.
-- **Biến thể [Đề xuất]**, gửi phiên điều phối 7/11/2026, chờ Hiếu chọn trước rollout đầu tiên của T2:
+- **Biến thể.** Đề xuất gửi phiên điều phối 7/11/2026. **[Đã chốt 7/11/2026, Hiếu]** "Đồng ý": chạy hai biến thể dưới đây, so với mốc eval C. Ngưỡng đọc vẫn là [Đề xuất].
 
 | Biến thể | `Ta` | RTC | Khác eval C ở |
 |---|---|---|---|
 | T2b | 24 | tắt | chỉ RTC |
 | T2a′ | 10 | tắt | RTC và số action thực thi; so với T2b thì chỉ khác số action thực thi |
 
-  Thứ tự chạy: T2b, rồi T2a′. Đổi cấu hình server thì khởi động lại server và ghi lệnh. Sau T2, trả server về cấu hình của eval C (`Ta = 24`, `--rtc`).
+  So T2a′ với T2b để tách riêng tác động của `Ta`. Thứ tự chạy: T1, rồi T2b, rồi T2a′. Đổi cấu hình server thì khởi động lại server và ghi lệnh. Sau T2, trả server về cấu hình của eval C (`Ta = 24`, `--rtc`).
 - **Đọc.** Một biến thể là "đáng xem" nếu thỏa một trong hai điều kiện:
   - hơn mốc ít nhất 3 thành công trên 20 điều kiện;
   - tỉ lệ qua bước `place` tăng rõ so với mốc. "Rõ" ở đây là ít nhất 3 điều kiện có `place` bật ở biến thể mà không bật ở mốc, nhiều hơn số điều kiện theo chiều ngược lại.
@@ -575,3 +575,4 @@ Chung cho T1 và T2:
 | 6/11/2026 | Mục 13.6: C-max chuẩn bị, chưa train (Hiếu 6/11): RunPlan nháp `rp_366283071c4a`, tập `CMAX` 429 episode, bản cắt trên `rtx3060`, bản nháp `Decision` của quy tắc 0 với hai biến thể (i) chỉ S1, (ii) S1 cộng S2 (chưa có release S2). Mục 13.5: lệch checkout SIMPLE `6d10628` so với ghim `b75c678` | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 13.7: kết quả eval C (0/270; mức 1–2 0/240, Wilson 0–1,6 %), nhãn lỗi, bước của bộ chấm, yaw trên 270 trace, quy tắc 0 xảy ra (không chạy C+), `Decision` `fail` chờ Hiếu, đề xuất C-max (i). Mục 13.5: trace không có `timing` (lô chạy trước #148) | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 14: luật đọc T1, T2 của bước kiểm pipeline ảnh ([Đề xuất]), viết trước rollout đầu tiên. T2: Ta = 10 với RTC không chạy được (`max_delay` 8), đề xuất T2b (Ta 24, RTC tắt) và T2a′ (Ta 10, RTC tắt) | Hiếu (soạn với Claude) |
+| 7/11/2026 | Mục 14.2: Hiếu chốt hai biến thể T2b (Ta 24, RTC tắt) và T2a′ (Ta 10, RTC tắt) ("Đồng ý"), ghi trước rollout đầu tiên của T2; thêm `inference_delay` = 6 của eval C | Hiếu (soạn với Claude) |
