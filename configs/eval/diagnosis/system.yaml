@@ -24,7 +24,8 @@ signals:
 r1:
   # τ_lat phải ≤ d / hz = 6 / 50 = 0,12 s (d ở r2): trễ trên 0,12 s đã cho
   # delay_steps = ceil(trễ × 50) ≥ 7 > d, tức đã là R2, nên τ_lat lớn hơn thì R1
-  # không bao giờ bắn mà không kèm R2 (AC 7). Đề xuất 5/11/2026, chờ PO duyệt.
+  # không bao giờ bắn mà không kèm R2 (AC 7). Chốt 6/11/2026 [Hiếu]: 0,10 s;
+  # con số vẫn là giả định tới khi hiệu chỉnh trên lần chạy chuẩn G0 (DA-37).
   tau_lat_s: 0.10          # giả định; độ trễ chu kỳ suy luận, đơn vị giây, chunk 0 không tính. Hiệu chỉnh: phân vị 99 của (chunk_received_s - observation_sent_s) trên lần chạy chuẩn G0, giữ ≤ d / hz
   percentile: 99.0         # chốt theo spec mục 6.4 ("phân vị 99 độ trễ chu kỳ suy luận")
 
