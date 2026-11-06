@@ -56,7 +56,7 @@ REPO = Path(__file__).resolve().parents[5]
 # Recipe args a plan may override for all its branches: they change what is logged,
 # not the weights (PO 4/11/2026, docs/g0/psi0-finetune-cost.md 4.1 on S1-04).
 TRAINING_NEUTRAL_OVERRIDES = frozenset({"train.validation_steps"})
-STATUS_FIELDS = {"superseded_by"}
+STATUS_FIELDS = {"superseded_by", "status"}
 # The block of the interpretation doc that `Interpretation.rules_sha256` pins; the
 # label above it ([Đề xuất], [Đã chốt]) stays outside, so approving it keeps the id.
 RULES_MARKERS = ("<!-- tier2-rules -->", "<!-- /tier2-rules -->")
@@ -256,6 +256,10 @@ class TrayRunPlan(_Frozen):
     # Repo path of the plan that replaced this one. Set after the freeze, so it is left
     # out of the id and the lock (STATUS_FIELDS): it says whether to run, not what runs.
     superseded_by: str | None = None
+    # "draft": prepared for a decision not yet taken (C-max under rule 0 of the tier 2
+    # rules); no job launches it and it cannot be frozen until the status goes. Out of
+    # the id and the lock like superseded_by.
+    status: Literal["draft"] | None = None
 
     @classmethod
     def load(cls, path: Path) -> TrayRunPlan:
@@ -542,6 +546,8 @@ def freeze(plan_path: Path, repo: Path = REPO) -> Path:
     problems = check(plan, repo) + pinned_file_drift(plan, repo)
     if plan.superseded_by is not None:
         problems.append(f"superseded by {plan.superseded_by}: freeze that plan instead")
+    if plan.status == "draft":
+        problems.append("status draft: drop it once a Decision orders this plan, then freeze")
     if not (repo / plan.interpretation.doc).is_file():
         problems.append(f"{plan.interpretation.doc} is missing: fix the reading rules first")
     if problems:
@@ -591,6 +597,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         summary = f"{args.plan}: {run_plan_id(plan)}, {len(plan.eval_conditions())} eval conditions"
         if plan.superseded_by is not None:
             problems.append(f"SUPERSEDED by {plan.superseded_by}: do not run this plan")
+        if plan.status == "draft":
+            summary += ", draft"
+            if args.launch:
+                problems.append("DRAFT: no job runs a draft plan; it needs a Decision first")
     warnings: list[str] = []
     if plan is not None:
         if args.release is not None:

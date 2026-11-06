@@ -432,9 +432,25 @@ Cách đọc **[Đề xuất]**, chưa kiểm ở mã của DA-13: nhãn R3 "`ta
 - `fetched.json` báo `final: false` do race (mục 13.1); checkpoint đủ và sha256 khớp.
 - Cờ bước của scorer chỉ tính theo thứ tự, bắt đầu từ `approach_a` (hai lòng bàn tay trên tay cầm, trước mép bàn A). Một episode mang khay sang bàn B mà không qua `approach_a` có 0/7 bước. Tỉ lệ qua từng bước đọc theo định nghĩa này.
 - 1 worker, đồng hồ sim. Thời gian tường phụ thuộc tải của máy, nhưng kết quả thì không (mục 8.1).
+- Checkout SIMPLE thực chạy là `6d10628`, không phải `b75c678` mà `code.simple` của plan ghim. Hai bản chỉ khác một file: task hai bàn (`g1_wholebody_locomotion_pick_between_tables_teleop.py`, 11 dòng `init_qpos`). Env khay không dùng file này. Kho S1 của release cũng sinh trên checkout này (cùng thư mục, qua symlink), nên train và eval của C dùng cùng một bản SIMPLE. `runplan check --launch` không kiểm `code.simple`; mọi file của `pinned_files` đều khớp.
+
+### 13.6 C-max: chuẩn bị, chưa train
+
+**[Đã chốt 6/11/2026, Hiếu]** "Chuẩn bị sẵn, chưa train". C-max chỉ dùng khi quy tắc 0 của mục 9 xảy ra (p_C < 10 % ở mức 1–2) **và** Hiếu ra lệnh. Khi đó C+ không chạy. C-max hỏi "160 demo có quá ít không?" trước khi quy lỗi cho pipeline ảnh.
+
+| Mục | Giá trị |
+|---|---|
+| RunPlan | [`he-tray-cmax.yaml`](../../configs/runplans/tray/he-tray-cmax.yaml), `rp_366283071c4a`, `status: draft`. `runplan check --launch` và `freeze` từ chối plan nháp. Khác bản 2 ở đúng 5 trường: `name`, `demo_sets`, `branches`, `budget`, `supersedes` (test). Cùng recipe, checkpoint gốc, seed train, eval 270, khối quy tắc và các file ghim |
+| Tập | `CMAX` = cả kho dùng được: 429 episode (bỏ 7 reject DA-03, qua bộ lọc). File [`demo_sets-v2-cmax.json`](../../configs/runplans/tray/demo_sets-v2-cmax.json): tập N40, N80, C, A giữ nguyên hash của bản 2, thêm `CMAX` = `084ebc03…` theo cùng thứ tự hash |
+| Bản cắt | `~/denso-da34-pool/fwdata/cut-cmax-draft` trên `rtx3060`: 429 episode, 610 069 frame, 3,6 GB, có danh sách sha256 (không commit). `demo_subset.py` của master `2e57f60`, 49 s |
+| Ngân sách | Cap 18 CU, lấy suất của C+ (C+ không chạy khi quy tắc 0 xảy ra). Bậc 2 vẫn dưới trần 36 CU. Ước lượng 16,0 CU trên L4, giả định thời gian một bước không đổi theo số episode (chưa đo với 429) |
+| `Decision` | Bản nháp [`he-tray-v2.rule0.decision.json`](../../configs/runplans/tray/he-tray-v2.rule0.decision.json): `dev_gate`, `verdict: open`, chủ thể `rp_a04c14e79dfd`, ngưỡng 0,10. Điền số đo và kết luận khi eval C xong; lệnh của Hiếu về C-max ghi vào đó |
+
+Nếu C-max chạy, phép so C-max với C không có trong quy tắc bậc 2. Quy tắc đọc phải ghi trong `Decision` **trước** khi chạy eval C-max.
 
 ## Change log
 
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 6/11/2026 | Mục 8.2: sửa câu "chạy lại riêng một episode cho ra đúng nó" (sai dưới EGL), câu cũ giữ nguyên. Thêm mục 13: khởi chạy eval C, kiểm tất định hỏng (ảnh reset EGL lệch 13/230 400 pixel), chạy thử và thời gian, số đo yaw, giới hạn. Quyết định của Hiếu ngày 6/11: chạy tiếp và ghi giới hạn; đủ 270, mức 1–2 trước; 1 worker. Khối quy tắc mục 9 không đổi | Hiếu (soạn với Claude) |
+| 6/11/2026 | Mục 13.6: C-max chuẩn bị, chưa train (Hiếu 6/11): RunPlan nháp `rp_366283071c4a`, tập `CMAX` 429 episode, bản cắt trên `rtx3060`, bản nháp `Decision` của quy tắc 0. Mục 13.5: lệch checkout SIMPLE `6d10628` so với ghim `b75c678` | Hiếu (soạn với Claude) |
