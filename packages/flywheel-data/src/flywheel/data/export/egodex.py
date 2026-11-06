@@ -385,7 +385,21 @@ def segment_transforms(
                 for name in (*JOINTS, CAMERA)
             }
             return transforms, np.asarray(f["camera/intrinsic"][:], dtype=np.float32)
-    raise ExportRefused([f"{bundle.episode_id}: E-A export is DA-18 task 3"])
+    # E-A: pose.npz from MediaPipe and VO (plan 4.2a); its `intrinsic` is DA-18's request
+    # to DA-04, since an E-A episode has no HDF5 to take the camera matrix from.
+    if "intrinsic" not in pose:
+        raise ExportRefused([f"{bundle.episode_id}: pose.npz has no 'intrinsic' (3, 3) for E-A"])
+    span = stop - start
+    transforms = {CAMERA: np.asarray(pose["camera"][start:stop], dtype=np.float32)}
+    for side in HANDS:
+        transforms[f"{side}Hand"] = np.asarray(pose[f"{side}_wrist"][start:stop], np.float32)
+        tips = np.asarray(pose[f"{side}_tips"][start:stop], dtype=np.float32)
+        for k, tip in enumerate(TIPS):
+            frame = np.tile(np.eye(4, dtype=np.float32), (span, 1, 1))
+            frame[:, :3, 3] = tips[:, k]
+            transforms[f"{side}{tip}"] = frame
+    intrinsic = np.asarray(pose["intrinsic"], dtype=np.float32)
+    return {name: transforms[name] for name in (*JOINTS, CAMERA)}, intrinsic
 
 
 def write_hdf5(
