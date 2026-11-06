@@ -16,6 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from flywheel.contracts.artifacts import Episode
+from flywheel.data.annotate.deid.gate import annotate_allowed, require_annotate
 from flywheel.data.ingest.egocentric.config import EgoConfig
 from flywheel.data.ingest.egocentric.episodes import (
     make_bundle,
@@ -62,5 +63,13 @@ def check_unchanged(source: EgoSourceRecord) -> None:
     if changed:
         raise ValueError(f"{len(changed)} files of {source.source_id} changed since ingest,"
                          f" e.g. {changed[0]}; ingest again")
+
+
+def gate_open(episode: Episode, source: EgoSourceRecord) -> bool:
+    return annotate_allowed(episode, source.source_detail, source.data_class, source.deid_waiver)
+
+
+def require_gate(episode: Episode, source: EgoSourceRecord) -> None:
+    require_annotate(episode, source.source_detail, source.data_class, source.deid_waiver)
 
 

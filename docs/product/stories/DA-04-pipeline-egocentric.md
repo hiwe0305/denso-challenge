@@ -30,7 +30,7 @@ Là kỹ sư dữ liệu, tôi muốn video egocentric của người đi qua c�
 ## Nhiệm vụ
 
 - [x] 1. Ingest tập con EgoDex, hash, nguồn (AC 1)
-- [ ] 2. Che danh tính và chặn `raw` (AC 2)
+- [x] 2. Che danh tính và chặn `raw` (AC 2)
 - [ ] 3. Cắt đoạn và nhãn ngôn ngữ (AC 3)
 - [ ] 4. Pose E-B đọc từ EgoDex (AC 4)
 - [ ] 5. Pose E-A ước lượng từ RGB, so với E-B (AC 4, 5)
