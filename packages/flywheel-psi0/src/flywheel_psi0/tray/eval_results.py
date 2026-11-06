@@ -6,9 +6,11 @@ already finished after a gap runs again; rollouts are not reproducible on EGL
 (docs/he/tray.md 13.2), so the later rollout may differ. It is counted as an extra
 rollout and never chosen, whatever its outcome (main-session review of #147).
 
-Per level: episodes, successes, p and its bootstrap CI (the plan's `stats`), failure
-kinds, the pass rate of each of the scorer's seven steps (`scorer_steps` of the
-outcome rows, in order), and the yaw error of DA-38's traces: target_yaw (cmd) minus
+Per level: episodes, successes, p and its bootstrap CI (the plan's `stats`) next to a
+Wilson 95 % interval (the bootstrap CI collapses to a point at 0 or n successes),
+failure kinds, the pass rate of each of the scorer's seven steps (`scorer_steps` of the
+outcome rows, in order), how many steps each rollout reached in a row from the first
+(the scorer latches steps in order), and the yaw error of DA-38's traces: target_yaw (cmd) minus
 base yaw (meas), raw and wrapped to [-pi, pi]. The headline is the levels marked
 `headline` in the plan, pooled, with the bootstrap resampling inside each level
 (docs/he/tray.md 8.2); level 0 is resampled by replicate the same way. Rule 0 of the
@@ -41,6 +43,7 @@ STEP_NAMES = ("approach_a", "grasp", "lift", "carry", "reach_b", "place", "relea
 RULE0_P = 0.10  # tier 2 rule 0: p_C < 10% on the headline levels
 YAW = 6  # index of yaw in TraceStep.cmd_lower / meas_lower (flywheel.contracts.trace)
 YAW_LARGE = 2.5  # rad, the threshold the yaw counts are reported against
+Z95 = 1.959963984540054  # two-sided 95 % normal quantile, for the Wilson interval
 
 
 @dataclass(frozen=True)
@@ -93,6 +96,26 @@ def bootstrap_ci(
     return float(np.quantile(means, tail)), float(np.quantile(means, 1 - tail))
 
 
+def wilson(k: int, n: int, z: float = Z95) -> tuple[float, float]:
+    """Wilson score interval of k successes in n trials."""
+    if n == 0:
+        raise ValueError("no trials")
+    p = k / n
+    centre = (p + z * z / (2 * n)) / (1 + z * z / n)
+    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
+    return max(0.0, centre - half), min(1.0, centre + half)
+
+
+def reached(steps: Sequence[bool]) -> int:
+    """Steps passed in a row from the first."""
+    n = 0
+    for passed in steps:
+        if not passed:
+            break
+        n += 1
+    return n
+
+
 def wrap(angle: float) -> float:
     return math.atan2(math.sin(angle), math.cos(angle))
 
@@ -136,12 +159,14 @@ def level_summary(rollouts: Sequence[Rollout]) -> dict[str, Any]:
         "n": len(rollouts),
         "successes": sum(success),
         "p": sum(success) / len(rollouts) if rollouts else None,
+        "wilson": wilson(sum(success), len(success)) if rollouts else None,
         "failures": dict(Counter(r.row["failure"] for r in rollouts if not r.row["success"])),
         "step_pass": {
             name: (sum(bool(s[k]) for s in known) / len(known) if known else None)
             for k, name in enumerate(STEP_NAMES)
         },
         "steps_unknown": len(steps) - len(known),
+        "reached": dict(sorted(Counter(reached(s) for s in known).items())),
     }
 
 
@@ -175,10 +200,13 @@ def summarize(
     groups = [[int(bool(r.row["success"])) for r in by_level[lv]] for lv in headline_levels]
     if all(groups):
         headline["ci"] = bootstrap_ci(groups, stats.resamples, stats.seed, stats.ci)
+    everything = level_summary(chosen)
+    everything["levels"] = [c.level for c in plan.eval.by_level]
     p = headline["p"]
     result: dict[str, Any] = {
         "levels": levels,
         "headline": headline,
+        "all": everything,
         "rule0": {"threshold": RULE0_P, "p": p, "fires": p is not None and p < RULE0_P},
         "rollouts": len(chosen),
         "missing": [list(m) for m in missing],
@@ -208,19 +236,22 @@ def table(result: dict[str, Any]) -> str:
         return "–" if x is None else f"{100 * x:.1f}"
 
     lines = [
-        "| Mức | n | Thành công | p (%) | CI 95 % (%) | "
+        "| Mức | n | Thành công | p (%) | CI bootstrap (%) | Wilson 95 % (%) | "
         + " | ".join(STEP_NAMES)
         + " | Loại lỗi |",
-        "|---" * (6 + len(STEP_NAMES)) + "|",
+        "|---" * (7 + len(STEP_NAMES)) + "|",
     ]
     rows = [(k, v) for k, v in result["levels"].items()]
     rows.append(("1–2 gộp", result["headline"]))
+    rows.append(("cả lô", result["all"]))
     for name, s in rows:
         ci = s.get("ci")
         ci_text = "–" if ci is None else f"{pct(ci[0])}–{pct(ci[1])}"
+        w = s.get("wilson")
+        wilson_text = "–" if w is None else f"{pct(w[0])}–{pct(w[1])}"
         failures = ", ".join(f"{k} {v}" for k, v in sorted(s["failures"].items()))
         lines.append(
-            f"| {name} | {s['n']} | {s['successes']} | {pct(s['p'])} | {ci_text} | "
+            f"| {name} | {s['n']} | {s['successes']} | {pct(s['p'])} | {ci_text} | {wilson_text} | "
             + " | ".join(pct(s["step_pass"][n]) for n in STEP_NAMES)
             + f" | {failures or '–'} |"
         )
