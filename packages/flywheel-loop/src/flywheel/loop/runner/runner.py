@@ -99,9 +99,9 @@ class Runner:
         job_dir.mkdir(parents=True)
 
         # Call simulator rollout (timing and latency profile passed directly in request)
-        result = self.simulator.rollout(request, policy).model_copy(
-            update={"timing": request.timing}
-        )
+        result = self.simulator.rollout(request, policy)
+        # Validated, not model_copy'd: a sync result must carry no timing verdict.
+        result = RolloutResult.model_validate({**result.model_dump(), "timing": request.timing})
 
         # In async mode the RTC log is part of the result: without a log that holds up,
         # the rollout says nothing about latency and must not count as a pass.
@@ -182,7 +182,7 @@ class Runner:
             starved = schedule["starved_steps"]
             verdict = "starved" if starved > self.config.max_starved_steps else "ok"
             update = {"timing_verdict": verdict, "starved_steps": starved}
-        return result.model_copy(update=update)
+        return RolloutResult.model_validate({**result.model_dump(), **update})
 
     def run_eval(
         self,
