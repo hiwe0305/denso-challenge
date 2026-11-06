@@ -1,0 +1,106 @@
+# Egocentric pipeline (DA-04): pinned EgoDex subset, de-identification waiver,
+# segmentation rules, QA thresholds, E-A estimation and labelling models.
+# Every number not measured on data is marked "giả định" (assumption) with its source.
+# `threshold_version` of each egocentric QAReport is `version` and the first 12 hex
+# of the sha256 of this file's bytes.
+version: ego-1
+
+sources:
+  egodex:
+    # Q-27H: the pick-and-place tasks of DA-30's sample (2 lowest episodes per task,
+    # test.zip of EgoDex, manifest in egodex-da30/manifest.json). 10 tasks, 20 episodes.
+    root: egodex-da30          # under the store root ($FW_ROOT, else ./fwdata)
+    split_dir: part1
+    episodes_per_task: 2
+    tasks:
+      - basic_pick_place
+      - insert_remove_cups_from_rack
+      - pick_place_food
+      - pick_up_and_put_down_case_or_bag
+      - put_in_take_out_glasses
+      - stack_unstack_bowls
+      - stack_unstack_cups
+      - stack_unstack_plates
+      - stock_unstock_fridge
+      - vertical_pick_place
+    license: CC-BY-NC-ND-4.0   # Apple EgoDex; Q-EGO-LIC still open (design 14)
+    data_class: public
+    layout: pick_place
+    embodiment_id: human_hands@egodex
+  ego_video:
+    # the team's own recordings: <root>/device.json + <root>/<task>/<i>.mp4
+    license: team-internal
+    data_class: internal
+    layout: two_table
+    embodiment_id: human_hands@ego_video
+
+segment:
+  smooth_frames: 5           # moving average of wrist speed and aperture
+  still_speed_m_s: 0.12      # wrist slower than this is a dwell; giả định, read off the 20 episodes 6/11/2026
+  min_dwell_frames: 3
+  min_path_m: 0.2            # a hand whose wrist travels less is not active; giả định
+  close_delta_m: 0.01        # aperture change across a dwell that tells grasp (-) from release (+); giả định
+  min_confidence: 0.3        # mean pose confidence in a dwell below this is ambiguous; giả định
+  min_gap_frames: 6          # two events closer than this are ambiguous; giả định
+  model_window_frames: 30    # frames either side of an ambiguous event shown to the model
+  model_frames: 8            # frames sampled from that window
+  walk_speed_rel: 0.3        # two_table: camera moving above this share of its peak speed; giả định
+  steps:
+    pick_place:
+      pick: "pick up the {object}"
+      place: "place the {object}"
+    two_table:
+      approach: "reach for the {object} on the first table"
+      grasp: "grasp the {object}"
+      walk: "walk to the other table holding the {object}"
+      arrive: "stop at the other table"
+      place: "place the {object} on the table"
+      release: "release the {object} and step back"
+
+qa:
+  # check: threshold and what failing it does. Values are fractions of frames unless
+  # named otherwise; a check fails when its value is above the threshold, except
+  # min_frames (below).
+  min_frames: {threshold: 30, on_fail: reject}                 # 1 s at 30 Hz; giả định
+  video_frames: {threshold: 0, on_fail: reject}                # |frames of the mp4 - frames of the pose|
+  pose_finite: {threshold: 0.0, on_fail: reject}               # share of frames whose camera pose is not finite
+  pose_low_confidence: {threshold: 0.5, on_fail: flag, below: 0.3, when_missing: flag}  # giả định
+  hand_out_of_frame: {threshold: 0.3, on_fail: flag}           # no wrist inside the image; giả định
+  camera_jitter_deg_s: {threshold: 60.0, on_fail: flag}        # RMS high-pass angular speed; giả định
+  instruction: {threshold: 0.0, on_fail: reject}               # 1 when the episode has no sentence
+  segments: {threshold: 0.0, on_fail: reject}                  # 1 when no segment, or segments overlap or leave the episode
+  segment_ambiguous: {threshold: 0.0, on_fail: flag}           # share of events the rule could not settle, no model or person
+  deid_gate: {threshold: 0.0, on_fail: reject}                 # 1 when raw and not waived
+
+pose_ea:
+  # E-A job (estimate_job.py on rtx3060): MediaPipe Hands + OpenCV monocular VO.
+  mediapipe_model: hand_landmarker.task   # float16, storage.googleapis.com/mediapipe-models
+  vo_features: 1500
+  vo_min_flow_px: 1.0        # below this median flow, rotation only; giả định
+  vo_step_m: 0.005           # translation per frame when moving: monocular VO has no scale; giả định (0.15 m/s)
+  max_side_px: 960           # frames are downscaled for MediaPipe and VO
+
+models:
+  # D6: rules first; RoboBrain suggests step boundaries when rules are ambiguous and
+  # writes each segment's sentence; Molmo2 points at the grasp. OpenAI-compatible
+  # endpoints with images. `served` is the name the endpoint knows the model by:
+  # on rtx3060 Ollama 0.32.14 serves the Q4_K_M GGUF builds (6/11/2026); `revision`
+  # is the commit of that GGUF repo on Hugging Face.
+  segment_suggester:
+    name: BAAI/RoboBrain2.5-4B
+    served: hf.co/mradermacher/RoboBrain2.5-4B-GGUF:Q4_K_M
+    revision: 4967565e14c91e2d14a762f1ec18b4f1a1703786
+  labeler:
+    name: BAAI/RoboBrain2.5-4B
+    served: hf.co/mradermacher/RoboBrain2.5-4B-GGUF:Q4_K_M
+    revision: 4967565e14c91e2d14a762f1ec18b4f1a1703786
+  grasp_pointer:
+    name: allenai/Molmo2-4B
+    served: allenai/Molmo2-4B
+    revision: 042abfa7a38879a376cec03d949eff0aefaa0600
+  timeout_s: 180
+  max_image_side_px: 640
+
+review:
+  sample_share: 0.2          # share of segments a person reviews; giả định
+  seed: 7
