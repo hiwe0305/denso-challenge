@@ -2,6 +2,7 @@
 
     fw agentqa run --input <dir|file> ... --out <dir>      reports, pages, figures, estimates
         [--record replies.jsonl | --replay replies.jsonl]  keep or reuse the model's replies
+        [--vision --image <png> ...]                       Qwen3.5-4B second pass (task 6)
     fw agentqa review --reports <reports.jsonl> --report-id <id> --reviewer <name>
         --decide find_001=agree --decide find_002=override:"reason"   writes AgentReview
     fw agentqa html --reports <reports.jsonl> --out <dir> [--reviews <dir>]
@@ -56,6 +57,8 @@ def run_command(
     config: Path = typer.Option(DEFAULT_AGENT_CONFIG, "--config"),
     record: Path | None = typer.Option(None, "--record", help="Append model replies here."),
     replay: Path | None = typer.Option(None, "--replay", help="Use recorded replies."),
+    vision: bool = typer.Option(False, "--vision", help="Second pass with the vision model."),
+    images: list[Path] = typer.Option([], "--image", help="Image for the vision pass."),
     store: Path | None = typer.Option(None, "--store"),
 ) -> None:
     for stream in (sys.stdout, sys.stderr):
@@ -70,7 +73,10 @@ def run_command(
             model = load_endpoint("agent", config)
             if record is not None:
                 model = RecordingModel(model, record)
-        result = run_agentqa(inputs, out, model, agent_config, store=store)
+        enabled = vision or bool((agent_config.raw.get("vision") or {}).get("enabled"))
+        vision_model = load_endpoint("vision", config) if enabled else None
+        result = run_agentqa(inputs, out, model, agent_config, vision_model=vision_model,
+                             images=images, store=store)
     except (OSError, ValueError, KeyError) as exc:
         _fail(str(exc))
         return

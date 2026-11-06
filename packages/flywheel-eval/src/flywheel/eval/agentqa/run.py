@@ -48,6 +48,7 @@ from flywheel.eval.agentqa.estimates import record_estimates
 from flywheel.eval.agentqa.facts import Analysis
 from flywheel.eval.agentqa.html import render_index, render_report
 from flywheel.eval.agentqa.inputs import InputSet, Loaded, collect
+from flywheel.eval.agentqa.vision import observe
 from flywheel.eval.api import DEFAULT_SYSTEM_CONFIG, DEFAULT_TRAIN_CONFIG
 from flywheel.store.ledger_append import append_ledger_entry
 from flywheel.store.paths import StorePaths
@@ -142,6 +143,8 @@ def run(
     model: ChatModel,
     config: AgentConfig,
     *,
+    vision_model: ChatModel | None = None,
+    images: Sequence[Path] = (),
     train_config: Path = DEFAULT_TRAIN_CONFIG,
     system_config: Path = DEFAULT_SYSTEM_CONFIG,
     store: Path | None = None,
@@ -166,6 +169,9 @@ def run(
         pages: list[tuple[str, AgentReport]] = []
         for n, analysis in enumerate(analyses, start=1):
             analysis.figures = _figures(analysis, found, out / "figures", n)
+            if vision_model is not None and images:
+                observe(analysis, [(p, p.as_posix()) for p in images], vision_model,
+                        int((config.raw.get("vision") or {}).get("max_images", 6)))
             report = run_agent(analysis, model, config, now=now)
             result.reports.append(report)
             page = f"{n:03d}-{analysis.stage}.html"
