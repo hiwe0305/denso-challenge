@@ -129,6 +129,8 @@ Quy tắc cho bản 2, thay mục 2 (theo nhánh "khác nhau" của review):
 | Nhiễu của policy | **[Đã chốt]** (Hiếu, 4/11/2026): gieo nhiễu theo từng episode, từ seed điều kiện lúc reset (mục 8.5). Nhờ vậy ghép cặp giữa các nhánh là ghép thật, và chạy lại riêng một episode cho ra đúng nó. Ở mức 0, các lượt lặp có seed điều kiện khác nhau, nên là lượt lặp có kiểm soát |
 | Phân bổ 270 lượt **[Đã chốt]** (Hiếu, 4/11/2026) | Mức 0: 30 lượt lặp. Mức 1 và 2: mỗi mức 120 seed dev (1 000 100–1 000 219). Tổng vẫn 270 episode mỗi nhánh, 240 cảnh khác nhau cho chỉ số chính. Nửa độ rộng CI ước lượng khoảng ±7,5 điểm (quy theo căn bậc hai từ số Monte Carlo ở mục 7, chưa chạy lại) |
 
+**Sửa 6/11/2026 (mục 13.2, change log).** Câu "chạy lại riêng một episode cho ra đúng nó" ở hàng "Nhiễu của policy" **không đúng** khi render bằng EGL trên `rtx3060`. Câu cũ giữ nguyên ở trên. Server đã tất định: cùng request và cùng seed cho cùng reply. Nhưng ảnh reset của client lệch 13/230400 pixel, mỗi pixel 1 mức, nên một rollout không lặp lại được. Ghép cặp theo điều kiện giữa các nhánh vẫn đúng **theo cảnh**: cùng seed, cùng mức, cùng cảnh dựng lại. Ghép cặp không đúng theo từng rollout. Chạy lại một episode do lỗi hạ tầng sẽ cho một rollout mới của cùng điều kiện. **[Đã chốt 6/11/2026, Hiếu]**: chạy tiếp, ghi giới hạn, không đổi quy tắc đọc.
+
 **Decision 4/11/2026 (Hiếu):** (1) eval tray ở thời gian sim; (2) mức 0 là lượt lặp của một cảnh, báo riêng; chỉ số chính từ mức 1–2; phân bổ 30 / 120 / 120; nhiễu gieo theo episode từ seed điều kiện. Đây là thay đổi trước khi chạy bất kỳ job nào, nên vào RunPlan mới `he-tray-v2.yaml`. Quy tắc ở mục 2 của bản 1 và quy tắc ở đây đều được báo cáo. `he-tray-v2.yaml` đóng băng khi có kho dữ liệu (nhiệm vụ con 1.7–1.8). Train chờ kết quả điều tra cú nhảy cổ tay của DA-33.
 
 ### 8.3 Cột `index` của release (điểm 2)
@@ -368,3 +370,71 @@ ssh rtx3060 'cd denso-da34-pool/fwdata/tray/runs/da34-t2-ft-c-s0 && sha256sum -c
 
 Giả định của ước lượng, chưa đo: tải bản cắt lên VM (khoảng 1,3 GB, 160/541 của 4,5 GB) với tốc độ không dưới 6 MB/s của `probe`, tức tối đa khoảng 4 phút. Tốc độ tải lên chưa đo; `probe` chỉ đo chiều kéo về.
 
+
+## 13. Nhiệm vụ 3: eval C (6/11/2026)
+
+_Chạy trên `rtx3060`, 0 CU. Story [DA-34](../product/stories/DA-34-thi-nghiem-egocentric-khay.md) nhiệm vụ con 3.2–3.4. Mọi số của eval C là **sơ bộ, trên dev**._
+
+### 13.1 Khởi chạy
+
+| Mục | Giá trị |
+|---|---|
+| Mã | master `2e57f60`, tức #147 squash: [`eval_set`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/eval_set.py), [`act_log`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/act_log.py), [`eval_driver`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/eval_driver.py), [`eval_batch`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/eval_batch.py). `git archive` vào `~/denso-da34-master-2e57f60` |
+| Kiểm lúc khởi chạy | `runplan check he-tray-v2.yaml --release … --launch`: "rp_a04c14e79dfd, 270 eval conditions, launch OK", mã 0, 2026-11-06T03:17:33Z |
+| Điều kiện | `eval_set` dựng 3 dataset LeRobot một khung mỗi episode, từ `eval.by_level` của plan. `conditions.sha256` = `b9c38b37…`. Bản dựng bằng mã master giống từng byte bản dựng trước (284 file). Env khay dựng lại cảnh chỉ từ `tray.sample` (seed, mức) |
+| Checkpoint | C `ckpt_40000` của `da34-t2-ft-c-s0` (mục 12). Danh sách sha256 432 file qua trên `rtx3060`. `fetched.json` báo `final: false`, `train: failed`: đây là race của `stage` đã ghi ở story 2.3, `result.json` ok ở bước 40 000. Lệch với điều kiện "chỉ chuyển khi `fetched.json` báo `final`" của mục 12; chuyển vì sha256 khớp |
+| Server | `scripts/g0/serve_psi0.sh serve` (launcher gieo nhiễu theo episode), image `psi0@sha256:0d580125…`, `127.0.0.1:22185`, 7,2 GB VRAM |
+| Lô | Bắt đầu 2026-11-06T03:17:58Z. **1 worker**, scope `MemoryMax=8G`. 27 lô 10 episode: mức 1 và 2 xen kẽ, mức 0 cuối **[Đã chốt 6/11/2026, Hiếu]**. Mỗi lô gồm một client `eval_driver` và một proxy `act_log`. Episode thiếu chạy lại tối đa 3 lần |
+| Vì sao 1 worker | Server Ψ₀ `serve_psi0_simple` tại `cda3fdf` giữ **một** trạng thái RTC (`previous_action`) cho mọi client. Client của SIMPLE không gửi `session_id`, nên hai client chạy song song trên cùng server sẽ dùng chung trạng thái đó mà không báo lỗi. Server thứ hai không vừa GPU 12 GB |
+| Log cho Agent QA/QC | Trong `~/denso-da34-pool/fwdata/tray/eval/eval-c-rp_a04c14e79dfd/<lô>/attempt-<k>/` (không commit): `requests.jsonl` (mọi request), `outcomes.jsonl` (mọi episode, có `scorer_steps`), `traces/` (trace DA-38 từng chu kỳ), `eval/` (thống kê của SIMPLE), `data/evals/…` (video). Mỗi lần chạy một lô ghi một dòng vào `runs.jsonl` ở thư mục gốc |
+
+### 13.2 Kiểm tất định (mục 8.5): hỏng
+
+Cùng checkpoint C, 3 điều kiện mức 0, mỗi điều kiện 2 lượt, thời gian sim, EGL. Thời điểm: 2026-11-06T01:50–02:11Z.
+
+| Seed | Lượt 1 | Lượt 2 |
+|---|---|---|
+| 1 000 100 | `L-PLACE-POSE`, 5/7 bước, khay ở x = −1,21 (bàn B) | `L-TRAY-TILT`, 3/7, khay ở x = +0,72 (gần bàn A) |
+| 1 000 101 | `L-TIMEOUT`, 3/7, x = +0,73 | `L-TRAY-TILT`, 5/7, x = −0,46 |
+| 1 000 102 | `L-TRAY-TILT`, 5/7, x = −1,19 | `L-TRAY-TILT`, 5/7, x = −0,49 |
+
+Khoanh nguyên nhân:
+
+- **Server tất định.** Một request cố định (reset + seed) gửi 3 lần cho cùng hash action. Seed khác cho hash khác; gửi lại seed cũ thì hash cũ trở lại.
+- **Ảnh reset của client không tất định dưới EGL.** Ảnh `head_stereo_left` đầu tiên của hai lượt lệch nhau 13/230 400 pixel (39 giá trị kênh), mỗi giá trị lệch 1 mức, ở hàng 320–323, cột 276–282. State gửi lên giống hệt. Reply đầu tiên vì thế đã khác, rồi vòng kín tách hẳn.
+- **OSMesa (render CPU) không dùng được.** 364 s tới request `/act` đầu tiên, 54 s mỗi request, so với 0,83 s khi dùng EGL. Cả lô sẽ mất nhiều tuần.
+
+Hệ quả: xem đoạn sửa ở mục 8.2. Quy tắc đọc của mục 9 không đổi.
+
+### 13.3 Chạy thử và thời gian
+
+| Lượt | Kết quả | Thời gian |
+|---|---|---|
+| Thử 2 mức 1 + 2 mức 2 (02:28–02:43Z) | 4/4 hỏng: `L-PLACE-POSE` 1, `L-TIMEOUT` 3. Không có lỗi hạ tầng | 200–220 s tường mỗi episode hỏng, tính cả khởi động. Client 3,5 GB RSS, khoảng 2,9 lõi. `/act` trung vị 0,38–0,41 s, 188 request mỗi episode, đều 200 |
+| Kiểm trước PR #147, 1 episode mức 1 (02:54Z) | `L-PLACE-POSE`, 5/7 bước, mã 0, trace 7,1 MB, 2 video | 349 s, lúc máy tải 35: một `llama-server` của ollama (không thuộc đội) dùng khoảng 12 lõi và 84 % GPU. Latency server tăng khoảng 55 %, phần client tăng khoảng 52 % |
+| 2 episode đầu của lô (03:18Z) | 2/2 hỏng | 188–189 s mỗi episode, máy rảnh. Ước lượng cả lô khoảng 14,4 giờ |
+
+Episode hỏng chạy đủ 4 664 bước env (93,3 s sim). Client SIMPLE `b75c678` khi chạy 1 worker thoát mã 1 sau episode cuối, do thanh tiến trình in vào luồng đã đóng; mọi outcome đã ghi xong trước đó. `eval_batch` đặt `DEBUG=1` để tắt thanh tiến trình (như [trace.md](../g0/trace.md) mục 1).
+
+### 13.4 Yaw và hướng đi (R3 của DA-38): số đo, chưa kết luận
+
+Đo trên 4 episode chạy thử, mỗi 1 s sim: yaw của pelvis và `navigate_cmd` (chiều 32–35: vx, vy, vyaw, `target_yaw`).
+
+- Robot quay khoảng π rồi đi về bàn B ở cả 4 episode: pelvis x đi từ +0,45 xuống −0,8…−0,9. Ở 3/4 episode, khay vẫn nằm ở bàn A.
+- `target_yaw` của Ψ₀ không wrap về [−π, π]: có lúc lên tới +3,56 rad. Khi yaw đo qua ±π, yaw đo là −3,13 còn `target_yaw` là +3,19. Hiệu thô khoảng 6,3 rad; sau khi wrap chỉ khoảng 0,04 rad.
+- 78 mẫu có hiệu thô trên 2,5 rad (56 + 7 + 4 + 11). Bỏ 8 mẫu có lệnh cũ của episode trước (vết của phép đo ghi trước request đầu tiên của episode), không mẫu nào có hiệu sau wrap trên 2,5 rad. Hiệu sau wrap lớn nhất là 1,25 rad, lúc đang quay; `target_yaw` đi trước yaw đo 0,3–0,5 rad.
+
+Cách đọc **[Đề xuất]**, chưa kiểm ở mã của DA-13: nhãn R3 "`target_yaw` gần ngược yaw đo" có thể do bộ chẩn đoán so yaw mà không wrap góc. Việc kiểm thuộc DA-13. Trace từng chu kỳ của eval C (`traces/`) là đầu vào cho việc đó.
+
+### 13.5 Giới hạn ghi cạnh mọi số của eval C
+
+- Rollout không lặp lại được (mục 13.2). Episode chạy lại do hạ tầng là một rollout mới. Bộ đọc kết quả lấy lần xong sớm nhất của mỗi episode, đếm số rollout thừa, và không bao giờ chọn giữa các lần.
+- `fetched.json` báo `final: false` do race (mục 13.1); checkpoint đủ và sha256 khớp.
+- Cờ bước của scorer chỉ tính theo thứ tự, bắt đầu từ `approach_a` (hai lòng bàn tay trên tay cầm, trước mép bàn A). Một episode mang khay sang bàn B mà không qua `approach_a` có 0/7 bước. Tỉ lệ qua từng bước đọc theo định nghĩa này.
+- 1 worker, đồng hồ sim. Thời gian tường phụ thuộc tải của máy, nhưng kết quả thì không (mục 8.1).
+
+## Change log
+
+| Ngày | Nội dung | Người |
+|---|---|---|
+| 6/11/2026 | Mục 8.2: sửa câu "chạy lại riêng một episode cho ra đúng nó" (sai dưới EGL), câu cũ giữ nguyên. Thêm mục 13: khởi chạy eval C, kiểm tất định hỏng (ảnh reset EGL lệch 13/230 400 pixel), chạy thử và thời gian, số đo yaw, giới hạn. Quyết định của Hiếu ngày 6/11: chạy tiếp và ghi giới hạn; đủ 270, mức 1–2 trước; 1 worker. Khối quy tắc mục 9 không đổi | Hiếu (soạn với Claude) |
