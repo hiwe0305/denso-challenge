@@ -31,7 +31,7 @@ import {
   SkippedList,
   SystemVerdictChip,
 } from "../ui/components";
-import { fmt } from "../ui/labels";
+import { fmt, rolloutTimingLabel } from "../ui/labels";
 
 /** Scorer disagreeing with the simulator by more than this means the scorer is broken. */
 export const SCORER_GAP_WARNING = 0.05;
@@ -412,6 +412,33 @@ function EpisodeDetail({ episode, check }: { episode: EvalEpisodeRow; check: Sys
           <SkippedList items={check.skipped.map((k) => ({
             source: "system_check" as const, code: k.code, reason: k.reason, eval_episode_id: null,
           }))} />
+          <p className="text-xs text-slate-500" data-testid="rollout-timing">
+            Rollout: {rolloutTimingLabel[check.timing ?? "unknown"]}
+          </p>
+          {check.recorded.length + check.recorded_skipped.length > 0 ? (
+            // Decision (a) of 5/11/2026: shown so the latency is not lost, but
+            // apart from the verdict, because it decides nothing.
+            <div className="rounded border border-slate-200 bg-slate-50 p-2 text-xs" data-testid="recorded-checks">
+              <p className="font-semibold text-slate-600">Ghi nhận, không quy lỗi</p>
+              <ul className="mt-1 space-y-0.5">
+                {check.recorded.map((f, i) => {
+                  const r = f as { code: string; value?: number; threshold?: number | null };
+                  return (
+                    <li key={`r${i}`}>
+                      <span className="font-mono">{r.code}</span>{" "}
+                      <span className="tabular-nums">{fmt(r.value, 3)}</span>
+                      {r.threshold != null ? <span className="text-slate-500"> / ngưỡng {fmt(r.threshold, 3)}</span> : null}
+                    </li>
+                  );
+                })}
+                {check.recorded_skipped.map((k) => (
+                  <li key={`s${k.code}`}>
+                    <span className="font-mono">{k.code}</span> <span className="text-slate-500">không đo được: {k.reason}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       )}
     </div>

@@ -125,6 +125,10 @@ export interface RawSystemDiagnosis {
   findings: Array<Record<string, unknown> & { code: string }>;
   skipped: Array<{ code: string; reason: string }>;
   measurements: Record<string, unknown>;
+  // DESIGN.md 0.5 (PR #146). Optional: rows written before it do not carry them.
+  timing?: "sync" | "async" | null;
+  recorded?: Array<Record<string, unknown> & { code: string }>;
+  recorded_skipped?: Array<{ code: string; reason: string }>;
 }
 
 export interface RawEvaluation {

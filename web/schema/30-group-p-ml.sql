@@ -277,8 +277,13 @@ WHERE sim_success IS NOT TRUE AND infra_status = 'ok';
 -- NULL, mọi truy vấn `WHERE latency_p99_ms > τ` bỏ qua nó, và nó đọc ra
 -- không có lỗi độ trễ — đúng silent pass FR21 cấm.
 --
--- Nguồn: `SystemDiagnosisRecord` của `flywheel.eval.diagnosis.system.artifact`
--- (DA-13, PR #71). Kiểu contract chờ issue #70.
+-- Nguồn: `SystemDiagnosis` của `flywheel.contracts.diagnosis` (issue #70), mà
+-- `SystemDiagnosisRecord` của DA-13 khớp từng trường.
+--
+-- Bản 0.5: `timing`, `recorded`, `recorded_skipped` theo PR #146. Quyết định
+-- (a) của PO (5/11/2026): trên rollout đồng bộ, R1 và R2 vẫn đo nhưng chỉ ghi
+-- nhận, không quy lỗi. Chúng nằm ở hai cột riêng để C17 vẫn đúng nguyên văn:
+-- `clean` cạnh R1, R2 ghi nhận là hợp lệ, vì hai mã đó không quyết định nhãn.
 CREATE TABLE system_diagnoses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   eval_episode_id UUID NOT NULL REFERENCES eval_episodes(id),
@@ -294,6 +299,12 @@ CREATE TABLE system_diagnoses (
   -- Số để M6 hiện dù không mã nào nổ ngưỡng: sai số bám lệnh theo nhóm, độ
   -- trễ p99, lệch đồng bộ. Giữ được ý của bản 0.2 mà không mất `skipped`.
   measurements JSONB NOT NULL DEFAULT '{}',
+  -- Chế độ rollout (bản 0.5). NULL là producer không nói, và không bao giờ
+  -- được đọc là đồng bộ (FR21): R1, R2 khi đó vẫn tính.
+  timing VARCHAR(8) CHECK (timing IN ('sync','async')),
+  -- R1, R2 của rollout đồng bộ: đã đo, giữ lại, không vào nhãn.
+  recorded JSONB NOT NULL DEFAULT '[]',
+  recorded_skipped JSONB NOT NULL DEFAULT '[]',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   -- Chấm lại dưới một file ngưỡng khác là một dòng mới, không ghi đè.
   UNIQUE (eval_episode_id, config_sha256),
@@ -306,7 +317,20 @@ CREATE TABLE system_diagnoses (
   CONSTRAINT c17_findings_imply_fault CHECK (
     jsonb_array_length(findings) = 0
     OR diagnosis NOT IN ('clean','unknown')),
-  CHECK (jsonb_typeof(findings) = 'array' AND jsonb_typeof(skipped) = 'array')
+  -- C20 (bản 0.5), ba luật của validator `SystemDiagnosis` (PR #146). Ghi
+  -- nhận chỉ có trên rollout đồng bộ; chỉ R1, R2 được ghi nhận; và rollout
+  -- đồng bộ không được vừa ghi nhận vừa tính R1, R2.
+  CONSTRAINT c20_recorded_only_on_sync CHECK (
+    timing = 'sync'
+    OR (jsonb_array_length(recorded) = 0 AND jsonb_array_length(recorded_skipped) = 0)),
+  CONSTRAINT c20_only_r1_r2_recorded CHECK (NOT jsonb_path_exists(
+    recorded || recorded_skipped, '$[*] ? (@.code != "R1" && @.code != "R2")')),
+  CONSTRAINT c20_sync_does_not_count_r1_r2 CHECK (
+    timing IS DISTINCT FROM 'sync'
+    OR NOT jsonb_path_exists(
+      findings || skipped, '$[*] ? (@.code == "R1" || @.code == "R2")')),
+  CHECK (jsonb_typeof(findings) = 'array' AND jsonb_typeof(skipped) = 'array'),
+  CHECK (jsonb_typeof(recorded) = 'array' AND jsonb_typeof(recorded_skipped) = 'array')
 );
 CREATE INDEX ON system_diagnoses (eval_episode_id, created_at DESC);
 CREATE INDEX ON system_diagnoses (diagnosis);

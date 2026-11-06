@@ -20,6 +20,9 @@ export type Findings = SystemFinding[];
 export type Code1 = string;
 export type Reason = string;
 export type Skipped = DiagnosisSkip[];
+export type Timing = ("sync" | "async") | null;
+export type Recorded = SystemFinding[];
+export type RecordedSkipped = DiagnosisSkip[];
 
 /**
  * One episode's system verdict, with unjudged checks and input hashes.
@@ -35,6 +38,9 @@ export interface SystemDiagnosis {
   infra_status?: InfraStatus;
   findings: Findings;
   skipped: Skipped;
+  timing?: Timing;
+  recorded?: Recorded;
+  recorded_skipped?: RecordedSkipped;
 }
 /**
  * One measured F-SYS fault; part identifies the body half for R3.

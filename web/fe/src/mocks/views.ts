@@ -536,6 +536,10 @@ export class MockViews {
       findings: s.findings,
       skipped: s.skipped,
       measurements: s.measurements,
+      // Unknown mode stays null, never sync (FR21); the lists default empty.
+      timing: s.timing ?? null,
+      recorded: s.recorded ?? [],
+      recorded_skipped: s.recorded_skipped ?? [],
       usable_as_policy_evidence: s.diagnosis === "clean",
       is_sealed: isSealed(ev, this.now()),
       origin: ORIGIN,

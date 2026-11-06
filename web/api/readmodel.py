@@ -608,6 +608,11 @@ class SinkReadModel:
             "findings": s["findings"],
             "skipped": s["skipped"],
             "measurements": s.get("measurements") or {},
+            # Bản 0.5: dòng nạp trước PR #146 không có ba cột này; mặc định
+            # là của hợp đồng, và timing None không bao giờ đọc là đồng bộ.
+            "timing": s.get("timing"),
+            "recorded": s.get("recorded") or [],
+            "recorded_skipped": s.get("recorded_skipped") or [],
             "usable_as_policy_evidence": s["diagnosis"] == "clean",
             "is_sealed": self._sealed(ev),
             "origin": s["origin"],

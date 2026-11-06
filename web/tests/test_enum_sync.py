@@ -156,11 +156,12 @@ def test_every_system_diagnosis_maps_to_a_cluster_diagnosis_or_is_excluded() -> 
 
 
 def test_step_status_is_the_four_strings_the_scorer_ships() -> None:
-    # DA-36 đã merge với đúng bốn chuỗi này. Test đọc thẳng enum của làn, nên
-    # nếu scorer đổi giá trị thì web biết ngay thay vì lệch âm thầm.
-    from flywheel.eval.scorer.status import StepStatus
+    # DA-36 đã merge với đúng bốn chuỗi này; từ #101 chúng là `Literal`
+    # `StepStatus` của hợp đồng. Test đọc thẳng kiểu đó, nên nếu hợp đồng đổi
+    # giá trị thì web biết ngay thay vì lệch âm thầm.
+    from flywheel.contracts import StepStatus
 
-    assert SPEC["step_status"] == tuple(status.value for status in StepStatus)
+    assert SPEC["step_status"] == typing.get_args(StepStatus)
 
 
 #: Hai test dưới đọc thẳng enum kiểm hệ thống của DA-13 (PR #71, đã merge).

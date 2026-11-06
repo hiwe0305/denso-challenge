@@ -14,6 +14,7 @@ export type Name = string;
 export type Version = string;
 export type ImageDigest = string | null;
 export type Nondeterminism = string[];
+export type Timing = ("sync" | "async") | null;
 export type TimingVerdict = ("ok" | "starved" | "not_checked") | null;
 export type StarvedSteps = number | null;
 
@@ -25,6 +26,7 @@ export interface RolloutResult {
   usage: ResourceUsage;
   camera_params_hash: CameraParamsHash;
   adapter_info: AdapterInfo;
+  timing?: Timing;
   timing_verdict?: TimingVerdict;
   starved_steps?: StarvedSteps;
 }

@@ -146,6 +146,9 @@ TOLERANT_COLUMNS: dict[str, frozenset[str]] = {
         {
             "eval_episode_ref", "diagnosis", "config_sha256", "trace_sha256",
             "infra_status", "findings", "skipped", "measurements",
+            # Bản 0.5 (PR #146): thiếu ba cột này thì đường khoan dung bỏ
+            # R1, R2 ghi nhận kèm log, và M6 không còn thấy độ trễ.
+            "timing", "recorded", "recorded_skipped",
         }
     ),
     "defect_scores": frozenset(
