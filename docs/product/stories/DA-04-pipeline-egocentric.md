@@ -5,7 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 27/10/2026) |
-| Người làm | Hưng |
+| Người làm | Hiếu, làm cùng Claude (từ 6/11/2026, thay Hưng; 07 bản 1.9) |
 | Làn | Dữ liệu |
 | Story PRD | 9.4 · Epic 9 · [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 5.0, 6.6 |
 | Nhãn | [Lõi] · `epic:9` · `gate:G1` · `area:data` |
@@ -65,7 +65,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Người phụ trách
 
-- Làm: Trần Ngọc Hưng
+- Làm: Dương Đình Hiếu, cùng Claude (từ 6/11/2026; trước đó Trần Ngọc Hưng)
 - Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
 
 ## Change log
@@ -75,6 +75,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 27/10/2026 | Tạo file story; trước đó DA-04 chỉ có trong bảng 07 mục 2.2. Mở lại theo quyết định ba loại dữ liệu (design 27/10 mục 1, câu 5–7) | PO (Hiếu) |
 | 27/10/2026 | Giao cho Hưng theo 07 mục 2.0 (bản 0.6) | PO (Hiếu) |
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
+| 6/11/2026 | Chuyển sang Hiếu làm cùng Claude theo [plan chia lại việc của Hưng](../../superpowers/plans/2026-11-06-hung-reassignment.md); bỏ bước che danh tính chỉ cho mẫu EgoDex công bố (D2); làm đủ mọi nhiệm vụ con (D3) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

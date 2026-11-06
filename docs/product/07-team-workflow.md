@@ -4,6 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Đầu vào
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 6/11/2026 | 1.9 | Chuyển DA-04, DA-18, DA-20 từ Hưng sang Hiếu, làm cùng Claude ([plan chia lại việc của Hưng](../superpowers/plans/2026-11-06-hung-reassignment.md), D1–D6). Mục 2.0: dòng Hưng, bảng dữ liệu đi giữa người; mục 2.1: đường dẫn egocentric và `agentqa/` (trừ `bench/`) sang Hiếu; mục 2.2: người làm ba story; mục 2.3, 2.4: tải và hạn. Bỏ bước che danh tính chỉ cho mẫu EgoDex công bố (D2) | PO (Hiếu) |
 | 4/11/2026 | 1.8 | Mục 2.2: thêm DA-39 (hợp đồng EvidenceCard, Hiếu, #82). Mục 2.4: thêm dòng DA-39, hạn 11/11 | PO (Hiếu) |
 | 3/11/2026 | 1.7 | Mục 3.2 luật 5: story thêm phụ thuộc ghi `uv.lock` vào Phạm vi file để pr-guard cho qua; chỉ nhận dòng do `uv lock` sinh, gói mới vào khóa thì nêu trong mô tả PR (chốt khi review #58) | PO (Hiếu) |
 | 3/11/2026 | 1.6 | Rút Thông khỏi S1-07, DA-02, DA-03, DA-17, DA-21, DA-27 và vai Scrum Master theo quyết định PO ([plan chia lại việc](../superpowers/plans/2026-11-03-thong-reassignment.md), Q1–Q6). Mục 2.0: việc của Thông sang Hiếu, `DefectManifest` đi tới Châu (DA-31, theo bản 1.0); mục 2.1: đường dẫn của Thông sang Hiếu; mục 2.2: chủ, phạm vi, giờ của DA-02, DA-03, DA-17, DA-27 theo plan mục 5, DA-21 chưa có chủ; mục 2.3, 2.4: tải và hạn mới; mục 4: bản tin tuần do Hiếu | PO (Hiếu) |
@@ -46,12 +47,13 @@ Năm người cùng dùng Claude trên một repo thì xung đột đến từ b
 | **Long** | **Nhân và Vòng quyết định**: hợp đồng, kho, bộ giả, CLI, test e2e, công cụ repo và CI; RunPlan, runner, decide, acquisition, gate, holdout, sổ chi phí, báo cáo, HD; kịch bản demo | S1-08, PR `chore-restructure`, S1-10, DA-01, DA-25, DA-23, DA-28; story Epic của `runner`, `ledger`, `gate`, `decide`, `acquisition`, `reports`, HD, thống kê, backup | khoảng 70, cộng story Epic |
 | **Thông** | **Rút khỏi phân công ngày 3/11/2026** theo quyết định PO (bản 1.6). Lý do và số liệu: [plan chia lại việc](../superpowers/plans/2026-11-03-thong-reassignment.md) mục 1. Phần dữ liệu robot và vai Scrum Master chuyển sang Hiếu; DA-21 chưa có chủ, sau 13/11 | — | — |
 | **Hưng** | **Dữ liệu egocentric và Agent QA/QC**: pipeline egocentric (che danh tính, cắt đoạn, pose, QA, export stage 1), model phụ trợ gán nhãn và vòng thử; Agent QA/QC và bộ chấm lỗi cấy | DA-04, DA-18, DA-20, DA-31 | khoảng 75 |
+| | **Bản 1.9 (6/11/2026):** DA-04, DA-18, DA-20 chuyển sang Hiếu, làm cùng Claude; DA-31 đã sang Châu từ bản 1.0. Lý do và số liệu: [plan chia lại việc của Hưng](../superpowers/plans/2026-11-06-hung-reassignment.md) mục 1. Hưng còn giữ việc gì do PO quyết, chưa ghi ở đây | — | — |
 | **Châu** | **Đánh giá**: tập điều kiện và chia tập, TaskDefinition và scorer của task hai bàn, chuỗi chẩn đoán, phát hiện lỗi train và offline, quy lỗi về stage, evidence card | DA-08, DA-13; story Epic `scenarios`, `scorer`, `diagnosis`, `cards` | khoảng 20, cộng story Epic (phần lớn tải của Châu) |
 | **Hiếu** | **Phần còn lại**: SIMPLE, Ψ₀, ACT, DP, mọi job GPU, thí nghiệm HE, thiết bị bàn phím, sinh tự động S1 và S2, probe; tài liệu, website; duyệt và merge. Bản 1.6: thêm **dữ liệu robot** (lớp phía làn của pipeline teleop và synthetic, phát lại action, release, export LeRobot v2.1, cấy lỗi) và vai Scrum Master, làm cùng Claude | S1-02, S1-03, S1-04, S1-05, S1-06, S1-09, S1-11, DA-09, DA-16, DA-19, DA-26, DA-29, DA-30, story 3.1a; bản 1.6: S1-07, DA-02, DA-03, DA-17, DA-27 | khoảng 230, cộng khoảng 28,5 của bản 1.6 và duyệt PR (mục 2.3) |
 
-Hưng không cần chạy SIMPLE: pipeline egocentric và Agent QA/QC code trên bộ giả và file mẫu; model phụ trợ và Nemotron chạy thật trên máy 3060 qua job.
+Hưng không cần chạy SIMPLE: pipeline egocentric và Agent QA/QC code trên bộ giả và file mẫu; model phụ trợ và Nemotron chạy thật trên máy 3060 qua job. Bản 1.9: phần này do Hiếu làm; job nhẹ chạy trên laptop, job không vừa laptop để lại runbook trong `docs/g0/egocentric.md`, `docs/g0/agent-qa.md`.
 
-**Dữ liệu đi giữa người** (chỉ qua artifact có schema, 03 mục 7.3; bản 1.6: phần của Thông do Hiếu giữ):
+**Dữ liệu đi giữa người** (chỉ qua artifact có schema, 03 mục 7.3; bản 1.6: phần của Thông do Hiếu giữ; bản 1.9: phần của Hưng do Hiếu giữ):
 
 | Từ | Tới | Artifact |
 |---|---|---|
@@ -93,17 +95,17 @@ Hưng không cần chạy SIMPLE: pipeline egocentric và Agent QA/QC code trên
 | `tests/e2e/` | Long | Hiếu |
 | `packages/flywheel-loop/` | Long | Châu |
 | `packages/flywheel-data/` trừ các đường dẫn egocentric dưới đây | Hiếu (bản 1.6, thay Thông) | Hưng |
-| `packages/flywheel-data/src/flywheel/data/ingest/egocentric/`, `annotate/deid/`, `qa/egocentric.py`, `export/egodex.py` và test tương ứng | Hưng | Hiếu (bản 1.6) |
+| `packages/flywheel-data/src/flywheel/data/ingest/egocentric/`, `annotate/deid/`, `qa/egocentric.py`, `export/egodex.py` và test tương ứng | Hiếu (bản 1.9, thay Hưng) | Long |
 | `packages/flywheel-eval/` trừ `agentqa/` | Châu | Hưng |
-| `packages/flywheel-eval/src/flywheel/eval/agentqa/` trừ `bench/`, và test tương ứng | Hưng | Châu |
+| `packages/flywheel-eval/src/flywheel/eval/agentqa/` trừ `bench/`, và test tương ứng | Hiếu (bản 1.9, thay Hưng) | Châu |
 | `packages/flywheel-eval/src/flywheel/eval/agentqa/bench/` và test tương ứng (DA-31, từ 3/11/2026) | Châu | Hưng |
 | `packages/flywheel-simple/`, `packages/flywheel-psi0/`, `packages/flywheel-lerobot/`, `packages/flywheel-nim/` | Hiếu | Long |
 | `configs/kernel/`, `configs/loop/` | Long | Hiếu |
 | `configs/runplans/` | Long viết công cụ, Hiếu viết và duyệt RunPlan | Châu |
 | `configs/data/` trừ `egocentric.yaml` | Hiếu (bản 1.6, thay Thông) | Hưng |
-| `configs/data/egocentric.yaml` | Hưng | Hiếu (bản 1.6) |
+| `configs/data/egocentric.yaml` | Hiếu (bản 1.9, thay Hưng) | Long |
 | `configs/eval/` trừ `agentqa/` | Châu | Hưng |
-| `configs/eval/agentqa/` | Hưng | Châu |
+| `configs/eval/agentqa/` | Hiếu (bản 1.9, thay Hưng) | Châu |
 | `configs/models/`, `configs/embodiments/`, `configs/sim/` | Hiếu | Long |
 | `docker/`, `compose.yaml` | Hiếu | Long |
 | `pyproject.toml` gốc, `uv.lock`, `.github/`, `scripts/repo/`, `ops/` | Long | Hiếu |
@@ -126,7 +128,7 @@ Chủ sở hữu không có nghĩa là người duy nhất được sửa. Ngư�
 | DA-01 | Định dạng episode chung, `action_layout` của G1 (36 chiều theo `ACTION_SLICES_36D` của Ψ₀, không đệm action; state 32 chiều đệm lên 36; bản 1.0), trường mới của Episode (design mục 6.1) | Giữ | Long (Hiếu duyệt schema; Hiếu điền giá trị `configs/embodiments/g1.yaml`) | `flywheel-contracts/` | S1-10 | 8–12 | S1 |
 | DA-02 | Export LeRobot v2.1 theo `action_layout`, `stats_psi0.json`, contract test bằng loader Ψ₀. Bản 1.6: checklist v2.1 phía làn, export dùng lại `flywheel-simple/tray/export.py` của DA-33 | Giữ | Hiếu (bản 1.6) | `flywheel-data/export/` (trừ `egodex.py`), `flywheel-psi0/tests/contract/` | DA-01, DA-03 PR 1 | 3,5 (bản 1.6) | S2 |
 | DA-03 | Pipeline teleop và synthetic: ingest, normalize, cắt đoạn, QA riêng nguồn trên psi-data, bàn phím, S1, S2; báo cáo dataset. Bản 1.6: trước 13/11 chỉ ingest, QA, release, báo cáo trên psi-data, khay S1, khay S2; normalize, cắt đoạn, nguồn bàn phím sau 13/11 | Sửa | Hiếu (bản 1.6) | `flywheel-data/ingest/` (trừ `egocentric/`), `qa/` (trừ `egocentric.py`), `release/`, `api.py`, `cli.py`, `config.py`, `configs/data/qa.yaml`; sau 13/11 thêm `normalize/`, `annotate/` (trừ `deid/`) | DA-01 | 10 (bản 1.6, hai PR) | S1–S2 |
-| DA-04 | Pipeline egocentric E-A, E-B: che danh tính, cắt đoạn, pose tay và camera, QA; mẫu EgoDex, sau đó video tự quay; vòng thử model gán nhãn | Mở lại | Hưng | `flywheel-data/ingest/egocentric/`, `annotate/deid/`, `qa/egocentric.py` | DA-01 | 25–35 | S1–S2 |
+| DA-04 | Pipeline egocentric E-A, E-B: che danh tính, cắt đoạn, pose tay và camera, QA; mẫu EgoDex, sau đó video tự quay; vòng thử model gán nhãn | Mở lại | Hiếu (bản 1.9, thay Hưng) | `flywheel-data/ingest/egocentric/`, `annotate/deid/`, `qa/egocentric.py` | DA-01 | 25–35 | S1–S2 |
 | DA-05 | `NimClient`, định tuyến theo `data_class` | Hoãn sau demo | | | | | |
 | DA-06 | Tầng S3: Cosmos Transfer | Hoãn sau PoC | | | | | |
 | DA-07 | Log train theo nhóm action | Đã gộp vào DA-19 | | | | | |
@@ -137,9 +139,9 @@ Chủ sở hữu không có nghĩa là người duy nhất được sửa. Ngư�
 | DA-15, DA-22, DA-24 | Robot DENSO trên MuJoCo, dataset BTC, ROS 2 | Xóa | | | | | |
 | DA-16 | Thiết bị bàn phím cho teleop decoupled WBC của SIMPLE, ghi episode, mục sổ chi phí mỗi phiên | Sửa | Hiếu | `flywheel-simple/teleop/` | S1-02 | 10–15 | S1–S2 |
 | DA-17 | Phát lại action động học và động lực học trên MuJoCo của SIMPLE, video so sánh, ngưỡng. Bản 1.6: phát lại action dự đoán và video sau 13/11 | Sửa | Hiếu (bản 1.6) | `flywheel-data/replay_check/`, `flywheel-simple/src/flywheel_simple/replay/` | `SimpleSim.replay()` (code trên bản giả), DA-03 PR 1 | 5 (bản 1.6) | S1–S2 |
-| DA-18 | Egocentric sang định dạng stage 1 của Ψ₀, stats, contract test bằng loader | Khôi phục, nội dung mới | Hưng | `flywheel-data/export/egodex.py` | DA-04 | 6–10 | S2 |
+| DA-18 | Egocentric sang định dạng stage 1 của Ψ₀, stats, contract test bằng loader | Khôi phục, nội dung mới | Hiếu (bản 1.9, thay Hưng) | `flywheel-data/export/egodex.py` | DA-04 | 6–10 | S2 |
 | DA-19 | Khung `flywheel-psi0`; đọc code train của tác giả, lớp bọc log, adapter fine-tune trên Colab, client RTC | Giữ | Hiếu | `flywheel-psi0/` | Không | 22–30 | S1–S2 |
-| DA-20 | Agent QA/QC: Nemotron cục bộ, dựng hình từng stage, báo cáo HTML, bộ ca mẫu | Sửa | Hưng | `flywheel-eval/agentqa/` (trừ `bench/`), `configs/eval/agentqa/` | DA-25 (file mẫu) | 20–30 | S2 |
+| DA-20 | Agent QA/QC: Nemotron cục bộ, dựng hình từng stage, báo cáo HTML, bộ ca mẫu | Sửa | Hiếu (bản 1.9, thay Hưng) | `flywheel-eval/agentqa/` (trừ `bench/`), `configs/eval/agentqa/` | DA-25 (file mẫu) | 20–30 | S2 |
 | DA-21 | Export LeRobot v3 từ v2.1, checklist chuẩn hóa trong contract test | Giữ | Chưa có chủ, sau 13/11 (bản 1.6) | `flywheel-data/export/` (trừ `egodex.py`) | DA-02 | 4–6 | S2 |
 | DA-23 | Eval bất đồng bộ trên SIMPLE, log inference RTC, dòng thời gian | Sửa | Long | `flywheel-loop/runner/` | `SimpleSim` (code trên policy giả) | 8–12 | S2–S3 |
 | DA-25 | Schema và file mẫu cho artifact giữa các làn (03 mục 7.3) | Sửa | Long (Hiếu duyệt) | `flywheel-contracts/`, `flywheel-testkit/` | PR restructure | 6–10 | S1, trước 30/10 |
@@ -173,9 +175,11 @@ File story nằm trong `docs/product/stories/`. Bản 1.6: DA-02, DA-03 có file
 |---|---|---|
 | Long | S1-10 10, DA-01 10, DA-25 8, PR restructure 6, DA-23 10, DA-28 10 | khoảng 55, cộng story Epic của làn Vòng (nhiều nhất trong ba làn) |
 | Thông | Bản 1.6: rút khỏi phân công ngày 3/11/2026 | 0 |
-| Hưng | DA-04 30, DA-18 8, DA-20 25, DA-31 6, vòng thử model 5 | khoảng 74 |
+| Hưng | DA-04 30, DA-18 8, DA-20 25, DA-31 6, vòng thử model 5 | khoảng 74 (bản 1.9: chuyển sang Hiếu) |
 | Châu | DA-08 10, DA-13 9 | khoảng 19, cộng story Epic của làn Đánh giá (scorer, tập điều kiện, chẩn đoán, evidence card) |
 | Hiếu | S1-02 14, S1-03 28, S1-04 20, S1-05 20, S1-06 8, S1-09 8, S1-11 8, DA-09 15, DA-16 12, DA-19 26, DA-26 20, DA-29 18, DA-30 12 | khoảng 209, cộng story 3.1a, ACT và DP, job GPU, duyệt PR |
+
+**Bản 1.9 (6/11/2026).** DA-04, DA-18, DA-20 (khoảng 63 giờ ước lượng, cộng vòng thử 5 giờ) sang Hiếu làm cùng Claude; giờ thực theo `Time-spent` của commit ở nhánh local: DA-20 17, DA-04 13,5, DA-18 5,3 (cộng 35,8; chưa gồm vòng thử model). Bảng trên giữ số của bản 0.6.
 
 **Bản 1.6 (3/11/2026).** Thông rút khỏi phân công; S1-07, DA-02, DA-03, DA-17, DA-27 sang Hiếu sau khi thu hẹp về lớp phía làn và dùng lại adapter của DA-33: S1-07 3,5, DA-02 3,5, DA-03 10, DA-17 5, DA-27 5, tài liệu 1,5, cộng khoảng 28,5 giờ ước lượng (plan chia lại việc mục 5). DA-21 chưa có chủ, sau 13/11. Bảng trên giữ số của bản 0.6.
 
@@ -204,15 +208,13 @@ Hiếu phải hoàn thiện mọi thứ cho demo trước **13/11/2026**, nên h
 | Hiếu | DA-26: HE sơ bộ V-EGO, V-NOEGO ở N = 20, 80; DA-34: nhánh A, C, C-NOEGO; DA-30: lần chạy stage 1 ngắn trên EgoDex (bản 1.2) | S1–S3 | 12/11 |
 | Hiếu | DA-34: vòng Failure → Data trên lỗi của nhánh C, sinh nhắm lỗi bằng DA-33, fine-tune và eval C+ (design 28/10 mục 6.6; bản 1.4). Trễ thì dừng ở episode nhắm lỗi đã qua QA | — | 12/11 |
 | Long | DA-23 runner eval; DA-28 lệnh và kịch bản demo | S2 | 10/11; chạy thử 12/11 |
-| Hưng | DA-04 nhiệm vụ 1, 2, 3, 4, 6 | 10/11 | 7/11 |
-| Hưng | DA-18: export EgoDex cho stage 1 (để Hiếu chạy DA-30) | 10/11 | 8/11 |
-| Hưng | DA-20 nhiệm vụ 1–5 | 13/11 | 10/11 |
+| Hiếu (bản 1.9, thay Hưng) | DA-04 nhiệm vụ 1–7 và vòng thử model gán nhãn; DA-18 nhiệm vụ 1–3; DA-20 nhiệm vụ 1–7. Code xong ở nhánh local 6/11; vòng thử model và chạy Nemotron còn chờ máy | 10/11, 13/11 | PR 10/11 |
 | Châu | #30: sửa hai story scorer | — | 4/11 |
 | Châu | DA-36: khung scorer từng bước (04 mục 4.2, story 3.3; bản 1.5) | S2 | 8/11 |
 | Châu | DA-13: kiểm hệ thống và quy lỗi về stage (phần 6 của demo); R3–R5 trên file mẫu trước, trên trace thật từ 8/11 | S3 | 10/11 |
 | Châu | DA-31: bộ chấm lỗi cấy (chuyển từ Hưng) | 13/11 | 11/11 |
 | Hiếu | DA-39: hợp đồng EvidenceCard và file mẫu, seam `6-EvidenceCard` qua (#82; bản 1.8) | — | 11/11 |
-| Sau 13/11 | DA-37 hiệu chỉnh scorer (story 3.5), DA-21 (v3, chưa có chủ), DA-17 nhiệm vụ 5, tầng normalize và cắt đoạn của DA-03, nguồn bàn phím (bản 1.6), DA-04 nhiệm vụ 5 và 7, DA-20 nhiệm vụ 6 và 7; của Hiếu (bản 1.2): S1-05, DA-29, S1-06, S1-09, S1-11, DA-16, DA-09, phần S1-02, S1-03, S1-04 mà DA-26 không cần | | sau demo |
+| Sau 13/11 | DA-37 hiệu chỉnh scorer (story 3.5), DA-21 (v3, chưa có chủ), DA-17 nhiệm vụ 5, tầng normalize và cắt đoạn của DA-03, nguồn bàn phím (bản 1.6), của Hiếu (bản 1.2): S1-05, DA-29, S1-06, S1-09, S1-11, DA-16, DA-09, phần S1-02, S1-03, S1-04 mà DA-26 không cần | | sau demo |
 
 **Cắt phạm vi của Hiếu [Đã chốt 3/11/2026, bản 1.2].** Phần của Hiếu tới 13/11 dồn vào đường găng của demo: DA-19 (code train, `metrics.jsonl`) → DA-26 (HE sơ bộ); DA-33 → DA-34 (task khay); hook `SimpleSim`; DA-35. Dời sau 13/11: S1-05, DA-29, S1-06, S1-09, S1-11, DA-16, DA-09. S1-02, S1-03, S1-04 chỉ làm phần DA-26 cần. Hệ quả cho người khác:
 
