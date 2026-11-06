@@ -99,6 +99,18 @@ def test_rollout_result_points_at_the_trace_directory(tmp_path: Path) -> None:
     assert result.camera_params_hash == PINNED
 
 
+@pytest.mark.parametrize("success", [True, None])
+def test_rollout_result_says_the_rollout_was_sync(tmp_path: Path, success: bool | None) -> None:
+    # Without it DA-13 reads timing as unknown and charges /act latency to the episode
+    # (FR21; PO decision (a), 5/11/2026: on sync rollouts R1, R2 are recorded only)
+    d = write(tmp_path, episode(success))
+    raw = json.loads((d / "rollout_result.json").read_text())
+    assert raw["timing"] == "sync"
+    result = RolloutResult.model_validate(raw)
+    assert result.timing == "sync"
+    assert (result.timing_verdict, result.starved_steps) == (None, None)
+
+
 def test_an_episode_simple_never_reported_is_a_simulator_error(tmp_path: Path) -> None:
     d = write(tmp_path, episode(success=None))
     result = RolloutResult.model_validate_json((d / "rollout_result.json").read_text())

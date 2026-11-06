@@ -113,6 +113,12 @@ class EpisodeDirSink:
             # SIMPLE reports every episode it finishes; one it never reported was cut off
             # by the simulator process (crash, or the env closed mid-episode)
             "infra_status": "ok" if episode.sim_success is not None else "simulator_error",
+            # No RolloutRequest or EvalConfig field carries timing, so it is stated from
+            # SIMPLE b75c678: the eval loop calls agent.get_action() then env.step(), and
+            # get_action() blocks on requests.post to the Psi0 server while its action
+            # queue is empty; physics only advances inside env.step(). The sim waits
+            # for the policy, so the rollout is sync: no timing_verdict, no starved_steps.
+            "timing": "sync",
             "usage": {"wall_seconds": episode.wall_seconds, "gpu_seconds": 0.0},
             "camera_params_hash": self.camera_reference_sha256,
             "adapter_info": {"name": "flywheel-simple.trace", "version": self.adapter_version},
