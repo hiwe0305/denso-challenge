@@ -36,7 +36,7 @@ Là AI Engineer, tôi muốn một agent đọc báo cáo dataset, log và outpu
 - [x] 4. `AgentReport`, HTML, `AgentReview` (AC 5)
 - [x] 5. Bộ ca mẫu, chấm agent, lưu ước lượng (AC 6)
 - [x] 6. Qwen3.5-4B nếu Q-M là có (AC 7)
-- [ ] 7. Chạy trên log thật, báo riêng (AC 8)
+- [x] 7. Chạy trên log thật, báo riêng (AC 8)
 
 ## Phạm vi file
 
@@ -82,7 +82,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
-- Ghi chú hoàn thành:
-- File đã tạo hoặc sửa:
+- Giờ thực: 17 giờ (tổng `Time-spent` của 7 commit; làm thay Hưng theo phân công lại 6/11/2026)
+- Công cụ AI đã dùng: Claude Code (Opus 5.5)
+- Ghi chú hoàn thành: code xong 7 nhiệm vụ con, chạy trên laptop bằng model giả. Bộ log cấy DA-27 chấm bằng DA-31: precision 3/3 mỗi mã T1–T8, R1, R2; 0/40 báo nhầm trên bản sạch. Đây là kiểm lớp code, chưa phải số của Nemotron. Log thật (DA-26, DA-34): bộ phát hiện F-TRAIN báo T1, T2, T8 trên cả ba job; T2 là lỗi logic khi val đo thưa, T8 là ngưỡng giả định thấp (chuyển cho làn Đánh giá). Chưa chạy Nemotron hay Qwen3.5-4B vì laptop không có Ollama; runbook và khoảng trống hợp đồng ở [agent-qa](../../g0/agent-qa.md)
+- File đã tạo hoặc sửa: `packages/flywheel-eval/src/flywheel/eval/agentqa/` (12 module), `tests/unit/agentqa/`, `tests/contract/agentqa/`, `configs/eval/agentqa/`, `docs/g0/agent-qa.md`
