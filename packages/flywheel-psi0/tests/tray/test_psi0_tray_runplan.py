@@ -636,11 +636,16 @@ def test_a_draft_neither_launches_nor_freezes(
     assert not lock_path(repo / "configs/runplans/tray/he-tray-cmax.yaml").exists()
 
 
-def test_the_rule_0_decision_draft_names_v2_and_the_cmax_plan() -> None:
+def test_the_rule_0_decision_records_eval_c_and_names_the_cmax_plan() -> None:
     decision = Decision.model_validate_json((PLANS / "he-tray-v2.rule0.decision.json").read_text())
     v2, cmax = TrayRunPlan.load(PLAN_V2), TrayRunPlan.load(PLAN_CMAX)
-    assert (decision.kind, decision.verdict) == ("dev_gate", "open")
-    assert decision.meta["status"] == "draft"
+    # eval C: 0/240 on the headline levels, rule 0 fires; Hiếu has not signed yet
+    assert (decision.kind, decision.verdict) == ("dev_gate", "fail")
+    assert decision.meta["status"] == "awaiting_signature"
+    assert decision.signed_by.startswith("pending")
+    assert decision.metrics["rule0"] == {"threshold": 0.10, "p": 0.0, "fires": True}
+    assert decision.metrics["headline"]["n"] == 240 and decision.metrics["all"]["n"] == 270
+    assert decision.criteria["next_step_proposed"]["run_plan_id"] == run_plan_id(cmax)
     assert decision.subject_id == run_plan_id(v2)
     assert decision.criteria["rules_sha256"] == v2.interpretation.rules_sha256
     assert decision.criteria["threshold_p"] == 0.10

@@ -432,6 +432,7 @@ Cách đọc **[Đề xuất]**, chưa kiểm ở mã của DA-13: nhãn R3 "`ta
 - `fetched.json` báo `final: false` do race (mục 13.1); checkpoint đủ và sha256 khớp.
 - Cờ bước của scorer chỉ tính theo thứ tự, bắt đầu từ `approach_a` (hai lòng bàn tay trên tay cầm, trước mép bàn A). Một episode mang khay sang bàn B mà không qua `approach_a` có 0/7 bước. Tỉ lệ qua từng bước đọc theo định nghĩa này.
 - 1 worker, đồng hồ sim. Thời gian tường phụ thuộc tải của máy, nhưng kết quả thì không (mục 8.1).
+- Trace DA-38 của lô không có `timing`. Hook ghi `timing` vào `rollout_result.json` từ #148, nhưng lô chạy ở master `2e57f60`, trước #148. `steps.jsonl` vẫn có `t_state`, `t_image` từng chu kỳ.
 - Checkout SIMPLE thực chạy là `6d10628`, không phải `b75c678` mà `code.simple` của plan ghim. Hai bản chỉ khác một file: task hai bàn (`g1_wholebody_locomotion_pick_between_tables_teleop.py`, 11 dòng `init_qpos`). Env khay không dùng file này. Kho S1 của release cũng sinh trên checkout này (cùng thư mục, qua symlink), nên train và eval của C dùng cùng một bản SIMPLE. Mọi file của `pinned_files` đều khớp. **Việc còn mở:** `runplan check --launch` không kiểm `code.simple`, nên lệch này không bị chặn. Đây là khoảng trống của công cụ, chưa sửa trong nhiệm vụ 3.
 
 ### 13.6 C-max: chuẩn bị, chưa train
@@ -444,7 +445,7 @@ Cách đọc **[Đề xuất]**, chưa kiểm ở mã của DA-13: nhãn R3 "`ta
 | Tập | `CMAX` = cả kho dùng được: 429 episode (bỏ 7 reject DA-03, qua bộ lọc). File [`demo_sets-v2-cmax.json`](../../configs/runplans/tray/demo_sets-v2-cmax.json): tập N40, N80, C, A giữ nguyên hash của bản 2, thêm `CMAX` = `084ebc03…` theo cùng thứ tự hash |
 | Bản cắt | `~/denso-da34-pool/fwdata/cut-cmax-draft` trên `rtx3060`: 429 episode, 610 069 frame, 3,6 GB, có danh sách sha256 (không commit). `demo_subset.py` của master `2e57f60`, 49 s |
 | Ngân sách | Cap 18 CU, lấy suất của C+ (C+ không chạy khi quy tắc 0 xảy ra). Bậc 2 vẫn dưới trần 36 CU. Ước lượng 16,0 CU trên L4, giả định thời gian một bước không đổi theo số episode (chưa đo với 429) |
-| `Decision` | Bản nháp [`he-tray-v2.rule0.decision.json`](../../configs/runplans/tray/he-tray-v2.rule0.decision.json): `dev_gate`, `verdict: open`, chủ thể `rp_a04c14e79dfd`, ngưỡng 0,10. Điền số đo và kết luận khi eval C xong; lệnh của Hiếu về C-max ghi vào đó |
+| `Decision` | [`he-tray-v2.rule0.decision.json`](../../configs/runplans/tray/he-tray-v2.rule0.decision.json): `dev_gate`, chủ thể `rp_a04c14e79dfd`, ngưỡng 0,10. Soạn 6/11 với `verdict: open`; từ 7/11 đã điền số đo của eval C, `verdict: fail`, chờ Hiếu ký (mục 13.7). Lệnh của Hiếu về C-max ghi vào đó |
 
 Hai biến thể chờ Hiếu chọn (`criteria.c_max_variants` của `Decision`):
 
@@ -461,9 +462,63 @@ Khoảng trống của (ii), ghi trong `meta.gaps` của `Decision`, không tự
 
 Ước lượng CU của cả hai biến thể là 16,0 CU: cùng 40.000 bước, nên lấy theo 15,99 CU đo được của C. Đây là giả định: thời gian một bước được coi là không đổi theo số episode, chưa đo với 429 hay hơn 1000 episode.
 
-Hai khoảng trống chung: quy tắc 0 đòi "kiểm pipeline ảnh" nhưng chưa có quy trình cho phép kiểm đó; bảng lỗi theo bước của C chỉ có khi eval C xong.
+Hai khoảng trống chung: quy tắc 0 đòi "kiểm pipeline ảnh" nhưng chưa có quy trình cho phép kiểm đó; bảng lỗi theo bước của C chỉ có khi eval C xong (đã có từ 7/11, mục 13.7).
 
 Nếu C-max chạy, phép so C-max với C không có trong quy tắc bậc 2. Quy tắc đọc phải ghi trong `Decision` **trước** khi chạy eval C-max.
+
+### 13.7 Kết quả eval C (sơ bộ, trên dev)
+
+Đọc bằng [`eval_results`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/eval_results.py) trên bản sao log của lô (không có video), máy laptop, 7/11/2026. Mỗi episode lấy lần xong sớm nhất. Số khớp từng con số với phép đếm thô của phiên điều phối trên `rtx3060` (20:52Z 6/11).
+
+**Chạy.** 27/27 lô xong ở lần chạy đầu (`attempt-0`), mã 0, không episode thiếu, không rollout thừa, không chạy lại. Từ 03:17:58Z tới 17:27:02Z 6/11/2026: **14,15 giờ tường**, 188,7 s mỗi episode (mỗi lô 10 episode: 1 838–1 940 s), khớp ước lượng 14,4 giờ. Mọi episode chạy hết giới hạn: 92,1–93,3 s sim. 50 787 request `/act`. `conditions.sha256` của bộ điều kiện đọc lại vẫn là `b9c38b37…`.
+
+| Mức | n | Thành công | p | Wilson 95 % | CI bootstrap của plan |
+|---|---|---|---|---|---|
+| 0 (30 lượt lặp, một cảnh) | 30 | 0 | 0 % | 0–11,4 % | 0–0 % |
+| 1 | 120 | 0 | 0 % | 0–3,1 % | 0–0 % |
+| 2 | 120 | 0 | 0 % | 0–3,1 % | 0–0 % |
+| **1–2 gộp (chỉ số chính)** | **240** | **0** | **0 %** | **0–1,6 %** | 0–0 % |
+| Cả lô | 270 | 0 | 0 % | 0–1,4 % | – |
+
+CI bootstrap theo điều kiện (`stats` của plan, 10 000 lần, seed 20261103) suy biến về một điểm khi không có lượt thành công nào. Vì vậy bảng ghi thêm khoảng Wilson 95 %.
+
+Nhãn lỗi (mục 8.2, design 3.3):
+
+| Mức | `L-TRAY-TILT` | `L-TIMEOUT` | `L-PLACE-POSE` | `L-PART-DROP` | `L-ONE-HAND` |
+|---|---|---|---|---|---|
+| 0 | 17 | 8 | 4 | 0 | 1 |
+| 1 | 62 | 37 | 14 | 6 | 1 |
+| 2 | 63 | 47 | 5 | 5 | 0 |
+| 1–2 gộp | 125 (52 %) | 84 (35 %) | 19 (8 %) | 11 (5 %) | 1 |
+
+Tỉ lệ qua từng bước của bộ chấm (`scorer_steps`, theo thứ tự `STEP_NAMES`; bước chỉ bật theo thứ tự, mục 13.5):
+
+| Mức | `approach_a` | `grasp` | `lift` | `carry` | `reach_b` | `place` | `release_stand` |
+|---|---|---|---|---|---|---|---|
+| 0 | 93,3 % | 93,3 % | 93,3 % | 70,0 % | 66,7 % | 0 % | 0 % |
+| 1 | 75,0 % | 75,0 % | 75,0 % | 59,2 % | 55,8 % | 0,8 % | 0 % |
+| 2 | 75,0 % | 75,0 % | 75,0 % | 57,5 % | 55,0 % | 0 % | 0 % |
+| 1–2 gộp | 75,0 % | 75,0 % | 75,0 % | 58,3 % | 55,4 % | 0,4 % | 0 % |
+
+Số bước qua liên tiếp từ bước đầu, mức 1–2 (240 rollout), với nhãn lỗi:
+
+| Bước qua | Rollout | Nhãn lỗi |
+|---|---|---|
+| 0 | 60 | `L-TIMEOUT` 41, `L-PART-DROP` 11, `L-PLACE-POSE` 8 |
+| 3 (tới `lift`) | 40 | `L-TRAY-TILT` 29, `L-TIMEOUT` 10, `L-ONE-HAND` 1 |
+| 4 (tới `carry`) | 7 | `L-TRAY-TILT` 6, `L-TIMEOUT` 1 |
+| 5 (tới `reach_b`) | 132 | `L-TRAY-TILT` 90, `L-TIMEOUT` 32, `L-PLACE-POSE` 10 |
+| 6 (tới `place`) | 1 | `L-PLACE-POSE` 1 |
+
+Không rollout nào dừng ở 1 hay 2 bước: `approach_a`, `grasp` và `lift` bật cùng nhau. 19 rollout có 0 bước mà vẫn có nhãn `L-PART-DROP` hoặc `L-PLACE-POSE`. Đây là ca khay rời bàn A mà cờ `approach_a` không bật (mục 13.5); chưa xem video.
+
+**Yaw (R3 của DA-38), số đo, chưa kết luận.** Trên cả 270 trace (1 215 000 chu kỳ): 730 147 chu kỳ (60,1 %) có |`target_yaw` − yaw đo| thô trên 2,5 rad. Sau khi wrap về [−π, π] còn 1 163 chu kỳ, ở 27 episode, lớn nhất 3,14 rad. Như vậy khác với 4 episode chạy thử ở mục 13.4 (0 chu kỳ sau wrap): có những đoạn `target_yaw` thật sự ngược hướng. Chưa xem các đoạn này ứng với pha nào; việc đọc thuộc DA-13.
+
+**Đọc theo bậc 2 (mục 9).** p_C = 0/240 = 0 % ở mức 1–2 gộp, cận trên Wilson 1,6 %, dưới ngưỡng 10 %. **Quy tắc 0 xảy ra.** Theo đúng câu của quy tắc: Ψ₀ chưa học được task khay từ ảnh MuJoCo; **không chạy C+**; kiểm pipeline ảnh; ghi `Decision`. Quy tắc 1–6 không đọc, vì quy tắc 0 đã chặn và C+ không chạy. Mọi số trên là **sơ bộ, trên dev**, một seed train, kèm các giới hạn của mục 13.5.
+
+Ghi cạnh, không đổi cách đọc: bảng bước cho thấy 55 % rollout mức 1–2 đã cầm, nhấc, mang khay tới bàn B, rồi hỏng ở bước đặt (`L-TRAY-TILT` là nhãn nhiều nhất của nhóm này). Đây là dữ kiện cho Hiếu khi chọn bước tiếp theo, không phải quy tắc mới.
+
+**`Decision`.** [`he-tray-v2.rule0.decision.json`](../../configs/runplans/tray/he-tray-v2.rule0.decision.json) chốt nhánh này: `verdict: fail` (quy tắc 0 xảy ra), số đo ở `metrics`, chờ Hiếu ký. Bước tiếp theo đề xuất **[Đề xuất]**: C-max (i), chỉ S1, 429 episode, ước lượng 16 CU, plan nháp `rp_366283071c4a` (mục 13.6). Chưa launch; C-max chỉ chạy khi Hiếu duyệt. C-max (ii) vẫn trong danh sách khoảng trống.
 
 ## Change log
 
@@ -471,3 +526,4 @@ Nếu C-max chạy, phép so C-max với C không có trong quy tắc bậc 2. Q
 |---|---|---|
 | 6/11/2026 | Mục 8.2: sửa câu "chạy lại riêng một episode cho ra đúng nó" (sai dưới EGL), câu cũ giữ nguyên. Thêm mục 13: khởi chạy eval C, kiểm tất định hỏng (ảnh reset EGL lệch 13/230 400 pixel), chạy thử và thời gian, số đo yaw, giới hạn. Quyết định của Hiếu ngày 6/11: chạy tiếp và ghi giới hạn; đủ 270, mức 1–2 trước; 1 worker. Khối quy tắc mục 9 không đổi | Hiếu (soạn với Claude) |
 | 6/11/2026 | Mục 13.6: C-max chuẩn bị, chưa train (Hiếu 6/11): RunPlan nháp `rp_366283071c4a`, tập `CMAX` 429 episode, bản cắt trên `rtx3060`, bản nháp `Decision` của quy tắc 0 với hai biến thể (i) chỉ S1, (ii) S1 cộng S2 (chưa có release S2). Mục 13.5: lệch checkout SIMPLE `6d10628` so với ghim `b75c678` | Hiếu (soạn với Claude) |
+| 7/11/2026 | Mục 13.7: kết quả eval C (0/270; mức 1–2 0/240, Wilson 0–1,6 %), nhãn lỗi, bước của bộ chấm, yaw trên 270 trace, quy tắc 0 xảy ra (không chạy C+), `Decision` `fail` chờ Hiếu, đề xuất C-max (i). Mục 13.5: trace không có `timing` (lô chạy trước #148) | Hiếu (soạn với Claude) |

@@ -13,9 +13,11 @@ from flywheel_psi0.tray.eval_results import (
     STEP_NAMES,
     bootstrap_ci,
     collect,
+    reached,
     summarize,
     table,
     trace_of,
+    wilson,
     yaw_errors,
 )
 from flywheel_psi0.tray.runplan import TrayRunPlan
@@ -108,6 +110,23 @@ def test_levels_headline_and_rule_0(tmp_path: Path) -> None:
     assert head["step_pass"]["approach_a"] == 1.0 and head["step_pass"]["carry"] == 0.05
     assert result["label"] == "preliminary, on dev"
     assert "| 1–2 gộp | 20 | 1 | 5.0 |" in table(result)
+    assert head["reached"] == {3: 19, 7: 1}
+    assert (result["all"]["n"], result["all"]["successes"]) == (30, 6)
+    assert "| cả lô | 30 | 6 | 20.0 |" in table(result)
+
+
+def test_wilson_interval() -> None:
+    low, high = wilson(0, 120)
+    assert low == 0.0 and high == pytest.approx(0.0310, abs=1e-4)  # 3.84 / 123.84
+    low, high = wilson(1, 20)
+    assert (low, high) == (pytest.approx(0.0089, abs=1e-4), pytest.approx(0.2361, abs=1e-4))
+    with pytest.raises(ValueError):
+        wilson(0, 0)
+
+
+def test_reached_counts_the_steps_passed_in_a_row() -> None:
+    assert reached([True, True, False, True]) == 2
+    assert reached([False] * 7) == 0 and reached([True] * 7) == 7
 
 
 def test_rule_0_does_not_fire_at_ten_percent(tmp_path: Path) -> None:
