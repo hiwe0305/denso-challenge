@@ -5,7 +5,7 @@
 | Trường | Giá trị |
 |---|---|
 | Trạng thái | Sẵn sàng (PO duyệt 25/10/2026; sửa 27/10/2026) |
-| Người làm | Hưng |
+| Người làm | Hiếu, làm cùng Claude (từ 6/11/2026, thay Hưng; 07 bản 1.9) |
 | Làn | Đánh giá |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 9 · Epic 9 |
 | Nhãn | [Lõi] · `epic:9` · `area:core` |
@@ -63,7 +63,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Người phụ trách
 
-- Làm: Trần Ngọc Hưng
+- Làm: Dương Đình Hiếu, cùng Claude (từ 6/11/2026; trước đó Trần Ngọc Hưng)
 - Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
 - Bình luận: Hiếu (endpoint, log), Long (báo cáo)
 
@@ -78,6 +78,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 3/11/2026 | AC 5 và nhiệm vụ 4: `AgentReport`, `AgentReview` thay `QAReport`; phụ thuộc PR hợp đồng của issue #34; Q-M trả lời không, AC 7 hoãn | PO (Hiếu) theo issue #34 |
 | 28/10/2026 | Sửa hạn PR `chore-restructure` theo 07 mục 3.6 bản 0.6: mở 28/10, merge 29/10 | PO (Hiếu) |
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
+| 6/11/2026 | Chuyển sang Hiếu làm cùng Claude theo [plan chia lại việc của Hưng](../../superpowers/plans/2026-11-06-hung-reassignment.md); bỏ bước che danh tính chỉ cho mẫu EgoDex công bố (D2); làm đủ mọi nhiệm vụ con (D3) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 
