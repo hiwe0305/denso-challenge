@@ -36,6 +36,7 @@ from flywheel.data.api import ConfigError, dataset_report, job_ledger, render_ht
 from flywheel.data.config import store_root
 from flywheel.data.ingest.egocentric import api
 from flywheel.data.ingest.egocentric import review as reviewing
+from flywheel.data.ingest.egocentric import trial as trials
 from flywheel.data.ingest.egocentric.config import EgoConfig, load_config
 from flywheel.data.ingest.egocentric.episodes import (
     COMPARE,
@@ -234,6 +235,47 @@ def review(
                 message = f"review applied: {counts}; run `fw egocentric qa` again"
             job.notes.append(message)
     _say(message)
+    _say(f"ledger: {job.run_plan_id}/{job.job_id}")
+
+
+@app.command()
+def trial(
+    work: Work,
+    simple: Annotated[Path, typer.Option(help="psi-data two-table LeRobot dataset with videos")],
+    reference: Annotated[Path, typer.Option(help="grasp points marked on the SIMPLE frames")],
+    robobrain: Endpoint = None,
+    molmo: Endpoint = None,
+    out: Annotated[Path | None, typer.Option(help="default <work>/trial")] = None,
+    vram: Annotated[list[str] | None, typer.Option(
+        help="model=what nvidia-smi showed while it was loaded, e.g. robobrain=3.3 GB")] = None,
+    timeout_s: Annotated[float | None, typer.Option(
+        help="seconds per query; default the config's timeout_s (a CPU model needs more)")]
+    = None,
+    boundary: Annotated[list[str] | None, typer.Option(
+        help="models asked for the grasp frame (robobrain, molmo); default both")] = None,
+    config: Config = CONFIG,
+    run_plan_id: RunPlan = None,
+) -> None:
+    """The labelling-model trial (design 6.7.4): 30 EgoDex + 30 SIMPLE frames, Decision."""
+
+    with _refusals():
+        cfg = load_config(config)
+        if robobrain is None or molmo is None:
+            raise ValueError("the trial needs --robobrain and --molmo endpoints")
+        target = out or work / "trial"
+        with _job("trial", 4 * trials.FRAMES, run_plan_id) as job:
+            timeout = timeout_s or cfg.timeout_s
+            models = {
+                "robobrain": OpenAIVision(robobrain, cfg.models["segment_suggester"].served,
+                                          timeout),
+                "molmo": OpenAIVision(molmo, cfg.models["grasp_pointer"].served, timeout),
+            }
+            measured = dict(v.split("=", 1) for v in vram or [])
+            result = trials.run(work, simple, reference, models, cfg, target, measured,
+                                boundary)
+            job.notes.append(f"trial written to {target}")
+    _say(json.dumps(result["summary"], indent=1))
+    _say(f"decision: {target / 'decision.json'}")
     _say(f"ledger: {job.run_plan_id}/{job.job_id}")
 
 
