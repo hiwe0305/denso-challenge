@@ -34,7 +34,7 @@ Là AI Engineer, tôi muốn một agent đọc báo cáo dataset, log và outpu
 - [x] 2. Đọc artifact, chặn `vault/`, kiểm số trích dẫn (AC 2, 3)
 - [x] 3. Dựng hình từng stage (AC 4)
 - [x] 4. `AgentReport`, HTML, `AgentReview` (AC 5)
-- [ ] 5. Bộ ca mẫu, chấm agent, lưu ước lượng (AC 6)
+- [x] 5. Bộ ca mẫu, chấm agent, lưu ước lượng (AC 6)
 - [ ] 6. Qwen3.5-4B nếu Q-M là có (AC 7)
 - [ ] 7. Chạy trên log thật, báo riêng (AC 8)
 
