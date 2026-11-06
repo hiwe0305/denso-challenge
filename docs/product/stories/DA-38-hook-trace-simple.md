@@ -41,7 +41,7 @@ Là người làm làn Đánh giá, tôi muốn mỗi rollout SIMPLE của độ
   - [x] 3.4. Đọc lại tệp qua `TraceStep`, `CameraParams` khi PR #48 merge (test đang skip hoặc xfail tới lúc đó)
 - [x] 4. Cài hook vào `eval-decoupled-wbc` (bọc env và agent), test `sim` (AC 1, 5)
 - [x] 5. Lượt chạy thật task hai bàn trên `rtx3060`, ghi ledger (AC 6)
-- [ ] 6. Lượt chạy thật task khay trên `rtx3060`, ghi ledger (AC 6)
+- [x] 6. Lượt chạy thật task khay trên `rtx3060`, ghi ledger (AC 6)
 - [x] 7. Tài liệu `docs/g0/trace.md`: cách chạy, ý nghĩa trường, giới hạn ở sim (AC 1–6)
 
 ## Phạm vi file
@@ -252,4 +252,29 @@ Hệ quả:
   - Hai lần gọi `/health` và `/info` tới `127.0.0.1:22095` đi qua reverse tunnel của eval DA-26, tới server Colab của nó. Không có lần gọi `/act` nào.
   - DDS không lẫn: DA-26 dùng `DOMAIN_ID: 126`, DA-38 dùng 0.
   - Bài học: trước khi chạy trên máy dùng chung, kiểm lịch giữ máy của đội, `nvidia-smi`, `docker ps` và `ss -ltn`. Khởi chạy theo dạng `cd … || exit 1; nohup setsid … &`; dạng `cd … && nohup setsid … &` giữ phiên ssh mở tới khi tiến trình thoát.
+
+### 6/11/2026 · Nhiệm vụ 6: lượt chạy thật task khay
+
+- Phiên điều phối báo máy trống lúc 22:35Z ngày 5/11. Hiếu cho phép trong phiên này.
+- Chạy trên `rtx3060`, 01:20:40Z–01:24:08Z:
+  - SIMPLE `b75c678`, `--sim-mode mujoco`, release `tray_s1_0d84cc87b1e5` của DA-33, episode 0 và 1.
+  - `--num-workers 2` (hai worker `spawn`), `systemd-run MemoryMax=24G`. Khởi chạy dạng `cd … || exit 1; nohup setsid … &`.
+  - Server Ψ₀ checkpoint hai bàn `ckpt_40000`, cổng `127.0.0.1:22195`, chạy từ 01:18:00Z. Chưa có checkpoint khay, nên policy không làm task khay; trace vẫn là trace thật của vòng eval.
+- Kết quả: hai thư mục `<trace_id>/`, mỗi worker một episode. Đường worker `spawn` (rủi ro 2 ở ghi chép 3/11) ghi đúng một thư mục cho mỗi episode.
+  - 4500 chu kỳ mỗi episode, `t_state` cách nhau 0,02 s; 188 khung ảnh.
+  - Cả 28 kênh thân trên và 7 kênh thân dưới có phương sai khác 0.
+  - `sim_success` False, False, khớp `eval_stats.txt`. `infra_status` là `ok`.
+  - Không có `camera_params.jsonl`, vì task khay chưa có bản tham chiếu ghim.
+  - Client thoát mã 0, nhờ `DEBUG=1`.
+- `fw eval diag-system` đọc được cả hai, mã 0, LỖI CONTROLLER:
+  - R3 thân trên 2,53 và 2,60.
+  - R3 thân dưới 2,93 và 3,06. `target_yaw` gần ngược hướng yaw đo (lệch −3,10 rad sau khi quấn góc); robot vẫn đứng, chiều cao gốc 0,74 m suốt episode.
+  - R1, R2, R5 bỏ qua.
+- `fw eval score` không chạy trên task khay: chưa có config scorer khay, và phạm vi (b) chỉ nói task hai bàn.
+- **Sự cố docker trên máy, ngoài DA-38.** Từ 01:33Z có người dọn docker trên `rtx3060` (`container prune`, `builder prune`, xóa image). Theo `docker events`:
+  - 01:34:33Z xóa image `phyrc-2027:isaac-6.0.1`;
+  - 01:34:43Z xóa image SIMPLE công bố `ghcr.io/physical-superintelligence-lab/simple@sha256:38a674…`, image mà eval Isaac của DA-26 và S1-03 dùng;
+  - 01:35:44Z xóa container `da38-psi0`.
+  - Job khay đã xong lúc 01:24Z, nên trace không bị ảnh hưởng. Image Ψ₀ ghim vẫn còn.
+- Ledger: lượt khay bị dừng ngày 5/11 (0,05 h), server 6/11 (0,296 h), job khay (0,058 h).
 
