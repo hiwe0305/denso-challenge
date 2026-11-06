@@ -45,7 +45,7 @@ from flywheel.eval.api import (
     store_train_diagnosis,
 )
 from flywheel.eval.config import ConfigError
-from flywheel.eval.diagnosis.system.artifact import SystemDiagnosisRecord
+from flywheel.eval.diagnosis.system.artifact import SystemDiagnosisRecord, SystemFindingRecord
 from flywheel.eval.diagnosis.system.reader import (
     CAMERA_NAME,
     ROLLOUT_NAME,
@@ -73,6 +73,13 @@ DIAGNOSIS_NAMES: dict[str, str] = {
     "sync": "LỖI ĐỒNG BỘ",
     "calibration": "LỖI CALIBRATION",
     "infra": "LỖI HẠ TẦNG (không tính là lỗi policy)",
+}
+
+# The rollout's mode, which decides whether R1 and R2 count (DA-13 AC 7).
+TIMING_NAMES: dict[str | None, str] = {
+    "sync": "đồng bộ (R1, R2 ghi nhận, không quy lỗi)",
+    "async": "bất đồng bộ (R1, R2 tính)",
+    None: "không rõ chế độ (R1, R2 tính)",
 }
 
 # The Vietnamese names of spec section 5.1, for the engineer reading the table.
@@ -262,19 +269,35 @@ def _print_system(record: SystemDiagnosisRecord) -> None:
     typer.echo(f"chẩn đoán: {DIAGNOSIS_NAMES.get(record.diagnosis, record.diagnosis)}")
     if record.infra_status is not None:
         typer.echo(f"infra_status: {record.infra_status}")
+    typer.echo(f"rollout: {TIMING_NAMES[record.timing]}")
     typer.echo(SYSTEM_HEADER)
     for finding in record.findings:
-        where = finding.where or ""
-        if finding.part is not None:
-            where = f"{finding.part} {where}".strip()
-        threshold = "-" if finding.threshold is None else f"{finding.threshold:.6g}"
-        typer.echo(
-            f"{finding.code:<5} {finding.value:>12.6g} {threshold:>12} "
-            f"{where:<24} {finding.detail or ''}"
-        )
+        typer.echo(_system_row(finding))
     typer.echo(f"phát hiện: {len(record.findings)}; bỏ qua: {len(record.skipped)}")
     for skip in record.skipped:
         typer.echo(f"bỏ qua {skip.code}: {skip.reason}")
+    if record.recorded or record.recorded_skipped:
+        # Decision (a), 5/11/2026: shown, so the latency is not lost, but apart
+        # from the table above, because it decides nothing.
+        typer.echo(
+            f"ghi nhận, không quy lỗi: {len(record.recorded)}; "
+            f"bỏ qua (ghi nhận): {len(record.recorded_skipped)}"
+        )
+        for finding in record.recorded:
+            typer.echo(_system_row(finding))
+        for skip in record.recorded_skipped:
+            typer.echo(f"bỏ qua {skip.code}: {skip.reason}")
+
+
+def _system_row(finding: SystemFindingRecord) -> str:
+    where = finding.where or ""
+    if finding.part is not None:
+        where = f"{finding.part} {where}".strip()
+    threshold = "-" if finding.threshold is None else f"{finding.threshold:.6g}"
+    return (
+        f"{finding.code:<5} {finding.value:>12.6g} {threshold:>12} "
+        f"{where:<24} {finding.detail or ''}"
+    )
 
 
 def _print_score(score: EpisodeScore) -> None:

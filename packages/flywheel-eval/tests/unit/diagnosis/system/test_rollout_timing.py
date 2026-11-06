@@ -13,12 +13,13 @@ from typing import Any
 
 import pytest
 from flywheel.contracts.artifacts import RTCInferenceRecord
+from flywheel.contracts.diagnosis import SystemDiagnosis
 from flywheel.eval.config import R1Thresholds, R2Thresholds, R3Thresholds
 from flywheel.eval.diagnosis.system.artifact import build_system_record
 from flywheel.eval.diagnosis.system.reader import SystemInputs, load_episode, read_trace_log
 from flywheel.eval.diagnosis.system.runtime import check_r1, check_r2
 from flywheel.eval.diagnosis.system.tracking import check_r3
-from flywheel.eval.diagnosis.system.verdict import CheckResult, Diagnosis, SystemError, combine
+from flywheel.eval.diagnosis.system.verdict import CheckResult, Diagnosis, combine
 
 R1 = R1Thresholds(tau_lat_s=0.1, percentile=99.0)
 R2 = R2Thresholds(rtc_inference_delay_steps=6, max_underruns=0)
@@ -98,21 +99,31 @@ def test_unknown_mode_without_an_rtc_log_stays_unknown() -> None:
     assert [skip.code for skip in verdict.skipped] == ["R1", "R2"]
 
 
-def test_a_timing_verdict_in_the_rollout_result_reads_as_async(
+@pytest.mark.parametrize("timing", ["sync", "async"])
+def test_the_rollout_result_states_its_mode_in_its_own_words(
+    write_job, rollout_result, clean_rows, timing
+) -> None:
+    # The SimpleSim hook writes "sync" for SIMPLE's eval loop (PR #148).
+    folder = write_job(clean_rows, result=dict(rollout_result(), timing=timing))
+
+    assert load_episode(folder).timing == timing
+
+
+def test_a_timing_verdict_without_timing_reads_as_async(
     write_job, rollout_result, clean_rows
 ) -> None:
+    # `runner.json` written before PR #146 carries a verdict and no `timing`;
+    # only an asynchronous rollout ever has a verdict.
     for verdict in ("ok", "starved", "not_checked"):
         folder = write_job(clean_rows, result=dict(rollout_result(), timing_verdict=verdict))
 
         assert load_episode(folder).timing == "async"
 
 
-def test_a_rollout_result_without_a_timing_verdict_is_unknown_not_sync(
+def test_a_rollout_result_that_does_not_say_is_unknown_not_sync(
     write_job, rollout_result, clean_rows
 ) -> None:
-    # The SimpleSim hook writes exactly this for every rollout, synchronous or
-    # not: the runner of DA-23 fills `timing_verdict` after the file is written.
-    # Until the contract says "sync" in its own words, nothing on disk does.
+    # What the hook wrote before PR #148: no `timing`, no verdict.
     with_result = write_job(clean_rows, result=rollout_result())
     without_result = write_job(clean_rows)
 
@@ -120,17 +131,55 @@ def test_a_rollout_result_without_a_timing_verdict_is_unknown_not_sync(
     assert load_episode(without_result).timing is None
 
 
-def test_the_record_refuses_a_verdict_it_cannot_hold_whole(
+def test_the_record_keeps_r1_and_r2_of_a_sync_rollout_apart_from_the_label(
     write_trace, clean_rows, rtc_rows
 ) -> None:
-    # `SystemDiagnosis` has no field for recorded findings and refuses `clean`
-    # beside a finding; a record without R1 and R2 would say less than was
-    # measured, so it is refused until the contract change lands.
     inputs = SystemInputs(trace=read_trace_log(write_trace(clean_rows)))
     synced = combine("ep_1", _slow(rtc_rows), "ok", "sync")
 
-    with pytest.raises(SystemError, match="11.2"):
-        build_system_record(synced, "c" * 64, inputs)
+    record = build_system_record(synced, "c" * 64, inputs)
+
+    assert record.diagnosis == "clean"
+    assert record.timing == "sync"
+    assert record.findings == [] and record.skipped == []
+    assert [finding.code for finding in record.recorded] == ["R1", "R2"]
+    assert all("không quy lỗi" in (finding.detail or "") for finding in record.recorded)
+    # The shared contract takes it whole: `clean` beside recorded R1 and R2.
+    shared = SystemDiagnosis.model_validate_json(record.model_dump_json())
+    assert shared.model_dump(mode="json") == record.model_dump(mode="json")
+
+
+def test_the_record_of_a_sync_rollout_without_an_rtc_log_keeps_the_skips(
+    write_trace, clean_rows
+) -> None:
+    inputs = SystemInputs(trace=read_trace_log(write_trace(clean_rows)))
+
+    record = build_system_record(combine("ep_1", _no_log(), "ok", "sync"), "c" * 64, inputs)
+
+    assert record.diagnosis == "clean"
+    assert [skip.code for skip in record.recorded_skipped] == ["R1", "R2"]
+    SystemDiagnosis.model_validate_json(record.model_dump_json())
+
+
+def test_a_slow_sync_episode_read_off_disk_is_not_a_runtime_fault(
+    write_job, rollout_result, clean_rows, rtc_rows
+) -> None:
+    # The demo's part 6 on a real SIMPLE episode: /act at ~0.4 s, 20 steps of
+    # delay against d = 6, and the hook's "sync". Decision (a) now holds on disk.
+    slow = [
+        dict(row, chunk_received_s=row["observation_sent_s"] + 0.4, delay_steps=20)
+        for row in rtc_rows
+    ]
+    folder = write_job(clean_rows, rtc=slow, result=dict(rollout_result(), timing="sync"))
+    inputs = load_episode(folder)
+
+    results = [check_r1(inputs.rtc, R1), check_r2(inputs.rtc, R2)]
+    record = build_system_record(
+        combine("ep_1", results, inputs.infra_status, inputs.timing), "c" * 64, inputs
+    )
+
+    assert record.diagnosis == "clean"
+    assert [finding.code for finding in record.recorded] == ["R1", "R2"]
 
 
 def test_the_record_of_an_unknown_mode_keeps_r1_and_r2_and_why(

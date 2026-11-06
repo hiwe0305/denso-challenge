@@ -72,13 +72,12 @@ as a trace of zero cycles named after its directory, so R6 still judges the
 RolloutResult beside it.
 
 **The rollout's mode comes from the contract or not at all.** R1 and R2 count
-only on an asynchronous rollout (`verdict.py`), and the contract does not yet
-say which a rollout was: `RolloutResult.timing_verdict` is None both for a
-synchronous rollout and for a producer that never wrote it, and the SimpleSim
-hook writes `rollout_result.json` before the runner of DA-23 fills it. So a
-`timing_verdict` that is set reads as async, and everything else as unknown,
-never as sync (FR21). The contract field that would say "sync" is a proposal
-to Long and Hiếu (DA-13 task 11.2); `_timing` is the one place that reads it.
+only on an asynchronous rollout (`verdict.py`). `RolloutResult.timing` says
+which a rollout was (PR #146), and the SimpleSim hook writes "sync" for
+SIMPLE's eval loop (PR #148). A result written before that field has none;
+then only a `timing_verdict` - which a synchronous rollout never carries -
+reads as async, and everything else is unknown, never sync (FR21). `_timing`
+is the one place that reads it.
 """
 
 from __future__ import annotations
@@ -491,7 +490,14 @@ def _artifact(path: Path, model: type[_ARTIFACT]) -> _ARTIFACT:
 
 
 def _timing(result: RolloutResult) -> Literal["sync", "async"] | None:
-    """The rollout's mode as the contract states it: only a timing verdict says async."""
+    """The rollout's mode as the contract states it, never guessed as sync.
+
+    `RolloutResult.timing` says it in its own words. A result written before
+    that field existed can still say async through a `timing_verdict`, which
+    only an asynchronous rollout carries; nothing else says anything.
+    """
+    if result.timing is not None:
+        return result.timing
     return "async" if result.timing_verdict is not None else None
 
 

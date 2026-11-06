@@ -25,13 +25,12 @@ def test_system_record_matches_shared_contract() -> None:
         infra_status="ok",
         findings=[SystemFindingRecord(code="R3", value=0.2, threshold=0.1, part="upper")],
         skipped=[SystemSkipRecord(code="R5", reason="missing reference")],
+        timing="sync",
+        recorded=[SystemFindingRecord(code="R1", value=0.4, threshold=0.1, detail="sync")],
+        recorded_skipped=[SystemSkipRecord(code="R2", reason="no RTC log")],
     )
     shared = SystemDiagnosis.model_validate_json(lane.model_dump_json())
-    # The lane record gains timing/recorded/recorded_skipped with DA-13 task 11.5
-    # (PR #142); until then they take the contract's defaults.
-    new = {"timing", "recorded", "recorded_skipped"}
-    assert shared.model_dump(mode="json", exclude=new) == lane.model_dump(mode="json")
-    assert (shared.timing, shared.recorded, shared.recorded_skipped) == (None, [], [])
+    assert shared.model_dump(mode="json") == lane.model_dump(mode="json")
 
 
 def test_stage_record_matches_shared_contract() -> None:
