@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
-from flywheel.contracts.artifacts import Episode
+from flywheel.contracts.artifacts import Episode, QAReport
 from flywheel.data.annotate.deid.gate import annotate_allowed, require_annotate
 from flywheel.data.ingest.egocentric.compare import compare
 from flywheel.data.ingest.egocentric.config import EgoConfig
@@ -28,6 +28,7 @@ from flywheel.data.ingest.egocentric.episodes import (
     LABELS,
     POSE,
     POSE_EA,
+    QA_FILE,
     SEGMENTS,
     Bundle,
     bundle_dir,
@@ -45,6 +46,7 @@ from flywheel.data.ingest.egocentric.segments import (
     Labeler,
     SegmentSuggester,
     cut_episode,
+    read_segment_rows,
     write_segment_table,
 )
 from flywheel.data.ingest.egocentric.source import (
@@ -54,6 +56,7 @@ from flywheel.data.ingest.egocentric.source import (
     load_record,
 )
 from flywheel.data.ingest.egocentric.video import frame_count, jpeg, read_frames
+from flywheel.data.qa.egocentric import EgoQAInput, run_ego_qa
 
 SOURCE = "source.json"
 
@@ -189,6 +192,36 @@ def annotate(work: Path, cfg: EgoConfig, models: Models = Models()) -> dict[str,
         (folder / LABELS).write_text(json.dumps(cut.labels(), indent=2) + "\n")
         cuts[episode.episode_id] = cut
     return cuts
+
+
+def qa(work: Path, cfg: EgoConfig) -> list[QAReport]:
+    source = read_source(work)
+    check_unchanged(source)
+    reports = []
+    for episode in read_episodes(work):
+        bundle = read_bundle(work, episode.episode_id)
+        folder = bundle_dir(work, episode.episode_id)
+        labels = json.loads((folder / LABELS).read_text()) if (folder / LABELS).is_file() \
+            else {"unresolved_share": 1.0}
+        segments = read_segment_rows(folder / SEGMENTS) if (folder / SEGMENTS).is_file() else []
+        reports.append(run_ego_qa(EgoQAInput(
+            episode=episode, pose=load_pose(folder / POSE), segments=segments,
+            unresolved_share=float(labels["unresolved_share"]),
+            video_frames=bundle.video_frames, instruction=bundle.instruction,
+            intrinsic=_intrinsic(bundle), image_size=bundle.image_size, fps=bundle.fps,
+            gate_passed=gate_open(episode, source),
+        ), cfg))
+    path = work / QA_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(r.model_dump_json() + "\n" for r in reports))
+    return reports
+
+
+def read_reports(work: Path) -> list[QAReport]:
+    path = work / QA_FILE
+    if not path.is_file():
+        raise FileNotFoundError(f"{path}: run `fw egocentric qa` first")
+    return [QAReport.model_validate_json(line) for line in path.read_text().splitlines() if line]
 
 
 def _intrinsic(bundle: Bundle) -> np.ndarray:  # type: ignore[type-arg]
