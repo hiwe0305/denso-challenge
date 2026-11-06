@@ -75,7 +75,7 @@ Giá trị không hữu hạn (NaN, ±inf) ghi theo tên của hợp đồng (`"
 - Client RTC của DA-19 không nằm trên đường eval này, nên job thường không có `rtc.jsonl`, và R1, R2 bị bỏ qua.
 - Trace chỉ có tín hiệu điều khiển. Tín hiệu task mà scorer hai bàn cần (khoảng cách tay–vật, tiếp xúc, chiều cao vật, vùng đích, va chạm, thăng bằng thân; xem `configs/eval/scorer/two-table.yaml`) không có trong `TraceStep`. Hook không ghi các tín hiệu này. `fw eval score` đọc một artifact khác (trace tín hiệu task, dòng V7 của 03 mục 4.2), nên không nhận `steps.jsonl` làm đầu vào. `TaskDefinition` hai bàn và tín hiệu của nó thuộc story 3.4 **[Đã chốt 5/11/2026, Hiếu]**; bảng tín hiệu thiếu ở story DA-38, ghi chép nhiệm vụ 5.
 - Chạy nhiều job SIMPLE cùng lúc trên một máy có thể dùng chung domain 0 của CycloneDDS (story DA-38, ghi chép 3.1/3.2).
-- Mỗi episode khay mất khoảng 10 phút, phần lớn do SIMPLE giải mã mọi khung video của episode điều kiện.
+- Thời gian một episode khay chưa ổn định. Test `sim` ngày 3/11 đo 605 s, phần lớn do SIMPLE giải mã mọi khung video của episode điều kiện. Lượt chạy thật ngày 6/11 (mục 5) chỉ mất 181 s mỗi episode. Chưa đo nguyên nhân của chênh lệch.
 - Hook ghi tệp lúc episode kết thúc. Job bị giết giữa episode thì episode đó không để lại thư mục nào.
 - Isaac (`mujoco_isaac`) và server Ψ₀ không vừa chung GPU 12 GB của `rtx3060`. Trước khi chạy server Ψ₀ ở đó, kiểm `nvidia-smi` và `docker ps` xem có eval Isaac nào đang chạy không.
 
@@ -83,16 +83,17 @@ Giá trị không hữu hạn (NaN, ±inf) ghi theo tên của hợp đồng (`"
 
 Số đo của một lần chạy; chi tiết ở story DA-38, ghi chép nhiệm vụ 5 và 6.
 
-| | Task hai bàn |
-|---|---|
-| Job | `job_da38_two_table_l0_20261105` |
-| Điều kiện | `e78fb93` mức 0, episode 0–1 |
-| Server | Ψ₀ checkpoint hai bàn `ckpt_40000`, image ghim, 7,25 GB VRAM |
-| Chu kỳ mỗi episode | 1200 (24 s mô phỏng), `t_state` cách nhau 0,02 s |
-| Khung ảnh đưa vào policy | 50 mỗi episode (24 chu kỳ một khung) |
-| Kênh có phương sai khác 0 | 28/28 thân trên, 7/7 thân dưới |
-| `sim_success` | False, False; khớp `eval_stats.txt` của SIMPLE |
-| Thời gian client | 147 s cho 2 episode, 1 worker |
-| `fw eval score` | `steps.jsonl`: không đọc được (khác artifact). Tệp V7 tạm chỉ có `t`: đọc được, cả 6 bước "chưa rõ" |
-| `fw eval diag-system` | Đọc được, mã 0; LỖI CONTROLLER (R3 thân trên 2,57 và 2,65; thân dưới 1,75 và 0,82; ngưỡng giả định); R1, R2 bỏ qua |
+| | Task hai bàn | Task khay |
+|---|---|---|
+| Job | `job_da38_two_table_l0_20261105` (5/11) | `job_da38_tray_20261106` (6/11) |
+| Điều kiện | `e78fb93` mức 0, episode 0–1 | Release `tray_s1_0d84cc87b1e5` của DA-33, episode 0–1 |
+| Server | Ψ₀ checkpoint hai bàn `ckpt_40000`, image ghim, 7,25 GB VRAM | Cùng server; chưa có checkpoint khay, nên policy không làm task khay |
+| Chu kỳ mỗi episode | 1200 (24 s mô phỏng), `t_state` cách nhau 0,02 s | 4500 (90 s mô phỏng), cách nhau 0,02 s |
+| Khung ảnh đưa vào policy | 50 mỗi episode (24 chu kỳ một khung) | 188 mỗi episode |
+| Kênh có phương sai khác 0 | 28/28 thân trên, 7/7 thân dưới | 28/28, 7/7 |
+| `sim_success` | False, False; khớp `eval_stats.txt` của SIMPLE | False, False; khớp |
+| `camera_params.jsonl` | Có, 2 camera, hash đã ghim | Không (chưa ghim bản tham chiếu khay) |
+| Thời gian client | 147 s cho 2 episode, 1 worker | 208 s cho 2 episode, 2 worker `spawn` |
+| `fw eval score` | `steps.jsonl`: không đọc được (khác artifact). Tệp V7 tạm chỉ có `t`: đọc được, cả 6 bước "chưa rõ" | Không chạy (chưa có config scorer khay) |
+| `fw eval diag-system` | Đọc được, mã 0; LỖI CONTROLLER (R3 thân trên 2,57 và 2,65; thân dưới 1,75 và 0,82; ngưỡng giả định); R1, R2 bỏ qua | Đọc được, mã 0; LỖI CONTROLLER (R3 thân trên 2,53 và 2,60; thân dưới 2,93 và 3,06, do `target_yaw` gần ngược hướng yaw đo); R1, R2, R5 bỏ qua |
 
