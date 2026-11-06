@@ -52,6 +52,7 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
   - [x] 3.3 Chạy cả lô 270 episode trên rtx3060 từ master, log đủ cho Agent QA/QC · **6/11/2026:** master `2e57f60`, 1 worker, 27/27 lô lần đầu, mã 0, 0 episode thiếu, 14,15 giờ (tray.md mục 13.7)
   - [x] 3.4 Bảng kết quả, đọc theo bậc 2 (tray.md mục 9, quy tắc 0), khoảng tin cậy bootstrap, tỷ lệ qua từng bước, loại lỗi, `Decision`; dòng ước lượng và thực đo trong sổ chi phí · **7/11/2026:** 0/270, mức 1–2 0/240 (Wilson 0–1,6 %), quy tắc 0 xảy ra: không chạy C+; `Decision` `fail` chờ Hiếu ký; đề xuất C-max (i) (tray.md mục 13.7)
   - [x] 3.5 Chuẩn bị C-max, chưa train: cắt 429 episode S1, RunPlan `draft`, `Decision` theo quy tắc 0, dòng ước lượng · **6/11/2026:** `rp_366283071c4a` (nháp, không khởi chạy được), tập `CMAX` 429 episode, bản cắt trên rtx3060, bản nháp `Decision` mở (tray.md mục 13.6)
+  - [ ] 3.6 Kiểm pipeline ảnh của quy tắc 0 (Hiếu 7/11/2026 "Chạy T1 + T2"): luật đọc viết trước (tray.md mục 14); T1 eval 20 điều kiện train của C; T2 đổi cách chạy (RTC, số action thực thi) trên 20 điều kiện dev; dòng ước lượng và thực đo
 - [ ] 4. Nhánh B khi có video (AC 5)
 - [ ] 5. Vòng Failure → Data trên lỗi của C: chẩn đoán, sinh nhắm lỗi, fine-tune và eval C+ (AC 6; trước 12/11/2026)
 

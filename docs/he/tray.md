@@ -520,6 +520,53 @@ Ghi cạnh, không đổi cách đọc: bảng bước cho thấy 55 % rollout m
 
 **`Decision`.** [`he-tray-v2.rule0.decision.json`](../../configs/runplans/tray/he-tray-v2.rule0.decision.json) chốt nhánh này: `verdict: fail` (quy tắc 0 xảy ra), số đo ở `metrics`, chờ Hiếu ký. Bước tiếp theo đề xuất **[Đề xuất]**: C-max (i), chỉ S1, 429 episode, ước lượng 16 CU, plan nháp `rp_366283071c4a` (mục 13.6). Chưa launch; C-max chỉ chạy khi Hiếu duyệt. C-max (ii) vẫn trong danh sách khoảng trống.
 
+## 14. Kiểm pipeline ảnh (T1, T2)
+
+_Bước "kiểm pipeline ảnh" của quy tắc 0 (mục 13.7), khoảng trống đầu tiên trong `Decision` `dec_01M6QERTS21J48KPACJX83QC3R`. **[Đã chốt 7/11/2026, Hiếu]** "Chạy T1 + T2": trên `rtx3060`, 0 CU, không Colab, không train. Luật đọc dưới đây là **[Đề xuất]** (ngưỡng do phiên điều phối đề xuất, Hiếu chốt sau). Luật được commit **trước** rollout đầu tiên của T1, và không sửa sau khi thấy kết quả._
+
+Chung cho T1 và T2:
+- Cùng checkpoint C `ckpt_40000`, cùng client SIMPLE `psi0_decoupled_wbc`, thời gian sim, EGL, 1 worker, `eval_batch` và `eval_results` như eval C (mục 13.1).
+- Mỗi điều kiện lấy lần xong sớm nhất.
+- Rollout EGL không lặp lại được (mục 13.2). Vì vậy so sánh theo cặp điều kiện chỉ là so hai rollout, không phải hai lần đo cùng một rollout.
+- Số đọc là **sơ bộ, trên dev**; T1 đọc trên cảnh train.
+
+### 14.1 T1: eval trên điều kiện train của C
+
+- **Điều kiện.** 20 episode của tập C, lấy tất định: 20 seed đầu theo thứ tự `sha256(salt | release_hash | seed)` mà `demo_sets` đã dùng ([`demo_sets-v2.json`](../../configs/runplans/tray/demo_sets-v2.json), salt `DA-34/demo-sets/v1`). Theo thứ tự đó là 1279, 1574, 1503, 1572, 1386, 1532, 1531, 1013, 1274, 1117, 1398, 1210, 1599, 1193, 1338, 1408, 1554, 1350, 1405, 1038; tất cả ở mức 1.
+- **Cảnh.** Env khay dựng lại cảnh chỉ từ (seed, mức) qua `sample_episode`. Trước khi chạy, so tư thế khay, vùng đích và chỗ robot xuất phát với `tray.sample` đã ghi trong release.
+- **Đọc** (p_T1 = số thành công / 20):
+
+| Kết quả | Đọc |
+|---|---|
+| ≥ 5/20 | C học được cảnh train nhưng không tổng quát sang dev; thêm dữ liệu (C-max) có lý do |
+| 1–4/20 | Yếu; báo kèm Wilson 95 % |
+| 0/20 | Model không tái hiện được cảnh đã học; nghi chuỗi train/serve (chuẩn hóa action, `stats_psi0.json`, bố cục 36 chiều, ảnh đầu vào, chunk). Không train gì cho tới khi tìm ra lỗi |
+
+- **Chỉ số phụ, báo cạnh:** tỉ lệ qua từng bước (`scorer_steps`), nhất là `reach_b` và `place`.
+
+### 14.2 T2: đổi cách chạy, không train lại
+
+- **Điều kiện.** 20 điều kiện dev đầu tiên của mức 1 trong eval C: seed 1 000 100–1 000 119, đúng các dòng `conditions.jsonl` của eval C.
+- **Mốc.** Rollout eval C trên đúng 20 điều kiện này (lô `l1-000`, `l1-010`), ghép cặp theo điều kiện.
+- **Kiểm tại nguồn** (Psi0 `cda3fdf`, SIMPLE `6d10628`):
+  - Số action thực thi mỗi lần gọi đặt ở **server**: `psi0_serve_simple.py` trả `pred_actions[:Ta]`, với `Ta` = `--action-exec-horizon`. Client `psi0_decoupled_wbc` đưa mọi action nhận được vào hàng đợi, rồi mới hỏi lại.
+  - Eval C chạy với `Ta = 24` và `--rtc`, theo mặc định của `scripts/g0/serve_psi0.sh`, không phải 30.
+  - Khi bật RTC, server assert `Tp − Ta ≤ max_delay`. Checkpoint C có chunk `Tp = 30` và `max_delay = 8`, nên `Ta` phải ≥ 22.
+  - **Vì vậy Ta = 10 với RTC bật không chạy được** nếu không sửa Psi0.
+  - Tắt RTC không cần sửa Psi0: `RTC_FLAG=` (rỗng) trong `serve_psi0.sh`.
+- **Biến thể [Đề xuất]**, gửi phiên điều phối 7/11/2026, chờ Hiếu chọn trước rollout đầu tiên của T2:
+
+| Biến thể | `Ta` | RTC | Khác eval C ở |
+|---|---|---|---|
+| T2b | 24 | tắt | chỉ RTC |
+| T2a′ | 10 | tắt | RTC và số action thực thi; so với T2b thì chỉ khác số action thực thi |
+
+  Thứ tự chạy: T2b, rồi T2a′. Đổi cấu hình server thì khởi động lại server và ghi lệnh. Sau T2, trả server về cấu hình của eval C (`Ta = 24`, `--rtc`).
+- **Đọc.** Một biến thể là "đáng xem" nếu thỏa một trong hai điều kiện:
+  - hơn mốc ít nhất 3 thành công trên 20 điều kiện;
+  - tỉ lệ qua bước `place` tăng rõ so với mốc. "Rõ" ở đây là ít nhất 3 điều kiện có `place` bật ở biến thể mà không bật ở mốc, nhiều hơn số điều kiện theo chiều ngược lại.
+- Chạy lại eval đủ 270 episode với cấu hình mới cần Hiếu quyết riêng.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -527,3 +574,4 @@ Ghi cạnh, không đổi cách đọc: bảng bước cho thấy 55 % rollout m
 | 6/11/2026 | Mục 8.2: sửa câu "chạy lại riêng một episode cho ra đúng nó" (sai dưới EGL), câu cũ giữ nguyên. Thêm mục 13: khởi chạy eval C, kiểm tất định hỏng (ảnh reset EGL lệch 13/230 400 pixel), chạy thử và thời gian, số đo yaw, giới hạn. Quyết định của Hiếu ngày 6/11: chạy tiếp và ghi giới hạn; đủ 270, mức 1–2 trước; 1 worker. Khối quy tắc mục 9 không đổi | Hiếu (soạn với Claude) |
 | 6/11/2026 | Mục 13.6: C-max chuẩn bị, chưa train (Hiếu 6/11): RunPlan nháp `rp_366283071c4a`, tập `CMAX` 429 episode, bản cắt trên `rtx3060`, bản nháp `Decision` của quy tắc 0 với hai biến thể (i) chỉ S1, (ii) S1 cộng S2 (chưa có release S2). Mục 13.5: lệch checkout SIMPLE `6d10628` so với ghim `b75c678` | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 13.7: kết quả eval C (0/270; mức 1–2 0/240, Wilson 0–1,6 %), nhãn lỗi, bước của bộ chấm, yaw trên 270 trace, quy tắc 0 xảy ra (không chạy C+), `Decision` `fail` chờ Hiếu, đề xuất C-max (i). Mục 13.5: trace không có `timing` (lô chạy trước #148) | Hiếu (soạn với Claude) |
+| 7/11/2026 | Mục 14: luật đọc T1, T2 của bước kiểm pipeline ảnh ([Đề xuất]), viết trước rollout đầu tiên. T2: Ta = 10 với RTC không chạy được (`max_delay` 8), đề xuất T2b (Ta 24, RTC tắt) và T2a′ (Ta 10, RTC tắt) | Hiếu (soạn với Claude) |
