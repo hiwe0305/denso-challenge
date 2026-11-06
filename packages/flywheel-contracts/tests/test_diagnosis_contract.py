@@ -5,6 +5,8 @@ import pytest
 from flywheel.contracts.diagnosis import StageAttribution, SystemDiagnosis
 from pydantic import ValidationError
 
+SYNC_R1 = {"code": "R1", "value": 0.41, "threshold": 0.12}
+
 ROOT = Path(__file__).resolve().parents[3]
 SCHEMAS = ROOT / "packages/flywheel-contracts/schemas"
 FIXTURES = ROOT / "packages/flywheel-testkit/src/flywheel/testkit/fixtures/artifacts"
@@ -70,3 +72,63 @@ def test_attribution_requires_unavailable_and_keeps_hypothesis_unconfirmed() -> 
         StageAttribution.model_validate(base)
     attribution = StageAttribution.model_validate({**base, "unavailable": []})
     assert attribution.hypotheses[0].confirmed is False
+
+
+def _system(**update: object) -> SystemDiagnosis:
+    return SystemDiagnosis.model_validate(
+        {
+            "episode_id": "ep",
+            "diagnosis": "clean",
+            "config_sha256": "a" * 64,
+            "trace_sha256": "b" * 64,
+            "findings": [],
+            "skipped": [],
+            **update,
+        }
+    )
+
+
+def test_system_record_without_timing_fields_still_validates() -> None:
+    # The fixture as master wrote it before timing/recorded existed.
+    old = json.loads((FIXTURES / "SystemDiagnosis.json").read_text(encoding="utf-8"))
+    for key in ("timing", "recorded", "recorded_skipped"):
+        del old[key]
+    value = SystemDiagnosis.model_validate(old)
+    assert (value.timing, value.recorded, value.recorded_skipped) == (None, [], [])
+
+
+def test_sync_rollout_stays_clean_with_recorded_r1_r2() -> None:
+    value = _system(
+        timing="sync",
+        recorded=[SYNC_R1, {"code": "R2", "value": 18, "threshold": 6}],
+        recorded_skipped=[{"code": "R2", "reason": "no RTC log"}],
+    )
+    assert value.diagnosis == "clean"
+    assert [item.code for item in value.recorded] == ["R1", "R2"]
+
+
+@pytest.mark.parametrize("timing", [None, "async"])
+def test_recorded_requires_sync_timing(timing: str | None) -> None:
+    with pytest.raises(ValidationError, match="timing == 'sync'"):
+        _system(timing=timing, recorded=[SYNC_R1])
+    with pytest.raises(ValidationError, match="timing == 'sync'"):
+        _system(timing=timing, recorded_skipped=[{"code": "R1", "reason": "no RTC log"}])
+
+
+@pytest.mark.parametrize("code", ["R3", "R4", "R5", "R6"])
+def test_recorded_holds_only_r1_r2(code: str) -> None:
+    with pytest.raises(ValidationError, match="may be recorded"):
+        _system(timing="sync", recorded=[{"code": code, "value": 1}])
+    with pytest.raises(ValidationError, match="may be recorded"):
+        _system(timing="sync", recorded_skipped=[{"code": code, "reason": "missing"}])
+
+
+def test_sync_rollout_does_not_count_r1_r2() -> None:
+    with pytest.raises(ValidationError, match="does not count"):
+        _system(diagnosis="runtime", timing="sync", findings=[SYNC_R1])
+    with pytest.raises(ValidationError, match="does not count"):
+        _system(diagnosis="unknown", timing="sync", skipped=[{"code": "R2", "reason": "no log"}])
+    for timing in (None, "async"):
+        assert _system(diagnosis="runtime", timing=timing, findings=[SYNC_R1]).findings
+    with pytest.raises(ValidationError):
+        _system(timing="realtime")

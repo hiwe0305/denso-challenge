@@ -8,6 +8,8 @@ from pydantic import Field, model_validator
 SHA256 = r"^[0-9a-f]{64}$"
 SystemCode = Literal["R1", "R2", "R3", "R4", "R5", "R6"]
 SystemLabel = Literal["clean", "unknown", "controller", "runtime", "sync", "calibration", "infra"]
+# Timing checks a sync rollout records without counting (PO decision (a), 5/11/2026).
+RECORDED_CODES = frozenset({"R1", "R2"})
 
 
 class SystemFinding(Contract):
@@ -34,11 +36,31 @@ class SystemDiagnosis(Contract):
     infra_status: str | None = None
     findings: list[SystemFinding]
     skipped: list[DiagnosisSkip]
+    # Rollout timing the check used; None = unknown, judged as async (FR21).
+    timing: Literal["sync", "async"] | None = None
+    # R1/R2 on a sync rollout: measured and kept, never counted in the label
+    # (PO decision (a), 5/11/2026).
+    recorded: list[SystemFinding] = Field(default_factory=list)
+    recorded_skipped: list[DiagnosisSkip] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def clean_requires_completed_checks(self) -> "SystemDiagnosis":
         if self.diagnosis == "clean" and (self.findings or self.skipped):
             raise ValueError("clean requires no findings and no skipped checks")
+        return self
+
+    @model_validator(mode="after")
+    def recorded_only_for_sync_timing_checks(self) -> "SystemDiagnosis":
+        codes = [item.code for item in self.recorded] + [
+            item.code for item in self.recorded_skipped
+        ]
+        if codes and self.timing != "sync":
+            raise ValueError("recorded checks require timing == 'sync'")
+        if any(code not in RECORDED_CODES for code in codes):
+            raise ValueError(f"only {sorted(RECORDED_CODES)} may be recorded")
+        counted = [item.code for item in self.findings] + [item.code for item in self.skipped]
+        if self.timing == "sync" and RECORDED_CODES.intersection(counted):
+            raise ValueError("a sync rollout records R1/R2, it does not count them")
         return self
 
 

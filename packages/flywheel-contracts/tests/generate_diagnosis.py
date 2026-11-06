@@ -20,6 +20,9 @@ examples = {
         "infra_status": "ok",
         "findings": [{"code": "R3", "value": 0.2, "threshold": 0.1, "part": "upper"}],
         "skipped": [{"code": "R5", "reason": "camera reference unavailable"}],
+        "timing": "sync",
+        "recorded": [{"code": "R1", "value": 0.41, "threshold": 0.12}],
+        "recorded_skipped": [{"code": "R2", "reason": "no RTC log"}],
     },
     StageAttribution: {
         "episode_id": "ep_1",

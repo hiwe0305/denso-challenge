@@ -99,7 +99,9 @@ class Runner:
         job_dir.mkdir(parents=True)
 
         # Call simulator rollout (timing and latency profile passed directly in request)
-        result = self.simulator.rollout(request, policy)
+        result = self.simulator.rollout(request, policy).model_copy(
+            update={"timing": request.timing}
+        )
 
         # In async mode the RTC log is part of the result: without a log that holds up,
         # the rollout says nothing about latency and must not count as a pass.

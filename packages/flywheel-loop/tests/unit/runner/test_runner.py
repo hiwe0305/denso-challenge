@@ -417,6 +417,10 @@ def test_sync_passes_and_async_reveals_the_latency_failure(tmp_path: Path) -> No
         "starved_steps": 12,
     }
     assert "timing_verdict" not in _entry(tmp_path, "sync")
+    # The result says which timing it ran under, on disk too (DA-13, decision (a)).
+    assert (sync.timing, async_.timing) == ("sync", "async")
+    assert _entry(tmp_path, "sync")["result"]["timing"] == "sync"
+    assert entry["result"]["timing"] == "async"
 
 
 def test_zero_latency_async_matches_sync_on_the_same_seed(tmp_path: Path) -> None:

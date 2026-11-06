@@ -137,3 +137,23 @@ def test_fake_llm_returns_scripted_responses_and_fails_when_exhausted() -> None:
     assert fake.requests == ["one", "two"]
     with pytest.raises(RuntimeError):
         fake.complete("three")
+
+
+def test_rollout_result_without_timing_is_unknown_not_sync() -> None:
+    # A record written before `timing` existed, verdict included (runner.json).
+    old = _rollout_result(timing_verdict="ok", starved_steps=0)
+    assert old.timing is None
+    assert _rollout_result().timing is None
+    assert RolloutResult.model_validate_json(old.model_dump_json(exclude={"timing"})) == old
+
+
+def test_rollout_result_timing_agrees_with_the_verdict() -> None:
+    assert _rollout_result(timing="sync").timing_verdict is None
+    assert _rollout_result(timing="async", timing_verdict="ok", starved_steps=0).timing == "async"
+    assert _rollout_result(timing="async").timing_verdict is None  # before the runner judges it
+    with pytest.raises(ValidationError, match="sync rollout"):
+        _rollout_result(timing="sync", timing_verdict="ok")
+    with pytest.raises(ValidationError, match="sync rollout"):
+        _rollout_result(timing="sync", starved_steps=0)
+    with pytest.raises(ValidationError):
+        _rollout_result(timing="realtime")

@@ -132,11 +132,24 @@ class RolloutResult(V0Model):
     usage: ResourceUsage
     camera_params_hash: str | None
     adapter_info: AdapterInfo
+    # The request's timing, copied by the producer. None means the producer did
+    # not say (older records): readers must not take it for sync (FR21).
+    timing: Literal["sync", "async"] | None = None
     # Async timing outcome, kept apart from sim_success (decision E2, 3/11/2026).
     # None for sync rollouts and older producers; "not_checked" when an async
     # rollout had no usable RTC log.
     timing_verdict: Literal["ok", "starved", "not_checked"] | None = None
     starved_steps: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def validate_timing(self) -> RolloutResult:
+        # timing None stays legal with a verdict: runner.json records written
+        # before `timing` existed carry one.
+        if self.timing == "sync" and (
+            self.timing_verdict is not None or self.starved_steps is not None
+        ):
+            raise ValueError("a sync rollout has no timing_verdict or starved_steps")
+        return self
 
 
 class PolicySpec(V0Model):

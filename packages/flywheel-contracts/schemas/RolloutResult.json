@@ -148,6 +148,22 @@
     "adapter_info": {
       "$ref": "#/$defs/AdapterInfo"
     },
+    "timing": {
+      "anyOf": [
+        {
+          "enum": [
+            "sync",
+            "async"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Timing"
+    },
     "timing_verdict": {
       "anyOf": [
         {

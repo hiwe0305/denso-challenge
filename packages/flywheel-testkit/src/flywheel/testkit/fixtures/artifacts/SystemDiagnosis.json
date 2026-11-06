@@ -22,5 +22,22 @@
       "code": "R5",
       "reason": "camera reference unavailable"
     }
+  ],
+  "timing": "sync",
+  "recorded": [
+    {
+      "code": "R1",
+      "value": 0.41,
+      "threshold": 0.12,
+      "part": null,
+      "where": null,
+      "detail": null
+    }
+  ],
+  "recorded_skipped": [
+    {
+      "code": "R2",
+      "reason": "no RTC log"
+    }
   ]
 }
