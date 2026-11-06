@@ -116,7 +116,8 @@ def write_eb_poses(work: Path) -> int:
         bundle = read_bundle(work, episode.episode_id)
         if bundle.hdf5 is None:
             continue
-        save_pose(read_egodex_pose(Path(bundle.hdf5)), bundle_dir(work, bundle.episode_id) / POSE)
+        save_pose(read_egodex_pose(Path(bundle.hdf5)), bundle_dir(work, bundle.episode_id) / POSE,
+                  _intrinsic(bundle))
         count += 1
     return count
 
@@ -147,9 +148,9 @@ def import_estimates(work: Path, estimates: Path) -> dict[str, dict[str, object]
         folder = bundle_dir(work, episode.episode_id)
         estimate = read_estimate(raw)
         pose = to_pose(estimate)
-        save_pose(pose, folder / POSE_EA)
+        save_pose(pose, folder / POSE_EA, _intrinsic(bundle))
         if bundle.hdf5 is None:
-            save_pose(pose, folder / POSE)
+            save_pose(pose, folder / POSE, _intrinsic(bundle))
             continue
         deviation = compare(load_pose(folder / POSE), estimate, _intrinsic(bundle),
                             bundle.image_size).to_dict()

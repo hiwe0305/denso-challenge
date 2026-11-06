@@ -38,13 +38,20 @@ def test_a_file_without_confidences_gives_nan_not_zero(tmp_path: Path) -> None:
 
 def test_pose_npz_round_trips_in_the_da18_layout(tmp_path: Path) -> None:
     pose = synthetic_pose()
-    save_pose(pose, tmp_path / "pose.npz")
+    intrinsic = np.array([[1450.0, 0, 960], [0, 1450, 540], [0, 0, 1]])
+    save_pose(pose, tmp_path / "pose.npz", intrinsic)
     with np.load(tmp_path / "pose.npz") as data:
-        assert sorted(data.files) == sorted(f.name for f in fields(EgoPose))
+        assert sorted(data.files) == sorted([*(f.name for f in fields(EgoPose)), "intrinsic"])
         assert all(data[name].dtype == np.float32 for name in data.files)
+        np.testing.assert_array_equal(data["intrinsic"], intrinsic.astype(np.float32))
     loaded = load_pose(tmp_path / "pose.npz")
     for f in fields(EgoPose):
         np.testing.assert_array_equal(getattr(loaded, f.name), getattr(pose, f.name))
+
+
+def test_an_intrinsic_that_is_not_3x3_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="intrinsic"):
+        save_pose(synthetic_pose(), tmp_path / "pose.npz", np.eye(4))
 
 
 def test_the_layout_is_checked() -> None:
