@@ -42,6 +42,7 @@ from flywheel.data.ingest.egocentric.episodes import (
     read_episodes,
 )
 from flywheel.data.ingest.egocentric.source import register_egodex
+from flywheel.data.ingest.egocentric.video_source import register_videos
 from flywheel.data.ingest.egocentric.vlm import ModelLabeler, ModelSuggester, OpenAIVision
 
 app = typer.Typer(no_args_is_help=True)
@@ -68,6 +69,7 @@ def root() -> None:
 @app.command()
 def ingest(
     source: Annotated[str, typer.Argument(help="egodex or video")],
+    root_dir: Annotated[Path | None, typer.Option("--root", help="video: recording root")] = None,
     split: Annotated[str, typer.Option(help="train or dev")] = "train",
     work: Annotated[Path | None, typer.Option(help="default $FW_ROOT/pipeline/<source_id>")] = None,
     config: Config = CONFIG,
@@ -78,11 +80,17 @@ def ingest(
     with _refusals():
         cfg = load_config(config)
         store = store_root()
-        if source != "egodex":
-            raise ValueError(f"source {source!r} is not egodex")
-        spec = cfg.sources["egodex"]
-        planned = len(spec.tasks) * (spec.episodes_per_task or 0)
-        register = partial(register_egodex, store, cfg)
+        if source == "egodex":
+            spec = cfg.sources["egodex"]
+            planned = len(spec.tasks) * (spec.episodes_per_task or 0)
+            register = partial(register_egodex, store, cfg)
+        elif source == "video":
+            if root_dir is None:
+                raise ValueError("ingest video needs --root <recording dir>")
+            planned = len(list(root_dir.glob("*/*.mp4")))
+            register = partial(register_videos, root_dir, cfg)
+        else:
+            raise ValueError(f"source {source!r} is not egodex or video")
         # hashing the files is most of the work, so it runs inside the job
         with _job("ingest", planned * EPISODE_FRAMES, run_plan_id) as job:
             record = register()
