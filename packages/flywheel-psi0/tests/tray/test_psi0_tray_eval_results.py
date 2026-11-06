@@ -13,6 +13,7 @@ from flywheel_psi0.tray.eval_results import (
     STEP_NAMES,
     bootstrap_ci,
     collect,
+    paired,
     reached,
     summarize,
     table,
@@ -180,3 +181,21 @@ def test_a_smaller_set_reports_its_levels_and_no_rule_0(tmp_path: Path) -> None:
     assert result["rule0"] is None and result["full_eval_set"] is False
     assert result["all"]["n"] == 20
     assert "gộp" not in table(result) and "| cả lô | 20 | 2 | 10.0 |" in table(result)
+
+
+def test_paired_counts_per_condition_and_the_gains(tmp_path: Path) -> None:
+    chunk = Chunk("l1-000", 1, 0, tuple(1000100 + i for i in range(4)))
+    # baseline: 1 success (episode 0); variant: successes 1 and 2, episode 3 reaches place
+    for i, ok in enumerate((True, False, False, False)):
+        episode(tmp_path / "base", chunk, 0, i, success=ok, steps=5)
+    for i, (ok, steps) in enumerate(((False, 5), (True, 7), (True, 7), (False, 6))):
+        episode(tmp_path / "var", chunk, 0, i, success=ok, steps=steps)
+    base, _, _ = collect(tmp_path / "base", [chunk])
+    var, _, _ = collect(tmp_path / "var", [chunk])
+    result = paired(var, base)
+    assert result["success"] == {"both": 0, "variant_only": 2, "baseline_only": 1, "neither": 1}
+    assert result["success_gain"] == 1
+    # place (step 6): variant on episodes 1, 2, 3; baseline on episode 0 (its success)
+    assert result["steps"]["place"]["variant_only"] == 3 and result["place_gain"] == 2
+    with pytest.raises(ValueError):
+        paired(var[:3], base)

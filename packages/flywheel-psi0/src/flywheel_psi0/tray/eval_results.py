@@ -237,6 +237,40 @@ def summarize(
     return result
 
 
+def paired(variant: Sequence[Rollout], baseline: Sequence[Rollout]) -> dict[str, Any]:
+    """Per condition (level, seed) of both: success and each step, variant against baseline.
+
+    Each side is one rollout per condition (EGL rollouts are not reproducible, tray.md
+    13.2), so a pair compares two rollouts, not two measurements of one.
+    """
+    a = {(r.level, r.seed): r.row for r in variant}
+    b = {(r.level, r.seed): r.row for r in baseline}
+    if a.keys() != b.keys():
+        raise ValueError("variant and baseline cover different conditions")
+
+    def counts(get: Any) -> dict[str, int]:
+        pairs = [(bool(get(a[k])), bool(get(b[k]))) for k in a]
+        return {
+            "both": sum(x and y for x, y in pairs),
+            "variant_only": sum(x and not y for x, y in pairs),
+            "baseline_only": sum(y and not x for x, y in pairs),
+            "neither": sum(not x and not y for x, y in pairs),
+        }
+
+    steps = {
+        name: counts(lambda row, k=k: (row.get("scorer_steps") or [False] * 7)[k])
+        for k, name in enumerate(STEP_NAMES)
+    }
+    success = counts(lambda row: row["success"])
+    return {
+        "conditions": len(a),
+        "success": success,
+        "steps": steps,
+        "success_gain": success["variant_only"] - success["baseline_only"],
+        "place_gain": steps["place"]["variant_only"] - steps["place"]["baseline_only"],
+    }
+
+
 def table(result: dict[str, Any]) -> str:
     """Markdown table of the result, one row per level and one for the headline."""
 
@@ -275,6 +309,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--chunk", type=int, default=10)
     parser.add_argument("--json", type=Path, help="write the result here")
     parser.add_argument("--no-yaw", action="store_true", help="skip reading the traces")
+    parser.add_argument(
+        "--baseline", type=Path, help="eval_batch directory of the same set to pair with"
+    )
     args = parser.parse_args(argv)
     plan = TrayRunPlan.load(args.plan)
     rows = [json.loads(line) for line in (args.set / "conditions.jsonl").read_text().splitlines()]
@@ -287,10 +324,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             if (steps := trace_of(args.out, r)) is not None:
                 yaw[(r.level, r.seed)] = yaw_errors(steps)
     result = summarize(plan, chosen, extra, missing, yaw, full)
+    if args.baseline is not None:
+        base, _, base_missing = collect(
+            args.baseline, chunk_plan(rows, args.chunk, phases_for(rows))
+        )
+        if base_missing:
+            raise ValueError(f"baseline misses {base_missing}")
+        result["paired"] = paired(chosen, base)
     if args.json is not None:
         args.json.write_text(json.dumps(result, indent=1) + "\n")
     print(table(result))
     counts = {"missing": len(result["missing"]), "yaw": result.get("yaw")}
+    if "paired" in result:
+        counts["paired"] = {k: result["paired"][k] for k in ("success_gain", "place_gain")}
     print(json.dumps({k: result[k] for k in ("rule0", "rollouts", "extra_rollouts")} | counts))
     return 0
 
