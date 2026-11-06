@@ -49,7 +49,7 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
 - [ ] 3. Eval và bảng kết quả, video (AC 3, 4) · **6/11/2026, Hiếu:** eval C đủ 270 điều kiện trên rtx3060, 1 worker, mức 1–2 xen kẽ trước, mức 0 cuối; chạy từ master sau PR mã eval
   - [x] 3.1 Mã eval trong `flywheel_psi0.tray`, test CPU: `eval_set` (điều kiện của plan thành dataset LeRobot một khung, có hash), `act_log` (proxy ghi mọi request với hash reply), `eval_driver` (cờ 7 bước của scorer và thời gian sim trong dòng outcome, hook trace DA-38; chỉ import `flywheel_simple` lúc chạy), `eval_batch` (lô 10 episode, chạy lại từ episode thiếu, chạy tiếp được, `runs.jsonl`)
   - [x] 3.2 Kiểm tất định (mục 8.5) và chạy thử; ghi giới hạn của EGL ở `docs/he/tray.md` kèm change log · **6/11/2026:** hỏng, ảnh reset EGL lệch 13/230 400 pixel, server tất định; Hiếu: chạy tiếp, ghi giới hạn (tray.md mục 8.2, 13)
-  - [ ] 3.3 Chạy cả lô 270 episode trên rtx3060 từ master, log đủ cho Agent QA/QC
+  - [x] 3.3 Chạy cả lô 270 episode trên rtx3060 từ master, log đủ cho Agent QA/QC · **6/11/2026:** master `2e57f60`, 1 worker, 27/27 lô lần đầu, mã 0, 0 episode thiếu, 14,15 giờ (tray.md mục 13.7)
   - [ ] 3.4 Bảng kết quả, đọc theo bậc 2 (tray.md mục 9, quy tắc 0), khoảng tin cậy bootstrap, tỷ lệ qua từng bước, loại lỗi, `Decision`; dòng ước lượng và thực đo trong sổ chi phí
   - [x] 3.5 Chuẩn bị C-max, chưa train: cắt 429 episode S1, RunPlan `draft`, `Decision` theo quy tắc 0, dòng ước lượng · **6/11/2026:** `rp_366283071c4a` (nháp, không khởi chạy được), tập `CMAX` 429 episode, bản cắt trên rtx3060, bản nháp `Decision` mở (tray.md mục 13.6)
 - [ ] 4. Nhánh B khi có video (AC 5)
