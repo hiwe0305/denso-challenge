@@ -30,7 +30,7 @@ Là AI Engineer, tôi muốn một agent đọc báo cáo dataset, log và outpu
 
 ## Nhiệm vụ
 
-- [ ] 1. Gọi endpoint cục bộ, model giả cho CI (AC 1)
+- [x] 1. Gọi endpoint cục bộ, model giả cho CI (AC 1)
 - [ ] 2. Đọc artifact, chặn `vault/`, kiểm số trích dẫn (AC 2, 3)
 - [ ] 3. Dựng hình từng stage (AC 4)
 - [ ] 4. `AgentReport`, HTML, `AgentReview` (AC 5)

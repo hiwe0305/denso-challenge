@@ -1,0 +1,45 @@
+# Agent QA/QC (DA-20): models, prompt and limits.
+# Design 27/10/2026 section 9.1; 03 ADR-19, ADR-24, ADR-26.
+#
+# Changing the prompt file or any model line is a new version of the agent: its
+# reports must be scored on the injected-defect bench again (DA-31) before use.
+
+models:
+  agent:
+    # Nemotron 3.5 Bolt E4B, Q4, served by Ollama on the RTX 3060 (Hiếu). Text only.
+    # Licence OpenMDW-1.1: record in Source before any product delivered to DENSO.
+    base_url: http://ubuntu-desktop.local:11434/v1
+    model: nemotron-3.5-bolt-e4b
+    revision: q4_K_M          # assumption until the served tag is pinned by digest
+    temperature: 0.0
+    max_tokens: 4096
+    timeout_s: 300
+    json_mode: true
+  vision:
+    # Qwen3.5-4B (Apache 2.0) behind a second endpoint, for the agent that looks at
+    # images (DA-20 AC 7, task 6). Off unless `vision.enabled` is true below.
+    base_url: http://ubuntu-desktop.local:11434/v1
+    model: qwen3.5:4b
+    revision: q4_K_M          # assumption
+    temperature: 0.0
+    max_tokens: 1024
+    timeout_s: 300
+    json_mode: false
+
+prompt: prompts/system.md
+
+limits:
+  context_tokens: 64000       # Nemotron's window (NVIDIA)
+  reply_tokens: 4096
+  chars_per_token: 3.5        # assumption for the budget check, English JSON
+  candidates_per_call: 20     # larger subjects are split into several calls
+  retries: 1                  # one more turn when the reply is not valid
+
+vision:
+  enabled: false
+  max_images: 6
+
+offline:                      # O1-O4 on probe P3 (design 10); assumptions until DA-09 calibrates
+  group_error: 0.3
+  chunk_growth: 2.0
+  hand_event_steps: 3.0
