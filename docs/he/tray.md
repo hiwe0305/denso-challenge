@@ -582,6 +582,31 @@ Chung cho T1 và T2:
 - **Đọc theo luật 14.1:** 0/20, nên **nghi chuỗi train/serve; không train gì cho tới khi tìm ra lỗi**. Trên cảnh đã train, C qua các bước tới `reach_b` gần như trên dev, rồi tắc ở `place` như trên dev. Kết quả này không ủng hộ giả thuyết "C học được cảnh train nhưng không tổng quát"; vì vậy chưa có lý do cho C-max.
 - `runs.jsonl` ở `rtx3060:~/denso-da34-pool/fwdata/tray/eval/check-t1-train-C20` (không commit).
 
+### 14.4 Kết quả T2b: `Ta = 24`, RTC tắt (sơ bộ, trên dev)
+
+- **Chạy.** Server của checkpoint C khởi động lại bằng `~/denso-da34-t4/serve.sh t2b 24 nortc` (script trên `rtx3060`):
+  - dừng container của eval C (`docker stop -t 30`) lúc 2026-11-06T22:12:09Z;
+  - chạy lại `scripts/g0/serve_psi0.sh serve` từ cùng cây `master` 7b585a7, cùng biến môi trường như eval C, cộng `ACTION_EXEC_HORIZON=24 RTC_FLAG=` (rỗng);
+  - container mới `fw-psi0-psi0-run-daa657455cb9` có tham số `--action-exec-horizon 24`, không có `--rtc`; khỏe lúc 22:14:29Z.
+
+  Lô từ cây `bb4cef1`, tập `t2-dev-L1-20-bb4cef1` (sha256 `0467f5e5…`), 22:14:39Z tới 23:17:11Z: 1,04 h, 2 lô 10, lần chạy 0, 0 thiếu, 186,6 s mỗi episode. Server nhận 3760 lần gọi `/act`, tức 188 mỗi episode, như eval C; log server không có lỗi; không thấy `llama-server` trên GPU.
+- **Số**, ghép cặp với eval C trên đúng 20 điều kiện (`eval_results --baseline`):
+
+| Bước | T2b qua (%) | Mốc eval C qua (%) | Cả hai | Chỉ T2b | Chỉ mốc | Không bên nào |
+|---|---|---|---|---|---|---|
+| approach_a | 55 | 80 | 11 | 0 | 5 | 4 |
+| grasp | 50 | 80 | 10 | 0 | 6 | 4 |
+| lift | 25 | 80 | 5 | 0 | 11 | 4 |
+| carry | 0 | 65 | 0 | 0 | 13 | 7 |
+| reach_b | 0 | 65 | 0 | 0 | 13 | 7 |
+| place | 0 | 0 | 0 | 0 | 0 | 20 |
+| release_stand | 0 | 0 | 0 | 0 | 0 | 20 |
+| **Thành công** | 0/20 (Wilson 0–16,1 %) | 0/20 | 0 | 0 | 0 | 20 |
+
+  Loại lỗi T2b: TIMEOUT 18, TRAY-TILT 1, PART-DROP 1. Số chu kỳ có yaw (quấn về ±π) vượt 2,5 rad: 9627 trên 90 000, so với 18 ở T1; đây là số đo, chưa kết luận.
+- **Đọc theo luật 14.2:** `success_gain` = 0, `place_gain` = 0, nên T2b **không đáng xem**. Tắt RTC, giữ `Ta = 24`, làm robot không mang được khay: không điều kiện nào qua `carry`, trong khi mốc qua 13/20.
+- `runs.jsonl` ở `rtx3060:~/denso-da34-pool/fwdata/tray/eval/check-t2b-ta24-nortc` (không commit).
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -592,3 +617,4 @@ Chung cho T1 và T2:
 | 7/11/2026 | Mục 14: luật đọc T1, T2 của bước kiểm pipeline ảnh ([Đề xuất]), viết trước rollout đầu tiên. T2: Ta = 10 với RTC không chạy được (`max_delay` 8), đề xuất T2b (Ta 24, RTC tắt) và T2a′ (Ta 10, RTC tắt) | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 14.2: Hiếu chốt hai biến thể T2b (Ta 24, RTC tắt) và T2a′ (Ta 10, RTC tắt) ("Đồng ý"), ghi trước rollout đầu tiên của T2; thêm `inference_delay` = 6 của eval C | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 14.3: kết quả T1 (0/20 trên 20 cảnh train của C, Wilson 0–16,1 %; `reach_b` 65 %, `place` 5 %). Đọc theo luật 14.1: nghi chuỗi train/serve, không train gì cho tới khi tìm ra lỗi. Luật 14.1, 14.2 không đổi | Hiếu (soạn với Claude) |
+| 7/11/2026 | Mục 14.4: kết quả T2b (`Ta = 24`, RTC tắt): 0/20, không qua `carry` ở điều kiện nào (mốc eval C 13/20); `success_gain` 0, `place_gain` 0, không đáng xem. Ghi lệnh khởi động lại server. Luật 14.2 không đổi | Hiếu (soạn với Claude) |
