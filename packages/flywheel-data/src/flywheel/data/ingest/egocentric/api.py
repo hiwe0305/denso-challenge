@@ -18,12 +18,16 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 from flywheel.contracts.artifacts import Episode
 from flywheel.data.annotate.deid.gate import annotate_allowed, require_annotate
+from flywheel.data.ingest.egocentric.compare import compare
 from flywheel.data.ingest.egocentric.config import EgoConfig
 from flywheel.data.ingest.egocentric.episodes import (
+    COMPARE,
     LABELS,
     POSE,
+    POSE_EA,
     SEGMENTS,
     Bundle,
     bundle_dir,
@@ -34,6 +38,7 @@ from flywheel.data.ingest.egocentric.episodes import (
     write_bundle,
     write_episodes,
 )
+from flywheel.data.ingest.egocentric.estimate import read_estimate, to_pose
 from flywheel.data.ingest.egocentric.pose import load_pose, read_egodex_pose, save_pose
 from flywheel.data.ingest.egocentric.segments import (
     Cut,
@@ -113,6 +118,44 @@ def write_eb_poses(work: Path) -> int:
     return count
 
 
+def estimate_jobs(work: Path, source: EgoSourceRecord) -> list[dict[str, object]]:
+    """The manifest `estimate_job.py` reads: every episode, E-B ones too (AC 5)."""
+    jobs = []
+    for episode in read_episodes(work):
+        require_gate(episode, source)  # E-A reads the video: de-identified first
+        bundle = read_bundle(work, episode.episode_id)
+        jobs.append({"episode_id": episode.episode_id,
+                     "mp4": Path(bundle.mp4).relative_to(source.root).as_posix(),
+                     "intrinsic": [list(r) for r in bundle.intrinsic], "fps": bundle.fps})
+    return jobs
+
+
+def import_estimates(work: Path, estimates: Path) -> dict[str, dict[str, object]]:
+    """E-A: pose_ea.npz from each job output; pose.npz too when there is no tracking;
+    compare.json where E-B exists. Returns the deviations by episode."""
+    deviations = {}
+    source = read_source(work)
+    for episode in read_episodes(work):
+        raw = estimates / f"{episode.episode_id}.npz"
+        if not raw.is_file():
+            continue
+        require_gate(episode, source)
+        bundle = read_bundle(work, episode.episode_id)
+        folder = bundle_dir(work, episode.episode_id)
+        estimate = read_estimate(raw)
+        pose = to_pose(estimate)
+        save_pose(pose, folder / POSE_EA)
+        if bundle.hdf5 is None:
+            save_pose(pose, folder / POSE)
+            continue
+        deviation = compare(load_pose(folder / POSE), estimate, _intrinsic(bundle),
+                            bundle.image_size).to_dict()
+        deviation["meta"] = estimate.meta
+        (folder / COMPARE).write_text(json.dumps(deviation, indent=2) + "\n")
+        deviations[episode.episode_id] = deviation
+    return deviations
+
+
 def frames_reader(bundle: Bundle, max_side: int) -> Callable[[Sequence[int]], list[bytes]]:
     def frames_of(indices: Sequence[int]) -> list[bytes]:
         return [jpeg(f) for f in read_frames(Path(bundle.mp4), indices, max_side)]
@@ -148,3 +191,5 @@ def annotate(work: Path, cfg: EgoConfig, models: Models = Models()) -> dict[str,
     return cuts
 
 
+def _intrinsic(bundle: Bundle) -> np.ndarray:  # type: ignore[type-arg]
+    return np.array(bundle.intrinsic, dtype=np.float64)
