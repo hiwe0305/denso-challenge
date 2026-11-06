@@ -53,6 +53,7 @@ class Spec:
     task: str = "pick_place_cup"
     split: str = "train"
     deid_status: str = "raw"
+    confidence_recorded: bool = True  # False: all-NaN confidence, as DA-04 writes it
     episode: dict[str, Any] = field(default_factory=dict)  # overrides of the Episode
 
 
@@ -216,6 +217,8 @@ def build(
             for tip in TIPS:
                 transforms[f"{side}{tip}"] = trajectory(rng, spec.frames, (x, 0.95, -0.5))
         confidence = rng.uniform(0.6, 1.0, spec.frames)
+        if not spec.confidence_recorded:
+            confidence[:] = np.nan
         descriptions = [f"Pick the cup {spec.episode_id}", f"Place the cup {spec.episode_id}"]
         if spec.pose_source == "E-B":
             n = numbers.get(spec.task, 0)
