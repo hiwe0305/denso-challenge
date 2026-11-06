@@ -609,7 +609,7 @@ Sửa 3/11/2026 [Đã chốt, issue #34]: D2 thêm rơi khung, D5 thêm trùng e
 
 **F-SYS · Runtime và hệ thống**: R1 độ trễ p99 > τ_lat; R2 buffer cạn; R3 bám lệnh WBC kém (`_cmd` so với `_meas` > τ_track); R4 lệch đồng bộ trên trace; R5 lệch calibration camera; R6 server lỗi (ghi `infra_status`, không tính là lỗi policy).
 
-(Sửa 5/11/2026) **[Đã chốt, Hiếu]** R2 là chunk có `delay_steps` vượt độ trễ RTC d của server (6 với cờ serve của đội; `configs/eval/diagnosis/system.yaml`), không phải max_delay của checkpoint; R1, R2 bỏ chunk 0. Trên rollout đồng bộ của SIMPLE, R1, R2 vẫn đo nhưng chỉ ghi nhận, không quy lỗi (sim chờ server nên độ trễ không gây hỏng, như R4); chỉ rollout bất đồng bộ (DA-23) tính chúng. Rollout không rõ chế độ không được coi là đồng bộ.
+(Sửa 5/11/2026) **[Đã chốt, Hiếu]** R2 là chunk có `delay_steps` vượt độ trễ RTC d của server (6 với cờ serve của đội; `configs/eval/diagnosis/system.yaml`), không phải max_delay của checkpoint; R1, R2 bỏ chunk 0. Trên rollout đồng bộ của SIMPLE, R1, R2 vẫn đo nhưng chỉ ghi nhận, không quy lỗi (sim chờ server nên độ trễ không gây hỏng, như R4); chỉ rollout bất đồng bộ (DA-23) tính chúng. Rollout không rõ chế độ không được coi là đồng bộ. Luật đồng bộ chỉ có hiệu lực khi hợp đồng ghi chế độ rollout (`RolloutResult.timing`, PR hợp đồng riêng); trước đó mọi rollout thật là không rõ chế độ, nên R1, R2 vẫn được tính.
 
 **Quy lỗi về stage** (sau kiểm hệ thống và kiểm dữ liệu, trước kiểm khả thi; kỹ sư xác nhận trên evidence card):
 
