@@ -95,5 +95,6 @@ Số đo của một lần chạy; chi tiết ở story DA-38, ghi chép nhiệm
 | `camera_params.jsonl` | Có, 2 camera, hash đã ghim | Không (chưa ghim bản tham chiếu khay) |
 | Thời gian client | 147 s cho 2 episode, 1 worker | 208 s cho 2 episode, 2 worker `spawn` |
 | `fw eval score` | `steps.jsonl`: không đọc được (khác artifact). Tệp V7 tạm chỉ có `t`: đọc được, cả 6 bước "chưa rõ" | Không chạy (chưa có config scorer khay) |
-| `fw eval diag-system` | Đọc được, mã 0; LỖI CONTROLLER (R3 thân trên 2,57 và 2,65; thân dưới 1,75 và 0,82; ngưỡng giả định); R1, R2 bỏ qua | Đọc được, mã 0; LỖI CONTROLLER (R3 thân trên 2,53 và 2,60; thân dưới 2,93 và 3,06, do `target_yaw` gần ngược hướng yaw đo); R1, R2, R5 bỏ qua |
+| `fw eval diag-system` | Đọc được, mã 0. Nhãn LỖI CONTROLLER ở ngưỡng giả định: R3 thân trên 2,57 và 2,65, thân dưới 1,75 và 0,82. R1, R2 bỏ qua | Đọc được, mã 0. Nhãn LỖI CONTROLLER ở ngưỡng giả định: R3 thân trên 2,53 và 2,60, thân dưới 2,93 và 3,06. R1, R2, R5 bỏ qua |
 
+Cả 4/4 episode bị gắn LỖI CONTROLLER do R3, ở ngưỡng còn là giả định. Chưa kiểm nguyên nhân: có thể là lỗi bám thật; có thể là policy sai task (lượt khay dùng checkpoint hai bàn); có thể là `target_yaw` và yaw đo khác hệ quy chiếu. Ngón tay lệch lệnh khi đang cầm vật cũng là chuyện bình thường. Vì vậy kết quả `diag-system` trên sim ở đây **chưa được hiệu chỉnh và chưa dùng để kết luận được**. Các trace này là đầu vào để DA-13 và DA-37 hiệu chỉnh ngưỡng.

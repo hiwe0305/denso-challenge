@@ -215,11 +215,11 @@ Hệ quả:
   - 1200 chu kỳ mỗi episode, `t_state` cách nhau đúng 0,02 s; 50 khung ảnh, mỗi chunk 24 bước một khung.
   - Cả 28 kênh thân trên và 7 kênh thân dưới có phương sai khác 0.
   - `sim_success` False, False, khớp `eval_stats.txt` của SIMPLE. `infra_status` là `ok`. `camera_params_hash` là hash đã ghim.
-- `fw eval diag-system --episode <trace_id>/` đọc được cả hai trace, mã thoát 0, chẩn đoán LỖI CONTROLLER:
-  - R3 thân trên 2,57 và 2,65 (ngưỡng giả định 0,1): ngón `index_0`, `middle_0` tay phải lệch lệnh khoảng 0,9 rad (trung vị), nghĩa là ngón bị chặn khi chạm bàn hoặc vật. Các khớp cánh tay và tay trái lệch dưới 0,2 rad.
-  - R3 thân dưới 1,75 và 0,82 (ngưỡng giả định 0,15): `yaw` đo bám `target_yaw` trễ khoảng 40 chu kỳ khi robot quay sang bàn đích, rồi hội tụ. Đây là sai số bám thật, không phải lỗi quấn góc (R3 đã quấn `yaw`).
+- `fw eval diag-system --episode <trace_id>/` đọc được cả hai trace, mã thoát 0. Nhãn nó gắn là LỖI CONTROLLER, ở ngưỡng R3 còn là giả định. Dưới đây là số đo; nguyên nhân chưa kiểm:
+  - R3 thân trên 2,57 và 2,65 (ngưỡng giả định 0,1). Ngón `index_0`, `middle_0` tay phải lệch lệnh khoảng 0,9 rad (trung vị); các khớp cánh tay và tay trái lệch dưới 0,2 rad. Chưa kiểm ngón lệch vì đang cầm hay chạm vật (bình thường khi gắp), hay là lỗi bám thật.
+  - R3 thân dưới 1,75 và 0,82 (ngưỡng giả định 0,15). Khi robot quay sang bàn đích, `yaw` đo đi sau `target_yaw` khoảng 40 chu kỳ, rồi hội tụ; R3 đã quấn `yaw`, nên đây không phải chênh 2π. Chưa kiểm độ trễ này có vượt mức WBC vẫn bám bình thường không.
   - R1, R2 bỏ qua vì không có `rtc.jsonl`.
-  - Ngưỡng R3 là việc của DA-13 và DA-37; trace này là dữ liệu thật đầu tiên để hiệu chỉnh.
+  - Ngưỡng R3 là việc của DA-13 và DA-37; trace này là dữ liệu thật đầu tiên để hiệu chỉnh. Phần kiểm theo từng khớp ở trên chỉ cho thấy thứ tự khớp của hook đúng (cánh tay và tay trái bám sát); nó không kết luận gì về controller.
 - **Phạm vi `fw eval score` [Đã chốt 5/11/2026, Hiếu]:** "(b) Giữ DA-38, giao cho 3.4 (Recommended)" (chuyển qua phiên "Công việc của Hiếu (todo)"). `TaskDefinition` hai bàn và tín hiệu vật, tiếp xúc của nó thuộc story 3.4 (Hưng), như DA-37 đã ghi phụ thuộc. DA-38 không sửa hợp đồng hay config.
 - Kết quả chạy `fw eval score` với một task giả (không commit; khai 6 bước và tín hiệu của `two-table.yaml`, `evaluate()` không phán bước nào):
   - Trên `steps.jsonl` của hook: **không đọc được**, mã 2: `tín hiệu trace_id phải là số hoặc null`. Reader của scorer (`flywheel.eval.scorer.reader`) đọc trace tín hiệu task (dòng V7 của 03 mục 4.2, mỗi dòng một object JSON phẳng toàn số), và docstring của nó ghi rõ không phải log `TraceStep` của DA-13. Hai trace là hai artifact khác nhau, nên `steps.jsonl` không thể là đầu vào của `fw eval score`.
@@ -266,10 +266,14 @@ Hệ quả:
   - `sim_success` False, False, khớp `eval_stats.txt`. `infra_status` là `ok`.
   - Không có `camera_params.jsonl`, vì task khay chưa có bản tham chiếu ghim.
   - Client thoát mã 0, nhờ `DEBUG=1`.
-- `fw eval diag-system` đọc được cả hai, mã 0, LỖI CONTROLLER:
+- `fw eval diag-system` đọc được cả hai, mã 0, nhãn LỖI CONTROLLER ở ngưỡng giả định. Số đo:
   - R3 thân trên 2,53 và 2,60.
-  - R3 thân dưới 2,93 và 3,06. `target_yaw` gần ngược hướng yaw đo (lệch −3,10 rad sau khi quấn góc); robot vẫn đứng, chiều cao gốc 0,74 m suốt episode.
+  - R3 thân dưới 2,93 và 3,06. Ở dòng 4004 của episode 1, `target_yaw` trừ yaw đo là −3,10 rad sau khi quấn góc; chiều cao gốc 0,74 m suốt episode.
   - R1, R2, R5 bỏ qua.
+  - **Chưa kiểm:**
+    - đây là lỗi bám thật của WBC, hay là checkpoint hai bàn (đã học bước quay khoảng 180°) ra lệnh quay trên cảnh khay mà robot không quay theo, tức policy sai task;
+    - `target_yaw` và yaw đo có cùng hệ quy chiếu trên cảnh khay không (tuyệt đối hay tương đối so với hướng ban đầu của robot).
+- **Kết luận cho cả hai task [Đề xuất].** 4/4 episode thật (2 hai bàn, 2 khay) đều bị gắn LỖI CONTROLLER do R3, ở ngưỡng còn là giả định. Kết quả `diag-system` trên sim vì vậy **chưa được hiệu chỉnh và chưa dùng để kết luận được**. Trace của DA-38 là đầu vào cho bước hiệu chỉnh của DA-13 và DA-37, không phải bằng chứng về controller.
 - `fw eval score` không chạy trên task khay: chưa có config scorer khay, và phạm vi (b) chỉ nói task hai bàn.
 - **Sự cố docker trên máy, ngoài DA-38.** Từ 01:33Z có người dọn docker trên `rtx3060` (`container prune`, `builder prune`, xóa image). Theo `docker events`:
   - 01:34:33Z xóa image `phyrc-2027:isaac-6.0.1`;
