@@ -35,7 +35,7 @@ from typing import Any
 
 import numpy as np
 
-from flywheel_psi0.tray.eval_batch import Chunk, attempts, chunk_plan, finished
+from flywheel_psi0.tray.eval_batch import Chunk, attempts, chunk_plan, finished, phases_for
 from flywheel_psi0.tray.runplan import TrayRunPlan
 
 # flywheel_simple.tray.predicates.STEP_NAMES; SIMPLE's venv is not this package's.
@@ -176,13 +176,18 @@ def summarize(
     extra: dict[tuple[int, int], int],
     missing: Sequence[tuple[int, int]],
     yaw: dict[tuple[int, int], dict[str, float]] | None = None,
+    full: bool = True,
 ) -> dict[str, Any]:
+    """With `full` False (a smaller set, tray.md 14), levels without rollouts are left out
+    and rule 0 is not reported: it reads the plan's whole eval set only."""
     if plan.eval.by_level is None:
         raise ValueError("eval_results reads a version 2 plan (eval.by_level)")
     stats = plan.stats
-    by_level = {c.level: [r for r in chosen if r.level == c.level] for c in plan.eval.by_level}
+    present = {r.level for r in chosen} | {level for level, _ in missing}
+    by_level_cfg = [c for c in plan.eval.by_level if full or c.level in present]
+    by_level = {c.level: [r for r in chosen if r.level == c.level] for c in by_level_cfg}
     levels = {}
-    for c in plan.eval.by_level:
+    for c in by_level_cfg:
         summary = level_summary(by_level[c.level])
         summary["unit"] = c.unit
         if by_level[c.level]:
@@ -193,7 +198,7 @@ def summarize(
                 stats.ci,
             )
         levels[str(c.level)] = summary
-    headline_levels = [c.level for c in plan.eval.by_level if c.headline]
+    headline_levels = [c.level for c in by_level_cfg if c.headline]
     headline_rollouts = [r for level in headline_levels for r in by_level[level]]
     headline = level_summary(headline_rollouts)
     headline["levels"] = headline_levels
@@ -201,13 +206,16 @@ def summarize(
     if all(groups):
         headline["ci"] = bootstrap_ci(groups, stats.resamples, stats.seed, stats.ci)
     everything = level_summary(chosen)
-    everything["levels"] = [c.level for c in plan.eval.by_level]
+    everything["levels"] = [c.level for c in by_level_cfg]
     p = headline["p"]
     result: dict[str, Any] = {
         "levels": levels,
         "headline": headline,
         "all": everything,
-        "rule0": {"threshold": RULE0_P, "p": p, "fires": p is not None and p < RULE0_P},
+        "rule0": (
+            {"threshold": RULE0_P, "p": p, "fires": p is not None and p < RULE0_P} if full else None
+        ),
+        "full_eval_set": full,
         "rollouts": len(chosen),
         "missing": [list(m) for m in missing],
         "extra_rollouts": sum(extra.values()),
@@ -242,7 +250,8 @@ def table(result: dict[str, Any]) -> str:
         "|---" * (7 + len(STEP_NAMES)) + "|",
     ]
     rows = [(k, v) for k, v in result["levels"].items()]
-    rows.append(("1–2 gộp", result["headline"]))
+    if result.get("full_eval_set", True):
+        rows.append(("1–2 gộp", result["headline"]))
     rows.append(("cả lô", result["all"]))
     for name, s in rows:
         ci = s.get("ci")
@@ -269,14 +278,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     plan = TrayRunPlan.load(args.plan)
     rows = [json.loads(line) for line in (args.set / "conditions.jsonl").read_text().splitlines()]
-    chosen, extra, missing = collect(args.out, chunk_plan(rows, args.chunk))
+    chosen, extra, missing = collect(args.out, chunk_plan(rows, args.chunk, phases_for(rows)))
+    full = sorted((int(r["level"]), int(r["seed"])) for r in rows) == sorted(plan.eval_conditions())
     yaw = None
     if not args.no_yaw:
         yaw = {}
         for r in chosen:
             if (steps := trace_of(args.out, r)) is not None:
                 yaw[(r.level, r.seed)] = yaw_errors(steps)
-    result = summarize(plan, chosen, extra, missing, yaw)
+    result = summarize(plan, chosen, extra, missing, yaw, full)
     if args.json is not None:
         args.json.write_text(json.dumps(result, indent=1) + "\n")
     print(table(result))

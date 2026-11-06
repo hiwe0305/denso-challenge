@@ -168,3 +168,15 @@ def test_the_trace_of_a_rollout_is_found_by_episode(tmp_path: Path) -> None:
     chosen, _, _ = collect(tmp_path, [L1])
     assert trace_of(tmp_path, chosen[1]) == second
     assert len(STEP_NAMES) == 7
+
+
+def test_a_smaller_set_reports_its_levels_and_no_rule_0(tmp_path: Path) -> None:
+    chunk = Chunk("l1-000", 1, 0, tuple(1000100 + i for i in range(20)))
+    for i in range(20):
+        episode(tmp_path, chunk, 0, i, success=i < 2)
+    chosen, extra, missing = collect(tmp_path, [chunk])
+    result = summarize(PLAN, chosen, extra, missing, full=False)
+    assert list(result["levels"]) == ["1"] and result["levels"]["1"]["successes"] == 2
+    assert result["rule0"] is None and result["full_eval_set"] is False
+    assert result["all"]["n"] == 20
+    assert "gộp" not in table(result) and "| cả lô | 20 | 2 | 10.0 |" in table(result)

@@ -60,6 +60,16 @@ class Chunk:
         return self.seeds[episode - self.start]
 
 
+def phases_for(rows: Sequence[dict[str, Any]]) -> tuple[tuple[int, ...], ...]:
+    """PHASES cut to the levels of the set (a smaller set of tray.md 14 has level 1 only)."""
+    levels = {int(row["level"]) for row in rows}
+    known = {level for phase in PHASES for level in phase}
+    if not levels <= known:
+        raise ValueError(f"set has levels {sorted(levels - known)} outside {PHASES}")
+    cut = (tuple(level for level in phase if level in levels) for phase in PHASES)
+    return tuple(phase for phase in cut if phase)
+
+
 def chunk_plan(
     rows: Sequence[dict[str, Any]], size: int, phases: Sequence[Sequence[int]] = PHASES
 ) -> list[Chunk]:
@@ -278,7 +288,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if len(plan_ids) != 1:
         print(f"set mixes run plans {sorted(plan_ids)}", file=sys.stderr)
         return 1
-    chunks = chunk_plan(rows, args.chunk)
+    chunks = chunk_plan(rows, args.chunk, phases_for(rows))
     if args.dry_run:
         for chunk in chunks:
             print(chunk.id, chunk.seeds[0], chunk.seeds[-1], len(chunk.seeds))

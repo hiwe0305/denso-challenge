@@ -150,3 +150,42 @@ def test_an_existing_set_is_never_overwritten(release: Path, tmp_path: Path) -> 
     build(PLAN, release, tmp_path / "set")
     with pytest.raises(FileExistsError):
         build(PLAN, release, tmp_path / "set")
+
+
+# The first 20 seeds of set C in the hash order of demo_sets-v2.json (docs/he/tray.md 14.1).
+T1_SEEDS = [1279, 1574, 1503, 1572, 1386, 1532, 1531, 1013, 1274, 1117,
+            1398, 1210, 1599, 1193, 1338, 1408, 1554, 1350, 1405, 1038]  # fmt: skip
+
+
+def test_t1_is_the_first_20_of_set_c_in_hash_order_as_train_scenes(
+    release: Path, tmp_path: Path
+) -> None:
+    build(PLAN, release, tmp_path / "t1", train_set=("C", 20))
+    rows = lines(tmp_path / "t1/conditions.jsonl")
+    assert [r["seed"] for r in rows] == T1_SEEDS
+    sets = json.loads((ROOT / "configs/runplans/tray/demo_sets-v2.json").read_text())["sets"]
+    assert set(T1_SEEDS) <= set(sets["C"]["seeds"]) and set(T1_SEEDS) <= set(sets["N40"]["seeds"])
+    assert {r["level"] for r in rows} == {1}  # the release's level
+    assert [p.name for p in (tmp_path / "t1").glob("dr-level-*")] == ["dr-level-1"]
+    config = rows[0]["environment_config"]
+    assert config["tray"] == {"sample": {"level": 1, "seed": 1279}}
+    assert config["metadata"]["split"] == config["flywheel"]["split"] == "train"
+    assert config["flywheel"]["purpose"] == "pipeline_check"
+    assert {r["unit"] for r in rows} == {"train_condition"}
+
+
+def test_t2_is_the_full_sets_rows_of_its_seeds(release: Path, tmp_path: Path) -> None:
+    build(PLAN, release, tmp_path / "full")
+    build(PLAN, release, tmp_path / "t2", subset=(1, 1000100, 1000120))
+    full = [r for r in lines(tmp_path / "full/conditions.jsonl") if r["level"] == 1][:20]
+    assert lines(tmp_path / "t2/conditions.jsonl") == full
+    with pytest.raises(ValueError):
+        build(PLAN, release, None, subset=(1, 1000200, 1000240))  # past the plan's seeds
+
+
+def test_the_cli_takes_a_train_set_or_a_subset(release: Path, tmp_path: Path) -> None:
+    base = [str(PLAN), "--release", str(release)]
+    assert main([*base, "--out", str(tmp_path / "a"), "--train-set", "C", "--first", "20"]) == 0
+    assert main([*base, "--out", str(tmp_path / "b"), "--only", "1:1000100:1000120"]) == 0
+    with pytest.raises(SystemExit):
+        main([*base, "--out", str(tmp_path / "c"), "--train-set", "C"])

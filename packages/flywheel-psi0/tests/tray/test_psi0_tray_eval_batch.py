@@ -7,7 +7,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from flywheel_psi0.tray.eval_batch import Chunk, chunk_plan, finished, missing, run_batch
+from flywheel_psi0.tray.eval_batch import (
+    Chunk,
+    chunk_plan,
+    finished,
+    missing,
+    phases_for,
+    run_batch,
+)
 
 
 def rows(counts: dict[int, int]) -> list[dict[str, Any]]:
@@ -105,3 +112,10 @@ def test_the_batch_stops_when_a_chunk_keeps_failing(tmp_path: Path) -> None:
 
     assert run_batch(tmp_path, [CHUNK, later], launch, max_attempts=2, log=lambda _: None) == 1
     assert seen == ["l1-010", "l1-010"]
+
+
+def test_phases_are_cut_to_the_levels_of_a_smaller_set() -> None:
+    assert phases_for([{"level": 1}, {"level": 1}]) == ((1,),)
+    assert phases_for([{"level": 0}, {"level": 2}]) == ((2,), (0,))
+    with pytest.raises(ValueError):
+        phases_for([{"level": 3}])
