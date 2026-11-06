@@ -25,7 +25,7 @@ Là kỹ sư dữ liệu, tôi muốn dữ liệu egocentric do pipeline của �
 
 ## Nhiệm vụ
 
-- [ ] 1. Export định dạng stage 1 và stats (AC 1)
+- [x] 1. Export định dạng stage 1 và stats (AC 1)
 - [ ] 2. Contract test bằng loader của Ψ₀ (AC 2)
 - [ ] 3. Export cho video tự quay (AC 3)
 
