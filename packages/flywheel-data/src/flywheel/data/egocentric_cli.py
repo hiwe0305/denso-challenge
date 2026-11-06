@@ -32,15 +32,20 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import typer
-from flywheel.data.api import ConfigError, job_ledger
+from flywheel.data.api import ConfigError, dataset_report, job_ledger, render_html
 from flywheel.data.config import store_root
 from flywheel.data.ingest.egocentric import api
 from flywheel.data.ingest.egocentric import review as reviewing
 from flywheel.data.ingest.egocentric.config import EgoConfig, load_config
 from flywheel.data.ingest.egocentric.episodes import (
+    COMPARE,
+    SEGMENTS,
+    bundle_dir,
     read_bundle,
     read_episodes,
 )
+from flywheel.data.ingest.egocentric.report import summarize_ego, write_page
+from flywheel.data.ingest.egocentric.segments import read_segment_rows
 from flywheel.data.ingest.egocentric.source import register_egodex
 from flywheel.data.ingest.egocentric.video_source import register_videos
 from flywheel.data.ingest.egocentric.vlm import ModelLabeler, ModelSuggester, OpenAIVision
@@ -151,6 +156,54 @@ def annotate(
             job.notes.append(f"{segments} segments, {open_events} events left ambiguous")
     _say(f"{len(cuts)} episodes, {segments} segments; {open_events} events the rules left"
          f" open{' and the model did not settle' if endpoint else ' (no model given)'}")
+    _say(f"ledger: {job.run_plan_id}/{job.job_id}")
+
+
+@app.command()
+def qa(work: Work, config: Config = CONFIG, run_plan_id: RunPlan = None) -> None:
+    """Egocentric QA of every episode: qa/egocentric.jsonl."""
+
+    with _refusals():
+        cfg = load_config(config)
+        with _job("qa", _frames(work), run_plan_id) as job:
+            reports = api.qa(work, cfg)
+            counts = {d: sum(r.decision == d for r in reports) for d in ("pass", "flag",
+                                                                           "reject")}
+            job.notes.append(json.dumps(counts))
+    _say(f"{len(reports)} QAReports: {counts}; thresholds {cfg.threshold_version}")
+    _say(f"ledger: {job.run_plan_id}/{job.job_id}")
+
+
+@app.command()
+def report(work: Work, config: Config = CONFIG, run_plan_id: RunPlan = None) -> None:
+    """DatasetReport and the page with its egocentric part: report/."""
+    with _refusals():
+        cfg = load_config(config)
+        episodes = read_episodes(work)
+        with _job("report", len(episodes), run_plan_id) as job:
+            source = api.read_source(work)
+            reports = api.read_reports(work)
+            dataset_id = f"ego_{source.source_id}"
+            segments, frames, deviations = {}, {}, {}
+            for e in episodes:
+                folder = bundle_dir(work, e.episode_id)
+                bundle = read_bundle(work, e.episode_id)
+                frames[e.episode_id] = (bundle.frames, bundle.fps)
+                if (folder / SEGMENTS).is_file():
+                    segments[e.episode_id] = read_segment_rows(folder / SEGMENTS)
+                if (folder / COMPARE).is_file():
+                    deviations[e.episode_id] = json.loads((folder / COMPARE).read_text())
+            contract = dataset_report(dataset_id, episodes, reports)
+            summary = summarize_ego(dataset_id, source, episodes, reports, segments, frames,
+                                    deviations, {k: r.on_fail for k, r in cfg.qa.items()})
+            out = work / "report"
+            out.mkdir(exist_ok=True)
+            (out / "dataset_report.json").write_text(contract.model_dump_json(indent=2) + "\n")
+            (out / "egocentric.json").write_text(summary.to_json() + "\n")
+            page = render_html(contract, out / "index.html")
+            write_page(page, summary)
+            job.notes.append(f"{summary.segments} segments, decisions {summary.decisions}")
+    _say(f"page: {page}")
     _say(f"ledger: {job.run_plan_id}/{job.job_id}")
 
 
