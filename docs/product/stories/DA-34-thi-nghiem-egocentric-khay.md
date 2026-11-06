@@ -46,7 +46,12 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
   - [x] 2.2 (5/11/2026) Dựng bản cắt C trên rtx3060 (`demo_subset.py` ở master a5e863f, sau PR #121), `colab_train check` qua: `cut_problems` rỗng, n = 160, `set_hash` a202cc02… tính lại từ seed của bản cắt, tree sha256 6db888a1…; ở `~/denso-da34-pool/fwdata/cut-c-rp_a04c14e79dfd`
   - [x] 2.3 (5/11/2026) Chạy C trên Colab L4 theo runbook, từ master 5632c74, phiên `da34-t2-ft-c-s0` (03:08–11:24Z): đủ 40.000 bước, `result.json` ok, `train exit 0`; `ckpt_10000`…`ckpt_40000` về laptop, sha256 khớp VM. `follow` thoát 5 do race của `stage` (đã kiểm, không phải lỗi train); hai listing sau khi dừng: 0 assignment. MANIFEST.md (435 mục, 25,47 GB) cho Agent QA/QC; bản chép sang rtx3060 ở `~/denso-da34-pool/fwdata/tray/runs/da34-t2-ft-c-s0`
   - [x] 2.4 (5/11/2026) Dòng `measured` của `job_da34_ft_C`: 15,99 CU theo `colab usage` (ước lượng 16,8, cap 18), 40.000 bước, phiên 8,27 giờ, train 8,08 giờ (0,724 s/bước); trỏ về dòng ước lượng 16,8 CU
-- [ ] 3. Eval và bảng kết quả, video (AC 3, 4)
+- [ ] 3. Eval và bảng kết quả, video (AC 3, 4) · **6/11/2026, Hiếu:** eval C đủ 270 điều kiện trên rtx3060, 1 worker, mức 1–2 xen kẽ trước, mức 0 cuối; chạy từ master sau PR mã eval
+  - [x] 3.1 Mã eval trong `flywheel_psi0.tray`, test CPU: `eval_set` (điều kiện của plan thành dataset LeRobot một khung, có hash), `act_log` (proxy ghi mọi request với hash reply), `eval_driver` (cờ 7 bước của scorer và thời gian sim trong dòng outcome, hook trace DA-38; chỉ import `flywheel_simple` lúc chạy), `eval_batch` (lô 10 episode, chạy lại từ episode thiếu, chạy tiếp được, `runs.jsonl`)
+  - [ ] 3.2 Kiểm tất định (mục 8.5) và chạy thử; ghi giới hạn của EGL ở `docs/he/tray.md` kèm change log
+  - [ ] 3.3 Chạy cả lô 270 episode trên rtx3060 từ master, log đủ cho Agent QA/QC
+  - [ ] 3.4 Bảng kết quả, đọc theo bậc 2 (tray.md mục 9, quy tắc 0), khoảng tin cậy bootstrap, tỷ lệ qua từng bước, loại lỗi, `Decision`; dòng ước lượng và thực đo trong sổ chi phí
+  - [ ] 3.5 Chuẩn bị C-max, chưa train: cắt 429 episode S1, RunPlan `draft`, `Decision` theo quy tắc 0, dòng ước lượng
 - [ ] 4. Nhánh B khi có video (AC 5)
 - [ ] 5. Vòng Failure → Data trên lỗi của C: chẩn đoán, sinh nhắm lỗi, fine-tune và eval C+ (AC 6; trước 12/11/2026)
 
