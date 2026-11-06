@@ -1,0 +1,143 @@
+"""DA-20 AC 3, 5: the agent ranks and explains on code's facts; a reply that breaks a rule
+never becomes findings."""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from pathlib import Path
+
+from agentqa_build import (
+    SYSTEM_YAML,
+    TRAIN_YAML,
+    EchoModel,
+    ScriptedModel,
+    config,
+    qa_work,
+    rtc_job,
+    train_job,
+)
+from flywheel.eval.agentqa.agent import build_messages, run_agent
+from flywheel.eval.agentqa.analyze import analyze_dataset, analyze_rtc, analyze_train
+from flywheel.eval.agentqa.inputs import collect, load_file
+
+NOW = datetime(2026, 11, 6, 9, 0, tzinfo=timezone.utc)
+NAN = "finite_values (D1): 3 non-finite value(s) in action"
+
+
+def _dataset(tmp_path: Path, reasons: dict[int, list[str]]):  # type: ignore[no-untyped-def]
+    work = qa_work(tmp_path / "work", 5, reasons)
+    found = collect([work])
+    return analyze_dataset(found, "work/qa/reports.jsonl")
+
+
+def test_code_candidates_become_ranked_findings(tmp_path: Path) -> None:
+    analysis = _dataset(tmp_path, {1: [NAN], 3: [NAN]})
+    report = run_agent(analysis, EchoModel(), config(), now=NOW)
+    assert report.status == "ok"
+    assert [(f.rank, f.code, f.target_ref) for f in report.findings] == [
+        (1, "D1", "episode_000001"), (2, "D1", "episode_000003")
+    ]
+    assert report.findings[0].insight.startswith("D1 on episode_000001: {F")
+
+
+def test_the_model_reorders_by_priority_and_may_drop(tmp_path: Path) -> None:
+    analysis = _dataset(tmp_path, {1: [NAN], 3: [NAN]})
+    c1, c2 = analysis.candidates
+    reply = {
+        "decisions": [
+            {"cid": c1.cid, "keep": False, "reason": "seen before"},
+            {"cid": c2.cid, "keep": True, "priority": 1, "insight": f"NaN in {{{c2.evidence[0]}}}",
+             "suggestion": "Re-record the episode."},
+        ],
+    }
+    report = run_agent(analysis, ScriptedModel([reply]), config(), now=NOW)
+    assert [(f.code, f.target_ref) for f in report.findings] == [("D1", "episode_000003")]
+
+
+def test_an_invented_number_is_sent_back_then_breaks_the_report(tmp_path: Path) -> None:
+    analysis = _dataset(tmp_path, {1: [NAN]})
+    (c1,) = analysis.candidates
+    bad = {"decisions": [{"cid": c1.cid, "insight": "NaN in 42 frames", "suggestion": "fix"}]}
+    model = ScriptedModel([bad, bad])
+    report = run_agent(analysis, model, config(), now=NOW)
+    assert report.status == "broken"
+    assert report.findings == []
+    assert "42" in report.problems[0]
+    assert len(model.messages) == 2
+    assert "broke the rules" in model.messages[1][-1]["content"]
+
+
+def test_a_retry_that_follows_the_rules_is_kept(tmp_path: Path) -> None:
+    analysis = _dataset(tmp_path, {1: [NAN]})
+    (c1,) = analysis.candidates
+    bad = {"decisions": [{"cid": c1.cid, "insight": "NaN in 42 frames", "suggestion": "fix"}]}
+    good = {"decisions": [{"cid": c1.cid, "insight": f"NaN, see {{{c1.evidence[0]}}}",
+                           "suggestion": "fix"}]}
+    report = run_agent(analysis, ScriptedModel([bad, good]), config(), now=NOW)
+    assert report.status == "ok" and len(report.findings) == 1
+
+
+def test_an_added_finding_needs_an_allowed_code_and_a_unit(tmp_path: Path) -> None:
+    analysis = _dataset(tmp_path, {})
+    fid = analysis.book.facts[0].fact_id
+    off_stage = {"added": [{"code": "T1", "target": "episode_000001", "insight": f"{{{fid}}}",
+                            "suggestion": "x", "evidence": [fid]}]}
+    report = run_agent(analysis, ScriptedModel([off_stage, off_stage]), config(), now=NOW)
+    assert report.status == "broken" and "not allowed" in report.problems[0]
+    ok = {"added": [{"code": "D5", "target": "episode_000002", "priority": 2,
+                     "insight": f"same as another, {{{fid}}}", "suggestion": "dedupe",
+                     "evidence": [fid]}]}
+    report = run_agent(analysis, ScriptedModel([ok]), config(), now=NOW)
+    assert [(f.code, f.target_ref) for f in report.findings] == [("D5", "episode_000002")]
+
+
+def test_estimates_keep_their_basis(tmp_path: Path) -> None:
+    analysis = _dataset(tmp_path, {1: [NAN]})
+    fid = analysis.book.facts[0].fact_id
+    reply = {"estimates": [{"quantity": "episodes left after quarantine", "low": 3, "high": 4,
+                            "unit": "episodes", "basis": [fid]}]}
+    report = run_agent(analysis, ScriptedModel([reply]), config(), now=NOW)
+    assert [(e.low, e.high, e.basis) for e in report.estimates] == [(3.0, 4.0, [fid])]
+
+
+def test_an_unreachable_endpoint_breaks_the_report(tmp_path: Path) -> None:
+    from flywheel.eval.agentqa.endpoint import OpenAIEndpoint
+
+    analysis = _dataset(tmp_path, {1: [NAN]})
+    dead = OpenAIEndpoint(base_url="http://127.0.0.1:9/v1", model="m", revision="r",
+                          timeout_s=0.5)
+    report = run_agent(analysis, dead, config(), now=NOW)
+    assert report.status == "broken" and "endpoint failed" in report.problems[0]
+
+
+def test_many_candidates_are_split_into_calls(tmp_path: Path) -> None:
+    analysis = _dataset(tmp_path, {i: [NAN] for i in range(5)})
+    small = config().__class__(**{**config().__dict__, "candidates_per_call": 2})
+    model = EchoModel()
+    report = run_agent(analysis, model, small, now=NOW)
+    assert model.calls == 3
+    assert [f.rank for f in report.findings] == [1, 2, 3, 4, 5]
+
+
+def test_the_payload_fits_the_window_by_dropping_uncited_facts(tmp_path: Path) -> None:
+    analysis = _dataset(tmp_path, {1: [NAN]})
+    for i in range(3000):
+        analysis.book.add(f"filler_{i}", i, "x")
+    tight = config().__class__(**{**config().__dict__, "context_tokens": 6000})
+    messages, facts = build_messages(analysis, analysis.candidates, tight)
+    cited = set(analysis.candidates[0].evidence)
+    assert cited <= {f.fact_id for f in facts}
+    assert len(facts) < len(analysis.book.facts)
+    assert len(messages[1]["content"]) <= (6000 - tight.reply_tokens) * tight.chars_per_token
+
+
+def test_train_and_rtc_findings_come_from_the_lane_detectors(tmp_path: Path) -> None:
+    metrics = train_job(tmp_path / "train" / "job-nan",
+                        loss=lambda s: "NaN" if s == 50 else 1.0 / (s + 1))
+    train = analyze_train(load_file(metrics), "train/job-nan", TRAIN_YAML)
+    assert ("T1", "train/job-nan") in {(c.code, c.target) for c in train.candidates}
+    log = rtc_job(tmp_path / "rtc" / "job-slow", latency=0.3)
+    rtc = analyze_rtc(load_file(log), "rtc/job-slow", SYSTEM_YAML)
+    assert "R1" in {c.code for c in rtc.candidates}
+    report = run_agent(rtc, EchoModel(), config(), now=NOW)
+    assert report.stage == "inference" and report.findings[0].code == "R1"
