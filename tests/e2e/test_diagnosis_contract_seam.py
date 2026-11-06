@@ -27,7 +27,11 @@ def test_system_record_matches_shared_contract() -> None:
         skipped=[SystemSkipRecord(code="R5", reason="missing reference")],
     )
     shared = SystemDiagnosis.model_validate_json(lane.model_dump_json())
-    assert shared.model_dump(mode="json") == lane.model_dump(mode="json")
+    # The lane record gains timing/recorded/recorded_skipped with DA-13 task 11.5
+    # (PR #142); until then they take the contract's defaults.
+    new = {"timing", "recorded", "recorded_skipped"}
+    assert shared.model_dump(mode="json", exclude=new) == lane.model_dump(mode="json")
+    assert (shared.timing, shared.recorded, shared.recorded_skipped) == (None, [], [])
 
 
 def test_stage_record_matches_shared_contract() -> None:

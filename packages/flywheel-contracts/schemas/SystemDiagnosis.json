@@ -197,6 +197,36 @@
       },
       "title": "Skipped",
       "type": "array"
+    },
+    "timing": {
+      "anyOf": [
+        {
+          "enum": [
+            "sync",
+            "async"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Timing"
+    },
+    "recorded": {
+      "items": {
+        "$ref": "#/$defs/SystemFinding"
+      },
+      "title": "Recorded",
+      "type": "array"
+    },
+    "recorded_skipped": {
+      "items": {
+        "$ref": "#/$defs/DiagnosisSkip"
+      },
+      "title": "Recorded Skipped",
+      "type": "array"
     }
   },
   "required": [

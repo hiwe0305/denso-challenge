@@ -133,6 +133,7 @@ result = RolloutResult.model_validate(
         "usage": {"wall_seconds": 12.5},
         "camera_params_hash": None,
         "adapter_info": {"name": "simple", "version": "0.1.0"},
+        "timing": "async",
         "timing_verdict": "starved",
         "starved_steps": 3,
     }

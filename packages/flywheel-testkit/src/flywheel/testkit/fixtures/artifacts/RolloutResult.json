@@ -18,6 +18,7 @@
     "image_digest": null,
     "nondeterminism": []
   },
+  "timing": "async",
   "timing_verdict": "starved",
   "starved_steps": 3
 }
