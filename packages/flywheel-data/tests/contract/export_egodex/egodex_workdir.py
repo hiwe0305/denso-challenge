@@ -187,7 +187,14 @@ def write_common(
     (work / "qa" / "egocentric.jsonl").write_text(text, encoding="utf-8")
 
 
-def build(work: Path, specs: Sequence[Spec], *, seed: int = 0, waiver: bool = True) -> Path:
+def build(
+    work: Path,
+    specs: Sequence[Spec],
+    *,
+    seed: int = 0,
+    waiver: bool = True,
+    intrinsic: bool = True,
+) -> Path:
     """Write the synthetic work dir under `work`; returns `work`."""
     rng = np.random.default_rng(seed)
     e_a = any(spec.pose_source == "E-A" for spec in specs)
@@ -232,7 +239,7 @@ def build(work: Path, specs: Sequence[Spec], *, seed: int = 0, waiver: bool = Tr
         else:
             mp4 = work / "raw" / "video" / f"{spec.episode_id}.mp4"
             write_video(mp4, spec.frames)
-            pose = pose_from_transforms(transforms, confidence, INTRINSIC)
+            pose = pose_from_transforms(transforms, confidence, INTRINSIC if intrinsic else None)
             write_bundle(work, spec, pose, None, mp4, descriptions)
         episodes.append(episode_record(spec, source["source_id"]))
     write_common(work, source, specs, episodes)

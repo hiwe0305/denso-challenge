@@ -27,7 +27,7 @@ Là kỹ sư dữ liệu, tôi muốn dữ liệu egocentric do pipeline của �
 
 - [x] 1. Export định dạng stage 1 và stats (AC 1)
 - [x] 2. Contract test bằng loader của Ψ₀ (AC 2)
-- [ ] 3. Export cho video tự quay (AC 3)
+- [x] 3. Export cho video tự quay (AC 3)
 
 ## Phạm vi file
 
@@ -65,7 +65,12 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
+- Giờ thực: 4,5 giờ (nhiệm vụ 1: 1,5; 2: 1,5; 3: 1,5), Hiếu làm cùng Claude từ 6/11/2026 (plan chia lại việc của Hưng).
+- Công cụ AI đã dùng: Claude Code (Claude Opus 5.5).
 - Ghi chú hoàn thành:
-- File đã tạo hoặc sửa:
+  - Đầu vào là work dir của DA-04 theo plan 6/11/2026 mục 4.2a; test dùng work dir tổng hợp theo đúng mục đó. DA-04 cần ghi thêm `intrinsic` (3, 3) vào `pose.npz` cho E-A **[Đề xuất]**: loader của Ψ₀ đọc `camera/intrinsic` ở mọi mẫu, còn episode E-A không có HDF5.
+  - `actions_48d` khớp đúng từng số với bản do script H-RDT của tác giả tính trên 20 episode EgoDex; stats lệch tối đa 9e-8 so với `calc_stat.py` của tác giả.
+  - Loader của Ψ₀ ở `cda3fdf` (image của tác giả trên `rtx3060`) đọc lại đúng batch đã lưu, cả 40 mẫu EgoDex thật và mẫu E-A.
+  - Phát hiện: với `img_history_size` 1 và `upsample_rate` 3, `parse_img_data` của Ψ₀ lấy khung `index - 2` (không nhỏ hơn 0) chứ không phải khung `index`. Đây là hành vi của tác giả; bản export giữ video và HDF5 khớp từng khung.
+  - Chưa xong ngoài phạm vi: `build_release` (DA-03) vẫn đóng băng release toàn egocentric với `kind` robot; test `xfail` strict ghi lại, đề xuất PR riêng cho DA-03.
+- File đã tạo hoặc sửa: `packages/flywheel-data/src/flywheel/data/export/egodex.py`, `packages/flywheel-data/tests/contract/export_egodex/`, `docs/g0/ledger/DA-18.csv`.
