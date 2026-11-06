@@ -70,11 +70,11 @@ from typing import Any
 
 import numpy as np
 import pyarrow.parquet as pq  # type: ignore[import-untyped]
-from numpy.typing import NDArray
 from flywheel.contracts.artifacts import Episode, QAReport
 from flywheel.contracts.base import canonical_json, content_id
 from flywheel.contracts.segments import Segment
 from flywheel.data.api import deid_blocks_annotate, job_ledger
+from numpy.typing import NDArray
 
 PSI0_COMMIT = "cda3fdf"
 FORMAT = "psi0-stage1-egodex"
