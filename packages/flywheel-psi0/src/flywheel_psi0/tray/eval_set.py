@@ -19,6 +19,14 @@ decodes frames only when one is read, and only policy `vlt` reads them), and
     python -m flywheel_psi0.tray.eval_set configs/runplans/tray/he-tray-v2.yaml \
         --release <release dir> --out fwdata/tray/eval-sets/rp_a04c14e79dfd
     python -m flywheel_psi0.tray.eval_set ... --check <sha256>
+
+Two smaller sets for the image pipeline check of rule 0 (docs/he/tray.md section 14):
+
+* `--train-set C --first 20`: the first 20 episodes of the plan's demo set C in the
+  hash order the sets were cut from (`demo_sets.rank`), at the release's level, with
+  split train: the scenes C was trained on (T1);
+* `--only 1:1000100:1000120`: the plan's eval conditions of level 1, seeds
+  [1000100, 1000120), row for row as in the full set (T2).
 """
 
 from __future__ import annotations
@@ -32,7 +40,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from flywheel_psi0.tray.runplan import TrayRunPlan, run_plan_id
+from flywheel_psi0.tray.demo_sets import DemoSets, ReleaseEpisode, rank
+from flywheel_psi0.tray.runplan import REPO, TrayRunPlan, file_sha256, run_plan_id
 
 DATA = "data/chunk-000/episode_{:06d}.parquet"
 
@@ -43,17 +52,22 @@ def conditions_sha256(rows: list[dict[str, Any]]) -> str:
 
 
 def environment_config(
-    template: dict[str, Any], level: int, seed: int, plan_id: str
+    template: dict[str, Any],
+    level: int,
+    seed: int,
+    plan_id: str,
+    split: str = "dev",
+    purpose: str = "eval",
 ) -> dict[str, Any]:
     """The release episode's config with the tray sample of (level, seed) and no recorded report."""
     config = copy.deepcopy(template)
-    config.setdefault("metadata", {}).update(dr_level=level, split="dev")
+    config.setdefault("metadata", {}).update(dr_level=level, split=split)
     config["tray"] = {"sample": {"level": level, "seed": seed}}
     config["flywheel"] = {
         "seed": seed,
         "level": level,
-        "purpose": "eval",
-        "split": "dev",
+        "purpose": purpose,
+        "split": split,
         "run_plan_id": plan_id,
     }
     return config
@@ -73,6 +87,44 @@ def condition_rows(plan: TrayRunPlan, template: dict[str, Any]) -> list[dict[str
         }
         for c in plan.eval.by_level
         for seed in range(c.seeds.start, c.seeds.stop)
+    ]
+
+
+def only(rows: list[dict[str, Any]], level: int, start: int, stop: int) -> list[dict[str, Any]]:
+    """The rows of `level` with seed in [start, stop); all of them must be in the set."""
+    picked = [r for r in rows if r["level"] == level and start <= r["seed"] < stop]
+    if len(picked) != stop - start:
+        raise ValueError(f"the plan has {len(picked)} conditions in {level}:{start}:{stop}")
+    return picked
+
+
+def train_rows(
+    plan: TrayRunPlan, repo: Path, template: dict[str, Any], set_name: str, first: int
+) -> list[dict[str, Any]]:
+    """The first `first` episodes of a demo set in its hash order, as train conditions."""
+    path = repo / plan.demo_sets.file
+    if plan.demo_sets.file_sha256 is not None and file_sha256(path) != plan.demo_sets.file_sha256:
+        raise ValueError(f"{plan.demo_sets.file} is not the demo-set file the plan pins")
+    sets = DemoSets.model_validate_json(path.read_text(encoding="utf-8"))
+    demo = sets.sets[set_name]
+    if not 0 < first <= demo.n:
+        raise ValueError(f"set {set_name} has {demo.n} episodes, asked for {first}")
+    episodes = [
+        ReleaseEpisode(episode_index=i, seed=s)
+        for i, s in zip(demo.episode_indices, demo.seeds, strict=True)
+    ]
+    level = int(template["tray"]["sample"]["level"])
+    plan_id = run_plan_id(plan)
+    return [
+        {
+            "level": level,
+            "seed": seed,
+            "unit": "train_condition",
+            "environment_config": environment_config(
+                template, level, seed, plan_id, split="train", purpose="pipeline_check"
+            ),
+        }
+        for seed in rank(sets.release_hash, episodes, sets.salt)[:first]
     ]
 
 
@@ -145,11 +197,23 @@ def write_level(
             st.write(json.dumps({"episode_index": i, "stats": episode_stats}) + "\n")
 
 
-def build(plan_path: Path, release: Path, out: Path | None) -> str:
+def build(
+    plan_path: Path,
+    release: Path,
+    out: Path | None,
+    train_set: tuple[str, int] | None = None,
+    subset: tuple[int, int, int] | None = None,
+    repo: Path = REPO,
+) -> str:
     """The conditions' sha256; with `out`, also the datasets and conditions.jsonl."""
     plan = TrayRunPlan.load(plan_path)
     info, template, tasks, stats = read_template(release)
-    rows = condition_rows(plan, template)
+    if train_set is not None:
+        rows = train_rows(plan, repo, template, *train_set)
+    else:
+        rows = condition_rows(plan, template)
+        if subset is not None:
+            rows = only(rows, *subset)
     digest = conditions_sha256(rows)
     if out is None:
         return digest
@@ -177,8 +241,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     target = parser.add_mutually_exclusive_group(required=True)
     target.add_argument("--out", type=Path)
     target.add_argument("--check", help="conditions sha256 of an earlier build")
+    kind = parser.add_mutually_exclusive_group()
+    kind.add_argument("--train-set", help="demo set of the plan, e.g. C (with --first)")
+    kind.add_argument("--only", help="LEVEL:START:STOP of the plan's eval conditions")
+    parser.add_argument("--first", type=int, help="episodes of --train-set, in hash order")
     args = parser.parse_args(argv)
-    digest = build(args.plan, args.release, args.out)
+    if (args.train_set is None) != (args.first is None):
+        parser.error("--train-set and --first go together")
+    train_set = None if args.train_set is None else (args.train_set, args.first)
+    subset = None
+    if args.only is not None:
+        level, start, stop = (int(x) for x in args.only.split(":"))
+        subset = (level, start, stop)
+    digest = build(args.plan, args.release, args.out, train_set, subset)
     print(digest)
     if args.check is not None and digest != args.check:
         print(f"conditions moved: {digest} != {args.check}", file=sys.stderr)
