@@ -34,12 +34,14 @@ import typer
 from flywheel.data.api import ConfigError, job_ledger
 from flywheel.data.config import store_root
 from flywheel.data.ingest.egocentric import api
-from flywheel.data.ingest.egocentric.config import load_config
+from flywheel.data.ingest.egocentric import review as reviewing
+from flywheel.data.ingest.egocentric.config import EgoConfig, load_config
 from flywheel.data.ingest.egocentric.episodes import (
     read_bundle,
     read_episodes,
 )
 from flywheel.data.ingest.egocentric.source import register_egodex
+from flywheel.data.ingest.egocentric.vlm import ModelLabeler, ModelSuggester, OpenAIVision
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -86,7 +88,7 @@ def ingest(
             out = work or store / "pipeline" / record.source_id
             episodes = api.ingest(record, out, cfg, store, split)
             job.notes.append(f"{len(episodes)} episodes of {record.source_id}")
-    waiver = "waived (D2)" if record.deid_waiver else "not waived: blocked at annotate"
+    waiver = "waived (D2)" if record.deid_waiver else "not waived: blocked before E-A and annotate"
     _say(f"{record.source_id}: {len(episodes)} episodes, {len(record.files)} files,"
          f" {record.total_bytes / 1e6:.1f} MB; de-identification {waiver}")
     _say(f"work: {out}")
@@ -101,6 +103,58 @@ def pose(work: Work, run_plan_id: RunPlan = None) -> None:
         frames = _frames(work)
         with _job("pose", frames, run_plan_id) as job:
             message = f"E-B pose of {api.write_eb_poses(work)} episodes"
+            job.notes.append(message)
+    _say(message)
+    _say(f"ledger: {job.run_plan_id}/{job.job_id}")
+
+
+@app.command()
+def annotate(
+    work: Work,
+    endpoint: Endpoint = None,
+    config: Config = CONFIG,
+    run_plan_id: RunPlan = None,
+) -> None:
+    """Gate, then cut every episode into steps with sentences (rules, then the model)."""
+
+    with _refusals():
+        cfg = load_config(config)
+        with _job("annotate", _frames(work), run_plan_id) as job:
+            models = _models(cfg, endpoint)
+            cuts = api.annotate(work, cfg, models)
+            segments = sum(len(c.segments) for c in cuts.values())
+            open_events = sum(e.unresolved for c in cuts.values() for e in c.events)
+            job.notes.append(f"{segments} segments, {open_events} events left ambiguous")
+    _say(f"{len(cuts)} episodes, {segments} segments; {open_events} events the rules left"
+         f" open{' and the model did not settle' if endpoint else ' (no model given)'}")
+    _say(f"ledger: {job.run_plan_id}/{job.job_id}")
+
+
+@app.command()
+def review(
+    work: Work,
+    sample: Annotated[bool, typer.Option("--sample", help="write review/sheet.jsonl")] = False,
+    apply_sheet: Annotated[Path | None, typer.Option("--apply", help="filled sheet")] = None,
+    config: Config = CONFIG,
+    run_plan_id: RunPlan = None,
+) -> None:
+    """Sample segments for a person, or write their decisions back (label_source human)."""
+
+    with _refusals():
+        cfg = load_config(config)
+        episodes = read_episodes(work)
+        with _job("review", len(episodes), run_plan_id) as job:
+            if sample == (apply_sheet is not None):
+                raise ValueError("give exactly one of --sample and --apply <sheet>")
+            if apply_sheet is None:
+                rows = reviewing.sample(work, [e.episode_id for e in episodes],
+                                        cfg.review_share, cfg.review_seed)
+                sheet = work / "review" / "sheet.jsonl"
+                reviewing.write_sheet(sheet, rows)
+                message = f"{len(rows)} segments to review: {sheet}"
+            else:
+                counts = reviewing.apply(work, reviewing.read_sheet(apply_sheet))
+                message = f"review applied: {counts}; run `fw egocentric qa` again"
             job.notes.append(message)
     _say(message)
     _say(f"ledger: {job.run_plan_id}/{job.job_id}")
@@ -128,6 +182,18 @@ def _job(command: str, units: int, run_plan_id: str | None) -> Any:
 def _frames(work: Path) -> int:
 
     return sum(read_bundle(work, e.episode_id).frames for e in read_episodes(work))
+
+
+def _models(cfg: EgoConfig, endpoint: str | None) -> api.Models:
+
+    if endpoint is None:
+        return api.Models()
+    roles = cfg.models
+    suggester = OpenAIVision(endpoint, roles["segment_suggester"].served, cfg.timeout_s)
+    labeler = OpenAIVision(endpoint, roles["labeler"].served, cfg.timeout_s)
+    return api.Models(ModelSuggester(suggester), ModelLabeler(labeler), {
+        role: f"{roles[role].name}@{roles[role].revision[:12]}"
+        for role in ("segment_suggester", "labeler")})
 
 
 def _say(text: str) -> None:
