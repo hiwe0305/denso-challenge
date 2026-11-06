@@ -48,7 +48,7 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
   - [x] 2.4 (5/11/2026) Dòng `measured` của `job_da34_ft_C`: 15,99 CU theo `colab usage` (ước lượng 16,8, cap 18), 40.000 bước, phiên 8,27 giờ, train 8,08 giờ (0,724 s/bước); trỏ về dòng ước lượng 16,8 CU
 - [ ] 3. Eval và bảng kết quả, video (AC 3, 4) · **6/11/2026, Hiếu:** eval C đủ 270 điều kiện trên rtx3060, 1 worker, mức 1–2 xen kẽ trước, mức 0 cuối; chạy từ master sau PR mã eval
   - [x] 3.1 Mã eval trong `flywheel_psi0.tray`, test CPU: `eval_set` (điều kiện của plan thành dataset LeRobot một khung, có hash), `act_log` (proxy ghi mọi request với hash reply), `eval_driver` (cờ 7 bước của scorer và thời gian sim trong dòng outcome, hook trace DA-38; chỉ import `flywheel_simple` lúc chạy), `eval_batch` (lô 10 episode, chạy lại từ episode thiếu, chạy tiếp được, `runs.jsonl`)
-  - [ ] 3.2 Kiểm tất định (mục 8.5) và chạy thử; ghi giới hạn của EGL ở `docs/he/tray.md` kèm change log
+  - [x] 3.2 Kiểm tất định (mục 8.5) và chạy thử; ghi giới hạn của EGL ở `docs/he/tray.md` kèm change log · **6/11/2026:** hỏng, ảnh reset EGL lệch 13/230 400 pixel, server tất định; Hiếu: chạy tiếp, ghi giới hạn (tray.md mục 8.2, 13)
   - [ ] 3.3 Chạy cả lô 270 episode trên rtx3060 từ master, log đủ cho Agent QA/QC
   - [ ] 3.4 Bảng kết quả, đọc theo bậc 2 (tray.md mục 9, quy tắc 0), khoảng tin cậy bootstrap, tỷ lệ qua từng bước, loại lỗi, `Decision`; dòng ước lượng và thực đo trong sổ chi phí
   - [ ] 3.5 Chuẩn bị C-max, chưa train: cắt 429 episode S1, RunPlan `draft`, `Decision` theo quy tắc 0, dòng ước lượng
