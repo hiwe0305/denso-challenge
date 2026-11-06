@@ -33,7 +33,7 @@ Là kỹ sư dữ liệu, tôi muốn video egocentric của người đi qua c�
 - [x] 2. Che danh tính và chặn `raw` (AC 2)
 - [x] 3. Cắt đoạn và nhãn ngôn ngữ (AC 3)
 - [x] 4. Pose E-B đọc từ EgoDex (AC 4)
-- [ ] 5. Pose E-A ước lượng từ RGB, so với E-B (AC 4, 5)
+- [x] 5. Pose E-A ước lượng từ RGB, so với E-B (AC 4, 5)
 - [ ] 6. QA riêng và phần egocentric của báo cáo dataset (AC 5, 7)
 - [ ] 7. Bộ đọc video tự quay (AC 6)
 

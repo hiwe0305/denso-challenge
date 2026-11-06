@@ -23,6 +23,7 @@ after the measured row is written.
 
 from __future__ import annotations
 
+import json
 import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -96,13 +97,28 @@ def ingest(
 
 
 @app.command()
-def pose(work: Work, run_plan_id: RunPlan = None) -> None:
-    """E-B from the tracking of every EgoDex episode: pose.npz."""
+def pose(
+    work: Work,
+    job_file: Annotated[Path | None, typer.Option("--job", help="write the E-A job manifest")]
+    = None,
+    estimates: Annotated[Path | None, typer.Option(help="dir of the E-A job's .npz")] = None,
+    run_plan_id: RunPlan = None,
+) -> None:
+    """E-B from tracking; or the E-A job manifest; or E-A from the job, compared with E-B."""
 
     with _refusals():
+        source = api.read_source(work)
         frames = _frames(work)
         with _job("pose", frames, run_plan_id) as job:
-            message = f"E-B pose of {api.write_eb_poses(work)} episodes"
+            if job_file is not None:
+                jobs = api.estimate_jobs(work, source)
+                job_file.write_text(json.dumps(jobs, indent=1) + "\n")
+                message = f"E-A job manifest: {len(jobs)} episodes -> {job_file}"
+            elif estimates is not None:
+                deviations = api.import_estimates(work, estimates)
+                message = f"E-A read for {len(deviations)} episodes with E-B; compare.json"
+            else:
+                message = f"E-B pose of {api.write_eb_poses(work)} episodes"
             job.notes.append(message)
     _say(message)
     _say(f"ledger: {job.run_plan_id}/{job.job_id}")
