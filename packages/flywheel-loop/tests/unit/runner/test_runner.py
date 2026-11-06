@@ -29,6 +29,7 @@ from flywheel.contracts.v0 import (
 from flywheel.loop.runner import EvalConfig, LatencyProfile, Runner, load_trace
 from flywheel.loop.runner.config import load_eval_config
 from flywheel.testkit.fakes import FakePolicy, FakeSim2D
+from pydantic import ValidationError
 
 TASK = TaskRef(task_id="toy-pick-place")
 SPEC = FakePolicy().describe(CheckpointRef(checkpoint_id="base"))
@@ -486,6 +487,19 @@ def test_async_rollout_failed_by_the_adapter_is_not_checked(tmp_path: Path) -> N
     assert result.infra_status == "timeout"
     assert result.timing_verdict == "not_checked"
     assert result.starved_steps is None
+
+
+def test_sync_result_with_a_timing_verdict_is_refused(tmp_path: Path) -> None:
+    sim = RTCLoggingSim(tmp_path)
+    runner = _runner(sim, tmp_path)
+    original = sim.rollout
+
+    def rollout(req: RolloutRequest, policy: PolicyEndpoint) -> RolloutResult:
+        return original(req, policy).model_copy(update={"timing_verdict": "ok"})
+
+    sim.rollout = rollout  # type: ignore[method-assign]
+    with pytest.raises(ValidationError, match="sync rollout"):
+        runner.run_rollout(_request(sim), _endpoint())
 
 
 def test_eval_yaml_sets_refill_level_to_psi0_max_delay() -> None:
