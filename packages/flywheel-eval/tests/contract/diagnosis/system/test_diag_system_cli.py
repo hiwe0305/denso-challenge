@@ -187,6 +187,54 @@ def test_the_shipped_config_prints_an_unjudged_calibration(write_episode) -> Non
     assert "bỏ qua R5" in result.output
 
 
+def _slow_rtc(folder: Path) -> None:
+    """Every chunk at 0.4 s, 20 steps of delay: R1 and R2 both fire (DA-13 AC 7)."""
+    path = folder.parent / RTC_NAME
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    path.write_text(
+        "".join(
+            json.dumps(dict(row, chunk_received_s=row["observation_sent_s"] + 0.4, delay_steps=20))
+            + "\n"
+            for row in rows
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_a_slow_sync_rollout_prints_clean_with_r1_and_r2_recorded(
+    write_episode, pinned_config, tmp_path
+) -> None:
+    folder = write_episode()
+    _slow_rtc(folder)
+    (folder / ROLLOUT_NAME).write_text(json.dumps(dict(ROLLOUT_RESULT, timing="sync")))
+    store = tmp_path / "store"
+
+    result = _run("--episode", str(folder), "--config", str(pinned_config), "--store", str(store))
+
+    assert result.exit_code == 0, result.output
+    assert "không thấy lỗi hệ thống" in result.output
+    assert "rollout: đồng bộ" in result.output
+    assert "phát hiện: 0; bỏ qua: 0" in result.output
+    assert "ghi nhận, không quy lỗi: 2" in result.output
+    stored = json.loads((store / SYSTEM_RECORDS).read_text(encoding="utf-8"))
+    assert stored["timing"] == "sync"
+    assert [finding["code"] for finding in stored["recorded"]] == ["R1", "R2"]
+
+
+def test_a_slow_rollout_of_unknown_mode_prints_the_runtime_label(
+    write_episode, pinned_config
+) -> None:
+    folder = write_episode()
+    _slow_rtc(folder)
+
+    result = _run("--episode", str(folder), "--config", str(pinned_config))
+
+    assert result.exit_code == 0, result.output
+    assert "LỖI RUNTIME" in result.output
+    assert "rollout: không rõ chế độ" in result.output
+    assert "ghi nhận, không quy lỗi" not in result.output
+
+
 def test_the_record_is_appended_not_replaced(write_episode, pinned_config, tmp_path) -> None:
     episode = write_episode()
     store = tmp_path / "store"

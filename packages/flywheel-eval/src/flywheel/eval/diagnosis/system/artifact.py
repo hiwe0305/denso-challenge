@@ -11,7 +11,7 @@ landed. The switch is registered as a task of the story. The records are
 append-only JSONL in the store until `flywheel.store` offers a writer, which
 is the same guarantee in the simplest form that holds it.
 
-Three things the record has to keep, because they are the difference between a
+Four things the record has to keep, because they are the difference between a
 diagnosis and an opinion:
 
 * **What was not judged.** `skipped` travels with `findings`, so a record with
@@ -25,15 +25,11 @@ diagnosis and an opinion:
   is hashed beside `trace_sha256` (None where the episode had no such file).
   Without them one trace with two RTC logs gives two verdicts nothing tells
   apart.
-
-What this record cannot hold yet is a synchronous rollout's R1 and R2, which
-are recorded without counting (`verdict.py`, decision (a) of 5/11/2026). The
-shared `SystemDiagnosis` has no field for the rollout's mode or for findings
-that do not count, and refuses `clean` beside any finding, so they have no
-place in it; DA-13 task 11.2 proposes the contract change. Until then
-`build_system_record` refuses such a verdict rather than drop what it
-measured. The reader never states "sync" today, so no episode read from disk
-reaches that refusal.
+* **What was measured and not counted.** On a synchronous rollout R1 and R2
+  are recorded without counting (`verdict.py`, decision (a) of 5/11/2026).
+  They go into `recorded` and `recorded_skipped`, beside the rollout's
+  `timing`, the three fields `SystemDiagnosis` gained in PR #146: the label
+  stays what the counted codes say, and the latency still travels with it.
 
 The stage attribution has its own record beside this one, in
 `diagnosis/stage/artifact.py`, because it is answered per failure while this
@@ -43,9 +39,10 @@ is answered per episode.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from flywheel.eval.diagnosis.system.reader import SystemInputs
-from flywheel.eval.diagnosis.system.verdict import SystemError, SystemVerdict
+from flywheel.eval.diagnosis.system.verdict import Skipped, SystemFinding, SystemVerdict
 from pydantic import BaseModel, ConfigDict, Field
 
 SYSTEM_RECORDS = Path("diagnosis") / "system.jsonl"
@@ -90,24 +87,17 @@ class SystemDiagnosisRecord(BaseModel):
     infra_status: str | None = None
     findings: list[SystemFindingRecord] = Field(default_factory=list)
     skipped: list[SystemSkipRecord] = Field(default_factory=list)
+    # The rollout's mode as the inputs stated it; None is unknown, never sync.
+    timing: Literal["sync", "async"] | None = None
+    # R1 and R2 of a synchronous rollout: measured, kept, never in the label.
+    recorded: list[SystemFindingRecord] = Field(default_factory=list)
+    recorded_skipped: list[SystemSkipRecord] = Field(default_factory=list)
 
 
 def build_system_record(
     verdict: SystemVerdict, config_sha256: str, inputs: SystemInputs
 ) -> SystemDiagnosisRecord:
-    """The record of one system check: both lists, and the hash of every input.
-
-    Raises `SystemError` on a verdict holding R1 or R2 recorded on a
-    synchronous rollout: the contract has nowhere to put them (module
-    docstring), and leaving them out would be a record that says less than
-    the check measured.
-    """
-    if verdict.recorded or verdict.recorded_skipped:
-        raise SystemError(
-            f"episode `{verdict.episode_id}`: R1, R2 của rollout đồng bộ được ghi nhận, "
-            f"không quy lỗi, nhưng `SystemDiagnosis` chưa có trường cho chúng (đề xuất "
-            f"hợp đồng, DA-13 nhiệm vụ con 11.2); không ghi bản ghi thiếu"
-        )
+    """The record of one system check: every list, the mode, and the hash of every input."""
     return SystemDiagnosisRecord(
         episode_id=verdict.episode_id,
         diagnosis=verdict.diagnosis.value,
@@ -117,21 +107,30 @@ def build_system_record(
         camera_sha256=inputs.camera_sha256,
         infra_sha256=inputs.infra_sha256,
         infra_status=verdict.infra_status,
-        findings=[
-            SystemFindingRecord(
-                code=finding.code,
-                value=finding.value,
-                threshold=finding.threshold,
-                part=finding.part,
-                where=finding.where,
-                detail=finding.detail,
-            )
-            for finding in verdict.findings
-        ],
-        skipped=[
-            SystemSkipRecord(code=skip.code, reason=skip.reason) for skip in verdict.skipped
-        ],
+        findings=_findings(verdict.findings),
+        skipped=_skips(verdict.skipped),
+        timing=verdict.timing,
+        recorded=_findings(verdict.recorded),
+        recorded_skipped=_skips(verdict.recorded_skipped),
     )
+
+
+def _findings(findings: list[SystemFinding]) -> list[SystemFindingRecord]:
+    return [
+        SystemFindingRecord(
+            code=finding.code,
+            value=finding.value,
+            threshold=finding.threshold,
+            part=finding.part,
+            where=finding.where,
+            detail=finding.detail,
+        )
+        for finding in findings
+    ]
+
+
+def _skips(skipped: list[Skipped]) -> list[SystemSkipRecord]:
+    return [SystemSkipRecord(code=skip.code, reason=skip.reason) for skip in skipped]
 
 
 def write_system_record(record: SystemDiagnosisRecord, store_path: Path) -> Path:
