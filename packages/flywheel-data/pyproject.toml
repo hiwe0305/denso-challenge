@@ -9,7 +9,7 @@ requires-python = ">=3.10"
 dependencies = ["flywheel-contracts", "flywheel-store", "numpy", "pyarrow", "pyyaml", "typer"]
 
 [project.optional-dependencies]
-egocentric = []
+egocentric = ["h5py>=3.11", "opencv-python-headless>=4.10"]
 
 [project.entry-points."flywheel.commands"]
 data = "flywheel.data.cli:app"
