@@ -645,3 +645,11 @@ def test_the_rule_0_decision_draft_names_v2_and_the_cmax_plan() -> None:
     assert decision.criteria["rules_sha256"] == v2.interpretation.rules_sha256
     assert decision.criteria["threshold_p"] == 0.10
     assert decision.criteria["c_max_plan"]["run_plan_id"] == run_plan_id(cmax)
+    variants = decision.criteria["c_max_variants"]
+    s1_only, s1_s2 = variants["i_s1_only"], variants["ii_s1_plus_s2"]
+    assert s1_only["plan"]["run_plan_id"] == run_plan_id(cmax)
+    sets = json.loads((REPO / cmax.demo_sets.file).read_text())["sets"]
+    assert s1_only["episodes"] == sets["CMAX"]["n"] == len(sets["CMAX"]["seeds"]) == 429
+    assert s1_only["demo_set_hash"] == cmax.demo_sets.hashes["CMAX"]
+    # (ii) waits for an S2 release: no numbers are filled in for it
+    assert s1_s2["plan"] is None and s1_s2["episodes"] is None and s1_s2["demo_set_hash"] is None

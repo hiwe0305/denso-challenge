@@ -6,7 +6,17 @@
  "meta": {
   "status": "draft",
   "story": "DA-34",
-  "subtask": "3.5"
+  "subtask": "3.5",
+  "gaps": [
+   "metrics, verdict and per-level p, CI, per-step pass rates and failure kinds of C: from eval_results when eval C ends",
+   "rule 0 says 'check the image pipeline': no procedure or result for that check exists yet",
+   "C-max vs C has no row in the tier 2 rules: the reading rule must be written here before any C-max eval",
+   "variant (ii): no S2 release (id, hash), so no demo set hash, no plan and no runplan check",
+   "variant (ii): TrayRunPlan names one release; S1 + S2 needs one release built from both batches, or a plan schema change (another story's call)",
+   "variant (ii): action layout and features of the S2 export against the S1 release not compared",
+   "variant (ii): S2 release is biased by its 20.6 % DA-03 rejects (wrist roll, waist pitch) and holds some level 0 episodes; S1 is level 1 only",
+   "choice between (i) and (ii): Hiếu"
+  ]
  },
  "id": "dec_01M6QERTS21J48KPACJX83QC3R",
  "kind": "dev_gate",
@@ -25,9 +35,52 @@
   "c_max_plan": {
    "path": "configs/runplans/tray/he-tray-cmax.yaml",
    "run_plan_id": "rp_366283071c4a"
+  },
+  "c_max_variants": {
+   "i_s1_only": {
+    "plan": {
+     "path": "configs/runplans/tray/he-tray-cmax.yaml",
+     "run_plan_id": "rp_366283071c4a",
+     "status": "draft"
+    },
+    "episodes": 429,
+    "sources": [
+     {
+      "release": "tray_s1_f9433b028c52",
+      "tier": "S1",
+      "episodes": 429,
+      "of": 541,
+      "note": "whole S1 pool after DA-03 rejects and the quality filter; includes the 160 of C"
+     }
+    ],
+    "demo_set_hash": "084ebc0353e72e10eac00b87e761e3635f45307aac742b68fb160edf1bcd01c5",
+    "estimate_cu": 16.0,
+    "runplan_check": "check passes; --launch refuses (DRAFT)"
+   },
+   "ii_s1_plus_s2": {
+    "plan": null,
+    "episodes": null,
+    "sources": [
+     {
+      "release": "tray_s1_f9433b028c52",
+      "tier": "S1",
+      "episodes": 429
+     },
+     {
+      "release": null,
+      "tier": "S2",
+      "episodes_decided": 669,
+      "batch": "rtx3060:~/denso-da35/fwdata/simple/tray/s2/prod-1105",
+      "note": "Hiếu 5/11/2026 (docs/g0/tray/s2.md): release the 669 DA-03 pass of 843 S2 variants; no release id or hash exists yet (DA-35 task 12 open)"
+     }
+    ],
+    "demo_set_hash": null,
+    "estimate_cu": 16.0,
+    "runplan_check": "not run: no S2 release, so no demo set and no plan to check"
+   }
   }
  },
  "signed_by": "pending: Hiếu",
- "reason": "DRAFT, written 6/11/2026 before the eval C result. Rule 0 of the tier 2 rules (docs/he/tray.md section 9): p_C < 10 % on the headline levels 1-2 means Psi0 did not learn the tray task from MuJoCo images: C+ does not run, the image pipeline is checked. To fill when eval C ends: metrics from flywheel_psi0.tray.eval_results (p, bootstrap CI, per level), verdict pass (rule 0 does not fire: C+ goes on as AC 6) or fail (rule 0 fires), and Hiếu's order on C-max. C-max (rp_366283071c4a, configs/runplans/tray/he-tray-cmax.yaml, status draft) is the one run kept ready for a fail: same recipe, parent, train seed and eval as v2 on all 429 usable S1 episodes, cap 18 CU in the slot C+ leaves unused. It trains only if rule 0 fires and Hiếu orders it; then this Decision records the order, the plan drops its draft status and is frozen. Results stay 'preliminary, on dev'. Known limits of eval C: EGL rollouts are not reproducible (tray.md 13.2); fetched.json final false by the stage race; SIMPLE checkout 6d10628 vs the b75c678 pin (differs only in the two-table task file).",
+ "reason": "DRAFT, written 6/11/2026 before the eval C result. Rule 0 of the tier 2 rules (docs/he/tray.md section 9): p_C < 10 % on the headline levels 1-2 means Psi0 did not learn the tray task from MuJoCo images: C+ does not run, the image pipeline is checked. To fill when eval C ends: metrics from flywheel_psi0.tray.eval_results (p, bootstrap CI, per level), verdict pass (rule 0 does not fire: C+ goes on as AC 6) or fail (rule 0 fires), and Hiếu's order on C-max. C-max has two variants for Hiếu to choose, in criteria.c_max_variants: (i) S1 only, ready as a draft plan; (ii) S1 + S2, not ready (gaps in meta.gaps). Variant (i), rp_366283071c4a (configs/runplans/tray/he-tray-cmax.yaml, status draft), is same recipe, parent, train seed and eval as v2 on all 429 usable S1 episodes, cap 18 CU in the slot C+ leaves unused. It trains only if rule 0 fires and Hiếu orders it; then this Decision records the order, the plan drops its draft status and is frozen. Results stay 'preliminary, on dev'. Known limits of eval C: EGL rollouts are not reproducible (tray.md 13.2); fetched.json final false by the stage race; SIMPLE checkout 6d10628 vs the b75c678 pin (differs only in the two-table task file).",
  "supersedes_decision_id": null
 }
