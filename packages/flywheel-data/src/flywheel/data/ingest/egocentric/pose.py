@@ -22,6 +22,13 @@ from dataclasses import dataclass, fields
 from pathlib import Path
 
 import numpy as np
+from flywheel.data.ingest.egocentric.egodex import (
+    FINGERS,
+    read_confidences,
+    read_transforms,
+    tip_joint,
+    wrist_joint,
+)
 from numpy.typing import NDArray
 
 SIDES = ("left", "right")
@@ -62,6 +69,27 @@ class EgoPose:
 
     def confidence(self, side: str) -> Array:
         return self.confidence_left if side == "left" else self.confidence_right
+
+
+def read_egodex_pose(path: Path) -> EgoPose:
+    """E-B: the tracked pose of an EgoDex HDF5, as recorded."""
+    joints = ["camera"]
+    for side in SIDES:
+        joints += [wrist_joint(side), *(tip_joint(side, f) for f in FINGERS)]
+    transforms = read_transforms(path, joints)
+    confidences = read_confidences(path, joints)
+    values: dict[str, Array] = {"camera": transforms["camera"]}
+    for side in SIDES:
+        tips = [tip_joint(side, f) for f in FINGERS]
+        values[f"{side}_wrist"] = transforms[wrist_joint(side)]
+        values[f"{side}_tips"] = np.stack([transforms[j][:, :3, 3] for j in tips], axis=1)
+        recorded = [confidences[j] for j in [wrist_joint(side), *tips] if j in confidences]
+        frames = len(values["camera"])
+        values[f"confidence_{side}"] = (
+            np.mean(recorded, axis=0).astype(np.float32) if recorded
+            else np.full(frames, np.nan, dtype=np.float32)
+        )
+    return EgoPose(**values)
 
 
 def save_pose(pose: EgoPose, path: Path) -> None:
