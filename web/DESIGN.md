@@ -1,6 +1,6 @@
 # Web Humanoid Data Flywheel · thiết kế
 
-Bản v0.4. Tài liệu này là nguồn duy nhất cho tầng web: API, Postgres, bộ nạp `fwsync` và FE. Lõi `flywheel` vẫn là nơi duy nhất chạy pipeline, train, eval và engine Failure → Data.
+Bản v0.5. Tài liệu này là nguồn duy nhất cho tầng web: API, Postgres, bộ nạp `fwsync` và FE. Lõi `flywheel` vẫn là nơi duy nhất chạy pipeline, train, eval và engine Failure → Data.
 
 ## Change log
 
@@ -11,6 +11,7 @@ Bản v0.4. Tài liệu này là nguồn duy nhất cho tầng web: API, Postgre
 | 3/11/2026 | 0.3 | Bỏ `episodes.episode_index` và `UNIQUE (dataset_id, episode_index)`: hợp đồng không có trường nào như thế, nên bộ nạp sẽ phải tự phát số. `episode_ref` đã là khoá tự nhiên và đã UNIQUE. Thêm W12 (`Episode` không mang `dataset_id`) | Châu |
 | 3/11/2026 | 0.3 | Dựng `web/schema/` theo tài liệu này: 9 file SQL, 41 bảng, 3 role, trigger C5–C9/C14/C19, 18 view, GRANT theo cột. `train_diagnosis_skips` là chỗ §4.4b để ngỏ tới M1, nay chốt | Châu |
 | 5/11/2026 | 0.3 | W11 đóng: hợp đồng đã có `EpisodeMetadata.benchmark_copy_id` (#62), bộ nạp map nó vào `episodes.benchmark_copy_id` thay vì để NULL, và bộ mock gắn nó cho 10 episode của bản sao chấm | Châu |
+| 6/11/2026 | 0.5 | `system_diagnoses` theo hợp đồng `SystemDiagnosis` sau PR #146, #148 và DA-13 11.5 (#154): thêm `timing`, `recorded`, `recorded_skipped` và C20; `v_system_check`, bộ nạp, API và M6 hiện chế độ rollout cùng khối R1, R2 "ghi nhận, không quy lỗi". Mock: 25 rollout đồng bộ mang R1, R2 ghi nhận. Type FE sinh lại từ schema master | Châu |
 | 5/11/2026 | 0.4 | Mốc M0 xong phần FE: thêm §7.4 hình dạng response cho 5 màn hình lõi (nguồn là `fe/src/api/types.ts`); §7.1 thêm `GET /recommendations` và `GET /evaluations/{id}`; quy ước trang, header vai tạm `X-Fw-Role`, id trong mock là mã `*_ref`. Dựng `fe/`: Vite, MSW đọc thẳng `mock/demo-17-11/`, type hợp đồng sinh bằng `json-schema-to-typescript`, màn hình M7 | Châu |
 | 5/11/2026 | 0.4 | Dựng `api/` trước khi có Postgres: FastAPI với mọi endpoint đọc của §7.1 và hai endpoint ghi của M7, trên lớp đọc thay được (`SinkReadModel` đọc sink JSONL của `fwsync`; `PostgresReadModel` chờ M1). Hành động ghi vào `human_actions.jsonl`, đầu vào của `fwsync export`. Test đối chiếu 38 request với response của MSW. Đi trước W8: thêm một dịch vụ ở L0, chờ PO | Châu |
 | 5/11/2026 | 0.4 | Hai view sửa: `v_branch_comparison` bỏ thí nghiệm HE và HE_T (mọi điểm HE chung một nhánh, nên `DISTINCT ON` sẽ lấy một điểm bất kỳ làm "nhánh"); `v_he_curve` thêm cột `he_variant` để vẽ một đường cho mỗi biến thể. Bộ mock thêm lượt eval cho A_07, B_FAIL và lưới HE; M9 vẽ đường cong HE có khoảng tin cậy Wilson 95% và N₅₀ | Châu |
@@ -487,13 +488,26 @@ CREATE TABLE system_diagnoses (
   findings JSONB NOT NULL DEFAULT '[]',      -- [{code, value, threshold, part, where, detail}]
   skipped  JSONB NOT NULL DEFAULT '[]',      -- [{code, reason}] mã không chấm được
   measurements JSONB NOT NULL DEFAULT '{}',  -- số để hiện ở M6 dù không nổ ngưỡng
+  timing VARCHAR(8) CHECK (timing IN ('sync','async')),  -- bản 0.5; NULL = không rõ
+  recorded JSONB NOT NULL DEFAULT '[]',          -- bản 0.5; R1, R2 ghi nhận
+  recorded_skipped JSONB NOT NULL DEFAULT '[]',  -- bản 0.5; R1, R2 không đo được
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (eval_episode_id, config_sha256),
   -- C17: sạch nghĩa là đã chấm hết và không mã nào nổ. Không có CHECK này thì
   -- một episode không ai chấm được vẫn đọc ra "không có lỗi hệ thống" (FR21).
   CONSTRAINT c17_clean_is_measured CHECK (
     diagnosis <> 'clean'
-    OR (jsonb_array_length(findings) = 0 AND jsonb_array_length(skipped) = 0))
+    OR (jsonb_array_length(findings) = 0 AND jsonb_array_length(skipped) = 0)),
+  -- C20 (bản 0.5): ba luật validator của `SystemDiagnosis` (PR #146).
+  CONSTRAINT c20_recorded_only_on_sync CHECK (
+    timing = 'sync'
+    OR (jsonb_array_length(recorded) = 0 AND jsonb_array_length(recorded_skipped) = 0)),
+  CONSTRAINT c20_only_r1_r2_recorded CHECK (NOT jsonb_path_exists(
+    recorded || recorded_skipped, '$[*] ? (@.code != "R1" && @.code != "R2")')),
+  CONSTRAINT c20_sync_does_not_count_r1_r2 CHECK (
+    timing IS DISTINCT FROM 'sync'
+    OR NOT jsonb_path_exists(
+      findings || skipped, '$[*] ? (@.code == "R1" || @.code == "R2")'))
 );
 CREATE INDEX ON system_diagnoses (eval_episode_id, created_at DESC);
 ```
@@ -504,7 +518,9 @@ Ba lý do bảng này thay bốn cột phẳng:
 - **R3 đo riêng thân trên và thân dưới** (spec §6.4 bước 2), nên một dòng finding phải mang `part`. Một cột `tracking_error JSONB` không có chỗ cho ngưỡng của từng nửa.
 - **`measurements` giữ được ý của bản 0.2**: M6 vẫn hiện sai số bám lệnh theo nhóm và độ trễ p99 dù không mã nào nổ ngưỡng.
 
-Nguồn: `SystemDiagnosisRecord` của `flywheel.eval.diagnosis.system.artifact` (DA-13, PR #71). Kiểu contract đang chờ issue #70; tới khi có, bộ nạp đọc bản ghi của làn.
+**Bản 0.5: rollout đồng bộ.** Quyết định (a) của PO (5/11/2026): SIMPLE chờ server Ψ₀ rồi mới bước sim, nên độ trễ `/act` (đo 350–460 ms) không làm hỏng được episode trong sim. Trên rollout đồng bộ, R1 và R2 vẫn đo nhưng nằm ở `recorded` và `recorded_skipped`, không ở `findings` hay `skipped`, nên không quyết định nhãn. `timing` NULL nghĩa là producer không nói, và không bao giờ đọc là đồng bộ (FR21): R1, R2 khi đó vẫn tính. C17 giữ nguyên văn, vì `clean` cạnh R1, R2 ghi nhận là hợp lệ; C20 là ba luật validator của hợp đồng. M6 hiện chế độ rollout và khối "ghi nhận, không quy lỗi" tách khỏi nhãn.
+
+Nguồn: `SystemDiagnosis` của `flywheel.contracts.diagnosis` (issue #70; ba trường bản 0.5 từ PR #146), mà `SystemDiagnosisRecord` của DA-13 khớp từng trường (test seam e2e). Bộ nạp vẫn đi đường khoan dung cho bảng này: dòng của nó mang `eval_episode_ref` và `measurements` mà hợp đồng không có.
 
 #### `failure_clusters`
 
@@ -792,6 +808,7 @@ Cột `detector` cho phép M3 nói "code bắt được 6/10, agent bắt thêm 
 | **C17** | **Kiểm hệ thống kết luận `clean` chỉ khi `findings` và `skipped` đều rỗng** | `CHECK c17_clean_is_measured` trên `system_diagnoses` | **P** |
 | **C18** | **`step_status` chỉ nhận `pass`, `fail`, `not_attempted`, `unknown`** | `CHECK c18_step_status` trên `eval_episodes` | **P** |
 | **C19** | **Release từ chối mọi episode có `benchmark_copy_id`** | Trigger trên `release_items` (03 bản 1.0) | **P** |
+| **C20** | **R1, R2 ghi nhận chỉ có trên rollout đồng bộ, chỉ gồm R1, R2, và rollout đồng bộ không tính R1, R2 vào `findings`, `skipped`** (bản 0.5, PR #146) | Ba `CHECK c20_*` trên `system_diagnoses` | **P** |
 
 ### 4.6 View cho FE
 
@@ -1228,7 +1245,7 @@ Nguồn duy nhất cho cả BE và FE là `web/fe/src/contracts/enums.ts` và `w
 | Log suy luận (M6) | `RTCInferenceRecord` | `RTCInferenceRecord.json` | có |
 | Cột nhóm action | `ActionLayout` | `ActionLayout.json` | có |
 | Yêu cầu rollout (M6) | `RolloutRequest` | `RolloutRequest.json` | có |
-| **`system_diagnoses`** | `SystemDiagnosisRecord` của `flywheel.eval.diagnosis.system.artifact` | **chưa có** | Issue #70 đề nghị `SystemDiagnosis`; tới khi merge, đọc bản ghi JSONL của làn |
+| **`system_diagnoses`** | `SystemDiagnosis` của `flywheel.contracts.diagnosis` (`SystemDiagnosisRecord` của DA-13 khớp từng trường) | `SystemDiagnosis.json` | có (issue #70; `timing`, `recorded`, `recorded_skipped` từ PR #146, bản 0.5) |
 | Giả thuyết stage (M7) | `StageAttributionRecord` của `flywheel.eval.diagnosis.stage.artifact` | **chưa có** | Issue #70 |
 
 Các thực thể còn lại (`Source`, `Condition`, `Release`, `Checkpoint`, `RunPlan`, `Score`, `Cluster`, `FixRateEvent`, `LedgerEntry`, `Decision`) do story S1-10 (#36, **chưa merge**) giao; tên cột theo [03 §4.3](../docs/product/03-architecture.md). Chúng chưa có file schema, nên **bộ nạp phải khoan dung** với phần này cho tới khi S1-10 merge.
@@ -1253,7 +1270,7 @@ Bảng dưới là file **thật** của thư mục. Nó khác bản 0.2 ở hai
 | `training_metrics.jsonl`, `train_diagnoses.jsonl` | 2 run, train và val; B_FAIL có T3; cả hai bỏ qua T7 kèm lý do |
 | `probes.jsonl` | P1, P3 của hai checkpoint; P4 của B so với cha A |
 | `evaluations.jsonl`, `eval_episodes.jsonl` | 4 lượt dev × 90 episode (A, A_07, B, B_FAIL), đủ ba mức, 2 episode lỗi hạ tầng mỗi lượt; 12 lượt dev chỉ có số tổng cho điểm HE (V_EGO chạm 50% ở N = 20, hai biến thể kia ở N = 40); 1 holdout niêm phong tới 20/11 |
-| `system_diagnoses.jsonl` | 27 episode lỗi của B: `controller`, `sync`, **`unknown` vì thiếu log RTC**, `clean` |
+| `system_diagnoses.jsonl` | 27 episode lỗi của B: `controller`, `sync`, **`unknown` vì thiếu log RTC**, `clean`. Bản 0.5: 25 dòng là rollout đồng bộ mang R1, R2 ghi nhận (độ trễ giả định 0,41 s, trong khoảng 350–460 ms đã đo); hai dòng `unknown` có `timing` trống nên R1, R2 vẫn tính |
 | `recommendation.json`, `failure_clusters.jsonl` | 1 lượt, 4 cụm: HE_THONG_CONTROLLER, NGOAI_MIEN, THIEU_VUNG_PHU, KY_NANG_YEU |
 | `flywheel_algo_steps.jsonl`, `diagnostic_runs.jsonl` | 12 bước; rollout chẩn đoán của ba cụm, một phép kiểm `skipped` kèm lý do |
 | `interventions.jsonl`, `repair_tickets.jsonl` | 4 can thiệp, chỉ trên hai cụm dữ liệu; 1 phiếu sửa cho cụm hệ thống |
@@ -1278,7 +1295,7 @@ Mọi bản ghi nạp từ thư mục này có `origin = 'mock'`.
 | W2 | Người làm BE | Châu nhận cả FE và BE (3/11) |
 | W7 | Trường `source_action_id` trên mọi artifact lõi sinh ra để đáp lại một hành động của web; artifact `JobStatus` (`job_request_id`, `status`, `picked_by`, `result_ref`, `updated_at`) | **chưa có**, cần PR hợp đồng cho Long |
 | W8 | ADR-13: web và DB server ở L0 hay L1+ | **chưa có**, chặn mốc M1 |
-| W9 | `SystemDiagnosis` và `StageAttribution` trong `flywheel.contracts` | issue #70 đã mở (3/11) |
+| W9 | `SystemDiagnosis` và `StageAttribution` trong `flywheel.contracts` | **đã merge** (DA-25/9, 4/11); ba trường rollout đồng bộ của `SystemDiagnosis` từ PR #146 (6/11), web theo ở bản 0.5 |
 | W10 | `Score` bốn trạng thái, lý do "chưa rõ" | issue #59 |
 | W11 | `benchmark_copy_id` thay `injected_defect` trong `Episode` | **đã merge** (S1-10/7, PR #36, 3/11); bộ nạp dùng từ 5/11 |
 | W12 | `Episode` không mang `dataset_id`. Ở lõi một episode trỏ `source_id` hoặc `intervention_id` (03 §4.3 cũng vậy), còn "lô" là khái niệm của web, không có thực thể tương ứng ở L0-lite. Bộ nạp suy `episodes.dataset_id` qua hai đường đó và **từ chối** dòng không suy được, chứ không gán lô mặc định — gán sai lô làm sai báo cáo dataset, phân bổ chi phí (BR-05) và `r_demo` mà không gì báo. Cần Long và PO quyết: thêm `dataset_id` vào `Episode`, hay web nhận đây là phép suy chính thức | **phát hiện 3/11 lúc viết mapper**; chưa mở issue |

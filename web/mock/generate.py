@@ -814,15 +814,35 @@ class Mock:
 
     def _system_diagnoses(self, members: dict[str, list[Row]]) -> list[Row]:
         config = hx("configs/eval/diagnosis/system.yaml@pinned-mock")
+        # Bản 0.5 (PR #146, #148): eval SIMPLE là rollout đồng bộ, và `/act`
+        # đo 350–460 ms (DA-13 nhiệm vụ 11), nên mọi episode đồng bộ mang R1,
+        # R2 ghi nhận mà nhãn không đổi. Số dưới là giả định trong khoảng đó.
+        sync_note = (
+            "rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm "
+            "hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, "
+            "5/11/2026)"
+        )
+        latency_s, slow_chunks = 0.41, 9
+        recorded_sync: list[Row] = [
+            {"code": "R1", "value": latency_s, "threshold": 0.10, "part": None,
+             "where": "chunk 4",
+             "detail": f"phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; {sync_note}"},
+            {"code": "R2", "value": float(slow_chunks), "threshold": 0.0, "part": None,
+             "where": "chunk 4",
+             "detail": f"{slow_chunks} chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC "
+             f"của server che, lớn nhất 21 bước; {sync_note}"},
+        ]
         rows: list[Row] = []
         for row in self.eval_failures["B"]:
             ref = row["eval_episode_ref"]
             measurements: Row = {
                 "tracking_error_p99": {"upper": 0.04, "lower": 0.06},
-                "latency_p99_s": 0.08, "sync_offset_max_s": 0.006,
+                "latency_p99_s": latency_s, "sync_offset_max_s": 0.006,
             }
             findings: list[Row] = []
             skipped: list[Row] = []
+            timing: str | None = "sync"
+            recorded: list[Row] = recorded_sync
             diagnosis = "clean"
             if row in members["clu_1"]:
                 value = round(0.14 + 0.005 * members["clu_1"].index(row), 3)
@@ -839,7 +859,10 @@ class Mock:
                 diagnosis = "sync"
             elif row in members["clu_3"][:2]:
                 # Không có log RTC: R1, R2 không chấm được. CHƯA RÕ, không phải
-                # sạch — ca chứng minh BR-12 và C17.
+                # sạch — ca chứng minh BR-12 và C17. Hai trace này ghi trước khi
+                # hook nói chế độ (#148), nên `timing` để trống và R1, R2 vẫn
+                # tính: trên rollout đồng bộ chúng sẽ chỉ là ghi nhận.
+                timing, recorded = None, []
                 del measurements["latency_p99_s"]
                 no_rtc = (
                     "episode không có log RTC (`rtc.jsonl`), không đo được độ trễ và buffer"
@@ -852,7 +875,8 @@ class Mock:
             rows.append(
                 {"eval_episode_ref": ref, "diagnosis": diagnosis, "config_sha256": config,
                  "trace_sha256": hx(f"trace:{ref}"), "infra_status": "ok",
-                 "findings": findings, "skipped": skipped, "measurements": measurements}
+                 "findings": findings, "skipped": skipped, "measurements": measurements,
+                 "timing": timing, "recorded": recorded, "recorded_skipped": []}
             )
         return rows
 

@@ -481,13 +481,33 @@
     ],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.14
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": false,
     "is_sealed": false,
     "origin": "mock"
@@ -521,13 +541,33 @@
     ],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.145
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": false,
     "is_sealed": false,
     "origin": "mock"
@@ -561,13 +601,33 @@
     ],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.15
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": false,
     "is_sealed": false,
     "origin": "mock"
@@ -601,13 +661,33 @@
     ],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.155
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": false,
     "is_sealed": false,
     "origin": "mock"
@@ -641,13 +721,33 @@
     ],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.16
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": false,
     "is_sealed": false,
     "origin": "mock"
@@ -681,13 +781,33 @@
     ],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.165
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": false,
     "is_sealed": false,
     "origin": "mock"
@@ -855,13 +975,33 @@
     ],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.035,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.04
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": false,
     "is_sealed": false,
     "origin": "mock"
@@ -884,13 +1024,33 @@
     "findings": [],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.04
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": true,
     "is_sealed": false,
     "origin": "mock"
@@ -913,13 +1073,33 @@
     "findings": [],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.04
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": true,
     "is_sealed": false,
     "origin": "mock"
@@ -942,13 +1122,33 @@
     "findings": [],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.04
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": true,
     "is_sealed": false,
     "origin": "mock"
@@ -971,13 +1171,33 @@
     "findings": [],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.04
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": true,
     "is_sealed": false,
     "origin": "mock"
@@ -1159,6 +1379,9 @@
       "upper": 0.04
      }
     },
+    "timing": null,
+    "recorded": [],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": false,
     "is_sealed": false,
     "origin": "mock"
@@ -1199,6 +1422,9 @@
       "upper": 0.04
      }
     },
+    "timing": null,
+    "recorded": [],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": false,
     "is_sealed": false,
     "origin": "mock"
@@ -1221,13 +1447,33 @@
     "findings": [],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.04
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": true,
     "is_sealed": false,
     "origin": "mock"
@@ -1250,13 +1496,33 @@
     "findings": [],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.04
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": true,
     "is_sealed": false,
     "origin": "mock"
@@ -1279,13 +1545,33 @@
     "findings": [],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.04
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": true,
     "is_sealed": false,
     "origin": "mock"
@@ -1308,13 +1594,33 @@
     "findings": [],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.04
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": true,
     "is_sealed": false,
     "origin": "mock"
@@ -1337,13 +1643,33 @@
     "findings": [],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.04
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": true,
     "is_sealed": false,
     "origin": "mock"
@@ -1366,13 +1692,33 @@
     "findings": [],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.04
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": true,
     "is_sealed": false,
     "origin": "mock"
@@ -1565,13 +1911,33 @@
     "findings": [],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.04
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": true,
     "is_sealed": false,
     "origin": "mock"
@@ -1594,13 +1960,33 @@
     "findings": [],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.04
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": true,
     "is_sealed": false,
     "origin": "mock"
@@ -1623,13 +2009,33 @@
     "findings": [],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.04
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": true,
     "is_sealed": false,
     "origin": "mock"
@@ -1652,13 +2058,33 @@
     "findings": [],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.04
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": true,
     "is_sealed": false,
     "origin": "mock"
@@ -1681,13 +2107,33 @@
     "findings": [],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.04
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": true,
     "is_sealed": false,
     "origin": "mock"
@@ -1710,13 +2156,33 @@
     "findings": [],
     "skipped": [],
     "measurements": {
-     "latency_p99_s": 0.08,
+     "latency_p99_s": 0.41,
      "sync_offset_max_s": 0.006,
      "tracking_error_p99": {
       "lower": 0.06,
       "upper": 0.04
      }
     },
+    "timing": "sync",
+    "recorded": [
+     {
+      "code": "R1",
+      "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0.1,
+      "value": 0.41,
+      "where": "chunk 4"
+     },
+     {
+      "code": "R2",
+      "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+      "part": null,
+      "threshold": 0,
+      "value": 9,
+      "where": "chunk 4"
+     }
+    ],
+    "recorded_skipped": [],
     "usable_as_policy_evidence": true,
     "is_sealed": false,
     "origin": "mock"
@@ -6118,13 +6584,33 @@
    "findings": [],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.04
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": true,
    "is_sealed": false,
    "origin": "mock"
@@ -6158,13 +6644,33 @@
    ],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.14
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": false,
    "is_sealed": false,
    "origin": "mock"
@@ -6198,13 +6704,33 @@
    ],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.145
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": false,
    "is_sealed": false,
    "origin": "mock"
@@ -6238,13 +6764,33 @@
    ],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.15
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": false,
    "is_sealed": false,
    "origin": "mock"
@@ -6278,13 +6824,33 @@
    ],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.155
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": false,
    "is_sealed": false,
    "origin": "mock"
@@ -6318,13 +6884,33 @@
    ],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.16
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": false,
    "is_sealed": false,
    "origin": "mock"
@@ -6358,13 +6944,33 @@
    ],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.165
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": false,
    "is_sealed": false,
    "origin": "mock"
@@ -6405,6 +7011,9 @@
      "upper": 0.04
     }
    },
+   "timing": null,
+   "recorded": [],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": false,
    "is_sealed": false,
    "origin": "mock"
@@ -6445,6 +7054,9 @@
      "upper": 0.04
     }
    },
+   "timing": null,
+   "recorded": [],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": false,
    "is_sealed": false,
    "origin": "mock"
@@ -6467,13 +7079,33 @@
    "findings": [],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.04
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": true,
    "is_sealed": false,
    "origin": "mock"
@@ -6496,13 +7128,33 @@
    "findings": [],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.04
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": true,
    "is_sealed": false,
    "origin": "mock"
@@ -6525,13 +7177,33 @@
    "findings": [],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.04
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": true,
    "is_sealed": false,
    "origin": "mock"
@@ -6554,13 +7226,33 @@
    "findings": [],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.04
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": true,
    "is_sealed": false,
    "origin": "mock"
@@ -6583,13 +7275,33 @@
    "findings": [],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.04
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": true,
    "is_sealed": false,
    "origin": "mock"
@@ -6612,13 +7324,33 @@
    "findings": [],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.04
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": true,
    "is_sealed": false,
    "origin": "mock"
@@ -6652,13 +7384,33 @@
    ],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.035,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.04
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": false,
    "is_sealed": false,
    "origin": "mock"
@@ -6681,13 +7433,33 @@
    "findings": [],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.04
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": true,
    "is_sealed": false,
    "origin": "mock"
@@ -6710,13 +7482,33 @@
    "findings": [],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.04
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": true,
    "is_sealed": false,
    "origin": "mock"
@@ -6739,13 +7531,33 @@
    "findings": [],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.04
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": true,
    "is_sealed": false,
    "origin": "mock"
@@ -6768,13 +7580,33 @@
    "findings": [],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.04
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": true,
    "is_sealed": false,
    "origin": "mock"
@@ -6797,13 +7629,33 @@
    "findings": [],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.04
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": true,
    "is_sealed": false,
    "origin": "mock"
@@ -6826,13 +7678,33 @@
    "findings": [],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.04
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": true,
    "is_sealed": false,
    "origin": "mock"
@@ -6855,13 +7727,33 @@
    "findings": [],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.04
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": true,
    "is_sealed": false,
    "origin": "mock"
@@ -6884,13 +7776,33 @@
    "findings": [],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.04
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": true,
    "is_sealed": false,
    "origin": "mock"
@@ -6913,13 +7825,33 @@
    "findings": [],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.04
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": true,
    "is_sealed": false,
    "origin": "mock"
@@ -6942,13 +7874,33 @@
    "findings": [],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.04
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": true,
    "is_sealed": false,
    "origin": "mock"
@@ -6971,13 +7923,33 @@
    "findings": [],
    "skipped": [],
    "measurements": {
-    "latency_p99_s": 0.08,
+    "latency_p99_s": 0.41,
     "sync_offset_max_s": 0.006,
     "tracking_error_p99": {
      "lower": 0.06,
      "upper": 0.04
     }
    },
+   "timing": "sync",
+   "recorded": [
+    {
+     "code": "R1",
+     "detail": "phân vị 99 của độ trễ chu kỳ suy luận, đơn vị giây; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0.1,
+     "value": 0.41,
+     "where": "chunk 4"
+    },
+    {
+     "code": "R2",
+     "detail": "9 chunk (trừ chunk 0) có delay_steps trên d = 6 mà RTC của server che, lớn nhất 21 bước; rollout đồng bộ: SIMPLE chờ server rồi mới bước sim, nên độ trễ không làm hỏng được episode trong sim; ghi nhận, không quy lỗi (quyết định (a) của PO, 5/11/2026)",
+     "part": null,
+     "threshold": 0,
+     "value": 9,
+     "where": "chunk 4"
+    }
+   ],
+   "recorded_skipped": [],
    "usable_as_policy_evidence": true,
    "is_sealed": false,
    "origin": "mock"

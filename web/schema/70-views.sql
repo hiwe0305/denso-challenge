@@ -192,6 +192,11 @@ SELECT
   sd.skipped,
   -- Số để hiện dù không mã nào nổ ngưỡng.
   sd.measurements,
+  -- Bản 0.5: chế độ rollout, và R1, R2 ghi nhận trên rollout đồng bộ. Cột
+  -- riêng, không gộp vào `findings`: chúng không quyết định nhãn.
+  sd.timing,
+  sd.recorded,
+  sd.recorded_skipped,
   -- Episode chỉ dùng được làm bằng chứng về policy khi đã chấm hết và sạch.
   (sd.diagnosis = 'clean')                                  AS usable_as_policy_evidence,
   ev.sealed_until > now()                                   AS is_sealed,

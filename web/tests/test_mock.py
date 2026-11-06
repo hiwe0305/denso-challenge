@@ -337,6 +337,29 @@ def test_system_diagnoses_obey_c17(data: dict[str, Any]) -> None:
             assert row["diagnosis"] not in ("clean", "unknown")
 
 
+def test_every_system_diagnosis_is_a_valid_shared_contract_record(data: dict[str, Any]) -> None:
+    # Bản 0.5: từ PR #146 hợp đồng `SystemDiagnosis` có đủ ba trường mới và
+    # validator của chúng (C20). Dòng mock phải qua đúng validator đó, nên
+    # một dòng ghi nhận R1, R2 mà không phải rollout đồng bộ sẽ đỏ ở đây.
+    from flywheel.contracts.diagnosis import SystemDiagnosis
+
+    lane_only = {"eval_episode_ref", "measurements"}
+    for row in data["system_diagnoses.jsonl"]:
+        record = {k: v for k, v in row.items() if k not in lane_only}
+        SystemDiagnosis.model_validate({**record, "episode_id": row["eval_episode_ref"]})
+
+
+def test_a_sync_rollout_keeps_its_label_and_records_r1_r2(data: dict[str, Any]) -> None:
+    # Quyết định (a) của PO, 5/11/2026: trên rollout đồng bộ, độ trễ `/act`
+    # 350–460 ms chỉ được ghi nhận. Ca này là thứ M6 vẽ thành khối riêng.
+    synced = [row for row in data["system_diagnoses.jsonl"] if row["timing"] == "sync"]
+    assert synced
+    assert any(row["diagnosis"] == "clean" for row in synced)
+    for row in synced:
+        assert [item["code"] for item in row["recorded"]] == ["R1", "R2"]
+        assert not {"R1", "R2"} & {item["code"] for item in row["findings"] + row["skipped"]}
+
+
 def test_the_mock_has_an_unknown_system_check_for_br12(data: dict[str, Any]) -> None:
     # Ca chứng minh BR-12: một phép kiểm không chạy được không bao giờ hiện là
     # "không có lỗi". Thiếu ca này thì FE không có gì để vẽ `SkippedList`.
@@ -344,6 +367,8 @@ def test_the_mock_has_an_unknown_system_check_for_br12(data: dict[str, Any]) -> 
     assert unknown
     assert all({skip["code"] for skip in row["skipped"]} == {"R1", "R2"} for row in unknown)
     assert all("latency_p99_s" not in row["measurements"] for row in unknown)
+    # Chế độ không rõ, nên R1, R2 vẫn tính: đó là lý do nhãn là CHƯA RÕ.
+    assert all(row["timing"] is None and row["recorded"] == [] for row in unknown)
 
 
 def test_every_system_diagnosis_belongs_to_a_failed_b_episode(data: dict[str, Any]) -> None:

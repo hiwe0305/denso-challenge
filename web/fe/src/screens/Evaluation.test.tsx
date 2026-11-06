@@ -47,6 +47,31 @@ describe("M6 screen", () => {
     expect(detail.textContent).toContain("R3");
     expect(detail.textContent).toContain("thân trên");
   });
+
+  it("shows R1, R2 of a sync rollout as recorded, apart from a clean verdict", async () => {
+    // Decision (a) of 5/11/2026 (DESIGN.md 0.5): the latency is shown, not counted.
+    renderApp("/danh-gia");
+    fireEvent.change(await screen.findByTestId("evaluation-picker"), { target: { value: "ev_B_dev" } });
+    const table = await screen.findByTestId("failed-episodes");
+    fireEvent.click(within(table).getByText("ee_B_dev_38"));
+    const detail = await screen.findByTestId("episode-detail");
+    expect(within(detail).getByTestId("rollout-timing").textContent).toContain("đồng bộ");
+    const recorded = within(detail).getByTestId("recorded-checks");
+    expect(recorded.textContent).toContain("không quy lỗi");
+    expect(recorded.textContent).toContain("R1");
+    expect(recorded.textContent).toContain("R2");
+    expect(within(detail).queryByTestId("skipped-list")).toBeNull();
+  });
+
+  it("says the mode was unknown and shows no recorded block when timing is null", async () => {
+    renderApp("/danh-gia");
+    fireEvent.change(await screen.findByTestId("evaluation-picker"), { target: { value: "ev_B_dev" } });
+    const table = await screen.findByTestId("failed-episodes");
+    fireEvent.click(within(table).getByText("ee_B_dev_36"));
+    const detail = await screen.findByTestId("episode-detail");
+    expect(within(detail).getByTestId("rollout-timing").textContent).toContain("không rõ chế độ");
+    expect(within(detail).queryByTestId("recorded-checks")).toBeNull();
+  });
 });
 
 describe("funnelSteps", () => {

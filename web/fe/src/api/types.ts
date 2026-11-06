@@ -375,6 +375,11 @@ export interface SystemCheckRow {
   findings: Array<Record<string, unknown>>;
   skipped: Array<{ code: string; reason: string }>;
   measurements: Record<string, unknown>;
+  /** Rollout mode (DESIGN.md 0.5). null: the producer did not say, so R1, R2 counted. */
+  timing: "sync" | "async" | null;
+  /** R1, R2 of a sync rollout: measured and kept, never in `diagnosis`. */
+  recorded: Array<Record<string, unknown>>;
+  recorded_skipped: Array<{ code: string; reason: string }>;
   usable_as_policy_evidence: boolean;
   is_sealed: boolean;
   origin: Origin;

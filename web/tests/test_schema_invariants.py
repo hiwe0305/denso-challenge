@@ -224,6 +224,18 @@ def test_the_system_check_lives_in_its_own_table_with_a_skipped_list() -> None:
         assert column in system.group(1), f"system_diagnoses thiếu `{column}`"
     # C17 là CHECK làm cả bảng này có nghĩa: `clean` chỉ khi đã chấm hết.
     assert "c17_clean_is_measured" in system.group(1)
+    # Bản 0.5 (PR #146): R1, R2 ghi nhận của rollout đồng bộ có cột riêng, và
+    # C20 giữ ba luật validator của `SystemDiagnosis`.
+    for column in ("timing", "recorded", "recorded_skipped"):
+        assert re.search(rf"^\s*{column} ", system.group(1), re.MULTILINE), (
+            f"system_diagnoses thiếu `{column}`"
+        )
+    for constraint in (
+        "c20_recorded_only_on_sync",
+        "c20_only_r1_r2_recorded",
+        "c20_sync_does_not_count_r1_r2",
+    ):
+        assert constraint in system.group(1), f"system_diagnoses thiếu `{constraint}`"
 
     evals = re.search(r"CREATE TABLE eval_episodes \((.*?)\n\);", ml, re.DOTALL)
     assert evals is not None

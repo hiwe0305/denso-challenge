@@ -31,6 +31,13 @@ export const systemDiagnosisLabel: Record<SystemDiagnosis, string> = {
   infra: "hạ tầng",
 };
 
+/** Rollout mode of a system check (DESIGN.md 0.5). `unknown` is a null `timing`. */
+export const rolloutTimingLabel: Record<"sync" | "async" | "unknown", string> = {
+  sync: "đồng bộ · R1, R2 ghi nhận, không quy lỗi",
+  async: "bất đồng bộ · R1, R2 tính",
+  unknown: "không rõ chế độ · R1, R2 tính",
+};
+
 export const interventionKindLabel: Record<InterventionKind, string> = {
   SIM_AROUND_FAILURE: "Sinh sim quanh điểm hỏng",
   TELEOP_CORRECTION: "Teleop sửa",
