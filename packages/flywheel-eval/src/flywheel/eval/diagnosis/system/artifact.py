@@ -42,7 +42,8 @@ from pathlib import Path
 from typing import Literal
 
 from flywheel.eval.diagnosis.system.reader import SystemInputs
-from flywheel.eval.diagnosis.system.verdict import Skipped, SystemFinding, SystemVerdict
+from flywheel.eval.diagnosis.system.verdict import SystemFinding, SystemVerdict
+from flywheel.eval.diagnosis.train.finding import Skipped
 from pydantic import BaseModel, ConfigDict, Field
 
 SYSTEM_RECORDS = Path("diagnosis") / "system.jsonl"
