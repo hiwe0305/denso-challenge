@@ -61,6 +61,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
 import sys
 from collections import Counter
 from collections.abc import Mapping, Sequence
@@ -474,13 +475,20 @@ def sha256(path: Path) -> str:
 
 
 def confidence_summary(pose: Mapping[str, NDArray[Any]], start: int, stop: int) -> dict[str, Any]:
-    """Mean and min pose confidence of each hand over the segment's frames."""
+    """Mean and min pose confidence of each hand over the segment's recorded frames.
+
+    NaN is a frame without a recorded confidence (DA-04 writes NaN when an EgoDex file
+    has no `confidences` group); `recorded` is the share of frames that have one, and
+    mean and min are None when none has.
+    """
     summary: dict[str, Any] = {}
     for side in HANDS:
         values = np.asarray(pose[f"confidence_{side}"][start:stop], dtype=np.float64)
+        known = values[np.isfinite(values)]
         summary[side] = {
-            "mean": round(float(values.mean()), 6),
-            "min": round(float(values.min()), 6),
+            "mean": round(float(known.mean()), 6) if known.size else None,
+            "min": round(float(known.min()), 6) if known.size else None,
+            "recorded": round(known.size / values.size, 6),
         }
     return summary
 
@@ -514,7 +522,11 @@ def export_stage1(
         story="DA-18",
         store=store,
     ) as job:
-        result = _write(work, out, planned, skipped, include, release_id)
+        try:
+            result = _write(work, out, planned, skipped, include, release_id)
+        except BaseException:
+            shutil.rmtree(out, ignore_errors=True)  # out was new or empty: no half export
+            raise
         job.notes.append(
             f"{result.samples} samples, {result.frames} frames, export {result.export_id}"
         )
@@ -559,6 +571,9 @@ def _write(
                     "action_quality": bundle.action_quality,
                 },
             )
+            if not np.isfinite(actions).all():
+                where = f"{item.episode.episode_id} {item.segment.segment.step_id}"
+                raise ExportRefused([f"{where}: actions_48d has NaN or Inf"])
             stats_inputs.append((actions, transforms[CAMERA]))
             cuts.append((out / f"{item.relpath}.mp4", start, stop))
             samples.append(_sample_meta(item, pose, start, stop))

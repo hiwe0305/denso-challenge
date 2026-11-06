@@ -65,13 +65,15 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực: 4,5 giờ (nhiệm vụ 1: 1,5; 2: 1,5; 3: 1,5), Hiếu làm cùng Claude từ 6/11/2026 (plan chia lại việc của Hưng).
+- Giờ thực: 5 giờ (nhiệm vụ 1: 1,5 + 0,5 sửa sau khi chạy work dir thật của DA-04; 2: 1,5; 3: 1,5), Hiếu làm cùng Claude từ 6/11/2026 (plan chia lại việc của Hưng).
 - Công cụ AI đã dùng: Claude Code (Claude Opus 5.5).
 - Ghi chú hoàn thành:
   - Đầu vào là work dir của DA-04 theo plan 6/11/2026 mục 4.2a; test dùng work dir tổng hợp theo đúng mục đó. DA-04 cần ghi thêm `intrinsic` (3, 3) vào `pose.npz` cho E-A **[Đề xuất]**: loader của Ψ₀ đọc `camera/intrinsic` ở mọi mẫu, còn episode E-A không có HDF5.
   - `actions_48d` khớp đúng từng số với bản do script H-RDT của tác giả tính trên 20 episode EgoDex; stats lệch tối đa 9e-8 so với `calc_stat.py` của tác giả.
   - Loader của Ψ₀ ở `cda3fdf` (image của tác giả trên `rtx3060`) đọc lại đúng batch đã lưu, cả 40 mẫu EgoDex thật và mẫu E-A.
   - Phát hiện: với `img_history_size` 1 và `upsample_rate` 3, `parse_img_data` của Ψ₀ lấy khung `index - 2` (không nhỏ hơn 0) chứ không phải khung `index`. Đây là hành vi của tác giả; bản export giữ video và HDF5 khớp từng khung.
+  - Chạy trên work dir thật của DA-04 (`fwdata/pipeline/src_050b9bf56a4e843c`, 20 episode EgoDex, QA 13 pass, 7 flag) với `--include-flag`, trên laptop: 38 mẫu (25 pass, 13 flag), 4143 khung, 79 MB, 53 giây đo, ước tính 84 giây. Loader giả đọc đủ 38 mẫu, action chuẩn hóa hữu hạn.
+  - 4 episode trong đó (8 mẫu) không có nhóm `confidences` trong file EgoDex, nên DA-04 ghi NaN. `meta` ghi `pose_confidence` với `mean`/`min` là `null` và `recorded` 0, không lấy trung bình NaN. Action có NaN hoặc Inf thì export từ chối và xóa thư mục đầu ra (thư mục đã được kiểm là mới hoặc rỗng), để lần chạy lại không bị chặn vì "không rỗng".
   - Chưa xong ngoài phạm vi: `build_release` (DA-03) vẫn đóng băng release toàn egocentric với `kind` robot; test `xfail` strict ghi lại, đề xuất PR riêng cho DA-03.
 - File đã tạo hoặc sửa: `packages/flywheel-data/src/flywheel/data/export/egodex.py`, `packages/flywheel-data/tests/contract/export_egodex/`, `docs/g0/ledger/DA-18.csv`.
 
@@ -81,7 +83,8 @@ Quy tắc mới (Hiếu, 6/11/2026): chạy trên laptop nếu được; không 
 
 | Việc | Chạy ở | Kết quả |
 |---|---|---|
-| Export, test CI (fake loader, batch đã lưu) | Laptop | 26 qua, 2 `xfail` strict |
+| Export, test CI (fake loader, batch đã lưu) | Laptop | 28 qua, 2 `xfail` strict |
+| Export work dir thật của DA-04, đọc lại bằng loader giả | Laptop | 38 mẫu, 53 giây, đọc đủ |
 | So `actions_48d` với bản của tác giả, so stats với `calc_stat.py` (môi trường Ψ₀ `fwdata/psi0/Psi0/.venv-psi`) | Laptop | Khớp (lệch 0 và 9e-8) |
 | Loader thật của Ψ₀ (`-k psi0`) | `rtx3060`, image Ψ₀ của tác giả, **trước khi có quy tắc mới** | 4 qua, rồi 2 qua (mục trên) |
 

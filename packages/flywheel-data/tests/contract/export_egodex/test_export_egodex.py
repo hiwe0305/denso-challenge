@@ -308,3 +308,24 @@ def test_a_bundle_that_contradicts_its_episode_is_refused(tmp_path: Path) -> Non
     spec = Spec("ep_a", 10, [(0, 10)], episode={"action_quality": "pseudo"})
     with pytest.raises(ExportRefused, match="bundle retargeted, Episode pseudo"):
         export(build(tmp_path / "work", [spec]), tmp_path / "out")
+
+
+def test_frames_without_a_recorded_confidence_are_reported_not_averaged(tmp_path: Path) -> None:
+    # EgoDex files without a `confidences` group: DA-04 writes NaN for every frame
+    specs = [Spec("ep_a", 10, [(0, 10)]), Spec("ep_b", 10, [(0, 10)], confidence_recorded=False)]
+    meta = export(build(tmp_path / "work", specs), tmp_path / "out")
+    recorded, missing = (s["pose_confidence"]["left"] for s in meta["samples"])
+    assert recorded["recorded"] == 1.0 and recorded["mean"] is not None
+    assert missing == {"mean": None, "min": None, "recorded": 0.0}
+
+
+def test_non_finite_actions_refuse_the_export_and_leave_nothing(tmp_path: Path) -> None:
+    work = build(tmp_path / "work", [Spec("ep_a", 10, [(0, 10)]), Spec("ep_b", 10, [(0, 10)])])
+    bundle = json.loads((work / "egocentric/ep_b/bundle.json").read_text())
+    with h5py.File(bundle["hdf5"], "r+") as f:
+        f["transforms/rightThumbTip"][4, 0, 3] = np.nan
+    with pytest.raises(ExportRefused, match="ep_b step_0: actions_48d has NaN"):
+        export(work, tmp_path / "out")
+    assert not (tmp_path / "out").exists()
+    [ledger] = (tmp_path / "store").rglob("ledger.jsonl")
+    assert "failed: ExportRefused" in ledger.read_text().splitlines()[-1]
