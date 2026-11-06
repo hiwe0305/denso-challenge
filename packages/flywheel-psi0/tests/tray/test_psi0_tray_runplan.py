@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from flywheel.contracts.entities import Decision
 from flywheel_psi0.trainer.recipe import Psi0Recipe
 from flywheel_psi0.tray import runplan
 from flywheel_psi0.tray.demo_sets import (
@@ -584,3 +585,63 @@ def test_pinned_file_drift_warns_on_ci_and_fails_at_launch(
 def test_launch_needs_the_release() -> None:
     with pytest.raises(SystemExit):
         main(["check", str(PLAN_V2), "--launch"])
+
+
+PLAN_CMAX = PLANS / "he-tray-cmax.yaml"
+
+
+def test_cmax_draft_matches_the_files_it_names(capsys: pytest.CaptureFixture[str]) -> None:
+    plan_cmax = TrayRunPlan.load(PLAN_CMAX)
+    assert plan_cmax.status == "draft" and check(plan_cmax) == []
+    assert main(["check", str(PLAN_CMAX)]) == 0
+    assert capsys.readouterr().out.endswith(", draft\n")
+
+
+def test_cmax_is_v2_with_the_whole_pool_as_its_one_branch(plan_v2: TrayRunPlan) -> None:
+    # Same recipe, parent, train seed, eval, rules and pins as v2 (Hiếu 6/11/2026).
+    cmax, v2 = plan_json(TrayRunPlan.load(PLAN_CMAX)), plan_json(plan_v2)
+    differ = {k for k in cmax.keys() | v2.keys() if cmax.get(k) != v2.get(k)}
+    assert differ == {"name", "demo_sets", "branches", "budget", "supersedes"}
+    assert cmax["branches"] == {
+        "CMAX": {
+            "demo_set": "CMAX",
+            "parent": "psi0-baseline-egodex-he",
+            "role": "all 429 usable S1 demos; only under rule 0",
+        }
+    }
+    assert cmax["budget"]["runs"] == ["CMAX"] and cmax["budget"]["cap_cu_per_run"] == 18
+    v2_sets = DemoSets.model_validate_json((PLANS / "demo_sets-v2.json").read_text())
+    cmax_sets = DemoSets.model_validate_json((PLANS / "demo_sets-v2-cmax.json").read_text())
+    assert {k: v for k, v in cmax_sets.sets.items() if k != "CMAX"} == v2_sets.sets
+    assert cmax_sets.sets["CMAX"].n == 429 and cmax_sets.qa == v2_sets.qa
+    assert set(v2_sets.sets["A"].seeds) < set(cmax_sets.sets["CMAX"].seeds)
+
+
+def test_status_is_left_out_of_the_id() -> None:
+    plan_cmax = TrayRunPlan.load(PLAN_CMAX)
+    assert run_plan_id(plan_cmax) == run_plan_id(plan_cmax.model_copy(update={"status": None}))
+
+
+def test_a_draft_neither_launches_nor_freezes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(runplan, "check_release", lambda *args: [])
+    assert main(["check", str(PLAN_CMAX), "--release", str(tmp_path), "--launch"]) == 1
+    assert "DRAFT: no job runs a draft plan" in capsys.readouterr().err
+    repo = _with_doc(tmp_path / "repo")  # a copy: a broken refusal must not write a lock here
+    for name in ("he-tray-cmax.yaml", "demo_sets-v2-cmax.json"):
+        shutil.copy(PLANS / name, repo / "configs/runplans/tray" / name)
+    with pytest.raises(ValueError, match="status draft"):
+        freeze(repo / "configs/runplans/tray/he-tray-cmax.yaml", repo)
+    assert not lock_path(repo / "configs/runplans/tray/he-tray-cmax.yaml").exists()
+
+
+def test_the_rule_0_decision_draft_names_v2_and_the_cmax_plan() -> None:
+    decision = Decision.model_validate_json((PLANS / "he-tray-v2.rule0.decision.json").read_text())
+    v2, cmax = TrayRunPlan.load(PLAN_V2), TrayRunPlan.load(PLAN_CMAX)
+    assert (decision.kind, decision.verdict) == ("dev_gate", "open")
+    assert decision.meta["status"] == "draft"
+    assert decision.subject_id == run_plan_id(v2)
+    assert decision.criteria["rules_sha256"] == v2.interpretation.rules_sha256
+    assert decision.criteria["threshold_p"] == 0.10
+    assert decision.criteria["c_max_plan"]["run_plan_id"] == run_plan_id(cmax)

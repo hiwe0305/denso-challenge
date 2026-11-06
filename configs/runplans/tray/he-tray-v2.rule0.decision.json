@@ -1,0 +1,33 @@
+{
+ "site_id": "local",
+ "task_id": "g1_wholebody_tray_transfer_teleop",
+ "embodiment_id": "g1_sonic_dwbc@1",
+ "schema_version": "1.0.0",
+ "meta": {
+  "status": "draft",
+  "story": "DA-34",
+  "subtask": "3.5"
+ },
+ "id": "dec_01M6QERTS21J48KPACJX83QC3R",
+ "kind": "dev_gate",
+ "subject_kind": "run_plan",
+ "subject_id": "rp_a04c14e79dfd",
+ "verdict": "open",
+ "metrics": {},
+ "criteria": {
+  "doc": "docs/he/tray.md",
+  "rules_sha256": "eec2222c148bf46d0d6ca9e88eb7fc8bc302223e248c8e1033630e56a9cf78b8",
+  "rule": 0,
+  "metric": "sim_success, headline levels 1-2 pooled, bootstrap by condition",
+  "threshold_p": 0.1,
+  "fires_when": "p_C < 0.10",
+  "if_fires": "no C+; check the image pipeline; C-max only on Hiếu's order",
+  "c_max_plan": {
+   "path": "configs/runplans/tray/he-tray-cmax.yaml",
+   "run_plan_id": "rp_366283071c4a"
+  }
+ },
+ "signed_by": "pending: Hiếu",
+ "reason": "DRAFT, written 6/11/2026 before the eval C result. Rule 0 of the tier 2 rules (docs/he/tray.md section 9): p_C < 10 % on the headline levels 1-2 means Psi0 did not learn the tray task from MuJoCo images: C+ does not run, the image pipeline is checked. To fill when eval C ends: metrics from flywheel_psi0.tray.eval_results (p, bootstrap CI, per level), verdict pass (rule 0 does not fire: C+ goes on as AC 6) or fail (rule 0 fires), and Hiếu's order on C-max. C-max (rp_366283071c4a, configs/runplans/tray/he-tray-cmax.yaml, status draft) is the one run kept ready for a fail: same recipe, parent, train seed and eval as v2 on all 429 usable S1 episodes, cap 18 CU in the slot C+ leaves unused. It trains only if rule 0 fires and Hiếu orders it; then this Decision records the order, the plan drops its draft status and is frozen. Results stay 'preliminary, on dev'. Known limits of eval C: EGL rollouts are not reproducible (tray.md 13.2); fetched.json final false by the stage race; SIMPLE checkout 6d10628 vs the b75c678 pin (differs only in the two-table task file).",
+ "supersedes_decision_id": null
+}

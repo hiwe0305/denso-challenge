@@ -51,7 +51,7 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
   - [x] 3.2 Kiểm tất định (mục 8.5) và chạy thử; ghi giới hạn của EGL ở `docs/he/tray.md` kèm change log · **6/11/2026:** hỏng, ảnh reset EGL lệch 13/230 400 pixel, server tất định; Hiếu: chạy tiếp, ghi giới hạn (tray.md mục 8.2, 13)
   - [ ] 3.3 Chạy cả lô 270 episode trên rtx3060 từ master, log đủ cho Agent QA/QC
   - [ ] 3.4 Bảng kết quả, đọc theo bậc 2 (tray.md mục 9, quy tắc 0), khoảng tin cậy bootstrap, tỷ lệ qua từng bước, loại lỗi, `Decision`; dòng ước lượng và thực đo trong sổ chi phí
-  - [ ] 3.5 Chuẩn bị C-max, chưa train: cắt 429 episode S1, RunPlan `draft`, `Decision` theo quy tắc 0, dòng ước lượng
+  - [x] 3.5 Chuẩn bị C-max, chưa train: cắt 429 episode S1, RunPlan `draft`, `Decision` theo quy tắc 0, dòng ước lượng · **6/11/2026:** `rp_366283071c4a` (nháp, không khởi chạy được), tập `CMAX` 429 episode, bản cắt trên rtx3060, bản nháp `Decision` mở (tray.md mục 13.6)
 - [ ] 4. Nhánh B khi có video (AC 5)
 - [ ] 5. Vòng Failure → Data trên lỗi của C: chẩn đoán, sinh nhắm lỗi, fine-tune và eval C+ (AC 6; trước 12/11/2026)
 
