@@ -6,10 +6,13 @@
     left_wrist, right_wrist     (T, 4, 4)  wrist to world
     left_tips, right_tips       (T, 5, 3)  Thumb, Index, Middle, Ring, Little tip, world
     confidence_left, _right     (T,)       in [0, 1]
+    intrinsic                   (3, 3)     camera matrix of the video, pixels
 
-all float32. E-B reads it from EgoDex tracking (ARKit world frame, y up; camera frame as in
-OpenCV, see `egodex.py`); E-A estimates it from RGB (`estimate.py`, world frame of the visual
-odometry). A hand that was not seen has NaN poses and confidence 0.
+all float32. E-B reads the pose from EgoDex tracking (ARKit world frame, y up; camera
+frame as in OpenCV, see `egodex.py`); E-A estimates it from RGB (`estimate.py`, world
+frame of the visual odometry). A hand that was not seen has NaN poses and confidence 0.
+`intrinsic` is not part of `EgoPose`: `save_pose` writes it beside the pose because DA-18
+reads it and an E-A episode has no HDF5 to read it from (DA-18, 6/11/2026).
 
 The confidence of a hand is the mean of the confidences of its wrist and five tips,
 the six joints exported. A file that recorded no confidence gives NaN: not recorded,
@@ -20,6 +23,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, fields
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 from flywheel.data.ingest.egocentric.egodex import (
@@ -92,9 +96,12 @@ def read_egodex_pose(path: Path) -> EgoPose:
     return EgoPose(**values)
 
 
-def save_pose(pose: EgoPose, path: Path) -> None:
+def save_pose(pose: EgoPose, path: Path, intrinsic: NDArray[np.floating[Any]]) -> None:
+    if intrinsic.shape != (3, 3):
+        raise ValueError(f"intrinsic has shape {intrinsic.shape}, expected (3, 3)")
     path.parent.mkdir(parents=True, exist_ok=True)
-    np.savez(path, **{f.name: getattr(pose, f.name) for f in fields(EgoPose)})
+    arrays: dict[str, Any] = {f.name: getattr(pose, f.name) for f in fields(EgoPose)}
+    np.savez(path, **arrays, intrinsic=intrinsic.astype(np.float32))
 
 
 def load_pose(path: Path) -> EgoPose:

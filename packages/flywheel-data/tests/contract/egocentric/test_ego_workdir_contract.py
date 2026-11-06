@@ -62,9 +62,12 @@ def test_the_files_da18_reads(work: Path) -> None:
         assert bundle["fps"] == 30 and Path(bundle["hdf5"]).is_absolute()
         with np.load(folder / "pose.npz") as pose:
             frames = bundle["frames"]
-            assert {name: pose[name].shape[1:] for name in pose.files} == POSE
-            assert {pose[name].shape[0] for name in pose.files} == {frames}
+            tracks = [name for name in pose.files if name != "intrinsic"]
+            assert {name: pose[name].shape[1:] for name in tracks} == POSE
+            assert {pose[name].shape[0] for name in tracks} == {frames}
             assert {pose[name].dtype for name in pose.files} == {np.dtype(np.float32)}
+            # DA-18 asked 6/11/2026: an E-A episode has no HDF5 to read the intrinsic from.
+            np.testing.assert_allclose(pose["intrinsic"], bundle["intrinsic"], rtol=1e-6)
         table = pq.read_table(folder / "segments.parquet")
         assert table.column_names == [*SEGMENT_SCHEMA.names, "frame_start", "frame_end"]
         rows = table.to_pylist()
