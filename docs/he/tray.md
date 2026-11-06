@@ -567,6 +567,21 @@ Chung cho T1 và T2:
   - tỉ lệ qua bước `place` tăng rõ so với mốc. "Rõ" ở đây là ít nhất 3 điều kiện có `place` bật ở biến thể mà không bật ở mốc, nhiều hơn số điều kiện theo chiều ngược lại.
 - Chạy lại eval đủ 270 episode với cấu hình mới cần Hiếu quyết riêng.
 
+### 14.3 Kết quả T1 (sơ bộ, trên cảnh train)
+
+- **Chạy.** Cây `bb4cef1` (nhánh `DA-34-t4-pipeline-check`), tập `t1-train-C20-bb4cef1` (sha256 `168cd1b8…`), server của eval C không đổi (`Ta = 24`, `--rtc`). Trên `rtx3060` từ 2026-11-06T21:08:32Z tới 22:11:46Z: 1,05 h, 2 lô 10, lần chạy 0, 0 thiếu, 189,4 s mỗi episode như eval C, không thấy `llama-server` trên GPU.
+- **Kiểm cảnh** trước khi chạy: 20 seed × 14 trường của `tray.sample` (tư thế khay, vùng đích, chỗ robot xuất phát), sai lệch lớn nhất 0 so với release; cả 20 episode release đều ghi là thành công.
+- **Số** (`eval_results` của repo, lần xong sớm nhất mỗi điều kiện):
+
+| Tập | n | Thành công | Wilson 95 % (%) | approach_a | grasp | lift | carry | reach_b | place | release_stand | Loại lỗi |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| T1, mức 1, cảnh train | 20 | 0 | 0,0–16,1 | 65,0 | 65,0 | 65,0 | 65,0 | 65,0 | 5,0 | 0,0 | TRAY-TILT 8, PART-DROP 5, TIMEOUT 4, PLACE-POSE 3 |
+| Eval C, mức 1, dev (mục 13.7) | 120 | 0 | 0,0–3,1 | 75,0 | 75,0 | 75,0 | 59,2 | 55,8 | 0,8 | 0,0 | TRAY-TILT 62, TIMEOUT 37, PLACE-POSE 14, PART-DROP 6, ONE-HAND 1 |
+
+  Bước xa nhất qua được ở T1: 7 episode không qua bước nào, 12 qua tới `reach_b`, 1 qua tới `place`.
+- **Đọc theo luật 14.1:** 0/20, nên **nghi chuỗi train/serve; không train gì cho tới khi tìm ra lỗi**. Trên cảnh đã train, C qua các bước tới `reach_b` gần như trên dev, rồi tắc ở `place` như trên dev. Kết quả này không ủng hộ giả thuyết "C học được cảnh train nhưng không tổng quát"; vì vậy chưa có lý do cho C-max.
+- `runs.jsonl` ở `rtx3060:~/denso-da34-pool/fwdata/tray/eval/check-t1-train-C20` (không commit).
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -576,3 +591,4 @@ Chung cho T1 và T2:
 | 7/11/2026 | Mục 13.7: kết quả eval C (0/270; mức 1–2 0/240, Wilson 0–1,6 %), nhãn lỗi, bước của bộ chấm, yaw trên 270 trace, quy tắc 0 xảy ra (không chạy C+), `Decision` `fail` chờ Hiếu, đề xuất C-max (i). Mục 13.5: trace không có `timing` (lô chạy trước #148) | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 14: luật đọc T1, T2 của bước kiểm pipeline ảnh ([Đề xuất]), viết trước rollout đầu tiên. T2: Ta = 10 với RTC không chạy được (`max_delay` 8), đề xuất T2b (Ta 24, RTC tắt) và T2a′ (Ta 10, RTC tắt) | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 14.2: Hiếu chốt hai biến thể T2b (Ta 24, RTC tắt) và T2a′ (Ta 10, RTC tắt) ("Đồng ý"), ghi trước rollout đầu tiên của T2; thêm `inference_delay` = 6 của eval C | Hiếu (soạn với Claude) |
+| 7/11/2026 | Mục 14.3: kết quả T1 (0/20 trên 20 cảnh train của C, Wilson 0–16,1 %; `reach_b` 65 %, `place` 5 %). Đọc theo luật 14.1: nghi chuỗi train/serve, không train gì cho tới khi tìm ra lỗi. Luật 14.1, 14.2 không đổi | Hiếu (soạn với Claude) |
