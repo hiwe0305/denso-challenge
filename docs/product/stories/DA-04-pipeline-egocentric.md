@@ -29,7 +29,7 @@ Là kỹ sư dữ liệu, tôi muốn video egocentric của người đi qua c�
 
 ## Nhiệm vụ
 
-- [ ] 1. Ingest tập con EgoDex, hash, nguồn (AC 1)
+- [x] 1. Ingest tập con EgoDex, hash, nguồn (AC 1)
 - [ ] 2. Che danh tính và chặn `raw` (AC 2)
 - [ ] 3. Cắt đoạn và nhãn ngôn ngữ (AC 3)
 - [ ] 4. Pose E-B đọc từ EgoDex (AC 4)
@@ -46,6 +46,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `packages/flywheel-data/src/flywheel/data/qa/egocentric.py`
 - `packages/flywheel-data/tests/unit/egocentric/`, `packages/flywheel-data/tests/contract/egocentric/`
 - `configs/data/egocentric.yaml`
+- `packages/flywheel-data/src/flywheel/data/egocentric_cli.py` (lệnh `fw egocentric`; thêm 6/11/2026)
 - `docs/g0/egocentric.md`
 
 ## Ghi chú cho người làm
