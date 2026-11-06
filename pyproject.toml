@@ -2,7 +2,7 @@
 name = "denso-humanoid-data-flywheel"
 version = "0.1.0"
 requires-python = ">=3.10"
-dependencies = ["flywheel-contracts", "flywheel-store", "flywheel-testkit", "flywheel-cli", "flywheel-data", "flywheel-eval", "flywheel-loop", "flywheel-simple", "flywheel-psi0"]
+dependencies = ["flywheel-contracts", "flywheel-store", "flywheel-testkit", "flywheel-cli", "flywheel-data[egocentric]", "flywheel-eval[agentqa]", "flywheel-loop", "flywheel-simple", "flywheel-psi0"]
 
 [tool.uv]
 package = false
@@ -37,6 +37,11 @@ python_version = "3.10"
 strict = true
 explicit_package_bases = true
 mypy_path = ["packages/flywheel-contracts/src", "packages/flywheel-testkit/src", "packages/flywheel-cli/src", "packages/flywheel-store/src", "packages/flywheel-data/src", "packages/flywheel-eval/src", "packages/flywheel-loop/src", "packages/flywheel-simple/src", "packages/flywheel-psi0/src"]
+
+# h5py ships no type stubs (egocentric extra, DA-04 and DA-18).
+[[tool.mypy.overrides]]
+module = ["h5py", "h5py.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 addopts = "-ra -m 'not gpu and not sim'"
