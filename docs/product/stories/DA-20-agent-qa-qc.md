@@ -35,7 +35,7 @@ Là AI Engineer, tôi muốn một agent đọc báo cáo dataset, log và outpu
 - [x] 3. Dựng hình từng stage (AC 4)
 - [x] 4. `AgentReport`, HTML, `AgentReview` (AC 5)
 - [x] 5. Bộ ca mẫu, chấm agent, lưu ước lượng (AC 6)
-- [ ] 6. Qwen3.5-4B nếu Q-M là có (AC 7)
+- [x] 6. Qwen3.5-4B nếu Q-M là có (AC 7)
 - [ ] 7. Chạy trên log thật, báo riêng (AC 8)
 
 ## Phạm vi file
