@@ -74,3 +74,28 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
   - Phát hiện: với `img_history_size` 1 và `upsample_rate` 3, `parse_img_data` của Ψ₀ lấy khung `index - 2` (không nhỏ hơn 0) chứ không phải khung `index`. Đây là hành vi của tác giả; bản export giữ video và HDF5 khớp từng khung.
   - Chưa xong ngoài phạm vi: `build_release` (DA-03) vẫn đóng băng release toàn egocentric với `kind` robot; test `xfail` strict ghi lại, đề xuất PR riêng cho DA-03.
 - File đã tạo hoặc sửa: `packages/flywheel-data/src/flywheel/data/export/egodex.py`, `packages/flywheel-data/tests/contract/export_egodex/`, `docs/g0/ledger/DA-18.csv`.
+
+### Chạy ở đâu, và lệnh để Hiếu chạy lại trên laptop
+
+Quy tắc mới (Hiếu, 6/11/2026): chạy trên laptop nếu được; không được thì để lại lệnh.
+
+| Việc | Chạy ở | Kết quả |
+|---|---|---|
+| Export, test CI (fake loader, batch đã lưu) | Laptop | 26 qua, 2 `xfail` strict |
+| So `actions_48d` với bản của tác giả, so stats với `calc_stat.py` (môi trường Ψ₀ `fwdata/psi0/Psi0/.venv-psi`) | Laptop | Khớp (lệch 0 và 9e-8) |
+| Loader thật của Ψ₀ (`-k psi0`) | `rtx3060`, image Ψ₀ của tác giả, **trước khi có quy tắc mới** | 4 qua, rồi 2 qua (mục trên) |
+
+Loader thật **không chạy được trên laptop** ngày 6/11/2026: torchcodec 0.4 của môi trường Ψ₀ cần thư viện chia sẻ FFmpeg 4–7, có cả `libavdevice` và `libavfilter`. Laptop chỉ có FFmpeg 8 (`libavutil.so.60`) và bản FFmpeg 6 trong snap thiếu hai thư viện đó. RAM trống lúc đó khoảng 1 GB.
+
+Để chạy lại trên laptop:
+
+1. Cài FFmpeg 7 dạng thư viện chia sẻ vào thư mục riêng, không đụng hệ thống. Ví dụ **[Đề xuất, chưa thử]**: `~/anaconda3/bin/conda create -y -p ~/ffmpeg7 -c conda-forge "ffmpeg=7.*"`. Kiểm tra: `ls ~/ffmpeg7/lib/libavdevice.so.61 ~/ffmpeg7/lib/libavutil.so.59`.
+2. Kiểm `free -g`: cần khoảng 3 GB trống (torch nạp trên CPU).
+3. Chọn vài episode: `mkdir -p /tmp/egodex4 && ln -s /home/hiwe/project/denso-challenge/fwdata/egodex-da30-probe/part1/{add_remove_lid,arrange_topple_dominoes} /tmp/egodex4/`.
+4. Từ worktree của nhánh `DA-18-egodex-export`:
+
+   ```bash
+   PSI0_ROOT=/home/hiwe/project/denso-challenge/fwdata/psi0/Psi0 PSI0_FFMPEG_LIB=$HOME/ffmpeg7/lib EGODEX_PROBE=/tmp/egodex4 uv run pytest -v packages/flywheel-data/tests/contract/export_egodex -k psi0
+   ```
+
+   Kết quả mong đợi: `3 passed` (batch đã lưu, EgoDex thật với 8 mẫu từ 4 episode, E-A). `PSI0_FFMPEG_LIB` chỉ đặt `LD_LIBRARY_PATH` cho tiến trình Ψ₀. Lỗi `Could not load libtorchcodec` nghĩa là bước 1 chưa đúng; lỗi so sánh in đường dẫn mẫu, khóa và độ lệch lớn nhất.

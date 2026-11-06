@@ -5,7 +5,9 @@ transform drew from the export of `GOLDEN_SPECS` (`psi0_loader_probe.py`, run in
 authors' Psi0 image; see `docs/g0/ledger/DA-18.csv`). In CI the fake loader, a
 torch-free copy of the same logic, must draw that batch value by value from a fresh
 export. With `PSI0_ROOT` set, Psi0's loader itself must draw it again; `PSI0_PYTHON`
-names the interpreter of Psi0's environment (default `$PSI0_ROOT/.venv-psi/bin/python`).
+names the interpreter of Psi0's environment (default `$PSI0_ROOT/.venv-psi/bin/python`),
+and `PSI0_FFMPEG_LIB` a directory of FFmpeg 4-7 shared libraries for its torchcodec,
+put on `LD_LIBRARY_PATH` of that process only.
 With `EGODEX_PROBE` also set (a directory of EgoDex `<task>/<i>.hdf5|mp4`), the fake
 and the real loader must agree on an export of those real episodes.
 """
@@ -54,9 +56,13 @@ def psi0_batch(out: Path, tmp: Path) -> dict:  # type: ignore[type-arg]
     assert PSI0_ROOT is not None
     python = os.environ.get("PSI0_PYTHON", f"{PSI0_ROOT}/.venv-psi/bin/python")
     target = tmp / "psi0_batch.json"
+    env = dict(os.environ)
+    if os.environ.get("PSI0_FFMPEG_LIB"):
+        env["LD_LIBRARY_PATH"] = os.environ["PSI0_FFMPEG_LIB"]
     run = subprocess.run(
         [python, str(HERE / "psi0_loader_probe.py"), str(out), str(out / STATS_FILE), str(target)],
         cwd=PSI0_ROOT,
+        env=env,
         capture_output=True,
         text=True,
         timeout=1800,
