@@ -76,11 +76,11 @@ def trajectory(rng: np.random.Generator, frames: int, origin: Sequence[float]) -
     return out.astype(np.float32)
 
 
-def write_video(path: Path, frames: int) -> None:
+def write_video(path: Path, frames: int, fps: float = FPS) -> None:
     import cv2
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    writer = cv2.VideoWriter(str(path), cv2.VideoWriter.fourcc(*"mp4v"), FPS, SIZE)
+    writer = cv2.VideoWriter(str(path), cv2.VideoWriter.fourcc(*"mp4v"), fps, SIZE)
     for k in range(frames):
         writer.write(np.full((SIZE[1], SIZE[0], 3), grey(k), np.uint8))
     writer.release()
