@@ -34,14 +34,16 @@ from flywheel.eval.diagnosis.system.artifact import (
     write_system_record,
 )
 from flywheel.eval.diagnosis.system.check import diagnose_system
-from flywheel.eval.diagnosis.system.reader import StageInputs, load_episode
+from flywheel.eval.diagnosis.system.reader import ROLLOUT_NAME, StageInputs, load_episode
 from flywheel.eval.diagnosis.train.artifact import (
     build_artifact,
     diagnose_all,
     load_job,
     write_artifact,
 )
+from flywheel.eval.scorer.agreement import AgreementReport, compare
 from flywheel.eval.scorer.artifact import build_record, write_record
+from flywheel.eval.scorer.calibration import read_rollouts, read_scores, store_report
 from flywheel.eval.scorer.reader import read_trace
 from flywheel.eval.scorer.score import EpisodeScore, score_episode
 
@@ -107,6 +109,35 @@ def store_score(score: EpisodeScore, store_path: Path, level: int | None = None)
 def score_record(score: EpisodeScore, level: int | None = None) -> Score:
     """The record of a score without writing it, for callers that keep their own store."""
     return build_record(score, level)
+
+
+def check_scorer_agreement(
+    scores_path: Path, rollouts_path: Path, release_id: str
+) -> AgreementReport:
+    """Compare stored `Score` records with SIMPLE's flag on the same episodes (DA-37 AC 1, 2).
+
+    `scores_path` is a JSONL of `Score`, such as `<store>/scorer/score.jsonl`.
+    `rollouts_path` is a directory holding the `<trace_id>/rollout_result.json`
+    of the same eval run, or one such file. A score pairs with the rollout
+    whose `trace_ref.trace_id` is its `episode_id`, which is what
+    `fw eval score --episode-id <trace_id>` writes. `release_id` is the release
+    the evaluated checkpoint was trained on; it goes into the report as given.
+
+    Raises `CalibrationInputError` on a file that does not parse and
+    `ScorerError` on a set that cannot make one report: two different scores
+    of one episode, scores from two scorers, or no score at all.
+    """
+    return compare(read_scores(scores_path), read_rollouts(rollouts_path, ROLLOUT_NAME), release_id)
+
+
+def store_scorer_agreement(report: AgreementReport, store_path: Path) -> tuple[str, Path]:
+    """Store the report through `flywheel.store`; return its hash and the list it joined.
+
+    The bytes go in the blob store, so the hash is the report; one line naming
+    it is appended to `<store>/scorer/agreement.jsonl`. Checking again appends
+    a line and never rewrites one (03 section 4.4, rule 3).
+    """
+    return store_report(report, store_path)
 
 
 def diagnose_episode_system(
