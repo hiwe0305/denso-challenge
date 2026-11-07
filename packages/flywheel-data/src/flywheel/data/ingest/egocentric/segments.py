@@ -46,6 +46,7 @@ import pyarrow as pa  # type: ignore[import-untyped]
 import pyarrow.parquet as pq  # type: ignore[import-untyped]
 from flywheel.contracts.segments import SEGMENT_SCHEMA, Segment
 from flywheel.data.ingest.egocentric.config import SegmentConfig
+from flywheel.data.ingest.egocentric.files import replacing
 from flywheel.data.ingest.egocentric.pose import SIDES, EgoPose, aperture, wrist_speed
 from numpy.typing import NDArray
 
@@ -335,7 +336,8 @@ def cut_episode(
 def write_segment_table(path: Path, segments: Sequence[EgoSegment], fps: float) -> None:
     rows = [{**s.to_segment(fps).model_dump(), "frame_start": s.frame_start,
              "frame_end": s.frame_end} for s in segments]
-    pq.write_table(pa.Table.from_pylist(rows, schema=TABLE_SCHEMA), path)
+    with replacing(path) as temporary:
+        pq.write_table(pa.Table.from_pylist(rows, schema=TABLE_SCHEMA), temporary)
 
 
 def read_segment_rows(path: Path) -> list[EgoSegment]:
