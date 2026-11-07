@@ -738,6 +738,59 @@ Bước kế tiếp do Hiếu quyết.
 - Server eval C (`Ta` 24, `--rtc`) có thể tắt trong phần A để lấy VRAM, và được trả lại cấu hình đó khi xong. Ghi lệnh và thời điểm.
 - Số đọc là sơ bộ.
 
+### 15.6 Kết quả B (sơ bộ)
+
+Chạy 7/11/2026 trên `rtx3060`, mã `cb0a386`, 0 CU. Luật 15.3 không đổi.
+
+**Đọc gộp B: đầu vào lúc serve khác lúc train, ở ảnh.** Stats khớp. State khớp về thứ tự, đơn vị và nghĩa; luật bắt vài chiều ngón cái, giải thích ở dưới.
+
+- **B1, stats: khớp.**
+  - Server không tìm thấy `stat_path` = `meta/stats_psi0.json` lúc serve, nên không file nào khác được đọc.
+  - Biên `action_min/max`, `state_min/max` mà server dùng bằng đúng `stats_psi0.json` của tập C (sha256 `1c9211ff…`): sai lệch lớn nhất 0 ở cả bốn. State có 32 chiều, đệm 0 lên 36.
+- **Phát lại.** Lô `b-replay`: 3/3 episode chạy hết, mã thoát 0, 153 s. Có 175 request được lưu (58, 57, 60).
+
+**B2, ảnh: khác** ở cả ba episode, vì PSNR thấp. Kích thước, kiểu dữ liệu và thứ tự kênh đều khớp.
+
+| Seed | Kích thước, kiểu | MAE ở frame 0 (đảo kênh) | PSNR ở frame 0 | PSNR theo request (nhỏ nhất – lớn nhất) |
+|---|---|---|---|---|
+| 1279 | 360 × 640 × 3, `uint8` | 15,8 (47,8) | 16,48 dB | 14,0 – 19,7 |
+| 1574 | 360 × 640 × 3, `uint8` | 15,9 (47,9) | 16,43 dB | 11,6 – 18,5 |
+| 1503 | 360 × 640 × 3, `uint8` | 15,7 (47,7) | 16,53 dB | 13,1 – 19,6 |
+
+So ảnh bằng mắt, frame 0 và 30:
+- Camera, tư thế, bàn và hai tay trùng chỗ.
+- Khay của eval là hộp xanh đặc, đáy mờ đục. Khay của dữ liệu train là thùng lưới đục lỗ (mesh SimReady).
+- Mặt dưới và quanh bàn cũng khác.
+- Ảnh eval tối hơn, khoảng 0,85 × ảnh train + 7.
+
+**Nguyên nhân, đã kiểm tại nguồn:**
+- `flywheel_simple.tray.visuals.default_manifest_path()` chỉ tìm `fwdata/simple/tray/simready/manifest.json` trong các thư mục cha của mã.
+- Không thấy manifest thì `mjcf.py` dựng cảnh bằng khối hình học trơn mà không báo. Ngược lại, `generate.py` từ chối chạy khi thiếu manifest, trừ khi có `allow_plain`.
+- Cả 160 episode của C ghi `visuals_revision` `4763fbf…`, đúng manifest trong `~/denso-da33`, nơi sinh dữ liệu.
+- Các cây đã chạy eval C (`denso-da34-master-2e57f60`), T1, T2 (`denso-da34-t4-bb4cef1`) và lần phát lại này không có manifest, nên revision là `none`.
+- Vậy eval C (mục 13.7), T1 và T2 (mục 14) đều chạy trên ảnh mà C chưa thấy lúc train.
+
+Đề xuất, Hiếu quyết, không làm trong DA-34:
+- PR riêng cho chủ `flywheel_simple`: eval từ chối chạy khi thiếu manifest, hoặc khi revision khác revision của dữ liệu train.
+- Chạy lại T1 với manifest `4763fbf`.
+
+**B3, state: theo luật là khác**, nhưng không phải lỗi thứ tự, đơn vị hay nghĩa.
+- Ở frame 0, sai lệch của mọi chiều sống là 0,000.
+- Hai cánh tay và hông (chiều 14–30): trung vị sai lệch ≤ 0,024. Tương quan cao nhất là chính chiều đó, hệ số góc gần 1. Vậy `waist_rpy` = qpos[13, 14, 12] đúng nghĩa với chiều 28–30 của dataset; chỗ nghi ở 15.1 bỏ.
+- Chiều 31 chết (biên độ 0).
+- Các chiều luật bắt:
+
+| Seed | Chiều | Trung vị | Chiều tương quan cao nhất (tương quan với chính nó) | Hệ số góc | Đọc |
+|---|---|---|---|---|---|
+| 1279 | 7 `right_hand_thumb_0` | 0,0001 | 7 (0,990) | 0,37 | ngón gần như đứng yên, hệ số góc không ổn định |
+| 1574 | 0 `left_hand_thumb_0` | 0,233 | 0 (0,924) | 1,72 | ngón cái trôi khi tiếp xúc |
+| 1574 | 2, 3, 4 | ≤ 0,006 | 9, 12, 3 (≥ 0,985) | 0,98–1,00 | các khớp ngón chuyển động cùng nhau nên tương quan gần bằng nhau |
+| 1503 | 0, 7 | 0,125; 0,051 | chính nó (≥ 0,994) | 1,60; 0,90 | báo, ngón cái trôi khi tiếp xúc |
+
+- **Lời nhắc.** Client gửi câu gốc có chữ hoa ("Pick up the parts tray from table A …"). `serve_psi0_simple` đổi sang chữ thường, nên khớp `task.lower()` lúc train. Mục 15.1 ghi "client gửi viết thường" là chưa chính xác: viết thường là do server.
+
+Dump, ảnh so sánh (`b-img-*.png`) và `b-result.json` ở `rtx3060:~/denso-da34-pool/fwdata/tray/chain-check/`, không commit.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -751,3 +804,4 @@ Bước kế tiếp do Hiếu quyết.
 | 7/11/2026 | Mục 14.4: kết quả T2b (`Ta = 24`, RTC tắt): 0/20, không qua `carry` ở điều kiện nào (mốc eval C 13/20); `success_gain` 0, `place_gain` 0, không đáng xem. Ghi lệnh khởi động lại server. Luật 14.2 không đổi | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 14.5, 14.6: kết quả T2a′ (`Ta = 10`, RTC tắt): 0/20, không qua `carry`, không đáng xem; tổng hợp T1, T2; server trả về `Ta = 24`, `--rtc`. `Decision` quy tắc 0 ghi `criteria.pipeline_check` và sửa khoảng trống đầu. Luật 14.1, 14.2 không đổi | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 15: luật đọc A (open-loop trên dữ liệu train của C, hai đường gọi) và B (stats, ảnh, state qua phát lại) của bước kiểm chuỗi train/serve ([Đề xuất]), viết trước lần chạy đầu tiên. Hiếu giao "Giao DA-34 làm" | Hiếu (soạn với Claude) |
+| 7/11/2026 | Mục 15.6: kết quả B. B1 stats khớp. B2 ảnh khác: PSNR ở frame 0 khoảng 16,5 dB; cây eval thiếu manifest SimReady nên khay và cảnh render bằng khối trơn, `visuals_revision` `none` so với `4763fbf` của dữ liệu C. B3: theo luật là khác ở các chiều ngón cái; thứ tự, đơn vị và nghĩa đúng. Luật 15.3 không đổi | Hiếu (soạn với Claude) |
