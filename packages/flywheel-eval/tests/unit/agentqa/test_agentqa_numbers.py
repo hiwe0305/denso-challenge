@@ -35,3 +35,20 @@ def test_an_invented_number_is_reported() -> None:
 def test_a_number_inside_a_text_fact_counts() -> None:
     facts = [AgentFact(fact_id="F1", name="detail", value="7 chunks over d", source_ref="a")]
     assert unsupported_numbers("7 chunks stalled", facts) == []
+
+
+def test_thousands_units_and_fractions_are_read_as_numbers() -> None:
+    assert numbers_in("12,000 steps in 120ms, 10x faster, 45/90 episodes, 4GB, 12k") == [
+        "12,000", "120ms", "10x", "45", "90", "4GB", "12k"
+    ]
+    facts = [AgentFact(fact_id="F1", name="steps", value=12000, source_ref="a")]
+    assert unsupported_numbers("12,000 steps", facts) == []
+    assert unsupported_numbers("12k steps", facts) == []
+    assert unsupported_numbers("12,000 steps", [*facts[:0]]) == ["12,000"]
+    assert unsupported_numbers("45/90 episodes and 10x", FACTS) == ["45", "90", "10x"]
+
+
+def test_names_paths_and_dates_stay_out() -> None:
+    assert numbers_in("a 3D pose, 6D rotation, 48d actions, Qwen3.5-4B, rtc/job-g1") == []
+    assert numbers_in("on 6/11/2026") == []
+
