@@ -65,7 +65,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực: 7,3 giờ (nhiệm vụ 1: 1,5 + 0,5 sửa sau khi chạy work dir thật của DA-04 + 0,5 sửa theo review PR #153 + 0,5 kiểm miễn trừ D2 theo pin + 0,25 bỏ cờ đổi pin; 2: 1,5 + 0,3 chạy loader thật trên laptop; 3: 1,5 + 0,75 sửa theo review), Hiếu làm cùng Claude từ 6/11/2026 (plan chia lại việc của Hưng).
+- Giờ thực: 7,6 giờ (nhiệm vụ 1: 1,5 + 0,5 sửa sau khi chạy work dir thật của DA-04 + 0,5 sửa theo review PR #153 + 0,5 kiểm miễn trừ D2 theo pin + 0,25 bỏ cờ đổi pin + 0,3 chạy lại trên QA mới của DA-04; 2: 1,5 + 0,3 chạy loader thật trên laptop; 3: 1,5 + 0,75 sửa theo review), Hiếu làm cùng Claude từ 6/11/2026 (plan chia lại việc của Hưng).
 - Công cụ AI đã dùng: Claude Code (Claude Opus 5.5).
 - Ghi chú hoàn thành:
   - Đầu vào là work dir của DA-04 theo plan 6/11/2026 mục 4.2a; test dùng work dir tổng hợp theo đúng mục đó. DA-04 cần ghi thêm `intrinsic` (3, 3) vào `pose.npz` cho E-A **[Đề xuất]**: loader của Ψ₀ đọc `camera/intrinsic` ở mọi mẫu, còn episode E-A không có HDF5.
@@ -73,6 +73,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
   - Loader của Ψ₀ ở `cda3fdf` (image của tác giả trên `rtx3060`) đọc lại đúng batch đã lưu, cả 40 mẫu EgoDex thật và mẫu E-A.
   - Phát hiện: với `img_history_size` 1 và `upsample_rate` 3, `parse_img_data` của Ψ₀ lấy khung `index - 2` (không nhỏ hơn 0) chứ không phải khung `index`. Đây là hành vi của tác giả; bản export giữ video và HDF5 khớp từng khung.
   - Chạy trên work dir thật của DA-04 (`fwdata/pipeline/src_050b9bf56a4e843c`, 20 episode EgoDex, QA 13 pass, 7 flag) với `--include-flag`, trên laptop: 38 mẫu (25 pass, 13 flag), 4143 khung, 79 MB, 53 giây đo, ước tính 84 giây. Loader giả đọc đủ 38 mẫu, action chuẩn hóa hữu hạn.
+  - Chạy lại ngày 7/11/2026 trên master `c8a7e46b` (sau khi #152 và #153 merge), cùng work dir do DA-04 chạy lại: QA `ego-1@2b0b593722be` 8 pass, 11 flag, 1 reject; 39 đoạn; `deid_waiver_manifest` = `egodex-test-da30-part1@4b4ad209ee99`, pin đọc từ đường dẫn cố định của DA-04 (không còn cờ). Với `--include-flag`, trên laptop: **38 mẫu (16 pass, 22 flag) từ 19 episode, 4072 khung**, 81 MB, export `egx_0b4a1daa411407da`; 59,6 giây đo trong `job_ledger` (62,5 giây wall, RSS đỉnh 341 MB), ước tính 82 giây. `ep_2732d666102ad9ff` bị bỏ vì QA `reject` (`meta.json` `skipped`: 1); **0 đoạn bị bỏ vì khung NaN**. So với lần trước (38 mẫu, 4143 khung, 53 giây, `egx_948a6927d3bb8136`): số mẫu bằng nhau vì DA-04 thêm một đoạn (39 thay vì 38) đúng bằng đoạn duy nhất của episode bị `reject`; 39 đoạn mới vẫn cộng lại 4143 khung (ranh giới đổi, tổng không đổi), nên 71 khung ít hơn chính là đoạn `pick` 0–71 của `ep_2732d666102ad9ff`. 8 mẫu từ 4 episode vẫn không có `confidences` (`recorded` 0). Loader giả đọc đủ 38 mẫu, action chuẩn hóa hữu hạn. Đầu ra nằm trong scratchpad của phiên, không trong `fwdata/`; DA-30 nên export lại vào thư mục của mình. Loader thật của Ψ₀ chưa chạy lại: laptop vẫn chưa có FFmpeg 7 (`~/ffmpeg7`), lệnh ở mục dưới.
   - 4 episode trong đó (8 mẫu) không có nhóm `confidences` trong file EgoDex, nên DA-04 ghi NaN. `meta` ghi `pose_confidence` với `mean`/`min` là `null` và `recorded` 0, không lấy trung bình NaN. Action có NaN hoặc Inf thì export từ chối và xóa thư mục đầu ra (thư mục đã được kiểm là mới hoặc rỗng), để lần chạy lại không bị chặn vì "không rỗng".
   - Sửa theo review PR #153 (7/11/2026):
     - Split `dev` của DA-04 vào thư mục `test/` của Ψ₀.
@@ -91,7 +92,7 @@ Quy tắc mới (Hiếu, 6/11/2026): chạy trên laptop nếu được; không 
 | Việc | Chạy ở | Kết quả |
 |---|---|---|
 | Export, test CI (fake loader, batch đã lưu) | Laptop | 38 qua, 2 `xfail` strict |
-| Export work dir thật của DA-04, đọc lại bằng loader giả | Laptop | 38 mẫu, 53 giây, đọc đủ |
+| Export work dir thật của DA-04, đọc lại bằng loader giả | Laptop | 38 mẫu, 53 giây, đọc đủ; chạy lại 7/11/2026 trên QA mới: 38 mẫu, 4072 khung, 59,6 giây, đọc đủ |
 | Export E-A thật (cùng 20 episode, pose của E-A) | Laptop | Giữ 2, bỏ 36 đoạn, 1,6 giây; loader giả đọc đủ 2 mẫu |
 | So `actions_48d` với bản của tác giả, so stats với `calc_stat.py` (môi trường Ψ₀ `fwdata/psi0/Psi0/.venv-psi`) | Laptop | Khớp (lệch 0 và 9e-8) |
 | Loader thật của Ψ₀ (`-k psi0`) | `rtx3060`, image Ψ₀ của tác giả, **trước khi có quy tắc mới** | 4 qua, rồi 2 qua (mục trên) |
