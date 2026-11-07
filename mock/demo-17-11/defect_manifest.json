@@ -1,77 +1,95 @@
-{
-  "dataset_id": "bench_kbd_teleop",
-  "defects": [
-    {
-      "code": "D1",
-      "parameters": {
-        "missing_column": "left_wrist_cmd"
+[
+  {
+    "dataset_id": "bench_kbd_teleop",
+    "defects": [
+      {
+        "code": "D1",
+        "parameters": {
+          "column": "left_wrist_cmd",
+          "kind": "missing_column"
+        },
+        "target_ref": "ep_bench_00"
       },
-      "target_ref": "ep_bench_00"
-    },
-    {
-      "code": "D2",
-      "parameters": {
-        "drop_frames": 5
+      {
+        "code": "D2",
+        "parameters": {
+          "drop_frames": 5,
+          "kind": "dropped_frames"
+        },
+        "target_ref": "ep_bench_01"
       },
-      "target_ref": "ep_bench_01"
-    },
-    {
-      "code": "D3",
-      "parameters": {
-        "dim": 12,
-        "scale": 1.8
+      {
+        "code": "D3",
+        "parameters": {
+          "dim": 12,
+          "kind": "action_scale",
+          "scale": 1.8
+        },
+        "target_ref": "ep_bench_02"
       },
-      "target_ref": "ep_bench_02"
-    },
-    {
-      "code": "D4",
-      "parameters": {
-        "dim": 31
+      {
+        "code": "D4",
+        "parameters": {
+          "dim": 31,
+          "kind": "dead_dim"
+        },
+        "target_ref": "ep_bench_03"
       },
-      "target_ref": "ep_bench_03"
-    },
-    {
-      "code": "D5",
-      "parameters": {
-        "near_duplicate_of": "ep_bench_07"
+      {
+        "code": "D5",
+        "parameters": {
+          "kind": "duplicate_episode",
+          "original_id": "ep_bench_07"
+        },
+        "target_ref": "ep_bench_04"
       },
-      "target_ref": "ep_bench_04"
-    },
-    {
-      "code": "D6",
-      "parameters": {
-        "label_swap": "3<->4"
+      {
+        "code": "D6",
+        "parameters": {
+          "kind": "label_swap",
+          "label_swap": "3<->4"
+        },
+        "target_ref": "ep_bench_05"
       },
-      "target_ref": "ep_bench_05"
-    },
-    {
-      "code": "D7",
-      "parameters": {
-        "flip_dim": 20
+      {
+        "code": "D7",
+        "parameters": {
+          "flip_dim": 20,
+          "kind": "action_sign_flip"
+        },
+        "target_ref": "ep_bench_06"
+      }
+    ],
+    "seed": 17
+  },
+  {
+    "dataset_id": "bench_logs_bfail",
+    "defects": [
+      {
+        "code": "T1",
+        "parameters": {
+          "kind": "nan_loss",
+          "nan_at_step": 1200
+        },
+        "target_ref": "runs/exp_BFAIL/metrics.jsonl"
       },
-      "target_ref": "ep_bench_06"
-    },
-    {
-      "code": "T1",
-      "parameters": {
-        "nan_at_step": 1200
+      {
+        "code": "T3",
+        "parameters": {
+          "kind": "overfit",
+          "overfit_from_step": 1400
+        },
+        "target_ref": "runs/exp_BFAIL/metrics.jsonl"
       },
-      "target_ref": "runs/exp_BFAIL/metrics.jsonl"
-    },
-    {
-      "code": "T3",
-      "parameters": {
-        "overfit_from_step": 1400
-      },
-      "target_ref": "runs/exp_BFAIL/metrics.jsonl"
-    },
-    {
-      "code": "T5",
-      "parameters": {
-        "dead_dim": 7
-      },
-      "target_ref": "runs/exp_BFAIL/metrics.jsonl"
-    }
-  ],
-  "seed": 17
-}
+      {
+        "code": "T5",
+        "parameters": {
+          "dead_dim": 7,
+          "kind": "dead_dim_train"
+        },
+        "target_ref": "runs/exp_BFAIL/metrics.jsonl"
+      }
+    ],
+    "seed": 18
+  }
+]

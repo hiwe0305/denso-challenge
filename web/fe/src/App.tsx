@@ -5,6 +5,7 @@ import { useState } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { role, setRole } from "./api/role";
 import { userRole, type UserRole } from "./contracts/enums";
+import { AgentQa } from "./screens/AgentQa";
 import { Audit } from "./screens/Audit";
 import { Cost } from "./screens/Cost";
 import { DataPipeline } from "./screens/DataPipeline";
@@ -25,7 +26,7 @@ interface Screen {
 export const screens: Screen[] = [
   { code: "M1", path: "/tong-quan", title: "Tổng quan", milestone: "M5 (14/11)" },
   { code: "M2", path: "/du-lieu", title: "Dữ liệu", element: <DataPipeline />, milestone: "M3 (10/11)" },
-  { code: "M3", path: "/agent-qa", title: "Agent QA/QC", milestone: "M5 (14/11)" },
+  { code: "M3", path: "/agent-qa", title: "Agent QA/QC", element: <AgentQa />, milestone: "M5 (14/11)" },
   { code: "M4", path: "/release", title: "Release", milestone: "M5 (14/11)" },
   { code: "M5", path: "/huan-luyen", title: "Huấn luyện", milestone: "M5 (14/11)" },
   { code: "M6", path: "/danh-gia", title: "Đánh giá", element: <Evaluation />, milestone: "M3 (10/11)" },

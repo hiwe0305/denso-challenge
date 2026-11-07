@@ -50,6 +50,8 @@ export const PARITY_REQUESTS = [
   "- /actions",
   "- /decisions",
   "- /sync/runs",
+  "- /defects/scoreboard",
+  "- /defects/scores?limit=500",
 ];
 
 it("records the MSW responses the backend must match", async () => {

@@ -1,9 +1,10 @@
 // Reads mock/demo-17-11/ at the repo root, the same directory `fwsync import`
 // loads (DESIGN.md Appendix C), so the FE on MSW and the DB see one set of numbers.
 //
-// Only `*.jsonl` and `recommendation.json` are read. `defect_manifest.json` is
-// the answer key of the seeded defects and only the grader reads it (BR-08);
-// it is deliberately not globbed here.
+// Only `*.jsonl`, `recommendation.json` and `bench_result.json` are read.
+// `defect_manifest.json` is the answer key of the seeded defects and only the
+// grader reads it (BR-08); it is deliberately not globbed here. The bench
+// result is DA-31's score of that key, which the API may read (§4.4c).
 
 const files = import.meta.glob("../../../../mock/demo-17-11/*.jsonl", {
   query: "?raw",
@@ -12,6 +13,12 @@ const files = import.meta.glob("../../../../mock/demo-17-11/*.jsonl", {
 }) as Record<string, string>;
 
 const recommendationFile = import.meta.glob("../../../../mock/demo-17-11/recommendation.json", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
+
+const benchFile = import.meta.glob("../../../../mock/demo-17-11/bench_result.json", {
   query: "?raw",
   import: "default",
   eager: true,
@@ -31,6 +38,19 @@ function single<T>(): T {
   if (text === undefined) throw new Error("mock file missing: recommendation.json");
   return JSON.parse(text) as T;
 }
+
+/** DA-31 writes at most one result per run dir; the mock has one, or none. */
+function bench(): RawBenchResult | null {
+  const text = Object.values(benchFile)[0];
+  return text === undefined ? null : (JSON.parse(text) as RawBenchResult);
+}
+
+/** sha256 of the exact JSON text, as `bench_result.sha256` beside it. */
+const benchLock = import.meta.glob("../../../../mock/demo-17-11/bench_result.sha256", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
 
 // ------------------------------------------------------------ raw shapes
 // The fields of each mock file that the views read. Names are the file's own.
@@ -300,6 +320,68 @@ export interface RawTrainDiagnosis {
   skipped: Array<{ code: string; reason: string }>;
 }
 
+interface RawRate {
+  hit: number;
+  total: number;
+  value: number | null;
+}
+
+/** One layer of one group of `bench_result.json` (DA-31, `da31-2`). */
+export interface RawBenchLayer {
+  recall_by_kind: Record<string, RawRate>;
+  masked_by_kind: Record<string, number>;
+  recall_unmasked_by_kind: Record<string, RawRate>;
+  precision_by_code: Record<string, RawRate>;
+  false_alarm_on_clean: RawRate & { bound: string };
+  false_alarm_not_a_unit: string[];
+  clean_reports: Array<[string, string]>;
+  natural: Array<[string, string]>;
+  seconds_to_report: Record<string, number | null>;
+  uncoded: Record<string, string[]>;
+}
+
+export interface RawBenchGroup {
+  group: string;
+  injected_copy: string;
+  clean_copy: string;
+  defects: number;
+  layers: { code: RawBenchLayer; agent: RawBenchLayer };
+  split: Array<{
+    kind: string;
+    code: string;
+    injected: number;
+    by_code: number;
+    agent_adds: number;
+    together: number;
+    agent_alone: number;
+  }>;
+  agent_quality: {
+    ranking: RawRate;
+    reviews: Record<string, Record<string, number>>;
+    findings: Array<{
+      copy: string;
+      report_id: string;
+      finding_id: string;
+      rank: number;
+      target: string;
+      code: string;
+      label: "hit" | "false" | "natural" | "clean";
+      review: "agree" | "override" | "unreviewed";
+      reason: string;
+    }>;
+  };
+}
+
+export interface RawBenchResult {
+  bench_version: string;
+  measured_on: string;
+  false_alarm_on_clean: string;
+  created_at: string;
+  groups: RawBenchGroup[];
+  /** Not in the file: the hash of it, from `bench_result.sha256`. */
+  result_sha256: string;
+}
+
 export interface MockData {
   recommendation: RawRecommendation;
   clusters: RawCluster[];
@@ -322,6 +404,7 @@ export interface MockData {
   priceBooks: RawPriceBook[];
   trainDiagnoses: RawTrainDiagnosis[];
   decisions: RawDecision[];
+  bench: RawBenchResult | null;
 }
 
 export function loadMockData(): MockData {
@@ -347,5 +430,12 @@ export function loadMockData(): MockData {
     priceBooks: table("price_books"),
     trainDiagnoses: table("train_diagnoses"),
     decisions: table("decisions"),
+    bench: withLock(bench()),
   };
+}
+
+function withLock(result: RawBenchResult | null): RawBenchResult | null {
+  const lock = Object.values(benchLock)[0];
+  if (result === null || lock === undefined) return result;
+  return { ...result, result_sha256: lock.trim() };
 }

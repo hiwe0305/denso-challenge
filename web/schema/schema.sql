@@ -6,7 +6,8 @@
 -- trỏ sang nhóm P (dataset_intakes.dataset_id) và ngược lại, nên bảng không
 -- chia được thành ba khối chạy nối tiếp. Mỗi file nói nó thuộc nhóm nào.
 --
--- 41 bảng nghiệp vụ: 9 nhóm W, 29 nhóm P, 3 nhóm S. Cộng `jobs` là hạ tầng
+-- 42 bảng nghiệp vụ: 9 nhóm W, 29 nhóm P, 4 nhóm S (bản 0.6 thêm
+-- `defect_bench_groups`). Cộng `jobs` là hạ tầng
 -- hàng đợi, không tính (§3.1).
 --
 -- Chạy lại trên một database đã có sẽ lỗi: file này dựng từ đầu. Đổi schema

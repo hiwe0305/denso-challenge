@@ -1,6 +1,6 @@
 # Web Humanoid Data Flywheel · thiết kế
 
-Bản v0.5. Tài liệu này là nguồn duy nhất cho tầng web: API, Postgres, bộ nạp `fwsync` và FE. Lõi `flywheel` vẫn là nơi duy nhất chạy pipeline, train, eval và engine Failure → Data.
+Bản v0.6. Tài liệu này là nguồn duy nhất cho tầng web: API, Postgres, bộ nạp `fwsync` và FE. Lõi `flywheel` vẫn là nơi duy nhất chạy pipeline, train, eval và engine Failure → Data.
 
 ## Change log
 
@@ -12,6 +12,7 @@ Bản v0.5. Tài liệu này là nguồn duy nhất cho tầng web: API, Postgre
 | 3/11/2026 | 0.3 | Dựng `web/schema/` theo tài liệu này: 9 file SQL, 41 bảng, 3 role, trigger C5–C9/C14/C19, 18 view, GRANT theo cột. `train_diagnosis_skips` là chỗ §4.4b để ngỏ tới M1, nay chốt | Châu |
 | 5/11/2026 | 0.3 | W11 đóng: hợp đồng đã có `EpisodeMetadata.benchmark_copy_id` (#62), bộ nạp map nó vào `episodes.benchmark_copy_id` thay vì để NULL, và bộ mock gắn nó cho 10 episode của bản sao chấm | Châu |
 | 6/11/2026 | 0.5 | `system_diagnoses` theo hợp đồng `SystemDiagnosis` sau PR #146, #148 và DA-13 11.5 (#154): thêm `timing`, `recorded`, `recorded_skipped` và C20; `v_system_check`, bộ nạp, API và M6 hiện chế độ rollout cùng khối R1, R2 "ghi nhận, không quy lỗi". Mock: 25 rollout đồng bộ mang R1, R2 ghi nhận. Type FE sinh lại từ schema master. Phụ lục D: W10 đóng (#101); thêm W13, kết quả kiểm hệ thống thật chưa tới được web (tên file và khoá `episode_N` không duy nhất), đề xuất nối bằng `trace_sha256` | Châu |
+| 7/11/2026 | 0.6 | Nhóm S theo đúng `bench_result.json` (`da31-2`) mà bộ chấm DA-31 ghi ra, thay bảng `defect_scores` tp/fp/fn đoán trước: recall theo **loại** lỗi, precision theo **mã** báo, báo nhầm trên bản sạch là **cận trên**, và phần agent bắt thêm so với code. `defect_scores` thành một dòng `hit`/`total` cho mỗi tỉ lệ; thêm `defect_bench_groups` (42 bảng, nhóm S có 4). Một lần chấm có danh tính là `result_sha256`, bộ nạp kiểm với `bench_result.sha256` và từ chối file đã sửa. `defect_manifests.dataset_id` cho NULL vì bản sao log train không phải lô. API thêm `GET /defects/scoreboard`, `/defects/scores`; FE dựng M3. Bộ mock: hai cặp bản sao (dữ liệu, log), `test_bench_result.py` so khoá của mock với hàm thật của DA-31. Phụ lục D thêm W14 | Châu |
 | 5/11/2026 | 0.4 | Mốc M0 xong phần FE: thêm §7.4 hình dạng response cho 5 màn hình lõi (nguồn là `fe/src/api/types.ts`); §7.1 thêm `GET /recommendations` và `GET /evaluations/{id}`; quy ước trang, header vai tạm `X-Fw-Role`, id trong mock là mã `*_ref`. Dựng `fe/`: Vite, MSW đọc thẳng `mock/demo-17-11/`, type hợp đồng sinh bằng `json-schema-to-typescript`, màn hình M7 | Châu |
 | 5/11/2026 | 0.4 | Dựng `api/` trước khi có Postgres: FastAPI với mọi endpoint đọc của §7.1 và hai endpoint ghi của M7, trên lớp đọc thay được (`SinkReadModel` đọc sink JSONL của `fwsync`; `PostgresReadModel` chờ M1). Hành động ghi vào `human_actions.jsonl`, đầu vào của `fwsync export`. Test đối chiếu 38 request với response của MSW. Đi trước W8: thêm một dịch vụ ở L0, chờ PO | Châu |
 | 5/11/2026 | 0.4 | Hai view sửa: `v_branch_comparison` bỏ thí nghiệm HE và HE_T (mọi điểm HE chung một nhánh, nên `DISTINCT ON` sẽ lấy một điểm bất kỳ làm "nhánh"); `v_he_curve` thêm cột `he_variant` để vẽ một đường cho mỗi biến thể. Bộ mock thêm lượt eval cho A_07, B_FAIL và lưới HE; M9 vẽ đường cong HE có khoảng tin cậy Wilson 95% và N₅₀ | Châu |
@@ -159,7 +160,7 @@ Lõi đã có kho append-only riêng (JSONL + DuckDB) và sổ chi phí riêng. 
 
 ## 4. Mô hình dữ liệu
 
-Schema có **41 bảng**, chia ba nhóm theo ai được ghi. File đầy đủ: `web/schema/schema.sql`, gọi 9 file đánh số theo thứ tự khoá ngoại.
+Schema có **42 bảng**, chia ba nhóm theo ai được ghi. File đầy đủ: `web/schema/schema.sql`, gọi 9 file đánh số theo thứ tự khoá ngoại.
 
 ### 4.1 Ba nhóm bảng
 
@@ -167,7 +168,7 @@ Schema có **41 bảng**, chia ba nhóm theo ai được ghi. File đầy đủ:
 |---|---|---|---|
 | **W** · web tự quản | 9 | `app_users`, `agent_chat_sessions`, `agent_chat_messages`, `notifications`, `human_actions`, `job_requests`, `dataset_intakes`, `experiment_drafts`, `sync_runs` | `fw_api` (riêng `sync_runs` do `fw_sync` ghi) |
 | **P** · chiếu từ lõi | 29 | `sources`, `datasets`, `episodes`, `episode_qa_reports`, `pipeline_stage_defs`, `pipeline_stage_runs`, `releases`, `release_items`, `run_plans`, `experiments`, `experiment_datasets`, `model_checkpoints`, `training_metrics`, `train_diagnoses`, **`train_diagnosis_skips`**, `probe_results`, `sim_evaluations`, `eval_episodes`, **`system_diagnoses`**, `failure_clusters`, `diagnostic_runs`, `interventions`, `fix_rate_events`, `repair_tickets`, `flywheel_recommendations`, `flywheel_algo_steps`, `decisions`, `cost_ledger_entries`, `price_books` | `fw_sync` |
-| **S** · bộ chấm, cách ly | 3 | `defect_manifests`, `defect_items`, `defect_scores` | `fw_sync`; `agent_ro` không đọc được |
+| **S** · bộ chấm, cách ly | 4 | `defect_manifests`, `defect_items`, **`defect_bench_groups`**, `defect_scores` | `fw_sync`; `agent_ro` không đọc được |
 
 ### 4.2 So với bản BA cũ (19 bảng)
 
@@ -195,7 +196,7 @@ Schema có **41 bảng**, chia ba nhóm theo ai được ghi. File đầy đủ:
 | `train_diagnoses`, `probe_results` | T1–T8, O1–O4, P1–P4 | M5 chỉ vẽ được đường loss |
 | `decisions` | Ai ký, tiêu chí, lý do ghi đè | Không tính được tỉ lệ ghi đè |
 | `price_books` | Bảng giá có phiên bản, nhiều kịch bản song song | Không chạy được bảng độ nhạy |
-| `defect_manifests`, `defect_items`, `defect_scores` | Đáp án lỗi cấy tách khỏi kết quả chấm | Agent đọc được đáp án; chấm lại ghi đè lần trước |
+| `defect_manifests`, `defect_items`, `defect_bench_groups`, `defect_scores` | Đáp án lỗi cấy tách khỏi kết quả chấm; kết quả theo đúng dạng DA-31 ghi (bản 0.6) | Agent đọc được đáp án; chấm lại ghi đè lần trước; M3 hiện số mà bộ chấm không tính |
 | `human_actions`, `job_requests` | Một đường ghi | Web ghi thẳng, hai nguồn số |
 | `dataset_intakes`, `experiment_drafts` | Web soạn yêu cầu mà không chạm bảng P | Luồng 1–2 phải ghi thẳng vào `datasets` và `experiments` (lỗi của v0.1) |
 | `sync_runs` | Lịch sử `fwsync`, phát hiện đồng bộ trễ | M10 không trả lời được "số này nạp lúc nào" |
@@ -765,7 +766,7 @@ ALTER TABLE cost_ledger_entries
 ```sql
 CREATE TABLE defect_manifests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  dataset_id UUID NOT NULL REFERENCES datasets(id),
+  dataset_id UUID REFERENCES datasets(id),     -- NULL: bản sao log train (bản 0.6)
   seed BIGINT NOT NULL CHECK (seed >= 0),
   sha256 CHAR(64) NOT NULL,                    -- khoá đáp án
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -779,18 +780,36 @@ CREATE TABLE defect_items (
   parameters JSONB NOT NULL DEFAULT '{}'
 );
 
-CREATE TABLE defect_scores (                   -- kết quả chấm, append-only
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  manifest_id UUID NOT NULL REFERENCES defect_manifests(id),
-  scorer_version VARCHAR(32) NOT NULL,
-  detector VARCHAR(16) NOT NULL CHECK (detector IN ('code','agent')),
-  agent_model VARCHAR(64),
-  code VARCHAR(8) NOT NULL,
-  tp INTEGER NOT NULL, fp INTEGER NOT NULL, fn INTEGER NOT NULL,
-  false_alarm_rate NUMERIC(5,4),               -- đo trên bản sạch
-  latency_s NUMERIC(8,2),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CHECK (detector <> 'agent' OR agent_model IS NOT NULL)
+-- Bản 0.6: theo bench_result.json (da31-2) của DA-31. DDL đầy đủ ở
+-- web/schema/50-group-s.sql; dưới đây là phần cột mang nghĩa.
+CREATE TABLE defect_bench_groups (            -- một nhóm của một lần chấm, append-only
+  result_sha256 CHAR(64) NOT NULL,             -- = bench_result.sha256
+  bench_version VARCHAR(16) NOT NULL,          -- 'da31-2'
+  measured_on TEXT NOT NULL,                   -- "trên lỗi cấy", in nguyên văn ở M3
+  false_alarm_note TEXT NOT NULL,              -- vì sao báo nhầm là cận trên
+  group_name VARCHAR(16) NOT NULL,             -- 'data' | 'logs'
+  injected_copy VARCHAR(64) NOT NULL,          -- = defect_manifests.manifest_ref, không FK
+  clean_copy VARCHAR(64) NOT NULL,
+  defects INTEGER NOT NULL,
+  split JSONB NOT NULL,                        -- theo loại: by_code, agent_adds, together, agent_alone
+  seconds_to_report JSONB NOT NULL,            -- theo lớp, theo bản sao; null = không đo được
+  clean_reports JSONB, natural JSONB, not_a_unit JSONB, uncoded JSONB,
+  agent_ranking_hit INTEGER, agent_ranking_total INTEGER,
+  agent_reviews JSONB, agent_findings JSONB,   -- từng phát hiện kèm nhãn so với đáp án
+  UNIQUE (result_sha256, group_name)
+);
+
+CREATE TABLE defect_scores (                   -- một tỉ lệ, append-only
+  result_sha256 CHAR(64) NOT NULL,
+  group_name VARCHAR(16) NOT NULL,
+  layer VARCHAR(8) NOT NULL CHECK (layer IN ('code','agent')),
+  metric VARCHAR(16) NOT NULL CHECK (metric IN ('recall','recall_unmasked','precision','false_alarm')),
+  subject VARCHAR(64) NOT NULL,                -- loại (recall), mã (precision), '*' (báo nhầm)
+  hit INTEGER NOT NULL, total INTEGER NOT NULL CHECK (total >= hit),
+  masked INTEGER,                              -- chỉ recall
+  bound VARCHAR(8),                            -- 'upper', chỉ báo nhầm
+  FOREIGN KEY (result_sha256, group_name) REFERENCES defect_bench_groups,
+  UNIQUE (result_sha256, group_name, layer, metric, subject)
 );
 
 CREATE ROLE agent_ro;
@@ -798,7 +817,7 @@ REVOKE ALL ON defect_manifests, defect_items FROM agent_ro;
 -- GRANT SELECT chỉ trên các view *_agent của mục 4.6
 ```
 
-Cột `detector` cho phép M3 nói "code bắt được 6/10, agent bắt thêm 2 và giải thích đúng 7". Kết nối dùng cho prompt của agent chat phải dùng role `agent_ro`, với connection pool riêng.
+Cột `layer` và `split` cho phép M3 nói "code bắt được 6/10, agent bắt thêm 2". Bản 0.2–0.5 đoán một bảng tp/fp/fn theo mã cho mỗi detector; bộ chấm thật (DA-31, PR #132 và hotfix #141) ra recall theo loại, precision theo mã, báo nhầm theo đơn vị và chỉ là cận trên, nên bảng đoán không chở được ba trong bốn con số đó. `agent_ro` cũng bị REVOKE trên hai bảng kết quả, vì nhãn từng phát hiện suy ra từ đáp án. Kết nối dùng cho prompt của agent chat phải dùng role `agent_ro`, với connection pool riêng.
 
 **Bản 0.3:** vì `episodes` không còn `injected_defect`, `agent_ro` có thể đọc `episodes` qua view mà không thấy đáp án. Trước đó thì không, và đó là lỗ R8.
 
@@ -833,7 +852,7 @@ Cột `detector` cho phép M3 nói "code bắt được 6/10, agent bắt thêm 
 |---|---|---|
 | `v_pipeline_current` | Stepper 6 tầng theo attempt hiện hành, kèm verdict code và verdict agent | M2 |
 | `v_dataset_report` | Số episode theo nguồn; pass / flag / quarantine / reject theo dataset | M2 |
-| `v_defect_detection` | Precision, recall, báo nhầm theo từng mã lỗi, tách code và agent | M3 |
+| `v_defect_detection` | Mỗi tỉ lệ của DA-31 một dòng: recall theo loại, precision theo mã, báo nhầm (cận trên), tách code và agent; `value` NULL khi mẫu số 0; `is_latest` đánh dấu lần chấm mới nhất (bản 0.6) | M3 |
 | `v_eval_funnel` | Tỉ lệ từng bước, tuyệt đối và có điều kiện, theo task và theo mức | M6 |
 | `v_system_check` | Chẩn đoán hệ thống từng episode, kèm mã đã nổ và mã không chấm được (bản 0.3) | M6, M7 |
 | `v_branch_comparison` | Tỉ lệ thành công cạnh chi phí theo (task, nhánh) | M1, M9 |
@@ -1040,7 +1059,7 @@ Năm màn hình **lõi** (M2, M6, M7, M8, M9) là kế hoạch chính. Năm màn
 | Nhóm | Endpoint |
 |---|---|
 | Dữ liệu | `GET /datasets`, `/datasets/{id}`, `/datasets/{id}/stages`, `/datasets/{id}/episodes`, `/datasets/{id}/report`, `/intakes` |
-| Lỗi cấy | `GET /defects/scoreboard`, `/defects/scores` |
+| Lỗi cấy | `GET /defects/scoreboard`, `/defects/scores` (bản 0.6) |
 | Release | `GET /releases`, `/releases/{id}/items` |
 | Huấn luyện | `GET /experiments`, `/experiment-drafts`, `/experiments/{id}/metrics?split=&every=`, `/experiments/{id}/diagnoses`, `/experiments/{id}/probes`, `/experiments/{id}/checkpoints` |
 | Đánh giá | `GET /evaluations`, `/evaluations/{id}`, `/evaluations/{id}/episodes`, `/evaluations/{id}/funnel`, `/evaluations/{id}/failures`, `/evaluations/{id}/system-checks` |
@@ -1113,6 +1132,7 @@ Nguồn duy nhất là [`fe/src/api/types.ts`](fe/src/api/types.ts). Mỗi kiể
 | M2 | `GET /datasets`, `/{id}`, `/{id}/stages`, `/{id}/episodes`, `/{id}/report`, `/intakes` | `Page<DatasetRow>`, `DatasetRow`, `PipelineView`, `Page<EpisodeRow>`, `DatasetReport`, `Page<…>` | `PipelineView` có cả stepper hiện hành lẫn mọi attempt |
 | M9 | `/results/branches?task_id=`, `/results/he-curve`, `/results/e1-curve` | `BranchComparisonRow[]`, `HeCurvePoint[]`, `E1CurvePoint[]` | Thiếu `task_id` → 400 |
 | M10, chuông | `GET /actions?sync_status=`, `/actions/{id}`, `/decisions`, `/sync/runs`; `POST /sync/run` | `Page<ActionStatusRow>`, `ActionStatusRow`, `Page<DecisionRow>`, `SyncRunRow[]`, `SyncRunRow` | Chuông không có bảng riêng: FE suy thông báo từ khuyến nghị, lô, phiếu sửa và hành động. Hành động EXPORTED quá 30 phút là "đồng bộ trễ" |
+| M3 | `GET /defects/scoreboard`, `GET /defects/scores` | `DefectScoreboard`, `Page<DefectScoreRow>` | Bản 0.6. Bảng điểm là lần chấm mới nhất, mỗi nhóm một khối: theo loại (code bắt, agent thêm, recall hai lớp), precision theo mã, báo nhầm cận trên, thời gian tới báo cáo, phát hiện của agent kèm duyệt của kỹ sư. Chưa chấm lần nào thì `result_sha256 = null`, không phải bảng toàn số 0 |
 | M8 | `/cost/ledger`, `/cost/by-branch`, `/cost/by-intervention`, `/cost/sensitivity` | `Page<LedgerRow>`, `CostByBranch`, `InterventionRow[]`, `SensitivityRow[]` | `CostByBranch` mang luôn `r_demo` và `data_allocation` (BR-05). Độ nhạy định giá lại từng bút toán theo tỉ lệ giá của bảng mới so với bảng đã ghi |
 
 Bốn quy ước thêm ở bản 0.4:
@@ -1164,6 +1184,8 @@ Hôm nay 3/11/2026, demo 17/11/2026, còn 14 ngày. Châu làm cả FE, BE và b
 | M7 · Tổng duyệt | 16/11 | Chạy trọn kịch bản hai lần liên tiếp; công tắc chuyển sang mock dự phòng | Hai lần không lỗi |
 
 **Trạng thái 5/11/2026.** M0 đạt: test so enum xanh, và MSW trả bộ mock của cả 5 màn hình lõi (`fe/src/mocks/handlers.test.ts`, 18 ca), trễ 1 ngày so với hạn. M1 mới đạt phần không cần database: 41 bảng, 3 role, trigger, `fwsync import` nạp hai lần cho cùng kết quả trên sink JSONL. Còn thiếu migration Alembic, ca đúng/ca sai của từng luật trên Postgres thật, và kiểm `fw_api` không ghi được bảng P; cả ba chờ Postgres 16 và W8. Màn hình M7 đã chạy trên MSW, đi trước phần FE của M3. M2 (API đọc) đạt trên sink JSONL: mọi endpoint §7.1 trả đúng response MSW trả (`tests/test_api.py`, 38 ca đối chiếu); còn thiếu SSE và bản Postgres. Bốn màn lõi của M3 (M7, M6, M2, M9) đã chạy, cả trên MSW lẫn trên API sink; bộ mock nay có đủ bốn nhánh và lưới HE 3 biến thể × N ∈ {10, 20, 40, 80}, nên M9 vẽ được cả bảng nhánh lẫn đường cong HE. M8 đã chạy: đủ năm màn lõi. Trong bốn chỉ số của M8, bộ mock cho số thật ở hai chỉ số (demo người để đạt 50%, phút operator mỗi điểm %); hai chỉ số còn lại hiện "chưa có" vì chưa có nhánh C và chưa bút toán nào có cả ước tính lẫn thực đo. M4 đạt trên sink JSONL: bấm duyệt → outbox → lõi giả áp dụng → nạp lại thấy APPLIED, cả bằng lệnh (`tests/test_action_loop.py`), qua HTTP (`tests/test_api.py::test_click_to_applied`) lẫn trên FE (`fe/src/screens/Audit.test.tsx`). Còn thiếu ở M4: SSE (FE hỏi lại 10 giây một lần), REJECTED từ lõi (chờ artifact `JobStatus`, W7), và chat chỉ đọc.
+
+**Trạng thái 7/11/2026 (mốc M5).** M3 Agent QA/QC chạy trên MSW và trên API sink, đọc `bench_result.json` của DA-31 theo đúng dạng `da31-2` (bản 0.6); hai endpoint mới nằm trong 43 ca đối chiếu MSW ↔ API. Còn M1, M4, M5 của mốc này. Model và hash prompt của agent trên M3 chờ W14.
 
 ### 9.3 Môi trường cần có
 
@@ -1294,7 +1316,7 @@ Bảng dưới là file **thật** của thư mục. Nó khác bản 0.2 ở hai
 | `decisions.jsonl` | 2 quyết định duyệt tầng: FORCE_CONTINUE, APPLY_FIX_AND_RETRY |
 | `ledger.jsonl` | 14 bút toán: thực đo, ước tính của 4 can thiệp, 1 bút toán đảo |
 | `price_books.jsonl` | 4 bảng giá cho bảng độ nhạy |
-| `defect_manifest.json`, `defect_scores.jsonl` | 10 lỗi cấy (7 dữ liệu, 3 log train); code bắt 6/10, agent bắt thêm 2 |
+| `defect_manifest.json`, `bench_result.json`, `bench_result.sha256` | Hai đáp án: 7 lỗi dữ liệu trên `bench_kbd_teleop`, 3 lỗi log train trên `bench_logs_bfail`. Kết quả chấm dạng `da31-2` (bản 0.6): code bắt 6/10, agent bắt thêm 2; agent báo sai một D2 và một D4 trên bản sạch (báo nhầm 1/10, cận trên) |
 
 Bốn cụm với bốn chẩn đoán khác nhau là cố ý: nó cho phép demo nói câu quan trọng nhất — *"hai cụm này là lỗi hệ thống và ngoài miền, không tốn một đồng dữ liệu nào; chỉ hai cụm còn lại mới cần thu thêm"*.
 
@@ -1317,3 +1339,4 @@ Mọi bản ghi nạp từ thư mục này có `origin = 'mock'`.
 | W11 | `benchmark_copy_id` thay `injected_defect` trong `Episode` | **đã merge** (S1-10/7, PR #36, 3/11); bộ nạp dùng từ 5/11 |
 | W12 | `Episode` không mang `dataset_id`. Ở lõi một episode trỏ `source_id` hoặc `intervention_id` (03 §4.3 cũng vậy), còn "lô" là khái niệm của web, không có thực thể tương ứng ở L0-lite. Bộ nạp suy `episodes.dataset_id` qua hai đường đó và **từ chối** dòng không suy được, chứ không gán lô mặc định — gán sai lô làm sai báo cáo dataset, phân bổ chi phí (BR-05) và `r_demo` mà không gì báo. Cần Long và PO quyết: thêm `dataset_id` vào `Episode`, hay web nhận đây là phép suy chính thức | **phát hiện 3/11 lúc viết mapper**; chưa mở issue |
 | W13 | **Kết quả kiểm hệ thống thật chưa tới được web.** Hai chỗ hở, chi tiết ở mục "Nối kiểm hệ thống thật với `eval_episodes`" dưới bảng `system_diagnoses` (§4.4b). (1) Làn DA-13 ghi `<store>/diagnosis/system.jsonl`; `FILE_TO_TABLE` của `fwsync/source.py` không có khoá `system`, nên file bị bỏ qua kèm log và `system_diagnoses` chỉ có dòng mock. (2) Dù có map, `SystemDiagnosis.episode_id` là tên `episode_N` mà SIMPLE ghi ở dòng thống kê (`parse_stats_line`, `flywheel_simple/trace/hook.py`). Tên này đếm lại từ đầu ở mỗi lượt eval nên không làm được `eval_episode_ref` (UNIQUE); bản ghi cũng không mang `trace_id`. [Đề xuất] nối bằng `trace_sha256`, trường đã có trên cả `Score` lẫn `SystemDiagnosis`, không cần đổi hợp đồng | **phát hiện 6/11**; chờ Châu chốt cùng PO; chưa sửa mã |
+| W14 | **`bench_result.json` không mang model và hash prompt của agent.** M3 (§6.2) cần hai thứ đó để một con số của agent tái lập được, và bảng `defect_scores` cũ có cột `agent_model`. `AgentReport` của DA-20 có thể mang chúng; DA-31 chưa chép sang kết quả. [Đề xuất] DA-31 thêm `agent: {model, prompt_sha256}` vào mỗi nhóm khi DA-20 merge; tới lúc đó M3 ghi "chưa có" | **phát hiện 7/11**; DA-31 là của Châu, chờ DA-20 |

@@ -1,0 +1,697 @@
+{
+  "bench_version": "da31-2",
+  "created_at": "2026-11-12T03:00:00+00:00",
+  "false_alarm_on_clean": "upper bound (cận trên): the clean copy still holds the real data's own defects, and a report of one of them counts as a false alarm",
+  "groups": [
+    {
+      "agent_quality": {
+        "findings": [
+          {
+            "code": "D1",
+            "copy": "bench_kbd_teleop",
+            "finding_id": "r-bench_kbd_teleop-f0",
+            "label": "hit",
+            "rank": 1,
+            "reason": "",
+            "report_id": "r-bench_kbd_teleop",
+            "review": "agree",
+            "target": "ep_bench_00"
+          },
+          {
+            "code": "D2",
+            "copy": "bench_kbd_teleop",
+            "finding_id": "r-bench_kbd_teleop-f1",
+            "label": "hit",
+            "rank": 2,
+            "reason": "",
+            "report_id": "r-bench_kbd_teleop",
+            "review": "agree",
+            "target": "ep_bench_01"
+          },
+          {
+            "code": "D3",
+            "copy": "bench_kbd_teleop",
+            "finding_id": "r-bench_kbd_teleop-f2",
+            "label": "hit",
+            "rank": 3,
+            "reason": "",
+            "report_id": "r-bench_kbd_teleop",
+            "review": "agree",
+            "target": "ep_bench_02"
+          },
+          {
+            "code": "D4",
+            "copy": "bench_kbd_teleop",
+            "finding_id": "r-bench_kbd_teleop-f3",
+            "label": "hit",
+            "rank": 4,
+            "reason": "",
+            "report_id": "r-bench_kbd_teleop",
+            "review": "agree",
+            "target": "ep_bench_03"
+          },
+          {
+            "code": "D2",
+            "copy": "bench_kbd_teleop",
+            "finding_id": "r-bench_kbd_teleop-f4",
+            "label": "false",
+            "rank": 5,
+            "reason": "kỹ sư: không phải lỗi",
+            "report_id": "r-bench_kbd_teleop",
+            "review": "override",
+            "target": "ep_bench_08"
+          },
+          {
+            "code": "D6",
+            "copy": "bench_kbd_teleop",
+            "finding_id": "r-bench_kbd_teleop-f5",
+            "label": "hit",
+            "rank": 6,
+            "reason": "",
+            "report_id": "r-bench_kbd_teleop",
+            "review": "agree",
+            "target": "ep_bench_05"
+          },
+          {
+            "code": "D7",
+            "copy": "bench_kbd_teleop",
+            "finding_id": "r-bench_kbd_teleop-f6",
+            "label": "hit",
+            "rank": 7,
+            "reason": "",
+            "report_id": "r-bench_kbd_teleop",
+            "review": "unreviewed",
+            "target": "ep_bench_06"
+          },
+          {
+            "code": "D4",
+            "copy": "bench_kbd_teleop_clean",
+            "finding_id": "r-bench_kbd_teleop_clean-f0",
+            "label": "clean",
+            "rank": 1,
+            "reason": "",
+            "report_id": "r-bench_kbd_teleop_clean",
+            "review": "unreviewed",
+            "target": "ep_bench_09"
+          }
+        ],
+        "ranking": {
+          "hit": 4,
+          "total": 6,
+          "value": 0.6666666666666666
+        },
+        "reviews": {
+          "clean": {
+            "unreviewed": 1
+          },
+          "false": {
+            "override": 1
+          },
+          "hit": {
+            "agree": 5,
+            "unreviewed": 1
+          }
+        }
+      },
+      "clean_copy": "bench_kbd_teleop_clean",
+      "defects": 7,
+      "group": "data",
+      "injected_copy": "bench_kbd_teleop",
+      "layers": {
+        "agent": {
+          "clean_reports": [
+            [
+              "ep_bench_09",
+              "D4"
+            ]
+          ],
+          "false_alarm_not_a_unit": [],
+          "false_alarm_on_clean": {
+            "bound": "upper (cận trên)",
+            "hit": 1,
+            "total": 10,
+            "value": 0.1
+          },
+          "masked_by_kind": {
+            "action_scale": 0,
+            "action_sign_flip": 0,
+            "dead_dim": 0,
+            "dropped_frames": 0,
+            "duplicate_episode": 0,
+            "label_swap": 0,
+            "missing_column": 0
+          },
+          "natural": [],
+          "precision_by_code": {
+            "D1": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "D2": {
+              "hit": 1,
+              "total": 2,
+              "value": 0.5
+            },
+            "D3": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "D4": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "D5": {
+              "hit": 0,
+              "total": 0,
+              "value": null
+            },
+            "D6": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "D7": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            }
+          },
+          "recall_by_kind": {
+            "action_scale": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "action_sign_flip": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "dead_dim": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "dropped_frames": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "duplicate_episode": {
+              "hit": 0,
+              "total": 1,
+              "value": 0.0
+            },
+            "label_swap": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "missing_column": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            }
+          },
+          "recall_unmasked_by_kind": {
+            "action_scale": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "action_sign_flip": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "dead_dim": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "dropped_frames": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "duplicate_episode": {
+              "hit": 0,
+              "total": 1,
+              "value": 0.0
+            },
+            "label_swap": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "missing_column": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            }
+          },
+          "seconds_to_report": {
+            "bench_kbd_teleop": 95.0,
+            "bench_kbd_teleop_clean": 88.0
+          },
+          "uncoded": {}
+        },
+        "code": {
+          "clean_reports": [],
+          "false_alarm_not_a_unit": [],
+          "false_alarm_on_clean": {
+            "bound": "upper (cận trên)",
+            "hit": 0,
+            "total": 10,
+            "value": 0.0
+          },
+          "masked_by_kind": {
+            "action_scale": 0,
+            "action_sign_flip": 0,
+            "dead_dim": 0,
+            "dropped_frames": 0,
+            "duplicate_episode": 0,
+            "label_swap": 0,
+            "missing_column": 0
+          },
+          "natural": [],
+          "precision_by_code": {
+            "D1": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "D2": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "D3": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "D4": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "D5": {
+              "hit": 0,
+              "total": 0,
+              "value": null
+            },
+            "D6": {
+              "hit": 0,
+              "total": 0,
+              "value": null
+            },
+            "D7": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            }
+          },
+          "recall_by_kind": {
+            "action_scale": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "action_sign_flip": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "dead_dim": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "dropped_frames": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "duplicate_episode": {
+              "hit": 0,
+              "total": 1,
+              "value": 0.0
+            },
+            "label_swap": {
+              "hit": 0,
+              "total": 1,
+              "value": 0.0
+            },
+            "missing_column": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            }
+          },
+          "recall_unmasked_by_kind": {
+            "action_scale": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "action_sign_flip": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "dead_dim": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "dropped_frames": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "duplicate_episode": {
+              "hit": 0,
+              "total": 1,
+              "value": 0.0
+            },
+            "label_swap": {
+              "hit": 0,
+              "total": 1,
+              "value": 0.0
+            },
+            "missing_column": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            }
+          },
+          "seconds_to_report": {
+            "bench_kbd_teleop": 4.2,
+            "bench_kbd_teleop_clean": 3.9
+          },
+          "uncoded": {}
+        }
+      },
+      "split": [
+        {
+          "agent_adds": 0,
+          "agent_alone": 1,
+          "by_code": 1,
+          "code": "D1",
+          "injected": 1,
+          "kind": "missing_column",
+          "together": 1
+        },
+        {
+          "agent_adds": 0,
+          "agent_alone": 1,
+          "by_code": 1,
+          "code": "D2",
+          "injected": 1,
+          "kind": "dropped_frames",
+          "together": 1
+        },
+        {
+          "agent_adds": 0,
+          "agent_alone": 1,
+          "by_code": 1,
+          "code": "D3",
+          "injected": 1,
+          "kind": "action_scale",
+          "together": 1
+        },
+        {
+          "agent_adds": 0,
+          "agent_alone": 1,
+          "by_code": 1,
+          "code": "D4",
+          "injected": 1,
+          "kind": "dead_dim",
+          "together": 1
+        },
+        {
+          "agent_adds": 0,
+          "agent_alone": 0,
+          "by_code": 0,
+          "code": "D5",
+          "injected": 1,
+          "kind": "duplicate_episode",
+          "together": 0
+        },
+        {
+          "agent_adds": 1,
+          "agent_alone": 1,
+          "by_code": 0,
+          "code": "D6",
+          "injected": 1,
+          "kind": "label_swap",
+          "together": 1
+        },
+        {
+          "agent_adds": 0,
+          "agent_alone": 1,
+          "by_code": 1,
+          "code": "D7",
+          "injected": 1,
+          "kind": "action_sign_flip",
+          "together": 1
+        }
+      ]
+    },
+    {
+      "agent_quality": {
+        "findings": [
+          {
+            "code": "T1",
+            "copy": "bench_logs_bfail",
+            "finding_id": "r-bench_logs_bfail-f0",
+            "label": "hit",
+            "rank": 1,
+            "reason": "",
+            "report_id": "r-bench_logs_bfail",
+            "review": "agree",
+            "target": "runs/exp_BFAIL/metrics.jsonl"
+          },
+          {
+            "code": "T3",
+            "copy": "bench_logs_bfail",
+            "finding_id": "r-bench_logs_bfail-f1",
+            "label": "hit",
+            "rank": 2,
+            "reason": "",
+            "report_id": "r-bench_logs_bfail",
+            "review": "unreviewed",
+            "target": "runs/exp_BFAIL/metrics.jsonl"
+          }
+        ],
+        "ranking": {
+          "hit": 0,
+          "total": 0,
+          "value": null
+        },
+        "reviews": {
+          "hit": {
+            "agree": 1,
+            "unreviewed": 1
+          }
+        }
+      },
+      "clean_copy": "bench_logs_bfail_clean",
+      "defects": 3,
+      "group": "logs",
+      "injected_copy": "bench_logs_bfail",
+      "layers": {
+        "agent": {
+          "clean_reports": [],
+          "false_alarm_not_a_unit": [],
+          "false_alarm_on_clean": {
+            "bound": "upper (cận trên)",
+            "hit": 0,
+            "total": 12,
+            "value": 0.0
+          },
+          "masked_by_kind": {
+            "dead_dim_train": 0,
+            "nan_loss": 0,
+            "overfit": 0
+          },
+          "natural": [],
+          "precision_by_code": {
+            "T1": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "T3": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "T5": {
+              "hit": 0,
+              "total": 0,
+              "value": null
+            }
+          },
+          "recall_by_kind": {
+            "dead_dim_train": {
+              "hit": 0,
+              "total": 1,
+              "value": 0.0
+            },
+            "nan_loss": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "overfit": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            }
+          },
+          "recall_unmasked_by_kind": {
+            "dead_dim_train": {
+              "hit": 0,
+              "total": 1,
+              "value": 0.0
+            },
+            "nan_loss": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "overfit": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            }
+          },
+          "seconds_to_report": {
+            "bench_logs_bfail": 140.0,
+            "bench_logs_bfail_clean": 131.0
+          },
+          "uncoded": {}
+        },
+        "code": {
+          "clean_reports": [],
+          "false_alarm_not_a_unit": [],
+          "false_alarm_on_clean": {
+            "bound": "upper (cận trên)",
+            "hit": 0,
+            "total": 12,
+            "value": 0.0
+          },
+          "masked_by_kind": {
+            "dead_dim_train": 0,
+            "nan_loss": 0,
+            "overfit": 0
+          },
+          "natural": [],
+          "precision_by_code": {
+            "T1": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "T3": {
+              "hit": 0,
+              "total": 0,
+              "value": null
+            },
+            "T5": {
+              "hit": 0,
+              "total": 0,
+              "value": null
+            }
+          },
+          "recall_by_kind": {
+            "dead_dim_train": {
+              "hit": 0,
+              "total": 1,
+              "value": 0.0
+            },
+            "nan_loss": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "overfit": {
+              "hit": 0,
+              "total": 1,
+              "value": 0.0
+            }
+          },
+          "recall_unmasked_by_kind": {
+            "dead_dim_train": {
+              "hit": 0,
+              "total": 1,
+              "value": 0.0
+            },
+            "nan_loss": {
+              "hit": 1,
+              "total": 1,
+              "value": 1.0
+            },
+            "overfit": {
+              "hit": 0,
+              "total": 1,
+              "value": 0.0
+            }
+          },
+          "seconds_to_report": {
+            "bench_logs_bfail": 2.1,
+            "bench_logs_bfail_clean": 2.0
+          },
+          "uncoded": {}
+        }
+      },
+      "split": [
+        {
+          "agent_adds": 0,
+          "agent_alone": 1,
+          "by_code": 1,
+          "code": "T1",
+          "injected": 1,
+          "kind": "nan_loss",
+          "together": 1
+        },
+        {
+          "agent_adds": 1,
+          "agent_alone": 1,
+          "by_code": 0,
+          "code": "T3",
+          "injected": 1,
+          "kind": "overfit",
+          "together": 1
+        },
+        {
+          "agent_adds": 0,
+          "agent_alone": 0,
+          "by_code": 0,
+          "code": "T5",
+          "injected": 1,
+          "kind": "dead_dim_train",
+          "together": 0
+        }
+      ]
+    }
+  ],
+  "inputs": {
+    "ledger": "g0-DA-31-20261112/job_bench_01",
+    "spec_sha256": "75279d29f1c2dbc2e075fdb8c6e7ae55632b293971fe8abae718636e71b496cf",
+    "system_config_sha256": "fc74ef9fd2f63a04249130bd1c7b72dc4c053d864dcfff03ae2c439e8620fc44",
+    "train_config_sha256": "56edc2a05b613a85c5ca0d296ca6d160b43c60d906db82a6066b847e3e5156ba"
+  },
+  "manifest_sha256": {
+    "bench_kbd_teleop": "87888ddb3ea6c0f4e2a23e4db2963123894737615fdbdecdb10a8df18a3039bf",
+    "bench_kbd_teleop_clean": "650878bd1d782b1436188c8c9fa444d408bbc1bbac471fbfc9d5831d55c29095",
+    "bench_logs_bfail": "3d0b472ce077c320c557c56f37328a2a726891a66e6dd6d815c07f06ae9c0130",
+    "bench_logs_bfail_clean": "7396adcf568822f401ef59ff22edcb6bf6c38813a3253411561e2341487f64d5"
+  },
+  "measured_on": "injected defects (DA-27), not natural defects"
+}

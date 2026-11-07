@@ -54,9 +54,9 @@ $$;
 -- sync_runs: API đọc để hiện v_sync_health, không ghi.
 GRANT SELECT ON sync_runs TO fw_api;
 
--- Nhóm S: API đọc được `defect_scores` để dựng bảng điểm M3, nhưng **không**
+-- Nhóm S: API đọc được kết quả chấm để dựng bảng điểm M3, nhưng **không**
 -- đọc đáp án. Đáp án chỉ bộ chấm của lõi đọc (CLAUDE.md, bất biến kiến trúc).
-GRANT SELECT ON defect_scores TO fw_api;
+GRANT SELECT ON defect_bench_groups, defect_scores TO fw_api;
 REVOKE ALL ON defect_manifests, defect_items FROM fw_api;
 
 -- View: API đọc hết, kể cả bản có cột is_sealed. Lọc theo vai làm ở tầng API
@@ -99,7 +99,7 @@ GRANT USAGE, SELECT ON SEQUENCE sync_runs_id_seq, training_metrics_id_seq TO fw_
 -- Hai bảng append-only khác cùng luật.
 REVOKE UPDATE, DELETE ON cost_ledger_entries FROM fw_sync;
 REVOKE UPDATE, DELETE ON episode_qa_reports FROM fw_sync;
-REVOKE UPDATE, DELETE ON defect_scores FROM fw_sync;
+REVOKE UPDATE, DELETE ON defect_bench_groups, defect_scores FROM fw_sync;
 
 -- Năm cột trạng thái của human_actions: quyền theo cột, nên bộ nạp không sửa
 -- được nội dung một hành động, chỉ đánh dấu nó đã đi tới đâu.
@@ -134,6 +134,9 @@ TO agent_ro;
 -- Nói rõ ràng điều quan trọng nhất, dù mặc định đã là không có quyền: nếu
 -- một PR sau này GRANT rộng tay cho agent_ro, ba dòng này vẫn chặn đáp án.
 REVOKE ALL ON defect_manifests, defect_items FROM agent_ro;
+-- Kết quả chấm cũng vậy (bản 0.6): nhãn hit / false của từng phát hiện và
+-- số lỗi mỗi loại suy ra từ đáp án.
+REVOKE ALL ON defect_bench_groups, defect_scores FROM agent_ro;
 REVOKE ALL ON episodes FROM agent_ro;
 REVOKE ALL ON sim_evaluations, eval_episodes FROM agent_ro;
 

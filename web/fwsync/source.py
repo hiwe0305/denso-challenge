@@ -12,7 +12,8 @@ này, và một file lạ không phải lý do để dừng (§9.4, "bộ nạp 
 **Hai mức khoan dung, khác nhau có chủ ý:**
 
 * Bảng có model hợp đồng (`episodes`, `episode_qa_reports`, `training_metrics`,
-  `train_diagnoses`, `probe_results`, `defect_manifests`) đi qua
+  `train_diagnoses`, `probe_results`, `defect_manifests`, cùng
+  `bench_result.json` của DA-31) đi qua
   `mapping.py` và bị **từ chối** nếu sai schema. Đây là phần hợp đồng đã chốt,
   nên sai là lỗi thật.
 * Bảng chưa có file schema (`Source`, `Condition`, `Release`, `Checkpoint`,
@@ -70,7 +71,9 @@ FILE_TO_TABLE: dict[str, str] = {
     "price_books": "price_books",
     "defect_manifest": "defect_manifests",
     "defect_manifests": "defect_manifests",
-    "defect_scores": "defect_scores",
+    # DA-31 ghi `<out>/bench_result.json`; một file cho cả hai bảng của lần
+    # chấm (bản 0.6). `defect_scores.jsonl` dạng tp/fp/fn cũ không còn nhận.
+    "bench_result": "defect_bench_groups",
 }
 
 #: Bảng đi qua đường khoan dung vì thực thể của nó chưa có file schema trong
@@ -100,7 +103,6 @@ TOLERANT_TABLES: frozenset[str] = frozenset(
         "decisions",
         "cost_ledger_entries",
         "price_books",
-        "defect_scores",
     }
 )
 

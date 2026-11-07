@@ -111,16 +111,20 @@ class Mock:
     #: `defect_manifest.json`, không vào episode nào (luật R8). Bộ nạp không có
     #: đường nào đưa nó sang nhóm P.
     DEFECTS: list[tuple[str, str, dict[str, Any]]] = [
-        ("ep_bench_00", "D1", {"missing_column": "left_wrist_cmd"}),
-        ("ep_bench_01", "D2", {"drop_frames": 5}),
-        ("ep_bench_02", "D3", {"dim": 12, "scale": 1.8}),
-        ("ep_bench_03", "D4", {"dim": 31}),
-        ("ep_bench_04", "D5", {"near_duplicate_of": "ep_bench_07"}),
-        ("ep_bench_05", "D6", {"label_swap": "3<->4"}),  # tham số phải vô hướng
-        ("ep_bench_06", "D7", {"flip_dim": 20}),
-        ("runs/exp_BFAIL/metrics.jsonl", "T1", {"nan_at_step": 1200}),
-        ("runs/exp_BFAIL/metrics.jsonl", "T3", {"overfit_from_step": 1400}),
-        ("runs/exp_BFAIL/metrics.jsonl", "T5", {"dead_dim": 7}),
+        ("ep_bench_00", "D1", {"kind": "missing_column", "column": "left_wrist_cmd"}),
+        ("ep_bench_01", "D2", {"kind": "dropped_frames", "drop_frames": 5}),
+        ("ep_bench_02", "D3", {"kind": "action_scale", "dim": 12, "scale": 1.8}),
+        ("ep_bench_03", "D4", {"kind": "dead_dim", "dim": 31}),
+        ("ep_bench_04", "D5", {"kind": "duplicate_episode", "original_id": "ep_bench_07"}),
+        ("ep_bench_05", "D6", {"kind": "label_swap", "label_swap": "3<->4"}),
+        ("ep_bench_06", "D7", {"kind": "action_sign_flip", "flip_dim": 20}),
+    ]
+    #: Lỗi cấy vào log train: một bản sao **khác** (DA-27 inject-logs), vì
+    #: bộ chấm DA-31 chấm từng nhóm trên một cặp bản có lỗi / bản sạch.
+    LOG_DEFECTS: list[tuple[str, str, dict[str, Any]]] = [
+        ("runs/exp_BFAIL/metrics.jsonl", "T1", {"kind": "nan_loss", "nan_at_step": 1200}),
+        ("runs/exp_BFAIL/metrics.jsonl", "T3", {"kind": "overfit", "overfit_from_step": 1400}),
+        ("runs/exp_BFAIL/metrics.jsonl", "T5", {"kind": "dead_dim_train", "dead_dim": 7}),
     ]
     #: Mã nào bộ phát hiện bằng code bắt được, mã nào agent bắt được. Code bắt
     #: 6/10; agent bắt thêm D6 và T3 (M3: "code bắt x, agent bắt thêm y").
@@ -1030,30 +1034,133 @@ class Mock:
         self.files["ledger.jsonl"] = rows
 
     # ------------------------------------------------------------ defects
+    #: Hai cặp bản sao của bộ chấm: (nhóm, bản có lỗi, bản sạch, số đơn vị
+    #: của bản sạch, tên danh sách lỗi cấy). Đơn vị là episode với nhóm dữ
+    #: liệu, job với log.
+    BENCH_GROUPS: list[tuple[str, str, str, int, str]] = [
+        ("data", "bench_kbd_teleop", "bench_kbd_teleop_clean", 10, "DEFECTS"),
+        ("logs", "bench_logs_bfail", "bench_logs_bfail_clean", 12, "LOG_DEFECTS"),
+    ]
+
     def defects(self) -> None:
-        self.files["defect_manifest.json"] = {
-            "dataset_id": "bench_kbd_teleop",
-            "seed": 17,
-            "defects": [
-                {"target_ref": target, "code": code, "parameters": params}
-                for target, code, params in self.DEFECTS
-            ],
+        """Đáp án (`defect_manifest.json`) và kết quả chấm (`bench_result.json`).
+
+        Kết quả theo đúng dạng `da31-2` mà `flywheel.eval.agentqa.bench.report`
+        ghi; `web/tests/test_bench_result.py` so khoá của nó với hàm thật.
+        """
+        self.files["defect_manifest.json"] = [
+            {"dataset_id": copy, "seed": 17 + index,
+             "defects": [{"target_ref": target, "code": code, "parameters": params}
+                         for target, code, params in getattr(self, defects)]}
+            for index, (_, copy, _, _, defects) in enumerate(self.BENCH_GROUPS)
+        ]
+        groups = [self._bench_group(*spec) for spec in self.BENCH_GROUPS]
+        hashes = {
+            copy: hx(f"manifest:{copy}")
+            for _, injected, clean, _, _ in self.BENCH_GROUPS for copy in (injected, clean)
         }
-        scores: list[Row] = []
-        for detector, caught, model, latency, false_alarm in (
-            ("code", self.CODE_CATCHES, None, 4.2, 0.0),
-            ("agent", self.AGENT_CATCHES, "mock-agent@0", 95.0, 0.05),
+        self.files["bench_result.json"] = {
+            "bench_version": "da31-2",
+            "measured_on": "injected defects (DA-27), not natural defects",
+            "false_alarm_on_clean": (
+                "upper bound (cận trên): the clean copy still holds the real data's own"
+                " defects, and a report of one of them counts as a false alarm"
+            ),
+            "created_at": "2026-11-12T03:00:00+00:00",
+            "manifest_sha256": dict(sorted(hashes.items())),
+            "inputs": {"spec_sha256": hx("bench-spec"), "train_config_sha256": hx("train-cfg"),
+                       "system_config_sha256": hx("system-cfg"),
+                       "ledger": "g0-DA-31-20261112/job_bench_01"},
+            "groups": groups,
+        }
+
+    @staticmethod
+    def _rate(hit: int, total: int) -> Row:
+        return {"hit": hit, "total": total, "value": hit / total if total else None}
+
+    def _bench_group(self, group: str, injected: str, clean: str, units: int,
+                     attr: str) -> Row:
+        defects: list[tuple[str, str, dict[str, Any]]] = getattr(self, attr)
+        kinds = [(str(params["kind"]), code) for _, code, params in defects]
+        injected_codes = {code for _, code in kinds}
+        # Agent báo nhầm một D2 trên bản có lỗi (precision D2 của agent 1/2) và
+        # một D4 trên bản sạch (báo nhầm 1/10, cận trên). Chỉ ở nhóm dữ liệu.
+        false_on_injected = [("ep_bench_08", "D2")] if group == "data" else []
+        false_on_clean = [("ep_bench_09", "D4")] if group == "data" else []
+        layers: Row = {}
+        for layer, caught, seconds in (
+            ("code", self.CODE_CATCHES, (4.2, 3.9) if group == "data" else (2.1, 2.0)),
+            ("agent", self.AGENT_CATCHES, (95.0, 88.0) if group == "data" else (140.0, 131.0)),
         ):
-            for _, code, _ in self.DEFECTS:
-                hit = code in caught
-                scores.append(
-                    {"manifest_ref": "bench_kbd_teleop", "scorer_version": "bench-0.1",
-                     "detector": detector, "agent_model": model, "code": code,
-                     "tp": 1 if hit else 0,
-                     "fp": 1 if (detector == "agent" and code == "D2") else 0,
-                     "fn": 0 if hit else 1, "false_alarm_rate": false_alarm, "latency_s": latency}
-                )
-        self.files["defect_scores.jsonl"] = scores
+            recall = {kind: self._rate(int(code in caught), 1) for kind, code in kinds}
+            wrong = false_on_injected if layer == "agent" else []
+            clean_reports = false_on_clean if layer == "agent" else []
+            codes = sorted(injected_codes | {code for _, code in wrong})
+            precision = {}
+            for code in codes:
+                hit = int(code in caught and code in injected_codes)
+                precision[code] = self._rate(hit, hit + sum(1 for _, c in wrong if c == code))
+            layers[layer] = {
+                "recall_by_kind": recall,
+                "masked_by_kind": {kind: 0 for kind, _ in kinds},
+                "recall_unmasked_by_kind": recall,
+                "precision_by_code": precision,
+                "false_alarm_on_clean": {**self._rate(len(clean_reports), units),
+                                         "bound": "upper (cận trên)"},
+                "false_alarm_not_a_unit": [],
+                "clean_reports": [list(pair) for pair in clean_reports],
+                "natural": [],
+                "seconds_to_report": {injected: seconds[0], clean: seconds[1]},
+                "uncoded": {},
+            }
+        split = []
+        for kind, code in kinds:
+            by_code = int(code in self.CODE_CATCHES)
+            alone = int(code in self.AGENT_CATCHES)
+            adds = int(alone and not by_code)
+            split.append({"kind": kind, "code": code, "injected": 1, "by_code": by_code,
+                          "agent_adds": adds, "together": by_code + adds, "agent_alone": alone})
+        hits = [(target, code) for target, code, _ in defects if code in self.AGENT_CATCHES]
+        # Phát hiện sai đứng hạng 5 trong báo cáo: bốn phát hiện đúng đứng trên
+        # nó, hai đứng dưới (thứ hạng đúng 4/6 cặp). Phát hiện cuối chưa ai duyệt.
+        ordered = hits[:4] + false_on_injected + hits[4:]
+        findings: list[Row] = []
+        for rank, (target, code) in enumerate(ordered, start=1):
+            label = "false" if (target, code) in false_on_injected else "hit"
+            review = "unreviewed" if rank == len(ordered) else (
+                "agree" if label == "hit" else "override")
+            findings.append({
+                "copy": injected, "report_id": f"r-{injected}",
+                "finding_id": f"r-{injected}-f{rank - 1}", "rank": rank, "target": target,
+                "code": code, "label": label, "review": review,
+                "reason": "kỹ sư: không phải lỗi" if review == "override" else "",
+            })
+        for rank, (target, code) in enumerate(false_on_clean, start=1):
+            findings.append({
+                "copy": clean, "report_id": f"r-{clean}", "finding_id": f"r-{clean}-f{rank - 1}",
+                "rank": rank, "target": target, "code": code, "label": "clean",
+                "review": "unreviewed", "reason": "",
+            })
+        trues = [f["rank"] for f in findings if f["copy"] == injected and f["label"] == "hit"]
+        falses = [f["rank"] for f in findings if f["copy"] == injected and f["label"] == "false"]
+        pairs = [(t, f) for t in trues for f in falses]
+        reviews: dict[str, dict[str, int]] = {}
+        for f in findings:
+            bucket = reviews.setdefault(f["label"], {})
+            bucket[f["review"]] = bucket.get(f["review"], 0) + 1
+        return {
+            "group": group,
+            "injected_copy": injected,
+            "clean_copy": clean,
+            "defects": len(defects),
+            "layers": layers,
+            "split": split,
+            "agent_quality": {
+                "ranking": self._rate(sum(1 for t, f in pairs if t < f), len(pairs)),
+                "reviews": reviews,
+                "findings": findings,
+            },
+        }
 
 
 README = """# Bộ mock kịch bản demo 17/11
@@ -1117,6 +1224,9 @@ def render() -> dict[str, str]:
             )
         else:
             out[name] = json.dumps(content, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+    # Như `write_bench` của DA-31: hash của đúng chuỗi JSON, trong file khoá.
+    bench = out["bench_result.json"]
+    out["bench_result.sha256"] = hashlib.sha256(bench.encode("utf-8")).hexdigest() + "\n"
     out["README.md"] = README
     return out
 

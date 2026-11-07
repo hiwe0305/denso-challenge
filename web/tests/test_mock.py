@@ -173,7 +173,9 @@ def test_no_benchmark_copy_episode_enters_a_release(data: dict[str, Any]) -> Non
 def test_exactly_the_benchmark_copy_carries_its_copy_id(data: dict[str, Any]) -> None:
     # #62: mọi episode của bản sao, kể cả episode sạch, mang mã bản sao, và
     # mã đó là `dataset_id` của manifest. Không episode nào khác mang nó.
-    copy_id = data["defect_manifest.json"]["dataset_id"]
+    # Hai đáp án (bản 0.6): bản sao dữ liệu và bản sao log train. Chỉ bản sao
+    # dữ liệu có episode.
+    copy_id = data["defect_manifest.json"][0]["dataset_id"]
     tagged = {
         e["episode_id"] for e in data["episodes.jsonl"] if e["meta"]["benchmark_copy_id"]
     }
@@ -214,7 +216,8 @@ def test_the_answer_key_is_nowhere_but_the_manifest(data: dict[str, Any]) -> Non
     # episode nào, không báo cáo QA nào, mang tham số của lỗi đã cấy.
     answers = {
         json.dumps(d["parameters"], sort_keys=True)
-        for d in data["defect_manifest.json"]["defects"]
+        for manifest in data["defect_manifest.json"]
+        for d in manifest["defects"]
     }
     episodes = (OUT / "episodes.jsonl").read_text(encoding="utf-8")
     assert "injected_defect" not in episodes
@@ -478,26 +481,42 @@ def test_every_ledger_entry_has_a_target_and_estimates_have_an_owner(data: dict[
 
 
 def test_code_catches_six_of_ten_and_the_agent_two_more(data: dict[str, Any]) -> None:
-    # Câu M3 nói thành lời: "code bắt 6/10, agent bắt thêm 2".
-    caught: dict[str, set[str]] = {"code": set(), "agent": set()}
-    for score in data["defect_scores.jsonl"]:
-        if score["tp"]:
-            caught[score["detector"]].add(score["code"])
-    total = len(data["defect_manifest.json"]["defects"])
-    assert total == 10
-    assert len(caught["code"]) == 6
-    assert len(caught["agent"] - caught["code"]) == 2
+    # Câu M3 nói thành lời: "code bắt 6/10, agent bắt thêm 2", đọc từ `split`
+    # của bench_result, đúng chỗ DA-31 ghi nó.
+    split = [row for group in data["bench_result.json"]["groups"] for row in group["split"]]
+    assert sum(row["injected"] for row in split) == 10
+    assert sum(row["by_code"] for row in split) == 6
+    assert sum(row["agent_adds"] for row in split) == 2
+    for row in split:
+        assert row["together"] == row["by_code"] + row["agent_adds"]
 
 
 def test_seven_data_defects_and_three_train_log_defects(data: dict[str, Any]) -> None:
-    # Phụ lục C: 4 ở tầng 2, 3 ở tầng 4, 3 trong log train. Tầng không có
-    # trong hợp đồng của DefectManifest, nên test chỉ kiểm được họ mã.
-    codes = Counter(d["code"][0] for d in data["defect_manifest.json"]["defects"])
-    assert codes == {"D": 7, "T": 3}
+    # Phụ lục C: 7 lỗi dữ liệu trên bản sao dữ liệu, 3 lỗi log train trên bản
+    # sao log. Tầng không có trong hợp đồng của DefectManifest, nên test chỉ
+    # kiểm được họ mã.
+    data_copy, log_copy = data["defect_manifest.json"]
+    assert Counter(d["code"][0] for d in data_copy["defects"]) == {"D": 7}
+    assert Counter(d["code"][0] for d in log_copy["defects"]) == {"T": 3}
+
+
+def test_the_bench_result_scores_exactly_the_sealed_copies(data: dict[str, Any]) -> None:
+    manifests = {m["dataset_id"]: m for m in data["defect_manifest.json"]}
+    for group in data["bench_result.json"]["groups"]:
+        manifest = manifests[group["injected_copy"]]
+        assert group["defects"] == len(manifest["defects"])
+        kinds = [d["parameters"]["kind"] for d in manifest["defects"]]
+        assert [row["kind"] for row in group["split"]] == kinds
+
+
+def test_the_bench_lock_is_the_hash_of_the_result() -> None:
+    text = (OUT / "bench_result.json").read_text(encoding="utf-8")
+    lock = (OUT / "bench_result.sha256").read_text(encoding="utf-8").strip()
+    assert hashlib.sha256(text.encode("utf-8")).hexdigest() == lock
 
 
 def test_every_defect_targets_something_that_exists(data: dict[str, Any]) -> None:
     episodes = {e["episode_id"] for e in data["episodes.jsonl"]}
-    for defect in data["defect_manifest.json"]["defects"]:
+    for defect in (d for m in data["defect_manifest.json"] for d in m["defects"]):
         target = defect["target_ref"]
         assert target in episodes or target.endswith("metrics.jsonl"), target

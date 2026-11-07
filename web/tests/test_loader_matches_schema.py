@@ -184,6 +184,7 @@ def _strict_rows() -> list[tuple[str, dict[str, object]]]:
 
     from web.fwsync.mapping import (
         DatasetLookup,
+        map_bench_result,
         map_defect_manifest,
         map_episode,
         map_probe_result,
@@ -232,6 +233,12 @@ def _strict_rows() -> list[tuple[str, dict[str, object]]]:
     manifest = map_defect_manifest(load("DefectManifest"))
     rows.append(("defect_manifests", manifest["manifest"]))
     rows += [("defect_items", item) for item in manifest["items"]]
+    # bench_result.json của DA-31 không có file mẫu ở testkit (không phải hợp
+    # đồng); bộ mock là file mẫu của nó, và test_bench_result.py giữ nó đúng
+    # dạng DA-31 ghi.
+    bench_file = Path(__file__).resolve().parents[2] / "mock/demo-17-11/bench_result.json"
+    bench = map_bench_result(json.loads(bench_file.read_text(encoding="utf-8")), "a" * 64)
+    rows += [(table, table_rows[0]) for table, table_rows in bench.items()]
     return rows
 
 

@@ -33,7 +33,7 @@ GROUP_W = {
     "agent_chat_sessions",
     "agent_chat_messages",
 }
-GROUP_S = {"defect_manifests", "defect_items", "defect_scores"}
+GROUP_S = {"defect_manifests", "defect_items", "defect_bench_groups", "defect_scores"}
 INFRASTRUCTURE = {"jobs"}
 
 # Mọi mã ràng buộc tài liệu nói là được cưỡng chế bằng schema hoặc trigger.
@@ -92,10 +92,10 @@ def tables() -> list[str]:
     return _created_tables(_all_sql())
 
 
-def test_the_schema_has_41_business_tables(tables: list[str]) -> None:
+def test_the_schema_has_42_business_tables(tables: list[str]) -> None:
     business = [name for name in tables if name not in INFRASTRUCTURE]
-    assert len(business) == 41, (
-        f"có {len(business)} bảng nghiệp vụ, DESIGN.md §4.1 nói 41: "
+    assert len(business) == 42, (
+        f"có {len(business)} bảng nghiệp vụ, DESIGN.md §4.1 nói 42: "
         f"{sorted(business)}"
     )
 
@@ -104,7 +104,7 @@ def test_the_three_groups_add_up(tables: list[str]) -> None:
     p_tables = set(_p_table_list())
     assert len(GROUP_W) == 9
     assert len(p_tables) == 29, f"nhóm P có {len(p_tables)} bảng, §4.1 nói 29"
-    assert len(GROUP_S) == 3
+    assert len(GROUP_S) == 4
     # Không bảng nào nằm ở hai nhóm, và ba nhóm phủ hết bảng nghiệp vụ.
     assert not (GROUP_W & p_tables) and not (p_tables & GROUP_S)
     covered = GROUP_W | p_tables | GROUP_S | INFRASTRUCTURE

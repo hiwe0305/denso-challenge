@@ -157,6 +157,10 @@ CREATE TRIGGER c8_defect_score_no_update
   BEFORE UPDATE OR DELETE ON defect_scores
   FOR EACH ROW EXECUTE FUNCTION p_ledger_is_append_only();
 
+CREATE TRIGGER c8_defect_bench_group_no_update
+  BEFORE UPDATE OR DELETE ON defect_bench_groups
+  FOR EACH ROW EXECUTE FUNCTION p_ledger_is_append_only();
+
 -- ---------------------------------------------------------------------------
 -- C9 · bút toán đảo đúng dấu, đúng đối tượng
 -- ---------------------------------------------------------------------------
