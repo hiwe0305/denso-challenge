@@ -4,6 +4,10 @@
 # Changing the prompt file or any model line is a new version of the agent: its
 # reports must be scored on the injected-defect bench again (DA-31) before use.
 
+# Hosts of our network the endpoints may name besides loopback and private IPs.
+# Any other host is refused when the config is read (endpoint.check_local_url).
+local_hosts: [ubuntu-desktop.local, rtx3060]
+
 models:
   agent:
     # Nemotron 3.5 Bolt E4B, Q4, served by Ollama on the RTX 3060 (Hiếu). Text only.
