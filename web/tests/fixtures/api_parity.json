@@ -12968,5 +12968,1616 @@
   ],
   "next_cursor": null,
   "total": 64
- }
+ },
+ "- /experiments?limit=500": {
+  "items": [
+   {
+    "experiment_id": "exp_A",
+    "task_id": "two_table",
+    "branch": "A",
+    "method": "PSI0",
+    "hypothesis": "HT",
+    "status": "DONE",
+    "train_seed": 100,
+    "hyperparams": {
+     "lr": 0.0001,
+     "steps": 2000
+    },
+    "base_source_id": "src_psi0_ckpt",
+    "started_at": "2026-11-04T08:00:00Z",
+    "finished_at": "2026-11-05T08:00:00Z",
+    "run_plan": {
+     "id": "rp_A",
+     "purpose": "branch_train",
+     "config_sha256": "dae258bcd136605ba2b6b755395d5db5c81f410f0c07390bf6fbe2f916143cf4",
+     "lock_uri": "mock://runs/rp_A/runplan.lock.json",
+     "frozen_at": "2026-11-03T12:00:00Z",
+     "seed_range": "[1000,1090)"
+    },
+    "releases": [
+     {
+      "release_id": "rel_two_table_v1",
+      "mix_weight": 1,
+      "episodes_used": 164
+     }
+    ],
+    "best_checkpoint_id": "ckpt_A",
+    "metric_rows": 30,
+    "diagnosis": {
+     "ran": true,
+     "fired": 0,
+     "clean": 11,
+     "skipped": 1,
+     "partial": 0,
+     "not_run": 0
+    },
+    "origin": "mock"
+   },
+   {
+    "experiment_id": "exp_A07",
+    "task_id": "two_table",
+    "branch": "A_07",
+    "method": "PSI0",
+    "hypothesis": "HTa",
+    "status": "DONE",
+    "train_seed": 101,
+    "hyperparams": {
+     "lr": 0.0001,
+     "steps": 2000
+    },
+    "base_source_id": "src_psi0_ckpt",
+    "started_at": "2026-11-04T08:00:00Z",
+    "finished_at": "2026-11-05T08:00:00Z",
+    "run_plan": {
+     "id": "rp_A07",
+     "purpose": "branch_train",
+     "config_sha256": "15ba561edb99f347fff37f6842a56b1d170b4f51c2ccafbeac28b792ed2e8bd3",
+     "lock_uri": "mock://runs/rp_A07/runplan.lock.json",
+     "frozen_at": "2026-11-03T12:00:00Z",
+     "seed_range": "[1000,1090)"
+    },
+    "releases": [
+     {
+      "release_id": "rel_two_table_a07",
+      "mix_weight": 1,
+      "episodes_used": 115
+     }
+    ],
+    "best_checkpoint_id": "ckpt_A07",
+    "metric_rows": 0,
+    "diagnosis": {
+     "ran": false,
+     "fired": 0,
+     "clean": 0,
+     "skipped": 0,
+     "partial": 0,
+     "not_run": 12
+    },
+    "origin": "mock"
+   },
+   {
+    "experiment_id": "exp_B",
+    "task_id": "two_table",
+    "branch": "B",
+    "method": "PSI0",
+    "hypothesis": "HT",
+    "status": "DONE",
+    "train_seed": 102,
+    "hyperparams": {
+     "lr": 0.0001,
+     "steps": 2000
+    },
+    "base_source_id": "src_psi0_ckpt",
+    "started_at": "2026-11-04T08:00:00Z",
+    "finished_at": "2026-11-05T08:00:00Z",
+    "run_plan": {
+     "id": "rp_B",
+     "purpose": "branch_train",
+     "config_sha256": "aa3931369cffad381dba9a66b7f2f0a356a2d76685171e42807a4ac9017b6c42",
+     "lock_uri": "mock://runs/rp_B/runplan.lock.json",
+     "frozen_at": "2026-11-03T12:00:00Z",
+     "seed_range": "[1000,1090)"
+    },
+    "releases": [
+     {
+      "release_id": "rel_two_table_v1",
+      "mix_weight": 1,
+      "episodes_used": 164
+     }
+    ],
+    "best_checkpoint_id": "ckpt_B",
+    "metric_rows": 0,
+    "diagnosis": {
+     "ran": false,
+     "fired": 0,
+     "clean": 0,
+     "skipped": 0,
+     "partial": 0,
+     "not_run": 12
+    },
+    "origin": "mock"
+   },
+   {
+    "experiment_id": "exp_BFAIL",
+    "task_id": "two_table",
+    "branch": "B_FAIL",
+    "method": "PSI0",
+    "hypothesis": "HTb",
+    "status": "DONE",
+    "train_seed": 103,
+    "hyperparams": {
+     "lr": 0.0001,
+     "steps": 2000
+    },
+    "base_source_id": "src_psi0_ckpt",
+    "started_at": "2026-11-04T08:00:00Z",
+    "finished_at": "2026-11-05T08:00:00Z",
+    "run_plan": {
+     "id": "rp_BFAIL",
+     "purpose": "branch_train",
+     "config_sha256": "2fbadf4cdc9edfe4404d99f3799efffb4bcc0e2542149871eb184ec56f3b0e93",
+     "lock_uri": "mock://runs/rp_BFAIL/runplan.lock.json",
+     "frozen_at": "2026-11-03T12:00:00Z",
+     "seed_range": "[1000,1090)"
+    },
+    "releases": [
+     {
+      "release_id": "rel_two_table_v1",
+      "mix_weight": 1,
+      "episodes_used": 164
+     }
+    ],
+    "best_checkpoint_id": "ckpt_BFAIL",
+    "metric_rows": 30,
+    "diagnosis": {
+     "ran": true,
+     "fired": 1,
+     "clean": 10,
+     "skipped": 1,
+     "partial": 0,
+     "not_run": 0
+    },
+    "origin": "mock"
+   },
+   {
+    "experiment_id": "exp_HE_V_EGO_10",
+    "task_id": "two_table",
+    "branch": "C",
+    "method": "PSI0",
+    "hypothesis": "HE",
+    "status": "DONE",
+    "train_seed": 104,
+    "hyperparams": {
+     "he_variant": "V_EGO",
+     "lr": 0.0001,
+     "n_demos": 10,
+     "steps": 2000
+    },
+    "base_source_id": "src_psi0_ckpt",
+    "started_at": "2026-11-04T08:00:00Z",
+    "finished_at": "2026-11-05T08:00:00Z",
+    "run_plan": {
+     "id": "rp_HE_V_EGO_10",
+     "purpose": "branch_train",
+     "config_sha256": "56eefd11b559d9bf3f5b8b475f700d5155ed5a6f15354a3fbd6fa26658ceea97",
+     "lock_uri": "mock://runs/rp_HE_V_EGO_10/runplan.lock.json",
+     "frozen_at": "2026-11-03T12:00:00Z",
+     "seed_range": "[1000,1090)"
+    },
+    "releases": [
+     {
+      "release_id": "rel_he_v_ego_10",
+      "mix_weight": 1,
+      "episodes_used": 30
+     }
+    ],
+    "best_checkpoint_id": "ckpt_HE_V_EGO_10",
+    "metric_rows": 0,
+    "diagnosis": {
+     "ran": false,
+     "fired": 0,
+     "clean": 0,
+     "skipped": 0,
+     "partial": 0,
+     "not_run": 12
+    },
+    "origin": "mock"
+   },
+   {
+    "experiment_id": "exp_HE_V_EGO_20",
+    "task_id": "two_table",
+    "branch": "C",
+    "method": "PSI0",
+    "hypothesis": "HE",
+    "status": "DONE",
+    "train_seed": 105,
+    "hyperparams": {
+     "he_variant": "V_EGO",
+     "lr": 0.0001,
+     "n_demos": 20,
+     "steps": 2000
+    },
+    "base_source_id": "src_psi0_ckpt",
+    "started_at": "2026-11-04T08:00:00Z",
+    "finished_at": "2026-11-05T08:00:00Z",
+    "run_plan": {
+     "id": "rp_HE_V_EGO_20",
+     "purpose": "branch_train",
+     "config_sha256": "08cb69b99da90bf159a50b431ce3b6abfefeaeb1d7bffbd3ca945f6ae149cc4e",
+     "lock_uri": "mock://runs/rp_HE_V_EGO_20/runplan.lock.json",
+     "frozen_at": "2026-11-03T12:00:00Z",
+     "seed_range": "[1000,1090)"
+    },
+    "releases": [
+     {
+      "release_id": "rel_he_v_ego_20",
+      "mix_weight": 1,
+      "episodes_used": 40
+     }
+    ],
+    "best_checkpoint_id": "ckpt_HE_V_EGO_20",
+    "metric_rows": 0,
+    "diagnosis": {
+     "ran": false,
+     "fired": 0,
+     "clean": 0,
+     "skipped": 0,
+     "partial": 0,
+     "not_run": 12
+    },
+    "origin": "mock"
+   },
+   {
+    "experiment_id": "exp_HE_V_EGO_40",
+    "task_id": "two_table",
+    "branch": "C",
+    "method": "PSI0",
+    "hypothesis": "HE",
+    "status": "DONE",
+    "train_seed": 106,
+    "hyperparams": {
+     "he_variant": "V_EGO",
+     "lr": 0.0001,
+     "n_demos": 40,
+     "steps": 2000
+    },
+    "base_source_id": "src_psi0_ckpt",
+    "started_at": "2026-11-04T08:00:00Z",
+    "finished_at": "2026-11-05T08:00:00Z",
+    "run_plan": {
+     "id": "rp_HE_V_EGO_40",
+     "purpose": "branch_train",
+     "config_sha256": "24a96bcd81eac035e6d00d00bbbb380b324578e35669b34c6411fa7ae498627e",
+     "lock_uri": "mock://runs/rp_HE_V_EGO_40/runplan.lock.json",
+     "frozen_at": "2026-11-03T12:00:00Z",
+     "seed_range": "[1000,1090)"
+    },
+    "releases": [
+     {
+      "release_id": "rel_he_v_ego_40",
+      "mix_weight": 1,
+      "episodes_used": 60
+     }
+    ],
+    "best_checkpoint_id": "ckpt_HE_V_EGO_40",
+    "metric_rows": 0,
+    "diagnosis": {
+     "ran": false,
+     "fired": 0,
+     "clean": 0,
+     "skipped": 0,
+     "partial": 0,
+     "not_run": 12
+    },
+    "origin": "mock"
+   },
+   {
+    "experiment_id": "exp_HE_V_EGO_80",
+    "task_id": "two_table",
+    "branch": "C",
+    "method": "PSI0",
+    "hypothesis": "HE",
+    "status": "DONE",
+    "train_seed": 107,
+    "hyperparams": {
+     "he_variant": "V_EGO",
+     "lr": 0.0001,
+     "n_demos": 80,
+     "steps": 2000
+    },
+    "base_source_id": "src_psi0_ckpt",
+    "started_at": "2026-11-04T08:00:00Z",
+    "finished_at": "2026-11-05T08:00:00Z",
+    "run_plan": {
+     "id": "rp_HE_V_EGO_80",
+     "purpose": "branch_train",
+     "config_sha256": "b00961ceb946578f9ff7c533a76272114f164063eb8750176e80d47aa1a12884",
+     "lock_uri": "mock://runs/rp_HE_V_EGO_80/runplan.lock.json",
+     "frozen_at": "2026-11-03T12:00:00Z",
+     "seed_range": "[1000,1090)"
+    },
+    "releases": [
+     {
+      "release_id": "rel_he_v_ego_80",
+      "mix_weight": 1,
+      "episodes_used": 100
+     }
+    ],
+    "best_checkpoint_id": "ckpt_HE_V_EGO_80",
+    "metric_rows": 0,
+    "diagnosis": {
+     "ran": false,
+     "fired": 0,
+     "clean": 0,
+     "skipped": 0,
+     "partial": 0,
+     "not_run": 12
+    },
+    "origin": "mock"
+   },
+   {
+    "experiment_id": "exp_HE_V_EGO10_10",
+    "task_id": "two_table",
+    "branch": "C",
+    "method": "PSI0",
+    "hypothesis": "HE",
+    "status": "DONE",
+    "train_seed": 108,
+    "hyperparams": {
+     "he_variant": "V_EGO10",
+     "lr": 0.0001,
+     "n_demos": 10,
+     "steps": 2000
+    },
+    "base_source_id": "src_psi0_ckpt",
+    "started_at": "2026-11-04T08:00:00Z",
+    "finished_at": "2026-11-05T08:00:00Z",
+    "run_plan": {
+     "id": "rp_HE_V_EGO10_10",
+     "purpose": "branch_train",
+     "config_sha256": "3828c68b74cf75d6ec9448719d6212904af63d60a3d27c3518c5d93cb0de5b8e",
+     "lock_uri": "mock://runs/rp_HE_V_EGO10_10/runplan.lock.json",
+     "frozen_at": "2026-11-03T12:00:00Z",
+     "seed_range": "[1000,1090)"
+    },
+    "releases": [
+     {
+      "release_id": "rel_he_v_ego10_10",
+      "mix_weight": 1,
+      "episodes_used": 20
+     }
+    ],
+    "best_checkpoint_id": "ckpt_HE_V_EGO10_10",
+    "metric_rows": 0,
+    "diagnosis": {
+     "ran": false,
+     "fired": 0,
+     "clean": 0,
+     "skipped": 0,
+     "partial": 0,
+     "not_run": 12
+    },
+    "origin": "mock"
+   },
+   {
+    "experiment_id": "exp_HE_V_EGO10_20",
+    "task_id": "two_table",
+    "branch": "C",
+    "method": "PSI0",
+    "hypothesis": "HE",
+    "status": "DONE",
+    "train_seed": 109,
+    "hyperparams": {
+     "he_variant": "V_EGO10",
+     "lr": 0.0001,
+     "n_demos": 20,
+     "steps": 2000
+    },
+    "base_source_id": "src_psi0_ckpt",
+    "started_at": "2026-11-04T08:00:00Z",
+    "finished_at": "2026-11-05T08:00:00Z",
+    "run_plan": {
+     "id": "rp_HE_V_EGO10_20",
+     "purpose": "branch_train",
+     "config_sha256": "f26c815c92727ba37d94272fa06cb4ad507194234bdf3a19c907c443d5a3f222",
+     "lock_uri": "mock://runs/rp_HE_V_EGO10_20/runplan.lock.json",
+     "frozen_at": "2026-11-03T12:00:00Z",
+     "seed_range": "[1000,1090)"
+    },
+    "releases": [
+     {
+      "release_id": "rel_he_v_ego10_20",
+      "mix_weight": 1,
+      "episodes_used": 30
+     }
+    ],
+    "best_checkpoint_id": "ckpt_HE_V_EGO10_20",
+    "metric_rows": 0,
+    "diagnosis": {
+     "ran": false,
+     "fired": 0,
+     "clean": 0,
+     "skipped": 0,
+     "partial": 0,
+     "not_run": 12
+    },
+    "origin": "mock"
+   },
+   {
+    "experiment_id": "exp_HE_V_EGO10_40",
+    "task_id": "two_table",
+    "branch": "C",
+    "method": "PSI0",
+    "hypothesis": "HE",
+    "status": "DONE",
+    "train_seed": 110,
+    "hyperparams": {
+     "he_variant": "V_EGO10",
+     "lr": 0.0001,
+     "n_demos": 40,
+     "steps": 2000
+    },
+    "base_source_id": "src_psi0_ckpt",
+    "started_at": "2026-11-04T08:00:00Z",
+    "finished_at": "2026-11-05T08:00:00Z",
+    "run_plan": {
+     "id": "rp_HE_V_EGO10_40",
+     "purpose": "branch_train",
+     "config_sha256": "3b60056ff611ddd3ed3ab5ec00d49555be511a645e22d6d69ac44b90ac283113",
+     "lock_uri": "mock://runs/rp_HE_V_EGO10_40/runplan.lock.json",
+     "frozen_at": "2026-11-03T12:00:00Z",
+     "seed_range": "[1000,1090)"
+    },
+    "releases": [
+     {
+      "release_id": "rel_he_v_ego10_40",
+      "mix_weight": 1,
+      "episodes_used": 50
+     }
+    ],
+    "best_checkpoint_id": "ckpt_HE_V_EGO10_40",
+    "metric_rows": 0,
+    "diagnosis": {
+     "ran": false,
+     "fired": 0,
+     "clean": 0,
+     "skipped": 0,
+     "partial": 0,
+     "not_run": 12
+    },
+    "origin": "mock"
+   },
+   {
+    "experiment_id": "exp_HE_V_EGO10_80",
+    "task_id": "two_table",
+    "branch": "C",
+    "method": "PSI0",
+    "hypothesis": "HE",
+    "status": "DONE",
+    "train_seed": 111,
+    "hyperparams": {
+     "he_variant": "V_EGO10",
+     "lr": 0.0001,
+     "n_demos": 80,
+     "steps": 2000
+    },
+    "base_source_id": "src_psi0_ckpt",
+    "started_at": "2026-11-04T08:00:00Z",
+    "finished_at": "2026-11-05T08:00:00Z",
+    "run_plan": {
+     "id": "rp_HE_V_EGO10_80",
+     "purpose": "branch_train",
+     "config_sha256": "78ddcb6587b6e83a28b576901bfeba22256d6f184d6e2b24382ef2dec67061b3",
+     "lock_uri": "mock://runs/rp_HE_V_EGO10_80/runplan.lock.json",
+     "frozen_at": "2026-11-03T12:00:00Z",
+     "seed_range": "[1000,1090)"
+    },
+    "releases": [
+     {
+      "release_id": "rel_he_v_ego10_80",
+      "mix_weight": 1,
+      "episodes_used": 90
+     }
+    ],
+    "best_checkpoint_id": "ckpt_HE_V_EGO10_80",
+    "metric_rows": 0,
+    "diagnosis": {
+     "ran": false,
+     "fired": 0,
+     "clean": 0,
+     "skipped": 0,
+     "partial": 0,
+     "not_run": 12
+    },
+    "origin": "mock"
+   },
+   {
+    "experiment_id": "exp_HE_V_NOEGO_10",
+    "task_id": "two_table",
+    "branch": "C",
+    "method": "PSI0",
+    "hypothesis": "HE",
+    "status": "DONE",
+    "train_seed": 112,
+    "hyperparams": {
+     "he_variant": "V_NOEGO",
+     "lr": 0.0001,
+     "n_demos": 10,
+     "steps": 2000
+    },
+    "base_source_id": "src_psi0_ckpt",
+    "started_at": "2026-11-04T08:00:00Z",
+    "finished_at": "2026-11-05T08:00:00Z",
+    "run_plan": {
+     "id": "rp_HE_V_NOEGO_10",
+     "purpose": "branch_train",
+     "config_sha256": "98c26e2d530cba7d851617b2f66235bf525b3e064dd9504e3606c5eaf86617a2",
+     "lock_uri": "mock://runs/rp_HE_V_NOEGO_10/runplan.lock.json",
+     "frozen_at": "2026-11-03T12:00:00Z",
+     "seed_range": "[1000,1090)"
+    },
+    "releases": [
+     {
+      "release_id": "rel_he_v_noego_10",
+      "mix_weight": 1,
+      "episodes_used": 10
+     }
+    ],
+    "best_checkpoint_id": "ckpt_HE_V_NOEGO_10",
+    "metric_rows": 0,
+    "diagnosis": {
+     "ran": false,
+     "fired": 0,
+     "clean": 0,
+     "skipped": 0,
+     "partial": 0,
+     "not_run": 12
+    },
+    "origin": "mock"
+   },
+   {
+    "experiment_id": "exp_HE_V_NOEGO_20",
+    "task_id": "two_table",
+    "branch": "C",
+    "method": "PSI0",
+    "hypothesis": "HE",
+    "status": "DONE",
+    "train_seed": 113,
+    "hyperparams": {
+     "he_variant": "V_NOEGO",
+     "lr": 0.0001,
+     "n_demos": 20,
+     "steps": 2000
+    },
+    "base_source_id": "src_psi0_ckpt",
+    "started_at": "2026-11-04T08:00:00Z",
+    "finished_at": "2026-11-05T08:00:00Z",
+    "run_plan": {
+     "id": "rp_HE_V_NOEGO_20",
+     "purpose": "branch_train",
+     "config_sha256": "ac93de80509487d0010bce458302b1ba359297f4c8a6de3914fded9743d1f130",
+     "lock_uri": "mock://runs/rp_HE_V_NOEGO_20/runplan.lock.json",
+     "frozen_at": "2026-11-03T12:00:00Z",
+     "seed_range": "[1000,1090)"
+    },
+    "releases": [
+     {
+      "release_id": "rel_he_v_noego_20",
+      "mix_weight": 1,
+      "episodes_used": 20
+     }
+    ],
+    "best_checkpoint_id": "ckpt_HE_V_NOEGO_20",
+    "metric_rows": 0,
+    "diagnosis": {
+     "ran": false,
+     "fired": 0,
+     "clean": 0,
+     "skipped": 0,
+     "partial": 0,
+     "not_run": 12
+    },
+    "origin": "mock"
+   },
+   {
+    "experiment_id": "exp_HE_V_NOEGO_40",
+    "task_id": "two_table",
+    "branch": "C",
+    "method": "PSI0",
+    "hypothesis": "HE",
+    "status": "DONE",
+    "train_seed": 114,
+    "hyperparams": {
+     "he_variant": "V_NOEGO",
+     "lr": 0.0001,
+     "n_demos": 40,
+     "steps": 2000
+    },
+    "base_source_id": "src_psi0_ckpt",
+    "started_at": "2026-11-04T08:00:00Z",
+    "finished_at": "2026-11-05T08:00:00Z",
+    "run_plan": {
+     "id": "rp_HE_V_NOEGO_40",
+     "purpose": "branch_train",
+     "config_sha256": "a4d7e78a930ce3beee85fea9a7a91f177b19b27a26ffd6f5b901c9eb61d10096",
+     "lock_uri": "mock://runs/rp_HE_V_NOEGO_40/runplan.lock.json",
+     "frozen_at": "2026-11-03T12:00:00Z",
+     "seed_range": "[1000,1090)"
+    },
+    "releases": [
+     {
+      "release_id": "rel_he_v_noego_40",
+      "mix_weight": 1,
+      "episodes_used": 40
+     }
+    ],
+    "best_checkpoint_id": "ckpt_HE_V_NOEGO_40",
+    "metric_rows": 0,
+    "diagnosis": {
+     "ran": false,
+     "fired": 0,
+     "clean": 0,
+     "skipped": 0,
+     "partial": 0,
+     "not_run": 12
+    },
+    "origin": "mock"
+   },
+   {
+    "experiment_id": "exp_HE_V_NOEGO_80",
+    "task_id": "two_table",
+    "branch": "C",
+    "method": "PSI0",
+    "hypothesis": "HE",
+    "status": "DONE",
+    "train_seed": 115,
+    "hyperparams": {
+     "he_variant": "V_NOEGO",
+     "lr": 0.0001,
+     "n_demos": 80,
+     "steps": 2000
+    },
+    "base_source_id": "src_psi0_ckpt",
+    "started_at": "2026-11-04T08:00:00Z",
+    "finished_at": "2026-11-05T08:00:00Z",
+    "run_plan": {
+     "id": "rp_HE_V_NOEGO_80",
+     "purpose": "branch_train",
+     "config_sha256": "0e6930d28b8e187d66ad55f65bfd775777057aa97fe149850781e2d63e0ec3e7",
+     "lock_uri": "mock://runs/rp_HE_V_NOEGO_80/runplan.lock.json",
+     "frozen_at": "2026-11-03T12:00:00Z",
+     "seed_range": "[1000,1090)"
+    },
+    "releases": [
+     {
+      "release_id": "rel_he_v_noego_80",
+      "mix_weight": 1,
+      "episodes_used": 80
+     }
+    ],
+    "best_checkpoint_id": "ckpt_HE_V_NOEGO_80",
+    "metric_rows": 0,
+    "diagnosis": {
+     "ran": false,
+     "fired": 0,
+     "clean": 0,
+     "skipped": 0,
+     "partial": 0,
+     "not_run": 12
+    },
+    "origin": "mock"
+   }
+  ],
+  "next_cursor": null,
+  "total": 16
+ },
+ "- /experiment-drafts": {
+  "items": [],
+  "next_cursor": null,
+  "total": 0
+ },
+ "- /experiments/exp_A/metrics": [
+  {
+   "step": 0,
+   "split": "train",
+   "attempt": 0,
+   "epoch": 0,
+   "loss": 1.35273,
+   "loss_nonfinite": null,
+   "lr": 0.0001,
+   "loss_by_group": {},
+   "grad_norm_vlm": 0,
+   "grad_norm_action": 1.8253,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 0
+  },
+  {
+   "step": 0,
+   "split": "val",
+   "attempt": 0,
+   "epoch": 0,
+   "loss": 1.45025,
+   "loss_nonfinite": null,
+   "lr": 0.0001,
+   "loss_by_group": {
+    "arm": 1.59528,
+    "base": 1.01517,
+    "hand": 1.88533
+   },
+   "grad_norm_vlm": null,
+   "grad_norm_action": null,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 0
+  },
+  {
+   "step": 100,
+   "split": "train",
+   "attempt": 0,
+   "epoch": 0,
+   "loss": 1.18599,
+   "loss_nonfinite": null,
+   "lr": 0.0000933,
+   "loss_by_group": {},
+   "grad_norm_vlm": 0,
+   "grad_norm_action": 1.3197,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 150
+  },
+  {
+   "step": 200,
+   "split": "train",
+   "attempt": 0,
+   "epoch": 0,
+   "loss": 1.04265,
+   "loss_nonfinite": null,
+   "lr": 0.00008706,
+   "loss_by_group": {},
+   "grad_norm_vlm": 0,
+   "grad_norm_action": 1.613,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 300
+  },
+  {
+   "step": 200,
+   "split": "val",
+   "attempt": 0,
+   "epoch": 0,
+   "loss": 1.17787,
+   "loss_nonfinite": null,
+   "lr": 0.00008706,
+   "loss_by_group": {
+    "arm": 1.29566,
+    "base": 0.82451,
+    "hand": 1.53123
+   },
+   "grad_norm_vlm": null,
+   "grad_norm_action": null,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 300
+  },
+  {
+   "step": 300,
+   "split": "train",
+   "attempt": 0,
+   "epoch": 0,
+   "loss": 0.9245,
+   "loss_nonfinite": null,
+   "lr": 0.00008123,
+   "loss_by_group": {},
+   "grad_norm_vlm": 0,
+   "grad_norm_action": 1.9424,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 450
+  },
+  {
+   "step": 400,
+   "split": "train",
+   "attempt": 0,
+   "epoch": 0,
+   "loss": 0.81842,
+   "loss_nonfinite": null,
+   "lr": 0.00007579,
+   "loss_by_group": {},
+   "grad_norm_vlm": 0,
+   "grad_norm_action": 1.2532,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 600
+  },
+  {
+   "step": 400,
+   "split": "val",
+   "attempt": 0,
+   "epoch": 0,
+   "loss": 0.96144,
+   "loss_nonfinite": null,
+   "lr": 0.00007579,
+   "loss_by_group": {
+    "arm": 1.05758,
+    "base": 0.67301,
+    "hand": 1.24987
+   },
+   "grad_norm_vlm": null,
+   "grad_norm_action": null,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 600
+  },
+  {
+   "step": 500,
+   "split": "train",
+   "attempt": 0,
+   "epoch": 1,
+   "loss": 0.73867,
+   "loss_nonfinite": null,
+   "lr": 0.00007071,
+   "loss_by_group": {},
+   "grad_norm_vlm": 0,
+   "grad_norm_action": 1.8589,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 750
+  },
+  {
+   "step": 600,
+   "split": "train",
+   "attempt": 0,
+   "epoch": 1,
+   "loss": 0.66158,
+   "loss_nonfinite": null,
+   "lr": 0.00006598,
+   "loss_by_group": {},
+   "grad_norm_vlm": 0,
+   "grad_norm_action": 2.4346,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 900
+  },
+  {
+   "step": 600,
+   "split": "val",
+   "attempt": 0,
+   "epoch": 1,
+   "loss": 0.79756,
+   "loss_nonfinite": null,
+   "lr": 0.00006598,
+   "loss_by_group": {
+    "arm": 0.87732,
+    "base": 0.55829,
+    "hand": 1.03683
+   },
+   "grad_norm_vlm": null,
+   "grad_norm_action": null,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 900
+  },
+  {
+   "step": 700,
+   "split": "train",
+   "attempt": 0,
+   "epoch": 1,
+   "loss": 0.60019,
+   "loss_nonfinite": null,
+   "lr": 0.00006156,
+   "loss_by_group": {},
+   "grad_norm_vlm": 0,
+   "grad_norm_action": 1.6127,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 1050
+  },
+  {
+   "step": 800,
+   "split": "train",
+   "attempt": 0,
+   "epoch": 1,
+   "loss": 0.53728,
+   "loss_nonfinite": null,
+   "lr": 0.00005743,
+   "loss_by_group": {},
+   "grad_norm_vlm": 0,
+   "grad_norm_action": 1.3658,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 1200
+  },
+  {
+   "step": 800,
+   "split": "val",
+   "attempt": 0,
+   "epoch": 1,
+   "loss": 0.66651,
+   "loss_nonfinite": null,
+   "lr": 0.00005743,
+   "loss_by_group": {
+    "arm": 0.73316,
+    "base": 0.46656,
+    "hand": 0.86646
+   },
+   "grad_norm_vlm": null,
+   "grad_norm_action": null,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 1200
+  },
+  {
+   "step": 900,
+   "split": "train",
+   "attempt": 0,
+   "epoch": 1,
+   "loss": 0.47734,
+   "loss_nonfinite": null,
+   "lr": 0.00005359,
+   "loss_by_group": {},
+   "grad_norm_vlm": 0,
+   "grad_norm_action": 1.0515,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 1350
+  },
+  {
+   "step": 1000,
+   "split": "train",
+   "attempt": 0,
+   "epoch": 2,
+   "loss": 0.43873,
+   "loss_nonfinite": null,
+   "lr": 0.00005,
+   "loss_by_group": {},
+   "grad_norm_vlm": 0,
+   "grad_norm_action": 2.4531,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 1500
+  },
+  {
+   "step": 1000,
+   "split": "val",
+   "attempt": 0,
+   "epoch": 2,
+   "loss": 0.55709,
+   "loss_nonfinite": null,
+   "lr": 0.00005,
+   "loss_by_group": {
+    "arm": 0.6128,
+    "base": 0.38996,
+    "hand": 0.72422
+   },
+   "grad_norm_vlm": null,
+   "grad_norm_action": null,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 1500
+  },
+  {
+   "step": 1100,
+   "split": "train",
+   "attempt": 0,
+   "epoch": 2,
+   "loss": 0.40438,
+   "loss_nonfinite": null,
+   "lr": 0.00004665,
+   "loss_by_group": {},
+   "grad_norm_vlm": 0,
+   "grad_norm_action": 2.1088,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 1650
+  },
+  {
+   "step": 1200,
+   "split": "train",
+   "attempt": 0,
+   "epoch": 2,
+   "loss": 0.37056,
+   "loss_nonfinite": null,
+   "lr": 0.00004353,
+   "loss_by_group": {},
+   "grad_norm_vlm": 0,
+   "grad_norm_action": 1.1758,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 1800
+  },
+  {
+   "step": 1200,
+   "split": "val",
+   "attempt": 0,
+   "epoch": 2,
+   "loss": 0.48379,
+   "loss_nonfinite": null,
+   "lr": 0.00004353,
+   "loss_by_group": {
+    "arm": 0.53217,
+    "base": 0.33865,
+    "hand": 0.62893
+   },
+   "grad_norm_vlm": null,
+   "grad_norm_action": null,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 1800
+  },
+  {
+   "step": 1300,
+   "split": "train",
+   "attempt": 0,
+   "epoch": 2,
+   "loss": 0.34412,
+   "loss_nonfinite": null,
+   "lr": 0.00004061,
+   "loss_by_group": {},
+   "grad_norm_vlm": 0,
+   "grad_norm_action": 2.1096,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 1950
+  },
+  {
+   "step": 1400,
+   "split": "train",
+   "attempt": 0,
+   "epoch": 2,
+   "loss": 0.31363,
+   "loss_nonfinite": null,
+   "lr": 0.00003789,
+   "loss_by_group": {},
+   "grad_norm_vlm": 0,
+   "grad_norm_action": 1.0321,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 2100
+  },
+  {
+   "step": 1400,
+   "split": "val",
+   "attempt": 0,
+   "epoch": 2,
+   "loss": 0.41679,
+   "loss_nonfinite": null,
+   "lr": 0.00003789,
+   "loss_by_group": {
+    "arm": 0.45847,
+    "base": 0.29175,
+    "hand": 0.54183
+   },
+   "grad_norm_vlm": null,
+   "grad_norm_action": null,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 2100
+  },
+  {
+   "step": 1500,
+   "split": "train",
+   "attempt": 0,
+   "epoch": 3,
+   "loss": 0.29221,
+   "loss_nonfinite": null,
+   "lr": 0.00003536,
+   "loss_by_group": {},
+   "grad_norm_vlm": 0,
+   "grad_norm_action": 1.4932,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 2250
+  },
+  {
+   "step": 1600,
+   "split": "train",
+   "attempt": 0,
+   "epoch": 3,
+   "loss": 0.26225,
+   "loss_nonfinite": null,
+   "lr": 0.00003299,
+   "loss_by_group": {},
+   "grad_norm_vlm": 0,
+   "grad_norm_action": 2.1693,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 2400
+  },
+  {
+   "step": 1600,
+   "split": "val",
+   "attempt": 0,
+   "epoch": 3,
+   "loss": 0.37734,
+   "loss_nonfinite": null,
+   "lr": 0.00003299,
+   "loss_by_group": {
+    "arm": 0.41507,
+    "base": 0.26414,
+    "hand": 0.49054
+   },
+   "grad_norm_vlm": null,
+   "grad_norm_action": null,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 2400
+  },
+  {
+   "step": 1700,
+   "split": "train",
+   "attempt": 0,
+   "epoch": 3,
+   "loss": 0.26179,
+   "loss_nonfinite": null,
+   "lr": 0.00003078,
+   "loss_by_group": {},
+   "grad_norm_vlm": 0,
+   "grad_norm_action": 1.3881,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 2550
+  },
+  {
+   "step": 1800,
+   "split": "train",
+   "attempt": 0,
+   "epoch": 3,
+   "loss": 0.23255,
+   "loss_nonfinite": null,
+   "lr": 0.00002872,
+   "loss_by_group": {},
+   "grad_norm_vlm": 0,
+   "grad_norm_action": 2.4326,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 2700
+  },
+  {
+   "step": 1800,
+   "split": "val",
+   "attempt": 0,
+   "epoch": 3,
+   "loss": 0.33439,
+   "loss_nonfinite": null,
+   "lr": 0.00002872,
+   "loss_by_group": {
+    "arm": 0.36783,
+    "base": 0.23407,
+    "hand": 0.43471
+   },
+   "grad_norm_vlm": null,
+   "grad_norm_action": null,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 2700
+  },
+  {
+   "step": 1900,
+   "split": "train",
+   "attempt": 0,
+   "epoch": 3,
+   "loss": 0.22961,
+   "loss_nonfinite": null,
+   "lr": 0.00002679,
+   "loss_by_group": {},
+   "grad_norm_vlm": 0,
+   "grad_norm_action": 0.9535,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 2850
+  }
+ ],
+ "- /experiments/exp_BFAIL/metrics?split=val&every=400": [
+  {
+   "step": 0,
+   "split": "val",
+   "attempt": 0,
+   "epoch": 0,
+   "loss": 1.4586,
+   "loss_nonfinite": null,
+   "lr": 0.0001,
+   "loss_by_group": {
+    "arm": 1.60446,
+    "base": 1.02102,
+    "hand": 1.89618
+   },
+   "grad_norm_vlm": null,
+   "grad_norm_action": null,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 0
+  },
+  {
+   "step": 400,
+   "split": "val",
+   "attempt": 0,
+   "epoch": 0,
+   "loss": 0.96233,
+   "loss_nonfinite": null,
+   "lr": 0.00007579,
+   "loss_by_group": {
+    "arm": 1.05856,
+    "base": 0.67363,
+    "hand": 1.25103
+   },
+   "grad_norm_vlm": null,
+   "grad_norm_action": null,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 600
+  },
+  {
+   "step": 800,
+   "split": "val",
+   "attempt": 0,
+   "epoch": 1,
+   "loss": 0.66618,
+   "loss_nonfinite": null,
+   "lr": 0.00005743,
+   "loss_by_group": {
+    "arm": 0.7328,
+    "base": 0.46633,
+    "hand": 0.86603
+   },
+   "grad_norm_vlm": null,
+   "grad_norm_action": null,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 1200
+  },
+  {
+   "step": 1200,
+   "split": "val",
+   "attempt": 0,
+   "epoch": 2,
+   "loss": 0.48441,
+   "loss_nonfinite": null,
+   "lr": 0.00004353,
+   "loss_by_group": {
+    "arm": 0.53285,
+    "base": 0.33909,
+    "hand": 0.62973
+   },
+   "grad_norm_vlm": null,
+   "grad_norm_action": null,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 1800
+  },
+  {
+   "step": 1600,
+   "split": "val",
+   "attempt": 0,
+   "epoch": 3,
+   "loss": 0.46038,
+   "loss_nonfinite": null,
+   "lr": 0.00003299,
+   "loss_by_group": {
+    "arm": 0.50642,
+    "base": 0.32227,
+    "hand": 0.59849
+   },
+   "grad_norm_vlm": null,
+   "grad_norm_action": null,
+   "vram_gb": null,
+   "throughput": null,
+   "wall_time_s": 2400
+  }
+ ],
+ "- /experiments/exp_BFAIL/diagnoses": {
+  "experiment_id": "exp_BFAIL",
+  "config_sha256": [
+   "ccfd44bbc3b23f27cad1cc0f192e54da54a84e025eb072cd69064f67f326062b"
+  ],
+  "checkpoint_ids": [
+   "ckpt_BFAIL"
+  ],
+  "summary": {
+   "ran": true,
+   "fired": 1,
+   "clean": 10,
+   "skipped": 1,
+   "partial": 0,
+   "not_run": 0
+  },
+  "codes": [
+   {
+    "code": "T1",
+    "family": "F-TRAIN",
+    "status": "clean",
+    "findings": [],
+    "skipped": []
+   },
+   {
+    "code": "T2",
+    "family": "F-TRAIN",
+    "status": "clean",
+    "findings": [],
+    "skipped": []
+   },
+   {
+    "code": "T3",
+    "family": "F-TRAIN",
+    "status": "fired",
+    "findings": [
+     {
+      "start_step": 1400,
+      "group": null,
+      "dim": null,
+      "value": 3,
+      "value_nonfinite": null,
+      "threshold": null,
+      "stop_job": false,
+      "checkpoint_id": "ckpt_BFAIL"
+     }
+    ],
+    "skipped": []
+   },
+   {
+    "code": "T4",
+    "family": "F-TRAIN",
+    "status": "clean",
+    "findings": [],
+    "skipped": []
+   },
+   {
+    "code": "T5",
+    "family": "F-TRAIN",
+    "status": "clean",
+    "findings": [],
+    "skipped": []
+   },
+   {
+    "code": "T6",
+    "family": "F-TRAIN",
+    "status": "clean",
+    "findings": [],
+    "skipped": []
+   },
+   {
+    "code": "T7",
+    "family": "F-TRAIN",
+    "status": "skipped",
+    "findings": [],
+    "skipped": [
+     {
+      "code": "T7",
+      "reason": "checkpoint không có checkpoint cha nên không có P4 để so (T7)"
+     }
+    ]
+   },
+   {
+    "code": "T8",
+    "family": "F-TRAIN",
+    "status": "clean",
+    "findings": [],
+    "skipped": []
+   },
+   {
+    "code": "O1",
+    "family": "F-OFF",
+    "status": "clean",
+    "findings": [],
+    "skipped": []
+   },
+   {
+    "code": "O2",
+    "family": "F-OFF",
+    "status": "clean",
+    "findings": [],
+    "skipped": []
+   },
+   {
+    "code": "O3",
+    "family": "F-OFF",
+    "status": "clean",
+    "findings": [],
+    "skipped": []
+   },
+   {
+    "code": "O4",
+    "family": "F-OFF",
+    "status": "clean",
+    "findings": [],
+    "skipped": []
+   }
+  ]
+ },
+ "- /experiments/exp_B/diagnoses": {
+  "experiment_id": "exp_B",
+  "config_sha256": [],
+  "checkpoint_ids": [],
+  "summary": {
+   "ran": false,
+   "fired": 0,
+   "clean": 0,
+   "skipped": 0,
+   "partial": 0,
+   "not_run": 12
+  },
+  "codes": [
+   {
+    "code": "T1",
+    "family": "F-TRAIN",
+    "status": "not_run",
+    "findings": [],
+    "skipped": []
+   },
+   {
+    "code": "T2",
+    "family": "F-TRAIN",
+    "status": "not_run",
+    "findings": [],
+    "skipped": []
+   },
+   {
+    "code": "T3",
+    "family": "F-TRAIN",
+    "status": "not_run",
+    "findings": [],
+    "skipped": []
+   },
+   {
+    "code": "T4",
+    "family": "F-TRAIN",
+    "status": "not_run",
+    "findings": [],
+    "skipped": []
+   },
+   {
+    "code": "T5",
+    "family": "F-TRAIN",
+    "status": "not_run",
+    "findings": [],
+    "skipped": []
+   },
+   {
+    "code": "T6",
+    "family": "F-TRAIN",
+    "status": "not_run",
+    "findings": [],
+    "skipped": []
+   },
+   {
+    "code": "T7",
+    "family": "F-TRAIN",
+    "status": "not_run",
+    "findings": [],
+    "skipped": []
+   },
+   {
+    "code": "T8",
+    "family": "F-TRAIN",
+    "status": "not_run",
+    "findings": [],
+    "skipped": []
+   },
+   {
+    "code": "O1",
+    "family": "F-OFF",
+    "status": "not_run",
+    "findings": [],
+    "skipped": []
+   },
+   {
+    "code": "O2",
+    "family": "F-OFF",
+    "status": "not_run",
+    "findings": [],
+    "skipped": []
+   },
+   {
+    "code": "O3",
+    "family": "F-OFF",
+    "status": "not_run",
+    "findings": [],
+    "skipped": []
+   },
+   {
+    "code": "O4",
+    "family": "F-OFF",
+    "status": "not_run",
+    "findings": [],
+    "skipped": []
+   }
+  ]
+ },
+ "- /experiments/exp_B/probes": [
+  {
+   "probe": "P1",
+   "checkpoint_id": "ckpt_B",
+   "parent_checkpoint_id": null,
+   "dataset_sha256": "b7a6e0c9ad9d11695c66fb2b7b5a898e37a213bb60d0a81e11623b7b975d9964",
+   "payload": {
+    "accuracy_by_question_type": {
+     "object": 0.94,
+     "step": 0.8899999999999999,
+     "table": 0.9199999999999999
+    },
+    "checkpoint_id": "ckpt_B",
+    "dataset_sha256": "b7a6e0c9ad9d11695c66fb2b7b5a898e37a213bb60d0a81e11623b7b975d9964",
+    "probe": "P1"
+   },
+   "origin": "mock"
+  },
+  {
+   "probe": "P3",
+   "checkpoint_id": "ckpt_B",
+   "parent_checkpoint_id": null,
+   "dataset_sha256": "b7a6e0c9ad9d11695c66fb2b7b5a898e37a213bb60d0a81e11623b7b975d9964",
+   "payload": {
+    "checkpoint_id": "ckpt_B",
+    "dataset_sha256": "b7a6e0c9ad9d11695c66fb2b7b5a898e37a213bb60d0a81e11623b7b975d9964",
+    "error_by_chunk_pos": [
+     0.09,
+     0.099,
+     0.11249999999999999
+    ],
+    "error_by_group": {
+     "arm": 0.09,
+     "base": 0.054,
+     "hand": 0.126
+    },
+    "hand_event_offset_steps": 1.5,
+    "out_of_limit_dims": [],
+    "probe": "P3"
+   },
+   "origin": "mock"
+  },
+  {
+   "probe": "P4",
+   "checkpoint_id": "ckpt_B",
+   "parent_checkpoint_id": "ckpt_A",
+   "dataset_sha256": null,
+   "payload": {
+    "checkpoint_id": "ckpt_B",
+    "p1": {
+     "accuracy_by_question_type": {
+      "object": 0.94,
+      "step": 0.8899999999999999,
+      "table": 0.9199999999999999
+     },
+     "checkpoint_id": "ckpt_B",
+     "dataset_sha256": "b7a6e0c9ad9d11695c66fb2b7b5a898e37a213bb60d0a81e11623b7b975d9964",
+     "probe": "P1"
+    },
+    "p3": {
+     "checkpoint_id": "ckpt_B",
+     "dataset_sha256": "b7a6e0c9ad9d11695c66fb2b7b5a898e37a213bb60d0a81e11623b7b975d9964",
+     "error_by_chunk_pos": [
+      0.09,
+      0.099,
+      0.11249999999999999
+     ],
+     "error_by_group": {
+      "arm": 0.09,
+      "base": 0.054,
+      "hand": 0.126
+     },
+     "hand_event_offset_steps": 1.5,
+     "out_of_limit_dims": [],
+     "probe": "P3"
+    },
+    "parent_checkpoint_id": "ckpt_A",
+    "probe": "P4"
+   },
+   "origin": "mock"
+  }
+ ],
+ "- /experiments/exp_B/checkpoints": [
+  {
+   "checkpoint_id": "ckpt_B",
+   "parent_checkpoint_id": "ckpt_A",
+   "release_id": "rel_two_table_v1",
+   "method": "PSI0",
+   "step": 2000,
+   "weights_sha256": "0aa2ff14440ec4b9bdfa959667f8de91c44f917332a7c37795a4c312d88be064",
+   "uri": "mock://checkpoints/exp_B",
+   "is_best": true,
+   "is_latest": true,
+   "train_seed": 102,
+   "origin": "mock"
+  }
+ ]
 }

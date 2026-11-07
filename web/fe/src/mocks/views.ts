@@ -18,6 +18,13 @@ import type {
   DataAllocationRow,
   DatasetRow,
   DecisionRow,
+  CheckpointRow,
+  DiagnosisSummary,
+  ExperimentRow,
+  ProbeRow,
+  TrainCodeStatus,
+  TrainDiagnosisView,
+  TrainingMetricRow,
   DefectBenchGroup,
   DefectRate,
   DefectScoreboard,
@@ -82,6 +89,17 @@ import type {
 
 const ORIGIN = "mock" as const;
 
+/** The twelve codes of the train diagnosis (DA-08). */
+const TRAIN_CODES = [
+  ...Array.from({ length: 8 }, (_, i) => `T${i + 1}`),
+  ...Array.from({ length: 4 }, (_, i) => `O${i + 1}`),
+];
+
+/** A skip names a code or one branch of it (`T8a`), never another code. */
+function skipOf(skipCode: string, code: string): boolean {
+  return skipCode === code || (skipCode.startsWith(code) && !/^\d/.test(skipCode.slice(code.length)));
+}
+
 type BenchLayer = "code" | "agent";
 const BENCH_LAYERS: readonly BenchLayer[] = ["code", "agent"];
 
@@ -138,6 +156,111 @@ export class MockViews {
       reason: d.reason ?? null,
       source_action_id: d.source_action_id ?? null,
       origin: ORIGIN,
+    }));
+  }
+
+  // ============================================================== M5
+
+  private experiment(id: string) {
+    return this.d.experiments.find((x) => x.experiment_code === id);
+  }
+
+  /** The experiment a telemetry line belongs to: by RunPlan, else by checkpoint (fwsync). */
+  private metricExperiment(m: { run_plan_id: string; checkpoint_id: string }): string | undefined {
+    return (
+      this.d.experiments.find((x) => x.run_plan_ref === m.run_plan_id)?.experiment_code ??
+      this.d.checkpoints.find((c) => c.checkpoint_ref === m.checkpoint_id)?.experiment_code
+    );
+  }
+
+  experiments(): ExperimentRow[] {
+    return this.d.experiments.map((x) => {
+      const plan = this.d.runPlans.find((p) => p.run_plan_ref === x.run_plan_ref);
+      return {
+        experiment_id: x.experiment_code, task_id: x.task_id, branch: x.branch, method: x.method,
+        hypothesis: x.hypothesis ?? null, status: x.status, train_seed: x.train_seed ?? null,
+        hyperparams: x.hyperparams ?? {}, base_source_id: x.base_source_ref ?? null,
+        started_at: x.started_at ?? null, finished_at: x.finished_at ?? null,
+        run_plan: plan === undefined ? null : {
+          id: plan.run_plan_ref, purpose: plan.purpose, config_sha256: plan.config_sha256,
+          lock_uri: plan.lock_uri, frozen_at: plan.frozen_at, seed_range: plan.seed_range ?? null,
+        },
+        releases: this.d.experimentDatasets
+          .filter((d) => d.experiment_code === x.experiment_code)
+          .map((d) => ({ release_id: d.release_ref, mix_weight: d.mix_weight, episodes_used: d.episodes_used ?? null })),
+        best_checkpoint_id: this.d.checkpoints.find((c) => c.experiment_code === x.experiment_code && c.is_best)?.checkpoint_ref ?? null,
+        metric_rows: this.d.trainingMetrics.filter((m) => this.metricExperiment(m) === x.experiment_code).length,
+        diagnosis: this.diagnoses(x.experiment_code)?.summary ?? null,
+        origin: ORIGIN,
+      };
+    });
+  }
+
+  metrics(id: string, split: string | null, every: number | null): TrainingMetricRow[] | null {
+    if (this.experiment(id) === undefined) return null;
+    return this.d.trainingMetrics
+      .filter((m) => this.metricExperiment(m) === id && (split === null || m.split === split))
+      .filter((m) => every === null || every <= 1 || m.step % every === 0)
+      .map((m) => ({
+        step: m.step, split: m.split, attempt: m.attempt, epoch: m.epoch,
+        loss: typeof m.loss === "number" ? m.loss : null,
+        loss_nonfinite: typeof m.loss === "number" ? null : m.loss,
+        lr: m.lr, loss_by_group: m.loss_by_group ?? {},
+        grad_norm_vlm: m.grad_norm_vlm ?? null, grad_norm_action: m.grad_norm_action ?? null,
+        vram_gb: m.vram_gb ?? null, throughput: m.throughput ?? null, wall_time_s: m.wall_time_s,
+      }));
+  }
+
+  /** T1–T8, O1–O4: a code with no finding is clean only if a diagnosis ran and did not skip it. */
+  diagnoses(id: string): TrainDiagnosisView | null {
+    if (this.experiment(id) === undefined) return null;
+    const mine = new Set(this.d.checkpoints.filter((c) => c.experiment_code === id).map((c) => c.checkpoint_ref));
+    const runs = this.d.trainDiagnoses.filter((t) => mine.has(t.checkpoint_id));
+    const findings = runs.flatMap((r) => r.findings.map((f) => ({ ...f, checkpoint_id: r.checkpoint_id })));
+    const skips = runs.flatMap((r) => r.skipped);
+    const ran = findings.length + skips.length > 0;
+    const codes = TRAIN_CODES.map((code) => {
+      const fired = findings.filter((f) => f.code === code).map((f) => ({
+        start_step: f.start_step ?? 0, group: f.group ?? null, dim: f.dim ?? null,
+        value: typeof f.value === "number" ? f.value : null,
+        value_nonfinite: typeof f.value === "string" ? f.value : null,
+        threshold: f.threshold ?? null, stop_job: f.stop_job ?? false, checkpoint_id: f.checkpoint_id,
+      }));
+      const skipped = skips.filter((k) => skipOf(k.code, code)).map((k) => ({ code: k.code, reason: k.reason }));
+      const status: TrainCodeStatus = !ran ? "not_run" : fired.length ? "fired"
+        : skipped.some((k) => k.code === code) ? "skipped" : skipped.length ? "partial" : "clean";
+      return { code, family: code.startsWith("T") ? "F-TRAIN" as const : "F-OFF" as const, status, findings: fired, skipped };
+    });
+    const count = (s: TrainCodeStatus) => codes.filter((c) => c.status === s).length;
+    const summary: DiagnosisSummary = {
+      ran, fired: count("fired"), clean: count("clean"), skipped: count("skipped"),
+      partial: count("partial"), not_run: count("not_run"),
+    };
+    return {
+      experiment_id: id,
+      config_sha256: [...new Set(runs.map((r) => r.config_sha256))].sort(),
+      checkpoint_ids: [...new Set(runs.map((r) => r.checkpoint_id))].sort(),
+      summary,
+      codes,
+    };
+  }
+
+  probes(id: string): ProbeRow[] | null {
+    if (this.experiment(id) === undefined) return null;
+    const mine = new Set(this.d.checkpoints.filter((c) => c.experiment_code === id).map((c) => c.checkpoint_ref));
+    return this.d.probes.filter((p) => mine.has(p.checkpoint_id)).map((p) => ({
+      probe: p.probe, checkpoint_id: p.checkpoint_id, parent_checkpoint_id: p.parent_checkpoint_id ?? null,
+      dataset_sha256: p.dataset_sha256 ?? null, payload: p as Record<string, unknown>, origin: ORIGIN,
+    }));
+  }
+
+  checkpoints(id: string): CheckpointRow[] | null {
+    if (this.experiment(id) === undefined) return null;
+    return this.d.checkpoints.filter((c) => c.experiment_code === id).map((c) => ({
+      checkpoint_id: c.checkpoint_ref, parent_checkpoint_id: c.parent_checkpoint_ref ?? null,
+      release_id: c.release_ref ?? null, method: c.method, step: c.step ?? null,
+      weights_sha256: c.weights_sha256, uri: c.uri, is_best: Boolean(c.is_best),
+      is_latest: Boolean(c.is_latest), train_seed: c.train_seed ?? null, origin: ORIGIN,
     }));
   }
 

@@ -47,8 +47,8 @@ describe("M7 screen", () => {
   });
 
   it("labels screens that are not built with their milestone", () => {
-    renderApp("/huan-luyen");
-    expect(screen.getByText(/M5 · Huấn luyện chưa dựng/)).toBeTruthy();
+    renderApp("/release");
+    expect(screen.getByText(/M4 · Release chưa dựng/)).toBeTruthy();
   });
 });
 

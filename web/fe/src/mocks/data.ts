@@ -194,9 +194,14 @@ export interface RawCheckpoint {
   checkpoint_ref: string;
   experiment_code: string;
   is_best: boolean;
+  is_latest: boolean;
   method: string;
+  parent_checkpoint_ref: string | null;
   release_ref: string | null;
+  step: number | null;
   train_seed: number | null;
+  uri: string;
+  weights_sha256: string;
 }
 
 export interface RawExperiment {
@@ -208,6 +213,46 @@ export interface RawExperiment {
   task_id: "two_table" | "tray";
   train_seed: number | null;
   status: string;
+  run_plan_ref: string | null;
+  base_source_ref: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface RawRunPlan {
+  run_plan_ref: string;
+  purpose: string;
+  config_sha256: string;
+  lock_uri: string;
+  frozen_at: string;
+  seed_range: string | null;
+}
+
+/** One line of `metrics.jsonl` (contract `TrainingMetric`). */
+export interface RawTrainingMetric {
+  run_plan_id: string;
+  checkpoint_id: string;
+  attempt: number;
+  step: number;
+  epoch: number;
+  split: "train" | "val";
+  loss: number | "NaN" | "Infinity" | "-Infinity";
+  lr: number;
+  loss_by_group?: Record<string, number>;
+  grad_norm_vlm?: number | null;
+  grad_norm_action?: number | null;
+  vram_gb?: number | null;
+  throughput?: number | null;
+  wall_time_s: number;
+}
+
+/** ProbeP1..P4 as written; P4 has a parent and no dataset hash of its own. */
+export interface RawProbe {
+  probe: "P1" | "P2" | "P3" | "P4";
+  checkpoint_id: string;
+  parent_checkpoint_id?: string | null;
+  dataset_sha256?: string | null;
+  [field: string]: unknown;
 }
 
 export interface RawExperimentDataset {
@@ -316,7 +361,15 @@ export interface RawPriceBook {
 export interface RawTrainDiagnosis {
   checkpoint_id: string;
   config_sha256: string;
-  findings: Array<{ code: string; value?: number | null; start_step?: number | null }>;
+  findings: Array<{
+    code: string;
+    value?: number | string | null;
+    start_step?: number | null;
+    group?: string | null;
+    dim?: number | null;
+    threshold?: number | null;
+    stop_job?: boolean;
+  }>;
   skipped: Array<{ code: string; reason: string }>;
 }
 
@@ -405,6 +458,9 @@ export interface MockData {
   trainDiagnoses: RawTrainDiagnosis[];
   decisions: RawDecision[];
   bench: RawBenchResult | null;
+  runPlans: RawRunPlan[];
+  trainingMetrics: RawTrainingMetric[];
+  probes: RawProbe[];
 }
 
 export function loadMockData(): MockData {
@@ -431,6 +487,9 @@ export function loadMockData(): MockData {
     trainDiagnoses: table("train_diagnoses"),
     decisions: table("decisions"),
     bench: withLock(bench()),
+    runPlans: table("run_plans"),
+    trainingMetrics: table("training_metrics"),
+    probes: table("probes"),
   };
 }
 

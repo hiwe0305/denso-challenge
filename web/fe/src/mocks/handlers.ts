@@ -132,6 +132,26 @@ export function createHandlers(views = new MockViews(loadMockData())) {
 
   return [
     // ------------------------------------------------------------ M7
+    // M5
+    http.get(url("/experiments"), ({ request }) => HttpResponse.json(page(views.experiments(), request))),
+    http.get(url("/experiment-drafts"), ({ request }) => HttpResponse.json(page([], request))),
+    http.get(url("/experiments/:id/metrics"), ({ params, request }) => {
+      const q = new URL(request.url).searchParams;
+      const split = q.get("split");
+      if (split !== null && split !== "train" && split !== "val") {
+        return error(422, "BAD_SPLIT", `split ${split} không hợp lệ; chỉ train, val`);
+      }
+      const every = q.get("every") === null ? null : Number(q.get("every"));
+      if (every !== null && !(every >= 1)) return error(422, "BAD_EVERY", "every phải >= 1");
+      return json(views.metrics(String(params.id), split, every), "thí nghiệm");
+    }),
+    http.get(url("/experiments/:id/diagnoses"), ({ params }) =>
+      json(views.diagnoses(String(params.id)), "thí nghiệm")),
+    http.get(url("/experiments/:id/probes"), ({ params }) =>
+      json(views.probes(String(params.id)), "thí nghiệm")),
+    http.get(url("/experiments/:id/checkpoints"), ({ params }) =>
+      json(views.checkpoints(String(params.id)), "thí nghiệm")),
+
     // M3
     http.get(url("/defects/scoreboard"), () => HttpResponse.json(views.defectScoreboard())),
     http.get(url("/defects/scores"), ({ request }) => HttpResponse.json(page(views.defectScores(), request))),
