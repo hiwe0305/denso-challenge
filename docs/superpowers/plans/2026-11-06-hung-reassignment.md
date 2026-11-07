@@ -33,7 +33,7 @@ Thư mục của Hưng trên `master` chỉ có file khung. `uv.lock` chưa có 
 | # | Quyết định |
 |---|---|
 | D1 | Hiếu và Claude làm ba story; làm ở máy local, chưa push |
-| D2 | **Bỏ bước che danh tính**, chỉ cho mẫu EgoDex công bố (`egodex`, `public`): mở rộng "Waive for EgoDex" của DA-30 (4/11) sang pipeline DA-04. Episode giữ `deid_status = raw`, Source ghi lý do miễn. Video tự quay và mọi nguồn khác vẫn bị cổng `deid_blocks_annotate` chặn cho tới khi có bước che (sau demo). Đây là **ngoại lệ** của bất biến "video egocentric phải qua bước che danh tính trước mọi bước xử lý khác" (CLAUDE.md, 03 mục 4.3, design mục 6.6). Ngoại lệ **chờ Product Owner ghi vào 03 hoặc design** kèm dòng change log (đề xuất ở mục 9); bất biến vẫn giữ cho mọi nguồn khác. DA-04 nhiệm vụ 2 thu về: cổng và miễn trừ, không làm mờ |
+| D2 | **Bỏ bước che danh tính**, chỉ cho mẫu EgoDex công bố (`egodex`, `public`): mở rộng "Waive for EgoDex" của DA-30 (4/11) sang pipeline DA-04. Episode giữ `deid_status = raw`, Source ghi lý do miễn. Video tự quay và mọi nguồn khác vẫn bị cổng `deid_blocks_annotate` chặn cho tới khi có bước che (sau demo). Đây là **ngoại lệ** của bất biến "video egocentric phải qua bước che danh tính trước mọi bước xử lý khác" (CLAUDE.md, 03 mục 4.3, design mục 6.6). Ngoại lệ đã ghi vào 03 (bản 1.3, mục 4.3), design (mục 6.6) và CLAUDE.md ngày 7/11/2026 (mục 9); bất biến vẫn giữ cho mọi nguồn khác. DA-04 nhiệm vụ 2 thu về: cổng và miễn trừ, không làm mờ |
 | D3 | **Làm đủ, không cắt phần nào khác**: DA-04 nhiệm vụ 5, 7; DA-18 nhiệm vụ 3; DA-20 nhiệm vụ 6 (Qwen3.5-4B, thay câu trả lời "không" của Q-M ngày 3/11), 7 (log thật); vòng thử model gán nhãn |
 | D4 | Mỗi story một nhánh local, một worktree từ `origin/master`; thêm `chore-egocentric-deps` |
 | D5 | Pose E-A: MediaPipe Hands cộng visual odometry đơn mắt của OpenCV, gắn `pseudo` |
@@ -196,3 +196,5 @@ D2 đang là quyết định trong chat và trong plan này. Còn 03 và design 
 | CLAUDE.md | Bất biến "Video egocentric phải qua bước che danh tính…" | Thêm "trừ mẫu EgoDex công bố (03 mục 4.3)" |
 
 Chưa sửa ba file này thì PR #152 vẫn đúng code: cổng chỉ miễn cho cặp (`egodex`, `public`) và ghi lý do miễn. Còn tài liệu gốc thì vẫn nói một điều khác với code.
+
+**Đã áp dụng 7/11/2026** (nhánh `docs-d2-deid-exception`): 03 bản 1.3 mục 4.3, design mục 6.6, CLAUDE.md. Câu chữ sửa theo code đã merge ở #152, #153: miễn chỉ khi `source.json` ghi `deid_waiver` và `deid_waiver_manifest`, và mọi mp4 của nguồn khớp sha256 trong `egodex_pin.json`.
