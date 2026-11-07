@@ -46,13 +46,17 @@ def test_a_clean_episode_passes_every_check(cfg: EgoConfig) -> None:
     ({"gate_passed": False}, "reject", "deid_gate"),
     ({"instruction": " "}, "reject", "instruction"),
     ({"video_frames": FRAMES - 3}, "reject", "video_frames"),
-    ({"segments": ()}, "reject", "segments"),
+    ({"segments": SEGMENTS[:1]}, "reject", "segment_count"),
     ({"unresolved_share": 0.5}, "flag", "segment_ambiguous"),
 ])
 def test_each_check_fails_as_the_config_says(
     cfg: EgoConfig, changes: dict[str, object], decision: str, check: str
 ) -> None:
     assert failed(cfg, **changes) == (decision, [check])
+
+
+def test_no_segment_fails_both_segment_checks(cfg: EgoConfig) -> None:
+    assert failed(cfg, segments=()) == ("reject", ["segments", "segment_count"])
 
 
 def test_a_short_episode_is_rejected(cfg: EgoConfig) -> None:
