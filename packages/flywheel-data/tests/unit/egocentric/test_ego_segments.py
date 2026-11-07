@@ -104,6 +104,31 @@ def test_without_an_answer_the_rule_stays_and_is_counted(cfg: EgoConfig) -> None
     assert cut.unresolved_share == 1.0 and {s.label_source for s in cut.segments} == {"rule"}
 
 
+class EdgeSuggester:
+    """Answers the first or the last frame it is shown, as RoboBrain did 6 times in 13."""
+
+    def __init__(self, last: bool = False) -> None:
+        self.last = last
+
+    def suggest(self, images: Sequence[bytes], frames: Sequence[int], event: str,
+                instruction: str) -> int | None:
+        return frames[-1] if self.last else frames[0]
+
+
+@pytest.mark.parametrize("last", [False, True])
+def test_an_answer_at_the_window_edge_is_no_answer(cfg: EgoConfig, last: bool) -> None:
+    """Review of PR 152: frame 0 from the model left ep_603d1475 a single pick."""
+    rule = cut_episode(low_confidence(synthetic_pose()), 30.0, "pick_place", cfg.segment,
+                       instruction="", obj="cup")
+    cut = cut_episode(low_confidence(synthetic_pose()), 30.0, "pick_place", cfg.segment,
+                      instruction="", obj="cup", suggester=EdgeSuggester(last),
+                      frames_of=frames_of)
+    assert [e.frame for e in cut.events] == [e.frame for e in rule.events]
+    assert all(e.source == "rule" and "model_at_edge" in e.reasons
+               and e.model_frame is not None for e in cut.events)
+    assert cut.unresolved_share == 1.0 and len(cut.segments) == 2 and cut.models == {}
+
+
 def test_the_labeler_writes_each_sentence(cfg: EgoConfig) -> None:
     cut = cut_episode(synthetic_pose(), 30.0, "pick_place", cfg.segment, instruction="",
                       obj="cup", labeler=FakeLabeler(), frames_of=frames_of,

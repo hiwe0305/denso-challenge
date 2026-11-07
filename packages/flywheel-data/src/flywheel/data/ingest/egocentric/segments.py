@@ -14,8 +14,11 @@ An event is *ambiguous* when its dwell's mean pose confidence is under
 are active, or no aperture change says what it is (the longest dwell, or the slowest
 frame, stands in for a missing grasp). Ambiguous events go to the `SegmentSuggester`
 (RoboBrain) with `model_frames` frames around them, when one is given; its frame then
-replaces the rule's (`label_source = model`). Unresolved ones stay as the rule put
-them and QA counts them (`segment_ambiguous`).
+replaces the rule's (`label_source = model`). An answer on the first or last frame shown
+is no answer: the model did not find the event inside the window, and on the real run
+6 of 13 answers were the first image (position bias; review of PR 152). Such an answer
+is kept in `model_frame` with the reason `model_at_edge` and the event stays the rule's.
+Unresolved ones stay as the rule put them and QA counts them (`segment_ambiguous`).
 
 Layouts (configs/data/egocentric.yaml `segment.steps`):
 
@@ -297,6 +300,10 @@ def cut_episode(
             hi = min(event.frame + cfg.model_window_frames, frames - 1)
             shown = sorted({int(round(x)) for x in np.linspace(lo, hi, cfg.model_frames)})
             answer = suggester.suggest(frames_of(shown), shown, event.kind, instruction)
+            if answer is not None and answer in (shown[0], shown[-1]):
+                event.model_frame = answer  # kept for the audit, not used
+                event.reasons.append("model_at_edge")
+                answer = None
             if answer is not None:
                 event.model_frame, event.frame, event.source = answer, answer, "model"
                 used["segment_suggester"] = names.get("segment_suggester", "model")
