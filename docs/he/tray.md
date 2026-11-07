@@ -922,6 +922,67 @@ _Đọc theo luật 15.7, luật không đổi sau khi thấy kết quả. Nhãn
 - **Đọc chung:** ảnh lệch có góp phần, nhưng không giải thích được lỗi ở `place`. Nguyên nhân còn lại chính là C chưa học `place`.
 - Eval C, T1, T2 đều đo trên cảnh trơn, khác cảnh train. Trên 20 cảnh train, T1r cho thấy khác biệt này đổi kết quả của các bước trước `place` theo cả hai chiều, nhưng không đổi `place`. Chạy lại eval C với SimReady, hoặc đi tiếp C-max, cần Hiếu quyết.
 
+## 16. Eval C trên cảnh SimReady (chạy lại)
+
+_**[Đã chốt 7/11/2026, Hiếu]** "Chạy lại eval C". Mục này được viết và commit **trước** lô đầu tiên. Story DA-34 nhiệm vụ con 3.8. Chạy trên `rtx3060`, 0 CU, không train._
+
+### 16.1 Vì sao chạy lại, luật đọc
+
+- **Vì sao chạy lại.** Eval C ở mục 13 đo trên cảnh trơn: cây eval thiếu manifest SimReady, nên khay và cảnh được render bằng khối trơn (`visuals_revision` `none`), còn 160 episode của C được ghi với revision `4763fbf` (mục 15.6). T1r (mục 15.8) đã chạy lại 20 cảnh train với SimReady.
+- **Luật không đổi.** Dùng nguyên quy tắc 0 và luật bậc 2 của mục 9 (khối `tier2-rules`, ghim bằng sha256 trong RunPlan bản 2). Chỉ số chính là p_C trên 240 điều kiện mức 1–2 gộp. Mức 0 báo riêng (mục 8.2).
+- **Kết quả cũ.** Mục 13.7 và 14 giữ nguyên làm bản ghi, nhưng **không** dùng để đọc quy tắc 0. Quy tắc 0 đọc trên lần chạy này. `Decision` quy tắc 0 không ký và không đổi verdict ở đây; Hiếu quyết sau khi có kết quả.
+- Không train, không chạy C-max khi chưa có lệnh của Hiếu.
+
+### 16.2 Chạy
+
+Mọi thứ giữ như eval C (mục 13.1), chỉ khác cây mã và cảnh render.
+
+| Mục | Giá trị |
+|---|---|
+| Mã | master `079160d` (sau #157), `git archive` vào `~/denso-da34-master-079160d`, `TREE_SHA` trong cây |
+| Cảnh | `fwdata/simple/tray/simready/` chép nguyên từ `~/denso-da33` (`cp -a`, không symlink, không sửa; `diff -r` trùng), manifest sha256 `eb2886e4…` |
+| RunPlan, điều kiện | Bản 2 `rp_a04c14e79dfd`, 270 điều kiện; dùng lại tập `rp_a04c14e79dfd-2e57f60` của eval C, `conditions.sha256` `b9c38b37…` (`eval_batch` kiểm lại) |
+| Server | Checkpoint C `ckpt_40000`, `Ta` 24, `--rtc`, `127.0.0.1:22185` (container `fw-psi0-psi0-run-41b48a6a5890`, cấu hình trả về sau phần A) |
+| Lô | `eval_batch`, 1 worker, scope `MemoryMax=8G`, `MemorySwapMax=0`, 27 lô 10 episode: mức 1 và 2 xen kẽ, mức 0 cuối; tối đa 3 lần cho mỗi lô |
+| Output | Thư mục mới `~/denso-da34-pool/fwdata/tray/eval/eval-c-simready-rp_a04c14e79dfd`; thư mục của eval C cũ không bị ghi đè |
+| Đọc | `eval_results`, mỗi điều kiện lấy lần xong sớm nhất |
+
+**Chặn theo từng lô.** `--simple-python` của `eval_batch` trỏ tới script vận hành `~/denso-da34-t6/simple-guard.sh` trên máy (không nằm trong repo, không sửa `flywheel_simple`). Trước mỗi lần khởi động client SIMPLE, tức mỗi lô và mỗi lần chạy lại, script kiểm:
+- `visuals_revision(default_manifest_path())` trong cây phải là `4763fbf…`;
+- sha256 của manifest phải là `eb2886e4…`.
+
+Nếu khác, script thoát mã 97 mà không chạy episode nào; sau 3 lần, `eval_batch` dừng cả lô. Mỗi lần kiểm ghi một dòng vào `~/denso-da34-t6/guard.log`. Đã thử cả hai chiều: cây này cho chạy; cây `bb4cef1` không có SimReady bị chặn (revision `none`, mã 97).
+
+### 16.3 Kiểm trước khi chạy
+
+| Kiểm | Kết quả | Ngưỡng |
+|---|---|---|
+| `visuals_revision(default_manifest_path())` trong cây | `4763fbfaa4f8…` | Bằng `4763fbf` |
+| PSNR ở frame 0, phát lại 3 episode train (seed 1279, 1574, 1503) qua client eval của cây này và qua `simple-guard.sh`, cách làm như B2 (mục 15.3) | 34,88 / 34,85 / 34,97 dB, MAE 2,62 / 2,64 / 2,59 (đảo kênh 35,2–35,3); B2 khớp ở cả ba, B1 khớp. Giống từng số với kiểm trước của T1r (mục 15.8). Guard ghi `ok` lúc 04:51:25Z | ≥ 30 dB ở cả ba: **đạt** |
+
+### 16.4 Chỉ số phụ: tư thế cuối của khay so với vùng đích
+
+_Thêm **sau khi thấy T1r**. Đây là chỉ số báo cạnh, **không phải luật đọc**, và không đổi cách đọc quy tắc 0._
+
+- **Lý do.** Ở T1r có 11/20 lượt `L-PLACE-POSE`; khay lệch vùng đích 5,6–18,4 cm.
+  - Phiên điều phối nêu: vùng đích không hiện trong ảnh và bị dịch ngẫu nhiên ±5 cm, ±10° ở mức 1–2 (`POSE_JITTER`, `YAW_JITTER` của [`randomize.py`](../../packages/flywheel-simple/src/flywheel_simple/tray/randomize.py)).
+  - Chỉ số này đo xem lỗi đặt là lệch vị trí hay lệch góc, và lệch bao nhiêu.
+- **Cách tính.** [`place_error`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/place_error.py) tính cho từng rollout mà `eval_results` chọn, theo đúng phép kiểm `_in_target` của bộ chấm:
+  - khoảng cách: |xy cuối của khay − xy đích|;
+  - sai số góc: nhỏ hơn trong hai sai số, so với yaw đích và yaw đích + π, vì khay đối xứng khi quay nửa vòng;
+  - đích dựng lại từ (mức, seed) bằng `sample_episode`; dung sai lấy từ `configs/sim/tray.yaml` (5 cm, 10°).
+  - Chạy lại trên T1r ra đúng: `L-PLACE-POSE` lệch 5,6–18,4 cm; lượt thành công (seed 1038) lệch 1,2 cm, 7,5°, nằm trong dung sai.
+- **Báo cáo.** Trung vị và khoảng 10–90 % của khoảng cách và sai số góc, cùng số rollout trong dung sai, theo từng nhóm:
+  - mỗi mức;
+  - mức 1–2 có `reach_b`;
+  - mức 1–2 theo từng nhãn lỗi.
+
+### 16.5 Báo cáo theo mốc
+
+- Lúc bắt đầu chạy: báo kèm giờ dự kiến xong.
+- Xong mức 1–2: báo số thô.
+- Xong cả lô: báo số thô; viết kết quả, dòng thực đo trong sổ chi phí, mở PR.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -939,3 +1000,4 @@ _Đọc theo luật 15.7, luật không đổi sau khi thấy kết quả. Nhãn
 | 7/11/2026 | Mục 15.7: luật đọc T1r (chạy lại T1 với cảnh SimReady, Hiếu "Oke chạy lại T1 cho tôi"), gồm kiểm trước (revision, PSNR) và so với T1 theo bước ([Đề xuất]), viết trước khi đọc PSNR và trước rollout đầu tiên | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 15.5: kết quả A. A1 khớp: 2783/2783 chunk giống hệt từng bit giữa đường serve và đường train. A2 theo luật là chưa học (`r_place` 2,73; `e_place` 1,47 × các bước đầu), ghi kèm việc vế `r` cũng ≥ 1 ở các bước vòng kín vẫn qua. Server trả về `Ta` 24, `--rtc`. Luật 15.2 không đổi | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 15.8: kết quả T1r. Kiểm trước đạt (revision `4763fbf`, PSNR frame 0 34,9 dB). p_T1r 1/20 (Wilson 0,9–23,6 %); `place` ghép cặp với T1: 1 và 1, không tốt hơn rõ. Đọc theo bảng 15.7: ảnh lệch là một phần nguyên nhân; đọc chung với A: C chưa học `place`. Luật 15.7 không đổi | Hiếu (soạn với Claude) |
+| 7/11/2026 | Mục 16: chạy lại eval C trên cảnh SimReady (Hiếu "Chạy lại eval C"). Viết trước lô đầu tiên: lý do, luật quy tắc 0 và bậc 2 không đổi, kết quả mục 13.7 giữ làm bản ghi nhưng không dùng để đọc quy tắc 0; cây master `079160d` có SimReady, guard revision theo từng lô; kiểm trước đạt (revision `4763fbf`, PSNR frame 0 34,9 dB); chỉ số phụ tư thế cuối của khay so với vùng đích, thêm sau khi thấy T1r, không phải luật | Hiếu (soạn với Claude) |
