@@ -2,7 +2,7 @@
 
 Agent đọc artifact của từng stage (dataset, train, stage 1, stage 3, inference, eval), rồi ra `AgentReport` cùng trang HTML tĩnh để kỹ sư duyệt. Code tính mọi con số. Model chỉ xếp hạng, giải thích, đề xuất và ước lượng, và mọi câu của model phải trích dẫn fact của code. Story: [DA-20](../product/stories/DA-20-agent-qa-qc.md). Bộ chấm: [defect-bench](defect-bench.md) (DA-31).
 
-Trạng thái 6/11/2026: code xong cả 7 nhiệm vụ con. Mọi lần chạy dưới đây đều trên laptop, dùng model giả (`EchoModel`). **Chưa có số đo nào với Nemotron**; runbook để chạy ở mục 5.
+Trạng thái 7/11/2026: code và test của cả 7 nhiệm vụ con đã có; nhiệm vụ 1–4 xong. Nhiệm vụ 5, 6, 7 còn mở vì AC 6, 7, 8 đòi chạy model thật (Nemotron, Qwen3.5-4B), mà mọi lần chạy dưới đây đều dùng model giả (`EchoModel`) trên laptop. **Chưa có số đo nào với Nemotron**; runbook ở mục 5. Ngày 7/11 sửa theo review của #151: chặn endpoint ngoài mạng, link vào `vault/`, số mượn fact không trích (mục 1).
 
 ## 1. Luồng chạy
 
@@ -18,8 +18,11 @@ analyze.py (code): mỗi chủ thể (dataset, train/<job>, rtc/<job>, probe, ev
   ▼
 agent.py (model): gửi fact + ứng viên theo lô, vừa ngữ cảnh 64K
   model trả {decisions, added, estimates}; code kiểm từng câu:
-  · số trong câu phải khớp một fact (hoặc dạng % của fact tỉ lệ), nếu không thì gửi lại 1 lần
-  · mã phát hiện phải hợp với stage; target phải là một đơn vị có trong đầu vào
+  · số trong câu phải khớp một fact mà chính mục đó trích (hoặc dạng % của fact tỉ lệ);
+    `12,000`, `120ms`, `10x`, hai vế của `45/90` đều là số; sai thì gửi lại 1 lần
+  · mỗi ứng viên cần đúng một decision, `keep` là true hoặc false
+  · mã phát hiện phải hợp với stage (stage không có mã thì không được thêm); target phải là
+    một đơn vị có trong đầu vào
   · ước lượng phải có basis là fact
   sai hai lần thì báo cáo "broken", không có phát hiện nào
   │
@@ -32,13 +35,14 @@ kỹ sư: fw agentqa review → <report_id>.review.json (AgentReview, append-onl
 
 Hai điểm thiết kế:
 
-- **Tách code với hint.** Ứng viên mang `origin`. Bộ chấm DA-31 nhờ đó đo được phần agent thêm vào so với phần code đã bắt (design mục 9.2). Model mà giữ một hint thì hint đó thành phát hiện. Model mà bỏ hint thì chỉ còn phần của code.
+- **Tách code với hint.** Ứng viên mang `origin` (code hoặc hint) trong lượt gửi cho model, để model biết đâu là bộ phát hiện đã bắn và đâu là dấu hiệu phải tự cân nhắc. Model giữ một hint thì hint đó thành phát hiện; model bỏ hint thì chỉ còn phần của code. `origin` **không** đi vào `AgentFinding` (hợp đồng không có trường này), nên DA-31 không đọc được nó. DA-31 tách phần agent thêm bằng cách tự chạy lại lớp code từ khóa `code` trong spec rồi so với phát hiện của agent (design mục 9.2). Muốn lưu `origin` trong báo cáo thì cần PR hợp đồng (mục 6).
+- **Endpoint chỉ trong mạng của đội.** URL phải là loopback, IP mạng riêng hoặc host khai trong `local_hosts`; request bỏ qua biến proxy và từ chối redirect. Bất biến "dữ liệu `restricted`, `internal` không tới API hosted" vì vậy không chỉ dựa vào config. Cách kiểm host và opener bỏ proxy theo commit `cbdfc295` của Hưng.
 - **Model hỏng không được tính công.** Endpoint chết, JSON sai hay câu bịa số đều cho báo cáo `broken` không có phát hiện nào. Như vậy bộ chấm không ghi cho agent những phát hiện mà thực ra là của code.
 
 | Module | Việc |
 |---|---|
 | `endpoint.py` | Client OpenAI-compatible (`/chat/completions`, JSON mode); `RecordingModel` / `ReplayModel` để ghi và phát lại câu trả lời |
-| `inputs.py` | Danh sách file được đọc, kiểm schema từng dòng, sha256 |
+| `inputs.py` | Danh sách file được đọc, kiểm schema từng dòng, sha256; từ chối `vault/`, `answers/` cả khi đi qua link |
 | `facts.py`, `numbers.py` | FactBook; kiểm số trong câu theo độ chính xác đã viết |
 | `analyze.py` | Chủ thể và ứng viên; train gọi `flywheel.eval.api.diagnose_train`, RTC gọi R1/R2 của `diagnosis.system` |
 | `agent.py` | Prompt, chia lô, kiểm câu trả lời, xếp hạng, gộp trùng (mã, target) |
@@ -65,7 +69,7 @@ uv run fw agentqa estimates --path <out>/estimates.jsonl [--measure <rep_…>/<e
 
 ## 3. Kết quả trên laptop, 6/11/2026
 
-Tất cả dùng `EchoModel`: giữ mọi ứng viên code, bỏ mọi hint, câu chỉ trích fact. Đây là kiểm lớp code và đường ống, **không phải số của Nemotron**.
+Tất cả dùng `EchoModel`: giữ mọi ứng viên code, bỏ mọi hint, câu chỉ trích fact. Đây là kiểm lớp code và đường ống, **không phải số của Nemotron**, và chưa đủ cho AC 6 (chấm agent trước khi dùng).
 
 ### 3.1 Bộ ca mẫu (nhiệm vụ 5)
 
@@ -82,7 +86,7 @@ Bộ log dựng bằng `python -m flywheel.data.inject.log_defects` (seed mặc 
 | Agent thêm so với code (`agent_adds`) | 0 ở mọi loại, đúng như mong đợi vì Echo không thêm gì |
 | Review | 30 phát hiện `unreviewed`, chưa ai duyệt |
 
-Kết quả có nghĩa là đường từ bộ phát hiện qua `AgentReport` tới bộ chấm không làm rơi hay lệch phát hiện nào. Kết quả chưa nói gì về chất lượng giải thích của model.
+Vì `EchoModel` giữ mọi ứng viên code, precision và báo nhầm ở đây chỉ đo lớp code: chúng cho biết đường từ bộ phát hiện qua `AgentReport` tới bộ chấm không làm rơi hay lệch phát hiện nào. Chúng chưa nói gì về việc model giữ, bỏ, thêm hay giải thích đúng không.
 
 ### 3.3 Log thật (nhiệm vụ 7, báo riêng với lỗi cấy)
 
