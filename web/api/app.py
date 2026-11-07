@@ -224,6 +224,35 @@ def create_app(
     def sensitivity(price_book: str | None = None) -> Any:
         return model.sensitivity(price_book)
 
+    # ------------------------------------------------------------ M5
+    @r.get("/experiments")
+    def experiments(cursor: str | None = None, limit: int | None = None) -> Any:
+        return _page(model.experiments(), cursor, limit)
+
+    @r.get("/experiment-drafts")
+    def experiment_drafts(cursor: str | None = None, limit: int | None = None) -> Any:
+        return _page(model.experiment_drafts(), cursor, limit)
+
+    @r.get("/experiments/{exp_id}/metrics")
+    def metrics(exp_id: str, split: str | None = None, every: int | None = None) -> Any:
+        if split is not None and split not in ("train", "val"):
+            raise ApiError(422, "BAD_SPLIT", f"split {split} không hợp lệ; chỉ train, val")
+        if every is not None and every < 1:
+            raise ApiError(422, "BAD_EVERY", "every phải >= 1")
+        return _found(model.metrics(exp_id, split, every), "thí nghiệm")
+
+    @r.get("/experiments/{exp_id}/diagnoses")
+    def diagnoses(exp_id: str) -> Any:
+        return _found(model.diagnoses(exp_id), "thí nghiệm")
+
+    @r.get("/experiments/{exp_id}/probes")
+    def probes(exp_id: str) -> Any:
+        return _found(model.probes(exp_id), "thí nghiệm")
+
+    @r.get("/experiments/{exp_id}/checkpoints")
+    def checkpoints(exp_id: str) -> Any:
+        return _found(model.checkpoints(exp_id), "thí nghiệm")
+
     # ------------------------------------------------------------ M3
     @r.get("/defects/scoreboard")
     def defect_scoreboard() -> Any:

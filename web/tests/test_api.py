@@ -95,7 +95,7 @@ def test_parity_covers_every_read_endpoint_of_7_1(client: TestClient) -> None:
     """A read route nobody compares is a route that can drift; list them all."""
     paths = client.get("/openapi.json").json()["paths"]
     routes = {path for path, ops in paths.items() if "get" in ops and path.startswith("/api")}
-    assert len(routes) == 32
+    assert len(routes) == 38
     covered = set()
     for line in PARITY_CASES:
         path = line.split(" ", 1)[1].split("?")[0]
@@ -261,3 +261,25 @@ def test_without_the_fake_core_the_action_waits(sink: Path, tmp_path: Path) -> N
                             headers={"Idempotency-Key": "m4b"}).json()["action_id"]
     client.post("/api/sync/run", headers={"X-Fw-Role": "ADMIN"})
     assert client.get(f"/api/actions/{action_id}").json()["sync_status"] == "EXPORTED"
+
+
+# ---------------------------------------------------------------- M5
+
+
+def test_an_unknown_experiment_is_404_on_every_detail_route(client: TestClient) -> None:
+    for tail in ("metrics", "diagnoses", "probes", "checkpoints"):
+        response = client.get(f"/api/experiments/exp_nope/{tail}")
+        assert response.status_code == 404, tail
+        assert response.json()["code"] == "NOT_FOUND"
+
+
+def test_metrics_refuse_a_bad_split_or_stride(client: TestClient) -> None:
+    assert client.get("/api/experiments/exp_A/metrics?split=test").json()["code"] == "BAD_SPLIT"
+    assert client.get("/api/experiments/exp_A/metrics?every=0").json()["code"] == "BAD_EVERY"
+
+
+def test_no_diagnosis_run_is_twelve_not_run_never_twelve_clean(client: TestClient) -> None:
+    body = client.get("/api/experiments/exp_B/diagnoses").json()
+    assert body["summary"]["ran"] is False
+    assert {c["status"] for c in body["codes"]} == {"not_run"}
+    assert len(body["codes"]) == 12

@@ -12,6 +12,7 @@ import { DataPipeline } from "./screens/DataPipeline";
 import { Evaluation } from "./screens/Evaluation";
 import { FailureToData } from "./screens/FailureToData";
 import { Results } from "./screens/Results";
+import { Training } from "./screens/Training";
 import { Bell } from "./ui/Bell";
 import { EmptyState } from "./ui/components";
 
@@ -28,7 +29,7 @@ export const screens: Screen[] = [
   { code: "M2", path: "/du-lieu", title: "Dữ liệu", element: <DataPipeline />, milestone: "M3 (10/11)" },
   { code: "M3", path: "/agent-qa", title: "Agent QA/QC", element: <AgentQa />, milestone: "M5 (14/11)" },
   { code: "M4", path: "/release", title: "Release", milestone: "M5 (14/11)" },
-  { code: "M5", path: "/huan-luyen", title: "Huấn luyện", milestone: "M5 (14/11)" },
+  { code: "M5", path: "/huan-luyen", title: "Huấn luyện", element: <Training />, milestone: "M5 (14/11)" },
   { code: "M6", path: "/danh-gia", title: "Đánh giá", element: <Evaluation />, milestone: "M3 (10/11)" },
   { code: "M7", path: "/failure-to-data", title: "Failure→Data", element: <FailureToData />, milestone: "M3 (10/11)" },
   { code: "M8", path: "/chi-phi", title: "Chi phí", element: <Cost />, milestone: "M5 (14/11)" },

@@ -52,6 +52,14 @@ export const PARITY_REQUESTS = [
   "- /sync/runs",
   "- /defects/scoreboard",
   "- /defects/scores?limit=500",
+  "- /experiments?limit=500",
+  "- /experiment-drafts",
+  "- /experiments/exp_A/metrics",
+  "- /experiments/exp_BFAIL/metrics?split=val&every=400",
+  "- /experiments/exp_BFAIL/diagnoses",
+  "- /experiments/exp_B/diagnoses",
+  "- /experiments/exp_B/probes",
+  "- /experiments/exp_B/checkpoints",
 ];
 
 it("records the MSW responses the backend must match", async () => {

@@ -8,6 +8,11 @@ import type {
   BranchComparisonRow,
   DecisionRow,
   DefectScoreboard,
+  CheckpointRow,
+  ExperimentRow,
+  ProbeRow,
+  TrainDiagnosisView,
+  TrainingMetricRow,
   SyncRunRow,
   ClusterBoardRow,
   E1CurvePoint,
@@ -80,6 +85,17 @@ export const useActions = () =>
 export const useDecisions = () => useGet<Page<DecisionRow>>("/decisions?limit=500");
 export const useSyncRuns = () => useGet<SyncRunRow[]>("/sync/runs");
 export const useRepairTicketsAll = () => useGet<RepairTicket[]>("/repair-tickets");
+
+// ---------------------------------------------------------------- M5
+export const useExperiments = () => useGet<Page<ExperimentRow>>("/experiments?limit=500");
+export const useMetrics = (id: string | null) =>
+  useGet<TrainingMetricRow[]>(id ? `/experiments/${id}/metrics` : null);
+export const useTrainDiagnoses = (id: string | null) =>
+  useGet<TrainDiagnosisView>(id ? `/experiments/${id}/diagnoses` : null);
+export const useProbes = (id: string | null) =>
+  useGet<ProbeRow[]>(id ? `/experiments/${id}/probes` : null);
+export const useCheckpoints = (id: string | null) =>
+  useGet<CheckpointRow[]>(id ? `/experiments/${id}/checkpoints` : null);
 
 // ---------------------------------------------------------------- M3
 export const useDefectScoreboard = () => useGet<DefectScoreboard>("/defects/scoreboard");

@@ -758,3 +758,118 @@ export interface DefectScoreboard {
   groups: DefectBenchGroup[];
   origin: Origin | null;
 }
+
+// ---------------------------------------------------------------- M5
+
+/** The RunPlan card: what a branch's training is pinned to (03 §4.3). */
+export interface RunPlanCard {
+  id: string;
+  purpose: string;
+  config_sha256: string;
+  lock_uri: string;
+  frozen_at: string;
+  seed_range: string | null;
+}
+
+export type TrainCodeStatus = "fired" | "clean" | "skipped" | "partial" | "not_run";
+
+export interface DiagnosisSummary {
+  ran: boolean;
+  fired: number;
+  clean: number;
+  skipped: number;
+  partial: number;
+  not_run: number;
+}
+
+/** GET /experiments. */
+export interface ExperimentRow {
+  experiment_id: string;
+  task_id: TaskId;
+  branch: string;
+  method: string;
+  hypothesis: string | null;
+  status: string;
+  train_seed: number | null;
+  hyperparams: Record<string, unknown>;
+  base_source_id: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  run_plan: RunPlanCard | null;
+  releases: Array<{ release_id: string; mix_weight: number; episodes_used: number | null }>;
+  best_checkpoint_id: string | null;
+  /** Telemetry rows loaded; 0 means none, so the chart says so instead of drawing nothing. */
+  metric_rows: number;
+  diagnosis: DiagnosisSummary | null;
+  origin: Origin;
+}
+
+/** GET /experiments/{id}/metrics?split=&every= · one row of `metrics.jsonl`. */
+export interface TrainingMetricRow {
+  step: number;
+  split: "train" | "val";
+  attempt: number;
+  epoch: number;
+  /** null when not finite; `loss_nonfinite` then says which. */
+  loss: number | null;
+  loss_nonfinite: "NaN" | "Infinity" | "-Infinity" | null;
+  lr: number;
+  /** Per action group (arm, hand, base); only val rows carry it. */
+  loss_by_group: Record<string, number>;
+  grad_norm_vlm: number | null;
+  grad_norm_action: number | null;
+  vram_gb: number | null;
+  throughput: number | null;
+  wall_time_s: number;
+}
+
+export interface TrainFinding {
+  start_step: number;
+  group: string | null;
+  dim: number | null;
+  value: number | null;
+  value_nonfinite: string | null;
+  threshold: number | null;
+  stop_job: boolean;
+  checkpoint_id: string | null;
+}
+
+/** GET /experiments/{id}/diagnoses · all twelve codes, each with a status (BR-12). */
+export interface TrainDiagnosisView {
+  experiment_id: string;
+  config_sha256: string[];
+  checkpoint_ids: string[];
+  summary: DiagnosisSummary;
+  codes: Array<{
+    code: string;
+    family: "F-TRAIN" | "F-OFF";
+    status: TrainCodeStatus;
+    findings: TrainFinding[];
+    skipped: Array<{ code: string; reason: string }>;
+  }>;
+}
+
+/** GET /experiments/{id}/probes · payload is the ProbeP1..P4 artifact as written. */
+export interface ProbeRow {
+  probe: "P1" | "P2" | "P3" | "P4";
+  checkpoint_id: string;
+  parent_checkpoint_id: string | null;
+  dataset_sha256: string | null;
+  payload: Record<string, unknown>;
+  origin: Origin;
+}
+
+/** GET /experiments/{id}/checkpoints. */
+export interface CheckpointRow {
+  checkpoint_id: string;
+  parent_checkpoint_id: string | null;
+  release_id: string | null;
+  method: string;
+  step: number | null;
+  weights_sha256: string;
+  uri: string;
+  is_best: boolean;
+  is_latest: boolean;
+  train_seed: number | null;
+  origin: Origin;
+}

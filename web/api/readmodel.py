@@ -71,6 +71,12 @@ class ReadModel(Protocol):
     def decisions(self) -> list[Row]: ...
     def defect_scoreboard(self) -> Row: ...
     def defect_scores(self) -> list[Row]: ...
+    def experiments(self) -> list[Row]: ...
+    def experiment_drafts(self) -> list[Row]: ...
+    def metrics(self, exp_id: str, split: str | None, every: int | None) -> list[Row] | None: ...
+    def diagnoses(self, exp_id: str) -> Row | None: ...
+    def probes(self, exp_id: str) -> list[Row] | None: ...
+    def checkpoints(self, exp_id: str) -> list[Row] | None: ...
     def refresh(self) -> None: ...
 
 
@@ -1193,6 +1199,166 @@ class SinkReadModel:
             "groups": blocks,
             "origin": head["origin"] if head else None,
         }
+
+    # ============================================================ M5
+
+    def _experiment(self, exp_id: str) -> Row | None:
+        return next(
+            (x for x in self.t("experiments") if x["experiment_code"] == exp_id), None
+        )
+
+    def experiments(self) -> list[Row]:
+        """Every experiment with its RunPlan card, releases, best checkpoint, diagnosis state."""
+        plans = {p["run_plan_ref"]: p for p in self.t("run_plans")}
+        out = []
+        for x in self.t("experiments"):
+            code = x["experiment_code"]
+            plan = plans.get(x.get("run_plan_ref") or "")
+            best = next(
+                (c["checkpoint_ref"] for c in self.t("model_checkpoints")
+                 if c["experiment_code"] == code and c.get("is_best")),
+                None,
+            )
+            diagnosis = self.diagnoses(code)
+            out.append({
+                "experiment_id": code, "task_id": x["task_id"], "branch": x["branch"],
+                "method": x["method"], "hypothesis": x.get("hypothesis"),
+                "status": x["status"], "train_seed": x.get("train_seed"),
+                "hyperparams": x.get("hyperparams") or {},
+                "base_source_id": x.get("base_source_ref"),
+                "started_at": x.get("started_at"), "finished_at": x.get("finished_at"),
+                "run_plan": None if plan is None else {
+                    "id": plan["run_plan_ref"], "purpose": plan["purpose"],
+                    "config_sha256": plan["config_sha256"], "lock_uri": plan["lock_uri"],
+                    "frozen_at": plan["frozen_at"], "seed_range": plan.get("seed_range"),
+                },
+                "releases": [
+                    {"release_id": d["release_ref"], "mix_weight": d["mix_weight"],
+                     "episodes_used": d.get("episodes_used")}
+                    for d in self.t("experiment_datasets") if d["experiment_code"] == code
+                ],
+                "best_checkpoint_id": best,
+                "metric_rows": sum(
+                    1 for m in self.t("training_metrics") if m["experiment_code"] == code
+                ),
+                "diagnosis": diagnosis["summary"] if diagnosis else None,
+                "origin": x["origin"],
+            })
+        return out
+
+    def experiment_drafts(self) -> list[Row]:
+        # `experiment_drafts` is a W table written by the API; none exists yet in sink mode.
+        return []
+
+    def metrics(self, exp_id: str, split: str | None, every: int | None) -> list[Row] | None:
+        """`training_metrics` of one experiment; `every` keeps steps divisible by it."""
+        if self._experiment(exp_id) is None:
+            return None
+        out = []
+        for m in self.t("training_metrics"):
+            if m["experiment_code"] != exp_id or (split is not None and m["split"] != split):
+                continue
+            if every is not None and every > 1 and m["step"] % every:
+                continue
+            out.append({
+                "step": m["step"], "split": m["split"], "attempt": m["attempt"],
+                "epoch": m["epoch"], "loss": m.get("loss"),
+                "loss_nonfinite": m.get("loss_nonfinite"), "lr": m["lr"],
+                "loss_by_group": m.get("loss_by_group") or {},
+                "grad_norm_vlm": m.get("grad_norm_vlm"),
+                "grad_norm_action": m.get("grad_norm_action"),
+                "vram_gb": m.get("vram_gb"), "throughput": m.get("throughput"),
+                "wall_time_s": m["wall_time_s"],
+            })
+        return out
+
+    def diagnoses(self, exp_id: str) -> Row | None:
+        """T1-T8, O1-O4 of one experiment: fired, clean, skipped, or never run.
+
+        A code with no finding is "clean" only when a diagnosis ran and did not
+        skip it (BR-12): no run is "not_run" for all twelve, never twelve greens.
+        """
+        if self._experiment(exp_id) is None:
+            return None
+        findings = [f for f in self.t("train_diagnoses") if f["experiment_code"] == exp_id]
+        skips = [k for k in self.t("train_diagnosis_skips") if k["experiment_code"] == exp_id]
+        ran = bool(findings or skips)
+        codes = []
+        for code in TRAIN_DIAGNOSIS_CODES:
+            mine = [
+                {"start_step": f["start_step"], "group": f.get("group_name"), "dim": f.get("dim"),
+                 "value": f.get("value"), "value_nonfinite": f.get("value_nonfinite"),
+                 "threshold": f.get("threshold"), "stop_job": bool(f.get("stop_job")),
+                 "checkpoint_id": f.get("checkpoint_ref")}
+                for f in findings if f["code"] == code
+            ]
+            skipped = [
+                {"code": k["code"], "reason": k["reason"]}
+                for k in skips if _skip_of(k["code"], code)
+            ]
+            if not ran:
+                status = "not_run"
+            elif mine:
+                status = "fired"
+            elif any(k["code"] == code for k in skipped):
+                status = "skipped"
+            elif skipped:
+                status = "partial"
+            else:
+                status = "clean"
+            codes.append({
+                "code": code, "family": "F-TRAIN" if code.startswith("T") else "F-OFF",
+                "status": status, "findings": mine, "skipped": skipped,
+            })
+        tally = {s: sum(1 for c in codes if c["status"] == s) for s in DIAGNOSIS_STATUSES}
+        rows = [*findings, *skips]
+        return {
+            "experiment_id": exp_id,
+            "config_sha256": sorted({str(r["config_sha256"]) for r in rows}),
+            "checkpoint_ids": sorted({str(r["checkpoint_ref"]) for r in rows
+                                      if r.get("checkpoint_ref")}),
+            "summary": {"ran": ran, **tally},
+            "codes": codes,
+        }
+
+    def probes(self, exp_id: str) -> list[Row] | None:
+        """P1-P4 of the experiment's checkpoints; P4 names the parent it compares with."""
+        if self._experiment(exp_id) is None:
+            return None
+        mine = {c["checkpoint_ref"] for c in self.t("model_checkpoints")
+                if c["experiment_code"] == exp_id}
+        return [
+            {"probe": p["probe"], "checkpoint_id": p["checkpoint_ref"],
+             "parent_checkpoint_id": p.get("parent_checkpoint_ref"),
+             "dataset_sha256": p.get("dataset_sha256"), "payload": p["payload"],
+             "origin": p["origin"]}
+            for p in self.t("probe_results") if p["checkpoint_ref"] in mine
+        ]
+
+    def checkpoints(self, exp_id: str) -> list[Row] | None:
+        if self._experiment(exp_id) is None:
+            return None
+        return [
+            {"checkpoint_id": c["checkpoint_ref"],
+             "parent_checkpoint_id": c.get("parent_checkpoint_ref"),
+             "release_id": c.get("release_ref"), "method": c["method"], "step": c.get("step"),
+             "weights_sha256": c["weights_sha256"], "uri": c["uri"],
+             "is_best": bool(c.get("is_best")), "is_latest": bool(c.get("is_latest")),
+             "train_seed": c.get("train_seed"), "origin": c["origin"]}
+            for c in self.t("model_checkpoints") if c["experiment_code"] == exp_id
+        ]
+
+
+#: The twelve codes of the train diagnosis (DA-08): F-TRAIN T1-T8, F-OFF O1-O4.
+TRAIN_DIAGNOSIS_CODES = tuple(f"T{i}" for i in range(1, 9)) + tuple(f"O{i}" for i in range(1, 5))
+DIAGNOSIS_STATUSES = ("fired", "clean", "skipped", "partial", "not_run")
+
+
+def _skip_of(skip_code: str, code: str) -> bool:
+    """A skip names a code or one branch of it (`T8a`), never another code (`T1` vs `T10`)."""
+    return skip_code == code or (
+        skip_code.startswith(code) and not skip_code[len(code):][:1].isdigit()
+    )
 
 
 BENCH_LAYERS = ("code", "agent")
