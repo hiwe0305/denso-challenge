@@ -94,10 +94,54 @@ def test_an_added_finding_needs_an_allowed_code_and_a_unit(tmp_path: Path) -> No
 def test_estimates_keep_their_basis(tmp_path: Path) -> None:
     analysis = _dataset(tmp_path, {1: [NAN]})
     fid = analysis.book.facts[0].fact_id
-    reply = {"estimates": [{"quantity": "episodes left after quarantine", "low": 3, "high": 4,
+    (c1,) = analysis.candidates
+    reply = {"decisions": [{"cid": c1.cid, "keep": False, "reason": "seen"}],
+             "estimates": [{"quantity": "episodes left after quarantine", "low": 3, "high": 4,
                             "unit": "episodes", "basis": [fid]}]}
     report = run_agent(analysis, ScriptedModel([reply]), config(), now=NOW)
     assert [(e.low, e.high, e.basis) for e in report.estimates] == [(3.0, 4.0, [fid])]
+
+
+def test_a_candidate_left_without_a_decision_breaks_the_report(tmp_path: Path) -> None:
+    analysis = _dataset(tmp_path, {1: [NAN]})
+    report = run_agent(analysis, ScriptedModel([{"decisions": []}] * 2), config(), now=NOW)
+    assert report.status == "broken" and report.findings == []
+    assert "no decision for candidates" in report.problems[0]
+
+
+def test_keep_must_be_a_json_boolean(tmp_path: Path) -> None:
+    analysis = _dataset(tmp_path, {1: [NAN]})
+    (c1,) = analysis.candidates
+    reply = {"decisions": [{"cid": c1.cid, "keep": "false"}]}
+    report = run_agent(analysis, ScriptedModel([reply, reply]), config(), now=NOW)
+    assert report.status == "broken" and "keep must be true or false" in report.problems[0]
+
+
+def test_a_number_may_not_borrow_a_fact_the_item_does_not_cite(tmp_path: Path) -> None:
+    analysis = _dataset(tmp_path, {1: [NAN]})
+    (c1,) = analysis.candidates
+    cited = set(c1.evidence)
+    other = next(f for f in analysis.book.facts
+                 if f.fact_id not in cited and isinstance(f.value, int) and f.value > 1)
+    lie = {"decisions": [{"cid": c1.cid, "insight": f"NaN in {other.value} frames",
+                          "suggestion": "Re-record."}]}
+    report = run_agent(analysis, ScriptedModel([lie, lie]), config(), now=NOW)
+    assert report.status == "broken" and str(other.value) in report.problems[0]
+
+
+def test_a_stage_without_codes_takes_no_added_finding(tmp_path: Path) -> None:
+    from importlib.resources import files
+
+    from flywheel.eval.agentqa.analyze import analyze_stage1
+
+    probe = tmp_path / "probe_p1.json"
+    probe.write_text((files("flywheel.testkit") / "fixtures/artifacts/ProbeP1.json").read_text())
+    analysis = analyze_stage1(load_file(probe))
+    fid, unit = analysis.book.facts[0].fact_id, analysis.units[0]
+    added = {"added": [{"code": "T1", "target": unit, "insight": f"{{{fid}}}",
+                        "suggestion": "x", "evidence": [fid]}]}
+    report = run_agent(analysis, ScriptedModel([added, added]), config(), now=NOW)
+    assert report.status == "broken" and "not allowed for stage1" in report.problems[0]
 
 
 def test_an_unreachable_endpoint_breaks_the_report(tmp_path: Path) -> None:

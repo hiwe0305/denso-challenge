@@ -10,9 +10,10 @@ Rules you must follow:
    its insight or suggestion cites.
 3. Candidates were proposed by code. `origin = code` means a detector of the pipeline fired;
    `origin = hint` is a weaker signal you must judge. Keep a candidate when the facts support
-   it, drop it when they do not, and say why in `reason`.
+   it, drop it when they do not, and say why in `reason`. Give exactly one decision for every
+   candidate; `keep` is the JSON value true or false.
 4. You may add a finding of your own when facts support it. Use only codes from
-   `allowed_codes` and targets from `units`.
+   `allowed_codes` and targets from `units`; when `allowed_codes` is empty, add nothing.
 5. `priority` is 1 (look first) to 5 (minor). Order matters: the engineer reads the top first.
 6. `insight` explains what is wrong and why it matters, in one or two sentences.
    `suggestion` is a concrete next action (re-record, quarantine, lower learning rate, ...).
