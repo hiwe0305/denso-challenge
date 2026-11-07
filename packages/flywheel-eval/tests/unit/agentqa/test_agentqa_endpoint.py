@@ -93,3 +93,49 @@ def test_recorded_replies_replay_in_order(server: str, tmp_path: Path) -> None:
     assert [replay.complete([]), replay.complete([])] == ['{"ok": true}'] * 2
     with pytest.raises(EndpointError):
         replay.complete([])
+
+
+@pytest.mark.parametrize("url", [
+    "https://api.openai.com/v1", "http://8.8.8.8:11434/v1", "ftp://127.0.0.1/v1", "127.0.0.1:80",
+])
+def test_an_endpoint_outside_our_network_is_refused(url: str) -> None:
+    with pytest.raises(ValueError, match="machine of ours|http"):
+        OpenAIEndpoint(base_url=url, model="m", revision="r")
+
+
+def test_the_url_override_passes_the_same_check(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FW_AGENTQA_AGENT_URL", "https://api.example.com/v1")
+    with pytest.raises(ValueError, match="machine of ours"):
+        load_endpoint("agent", AGENT_YAML)
+    for url in ("http://10.0.0.5:11434/v1", "http://rtx3060:11434/v1", "http://[::1]:8000/v1"):
+        monkeypatch.setenv("FW_AGENTQA_AGENT_URL", url)
+        assert load_endpoint("agent", AGENT_YAML).base_url == url
+
+
+class _Redirect(BaseHTTPRequestHandler):
+    def do_POST(self) -> None:  # noqa: N802 - http.server's name
+        self.send_response(307)
+        self.send_header("Location", "https://api.example.com/v1/chat/completions")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def log_message(self, *args: object) -> None:
+        pass
+
+
+def test_a_redirect_and_the_proxy_variables_are_not_followed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    httpd = HTTPServer(("127.0.0.1", 0), _Redirect)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        # A proxy that does not exist: the request only works if it is ignored.
+        monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:9")
+        monkeypatch.setenv("http_proxy", "http://127.0.0.1:9")
+        model = OpenAIEndpoint(base_url=f"http://127.0.0.1:{httpd.server_address[1]}/v1",
+                               model="m", revision="r", timeout_s=2.0)
+        with pytest.raises(EndpointError, match="redirect .* refused"):
+            model.complete([{"role": "user", "content": "hi"}])
+    finally:
+        httpd.shutdown()

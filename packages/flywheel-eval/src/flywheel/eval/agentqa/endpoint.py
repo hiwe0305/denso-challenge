@@ -10,18 +10,28 @@ Which model, which revision and which temperature live in
 `configs/eval/agentqa/agent.yaml`; the report records all three with the hash of
 the prompt (`AgentModel`), so two reports can only be compared when they name the
 same four values.
+
+The endpoint must be a machine of ours: loopback, a private-network address, or a
+host the config lists in `local_hosts`. The request ignores the proxy variables and
+refuses a redirect, so data marked `restricted` or `internal` cannot reach a hosted
+API through a typo in a URL, an environment variable or a server that forwards
+(CLAUDE.md, architecture invariants). The host check and the proxy-free opener
+follow Hưng's `settings._is_local` and `ChatEndpointClient` (commit cbdfc295).
 """
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 import urllib.error
 import urllib.request
 from collections.abc import Sequence
 from dataclasses import dataclass
+from email.message import Message as Headers
 from pathlib import Path
-from typing import Any, Protocol
+from typing import IO, Any, NoReturn, Protocol
+from urllib.parse import urlparse
 
 import yaml
 
@@ -34,6 +44,45 @@ Message = dict[str, Any]
 
 class EndpointError(RuntimeError):
     """The endpoint could not be reached or answered with something that is not a reply."""
+
+
+def is_local(host: str, local_hosts: Sequence[str] = ()) -> bool:
+    """Loopback, a private-network address, `localhost`, or a host named in `local_hosts`."""
+    if host == "localhost" or host in local_hosts:
+        return True
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return address.is_loopback or address.is_private
+
+
+def check_local_url(url: str, local_hosts: Sequence[str] = ()) -> None:
+    """Refuse a URL that is not http(s) to a machine of ours."""
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        raise ValueError(f"endpoint {url!r} is not an http(s) URL with a host")
+    if not is_local(parsed.hostname, local_hosts):
+        raise ValueError(
+            f"endpoint host {parsed.hostname!r} is not a machine of ours; add it to "
+            "local_hosts in the config only if it is served inside our network"
+        )
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """A redirect could carry the request, and its key, to a host nobody checked."""
+
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: IO[bytes],
+        code: int,
+        msg: str,
+        headers: Headers,
+        newurl: str,
+    ) -> NoReturn:
+        raise urllib.error.HTTPError(req.full_url, code, f"redirect to {newurl} refused",
+                                     headers, fp)
 
 
 class ChatModel(Protocol):
@@ -68,6 +117,10 @@ class OpenAIEndpoint:
     timeout_s: float = 300.0
     json_mode: bool = True
     api_key_env: str | None = None
+    local_hosts: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        check_local_url(self.base_url, self.local_hosts)
 
     @property
     def name(self) -> str:
@@ -92,8 +145,9 @@ class OpenAIEndpoint:
             headers=headers,
             method="POST",
         )
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout_s) as response:
+            with opener.open(request, timeout=self.timeout_s) as response:
                 reply = json.loads(response.read().decode("utf-8"))
         except (urllib.error.URLError, OSError, json.JSONDecodeError) as exc:
             raise EndpointError(f"{self.base_url}: {exc}") from exc
@@ -110,7 +164,7 @@ def load_endpoint(role: str = "agent", config: Path = DEFAULT_AGENT_CONFIG) -> O
     """The endpoint of `role` ("agent" for Nemotron, "vision" for Qwen3.5-4B) in the config.
 
     `FW_AGENTQA_<ROLE>_URL` overrides the URL, so a run through an SSH tunnel to
-    the 3060 needs no config edit.
+    the 3060 needs no config edit; the override passes the same host check.
     """
     raw = yaml.safe_load(config.read_text(encoding="utf-8"))
     models = raw.get("models") if isinstance(raw, dict) else None
@@ -118,6 +172,9 @@ def load_endpoint(role: str = "agent", config: Path = DEFAULT_AGENT_CONFIG) -> O
     if not isinstance(entry, dict):
         raise ValueError(f"{config}: no models.{role}")
     url = os.environ.get(f"FW_AGENTQA_{role.upper()}_URL") or entry["base_url"]
+    hosts = raw.get("local_hosts") or []
+    if not isinstance(hosts, list) or not all(isinstance(h, str) and h for h in hosts):
+        raise ValueError(f"{config}: local_hosts must be a list of host names")
     return OpenAIEndpoint(
         base_url=str(url),
         model=str(entry["model"]),
@@ -127,6 +184,7 @@ def load_endpoint(role: str = "agent", config: Path = DEFAULT_AGENT_CONFIG) -> O
         timeout_s=float(entry.get("timeout_s", 300.0)),
         json_mode=bool(entry.get("json_mode", True)),
         api_key_env=entry.get("api_key_env"),
+        local_hosts=tuple(hosts),
     )
 
 
