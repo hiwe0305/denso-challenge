@@ -6,11 +6,11 @@
 
 **Nguồn:** [Design 27/10/2026](../specs/2026-10-27-g1-psi0-demo-design.md) mục 5.0, 6, 6.7, 9, 10, 11; [03 · Kiến trúc](../../product/03-architecture.md) mục 5.4, 7.3, ADR-19, ADR-24, ADR-26; [07](../../product/07-team-workflow.md) mục 2.0–2.4; story DA-04, DA-18, DA-20; Ψ₀ ở `cda3fdf` (`src/psi/data/egodex/egodex_dataset.py`, `src/h_rdt/datasets/pretrain/precompute_48d_actions.py`, `calc_stat.py`, `scripts/train/psi0/pretrain-egodex-psi0-fast.sh`).
 
-_Ngày 6/11/2026. Trạng thái: quyết định ở mục 3 do Hiếu chốt trong chat ngày 6/11/2026; kiến trúc ở mục 4, 5 là [Đề xuất] của Claude; giờ là ước lượng. Kết quả cuối ngày 6/11 ở mục 8._
+_Ngày 6/11/2026. Trạng thái: quyết định ở mục 3 do Hiếu chốt trong chat ngày 6/11/2026; kiến trúc ở mục 4, 5 là [Đề xuất] của Claude; giờ là ước lượng. Kết quả cuối ngày 6/11 ở mục 8. Cập nhật 7/11/2026 theo review #150: mục 1 (nhánh của Hưng), D2 (ngoại lệ chờ PO), mục 8 (đã push, đã mở PR), mục 9 (đề xuất cho PO)._
 
 ## 1. Lý do
 
-Tới 6/11/2026 Hưng (GitHub `KhaazixGod`) có 0/17 nhiệm vụ con, 0 commit, không nhánh, không PR; việc duy nhất là issue #34 ngày 2/11 (hợp đồng `AgentReport`, đã merge ở #46). Báo cáo ngày 5/11 ghi **Đỏ**. Châu (DA-31) chờ `AgentReport` thật cho cột agent của bộ chấm; Long (DA-28) chờ phần 3 và 4 của kịch bản. DA-30 không còn chờ DA-18: Hiếu chạy stage 1 trên dữ liệu thay thế `egodex_sample.py`.
+Lúc viết plan, sáng 6/11/2026, Hưng (GitHub `KhaazixGod`) có 0/17 nhiệm vụ con, 0 commit, không nhánh, không PR. Cùng ngày lúc 17:43 Hưng push nhánh `DA-20-agent-qa-qc` với một commit `cbdfc295` (DA-20/1, endpoint cục bộ, +788 dòng), không mở PR. Phần kiểm host và opener bỏ proxy của commit đó đã được lấy vào #151 (`868312f2`, có trailer `Co-authored-by`). Trước đó, việc duy nhất là issue #34 ngày 2/11 (hợp đồng `AgentReport`, đã merge ở #46). Báo cáo ngày 5/11 ghi **Đỏ**. Châu (DA-31) chờ `AgentReport` thật cho cột agent của bộ chấm; Long (DA-28) chờ phần 3 và 4 của kịch bản. DA-30 không còn chờ DA-18: Hiếu chạy stage 1 trên dữ liệu thay thế `egodex_sample.py`.
 
 ## 2. Hiện trạng: đã có gì
 
@@ -33,7 +33,7 @@ Thư mục của Hưng trên `master` chỉ có file khung. `uv.lock` chưa có 
 | # | Quyết định |
 |---|---|
 | D1 | Hiếu và Claude làm ba story; làm ở máy local, chưa push |
-| D2 | **Bỏ bước che danh tính**, chỉ cho mẫu EgoDex công bố (`egodex`, `public`): mở rộng "Waive for EgoDex" của DA-30 (4/11) sang pipeline DA-04. Episode giữ `deid_status = raw`, Source ghi lý do miễn. Video tự quay và mọi nguồn khác vẫn bị cổng `deid_blocks_annotate` chặn cho tới khi có bước che (sau demo). Bất biến trong CLAUDE.md, 03, design giữ nguyên. DA-04 nhiệm vụ 2 thu về: cổng và miễn trừ, không làm mờ |
+| D2 | **Bỏ bước che danh tính**, chỉ cho mẫu EgoDex công bố (`egodex`, `public`): mở rộng "Waive for EgoDex" của DA-30 (4/11) sang pipeline DA-04. Episode giữ `deid_status = raw`, Source ghi lý do miễn. Video tự quay và mọi nguồn khác vẫn bị cổng `deid_blocks_annotate` chặn cho tới khi có bước che (sau demo). Đây là **ngoại lệ** của bất biến "video egocentric phải qua bước che danh tính trước mọi bước xử lý khác" (CLAUDE.md, 03 mục 4.3, design mục 6.6). Ngoại lệ **chờ Product Owner ghi vào 03 hoặc design** kèm dòng change log (đề xuất ở mục 9); bất biến vẫn giữ cho mọi nguồn khác. DA-04 nhiệm vụ 2 thu về: cổng và miễn trừ, không làm mờ |
 | D3 | **Làm đủ, không cắt phần nào khác**: DA-04 nhiệm vụ 5, 7; DA-18 nhiệm vụ 3; DA-20 nhiệm vụ 6 (Qwen3.5-4B, thay câu trả lời "không" của Q-M ngày 3/11), 7 (log thật); vòng thử model gán nhãn |
 | D4 | Mỗi story một nhánh local, một worktree từ `origin/master`; thêm `chore-egocentric-deps` |
 | D5 | Pose E-A: MediaPipe Hands cộng visual odometry đơn mắt của OpenCV, gắn `pseudo` |
@@ -173,7 +173,7 @@ DA-04 và DA-18 cần h5py: nhánh của hai story tạo từ đầu nhánh `cho
 
 ## 8. Kết quả ngày 6/11/2026
 
-Cả bốn nhánh ở máy local, chưa push, chưa mở PR. Gộp thử bốn nhánh lên `origin/master` (`2e57f603`) không có xung đột.
+Cuối ngày 6/11 cả bốn nhánh còn ở máy local. Sau đó Hiếu cho push và mở PR theo thứ tự: #149 (`chore-egocentric-deps`), #150 (nhánh tài liệu này), #151 (DA-20), #152 (DA-04) và #153 (DA-18); #152 và #153 lấy #149 làm base. Ngày 7/11 cả năm PR được sửa theo review. Gộp thử bốn nhánh lên `origin/master` (`2e57f603`) không có xung đột.
 
 | Nhánh | Commit | Đã chạy | Còn lại |
 |---|---|---|---|
@@ -183,3 +183,16 @@ Cả bốn nhánh ở máy local, chưa push, chưa mở PR. Gộp thử bốn n
 | `DA-18-egodex-export` | 5 | Export work dir thật của DA-04: 38 mẫu, 4143 khung, 53 giây trên laptop; khớp script của tác giả | Loader thật của Ψ₀ trên laptop cần FFmpeg 7 (laptop có FFmpeg 8); lệnh trong ghi chép của story |
 
 Đề xuất hợp đồng gom từ ba nhánh (chưa làm, cần PR của chủ): `source_detail` thêm `egodex`, `ego_video`; `read_segments` nhận `frame_start`, `frame_end`; danh sách câu hỏi P1 và mảng action theo episode cho hình của DA-20; khai endpoint model trong `configs/models/`. `.github/CODEOWNERS` cần đổi theo 07 bản 1.9 trong một PR `chore-…` riêng.
+
+## 9. Đề xuất cho Product Owner: ghi ngoại lệ D2 [Đề xuất, 7/11/2026]
+
+D2 đang là quyết định trong chat và trong plan này. Còn 03 và design vẫn viết bất biến che danh tính mà không có ngoại lệ, và theo CLAUDE.md chỉ Product Owner được sửa hai file đó. Đề xuất Hiếu sửa trong một PR `docs-…` riêng:
+
+| File | Chỗ sửa | Câu đề xuất |
+|---|---|---|
+| 03 | Mục 4.3, đoạn trường `deid_status` | "Ngoại lệ (D2, 6/11/2026): mẫu EgoDex công bố (`source_detail = egodex`, `data_class = public`) được miễn bước che; episode giữ `deid_status = raw`, Source ghi lý do miễn và sha256 của file nguồn. Mọi nguồn egocentric khác vẫn bị cổng `deid_blocks_annotate` chặn tới khi đã che." |
+| 03 | Bảng change log | "7/11/2026 · 1.3 · Mục 4.3: ghi ngoại lệ che danh tính cho mẫu EgoDex công bố (D2 của plan chia lại việc của Hưng; mở rộng miễn trừ của DA-30 ngày 4/11) · PO (Hiếu)" |
+| design | Mục 6.6, dòng Annotate | Thêm sau "Che danh tính trước mọi bước khác": "(trừ mẫu EgoDex công bố, D2 ngày 6/11/2026; xem 03 mục 4.3)" |
+| CLAUDE.md | Bất biến "Video egocentric phải qua bước che danh tính…" | Thêm "trừ mẫu EgoDex công bố (03 mục 4.3)" |
+
+Chưa sửa ba file này thì PR #152 vẫn đúng code: cổng chỉ miễn cho cặp (`egodex`, `public`) và ghi lý do miễn. Còn tài liệu gốc thì vẫn nói một điều khác với code.
