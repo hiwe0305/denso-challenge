@@ -99,6 +99,55 @@ def test_e_a_must_be_pseudo_without_an_hdf5(tmp_path: Path) -> None:
         export(work, tmp_path / "out")
 
 
+def nan_frames(work: Path, episode_id: str, key: str, frames: list[int]) -> None:
+    """NaN in `key` of pose.npz at `frames`, as DA-04's `to_pose` writes an unseen hand."""
+    path = work / "egocentric" / episode_id / "pose.npz"
+    with np.load(path) as npz:
+        pose = {k: npz[k] for k in npz.files}
+    pose[key][frames] = np.nan
+    np.savez(path, **pose)
+
+
+def test_a_segment_with_a_nan_frame_is_dropped_whole_and_listed(tmp_path: Path) -> None:
+    work = build(tmp_path / "work", EA)
+    nan_frames(work, "ea_1", "left_wrist", [3, 4, 5])  # in step_0, frames [0, 14)
+    nan_frames(work, "ea_1", "right_tips", [13])
+    meta = export(work, tmp_path / "out", include_flag=True)
+    assert [(s["episode_id"], s["step_id"], s["hdf5"]) for s in meta["samples"]] == [
+        ("ea_1", "step_1", "part1/pick_place_cup/0.hdf5"),
+        ("ea_2", "step_0", "part1/pick_place_cup/1.hdf5"),  # flag: DA-04 flags NaN episodes
+    ]
+    assert meta["skipped"] == [
+        {
+            "episode_id": "ea_1",
+            "step_id": "step_0",
+            "frame_start": 0,
+            "frame_end": 14,
+            "reason": "not finite: left hand in 3 of 14 frames, right hand in 1 of 14 frames",
+        }
+    ]
+    assert len(scan(tmp_path / "out")) == 2
+
+
+def test_an_e_a_run_with_no_finite_segment_is_refused(tmp_path: Path) -> None:
+    work = build(tmp_path / "work", EA[:1])
+    nan_frames(work, "ea_1", "right_tips", [0, 20])
+    with pytest.raises(ExportRefused, match=r"no segment to export \(2 skipped: 2 not finite\)"):
+        export(work, tmp_path / "out")
+    assert not (tmp_path / "out").exists()
+
+
+def test_e_a_and_e_b_in_one_run_are_refused(tmp_path: Path) -> None:
+    specs = [
+        Spec("eb_1", 10, [(0, 10)], deid_status="blurred"),
+        Spec("ea_1", 10, [(0, 10)], pose_source="E-A", deid_status="blurred"),
+    ]
+    with pytest.raises(
+        ExportRefused, match="one pose source, this work dir has E-A: ea_1; E-B: eb_1"
+    ):
+        export(build(tmp_path / "work", specs), tmp_path / "out")
+
+
 @pytest.mark.skipif(PSI0_ROOT is None, reason="PSI0_ROOT not set: Psi0's own loader not run")
 def test_psi0s_loader_and_the_fake_agree_on_e_a(tmp_path: Path) -> None:
     out = tmp_path / "out"

@@ -39,14 +39,19 @@ shipped `egodex_stat_all.json`; this file is for comparison and travels with the
 release.
 
 What is exported: every segment of an episode whose QAReport decides `pass`
-(`include_flag` adds `flag`); an episode without a QAReport is not exported. E-B
+(`include_flag` adds `flag`); an episode without a QAReport is not exported. A segment
+with a frame whose hand or camera transform is not finite (E-A leaves NaN where
+MediaPipe finds no hand) is dropped whole, never cut, and `meta.json` lists it with
+the reason; the export is refused only when no segment is left. E-B
 episodes (`pose_source` E-B, EgoDex, `retargeted`) copy the transforms from their
 EgoDex HDF5; E-A episodes (`pose_source` E-A, the team's own video, `pseudo`) build
 them from `pose.npz` (tips get an identity rotation, which `actions_48d` never reads).
 An egocentric video whose `deid_status` is `raw` is refused unless the source carries
-the EgoDex waiver (plan 6/11/2026 D2: `egodex` and `public` only). The recipe's
-`upsample_rate` 3 is three frames at 30 Hz, so a bundle or video at another fps is
-refused (resampling is not done here).
+the EgoDex waiver (plan 6/11/2026 D2: `egodex` and `public` only). One run exports one
+pose source: E-A and E-B in the same work dir are refused, so a `<task>/<i>` never
+mixes a `pseudo` sample into EgoDex's numbering. The recipe's `upsample_rate` 3 is
+three frames at 30 Hz, so a bundle or video at another fps is refused (resampling is
+not done here).
 
 Egocentric data is stage 1 only (design 7.8): nothing here writes a LeRobot dataset,
 and `meta.json` says so.
@@ -291,10 +296,10 @@ class Stage1Export:
     export_id: str
     samples: int
     frames: int
-    skipped: list[dict[str, str]] = field(default_factory=list)
+    skipped: list[dict[str, Any]] = field(default_factory=list)
 
 
-def plan_export(work: Path, include: Sequence[str]) -> tuple[list[Planned], list[dict[str, str]]]:
+def plan_export(work: Path, include: Sequence[str]) -> tuple[list[Planned], list[dict[str, Any]]]:
     """The samples to write and the skipped episodes or segments, or ExportRefused."""
     source = json.loads((work / "source.json").read_text(encoding="utf-8"))
     episodes = [Episode.model_validate(r) for r in read_jsonl(work / "episodes.jsonl")]
@@ -309,7 +314,8 @@ def plan_export(work: Path, include: Sequence[str]) -> tuple[list[Planned], list
         (str(source.get("source_detail")), str(source.get("data_class"))) in DEID_WAIVED
     )
     chosen: list[tuple[Episode, Bundle, FramedSegment, QAReport]] = []
-    skipped: list[dict[str, str]] = []
+    skipped: list[dict[str, Any]] = []
+    pose_sources: dict[str, list[str]] = {}
     for episode in sorted(episodes, key=lambda e: e.episode_id):
         eid = episode.episode_id
         report = reports.get(eid)
@@ -330,16 +336,37 @@ def plan_export(work: Path, include: Sequence[str]) -> tuple[list[Planned], list
             continue
         directory = work / "egocentric" / eid
         bundle = Bundle.read(directory / "bundle.json")
-        problems += _bundle_problems(episode, bundle) + _video_problems(bundle)
+        pose_sources.setdefault(bundle.pose_source, []).append(eid)
+        found = _bundle_problems(episode, bundle) + _video_problems(bundle)
+        if found:
+            problems += found
+            continue
+        with np.load(bundle.pose) as npz:
+            pose = {key: npz[key] for key in npz.files}
         for framed in read_segments(directory / "segments.parquet"):
-            span = framed.frame_end - framed.frame_start
-            where = f"{eid} {framed.segment.step_id} [{framed.frame_start}, {framed.frame_end})"
-            if framed.frame_start < 0 or framed.frame_end > bundle.frames:
+            start, stop = framed.frame_start, framed.frame_end
+            where = f"{eid} {framed.segment.step_id} [{start}, {stop})"
+            if start < 0 or stop > bundle.frames:
                 problems.append(f"{where}: outside the episode's {bundle.frames} frames")
-            elif span < MIN_FRAMES:
-                skipped.append({"episode_id": eid, "reason": f"{where}: under {MIN_FRAMES} frames"})
-            else:
+                continue
+            if stop - start < MIN_FRAMES:
+                skipped.append(_skip(eid, framed, f"under {MIN_FRAMES} frames"))
+                continue
+            try:
+                transforms, intrinsic = segment_transforms(bundle, pose, start, stop)
+            except ExportRefused as refused:
+                problems += refused.problems
+                break
+            reason = non_finite(transforms, intrinsic)
+            if reason is None:
                 chosen.append((episode, bundle, framed, report))
+            else:
+                skipped.append(_skip(eid, framed, reason))
+    if len(pose_sources) > 1:
+        problems.append(
+            "one run exports one pose source, this work dir has "
+            + "; ".join(f"{k}: {', '.join(v)}" for k, v in sorted(pose_sources.items()))
+        )
     if problems:
         raise ExportRefused(problems)
     counters: Counter[tuple[str, str]] = Counter()
@@ -352,6 +379,37 @@ def plan_export(work: Path, include: Sequence[str]) -> tuple[list[Planned], list
         counters[key] += 1
         planned.append(Planned(episode, bundle, framed, report, relpath))
     return planned, skipped
+
+
+def _skip(eid: str, framed: FramedSegment, reason: str) -> dict[str, Any]:
+    return {
+        "episode_id": eid,
+        "step_id": framed.segment.step_id,
+        "frame_start": framed.frame_start,
+        "frame_end": framed.frame_end,
+        "reason": reason,
+    }
+
+
+def non_finite(transforms: Mapping[str, NDArray[Any]], intrinsic: NDArray[Any]) -> str | None:
+    """Why a segment's transforms cannot be exported, or None when every value is finite.
+
+    Psi0's loader gives no way to mask a frame: a NaN in a hand reaches `actions_48d`,
+    and one in the camera reaches every delta through its inverse.
+    """
+    span = transforms[CAMERA].shape[0]
+    parts = {f"{side} hand": [f"{side}Hand", *(f"{side}{t}" for t in TIPS)] for side in HANDS}
+    parts["camera"] = [CAMERA]
+    found = []
+    for part, names in parts.items():
+        bad = np.zeros(span, dtype=bool)
+        for name in names:
+            bad |= ~np.isfinite(transforms[name].reshape(span, -1)).all(axis=1)
+        if bad.any():
+            found.append(f"{part} in {int(bad.sum())} of {span} frames")
+    if not np.isfinite(intrinsic).all():
+        found.append("camera intrinsic")
+    return f"not finite: {', '.join(found)}" if found else None
 
 
 def _bundle_problems(episode: Episode, bundle: Bundle) -> list[str]:
@@ -536,7 +594,9 @@ def export_stage1(
     include = ("pass", "flag") if include_flag else ("pass",)
     planned, skipped = plan_export(work, include)
     if not planned:
-        raise ExportRefused([f"{work}: no segment to export ({len(skipped)} skipped)"])
+        reasons = Counter(str(s["reason"]).split(":")[0] for s in skipped)
+        why = ", ".join(f"{n} {reason}" for reason, n in sorted(reasons.items()))
+        raise ExportRefused([f"{work}: no segment to export ({len(skipped)} skipped: {why})"])
     existed = out.exists()
     if existed and any(out.iterdir()):
         raise ExportRefused([f"{out} is not empty: an export is never written over"])
@@ -584,7 +644,7 @@ def _write(
     work: Path,
     out: Path,
     planned: list[Planned],
-    skipped: list[dict[str, str]],
+    skipped: list[dict[str, Any]],
     include: Sequence[str],
     release_id: str | None,
 ) -> Stage1Export:
@@ -618,9 +678,6 @@ def _write(
                     "action_quality": bundle.action_quality,
                 },
             )
-            if not np.isfinite(actions).all():
-                where = f"{item.episode.episode_id} {item.segment.segment.step_id}"
-                raise ExportRefused([f"{where}: actions_48d has NaN or Inf"])
             stats_inputs.append((actions, transforms[CAMERA]))
             cuts.append((out / f"{item.relpath}.mp4", start, stop))
             samples.append(_sample_meta(item, pose, start, stop))

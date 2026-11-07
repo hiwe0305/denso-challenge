@@ -384,13 +384,23 @@ def test_a_refused_export_into_a_symlink_empties_its_target(tmp_path: Path) -> N
     assert (tmp_path / "out").is_symlink() and list(target.iterdir()) == []
 
 
-def test_non_finite_actions_refuse_the_export_and_leave_nothing(tmp_path: Path) -> None:
-    work = build(tmp_path / "work", [Spec("ep_a", 10, [(0, 10)]), Spec("ep_b", 10, [(0, 10)])])
+def test_a_non_finite_camera_drops_its_segment_not_the_export(tmp_path: Path) -> None:
+    specs = [Spec("ep_a", 10, [(0, 10)]), Spec("ep_b", 10, [(0, 5), (5, 10)])]
+    work = build(tmp_path / "work", specs)
     bundle = json.loads((work / "egocentric/ep_b/bundle.json").read_text())
     with h5py.File(bundle["hdf5"], "r+") as f:
-        f["transforms/rightThumbTip"][4, 0, 3] = np.nan
-    with pytest.raises(ExportRefused, match="ep_b step_0: actions_48d has NaN"):
-        export(work, tmp_path / "out")
-    assert not (tmp_path / "out").exists()
-    [ledger] = (tmp_path / "store").rglob("ledger.jsonl")
-    assert "failed: ExportRefused" in ledger.read_text().splitlines()[-1]
+        f["transforms/camera"][7, 0, 3] = np.nan
+    meta = export(work, tmp_path / "out")
+    assert [(s["episode_id"], s["step_id"], s["hdf5"]) for s in meta["samples"]] == [
+        ("ep_a", "step_0", "part1/pick_place_cup/0.hdf5"),
+        ("ep_b", "step_0", "part1/pick_place_cup/1.hdf5"),
+    ]
+    assert meta["skipped"] == [
+        {
+            "episode_id": "ep_b",
+            "step_id": "step_1",
+            "frame_start": 5,
+            "frame_end": 10,
+            "reason": "not finite: camera in 1 of 5 frames",
+        }
+    ]
