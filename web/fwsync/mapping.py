@@ -350,3 +350,125 @@ def map_defect_manifest(payload: Any) -> dict[str, Any]:
             for defect in manifest.defects
         ],
     }
+
+
+#: Dạng `bench_result.json` của DA-31 mà bộ nạp hiểu. `da31-1` thiếu
+#: `recall_unmasked_by_kind` và tính báo nhầm khác (hotfix #141), nên nạp nó
+#: vào cùng cột với `da31-2` sẽ đặt hai con số khác nghĩa cạnh nhau.
+BENCH_VERSIONS = ("da31-2",)
+BENCH_LAYERS = ("code", "agent")
+_BENCH_LAYER_KEYS = (
+    "recall_by_kind", "masked_by_kind", "recall_unmasked_by_kind", "precision_by_code",
+    "false_alarm_on_clean", "false_alarm_not_a_unit", "clean_reports", "natural",
+    "seconds_to_report", "uncoded",
+)
+
+
+def map_bench_result(payload: Any, result_sha256: str) -> dict[str, list[dict[str, Any]]]:
+    """Một `bench_result.json` của DA-31 thành dòng `defect_bench_groups` và `defect_scores`.
+
+    File này không phải artifact hợp đồng: DA-31 (làn Đánh giá) định nghĩa nó
+    ở `flywheel.eval.agentqa.bench.report`, và `web/tests/test_bench_result.py`
+    so dạng của nó với hàm thật. Vì vậy mapper kiểm tay, và **nghiêm**: một
+    khoá thiếu là từ chối cả file, không bỏ một con số rồi hiện bảng điểm
+    thiếu dòng như thể lớp đó không báo gì.
+
+    `result_sha256` là hash của đúng chuỗi JSON (như `bench_result.sha256`),
+    do runner tính vì tầng này không mở file. Nó là danh tính của lần chấm:
+    chấm lại ra file khác, hash khác, dòng khác (append-only).
+    """
+    if not isinstance(payload, dict):
+        raise MappingError("bench result: phải là một đối tượng JSON")
+    version = payload.get("bench_version")
+    if version not in BENCH_VERSIONS:
+        raise MappingError(
+            f"bench result: bench_version {version!r} không nhận; bộ nạp hiểu {BENCH_VERSIONS}"
+        )
+    head = _require(payload, ("measured_on", "false_alarm_on_clean", "created_at",
+                              "manifest_sha256", "inputs", "groups"), "bench result")
+    if not isinstance(head["groups"], list) or not head["groups"]:
+        raise MappingError("bench result: `groups` rỗng; một lần chấm không nhóm nào là file hỏng")
+    groups: list[dict[str, Any]] = []
+    scores: list[dict[str, Any]] = []
+    for index, group in enumerate(head["groups"]):
+        where = f"bench result groups[{index}]"
+        g = _require(group, ("group", "injected_copy", "clean_copy", "defects", "layers",
+                             "split", "agent_quality"), where)
+        name = str(g["group"])
+        layers = g["layers"]
+        if not isinstance(layers, dict) or set(layers) != set(BENCH_LAYERS):
+            raise MappingError(f"{where}: `layers` phải có đúng {BENCH_LAYERS}")
+        quality = _require(g["agent_quality"], ("ranking", "reviews", "findings"),
+                           f"{where}.agent_quality")
+        ranking = _rate(quality["ranking"], f"{where}.agent_quality.ranking")
+        per_layer: dict[str, dict[str, Any]] = {}
+        for layer in BENCH_LAYERS:
+            lw = f"{where}.layers.{layer}"
+            body = _require(layers[layer], _BENCH_LAYER_KEYS, lw)
+            per_layer[layer] = body
+            key = {"result_sha256": result_sha256, "group_name": name, "layer": layer,
+                   "created_at": head["created_at"]}
+            masked = body["masked_by_kind"]
+            for kind, rate in body["recall_by_kind"].items():
+                if kind not in masked:
+                    raise MappingError(f"{lw}: loại `{kind}` có recall mà không có masked_by_kind")
+                scores.append({**key, "metric": "recall", "subject": kind,
+                               **_rate(rate, f"{lw}.recall_by_kind.{kind}"),
+                               "masked": int(masked[kind]), "bound": None})
+            for kind, rate in body["recall_unmasked_by_kind"].items():
+                scores.append({**key, "metric": "recall_unmasked", "subject": kind,
+                               **_rate(rate, f"{lw}.recall_unmasked_by_kind.{kind}"),
+                               "masked": None, "bound": None})
+            for code, rate in body["precision_by_code"].items():
+                scores.append({**key, "metric": "precision", "subject": code,
+                               **_rate(rate, f"{lw}.precision_by_code.{code}"),
+                               "masked": None, "bound": None})
+            false_alarm = body["false_alarm_on_clean"]
+            if not isinstance(false_alarm, dict) or "bound" not in false_alarm:
+                raise MappingError(f"{lw}.false_alarm_on_clean: thiếu `bound`")
+            scores.append({**key, "metric": "false_alarm", "subject": "*",
+                           **_rate(false_alarm, f"{lw}.false_alarm_on_clean"),
+                           "masked": None, "bound": "upper"})
+        groups.append({
+            "result_sha256": result_sha256,
+            "bench_version": version,
+            "measured_on": head["measured_on"],
+            "false_alarm_note": head["false_alarm_on_clean"],
+            "group_name": name,
+            "injected_copy": g["injected_copy"],
+            "clean_copy": g["clean_copy"],
+            "defects": int(g["defects"]),
+            "split": g["split"],
+            "seconds_to_report": {k: v["seconds_to_report"] for k, v in per_layer.items()},
+            "clean_reports": {k: v["clean_reports"] for k, v in per_layer.items()},
+            "natural": {k: v["natural"] for k, v in per_layer.items()},
+            "not_a_unit": {k: v["false_alarm_not_a_unit"] for k, v in per_layer.items()},
+            "uncoded": {k: v["uncoded"] for k, v in per_layer.items()},
+            "agent_ranking_hit": ranking["hit"],
+            "agent_ranking_total": ranking["total"],
+            "agent_reviews": quality["reviews"],
+            "agent_findings": quality["findings"],
+            "manifest_sha256": head["manifest_sha256"],
+            "inputs": head["inputs"],
+            "created_at": head["created_at"],
+        })
+    return {"defect_bench_groups": groups, "defect_scores": scores}
+
+
+def _require(value: Any, keys: tuple[str, ...], where: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise MappingError(f"{where}: phải là một đối tượng JSON")
+    missing = [key for key in keys if key not in value]
+    if missing:
+        raise MappingError(f"{where}: thiếu {missing}")
+    return value
+
+
+def _rate(value: Any, where: str) -> dict[str, int]:
+    """`{hit, total, value}` của DA-31 thành hai cột; `value` do view tính lại."""
+    if not isinstance(value, dict):
+        raise MappingError(f"{where}: phải là {{hit, total, value}}")
+    hit, total = value.get("hit"), value.get("total")
+    if not isinstance(hit, int) or not isinstance(total, int) or not 0 <= hit <= total:
+        raise MappingError(f"{where}: hit={hit!r}, total={total!r} không phải 0 <= hit <= total")
+    return {"hit": hit, "total": total}

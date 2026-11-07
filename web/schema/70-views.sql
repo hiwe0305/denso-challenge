@@ -78,26 +78,31 @@ GROUP BY d.id, d.dataset_code, e.source_kind, e.synthetic_tier, d.origin;
 -- ---------------------------------------------------------------------------
 -- v_defect_detection · bảng điểm lỗi cấy (M3)
 -- ---------------------------------------------------------------------------
--- Hai cột `code` và `agent` cạnh nhau là lý do bảng defect_scores có cột
--- `detector`. Precision và recall tính ở đây, không ở FE, để M3 và báo cáo
--- không thể lệch công thức.
+-- Hai lớp `code` và `agent` cạnh nhau là lý do bảng defect_scores có cột
+-- `layer`. `value` tính ở đây, không ở FE, để M3 và báo cáo không thể lệch
+-- công thức; mẫu 0 cho NULL, đúng `value: null` của DA-31, không phải 0.
+-- Chỉ lần chấm mới nhất của mỗi nhóm (`is_latest`); lần cũ vẫn còn trong bảng.
 CREATE VIEW v_defect_detection AS
 SELECT
-  s.manifest_id,
-  m.dataset_id,
-  s.scorer_version,
-  s.detector,
-  s.agent_model,
-  s.code,
-  s.tp, s.fp, s.fn,
-  CASE WHEN s.tp + s.fp > 0 THEN s.tp::numeric / (s.tp + s.fp) END AS precision,
-  CASE WHEN s.tp + s.fn > 0 THEN s.tp::numeric / (s.tp + s.fn) END AS recall,
-  s.false_alarm_rate,
-  s.latency_s,
+  s.result_sha256,
+  g.bench_version,
+  s.group_name,
+  g.injected_copy,
+  g.clean_copy,
+  s.layer,
+  s.metric,
+  s.subject,
+  s.hit,
+  s.total,
+  CASE WHEN s.total > 0 THEN s.hit::numeric / s.total END AS value,
+  s.masked,
+  s.bound,
   s.created_at,
+  g.created_at = max(g.created_at) OVER (PARTITION BY s.group_name) AS is_latest,
   s.origin
 FROM defect_scores s
-JOIN defect_manifests m ON m.id = s.manifest_id;
+JOIN defect_bench_groups g
+  ON g.result_sha256 = s.result_sha256 AND g.group_name = s.group_name;
 
 -- ---------------------------------------------------------------------------
 -- v_eval_funnel · phễu theo bước (M6)

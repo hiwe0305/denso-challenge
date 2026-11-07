@@ -657,3 +657,104 @@ export interface SensitivityRow {
   by_branch: Array<{ branch: string | null; usd: number }>;
   total_usd: number;
 }
+
+// ---------------------------------------------------------------- M3
+
+/** `{hit, total, value}` of DA-31; `value` is null when `total` is 0, never 0. */
+export interface DefectRate {
+  hit: number;
+  total: number;
+  value: number | null;
+}
+
+export type BenchLayer = "code" | "agent";
+export type ByLayer<T> = Record<BenchLayer, T>;
+
+/** v_defect_detection: one rate of one layer in one group of one bench run. */
+export interface DefectScoreRow {
+  result_sha256: string;
+  bench_version: string;
+  group_name: string;
+  injected_copy: string;
+  clean_copy: string;
+  layer: BenchLayer;
+  metric: "recall" | "recall_unmasked" | "precision" | "false_alarm";
+  /** Kind for recall, code for precision, "*" for the false alarm. */
+  subject: string;
+  hit: number;
+  total: number;
+  value: number | null;
+  masked: number | null;
+  bound: "upper" | null;
+  created_at: string;
+  is_latest: boolean;
+  origin: Origin;
+}
+
+/** One defect kind: what code caught, what the agent adds (DA-31 AC 3). */
+export interface DefectKindRow {
+  kind: string;
+  code: string;
+  injected: number;
+  by_code: number;
+  agent_adds: number;
+  together: number;
+  agent_alone: number;
+  /** Defects of this kind hidden by a natural defect of the real data. */
+  masked: ByLayer<number>;
+  recall: ByLayer<DefectRate>;
+  recall_unmasked: ByLayer<DefectRate>;
+}
+
+export interface DefectTotals {
+  injected: number;
+  by_code: number;
+  agent_adds: number;
+  together: number;
+}
+
+/** One agent finding judged against the key, with the engineer's review. */
+export interface DefectFinding {
+  copy: string;
+  report_id: string;
+  finding_id: string;
+  rank: number;
+  target: string;
+  code: string;
+  label: "hit" | "false" | "natural" | "clean";
+  review: "agree" | "override" | "unreviewed";
+  reason: string;
+}
+
+/** One group (`data`, `logs`) of a bench run: an injected copy and its clean twin. */
+export interface DefectBenchGroup {
+  group_name: string;
+  injected_copy: string;
+  clean_copy: string;
+  defects: number;
+  totals: DefectTotals;
+  kinds: DefectKindRow[];
+  codes: Array<{ code: string; precision: ByLayer<DefectRate> }>;
+  /** An upper bound: the clean copy still holds the real data's own defects. */
+  false_alarm: ByLayer<DefectRate>;
+  /** Seconds from the job's end to the report, per copy; null = not measured. */
+  seconds_to_report: ByLayer<Record<string, number | null>>;
+  clean_reports: ByLayer<Array<[string, string]>>;
+  natural: ByLayer<Array<[string, string]>>;
+  not_a_unit: ByLayer<string[]>;
+  agent_ranking: DefectRate;
+  agent_reviews: Record<string, Record<string, number>>;
+  agent_findings: DefectFinding[];
+}
+
+/** GET /defects/scoreboard · the newest bench run; `result_sha256` null when none. */
+export interface DefectScoreboard {
+  result_sha256: string | null;
+  bench_version: string | null;
+  created_at: string | null;
+  measured_on: string | null;
+  false_alarm_note: string | null;
+  totals: DefectTotals;
+  groups: DefectBenchGroup[];
+  origin: Origin | null;
+}

@@ -11027,5 +11027,1946 @@
   "next_cursor": null,
   "total": 2
  },
- "- /sync/runs": []
+ "- /sync/runs": [],
+ "- /defects/scoreboard": {
+  "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+  "bench_version": "da31-2",
+  "created_at": "2026-11-12T03:00:00+00:00",
+  "measured_on": "injected defects (DA-27), not natural defects",
+  "false_alarm_note": "upper bound (cận trên): the clean copy still holds the real data's own defects, and a report of one of them counts as a false alarm",
+  "totals": {
+   "injected": 10,
+   "by_code": 6,
+   "agent_adds": 2,
+   "together": 8
+  },
+  "groups": [
+   {
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "defects": 7,
+    "totals": {
+     "injected": 7,
+     "by_code": 5,
+     "agent_adds": 1,
+     "together": 6
+    },
+    "kinds": [
+     {
+      "kind": "missing_column",
+      "code": "D1",
+      "injected": 1,
+      "by_code": 1,
+      "agent_adds": 0,
+      "together": 1,
+      "agent_alone": 1,
+      "masked": {
+       "code": 0,
+       "agent": 0
+      },
+      "recall": {
+       "code": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      },
+      "recall_unmasked": {
+       "code": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      }
+     },
+     {
+      "kind": "dropped_frames",
+      "code": "D2",
+      "injected": 1,
+      "by_code": 1,
+      "agent_adds": 0,
+      "together": 1,
+      "agent_alone": 1,
+      "masked": {
+       "code": 0,
+       "agent": 0
+      },
+      "recall": {
+       "code": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      },
+      "recall_unmasked": {
+       "code": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      }
+     },
+     {
+      "kind": "action_scale",
+      "code": "D3",
+      "injected": 1,
+      "by_code": 1,
+      "agent_adds": 0,
+      "together": 1,
+      "agent_alone": 1,
+      "masked": {
+       "code": 0,
+       "agent": 0
+      },
+      "recall": {
+       "code": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      },
+      "recall_unmasked": {
+       "code": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      }
+     },
+     {
+      "kind": "dead_dim",
+      "code": "D4",
+      "injected": 1,
+      "by_code": 1,
+      "agent_adds": 0,
+      "together": 1,
+      "agent_alone": 1,
+      "masked": {
+       "code": 0,
+       "agent": 0
+      },
+      "recall": {
+       "code": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      },
+      "recall_unmasked": {
+       "code": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      }
+     },
+     {
+      "kind": "duplicate_episode",
+      "code": "D5",
+      "injected": 1,
+      "by_code": 0,
+      "agent_adds": 0,
+      "together": 0,
+      "agent_alone": 0,
+      "masked": {
+       "code": 0,
+       "agent": 0
+      },
+      "recall": {
+       "code": {
+        "hit": 0,
+        "total": 1,
+        "value": 0
+       },
+       "agent": {
+        "hit": 0,
+        "total": 1,
+        "value": 0
+       }
+      },
+      "recall_unmasked": {
+       "code": {
+        "hit": 0,
+        "total": 1,
+        "value": 0
+       },
+       "agent": {
+        "hit": 0,
+        "total": 1,
+        "value": 0
+       }
+      }
+     },
+     {
+      "kind": "label_swap",
+      "code": "D6",
+      "injected": 1,
+      "by_code": 0,
+      "agent_adds": 1,
+      "together": 1,
+      "agent_alone": 1,
+      "masked": {
+       "code": 0,
+       "agent": 0
+      },
+      "recall": {
+       "code": {
+        "hit": 0,
+        "total": 1,
+        "value": 0
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      },
+      "recall_unmasked": {
+       "code": {
+        "hit": 0,
+        "total": 1,
+        "value": 0
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      }
+     },
+     {
+      "kind": "action_sign_flip",
+      "code": "D7",
+      "injected": 1,
+      "by_code": 1,
+      "agent_adds": 0,
+      "together": 1,
+      "agent_alone": 1,
+      "masked": {
+       "code": 0,
+       "agent": 0
+      },
+      "recall": {
+       "code": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      },
+      "recall_unmasked": {
+       "code": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      }
+     }
+    ],
+    "codes": [
+     {
+      "code": "D1",
+      "precision": {
+       "code": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      }
+     },
+     {
+      "code": "D2",
+      "precision": {
+       "code": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       },
+       "agent": {
+        "hit": 1,
+        "total": 2,
+        "value": 0.5
+       }
+      }
+     },
+     {
+      "code": "D3",
+      "precision": {
+       "code": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      }
+     },
+     {
+      "code": "D4",
+      "precision": {
+       "code": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      }
+     },
+     {
+      "code": "D5",
+      "precision": {
+       "code": {
+        "hit": 0,
+        "total": 0,
+        "value": null
+       },
+       "agent": {
+        "hit": 0,
+        "total": 0,
+        "value": null
+       }
+      }
+     },
+     {
+      "code": "D6",
+      "precision": {
+       "code": {
+        "hit": 0,
+        "total": 0,
+        "value": null
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      }
+     },
+     {
+      "code": "D7",
+      "precision": {
+       "code": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      }
+     }
+    ],
+    "false_alarm": {
+     "code": {
+      "hit": 0,
+      "total": 10,
+      "value": 0
+     },
+     "agent": {
+      "hit": 1,
+      "total": 10,
+      "value": 0.1
+     }
+    },
+    "seconds_to_report": {
+     "code": {
+      "bench_kbd_teleop": 4.2,
+      "bench_kbd_teleop_clean": 3.9
+     },
+     "agent": {
+      "bench_kbd_teleop": 95,
+      "bench_kbd_teleop_clean": 88
+     }
+    },
+    "clean_reports": {
+     "code": [],
+     "agent": [
+      [
+       "ep_bench_09",
+       "D4"
+      ]
+     ]
+    },
+    "natural": {
+     "code": [],
+     "agent": []
+    },
+    "not_a_unit": {
+     "code": [],
+     "agent": []
+    },
+    "agent_ranking": {
+     "hit": 4,
+     "total": 6,
+     "value": 0.6666666666666666
+    },
+    "agent_reviews": {
+     "clean": {
+      "unreviewed": 1
+     },
+     "false": {
+      "override": 1
+     },
+     "hit": {
+      "agree": 5,
+      "unreviewed": 1
+     }
+    },
+    "agent_findings": [
+     {
+      "code": "D1",
+      "copy": "bench_kbd_teleop",
+      "finding_id": "r-bench_kbd_teleop-f0",
+      "label": "hit",
+      "rank": 1,
+      "reason": "",
+      "report_id": "r-bench_kbd_teleop",
+      "review": "agree",
+      "target": "ep_bench_00"
+     },
+     {
+      "code": "D2",
+      "copy": "bench_kbd_teleop",
+      "finding_id": "r-bench_kbd_teleop-f1",
+      "label": "hit",
+      "rank": 2,
+      "reason": "",
+      "report_id": "r-bench_kbd_teleop",
+      "review": "agree",
+      "target": "ep_bench_01"
+     },
+     {
+      "code": "D3",
+      "copy": "bench_kbd_teleop",
+      "finding_id": "r-bench_kbd_teleop-f2",
+      "label": "hit",
+      "rank": 3,
+      "reason": "",
+      "report_id": "r-bench_kbd_teleop",
+      "review": "agree",
+      "target": "ep_bench_02"
+     },
+     {
+      "code": "D4",
+      "copy": "bench_kbd_teleop",
+      "finding_id": "r-bench_kbd_teleop-f3",
+      "label": "hit",
+      "rank": 4,
+      "reason": "",
+      "report_id": "r-bench_kbd_teleop",
+      "review": "agree",
+      "target": "ep_bench_03"
+     },
+     {
+      "code": "D2",
+      "copy": "bench_kbd_teleop",
+      "finding_id": "r-bench_kbd_teleop-f4",
+      "label": "false",
+      "rank": 5,
+      "reason": "kỹ sư: không phải lỗi",
+      "report_id": "r-bench_kbd_teleop",
+      "review": "override",
+      "target": "ep_bench_08"
+     },
+     {
+      "code": "D6",
+      "copy": "bench_kbd_teleop",
+      "finding_id": "r-bench_kbd_teleop-f5",
+      "label": "hit",
+      "rank": 6,
+      "reason": "",
+      "report_id": "r-bench_kbd_teleop",
+      "review": "agree",
+      "target": "ep_bench_05"
+     },
+     {
+      "code": "D7",
+      "copy": "bench_kbd_teleop",
+      "finding_id": "r-bench_kbd_teleop-f6",
+      "label": "hit",
+      "rank": 7,
+      "reason": "",
+      "report_id": "r-bench_kbd_teleop",
+      "review": "unreviewed",
+      "target": "ep_bench_06"
+     },
+     {
+      "code": "D4",
+      "copy": "bench_kbd_teleop_clean",
+      "finding_id": "r-bench_kbd_teleop_clean-f0",
+      "label": "clean",
+      "rank": 1,
+      "reason": "",
+      "report_id": "r-bench_kbd_teleop_clean",
+      "review": "unreviewed",
+      "target": "ep_bench_09"
+     }
+    ]
+   },
+   {
+    "group_name": "logs",
+    "injected_copy": "bench_logs_bfail",
+    "clean_copy": "bench_logs_bfail_clean",
+    "defects": 3,
+    "totals": {
+     "injected": 3,
+     "by_code": 1,
+     "agent_adds": 1,
+     "together": 2
+    },
+    "kinds": [
+     {
+      "kind": "nan_loss",
+      "code": "T1",
+      "injected": 1,
+      "by_code": 1,
+      "agent_adds": 0,
+      "together": 1,
+      "agent_alone": 1,
+      "masked": {
+       "code": 0,
+       "agent": 0
+      },
+      "recall": {
+       "code": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      },
+      "recall_unmasked": {
+       "code": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      }
+     },
+     {
+      "kind": "overfit",
+      "code": "T3",
+      "injected": 1,
+      "by_code": 0,
+      "agent_adds": 1,
+      "together": 1,
+      "agent_alone": 1,
+      "masked": {
+       "code": 0,
+       "agent": 0
+      },
+      "recall": {
+       "code": {
+        "hit": 0,
+        "total": 1,
+        "value": 0
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      },
+      "recall_unmasked": {
+       "code": {
+        "hit": 0,
+        "total": 1,
+        "value": 0
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      }
+     },
+     {
+      "kind": "dead_dim_train",
+      "code": "T5",
+      "injected": 1,
+      "by_code": 0,
+      "agent_adds": 0,
+      "together": 0,
+      "agent_alone": 0,
+      "masked": {
+       "code": 0,
+       "agent": 0
+      },
+      "recall": {
+       "code": {
+        "hit": 0,
+        "total": 1,
+        "value": 0
+       },
+       "agent": {
+        "hit": 0,
+        "total": 1,
+        "value": 0
+       }
+      },
+      "recall_unmasked": {
+       "code": {
+        "hit": 0,
+        "total": 1,
+        "value": 0
+       },
+       "agent": {
+        "hit": 0,
+        "total": 1,
+        "value": 0
+       }
+      }
+     }
+    ],
+    "codes": [
+     {
+      "code": "T1",
+      "precision": {
+       "code": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      }
+     },
+     {
+      "code": "T3",
+      "precision": {
+       "code": {
+        "hit": 0,
+        "total": 0,
+        "value": null
+       },
+       "agent": {
+        "hit": 1,
+        "total": 1,
+        "value": 1
+       }
+      }
+     },
+     {
+      "code": "T5",
+      "precision": {
+       "code": {
+        "hit": 0,
+        "total": 0,
+        "value": null
+       },
+       "agent": {
+        "hit": 0,
+        "total": 0,
+        "value": null
+       }
+      }
+     }
+    ],
+    "false_alarm": {
+     "code": {
+      "hit": 0,
+      "total": 12,
+      "value": 0
+     },
+     "agent": {
+      "hit": 0,
+      "total": 12,
+      "value": 0
+     }
+    },
+    "seconds_to_report": {
+     "code": {
+      "bench_logs_bfail": 2.1,
+      "bench_logs_bfail_clean": 2
+     },
+     "agent": {
+      "bench_logs_bfail": 140,
+      "bench_logs_bfail_clean": 131
+     }
+    },
+    "clean_reports": {
+     "code": [],
+     "agent": []
+    },
+    "natural": {
+     "code": [],
+     "agent": []
+    },
+    "not_a_unit": {
+     "code": [],
+     "agent": []
+    },
+    "agent_ranking": {
+     "hit": 0,
+     "total": 0,
+     "value": null
+    },
+    "agent_reviews": {
+     "hit": {
+      "agree": 1,
+      "unreviewed": 1
+     }
+    },
+    "agent_findings": [
+     {
+      "code": "T1",
+      "copy": "bench_logs_bfail",
+      "finding_id": "r-bench_logs_bfail-f0",
+      "label": "hit",
+      "rank": 1,
+      "reason": "",
+      "report_id": "r-bench_logs_bfail",
+      "review": "agree",
+      "target": "runs/exp_BFAIL/metrics.jsonl"
+     },
+     {
+      "code": "T3",
+      "copy": "bench_logs_bfail",
+      "finding_id": "r-bench_logs_bfail-f1",
+      "label": "hit",
+      "rank": 2,
+      "reason": "",
+      "report_id": "r-bench_logs_bfail",
+      "review": "unreviewed",
+      "target": "runs/exp_BFAIL/metrics.jsonl"
+     }
+    ]
+   }
+  ],
+  "origin": "mock"
+ },
+ "- /defects/scores?limit=500": {
+  "items": [
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "recall",
+    "subject": "action_scale",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": 0,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "recall",
+    "subject": "action_sign_flip",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": 0,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "recall",
+    "subject": "dead_dim",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": 0,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "recall",
+    "subject": "dropped_frames",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": 0,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "recall",
+    "subject": "duplicate_episode",
+    "hit": 0,
+    "total": 1,
+    "value": 0,
+    "masked": 0,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "recall",
+    "subject": "label_swap",
+    "hit": 0,
+    "total": 1,
+    "value": 0,
+    "masked": 0,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "recall",
+    "subject": "missing_column",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": 0,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "recall_unmasked",
+    "subject": "action_scale",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "recall_unmasked",
+    "subject": "action_sign_flip",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "recall_unmasked",
+    "subject": "dead_dim",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "recall_unmasked",
+    "subject": "dropped_frames",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "recall_unmasked",
+    "subject": "duplicate_episode",
+    "hit": 0,
+    "total": 1,
+    "value": 0,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "recall_unmasked",
+    "subject": "label_swap",
+    "hit": 0,
+    "total": 1,
+    "value": 0,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "recall_unmasked",
+    "subject": "missing_column",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "precision",
+    "subject": "D1",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "precision",
+    "subject": "D2",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "precision",
+    "subject": "D3",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "precision",
+    "subject": "D4",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "precision",
+    "subject": "D5",
+    "hit": 0,
+    "total": 0,
+    "value": null,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "precision",
+    "subject": "D6",
+    "hit": 0,
+    "total": 0,
+    "value": null,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "precision",
+    "subject": "D7",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "code",
+    "metric": "false_alarm",
+    "subject": "*",
+    "hit": 0,
+    "total": 10,
+    "value": 0,
+    "masked": null,
+    "bound": "upper",
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "recall",
+    "subject": "action_scale",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": 0,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "recall",
+    "subject": "action_sign_flip",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": 0,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "recall",
+    "subject": "dead_dim",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": 0,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "recall",
+    "subject": "dropped_frames",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": 0,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "recall",
+    "subject": "duplicate_episode",
+    "hit": 0,
+    "total": 1,
+    "value": 0,
+    "masked": 0,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "recall",
+    "subject": "label_swap",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": 0,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "recall",
+    "subject": "missing_column",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": 0,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "recall_unmasked",
+    "subject": "action_scale",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "recall_unmasked",
+    "subject": "action_sign_flip",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "recall_unmasked",
+    "subject": "dead_dim",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "recall_unmasked",
+    "subject": "dropped_frames",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "recall_unmasked",
+    "subject": "duplicate_episode",
+    "hit": 0,
+    "total": 1,
+    "value": 0,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "recall_unmasked",
+    "subject": "label_swap",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "recall_unmasked",
+    "subject": "missing_column",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "precision",
+    "subject": "D1",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "precision",
+    "subject": "D2",
+    "hit": 1,
+    "total": 2,
+    "value": 0.5,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "precision",
+    "subject": "D3",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "precision",
+    "subject": "D4",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "precision",
+    "subject": "D5",
+    "hit": 0,
+    "total": 0,
+    "value": null,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "precision",
+    "subject": "D6",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "precision",
+    "subject": "D7",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "data",
+    "injected_copy": "bench_kbd_teleop",
+    "clean_copy": "bench_kbd_teleop_clean",
+    "layer": "agent",
+    "metric": "false_alarm",
+    "subject": "*",
+    "hit": 1,
+    "total": 10,
+    "value": 0.1,
+    "masked": null,
+    "bound": "upper",
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "logs",
+    "injected_copy": "bench_logs_bfail",
+    "clean_copy": "bench_logs_bfail_clean",
+    "layer": "code",
+    "metric": "recall",
+    "subject": "dead_dim_train",
+    "hit": 0,
+    "total": 1,
+    "value": 0,
+    "masked": 0,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "logs",
+    "injected_copy": "bench_logs_bfail",
+    "clean_copy": "bench_logs_bfail_clean",
+    "layer": "code",
+    "metric": "recall",
+    "subject": "nan_loss",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": 0,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "logs",
+    "injected_copy": "bench_logs_bfail",
+    "clean_copy": "bench_logs_bfail_clean",
+    "layer": "code",
+    "metric": "recall",
+    "subject": "overfit",
+    "hit": 0,
+    "total": 1,
+    "value": 0,
+    "masked": 0,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "logs",
+    "injected_copy": "bench_logs_bfail",
+    "clean_copy": "bench_logs_bfail_clean",
+    "layer": "code",
+    "metric": "recall_unmasked",
+    "subject": "dead_dim_train",
+    "hit": 0,
+    "total": 1,
+    "value": 0,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "logs",
+    "injected_copy": "bench_logs_bfail",
+    "clean_copy": "bench_logs_bfail_clean",
+    "layer": "code",
+    "metric": "recall_unmasked",
+    "subject": "nan_loss",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "logs",
+    "injected_copy": "bench_logs_bfail",
+    "clean_copy": "bench_logs_bfail_clean",
+    "layer": "code",
+    "metric": "recall_unmasked",
+    "subject": "overfit",
+    "hit": 0,
+    "total": 1,
+    "value": 0,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "logs",
+    "injected_copy": "bench_logs_bfail",
+    "clean_copy": "bench_logs_bfail_clean",
+    "layer": "code",
+    "metric": "precision",
+    "subject": "T1",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "logs",
+    "injected_copy": "bench_logs_bfail",
+    "clean_copy": "bench_logs_bfail_clean",
+    "layer": "code",
+    "metric": "precision",
+    "subject": "T3",
+    "hit": 0,
+    "total": 0,
+    "value": null,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "logs",
+    "injected_copy": "bench_logs_bfail",
+    "clean_copy": "bench_logs_bfail_clean",
+    "layer": "code",
+    "metric": "precision",
+    "subject": "T5",
+    "hit": 0,
+    "total": 0,
+    "value": null,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "logs",
+    "injected_copy": "bench_logs_bfail",
+    "clean_copy": "bench_logs_bfail_clean",
+    "layer": "code",
+    "metric": "false_alarm",
+    "subject": "*",
+    "hit": 0,
+    "total": 12,
+    "value": 0,
+    "masked": null,
+    "bound": "upper",
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "logs",
+    "injected_copy": "bench_logs_bfail",
+    "clean_copy": "bench_logs_bfail_clean",
+    "layer": "agent",
+    "metric": "recall",
+    "subject": "dead_dim_train",
+    "hit": 0,
+    "total": 1,
+    "value": 0,
+    "masked": 0,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "logs",
+    "injected_copy": "bench_logs_bfail",
+    "clean_copy": "bench_logs_bfail_clean",
+    "layer": "agent",
+    "metric": "recall",
+    "subject": "nan_loss",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": 0,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "logs",
+    "injected_copy": "bench_logs_bfail",
+    "clean_copy": "bench_logs_bfail_clean",
+    "layer": "agent",
+    "metric": "recall",
+    "subject": "overfit",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": 0,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "logs",
+    "injected_copy": "bench_logs_bfail",
+    "clean_copy": "bench_logs_bfail_clean",
+    "layer": "agent",
+    "metric": "recall_unmasked",
+    "subject": "dead_dim_train",
+    "hit": 0,
+    "total": 1,
+    "value": 0,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "logs",
+    "injected_copy": "bench_logs_bfail",
+    "clean_copy": "bench_logs_bfail_clean",
+    "layer": "agent",
+    "metric": "recall_unmasked",
+    "subject": "nan_loss",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "logs",
+    "injected_copy": "bench_logs_bfail",
+    "clean_copy": "bench_logs_bfail_clean",
+    "layer": "agent",
+    "metric": "recall_unmasked",
+    "subject": "overfit",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "logs",
+    "injected_copy": "bench_logs_bfail",
+    "clean_copy": "bench_logs_bfail_clean",
+    "layer": "agent",
+    "metric": "precision",
+    "subject": "T1",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "logs",
+    "injected_copy": "bench_logs_bfail",
+    "clean_copy": "bench_logs_bfail_clean",
+    "layer": "agent",
+    "metric": "precision",
+    "subject": "T3",
+    "hit": 1,
+    "total": 1,
+    "value": 1,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "logs",
+    "injected_copy": "bench_logs_bfail",
+    "clean_copy": "bench_logs_bfail_clean",
+    "layer": "agent",
+    "metric": "precision",
+    "subject": "T5",
+    "hit": 0,
+    "total": 0,
+    "value": null,
+    "masked": null,
+    "bound": null,
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   },
+   {
+    "result_sha256": "373fd096ed42568727def1b7f00dde779e8268f152250b60b4402eae2c59adbe",
+    "bench_version": "da31-2",
+    "group_name": "logs",
+    "injected_copy": "bench_logs_bfail",
+    "clean_copy": "bench_logs_bfail_clean",
+    "layer": "agent",
+    "metric": "false_alarm",
+    "subject": "*",
+    "hit": 0,
+    "total": 12,
+    "value": 0,
+    "masked": null,
+    "bound": "upper",
+    "created_at": "2026-11-12T03:00:00+00:00",
+    "is_latest": true,
+    "origin": "mock"
+   }
+  ],
+  "next_cursor": null,
+  "total": 64
+ }
 }

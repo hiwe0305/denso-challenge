@@ -18,6 +18,11 @@ import type {
   DataAllocationRow,
   DatasetRow,
   DecisionRow,
+  DefectBenchGroup,
+  DefectRate,
+  DefectScoreboard,
+  DefectScoreRow,
+  DefectTotals,
   DiagnosticRun,
   E1CurvePoint,
   EpisodeRow,
@@ -77,6 +82,19 @@ import type {
 
 const ORIGIN = "mock" as const;
 
+type BenchLayer = "code" | "agent";
+const BENCH_LAYERS: readonly BenchLayer[] = ["code", "agent"];
+
+/** `hit / total`; null when there is nothing to divide by (DA-31's `value: null`). */
+function ratio(hit: number, total: number): number | null {
+  return total ? hit / total : null;
+}
+
+function benchTotals(parts: DefectTotals[]): DefectTotals {
+  const sum = (k: keyof DefectTotals) => parts.reduce((acc, p) => acc + p[k], 0);
+  return { injected: sum("injected"), by_code: sum("by_code"), agent_adds: sum("agent_adds"), together: sum("together") };
+}
+
 /** g/c stop rule: 1 percentage point per $100 (spec v10.5 §8, "Ngưỡng dừng g/c"). */
 export const STOP_THRESHOLD_PP_PER_100USD = 1;
 
@@ -121,6 +139,81 @@ export class MockViews {
       source_action_id: d.source_action_id ?? null,
       origin: ORIGIN,
     }));
+  }
+
+  // ============================================================== M3
+
+  /** v_defect_detection, in the order `fwsync` loads the file (mapper order). */
+  defectScores(): DefectScoreRow[] {
+    const b = this.d.bench;
+    if (b === null) return [];
+    const out: DefectScoreRow[] = [];
+    for (const g of b.groups) {
+      for (const layer of BENCH_LAYERS) {
+        const l = g.layers[layer];
+        const row = (metric: DefectScoreRow["metric"], subject: string, r: { hit: number; total: number },
+          masked: number | null, bound: "upper" | null): DefectScoreRow => ({
+          result_sha256: b.result_sha256, bench_version: b.bench_version, group_name: g.group,
+          injected_copy: g.injected_copy, clean_copy: g.clean_copy, layer, metric, subject,
+          hit: r.hit, total: r.total, value: ratio(r.hit, r.total), masked, bound,
+          created_at: b.created_at, is_latest: true, origin: ORIGIN,
+        });
+        for (const [kind, r] of Object.entries(l.recall_by_kind)) {
+          out.push(row("recall", kind, r, l.masked_by_kind[kind] ?? 0, null));
+        }
+        for (const [kind, r] of Object.entries(l.recall_unmasked_by_kind)) {
+          out.push(row("recall_unmasked", kind, r, null, null));
+        }
+        for (const [code, r] of Object.entries(l.precision_by_code)) {
+          out.push(row("precision", code, r, null, null));
+        }
+        out.push(row("false_alarm", "*", l.false_alarm_on_clean, null, "upper"));
+      }
+    }
+    return out;
+  }
+
+  /** M3 · the newest bench run, one block per group, code and agent side by side. */
+  defectScoreboard(): DefectScoreboard {
+    const b = this.d.bench;
+    const groups = b === null ? [] : [...b.groups].sort((x, y) => (x.group < y.group ? -1 : 1)).map((g) => {
+      const rate = (r: { hit: number; total: number } | undefined): DefectRate =>
+        r ? { hit: r.hit, total: r.total, value: ratio(r.hit, r.total) } : { hit: 0, total: 0, value: null };
+      const both = <T>(pick: (layer: BenchLayer) => T) => ({ code: pick("code"), agent: pick("agent") });
+      const kinds = g.split.map((s) => ({
+        kind: s.kind, code: s.code, injected: s.injected, by_code: s.by_code, agent_adds: s.agent_adds,
+        together: s.together, agent_alone: s.agent_alone,
+        masked: both((l) => g.layers[l].masked_by_kind[s.kind] ?? 0),
+        recall: both((l) => rate(g.layers[l].recall_by_kind[s.kind])),
+        recall_unmasked: both((l) => rate(g.layers[l].recall_unmasked_by_kind[s.kind])),
+      }));
+      const codes = [...new Set(BENCH_LAYERS.flatMap((l) => Object.keys(g.layers[l].precision_by_code)))].sort();
+      const block: DefectBenchGroup = {
+        group_name: g.group, injected_copy: g.injected_copy, clean_copy: g.clean_copy, defects: g.defects,
+        totals: benchTotals(kinds),
+        kinds,
+        codes: codes.map((code) => ({ code, precision: both((l) => rate(g.layers[l].precision_by_code[code])) })),
+        false_alarm: both((l) => rate(g.layers[l].false_alarm_on_clean)),
+        seconds_to_report: both((l) => g.layers[l].seconds_to_report),
+        clean_reports: both((l) => g.layers[l].clean_reports),
+        natural: both((l) => g.layers[l].natural),
+        not_a_unit: both((l) => g.layers[l].false_alarm_not_a_unit),
+        agent_ranking: rate(g.agent_quality.ranking),
+        agent_reviews: g.agent_quality.reviews,
+        agent_findings: g.agent_quality.findings,
+      };
+      return block;
+    });
+    return {
+      result_sha256: b?.result_sha256 ?? null,
+      bench_version: b?.bench_version ?? null,
+      created_at: b?.created_at ?? null,
+      measured_on: b?.measured_on ?? null,
+      false_alarm_note: b?.false_alarm_on_clean ?? null,
+      totals: benchTotals(groups.map((g) => g.totals)),
+      groups,
+      origin: b === null ? null : ORIGIN,
+    };
   }
 
   // ============================================================== M7

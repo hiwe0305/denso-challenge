@@ -95,7 +95,7 @@ def test_parity_covers_every_read_endpoint_of_7_1(client: TestClient) -> None:
     """A read route nobody compares is a route that can drift; list them all."""
     paths = client.get("/openapi.json").json()["paths"]
     routes = {path for path, ops in paths.items() if "get" in ops and path.startswith("/api")}
-    assert len(routes) == 30
+    assert len(routes) == 32
     covered = set()
     for line in PARITY_CASES:
         path = line.split(" ", 1)[1].split("?")[0]

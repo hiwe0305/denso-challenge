@@ -7,6 +7,7 @@ import type {
   AlgoStep,
   BranchComparisonRow,
   DecisionRow,
+  DefectScoreboard,
   SyncRunRow,
   ClusterBoardRow,
   E1CurvePoint,
@@ -79,6 +80,9 @@ export const useActions = () =>
 export const useDecisions = () => useGet<Page<DecisionRow>>("/decisions?limit=500");
 export const useSyncRuns = () => useGet<SyncRunRow[]>("/sync/runs");
 export const useRepairTicketsAll = () => useGet<RepairTicket[]>("/repair-tickets");
+
+// ---------------------------------------------------------------- M3
+export const useDefectScoreboard = () => useGet<DefectScoreboard>("/defects/scoreboard");
 
 // ---------------------------------------------------------------- M8
 export const useLedger = () => useGet<Page<LedgerRow>>("/cost/ledger?limit=500");

@@ -132,6 +132,10 @@ export function createHandlers(views = new MockViews(loadMockData())) {
 
   return [
     // ------------------------------------------------------------ M7
+    // M3
+    http.get(url("/defects/scoreboard"), () => HttpResponse.json(views.defectScoreboard())),
+    http.get(url("/defects/scores"), ({ request }) => HttpResponse.json(page(views.defectScores(), request))),
+
     http.get(url("/recommendations"), () => HttpResponse.json(views.recommendations())),
     http.get(url("/recommendations/:id"), ({ params }) =>
       json(views.recommendation(String(params.id)), "đề xuất")),

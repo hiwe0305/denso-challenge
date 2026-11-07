@@ -25,6 +25,7 @@ from web.fwsync import actions as log
 from web.fwsync.mapping import (
     DatasetLookup,
     MappingError,
+    map_bench_result,
     map_defect_manifest,
     map_episode,
     map_probe_result,
@@ -67,6 +68,7 @@ IMPORT_ORDER: tuple[str, ...] = (
     "decisions",
     "cost_ledger_entries",
     "defect_manifests",
+    "defect_bench_groups",
     "defect_scores",
 )
 
@@ -149,12 +151,6 @@ TOLERANT_COLUMNS: dict[str, frozenset[str]] = {
             # Bản 0.5 (PR #146): thiếu ba cột này thì đường khoan dung bỏ
             # R1, R2 ghi nhận kèm log, và M6 không còn thấy độ trễ.
             "timing", "recorded", "recorded_skipped",
-        }
-    ),
-    "defect_scores": frozenset(
-        {
-            "manifest_ref", "scorer_version", "detector", "agent_model", "code",
-            "tp", "fp", "fn", "false_alarm_rate", "latency_s",
         }
     ),
     "experiment_datasets": frozenset(
@@ -426,6 +422,9 @@ def _map(
         for item in manifest["items"]:
             rows.append(("defect_items", {"manifest_ref": head["manifest_ref"], **item}))
         return rows
+    if table == "defect_bench_groups":
+        bench = map_bench_result(record.payload, _bench_sha256(record))
+        return [(target, row) for target, rows in bench.items() for row in rows]
     if table in TOLERANT_TABLES:
         allowed = TOLERANT_COLUMNS.get(table)
         if allowed is None:
@@ -438,6 +437,27 @@ def _map(
             row["__unknown__"] = unknown
         return [(table, row)]
     raise MappingError(f"{record.where}: chưa có mapper cho bảng `{table}`")
+
+
+def _bench_sha256(record: Record) -> str:
+    """Hash của một `bench_result.json`, kiểm với `bench_result.sha256` bên cạnh.
+
+    DA-31 băm chuỗi JSON với `
+` rồi `write_text`, nên trên Windows file trên
+    đĩa có `
+` mà hash thì không. Đọc ở chế độ văn bản trả lại đúng chuỗi
+    đã băm. Hash lệch file khoá là file đã bị sửa sau khi chấm: từ chối.
+    """
+    digest = hashlib.sha256(record.path.read_text(encoding="utf-8").encode("utf-8")).hexdigest()
+    lock = record.path.with_suffix(".sha256")
+    if lock.exists():
+        expected = lock.read_text(encoding="utf-8").strip()
+        if expected != digest:
+            raise MappingError(
+                f"{record.where}: sha256 {digest[:12]}… khác {lock.name} {expected[:12]}…; "
+                f"kết quả chấm đã bị sửa sau khi ghi"
+            )
+    return digest
 
 
 def _error(record: Record, error: Exception) -> dict[str, Any]:

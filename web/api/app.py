@@ -224,6 +224,15 @@ def create_app(
     def sensitivity(price_book: str | None = None) -> Any:
         return model.sensitivity(price_book)
 
+    # ------------------------------------------------------------ M3
+    @r.get("/defects/scoreboard")
+    def defect_scoreboard() -> Any:
+        return model.defect_scoreboard()
+
+    @r.get("/defects/scores")
+    def defect_scores(cursor: str | None = None, limit: int | None = None) -> Any:
+        return _page(model.defect_scores(), cursor, limit)
+
     # ------------------------------------------------------------ actions
     @r.get("/actions")
     def action_list(sync_status: str | None = None, cursor: str | None = None,

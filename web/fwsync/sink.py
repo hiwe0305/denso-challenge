@@ -61,7 +61,8 @@ NATURAL_KEY: dict[str, tuple[str, ...]] = {
     "price_books": ("name", "sha256"),
     "defect_manifests": ("manifest_ref",),
     "defect_items": ("manifest_ref", "target_ref", "code"),
-    "defect_scores": ("manifest_ref", "scorer_version", "detector", "code"),
+    "defect_bench_groups": ("result_sha256", "group_name"),
+    "defect_scores": ("result_sha256", "group_name", "layer", "metric", "subject"),
     "pipeline_stage_runs": ("dataset_code", "stage_number", "attempt_no"),
     "experiment_datasets": ("experiment_code", "release_ref"),
     "diagnostic_runs": ("cluster_ref", "step_no", "check_name"),
@@ -91,6 +92,7 @@ APPEND_ONLY: frozenset[str] = frozenset(
         "train_diagnosis_skips",
         "fix_rate_events",
         "cost_ledger_entries",
+        "defect_bench_groups",
         "defect_scores",
     }
 )

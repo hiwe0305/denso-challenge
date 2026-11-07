@@ -69,6 +69,8 @@ class ReadModel(Protocol):
     def cost_by_intervention(self) -> list[Row]: ...
     def sensitivity(self, price_book: str | None) -> list[Row]: ...
     def decisions(self) -> list[Row]: ...
+    def defect_scoreboard(self) -> Row: ...
+    def defect_scores(self) -> list[Row]: ...
     def refresh(self) -> None: ...
 
 
@@ -1137,6 +1139,121 @@ class SinkReadModel:
                 "total_usd": js_round(sum(usd for _, usd in rounded), 2),
             })
         return out
+
+    # ============================================================ M3
+
+    def _latest_bench(self) -> str | None:
+        """`result_sha256` of the newest bench run (v_defect_detection.is_latest)."""
+        groups = self.t("defect_bench_groups")
+        if not groups:
+            return None
+        newest = max(groups, key=lambda g: (_parse_ts(g["created_at"]), g["result_sha256"]))
+        return str(newest["result_sha256"])
+
+    def defect_scores(self) -> list[Row]:
+        """v_defect_detection: every rate of every bench run, `value` computed here."""
+        latest = self._latest_bench()
+        groups = {(g["result_sha256"], g["group_name"]): g for g in self.t("defect_bench_groups")}
+        out = []
+        for s in self.t("defect_scores"):
+            g = groups.get((s["result_sha256"], s["group_name"]))
+            if g is None:
+                continue
+            out.append({
+                "result_sha256": s["result_sha256"], "bench_version": g["bench_version"],
+                "group_name": s["group_name"], "injected_copy": g["injected_copy"],
+                "clean_copy": g["clean_copy"], "layer": s["layer"], "metric": s["metric"],
+                "subject": s["subject"], "hit": s["hit"], "total": s["total"],
+                "value": _ratio(s["hit"], s["total"]), "masked": s.get("masked"),
+                "bound": s.get("bound"), "created_at": s["created_at"],
+                "is_latest": s["result_sha256"] == latest, "origin": s["origin"],
+            })
+        return out
+
+    def defect_scoreboard(self) -> Row:
+        """M3: the newest bench run, one block per group, code and agent side by side."""
+        latest = self._latest_bench()
+        groups = sorted(
+            (g for g in self.t("defect_bench_groups") if g["result_sha256"] == latest),
+            key=lambda g: str(g["group_name"]),
+        )
+        rates: dict[tuple[str, str, str, str], Row] = {}
+        for s in self.t("defect_scores"):
+            if s["result_sha256"] == latest:
+                rates[(s["group_name"], s["layer"], s["metric"], s["subject"])] = s
+        blocks = [_bench_block(g, rates) for g in groups]
+        head = groups[0] if groups else None
+        return {
+            "result_sha256": latest,
+            "bench_version": head["bench_version"] if head else None,
+            "created_at": head["created_at"] if head else None,
+            "measured_on": head["measured_on"] if head else None,
+            "false_alarm_note": head["false_alarm_note"] if head else None,
+            "totals": _bench_totals([b["totals"] for b in blocks]),
+            "groups": blocks,
+            "origin": head["origin"] if head else None,
+        }
+
+
+BENCH_LAYERS = ("code", "agent")
+
+
+def _ratio(hit: int, total: int) -> float | None:
+    return hit / total if total else None
+
+
+def _bench_rate(row: Row | None) -> Row:
+    """`{hit, total, value}`; a rate the bench did not write is 0 of 0, value null."""
+    hit, total = (row["hit"], row["total"]) if row else (0, 0)
+    return {"hit": hit, "total": total, "value": _ratio(hit, total)}
+
+
+def _bench_totals(parts: Iterable[Row]) -> Row:
+    keys = ("injected", "by_code", "agent_adds", "together")
+    rows = list(parts)
+    return {k: sum(int(p[k]) for p in rows) for k in keys}
+
+
+def _bench_block(g: Row, rates: dict[tuple[str, str, str, str], Row]) -> Row:
+    name = g["group_name"]
+
+    def both(metric: str, subject: str) -> Row:
+        return {layer: _bench_rate(rates.get((name, layer, metric, subject)))
+                for layer in BENCH_LAYERS}
+
+    kinds = []
+    for s in g["split"]:
+        masked = {
+            layer: int((rates.get((name, layer, "recall", s["kind"])) or {}).get("masked") or 0)
+            for layer in BENCH_LAYERS
+        }
+        kinds.append({
+            "kind": s["kind"], "code": s["code"], "injected": s["injected"],
+            "by_code": s["by_code"], "agent_adds": s["agent_adds"], "together": s["together"],
+            "agent_alone": s["agent_alone"], "masked": masked,
+            "recall": both("recall", s["kind"]),
+            "recall_unmasked": both("recall_unmasked", s["kind"]),
+        })
+    codes = sorted({subject for (n, _, metric, subject) in rates
+                    if n == name and metric == "precision"})
+    return {
+        "group_name": name,
+        "injected_copy": g["injected_copy"],
+        "clean_copy": g["clean_copy"],
+        "defects": g["defects"],
+        "totals": _bench_totals(kinds),
+        "kinds": kinds,
+        "codes": [{"code": c, "precision": both("precision", c)} for c in codes],
+        "false_alarm": both("false_alarm", "*"),
+        "seconds_to_report": g["seconds_to_report"],
+        "clean_reports": g["clean_reports"],
+        "natural": g["natural"],
+        "not_a_unit": g["not_a_unit"],
+        "agent_ranking": _bench_rate(
+            {"hit": g["agent_ranking_hit"], "total": g["agent_ranking_total"]}),
+        "agent_reviews": g["agent_reviews"],
+        "agent_findings": g["agent_findings"],
+    }
 
 
 @dataclass
