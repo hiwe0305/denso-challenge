@@ -5,14 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from ego_data import config_for, make_egodex
+from ego_data import config_for, make_egodex, pin_videos
 from flywheel.data.ingest.egocentric.config import EgoConfig, load_config
 
 
 @pytest.fixture
 def store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     root = tmp_path / "store"
-    make_egodex(root)
+    pin_videos(monkeypatch, make_egodex(root))
     monkeypatch.setenv("FW_ROOT", str(root))
     return root
 

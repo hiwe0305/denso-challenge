@@ -18,7 +18,7 @@ from flywheel.contracts.artifacts import Episode, QAReport
 from flywheel.contracts.segments import SEGMENT_SCHEMA
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "unit" / "egocentric"))
-from ego_data import config_for, make_egodex  # noqa: E402
+from ego_data import config_for, make_egodex, pin_videos  # noqa: E402
 from flywheel.data.ingest.egocentric import api  # noqa: E402
 from flywheel.data.ingest.egocentric.config import load_config  # noqa: E402
 from flywheel.data.ingest.egocentric.source import register_egodex  # noqa: E402
@@ -26,15 +26,15 @@ from flywheel.data.ingest.egocentric.source import register_egodex  # noqa: E402
 BUNDLE_KEYS = {"episode_id", "hdf5", "mp4", "frames", "fps", "task", "instruction",
                "pose_source", "action_quality", "pose"}
 SOURCE_KEYS = {"source_id", "source_detail", "license", "data_class", "root", "files",
-               "deid_waiver"}
+               "deid_waiver", "deid_waiver_manifest"}
 POSE = {"camera": (4, 4), "left_wrist": (4, 4), "right_wrist": (4, 4), "left_tips": (5, 3),
         "right_tips": (5, 3), "confidence_left": (), "confidence_right": ()}
 
 
 @pytest.fixture
-def work(tmp_path: Path) -> Path:
+def work(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     store = tmp_path / "store"
-    make_egodex(store)
+    pin_videos(monkeypatch, make_egodex(store))
     cfg = load_config(config_for(tmp_path))
     out = tmp_path / "work"
     api.ingest(register_egodex(store, cfg), out, cfg, store, "train")
@@ -47,6 +47,7 @@ def work(tmp_path: Path) -> Path:
 def test_the_files_da18_reads(work: Path) -> None:
     source = json.loads((work / "source.json").read_text())
     assert SOURCE_KEYS <= set(source) and source["source_detail"] == "egodex"
+    assert source["deid_waiver"] and source["deid_waiver_manifest"] == "test-pin@000000000000"
     assert all(len(digest) == 64 for digest in source["files"].values())
     episodes = [Episode.model_validate_json(line)
                 for line in (work / "episodes.jsonl").read_text().splitlines()]

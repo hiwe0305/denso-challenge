@@ -8,6 +8,7 @@ while they open again, then goes back and rests. The left hand does not move.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Sequence
 from pathlib import Path
@@ -15,6 +16,9 @@ from typing import Any
 
 import h5py
 import numpy as np
+import pytest
+from flywheel.data.annotate.deid import gate
+from flywheel.data.annotate.deid.pin import pin_key
 from flywheel.data.ingest.egocentric.egodex import FINGERS, tip_joint, wrist_joint
 from flywheel.data.ingest.egocentric.pose import EgoPose
 from numpy.typing import NDArray
@@ -101,6 +105,14 @@ def make_egodex(store: Path, tasks: Sequence[str] = ("basic_pick_place", "stack_
             write_hdf5(root / task / f"{i}.hdf5", frames=frames)
             write_mp4(root / task / f"{i}.mp4", frames)
     return store / "egodex"
+
+
+def pin_videos(monkeypatch: pytest.MonkeyPatch, sample: Path) -> dict[str, str]:
+    """Pin the sample's videos the way `egodex_pin.json` pins Apple's, for the gate."""
+    pinned = {pin_key(p.relative_to(sample).as_posix()): hashlib.sha256(p.read_bytes()).hexdigest()
+              for p in sorted(sample.rglob("*.mp4"))}
+    monkeypatch.setattr(gate, "egodex_pin", lambda: ("test-pin@000000000000", pinned))
+    return pinned
 
 
 def config_for(tmp: Path, tasks: Sequence[str] = ("basic_pick_place", "stack_cups"),

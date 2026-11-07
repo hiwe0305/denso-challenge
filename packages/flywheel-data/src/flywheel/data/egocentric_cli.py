@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import typer
+from flywheel.data.annotate.deid.gate import unpinned_videos
 from flywheel.data.api import ConfigError, dataset_report, job_ledger, render_html
 from flywheel.data.config import store_root
 from flywheel.data.ingest.egocentric import api
@@ -103,7 +104,12 @@ def ingest(
             out = work or store / "pipeline" / record.source_id
             episodes = api.ingest(record, out, cfg, store, split)
             job.notes.append(f"{len(episodes)} episodes of {record.source_id}")
-    waiver = "waived (D2)" if record.deid_waiver else "not waived: blocked before E-A and annotate"
+    if record.deid_waiver:
+        waiver = f"waived (D2; videos match {record.deid_waiver_manifest})"
+    else:
+        waiver = "not waived: blocked before E-A and annotate"
+        if record.source_detail == "egodex":
+            waiver += f" ({len(unpinned_videos(record.files))} videos not in the pinned sample)"
     _say(f"{record.source_id}: {len(episodes)} episodes, {len(record.files)} files,"
          f" {record.total_bytes / 1e6:.1f} MB; de-identification {waiver}")
     _say(f"work: {out}")
