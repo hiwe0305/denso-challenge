@@ -82,12 +82,13 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực: nhiệm vụ 1: 1h; nhiệm vụ 6.1: 1h.
+- Giờ thực: nhiệm vụ 1: 1h, cộng 1h sửa theo review #158; nhiệm vụ 6.1: 1h.
 - Công cụ AI đã dùng: Claude Code.
 - Ghi chú hoàn thành:
   - 7/11/2026, nhiệm vụ 1: `fw eval agree --scores <score.jsonl> --rollouts <thư mục eval> --release <release> [--store <store>]`. Phần thuần ở `scorer/agreement.py` (`compare`), phần đọc ghi ở `scorer/calibration.py`. Score ghép với `RolloutResult` theo `trace_ref.trace_id`, nên lúc chấm phải gọi `fw eval score --episode-id <trace_id>`: tên `episode_N` của SIMPLE đếm lại ở mỗi lượt eval nên không ghép được. Score hay rollout không có cặp được liệt kê trong báo cáo, không bị bỏ.
   - Cách đếm (đề xuất, chờ PO xem): rollout có `infra_status` khác `ok`, hoặc `ok` mà `sim_success` là `None`, nằm ở `excluded` kèm lý do và không vào tỉ lệ. Scorer trả "chưa rõ" (`success = None`) **không** tính là trùng, là một loại lệch riêng (`scorer_unknown`): nếu không, một scorer né mọi episode sẽ không bao giờ lệch. Tỉ lệ trên 0 episode là `None`, không phải 0% hay 100%.
   - Một báo cáo nói về đúng một bộ (`task_id`, `scorer_version`, `config_sha256`); bộ trộn hai scorer bị từ chối, hai `Score` khác nhau của một episode cũng vậy. "Hash của scorer" của AC 2 là `scorer_version` (bump mỗi lần đổi hình dạng bản ghi, DA-36 8.4); `release_id` do người chạy truyền vào vì cả `Score` lẫn `RolloutResult` đều không mang release.
   - Lưu qua kho: byte của báo cáo vào blob store (`put_blob`, hash là báo cáo), và một dòng chỉ mục vào `<store>/scorer/agreement.jsonl`. Báo cáo không có thời gian hay đường dẫn, nên chạy lại cho cùng blob; chỉ mục chỉ thêm dòng.
+  - Review #158 (Hiếu, 7/11/2026) đồng ý bốn điểm trên và đòi sửa hai chỗ, đã sửa: (1) `passed` chỉ có giá trị trên bộ G1 xét được, tức ít nhất 100 episode tính được và có cả SIMPLE đạt lẫn trượt; ngoài ra `passed` là `None` và `unjudged` nêu lý do (`no_episodes`, `not_enough_episodes`, `no_sim_success`, `no_sim_failure`), `agreement` vẫn tính. (2) Rollout không có `trace_ref` (simulator chết trước khi ghi trace) được liệt kê ở `untraced_rollouts` theo `job_id`, kèm `infra_status`, không bị bỏ im lặng.
   - Chưa chạy trên dữ liệu thật: eval tray hiện ghi `scorer_steps` của vị từ SIMPLE trong dòng outcome, chưa có trace tín hiệu cho scorer của làn đọc. 100 episode thật vẫn chờ (Chỗ cần quyết, điểm 2).
 - File đã tạo hoặc sửa: `packages/flywheel-eval/src/flywheel/eval/scorer/agreement.py`, `scorer/calibration.py`, `api.py`, `cli.py`; `packages/flywheel-eval/tests/unit/scorer/test_agreement.py`, `test_agreement_rerun.py`.
