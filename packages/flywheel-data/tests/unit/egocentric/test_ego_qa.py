@@ -67,6 +67,34 @@ def test_a_short_episode_is_rejected(cfg: EgoConfig) -> None:
     assert decision == "reject" and "min_frames" in names
 
 
+def lose(pose: EgoPose, side: str, frames: slice) -> EgoPose:
+    wrist, tips = pose.wrist(side).copy(), pose.tips(side).copy()
+    wrist[frames], tips[frames] = np.nan, np.nan
+    return replace(pose, **{f"{side}_wrist": wrist, f"{side}_tips": tips})
+
+
+def test_nan_hand_frames_are_flagged_with_counts_per_hand(cfg: EgoConfig) -> None:
+    """Review of PR 152: E-A loses hands (20/20 real files); QA says how many frames."""
+    pose = lose(lose(synthetic_pose(), "left", slice(0, 30)), "right", slice(20, 25))
+    report = run_ego_qa(item(pose=pose), cfg)
+    assert report.decision == "flag"
+    assert report.reasons == [
+        f"hand_pose_nan (D1): NaN hand pose in 30 frames (left 30/{FRAMES}, right 5/{FRAMES})"]
+    check = next(c for c in report.checks if c.name == "hand_pose_nan")
+    assert check.value == 30 and not check.passed
+    assert np.isnan(pose.left_wrist[0]).all()  # QA reads the pose, it does not mend it
+
+
+def test_no_finite_hand_at_all_is_rejected(cfg: EgoConfig) -> None:
+    pose = lose(lose(synthetic_pose(), "left", slice(0, 50)), "right", slice(50, FRAMES))
+    assert failed(cfg, pose=pose)[0] == "flag"  # one hand at a time is still a hand
+    gone = lose(lose(synthetic_pose(), "left", slice(None)), "right", slice(None))
+    report = run_ego_qa(item(pose=gone), cfg)
+    assert report.decision == "reject" and report.reasons[0] == (
+        f"hand_pose_nan (D1): no frame has a finite hand pose"
+        f" (NaN frames: left {FRAMES}/{FRAMES}, right {FRAMES}/{FRAMES})")
+
+
 def test_confidence_not_recorded_is_a_flag_not_a_pass(cfg: EgoConfig) -> None:
     pose = synthetic_pose()
     nan = np.full(FRAMES, np.nan, dtype=np.float32)

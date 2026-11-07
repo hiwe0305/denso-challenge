@@ -65,6 +65,8 @@ qa:
   segment_count: {threshold: 2, on_fail: reject}               # fewer segments than a pick and a place
   video_frames: {threshold: 0, on_fail: reject}                # |frames of the mp4 - frames of the pose|
   pose_finite: {threshold: 0.0, on_fail: reject}               # share of frames whose camera pose is not finite
+  hand_pose_nan: {code: D1, threshold: 0, on_fail: flag, when_missing: reject}  # frames with a NaN hand pose;
+                                                               # reject only when no frame has a finite hand
   pose_low_confidence: {threshold: 0.5, on_fail: flag, below: 0.3, when_missing: flag}  # giả định
   hand_out_of_frame: {threshold: 0.3, on_fail: flag}           # no wrist inside the image; giả định
   camera_jitter_deg_s: {threshold: 60.0, on_fail: flag}        # RMS high-pass angular speed; giả định
