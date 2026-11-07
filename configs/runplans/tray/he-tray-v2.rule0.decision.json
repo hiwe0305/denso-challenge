@@ -8,7 +8,8 @@
   "story": "DA-34",
   "subtask": "3.4",
   "gaps": [
-   "rule 0 says 'check the image pipeline': no procedure or result for that check exists yet",
+   "image pipeline check ran (tray.md 14, Hiếu 7/11/2026 'Chạy T1 + T2'): T1 0/20 on C's train scenes, so by rule 14.1 the train/serve chain is suspect and nothing is trained until the fault is found; the fault is not found yet",
+   "next_step_proposed (C-max variant (i)) conflicts with rule 14.1 after T1 (train nothing until the fault is found): Hiếu decides whether it stays",
    "C-max vs C has no row in the tier 2 rules: the reading rule must be written here before any C-max eval",
    "variant (ii): no S2 release (id, hash), so no demo set hash, no plan and no runplan check",
    "variant (ii): TrayRunPlan names one release; S1 + S2 needs one release built from both batches, or a plan schema change (another story's call)",
@@ -307,7 +308,71 @@
    "open item: runplan check --launch does not check code.simple; tool gap, not fixed here",
    "traces have no timing: the batch ran at 2e57f60, before the timing hook of #148",
    "one train seed, dev split only"
-  ]
+  ],
+  "pipeline_check": {
+   "doc": "docs/he/tray.md",
+   "sections": "14.1-14.6",
+   "rules": "written and committed before the first rollout of each part; thresholds [Đề xuất]",
+   "code_tree": "bb4cef1a7a3c09b0e1ed9c3bad2d7fed3a171b3f",
+   "label": "preliminary; T1 on train scenes, T2 on dev",
+   "T1": {
+    "set": "t1-train-C20-bb4cef1",
+    "conditions": 20,
+    "split": "train",
+    "server": {
+     "action_exec_horizon": 24,
+     "rtc": true
+    },
+    "successes": 0,
+    "wilson": [
+     0.0,
+     0.161
+    ],
+    "step_pass": {
+     "reach_b": 0.65,
+     "place": 0.05
+    },
+    "reading": "0/20: suspect the train/serve chain; train nothing until the fault is found"
+   },
+   "T2b": {
+    "set": "t2-dev-L1-20-bb4cef1",
+    "conditions": 20,
+    "split": "dev",
+    "server": {
+     "action_exec_horizon": 24,
+     "rtc": false
+    },
+    "successes": 0,
+    "step_pass": {
+     "carry": 0.0,
+     "reach_b": 0.0,
+     "place": 0.0
+    },
+    "success_gain": 0,
+    "place_gain": 0,
+    "baseline": "eval C on the same 20 conditions: 0/20, carry 0.65, reach_b 0.65, place 0.0",
+    "reading": "not worth a look"
+   },
+   "T2a_prime": {
+    "set": "t2-dev-L1-20-bb4cef1",
+    "conditions": 20,
+    "split": "dev",
+    "server": {
+     "action_exec_horizon": 10,
+     "rtc": false
+    },
+    "successes": 0,
+    "step_pass": {
+     "lift": 0.5,
+     "carry": 0.0,
+     "reach_b": 0.0,
+     "place": 0.0
+    },
+    "success_gain": 0,
+    "place_gain": 0,
+    "reading": "not worth a look"
+   }
+  }
  },
  "signed_by": "pending: Hiếu",
  "reason": "Eval C of RunPlan v2 rp_a04c14e79dfd (DA-34 task 3, 6/11/2026, rtx3060, 0 CU): 0/270 successes; headline levels 1-2 pooled 0/240, Wilson 95 % 0-1.6 %; level 0 0/30. Rule 0 of the tier 2 rules (docs/he/tray.md section 9, rules_sha256 eec2222c...) fires: Psi0 did not learn the tray task from MuJoCo images; C+ does not run; the image pipeline is checked; this Decision records it (verdict fail of the dev gate). Reading rules unchanged after the result. Noted beside it, not a new rule: 55 % of level 1-2 rollouts reached reach_b and failed at place (L-TRAY-TILT most). Proposed next step, waiting for Hiếu: C-max variant (i), S1 only, 429 episodes, about 16 CU, draft plan rp_366283071c4a; not launched. Variant (ii) S1 + S2 stays in meta.gaps. Results are preliminary, on dev; limits in criteria.known_limits and tray.md 13.5, 13.7.",

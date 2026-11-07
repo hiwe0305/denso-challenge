@@ -658,3 +658,16 @@ def test_the_rule_0_decision_records_eval_c_and_names_the_cmax_plan() -> None:
     assert s1_only["demo_set_hash"] == cmax.demo_sets.hashes["CMAX"]
     # (ii) waits for an S2 release: no numbers are filled in for it
     assert s1_s2["plan"] is None and s1_s2["episodes"] is None and s1_s2["demo_set_hash"] is None
+    # the image pipeline check of rule 0 ran (task 3.6): T1 0/20 on train scenes holds any training
+    check = decision.criteria["pipeline_check"]
+    assert (check["T1"]["successes"], check["T1"]["conditions"], check["T1"]["split"]) == (
+        0,
+        20,
+        "train",
+    )
+    assert {
+        name: (part["server"]["action_exec_horizon"], part["server"]["rtc"])
+        for name, part in check.items()
+        if name.startswith("T")
+    } == {"T1": (24, True), "T2b": (24, False), "T2a_prime": (10, False)}
+    assert not any("no procedure or result" in gap for gap in decision.meta["gaps"])
