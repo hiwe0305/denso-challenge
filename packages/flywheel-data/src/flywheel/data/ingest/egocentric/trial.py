@@ -36,6 +36,7 @@ from typing import Any
 import numpy as np
 import pyarrow.parquet as pq  # type: ignore[import-untyped]
 from flywheel.contracts.entities import Decision
+from flywheel.data.ingest.egocentric.api import check_unchanged, read_source, require_gate
 from flywheel.data.ingest.egocentric.config import EgoConfig
 from flywheel.data.ingest.egocentric.episodes import (
     LABELS,
@@ -89,7 +90,10 @@ def clip_frames(grasp: int, total: int, half: int) -> list[int]:
 def egodex_clips(work: Path) -> list[Clip]:
     """The first CLIPS episodes, by id, whose rule found a settled grasp on E-B."""
     clips: list[Clip] = []
+    source = read_source(work)
+    check_unchanged(source)
     for episode in sorted(read_episodes(work), key=lambda e: e.episode_id):
+        require_gate(episode, source)  # the frames go to the models
         folder = bundle_dir(work, episode.episode_id)
         labels = json.loads((folder / LABELS).read_text())
         grasp = next((e for e in labels["events"] if e["kind"] == "grasp" and not e["reasons"]

@@ -44,7 +44,7 @@ def segment_hash(work: Path) -> str:
 def test_ingest_pose_annotate_qa_report_review(store: Path, config_path: Path) -> None:
     config = ["--config", str(config_path)]
     output = run("ingest", "egodex", *config)
-    assert "4 episodes" in output and "waived (D2)" in output
+    assert "4 episodes" in output and "waived (D2; videos match test-pin@" in output
     work = Path(output.split("work: ")[1].split()[0])
     assert "E-B pose of 4 episodes" in run("pose", str(work))
     output = run("annotate", str(work), *config)

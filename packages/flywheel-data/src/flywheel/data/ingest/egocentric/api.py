@@ -101,11 +101,13 @@ def check_unchanged(source: EgoSourceRecord) -> None:
 
 
 def gate_open(episode: Episode, source: EgoSourceRecord) -> bool:
-    return annotate_allowed(episode, source.source_detail, source.data_class, source.deid_waiver)
+    return annotate_allowed(episode, source.source_detail, source.data_class, source.deid_waiver,
+                            source.files)
 
 
 def require_gate(episode: Episode, source: EgoSourceRecord) -> None:
-    require_annotate(episode, source.source_detail, source.data_class, source.deid_waiver)
+    require_annotate(episode, source.source_detail, source.data_class, source.deid_waiver,
+                     source.files)
 
 
 def write_eb_poses(work: Path) -> int:
@@ -124,6 +126,7 @@ def write_eb_poses(work: Path) -> int:
 
 def estimate_jobs(work: Path, source: EgoSourceRecord) -> list[dict[str, object]]:
     """The manifest `estimate_job.py` reads: every episode, E-B ones too (AC 5)."""
+    check_unchanged(source)  # the job reads the videos the gate checked
     jobs = []
     for episode in read_episodes(work):
         require_gate(episode, source)  # E-A reads the video: de-identified first

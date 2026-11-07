@@ -11,7 +11,9 @@ order, the `episodes_per_task` lowest episode numbers that have both files.
 
 `EgoSourceRecord` is what `source.json` holds (plan 6/11/2026 4.2a, read by DA-18):
 `source_id`, `source_detail`, `license`, `data_class`, `root`, `files` (path relative
-to root -> sha256), `deid_waiver` (D2 reason or null), and the chosen `episodes`.
+to root -> sha256), `deid_waiver` (D2 reason or null), `deid_waiver_manifest` (the pin
+of Apple's videos the waiver was checked against, or null; `annotate/deid/gate.py`)
+and the chosen `episodes`.
 `source_id` hashes the detail, licence, data class and every file hash, so the same
 files give the same id and the same episode ids. Data stays out of git: `root` is a
 directory of the store (`$FW_ROOT`, else ./fwdata).
@@ -56,6 +58,7 @@ class EgoSourceRecord:
     total_bytes: int = 0
     config_version: str = ""
     device: dict[str, Any] = field(default_factory=dict)  # EgoVideoSource's device.json
+    deid_waiver_manifest: str | None = None  # pin id, set with deid_waiver
 
     def path(self, relative: str) -> Path:
         return Path(self.root) / relative
@@ -114,6 +117,7 @@ def make_record(
     if device:
         names.append(DEVICE_FILE)
     files = {name: _sha256(root / name) for name in sorted(names)}
+    waiver, pin = deid_waiver(detail, source.data_class, files)
     identity = hashlib.sha256(f"{detail}\n{source.license}\n{source.data_class}\n".encode())
     for name, digest in files.items():
         identity.update(f"{digest}  {name}\n".encode())
@@ -124,11 +128,12 @@ def make_record(
         data_class=source.data_class,
         root=str(root),
         files=files,
-        deid_waiver=deid_waiver(detail, source.data_class),
+        deid_waiver=waiver,
         episodes=tuple(chosen),
         total_bytes=sum((root / n).stat().st_size for n in files),
         config_version=cfg.threshold_version,
         device=device,
+        deid_waiver_manifest=pin,
     )
 
 
