@@ -65,7 +65,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực: 7,6 giờ (nhiệm vụ 1: 1,5 + 0,5 sửa sau khi chạy work dir thật của DA-04 + 0,5 sửa theo review PR #153 + 0,5 kiểm miễn trừ D2 theo pin + 0,25 bỏ cờ đổi pin + 0,3 chạy lại trên QA mới của DA-04; 2: 1,5 + 0,3 chạy loader thật trên laptop; 3: 1,5 + 0,75 sửa theo review), Hiếu làm cùng Claude từ 6/11/2026 (plan chia lại việc của Hưng).
+- Giờ thực: 7,85 giờ (nhiệm vụ 1: 1,5 + 0,5 sửa sau khi chạy work dir thật của DA-04 + 0,5 sửa theo review PR #153 + 0,5 kiểm miễn trừ D2 theo pin + 0,25 bỏ cờ đổi pin + 0,3 chạy lại trên QA mới của DA-04 + 0,25 runbook cho Hiếu; 2: 1,5 + 0,3 chạy loader thật trên laptop; 3: 1,5 + 0,75 sửa theo review), Hiếu làm cùng Claude từ 6/11/2026 (plan chia lại việc của Hưng).
 - Công cụ AI đã dùng: Claude Code (Claude Opus 5.5).
 - Ghi chú hoàn thành:
   - Đầu vào là work dir của DA-04 theo plan 6/11/2026 mục 4.2a; test dùng work dir tổng hợp theo đúng mục đó. DA-04 cần ghi thêm `intrinsic` (3, 3) vào `pose.npz` cho E-A **[Đề xuất]**: loader của Ψ₀ đọc `camera/intrinsic` ở mọi mẫu, còn episode E-A không có HDF5.
@@ -111,3 +111,71 @@ Loader thật **không chạy được trên laptop** ngày 6/11/2026: torchcode
    ```
 
    Kết quả mong đợi: `3 passed` (batch đã lưu, EgoDex thật với 8 mẫu từ 4 episode, E-A). `PSI0_FFMPEG_LIB` chỉ đặt `LD_LIBRARY_PATH` cho tiến trình Ψ₀. Lỗi `Could not load libtorchcodec` nghĩa là bước 1 chưa đúng; lỗi so sánh in đường dẫn mẫu, khóa và độ lệch lớn nhất.
+
+### Runbook: export lại trên QA mới của DA-04 (để Hiếu chạy)
+
+Hiếu dặn 7/11/2026: chưa có tài nguyên, để Hiếu chạy sau. Lưu ý: tin đó đến sau khi phiên này đã chạy xong một lần export trên laptop (khoảng 60 giây; số đo ở mục ghi chú bên trên, export `egx_0b4a1daa411407da`). Lần Hiếu chạy dùng đúng các lệnh dưới đây.
+
+Đường dẫn (đều trên laptop, ngoài mọi worktree trong `.claude/worktrees/`, nên lưu trữ phiên DA-04 không làm mất):
+
+| Thứ | Đường dẫn tuyệt đối |
+|---|---|
+| Work dir của DA-04, chạy lại 7/11/2026 (QA `ego-1@2b0b593722be`: 8 pass, 11 flag, 1 reject; 39 đoạn) | `/home/hiwe/project/denso-challenge/fwdata/pipeline/src_050b9bf56a4e843c` |
+| Video và HDF5 EgoDex mà work dir trỏ tới (`source.json` `root`, `bundle.json`) | `/home/hiwe/project/denso-challenge/fwdata/egodex-da30/part1` |
+| Pin D2 (trên master, id `egodex-test-da30-part1@4b4ad209ee99`) | `/home/hiwe/project/denso-challenge/packages/flywheel-data/src/flywheel/data/annotate/deid/egodex_pin.json` |
+
+Chạy từ checkout chính `/home/hiwe/project/denso-challenge` khi nó ở master có `c8a7e46b` trở về sau.
+
+1. Chuẩn bị `source.json`. Lệnh băm từng mp4 trong `files`, so với pin theo khóa `<task>/<i>.mp4`, và chỉ ghi `deid_waiver_manifest` khi cả 20 khớp (giữ bản sao `source.json.bak`). `WRITE=0` chỉ kiểm. Ngày 7/11/2026 work dir **đã có** trường này; chạy kiểm in `pin egodex-test-da30-part1@4b4ad209ee99: 20/20 mp4 match; now egodex-test-da30-part1@4b4ad209ee99`, nên không cần `WRITE=1`.
+
+   ```bash
+   cd /home/hiwe/project/denso-challenge && W=/home/hiwe/project/denso-challenge/fwdata/pipeline/src_050b9bf56a4e843c PIN=/home/hiwe/project/denso-challenge/packages/flywheel-data/src/flywheel/data/annotate/deid/egodex_pin.json WRITE=0 python3 - <<'PY'
+   import hashlib, json, os, pathlib
+   w = pathlib.Path(os.environ["W"]); pin_path = pathlib.Path(os.environ["PIN"])
+   raw = pin_path.read_bytes(); pin = json.loads(raw)
+   pin_id = f"{pin['name']}@{hashlib.sha256(raw).hexdigest()[:12]}"
+   src = json.loads((w / "source.json").read_text())
+   root = pathlib.Path(src["root"])
+   mp4s = [k for k in src["files"] if k.endswith(".mp4")]
+   bad = [k for k in mp4s
+          if pin["files"].get("/".join(k.split("/")[-2:]))
+          != hashlib.sha256((root / k).read_bytes()).hexdigest()]
+   print(f"pin {pin_id}: {len(mp4s) - len(bad)}/{len(mp4s)} mp4 match; now {src.get('deid_waiver_manifest')}")
+   if bad:
+       raise SystemExit(f"not waived, mismatches: {bad}")
+   if os.environ.get("WRITE") == "1" and src.get("deid_waiver_manifest") != pin_id:
+       (w / "source.json.bak").write_text((w / "source.json").read_text())
+       src["deid_waiver_manifest"] = pin_id
+       (w / "source.json").write_text(json.dumps(src, ensure_ascii=False, indent=2) + "\n")
+       print("wrote deid_waiver_manifest; backup source.json.bak")
+   PY
+   ```
+
+2. Export. Thư mục `--out` phải mới hoặc rỗng; `--store` là nơi ghi hai dòng ledger của job (ước tính và thực đo). CLI không còn `--waiver-pin`, pin luôn đọc từ đường dẫn ở bảng trên.
+
+   ```bash
+   cd /home/hiwe/project/denso-challenge && /usr/bin/time -v uv run python -m flywheel.data.export.egodex --work /home/hiwe/project/denso-challenge/fwdata/pipeline/src_050b9bf56a4e843c --out /home/hiwe/project/denso-challenge/fwdata/psi0-stage1/egodex-da04-qa2 --include-flag --store /home/hiwe/project/denso-challenge/fwdata
+   ```
+
+   Dòng cuối stdout là JSON `{"export_id", "root", "samples", "frames", "skipped"}`. `/usr/bin/time -v` cho thời gian wall và RSS đỉnh. Thời gian đo của job nằm trong `fwdata/sites/local/runs/g0-DA-18-<ngày>/job_egodex_export_*/ledger.jsonl` (dòng `measure_kind` `measured`).
+
+3. Số cần so:
+
+   | Số | Lần 6/11/2026 (QA cũ: 13 pass, 7 flag) | Lần 7/11/2026 trong phiên này (QA mới) |
+   |---|---|---|
+   | Mẫu | 38 (25 pass, 13 flag) | 38 (16 pass, 22 flag), 19 episode |
+   | Khung | 4143 | 4072 |
+   | Thời gian đo (`job_ledger`) | 53 giây | 59,6 giây (wall 62,5 giây, RSS đỉnh 341 MB) |
+   | `skipped` trong `meta.json` | 0 | 1: `ep_2732d666102ad9ff`, `QA reject` |
+   | Đoạn bỏ vì khung NaN | 0 | 0 |
+   | Export id | `egx_948a6927d3bb8136` | `egx_0b4a1daa411407da` |
+
+   Cùng mã và cùng work dir thì export id phải bằng `egx_0b4a1daa411407da`. Lệch nghĩa là work dir hoặc mã đã đổi từ 7/11/2026. Đếm mẫu theo QA và đoạn bỏ vì NaN:
+
+   ```bash
+   python3 -c "import json,collections;m=json.load(open('/home/hiwe/project/denso-challenge/fwdata/psi0-stage1/egodex-da04-qa2/meta.json'));print(m['export_id'],m['counts'],collections.Counter(s['qa_decision'] for s in m['samples']),m['skipped'])"
+   ```
+
+4. Loader thật của Ψ₀, nếu muốn: các bước 1–4 ở mục "Chạy ở đâu" bên trên, chạy từ `/home/hiwe/project/denso-challenge` (master đã có test). Ngày 7/11/2026 laptop vẫn chưa có `~/ffmpeg7`. Test này export lại từ thư mục probe `EGODEX_PROBE` của nó, không đọc export ở bước 2. Mong đợi `3 passed`.
+
+5. Khi xong: ghi số vào mục ghi chú và hai dòng vào `docs/g0/ledger/DA-18.csv` (ước tính và thực đo, cùng job id mới). Không commit `fwdata/`. DA-30 đọc export ở `fwdata/psi0-stage1/egodex-da04-qa2`.
