@@ -47,3 +47,18 @@ def test_a_file_that_is_not_its_contract_is_refused(tmp_path: Path) -> None:
     path.write_text(json.dumps({"step": 1}) + "\n")
     with pytest.raises(InputRefused, match="metrics"):
         load_file(path)
+
+
+def test_a_link_into_a_forbidden_dir_is_refused(tmp_path: Path) -> None:
+    secret = train_job(tmp_path / "vault" / "train" / "job-a")
+    given = tmp_path / "given"
+    (given / "train" / "job-file").mkdir(parents=True)
+    (given / "train" / "job-file" / "metrics.jsonl").symlink_to(secret)
+    (given / "train" / "job-dir").symlink_to(secret.parent, target_is_directory=True)
+    with pytest.raises(InputRefused, match="vault"):
+        load_file(given / "train" / "job-file" / "metrics.jsonl")
+    with pytest.raises(InputRefused, match="vault"):
+        collect([given / "train" / "job-dir"])
+    found = collect([given])
+    assert found.loaded == []
+    assert any("forbidden" in s for s in found.skipped)

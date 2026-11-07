@@ -141,11 +141,21 @@ def kind_of(path: Path) -> tuple[str, Callable[[str], tuple[Any, ...]]] | None:
     return None
 
 
+def forbidden_part(path: Path) -> str | None:
+    """The forbidden directory `path` is in, as written or once links are resolved."""
+    for candidate in (path, path.resolve()):
+        lowered = [p.lower() for p in PurePosixPath(candidate.as_posix()).parts]
+        for part in FORBIDDEN_PARTS:
+            if part in lowered:
+                return part
+    return None
+
+
 def refuse_forbidden(path: Path) -> None:
-    lowered = [p.lower() for p in PurePosixPath(path.as_posix()).parts]
-    for part in FORBIDDEN_PARTS:
-        if part in lowered:
-            raise InputRefused(f"{path}: the agent does not read {part}/")
+    # Resolved too: a link (file or directory) into vault/ is vault/.
+    part = forbidden_part(path)
+    if part is not None:
+        raise InputRefused(f"{path}: the agent does not read {part}/")
 
 
 def _sha256(data: bytes) -> str:
@@ -179,7 +189,7 @@ def collect(paths: Iterable[Path], base: Path | None = None) -> InputSet:
             if not path.is_file():
                 continue
             rel = path.relative_to(root) if root.is_dir() else Path(path.name)
-            if any(part.lower() in FORBIDDEN_PARTS for part in rel.parts):
+            if any(part.lower() in FORBIDDEN_PARTS for part in rel.parts) or forbidden_part(path):
                 found.skipped.append(f"{path.as_posix()} (forbidden part)")
                 continue
             if kind_of(path) is None:
