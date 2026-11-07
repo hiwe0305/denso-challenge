@@ -67,7 +67,8 @@ def stage_of(steps: Sequence[bool]) -> str:
 def live_dims(lo: Array, hi: Array) -> NDArray[np.bool_]:
     """Dims Psi0 really normalizes: not its `ill_mask` (range near zero, e.g. padding)."""
     lo, hi = np.asarray(lo, np.float64), np.asarray(hi, np.float64)
-    return ~(np.abs(hi - lo) < 1e-4 * (np.abs(hi) + np.abs(lo) + 1e-8))
+    dead = np.abs(hi - lo) < 1e-4 * (np.abs(hi) + np.abs(lo) + 1e-8)
+    return np.asarray(~dead, dtype=np.bool_)
 
 
 def half_range(lo: Array, hi: Array) -> Array:
@@ -79,7 +80,7 @@ def half_range(lo: Array, hi: Array) -> Array:
 def window(actions: Array, t: int, rows: int = ROWS) -> Array:
     """actions[t : t + rows], the last row repeated past the end of the episode."""
     take = np.minimum(np.arange(t, t + rows), len(actions) - 1)
-    return np.asarray(actions, np.float64)[take]
+    return np.asarray(np.asarray(actions, np.float64)[take], dtype=np.float64)
 
 
 def chunk_error(a: Array, b: Array, scale: Array, live: NDArray[np.bool_]) -> float:
