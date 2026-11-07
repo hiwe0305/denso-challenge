@@ -21,7 +21,7 @@ Layout = Literal["pick_place", "two_table"]
 DECISIONS = ("pass", "flag", "quarantine", "reject")
 QA_CHECKS = ("min_frames", "video_frames", "pose_finite", "pose_low_confidence",
              "hand_out_of_frame", "camera_jitter_deg_s", "instruction", "segments",
-             "segment_ambiguous", "deid_gate")
+             "segment_count", "segment_ambiguous", "deid_gate")
 
 
 @dataclass(frozen=True)

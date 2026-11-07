@@ -14,10 +14,12 @@ neither, so its checks are its own (design 6.6), thresholds in
     instruction          1 when the episode has no sentence
     segments             1 without segments, or with empty, overlapping or out-of-order
                          ones, or ones past the last frame
+    segment_count        number of segments; fails below the threshold (a pick and a place)
     segment_ambiguous    share of events the rules left open, no model or person
     deid_gate            1 when the de-identification gate stops the episode
 
-A check fails when its value is above the threshold (min_frames: below). The
+A check fails when its value is above the threshold (min_frames, segment_count:
+below). The
 decision is the worst `on_fail` of the failed checks, as in robot QA.
 """
 
@@ -147,6 +149,9 @@ def run_ego_qa(item: EgoQAInput, cfg: EgoConfig) -> QAReport:
     judge("instruction", 0.0 if item.instruction.strip() else 1.0)
     judge("segments", 0.0 if valid_segments(item.segments, pose.frames) else 1.0,
           f"{len(item.segments)} segments")
+    # a pick-and-place episode has a pick and a place at least; one segment means an
+    # event was lost (review of PR 152: a model frame 0 left ep_603d1475 one pick)
+    judge("segment_count", len(item.segments), "a pick and a place at least", below=True)
     judge("segment_ambiguous", item.unresolved_share)
     decision = max((r[1] for r in results), key=SEVERITY.__getitem__, default="pass")
     key = hashlib.sha256(f"{item.episode.episode_id}|{cfg.threshold_version}".encode())

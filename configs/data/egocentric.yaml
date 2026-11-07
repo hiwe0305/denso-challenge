@@ -60,8 +60,9 @@ segment:
 qa:
   # check: threshold and what failing it does. Values are fractions of frames unless
   # named otherwise; a check fails when its value is above the threshold, except
-  # min_frames (below).
+  # min_frames and segment_count (below).
   min_frames: {threshold: 30, on_fail: reject}                 # 1 s at 30 Hz; giả định
+  segment_count: {threshold: 2, on_fail: reject}               # fewer segments than a pick and a place
   video_frames: {threshold: 0, on_fail: reject}                # |frames of the mp4 - frames of the pose|
   pose_finite: {threshold: 0.0, on_fail: reject}               # share of frames whose camera pose is not finite
   pose_low_confidence: {threshold: 0.5, on_fail: flag, below: 0.3, when_missing: flag}  # giả định
