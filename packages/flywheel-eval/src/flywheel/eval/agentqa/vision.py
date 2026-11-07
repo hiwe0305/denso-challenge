@@ -17,6 +17,7 @@ from pathlib import Path
 
 from flywheel.eval.agentqa.endpoint import ChatModel, EndpointError, Message
 from flywheel.eval.agentqa.facts import Analysis
+from flywheel.eval.agentqa.inputs import refuse_forbidden
 from flywheel.eval.agentqa.numbers import numbers_in
 
 _MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
@@ -29,6 +30,7 @@ QUESTION = (
 
 
 def image_message(path: Path, question: str = QUESTION) -> list[Message]:
+    refuse_forbidden(path)
     mime = _MIME.get(path.suffix.lower())
     if mime is None:
         raise ValueError(f"{path}: not an image the endpoint takes")
