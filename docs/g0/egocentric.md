@@ -1,12 +1,12 @@
 # Pipeline egocentric: EgoDex qua sáu tầng, E-A so với E-B, vòng thử model gán nhãn
 
-_Ngày 6/11/2026. Story [DA-04](../product/stories/DA-04-pipeline-egocentric.md), cả 7 nhiệm vụ. Người làm: Claude (phiên DA-04) theo phân công của Hiếu; Hiếu duyệt. Mọi số trong file này là output của `fw egocentric` trên 20 episode EgoDex thật, trừ chỗ ghi là giả định. Dữ liệu và kết quả nằm trong `fwdata/` (không commit). Job E-A và lần cắt có RoboBrain chạy trên `rtx3060:~/denso-da04` trước 10:20 ngày 6/11/2026. Sau đó máy được giữ cho eval C, nên các bước còn lại chạy trên laptop, còn bước nào không chạy được thì để lại cách chạy ở mục 10._
+_Ngày 6/11/2026; sửa theo review PR 152 ngày 7/11/2026 (mục 3, 5, 6, 1.2, 10.5; các bước chạy lại trên laptop). Story [DA-04](../product/stories/DA-04-pipeline-egocentric.md), cả 7 nhiệm vụ. Người làm: Claude (phiên DA-04) theo phân công của Hiếu; Hiếu duyệt. Mọi số trong file này là output của `fw egocentric` trên 20 episode EgoDex thật, trừ chỗ ghi là giả định. Dữ liệu và kết quả nằm trong `fwdata/` (không commit). Job E-A và lần cắt có RoboBrain chạy trên `rtx3060:~/denso-da04` trước 10:20 ngày 6/11/2026. Sau đó máy được giữ cho eval C, nên các bước còn lại chạy trên laptop, còn bước nào không chạy được thì để lại cách chạy ở mục 10._
 
 ## Kết luận
 
-- Pipeline chạy hết sáu tầng trên 20 episode EgoDex thật: ingest, cổng che danh tính (EgoDex được miễn), pose E-B, pose E-A, cắt đoạn kèm câu lệnh, QA, báo cáo. QA cho **13 `pass`, 7 `flag`, 0 `reject`**.
+- Pipeline chạy hết sáu tầng trên 20 episode EgoDex thật: ingest, cổng che danh tính (EgoDex được miễn khi video khớp sha256 đã ghim), pose E-B, pose E-A, cắt đoạn kèm câu lệnh, QA, báo cáo. Sau các sửa theo review PR 152 (7/11/2026), QA cho **8 `pass`, 11 `flag`, 1 `reject`**. Ngày 6/11/2026 là 13, 7, 0; số đổi vì câu trả lời ở mép cửa sổ không còn được tính (mục 5) và có phép kiểm `segment_count` mới (mục 6).
 - E-A chỉ từ RGB đặt đầu ngón lệch 43–51 px, điểm 3D lệch khoảng 7 cm so với tracking của Vision Pro. Tư thế camera của E-A chưa dùng được: sai số xoay (0,20° mỗi khung) lớn hơn chính chuyển động (0,12°), còn phần tịnh tiến chưa đo được.
-- Luật để mở 13 trên 21 sự kiện gắp, thả. RoboBrain trả lời cả 13 và viết 38 câu lệnh đọc hợp lý, nhưng 6 trên 13 câu trả lời là ảnh đầu tiên. **[Đề xuất]** chưa dùng ranh giới của model cho tới khi vòng thử đo xong sai số.
+- Luật để mở 13 trên 21 sự kiện gắp, thả. RoboBrain trả lời cả 13, nhưng 6 trên 13 câu trả lời là ảnh đầu tiên. Từ 7/11/2026, câu trả lời ở mép cửa sổ bị bỏ, nên 6 sự kiện vẫn mở và chờ người duyệt. **[Đề xuất]** chưa dùng ranh giới của model cho tới khi vòng thử đo xong sai số.
 - **Vòng thử model gán nhãn (D3) chưa có kết quả và chưa có `Decision`.** Lần chạy dừng giữa chừng lúc 10:20 ngày 6/11/2026, vì Hiếu giữ `rtx3060` cho eval C của DA-34. Laptop không đủ bộ nhớ để chạy hai model. Cách chạy lại ở mục 10.
 - Video đội tự quay dừng ở cổng che danh tính, đúng D2.
 
@@ -53,6 +53,13 @@ nohup setsid systemd-run --user --scope -p MemoryMax=8G -p MemorySwapMax=0 \
 | Gợi ý ranh giới, viết câu | RoboBrain 2.5-4B (BAAI) | Ollama 0.32.14, `hf.co/mradermacher/RoboBrain2.5-4B-GGUF:Q4_K_M` | repo GGUF `4967565e14c9` |
 | Chỉ điểm gắp | Molmo2-4B (AllenAI) | transformers 4.57.1, torch 2.15.0+cpu trên CPU, bf16, 16 luồng, server OpenAI tối giản `serve_molmo2.py` | `042abfa7a388` |
 
+Endpoint chỉ được là máy của đội (review PR 152, 7/11/2026), vì khung hình là video có người. Điều kiện:
+
+- scheme `http` hoặc `https`;
+- host là `localhost`, IP loopback hoặc IP mạng riêng, hoặc một tên khai trong `models.local_hosts` của cấu hình (mặc định rỗng).
+
+Client bỏ qua `HTTP(S)_PROXY` và từ chối chuyển hướng; endpoint khác thì lệnh trả mã 2. Cách kiểm theo client DA-20 của Hưng (commit `cbdfc295`).
+
 Bản GGUF của Molmo2 (`mu2solutions`, `c21183cb41da`) không chạy được trên Ollama: lỗi "Failed to load CLIP model". GPU 12 GB còn bị server Ψ₀ của DA-34 giữ 7,2 GB, nên Molmo2 chạy CPU. Lane gọi cả hai qua endpoint OpenAI bằng `urllib`, ảnh JPEG cạnh dài 640 px; test dùng model giả.
 
 ## 2. Ingest (nhiệm vụ 1, câu Q-27H)
@@ -74,7 +81,25 @@ Chạy lại `ingest` vào một thư mục khác cho đúng `source_id` và đ�
 
 ## 3. Che danh tính (nhiệm vụ 2, quyết định D2)
 
-**[Đã chốt]** (Hiếu, 6/11/2026): chưa làm bước làm mờ. Chỉ mẫu EgoDex công bố (`egodex`, `public`) được miễn, mở rộng quyết định "Waive for EgoDex" của DA-30. Episode EgoDex giữ `deid_status = raw`, qua cổng Annotate, và `source.json` ghi lý do miễn. Mọi nguồn khác, trước hết là video đội tự quay, bị `deid_blocks_annotate` chặn trước job E-A và trước Annotate. Danh sách miễn nằm trong code (`annotate/deid/gate.py`), không trong cấu hình, để một lần chạy không tự nới quyết định của PO.
+**[Đã chốt]** (Hiếu, 6/11/2026): chưa làm bước làm mờ. Chỉ mẫu EgoDex công bố (`egodex`, `public`) được miễn, mở rộng quyết định "Waive for EgoDex" của DA-30. Episode EgoDex giữ `deid_status = raw`, qua cổng Annotate, và `source.json` ghi lý do miễn. Mọi nguồn khác, trước hết là video đội tự quay, bị `deid_blocks_annotate` chặn trước job E-A, trước Annotate và trước vòng thử. Danh sách miễn nằm trong code (`annotate/deid/gate.py`), không trong cấu hình, để một lần chạy không tự nới quyết định của PO.
+
+**Miễn theo file, không theo nhãn** (review PR 152, 7/11/2026). Nhãn (`egodex`, `public`) đến từ lệnh `ingest egodex` và thư mục gốc trong cấu hình, nên trỏ gốc vào thư mục có video tự quay cạnh file HDF5 của EgoDex cũng mang đủ nhãn. Vì vậy cổng chỉ miễn khi **mọi video** của nguồn có tên và sha256 nằm trong `annotate/deid/egodex_pin.json`. Ngoài ra:
+
+- `source.json` có thêm trường `deid_waiver_manifest`: id của pin đã dùng để kiểm, hoặc `null` khi không được miễn.
+- Cổng kiểm lại sha256 ở mỗi bước; `check_unchanged` buộc các sha256 đó vào file trên đĩa.
+
+| Pin | Giá trị |
+|---|---|
+| Id | `egodex-test-da30-part1@4b4ad209ee99` (tên, cộng 12 ký tự đầu sha256 của file pin) |
+| Nội dung | 218 mp4 của mẫu DA-30, `{"<task>/<i>.mp4": sha256}`, 22 KB |
+| Cách dựng | `python -m flywheel.data.annotate.deid.pin fwdata/egodex-da30 <pin>`: kiểm kích thước và CRC-32 của từng video với `manifest.json` của DA-30 (lấy từ thư mục của `test.zip` của Apple), rồi mới tính sha256; 3,0 s |
+| Vì sao chỉ ghim video | Manifest của DA-30 không có sha256, chỉ có tên, kích thước, CRC-32. Cả 218 HDF5 của DA-30 đã khác zip, vì bước H-RDT thêm `actions_48d`; cả 218 mp4 đều khớp (kiểm 7/11/2026). Che danh tính là việc của hình ảnh; HDF5 không chứa ảnh |
+
+Kiểm trên laptop ngày 7/11/2026:
+
+- 20 episode của tập con được miễn, cùng `source_id`.
+- Thư mục gốc có HDF5 thật và một mp4 bị thay: không được miễn ("1 videos not in the pinned sample"); `pose --job` và `annotate` trả mã 2.
+- Sửa tay `source.json` để ghi lý do miễn: `annotate` vẫn trả mã 2 và nêu tên video lạ.
 
 Câu Q-27I phần che danh tính: chưa chọn model, vì D2 hoãn bước này.
 
@@ -116,39 +141,64 @@ Luật trước, model khi luật mơ hồ, người duyệt mẫu (**[Đã ch�
 2. Điểm dừng là đoạn tốc độ cổ tay (trung bình trượt 5 khung) dưới 0,12 m/s, dài ít nhất 3 khung, trừ đoạn dừng ở đầu và cuối video.
 3. Khoảng thumb–index đóng lại qua một điểm dừng là gắp, mở ra là thả. Các điểm dừng liền nhau cùng loại gộp thành một, giữ điểm có thay đổi lớn nhất; lần thả đứng trước mọi lần gắp bị bỏ.
 4. Lý do mơ hồ: `low_confidence` (độ tin trung bình dưới 0,3), `close_to_previous` (cách sự kiện trước dưới 6 khung), `two_hands`, `aperture_flat` (khoảng đổi dưới 1 cm), `no_dwell` (không thấy điểm dừng, dùng điểm dừng dài nhất làm gắp tạm).
-5. Sự kiện mơ hồ gửi RoboBrain 8 khung trong cửa sổ ±30 khung và hỏi khung nào tay bắt đầu nắm (hoặc buông); câu trả lời đọc được thì thay khung của luật và ghi `source = model`.
+5. Sự kiện mơ hồ gửi RoboBrain 8 khung trong cửa sổ ±30 khung và hỏi khung nào tay bắt đầu nắm (hoặc buông). Câu trả lời đọc được thì thay khung của luật và ghi `source = model`. Riêng câu trả lời là khung đầu hoặc khung cuối được cho xem thì không tính (review PR 152, 7/11/2026): sự kiện giữ khung của luật, câu trả lời lưu ở `model_frame` với lý do `model_at_edge`, và sự kiện vẫn mở.
 6. EgoDex cắt thành `pick`, `place` theo sự kiện; đoạn sau lần thả cuối gộp vào `place`. Video hai bàn cắt thành 6 bước của design: tiếp cận, gắp, đi, tới, đặt, thả; bước đi là đoạn camera di chuyển trên 30% tốc độ đỉnh của nó.
-7. Mỗi đoạn có một câu lệnh: RoboBrain viết từ các khung của đoạn (`label_source = model`), không thì dùng mẫu câu trong cấu hình (`rule`). `fw egocentric review --sample` lấy 20% số đoạn theo seed 7; người điền `accept`, `fix` hoặc `reject`, `--apply` ghi lại với `label_source = human`.
+7. Mỗi đoạn có một câu lệnh: RoboBrain viết từ các khung của đoạn (`label_source = model`), không thì dùng mẫu câu trong cấu hình (`rule`). `fw egocentric review --sample` lấy 20% số đoạn theo seed 7; người điền `accept`, `fix` hoặc `reject`, `--apply` ghi lại với `label_source = human`. Mỗi dòng của phiếu chỉ đoạn bằng `match` (`step_id`, `frame_start`, `frame_end` lúc lấy mẫu), không bằng vị trí. Các trường hợp sau làm cả phiếu bị từ chối trước khi ghi file nào: đoạn đã bị bỏ, sửa hay cắt lại; episode không có trong `episodes.jsonl`; một đoạn duyệt hai lần; đoạn chồng nhau.
 
 Kết quả trên 20 episode:
 
 | Lần chạy | Đoạn | Sự kiện luật để mở | Câu lệnh | Thời gian job |
 |---|---|---|---|---|
 | Chỉ luật | 41 (22 `pick`, 19 `place`) | 13 trên 21 | mẫu câu (`rule`) | 1,26 s |
-| Luật + RoboBrain | 38 (20 `pick`, 18 `place`) | 0 (model trả lời cả 13) | 38 câu do model viết | 1.125,5 s (ước tính 20,7 s) |
+| Luật + RoboBrain, 6/11/2026 | 38 (20 `pick`, 18 `place`) | 0 (model trả lời cả 13) | 38 câu do model viết | 1.125,5 s (ước tính 20,7 s) |
+| Luật + câu trả lời của RoboBrain phát lại, bỏ câu ở mép, 7/11/2026 | 39 | 6 (bỏ 6 câu ở mép) | 27 câu của model, 12 mẫu câu | 22,2 s trên laptop |
 
 Lý do mơ hồ của 13 sự kiện: `aperture_flat` 11, `two_hands` 6, `low_confidence` 1 (một sự kiện có thể có nhiều lý do). Câu RoboBrain viết đọc hợp lý và gọi đúng vật, ví dụ "Pick up the green grapes from the plate.", "Place the sunglasses into the black case."; chưa có người chấm.
 
-Ranh giới RoboBrain đề xuất đáng ngờ: 6 trong 13 câu trả lời là ảnh đầu tiên được cho xem. Ở `ep_603d1475` model chọn khung 0, nên episode chỉ còn một đoạn `pick`. Nhiều khả năng đây là thiên lệch vị trí của model, không phải ranh giới thật; vòng thử ở mục 7 là để đo sai số ranh giới trên khung có đáp án, nhưng chưa chạy xong.
+Ranh giới RoboBrain đề xuất đáng ngờ: 6 trong 13 câu trả lời là ảnh đầu tiên được cho xem. Ở `ep_603d1475` model chọn khung 0, nên episode chỉ còn một đoạn `pick` (0–81, `model`) mà QA vẫn cho `pass`. Nhiều khả năng đây là thiên lệch vị trí của model, không phải ranh giới thật. Vòng thử ở mục 7 là để đo sai số ranh giới trên khung có đáp án, nhưng chưa chạy xong.
+
+Lần chạy lại ngày 7/11/2026 dùng lại đúng câu trả lời RoboBrain đã cho ngày 6/11/2026, vì `rtx3060` đang giữ cho eval C:
+
+- Khung ranh giới lấy từ `labels.json` cũ: cùng câu lệnh, cùng loại sự kiện, nằm trong các khung được cho xem.
+- Câu lệnh lấy từ `segments.parquet` cũ khi đoạn cho xem đúng các ảnh cũ (so sha256 của JPEG); đoạn đổi thì dùng mẫu câu.
+- Kịch bản `~/.cache/denso-da04-check/replay.py` gọi thẳng `api.annotate`, nên không có dòng ledger.
+
+Kết quả: 13 câu trả lời phát lại đủ, 6 câu ở mép bị bỏ. `ep_603d1475` thành `pick` 0–12 và `place` 12–81 (`rule`), và bị QA gắn `flag` (`segment_ambiguous`).
 
 ## 6. QA và báo cáo (nhiệm vụ 6)
 
-Mỗi episode một `QAReport` của hợp đồng (`qa/egocentric.jsonl`), ngưỡng trong mục `qa` của cấu hình, `threshold_version = ego-1@f52e55c158ab`. Episode egocentric không có action robot hay bản phát lại, nên QA của nó có phép kiểm riêng:
+Mỗi episode một `QAReport` của hợp đồng (`qa/egocentric.jsonl`), ngưỡng trong mục `qa` của cấu hình, `threshold_version = ego-1@2b0b593722be` (7/11/2026; ngày 6/11/2026 là `ego-1@f52e55c158ab`). Episode egocentric không có action robot hay bản phát lại, nên QA của nó có phép kiểm riêng:
 
-| Phép kiểm | Giá trị | Ngưỡng | Hỏng thì | Pass | Flag | Trung vị |
+| Phép kiểm | Giá trị | Ngưỡng | Hỏng thì | Qua | Hỏng | Trung vị |
 |---|---|---|---|---|---|---|
 | `deid_gate` | 1 khi cổng chặn | 0 | `reject` | 20 | 0 | 0 |
 | `min_frames` | số khung của pose | ≥ 30 | `reject` | 20 | 0 | 179 |
 | `video_frames` | lệch số khung mp4 và pose | 0 | `reject` | 20 | 0 | 0 |
 | `pose_finite` | tỉ lệ khung camera không hữu hạn | 0 | `reject` | 20 | 0 | 0 |
+| `hand_pose_nan` (D1, 7/11/2026) | số khung có tay NaN; lý do ghi số khung NaN theo từng tay | 0 | `flag`; `reject` khi không khung nào có tay hữu hạn | 20 | 0 | 0 |
 | `pose_low_confidence` | tỉ lệ khung không tay nào đạt độ tin 0,3; nguồn không ghi độ tin thì `flag` | 0,5 | `flag` | 16 | 4 | 0 |
 | `hand_out_of_frame` | tỉ lệ khung không cổ tay nào chiếu vào ảnh | 0,3 | `flag` | 17 | 3 | 0,044 |
 | `camera_jitter_deg_s` | RMS tốc độ xoay camera trừ trung bình trượt 9 khung | 60°/s | `flag` | 20 | 0 | 1,39°/s |
 | `instruction` | 1 khi không có câu lệnh | 0 | `reject` | 20 | 0 | 0 |
 | `segments` | 1 khi không có đoạn, hoặc đoạn rỗng, chồng nhau, sai thứ tự, quá khung cuối | 0 | `reject` | 20 | 0 | 0 |
-| `segment_ambiguous` | tỉ lệ sự kiện còn mở; 1 khi không có sự kiện | 0 | `flag` | 19 | 1 | 0 |
+| `segment_count` (7/11/2026) | số đoạn | ≥ 2 | `reject` | 19 | 1 | 2 |
+| `segment_ambiguous` | tỉ lệ sự kiện còn mở; 1 khi không có sự kiện | 0 | `flag` | 13 | 7 | 0 |
 
-Kết quả sau E-A và lần cắt có RoboBrain: **13 `pass`, 7 `flag`, 0 `reject`**. Bốn episode `flag` vì file không có nhóm `confidences`; ba vì tay ra khỏi khung 42–52% thời gian; một (`ep_2732d666`, 2,4 giây) vì không tay nào đi đủ 0,2 m nên luật không thấy sự kiện. Lần chạy chỉ luật trước đó cho 5 `pass`, 15 `flag`, vì 13 sự kiện còn mở.
+Kết quả ngày 6/11/2026, sau E-A và lần cắt có RoboBrain: 13 `pass`, 7 `flag`, 0 `reject`. Lần chạy chỉ luật trước đó cho 5 `pass`, 15 `flag`, vì 13 sự kiện còn mở.
+
+Kết quả ngày 7/11/2026, chạy lại trên laptop: **8 `pass`, 11 `flag`, 1 `reject`**.
+
+| Episode | Quyết định | Lý do |
+|---|---|---|
+| 4 episode | `flag` | file không có nhóm `confidences` |
+| 3 episode | `flag` | tay ra khỏi khung 42–52% thời gian |
+| 7 episode | `flag` | còn sự kiện mở (6 trong số đó do bỏ câu trả lời ở mép cửa sổ) |
+| `ep_2732d666` (2,4 giây) | `reject` | `segment_count` 1 < 2: không tay nào đi đủ 0,2 m nên luật không thấy sự kiện |
+
+Một episode có thể có nhiều lý do. Hai phép kiểm mới:
+
+- `segment_count` chặn trường hợp một model làm mất sự kiện, như `ep_603d1475`.
+- `hand_pose_nan` chạy trên `pose.npz`, tức pose DA-18 xuất: E-B với EgoDex, E-A với video tự quay. E-B không có khung NaN, nên 20/20 qua. Trên một bản sao lấy E-A làm `pose.npz`: 20/20 `flag`, không `reject`; ví dụ `ep_813f1b1e` có "NaN hand pose in 197 frames (left 197/266, right 10/266)". QA không cắt, không sửa pose; DA-18 bỏ các đoạn có khung NaN.
 
 `fw egocentric report` ghi `DatasetReport` của hợp đồng (qua `dataset_report`, `render_html` của API làn) và thêm phần egocentric vào trang `report/index.html` và `report/egocentric.json`: số đoạn theo bước và theo nguồn nhãn, pass, flag, reject theo phép kiểm, giờ video, giấy phép và lý do miễn, độ lệch E-A so với E-B. Hợp đồng không thêm trường nào. `qa` chạy 1,15 s (ước tính 4,14 s), `report` 0,85 s (ước tính 0,2 s).
 
@@ -215,6 +265,8 @@ Chưa trả lời được câu của D3 ("model nào, có dùng không"). Trong
 | 10 | Vòng thử model chưa xong, chưa có `Decision` (D3) | Chưa chọn được model cho ranh giới và điểm gắp | Hiếu chạy theo mục 10.3 khi `rtx3060` trống |
 | 11 | `trial` chỉ ghi `rows.json` khi chạy xong, nên lần chạy bị dừng không để lại gì | Mất 6 phút kết quả RoboBrain đã chạy | **[Đề xuất]** ghi theo từng model; việc nhỏ trong `trial.py` |
 | 12 | Job `trial` bị dừng chỉ có dòng ledger ước tính, không có dòng thực đo | Sổ chi phí có một ước tính không có thực đo đi kèm | Ghi chú ở đây; sổ append-only nên không xóa dòng |
+| 13 | Câu lệnh của 12 đoạn đổi sau khi bỏ câu trả lời ở mép (7/11/2026) đang là mẫu câu, vì RoboBrain chưa chạy lại | 12 trên 39 đoạn có `label_source = rule` | Chạy `annotate --endpoint` khi `rtx3060` trống |
+| 14 | Pin chỉ gồm 218 video của mẫu DA-30; mở rộng tập con ra ngoài mẫu đó cần dựng lại pin | Episode mới không được miễn cho tới khi pin có video của nó | Dựng lại bằng `pin.py`; PO duyệt PR |
 
 ## 10. Việc để chạy sau
 
@@ -288,7 +340,7 @@ Chưa thử cài MediaPipe trên laptop. Gói có wheel sẵn nên không cần 
 
 ### 10.5 Mẫu duyệt của người
 
-Điền `decision` (`accept`, `fix` hoặc `reject`; `fix` thì sửa `description`) và `reviewer` cho 8 đoạn trong `$W/review/sheet.jsonl`, rồi chạy `fw egocentric review $W --apply $W/review/sheet.jsonl`. Đoạn đã duyệt được ghi `label_source = human`. Việc này không cần máy mạnh.
+Điền `decision` (`accept`, `fix` hoặc `reject`; `fix` thì sửa `description`) và `reviewer` cho 8 đoạn trong `$W/review/sheet.jsonl` (phiếu ghi lại ngày 7/11/2026; không sửa `match`), rồi chạy `fw egocentric review $W --apply $W/review/sheet.jsonl`. Đoạn đã duyệt được ghi `label_source = human`. Việc này không cần máy mạnh.
 
 ## Phụ lục A. `serve_molmo2.py`
 
