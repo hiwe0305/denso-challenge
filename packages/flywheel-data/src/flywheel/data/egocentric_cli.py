@@ -273,8 +273,9 @@ def trial(
             timeout = timeout_s or cfg.timeout_s
             models = {
                 "robobrain": OpenAIVision(robobrain, cfg.models["segment_suggester"].served,
-                                          timeout),
-                "molmo": OpenAIVision(molmo, cfg.models["grasp_pointer"].served, timeout),
+                                          timeout, local_hosts=cfg.local_hosts),
+                "molmo": OpenAIVision(molmo, cfg.models["grasp_pointer"].served, timeout,
+                                      local_hosts=cfg.local_hosts),
             }
             measured = dict(v.split("=", 1) for v in vram or [])
             result = trials.run(work, simple, reference, models, cfg, target, measured,
@@ -314,8 +315,10 @@ def _models(cfg: EgoConfig, endpoint: str | None) -> api.Models:
     if endpoint is None:
         return api.Models()
     roles = cfg.models
-    suggester = OpenAIVision(endpoint, roles["segment_suggester"].served, cfg.timeout_s)
-    labeler = OpenAIVision(endpoint, roles["labeler"].served, cfg.timeout_s)
+    suggester = OpenAIVision(endpoint, roles["segment_suggester"].served, cfg.timeout_s,
+                             local_hosts=cfg.local_hosts)
+    labeler = OpenAIVision(endpoint, roles["labeler"].served, cfg.timeout_s,
+                           local_hosts=cfg.local_hosts)
     return api.Models(ModelSuggester(suggester), ModelLabeler(labeler), {
         role: f"{roles[role].name}@{roles[role].revision[:12]}"
         for role in ("segment_suggester", "labeler")})

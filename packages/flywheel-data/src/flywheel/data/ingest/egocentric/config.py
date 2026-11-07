@@ -77,6 +77,7 @@ class EgoConfig:
     models: dict[str, ModelConfig]
     timeout_s: float
     max_image_side_px: int
+    local_hosts: tuple[str, ...]
     review_share: float
     review_seed: int
 
@@ -104,7 +105,7 @@ def load_config(path: Path = DEFAULT) -> EgoConfig:
                                          "tasks": tuple(v.get("tasks", ()))})
                    for name, v in _mapping(data["sources"], "sources").items()}
         roles = {k: ModelConfig(**_mapping(v, f"models.{k}")) for k, v in models.items()
-                 if k not in ("timeout_s", "max_image_side_px")}
+                 if k not in ("timeout_s", "max_image_side_px", "local_hosts")}
     except TypeError as error:
         raise ConfigError(f"{path}: {error}") from error
     for name, rule in rules.items():
@@ -123,6 +124,7 @@ def load_config(path: Path = DEFAULT) -> EgoConfig:
         models=roles,
         timeout_s=float(models["timeout_s"]),
         max_image_side_px=int(models["max_image_side_px"]),
+        local_hosts=_hosts(models.get("local_hosts", [])),
         review_share=float(review["sample_share"]),
         review_seed=int(review["seed"]),
     )
@@ -132,6 +134,12 @@ def _mapping(value: Any, where: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ConfigError(f"{where} must be a mapping")
     return cast(dict[str, Any], dict(value))
+
+
+def _hosts(value: Any) -> tuple[str, ...]:
+    if not isinstance(value, list) or not all(isinstance(h, str) and h for h in value):
+        raise ConfigError("models.local_hosts must be a list of host names")
+    return tuple(value)
 
 
 def _keys(data: dict[str, Any], names: tuple[str, ...], where: str) -> None:
