@@ -65,7 +65,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực: 5 giờ (nhiệm vụ 1: 1,5 + 0,5 sửa sau khi chạy work dir thật của DA-04; 2: 1,5; 3: 1,5), Hiếu làm cùng Claude từ 6/11/2026 (plan chia lại việc của Hưng).
+- Giờ thực: 6,55 giờ (nhiệm vụ 1: 1,5 + 0,5 sửa sau khi chạy work dir thật của DA-04 + 0,5 sửa theo review PR #153; 2: 1,5 + 0,3 chạy loader thật trên laptop; 3: 1,5 + 0,75 sửa theo review), Hiếu làm cùng Claude từ 6/11/2026 (plan chia lại việc của Hưng).
 - Công cụ AI đã dùng: Claude Code (Claude Opus 5.5).
 - Ghi chú hoàn thành:
   - Đầu vào là work dir của DA-04 theo plan 6/11/2026 mục 4.2a; test dùng work dir tổng hợp theo đúng mục đó. DA-04 cần ghi thêm `intrinsic` (3, 3) vào `pose.npz` cho E-A **[Đề xuất]**: loader của Ψ₀ đọc `camera/intrinsic` ở mọi mẫu, còn episode E-A không có HDF5.
@@ -74,6 +74,12 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
   - Phát hiện: với `img_history_size` 1 và `upsample_rate` 3, `parse_img_data` của Ψ₀ lấy khung `index - 2` (không nhỏ hơn 0) chứ không phải khung `index`. Đây là hành vi của tác giả; bản export giữ video và HDF5 khớp từng khung.
   - Chạy trên work dir thật của DA-04 (`fwdata/pipeline/src_050b9bf56a4e843c`, 20 episode EgoDex, QA 13 pass, 7 flag) với `--include-flag`, trên laptop: 38 mẫu (25 pass, 13 flag), 4143 khung, 79 MB, 53 giây đo, ước tính 84 giây. Loader giả đọc đủ 38 mẫu, action chuẩn hóa hữu hạn.
   - 4 episode trong đó (8 mẫu) không có nhóm `confidences` trong file EgoDex, nên DA-04 ghi NaN. `meta` ghi `pose_confidence` với `mean`/`min` là `null` và `recorded` 0, không lấy trung bình NaN. Action có NaN hoặc Inf thì export từ chối và xóa thư mục đầu ra (thư mục đã được kiểm là mới hoặc rỗng), để lần chạy lại không bị chặn vì "không rỗng".
+  - Sửa theo review PR #153 (7/11/2026):
+    - Split `dev` của DA-04 vào thư mục `test/` của Ψ₀.
+    - Từ chối fps khác 30 (trong `bundle.json` hoặc trong mp4), vì `upsample_rate` 3 giả định 30 Hz; 29,97 vẫn qua; resample để sau.
+    - Từ chối trộn E-A với E-B trong một lượt export.
+    - Đoạn có khung không hữu hạn (tay hoặc camera) bị bỏ nguyên đoạn và liệt kê trong `meta.json`; chỉ từ chối cả lượt khi không còn đoạn nào.
+  - E-A thật (pose `pose_ea.npz` của DA-04 trên 20 episode EgoDex, tức `to_pose` của `fwdata/egocentric-ea/src_050b9bf56a4e843c-v2`), với `--include-flag`: **giữ 2 trên 38 đoạn** (109 trên 4143 khung). 36 đoạn bị bỏ vì tay không thấy ở ít nhất một khung. Với luật bỏ nguyên đoạn, E-A trên video EgoDex gần như không cho mẫu nào; cần PO xem lại luật hoặc đợi video đội tự quay.
   - Chưa xong ngoài phạm vi: `build_release` (DA-03) vẫn đóng băng release toàn egocentric với `kind` robot; test `xfail` strict ghi lại, đề xuất PR riêng cho DA-03.
 - File đã tạo hoặc sửa: `packages/flywheel-data/src/flywheel/data/export/egodex.py`, `packages/flywheel-data/tests/contract/export_egodex/`, `docs/g0/ledger/DA-18.csv`.
 
@@ -83,8 +89,9 @@ Quy tắc mới (Hiếu, 6/11/2026): chạy trên laptop nếu được; không 
 
 | Việc | Chạy ở | Kết quả |
 |---|---|---|
-| Export, test CI (fake loader, batch đã lưu) | Laptop | 28 qua, 2 `xfail` strict |
+| Export, test CI (fake loader, batch đã lưu) | Laptop | 38 qua, 2 `xfail` strict |
 | Export work dir thật của DA-04, đọc lại bằng loader giả | Laptop | 38 mẫu, 53 giây, đọc đủ |
+| Export E-A thật (cùng 20 episode, pose của E-A) | Laptop | Giữ 2, bỏ 36 đoạn, 1,6 giây; loader giả đọc đủ 2 mẫu |
 | So `actions_48d` với bản của tác giả, so stats với `calc_stat.py` (môi trường Ψ₀ `fwdata/psi0/Psi0/.venv-psi`) | Laptop | Khớp (lệch 0 và 9e-8) |
 | Loader thật của Ψ₀ (`-k psi0`) | `rtx3060`, image Ψ₀ của tác giả, **trước khi có quy tắc mới** | 4 qua, rồi 2 qua (mục trên) |
 
