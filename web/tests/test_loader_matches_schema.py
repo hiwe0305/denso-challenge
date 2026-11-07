@@ -184,11 +184,13 @@ def _strict_rows() -> list[tuple[str, dict[str, object]]]:
 
     from web.fwsync.mapping import (
         DatasetLookup,
+        TraceLookup,
         map_bench_result,
         map_defect_manifest,
         map_episode,
         map_probe_result,
         map_qa_report,
+        map_system_diagnosis,
         map_train_diagnosis,
         map_training_metric,
     )
@@ -230,6 +232,9 @@ def _strict_rows() -> list[tuple[str, dict[str, object]]]:
     )
     rows += [(table, row) for table, table_rows in diagnosis.items() for row in table_rows]
     rows += [("probe_results", map_probe_result(load(f"ProbeP{i}"))) for i in (1, 2, 3, 4)]
+    system = load("SystemDiagnosis")
+    lookup = TraceLookup(by_trace={str(system["trace_sha256"]): "ee_1"})
+    rows.append(("system_diagnoses", map_system_diagnosis(system, lookup)))
     manifest = map_defect_manifest(load("DefectManifest"))
     rows.append(("defect_manifests", manifest["manifest"]))
     rows += [("defect_items", item) for item in manifest["items"]]

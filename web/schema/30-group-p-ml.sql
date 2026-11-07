@@ -246,6 +246,11 @@ CREATE TABLE eval_episodes (
   -- Provenance của episode (03 §4.3), không phải kết quả một phép kiểm; kết
   -- quả kiểm hệ thống nằm ở `system_diagnoses`.
   camera_params_hash VARCHAR(64),
+  -- W13 (bản 0.7): sha256 của `steps.jsonl` mà scorer và kiểm hệ thống đã
+  -- đọc. Khoá nối bản ghi `diagnosis/system.jsonl` thật với episode này, vì
+  -- `SystemDiagnosis.episode_id` (`episode_N`) đếm lại ở mỗi lượt eval. NULL
+  -- là episode chưa có trace; nhiều NULL không phạm UNIQUE.
+  trace_sha256 CHAR(64) UNIQUE,
   video_uri TEXT,
   trajectory_log_uri TEXT,
   -- Lý do từng bước `unknown`, tín hiệu thiếu, lớp lỗi chung. Thành trường có
@@ -291,6 +296,11 @@ CREATE TABLE system_diagnoses (
     'clean','unknown','controller','runtime','sync','calibration','infra')),
   config_sha256 CHAR(64) NOT NULL,             -- hash system.yaml đã chấm
   trace_sha256 CHAR(64) NOT NULL,
+  -- Hash của mọi đầu vào khác phép kiểm đã đọc (DA-13 AC 2, bản 0.7). NULL là
+  -- đầu vào đó không có, ví dụ episode không có log RTC.
+  rtc_sha256 CHAR(64),
+  camera_sha256 CHAR(64),
+  infra_sha256 CHAR(64),
   infra_status VARCHAR(24),                    -- R6; ghi dù R6 không nổ
   -- [{code, value, threshold, part, where, detail}]
   findings JSONB NOT NULL DEFAULT '[]',

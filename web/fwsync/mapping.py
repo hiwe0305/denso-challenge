@@ -14,8 +14,9 @@ chạy tiếp dòng khác (§2, lưới an toàn) — không dừng cả lần n
 
 **Trường hợp đồng có mà schema web không có thì bỏ, có chủ ý.**
 `DROPPED_FIELDS` liệt kê từng trường như vậy kèm lý do để test kiểm được,
-chứ không im lặng. Hiện danh sách rỗng: `EpisodeMetadata.injected_defect`,
-trường duy nhất từng ở đây, đã ra khỏi hợp đồng (issue #62, S1-10/7), và
+chứ không im lặng. Hiện có một trường, `SystemDiagnosis.episode_id` (W13).
+`EpisodeMetadata.injected_defect`, trường từng ở đây trước nó, đã ra khỏi
+hợp đồng (issue #62, S1-10/7), và
 `benchmark_copy_id` thay nó đi thẳng vào cột cùng tên. Artifact còn mang
 `injected_defect` giờ bị chính model hợp đồng từ chối (`extra="forbid"`),
 nên đáp án lỗi cấy không tới được bảng mà `agent_ro` đọc (luật R8).
@@ -47,13 +48,19 @@ from flywheel.contracts.artifacts import (
     ProbeP4,
     QAReport,
 )
+from flywheel.contracts.diagnosis import SystemDiagnosis
 from flywheel.contracts.training import TrainDiagnosis, TrainingMetric
 from pydantic import BaseModel, ValidationError
 
 #: Trường của hợp đồng bị bỏ có chủ ý, và lý do. Test kiểm danh sách này, nên
 #: một trường bị bỏ âm thầm sẽ không lọt.
 #: Khoá là `<Model>.<trường>`; mapper bỏ trường đó khỏi mọi cột và `meta`.
-DROPPED_FIELDS: dict[str, str] = {}
+DROPPED_FIELDS: dict[str, str] = {
+    "SystemDiagnosis.episode_id": (
+        "tên `episode_N` của dòng thống kê SIMPLE, đếm lại ở mỗi lượt eval nên không "
+        "duy nhất; bản ghi nối với `eval_episodes` bằng `trace_sha256` (W13)"
+    ),
+}
 
 NON_FINITE = ("NaN", "Infinity", "-Infinity")
 
@@ -315,6 +322,69 @@ def map_probe_result(payload: Any) -> dict[str, Any]:
         "parent_checkpoint_ref": getattr(probe, "parent_checkpoint_id", None),
         "dataset_sha256": getattr(probe, "dataset_sha256", None),
         "payload": probe.model_dump(),
+    }
+
+
+@dataclass(frozen=True)
+class TraceLookup:
+    """Cách nối một `SystemDiagnosis` thật với dòng `eval_episodes` của nó (W13).
+
+    `SystemDiagnosis.episode_id` là tên `episode_N` mà SIMPLE ghi ở dòng
+    thống kê, đếm lại từ đầu ở mỗi lượt eval, nên không làm khoá được: hai
+    job khác nhau cùng có `episode_3`. `trace_sha256` thì làm được: nó là
+    sha256 của `steps.jsonl` mà phép kiểm đã đọc, mỗi dòng của file đó mang
+    `trace_id` duy nhất, nên hai trace khác nhau không trùng hash. Không đổi
+    hợp đồng (DESIGN.md §4.4b, phương án 1).
+
+    * ``by_trace`` — ``eval_episodes.trace_sha256`` → ``eval_episode_ref``.
+    * ``ambiguous`` — hash mà hai dòng `eval_episodes` cùng mang. Nối vào hash
+      đó là chọn bừa một trong hai, nên từ chối như hash không có.
+
+    Giống W12: tra không ra thì từ chối dòng, không gán vào episode nào.
+    """
+
+    by_trace: dict[str, str]
+    ambiguous: frozenset[str] = frozenset()
+
+    def resolve(self, trace_sha256: str) -> str:
+        if trace_sha256 in self.ambiguous:
+            raise MappingError(
+                f"trace_sha256 `{trace_sha256[:12]}…` có trên nhiều dòng `eval_episodes`; "
+                f"không nối được bản ghi kiểm hệ thống vào một episode"
+            )
+        if trace_sha256 not in self.by_trace:
+            raise MappingError(
+                f"không có dòng `eval_episodes` nào mang trace_sha256 `{trace_sha256[:12]}…`; "
+                f"bản ghi kiểm hệ thống bị từ chối thay vì gán vào một episode bất kỳ (W13)"
+            )
+        return self.by_trace[trace_sha256]
+
+
+def map_system_diagnosis(payload: Any, lookup: TraceLookup) -> dict[str, Any]:
+    """Một `SystemDiagnosis` của làn DA-13 thành một dòng `system_diagnoses`.
+
+    Validate bằng model hợp đồng trước, nên `clean` kèm mã bị bỏ qua, hay R1
+    ghi nhận trên rollout không đồng bộ, bị từ chối ở đây chứ không đợi C17
+    của Postgres. `episode_id` bị bỏ có chủ ý (`DROPPED_FIELDS`); khoá nối là
+    `trace_sha256`. Hợp đồng không có `measurements`, nên cột đó để `{}`: M6
+    khi đó hiện số qua `findings` và `recorded`.
+    """
+    diagnosis: SystemDiagnosis = _validated(SystemDiagnosis, payload, "system diagnosis")
+    return {
+        "eval_episode_ref": lookup.resolve(diagnosis.trace_sha256),
+        "diagnosis": diagnosis.diagnosis,
+        "config_sha256": diagnosis.config_sha256,
+        "trace_sha256": diagnosis.trace_sha256,
+        "rtc_sha256": diagnosis.rtc_sha256,
+        "camera_sha256": diagnosis.camera_sha256,
+        "infra_sha256": diagnosis.infra_sha256,
+        "infra_status": diagnosis.infra_status,
+        "findings": [finding.model_dump() for finding in diagnosis.findings],
+        "skipped": [skip.model_dump() for skip in diagnosis.skipped],
+        "measurements": {},
+        "timing": diagnosis.timing,
+        "recorded": [finding.model_dump() for finding in diagnosis.recorded],
+        "recorded_skipped": [skip.model_dump() for skip in diagnosis.recorded_skipped],
     }
 
 
