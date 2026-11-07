@@ -651,6 +651,93 @@ Chung cho T1 và T2:
 - **Server đã trả về cấu hình của eval C** sau T2 (mục 14.2): `~/denso-da34-t4/serve.sh c 24 rtc` dừng container T2a′ lúc 2026-11-07T00:57:22Z; container `fw-psi0-psi0-run-4e2f7b1ee2d3` có `--action-exec-horizon 24 --rtc`, cùng checkpoint và cổng 22185, khỏe lúc 00:59:35Z. Server để chạy, không tắt.
 - Bước kế tiếp do Hiếu quyết. Các chỗ nghi trong chuỗi train/serve đã liệt kê ở luật 14.1: chuẩn hóa action, `stats_psi0.json`, bố cục 36 chiều, ảnh đầu vào, chunk.
 
+## 15. Kiểm chuỗi train/serve (A, B)
+
+_Bước kế tiếp của luật 14.1 sau T1 0/20. **[Đã chốt 7/11/2026, Hiếu]** "Giao DA-34 làm": trên `rtx3060`, 0 CU, không train. Mục tiêu: tách hai khả năng "C chưa học được `place`" và "đầu vào lúc serve khác lúc train". Luật đọc và ngưỡng dưới đây là **[Đề xuất]**, commit **trước** lần chạy đầu tiên, không sửa sau khi thấy kết quả._
+
+### 15.1 Đã đọc tại nguồn trước khi viết luật
+
+Psi0 `cda3fdf`, SIMPLE `6d10628`, checkpoint C `ckpt_40000`:
+
+- **Chuẩn hóa.**
+  - `run_config.json` của C mang sẵn `action_min/max`, `state_min/max`, khớp `meta/stats_psi0.json` của tập C (sai lệch lớn nhất 0). State có 32 chiều, đệm 0 lên 36. Kiểu chuẩn hóa `bounds`, về [−1, 1].
+  - `ActionStateTransform.model_post_init` đọc lại `stat_path` = `meta/stats_psi0.json` nếu đường dẫn này tìm thấy lúc serve (thư mục chạy, thư mục asset, `DATA_HOME`). Vì vậy phải kiểm stats mà server thật sự dùng.
+- **Ảnh lúc train.** LeRobot giải mã mp4 bằng `pyav`, `pt_to_pil`, rồi `resize` + `center_crop` về 180 × 320. Màu (`color_jitter`) chỉ bật khi train, tắt ở split `val` và lúc serve.
+- **Ảnh lúc serve.** Server nhận ảnh `uint8` dưới khóa `rgb_head_stereo_left`, rồi `resize` + `center_crop` như trên. Checkpoint không có `image_keys`, nên server dùng thứ tự trong payload; log của eval C có cảnh báo này, vô hại với một góc nhìn.
+- **Lời nhắc.** Lúc train là `task.lower()`. Log server của eval C cho thấy client gửi đúng câu đó, viết thường. Lời nhắc không phải chỗ nghi.
+- **State lúc serve** (`psi0_decoupled_wbc`):
+  - qpos các khớp tay và cánh tay, sắp lại theo `STATE_SLICES`;
+  - `waist_rpy` = qpos[13, 14, 12];
+  - lệnh chiều cao base trước đó (0,74 lúc reset).
+
+  Export đặt tên ba chiều 28–30 là `waist_roll/pitch/yaw_joint` và chiều 31 là `prev_base_height_command`. `modality.json` gọi chúng là `rpy` và `height`, còn dataset có thêm cột `observation.prev_torso_rpy`. Nghĩa của chiều 28–30 là một chỗ nghi.
+
+### 15.2 Phần A: open-loop trên dữ liệu train của C
+
+- **Frame.** 20 episode của T1 (mục 14.1) trong tập C, lấy mỗi frame thứ 10.
+- **Nhãn stage của mỗi frame** lấy từ cờ `observation.tray_steps` của episode thô (lô `gen/s1-pool-1104`, qua `flywheel_export.json` của release):
+  - stage của frame t là bước đầu tiên chưa bật, theo thứ tự `approach_a` … `release_stand`;
+  - frame sau `release_stand` ghi là `done`, báo riêng;
+  - nếu độ dài episode thô khác episode export thì không dùng nhãn, và báo.
+- **Hai đường gọi trên cùng frame, cùng seed nhiễu:**
+  - **Đường serve.** `POST /act` tới server eval C (`Ta` 24, `--rtc`), với `history.reset` và một seed riêng cho mỗi frame. Khi có reset, server bỏ qua nhánh RTC. Payload theo đúng định dạng của client SIMPLE: ảnh là frame mp4 của dataset giải mã thành `uint8`, state là 32 chiều thô của cột `states`, lời nhắc là `task.lower()`.
+  - **Đường train.** Dataset của Psi0 dựng từ `launch_config.data` của C (split `val`, `no_aug`) trên bản cắt C ở `rtx3060`, rồi `Psi0Model.predict_action` với cùng seed. Cần tắt server để có VRAM, sau đó trả lại `Ta` 24 + `--rtc`.
+- **Số đo.** Tính theo đơn vị chuẩn hóa [−1, 1] của từng chiều, trên 24 hàng đầu của chunk, chỉ các chiều action có biên độ khác 0:
+  - `d_path`: sai lệch tuyệt đối trung bình giữa hai đường;
+  - `e`: sai lệch giữa đường train và action thật `a[t:t+24]` (thiếu ở cuối episode thì lặp hàng cuối);
+  - `h`: sai lệch của mốc "giữ nguyên action hiện tại" (`a[t]` lặp 24 lần) so với action thật;
+  - `r` = trung vị `e` / trung vị `h`, tính theo stage.
+
+**Luật đọc A** [Đề xuất]:
+
+| Kiểm | Khớp | Lỗi | Giữa hai ngưỡng |
+|---|---|---|---|
+| A1, hai đường | trung vị `d_path` ≤ 0,01 và p95 ≤ 0,03 | trung vị > 0,05 hoặc p95 > 0,15: **lỗi chuỗi serve** | lệch nhỏ; báo theo chiều |
+| A2, `place` | `r_place` ≤ 0,7 và `e_place` ≤ 1,5 × trung vị `e` của `approach_a` … `reach_b`: **C học được `place` open-loop** | `r_place` ≥ 1 (không hơn mốc giữ nguyên) hoặc `e_place` ≥ 2 × trung vị đó: **C chưa học được `place`** | yếu; báo |
+
+Đọc gộp:
+- A1 lỗi: sửa chuỗi serve trước mọi việc khác.
+- A1 khớp và A2 chưa học: lỗi ở dữ liệu hoặc ở train.
+- A1 khớp và A2 học được: open-loop đúng, nên lỗi nằm ở vòng kín (đầu vào khác, phần B; hoặc sai số cộng dồn).
+
+Bước kế tiếp do Hiếu quyết.
+
+### 15.3 Phần B: so ảnh, state và stats
+
+- **B1, stats.** Trong container Psi0, dựng cấu hình như `Server.__init__` (không cần GPU), rồi so:
+  - `action_min/max`, `state_min/max` mà server dùng với `stats_psi0.json` của C;
+  - đường dẫn `stat_path` tìm được lúc serve (nếu có) và sha256 của file đó.
+
+  **Khớp** khi sai lệch lớn nhất bằng 0 và không có file nào khác được đọc. Nếu khác thì đó là **lỗi chuỗi serve**.
+- **B2, B3, phát lại.** Ba episode train đầu của T1 (seed 1279, 1574, 1503) được phát lại qua client eval thật: `eval_batch` với server giả `replay_server`, trả action của release, 24 frame mỗi lần gọi, như cổng phát lại ở mục 8.1. `replay_server --dump` lưu state, ảnh và lời nhắc của từng request. Request thứ k ứng với frame 24k của dataset.
+- **B2, ảnh.** So với frame mp4 cùng chỉ số: kích thước, kiểu dữ liệu, thứ tự kênh (sai lệch giữ nguyên so với đảo RGB/BGR), PSNR.
+
+| Kết quả | Đọc |
+|---|---|
+| Kích thước như dataset (360 × 640 × 3, `uint8`), thứ tự kênh đúng, PSNR ở frame 0 ≥ 30 dB | **Ảnh khớp** |
+| Kích thước khác, kênh đảo, hoặc PSNR ở frame 0 < 20 dB | **Ảnh khác** (camera, tư thế, render hoặc màu); ghi rõ cái nào |
+| PSNR ở frame 0 từ 20 tới 30 dB | Báo; xem ảnh |
+
+  Chỉ số phụ: PSNR theo k (phát lại trôi dần nên giảm dần là bình thường).
+- **B3, state.** So 32 chiều với cột `states` của dataset, theo đơn vị chuẩn hóa:
+  - ở frame 0: sai lệch từng chiều;
+  - cả episode: trung vị sai lệch từng chiều, tương quan và hệ số góc với từng chiều của dataset.
+
+| Kết quả | Đọc |
+|---|---|
+| Mọi chiều sống: trung vị sai lệch ≤ 0,05, chiều tương quan cao nhất là chính nó | **State khớp** |
+| Có chiều trung vị > 0,2, hoặc chiều tương quan cao nhất là chiều khác, hoặc hệ số góc âm hay lệch xa 1 | **State khác** (thứ tự, đơn vị, dấu hoặc nghĩa); ghi chiều |
+| Còn lại | Báo theo chiều |
+
+- **Đọc gộp B:** một kiểm "khác" là đủ để kết luận đầu vào lúc serve khác lúc train, ở trường được ghi.
+
+### 15.4 Chung
+
+- Log, ảnh và `runs.jsonl` để trên `rtx3060`, không commit.
+- Ghi dòng ước lượng trong sổ chi phí trước khi chạy, dòng thực đo sau khi chạy.
+- Server eval C (`Ta` 24, `--rtc`) có thể tắt trong phần A để lấy VRAM, và được trả lại cấu hình đó khi xong. Ghi lệnh và thời điểm.
+- Số đọc là sơ bộ.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -663,3 +750,4 @@ Chung cho T1 và T2:
 | 7/11/2026 | Mục 14.3: kết quả T1 (0/20 trên 20 cảnh train của C, Wilson 0–16,1 %; `reach_b` 65 %, `place` 5 %). Đọc theo luật 14.1: nghi chuỗi train/serve, không train gì cho tới khi tìm ra lỗi. Luật 14.1, 14.2 không đổi | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 14.4: kết quả T2b (`Ta = 24`, RTC tắt): 0/20, không qua `carry` ở điều kiện nào (mốc eval C 13/20); `success_gain` 0, `place_gain` 0, không đáng xem. Ghi lệnh khởi động lại server. Luật 14.2 không đổi | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 14.5, 14.6: kết quả T2a′ (`Ta = 10`, RTC tắt): 0/20, không qua `carry`, không đáng xem; tổng hợp T1, T2; server trả về `Ta = 24`, `--rtc`. `Decision` quy tắc 0 ghi `criteria.pipeline_check` và sửa khoảng trống đầu. Luật 14.1, 14.2 không đổi | Hiếu (soạn với Claude) |
+| 7/11/2026 | Mục 15: luật đọc A (open-loop trên dữ liệu train của C, hai đường gọi) và B (stats, ảnh, state qua phát lại) của bước kiểm chuỗi train/serve ([Đề xuất]), viết trước lần chạy đầu tiên. Hiếu giao "Giao DA-34 làm" | Hiếu (soạn với Claude) |
