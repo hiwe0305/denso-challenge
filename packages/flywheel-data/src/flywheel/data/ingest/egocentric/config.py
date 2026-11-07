@@ -19,7 +19,7 @@ from flywheel.data.api import ConfigError
 DEFAULT = Path("configs/data/egocentric.yaml")
 Layout = Literal["pick_place", "two_table"]
 DECISIONS = ("pass", "flag", "quarantine", "reject")
-QA_CHECKS = ("min_frames", "video_frames", "pose_finite", "pose_low_confidence",
+QA_CHECKS = ("min_frames", "video_frames", "pose_finite", "hand_pose_nan", "pose_low_confidence",
              "hand_out_of_frame", "camera_jitter_deg_s", "instruction", "segments",
              "segment_count", "segment_ambiguous", "deid_gate")
 
@@ -57,6 +57,7 @@ class QARule:
     on_fail: str
     below: float | None = None  # pose_low_confidence: a frame counts when below this
     when_missing: str | None = None
+    code: str | None = None  # design 10 D-code, as robot QA's (qa.yaml), in the reason
 
 
 @dataclass(frozen=True)

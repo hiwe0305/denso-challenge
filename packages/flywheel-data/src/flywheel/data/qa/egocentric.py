@@ -7,6 +7,10 @@ neither, so its checks are its own (design 6.6), thresholds in
     min_frames           frames of the pose; fails below the threshold
     video_frames         |frames of the mp4 - frames of the pose|; DA-18 cuts both
     pose_finite          share of frames whose camera pose is not finite
+    hand_pose_nan        frames where a hand's wrist or tips are NaN (E-A loses hands);
+                         the reason gives the count per hand. Fails `when_missing` when no
+                         frame has a finite hand. The pose is not cut or mended: DA-18
+                         drops the segments with NaN frames
     pose_low_confidence  share of frames where neither hand reaches `below`;
                          a source that recorded no confidence fails `when_missing`
     hand_out_of_frame    share of frames where no wrist projects inside the image
@@ -52,6 +56,40 @@ class EgoQAInput:
     image_size: tuple[int, int]  # width, height
     fps: float
     gate_passed: bool
+
+
+def finite_hands(pose: EgoPose) -> dict[str, NDArray[np.bool_]]:
+    """Per side, (T,) True where the wrist and the five tips are all finite."""
+    t = pose.frames
+    out: dict[str, NDArray[np.bool_]] = {}
+    for side in SIDES:
+        joints = np.concatenate([pose.wrist(side).reshape(t, -1), pose.tips(side).reshape(t, -1)],
+                                axis=1)
+        out[side] = np.asarray(np.isfinite(joints).all(axis=1))
+    return out
+
+
+def judge_hands(pose: EgoPose, cfg: EgoConfig,
+                results: list[tuple[QACheck, str, str | None]]) -> None:
+    """`hand_pose_nan`: flag NaN hand frames, reject when no frame has a finite hand."""
+    rule = cfg.qa["hand_pose_nan"]
+    finite = finite_hands(pose)
+    nan = {side: int((~ok).sum()) for side, ok in finite.items()}
+    count = sum(1 for ok in zip(*finite.values()) if not all(ok))
+    check = QACheck(name="hand_pose_nan", value=float(count), threshold=rule.threshold,
+                    passed=count <= rule.threshold)
+    if check.passed:
+        results.append((check, "pass", None))
+        return
+    per_hand = ", ".join(f"{side} {nan[side]}/{pose.frames}" for side in SIDES)
+    if not np.logical_or(*finite.values()).any():
+        results.append((check, rule.when_missing or rule.on_fail,
+                        f"hand_pose_nan ({rule.code}): no frame has a finite hand pose"
+                        f" (NaN frames: {per_hand})"))
+    else:
+        results.append((check, rule.on_fail,
+                        f"hand_pose_nan ({rule.code}): NaN hand pose in {count} frames"
+                        f" ({per_hand})"))
 
 
 def wrist_pixels(pose: EgoPose, side: str, intrinsic: NDArray[np.float64]) -> NDArray[np.float64]:
@@ -132,6 +170,7 @@ def run_ego_qa(item: EgoQAInput, cfg: EgoConfig) -> QAReport:
           f"mp4 {item.video_frames}, pose {pose.frames}")
     finite = np.isfinite(pose.camera.reshape(pose.frames, -1)).all(axis=1)
     judge("pose_finite", float(1 - finite.mean()) if pose.frames else 1.0)
+    judge_hands(pose, cfg, results)
     confidence = np.stack([pose.confidence_left, pose.confidence_right], axis=1)
     if not np.isfinite(confidence).any():
         rule = cfg.qa["pose_low_confidence"]
