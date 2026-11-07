@@ -63,6 +63,7 @@ def store_report(report: AgreementReport, store_path: Path) -> tuple[str, Path]:
         "agreed": report.agreed,
         "agreement": report.agreement,
         "passed": report.passed,
+        "unjudged": report.unjudged,
         "mismatches": len(report.mismatches),
     }
     index = store_path / AGREEMENT_RECORDS

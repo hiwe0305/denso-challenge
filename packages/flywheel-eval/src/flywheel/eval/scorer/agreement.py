@@ -24,9 +24,17 @@ Which episodes count:
   a rollout that is `ok` but whose `sim_success` is `None` gave no flag to
   check against. Both are listed under `excluded`, with the reason, and kept
   out of the rate.
+* A rollout with no `trace_ref` (the simulator died before writing a trace,
+  the commonest infra failure) has nothing to pair on. It is listed under
+  `untraced_rollouts` by `job_id`, never dropped (review of #158, point 2).
 * Every other paired episode counts. A scorer that answered "chưa rõ" (`None`)
   did not agree with SIMPLE: it is a mismatch of its own kind, because a
   scorer that hedges on every episode would otherwise never disagree.
+
+A rate is not a pass. G1 asks for the bar on **100 episodes holding both
+successes and failures** (AC 1, 04 section 4.2): a set that is smaller, or
+where SIMPLE never passed or never failed, can show a rate but not a verdict,
+so `passed` is `None` there and `unjudged` says why (review of #158, point 1).
 
 One report is about one scorer: one `task_id`, one `scorer_version`, one
 `config_sha256`. A set that mixes them is refused, since a rate over two
@@ -49,8 +57,13 @@ from pydantic import BaseModel, ConfigDict, Field
 #: The bar of G1 (04 section 4.2): the scorer's whole-task verdict matches
 #: SIMPLE's flag on at least this share of the counted episodes.
 AGREEMENT_BAR = 0.95
+#: The size of the set G1 is judged on (AC 1): fewer counted episodes give a
+#: rate, never a pass.
+MIN_EPISODES = 100
 
 MismatchKind = Literal["scorer_fail_sim_pass", "scorer_pass_sim_fail", "scorer_unknown"]
+#: Why a rate was not turned into a pass or a fail of G1.
+UnjudgedReason = Literal["no_episodes", "not_enough_episodes", "no_sim_success", "no_sim_failure"]
 
 
 class Mismatch(BaseModel):
@@ -80,6 +93,17 @@ class Excluded(BaseModel):
     reason: str
 
 
+class Untraced(BaseModel):
+    """A rollout with no trace: nothing to pair a `Score` with, listed by its job."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    job_id: str
+    infra_status: str
+    sim_success: bool | None
+    reason: str
+
+
 class AgreementReport(BaseModel):
     """The calibration report of FR18: the rate, and every episode behind it.
 
@@ -102,13 +126,18 @@ class AgreementReport(BaseModel):
     # None where nothing could be counted: a rate over zero episodes is not
     # 100 %, and not 0 % either.
     agreement: float | None
+    # The G1 verdict, only on a set G1 can be judged on; None otherwise, with
+    # the reasons in `unjudged`.
     passed: bool | None
+    unjudged: list[UnjudgedReason]
+    min_episodes: int = MIN_EPISODES
     sim_successes: int
     sim_failures: int
     mismatches: list[Mismatch]
     excluded: list[Excluded]
     unpaired_scores: list[str]
     unpaired_rollouts: list[str]
+    untraced_rollouts: list[Untraced]
 
     def canonical(self) -> bytes:
         """The bytes the report is stored and hashed as."""
@@ -134,6 +163,7 @@ def compare(
     if not release_id:
         raise ScorerError("thiếu release của checkpoint đã chấm; báo cáo phải nói nó (AC 2)")
     by_episode = _scores_by_episode(scores)
+    rollouts = list(rollouts)
     by_trace = _rollouts_by_trace(rollouts)
     identity = _identity(by_episode.values())
 
@@ -151,6 +181,9 @@ def compare(
     mismatches = [item for pair in counted if (item := _mismatch(pair)) is not None]
     agreed = len(counted) - len(mismatches)
     rate = agreed / len(counted) if counted else None
+    successes = sum(1 for pair in counted if pair.rollout.sim_success is True)
+    failures = sum(1 for pair in counted if pair.rollout.sim_success is False)
+    unjudged = _unjudged(len(counted), successes, failures)
     return AgreementReport(
         task_id=identity[0],
         scorer_version=identity[1],
@@ -159,14 +192,44 @@ def compare(
         counted=len(counted),
         agreed=agreed,
         agreement=rate,
-        passed=None if rate is None else rate >= AGREEMENT_BAR,
-        sim_successes=sum(1 for pair in counted if pair.rollout.sim_success is True),
-        sim_failures=sum(1 for pair in counted if pair.rollout.sim_success is False),
+        passed=None if rate is None or unjudged else rate >= AGREEMENT_BAR,
+        unjudged=unjudged,
+        sim_successes=successes,
+        sim_failures=failures,
         mismatches=mismatches,
         excluded=excluded,
         unpaired_scores=sorted(by_episode.keys() - by_trace.keys()),
         unpaired_rollouts=sorted(by_trace.keys() - by_episode.keys()),
+        untraced_rollouts=_untraced(rollouts),
     )
+
+
+def _unjudged(counted: int, successes: int, failures: int) -> list[UnjudgedReason]:
+    """Why this set cannot carry a G1 verdict; empty when it can (AC 1)."""
+    if counted == 0:
+        return ["no_episodes"]
+    reasons: list[UnjudgedReason] = []
+    if counted < MIN_EPISODES:
+        reasons.append("not_enough_episodes")
+    if successes == 0:
+        reasons.append("no_sim_success")
+    if failures == 0:
+        reasons.append("no_sim_failure")
+    return reasons
+
+
+def _untraced(rollouts: Iterable[RolloutResult]) -> list[Untraced]:
+    items = [
+        Untraced(
+            job_id=rollout.job_id,
+            infra_status=rollout.infra_status,
+            sim_success=rollout.sim_success,
+            reason="rollout không có trace (`trace_ref` rỗng): không có gì để ghép với `Score`",
+        )
+        for rollout in rollouts
+        if rollout.trace_ref is None
+    ]
+    return sorted(items, key=lambda item: (item.job_id, item.infra_status, str(item.sim_success)))
 
 
 def _scores_by_episode(scores: Iterable[Score]) -> dict[str, Score]:
@@ -194,8 +257,7 @@ def _rollouts_by_trace(rollouts: Iterable[RolloutResult]) -> dict[str, RolloutRe
     found: dict[str, RolloutResult] = {}
     for rollout in rollouts:
         if rollout.trace_ref is None:
-            # Without a trace there is nothing the scorer could have read, so
-            # the rollout cannot be paired; it is not a mismatch either.
+            # Nothing to pair on; `_untraced` lists it in the report.
             continue
         trace_id = rollout.trace_ref.trace_id
         if trace_id in found and found[trace_id] != rollout:

@@ -264,8 +264,13 @@ def _print_agreement(report: AgreementReport) -> None:
     if report.agreement is None:
         typer.echo("tỉ lệ trùng: chưa có (không episode nào tính được)")
     else:
-        verdict = "đạt" if report.passed else "KHÔNG đạt"
+        verdict = {True: "đạt", False: "KHÔNG đạt", None: "chưa kết luận G1"}[report.passed]
         typer.echo(f"tỉ lệ trùng: {report.agreement:.1%} (ngưỡng {report.bar:.0%}): {verdict}")
+    if report.unjudged:
+        typer.echo(
+            f"chưa kết luận G1 (cần ít nhất {report.min_episodes} episode có cả đạt lẫn trượt): "
+            + ", ".join(report.unjudged)
+        )
     for mismatch in report.mismatches:
         typer.echo(f"lệch {mismatch.episode_id} [{mismatch.kind}]: {mismatch.reason}")
     for item in report.excluded:
@@ -274,6 +279,11 @@ def _print_agreement(report: AgreementReport) -> None:
         typer.echo("Score không có rollout: " + ", ".join(report.unpaired_scores))
     if report.unpaired_rollouts:
         typer.echo("rollout không có Score: " + ", ".join(report.unpaired_rollouts))
+    for untraced in report.untraced_rollouts:
+        typer.echo(
+            f"rollout không có trace, job {untraced.job_id} "
+            f"({untraced.infra_status}): {untraced.reason}"
+        )
 
 
 def load_task(reference: str) -> TaskDefinition:
