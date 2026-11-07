@@ -116,6 +116,7 @@ Máy phát hiện (pr-guard hoặc báo cáo ngày); người làm theo cột "L
 | R7 | Lỗi `severity:high` (rò holdout, gửi dữ liệu DENSO ra ngoài, sai kết luận, mất dữ liệu) | Đổi thành `type:incident`; postmortem 1 trang trong 2 ngày |
 | R8 | Cùng một nguyên nhân lỗi ≥ 3 lần trong 7 ngày | Thêm một can thiệp (rule, test, sửa CLAUDE.md), ghi vào sổ can thiệp |
 | R9 | PR > 1500 dòng mã (không tính test, tài liệu, schema sinh ra, fixture) | Được gắn `size:large`; nên tách story |
+| R10 | Story của bạn chưa có commit nào, hạn nội bộ ([07 mục 2.4](docs/product/07-team-workflow.md)) còn ≤ 3 ngày (08 bản 0.5, ngưỡng đề xuất) | Trả lời dưới báo cáo ngày: bắt đầu khi nào, có kịp không; không kịp thì Hiếu chia lại hoặc dời hạn |
 
 ### 5.2 Không bao giờ được phá
 

@@ -4,6 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Trưởng n
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 4/11/2026 | 0.5 | Thêm R10: story chưa có commit nào khi hạn nội bộ ở [07 mục 2.4](07-team-workflow.md) còn ≤ 3 ngày (ngưỡng [Đề xuất]); báo cáo ngày 4/11 không nêu DA-04, DA-18, DA-20 của Hưng vì R4 chỉ xét story đã bắt đầu. Mục 3.1, 8: "Hôm qua theo người" đếm theo tác giả git của commit, không theo người làm của story (DA-13 có commit của cả hiwe0305 và HoangChau6179); k vẫn theo người làm | Claude, chờ PO (Hiếu) duyệt |
 | 3/11/2026 | 0.4 | Thông rút khỏi vai Scrum Master theo quyết định PO ([plan chia lại việc](../superpowers/plans/2026-11-03-thong-reassignment.md), Q1); vai SM và các việc của Thông ở R2, R4, R5, R8 (mục 3.2), nhịp thứ Sáu và review cổng G (mục 5), người viết file story (mục 2) chuyển sang Hiếu | PO (Hiếu) |
 | 3/11/2026 | 0.3 | Mục 3.2: R9 chỉ đếm dòng mã chạy và nâng ngưỡng từ 400 lên 1500 dòng; cả 6 PR gần nhất đều vượt 400 nên cờ `size:large` không còn phân biệt PR lớn thật | PO (Hiếu) |
 | 25/10/2026 | 0.2 | Theo design ngày 25/10/2026 (file đã xóa ngày 27/10/2026) mục 10: Hiếu là người duyệt và merge duy nhất, R2 đổi hành động (mục 3.2); thêm lịch tracking tự động và tổng kết cuối ngày (mục 5, 7) | PO (Hiếu) |
@@ -42,11 +43,12 @@ Time-spent: 2.5h
 
 | Chỉ số | Cách tính | Nguồn |
 |---|---|---|
-| Nhiệm vụ con xong | Số commit `<story>/<số>:` vào `master` trong cửa sổ "hôm qua" (24 giờ; thứ Hai lấy 72 giờ), gán cho người làm của story | git |
+| Nhiệm vụ con xong | Số commit `<story>/<số>:` vào `master` trong cửa sổ "hôm qua" (24 giờ; thứ Hai lấy 72 giờ), gán cho tác giả git của commit; mỗi dòng ghi kèm người làm của story (bản 0.5; trước gán cho người làm của story) | git |
 | Giờ thực | Tổng `Time-spent` của các commit đó | git |
 | Hệ số k của người, 7 ngày | Giờ thực ÷ giờ ước đã "kiếm được". Mỗi commit nhiệm vụ con kiếm được `Ước lượng của story ÷ số dòng - [ ] của story` | git, file story |
 | Tiến độ story | Số `[x]` ÷ tổng số dòng nhiệm vụ trên `master` | file story |
 | Story đứng yên | Story đã có commit nhưng chưa xong, không có commit mới trên bất kỳ nhánh nào trong N ngày làm việc | git (mọi nhánh) |
+| Story chưa bắt đầu sát hạn (bản 0.5) | Story chưa xong, chưa có commit `<story>/` nào trên bất kỳ nhánh nào, và hạn nội bộ còn ≤ N ngày lịch. Hạn là ngày sớm nhất ở cột "Hạn mới" của mọi dòng bảng 07 mục 2.4 có mã story ở đầu ô "Việc" hoặc sau `; `, `, ` (mã nằm giữa câu, như "sinh nhắm lỗi bằng DA-33", là phụ thuộc, không tính) | git (mọi nhánh), 07 mục 2.4 |
 | PR chờ review | PR không phải bản nháp, chưa có review nào; tuổi tính bằng ngày làm việc | GitHub API |
 | WIP | Số PR đang mở theo tác giả | GitHub API |
 | Kích thước PR | Số dòng thêm cộng xóa, trừ lock file và fixture | GitHub API, git |
@@ -66,8 +68,9 @@ Time-spent: 2.5h
 | R7 | Issue `severity:high` đang mở (rò holdout, gửi dữ liệu `restricted` ra ngoài, sai kết luận HS/HT/HD, mất dữ liệu) | Báo cáo ngày | Đổi thành `type:incident`; postmortem 1 trang trong 2 ngày, ghi vào mục 6 | Người phát hiện; Hiếu |
 | R8 | Cùng một `cause:*` có ≥ 3 issue trong 7 ngày | Báo cáo ngày | Bắt buộc một can thiệp (rule, test, sửa CLAUDE.md hoặc template), ghi vào mục 6 | Hiếu chủ trì (bản 0.4) |
 | R9 | PR > 1500 dòng mã (bản 0.3: không tính test, file `.md`, schema JSON sinh ra, fixture, `examples/` và lock file) | `pr-guard` (gắn `size:large`), báo cáo ngày | Đề nghị tách story; không chặn | Người làm, người review |
+| R10 | Bản 0.5: story chưa có commit nào, hạn nội bộ (07 mục 2.4) còn ≤ 3 ngày lịch hoặc đã quá hạn | Báo cáo ngày | Người làm trả lời dưới báo cáo trong ngày: bắt đầu khi nào, có kịp hạn không; không kịp thì Hiếu chia lại việc hoặc dời hạn ở 07 mục 2.4 | Người làm; Hiếu |
 
-Ngưỡng mặc định: k 1,3; chờ review 1 ngày làm việc; WIP 2; đứng yên 2 ngày làm việc; lặp nguyên nhân 3 lần trong 7 ngày; PR 1500 dòng mã (bản 0.3; trước là 400 dòng tính cả test và tài liệu).
+Ngưỡng mặc định: k 1,3; chờ review 1 ngày làm việc; WIP 2; đứng yên 2 ngày làm việc; lặp nguyên nhân 3 lần trong 7 ngày; PR 1500 dòng mã (bản 0.3; trước là 400 dòng tính cả test và tài liệu); chưa bắt đầu 3 ngày lịch trước hạn nội bộ (bản 0.5, **[Đề xuất]**, Hiếu chốt khi merge). R10 đếm ngày lịch, không phải ngày làm việc, vì hạn ở 07 mục 2.4 rơi cả vào thứ Bảy và Chủ nhật.
 
 ## 4. Phân loại lỗi
 
@@ -114,7 +117,7 @@ Mỗi lần R7 hoặc R8 kích hoạt, thêm một dòng. Đây là chỗ các "
 | Công cụ | Làm gì | Ở đâu |
 |---|---|---|
 | `pr-guard` | Kiểm tên nhánh, định dạng commit, `Time-spent`, phạm vi file (R6); gắn `size:large` (R9) | `.github/workflows/pr-guard.yml`, `scripts/repo/pr_guard.py` |
-| `daily-report` | Tính chỉ số mục 3.1, kiểm R1–R5, R7–R9, đăng báo cáo vào issue | `.github/workflows/daily-report.yml`, `scripts/repo/daily_report.py` |
+| `daily-report` | Tính chỉ số mục 3.1, kiểm R1–R5, R7–R10, đăng báo cáo vào issue | `.github/workflows/daily-report.yml`, `scripts/repo/daily_report.py` |
 | Trang Tiến độ | Hiển thị báo cáo ngày mới nhất: rule kích hoạt, theo người, PR, story | `website/dist/progress.html`; dữ liệu `data/progress.json` sinh khi build Pages |
 | Label | Tạo đủ label ở mục 4 và 07 mục 3.5 | `bash scripts/repo/setup_labels.sh` (chạy một lần, cần `gh` đã đăng nhập) |
 | Tiến độ story tại máy | In tiến độ nhiệm vụ con theo story | `python3 scripts/repo/progress.py` |
@@ -137,7 +140,8 @@ Việc Hiếu làm trên GitHub một lần: chạy `scripts/repo/setup_labels.s
 ## 8. Giới hạn
 
 - k chỉ đúng khi mọi commit nhiệm vụ con có `Time-spent`; `pr-guard` chặn commit thiếu dòng này. Giờ của việc ngoài story (họp, DENSO, review) không vào k.
-- Nhiệm vụ con được gán cho **người làm của story**, kể cả khi người khác commit giúp.
+- Bản 0.5: mục "Hôm qua theo người" gán nhiệm vụ con cho **tác giả git của commit** (tên tài khoản git, ví dụ `hiwe0305`, không phải tên trong file story) và ghi người làm của story trong ngoặc. Hệ số k (R5) vẫn gán cho **người làm của story**, kể cả khi người khác commit giúp, nên k của người được giúp tính cả giờ của người giúp.
+- R10 chỉ biết story có trong bảng 07 mục 2.4; story không có dòng ở đó thì không có hạn nội bộ và không bị cảnh báo. Ngày trong bảng không ghi năm được hiểu là năm hiện tại.
 - Ước lượng mỗi nhiệm vụ con chia đều từ ước lượng của story; story có nhiệm vụ con lệch nhau nhiều thì k theo ngày dao động, nên nhìn trung bình 7 ngày.
 - Ngày làm việc chỉ trừ thứ Bảy và Chủ nhật; ngày lễ chưa trừ.
 - Báo cáo đọc tối đa 100 PR mở và 100 issue mới mỗi lần; đủ cho quy mô đội.
