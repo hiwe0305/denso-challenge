@@ -40,6 +40,7 @@ from flywheel.data.ingest.egocentric.episodes import (
     write_episodes,
 )
 from flywheel.data.ingest.egocentric.estimate import read_estimate, to_pose
+from flywheel.data.ingest.egocentric.files import write_text
 from flywheel.data.ingest.egocentric.pose import load_pose, read_egodex_pose, save_pose
 from flywheel.data.ingest.egocentric.segments import (
     Cut,
@@ -171,7 +172,9 @@ def frames_reader(bundle: Bundle, max_side: int) -> Callable[[Sequence[int]], li
 
 
 def annotate(work: Path, cfg: EgoConfig, models: Models = Models()) -> dict[str, Cut]:
-    """Gate every episode first; a blocked one stops the step before anything is cut."""
+    """Gate every episode first; a blocked one stops the step before anything is cut.
+    Every episode is cut before any is written: a model that stops answering half way
+    leaves the old segments, not a mix of old and new."""
     source = read_source(work)
     episodes = read_episodes(work)
     for episode in episodes:
@@ -192,9 +195,12 @@ def annotate(work: Path, cfg: EgoConfig, models: Models = Models()) -> dict[str,
             frames_of=frames_reader(bundle, cfg.max_image_side_px),
             model_names=models.names,
         )
-        write_segment_table(folder / SEGMENTS, cut.segments, bundle.fps)
-        (folder / LABELS).write_text(json.dumps(cut.labels(), indent=2) + "\n")
         cuts[episode.episode_id] = cut
+    for episode in episodes:  # all cut: now write
+        cut, folder = cuts[episode.episode_id], bundle_dir(work, episode.episode_id)
+        write_segment_table(folder / SEGMENTS, cut.segments,
+                            read_bundle(work, episode.episode_id).fps)
+        write_text(folder / LABELS, json.dumps(cut.labels(), indent=2) + "\n")
     return cuts
 
 

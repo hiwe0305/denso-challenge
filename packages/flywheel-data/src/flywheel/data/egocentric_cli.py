@@ -237,7 +237,8 @@ def review(
                 reviewing.write_sheet(sheet, rows)
                 message = f"{len(rows)} segments to review: {sheet}"
             else:
-                counts = reviewing.apply(work, reviewing.read_sheet(apply_sheet))
+                counts = reviewing.apply(work, reviewing.read_sheet(apply_sheet),
+                                         [e.episode_id for e in episodes])
                 message = f"review applied: {counts}; run `fw egocentric qa` again"
             job.notes.append(message)
     _say(message)
@@ -289,10 +290,11 @@ def trial(
 @contextmanager
 def _refusals() -> Iterator[None]:
     """A refusal of a command: one line on stderr, exit 2. The gate's DeidBlocked and
-    ConfigError are ValueErrors."""
+    ConfigError are ValueErrors; a model that does not answer raises URLError, an OSError,
+    and the step has written nothing (files.py)."""
     try:
         yield
-    except (ConfigError, ValueError, FileNotFoundError, FileExistsError) as error:
+    except (ConfigError, ValueError, OSError) as error:
         typer.echo(str(error), err=True)
         sys.exit(2)
 
