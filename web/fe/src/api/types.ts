@@ -873,3 +873,52 @@ export interface CheckpointRow {
   train_seed: number | null;
   origin: Origin;
 }
+
+// ---------------------------------------------------------------- M4
+
+export type GuardCheckName = "split" | "benchmark_copy" | "raw_egocentric" | "qa_not_pass" | "near_duplicate";
+
+/** What must hold before a release is frozen; `not_run` is never shown as ok. */
+export interface SplitGuard {
+  ok: boolean;
+  checks: Array<{
+    name: GuardCheckName;
+    status: "ok" | "fail" | "not_run";
+    count: number;
+    /** Up to five episode ids that break the check. */
+    examples: string[];
+  }>;
+}
+
+/** GET /releases. */
+export interface ReleaseRow {
+  release_id: string;
+  name: string;
+  status: "draft" | "frozen";
+  parent_release_id: string | null;
+  manifest_sha256: string | null;
+  manifest_uri: string | null;
+  split_plan_sha256: string | null;
+  license_summary: string | null;
+  frozen_at: string | null;
+  /** Items kept; excluded ones are counted apart and listed with their reason. */
+  item_count: number;
+  excluded_count: number;
+  by_source: Record<string, number>;
+  used_by: string[];
+  guard: SplitGuard;
+  origin: Origin;
+}
+
+/** GET /releases/{id}/items. */
+export interface ReleaseItemRow {
+  episode_id: string;
+  dataset_id: string | null;
+  source_kind: string | null;
+  split: string | null;
+  sample_weight: number;
+  excluded: boolean;
+  exclude_reason: string | null;
+  qa_decision: string | null;
+  origin: Origin;
+}

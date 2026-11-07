@@ -132,6 +132,30 @@ export function createHandlers(views = new MockViews(loadMockData())) {
 
   return [
     // ------------------------------------------------------------ M7
+    // M4
+    http.get(url("/releases"), ({ request }) => HttpResponse.json(page(views.releases(), request))),
+    http.get(url("/releases/:id/items"), ({ params, request }) => {
+      const rows = views.releaseItems(String(params.id));
+      return rows === null ? notFound("release") : HttpResponse.json(page(rows, request));
+    }),
+    http.post(url("/releases/:id/freeze-request"), async ({ params, request }) => {
+      const key = request.headers.get("idempotency-key");
+      if (!key) return error(400, "IDEMPOTENCY_KEY_REQUIRED", "thiếu header Idempotency-Key (§7.3)");
+      const release = views.releaseRow(String(params.id));
+      if (!release) return notFound("release");
+      if (release.status === "frozen") {
+        return error(409, "ALREADY_FROZEN", "release đã đóng băng; đóng băng là bất biến");
+      }
+      if (!release.guard.ok) {
+        const failed = release.guard.checks.filter((c) => c.status !== "ok").map((c) => c.name);
+        return error(422, "SPLIT_GUARD", `guard chia tập chưa qua: ${failed.join(", ")}`,
+          "bỏ các episode bị nêu khỏi bản nháp rồi gửi lại");
+      }
+      const body = (await request.json().catch(() => ({}))) as { reason?: string };
+      const row = actions.record(key, "RELEASE_FREEZE_REQUEST", "releases", release.release_id, body.reason?.trim() || null);
+      return accepted(row);
+    }),
+
     // M5
     http.get(url("/experiments"), ({ request }) => HttpResponse.json(page(views.experiments(), request))),
     http.get(url("/experiment-drafts"), ({ request }) => HttpResponse.json(page([], request))),

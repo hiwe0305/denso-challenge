@@ -8,6 +8,8 @@ import type {
   BranchComparisonRow,
   DecisionRow,
   DefectScoreboard,
+  ReleaseItemRow,
+  ReleaseRow,
   CheckpointRow,
   ExperimentRow,
   ProbeRow,
@@ -85,6 +87,11 @@ export const useActions = () =>
 export const useDecisions = () => useGet<Page<DecisionRow>>("/decisions?limit=500");
 export const useSyncRuns = () => useGet<SyncRunRow[]>("/sync/runs");
 export const useRepairTicketsAll = () => useGet<RepairTicket[]>("/repair-tickets");
+
+// ---------------------------------------------------------------- M4
+export const useReleases = () => useGet<Page<ReleaseRow>>("/releases?limit=500");
+export const useReleaseItems = (id: string | null) =>
+  useGet<Page<ReleaseItemRow>>(id ? `/releases/${id}/items?limit=500` : null);
 
 // ---------------------------------------------------------------- M5
 export const useExperiments = () => useGet<Page<ExperimentRow>>("/experiments?limit=500");
