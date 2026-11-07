@@ -24,6 +24,7 @@ from flywheel.data.export.egodex import (
     delta_actions,
     euler_xyz,
     export_stage1,
+    main,
     sha256,
     stage1_stats,
 )
@@ -456,6 +457,19 @@ def test_a_video_changed_or_not_pinned_is_not_waived(tmp_path: Path) -> None:
     (work / "source.json").write_text(json.dumps(source))
     with pytest.raises(ExportRefused, match="ep_b: pick_place_cup/1.mp4 is not in the D2 pin"):
         export(work, tmp_path / "out")
+
+
+def test_the_cli_takes_no_other_pin(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    # the pin is the PO's decision: a run must not swap in a pin of its own videos
+    work = waived(tmp_path)
+    argv = ["--work", str(work), "--out", str(tmp_path / "out"), "--store", str(tmp_path / "s")]
+    with pytest.raises(SystemExit) as stopped:
+        main([*argv, "--waiver-pin", str(work / PIN)])
+    assert (
+        stopped.value.code == 2
+        and "unrecognized arguments: --waiver-pin" in capsys.readouterr().err
+    )
+    assert not (tmp_path / "out").exists()
 
 
 def test_internal_data_is_never_waived(tmp_path: Path) -> None:
