@@ -5,7 +5,7 @@ Psi0's `EgoDexDataset` reads at the pinned commit `cda3fdf`
 (`src/psi/data/egodex/egodex_dataset.py`):
 
     <out>/part1/<task>/<i>.hdf5 + <i>.mp4     one QA'd segment each (split train)
-    <out>/test/<task>/<i>.hdf5 + <i>.mp4      split val or test (the loader's val set)
+    <out>/test/<task>/<i>.hdf5 + <i>.mp4      split dev, val or test (the loader's val set)
     <out>/egodex_stat.json                    stats as `calc_stat.py --use_delta_actions`
     <out>/meta.json                           source, recipe, per-sample provenance, sha256
 
@@ -44,7 +44,9 @@ episodes (`pose_source` E-B, EgoDex, `retargeted`) copy the transforms from thei
 EgoDex HDF5; E-A episodes (`pose_source` E-A, the team's own video, `pseudo`) build
 them from `pose.npz` (tips get an identity rotation, which `actions_48d` never reads).
 An egocentric video whose `deid_status` is `raw` is refused unless the source carries
-the EgoDex waiver (plan 6/11/2026 D2: `egodex` and `public` only).
+the EgoDex waiver (plan 6/11/2026 D2: `egodex` and `public` only). The recipe's
+`upsample_rate` 3 is three frames at 30 Hz, so a bundle or video at another fps is
+refused (resampling is not done here).
 
 Egocentric data is stage 1 only (design 7.8): nothing here writes a LeRobot dataset,
 and `meta.json` says so.
@@ -94,8 +96,11 @@ RECIPE: dict[str, Any] = {
     "stat_action_key": "egodex",
     "resize": [270, 480],
 }
-SPLIT_DIRS = {"train": "part1", "val": "test", "test": "test"}
+# dev is the split our own evaluation uses (DA-04 writes train or dev): Psi0's val set
+SPLIT_DIRS = {"train": "part1", "dev": "test", "val": "test", "test": "test"}
 MIN_FRAMES = 2  # the loader samples index in [0, T - 2]
+FPS = 30.0  # `upsample_rate` 3 of the recipe is 0.1 s at EgoDex's 30 Hz
+FPS_TOLERANCE = 0.05  # 29.97 (NTSC) passes; 25 or 60 does not
 STATS_FILE = "egodex_stat.json"
 META_FILE = "meta.json"
 FOURCC = "mp4v"
@@ -325,7 +330,7 @@ def plan_export(work: Path, include: Sequence[str]) -> tuple[list[Planned], list
             continue
         directory = work / "egocentric" / eid
         bundle = Bundle.read(directory / "bundle.json")
-        problems += _bundle_problems(episode, bundle)
+        problems += _bundle_problems(episode, bundle) + _video_problems(bundle)
         for framed in read_segments(directory / "segments.parquet"):
             span = framed.frame_end - framed.frame_start
             where = f"{eid} {framed.segment.step_id} [{framed.frame_start}, {framed.frame_end})"
@@ -367,7 +372,32 @@ def _bundle_problems(episode: Episode, bundle: Bundle) -> list[str]:
         )
     if "/" in bundle.task or bundle.task in {"", ".", ".."}:
         problems.append(f"{eid}: task {bundle.task!r} is not a directory name")
+    if abs(bundle.fps - FPS) > FPS_TOLERANCE:
+        problems.append(_fps_problem(eid, "bundle.json", bundle.fps))
     return problems
+
+
+def _fps_problem(eid: str, where: str, fps: float) -> str:
+    return (
+        f"{eid}: {where} says {fps:g} fps; upsample_rate {RECIPE['upsample_rate']} assumes "
+        f"{FPS:g} fps (resample the video to {FPS:g} fps first, not done by the export)"
+    )
+
+
+def _video_problems(bundle: Bundle) -> list[str]:
+    """The video itself, read with OpenCV: it opens, and its fps is the bundle's."""
+    import cv2
+
+    capture = cv2.VideoCapture(str(bundle.mp4))
+    try:
+        if not capture.isOpened():
+            return [f"{bundle.episode_id}: OpenCV cannot open {bundle.mp4}"]
+        fps = float(capture.get(cv2.CAP_PROP_FPS))
+    finally:
+        capture.release()
+    if abs(fps - FPS) > FPS_TOLERANCE:
+        return [_fps_problem(bundle.episode_id, bundle.mp4.name, fps)]
+    return []
 
 
 # --- writing ---------------------------------------------------------------------------
@@ -507,7 +537,8 @@ def export_stage1(
     planned, skipped = plan_export(work, include)
     if not planned:
         raise ExportRefused([f"{work}: no segment to export ({len(skipped)} skipped)"])
-    if out.exists() and any(out.iterdir()):
+    existed = out.exists()
+    if existed and any(out.iterdir()):
         raise ExportRefused([f"{out} is not empty: an export is never written over"])
     frames = sum(p.segment.frame_end - p.segment.frame_start for p in planned)
     with job_ledger(
@@ -525,12 +556,28 @@ def export_stage1(
         try:
             result = _write(work, out, planned, skipped, include, release_id)
         except BaseException:
-            shutil.rmtree(out, ignore_errors=True)  # out was new or empty: no half export
+            _discard(out, existed)
             raise
         job.notes.append(
             f"{result.samples} samples, {result.frames} frames, export {result.export_id}"
         )
     return result
+
+
+def _discard(out: Path, existed: bool) -> None:
+    """Remove a half-written export: `out` itself if the export made it, else its contents.
+
+    `out` was new or empty, so all it holds is the export's. Emptying in place also
+    works when `out` is a symlink to the directory, where rmtree would refuse.
+    """
+    if not existed:
+        shutil.rmtree(out, ignore_errors=True)
+        return
+    for child in out.iterdir():
+        if child.is_dir() and not child.is_symlink():
+            shutil.rmtree(child, ignore_errors=True)
+        else:
+            child.unlink(missing_ok=True)
 
 
 def _write(

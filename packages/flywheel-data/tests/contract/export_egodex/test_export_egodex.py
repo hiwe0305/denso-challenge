@@ -12,7 +12,8 @@ from pathlib import Path
 import h5py  # type: ignore[import-untyped]
 import numpy as np
 import pytest
-from egodex_workdir import INTRINSIC, Spec, build, grey
+from egodex_workdir import INTRINSIC, Spec, build, grey, write_video
+from fake_loader import scan
 from flywheel.data.export.egodex import (
     CAMERA,
     JOINTS,
@@ -317,6 +318,70 @@ def test_frames_without_a_recorded_confidence_are_reported_not_averaged(tmp_path
     recorded, missing = (s["pose_confidence"]["left"] for s in meta["samples"])
     assert recorded["recorded"] == 1.0 and recorded["mean"] is not None
     assert missing == {"mean": None, "min": None, "recorded": 0.0}
+
+
+def set_bundle(work: Path, episode_id: str, **fields: object) -> dict:  # type: ignore[type-arg]
+    path = work / "egocentric" / episode_id / "bundle.json"
+    bundle = json.loads(path.read_text()) | fields
+    path.write_text(json.dumps(bundle))
+    return bundle  # type: ignore[no-any-return]
+
+
+def test_a_dev_episode_lands_in_psi0s_val_set(tmp_path: Path) -> None:
+    # DA-04 writes split train or dev; dev is our evaluation split, Psi0's test/ dir
+    specs = [Spec("ep_a", 10, [(0, 10)]), Spec("ep_dev", 12, [(0, 12)], split="dev")]
+    meta = export(build(tmp_path / "work", specs), tmp_path / "out")
+    assert [(s["episode_id"], s["hdf5"]) for s in meta["samples"]] == [
+        ("ep_a", "part1/pick_place_cup/0.hdf5"),
+        ("ep_dev", "test/pick_place_cup/0.hdf5"),
+    ]
+    assert meta["counts"]["by_part"] == {"part1": 1, "test": 1}
+    [val] = scan(tmp_path / "out", val=True)
+    assert val["hdf5"] == tmp_path / "out/test/pick_place_cup/0.hdf5"
+
+
+@pytest.mark.parametrize("fps", [25.0, 60.0])
+def test_a_bundle_not_at_30_fps_is_refused(tmp_path: Path, fps: float) -> None:
+    work = build(tmp_path / "work", [Spec("ep_a", 10, [(0, 10)])])
+    set_bundle(work, "ep_a", fps=fps)
+    with pytest.raises(ExportRefused, match=f"bundle.json says {fps:g} fps; upsample_rate 3"):
+        export(work, tmp_path / "out")
+    assert not (tmp_path / "out").exists()
+
+
+def test_a_video_not_at_30_fps_is_refused_whatever_the_bundle_says(tmp_path: Path) -> None:
+    work = build(tmp_path / "work", [Spec("ep_a", 10, [(0, 10)])])
+    bundle = set_bundle(work, "ep_a")
+    write_video(Path(bundle["mp4"]), 10, fps=60)
+    with pytest.raises(ExportRefused, match="ep_a: 0.mp4 says 60 fps; .*resample"):
+        export(work, tmp_path / "out")
+
+
+def test_ntsc_29_97_fps_is_30_fps(tmp_path: Path) -> None:
+    work = build(tmp_path / "work", [Spec("ep_a", 10, [(0, 10)])])
+    set_bundle(work, "ep_a", fps=29.97)
+    assert len(export(work, tmp_path / "out")["samples"]) == 1
+
+
+def test_a_refused_export_leaves_nothing(tmp_path: Path) -> None:
+    work = build(tmp_path / "work", [Spec("ep_a", 10, [(0, 10)]), Spec("ep_b", 10, [(0, 10)])])
+    write_video(Path(set_bundle(work, "ep_b")["mp4"]), 6)  # ep_a written, then ep_b fails
+    with pytest.raises(ExportRefused, match="ended at frame 6"):
+        export(work, tmp_path / "out")
+    assert not (tmp_path / "out").exists()
+    [ledger] = (tmp_path / "store").rglob("ledger.jsonl")
+    assert "failed: ExportRefused" in ledger.read_text().splitlines()[-1]
+
+
+def test_a_refused_export_into_a_symlink_empties_its_target(tmp_path: Path) -> None:
+    work = build(tmp_path / "work", [Spec("ep_a", 10, [(0, 10)]), Spec("ep_b", 10, [(0, 10)])])
+    write_video(Path(set_bundle(work, "ep_b")["mp4"]), 6)
+    target = tmp_path / "target"
+    target.mkdir()
+    (tmp_path / "out").symlink_to(target)
+    with pytest.raises(ExportRefused, match="ended at frame 6"):
+        export(work, tmp_path / "out")
+    assert (tmp_path / "out").is_symlink() and list(target.iterdir()) == []
 
 
 def test_non_finite_actions_refuse_the_export_and_leave_nothing(tmp_path: Path) -> None:
