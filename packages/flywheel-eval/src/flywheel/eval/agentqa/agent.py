@@ -168,6 +168,7 @@ def _parse_reply(
     if not isinstance(reply, dict):
         raise ReplyError("the reply is not a JSON object")
     known = {f.fact_id for f in facts}
+    by_id = {f.fact_id: f for f in facts}
     by_cid = {c.cid: c for c in batch}
     units = set(analysis.units)
     allowed = set(_allowed_codes(analysis.stage))
@@ -175,17 +176,29 @@ def _parse_reply(
     drafted: list[_Drafted] = []
     order = order_base
 
-    def text_field(item: dict[str, Any], key: str, where: str) -> str:
+    def scope(item: dict[str, Any], extra: Sequence[str] = ()) -> list[AgentFact]:
+        """The facts one item may lean on: what it lists, what it cites, its candidate's."""
+        listed = item.get("evidence")
+        ids = [str(x) for x in listed] if isinstance(listed, list) else []
+        for key in ("insight", "suggestion"):
+            if isinstance(item.get(key), str):
+                ids += _PLACEHOLDER.findall(item[key])
+        ids += list(extra)
+        return [by_id[i] for i in dict.fromkeys(ids) if i in by_id]
+
+    def text_field(item: dict[str, Any], key: str, where: str, cited: list[AgentFact]) -> str:
         value = item.get(key)
         if not isinstance(value, str) or not value.strip():
             problems.append(f"{where}: {key} missing")
             return ""
-        bad = unsupported_numbers(value, facts)
+        bad = unsupported_numbers(value, cited)
         if bad:
-            problems.append(f"{where}: {key} states numbers no fact holds: {', '.join(bad)}")
-        cited = set(_PLACEHOLDER.findall(value)) - known
-        if cited:
-            problems.append(f"{where}: {key} cites unknown facts {sorted(cited)}")
+            problems.append(
+                f"{where}: {key} states numbers no cited fact holds: {', '.join(bad)}"
+            )
+        unknown = set(_PLACEHOLDER.findall(value)) - known
+        if unknown:
+            problems.append(f"{where}: {key} cites unknown facts {sorted(unknown)}")
         return value.strip()
 
     def evidence_of(item: dict[str, Any], insight: str, suggestion: str, where: str) -> list[str]:
@@ -201,16 +214,26 @@ def _parse_reply(
             problems.append(f"{where}: no evidence")
         return [e for e in evidence if e in known]
 
+    decided: set[str] = set()
     for item in reply.get("decisions") or []:
         if not isinstance(item, dict) or item.get("cid") not in by_cid:
             problems.append(f"decision for unknown candidate {item!r:.80}")
             continue
-        if not item.get("keep", True):
+        if item["cid"] in decided:
+            problems.append(f"{item['cid']}: decided twice")
+            continue
+        decided.add(item["cid"])
+        keep = item.get("keep", True)
+        if not isinstance(keep, bool):
+            problems.append(f"{item['cid']}: keep must be true or false, not {keep!r:.20}")
+            continue
+        if not keep:
             continue
         candidate = by_cid[item["cid"]]
         where = str(item["cid"])
-        insight = text_field(item, "insight", where)
-        suggestion = text_field(item, "suggestion", where)
+        cited = scope(item, candidate.evidence)
+        insight = text_field(item, "insight", where, cited)
+        suggestion = text_field(item, "suggestion", where, cited)
         evidence = evidence_of(item, insight, suggestion, where)
         evidence = list(dict.fromkeys(list(candidate.evidence) + evidence))
         drafted.append(
@@ -218,20 +241,25 @@ def _parse_reply(
                      insight, suggestion, [])
         )
         order += 1
+    # A candidate the model left out would vanish without a word; code proposed it.
+    missing = [c.cid for c in batch if c.cid not in decided]
+    if missing:
+        problems.append(f"no decision for candidates {missing}")
     for n, item in enumerate(reply.get("added") or []):
         where = f"added[{n}]"
         if not isinstance(item, dict):
             problems.append(f"{where}: not an object")
             continue
         code, target = str(item.get("code", "")), str(item.get("target", ""))
-        if not _CODE.fullmatch(code) or (allowed and code not in allowed):
+        if not _CODE.fullmatch(code) or code not in allowed:
             problems.append(f"{where}: code {code!r} not allowed for {analysis.stage}")
             continue
         if units and target not in units:
             problems.append(f"{where}: target {target!r} is not a unit of {analysis.subject_ref}")
             continue
-        insight = text_field(item, "insight", where)
-        suggestion = text_field(item, "suggestion", where)
+        cited = scope(item)
+        insight = text_field(item, "insight", where, cited)
+        suggestion = text_field(item, "suggestion", where, cited)
         evidence = evidence_of(item, insight, suggestion, where)
         drafted.append(
             _Drafted(code, target, _priority(item), order, evidence, insight, suggestion, [])
