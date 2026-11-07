@@ -38,8 +38,6 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from flywheel_psi0.tray.demo_sets import EXPORT_META
-
 CHUNK = 24  # = action_exec_horizon of the Psi0 SIMPLE server
 
 
@@ -73,6 +71,10 @@ def decode(value: Any) -> Any:
 def release_actions(release: Path, seed: int) -> NDArray[np.float32]:
     """The exported (T, 36) `action` of the release episode recorded with this seed."""
     import pyarrow.parquet as pq  # type: ignore[import-untyped]
+
+    # imported here so that the wire format (encode, decode) needs no pydantic: SIMPLE's
+    # venv, which runs chain_check, has none
+    from flywheel_psi0.tray.demo_sets import EXPORT_META
 
     rows = json.loads((release / EXPORT_META).read_text(encoding="utf-8"))["episodes"]
     index = next((r["episode_index"] for r in rows if r["seed"] == seed), None)
