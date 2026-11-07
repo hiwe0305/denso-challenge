@@ -113,7 +113,10 @@ FPS_TOLERANCE = 0.05  # 29.97 (NTSC) passes; 25 or 60 does not
 STATS_FILE = "egodex_stat.json"
 META_FILE = "meta.json"
 FOURCC = "mp4v"
-# DA-04's pin of the videos D2 waives (DA-04 commit a1e3ef1a; `--waiver-pin` overrides)
+# DA-04's pin of the videos D2 waives (DA-04 commit a1e3ef1a). Fixed for every run: the
+# waiver is the PO's decision, so no CLI flag names another pin (a run could otherwise
+# pin its own video and name that pin in source.json). Before DA-04 merges the file is
+# missing and a waived export is refused.
 WAIVER_PIN = Path(__file__).resolve().parents[1] / "annotate" / "deid" / "egodex_pin.json"
 STAGE3 = "refused: egocentric data is stage 1 only (design 27/10/2026 7.8)"
 # Assumption for the estimated ledger row, not a measurement: decoding and mp4v
@@ -347,7 +350,10 @@ class Waiver:
 def plan_export(
     work: Path, include: Sequence[str], waiver_pin: Path = WAIVER_PIN
 ) -> tuple[list[Planned], list[dict[str, Any]]]:
-    """The samples to write and the skipped episodes or segments, or ExportRefused."""
+    """The samples to write and the skipped episodes or segments, or ExportRefused.
+
+    `waiver_pin` is for tests only (a fixture pin); the CLI never exposes it.
+    """
     source = json.loads((work / "source.json").read_text(encoding="utf-8"))
     episodes = [Episode.model_validate(r) for r in read_jsonl(work / "episodes.jsonl")]
     reports: dict[str, QAReport] = {}
@@ -637,7 +643,10 @@ def export_stage1(
     store: Path | None = None,
     waiver_pin: Path = WAIVER_PIN,
 ) -> Stage1Export:
-    """Write the stage 1 export of `work` under `out` (new or empty), with its ledger rows."""
+    """Write the stage 1 export of `work` under `out` (new or empty), with its ledger rows.
+
+    `waiver_pin` is for tests only; the CLI always uses `WAIVER_PIN`.
+    """
     include = ("pass", "flag") if include_flag else ("pass",)
     planned, skipped = plan_export(work, include, waiver_pin)
     if not planned:
@@ -802,9 +811,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--release-id", help="the ReleaseManifest these episodes belong to")
     parser.add_argument("--run-plan-id", help="RunPlan of the job (default g0-DA-18-<date>)")
     parser.add_argument("--store", type=Path, help="ledger store root (default $FW_ROOT)")
-    parser.add_argument(
-        "--waiver-pin", type=Path, default=WAIVER_PIN, help="D2 pin (default DA-04's)"
-    )
     args = parser.parse_args(argv)
     try:
         result = export_stage1(
@@ -814,7 +820,6 @@ def main(argv: list[str] | None = None) -> int:
             release_id=args.release_id,
             run_plan_id=args.run_plan_id,
             store=args.store,
-            waiver_pin=args.waiver_pin,
         )
     except ExportRefused as error:
         print(error, file=sys.stderr)
