@@ -864,6 +864,64 @@ _**[Đã chốt 7/11/2026, Hiếu]** "Oke chạy lại T1 cho tôi", sau kết q
 - **Chỉ số phụ, báo cạnh:** loại lỗi, số chu kỳ có yaw vượt 2,5 rad, thời gian mỗi episode, số lần gọi `/act`.
 - Không chạy lại eval C đầy đủ và không train gì nếu chưa có lệnh của Hiếu.
 
+### 15.8 Kết quả T1r (sơ bộ)
+
+_Đọc theo luật 15.7, luật không đổi sau khi thấy kết quả. Nhãn "sơ bộ, trên dev" như T1._
+
+**Kiểm trước** (02:45:17Z, 166 s, CPU, chạy song song với đường serve của phần A):
+
+| Kiểm | Kết quả | Đọc |
+|---|---|---|
+| `visuals_revision(default_manifest_path())` | `4763fbfaa4f8…`, manifest sha256 `eb2886e4…` | Đạt |
+| PSNR frame 0, seed 1279 / 1574 / 1503 | 34,88 / 34,85 / 34,97 dB (trước khi chép: 16,48 / 16,43 / 16,53) | Đạt, cả ba ≥ 30 dB |
+| MAE frame 0 (đảo kênh) | 2,62 / 2,64 / 2,59 (35,2–35,3) | B2 khớp |
+| PSNR trung vị theo request | 27,3 / 19,4 / 21,5 dB | Ghi kèm; các frame sau lệch dần vì vòng hở |
+| B3 | Không đổi so với mục 15.6 | Ghi kèm |
+
+**Chạy.** Scope `da34-check-t1r` (`MemoryMax=8G`, 1 worker), 03:19:53Z–04:36:24Z, 2 chunk 10 episode (2458,1 s và 2134,4 s), attempt 0, exit 0, không thiếu episode. `CODE_SHA` `bb4cef1`. Server eval C (`Ta` 24, `--rtc`) như T1, vẫn chạy sau T1r.
+
+**Đọc chính.** p_T1r = **1/20** (5 %, Wilson 95 % 0,9–23,6 %; T1: 0/20, 0–16,1 %). Thành công duy nhất là seed 1038, xong ở 29,5 s mô phỏng; ở T1, seed này dừng sau `reach_b` (`L-TIMEOUT`).
+
+| Bước | T1r | T1 | Cả hai | Chỉ T1r | Chỉ T1 | Không bên nào |
+|---|---|---|---|---|---|---|
+| `approach_a` | 15 | 13 | 10 | 5 | 3 | 2 |
+| `grasp` | 15 | 13 | 10 | 5 | 3 | 2 |
+| `lift` | 15 | 13 | 10 | 5 | 3 | 2 |
+| `carry` | 15 | 13 | 10 | 5 | 3 | 2 |
+| `reach_b` | 14 | 13 | 9 | 5 | 4 | 2 |
+| `place` | 1 | 1 | 0 | 1 | 1 | 18 |
+| `release_stand` | 1 | 0 | 0 | 1 | 0 | 19 |
+
+- `place`: chỉ T1r 1, chỉ T1 1, hiệu 0 < 3, nên **không tốt hơn rõ**.
+- Các bước đầu: hiệu "chỉ T1r" trừ "chỉ T1" là 1–2, dưới ngưỡng 3.
+- Hai lần chạy chọn điều kiện khác nhau dù cùng tập: 8 điều kiện đổi kết quả ở `carry`, theo cả hai chiều.
+
+**Theo bảng 15.7:** p_T1r ở khoảng 1–4/20, nên **ảnh lệch là một phần nguyên nhân; báo kèm phần A**. Ghi kèm:
+- Thành công là 1 điều kiện. Khoảng Wilson của T1r và T1 chồng nhau.
+- Ở `place`, ghép cặp không thấy khác (1 và 1).
+
+**Chỉ số phụ:**
+
+| Chỉ số | T1r | T1 |
+|---|---|---|
+| Loại lỗi | `L-PLACE-POSE` 11, `L-TIMEOUT` 5, `L-TRAY-TILT` 3 | `L-TRAY-TILT` 8, `L-PART-DROP` 5, `L-TIMEOUT` 4, `L-PLACE-POSE` 3 |
+| Bước đạt xa nhất (số điều kiện) | 0 bước: 5; 4 bước: 1; 5 bước: 13; 7 bước: 1 | – |
+| Chu kỳ có yaw vượt 2,5 rad (sau khi quấn góc) | 1 / 86 813 (max 2,93 rad) | 18 / 90 000 (max 2,85 rad) |
+| Thời gian thật mỗi episode | 229,6 s | 189,4 s |
+| Số lần gọi `/act` (reset) | 3627 (20) | 3760 (20) |
+
+- `L-PLACE-POSE` 11/20: khay tới bàn B và nằm trên mặt bàn, nhưng sai tư thế đặt. Ở T1, `L-TRAY-TILT` cộng `L-PART-DROP` là 13/20.
+- Ghi đây là quan sát, không có luật đọc riêng: với cảnh SimReady, lỗi dời từ "nghiêng hoặc làm rơi khi mang" sang "đặt sai tư thế".
+- Mỗi episode chậm hơn 40 s, có thể vì render lưới SimReady; chưa đo riêng.
+
+**Đọc chung A, B, T1r:**
+- A1: đường serve và đường train khớp từng bit (mục 15.5), nên chuẩn hóa, stats và tiền xử lý ảnh lúc serve không có lỗi. Nhánh RTC chưa kiểm.
+- B2: ảnh lúc serve khác ảnh train vì cây eval thiếu manifest SimReady (mục 15.6). Đã sửa cho T1r.
+- Sửa ảnh làm T1 đổi từ 0/20 sang 1/20, nhưng không đổi `place`.
+- A2: theo luật, `place` chưa học được.
+- **Đọc chung:** ảnh lệch có góp phần, nhưng không giải thích được lỗi ở `place`. Nguyên nhân còn lại chính là C chưa học `place`.
+- Eval C, T1, T2 đều đo trên cảnh trơn, khác cảnh train. Trên 20 cảnh train, T1r cho thấy khác biệt này đổi kết quả của các bước trước `place` theo cả hai chiều, nhưng không đổi `place`. Chạy lại eval C với SimReady, hoặc đi tiếp C-max, cần Hiếu quyết.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -880,3 +938,4 @@ _**[Đã chốt 7/11/2026, Hiếu]** "Oke chạy lại T1 cho tôi", sau kết q
 | 7/11/2026 | Mục 15.6: kết quả B. B1 stats khớp. B2 ảnh khác: PSNR ở frame 0 khoảng 16,5 dB; cây eval thiếu manifest SimReady nên khay và cảnh render bằng khối trơn, `visuals_revision` `none` so với `4763fbf` của dữ liệu C. B3: theo luật là khác ở các chiều ngón cái; thứ tự, đơn vị và nghĩa đúng. Luật 15.3 không đổi | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 15.7: luật đọc T1r (chạy lại T1 với cảnh SimReady, Hiếu "Oke chạy lại T1 cho tôi"), gồm kiểm trước (revision, PSNR) và so với T1 theo bước ([Đề xuất]), viết trước khi đọc PSNR và trước rollout đầu tiên | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 15.5: kết quả A. A1 khớp: 2783/2783 chunk giống hệt từng bit giữa đường serve và đường train. A2 theo luật là chưa học (`r_place` 2,73; `e_place` 1,47 × các bước đầu), ghi kèm việc vế `r` cũng ≥ 1 ở các bước vòng kín vẫn qua. Server trả về `Ta` 24, `--rtc`. Luật 15.2 không đổi | Hiếu (soạn với Claude) |
+| 7/11/2026 | Mục 15.8: kết quả T1r. Kiểm trước đạt (revision `4763fbf`, PSNR frame 0 34,9 dB). p_T1r 1/20 (Wilson 0,9–23,6 %); `place` ghép cặp với T1: 1 và 1, không tốt hơn rõ. Đọc theo bảng 15.7: ảnh lệch là một phần nguyên nhân; đọc chung với A: C chưa học `place`. Luật 15.7 không đổi | Hiếu (soạn với Claude) |
