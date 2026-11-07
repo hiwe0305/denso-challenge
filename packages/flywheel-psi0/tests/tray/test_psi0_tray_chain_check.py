@@ -200,3 +200,16 @@ def test_compare_episode_matches_request_k_with_frame_24k() -> None:
     result = cc.compare_episode(requests, frames, states, lo, hi, "pick up the tray.")
     assert result["compared"] == 5 and result["instruction_matches_train"]
     assert result["b2"]["verdict"] == "match" and result["b3"]["verdict"] == "match"
+
+
+def test_chain_check_imports_without_pydantic() -> None:
+    """It runs in SIMPLE's venv, which has numpy, pyarrow and PyAV but no pydantic."""
+    import subprocess
+    import sys
+
+    code = (
+        "import sys; import flywheel_psi0.tray.chain_check; "
+        "bad = [m for m in ('pydantic', 'flywheel.contracts') if m in sys.modules]; "
+        "assert not bad, bad"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)
