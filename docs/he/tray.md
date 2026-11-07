@@ -607,6 +607,50 @@ Chung cho T1 và T2:
 - **Đọc theo luật 14.2:** `success_gain` = 0, `place_gain` = 0, nên T2b **không đáng xem**. Tắt RTC, giữ `Ta = 24`, làm robot không mang được khay: không điều kiện nào qua `carry`, trong khi mốc qua 13/20.
 - `runs.jsonl` ở `rtx3060:~/denso-da34-pool/fwdata/tray/eval/check-t2b-ta24-nortc` (không commit).
 
+### 14.5 Kết quả T2a′: `Ta = 10`, RTC tắt (sơ bộ, trên dev)
+
+- **Chạy.** `~/denso-da34-t4/serve.sh t2a 10 nortc`:
+  - dừng container T2b lúc 2026-11-06T23:17:22Z;
+  - container mới `fw-psi0-psi0-run-01767bf45f77` có `--action-exec-horizon 10`, không có `--rtc`; khỏe lúc 23:19:34Z.
+
+  Cùng cây và tập như T2b, từ 23:19:43Z tới 2026-11-07T00:57:10Z: 1,62 h, 2 lô 10, lần chạy 0, 0 thiếu, 290,9 s mỗi episode. Server nhận 9000 lần gọi `/act` (450 mỗi episode; ước tính trước là 466). Log server không có lỗi; không thấy `llama-server`.
+- **Số.** Tỉ lệ qua từng bước, 20 điều kiện:
+
+| Bước | T2a′ (`Ta` 10, RTC tắt) | T2b (`Ta` 24, RTC tắt) | Mốc eval C (`Ta` 24, RTC bật) |
+|---|---|---|---|
+| approach_a | 85 | 55 | 80 |
+| grasp | 75 | 50 | 80 |
+| lift | 50 | 25 | 80 |
+| carry | 0 | 0 | 65 |
+| reach_b | 0 | 0 | 65 |
+| place | 0 | 0 | 0 |
+| release_stand | 0 | 0 | 0 |
+| **Thành công** | 0/20 | 0/20 | 0/20 |
+
+  Loại lỗi T2a′: TIMEOUT 17, PART-DROP 2, TRAY-TILT 1. Yaw vượt 2,5 rad: 9766 chu kỳ trên 90 000, gần bằng T2b (9627).
+- **Ghép cặp** (cả hai / chỉ T2a′ / chỉ đối chứng / không bên nào):
+
+| Bước | T2a′ so với eval C | T2a′ so với T2b (chỉ khác `Ta`) |
+|---|---|---|
+| approach_a | 14 / 3 / 2 / 1 | 10 / 7 / 1 / 2 |
+| grasp | 12 / 3 / 4 / 1 | 7 / 8 / 3 / 2 |
+| lift | 8 / 2 / 8 / 2 | 3 / 7 / 2 / 8 |
+| carry, reach_b | 0 / 0 / 13 / 7 | 0 / 0 / 0 / 20 |
+| place, release_stand, thành công | 0 / 0 / 0 / 20 | 0 / 0 / 0 / 20 |
+
+- **Đọc theo luật 14.2:** so với mốc, `success_gain` = 0, `place_gain` = 0, nên T2a′ **không đáng xem**.
+- `runs.jsonl` ở `rtx3060:~/denso-da34-pool/fwdata/tray/eval/check-t2a-ta10-nortc` (không commit).
+
+### 14.6 Tổng hợp T1, T2
+
+- Theo luật viết trước: T1 0/20 trên cảnh train, nên **nghi chuỗi train/serve; không train gì, kể cả C-max, cho tới khi tìm ra lỗi**. T2b và T2a′ không đáng xem.
+- Ghi cạnh số, không phải luật mới:
+  - Không lần chạy nào qua `place` quá 1/20, dù trên cảnh train hay dev, dù `Ta` 24 hay 10, có hay không RTC. Vì vậy cách thực thi chunk không giải thích được lỗi ở `place`.
+  - Tắt RTC thì không điều kiện nào qua `carry`, ở cả hai `Ta`. Với `Ta` 10, các bước đầu tốt hơn `Ta` 24 (`lift` 10 so với 5 điều kiện), nhưng không bù được việc mất RTC.
+  - Vì vậy RTC (`inference_delay` 6) đang giữ phần lớn những gì C làm được tới `reach_b`.
+- **Server đã trả về cấu hình của eval C** sau T2 (mục 14.2): `~/denso-da34-t4/serve.sh c 24 rtc` dừng container T2a′ lúc 2026-11-07T00:57:22Z; container `fw-psi0-psi0-run-4e2f7b1ee2d3` có `--action-exec-horizon 24 --rtc`, cùng checkpoint và cổng 22185, khỏe lúc 00:59:35Z. Server để chạy, không tắt.
+- Bước kế tiếp do Hiếu quyết. Các chỗ nghi trong chuỗi train/serve đã liệt kê ở luật 14.1: chuẩn hóa action, `stats_psi0.json`, bố cục 36 chiều, ảnh đầu vào, chunk.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -618,3 +662,4 @@ Chung cho T1 và T2:
 | 7/11/2026 | Mục 14.2: Hiếu chốt hai biến thể T2b (Ta 24, RTC tắt) và T2a′ (Ta 10, RTC tắt) ("Đồng ý"), ghi trước rollout đầu tiên của T2; thêm `inference_delay` = 6 của eval C | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 14.3: kết quả T1 (0/20 trên 20 cảnh train của C, Wilson 0–16,1 %; `reach_b` 65 %, `place` 5 %). Đọc theo luật 14.1: nghi chuỗi train/serve, không train gì cho tới khi tìm ra lỗi. Luật 14.1, 14.2 không đổi | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 14.4: kết quả T2b (`Ta = 24`, RTC tắt): 0/20, không qua `carry` ở điều kiện nào (mốc eval C 13/20); `success_gain` 0, `place_gain` 0, không đáng xem. Ghi lệnh khởi động lại server. Luật 14.2 không đổi | Hiếu (soạn với Claude) |
+| 7/11/2026 | Mục 14.5, 14.6: kết quả T2a′ (`Ta = 10`, RTC tắt): 0/20, không qua `carry`, không đáng xem; tổng hợp T1, T2; server trả về `Ta = 24`, `--rtc`. `Decision` quy tắc 0 ghi `criteria.pipeline_check` và sửa khoảng trống đầu. Luật 14.1, 14.2 không đổi | Hiếu (soạn với Claude) |
