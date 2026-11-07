@@ -17,6 +17,11 @@ next episode of the queue; after the last recorded frame the last action is held
 
     python -m flywheel_psi0.tray.replay_server --release <release dir> \
         --seed 1003 --seed 1003 --port 22190 --log requests.jsonl
+
+`--dump DIR` also saves what the client sent with each request (DA-34 task 3.7, tray.md 15.3):
+`DIR/ep-<queue position>/req-<n>.npz` holds the arrays of `state` and `image` (keys
+`state.<name>`, `image.<name>`), `req-<n>.json` the instruction, history, dataset name, image
+keys and the replay record; request n of an episode got frames 24n onward.
 """
 
 from __future__ import annotations
@@ -103,7 +108,30 @@ class Replay:
             return out, record
 
 
-def make_server(replay: Replay, port: int, log: Path | None = None) -> ThreadingHTTPServer:
+def dump_request(dump: Path, request: dict[str, Any], record: dict[str, Any], chunk: int) -> Path:
+    """Save the observation of one decoded request; returns the .json path."""
+    folder = dump / f"ep-{int(record['episode']):03d}"
+    folder.mkdir(parents=True, exist_ok=True)
+    stem = folder / f"req-{int(record['start']) // chunk:05d}"
+    arrays: dict[str, NDArray[Any]] = {}
+    for group in ("state", "image"):
+        for name, value in (request.get(group) or {}).items():
+            arrays[f"{group}.{name}"] = np.asarray(value)
+    np.savez_compressed(stem.with_suffix(".npz"), **arrays)  # type: ignore[arg-type]
+    meta = {
+        "record": record,
+        "instruction": request.get("instruction"),
+        "history": {k: v for k, v in (request.get("history") or {}).items() if np.isscalar(v)},
+        "dataset_name": request.get("dataset_name"),
+        "image_keys": list((request.get("image") or {}).keys()),
+    }
+    stem.with_suffix(".json").write_text(json.dumps(meta, default=str), encoding="utf-8")
+    return stem.with_suffix(".json")
+
+
+def make_server(
+    replay: Replay, port: int, log: Path | None = None, dump: Path | None = None
+) -> ThreadingHTTPServer:
     class Handler(BaseHTTPRequestHandler):
         def _send(self, body: Any) -> None:
             data = json.dumps(body).encode()
@@ -127,6 +155,8 @@ def make_server(replay: Replay, port: int, log: Path | None = None) -> Threading
             if log is not None:
                 with log.open("a", encoding="utf-8") as f:
                     f.write(json.dumps(record) + "\n")
+            if dump is not None:
+                dump_request(dump, request, record, replay.chunk)
             empty = np.zeros((1, 1, 3), dtype=np.uint8)
             self._send(encode({"action": action, "err": 0.0, "traj_image": empty}))
 
@@ -143,10 +173,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--chunk", type=int, default=CHUNK)
     parser.add_argument("--log", type=Path)
+    parser.add_argument("--dump", type=Path, help="save each request's observation here")
     args = parser.parse_args(argv)
     replay = Replay([release_actions(args.release, s) for s in args.seed], args.chunk)
     print(f"serving {len(replay.episodes)} episodes on 127.0.0.1:{args.port}", flush=True)
-    make_server(replay, args.port, args.log).serve_forever()
+    make_server(replay, args.port, args.log, args.dump).serve_forever()
     return 0
 
 
