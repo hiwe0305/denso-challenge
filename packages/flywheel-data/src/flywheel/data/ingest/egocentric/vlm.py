@@ -9,6 +9,12 @@ Models run on the rtx3060 host behind an OpenAI-compatible `/v1/chat/completions
 (vLLM or Ollama). `OpenAIVision` posts images as base64 data URLs through `urllib`:
 no torch, no client library in the lane. Tests and CI use fakes of `VisionModel`.
 
+The frames are video of people, so an endpoint must be a machine of ours (CLAUDE.md:
+no hosted API for egocentric data; review of PR 152): http(s), and a host that is
+`localhost`, a loopback or private IP, or one named in the config's `local_hosts`.
+The client ignores `HTTP(S)_PROXY` and refuses redirects, so a request cannot leave
+for another host on the way. After Hưng's DA-20 client (commit cbdfc295).
+
 Parsing is lenient because each model answers in its own way: Qwen3-VL (RoboBrain's
 base) gives points as `[(x, y)]` in 0-1000 coordinates, Molmo2
 `<points coords="image point x y">` with x, y scaled by 1000 (seen from Molmo2-4B on
@@ -18,15 +24,56 @@ rtx3060, 6/11/2026), Molmo 1 `<point x="" y="">` in percent.
 from __future__ import annotations
 
 import base64
+import ipaddress
 import json
 import re
 import time
+import urllib.error
 import urllib.request
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import IO, Any, Protocol
+from urllib.parse import urlparse
 
 Point = tuple[float, float]  # x, y as a share of image width and height, in [0, 1]
+
+
+class EndpointRefused(ValueError):
+    """The endpoint is not a machine of ours, or not an http(s) URL."""
+
+
+def is_local(host: str, local_hosts: Sequence[str] = ()) -> bool:
+    if host == "localhost" or host in local_hosts:
+        return True
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return address.is_loopback or address.is_private
+
+
+def check_endpoint(endpoint: str, local_hosts: Sequence[str] = ()) -> str:
+    """The endpoint without its trailing slash; `EndpointRefused` when it may not be used."""
+    parsed = urlparse(endpoint)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        raise EndpointRefused(f"endpoint {endpoint!r} is not an http(s) URL with a host")
+    if not is_local(parsed.hostname, local_hosts):
+        raise EndpointRefused(
+            f"endpoint host {parsed.hostname!r} is not a machine of ours: egocentric frames"
+            " go only to localhost, a private IP or a host in models.local_hosts")
+    return endpoint.rstrip("/")
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req: urllib.request.Request, fp: IO[bytes], code: int,
+                         msg: str, headers: Any, newurl: str) -> None:
+        raise urllib.error.HTTPError(req.full_url, code, f"redirect to {newurl} refused",
+                                     headers, fp)
+
+
+def local_opener() -> urllib.request.OpenerDirector:
+    """No proxy from the environment, no redirect."""
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
 
 
 class VisionModel(Protocol):
@@ -44,7 +91,12 @@ class OpenAIVision:
     timeout_s: float = 120.0
     max_tokens: int = 200
     temperature: float = 0.0
+    local_hosts: tuple[str, ...] = ()
     latencies_s: list[float] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        self.endpoint = check_endpoint(self.endpoint, self.local_hosts)
+        self._opener = local_opener()
 
     def complete(self, prompt: str, images: Sequence[bytes]) -> str:
         content: list[dict[str, Any]] = [
@@ -56,11 +108,11 @@ class OpenAIVision:
         body = {"model": self.name, "messages": [{"role": "user", "content": content}],
                 "max_tokens": self.max_tokens, "temperature": self.temperature}
         request = urllib.request.Request(
-            self.endpoint.rstrip("/") + "/chat/completions",
+            self.endpoint + "/chat/completions",
             data=json.dumps(body).encode(), headers={"Content-Type": "application/json"},
         )
         start = time.monotonic()
-        with urllib.request.urlopen(request, timeout=self.timeout_s) as response:
+        with self._opener.open(request, timeout=self.timeout_s) as response:
             reply = json.loads(response.read())
         self.latencies_s.append(time.monotonic() - start)
         return str(reply["choices"][0]["message"]["content"] or "")

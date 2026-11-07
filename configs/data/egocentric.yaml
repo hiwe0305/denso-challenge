@@ -101,6 +101,9 @@ models:
     revision: 042abfa7a38879a376cec03d949eff0aefaa0600
   timeout_s: 180
   max_image_side_px: 640
+  # hosts by name that serve inside our network; IPs that are loopback or private and
+  # localhost need no entry. Egocentric frames go to no other host (CLAUDE.md).
+  local_hosts: []
 
 review:
   sample_share: 0.2          # share of segments a person reviews; giả định

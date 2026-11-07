@@ -105,6 +105,16 @@ def test_recordings_stop_at_the_gate_with_exit_2(
     assert len(ledger(store)) == 4  # the refused job still wrote its measured row
 
 
+def test_a_hosted_endpoint_is_refused_with_exit_2(store: Path, config_path: Path) -> None:
+    config = ["--config", str(config_path)]
+    work = Path(run("ingest", "egodex", *config).split("work: ")[1].split()[0])
+    run("pose", str(work))
+    result = runner.invoke(app, ["annotate", str(work), "--endpoint",
+                                 "https://api.example.com/v1", *config])
+    assert result.exit_code == 2 and "not a machine of ours" in result.output
+    assert not list(work.glob("egocentric/*/segments.parquet"))
+
+
 def test_a_wrong_source_name_is_refused(store: Path, config_path: Path) -> None:
     result = runner.invoke(app, ["ingest", "kinect", "--config", str(config_path)])
     assert result.exit_code == 2 and "egodex or video" in result.output
