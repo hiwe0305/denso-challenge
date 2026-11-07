@@ -224,6 +224,32 @@ def create_app(
     def sensitivity(price_book: str | None = None) -> Any:
         return model.sensitivity(price_book)
 
+    # ------------------------------------------------------------ M4
+    @r.get("/releases")
+    def releases(cursor: str | None = None, limit: int | None = None) -> Any:
+        return _page(model.releases(), cursor, limit)
+
+    @r.get("/releases/{release_id}/items")
+    def release_items(release_id: str, cursor: str | None = None,
+                      limit: int | None = None) -> Any:
+        return _page(_found(model.release_items(release_id), "release"), cursor, limit)
+
+    @r.post("/releases/{release_id}/freeze-request", status_code=202)
+    def freeze_request(release_id: str, body: dict[str, Any] | None = None,
+                       idempotency_key: str | None = Key) -> Any:
+        key = _require_key(idempotency_key)
+        release = _found(model.release(release_id), "release")
+        if release["status"] == "frozen":
+            raise ApiError(409, "ALREADY_FROZEN", "release đã đóng băng; đóng băng là bất biến")
+        if not release["guard"]["ok"]:
+            failed = [c["name"] for c in release["guard"]["checks"] if c["status"] != "ok"]
+            raise ApiError(422, "SPLIT_GUARD", f"guard chia tập chưa qua: {', '.join(failed)}",
+                           "bỏ các episode bị nêu khỏi bản nháp rồi gửi lại")
+        reason = str((body or {}).get("reason") or "").strip() or None
+        row = actions.record(key, "RELEASE_FREEZE_REQUEST", "releases", release_id,
+                             {"item_count": release["item_count"]}, reason)
+        return {"action_id": row["id"], "sync_status": row["sync_status"]}
+
     # ------------------------------------------------------------ M5
     @r.get("/experiments")
     def experiments(cursor: str | None = None, limit: int | None = None) -> Any:

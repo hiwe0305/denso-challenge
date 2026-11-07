@@ -566,6 +566,7 @@ FAKE_CORE_REPLIES: dict[str, str] = {
     "DIAGNOSIS_OVERRIDE": "decisions",
     "HOLDOUT_UNSEAL": "decisions",
     "STAGE_REVIEW": "decisions",
+    "RELEASE_FREEZE_REQUEST": "decisions",
     "EXPERIMENT_SUBMIT": "experiments",
     "INTAKE_SUBMIT": "datasets",
 }

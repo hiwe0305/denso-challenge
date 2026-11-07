@@ -18,6 +18,10 @@ import type {
   DataAllocationRow,
   DatasetRow,
   DecisionRow,
+  GuardCheckName,
+  ReleaseItemRow,
+  ReleaseRow,
+  SplitGuard,
   CheckpointRow,
   DiagnosisSummary,
   ExperimentRow,
@@ -89,6 +93,8 @@ import type {
 
 const ORIGIN = "mock" as const;
 
+const GUARD_CHECKS: readonly GuardCheckName[] = ["split", "benchmark_copy", "raw_egocentric", "qa_not_pass", "near_duplicate"];
+
 /** The twelve codes of the train diagnosis (DA-08). */
 const TRAIN_CODES = [
   ...Array.from({ length: 8 }, (_, i) => `T${i + 1}`),
@@ -156,6 +162,77 @@ export class MockViews {
       reason: d.reason ?? null,
       source_action_id: d.source_action_id ?? null,
       origin: ORIGIN,
+    }));
+  }
+
+  // ============================================================== M4
+
+  /** Episode → dataset the way fwsync resolves it (W12): by source. */
+  private datasetOfEpisode(): Map<string, string | null> {
+    const bySource = new Map(this.d.datasets.map((d) => [d.source_ref, d.dataset_code]));
+    return new Map(this.d.episodes.map((e) => [e.episode_id, e.source_id ? (bySource.get(e.source_id) ?? null) : null]));
+  }
+
+  releases(): ReleaseRow[] {
+    return this.d.releases.map((r) => this.releaseRow(r.release_ref)!);
+  }
+
+  releaseRow(id: string): ReleaseRow | null {
+    const r = this.d.releases.find((x) => x.release_ref === id);
+    if (!r) return null;
+    const items = this.d.releaseItems.filter((i) => i.release_ref === id);
+    const kept = items.filter((i) => !i.excluded);
+    const episodes = new Map(this.d.episodes.map((e) => [e.episode_id, e]));
+    const bySource: Record<string, number> = {};
+    for (const i of kept) {
+      const kind = episodes.get(i.episode_ref)?.source_kind ?? "unknown";
+      bySource[kind] = (bySource[kind] ?? 0) + 1;
+    }
+    return {
+      release_id: r.release_ref, name: r.name, status: r.status,
+      parent_release_id: r.parent_release_ref ?? null, manifest_sha256: r.manifest_sha256 ?? null,
+      manifest_uri: r.manifest_uri ?? null, split_plan_sha256: r.split_plan_sha256 ?? null,
+      license_summary: r.license_summary ?? null, frozen_at: r.frozen_at ?? null,
+      item_count: kept.length, excluded_count: items.length - kept.length,
+      by_source: Object.fromEntries(Object.entries(bySource).sort(([a], [b]) => (a < b ? -1 : 1))),
+      used_by: this.d.experimentDatasets.filter((d) => d.release_ref === id).map((d) => d.experiment_code),
+      guard: this.splitGuard(kept.map((i) => i.episode_ref)),
+      origin: ORIGIN,
+    };
+  }
+
+  /** M4's split guard over the kept items; mirrors `_split_guard` of the read model. */
+  private splitGuard(refs: string[]): SplitGuard {
+    const episodes = new Map(this.d.episodes.map((e) => [e.episode_id, e]));
+    const qa = new Map(this.d.qaReports.map((q) => [q.episode_id, q]));
+    const ep = (r: string) => episodes.get(r);
+    const found: Record<GuardCheckName, string[]> = {
+      split: refs.filter((r) => ep(r)?.split !== "train"),
+      benchmark_copy: refs.filter((r) => Boolean(ep(r)?.meta.benchmark_copy_id)),
+      raw_egocentric: refs.filter((r) => ep(r)?.source_kind === "egocentric" && ep(r)?.deid_status === "raw"),
+      qa_not_pass: refs.filter((r) => ["quarantine", "reject"].includes(qa.get(r)?.decision ?? "")),
+      near_duplicate: refs.filter((r) => (qa.get(r)?.checks ?? []).some((c) => c.name === "dedup" && !c.passed)),
+    };
+    const checks = GUARD_CHECKS.map((name) => {
+      const hits = found[name];
+      const unchecked = name === "near_duplicate" && !refs.some((r) => qa.has(r));
+      const status = unchecked || refs.length === 0 ? "not_run" as const : hits.length ? "fail" as const : "ok" as const;
+      return { name, status, count: hits.length, examples: hits.slice(0, 5) };
+    });
+    return { ok: refs.length > 0 && checks.every((c) => c.status === "ok"), checks };
+  }
+
+  releaseItems(id: string): ReleaseItemRow[] | null {
+    if (!this.d.releases.some((r) => r.release_ref === id)) return null;
+    const episodes = new Map(this.d.episodes.map((e) => [e.episode_id, e]));
+    const qa = new Map(this.d.qaReports.map((q) => [q.episode_id, q]));
+    const datasetOf = this.datasetOfEpisode();
+    return this.d.releaseItems.filter((i) => i.release_ref === id).map((i) => ({
+      episode_id: i.episode_ref, dataset_id: datasetOf.get(i.episode_ref) ?? null,
+      source_kind: episodes.get(i.episode_ref)?.source_kind ?? null,
+      split: episodes.get(i.episode_ref)?.split ?? null,
+      sample_weight: i.sample_weight, excluded: i.excluded, exclude_reason: i.exclude_reason ?? null,
+      qa_decision: qa.get(i.episode_ref)?.decision ?? null, origin: ORIGIN,
     }));
   }
 

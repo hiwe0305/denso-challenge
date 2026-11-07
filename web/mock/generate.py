@@ -417,6 +417,19 @@ class Mock:
              "status": "draft", "manifest_sha256": None, "manifest_uri": None,
              "license_summary": LICENSE, "frozen_at": None, "meta": {}},
         ]
+        # The draft v2: v1's kept items plus two dev episodes that slipped in.
+        # It is the case M4's split guard exists for: a draft that must not be
+        # frozen until the two are taken out (DESIGN.md §6.2, M4).
+        leaked = [e["episode_id"] for e in self.episodes_by_dataset["ds_psi_teleop"]
+                  if e["split"] == "dev"][:2]
+        draft = [
+            {**item, "release_ref": "rel_two_table_v2"} for item in items if not item["excluded"]
+        ] + [
+            {"release_ref": "rel_two_table_v2", "episode_ref": ref, "sample_weight": 1.0,
+             "excluded": False, "exclude_reason": None}
+            for ref in leaked
+        ]
+        self.draft_release_items = draft
         self.files["release_items.jsonl"] = items
 
     # ------------------------------------------------------------- training
@@ -541,7 +554,8 @@ class Mock:
             )
         self.files["experiments.jsonl"] = experiments
         self.files["releases.jsonl"] = [*self.files["releases.jsonl"], *self.he_releases]
-        self.files["release_items.jsonl"] = [*self.release_items, *self.he_release_items]
+        self.files["release_items.jsonl"] = [
+            *self.release_items, *self.draft_release_items, *self.he_release_items]
         self.files["experiment_datasets.jsonl"] = links
         self.files["checkpoints.jsonl"] = checkpoints
 

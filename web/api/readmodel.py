@@ -71,6 +71,9 @@ class ReadModel(Protocol):
     def decisions(self) -> list[Row]: ...
     def defect_scoreboard(self) -> Row: ...
     def defect_scores(self) -> list[Row]: ...
+    def releases(self) -> list[Row]: ...
+    def release(self, release_id: str) -> Row | None: ...
+    def release_items(self, release_id: str) -> list[Row] | None: ...
     def experiments(self) -> list[Row]: ...
     def experiment_drafts(self) -> list[Row]: ...
     def metrics(self, exp_id: str, split: str | None, every: int | None) -> list[Row] | None: ...
@@ -1200,6 +1203,59 @@ class SinkReadModel:
             "origin": head["origin"] if head else None,
         }
 
+    # ============================================================ M4
+
+    def releases(self) -> list[Row]:
+        """Every release with its counts, the experiments that train on it, its split guard."""
+        return [self._release_row(r) for r in self.t("releases")]
+
+    def release(self, release_id: str) -> Row | None:
+        raw = next((r for r in self.t("releases") if r["release_ref"] == release_id), None)
+        return None if raw is None else self._release_row(raw)
+
+    def _release_row(self, r: Row) -> Row:
+        ref = r["release_ref"]
+        items = [i for i in self.t("release_items") if i["release_ref"] == ref]
+        kept = [i for i in items if not i["excluded"]]
+        episodes = {e["episode_ref"]: e for e in self.t("episodes")}
+        by_source: dict[str, int] = {}
+        for i in kept:
+            kind = (episodes.get(i["episode_ref"]) or {}).get("source_kind") or "unknown"
+            by_source[kind] = by_source.get(kind, 0) + 1
+        return {
+            "release_id": ref, "name": r["name"], "status": r["status"],
+            "parent_release_id": r.get("parent_release_ref"),
+            "manifest_sha256": r.get("manifest_sha256"), "manifest_uri": r.get("manifest_uri"),
+            "split_plan_sha256": r.get("split_plan_sha256"),
+            "license_summary": r.get("license_summary"), "frozen_at": r.get("frozen_at"),
+            "item_count": len(kept), "excluded_count": len(items) - len(kept),
+            "by_source": dict(sorted(by_source.items())),
+            "used_by": [d["experiment_code"] for d in self.t("experiment_datasets")
+                        if d["release_ref"] == ref],
+            "guard": _split_guard(kept, episodes, self._latest_qa()),
+            "origin": r["origin"],
+        }
+
+    def release_items(self, release_id: str) -> list[Row] | None:
+        if self.release(release_id) is None:
+            return None
+        episodes = {e["episode_ref"]: e for e in self.t("episodes")}
+        qa = self._latest_qa()
+        out = []
+        for i in self.t("release_items"):
+            if i["release_ref"] != release_id:
+                continue
+            e = episodes.get(i["episode_ref"]) or {}
+            out.append({
+                "episode_id": i["episode_ref"], "dataset_id": e.get("dataset_code"),
+                "source_kind": e.get("source_kind"), "split": e.get("split"),
+                "sample_weight": i["sample_weight"], "excluded": i["excluded"],
+                "exclude_reason": i.get("exclude_reason"),
+                "qa_decision": (qa.get(i["episode_ref"]) or {}).get("decision"),
+                "origin": i["origin"],
+            })
+        return out
+
     # ============================================================ M5
 
     def _experiment(self, exp_id: str) -> Row | None:
@@ -1347,6 +1403,41 @@ class SinkReadModel:
              "train_seed": c.get("train_seed"), "origin": c["origin"]}
             for c in self.t("model_checkpoints") if c["experiment_code"] == exp_id
         ]
+
+
+#: The split guard of M4 (DESIGN.md §1.1 row 7), in display order.
+SPLIT_GUARD_CHECKS = ("split", "benchmark_copy", "raw_egocentric", "qa_not_pass", "near_duplicate")
+
+
+def _split_guard(kept: list[Row], episodes: dict[str, Row], qa: dict[str, Row]) -> Row:
+    """What must hold before a release is frozen, over the items it keeps.
+
+    The web checks this to say it early and to refuse a freeze request; the core
+    checks it again when it freezes. `near_duplicate` reads the `dedup` check of
+    the latest QA report, so items with no report make it `not_run`, never ok.
+    """
+    def ep(ref: str) -> Row:
+        return episodes.get(ref) or {}
+
+    refs = [i["episode_ref"] for i in kept]
+    found: dict[str, list[str]] = {
+        "split": [r for r in refs if ep(r).get("split") != "train"],
+        "benchmark_copy": [r for r in refs if ep(r).get("benchmark_copy_id")],
+        "raw_egocentric": [r for r in refs if ep(r).get("source_kind") == "egocentric"
+                           and ep(r).get("deid_status") == "raw"],
+        "qa_not_pass": [r for r in refs if (qa.get(r) or {}).get("decision")
+                        in ("quarantine", "reject")],
+        "near_duplicate": [r for r in refs if any(
+            c.get("name") == "dedup" and not c.get("passed")
+            for c in (qa.get(r) or {}).get("checks") or [])],
+    }
+    checks = []
+    for name in SPLIT_GUARD_CHECKS:
+        hits = found[name]
+        unchecked = name == "near_duplicate" and not any(r in qa for r in refs)
+        status = "not_run" if unchecked or not refs else ("fail" if hits else "ok")
+        checks.append({"name": name, "status": status, "count": len(hits), "examples": hits[:5]})
+    return {"ok": bool(refs) and all(c["status"] == "ok" for c in checks), "checks": checks}
 
 
 #: The twelve codes of the train diagnosis (DA-08): F-TRAIN T1-T8, F-OFF O1-O4.

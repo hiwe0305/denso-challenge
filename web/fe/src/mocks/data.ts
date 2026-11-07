@@ -314,6 +314,20 @@ export interface RawReleaseItem {
   release_ref: string;
   episode_ref: string;
   excluded: boolean;
+  exclude_reason: string | null;
+  sample_weight: number;
+}
+
+export interface RawRelease {
+  release_ref: string;
+  name: string;
+  status: "draft" | "frozen";
+  parent_release_ref: string | null;
+  manifest_sha256: string | null;
+  manifest_uri: string | null;
+  split_plan_sha256: string | null;
+  license_summary: string | null;
+  frozen_at: string | null;
 }
 
 export interface RawLedger {
@@ -453,6 +467,7 @@ export interface MockData {
   episodes: RawEpisode[];
   qaReports: RawQaReport[];
   releaseItems: RawReleaseItem[];
+  releases: RawRelease[];
   ledger: RawLedger[];
   priceBooks: RawPriceBook[];
   trainDiagnoses: RawTrainDiagnosis[];
@@ -482,6 +497,7 @@ export function loadMockData(): MockData {
     episodes: table("episodes"),
     qaReports: table("qa_reports"),
     releaseItems: table("release_items"),
+    releases: table("releases"),
     ledger: table("ledger"),
     priceBooks: table("price_books"),
     trainDiagnoses: table("train_diagnoses"),

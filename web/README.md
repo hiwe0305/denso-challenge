@@ -13,7 +13,7 @@ Thiết kế đầy đủ: [DESIGN.md](DESIGN.md). File này chỉ nói cách ch
 | `api/` | FastAPI: `app.py` các route §7, `readmodel.py` lớp đọc (sink JSONL hôm nay, Postgres sau), `actions.py` ghi `human_actions.jsonl`. Chưa có SQLAlchemy, Alembic |
 | `fwsync/` | Bộ nạp: `source.py` đọc, `mapping.py` ánh xạ, `sink.py` ghi, `runner.py` bốn việc, `cli.py` lệnh |
 | `mock/` | Generator của bộ mock; output ở `mock/demo-17-11/` ngoài thư mục `web/` |
-| `fe/` | React, Vite, TanStack Query, Tailwind, MSW. `src/api/types.ts` là hình dạng response (DESIGN.md §7.4); `src/mocks/` dựng response từ `mock/demo-17-11/`; `src/contracts/schemas/` sinh từ hợp đồng. Màn hình đã dựng: M2, M6, M7, M8, M9 (đủ năm màn lõi), M3, M5 và M10 bản tối thiểu |
+| `fe/` | React, Vite, TanStack Query, Tailwind, MSW. `src/api/types.ts` là hình dạng response (DESIGN.md §7.4); `src/mocks/` dựng response từ `mock/demo-17-11/`; `src/contracts/schemas/` sinh từ hợp đồng. Màn hình đã dựng: M2, M6, M7, M8, M9 (đủ năm màn lõi), M3, M4, M5 và M10 bản tối thiểu |
 
 ## Chạy test
 

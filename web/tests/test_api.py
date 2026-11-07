@@ -27,7 +27,7 @@ from fastapi.testclient import TestClient
 from web.api.actions import ActionStore
 from web.api.app import SyncConfig, create_app
 from web.api.readmodel import PostgresReadModel, SinkReadModel, SinkTables, js_round
-from web.fwsync.runner import run_export, run_import
+from web.fwsync.runner import run_export, run_fake_core, run_import
 from web.fwsync.sink import JsonlSink
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -95,7 +95,7 @@ def test_parity_covers_every_read_endpoint_of_7_1(client: TestClient) -> None:
     """A read route nobody compares is a route that can drift; list them all."""
     paths = client.get("/openapi.json").json()["paths"]
     routes = {path for path, ops in paths.items() if "get" in ops and path.startswith("/api")}
-    assert len(routes) == 38
+    assert len(routes) == 40
     covered = set()
     for line in PARITY_CASES:
         path = line.split(" ", 1)[1].split("?")[0]
@@ -283,3 +283,51 @@ def test_no_diagnosis_run_is_twelve_not_run_never_twelve_clean(client: TestClien
     assert body["summary"]["ran"] is False
     assert {c["status"] for c in body["codes"]} == {"not_run"}
     assert len(body["codes"]) == 12
+
+
+# ---------------------------------------------------------------- M4
+
+
+def test_freeze_request_is_refused_while_the_split_guard_fails(client: TestClient) -> None:
+    response = client.post("/api/releases/rel_two_table_v2/freeze-request", json={},
+                           headers={"Idempotency-Key": "fz-1"})
+    assert response.status_code == 422
+    assert response.json()["code"] == "SPLIT_GUARD"
+    assert "split" in response.json()["message"]
+
+
+def test_a_frozen_release_cannot_be_asked_to_freeze_again(client: TestClient) -> None:
+    response = client.post("/api/releases/rel_two_table_v1/freeze-request", json={},
+                           headers={"Idempotency-Key": "fz-2"})
+    assert (response.status_code, response.json()["code"]) == (409, "ALREADY_FROZEN")
+    assert client.post("/api/releases/rel_nope/freeze-request", json={},
+                       headers={"Idempotency-Key": "fz-3"}).status_code == 404
+    assert client.post("/api/releases/rel_two_table_v2/freeze-request",
+                       json={}).json()["code"] == "IDEMPOTENCY_KEY_REQUIRED"
+
+
+def test_a_clean_draft_becomes_one_freeze_action_the_fake_core_answers(
+    sink: Path, tmp_path: Path
+) -> None:
+    clean = tmp_path / "sink"
+    shutil.copytree(sink, clean)
+    items = clean / "release_items.jsonl"
+    episodes = {json.loads(line)["episode_ref"]: json.loads(line)
+                for line in (clean / "episodes.jsonl").read_text(encoding="utf-8").splitlines()}
+    kept = [line for line in items.read_text(encoding="utf-8").splitlines()
+            if json.loads(line)["release_ref"] != "rel_two_table_v2"
+            or episodes[json.loads(line)["episode_ref"]]["split"] == "train"]
+    items.write_text("\n".join(kept) + "\n", encoding="utf-8")
+    client = make_client(clean, tmp_path / "state")
+    release = next(r for r in client.get("/api/releases").json()["items"]
+                   if r["release_id"] == "rel_two_table_v2")
+    assert release["guard"]["ok"] is True
+    first = client.post("/api/releases/rel_two_table_v2/freeze-request", json={},
+                        headers={"Idempotency-Key": "fz-ok"})
+    again = client.post("/api/releases/rel_two_table_v2/freeze-request", json={},
+                        headers={"Idempotency-Key": "fz-ok"})
+    assert first.status_code == 202 and first.json() == again.json()  # C16
+    store = tmp_path / "state" / "human_actions.jsonl"
+    actions = [json.loads(line) for line in store.read_text(encoding="utf-8").splitlines()]
+    assert run_export(actions, tmp_path / "outbox").status == "ok"
+    assert run_fake_core(tmp_path / "outbox", tmp_path / "inbox").status == "ok"

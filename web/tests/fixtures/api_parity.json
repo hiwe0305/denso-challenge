@@ -12969,6 +12969,4518 @@
   "next_cursor": null,
   "total": 64
  },
+ "- /releases?limit=500": {
+  "items": [
+   {
+    "release_id": "rel_two_table_v1",
+    "name": "two_table v1",
+    "status": "frozen",
+    "parent_release_id": null,
+    "manifest_sha256": "7705924d01a10a39e403cd107cc20107bed228cb88baa4f0ad996789b9f0db4c",
+    "manifest_uri": "mock://releases/v1/items.parquet",
+    "split_plan_sha256": "cdee2fbf735124f70d7b58522fbd3ac446a36b88a7efa804bae0e81ba168d732",
+    "license_summary": "mock-public",
+    "frozen_at": "2026-11-03T10:00:00Z",
+    "item_count": 164,
+    "excluded_count": 2,
+    "by_source": {
+     "egocentric": 20,
+     "synthetic": 50,
+     "teleop": 94
+    },
+    "used_by": [
+     "exp_A",
+     "exp_B",
+     "exp_BFAIL"
+    ],
+    "guard": {
+     "ok": true,
+     "checks": [
+      {
+       "name": "split",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "benchmark_copy",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "raw_egocentric",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "qa_not_pass",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "near_duplicate",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      }
+     ]
+    },
+    "origin": "mock"
+   },
+   {
+    "release_id": "rel_two_table_v2",
+    "name": "two_table v2 (nháp)",
+    "status": "draft",
+    "parent_release_id": "rel_two_table_v1",
+    "manifest_sha256": null,
+    "manifest_uri": null,
+    "split_plan_sha256": "cdee2fbf735124f70d7b58522fbd3ac446a36b88a7efa804bae0e81ba168d732",
+    "license_summary": "mock-public",
+    "frozen_at": null,
+    "item_count": 166,
+    "excluded_count": 0,
+    "by_source": {
+     "egocentric": 20,
+     "synthetic": 50,
+     "teleop": 96
+    },
+    "used_by": [],
+    "guard": {
+     "ok": false,
+     "checks": [
+      {
+       "name": "split",
+       "status": "fail",
+       "count": 2,
+       "examples": [
+        "ep_psi_064",
+        "ep_psi_065"
+       ]
+      },
+      {
+       "name": "benchmark_copy",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "raw_egocentric",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "qa_not_pass",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "near_duplicate",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      }
+     ]
+    },
+    "origin": "mock"
+   },
+   {
+    "release_id": "rel_two_table_a07",
+    "name": "two_table v1 · 70%",
+    "status": "frozen",
+    "parent_release_id": "rel_two_table_v1",
+    "manifest_sha256": "5ba0e9b03c4b6b1cf7c63549ec83da41c5eace9bd71e6b273d6f6c61c348c49f",
+    "manifest_uri": "mock://releases/a07/items.parquet",
+    "split_plan_sha256": "cdee2fbf735124f70d7b58522fbd3ac446a36b88a7efa804bae0e81ba168d732",
+    "license_summary": "mock-public",
+    "frozen_at": "2026-11-03T11:00:00Z",
+    "item_count": 115,
+    "excluded_count": 0,
+    "by_source": {
+     "egocentric": 14,
+     "synthetic": 35,
+     "teleop": 66
+    },
+    "used_by": [
+     "exp_A07"
+    ],
+    "guard": {
+     "ok": true,
+     "checks": [
+      {
+       "name": "split",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "benchmark_copy",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "raw_egocentric",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "qa_not_pass",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "near_duplicate",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      }
+     ]
+    },
+    "origin": "mock"
+   },
+   {
+    "release_id": "rel_he_v_ego_10",
+    "name": "HE V_EGO N=10",
+    "status": "frozen",
+    "parent_release_id": "rel_two_table_v1",
+    "manifest_sha256": "62e85ead585d4a4c24171d335c2c54c38a56d021bd80ad808c44941212f1d10a",
+    "manifest_uri": "mock://releases/he/V_EGO_10.parquet",
+    "split_plan_sha256": "cdee2fbf735124f70d7b58522fbd3ac446a36b88a7efa804bae0e81ba168d732",
+    "license_summary": "mock-public",
+    "frozen_at": "2026-11-03T11:00:00Z",
+    "item_count": 30,
+    "excluded_count": 0,
+    "by_source": {
+     "egocentric": 20,
+     "teleop": 10
+    },
+    "used_by": [
+     "exp_HE_V_EGO_10"
+    ],
+    "guard": {
+     "ok": true,
+     "checks": [
+      {
+       "name": "split",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "benchmark_copy",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "raw_egocentric",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "qa_not_pass",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "near_duplicate",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      }
+     ]
+    },
+    "origin": "mock"
+   },
+   {
+    "release_id": "rel_he_v_ego_20",
+    "name": "HE V_EGO N=20",
+    "status": "frozen",
+    "parent_release_id": "rel_two_table_v1",
+    "manifest_sha256": "9347eb87e5bd65310e8509e5492f36abc6bae987e2629c32da000b2a3c62dbc7",
+    "manifest_uri": "mock://releases/he/V_EGO_20.parquet",
+    "split_plan_sha256": "cdee2fbf735124f70d7b58522fbd3ac446a36b88a7efa804bae0e81ba168d732",
+    "license_summary": "mock-public",
+    "frozen_at": "2026-11-03T11:00:00Z",
+    "item_count": 40,
+    "excluded_count": 0,
+    "by_source": {
+     "egocentric": 20,
+     "teleop": 20
+    },
+    "used_by": [
+     "exp_HE_V_EGO_20"
+    ],
+    "guard": {
+     "ok": true,
+     "checks": [
+      {
+       "name": "split",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "benchmark_copy",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "raw_egocentric",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "qa_not_pass",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "near_duplicate",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      }
+     ]
+    },
+    "origin": "mock"
+   },
+   {
+    "release_id": "rel_he_v_ego_40",
+    "name": "HE V_EGO N=40",
+    "status": "frozen",
+    "parent_release_id": "rel_two_table_v1",
+    "manifest_sha256": "713e6a72b4042bbb097177b01a93b7c1bdb5db3d7c59b1de773601b330d3a46f",
+    "manifest_uri": "mock://releases/he/V_EGO_40.parquet",
+    "split_plan_sha256": "cdee2fbf735124f70d7b58522fbd3ac446a36b88a7efa804bae0e81ba168d732",
+    "license_summary": "mock-public",
+    "frozen_at": "2026-11-03T11:00:00Z",
+    "item_count": 60,
+    "excluded_count": 0,
+    "by_source": {
+     "egocentric": 20,
+     "teleop": 40
+    },
+    "used_by": [
+     "exp_HE_V_EGO_40"
+    ],
+    "guard": {
+     "ok": true,
+     "checks": [
+      {
+       "name": "split",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "benchmark_copy",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "raw_egocentric",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "qa_not_pass",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "near_duplicate",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      }
+     ]
+    },
+    "origin": "mock"
+   },
+   {
+    "release_id": "rel_he_v_ego_80",
+    "name": "HE V_EGO N=80",
+    "status": "frozen",
+    "parent_release_id": "rel_two_table_v1",
+    "manifest_sha256": "c3e96b334157ac2794e17c009433da99d7390ce9bbf0b293e27c603ffef3af0d",
+    "manifest_uri": "mock://releases/he/V_EGO_80.parquet",
+    "split_plan_sha256": "cdee2fbf735124f70d7b58522fbd3ac446a36b88a7efa804bae0e81ba168d732",
+    "license_summary": "mock-public",
+    "frozen_at": "2026-11-03T11:00:00Z",
+    "item_count": 100,
+    "excluded_count": 0,
+    "by_source": {
+     "egocentric": 20,
+     "teleop": 80
+    },
+    "used_by": [
+     "exp_HE_V_EGO_80"
+    ],
+    "guard": {
+     "ok": true,
+     "checks": [
+      {
+       "name": "split",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "benchmark_copy",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "raw_egocentric",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "qa_not_pass",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "near_duplicate",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      }
+     ]
+    },
+    "origin": "mock"
+   },
+   {
+    "release_id": "rel_he_v_ego10_10",
+    "name": "HE V_EGO10 N=10",
+    "status": "frozen",
+    "parent_release_id": "rel_two_table_v1",
+    "manifest_sha256": "a6d1135847b93bf34976062d93e611ffc1e2beb453e68b9c02476863f6572636",
+    "manifest_uri": "mock://releases/he/V_EGO10_10.parquet",
+    "split_plan_sha256": "cdee2fbf735124f70d7b58522fbd3ac446a36b88a7efa804bae0e81ba168d732",
+    "license_summary": "mock-public",
+    "frozen_at": "2026-11-03T11:00:00Z",
+    "item_count": 20,
+    "excluded_count": 0,
+    "by_source": {
+     "egocentric": 10,
+     "teleop": 10
+    },
+    "used_by": [
+     "exp_HE_V_EGO10_10"
+    ],
+    "guard": {
+     "ok": true,
+     "checks": [
+      {
+       "name": "split",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "benchmark_copy",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "raw_egocentric",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "qa_not_pass",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "near_duplicate",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      }
+     ]
+    },
+    "origin": "mock"
+   },
+   {
+    "release_id": "rel_he_v_ego10_20",
+    "name": "HE V_EGO10 N=20",
+    "status": "frozen",
+    "parent_release_id": "rel_two_table_v1",
+    "manifest_sha256": "f5193fdb22f7f94452c6632fc9ef4d65402abeaaaac5e93067811074fa64039a",
+    "manifest_uri": "mock://releases/he/V_EGO10_20.parquet",
+    "split_plan_sha256": "cdee2fbf735124f70d7b58522fbd3ac446a36b88a7efa804bae0e81ba168d732",
+    "license_summary": "mock-public",
+    "frozen_at": "2026-11-03T11:00:00Z",
+    "item_count": 30,
+    "excluded_count": 0,
+    "by_source": {
+     "egocentric": 10,
+     "teleop": 20
+    },
+    "used_by": [
+     "exp_HE_V_EGO10_20"
+    ],
+    "guard": {
+     "ok": true,
+     "checks": [
+      {
+       "name": "split",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "benchmark_copy",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "raw_egocentric",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "qa_not_pass",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "near_duplicate",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      }
+     ]
+    },
+    "origin": "mock"
+   },
+   {
+    "release_id": "rel_he_v_ego10_40",
+    "name": "HE V_EGO10 N=40",
+    "status": "frozen",
+    "parent_release_id": "rel_two_table_v1",
+    "manifest_sha256": "0fda1eb59a42530557dbd0734046a71ccac6a59df7afcfddc649ff62a3842bf3",
+    "manifest_uri": "mock://releases/he/V_EGO10_40.parquet",
+    "split_plan_sha256": "cdee2fbf735124f70d7b58522fbd3ac446a36b88a7efa804bae0e81ba168d732",
+    "license_summary": "mock-public",
+    "frozen_at": "2026-11-03T11:00:00Z",
+    "item_count": 50,
+    "excluded_count": 0,
+    "by_source": {
+     "egocentric": 10,
+     "teleop": 40
+    },
+    "used_by": [
+     "exp_HE_V_EGO10_40"
+    ],
+    "guard": {
+     "ok": true,
+     "checks": [
+      {
+       "name": "split",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "benchmark_copy",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "raw_egocentric",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "qa_not_pass",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "near_duplicate",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      }
+     ]
+    },
+    "origin": "mock"
+   },
+   {
+    "release_id": "rel_he_v_ego10_80",
+    "name": "HE V_EGO10 N=80",
+    "status": "frozen",
+    "parent_release_id": "rel_two_table_v1",
+    "manifest_sha256": "8a91c2c02dbb69da142dc6aacde5f805673ba43d7d07a135033a55bc8c999574",
+    "manifest_uri": "mock://releases/he/V_EGO10_80.parquet",
+    "split_plan_sha256": "cdee2fbf735124f70d7b58522fbd3ac446a36b88a7efa804bae0e81ba168d732",
+    "license_summary": "mock-public",
+    "frozen_at": "2026-11-03T11:00:00Z",
+    "item_count": 90,
+    "excluded_count": 0,
+    "by_source": {
+     "egocentric": 10,
+     "teleop": 80
+    },
+    "used_by": [
+     "exp_HE_V_EGO10_80"
+    ],
+    "guard": {
+     "ok": true,
+     "checks": [
+      {
+       "name": "split",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "benchmark_copy",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "raw_egocentric",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "qa_not_pass",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "near_duplicate",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      }
+     ]
+    },
+    "origin": "mock"
+   },
+   {
+    "release_id": "rel_he_v_noego_10",
+    "name": "HE V_NOEGO N=10",
+    "status": "frozen",
+    "parent_release_id": "rel_two_table_v1",
+    "manifest_sha256": "c4c738cbbcbda71d90c9a12310b9ee24c249259107e1c6b0c6887552cdefb27d",
+    "manifest_uri": "mock://releases/he/V_NOEGO_10.parquet",
+    "split_plan_sha256": "cdee2fbf735124f70d7b58522fbd3ac446a36b88a7efa804bae0e81ba168d732",
+    "license_summary": "mock-public",
+    "frozen_at": "2026-11-03T11:00:00Z",
+    "item_count": 10,
+    "excluded_count": 0,
+    "by_source": {
+     "teleop": 10
+    },
+    "used_by": [
+     "exp_HE_V_NOEGO_10"
+    ],
+    "guard": {
+     "ok": true,
+     "checks": [
+      {
+       "name": "split",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "benchmark_copy",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "raw_egocentric",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "qa_not_pass",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "near_duplicate",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      }
+     ]
+    },
+    "origin": "mock"
+   },
+   {
+    "release_id": "rel_he_v_noego_20",
+    "name": "HE V_NOEGO N=20",
+    "status": "frozen",
+    "parent_release_id": "rel_two_table_v1",
+    "manifest_sha256": "dd0f37499f76219e5e0a2853268ad9d052b4684700a00b77fa5715c0f1bc9c57",
+    "manifest_uri": "mock://releases/he/V_NOEGO_20.parquet",
+    "split_plan_sha256": "cdee2fbf735124f70d7b58522fbd3ac446a36b88a7efa804bae0e81ba168d732",
+    "license_summary": "mock-public",
+    "frozen_at": "2026-11-03T11:00:00Z",
+    "item_count": 20,
+    "excluded_count": 0,
+    "by_source": {
+     "teleop": 20
+    },
+    "used_by": [
+     "exp_HE_V_NOEGO_20"
+    ],
+    "guard": {
+     "ok": true,
+     "checks": [
+      {
+       "name": "split",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "benchmark_copy",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "raw_egocentric",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "qa_not_pass",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "near_duplicate",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      }
+     ]
+    },
+    "origin": "mock"
+   },
+   {
+    "release_id": "rel_he_v_noego_40",
+    "name": "HE V_NOEGO N=40",
+    "status": "frozen",
+    "parent_release_id": "rel_two_table_v1",
+    "manifest_sha256": "49d96461a0f5bdcb6961e1db3b6ca5a729e169d71681cb595fb80736381cdd03",
+    "manifest_uri": "mock://releases/he/V_NOEGO_40.parquet",
+    "split_plan_sha256": "cdee2fbf735124f70d7b58522fbd3ac446a36b88a7efa804bae0e81ba168d732",
+    "license_summary": "mock-public",
+    "frozen_at": "2026-11-03T11:00:00Z",
+    "item_count": 40,
+    "excluded_count": 0,
+    "by_source": {
+     "teleop": 40
+    },
+    "used_by": [
+     "exp_HE_V_NOEGO_40"
+    ],
+    "guard": {
+     "ok": true,
+     "checks": [
+      {
+       "name": "split",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "benchmark_copy",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "raw_egocentric",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "qa_not_pass",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "near_duplicate",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      }
+     ]
+    },
+    "origin": "mock"
+   },
+   {
+    "release_id": "rel_he_v_noego_80",
+    "name": "HE V_NOEGO N=80",
+    "status": "frozen",
+    "parent_release_id": "rel_two_table_v1",
+    "manifest_sha256": "3e3679b9bf20b289cc0962a7f2d23f7b60e511e7f8c6d51647a2fafd14666078",
+    "manifest_uri": "mock://releases/he/V_NOEGO_80.parquet",
+    "split_plan_sha256": "cdee2fbf735124f70d7b58522fbd3ac446a36b88a7efa804bae0e81ba168d732",
+    "license_summary": "mock-public",
+    "frozen_at": "2026-11-03T11:00:00Z",
+    "item_count": 80,
+    "excluded_count": 0,
+    "by_source": {
+     "teleop": 80
+    },
+    "used_by": [
+     "exp_HE_V_NOEGO_80"
+    ],
+    "guard": {
+     "ok": true,
+     "checks": [
+      {
+       "name": "split",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "benchmark_copy",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "raw_egocentric",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "qa_not_pass",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      },
+      {
+       "name": "near_duplicate",
+       "status": "ok",
+       "count": 0,
+       "examples": []
+      }
+     ]
+    },
+    "origin": "mock"
+   }
+  ],
+  "next_cursor": null,
+  "total": 15
+ },
+ "- /releases/rel_two_table_v1/items?limit=500": {
+  "items": [
+   {
+    "episode_id": "ep_psi_000",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_001",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_002",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_003",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_004",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_005",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "flag",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_006",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_007",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_008",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_009",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_010",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_011",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_012",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_013",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_014",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_015",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_016",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_017",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_018",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_019",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_020",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_021",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_022",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_023",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "flag",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_024",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_025",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_026",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_027",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_028",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_029",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_030",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_031",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_032",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_033",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_034",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_035",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_036",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_037",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_038",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_039",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_040",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_041",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_042",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_043",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_044",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_045",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_046",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_047",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "flag",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_048",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_049",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_050",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_051",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_052",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_053",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_054",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_055",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_056",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_057",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_058",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_059",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_060",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_061",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_062",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_063",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_000",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_001",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_002",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_003",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": true,
+    "exclude_reason": "QA quarantine: vượt giới hạn vận tốc khớp",
+    "qa_decision": "quarantine",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_004",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_005",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_006",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_007",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_008",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_009",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_010",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_011",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_012",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_013",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_014",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_015",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_016",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_017",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": true,
+    "exclude_reason": "QA quarantine: vượt giới hạn vận tốc khớp",
+    "qa_decision": "quarantine",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_018",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_019",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_020",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_021",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_022",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_023",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_024",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_025",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_026",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_027",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_028",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_029",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_030",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_031",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_000",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_001",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_002",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_003",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_004",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_005",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_006",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_007",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_008",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_009",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_010",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_011",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_012",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_013",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_014",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_015",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_016",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_017",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_018",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_019",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_020",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_021",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_022",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_023",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_024",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_025",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_026",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_027",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_028",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_029",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_030",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_031",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_032",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_033",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_034",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_035",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_036",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_037",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_038",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_039",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_040",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_041",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_042",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_043",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_044",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_045",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_046",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_047",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_048",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_049",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_000",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_001",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_002",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_003",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_004",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_005",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_006",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_007",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_008",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_009",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_010",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_011",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_012",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_013",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_014",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_015",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_016",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_017",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_018",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_019",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   }
+  ],
+  "next_cursor": null,
+  "total": 166
+ },
+ "- /releases/rel_two_table_v2/items?limit=500": {
+  "items": [
+   {
+    "episode_id": "ep_psi_000",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_001",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_002",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_003",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_004",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_005",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "flag",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_006",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_007",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_008",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_009",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_010",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_011",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_012",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_013",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_014",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_015",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_016",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_017",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_018",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_019",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_020",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_021",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_022",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_023",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "flag",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_024",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_025",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_026",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_027",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_028",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_029",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_030",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_031",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_032",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_033",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_034",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_035",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_036",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_037",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_038",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_039",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_040",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_041",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_042",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_043",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_044",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_045",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_046",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_047",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "flag",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_048",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_049",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_050",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_051",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_052",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_053",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_054",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_055",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_056",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_057",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_058",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_059",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_060",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_061",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_062",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_063",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_000",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_001",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_002",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_004",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_005",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_006",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_007",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_008",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_009",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_010",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_011",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_012",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_013",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_014",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_015",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_016",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_018",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_019",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_020",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_021",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_022",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_023",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_024",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_025",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_026",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_027",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_028",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_029",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_030",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_kbd_031",
+    "dataset_id": "ds_kbd_teleop",
+    "source_kind": "teleop",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_000",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_001",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_002",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_003",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_004",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_005",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_006",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_007",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_008",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_009",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_010",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_011",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_012",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_013",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_014",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_015",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_016",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_017",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_018",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_019",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_020",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_021",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_022",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_023",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_024",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_025",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_026",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_027",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_028",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_029",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_030",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_031",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_032",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_033",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_034",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_035",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_036",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_037",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_038",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_039",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_040",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_041",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_042",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_043",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_044",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_045",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_046",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_047",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_048",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_s1_049",
+    "dataset_id": "ds_synth_s1",
+    "source_kind": "synthetic",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_000",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_001",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_002",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_003",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_004",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_005",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_006",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_007",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_008",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_009",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_010",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_011",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_012",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_013",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_014",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_015",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_016",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_017",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_018",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_ego_019",
+    "dataset_id": "ds_egodex",
+    "source_kind": "egocentric",
+    "split": "train",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_064",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "dev",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   },
+   {
+    "episode_id": "ep_psi_065",
+    "dataset_id": "ds_psi_teleop",
+    "source_kind": "teleop",
+    "split": "dev",
+    "sample_weight": 1,
+    "excluded": false,
+    "exclude_reason": null,
+    "qa_decision": "pass",
+    "origin": "mock"
+   }
+  ],
+  "next_cursor": null,
+  "total": 166
+ },
  "- /experiments?limit=500": {
   "items": [
    {
