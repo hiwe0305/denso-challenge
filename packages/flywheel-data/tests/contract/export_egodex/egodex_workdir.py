@@ -4,6 +4,7 @@ DA-04 writes the real one in a parallel session; this builds the same files from
 seeded generator, so the export's input is known exactly:
 
     source.json, episodes.jsonl, qa/egocentric.jsonl
+    egodex_pin.json                     a D2 pin of the E-B videos, as DA-04's
     egocentric/<episode_id>/bundle.json, pose.npz, segments.parquet
     raw/<task>/<n>.hdf5 + <n>.mp4       the "EgoDex" recording of an E-B episode
     raw/video/<episode_id>.mp4          the recording of an E-A episode
@@ -16,8 +17,9 @@ used by the real-loader check.
 
 from __future__ import annotations
 
+import hashlib
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -30,6 +32,7 @@ from flywheel.contracts.segments import SEGMENT_SCHEMA
 from flywheel.data.export.egodex import CAMERA, HANDS, JOINTS, TIPS
 
 FPS = 30
+PIN = "egodex_pin.json"  # the fixture's pin, in the shape of DA-04's egodex_pin.json
 SIZE = (96, 64)  # width, height of the synthetic videos
 INTRINSIC = np.array([[73.6, 0.0, 48.0], [0.0, 73.6, 32.0], [0.0, 0.0, 1.0]], np.float32)
 SEGMENTS_SCHEMA = SEGMENT_SCHEMA.append(pa.field("frame_start", pa.int64())).append(
@@ -165,6 +168,15 @@ def pose_from_transforms(
     return pose
 
 
+def write_pin(work: Path, videos: Mapping[str, Path], name: str = "test-pin") -> str:
+    """Pin `videos` ({<task>/<i>.mp4: path}) under `work`; returns the pin id."""
+    files = {key: hashlib.sha256(path.read_bytes()).hexdigest() for key, path in videos.items()}
+    pin = {"name": name, "source": {"url": "fixture"}, "check": "fixture", "files": files}
+    data = json.dumps(pin, indent=1, sort_keys=True).encode()
+    (work / PIN).write_bytes(data)
+    return f"{name}@{hashlib.sha256(data).hexdigest()[:12]}"
+
+
 def write_common(
     work: Path, source: dict[str, Any], specs: Sequence[Spec], episodes: list[dict[str, Any]]
 ) -> None:
@@ -207,8 +219,10 @@ def build(
         "root": str(work / "raw"),
         "files": {},
         "deid_waiver": "D2 6/11/2026: published EgoDex sample" if waiver and not e_a else None,
+        "deid_waiver_manifest": None,
     }
     numbers: dict[str, int] = {}
+    videos: dict[str, Path] = {}
     episodes = []
     for spec in specs:
         transforms = {CAMERA: trajectory(rng, spec.frames, (0.0, 1.4, 0.0))}
@@ -237,6 +251,7 @@ def build(
                 f.attrs["llm_description"] = descriptions[0]
                 f.attrs["llm_description2"] = descriptions[1]
             write_video(mp4, spec.frames)
+            videos[f"{spec.task}/{n}.mp4"] = mp4
             pose = pose_from_transforms(transforms, confidence, None)
             write_bundle(work, spec, pose, hdf5, mp4, descriptions)
         else:
@@ -245,12 +260,18 @@ def build(
             pose = pose_from_transforms(transforms, confidence, INTRINSIC if intrinsic else None)
             write_bundle(work, spec, pose, None, mp4, descriptions)
         episodes.append(episode_record(spec, source["source_id"]))
+    pin_id = write_pin(work, videos)
+    if source["deid_waiver"] is not None:
+        source["deid_waiver_manifest"] = pin_id
     write_common(work, source, specs, episodes)
     return work
 
 
 def from_egodex(work: Path, hdf5_files: Sequence[Path], *, split_in_two: bool = True) -> Path:
     """A work dir around real EgoDex episodes: pose.npz from their HDF5, QA pass.
+
+    The fixture pin holds their videos as read now (DA-04's real pin checks them
+    against DA-30's zip directory first).
 
     Each episode gets one segment over all its frames, or two halves with
     `split_in_two`; the segment's description is the episode's own instruction.
@@ -298,5 +319,8 @@ def from_egodex(work: Path, hdf5_files: Sequence[Path], *, split_in_two: bool = 
         )
         specs.append(spec)
         episodes.append(episode_record(spec, source["source_id"]))
+    videos = {"/".join(p.with_suffix(".mp4").parts[-2:]): p.with_suffix(".mp4") for p in hdf5_files}
+    work.mkdir(parents=True, exist_ok=True)
+    source["deid_waiver_manifest"] = write_pin(work, {k: Path(v) for k, v in videos.items()})
     write_common(work, source, specs, episodes)
     return work

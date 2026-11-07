@@ -46,8 +46,12 @@ the reason; the export is refused only when no segment is left. E-B
 episodes (`pose_source` E-B, EgoDex, `retargeted`) copy the transforms from their
 EgoDex HDF5; E-A episodes (`pose_source` E-A, the team's own video, `pseudo`) build
 them from `pose.npz` (tips get an identity rotation, which `actions_48d` never reads).
-An egocentric video whose `deid_status` is `raw` is refused unless the source carries
-the EgoDex waiver (plan 6/11/2026 D2: `egodex` and `public` only). One run exports one
+An egocentric video whose `deid_status` is `raw` is refused unless the D2 waiver
+(plan 6/11/2026) holds for it, checked here and not taken from the labels: the source
+names DA-04's pin of DA-30's EgoDex videos in `deid_waiver_manifest` (pin name, "@",
+the first 12 hex of the pin file's sha256), that is the pin the export reads, the
+episode is `public`, and the sha256 of the very mp4 the export cuts is the pin's for
+its `<task>/<i>.mp4`. One run exports one
 pose source: E-A and E-B in the same work dir are refused, so a `<task>/<i>` never
 mixes a `pseudo` sample into EgoDex's numbering. The recipe's `upsample_rate` 3 is
 three frames at 30 Hz, so a bundle or video at another fps is refused (resampling is
@@ -109,7 +113,8 @@ FPS_TOLERANCE = 0.05  # 29.97 (NTSC) passes; 25 or 60 does not
 STATS_FILE = "egodex_stat.json"
 META_FILE = "meta.json"
 FOURCC = "mp4v"
-DEID_WAIVED = frozenset({("egodex", "public")})  # plan 6/11/2026 D2
+# DA-04's pin of the videos D2 waives (DA-04 commit a1e3ef1a; `--waiver-pin` overrides)
+WAIVER_PIN = Path(__file__).resolve().parents[1] / "annotate" / "deid" / "egodex_pin.json"
 STAGE3 = "refused: egocentric data is stage 1 only (design 27/10/2026 7.8)"
 # Assumption for the estimated ledger row, not a measurement: decoding and mp4v
 # encoding one 1920x1080 frame on a laptop CPU, plus the HDF5 and stats work.
@@ -299,7 +304,49 @@ class Stage1Export:
     skipped: list[dict[str, Any]] = field(default_factory=list)
 
 
-def plan_export(work: Path, include: Sequence[str]) -> tuple[list[Planned], list[dict[str, Any]]]:
+class Waiver:
+    """The D2 waiver of a work dir's source, checked per raw episode against the pin."""
+
+    def __init__(self, source: Mapping[str, Any], pin_path: Path) -> None:
+        self.claimed = source.get("deid_waiver") is not None
+        self.manifest = source.get("deid_waiver_manifest")
+        self.pin_path = pin_path
+        self._pin: tuple[str, dict[str, str]] | None = None
+
+    def pin(self) -> tuple[str, dict[str, str]]:
+        """`(pin id, {<task>/<i>.mp4: sha256})`, the id as DA-04's `egodex_pin()`."""
+        if self._pin is None:
+            data = self.pin_path.read_bytes()
+            raw = json.loads(data)
+            pin_id = f"{raw['name']}@{hashlib.sha256(data).hexdigest()[:12]}"
+            self._pin = pin_id, {str(k): str(v) for k, v in raw["files"].items()}
+        return self._pin
+
+    def problem(self, episode: Episode, bundle: Bundle) -> str | None:
+        """Why a raw episode is not waived, or None when it is."""
+        eid = episode.episode_id
+        if not (self.claimed and self.manifest):
+            return f"{eid}: deid_status raw and the source has no EgoDex waiver (D2)"
+        if episode.data_class != "public":
+            return f"{eid}: deid_status raw and data_class {episode.data_class} is never waived"
+        if not self.pin_path.is_file():
+            return f"{eid}: deid_status raw and the D2 pin {self.pin_path} is not there"
+        pin_id, files = self.pin()
+        if pin_id != self.manifest:
+            return (
+                f"{eid}: source.json deid_waiver_manifest {self.manifest} is not the pin {pin_id}"
+            )
+        key = "/".join(bundle.mp4.parts[-2:])
+        if key not in files:
+            return f"{eid}: {key} is not in the D2 pin {pin_id}"
+        if sha256(bundle.mp4) != files[key]:
+            return f"{eid}: {key} sha256 differs from the D2 pin {pin_id}"
+        return None
+
+
+def plan_export(
+    work: Path, include: Sequence[str], waiver_pin: Path = WAIVER_PIN
+) -> tuple[list[Planned], list[dict[str, Any]]]:
     """The samples to write and the skipped episodes or segments, or ExportRefused."""
     source = json.loads((work / "source.json").read_text(encoding="utf-8"))
     episodes = [Episode.model_validate(r) for r in read_jsonl(work / "episodes.jsonl")]
@@ -310,9 +357,7 @@ def plan_export(work: Path, include: Sequence[str]) -> tuple[list[Planned], list
         if qa.episode_id in reports:
             problems.append(f"{qa.episode_id}: two QAReports")
         reports[qa.episode_id] = qa
-    waived = source.get("deid_waiver") is not None and (
-        (str(source.get("source_detail")), str(source.get("data_class"))) in DEID_WAIVED
-    )
+    waiver = Waiver(source, waiver_pin)
     chosen: list[tuple[Episode, Bundle, FramedSegment, QAReport]] = []
     skipped: list[dict[str, Any]] = []
     pose_sources: dict[str, list[str]] = {}
@@ -328,15 +373,16 @@ def plan_export(work: Path, include: Sequence[str]) -> tuple[list[Planned], list
         if episode.source_kind != "egocentric":
             problems.append(f"{eid}: source_kind {episode.source_kind}, not egocentric")
             continue
-        if deid_blocks_annotate(episode) and not (waived and episode.data_class == "public"):
-            problems.append(f"{eid}: deid_status raw and the source has no EgoDex waiver (D2)")
-            continue
         if episode.split not in SPLIT_DIRS:
             problems.append(f"{eid}: split {episode.split!r} is not one of {sorted(SPLIT_DIRS)}")
             continue
         directory = work / "egocentric" / eid
         bundle = Bundle.read(directory / "bundle.json")
         pose_sources.setdefault(bundle.pose_source, []).append(eid)
+        unwaived = waiver.problem(episode, bundle) if deid_blocks_annotate(episode) else None
+        if unwaived is not None:
+            problems.append(unwaived)
+            continue
         found = _bundle_problems(episode, bundle) + _video_problems(bundle)
         if found:
             problems += found
@@ -589,10 +635,11 @@ def export_stage1(
     release_id: str | None = None,
     run_plan_id: str | None = None,
     store: Path | None = None,
+    waiver_pin: Path = WAIVER_PIN,
 ) -> Stage1Export:
     """Write the stage 1 export of `work` under `out` (new or empty), with its ledger rows."""
     include = ("pass", "flag") if include_flag else ("pass",)
-    planned, skipped = plan_export(work, include)
+    planned, skipped = plan_export(work, include, waiver_pin)
     if not planned:
         reasons = Counter(str(s["reason"]).split(":")[0] for s in skipped)
         why = ", ".join(f"{n} {reason}" for reason, n in sorted(reasons.items()))
@@ -700,7 +747,14 @@ def _write(
         "include": list(include),
         "source": {
             key: source.get(key)
-            for key in ("source_id", "source_detail", "license", "data_class", "deid_waiver")
+            for key in (
+                "source_id",
+                "source_detail",
+                "license",
+                "data_class",
+                "deid_waiver",
+                "deid_waiver_manifest",
+            )
         },
         "stats": {"path": STATS_FILE, "sha256": files[STATS_FILE], "files": len(stats_inputs)},
         "counts": {
@@ -748,6 +802,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--release-id", help="the ReleaseManifest these episodes belong to")
     parser.add_argument("--run-plan-id", help="RunPlan of the job (default g0-DA-18-<date>)")
     parser.add_argument("--store", type=Path, help="ledger store root (default $FW_ROOT)")
+    parser.add_argument(
+        "--waiver-pin", type=Path, default=WAIVER_PIN, help="D2 pin (default DA-04's)"
+    )
     args = parser.parse_args(argv)
     try:
         result = export_stage1(
@@ -757,6 +814,7 @@ def main(argv: list[str] | None = None) -> int:
             release_id=args.release_id,
             run_plan_id=args.run_plan_id,
             store=args.store,
+            waiver_pin=args.waiver_pin,
         )
     except ExportRefused as error:
         print(error, file=sys.stderr)

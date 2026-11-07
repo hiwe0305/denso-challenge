@@ -20,7 +20,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from egodex_workdir import Spec, build, from_egodex
+from egodex_workdir import PIN, Spec, build, from_egodex
 from fake_loader import get_item, normalize_bounds_q99, scan
 from flywheel.data.export.egodex import STATS_FILE, export_stage1
 from loader_batch import compare, draw, record
@@ -38,7 +38,7 @@ PSI0_ROOT = os.environ.get("PSI0_ROOT")
 
 def golden_export(root: Path) -> Path:
     work = build(root / "work", GOLDEN_SPECS, seed=18)
-    export_stage1(work, root / "out", store=root / "store")
+    export_stage1(work, root / "out", store=root / "store", waiver_pin=work / PIN)
     return root / "out"
 
 
@@ -105,7 +105,7 @@ def test_psi0s_loader_draws_the_saved_batch(tmp_path: Path) -> None:
 def test_psi0s_loader_and_the_fake_agree_on_real_egodex(tmp_path: Path) -> None:
     probe = Path(os.environ["EGODEX_PROBE"])
     work = from_egodex(tmp_path / "work", sorted(probe.glob("*/*.hdf5")))
-    export_stage1(work, tmp_path / "out", store=tmp_path / "store")
+    export_stage1(work, tmp_path / "out", store=tmp_path / "store", waiver_pin=work / PIN)
     real = psi0_batch(tmp_path / "out", tmp_path)
     assert len(real) == 2 * len(list(probe.glob("*/*.hdf5")))
     assert compare(real, fake_batch(tmp_path / "out")) == []

@@ -15,7 +15,7 @@ from pathlib import Path
 import h5py  # type: ignore[import-untyped]
 import numpy as np
 import pytest
-from egodex_workdir import INTRINSIC, Spec, build, episode_record
+from egodex_workdir import INTRINSIC, PIN, Spec, build, episode_record
 from fake_loader import get_item, scan
 from flywheel.contracts.artifacts import Episode, QAReport
 from flywheel.data.api import ReleaseRefused, build_release, load_layout
@@ -34,6 +34,7 @@ EA = [
 
 
 def export(work: Path, out: Path, **kwargs: object) -> dict:  # type: ignore[type-arg]
+    kwargs.setdefault("waiver_pin", work / PIN)
     export_stage1(work, out, store=out.parent / "store", **kwargs)  # type: ignore[arg-type]
     return json.loads((out / META_FILE).read_text())
 

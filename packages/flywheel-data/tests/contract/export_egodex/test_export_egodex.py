@@ -12,7 +12,7 @@ from pathlib import Path
 import h5py  # type: ignore[import-untyped]
 import numpy as np
 import pytest
-from egodex_workdir import INTRINSIC, Spec, build, grey, write_video
+from egodex_workdir import INTRINSIC, PIN, Spec, build, grey, write_pin, write_video
 from fake_loader import scan
 from flywheel.data.export.egodex import (
     CAMERA,
@@ -43,6 +43,7 @@ def work(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 
 def export(work: Path, out: Path, **kwargs: object) -> dict:  # type: ignore[type-arg]
+    kwargs.setdefault("waiver_pin", work / PIN)
     export_stage1(work, out, store=out.parent / "store", **kwargs)  # type: ignore[arg-type]
     return json.loads((out / META_FILE).read_text())
 
@@ -320,6 +321,9 @@ def test_frames_without_a_recorded_confidence_are_reported_not_averaged(tmp_path
     assert missing == {"mean": None, "min": None, "recorded": 0.0}
 
 
+EPS = ("ep_a", "ep_b")
+
+
 def set_bundle(work: Path, episode_id: str, **fields: object) -> dict:  # type: ignore[type-arg]
     path = work / "egocentric" / episode_id / "bundle.json"
     bundle = json.loads(path.read_text()) | fields
@@ -350,7 +354,7 @@ def test_a_bundle_not_at_30_fps_is_refused(tmp_path: Path, fps: float) -> None:
 
 
 def test_a_video_not_at_30_fps_is_refused_whatever_the_bundle_says(tmp_path: Path) -> None:
-    work = build(tmp_path / "work", [Spec("ep_a", 10, [(0, 10)])])
+    work = build(tmp_path / "work", [Spec("ep_a", 10, [(0, 10)], deid_status="blurred")])
     bundle = set_bundle(work, "ep_a")
     write_video(Path(bundle["mp4"]), 10, fps=60)
     with pytest.raises(ExportRefused, match="ep_a: 0.mp4 says 60 fps; .*resample"):
@@ -364,7 +368,7 @@ def test_ntsc_29_97_fps_is_30_fps(tmp_path: Path) -> None:
 
 
 def test_a_refused_export_leaves_nothing(tmp_path: Path) -> None:
-    work = build(tmp_path / "work", [Spec("ep_a", 10, [(0, 10)]), Spec("ep_b", 10, [(0, 10)])])
+    work = build(tmp_path / "work", [Spec(e, 10, [(0, 10)], deid_status="blurred") for e in EPS])
     write_video(Path(set_bundle(work, "ep_b")["mp4"]), 6)  # ep_a written, then ep_b fails
     with pytest.raises(ExportRefused, match="ended at frame 6"):
         export(work, tmp_path / "out")
@@ -374,7 +378,7 @@ def test_a_refused_export_leaves_nothing(tmp_path: Path) -> None:
 
 
 def test_a_refused_export_into_a_symlink_empties_its_target(tmp_path: Path) -> None:
-    work = build(tmp_path / "work", [Spec("ep_a", 10, [(0, 10)]), Spec("ep_b", 10, [(0, 10)])])
+    work = build(tmp_path / "work", [Spec(e, 10, [(0, 10)], deid_status="blurred") for e in EPS])
     write_video(Path(set_bundle(work, "ep_b")["mp4"]), 6)
     target = tmp_path / "target"
     target.mkdir()
@@ -404,3 +408,61 @@ def test_a_non_finite_camera_drops_its_segment_not_the_export(tmp_path: Path) ->
             "reason": "not finite: camera in 1 of 5 frames",
         }
     ]
+
+
+# --- the D2 waiver, checked against the pin --------------------------------------------
+
+
+def waived(tmp_path: Path) -> Path:
+    return build(tmp_path / "work", [Spec("ep_a", 10, [(0, 10)]), Spec("ep_b", 10, [(0, 10)])])
+
+
+def test_a_raw_episode_is_waived_only_with_the_pin_named_in_source_json(tmp_path: Path) -> None:
+    work = waived(tmp_path)
+    meta = export(work, tmp_path / "out")
+    pin_id = meta["source"]["deid_waiver_manifest"]
+    assert pin_id.startswith("test-pin@") and len(meta["samples"]) == 2
+    source = json.loads((work / "source.json").read_text()) | {"deid_waiver_manifest": None}
+    (work / "source.json").write_text(json.dumps(source))
+    with pytest.raises(ExportRefused, match="ep_a: deid_status raw and the source has no EgoDex"):
+        export(work, tmp_path / "out2")
+
+
+def test_a_pin_other_than_the_one_named_is_refused(tmp_path: Path) -> None:
+    work = waived(tmp_path)
+    pin = json.loads((work / PIN).read_text())
+    other = write_pin(tmp_path, {k: work / "raw" / k for k in pin["files"]}, name="other-pin")
+    with pytest.raises(
+        ExportRefused, match=f"deid_waiver_manifest test-pin@.* is not the pin {other}"
+    ):
+        export(work, tmp_path / "out", waiver_pin=tmp_path / PIN)
+    with pytest.raises(ExportRefused, match="the D2 pin .*missing.json is not there"):
+        export(work, tmp_path / "out", waiver_pin=tmp_path / "missing.json")
+
+
+def test_a_video_changed_or_not_pinned_is_not_waived(tmp_path: Path) -> None:
+    # the labels say egodex and public, but the waiver rests on the video's sha256
+    work = waived(tmp_path)
+    write_video(Path(set_bundle(work, "ep_b")["mp4"]), 9)
+    with pytest.raises(ExportRefused) as refused:
+        export(work, tmp_path / "out")
+    assert refused.value.problems == [
+        f"ep_b: pick_place_cup/1.mp4 sha256 differs from the D2 pin {pin_id(work)}"
+    ]
+    source = json.loads((work / "source.json").read_text())
+    source["deid_waiver_manifest"] = write_pin(
+        work, {"pick_place_cup/0.mp4": work / "raw/pick_place_cup/0.mp4"}
+    )
+    (work / "source.json").write_text(json.dumps(source))
+    with pytest.raises(ExportRefused, match="ep_b: pick_place_cup/1.mp4 is not in the D2 pin"):
+        export(work, tmp_path / "out")
+
+
+def test_internal_data_is_never_waived(tmp_path: Path) -> None:
+    spec = Spec("ep_a", 10, [(0, 10)], episode={"data_class": "internal"})
+    with pytest.raises(ExportRefused, match="data_class internal is never waived"):
+        export(build(tmp_path / "work", [spec]), tmp_path / "out")
+
+
+def pin_id(work: Path) -> str:
+    return str(json.loads((work / "source.json").read_text())["deid_waiver_manifest"])
