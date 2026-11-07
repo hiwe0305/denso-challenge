@@ -21,3 +21,17 @@ def test_the_vision_pass_adds_text_facts_without_numbers(tmp_path: Path) -> None
     assert kept == 1
     assert analysis.book.facts[0].source_ref == "frames/0.png"
     assert "states numbers" in analysis.notes[0]
+
+
+def test_an_image_in_a_forbidden_dir_is_refused(tmp_path: Path) -> None:
+    import pytest
+    from flywheel.eval.agentqa.inputs import InputRefused
+
+    image = tmp_path / "vault" / "frame.png"
+    image.parent.mkdir()
+    image.write_bytes(b"\x89PNG\r\n\x1a\nfake")
+    link = tmp_path / "frame.png"
+    link.symlink_to(image)
+    for path in (image, link):
+        with pytest.raises(InputRefused, match="vault"):
+            image_message(path)

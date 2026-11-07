@@ -47,7 +47,7 @@ from flywheel.eval.agentqa.endpoint import ChatModel
 from flywheel.eval.agentqa.estimates import record_estimates
 from flywheel.eval.agentqa.facts import Analysis
 from flywheel.eval.agentqa.html import render_index, render_report
-from flywheel.eval.agentqa.inputs import InputSet, Loaded, collect
+from flywheel.eval.agentqa.inputs import InputSet, Loaded, collect, refuse_forbidden
 from flywheel.eval.agentqa.vision import observe
 from flywheel.eval.api import DEFAULT_SYSTEM_CONFIG, DEFAULT_TRAIN_CONFIG
 from flywheel.store.ledger_append import append_ledger_entry
@@ -154,6 +154,8 @@ def run(
     if out.exists():
         raise FileExistsError(f"{out} exists: each run writes a new directory")
     found = collect(paths)
+    for image in images:
+        refuse_forbidden(image)  # before any model call or ledger row
     offline = OfflineThresholds(**(config.raw.get("offline") or {}))
     analyses = subjects(found, offline, train_config, system_config)
     ledger = StorePaths(store)
