@@ -33,6 +33,7 @@ from flywheel.data.ingest.egocentric.egodex import (
     tip_joint,
     wrist_joint,
 )
+from flywheel.data.ingest.egocentric.files import replacing
 from numpy.typing import NDArray
 
 SIDES = ("left", "right")
@@ -99,9 +100,9 @@ def read_egodex_pose(path: Path) -> EgoPose:
 def save_pose(pose: EgoPose, path: Path, intrinsic: NDArray[np.floating[Any]]) -> None:
     if intrinsic.shape != (3, 3):
         raise ValueError(f"intrinsic has shape {intrinsic.shape}, expected (3, 3)")
-    path.parent.mkdir(parents=True, exist_ok=True)
     arrays: dict[str, Any] = {f.name: getattr(pose, f.name) for f in fields(EgoPose)}
-    np.savez(path, **arrays, intrinsic=intrinsic.astype(np.float32))
+    with replacing(path) as temporary, temporary.open("wb") as f:  # a file: no .npz added
+        np.savez(f, **arrays, intrinsic=intrinsic.astype(np.float32))
 
 
 def load_pose(path: Path) -> EgoPose:

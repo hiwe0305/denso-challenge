@@ -140,9 +140,13 @@ def estimate_jobs(work: Path, source: EgoSourceRecord) -> list[dict[str, object]
 
 def import_estimates(work: Path, estimates: Path) -> dict[str, dict[str, object]]:
     """E-A: pose_ea.npz from each job output; pose.npz too when there is no tracking;
-    compare.json where E-B exists. Returns the deviations by episode."""
+    compare.json where E-B exists. Returns the deviations by episode.
+
+    Every estimate is read and compared before any file is written, so a bad one leaves
+    the work dir as it was."""
     deviations = {}
     source = read_source(work)
+    done = []
     for episode in read_episodes(work):
         raw = estimates / f"{episode.episode_id}.npz"
         if not raw.is_file():
@@ -152,15 +156,19 @@ def import_estimates(work: Path, estimates: Path) -> dict[str, dict[str, object]
         folder = bundle_dir(work, episode.episode_id)
         estimate = read_estimate(raw)
         pose = to_pose(estimate)
+        deviation = None
+        if bundle.hdf5 is not None:
+            deviation = compare(load_pose(folder / POSE), estimate, _intrinsic(bundle),
+                                bundle.image_size).to_dict()
+            deviation["meta"] = estimate.meta
+            deviations[episode.episode_id] = deviation
+        done.append((bundle, folder, pose, deviation))
+    for bundle, folder, pose, deviation in done:
         save_pose(pose, folder / POSE_EA, _intrinsic(bundle))
-        if bundle.hdf5 is None:
+        if deviation is None:
             save_pose(pose, folder / POSE, _intrinsic(bundle))
-            continue
-        deviation = compare(load_pose(folder / POSE), estimate, _intrinsic(bundle),
-                            bundle.image_size).to_dict()
-        deviation["meta"] = estimate.meta
-        (folder / COMPARE).write_text(json.dumps(deviation, indent=2) + "\n")
-        deviations[episode.episode_id] = deviation
+        else:
+            write_text(folder / COMPARE, json.dumps(deviation, indent=2) + "\n")
     return deviations
 
 
