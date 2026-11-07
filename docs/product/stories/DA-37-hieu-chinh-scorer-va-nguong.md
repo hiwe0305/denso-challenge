@@ -34,7 +34,7 @@ Là kỹ sư đánh giá, tôi muốn đối chiếu scorer với cờ thành c�
 - [ ] 4. Tính τ_sync và ghi τ_lat của G0, kèm số mẫu (AC 4)
 - [ ] 5. Ghi giá trị vào `system.yaml` và RunPlan, bỏ `null` (AC 5)
 - [ ] 6. Test chạy lại cho kết quả trùng trên bộ episode nhỏ (AC 6)
-  - [ ] 6.1 Báo cáo đối chiếu: cùng bộ episode và cùng cấu hình cho cùng báo cáo, cùng hash, cùng blob
+  - [x] 6.1 Báo cáo đối chiếu: cùng bộ episode và cùng cấu hình cho cùng báo cáo, cùng hash, cùng blob
   - [ ] 6.2 τ: cùng bộ episode teleop cho cùng τ_track, τ_sync (sau nhiệm vụ 3, 4)
 
 ## Phạm vi file
