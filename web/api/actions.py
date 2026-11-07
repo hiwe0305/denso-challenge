@@ -89,6 +89,11 @@ class ActionStore:
             "applied_at": row.get("applied_at"),
         }
 
+    def by_key(self, key: str) -> Row | None:
+        """The action already recorded under an Idempotency-Key, in the shape of `status`."""
+        row = next((r for r in self._state().values() if r.get("idempotency_key") == key), None)
+        return self._view(row) if row else None
+
     def status(self, action_id: str) -> Row | None:
         row = self._state().get(action_id)
         return self._view(row) if row else None

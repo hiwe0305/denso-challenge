@@ -37,6 +37,7 @@ import type {
 } from "../api/types";
 import { EmptyState, ErrorBox, HashBadge, Loading, MockBadge, Panel } from "../ui/components";
 import { fmt, fmtTime } from "../ui/labels";
+import { DraftPanel } from "./DraftPanel";
 
 const SPLIT_COLOR = { train: "#2a78d6", val: "#eb6834" } as const;
 const SPLIT_LABEL = { train: "train", val: "val" } as const;
@@ -320,7 +321,7 @@ export function Training() {
     <div className="space-y-4">
       <header className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold">Huấn luyện</h1>
-        <span className="text-xs text-slate-500">{items.length} thí nghiệm · form bản nháp chờ mốc sau (§7.2 POST /experiment-drafts)</span>
+        <span className="text-xs text-slate-500">{items.length} thí nghiệm · bản nháp mới ở cuối trang</span>
       </header>
       <Panel title="Thí nghiệm">
         <div className="overflow-x-auto">
@@ -349,6 +350,7 @@ export function Training() {
         </div>
       </Panel>
       <ExperimentDetail key={current.experiment_id} x={current} />
+      <DraftPanel />
     </div>
   );
 }

@@ -7,12 +7,16 @@ import type {
   ActionAccepted,
   ActionStatusRow,
   ApiError,
+  ExperimentDraft,
   Page,
   SyncRunRow,
 } from "../api/types";
 import {
   clusterDiagnosis,
   interventionDecision,
+  method,
+  taskId,
+  type TaskId,
   syncStatus,
   userRole,
   type UserRole,
@@ -21,6 +25,27 @@ import { loadMockData } from "./data";
 import { MockViews } from "./views";
 
 const url = (path: string) => `${API_BASE}${path}`;
+
+const DRAFT_FIELDS = ["task_id", "branch", "method", "hypothesis", "base_checkpoint_ref", "run_plan_ref", "hyperparams", "release_mix"];
+
+/** Shape check of a draft body, as `check_body` in web/api/drafts.py; domain rules wait for submit. */
+function checkDraft(body: Record<string, unknown>, partial: boolean): string | null {
+  const unknown = Object.keys(body).filter((k) => !DRAFT_FIELDS.includes(k)).sort();
+  if (unknown.length) return `trường không sửa được: ${JSON.stringify(unknown)}`;
+  if (!partial) {
+    const missing = ["task_id", "branch", "method", "base_checkpoint_ref"].filter((k) => !body[k]);
+    if (missing.length) return `thiếu ${JSON.stringify(missing)}`;
+  }
+  if ("task_id" in body && !(taskId as readonly unknown[]).includes(body.task_id)) return `task_id ${String(body.task_id)} không có`;
+  if ("method" in body && !(method as readonly unknown[]).includes(body.method)) return `method ${String(body.method)} không có`;
+  if ("release_mix" in body) {
+    const mix = body.release_mix;
+    const ok = Array.isArray(mix) && mix.every((m: { release_id?: unknown; mix_weight?: unknown }) =>
+      typeof m?.release_id === "string" && typeof m?.mix_weight === "number" && m.mix_weight > 0 && m.mix_weight <= 1);
+    if (!ok) return "release_mix là [{release_id, mix_weight ∈ (0, 1]}]";
+  }
+  return null;
+}
 
 function error(status: number, code: string, message: string, hint: string | null = null) {
   const body: ApiError = { code, message, hint, ref: null };
@@ -84,6 +109,11 @@ class ActionStore {
     return this.rows.get(id) ?? null;
   }
 
+  findByKey(key: string) {
+    const id = this.byKey.get(key);
+    return id ? (this.rows.get(id) ?? null) : null;
+  }
+
   /** Newest first, like the API. */
   list(syncStatus: string | null) {
     const rows = [...this.rows.values()].reverse();
@@ -123,6 +153,7 @@ interface DecisionItem {
 
 export function createHandlers(views = new MockViews(loadMockData())) {
   const actions = new ActionStore();
+  const drafts: ExperimentDraft[] = [];
 
   const accepted = (row: ActionStatusRow) =>
     HttpResponse.json<ActionAccepted>(
@@ -158,7 +189,50 @@ export function createHandlers(views = new MockViews(loadMockData())) {
 
     // M5
     http.get(url("/experiments"), ({ request }) => HttpResponse.json(page(views.experiments(), request))),
-    http.get(url("/experiment-drafts"), ({ request }) => HttpResponse.json(page([], request))),
+    http.get(url("/experiment-drafts"), ({ request }) => HttpResponse.json(page([...drafts].reverse(), request))),
+    http.post(url("/experiment-drafts"), async ({ request }) => {
+      const body = (await request.json()) as Record<string, unknown>;
+      const bad = checkDraft(body, false);
+      if (bad) return error(422, "BAD_DRAFT", bad);
+      const now = new Date().toISOString();
+      const row: ExperimentDraft = {
+        id: `drf_${String(drafts.length + 1).padStart(4, "0")}`, task_id: body.task_id as TaskId,
+        branch: String(body.branch), method: String(body.method), hypothesis: (body.hypothesis as string) ?? null,
+        base_checkpoint_ref: String(body.base_checkpoint_ref), run_plan_ref: (body.run_plan_ref as string) ?? null,
+        hyperparams: (body.hyperparams as Record<string, unknown>) ?? {},
+        release_mix: (body.release_mix as ExperimentDraft["release_mix"]) ?? [],
+        status: "DRAFT", submit_action_id: null, experiment_id: null, reject_reason: null,
+        created_by: roleOf(request), created_at: now, updated_at: now,
+      };
+      drafts.push(row);
+      return HttpResponse.json(row, { status: 201 });
+    }),
+    http.patch(url("/experiment-drafts/:id"), async ({ params, request }) => {
+      const row = drafts.find((d) => d.id === params.id);
+      if (!row) return notFound("bản nháp");
+      const body = (await request.json()) as Record<string, unknown>;
+      const bad = checkDraft(body, true);
+      if (bad) return error(422, "BAD_DRAFT", bad);
+      if (row.status !== "DRAFT") return error(409, "ALREADY_SUBMITTED", "bản nháp đã nộp; không sửa được nữa");
+      Object.assign(row, body, { updated_at: new Date().toISOString() });
+      return HttpResponse.json(row);
+    }),
+    http.post(url("/experiment-drafts/:id/submit"), ({ params, request }) => {
+      const key = request.headers.get("idempotency-key");
+      if (!key) return error(400, "IDEMPOTENCY_KEY_REQUIRED", "thiếu header Idempotency-Key (§7.3)");
+      const row = drafts.find((d) => d.id === params.id);
+      if (!row) return notFound("bản nháp");
+      if (row.status !== "DRAFT") {
+        const previous = actions.findByKey(key);
+        if (previous && previous.action_id === row.submit_action_id) return accepted(previous);
+        return error(409, "ALREADY_SUBMITTED", "bản nháp đã nộp");
+      }
+      const problems = views.submitProblems(row);
+      if (problems.length) return error(422, "BR-01", problems.join("; "), "sửa bản nháp rồi nộp lại");
+      const action = actions.record(key, "EXPERIMENT_SUBMIT", "experiment_drafts", row.id, null);
+      Object.assign(row, { status: "SUBMITTED", submit_action_id: action.action_id, updated_at: new Date().toISOString() });
+      return accepted(action);
+    }),
     http.get(url("/experiments/:id/metrics"), ({ params, request }) => {
       const q = new URL(request.url).searchParams;
       const split = q.get("split");

@@ -9,6 +9,7 @@ import type {
   DecisionRow,
   DefectScoreboard,
   ReleaseItemRow,
+  ExperimentDraft,
   ReleaseRow,
   CheckpointRow,
   ExperimentRow,
@@ -94,6 +95,7 @@ export const useReleaseItems = (id: string | null) =>
   useGet<Page<ReleaseItemRow>>(id ? `/releases/${id}/items?limit=500` : null);
 
 // ---------------------------------------------------------------- M5
+export const useDrafts = () => useGet<Page<ExperimentDraft>>("/experiment-drafts?limit=500");
 export const useExperiments = () => useGet<Page<ExperimentRow>>("/experiments?limit=500");
 export const useMetrics = (id: string | null) =>
   useGet<TrainingMetricRow[]>(id ? `/experiments/${id}/metrics` : null);

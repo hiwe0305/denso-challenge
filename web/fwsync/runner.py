@@ -33,7 +33,7 @@ from web.fwsync.mapping import (
     map_train_diagnosis,
     map_training_metric,
 )
-from web.fwsync.sink import JsonlSink, Sink
+from web.fwsync.sink import NATURAL_KEY, JsonlSink, Sink
 from web.fwsync.source import TOLERANT_TABLES, Record, SourceScan, scan, tolerant_row
 
 #: Thứ tự nạp theo khoá ngoại. Bảng không có trong danh sách được nạp sau
@@ -433,6 +433,11 @@ def _map(
                 f"cột được nhận trong TOLERANT_COLUMNS"
             )
         row, unknown = tolerant_row(record.payload, allowed, record.where)
+        key = NATURAL_KEY.get(table, ())
+        if key and all(row.get(column) in (None, "") for column in key):
+            # Không cột khoá nào: dòng không tra lại được, nạp lần hai sẽ thành
+            # dòng thứ hai, và Postgres sẽ chết ở NOT NULL. Từ chối ở đây.
+            raise MappingError(f"{record.where}: thiếu khoá tự nhiên {list(key)} của `{table}`")
         if unknown:
             row["__unknown__"] = unknown
         return [(table, row)]
@@ -567,8 +572,11 @@ FAKE_CORE_REPLIES: dict[str, str] = {
     "HOLDOUT_UNSEAL": "decisions",
     "STAGE_REVIEW": "decisions",
     "RELEASE_FREEZE_REQUEST": "decisions",
-    "EXPERIMENT_SUBMIT": "experiments",
-    "INTAKE_SUBMIT": "datasets",
+    # Lõi giả không dựng được một thí nghiệm hay một lô thật: trả lời bằng một
+    # quyết định. Trước đây nó ghi câu trả lời dạng quyết định vào thư mục
+    # `experiments`/`datasets`, và bộ nạp chèn một dòng không có khoá nào.
+    "EXPERIMENT_SUBMIT": "decisions",
+    "INTAKE_SUBMIT": "decisions",
 }
 
 

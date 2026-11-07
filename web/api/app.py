@@ -20,10 +20,12 @@ from typing import Any
 
 from fastapi import APIRouter, FastAPI, Header, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from web.api.actions import ActionStore
+from web.api.drafts import DraftError, DraftStore
 from web.api.readmodel import ReadModel
+from web.api.stream import change_events, signature
 from web.contracts.enums import ALL
 from web.fwsync import actions as action_log
 from web.fwsync.runner import run_cycle
@@ -106,6 +108,7 @@ def create_app(
                 "ref": None}
         return JSONResponse(body, status_code=422)
 
+    drafts = DraftStore(actions.directory)
     r = APIRouter(prefix=API_PREFIX)
     Role = Header(default=None, alias="X-Fw-Role")
     Key = Header(default=None, alias="Idempotency-Key")
@@ -257,7 +260,45 @@ def create_app(
 
     @r.get("/experiment-drafts")
     def experiment_drafts(cursor: str | None = None, limit: int | None = None) -> Any:
-        return _page(model.experiment_drafts(), cursor, limit)
+        return _page(drafts.list(), cursor, limit)
+
+    @r.post("/experiment-drafts", status_code=201)
+    def create_draft(body: dict[str, Any], x_fw_role: str | None = Role) -> Any:
+        try:
+            return drafts.create(body, _role(x_fw_role))
+        except DraftError as error:
+            raise ApiError(422, error.code, str(error)) from error
+
+    @r.patch("/experiment-drafts/{draft_id}")
+    def patch_draft(draft_id: str, body: dict[str, Any]) -> Any:
+        try:
+            return _found(drafts.patch(draft_id, body), "bản nháp")
+        except DraftError as error:
+            raise ApiError(409 if error.code == "ALREADY_SUBMITTED" else 422, error.code,
+                           str(error)) from error
+
+    @r.post("/experiment-drafts/{draft_id}/submit", status_code=202)
+    def submit_draft(draft_id: str, idempotency_key: str | None = Key) -> Any:
+        key = _require_key(idempotency_key)
+        draft = _found(drafts.get(draft_id), "bản nháp")
+        if draft["status"] != "DRAFT":
+            # C16: the same click retried gets its action back; another click is a 409.
+            previous = actions.by_key(key)
+            if previous and previous["action_id"] == draft["submit_action_id"]:
+                return {"action_id": previous["action_id"],
+                        "sync_status": previous["sync_status"]}
+            raise ApiError(409, "ALREADY_SUBMITTED", "bản nháp đã nộp")
+        problems = model.submit_problems(draft)
+        if problems:
+            raise ApiError(422, "BR-01", "; ".join(problems),
+                           "sửa bản nháp rồi nộp lại")
+        payload = {k: draft[k] for k in ("task_id", "branch", "method", "hypothesis",
+                                         "base_checkpoint_ref", "run_plan_ref",
+                                         "hyperparams", "release_mix")}
+        row = actions.record(key, "EXPERIMENT_SUBMIT", "experiment_drafts", draft_id,
+                             {"draft": payload}, None)
+        drafts.mark_submitted(draft_id, row["id"])
+        return {"action_id": row["id"], "sync_status": row["sync_status"]}
 
     @r.get("/experiments/{exp_id}/metrics")
     def metrics(exp_id: str, split: str | None = None, every: int | None = None) -> Any:
@@ -303,6 +344,21 @@ def create_app(
     @r.get("/decisions")
     def decisions(cursor: str | None = None, limit: int | None = None) -> Any:
         return _page(model.decisions(), cursor, limit)
+
+    @r.get("/notifications/stream")
+    def notifications_stream() -> StreamingResponse:
+        """SSE `fw_changed` whenever the sink or the API's state changes (§6.4)."""
+        watched = [actions.directory]
+        directory = getattr(getattr(model, "t", None), "directory", None)
+        if isinstance(directory, Path):
+            watched.append(directory)
+        if sync is not None:
+            watched.append(sync.sink)
+        return StreamingResponse(
+            change_events(lambda: signature(watched), model.refresh),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     @r.get("/sync/runs")
     def sync_runs() -> Any:

@@ -62,6 +62,8 @@ import type {
   SystemCheckRow,
 } from "../api/types";
 import {
+  branchTray,
+  branchTwoTable,
   dataBudgetDiagnosis,
   pipelineStage,
   type ClusterDiagnosis,
@@ -234,6 +236,31 @@ export class MockViews {
       sample_weight: i.sample_weight, excluded: i.excluded, exclude_reason: i.exclude_reason ?? null,
       qa_decision: qa.get(i.episode_ref)?.decision ?? null, origin: ORIGIN,
     }));
+  }
+
+  /** BR-01 / C7 on a draft about to be submitted; mirrors `submit_problems` of the read model. */
+  submitProblems(draft: { task_id: string; branch: string; base_checkpoint_ref: string;
+    release_mix: Array<{ release_id: string }> }): string[] {
+    const problems: string[] = [];
+    const branches: readonly string[] = draft.task_id === "two_table" ? branchTwoTable
+      : draft.task_id === "tray" ? branchTray : [];
+    if (!branches.includes(draft.branch)) problems.push(`nhánh ${draft.branch} không thuộc task ${draft.task_id}`);
+    if (!draft.release_mix.length) problems.push("chưa chọn release nào");
+    const episodes = new Map(this.d.episodes.map((e) => [e.episode_id, e]));
+    const datasetOf = this.datasetOfEpisode();
+    const seeded = new Set(this.d.datasets.filter((d) => d.has_seeded_faults).map((d) => d.dataset_code));
+    for (const m of draft.release_mix) {
+      const release = this.d.releases.find((r) => r.release_ref === m.release_id);
+      if (!release) { problems.push(`release ${m.release_id} không tồn tại`); continue; }
+      if (release.status !== "frozen") problems.push(`release ${m.release_id} chưa đóng băng`);
+      const kept = this.d.releaseItems.filter((i) => i.release_ref === m.release_id && !i.excluded).map((i) => i.episode_ref);
+      if (kept.some((r) => episodes.get(r)?.meta.benchmark_copy_id)) problems.push(`release ${m.release_id} chứa episode của bản sao chấm`);
+      if (kept.some((r) => seeded.has(datasetOf.get(r) ?? ""))) problems.push(`release ${m.release_id} chứa episode của lô có lỗi cấy`);
+    }
+    const base = this.d.sources.find((s) => s.source_ref === draft.base_checkpoint_ref);
+    if (!base) problems.push(`checkpoint gốc ${draft.base_checkpoint_ref} không có trong sources`);
+    else if (String(base.clean_for_main_task).toLowerCase() === "false") problems.push(`checkpoint gốc ${base.source_ref} không sạch cho task chính`);
+    return problems;
   }
 
   // ============================================================== M5

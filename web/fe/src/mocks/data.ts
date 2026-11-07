@@ -449,6 +449,12 @@ export interface RawBenchResult {
   result_sha256: string;
 }
 
+export interface RawSource {
+  source_ref: string;
+  kind: string;
+  clean_for_main_task: string | null;
+}
+
 export interface MockData {
   recommendation: RawRecommendation;
   clusters: RawCluster[];
@@ -468,6 +474,7 @@ export interface MockData {
   qaReports: RawQaReport[];
   releaseItems: RawReleaseItem[];
   releases: RawRelease[];
+  sources: RawSource[];
   ledger: RawLedger[];
   priceBooks: RawPriceBook[];
   trainDiagnoses: RawTrainDiagnosis[];
@@ -498,6 +505,7 @@ export function loadMockData(): MockData {
     qaReports: table("qa_reports"),
     releaseItems: table("release_items"),
     releases: table("releases"),
+    sources: table("sources"),
     ledger: table("ledger"),
     priceBooks: table("price_books"),
     trainDiagnoses: table("train_diagnoses"),

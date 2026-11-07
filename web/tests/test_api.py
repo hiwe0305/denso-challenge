@@ -95,7 +95,7 @@ def test_parity_covers_every_read_endpoint_of_7_1(client: TestClient) -> None:
     """A read route nobody compares is a route that can drift; list them all."""
     paths = client.get("/openapi.json").json()["paths"]
     routes = {path for path, ops in paths.items() if "get" in ops and path.startswith("/api")}
-    assert len(routes) == 40
+    assert len(routes) == 41
     covered = set()
     for line in PARITY_CASES:
         path = line.split(" ", 1)[1].split("?")[0]
@@ -107,7 +107,8 @@ def test_parity_covers_every_read_endpoint_of_7_1(client: TestClient) -> None:
             ):
                 covered.add(route)
     # /actions/{id} is covered by the write tests below; it has no fixed id to record.
-    assert routes - covered == {"/api/actions/{action_id}"}
+    # The SSE stream never ends, so it has no body to record; test_stream covers it.
+    assert routes - covered == {"/api/actions/{action_id}", "/api/notifications/stream"}
 
 
 # ---------------------------------------------------------------- §7.3 and rules
@@ -331,3 +332,73 @@ def test_a_clean_draft_becomes_one_freeze_action_the_fake_core_answers(
     actions = [json.loads(line) for line in store.read_text(encoding="utf-8").splitlines()]
     assert run_export(actions, tmp_path / "outbox").status == "ok"
     assert run_fake_core(tmp_path / "outbox", tmp_path / "inbox").status == "ok"
+
+
+# ---------------------------------------------------------------- M5 drafts
+
+DRAFT = {"task_id": "two_table", "branch": "B_PLUS", "method": "PSI0", "hypothesis": "HT",
+         "base_checkpoint_ref": "src_psi0_ckpt", "hyperparams": {"lr": 1e-4, "steps": 2000},
+         "release_mix": [{"release_id": "rel_two_table_v1", "mix_weight": 1.0}]}
+
+
+def test_a_draft_is_saved_edited_and_submitted_once(client: TestClient) -> None:
+    created = client.post("/api/experiment-drafts", json=DRAFT)
+    assert created.status_code == 201 and created.json()["status"] == "DRAFT"
+    draft_id = created.json()["id"]
+    patched = client.patch(f"/api/experiment-drafts/{draft_id}", json={"hypothesis": "HTb"})
+    assert patched.json()["hypothesis"] == "HTb"
+    first = client.post(f"/api/experiment-drafts/{draft_id}/submit",
+                        headers={"Idempotency-Key": "sub-1"})
+    again = client.post(f"/api/experiment-drafts/{draft_id}/submit",
+                        headers={"Idempotency-Key": "sub-1"})
+    assert first.status_code == 202 and first.json() == again.json()  # C16
+    other = client.post(f"/api/experiment-drafts/{draft_id}/submit",
+                        headers={"Idempotency-Key": "sub-2"})
+    assert (other.status_code, other.json()["code"]) == (409, "ALREADY_SUBMITTED")
+    assert client.patch(f"/api/experiment-drafts/{draft_id}",
+                        json={"hypothesis": "x"}).status_code == 409
+    listed = client.get("/api/experiment-drafts").json()["items"]
+    assert listed[0]["status"] == "SUBMITTED" and listed[0]["submit_action_id"]
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"branch": "TRAY_A"}, "không thuộc task"),
+        ({"release_mix": []}, "chưa chọn release"),
+        ({"release_mix": [{"release_id": "rel_two_table_v2", "mix_weight": 1.0}]},
+         "chưa đóng băng"),
+        ({"release_mix": [{"release_id": "rel_nope", "mix_weight": 1.0}]}, "không tồn tại"),
+        ({"base_checkpoint_ref": "src_bench_kbd"}, "không sạch"),
+        ({"base_checkpoint_ref": "src_nope"}, "không có trong sources"),
+    ],
+)
+def test_submit_refuses_what_br01_forbids(client: TestClient, change: dict[str, Any],
+                                          message: str) -> None:
+    draft_id = client.post("/api/experiment-drafts", json={**DRAFT, **change}).json()["id"]
+    response = client.post(f"/api/experiment-drafts/{draft_id}/submit",
+                           headers={"Idempotency-Key": f"br01-{draft_id}"})
+    assert (response.status_code, response.json()["code"]) == (422, "BR-01")
+    assert message in response.json()["message"]
+
+
+def test_a_draft_body_with_bad_types_is_refused(client: TestClient) -> None:
+    for body in ({**DRAFT, "method": "GPT"}, {**DRAFT, "task_id": "x"},
+                 {"task_id": "two_table"}, {**DRAFT, "owner": "me"},
+                 {**DRAFT, "release_mix": [{"release_id": "r", "mix_weight": 2}]}):
+        response = client.post("/api/experiment-drafts", json=body)
+        assert (response.status_code, response.json()["code"]) == (422, "BAD_DRAFT"), body
+
+
+def test_a_submitted_draft_goes_round_the_write_loop(sink: Path, tmp_path: Path) -> None:
+    client = make_client(sink, tmp_path / "state")
+    draft_id = client.post("/api/experiment-drafts", json=DRAFT).json()["id"]
+    action_id = client.post(f"/api/experiment-drafts/{draft_id}/submit",
+                            headers={"Idempotency-Key": "loop"}).json()["action_id"]
+    store = tmp_path / "state" / "human_actions.jsonl"
+    actions = [json.loads(line) for line in store.read_text(encoding="utf-8").splitlines()]
+    assert run_export(actions, tmp_path / "outbox").status == "ok"
+    assert run_fake_core(tmp_path / "outbox", tmp_path / "inbox").status == "ok"
+    artifact = json.loads(next((tmp_path / "outbox").glob("*.json")).read_text(encoding="utf-8"))
+    assert artifact["source_action_id"] == action_id
+    assert artifact["payload"]["draft"]["branch"] == "B_PLUS"

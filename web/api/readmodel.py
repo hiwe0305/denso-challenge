@@ -75,7 +75,7 @@ class ReadModel(Protocol):
     def release(self, release_id: str) -> Row | None: ...
     def release_items(self, release_id: str) -> list[Row] | None: ...
     def experiments(self) -> list[Row]: ...
-    def experiment_drafts(self) -> list[Row]: ...
+    def submit_problems(self, draft: Row) -> list[str]: ...
     def metrics(self, exp_id: str, split: str | None, every: int | None) -> list[Row] | None: ...
     def diagnoses(self, exp_id: str) -> Row | None: ...
     def probes(self, exp_id: str) -> list[Row] | None: ...
@@ -1302,9 +1302,45 @@ class SinkReadModel:
             })
         return out
 
-    def experiment_drafts(self) -> list[Row]:
-        # `experiment_drafts` is a W table written by the API; none exists yet in sink mode.
-        return []
+    def submit_problems(self, draft: Row) -> list[str]:
+        """BR-01 / C7 on a draft about to be submitted; empty means it may go.
+
+        The same checks the trigger runs when a draft turns SUBMITTED in
+        Postgres: a valid branch for the task, at least one release, every
+        release frozen with no benchmark-copy episode and no lot carrying seeded
+        faults, and a base checkpoint whose source is not marked unclean.
+        """
+        problems = []
+        branches = BRANCHES.get(draft.get("task_id") or "", ())
+        if draft.get("branch") not in branches:
+            problems.append(f"nhánh {draft.get('branch')} không thuộc task {draft.get('task_id')}")
+        mix = draft.get("release_mix") or []
+        if not mix:
+            problems.append("chưa chọn release nào")
+        episodes = {e["episode_ref"]: e for e in self.t("episodes")}
+        seeded = {d["dataset_code"] for d in self.t("datasets") if d.get("has_seeded_faults")}
+        for m in mix:
+            ref = m.get("release_id")
+            release = next((r for r in self.t("releases") if r["release_ref"] == ref), None)
+            if release is None:
+                problems.append(f"release {ref} không tồn tại")
+                continue
+            if release["status"] != "frozen":
+                problems.append(f"release {ref} chưa đóng băng")
+            kept = [episodes.get(i["episode_ref"]) or {} for i in self.t("release_items")
+                    if i["release_ref"] == ref and not i["excluded"]]
+            if any(e.get("benchmark_copy_id") for e in kept):
+                problems.append(f"release {ref} chứa episode của bản sao chấm")
+            if any(e.get("dataset_code") in seeded for e in kept):
+                problems.append(f"release {ref} chứa episode của lô có lỗi cấy")
+        base = next((s for s in self.t("sources")
+                     if s["source_ref"] == draft.get("base_checkpoint_ref")), None)
+        if base is None:
+            problems.append(
+                f"checkpoint gốc {draft.get('base_checkpoint_ref')} không có trong sources")
+        elif str(base.get("clean_for_main_task")).lower() == "false":
+            problems.append(f"checkpoint gốc {base['source_ref']} không sạch cho task chính")
+        return problems
 
     def metrics(self, exp_id: str, split: str | None, every: int | None) -> list[Row] | None:
         """`training_metrics` of one experiment; `every` keeps steps divisible by it."""
@@ -1404,6 +1440,8 @@ class SinkReadModel:
             for c in self.t("model_checkpoints") if c["experiment_code"] == exp_id
         ]
 
+
+BRANCHES = {"two_table": ALL["branch_two_table"], "tray": ALL["branch_tray"]}
 
 #: The split guard of M4 (DESIGN.md §1.1 row 7), in display order.
 SPLIT_GUARD_CHECKS = ("split", "benchmark_copy", "raw_egocentric", "qa_not_pass", "near_duplicate")
