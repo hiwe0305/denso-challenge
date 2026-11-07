@@ -17,7 +17,12 @@ from flywheel.contracts.entities import Score
 from flywheel.contracts.v0 import StepStatus
 from flywheel.eval.api import check_scorer_agreement, store_scorer_agreement
 from flywheel.eval.cli import app
-from flywheel.eval.scorer.agreement import AGREEMENT_BAR, AgreementReport, compare
+from flywheel.eval.scorer.agreement import (
+    AGREEMENT_BAR,
+    MIN_EPISODES,
+    AgreementReport,
+    compare,
+)
 from flywheel.eval.scorer.calibration import AGREEMENT_RECORDS, CalibrationInputError
 from flywheel.eval.scorer.status import ScorerError
 from flywheel.store.blobs import get_blob
@@ -87,16 +92,55 @@ def rollout_json(trace_id: str, sim: bool | None, infra: str = "ok") -> dict[str
     }
 
 
-def test_twenty_agreeing_episodes_pass_the_bar() -> None:
-    scores = [score(f"j1-{i}", i % 2 == 0, failed=None if i % 2 == 0 else 1) for i in range(20)]
-    rollouts = [rollout(f"j1-{i}", i % 2 == 0) for i in range(20)]
+def mixed_set(size: int, wrong: int) -> tuple[list[Score], list[RolloutResult]]:
+    """`size` episodes, half SIMPLE passes and half it fails; the scorer gets
+    the first `wrong` of them backwards."""
+    scores, rollouts = [], []
+    for i in range(size):
+        sim = i % 2 == 0
+        said = sim if i >= wrong else not sim
+        scores.append(score(f"j1-{i:03d}", said, failed=None if said else 1))
+        rollouts.append(rollout(f"j1-{i:03d}", sim))
+    return scores, rollouts
+
+
+def test_twenty_agreeing_episodes_give_a_rate_but_no_g1_verdict() -> None:
+    # AC 1 judges G1 on 100 episodes; a perfect rate on 20 is not a pass
+    # (review of #158, point 1).
+    report = compare(*mixed_set(20, 0), RELEASE)
+
+    assert (report.counted, report.agreed, report.agreement) == (20, 20, 1.0)
+    assert report.passed is None
+    assert report.unjudged == ["not_enough_episodes"]
+    assert (report.sim_successes, report.sim_failures) == (10, 10)
+    assert report.mismatches == []
+
+
+def test_a_hundred_episodes_without_a_sim_failure_are_not_judged() -> None:
+    scores = [score(f"j1-{i:03d}", True) for i in range(100)]
+    rollouts = [rollout(f"j1-{i:03d}", True) for i in range(100)]
 
     report = compare(scores, rollouts, RELEASE)
 
-    assert (report.counted, report.agreed, report.agreement) == (20, 20, 1.0)
-    assert report.passed is True
-    assert (report.sim_successes, report.sim_failures) == (10, 10)
-    assert report.mismatches == []
+    assert report.agreement == 1.0
+    assert report.passed is None
+    assert report.unjudged == ["no_sim_failure"]
+
+
+def test_a_hundred_episodes_without_a_sim_success_are_not_judged() -> None:
+    scores = [score(f"j1-{i:03d}", False, failed=0) for i in range(100)]
+    rollouts = [rollout(f"j1-{i:03d}", False) for i in range(100)]
+
+    report = compare(scores, rollouts, RELEASE)
+
+    assert report.passed is None
+    assert report.unjudged == ["no_sim_success"]
+
+
+def test_a_small_one_sided_set_names_every_reason() -> None:
+    report = compare([score("j1-a", True)], [rollout("j1-a", True)], RELEASE)
+
+    assert report.unjudged == ["not_enough_episodes", "no_sim_failure"]
 
 
 def test_every_mismatch_is_listed_with_its_reason() -> None:
@@ -119,7 +163,6 @@ def test_every_mismatch_is_listed_with_its_reason() -> None:
     assert by_episode["j1-c"].kind == "scorer_unknown"
     assert "`arrive` (missing_signal)" in by_episode["j1-c"].reason
     assert (report.agreed, report.counted) == (1, 4)
-    assert report.passed is False
 
 
 def test_an_unknown_scorer_verdict_is_never_agreement() -> None:
@@ -172,17 +215,35 @@ def test_nothing_countable_is_no_rate_rather_than_zero() -> None:
 
     assert report.agreement is None
     assert report.passed is None
+    assert report.unjudged == ["no_episodes"]
 
 
-def test_the_bar_is_95_percent() -> None:
-    nineteen = [score(f"j1-{i}", True) for i in range(19)] + [score("j1-x", False, failed=2)]
-    rollouts = [rollout(f"j1-{i}", True) for i in range(19)] + [rollout("j1-x", True)]
+def test_a_rollout_without_a_trace_is_listed_by_its_job() -> None:
+    # The simulator died before writing a trace: the commonest infra failure,
+    # and FR18 lists every episode (review of #158, point 2).
+    untraced = rollout("j9-zzz", None, infra="simulator_error").model_copy(
+        update={"trace_ref": None}
+    )
 
-    report = compare(nineteen, rollouts, RELEASE)
+    report = compare([score("j1-a", True)], [rollout("j1-a", True), untraced], RELEASE)
 
-    assert AGREEMENT_BAR == 0.95
-    assert report.agreement == pytest.approx(0.95)
-    assert report.passed is True
+    assert report.counted == 1
+    assert report.unpaired_rollouts == []
+    (item,) = report.untraced_rollouts
+    assert (item.job_id, item.infra_status, item.sim_success) == ("j9", "simulator_error", None)
+    assert "trace_ref" in item.reason
+
+
+def test_the_bar_is_95_percent_on_a_hundred_mixed_episodes() -> None:
+    at_bar = compare(*mixed_set(100, 5), RELEASE)
+    below = compare(*mixed_set(100, 6), RELEASE)
+
+    assert (AGREEMENT_BAR, MIN_EPISODES) == (0.95, 100)
+    assert at_bar.agreement == pytest.approx(0.95)
+    assert at_bar.unjudged == []
+    assert at_bar.passed is True
+    assert below.agreement == pytest.approx(0.94)
+    assert below.passed is False
 
 
 def test_a_set_from_two_scorers_is_refused() -> None:
@@ -277,7 +338,8 @@ def test_the_report_is_stored_as_a_blob_and_listed(tmp_path: Path) -> None:
     (line,) = [json.loads(row) for row in index.read_text(encoding="utf-8").splitlines()]
     assert index == store / AGREEMENT_RECORDS
     assert line["report_sha256"] == digest
-    assert (line["release_id"], line["passed"]) == (RELEASE, True)
+    assert (line["release_id"], line["passed"]) == (RELEASE, None)
+    assert line["unjudged"] == ["not_enough_episodes", "no_sim_failure"]
 
 
 def test_storing_again_appends_a_line_and_rewrites_nothing(tmp_path: Path) -> None:
@@ -322,7 +384,8 @@ def test_the_command_prints_the_rate_and_every_mismatch(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 0, result.output
-    assert "tỉ lệ trùng: 50.0% (ngưỡng 95%): KHÔNG đạt" in result.output
+    assert "tỉ lệ trùng: 50.0% (ngưỡng 95%): chưa kết luận G1" in result.output
+    assert "not_enough_episodes, no_sim_failure" in result.output
     assert "lệch j1-b [scorer_fail_sim_pass]" in result.output
     assert "report_sha256: " in result.output
     assert (tmp_path / "store" / AGREEMENT_RECORDS).is_file()
