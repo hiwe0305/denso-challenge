@@ -738,6 +738,45 @@ Bước kế tiếp do Hiếu quyết.
 - Server eval C (`Ta` 24, `--rtc`) có thể tắt trong phần A để lấy VRAM, và được trả lại cấu hình đó khi xong. Ghi lệnh và thời điểm.
 - Số đọc là sơ bộ.
 
+### 15.5 Kết quả A (sơ bộ)
+
+Chạy 7/11/2026 trên `rtx3060`, mã `cb0a386`, 0 CU. Luật 15.2 không đổi.
+
+- **Frame.** 2783 frame của 20 episode T1, chia theo stage:
+
+  | `approach_a` | `grasp` | `lift` | `carry` | `reach_b` | `place` | `release_stand` | `done` |
+  |---|---|---|---|---|---|---|---|
+  | 479 | 15 | 238 | 480 | 799 | 628 | 144 | 0 |
+
+  Độ dài episode thô bằng độ dài episode export ở cả 20 episode. Có 30 chiều action sống.
+- **Đường serve.** `POST /act` tới server eval C (`Ta` 24, `--rtc`, có reset, seed riêng cho mỗi frame), scope `da34-chain-serve`, từ 02:32:25Z tới 02:50:45Z.
+- **Đường train.** Server eval C dừng lúc 02:50:59Z. Container Psi0 chạy từ 02:52:03Z tới 03:15:43Z, mã thoát 0, 2783 dòng. Ảnh 320 × 180; lời nhắc viết thường, như lúc train.
+- **Trả server.** `serve.sh c 24 rtc` khởi động container `fw-psi0-psi0-run-41b48a6a5890` với `--action-exec-horizon 24 --rtc`, khỏe lúc 03:19:35Z.
+
+**A1, hai đường: khớp.** Trung vị `d_path` = 0, p95 = 0. Đã kiểm trực tiếp trên hai file: 2783/2783 chunk giống hệt từng bit (sai lệch thô lớn nhất 0,0). Khi có reset, chuỗi serve (giải mã ảnh, `resize`/`crop`, chuẩn hóa state, lời nhắc, bỏ chuẩn hóa action) cho đúng kết quả của chuỗi train. Kiểm này không đụng tới nhánh RTC.
+
+**A2, `place`: theo luật là chưa học được**, vì `r_place` = 2,73 ≥ 1.
+
+| Stage | Frame | `e` (trung vị) | `e` p90 | `h` (giữ nguyên) | `r` = `e`/`h` |
+|---|---|---|---|---|---|
+| approach_a | 479 | 0,018 | 0,070 | 0,042 | 0,43 |
+| grasp | 15 | 0,084 | 0,111 | 0,495 | 0,17 |
+| lift | 238 | 0,032 | 0,052 | 0,016 | 2,06 |
+| carry | 480 | 0,028 | 0,053 | 0,006 | 4,94 |
+| reach_b | 799 | 0,025 | 0,057 | 0,002 | 14,59 |
+| **place** | 628 | **0,041** | 0,108 | 0,015 | **2,73** |
+| release_stand | 144 | 0,048 | 0,102 | 0,002 | 27,40 |
+
+`e_place` / trung vị `e` của `approach_a` … `reach_b` (0,028) = 1,47: dưới ngưỡng 1,5 của "học được", còn xa ngưỡng 2 của "chưa học".
+
+Ghi cạnh số, không phải luật mới:
+- `r` ≥ 1 cả ở `lift`, `carry`, `reach_b`, những bước mà vòng kín vẫn qua 65 %. Lý do: trong một chunk 24 hàng ở các stage này robot gần như đứng yên, nên mốc giữ nguyên rất mạnh.
+- Vì vậy luật A2 đọc là "chưa học" chủ yếu nhờ vế `r`. Theo vế `e`, sai số ở `place` chỉ cao hơn các bước đầu khoảng một nửa, và nhỏ (0,04 trên nửa biên độ [−1, 1]).
+
+**Đọc gộp theo 15.2:** A1 khớp và A2 chưa học, nên lỗi ở dữ liệu hoặc ở train. Đọc cùng B (mục 15.6): đầu vào ảnh lúc eval khác lúc train, nên kết quả vòng kín của eval C, T1, T2 chưa nói được C có làm được `place` hay không. T1r (mục 15.7) kiểm điều này.
+
+`serve.jsonl`, `train.jsonl`, `a-result.json` ở `rtx3060:~/denso-da34-pool/fwdata/` (`tray/chain-check/` và `psi0/chain-check/`), không commit.
+
 ### 15.6 Kết quả B (sơ bộ)
 
 Chạy 7/11/2026 trên `rtx3060`, mã `cb0a386`, 0 CU. Luật 15.3 không đổi.
@@ -840,3 +879,4 @@ _**[Đã chốt 7/11/2026, Hiếu]** "Oke chạy lại T1 cho tôi", sau kết q
 | 7/11/2026 | Mục 15: luật đọc A (open-loop trên dữ liệu train của C, hai đường gọi) và B (stats, ảnh, state qua phát lại) của bước kiểm chuỗi train/serve ([Đề xuất]), viết trước lần chạy đầu tiên. Hiếu giao "Giao DA-34 làm" | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 15.6: kết quả B. B1 stats khớp. B2 ảnh khác: PSNR ở frame 0 khoảng 16,5 dB; cây eval thiếu manifest SimReady nên khay và cảnh render bằng khối trơn, `visuals_revision` `none` so với `4763fbf` của dữ liệu C. B3: theo luật là khác ở các chiều ngón cái; thứ tự, đơn vị và nghĩa đúng. Luật 15.3 không đổi | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 15.7: luật đọc T1r (chạy lại T1 với cảnh SimReady, Hiếu "Oke chạy lại T1 cho tôi"), gồm kiểm trước (revision, PSNR) và so với T1 theo bước ([Đề xuất]), viết trước khi đọc PSNR và trước rollout đầu tiên | Hiếu (soạn với Claude) |
+| 7/11/2026 | Mục 15.5: kết quả A. A1 khớp: 2783/2783 chunk giống hệt từng bit giữa đường serve và đường train. A2 theo luật là chưa học (`r_place` 2,73; `e_place` 1,47 × các bước đầu), ghi kèm việc vế `r` cũng ≥ 1 ở các bước vòng kín vẫn qua. Server trả về `Ta` 24, `--rtc`. Luật 15.2 không đổi | Hiếu (soạn với Claude) |
