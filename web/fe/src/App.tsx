@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { role, setRole } from "./api/role";
+import { useChangeStream } from "./api/stream";
 import { userRole, type UserRole } from "./contracts/enums";
 import { AgentQa } from "./screens/AgentQa";
 import { Audit } from "./screens/Audit";
@@ -11,6 +12,7 @@ import { Cost } from "./screens/Cost";
 import { DataPipeline } from "./screens/DataPipeline";
 import { Evaluation } from "./screens/Evaluation";
 import { FailureToData } from "./screens/FailureToData";
+import { Overview } from "./screens/Overview";
 import { Release } from "./screens/Release";
 import { Results } from "./screens/Results";
 import { Training } from "./screens/Training";
@@ -26,7 +28,7 @@ interface Screen {
 }
 
 export const screens: Screen[] = [
-  { code: "M1", path: "/tong-quan", title: "Tổng quan", milestone: "M5 (14/11)" },
+  { code: "M1", path: "/tong-quan", title: "Tổng quan", element: <Overview />, milestone: "M5 (14/11)" },
   { code: "M2", path: "/du-lieu", title: "Dữ liệu", element: <DataPipeline />, milestone: "M3 (10/11)" },
   { code: "M3", path: "/agent-qa", title: "Agent QA/QC", element: <AgentQa />, milestone: "M5 (14/11)" },
   { code: "M4", path: "/release", title: "Release", element: <Release />, milestone: "M5 (14/11)" },
@@ -57,6 +59,7 @@ function RolePicker() {
 }
 
 export function App({ apiMode }: { apiMode: "mock" | "real" }) {
+  useChangeStream(apiMode === "real");
   return (
     <div className="min-h-screen">
       <nav className="sticky top-0 z-10 flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-2 text-sm">
@@ -83,7 +86,7 @@ export function App({ apiMode }: { apiMode: "mock" | "real" }) {
       </nav>
       <main className="mx-auto max-w-[1500px] p-4">
         <Routes>
-          <Route path="/" element={<Navigate to="/failure-to-data" replace />} />
+          <Route path="/" element={<Navigate to="/tong-quan" replace />} />
           {screens.map((s) => (
             <Route key={s.code} path={s.path} element={s.element ?? (
               <EmptyState title={`${s.code} · ${s.title} chưa dựng`}>Hạn theo kế hoạch: mốc {s.milestone}.</EmptyState>

@@ -55,4 +55,15 @@ export async function apiPost<T>(path: string): Promise<T> {
   return parse<T>(await fetch(`${API_BASE}${path}`, { method: "POST", headers: baseHeaders() }));
 }
 
+/** POST or PATCH of a W-table record that is not an action yet, e.g. a draft (§7.2). */
+export async function apiWrite<T>(path: string, body: unknown, method: "POST" | "PATCH" = "POST"): Promise<T> {
+  return parse<T>(
+    await fetch(`${API_BASE}${path}`, {
+      method,
+      headers: { ...baseHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
+}
+
 export const newIdempotencyKey = (): string => crypto.randomUUID();

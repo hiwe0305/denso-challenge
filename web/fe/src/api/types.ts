@@ -922,3 +922,30 @@ export interface ReleaseItemRow {
   qa_decision: string | null;
   origin: Origin;
 }
+
+// ---------------------------------------------------------------- M5 drafts
+
+/** The editable part of an experiment draft (W table `experiment_drafts`). */
+export interface DraftBody {
+  task_id: TaskId;
+  branch: string;
+  method: string;
+  hypothesis: string | null;
+  base_checkpoint_ref: string;
+  run_plan_ref?: string | null;
+  hyperparams: Record<string, unknown>;
+  release_mix: Array<{ release_id: string; mix_weight: number }>;
+}
+
+/** GET /experiment-drafts · newest first. Submitting freezes it; the core answers. */
+export interface ExperimentDraft extends DraftBody {
+  id: string;
+  run_plan_ref: string | null;
+  status: "DRAFT" | "SUBMITTED" | "ACCEPTED" | "REJECTED";
+  submit_action_id: string | null;
+  experiment_id: string | null;
+  reject_reason: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}

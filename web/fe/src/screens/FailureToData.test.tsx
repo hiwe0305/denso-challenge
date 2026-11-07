@@ -4,6 +4,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { Recommendation } from "../api/types";
+import { screens } from "../App";
 import { renderApp as renderAt } from "../test/renderApp";
 import { liveBudget } from "./FailureToData";
 
@@ -46,9 +47,10 @@ describe("M7 screen", () => {
     expect((screen.getByRole("button", { name: "Duyệt" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("labels screens that are not built with their milestone", () => {
-    renderApp("/tong-quan");
-    expect(screen.getByText(/M1 · Tổng quan chưa dựng/)).toBeTruthy();
+  it("leaves no screen as a placeholder", () => {
+    // All ten screens of §6 are built (7/11/2026); the placeholder route stays
+    // for a screen added later, so a missing element shows up here first.
+    expect(screens.filter((s) => s.element === undefined).map((s) => s.code)).toEqual([]);
   });
 });
 
