@@ -791,6 +791,40 @@ So ảnh bằng mắt, frame 0 và 30:
 
 Dump, ảnh so sánh (`b-img-*.png`) và `b-result.json` ở `rtx3060:~/denso-da34-pool/fwdata/tray/chain-check/`, không commit.
 
+### 15.7 T1r: chạy lại T1 với cảnh SimReady
+
+_**[Đã chốt 7/11/2026, Hiếu]** "Oke chạy lại T1 cho tôi", sau kết quả B2 (mục 15.6). Luật đọc dưới đây là **[Đề xuất]**. Luật được viết và commit **trước** khi đọc PSNR của bước kiểm trước và trước rollout đầu tiên của T1r, và không sửa sau khi thấy kết quả._
+
+- **Chạy.** Chỉ khác T1 (mục 14.3) ở cảnh render:
+  - Cây `~/denso-da34-t1r-bb4cef1` là bản chép của cây T1 `bb4cef1`. Thư mục `fwdata/simple/tray/simready/` được chép nguyên từ `~/denso-da33` (không symlink, không sửa; manifest sha256 `eb2886e4…`).
+  - Những thứ giữ nguyên như T1: tập `t1-train-C20-bb4cef1` (sha256 `168cd1b8…`); server của eval C (`Ta` 24, `--rtc`), sau khi phần A trả server về cấu hình đó; cùng launcher `batch.sh`, scope `MemoryMax=8G`, 1 worker; `eval_results` của repo, lấy lần xong sớm nhất.
+  - Output đặt ở thư mục mới `check-t1r-simready`; lần chạy cũ không bị ghi đè.
+  - Không sửa `flywheel_simple`.
+- **Kiểm trước khi chạy:**
+
+| Kiểm | Đạt | Không đạt |
+|---|---|---|
+| `visuals_revision(default_manifest_path())` trong cây T1r | `4763fbf…`, như 160 episode của C | Không chạy; báo |
+| PSNR ở frame 0 khi phát lại 3 episode train (seed 1279, 1574, 1503, cách làm như B2) qua client eval của cây T1r | ≥ 20 dB ở cả ba: chạy; dưới 30 dB thì ghi kèm | < 20 dB ở một episode: không chạy; báo |
+
+  Ghi PSNR theo từng episode và kết quả B2 theo luật 15.3.
+- **Đọc chính.** Dùng luật 14.1 cho p_T1r (số thành công trên 20):
+  - ≥ 5/20;
+  - 1–4/20, báo Wilson 95 %;
+  - 0/20.
+- **So với T1.** Ghép cặp theo điều kiện, từng bước. Đếm số điều kiện ở mỗi ô: cả hai, chỉ T1r, chỉ T1, không bên nào.
+  - `place` của T1r "tốt hơn rõ" khi số điều kiện "chỉ T1r" hơn số điều kiện "chỉ T1" ít nhất 3, giống ngưỡng `place_gain` ở mục 14.2.
+  - Mọi bước khác cũng báo theo cùng cách.
+
+| Kết quả | Đọc |
+|---|---|
+| p_T1r ≥ 5/20 | Ảnh lệch là nguyên nhân chính của T1 0/20. Số của eval C, T1, T2 đo trên cảnh trơn nên không đại diện cho C. Chạy lại eval C với SimReady cần Hiếu quyết |
+| p_T1r 1–4/20, hoặc `place` tốt hơn rõ | Ảnh lệch là một phần nguyên nhân; báo kèm phần A |
+| p_T1r 0/20 và `place` không tốt hơn rõ | Ảnh lệch không giải thích được lỗi ở `place`; đọc cùng A2 (mục 15.2) |
+
+- **Chỉ số phụ, báo cạnh:** loại lỗi, số chu kỳ có yaw vượt 2,5 rad, thời gian mỗi episode, số lần gọi `/act`.
+- Không chạy lại eval C đầy đủ và không train gì nếu chưa có lệnh của Hiếu.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -805,3 +839,4 @@ Dump, ảnh so sánh (`b-img-*.png`) và `b-result.json` ở `rtx3060:~/denso-da
 | 7/11/2026 | Mục 14.5, 14.6: kết quả T2a′ (`Ta = 10`, RTC tắt): 0/20, không qua `carry`, không đáng xem; tổng hợp T1, T2; server trả về `Ta = 24`, `--rtc`. `Decision` quy tắc 0 ghi `criteria.pipeline_check` và sửa khoảng trống đầu. Luật 14.1, 14.2 không đổi | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 15: luật đọc A (open-loop trên dữ liệu train của C, hai đường gọi) và B (stats, ảnh, state qua phát lại) của bước kiểm chuỗi train/serve ([Đề xuất]), viết trước lần chạy đầu tiên. Hiếu giao "Giao DA-34 làm" | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 15.6: kết quả B. B1 stats khớp. B2 ảnh khác: PSNR ở frame 0 khoảng 16,5 dB; cây eval thiếu manifest SimReady nên khay và cảnh render bằng khối trơn, `visuals_revision` `none` so với `4763fbf` của dữ liệu C. B3: theo luật là khác ở các chiều ngón cái; thứ tự, đơn vị và nghĩa đúng. Luật 15.3 không đổi | Hiếu (soạn với Claude) |
+| 7/11/2026 | Mục 15.7: luật đọc T1r (chạy lại T1 với cảnh SimReady, Hiếu "Oke chạy lại T1 cho tôi"), gồm kiểm trước (revision, PSNR) và so với T1 theo bước ([Đề xuất]), viết trước khi đọc PSNR và trước rollout đầu tiên | Hiếu (soạn với Claude) |
