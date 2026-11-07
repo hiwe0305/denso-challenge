@@ -7,6 +7,7 @@ import hashlib
 import html
 import json
 import os
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -52,6 +53,37 @@ LABELS = {
     "reference": "Tài liệu tham chiếu",
 }
 MAX_TEXT_BYTES = 2_000_000
+
+
+def reject_answer_key(path: Path, relative: str, root: Path) -> None:
+    """Reject recognizable answer-key paths and JSON records in section 4.
+
+    This is a guard against common mistakes, not a content classification boundary.
+    """
+    components = (*Path(relative).parts, *path.relative_to(root).parts)
+    for component in components:
+        name = re.sub(r"[^a-z0-9]", "", component.casefold())
+        if "defectmanifest" in name or name in {"answers", "answerkeys", "answerkey"}:
+            raise ValueError(f"phần 4: không được trình chiếu file đáp án: {relative}")
+    if path.suffix.lower() not in {".json", ".jsonl"}:
+        return
+    if path.stat().st_size > MAX_TEXT_BYTES:
+        raise ValueError(f"phần 4: JSON quá lớn để kiểm tra đáp án: {relative}")
+    text = path.read_text(encoding="utf-8")
+    try:
+        records = (
+            [json.loads(text)]
+            if path.suffix.lower() == ".json"
+            else [json.loads(line) for line in text.splitlines() if line.strip()]
+        )
+    except json.JSONDecodeError as error:
+        raise ValueError(f"phần 4: JSON không hợp lệ: {relative}") from error
+    if any(
+        isinstance(record, dict)
+        and ({"dataset_id", "defects"} <= record.keys() or record.get("title") == "DefectManifest")
+        for record in records
+    ):
+        raise ValueError(f"phần 4: không được trình chiếu DefectManifest: {relative}")
 
 
 def digest(path: Path) -> str:
@@ -119,6 +151,9 @@ def validated_items(manifest: dict[str, Any], root: Path, section: str) -> list[
             raise ValueError("phần 4: báo cáo phải ghi nhãn bộ lỗi cấy")
         if section == "5" and label != "preliminary":
             raise ValueError("phần 5: kết quả HE-1 phải ghi nhãn sơ bộ")
+        source = item.get("source")
+        if not isinstance(source, str) or not source.strip():
+            raise ValueError(f"phần {section}: mỗi bằng chứng cần source xác định nguồn gốc")
         if (
             not isinstance(expected, str)
             or len(expected) != 64
@@ -126,6 +161,8 @@ def validated_items(manifest: dict[str, Any], root: Path, section: str) -> list[
         ):
             raise ValueError(f"phần {section}: cần sha256 64 ký tự hex thường")
         path = local_file(root, item.get("path"))
+        if section == "4":
+            reject_answer_key(path, item["path"], root)
         if digest(path) != expected:
             raise ValueError(f"phần {section}: sha256 không khớp {item['path']}")
         if kind == "text" and path.stat().st_size > MAX_TEXT_BYTES:
@@ -153,7 +190,8 @@ def render(section: str, items: list[dict[str, Any]], *, tray_outcome: str | Non
         cards.append(
             f"<section><h2>{html.escape(item['title'])}</h2>"
             f"<p>{LABELS[item['label']]}</p>{body}"
-            f'<p>Nguồn: <a href="{url}">{html.escape(item["path"])}</a><br>'
+            f"<p>Nguồn gốc: {html.escape(item['source'])}<br>"
+            f'Bản sao: <a href="{url}">{html.escape(item["path"])}</a><br>'
             f"SHA-256: <code>{item['sha256']}</code></p></section>"
         )
     tray_note = ""
@@ -194,6 +232,7 @@ def main(argv: list[str] | None = None) -> int:
                         "title": role,
                         "kind": "file",
                         "label": None,
+                        "source": None,
                         "path": None,
                         "sha256": None,
                     }
@@ -228,11 +267,15 @@ def main(argv: list[str] | None = None) -> int:
                 try:
                     validated_items(manifest, root, section)
                     print(f"{section}: sẵn sàng")
-                except (ValueError, OSError) as error:
+                except (ValueError, OSError, UnicodeError) as error:
                     errors.append(str(error))
                     print(f"{section}: {error}")
             return 1 if errors else 0
-        items = validated_items(manifest, root, args.section)
+        try:
+            items = validated_items(manifest, root, args.section)
+        except (ValueError, OSError, UnicodeError) as error:
+            print(f"Bằng chứng chưa hợp lệ: {error}", file=sys.stderr)
+            return 1
         page = render(
             args.section, items, tray_outcome=manifest["sections"][args.section].get("tray_outcome")
         )

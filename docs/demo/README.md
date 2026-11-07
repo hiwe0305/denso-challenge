@@ -8,13 +8,15 @@ Ngày 5/11/2026 chưa có đủ bằng chứng cho cả sáu phần trong kho. V
 
 1. Cài Python 3.10 trở lên. Lấy mã ở đúng revision đã duyệt; công cụ trình chiếu chỉ dùng thư viện chuẩn, không cần GPU hay mạng khi chạy.
 2. Tập hợp **bản sao chỉ đọc** của báo cáo, bảng, video và sổ chi phí đã được duyệt vào `fwdata/demo/`. Không chép checkpoint, dữ liệu nhạy cảm hoặc đáp án lỗi cấy vào gói trình chiếu. Mỗi số hiển thị phải nằm trong file nguồn tương ứng; báo cáo cần nêu rõ tập, điều kiện và giới hạn của nó.
-3. Tạo manifest mẫu và điền `path`, `sha256`, `title`, `kind`, `label` cho từng vai trò:
+3. Tạo manifest mẫu và điền `path`, `sha256`, `title`, `kind`, `label`, `source` cho từng vai trò:
 
    ```bash
    python -X utf8 scripts/demo/demo.py template --output fwdata/demo/manifest.json
    ```
 
-   `path` là đường dẫn tương đối từ thư mục chứa manifest, dùng `/`. `kind` là `text` (UTF-8, tối đa 2 MB, hiện toàn văn), `image`, `video` hoặc `file` (liên kết mở file). `label` là `measured`, `preliminary`, `injected` hoặc `reference`. Phần 4 bắt buộc `injected`, phần 5 bắt buộc `preliminary`. Có thể thêm nhiều item cùng vai trò khi cần cả bảng và video. File HTML liên kết tới bằng chứng tại chỗ: **giữ nguyên vị trí bundle** sau khi tạo trang.
+   `path` là đường dẫn tương đối từ thư mục chứa manifest, dùng `/`. `source` là chuỗi không rỗng xác định nguồn gốc thật của bằng chứng, ví dụ ID RunPlan, ID release hoặc dòng ledger, đường dẫn báo cáo nguồn kèm commit/PR đã tạo ra nó. Không dùng riêng đường dẫn bản sao làm nguồn gốc. Trên trang, nguồn gốc được hiển thị riêng với đường dẫn và SHA-256 của bản sao. Người bàn giao phải kiểm tính đúng của `source`; chương trình không tự xác minh ID.
+
+   `kind` là `text` (UTF-8, tối đa 2 MB, hiện toàn văn), `image`, `video` hoặc `file` (liên kết mở file). `label` là `measured`, `preliminary`, `injected` hoặc `reference`. Phần 4 bắt buộc `injected`, phần 5 bắt buộc `preliminary`. Có thể thêm nhiều item cùng vai trò khi cần cả bảng và video. File HTML liên kết tới bằng chứng tại chỗ: **giữ nguyên vị trí bundle** sau khi tạo trang.
 
 4. Tính SHA-256 của từng file sau khi chép, rồi điền 64 ký tự hex thường vào manifest. Ví dụ chạy được trên Windows và Linux:
 
@@ -30,7 +32,9 @@ Ngày 5/11/2026 chưa có đủ bằng chứng cho cả sáu phần trong kho. V
    python -X utf8 scripts/demo/demo.py check --manifest fwdata/demo/manifest.json
    ```
 
-   Mã 0 là đủ vai trò và hash khớp, mã 1 là thiếu hoặc sai bằng chứng, mã 2 là manifest không đọc được. Kiểm thủ công nội dung, khả năng phát video và nguồn của mỗi con số; công cụ không kiểm tính đúng đắn của báo cáo hay tự phát hiện file bị gán sai vai trò.
+   Mã 0 là đủ vai trò và hash khớp, mã 1 là thiếu hoặc sai bằng chứng, mã 2 là manifest không đọc được hoặc lỗi tạo đầu ra. Mã lỗi cho bằng chứng giống nhau ở `check` và lệnh từng phần. Kiểm thủ công nội dung, khả năng phát video và nguồn của mỗi con số; công cụ không kiểm tính đúng đắn của báo cáo hay tự phát hiện file bị gán sai vai trò.
+
+   Phần 4 từ chối đường dẫn có tên giống `DefectManifest` hoặc thư mục `answers` và kiểm tra hình dạng manifest trong JSON/JSONL. Đây chỉ là rào phát hiện các trường hợp thường gặp, không bảo đảm phát hiện mọi cách đổi tên hoặc nhúng đáp án: bộ chấm giữ đáp án riêng, người bàn giao vẫn phải kiểm bundle trước khi trình chiếu.
 
 ## Sáu lệnh trình chiếu
 
@@ -59,6 +63,14 @@ Nếu một file thiếu hoặc hash sai, lệnh dừng trước khi tạo HTML 
 | 6 · Failure → Data | `two_table_score`, `two_table_diagnosis`, `two_table_card`, `two_table_proposal`, `two_table_ledger`, `tray_score`, `tray_diagnosis`, `tray_card`, `tray_generation`, `tray_qa`, `tray_decision` | Hai bàn dừng ở đề xuất dữ liệu và sổ chi phí. Khay: lỗi C → chấm/chẩn đoán → sinh nhắm lỗi → QA → C+ → eval, hoặc đường lui đã ghi ở trên. Kết quả C/C+/A trên dev, một seed là mô tả sơ bộ, không gọi là kiểm HT. Nguồn: [design task khay](../superpowers/specs/2026-10-28-tray-transfer-he-design.md) mục 6.6 và [runbook khay](../he/tray.md). |
 
 Danh sách này là yêu cầu bàn giao, không khẳng định mỗi artifact đã tồn tại. `text` hiện nguyên file kèm đường dẫn và hash; với biểu đồ, video hoặc tài liệu `file`, người trình bày phải mở và chỉ rõ báo cáo/ledger chứa từng số. Không đưa kết quả không có nguồn vào slide hoặc lời dẫn.
+
+## Chạy lại phần CPU [Đề xuất, chờ Hiếu chốt]
+
+Review PR #133 đề xuất phần 3, 4 và nhánh hai bàn của phần 6 chạy lại trên CPU, so kết quả rồi mới trình chiếu; nếu chạy lỗi thì hiện bản ghi sẵn và ghi rõ. Bản hiện tại **chưa triển khai** hành vi này và vẫn chỉ trình chiếu. Cần chốt đầu vào, cách so và đường lui trước khi dùng làm bằng chứng AC 2:
+
+- Phần 3: test loader Ψ₀ ở `packages/flywheel-psi0/tests/contract/test_loader_roundtrip.py` cần môi trường Ψ₀ và LeRobot ghim, dataset và `.npz` tham chiếu ngoài git. Thiếu các gói hay dataset có thể làm pytest báo skipped; không được coi skipped là chạy thành công. Báo cáo dataset cần bộ đầu vào và nơi ghi riêng.
+- Phần 4: `python -m flywheel.eval.agentqa.bench` cần spec, các thư mục `--answers` riêng và `--out` mới. Đáp án chỉ bộ chấm đọc, không thêm vào bundle trình chiếu. Kết quả hiện chứa `created_at` và ID ledger phát sinh mỗi lần, nên hash toàn bộ file kết quả không ổn định giữa các lần chạy; cần chốt phép so các trường kết quả và nguồn đầu vào, không so hash thô một cách mặc định.
+- Phần 6: cần xác nhận lệnh và artifact thật của scorer, chẩn đoán, evidence card, đề xuất và ledger; thiếu một khâu thì không báo đã chạy hết vòng. Các lệnh phải ghi vào thư mục lượt chạy mới, không ghi đè bản bàn giao.
 
 ## Chưa có ở demo
 

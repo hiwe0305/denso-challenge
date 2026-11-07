@@ -71,4 +71,5 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - Giờ thực:
 - Công cụ AI đã dùng:
 - Ghi chú tiến độ: `docs/demo/README.md` và `scripts/demo/demo.py` dựng phần trình chiếu ngoại tuyến, kiểm vai trò, SHA-256 và nhãn sơ bộ/lỗi cấy; test `scripts/demo/test_demo.py` kiểm bằng dữ liệu giả. Chưa có bundle thật đủ sáu phần, video GPU, kiểm nội dung/số liệu và chạy thử với người khác. Không đánh dấu xong nhiệm vụ 1–4 cho tới khi có bằng chứng nghiệm thu tương ứng.
+- Sửa review PR #133: bắt buộc `source` xác định nguồn gốc từng item, thêm rào nhận diện đáp án ở phần 4 và thống nhất mã thoát khi thiếu hoặc sai bằng chứng. Đề xuất chạy lại CPU cho phần 3, 4, 6 còn chờ Hiếu chốt; README ghi phụ thuộc và hạn chế của việc so hash đầu ra.
 - File đã tạo hoặc sửa: `docs/demo/README.md`, `scripts/demo/demo.py`, `scripts/demo/test_demo.py`.
