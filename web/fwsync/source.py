@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -76,6 +76,18 @@ FILE_TO_TABLE: dict[str, str] = {
     "bench_result": "defect_bench_groups",
 }
 
+#: Artifact mà tên file một mình không nói được bảng: khoá là cặp (thư mục
+#: cha, tên file không đuôi). Làn DA-13 ghi `<store>/diagnosis/system.jsonl`
+#: (`SYSTEM_RECORDS` của `diagnosis/system/artifact.py`); khoá `system` trần
+#: thì bắt nhầm mọi `system.jsonl` khác, nên khoá đúng là cả cặp (W13).
+#:
+#: Bản ghi đến từ đây mang hình dạng **hợp đồng**, không phải dòng web, nên
+#: đi đường nghiêm (`Record.contract`) dù bảng đích nằm trong
+#: `TOLERANT_TABLES` vì các dòng của bộ mock.
+CONTRACT_PATHS: dict[tuple[str, str], str] = {
+    ("diagnosis", "system"): "system_diagnoses",
+}
+
 #: Bảng đi qua đường khoan dung vì thực thể của nó chưa có file schema trong
 #: `flywheel-contracts` (S1-10 #36). Xoá một dòng ở đây khi #36 merge và bảng
 #: đó có model, để nó chuyển sang đường nghiêm.
@@ -119,6 +131,9 @@ class Record:
     payload: Any
     path: Path
     line: int | None = None
+    #: Đến từ một đường của `CONTRACT_PATHS`: hình dạng là hợp đồng, đi đường
+    #: nghiêm, kể cả khi bảng đích có dòng mock đi đường khoan dung.
+    contract: bool = False
 
     @property
     def where(self) -> str:
@@ -147,9 +162,21 @@ def table_of(path: Path) -> str | None:
     trước tên file: một file `part-01.jsonl` chỉ nói được nó thuộc bảng nào
     qua thư mục.
     """
+    return _classify(path)[0]
+
+
+def _classify(path: Path) -> tuple[str | None, bool]:
+    """(bảng đích, có phải đường hợp đồng không) của một file.
+
+    Cặp (thư mục, tên) của `CONTRACT_PATHS` được thử trước, vì nó cụ thể hơn
+    cả tên thư mục lẫn tên file.
+    """
+    pair = (path.parent.name, path.stem)
+    if pair in CONTRACT_PATHS:
+        return CONTRACT_PATHS[pair], True
     if path.parent.name in FILE_TO_TABLE:
-        return FILE_TO_TABLE[path.parent.name]
-    return FILE_TO_TABLE.get(path.stem)
+        return FILE_TO_TABLE[path.parent.name], False
+    return FILE_TO_TABLE.get(path.stem), False
 
 
 def scan(directory: Path) -> SourceScan:
@@ -160,12 +187,15 @@ def scan(directory: Path) -> SourceScan:
     for path in sorted(directory.rglob("*")):
         if not path.is_file() or path.suffix not in (".json", ".jsonl"):
             continue
-        table = table_of(path)
+        table, contract = _classify(path)
         if table is None:
             # Lõi còn thêm artifact mới; một file lạ không phải lý do để dừng.
             result.ignored.append(str(path.relative_to(directory)))
             continue
-        result.records.extend(_read(path, table))
+        result.records.extend(
+            replace(record, contract=contract) if contract else record
+            for record in _read(path, table)
+        )
     return result
 
 

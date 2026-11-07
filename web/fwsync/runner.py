@@ -25,11 +25,13 @@ from web.fwsync import actions as log
 from web.fwsync.mapping import (
     DatasetLookup,
     MappingError,
+    TraceLookup,
     map_bench_result,
     map_defect_manifest,
     map_episode,
     map_probe_result,
     map_qa_report,
+    map_system_diagnosis,
     map_train_diagnosis,
     map_training_metric,
 )
@@ -142,6 +144,9 @@ TOLERANT_COLUMNS: dict[str, frozenset[str]] = {
             "first_failed_step", "failure_code", "failure_class",
             "failure_time_s", "camera_params_hash", "video_uri",
             "trajectory_log_uri", "details",
+            # W13: khoá nối bản ghi kiểm hệ thống thật (`diagnosis/system.jsonl`)
+            # với episode của nó; `SystemDiagnosis.episode_id` không duy nhất.
+            "trace_sha256",
         }
     ),
     "system_diagnoses": frozenset(
@@ -151,6 +156,8 @@ TOLERANT_COLUMNS: dict[str, frozenset[str]] = {
             # Bản 0.5 (PR #146): thiếu ba cột này thì đường khoan dung bỏ
             # R1, R2 ghi nhận kèm log, và M6 không còn thấy độ trễ.
             "timing", "recorded", "recorded_skipped",
+            # W13: hash của mọi đầu vào khác mà phép kiểm đã đọc (DA-13 AC 2).
+            "rtc_sha256", "camera_sha256", "infra_sha256",
         }
     ),
     "experiment_datasets": frozenset(
@@ -318,6 +325,7 @@ class Lookups:
 
     dataset: DatasetLookup
     experiment: ExperimentLookup
+    trace: TraceLookup
 
 
 def run_import(source_dir: Path, sink: Sink, origin: str = "core") -> SyncResult:
@@ -328,14 +336,19 @@ def run_import(source_dir: Path, sink: Sink, origin: str = "core") -> SyncResult
     là tham số chứ không phải trường đọc từ file: một artifact thật lỡ mang
     `origin: mock` không được làm FE dán nhãn sai (DESIGN.md §4.4b).
 
-    Hai thứ hợp đồng không mang được tra từ chính các artifact vừa đọc: lô
-    của một episode (W12) và thí nghiệm của một dòng telemetry.
+    Ba thứ hợp đồng không mang được tra từ chính các artifact vừa đọc: lô
+    của một episode (W12), thí nghiệm của một dòng telemetry, và episode của
+    một bản ghi kiểm hệ thống (W13).
     """
     if origin not in ORIGINS:
         raise ValueError(f"origin `{origin}` không có; chỉ {ORIGINS}")
     found: SourceScan = scan(source_dir)
     result = SyncResult(direction="import", source_dir=str(source_dir), ignored=found.ignored)
-    lookups = Lookups(dataset=_dataset_lookup(found), experiment=_experiment_lookup(found))
+    lookups = Lookups(
+        dataset=_dataset_lookup(found),
+        experiment=_experiment_lookup(found),
+        trace=_trace_lookup(found),
+    )
     loaded_episodes: set[str] = set()
 
     for table in _ordered(found.tables):
@@ -387,6 +400,24 @@ def _experiment_lookup(found: SourceScan) -> ExperimentLookup:
     )
 
 
+def _trace_lookup(found: SourceScan) -> TraceLookup:
+    """`trace_sha256` → `eval_episode_ref`, từ chính `eval_episodes` vừa đọc.
+
+    Hash mà hai dòng cùng mang thì vào `ambiguous`, không giữ dòng nào: chọn
+    một trong hai là gán bừa (W13).
+    """
+    seen: dict[str, set[str]] = {}
+    for record in found.by_table("eval_episodes"):
+        if isinstance(record.payload, dict):
+            digest, ref = record.payload.get("trace_sha256"), record.payload.get("eval_episode_ref")
+            if digest and ref:
+                seen.setdefault(str(digest), set()).add(str(ref))
+    return TraceLookup(
+        by_trace={digest: next(iter(refs)) for digest, refs in seen.items() if len(refs) == 1},
+        ambiguous=frozenset(digest for digest, refs in seen.items() if len(refs) > 1),
+    )
+
+
 def _pairs(found: SourceScan, table: str, key: str, value: str) -> dict[str, str]:
     pairs: dict[str, str] = {}
     for record in found.by_table(table):
@@ -425,6 +456,11 @@ def _map(
     if table == "defect_bench_groups":
         bench = map_bench_result(record.payload, _bench_sha256(record))
         return [(target, row) for target, rows in bench.items() for row in rows]
+    if table == "system_diagnoses" and record.contract:
+        # `diagnosis/system.jsonl` của làn DA-13: hình dạng hợp đồng, đi đường
+        # nghiêm. Dòng `system_diagnoses.jsonl` của bộ mock đi tiếp xuống
+        # đường khoan dung bên dưới.
+        return [("system_diagnoses", map_system_diagnosis(record.payload, lookups.trace))]
     if table in TOLERANT_TABLES:
         allowed = TOLERANT_COLUMNS.get(table)
         if allowed is None:

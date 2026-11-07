@@ -721,8 +721,12 @@ class Mock:
     def _eval_row(
         self, ref: str, index: int, level: int, code: str | None, step: int | None, infra: bool
     ) -> Row:
+        episode_ref = f"ee_{ref.removeprefix('ev_')}_{index:02d}"
         row: Row = {
-            "eval_episode_ref": f"ee_{ref.removeprefix('ev_')}_{index:02d}",
+            "eval_episode_ref": episode_ref,
+            # W13: cùng hash mà `_system_diagnoses` ghi, nên một bản ghi kiểm hệ
+            # thống dạng hợp đồng nối được vào đúng episode này.
+            "trace_sha256": hx(f"trace:{episode_ref}"),
             "evaluation_ref": ref, "episode_index": index,
             "condition_id": f"cond_dev_{index:02d}", "level": level,
             "episode_seed": 2000 + index, "rollout_seed": 5000 + index,
