@@ -112,6 +112,14 @@ Dạng `bench_result.json` đổi từ `bench_version` `da31-1` sang `da31-2` (h
 
 Hash và hai dòng ledger không đổi cách làm: hash là sha256 của đúng chuỗi JSON đã ghi, trang HTML dựng từ JSON đó.
 
+Dạng `da31-3` (8/11/2026, nhiệm vụ 5) thêm một khóa, mọi khóa của `da31-2` giữ nguyên tên và nghĩa:
+
+| Khóa | Ở đâu | Nghĩa |
+|---|---|---|
+| `agent_models` | Mỗi nhóm | Danh sách `{copy, name, revision, temperature, prompt_sha256, reports}`, chép từ `AgentReport.model` của các báo cáo agent mỗi bản sao: mỗi bản một dòng cho mỗi model khác nhau, `reports` là số báo cáo dùng model đó; xếp theo bản rồi theo model |
+
+Không có nó thì một con số của cột agent không chạy lại được: cùng bộ lỗi cấy, đổi model hay prompt là đổi số. Trang HTML có bảng "Agent model per copy" và một dòng cảnh báo khi bản có lỗi và bản sạch không cùng tập model, vì recall lấy từ bản có lỗi còn báo nhầm lấy từ bản sạch; hai con số chỉ đọc chung được khi cùng một agent.
+
 ## 6. Lần chạy 5/11/2026 trên bộ log cấy
 
 Dựng lại bộ log của DA-27 trên laptop (Windows, CPU) bằng `flywheel.data.inject.log_defects.build_log_benchmark` ở `origin/master` `182dd65`, rồi chạy lệnh ở mục 5 với `log_root` của hai bản. **Lớp agent là báo cáo rỗng đứng tạm** (`stand-in-empty`), vì DA-20 chưa có agent; cột agent của lần chạy này không phải số đo của agent.
@@ -143,5 +151,5 @@ Kết quả khớp test nối làn của DA-27 (`tests/e2e/test_log_defects_dete
 | Việc | Chờ | Ghi chú |
 |---|---|---|
 | Chạy trên hai bản sao psi-data | Máy `rtx3060` | Bản sao và đáp án ở `rtx3060:~/denso-da27/fwdata/inject/` (bàn giao của DA-27). Cần `fw data ingest` rồi `fw data qa` trên mỗi bản (mỗi lượt gắn đúng một bản), rồi chạy lệnh ở mục 5. Laptop không vào được máy này |
-| Cột agent thật | DA-20 (Hưng) | Bộ chấm đã nhận `AgentReport` và `AgentReview`; chỉ cần thay báo cáo đứng tạm bằng báo cáo thật |
+| Cột agent thật | Chạy Nemotron thật (DA-20 nhiệm vụ 5–7, Hiếu) | DA-20 đã merge (PR #151, 7/11/2026); code và test chạy bằng model giả. Bộ chấm đã nhận `AgentReport` và `AgentReview` và ghi model, hash prompt của từng bản (dạng `da31-3`); chỉ cần thay báo cáo đứng tạm bằng báo cáo của lần chạy Nemotron |
 | Chấm riêng giải thích và đề xuất | Đổi hợp đồng `FindingDecision` nếu cần | Mục 3 |
