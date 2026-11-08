@@ -60,7 +60,7 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
   - [x] 5.1 `Decision` mở lại C+ sau quy tắc 0 trên eval C SimReady (Hiếu 8/11/2026 "Làm tiếp đi từ kết quả và phân tích kia. tôi muốn làm nó nhanh hơn"): sửa luật sau khi thấy kết quả, luật đọc C+ là quy tắc 1–2 không đổi, chờ Hiếu ký · **8/11/2026:** `round-tray-cplus.rule0-override.decision.json` (tray.md mục 17.1)
   - [x] 5.2 Evidence card cụm `L-PLACE-POSE` và luật chọn điều kiện nhắm lỗi, viết trước khi sinh · **8/11/2026:** 131 điều kiện, mỗi điều kiện 2 seed train (`cplus-conditions.jsonl`, sha256 `64d97c4e…`); card: vùng đích không render, không tham số cảnh nào gắn với lỗi (tray.md mục 17.2–17.3)
   - [x] 5.3 Sinh episode nhắm lỗi trên rtx3060, QA như release của C, release có hash, cắt tập C+ (160 + 160), đóng băng `round-tray-cplus.yaml` và ghi lock; dòng ước lượng và thực đo · **8/11/2026:** 262 lượt, 229 ghi được, release `tray_s1_6c0fd7d37f77`, 177 qua QA và bộ lọc, chọn 160 (`T160` `1104d00e…`), round `rp_71fee3fcff69`, bản cắt C+ 320 episode kiểm đạt (tray.md mục 17.5)
-  - [ ] 5.4 Runbook Colab cho C+ (như mục 12), chạy từ master; Hiếu launch
+  - [x] 5.4 Runbook Colab cho C+ (như mục 12), chạy từ master; Hiếu launch · **8/11/2026:** runbook ở tray.md mục 17.6, `colab_train --branch C_PLUS` chỉ chạy round `rp_71fee3fcff69`; chưa launch
   - [ ] 5.5 Đo eval 2 worker trên cùng server (thông lượng, độ lệch kết quả), đề xuất cho eval C+
   - [ ] 5.6 Eval C+ và đọc theo quy tắc 1–2
 

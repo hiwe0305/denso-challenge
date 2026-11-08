@@ -1157,6 +1157,79 @@ Parent, recipe và seed train lấy của nhánh C.
 
 **Đọc (giả định, chưa kiểm bằng train).** Như 17.2 đã ghi: lỗi đặt không gắn với vùng cảnh nào, nên 160 episode này gần với "thêm 160 episode S1 rải trên mức 1–2" hơn là dữ liệu sửa đúng lỗi. Khác với C về phân bố: C chỉ có mức 1 (seed 1000–1609), còn `T160` có cả mức 2. Vì vậy C+ − C gộp ba thứ: nhiều dữ liệu hơn, dữ liệu nhắm lỗi, và dữ liệu mức 2 (giới hạn đã nói ở quy tắc 2).
 
+### 17.6 Runbook: fine-tune C+ trên Colab (nhiệm vụ 5.4, soạn 8/11/2026, chưa chạy)
+
+Một phiên Colab L4, job `da34-t5-ft-cplus-s0`, cap 18 CU (slot `round_runs: [C_PLUS]` của budget bậc 2). Giống mục 12, chỉ khác: plan round, bản cắt hai phần và `--branch C_PLUS`. **Không chạy gì trước khi Hiếu launch.**
+
+**Điều kiện trước khi chạy.**
+
+1. PR (a) (#162: `Decision` mở lại C+ và luật chọn) và PR (b) (release, round đóng băng, runbook này) đã merge. `Decision` [`round-tray-cplus.rule0-override.decision.json`](../../configs/runplans/tray/round-tray-cplus.rule0-override.decision.json) đã ký. Mọi lệnh chạy từ bản checkout `master`.
+2. `colab sessions` trống, một lô mỗi tài khoản. Số dư ít nhất 32 CU (sàn 14 cộng cap 18). Laptop thức suốt lần chạy.
+3. Hiếu cho chạy.
+
+**rtx3060: kiểm lúc khởi chạy và dựng bản cắt** (0 CU, khoảng 1 phút; `D` là bản `master` mới, `git archive` vào `~/denso-da34-master-<sha>` kèm `TREE_SHA`). Bản cắt dựng lại từ master vào thư mục mới, vì `demo_subset` và `cplus_cut` không ghi đè; bản dựng thử ở 17.5 chỉ để đối chiếu sha256:
+
+```bash
+cd $D && export PYTHONPATH=$(ls -d $PWD/packages/*/src | paste -sd:)
+PY=~/denso-da34-pool/.venv/bin/python
+REL_C=~/denso-da34-pool/fwdata/releases/tray_s1_f9433b028c52
+REL_T=~/denso-da34-pool/fwdata/releases/tray_s1_6c0fd7d37f77
+CUT=~/denso-da34-pool/fwdata/cut-cplus-rp_71fee3fcff69-$(cut -c1-7 TREE_SHA)   # D is a git archive with TREE_SHA, as 16.2
+E=G1WholebodyTrayTransferTeleop-v0
+$PY -m flywheel_psi0.tray.runplan check configs/runplans/tray/round-tray-cplus.yaml \
+    --release $REL_C --targets-release $REL_T --launch \
+  || { echo "runplan check --launch failed: do not launch"; exit 1; }
+$PY scripts/he/demo_subset.py --src $REL_C --sets configs/runplans/tray/demo_sets-v2.json --set C --out $CUT/parts/C/$E
+$PY scripts/he/demo_subset.py --src $REL_T --sets configs/runplans/tray/demo_sets-cplus.json --set T160 --out $CUT/parts/T160/$E
+$PY -m flywheel_psi0.tray.cplus_cut --part $CUT/parts/C/$E --part $CUT/parts/T160/$E --demo-set C_PLUS --out $CUT/sets/C_PLUS/$E
+$PY -m flywheel_psi0.tray.colab_train check --branch C_PLUS --work $CUT   # "rp_71fee3fcff69 da34-t5-ft-cplus-s0: cut and plan hold"
+```
+
+**Laptop: kéo bản cắt, rồi guard và watcher** (thư mục gốc là bản checkout `master`). Như mục 12, với `S` và đường dẫn mới:
+
+```bash
+CUT=denso-da34-pool/fwdata/cut-cplus-rp_71fee3fcff69-<sha7>   # the folder the rtx3060 step wrote
+rsync -a --delete --partial-dir=.rsync-partial rtx3060:$CUT/sets/ fwdata/tray/cut-cplus/sets/   # sets/ only, not parts/
+export PATH=~/project/wm-wam-review/.venv-colab-cli/bin:$PATH
+colab sessions; colab usage
+S=da34-t5-ft-cplus-s0
+R=fwdata/colab/batch-$(date +%Y%m%d-%H%M%S); mkdir -p fwdata/colab && mkdir $R && git rev-parse HEAD > $R/master.sha
+nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py guard --registry "$0" --floor 14 --log "$0/guard.jsonl"; echo "exit $?"' $R < /dev/null > $R/guard.out 2>&1 &
+nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py session --registry "$0" --new --name "$1" --gpu L4 --cap 18 --floor 14 --persist "python3 scripts/he/he1_fetch.py once --session $1 --registry $0 --dest fwdata/tray/runs --remote-work /content/da34" --log "$0/$1.jsonl"; echo "exit $?"' $R $S < /dev/null > $R/$S.out 2>&1 &
+```
+
+Hàm `ready` và `vm` như ở mục 12.
+
+**Phiên C+.** Mỗi bước chỉ chạy khi bước trước đã xong.
+
+```bash
+ready $S && python3 scripts/he/he1_fetch.py probe --session $S --registry $R --dest fwdata/tray/runs --remote-work /content/da34 \
+  || { colab stop -s $S; echo "$S: not ready or proxy too slow, session stopped"; }
+git archive --format=tar.gz HEAD | vm $S 'mkdir -p /content/da34/fw && tar -xz -C /content/da34/fw'
+rsync -a --partial-dir=.rsync-partial -e "ssh -o ProxyCommand='colab ssh --proxy-mode -s $S' -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+  fwdata/tray/cut-cplus/sets/ root@colab:/content/da34/sets/
+VMPP=fw/packages/flywheel-psi0/src:fw/packages/flywheel-contracts/src
+vm $S "cd /content/da34 && PYTHONPATH=$VMPP python3 -m flywheel_psi0.tray.colab_train check --branch C_PLUS" \
+  || { colab stop -s $S; echo "$S: cut or round does not hold on the VM, session stopped"; }
+vm $S "cd /content/da34; nohup setsid bash -c 'PYTHONPATH=$VMPP python3 -m flywheel_psi0.tray.colab_train setup --branch C_PLUS; echo setup exit \$?' > setup.log 2>&1 < /dev/null &"
+vm $S 'tail -2 /content/da34/setup.log'   # chờ "setup exit 0"
+vm $S "cd /content/da34; nohup setsid bash -c 'PYTHONPATH=$VMPP Psi0/.venv-psi/bin/python -m flywheel_psi0.tray.colab_train train --branch C_PLUS; echo train exit \$?' > train.log 2>&1 < /dev/null &"
+nohup setsid bash -c 'python3 scripts/he/he1_fetch.py follow --session "$1" --registry "$0" --dest fwdata/tray/runs --remote-work /content/da34 --every 600 --stop-when-done; echo "exit $?"' $R $S < /dev/null > $R/$S.fetch.log 2>&1 &
+```
+
+**Trong và sau lúc chạy.** Như mục 12: quy tắc dừng sớm, `ALERT` và mã thoát của `he1_fetch`; watcher dừng ở cap 18 CU. Khi xong, ghi dòng `measured` cho `job_da34_ft_CPLUS` (CU theo `colab usage`, số bước, giờ), trỏ về dòng ước lượng; dòng ước lượng ghi trước khi launch. Chuyển checkpoint sang `rtx3060` như mục 12, với `J=fwdata/tray/runs/da34-t5-ft-cplus-s0` và đích `denso-da34-pool/fwdata/tray/runs/da34-t5-ft-cplus-s0/`.
+
+**Eval C+ (nhiệm vụ 5.6) trên rtx3060.** Giống hệt eval C SimReady (mục 16.2) để so cặp với mốc 16.6:
+- tập `rp_a04c14e79dfd-2e57f60`, `conditions.sha256` `b9c38b37…`;
+- cây master có SimReady, guard `simple-guard.sh`;
+- server `Ta` 24, `--rtc`, 1 worker (mục 17.7), thư mục ra mới.
+
+Chỉ khác checkpoint: C+ `ckpt_40000` thay cho C. Đọc bằng `eval_results --baseline` trỏ vào lô eval C SimReady, theo quy tắc 1–2; `place_error` báo cạnh, không phải luật.
+
+Giả định của ước lượng, chưa đo:
+- bản cắt C+ gấp đôi C (2,7 GB so với khoảng 1,3 GB), nên tải lên VM khoảng 8 phút ở 6 MB/s;
+- fine-tune 40 000 bước với batch như C, nên giờ GPU gần bằng C; số bước không đổi theo cỡ dữ liệu.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -1177,4 +1250,4 @@ Parent, recipe và seed train lấy của nhánh C.
 | 7/11/2026 | Mục 16: chạy lại eval C trên cảnh SimReady (Hiếu "Chạy lại eval C"). Viết trước lô đầu tiên: lý do, luật quy tắc 0 và bậc 2 không đổi, kết quả mục 13.7 giữ làm bản ghi nhưng không dùng để đọc quy tắc 0; cây master `079160d` có SimReady, guard revision theo từng lô; kiểm trước đạt (revision `4763fbf`, PSNR frame 0 34,9 dB); chỉ số phụ tư thế cuối của khay so với vùng đích, thêm sau khi thấy T1r, không phải luật | Hiếu (soạn với Claude) |
 | 8/11/2026 | Mục 16.6: kết quả eval C trên cảnh SimReady. 27/27 lô, 17,2 giờ. Mức 1–2 gộp 20/240 = 8,3 % (Wilson 5,5–12,5 %); quy tắc 0 xảy ra theo luật, cận trên khoảng tin cậy vượt 10 % ghi kèm. Mức 0 5/30. `L-PLACE-POSE` 131/240, trung vị lệch vùng đích 10–11 cm (chỉ số phụ). `Decision` ghi kết quả mới, kết quả mục 13.7 là bản ghi trên cảnh trơn; chưa ký. Luật mục 9, 16.1 không đổi | Hiếu (soạn với Claude) |
 | 8/11/2026 | Mục 17: nhiệm vụ 5, C+. 17.1 `Decision` mở lại C+ (sửa hệ quả "không chạy C+" của quy tắc 0 sau khi thấy kết quả, trích nguyên văn lời Hiếu 8/11; luật đọc C+ là quy tắc 1–2 không đổi; chờ ký). 17.2 evidence card cụm `L-PLACE-POSE`: vùng đích không render, vị trí đặt không đi theo đích, sai số chủ yếu là độ tản ngang, không tham số cảnh nào gắn với lỗi. 17.3 cách chọn 160 episode nhắm lỗi và luật đọc, viết trước khi sinh. 17.4 khoảng trống | Hiếu (soạn với Claude) |
-| 8/11/2026 | Mục 17.5: sinh 262 lượt nhắm lỗi (229 ghi được), QA phát lại 229/229, release `tray_s1_6c0fd7d37f77`, QA DA-03 226 pass / 3 reject, bộ lọc 177; chọn 160 theo luật 17.3 (bước 1: 117, bước 2: 43), tập `T160` `1104d00e…`; `round-tray-cplus.yaml` đóng băng `rp_71fee3fcff69`; bản cắt C+ 320 episode dựng thử và kiểm. | Hiếu (soạn với Claude) |
+| 8/11/2026 | Mục 17.5: sinh 262 lượt nhắm lỗi (229 ghi được), QA phát lại 229/229, release `tray_s1_6c0fd7d37f77`, QA DA-03 226 pass / 3 reject, bộ lọc 177; chọn 160 theo luật 17.3 (bước 1: 117, bước 2: 43), tập `T160` `1104d00e…`; `round-tray-cplus.yaml` đóng băng `rp_71fee3fcff69`; bản cắt C+ 320 episode dựng thử và kiểm. Mục 17.6: runbook Colab cho C+ (chưa chạy) | Hiếu (soạn với Claude) |
