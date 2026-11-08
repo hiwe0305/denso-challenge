@@ -1123,7 +1123,7 @@ Mốc so sánh C là eval C SimReady (mục 16.6). Chỉ số phụ, không ph�
 ### 17.4 Việc còn lại và khoảng trống
 
 - Bản cắt C+ cần 160 episode của C (release `tray_s1_f9433b028c52`) và 160 episode nhắm lỗi (release mới). `round-tray-cplus.yaml` chỉ ghim `targets.seeds` và `set_hash`. `demo_subset.py` của DA-26 và `colab_train` hiện chỉ đọc một release, và `colab_train` từ chối plan khác `rp_a04c14e79dfd`. Bước 3 phải ghép hai release, hoặc dựng một release từ cả hai lô; cách làm ghi ở PR (b).
-- Đo eval 2 worker trên cùng server (bước 4, kết quả ở mục 17.7): server Ψ₀ giữ **một** trạng thái RTC cho mọi client (mục 13.1). Đọc tại nguồn (`serve_psi0_simple.py` của Ψ₀ `cda3fdf`, `_claim_rtc_session`): mỗi client SIMPLE gửi `session_id` riêng; request có `reset` giành phiên RTC, request khác của client không giữ phiên bị trả **HTTP 409**. Vậy hai client trên cùng server không dùng chung trạng thái một cách âm thầm. Chúng giành phiên của nhau, và mỗi lần giành thì một episode bị hỏng. Phép đo phải tính tới điều này trước khi đề xuất (bước 4).
+- Đo eval 2 worker trên cùng server (bước 4, kết quả ở mục 17.7): server Ψ₀ giữ **một** trạng thái RTC cho mọi client (mục 13.1). **Sửa lại (8/11/2026, sau phép đo 17.7): câu "409" dưới đây sai cho đường eval của DA-34.** Câu đó đọc `simple/baselines/psi0.py`, baseline có gửi `session_id`. Eval khay dùng `psi0_decoupled_wbc.py` (SIMPLE `6d10628`): gửi `{"reset": True}` lúc reset (cộng `seed` của `flywheel_simple.tray.run`) và `{}` ở mọi bước khác, không có `session_id`. Khi đó `_claim_rtc_session` lấy host làm danh tính; mọi client trên `rtx3060` đều là `127.0.0.1`, nên hai client là **một** phiên. Chúng dùng chung `previous_action` mà không báo lỗi. Câu gốc của #161–#162 ("dùng chung trạng thái đó mà không báo lỗi") là đúng. Câu sai, giữ để đối chiếu: "Đọc tại nguồn (`serve_psi0_simple.py` của Ψ₀ `cda3fdf`, `_claim_rtc_session`): mỗi client SIMPLE gửi `session_id` riêng; request có `reset` giành phiên RTC, request khác của client không giữ phiên bị trả HTTP 409."
 
 ### 17.5 Sinh, QA, release và tập C+ (8/11/2026)
 
@@ -1230,6 +1230,48 @@ Chỉ khác checkpoint: C+ `ckpt_40000` thay cho C. Đọc bằng `eval_results 
 - thời gian mỗi bước không phụ thuộc số episode, vì 40 000 bước, batch và recipe như C; chưa đo ở 320 episode;
 - bản cắt C+ 2,7 GB tải lên khoảng 1,5 phút ở 33 MB/s, tốc độ probe của lần chạy C (C: 1,3 GB trong 52 s).
 
+### 17.7 Eval 2 worker trên một server: không dùng (nhiệm vụ 5.5, 8/11/2026)
+
+**[Đề xuất] Kết luận: không dùng 2 worker trên một server Ψ₀.** Eval C+ chạy 1 worker như eval C. Lý do là tính đúng của kết quả, không phải tốc độ. Phiên điều phối yêu cầu ghi kết luận này và cho dừng phép đo ngày 8/11; Hiếu duyệt qua PR chứa mục này.
+
+**Vì sao, đọc tại nguồn.** Client của eval khay là `psi0_decoupled_wbc.py` (SIMPLE `6d10628`), không gửi `session_id`. Vì vậy `_claim_rtc_session` của `serve_psi0_simple.py` (Ψ₀ `cda3fdf`) lấy host làm danh tính, và hai client trên `rtx3060` (`127.0.0.1`) là một phiên. Mục 17.4 có câu sửa lại. Hệ quả:
+
+| # | Chuyện gì xảy ra | Vì sao làm hỏng kết quả |
+|---|---|---|
+| 1 | Một `previous_action` chung | Chunk mới của episode này lấy phần đầu action của episode kia làm tiền tố RTC |
+| 2 | `reset` của client này xóa trạng thái RTC của client kia giữa episode | Episode kia mất tiền tố giữa chừng, dù server không báo lỗi |
+| 3 | `serve_psi0_seeded` gieo RNG toàn cục của torch lúc `reset`; lượt `/act` của client kia rút nhiễu xen vào | Nhiễu của mỗi episode phụ thuộc thời điểm của client kia; gieo theo episode (mục 8) mất tác dụng |
+
+Kết quả 2 worker vì thế không còn là cùng một thí nghiệm với eval C 1 worker, nên không so cặp được với mốc 16.6.
+
+**Phép đo, dừng giữa chừng.**
+
+| Mục | Giá trị |
+|---|---|
+| Cách chạy | Hai tiến trình `eval_batch` (`eval_driver` chỉ cho 1 worker mỗi tiến trình), proxy riêng trên 22196 và 22197. Cùng server C (`Ta` 24, `--rtc`). Mỗi bên 5 điều kiện mức 1 của tập eval C (seed 1000100–1000104 và 1000105–1000109). Guard SimReady bật, 1 lần thử, scope `MemoryMax=12G` |
+| Thời gian | Bắt đầu 04:54:52Z; dừng 05:01:47Z (`systemctl --user stop da34-w2-probe.scope`), khoảng 7 phút |
+| Episode xong | Mỗi bên 1 episode. Episode thứ hai (1000101, 1000106) bị cắt ở khoảng 166–170 s |
+| Server thấy gì | `history` chỉ là `{}` và `{"reset": True, "seed": N}`, không có `session_id`; log không có 409 hay lỗi. Đúng như đọc nguồn |
+
+So với cùng seed trong eval C SimReady (1 worker, lô `l1-000`):
+
+| Seed | 2 worker | 1 worker |
+|---|---|---|
+| 1000100 | `L-TIMEOUT`, 218,7 s | `L-TIMEOUT`, 196,3 s |
+| 1000105 | `L-TIMEOUT`, 218,2 s | `L-PLACE-POSE`, 280,4 s |
+
+- Seed 1000105 cho kết quả khác. Chỉ một episode, nên không tách được do tiền tố chung hay do nhiễu đổi; cả hai đều do chạy chung server.
+- Độ trễ `/act` trung bình 0,46 s ở 2 client; lô `l1-000` của eval C 1 client là 0,52 s, tải máy lúc đó khác.
+- Hai episode xong trong khoảng 219 s, nên thông lượng có thể gần gấp đôi. Đây là ước lượng từ 2 episode, không phải số đo, và không đổi kết luận.
+
+**Đường khác, chưa làm.**
+- `serve_psi0_simple_multi.py` giữ trạng thái RTC riêng cho từng client, nhưng gom batch, nên mất gieo nhiễu theo episode.
+- Server thứ hai không vừa GPU 12 GB (mục 13.1).
+
+Muốn eval nhanh hơn thì cần một trong hai đường trên, kèm luật đọc mới, và là quyết định của Hiếu.
+
+**Trả server.** Server C chưa bao giờ bị cấu hình lại trong phép đo. Container `fw-psi0-psi0-run-41b48a6a5890` vẫn chạy `ckpt_40000` của C với `--action-exec-horizon 24 --rtc` trên 22185, khỏe lúc 05:02Z, không còn client nào. Client kế tiếp gửi `reset`, lệnh này xóa `previous_action` còn lại của phép đo.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -1251,3 +1293,4 @@ Chỉ khác checkpoint: C+ `ckpt_40000` thay cho C. Đọc bằng `eval_results 
 | 8/11/2026 | Mục 16.6: kết quả eval C trên cảnh SimReady. 27/27 lô, 17,2 giờ. Mức 1–2 gộp 20/240 = 8,3 % (Wilson 5,5–12,5 %); quy tắc 0 xảy ra theo luật, cận trên khoảng tin cậy vượt 10 % ghi kèm. Mức 0 5/30. `L-PLACE-POSE` 131/240, trung vị lệch vùng đích 10–11 cm (chỉ số phụ). `Decision` ghi kết quả mới, kết quả mục 13.7 là bản ghi trên cảnh trơn; chưa ký. Luật mục 9, 16.1 không đổi | Hiếu (soạn với Claude) |
 | 8/11/2026 | Mục 17: nhiệm vụ 5, C+. 17.1 `Decision` mở lại C+ (sửa hệ quả "không chạy C+" của quy tắc 0 sau khi thấy kết quả, trích nguyên văn lời Hiếu 8/11; luật đọc C+ là quy tắc 1–2 không đổi; chờ ký). 17.2 evidence card cụm `L-PLACE-POSE`: vùng đích không render, vị trí đặt không đi theo đích, sai số chủ yếu là độ tản ngang, không tham số cảnh nào gắn với lỗi. 17.3 cách chọn 160 episode nhắm lỗi và luật đọc, viết trước khi sinh. 17.4 khoảng trống | Hiếu (soạn với Claude) |
 | 8/11/2026 | Mục 17.5: sinh 262 lượt nhắm lỗi (229 ghi được), QA phát lại 229/229, release `tray_s1_6c0fd7d37f77`, QA DA-03 226 pass / 3 reject, bộ lọc 177; chọn 160 theo luật 17.3 (bước 1: 117, bước 2: 43), tập `T160` `1104d00e…`; `round-tray-cplus.yaml` đóng băng `rp_71fee3fcff69`; bản cắt C+ 320 episode dựng thử và kiểm. Mục 17.6: runbook Colab cho C+ (chưa chạy) | Hiếu (soạn với Claude) |
+| 8/11/2026 | Mục 17.4: sửa câu "HTTP 409" (đọc nhầm `baselines/psi0.py`; client của eval khay `psi0_decoupled_wbc.py` không gửi `session_id`, nên hai client là một phiên RTC, dùng chung trạng thái mà không báo lỗi); câu sai giữ để đối chiếu. Mục 17.7: phép đo 2 worker trên một server, dừng sau 1 episode mỗi bên; kết luận không dùng 2 worker trên một server, eval C+ chạy 1 worker | Hiếu (soạn với Claude) |

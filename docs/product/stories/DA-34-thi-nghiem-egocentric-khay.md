@@ -61,7 +61,7 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
   - [x] 5.2 Evidence card cụm `L-PLACE-POSE` và luật chọn điều kiện nhắm lỗi, viết trước khi sinh · **8/11/2026:** 131 điều kiện, mỗi điều kiện 2 seed train (`cplus-conditions.jsonl`, sha256 `64d97c4e…`); card: vùng đích không render, không tham số cảnh nào gắn với lỗi (tray.md mục 17.2–17.3)
   - [x] 5.3 Sinh episode nhắm lỗi trên rtx3060, QA như release của C, release có hash, cắt tập C+ (160 + 160), đóng băng `round-tray-cplus.yaml` và ghi lock; dòng ước lượng và thực đo · **8/11/2026:** 262 lượt, 229 ghi được, release `tray_s1_6c0fd7d37f77`, 177 qua QA và bộ lọc, chọn 160 (`T160` `1104d00e…`), round `rp_71fee3fcff69`, bản cắt C+ 320 episode kiểm đạt (tray.md mục 17.5)
   - [x] 5.4 Runbook Colab cho C+ (như mục 12), chạy từ master; Hiếu launch · **8/11/2026:** runbook ở tray.md mục 17.6, `colab_train --branch C_PLUS` chỉ chạy round `rp_71fee3fcff69`; chưa launch
-  - [ ] 5.5 Đo eval 2 worker trên cùng server (thông lượng, độ lệch kết quả), đề xuất cho eval C+
+  - [x] 5.5 Đo eval 2 worker trên cùng server (thông lượng, độ lệch kết quả), đề xuất cho eval C+. Bằng chứng (tray.md 17.7): đề xuất không dùng 2 worker trên một server, vì client `psi0_decoupled_wbc.py` không gửi `session_id` nên hai client là một phiên RTC (`previous_action` chung, `reset` của bên này xóa trạng thái bên kia, nhiễu gieo theo episode xen nhau); log server chỉ có `{}` và `{reset, seed}`, không 409. Phép đo dừng theo lệnh phiên điều phối sau 1 episode mỗi bên (7 phút); seed 1000105 cho kết quả khác 1 worker. Sửa câu "409" của 17.4; dòng ước lượng và thực đo trong sổ
   - [ ] 5.6 Eval C+ và đọc theo quy tắc 1–2
 
 ## Phạm vi file
