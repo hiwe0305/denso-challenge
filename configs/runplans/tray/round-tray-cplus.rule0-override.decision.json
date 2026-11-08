@@ -4,9 +4,12 @@
  "embodiment_id": "g1_sonic_dwbc@1",
  "schema_version": "1.0.0",
  "meta": {
-  "status": "awaiting_signature",
+  "status": "signed",
   "story": "DA-34",
-  "subtask": "5.1"
+  "subtask": "5.1",
+  "signed_at": "2026-11-08",
+  "signature_words": "Ký, chuẩn bị PR ký",
+  "signature_via": "coordinator session 'Công việc của Hiếu (todo)'"
  },
  "id": "dec_01M6WJMMJ5GZCXFWR3E4GSXZZ0",
  "kind": "dev_gate",
@@ -60,7 +63,7 @@
   "evidence_card": "tray.md 17.2: no scene parameter separates success from L-PLACE-POSE; the target zone is not rendered; error is mostly lateral spread",
   "launch": "Colab train only by Hiếu, from master, after runplan check --launch on round-tray-cplus.yaml"
  },
- "signed_by": "pending: Hiếu",
- "reason": "Rule 0 fired on eval C rerun with SimReady visuals: 20/240 = 8.3 % on levels 1-2 (tray.md 16.6). The image pipeline check rule 0 asks for is done and its fault fixed (tray.md 15, 16). Hiếu, 8/11/2026 (quoted in criteria.hieu_words), goes on from that result and the coordinator's analysis: C reaches table B in 151/240 rollouts and fails mostly at L-PLACE-POSE (131/240, median 10-11 cm off). So the round plan round-tray-cplus.yaml runs C+ (160 of C + 160 targeted at C's failures, 18 CU slot of the tier 2 budget) instead of C-max. This changes a rule after its result was seen; the rule text and its sha256 stay as they are, and C+ is read by rules 1 and 2 of the same block, unchanged. Awaiting Hiếu's signature.",
+ "signed_by": "Hiếu",
+ "reason": "Rule 0 fired on eval C rerun with SimReady visuals: 20/240 = 8.3 % on levels 1-2 (tray.md 16.6). The image pipeline check rule 0 asks for is done and its fault fixed (tray.md 15, 16). Hiếu, 8/11/2026 (quoted in criteria.hieu_words), goes on from that result and the coordinator's analysis: C reaches table B in 151/240 rollouts and fails mostly at L-PLACE-POSE (131/240, median 10-11 cm off). So the round plan round-tray-cplus.yaml runs C+ (160 of C + 160 targeted at C's failures, 18 CU slot of the tier 2 budget) instead of C-max. This changes a rule after its result was seen; the rule text and its sha256 stay as they are, and C+ is read by rules 1 and 2 of the same block, unchanged. Signed by Hiếu 8/11/2026 (meta.signature_words).",
  "supersedes_decision_id": null
 }
