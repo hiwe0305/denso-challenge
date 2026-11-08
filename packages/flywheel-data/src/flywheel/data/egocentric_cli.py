@@ -1,4 +1,4 @@
-"""`fw egocentric ingest | pose | annotate | qa | report | review | trial` (DA-04).
+"""`fw egocentric ingest | deid | pose | annotate | qa | report | review | trial` (DA-04).
 
 One work directory per source, by default `$FW_ROOT/pipeline/<source_id>/` (ingest
 prints it); its layout is the one DA-18 reads (`ingest/egocentric/episodes.py`).
@@ -6,6 +6,8 @@ In order:
 
     fw egocentric ingest egodex                    pinned EgoDex subset (egocentric.yaml)
     fw egocentric ingest video --root <dir>        the team's recordings (EgoVideoSource)
+    fw egocentric deid <work>                      faces covered on this machine (YuNet);
+                                                   first, before anything reads a frame
     fw egocentric pose <work>                      E-B from the HDF5
     fw egocentric pose <work> --job jobs.json      manifest for the E-A job (rtx3060)
     fw egocentric pose <work> --estimates <dir>    E-A from the job's .npz, against E-B
@@ -32,6 +34,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import typer
+from flywheel.data.annotate.deid.blur import FaceDetector, YuNet
 from flywheel.data.annotate.deid.gate import unpinned_videos
 from flywheel.data.api import ConfigError, dataset_report, job_ledger, render_html
 from flywheel.data.config import store_root
@@ -49,7 +52,7 @@ from flywheel.data.ingest.egocentric.episodes import (
 from flywheel.data.ingest.egocentric.report import summarize_ego, write_page
 from flywheel.data.ingest.egocentric.segments import read_segment_rows
 from flywheel.data.ingest.egocentric.source import register_egodex
-from flywheel.data.ingest.egocentric.video_source import register_videos
+from flywheel.data.ingest.egocentric.video_source import register_videos, select_videos
 from flywheel.data.ingest.egocentric.vlm import ModelLabeler, ModelSuggester, OpenAIVision
 
 app = typer.Typer(no_args_is_help=True)
@@ -57,7 +60,8 @@ app = typer.Typer(no_args_is_help=True)
 CONFIG = Path("configs/data/egocentric.yaml")
 STORY = "DA-04"
 # Assumptions for the estimated ledger rows, not measurements: seconds per unit.
-ESTIMATE = {"ingest": (1e-3, "frame"), "pose": (2e-3, "frame"), "annotate": (5e-3, "frame"),
+ESTIMATE = {"ingest": (1e-3, "frame"), "deid": (5e-2, "frame"), "pose": (2e-3, "frame"),
+            "annotate": (5e-3, "frame"),
             "qa": (1e-3, "frame"), "report": (1e-2, "episode"), "review": (1e-2, "episode"),
             "trial": (20.0, "query")}
 EPISODE_FRAMES = 300  # assumed frames of an episode, before ingest has read the files
@@ -94,7 +98,7 @@ def ingest(
         elif source == "video":
             if root_dir is None:
                 raise ValueError("ingest video needs --root <recording dir>")
-            planned = len(list(root_dir.glob("*/*.mp4")))
+            planned = len(select_videos(root_dir))
             register = partial(register_videos, root_dir, cfg)
         else:
             raise ValueError(f"source {source!r} is not egodex or video")
@@ -107,12 +111,35 @@ def ingest(
     if record.deid_waiver:
         waiver = f"waived (D2; videos match {record.deid_waiver_manifest})"
     else:
-        waiver = "not waived: blocked before E-A and annotate"
+        waiver = "not waived: run `fw egocentric deid` before E-A and annotate"
         if record.source_detail == "egodex":
             waiver += f" ({len(unpinned_videos(record.files))} videos not in the pinned sample)"
     _say(f"{record.source_id}: {len(episodes)} episodes, {len(record.files)} files,"
          f" {record.total_bytes / 1e6:.1f} MB; de-identification {waiver}")
     _say(f"work: {out}")
+    _say(f"ledger: {job.run_plan_id}/{job.job_id}")
+
+
+@app.command()
+def deid(work: Work, config: Config = CONFIG, run_plan_id: RunPlan = None) -> None:
+    """Cover faces in a <i>.deid.mp4 beside each raw video; later steps read only the copy."""
+
+    with _refusals():
+        cfg = load_config(config)
+        source = api.read_source(work)
+        with _job("deid", _frames(work), run_plan_id) as job:
+            done = api.deid(work, _detector(cfg), cfg.deid.params, {
+                "name": cfg.deid.model.name, "revision": cfg.deid.model.revision,
+                "sha256": cfg.deid.sha256, "runtime": cfg.deid.model.served})
+            faces = sum(d.video.frames_with_faces for d in done)
+            message = (f"{source.source_id}: waived (D2), nothing to blur" if not done else
+                       f"{len(done)} videos blurred, faces found in {faces} of"
+                       f" {sum(d.video.frames for d in done)} frames; episodes are blurred")
+            job.notes.append(message)
+    _say(message)
+    for item in done:
+        _say(f"  {item.copy}: {item.video.frames_blurred} frames covered,"
+             f" {item.video.seconds:.1f} s")
     _say(f"ledger: {job.run_plan_id}/{job.job_id}")
 
 
@@ -310,6 +337,15 @@ def _job(command: str, units: int, run_plan_id: str | None) -> Any:
 def _frames(work: Path) -> int:
 
     return sum(read_bundle(work, e.episode_id).frames for e in read_episodes(work))
+
+
+def _detector(cfg: EgoConfig) -> FaceDetector:
+    """YuNet from the store; a missing file says where the pinned one is published."""
+    path = store_root() / cfg.deid.path
+    if not path.is_file():
+        raise FileNotFoundError(f"{path}: no face model; fetch it once with\n  mkdir -p"
+                                f" {path.parent} && curl -L -o {path} {cfg.deid.url}")
+    return YuNet(path, cfg.deid.sha256, cfg.deid.params)
 
 
 def _models(cfg: EgoConfig, endpoint: str | None) -> api.Models:

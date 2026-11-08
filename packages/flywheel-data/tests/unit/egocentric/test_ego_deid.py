@@ -14,8 +14,10 @@ from flywheel.data.annotate.deid.gate import (
     WAIVER_REASON,
     DeidBlocked,
     annotate_allowed,
+    deid_copy,
     deid_waiver,
     require_annotate,
+    uncovered_videos,
     unpinned_videos,
 )
 from flywheel.data.ingest.egocentric import api
@@ -86,11 +88,51 @@ def test_every_other_raw_egocentric_episode_is_blocked() -> None:
     assert not annotate_allowed(episode(), "egodex", "internal", WAIVER_REASON, VIDEO)
 
 
-def test_blurred_egocentric_and_robot_episodes_pass() -> None:
-    assert annotate_allowed(episode(deid_status="blurred", data_class="internal"),
-                            "ego_video", "internal", None, {})
+TEAM = {"two_table/0.mp4": "e" * 64, "two_table/1.mp4": "f" * 64, "device.json": "9" * 64}
+COPIES = {"two_table/0.deid.mp4": "1" * 64, "two_table/1.deid.mp4": "2" * 64}
+
+
+def team(status: str = "blurred") -> Episode:
+    return episode(deid_status=status, data_class="internal", action_quality="pseudo")
+
+
+def test_robot_episodes_pass_and_raw_team_video_is_refused() -> None:
     robot = episode(source_kind="teleop", action_quality="measured")
     assert annotate_allowed(robot, "psi_data", "public", None, {})
+    # raw team video: copies on disk do not help until the episodes are blurred
+    assert not annotate_allowed(team("raw"), "ego_video", "internal", None, TEAM, COPIES, COPIES)
+    with pytest.raises(DeidBlocked, match="not waived"):
+        require_annotate(team("raw"), "ego_video", "internal", None, TEAM, COPIES, COPIES)
+
+
+def test_a_blurred_source_passes_when_every_copy_has_its_recorded_sha256() -> None:
+    assert annotate_allowed(team(), "ego_video", "internal", None, TEAM, COPIES, COPIES)
+    require_annotate(team("verified"), "ego_video", "internal", None, TEAM, COPIES, COPIES)
+    assert uncovered_videos(TEAM, COPIES, COPIES) == []
+    assert deid_copy("two_table/0.mp4") == "two_table/0.deid.mp4"
+    with pytest.raises(ValueError):
+        deid_copy("two_table/0.deid.mp4")
+
+
+def test_the_status_alone_is_not_enough() -> None:
+    """episodes.jsonl is a text file: `blurred` without copies is refused (was allowed)."""
+    assert not annotate_allowed(team(), "ego_video", "internal", None, TEAM)
+    assert not annotate_allowed(team(), "ego_video", "internal", None, {})
+    one = {"two_table/0.deid.mp4": "1" * 64}
+    assert uncovered_videos(TEAM, one, one) == ["two_table/1.mp4"]
+    assert not annotate_allowed(team(), "ego_video", "internal", None, TEAM, one, one)
+    # the record must be the episode's own
+    assert not annotate_allowed(team(), "ego_video", "public", None, TEAM, COPIES, COPIES)
+
+
+@pytest.mark.parametrize("on_disk", [
+    {**COPIES, "two_table/1.deid.mp4": "3" * 64},  # the copy changed after deid
+    {**COPIES, "two_table/1.deid.mp4": None},  # the copy is gone
+])
+def test_a_copy_whose_sha256_differs_is_refused(on_disk: dict[str, str | None]) -> None:
+    assert not annotate_allowed(team(), "ego_video", "internal", None, TEAM, COPIES, on_disk)
+    with pytest.raises(DeidBlocked, match="no de-identified copy with the sha256.*1.mp4"):
+        require_annotate(team(), "ego_video", "internal", None, TEAM, COPIES, on_disk)
 
 
 def test_the_pin_holds_the_videos_of_da30s_sample() -> None:

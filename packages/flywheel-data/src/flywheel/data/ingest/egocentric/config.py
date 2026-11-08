@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Literal, cast
 
 import yaml
+from flywheel.data.annotate.deid.blur import BlurParams
 from flywheel.data.api import ConfigError
 
 DEFAULT = Path("configs/data/egocentric.yaml")
@@ -68,6 +69,17 @@ class ModelConfig:
 
 
 @dataclass(frozen=True)
+class DeidConfig:
+    """`deid`: the face model, pinned by sha256, and how its boxes are covered."""
+
+    model: ModelConfig
+    path: str  # the model file, relative to the store root
+    url: str
+    sha256: str
+    params: BlurParams
+
+
+@dataclass(frozen=True)
 class EgoConfig:
     version: str
     sha256: str
@@ -81,6 +93,7 @@ class EgoConfig:
     local_hosts: tuple[str, ...]
     review_share: float
     review_seed: int
+    deid: DeidConfig
 
     @property
     def threshold_version(self) -> str:
@@ -90,7 +103,7 @@ class EgoConfig:
 def load_config(path: Path = DEFAULT) -> EgoConfig:
     raw = path.read_bytes()
     data = _mapping(yaml.safe_load(raw), str(path))
-    _keys(data, ("version", "sources", "segment", "qa", "pose_ea", "models", "review"),
+    _keys(data, ("version", "sources", "segment", "qa", "pose_ea", "models", "review", "deid"),
           str(path))
     segment = _mapping(data["segment"], "segment")
     steps = _mapping(segment.pop("steps"), "segment.steps")
@@ -107,6 +120,7 @@ def load_config(path: Path = DEFAULT) -> EgoConfig:
                    for name, v in _mapping(data["sources"], "sources").items()}
         roles = {k: ModelConfig(**_mapping(v, f"models.{k}")) for k, v in models.items()
                  if k not in ("timeout_s", "max_image_side_px", "local_hosts")}
+        deid = _deid(_mapping(data["deid"], "deid"))
     except TypeError as error:
         raise ConfigError(f"{path}: {error}") from error
     for name, rule in rules.items():
@@ -128,6 +142,18 @@ def load_config(path: Path = DEFAULT) -> EgoConfig:
         local_hosts=_hosts(models.get("local_hosts", [])),
         review_share=float(review["sample_share"]),
         review_seed=int(review["seed"]),
+        deid=deid,
+    )
+
+
+def _deid(data: dict[str, Any]) -> DeidConfig:
+    model = _mapping(data.pop("model", None), "deid.model")
+    _keys(model, ("name", "path", "url", "revision", "sha256"), "deid.model")
+    return DeidConfig(
+        model=ModelConfig(name=str(model["name"]), served="opencv.FaceDetectorYN",
+                          revision=str(model["revision"])),
+        path=str(model["path"]), url=str(model["url"]), sha256=str(model["sha256"]),
+        params=BlurParams(**data),
     )
 
 

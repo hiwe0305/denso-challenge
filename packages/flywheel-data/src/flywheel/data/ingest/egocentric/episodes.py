@@ -11,9 +11,10 @@ DA-04 writes the work directory and DA-18 reads it; neither imports the other:
     qa/egocentric.jsonl                  one QAReport per episode
 
 An egocentric Episode is a human demonstration (`teleop_demo`, `operator_kind`
-human, a root), `source_kind` egocentric, `deid_status` raw until a blurring step
-exists (D2). `action_quality` follows the pose: `retargeted` for E-B, the tracked
-hand turned into Psi0's format (design 5.0), `pseudo` for E-A. An egocentric
+human, a root), `source_kind` egocentric, `deid_status` raw until `fw egocentric deid`
+sets it `blurred` (subtask 8; EgoDex keeps raw under the D2 waiver). `action_quality`
+follows the pose: `retargeted` for E-B, the tracked hand turned into Psi0's format
+(design 5.0), `pseudo` for E-A. An egocentric
 episode has no robot action and never goes to stage 3 (design 6.6).
 
 The episode id is `ep_` and the first 16 hex of sha256("<source_id>:<task>/<i>"):
@@ -104,7 +105,7 @@ def to_episode(
         split=split,
         source_kind="egocentric",
         action_quality="retargeted" if tracked else "pseudo",
-        deid_status="raw",  # D2: nothing is blurred yet; the gate decides
+        deid_status="raw",  # `deid` sets blurred; the gate decides
         embodiment_id=cfg.sources[source.source_detail].embodiment_id,
         meta=EpisodeMetadata(),
     )

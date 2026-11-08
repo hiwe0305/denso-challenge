@@ -98,7 +98,7 @@ def test_recordings_stop_at_the_gate_with_exit_2(
     config = ["--config", str(config_path)]
     root = make_videos(tmp_path / "rec")
     output = run("ingest", "video", "--root", str(root), *config)
-    assert "not waived: blocked before E-A and annotate" in output
+    assert "not waived: run `fw egocentric deid` before E-A and annotate" in output
     work = Path(output.split("work: ")[1].split()[0])
     result = runner.invoke(app, ["annotate", str(work), *config])
     assert result.exit_code == 2 and "ego_video" in result.output

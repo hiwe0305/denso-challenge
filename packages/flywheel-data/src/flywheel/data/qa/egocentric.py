@@ -164,7 +164,8 @@ def run_ego_qa(item: EgoQAInput, cfg: EgoConfig) -> QAReport:
                                                                          else "")
             results.append((check, rule.on_fail, reason))
 
-    judge("deid_gate", 0.0 if item.gate_passed else 1.0, "raw and not waived")
+    judge("deid_gate", 0.0 if item.gate_passed else 1.0,
+          "raw and not waived, or a blurred copy missing or changed")
     judge("min_frames", pose.frames, "frames of the pose", below=True)
     judge("video_frames", abs(item.video_frames - pose.frames),
           f"mp4 {item.video_frames}, pose {pose.frames}")
