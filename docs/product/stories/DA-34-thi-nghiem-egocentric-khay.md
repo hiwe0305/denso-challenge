@@ -57,6 +57,12 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
   - [x] 3.8 Chạy lại eval C trên cảnh SimReady (Hiếu 7/11/2026 "Chạy lại eval C"): cây master có SimReady chép từ `~/denso-da33`, kiểm revision và PSNR trước khi chạy, guard revision theo từng lô; cùng RunPlan, 270 điều kiện, server `Ta` 24 + RTC, 1 worker; luật quy tắc 0 và bậc 2 không đổi, viết trước lô đầu tiên (tray.md mục 16); chỉ số phụ tư thế cuối của khay (`place_error`); dòng ước lượng và thực đo; không train, 0 CU · **8/11/2026:** 27/27 lô lần đầu, mã 0, 17,2 giờ; mức 1–2 gộp 20/240 = 8,3 % (Wilson 5,5–12,5 %), quy tắc 0 xảy ra; mức 0 5/30; `L-PLACE-POSE` 131/240, trung vị lệch 10–11 cm; `Decision` ghi kết quả mới, chờ Hiếu ký (tray.md mục 16.6)
 - [ ] 4. Nhánh B khi có video (AC 5)
 - [ ] 5. Vòng Failure → Data trên lỗi của C: chẩn đoán, sinh nhắm lỗi, fine-tune và eval C+ (AC 6; trước 12/11/2026)
+  - [x] 5.1 `Decision` mở lại C+ sau quy tắc 0 trên eval C SimReady (Hiếu 8/11/2026 "Làm tiếp đi từ kết quả và phân tích kia. tôi muốn làm nó nhanh hơn"): sửa luật sau khi thấy kết quả, luật đọc C+ là quy tắc 1–2 không đổi, chờ Hiếu ký · **8/11/2026:** `round-tray-cplus.rule0-override.decision.json` (tray.md mục 17.1)
+  - [x] 5.2 Evidence card cụm `L-PLACE-POSE` và luật chọn điều kiện nhắm lỗi, viết trước khi sinh · **8/11/2026:** 131 điều kiện, mỗi điều kiện 2 seed train (`cplus-conditions.jsonl`, sha256 `64d97c4e…`); card: vùng đích không render, không tham số cảnh nào gắn với lỗi (tray.md mục 17.2–17.3)
+  - [ ] 5.3 Sinh episode nhắm lỗi trên rtx3060, QA như release của C, release có hash, cắt tập C+ (160 + 160), đóng băng `round-tray-cplus.yaml` và ghi lock; dòng ước lượng và thực đo
+  - [ ] 5.4 Runbook Colab cho C+ (như mục 12), chạy từ master; Hiếu launch
+  - [ ] 5.5 Đo eval 2 worker trên cùng server (thông lượng, độ lệch kết quả), đề xuất cho eval C+
+  - [ ] 5.6 Eval C+ và đọc theo quy tắc 1–2
 
 ## Phạm vi file
 

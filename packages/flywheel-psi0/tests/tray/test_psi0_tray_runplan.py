@@ -682,3 +682,42 @@ def test_the_rule_0_decision_records_eval_c_and_names_the_cmax_plan() -> None:
         if name.startswith("T")
     } == {"T1": (24, True), "T2b": (24, False), "T2a_prime": (10, False)}
     assert not any("no procedure or result" in gap for gap in decision.meta["gaps"])
+
+
+def test_the_cplus_decision_lifts_rule_0_for_one_round_and_keeps_the_rules() -> None:
+    override = Decision.model_validate_json(
+        (PLANS / "round-tray-cplus.rule0-override.decision.json").read_text()
+    )
+    rule0 = Decision.model_validate_json((PLANS / "he-tray-v2.rule0.decision.json").read_text())
+    v2 = TrayRunPlan.load(PLAN_V2)
+    # a rule change after the result: names the rule 0 Decision, keeps the rule text, unsigned
+    assert (override.kind, override.verdict) == ("dev_gate", "overridden")
+    assert (override.subject_kind, override.subject_id) == ("decision", rule0.id)
+    assert override.signed_by.startswith("pending")
+    assert override.criteria["rule_change_after_result"] is True
+    assert override.criteria["rules_sha256"] == v2.interpretation.rules_sha256
+    assert (
+        override.metrics["rule0_result"]["headline_successes"]
+        == rule0.metrics["headline"]["successes"]
+    )
+    assert rule0.verdict == "fail"  # the rule 0 Decision itself is not changed
+
+
+def test_cplus_conditions_are_the_place_pose_failures_of_eval_c_on_dev() -> None:
+    from flywheel_simple.tray.randomize import split_of
+
+    rows = [
+        json.loads(line) for line in (PLANS / "cplus-conditions.jsonl").read_text().splitlines()
+    ]
+    errors = [
+        json.loads(line)
+        for line in (PLANS / "cplus-conditions-place-error.jsonl").read_text().splitlines()
+    ]
+    assert len(rows) == 131 and {r["n"] for r in rows} == {2}
+    assert sorted((r["level"], r["seed"]) for r in rows) == [(r["level"], r["seed"]) for r in rows]
+    assert {r["level"] for r in rows} == {1, 2}
+    assert all(
+        split_of(r["seed"]) == "dev" for r in rows
+    )  # failures found on dev, never regenerated
+    assert [e["cluster_id"] for e in errors] == [r["cluster_id"] for r in rows]
+    assert all(e["distance_m"] > 0.0 for e in errors)

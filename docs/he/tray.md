@@ -1054,6 +1054,77 @@ Nhãn lỗi:
 - Số của lần chạy trên cảnh trơn chuyển vào `metrics.plain_visuals_record`, ghi rõ chỉ là bản ghi.
 - `next_step_proposed` (C-max (i)) được viết trên kết quả cảnh trơn. Giữ hay đổi bước tiếp theo là quyết định của Hiếu; chưa launch gì.
 
+## 17. Nhiệm vụ 5: C+, vòng Failure → Data trên lỗi của C
+
+_Story DA-34 nhiệm vụ 5 (AC 6). Mốc theo mục 5: C+ phải bắt đầu train trước 11/11/2026; nếu không kịp thì đi đường lui của mục 5. Mục 17.1–17.3 được viết và commit **trước** khi sinh episode nhắm lỗi nào._
+
+### 17.1 `Decision` mở lại C+
+
+**[Đã chốt 8/11/2026, Hiếu]**, qua phiên điều phối, nguyên văn: "Làm tiếp đi từ kết quả và phân tích kia. tôi muốn làm nó nhanh hơn". "Phân tích kia" là đề xuất của phiên điều phối sau mục 16.6:
+- C mang khay tới bàn B ở 151/240 lượt nhưng đặt lệch, trung vị khoảng 10 cm;
+- lỗi chính là `L-PLACE-POSE` (131/240);
+- vì vậy đi C+ thay vì C-max.
+
+**Đây là sửa luật sau khi đã thấy kết quả.** Quy tắc 0 xảy ra trên eval C SimReady (8,3 %, mục 16.6), và câu của quy tắc nói "không chạy C+". [`round-tray-cplus.rule0-override.decision.json`](../../configs/runplans/tray/round-tray-cplus.rule0-override.decision.json) gỡ hệ quả đó cho một vòng:
+
+| Mục | Nội dung |
+|---|---|
+| Căn cứ | Quy tắc 0 đã xảy ra. Bước "kiểm pipeline ảnh" mà quy tắc 0 yêu cầu đã làm xong, và lỗi đã được sửa: cây eval thiếu manifest SimReady (mục 15), eval C chạy lại trên SimReady có guard (mục 16) |
+| Cho chạy | C+ theo [`round-tray-cplus.yaml`](../../configs/runplans/tray/round-tray-cplus.yaml): 160 episode của C cộng 160 episode nhắm lỗi; dùng slot 18 CU đã có trong budget bậc 2 (`round_runs: [C_PLUS]`). Thay cho C-max (i) `rp_366283071c4a`, chưa launch |
+| Luật đọc C+ | Quy tắc 1 và 2 của khối `tier2-rules` (mục 9), không đổi; sha256 của khối giữ nguyên |
+| Luật 14.1 | Sau T1 0/20, luật 14.1 giữ không train cho tới khi tìm ra lỗi. `Decision` này, khi được ký, gỡ việc giữ đó **cho riêng C+** |
+| Ký | `signed_by: pending: Hiếu`; Hiếu ký khi merge. Launch Colab chỉ do Hiếu, từ master, sau `runplan check --launch` trên `round-tray-cplus.yaml` |
+
+`Decision` quy tắc 0 (`he-tray-v2.rule0.decision.json`) giữ nguyên, không đổi verdict.
+
+### 17.2 Evidence card: cụm `L-PLACE-POSE`
+
+**Vì sao không dùng công cụ của DA-13.** Phân bổ stage của DA-13 (`flywheel.eval.diagnosis.stage`) cần số đo probe P1/P3 trên model, mà eval C không có. `EvidenceCard` của hợp đồng cần thêm các phép kiểm hệ thống R1–R6 cho từng đại diện, mà trace của lô này không đủ. Vì vậy card dưới đây làm bằng công cụ trong phạm vi DA-34 (`place_error`, `eval_results`) và hai phân tích ad hoc trên outcome. Nó là bảng tóm tắt, không phải `EvidenceCard` theo schema.
+
+| Mục | Giá trị |
+|---|---|
+| Cụm | `L-PLACE-POSE`, bước hỏng đầu tiên `place` (bước 6), mức 1–2: 131/240 lượt (68 ở mức 1, 63 ở mức 2). Mức 0 có thêm 16/30 |
+| Nguồn | Outcome và trace của eval C SimReady (mục 16.6), cây `079160d` |
+| Độ lệch cuối (`place_error`) | Trung vị 10,1 cm (mức 1) và 11,2 cm (mức 2); dung sai 5 cm. 78/131 chỉ lệch vị trí, 44 lệch cả vị trí và góc, 8 chỉ lệch góc |
+| Vùng đích có hiện trong ảnh không | **Không.** `mjcf.py` không dựng geom nào cho vùng đích; chỉ bộ chấm biết nó |
+| Vị trí đặt có đi theo vùng đích không | Gần như không. Hồi quy vị trí cuối (so với vị trí danh định) theo độ dịch của đích, trên lượt thành công và `L-PLACE-POSE` dưới 60 cm: hệ số dốc 0,41 / 0,45 (x / y) ở mức 1 và 0,08 / −0,19 ở mức 2; r ≤ 0,19 |
+| Sai số đến từ đâu | Phần lớn là độ tản dọc trục y của bàn B: độ lệch chuẩn 10,0 cm ở mức 0 (đích không dịch), 10,8 cm ở mức 1, 15,3 cm ở mức 2. Theo x là 4,3–5,2 cm. Đích chỉ dịch với độ lệch chuẩn khoảng 2,5 cm. Góc cuối lệch trung bình −4,6° / −6,0°, độ lệch chuẩn khoảng 7° |
+| Nếu đặt đúng vị trí danh định | 84 % (mức 1) và 86 % (mức 2) số điều kiện sẽ qua dung sai, dù không thấy vùng đích |
+| Tham số cảnh nào gắn với lỗi | Không tham số nào. Trên 151 lượt có khay trên bàn B, so 20 thành công với 131 `L-PLACE-POSE` theo độ dịch của khay và của đích, góc khay và góc đích, khoảng cách hai bàn, vị trí xuất phát, khối lượng linh kiện, ánh sáng: cả 8 tham số đều có p hoán vị > 0,2. Tỉ lệ thành công theo ba khoảng độ dịch của đích là 0,15 / 0,11 / 0,17 |
+
+**Đọc (giả định, chưa kiểm bằng train).**
+- Lỗi đặt là độ chính xác của chính policy, chủ yếu theo trục ngang. Nó không tập trung ở vùng cảnh nào.
+- Vùng đích không hiện trong ảnh giới hạn mức tối đa, nhưng không phải nguyên nhân chính: đặt đúng chỗ danh định đã đạt khoảng 85 %.
+- Theo spec mục 6.9, dạng lỗi này gần "kỹ năng yếu" (`weak_skill`, đề xuất `teleop_correction`) hơn "thiếu vùng phủ" (`coverage_gap`, đề xuất `sim_s1`).
+- Sinh S1 nhắm lỗi theo điều kiện, như `targets.py` làm, chọn seed train gần cảnh đã hỏng. Vì lỗi không gắn với cảnh, các seed đó thực chất là thêm dữ liệu S1 rải đều trên vùng mức 1–2.
+- Đây là ghi nhận cho Hiếu, không phải luật. C+ vẫn chạy theo `Decision` 17.1. Giới hạn ở quy tắc 2 đã nói hiệu C+ − C gộp "nhiều dữ liệu hơn" và "dữ liệu nhắm lỗi".
+
+### 17.3 Chọn điều kiện nhắm lỗi và luật đọc (viết trước khi sinh)
+
+**[Đề xuất]**, viết và commit trước lần sinh đầu tiên, không sửa sau khi thấy episode.
+
+| Bước | Cách làm |
+|---|---|
+| Điều kiện | Mọi lượt mức 1–2 của eval C SimReady có nhãn `L-PLACE-POSE` (131 điều kiện dev), mỗi điều kiện `n` = 2. File [`cplus-conditions.jsonl`](../../configs/runplans/tray/cplus-conditions.jsonl), sha256 `64d97c4e…`, xếp theo mức rồi seed |
+| Seed | `generate.py --conditions` dùng `flywheel_simple.tray.targets` với tham số mặc định: với mỗi điều kiện, lấy các seed train gần nhất trong cửa sổ 100 000–199 999, đo theo nhóm tham số mà mức đó dịch (mức 1: khay và đích; mức 2: thêm khoảng cách hai bàn, vị trí xuất phát, khối lượng, ánh sáng). Episode luôn sinh trên seed train, không bao giờ trên điều kiện dev (Q-33A). Kế hoạch thử: 262 seed, khoảng cách trung vị 0,28, lớn nhất 0,80 (1,0 = một biên độ dịch). Cửa sổ không chồng với seed 1000–1609 của C |
+| Sinh | `rtx3060`, planner `da33-planner-5+cfg.4e2a4505` (trùng C, đã kiểm trên master `079160d`). SimReady chép từ `~/denso-da33`; `generate.py` từ chối ghi khi thiếu SimReady (không truyền `--allow-plain`). Revision và sha của manifest được kiểm trước khi chạy |
+| QA | Như release của C (mục 10): QA phát lại, QA của DA-03 (loại `reject` và `quarantine`), rồi bộ lọc chất lượng của C (nghiêng ≤ 10°, xê dịch ≤ 20 mm) |
+| Chọn 160 | (1) Đi theo thứ tự trong file, mỗi điều kiện lấy seed qua QA gần nhất. (2) Nếu chưa đủ 160, thêm seed qua QA thứ hai của các điều kiện, ưu tiên điều kiện có độ lệch đặt lớn hơn trong eval C ([`cplus-conditions-place-error.jsonl`](../../configs/runplans/tray/cplus-conditions-place-error.jsonl), sha256 `dd5efd05…`). (3) Nếu vẫn dưới 160, sinh thêm một lô mới với `n` = 1 cho các điều kiện chưa có seed nào qua, rồi áp lại (1)–(2); điều này được ghi lại, không đổi luật |
+| Ước lượng hiệu suất | Giả định theo lô `s1-pool-1104`: thành công 89 %, QA của DA-03 99 %, bộ lọc 81 %, tổng khoảng 70 %, tức khoảng 184 episode qua trên 262 |
+
+**Luật đọc C+.** Quy tắc 1 và 2 của khối `tier2-rules`, không đổi:
+- trên 240 điều kiện mức 1–2: hiệu C+ − C kèm CI bootstrap theo điều kiện;
+- tỉ lệ C+ làm được trên các điều kiện C hỏng;
+- số hồi quy, kèm số lượt C hỏng mà C+ làm được;
+- mức 0 báo riêng.
+
+Mốc so sánh C là eval C SimReady (mục 16.6). Chỉ số phụ, không phải luật: `place_error` của C+ trên cùng 131 điều kiện, so với C.
+
+### 17.4 Việc còn lại và khoảng trống
+
+- Bản cắt C+ cần 160 episode của C (release `tray_s1_f9433b028c52`) và 160 episode nhắm lỗi (release mới). `round-tray-cplus.yaml` chỉ ghim `targets.seeds` và `set_hash`. `demo_subset.py` của DA-26 và `colab_train` hiện chỉ đọc một release, và `colab_train` từ chối plan khác `rp_a04c14e79dfd`. Bước 3 phải ghép hai release, hoặc dựng một release từ cả hai lô; cách làm ghi ở PR (b).
+- Đo eval 2 worker trên cùng server: server Ψ₀ giữ **một** trạng thái RTC cho mọi client (mục 13.1). Hai client cùng lúc với `--rtc` sẽ dùng chung trạng thái đó mà không báo lỗi. Phép đo phải tính tới điều này trước khi đề xuất (bước 4).
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -1073,3 +1144,4 @@ Nhãn lỗi:
 | 7/11/2026 | Mục 15.8: kết quả T1r. Kiểm trước đạt (revision `4763fbf`, PSNR frame 0 34,9 dB). p_T1r 1/20 (Wilson 0,9–23,6 %); `place` ghép cặp với T1: 1 và 1, không tốt hơn rõ. Đọc theo bảng 15.7: ảnh lệch là một phần nguyên nhân; đọc chung với A: C chưa học `place`. Luật 15.7 không đổi | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 16: chạy lại eval C trên cảnh SimReady (Hiếu "Chạy lại eval C"). Viết trước lô đầu tiên: lý do, luật quy tắc 0 và bậc 2 không đổi, kết quả mục 13.7 giữ làm bản ghi nhưng không dùng để đọc quy tắc 0; cây master `079160d` có SimReady, guard revision theo từng lô; kiểm trước đạt (revision `4763fbf`, PSNR frame 0 34,9 dB); chỉ số phụ tư thế cuối của khay so với vùng đích, thêm sau khi thấy T1r, không phải luật | Hiếu (soạn với Claude) |
 | 8/11/2026 | Mục 16.6: kết quả eval C trên cảnh SimReady. 27/27 lô, 17,2 giờ. Mức 1–2 gộp 20/240 = 8,3 % (Wilson 5,5–12,5 %); quy tắc 0 xảy ra theo luật, cận trên khoảng tin cậy vượt 10 % ghi kèm. Mức 0 5/30. `L-PLACE-POSE` 131/240, trung vị lệch vùng đích 10–11 cm (chỉ số phụ). `Decision` ghi kết quả mới, kết quả mục 13.7 là bản ghi trên cảnh trơn; chưa ký. Luật mục 9, 16.1 không đổi | Hiếu (soạn với Claude) |
+| 8/11/2026 | Mục 17: nhiệm vụ 5, C+. 17.1 `Decision` mở lại C+ (sửa hệ quả "không chạy C+" của quy tắc 0 sau khi thấy kết quả, trích nguyên văn lời Hiếu 8/11; luật đọc C+ là quy tắc 1–2 không đổi; chờ ký). 17.2 evidence card cụm `L-PLACE-POSE`: vùng đích không render, vị trí đặt không đi theo đích, sai số chủ yếu là độ tản ngang, không tham số cảnh nào gắn với lỗi. 17.3 cách chọn 160 episode nhắm lỗi và luật đọc, viết trước khi sinh. 17.4 khoảng trống | Hiếu (soạn với Claude) |
