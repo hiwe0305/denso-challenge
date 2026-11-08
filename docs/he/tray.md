@@ -1320,6 +1320,19 @@ Muốn eval nhanh hơn thì cần một trong hai đường trên, kèm luật �
 
 **Trả server.** Server C chưa bao giờ bị cấu hình lại trong phép đo. Container `fw-psi0-psi0-run-41b48a6a5890` vẫn chạy `ckpt_40000` của C với `--action-exec-horizon 24 --rtc` trên 22185, khỏe lúc 05:02Z, không còn client nào. Client kế tiếp gửi `reset`, lệnh này xóa `previous_action` còn lại của phép đo.
 
+### 17.8 Fine-tune C+: lần 1 dừng giữa chừng, lần 2 chạy lại từ đầu (8–9/11/2026)
+
+| Lần | Diễn biến |
+|---|---|
+| 1 | Phiên `da34-t5-ft-cplus-s0` chạy từ master `2363f70`, bản cắt dựng lại từ master trùng từng byte bản dựng thử ở 17.5 (654 file). L4 bound 11:30:13Z, train từ 11:38Z, 0,73 s/bước (như C). Lúc 15:21:40Z laptop chạy watcher bị restart từ hộp thoại tắt máy của GNOME. Watcher nhận SIGTERM và trả VM lúc 15:21:47Z, nên không có CU nào chạy khi không có người canh. Train tới khoảng bước 18 000/40 000. Chỉ `ckpt_10000` về tới laptop; checkpoint này không có trạng thái optimizer và `colab_train` không có chế độ chạy tiếp, nên không dùng. Đã tiêu 7,49 CU |
+| 2 | Hiếu 9/11/2026: "Chạy lại, cap 17". Chạy lại từ bước 0 trên cùng bản cắt và plan `rp_71fee3fcff69`. L4 bound 18:22:18Z, `colab_train check` trên VM qua. Cap watcher 17 CU để số dư (30,99 CU) không xuống dưới sàn 14. Ước lượng 16,0 CU, 8,3 giờ (giả định theo C) |
+
+**Ngân sách.** C+ tổng khoảng 7,49 + 16,0 = 23,5 CU, vượt slot 18 CU của `round_runs` trong `rp_a04c14e79dfd`. Cộng với C (15,99 CU) là khoảng 39,5 CU, vượt trần 36 CU. Hiếu duyệt bằng lời trích ở trên; số đo ở ledger `job_da34_ft_C_PLUS`.
+
+**Đọc kết quả.** Lần 2 dùng đúng recipe, seed, parent và bản cắt của lần 1, nên phép so C+ với C không đổi. Lần 1 không sinh checkpoint nào được dùng.
+
+**Bài học vận hành.** Khóa của watcher (`systemd-inhibit`) chỉ chặn ngủ, nghỉ và gập nắp; nó không chặn restart bấm tay. Trong lúc chạy job Colab, laptop không được restart; có thông báo cập nhật thì hoãn.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -1344,3 +1357,4 @@ Muốn eval nhanh hơn thì cần một trong hai đường trên, kèm luật �
 | 8/11/2026 | Mục 17.4: sửa câu "HTTP 409" (đọc nhầm `baselines/psi0.py`; client của eval khay `psi0_decoupled_wbc.py` không gửi `session_id`, nên hai client là một phiên RTC, dùng chung trạng thái mà không báo lỗi); câu sai giữ để đối chiếu. Mục 17.7: phép đo 2 worker trên một server, dừng sau 1 episode mỗi bên; kết luận không dùng 2 worker trên một server, eval C+ chạy 1 worker | Hiếu (soạn với Claude) |
 | 8/11/2026 | Mục 17.6: ba điều bắt buộc (launch check, cap 18 CU, đường checkpoint về `rtx3060` có sha256), lệnh hand-off chép cả danh sách sha256, eval C+ chuẩn bị sẵn (`serve-cplus.sh`, `launch-eval-cplus.sh`, `stats-check.py` trong `~/denso-da34-t8`), chưa chạy; sửa tên job `job_da34_ft_C_PLUS` | Hiếu (soạn với Claude) |
 | 8/11/2026 | Hiếu ký hai `Decision`: quy tắc 0 (`he-tray-v2.rule0.decision.json`, `verdict: fail` giữ nguyên) và mở lại C+ (`round-tray-cplus.rule0-override.decision.json`). Các chỗ ghi "chờ ký" đổi thành đã ký; C+ chưa launch | Hiếu (soạn với Claude) |
+| 9/11/2026 | Mục 17.8: fine-tune C+ lần 1 dừng ở khoảng bước 18 000 vì laptop restart (7,49 CU, không checkpoint nào dùng được); Hiếu duyệt chạy lại từ đầu với cap 17 CU, C+ tổng khoảng 23,5 CU vượt slot 18 CU | Hiếu (soạn với Claude) |
