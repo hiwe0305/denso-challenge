@@ -1123,7 +1123,7 @@ Mốc so sánh C là eval C SimReady (mục 16.6). Chỉ số phụ, không ph�
 ### 17.4 Việc còn lại và khoảng trống
 
 - Bản cắt C+ cần 160 episode của C (release `tray_s1_f9433b028c52`) và 160 episode nhắm lỗi (release mới). `round-tray-cplus.yaml` chỉ ghim `targets.seeds` và `set_hash`. `demo_subset.py` của DA-26 và `colab_train` hiện chỉ đọc một release, và `colab_train` từ chối plan khác `rp_a04c14e79dfd`. Bước 3 phải ghép hai release, hoặc dựng một release từ cả hai lô; cách làm ghi ở PR (b).
-- Đo eval 2 worker trên cùng server: server Ψ₀ giữ **một** trạng thái RTC cho mọi client (mục 13.1). Hai client cùng lúc với `--rtc` sẽ dùng chung trạng thái đó mà không báo lỗi. Phép đo phải tính tới điều này trước khi đề xuất (bước 4).
+- Đo eval 2 worker trên cùng server: server Ψ₀ giữ **một** trạng thái RTC cho mọi client (mục 13.1). Đọc tại nguồn (`serve_psi0_simple.py` của Ψ₀ `cda3fdf`, `_claim_rtc_session`): mỗi client SIMPLE gửi `session_id` riêng; request có `reset` giành phiên RTC, request khác của client không giữ phiên bị trả **HTTP 409**. Vậy hai client trên cùng server không dùng chung trạng thái một cách âm thầm. Chúng giành phiên của nhau, và mỗi lần giành thì một episode bị hỏng. Phép đo phải tính tới điều này trước khi đề xuất (bước 4).
 
 ## Change log
 
