@@ -1123,7 +1123,39 @@ Mốc so sánh C là eval C SimReady (mục 16.6). Chỉ số phụ, không ph�
 ### 17.4 Việc còn lại và khoảng trống
 
 - Bản cắt C+ cần 160 episode của C (release `tray_s1_f9433b028c52`) và 160 episode nhắm lỗi (release mới). `round-tray-cplus.yaml` chỉ ghim `targets.seeds` và `set_hash`. `demo_subset.py` của DA-26 và `colab_train` hiện chỉ đọc một release, và `colab_train` từ chối plan khác `rp_a04c14e79dfd`. Bước 3 phải ghép hai release, hoặc dựng một release từ cả hai lô; cách làm ghi ở PR (b).
-- Đo eval 2 worker trên cùng server: server Ψ₀ giữ **một** trạng thái RTC cho mọi client (mục 13.1). Đọc tại nguồn (`serve_psi0_simple.py` của Ψ₀ `cda3fdf`, `_claim_rtc_session`): mỗi client SIMPLE gửi `session_id` riêng; request có `reset` giành phiên RTC, request khác của client không giữ phiên bị trả **HTTP 409**. Vậy hai client trên cùng server không dùng chung trạng thái một cách âm thầm. Chúng giành phiên của nhau, và mỗi lần giành thì một episode bị hỏng. Phép đo phải tính tới điều này trước khi đề xuất (bước 4).
+- Đo eval 2 worker trên cùng server (bước 4, kết quả ở mục 17.7): server Ψ₀ giữ **một** trạng thái RTC cho mọi client (mục 13.1). Đọc tại nguồn (`serve_psi0_simple.py` của Ψ₀ `cda3fdf`, `_claim_rtc_session`): mỗi client SIMPLE gửi `session_id` riêng; request có `reset` giành phiên RTC, request khác của client không giữ phiên bị trả **HTTP 409**. Vậy hai client trên cùng server không dùng chung trạng thái một cách âm thầm. Chúng giành phiên của nhau, và mỗi lần giành thì một episode bị hỏng. Phép đo phải tính tới điều này trước khi đề xuất (bước 4).
+
+### 17.5 Sinh, QA, release và tập C+ (8/11/2026)
+
+_Chạy trên `rtx3060`, 0 CU. Mọi bước theo luật 17.3 đã commit trước lần sinh đầu tiên (`40dc512a`); không đổi luật nào sau khi thấy episode._
+
+| Bước | Kết quả |
+|---|---|
+| Sinh, lô `cplus-tgt-1108` | 03:23:33Z–04:19:39Z, 0,93 giờ, 10 worker, cây master `079160d`, SimReady `4763fbf`, planner `da33-planner-5+cfg.4e2a4505` (trùng C). 262 lượt, **229 ghi được** (120 mức 1, 109 mức 2). Hỏng: `L-PLACE-POSE` 9, `L-TRAY-TILT` 7, `L-ONE-HAND` 4, timeout 13. Shard 07–09 chết lúc khởi động vì GPU gần đầy (framebuffer EGL không tạo được; server C giữ 8,5 GB); `generate.py` chạy lại một lần sau các shard khác, không shard nào hỏng |
+| QA phát lại (D-24) | 229/229 đạt, lệch khay 0,0 mm, 10 worker, 26 phút |
+| Release | **`tray_s1_6c0fd7d37f77`**, `release_hash` `6c0fd7d37f7793f0ce64af79053a4f4778689ec6f5ee9fc6615422a65f18894c`, 229 episode, một planner |
+| QA của DA-03 (`qa-1@fb6ddaf9f48c`) cùng phát lại động học DA-17 (`replay-1@cf2515483a8c`) | Chạy từ cây `3e45bb6`, đúng code và ngưỡng của QA cho C (QA trên master đã đổi sau đó vì DA-04). **226 pass, 0 flag, 3 reject**, cả ba `joint_mapping` (seed 125195, 137108, 181063). `stats_json.states` D4 lệch 0,0022, như release của C (lỗi đã biết của script tác giả, mục 10) |
+| Bộ lọc chất lượng của C (nghiêng ≤ 10°, xê dịch ≤ 20 mm) | 177 / 226 giữ lại. Trên cả 229: nghiêng trung vị 7,1°, p90 10,0°; xê dịch trung vị 10,9 mm, p90 21,1 mm. [`quality-cplus-tgt-1108.jsonl`](../../configs/runplans/tray/quality-cplus-tgt-1108.jsonl), sha256 `3c1d853c…` |
+| Hiệu suất | 177/262 = 67,6 %, gần giả định 70 % của 17.3. Sinh thành công cao hơn giả định (87 % so với 89 % × QA), bộ lọc loại nhiều hơn |
+| Chọn 160 ([`cplus_select`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/cplus_select.py)) | Bước (1): 117 điều kiện có seed qua QA, lấy seed gần nhất. Bước (2): thêm 43 seed thứ hai, theo độ lệch đặt giảm dần. Không cần bước (3). 14 điều kiện không có seed nào qua (9 mức 1, 5 mức 2) và không có trong C+. Tập: 82 mức 1, 78 mức 2; khoảng cách tới điều kiện trung vị 0,29, lớn nhất 0,80 |
+| Tập `T160` | [`demo_sets-cplus.json`](../../configs/runplans/tray/demo_sets-cplus.json), `set_hash` `1104d00ea3ea…`; danh sách chọn [`cplus-selection.jsonl`](../../configs/runplans/tray/cplus-selection.jsonl) (mỗi dòng: điều kiện, seed, bước, hạng) |
+| Đóng băng | [`round-tray-cplus.yaml`](../../configs/runplans/tray/round-tray-cplus.yaml) **`rp_71fee3fcff69`**, lock [`round-tray-cplus.lock.json`](../../configs/runplans/tray/round-tray-cplus.lock.json). Plan ghim conditions, danh sách chọn, release nhắm lỗi, file tập (cùng ghim chất lượng và QA) và tên tập. `runplan check` kiểm cả các ghim đó; `--launch` trên round cần thêm `--targets-release` |
+| Bản cắt C+ (dựng thử) | Trên `rtx3060`, từ cây của commit `6a96b1b`: `runplan check … --launch` đạt; `demo_subset` cắt C từ `tray_s1_f9433b028c52` và `T160` từ `tray_s1_6c0fd7d37f77`; [`cplus_cut`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/cplus_cut.py) ghép thành 320 episode, 455 372 frame, 2,7 GB; `colab_train check --branch C_PLUS` đạt. 320 file của phần C (160 parquet, 160 video) giống từng byte bản cắt C đã train. Ở `~/denso-da34-pool/fwdata/cut-cplus-rp_71fee3fcff69`, danh sách sha256 `cut-cplus-rp_71fee3fcff69.sha256` (654 file) |
+
+**Khoảng trống 1 của 17.4 đã xử lý.** C+ là một dataset LeRobot gồm hai phần, theo thứ tự:
+- index 0–159: bản cắt C, chép nguyên từng byte;
+- index 160–319: tập nhắm lỗi `T160`.
+
+Stats là của chính 320 episode (`own_train_set`), tính lại bằng `flywheel.data.inject.stats` như `demo_subset`. Riêng stats ảnh được giữ theo từng episode của phần gốc. Marker ghi đủ hai phần.
+
+`colab_train --branch C_PLUS` chỉ chạy khi:
+- round đã đóng băng đúng `rp_71fee3fcff69`;
+- phần 1 của bản cắt đúng là tập C ở index 0–159;
+- phần 2 đúng là `T160` từ index 160.
+
+Parent, recipe và seed train lấy của nhánh C.
+
+**Đọc (giả định, chưa kiểm bằng train).** Như 17.2 đã ghi: lỗi đặt không gắn với vùng cảnh nào, nên 160 episode này gần với "thêm 160 episode S1 rải trên mức 1–2" hơn là dữ liệu sửa đúng lỗi. Khác với C về phân bố: C chỉ có mức 1 (seed 1000–1609), còn `T160` có cả mức 2. Vì vậy C+ − C gộp ba thứ: nhiều dữ liệu hơn, dữ liệu nhắm lỗi, và dữ liệu mức 2 (giới hạn đã nói ở quy tắc 2).
 
 ## Change log
 
@@ -1145,3 +1177,4 @@ Mốc so sánh C là eval C SimReady (mục 16.6). Chỉ số phụ, không ph�
 | 7/11/2026 | Mục 16: chạy lại eval C trên cảnh SimReady (Hiếu "Chạy lại eval C"). Viết trước lô đầu tiên: lý do, luật quy tắc 0 và bậc 2 không đổi, kết quả mục 13.7 giữ làm bản ghi nhưng không dùng để đọc quy tắc 0; cây master `079160d` có SimReady, guard revision theo từng lô; kiểm trước đạt (revision `4763fbf`, PSNR frame 0 34,9 dB); chỉ số phụ tư thế cuối của khay so với vùng đích, thêm sau khi thấy T1r, không phải luật | Hiếu (soạn với Claude) |
 | 8/11/2026 | Mục 16.6: kết quả eval C trên cảnh SimReady. 27/27 lô, 17,2 giờ. Mức 1–2 gộp 20/240 = 8,3 % (Wilson 5,5–12,5 %); quy tắc 0 xảy ra theo luật, cận trên khoảng tin cậy vượt 10 % ghi kèm. Mức 0 5/30. `L-PLACE-POSE` 131/240, trung vị lệch vùng đích 10–11 cm (chỉ số phụ). `Decision` ghi kết quả mới, kết quả mục 13.7 là bản ghi trên cảnh trơn; chưa ký. Luật mục 9, 16.1 không đổi | Hiếu (soạn với Claude) |
 | 8/11/2026 | Mục 17: nhiệm vụ 5, C+. 17.1 `Decision` mở lại C+ (sửa hệ quả "không chạy C+" của quy tắc 0 sau khi thấy kết quả, trích nguyên văn lời Hiếu 8/11; luật đọc C+ là quy tắc 1–2 không đổi; chờ ký). 17.2 evidence card cụm `L-PLACE-POSE`: vùng đích không render, vị trí đặt không đi theo đích, sai số chủ yếu là độ tản ngang, không tham số cảnh nào gắn với lỗi. 17.3 cách chọn 160 episode nhắm lỗi và luật đọc, viết trước khi sinh. 17.4 khoảng trống | Hiếu (soạn với Claude) |
+| 8/11/2026 | Mục 17.5: sinh 262 lượt nhắm lỗi (229 ghi được), QA phát lại 229/229, release `tray_s1_6c0fd7d37f77`, QA DA-03 226 pass / 3 reject, bộ lọc 177; chọn 160 theo luật 17.3 (bước 1: 117, bước 2: 43), tập `T160` `1104d00e…`; `round-tray-cplus.yaml` đóng băng `rp_71fee3fcff69`; bản cắt C+ 320 episode dựng thử và kiểm. | Hiếu (soạn với Claude) |
