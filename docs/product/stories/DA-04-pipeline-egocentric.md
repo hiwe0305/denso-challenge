@@ -36,6 +36,7 @@ Là kỹ sư dữ liệu, tôi muốn video egocentric của người đi qua c�
 - [x] 5. Pose E-A ước lượng từ RGB, so với E-B (AC 4, 5)
 - [x] 6. QA riêng và phần egocentric của báo cáo dataset (AC 5, 7)
 - [x] 7. Bộ đọc video tự quay (AC 6)
+- [x] 8. Bước làm mờ mặt cho video tự quay, cổng kiểm sha256 của bản sao (AC 2, 6; thêm 8/11/2026)
 
 ## Phạm vi file
 
@@ -78,6 +79,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 | 6/11/2026 | Chuyển sang Hiếu làm cùng Claude theo [plan chia lại việc của Hưng](../../superpowers/plans/2026-11-06-hung-reassignment.md); bỏ bước che danh tính chỉ cho mẫu EgoDex công bố (D2); làm đủ mọi nhiệm vụ con (D3) | PO (Hiếu) |
 | 6/11/2026 | Thêm `egocentric_cli.py` vào phạm vi file; ghi chép khi làm | Claude (phiên DA-04), theo phân công của Hiếu |
+| 8/11/2026 | Thêm nhiệm vụ 8: `fw egocentric deid` che mặt bằng YuNet trên máy của đội, để video Hiếu quay ngày 8/11/2026 qua được cổng; trong phạm vi file sẵn có | Claude (phiên DA-04 deid), theo yêu cầu của Hiếu |
 | 7/11/2026 | Sửa theo review PR 152: miễn che danh tính theo sha256 của video đã ghim, bỏ câu trả lời ở mép cửa sổ, QA `segment_count` và `hand_pose_nan`, endpoint chỉ máy của đội, ghi file trọn vẹn, phiếu duyệt khớp theo đoạn | Claude (phiên DA-04), theo review của Hiếu |
 
 ## Ghi chép khi làm
@@ -85,4 +87,5 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - Giờ thực: 20,5 giờ tập trung, theo `Time-spent` của 18 commit: 13,5 giờ ngày 6/11/2026, 7 giờ sửa theo review PR 152 ngày 7/11/2026. Hưng không nộp phần nào; Hiếu giao lại cho một phiên Claude ngày 6/11/2026.
 - Công cụ AI đã dùng: Claude Code (Opus 5.5), một phiên trên nhánh `DA-04-egocentric-pipeline`; RoboBrain 2.5-4B và Molmo2-4B trên `rtx3060` cho vòng thử và lần cắt đoạn có model.
 - Ghi chú hoàn thành: cả 7 nhiệm vụ chạy trên 20 episode EgoDex thật (E-A, RoboBrain, vòng thử chạy trên `rtx3060`); video tự quay mới thử trên một mp4 EgoDex đóng vai video của đội, vì đội chưa quay. Quyết định PO áp dụng: D2 (không làm mờ, miễn EgoDex `public`), D3 (không cắt nhiệm vụ nào), D5 (MediaPipe và VO OpenCV, job riêng), D6 (luật trước, model khi mơ hồ). Số đo, cách chạy, kết quả vòng thử và việc còn mở: [docs/g0/egocentric.md](../../g0/egocentric.md). Vòng thử model (D3) có code và test với model giả. Lần chạy thật bị dừng giữa chừng lúc khoảng 10:20 vì Hiếu giữ `rtx3060` cho eval C, nên **chưa có `Decision`**; cách chạy lại ở mục 10.3 của file đó. Theo yêu cầu của DA-18, `pose.npz` có thêm `intrinsic` (3, 3).
+- Nhiệm vụ 8 (8/11/2026): YuNet của OpenCV Zoo chạy cục bộ (không thêm gói), bản sao `<i>.deid.mp4`, cổng kiểm sha256 của bản sao. Thử trên clip EgoDex có dán mặt: che 80 trên 80 khung có mặt, không che nhầm tay; pipeline qua cổng tới `report`. Chi tiết: mục 3.1 của docs/g0/egocentric.md.
 - File đã tạo hoặc sửa: `ingest/egocentric/` (17 file), `annotate/deid/gate.py`, `qa/egocentric.py`, `egocentric_cli.py`, `configs/data/egocentric.yaml`, test trong `tests/unit/egocentric/` và `tests/contract/egocentric/`, `docs/g0/egocentric.md`, file story này. Không sửa `flywheel.data.api`, `cli.py`, `config.py`, hợp đồng hay `flywheel-eval`.

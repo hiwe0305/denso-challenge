@@ -1,6 +1,6 @@
 # Pipeline egocentric: EgoDex qua sáu tầng, E-A so với E-B, vòng thử model gán nhãn
 
-_Ngày 6/11/2026; sửa theo review PR 152 ngày 7/11/2026 (mục 3, 5, 6, 1.2, 10.5; các bước chạy lại trên laptop). Story [DA-04](../product/stories/DA-04-pipeline-egocentric.md), cả 7 nhiệm vụ. Người làm: Claude (phiên DA-04) theo phân công của Hiếu; Hiếu duyệt. Mọi số trong file này là output của `fw egocentric` trên 20 episode EgoDex thật, trừ chỗ ghi là giả định. Dữ liệu và kết quả nằm trong `fwdata/` (không commit). Job E-A và lần cắt có RoboBrain chạy trên `rtx3060:~/denso-da04` trước 10:20 ngày 6/11/2026. Sau đó máy được giữ cho eval C, nên các bước còn lại chạy trên laptop, còn bước nào không chạy được thì để lại cách chạy ở mục 10._
+_Ngày 6/11/2026; sửa theo review PR 152 ngày 7/11/2026 (mục 3, 5, 6, 1.2, 10.5; các bước chạy lại trên laptop); thêm bước làm mờ ngày 8/11/2026 (nhiệm vụ 8, mục 3.1). Story [DA-04](../product/stories/DA-04-pipeline-egocentric.md), nhiệm vụ 1–8. Người làm: Claude (phiên DA-04) theo phân công của Hiếu; Hiếu duyệt. Mọi số trong file này là output của `fw egocentric` trên 20 episode EgoDex thật, trừ chỗ ghi là giả định. Dữ liệu và kết quả nằm trong `fwdata/` (không commit). Job E-A và lần cắt có RoboBrain chạy trên `rtx3060:~/denso-da04` trước 10:20 ngày 6/11/2026. Sau đó máy được giữ cho eval C, nên các bước còn lại chạy trên laptop, còn bước nào không chạy được thì để lại cách chạy ở mục 10._
 
 ## Kết luận
 
@@ -8,7 +8,7 @@ _Ngày 6/11/2026; sửa theo review PR 152 ngày 7/11/2026 (mục 3, 5, 6, 1.2, 
 - E-A chỉ từ RGB đặt đầu ngón lệch 43–51 px, điểm 3D lệch khoảng 7 cm so với tracking của Vision Pro. Tư thế camera của E-A chưa dùng được: sai số xoay (0,20° mỗi khung) lớn hơn chính chuyển động (0,12°), còn phần tịnh tiến chưa đo được.
 - Luật để mở 13 trên 21 sự kiện gắp, thả. RoboBrain trả lời cả 13, nhưng 6 trên 13 câu trả lời là ảnh đầu tiên. Từ 7/11/2026, câu trả lời ở mép cửa sổ bị bỏ, nên 6 sự kiện vẫn mở và chờ người duyệt. **[Đề xuất]** chưa dùng ranh giới của model cho tới khi vòng thử đo xong sai số.
 - **Vòng thử model gán nhãn (D3) chưa có kết quả và chưa có `Decision`.** Lần chạy dừng giữa chừng lúc 10:20 ngày 6/11/2026, vì Hiếu giữ `rtx3060` cho eval C của DA-34. Laptop không đủ bộ nhớ để chạy hai model. Cách chạy lại ở mục 10.
-- Video đội tự quay dừng ở cổng che danh tính, đúng D2.
+- Video đội tự quay dừng ở cổng che danh tính cho tới khi chạy `fw egocentric deid` (từ 8/11/2026, mục 3.1). Bước này che mặt trên laptop bằng YuNet của OpenCV, ghi bản sao `<i>.deid.mp4` cạnh video gốc, và mọi bước sau chỉ đọc bản sao. Thử trên một clip EgoDex có dán một khuôn mặt: mặt bị che ở cả 80 trên 80 khung có mặt, 0 khung báo nhầm trên clip không có người, và pipeline qua cổng tới tận `report`.
 
 ## 1. Cách chạy
 
@@ -16,6 +16,7 @@ Cài: `uv sync --extra egocentric` (h5py, OpenCV headless; commit `c11b88a6`). G
 
 ```bash
 fw egocentric ingest egodex                       # in ra thư mục làm việc $W
+fw egocentric deid $W                             # video tự quay: che mặt trước mọi bước khác (mục 3.1)
 fw egocentric pose $W                             # E-B từ HDF5
 fw egocentric pose $W --job ea_jobs.json          # manifest cho job E-A
 fw egocentric pose $W --estimates <thư mục .npz>  # đọc E-A, so với E-B
@@ -101,7 +102,62 @@ Kiểm trên laptop ngày 7/11/2026:
 - Thư mục gốc có HDF5 thật và một mp4 bị thay: không được miễn ("1 videos not in the pinned sample"); `pose --job` và `annotate` trả mã 2.
 - Sửa tay `source.json` để ghi lý do miễn: `annotate` vẫn trả mã 2 và nêu tên video lạ.
 
-Câu Q-27I phần che danh tính: chưa chọn model, vì D2 hoãn bước này.
+Câu Q-27I phần che danh tính: từ 8/11/2026 trả lời bằng YuNet (mục 3.1).
+
+### 3.1 Bước làm mờ (nhiệm vụ 8, 8/11/2026)
+
+Hiếu quay video task hai bàn ngày 8/11/2026 và cần dùng ngay, nên bước làm mờ không chờ tới sau 13/11/2026 như dòng 4 của mục 9 cũ. `fw egocentric deid <thư mục làm việc>` chạy ngay sau `ingest`, trước mọi bước đọc khung hình:
+
+1. Kiểm sha256 của video gốc với `source.json` (`check_unchanged`). Nguồn được miễn theo D2 thì không làm gì.
+2. Mỗi video giải mã hai lượt. Lượt 1 dò mặt trên khung thu về cạnh dài 960 px, nới mỗi hộp thêm 25 % mỗi phía. Lượt 2 che mỗi hộp bằng khảm 8 ô theo cạnh dài, làm mịn, trên chính khung đó và 5 khung trước, 5 khung sau (detector hay sót một hai khung khi mặt quay hoặc nhòe).
+3. Ghi `<task>/<i>.deid.mp4` cạnh video gốc, mp4v, cùng fps và kích thước, ghi trọn hoặc không ghi (file tạm, đổi tên khi xong). OpenCV không ghi tiếng, nên giọng nói cũng mất. Số khung phải bằng lượt 1; kích thước sau khi OpenCV xoay theo thẻ xoay phải bằng `width`, `height` của `device.json`, sai thì từ chối.
+4. Chỉ khi mọi video đã ghi xong mới ghi bản ghi, theo thứ tự: `bundle.json` trỏ `mp4` sang bản sao, `source.json` thêm `deid_copies` (bản sao → sha256) và `deid_method` (model, revision, sha256 model, tham số, số khung có mặt, số khung bị che, thời gian của từng video), rồi `episodes.jsonl` đổi `deid_status` sang `blurred`. Dừng giữa chừng thì episode vẫn bị cổng chặn.
+5. Một job, hai dòng `LedgerEntry`; ước tính là giả định 0,05 s mỗi khung.
+
+| Model | Giá trị |
+|---|---|
+| Tên | YuNet `face_detection_yunet_2023mar` (OpenCV Zoo, giấy phép MIT), ONNX 227 KB |
+| Chạy | `cv2.FaceDetectorYN` của OpenCV 5.0 trên CPU. OpenCV đã có trong extra `egocentric`, nên `uv.lock` không đổi (giống MediaPipe ở D5) |
+| Revision | commit `f12e12798e83` của `opencv/opencv_zoo`, commit cuối sửa file này |
+| sha256 | `8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4`; file khác sha256 thì lệnh từ chối |
+| Nơi để | `$FW_ROOT/models/yunet/face_detection_yunet_2023mar.onnx`, ngoài git; thiếu file thì lệnh in câu `curl` để tải |
+| Tham số (`deid` trong cấu hình) | `score_threshold` 0,6 (mặc định của YuNet là 0,9; hạ để sót ít mặt hơn), `nms_threshold` 0,3, `detect_side_px` 960, `pad` 0,25, `hold_frames` 5, `mosaic_cells` 8. Trừ `nms_threshold`, các số đều là giả định |
+
+Không khung nào rời máy: model chạy cục bộ, dữ liệu `internal` không tới API hosted nào (CLAUDE.md).
+
+**Cổng kiểm bản sao, không kiểm nhãn.** `episodes.jsonl` là file văn bản, nên `deid_status = blurred` một mình không đủ: trước đây cổng cho episode `blurred` qua ngay. Từ 8/11/2026, episode egocentric không ở `raw` chỉ qua khi **mọi** video của nguồn có bản sao trong `deid_copies`, và sha256 của bản sao trên đĩa (băm lại ở mỗi bước) đúng bằng số `deid` đã ghi. Episode `raw` vẫn chỉ qua bằng miễn D2 theo pin, như cũ. `api.video_of` từ chối mọi `bundle.mp4` không phải bản sao của một nguồn cần làm mờ, nên manifest E-A, `annotate` và `trial` không đọc được video gốc. `ingest` lại thì mất `deid_copies`, episode về `raw`, phải chạy `deid` lại. Test: `tests/unit/egocentric/test_ego_blur.py`, `test_ego_deid.py`.
+
+**Chạy thử trên laptop, 8/11/2026.** Thư mục giả làm video tự quay (`fwdata/egocentric-deid-e2e/`, không commit). Có hai video 1920 × 1080, mỗi video 126 khung: `two_table/0.mp4` là `basic_pick_place/0.mp4` của EgoDex, giữ nguyên. `two_table/1.mp4` là cùng video đó, có dán một khuôn mặt thật ở góc phải trên, từ khung 20 tới 99. Ảnh mặt là `astronaut.png` của scikit-image, ảnh NASA thuộc phạm vi công cộng. Log: `run.log`.
+
+| Bước | Kết quả |
+|---|---|
+| `ingest video` | `src_fa9bcf457f85ccaf`, 2 episode, 3 file, 5,3 MB, không miễn |
+| `pose --job` trước `deid` | mã 2 ở cổng: "it is not waived … until `fw egocentric deid` blurs it" |
+| `deid` | 2 video, 252 khung, 11,0 s (ước tính 12,6 s, ledger thực đo 9,98 s), RSS 315 MB. Video 1: mặt tìm thấy ở 80 trên 80 khung có dán mặt, 90 khung bị che (80 cộng 5 mỗi phía). Video 0: 0 khung có mặt, tay không bị che |
+| `pose --job` | manifest trỏ tới `two_table/0.deid.mp4`, `two_table/1.deid.mp4` |
+| Job E-A (MediaPipe, venv riêng trên laptop, mục 1.1) | 18,8 s, RSS 526 MB. Tay phải NaN ở 84 trên 126 khung của bản sao; trên video gốc, E-A chạy ở `rtx3060` ngày 6/11/2026 cho 82 trên 126. Mã hóa lại làm mất khoảng 2 khung |
+| `pose --estimates`, `annotate`, `qa` | 4 đoạn, 2 sự kiện để mở; QA 0 `pass`, 2 `flag` (`hand_pose_nan`, `segment_ambiguous`), `deid_gate` qua ở cả hai |
+| `report` | trang có dòng "De-identified: 2 videos copied with their faces covered by opencv_zoo/face_detection_yunet_2023mar" |
+| Xuất stage 1 của DA-18 | từ chối vì pose tay không hữu hạn ("4 not finite"), không phải vì cổng che danh tính |
+
+Ảnh khung 50 trước và sau: mặt thành một khối màu mịn; hộp YuNet ôm sát mặt nên còn thấy phần tóc phía trên.
+
+**Chạy trên video quay hôm nay** (máy có OpenCV, ví dụ laptop):
+
+```bash
+export FW_ROOT=<gốc kho>
+mkdir -p $FW_ROOT/models/yunet && curl -L -o $FW_ROOT/models/yunet/face_detection_yunet_2023mar.onnx \
+  https://github.com/opencv/opencv_zoo/raw/f12e12798e8314f7c074a6656816c048dcc95b7a/models/face_detection_yunet/face_detection_yunet_2023mar.onnx
+fw egocentric ingest video --root <thư mục: device.json + two_table/<i>.mp4>   # in ra $W
+fw egocentric deid $W
+fw egocentric pose $W --job ea_jobs.json        # rồi job E-A (mục 1.1) với --root là thư mục video
+fw egocentric pose $W --estimates <thư mục .npz>
+fw egocentric annotate $W && fw egocentric qa $W && fw egocentric report $W
+```
+
+`width`, `height` trong `device.json` là kích thước khung **sau khi xoay**: quay dọc thì cao lớn hơn rộng. Sai thì `deid` từ chối và nêu kích thước đúng.
+
+Chưa làm: che thẻ tên, màn hình, giấy tờ (AC 2 có nêu), và chưa có người duyệt mẫu để đặt `verified` (mục 9).
 
 ## 4. Pose (nhiệm vụ 4, 5)
 
@@ -247,7 +303,7 @@ Chưa trả lời được câu của D3 ("model nào, có dùng không"). Trong
  "objects": ["cup"]}
 ```
 
-Đội chưa quay video nào. Phép thử trên file thật: một thư mục giả làm video tự quay, chứa một mp4 thật của EgoDex (`basic_pick_place/0.mp4`, 126 khung) và `device.json`. `ingest video` ghi `src_20c38abea95118a4` với đúng các nhãn trên; `pose --job` và `annotate` đều trả mã 2 ở cổng che danh tính. Theo D2, video của đội không tới được model nào cho tới khi có bước làm mờ. Khi có bước đó, phần còn lại của pipeline chạy như EgoDex: job E-A cho pose, rồi `annotate`, `qa`, `report`.
+Tới 7/11/2026 đội chưa quay video nào. Phép thử trên file thật: một thư mục giả làm video tự quay, chứa một mp4 thật của EgoDex (`basic_pick_place/0.mp4`, 126 khung) và `device.json`. `ingest video` ghi `src_20c38abea95118a4` với đúng các nhãn trên; `pose --job` và `annotate` đều trả mã 2 ở cổng che danh tính. Theo D2, video của đội không tới được model nào cho tới khi có bước làm mờ. Từ 8/11/2026 bước đó là `fw egocentric deid` (mục 3.1). Sau bước này, phần còn lại của pipeline chạy như EgoDex trên bản sao đã che: job E-A cho pose, rồi `annotate`, `qa`, `report`.
 
 ## 9. Việc còn mở
 
@@ -256,7 +312,7 @@ Chưa trả lời được câu của D3 ("model nào, có dùng không"). Trong
 | 1 | Hợp đồng: `EpisodeMetadata.source_detail` chưa có `egodex`, `ego_video`; episode egocentric để trường này `None` | Bộ lọc theo nguồn chỉ đọc được từ `source.json` | **[Đề xuất]** PR hợp đồng của Hiếu thêm hai giá trị |
 | 2 | Hợp đồng: `read_segments` từ chối hai cột `frame_start`, `frame_end` mà kế hoạch 4.2a thêm vào `segments.parquet` | DA-18 phải đọc bằng pyarrow, không qua `read_segments` | **[Đề xuất]** PR hợp đồng: cho phép cột khung, hoặc thêm hai trường vào `Segment` |
 | 3 | Model và revision nằm trong `configs/data/egocentric.yaml`, story ghi `configs/models/` | Ngoài phạm vi file của story | PR riêng của chủ `configs/models/` |
-| 4 | Chưa có bước làm mờ (D2), nên câu Q-27I phần che danh tính chưa trả lời | Video đội tự quay dừng ở cổng | Sau 13/11/2026 |
+| 4 | ~~Chưa có bước làm mờ (D2)~~ Đã có từ 8/11/2026: `fw egocentric deid`, YuNet (mục 3.1) | Video đội tự quay qua cổng sau khi chạy `deid` | Xong (nhiệm vụ 8); chờ Hiếu duyệt PR |
 | 5 | Mẫu duyệt của người (`fw egocentric review`) chưa có ai điền; `label_source = human` mới chạy trong test | Chưa có số đo độ đúng của nhãn luật và nhãn model | Hiếu hoặc người được giao điền `review/sheet.jsonl` |
 | 6 | Ngưỡng luật cắt đoạn và QA là giả định đọc từ 20 episode | Đổi ngưỡng là đổi `threshold_version` | Hiệu chỉnh khi có mẫu duyệt |
 | 7 | Cổ tay E-A lệch nhiều hơn đầu ngón (63 và 115 px so với 43 và 51 px); chưa kiểm hai điểm cổ tay có cùng định nghĩa không | Action 48 chiều của DA-18 dùng cổ tay | Kiểm khi DA-18 xuất E-A |
@@ -267,6 +323,9 @@ Chưa trả lời được câu của D3 ("model nào, có dùng không"). Trong
 | 12 | Job `trial` bị dừng chỉ có dòng ledger ước tính, không có dòng thực đo | Sổ chi phí có một ước tính không có thực đo đi kèm | Ghi chú ở đây; sổ append-only nên không xóa dòng |
 | 13 | Câu lệnh của 12 đoạn đổi sau khi bỏ câu trả lời ở mép (7/11/2026) đang là mẫu câu, vì RoboBrain chưa chạy lại | 12 trên 39 đoạn có `label_source = rule` | Chạy `annotate --endpoint` khi `rtx3060` trống |
 | 14 | Pin chỉ gồm 218 video của mẫu DA-30; mở rộng tập con ra ngoài mẫu đó cần dựng lại pin | Episode mới không được miễn cho tới khi pin có video của nó | Dựng lại bằng `pin.py`; PO duyệt PR |
+| 15 | Bước làm mờ chỉ che mặt; thẻ tên, màn hình, giấy tờ (AC 2) chưa che | Video quay trong nhà máy hay văn phòng có thể lộ chữ trên thẻ hoặc màn hình | **[Đề xuất]** quay sao cho không có màn hình, thẻ trong khung; thêm detector chữ (ví dụ EAST của OpenCV) sau demo |
+| 16 | Ngưỡng `deid` (0,6, nới 25 %, giữ 5 khung) là giả định; mới đo trên một mặt dán vào video, chưa đo trên người thật đứng xa, nghiêng, đeo khẩu trang | Có thể sót mặt nhỏ hoặc nghiêng | Hiếu xem nhanh `frames_with_faces` trong `source.json` và vài khung của bản sao trước khi dùng; người duyệt mẫu thì đặt `verified` |
+| 17 | Xuất stage 1 của DA-18 (`export/egodex.py`) đọc `bundle.mp4`, nên dùng bản sao, nhưng chưa tự kiểm sha256 của bản sao như cổng | Bản sao bị thay sau `deid` mà không chạy lại bước nào của DA-04 thì DA-18 không biết | **[Đề xuất]** DA-18 gọi `annotate_allowed` với `deid_copies`; PR riêng của DA-18 |
 
 ## 10. Việc để chạy sau
 
@@ -341,6 +400,14 @@ Chưa thử cài MediaPipe trên laptop. Gói có wheel sẵn nên không cần 
 ### 10.5 Mẫu duyệt của người
 
 Điền `decision` (`accept`, `fix` hoặc `reject`; `fix` thì sửa `description`) và `reviewer` cho 8 đoạn trong `$W/review/sheet.jsonl` (phiếu ghi lại ngày 7/11/2026; không sửa `match`), rồi chạy `fw egocentric review $W --apply $W/review/sheet.jsonl`. Đoạn đã duyệt được ghi `label_source = human`. Việc này không cần máy mạnh.
+
+## Change log
+
+| Ngày | Nội dung | Người |
+|---|---|---|
+| 8/11/2026 | Thêm bước làm mờ `fw egocentric deid` (nhiệm vụ 8, mục 3.1); cổng chỉ cho episode `blurred` qua khi mọi video có bản sao đúng sha256; dòng 4 mục 9 xong, thêm dòng 15–17 | Claude (phiên DA-04 deid), theo yêu cầu của Hiếu |
+| 7/11/2026 | Sửa theo review PR 152 (mục 3, 5, 6, 1.2, 10.5) | Claude (phiên DA-04), theo review của Hiếu |
+| 6/11/2026 | Tạo file: 7 nhiệm vụ trên 20 episode EgoDex | Claude (phiên DA-04), theo phân công của Hiếu |
 
 ## Phụ lục A. `serve_molmo2.py`
 
