@@ -30,9 +30,9 @@ Là AI Engineer, tôi muốn chấm phép kiểm QA và Agent QA/QC trên bộ l
 - [x] 2. Precision, recall, báo nhầm, thời gian (AC 2)
 - [x] 3. Tách phần code và phần agent (AC 3)
 - [x] 4. Báo cáo (AC 4)
-- [ ] 5. Ghi model và hash prompt của agent vào kết quả, để một con số của cột agent chạy lại được (AC 3, 4; W14 của tầng web, PR #72; mở khi DA-20 merge, PR #151 ngày 7/11/2026)
+- [x] 5. Ghi model và hash prompt của agent vào kết quả, để một con số của cột agent chạy lại được (AC 3, 4; W14 của tầng web, PR #72; mở khi DA-20 merge, PR #151 ngày 7/11/2026)
   - [x] 5.1 Mỗi nhóm của `bench_result.json` có `agent_models`: mỗi bản sao một dòng cho mỗi model khác nhau trong `AgentReport.model` của nó (`name`, `revision`, `temperature`, `prompt_sha256`, số báo cáo); trang HTML có bảng model và cảnh báo khi hai bản sao không cùng model; `bench_version` lên `da31-3`
-  - [ ] 5.2 Ghi dạng `da31-3` và việc còn lại sau DA-20 vào `docs/g0/defect-bench.md`
+  - [x] 5.2 Ghi dạng `da31-3` và việc còn lại sau DA-20 vào `docs/g0/defect-bench.md`
 
 ## Phạm vi file
 
