@@ -1226,9 +1226,9 @@ nohup setsid bash -c 'python3 scripts/he/he1_fetch.py follow --session "$1" --re
 
 Chỉ khác checkpoint: C+ `ckpt_40000` thay cho C. Đọc bằng `eval_results --baseline` trỏ vào lô eval C SimReady, theo quy tắc 1–2; `place_error` báo cạnh, không phải luật.
 
-Giả định của ước lượng, chưa đo:
-- bản cắt C+ gấp đôi C (2,7 GB so với khoảng 1,3 GB), nên tải lên VM khoảng 8 phút ở 6 MB/s;
-- fine-tune 40 000 bước với batch như C, nên giờ GPU gần bằng C; số bước không đổi theo cỡ dữ liệu.
+Ước lượng (dòng `job_da34_ft_C_PLUS` trong sổ, ghi trước khi launch): khoảng 16,0 CU, như C đo được 15,99 CU (8,27 giờ L4, 0,724 s/bước). Giả định, chưa đo:
+- thời gian mỗi bước không phụ thuộc số episode, vì 40 000 bước, batch và recipe như C; chưa đo ở 320 episode;
+- bản cắt C+ 2,7 GB tải lên khoảng 1,5 phút ở 33 MB/s, tốc độ probe của lần chạy C (C: 1,3 GB trong 52 s).
 
 ## Change log
 
