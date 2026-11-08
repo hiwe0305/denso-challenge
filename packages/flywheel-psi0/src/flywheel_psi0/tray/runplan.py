@@ -281,12 +281,25 @@ class TrayRunPlan(_Frozen):
         return [(level, seed) for level, seed in self.eval_conditions() if level in headline]
 
 
+class FilePin(_Frozen):
+    file: str  # repo-relative
+    sha256: str = Field(min_length=64, max_length=64)
+
+
 class RoundTargets(_Frozen):
     n_add: int = Field(gt=0)
     from_failures_of: str
     generator: str
     seeds: list[int] = Field(default_factory=list)  # empty until generated (task 5)
     set_hash: str | None = None
+    # Filled with the seeds when the round freezes (docs/he/tray.md section 17): the
+    # conditions the targets were planned from, the targeted release, its demo-set file
+    # (one set, `set_name`, on that release) and the rule's picks (cplus_select).
+    conditions: FilePin | None = None
+    selection: FilePin | None = None
+    release: Release | None = None
+    demo_sets: DemoSetPins | None = None
+    set_name: str | None = None
 
 
 class TrayRoundPlan(_Frozen):
@@ -538,10 +551,113 @@ def check_round(round_plan: TrayRoundPlan, repo: Path = REPO) -> list[str]:
         len(targets.seeds) != targets.n_add or not targets.set_hash
     ):
         problems.append("a frozen round needs its n_add targeted seeds and their set_hash")
+    elif round_plan.status == "frozen":
+        problems += check_targets(targets, repo)
     return problems
 
 
+def check_targets(targets: RoundTargets, repo: Path = REPO) -> list[str]:
+    """A frozen round's targeted set against the files it names (no release needed)."""
+    missing = [
+        name
+        for name in ("conditions", "selection", "release", "demo_sets", "set_name")
+        if getattr(targets, name) is None
+    ]
+    if missing:
+        return [f"a frozen round pins its targets: {', '.join(missing)} missing"]
+    assert targets.conditions and targets.selection and targets.release and targets.demo_sets
+    assert targets.set_name
+    problems = []
+    for pin in (targets.conditions, targets.selection):
+        path = repo / pin.file
+        if not path.is_file():
+            problems.append(f"{pin.file} is missing")
+        elif file_sha256(path) != pin.sha256:
+            problems.append(f"{pin.file} changed since the round was frozen")
+    if targets.seeds != sorted(set(targets.seeds)):
+        problems.append("targets.seeds must be unique and ascending")
+    if set_hash(targets.release.release_hash, targets.seeds) != targets.set_hash:
+        problems.append("targets.set_hash is not the hash of its seeds in the targeted release")
+    pins = targets.demo_sets
+    sets_file = repo / pins.file
+    if not sets_file.is_file():
+        return [*problems, f"{pins.file} is missing"]
+    if pins.file_sha256 is None or file_sha256(sets_file) != pins.file_sha256:
+        problems.append(f"{pins.file} changed since the round was frozen")
+    sets = DemoSets.model_validate_json(sets_file.read_text(encoding="utf-8"))
+    demo = sets.sets.get(targets.set_name)
+    if sets.release_hash != targets.release.release_hash or sets.release_id != targets.release.id:
+        problems.append(f"{pins.file} is not of the targeted release {targets.release.id}")
+    if demo is None:
+        problems.append(f"{pins.file} has no set {targets.set_name}")
+    elif demo.seeds != targets.seeds or demo.set_hash != targets.set_hash:
+        problems.append(f"set {targets.set_name} of {pins.file} is not targets.seeds")
+    if pins.hashes != {name: d.set_hash for name, d in sets.sets.items()}:
+        problems.append(f"demo_sets.hashes are not the sets of {pins.file}")
+    if pins.quality is not None:
+        quality = repo / pins.quality.file
+        if not quality.is_file() or file_sha256(quality) != pins.quality.sha256:
+            problems.append(f"{pins.quality.file} is missing or changed")
+        elif sets.quality is None or sets.quality.file_sha256 != pins.quality.sha256:
+            problems.append(f"{pins.file} was not cut with {pins.quality.file}")
+    if pins.qa is not None and (
+        sets.qa is None or sets.qa.reports_sha256 != pins.qa.reports_sha256
+    ):
+        problems.append(f"{pins.file} was not cut with the pinned DA-03 QA reports")
+    selection = repo / targets.selection.file
+    if selection.is_file():
+        lines = selection.read_text(encoding="utf-8").splitlines()
+        picked = sorted(int(json.loads(line)["seed"]) for line in lines if line.strip())
+        if picked != targets.seeds:
+            problems.append(f"{targets.selection.file} does not pick targets.seeds")
+    return problems
+
+
+def check_targets_release(
+    targets: RoundTargets, release_root: Path, repo: Path = REPO
+) -> list[str]:
+    """The targeted set's seeds against the targeted release's own export."""
+    if targets.release is None or targets.demo_sets is None or targets.set_name is None:
+        return ["the round pins no targeted release yet"]
+    try:
+        release_hash, episodes = read_release(release_root)
+    except (OSError, ValueError, KeyError) as error:
+        return [f"{release_root}: {error}"]
+    if release_hash != targets.release.release_hash:
+        return [f"{release_root} is release {release_hash}, not {targets.release.release_hash}"]
+    index_of = {e.seed: e.episode_index for e in episodes}
+    missing = [seed for seed in targets.seeds if seed not in index_of]
+    if missing:
+        return [f"targeted seeds {missing[:5]} are not in {release_root}"]
+    sets_file = repo / targets.demo_sets.file
+    sets = DemoSets.model_validate_json(sets_file.read_text(encoding="utf-8"))
+    demo = sets.sets[targets.set_name]
+    if sorted(index_of[s] for s in targets.seeds) != demo.episode_indices:
+        return [f"set {targets.set_name}: episode_indices are not its seeds' in the release"]
+    return []
+
+
+def freeze_round(plan_path: Path, repo: Path = REPO) -> Path:
+    """Lock a round plan once its targets are in; the parent must be frozen already."""
+    round_plan = TrayRoundPlan.load(plan_path)
+    problems = check_round(round_plan, repo)
+    if round_plan.status != "frozen":
+        problems.append("status draft: set status frozen with the targets, then freeze")
+    if problems:
+        raise ValueError("; ".join(problems))
+    lock = {
+        "run_plan_id": run_plan_id(round_plan),
+        "frozen_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+        "plan": plan_json(round_plan),
+    }
+    out = lock_path(plan_path)
+    out.write_text(json.dumps(lock, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    return out
+
+
 def freeze(plan_path: Path, repo: Path = REPO) -> Path:
+    if yaml.safe_load(plan_path.read_text(encoding="utf-8")).get("purpose") == "round":
+        return freeze_round(plan_path, repo)
     plan = TrayRunPlan.load(plan_path)
     problems = check(plan, repo) + pinned_file_drift(plan, repo)
     if plan.superseded_by is not None:
@@ -568,6 +684,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("plan", type=Path)
     parser.add_argument("--release", type=Path, help="check episode indices against it")
     parser.add_argument(
+        "--targets-release",
+        type=Path,
+        help="round plan: the targeted release, checked against the round's targeted set",
+    )
+    parser.add_argument(
         "--launch",
         action="store_true",
         help="before a train or eval job: pinned-file drift fails; needs --release",
@@ -591,6 +712,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.launch or args.release is not None:
             plan = TrayRunPlan.load(repo / round_plan.inherits)
             problems += check(plan, repo)
+        if args.launch:
+            lock = lock_path(args.plan)
+            if round_plan.status != "frozen":
+                problems.append("DRAFT: no job runs a draft round; freeze it with its targets")
+            elif not lock.is_file():
+                problems.append(f"{args.plan} is not frozen: no {lock.name}")
+            elif json.loads(lock.read_text(encoding="utf-8"))["run_plan_id"] != run_plan_id(
+                round_plan
+            ):
+                problems.append(f"{args.plan} changed since it was frozen")
+            if args.targets_release is None:
+                problems.append("--launch on a round needs --targets-release as well")
+        if args.targets_release is not None:
+            problems += check_targets_release(round_plan.targets, args.targets_release, repo)
+        if round_plan.status == "frozen":
+            summary += f", {run_plan_id(round_plan)}"
     else:
         plan = TrayRunPlan.model_validate(raw)
         problems = check(plan, repo)
