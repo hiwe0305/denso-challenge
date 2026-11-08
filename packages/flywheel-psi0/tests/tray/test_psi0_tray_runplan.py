@@ -164,17 +164,45 @@ def test_check_catches_unknown_parent_and_branch(plan: TrayRunPlan) -> None:
     assert any("psi0-unknown is not pinned" in p for p in check(bad))
 
 
-def test_cplus_slot_is_a_draft_on_branch_c() -> None:
+def test_cplus_round_is_frozen_on_branch_c_with_its_targets() -> None:
     round_plan = TrayRoundPlan.load(ROUND)
-    assert round_plan.status == "draft" and round_plan.base_branch == "C"
+    assert round_plan.status == "frozen" and round_plan.base_branch == "C"
     assert round_plan.inherits == "configs/runplans/tray/he-tray-v2.yaml"
-    assert round_plan.targets.n_add == 160 and round_plan.targets.seeds == []
+    targets = round_plan.targets
+    assert targets.n_add == len(targets.seeds) == 160 and targets.set_name == "T160"
     assert check_round(round_plan) == []
+    lock = json.loads(lock_path(ROUND).read_text())
+    assert lock["run_plan_id"] == run_plan_id(round_plan) == "rp_71fee3fcff69"
+    assert lock["plan"] == plan_json(round_plan)
+    # Q-33A: targeted episodes are generated on train seeds, never on dev conditions
+    assert all(100_000 <= s < 200_000 for s in targets.seeds)
+    assert not set(targets.seeds) & {s for _, s in TrayRunPlan.load(PLAN_V2).eval_conditions()}
     # C+ has no recipe of its own: it trains with the frozen plan's, override included.
     inherited = TrayRunPlan.load(REPO / round_plan.inherits)
     assert inherited.recipe.overrides == {"train.validation_steps": 2000}
-    frozen = round_plan.model_copy(update={"status": "frozen"})
-    assert any("n_add targeted seeds" in p for p in check_round(frozen))
+    draft = round_plan.model_copy(
+        update={"targets": targets.model_copy(update={"seeds": [], "set_hash": None})}
+    )
+    assert any("n_add targeted seeds" in p for p in check_round(draft))
+
+
+def test_cplus_selection_follows_the_rule_written_before_generation() -> None:
+    # tray.md 17.3: step 1 one seed per condition in file order, step 2 second seeds
+    conditions = [json.loads(x)["cluster_id"] for x in (PLANS / "cplus-conditions.jsonl").open()]
+    picks = [json.loads(x) for x in (PLANS / "cplus-selection.jsonl").open()]
+    step_1 = [p for p in picks if p["step"] == 1]
+    assert [p["cluster_id"] for p in step_1] == [c for c in conditions if c in
+                                                 {p["cluster_id"] for p in step_1}]  # fmt: skip
+    assert all(p["rank"] == 1 for p in step_1) and len(step_1) == 117
+    step_2 = [p for p in picks if p["step"] == 2]
+    assert {p["cluster_id"] for p in step_2} <= {p["cluster_id"] for p in step_1}
+    place = {
+        json.loads(x)["cluster_id"]: json.loads(x)["distance_m"]
+        for x in (PLANS / "cplus-conditions-place-error.jsonl").open()
+    }
+    gaps = [place[p["cluster_id"]] for p in step_2]
+    assert gaps == sorted(gaps, reverse=True) and len(step_2) == 43
+    assert len({p["seed"] for p in picks}) == 160
 
 
 def test_plan_is_unchanged_since_it_was_frozen(plan: TrayRunPlan) -> None:
@@ -209,7 +237,7 @@ def test_cli_refuses_to_pass_a_superseded_plan(capsys: pytest.CaptureFixture[str
 
 def test_cli_checks_a_round_plan(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["check", str(ROUND)]) == 0
-    assert "round draft, branch C_PLUS" in capsys.readouterr().out
+    assert "round frozen, branch C_PLUS, rp_71fee3fcff69" in capsys.readouterr().out
 
 
 def test_freeze_refuses_a_superseded_plan(tmp_path: Path) -> None:

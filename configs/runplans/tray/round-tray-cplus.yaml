@@ -1,5 +1,5 @@
-# DA-34 AC 6 (task 5): slot for branch C+ of the Failure -> Data round on the tray task
-# (design 28/10/2026 section 6.6). Draft: filled in task 5, not by task 1.
+# DA-34 AC 6 (task 5): branch C+ of the Failure -> Data round on the tray task
+# (design 28/10/2026 section 6.6). Frozen 8/11/2026 with its targets (tray.md 17.5).
 #
 # C+ = the 160 demos of C plus n_add episodes S1 targeted at C's failures. Recipe, train
 # seed, parent checkpoint and eval conditions are those of `inherits` (frozen). Tier 2
@@ -8,13 +8,15 @@
 # Version 2 (5/11/2026): inherits he-tray-v2.yaml (was he-tray.yaml, superseded) and C+
 # is one of its budget's round_runs (18 CU cap).
 #
-# Task 5 fills `targets.seeds` and `targets.set_hash` from DA-33's
-# `generate.py --conditions` run on the clusters DA-13 finds in C's eval, after QA and
-# replay as for the release, then sets status: frozen and writes the lock.
+# Task 5 filled `targets` from DA-33's `generate.py --conditions` run on the
+# L-PLACE-POSE cluster of eval C on SimReady (tray.md 17.2; DA-13's stage attribution
+# needs probes eval C has not, so the cluster comes from DA-34's own tools), after QA
+# and replay as for C's release, then set status: frozen and wrote the lock. The
+# Decision that reopens C+ after rule 0: round-tray-cplus.rule0-override.decision.json.
 name: round-tray-cplus-psi0
 purpose: round
 story: DA-34
-status: draft
+status: frozen
 inherits: configs/runplans/tray/he-tray-v2.yaml
 branch: C_PLUS
 base_branch: C
@@ -23,5 +25,34 @@ targets:
   n_add: 160 # = N_full - N_cut = 320 - 160 (docs/he/tray.md section 7)
   from_failures_of: C
   generator: "flywheel_simple.tray.targets via scripts/g0/tray/generate.py --conditions"
-  seeds: []
-  set_hash: null
+  seeds: [100506, 100620, 100798, 100975, 101460, 101859, 102205, 102400, 102652, 102714, 104152, 104690, 104867, 104945, 105837, 107372, 107874, 108720, 109023, 109319, 110669, 112492, 112730, 113239, 113504, 113523, 114556, 114929, 115200, 115534, 115847, 117359, 117598, 117763, 118125, 118231, 119266, 119540, 119658, 120337, 120742, 121927, 122058, 122946, 123590, 123937, 124776, 125590, 125636, 125732, 126035, 126137, 127482, 127695, 128983, 129352, 130030, 130099, 131506, 131535, 132150, 132632, 133306, 133952, 134717, 136061, 137038, 137427, 137669, 138138, 138341, 138581, 138991, 139704, 139748, 140413, 142465, 143705, 143833, 144700, 145046, 145836, 146153, 146507, 147295, 148718, 149553, 149982, 150013, 150059, 150281, 150331, 150504, 151424, 152328, 152673, 153569, 154414, 155577, 156257, 157804, 157861, 159131, 159541, 160074, 160271, 160833, 160956, 162161, 162249, 163742, 163829, 163898, 164740, 164897, 165361, 165722, 166555, 167100, 168373, 168628, 169230, 169883, 170120, 170804, 171105, 171970, 172654, 173584, 174513, 175304, 175789, 175842, 175954, 177562, 179750, 179872, 180950, 180964, 182093, 182271, 183096, 184009, 184705, 184855, 184960, 185036, 186598, 187036, 187811, 189885, 190113, 191220, 192712, 196814, 197375, 198412, 198419, 199244, 199711]
+  set_hash: 1104d00ea3ea257ee6dd83e5031cc04435488aa974af5328129e5683d7766c4e
+  # Frozen 8/11/2026 (docs/he/tray.md 17.5): 160 of the 177 targeted episodes that
+  # passed C's QA, picked by the rule of 17.3 (cplus_select), on their own release.
+  conditions:
+    file: configs/runplans/tray/cplus-conditions.jsonl
+    sha256: 64d97c4e85c551d0ac91c702f5f170cfce828363174b9e11c989bb3dd5527857
+  selection:
+    file: configs/runplans/tray/cplus-selection.jsonl
+    sha256: 8cb79a3259dcaf6d7e250e9a0c9e4f258ec1840e10088b870eb8bf28864804f8
+  release:
+    id: tray_s1_6c0fd7d37f77
+    release_hash: 6c0fd7d37f7793f0ce64af79053a4f4778689ec6f5ee9fc6615422a65f18894c
+    location: "rtx3060:~/denso-da34-pool/fwdata/releases/tray_s1_6c0fd7d37f77"
+    data_class: public
+  demo_sets:
+    file: configs/runplans/tray/demo_sets-cplus.json
+    file_sha256: 48e844ae9aae811cad28fb38d889bff6e4e9edaf7cbabf5326c88513b4f24149
+    salt: DA-34/demo-sets/v1
+    hashes:
+      T160: 1104d00ea3ea257ee6dd83e5031cc04435488aa974af5328129e5683d7766c4e
+    quality:
+      file: configs/runplans/tray/quality-cplus-tgt-1108.jsonl
+      sha256: 3c1d853cc0d90b3cbd35e268f20f3f387a6266459d22cfb824dd97c586275c2d
+      filter:
+        max_tilt_carry_deg: 10.0
+        max_part_shift_end_mm: 20.0
+    qa:
+      reports_sha256: 38ff2b21ebedc55937abc0ed7bed921472651e8279321426d1c6d1cf67a522f2
+      threshold_version: qa-1@fb6ddaf9f48c
+  set_name: T160

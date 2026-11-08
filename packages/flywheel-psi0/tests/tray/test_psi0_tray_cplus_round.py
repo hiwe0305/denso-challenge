@@ -271,6 +271,18 @@ def test_a_joined_cut_of_other_parts_is_refused(
     )
 
 
-def test_a_draft_round_does_not_train() -> None:
+def test_the_real_round_is_the_approved_one() -> None:
+    plan, round_plan, run_plan = colab_train.load_round(REPO)
+    assert run_plan == colab_train.CPLUS_FROZEN == "rp_71fee3fcff69"
+    job = colab_train.load_job("C_PLUS")
+    assert job.job_id == "da34-t5-ft-cplus-s0" and job.set_hash == round_plan.targets.set_hash
+    assert job.release_id == "tray_s1_f9433b028c52+tray_s1_6c0fd7d37f77"
+
+
+def test_a_draft_round_does_not_train(tmp_path: Path) -> None:
+    repo, _ = frozen_round(tmp_path)
+    raw = yaml.safe_load((repo / ROUND).read_text())
+    raw["status"] = "draft"
+    (repo / ROUND).write_text(yaml.safe_dump(raw, sort_keys=False))
     with pytest.raises(SystemExit, match="round-tray-cplus.yaml is not frozen"):
-        colab_train.load_round(REPO)
+        colab_train.load_round(repo)
