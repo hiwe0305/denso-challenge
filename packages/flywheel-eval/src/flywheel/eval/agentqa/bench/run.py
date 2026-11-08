@@ -50,7 +50,13 @@ from flywheel.eval.agentqa.bench.detections import (
 )
 from flywheel.eval.agentqa.bench.layers import agent_quality, split_by_layer
 from flywheel.eval.agentqa.bench.logs import run_log_checks
-from flywheel.eval.agentqa.bench.report import GroupReport, bench_result, write_bench
+from flywheel.eval.agentqa.bench.report import (
+    GroupReport,
+    ModelUse,
+    bench_result,
+    model_uses,
+    write_bench,
+)
 from flywheel.eval.agentqa.bench.score import score_group
 from flywheel.eval.agentqa.bench.session import AnswerLeak, BenchIncomplete, BenchSession
 from flywheel.eval.api import DEFAULT_SYSTEM_CONFIG, DEFAULT_TRAIN_CONFIG
@@ -89,10 +95,13 @@ def run_bench(
     start, outcome, notes = time.monotonic(), "ok", []
     try:
         session = BenchSession([(c["group"], c["dataset_id"]) for c in copies], answer_roots)
+        models: dict[str, list[ModelUse]] = {}
         for entry in copies:
             code = _code_run(entry, base, train_config, system_config)
             reports = [r for p in entry.get("agent_reports", []) for r in _reports(base / p)]
             agent = agent_run(reports, entry["dataset_id"], code.units, code.aliases)
+            models.setdefault(entry["dataset_id"], []).extend(
+                model_uses(entry["dataset_id"], reports))
             finished = entry.get("job_finished_at")
             session.record(code, _when(finished) if finished else None)
             session.record(agent)
@@ -103,8 +112,10 @@ def run_bench(
         groups = []
         for group in opened.groups:
             score = score_group(group)
+            used = [*models.get(score.injected_id, []), *models.get(score.clean_id, [])]
             groups.append(GroupReport(score, split_by_layer(score),
-                                      agent_quality(group, score, opened.reviews)))
+                                      agent_quality(group, score, opened.reviews),
+                                      tuple(sorted(used))))
         result = bench_result(
             groups,
             created_at=datetime.now(timezone.utc),

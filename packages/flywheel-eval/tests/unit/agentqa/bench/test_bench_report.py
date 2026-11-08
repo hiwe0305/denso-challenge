@@ -9,8 +9,9 @@ from pathlib import Path
 
 import pytest
 from conftest import CLEAN, INJECTED, QAWork, Report, Seal
-from flywheel.contracts.agentqa import AgentReview, FindingDecision
+from flywheel.contracts.agentqa import AgentModel, AgentReview, FindingDecision
 from flywheel.contracts.artifacts import Defect
+from flywheel.eval.agentqa.bench.report import BENCH_VERSION, ModelUse, model_uses
 from flywheel.eval.agentqa.bench.run import main, run_bench
 
 REASON = "finite_values (D3): NaN or Inf values = 4 > 0"
@@ -18,7 +19,8 @@ REASON = "finite_values (D3): NaN or Inf values = 4 > 0"
 
 def _bench(tmp_path: Path, qa_work: QAWork, report: Report, seal: Seal,
            agent_reports: bool = True,
-           clean_findings: tuple[tuple[str, str], ...] = ()) -> tuple[Path, Path]:
+           clean_findings: tuple[tuple[str, str], ...] = (),
+           clean_model: AgentModel | None = None) -> tuple[Path, Path]:
     answers = tmp_path / "answers"
     seal(answers, INJECTED, [
         Defect(target_ref="episode_000001", code="D3", parameters={"kind": "nan_values"}),
@@ -35,6 +37,8 @@ def _bench(tmp_path: Path, qa_work: QAWork, report: Report, seal: Seal,
         work = qa_work(spec_dir, copy_id, 4, reasons)
         name = f"agent-{copy_id}.jsonl"
         rep = report(f"r-{copy_id}", findings, inputs=(f"copies/{copy_id}/meta/info.json",))
+        if copy_id == CLEAN and clean_model is not None:
+            rep = rep.model_copy(update={"model": clean_model})
         (spec_dir / name).write_text(rep.model_dump_json() + "\n")
         copies.append({
             "group": "data", "dataset_id": copy_id, "job_finished_at": "2026-11-05T08:00:00Z",
@@ -84,6 +88,50 @@ def test_one_run_writes_a_hashed_result_a_labelled_page_and_two_ledger_rows(
     assert rows[1]["estimate_entry_id"] == rows[0]["id"]
     assert rows[1]["job_id"] == rows[0]["job_id"]
     assert all(r["activity"] == "agent_qa" and r["run_plan_id"] == "rp_bench_test" for r in rows)
+
+
+def test_each_copy_names_the_agent_model_and_prompt_hash_behind_its_reports(
+    tmp_path: Path, qa_work: QAWork, report: Report, seal: Seal
+) -> None:
+    spec, answers = _bench(tmp_path, qa_work, report, seal)
+    out = tmp_path / "out"
+    run_bench(spec, [answers], out, store=tmp_path / "store")
+    result = json.loads((out / "bench_result.json").read_text(encoding="utf-8"))
+    assert result["bench_version"] == BENCH_VERSION == "da31-3"
+    (group,) = result["groups"]
+    fake = {"name": "fake", "revision": "r0", "temperature": 0.0,
+            "prompt_sha256": "0" * 64, "reports": 1}
+    assert group["agent_models"] == [{"copy": INJECTED, **fake}, {"copy": CLEAN, **fake}]
+    page = (out / "index.html").read_text(encoding="utf-8")
+    assert "Agent model per copy" in page and "0" * 64 in page
+    assert "different agent models" not in page
+
+
+def test_reports_of_one_model_are_counted_once_per_copy(report: Report) -> None:
+    a, b = report("r-1", [("episode_000001", "D3")]), report("r-2", [])
+    other = b.model_copy(update={"model": a.model.model_copy(update={"revision": "r1"})})
+    assert model_uses(INJECTED, [a, b, other]) == [
+        ModelUse(INJECTED, "fake", "r0", 0.0, "0" * 64, 2),
+        ModelUse(INJECTED, "fake", "r1", 0.0, "0" * 64, 1),
+    ]
+    assert model_uses(CLEAN, []) == []
+
+
+def test_copies_read_by_different_models_are_both_listed_and_flagged(
+    tmp_path: Path, qa_work: QAWork, report: Report, seal: Seal
+) -> None:
+    other = AgentModel(name="nemotron-3.5-bolt-e4b", revision="q4", temperature=0.2,
+                       prompt_sha256="a" * 64)
+    spec, answers = _bench(tmp_path, qa_work, report, seal, clean_model=other)
+    out = tmp_path / "out"
+    run_bench(spec, [answers], out, store=tmp_path / "store")
+    (group,) = json.loads((out / "bench_result.json").read_text(encoding="utf-8"))["groups"]
+    assert [(m["copy"], m["name"], m["prompt_sha256"]) for m in group["agent_models"]] == [
+        (INJECTED, "fake", "0" * 64),
+        (CLEAN, "nemotron-3.5-bolt-e4b", "a" * 64),
+    ]
+    page = (out / "index.html").read_text(encoding="utf-8")
+    assert "different agent models" in page
 
 
 def test_a_result_is_never_overwritten(tmp_path: Path, qa_work: QAWork, report: Report,
