@@ -15,17 +15,19 @@ from __future__ import annotations
 import hashlib
 import html
 import json
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from flywheel.contracts.agentqa import AgentReport
 from flywheel.eval.agentqa.bench.detections import LAYERS
 from flywheel.eval.agentqa.bench.layers import AgentQuality, KindSplit
 from flywheel.eval.agentqa.bench.score import GroupScore, Rate
 
-BENCH_VERSION = "da31-2"
+BENCH_VERSION = "da31-3"
 RESULT = "bench_result.json"
 RESULT_LOCK = "bench_result.sha256"
 PAGE = "index.html"
@@ -37,11 +39,33 @@ FALSE_ALARM_NOTE = (
 )
 
 
+@dataclass(frozen=True, order=True)
+class ModelUse:
+    """One agent model, as `AgentReport.model` names it, and how many reports of a copy used it."""
+
+    copy: str
+    name: str
+    revision: str
+    temperature: float
+    prompt_sha256: str
+    reports: int
+
+
+def model_uses(copy_id: str, reports: Sequence[AgentReport]) -> list[ModelUse]:
+    """The distinct models behind a copy's agent reports, so an agent number can be rerun."""
+    counts = Counter(
+        (r.model.name, r.model.revision, r.model.temperature, r.model.prompt_sha256)
+        for r in reports
+    )
+    return [ModelUse(copy_id, *key, n) for key, n in sorted(counts.items())]
+
+
 @dataclass(frozen=True)
 class GroupReport:
     score: GroupScore
     split: tuple[KindSplit, ...]
     quality: AgentQuality
+    agent_models: tuple[ModelUse, ...] = ()
 
 
 def bench_result(
@@ -125,6 +149,12 @@ def _group_json(report: GroupReport) -> dict[str, Any]:
              "agent_adds": r.agent_adds, "together": r.together, "agent_alone": r.agent_alone}
             for r in report.split
         ],
+        "agent_models": [
+            {"copy": m.copy, "name": m.name, "revision": m.revision,
+             "temperature": m.temperature, "prompt_sha256": m.prompt_sha256,
+             "reports": m.reports}
+            for m in sorted(report.agent_models)
+        ],
         "agent_quality": {
             "ranking": _rate(quality.ranking),
             "reviews": {k: dict(v) for k, v in quality.reviews.items()},
@@ -187,6 +217,11 @@ def _group_html(group: Mapping[str, Any]) -> str:
         for layer in LAYERS
         for copy, s in layers[layer]["seconds_to_report"].items()
     ]
+    models = group["agent_models"]
+    model_rows = [
+        [m["copy"], m["name"], m["revision"], m["temperature"], m["prompt_sha256"], m["reports"]]
+        for m in models
+    ]
     quality = group["agent_quality"]
     review_rows = [
         [label, counts.get("agree", 0), counts.get("override", 0), counts.get("unreviewed", 0)]
@@ -221,6 +256,10 @@ def _group_html(group: Mapping[str, Any]) -> str:
                ["layer", "rate", "not a unit (không gắn đơn vị)", "reports"], alarm_rows),
         f"<p class=none>{_e(FALSE_ALARM_NOTE[0].upper() + FALSE_ALARM_NOTE[1:])}.</p>",
         _table("Time from job end to report", ["layer", "copy", "time"], time_rows),
+        _table("Agent model per copy (AgentReport.model)",
+               ["copy", "model", "revision", "temperature", "prompt sha256", "reports"],
+               model_rows),
+        _models_differ(group),
         f"<h3>Agent QA/QC: ranking {_e(_shown(quality['ranking']))}"
         " (true finding ranked above false, pairs within a report)</h3>",
         _table("Engineer's review by label (agree = insight and suggestion stood)",
@@ -232,6 +271,20 @@ def _group_html(group: Mapping[str, Any]) -> str:
         _table("Failures without a code (not counted)", ["layer", "copy", "reason"],
                uncoded_rows),
     ])
+
+
+def _models_differ(group: Mapping[str, Any]) -> str:
+    """A warning when the two copies were not read by the same models: recall comes from
+    the copy with defects and false alarms from the clean one, so one agent must do both."""
+    def key(copy: str) -> set[tuple[Any, ...]]:
+        return {(m["name"], m["revision"], m["temperature"], m["prompt_sha256"])
+                for m in group["agent_models"] if m["copy"] == copy}
+
+    if key(group["injected_copy"]) == key(group["clean_copy"]):
+        return ""
+    return ("<p class=banner>The two copies were read by different agent models or"
+            " prompts: recall and false alarms of the agent column are not from one"
+            " agent.</p>")
 
 
 def _listed(names: Sequence[str]) -> str:
