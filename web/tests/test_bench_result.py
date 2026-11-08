@@ -19,6 +19,7 @@ from typing import Any
 
 import pytest
 from flywheel.contracts.artifacts import Defect
+from flywheel.eval.agentqa.bench import report as da31_report
 from flywheel.eval.agentqa.bench.layers import AgentQuality, FindingJudgement, KindSplit
 from flywheel.eval.agentqa.bench.report import BENCH_VERSION, GroupReport, bench_result
 from flywheel.eval.agentqa.bench.score import GroupScore, LayerScore, Rate
@@ -30,6 +31,11 @@ from web.fwsync.sink import JsonlSink
 ROOT = Path(__file__).resolve().parents[2]
 MOCK = ROOT / "mock" / "demo-17-11"
 MOCK_RESULT = json.loads((MOCK / "bench_result.json").read_text(encoding="utf-8"))
+
+#: `ModelUse` có từ `da31-3` (DA-31 nhiệm vụ 5, PR #166). Tới khi #166 merge và
+#: nhánh này rebase, lõi cài ở đây vẫn ghi `da31-2`; hai chỗ dưới dùng cờ này
+#: và bỏ được khi lõi đã là `da31-3`.
+MODEL_USE: Any = getattr(da31_report, "ModelUse", None)
 
 
 def _layer(layer: str) -> LayerScore:
@@ -64,8 +70,11 @@ def _real_result() -> dict[str, Any]:
                                    "agree", ""),),
     )
     split = (KindSplit("nan_values", "D3", 1, 1, 0, 1),)
+    models: tuple[Any, ...] = ()
+    if MODEL_USE is not None:
+        models = (MODEL_USE("inj", "m", "r", 0.0, "0" * 64, 1),)
     return bench_result(
-        [GroupReport(score, split, quality)],
+        [GroupReport(score, split, quality, *([models] if models else []))],
         created_at=datetime(2026, 11, 12, tzinfo=timezone.utc),
         manifest_sha256={"inj": "0" * 64},
         inputs={"spec_sha256": "1" * 64},
@@ -97,6 +106,8 @@ def _shape(value: Any, path: str = "$") -> set[str]:
 
 def test_the_mock_has_the_shape_da31_writes() -> None:
     real, mock = _shape(_real_result()), _shape(MOCK_RESULT)
+    if MODEL_USE is None:  # lõi còn là da31-2: mọi khoá khác vẫn phải khớp
+        mock = {k for k in mock if ".agent_models" not in k}
     assert real == mock, (
         f"chỉ DA-31 có: {sorted(real - mock)}; chỉ mock có: {sorted(mock - real)}"
     )
@@ -104,7 +115,7 @@ def test_the_mock_has_the_shape_da31_writes() -> None:
 
 def test_the_loader_reads_the_version_da31_writes_today() -> None:
     assert BENCH_VERSION in BENCH_VERSIONS
-    assert MOCK_RESULT["bench_version"] == BENCH_VERSION
+    assert MOCK_RESULT["bench_version"] == BENCH_VERSIONS[-1] == "da31-3"
 
 
 def test_a_real_result_maps_without_loss() -> None:
@@ -112,6 +123,12 @@ def test_a_real_result_maps_without_loss() -> None:
     (group,) = rows["defect_bench_groups"]
     assert group["injected_copy"] == "inj" and group["agent_ranking_total"] == 1
     assert group["natural"]["code"] == [["episode_000002", "D2"]]
+    if MODEL_USE is None:
+        assert group["agent_models"] is None
+    else:
+        assert group["agent_models"] == [{"copy": "inj", "name": "m", "revision": "r",
+                                          "temperature": 0.0, "prompt_sha256": "0" * 64,
+                                          "reports": 1}]
     metrics = sorted((r["layer"], r["metric"], r["subject"]) for r in rows["defect_scores"])
     assert metrics == sorted(
         (layer, metric, subject)
@@ -147,6 +164,11 @@ def test_every_rate_of_the_mock_becomes_one_row() -> None:
             D1={"hit": 2, "total": 1, "value": 2.0}), "hit"),
         (lambda r: r["groups"][0]["layers"]["code"]["false_alarm_on_clean"].pop("bound"),
          "bound"),
+        (lambda r: r["groups"][0].pop("agent_models"), "agent_models"),
+        (lambda r: r["groups"][0]["agent_models"][0].pop("prompt_sha256"), "thiếu"),
+        (lambda r: r["groups"][0]["agent_models"][0].update(copy="bench_other"), "không thuộc"),
+        (lambda r: r["groups"][0]["agent_models"][0].update(prompt_sha256="abc"), "sha256"),
+        (lambda r: r["groups"][0]["agent_models"][0].update(reports=0), "reports"),
     ],
 )
 def test_a_result_the_loader_cannot_trust_is_refused(change: Any, message: str) -> None:
@@ -154,6 +176,23 @@ def test_a_result_the_loader_cannot_trust_is_refused(change: Any, message: str) 
     change(result)
     with pytest.raises(MappingError, match=message):
         map_bench_result(result, "c" * 64)
+
+
+def test_each_group_keeps_the_model_behind_each_copy() -> None:
+    rows = map_bench_result(MOCK_RESULT, "d" * 64)
+    for group, raw in zip(rows["defect_bench_groups"], MOCK_RESULT["groups"], strict=True):
+        assert group["agent_models"] == raw["agent_models"]
+        assert {m["copy"] for m in group["agent_models"]} == {
+            group["injected_copy"], group["clean_copy"]}
+
+
+def test_a_da31_2_result_loads_without_a_model_rather_than_a_guessed_one() -> None:
+    old = json.loads(json.dumps(MOCK_RESULT))
+    old["bench_version"] = "da31-2"
+    for group in old["groups"]:
+        del group["agent_models"]
+    rows = map_bench_result(old, "e" * 64)
+    assert [g["agent_models"] for g in rows["defect_bench_groups"]] == [None, None]
 
 
 def test_import_loads_both_tables_keyed_by_the_result_hash(tmp_path: Path) -> None:

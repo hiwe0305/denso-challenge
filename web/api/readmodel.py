@@ -1548,6 +1548,8 @@ def _bench_block(g: Row, rates: dict[tuple[str, str, str, str], Row]) -> Row:
             {"hit": g["agent_ranking_hit"], "total": g["agent_ranking_total"]}),
         "agent_reviews": g["agent_reviews"],
         "agent_findings": g["agent_findings"],
+        # None = a da31-2 result, which does not name the agent's model (W14).
+        "agent_models": g.get("agent_models"),
     }
 
 

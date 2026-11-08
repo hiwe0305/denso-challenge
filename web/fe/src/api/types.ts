@@ -726,6 +726,17 @@ export interface DefectFinding {
   reason: string;
 }
 
+/** One agent model behind a copy's reports (`agent_models` of `da31-3`, W14). */
+export interface AgentModelUse {
+  copy: string;
+  name: string;
+  revision: string;
+  temperature: number;
+  prompt_sha256: string;
+  /** How many of the copy's agent reports this model wrote. */
+  reports: number;
+}
+
 /** One group (`data`, `logs`) of a bench run: an injected copy and its clean twin. */
 export interface DefectBenchGroup {
   group_name: string;
@@ -745,6 +756,8 @@ export interface DefectBenchGroup {
   agent_ranking: DefectRate;
   agent_reviews: Record<string, Record<string, number>>;
   agent_findings: DefectFinding[];
+  /** null = a `da31-2` result, which does not name the model; [] = no agent report. */
+  agent_models: AgentModelUse[] | null;
 }
 
 /** GET /defects/scoreboard · the newest bench run; `result_sha256` null when none. */

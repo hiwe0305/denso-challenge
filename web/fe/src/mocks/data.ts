@@ -6,6 +6,8 @@
 // grader reads it (BR-08); it is deliberately not globbed here. The bench
 // result is DA-31's score of that key, which the API may read (§4.4c).
 
+import type { AgentModelUse } from "../api/types";
+
 const files = import.meta.glob("../../../../mock/demo-17-11/*.jsonl", {
   query: "?raw",
   import: "default",
@@ -393,7 +395,7 @@ interface RawRate {
   value: number | null;
 }
 
-/** One layer of one group of `bench_result.json` (DA-31, `da31-2`). */
+/** One layer of one group of `bench_result.json` (DA-31, `da31-2` and `da31-3`). */
 export interface RawBenchLayer {
   recall_by_kind: Record<string, RawRate>;
   masked_by_kind: Record<string, number>;
@@ -437,6 +439,8 @@ export interface RawBenchGroup {
       reason: string;
     }>;
   };
+  /** From `da31-3` on (W14): the agent model behind each copy's reports. */
+  agent_models?: AgentModelUse[];
 }
 
 export interface RawBenchResult {

@@ -1063,8 +1063,9 @@ class Mock:
     def defects(self) -> None:
         """Đáp án (`defect_manifest.json`) và kết quả chấm (`bench_result.json`).
 
-        Kết quả theo đúng dạng `da31-2` mà `flywheel.eval.agentqa.bench.report`
-        ghi; `web/tests/test_bench_result.py` so khoá của nó với hàm thật.
+        Kết quả theo đúng dạng `da31-3` mà `flywheel.eval.agentqa.bench.report`
+        ghi (DA-31 nhiệm vụ 5, PR #166: thêm `agent_models`);
+        `web/tests/test_bench_result.py` so khoá của nó với hàm thật.
         """
         self.files["defect_manifest.json"] = [
             {"dataset_id": copy, "seed": 17 + index,
@@ -1078,7 +1079,7 @@ class Mock:
             for _, injected, clean, _, _ in self.BENCH_GROUPS for copy in (injected, clean)
         }
         self.files["bench_result.json"] = {
-            "bench_version": "da31-2",
+            "bench_version": "da31-3",
             "measured_on": "injected defects (DA-27), not natural defects",
             "false_alarm_on_clean": (
                 "upper bound (cận trên): the clean copy still holds the real data's own"
@@ -1166,6 +1167,10 @@ class Mock:
         for f in findings:
             bucket = reviews.setdefault(f["label"], {})
             bucket[f["review"]] = bucket.get(f["review"], 0) + 1
+        # Một model đọc cả hai bản (một báo cáo mỗi bản), nên số của cột agent
+        # đến từ một agent. Tên theo DA-20; revision và hash prompt là bịa.
+        model = {"name": "nemotron-3.5-bolt-e4b", "revision": "q4-mock", "temperature": 0.0,
+                 "prompt_sha256": hx("agent-prompt"), "reports": 1}
         return {
             "group": group,
             "injected_copy": injected,
@@ -1173,6 +1178,7 @@ class Mock:
             "defects": len(defects),
             "layers": layers,
             "split": split,
+            "agent_models": [{"copy": copy, **model} for copy in sorted((injected, clean))],
             "agent_quality": {
                 "ranking": self._rate(sum(1 for t, f in pairs if t < f), len(pairs)),
                 "reviews": reviews,

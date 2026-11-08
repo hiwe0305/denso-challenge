@@ -4,7 +4,7 @@
 // copy is an upper bound. Code and agent stand side by side so the agent is
 // never credited with what code already caught (design 27/10 §9.2).
 import { useDefectScoreboard } from "../api/hooks";
-import type { BenchLayer, DefectBenchGroup, DefectFinding, DefectRate } from "../api/types";
+import type { AgentModelUse, BenchLayer, DefectBenchGroup, DefectFinding, DefectRate } from "../api/types";
 import { EmptyState, ErrorBox, HashBadge, Loading, MockBadge, Panel } from "../ui/components";
 import { fmtTime } from "../ui/labels";
 
@@ -160,8 +160,86 @@ function GroupBlock({ g }: { g: DefectBenchGroup }) {
             </>
           )}
         </div>
+        <GroupModels g={g} />
       </div>
     </Panel>
+  );
+}
+
+/** "name revision · t=0.2"; the model as the agent column depends on it. */
+function modelLabel(m: AgentModelUse): string {
+  return `${m.name} ${m.revision} · t=${m.temperature}`;
+}
+
+/** The key of a model a number can be rerun with: everything but the copy and the count. */
+function modelKey(m: AgentModelUse): string {
+  return `${m.name}\u0000${m.revision}\u0000${m.temperature}\u0000${m.prompt_sha256}`;
+}
+
+/** Whether both copies were read by the same set of models (recall and false alarm from one agent). */
+export function sameModels(g: DefectBenchGroup): boolean {
+  const keys = (copy: string) => [...new Set((g.agent_models ?? []).filter((m) => m.copy === copy).map(modelKey))].sort().join("|");
+  return keys(g.injected_copy) === keys(g.clean_copy);
+}
+
+/** Header line: the models behind the agent column, or why there are none (W14). */
+function BenchModels({ groups, version }: { groups: DefectBenchGroup[]; version: string | null }) {
+  if (groups.every((g) => g.agent_models === null)) {
+    return (
+      <p className="text-xs text-slate-500" data-testid="bench-model">
+        Model và hash prompt của agent: chưa có — kết quả <span className="font-mono">{version}</span> chưa mang hai trường này
+        (có từ <span className="font-mono">da31-3</span>, W14).
+      </p>
+    );
+  }
+  const seen = new Map<string, AgentModelUse>();
+  for (const m of groups.flatMap((g) => g.agent_models ?? [])) seen.set(modelKey(m), m);
+  const models = [...seen.values()];
+  return (
+    <p className="text-xs text-slate-500" data-testid="bench-model">
+      Model của agent:{" "}
+      {models.length === 0 ? "không có báo cáo agent nào" : models.map((m, i) => (
+        <span key={modelKey(m)}>
+          {i > 0 ? "; " : ""}<span className="font-mono">{modelLabel(m)}</span>, prompt <HashBadge value={m.prompt_sha256} />
+        </span>
+      ))}
+    </p>
+  );
+}
+
+/** Per group: which model read which copy, and a warning when the two copies differ. */
+function GroupModels({ g }: { g: DefectBenchGroup }) {
+  if (g.agent_models === null) return null;
+  const rows = [...g.agent_models].sort((a, b) =>
+    a.copy === b.copy ? modelKey(a).localeCompare(modelKey(b)) : a.copy === g.injected_copy ? -1 : 1);
+  return (
+    <div>
+      <h3 className="mb-1 text-xs font-semibold uppercase text-slate-500">Model của agent theo bản sao</h3>
+      {rows.length === 0 ? (
+        <p className="text-xs text-slate-500">Không bản nào có báo cáo agent.</p>
+      ) : (
+        <table className="w-full text-xs" data-testid={`models-${g.group_name}`}>
+          <thead className="text-left text-slate-500">
+            <tr><th className="py-1">Bản</th><th>Model</th><th>Hash prompt</th><th>Số báo cáo</th></tr>
+          </thead>
+          <tbody>
+            {rows.map((m) => (
+              <tr key={`${m.copy}/${modelKey(m)}`} className="border-t border-slate-100">
+                <td className="py-1">{m.copy === g.injected_copy ? "có lỗi" : "sạch"}</td>
+                <td className="font-mono">{modelLabel(m)}</td>
+                <td><HashBadge value={m.prompt_sha256} /></td>
+                <td className="tabular-nums">{m.reports}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {sameModels(g) ? null : (
+        <p className="mt-1 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-900" data-testid={`models-differ-${g.group_name}`}>
+          Hai bản sao không do cùng model hoặc prompt đọc: recall (bản có lỗi) và báo nhầm (bản sạch) của cột agent không đến từ một agent.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -196,9 +274,7 @@ export function AgentQa() {
         <p className="text-base" data-testid="bench-summary">
           Code bắt <b>{t.by_code}/{t.injected}</b> lỗi cấy; agent bắt thêm <b>{t.agent_adds}</b>; cùng nhau <b>{t.together}/{t.injected}</b>.
         </p>
-        <p className="text-xs text-slate-500" data-testid="bench-model">
-          Model và hash prompt của agent: chưa có — <span className="font-mono">bench_result.json</span> chưa mang hai trường này (W14).
-        </p>
+        <BenchModels groups={b.groups} version={b.bench_version} />
       </header>
       {b.groups.map((g) => <GroupBlock key={g.group_name} g={g} />)}
     </div>

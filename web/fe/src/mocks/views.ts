@@ -428,6 +428,7 @@ export class MockViews {
         agent_ranking: rate(g.agent_quality.ranking),
         agent_reviews: g.agent_quality.reviews,
         agent_findings: g.agent_quality.findings,
+        agent_models: b.bench_version === "da31-2" ? null : (g.agent_models ?? []),
       };
       return block;
     });

@@ -87,6 +87,10 @@ CREATE TABLE defect_bench_groups (
   agent_ranking_total INTEGER NOT NULL CHECK (agent_ranking_total >= agent_ranking_hit),
   agent_reviews JSONB NOT NULL,
   agent_findings JSONB NOT NULL,
+  -- [{copy, name, revision, temperature, prompt_sha256, reports}] từ
+  -- `agent_models` của da31-3 (W14): model và prompt sau mỗi con số của cột
+  -- agent. NULL = kết quả da31-2, không mang trường này; M3 ghi "chưa có".
+  agent_models JSONB,
   manifest_sha256 JSONB NOT NULL,
   inputs JSONB NOT NULL,
   created_at TIMESTAMPTZ NOT NULL,

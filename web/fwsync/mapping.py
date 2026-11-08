@@ -424,8 +424,12 @@ def map_defect_manifest(payload: Any) -> dict[str, Any]:
 
 #: Dạng `bench_result.json` của DA-31 mà bộ nạp hiểu. `da31-1` thiếu
 #: `recall_unmasked_by_kind` và tính báo nhầm khác (hotfix #141), nên nạp nó
-#: vào cùng cột với `da31-2` sẽ đặt hai con số khác nghĩa cạnh nhau.
-BENCH_VERSIONS = ("da31-2",)
+#: vào cùng cột với `da31-2` sẽ đặt hai con số khác nghĩa cạnh nhau. `da31-3`
+#: (DA-31 nhiệm vụ 5, PR #166) giữ mọi khoá của `da31-2` và thêm
+#: `agent_models` mỗi nhóm (W14); kết quả `da31-2` nạp với `agent_models` rỗng
+#: (NULL), để M3 ghi "chưa có" thay vì đoán model.
+BENCH_VERSIONS = ("da31-2", "da31-3")
+_AGENT_MODEL_KEYS = ("copy", "name", "revision", "temperature", "prompt_sha256", "reports")
 BENCH_LAYERS = ("code", "agent")
 _BENCH_LAYER_KEYS = (
     "recall_by_kind", "masked_by_kind", "recall_unmasked_by_kind", "precision_by_code",
@@ -471,6 +475,8 @@ def map_bench_result(payload: Any, result_sha256: str) -> dict[str, list[dict[st
         quality = _require(g["agent_quality"], ("ranking", "reviews", "findings"),
                            f"{where}.agent_quality")
         ranking = _rate(quality["ranking"], f"{where}.agent_quality.ranking")
+        models = (None if version == "da31-2"
+                  else _agent_models(g, (g["injected_copy"], g["clean_copy"]), where))
         per_layer: dict[str, dict[str, Any]] = {}
         for layer in BENCH_LAYERS:
             lw = f"{where}.layers.{layer}"
@@ -518,11 +524,40 @@ def map_bench_result(payload: Any, result_sha256: str) -> dict[str, list[dict[st
             "agent_ranking_total": ranking["total"],
             "agent_reviews": quality["reviews"],
             "agent_findings": quality["findings"],
+            "agent_models": models,
             "manifest_sha256": head["manifest_sha256"],
             "inputs": head["inputs"],
             "created_at": head["created_at"],
         })
     return {"defect_bench_groups": groups, "defect_scores": scores}
+
+
+def _agent_models(group: dict[str, Any], copies: tuple[str, str],
+                  where: str) -> list[dict[str, Any]]:
+    """`agent_models` của một nhóm `da31-3`: mỗi dòng nói bản sao nào, model nào.
+
+    Thiếu khoá là từ chối, như mọi chỗ khác của file: không có model thì một
+    con số của cột agent không chạy lại được. Danh sách rỗng thì nhận (bộ chấm
+    chạy không báo cáo agent nào); M3 ghi nó là "không có báo cáo agent".
+    """
+    if "agent_models" not in group:
+        raise MappingError(f"{where}: thiếu ['agent_models'] (bắt buộc từ da31-3)")
+    models = group["agent_models"]
+    if not isinstance(models, list):
+        raise MappingError(f"{where}.agent_models: phải là danh sách")
+    out = []
+    for i, raw in enumerate(models):
+        row = _require(raw, _AGENT_MODEL_KEYS, f"{where}.agent_models[{i}]")
+        if row["copy"] not in copies:
+            raise MappingError(
+                f"{where}.agent_models[{i}]: bản `{row['copy']}` không thuộc nhóm {copies}")
+        sha = row["prompt_sha256"]
+        if not isinstance(sha, str) or len(sha) != 64:
+            raise MappingError(f"{where}.agent_models[{i}]: prompt_sha256 không phải sha256")
+        if not isinstance(row["reports"], int) or row["reports"] < 1:
+            raise MappingError(f"{where}.agent_models[{i}]: reports phải là số nguyên >= 1")
+        out.append({key: row[key] for key in _AGENT_MODEL_KEYS})
+    return out
 
 
 def _require(value: Any, keys: tuple[str, ...], where: str) -> dict[str, Any]:

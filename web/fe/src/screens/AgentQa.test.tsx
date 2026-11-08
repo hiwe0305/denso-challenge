@@ -4,7 +4,8 @@
 import { screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { renderApp } from "../test/renderApp";
-import { fmtRate } from "./AgentQa";
+import type { DefectBenchGroup } from "../api/types";
+import { fmtRate, sameModels } from "./AgentQa";
 
 describe("M3 screen", () => {
   it("says the numbers are on injected defects before anything else", async () => {
@@ -47,6 +48,26 @@ describe("M3 screen", () => {
     expect(findings.textContent).toContain("kỹ sư bác");
     expect(screen.getByTestId("ranking-data").textContent).toContain("4/6 · 67%");
     expect(screen.getByTestId("ranking-logs").textContent).toContain("—");
+  });
+
+  it("names the agent model and prompt behind each copy (W14)", async () => {
+    renderApp("/agent-qa");
+    const head = await screen.findByTestId("bench-model");
+    expect(head.textContent).toContain("Model của agent: nemotron-3.5-bolt-e4b q4-mock · t=0");
+    const models = screen.getByTestId("models-data");
+    const rows = within(models).getAllByRole("row").slice(1);
+    expect(rows.map((r) => r.querySelector("td")?.textContent)).toEqual(["có lỗi", "sạch"]);
+    expect(screen.queryByTestId("models-differ-data")).toBeNull();
+  });
+
+  it("tells when the two copies were not read by one model", () => {
+    const m = { name: "n", revision: "r", temperature: 0, prompt_sha256: "a".repeat(64), reports: 1 };
+    const group = (models: DefectBenchGroup["agent_models"]) =>
+      ({ injected_copy: "inj", clean_copy: "clean", agent_models: models }) as DefectBenchGroup;
+    expect(sameModels(group([{ ...m, copy: "inj" }, { ...m, copy: "clean" }]))).toBe(true);
+    expect(sameModels(group([{ ...m, copy: "inj" }, { ...m, copy: "clean", prompt_sha256: "b".repeat(64) }]))).toBe(false);
+    expect(sameModels(group([{ ...m, copy: "inj" }]))).toBe(false);
+    expect(sameModels(group(null))).toBe(true);
   });
 
   it("formats rates", () => {

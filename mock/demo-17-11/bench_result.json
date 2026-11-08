@@ -1,9 +1,27 @@
 {
-  "bench_version": "da31-2",
+  "bench_version": "da31-3",
   "created_at": "2026-11-12T03:00:00+00:00",
   "false_alarm_on_clean": "upper bound (cận trên): the clean copy still holds the real data's own defects, and a report of one of them counts as a false alarm",
   "groups": [
     {
+      "agent_models": [
+        {
+          "copy": "bench_kbd_teleop",
+          "name": "nemotron-3.5-bolt-e4b",
+          "prompt_sha256": "392f3eb4cb8dea0d8c20b7183fa0e9fbac3ee7fe05443455813c09d3fb5a8f11",
+          "reports": 1,
+          "revision": "q4-mock",
+          "temperature": 0.0
+        },
+        {
+          "copy": "bench_kbd_teleop_clean",
+          "name": "nemotron-3.5-bolt-e4b",
+          "prompt_sha256": "392f3eb4cb8dea0d8c20b7183fa0e9fbac3ee7fe05443455813c09d3fb5a8f11",
+          "reports": 1,
+          "revision": "q4-mock",
+          "temperature": 0.0
+        }
+      ],
       "agent_quality": {
         "findings": [
           {
@@ -463,6 +481,24 @@
       ]
     },
     {
+      "agent_models": [
+        {
+          "copy": "bench_logs_bfail",
+          "name": "nemotron-3.5-bolt-e4b",
+          "prompt_sha256": "392f3eb4cb8dea0d8c20b7183fa0e9fbac3ee7fe05443455813c09d3fb5a8f11",
+          "reports": 1,
+          "revision": "q4-mock",
+          "temperature": 0.0
+        },
+        {
+          "copy": "bench_logs_bfail_clean",
+          "name": "nemotron-3.5-bolt-e4b",
+          "prompt_sha256": "392f3eb4cb8dea0d8c20b7183fa0e9fbac3ee7fe05443455813c09d3fb5a8f11",
+          "reports": 1,
+          "revision": "q4-mock",
+          "temperature": 0.0
+        }
+      ],
       "agent_quality": {
         "findings": [
           {
