@@ -983,6 +983,77 @@ _Thêm **sau khi thấy T1r**. Đây là chỉ số báo cạnh, **không phải
 - Xong mức 1–2: báo số thô.
 - Xong cả lô: báo số thô; viết kết quả, dòng thực đo trong sổ chi phí, mở PR.
 
+### 16.6 Kết quả (sơ bộ, trên dev)
+
+_Đọc theo mục 16.1. Luật không đổi sau khi thấy kết quả. Đọc bằng `eval_results` của cây chạy (`079160d`) trên `rtx3060`, có yaw, mỗi điều kiện lấy lần xong sớm nhất. Số khớp từng con số với phép đếm thô của phiên điều phối._
+
+**Chạy.**
+- Thời gian: 04:58:31Z–22:10:49Z ngày 7/11/2026, **17,2 giờ tường**, 229,4 s mỗi episode (mỗi lô 10 episode: 1 923–2 566 s).
+- 27/27 lô xong ở lần chạy đầu (`attempt-0`), mã 0, không episode thiếu, không rollout thừa.
+- Guard ghi `ok` ở cả 27 lần khởi động client; không lần nào bị chặn.
+- 47 611 request `/act`. Output 11 GB, không commit.
+- GPU dùng chung với job của một đội khác trong một phần thời gian chạy.
+
+| Mức | n | Thành công | p | Wilson 95 % | CI bootstrap của plan |
+|---|---|---|---|---|---|
+| 0 (30 lượt lặp, một cảnh) | 30 | 5 | 16,7 % | 7,3–33,6 % | 3,3–30,0 % |
+| 1 | 120 | 9 | 7,5 % | 4,0–13,6 % | 3,3–12,5 % |
+| 2 | 120 | 11 | 9,2 % | 5,2–15,7 % | 4,2–15,0 % |
+| **1–2 gộp (chỉ số chính)** | **240** | **20** | **8,3 %** | **5,5–12,5 %** | **5,0–12,1 %** |
+| Cả lô | 270 | 25 | 9,3 % | 6,4–13,3 % | – |
+
+Tỉ lệ qua từng bước của bộ chấm:
+
+| Mức | `approach_a` | `grasp` | `lift` | `carry` | `reach_b` | `place` | `release_stand` |
+|---|---|---|---|---|---|---|---|
+| 0 | 93,3 % | 93,3 % | 93,3 % | 90,0 % | 90,0 % | 23,3 % | 16,7 % |
+| 1 | 60,8 % | 60,8 % | 60,8 % | 60,8 % | 60,8 % | 10,8 % | 7,5 % |
+| 2 | 73,3 % | 73,3 % | 73,3 % | 71,7 % | 68,3 % | 11,7 % | 7,5 % |
+| 1–2 gộp | 67,1 % | 67,1 % | 67,1 % | 66,2 % | 64,6 % | 11,2 % | 7,5 % |
+
+Nhãn lỗi:
+
+| Mức | `L-PLACE-POSE` | `L-TIMEOUT` | `L-TRAY-TILT` | `L-PART-DROP` | `L-ONE-HAND` |
+|---|---|---|---|---|---|
+| 0 | 16 | 1 | 8 | 0 | 0 |
+| 1 | 68 | 24 | 10 | 6 | 3 |
+| 2 | 63 | 18 | 20 | 5 | 3 |
+| 1–2 gộp | 131 (55 %) | 42 (18 %) | 30 (13 %) | 11 (5 %) | 6 (3 %) |
+
+- Ở mức 1–2 có 20 thành công nhưng chỉ 18 lượt bật cờ `release_stand`. Hai lượt thành công ở mức 2 (seed 1000142 và 1000196, xong ở khoảng 30 s mô phỏng) có cả 7 cờ bước đều tắt. Đây là giới hạn cờ bước ở mục 13.5. Thành công tính theo `success` của bộ chấm.
+- Yaw: 1 493 trên 1 139 427 chu kỳ vượt 2,5 rad sau khi quấn góc (lớn nhất 3,14 rad); lần chạy trên cảnh trơn là 1 163 trên 1 215 000.
+
+**Đọc theo bậc 2 (mục 9).**
+- p_C = 20/240 = **8,3 %** ở mức 1–2 gộp, dưới ngưỡng 10 %. **Quy tắc 0 xảy ra.**
+- Theo đúng câu của quy tắc: Ψ₀ chưa học được task khay từ ảnh MuJoCo; **không chạy C+**; ghi `Decision`.
+- Quy tắc 1–6 không đọc.
+- Ghi kèm, không đổi cách đọc: cận trên của khoảng tin cậy (Wilson 12,5 %, bootstrap 12,1 %) vượt 10 %. Quy tắc 0 đọc trên ước lượng điểm p_C, như đã viết.
+- Mọi số là **sơ bộ, trên dev**, một seed train, kèm các giới hạn ở mục 13.5.
+
+**So với lần chạy trên cảnh trơn** (mục 13.7; chỉ là số báo cạnh, ghép cặp trên cùng 270 điều kiện):
+- Thành công: 25 điều kiện chỉ lần này thành công, 0 điều kiện chỉ lần cũ thành công.
+- `place`: 34 chỉ lần này, 1 chỉ lần cũ.
+- `reach_b`: 72 chỉ lần này, 43 chỉ lần cũ.
+- Lỗi dời từ `L-TRAY-TILT` (52 % trên cảnh trơn) sang `L-PLACE-POSE` (55 % lần này).
+
+**Chỉ số phụ: tư thế cuối của khay** (mục 16.4; không phải luật). Bảng dưới là các lượt `L-PLACE-POSE`; dung sai là 5 cm và 10°.
+
+| Mức | n | Khoảng cách p10 / p50 / p90 (cm) | Nhỏ nhất–lớn nhất (cm) | Sai số góc p10 / p50 / p90 (°) | Chỉ lệch vị trí | Chỉ lệch góc | Lệch cả hai | Trong dung sai lúc cuối |
+|---|---|---|---|---|---|---|---|---|
+| 0 | 16 | 2,5 / 9,5 / 17,6 | 0,9–28,6 | 1,5 / 6,9 / 12,1 | 11 | 3 | 2 | 0 |
+| 1 | 68 | 5,2 / 10,1 / 19,9 | 0,4–36,1 | 2,1 / 8,4 / 18,8 | 38 | 6 | 23 | 1 |
+| 2 | 63 | 6,1 / 11,2 / 32,0 | 2,7–54,7 | 1,4 / 7,3 / 17,5 | 40 | 2 | 21 | 0 |
+
+- Ở mức 1–2, phần lớn lượt `L-PLACE-POSE` lệch vị trí: 78/131 chỉ lệch vị trí, 44 lệch cả hai, 8 chỉ lệch góc.
+- Trung vị lệch khoảng 10–11 cm, gấp đôi dung sai 5 cm.
+- 20 lượt thành công ở mức 1–2 lệch 1,3 / 3,0 / 4,4 cm và 1,9 / 3,8 / 8,5° (p10 / p50 / p90).
+- Một lượt `L-PLACE-POSE` ở mức 1 nằm trong dung sai lúc cuối. Nhãn lỗi lấy theo lúc khay đứng yên sai chỗ lần đầu, nên khay có thể đã vào vùng đích sau đó.
+
+**`Decision`.** Ghi lại kết quả mới vào [`he-tray-v2.rule0.decision.json`](../../configs/runplans/tray/he-tray-v2.rule0.decision.json):
+- `verdict: fail` theo quy tắc 0; `signed_by` vẫn chờ Hiếu.
+- Số của lần chạy trên cảnh trơn chuyển vào `metrics.plain_visuals_record`, ghi rõ chỉ là bản ghi.
+- `next_step_proposed` (C-max (i)) được viết trên kết quả cảnh trơn. Giữ hay đổi bước tiếp theo là quyết định của Hiếu; chưa launch gì.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -1001,3 +1072,4 @@ _Thêm **sau khi thấy T1r**. Đây là chỉ số báo cạnh, **không phải
 | 7/11/2026 | Mục 15.5: kết quả A. A1 khớp: 2783/2783 chunk giống hệt từng bit giữa đường serve và đường train. A2 theo luật là chưa học (`r_place` 2,73; `e_place` 1,47 × các bước đầu), ghi kèm việc vế `r` cũng ≥ 1 ở các bước vòng kín vẫn qua. Server trả về `Ta` 24, `--rtc`. Luật 15.2 không đổi | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 15.8: kết quả T1r. Kiểm trước đạt (revision `4763fbf`, PSNR frame 0 34,9 dB). p_T1r 1/20 (Wilson 0,9–23,6 %); `place` ghép cặp với T1: 1 và 1, không tốt hơn rõ. Đọc theo bảng 15.7: ảnh lệch là một phần nguyên nhân; đọc chung với A: C chưa học `place`. Luật 15.7 không đổi | Hiếu (soạn với Claude) |
 | 7/11/2026 | Mục 16: chạy lại eval C trên cảnh SimReady (Hiếu "Chạy lại eval C"). Viết trước lô đầu tiên: lý do, luật quy tắc 0 và bậc 2 không đổi, kết quả mục 13.7 giữ làm bản ghi nhưng không dùng để đọc quy tắc 0; cây master `079160d` có SimReady, guard revision theo từng lô; kiểm trước đạt (revision `4763fbf`, PSNR frame 0 34,9 dB); chỉ số phụ tư thế cuối của khay so với vùng đích, thêm sau khi thấy T1r, không phải luật | Hiếu (soạn với Claude) |
+| 8/11/2026 | Mục 16.6: kết quả eval C trên cảnh SimReady. 27/27 lô, 17,2 giờ. Mức 1–2 gộp 20/240 = 8,3 % (Wilson 5,5–12,5 %); quy tắc 0 xảy ra theo luật, cận trên khoảng tin cậy vượt 10 % ghi kèm. Mức 0 5/30. `L-PLACE-POSE` 131/240, trung vị lệch vùng đích 10–11 cm (chỉ số phụ). `Decision` ghi kết quả mới, kết quả mục 13.7 là bản ghi trên cảnh trơn; chưa ký. Luật mục 9, 16.1 không đổi | Hiếu (soạn với Claude) |

@@ -639,12 +639,23 @@ def test_a_draft_neither_launches_nor_freezes(
 def test_the_rule_0_decision_records_eval_c_and_names_the_cmax_plan() -> None:
     decision = Decision.model_validate_json((PLANS / "he-tray-v2.rule0.decision.json").read_text())
     v2, cmax = TrayRunPlan.load(PLAN_V2), TrayRunPlan.load(PLAN_CMAX)
-    # eval C: 0/240 on the headline levels, rule 0 fires; Hiếu has not signed yet
+    # eval C rerun on SimReady visuals (tray.md 16): 20/240 on the headline levels, still under
+    # 0.10, so rule 0 fires; Hiếu has not signed yet
     assert (decision.kind, decision.verdict) == ("dev_gate", "fail")
     assert decision.meta["status"] == "awaiting_signature"
     assert decision.signed_by.startswith("pending")
-    assert decision.metrics["rule0"] == {"threshold": 0.10, "p": 0.0, "fires": True}
-    assert decision.metrics["headline"]["n"] == 240 and decision.metrics["all"]["n"] == 270
+    head = decision.metrics["headline"]
+    assert (head["n"], head["successes"], decision.metrics["all"]["n"]) == (240, 20, 270)
+    assert decision.metrics["rule0"] == {
+        "threshold": 0.10,
+        "p": round(20 / 240, 4),
+        "fires": True,
+    }
+    assert decision.metrics["rule0"]["p"] < decision.criteria["threshold_p"]
+    assert decision.metrics["visuals"]["simready_revision"].startswith("4763fbf")
+    # the plain-visuals run (tray.md 13.7) stays as a record, not used for rule 0
+    plain = decision.metrics["plain_visuals_record"]
+    assert (plain["headline"]["successes"], plain["rule0"]["p"]) == (0, 0.0)
     assert decision.criteria["next_step_proposed"]["run_plan_id"] == run_plan_id(cmax)
     assert decision.subject_id == run_plan_id(v2)
     assert decision.criteria["rules_sha256"] == v2.interpretation.rules_sha256
