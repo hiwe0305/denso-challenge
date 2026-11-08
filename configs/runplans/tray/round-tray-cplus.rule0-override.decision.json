@@ -1,0 +1,66 @@
+{
+ "site_id": "local",
+ "task_id": "g1_wholebody_tray_transfer_teleop",
+ "embodiment_id": "g1_sonic_dwbc@1",
+ "schema_version": "1.0.0",
+ "meta": {
+  "status": "awaiting_signature",
+  "story": "DA-34",
+  "subtask": "5.1"
+ },
+ "id": "dec_01M6WJMMJ5GZCXFWR3E4GSXZZ0",
+ "kind": "dev_gate",
+ "subject_kind": "decision",
+ "subject_id": "dec_01M6QERTS21J48KPACJX83QC3R",
+ "verdict": "overridden",
+ "metrics": {
+  "rule0_result": {
+   "run": "eval C on SimReady visuals (tray.md 16.6)",
+   "headline_n": 240,
+   "headline_successes": 20,
+   "p": 0.0833,
+   "wilson_95": [
+    0.0546,
+    0.1252
+   ],
+   "fires": true
+  },
+  "place_pose_cluster": {
+   "levels_1_2": 131,
+   "of": 240,
+   "median_distance_cm": [
+    10.1,
+    11.2
+   ],
+   "reached_table_b_levels_1_2": 151
+  }
+ },
+ "criteria": {
+  "doc": "docs/he/tray.md",
+  "section": "17.1",
+  "rules_sha256": "eec2222c148bf46d0d6ca9e88eb7fc8bc302223e248c8e1033630e56a9cf78b8",
+  "overrides": "the 'no C+' consequence of rule 0 (tier 2 rules, section 9) for one round",
+  "rule_change_after_result": true,
+  "hieu_words": "Làm tiếp đi từ kết quả và phân tích kia. tôi muốn làm nó nhanh hơn",
+  "hieu_words_date": "8/11/2026",
+  "hieu_words_via": "coordinator session 'Công việc của Hiếu (todo)'",
+  "image_pipeline_check": {
+   "done": true,
+   "sections": "15, 16",
+   "fault": "eval tree lacked the SimReady manifest (tray.md 15.6)",
+   "fixed": "eval C rerun on SimReady with a per-chunk revision guard (tray.md 16)"
+  },
+  "round_plan": "configs/runplans/tray/round-tray-cplus.yaml",
+  "branch": "C_PLUS",
+  "n_add": 160,
+  "budget_slot_cu": 18,
+  "replaces_next_step": "C-max variant (i), rp_366283071c4a (not launched)",
+  "reading_rules": "rules 1 and 2 of the tier2-rules block, unchanged (rules_sha256 above)",
+  "lifts_rule_14_1_hold": "for C+ only, when signed (rule 14.1 held training after T1 0/20 until the fault was found)",
+  "evidence_card": "tray.md 17.2: no scene parameter separates success from L-PLACE-POSE; the target zone is not rendered; error is mostly lateral spread",
+  "launch": "Colab train only by Hiếu, from master, after runplan check --launch on round-tray-cplus.yaml"
+ },
+ "signed_by": "pending: Hiếu",
+ "reason": "Rule 0 fired on eval C rerun with SimReady visuals: 20/240 = 8.3 % on levels 1-2 (tray.md 16.6). The image pipeline check rule 0 asks for is done and its fault fixed (tray.md 15, 16). Hiếu, 8/11/2026 (quoted in criteria.hieu_words), goes on from that result and the coordinator's analysis: C reaches table B in 151/240 rollouts and fails mostly at L-PLACE-POSE (131/240, median 10-11 cm off). So the round plan round-tray-cplus.yaml runs C+ (160 of C + 160 targeted at C's failures, 18 CU slot of the tier 2 budget) instead of C-max. This changes a rule after its result was seen; the rule text and its sha256 stay as they are, and C+ is read by rules 1 and 2 of the same block, unchanged. Awaiting Hiếu's signature.",
+ "supersedes_decision_id": null
+}
