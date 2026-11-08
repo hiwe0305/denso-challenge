@@ -36,7 +36,12 @@ from typing import Any
 import numpy as np
 import pyarrow.parquet as pq  # type: ignore[import-untyped]
 from flywheel.contracts.entities import Decision
-from flywheel.data.ingest.egocentric.api import check_unchanged, read_source, require_gate
+from flywheel.data.ingest.egocentric.api import (
+    check_unchanged,
+    read_source,
+    require_gate,
+    video_of,
+)
 from flywheel.data.ingest.egocentric.config import EgoConfig
 from flywheel.data.ingest.egocentric.episodes import (
     LABELS,
@@ -108,7 +113,7 @@ def egodex_clips(work: Path) -> list[Clip]:
         k = np.array(bundle.intrinsic)
         points = [_grasp_point(pose, labels["side"], grasp["frame"], f, k, bundle.image_size)
                   for f in frames]
-        clips.append(Clip("egodex", episode.episode_id, Path(bundle.mp4), frames,
+        clips.append(Clip("egodex", episode.episode_id, video_of(bundle, source), frames,
                           grasp["frame"], points, bundle.image_size,
                           bundle.objects[0] if bundle.objects else "object",
                           bundle.instruction))

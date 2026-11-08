@@ -82,7 +82,8 @@ def summarize_ego(
         source={"source_id": source.source_id, "source_detail": source.source_detail,
                 "license": source.license, "data_class": source.data_class,
                 "deid_waiver": source.deid_waiver, "files": len(source.files),
-                "bytes": source.total_bytes},
+                "bytes": source.total_bytes, "deid_copies": len(source.deid_copies),
+                "deid_model": source.deid_method.get("model", {}).get("name")},
         episodes=len(episodes),
         frames=total,
         seconds=round(seconds, 2),
@@ -125,6 +126,10 @@ def section_html(summary: EgoSummary) -> str:
     ]
     if s["deid_waiver"]:
         parts.append(f"<p class='note'>De-identification waived: {_e(s['deid_waiver'])}</p>")
+    if s.get("deid_copies"):
+        parts.append(f"<p class='note'>De-identified: {s['deid_copies']} videos copied with"
+                     f" their faces covered by {_e(str(s['deid_model']))} on this machine;"
+                     " every later step read the copies.</p>")
     parts.append(_table("Decisions", ["decision", "episodes"],
                         [[d, n] for d, n in summary.decisions.items()]))
     parts.append(_table(

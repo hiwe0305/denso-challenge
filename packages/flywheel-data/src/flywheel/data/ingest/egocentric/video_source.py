@@ -9,8 +9,9 @@ A recording root holds `device.json` and `<task>/<i>.mp4`:
 
 `tasks` and `objects` are optional. There is no tracking: pose comes from the E-A job
 (`estimate_job.py`), `action_quality` is `pseudo`, and the video is `internal` with
-no waiver, so the de-identification gate stops it at Annotate until a blurring step
-exists (D2). Everything after ingest is the EgoDex pipeline unchanged.
+no waiver, so the de-identification gate stops it at Annotate until `fw egocentric
+deid` has written a blurred copy of every video (subtask 8). Everything after that is
+the EgoDex pipeline unchanged, reading the copies.
 """
 
 from __future__ import annotations

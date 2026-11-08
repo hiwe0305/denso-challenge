@@ -12,8 +12,10 @@ order, the `episodes_per_task` lowest episode numbers that have both files.
 `EgoSourceRecord` is what `source.json` holds (plan 6/11/2026 4.2a, read by DA-18):
 `source_id`, `source_detail`, `license`, `data_class`, `root`, `files` (path relative
 to root -> sha256), `deid_waiver` (D2 reason or null), `deid_waiver_manifest` (the pin
-of Apple's videos the waiver was checked against, or null; `annotate/deid/gate.py`)
-and the chosen `episodes`.
+of Apple's videos the waiver was checked against, or null; `annotate/deid/gate.py`),
+the chosen `episodes`, and what `fw egocentric deid` wrote: `deid_copies` (copy ->
+sha256 as written) and `deid_method` (model, revision, parameters, per-video counts).
+Ingest leaves both empty; ingesting again drops them, so the source is raw again.
 `source_id` hashes the detail, licence, data class and every file hash, so the same
 files give the same id and the same episode ids. Data stays out of git: `root` is a
 directory of the store (`$FW_ROOT`, else ./fwdata).
@@ -59,6 +61,8 @@ class EgoSourceRecord:
     config_version: str = ""
     device: dict[str, Any] = field(default_factory=dict)  # EgoVideoSource's device.json
     deid_waiver_manifest: str | None = None  # pin id, set with deid_waiver
+    deid_copies: dict[str, str] = field(default_factory=dict)  # copy -> sha256 (deid step)
+    deid_method: dict[str, Any] = field(default_factory=dict)  # model, params, counts
 
     def path(self, relative: str) -> Path:
         return Path(self.root) / relative

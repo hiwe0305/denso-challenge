@@ -34,6 +34,23 @@ sources:
     layout: two_table
     embodiment_id: human_hands@ego_video
 
+deid:
+  # DA-04 subtask 8 (8/11/2026): `fw egocentric deid` covers faces on this machine
+  # before any other step reads a frame (annotate/deid/blur.py). YuNet of the OpenCV
+  # Zoo (MIT), run by OpenCV's FaceDetectorYN on the CPU; no hosted API (internal data).
+  model:
+    name: opencv_zoo/face_detection_yunet_2023mar
+    path: models/yunet/face_detection_yunet_2023mar.onnx   # under the store root
+    url: https://github.com/opencv/opencv_zoo/raw/f12e12798e8314f7c074a6656816c048dcc95b7a/models/face_detection_yunet/face_detection_yunet_2023mar.onnx
+    revision: f12e12798e8314f7c074a6656816c048dcc95b7a     # last opencv_zoo commit of the file
+    sha256: 8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4
+  score_threshold: 0.6       # YuNet's default is 0.9; lower keeps more faces; giả định
+  nms_threshold: 0.3
+  detect_side_px: 960        # frames are scaled to this longer side for detection
+  pad: 0.25                  # each box grows by this share of its size on every side; giả định
+  hold_frames: 5             # a box also covers this many frames before and after; giả định
+  mosaic_cells: 8            # cells across the box's longer side
+
 segment:
   smooth_frames: 5           # moving average of wrist speed and aperture
   still_speed_m_s: 0.12      # wrist slower than this is a dwell; giả định, read off the 20 episodes 6/11/2026
