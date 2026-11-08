@@ -6,10 +6,10 @@
  "meta": {
   "status": "awaiting_signature",
   "story": "DA-34",
-  "subtask": "3.4",
+  "subtask": "3.4, 3.8",
   "gaps": [
-   "image pipeline check ran (tray.md 14, Hiếu 7/11/2026 'Chạy T1 + T2'): T1 0/20 on C's train scenes, so by rule 14.1 the train/serve chain is suspect and nothing is trained until the fault is found; the fault is not found yet",
-   "next_step_proposed (C-max variant (i)) conflicts with rule 14.1 after T1 (train nothing until the fault is found): Hiếu decides whether it stays",
+   "train/serve check done (tray.md 15): serve chain bit-identical to train (A1); place not learned by rule (A2); the eval tree lacked the SimReady manifest (B2), fixed for the rerun of tray.md 16. Rule 14.1's hold on training after T1 is Hiếu's to lift",
+   "next_step_proposed (C-max variant (i)) was written on the plain-visuals result; Hiếu decides whether it stays after the SimReady rerun",
    "C-max vs C has no row in the tier 2 rules: the reading rule must be written here before any C-max eval",
    "variant (ii): no S2 release (id, hash), so no demo set hash, no plan and no runplan check",
    "variant (ii): TrayRunPlan names one release; S1 + S2 needs one release built from both batches, or a plan schema change (another story's call)",
@@ -25,40 +25,51 @@
  "verdict": "fail",
  "metrics": {
   "label": "preliminary, on dev",
+  "visuals": {
+   "simready_revision": "4763fbfaa4f8e97658e68b57d01b4c86659e08b5",
+   "manifest_sha256": "eb2886e47115432418f45beaa59fbbedd1a34066cc1cd916b70942b7a1bab698",
+   "frame0_psnr_db": [
+    34.88,
+    34.85,
+    34.97
+   ],
+   "guard": "per chunk attempt, 27/27 ok"
+  },
   "headline": {
    "n": 240,
-   "successes": 0,
-   "p": 0.0,
+   "successes": 20,
+   "p": 0.0833,
    "wilson_95": [
-    0.0,
-    0.0158
+    0.0546,
+    0.1252
    ],
    "bootstrap_ci": [
-    0.0,
-    0.0
+    0.05,
+    0.1208
    ],
    "failures": {
-    "L-ONE-HAND": 1,
+    "L-ONE-HAND": 6,
     "L-PART-DROP": 11,
-    "L-PLACE-POSE": 19,
-    "L-TIMEOUT": 84,
-    "L-TRAY-TILT": 125
+    "L-PLACE-POSE": 131,
+    "L-TIMEOUT": 42,
+    "L-TRAY-TILT": 30
    },
    "step_pass": {
-    "approach_a": 0.75,
-    "grasp": 0.75,
-    "lift": 0.75,
-    "carry": 0.5833,
-    "reach_b": 0.5542,
-    "place": 0.0042,
-    "release_stand": 0.0
+    "approach_a": 0.6708,
+    "grasp": 0.6708,
+    "lift": 0.6708,
+    "carry": 0.6625,
+    "reach_b": 0.6458,
+    "place": 0.1125,
+    "release_stand": 0.075
    },
    "reached": {
-    "0": 60,
-    "3": 40,
-    "4": 7,
-    "5": 132,
-    "6": 1
+    "0": 79,
+    "3": 2,
+    "4": 4,
+    "5": 128,
+    "6": 9,
+    "7": 18
    },
    "levels": [
     1,
@@ -68,144 +79,152 @@
   "levels": {
    "0": {
     "n": 30,
-    "successes": 0,
-    "p": 0.0,
+    "successes": 5,
+    "p": 0.1667,
     "wilson_95": [
-     0.0,
-     0.1135
+     0.0734,
+     0.3356
     ],
     "bootstrap_ci": [
-     0.0,
-     0.0
+     0.0333,
+     0.3
     ],
     "failures": {
-     "L-ONE-HAND": 1,
-     "L-PLACE-POSE": 4,
-     "L-TIMEOUT": 8,
-     "L-TRAY-TILT": 17
+     "L-PLACE-POSE": 16,
+     "L-TIMEOUT": 1,
+     "L-TRAY-TILT": 8
     },
     "step_pass": {
      "approach_a": 0.9333,
      "grasp": 0.9333,
      "lift": 0.9333,
-     "carry": 0.7,
-     "reach_b": 0.6667,
-     "place": 0.0,
-     "release_stand": 0.0
+     "carry": 0.9,
+     "reach_b": 0.9,
+     "place": 0.2333,
+     "release_stand": 0.1667
     },
     "reached": {
      "0": 2,
-     "3": 7,
-     "4": 1,
-     "5": 20
+     "3": 1,
+     "5": 20,
+     "6": 2,
+     "7": 5
     }
    },
    "1": {
     "n": 120,
-    "successes": 0,
-    "p": 0.0,
+    "successes": 9,
+    "p": 0.075,
     "wilson_95": [
-     0.0,
-     0.031
+     0.04,
+     0.1364
     ],
     "bootstrap_ci": [
-     0.0,
-     0.0
+     0.0333,
+     0.125
     ],
     "failures": {
-     "L-ONE-HAND": 1,
+     "L-ONE-HAND": 3,
      "L-PART-DROP": 6,
-     "L-PLACE-POSE": 14,
-     "L-TIMEOUT": 37,
-     "L-TRAY-TILT": 62
+     "L-PLACE-POSE": 68,
+     "L-TIMEOUT": 24,
+     "L-TRAY-TILT": 10
     },
     "step_pass": {
-     "approach_a": 0.75,
-     "grasp": 0.75,
-     "lift": 0.75,
-     "carry": 0.5917,
-     "reach_b": 0.5583,
-     "place": 0.0083,
-     "release_stand": 0.0
+     "approach_a": 0.6083,
+     "grasp": 0.6083,
+     "lift": 0.6083,
+     "carry": 0.6083,
+     "reach_b": 0.6083,
+     "place": 0.1083,
+     "release_stand": 0.075
     },
     "reached": {
-     "0": 30,
-     "3": 19,
-     "4": 4,
-     "5": 66,
-     "6": 1
+     "0": 47,
+     "5": 60,
+     "6": 4,
+     "7": 9
     }
    },
    "2": {
     "n": 120,
-    "successes": 0,
-    "p": 0.0,
+    "successes": 11,
+    "p": 0.0917,
     "wilson_95": [
-     0.0,
-     0.031
+     0.052,
+     0.1567
     ],
     "bootstrap_ci": [
-     0.0,
-     0.0
+     0.0417,
+     0.15
     ],
     "failures": {
+     "L-ONE-HAND": 3,
      "L-PART-DROP": 5,
-     "L-PLACE-POSE": 5,
-     "L-TIMEOUT": 47,
-     "L-TRAY-TILT": 63
+     "L-PLACE-POSE": 63,
+     "L-TIMEOUT": 18,
+     "L-TRAY-TILT": 20
     },
     "step_pass": {
-     "approach_a": 0.75,
-     "grasp": 0.75,
-     "lift": 0.75,
-     "carry": 0.575,
-     "reach_b": 0.55,
-     "place": 0.0,
-     "release_stand": 0.0
+     "approach_a": 0.7333,
+     "grasp": 0.7333,
+     "lift": 0.7333,
+     "carry": 0.7167,
+     "reach_b": 0.6833,
+     "place": 0.1167,
+     "release_stand": 0.075
     },
     "reached": {
-     "0": 30,
-     "3": 21,
-     "4": 3,
-     "5": 66
+     "0": 32,
+     "3": 2,
+     "4": 4,
+     "5": 68,
+     "6": 5,
+     "7": 9
     }
    }
   },
   "all": {
    "n": 270,
-   "successes": 0,
-   "p": 0.0,
+   "successes": 25,
+   "p": 0.0926,
    "wilson_95": [
-    0.0,
-    0.014
+    0.0635,
+    0.1331
    ],
    "failures": {
-    "L-ONE-HAND": 2,
+    "L-ONE-HAND": 6,
     "L-PART-DROP": 11,
-    "L-PLACE-POSE": 23,
-    "L-TIMEOUT": 92,
-    "L-TRAY-TILT": 142
+    "L-PLACE-POSE": 147,
+    "L-TIMEOUT": 43,
+    "L-TRAY-TILT": 38
    },
    "step_pass": {
-    "approach_a": 0.7704,
-    "grasp": 0.7704,
-    "lift": 0.7704,
-    "carry": 0.5963,
-    "reach_b": 0.5667,
-    "place": 0.0037,
-    "release_stand": 0.0
+    "approach_a": 0.7,
+    "grasp": 0.7,
+    "lift": 0.7,
+    "carry": 0.6889,
+    "reach_b": 0.6741,
+    "place": 0.1259,
+    "release_stand": 0.0852
    },
    "reached": {
-    "0": 62,
-    "3": 47,
-    "4": 8,
-    "5": 152,
-    "6": 1
-   }
+    "0": 81,
+    "3": 3,
+    "4": 4,
+    "5": 148,
+    "6": 11,
+    "7": 23
+   },
+   "levels": [
+    0,
+    1,
+    2
+   ]
   },
   "rule0": {
    "threshold": 0.1,
-   "p": 0.0,
+   "p": 0.0833,
    "fires": true
   },
   "rollouts": 270,
@@ -214,27 +233,416 @@
   "reruns": 0,
   "yaw": {
    "episodes": 270,
-   "cycles": 1215000,
-   "raw_over": 730147,
-   "wrapped_over": 1163,
-   "max_wrapped": 3.1406,
-   "threshold_rad": 2.5,
-   "episodes_wrapped_over": 27
+   "cycles": 1139427,
+   "raw_over": 308602,
+   "wrapped_over": 1493,
+   "max_wrapped": 3.1399,
+   "threshold_rad": 2.5
+  },
+  "paired_with_plain": {
+   "conditions": 270,
+   "success": {
+    "both": 0,
+    "variant_only": 25,
+    "baseline_only": 0,
+    "neither": 245
+   },
+   "place": {
+    "both": 0,
+    "variant_only": 34,
+    "baseline_only": 1,
+    "neither": 235
+   },
+   "success_gain": 25,
+   "place_gain": 33,
+   "note": "side figure, not a rule: same 270 conditions, plain-visuals run as baseline"
+  },
+  "place_error": {
+   "note": "side metric added after T1r, not a reading rule (tray.md 16.4); final tray pose to the target zone, p10/p50/p90",
+   "tolerance": {
+    "distance_m": 0.05,
+    "yaw_error_deg": 10.0
+   },
+   "groups": {
+    "level 0": {
+     "n": 30,
+     "distance_m": [
+      0.0195,
+      0.095,
+      0.3326
+     ],
+     "yaw_error_deg": [
+      1.79,
+      6.36,
+      15.39
+     ],
+     "in_tolerance": 5
+    },
+    "level 1": {
+     "n": 120,
+     "distance_m": [
+      0.0434,
+      0.1263,
+      2.2542
+     ],
+     "yaw_error_deg": [
+      1.93,
+      8.75,
+      23.95
+     ],
+     "in_tolerance": 9
+    },
+    "level 2": {
+     "n": 120,
+     "distance_m": [
+      0.0435,
+      0.1553,
+      2.2967
+     ],
+     "yaw_error_deg": [
+      2.14,
+      8.7,
+      27.24
+     ],
+     "in_tolerance": 12
+    },
+    "levels 1-2, reach_b": {
+     "n": 155,
+     "distance_m": [
+      0.028,
+      0.1021,
+      0.2895
+     ],
+     "yaw_error_deg": [
+      1.99,
+      7.65,
+      20.38
+     ],
+     "in_tolerance": 19
+    },
+    "levels 1-2, L-ONE-HAND": {
+     "n": 6,
+     "distance_m": [
+      0.0927,
+      0.5058,
+      1.9449
+     ],
+     "yaw_error_deg": [
+      2.78,
+      7.63,
+      45.07
+     ],
+     "in_tolerance": 0
+    },
+    "levels 1-2, L-PART-DROP": {
+     "n": 11,
+     "distance_m": [
+      0.2453,
+      1.7505,
+      2.1551
+     ],
+     "yaw_error_deg": [
+      10.06,
+      33.37,
+      79.4
+     ],
+     "in_tolerance": 0
+    },
+    "levels 1-2, L-PLACE-POSE": {
+     "n": 131,
+     "distance_m": [
+      0.0546,
+      0.1032,
+      0.2513
+     ],
+     "yaw_error_deg": [
+      1.86,
+      7.88,
+      18.55
+     ],
+     "in_tolerance": 0
+    },
+    "levels 1-2, L-TIMEOUT": {
+     "n": 42,
+     "distance_m": [
+      2.1262,
+      2.2569,
+      2.3677
+     ],
+     "yaw_error_deg": [
+      2.25,
+      11.14,
+      23.66
+     ],
+     "in_tolerance": 0
+    },
+    "levels 1-2, L-TRAY-TILT": {
+     "n": 30,
+     "distance_m": [
+      0.0744,
+      0.1961,
+      8.0474
+     ],
+     "yaw_error_deg": [
+      4.87,
+      19.83,
+      70.3
+     ],
+     "in_tolerance": 1
+    },
+    "levels 1-2, success": {
+     "n": 20,
+     "distance_m": [
+      0.0132,
+      0.0301,
+      0.0441
+     ],
+     "yaw_error_deg": [
+      1.88,
+      3.82,
+      8.51
+     ],
+     "in_tolerance": 20
+    }
+   }
   },
   "batch": {
-   "runs_jsonl": "rtx3060:~/denso-da34-pool/fwdata/tray/eval/eval-c-rp_a04c14e79dfd/runs.jsonl",
-   "code": "master 2e57f603c502",
+   "runs_jsonl": "rtx3060:~/denso-da34-pool/fwdata/tray/eval/eval-c-simready-rp_a04c14e79dfd/runs.jsonl",
+   "code": "master 079160d5ec00 + fwdata/simple/tray/simready copied from denso-da33",
    "conditions_sha256": "b9c38b37afa6fbdd4027be287df85fe7b016130bd32227f97c876f6bae7d3dfb",
-   "began": "2026-11-06T03:17:58Z",
-   "ended": "2026-11-06T17:27:02Z",
-   "wall_h": 14.15,
-   "s_per_episode": 188.7,
+   "began": "2026-11-07T04:58:31Z",
+   "ended": "2026-11-07T22:10:49Z",
+   "wall_h": 17.2,
+   "s_per_episode": 229.4,
    "chunks": 27,
    "exit_codes": [
     0
    ],
+   "attempts": [
+    0
+   ],
    "workers": 1,
+   "act_requests": 47611,
+   "server": {
+    "action_exec_horizon": 24,
+    "rtc": true
+   },
    "checkpoint": "da34-t2-ft-c-s0 ckpt_40000"
+  },
+  "plain_visuals_record": {
+   "label": "preliminary, on dev",
+   "headline": {
+    "n": 240,
+    "successes": 0,
+    "p": 0.0,
+    "wilson_95": [
+     0.0,
+     0.0158
+    ],
+    "bootstrap_ci": [
+     0.0,
+     0.0
+    ],
+    "failures": {
+     "L-ONE-HAND": 1,
+     "L-PART-DROP": 11,
+     "L-PLACE-POSE": 19,
+     "L-TIMEOUT": 84,
+     "L-TRAY-TILT": 125
+    },
+    "step_pass": {
+     "approach_a": 0.75,
+     "grasp": 0.75,
+     "lift": 0.75,
+     "carry": 0.5833,
+     "reach_b": 0.5542,
+     "place": 0.0042,
+     "release_stand": 0.0
+    },
+    "reached": {
+     "0": 60,
+     "3": 40,
+     "4": 7,
+     "5": 132,
+     "6": 1
+    },
+    "levels": [
+     1,
+     2
+    ]
+   },
+   "levels": {
+    "0": {
+     "n": 30,
+     "successes": 0,
+     "p": 0.0,
+     "wilson_95": [
+      0.0,
+      0.1135
+     ],
+     "bootstrap_ci": [
+      0.0,
+      0.0
+     ],
+     "failures": {
+      "L-ONE-HAND": 1,
+      "L-PLACE-POSE": 4,
+      "L-TIMEOUT": 8,
+      "L-TRAY-TILT": 17
+     },
+     "step_pass": {
+      "approach_a": 0.9333,
+      "grasp": 0.9333,
+      "lift": 0.9333,
+      "carry": 0.7,
+      "reach_b": 0.6667,
+      "place": 0.0,
+      "release_stand": 0.0
+     },
+     "reached": {
+      "0": 2,
+      "3": 7,
+      "4": 1,
+      "5": 20
+     }
+    },
+    "1": {
+     "n": 120,
+     "successes": 0,
+     "p": 0.0,
+     "wilson_95": [
+      0.0,
+      0.031
+     ],
+     "bootstrap_ci": [
+      0.0,
+      0.0
+     ],
+     "failures": {
+      "L-ONE-HAND": 1,
+      "L-PART-DROP": 6,
+      "L-PLACE-POSE": 14,
+      "L-TIMEOUT": 37,
+      "L-TRAY-TILT": 62
+     },
+     "step_pass": {
+      "approach_a": 0.75,
+      "grasp": 0.75,
+      "lift": 0.75,
+      "carry": 0.5917,
+      "reach_b": 0.5583,
+      "place": 0.0083,
+      "release_stand": 0.0
+     },
+     "reached": {
+      "0": 30,
+      "3": 19,
+      "4": 4,
+      "5": 66,
+      "6": 1
+     }
+    },
+    "2": {
+     "n": 120,
+     "successes": 0,
+     "p": 0.0,
+     "wilson_95": [
+      0.0,
+      0.031
+     ],
+     "bootstrap_ci": [
+      0.0,
+      0.0
+     ],
+     "failures": {
+      "L-PART-DROP": 5,
+      "L-PLACE-POSE": 5,
+      "L-TIMEOUT": 47,
+      "L-TRAY-TILT": 63
+     },
+     "step_pass": {
+      "approach_a": 0.75,
+      "grasp": 0.75,
+      "lift": 0.75,
+      "carry": 0.575,
+      "reach_b": 0.55,
+      "place": 0.0,
+      "release_stand": 0.0
+     },
+     "reached": {
+      "0": 30,
+      "3": 21,
+      "4": 3,
+      "5": 66
+     }
+    }
+   },
+   "all": {
+    "n": 270,
+    "successes": 0,
+    "p": 0.0,
+    "wilson_95": [
+     0.0,
+     0.014
+    ],
+    "failures": {
+     "L-ONE-HAND": 2,
+     "L-PART-DROP": 11,
+     "L-PLACE-POSE": 23,
+     "L-TIMEOUT": 92,
+     "L-TRAY-TILT": 142
+    },
+    "step_pass": {
+     "approach_a": 0.7704,
+     "grasp": 0.7704,
+     "lift": 0.7704,
+     "carry": 0.5963,
+     "reach_b": 0.5667,
+     "place": 0.0037,
+     "release_stand": 0.0
+    },
+    "reached": {
+     "0": 62,
+     "3": 47,
+     "4": 8,
+     "5": 152,
+     "6": 1
+    }
+   },
+   "rule0": {
+    "threshold": 0.1,
+    "p": 0.0,
+    "fires": true
+   },
+   "rollouts": 270,
+   "missing": 0,
+   "extra_rollouts": 0,
+   "reruns": 0,
+   "yaw": {
+    "episodes": 270,
+    "cycles": 1215000,
+    "raw_over": 730147,
+    "wrapped_over": 1163,
+    "max_wrapped": 3.1406,
+    "threshold_rad": 2.5,
+    "episodes_wrapped_over": 27
+   },
+   "batch": {
+    "runs_jsonl": "rtx3060:~/denso-da34-pool/fwdata/tray/eval/eval-c-rp_a04c14e79dfd/runs.jsonl",
+    "code": "master 2e57f603c502",
+    "conditions_sha256": "b9c38b37afa6fbdd4027be287df85fe7b016130bd32227f97c876f6bae7d3dfb",
+    "began": "2026-11-06T03:17:58Z",
+    "ended": "2026-11-06T17:27:02Z",
+    "wall_h": 14.15,
+    "s_per_episode": 188.7,
+    "chunks": 27,
+    "exit_codes": [
+     0
+    ],
+    "workers": 1,
+    "checkpoint": "da34-t2-ft-c-s0 ckpt_40000"
+   },
+   "note": "eval C on plain visuals (tray.md 13.7): the eval tree had no SimReady manifest, so the scene rendered as plain primitives (visuals_revision none) while C's 160 train episodes carry 4763fbf (tray.md 15.6). Kept as a record only; not used to read rule 0 (tray.md 16.1)"
   }
  },
  "criteria": {
@@ -292,7 +700,7 @@
     "runplan_check": "not run: no S2 release, so no demo set and no plan to check"
    }
   },
-  "outcome": "rule 0 fires: p_C = 0/240 < 0.10; no C+; check the image pipeline",
+  "outcome": "rule 0 fires: p_C = 20/240 = 0.083 < 0.10 on the headline levels (SimReady rerun; Wilson 95 % 5.5-12.5 %, bootstrap 5.0-12.1 %); no C+; C-max only on Hiếu's order",
   "next_step_proposed": {
    "what": "C-max variant (i), S1 only",
    "run_plan_id": "rp_366283071c4a",
@@ -301,12 +709,15 @@
    "status": "not launched; waits for Hiếu"
   },
   "known_limits": [
+   "the upper end of the interval (Wilson 12.5 %, bootstrap 12.1 %) is above 0.10; rule 0 reads the point estimate p_C, as written",
+   "eval C on plain visuals (tray.md 13.7, 0/240) is a record only: wrong scene visuals, not used to read rule 0",
+   "two level 2 successes (seeds 1000142, 1000196) have every scorer step flag off: the step-flag limit of tray.md 13.5; success comes from the scorer",
    "EGL reset images are not reproducible (tray.md 13.2): a rerun is a new rollout",
    "fetched.json of the C fine-tune says train failed / final false: the stage race; result.json ok at step 40000, sha256 match",
    "SIMPLE checkout 6d10628, not the b75c678 pin: differs only in the two-table task file, unused by the tray env",
-   "train data of C (release tray_s1_f9433b028c52) and eval C both ran on 6d10628, so the comparison stays consistent",
-   "open item: runplan check --launch does not check code.simple; tool gap, not fixed here",
-   "traces have no timing: the batch ran at 2e57f60, before the timing hook of #148",
+   "train data of C (release tray_s1_f9433b028c52) and both eval C runs ran on 6d10628, so the comparison stays consistent",
+   "open item: runplan check --launch does not check code.simple or the SimReady manifest; tool gap, not fixed here",
+   "the GPU was shared with another team's job during part of the SimReady run (229.4 s per episode vs 188.7 s before)",
    "one train seed, dev split only"
   ],
   "pipeline_check": {
@@ -372,9 +783,35 @@
     "place_gain": 0,
     "reading": "not worth a look"
    }
+  },
+  "evaluated_on": {
+   "run": "eval C on SimReady visuals (tray.md 16, Hiếu 7/11/2026 'Chạy lại eval C')",
+   "replaces_for_rule_0": "eval C on plain visuals (tray.md 13.7), kept in metrics.plain_visuals_record"
+  },
+  "train_serve_check": {
+   "doc": "docs/he/tray.md",
+   "sections": "15.1-15.8",
+   "A1": "serve and train paths bit-identical on 2783/2783 chunks (reset branch; RTC branch not checked)",
+   "A2": "place not learned by rule (r_place 2.73, e_place 1.47x the early steps)",
+   "B": "stats match; image differs (frame-0 PSNR ~16.5 dB, SimReady manifest missing in the eval tree); state order and units right",
+   "T1r": {
+    "set": "t1-train-C20-bb4cef1",
+    "conditions": 20,
+    "split": "train",
+    "successes": 1,
+    "wilson": [
+     0.009,
+     0.236
+    ],
+    "place_paired_with_T1": {
+     "only_T1r": 1,
+     "only_T1": 1
+    },
+    "reading": "image mismatch is a partial cause"
+   }
   }
  },
  "signed_by": "pending: Hiếu",
- "reason": "Eval C of RunPlan v2 rp_a04c14e79dfd (DA-34 task 3, 6/11/2026, rtx3060, 0 CU): 0/270 successes; headline levels 1-2 pooled 0/240, Wilson 95 % 0-1.6 %; level 0 0/30. Rule 0 of the tier 2 rules (docs/he/tray.md section 9, rules_sha256 eec2222c...) fires: Psi0 did not learn the tray task from MuJoCo images; C+ does not run; the image pipeline is checked; this Decision records it (verdict fail of the dev gate). Reading rules unchanged after the result. Noted beside it, not a new rule: 55 % of level 1-2 rollouts reached reach_b and failed at place (L-TRAY-TILT most). Proposed next step, waiting for Hiếu: C-max variant (i), S1 only, 429 episodes, about 16 CU, draft plan rp_366283071c4a; not launched. Variant (ii) S1 + S2 stays in meta.gaps. Results are preliminary, on dev; limits in criteria.known_limits and tray.md 13.5, 13.7.",
+ "reason": "Rule 0 of the tier 2 rules (docs/he/tray.md section 9, rules_sha256 eec2222c...) read on eval C rerun with SimReady visuals (tray.md 16, Hiếu 7/11/2026 'Chạy lại eval C'; rtx3060, 0 CU): 25/270 successes; headline levels 1-2 pooled 20/240 = 8.3 %, Wilson 95 % 5.5-12.5 %; level 1 9/120, level 2 11/120, level 0 5/30. p_C < 0.10, so rule 0 fires: no C+; this Decision records it (verdict fail of the dev gate), awaiting Hiếu's signature. Reading rules unchanged after the result. The first eval C (0/240, tray.md 13.7) ran on plain visuals because the eval tree lacked the SimReady manifest; it is kept as a record in metrics.plain_visuals_record and not used for rule 0. Noted beside it, not a rule: L-PLACE-POSE is 131 of 240 level 1-2 rollouts (median 10-11 cm from the target zone). Next step (C-max or other) is Hiếu's call; nothing launched. Results are preliminary, on dev; limits in criteria.known_limits and tray.md 13.5, 16.",
  "supersedes_decision_id": null
 }
