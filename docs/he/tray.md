@@ -1161,6 +1161,14 @@ Parent, recipe và seed train lấy của nhánh C.
 
 Một phiên Colab L4, job `da34-t5-ft-cplus-s0`, cap 18 CU (slot `round_runs: [C_PLUS]` của budget bậc 2). Giống mục 12, chỉ khác: plan round, bản cắt hai phần và `--branch C_PLUS`. **Không chạy gì trước khi Hiếu launch.**
 
+**Ba điều bắt buộc** (thiếu một điều thì không launch, không eval):
+
+| # | Điều | Ở đâu bên dưới |
+|---|---|---|
+| 1 | `runplan check configs/runplans/tray/round-tray-cplus.yaml --release <C> --targets-release <T> --launch` chạy và **qua** trên `rtx3060` trước khi mở phiên Colab. Lệnh trả mã khác 0 thì dừng ở đó | Khối "rtx3060: kiểm lúc khởi chạy" |
+| 2 | Watcher `cu_watch.py session … --cap 18 --floor 14`: phiên bị dừng ở 18 CU kể cả khi chưa đủ 40 000 bước | Khối "Laptop" |
+| 3 | Checkpoint về `rtx3060` theo đúng một đường: laptop `fwdata/tray/runs/da34-t5-ft-cplus-s0/` → `rtx3060:denso-da34-pool/fwdata/tray/runs/da34-t5-ft-cplus-s0/`, danh sách sha256 lập trên laptop và kiểm lại trên `rtx3060`. Lệch một file thì không eval | Khối "Chuyển checkpoint sang rtx3060" |
+
 **Điều kiện trước khi chạy.**
 
 1. PR (a) (#162: `Decision` mở lại C+ và luật chọn) và PR (b) (release, round đóng băng, runbook này) đã merge. `Decision` [`round-tray-cplus.rule0-override.decision.json`](../../configs/runplans/tray/round-tray-cplus.rule0-override.decision.json) đã ký. Mọi lệnh chạy từ bản checkout `master`.
@@ -1217,14 +1225,54 @@ vm $S "cd /content/da34; nohup setsid bash -c 'PYTHONPATH=$VMPP Psi0/.venv-psi/b
 nohup setsid bash -c 'python3 scripts/he/he1_fetch.py follow --session "$1" --registry "$0" --dest fwdata/tray/runs --remote-work /content/da34 --every 600 --stop-when-done; echo "exit $?"' $R $S < /dev/null > $R/$S.fetch.log 2>&1 &
 ```
 
-**Trong và sau lúc chạy.** Như mục 12: quy tắc dừng sớm, `ALERT` và mã thoát của `he1_fetch`; watcher dừng ở cap 18 CU. Khi xong, ghi dòng `measured` cho `job_da34_ft_CPLUS` (CU theo `colab usage`, số bước, giờ), trỏ về dòng ước lượng; dòng ước lượng ghi trước khi launch. Chuyển checkpoint sang `rtx3060` như mục 12, với `J=fwdata/tray/runs/da34-t5-ft-cplus-s0` và đích `denso-da34-pool/fwdata/tray/runs/da34-t5-ft-cplus-s0/`.
+**Trong và sau lúc chạy.** Như mục 12: quy tắc dừng sớm, `ALERT` và mã thoát của `he1_fetch`; watcher dừng ở cap 18 CU. Khi xong, ghi dòng `measured` cho `job_da34_ft_C_PLUS` (CU theo `colab usage`, số bước, giờ), trỏ về dòng ước lượng; dòng ước lượng đã ghi trước khi launch.
 
-**Eval C+ (nhiệm vụ 5.6) trên rtx3060.** Giống hệt eval C SimReady (mục 16.2) để so cặp với mốc 16.6:
-- tập `rp_a04c14e79dfd-2e57f60`, `conditions.sha256` `b9c38b37…`;
-- cây master có SimReady, guard `simple-guard.sh`;
-- server `Ta` 24, `--rtc`, 1 worker (mục 17.7), thư mục ra mới.
+**Chuyển checkpoint sang rtx3060 (điều 3).** Từ laptop, như mục 12, cộng một bước: chép cả danh sách sha256 sang `rtx3060`, vì `serve-cplus.sh` kiểm lại nó trước khi phục vụ. Chỉ chuyển khi `fetched.json` báo `final`; nếu không, xử lý như C ở mục 13.1 (chuyển khi `result.json` ok ở bước 40 000 và sha256 khớp, ghi lệch vào mục kết quả).
 
-Chỉ khác checkpoint: C+ `ckpt_40000` thay cho C. Đọc bằng `eval_results --baseline` trỏ vào lô eval C SimReady, theo quy tắc 1–2; `place_error` báo cạnh, không phải luật.
+```bash
+J=fwdata/tray/runs/da34-t5-ft-cplus-s0
+DST=denso-da34-pool/fwdata/tray/runs/da34-t5-ft-cplus-s0
+python3 -c 'import json, sys; sys.exit(0 if json.load(open(sys.argv[1]))["final"] else 1)' $J/fetched.json \
+  || { echo "not final: no hand-off"; exit 1; }
+(cd $J && find . -type f -not -path '*/.*' -print0 | sort -z | xargs -0 sha256sum) > $J.sha256
+rsync -a --partial-dir=.rsync-partial --exclude='.*' $J/ rtx3060:$DST/
+rsync -a $J.sha256 rtx3060:$DST.sha256
+ssh rtx3060 "cd $DST && sha256sum -c --quiet" < $J.sha256 && echo "hand-off OK" || echo "hand-off FAILED: do not eval"
+```
+
+**Eval C+ (nhiệm vụ 5.6) trên rtx3060: đã chuẩn bị, chưa chạy.** Chỉ chạy khi hand-off OK và Hiếu bảo chạy. Giống hệt eval C SimReady (mục 16.2) để so cặp với mốc 16.6:
+
+| Mục | Giá trị |
+|---|---|
+| Tập, điều kiện | `rp_a04c14e79dfd-2e57f60`, 270 điều kiện, `conditions.sha256` `b9c38b37…` |
+| Cây client | `~/denso-da34-master-079160d` có SimReady, như eval C SimReady; `simple-guard.sh` trước mỗi lô |
+| Server | C+ `ckpt_40000`, `Ta` 24, `--rtc`, `127.0.0.1:22185`; cùng cây `master` `7b585a7` và cùng `serve_psi0.sh serve` như server C |
+| Lô | 1 worker (mục 17.7), 27 lô 10 episode, tối đa 3 lần, scope `MemoryMax=8G`, `MemorySwapMax=0` |
+| Output | Thư mục mới `~/denso-da34-pool/fwdata/tray/eval/eval-cplus-simready-rp_a04c14e79dfd` |
+| Thời gian | Khoảng 17,2 giờ như eval C SimReady (giả định: cùng tốc độ mỗi episode) |
+
+Hai script vận hành nằm trên máy, trong `~/denso-da34-t8/` (không trong repo, không sửa `flywheel_simple`):
+- `serve-cplus.sh <CUT>` từ chối nếu một trong các điều sau không đúng:
+  - danh sách sha256 của hand-off kiểm qua;
+  - dưới `psi0/finetune/` có đúng một run của `da34-t5-ft-cplus-s0`, có `ckpt_40000`;
+  - `action_min/max`, `state_min/max` trong `run_config.json` bằng min/max của `meta/stats_psi0.json` của bản cắt C+ (`stats-check.py`; server chuẩn hóa bằng các giá trị này, mục 15).
+
+  Qua cả ba thì script hard link checkpoint vào `psi0/hf/psi0/simple-checkpoints/<RUN>` như của C. Sau đó nó dừng container `fw-psi0` đang chạy (server C) và khởi động server C+.
+- `launch-eval-cplus.sh` từ chối nếu container không mang `da34-t5-ft-cplus-s0`, `--ckpt-step 40000`, `--action-exec-horizon 24`, `--rtc`, nếu `/health` không ok, hoặc nếu đã có client khác trên 22185. Chạy lại file này là chạy tiếp.
+
+Đã thử ngày 8/11 (không chạy episode nào, server C không bị động tới):
+- `stats-check.py` cho run C trên stats của tập C ra lệch 0; trên stats của C+ ra lệch 0,133 và từ chối.
+- `serve-cplus.sh` từ chối vì chưa có hand-off.
+- `launch-eval-cplus.sh` từ chối vì server đang là C.
+
+```bash
+# on rtx3060, after "hand-off OK" and Hiếu's go; CUT = the folder the launch step above wrote
+~/denso-da34-t8/serve-cplus.sh $CUT
+systemd-run --user --scope --unit da34-eval-cplus -p MemoryMax=8G -p MemorySwapMax=0 \
+  nohup setsid ~/denso-da34-t8/launch-eval-cplus.sh > ~/denso-da34-t8/eval-cplus.out 2>&1 < /dev/null &
+```
+
+Đọc bằng `eval_results --baseline` trỏ vào lô eval C SimReady, theo quy tắc 1–2; `place_error` báo cạnh, không phải luật. Sau eval C+, server để ở C+; muốn trả về C thì chạy `~/denso-da34-t4/serve.sh c 24 rtc`.
 
 Ước lượng (dòng `job_da34_ft_C_PLUS` trong sổ, ghi trước khi launch): khoảng 16,0 CU, như C đo được 15,99 CU (8,27 giờ L4, 0,724 s/bước). Giả định, chưa đo:
 - thời gian mỗi bước không phụ thuộc số episode, vì 40 000 bước, batch và recipe như C; chưa đo ở 320 episode;
@@ -1294,3 +1342,4 @@ Muốn eval nhanh hơn thì cần một trong hai đường trên, kèm luật �
 | 8/11/2026 | Mục 17: nhiệm vụ 5, C+. 17.1 `Decision` mở lại C+ (sửa hệ quả "không chạy C+" của quy tắc 0 sau khi thấy kết quả, trích nguyên văn lời Hiếu 8/11; luật đọc C+ là quy tắc 1–2 không đổi; chờ ký). 17.2 evidence card cụm `L-PLACE-POSE`: vùng đích không render, vị trí đặt không đi theo đích, sai số chủ yếu là độ tản ngang, không tham số cảnh nào gắn với lỗi. 17.3 cách chọn 160 episode nhắm lỗi và luật đọc, viết trước khi sinh. 17.4 khoảng trống | Hiếu (soạn với Claude) |
 | 8/11/2026 | Mục 17.5: sinh 262 lượt nhắm lỗi (229 ghi được), QA phát lại 229/229, release `tray_s1_6c0fd7d37f77`, QA DA-03 226 pass / 3 reject, bộ lọc 177; chọn 160 theo luật 17.3 (bước 1: 117, bước 2: 43), tập `T160` `1104d00e…`; `round-tray-cplus.yaml` đóng băng `rp_71fee3fcff69`; bản cắt C+ 320 episode dựng thử và kiểm. Mục 17.6: runbook Colab cho C+ (chưa chạy) | Hiếu (soạn với Claude) |
 | 8/11/2026 | Mục 17.4: sửa câu "HTTP 409" (đọc nhầm `baselines/psi0.py`; client của eval khay `psi0_decoupled_wbc.py` không gửi `session_id`, nên hai client là một phiên RTC, dùng chung trạng thái mà không báo lỗi); câu sai giữ để đối chiếu. Mục 17.7: phép đo 2 worker trên một server, dừng sau 1 episode mỗi bên; kết luận không dùng 2 worker trên một server, eval C+ chạy 1 worker | Hiếu (soạn với Claude) |
+| 8/11/2026 | Mục 17.6: ba điều bắt buộc (launch check, cap 18 CU, đường checkpoint về `rtx3060` có sha256), lệnh hand-off chép cả danh sách sha256, eval C+ chuẩn bị sẵn (`serve-cplus.sh`, `launch-eval-cplus.sh`, `stats-check.py` trong `~/denso-da34-t8`), chưa chạy; sửa tên job `job_da34_ft_C_PLUS` | Hiếu (soạn với Claude) |
