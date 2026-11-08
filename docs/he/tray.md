@@ -445,7 +445,7 @@ Cách đọc **[Đề xuất]**, chưa kiểm ở mã của DA-13: nhãn R3 "`ta
 | Tập | `CMAX` = cả kho dùng được: 429 episode (bỏ 7 reject DA-03, qua bộ lọc). File [`demo_sets-v2-cmax.json`](../../configs/runplans/tray/demo_sets-v2-cmax.json): tập N40, N80, C, A giữ nguyên hash của bản 2, thêm `CMAX` = `084ebc03…` theo cùng thứ tự hash |
 | Bản cắt | `~/denso-da34-pool/fwdata/cut-cmax-draft` trên `rtx3060`: 429 episode, 610 069 frame, 3,6 GB, có danh sách sha256 (không commit). `demo_subset.py` của master `2e57f60`, 49 s |
 | Ngân sách | Cap 18 CU, lấy suất của C+ (C+ không chạy khi quy tắc 0 xảy ra). Bậc 2 vẫn dưới trần 36 CU. Ước lượng 16,0 CU trên L4, giả định thời gian một bước không đổi theo số episode (chưa đo với 429) |
-| `Decision` | [`he-tray-v2.rule0.decision.json`](../../configs/runplans/tray/he-tray-v2.rule0.decision.json): `dev_gate`, chủ thể `rp_a04c14e79dfd`, ngưỡng 0,10. Soạn 6/11 với `verdict: open`; từ 7/11 đã điền số đo của eval C, `verdict: fail`, chờ Hiếu ký (mục 13.7). Lệnh của Hiếu về C-max ghi vào đó |
+| `Decision` | [`he-tray-v2.rule0.decision.json`](../../configs/runplans/tray/he-tray-v2.rule0.decision.json): `dev_gate`, chủ thể `rp_a04c14e79dfd`, ngưỡng 0,10. Soạn 6/11 với `verdict: open`; từ 7/11 đã điền số đo của eval C, `verdict: fail`, Hiếu ký 8/11/2026 (mục 13.7). Lệnh của Hiếu về C-max ghi vào đó |
 
 Hai biến thể chờ Hiếu chọn (`criteria.c_max_variants` của `Decision`):
 
@@ -518,7 +518,7 @@ Không rollout nào dừng ở 1 hay 2 bước: `approach_a`, `grasp` và `lift`
 
 Ghi cạnh, không đổi cách đọc: bảng bước cho thấy 55 % rollout mức 1–2 đã cầm, nhấc, mang khay tới bàn B, rồi hỏng ở bước đặt (`L-TRAY-TILT` là nhãn nhiều nhất của nhóm này). Đây là dữ kiện cho Hiếu khi chọn bước tiếp theo, không phải quy tắc mới.
 
-**`Decision`.** [`he-tray-v2.rule0.decision.json`](../../configs/runplans/tray/he-tray-v2.rule0.decision.json) chốt nhánh này: `verdict: fail` (quy tắc 0 xảy ra), số đo ở `metrics`, chờ Hiếu ký. Bước tiếp theo đề xuất **[Đề xuất]**: C-max (i), chỉ S1, 429 episode, ước lượng 16 CU, plan nháp `rp_366283071c4a` (mục 13.6). Chưa launch; C-max chỉ chạy khi Hiếu duyệt. C-max (ii) vẫn trong danh sách khoảng trống.
+**`Decision`.** [`he-tray-v2.rule0.decision.json`](../../configs/runplans/tray/he-tray-v2.rule0.decision.json) chốt nhánh này: `verdict: fail` (quy tắc 0 xảy ra), số đo ở `metrics`, Hiếu ký 8/11/2026. Bước tiếp theo Hiếu chọn là C+ (mục 17.1), không phải C-max. Bước tiếp theo đề xuất **[Đề xuất]**: C-max (i), chỉ S1, 429 episode, ước lượng 16 CU, plan nháp `rp_366283071c4a` (mục 13.6). Chưa launch; C-max chỉ chạy khi Hiếu duyệt. C-max (ii) vẫn trong danh sách khoảng trống.
 
 ## 14. Kiểm pipeline ảnh (T1, T2)
 
@@ -1073,7 +1073,7 @@ _Story DA-34 nhiệm vụ 5 (AC 6). Mốc theo mục 5: C+ phải bắt đầu t
 | Cho chạy | C+ theo [`round-tray-cplus.yaml`](../../configs/runplans/tray/round-tray-cplus.yaml): 160 episode của C cộng 160 episode nhắm lỗi; dùng slot 18 CU đã có trong budget bậc 2 (`round_runs: [C_PLUS]`). Thay cho C-max (i) `rp_366283071c4a`, chưa launch |
 | Luật đọc C+ | Quy tắc 1 và 2 của khối `tier2-rules` (mục 9), không đổi; sha256 của khối giữ nguyên |
 | Luật 14.1 | Sau T1 0/20, luật 14.1 giữ không train cho tới khi tìm ra lỗi. `Decision` này, khi được ký, gỡ việc giữ đó **cho riêng C+** |
-| Ký | `signed_by: pending: Hiếu`; Hiếu ký khi merge. Launch Colab chỉ do Hiếu, từ master, sau `runplan check --launch` trên `round-tray-cplus.yaml` |
+| Ký | `signed_by: Hiếu`, ký 8/11/2026 sau khi #164 merge (`meta.signature_words` trích nguyên văn). Cùng lúc Hiếu ký `Decision` quy tắc 0. Launch Colab chỉ do Hiếu, từ master, sau `runplan check --launch` trên `round-tray-cplus.yaml` |
 
 `Decision` quy tắc 0 (`he-tray-v2.rule0.decision.json`) giữ nguyên, không đổi verdict.
 
@@ -1343,3 +1343,4 @@ Muốn eval nhanh hơn thì cần một trong hai đường trên, kèm luật �
 | 8/11/2026 | Mục 17.5: sinh 262 lượt nhắm lỗi (229 ghi được), QA phát lại 229/229, release `tray_s1_6c0fd7d37f77`, QA DA-03 226 pass / 3 reject, bộ lọc 177; chọn 160 theo luật 17.3 (bước 1: 117, bước 2: 43), tập `T160` `1104d00e…`; `round-tray-cplus.yaml` đóng băng `rp_71fee3fcff69`; bản cắt C+ 320 episode dựng thử và kiểm. Mục 17.6: runbook Colab cho C+ (chưa chạy) | Hiếu (soạn với Claude) |
 | 8/11/2026 | Mục 17.4: sửa câu "HTTP 409" (đọc nhầm `baselines/psi0.py`; client của eval khay `psi0_decoupled_wbc.py` không gửi `session_id`, nên hai client là một phiên RTC, dùng chung trạng thái mà không báo lỗi); câu sai giữ để đối chiếu. Mục 17.7: phép đo 2 worker trên một server, dừng sau 1 episode mỗi bên; kết luận không dùng 2 worker trên một server, eval C+ chạy 1 worker | Hiếu (soạn với Claude) |
 | 8/11/2026 | Mục 17.6: ba điều bắt buộc (launch check, cap 18 CU, đường checkpoint về `rtx3060` có sha256), lệnh hand-off chép cả danh sách sha256, eval C+ chuẩn bị sẵn (`serve-cplus.sh`, `launch-eval-cplus.sh`, `stats-check.py` trong `~/denso-da34-t8`), chưa chạy; sửa tên job `job_da34_ft_C_PLUS` | Hiếu (soạn với Claude) |
+| 8/11/2026 | Hiếu ký hai `Decision`: quy tắc 0 (`he-tray-v2.rule0.decision.json`, `verdict: fail` giữ nguyên) và mở lại C+ (`round-tray-cplus.rule0-override.decision.json`). Các chỗ ghi "chờ ký" đổi thành đã ký; C+ chưa launch | Hiếu (soạn với Claude) |

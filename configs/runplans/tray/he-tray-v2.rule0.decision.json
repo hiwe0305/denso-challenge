@@ -4,7 +4,7 @@
  "embodiment_id": "g1_sonic_dwbc@1",
  "schema_version": "1.0.0",
  "meta": {
-  "status": "awaiting_signature",
+  "status": "signed",
   "story": "DA-34",
   "subtask": "3.4, 3.8",
   "gaps": [
@@ -16,7 +16,10 @@
    "variant (ii): action layout and features of the S2 export against the S1 release not compared",
    "variant (ii): S2 release is biased by its 20.6 % DA-03 rejects (wrist roll, waist pitch) and holds some level 0 episodes; S1 is level 1 only",
    "choice between (i) and (ii): Hiếu"
-  ]
+  ],
+  "signed_at": "2026-11-08",
+  "signature_words": "Ký, chuẩn bị PR ký",
+  "signature_via": "coordinator session 'Công việc của Hiếu (todo)'"
  },
  "id": "dec_01M6QERTS21J48KPACJX83QC3R",
  "kind": "dev_gate",
@@ -811,7 +814,7 @@
    }
   }
  },
- "signed_by": "pending: Hiếu",
- "reason": "Rule 0 of the tier 2 rules (docs/he/tray.md section 9, rules_sha256 eec2222c...) read on eval C rerun with SimReady visuals (tray.md 16, Hiếu 7/11/2026 'Chạy lại eval C'; rtx3060, 0 CU): 25/270 successes; headline levels 1-2 pooled 20/240 = 8.3 %, Wilson 95 % 5.5-12.5 %; level 1 9/120, level 2 11/120, level 0 5/30. p_C < 0.10, so rule 0 fires: no C+; this Decision records it (verdict fail of the dev gate), awaiting Hiếu's signature. Reading rules unchanged after the result. The first eval C (0/240, tray.md 13.7) ran on plain visuals because the eval tree lacked the SimReady manifest; it is kept as a record in metrics.plain_visuals_record and not used for rule 0. Noted beside it, not a rule: L-PLACE-POSE is 131 of 240 level 1-2 rollouts (median 10-11 cm from the target zone). Next step (C-max or other) is Hiếu's call; nothing launched. Results are preliminary, on dev; limits in criteria.known_limits and tray.md 13.5, 16.",
+ "signed_by": "Hiếu",
+ "reason": "Rule 0 of the tier 2 rules (docs/he/tray.md section 9, rules_sha256 eec2222c...) read on eval C rerun with SimReady visuals (tray.md 16, Hiếu 7/11/2026 'Chạy lại eval C'; rtx3060, 0 CU): 25/270 successes; headline levels 1-2 pooled 20/240 = 8.3 %, Wilson 95 % 5.5-12.5 %; level 1 9/120, level 2 11/120, level 0 5/30. p_C < 0.10, so rule 0 fires: no C+; this Decision records it (verdict fail of the dev gate), signed by Hiếu 8/11/2026 (meta.signature_words). Reading rules unchanged after the result. The first eval C (0/240, tray.md 13.7) ran on plain visuals because the eval tree lacked the SimReady manifest; it is kept as a record in metrics.plain_visuals_record and not used for rule 0. Noted beside it, not a rule: L-PLACE-POSE is 131 of 240 level 1-2 rollouts (median 10-11 cm from the target zone). Next step (C-max or other) is Hiếu's call; nothing launched. Results are preliminary, on dev; limits in criteria.known_limits and tray.md 13.5, 16. Next step chosen by Hiếu: C+ under dec_01M6WJMMJ5GZCXFWR3E4GSXZZ0 (round-tray-cplus.rule0-override.decision.json), not C-max.",
  "supersedes_decision_id": null
 }

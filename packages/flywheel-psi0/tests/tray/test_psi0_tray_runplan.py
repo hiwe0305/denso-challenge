@@ -668,10 +668,9 @@ def test_the_rule_0_decision_records_eval_c_and_names_the_cmax_plan() -> None:
     decision = Decision.model_validate_json((PLANS / "he-tray-v2.rule0.decision.json").read_text())
     v2, cmax = TrayRunPlan.load(PLAN_V2), TrayRunPlan.load(PLAN_CMAX)
     # eval C rerun on SimReady visuals (tray.md 16): 20/240 on the headline levels, still under
-    # 0.10, so rule 0 fires; Hiếu has not signed yet
+    # 0.10, so rule 0 fires; signed by Hiếu 8/11/2026
     assert (decision.kind, decision.verdict) == ("dev_gate", "fail")
-    assert decision.meta["status"] == "awaiting_signature"
-    assert decision.signed_by.startswith("pending")
+    assert (decision.meta["status"], decision.signed_by) == ("signed", "Hiếu")
     head = decision.metrics["headline"]
     assert (head["n"], head["successes"], decision.metrics["all"]["n"]) == (240, 20, 270)
     assert decision.metrics["rule0"] == {
@@ -718,10 +717,10 @@ def test_the_cplus_decision_lifts_rule_0_for_one_round_and_keeps_the_rules() -> 
     )
     rule0 = Decision.model_validate_json((PLANS / "he-tray-v2.rule0.decision.json").read_text())
     v2 = TrayRunPlan.load(PLAN_V2)
-    # a rule change after the result: names the rule 0 Decision, keeps the rule text, unsigned
+    # a rule change after the result: names the rule 0 Decision, keeps the rule text, signed
     assert (override.kind, override.verdict) == ("dev_gate", "overridden")
     assert (override.subject_kind, override.subject_id) == ("decision", rule0.id)
-    assert override.signed_by.startswith("pending")
+    assert (override.meta["status"], override.signed_by) == ("signed", "Hiếu")
     assert override.criteria["rule_change_after_result"] is True
     assert override.criteria["rules_sha256"] == v2.interpretation.rules_sha256
     assert (
