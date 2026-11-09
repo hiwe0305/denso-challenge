@@ -37,8 +37,9 @@ def make_export(root: Path, samples: int = 3, data_class: str = "public") -> str
             (root / name).parent.mkdir(parents=True, exist_ok=True)
             (root / name).write_bytes(f"{ext} {i}".encode())
             files[name] = hashlib.sha256(f"{ext} {i}".encode()).hexdigest()
-    (root / "egodex_stat.json").write_text('{"egodex": {}}')
-    files["egodex_stat.json"] = hashlib.sha256(b'{"egodex": {}}').hexdigest()
+    stats = json.dumps({"egodex": {"q01": [-1.0, 0.0, -3.0], "q99": [1.0, 0.0, 3.0]}}).encode()
+    (root / "egodex_stat.json").write_bytes(stats)
+    files["egodex_stat.json"] = hashlib.sha256(stats).hexdigest()
     fmt = export_source.FORMAT
     export_id = content_id("egx", {"format": fmt, "recipe": RECIPE, "files": files})
     meta = {
@@ -184,7 +185,9 @@ def test_setup_gets_the_export_from_drive(
     plan_path = tmp_path / "plan.yaml"
     plan_path.write_text(yaml.safe_dump(raw))
     work = tmp_path / "da30"
-    (work / "Psi0").mkdir(parents=True)
+    (work / "Psi0" / "assets" / "stats").mkdir(parents=True)
+    shipped = {"egodex": {"q01": [-2.0, 0.0, -1.0], "q99": [2.0, 0.0, 1.0]}}
+    (work / "Psi0" / "assets" / "stats" / "egodex_stat_all.json").write_text(json.dumps(shipped))
     (work / "fw").symlink_to(REPO)
     commands: list[str] = []
     monkeypatch.setattr(colab, "setup_psi0_env", lambda work: None)
@@ -194,6 +197,8 @@ def test_setup_gets_the_export_from_drive(
     report = json.loads((work / "report.json").read_text())["phases"]["setup_stage1"]
     assert report["export_id"] == export_id and report["episodes"] == 3
     assert report["layout_problems"] == []
+    assert report["stats_coverage"]["dims_outside_shipped_q01_q99"] == [2]
+    assert (work / "plan.path").read_text() == str(plan_path.resolve())  # for persist_cell
     assert not any("precompute" in c for c in commands)  # the export has actions_48d
     assert (work / "data" / "egodex" / "part1" / "carry_red_box" / "0.hdf5").exists()
 
@@ -205,3 +210,13 @@ def test_setup_stops_on_a_parent_that_is_not_the_pin(tmp_path: Path) -> None:
     weights.write_bytes(b"not the parent")
     with pytest.raises(SystemExit, match="the plan pins"):
         colab.check_parent(tmp_path, plan)
+
+
+def test_stats_coverage_names_the_dims_the_clip_would_cut() -> None:
+    shipped = {"egodex": {"q01": [-1.0, 0.0, -1.0, -2.0], "q99": [1.0, 0.0, 1.0, 2.0]}}
+    export = {"egodex": {"q01": [-0.5, 0.0, -1.5, -1.0], "q99": [0.5, 0.0, 0.5, 1.0]}}
+    coverage = export_source.stats_coverage(export, shipped)
+    assert coverage["dims"] == 3  # the zero-range pad dim is left out
+    assert coverage["dims_outside_shipped_q01_q99"] == [2]
+    assert coverage["span_ratio_median"] == 0.5 and coverage["span_ratio_max"] == 1.0
+    assert coverage["span_ratio_max_dim"] == 2
