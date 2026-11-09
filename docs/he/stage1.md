@@ -353,7 +353,7 @@ Psi0/.venv-psi/bin/python -m flywheel_psi0.stage1.colab repeat --work /content/d
 python3 -m flywheel_psi0.stage1.colab persist --work /content/da30 --plan fw/configs/runplans/stage1/tray-ego-b.yaml
 ```
 
-Sau lần chạy: tải `report.json` và log về `fwdata/colab/`, ghi dòng `measured` của sổ chi phí (`balance_drop` ở dòng `exit` của `da30-stage1-b.jsonl`), ghi kết quả vào mục 2.8. VLM nằm ở `MyDrive/denso/da30/da30-tray-ego-b/vlm/`, bản ghi ở `…/da30-tray-ego-b/vlm.json`. Bốn giá trị cần ghim vào `he-tray-b.yaml` của DA-34 (`parents.psi0-b-ego-stage1.vlm_stage1`) có sẵn trong mục `persist.vlm` của `report.json`: `job_id` `da30-tray-ego-b`, `drive_dir`, `weights_sha256`, `manifest_sha256`.
+Sau lần chạy: tải `report.json` và log về `fwdata/colab/`, ghi dòng `measured` của sổ chi phí (`balance_drop` ở dòng `exit` của `da30-stage1-b.jsonl`), ghi kết quả vào mục 2.9. VLM nằm ở `MyDrive/denso/da30/da30-tray-ego-b/vlm/`, bản ghi ở `…/da30-tray-ego-b/vlm.json`. Bốn giá trị cần ghim vào `he-tray-b.yaml` của DA-34 (`parents.psi0-b-ego-stage1.vlm_stage1`) có sẵn trong mục `persist.vlm` của `report.json`: `job_id` `da30-tray-ego-b`, `drive_dir`, `weights_sha256`, `manifest_sha256`.
 
 ### 2.7 Loader check trên bản export thử (9/11/2026)
 
@@ -383,7 +383,7 @@ Hai dòng cuối là mục mới của `loader_check` (`actions` trong báo cáo
 - `stats_coverage`: cả 42 chiều không phải pad có q01 hoặc q99 của export ngoài khoảng của tác giả; tỉ lệ độ rộng khoảng trung vị 11,9, lớn nhất 26,0.
 - Delta tính như loader (khung i và i+3, trong hệ camera của khung i; 7408 delta): cổ tay trái theo x có trung vị |d| 0,030 m, gần bằng q99 của tác giả (0,030), nhưng p90 là 0,22 m mỗi 0,1 s. Góc roll cổ tay trái có p90 là 2,22 rad (q99 của tác giả 0,21); có delta gần ±π.
 - Thang đo không sai: cổ tay cách camera trung vị 0,54 m. Phần lớn delta có cỡ hợp lý; phần đuôi rất lớn. Đó là dạng của nhiễu tư thế (tư thế tay ước lượng nhảy giữa các khung, góc lật qua ±π), không phải của chuyển động thật.
-- Bước camera mỗi khung đúng bằng 0,005 ở mọi khung (trung vị = p95 = max), tức là quỹ đạo camera được đặt cố định, không đo. Delta nằm trong hệ camera của khung i, nên chuyển động giả này đi vào mọi delta.
+- Quỹ đạo camera không phải số đo: bước tịnh tiến mỗi khung chỉ có hai giá trị, 0 hoặc 0,005 (70 % số khung là 0,005). Quay của camera trung vị 2,2° mỗi khung, p90 19,6°, có bước gần 180°. Tư thế tay được đưa sang hệ thế giới bằng quỹ đạo này, nên chuyển động của nó đi vào mọi delta; mục 2.8 cho thấy phần quay là nguồn chính của phần bị cắt. (Bản đầu của mục này ghi bước tịnh tiến luôn là 0,005; sửa ngày 9/11/2026.)
 
 **Kết quả 2: mẫu một token là delta bằng 0, do clip ngắn.** Cả 9 mẫu một token có cùng một hàng action, đúng bằng giá trị 0 sau chuẩn hóa (token `<|a_378|>`). Loader bốc khung `index` trong [0, T−2] và cần khung `index + 3`; khi `index` rơi vào ba khung cuối không có khung đó, nó lặp lại `index` (`egodex_dataset.py:470-506` ở `cda3fdf`), nên delta bằng 0. Tỉ lệ kỳ vọng là 3/(T−1) trung bình trên các clip, tức 5,6 % với độ dài của bản thử (EgoDex: clip dài hàng trăm khung, dưới 1 %); đo được 6,6–7,8 %.
 
@@ -400,3 +400,62 @@ Hai dòng cuối là mục mới của `loader_check` (`actions` trong báo cáo
 | Số mẫu | Plan ghi `samples` theo kết quả `pack` của bản thật | Bản thử có 132 mẫu, không phải 153 (export bỏ 21 clip); `setup` từ chối khi số mẫu lệch plan. 300 bước × 32 mẫu là khoảng 73 lượt mỗi clip ở 132 clip |
 
 Plan giữ `status: draft`. Không chạy Colab.
+
+### 2.8 Làm sạch tư thế có đưa phần bị cắt xuống dưới 5 % không [Đề xuất, 9/11/2026]
+
+Đo trên CPU, ngoài repo, trên cùng bản export thử (132 clip, 7804 khung). Không sửa bản export hay pipeline; thay đổi pipeline sẽ đi vào một PR của DA-04.
+
+**Cách đo.** Script đọc `transforms/` của 132 file HDF5, dựng lại `actions_48d` như script `precompute` của tác giả (trùng khớp tuyệt đối với `actions_48d` đã lưu), rồi tính delta đúng như loader ở `cda3fdf`. Mọi `index` trong [0, T−2] đều được lấy. Khung i và i+3 (hoặc i và i ở ba khung cuối) đều nằm trong hệ camera của khung i. Delta gồm vị trí, roll/pitch/yaw kiểu `xyz` của `R2 @ R1.T`, và đầu ngón. Sau đó chuẩn hóa bằng `egodex_stat_all.json`, cắt về [−1, 1], và cho mỗi clip trọng số bằng nhau như loader. Bản xuất như hiện có cho 42,7 % giá trị bị cắt; `loader_check` đo 41,6 % (mục 2.7). Bản dựng lại khớp với loader.
+
+Các bước làm sạch, áp cho từng tay:
+
+- **Liên tục của góc:** nếu xoay khung cổ tay π quanh một trục của nó làm khung gần khung trước hơn 30° trở lên, thì xoay.
+- **Làm mượt:** Savitzky–Golay bậc 2 trên vị trí cổ tay, đầu ngón, và quaternion của cổ tay (đã giữ dấu liên tục, chuẩn hóa lại). Cửa sổ 9 khung (0,3 s) và 21 khung (0,7 s).
+- **Khung nhảy:** khung có bước nhảy của cổ tay (tịnh tiến hoặc quay) lớn hơn trung vị + 5 × MAD của clip thì **nội suy** (tuyến tính cho vị trí, slerp cho quay), không bỏ. Loader đọc HDF5 và video theo cùng chỉ số khung, nên bỏ khung sẽ lệch ảnh với action.
+- **Camera:** 4a giữ quay của camera đã làm mượt, đặt tịnh tiến bằng 0. 4a+ làm sạch quay của camera như cổ tay. 4b dùng camera đơn vị: tư thế giữ trong hệ camera, delta không bù chuyển động đầu.
+
+Ngưỡng q01/q99 của tác giả: cổ tay trái x −0,029/0,030 m, roll trái −0,226/0,213 rad. Delta là cho 3 khung (0,1 s); trung vị và p90 tính trên các delta khác 0.
+
+| Biến thể | Cửa sổ | Giá trị bị cắt | Mẫu có chiều bị cắt | \|Δ\| cổ tay trái x, trung vị / p90 (m) | \|Δ\| roll trái, trung vị / p90 (rad) | Khung tay nội suy (trên 15 608) |
+|---|---|---|---|---|---|---|
+| 0 Như xuất | | 42,7 % | 92,5 % | 0,027 / 0,215 | 0,287 / 2,12 | 0 |
+| 1 Liên tục góc (sửa 5802 lần lật) | | 42,6 % | 92,5 % | 0,027 / 0,215 | 0,270 / 1,37 | 0 |
+| 2 = 1 + làm mượt | 9 | 41,3 % | 90,9 % | 0,032 / 0,170 | 0,189 / 0,83 | 0 |
+| 3 = 2 + khung nhảy | 9 | 40,7 % | 90,9 % | 0,032 / 0,164 | 0,188 / 0,79 | 1819 |
+| 4a = 3, quay camera làm mượt, tịnh tiến 0 | 9 | 41,1 % | 91,1 % | 0,038 / 0,195 | 0,215 / 0,94 | 988 |
+| 4a+ = 3, quay camera làm sạch như cổ tay | 9 | 39,2 % | 91,0 % | 0,037 / 0,175 | 0,204 / 0,77 | 748 |
+| 4b = 3, camera đơn vị | 9 | 10,6 % | 80,0 % | 0,008 / 0,021 | 0,135 / 0,58 | 816 |
+| 2 | 21 | 37,4 % | 87,5 % | 0,032 / 0,111 | 0,124 / 0,44 | 0 |
+| 3 | 21 | 37,1 % | 87,7 % | 0,031 / 0,111 | 0,125 / 0,43 | 1819 |
+| 4a | 21 | 36,8 % | 87,3 % | 0,039 / 0,152 | 0,142 / 0,50 | 679 |
+| 4a+ | 21 | 31,9 % | 86,9 % | 0,035 / 0,132 | 0,131 / 0,42 | 663 |
+| **4b** | **21** | **3,9 %** | **56,3 %** | **0,005 / 0,014** | **0,082 / 0,29** | **816** |
+
+Đối chứng, chỉ đổi camera, không làm sạch tay: quay làm mượt và tịnh tiến 0 cho 45,9 %; camera đơn vị cho 18,6 %. 4b với cửa sổ 15 cho 6,0 %. Theo nhóm chiều, 4b cửa sổ 21: vị trí cổ tay 5,5 %, góc cổ tay 13,3 %, đầu ngón x/y 1,1 %, đầu ngón z 2,7 %.
+
+**Làm mượt có xóa chuyển động thật không.** Đo cùng cách trên 73 episode EgoDex (một phần ba của mẫu 218 episode, 600 khung đầu mỗi episode, 23 646 khung). Camera của Vision Pro là số đo thật.
+
+| EgoDex | Giá trị bị cắt | Mẫu có chiều bị cắt | p90 \|Δ\| cổ tay trái x | p90 \|Δ\| roll trái |
+|---|---|---|---|---|
+| Như có | 1,9 % | 19,5 % | 0,0099 m | 0,084 rad |
+| Camera đơn vị | 1,8 % | 19,2 % | 0,0105 m | 0,084 rad |
+| Làm mượt cửa sổ 21 | 1,0 % | 11,5 % | 0,0095 m | 0,071 rad |
+| 4b cửa sổ 21 | 0,7 % | 9,9 % | 0,0098 m | 0,065 rad |
+
+Cửa sổ 21 giữ gần hết chuyển động của EgoDex: p90 giảm 4 % ở vị trí và 15 % ở roll. Bỏ phần bù chuyển động đầu gần như không đổi phần bị cắt trên EgoDex.
+
+**Kết luận.**
+
+- **Nguồn chính là quỹ đạo quay của camera, không phải nhiễu của tay.** Mọi biến thể còn giữ quay của camera đều ở 32–46 %, kể cả khi quay đó đã được làm sạch như cổ tay. Bỏ camera (đơn vị) một mình đưa 42,7 % xuống 18,6 %. Quay trung vị 2,2° mỗi khung, tức khoảng 65°/s, không hợp với người bê khay; ở khoảng cách tay 0,54 m, 3 khung quay như thế dời tay khoảng 6 cm, gấp đôi q99 của tác giả.
+- **Làm sạch tay chỉ có tác dụng khi bỏ camera.** Với camera đơn vị: lật góc, khung nhảy và làm mượt cửa sổ 9 đưa 18,6 % xuống 10,6 %; cửa sổ 21 xuống 3,9 %.
+- **Khung cổ tay lật rất thường xuyên:** 22 % số bước khung trong hệ camera (37 % trong hệ thế giới) cần xoay π mới liên tục. Đó là dấu hiệu cách dựng trục cổ tay từ landmark có chỗ mơ hồ về dấu; nên sửa ở chỗ dựng, không chỉ vá sau.
+
+**Đề xuất cho PR của DA-04 [Đề xuất]:**
+
+1. Ghi tư thế trong hệ camera (`transforms/camera` là ma trận đơn vị) cho tới khi có quỹ đạo đầu đo được và đã kiểm. Trên EgoDex, bỏ phần bù chuyển động đầu gần như không đổi gì.
+2. Dựng trục cổ tay có dấu xác định. Thêm bước giữ liên tục (xoay π khi gần khung trước hơn 30°) làm lưới an toàn.
+3. Nội suy khung có bước nhảy của cổ tay lớn hơn trung vị + 5 × MAD của clip; không bỏ khung.
+4. Savitzky–Golay bậc 2, cửa sổ 21 khung ở 30 fps, trên vị trí cổ tay, đầu ngón và quaternion cổ tay.
+5. Kiểm lại bằng `loader_check` trên bản export thật trước khi ghim, với ngưỡng 5 % của mục 2.7.
+
+Còn lại sau đề xuất: 3,9 % là trên bản thử, không phải bản thật. Góc cổ tay vẫn bị cắt 13 %, và 56 % mẫu có ít nhất một chiều bị cắt (EgoDex 19,5 %). Bản export qua ngưỡng nhưng vẫn nhiễu hơn EgoDex. Cửa sổ 21 có thể làm mờ những lúc tay đổi hướng nhanh (cầm và đặt khay); phần bị cắt không nói gì về chất lượng policy, closed-loop của B so với C mới trả lời.
