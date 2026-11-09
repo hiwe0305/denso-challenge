@@ -30,7 +30,9 @@ sources:
   ego_video:
     # the team's own recordings: <root>/device.json + <root>/<task>/<i>.mp4
     license: team-internal
-    data_class: internal
+    # public from 9/11/2026 (Hiếu): the team's own demo recordings, faces covered by
+    # `fw egocentric deid` before any other step; trainable on Colab (docs/g0/egocentric.md 8.1)
+    data_class: public
     layout: two_table
     embodiment_id: human_hands@ego_video
 
