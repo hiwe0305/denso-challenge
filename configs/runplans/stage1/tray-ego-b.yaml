@@ -48,10 +48,11 @@ dataset:
   id: team-ego-tray-clean-132
   source:
     name: team-ego
-    # fwdata/egocentric-export/tray-ego-b-480p-clean; loader_check 4.3 % clipped (2.9)
-    export_id: egx_b6e974e46e8222e8
-    tarball: denso/da30/exports/egx_b6e974e46e8222e8.tar # under /content/drive/MyDrive
-    sha256: 61c3497aa48bd59182aebadcdb5816d5d8a7de11cec0aa393c90eb32906bafc8
+    # fwdata/egocentric-export/tray-ego-b-480p-clean2 (PR #174 at ac3637da);
+    # loader_check 3.6 % clipped (docs/he/stage1.md 2.9)
+    export_id: egx_7b43c30dc5d88cd7
+    tarball: denso/da30/exports/egx_7b43c30dc5d88cd7.tar # under /content/drive/MyDrive
+    sha256: 666a67fc47ff9da1218718d3926b88bb9d7b8ad433ae311c0f636fbe01aaf84a
     bytes: 48701440
     samples: 132
   split_dir: part1

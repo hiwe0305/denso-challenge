@@ -23,7 +23,7 @@ from flywheel_psi0.tray.runplan import run_plan_id
 REPO = Path(__file__).resolve().parents[4]
 PLAN = REPO / "configs" / "runplans" / "stage1" / "tray-ego-b.yaml"
 TRAY = REPO / "configs" / "runplans" / "tray" / "he-tray-v2.yaml"
-EXPORT_ID = "egx_b6e974e46e8222e8"  # DA-04's cleaned export, docs/he/stage1.md 2.9
+EXPORT_ID = "egx_7b43c30dc5d88cd7"  # DA-04's cleaned export, docs/he/stage1.md 2.9
 
 
 def plan() -> Stage1Plan:
