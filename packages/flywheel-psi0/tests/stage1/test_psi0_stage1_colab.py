@@ -114,6 +114,7 @@ def test_setup_runs_the_preflight_before_any_download(
         raise Fetched  # the EgoDex download: far enough for this test
 
     monkeypatch.setattr(colab, "setup_psi0_env", lambda work: None)
+    monkeypatch.setattr(colab, "check_parent", lambda psi0, plan: None)
     monkeypatch.setattr(colab, "sh", sh)
     monkeypatch.setattr(colab, "fetch", fetch)
     with pytest.raises(subprocess.CalledProcessError if preflight_fails else Fetched):

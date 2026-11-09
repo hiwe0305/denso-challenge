@@ -106,6 +106,39 @@ class Dataset(_Frozen):
         return self
 
 
+class ExportSource(_Frozen):
+    """A DA-18 export, pinned by its id and by the sha256 of `pack`'s tarball."""
+
+    name: str  # who recorded it, e.g. "team-ego" for the team's own videos
+    export_id: str = Field(pattern=r"^egx_[0-9a-f]{16}$")
+    tarball: str  # under the Drive root (/content/drive/MyDrive on Colab)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    bytes: int = Field(gt=0)
+    samples: int = Field(gt=0)
+
+
+class ExportDataset(_Frozen):
+    """The team's export (`flywheel_psi0.stage1.export_source`); it carries `actions_48d`."""
+
+    kind: Literal["export"]
+    id: str
+    source: ExportSource
+    split_dir: str
+    data_class: Literal["public", "internal", "restricted"]
+    identity_masked: bool
+
+    @model_validator(mode="after")
+    def _masked(self) -> ExportDataset:
+        # The EgoDex waiver of 4/11/2026 is for Apple's zip only; an export of any
+        # source, the team's own video first, must have passed identity masking.
+        if not self.identity_masked:
+            raise ValueError(
+                f"{self.id}: an export must pass identity masking first (CLAUDE.md); "
+                "the EgoDex waiver covers only Apple's published sample"
+            )
+        return self
+
+
 class Job(_Frozen):
     id: str
     seed: int
@@ -130,7 +163,7 @@ class Stage1Plan(_Frozen):
     psi_model: PsiModel
     recipe: str  # path from the repo root
     parent: Parent
-    dataset: Dataset
+    dataset: Dataset | ExportDataset  # Apple's EgoDex sample, or a DA-18 export
     job: Job
     deepspeed_config: str  # path from the repo root; replaces the recipe's
     overrides: dict[str, ArgValue]
