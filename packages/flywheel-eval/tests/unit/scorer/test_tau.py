@@ -366,3 +366,59 @@ def test_the_command_reads_g0_alone_and_warns_on_a_sim_sync_of_zero(tmp_path: Pa
     assert "log RTC của G0: 1 file, 2 chunk" in both.output
     assert g0_only.exit_code == 0, g0_only.output
     assert "tau_track_upper" not in g0_only.output
+
+
+# ---------------------------------------------------------------------------
+# task 6.2: calibrating again gives the same tau, byte for byte (AC 6)
+# ---------------------------------------------------------------------------
+
+EPISODES: dict[str, tuple[list[float], list[Any]]] = {
+    "j1-a": ([0.001 * i for i in range(40)], [0.003] * 20 + [None] * 20),
+    "j1-b": ([0.002 * i for i in range(70)], [0.001] * 70),
+    "j1-c": ([0.05] * 30, [0.002] * 30),
+}
+LATENCIES = {"g0-t1": [1.5, 0.05, 0.07, 0.06], "g0-t2": [1.4, 0.08, 0.04]}
+
+
+def build(root: Path, order: list[str]) -> tuple[Path, Path]:
+    """The same episodes and G0 log under `root`, the traces written in `order`."""
+    for trace_id in order:
+        upper, sync = EPISODES[trace_id]
+        write_trace(root / "teleop", trace_id, upper, sync=sync)
+    write_rtc(root / "g0", LATENCIES)
+    return root / "teleop", root / "g0"
+
+
+def test_the_same_episodes_give_the_same_report_in_two_places(tmp_path: Path) -> None:
+    # A tau that moved between two runs over the same data would make the
+    # threshold a property of the run rather than of the data.
+    teleop_one, g0_one = build(tmp_path / "one", ["j1-a", "j1-b", "j1-c"])
+    teleop_two, g0_two = build(tmp_path / "two", ["j1-c", "j1-a", "j1-b"])
+
+    first = calibrate_tau([teleop_one], [g0_one])
+    second = calibrate_tau([teleop_two], [g0_two])
+
+    assert first.canonical() == second.canonical()
+    assert first.sha256 == second.sha256
+
+
+def test_running_twice_gives_the_same_blob_and_appends_a_line(tmp_path: Path) -> None:
+    teleop, g0 = build(tmp_path / "data", ["j1-a", "j1-b", "j1-c"])
+    store = tmp_path / "store"
+
+    first, index = store_tau(calibrate_tau([teleop], [g0]), store)
+    second, _ = store_tau(calibrate_tau([teleop], [g0]), store)
+
+    assert first == second
+    assert len(index.read_text(encoding="utf-8").splitlines()) == 2
+
+
+def test_another_episode_changes_the_report(tmp_path: Path) -> None:
+    teleop, _ = build(tmp_path / "data", ["j1-a", "j1-b", "j1-c"])
+    base = calibrate_tau([teleop])
+    write_trace(teleop, "j1-d", [0.5] * 20)
+
+    grown = calibrate_tau([teleop])
+
+    assert grown.sha256 != base.sha256
+    assert grown.value("tau_track_upper").value != base.value("tau_track_upper").value

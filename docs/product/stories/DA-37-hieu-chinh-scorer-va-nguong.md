@@ -35,7 +35,7 @@ Là kỹ sư đánh giá, tôi muốn đối chiếu scorer với cờ thành c�
 - [ ] 5. Ghi giá trị vào `system.yaml` và RunPlan, bỏ `null` (AC 5)
 - [ ] 6. Test chạy lại cho kết quả trùng trên bộ episode nhỏ (AC 6)
   - [x] 6.1 Báo cáo đối chiếu: cùng bộ episode và cùng cấu hình cho cùng báo cáo, cùng hash, cùng blob
-  - [ ] 6.2 τ: cùng bộ episode teleop cho cùng τ_track, τ_sync (sau nhiệm vụ 3, 4)
+  - [x] 6.2 τ: cùng bộ episode teleop cho cùng τ_track, τ_sync (sau nhiệm vụ 3, 4)
 
 ## Phạm vi file
 
@@ -82,7 +82,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực: nhiệm vụ 1: 1h, cộng 1h sửa theo review #158 lần đầu, 1h theo lần hai; nhiệm vụ 6.1: 1h; nhiệm vụ 3: 1.5h; nhiệm vụ 4: 1.5h.
+- Giờ thực: nhiệm vụ 1: 1h, cộng 1h sửa theo review #158 lần đầu, 1h theo lần hai; nhiệm vụ 6.1: 1h; nhiệm vụ 3: 1.5h; nhiệm vụ 4: 1.5h; nhiệm vụ 6.2: 0.5h.
 - Công cụ AI đã dùng: Claude Code.
 - Ghi chú hoàn thành:
   - 7/11/2026, nhiệm vụ 1: `fw eval agree --scores <score.jsonl> --rollouts <thư mục eval> --release <release> [--store <store>]`. Phần thuần ở `scorer/agreement.py` (`compare`), phần đọc ghi ở `scorer/calibration.py`. Score ghép với `RolloutResult` theo `trace_ref.trace_id`, nên lúc chấm phải gọi `fw eval score --episode-id <trace_id>`: tên `episode_N` của SIMPLE đếm lại ở mỗi lượt eval nên không ghép được. Score hay rollout không có cặp được liệt kê trong báo cáo, không bị bỏ.
@@ -96,5 +96,6 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
   - Episode nào được tính (đề xuất, chờ PO xem): `rollout_result.json` có `infra_status` ok và `sim_success` true. Demo teleop không có cờ SIMPLE nên chỉ được tính khi người chạy khai `--demos`, và báo cáo ghi thành công là `declared_demo`, không phải đo. Episode bị bỏ được liệt kê kèm lý do.
   - Báo cáo lưu như báo cáo đối chiếu: byte vào blob store, một dòng vào `<store>/scorer/tau.jsonl`; không có thời gian hay đường dẫn. Lệnh không sửa `system.yaml` (nhiệm vụ 5) mà in giá trị đang dùng bên cạnh.
   - 9/11/2026, nhiệm vụ 4: cùng lệnh, thêm `--g0 <rtc.jsonl hoặc thư mục>`. τ_sync là phân vị 99 của |t_image - t_state| mọi chu kỳ có khung ảnh mới (`TraceLog.sync_offset` của DA-13) trên cùng các episode thành công; R4 vẫn so lệch **lớn nhất** của episode với nó (`system.yaml`, r4). Trên rollout SIMPLE mọi lệch bằng 0 theo cách dựng, nên τ_sync bằng 0 thì lệnh in cảnh báo rằng nó không nói gì về đồng bộ cảm biến. τ_lat là phân vị 99 của `chunk_received_s - observation_sent_s` mọi chunk trừ chunk 0 (như R1) trên log RTC của lần chạy chuẩn G0, nguồn riêng mà DA-13 AC 2 tách khỏi teleop; số episode của τ_lat là số trace có chunk. Báo cáo ghi hash và job của từng log RTC. Hai nguồn chạy riêng hay cùng lúc đều được; thiếu cả hai thì từ chối.
+  - 9/11/2026, nhiệm vụ 6.2: cùng episode teleop và cùng log G0, ghi vào hai thư mục khác nhau theo thứ tự khác nhau, cho cùng byte và cùng hash; chạy hai lần cho cùng blob và chỉ mục thêm một dòng; thêm một episode thì báo cáo đổi.
   - Chưa chạy trên dữ liệu thật: cần trace teleop thành công có `cmd_*` và `meas_*` (dạng `TraceStep`), và log RTC của lần chạy chuẩn G0. Giới hạn τ_lat ≤ d / hz (0,12 s) chưa kiểm trong lệnh vì `system.yaml` không ghi hz; người chép giá trị sang ở nhiệm vụ 5 kiểm.
 - File đã tạo hoặc sửa: `packages/flywheel-eval/src/flywheel/eval/scorer/agreement.py`, `scorer/calibration.py`, `api.py`, `cli.py`; `packages/flywheel-eval/tests/unit/scorer/test_agreement.py`, `test_agreement_rerun.py`; `scorer/tau.py`, `test_tau.py`.
