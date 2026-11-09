@@ -107,6 +107,8 @@ pose_ea:
     # offline test on the tray clips, docs/he/stage1.md 2.8 (PR 171).
     frame: camera            # hands in the camera frame, camera = identity: the VO track
                              # is not measured (translation is vo_step_m per moving frame)
+    flip_deg: 30             # turn a wrist frame pi about an axis when that is > 30 deg
+                             # closer to the previous seen frame; giả định (2.8)
 
 models:
   # D6: rules first; RoboBrain suggests step boundaries when rules are ambiguous and
