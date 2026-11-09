@@ -933,3 +933,17 @@ def test_the_b_decision_is_an_open_draft_on_the_b_plan_and_its_rules() -> None:
         == rule0.metrics["batch"]["conditions_sha256"]
     )
     assert decision.metrics["b_vs_c"]["headline"]["diff"] is None  # nothing measured yet
+    # two stages, Hiếu 10/11/2026 (tray.md 18.9): stage 1 maps onto the same verdicts
+    from flywheel_psi0.tray.eval_results import STAGE1_CHUNKS, STAGE1_P
+
+    two = decision.criteria["two_stage"]
+    assert len(two["stage1_chunks"]) == STAGE1_CHUNKS and two["p_threshold"] == STAGE1_P
+    assert set(two["outcomes"]) == {"E1", "E3", "F", "continue"}
+    assert {k: v for k, v in decision.criteria["verdict_map"].items() if "stage 1" in k} == {
+        "stage 1 E1": "pass",
+        "stage 1 E3": "fail",
+        "stage 1 F": "recorded",
+    }
+    assert (base["stage1_n"], base["stage1_successes"]) == (60, 7)
+    assert decision.metrics["stage1"]["chunks"] == two["stage1_chunks"]
+    assert decision.metrics["stage1"]["outcome"] is None

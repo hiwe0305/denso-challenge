@@ -9,17 +9,38 @@
   "subtask": "4.5",
   "gaps": [
    "subject_id is the draft id of he-tray-b.yaml; it becomes the frozen B id at task 4.7, when DA-30's stage 1 checkpoint is pinned",
-   "the reading rules (tray.md 18.2) are [Đề xuất]: Hiếu approves them before any B run",
-   "every metric is null until eval B ends (task 4.8)"
+   "the reading rules (tray.md 18.2) are [Đề xuất] except the two stages, which Hiếu decided on 10/11/2026 (tray.md 18.9): Hiếu approves the rest before any B run",
+   "every metric is null until eval B's stage 1 ends (task 4.8); stage 2 metrics stay null if stage 1 stops"
   ]
  },
  "id": "dec_01M6ZVR21V7ZD52KG03BMFJK39",
  "kind": "dev_gate",
  "subject_kind": "run_plan",
- "subject_id": "rp_a3d3f96260d9",
+ "subject_id": "rp_128aec169e12",
  "verdict": "open",
  "metrics": {
   "label": "preliminary, on dev",
+  "stage1": {
+   "chunks": [
+    "l1-000",
+    "l2-000",
+    "l1-010",
+    "l2-010",
+    "l1-020",
+    "l2-020"
+   ],
+   "n": 60,
+   "variant": null,
+   "baseline": null,
+   "diff": null,
+   "ci": null,
+   "variant_only": null,
+   "baseline_only": null,
+   "mcnemar_exact_p": null,
+   "outcome": null,
+   "level0_run": null,
+   "source": "eval_results --baseline <eval C SimReady> --stage1 (tray.md 18.5)"
+  },
   "b_vs_c": {
    "headline": {
     "levels": [
@@ -78,10 +99,10 @@
   "doc": "docs/he/tray.md",
   "section": "18.2",
   "rules_marker": "branch-b-rules",
-  "rules_sha256": "6c0eb9c9537c7093929a3fbc90d3d09536c423eabea266890ef1c669c7cc800d",
+  "rules_sha256": "52f3385b78eb976ef729f591dda17bb10c3f0b74bc23ded8b37553c3fe2cd24d",
   "plan": {
    "path": "configs/runplans/tray/he-tray-b.yaml",
-   "run_plan_id": "rp_a3d3f96260d9",
+   "run_plan_id": "rp_128aec169e12",
    "status": "draft",
    "variant_of": {
     "plan": "configs/runplans/tray/he-tray-v2.yaml",
@@ -101,7 +122,28 @@
    "parent_header_sha256": "53d000d9626a13faf4bcb5268517b8441c34b187c88c9dee0b4c250dc19d6d59",
    "parent_header": "625 BF16 tensors, no lm_head, model.language_model.embed_tokens.weight 153792 x 2048 (psi-model cb1480f)"
   },
-  "primary": "paired B - C on the 240 level 1-2 conditions; 95 % CI by bootstrap of the per-condition differences within level, 10000 resamples, seed 20261103 (plan stats)",
+  "primary": "paired B - C on the level 1-2 conditions run: the 60 of stage 1, or all 240 if stage 2 runs; 95 % CI by bootstrap of the per-condition differences within level, 10000 resamples, seed 20261103 (plan stats)",
+  "two_stage": {
+   "decided": "Hiếu 10/11/2026, 'Ghi Decision' (tray.md 18.9), before any B run",
+   "stage1_chunks": [
+    "l1-000",
+    "l2-000",
+    "l1-010",
+    "l2-010",
+    "l1-020",
+    "l2-020"
+   ],
+   "stage1_conditions": "60: seeds 1000100-1000129 at levels 1 and 2",
+   "p_threshold": 0.001,
+   "outcomes": {
+    "E1": "McNemar p < 0.001, b > c, lower CI bound > 0 on the 60: stop, read rule 1",
+    "E3": "McNemar p < 0.001, b < c, upper CI bound < 0 on the 60: stop, read rule 3",
+    "F": "otherwise with b <= c: stop as not promising, read as rule 2 ('no gain of B over C seen on 60 conditions'); not rule 3, not 'egocentric does not help'",
+    "continue": "otherwise (b > c): run the other 18 level 1-2 chunks, then level 0; read rules 1-6 on all 240, the 60 of stage 1 included"
+   },
+   "level0": "run only if stage 2 runs",
+   "rules_sha256_before": "6c0eb9c9537c7093929a3fbc90d3d09536c423eabea266890ef1c669c7cc800d"
+  },
   "rules": {
    "1": "lower CI bound of (B - C) > 0: B passes",
    "2": "CI of (B - C) contains 0: no effect seen; not 'egocentric does not help'",
@@ -113,7 +155,10 @@
   "verdict_map": {
    "rule 1": "pass",
    "rule 2": "recorded",
-   "rule 3": "fail"
+   "rule 3": "fail",
+   "stage 1 E1": "pass",
+   "stage 1 E3": "fail",
+   "stage 1 F": "recorded"
   },
   "baseline_c": {
    "run": "eval C on SimReady visuals (tray.md 16.6)",
@@ -122,7 +167,15 @@
    "headline_n": 240,
    "headline_successes": 20,
    "place_pose_levels_1_2": 131,
-   "level0_successes": 5
+   "level0_successes": 5,
+   "stage1_n": 60,
+   "stage1_successes": 7,
+   "stage1_by_level": {
+    "1": 4,
+    "2": 3
+   },
+   "stage1_place_pose": 33,
+   "stage1_counted": "eval_results --stage1 on the outcomes of eval-c-simready-rp_a04c14e79dfd, 10/11/2026"
   },
   "baseline_cplus": {
    "run": "eval C+ on SimReady visuals (tray.md 17.6), running on 9/11/2026",
@@ -135,10 +188,11 @@
    "the same team builds the task, the robot demos and the egocentric clips",
    "sim only, MuJoCo renderer",
    "preliminary on dev: 1 train seed per branch, 1 rollout per condition; EGL rollouts are not reproducible (tray.md 13.2)",
-   "no branch A: the HE-T rules of tray.md section 4 are not read"
+   "no branch A: the HE-T rules of tray.md section 4 are not read",
+   "a stop at stage 1 reads 60 conditions; F is no evidence that B does not help (tray.md 18.9)"
   ]
  },
  "signed_by": "pending: Hiếu",
- "reason": "DRAFT, written 9/11/2026 before any B run (Hiếu's four defaults of 9/11/2026). Branch B is branch C of rp_a04c14e79dfd with one change, the VLM parent: C's VLM fine-tuned at stage 1 by DA-30 on the team's 153 egocentric clips (he-tray-b.yaml, status draft until the checkpoint is pinned). Read by the branch-b-rules block of docs/he/tray.md 18.2 (rules_sha256 above): B passes when the lower bound of the 95 % CI of the paired B - C on the 240 level 1-2 conditions is above 0, against eval C on SimReady (20/240). To fill when eval B ends: metrics from eval_results --baseline (vs C, and vs C+ as a description), verdict by verdict_map, Hiếu's signature. Results stay 'preliminary, on dev'.",
+ "reason": "DRAFT, written 9/11/2026 before any B run (Hiếu's four defaults of 9/11/2026). Branch B is branch C of rp_a04c14e79dfd with one change, the VLM parent: C's VLM fine-tuned at stage 1 by DA-30 on the team's 153 egocentric clips (he-tray-b.yaml, status draft until the checkpoint is pinned). Read by the branch-b-rules block of docs/he/tray.md 18.2 (rules_sha256 above): Two stages (Hiếu 10/11/2026, tray.md 18.9): stage 1 is the first 6 chunks, 60 conditions, against the same 60 of eval C on SimReady (7/60); it stops on E1 (pass), E3 (fail) or F (recorded, no gain seen), else stage 2 runs to all 240 level 1-2 conditions and level 0, and B passes when the lower bound of the 95 % CI of the paired B - C on the 240 is above 0 (C: 20/240). To fill: metrics.stage1 from eval_results --baseline --stage1 after stage 1, the others from eval_results --baseline if stage 2 runs (vs C, and vs C+ as a description), verdict by verdict_map, Hiếu's signature. Results stay 'preliminary, on dev'.",
  "supersedes_decision_id": null
 }
