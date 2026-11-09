@@ -1333,6 +1333,60 @@ Muốn eval nhanh hơn thì cần một trong hai đường trên, kèm luật �
 
 **Bài học vận hành.** Khóa của watcher (`systemd-inhibit`) chỉ chặn ngủ, nghỉ và gập nắp; nó không chặn restart bấm tay. Trong lúc chạy job Colab, laptop không được restart; có thông báo cập nhật thì hoãn.
 
+## 18. Nhánh B: stage 1 trên egocentric của đội (nhiệm vụ 4, AC 5; soạn 9/11/2026, chưa chạy)
+
+_**[Đã chốt 9/11/2026, Hiếu]** "Chốt 4 mặc định" (qua phiên điều phối): chuẩn bị nhánh B để so "egocentric + demo robot" với "chỉ demo robot". Mục này viết và commit **trước** mọi lượt train hay eval của B. Story DA-34 nhiệm vụ con 4.1–4.8. Stage 1 là việc của [DA-30](../product/stories/DA-30-stage1-egocentric.md) nhiệm vụ 2; mục này dùng checkpoint của nó, không chạy nó._
+
+### 18.1 Thiết lập
+
+B là nhánh C của RunPlan bản 2 `rp_a04c14e79dfd` với **đúng một thay đổi**: VLM cha.
+
+| Mục | C (mốc) | B |
+|---|---|---|
+| VLM cha | `pre.fast.1by1.2601091803.ckpt.ego200k.he30k` (psi-model `cb1480f`) | VLM của C fine-tune thêm ở stage 1 trên 153 clip egocentric của đội (DA-30, khoảng 300 bước, trần 4 CU) |
+| Action header | `postpre.1by1.pad36.2601131206.ckpt.he30k` | Giống C |
+| Demo robot (stage 3) | Tập `C`, 160 episode, `a202cc02…`, release `tray_s1_f9433b028c52` | Giống C, cùng bản cắt |
+| Recipe, bước, seed | `psi0-stage3.yaml`, 40 000 bước, batch 16, seed train 0, ghi đè `train.validation_steps: 2000` | Giống C |
+| Ngân sách stage 3 | Cap 18 CU một lần (đo: 15,99 CU) | Cap 18 CU, sàn số dư 14 CU; ngân sách riêng của B, không nằm trong trần 36 CU của bậc 2 |
+| Eval | 270 điều kiện của plan, cảnh SimReady (mục 16) | Giống eval C SimReady |
+
+- **Dữ liệu stage 1.** 153 clip egocentric đội tự quay. Mỗi clip là trọn một lần làm task, khuôn mặt đã làm mờ, `data_class` `public` (PR #170). Pose tay ước lượng từ một camera, nội tham số camera là giả định. Mỗi clip dài khoảng 2,6 s; người bê một hộp đỏ, không phải khay của sim.
+- **Ghép VLM với action header.** Ψ₀ tại `cda3fdf` nạp VLM (`model_name_or_path`) và action header (`pretrained_action_header_path`) riêng nhau (`src/psi/trainers/finetune.py` dòng 324–356). Vì vậy ghép VLM sau stage 1 với action header gốc không cần sửa Ψ₀ (design mục 6.2, stage 2).
+- **Checkpoint stage 3 mang VLM của B.** Server eval nạp cả VLM lẫn action header từ `model.safetensors` của checkpoint stage 3 (`Psi0Model.from_pretrained`, `src/psi/models/psi0.py` dòng 1733–1775). Vì vậy eval B không cần thêm bước nạp VLM nào.
+- **Không có A.** Bậc 2 bỏ A (mục 9), nên quy tắc HE-T của mục 4 không đọc được. B so với C chỉ trả lời: thêm egocentric ở stage 1, với cùng 160 demo robot, có giúp không. Câu "egocentric **thay** được một phần demo robot" chưa đo.
+
+### 18.2 Luật đọc B (viết trước khi chạy)
+
+**[Đề xuất]**, chờ Hiếu duyệt. Khối giữa hai dấu `branch-b-rules` (chú thích HTML) được ghim bằng sha256 ở `interpretation.rules_sha256` của `configs/runplans/tray/he-tray-b.yaml` (nhiệm vụ con 4.2). Sửa một ký tự trong khối thì `runplan check` báo lỗi; nhãn này nằm ngoài khối. Luật là design mục 6.4 bỏ vế so với A.
+
+<!-- branch-b-rules -->
+
+**Phép đo.** Chỉ số chính là hiệu ghép cặp B − C trên 240 điều kiện mức 1–2 (120 mỗi mức), mốc C là eval C SimReady (mục 16.6: 20/240). Với mỗi điều kiện i: d_i = s_B,i − s_C,i. Hiệu là trung bình của d_i. CI 95 % bootstrap theo điều kiện: lấy mẫu lại d_i trong từng mức, 10 000 lần, hạt giống 20261103, khoảng phân vị (`stats` của plan, như mục 2 và 9). Phép kiểm phụ: McNemar chính xác hai phía trên các cặp bất đồng (B làm được mà C hỏng, và ngược lại).
+
+**Trước khi đọc.** Lô B có đủ 270 rollout, cùng tập điều kiện với eval C SimReady (`conditions.sha256` `b9c38b37…`), cảnh SimReady có guard từng lô (mục 16.2), server `Ta` 24 + RTC, 1 worker. Thiếu một điều thì không đọc quy tắc 1–3: ghi `Decision` và báo. Lượt hỏng do hạ tầng chạy lại như mục 2; mỗi điều kiện lấy lần xong sớm nhất.
+
+| # | Điều kiện | Đọc là |
+|---|---|---|
+| 1 | Cận dưới CI 95 % của (B − C) > 0 | **B đạt.** Với cùng 160 demo robot, stage 1 trên egocentric của đội giúp Ψ₀ trên task khay (sơ bộ, trên dev) |
+| 2 | CI 95 % của (B − C) chứa 0 | Không thấy tác động của egocentric ở mức này. Không đọc thành "egocentric không giúp" |
+| 3 | Cận trên CI 95 % của (B − C) < 0 | B kém hơn C. Đây là kết quả âm hợp lệ, phải báo |
+| 4 | McNemar | Báo p cạnh quy tắc 1–3; không đổi quyết định của 1–3. Nếu McNemar (p < 0,05 hay không) và CI cho hai kết luận khác nhau, báo cả hai và ghi rõ là khác nhau |
+| 5 | B so với C+ | Chỉ mô tả: hiệu ghép cặp và CI như trên, không có luật. B và C+ khác nhau cả VLM lẫn số demo robot (160 so với 320) |
+| 6 | Chỉ số phụ, báo cạnh | Tỉ lệ qua từng bước trong 7 bước của bộ chấm theo mức, và ghép cặp B với C theo từng bước; tỉ lệ `L-PLACE-POSE` trên 240 (C: 131/240); `place_error` (mục 16.4); mức 0 báo riêng (30 lượt lặp, C: 5/30) |
+
+**Giới hạn phải ghi cạnh mọi số B − C.**
+- B tốn thêm compute ở stage 1 (sổ chi phí của DA-30).
+- Pose tay của 153 clip là pose giả, ước lượng từ một camera với nội tham số giả định.
+- 153 clip, mỗi clip khoảng 2,6 s, người bê một hộp đỏ, không phải khay của sim.
+- Cùng một đội dựng task, sinh demo robot và quay egocentric.
+- Kết quả chỉ trong sim, renderer MuJoCo.
+- Sơ bộ, trên dev: 1 seed train mỗi nhánh, 1 rollout mỗi điều kiện. Rollout trên EGL không lặp lại được (mục 13.2), nên một cặp là hai rollout, không phải hai phép đo lặp của một rollout.
+- Không có A: không đọc HE-T (mục 4).
+
+Luật này không đổi sau khi thấy kết quả. Muốn đổi thì ghi `Decision` mới và báo theo cả luật cũ lẫn luật mới.
+
+<!-- /branch-b-rules -->
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -1359,3 +1413,4 @@ Muốn eval nhanh hơn thì cần một trong hai đường trên, kèm luật �
 | 8/11/2026 | Hiếu ký hai `Decision`: quy tắc 0 (`he-tray-v2.rule0.decision.json`, `verdict: fail` giữ nguyên) và mở lại C+ (`round-tray-cplus.rule0-override.decision.json`). Các chỗ ghi "chờ ký" đổi thành đã ký; C+ chưa launch | Hiếu (soạn với Claude) |
 | 9/11/2026 | Mục 17.8: fine-tune C+ lần 1 dừng ở khoảng bước 18 000 vì laptop restart (7,49 CU, không checkpoint nào dùng được); Hiếu duyệt chạy lại từ đầu với cap 17 CU, C+ tổng khoảng 23,5 CU vượt slot 18 CU | Hiếu (soạn với Claude) |
 | 9/11/2026 | Mục 17.8: fine-tune C+ lần 2 xong (40 000 bước, 16,11 CU, 8,37 giờ), checkpoint về `rtx3060` và kiểm sha256; C+ tổng 23,6 CU. Eval C+ chưa chạy | Hiếu (soạn với Claude) |
+| 9/11/2026 | Mục 18.1–18.2: nhánh B (nhiệm vụ 4, Hiếu "Chốt 4 mặc định" 9/11): thiết lập (B là C của `rp_a04c14e79dfd`, chỉ đổi VLM cha thành VLM sau stage 1 của DA-30) và luật đọc B ([Đề xuất], khối `branch-b-rules`), viết trước mọi lượt của B. Khối `tier2-rules` không đổi | Hiếu (soạn với Claude) |
