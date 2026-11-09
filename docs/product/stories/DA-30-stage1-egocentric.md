@@ -36,6 +36,7 @@ Là kỹ sư robot learning, tôi muốn chạy stage 1 của Ψ₀ trên dữ l
   - [x] 2.3 RunPlan `tray-ego-b.yaml`: cha là VLM của nhánh C, stats chuẩn hóa, số bước, checkpoint, val, tiêu chí chốt trước, trần 4 CU; `runplan check` qua (`rp_6a66a6ff082c`, bản nháp tới khi có bản export: `setup` từ chối plan nháp); `setup` ghi độ phủ stats; [stage1.md](../../he/stage1.md) mục 2.4; test CPU (`test_psi0_stage1_tray_ego_b.py`, 7 test)
   - [x] 2.4 `stage1.md` mục 2, dòng `estimated` của sổ chi phí (2,5 CU, giả định), lệnh chạy cho Hiếu ([stage1.md](../../he/stage1.md) mục 2.5, 2.6). Còn lại của nhiệm vụ 2: ghim bản export vào plan khi phiên điều phối giao (bỏ `status: draft`)
   - [x] 2.5 Loader check của Ψ₀ trên bản export thử `egx_fb3d1401dac0bd4c` (132 mẫu, chỉ CPU); `loader_check` báo phần action bị cắt ở [−1, 1] và số mẫu một token; ghi kết quả và đề xuất cho plan ([stage1.md](../../he/stage1.md) mục 2.7); test CPU (`test_psi0_stage1_loader_check.py`, 3 test)
+  - [x] 2.6 Đo offline, trên bản export thử, làm sạch tư thế có đưa phần action bị cắt xuống dưới 5 % không (liên tục góc, làm mượt, khung nhảy, camera); bảng và đề xuất cho PR của DA-04 ([stage1.md](../../he/stage1.md) mục 2.8)
 - [ ] 3. Fine-tune, probe, closed-loop, báo cáo (AC 2, 3)
 
 ## Phạm vi file
