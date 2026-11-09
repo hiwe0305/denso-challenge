@@ -123,7 +123,7 @@ Hiếu quay video task hai bàn ngày 8/11/2026 và cần dùng ngay, nên bư�
 | Nơi để | `$FW_ROOT/models/yunet/face_detection_yunet_2023mar.onnx`, ngoài git; thiếu file thì lệnh in câu `curl` để tải |
 | Tham số (`deid` trong cấu hình) | `score_threshold` 0,6 (mặc định của YuNet là 0,9; hạ để sót ít mặt hơn), `nms_threshold` 0,3, `detect_side_px` 960, `pad` 0,25, `hold_frames` 5, `mosaic_cells` 8. Trừ `nms_threshold`, các số đều là giả định |
 
-Không khung nào rời máy: model chạy cục bộ, dữ liệu `internal` không tới API hosted nào (CLAUDE.md).
+Bước làm mờ chạy cục bộ, nên khung gốc chưa che không rời máy. Dữ liệu `internal` không tới API hosted nào (CLAUDE.md); video tự quay là `public` từ 9/11/2026 (mục 8.1), nhưng chỉ bản sao đã che đi tiếp.
 
 **Cổng kiểm bản sao, không kiểm nhãn.** `episodes.jsonl` là file văn bản, nên `deid_status = blurred` một mình không đủ: trước đây cổng cho episode `blurred` qua ngay. Từ 8/11/2026, episode egocentric không ở `raw` chỉ qua khi **mọi** video của nguồn có bản sao trong `deid_copies`, và sha256 của bản sao trên đĩa (băm lại ở mỗi bước) đúng bằng số `deid` đã ghi. Episode `raw` vẫn chỉ qua bằng miễn D2 theo pin, như cũ. `api.video_of` từ chối mọi `bundle.mp4` không phải bản sao của một nguồn cần làm mờ, nên manifest E-A, `annotate` và `trial` không đọc được video gốc. `ingest` lại thì mất `deid_copies`, episode về `raw`, phải chạy `deid` lại. Test: `tests/unit/egocentric/test_ego_blur.py`, `test_ego_deid.py`.
 
@@ -294,7 +294,7 @@ Chưa trả lời được câu của D3 ("model nào, có dùng không"). Trong
 
 ## 8. Video tự quay (nhiệm vụ 7)
 
-`fw egocentric ingest video --root <thư mục>` đọc `device.json` (tên thiết bị, fps, rộng, cao, ma trận nội 3 × 3; `tasks` và `objects` tùy chọn) và `<task>/<i>.mp4`, rồi ghi cùng thư mục làm việc như EgoDex: `source_detail = ego_video`, `data_class = internal`, không miễn che danh tính, `hdf5 = null`, `pose_source = E-A`, `action_quality = pseudo`, luật cắt đoạn `two_table` (6 bước: tiếp cận, gắp, đi, tới, đặt, thả; bước đi lấy từ tốc độ camera).
+`fw egocentric ingest video --root <thư mục>` đọc `device.json` (tên thiết bị, fps, rộng, cao, ma trận nội 3 × 3; `tasks` và `objects` tùy chọn) và `<task>/<i>.mp4`, rồi ghi cùng thư mục làm việc như EgoDex: `source_detail = ego_video`, `data_class = public` (từ 9/11/2026, mục 8.1; trước đó `internal`), không miễn che danh tính, `hdf5 = null`, `pose_source = E-A`, `action_quality = pseudo`, luật cắt đoạn `two_table` (6 bước: tiếp cận, gắp, đi, tới, đặt, thả; bước đi lấy từ tốc độ camera).
 
 ```json
 {"device": "iphone-15-wide", "fps": 30, "width": 1920, "height": 1080,
@@ -304,6 +304,15 @@ Chưa trả lời được câu của D3 ("model nào, có dùng không"). Trong
 ```
 
 Tới 7/11/2026 đội chưa quay video nào. Phép thử trên file thật: một thư mục giả làm video tự quay, chứa một mp4 thật của EgoDex (`basic_pick_place/0.mp4`, 126 khung) và `device.json`. `ingest video` ghi `src_20c38abea95118a4` với đúng các nhãn trên; `pose --job` và `annotate` đều trả mã 2 ở cổng che danh tính. Theo D2, video của đội không tới được model nào cho tới khi có bước làm mờ. Từ 8/11/2026 bước đó là `fw egocentric deid` (mục 3.1). Sau bước này, phần còn lại của pipeline chạy như EgoDex trên bản sao đã che: job E-A cho pose, rồi `annotate`, `qa`, `report`.
+
+### 8.1 Video tự quay là `public` (9/11/2026)
+
+**[Đã chốt 9/11/2026, Hiếu]:** "Bỏ cái internal đi được đưa lên colab thì tôi mới train được chứ". Nguồn `ego_video` trong `configs/data/egocentric.yaml` đổi từ `internal` sang `public`, để stage 1 của nhánh B (DA-34 nhiệm vụ 4, DA-30 nhiệm vụ 2) train được trên Colab như C và C+.
+
+- Video là của đội tự quay để làm demo, không phải dữ liệu DENSO; CLAUDE.md chỉ buộc dữ liệu DENSO là `internal` hoặc `restricted`.
+- **Không đổi:** bước làm mờ vẫn bắt buộc trước mọi bước khác. Cổng che danh tính xét `source_detail`, không xét `data_class`: miễn chỉ có cho `egodex` + `public` theo pin, nên `ego_video` + `public` vẫn bị chặn tới khi có bản sao `blurred` (test `test_ego_deid.py`). Chỉ bản sao đã che rời máy; video gốc ở lại laptop.
+- `source_id` băm cả `data_class`, nên nguồn đã ingest trước ngày này giữ id cũ và nhãn `internal`. Muốn dùng nhãn mới thì ingest lại, rồi chạy lại `deid`.
+- **Còn mở:** người xuất hiện trong video đồng ý cho dùng video (đã che mặt) để train trên dịch vụ hosted; Hiếu xác nhận trước lần train đầu.
 
 ## 9. Việc còn mở
 
@@ -405,6 +414,7 @@ Chưa thử cài MediaPipe trên laptop. Gói có wheel sẵn nên không cần 
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 9/11/2026 | Video tự quay đổi sang `public` theo quyết định của Hiếu (mục 8.1); bước làm mờ không đổi | Claude, theo quyết định của Hiếu |
 | 8/11/2026 | Thêm bước làm mờ `fw egocentric deid` (nhiệm vụ 8, mục 3.1); cổng chỉ cho episode `blurred` qua khi mọi video có bản sao đúng sha256; dòng 4 mục 9 xong, thêm dòng 15–17 | Claude (phiên DA-04 deid), theo yêu cầu của Hiếu |
 | 7/11/2026 | Sửa theo review PR 152 (mục 3, 5, 6, 1.2, 10.5) | Claude (phiên DA-04), theo review của Hiếu |
 | 6/11/2026 | Tạo file: 7 nhiệm vụ trên 20 episode EgoDex | Claude (phiên DA-04), theo phân công của Hiếu |
