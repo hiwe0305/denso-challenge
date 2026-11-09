@@ -104,6 +104,34 @@ def verify_export(
     return problems
 
 
+def stats_coverage(export: dict[str, Any], shipped: dict[str, Any]) -> dict[str, Any]:
+    """How the export's q01..q99 per dim sits in the training stats' (`egodex` blocks).
+
+    The run normalizes with the shipped stats, and Psi0 clips the normalized action to
+    [-1, 1] (`config/transform.py:682` at the pin): a dim whose export range reaches past
+    the shipped q01..q99 loses its tails to the clip. Dims where the shipped range is
+    zero (the pads, 6:9 and 30:33) are left out. Reported, never a refusal.
+    """
+    low, high = export["egodex"]["q01"], export["egodex"]["q99"]
+    ship_low, ship_high = shipped["egodex"]["q01"], shipped["egodex"]["q99"]
+    ratios: dict[int, float] = {}
+    outside: list[int] = []
+    for dim, (lo, hi, slo, shi) in enumerate(zip(low, high, ship_low, ship_high, strict=True)):
+        if shi - slo <= 0:
+            continue
+        ratios[dim] = (hi - lo) / (shi - slo)
+        if lo < slo or hi > shi:
+            outside.append(dim)
+    spans = sorted(ratios.values())
+    return {
+        "dims": len(ratios),
+        "dims_outside_shipped_q01_q99": outside,
+        "span_ratio_median": round(spans[len(spans) // 2], 3) if spans else None,
+        "span_ratio_max": round(spans[-1], 3) if spans else None,
+        "span_ratio_max_dim": max(ratios, key=lambda d: ratios[d]) if ratios else None,
+    }
+
+
 def _members(root: Path) -> list[Path]:
     return sorted((p for p in root.rglob("*") if p.is_file()), key=lambda p: p.as_posix())
 

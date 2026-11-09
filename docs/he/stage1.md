@@ -219,7 +219,7 @@ RunPlan của B không tải mẫu EgoDex mà nhận bản export của DA-18 (`
 - Che danh tính: nguồn `export` chỉ nạp được khi `identity_masked: true`. Miễn trừ ngày 4/11/2026 chỉ áp cho zip EgoDex của Apple (mục 1.4), không áp cho bản export, kể cả export của EgoDex. Test: `test_an_export_must_be_identity_masked`.
 - `setup` giờ cũng kiểm sha256 của trọng số cha sau khi tải, cho mọi plan.
 
-Bản export thật chưa có: phiên điều phối dữ liệu sẽ đưa đường dẫn và sha256. Đến lúc đó RunPlan `tray-ego-b.yaml` chưa đóng băng được (mục 2.4).
+Bản export thật chưa có: phiên điều phối dữ liệu sẽ đưa đường dẫn và sha256. Đến lúc đó RunPlan [`tray-ego-b.yaml`](../../configs/runplans/stage1/tray-ego-b.yaml) chưa đóng băng được (mục 2.4).
 
 ### 2.3 Checkpoint stage 1 có nạp được vào stage 3 không (Q-28C)
 
@@ -249,3 +249,36 @@ Cách làm ([`vlm_checkpoint.py`](../../packages/flywheel-psi0/src/flywheel_psi0
 Phần chưa thử: bước gom ZeRO-3 trên GPU (dựa vào cờ ở trên và dạng file của cha) và nạp model thật 2,1 tỉ tham số. `check-vlm` trên Colab làm phần đó, ngay sau lần chạy.
 
 Một điều cần ghi cạnh kết quả của B: action header `postpre.*` được train (stage 2 của tác giả) trên đặc trưng của VLM cha. Sau 300 bước stage 1, đặc trưng của VLM lệch đi một chút, và stage 3 khởi đầu header từ chỗ lệch đó; stage 3 train header đủ lâu để thích nghi, nhưng đây là khác biệt thứ hai giữa B và C ngoài "VLM đã thấy video". Chạy lại stage 2 thì loại được khác biệt này, nhưng không nằm trong kế hoạch.
+
+### 2.4 RunPlan `tray-ego-b.yaml`
+
+[`tray-ego-b.yaml`](../../configs/runplans/stage1/tray-ego-b.yaml), `run_plan_id` hiện tại `rp_6a66a6ff082c` (bản nháp: id sẽ đổi khi ghim bản export thật). `runplan check` qua và in "draft" kèm lý do.
+
+**Bản nháp cho tới khi có bản export.** Khối `dataset.source` giữ giá trị giữ chỗ (`egx_0000000000000000`, sha256 toàn số 0) và plan có `status: draft`. `colab setup` từ chối plan nháp trước khi làm bất cứ gì (không tốn CU). `runplan check` báo lỗi nếu giá trị giữ chỗ còn mà plan không ghi `draft`, hoặc ngược lại. `status` nằm ngoài `run_plan_id` (như plan của DA-34), nên bỏ nó đi không đổi id. Để đóng băng: chạy `pack` trên bản export, chép `export_id`, `sha256`, `bytes` và đường dẫn tarball trên Drive vào plan, bỏ `status: draft`, chạy lại `runplan check`.
+
+| Khối | Giá trị | Lý do |
+|---|---|---|
+| `recipe` | [`psi0-stage1-egodex.yaml`](../../configs/runplans/stage1/psi0-stage1-egodex.yaml), không đổi `args` | Bản export có bố cục EgoDex. Cha được train bằng `pretrain-mix-psi0-fast.sh` (HE và EgoDex 1:1, từ `ckpt200k`), với cùng tokenizer FAST `egodex-rel-50w-1x48-v2048-s100`, cùng `egodex_stat_all.json` và ảnh EgoDex 270×480 như script EgoDex. Recipe thêm cha `psi0-pre-egodex-he` vào `parents` |
+| `parent` | `pre.fast.1by1.2601091803.ckpt.ego200k.he30k`, sha256 `6e63…d3f9` | VLM của C (quyết định 1). Test so với `he-tray-v2.yaml`; `setup` kiểm sha256 sau khi tải |
+| `train.max_training_steps` | 300 | Quyết định 4. 300 bước × 32 mẫu là khoảng 63 lượt qua 153 clip (mỗi lượt một khung ngẫu nhiên mỗi clip). Loss sẽ giảm một phần do học thuộc; B được đánh giá bằng closed-loop của stage 3 so với C (DA-34), không bằng loss này |
+| `train.checkpointing_steps` | 300 | Một checkpoint ở cuối (Ψ₀ luôn lưu ở bước cuối: `scripts/train.py:304-310` gọi `should_save_training_checkpoint`, `trainer.py:30-41`). Checkpoint giữa tốn một lần lưu DeepSpeed khoảng 30 GB và vô dụng: phiên đã dừng không chạy tiếp |
+| `train.validation_steps` | 0 | Bản export không có split `test/`; val dạng sinh token của Ψ₀ nói ít trong 300 bước. Quên (P4) và hiểu cảnh (P1) là probe của DA-09, dời sau demo |
+| `deepspeed_config` | `zero3_offload.json` của mục 1.2 | Một L4; `runplan check` so với recipe; pre-flight của `setup` thử trên model nhỏ. File này bật gom trọng số 16 bit khi lưu, điều kiện của mục 2.3 |
+| `persist_vlm` | `true` | Giữ VLM cho stage 3 của B (mục 2.3) |
+| `compute.max_compute_units` | 4,0 | Quyết định 4 |
+
+**Stats chuẩn hóa [Đề xuất, 9/11/2026]: dùng file của tác giả `egodex_stat_all.json`, không dùng `egodex_stat.json` của bản export.** Lý do:
+
+- Cha học token action FAST trên action đã chuẩn hóa bằng file của tác giả: cả script EgoDex lẫn script trộn tạo ra cha đều truyền `--data.transform.field.stat-path=assets/stats/egodex_stat_all.json` với khóa `egodex`, và tokenizer FAST được fit trên action ở thang đó. Chuẩn hóa bằng stats khác thì cùng một chuyển động tay cho ra chuỗi token khác, tức là đổi nghĩa của token mà cha đã học, và B sẽ khác C ở hai chỗ thay vì một.
+- Stats của 153 clip tư thế giả (MediaPipe) có q01 và q99 nhiễu hơn nhiều so với stats của EgoDex.
+- Docstring của export cũng ghi lần chạy của tác giả chuẩn hóa bằng file của họ; file của export dùng để so sánh.
+
+Giá phải trả: Ψ₀ cắt action đã chuẩn hóa về [−1, 1] (`config/transform.py:682`), nên phần đuôi của những chiều mà video của đội vượt khoảng q01–q99 của EgoDex bị cắt. `setup` đo việc này và ghi vào `report.json`, mục `setup_stage1.stats_coverage`: các chiều có q01 hoặc q99 của export nằm ngoài khoảng của tác giả, và tỉ lệ độ rộng khoảng (trung vị, lớn nhất). Chỉ ghi lại, không chặn. Số này đọc được ngay khi có bản export, trước khi tốn GPU (`export_source.stats_coverage` trên CPU).
+
+**Tiêu chí chốt trước** (như mục 1.6, chỉ khác độ dài):
+
+- **Loss giảm**: trung vị loss train của 30 bước cuối thấp hơn trung vị của 30 bước đầu. Ψ₀ ghi một dòng mỗi bước optimizer (`scripts/train.py:298-301`), nên 30 là một phần mười lần chạy ở mỗi đầu.
+- **Chạy lại**: chạy lại 3 bước đầu dưới `da30-tray-ego-b-repeat`, cùng seed 7; loss bước đầu lệch không quá 2%.
+- **Nạp được ở stage 3**: `check-vlm` không báo vấn đề nào (mục 2.3).
+
+Ba tiêu chí này là bằng chứng đường đi. Chúng không nói gì về việc video của đội có giúp hay không: câu hỏi đó trả lời bằng closed-loop của stage 3 (B so với C), theo quy tắc của DA-34 ([tray.md](tray.md) mục 4).

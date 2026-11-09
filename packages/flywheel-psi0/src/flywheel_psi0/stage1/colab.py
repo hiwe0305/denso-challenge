@@ -34,8 +34,8 @@ from pathlib import Path
 from typing import Any
 
 from flywheel_psi0.stage1.egodex_sample import fetch, layout_problems
+from flywheel_psi0.stage1.export_source import STATS_FILE, sha256, stats_coverage
 from flywheel_psi0.stage1.export_source import fetch as fetch_export
-from flywheel_psi0.stage1.export_source import sha256
 from flywheel_psi0.stage1.vlm_checkpoint import load_check
 from flywheel_psi0.stage1.vlm_checkpoint import package as package_vlm
 from flywheel_psi0.trainer.colab import Report, sh
@@ -44,12 +44,19 @@ from flywheel_psi0.trainer.psi0_trainer import _src_dir
 
 DRIVE_ROOT = Path("/content/drive/MyDrive")
 DRIVE = DRIVE_ROOT / "denso" / "da30"
+PLAN_POINTER = "plan.path"  # in the work dir, written by setup
 
 
 def _plan(path: Path) -> Any:
     from flywheel_psi0.stage1.runplan import Stage1Plan
 
     return Stage1Plan.load(path)
+
+
+def draft_reasons(plan: Any) -> list[str]:
+    from flywheel_psi0.stage1.runplan import draft_reasons as reasons
+
+    return reasons(plan)
 
 
 def preflight_command(plan: Any, psi0: Path, repo: Path) -> str:
@@ -82,7 +89,11 @@ def setup(work: Path, plan_path: Path, drive_root: Path = DRIVE_ROOT) -> None:
     import yaml
 
     plan = _plan(plan_path)  # validates first: unmasked video only under the EgoDex waiver
+    if plan.status == "draft":
+        raise SystemExit(f"{plan_path} is a draft ({', '.join(draft_reasons(plan))}): not run")
     raw = yaml.safe_load(plan_path.read_text(encoding="utf-8"))
+    # The watcher's persist cell reads this to know which plan the session runs.
+    (work / PLAN_POINTER).write_text(str(plan_path.resolve()), encoding="utf-8")
     setup_psi0_env(work)
     psi0 = work / "Psi0"
     start = time.monotonic()
@@ -106,6 +117,11 @@ def setup(work: Path, plan_path: Path, drive_root: Path = DRIVE_ROOT) -> None:
     root = work / "data" / "egodex"
     if raw["dataset"].get("kind") == "export":
         details = _setup_export(plan, root, drive_root)
+        stat_path = plan.load_recipe(work / "fw").args["data.transform.field.stat-path"]
+        details["stats_coverage"] = stats_coverage(
+            json.loads((root / STATS_FILE).read_text(encoding="utf-8")),
+            json.loads((psi0 / str(stat_path)).read_text(encoding="utf-8")),
+        )
     else:
         details = _setup_egodex_sample(raw["dataset"], root, psi0)
     problems = layout_problems(root, plan.dataset.split_dir)

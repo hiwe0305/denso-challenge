@@ -1,0 +1,99 @@
+# DA-30 task 2 (AC 2): Psi0 stage 1 on the team's own egocentric video, for branch B of
+# DA-34 (docs/he/stage1.md section 2, docs/he/tray.md section 4). B is branch C with one
+# step more: this stage 1 run on C's VLM. Its output VLM, packaged by `persist`
+# (persist_vlm) and loaded once by `check-vlm`, is the `model_name_or_path` of B's
+# stage 3; the action header stays C's `postpre.*` (Q-28C, docs/he/stage1.md 2.3).
+# First stage 1 run to reach a train step in the project: also the path proof.
+#
+# Hiếu, 9/11/2026, "Chốt 4 mặc định": parent = C's VLM; one sample per clip with the
+# whole-task sentence; the 153 deidentified 480p clips at 30 fps, data_class public
+# (PR #170); about 300 steps, hard cap 4 CU.
+#
+# DRAFT until the data coordinator delivers the export: `dataset.source` holds
+# placeholders, `colab setup` refuses the plan and `runplan check` prints "draft".
+# To freeze: put the export's id, tarball sha256 and bytes (printed by
+#   python -m flywheel_psi0.stage1.export_source pack --export <root> --out <tar>)
+# below, set `tarball` to where it sits on Drive, drop `status: draft`, check again.
+#
+#   uv run python -m flywheel_psi0.stage1.runplan check configs/runplans/stage1/tray-ego-b.yaml
+name: stage1-tray-ego-b
+story: DA-30
+status: draft
+
+code:
+  psi0: {repo: physical-superintelligence-lab/Psi0, commit: cda3fdfafe47cb6fa75400d013de1bd36e3cea05}
+
+# Same revision as configs/runplans/tray/he-tray-v2.yaml (S1-03's pin).
+psi_model: {repo: USC-PSI-Lab/psi-model, revision: cb1480f50d9764ab2f6261bc2e651a67ad54da17}
+
+# The authors' EgoDex stage 1 script: the export has EgoDex's layout. The parent was
+# trained with the same tokenizer, stats and EgoDex image size (recipe, `parents`).
+recipe: configs/runplans/stage1/psi0-stage1-egodex.yaml
+
+# Branch C's VLM, path and sha256 as `parents.psi0-baseline-egodex-he.vlm` of
+# he-tray-v2.yaml; `setup` checks the sha256 after the download.
+parent:
+  id: psi0-pre-egodex-he
+  vlm:
+    path: psi0/pre.fast.1by1.2601091803.ckpt.ego200k.he30k/model.safetensors
+    sha256: 6e63da17bdd22430bc07c40e4b14ebb96c9d124d014c532449142862c186d3f9
+
+# DA-18's export of the team's clips (E-A: MediaPipe hands, `pseudo` actions), one
+# sample per clip, every clip under part1/ (train). Pinned by export_id and by the
+# sha256 of `pack`'s tarball, which `setup` copies from Drive and checks with every
+# file of meta.json before unpacking is accepted (export_source.fetch). The export
+# carries `actions_48d`; no precompute.
+dataset:
+  kind: export
+  id: team-ego-tray-153
+  source:
+    name: team-ego
+    export_id: egx_0000000000000000 # placeholder: the coordinator's export
+    tarball: denso/da30/exports/egx_0000000000000000.tar # under /content/drive/MyDrive
+    sha256: '0000000000000000000000000000000000000000000000000000000000000000' # placeholder
+    bytes: 1 # placeholder
+    samples: 153
+  split_dir: part1
+  data_class: public # PR #170; the export's meta.json must say the same
+  identity_masked: true # faces blurred by `fw egocentric deid` before anything else
+
+job:
+  id: da30-tray-ego-b
+  seed: 7
+  nproc_per_node: 1
+
+# The DeepSpeed config of section 1.2 (checked against the recipe by `runplan check`,
+# tried on a tiny model by `setup`'s pre-flight): one L4, ZeRO-3 with CPU offload.
+deepspeed_config: configs/runplans/stage1/zero3_offload.json
+
+# Normalization: the recipe's `assets/stats/egodex_stat_all.json`, not the export's
+# own `egodex_stat.json` (docs/he/stage1.md 2.4): the parent learned its FAST action
+# tokens on actions normalized by the shipped file, so it keeps their meaning; `setup`
+# records how the export's q01..q99 sits in it (`stats_coverage`), since Psi0 clips the
+# normalized action to [-1, 1].
+overrides:
+  # Hiếu's ~300. 300 x 32 samples is ~63 passes over 153 clips (one random frame per
+  # clip per pass): the loss will fall partly by memorizing; what B is judged on is
+  # stage 3 closed-loop against C (DA-34), not this loss.
+  train.max_training_steps: 300
+  # One checkpoint, at the end (Psi0 always saves at the last step). A middle one costs
+  # a ~30 GB DeepSpeed save and is of no use: a stopped session is not resumed.
+  train.checkpointing_steps: 300
+  # No val: the export has no test/ split, and Psi0's generation-based val says
+  # little in 300 steps. Forgetting (P4) and scene understanding (P1) are DA-09 probes.
+  train.validation_steps: 0
+
+compute:
+  gpu: L4
+  max_compute_units: 4.0 # Hiếu's hard cap; estimate in docs/g0/ledger/DA-30.csv
+
+# Fixed before the run, as egodex-short: the median train loss of the last
+# `loss_window` steps is below that of the first (one line per optimizer step); a rerun
+# of the first `repeat_steps` under `<job>-repeat`, same seed, starts within
+# `first_loss_rtol` of the run. 30 is a tenth of the run at each end.
+criteria:
+  loss_window: 30
+  repeat_steps: 3
+  first_loss_rtol: 0.02
+
+persist_vlm: true

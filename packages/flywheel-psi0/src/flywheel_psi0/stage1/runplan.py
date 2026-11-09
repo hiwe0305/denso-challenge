@@ -173,6 +173,9 @@ class Stage1Plan(_Frozen):
     # (`flywheel_psi0.stage1.vlm_checkpoint`). Unset (not False) when not wanted, so
     # plans written before the field keep their run_plan_id.
     persist_vlm: bool | None = None
+    # "draft": a pin is still a placeholder; `colab setup` refuses it. Out of the
+    # run_plan_id (STATUS_FIELDS), so dropping it once the pins are real keeps the id.
+    status: Literal["draft"] | None = None
 
     @classmethod
     def load(cls, path: Path) -> Stage1Plan:
@@ -188,6 +191,25 @@ class Stage1Plan(_Frozen):
     @property
     def repeat_job_id(self) -> str:
         return f"{self.job.id}-repeat"
+
+
+# The pin of an export not yet delivered: valid in form, refused by `setup` and, unless
+# the plan says `status: draft`, by `check`.
+PLACEHOLDER_EXPORT_ID = "egx_" + "0" * 16
+PLACEHOLDER_SHA256 = "0" * 64
+
+
+def draft_reasons(plan: Stage1Plan) -> list[str]:
+    """What still keeps the plan from being frozen."""
+    if not isinstance(plan.dataset, ExportDataset):
+        return []
+    source = plan.dataset.source
+    reasons = []
+    if source.export_id == PLACEHOLDER_EXPORT_ID:
+        reasons.append("export_id is the placeholder")
+    if source.sha256 == PLACEHOLDER_SHA256:
+        reasons.append("tarball sha256 is the placeholder")
+    return reasons
 
 
 def _leaves(config: dict[str, Any], prefix: str = "") -> dict[str, Any]:
@@ -305,6 +327,11 @@ def check(plan: Stage1Plan, repo: Path = REPO) -> list[str]:
         problems.append("the rerun must be shorter than the run")
     config = json.loads((repo / plan.deepspeed_config).read_text(encoding="utf-8"))
     problems += [f"{plan.deepspeed_config}: {p}" for p in deepspeed_problems(config, recipe)]
+    reasons = draft_reasons(plan)
+    if reasons and plan.status != "draft":
+        problems += [f"{r}, but the plan is not marked `status: draft`" for r in reasons]
+    if not reasons and plan.status == "draft":
+        problems.append("`status: draft` but every pin is set: drop the status")
     return problems
 
 
@@ -355,7 +382,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"FAIL {problem}", file=sys.stderr)
     if problems:
         return 1
-    print(f"OK {run_plan_id(plan)}")
+    reasons = draft_reasons(plan)
+    print(f"OK {run_plan_id(plan)}" + (f" (draft: {'; '.join(reasons)})" if reasons else ""))
     return 0
 
 
