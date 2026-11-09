@@ -1452,6 +1452,39 @@ vm $S "cd /content/da34; nohup setsid bash -c 'PYTHONPATH=$VMPP Psi0/.venv-psi/b
 
 **Sau khi chạy.** Dòng `measured` cho `job_da34_ft_B` trỏ về dòng ước lượng. Chuyển checkpoint sang `rtx3060` theo đúng ba lệnh của mục 17.6 với `J=fwdata/tray/runs/da34-t4-ft-b-s0`; lệch một file thì không eval.
 
+### 18.5 Eval B và cách đọc (nhiệm vụ con 4.4, soạn 9/11/2026, chưa chạy)
+
+**Chạy.** Giống hệt eval C SimReady (mục 16.2) và eval C+ (mục 17.6), để ghép cặp được với mốc 16.6.
+
+| Mục | Giá trị |
+|---|---|
+| Khi nào | Sau khi eval C+ xong (dự kiến khoảng 18:10Z ngày 9/11/2026), checkpoint B đã chuyển sang `rtx3060` và kiểm sha256 (mục 18.4), và Hiếu bảo chạy. Không chạy song song với eval khác (mục 17.7) |
+| Tập, điều kiện | `rp_a04c14e79dfd-2e57f60`, 270 điều kiện, `conditions.sha256` `b9c38b37…`. B không có tập riêng: `variant_of` bảo đảm eval của B là eval của bản 2. Dòng outcome vì vậy mang `run_plan_id` của bản 2, như C+; danh tính của B là checkpoint `da34-t4-ft-b-s0` và thư mục output |
+| Cây client | `~/denso-da34-master-079160d` có SimReady, `simple-guard.sh` trước mỗi lô |
+| Server | B `ckpt_40000`, `Ta` 24, `--rtc`, `127.0.0.1:22185`, cùng `serve_psi0.sh serve` như server C và C+ |
+| Lô | 1 worker, 27 lô 10 episode: mức 1 và 2 xen kẽ trước, mức 0 cuối; tối đa 3 lần, scope `MemoryMax=8G`, `MemorySwapMax=0` |
+| Output | Thư mục mới `~/denso-da34-pool/fwdata/tray/eval/eval-b-simready-<id của B>` |
+| Thời gian | Khoảng 17,2 giờ như eval C SimReady (giả định: cùng tốc độ mỗi episode) |
+
+Script vận hành trên máy (ngoài repo): chép `serve-cplus.sh` và `launch-eval-cplus.sh` của `~/denso-da34-t8/` thành `serve-b.sh` và `launch-eval-b.sh`, thay job thành `da34-t4-ft-b-s0`. Ba điều chặn giữ nguyên: danh sách sha256 của hand-off kiểm qua; có đúng một run có `ckpt_40000`; bounds trong `run_config.json` bằng `meta/stats_psi0.json` của bản cắt B. Bản cắt B là bản cắt C, nên stats phải lệch 0 so với stats của C. Việc này làm ở nhiệm vụ con 4.8, khi Hiếu cho chạy.
+
+**Đọc** bằng [`eval_results`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/eval_results.py) `--baseline`, chạy hai lần:
+
+```bash
+PLAN=configs/runplans/tray/he-tray-b.yaml
+SET=~/denso-da34-pool/fwdata/tray/eval-sets/rp_a04c14e79dfd-2e57f60   # eval C's set (built by master 2e57f60)
+EV=~/denso-da34-pool/fwdata/tray/eval
+$PY -m flywheel_psi0.tray.eval_results $PLAN --set $SET --out $EV/eval-b-simready-<B id> \
+    --baseline $EV/eval-c-simready-rp_a04c14e79dfd --json b-vs-c.json      # luật 1–4
+$PY -m flywheel_psi0.tray.eval_results $PLAN --set $SET --out $EV/eval-b-simready-<B id> \
+    --baseline $EV/eval-cplus-simready-rp_a04c14e79dfd --json b-vs-cplus.json   # luật 5, mô tả
+```
+
+- `paired.headline` là phép đo của luật 18.2 trên mức 1–2 gộp: `diff` (B − C), `ci` (bootstrap theo điều kiện trong từng mức, `stats` của plan), `ci_vs_0` (`above`, `contains`, `below`; ứng với luật 1, 2, 3), `variant_only` và `baseline_only` (cặp bất đồng), `mcnemar_exact_p` (luật 4).
+- `paired.by_level` cho cùng các số theo từng mức; mức 0 chỉ để báo riêng, không vào luật.
+- `paired.steps` cho các cặp theo từng bước của bộ chấm (luật 6). `levels` và `headline.failures` cho tỉ lệ `L-PLACE-POSE`. `place_error` chạy như mục 16.4.
+- Kiểm trên số giả (12 điều kiện, B 6, C 2, không cặp nào C làm được mà B hỏng): `ci` 0,08–0,58, `above`, `mcnemar_exact_p` 0,125. Đây đúng là trường hợp luật 4 bắt báo cả hai.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -1481,3 +1514,4 @@ vm $S "cd /content/da34; nohup setsid bash -c 'PYTHONPATH=$VMPP Psi0/.venv-psi/b
 | 9/11/2026 | Mục 18.1–18.2: nhánh B (nhiệm vụ 4, Hiếu "Chốt 4 mặc định" 9/11): thiết lập (B là C của `rp_a04c14e79dfd`, chỉ đổi VLM cha thành VLM sau stage 1 của DA-30) và luật đọc B ([Đề xuất], khối `branch-b-rules`), viết trước mọi lượt của B. Khối `tier2-rules` không đổi | Hiếu (soạn với Claude) |
 | 9/11/2026 | Mục 18.3: RunPlan B nháp `he-tray-b.yaml` (`rp_97922261b774` khi chưa điền ghim), cha stage 1, bất biến `variant_of`, chặn `freeze` và `--launch` khi chưa đủ ghim. Mục 18.2 trỏ tới file plan | Hiếu (soạn với Claude) |
 | 9/11/2026 | Mục 18.4: `colab_train --branch B` (chỉ plan B đã đóng băng và duyệt; VLM stage 1 từ Drive, kiểm sha256 trọng số, manifest cả thư mục, file khác trùng VLM của C; cha stage 1 thêm vào recipe trong bộ nhớ) và runbook Colab cho B, chưa chạy | Hiếu (soạn với Claude) |
+| 9/11/2026 | Mục 18.5: runbook eval B (như eval C SimReady, sau eval C+) và cách đọc bằng `eval_results --baseline`: hiệu ghép cặp, CI bootstrap theo mức, McNemar chính xác; luật 18.2 không đổi | Hiếu (soạn với Claude) |

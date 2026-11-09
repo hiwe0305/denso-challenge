@@ -59,7 +59,7 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
   - [x] 4.1 Thiết lập và luật đọc B viết trước mọi lượt của B (tray.md 18.1–18.2): chính là cận dưới CI 95 % của (B − C) > 0 trên 240 điều kiện mức 1–2, ghép cặp, bootstrap theo điều kiện; McNemar phụ; B so với C+ chỉ mô tả; chỉ số phụ và giới hạn; khối `branch-b-rules` để RunPlan ghim sha256
   - [x] 4.2 RunPlan nháp `he-tray-b.yaml` và `runplan`: cha stage 1 (`Stage1Parent`, ghim thư mục Drive, sha256 trọng số và sha256 manifest của DA-30, để trống tới khi có), bất biến "C của bản 2 với một thay đổi" (`variant_of`), `check` qua ở dạng nháp còn `freeze` và `--launch` từ chối khi chưa đủ ghim; test CPU
   - [x] 4.3 `colab_train --branch B`: chỉ chạy plan B đã đóng băng; lấy VLM từ Drive, kiểm sha256 trọng số, manifest cả thư mục và file không phải trọng số trùng VLM của C; recipe nhận cha stage 1 trong bộ nhớ; runbook Colab (tray.md 18.4); test CPU
-  - [ ] 4.4 `eval_results`: CI bootstrap ghép cặp của hiệu theo mức và McNemar chính xác cho luật 18.2; runbook eval B trên `rtx3060` sau eval C+ (tray.md 18.5); test CPU
+  - [x] 4.4 `eval_results`: CI bootstrap ghép cặp của hiệu theo mức và McNemar chính xác cho luật 18.2; runbook eval B trên `rtx3060` sau eval C+ (tray.md 18.5); test CPU
   - [ ] 4.5 `Decision` nháp cho B (`he-tray-b.decision.json`, cùng dạng `Decision` quy tắc 0), chờ Hiếu ký sau eval
   - [ ] 4.6 Dòng `estimated` trong sổ chi phí: stage 3 B (Colab L4) và eval B (`rtx3060`); stage 1 ở sổ của DA-30
   - [ ] 4.7 Khi DA-30 có checkpoint: điền ghim VLM, bỏ `draft`, đóng băng, ghi id vào `colab_train`; Hiếu launch stage 3 B
