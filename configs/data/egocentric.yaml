@@ -104,6 +104,12 @@ pose_ea:
   vo_min_flow_px: 1.0        # below this median flow, rotation only; giả định
   vo_step_m: 0.005           # translation per frame when moving: monocular VO has no scale; giả định (0.15 m/s)
   max_side_px: 960           # frames are downscaled for MediaPipe and VO
+  clean:
+    # DA-04 task 10 (9/11/2026): `fw egocentric pose --estimates` cleans E-A before it
+    # writes pose.npz (ingest/egocentric/clean.py); E-B is never cleaned. Values from the
+    # offline test on the tray clips, docs/he/stage1.md 2.8 (PR 171).
+    frame: camera            # hands in the camera frame, camera = identity: the VO track
+                             # is not measured (translation is vo_step_m per moving frame)
 
 models:
   # D6: rules first; RoboBrain suggests step boundaries when rules are ambiguous and

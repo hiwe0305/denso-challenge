@@ -3,8 +3,9 @@
 The estimators run in `estimate_job.py` outside the workspace venv (D5): MediaPipe
 Hands for the hand, OpenCV visual odometry for the camera. The lane never imports
 MediaPipe; it reads the `.npz` the job wrote and turns it into an `EgoPose` in the
-same layout as E-B, in the VO's world frame (the first frame's camera), so every
-later tier and DA-18's export read E-A and E-B the same way. CI runs the same math
+same layout as E-B, in the VO's world frame (the first frame's camera) or, from task
+10, in the camera frame with an identity camera, so every later tier and DA-18's
+export read E-A and E-B the same way. CI runs the same math
 with fakes of the two Protocols.
 """
 
@@ -64,14 +65,24 @@ def read_estimate(path: Path) -> Estimate:
         )
 
 
-def to_pose(estimate: Estimate) -> EgoPose:
-    """The E-A `EgoPose`: hands moved from the camera frame to the VO world frame.
+POSE_FRAMES = ("world", "camera")
+
+
+def to_pose(estimate: Estimate, frame: str = "world") -> EgoPose:
+    """The E-A `EgoPose`. `world`: hands moved from the camera frame to the VO world
+    frame. `camera` (task 10, 9/11/2026): hands stay in each frame's camera frame and
+    `camera` is the identity, because the VO track is not a measurement (its translation
+    is a fixed step, its rotation drifts) and moving hands by it put its noise into
+    every delta of DA-18's export (docs/he/stage1.md 2.8).
 
     A hand not found in a frame has NaN wrist and tips and confidence 0; the
     confidence of a found hand is MediaPipe's handedness score.
     """
+    if frame not in POSE_FRAMES:
+        raise ValueError(f"pose frame {frame!r} is not one of {POSE_FRAMES}")
     t = estimate.frames
-    values: dict[str, NDArray[np.float32]] = {"camera": estimate.camera.astype(np.float32)}
+    camera = estimate.camera if frame == "world" else np.repeat(np.eye(4)[None], t, axis=0)
+    values: dict[str, NDArray[np.float32]] = {"camera": camera.astype(np.float32)}
     for side in SIDES:
         wrist = np.full((t, 4, 4), np.nan)
         tips = np.full((t, 5, 3), np.nan)
@@ -79,9 +90,9 @@ def to_pose(estimate: Estimate) -> EgoPose:
             local = estimate.points[side][i]
             if not np.isfinite(local).all():
                 continue
-            world = estimate.camera[i] @ np.vstack([local.T, np.ones(len(local))])
+            world = camera[i] @ np.vstack([local.T, np.ones(len(local))])
             world_points = world[:3].T
-            wrist[i] = estimate.camera[i] @ wrist_frame(local)
+            wrist[i] = camera[i] @ wrist_frame(local)
             tips[i] = world_points[list(TIPS)]
         values[f"{side}_wrist"] = wrist.astype(np.float32)
         values[f"{side}_tips"] = tips.astype(np.float32)
