@@ -191,18 +191,25 @@ def test_a_real_turn_is_not_taken_for_a_flip() -> None:
     assert turned == 0 and np.allclose(fixed, turning)
 
 
-def test_a_mirrored_track_gets_its_sides_sign() -> None:
+@pytest.mark.parametrize("axis", ["x", "y", "z"])
+def test_a_track_locked_pi_off_gets_its_sides_sign(axis: str) -> None:
+    """Review of PR 174: a lock about x or z is undone too, not only one about y."""
     pose = to_pose(estimate(), "camera")
     right, tips = pose.right_wrist.astype(float), pose.right_tips.astype(float)
-    mirrored = right.copy()
-    mirrored[:, :3, :3] = right[:, :3, :3] @ FLIPS[1]  # the whole track the other way
-    fixed, turned = one_sign(mirrored, tips, "right")
-    assert turned and np.allclose(fixed, right)
-    same, turned = one_sign(right, tips, "right")
-    assert not turned and same is right
+    locked = right.copy()
+    locked[:, :3, :3] = right[:, :3, :3] @ FLIPS["xyz".index(axis)]  # the whole track
+    fixed, turn = one_sign(locked, tips, "right")
+    assert turn == axis and np.allclose(fixed, right)
+
+
+def test_a_correct_track_is_left_alone() -> None:
+    pose = to_pose(estimate(), "camera")
+    right, tips = pose.right_wrist.astype(float), pose.right_tips.astype(float)
+    same, turn = one_sign(right, tips, "right")
+    assert turn == "none" and same is right
     # the left hand's chirality is the other one: a correct left track stays
-    left = pose.left_wrist.astype(float)
-    assert not one_sign(left, pose.left_tips.astype(float), "left")[1]
+    assert one_sign(pose.left_wrist.astype(float), pose.left_tips.astype(float),
+                    "left")[1] == "none"
 
 
 def test_clean_pose_reports_what_it_turned() -> None:
@@ -210,7 +217,7 @@ def test_clean_pose_reports_what_it_turned() -> None:
     noisy = pose.right_wrist.copy()
     noisy[5, :3, :3] = noisy[5, :3, :3] @ FLIPS[1].astype(np.float32)
     out, report = clean_pose(replace(pose, right_wrist=noisy), CleanParams("camera", 30.0))
-    assert report["right"] == {"seen_frames": FRAMES, "flipped_frames": 1, "track_turned": False}
+    assert report["right"] == {"seen_frames": FRAMES, "flipped_frames": 1, "track_turn": "none"}
     assert report["left"]["flipped_frames"] == 0
     np.testing.assert_allclose(out.right_wrist, pose.right_wrist, atol=1e-5)
     untouched, _ = clean_pose(replace(pose, right_wrist=noisy), CleanParams("camera"))
@@ -321,7 +328,7 @@ def test_the_repo_cleaning_end_to_end_on_a_noisy_clip() -> None:
     noisy[20, :3, :3] = noisy[20, :3, :3] @ FLIPS[1].astype(np.float32)
     noisy[80, :3, 3] += 0.3
     out, report = clean_pose(replace(pose, left_wrist=noisy), params)
-    assert report["left"] == {"seen_frames": FRAMES, "flipped_frames": 1, "track_turned": False,
+    assert report["left"] == {"seen_frames": FRAMES, "flipped_frames": 1, "track_turn": "none",
                               "interpolated_frames": 2, "smoothed_runs": 1}
     assert np.linalg.norm(out.left_wrist[80, :3, 3] - pose.left_wrist[80, :3, 3]) < 0.005
     assert out.camera.shape == pose.camera.shape and out.frames == pose.frames

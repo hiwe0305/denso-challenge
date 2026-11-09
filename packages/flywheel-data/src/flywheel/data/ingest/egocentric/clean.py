@@ -11,12 +11,18 @@ only these steps together brought it under 5 % (2.8):
               (`estimate_job.wrist_frame`, signs fixed by the landmarks) then turn by
               pi, mostly about y (81 % of 1052 flips on the 153 tray clips). Each frame
               is turned pi about a wrist axis when that brings it more than `flip_deg`
-              closer to the previous seen frame. Then the whole track gets one sign:
-              turned pi about y when most frames have the other hand's chirality
-              (fingertips on the palm side: +z for a right hand, -z for a left one).
-              Forcing that chirality frame by frame was tried and gave more flips
-              (6.4 % of steps instead of 4.9 %): it is a vote over the track, not a rule
-              per frame. A pi turn of the whole track leaves every delta unchanged.
+              closer to the previous seen frame. Then the whole track gets one sign by
+              two votes of its seen frames: fingertips on the palm side (+z for a right
+              hand, -z for a left one) and fingers along +y; the one pi turn (about x,
+              y or z) that satisfies both is applied. Forcing the chirality frame by
+              frame was tried and gave more flips (6.4 % of steps instead of 4.9 %).
+              A pi turn of the whole track leaves every delta unchanged.
+              The tips are points and are not turned: on the tray clips 14.9 % of seen
+              frames keep their fingertips on the wrong side of the cleaned wrist frame
+              (33 % of the frames the cleaning turned, 8 % of the others; median 2.6 cm
+              off the palm plane). Reflecting those tips in depth about the wrist, along
+              the camera ray, was tried and made the export worse (4.0 % of actions
+              clipped instead of 3.5 % with the other steps then in place).
     jumps     a frame whose wrist moved (translation or rotation) from the previous
               frame by more than median + `jump_mad` x MAD of the clip's steps (MAD
               scaled by 1.4826, a standard deviation for normal noise) is replaced:
@@ -49,7 +55,6 @@ from numpy.typing import NDArray
 F64 = NDArray[np.float64]
 # pi about the wrist's x, y, z: R @ FLIP keeps that axis and negates the other two
 FLIPS = (np.diag([1.0, -1.0, -1.0]), np.diag([-1.0, 1.0, -1.0]), np.diag([-1.0, -1.0, 1.0]))
-FLIP_Y = FLIPS[1]
 CHIRALITY = {"left": -1.0, "right": 1.0}  # side of the palm plane the fingertips are on
 
 
@@ -117,15 +122,33 @@ def chirality(wrist: F64, tips: F64) -> F64:
     return out
 
 
-def one_sign(wrist: F64, tips: F64, side: str) -> tuple[F64, bool]:
-    """The track turned pi about y when most seen frames have the other hand's chirality."""
-    votes = chirality(wrist, tips)
+def pointing(wrist: F64, tips: F64) -> F64:
+    """(T,) +1 where the four fingertips are on the +y side of the wrist (y runs from the
+    wrist to the middle knuckle, so a real hand points along +y), -1 else; NaN unseen."""
+    offset = tips[:, 1:] - wrist[:, None, :3, 3]
+    out: F64 = np.sign(np.einsum("tfi,ti->t", offset, wrist[:, :3, 1]) / 4)
+    return out
+
+
+def majority(votes: F64, want: float) -> bool:
+    """True when the seen frames' votes for `want` are at least those against."""
     votes = votes[np.isfinite(votes)]
-    if not len(votes) or np.sum(votes == CHIRALITY[side]) >= np.sum(votes == -CHIRALITY[side]):
-        return wrist, False
+    return bool(np.sum(votes == want) >= np.sum(votes == -want))
+
+
+def one_sign(wrist: F64, tips: F64, side: str) -> tuple[F64, str]:
+    """The whole track turned by the pi turn that gives it its side's chirality (z) and
+    fingers along +y, each by a vote of the seen frames. Returns the track and the turn:
+    "none", "x" (y and z were both wrong), "y" (z only) or "z" (y only)."""
+    z_ok = majority(chirality(wrist, tips), CHIRALITY[side])
+    y_ok = majority(pointing(wrist, tips), 1.0)
+    turn = {(True, True): "none", (False, True): "y", (False, False): "x",
+            (True, False): "z"}[(z_ok, y_ok)]
+    if turn == "none":
+        return wrist, turn
     out = wrist.copy()
-    out[:, :3, :3] = wrist[:, :3, :3] @ FLIP_Y
-    return out, True
+    out[:, :3, :3] = wrist[:, :3, :3] @ FLIPS["xyz".index(turn)]
+    return out, turn
 
 
 def seen_runs(seen: NDArray[np.bool_]) -> list[tuple[int, int]]:
@@ -293,7 +316,7 @@ def clean_pose(pose: EgoPose, params: CleanParams) -> tuple[EgoPose, dict[str, A
             wrist = wrist.copy()
             wrist[:, :3, :3], done["flipped_frames"] = keep_continuous(wrist[:, :3, :3],
                                                                        params.flip_deg)
-            wrist, done["track_turned"] = one_sign(wrist, tips, side)
+            wrist, done["track_turn"] = one_sign(wrist, tips, side)
         if params.jump_mad is not None:
             wrist, tips, done["interpolated_frames"] = interpolate(
                 wrist, tips, jump_frames(wrist, params.jump_mad))
