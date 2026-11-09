@@ -80,6 +80,9 @@ qa:
   # check: threshold and what failing it does. Values are fractions of frames unless
   # named otherwise; a check fails when its value is above the threshold, except
   # min_frames and segment_count (below).
+  # A person's review settles segments (DA-04 task 9, 9/11/2026): when every segment is
+  # `label_source = human`, segment_ambiguous is 0; one human segment whose sentence is
+  # the episode's instruction is a whole-task sample and segment_count needs 1 there.
   min_frames: {threshold: 30, on_fail: reject}                 # 1 s at 30 Hz; giả định
   segment_count: {threshold: 2, on_fail: reject}               # fewer segments than a pick and a place
   video_frames: {threshold: 0, on_fail: reject}                # |frames of the mp4 - frames of the pose|
