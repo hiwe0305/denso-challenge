@@ -65,6 +65,10 @@ class Bundle:
     intrinsic: tuple[tuple[float, float, float], ...]
     image_size: tuple[int, int]  # width, height
     index: int = 0  # episode number inside the task folder
+    # frame of pose.npz: "world" (E-B, E-A before task 10) or "camera" (E-A, camera
+    # = identity: the head trajectory is not measured); how E-A was cleaned (task 10)
+    pose_frame: str = "world"
+    pose_cleaning: dict[str, Any] | None = None
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), indent=2)
