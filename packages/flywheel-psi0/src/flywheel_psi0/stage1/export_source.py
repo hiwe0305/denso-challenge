@@ -179,9 +179,11 @@ def fetch(
     split_dir: str,
     data_class: str | None = None,
 ) -> dict[str, Any]:
-    """Copy `tarball` beside `root`, check it, unpack it into `root` and verify the export.
+    """Copy `tarball` beside `root`, check it, unpack it and verify the export.
 
-    `root` must be missing or empty: an export is never unpacked over another one.
+    `root` must be missing or empty: an export is never unpacked over another one. The
+    tarball is unpacked into `<root>.unverified` and renamed to `root` only once
+    `verify_export` passes, so a refused export never sits where the loader reads.
     """
     if root.exists() and any(root.iterdir()):
         raise ExportRefused([f"{root} is not empty"])
@@ -194,14 +196,24 @@ def fetch(
     if got != want_sha256:
         local.unlink()
         raise ExportRefused([f"{tarball} sha256 {got}, the plan pins {want_sha256}"])
-    root.mkdir(parents=True, exist_ok=True)
-    with tarfile.open(local) as tar:
-        for member in _safe_members(tar):
-            tar.extract(member, root, set_attrs=False, filter="data")
-    local.unlink()
-    problems = verify_export(root, export_id, split_dir, data_class)
-    if problems:
-        raise ExportRefused(problems)
+    staging = root.with_name(f"{root.name}.unverified")
+    shutil.rmtree(staging, ignore_errors=True)
+    staging.mkdir()
+    try:
+        with tarfile.open(local) as tar:
+            for member in _safe_members(tar):
+                tar.extract(member, staging, set_attrs=False, filter="data")
+        problems = verify_export(staging, export_id, split_dir, data_class)
+        if problems:
+            raise ExportRefused(problems)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    finally:
+        local.unlink(missing_ok=True)
+    if root.exists():
+        root.rmdir()  # empty, checked above
+    staging.rename(root)
     meta = json.loads((root / META_FILE).read_text(encoding="utf-8"))
     return {
         "export_id": export_id,
