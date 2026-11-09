@@ -133,3 +133,49 @@ def test_valid_segments_allow_a_gap_but_not_an_overlap() -> None:
     assert not valid_segments((EgoSegment(0, 40, "pick", "a", "rule"),
                                EgoSegment(30, 100, "place", "b", "rule")), 100)
     assert not valid_segments((EgoSegment(5, 5, "pick", "a", "rule"),), 100)
+
+
+WHOLE_TASK = "Pick up the cup and place it on the plate."  # item()'s instruction
+
+
+def human(*segments: EgoSegment) -> tuple[EgoSegment, ...]:
+    return tuple(replace(s, label_source="human") for s in segments)
+
+
+def test_a_person_settles_what_the_rules_left_open(cfg: EgoConfig) -> None:
+    """Task 9: once every segment is human-reviewed, the rules' open events do not count."""
+    report = run_ego_qa(item(segments=human(*SEGMENTS), unresolved_share=0.5), cfg)
+    assert report.decision == "pass"
+    check = next(c for c in report.checks if c.name == "segment_ambiguous")
+    assert check.value == 0.0 and check.passed
+    # one segment a person did not see keeps the rules' share
+    mixed = (SEGMENTS[0], *human(SEGMENTS[1]))
+    assert failed(cfg, segments=mixed, unresolved_share=0.5) == ("flag", ["segment_ambiguous"])
+    # no segment at all is not "every segment human"
+    assert "segment_ambiguous" in failed(cfg, segments=(), unresolved_share=0.5)[1]
+
+
+def test_one_human_segment_with_the_whole_task_sentence_is_a_sample(cfg: EgoConfig) -> None:
+    """Task 9 (Hiếu 9/11/2026): a 2-3 s clip is one sample with the whole-task sentence;
+    a person cut it to the frames to keep, so one segment is enough there."""
+    whole = human(EgoSegment(20, 120, "pick", WHOLE_TASK, "rule"))
+    report = run_ego_qa(item(segments=whole, unresolved_share=1.0), cfg)
+    assert report.decision == "pass" and report.reasons == []
+    count = next(c for c in report.checks if c.name == "segment_count")
+    assert (count.value, count.threshold, count.passed) == (1.0, 1.0, True)
+
+
+@pytest.mark.parametrize("segments", [
+    # EgoDex: a person kept the pick and rejected the place; the place is still lost
+    human(EgoSegment(0, 45, "pick", "pick up the cup", "rule")),
+    # the whole-task sentence, but no person said so
+    (EgoSegment(0, FRAMES, "pick", WHOLE_TASK, "rule"),),
+    (EgoSegment(0, FRAMES, "pick", WHOLE_TASK, "model"),),
+])
+def test_other_single_segments_still_fail_segment_count(
+    cfg: EgoConfig, segments: tuple[EgoSegment, ...]
+) -> None:
+    report = run_ego_qa(item(segments=segments), cfg)
+    assert report.decision == "reject"
+    count = next(c for c in report.checks if c.name == "segment_count")
+    assert (count.value, count.threshold, count.passed) == (1.0, 2.0, False)
