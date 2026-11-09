@@ -40,6 +40,12 @@ Là kỹ sư dữ liệu, tôi muốn video egocentric của người đi qua c�
 - [x] 9. QA tôn trọng phiếu duyệt của người (AC 3, 5; thêm 9/11/2026)
   - [x] 9.1 Đoạn do người duyệt hết thì `segment_ambiguous` = 0; một đoạn người duyệt mang câu cả task là một mẫu, `segment_count` cần 1
   - [x] 9.2 Ghi số QA trên 153 clip khay và 21 clip bị bỏ vì pose vào docs/g0/egocentric.md
+- [ ] 10. Làm sạch pose E-A trước khi xuất stage 1 (AC 4, 5; thêm 9/11/2026; số 9 dùng ở PR 173)
+  - [x] 10.1 Pose E-A trong hệ camera (`camera` đơn vị) khi chưa đo được quỹ đạo đầu; ghi nguồn gốc trong `bundle.json`
+  - [ ] 10.2 Trục cổ tay có dấu xác định theo tay, và bước giữ liên tục (xoay π khi gần khung trước hơn 30°)
+  - [ ] 10.3 Nội suy khung có bước nhảy cổ tay trên trung vị + 5 × MAD của clip; không bỏ khung
+  - [ ] 10.4 Savitzky–Golay bậc 2, cửa sổ 21 khung, trên vị trí cổ tay, đầu ngón và quaternion cổ tay
+  - [ ] 10.5 Chạy lại trên 153 clip khay, xuất stage 1, đo phần action bị cắt (ngưỡng 5 %), ghi vào docs/g0/egocentric.md
 
 ## Phạm vi file
 
@@ -84,6 +90,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 6/11/2026 | Thêm `egocentric_cli.py` vào phạm vi file; ghi chép khi làm | Claude (phiên DA-04), theo phân công của Hiếu |
 | 8/11/2026 | Thêm nhiệm vụ 8: `fw egocentric deid` che mặt bằng YuNet trên máy của đội, để video Hiếu quay ngày 8/11/2026 qua được cổng; trong phạm vi file sẵn có | Claude (phiên DA-04 deid), theo yêu cầu của Hiếu |
 | 9/11/2026 | Thêm nhiệm vụ 9: sau khi Hiếu chốt mỗi clip khay là một mẫu với câu cả task, QA từ chối cả 153 episode vì `segment_count` và `segment_ambiguous` không đọc `label_source = human`; trong phạm vi file sẵn có | Claude (phiên DA-04 QA), theo yêu cầu của phiên điều phối DA-34 nhánh B |
+| 9/11/2026 | Thêm nhiệm vụ 10: làm sạch pose E-A theo đề xuất ở docs/he/stage1.md mục 2.8 (PR 171), vì bản xuất thử của clip khay có 41,6 % action bị cắt ở ±1; trong phạm vi file sẵn có | Claude (phiên DA-04 QA), theo giao việc của Hiếu qua phiên điều phối |
 | 7/11/2026 | Sửa theo review PR 152: miễn che danh tính theo sha256 của video đã ghim, bỏ câu trả lời ở mép cửa sổ, QA `segment_count` và `hand_pose_nan`, endpoint chỉ máy của đội, ghi file trọn vẹn, phiếu duyệt khớp theo đoạn | Claude (phiên DA-04), theo review của Hiếu |
 
 ## Ghi chép khi làm

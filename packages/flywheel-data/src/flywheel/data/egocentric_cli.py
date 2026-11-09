@@ -41,6 +41,7 @@ from flywheel.data.config import store_root
 from flywheel.data.ingest.egocentric import api
 from flywheel.data.ingest.egocentric import review as reviewing
 from flywheel.data.ingest.egocentric import trial as trials
+from flywheel.data.ingest.egocentric.clean import CleanParams
 from flywheel.data.ingest.egocentric.config import EgoConfig, load_config
 from flywheel.data.ingest.egocentric.episodes import (
     COMPARE,
@@ -149,9 +150,11 @@ def pose(
     job_file: Annotated[Path | None, typer.Option("--job", help="write the E-A job manifest")]
     = None,
     estimates: Annotated[Path | None, typer.Option(help="dir of the E-A job's .npz")] = None,
+    config: Config = CONFIG,
     run_plan_id: RunPlan = None,
 ) -> None:
-    """E-B from tracking; or the E-A job manifest; or E-A from the job, compared with E-B."""
+    """E-B from tracking; or the E-A job manifest; or E-A from the job, compared with E-B
+    and cleaned as `pose_ea.clean` of the config says."""
 
     with _refusals():
         source = api.read_source(work)
@@ -162,7 +165,8 @@ def pose(
                 job_file.write_text(json.dumps(jobs, indent=1) + "\n")
                 message = f"E-A job manifest: {len(jobs)} episodes -> {job_file}"
             elif estimates is not None:
-                deviations = api.import_estimates(work, estimates)
+                cleaning = CleanParams.from_config(load_config(config).pose_ea)
+                deviations = api.import_estimates(work, estimates, cleaning)
                 message = f"E-A read for {len(deviations)} episodes with E-B; compare.json"
             else:
                 message = f"E-B pose of {api.write_eb_poses(work)} episodes"

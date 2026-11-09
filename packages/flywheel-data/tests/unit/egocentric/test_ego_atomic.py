@@ -80,7 +80,7 @@ def test_a_comparison_that_raises_writes_no_e_a_file(
         return Deviation()
 
     monkeypatch.setattr(api, "read_estimate", lambda path: Estimate())
-    monkeypatch.setattr(api, "to_pose", lambda estimate: synthetic_pose())
+    monkeypatch.setattr(api, "to_pose", lambda estimate, frame="world": synthetic_pose())
     monkeypatch.setattr(api, "compare", compare)
     before = files(work, "egocentric/*/*")
     with pytest.raises(ValueError, match="frame count"):
