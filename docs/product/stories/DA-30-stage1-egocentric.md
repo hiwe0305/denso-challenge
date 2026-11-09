@@ -30,7 +30,11 @@ Là kỹ sư robot learning, tôi muốn chạy stage 1 của Ψ₀ trên dữ l
   - [x] 1.2 Loader check của Ψ₀ trên dữ liệu thay thế, chỉ CPU ([stage1.md](../../he/stage1.md) mục 1.5)
   - [x] 1.3 Chuẩn bị chạy sau khi Hiếu duyệt CU (4/11/2026): ghi quyết định, bộ canh CU dừng phiên ở trần (dùng chung, PR #108), lệnh `persist` ở trần mềm
   - [ ] 1.4 Chạy trên Colab (Hiếu đã miễn bước che danh tính cho mẫu EgoDex công bố, 4/11/2026); ghi loss, `metrics.jsonl`, dòng `measured` của sổ chi phí
-- [ ] 2. RunPlan fine-tune stage 1 trên video tự quay (AC 2)
+- [ ] 2. RunPlan fine-tune stage 1 trên video tự quay (AC 2): nhánh B của DA-34 (VLM qua stage 1 trên video đội tự quay, rồi stage 3 như nhánh C); Hiếu chốt 4 mặc định ngày 9/11/2026 ([stage1.md](../../he/stage1.md) mục 2)
+  - [ ] 2.1 Nguồn dữ liệu `export` cho `Stage1Plan`: ghim bản export của DA-18 bằng `export_id` và sha256 của tarball; `setup` lấy tarball từ Google Drive, kiểm sha256, `export_id`, sha256 từng file trong `meta.json` và `layout_problems`, từ chối khi lệch; nguồn này chỉ nhận `identity_masked: true`; lệnh `pack` đóng tarball; test CPU
+  - [ ] 2.2 `persist` lưu cả checkpoint VLM (trọng số, kèm config và tokenizer của checkpoint cha) lên Drive với sha256, kiểm header safetensors khớp cha; trả lời Q-28C (stage 3 nạp được VLM của stage 1 cùng action header `postpre.*` gốc) bằng dẫn chứng file:dòng ở `cda3fdf`; test CPU
+  - [ ] 2.3 RunPlan `tray-ego-b.yaml`: cha là VLM của nhánh C, stats chuẩn hóa, số bước, checkpoint, val, tiêu chí chốt trước, trần 4 CU; `runplan check` qua; `setup` ghi độ phủ stats
+  - [ ] 2.4 `stage1.md` mục 2, dòng `estimated` của sổ chi phí, lệnh chạy cho Hiếu
 - [ ] 3. Fine-tune, probe, closed-loop, báo cáo (AC 2, 3)
 
 ## Phạm vi file
