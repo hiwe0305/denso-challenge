@@ -17,6 +17,12 @@ only these steps together brought it under 5 % (2.8):
               Forcing that chirality frame by frame was tried and gave more flips
               (6.4 % of steps instead of 4.9 %): it is a vote over the track, not a rule
               per frame. A pi turn of the whole track leaves every delta unchanged.
+    jumps     a frame whose wrist moved (translation or rotation) from the previous
+              frame by more than median + `jump_mad` x MAD of the clip's steps (MAD
+              scaled by 1.4826, a standard deviation for normal noise) is replaced:
+              position and tips linearly, rotation by slerp, between the nearest good
+              frames of the same run of seen frames. A run edge holds the nearest good
+              frame. Never dropped.
 
 Parameters are `pose_ea.clean` of `configs/data/egocentric.yaml`. E-B (EgoDex tracking)
 is never cleaned. Frames are never dropped or added: DA-18 reads the video and the pose
@@ -45,6 +51,7 @@ CHIRALITY = {"left": -1.0, "right": 1.0}  # side of the palm plane the fingertip
 class CleanParams:
     frame: str = "world"
     flip_deg: float | None = None  # None: no continuity guard, no track sign
+    jump_mad: float | None = None  # None: no jump interpolation
 
     def __post_init__(self) -> None:
         if self.frame not in POSE_FRAMES:
@@ -109,6 +116,105 @@ def one_sign(wrist: F64, tips: F64, side: str) -> tuple[F64, bool]:
     return out, True
 
 
+def seen_runs(seen: NDArray[np.bool_]) -> list[tuple[int, int]]:
+    """Half-open [start, stop) of each run of consecutive seen frames."""
+    edges = np.diff(np.r_[0, seen.astype(np.int8), 0])
+    return list(zip(np.flatnonzero(edges == 1).tolist(), np.flatnonzero(edges == -1).tolist()))
+
+
+def to_quaternion(rotations: F64) -> F64:
+    """(T, 3, 3) rotations to (T, 4) unit quaternions w, x, y, z (Shepperd's method)."""
+    m = rotations
+    trace = np.trace(m, axis1=-2, axis2=-1)
+    candidates = np.stack([trace, m[:, 0, 0], m[:, 1, 1], m[:, 2, 2]], axis=1)
+    choice = np.argmax(candidates, axis=1)
+    q = np.empty((len(m), 4))
+    for i, (r, k) in enumerate(zip(m, choice)):
+        if k == 0:
+            w = np.sqrt(max(1.0 + trace[i], 0.0)) / 2
+            q[i] = [w, (r[2, 1] - r[1, 2]) / (4 * w), (r[0, 2] - r[2, 0]) / (4 * w),
+                    (r[1, 0] - r[0, 1]) / (4 * w)]
+        else:
+            a = k - 1
+            b, c = (a + 1) % 3, (a + 2) % 3
+            v = np.sqrt(max(1.0 + r[a, a] - r[b, b] - r[c, c], 0.0)) / 2
+            q[i, 0] = (r[c, b] - r[b, c]) / (4 * v)
+            q[i, 1 + a] = v
+            q[i, 1 + b] = (r[b, a] + r[a, b]) / (4 * v)
+            q[i, 1 + c] = (r[c, a] + r[a, c]) / (4 * v)
+    out: F64 = q / np.linalg.norm(q, axis=1, keepdims=True)
+    return out
+
+
+def to_rotation(q: F64) -> F64:
+    """(T, 4) quaternions w, x, y, z (normalized here) to (T, 3, 3) rotations."""
+    w, x, y, z = (q / np.linalg.norm(q, axis=1, keepdims=True)).T
+    out: F64 = np.stack([
+        np.stack([1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)], -1),
+        np.stack([2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)], -1),
+        np.stack([2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)], -1),
+    ], axis=1)
+    return out
+
+
+def slerp(a: F64, b: F64, u: float) -> F64:
+    """Unit quaternion between `a` (u = 0) and `b` (u = 1) on the shorter arc."""
+    if np.dot(a, b) < 0:
+        b = -b
+    cos = float(np.clip(np.dot(a, b), -1.0, 1.0))
+    if cos > 1 - 1e-9:
+        out: F64 = (1 - u) * a + u * b
+    else:
+        theta = np.arccos(cos)
+        out = (np.sin((1 - u) * theta) * a + np.sin(u * theta) * b) / np.sin(theta)
+    return out / np.linalg.norm(out)
+
+
+def jump_frames(wrist: F64, k: float) -> NDArray[np.bool_]:
+    """(T,) True where the step from the previous frame, both seen, is above median +
+    k x 1.4826 x MAD of the clip's steps, in translation or in rotation."""
+    seen = finite_frames(wrist)
+    steps = np.flatnonzero(seen[1:] & seen[:-1]) + 1  # frame t with t - 1 seen
+    bad = np.zeros(len(wrist), dtype=bool)
+    if len(steps) < 3:
+        return bad
+    moved = np.linalg.norm(wrist[steps, :3, 3] - wrist[steps - 1, :3, 3], axis=1)
+    turned = angle(wrist[steps, :3, :3], wrist[steps - 1, :3, :3])
+    for size in (moved, turned):
+        median = np.median(size)
+        mad = 1.4826 * np.median(np.abs(size - median)) + 1e-9
+        bad[steps[size > median + k * mad]] = True
+    return bad
+
+
+def interpolate(wrist: F64, tips: F64, bad: NDArray[np.bool_]) -> tuple[F64, F64, int]:
+    """Bad frames rebuilt from the nearest good frames of their run; edges hold."""
+    wrist, tips = wrist.copy(), tips.copy()
+    done = 0
+    for start, stop in seen_runs(finite_frames(wrist)):
+        frames = np.arange(start, stop)
+        good = frames[~bad[start:stop]]
+        fix = frames[bad[start:stop]]
+        if len(good) < 2 or not len(fix):
+            continue
+        for column in range(3):
+            wrist[fix, column, 3] = np.interp(fix, good, wrist[good, column, 3])
+        flat = tips.reshape(len(tips), -1)
+        for column in range(flat.shape[1]):
+            flat[fix, column] = np.interp(fix, good, flat[good, column])
+        quats = to_quaternion(wrist[good, :3, :3])
+        for t in fix:
+            after = int(np.searchsorted(good, t))
+            if after == 0 or after == len(good):  # before the first or after the last
+                q = quats[0 if after == 0 else -1]
+            else:
+                a, b = good[after - 1], good[after]
+                q = slerp(quats[after - 1], quats[after], (t - a) / (b - a))
+            wrist[t, :3, :3] = to_rotation(q[None])[0]
+        done += len(fix)
+    return wrist, tips, done
+
+
 def clean_pose(pose: EgoPose, params: CleanParams) -> tuple[EgoPose, dict[str, Any]]:
     """The cleaned pose and what was done, for `bundle.json` `pose_cleaning`."""
     values = {name: np.asarray(getattr(pose, name), np.float64) for name in (
@@ -122,6 +228,9 @@ def clean_pose(pose: EgoPose, params: CleanParams) -> tuple[EgoPose, dict[str, A
             wrist[:, :3, :3], done["flipped_frames"] = keep_continuous(wrist[:, :3, :3],
                                                                        params.flip_deg)
             wrist, done["track_turned"] = one_sign(wrist, tips, side)
+        if params.jump_mad is not None:
+            wrist, tips, done["interpolated_frames"] = interpolate(
+                wrist, tips, jump_frames(wrist, params.jump_mad))
         values[f"{side}_wrist"], values[f"{side}_tips"] = wrist, tips
         report[side] = done
     cleaned = replace(pose, **{k: v.astype(np.float32) for k, v in values.items()})
