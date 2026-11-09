@@ -169,6 +169,10 @@ class Stage1Plan(_Frozen):
     overrides: dict[str, ArgValue]
     compute: Compute
     criteria: Criteria
+    # `persist` also keeps the trained VLM in the layout stage 3 loads
+    # (`flywheel_psi0.stage1.vlm_checkpoint`). Unset (not False) when not wanted, so
+    # plans written before the field keep their run_plan_id.
+    persist_vlm: bool | None = None
 
     @classmethod
     def load(cls, path: Path) -> Stage1Plan:

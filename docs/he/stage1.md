@@ -192,3 +192,60 @@ Giả định, chưa đo. Một VM L4 ở 1,94 CU/giờ (S1-04). **Hơn một n�
 Quy tắc dừng [Đề xuất]: đọc s/bước trong `train.log` sau 20 bước; quá 20 s thì dừng VM và báo Hiếu trước khi chạy tiếp, trước khi bộ canh tự dừng ở khoảng 24 s (dưới đây). Bộ canh CU (mục 1.6) là chốt chặn cuối: phiên tự dừng trước 4 CU dù không ai đọc log. Biên của bộ canh là 430 s, khoảng 0,23 CU ở L4, nên phiên dừng ở khoảng 3,77 CU, tức khoảng 117 phút. Trừ 38 phút cố định, còn khoảng 79 phút train, tức khi s/bước vượt khoảng 24 s.
 
 **Lần chạy 2 [Ước lượng, 4/11/2026].** Khoảng 2,0 CU, khoảng 62 phút ([sổ chi phí](../g0/ledger/DA-30.csv), dòng `job_da30_stage1_short_run2`). Phần cố định dùng số đo của lần chạy 1 (mục 1.7): chuẩn bị VM khoảng 3 phút, môi trường 3,1 phút, mẫu EgoDex 4,5 phút. Phần còn lại là giả định: pre-flight khoảng 2 phút, nạp model và khởi tạo ZeRO-3 offload khoảng 5 phút, 200 bước ở 9 s/bước khoảng 30 phút, checkpoint 4 phút, chạy lại 3 bước 7 phút, persist và tải về 3 phút. Với `--cap 3.5`, watcher dừng ở khoảng 3,27 CU (khoảng 101 phút) và chạy `persist` ở khoảng 2,95 CU (600 s trước mốc dừng, sớm hơn 90% trần). Trừ khoảng 32 phút cố định, còn khoảng 69 phút train, tức phiên tự dừng khi s/bước vượt khoảng 21 s. Quy tắc dừng tay ở 20 s/bước giữ nguyên.
+
+## 2. Nhánh B của DA-34: stage 1 trên video đội tự quay (AC 2)
+
+_Soạn 9/11/2026, chưa chạy._ Nhánh B của thí nghiệm khay ([tray.md](tray.md) mục 4) giống hệt nhánh C, chỉ khác VLM: trước stage 3, VLM của C được fine-tune stage 1 trên video egocentric đội tự quay (người cầm hộp đỏ đi giữa hai bàn). So B với C trả lời câu hỏi "video người + demo robot" có hơn "chỉ demo robot" không. Ở Ψ₀, dữ liệu egocentric chỉ vào stage 1 (48 chiều tay và video), không bao giờ vào stage 3.
+
+Lần chạy này cũng là **lần đầu stage 1 chạy hết đường đi** trong dự án: lần 1 của mục 1 hỏng trước bước train đầu (mục 1.7), lần 2 chưa chạy.
+
+### 2.1 Quyết định
+
+**[Đã chốt 9/11/2026, Hiếu]** "Chốt 4 mặc định":
+
+1. VLM cha là VLM của nhánh C: `psi0/pre.fast.1by1.2601091803.ckpt.ego200k.he30k/model.safetensors` ở revision và sha256 ghim trong [`he-tray-v2.yaml`](../../configs/runplans/tray/he-tray-v2.yaml), không phải `ego390k` của mục 1. Như vậy B khác C đúng một bước stage 1.
+2. Mỗi clip là một mẫu, mang câu mô tả cả task (như một episode EgoDex).
+3. Dữ liệu: 153 clip của đội (480p, hộp đỏ, hai bàn đặt lưng nhau), 30 fps, mặt đã làm mờ bằng `fw egocentric deid`; `data_class` `public` theo PR #170 (chờ merge). Bỏ 8 clip 1080p vì thấy bảng tên.
+4. Khoảng 300 bước train; trần cứng 4 CU (`compute.max_compute_units`), cùng bộ canh CU như mục 1.6.
+
+### 2.2 Dữ liệu: bản export ghim bằng `export_id` và tarball
+
+RunPlan của B không tải mẫu EgoDex mà nhận bản export của DA-18 (`flywheel.data.export.egodex.export_stage1`): `part1/<task>/<i>.hdf5` và `.mp4`, `egodex_stat.json`, `meta.json` có `export_id` và sha256 của từng file. Khối `dataset` có `kind: export` ([`runplan.py`](../../packages/flywheel-psi0/src/flywheel_psi0/stage1/runplan.py), `ExportDataset`):
+
+- Ghim bằng `export_id` (định danh theo nội dung, do export tính từ sha256 các file) và sha256 của **một tarball** do `python -m flywheel_psi0.stage1.export_source pack` ghi. Tarball chỉ phụ thuộc nội dung file (thứ tự cố định, mtime 0, không chủ sở hữu), nên cùng một export luôn cho cùng sha256.
+- Tarball nằm trên Google Drive, dưới `/content/drive/MyDrive/<source.tarball>`. Vì vậy với B, **Drive phải mount trước `setup`**, không phải sau như mục 1.6.
+- `setup` chép tarball sang đĩa VM, từ chối nếu sha256 khác plan, giải nén chỉ file thường và thư mục (bộ lọc `data` của `tarfile`), rồi từ chối bản export nếu một trong các điều sau sai ([`export_source.py`](../../packages/flywheel-psi0/src/flywheel_psi0/stage1/export_source.py)): `export_id` trong `meta.json` đúng plan và đúng giá trị mà danh sách file băm ra; mỗi file khớp sha256 trong `meta.json`; không có file nào ngoài danh sách (loader của Ψ₀ sẽ train cả file thừa); `data_class` khớp plan; nguồn không có miễn trừ che danh tính; số mẫu khớp plan; `layout_problems` rỗng.
+- Bản export đã có `actions_48d` (DA-18 ghi), nên không chạy script `precompute` của tác giả.
+- Che danh tính: nguồn `export` chỉ nạp được khi `identity_masked: true`. Miễn trừ ngày 4/11/2026 chỉ áp cho zip EgoDex của Apple (mục 1.4), không áp cho bản export, kể cả export của EgoDex. Test: `test_an_export_must_be_identity_masked`.
+- `setup` giờ cũng kiểm sha256 của trọng số cha sau khi tải, cho mọi plan.
+
+Bản export thật chưa có: phiên điều phối dữ liệu sẽ đưa đường dẫn và sha256. Đến lúc đó RunPlan `tray-ego-b.yaml` chưa đóng băng được (mục 2.4).
+
+### 2.3 Checkpoint stage 1 có nạp được vào stage 3 không (Q-28C)
+
+Câu hỏi Q-28C của [design 28/10/2026](../superpowers/specs/2026-10-28-tray-transfer-he-design.md): mã Ψ₀ có cho ghép VLM đã fine-tune stage 1 với action header `postpre.*` gốc không. **Trả lời: có, nhưng thư mục checkpoint của stage 1 phải được đóng gói lại trước.** Dẫn chứng ở `cda3fdf`:
+
+| Điểm | Mã Ψ₀ | Hệ quả |
+|---|---|---|
+| Stage 1 lưu gì | `trainers/pretrain.py:441-447`: `accelerator.save_model(self.model, ckpt_dir)`, rồi `trainer.py:428-463` gọi `accelerator.save_state(ckpt_dir)` | Thư mục `ckpt_<bước>` có `model.safetensors` (chỉ trọng số Qwen3-VL) và trạng thái DeepSpeed (`pytorch_model/`, optimizer khoảng 25 GB). Không có `config.json`, không có file tokenizer hay processor |
+| Trọng số có gom đủ không | `zero3_offload.json` của repo đặt `gather_16bit_weights_on_model_save: true`; `accelerate` 1.7.0 `accelerator.py:3604` đọc cờ này từ engine và chỉ điền khóa này khi là `"auto"` (`utils/dataclasses.py:1275-1290`) | ZeRO-3 gom trọng số bf16 vào một file. `zero3.json` của tác giả cũng bật cờ này, và file `model.safetensors` của các checkpoint `pre.*` công bố có đúng dạng đó (625 tensor, `model.language_model.embed_tokens.weight` 153792 × 2048, không có `lm_head`, metadata `{"format": "pt"}`) |
+| Stage 3 đọc VLM thế nào | `trainers/finetune.py:266-288`: `Qwen3VLForConditionalGeneration.from_pretrained(model_name_or_path)` và `AutoProcessor.from_pretrained(model_name_or_path)` | Cần một thư mục có cả trọng số, `config.json` và file processor |
+| `vlm_ckpt_step` | Chỉ khai báo ở `config/model_psi0.py:119`; không chỗ nào trong `src/` hay `scripts/` đọc nó | Không dùng được để trỏ vào bước checkpoint; chỉ dùng `model_name_or_path` |
+| Action header | `trainers/finetune.py:333-337`: nạp `{pretrained_action_header_path}/action_header.safetensors`, độc lập với VLM | Ghép VLM mới với `postpre.1by1.pad36.2601131206.ckpt.he30k` gốc được, như nhánh C |
+| Kích thước vocab | `pretrain.py:63-72` đổi cỡ embedding về `len(tokenizer) + 2048`, làm tròn lên bội của 192. `config.json` của cha đã là 153792 = 151669 + 2048 làm tròn | Trên cha đã đổi cỡ, bước này không đổi gì; `config.json` của cha đúng cho checkpoint mới |
+| VLM trong stage 3 | `configs/models/psi0-stage3.yaml`: `model.no-tune-vlm: true` | VLM của B giữ nguyên trong stage 3; chỉ action header học tiếp |
+
+Cách làm ([`vlm_checkpoint.py`](../../packages/flywheel-psi0/src/flywheel_psi0/stage1/vlm_checkpoint.py)): khi RunPlan đặt `persist_vlm: true`, `persist` chép `model.safetensors` của checkpoint cuối, cùng mọi file khác của thư mục cha (`config.json`, `generation_config.json`, tokenizer, processor), vào `<Drive>/denso/da30/<job_id>/vlm/`. Nó so header safetensors với file của cha (cùng tên, cỡ, kiểu tensor) và ghi `vlm.json` (sha256 từng file, bước, `run_plan_id`, cha). Log và `metrics.jsonl` được chép trước trọng số, nên còn lại nếu phiên dừng giữa lúc chép. Sau đó pha `check-vlm`, trong môi trường Ψ₀, nạp bản trên Drive đúng như stage 3 (`from_pretrained` và `AutoProcessor`) và dừng nếu: sha256 khác `vlm.json`, transformers báo thiếu hay thừa khóa, embedding nạp vào khác giá trị trong file (tức bị khởi tạo lại), `lm_head` không buộc vào embedding, hoặc 2048 token FAST không vừa vocab. Nhánh B của stage 3 đặt `model_name_or_path` vào thư mục `vlm/` này (sau khi kiểm sha256), giữ `pretrained_action_header_path` của C.
+
+**Thử trên CPU, 9/11/2026** (môi trường Ψ₀ của laptop: transformers 4.57.1, accelerate 1.7.0, `DS_ACCELERATOR=cpu`). Một Qwen3-VL nhỏ dựng từ `config.json` của cha (2 lớp, vocab 153792 như cha), đổi cỡ embedding như `pretrain.py`, lưu bằng `Accelerator.save_model` như `pretrain.py:446`, file tokenizer và processor tải từ thư mục cha trên Hugging Face:
+
+| Bước | Kết quả |
+|---|---|
+| `save_model` ghi gì | chỉ `model.safetensors`; tên tensor cùng dạng file của cha (`model.language_model.*`, `model.visual.*`, không `lm_head`) |
+| `from_pretrained` trên thư mục checkpoint như đã lưu | lỗi (không có `config.json`) |
+| `package`, rồi `load_check` | không vấn đề nào: vocab 153792, tokenizer 151669, không thiếu hay thừa khóa, `lm_head` buộc vào embedding |
+| Mọi tensor nạp lại so với model đã lưu | bằng nhau |
+
+Phần chưa thử: bước gom ZeRO-3 trên GPU (dựa vào cờ ở trên và dạng file của cha) và nạp model thật 2,1 tỉ tham số. `check-vlm` trên Colab làm phần đó, ngay sau lần chạy.
+
+Một điều cần ghi cạnh kết quả của B: action header `postpre.*` được train (stage 2 của tác giả) trên đặc trưng của VLM cha. Sau 300 bước stage 1, đặc trưng của VLM lệch đi một chút, và stage 3 khởi đầu header từ chỗ lệch đó; stage 3 train header đủ lâu để thích nghi, nhưng đây là khác biệt thứ hai giữa B và C ngoài "VLM đã thấy video". Chạy lại stage 2 thì loại được khác biệt này, nhưng không nằm trong kế hoạch.
