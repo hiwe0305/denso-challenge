@@ -37,6 +37,7 @@ from flywheel.eval.api import (
     DEFAULT_SYSTEM_CONFIG,
     DEFAULT_TRAIN_CONFIG,
     SCORER_CONFIG_DIR,
+    calibrate_tau,
     check_scorer_agreement,
     diagnose_episode_system,
     diagnose_train,
@@ -44,9 +45,10 @@ from flywheel.eval.api import (
     store_score,
     store_scorer_agreement,
     store_system_diagnosis,
+    store_tau,
     store_train_diagnosis,
 )
-from flywheel.eval.config import ConfigError
+from flywheel.eval.config import ConfigError, load_system_thresholds
 from flywheel.eval.diagnosis.system.artifact import SystemDiagnosisRecord, SystemFindingRecord
 from flywheel.eval.diagnosis.system.reader import (
     CAMERA_NAME,
@@ -61,6 +63,7 @@ from flywheel.eval.scorer.calibration import CalibrationInputError
 from flywheel.eval.scorer.reader import TraceError
 from flywheel.eval.scorer.score import EpisodeScore
 from flywheel.eval.scorer.status import ScorerError, StepStatus
+from flywheel.eval.scorer.tau import FEW_SAMPLES, TauError, TauReport
 
 app = typer.Typer()
 
@@ -169,6 +172,74 @@ def diag_system(
         typer.echo(f"kiểm được nhưng không ghi được vào `{store}`: {error}", err=True)
         raise typer.Exit(code=2) from error
     typer.echo(f"ghi vào: {written}")
+
+
+@app.command("tau")
+def tau(
+    teleop: list[Path] = typer.Option(
+        ...,
+        "--teleop",
+        help="Thư mục trace `<trace_id>/` (dạng DA-38) hoặc thư mục cha của chúng; lặp được.",
+    ),
+    demos: bool = typer.Option(
+        False,
+        "--demos",
+        help="Khai các episode không có cờ SIMPLE là demo teleop thành công.",
+    ),
+    config: Path = typer.Option(
+        DEFAULT_SYSTEM_CONFIG,
+        "--config",
+        help="`system.yaml` để in giá trị đang dùng bên cạnh; không sửa file.",
+    ),
+    store: Path | None = typer.Option(
+        None, "--store", help="Thư mục store để lưu báo cáo. Không có thì không ghi gì."
+    ),
+) -> None:
+    """Hiệu chỉnh τ_track bằng phân vị 99 trên episode thành công (DA-37 AC 4)."""
+    use_utf8()
+    try:
+        report = calibrate_tau(teleop, demos)
+        current = _current_taus(config)
+    except (SystemReaderError, TauError, ConfigError) as error:
+        typer.echo(f"không hiệu chỉnh được: {error}", err=True)
+        raise typer.Exit(code=2) from error
+    _print_tau(report, current)
+    if store is None:
+        return
+    try:
+        digest, index = store_tau(report, store)
+    except OSError as error:
+        typer.echo(f"hiệu chỉnh được nhưng không ghi được vào `{store}`: {error}", err=True)
+        raise typer.Exit(code=2) from error
+    typer.echo(f"report_sha256: {digest}")
+    typer.echo(f"ghi vào: {index}")
+
+
+def _current_taus(config: Path) -> dict[str, float]:
+    thresholds, _ = load_system_thresholds(config)
+    return {
+        "tau_track_upper": thresholds.r3.tau_track_upper,
+        "tau_track_lower": thresholds.r3.tau_track_lower,
+    }
+
+
+def _print_tau(report: TauReport, current: dict[str, float]) -> None:
+    sources = sorted({episode.success for episode in report.episodes})
+    typer.echo(f"episode dùng: {len(report.episodes)} ({', '.join(sources)})")
+    for item in report.values:
+        value = "chưa có (không có mẫu nào)" if item.value is None else f"{item.value:.6g}"
+        typer.echo(
+            f"{item.key}: {value} {item.unit}; phân vị {item.percentile:g} trên "
+            f"{item.samples} mẫu từ {item.episodes} episode"
+            f" (bỏ {item.skipped_cycles} chu kỳ thiếu tín hiệu); đang dùng {current[item.key]:g}"
+        )
+        if item.few_samples:
+            typer.echo(
+                f"  ít mẫu (dưới {FEW_SAMPLES}): phân vị {item.percentile:g} "
+                "gần bằng giá trị lớn nhất"
+            )
+    for left in report.left_out:
+        typer.echo(f"không dùng {left.trace_id}: {left.reason}")
 
 
 @app.command("score")
