@@ -240,7 +240,8 @@ def import_estimates(work: Path, estimates: Path, cleaning: CleanParams | None =
     compare.json where E-B exists. Returns the deviations by episode.
 
     `cleaning` (`pose_ea.clean` of the config; task 10) sets the frame of the pose and
-    cleans it (`clean.py`); `bundle.json` records both. compare.json compares the raw
+    cleans it (`clean.py`); `bundle.json` records both, or for an episode with E-B, whose
+    bundle describes E-B, `compare.json` `pose_ea` does. compare.json compares the raw
     estimate, so cleaning does not change it. E-B is never touched.
 
     Every estimate is read and compared before any file is written, so a bad one leaves
@@ -264,6 +265,8 @@ def import_estimates(work: Path, estimates: Path, cleaning: CleanParams | None =
             deviation = compare(load_pose(folder / POSE), estimate, _intrinsic(bundle),
                                 bundle.image_size).to_dict()
             deviation["meta"] = estimate.meta
+            # pose_ea.npz of a tracked episode follows the config too; trial.py reads it
+            deviation["pose_ea"] = {"frame": cleaning.frame, "cleaning": done_cleaning}
             deviations[episode.episode_id] = deviation
         done.append((bundle, folder, pose, deviation, done_cleaning))
     for bundle, folder, pose, deviation, done_cleaning in done:

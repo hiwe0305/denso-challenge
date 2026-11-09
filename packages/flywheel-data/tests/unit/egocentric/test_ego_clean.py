@@ -160,6 +160,11 @@ def test_eb_is_never_cleaned(tmp_path: Path, store: Path, cfg: EgoConfig) -> Non
     api.import_estimates(work, estimates, CleanParams(frame="camera"))
     assert ((folder / POSE).read_bytes(), (folder / "bundle.json").read_bytes()) == before
     assert (folder / POSE_EA).is_file()
+    # what pose_ea.npz is, where an episode with E-B can say it (review of PR 174)
+    recorded = json.loads((folder / "compare.json").read_text())["pose_ea"]
+    assert recorded["frame"] == "camera" and recorded["cleaning"]["params"]["frame"] == "camera"
+    np.testing.assert_allclose(load_pose(folder / POSE_EA).camera,
+                               np.repeat(np.eye(4)[None], frames, 0))
 
 
 def test_the_test_hands_have_their_sides_chirality() -> None:
