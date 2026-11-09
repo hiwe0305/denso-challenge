@@ -46,6 +46,12 @@ from flywheel.eval.scorer.artifact import build_record, write_record
 from flywheel.eval.scorer.calibration import read_rollouts, read_scores, store_report
 from flywheel.eval.scorer.reader import read_trace
 from flywheel.eval.scorer.score import EpisodeScore, score_episode
+from flywheel.eval.scorer.tau import (
+    TauReport,
+    calibrate_teleop,
+    read_candidates,
+    store_tau_report,
+)
 
 DEFAULT_TRAIN_CONFIG = Path("configs") / "eval" / "diagnosis" / "train.yaml"
 DEFAULT_SYSTEM_CONFIG = Path("configs") / "eval" / "diagnosis" / "system.yaml"
@@ -223,3 +229,28 @@ def store_train_diagnosis(diagnosis: TrainDiagnosis, store_path: Path) -> Path:
     or removed, only followed.
     """
     return write_artifact(diagnosis, store_path)
+
+
+def calibrate_tau(teleop_paths: list[Path], declared_demos: bool = False) -> TauReport:
+    """τ_track of each half of the body from successful episodes (DA-37 AC 4).
+
+    `teleop_paths` are trace directories `<trace_id>/` (DA-38's layout) or
+    directories above them. An episode counts when its `rollout_result.json`
+    says `infra_status` ok and `sim_success` true; teleop demonstrations,
+    which have no SIMPLE flag, count only with `declared_demos`. Nothing is
+    written; `system.yaml` keeps its values until a person carries them over
+    (AC 5).
+
+    Raises `ReaderError` on a trace that does not parse and `TauError` on a
+    set with no successful episode, or with one trace in two versions.
+    """
+    return calibrate_teleop(read_candidates(teleop_paths), declared_demos)
+
+
+def store_tau(report: TauReport, store_path: Path) -> tuple[str, Path]:
+    """Store the calibration through `flywheel.store`; return its hash and the list it joined.
+
+    The bytes go in the blob store, so the hash is the report; one line naming
+    it is appended to `<store>/scorer/tau.jsonl` (03 section 4.4, rule 3).
+    """
+    return store_tau_report(report, store_path)

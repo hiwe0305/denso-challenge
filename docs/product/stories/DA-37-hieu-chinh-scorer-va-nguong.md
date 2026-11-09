@@ -30,7 +30,7 @@ Là kỹ sư đánh giá, tôi muốn đối chiếu scorer với cờ thành c�
 
 - [x] 1. Lệnh đối chiếu scorer với cờ SIMPLE trên một tập episode, báo cáo lệch (AC 1, 2)
 - [ ] 2. Lưu nhãn xác nhận của kỹ sư vào catalog (AC 3)
-- [ ] 3. Tính τ_track thân trên và thân dưới theo phân vị 99, kèm số mẫu (AC 4)
+- [x] 3. Tính τ_track thân trên và thân dưới theo phân vị 99, kèm số mẫu (AC 4)
 - [ ] 4. Tính τ_sync và ghi τ_lat của G0, kèm số mẫu (AC 4)
 - [ ] 5. Ghi giá trị vào `system.yaml` và RunPlan, bỏ `null` (AC 5)
 - [ ] 6. Test chạy lại cho kết quả trùng trên bộ episode nhỏ (AC 6)
@@ -82,7 +82,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực: nhiệm vụ 1: 1h, cộng 1h sửa theo review #158 lần đầu, 1h theo lần hai; nhiệm vụ 6.1: 1h.
+- Giờ thực: nhiệm vụ 1: 1h, cộng 1h sửa theo review #158 lần đầu, 1h theo lần hai; nhiệm vụ 6.1: 1h; nhiệm vụ 3: 1.5h.
 - Công cụ AI đã dùng: Claude Code.
 - Ghi chú hoàn thành:
   - 7/11/2026, nhiệm vụ 1: `fw eval agree --scores <score.jsonl> --rollouts <thư mục eval> --release <release> [--store <store>]`. Phần thuần ở `scorer/agreement.py` (`compare`), phần đọc ghi ở `scorer/calibration.py`. Score ghép với `RolloutResult` theo `trace_ref.trace_id`, nên lúc chấm phải gọi `fw eval score --episode-id <trace_id>`: tên `episode_N` của SIMPLE đếm lại ở mỗi lượt eval nên không ghép được. Score hay rollout không có cặp được liệt kê trong báo cáo, không bị bỏ.
@@ -92,4 +92,8 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
   - Review #158 (Hiếu, 7/11/2026) đồng ý bốn điểm trên và đòi sửa hai chỗ, đã sửa: (1) `passed` chỉ có giá trị trên bộ G1 xét được, tức ít nhất 100 episode tính được và có cả SIMPLE đạt lẫn trượt; ngoài ra `passed` là `None` và `unjudged` nêu lý do (`no_episodes`, `not_enough_episodes`, `no_sim_success`, `no_sim_failure`), `agreement` vẫn tính. (2) Rollout không có `trace_ref` (simulator chết trước khi ghi trace) được liệt kê ở `untraced_rollouts` theo `job_id`, kèm `infra_status`, không bị bỏ im lặng.
   - Review #158 lần hai (tại `a062d47`, 8/11/2026), hai chỗ nên sửa, đã sửa 9/11/2026: (1) `score.jsonl` chỉ ghi thêm, nên episode chấm lại có nhiều `Score`; nay chọn scorer bằng `--task-id`, `--scorer-version`, `--config-sha256` (`ScorerKey`), `Score` của scorer khác bị bỏ trước khi ghép. Không chọn mà file có hai scorer thì vẫn từ chối, kèm danh sách scorer và tên cờ; chọn mà không khớp `Score` nào cũng từ chối và nêu file có gì. (2) Không `Score` nào ghép được với rollout nào (ví dụ chấm bằng `episode_N` của SIMPLE) thì từ chối, thoát 2, không lưu báo cáo; thông báo nêu vài id mỗi bên và cách chấm đúng (`--episode-id <trace_id>`). Có ít nhất một cặp thì vẫn ra báo cáo như cũ, kể cả khi mọi cặp bị loại vì lỗi hạ tầng (`no_episodes`).
   - Chưa chạy trên dữ liệu thật: eval tray hiện ghi `scorer_steps` của vị từ SIMPLE trong dòng outcome, chưa có trace tín hiệu cho scorer của làn đọc. 100 episode thật vẫn chờ (Chỗ cần quyết, điểm 2).
-- File đã tạo hoặc sửa: `packages/flywheel-eval/src/flywheel/eval/scorer/agreement.py`, `scorer/calibration.py`, `api.py`, `cli.py`; `packages/flywheel-eval/tests/unit/scorer/test_agreement.py`, `test_agreement_rerun.py`.
+  - 9/11/2026, nhiệm vụ 3 (nhánh `DA-37-tau`, tách khỏi PR #158 để PR đó không to thêm): `fw eval tau --teleop <thư mục trace> [--demos] [--store <store>]`. Đọc mỗi `<trace_id>/` bằng `load_episode` của DA-13 và đo bằng chính `TraceLog.tracking_error`, nên ngưỡng và phép kiểm R3 tính cùng một cách (yaw quấn, chu kỳ thiếu tín hiệu bỏ ra, không tính là 0). Gộp mọi chu kỳ của các episode rồi lấy phân vị 99, không lấy phân vị của phân vị từng episode: ngưỡng nói về một chu kỳ của lượt chạy tốt, và gộp cho mỗi chu kỳ một phiếu. Mỗi giá trị ghi số mẫu, số episode, số chu kỳ bỏ, cách tính; dưới 100 mẫu thì gắn `few_samples` và lệnh in cảnh báo (AC 4).
+  - Episode nào được tính (đề xuất, chờ PO xem): `rollout_result.json` có `infra_status` ok và `sim_success` true. Demo teleop không có cờ SIMPLE nên chỉ được tính khi người chạy khai `--demos`, và báo cáo ghi thành công là `declared_demo`, không phải đo. Episode bị bỏ được liệt kê kèm lý do.
+  - Báo cáo lưu như báo cáo đối chiếu: byte vào blob store, một dòng vào `<store>/scorer/tau.jsonl`; không có thời gian hay đường dẫn. Lệnh không sửa `system.yaml` (nhiệm vụ 5) mà in giá trị đang dùng bên cạnh.
+  - Chưa chạy trên dữ liệu thật: cần trace teleop thành công có `cmd_*` và `meas_*` (dạng `TraceStep`).
+- File đã tạo hoặc sửa: `packages/flywheel-eval/src/flywheel/eval/scorer/agreement.py`, `scorer/calibration.py`, `api.py`, `cli.py`; `packages/flywheel-eval/tests/unit/scorer/test_agreement.py`, `test_agreement_rerun.py`; `scorer/tau.py`, `test_tau.py`.
