@@ -267,13 +267,16 @@ Trước nhiệm vụ 9, QA từ chối cả 153 episode: `segment_count` đòi 
 | Trường hợp | `segment_ambiguous` | `segment_count` |
 |---|---|---|
 | Mọi đoạn có `label_source = human` | 0: người đã chốt | như cũ, ngưỡng 2 |
-| Một đoạn duy nhất, `human`, câu trùng câu lệnh của episode (so sau khi gộp khoảng trắng, không phân biệt hoa thường) | 0 | ngưỡng 1; `QACheck.threshold` ghi 1 |
+| Một đoạn duy nhất, `human`, dài ít nhất `min_frames` (30) khung, câu trùng câu lệnh của episode (so sau khi gộp khoảng trắng, không phân biệt hoa thường) | 0 | ngưỡng 1; `QACheck.threshold` ghi 1 |
+| Như trên nhưng ngắn hơn `min_frames` | 0 | ngưỡng 2: vẫn `reject` |
 | Một đoạn `human` mang câu của một bước (EgoDex: giữ `pick`, bỏ `place`) | 0 | ngưỡng 2: vẫn `reject`, vì mất lần đặt |
 | Một đoạn `rule` hoặc `model`, dù câu trùng câu lệnh | `unresolved_share` | ngưỡng 2: vẫn `reject` |
 
 Chọn cách này thay vì thêm bố cục `whole_clip` vào cấu hình: dấu hiệu "cả clip là một mẫu" là quyết định của người, đã nằm trong `segments.parquet` (nguồn nhãn và câu), nên không cần đổi bộ cắt đoạn hay `sources`. Câu của EgoDex là mẫu câu từng bước (`pick up the {object}`), không bao giờ trùng câu lệnh, nên EgoDex không đổi; test cũ giữ nguyên. Cấu hình chỉ thêm một dòng chú thích. Lần chạy dưới đây có `threshold_version` `ego-1@4439a2eb166e`; sau khi rebase lên `bff2fdff` (video tự quay thành `public`, cùng file cấu hình) version là `ego-1@f9b3a906ff85`, quy tắc QA không đổi.
 
 Chạy lại `fw egocentric qa` trên thư mục đó với cấu hình của repo (9/11/2026): **0 `pass`, 132 `flag`, 21 `reject`**, trùng từng episode với lần thử bằng bản sao cấu hình có `segment_count` ngưỡng 1.
+
+Số này là của pose E-A trước khi làm sạch. PR 174 (nhiệm vụ 10, làm sạch E-A, camera là ma trận đơn vị; mục 4.1 khi PR đó vào) đổi kết quả trên cùng 153 clip thành 10 `pass`, 122 `flag`, 21 `reject`: `camera_jitter_deg_s` không còn hỏng, `hand_pose_nan` vẫn `flag`. Bảng dưới là của lần chạy trước khi làm sạch.
 
 | Phép kiểm hỏng | Episode | Ghi chú |
 |---|---|---|
