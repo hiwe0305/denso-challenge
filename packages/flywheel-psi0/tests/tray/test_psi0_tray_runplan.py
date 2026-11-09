@@ -896,3 +896,35 @@ def test_b_needs_v2_frozen_as_named(tmp_path: Path) -> None:
     repo = _b_repo(tmp_path)
     (repo / "configs/runplans/tray/he-tray-v2.lock.json").unlink()
     assert any("is not frozen" in p for p in check(TrayRunPlan.load(PLAN_B), repo))
+
+
+def test_the_b_decision_is_an_open_draft_on_the_b_plan_and_its_rules() -> None:
+    decision = Decision.model_validate_json((PLANS / "he-tray-b.decision.json").read_text())
+    b = TrayRunPlan.load(PLAN_B)
+    rule0 = Decision.model_validate_json((PLANS / "he-tray-v2.rule0.decision.json").read_text())
+    assert (decision.kind, decision.verdict, decision.meta["status"]) == (
+        "dev_gate",
+        "open",
+        "draft",
+    )
+    assert decision.signed_by.startswith("pending")
+    # re-pointed at task 4.7, when the pins change the plan's id
+    assert decision.subject_id == decision.criteria["plan"]["run_plan_id"] == run_plan_id(b)
+    assert decision.criteria["rules_sha256"] == b.interpretation.rules_sha256
+    assert decision.criteria["rules_marker"] == b.interpretation.rules_marker
+    stage1 = b.parents["psi0-b-ego-stage1"]
+    assert isinstance(stage1, runplan.Stage1Parent)
+    assert {k: decision.criteria["stage1"][k] for k in B_PINS} == {
+        k: getattr(stage1.vlm_stage1, k) for k in B_PINS
+    }
+    base = decision.criteria["baseline_c"]
+    assert (base["headline_n"], base["headline_successes"]) == (
+        rule0.metrics["headline"]["n"],
+        rule0.metrics["headline"]["successes"],
+    )
+    assert base["place_pose_levels_1_2"] == rule0.metrics["headline"]["failures"]["L-PLACE-POSE"]
+    assert (
+        decision.metrics["batch"]["conditions_sha256"]
+        == rule0.metrics["batch"]["conditions_sha256"]
+    )
+    assert decision.metrics["b_vs_c"]["headline"]["diff"] is None  # nothing measured yet
