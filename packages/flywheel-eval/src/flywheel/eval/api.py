@@ -48,8 +48,9 @@ from flywheel.eval.scorer.reader import read_trace
 from flywheel.eval.scorer.score import EpisodeScore, score_episode
 from flywheel.eval.scorer.tau import (
     TauReport,
-    calibrate_teleop,
+    calibrate,
     read_candidates,
+    read_rtc_logs,
     store_tau_report,
 )
 
@@ -231,20 +232,28 @@ def store_train_diagnosis(diagnosis: TrainDiagnosis, store_path: Path) -> Path:
     return write_artifact(diagnosis, store_path)
 
 
-def calibrate_tau(teleop_paths: list[Path], declared_demos: bool = False) -> TauReport:
-    """τ_track of each half of the body from successful episodes (DA-37 AC 4).
+def calibrate_tau(
+    teleop_paths: list[Path],
+    g0_paths: list[Path] | None = None,
+    declared_demos: bool = False,
+) -> TauReport:
+    """τ_track, τ_sync from successful episodes and τ_lat from the G0 run (DA-37 AC 4).
 
     `teleop_paths` are trace directories `<trace_id>/` (DA-38's layout) or
     directories above them. An episode counts when its `rollout_result.json`
     says `infra_status` ok and `sim_success` true; teleop demonstrations,
-    which have no SIMPLE flag, count only with `declared_demos`. Nothing is
-    written; `system.yaml` keeps its values until a person carries them over
-    (AC 5).
+    which have no SIMPLE flag, count only with `declared_demos`. `g0_paths`
+    are the `rtc.jsonl` files of the G0 baseline run, or directories above
+    them. Either list may be empty, not both. Nothing is written;
+    `system.yaml` keeps its values until a person carries them over (AC 5).
 
-    Raises `ReaderError` on a trace that does not parse and `TauError` on a
-    set with no successful episode, or with one trace in two versions.
+    Raises `ReaderError` on a trace or log that does not parse and `TauError`
+    on a set with no successful episode, with one trace in two versions, or
+    with no input at all.
     """
-    return calibrate_teleop(read_candidates(teleop_paths), declared_demos)
+    candidates = read_candidates(teleop_paths) if teleop_paths else []
+    logs = read_rtc_logs(g0_paths) if g0_paths else []
+    return calibrate(candidates, logs, declared_demos)
 
 
 def store_tau(report: TauReport, store_path: Path) -> tuple[str, Path]:
