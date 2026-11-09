@@ -32,11 +32,14 @@ from pathlib import Path
 from typing import Any
 
 from flywheel_psi0.stage1.egodex_sample import fetch, layout_problems
+from flywheel_psi0.stage1.export_source import fetch as fetch_export
+from flywheel_psi0.stage1.export_source import sha256
 from flywheel_psi0.trainer.colab import Report, sh
 from flywheel_psi0.trainer.colab import setup as setup_psi0_env
 from flywheel_psi0.trainer.psi0_trainer import _src_dir
 
-DRIVE = Path("/content/drive/MyDrive/denso/da30")
+DRIVE_ROOT = Path("/content/drive/MyDrive")
+DRIVE = DRIVE_ROOT / "denso" / "da30"
 
 
 def _plan(path: Path) -> Any:
@@ -71,7 +74,7 @@ def preflight_env() -> dict[str, str]:
     }
 
 
-def setup(work: Path, plan_path: Path) -> None:
+def setup(work: Path, plan_path: Path, drive_root: Path = DRIVE_ROOT) -> None:
     import yaml
 
     plan = _plan(plan_path)  # validates first: unmasked video only under the EgoDex waiver
@@ -93,10 +96,37 @@ def setup(work: Path, plan_path: Path) -> None:
         f"revision='{raw['psi_model']['revision']}', allow_patterns=['{parent_dir}/*'], "
         f"local_dir='{psi0}/cache/checkpoints')\""
     )
+    check_parent(psi0, plan)
     parent_seconds = time.monotonic() - start
 
+    root = work / "data" / "egodex"
+    if raw["dataset"].get("kind") == "export":
+        details = _setup_export(plan, root, drive_root)
+    else:
+        details = _setup_egodex_sample(raw["dataset"], root, psi0)
+    problems = layout_problems(root, plan.dataset.split_dir)
+    Report(work).phase(
+        "setup_stage1",
+        parent_seconds + details.pop("seconds"),
+        parent_seconds=round(parent_seconds, 1),
+        **details,
+        layout_problems=problems,
+    )
+    if problems:
+        raise SystemExit("\n".join(problems))
+
+
+def check_parent(psi0: Path, plan: Any) -> None:
+    """Stop unless the downloaded parent weights are the ones the plan pins."""
+    weights = psi0 / "cache" / "checkpoints" / plan.parent.vlm.path
+    got = sha256(weights) if weights.is_file() else "missing"
+    if got != plan.parent.vlm.sha256:
+        raise SystemExit(f"{weights}: sha256 {got}, the plan pins {plan.parent.vlm.sha256}")
+
+
+def _setup_egodex_sample(dataset: dict[str, Any], root: Path, psi0: Path) -> dict[str, Any]:
+    """Fetch the EgoDex stand-in and add `actions_48d` with the authors' script."""
     start = time.monotonic()
-    dataset, root = raw["dataset"], work / "data" / "egodex"
     manifest = fetch(
         dataset["source"]["url"],
         root,
@@ -105,27 +135,50 @@ def setup(work: Path, plan_path: Path) -> None:
         dataset["source"]["etag"],
     )
     fetch_seconds = time.monotonic() - start
-
     start = time.monotonic()
     sh(
         f".venv-psi/bin/python {dataset['precompute']} --data_root {root} "
         f"--num_processes {os.cpu_count() or 4}",
         cwd=psi0,
     )
-    problems = layout_problems(root, dataset["split_dir"])
-    Report(work).phase(
-        "setup_stage1",
-        parent_seconds + fetch_seconds + time.monotonic() - start,
-        parent_seconds=round(parent_seconds, 1),
-        fetch_seconds=round(fetch_seconds, 1),
-        precompute_seconds=round(time.monotonic() - start, 1),
-        episodes=manifest["episodes"],
-        tasks=manifest["tasks"],
-        gigabytes=round(manifest["bytes"] / 1e9, 2),
-        layout_problems=problems,
+    precompute_seconds = time.monotonic() - start
+    return {
+        "seconds": fetch_seconds + precompute_seconds,
+        "fetch_seconds": round(fetch_seconds, 1),
+        "precompute_seconds": round(precompute_seconds, 1),
+        "episodes": manifest["episodes"],
+        "tasks": manifest["tasks"],
+        "gigabytes": round(manifest["bytes"] / 1e9, 2),
+    }
+
+
+def _setup_export(plan: Any, root: Path, drive_root: Path) -> dict[str, Any]:
+    """Get the plan's export tarball from Drive, check it and unpack it at `root`.
+
+    The export already holds `actions_48d` (DA-18 writes it), so no precompute.
+    Refused, before any training, unless every check of `export_source.fetch` holds.
+    """
+    source = plan.dataset.source
+    start = time.monotonic()
+    got = fetch_export(
+        drive_root / source.tarball,
+        source.sha256,
+        root,
+        source.export_id,
+        plan.dataset.split_dir,
+        plan.dataset.data_class,
     )
-    if problems:
-        raise SystemExit("\n".join(problems))
+    if got["samples"] != source.samples:
+        raise SystemExit(f"export has {got['samples']} samples, the plan pins {source.samples}")
+    seconds = time.monotonic() - start
+    return {
+        "seconds": seconds,
+        "fetch_seconds": round(seconds, 1),
+        "export_id": got["export_id"],
+        "episodes": got["samples"],
+        "frames": got["frames"],
+        "gigabytes": round(got["bytes"] / 1e9, 2),
+    }
 
 
 def logging_runner(log_path: Path) -> Any:
@@ -237,10 +290,11 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--work", type=Path, default=Path("/content/da30"))
     parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--to", type=Path, default=DRIVE, help="durable directory")
+    parser.add_argument("--drive-root", type=Path, default=DRIVE_ROOT, help="where tarballs live")
     args = parser.parse_args(argv)
     args.work.mkdir(parents=True, exist_ok=True)
     if args.phase == "setup":
-        setup(args.work, args.plan)
+        setup(args.work, args.plan, args.drive_root)
     elif args.phase in ("run", "repeat"):
         train(args.work, args.plan, repeat=args.phase == "repeat")
     else:
