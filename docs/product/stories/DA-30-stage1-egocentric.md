@@ -34,7 +34,7 @@ Là kỹ sư robot learning, tôi muốn chạy stage 1 của Ψ₀ trên dữ l
   - [x] 2.1 Nguồn dữ liệu `export` cho `Stage1Plan`: ghim bản export của DA-18 bằng `export_id` và sha256 của tarball; `setup` lấy tarball từ Google Drive, kiểm sha256, `export_id`, sha256 từng file trong `meta.json` và `layout_problems`, từ chối khi lệch; nguồn này chỉ nhận `identity_masked: true`; lệnh `pack` đóng tarball; `setup` kiểm sha256 của trọng số cha; test CPU (`test_psi0_stage1_export_source.py`, 15 test)
   - [x] 2.2 `persist` lưu cả checkpoint VLM (trọng số, kèm config và tokenizer của checkpoint cha) lên Drive với sha256, kiểm header safetensors khớp cha; trả lời Q-28C (stage 3 nạp được VLM của stage 1 cùng action header `postpre.*` gốc) bằng dẫn chứng file:dòng ở `cda3fdf` ([stage1.md](../../he/stage1.md) mục 2.3); pha `check-vlm` nạp bản trên Drive như stage 3; thử trên CPU với Qwen3-VL nhỏ; test CPU (`test_psi0_stage1_vlm_checkpoint.py`, 10 test)
   - [x] 2.3 RunPlan `tray-ego-b.yaml`: cha là VLM của nhánh C, stats chuẩn hóa, số bước, checkpoint, val, tiêu chí chốt trước, trần 4 CU; `runplan check` qua (`rp_6a66a6ff082c`, bản nháp tới khi có bản export: `setup` từ chối plan nháp); `setup` ghi độ phủ stats; [stage1.md](../../he/stage1.md) mục 2.4; test CPU (`test_psi0_stage1_tray_ego_b.py`, 7 test)
-  - [ ] 2.4 `stage1.md` mục 2, dòng `estimated` của sổ chi phí, lệnh chạy cho Hiếu
+  - [x] 2.4 `stage1.md` mục 2, dòng `estimated` của sổ chi phí (2,5 CU, giả định), lệnh chạy cho Hiếu ([stage1.md](../../he/stage1.md) mục 2.5, 2.6). Còn lại của nhiệm vụ 2: ghim bản export vào plan khi phiên điều phối giao (bỏ `status: draft`)
 - [ ] 3. Fine-tune, probe, closed-loop, báo cáo (AC 2, 3)
 
 ## Phạm vi file
@@ -72,6 +72,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 4/11/2026 | Miễn bước che danh tính ("Waive for EgoDex") chỉ cho mẫu EgoDex công bố (`public`) trong các lần chạy stage 1 của DA-30; video tự quay và mọi nguồn egocentric khác vẫn phải che trước. RunPlan chặn mọi nguồn khác ([stage1.md](../../he/stage1.md) mục 1.4) | PO (Hiếu) |
 | 4/11/2026 | Bộ canh CU dùng chung đổi thiết kế (PR #108): mỗi phiên một watcher theo endpoint, cộng một guard cho cả đợt; một đợt một lúc trên tài khoản, DA-30 chạy trước rồi đến DA-26 ([stage1.md](../../he/stage1.md) mục 1.6) | Review PR #108 |
 | 4/11/2026 | Lần chạy 1 hỏng ở `accelerator.prepare` (`betas: "auto"` trong `zero3_offload.json` của tác giả). RunPlan dùng file DeepSpeed của repo, khớp recipe và giữ lr riêng của từng nhóm; `setup` chạy pre-flight DeepSpeed trên model nhỏ trước mọi lần tải ([stage1.md](../../he/stage1.md) mục 1.2, 1.6) | Lần chạy 1 |
+| 9/11/2026 | "Chốt 4 mặc định" cho nhánh B của DA-34: VLM cha là VLM của C (`ego200k.he30k`), mỗi clip một mẫu với câu mô tả cả task, 153 clip 480p đã làm mờ mặt (`public` theo PR #170, bỏ 8 clip 1080p), khoảng 300 bước, trần 4 CU ([stage1.md](../../he/stage1.md) mục 2.1) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

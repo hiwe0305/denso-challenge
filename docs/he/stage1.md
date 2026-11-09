@@ -282,3 +282,73 @@ Giá phải trả: Ψ₀ cắt action đã chuẩn hóa về [−1, 1] (`config/
 - **Nạp được ở stage 3**: `check-vlm` không báo vấn đề nào (mục 2.3).
 
 Ba tiêu chí này là bằng chứng đường đi. Chúng không nói gì về việc video của đội có giúp hay không: câu hỏi đó trả lời bằng closed-loop của stage 3 (B so với C), theo quy tắc của DA-34 ([tray.md](tray.md) mục 4).
+
+### 2.5 Ước lượng CU
+
+Giả định, chưa đo; dòng `job_da30_stage1_tray_ego_b` của [sổ chi phí](../g0/ledger/DA-30.csv). Một VM L4 ở 1,94 CU/giờ (S1-04). Phần cố định dùng số đo của lần 1 (mục 1.7): từ lúc nhận VM đến lúc nạp model xong khoảng 11 phút; bản export chép từ Drive thay cho phần tải EgoDex, giả định không lâu hơn. Phần còn lại là giả định: pre-flight khoảng 2 phút, khởi tạo ZeRO-3 offload khoảng 2 phút, checkpoint cuối 4 phút, chạy lại 3 bước 7 phút, `persist` kèm VLM 4,3 GB lên Drive 4 phút, `check-vlm` 3 phút. Cộng khoảng 33 phút cố định với 300 bước train:
+
+| s/bước | Train | Tổng | CU |
+|---|---|---|---|
+| 5 | 25 phút | 58 phút | 1,9 |
+| 9 (giả định chính) | 45 phút | 78 phút | 2,5 |
+| 14 | 70 phút | 103 phút | 3,3 |
+| 17 | 85 phút | 118 phút | 3,8 (bộ canh dừng ở khoảng 3,77) |
+
+Với `--cap 4`, bộ canh dừng phiên ở khoảng 3,77 CU (biên 430 s, khoảng 117 phút) và chạy `persist` sớm hơn 600 s (khoảng 107 phút). Nếu lúc đó run chưa tới checkpoint cuối, `persist` chỉ giữ được log, không có VLM.
+
+**Quy tắc dừng [Đề xuất]:** đọc s/bước trong `train.log` sau 20 bước; quá 14 s thì dừng VM và báo Hiếu (ở 14 s/bước, run xong khoảng 3,3 CU, còn chỗ cho `persist`). Thứ tự chạy cũng đổi so với mục 1.6 để trọng số lên Drive sớm nhất: `run`, `persist`, `check-vlm`, rồi mới `repeat` và `persist` lần nữa (lần thứ hai không chép lại trọng số đã có).
+
+### 2.6 Việc Hiếu làm để chạy
+
+Chưa chạy. Điều kiện trước:
+
+1. PR này merge vào `master`; chạy từ `master`, không từ nhánh.
+2. PR #170 (`data_class` `public` cho video của đội) đã merge.
+3. Phiên điều phối dữ liệu giao bản export: chạy `python -m flywheel_psi0.stage1.export_source pack --export <root> --out <export_id>.tar`, đưa tarball lên `MyDrive/denso/da30/exports/`, gửi `export_id`, `sha256`, `bytes`. Một PR nhỏ ghim ba số đó vào `tray-ego-b.yaml`, bỏ `status: draft`; `runplan check` in `OK rp_…` không còn chữ "draft".
+4. Đọc `stats_coverage` của bản export trên CPU trước khi tốn GPU (mục 2.4).
+5. `colab sessions` trống: một đợt một lúc trên tài khoản (mục 1.6).
+
+Bộ canh CU như mục 1.6, đổi tên phiên và trần:
+
+```bash
+export PATH=~/project/wm-wam-review/.venv-colab-cli/bin:$PATH
+R=fwdata/colab/da30b-$(date +%Y%m%d-%H%M%S); mkdir -p fwdata/colab && mkdir $R
+nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py guard --registry "$0" --floor 14 --log "$0/guard.jsonl"; echo "exit $?"' $R < /dev/null > $R/guard.out 2>&1 &
+nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py session --registry "$0" --new --name da30-stage1-b --gpu L4 --cap 4 --floor 14 --persist "colab exec -s da30-stage1-b -f configs/runplans/stage1/persist_cell.py" --log "$0/da30-stage1-b.jsonl"; echo "exit $?"' $R < /dev/null > $R/da30-stage1-b.out 2>&1 &
+( until [ -f $R/da30-stage1-b.ready ]; do grep -q '^exit ' $R/da30-stage1-b.out && exit 1; sleep 5; done
+  [ -f $R/guard.beat ] && [ $(( $(date +%s) - $(stat -c %Y $R/guard.beat) )) -lt 120 ] ) && echo READY || echo "NOT READY: do not start the job"
+```
+
+Sau `READY`: đưa mã ở commit `master` vào `/content/da30/fw` như lần 1, rồi **mount Drive trước `setup`** (tarball nằm trên Drive):
+
+```bash
+colab drivemount -s da30-stage1-b /content/drive
+```
+
+Trên VM, từ `/content/da30` (lệnh train chạy trong shell SSH, không qua `colab exec`, để kernel rảnh cho `persist` của bộ canh):
+
+```bash
+python3 -m flywheel_psi0.stage1.colab setup --work /content/da30 --plan fw/configs/runplans/stage1/tray-ego-b.yaml
+```
+
+```bash
+Psi0/.venv-psi/bin/python -m flywheel_psi0.stage1.colab run --work /content/da30 --plan fw/configs/runplans/stage1/tray-ego-b.yaml
+```
+
+```bash
+python3 -m flywheel_psi0.stage1.colab persist --work /content/da30 --plan fw/configs/runplans/stage1/tray-ego-b.yaml
+```
+
+```bash
+Psi0/.venv-psi/bin/python -m flywheel_psi0.stage1.colab check-vlm --work /content/da30 --plan fw/configs/runplans/stage1/tray-ego-b.yaml
+```
+
+```bash
+Psi0/.venv-psi/bin/python -m flywheel_psi0.stage1.colab repeat --work /content/da30 --plan fw/configs/runplans/stage1/tray-ego-b.yaml
+```
+
+```bash
+python3 -m flywheel_psi0.stage1.colab persist --work /content/da30 --plan fw/configs/runplans/stage1/tray-ego-b.yaml
+```
+
+Sau lần chạy: tải `report.json` và log về `fwdata/colab/`, ghi dòng `measured` của sổ chi phí (`balance_drop` ở dòng `exit` của `da30-stage1-b.jsonl`), ghi kết quả vào mục 2.7. VLM nằm ở `MyDrive/denso/da30/da30-tray-ego-b/vlm/` kèm `vlm.json` (sha256 trọng số); phiên DA-34 của nhánh B ghim sha256 đó trong RunPlan stage 3 của B.
