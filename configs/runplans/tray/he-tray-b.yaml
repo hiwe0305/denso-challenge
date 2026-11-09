@@ -12,7 +12,8 @@
 # Until DA-30 persists its checkpoint, the vlm_stage1 pins are null: `check` passes as
 # a draft, `freeze` and `check --launch` refuse (stage1_pending). Then (task 4.7): fill
 # job_id, drive_dir, weights_sha256 and manifest_sha256
-# (python -m flywheel_psi0.tray.colab_train manifest <folder>), drop status, freeze,
+# (python -m flywheel_psi0.tray.colab_train manifest --folder <folder>, which also checks
+# the weights' header against parent_header_sha256), drop status, freeze,
 # and set B_FROZEN in colab_train. Reading rules: docs/he/tray.md section 18.2, the
 # branch-b-rules block, pinned by sha256 below.
 name: he-tray-psi0-b
@@ -60,6 +61,9 @@ parents:
       drive_dir: null # folder under MyDrive: every file of the parent's VLM folder, weights replaced
       weights_sha256: null # model.safetensors of that folder
       manifest_sha256: null # colab_train manifest of the whole folder
+      # header of the parent VLM's model.safetensors at psi-model cb1480f (625 BF16 tensors,
+      # no lm_head, embed_tokens 153792 x 2048): the stage 1 weights must match it
+      parent_header_sha256: 53d000d9626a13faf4bcb5268517b8441c34b187c88c9dee0b4c250dc19d6d59
     action_header:
       path: psi0/postpre.1by1.pad36.2601131206.ckpt.he30k/action_header.safetensors
       sha256: 238b4d95862b0eb44bffa75a2ae69e120aeda3d159fd6f29802dd9338019e14d

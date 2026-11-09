@@ -34,8 +34,12 @@ refuses. B is C's job with one change, the VLM: C's cut (set C) goes to
 refuses unless its `model.safetensors` and its whole-folder manifest match the plan's
 sha256 and every other file is byte for byte the file of C's VLM folder at the plan's
 psi-model revision (config, tokenizer, processor: only the weights may differ).
-`train` checks the folder again and gives Psi0Trainer the recipe with the stage 1
-parent added in memory (the recipe file is not edited). The action header is C's.
+The weights' safetensors header (tensor names, dtypes, shapes) must hash to the plan's
+`parent_header_sha256`, the header of C's VLM weights: Qwen3VL `from_pretrained` only
+warns on unmatched keys (a `vlm_model.` prefix, a sharded file) and stage 3 would train
+from freshly initialised weights. `train` checks the folder again and gives Psi0Trainer
+the recipe with the stage 1 parent added in memory (the recipe file is not edited).
+The action header is C's.
 `manifest --folder <dir>` prints what the plan pins, for whoever fills them (task 4.7).
 
 What happens after is DA-26's code: `scripts/he/he1_colab.py stage` and
@@ -51,6 +55,7 @@ import hashlib
 import json
 import os
 import shutil
+import struct
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -66,7 +71,7 @@ from flywheel_psi0.trainer.colab import (
     sh,
 )
 from flywheel_psi0.trainer.recipe import ParentCheckpoint, Psi0Recipe
-from flywheel_psi0.tray.demo_sets import DemoSets
+from flywheel_psi0.tray.demo_sets import DemoSets, canonical_sha256
 from flywheel_psi0.tray.runplan import (
     REPO,
     Parent,
@@ -411,6 +416,37 @@ def manifest_sha256(folder: Path) -> str:
     return hashlib.sha256(folder_manifest(folder).encode("utf-8")).hexdigest()
 
 
+def safetensors_header(path: Path) -> dict[str, tuple[str, tuple[int, ...]]]:
+    """`{tensor name: (dtype, shape)}` from a safetensors file's JSON header, not its data."""
+    with path.open("rb") as f:
+        (length,) = struct.unpack("<Q", f.read(8))
+        if length > path.stat().st_size - 8:  # not a header length: never read that much
+            raise ValueError(f"header length {length} exceeds the file")
+        header: dict[str, Any] = json.loads(f.read(length))
+    return {
+        name: (str(entry["dtype"]), tuple(int(n) for n in entry["shape"]))
+        for name, entry in header.items()
+        if name != "__metadata__"
+    }
+
+
+def header_sha256(header: dict[str, tuple[str, tuple[int, ...]]]) -> str:
+    """Canonical sha256 of `{name: [dtype, shape]}`: what `parent_header_sha256` pins."""
+    return canonical_sha256({name: [dtype, list(shape)] for name, (dtype, shape) in header.items()})
+
+
+def header_summary(header: dict[str, tuple[str, tuple[int, ...]]]) -> str:
+    """Tensors, dtypes, lm_head and embedding shape: what to read when the hash differs."""
+    dtypes = sorted({dtype for dtype, _ in header.values()})
+    embed = [shape for name, (_, shape) in header.items() if name.endswith("embed_tokens.weight")]
+    lm_head = any("lm_head" in name for name in header)
+    prefixes = sorted({name.split(".", 1)[0] for name in header})
+    return (
+        f"{len(header)} tensors, dtypes {dtypes}, top-level {prefixes}, lm_head {lm_head},"
+        f" embed_tokens {embed}"
+    )
+
+
 def stage1_vlm_problems(folder: Path, base: Path, vlm: Stage1Vlm) -> list[str]:
     """A stage 1 VLM folder against its pins and against the parent VLM folder it came from.
 
@@ -426,6 +462,18 @@ def stage1_vlm_problems(folder: Path, base: Path, vlm: Stage1Vlm) -> list[str]:
     found = sha256(weights) if weights.is_file() else "missing"
     if found != vlm.weights_sha256:
         problems.append(f"{weights}: sha256 {found}, plan pins {vlm.weights_sha256}")
+    if weights.is_file():
+        try:
+            header = safetensors_header(weights)
+        except (OSError, ValueError, KeyError, struct.error) as error:
+            problems.append(f"{weights}: no readable safetensors header ({error})")
+        else:
+            if header_sha256(header) != vlm.parent_header_sha256:
+                problems.append(
+                    f"{weights}: tensors are not the parent VLM's (header sha256"
+                    f" {header_sha256(header)}, plan pins {vlm.parent_header_sha256});"
+                    f" {header_summary(header)}"
+                )
     found = manifest_sha256(folder)
     if found != vlm.manifest_sha256:
         problems.append(f"{folder}: manifest sha256 {found}, plan pins {vlm.manifest_sha256}")
@@ -664,6 +712,8 @@ def main(argv: list[str] | None = None) -> None:
     if args.phase == "manifest":  # what he-tray-b.yaml pins for DA-30's folder (task 4.7)
         if args.folder is None or not (args.folder / WEIGHTS).is_file():
             raise SystemExit(f"manifest needs --folder <a folder with {WEIGHTS}>")
+        header = safetensors_header(args.folder / WEIGHTS)
+        print(f"header_sha256: {header_sha256(header)} ({header_summary(header)})")
         print(f"weights_sha256: {sha256(args.folder / WEIGHTS)}")
         print(f"manifest_sha256: {manifest_sha256(args.folder)}")
         print(f"files: {len(_files(args.folder))}")

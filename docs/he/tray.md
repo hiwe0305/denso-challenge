@@ -1389,15 +1389,15 @@ Luật này không đổi sau khi thấy kết quả. Muốn đổi thì ghi `De
 
 ### 18.3 RunPlan B (nhiệm vụ con 4.2)
 
-[`he-tray-b.yaml`](../../configs/runplans/tray/he-tray-b.yaml), `status: draft`, id nháp `rp_97922261b774`. Id này đổi khi điền ghim của checkpoint stage 1 (nhiệm vụ con 4.7), vì ghim nằm trong id.
+[`he-tray-b.yaml`](../../configs/runplans/tray/he-tray-b.yaml), `status: draft`, id nháp `rp_a3d3f96260d9`. Id này đổi khi điền ghim của checkpoint stage 1 (nhiệm vụ con 4.7), vì ghim nằm trong id.
 
 | Trường | Giá trị |
 |---|---|
-| `variant_of` | `he-tray-v2.yaml`, `rp_a04c14e79dfd`, nhánh `C`. `runplan check` so mọi trường khác với bản 2 và báo lỗi khi lệch. Chỉ được khác: `name`, `status`, `parents`, `branches`, `budget`, `interpretation`, `variant_of`, `supersedes`. Bản 2 phải đã đóng băng và đúng id đó |
+| `variant_of` | `he-tray-v2.yaml`, `rp_a04c14e79dfd`, nhánh `C`. `runplan check` so mọi trường khác với bản 2 và báo lỗi khi lệch. Chỉ được khác: `name`, `status`, `parents`, `branches`, `budget`, `interpretation`, `variant_of`, `supersedes`, `superseded_by`. Bản 2 phải đã đóng băng và đúng id đó |
 | `parents` | Cặp của C giữ nguyên, thêm đúng một cha stage 1 `psi0-b-ego-stage1`: `vlm_stage1.from_parent` là cha của C; action header trùng của C; `story` DA-30, sổ `docs/g0/ledger/DA-30.csv` |
-| Ghim stage 1 | `job_id`, `drive_dir` (thư mục dưới `MyDrive`), `weights_sha256` (`model.safetensors`), `manifest_sha256` (cả thư mục, `colab_train manifest`). Để `null` tới khi DA-30 có checkpoint |
+| Ghim stage 1 | `job_id`, `drive_dir` (thư mục dưới `MyDrive`), `weights_sha256` (`model.safetensors`), `manifest_sha256` (cả thư mục, `colab_train manifest`). Để `null` tới khi DA-30 có checkpoint. Có sẵn `parent_header_sha256` `53d000d9…`: sha256 chuẩn hóa của header safetensors của VLM C (tên, dtype, shape của từng tensor). Header đọc bằng range request từ psi-model `cb1480f` ngày 9/11: 625 tensor BF16, không có `lm_head`, `embed_tokens` 153 792 × 2 048 |
 | `branches` | `B`: tập `C`, cha `psi0-b-ego-stage1` |
-| `budget` | Trần 18 CU, cap 18 CU một lần, watcher `--cap 18 --floor 14`. Ngân sách riêng của B (Hiếu 9/11), ngoài trần 36 CU của bậc 2. Stage 1 tính ở DA-30 |
+| `budget` | Trần 18 CU, cap 18 CU một lần, `runs` đúng `[B]` (`check` kiểm), watcher `--cap 18 --floor 14`. Ngân sách riêng của B (Hiếu 9/11), ngoài trần 36 CU của bậc 2. Stage 1 tính ở DA-30 |
 | `interpretation` | `docs/he/tray.md`, `rules_marker: branch-b-rules`, `rules_sha256` của khối mục 18.2 |
 
 **Chặn khi chưa đủ ghim.** `runplan check` (cũng là lệnh CI chạy) qua và ghi "draft, 4 stage 1 pins pending". `runplan freeze` từ chối khi còn `status: draft` hoặc còn một ghim `null`, kể cả khi đã bỏ `draft`. `runplan check --release … --launch` từ chối với một dòng `DRAFT` và một dòng `PENDING` cho mỗi ghim thiếu. Test: `test_b_neither_launches_nor_freezes_until_stage1_is_pinned`, `test_b_refuses_any_second_change`, `test_b_freezes_once_pinned_and_released_from_draft`.
@@ -1411,12 +1411,13 @@ Một phiên Colab L4, job `da34-t4-ft-b-s0`, cap 18 CU, sàn số dư 14 CU. Gi
 - `setup`: kiểm bản cắt như C, rồi kiểm có `model.safetensors` dưới `/content/drive/MyDrive/<drive_dir>`, cả hai **trước** khi cài môi trường. Sau đó tải từ psi-model (revision của plan) action header của C và thư mục VLM của C **không kèm trọng số**, chép thư mục stage 1 từ Drive vào `Psi0/cache/checkpoints/stage1/<tên thư mục>`, rồi kiểm:
   - sha256 action header bằng ghim của C;
   - sha256 `model.safetensors` bằng `weights_sha256`;
+  - header safetensors của `model.safetensors` (tên, dtype, shape) có sha256 bằng `parent_header_sha256`, tức đúng các tensor của VLM C. Lý do: `Qwen3VLForConditionalGeneration.from_pretrained` (`finetune.py` dòng 272) chỉ cảnh báo khi khóa không khớp, ví dụ tiền tố `vlm_model.` hay file chia mảnh, và stage 3 sẽ train khoảng 16 CU trên trọng số khởi tạo ngẫu nhiên. Khi lệch, lỗi in số tensor, dtype, tiền tố, `lm_head` và shape của `embed_tokens`;
   - sha256 manifest cả thư mục bằng `manifest_sha256`;
   - mọi file khác (config, tokenizer, processor) trùng từng byte file cùng tên của VLM C; không thừa, không thiếu file nào. Stage 1 chỉ được đổi trọng số.
 
   Lệch một điều thì dừng, không train.
 - `train`: kiểm lại bản cắt và thư mục stage 1, rồi chạy Psi0Trainer với recipe của plan. Cha stage 1 được thêm vào recipe trong bộ nhớ: `model_name_or_path` trỏ vào thư mục stage 1, action header của C; file recipe không sửa. Mọi thứ khác như C: override, seed, `release_id` `tray_s1_f9433b028c52#C:a202cc028a2e`.
-- `manifest --folder <thư mục>` in `weights_sha256`, `manifest_sha256` và số file: chính các ghim của plan. Manifest là một dòng `<sha256>  <đường dẫn>` cho mỗi file, xếp theo đường dẫn, bỏ mục bắt đầu bằng dấu chấm.
+- `manifest --folder <thư mục>` in `header_sha256` (phải bằng `parent_header_sha256`), `weights_sha256`, `manifest_sha256` và số file: chính các ghim của plan. Manifest là một dòng `<sha256>  <đường dẫn>` cho mỗi file, xếp theo đường dẫn, bỏ mục bắt đầu bằng dấu chấm.
 
 **Điều kiện trước khi chạy.**
 1. Nhiệm vụ con 4.7 đã merge: ghim stage 1 điền từ checkpoint của DA-30, bỏ `draft`, `runplan freeze` ra id mới, `B_FROZEN` đặt bằng id đó. Luật 18.2 đã duyệt.
@@ -1490,7 +1491,7 @@ $PY -m flywheel_psi0.tray.eval_results $PLAN --set $SET --out $EV/eval-b-simread
 [`he-tray-b.decision.json`](../../configs/runplans/tray/he-tray-b.decision.json): cùng dạng `Decision` với `Decision` quy tắc 0 ([`he-tray-v2.rule0.decision.json`](../../configs/runplans/tray/he-tray-v2.rule0.decision.json)); `meta.status` `draft`, `verdict` `open`, `signed_by` "pending: Hiếu".
 - `criteria` ghi: luật 18.2 và sha256 của khối; plan B và `variant_of`; ghim stage 1 (đang `null`); mốc C (20/240, `L-PLACE-POSE` 131/240, mức 0 5/30, lô của eval C SimReady); mốc C+ (lô đang chạy); bảng `verdict_map`: luật 1 là `pass`, luật 2 là `recorded`, luật 3 là `fail`; giới hạn.
 - `metrics` để `null` tới khi eval B xong. Khi đó điền từ `eval_results --baseline` (mục 18.5).
-- `subject_id` là id nháp `rp_97922261b774`. Ở nhiệm vụ con 4.7 nó đổi thành id đóng băng; test `test_the_b_decision_is_an_open_draft_on_the_b_plan_and_its_rules` báo lỗi cho tới khi sửa.
+- `subject_id` là id nháp `rp_a3d3f96260d9`. Ở nhiệm vụ con 4.7 nó đổi thành id đóng băng; test `test_the_b_decision_is_an_open_draft_on_the_b_plan_and_its_rules` báo lỗi cho tới khi sửa.
 
 ### 18.7 Ước lượng chi phí (nhiệm vụ con 4.6)
 
@@ -1508,7 +1509,7 @@ Số dư Colab ngày 9/11 là 14,88 CU (mục 17.8). Nó không đủ cho cap 18
 
 - **Phía DA-30** (nhiệm vụ con 2.2 của DA-30). Checkpoint stage 1 cần đúng dạng mà `colab_train --branch B` nhận:
   - một thư mục trên Drive chứa mọi file của thư mục `pre.fast.1by1.2601091803.ckpt.ego200k.he30k` ở psi-model `cb1480f`, cùng tên và trùng từng byte, trừ `model.safetensors`;
-  - `model.safetensors` là trọng số sau stage 1, một file, khóa theo tên của Qwen3VL như `PretrainTrainer.save_checkpoint` ghi (`accelerator.save_model` trên mô hình Qwen3VL; `src/psi/trainers/pretrain.py` dòng 441–447 ở `cda3fdf`);
+  - `model.safetensors` là trọng số sau stage 1, một file, khóa theo tên của Qwen3VL như `PretrainTrainer.save_checkpoint` ghi (`accelerator.save_model` trên mô hình Qwen3VL; `src/psi/trainers/pretrain.py` dòng 441–447 ở `cda3fdf`); header phải trùng header của VLM C (`parent_header_sha256`). `package` của DA-30 (PR #171) kiểm cùng điều này;
   - không file thừa như optimizer hay trạng thái accelerate.
 
   Lý do: `save_model` chỉ ghi trọng số, còn `from_pretrained` cần config, tokenizer và processor. Khi có thư mục, chạy `colab_train manifest --folder <thư mục>` để lấy hai sha256.
@@ -1547,3 +1548,4 @@ Số dư Colab ngày 9/11 là 14,88 CU (mục 17.8). Nó không đủ cho cap 18
 | 9/11/2026 | Mục 18.5: runbook eval B (như eval C SimReady, sau eval C+) và cách đọc bằng `eval_results --baseline`: hiệu ghép cặp, CI bootstrap theo mức, McNemar chính xác; luật 18.2 không đổi | Hiếu (soạn với Claude) |
 | 9/11/2026 | Mục 18.6: `Decision` nháp của B (`he-tray-b.decision.json`, `open`, chờ eval B và chữ ký của Hiếu) | Hiếu (soạn với Claude) |
 | 9/11/2026 | Mục 18.7–18.8: ước lượng stage 3 B (16,0 CU, cap 18, sàn 14) và eval B (17,3 giờ `rtx3060`), stage 1 ở sổ DA-30; dạng checkpoint stage 1 mà B nhận và việc còn lại (4.7, 4.8) | Hiếu (soạn với Claude) |
+| 9/11/2026 | Mục 18.3, 18.4, 18.6, 18.8 (review PR #172): ghim `parent_header_sha256` (header safetensors của VLM C) và `colab_train` kiểm header của trọng số stage 1 trước khi train; `budget.runs` phải là `[B]`; thêm `superseded_by` vào danh sách trường được khác; id nháp đổi thành `rp_a3d3f96260d9`. Luật 18.2 không đổi | Hiếu (soạn với Claude) |

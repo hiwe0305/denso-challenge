@@ -16,7 +16,7 @@
  "id": "dec_01M6ZVR21V7ZD52KG03BMFJK39",
  "kind": "dev_gate",
  "subject_kind": "run_plan",
- "subject_id": "rp_97922261b774",
+ "subject_id": "rp_a3d3f96260d9",
  "verdict": "open",
  "metrics": {
   "label": "preliminary, on dev",
@@ -81,7 +81,7 @@
   "rules_sha256": "6c0eb9c9537c7093929a3fbc90d3d09536c423eabea266890ef1c669c7cc800d",
   "plan": {
    "path": "configs/runplans/tray/he-tray-b.yaml",
-   "run_plan_id": "rp_97922261b774",
+   "run_plan_id": "rp_a3d3f96260d9",
    "status": "draft",
    "variant_of": {
     "plan": "configs/runplans/tray/he-tray-v2.yaml",
@@ -97,7 +97,9 @@
    "job_id": null,
    "drive_dir": null,
    "weights_sha256": null,
-   "manifest_sha256": null
+   "manifest_sha256": null,
+   "parent_header_sha256": "53d000d9626a13faf4bcb5268517b8441c34b187c88c9dee0b4c250dc19d6d59",
+   "parent_header": "625 BF16 tensors, no lm_head, model.language_model.embed_tokens.weight 153792 x 2048 (psi-model cb1480f)"
   },
   "primary": "paired B - C on the 240 level 1-2 conditions; 95 % CI by bootstrap of the per-condition differences within level, 10000 resamples, seed 20261103 (plan stats)",
   "rules": {
