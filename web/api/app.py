@@ -23,6 +23,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from web.api.actions import ActionStore
+from web.api.chat import ChatError, ChatModel, ChatStore
 from web.api.drafts import DraftError, DraftStore
 from web.api.readmodel import ReadModel
 from web.api.stream import change_events, signature
@@ -89,7 +90,10 @@ def _require_key(key: str | None) -> str:
 
 
 def create_app(
-    model: ReadModel, actions: ActionStore, sync: SyncConfig | None = None
+    model: ReadModel,
+    actions: ActionStore,
+    sync: SyncConfig | None = None,
+    chat_model: ChatModel | None = None,
 ) -> FastAPI:
     app = FastAPI(
         title="Humanoid Data Flywheel · web API",
@@ -102,6 +106,11 @@ def create_app(
         body = {"code": error.code, "message": error.message, "hint": error.hint, "ref": None}
         return JSONResponse(body, status_code=error.status)
 
+    @app.exception_handler(ChatError)
+    async def _chat_error(_: Request, error: ChatError) -> JSONResponse:
+        body = {"code": error.code, "message": error.message, "hint": error.hint, "ref": None}
+        return JSONResponse(body, status_code=error.status)
+
     @app.exception_handler(RequestValidationError)
     async def _validation(_: Request, error: RequestValidationError) -> JSONResponse:
         body = {"code": "BAD_REQUEST", "message": str(error.errors()[:1]), "hint": None,
@@ -109,6 +118,7 @@ def create_app(
         return JSONResponse(body, status_code=422)
 
     drafts = DraftStore(actions.directory)
+    chat = ChatStore(actions.directory, model, chat_model)
     r = APIRouter(prefix=API_PREFIX)
     Role = Header(default=None, alias="X-Fw-Role")
     Key = Header(default=None, alias="Idempotency-Key")
@@ -328,6 +338,19 @@ def create_app(
     @r.get("/defects/scores")
     def defect_scores(cursor: str | None = None, limit: int | None = None) -> Any:
         return _page(model.defect_scores(), cursor, limit)
+
+    # ------------------------------------------------------------ chat (read-only minimum)
+    @r.post("/chat/sessions", status_code=201)
+    def chat_session(body: dict[str, Any], x_fw_role: str | None = Role) -> Any:
+        return chat.create_session(body, _role(x_fw_role))
+
+    @r.get("/chat/sessions/{session_id}")
+    def chat_session_get(session_id: str) -> Any:
+        return _found(chat.session(session_id), "phiên chat")
+
+    @r.post("/chat/sessions/{session_id}/messages", status_code=201)
+    def chat_message(session_id: str, body: dict[str, Any]) -> Any:
+        return chat.ask(session_id, body)
 
     # ------------------------------------------------------------ actions
     @r.get("/actions")

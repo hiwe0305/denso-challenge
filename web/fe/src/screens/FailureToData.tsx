@@ -1,6 +1,7 @@
 // M7 · Failure → Data (DESIGN.md §6.1): steps on the left, the cluster board
 // with its evidence cards in the middle, proposals and budget on the right,
 // repair tickets underneath.
+import { useFocus } from "../api/focus";
 import { useMemo, useRef, useState } from "react";
 import { apiAction, newIdempotencyKey } from "../api/client";
 import {
@@ -45,6 +46,7 @@ export function FailureToData() {
   const list = useRecommendations();
   const id = list.data?.[0]?.id ?? null;
   const rec = useRecommendation(id);
+  useFocus({ recommendation_id: id });
 
   if (list.isLoading) return <Loading />;
   if (list.error) return <ErrorBox error={list.error} />;
@@ -128,6 +130,7 @@ function StepItem({ step }: { step: AlgoStep }) {
 function ClusterColumn({ recommendationId }: { recommendationId: string }) {
   const clusters = useClusters(recommendationId);
   const [open, setOpen] = useState<string | null>(null);
+  useFocus({ cluster_id: open });
   const rows = clusters.data ?? [];
   const free = rows.filter((c) => !c.consumes_data_budget);
   return (

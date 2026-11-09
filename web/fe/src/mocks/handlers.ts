@@ -7,6 +7,9 @@ import type {
   ActionAccepted,
   ActionStatusRow,
   ApiError,
+  ChatFocus,
+  ChatMessage,
+  ChatSession,
   ExperimentDraft,
   Page,
   SyncRunRow,
@@ -151,9 +154,23 @@ interface DecisionItem {
   reason?: string;
 }
 
+const CHAT_SCREENS = ["M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10"];
+const CHAT_FOCUS_KEYS = ["dataset_id", "experiment_id", "evaluation_id", "recommendation_id", "cluster_id"] as const;
+const CHAT_KINDS: Record<(typeof CHAT_FOCUS_KEYS)[number], string> = {
+  dataset_id: "dataset", experiment_id: "experiment", evaluation_id: "evaluation",
+  recommendation_id: "recommendation", cluster_id: "cluster_card",
+};
+
+/** A sha256-shaped stand-in: MSW has no model and no prompt, only the shape of a turn. */
+const fakeSha = (n: number) => n.toString(16).padStart(8, "0").repeat(8);
+
 export function createHandlers(views = new MockViews(loadMockData())) {
   const actions = new ActionStore();
   const drafts: ExperimentDraft[] = [];
+  // Chat, read-only minimum (web/api/chat.py). MSW has no model: the answer
+  // says so and lists what the API would load, so the pane can be built and tested.
+  const chatSessions: ChatSession[] = [];
+  let chatMessageCount = 0;
 
   const accepted = (row: ActionStatusRow) =>
     HttpResponse.json<ActionAccepted>(
@@ -333,6 +350,64 @@ export function createHandlers(views = new MockViews(loadMockData())) {
       json(actions.get(String(params.id)), "hành động")),
     http.get(url("/decisions"), ({ request }) => HttpResponse.json(page(views.decisions(), request))),
     http.get(url("/sync/runs"), () => HttpResponse.json(actions.runs)),
+
+    // ------------------------------------------------------------ chat
+    http.post(url("/chat/sessions"), async ({ request }) => {
+      const body = (await request.json()) as { screen?: string; focus?: unknown; title?: string };
+      if (!body.screen || !CHAT_SCREENS.includes(body.screen)) {
+        return error(422, "BAD_SCREEN", `screen ${String(body.screen)} không có`);
+      }
+      const focus = (body.focus ?? {}) as Record<string, unknown>;
+      if (typeof focus !== "object" || Array.isArray(focus)) return error(422, "BAD_FOCUS", "focus phải là đối tượng");
+      const unknown = Object.keys(focus).filter((k) => !(CHAT_FOCUS_KEYS as readonly string[]).includes(k));
+      if (unknown.length) return error(422, "BAD_FOCUS", `focus không nhận ${JSON.stringify(unknown.sort())}`);
+      const pick = (k: keyof ChatFocus) => (typeof focus[k] === "string" && focus[k] ? (focus[k] as string) : null);
+      const row: ChatSession = {
+        id: `chs_${String(chatSessions.length + 1).padStart(4, "0")}`,
+        user_role: roleOf(request), title: body.title?.trim() || null, screen: body.screen,
+        context_dataset_id: pick("dataset_id"), context_experiment_id: pick("experiment_id"),
+        context_evaluation_id: pick("evaluation_id"), context_recommendation_id: pick("recommendation_id"),
+        context_cluster_id: pick("cluster_id"),
+        created_at: new Date().toISOString(), closed_at: null, messages: [],
+      };
+      chatSessions.push(row);
+      return HttpResponse.json(row, { status: 201 });
+    }),
+    http.get(url("/chat/sessions/:id"), ({ params }) => {
+      const row = chatSessions.find((c) => c.id === params.id);
+      return row ? HttpResponse.json(row) : notFound("phiên chat");
+    }),
+    http.post(url("/chat/sessions/:id/messages"), async ({ params, request }) => {
+      const session = chatSessions.find((c) => c.id === params.id);
+      if (!session) return error(404, "NOT_FOUND", "phiên chat không tồn tại");
+      const content = String(((await request.json()) as { content?: unknown }).content ?? "").trim();
+      if (!content) return error(422, "EMPTY_MESSAGE", "câu hỏi rỗng");
+      if (content.length > 4000) return error(422, "MESSAGE_TOO_LONG", "câu hỏi dài quá 4000 ký tự");
+      const loaded: Array<{ kind: string; id: string | null }> = [];
+      const missing: Array<{ kind: string; id: string | null }> = [];
+      if (session.screen !== "M3") {
+        for (const k of CHAT_FOCUS_KEYS) {
+          const id = session[`context_${k}`];
+          if (!id) continue;
+          // As agent_ro: a sealed evaluation is not visible, whoever asks (BR-10).
+          const visible = k !== "evaluation_id" || views.evaluation(id, "JUDGE_VIEWER") !== null;
+          (visible ? loaded : missing).push({ kind: CHAT_KINDS[k], id });
+        }
+      }
+      const base = { session_id: session.id, attachments: [], proposed_action: null, confirmed_action_id: null,
+        created_at: new Date().toISOString() };
+      const user: ChatMessage = { ...base, id: ++chatMessageCount, role: "user", content, context_snapshot: {},
+        prompt_sha256: null, model: null };
+      const read = loaded.map((x) => `${x.kind} ${x.id}`).join(", ") || "danh sách của màn hình";
+      const assistant: ChatMessage = {
+        ...base, id: ++chatMessageCount, role: "assistant",
+        content: `(mock) MSW không có model. API thật sẽ đọc ${session.screen}: ${read}.`,
+        context_snapshot: { screen: session.screen, loaded, withheld: [], missing, truncated: false },
+        prompt_sha256: fakeSha(chatMessageCount), model: "msw-mock",
+      };
+      session.messages.push(user, assistant);
+      return HttpResponse.json({ user, assistant }, { status: 201 });
+    }),
     http.post(url("/sync/run"), ({ request }) => {
       const role = roleOf(request);
       if (role !== "ADMIN" && role !== "LEAD") {

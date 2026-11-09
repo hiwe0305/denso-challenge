@@ -962,3 +962,62 @@ export interface ExperimentDraft extends DraftBody {
   created_at: string;
   updated_at: string;
 }
+
+// ---------------------------------------------------------------- chat (read-only minimum)
+
+/** The record the chat pane reads with the open screen (§5.4 point 1: one key per kind). */
+export interface ChatFocus {
+  dataset_id?: string | null;
+  experiment_id?: string | null;
+  evaluation_id?: string | null;
+  recommendation_id?: string | null;
+  cluster_id?: string | null;
+}
+
+/** What one assistant turn loaded, as ids; never the prompt (§5.4 point 3). */
+export interface ChatContextSnapshot {
+  screen?: string;
+  loaded?: Array<{ kind: string; id: string | null }>;
+  /** Records dropped before the prompt because `data_class` is not public (R6). */
+  withheld?: Array<{ id: string | null; data_class: string }>;
+  /** Records asked for that the agent cannot see: unknown, or a sealed evaluation (BR-10). */
+  missing?: Array<{ kind: string; id: string | null }>;
+  truncated?: boolean;
+}
+
+/** One row of `agent_chat_messages`. `proposed_action` stays null while chat is read-only. */
+export interface ChatMessage {
+  id: number;
+  session_id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  context_snapshot: ChatContextSnapshot;
+  prompt_sha256: string | null;
+  model: string | null;
+  proposed_action: null;
+  confirmed_action_id: null;
+  attachments: unknown[];
+  created_at: string;
+}
+
+/** POST /chat/sessions, GET /chat/sessions/{id}: a session with its context columns. */
+export interface ChatSession {
+  id: string;
+  user_role: string;
+  title: string | null;
+  screen: string;
+  context_dataset_id: string | null;
+  context_experiment_id: string | null;
+  context_evaluation_id: string | null;
+  context_recommendation_id: string | null;
+  context_cluster_id: string | null;
+  created_at: string;
+  closed_at: string | null;
+  messages: ChatMessage[];
+}
+
+/** POST /chat/sessions/{id}/messages: the question and the answer, stored together. */
+export interface ChatTurn {
+  user: ChatMessage;
+  assistant: ChatMessage;
+}

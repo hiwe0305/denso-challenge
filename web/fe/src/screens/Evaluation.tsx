@@ -4,6 +4,7 @@
 // The simulator flag is the headline (ADR-14), the scorer sits beside it and
 // a gap above 5 points is a warning. Infra failures leave the denominator.
 // A failure family nobody produced is "chưa chạy", never "không lỗi" (BR-12).
+import { useFocus } from "../api/focus";
 import { useMemo, useState } from "react";
 import {
   useEvalEpisodes,
@@ -105,6 +106,7 @@ export function Evaluation() {
     [list.data, task, renderer, mode, split],
   );
   const current = evaluations.find((e) => e.evaluation_id === chosen) ?? evaluations[0] ?? null;
+  useFocus({ evaluation_id: current?.evaluation_id ?? null });
 
   if (list.isLoading) return <Loading />;
   if (list.error) return <ErrorBox error={list.error} />;

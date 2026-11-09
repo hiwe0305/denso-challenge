@@ -95,7 +95,7 @@ def test_parity_covers_every_read_endpoint_of_7_1(client: TestClient) -> None:
     """A read route nobody compares is a route that can drift; list them all."""
     paths = client.get("/openapi.json").json()["paths"]
     routes = {path for path, ops in paths.items() if "get" in ops and path.startswith("/api")}
-    assert len(routes) == 41
+    assert len(routes) == 42
     covered = set()
     for line in PARITY_CASES:
         path = line.split(" ", 1)[1].split("?")[0]
@@ -108,7 +108,10 @@ def test_parity_covers_every_read_endpoint_of_7_1(client: TestClient) -> None:
                 covered.add(route)
     # /actions/{id} is covered by the write tests below; it has no fixed id to record.
     # The SSE stream never ends, so it has no body to record; test_stream covers it.
-    assert routes - covered == {"/api/actions/{action_id}", "/api/notifications/stream"}
+    # A chat session exists only after a POST, and its reply depends on the model;
+    # test_chat covers it.
+    assert routes - covered == {"/api/actions/{action_id}", "/api/notifications/stream",
+                                "/api/chat/sessions/{session_id}"}
 
 
 # ---------------------------------------------------------------- §7.3 and rules

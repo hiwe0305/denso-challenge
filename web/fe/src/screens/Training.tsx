@@ -7,6 +7,7 @@
 // two HeCurve validated on white), train = slot 1, val = slot 2, fixed per
 // series. Both lines are direct-labelled and the table under the chart holds
 // the same numbers, so identity never rests on colour alone.
+import { useFocus } from "../api/focus";
 import { useState } from "react";
 import {
   CartesianGrid,
@@ -313,6 +314,10 @@ export function Training() {
   const experiments = useExperiments();
   const items = experiments.data?.items ?? [];
   const [picked, setPicked] = useState<string | null>(null);
+  useFocus({
+    experiment_id: (items.find((x) => x.experiment_id === picked) ?? items.find((x) => x.metric_rows > 0) ?? items[0])
+      ?.experiment_id ?? null,
+  });
   if (experiments.isLoading) return <Loading />;
   if (experiments.error) return <ErrorBox error={experiments.error} />;
   if (!items.length) return <EmptyState title="Chưa có thí nghiệm nào" />;

@@ -115,6 +115,22 @@ Lõi giả ghi theo bố cục của lõi, `<bảng>/part-<id>.jsonl`, vì bộ 
 qua tên thư mục. Bản trước ghi `decisions-<id>.jsonl` ở gốc inbox, bộ nạp bỏ qua
 file đó, nên vòng ghi chưa bao giờ khép.
 
+### Ngăn chat (bản chỉ đọc)
+
+Nút "Chat" trên thanh trên cùng mở ngăn bên phải. Nó hỏi về màn hình đang mở và
+bản ghi đang chọn; API nạp chúng như role `agent_ro` (không nhóm S, không eval
+niêm phong, không dữ liệu khác `public`) và chỉ lưu id đã nạp cùng sha256 của
+prompt (`web/api/chat.py`). Model phải chạy trên máy của đội, ví dụ Ollama đang
+phục vụ Agent QA/QC:
+
+```bash
+uv run python -m web.api --import-from mock/demo-17-11 --origin mock   --chat-url http://127.0.0.1:11434/v1 --chat-model <tên model>
+```
+
+Host không phải loopback hay mạng riêng thì API không mở (R6); host nội bộ có
+tên thì thêm `--chat-local-host <tên>`. Không có `--chat-url` thì API vẫn chạy và
+chat trả 503. Trên MSW, câu trả lời là một dòng `(mock)` liệt kê thứ API sẽ đọc.
+
 Hai bản của lớp đọc, cùng một tập route:
 
 - `SinkReadModel` tính từng view của `schema/70-views.sql` bằng Python trên các

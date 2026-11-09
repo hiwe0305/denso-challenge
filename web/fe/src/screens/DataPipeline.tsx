@@ -3,6 +3,7 @@
 // Each stage carries two labels side by side: the code check (the gate) and
 // the agent's reading (advice only, §1 rule 7). QA not run is its own count,
 // never folded into pass. Raw egocentric episodes lock every split action (BR-09).
+import { useFocus } from "../api/focus";
 import { useState } from "react";
 import {
   useDatasetEpisodes,
@@ -60,6 +61,7 @@ export function DataPipeline() {
   const [chosen, setChosen] = useState<string | null>(null);
   const items = datasets.data?.items ?? [];
   const current = items.find((d) => d.id === chosen) ?? items[0] ?? null;
+  useFocus({ dataset_id: current?.id ?? null });
 
   if (datasets.isLoading) return <Loading />;
   if (datasets.error) return <ErrorBox error={datasets.error} />;

@@ -2,7 +2,8 @@
 // with their milestone instead of rendering an empty page.
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { FocusProvider } from "./api/focus";
 import { role, setRole } from "./api/role";
 import { useChangeStream } from "./api/stream";
 import { userRole, type UserRole } from "./contracts/enums";
@@ -17,6 +18,7 @@ import { Release } from "./screens/Release";
 import { Results } from "./screens/Results";
 import { Training } from "./screens/Training";
 import { Bell } from "./ui/Bell";
+import { ChatPane } from "./ui/ChatPane";
 import { EmptyState } from "./ui/components";
 
 interface Screen {
@@ -60,7 +62,11 @@ function RolePicker() {
 
 export function App({ apiMode }: { apiMode: "mock" | "real" }) {
   useChangeStream(apiMode === "real");
+  const location = useLocation();
+  const [chatOpen, setChatOpen] = useState(false);
+  const current = screens.find((s) => location.pathname.startsWith(s.path))?.code ?? "M1";
   return (
+    <FocusProvider>
     <div className="min-h-screen">
       <nav className="sticky top-0 z-10 flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-2 text-sm">
         <span className="mr-2 shrink-0 font-semibold">Data Flywheel</span>
@@ -82,9 +88,15 @@ export function App({ apiMode }: { apiMode: "mock" | "real" }) {
           ) : null}
           <RolePicker />
           <Bell />
+          <button type="button" aria-label="mở ngăn chat" aria-pressed={chatOpen}
+            className={`rounded px-2 py-0.5 text-xs ${chatOpen ? "bg-slate-900 text-white" : "border border-slate-300 text-slate-700"}`}
+            title="Hỏi agent về màn hình đang mở; bản tối thiểu chỉ đọc"
+            onClick={() => setChatOpen((v) => !v)}>
+            Chat
+          </button>
         </div>
       </nav>
-      <main className="mx-auto max-w-[1500px] p-4">
+      <main className={`mx-auto max-w-[1500px] p-4 ${chatOpen ? "sm:pr-[24rem]" : ""}`}>
         <Routes>
           <Route path="/" element={<Navigate to="/tong-quan" replace />} />
           {screens.map((s) => (
@@ -95,6 +107,8 @@ export function App({ apiMode }: { apiMode: "mock" | "real" }) {
           <Route path="*" element={<EmptyState title="Không có màn hình này" />} />
         </Routes>
       </main>
+      {chatOpen ? <ChatPane screen={current} onClose={() => setChatOpen(false)} /> : null}
     </div>
+    </FocusProvider>
   );
 }

@@ -6,16 +6,22 @@
 `--import-from` runs `fwsync import` into the sink first, so one command
 brings up the API on the demo mock. The FE talks to it with
 `VITE_API_MODE=real npm run dev` (Vite proxies `/api` to port 8000).
+
+The chat pane needs a model on a machine of ours (R6), e.g. the Ollama that
+serves Agent QA/QC: `--chat-url http://127.0.0.1:11434/v1 --chat-model <name>`.
+Without `--chat-url` the API runs and the chat answers 503.
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
 from web.api.actions import ActionStore
 from web.api.app import SyncConfig, create_app
+from web.api.chat import LocalEndpoint
 from web.api.readmodel import SinkReadModel, SinkTables
 
 
@@ -35,6 +41,12 @@ def main(argv: list[str] | None = None) -> int:
                         help="nơi lõi (hoặc lõi giả) ghi kết quả để nạp lại")
     parser.add_argument("--fake-core", action="store_true",
                         help="để lõi giả trả lời outbox ngay trong `POST /sync/run` (mốc M4)")
+    parser.add_argument("--chat-url", default=os.environ.get("FW_WEB_CHAT_URL"),
+                        help="endpoint OpenAI-style (…/v1) của model chat, chỉ máy của đội (R6)")
+    parser.add_argument("--chat-model", default=os.environ.get("FW_WEB_CHAT_MODEL"),
+                        help="tên model mà endpoint phục vụ")
+    parser.add_argument("--chat-local-host", action="append", default=[],
+                        help="tên host trong mạng của đội được coi là máy của ta (lặp được)")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args(argv)
@@ -55,9 +67,22 @@ def main(argv: list[str] | None = None) -> int:
 
     import uvicorn
 
+    chat_model = None
+    if args.chat_url:
+        if not args.chat_model:
+            print("--chat-url cần --chat-model", file=sys.stderr)
+            return 2
+        try:
+            chat_model = LocalEndpoint(base_url=args.chat_url, model=args.chat_model,
+                                       local_hosts=tuple(args.chat_local_host))
+        except ValueError as error:
+            print(error, file=sys.stderr)
+            return 2
+
     sync = SyncConfig(outbox=args.outbox, inbox=args.inbox, sink=args.sink,
                       fake_core=args.fake_core, origin=args.origin)
-    app = create_app(SinkReadModel(SinkTables(args.sink)), ActionStore(args.state), sync)
+    app = create_app(SinkReadModel(SinkTables(args.sink)), ActionStore(args.state), sync,
+                     chat_model)
     uvicorn.run(app, host=args.host, port=args.port)
     return 0
 
