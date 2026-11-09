@@ -19,6 +19,13 @@ is the RunPlan's interpretation doc, not this module.
 
     python -m flywheel_psi0.tray.eval_results configs/runplans/tray/he-tray-v2.yaml \
         --set <eval set> --out <eval_batch dir> --json results.json
+
+With `--baseline <eval_batch dir of the same set>`, `paired` adds the per-condition
+counts and, for the headline levels pooled and for each level, the paired difference
+variant - baseline with its bootstrap CI (the per-condition differences resampled within
+each level, the plan's `stats`) and the exact two-sided McNemar p on the discordant
+pairs: the measures of branch B's reading rules (docs/he/tray.md 18.2). `ci_vs_0` says
+where the CI lies; reading it is the doc's.
 """
 
 from __future__ import annotations
@@ -36,7 +43,7 @@ from typing import Any
 import numpy as np
 
 from flywheel_psi0.tray.eval_batch import Chunk, attempts, chunk_plan, finished, phases_for
-from flywheel_psi0.tray.runplan import TrayRunPlan
+from flywheel_psi0.tray.runplan import Stats, TrayRunPlan
 
 # flywheel_simple.tray.predicates.STEP_NAMES; SIMPLE's venv is not this package's.
 STEP_NAMES = ("approach_a", "grasp", "lift", "carry", "reach_b", "place", "release_stand")
@@ -94,6 +101,50 @@ def bootstrap_ci(
     means = sums / total
     tail = (1 - ci) / 2
     return float(np.quantile(means, tail)), float(np.quantile(means, 1 - tail))
+
+
+def mcnemar_exact(variant_only: int, baseline_only: int) -> float:
+    """Exact two-sided McNemar p: the smaller discordant count under Binomial(n, 1/2)."""
+    n = variant_only + baseline_only
+    if n == 0:
+        return 1.0
+    tail = sum(math.comb(n, i) for i in range(min(variant_only, baseline_only) + 1))
+    return min(1.0, 2.0 * tail / float(2**n))
+
+
+def paired_diff(
+    variant: Sequence[Rollout], baseline: Sequence[Rollout], levels: Sequence[int], stats: Stats
+) -> dict[str, Any]:
+    """Paired success difference variant - baseline over the conditions of `levels`.
+
+    d_i = s_variant,i - s_baseline,i per condition (level, seed); the difference is the
+    mean of d_i and its CI resamples d_i within each level, with the plan's resamples,
+    seed and level, so the two sides stay paired (docs/he/tray.md 2, 9 and 18.2).
+    """
+    a = {(r.level, r.seed): int(bool(r.row["success"])) for r in variant if r.level in levels}
+    b = {(r.level, r.seed): int(bool(r.row["success"])) for r in baseline if r.level in levels}
+    if a.keys() != b.keys():
+        raise ValueError("variant and baseline cover different conditions")
+    groups = [[a[k] - b[k] for k in sorted(a) if k[0] == level] for level in levels]
+    groups = [g for g in groups if g]
+    n = sum(len(g) for g in groups)
+    if n == 0:
+        raise ValueError(f"no condition at levels {list(levels)}")
+    variant_only = sum(1 for k in a if a[k] > b[k])
+    baseline_only = sum(1 for k in a if a[k] < b[k])
+    low, high = bootstrap_ci(groups, stats.resamples, stats.seed, stats.ci)
+    return {
+        "levels": list(levels),
+        "n": n,
+        "variant": sum(a.values()),
+        "baseline": sum(b.values()),
+        "diff": round(sum(sum(g) for g in groups) / n, 4),
+        "ci": (round(low, 4), round(high, 4)),
+        "ci_vs_0": "above" if low > 0 else "below" if high < 0 else "contains",
+        "variant_only": variant_only,
+        "baseline_only": baseline_only,
+        "mcnemar_exact_p": round(mcnemar_exact(variant_only, baseline_only), 4),
+    }
 
 
 def wilson(k: int, n: int, z: float = Z95) -> tuple[float, float]:
@@ -331,12 +382,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         if base_missing:
             raise ValueError(f"baseline misses {base_missing}")
         result["paired"] = paired(chosen, base)
+        if plan.eval.by_level is not None:
+            headline = [c.level for c in plan.eval.by_level if c.headline]
+            result["paired"]["headline"] = paired_diff(chosen, base, headline, plan.stats)
+            result["paired"]["by_level"] = {
+                str(c.level): paired_diff(chosen, base, [c.level], plan.stats)
+                for c in plan.eval.by_level
+                if any(r.level == c.level for r in chosen)
+            }
     if args.json is not None:
         args.json.write_text(json.dumps(result, indent=1) + "\n")
     print(table(result))
-    counts = {"missing": len(result["missing"]), "yaw": result.get("yaw")}
+    counts: dict[str, Any] = {"missing": len(result["missing"]), "yaw": result.get("yaw")}
     if "paired" in result:
-        counts["paired"] = {k: result["paired"][k] for k in ("success_gain", "place_gain")}
+        brief = {k: result["paired"][k] for k in ("success_gain", "place_gain")}
+        if "headline" in result["paired"]:
+            brief["headline"] = result["paired"]["headline"]
+        counts["paired"] = brief
     print(json.dumps({k: result[k] for k in ("rule0", "rollouts", "extra_rollouts")} | counts))
     return 0
 

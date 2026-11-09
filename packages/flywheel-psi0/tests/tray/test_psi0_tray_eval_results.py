@@ -13,7 +13,9 @@ from flywheel_psi0.tray.eval_results import (
     STEP_NAMES,
     bootstrap_ci,
     collect,
+    mcnemar_exact,
     paired,
+    paired_diff,
     reached,
     summarize,
     table,
@@ -199,3 +201,54 @@ def test_paired_counts_per_condition_and_the_gains(tmp_path: Path) -> None:
     assert result["steps"]["place"]["variant_only"] == 3 and result["place_gain"] == 2
     with pytest.raises(ValueError):
         paired(var[:3], base)
+
+
+def test_mcnemar_exact_two_sided() -> None:
+    assert mcnemar_exact(0, 0) == 1.0
+    assert mcnemar_exact(5, 0) == mcnemar_exact(0, 5) == pytest.approx(2 / 32)
+    assert mcnemar_exact(10, 2) == pytest.approx(2 * (1 + 12 + 66) / 4096)  # 0.0386
+    assert mcnemar_exact(3, 3) == 1.0  # capped
+
+
+def _two_level_runs(tmp_path: Path, var_ok: dict[int, list[bool]], base_ok: dict[int, list[bool]]):
+    chunks = [
+        Chunk(f"l{lv}-000", lv, 0, tuple(1000100 + i for i in range(len(var_ok[lv]))))
+        for lv in var_ok
+    ]
+    for name, oks in (("var", var_ok), ("base", base_ok)):
+        for chunk in chunks:
+            for i, ok in enumerate(oks[chunk.level]):
+                episode(tmp_path / name, chunk, 0, i, success=ok, steps=5)
+    var, _, _ = collect(tmp_path / "var", chunks)
+    base, _, _ = collect(tmp_path / "base", chunks)
+    return var, base
+
+
+def test_paired_diff_resamples_the_differences_within_each_level(tmp_path: Path) -> None:
+    # level 1: variant 3/4 vs 0/4; level 2: variant 1/4 vs 1/4 (one swap)
+    var, base = _two_level_runs(
+        tmp_path,
+        {1: [True, True, True, False], 2: [True, False, False, False]},
+        {1: [False, False, False, False], 2: [False, True, False, False]},
+    )
+    result = paired_diff(var, base, [1, 2], PLAN.stats)
+    assert (result["n"], result["variant"], result["baseline"]) == (8, 4, 1)
+    assert result["diff"] == pytest.approx(3 / 8)
+    assert (result["variant_only"], result["baseline_only"]) == (4, 1)
+    assert result["mcnemar_exact_p"] == pytest.approx(round(mcnemar_exact(4, 1), 4))
+    groups = [[1, 1, 1, 0], [1, -1, 0, 0]]
+    expected = bootstrap_ci(groups, PLAN.stats.resamples, PLAN.stats.seed, PLAN.stats.ci)
+    assert result["ci"] == pytest.approx(expected, abs=1e-4)
+    assert result["ci_vs_0"] == ("above" if expected[0] > 0 else "contains")
+    only_2 = paired_diff(var, base, [2], PLAN.stats)
+    assert (only_2["n"], only_2["diff"], only_2["ci_vs_0"]) == (4, 0.0, "contains")
+
+
+def test_paired_diff_reads_below_zero_and_refuses_other_conditions(tmp_path: Path) -> None:
+    var, base = _two_level_runs(tmp_path, {1: [False] * 6}, {1: [True] * 6})
+    result = paired_diff(var, base, [1], PLAN.stats)
+    assert (result["diff"], result["ci"], result["ci_vs_0"]) == (-1.0, (-1.0, -1.0), "below")
+    with pytest.raises(ValueError, match="different conditions"):
+        paired_diff(var[:5], base, [1], PLAN.stats)
+    with pytest.raises(ValueError, match="no condition"):
+        paired_diff(var, base, [2], PLAN.stats)
