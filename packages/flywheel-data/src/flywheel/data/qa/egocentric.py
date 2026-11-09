@@ -31,10 +31,11 @@ decision is the worst `on_fail` of the failed checks, as in robot QA.
 A person's review is the last word on segments (D6: rules, then models, then a person;
 task 9, 9/11/2026). When every segment has `label_source = human`, nothing the rules
 left open is still open, so `segment_ambiguous` is 0. When the only segment is human and
-its sentence is the episode's instruction, the person kept the clip as one whole-task
-sample (Hiếu 9/11/2026: the team's 2-3 s tray clips), so `segment_count` needs 1 and the
-report records that threshold. A lone human segment with a step sentence (an EgoDex pick
-whose place was rejected) still fails: the place is lost.
+its sentence is the episode's instruction and it is at least `min_frames` long, the
+person kept the clip as one whole-task sample (Hiếu 9/11/2026: the team's 2-3 s tray
+clips), so `segment_count` needs 1 and the report records that threshold. A lone human
+segment with a step sentence (an EgoDex pick whose place was rejected) still fails: the
+place is lost.
 """
 
 from __future__ import annotations
@@ -163,12 +164,14 @@ def human_reviewed(segments: Sequence[EgoSegment]) -> bool:
     return bool(segments) and all(s.label_source == "human" for s in segments)
 
 
-def whole_task_sample(segments: Sequence[EgoSegment], instruction: str) -> bool:
-    """One human segment whose sentence is the episode's instruction: a person kept the
-    clip as one sample of the whole task."""
+def whole_task_sample(segments: Sequence[EgoSegment], instruction: str,
+                      min_frames: float) -> bool:
+    """One human segment, at least `min_frames` long, whose sentence is the episode's
+    instruction: a person kept the clip as one sample of the whole task."""
     def norm(text: str) -> str:
         return " ".join(text.split()).casefold()
     return (len(segments) == 1 and human_reviewed(segments) and bool(norm(instruction))
+            and segments[0].frame_end - segments[0].frame_start >= min_frames
             and norm(segments[0].description) == norm(instruction))
 
 
@@ -216,7 +219,7 @@ def run_ego_qa(item: EgoQAInput, cfg: EgoConfig) -> QAReport:
           f"{len(item.segments)} segments")
     # a pick-and-place episode has a pick and a place at least; one segment means an
     # event was lost (review of PR 152: a model frame 0 left ep_603d1475 one pick)
-    whole = whole_task_sample(item.segments, item.instruction)
+    whole = whole_task_sample(item.segments, item.instruction, cfg.qa["min_frames"].threshold)
     judge("segment_count", len(item.segments), "a pick and a place at least", below=True,
           threshold=1.0 if whole else None)
     judge("segment_ambiguous", 0.0 if human_reviewed(item.segments) else item.unresolved_share)

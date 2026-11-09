@@ -168,6 +168,8 @@ def test_one_human_segment_with_the_whole_task_sentence_is_a_sample(cfg: EgoConf
 @pytest.mark.parametrize("segments", [
     # EgoDex: a person kept the pick and rejected the place; the place is still lost
     human(EgoSegment(0, 45, "pick", "pick up the cup", "rule")),
+    # a person's whole-task segment shorter than min_frames (30): too short to be a sample
+    human(EgoSegment(20, 49, "pick", WHOLE_TASK, "rule")),
     # the whole-task sentence, but no person said so
     (EgoSegment(0, FRAMES, "pick", WHOLE_TASK, "rule"),),
     (EgoSegment(0, FRAMES, "pick", WHOLE_TASK, "model"),),
