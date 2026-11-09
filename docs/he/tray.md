@@ -1492,6 +1492,29 @@ $PY -m flywheel_psi0.tray.eval_results $PLAN --set $SET --out $EV/eval-b-simread
 - `metrics` để `null` tới khi eval B xong. Khi đó điền từ `eval_results --baseline` (mục 18.5).
 - `subject_id` là id nháp `rp_97922261b774`. Ở nhiệm vụ con 4.7 nó đổi thành id đóng băng; test `test_the_b_decision_is_an_open_draft_on_the_b_plan_and_its_rules` báo lỗi cho tới khi sửa.
 
+### 18.7 Ước lượng chi phí (nhiệm vụ con 4.6)
+
+Giả định, chưa đo. Dòng `estimated` trong [sổ chi phí](../g0/ledger/DA-34.csv), ghi trước mọi lượt của B:
+
+| Job | Ước lượng | Căn cứ |
+|---|---|---|
+| `job_da34_ft_B` | 16,0 CU (Colab L4), cap 18, sàn 14 | Như C đo được: 15,99 CU, 8,27 giờ, 0,724 s/bước; cùng recipe, cùng bản cắt, 40 000 bước. Chép thư mục VLM từ Drive thay cho tải trọng số VLM của C (khoảng 4,3 GB), coi như không đổi |
+| `job_da34_eval_B` | 17,3 giờ `rtx3060`, 0 CU | Như eval C SimReady đo được 17,25 giờ, cộng thời gian khởi động server |
+| Stage 1 | Không tính ở đây | Sổ chi phí của DA-30 ([`DA-30.csv`](../g0/ledger/DA-30.csv)), nhiệm vụ 2 của DA-30, trần 4 CU |
+
+Số dư Colab ngày 9/11 là 14,88 CU (mục 17.8). Nó không đủ cho cap 18 cộng sàn 14, nên phải mua thêm CU trước khi launch stage 3 B.
+
+### 18.8 Việc còn lại
+
+- **Phía DA-30** (nhiệm vụ con 2.2 của DA-30). Checkpoint stage 1 cần đúng dạng mà `colab_train --branch B` nhận:
+  - một thư mục trên Drive chứa mọi file của thư mục `pre.fast.1by1.2601091803.ckpt.ego200k.he30k` ở psi-model `cb1480f`, cùng tên và trùng từng byte, trừ `model.safetensors`;
+  - `model.safetensors` là trọng số sau stage 1, một file, khóa theo tên của Qwen3VL như `PretrainTrainer.save_checkpoint` ghi (`accelerator.save_model` trên mô hình Qwen3VL; `src/psi/trainers/pretrain.py` dòng 441–447 ở `cda3fdf`);
+  - không file thừa như optimizer hay trạng thái accelerate.
+
+  Lý do: `save_model` chỉ ghi trọng số, còn `from_pretrained` cần config, tokenizer và processor. Khi có thư mục, chạy `colab_train manifest --folder <thư mục>` để lấy hai sha256.
+- **4.7.** Điền `job_id`, `drive_dir`, `weights_sha256`, `manifest_sha256` vào `he-tray-b.yaml`, bỏ `status: draft`, `runplan freeze`. Đặt `B_FROZEN` trong `colab_train`. Đổi `subject_id` của `Decision` sang id mới. Hiếu duyệt luật 18.2 (nhãn ngoài khối, không đổi sha256) rồi launch.
+- **4.8.** Script `serve-b.sh` và `launch-eval-b.sh` trên `rtx3060`, eval B, đọc theo 18.2, điền `Decision`, dòng thực đo.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -1523,3 +1546,4 @@ $PY -m flywheel_psi0.tray.eval_results $PLAN --set $SET --out $EV/eval-b-simread
 | 9/11/2026 | Mục 18.4: `colab_train --branch B` (chỉ plan B đã đóng băng và duyệt; VLM stage 1 từ Drive, kiểm sha256 trọng số, manifest cả thư mục, file khác trùng VLM của C; cha stage 1 thêm vào recipe trong bộ nhớ) và runbook Colab cho B, chưa chạy | Hiếu (soạn với Claude) |
 | 9/11/2026 | Mục 18.5: runbook eval B (như eval C SimReady, sau eval C+) và cách đọc bằng `eval_results --baseline`: hiệu ghép cặp, CI bootstrap theo mức, McNemar chính xác; luật 18.2 không đổi | Hiếu (soạn với Claude) |
 | 9/11/2026 | Mục 18.6: `Decision` nháp của B (`he-tray-b.decision.json`, `open`, chờ eval B và chữ ký của Hiếu) | Hiếu (soạn với Claude) |
+| 9/11/2026 | Mục 18.7–18.8: ước lượng stage 3 B (16,0 CU, cap 18, sàn 14) và eval B (17,3 giờ `rtx3060`), stage 1 ở sổ DA-30; dạng checkpoint stage 1 mà B nhận và việc còn lại (4.7, 4.8) | Hiếu (soạn với Claude) |
