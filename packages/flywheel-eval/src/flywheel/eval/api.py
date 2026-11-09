@@ -41,7 +41,7 @@ from flywheel.eval.diagnosis.train.artifact import (
     load_job,
     write_artifact,
 )
-from flywheel.eval.scorer.agreement import AgreementReport, compare
+from flywheel.eval.scorer.agreement import AgreementReport, ScorerKey, compare
 from flywheel.eval.scorer.artifact import build_record, write_record
 from flywheel.eval.scorer.calibration import read_rollouts, read_scores, store_report
 from flywheel.eval.scorer.reader import read_trace
@@ -112,11 +112,16 @@ def score_record(score: EpisodeScore, level: int | None = None) -> Score:
 
 
 def check_scorer_agreement(
-    scores_path: Path, rollouts_path: Path, release_id: str
+    scores_path: Path,
+    rollouts_path: Path,
+    release_id: str,
+    scorer: ScorerKey | None = None,
 ) -> AgreementReport:
     """Compare stored `Score` records with SIMPLE's flag on the same episodes (DA-37 AC 1, 2).
 
     `scores_path` is a JSONL of `Score`, such as `<store>/scorer/score.jsonl`.
+    That file is append-only and may hold several scorers; `scorer` names the
+    one to check, and the others are left out before pairing.
     `rollouts_path` is a directory holding the `<trace_id>/rollout_result.json`
     of the same eval run, or one such file. A score pairs with the rollout
     whose `trace_ref.trace_id` is its `episode_id`, which is what
@@ -124,10 +129,16 @@ def check_scorer_agreement(
     the evaluated checkpoint was trained on; it goes into the report as given.
 
     Raises `CalibrationInputError` on a file that does not parse and
-    `ScorerError` on a set that cannot make one report: two different scores
-    of one episode, scores from two scorers, or no score at all.
+    `ScorerError` on a set that cannot make one report: no score of the chosen
+    scorer, scores from two scorers with none chosen, two different scores of
+    one episode under one scorer, or no score that pairs with any rollout.
     """
-    return compare(read_scores(scores_path), read_rollouts(rollouts_path, ROLLOUT_NAME), release_id)
+    return compare(
+        read_scores(scores_path),
+        read_rollouts(rollouts_path, ROLLOUT_NAME),
+        release_id,
+        scorer,
+    )
 
 
 def store_scorer_agreement(report: AgreementReport, store_path: Path) -> tuple[str, Path]:
