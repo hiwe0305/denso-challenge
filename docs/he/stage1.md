@@ -254,9 +254,9 @@ Một điều cần ghi cạnh kết quả của B: action header `postpre.*` đ
 
 ### 2.4 RunPlan `tray-ego-b.yaml`
 
-[`tray-ego-b.yaml`](../../configs/runplans/stage1/tray-ego-b.yaml), `run_plan_id` `rp_ecd2bb11c415` từ khi ghim bản export đã làm sạch ngày 9/11/2026 (mục 2.9); trước đó, với giá trị giữ chỗ, là `rp_6a66a6ff082c`. `runplan check` qua và in "draft" kèm lý do.
+[`tray-ego-b.yaml`](../../configs/runplans/stage1/tray-ego-b.yaml), `run_plan_id` `rp_64bde22a5dda` từ khi ghim bản export đã làm sạch ngày 9/11/2026 (mục 2.9; lần ghim đầu là `rp_ecd2bb11c415`); trước đó, với giá trị giữ chỗ, là `rp_6a66a6ff082c`. `runplan check` qua và in "draft" kèm lý do.
 
-**Bản nháp.** Khối `dataset.source` đã ghim bản export thật (`egx_b6e974e46e8222e8`, mục 2.9); plan vẫn có `status: draft` vì bản export do mã của PR #173 và #174 tạo ra, chưa merge. `colab setup` từ chối plan nháp trước khi làm bất cứ gì (không tốn CU); `check` và `setup` in lý do "marked `status: draft` with every pin set". Quy tắc chung: plan có giá trị giữ chỗ (`egx_0000000000000000`, sha256 toàn số 0) bắt buộc ghi `draft`, nếu không `runplan check` báo lỗi; plan đã ghim đủ được phép giữ `draft`. `status` nằm ngoài `run_plan_id` (như plan của DA-34), nên bỏ nó đi không đổi id. Để chạy: làm theo mục 2.6 bước 3.
+**Bản nháp.** Khối `dataset.source` đã ghim bản export thật (`egx_7b43c30dc5d88cd7`, mục 2.9); plan vẫn có `status: draft` vì bản export do mã của PR #173 và #174 tạo ra, chưa merge. `colab setup` từ chối plan nháp trước khi làm bất cứ gì (không tốn CU); `check` và `setup` in lý do "marked `status: draft` with every pin set". Quy tắc chung: plan có giá trị giữ chỗ (`egx_0000000000000000`, sha256 toàn số 0) bắt buộc ghi `draft`, nếu không `runplan check` báo lỗi; plan đã ghim đủ được phép giữ `draft`. `status` nằm ngoài `run_plan_id` (như plan của DA-34), nên bỏ nó đi không đổi id. Để chạy: làm theo mục 2.6 bước 3.
 
 | Khối | Giá trị | Lý do |
 |---|---|---|
@@ -306,7 +306,7 @@ Chưa chạy. Điều kiện trước:
 
 1. PR này merge vào `master`; chạy từ `master`, không từ nhánh.
 2. PR #170 (`data_class` `public` cho video của đội) đã merge.
-3. Bản export đã ghim (mục 2.9). Sau khi PR #173 và #174 merge: đưa `fwdata/egocentric-export/tarballs/egx_b6e974e46e8222e8.tar` (sha256 `61c3497a…afc8`, 48 701 440 byte) lên `MyDrive/denso/da30/exports/`; một PR nhỏ bỏ `status: draft` khỏi `tray-ego-b.yaml`; `runplan check` in `OK rp_ecd2bb11c415` không còn chữ "draft".
+3. Bản export đã ghim (mục 2.9). Sau khi PR #173 và #174 merge: đưa `fwdata/egocentric-export/tarballs/egx_7b43c30dc5d88cd7.tar` (sha256 `666a67fc…f84a`, 48 701 440 byte) lên `MyDrive/denso/da30/exports/`; một PR nhỏ bỏ `status: draft` khỏi `tray-ego-b.yaml`; `runplan check` in `OK rp_64bde22a5dda` không còn chữ "draft".
 4. Đọc `stats_coverage` của bản export trên CPU trước khi tốn GPU (mục 2.4).
    - Che danh tính: `identity_masked: true` là lời khẳng định của plan, không phải điều `setup` kiểm được. `verify_export` chỉ kiểm `source.deid_waiver` là null và `data_class` khớp plan; việc làm mờ mặt trước mọi bước khác là mã của DA-04 (`fw egocentric deid`), cần đúng trước khi bỏ `draft`.
 5. `colab sessions` trống: một đợt một lúc trên tài khoản (mục 1.6).
@@ -463,37 +463,39 @@ Còn lại sau đề xuất: 3,9 % là trên bản thử, không phải bản th
 
 ### 2.9 Ghim bản export đã làm sạch (9/11/2026)
 
-DA-04 làm sạch tư thế theo đề xuất của mục 2.8 (PR #174; QA ở PR #173) và xuất lại cùng 132 clip: `egx_b6e974e46e8222e8`, 7804 khung, `data_class` `public`, không miễn trừ che danh tính, `verify_export` qua. DA-04 đo 3,8 % giá trị bị cắt bằng cách đo của mục 2.8.
+DA-04 làm sạch tư thế theo đề xuất của mục 2.8 (PR #174; QA ở PR #173) và xuất lại cùng 132 clip. Lần ghim đầu (`egx_b6e974e46e8222e8`) dùng mã làm sạch có lỗi mà review của PR #174 tìm ra. DA-04 đã sửa: khung nhảy giờ được dò so với một mốc cục bộ bền (bắt cả chuỗi khung lệch từ đầu clip và các đợt nhảy liền nhau), và bước nhảy của đầu ngón cũng được xét. Plan giờ ghim bản xuất lại bằng mã đã sửa (PR #174 ở `ac3637da`): `egx_7b43c30dc5d88cd7`, 7804 khung, `data_class` `public`, không miễn trừ che danh tính, `verify_export` qua. DA-04 đo 3,3 % giá trị bị cắt bằng cách đo của mục 2.8.
 
-**Loader check, như mục 2.7** (cùng image, cùng mã `cda3fdf`, chỉ CPU, argv của `tray-ego-b.yaml`, 8 CPU, 4 worker, thư mục dữ liệu ghi được):
+**Loader check, như mục 2.7** (cùng image, cùng mã `cda3fdf`, chỉ CPU, argv của `tray-ego-b.yaml`, 8 CPU, 4 worker, trên một bản chép ghi được):
 
-| Mục | Bản đã làm sạch | Bản thử (mục 2.7) |
+| Mục | `egx_7b43…` (ghim) | `egx_b6e9…` (lần ghim đầu, bỏ) | Bản thử (mục 2.7) |
+|---|---|---|---|
+| Mẫu train, test | 132, 0 | 132, 0 | 132, 0 |
+| Một epoch | 8 batch × 16 = 128 | như vậy | như vậy |
+| `input_ids` | 16 × 192–195 | 16 × 193–195 | 16 × 191–195 |
+| Ảnh, action thô | lưới 1 × 16 × 30, `pixel_values` 7680 × 1536; 1 × 48 | như vậy | như vậy |
+| Token action FAST mỗi mẫu | 1–44 | 1–44 | 1–44 |
+| NaN, `problems` | không có, rỗng | không có, rỗng | không có, rỗng |
+| Thời gian | batch đầu 1,6 s, sau đó 0,01–0,3 s | batch đầu 1,5 s, sau đó 0,01–0,5 s | như vậy |
+| **`actions.clipped_value_share`** | **3,6 %** | 4,3 % | 41,6 % |
+| `actions.samples_with_a_clipped_dim` | 60,9 % | 61,7 % | 89,8 % |
+| `actions.one_token_samples` | 9 / 128 (7,0 %) | 9 / 128 | 9 / 128 |
+| 5 epoch (640 mẫu): giá trị / mẫu bị cắt | 3,3 % / 53,9 % | 3,7 % / 55,3 % | 41 % / 90 % |
+
+128 mẫu là ít cho một số gần ngưỡng, nên đo thêm 5 epoch (640 mẫu) bằng script riêng của mục 2.7. Loader có seed cố định (seed 7), nên chạy lại cho đúng cùng các mẫu đó: đây là một phép đo, không phải hai. (Bản đầu của mục này ghi "hai lần" như thể hai mẫu độc lập; sửa ngày 9/11/2026.) Với bản ghim, 3,3 % khớp với số của DA-04. Phần còn bị cắt vẫn nằm ở cổ tay trái: pitch 32 %, y 19 %, roll 16 %; cổ tay phải pitch 10 %; mọi chiều khác dưới 10 %. Mẫu một token vẫn là delta bằng 0 ở ba khung cuối mỗi clip (mục 2.7, kết quả 2); làm sạch không đổi điều này.
+
+**Qua ngưỡng 5 % của mục 2.7, nên ghim.** Tarball đóng bằng `pack` từ thư mục export gốc (chưa bị loader ghi `filelist_cache.pkl`); đóng hai lần cho cùng sha256, và `fetch` (kể cả kiểm số mẫu) nhận lại nó như `setup` sẽ làm (132 mẫu, 7804 khung).
+
+| Trường của `dataset.source` | Ghim hiện tại | Lần ghim đầu (bỏ, lịch sử) |
 |---|---|---|
-| Mẫu train, test | 132, 0 | 132, 0 |
-| Một epoch | 8 batch × 16 = 128 | như vậy |
-| `input_ids` | 16 × 193–195 | 16 × 191–195 |
-| Ảnh, action thô | lưới 1 × 16 × 30, `pixel_values` 7680 × 1536; 1 × 48 | như vậy |
-| Token action FAST mỗi mẫu | 1–44 | 1–44 |
-| NaN, `problems` | không có, rỗng | không có, rỗng |
-| Thời gian | batch đầu 1,5 s, sau đó 0,01–0,5 s | như vậy |
-| **`actions.clipped_value_share`** | **4,3 %** | 41,6 % |
-| `actions.samples_with_a_clipped_dim` | 61,7 % | 89,8 % |
-| `actions.one_token_samples` | 9 / 128 (7,0 %) | 9 / 128 |
+| `export_id` | `egx_7b43c30dc5d88cd7` | `egx_b6e974e46e8222e8` |
+| `tarball` dưới `MyDrive` | `denso/da30/exports/egx_7b43c30dc5d88cd7.tar` (chưa đưa lên Drive) | `denso/da30/exports/egx_b6e974e46e8222e8.tar` |
+| `sha256` | `666a67fc47ff9da1218718d3926b88bb9d7b8ad433ae311c0f636fbe01aaf84a` | `61c3497aa48bd59182aebadcdb5816d5d8a7de11cec0aa393c90eb32906bafc8` |
+| `bytes` | 48 701 440 | 48 701 440 |
+| `samples` | 132 | 132 |
+| `run_plan_id` | `rp_64bde22a5dda` | `rp_ecd2bb11c415` |
 
-128 mẫu là ít cho một số gần ngưỡng, nên chạy thêm 5 epoch (640 mẫu, hai lần) bằng script riêng của mục 2.7: 3,7 % giá trị và 55 % mẫu bị cắt, 7,8 % mẫu một token. Số này khớp với 3,8 % của DA-04. Phần còn bị cắt nằm chủ yếu ở cổ tay trái: pitch 34 %, y 19 %, roll 17 %; cổ tay phải pitch 15 %; mọi chiều khác dưới 10 %. Mẫu một token vẫn là delta bằng 0 ở ba khung cuối mỗi clip (mục 2.7, kết quả 2); làm sạch không đổi điều này.
+`dataset.id` là `team-ego-tray-clean-132`. Dòng `estimated` của sổ chi phí vẫn ghi id của bản nháp đầu `rp_6a66a6ff082c` (sổ là append-only; ước lượng CU không đổi). Tarball của lần ghim đầu không dùng nữa; không đưa nó lên Drive.
 
-**Qua ngưỡng 5 % của mục 2.7, nên ghim.** Tarball đóng bằng `pack` từ thư mục export gốc (chưa bị loader ghi `filelist_cache.pkl`), hai lần cho cùng sha256; `fetch` nhận lại nó như `setup` sẽ làm (132 mẫu, 7804 khung).
+**Plan vẫn là bản nháp.** Bản export do mã của PR #173 và #174 tạo ra, chưa merge, mà lần chạy chỉ khởi động từ `master`. Trước đây `runplan check` coi plan nháp đã ghim đủ là lỗi; giờ điều đó được phép, và `check` lẫn `setup` in lý do "marked `status: draft` with every pin set". `setup` vẫn từ chối trước khi cài hay tải gì. `status` nằm ngoài `run_plan_id`, nên khi bỏ `draft` id vẫn là `rp_64bde22a5dda` (test `test_dropping_the_draft_keeps_the_checks_and_the_id`). Việc còn lại trước khi chạy ở mục 2.6 bước 3. Nếu PR #174 còn đổi mã làm sạch trước khi merge, bản export phải xuất và ghim lại.
 
-| Trường của `dataset.source` | Giá trị |
-|---|---|
-| `export_id` | `egx_b6e974e46e8222e8` |
-| `tarball` | `denso/da30/exports/egx_b6e974e46e8222e8.tar` dưới `MyDrive` (chưa đưa lên Drive) |
-| `sha256` | `61c3497aa48bd59182aebadcdb5816d5d8a7de11cec0aa393c90eb32906bafc8` |
-| `bytes` | 48 701 440 |
-| `samples` | 132 |
-
-`dataset.id` đổi thành `team-ego-tray-clean-132`. `run_plan_id` là `rp_ecd2bb11c415`; dòng `estimated` của sổ chi phí vẫn ghi id cũ của bản nháp (sổ là append-only; ước lượng CU không đổi).
-
-**Plan vẫn là bản nháp.** Bản export này do mã của PR #173 và #174 tạo ra, chưa merge, mà lần chạy chỉ khởi động từ `master`. Trước đây `runplan check` coi plan nháp đã ghim đủ là lỗi; giờ điều đó được phép, và `check` lẫn `setup` in lý do "marked `status: draft` with every pin set". `setup` vẫn từ chối trước khi cài hay tải gì. `status` nằm ngoài `run_plan_id`, nên khi bỏ `draft` id vẫn là `rp_ecd2bb11c415` (test `test_dropping_the_draft_keeps_the_checks_and_the_id`). Việc còn lại trước khi chạy ở mục 2.6 bước 3.
-
-Lưu ý: 3,7–4,3 % là trên chính 132 clip đã dùng để chọn cách làm sạch ở mục 2.8, nên không phải số đo độc lập. Video quay thêm sau này cần đo lại bằng `loader_check`.
+Lưu ý: 3,3–3,6 % là trên chính 132 clip đã dùng để chọn cách làm sạch ở mục 2.8, nên không phải số đo độc lập. Video quay thêm sau này cần đo lại bằng `loader_check`.
