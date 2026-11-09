@@ -27,10 +27,18 @@ before the first job (design 6.4) cannot drift silently.
 (section 6.6, task 5): it inherits everything from the frozen plan and stays a
 draft until its targeted episodes exist.
 
+`he-tray-b.yaml` is branch B (task 4, AC 5): branch C of the frozen v2 plan with one
+change, the VLM parent, which is C's VLM fine-tuned at stage 1 by DA-30 on the team's
+egocentric clips (`Stage1Parent`). `variant_of` names the plan and branch it copies,
+and `check` fails on any other difference. Until DA-30's checkpoint is pinned (Drive
+folder, weights and folder sha256), `check` passes as a draft but `freeze` and
+`--launch` refuse (`stage1_pending`).
+
     python -m flywheel_psi0.tray.runplan check configs/runplans/tray/he-tray.yaml
     python -m flywheel_psi0.tray.runplan check configs/runplans/tray/he-tray-v2.yaml \
         --release ~/denso-da34-pool/fwdata/releases/tray_s1_f9433b028c52 --launch
     python -m flywheel_psi0.tray.runplan check configs/runplans/tray/round-tray-cplus.yaml
+    python -m flywheel_psi0.tray.runplan check configs/runplans/tray/he-tray-b.yaml
     python -m flywheel_psi0.tray.runplan freeze configs/runplans/tray/he-tray.yaml
 """
 
@@ -59,7 +67,13 @@ TRAINING_NEUTRAL_OVERRIDES = frozenset({"train.validation_steps"})
 STATUS_FIELDS = {"superseded_by", "status"}
 # The block of the interpretation doc that `Interpretation.rules_sha256` pins; the
 # label above it ([Đề xuất], [Đã chốt]) stays outside, so approving it keeps the id.
-RULES_MARKERS = ("<!-- tier2-rules -->", "<!-- /tier2-rules -->")
+# A plan names another block with `Interpretation.rules_marker` (branch B: branch-b-rules).
+RULES_MARKER = "tier2-rules"
+# Top-level fields a variant (`variant_of`) may set apart from the plan it copies.
+VARIANT_FIELDS = frozenset(
+    {"name", "status", "parents", "branches", "budget", "interpretation", "variant_of"}
+    | {"supersedes", "superseded_by"}
+)
 SPLIT_FILE = "configs/splits/default.yaml"
 
 
@@ -82,6 +96,44 @@ class Parent(_Frozen):
     action_header: Weights
     clean_for_main_task: bool  # Q0 (03 section 8.3 point 7)
     note: str = ""
+
+
+class Stage1Vlm(_Frozen):
+    """A VLM fine-tuned at stage 1 by another story's job, not a psi-model release file.
+
+    Branch B (docs/he/tray.md section 18): DA-30 fine-tunes the VLM of `from_parent` on
+    the team's egocentric clips and persists the whole folder (every file of the parent's
+    VLM folder, weights replaced) to Google Drive. The three pins stay null until that
+    checkpoint exists; `freeze` and `--launch` refuse while any is null.
+    """
+
+    from_parent: str  # parent of this plan whose VLM the stage 1 run started from
+    story: str  # the story whose job produced it (its cost is in that story's ledger)
+    ledger: str  # repo-relative ledger of that job
+    job_id: str | None = None
+    # Folder under MyDrive: what Qwen3VLForConditionalGeneration.from_pretrained loads.
+    drive_dir: str | None = None
+    weights_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    # sha256 of the folder manifest (colab_train.folder_manifest): every file, not only
+    # the weights, since no psi-model revision pins the config and tokenizer here.
+    manifest_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+
+
+class Stage1Parent(_Frozen):
+    """A parent whose VLM is a stage 1 checkpoint and whose action header is a release file."""
+
+    vlm_stage1: Stage1Vlm
+    action_header: Weights
+    clean_for_main_task: bool
+    note: str = ""
+
+
+class VariantOf(_Frozen):
+    """The frozen plan and branch a plan copies; `check` allows only VARIANT_FIELDS to differ."""
+
+    plan: str  # repo-relative
+    run_plan_id: str
+    branch: str
 
 
 class PsiModel(_Frozen):
@@ -215,6 +267,7 @@ class Interpretation(_Frozen):
     doc: str  # repo-relative
     delta_pp: float | None = Field(default=None, gt=0)  # delta of the HE-T rules (branch B)
     rules_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    rules_marker: str | None = None  # None: RULES_MARKER
 
 
 class Budget(_Frozen):
@@ -236,7 +289,7 @@ class TrayRunPlan(_Frozen):
     embodiment: str
     code: dict[str, Pin]
     psi_model: PsiModel
-    parents: dict[str, Parent]
+    parents: dict[str, Parent | Stage1Parent]
     release: Release
     demo_sets: DemoSetPins
     recipe: Recipe
@@ -260,6 +313,7 @@ class TrayRunPlan(_Frozen):
     # rules); no job launches it and it cannot be frozen until the status goes. Out of
     # the id and the lock like superseded_by.
     status: Literal["draft"] | None = None
+    variant_of: VariantOf | None = None  # branch B: branch C of v2 with one change
 
     @classmethod
     def load(cls, path: Path) -> TrayRunPlan:
@@ -340,9 +394,9 @@ def lock_path(plan_path: Path) -> Path:
     return plan_path.with_name(plan_path.name.removesuffix(".yaml") + ".lock.json")
 
 
-def rules_block(text: str) -> str:
-    """The text between the tier2-rules markers: exactly one pair, in order."""
-    begin, end = RULES_MARKERS
+def rules_block(text: str, marker: str | None = None) -> str:
+    """The text between the markers of one block (tier2-rules by default): one pair, in order."""
+    begin, end = f"<!-- {marker or RULES_MARKER} -->", f"<!-- /{marker or RULES_MARKER} -->"
     if text.count(begin) != 1 or text.count(end) != 1:
         raise ValueError(f"needs exactly one {begin} ... {end} block")
     start, stop = text.index(begin) + len(begin), text.index(end)
@@ -351,8 +405,8 @@ def rules_block(text: str) -> str:
     return text[start:stop]
 
 
-def rules_sha256(text: str) -> str:
-    return hashlib.sha256(rules_block(text).encode("utf-8")).hexdigest()
+def rules_sha256(text: str, marker: str | None = None) -> str:
+    return hashlib.sha256(rules_block(text, marker).encode("utf-8")).hexdigest()
 
 
 def file_sha256(path: Path) -> str:
@@ -376,14 +430,27 @@ def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
             problems.append(f"override {key} must be a positive step count, not {value!r}")
 
     for name, parent in plan.parents.items():
-        known = recipe.parents.get(name)
-        if known is None:
-            problems.append(f"parent {name} is not in {plan.recipe.file}")
-            continue
-        paired = [
-            (parent.vlm.path, known.model_name_or_path),
-            (parent.action_header.path, known.pretrained_action_header_path or ""),
-        ]
+        paired: list[tuple[str, str]]
+        if isinstance(parent, Stage1Parent):
+            # The VLM is not in the recipe; the action header is the one its base loads.
+            base_name = parent.vlm_stage1.from_parent
+            base = plan.parents.get(base_name)
+            known = recipe.parents.get(base_name)
+            if not isinstance(base, Parent) or known is None:
+                problems.append(f"parent {name}: from_parent {base_name} is no release parent")
+                continue
+            if parent.action_header != base.action_header:
+                problems.append(f"parent {name}: action header is not {base_name}'s")
+            paired = [(parent.action_header.path, known.pretrained_action_header_path or "")]
+        else:
+            known = recipe.parents.get(name)
+            if known is None:
+                problems.append(f"parent {name} is not in {plan.recipe.file}")
+                continue
+            paired = [
+                (parent.vlm.path, known.model_name_or_path),
+                (parent.action_header.path, known.pretrained_action_header_path or ""),
+            ]
         for hf_path, local in paired:  # a weight file inside the folder the recipe loads
             if Path(hf_path).parent.name != Path(local).name:
                 problems.append(f"parent {name}: {hf_path} is not {local} of the recipe")
@@ -466,7 +533,8 @@ def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
     if rules is not None:
         doc = plan.interpretation.doc
         try:
-            actual = rules_sha256((repo / doc).read_text(encoding="utf-8"))
+            text = (repo / doc).read_text(encoding="utf-8")
+            actual = rules_sha256(text, plan.interpretation.rules_marker)
         except (OSError, ValueError) as error:
             problems.append(f"{doc}: {error}")
         else:
@@ -478,6 +546,9 @@ def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
             if rel not in plan.pinned_files:
                 problems.append(f"pinned_files lacks {rel}, which the eval reads")
 
+    if plan.variant_of is not None:
+        problems += check_variant(plan, repo)
+
     split = yaml.safe_load((repo / SPLIT_FILE).read_text(encoding="utf-8"))
     dev = split["seed_ranges"][plan.eval.split]
     for level, seeds in plan.eval.seed_ranges():
@@ -487,6 +558,83 @@ def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
                 f" {plan.eval.split} range"
             )
     return problems
+
+
+def check_variant(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
+    """A variant against the frozen plan it copies: one branch, one stage 1 parent, nothing else.
+
+    Branch B is branch C of v2 with only the VLM parent changed: same demo set, same
+    action header, the stage 1 run started from C's VLM, and every field outside
+    VARIANT_FIELDS (recipe, release, demo sets, train seed, eval, stats, pins) equal.
+    """
+    assert plan.variant_of is not None
+    ref = plan.variant_of
+    path = repo / ref.plan
+    if not path.is_file():
+        return [f"variant_of: {ref.plan} is missing"]
+    base = TrayRunPlan.load(path)
+    problems = []
+    lock = lock_path(path)
+    if not lock.is_file():
+        problems.append(f"variant_of: {ref.plan} is not frozen")
+    elif json.loads(lock.read_text(encoding="utf-8"))["run_plan_id"] != run_plan_id(base):
+        problems.append(f"variant_of: {ref.plan} changed since it was frozen")
+    if run_plan_id(base) != ref.run_plan_id:
+        problems.append(f"variant_of: {ref.plan} is {run_plan_id(base)}, not {ref.run_plan_id}")
+    if base.superseded_by is not None or base.status is not None:
+        problems.append(f"variant_of: {ref.plan} is not a plan that runs")
+    mine, theirs = plan_json(plan), plan_json(base)
+    for key in sorted((set(mine) | set(theirs)) - VARIANT_FIELDS):
+        if mine.get(key) != theirs.get(key):
+            problems.append(f"variant_of: {key} differs from {ref.plan}")
+    base_branch = base.branches.get(ref.branch)
+    if base_branch is None:
+        return [*problems, f"variant_of: {ref.plan} has no branch {ref.branch}"]
+    extra = {k: v for k, v in plan.parents.items() if k not in base.parents}
+    for name, parent in base.parents.items():
+        if plan.parents.get(name) != parent:
+            problems.append(f"variant_of: parent {name} is not {ref.plan}'s")
+    if len(extra) != 1 or not isinstance(next(iter(extra.values())), Stage1Parent):
+        problems.append("variant_of: needs exactly one parent more, a stage 1 parent")
+        return problems
+    ((stage1_name, stage1),) = extra.items()
+    assert isinstance(stage1, Stage1Parent)
+    if stage1.vlm_stage1.from_parent != base_branch.parent:
+        problems.append(
+            f"variant_of: stage 1 starts from {stage1.vlm_stage1.from_parent},"
+            f" not {ref.branch}'s parent {base_branch.parent}"
+        )
+    if len(plan.branches) != 1:
+        problems.append(f"variant_of: one branch, not {sorted(plan.branches)}")
+    for name, branch in plan.branches.items():
+        if branch.demo_set != base_branch.demo_set:
+            problems.append(
+                f"variant_of: branch {name} trains on {branch.demo_set},"
+                f" not {ref.branch}'s {base_branch.demo_set}"
+            )
+        if branch.parent != stage1_name:
+            problems.append(f"variant_of: branch {name} does not use the stage 1 parent")
+    if plan.interpretation.doc != base.interpretation.doc:
+        problems.append("variant_of: the reading rules live in another doc")
+    if plan.budget is None or base.budget is None:
+        problems.append("variant_of: both plans need a budget")
+    elif plan.budget.cap_cu_per_run != base.budget.cap_cu_per_run or plan.budget.round_runs:
+        problems.append(f"variant_of: the budget is not one run at {ref.branch}'s cap")
+    return problems
+
+
+def stage1_pending(plan: TrayRunPlan) -> list[str]:
+    """Stage 1 pins still null: no freeze and no launch until DA-30's checkpoint is pinned."""
+    pending = []
+    for name, parent in plan.parents.items():
+        if isinstance(parent, Stage1Parent):
+            vlm = parent.vlm_stage1
+            for field in ("job_id", "drive_dir", "weights_sha256", "manifest_sha256"):
+                if getattr(vlm, field) is None:
+                    pending.append(
+                        f"parent {name}: vlm_stage1.{field} is not pinned yet ({vlm.story})"
+                    )
+    return pending
 
 
 def pinned_file_drift(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
@@ -664,6 +812,7 @@ def freeze(plan_path: Path, repo: Path = REPO) -> Path:
         problems.append(f"superseded by {plan.superseded_by}: freeze that plan instead")
     if plan.status == "draft":
         problems.append("status draft: drop it once a Decision orders this plan, then freeze")
+    problems += stage1_pending(plan)
     if not (repo / plan.interpretation.doc).is_file():
         problems.append(f"{plan.interpretation.doc} is missing: fix the reading rules first")
     if problems:
@@ -738,6 +887,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             summary += ", draft"
             if args.launch:
                 problems.append("DRAFT: no job runs a draft plan; it needs a Decision first")
+        pending = stage1_pending(plan)
+        if pending:
+            summary += f", {len(pending)} stage 1 pins pending"
+            if args.launch:
+                problems += [f"PENDING: {p}" for p in pending]
     warnings: list[str] = []
     if plan is not None:
         if args.release is not None:

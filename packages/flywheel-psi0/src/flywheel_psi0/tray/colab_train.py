@@ -55,6 +55,7 @@ from flywheel_psi0.trainer.colab import (
 from flywheel_psi0.tray.demo_sets import DemoSets
 from flywheel_psi0.tray.runplan import (
     REPO,
+    Parent,
     TrayRoundPlan,
     TrayRunPlan,
     check,
@@ -361,6 +362,8 @@ def setup(work: Path, branch: str = BRANCH) -> None:
     psi0, python = work / "Psi0", work / "Psi0" / ".venv-psi" / "bin" / "python"
     start = time.monotonic()
     parent = plan.parents[plan.branches[BRANCH].parent]
+    if not isinstance(parent, Parent):
+        raise SystemExit(f"branch {BRANCH}'s parent is not a psi-model release pair")
     # whole folders: Psi0 loads each as a directory (config, tokenizer, weights)
     weights = [f"{w.path.rsplit('/', 1)[0]}/*" for w in (parent.vlm, parent.action_header)]
     sh(

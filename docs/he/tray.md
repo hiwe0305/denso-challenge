@@ -1357,7 +1357,7 @@ B là nhánh C của RunPlan bản 2 `rp_a04c14e79dfd` với **đúng một thay
 
 ### 18.2 Luật đọc B (viết trước khi chạy)
 
-**[Đề xuất]**, chờ Hiếu duyệt. Khối giữa hai dấu `branch-b-rules` (chú thích HTML) được ghim bằng sha256 ở `interpretation.rules_sha256` của `configs/runplans/tray/he-tray-b.yaml` (nhiệm vụ con 4.2). Sửa một ký tự trong khối thì `runplan check` báo lỗi; nhãn này nằm ngoài khối. Luật là design mục 6.4 bỏ vế so với A.
+**[Đề xuất]**, chờ Hiếu duyệt. Khối giữa hai dấu `branch-b-rules` (chú thích HTML) được ghim bằng sha256 ở `interpretation.rules_sha256` của [`he-tray-b.yaml`](../../configs/runplans/tray/he-tray-b.yaml). Sửa một ký tự trong khối thì `runplan check` báo lỗi; nhãn này nằm ngoài khối. Luật là design mục 6.4 bỏ vế so với A.
 
 <!-- branch-b-rules -->
 
@@ -1387,6 +1387,21 @@ Luật này không đổi sau khi thấy kết quả. Muốn đổi thì ghi `De
 
 <!-- /branch-b-rules -->
 
+### 18.3 RunPlan B (nhiệm vụ con 4.2)
+
+[`he-tray-b.yaml`](../../configs/runplans/tray/he-tray-b.yaml), `status: draft`, id nháp `rp_97922261b774`. Id này đổi khi điền ghim của checkpoint stage 1 (nhiệm vụ con 4.7), vì ghim nằm trong id.
+
+| Trường | Giá trị |
+|---|---|
+| `variant_of` | `he-tray-v2.yaml`, `rp_a04c14e79dfd`, nhánh `C`. `runplan check` so mọi trường khác với bản 2 và báo lỗi khi lệch. Chỉ được khác: `name`, `status`, `parents`, `branches`, `budget`, `interpretation`, `variant_of`, `supersedes`. Bản 2 phải đã đóng băng và đúng id đó |
+| `parents` | Cặp của C giữ nguyên, thêm đúng một cha stage 1 `psi0-b-ego-stage1`: `vlm_stage1.from_parent` là cha của C; action header trùng của C; `story` DA-30, sổ `docs/g0/ledger/DA-30.csv` |
+| Ghim stage 1 | `job_id`, `drive_dir` (thư mục dưới `MyDrive`), `weights_sha256` (`model.safetensors`), `manifest_sha256` (cả thư mục, `colab_train manifest`). Để `null` tới khi DA-30 có checkpoint |
+| `branches` | `B`: tập `C`, cha `psi0-b-ego-stage1` |
+| `budget` | Trần 18 CU, cap 18 CU một lần, watcher `--cap 18 --floor 14`. Ngân sách riêng của B (Hiếu 9/11), ngoài trần 36 CU của bậc 2. Stage 1 tính ở DA-30 |
+| `interpretation` | `docs/he/tray.md`, `rules_marker: branch-b-rules`, `rules_sha256` của khối mục 18.2 |
+
+**Chặn khi chưa đủ ghim.** `runplan check` (cũng là lệnh CI chạy) qua và ghi "draft, 4 stage 1 pins pending". `runplan freeze` từ chối khi còn `status: draft` hoặc còn một ghim `null`, kể cả khi đã bỏ `draft`. `runplan check --release … --launch` từ chối với một dòng `DRAFT` và một dòng `PENDING` cho mỗi ghim thiếu. Test: `test_b_neither_launches_nor_freezes_until_stage1_is_pinned`, `test_b_refuses_any_second_change`, `test_b_freezes_once_pinned_and_released_from_draft`.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -1414,3 +1429,4 @@ Luật này không đổi sau khi thấy kết quả. Muốn đổi thì ghi `De
 | 9/11/2026 | Mục 17.8: fine-tune C+ lần 1 dừng ở khoảng bước 18 000 vì laptop restart (7,49 CU, không checkpoint nào dùng được); Hiếu duyệt chạy lại từ đầu với cap 17 CU, C+ tổng khoảng 23,5 CU vượt slot 18 CU | Hiếu (soạn với Claude) |
 | 9/11/2026 | Mục 17.8: fine-tune C+ lần 2 xong (40 000 bước, 16,11 CU, 8,37 giờ), checkpoint về `rtx3060` và kiểm sha256; C+ tổng 23,6 CU. Eval C+ chưa chạy | Hiếu (soạn với Claude) |
 | 9/11/2026 | Mục 18.1–18.2: nhánh B (nhiệm vụ 4, Hiếu "Chốt 4 mặc định" 9/11): thiết lập (B là C của `rp_a04c14e79dfd`, chỉ đổi VLM cha thành VLM sau stage 1 của DA-30) và luật đọc B ([Đề xuất], khối `branch-b-rules`), viết trước mọi lượt của B. Khối `tier2-rules` không đổi | Hiếu (soạn với Claude) |
+| 9/11/2026 | Mục 18.3: RunPlan B nháp `he-tray-b.yaml` (`rp_97922261b774` khi chưa điền ghim), cha stage 1, bất biến `variant_of`, chặn `freeze` và `--launch` khi chưa đủ ghim. Mục 18.2 trỏ tới file plan | Hiếu (soạn với Claude) |

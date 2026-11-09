@@ -748,3 +748,151 @@ def test_cplus_conditions_are_the_place_pose_failures_of_eval_c_on_dev() -> None
     )  # failures found on dev, never regenerated
     assert [e["cluster_id"] for e in errors] == [r["cluster_id"] for r in rows]
     assert all(e["distance_m"] > 0.0 for e in errors)
+
+
+# Branch B (task 4, docs/he/tray.md section 18): C of v2 with only the VLM parent changed.
+PLAN_B = PLANS / "he-tray-b.yaml"
+B_PINS = {
+    "job_id": "da30-t2-stage1-ego-s0",
+    "drive_dir": "denso/da30/stage1-ego-vlm",
+    "weights_sha256": "a" * 64,
+    "manifest_sha256": "b" * 64,
+}
+
+
+def _b_repo(tmp_path: Path) -> Path:
+    repo = _with_doc(tmp_path)
+    for name in ("he-tray-v2.lock.json", "he-tray-b.yaml"):
+        shutil.copy(PLANS / name, repo / "configs/runplans/tray" / name)
+    return repo
+
+
+def _b_raw(**pins: object) -> dict:
+    raw = yaml.safe_load(PLAN_B.read_text())
+    raw["parents"]["psi0-b-ego-stage1"]["vlm_stage1"].update(pins)
+    return raw
+
+
+def test_b_is_c_of_v2_with_one_changed_parent(plan_v2: TrayRunPlan) -> None:
+    b = TrayRunPlan.load(PLAN_B)
+    assert check(b) == []
+    assert b.variant_of is not None and b.variant_of.run_plan_id == run_plan_id(plan_v2)
+    mine, v2 = plan_json(b), plan_json(plan_v2)
+    differ = {k for k in mine.keys() | v2.keys() if mine.get(k) != v2.get(k)}
+    # v2 supersedes version 1; B supersedes nothing
+    assert differ == {
+        "name",
+        "parents",
+        "branches",
+        "budget",
+        "interpretation",
+        "variant_of",
+        "supersedes",
+    }
+    assert differ <= runplan.VARIANT_FIELDS
+    ((name, branch),) = b.branches.items()
+    assert (name, branch.demo_set) == ("B", plan_v2.branches["C"].demo_set)
+    stage1 = b.parents[branch.parent]
+    base = plan_v2.parents[plan_v2.branches["C"].parent]
+    assert isinstance(stage1, runplan.Stage1Parent) and isinstance(base, runplan.Parent)
+    assert stage1.vlm_stage1.from_parent == plan_v2.branches["C"].parent
+    assert stage1.action_header == base.action_header
+    assert {k: v for k, v in b.parents.items() if k != branch.parent} == plan_v2.parents
+    assert b.budget is not None and b.budget.runs == ["B"] and b.budget.cap_cu_per_run == 18
+    assert "--floor 14" in b.budget.watcher
+
+
+def test_b_pins_its_own_rules_block(tmp_path: Path) -> None:
+    b = TrayRunPlan.load(PLAN_B)
+    text = (REPO / "docs/he/tray.md").read_text()
+    assert b.interpretation.rules_marker == "branch-b-rules"
+    assert runplan.rules_sha256(text, "branch-b-rules") == b.interpretation.rules_sha256
+    assert runplan.rules_sha256(text) != b.interpretation.rules_sha256  # not tier2-rules
+    repo = _b_repo(tmp_path)
+    doc = repo / "docs/he/tray.md"
+    block = rules_block(doc.read_text(), "branch-b-rules")
+    doc.write_text(doc.read_text().replace(block, block.replace("> 0", ">= 0", 1)))
+    assert any("reading rules" in p for p in check(b, repo))
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "problem"),
+    [
+        (("train_seeds",), [1], "variant_of: train_seeds differs"),
+        (("recipe", "overrides", "train.validation_steps"), 1000, "variant_of: recipe differs"),
+        (("eval", "episode_limit_s"), 60.0, "variant_of: eval differs"),
+        (("branches", "B", "demo_set"), "A", "trains on A, not C's C"),
+        (("budget", "cap_cu_per_run"), 12, "not one run at C's cap"),
+        (("variant_of", "run_plan_id"), "rp_000000000000", "not rp_000000000000"),
+        (
+            ("parents", "psi0-b-ego-stage1", "action_header", "sha256"),
+            "c" * 64,
+            "action header is not psi0-baseline-egodex-he's",
+        ),
+    ],
+)
+def test_b_refuses_any_second_change(path: tuple[str, ...], value: object, problem: str) -> None:
+    raw = _b_raw()
+    node = raw
+    for key in path[:-1]:
+        node = node[key]
+    node[path[-1]] = value
+    assert any(problem in p for p in check(TrayRunPlan.model_validate(raw))), problem
+
+
+def test_b_refuses_a_second_branch_and_a_release_vlm() -> None:
+    raw = _b_raw()
+    raw["branches"]["C"] = {"demo_set": "C", "parent": "psi0-baseline-egodex-he", "role": "x"}
+    raw["budget"]["runs"] = ["B", "C"]
+    raw["budget"]["ceiling_cu"] = 36
+    assert any("one branch" in p for p in check(TrayRunPlan.model_validate(raw)))
+    raw = _b_raw()
+    raw["parents"]["psi0-b-ego-stage1"]["vlm_stage1"]["from_parent"] = "nope"
+    assert any(
+        "from_parent nope is no release parent" in p for p in check(TrayRunPlan.model_validate(raw))
+    )
+
+
+def test_b_neither_launches_nor_freezes_until_stage1_is_pinned(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["check", str(PLAN_B)]) == 0
+    assert "draft, 4 stage 1 pins pending" in capsys.readouterr().out
+    monkeypatch.setattr(runplan, "check_release", lambda *args: [])
+    assert main(["check", str(PLAN_B), "--release", str(tmp_path), "--launch"]) == 1
+    err = capsys.readouterr().err
+    assert "DRAFT" in err and err.count("PENDING: ") == 4
+    repo = _b_repo(tmp_path / "repo")
+    plan_path = repo / "configs/runplans/tray/he-tray-b.yaml"
+    raw = _b_raw()
+    del raw["status"]  # a Decision alone does not do: the checkpoint must be pinned
+    plan_path.write_text(yaml.safe_dump(raw, allow_unicode=True, sort_keys=False))
+    with pytest.raises(ValueError, match="vlm_stage1.weights_sha256 is not pinned yet"):
+        freeze(plan_path, repo)
+    assert not lock_path(plan_path).exists()
+
+
+def test_b_freezes_once_pinned_and_released_from_draft(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(runplan, "pinned_file_drift", lambda *args: [])  # sim sources not copied
+    repo = _b_repo(tmp_path)
+    plan_path = repo / "configs/runplans/tray/he-tray-b.yaml"
+    raw = _b_raw(**B_PINS)
+    plan_path.write_text(yaml.safe_dump(raw, allow_unicode=True, sort_keys=False))
+    with pytest.raises(ValueError, match="status draft"):
+        freeze(plan_path, repo)
+    del raw["status"]
+    plan_path.write_text(yaml.safe_dump(raw, allow_unicode=True, sort_keys=False))
+    lock = json.loads(freeze(plan_path, repo).read_text())
+    assert lock["run_plan_id"] == run_plan_id(TrayRunPlan.model_validate(raw))
+    # the pins are part of the id: another checkpoint is another plan
+    other = _b_raw(**{**B_PINS, "weights_sha256": "d" * 64})
+    del other["status"]
+    assert run_plan_id(TrayRunPlan.model_validate(other)) != lock["run_plan_id"]
+
+
+def test_b_needs_v2_frozen_as_named(tmp_path: Path) -> None:
+    repo = _b_repo(tmp_path)
+    (repo / "configs/runplans/tray/he-tray-v2.lock.json").unlink()
+    assert any("is not frozen" in p for p in check(TrayRunPlan.load(PLAN_B), repo))
