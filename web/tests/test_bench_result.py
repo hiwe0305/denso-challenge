@@ -19,9 +19,8 @@ from typing import Any
 
 import pytest
 from flywheel.contracts.artifacts import Defect
-from flywheel.eval.agentqa.bench import report as da31_report
 from flywheel.eval.agentqa.bench.layers import AgentQuality, FindingJudgement, KindSplit
-from flywheel.eval.agentqa.bench.report import BENCH_VERSION, GroupReport, bench_result
+from flywheel.eval.agentqa.bench.report import BENCH_VERSION, GroupReport, ModelUse, bench_result
 from flywheel.eval.agentqa.bench.score import GroupScore, LayerScore, Rate
 
 from web.fwsync.mapping import BENCH_VERSIONS, MappingError, map_bench_result
@@ -31,11 +30,6 @@ from web.fwsync.sink import JsonlSink
 ROOT = Path(__file__).resolve().parents[2]
 MOCK = ROOT / "mock" / "demo-17-11"
 MOCK_RESULT = json.loads((MOCK / "bench_result.json").read_text(encoding="utf-8"))
-
-#: `ModelUse` có từ `da31-3` (DA-31 nhiệm vụ 5, PR #166). Tới khi #166 merge và
-#: nhánh này rebase, lõi cài ở đây vẫn ghi `da31-2`; hai chỗ dưới dùng cờ này
-#: và bỏ được khi lõi đã là `da31-3`.
-MODEL_USE: Any = getattr(da31_report, "ModelUse", None)
 
 
 def _layer(layer: str) -> LayerScore:
@@ -70,11 +64,9 @@ def _real_result() -> dict[str, Any]:
                                    "agree", ""),),
     )
     split = (KindSplit("nan_values", "D3", 1, 1, 0, 1),)
-    models: tuple[Any, ...] = ()
-    if MODEL_USE is not None:
-        models = (MODEL_USE("inj", "m", "r", 0.0, "0" * 64, 1),)
+    models = (ModelUse("inj", "m", "r", 0.0, "0" * 64, 1),)
     return bench_result(
-        [GroupReport(score, split, quality, *([models] if models else []))],
+        [GroupReport(score, split, quality, models)],
         created_at=datetime(2026, 11, 12, tzinfo=timezone.utc),
         manifest_sha256={"inj": "0" * 64},
         inputs={"spec_sha256": "1" * 64},
@@ -106,15 +98,14 @@ def _shape(value: Any, path: str = "$") -> set[str]:
 
 def test_the_mock_has_the_shape_da31_writes() -> None:
     real, mock = _shape(_real_result()), _shape(MOCK_RESULT)
-    if MODEL_USE is None:  # lõi còn là da31-2: mọi khoá khác vẫn phải khớp
-        mock = {k for k in mock if ".agent_models" not in k}
     assert real == mock, (
         f"chỉ DA-31 có: {sorted(real - mock)}; chỉ mock có: {sorted(mock - real)}"
     )
 
 
 def test_the_loader_reads_the_version_da31_writes_today() -> None:
-    assert BENCH_VERSION in BENCH_VERSIONS
+    # The core installed here writes the newest version the loader knows.
+    assert BENCH_VERSION == BENCH_VERSIONS[-1]
     assert MOCK_RESULT["bench_version"] == BENCH_VERSIONS[-1] == "da31-3"
 
 
@@ -123,12 +114,9 @@ def test_a_real_result_maps_without_loss() -> None:
     (group,) = rows["defect_bench_groups"]
     assert group["injected_copy"] == "inj" and group["agent_ranking_total"] == 1
     assert group["natural"]["code"] == [["episode_000002", "D2"]]
-    if MODEL_USE is None:
-        assert group["agent_models"] is None
-    else:
-        assert group["agent_models"] == [{"copy": "inj", "name": "m", "revision": "r",
-                                          "temperature": 0.0, "prompt_sha256": "0" * 64,
-                                          "reports": 1}]
+    assert group["agent_models"] == [{"copy": "inj", "name": "m", "revision": "r",
+                                      "temperature": 0.0, "prompt_sha256": "0" * 64,
+                                      "reports": 1}]
     metrics = sorted((r["layer"], r["metric"], r["subject"]) for r in rows["defect_scores"])
     assert metrics == sorted(
         (layer, metric, subject)
