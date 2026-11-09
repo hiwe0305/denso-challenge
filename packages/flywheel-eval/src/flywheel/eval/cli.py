@@ -56,7 +56,7 @@ from flywheel.eval.diagnosis.system.reader import (
 )
 from flywheel.eval.diagnosis.system.reader import ReaderError as SystemReaderError
 from flywheel.eval.diagnosis.train.reader import ReaderError
-from flywheel.eval.scorer.agreement import AgreementReport
+from flywheel.eval.scorer.agreement import AgreementReport, ScorerKey
 from flywheel.eval.scorer.calibration import CalibrationInputError
 from flywheel.eval.scorer.reader import TraceError
 from flywheel.eval.scorer.score import EpisodeScore
@@ -232,11 +232,22 @@ def agree(
     store: Path | None = typer.Option(
         None, "--store", help="Thư mục store để lưu báo cáo. Không có thì không ghi gì."
     ),
+    task_id: str | None = typer.Option(None, "--task-id", help="Chỉ xét `Score` của task này."),
+    scorer_version: str | None = typer.Option(
+        None,
+        "--scorer-version",
+        help="Chỉ xét `Score` của phiên bản scorer này (`score.jsonl` chỉ ghi thêm, "
+        "nên episode chấm lại có nhiều `Score`).",
+    ),
+    config_sha256: str | None = typer.Option(
+        None, "--config-sha256", help="Chỉ xét `Score` chấm bằng cấu hình có hash này."
+    ),
 ) -> None:
     """Đối chiếu kết luận toàn task của scorer với cờ `check_success` của SIMPLE."""
     use_utf8()
+    key = ScorerKey(task_id=task_id, scorer_version=scorer_version, config_sha256=config_sha256)
     try:
-        report = check_scorer_agreement(scores, rollouts, release)
+        report = check_scorer_agreement(scores, rollouts, release, key)
     except (CalibrationInputError, ScorerError) as error:
         # A set that cannot be read or cannot make one report is not a rate,
         # so nothing is printed as one and nothing is stored.

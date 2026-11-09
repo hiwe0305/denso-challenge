@@ -21,6 +21,7 @@ from flywheel.eval.scorer.agreement import (
     AGREEMENT_BAR,
     MIN_EPISODES,
     AgreementReport,
+    ScorerKey,
     compare,
 )
 from flywheel.eval.scorer.calibration import AGREEMENT_RECORDS, CalibrationInputError
@@ -264,6 +265,68 @@ def test_two_different_scores_of_one_episode_are_refused() -> None:
         )
 
 
+def test_scores_keyed_on_simple_episode_names_are_refused() -> None:
+    # SIMPLE's `episode_N` is what DA-38's trace writes as `episode_id`, so it
+    # is the easy default; pairing nothing must not pass for a report of 0
+    # episodes (review of #158 at a062d47, point 2).
+    scores = [score(f"episode_{i}", True) for i in range(5)]
+    rollouts = [rollout(f"j1-{i:03d}", True) for i in range(5)]
+
+    with pytest.raises(ScorerError, match="ghép được") as error:
+        compare(scores, rollouts, RELEASE)
+
+    message = str(error.value)
+    assert "--episode-id <trace_id>" in message
+    assert "`episode_0`" in message and "`j1-000`" in message
+    assert "(5 id)" in message
+
+
+def test_rollouts_without_any_trace_are_refused() -> None:
+    untraced = rollout("j9-zzz", None, infra="simulator_error").model_copy(
+        update={"trace_ref": None}
+    )
+
+    with pytest.raises(ScorerError, match="không rollout nào có trace"):
+        compare([score("j1-a", True)], [untraced], RELEASE)
+
+
+def test_a_rescored_store_is_checked_one_scorer_at_a_time() -> None:
+    # `score.jsonl` is append-only: an episode scored again under a new
+    # scorer has two records (review of #158 at a062d47, point 1).
+    scores = [score("j1-a", True), score("j1-a", False, failed=1, version="0.3.0")]
+    rollouts = [rollout("j1-a", True)]
+
+    with pytest.raises(ScorerError, match="--scorer-version"):
+        compare(scores, rollouts, RELEASE)
+    old = compare(scores, rollouts, RELEASE, ScorerKey(scorer_version="0.2.0"))
+    new = compare(scores, rollouts, RELEASE, ScorerKey(scorer_version="0.3.0"))
+
+    assert (old.scorer_version, old.agreed) == ("0.2.0", 1)
+    assert (new.scorer_version, new.agreed) == ("0.3.0", 0)
+    assert new.mismatches[0].kind == "scorer_fail_sim_pass"
+
+
+def test_the_scorer_can_be_chosen_by_its_config() -> None:
+    scores = [score("j1-a", True), score("j1-a", False, failed=0, config="d" * 64)]
+
+    report = compare(scores, [rollout("j1-a", True)], RELEASE, ScorerKey(config_sha256="d" * 64))
+
+    assert report.config_sha256 == "d" * 64
+    assert report.agreed == 0
+
+
+def test_a_scorer_choice_that_matches_nothing_names_what_the_file_holds() -> None:
+    with pytest.raises(ScorerError, match="0.2.0") as error:
+        compare(
+            [score("j1-a", True)],
+            [rollout("j1-a", True)],
+            RELEASE,
+            ScorerKey(task_id="tray", scorer_version="9.9.9"),
+        )
+
+    assert "task_id=tray, scorer_version=9.9.9" in str(error.value)
+
+
 def test_the_same_score_appended_twice_counts_once() -> None:
     report = compare([score("j1-a", True), score("j1-a", True)], [rollout("j1-a", True)], RELEASE)
 
@@ -416,3 +479,49 @@ def test_the_command_exits_two_on_a_mixed_set(tmp_path: Path) -> None:
     assert result.exit_code == 2
     assert "không đối chiếu được" in result.output
     assert not (tmp_path / "store" / AGREEMENT_RECORDS).exists()
+
+
+def agree_args(tmp_path: Path, *extra: str) -> list[str]:
+    return [
+        "agree",
+        "--scores",
+        str(tmp_path / "store" / "scorer" / "score.jsonl"),
+        "--rollouts",
+        str(tmp_path / "eval"),
+        "--release",
+        RELEASE,
+        "--store",
+        str(tmp_path / "store"),
+        *extra,
+    ]
+
+
+def test_the_command_exits_two_and_stores_nothing_when_no_episode_pairs(tmp_path: Path) -> None:
+    write_inputs(
+        tmp_path,
+        [score("episode_0", True), score("episode_1", False, failed=1)],
+        {"j1-a": rollout_json("j1-a", True), "j1-b": rollout_json("j1-b", False)},
+    )
+
+    result = CliRunner().invoke(app, agree_args(tmp_path))
+
+    assert result.exit_code == 2
+    assert "không `Score` nào ghép được" in result.output
+    assert not (tmp_path / "store" / AGREEMENT_RECORDS).exists()
+
+
+def test_the_command_reads_a_rescored_store_by_scorer_version(tmp_path: Path) -> None:
+    write_inputs(
+        tmp_path,
+        [score("j1-a", True), score("j1-a", False, failed=1, version="0.3.0")],
+        {"j1-a": rollout_json("j1-a", True)},
+    )
+
+    mixed = CliRunner().invoke(app, agree_args(tmp_path))
+    chosen = CliRunner().invoke(app, agree_args(tmp_path, "--scorer-version", "0.3.0"))
+
+    assert mixed.exit_code == 2
+    assert "--scorer-version" in mixed.output
+    assert chosen.exit_code == 0, chosen.output
+    assert "task: two-table 0.3.0" in chosen.output
+    assert "lệch j1-a [scorer_fail_sim_pass]" in chosen.output

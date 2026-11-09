@@ -16,7 +16,17 @@ its trace by `trace_ref.trace_id` (`<job_id>-<uuid>`, unique across jobs). The
 two meet when the episode was scored with `--episode-id <trace_id>`. The
 `episode_N` name SIMPLE prints restarts at every eval run, so two jobs would
 both have an `episode_3` and pairing on it would be a guess; a `Score` or a
-rollout that finds no partner is listed in the report, not dropped.
+rollout that finds no partner is listed in the report, not dropped. A set where
+**no** score finds a partner is refused instead of reported: it is the mark of
+scores keyed on the wrong id, and a report of "0 episodes" would read as a run
+that had nothing to say (review of #158 at `a062d47`, point 2).
+
+Choosing the scorer. `<store>/scorer/score.jsonl` is append-only, so an episode
+scored again under a new `scorer_version` or config has two `Score` records in
+it. The caller names the scorer to check (`ScorerKey`); scores of any other
+scorer are left out before pairing, so the file the help points to can be read
+as it is (same review, point 1). Without a key, a file holding two scorers is
+refused with the scorers it holds listed.
 
 Which episodes count:
 
@@ -151,25 +161,48 @@ class AgreementReport(BaseModel):
 
 
 @dataclass(frozen=True)
+class ScorerKey:
+    """Which scorer's `Score` records to check; a field left `None` matches any."""
+
+    task_id: str | None = None
+    scorer_version: str | None = None
+    config_sha256: str | None = None
+
+    def matches(self, score: Score) -> bool:
+        return (
+            self.task_id in (None, score.task_id)
+            and self.scorer_version in (None, score.scorer_version)
+            and self.config_sha256 in (None, score.config_sha256)
+        )
+
+
+@dataclass(frozen=True)
 class _Pair:
     score: Score
     rollout: RolloutResult
 
 
 def compare(
-    scores: Iterable[Score], rollouts: Iterable[RolloutResult], release_id: str
+    scores: Iterable[Score],
+    rollouts: Iterable[RolloutResult],
+    release_id: str,
+    scorer: ScorerKey | None = None,
 ) -> AgreementReport:
-    """Pair every `Score` with its rollout and count where they agree (AC 1, 2)."""
+    """Pair every `Score` of one scorer with its rollout and count where they agree (AC 1, 2)."""
     if not release_id:
         raise ScorerError("thiếu release của checkpoint đã chấm; báo cáo phải nói nó (AC 2)")
-    by_episode = _scores_by_episode(scores)
+    chosen = _select(list(scores), scorer or ScorerKey())
+    # The scorer first: a file holding two scorers is the common way to have
+    # two scores of one episode, and naming the scorers says how to fix it.
+    identity = _identity(chosen)
+    by_episode = _scores_by_episode(chosen)
     rollouts = list(rollouts)
     by_trace = _rollouts_by_trace(rollouts)
-    identity = _identity(by_episode.values())
 
-    pairs = [
-        _Pair(by_episode[key], by_trace[key]) for key in sorted(by_episode.keys() & by_trace.keys())
-    ]
+    keys = sorted(by_episode.keys() & by_trace.keys())
+    if not keys:
+        raise ScorerError(_no_pair_message(by_episode.keys(), by_trace.keys()))
+    pairs = [_Pair(by_episode[key], by_trace[key]) for key in keys]
     excluded: list[Excluded] = []
     counted: list[_Pair] = []
     for pair in pairs:
@@ -232,24 +265,71 @@ def _untraced(rollouts: Iterable[RolloutResult]) -> list[Untraced]:
     return sorted(items, key=lambda item: (item.job_id, item.infra_status, str(item.sim_success)))
 
 
+#: How many ids an error message shows from each side before "…".
+_SHOWN_IDS = 3
+
+
+def _select(scores: list[Score], key: ScorerKey) -> list[Score]:
+    """The scores of the scorer `key` names; refuse when none, naming what there is."""
+    if not scores:
+        raise ScorerError("không có `Score` nào để đối chiếu")
+    chosen = [score for score in scores if key.matches(score)]
+    if not chosen:
+        raise ScorerError(
+            f"không `Score` nào thuộc scorer đã chọn ({_key_text(key)}); "
+            f"file có: {_identities(scores)}"
+        )
+    return chosen
+
+
+def _key_text(key: ScorerKey) -> str:
+    fields = {
+        "task_id": key.task_id,
+        "scorer_version": key.scorer_version,
+        "config_sha256": key.config_sha256,
+    }
+    return ", ".join(f"{name}={value}" for name, value in fields.items() if value is not None)
+
+
+def _identities(scores: Iterable[Score]) -> list[tuple[str, str, str]]:
+    return sorted({(s.task_id, s.scorer_version, s.config_sha256) for s in scores})
+
+
+def _no_pair_message(score_ids: Iterable[str], trace_ids: Iterable[str]) -> str:
+    episodes, traces = sorted(score_ids), sorted(trace_ids)
+    if not traces:
+        return "không rollout nào có trace (`trace_ref`) để ghép với `Score`"
+    return (
+        "không `Score` nào ghép được với rollout nào: `Score.episode_id` phải là "
+        "`trace_ref.trace_id` của rollout (`fw eval score --episode-id <trace_id>`), "
+        "không phải `episode_N` của SIMPLE; "
+        f"Score có {_sample(episodes)}, rollout có {_sample(traces)}"
+    )
+
+
+def _sample(ids: Sequence[str]) -> str:
+    shown = ", ".join(f"`{item}`" for item in ids[:_SHOWN_IDS])
+    more = f", … ({len(ids)} id)" if len(ids) > _SHOWN_IDS else ""
+    return shown + more
+
+
 def _scores_by_episode(scores: Iterable[Score]) -> dict[str, Score]:
     """One `Score` per episode; the same record twice is one, two different ones refuse.
 
     `Score` is content-addressed, so a re-score that changed nothing has the
     same id and is the same record appended twice. A different id for the same
-    episode is a second opinion, and picking one would be choosing the answer.
+    episode under the same scorer is a second opinion, and picking one would be
+    choosing the answer.
     """
     found: dict[str, Score] = {}
     for score in scores:
         held = found.get(score.episode_id)
         if held is not None and held.id != score.id:
             raise ScorerError(
-                f"episode `{score.episode_id}` có hai `Score` khác nhau ({held.id}, {score.id}); "
-                "lọc về một lần chấm trước khi đối chiếu"
+                f"episode `{score.episode_id}` có hai `Score` khác nhau ({held.id}, {score.id}) "
+                "dưới cùng một scorer; lọc về một lần chấm trước khi đối chiếu"
             )
         found[score.episode_id] = score
-    if not found:
-        raise ScorerError("không có `Score` nào để đối chiếu")
     return found
 
 
@@ -269,11 +349,12 @@ def _rollouts_by_trace(rollouts: Iterable[RolloutResult]) -> dict[str, RolloutRe
 
 
 def _identity(scores: Iterable[Score]) -> tuple[str, str, str]:
-    seen = sorted({(s.task_id, s.scorer_version, s.config_sha256) for s in scores})
+    seen = _identities(scores)
     if len(seen) != 1:
         raise ScorerError(
             f"các `Score` thuộc {len(seen)} bộ (task, scorer_version, config_sha256) khác "
-            f"nhau: {seen}; một báo cáo chỉ nói về một scorer"
+            f"nhau: {seen}; một báo cáo chỉ nói về một scorer, chọn một bằng "
+            "`--task-id`, `--scorer-version`, `--config-sha256`"
         )
     return seen[0]
 
