@@ -1485,6 +1485,13 @@ $PY -m flywheel_psi0.tray.eval_results $PLAN --set $SET --out $EV/eval-b-simread
 - `paired.steps` cho các cặp theo từng bước của bộ chấm (luật 6). `levels` và `headline.failures` cho tỉ lệ `L-PLACE-POSE`. `place_error` chạy như mục 16.4.
 - Kiểm trên số giả (12 điều kiện, B 6, C 2, không cặp nào C làm được mà B hỏng): `ci` 0,08–0,58, `above`, `mcnemar_exact_p` 0,125. Đây đúng là trường hợp luật 4 bắt báo cả hai.
 
+### 18.6 `Decision` nháp của B (nhiệm vụ con 4.5)
+
+[`he-tray-b.decision.json`](../../configs/runplans/tray/he-tray-b.decision.json): cùng dạng `Decision` với `Decision` quy tắc 0 ([`he-tray-v2.rule0.decision.json`](../../configs/runplans/tray/he-tray-v2.rule0.decision.json)); `meta.status` `draft`, `verdict` `open`, `signed_by` "pending: Hiếu".
+- `criteria` ghi: luật 18.2 và sha256 của khối; plan B và `variant_of`; ghim stage 1 (đang `null`); mốc C (20/240, `L-PLACE-POSE` 131/240, mức 0 5/30, lô của eval C SimReady); mốc C+ (lô đang chạy); bảng `verdict_map`: luật 1 là `pass`, luật 2 là `recorded`, luật 3 là `fail`; giới hạn.
+- `metrics` để `null` tới khi eval B xong. Khi đó điền từ `eval_results --baseline` (mục 18.5).
+- `subject_id` là id nháp `rp_97922261b774`. Ở nhiệm vụ con 4.7 nó đổi thành id đóng băng; test `test_the_b_decision_is_an_open_draft_on_the_b_plan_and_its_rules` báo lỗi cho tới khi sửa.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -1515,3 +1522,4 @@ $PY -m flywheel_psi0.tray.eval_results $PLAN --set $SET --out $EV/eval-b-simread
 | 9/11/2026 | Mục 18.3: RunPlan B nháp `he-tray-b.yaml` (`rp_97922261b774` khi chưa điền ghim), cha stage 1, bất biến `variant_of`, chặn `freeze` và `--launch` khi chưa đủ ghim. Mục 18.2 trỏ tới file plan | Hiếu (soạn với Claude) |
 | 9/11/2026 | Mục 18.4: `colab_train --branch B` (chỉ plan B đã đóng băng và duyệt; VLM stage 1 từ Drive, kiểm sha256 trọng số, manifest cả thư mục, file khác trùng VLM của C; cha stage 1 thêm vào recipe trong bộ nhớ) và runbook Colab cho B, chưa chạy | Hiếu (soạn với Claude) |
 | 9/11/2026 | Mục 18.5: runbook eval B (như eval C SimReady, sau eval C+) và cách đọc bằng `eval_results --baseline`: hiệu ghép cặp, CI bootstrap theo mức, McNemar chính xác; luật 18.2 không đổi | Hiếu (soạn với Claude) |
+| 9/11/2026 | Mục 18.6: `Decision` nháp của B (`he-tray-b.decision.json`, `open`, chờ eval B và chữ ký của Hiếu) | Hiếu (soạn với Claude) |

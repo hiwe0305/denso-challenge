@@ -1,0 +1,142 @@
+{
+ "site_id": "local",
+ "task_id": "g1_wholebody_tray_transfer_teleop",
+ "embodiment_id": "g1_sonic_dwbc@1",
+ "schema_version": "1.0.0",
+ "meta": {
+  "status": "draft",
+  "story": "DA-34",
+  "subtask": "4.5",
+  "gaps": [
+   "subject_id is the draft id of he-tray-b.yaml; it becomes the frozen B id at task 4.7, when DA-30's stage 1 checkpoint is pinned",
+   "the reading rules (tray.md 18.2) are [Đề xuất]: Hiếu approves them before any B run",
+   "every metric is null until eval B ends (task 4.8)"
+  ]
+ },
+ "id": "dec_01M6ZVR21V7ZD52KG03BMFJK39",
+ "kind": "dev_gate",
+ "subject_kind": "run_plan",
+ "subject_id": "rp_97922261b774",
+ "verdict": "open",
+ "metrics": {
+  "label": "preliminary, on dev",
+  "b_vs_c": {
+   "headline": {
+    "levels": [
+     1,
+     2
+    ],
+    "n": 240,
+    "variant": null,
+    "baseline": null,
+    "diff": null,
+    "ci": null,
+    "ci_vs_0": null,
+    "variant_only": null,
+    "baseline_only": null,
+    "mcnemar_exact_p": null
+   },
+   "steps": null,
+   "by_level": null
+  },
+  "b_vs_cplus": {
+   "headline": {
+    "levels": [
+     1,
+     2
+    ],
+    "n": 240,
+    "variant": null,
+    "baseline": null,
+    "diff": null,
+    "ci": null,
+    "ci_vs_0": null,
+    "variant_only": null,
+    "baseline_only": null,
+    "mcnemar_exact_p": null
+   },
+   "note": "descriptive only (rule 5)"
+  },
+  "b": {
+   "headline": null,
+   "levels": null,
+   "place_pose_share": null,
+   "place_error": null
+  },
+  "batch": {
+   "runs_jsonl": null,
+   "conditions_sha256": "b9c38b37afa6fbdd4027be287df85fe7b016130bd32227f97c876f6bae7d3dfb",
+   "workers": 1,
+   "server": {
+    "action_exec_horizon": 24,
+    "rtc": true
+   },
+   "checkpoint": "da34-t4-ft-b-s0 ckpt_40000"
+  }
+ },
+ "criteria": {
+  "doc": "docs/he/tray.md",
+  "section": "18.2",
+  "rules_marker": "branch-b-rules",
+  "rules_sha256": "6c0eb9c9537c7093929a3fbc90d3d09536c423eabea266890ef1c669c7cc800d",
+  "plan": {
+   "path": "configs/runplans/tray/he-tray-b.yaml",
+   "run_plan_id": "rp_97922261b774",
+   "status": "draft",
+   "variant_of": {
+    "plan": "configs/runplans/tray/he-tray-v2.yaml",
+    "run_plan_id": "rp_a04c14e79dfd",
+    "branch": "C"
+   },
+   "one_change": "VLM parent: C's VLM after DA-30's stage 1 on the team's 153 egocentric clips"
+  },
+  "stage1": {
+   "story": "DA-30",
+   "ledger": "docs/g0/ledger/DA-30.csv",
+   "from_vlm": "psi0/pre.fast.1by1.2601091803.ckpt.ego200k.he30k",
+   "job_id": null,
+   "drive_dir": null,
+   "weights_sha256": null,
+   "manifest_sha256": null
+  },
+  "primary": "paired B - C on the 240 level 1-2 conditions; 95 % CI by bootstrap of the per-condition differences within level, 10000 resamples, seed 20261103 (plan stats)",
+  "rules": {
+   "1": "lower CI bound of (B - C) > 0: B passes",
+   "2": "CI of (B - C) contains 0: no effect seen; not 'egocentric does not help'",
+   "3": "upper CI bound of (B - C) < 0: B worse than C, a valid negative result",
+   "4": "exact two-sided McNemar p reported beside rules 1-3, does not change them; a disagreement is reported",
+   "5": "B vs C+ descriptive only",
+   "6": "side figures: per-step paired counts, L-PLACE-POSE share, place_error, level 0 apart"
+  },
+  "verdict_map": {
+   "rule 1": "pass",
+   "rule 2": "recorded",
+   "rule 3": "fail"
+  },
+  "baseline_c": {
+   "run": "eval C on SimReady visuals (tray.md 16.6)",
+   "runs_jsonl": "rtx3060:~/denso-da34-pool/fwdata/tray/eval/eval-c-simready-rp_a04c14e79dfd/runs.jsonl",
+   "checkpoint": "da34-t2-ft-c-s0 ckpt_40000",
+   "headline_n": 240,
+   "headline_successes": 20,
+   "place_pose_levels_1_2": 131,
+   "level0_successes": 5
+  },
+  "baseline_cplus": {
+   "run": "eval C+ on SimReady visuals (tray.md 17.6), running on 9/11/2026",
+   "runs_jsonl": "rtx3060:~/denso-da34-pool/fwdata/tray/eval/eval-cplus-simready-rp_a04c14e79dfd/runs.jsonl"
+  },
+  "known_limits": [
+   "B spends extra compute at stage 1 (DA-30's ledger)",
+   "hand pose of the 153 clips is a pseudo pose from one camera with assumed intrinsics",
+   "153 clips of about 2.6 s each, a person carrying a red box, not the sim tray",
+   "the same team builds the task, the robot demos and the egocentric clips",
+   "sim only, MuJoCo renderer",
+   "preliminary on dev: 1 train seed per branch, 1 rollout per condition; EGL rollouts are not reproducible (tray.md 13.2)",
+   "no branch A: the HE-T rules of tray.md section 4 are not read"
+  ]
+ },
+ "signed_by": "pending: Hiếu",
+ "reason": "DRAFT, written 9/11/2026 before any B run (Hiếu's four defaults of 9/11/2026). Branch B is branch C of rp_a04c14e79dfd with one change, the VLM parent: C's VLM fine-tuned at stage 1 by DA-30 on the team's 153 egocentric clips (he-tray-b.yaml, status draft until the checkpoint is pinned). Read by the branch-b-rules block of docs/he/tray.md 18.2 (rules_sha256 above): B passes when the lower bound of the 95 % CI of the paired B - C on the 240 level 1-2 conditions is above 0, against eval C on SimReady (20/240). To fill when eval B ends: metrics from eval_results --baseline (vs C, and vs C+ as a description), verdict by verdict_map, Hiếu's signature. Results stay 'preliminary, on dev'.",
+ "supersedes_decision_id": null
+}
