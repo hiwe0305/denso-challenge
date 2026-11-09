@@ -334,6 +334,10 @@ def persist_vlm(work: Path, plan: Any, out: Path) -> dict[str, Any]:
             "dataset_id": plan.dataset.id,
             "psi0_commit": plan.code.psi0.commit,
             "parent": {"id": plan.parent.id, **plan.parent.vlm.model_dump()},
+            # Under MyDrive, as DA-34's B plan pins `drive_dir`.
+            "drive_dir": out.relative_to(DRIVE_ROOT).as_posix()
+            if out.is_relative_to(DRIVE_ROOT)
+            else str(out),
         },
     )
     return {
@@ -341,7 +345,9 @@ def persist_vlm(work: Path, plan: Any, out: Path) -> dict[str, Any]:
         "path": str(out),
         "step": manifest["step"],
         "final": manifest["final"],
+        "drive_dir": manifest["drive_dir"],
         "weights_sha256": manifest["weights_sha256"],
+        "manifest_sha256": manifest["manifest_sha256"],
         "header_problems": manifest["header_problems"],
     }
 

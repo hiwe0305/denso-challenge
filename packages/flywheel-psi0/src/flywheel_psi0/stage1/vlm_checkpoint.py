@@ -16,7 +16,10 @@ resized when the parent was trained (`pretrain.py:63-72` resizes to
 len(tokenizer) + 2048 FAST bins, padded to 192, and the parent's config already has
 that size), and the processor is read, never written. It checks the trained file's
 safetensors header against the parent's (same tensor names, shapes and dtypes) and
-writes `vlm.json` with every file's sha256.
+writes `<folder>.json` beside the folder (never inside: DA-34's `colab_train --branch B`
+refuses a file the parent folder does not have) with every file's sha256 and the
+pins B's stage 3 plan takes, `weights_sha256` and `manifest_sha256` (`folder_manifest`,
+the same hash as DA-34's `tray.colab_train.manifest_sha256`).
 
 `package` is standard library only (`persist` runs it in the VM's python);
 `load_check` needs Psi0's environment:
@@ -39,7 +42,6 @@ from pathlib import Path
 from typing import Any
 
 WEIGHTS = "model.safetensors"
-MANIFEST = "vlm.json"
 FORMAT = "psi0-stage1-vlm"
 _CHUNK = 1 << 22
 
@@ -50,6 +52,26 @@ def sha256(path: Path) -> str:
         while chunk := f.read(_CHUNK):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def manifest_path(folder: Path) -> Path:
+    """`<parent>/<folder>.json`: the package's record, kept out of the folder itself."""
+    return folder.parent / f"{folder.name}.json"
+
+
+def _files(folder: Path) -> list[Path]:
+    """Regular files under `folder` by path, dot entries left out (as DA-34 reads it)."""
+    return sorted(
+        p
+        for p in folder.rglob("*")
+        if p.is_file() and not any(part.startswith(".") for part in p.relative_to(folder).parts)
+    )
+
+
+def folder_manifest_sha256(folder: Path) -> str:
+    """sha256 of `<sha256>  <path>` lines, one per file in path order (DA-34's pin)."""
+    lines = "".join(f"{sha256(p)}  {p.relative_to(folder).as_posix()}\n" for p in _files(folder))
+    return hashlib.sha256(lines.encode("utf-8")).hexdigest()
 
 
 def safetensors_header(path: Path) -> dict[str, tuple[str, tuple[int, ...]]]:
@@ -85,9 +107,9 @@ def header_problems(
 def package(
     checkpoint_dir: Path, parent_dir: Path, out: Path, identity: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """Write the stage 3 loadable VLM of `checkpoint_dir` at `out`; returns `vlm.json`.
+    """Write the stage 3 loadable VLM of `checkpoint_dir` at `out`; returns `<out>.json`.
 
-    A second call for the same weights only rewrites `vlm.json` (persist may run at
+    A second call for the same weights only rewrites `<out>.json` (persist may run at
     the watcher's soft cap and again by hand).
     """
     trained = checkpoint_dir / WEIGHTS
@@ -98,7 +120,7 @@ def package(
         safetensors_header(trained), safetensors_header(parent_dir / WEIGHTS)
     )
     out.mkdir(parents=True, exist_ok=True)
-    previous = out / MANIFEST
+    previous = manifest_path(out)
     kept = (
         previous.is_file()
         and json.loads(previous.read_text(encoding="utf-8")).get("weights_sha256") == weights_sha256
@@ -106,22 +128,29 @@ def package(
         and (out / WEIGHTS).stat().st_size == trained.stat().st_size
     )
     files: dict[str, str] = {}
-    for source in sorted(p for p in parent_dir.iterdir() if p.is_file()):
-        if source.name == WEIGHTS or source.suffix == ".safetensors":
+    for source in _files(parent_dir):
+        if source.suffix == ".safetensors":
             continue
-        shutil.copyfile(source, out / source.name)
-        files[source.name] = sha256(source)
+        name = source.relative_to(parent_dir).as_posix()
+        (out / name).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, out / name)
+        files[name] = sha256(source)
     if not kept:
-        partial = out / f"{WEIGHTS}.part"
+        partial = out / f".{WEIGHTS}.part"  # a dot name: never mistaken for a file of the VLM
         shutil.copyfile(trained, partial)
         partial.replace(out / WEIGHTS)
     files[WEIGHTS] = weights_sha256
+    extra = sorted(p.relative_to(out).as_posix() for p in _files(out))
+    problems += [
+        f"{name}: in the folder but not in the parent's" for name in extra if name not in files
+    ]
     manifest = {
         "format": FORMAT,
         **identity,
         "checkpoint_dir": str(checkpoint_dir),
         "weights_sha256": weights_sha256,
         "weights_bytes": trained.stat().st_size,
+        "manifest_sha256": folder_manifest_sha256(out),
         "files": files,
         "header_problems": problems,
         "loadable_as_model_name_or_path": not problems,
@@ -141,17 +170,21 @@ def load_check(path: Path) -> dict[str, Any]:
     flash attention: the attention kernel does not change what is loaded), asks
     transformers which keys it missed, and checks that the input embeddings hold the
     file's values (not a fresh init), that `lm_head` is tied to them, that the FAST
-    bins fit the vocabulary, and that the weights' sha256 is the one in `vlm.json`.
+    bins fit the vocabulary, and that the weights' sha256 and the folder manifest are the
+    ones in `<folder>.json`.
     """
     torch = importlib.import_module("torch")
     transformers = importlib.import_module("transformers")
     safe_open = importlib.import_module("safetensors").safe_open
 
     start = time.monotonic()
-    manifest = json.loads((path / MANIFEST).read_text(encoding="utf-8"))
+    record = manifest_path(path)
+    manifest = json.loads(record.read_text(encoding="utf-8"))
     problems: list[str] = []
     if sha256(path / WEIGHTS) != manifest["weights_sha256"]:
-        problems.append(f"{path / WEIGHTS} sha256 differs from {MANIFEST}")
+        problems.append(f"{path / WEIGHTS} sha256 differs from {record.name}")
+    if folder_manifest_sha256(path) != manifest["manifest_sha256"]:
+        problems.append(f"{path}: folder manifest differs from {record.name}")
     model, info = transformers.Qwen3VLForConditionalGeneration.from_pretrained(
         str(path), dtype=torch.bfloat16, attn_implementation="sdpa", output_loading_info=True
     )
