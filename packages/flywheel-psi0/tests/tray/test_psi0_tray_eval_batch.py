@@ -119,3 +119,34 @@ def test_phases_are_cut_to_the_levels_of_a_smaller_set() -> None:
     assert phases_for([{"level": 0}, {"level": 2}]) == ((2,), (0,))
     with pytest.raises(ValueError):
         phases_for([{"level": 3}])
+
+
+def test_max_chunks_runs_the_first_chunks_of_the_order_only(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # branch B's stage 1 (tray.md 18.2): the first 6 chunks, 30 level 1 and 30 level 2
+    from flywheel_psi0.tray import eval_batch
+    from flywheel_psi0.tray.eval_set import conditions_sha256
+
+    conditions = [
+        row | {"environment_config": {"flywheel": {"run_plan_id": "rp_a04c14e79dfd"}}}
+        for row in rows({0: 30, 1: 120, 2: 120})
+    ]
+    (tmp_path / "conditions.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in conditions)
+    )
+    common = [
+        "--set", str(tmp_path), "--conditions-sha256", conditions_sha256(conditions),
+        "--out", str(tmp_path / "out"), "--simple-python", "python", "--pythonpath", "x",
+        "--dry-run",
+    ]  # fmt: skip
+    assert eval_batch.main([*common, "--max-chunks", "6"]) == 0
+    printed = capsys.readouterr().out.splitlines()
+    assert [line.split()[0] for line in printed] == [
+        "l1-000", "l2-000", "l1-010", "l2-010", "l1-020", "l2-020",
+    ]  # fmt: skip
+    assert {line.split()[1] for line in printed} == {"1000100", "1000110", "1000120"}
+    assert eval_batch.main(common) == 0
+    assert len(capsys.readouterr().out.splitlines()) == 27  # without it: the whole order
+    with pytest.raises(SystemExit):
+        eval_batch.main([*common, "--max-chunks", "0"])

@@ -1357,13 +1357,29 @@ B là nhánh C của RunPlan bản 2 `rp_a04c14e79dfd` với **đúng một thay
 
 ### 18.2 Luật đọc B (viết trước khi chạy)
 
-**[Đề xuất]**, chờ Hiếu duyệt. Khối giữa hai dấu `branch-b-rules` (chú thích HTML) được ghim bằng sha256 ở `interpretation.rules_sha256` của [`he-tray-b.yaml`](../../configs/runplans/tray/he-tray-b.yaml). Sửa một ký tự trong khối thì `runplan check` báo lỗi; nhãn này nằm ngoài khối. Luật là design mục 6.4 bỏ vế so với A.
+**[Đề xuất]**, chờ Hiếu duyệt; riêng phần "Hai giai đoạn" **[Đã chốt 10/11/2026, Hiếu]** (mục 18.9). Khối giữa hai dấu `branch-b-rules` (chú thích HTML) được ghim bằng sha256 ở `interpretation.rules_sha256` của [`he-tray-b.yaml`](../../configs/runplans/tray/he-tray-b.yaml). Sửa một ký tự trong khối thì `runplan check` báo lỗi; nhãn này nằm ngoài khối. Luật là design mục 6.4 bỏ vế so với A.
 
 <!-- branch-b-rules -->
 
-**Phép đo.** Chỉ số chính là hiệu ghép cặp B − C trên 240 điều kiện mức 1–2 (120 mỗi mức), mốc C là eval C SimReady (mục 16.6: 20/240). Với mỗi điều kiện i: d_i = s_B,i − s_C,i. Hiệu là trung bình của d_i. CI 95 % bootstrap theo điều kiện: lấy mẫu lại d_i trong từng mức, 10 000 lần, hạt giống 20261103, khoảng phân vị (`stats` của plan, như mục 2 và 9). Phép kiểm phụ: McNemar chính xác hai phía trên các cặp bất đồng (B làm được mà C hỏng, và ngược lại).
+**Phép đo.** Chỉ số chính là hiệu ghép cặp B − C trên các điều kiện mức 1–2 đã chạy: 60 ở giai đoạn 1, 240 (120 mỗi mức) nếu đi tiếp giai đoạn 2. Mốc C là eval C SimReady (mục 16.6): 7/60 trên 60 điều kiện của giai đoạn 1, 20/240 trên cả mức 1–2. Với mỗi điều kiện i: d_i = s_B,i − s_C,i. Hiệu là trung bình của d_i. CI 95 % bootstrap theo điều kiện: lấy mẫu lại d_i trong từng mức, 10 000 lần, hạt giống 20261103, khoảng phân vị (`stats` của plan, như mục 2 và 9). Phép kiểm phụ: McNemar chính xác hai phía trên các cặp bất đồng. b là số cặp B làm được mà C hỏng, c là số cặp ngược lại.
 
-**Trước khi đọc.** Lô B có đủ 270 rollout, cùng tập điều kiện với eval C SimReady (`conditions.sha256` `b9c38b37…`), cảnh SimReady có guard từng lô (mục 16.2), server `Ta` 24 + RTC, 1 worker. Thiếu một điều thì không đọc quy tắc 1–3: ghi `Decision` và báo. Lượt hỏng do hạ tầng chạy lại như mục 2; mỗi điều kiện lấy lần xong sớm nhất.
+**Hai giai đoạn.**
+- Giai đoạn 1 là 6 lô đầu theo thứ tự chạy của `eval_batch`: `l1-000`, `l2-000`, `l1-010`, `l2-010`, `l1-020`, `l2-020`. Đó là 60 điều kiện: seed 1000100–1000129 ở mức 1 và ở mức 2. Ghép cặp với đúng 60 điều kiện đó của eval C SimReady.
+- Sau giai đoạn 1 đọc một trong bốn kết quả (`eval_results --stage1`, trường `stage1.outcome`):
+
+| Kết quả | Điều kiện, trên 60 điều kiện | Làm gì |
+|---|---|---|
+| E1 | McNemar p < 0,001, b > c, cận dưới CI 95 % của (B − C) > 0 | Dừng. Đọc luật 1 |
+| E3 | McNemar p < 0,001, b < c, cận trên CI 95 % của (B − C) < 0 | Dừng. Đọc luật 3 |
+| F | Không phải E1 hay E3, và b ≤ c | Dừng vì không hứa hẹn. Đọc như luật 2: "không thấy B hơn C trên 60 điều kiện". Không đọc luật 3, không đọc "egocentric không giúp" |
+| Đi tiếp | Còn lại: b > c | Chạy 18 lô còn lại của mức 1–2, rồi mức 0. Đọc luật 1–6 trên đủ 240 điều kiện. 60 lượt của giai đoạn 1 tính vào 240, không chạy lại |
+
+- Mức 0 (30 lượt lặp) chỉ chạy khi đi tiếp giai đoạn 2. Dừng ở giai đoạn 1 thì không chạy mức 0, và `Decision` ghi rõ điều đó.
+- Không có điểm đọc nào khác. Giữa giai đoạn 2 không đọc và không dừng vì kết quả.
+
+**Trước khi đọc.** Lô B có đủ rollout của giai đoạn đang đọc: 60 rollout của 6 lô giai đoạn 1, hoặc 270 nếu đã đi tiếp giai đoạn 2. Cùng tập điều kiện với eval C SimReady (`conditions.sha256` `b9c38b37…`), cảnh SimReady có guard từng lô (mục 16.2), server `Ta` 24 + RTC, 1 worker. Thiếu một điều thì không đọc E1, E3, F và quy tắc 1–3: ghi `Decision` và báo. Lượt hỏng do hạ tầng chạy lại như mục 2; mỗi điều kiện lấy lần xong sớm nhất.
+
+Luật 1–3 đọc trên 240 điều kiện khi đã đi tiếp giai đoạn 2, và trên 60 điều kiện khi dừng ở E1 hay E3. Luật 4–6 báo trên đúng các điều kiện đã chạy.
 
 | # | Điều kiện | Đọc là |
 |---|---|---|
@@ -1372,7 +1388,7 @@ B là nhánh C của RunPlan bản 2 `rp_a04c14e79dfd` với **đúng một thay
 | 3 | Cận trên CI 95 % của (B − C) < 0 | B kém hơn C. Đây là kết quả âm hợp lệ, phải báo |
 | 4 | McNemar | Báo p cạnh quy tắc 1–3; không đổi quyết định của 1–3. Nếu McNemar (p < 0,05 hay không) và CI cho hai kết luận khác nhau, báo cả hai và ghi rõ là khác nhau |
 | 5 | B so với C+ | Chỉ mô tả: hiệu ghép cặp và CI như trên, không có luật. B và C+ khác nhau cả VLM lẫn số demo robot (160 so với 320) |
-| 6 | Chỉ số phụ, báo cạnh | Tỉ lệ qua từng bước trong 7 bước của bộ chấm theo mức, và ghép cặp B với C theo từng bước; tỉ lệ `L-PLACE-POSE` trên 240 (C: 131/240); `place_error` (mục 16.4); mức 0 báo riêng (30 lượt lặp, C: 5/30) |
+| 6 | Chỉ số phụ, báo cạnh | Tỉ lệ qua từng bước trong 7 bước của bộ chấm theo mức, và ghép cặp B với C theo từng bước; tỉ lệ `L-PLACE-POSE` (C: 33/60 ở giai đoạn 1, 131/240 trên cả mức 1–2); `place_error` (mục 16.4); mức 0 báo riêng nếu đã chạy (30 lượt lặp, C: 5/30) |
 
 **Giới hạn phải ghi cạnh mọi số B − C.**
 - B tốn thêm compute ở stage 1 (sổ chi phí của DA-30).
@@ -1382,6 +1398,7 @@ B là nhánh C của RunPlan bản 2 `rp_a04c14e79dfd` với **đúng một thay
 - Kết quả chỉ trong sim, renderer MuJoCo.
 - Sơ bộ, trên dev: 1 seed train mỗi nhánh, 1 rollout mỗi điều kiện. Rollout trên EGL không lặp lại được (mục 13.2), nên một cặp là hai rollout, không phải hai phép đo lặp của một rollout.
 - Không có A: không đọc HE-T (mục 4).
+- Dừng ở giai đoạn 1 là đọc trên 60 điều kiện. F không phải bằng chứng B không giúp: một cải thiện vừa vẫn có thể dừng ở F (mục 18.9).
 
 Luật này không đổi sau khi thấy kết quả. Muốn đổi thì ghi `Decision` mới và báo theo cả luật cũ lẫn luật mới.
 
@@ -1389,7 +1406,7 @@ Luật này không đổi sau khi thấy kết quả. Muốn đổi thì ghi `De
 
 ### 18.3 RunPlan B (nhiệm vụ con 4.2)
 
-[`he-tray-b.yaml`](../../configs/runplans/tray/he-tray-b.yaml), `status: draft`, id nháp `rp_a3d3f96260d9`. Id này đổi khi điền ghim của checkpoint stage 1 (nhiệm vụ con 4.7), vì ghim nằm trong id.
+[`he-tray-b.yaml`](../../configs/runplans/tray/he-tray-b.yaml), `status: draft`, id nháp `rp_128aec169e12` (từ 10/11, khi `rules_sha256` đổi theo mục 18.9). Id này đổi khi điền ghim của checkpoint stage 1 (nhiệm vụ con 4.7), vì ghim nằm trong id.
 
 | Trường | Giá trị |
 |---|---|
@@ -1463,18 +1480,37 @@ vm $S "cd /content/da34; nohup setsid bash -c 'PYTHONPATH=$VMPP Psi0/.venv-psi/b
 | Tập, điều kiện | `rp_a04c14e79dfd-2e57f60`, 270 điều kiện, `conditions.sha256` `b9c38b37…`. B không có tập riêng: `variant_of` bảo đảm eval của B là eval của bản 2. Dòng outcome vì vậy mang `run_plan_id` của bản 2, như C+; danh tính của B là checkpoint `da34-t4-ft-b-s0` và thư mục output |
 | Cây client | `~/denso-da34-master-079160d` có SimReady, `simple-guard.sh` trước mỗi lô |
 | Server | B `ckpt_40000`, `Ta` 24, `--rtc`, `127.0.0.1:22185`, cùng `serve_psi0.sh serve` như server C và C+ |
-| Lô | 1 worker, 27 lô 10 episode: mức 1 và 2 xen kẽ trước, mức 0 cuối; tối đa 3 lần, scope `MemoryMax=8G`, `MemorySwapMax=0` |
-| Output | Thư mục mới `~/denso-da34-pool/fwdata/tray/eval/eval-b-simready-<id của B>` |
-| Thời gian | Khoảng 17,2 giờ như eval C SimReady (giả định: cùng tốc độ mỗi episode) |
+| Lô | 1 worker, lô 10 episode: mức 1 và 2 xen kẽ trước, mức 0 cuối; tối đa 3 lần, scope `MemoryMax=8G`, `MemorySwapMax=0`. Hai giai đoạn (luật 18.2): giai đoạn 1 là `eval_batch --max-chunks 6`; giai đoạn 2, nếu đi tiếp, là cùng lệnh không có `--max-chunks`, chạy tiếp từ lô thứ 7 tới đủ 27 lô |
+| Output | Thư mục mới `~/denso-da34-pool/fwdata/tray/eval/eval-b-simready-<id của B>`, chung cho hai giai đoạn |
+| Thời gian | Giả định, theo số đo của eval C SimReady (`runs.jsonl`, 232 s mỗi episode ở mức 1–2): giai đoạn 1 khoảng 4,1 giờ (6 lô đó đo 4,07 giờ). Nếu đi tiếp: 18 lô còn lại khoảng 11,4 giờ, mức 0 khoảng 1,7 giờ; cả 270 khoảng 17,2 giờ. C+ chạy nhanh hơn (204 s mỗi episode), nên đây là cận trên hợp lý |
 
 Script vận hành trên máy (ngoài repo): chép `serve-cplus.sh` và `launch-eval-cplus.sh` của `~/denso-da34-t8/` thành `serve-b.sh` và `launch-eval-b.sh`, thay job thành `da34-t4-ft-b-s0`. Ba điều chặn giữ nguyên: danh sách sha256 của hand-off kiểm qua; có đúng một run có `ckpt_40000`; bounds trong `run_config.json` bằng `meta/stats_psi0.json` của bản cắt B. Bản cắt B là bản cắt C, nên stats phải lệch 0 so với stats của C. Việc này làm ở nhiệm vụ con 4.8, khi Hiếu cho chạy.
 
-**Đọc** bằng [`eval_results`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/eval_results.py) `--baseline`, chạy hai lần:
+**Dừng sau giai đoạn 1.** Cây client `~/denso-da34-master-079160d` không có `--max-chunks`, và B phải chạy đúng client của C. Vì vậy `launch-eval-b.sh` tách hai phần:
+- Bộ điều phối `eval_batch` chạy từ một bản checkout master có `--max-chunks` (sau khi PR này merge): `PYTHONPATH` của lệnh `python -m flywheel_psi0.tray.eval_batch` trỏ vào `packages/*/src` của bản checkout đó.
+- `--pythonpath` vẫn là `packages/*/src` của `~/denso-da34-master-079160d`. `launcher` đặt biến này cho proxy `act_log` và client `eval_driver`, nên hai tiến trình đó chạy đúng mã của eval C và C+.
+
+`eval_batch.py` ở `079160d`, ở cây client trên máy và ở master trước PR này cùng sha256 `f2f4434e…`; PR này chỉ thêm `--max-chunks`. Giai đoạn 1: `launch-eval-b.sh` với `--max-chunks 6`, rồi dừng. Hiếu đọc rồi mới bảo chạy tiếp. Giai đoạn 2: chạy lại lệnh không có `--max-chunks`; 60 episode đã xong không chạy lại. Kiểm thứ tự trước khi launch: `--dry-run --max-chunks 6` in đúng `l1-000`, `l2-000`, `l1-010`, `l2-010`, `l1-020`, `l2-020`.
+
+**Đọc giai đoạn 1** bằng [`eval_results`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/eval_results.py) `--baseline … --stage1`:
 
 ```bash
 PLAN=configs/runplans/tray/he-tray-b.yaml
 SET=~/denso-da34-pool/fwdata/tray/eval-sets/rp_a04c14e79dfd-2e57f60   # eval C's set (built by master 2e57f60)
 EV=~/denso-da34-pool/fwdata/tray/eval
+$PY -m flywheel_psi0.tray.eval_results $PLAN --set $SET --out $EV/eval-b-simready-<B id> \
+    --baseline $EV/eval-c-simready-rp_a04c14e79dfd --stage1 --json b-vs-c-stage1.json        # E1, E3, F hay đi tiếp
+$PY -m flywheel_psi0.tray.eval_results $PLAN --set $SET --out $EV/eval-b-simready-<B id> \
+    --baseline $EV/eval-cplus-simready-rp_a04c14e79dfd --stage1 --json b-vs-cplus-stage1.json  # luật 5, mô tả
+```
+
+- `--stage1` chỉ đọc 6 lô đầu của cả hai phía. Thiếu một rollout trong 6 lô đó thì lệnh báo lỗi và không đọc.
+- `stage1.outcome` là `E1`, `E3`, `F` hoặc `continue`, theo bảng "Hai giai đoạn" của 18.2, tính từ `paired.headline` trên 60 điều kiện. p của McNemar tính lại không làm tròn: 11 cặp so với 0 cho p 0,00098, làm tròn 4 chữ số sẽ thành 0,001. Chỉ đọc `outcome` của lần so với C; lần so với C+ chỉ để mô tả.
+- Thử trên số thật đã có (C+ làm biến thể, C làm mốc, 60 điều kiện): C+ 3, C 7, cặp bất đồng 3 và 7, p 0,34, CI −0,17 đến 0,03, `F`. Đây chỉ là kiểm công cụ, không phải luật đọc C+.
+
+**Đọc giai đoạn 2** (nếu đi tiếp, đủ 270 rollout) bằng `eval_results --baseline` không có `--stage1`, cùng các biến, chạy hai lần:
+
+```bash
 $PY -m flywheel_psi0.tray.eval_results $PLAN --set $SET --out $EV/eval-b-simready-<B id> \
     --baseline $EV/eval-c-simready-rp_a04c14e79dfd --json b-vs-c.json      # luật 1–4
 $PY -m flywheel_psi0.tray.eval_results $PLAN --set $SET --out $EV/eval-b-simready-<B id> \
@@ -1489,9 +1525,10 @@ $PY -m flywheel_psi0.tray.eval_results $PLAN --set $SET --out $EV/eval-b-simread
 ### 18.6 `Decision` nháp của B (nhiệm vụ con 4.5)
 
 [`he-tray-b.decision.json`](../../configs/runplans/tray/he-tray-b.decision.json): cùng dạng `Decision` với `Decision` quy tắc 0 ([`he-tray-v2.rule0.decision.json`](../../configs/runplans/tray/he-tray-v2.rule0.decision.json)); `meta.status` `draft`, `verdict` `open`, `signed_by` "pending: Hiếu".
-- `criteria` ghi: luật 18.2 và sha256 của khối; plan B và `variant_of`; ghim stage 1 (đang `null`); mốc C (20/240, `L-PLACE-POSE` 131/240, mức 0 5/30, lô của eval C SimReady); mốc C+ (lô đang chạy); bảng `verdict_map`: luật 1 là `pass`, luật 2 là `recorded`, luật 3 là `fail`; giới hạn.
+- `criteria` ghi: luật 18.2 và sha256 của khối; plan B và `variant_of`; ghim stage 1 (đang `null`); mốc C (20/240, `L-PLACE-POSE` 131/240, mức 0 5/30, lô của eval C SimReady); mốc C+ (lô đang chạy); bảng `verdict_map`: luật 1 là `pass`, luật 2 là `recorded`, luật 3 là `fail`; ở giai đoạn 1, E1 là `pass`, E3 là `fail`, F là `recorded`; giới hạn.
+- `criteria.two_stage` ghi luật hai giai đoạn (mục 18.9) và mốc C trên 60 điều kiện của giai đoạn 1 (7/60, `L-PLACE-POSE` 33/60). `metrics.stage1` để `null` tới khi giai đoạn 1 xong.
 - `metrics` để `null` tới khi eval B xong. Khi đó điền từ `eval_results --baseline` (mục 18.5).
-- `subject_id` là id nháp `rp_a3d3f96260d9`. Ở nhiệm vụ con 4.7 nó đổi thành id đóng băng; test `test_the_b_decision_is_an_open_draft_on_the_b_plan_and_its_rules` báo lỗi cho tới khi sửa.
+- `subject_id` là id nháp `rp_128aec169e12`. Ở nhiệm vụ con 4.7 nó đổi thành id đóng băng; test `test_the_b_decision_is_an_open_draft_on_the_b_plan_and_its_rules` báo lỗi cho tới khi sửa.
 
 ### 18.7 Ước lượng chi phí (nhiệm vụ con 4.6)
 
@@ -1500,7 +1537,8 @@ Giả định, chưa đo. Dòng `estimated` trong [sổ chi phí](../g0/ledger/D
 | Job | Ước lượng | Căn cứ |
 |---|---|---|
 | `job_da34_ft_B` | 16,0 CU (Colab L4), cap 18, sàn 14 | Như C đo được: 15,99 CU, 8,27 giờ, 0,724 s/bước; cùng recipe, cùng bản cắt, 40 000 bước. Chép thư mục VLM từ Drive thay cho tải trọng số VLM của C (khoảng 4,3 GB), coi như không đổi |
-| `job_da34_eval_B` | 17,3 giờ `rtx3060`, 0 CU | Như eval C SimReady đo được 17,25 giờ, cộng thời gian khởi động server |
+| `job_da34_eval_B` | 17,3 giờ `rtx3060`, 0 CU | Như eval C SimReady đo được 17,25 giờ, cộng thời gian khởi động server. Từ 10/11 đây là cận trên, khi đi tiếp giai đoạn 2 |
+| `job_da34_eval_B` giai đoạn 1 | 4,1 giờ `rtx3060`, 0 CU | 6 lô đầu của eval C SimReady đo 4,07 giờ. Dòng `estimated` mới ngày 10/11, trỏ về dòng 17,3 giờ; dòng cũ giữ nguyên |
 | Stage 1 | Không tính ở đây | Sổ chi phí của DA-30 ([`DA-30.csv`](../g0/ledger/DA-30.csv)), nhiệm vụ 2 của DA-30, trần 4 CU |
 
 Số dư Colab ngày 9/11 là 14,88 CU (mục 17.8). Nó không đủ cho cap 18 cộng sàn 14, nên phải mua thêm CU trước khi launch stage 3 B.
@@ -1514,7 +1552,33 @@ Số dư Colab ngày 9/11 là 14,88 CU (mục 17.8). Nó không đủ cho cap 18
 
   Lý do: `save_model` chỉ ghi trọng số, còn `from_pretrained` cần config, tokenizer và processor. Khi có thư mục, chạy `colab_train manifest --folder <thư mục>` để lấy hai sha256.
 - **4.7.** Điền `job_id`, `drive_dir`, `weights_sha256`, `manifest_sha256` vào `he-tray-b.yaml`, bỏ `status: draft`, `runplan freeze`. Đặt `B_FROZEN` trong `colab_train`. Đổi `subject_id` của `Decision` sang id mới. Hiếu duyệt luật 18.2 (nhãn ngoài khối, không đổi sha256) rồi launch.
-- **4.8.** Script `serve-b.sh` và `launch-eval-b.sh` trên `rtx3060`, eval B, đọc theo 18.2, điền `Decision`, dòng thực đo.
+- **4.8.** Script `serve-b.sh` và `launch-eval-b.sh` trên `rtx3060` (bộ điều phối từ bản master có `--max-chunks`, mục 18.5). Eval B giai đoạn 1, đọc `stage1.outcome`; Hiếu bảo chạy tiếp thì giai đoạn 2. Đọc theo 18.2, điền `Decision`, dòng thực đo.
+
+### 18.9 Eval B hai giai đoạn (Hiếu 10/11/2026)
+
+_**[Đã chốt 10/11/2026, Hiếu]** "Ghi Decision" (qua phiên điều phối): eval B chạy hai giai đoạn, và luật 18.2 sửa **trước** mọi lượt của B. Phần còn lại của 18.2 vẫn **[Đề xuất]**._
+
+**Lý do.**
+- Eval C+ cho thấy thành công gần như độc lập với điều kiện. Số do phiên điều phối đếm: C và C+ cùng thành công ở đúng 1 trong 240 điều kiện mức 1–2, kỳ vọng ngẫu nhiên khoảng 0,75. Trên 60 điều kiện của giai đoạn 1, C+ 3 và C 7 không trùng điều kiện nào (đếm lại ở mục 18.5).
+- Mỗi lượt mất khoảng 4 phút (eval C SimReady: 232 s mỗi episode ở mức 1–2). 240 lượt mất khoảng 15,5 giờ.
+- Hiếu muốn dừng sớm khi kết quả đã rõ.
+
+**Sửa gì.** Khối `branch-b-rules` thêm phần "Hai giai đoạn", sửa "Phép đo", "Trước khi đọc", luật 6 và giới hạn. sha256 của khối đổi từ `6c0eb9c9…` thành `52f3385b…`; `interpretation.rules_sha256` của [`he-tray-b.yaml`](../../configs/runplans/tray/he-tray-b.yaml) và `Decision` nháp ghi số mới, nên id nháp của plan đổi (mục 18.3). Chưa có lượt train hay eval nào của B, nên đây là sửa trước khi thấy kết quả, không phải đổi luật sau kết quả. Mã: `eval_batch --max-chunks` và `eval_results --stage1` (mục 18.5).
+
+**Đặc tính của luật hai giai đoạn.** Giả định, không phải kết quả: thành công độc lập theo điều kiện, C 8,3 %, B là tỉ lệ thật của B. Số của phiên điều phối (20 000 lần mô phỏng); "Lượt" là số lượt mức 1–2 trung bình, chưa tính 30 lượt mức 0. Claude chạy lại độc lập (3 000 lần, bootstrap 1 000 mẫu) và ra số gần như vậy, ví dụ B = C: báo nhầm 1,7 % (cố định: 2,0 %), dừng F 56 %, 139 lượt; B 16 %: đạt 67 % (cố định: 72,5 %).
+
+| B thật | "B đạt" | "B đạt" nếu cố định 240 | Dừng F | Lượt trung bình |
+|---|---|---|---|---|
+| 4 % | 0 %* | 0 %* | 88 % | 81 |
+| 8,3 % (bằng C) | 2,1 % (báo nhầm) | 2,3 % | 57 % | 138 |
+| 12 % | 24 % | 26 % | 29 %* | 186 |
+| 16 % | 69 % | 74 % | 12 % (dừng nhầm) | 217 |
+| 25 % | 99 % | 100 %* | 0,5 %* | 215 |
+| 40 % | 100 % | 100 %* | 0 %* (dừng E1 76 %) | 104 |
+
+\* Ô phiên điều phối không báo; số lấy từ lần chạy lại của Claude.
+
+Đọc bảng: tiết kiệm nhiều nhất khi B không hơn C, trường hợp hay gặp nhất. Đổi lại mất khoảng 5 điểm power ở mức cải thiện vừa (B 16 %). Tỉ lệ báo nhầm khi B = C không tăng (2,1 % so với 2,3 %).
 
 ## Change log
 
@@ -1549,3 +1613,4 @@ Số dư Colab ngày 9/11 là 14,88 CU (mục 17.8). Nó không đủ cho cap 18
 | 9/11/2026 | Mục 18.6: `Decision` nháp của B (`he-tray-b.decision.json`, `open`, chờ eval B và chữ ký của Hiếu) | Hiếu (soạn với Claude) |
 | 9/11/2026 | Mục 18.7–18.8: ước lượng stage 3 B (16,0 CU, cap 18, sàn 14) và eval B (17,3 giờ `rtx3060`), stage 1 ở sổ DA-30; dạng checkpoint stage 1 mà B nhận và việc còn lại (4.7, 4.8) | Hiếu (soạn với Claude) |
 | 9/11/2026 | Mục 18.3, 18.4, 18.6, 18.8 (review PR #172): ghim `parent_header_sha256` (header safetensors của VLM C) và `colab_train` kiểm header của trọng số stage 1 trước khi train; `budget.runs` phải là `[B]`; thêm `superseded_by` vào danh sách trường được khác; id nháp đổi thành `rp_a3d3f96260d9`. Luật 18.2 không đổi | Hiếu (soạn với Claude) |
+| 10/11/2026 | Mục 18.9 (quyết định của Hiếu 10/11/2026 "Ghi Decision"): eval B hai giai đoạn, giai đoạn 1 là 6 lô đầu (60 điều kiện), dừng E1, E3 hoặc F, còn lại chạy tiếp tới 240; mức 0 chỉ khi đi tiếp. Mục 18.2: khối `branch-b-rules` sửa trước mọi lượt của B (sha256 `6c0eb9c9…` thành `52f3385b…`), nhãn ngoài khối. Mục 18.5: `eval_batch --max-chunks 6`, `eval_results --stage1`, thời gian từng giai đoạn. Mục 18.3, 18.6, 18.7, 18.8: id nháp mới, `Decision`, dòng ước lượng giai đoạn 1 | Hiếu (soạn với Claude) |

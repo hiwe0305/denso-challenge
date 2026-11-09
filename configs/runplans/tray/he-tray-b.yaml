@@ -146,7 +146,7 @@ comparisons: []
 interpretation:
   doc: docs/he/tray.md
   rules_marker: branch-b-rules
-  rules_sha256: 6c0eb9c9537c7093929a3fbc90d3d09536c423eabea266890ef1c669c7cc800d # section 18.2 block
+  rules_sha256: 52f3385b78eb976ef729f591dda17bb10c3f0b74bc23ded8b37553c3fe2cd24d # section 18.2 block (two stages, Hiếu 10/11/2026)
 pricebook: "assumption: Colab 100 CU pack, 0.0999 USD per CU (docs/g0/ledger/DA-19.csv)"
 
 # B's own budget (Hiếu 9/11/2026), outside the 36 CU of tier 2: one stage 3 run at C's
