@@ -85,12 +85,36 @@ def preflight_env() -> dict[str, str]:
     }
 
 
+def preflight_plan_problems(plan: Any, drive_root: Path) -> list[str]:
+    """What stops `setup` before anything is installed or downloaded (no GPU time spent).
+
+    A draft or a placeholder pin; data that is not `public` (CLAUDE.md: internal and
+    restricted data never go to a hosted service, Colab included); an export tarball
+    that is not on Drive at the plan's path and size. Its sha256 is checked on the VM's
+    copy, in `_setup_export`.
+    """
+    problems = [f"draft: {reason}" for reason in draft_reasons(plan)]
+    if plan.status == "draft" and not problems:
+        problems.append("the plan is marked `status: draft`")
+    if plan.dataset.data_class != "public":
+        problems.append(f"data_class {plan.dataset.data_class}: only public data goes to Colab")
+    if getattr(plan.dataset, "kind", None) == "export" and not problems:
+        tarball = drive_root / plan.dataset.source.tarball
+        if not tarball.is_file():
+            problems.append(f"{tarball} not found (mount Drive before setup)")
+        elif tarball.stat().st_size != plan.dataset.source.bytes:
+            size = tarball.stat().st_size
+            problems.append(f"{tarball} is {size} bytes, the plan pins {plan.dataset.source.bytes}")
+    return problems
+
+
 def setup(work: Path, plan_path: Path, drive_root: Path = DRIVE_ROOT) -> None:
     import yaml
 
     plan = _plan(plan_path)  # validates first: unmasked video only under the EgoDex waiver
-    if plan.status == "draft":
-        raise SystemExit(f"{plan_path} is a draft ({', '.join(draft_reasons(plan))}): not run")
+    refused = preflight_plan_problems(plan, drive_root)
+    if refused:
+        raise SystemExit(f"{plan_path} not run:\n" + "\n".join(f"- {p}" for p in refused))
     raw = yaml.safe_load(plan_path.read_text(encoding="utf-8"))
     # The watcher's persist cell reads this to know which plan the session runs.
     (work / PLAN_POINTER).write_text(str(plan_path.resolve()), encoding="utf-8")

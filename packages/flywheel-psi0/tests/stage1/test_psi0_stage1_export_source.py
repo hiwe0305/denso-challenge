@@ -141,7 +141,9 @@ def test_fetch_never_unpacks_over_another_export(export: tuple[Path, str], tmp_p
         fetch(tmp_path / "missing.tar", "0" * 64, root, export_id, "part1")
 
 
-def export_block(export_id: str, digest: str, masked: bool = True) -> dict[str, Any]:
+def export_block(
+    export_id: str, digest: str, masked: bool = True, size: int = 1000
+) -> dict[str, Any]:
     return {
         "kind": "export",
         "id": f"team-ego-{export_id}",
@@ -150,7 +152,7 @@ def export_block(export_id: str, digest: str, masked: bool = True) -> dict[str, 
             "export_id": export_id,
             "tarball": f"denso/da30/exports/{export_id}.tar",
             "sha256": digest,
-            "bytes": 1000,
+            "bytes": size,
             "samples": 3,
         },
         "split_dir": "part1",
@@ -181,7 +183,7 @@ def test_setup_gets_the_export_from_drive(
     drive = tmp_path / "MyDrive"
     pin = pack(root, drive / "denso" / "da30" / "exports" / f"{export_id}.tar")
     raw = yaml.safe_load(EGODEX_SHORT.read_text())
-    raw["dataset"] = export_block(export_id, pin["sha256"])
+    raw["dataset"] = export_block(export_id, pin["sha256"], size=pin["bytes"])
     plan_path = tmp_path / "plan.yaml"
     plan_path.write_text(yaml.safe_dump(raw))
     work = tmp_path / "da30"
@@ -220,3 +222,55 @@ def test_stats_coverage_names_the_dims_the_clip_would_cut() -> None:
     assert coverage["dims_outside_shipped_q01_q99"] == [2]
     assert coverage["span_ratio_median"] == 0.5 and coverage["span_ratio_max"] == 1.0
     assert coverage["span_ratio_max_dim"] == 2
+
+
+def test_a_refused_export_is_not_left_where_the_loader_reads(
+    export: tuple[Path, str], tmp_path: Path
+) -> None:
+    root, export_id = export
+    (root / "part1" / "carry_red_box" / "1.mp4").write_bytes(b"tampered")
+    tarball = tmp_path / "t.tar"
+    with tarfile.open(tarball, "w") as tar:  # a tar of the tampered export (pack refuses)
+        tar.add(root, arcname=".")
+    target = tmp_path / "vm" / "data" / "egodex"
+    with pytest.raises(ExportRefused, match="sha256 differs"):
+        fetch(tarball, export_source.sha256(tarball), target, export_id, "part1")
+    assert not target.exists() and not (target.parent / "egodex.unverified").exists()
+    assert list(target.parent.iterdir()) == []  # the local tar copy is gone too
+
+
+def _setup_refuses(plan_path: Path, drive: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    ran: list[str] = []
+    monkeypatch.setattr(colab, "setup_psi0_env", lambda work: ran.append("env"))
+    monkeypatch.setattr(colab, "sh", lambda command, cwd=None, env=None: ran.append(command))
+    with pytest.raises(SystemExit) as refused:
+        colab.setup(drive.parent / "da30", plan_path, drive)
+    assert ran == []  # nothing installed, nothing downloaded
+    return str(refused.value)
+
+
+@pytest.mark.parametrize("data_class", ["internal", "restricted"])
+def test_setup_sends_only_public_data_to_colab(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, data_class: str
+) -> None:
+    raw = yaml.safe_load(EGODEX_SHORT.read_text())
+    raw["dataset"] = export_block("egx_" + "1" * 16, "2" * 64) | {"data_class": data_class}
+    plan_path = tmp_path / "plan.yaml"
+    plan_path.write_text(yaml.safe_dump(raw))
+    assert "only public data goes to Colab" in _setup_refuses(
+        plan_path, tmp_path / "MyDrive", monkeypatch
+    )
+
+
+def test_setup_checks_the_tarball_on_drive_before_any_install(
+    export: tuple[Path, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, export_id = export
+    drive = tmp_path / "MyDrive"
+    raw = yaml.safe_load(EGODEX_SHORT.read_text())
+    raw["dataset"] = export_block(export_id, "2" * 64)
+    plan_path = tmp_path / "plan.yaml"
+    plan_path.write_text(yaml.safe_dump(raw))
+    assert "mount Drive before setup" in _setup_refuses(plan_path, drive, monkeypatch)
+    pack(root, drive / raw["dataset"]["source"]["tarball"])  # there, but not 1000 bytes
+    assert "the plan pins 1000" in _setup_refuses(plan_path, drive, monkeypatch)

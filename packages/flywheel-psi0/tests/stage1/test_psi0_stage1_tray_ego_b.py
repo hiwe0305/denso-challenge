@@ -90,6 +90,6 @@ def test_setup_refuses_the_draft_before_anything_runs(
     ran: list[str] = []
     monkeypatch.setattr(colab, "setup_psi0_env", lambda work: ran.append("env"))
     monkeypatch.setattr(colab, "sh", lambda command, cwd=None, env=None: ran.append(command))
-    with pytest.raises(SystemExit, match="is a draft"):
+    with pytest.raises(SystemExit, match="draft: export_id is the placeholder"):
         colab.setup(tmp_path, PLAN)
     assert ran == []
