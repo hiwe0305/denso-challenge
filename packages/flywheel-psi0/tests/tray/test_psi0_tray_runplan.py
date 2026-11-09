@@ -7,6 +7,7 @@ import json
 import shutil
 import warnings
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -76,7 +77,9 @@ def test_three_branches_as_ac1(plan: TrayRunPlan) -> None:
     a, c, noego = (plan.branches[k] for k in ("A", "C", "C_NOEGO"))
     assert c.demo_set == noego.demo_set != a.demo_set
     assert a.parent == c.parent != noego.parent
-    assert plan.parents[noego.parent].vlm.path.startswith("psi0/pre.abl.only.he")
+    noego_parent = plan.parents[noego.parent]
+    assert isinstance(noego_parent, runplan.Parent)
+    assert noego_parent.vlm.path.startswith("psi0/pre.abl.only.he")
 
 
 def test_eval_conditions_are_90_dev_conditions(plan: TrayRunPlan) -> None:
@@ -767,8 +770,8 @@ def _b_repo(tmp_path: Path) -> Path:
     return repo
 
 
-def _b_raw(**pins: object) -> dict:
-    raw = yaml.safe_load(PLAN_B.read_text())
+def _b_raw(**pins: object) -> dict[str, Any]:
+    raw: dict[str, Any] = yaml.safe_load(PLAN_B.read_text())
     raw["parents"]["psi0-b-ego-stage1"]["vlm_stage1"].update(pins)
     return raw
 
@@ -822,7 +825,8 @@ def test_b_pins_its_own_rules_block(tmp_path: Path) -> None:
         (("recipe", "overrides", "train.validation_steps"), 1000, "variant_of: recipe differs"),
         (("eval", "episode_limit_s"), 60.0, "variant_of: eval differs"),
         (("branches", "B", "demo_set"), "A", "trains on A, not C's C"),
-        (("budget", "cap_cu_per_run"), 12, "not one run at C's cap"),
+        (("budget", "cap_cu_per_run"), 12, "not one run of ['B'] at C's cap"),
+        (("budget", "runs"), ["C"], "not one run of ['B'] at C's cap"),
         (("variant_of", "run_plan_id"), "rp_000000000000", "not rp_000000000000"),
         (
             ("parents", "psi0-b-ego-stage1", "action_header", "sha256"),
@@ -914,8 +918,9 @@ def test_the_b_decision_is_an_open_draft_on_the_b_plan_and_its_rules() -> None:
     assert decision.criteria["rules_marker"] == b.interpretation.rules_marker
     stage1 = b.parents["psi0-b-ego-stage1"]
     assert isinstance(stage1, runplan.Stage1Parent)
-    assert {k: decision.criteria["stage1"][k] for k in B_PINS} == {
-        k: getattr(stage1.vlm_stage1, k) for k in B_PINS
+    pinned = [*B_PINS, "parent_header_sha256"]
+    assert {k: decision.criteria["stage1"][k] for k in pinned} == {
+        k: getattr(stage1.vlm_stage1, k) for k in pinned
     }
     base = decision.criteria["baseline_c"]
     assert (base["headline_n"], base["headline_successes"]) == (

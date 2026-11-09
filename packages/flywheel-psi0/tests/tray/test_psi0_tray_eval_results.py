@@ -210,7 +210,9 @@ def test_mcnemar_exact_two_sided() -> None:
     assert mcnemar_exact(3, 3) == 1.0  # capped
 
 
-def _two_level_runs(tmp_path: Path, var_ok: dict[int, list[bool]], base_ok: dict[int, list[bool]]):
+def _two_level_runs(
+    tmp_path: Path, var_ok: dict[int, list[bool]], base_ok: dict[int, list[bool]]
+) -> tuple[Any, Any]:
     chunks = [
         Chunk(f"l{lv}-000", lv, 0, tuple(1000100 + i for i in range(len(var_ok[lv]))))
         for lv in var_ok

@@ -117,6 +117,11 @@ class Stage1Vlm(_Frozen):
     # sha256 of the folder manifest (colab_train.folder_manifest): every file, not only
     # the weights, since no psi-model revision pins the config and tokenizer here.
     manifest_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    # canonical sha256 of the parent VLM's safetensors header ({tensor: [dtype, shape]},
+    # colab_train.header_sha256), read at the plan's psi-model revision: the stage 1
+    # weights must have exactly these tensors, or Qwen3VL from_pretrained would only warn
+    # and stage 3 would train from freshly initialised weights.
+    parent_header_sha256: str = Field(min_length=64, max_length=64)
 
 
 class Stage1Parent(_Frozen):
@@ -618,8 +623,15 @@ def check_variant(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
         problems.append("variant_of: the reading rules live in another doc")
     if plan.budget is None or base.budget is None:
         problems.append("variant_of: both plans need a budget")
-    elif plan.budget.cap_cu_per_run != base.budget.cap_cu_per_run or plan.budget.round_runs:
-        problems.append(f"variant_of: the budget is not one run at {ref.branch}'s cap")
+    elif (
+        plan.budget.cap_cu_per_run != base.budget.cap_cu_per_run
+        or plan.budget.round_runs
+        or plan.budget.runs != list(plan.branches)
+    ):
+        problems.append(
+            f"variant_of: the budget is not one run of {sorted(plan.branches)} at"
+            f" {ref.branch}'s cap"
+        )
     return problems
 
 

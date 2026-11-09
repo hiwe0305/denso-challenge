@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 import shutil
+import struct
 from pathlib import Path
 from typing import Any
 
 import pytest
+from flywheel_psi0.trainer.recipe import Psi0Recipe
 from flywheel_psi0.tray import colab_train
 from flywheel_psi0.tray.colab_train import (
     FROZEN,
@@ -17,7 +19,7 @@ from flywheel_psi0.tray.colab_train import (
     load_plan,
 )
 from flywheel_psi0.tray.demo_sets import DemoSets
-from flywheel_psi0.tray.runplan import TrayRunPlan
+from flywheel_psi0.tray.runplan import Stage1Parent, TrayRunPlan
 
 REPO = Path(__file__).resolve().parents[4]
 PLAN = "configs/runplans/tray/he-tray-v2.yaml"
@@ -175,7 +177,12 @@ def test_setup_refuses_a_wrong_cut_before_any_install(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     installs: list[Path] = []
-    monkeypatch.setattr(colab_train, "install_env", lambda work: installs.append(work) or 0.0)
+
+    def install_env(work: Path) -> float:
+        installs.append(work)
+        return 0.0
+
+    monkeypatch.setattr(colab_train, "install_env", install_env)
     with pytest.raises(SystemExit, match="cut does not hold"):
         colab_train.setup(tmp_path)  # nothing uploaded
     assert installs == []
@@ -235,6 +242,29 @@ B_PLAN = "configs/runplans/tray/he-tray-b.yaml"
 BASE_VLM = "psi0/pre.fast.1by1.2601091803.ckpt.ego200k.he30k"
 
 
+# The parent VLM's tensors, in miniature: names, dtypes and shapes are what the pin hashes.
+TENSORS: dict[str, tuple[str, tuple[int, ...]]] = {
+    "model.language_model.embed_tokens.weight": ("BF16", (6, 2)),
+    "model.visual.patch_embed.proj.weight": ("BF16", (2, 3)),
+}
+
+
+def _write_safetensors(path: Path, tensors: dict[str, tuple[str, tuple[int, ...]]]) -> None:
+    """A valid safetensors file: little-endian header length, JSON header, zero data."""
+    header: dict[str, object] = {"__metadata__": {"format": "pt"}}
+    offset = 0
+    for name, (dtype, shape) in tensors.items():
+        size = 2 * shape[0] * shape[1]
+        header[name] = {
+            "dtype": dtype,
+            "shape": list(shape),
+            "data_offsets": [offset, offset + size],
+        }
+        offset += size
+    raw = json.dumps(header).encode()
+    path.write_bytes(struct.pack("<Q", len(raw)) + raw + bytes(offset))
+
+
 def _vlm_folders(root: Path) -> tuple[Path, Path]:
     """(stage 1 folder as on Drive, parent VLM folder without weights) with fake files."""
     base, stage1 = root / "base" / Path(BASE_VLM).name, root / "drive" / "da30" / "vlm-ego"
@@ -242,7 +272,7 @@ def _vlm_folders(root: Path) -> tuple[Path, Path]:
         (folder / "sub").mkdir(parents=True)
         (folder / "config.json").write_text('{"model_type": "qwen3_vl"}')
         (folder / "sub" / "tokenizer.json").write_text('{"vocab": 1}')
-    (stage1 / colab_train.WEIGHTS).write_bytes(b"stage 1 weights")
+    _write_safetensors(stage1 / colab_train.WEIGHTS, TENSORS)
     return stage1, base
 
 
@@ -252,6 +282,7 @@ def _pins(stage1: Path) -> dict[str, str]:
         "drive_dir": "da30/vlm-ego",
         "weights_sha256": colab_train.sha256(stage1 / colab_train.WEIGHTS),
         "manifest_sha256": colab_train.manifest_sha256(stage1),
+        "parent_header_sha256": colab_train.header_sha256(TENSORS),
     }
 
 
@@ -322,7 +353,7 @@ def test_the_stage1_folder_must_be_the_pinned_one_with_only_the_weights_changed(
     problems = colab_train.stage1_vlm_problems(stage1, base, pins)
     assert "optimizer.bin: not in the parent VLM folder" in problems
     assert "preprocessor_config.json: missing from the stage 1 VLM folder" in problems
-    (stage1 / colab_train.WEIGHTS).write_bytes(b"other weights")
+    _write_safetensors(stage1 / colab_train.WEIGHTS, {"a.weight": ("BF16", (1, 1))})
     assert any(
         p.endswith(f"plan pins {pins.weights_sha256}")
         for p in colab_train.stage1_vlm_problems(stage1, base, pins)
@@ -342,6 +373,7 @@ def test_manifest_prints_what_the_plan_pins(
     pins = _pins(stage1)
     out = capsys.readouterr().out
     assert f"weights_sha256: {pins['weights_sha256']}" in out
+    assert f"header_sha256: {pins['parent_header_sha256']} (2 tensors, dtypes ['BF16']" in out
     assert f"manifest_sha256: {pins['manifest_sha256']}" in out and "files: 3" in out
     lines = colab_train.folder_manifest(stage1).splitlines()
     assert [line.split("  ")[1] for line in lines] == [
@@ -359,7 +391,12 @@ def test_setup_of_b_refuses_without_the_drive_folder_before_any_install(
     monkeypatch.setattr(colab_train, "B_FROZEN", frozen)
     monkeypatch.setattr(colab_train, "DRIVE", tmp_path / "unmounted")
     installs: list[Path] = []
-    monkeypatch.setattr(colab_train, "install_env", lambda work: installs.append(work) or 0.0)
+
+    def install_env(work: Path) -> float:
+        installs.append(work)
+        return 0.0
+
+    monkeypatch.setattr(colab_train, "install_env", install_env)
     work = tmp_path / "work"
     _write_cut(colab_train.load_job("B", repo).data(work), plan)
     with pytest.raises(SystemExit, match="mount Drive first"):
@@ -398,7 +435,51 @@ def test_train_runs_b_on_the_stage1_vlm_and_cs_action_header(
     assert added.model_name_or_path == "cache/checkpoints/stage1/vlm-ego"
     assert added.pretrained_action_header_path == c_parent.pretrained_action_header_path
     # everything else as C: recipe args, override, release id of set C
-    assert seen["recipe"].args == colab_train.Psi0Recipe.load(REPO / plan.recipe.file).args
+    assert seen["recipe"].args == Psi0Recipe.load(REPO / plan.recipe.file).args
     assert seen["overrides"] == {"train.validation_steps": 2000}
     assert seen["release_id"] == "tray_s1_f9433b028c52#C:a202cc028a2e"
     assert seen["run_plan_id"] == frozen
+
+
+@pytest.mark.parametrize(
+    ("tensors", "seen"),
+    [
+        # what save_model writes from a wrapped model: same tensors under another prefix
+        ({f"vlm_model.{k}": v for k, v in TENSORS.items()}, "top-level ['vlm_model']"),
+        ({**TENSORS, "lm_head.weight": ("BF16", (6, 2))}, "lm_head True"),
+        ({k: ("F32", s) for k, (_, s) in TENSORS.items()}, "dtypes ['F32']"),
+        (
+            {**TENSORS, "model.language_model.embed_tokens.weight": ("BF16", (4, 2))},
+            "embed_tokens [(4, 2)]",
+        ),
+    ],
+)
+def test_stage1_weights_must_have_the_parent_vlms_tensors(
+    tmp_path: Path, tensors: dict[str, tuple[str, tuple[int, ...]]], seen: str
+) -> None:
+    # Qwen3VL from_pretrained only warns on such keys: stage 3 would train from random weights
+    from flywheel_psi0.tray.runplan import Stage1Vlm
+
+    stage1, base = _vlm_folders(tmp_path)
+    _write_safetensors(stage1 / colab_train.WEIGHTS, tensors)
+    pins = Stage1Vlm(story="DA-30", ledger="x", from_parent="p", **_pins(stage1))
+    pins = pins.model_copy(update={"parent_header_sha256": colab_train.header_sha256(TENSORS)})
+    problems = colab_train.stage1_vlm_problems(stage1, base, pins)
+    assert [p for p in problems if "tensors are not the parent VLM's" in p and seen in p], problems
+    assert len(problems) == 1  # sha256 and manifest are the folder's own: only the header fails
+    (stage1 / colab_train.WEIGHTS).write_bytes(b"not a safetensors file")
+    assert any(
+        "no readable safetensors header" in p
+        for p in colab_train.stage1_vlm_problems(stage1, base, pins)
+    )
+
+
+def test_the_plan_pins_the_header_of_cs_vlm() -> None:
+    # 625 BF16 tensors, no lm_head, embed_tokens 153792 x 2048, read by range request from
+    # psi-model cb1480f on 9/11/2026; DA-30's package (PR #171) found the same
+    plan = TrayRunPlan.load(REPO / B_PLAN)
+    stage1 = plan.parents["psi0-b-ego-stage1"]
+    assert isinstance(stage1, Stage1Parent)
+    assert stage1.vlm_stage1.parent_header_sha256 == (
+        "53d000d9626a13faf4bcb5268517b8441c34b187c88c9dee0b4c250dc19d6d59"
+    )
