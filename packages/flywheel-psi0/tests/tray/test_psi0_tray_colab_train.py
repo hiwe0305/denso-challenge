@@ -228,3 +228,177 @@ def test_check_phase_needs_no_env(
         colab_train.main(["check", "--work", str(tmp_path)])
     assert stop.value.code == 0
     assert "rp_a04c14e79dfd da34-t2-ft-c-s0: cut and plan hold" in capsys.readouterr().out
+
+
+# Branch B (task 4): C's job with the VLM from DA-30's stage 1 folder on Drive.
+B_PLAN = "configs/runplans/tray/he-tray-b.yaml"
+BASE_VLM = "psi0/pre.fast.1by1.2601091803.ckpt.ego200k.he30k"
+
+
+def _vlm_folders(root: Path) -> tuple[Path, Path]:
+    """(stage 1 folder as on Drive, parent VLM folder without weights) with fake files."""
+    base, stage1 = root / "base" / Path(BASE_VLM).name, root / "drive" / "da30" / "vlm-ego"
+    for folder in (base, stage1):
+        (folder / "sub").mkdir(parents=True)
+        (folder / "config.json").write_text('{"model_type": "qwen3_vl"}')
+        (folder / "sub" / "tokenizer.json").write_text('{"vocab": 1}')
+    (stage1 / colab_train.WEIGHTS).write_bytes(b"stage 1 weights")
+    return stage1, base
+
+
+def _pins(stage1: Path) -> dict[str, str]:
+    return {
+        "job_id": "da30-t2-stage1-ego-s0",
+        "drive_dir": "da30/vlm-ego",
+        "weights_sha256": colab_train.sha256(stage1 / colab_train.WEIGHTS),
+        "manifest_sha256": colab_train.manifest_sha256(stage1),
+    }
+
+
+def _frozen_b(tmp_path: Path, plan: TrayRunPlan, pins: dict[str, str]) -> tuple[Path, str]:
+    """A repo copy whose B plan is pinned, out of draft and frozen, as task 4.7 leaves it."""
+    import yaml
+    from flywheel_psi0.tray import runplan
+
+    repo = _repo_copy(tmp_path, plan)
+    raw = yaml.safe_load((REPO / B_PLAN).read_text())
+    raw["parents"]["psi0-b-ego-stage1"]["vlm_stage1"].update(pins)
+    del raw["status"]
+    (repo / B_PLAN).write_text(yaml.safe_dump(raw, allow_unicode=True, sort_keys=False))
+    lock = json.loads(runplan.freeze(repo / B_PLAN, repo).read_text())
+    return repo, lock["run_plan_id"]
+
+
+def test_b_does_not_run_from_the_draft_plan() -> None:
+    with pytest.raises(SystemExit) as stop:
+        colab_train.load_job("B")
+    message = str(stop.value)
+    assert "is a draft" in message and "B_FROZEN is unset" in message
+    assert "vlm_stage1.weights_sha256 is not pinned yet (DA-30)" in message
+
+
+def test_b_runs_only_the_approved_frozen_plan(
+    tmp_path: Path, plan: TrayRunPlan, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stage1, _ = _vlm_folders(tmp_path / "vlm")
+    repo, frozen = _frozen_b(tmp_path / "repo", plan, _pins(stage1))
+    with pytest.raises(SystemExit, match="B_FROZEN is unset"):
+        colab_train.load_job("B", repo)
+    monkeypatch.setattr(colab_train, "B_FROZEN", "rp_000000000000")
+    with pytest.raises(SystemExit, match="only rp_000000000000 is approved for B"):
+        colab_train.load_job("B", repo)
+    monkeypatch.setattr(colab_train, "B_FROZEN", frozen)
+    job = colab_train.load_job("B", repo)
+    assert (job.job_id, job.run_plan_id, job.parent_name) == (
+        "da34-t4-ft-b-s0",
+        frozen,
+        "psi0-b-ego-stage1",
+    )
+    assert (job.demo_set, job.set_hash) == ("C", plan.demo_sets.hashes["C"])
+    # B uploads C's cut as is: same marker, same checks
+    _write_cut(job.data(tmp_path / "work"), plan)
+    assert job.data(tmp_path / "work").parent.name == "B"
+    assert job.cut_problems(job.data(tmp_path / "work"), repo) == []
+
+
+def test_the_stage1_folder_must_be_the_pinned_one_with_only_the_weights_changed(
+    tmp_path: Path,
+) -> None:
+    from flywheel_psi0.tray.runplan import Stage1Vlm
+
+    stage1, base = _vlm_folders(tmp_path)
+    pins = Stage1Vlm(story="DA-30", ledger="x", from_parent="p", **_pins(stage1))
+    assert colab_train.stage1_vlm_problems(stage1, base, pins) == []
+    (stage1 / ".cache").mkdir()  # dot entries are left out of the manifest
+    (stage1 / ".cache" / "lock").write_text("x")
+    assert colab_train.stage1_vlm_problems(stage1, base, pins) == []
+    (stage1 / "sub" / "tokenizer.json").write_text('{"vocab": 2}')
+    problems = colab_train.stage1_vlm_problems(stage1, base, pins)
+    assert "sub/tokenizer.json: differs from the parent VLM folder's" in problems
+    assert any("manifest sha256" in p for p in problems)
+    (stage1 / "sub" / "tokenizer.json").write_text('{"vocab": 1}')
+    (stage1 / "optimizer.bin").write_text("x")
+    (base / "preprocessor_config.json").write_text("{}")
+    problems = colab_train.stage1_vlm_problems(stage1, base, pins)
+    assert "optimizer.bin: not in the parent VLM folder" in problems
+    assert "preprocessor_config.json: missing from the stage 1 VLM folder" in problems
+    (stage1 / colab_train.WEIGHTS).write_bytes(b"other weights")
+    assert any(
+        p.endswith(f"plan pins {pins.weights_sha256}")
+        for p in colab_train.stage1_vlm_problems(stage1, base, pins)
+    )
+    assert colab_train.stage1_vlm_problems(tmp_path / "nowhere", base, pins)[0].endswith(
+        "the stage 1 VLM is not there"
+    )
+
+
+def test_manifest_prints_what_the_plan_pins(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    stage1, _ = _vlm_folders(tmp_path)
+    with pytest.raises(SystemExit) as stop:
+        colab_train.main(["manifest", "--folder", str(stage1)])
+    assert stop.value.code == 0
+    pins = _pins(stage1)
+    out = capsys.readouterr().out
+    assert f"weights_sha256: {pins['weights_sha256']}" in out
+    assert f"manifest_sha256: {pins['manifest_sha256']}" in out and "files: 3" in out
+    lines = colab_train.folder_manifest(stage1).splitlines()
+    assert [line.split("  ")[1] for line in lines] == [
+        "config.json",
+        "model.safetensors",
+        "sub/tokenizer.json",
+    ]
+
+
+def test_setup_of_b_refuses_without_the_drive_folder_before_any_install(
+    tmp_path: Path, plan: TrayRunPlan, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stage1, _ = _vlm_folders(tmp_path / "vlm")
+    repo, frozen = _frozen_b(tmp_path / "repo", plan, _pins(stage1))
+    monkeypatch.setattr(colab_train, "B_FROZEN", frozen)
+    monkeypatch.setattr(colab_train, "DRIVE", tmp_path / "unmounted")
+    installs: list[Path] = []
+    monkeypatch.setattr(colab_train, "install_env", lambda work: installs.append(work) or 0.0)
+    work = tmp_path / "work"
+    _write_cut(colab_train.load_job("B", repo).data(work), plan)
+    with pytest.raises(SystemExit, match="mount Drive first"):
+        colab_train.setup(work, "B", repo)
+    assert installs == []
+
+
+def test_train_runs_b_on_the_stage1_vlm_and_cs_action_header(
+    tmp_path: Path, plan: TrayRunPlan, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import flywheel_psi0.trainer as trainer_package
+
+    stage1, base = _vlm_folders(tmp_path / "vlm")
+    repo, frozen = _frozen_b(tmp_path / "repo", plan, _pins(stage1))
+    monkeypatch.setattr(colab_train, "B_FROZEN", frozen)
+    monkeypatch.setattr(trainer_package, "Psi0Trainer", _FakeTrainer)
+    work = tmp_path / "work"
+    job = colab_train.load_job("B", repo)
+    _write_cut(job.data(work), plan)
+    # where setup leaves the two folders
+    psi0 = work / "Psi0"
+    with pytest.raises(SystemExit, match="the stage 1 VLM is not there"):
+        colab_train.train(work, "B", repo)
+    shutil.copytree(stage1, psi0 / colab_train.STAGE1_DIR / "vlm-ego")
+    shutil.copytree(base, psi0 / "cache/checkpoints" / BASE_VLM)
+    colab_train.train(work, "B", repo)
+    seen = _FakeTrainer.seen
+    spec = seen["spec"]
+    assert (spec.job_id, spec.seed, spec.parent.checkpoint_id) == (
+        "da34-t4-ft-b-s0",
+        0,
+        "psi0-b-ego-stage1",
+    )
+    added = seen["recipe"].parents["psi0-b-ego-stage1"]
+    c_parent = seen["recipe"].parents["psi0-baseline-egodex-he"]
+    assert added.model_name_or_path == "cache/checkpoints/stage1/vlm-ego"
+    assert added.pretrained_action_header_path == c_parent.pretrained_action_header_path
+    # everything else as C: recipe args, override, release id of set C
+    assert seen["recipe"].args == colab_train.Psi0Recipe.load(REPO / plan.recipe.file).args
+    assert seen["overrides"] == {"train.validation_steps": 2000}
+    assert seen["release_id"] == "tray_s1_f9433b028c52#C:a202cc028a2e"
+    assert seen["run_plan_id"] == frozen

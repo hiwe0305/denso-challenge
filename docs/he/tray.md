@@ -1402,6 +1402,56 @@ Luật này không đổi sau khi thấy kết quả. Muốn đổi thì ghi `De
 
 **Chặn khi chưa đủ ghim.** `runplan check` (cũng là lệnh CI chạy) qua và ghi "draft, 4 stage 1 pins pending". `runplan freeze` từ chối khi còn `status: draft` hoặc còn một ghim `null`, kể cả khi đã bỏ `draft`. `runplan check --release … --launch` từ chối với một dòng `DRAFT` và một dòng `PENDING` cho mỗi ghim thiếu. Test: `test_b_neither_launches_nor_freezes_until_stage1_is_pinned`, `test_b_refuses_any_second_change`, `test_b_freezes_once_pinned_and_released_from_draft`.
 
+### 18.4 Runbook: fine-tune stage 3 B trên Colab (nhiệm vụ con 4.3, soạn 9/11/2026, chưa chạy)
+
+Một phiên Colab L4, job `da34-t4-ft-b-s0`, cap 18 CU, sàn số dư 14 CU. Giống mục 17.6, chỉ khác bốn điều: plan `he-tray-b.yaml`, `--branch B`, bản cắt là bản cắt C đặt ở `sets/B/`, và VLM lấy từ Drive. **Không chạy gì trước khi Hiếu launch.**
+
+**Mã phía VM** ([`colab_train`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/colab_train.py) `--branch B`):
+- Chỉ chạy plan B đã đóng băng với id bằng `B_FROZEN`. Hiện `B_FROZEN` là `None`, nên `check`, `setup` và `train` của B đều từ chối, kèm lý do: plan còn nháp, 4 ghim chưa điền, chưa duyệt id.
+- `setup`: kiểm bản cắt như C, rồi kiểm có `model.safetensors` dưới `/content/drive/MyDrive/<drive_dir>`, cả hai **trước** khi cài môi trường. Sau đó tải từ psi-model (revision của plan) action header của C và thư mục VLM của C **không kèm trọng số**, chép thư mục stage 1 từ Drive vào `Psi0/cache/checkpoints/stage1/<tên thư mục>`, rồi kiểm:
+  - sha256 action header bằng ghim của C;
+  - sha256 `model.safetensors` bằng `weights_sha256`;
+  - sha256 manifest cả thư mục bằng `manifest_sha256`;
+  - mọi file khác (config, tokenizer, processor) trùng từng byte file cùng tên của VLM C; không thừa, không thiếu file nào. Stage 1 chỉ được đổi trọng số.
+
+  Lệch một điều thì dừng, không train.
+- `train`: kiểm lại bản cắt và thư mục stage 1, rồi chạy Psi0Trainer với recipe của plan. Cha stage 1 được thêm vào recipe trong bộ nhớ: `model_name_or_path` trỏ vào thư mục stage 1, action header của C; file recipe không sửa. Mọi thứ khác như C: override, seed, `release_id` `tray_s1_f9433b028c52#C:a202cc028a2e`.
+- `manifest --folder <thư mục>` in `weights_sha256`, `manifest_sha256` và số file: chính các ghim của plan. Manifest là một dòng `<sha256>  <đường dẫn>` cho mỗi file, xếp theo đường dẫn, bỏ mục bắt đầu bằng dấu chấm.
+
+**Điều kiện trước khi chạy.**
+1. Nhiệm vụ con 4.7 đã merge: ghim stage 1 điền từ checkpoint của DA-30, bỏ `draft`, `runplan freeze` ra id mới, `B_FROZEN` đặt bằng id đó. Luật 18.2 đã duyệt.
+2. `colab sessions` trống. Số dư ít nhất 32 CU (sàn 14 cộng cap 18). Ngày 9/11 số dư là 14,88 CU sau C+ (mục 17.8), nên phải mua thêm CU trước khi launch.
+3. Laptop thức suốt lần chạy (bài học ở mục 17.8). Hiếu cho chạy.
+
+**rtx3060: kiểm lúc khởi chạy và dựng bản cắt** (0 CU, khoảng 1 phút; `D` như ở mục 17.6):
+
+```bash
+cd $D && export PYTHONPATH=$(ls -d $PWD/packages/*/src | paste -sd:)
+PY=~/denso-da34-pool/.venv/bin/python
+REL_C=~/denso-da34-pool/fwdata/releases/tray_s1_f9433b028c52
+CUT=~/denso-da34-pool/fwdata/cut-b-$(cut -c1-7 TREE_SHA)
+E=G1WholebodyTrayTransferTeleop-v0
+$PY -m flywheel_psi0.tray.runplan check configs/runplans/tray/he-tray-b.yaml --release $REL_C --launch \
+  || { echo "runplan check --launch failed: do not launch"; exit 1; }
+$PY scripts/he/demo_subset.py --src $REL_C --sets configs/runplans/tray/demo_sets-v2.json --set C --out $CUT/sets/B/$E
+$PY -m flywheel_psi0.tray.colab_train check --branch B --work $CUT   # "<B id> da34-t4-ft-b-s0: cut and plan hold"
+```
+
+**Laptop: kéo bản cắt, guard và watcher.** Như mục 17.6, với `S=da34-t4-ft-b-s0`, `rsync … rtx3060:$CUT/sets/ fwdata/tray/cut-b/sets/`, `--cap 18 --floor 14`.
+
+**Phiên B.** Như phiên C+ ở mục 17.6, thay `C_PLUS` bằng `B` và `cut-cplus` bằng `cut-b`, cộng một bước: mount Drive ngay sau khi upload mã và bản cắt, trước `setup`.
+
+```bash
+colab drivemount -s $S /content/drive
+vm $S "cd /content/da34 && PYTHONPATH=$VMPP python3 -m flywheel_psi0.tray.colab_train check --branch B" \
+  || { colab stop -s $S; echo "$S: cut or plan does not hold on the VM, session stopped"; }
+vm $S "cd /content/da34; nohup setsid bash -c 'PYTHONPATH=$VMPP python3 -m flywheel_psi0.tray.colab_train setup --branch B; echo setup exit \$?' > setup.log 2>&1 < /dev/null &"
+vm $S 'tail -2 /content/da34/setup.log'   # chờ "setup exit 0"; phase setup_tray_b của report.json ghi stage1_vlm
+vm $S "cd /content/da34; nohup setsid bash -c 'PYTHONPATH=$VMPP Psi0/.venv-psi/bin/python -m flywheel_psi0.tray.colab_train train --branch B; echo train exit \$?' > train.log 2>&1 < /dev/null &"
+```
+
+**Sau khi chạy.** Dòng `measured` cho `job_da34_ft_B` trỏ về dòng ước lượng. Chuyển checkpoint sang `rtx3060` theo đúng ba lệnh của mục 17.6 với `J=fwdata/tray/runs/da34-t4-ft-b-s0`; lệch một file thì không eval.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -1430,3 +1480,4 @@ Luật này không đổi sau khi thấy kết quả. Muốn đổi thì ghi `De
 | 9/11/2026 | Mục 17.8: fine-tune C+ lần 2 xong (40 000 bước, 16,11 CU, 8,37 giờ), checkpoint về `rtx3060` và kiểm sha256; C+ tổng 23,6 CU. Eval C+ chưa chạy | Hiếu (soạn với Claude) |
 | 9/11/2026 | Mục 18.1–18.2: nhánh B (nhiệm vụ 4, Hiếu "Chốt 4 mặc định" 9/11): thiết lập (B là C của `rp_a04c14e79dfd`, chỉ đổi VLM cha thành VLM sau stage 1 của DA-30) và luật đọc B ([Đề xuất], khối `branch-b-rules`), viết trước mọi lượt của B. Khối `tier2-rules` không đổi | Hiếu (soạn với Claude) |
 | 9/11/2026 | Mục 18.3: RunPlan B nháp `he-tray-b.yaml` (`rp_97922261b774` khi chưa điền ghim), cha stage 1, bất biến `variant_of`, chặn `freeze` và `--launch` khi chưa đủ ghim. Mục 18.2 trỏ tới file plan | Hiếu (soạn với Claude) |
+| 9/11/2026 | Mục 18.4: `colab_train --branch B` (chỉ plan B đã đóng băng và duyệt; VLM stage 1 từ Drive, kiểm sha256 trọng số, manifest cả thư mục, file khác trùng VLM của C; cha stage 1 thêm vào recipe trong bộ nhớ) và runbook Colab cho B, chưa chạy | Hiếu (soạn với Claude) |

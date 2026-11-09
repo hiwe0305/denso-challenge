@@ -26,6 +26,18 @@ and a joined cut (`flywheel_psi0.tray.cplus_cut`) whose first part is exactly C'
 and whose second is the round's targeted set. Recipe, parent and train seed are
 branch C's, as the round plan inherits them.
 
+Branch B (task 4, `--branch B`) runs the plan `configs/runplans/tray/he-tray-b.yaml`
+once it is frozen as `B_FROZEN` with DA-30's stage 1 checkpoint pinned; until then it
+refuses. B is C's job with one change, the VLM: C's cut (set C) goes to
+`<work>/sets/B/<env name>`; `setup` copies the stage 1 VLM folder from Google Drive
+(`/content/drive/MyDrive/<drive_dir>`, mounted before) to `Psi0/<STAGE1_DIR>`, and
+refuses unless its `model.safetensors` and its whole-folder manifest match the plan's
+sha256 and every other file is byte for byte the file of C's VLM folder at the plan's
+psi-model revision (config, tokenizer, processor: only the weights may differ).
+`train` checks the folder again and gives Psi0Trainer the recipe with the stage 1
+parent added in memory (the recipe file is not edited). The action header is C's.
+`manifest --folder <dir>` prints what the plan pins, for whoever fills them (task 4.7).
+
 What happens after is DA-26's code: `scripts/he/he1_colab.py stage` and
 `persist` read only `<work>/runs`, `report.json` and `train.log`, and
 `scripts/he/he1_fetch.py --remote-work /content/da34` pulls the checkpoints to the
@@ -38,6 +50,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -52,10 +65,13 @@ from flywheel_psi0.trainer.colab import (
     repair_lock,
     sh,
 )
+from flywheel_psi0.trainer.recipe import ParentCheckpoint, Psi0Recipe
 from flywheel_psi0.tray.demo_sets import DemoSets
 from flywheel_psi0.tray.runplan import (
     REPO,
     Parent,
+    Stage1Parent,
+    Stage1Vlm,
     TrayRoundPlan,
     TrayRunPlan,
     check,
@@ -63,6 +79,7 @@ from flywheel_psi0.tray.runplan import (
     lock_path,
     pinned_file_drift,
     run_plan_id,
+    stage1_pending,
 )
 
 PLAN = "configs/runplans/tray/he-tray-v2.yaml"
@@ -71,6 +88,14 @@ BRANCH = "C"  # tier 2: the only branch of the plan (C+ is round-tray-cplus.yaml
 CPLUS_PLAN = "configs/runplans/tray/round-tray-cplus.yaml"
 CPLUS_FROZEN = "rp_71fee3fcff69"  # round-tray-cplus.lock.json, frozen 8/11/2026 (task 5.3)
 CPLUS = "C_PLUS"
+B_PLAN = "configs/runplans/tray/he-tray-b.yaml"
+# Set when he-tray-b.yaml is frozen with DA-30's checkpoint pinned (task 4.7); until
+# then no B job runs, whatever the plan file says.
+B_FROZEN: str | None = None
+B = "B"
+DRIVE = Path("/content/drive/MyDrive")  # `colab drivemount -s <session> /content/drive`
+STAGE1_DIR = "cache/checkpoints/stage1"  # under Psi0, beside the psi-model snapshot
+WEIGHTS = "model.safetensors"  # the one file a stage 1 VLM folder changes
 WORK = Path("/content/da34")
 MARKER = "flywheel_subset.json"  # written by scripts/he/demo_subset.py and cplus_cut
 
@@ -121,30 +146,65 @@ def load_round(repo: Path = REPO) -> tuple[TrayRunPlan, TrayRoundPlan, str]:
     return plan, round_plan, CPLUS_FROZEN
 
 
+def load_b(repo: Path = REPO) -> tuple[TrayRunPlan, str]:
+    """The frozen B plan and its run_plan_id, or SystemExit with every reason not to run."""
+    plan = TrayRunPlan.load(repo / B_PLAN)
+    problems = check(plan, repo)
+    problems += [f"{d}: re-freeze or record a Decision" for d in pinned_file_drift(plan, repo)]
+    if plan.status == "draft":
+        problems.append(f"{B_PLAN} is a draft: no B job runs before task 4.7")
+    problems += stage1_pending(plan)
+    if plan.variant_of is None or plan.variant_of.run_plan_id != FROZEN:
+        problems.append(f"{B_PLAN} is not a variant of {FROZEN}")
+    lock = lock_path(repo / B_PLAN)
+    frozen = json.loads(lock.read_text(encoding="utf-8"))["run_plan_id"] if lock.is_file() else None
+    if frozen is None:
+        problems.append(f"{lock.name} missing: the B plan is not frozen")
+    elif frozen != run_plan_id(plan):
+        problems.append(f"{B_PLAN} changed since it was frozen as {frozen}")
+    if B_FROZEN is None:
+        problems.append("no B plan is approved yet: B_FROZEN is unset (task 4.7)")
+    elif frozen is not None and frozen != B_FROZEN:
+        problems.append(f"{lock.name} holds {frozen}; only {B_FROZEN} is approved for B")
+    if B not in plan.branches or plan.budget is None or B not in plan.budget.runs:
+        problems.append(f"branch {B} has no run in the plan's budget")
+    if problems:
+        raise SystemExit("B plan does not hold, no training:\n  " + "\n  ".join(problems))
+    assert B_FROZEN is not None
+    return plan, B_FROZEN
+
+
 @dataclass(frozen=True)
 class Job:
-    """One fine-tune of the tray experiment: branch C of v2, or C+ of its round."""
+    """One fine-tune of the tray experiment: branch C of v2, C+ of its round, or B."""
 
-    plan: TrayRunPlan  # the frozen v2 plan: recipe, parent, train seed, task
+    plan: TrayRunPlan  # the frozen plan: recipe, parent, train seed, task
     run_plan_id: str
     branch: str
     demo_set: str  # what the release id of the run names
     set_hash: str
     release_id: str
     round_plan: TrayRoundPlan | None = None
+    plan_branch: str = BRANCH  # the plan's branch whose parent and demo set the job uses
 
     @property
     def job_id(self) -> str:
         if self.branch == BRANCH:
             return job_id(self.plan)
+        if self.branch == B:
+            return f"da34-t4-ft-b-s{self.plan.train_seeds[0]}"
         return f"da34-t5-ft-cplus-s{self.plan.train_seeds[0]}"
+
+    @property
+    def parent_name(self) -> str:
+        return self.plan.branches[self.plan_branch].parent
 
     def data(self, work: Path) -> Path:
         return work / "sets" / self.branch / self.plan.task["env_id"].rsplit("/", 1)[-1]
 
     def cut_problems(self, data: Path, repo: Path = REPO) -> list[str]:
         if self.round_plan is None:
-            return cut_problems(data, self.plan, repo)
+            return cut_problems(data, self.plan, repo, self.plan_branch)
         return cplus_cut_problems(data, self.plan, self.round_plan, repo)
 
 
@@ -167,6 +227,18 @@ def load_job(branch: str = BRANCH, repo: Path = REPO) -> Job:
             f"{plan.release.id}+{round_plan.targets.release.id}",
             round_plan,
         )
+    if branch == B:
+        plan, run_plan = load_b(repo)
+        demo_set = plan.branches[B].demo_set
+        return Job(
+            plan,
+            run_plan,
+            B,
+            demo_set,
+            plan.demo_sets.hashes[demo_set],
+            plan.release.id,
+            plan_branch=B,
+        )
     raise SystemExit(f"no fine-tune for branch {branch}")
 
 
@@ -188,18 +260,21 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def cut_problems(data: Path, plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
-    """Everything wrong between C's uploaded cut and the plan's pins; empty when it holds."""
+def cut_problems(
+    data: Path, plan: TrayRunPlan, repo: Path = REPO, branch: str = BRANCH
+) -> list[str]:
+    """Everything wrong between a branch's uploaded cut (C's, also B's) and the plan's pins."""
     marker_path = data / "meta" / MARKER
     if not marker_path.is_file():
         return [f"{marker_path} missing: not a demo-set cut"]
     marker: dict[str, Any] = json.loads(marker_path.read_text(encoding="utf-8"))
     sets = DemoSets.model_validate_json((repo / plan.demo_sets.file).read_text(encoding="utf-8"))
-    demo = sets.sets[plan.branches[BRANCH].demo_set]
+    name = plan.branches[branch].demo_set
+    demo = sets.sets[name]
     problems = []
     expected = {
-        "demo_set": plan.branches[BRANCH].demo_set,
-        "set_hash": plan.demo_sets.hashes[plan.branches[BRANCH].demo_set],
+        "demo_set": name,
+        "set_hash": plan.demo_sets.hashes[name],
         "release_id": plan.release.id,
         "release_hash": plan.release.release_hash,
         "n": demo.n,
@@ -209,7 +284,7 @@ def cut_problems(data: Path, plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
             problems.append(f"cut {key} is {marker.get(key)!r}, the plan's is {value!r}")
     sources = [e["source_episode_index"] for e in marker.get("episodes", [])]
     if sources != demo.episode_indices:
-        problems.append("cut episodes are not set C's episode indices in the release")
+        problems.append(f"cut episodes are not set {name}'s episode indices in the release")
     if [e["episode_index"] for e in marker.get("episodes", [])] != list(range(len(sources))):
         problems.append("cut episodes are not renumbered 0 .. n-1")
     # the dataset Psi0 reads, not only the marker that describes it
@@ -220,7 +295,7 @@ def cut_problems(data: Path, plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
         else None
     )
     if total != demo.n:
-        problems.append(f"cut meta/info.json total_episodes is {total!r}, set C has {demo.n}")
+        problems.append(f"cut meta/info.json total_episodes is {total!r}, set {name} has {demo.n}")
     rows = data / "meta" / "episodes.jsonl"
     lines = rows.read_text(encoding="utf-8").splitlines() if rows.is_file() else []
     if [json.loads(line)["episode_index"] for line in lines if line.strip()] != list(range(demo.n)):
@@ -318,6 +393,84 @@ def cplus_cut_problems(
     return problems + _dataset_problems(data, n)
 
 
+def _files(folder: Path) -> list[Path]:
+    """Regular files under folder, by path; dot entries (OS and cache cruft) left out."""
+    return sorted(
+        p
+        for p in folder.rglob("*")
+        if p.is_file() and not any(part.startswith(".") for part in p.relative_to(folder).parts)
+    )
+
+
+def folder_manifest(folder: Path) -> str:
+    """`<sha256>  <path>` per file, sorted by path: what `manifest_sha256` hashes."""
+    return "".join(f"{sha256(p)}  {p.relative_to(folder).as_posix()}\n" for p in _files(folder))
+
+
+def manifest_sha256(folder: Path) -> str:
+    return hashlib.sha256(folder_manifest(folder).encode("utf-8")).hexdigest()
+
+
+def stage1_vlm_problems(folder: Path, base: Path, vlm: Stage1Vlm) -> list[str]:
+    """A stage 1 VLM folder against its pins and against the parent VLM folder it came from.
+
+    `base` holds the parent's VLM folder without its weights (config, tokenizer,
+    processor). The stage 1 folder must hold exactly those files, byte for byte, plus
+    WEIGHTS: stage 1 changes the weights and nothing Qwen3VL or its processor reads
+    besides them.
+    """
+    if not folder.is_dir():
+        return [f"{folder} missing: the stage 1 VLM is not there"]
+    problems = []
+    weights = folder / WEIGHTS
+    found = sha256(weights) if weights.is_file() else "missing"
+    if found != vlm.weights_sha256:
+        problems.append(f"{weights}: sha256 {found}, plan pins {vlm.weights_sha256}")
+    found = manifest_sha256(folder)
+    if found != vlm.manifest_sha256:
+        problems.append(f"{folder}: manifest sha256 {found}, plan pins {vlm.manifest_sha256}")
+    mine = {p.relative_to(folder).as_posix(): p for p in _files(folder)}
+    theirs = {p.relative_to(base).as_posix(): p for p in _files(base)}
+    if WEIGHTS in theirs:
+        problems.append(f"{base} holds {WEIGHTS}: download the parent folder without weights")
+    for rel in sorted(set(mine) - set(theirs) - {WEIGHTS}):
+        problems.append(f"{rel}: not in the parent VLM folder")
+    for rel in sorted(set(theirs) - set(mine)):
+        problems.append(f"{rel}: missing from the stage 1 VLM folder")
+    for rel in sorted(set(mine) & set(theirs)):
+        if sha256(mine[rel]) != sha256(theirs[rel]):
+            problems.append(f"{rel}: differs from the parent VLM folder's")
+    if not theirs:
+        problems.append(f"{base}: no parent VLM files to compare with")
+    return problems
+
+
+def stage1_paths(plan: TrayRunPlan, parent_name: str, psi0: Path) -> tuple[Path, Path, Stage1Vlm]:
+    """(stage 1 folder on the VM, parent VLM folder of the snapshot, pins) of a B parent."""
+    parent = plan.parents[parent_name]
+    if not isinstance(parent, Stage1Parent) or parent.vlm_stage1.drive_dir is None:
+        raise SystemExit(f"parent {parent_name} is not a pinned stage 1 parent")
+    base = plan.parents[parent.vlm_stage1.from_parent]
+    assert isinstance(base, Parent)  # runplan.check holds
+    folder = psi0 / STAGE1_DIR / Path(parent.vlm_stage1.drive_dir).name
+    snapshot = psi0 / "cache/checkpoints" / Path(base.vlm.path).parent
+    return folder, snapshot, parent.vlm_stage1
+
+
+def recipe_for(job: Job, recipe: Psi0Recipe, psi0: Path) -> Psi0Recipe:
+    """The recipe a job trains with: B's stage 1 parent added in memory, the file unchanged."""
+    parent = job.plan.parents[job.parent_name]
+    if not isinstance(parent, Stage1Parent):
+        return recipe
+    folder, _, vlm = stage1_paths(job.plan, job.parent_name, psi0)
+    base = recipe.parents[vlm.from_parent]
+    added = ParentCheckpoint(
+        model_name_or_path=folder.relative_to(psi0).as_posix(),
+        pretrained_action_header_path=base.pretrained_action_header_path,
+    )
+    return recipe.model_copy(update={"parents": {**recipe.parents, job.parent_name: added}})
+
+
 def install_env(work: Path) -> float:
     """The commands of scripts/he/he1_colab.py install_env (DA-19 setup, no downloads)."""
     start = time.monotonic()
@@ -347,35 +500,28 @@ def install_env(work: Path) -> float:
     return time.monotonic() - start
 
 
-def setup(work: Path, branch: str = BRANCH) -> None:
-    job = load_job(branch)
+def setup(work: Path, branch: str = BRANCH, repo: Path = REPO) -> None:
+    job = load_job(branch, repo)
     plan = job.plan
     if plan.code["psi0"].commit != PSI0_COMMIT:
         raise SystemExit(f"plan pins Psi0 {plan.code['psi0'].commit}, DA-19 setup {PSI0_COMMIT}")
     data = job.data(work)
-    problems = job.cut_problems(data)  # before the env: a wrong upload costs no install
+    problems = job.cut_problems(data, repo)  # before the env: a wrong upload costs no install
     if problems:
         raise SystemExit(
             f"{job.branch}'s cut does not hold, no training:\n  " + "\n  ".join(problems)
         )
+    if isinstance(
+        plan.parents[job.parent_name], Stage1Parent
+    ):  # before the env too: a missing Drive folder costs no install
+        _, _, vlm = stage1_paths(plan, job.parent_name, work / "Psi0")
+        assert vlm.drive_dir is not None
+        if not (DRIVE / vlm.drive_dir / WEIGHTS).is_file():
+            raise SystemExit(f"{DRIVE / vlm.drive_dir / WEIGHTS} missing: mount Drive first")
     env_seconds = install_env(work)
     psi0, python = work / "Psi0", work / "Psi0" / ".venv-psi" / "bin" / "python"
     start = time.monotonic()
-    parent = plan.parents[plan.branches[BRANCH].parent]
-    if not isinstance(parent, Parent):
-        raise SystemExit(f"branch {BRANCH}'s parent is not a psi-model release pair")
-    # whole folders: Psi0 loads each as a directory (config, tokenizer, weights)
-    weights = [f"{w.path.rsplit('/', 1)[0]}/*" for w in (parent.vlm, parent.action_header)]
-    sh(
-        f'{python} -c "from huggingface_hub import snapshot_download; '
-        f"snapshot_download('{plan.psi_model.repo}', repo_type='model', "
-        f"revision='{plan.psi_model.revision}', allow_patterns={weights!r}, "
-        f"local_dir='{psi0 / 'cache/checkpoints'}')\""
-    )
-    pinned = {
-        psi0 / "cache/checkpoints" / parent.vlm.path: parent.vlm.sha256,
-        psi0 / "cache/checkpoints" / parent.action_header.path: parent.action_header.sha256,
-    }
+    pinned, extra = fetch_parent(job, psi0, python)
     problems = []
     for path, expected in pinned.items():
         found = sha256(path) if path.is_file() else "missing"
@@ -393,34 +539,93 @@ def setup(work: Path, branch: str = BRANCH) -> None:
         sha256_checked={str(p.relative_to(work)): h for p, h in pinned.items()},
         demo_set_hash=job.set_hash,
         dataset=str(data),
+        **extra,
     )
 
 
-def train(work: Path, branch: str = BRANCH) -> None:
+def fetch_parent(job: Job, psi0: Path, python: Path) -> tuple[dict[Path, str], dict[str, Any]]:
+    """Put the job's parent where its recipe points; return the files to check and report.
+
+    C and C+: the release pair, whole folders, at the plan's psi-model revision. B: the
+    action header the same way, the parent VLM folder without its weights (to compare
+    with), and the stage 1 VLM folder copied from Drive and checked by stage1_vlm_problems.
+    """
+    plan = job.plan
+    parent = plan.parents[job.parent_name]
+    snapshot = psi0 / "cache/checkpoints"
+    ignore: list[str] = []
+    if isinstance(parent, Parent):
+        # whole folders: Psi0 loads each as a directory (config, tokenizer, weights)
+        dirs = [w.path.rsplit("/", 1)[0] for w in (parent.vlm, parent.action_header)]
+    else:
+        base = plan.parents[parent.vlm_stage1.from_parent]
+        assert isinstance(base, Parent)
+        base_dir = base.vlm.path.rsplit("/", 1)[0]
+        dirs = [base_dir, parent.action_header.path.rsplit("/", 1)[0]]
+        ignore = [f"{base_dir}/*.safetensors"]  # B never loads the parent's VLM weights
+    sh(
+        f'{python} -c "from huggingface_hub import snapshot_download; '
+        f"snapshot_download('{plan.psi_model.repo}', repo_type='model', "
+        f"revision='{plan.psi_model.revision}', allow_patterns={[f'{d}/*' for d in dirs]!r}, "
+        f"ignore_patterns={ignore!r}, local_dir='{snapshot}')\""
+    )
+    if isinstance(parent, Parent):
+        return {
+            snapshot / parent.vlm.path: parent.vlm.sha256,
+            snapshot / parent.action_header.path: parent.action_header.sha256,
+        }, {}
+    folder, base_folder, vlm = stage1_paths(plan, job.parent_name, psi0)
+    assert vlm.drive_dir is not None and vlm.weights_sha256 is not None
+    start = time.monotonic()
+    if folder.exists():
+        shutil.rmtree(folder)  # a rerun copies again rather than trust a partial copy
+    shutil.copytree(DRIVE / vlm.drive_dir, folder)
+    copy_seconds = time.monotonic() - start
+    problems = stage1_vlm_problems(folder, base_folder, vlm)
+    if problems:
+        raise SystemExit("stage 1 VLM does not hold, no training:\n  " + "\n  ".join(problems))
+    return {snapshot / parent.action_header.path: parent.action_header.sha256}, {
+        "stage1_vlm": {
+            "drive_dir": vlm.drive_dir,
+            "folder": str(folder.relative_to(psi0.parent)),
+            "weights_sha256": vlm.weights_sha256,
+            "manifest_sha256": vlm.manifest_sha256,
+            "job_id": vlm.job_id,
+            "copy_seconds": round(copy_seconds, 1),
+        }
+    }
+
+
+def train(work: Path, branch: str = BRANCH, repo: Path = REPO) -> None:
     from flywheel.contracts import CheckpointRef, DatasetRef, TrainSpec
     from flywheel.contracts.artifacts import ActionLayout
 
-    from flywheel_psi0.trainer import Psi0Recipe, Psi0Trainer
+    from flywheel_psi0.trainer import Psi0Trainer
     from flywheel_psi0.trainer.colab import g1_layout_json
 
-    job = load_job(branch)
+    job = load_job(branch, repo)
     plan = job.plan
     data = job.data(work)
-    problems = job.cut_problems(data)
+    problems = job.cut_problems(data, repo)
+    psi0 = work / "Psi0"
+    if isinstance(plan.parents[job.parent_name], Stage1Parent):
+        folder, base_folder, vlm = stage1_paths(plan, job.parent_name, psi0)
+        problems += stage1_vlm_problems(folder, base_folder, vlm)  # as setup left it
     if problems:
         raise SystemExit(
-            f"{job.branch}'s cut does not hold, no training:\n  " + "\n  ".join(problems)
+            f"{job.branch}'s cut or parent does not hold, no training:\n  " + "\n  ".join(problems)
         )
     spec = TrainSpec(
         job_id=job.job_id,
         dataset=DatasetRef(dataset_id=f"{job.release_id}#{job.demo_set}", uri=str(data)),
-        # C+ starts where C started: same parent, recipe and seed (round-tray-cplus.yaml)
-        parent=CheckpointRef(checkpoint_id=plan.branches[BRANCH].parent),
+        # C+ starts where C started: same parent, recipe and seed (round-tray-cplus.yaml);
+        # B from its stage 1 parent, added to the recipe by recipe_for
+        parent=CheckpointRef(checkpoint_id=job.parent_name),
         seed=plan.train_seeds[0],
     )
     trainer = Psi0Trainer(
-        Psi0Recipe.load(REPO / plan.recipe.file),
-        psi0_root=work / "Psi0",
+        recipe_for(job, Psi0Recipe.load(repo / plan.recipe.file), psi0),
+        psi0_root=psi0,
         runs_root=work / "runs",
         layout=ActionLayout.model_validate({"dimensions": g1_layout_json()}),
         run_plan_id=job.run_plan_id,
@@ -450,11 +655,19 @@ def train(work: Path, branch: str = BRANCH) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
-    parser.add_argument("phase", choices=["setup", "train", "check"])
+    parser.add_argument("phase", choices=["setup", "train", "check", "manifest"])
     parser.add_argument("--work", type=Path, default=WORK)
-    parser.add_argument("--branch", choices=[BRANCH, CPLUS], default=BRANCH)
+    parser.add_argument("--branch", choices=[BRANCH, CPLUS, B], default=BRANCH)
+    parser.add_argument("--folder", type=Path, help="manifest: a stage 1 VLM folder")
     args = parser.parse_args(argv)
     os.environ.setdefault("PYTHONUNBUFFERED", "1")
+    if args.phase == "manifest":  # what he-tray-b.yaml pins for DA-30's folder (task 4.7)
+        if args.folder is None or not (args.folder / WEIGHTS).is_file():
+            raise SystemExit(f"manifest needs --folder <a folder with {WEIGHTS}>")
+        print(f"weights_sha256: {sha256(args.folder / WEIGHTS)}")
+        print(f"manifest_sha256: {manifest_sha256(args.folder)}")
+        print(f"files: {len(_files(args.folder))}")
+        raise SystemExit(0)
     if args.phase == "check":  # on rtx3060 before the upload, and in tests: no env, no GPU
         job = load_job(args.branch)
         problems = job.cut_problems(job.data(args.work))
