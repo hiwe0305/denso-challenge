@@ -23,6 +23,12 @@ only these steps together brought it under 5 % (2.8):
               position and tips linearly, rotation by slerp, between the nearest good
               frames of the same run of seen frames. A run edge holds the nearest good
               frame. Never dropped.
+    smooth    Savitzky-Golay of order `savgol_order` over `savgol_window` frames on each
+              run of seen frames: wrist position, tips, and wrist quaternion (signs made
+              continuous, renormalized after). A run shorter than the window uses the
+              longest odd window it holds; edges fit the polynomial to the first or last
+              window, as scipy's `savgol_filter(mode="interp")`. On EgoDex, window 21
+              kept most real motion: p90 of the 0.1 s wrist delta fell 4 % (2.8).
 
 Parameters are `pose_ea.clean` of `configs/data/egocentric.yaml`. E-B (EgoDex tracking)
 is never cleaned. Frames are never dropped or added: DA-18 reads the video and the pose
@@ -52,10 +58,16 @@ class CleanParams:
     frame: str = "world"
     flip_deg: float | None = None  # None: no continuity guard, no track sign
     jump_mad: float | None = None  # None: no jump interpolation
+    savgol_window: int | None = None  # frames, odd; None: no smoothing
+    savgol_order: int = 2
 
     def __post_init__(self) -> None:
         if self.frame not in POSE_FRAMES:
             raise ValueError(f"pose_ea.clean.frame {self.frame!r} is not one of {POSE_FRAMES}")
+        if self.savgol_window is not None and (
+                self.savgol_window % 2 == 0 or self.savgol_window <= self.savgol_order):
+            raise ValueError(f"pose_ea.clean.savgol_window {self.savgol_window} must be odd and"
+                             f" above savgol_order {self.savgol_order}")
 
     @classmethod
     def from_config(cls, pose_ea: Mapping[str, Any]) -> CleanParams:
@@ -215,6 +227,60 @@ def interpolate(wrist: F64, tips: F64, bad: NDArray[np.bool_]) -> tuple[F64, F64
     return wrist, tips, done
 
 
+def fitted_window(window: int, frames: int) -> int:
+    """The longest odd window up to `window` that `frames` hold."""
+    return min(window, frames if frames % 2 else frames - 1)
+
+
+def savgol(values: F64, window: int, order: int) -> F64:
+    """Savitzky-Golay along axis 0 of (T, ...), as scipy's `savgol_filter(mode="interp")`:
+    the least-squares polynomial of `order` over `window` frames, evaluated at the centre;
+    the first and last `window // 2` frames from the fit to the first or last window.
+    `window` shrinks to the longest odd length T holds; no change when that is at most
+    `order + 1` (the fit goes through every point)."""
+    t = len(values)
+    window = fitted_window(window, t)
+    if window <= order + 1:
+        same: F64 = np.array(values, dtype=np.float64)
+        return same
+    half = window // 2
+    vander = np.vander(np.arange(window) - half, order + 1, increasing=True).astype(np.float64)
+    hat = vander @ np.linalg.pinv(vander)  # fitted values from the window's values
+    flat = values.reshape(t, -1)
+    out = np.empty_like(flat)
+    windows = np.lib.stride_tricks.sliding_window_view(flat, window, axis=0)  # (n, d, w)
+    out[half:t - half] = windows @ hat[half]
+    out[:half] = hat[:half] @ flat[:window]
+    out[t - half:] = hat[window - half:] @ flat[t - window:]
+    result: F64 = out.reshape(values.shape)
+    return result
+
+
+def continuous_signs(q: F64) -> F64:
+    """Quaternions with each sign chosen to be nearest the previous one."""
+    out: F64 = np.array(q, dtype=np.float64)
+    for t in range(1, len(out)):
+        if np.dot(out[t], out[t - 1]) < 0:
+            out[t] = -out[t]
+    return out
+
+
+def smooth(wrist: F64, tips: F64, window: int, order: int) -> tuple[F64, F64, int]:
+    """Savitzky-Golay on each run of seen frames; returns how many runs changed."""
+    wrist, tips = wrist.copy(), tips.copy()
+    changed = 0
+    for start, stop in seen_runs(finite_frames(wrist)):
+        if fitted_window(window, stop - start) <= order + 1:
+            continue
+        span = slice(start, stop)
+        wrist[span, :3, 3] = savgol(wrist[span, :3, 3], window, order)
+        tips[span] = savgol(tips[span], window, order)
+        q = savgol(continuous_signs(to_quaternion(wrist[span, :3, :3])), window, order)
+        wrist[span, :3, :3] = to_rotation(q)
+        changed += 1
+    return wrist, tips, changed
+
+
 def clean_pose(pose: EgoPose, params: CleanParams) -> tuple[EgoPose, dict[str, Any]]:
     """The cleaned pose and what was done, for `bundle.json` `pose_cleaning`."""
     values = {name: np.asarray(getattr(pose, name), np.float64) for name in (
@@ -231,6 +297,9 @@ def clean_pose(pose: EgoPose, params: CleanParams) -> tuple[EgoPose, dict[str, A
         if params.jump_mad is not None:
             wrist, tips, done["interpolated_frames"] = interpolate(
                 wrist, tips, jump_frames(wrist, params.jump_mad))
+        if params.savgol_window is not None:
+            wrist, tips, done["smoothed_runs"] = smooth(wrist, tips, params.savgol_window,
+                                                        params.savgol_order)
         values[f"{side}_wrist"], values[f"{side}_tips"] = wrist, tips
         report[side] = done
     cleaned = replace(pose, **{k: v.astype(np.float32) for k, v in values.items()})
