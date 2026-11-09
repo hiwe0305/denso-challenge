@@ -275,7 +275,7 @@ Một điều cần ghi cạnh kết quả của B: action header `postpre.*` đ
 - Stats của 153 clip tư thế giả (MediaPipe) có q01 và q99 nhiễu hơn nhiều so với stats của EgoDex.
 - Docstring của export cũng ghi lần chạy của tác giả chuẩn hóa bằng file của họ; file của export dùng để so sánh.
 
-Giá phải trả: Ψ₀ cắt action đã chuẩn hóa về [−1, 1] (`config/transform.py:682`), nên phần đuôi của những chiều mà video của đội vượt khoảng q01–q99 của EgoDex bị cắt. `setup` đo việc này và ghi vào `report.json`, mục `setup_stage1.stats_coverage`: các chiều có q01 hoặc q99 của export nằm ngoài khoảng của tác giả, và tỉ lệ độ rộng khoảng (trung vị, lớn nhất). Chỉ ghi lại, không chặn. Số này đọc được ngay khi có bản export, trước khi tốn GPU (`export_source.stats_coverage` trên CPU).
+Giá phải trả: Ψ₀ cắt action đã chuẩn hóa về [−1, 1] (`config/transform.py:682`), nên phần đuôi của những chiều mà video của đội vượt khoảng q01–q99 của EgoDex bị cắt. `setup` đo việc này và ghi vào `report.json`, mục `setup_stage1.stats_coverage`: các chiều có q01 hoặc q99 của export nằm ngoài khoảng của tác giả, và tỉ lệ độ rộng khoảng (trung vị, lớn nhất). Chỉ ghi lại, không chặn. Số này đọc được ngay khi có bản export, trước khi tốn GPU (`export_source.stats_coverage` trên CPU). Đo trên bản export thử: phần bị cắt rất lớn (mục 2.7).
 
 **Tiêu chí chốt trước** (như mục 1.6, chỉ khác độ dài):
 
@@ -353,4 +353,50 @@ Psi0/.venv-psi/bin/python -m flywheel_psi0.stage1.colab repeat --work /content/d
 python3 -m flywheel_psi0.stage1.colab persist --work /content/da30 --plan fw/configs/runplans/stage1/tray-ego-b.yaml
 ```
 
-Sau lần chạy: tải `report.json` và log về `fwdata/colab/`, ghi dòng `measured` của sổ chi phí (`balance_drop` ở dòng `exit` của `da30-stage1-b.jsonl`), ghi kết quả vào mục 2.7. VLM nằm ở `MyDrive/denso/da30/da30-tray-ego-b/vlm/`, bản ghi ở `…/da30-tray-ego-b/vlm.json`. Bốn giá trị cần ghim vào `he-tray-b.yaml` của DA-34 (`parents.psi0-b-ego-stage1.vlm_stage1`) có sẵn trong mục `persist.vlm` của `report.json`: `job_id` `da30-tray-ego-b`, `drive_dir`, `weights_sha256`, `manifest_sha256`.
+Sau lần chạy: tải `report.json` và log về `fwdata/colab/`, ghi dòng `measured` của sổ chi phí (`balance_drop` ở dòng `exit` của `da30-stage1-b.jsonl`), ghi kết quả vào mục 2.8. VLM nằm ở `MyDrive/denso/da30/da30-tray-ego-b/vlm/`, bản ghi ở `…/da30-tray-ego-b/vlm.json`. Bốn giá trị cần ghim vào `he-tray-b.yaml` của DA-34 (`parents.psi0-b-ego-stage1.vlm_stage1`) có sẵn trong mục `persist.vlm` của `report.json`: `job_id` `da30-tray-ego-b`, `drive_dir`, `weights_sha256`, `manifest_sha256`.
+
+### 2.7 Loader check trên bản export thử (9/11/2026)
+
+Bản export **thử**, không để ghim: `egx_fb3d1401dac0bd4c`, 47 MB, 132 mẫu (`part1/two_table/<i>.hdf5` và `.mp4`), 7804 khung ở 30 fps, mỗi clip 30–99 khung (trung vị 59,5), một câu mô tả cho mọi mẫu, không có `test/`, `data_class` `public`, không miễn trừ che danh tính. Phiên điều phối giao bản này để thử loader; bản thật sẽ có `export_id` mới. `export_source verify` qua.
+
+Cách chạy như mục 1.5: image `psi0@sha256:0d58…80b2` trên `rtx3060`, `PYTHONPATH` trỏ vào bản clone ở `cda3fdf` (mã trong image khác commit ghim nên không dùng), chỉ CPU, container 8 CPU, 10 GB RAM, `--shm-size 4g`, 4 worker. Argv là argv của `tray-ego-b.yaml` (bản nháp), chỉ đổi đường dẫn dữ liệu và VLM cha sang chỗ mount; chỉ nạp processor của cha `ego200k.he30k`, không nạp trọng số. Để so sánh, chạy cùng argv trên 218 episode EgoDex của mục 1.4.
+
+| Mục | Bản export thử | EgoDex (218 episode) |
+|---|---|---|
+| Mẫu train, test | 132, 0 | 218, 0 |
+| Một epoch (`drop_last`) | 8 batch × 16 = 128 | 13 batch × 16 = 208 |
+| `input_ids` | 16 × 191–195 | như mục 1.5 |
+| Ảnh | lưới 1 × 16 × 30 (270×480), `pixel_values` 7680 × 1536 | như mục 1.5 |
+| Action thô | 1 × 48 | 1 × 48 |
+| Token action FAST mỗi mẫu | 1–44 | 1–43 |
+| NaN, `problems` | không có, rỗng | không có, rỗng |
+| Hàm gốc ở `cda3fdf` | vẫn `UnboundLocalError`; bản vá còn cần | như trên |
+| Thời gian | batch đầu 1,5–1,7 s (4 worker khởi động), sau đó 0,01–0,5 s mỗi batch | |
+| **Giá trị action bị cắt ở ±1** | **41,6 %** | **2,2 %** |
+| **Mẫu có ít nhất một chiều bị cắt** | **89,8 %** | 21,2 % |
+| Mẫu chỉ có 1 token | 9 / 128 (7,0 %) | 2 / 208 (1,0 %) |
+
+Hai dòng cuối là mục mới của `loader_check` (`actions` trong báo cáo, test `test_psi0_stage1_loader_check.py`), để kiểm bản export thật bằng đúng lệnh này. Một lần chạy riêng 5 epoch (640 mẫu) cho cùng kết quả: 41 % giá trị và 90 % mẫu bị cắt, 7,8 % mẫu một token.
+
+**Kết quả 1: action của bản thử phần lớn nằm ngoài stats của EgoDex.** Đường đi chạy được, nhưng 41,6 % giá trị action sau chuẩn hóa bằng `egodex_stat_all.json` nằm ở biên ±1, gấp 19 lần EgoDex. Với dữ liệu khớp stats, mỗi chiều có khoảng 2 % giá trị ngoài q01–q99, đúng như số đo trên EgoDex. Trên CPU, ngoài Ψ₀:
+
+- `stats_coverage`: cả 42 chiều không phải pad có q01 hoặc q99 của export ngoài khoảng của tác giả; tỉ lệ độ rộng khoảng trung vị 11,9, lớn nhất 26,0.
+- Delta tính như loader (khung i và i+3, trong hệ camera của khung i; 7408 delta): cổ tay trái theo x có trung vị |d| 0,030 m, gần bằng q99 của tác giả (0,030), nhưng p90 là 0,22 m mỗi 0,1 s. Góc roll cổ tay trái có p90 là 2,22 rad (q99 của tác giả 0,21); có delta gần ±π.
+- Thang đo không sai: cổ tay cách camera trung vị 0,54 m. Phần lớn delta có cỡ hợp lý; phần đuôi rất lớn. Đó là dạng của nhiễu tư thế (tư thế tay ước lượng nhảy giữa các khung, góc lật qua ±π), không phải của chuyển động thật.
+- Bước camera mỗi khung đúng bằng 0,005 ở mọi khung (trung vị = p95 = max), tức là quỹ đạo camera được đặt cố định, không đo. Delta nằm trong hệ camera của khung i, nên chuyển động giả này đi vào mọi delta.
+
+**Kết quả 2: mẫu một token là delta bằng 0, do clip ngắn.** Cả 9 mẫu một token có cùng một hàng action, đúng bằng giá trị 0 sau chuẩn hóa (token `<|a_378|>`). Loader bốc khung `index` trong [0, T−2] và cần khung `index + 3`; khi `index` rơi vào ba khung cuối không có khung đó, nó lặp lại `index` (`egodex_dataset.py:470-506` ở `cda3fdf`), nên delta bằng 0. Tỉ lệ kỳ vọng là 3/(T−1) trung bình trên các clip, tức 5,6 % với độ dài của bản thử (EgoDex: clip dài hàng trăm khung, dưới 1 %); đo được 6,6–7,8 %.
+
+**Kết quả 3: loader ghi file vào thư mục export.** Lần đọc đầu, `EgoDexDataset._load_file_list` ghi `part1/filelist_cache.pkl` (`egodex_dataset.py:249-282`); mount chỉ đọc thì dừng với `OSError`. Trên Colab thư mục export ghi được nên không sao. File này không có trong `meta.json`: `verify_export` chỉ chạy trong `setup` trước khi train, và `pack` từ chối thư mục đã bị loader đọc, nên phải đóng tarball từ bản export gốc.
+
+**Đề xuất cho plan [Đề xuất, 9/11/2026], chờ Hiếu duyệt:**
+
+| Câu hỏi | Đề xuất | Lý do |
+|---|---|---|
+| Stats | Giữ `egodex_stat_all.json` (mục 2.4) | Đổi sang stats của export sẽ giảm phần bị cắt nhưng đổi nghĩa token mà cha đã học. Với đuôi nhiễu thế này, q01–q99 của export phần lớn là nhiễu, nên khoảng chuẩn hóa sẽ rộng gấp khoảng 12 lần và chuyển động thật bị nén vào vài bin |
+| Phần bị cắt | **Không ghim bản export khi `actions.clipped_value_share` của `loader_check` trên 5 %** (EgoDex 2,2 %). Sửa ở pipeline egocentric trước bản export thật: làm mượt tư thế cổ tay theo thời gian, nối góc để không lật qua ±π, bỏ hoặc nội suy khung có bước nhảy lớn; ghi rõ quỹ đạo camera là đo hay đặt | Với 90 % mẫu bị cắt, token FAST chủ yếu mã hóa biên ±1; 300 bước sẽ dạy cha một phân bố action méo. B khi đó khác C vì nhiễu, không vì video của đội, và closed-loop của DA-34 không tách được hai thứ này. Ngưỡng 5 % là đề xuất; Hiếu chọn |
+| Không có `test/` | Không đổi | `validation_steps` đã là 0; loader đọc 0 file test và `create_dataloaders` chạy được |
+| `upsample_rate` 3 với clip ngắn | Giữ 3 | 3 khung ở 30 fps là 0,1 s, thang thời gian mà token của cha đã học. Giá là khoảng 6 % mẫu có đích bằng 0, phần lớn ở cuối clip, khi tay đã đặt khay xuống và gần như đứng yên |
+| Số mẫu | Plan ghi `samples` theo kết quả `pack` của bản thật | Bản thử có 132 mẫu, không phải 153 (export bỏ 21 clip); `setup` từ chối khi số mẫu lệch plan. 300 bước × 32 mẫu là khoảng 73 lượt mỗi clip ở 132 clip |
+
+Plan giữ `status: draft`. Không chạy Colab.

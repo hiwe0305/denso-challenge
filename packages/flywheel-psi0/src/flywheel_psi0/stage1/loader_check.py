@@ -46,6 +46,31 @@ def build_trainer(argv: list[str]) -> Any:
     return trainer
 
 
+PAD_DIMS = frozenset((6, 7, 8, 30, 31, 32))  # zero in the 48-d EgoDex action, never normalized
+CLIP_EDGE = 0.999
+
+
+def action_clip_summary(rows: list[list[float]]) -> dict[str, Any]:
+    """How much of the normalized actions sits on Psi0's [-1, 1] clip.
+
+    `raw_actions` in a collated batch is the action after `bounds_q99` normalization
+    and `np.clip(actions, -1, 1)` (`config/transform.py:682-685` at the pin). On data
+    the stats fit, about 2% of the values of a dim lie past q01..q99; a large share
+    means the stats do not fit the data and the FAST tokens see mostly the clip.
+    """
+    live = [[x for d, x in enumerate(row) if d not in PAD_DIMS] for row in rows]
+    values = [abs(x) >= CLIP_EDGE for row in live for x in row]
+    return {
+        "samples": len(rows),
+        "clipped_value_share": round(sum(values) / len(values), 3) if values else None,
+        "samples_with_a_clipped_dim": (
+            round(sum(any(abs(x) >= CLIP_EDGE for x in row) for row in live) / len(live), 3)
+            if live
+            else None
+        ),
+    }
+
+
 def check_batches(trainer: Any, batches: int, workers: int | None = None) -> dict[str, Any]:
     torch = importlib.import_module("torch")
     if workers is not None:
@@ -65,6 +90,8 @@ def check_batches(trainer: Any, batches: int, workers: int | None = None) -> dic
     begin, bins = tokenizer.action_token_begin_idx, tokenizer.n_bins
     problems: list[str] = []
     seen: list[dict[str, Any]] = []
+    rows: list[list[float]] = []
+    one_token = 0
     start = time.monotonic()
     for index, batch in enumerate(trainer.train_dataloader):
         if index >= batches:
@@ -83,6 +110,9 @@ def check_batches(trainer: Any, batches: int, workers: int | None = None) -> dic
                 "raw_action_shape": list(raw[0].shape) if raw is not None else None,
             }
         )
+        one_token += sum(n == 1 for n in per_sample)
+        if raw is not None:
+            rows += [torch.as_tensor(r).float().reshape(-1).tolist() for r in raw]
         if min(per_sample) == 0:
             problems.append(f"batch {index}: a sample has no FAST action token")
         if torch.isnan(batch["pixel_values"].float()).any():
@@ -92,7 +122,13 @@ def check_batches(trainer: Any, batches: int, workers: int | None = None) -> dic
         if batch["input_ids"].shape[0] != trainer.train_cfg.train_batch_size:
             problems.append(f"batch {index}: {batch['input_ids'].shape[0]} samples")
         start = time.monotonic()
-    report |= {"batches": seen, "problems": problems}
+    # A 1-token sample is usually a zero delta: near a clip's end Psi0 repeats the last
+    # frame index instead of the one `upsample_rate` ahead (`egodex_dataset.py:470-506`).
+    report |= {
+        "batches": seen,
+        "actions": action_clip_summary(rows) | {"one_token_samples": one_token},
+        "problems": problems,
+    }
     return report
 
 
