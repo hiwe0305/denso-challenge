@@ -21,11 +21,14 @@ from flywheel.data.ingest.egocentric.clean import (
     angle,
     chirality,
     clean_pose,
+    continuous_signs,
     interpolate,
     jump_frames,
     keep_continuous,
     one_sign,
+    savgol,
     seen_runs,
+    smooth,
     to_quaternion,
     to_rotation,
 )
@@ -259,3 +262,71 @@ def test_a_jump_frame_is_interpolated_and_no_frame_is_dropped() -> None:
 def test_a_quiet_track_has_no_jumps() -> None:
     truth = to_pose(estimate(), "camera").right_wrist.astype(float)
     assert not jump_frames(truth, 5.0).any()
+
+
+@pytest.mark.parametrize(("frames", "window"), [(50, 21), (30, 21), (21, 21), (12, 21), (40, 9)])
+def test_savgol_matches_scipys_interp_mode(frames: int, window: int) -> None:
+    signal = pytest.importorskip("scipy.signal")
+    values = np.random.default_rng(frames).normal(size=(frames, 5, 3))
+    used = min(window, frames if frames % 2 else frames - 1)
+    expected = signal.savgol_filter(values, used, 2, axis=0, mode="interp")
+    np.testing.assert_allclose(savgol(values, window, 2), expected, atol=1e-12)
+
+
+def test_savgol_keeps_a_parabola_and_leaves_short_runs_alone() -> None:
+    t = np.arange(40, dtype=float)
+    parabola = np.stack([0.5 * t**2 - t, 3 - 0.1 * t], axis=1)
+    np.testing.assert_allclose(savgol(parabola, 21, 2), parabola, atol=1e-8)
+    short = np.random.default_rng(0).normal(size=(3, 2))
+    assert np.array_equal(savgol(short, 21, 2), short)  # window 3 fits order 2 exactly
+
+
+def test_quaternion_signs_follow_the_previous_one() -> None:
+    q = to_quaternion(np.stack([axis_angle([0, 0, 1], 0.1 * t) for t in range(6)]))
+    mixed = q * np.array([1, -1, 1, -1, -1, 1])[:, None]
+    np.testing.assert_allclose(continuous_signs(mixed), q)
+
+
+def test_smoothing_brings_a_shaking_hand_closer_and_keeps_unseen_frames() -> None:
+    truth_pose = to_pose(estimate(), "camera")
+    truth = truth_pose.right_wrist.astype(float)
+    tips = truth_pose.right_tips.astype(float)
+    rng = np.random.default_rng(9)
+    noisy = truth.copy()
+    noisy[:, :3, 3] += rng.normal(0, 0.01, (FRAMES, 3))  # 1 cm shake
+    for t in range(FRAMES):
+        noisy[t, :3, :3] = axis_angle(rng.normal(size=3), np.radians(5)) @ noisy[t, :3, :3]
+    noisy[60:62] = np.nan  # a 2-frame gap splits the clip in two runs
+    smoothed, _, runs = smooth(noisy, tips, 21, 2)
+    assert runs == 2 and np.isnan(smoothed[60:62]).all()
+    seen = np.isfinite(noisy[:, 0, 0])
+
+    def error(w: np.ndarray) -> tuple[float, float]:
+        return (float(np.linalg.norm(w[seen, :3, 3] - truth[seen, :3, 3], axis=1).mean()),
+                float(np.degrees(angle(w[seen, :3, :3], truth[seen, :3, :3])).mean()))
+
+    (before_m, before_deg), (after_m, after_deg) = error(noisy), error(smoothed)
+    assert after_m < before_m / 2 and after_deg < before_deg / 2
+    rotations = smoothed[seen, :3, :3]
+    np.testing.assert_allclose(rotations @ np.swapaxes(rotations, 1, 2),
+                               np.broadcast_to(np.eye(3), rotations.shape), atol=1e-9)
+
+
+def test_the_repo_cleaning_end_to_end_on_a_noisy_clip() -> None:
+    params = CleanParams.from_config(load_config(ROOT / "configs/data/egocentric.yaml").pose_ea)
+    assert (params.flip_deg, params.jump_mad, params.savgol_window, params.savgol_order) == (
+        30, 5.0, 21, 2)
+    pose = to_pose(estimate(), "camera")
+    noisy = pose.left_wrist.copy()
+    noisy[20, :3, :3] = noisy[20, :3, :3] @ FLIPS[1].astype(np.float32)
+    noisy[80, :3, 3] += 0.3
+    out, report = clean_pose(replace(pose, left_wrist=noisy), params)
+    assert report["left"] == {"seen_frames": FRAMES, "flipped_frames": 1, "track_turned": False,
+                              "interpolated_frames": 2, "smoothed_runs": 1}
+    assert np.linalg.norm(out.left_wrist[80, :3, 3] - pose.left_wrist[80, :3, 3]) < 0.005
+    assert out.camera.shape == pose.camera.shape and out.frames == pose.frames
+
+
+def test_a_bad_window_is_refused() -> None:
+    with pytest.raises(ValueError, match="odd"):
+        CleanParams(savgol_window=20)
