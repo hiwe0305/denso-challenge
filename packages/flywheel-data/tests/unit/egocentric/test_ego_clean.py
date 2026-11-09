@@ -246,29 +246,69 @@ def spiked() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     noisy[50, :3, :3] = axis_angle([1, 0, 0], np.radians(60)) @ noisy[50, :3, :3]
     noisy[100:110] = np.nan  # not seen
     noisy_tips[100:110] = np.nan
-    noisy[110, :3, 3] += [0.3, 0, 0]  # a run's first frame: no step to judge it by
-    noisy[FRAMES - 1, :3, 3] += [0.3, 0, 0]  # a run's last frame: held from the one before
+    noisy[110, :3, 3] += [0.3, 0, 0]  # a run's first frame
+    noisy[FRAMES - 1, :3, 3] += [0.3, 0, 0]  # a run's last frame
     return truth, noisy, noisy_tips
 
 
 def test_a_jump_frame_is_interpolated_and_no_frame_is_dropped() -> None:
     truth, noisy, tips = spiked()
-    bad = jump_frames(noisy, 5.0)
-    # the jump in and the jump back out; the first frame after the gap has no step
-    assert np.flatnonzero(bad).tolist() == [50, 51, 111, FRAMES - 1]
+    bad = jump_frames(noisy, tips, 5.0, 4)
+    # only the bad frames: not the good frame after a jump, and run edges are judged too
+    assert np.flatnonzero(bad).tolist() == [50, 110, FRAMES - 1]
     wrist, fixed_tips, count = interpolate(noisy, tips, bad)
-    assert count == 4 and wrist.shape == noisy.shape and fixed_tips.shape == tips.shape
+    assert count == 3 and wrist.shape == noisy.shape and fixed_tips.shape == tips.shape
     np.testing.assert_allclose(wrist[50, :3, 3], truth[50, :3, 3], atol=1e-3)  # 1 mm
-    np.testing.assert_allclose(fixed_tips[50], tips[49] + (tips[52] - tips[49]) / 3)
+    np.testing.assert_allclose(fixed_tips[50], (tips[49] + tips[51]) / 2)
     assert np.degrees(angle(wrist[50, :3, :3], truth[50, :3, :3])) < 0.5
+    np.testing.assert_allclose(wrist[110, :3, 3], noisy[111, :3, 3])  # held from the next
     np.testing.assert_allclose(wrist[FRAMES - 1, :3, 3], noisy[FRAMES - 2, :3, 3])
     assert np.isnan(wrist[100:110]).all() and np.isnan(fixed_tips[100:110]).all()
-    np.testing.assert_allclose(wrist[110], noisy[110])  # judged by nothing: kept as seen
+
+
+def test_a_burst_of_bad_frames_is_removed_not_widened() -> None:
+    """Review of PR 174: frames 30-32 off by 0.1 m were judged by steps, so only 30 and
+    33 were marked; after interpolation 31-32 stayed off and 33 was dragged."""
+    pose = to_pose(estimate(), "camera")
+    truth, tips = pose.left_wrist.astype(float), pose.left_tips.astype(float)
+    noisy, noisy_tips = truth.copy(), tips.copy()
+    noisy[30:33, :3, 3] += [0.1, 0, 0]
+    noisy_tips[30:33] += [0.1, 0, 0]
+    bad = jump_frames(noisy, noisy_tips, 5.0, 4)
+    assert np.flatnonzero(bad).tolist() == [30, 31, 32]
+    wrist, fixed_tips, _ = interpolate(noisy, noisy_tips, bad)
+    assert np.linalg.norm(wrist[29:34, :3, 3] - truth[29:34, :3, 3], axis=1).max() < 1e-3
+    assert np.abs(fixed_tips[29:34] - tips[29:34]).max() < 1e-3
+
+
+def test_an_outlier_first_frame_of_a_run_does_not_drag_the_next() -> None:
+    """Review of PR 174: frame 10, the first seen, off by 0.1 m was never judged and
+    frame 11 was pulled half way to it."""
+    pose = to_pose(estimate(), "camera")
+    truth, tips = pose.left_wrist.astype(float), pose.left_tips.astype(float)
+    noisy, noisy_tips = truth.copy(), tips.copy()
+    noisy[:10], noisy_tips[:10] = np.nan, np.nan
+    noisy[10, :3, 3] += [0.1, 0, 0]
+    bad = jump_frames(noisy, noisy_tips, 5.0, 4)
+    assert np.flatnonzero(bad).tolist() == [10]
+    wrist, _, _ = interpolate(noisy, noisy_tips, bad)
+    np.testing.assert_allclose(wrist[11], truth[11])
+    np.testing.assert_allclose(wrist[10, :3, 3], truth[11, :3, 3])  # held from frame 11
+
+
+def test_one_real_fast_step_marks_nothing() -> None:
+    """The hand moves 0.1 m between frames 70 and 71 and stays there: two long pieces."""
+    pose = to_pose(estimate(), "camera")
+    wrist, tips = pose.left_wrist.astype(float), pose.left_tips.astype(float)
+    wrist[71:, :3, 3] += [0.1, 0, 0]
+    tips[71:] += [0.1, 0, 0]
+    assert not jump_frames(wrist, tips, 5.0, 4).any()
 
 
 def test_a_quiet_track_has_no_jumps() -> None:
-    truth = to_pose(estimate(), "camera").right_wrist.astype(float)
-    assert not jump_frames(truth, 5.0).any()
+    pose = to_pose(estimate(), "camera")
+    assert not jump_frames(pose.right_wrist.astype(float), pose.right_tips.astype(float),
+                           5.0, 4).any()
 
 
 @pytest.mark.parametrize(("frames", "window"), [(50, 21), (30, 21), (21, 21), (12, 21), (40, 9)])
@@ -321,15 +361,15 @@ def test_smoothing_brings_a_shaking_hand_closer_and_keeps_unseen_frames() -> Non
 
 def test_the_repo_cleaning_end_to_end_on_a_noisy_clip() -> None:
     params = CleanParams.from_config(load_config(ROOT / "configs/data/egocentric.yaml").pose_ea)
-    assert (params.flip_deg, params.jump_mad, params.savgol_window, params.savgol_order) == (
-        30, 5.0, 21, 2)
+    assert (params.flip_deg, params.jump_mad, params.jump_burst, params.savgol_window,
+            params.savgol_order) == (30, 5.0, 4, 21, 2)
     pose = to_pose(estimate(), "camera")
     noisy = pose.left_wrist.copy()
     noisy[20, :3, :3] = noisy[20, :3, :3] @ FLIPS[1].astype(np.float32)
     noisy[80, :3, 3] += 0.3
     out, report = clean_pose(replace(pose, left_wrist=noisy), params)
     assert report["left"] == {"seen_frames": FRAMES, "flipped_frames": 1, "track_turn": "none",
-                              "interpolated_frames": 2, "smoothed_runs": 1}
+                              "interpolated_frames": 1, "smoothed_runs": 1}
     assert np.linalg.norm(out.left_wrist[80, :3, 3] - pose.left_wrist[80, :3, 3]) < 0.005
     assert out.camera.shape == pose.camera.shape and out.frames == pose.frames
 
