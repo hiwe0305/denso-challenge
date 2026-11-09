@@ -37,12 +37,12 @@ Là kỹ sư dữ liệu, tôi muốn video egocentric của người đi qua c�
 - [x] 6. QA riêng và phần egocentric của báo cáo dataset (AC 5, 7)
 - [x] 7. Bộ đọc video tự quay (AC 6)
 - [x] 8. Bước làm mờ mặt cho video tự quay, cổng kiểm sha256 của bản sao (AC 2, 6; thêm 8/11/2026)
-- [ ] 10. Làm sạch pose E-A trước khi xuất stage 1 (AC 4, 5; thêm 9/11/2026; số 9 dùng ở PR 173)
+- [x] 10. Làm sạch pose E-A trước khi xuất stage 1 (AC 4, 5; thêm 9/11/2026; số 9 dùng ở PR 173)
   - [x] 10.1 Pose E-A trong hệ camera (`camera` đơn vị) khi chưa đo được quỹ đạo đầu; ghi nguồn gốc trong `bundle.json`
   - [x] 10.2 Trục cổ tay có dấu xác định theo tay, và bước giữ liên tục (xoay π khi gần khung trước hơn 30°)
   - [x] 10.3 Nội suy khung có bước nhảy cổ tay trên trung vị + 5 × MAD của clip; không bỏ khung
   - [x] 10.4 Savitzky–Golay bậc 2, cửa sổ 21 khung, trên vị trí cổ tay, đầu ngón và quaternion cổ tay
-  - [ ] 10.5 Chạy lại trên 153 clip khay, xuất stage 1, đo phần action bị cắt (ngưỡng 5 %), ghi vào docs/g0/egocentric.md
+  - [x] 10.5 Chạy lại trên 153 clip khay, xuất stage 1, đo phần action bị cắt (ngưỡng 5 %), ghi vào docs/g0/egocentric.md
 
 ## Phạm vi file
 
@@ -95,4 +95,5 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - Công cụ AI đã dùng: Claude Code (Opus 5.5), một phiên trên nhánh `DA-04-egocentric-pipeline`; RoboBrain 2.5-4B và Molmo2-4B trên `rtx3060` cho vòng thử và lần cắt đoạn có model.
 - Ghi chú hoàn thành: cả 7 nhiệm vụ chạy trên 20 episode EgoDex thật (E-A, RoboBrain, vòng thử chạy trên `rtx3060`); video tự quay mới thử trên một mp4 EgoDex đóng vai video của đội, vì đội chưa quay. Quyết định PO áp dụng: D2 (không làm mờ, miễn EgoDex `public`), D3 (không cắt nhiệm vụ nào), D5 (MediaPipe và VO OpenCV, job riêng), D6 (luật trước, model khi mơ hồ). Số đo, cách chạy, kết quả vòng thử và việc còn mở: [docs/g0/egocentric.md](../../g0/egocentric.md). Vòng thử model (D3) có code và test với model giả. Lần chạy thật bị dừng giữa chừng lúc khoảng 10:20 vì Hiếu giữ `rtx3060` cho eval C, nên **chưa có `Decision`**; cách chạy lại ở mục 10.3 của file đó. Theo yêu cầu của DA-18, `pose.npz` có thêm `intrinsic` (3, 3).
 - Nhiệm vụ 8 (8/11/2026): YuNet của OpenCV Zoo chạy cục bộ (không thêm gói), bản sao `<i>.deid.mp4`, cổng kiểm sha256 của bản sao. Thử trên clip EgoDex có dán mặt: che 80 trên 80 khung có mặt, không che nhầm tay; pipeline qua cổng tới `report`. Chi tiết: mục 3.1 của docs/g0/egocentric.md.
+- Nhiệm vụ 10 (9/11/2026): `ingest/egocentric/clean.py` làm sạch E-A ở bước `pose --estimates`; trên 153 clip khay, bản xuất `egx_b6e974e46e8222e8` (132 mẫu, 7 804 khung) có 3,8 % action bị cắt, bản thử 42,7 %. QA của lần chạy dùng mã gộp tạm với PR 173. Chi tiết: mục 4.1 của docs/g0/egocentric.md.
 - File đã tạo hoặc sửa: `ingest/egocentric/` (17 file), `annotate/deid/gate.py`, `qa/egocentric.py`, `egocentric_cli.py`, `configs/data/egocentric.yaml`, test trong `tests/unit/egocentric/` và `tests/contract/egocentric/`, `docs/g0/egocentric.md`, file story này. Không sửa `flywheel.data.api`, `cli.py`, `config.py`, hợp đồng hay `flywheel-eval`.
