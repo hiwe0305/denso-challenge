@@ -112,6 +112,8 @@ pose_ea:
                              # is not measured (translation is vo_step_m per moving frame)
     flip_deg: 30             # turn a wrist frame pi about an axis when that is > 30 deg
                              # closer to the previous seen frame; giả định (2.8)
+    jump_mad: 5.0            # interpolate frames whose wrist step is > median + 5 MAD
+                             # (MAD x 1.4826) of the clip; never drop; giả định (2.8)
 
 models:
   # D6: rules first; RoboBrain suggests step boundaries when rules are ambiguous and

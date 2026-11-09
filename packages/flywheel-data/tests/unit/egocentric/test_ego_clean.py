@@ -21,8 +21,13 @@ from flywheel.data.ingest.egocentric.clean import (
     angle,
     chirality,
     clean_pose,
+    interpolate,
+    jump_frames,
     keep_continuous,
     one_sign,
+    seen_runs,
+    to_quaternion,
+    to_rotation,
 )
 from flywheel.data.ingest.egocentric.config import EgoConfig, load_config
 from flywheel.data.ingest.egocentric.episodes import (
@@ -207,3 +212,50 @@ def test_clean_pose_reports_what_it_turned() -> None:
     np.testing.assert_allclose(out.right_wrist, pose.right_wrist, atol=1e-5)
     untouched, _ = clean_pose(replace(pose, right_wrist=noisy), CleanParams("camera"))
     assert np.array_equal(untouched.right_wrist, noisy)
+
+
+def test_quaternions_round_trip_near_and_far_from_identity() -> None:
+    rng = np.random.default_rng(5)
+    rotations = [axis_angle(rng.normal(size=3), a) for a in rng.uniform(0, np.pi, 50)]
+    rotations += [axis_angle([1, 0, 0], np.pi), axis_angle([0, 1, 1], np.pi - 1e-6), np.eye(3)]
+    m = np.stack(rotations)
+    np.testing.assert_allclose(to_rotation(to_quaternion(m)), m, atol=1e-9)
+
+
+def test_seen_runs_are_half_open() -> None:
+    seen = np.array([0, 1, 1, 0, 0, 1, 0, 1, 1, 1], dtype=bool)
+    assert seen_runs(seen) == [(1, 3), (5, 6), (7, 10)]
+
+
+def spiked() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    pose = to_pose(estimate(), "camera")
+    truth, tips = pose.left_wrist.astype(float), pose.left_tips.astype(float)
+    noisy, noisy_tips = truth.copy(), tips.copy()
+    noisy[50, :3, 3] += [0.2, 0, 0]  # the hand estimate jumps for one frame
+    noisy_tips[50] += [0.2, 0, 0]
+    noisy[50, :3, :3] = axis_angle([1, 0, 0], np.radians(60)) @ noisy[50, :3, :3]
+    noisy[100:110] = np.nan  # not seen
+    noisy_tips[100:110] = np.nan
+    noisy[110, :3, 3] += [0.3, 0, 0]  # a run's first frame: no step to judge it by
+    noisy[FRAMES - 1, :3, 3] += [0.3, 0, 0]  # a run's last frame: held from the one before
+    return truth, noisy, noisy_tips
+
+
+def test_a_jump_frame_is_interpolated_and_no_frame_is_dropped() -> None:
+    truth, noisy, tips = spiked()
+    bad = jump_frames(noisy, 5.0)
+    # the jump in and the jump back out; the first frame after the gap has no step
+    assert np.flatnonzero(bad).tolist() == [50, 51, 111, FRAMES - 1]
+    wrist, fixed_tips, count = interpolate(noisy, tips, bad)
+    assert count == 4 and wrist.shape == noisy.shape and fixed_tips.shape == tips.shape
+    np.testing.assert_allclose(wrist[50, :3, 3], truth[50, :3, 3], atol=1e-3)  # 1 mm
+    np.testing.assert_allclose(fixed_tips[50], tips[49] + (tips[52] - tips[49]) / 3)
+    assert np.degrees(angle(wrist[50, :3, :3], truth[50, :3, :3])) < 0.5
+    np.testing.assert_allclose(wrist[FRAMES - 1, :3, 3], noisy[FRAMES - 2, :3, 3])
+    assert np.isnan(wrist[100:110]).all() and np.isnan(fixed_tips[100:110]).all()
+    np.testing.assert_allclose(wrist[110], noisy[110])  # judged by nothing: kept as seen
+
+
+def test_a_quiet_track_has_no_jumps() -> None:
+    truth = to_pose(estimate(), "camera").right_wrist.astype(float)
+    assert not jump_frames(truth, 5.0).any()
