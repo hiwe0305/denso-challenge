@@ -19,7 +19,7 @@ fw egocentric ingest egodex                       # in ra thư mục làm việc
 fw egocentric deid $W                             # video tự quay: che mặt trước mọi bước khác (mục 3.1)
 fw egocentric pose $W                             # E-B từ HDF5
 fw egocentric pose $W --job ea_jobs.json          # manifest cho job E-A
-fw egocentric pose $W --estimates <thư mục .npz>  # đọc E-A, so với E-B
+fw egocentric pose $W --estimates <thư mục .npz>  # đọc E-A, làm sạch (mục 4.1), so với E-B
 fw egocentric annotate $W --endpoint http://127.0.0.1:11434/v1
 fw egocentric qa $W
 fw egocentric report $W
@@ -188,6 +188,52 @@ So E-A với E-B trên cùng khung (`compare.json`), trung vị theo episode r�
 | Hướng tịnh tiến | Không đo được: VO coi 164/4.143 khung là có tịnh tiến, chỉ 1 trong số đó trùng bước E-B dịch ít nhất 2 mm |
 
 Đọc số: đầu ngón lệch khoảng 2,5% bề ngang ảnh, độ sâu lệch 5–6 cm. Cổ tay lệch nhiều hơn đầu ngón, nhiều khả năng vì điểm cổ tay của MediaPipe (nếp cổ tay) và khớp cổ tay của ARKit không cùng định nghĩa; chưa kiểm. Trên EgoDex người ngồi trước bàn nên camera gần như chỉ xoay; sai số xoay của VO lớn hơn chính chuyển động, tức tư thế camera E-A chưa dùng được để tính action trong khung thế giới. Video hai bàn có đi bộ sẽ là phép thử thật của phần tịnh tiến.
+
+### 4.1 Làm sạch E-A (nhiệm vụ 10, 9/11/2026)
+
+Lý do: bản xuất thử `egx_fb3d1401dac0bd4c` của 132 clip khay có 41,6 % giá trị action bị cắt ở ±1 khi chuẩn hóa bằng stats EgoDex (`loader_check`, [docs/he/stage1.md](../he/stage1.md) mục 2.7 ở PR 171; EgoDex 2,2 %). Phép đo ngoài repo ở mục 2.8 cho thấy chỉ tổ hợp "camera đơn vị + làm sạch tay, cửa sổ 21" xuống dưới 5 %. Hiếu giao làm trong DA-04 ngày 9/11/2026.
+
+Làm ở bước `fw egocentric pose --estimates` trên laptop (`ingest/egocentric/clean.py`, tham số `pose_ea.clean` của cấu hình), nên không cần chạy lại job E-A trên `rtx3060`. E-B không bao giờ bị làm sạch: với EgoDex chỉ `pose_ea.npz` đổi, `pose.npz` và `bundle.json` giữ nguyên; `compare.json` so ước lượng thô nên cũng không đổi. Không bỏ hay thêm khung nào; khung không thấy tay vẫn là NaN.
+
+| Bước | Làm gì | Tham số (giả định, từ mục 2.8) |
+|---|---|---|
+| Hệ tọa độ | Tay ở trong hệ camera của từng khung, `camera` là ma trận đơn vị. Quỹ đạo VO không phải số đo: tịnh tiến là bước cố định `vo_step_m` (0,005 m) mỗi khung "di chuyển", quay trôi. `bundle.json` ghi `pose_frame = camera` và `pose_cleaning` (tham số, số khung đã sửa) | `frame: camera` |
+| Liên tục góc | Khung cổ tay xoay π quanh một trục của nó khi việc đó làm nó gần khung thấy trước đó hơn 30°, nối qua khung không thấy tay | `flip_deg: 30` |
+| Dấu của cả track | Sau bước trên, cả track của một tay xoay π quanh y khi đa số khung có chirality của tay kia (bốn đầu ngón ở phía +z của khung cổ tay với tay phải, −z với tay trái). Xoay cả track không đổi delta nào | |
+| Khung nhảy | Khung có bước cổ tay (tịnh tiến hoặc quay) trên trung vị + 5 × MAD (nhân 1,4826) của clip được nội suy từ hai khung tốt gần nhất trong cùng đoạn thấy tay: vị trí, đầu ngón tuyến tính, quay bằng slerp; ở mép đoạn giữ khung tốt gần nhất | `jump_mad: 5.0` |
+| Làm mượt | Savitzky–Golay trên từng đoạn thấy tay: vị trí cổ tay, đầu ngón, quaternion cổ tay (giữ dấu liên tục, chuẩn hóa lại). Đoạn ngắn hơn cửa sổ dùng cửa sổ lẻ dài nhất nó chứa. Viết bằng numpy (scipy không là phụ thuộc của `flywheel-data`); test so khớp `scipy.signal.savgol_filter(mode="interp")` tới 1e-12 | `savgol_window: 21`, `savgol_order: 2` |
+
+**Dấu trục cổ tay.** Đề xuất ở mục 2.8 là sửa dấu ngay khi dựng trục. `estimate_job.wrist_frame` đã có dấu cố định theo landmark: x từ khớp gốc ngón út tới ngón trỏ, z = x × y. Trên 153 file E-A của clip khay (trong hệ camera), 1 052 trên 21 474 bước giữa hai khung thấy tay (4,9 %) là lật π, 856 quanh y, 87 % kèm đổi chirality của bộ điểm: MediaPipe trả về tay phản chiếu. Ép mỗi khung theo chirality của bên tay cho 6,4 % bước lật (dùng bốn đầu ngón; 6,7 % với ngón cái, 6,9 % với khớp giữa ngón), tức tệ hơn. Vì vậy chirality chỉ dùng để bỏ phiếu cho cả track, còn bước giữ liên tục làm việc theo từng khung.
+
+Chạy trên 153 clip khay (`src_805804635f9af7f7`, 9/11/2026, 4 s). Bản lưu trước khi chạy: `fwdata/pipeline/backup/src_805804635f9af7f7-before-DA-04-10-20261109.tar`.
+
+| Đại lượng | Tay trái | Tay phải |
+|---|---|---|
+| Khung thấy tay | 10 960 | 11 324 |
+| Khung bị xoay π (gồm cả các khung theo sau một lần lật) | 4 095 | 4 201 |
+| Track xoay cả cho đúng chirality | 64 / 153 | 54 / 153 |
+| Khung nhảy được nội suy | 504 | 723 |
+| Đoạn thấy tay được làm mượt | 290 | 294 |
+
+- Mẫu NaN không đổi ở 612 / 612 mảng; `segments.parquet` không đổi byte nào; 132 đoạn vẫn trùng đoạn pose hữu hạn dài nhất, nên không cần áp lại phiếu duyệt.
+- QA, chạy bằng mã của nhánh này gộp tạm với PR 173 (chưa merge; không có PR 173 thì `segment_count` từ chối cả 153): **10 `pass`, 122 `flag`, 21 `reject`**, `threshold_version` `ego-1@311eae7fe08e`. `camera_jitter_deg_s` không còn hỏng vì camera là đơn vị; `flag` còn lại do `hand_pose_nan` (143).
+- Xuất stage 1 (`--include-flag`): **`egx_b6e974e46e8222e8`**, 132 mẫu, 7 804 khung, 47 MB, ở `fwdata/egocentric-export/tray-ego-b-480p-clean`. `export_source verify` của PR 171: `OK`.
+
+Phần action bị cắt, đo bằng đúng script của mục 2.8 (dựng lại delta như loader ở `cda3fdf`, stats `egodex_stat_all.json`, mỗi clip trọng số bằng nhau):
+
+| Bản xuất | Giá trị bị cắt | Mẫu có chiều bị cắt | \|Δ\| cổ tay trái x, trung vị / p90 (m) | \|Δ\| roll trái, trung vị / p90 (rad) |
+|---|---|---|---|---|
+| Thử `egx_fb3d1401dac0bd4c` | 42,7 % | 92,5 % | 0,027 / 0,215 | 0,287 / 2,12 |
+| Đã làm sạch `egx_b6e974e46e8222e8` | **3,8 %** | 56,5 % | 0,005 / 0,013 | 0,077 / 0,289 |
+
+Theo nhóm chiều, gộp mọi delta: vị trí cổ tay 5,4 %, góc cổ tay 13,6 %, đầu ngón x/y 1,0 %, đầu ngón z 2,7 %. `stats_coverage`: tỉ lệ độ rộng khoảng q01–q99 so với của tác giả có trung vị 1,06, lớn nhất 4,6 (chiều 4, pitch cổ tay trái); bản thử là 11,9 và 26,0. Bản mới qua ngưỡng 5 % đề xuất ở mục 2.7, khớp số 3,9 % của biến thể 4b cửa sổ 21. **Chưa chạy `loader_check` trong image Ψ₀** (cần Docker trên `rtx3060`); trên bản thử, script này lệch `loader_check` 1,1 điểm (42,7 % so với 41,6 %). Vẫn nhiễu hơn EgoDex: 56,5 % mẫu có ít nhất một chiều bị cắt (EgoDex 19,5 %).
+
+Hệ quả cần biết (mục 9, dòng 19–20):
+
+- Delta là chuyển động tay so với đầu, không bù chuyển động đầu. Trên EgoDex, bỏ phần bù gần như không đổi phần bị cắt (mục 2.8).
+- `camera_jitter_deg_s` bằng 0 với E-A trong hệ camera: phép kiểm chỉ còn nghĩa với E-B.
+- Luật cắt đoạn `two_table` tìm bước `walk` từ tốc độ camera; với camera đơn vị, cắt lại sẽ không thấy bước đó. Clip khay dùng phiếu duyệt cả clip nên không bị ảnh hưởng; quỹ đạo VO thô vẫn ở file `.npz` của job.
+- `trial.py` đọc `pose_ea.npz` của EgoDex: chạy lại vòng thử (mục 10.3) sẽ dùng E-A đã làm sạch trong hệ camera.
 
 ## 5. Cắt đoạn và câu lệnh (nhiệm vụ 3)
 
@@ -365,6 +411,8 @@ Tới 7/11/2026 đội chưa quay video nào. Phép thử trên file thật: m�
 | 16 | Ngưỡng `deid` (0,6, nới 25 %, giữ 5 khung) là giả định; mới đo trên một mặt dán vào video, chưa đo trên người thật đứng xa, nghiêng, đeo khẩu trang | Có thể sót mặt nhỏ hoặc nghiêng | Hiếu xem nhanh `frames_with_faces` trong `source.json` và vài khung của bản sao trước khi dùng; người duyệt mẫu thì đặt `verified` |
 | 17 | Xuất stage 1 của DA-18 (`export/egodex.py`) đọc `bundle.mp4`, nên dùng bản sao, nhưng chưa tự kiểm sha256 của bản sao như cổng | Bản sao bị thay sau `deid` mà không chạy lại bước nào của DA-04 thì DA-18 không biết | **[Đề xuất]** DA-18 gọi `annotate_allowed` với `deid_copies`; PR riêng của DA-18 |
 | 18 | 21 trên 153 clip khay bị bỏ vì đoạn pose hữu hạn liên tục dài nhất dưới 30 khung (mục 6.1) | Mất 14 % số clip; tính cả phần cắt bớt ở clip giữ lại thì mất 34 % số khung của nhánh B | Lấp khoảng trống pose nằm ngoài nhiệm vụ 9; **[Đề xuất]** quyết định sau khi có kết quả nhánh B |
+| 19 | E-A trong hệ camera (mục 4.1): không có quỹ đạo đầu; luật `two_table` không tìm được bước `walk`; `camera_jitter_deg_s` không đo gì với E-A | Delta stage 1 là tay so với đầu; cắt lại video hai bàn bằng luật sẽ thiếu bước đi | Đo quỹ đạo đầu (IMU của điện thoại, hoặc VO có tỉ lệ) rồi đặt `frame: world`; tới lúc đó dùng phiếu duyệt |
+| 20 | Phần bị cắt 3,8 % đo bằng script của DA-30, chưa bằng `loader_check` trong image Ψ₀ | Script lệch `loader_check` khoảng 1 điểm trên bản thử | Phiên DA-30 chạy `loader_check` trên `egx_b6e974e46e8222e8` trước khi ghim |
 
 ## 10. Việc để chạy sau
 
@@ -445,6 +493,7 @@ Chưa thử cài MediaPipe trên laptop. Gói có wheel sẵn nên không cần 
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 9/11/2026 | Thêm mục 6.1: QA tôn trọng phiếu duyệt của người (nhiệm vụ 9), số QA trên 153 clip khay; sửa dòng 5, thêm dòng 18 mục 9 | Claude (phiên DA-04 QA), theo yêu cầu của phiên điều phối DA-34 nhánh B |
+| 9/11/2026 | Thêm mục 4.1: làm sạch E-A (nhiệm vụ 10), chạy trên 153 clip khay, bản xuất `egx_b6e974e46e8222e8` có 3,8 % action bị cắt; dòng 19–20 mục 9 | Claude (phiên DA-04 QA), theo giao việc của Hiếu |
 | 9/11/2026 | Video tự quay đổi sang `public` theo quyết định của Hiếu (mục 8.1); bước làm mờ không đổi | Claude, theo quyết định của Hiếu |
 | 8/11/2026 | Thêm bước làm mờ `fw egocentric deid` (nhiệm vụ 8, mục 3.1); cổng chỉ cho episode `blurred` qua khi mọi video có bản sao đúng sha256; dòng 4 mục 9 xong, thêm dòng 15–17 | Claude (phiên DA-04 deid), theo yêu cầu của Hiếu |
 | 7/11/2026 | Sửa theo review PR 152 (mục 3, 5, 6, 1.2, 10.5) | Claude (phiên DA-04), theo review của Hiếu |
