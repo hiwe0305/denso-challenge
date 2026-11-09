@@ -173,8 +173,9 @@ class Stage1Plan(_Frozen):
     # (`flywheel_psi0.stage1.vlm_checkpoint`). Unset (not False) when not wanted, so
     # plans written before the field keep their run_plan_id.
     persist_vlm: bool | None = None
-    # "draft": a pin is still a placeholder; `colab setup` refuses it. Out of the
-    # run_plan_id (STATUS_FIELDS), so dropping it once the pins are real keeps the id.
+    # "draft": not to run yet; `colab setup` refuses it. Required while a pin is a
+    # placeholder; also allowed with every pin set (the data's code is not merged yet).
+    # Out of the run_plan_id (STATUS_FIELDS), so dropping it keeps the id.
     status: Literal["draft"] | None = None
 
     @classmethod
@@ -199,8 +200,8 @@ PLACEHOLDER_EXPORT_ID = "egx_" + "0" * 16
 PLACEHOLDER_SHA256 = "0" * 64
 
 
-def draft_reasons(plan: Stage1Plan) -> list[str]:
-    """What still keeps the plan from being frozen."""
+def placeholder_pins(plan: Stage1Plan) -> list[str]:
+    """The pins that are still placeholders."""
     if not isinstance(plan.dataset, ExportDataset):
         return []
     source = plan.dataset.source
@@ -209,6 +210,14 @@ def draft_reasons(plan: Stage1Plan) -> list[str]:
         reasons.append("export_id is the placeholder")
     if source.sha256 == PLACEHOLDER_SHA256:
         reasons.append("tarball sha256 is the placeholder")
+    return reasons
+
+
+def draft_reasons(plan: Stage1Plan) -> list[str]:
+    """What keeps the plan from running: placeholder pins, or `status: draft` alone."""
+    reasons = placeholder_pins(plan)
+    if not reasons and plan.status == "draft":
+        reasons.append("marked `status: draft` with every pin set")
     return reasons
 
 
@@ -327,11 +336,10 @@ def check(plan: Stage1Plan, repo: Path = REPO) -> list[str]:
         problems.append("the rerun must be shorter than the run")
     config = json.loads((repo / plan.deepspeed_config).read_text(encoding="utf-8"))
     problems += [f"{plan.deepspeed_config}: {p}" for p in deepspeed_problems(config, recipe)]
-    reasons = draft_reasons(plan)
-    if reasons and plan.status != "draft":
-        problems += [f"{r}, but the plan is not marked `status: draft`" for r in reasons]
-    if not reasons and plan.status == "draft":
-        problems.append("`status: draft` but every pin is set: drop the status")
+    if plan.status != "draft":
+        problems += [
+            f"{r}, but the plan is not marked `status: draft`" for r in placeholder_pins(plan)
+        ]
     return problems
 
 

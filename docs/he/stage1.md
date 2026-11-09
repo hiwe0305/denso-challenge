@@ -254,15 +254,15 @@ Một điều cần ghi cạnh kết quả của B: action header `postpre.*` đ
 
 ### 2.4 RunPlan `tray-ego-b.yaml`
 
-[`tray-ego-b.yaml`](../../configs/runplans/stage1/tray-ego-b.yaml), `run_plan_id` hiện tại `rp_6a66a6ff082c` (bản nháp: id sẽ đổi khi ghim bản export thật). `runplan check` qua và in "draft" kèm lý do.
+[`tray-ego-b.yaml`](../../configs/runplans/stage1/tray-ego-b.yaml), `run_plan_id` `rp_ecd2bb11c415` từ khi ghim bản export đã làm sạch ngày 9/11/2026 (mục 2.9); trước đó, với giá trị giữ chỗ, là `rp_6a66a6ff082c`. `runplan check` qua và in "draft" kèm lý do.
 
-**Bản nháp cho tới khi có bản export.** Khối `dataset.source` giữ giá trị giữ chỗ (`egx_0000000000000000`, sha256 toàn số 0) và plan có `status: draft`. `colab setup` từ chối plan nháp trước khi làm bất cứ gì (không tốn CU). `runplan check` báo lỗi nếu giá trị giữ chỗ còn mà plan không ghi `draft`, hoặc ngược lại. `status` nằm ngoài `run_plan_id` (như plan của DA-34), nên bỏ nó đi không đổi id. Để đóng băng: chạy `pack` trên bản export, chép `export_id`, `sha256`, `bytes` và đường dẫn tarball trên Drive vào plan, bỏ `status: draft`, chạy lại `runplan check`.
+**Bản nháp cho tới khi có bản export.** Khối `dataset.source` giữ giá trị giữ chỗ (`egx_0000000000000000`, sha256 toàn số 0) và plan có `status: draft`. `colab setup` từ chối plan nháp trước khi làm bất cứ gì (không tốn CU). `runplan check` báo lỗi nếu giá trị giữ chỗ còn mà plan không ghi `draft`. Từ 9/11/2026, plan đã ghim đủ vẫn được giữ `draft` (mã tạo ra dữ liệu chưa merge, mục 2.9); `check` và `setup` in lý do "marked `status: draft` with every pin set". `status` nằm ngoài `run_plan_id` (như plan của DA-34), nên bỏ nó đi không đổi id. Để đóng băng: chạy `pack` trên bản export, chép `export_id`, `sha256`, `bytes` và đường dẫn tarball trên Drive vào plan, bỏ `status: draft`, chạy lại `runplan check`.
 
 | Khối | Giá trị | Lý do |
 |---|---|---|
 | `recipe` | [`psi0-stage1-egodex.yaml`](../../configs/runplans/stage1/psi0-stage1-egodex.yaml), không đổi `args` | Bản export có bố cục EgoDex. Cha được train bằng `pretrain-mix-psi0-fast.sh` (HE và EgoDex 1:1, từ `ckpt200k`), với cùng tokenizer FAST `egodex-rel-50w-1x48-v2048-s100`, cùng `egodex_stat_all.json` và ảnh EgoDex 270×480 như script EgoDex. Recipe thêm cha `psi0-pre-egodex-he` vào `parents` |
 | `parent` | `pre.fast.1by1.2601091803.ckpt.ego200k.he30k`, sha256 `6e63…d3f9` | VLM của C (quyết định 1). Test so với `he-tray-v2.yaml`; `setup` kiểm sha256 sau khi tải |
-| `train.max_training_steps` | 300 | Quyết định 4. 300 bước × 32 mẫu là khoảng 63 lượt qua 153 clip (mỗi lượt một khung ngẫu nhiên mỗi clip). Loss sẽ giảm một phần do học thuộc; B được đánh giá bằng closed-loop của stage 3 so với C (DA-34), không bằng loss này |
+| `train.max_training_steps` | 300 | Quyết định 4. 300 bước × 32 mẫu là khoảng 73 lượt qua 132 clip của bản export đã ghim (mỗi lượt một khung ngẫu nhiên mỗi clip). Loss sẽ giảm một phần do học thuộc; B được đánh giá bằng closed-loop của stage 3 so với C (DA-34), không bằng loss này |
 | `train.checkpointing_steps` | 300 | Một checkpoint ở cuối (Ψ₀ luôn lưu ở bước cuối: `scripts/train.py:304-310` gọi `should_save_training_checkpoint`, `trainer.py:30-41`). Checkpoint giữa tốn một lần lưu DeepSpeed khoảng 30 GB và vô dụng: phiên đã dừng không chạy tiếp |
 | `train.validation_steps` | 0 | Bản export không có split `test/`; val dạng sinh token của Ψ₀ nói ít trong 300 bước. Quên (P4) và hiểu cảnh (P1) là probe của DA-09, dời sau demo |
 | `deepspeed_config` | `zero3_offload.json` của mục 1.2 | Một L4; `runplan check` so với recipe; pre-flight của `setup` thử trên model nhỏ. File này bật gom trọng số 16 bit khi lưu, điều kiện của mục 2.3 |
@@ -306,7 +306,7 @@ Chưa chạy. Điều kiện trước:
 
 1. PR này merge vào `master`; chạy từ `master`, không từ nhánh.
 2. PR #170 (`data_class` `public` cho video của đội) đã merge.
-3. Phiên điều phối dữ liệu giao bản export: chạy `python -m flywheel_psi0.stage1.export_source pack --export <root> --out <export_id>.tar`, đưa tarball lên `MyDrive/denso/da30/exports/`, gửi `export_id`, `sha256`, `bytes`. Một PR nhỏ ghim ba số đó vào `tray-ego-b.yaml`, bỏ `status: draft`; `runplan check` in `OK rp_…` không còn chữ "draft".
+3. Bản export đã ghim (mục 2.9). Sau khi PR #173 và #174 merge: đưa `fwdata/egocentric-export/tarballs/egx_b6e974e46e8222e8.tar` (sha256 `61c3497a…afc8`, 48 701 440 byte) lên `MyDrive/denso/da30/exports/`; một PR nhỏ bỏ `status: draft` khỏi `tray-ego-b.yaml`; `runplan check` in `OK rp_ecd2bb11c415` không còn chữ "draft".
 4. Đọc `stats_coverage` của bản export trên CPU trước khi tốn GPU (mục 2.4).
 5. `colab sessions` trống: một đợt một lúc trên tài khoản (mục 1.6).
 
@@ -353,7 +353,7 @@ Psi0/.venv-psi/bin/python -m flywheel_psi0.stage1.colab repeat --work /content/d
 python3 -m flywheel_psi0.stage1.colab persist --work /content/da30 --plan fw/configs/runplans/stage1/tray-ego-b.yaml
 ```
 
-Sau lần chạy: tải `report.json` và log về `fwdata/colab/`, ghi dòng `measured` của sổ chi phí (`balance_drop` ở dòng `exit` của `da30-stage1-b.jsonl`), ghi kết quả vào mục 2.9. VLM nằm ở `MyDrive/denso/da30/da30-tray-ego-b/vlm/`, bản ghi ở `…/da30-tray-ego-b/vlm.json`. Bốn giá trị cần ghim vào `he-tray-b.yaml` của DA-34 (`parents.psi0-b-ego-stage1.vlm_stage1`) có sẵn trong mục `persist.vlm` của `report.json`: `job_id` `da30-tray-ego-b`, `drive_dir`, `weights_sha256`, `manifest_sha256`.
+Sau lần chạy: tải `report.json` và log về `fwdata/colab/`, ghi dòng `measured` của sổ chi phí (`balance_drop` ở dòng `exit` của `da30-stage1-b.jsonl`), ghi kết quả vào mục 2.10. VLM nằm ở `MyDrive/denso/da30/da30-tray-ego-b/vlm/`, bản ghi ở `…/da30-tray-ego-b/vlm.json`. Bốn giá trị cần ghim vào `he-tray-b.yaml` của DA-34 (`parents.psi0-b-ego-stage1.vlm_stage1`) có sẵn trong mục `persist.vlm` của `report.json`: `job_id` `da30-tray-ego-b`, `drive_dir`, `weights_sha256`, `manifest_sha256`.
 
 ### 2.7 Loader check trên bản export thử (9/11/2026)
 
@@ -459,3 +459,40 @@ Cửa sổ 21 giữ gần hết chuyển động của EgoDex: p90 giảm 4 % �
 5. Kiểm lại bằng `loader_check` trên bản export thật trước khi ghim, với ngưỡng 5 % của mục 2.7.
 
 Còn lại sau đề xuất: 3,9 % là trên bản thử, không phải bản thật. Góc cổ tay vẫn bị cắt 13 %, và 56 % mẫu có ít nhất một chiều bị cắt (EgoDex 19,5 %). Bản export qua ngưỡng nhưng vẫn nhiễu hơn EgoDex. Cửa sổ 21 có thể làm mờ những lúc tay đổi hướng nhanh (cầm và đặt khay); phần bị cắt không nói gì về chất lượng policy, closed-loop của B so với C mới trả lời.
+
+### 2.9 Ghim bản export đã làm sạch (9/11/2026)
+
+DA-04 làm sạch tư thế theo đề xuất của mục 2.8 (PR #174; QA ở PR #173) và xuất lại cùng 132 clip: `egx_b6e974e46e8222e8`, 7804 khung, `data_class` `public`, không miễn trừ che danh tính, `verify_export` qua. DA-04 đo 3,8 % giá trị bị cắt bằng cách đo của mục 2.8.
+
+**Loader check, như mục 2.7** (cùng image, cùng mã `cda3fdf`, chỉ CPU, argv của `tray-ego-b.yaml`, 8 CPU, 4 worker, thư mục dữ liệu ghi được):
+
+| Mục | Bản đã làm sạch | Bản thử (mục 2.7) |
+|---|---|---|
+| Mẫu train, test | 132, 0 | 132, 0 |
+| Một epoch | 8 batch × 16 = 128 | như vậy |
+| `input_ids` | 16 × 193–195 | 16 × 191–195 |
+| Ảnh, action thô | lưới 1 × 16 × 30, `pixel_values` 7680 × 1536; 1 × 48 | như vậy |
+| Token action FAST mỗi mẫu | 1–44 | 1–44 |
+| NaN, `problems` | không có, rỗng | không có, rỗng |
+| Thời gian | batch đầu 1,5 s, sau đó 0,01–0,5 s | như vậy |
+| **`actions.clipped_value_share`** | **4,3 %** | 41,6 % |
+| `actions.samples_with_a_clipped_dim` | 61,7 % | 89,8 % |
+| `actions.one_token_samples` | 9 / 128 (7,0 %) | 9 / 128 |
+
+128 mẫu là ít cho một số gần ngưỡng, nên chạy thêm 5 epoch (640 mẫu, hai lần) bằng script riêng của mục 2.7: 3,7 % giá trị và 55 % mẫu bị cắt, 7,8 % mẫu một token. Số này khớp với 3,8 % của DA-04. Phần còn bị cắt nằm chủ yếu ở cổ tay trái: pitch 34 %, y 19 %, roll 17 %; cổ tay phải pitch 15 %; mọi chiều khác dưới 10 %. Mẫu một token vẫn là delta bằng 0 ở ba khung cuối mỗi clip (mục 2.7, kết quả 2); làm sạch không đổi điều này.
+
+**Qua ngưỡng 5 % của mục 2.7, nên ghim.** Tarball đóng bằng `pack` từ thư mục export gốc (chưa bị loader ghi `filelist_cache.pkl`), hai lần cho cùng sha256; `fetch` nhận lại nó như `setup` sẽ làm (132 mẫu, 7804 khung).
+
+| Trường của `dataset.source` | Giá trị |
+|---|---|
+| `export_id` | `egx_b6e974e46e8222e8` |
+| `tarball` | `denso/da30/exports/egx_b6e974e46e8222e8.tar` dưới `MyDrive` (chưa đưa lên Drive) |
+| `sha256` | `61c3497aa48bd59182aebadcdb5816d5d8a7de11cec0aa393c90eb32906bafc8` |
+| `bytes` | 48 701 440 |
+| `samples` | 132 |
+
+`dataset.id` đổi thành `team-ego-tray-clean-132`. `run_plan_id` là `rp_ecd2bb11c415`; dòng `estimated` của sổ chi phí vẫn ghi id cũ của bản nháp (sổ là append-only; ước lượng CU không đổi).
+
+**Plan vẫn là bản nháp.** Bản export này do mã của PR #173 và #174 tạo ra, chưa merge, mà lần chạy chỉ khởi động từ `master`. Trước đây `runplan check` coi plan nháp đã ghim đủ là lỗi; giờ điều đó được phép, và `check` lẫn `setup` in lý do "marked `status: draft` with every pin set". `setup` vẫn từ chối trước khi cài hay tải gì. `status` nằm ngoài `run_plan_id`, nên khi bỏ `draft` id vẫn là `rp_ecd2bb11c415` (test `test_dropping_the_draft_keeps_the_checks_and_the_id`). Việc còn lại trước khi chạy ở mục 2.6 bước 3.
+
+Lưu ý: 3,7–4,3 % là trên chính 132 clip đã dùng để chọn cách làm sạch ở mục 2.8, nên không phải số đo độc lập. Video quay thêm sau này cần đo lại bằng `loader_check`.

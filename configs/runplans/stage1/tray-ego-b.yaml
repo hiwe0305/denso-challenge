@@ -6,14 +6,14 @@
 # First stage 1 run to reach a train step in the project: also the path proof.
 #
 # Hiếu, 9/11/2026, "Chốt 4 mặc định": parent = C's VLM; one sample per clip with the
-# whole-task sentence; the 153 deidentified 480p clips at 30 fps, data_class public
-# (PR #170); about 300 steps, hard cap 4 CU.
+# whole-task sentence; the deidentified 480p clips at 30 fps, data_class public
+# (PR #170); about 300 steps, hard cap 4 CU. The export holds 132 of the 153 clips
+# (QA kept pass and flag), with DA-04's pose cleaning (docs/he/stage1.md 2.8, 2.9).
 #
-# DRAFT until the data coordinator delivers the export: `dataset.source` holds
-# placeholders, `colab setup` refuses the plan and `runplan check` prints "draft".
-# To freeze: put the export's id, tarball sha256 and bytes (printed by
-#   python -m flywheel_psi0.stage1.export_source pack --export <root> --out <tar>)
-# below, set `tarball` to where it sits on Drive, drop `status: draft`, check again.
+# Pinned 9/11/2026, still DRAFT: the export comes from code in PR #173 (QA) and PR #174
+# (pose cleaning), not yet merged, and a run starts only from master. `colab setup`
+# refuses a draft. Once both are merged: put the tarball on Drive at `tarball`, drop
+# `status: draft` (the run_plan_id stays the same), check again.
 #
 #   uv run python -m flywheel_psi0.stage1.runplan check configs/runplans/stage1/tray-ego-b.yaml
 name: stage1-tray-ego-b
@@ -45,14 +45,15 @@ parent:
 # carries `actions_48d`; no precompute.
 dataset:
   kind: export
-  id: team-ego-tray-153
+  id: team-ego-tray-clean-132
   source:
     name: team-ego
-    export_id: egx_0000000000000000 # placeholder: the coordinator's export
-    tarball: denso/da30/exports/egx_0000000000000000.tar # under /content/drive/MyDrive
-    sha256: '0000000000000000000000000000000000000000000000000000000000000000' # placeholder
-    bytes: 1 # placeholder
-    samples: 153
+    # fwdata/egocentric-export/tray-ego-b-480p-clean; loader_check 4.3 % clipped (2.9)
+    export_id: egx_b6e974e46e8222e8
+    tarball: denso/da30/exports/egx_b6e974e46e8222e8.tar # under /content/drive/MyDrive
+    sha256: 61c3497aa48bd59182aebadcdb5816d5d8a7de11cec0aa393c90eb32906bafc8
+    bytes: 48701440
+    samples: 132
   split_dir: part1
   data_class: public # PR #170; the export's meta.json must say the same
   identity_masked: true # faces blurred by `fw egocentric deid` before anything else
@@ -72,7 +73,7 @@ deepspeed_config: configs/runplans/stage1/zero3_offload.json
 # records how the export's q01..q99 sits in it (`stats_coverage`), since Psi0 clips the
 # normalized action to [-1, 1].
 overrides:
-  # Hiếu's ~300. 300 x 32 samples is ~63 passes over 153 clips (one random frame per
+  # Hiếu's ~300. 300 x 32 samples is ~73 passes over 132 clips (one random frame per
   # clip per pass): the loss will fall partly by memorizing; what B is judged on is
   # stage 3 closed-loop against C (DA-34), not this loss.
   train.max_training_steps: 300
