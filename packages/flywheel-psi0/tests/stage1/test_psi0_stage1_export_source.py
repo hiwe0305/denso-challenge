@@ -224,6 +224,56 @@ def test_stats_coverage_names_the_dims_the_clip_would_cut() -> None:
     assert coverage["span_ratio_max_dim"] == 2
 
 
+def test_fetch_refuses_another_sample_count_before_moving_anything(
+    export: tuple[Path, str], tmp_path: Path
+) -> None:
+    root, export_id = export
+    pin = pack(root, tmp_path / "drive" / f"{export_id}.tar")
+    target = tmp_path / "vm" / "data" / "egodex"
+    with pytest.raises(ExportRefused, match="counts 3 samples, the plan pins 4"):
+        fetch(
+            tmp_path / "drive" / f"{export_id}.tar",
+            pin["sha256"],
+            target,
+            export_id,
+            "part1",
+            samples=4,
+        )
+    assert list(target.parent.iterdir()) == []  # no export, no staging dir, no local tar
+    got = fetch(
+        tmp_path / "drive" / f"{export_id}.tar",
+        pin["sha256"],
+        target,
+        export_id,
+        "part1",
+        samples=3,
+    )
+    assert got["samples"] == 3  # and the next setup is not refused as "not empty"
+
+
+def test_setup_refuses_a_plan_that_pins_another_sample_count(
+    export: tuple[Path, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, export_id = export
+    drive = tmp_path / "MyDrive"
+    pin = pack(root, drive / "denso" / "da30" / "exports" / f"{export_id}.tar")
+    raw = yaml.safe_load(EGODEX_SHORT.read_text())
+    raw["dataset"] = export_block(export_id, pin["sha256"], size=pin["bytes"])
+    raw["dataset"]["source"]["samples"] = 4
+    plan_path = tmp_path / "plan.yaml"
+    plan_path.write_text(yaml.safe_dump(raw))
+    work = tmp_path / "da30"
+    work.mkdir()
+    (work / "fw").symlink_to(REPO)
+    monkeypatch.setattr(colab, "setup_psi0_env", lambda work: None)
+    monkeypatch.setattr(colab, "check_parent", lambda psi0, plan: None)
+    monkeypatch.setattr(colab, "sh", lambda command, cwd=None, env=None: None)
+    with pytest.raises(ExportRefused, match="the plan pins 4"):
+        colab.setup(work, plan_path, drive)
+    assert not (work / "data" / "egodex").exists()
+    assert not (work / "data" / "egodex.unverified").exists()
+
+
 def test_a_refused_export_is_not_left_where_the_loader_reads(
     export: tuple[Path, str], tmp_path: Path
 ) -> None:
