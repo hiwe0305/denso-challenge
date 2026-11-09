@@ -35,15 +35,18 @@ ROOT = Path(__file__).resolve().parents[5]
 SYSTEM_YAML = ROOT / "configs" / "eval" / "diagnosis" / "system.yaml"
 
 
-def step(trace_id: str, index: int, upper_error: float, lower_error: Any = 0.0) -> dict[str, Any]:
-    """One cycle whose first upper and first lower channel miss by the given amounts."""
+def step(
+    trace_id: str, index: int, upper_error: float, lower_error: Any = 0.0, sync: Any = 0.0
+) -> dict[str, Any]:
+    """One cycle whose first upper and first lower channel miss by the given amounts,
+    with the frame `sync` seconds after the state (None: no new frame)."""
     return {
         "trace_id": trace_id,
         "episode_id": f"episode_{index}",
         "run_plan_id": "rp_1",
         "step": index,
         "t_state": 0.02 * index,
-        "t_image": 0.02 * index,
+        "t_image": None if sync is None else 0.02 * index + sync,
         "cmd_upper": [upper_error, *UPPER[1:]],
         "meas_upper": list(UPPER),
         "cmd_lower": [lower_error, *LOWER[1:]],
@@ -61,12 +64,17 @@ def write_trace(
     sim: bool | None = True,
     infra: str = "ok",
     result: bool = True,
+    sync: list[Any] | None = None,
 ) -> Path:
     """`<root>/<trace_id>/steps.jsonl`, and `rollout_result.json` unless `result` is False."""
     lower = lower if lower is not None else [0.0] * len(upper)
+    sync = sync if sync is not None else [0.0] * len(upper)
     folder = root / trace_id
     folder.mkdir(parents=True)
-    rows = [step(trace_id, i, u, lo) for i, (u, lo) in enumerate(zip(upper, lower, strict=True))]
+    rows = [
+        step(trace_id, i, u, lo, s)
+        for i, (u, lo, s) in enumerate(zip(upper, lower, sync, strict=True))
+    ]
     data = "".join(json.dumps(row) + "\n" for row in rows).encode("utf-8")
     (folder / "steps.jsonl").write_bytes(data)
     if result:
@@ -248,3 +256,113 @@ def test_the_command_exits_two_and_stores_nothing_without_a_success(tmp_path: Pa
     assert result.exit_code == 2
     assert "không hiệu chỉnh được" in result.output
     assert not (tmp_path / "store" / TAU_RECORDS).exists()
+
+
+# ---------------------------------------------------------------------------
+# task 4: tau_sync from the same episodes, tau_lat from the G0 baseline run
+# ---------------------------------------------------------------------------
+
+
+def write_rtc(folder: Path, latencies: dict[str, list[float]], job: str = "g0") -> Path:
+    """`<folder>/rtc.jsonl`: per trace, chunk i took `latencies[trace][i]` seconds."""
+    folder.mkdir(parents=True, exist_ok=True)
+    rows = []
+    for trace_id, values in latencies.items():
+        for index, latency in enumerate(values):
+            sent = 1.0 + 0.5 * index
+            rows.append(
+                {
+                    "job_id": job,
+                    "trace_id": trace_id,
+                    "chunk_index": index,
+                    "observation_sent_s": sent,
+                    "chunk_received_s": sent + latency,
+                    "delay_steps": 1,
+                    "buffer_level": 0,
+                    "boundary_jump": 0.0,
+                }
+            )
+    path = folder / "rtc.jsonl"
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+    return path
+
+
+def test_tau_sync_pools_the_offsets_of_cycles_with_a_frame(tmp_path: Path) -> None:
+    # A cycle with no new frame (`t_image: null`) has no offset to count.
+    sync: list[Any] = [0.004] * 10 + [None] * 5 + [0.001] * 5
+    write_trace(tmp_path, "j1-a", [0.01] * 20, sync=sync)
+
+    tau_sync = calibrate_tau([tmp_path]).value("tau_sync_s")
+
+    assert tau_sync.value == pytest.approx(0.004)
+    assert (tau_sync.samples, tau_sync.skipped_cycles, tau_sync.unit) == (15, 5, "s")
+
+
+def test_tau_lat_leaves_chunk_0_out_and_counts_the_traces(tmp_path: Path) -> None:
+    # Chunk 0 is the cold start; R1 leaves it out, so the threshold does too.
+    log = write_rtc(tmp_path / "g0", {"g0-t1": [2.0, 0.05, 0.06], "g0-t2": [2.0, 0.07]})
+
+    report = calibrate_tau([], [log])
+
+    (tau_lat,) = report.values
+    assert tau_lat.key == "tau_lat_s"
+    assert tau_lat.value == pytest.approx(float(np.percentile([0.05, 0.06, 0.07], 99.0)))
+    assert (tau_lat.samples, tau_lat.episodes, tau_lat.few_samples) == (3, 2, True)
+    assert report.episodes == []
+    (used,) = report.rtc_logs
+    assert (used.job_ids, used.chunks) == (["g0"], 5)
+    assert used.sha256 == hashlib.sha256(log.read_bytes()).hexdigest()
+
+
+def test_both_sources_give_all_four_values_apart(tmp_path: Path) -> None:
+    write_trace(tmp_path / "teleop", "j1-a", [0.01] * 20)
+    write_rtc(tmp_path / "g0", {"g0-t1": [1.0, 0.08]})
+
+    report = calibrate_tau([tmp_path / "teleop"], [tmp_path / "g0"])
+
+    assert [item.key for item in report.values] == [
+        "tau_track_upper",
+        "tau_track_lower",
+        "tau_sync_s",
+        "tau_lat_s",
+    ]
+    assert report.value("tau_lat_s").value == pytest.approx(0.08)
+
+
+def test_no_input_at_all_is_refused() -> None:
+    with pytest.raises(TauError, match="không có đầu vào"):
+        calibrate_tau([], [])
+
+
+def test_a_g0_directory_with_no_rtc_log_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(TauError, match="rtc.jsonl"):
+        calibrate_tau([], [tmp_path])
+
+
+def test_the_command_reads_g0_alone_and_warns_on_a_sim_sync_of_zero(tmp_path: Path) -> None:
+    write_trace(tmp_path / "eval", "j1-a", [0.01] * 20)
+    write_rtc(tmp_path / "g0", {"g0-t1": [1.0, 0.08]})
+
+    both = CliRunner().invoke(
+        app,
+        [
+            "tau",
+            "--teleop",
+            str(tmp_path / "eval"),
+            "--g0",
+            str(tmp_path / "g0"),
+            "--config",
+            str(SYSTEM_YAML),
+        ],
+    )
+    g0_only = CliRunner().invoke(
+        app, ["tau", "--g0", str(tmp_path / "g0"), "--config", str(SYSTEM_YAML)]
+    )
+
+    assert both.exit_code == 0, both.output
+    assert "tau_sync_s: 0 s" in both.output
+    assert "rollout SIMPLE đồng bộ theo cách dựng" in both.output
+    assert "tau_lat_s: 0.08 s; phân vị 99 trên 1 mẫu từ 1 episode" in both.output
+    assert "log RTC của G0: 1 file, 2 chunk" in both.output
+    assert g0_only.exit_code == 0, g0_only.output
+    assert "tau_track_upper" not in g0_only.output

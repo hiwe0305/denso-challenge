@@ -177,9 +177,15 @@ def diag_system(
 @app.command("tau")
 def tau(
     teleop: list[Path] = typer.Option(
-        ...,
+        [],
         "--teleop",
-        help="Thư mục trace `<trace_id>/` (dạng DA-38) hoặc thư mục cha của chúng; lặp được.",
+        help="Thư mục trace `<trace_id>/` (dạng DA-38) hoặc thư mục cha của chúng; lặp được. "
+        "Cho τ_track và τ_sync.",
+    ),
+    g0: list[Path] = typer.Option(
+        [],
+        "--g0",
+        help=f"`{RTC_NAME}` của lần chạy chuẩn G0 hoặc thư mục chứa nó; lặp được. Cho τ_lat.",
     ),
     demos: bool = typer.Option(
         False,
@@ -195,10 +201,10 @@ def tau(
         None, "--store", help="Thư mục store để lưu báo cáo. Không có thì không ghi gì."
     ),
 ) -> None:
-    """Hiệu chỉnh τ_track bằng phân vị 99 trên episode thành công (DA-37 AC 4)."""
+    """Hiệu chỉnh τ_track, τ_sync (episode thành công), τ_lat (chạy chuẩn G0), phân vị 99."""
     use_utf8()
     try:
-        report = calibrate_tau(teleop, demos)
+        report = calibrate_tau(teleop, g0, demos)
         current = _current_taus(config)
     except (SystemReaderError, TauError, ConfigError) as error:
         typer.echo(f"không hiệu chỉnh được: {error}", err=True)
@@ -220,12 +226,18 @@ def _current_taus(config: Path) -> dict[str, float]:
     return {
         "tau_track_upper": thresholds.r3.tau_track_upper,
         "tau_track_lower": thresholds.r3.tau_track_lower,
+        "tau_sync_s": thresholds.r4.tau_sync_s,
+        "tau_lat_s": thresholds.r1.tau_lat_s,
     }
 
 
 def _print_tau(report: TauReport, current: dict[str, float]) -> None:
-    sources = sorted({episode.success for episode in report.episodes})
-    typer.echo(f"episode dùng: {len(report.episodes)} ({', '.join(sources)})")
+    if report.episodes or report.left_out:
+        sources = sorted({episode.success for episode in report.episodes})
+        typer.echo(f"episode dùng: {len(report.episodes)} ({', '.join(sources)})")
+    if report.rtc_logs:
+        chunks = sum(log.chunks for log in report.rtc_logs)
+        typer.echo(f"log RTC của G0: {len(report.rtc_logs)} file, {chunks} chunk")
     for item in report.values:
         value = "chưa có (không có mẫu nào)" if item.value is None else f"{item.value:.6g}"
         typer.echo(
@@ -237,6 +249,11 @@ def _print_tau(report: TauReport, current: dict[str, float]) -> None:
             typer.echo(
                 f"  ít mẫu (dưới {FEW_SAMPLES}): phân vị {item.percentile:g} "
                 "gần bằng giá trị lớn nhất"
+            )
+        if item.key == "tau_sync_s" and item.value == 0.0:
+            typer.echo(
+                "  t_image = t_state ở mọi chu kỳ: rollout SIMPLE đồng bộ theo cách dựng, "
+                "không nói gì về đồng bộ cảm biến; τ_sync phải lấy từ teleop thật"
             )
     for left in report.left_out:
         typer.echo(f"không dùng {left.trace_id}: {left.reason}")

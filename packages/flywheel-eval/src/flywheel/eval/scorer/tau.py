@@ -7,6 +7,16 @@ AC 4 replaces them with the 99th percentile measured where nothing was wrong:
   (command sent - state measured) per control cycle, on **successful teleop
   episodes**. A controller that tracks no worse than it did while a person got
   the task done is a controller nobody has evidence against.
+* **τ_sync** (task 4): |t_image - t_state| per cycle that carries a new frame,
+  on the same successful episodes. R4 then compares the *largest* offset of an
+  episode with it (`system.yaml`, r4): the threshold comes from good data, the
+  check from the worst moment of the run. On a SIMPLE rollout every offset is 0
+  by construction (`runtime.py`, R4), so a τ_sync of 0 from sim says nothing
+  about sensor sync and the command says so.
+* **τ_lat** (task 4): chunk_received_s - observation_sent_s of every chunk but
+  chunk 0, from the RTC logs of the **G0 baseline run** (same machine, same
+  RTC config), the other source AC 2 of DA-13 keeps apart. Chunk 0 is left
+  out as R1 leaves it out: it is the cold start, not the running loop.
 
 The per-cycle measurement is DA-13's own (`TraceLog.tracking_error`), read
 through DA-13's own loader (`load_episode`), so the threshold and the check it
@@ -44,14 +54,17 @@ from pathlib import Path
 from typing import Literal
 
 import numpy as np
+from flywheel.contracts.artifacts import RTCInferenceRecord
 from flywheel.contracts.v0 import RolloutResult
 from flywheel.eval.diagnosis.system.reader import (
     ROLLOUT_NAME,
+    RTC_NAME,
     STEPS_NAME,
     SystemInputs,
     Values,
     load_episode,
     percentile,
+    read_rtc_log,
 )
 from flywheel.store.blobs import put_blob
 from flywheel.store.paths import StorePaths
@@ -104,6 +117,16 @@ class EpisodeLeftOut(BaseModel):
     reason: str
 
 
+class RtcLogUsed(BaseModel):
+    """One RTC log of the G0 baseline run that τ_lat was read from."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    sha256: str
+    job_ids: list[str]
+    chunks: int
+
+
 class TauReport(BaseModel):
     """The calibration of AC 4: each value, how it was computed, and what it read."""
 
@@ -112,6 +135,7 @@ class TauReport(BaseModel):
     values: list[TauValue]
     episodes: list[EpisodeUsed]
     left_out: list[EpisodeLeftOut]
+    rtc_logs: list[RtcLogUsed]
 
     def canonical(self) -> bytes:
         """The bytes the report is stored and hashed as."""
@@ -136,14 +160,55 @@ class Candidate:
     sim_success: bool | None = None
 
 
+@dataclass(frozen=True)
+class RtcLog:
+    """One `rtc.jsonl` as read: its records and the hash of its bytes."""
+
+    sha256: str
+    records: tuple[RTCInferenceRecord, ...]
+
+
 _TRACK = (
     ("upper", "tau_track_upper", "rad"),
     ("lower", "tau_track_lower", "chuẩn hỗn hợp: rad, m, m/s"),
 )
 
 
-def calibrate_teleop(candidates: Sequence[Candidate], declared_demos: bool = False) -> TauReport:
-    """τ_track of each half of the body from the successful episodes (AC 4)."""
+def calibrate(
+    candidates: Sequence[Candidate],
+    rtc_logs: Sequence[RtcLog] = (),
+    declared_demos: bool = False,
+) -> TauReport:
+    """Every τ the inputs allow: τ_track and τ_sync from traces, τ_lat from RTC logs (AC 4)."""
+    if not candidates and not rtc_logs:
+        raise TauError("không có đầu vào: cần trace teleop, log RTC của G0, hoặc cả hai")
+    values: list[TauValue] = []
+    episodes: list[EpisodeUsed] = []
+    left_out: list[EpisodeLeftOut] = []
+    if candidates:
+        values, episodes, left_out = _teleop(candidates, declared_demos)
+    logs = sorted(rtc_logs, key=lambda log: log.sha256)
+    if logs:
+        values.append(_latency(logs))
+    return TauReport(
+        values=values,
+        episodes=episodes,
+        left_out=left_out,
+        rtc_logs=[
+            RtcLogUsed(
+                sha256=log.sha256,
+                job_ids=sorted({record.job_id for record in log.records}),
+                chunks=len(log.records),
+            )
+            for log in logs
+        ],
+    )
+
+
+def _teleop(
+    candidates: Sequence[Candidate], declared_demos: bool
+) -> tuple[list[TauValue], list[EpisodeUsed], list[EpisodeLeftOut]]:
+    """τ_track of each half of the body and τ_sync, from the successful episodes."""
     _refuse_duplicates(candidates)
     used: list[tuple[Candidate, SuccessSource]] = []
     left_out: list[EpisodeLeftOut] = []
@@ -168,18 +233,49 @@ def calibrate_teleop(candidates: Sequence[Candidate], declared_demos: bool = Fal
         )
         for part, key, unit in _TRACK
     ]
-    return TauReport(
-        values=values,
-        episodes=[
-            EpisodeUsed(
-                trace_id=c.inputs.trace.trace_id,
-                trace_sha256=c.inputs.trace.trace_sha256,
-                success=source,
-            )
-            for c, source in used
-        ],
-        left_out=left_out,
+    values.append(
+        _pooled(
+            "tau_sync_s",
+            "s",
+            [c.inputs.trace.sync_offset() for c, _ in used],
+            "|t_image - t_state| mỗi chu kỳ có khung ảnh mới (`TraceLog.sync_offset` của "
+            "DA-13), gộp mọi chu kỳ rồi lấy phân vị; R4 so lệch lớn nhất của episode với nó",
+        )
     )
+    episodes = [
+        EpisodeUsed(
+            trace_id=c.inputs.trace.trace_id,
+            trace_sha256=c.inputs.trace.trace_sha256,
+            success=source,
+        )
+        for c, source in used
+    ]
+    return values, episodes, left_out
+
+
+def _latency(logs: Sequence[RtcLog]) -> TauValue:
+    """τ_lat from the G0 baseline run: every chunk but chunk 0 (R1 leaves it out too)."""
+    series = [
+        np.array(
+            [
+                record.chunk_received_s - record.observation_sent_s
+                for record in log.records
+                if record.chunk_index > 0
+            ],
+            dtype=np.float64,
+        )
+        for log in logs
+    ]
+    value = _pooled(
+        "tau_lat_s",
+        "s",
+        series,
+        "chunk_received_s - observation_sent_s của mọi chunk trừ chunk 0, trên log RTC "
+        "của lần chạy chuẩn G0, gộp rồi lấy phân vị; phải giữ ≤ d / hz (`system.yaml`, r1)",
+    )
+    # A log is not an episode: count the traces the chunks came from.
+    traces = {(r.job_id, r.trace_id) for log in logs for r in log.records if r.chunk_index > 0}
+    return value.model_copy(update={"episodes": len(traces)})
 
 
 _PART_NAMES = {"upper": "trên", "lower": "dưới"}
@@ -258,6 +354,21 @@ def read_candidates(paths: Sequence[Path]) -> list[Candidate]:
     return [_candidate(directory) for directory in sorted(directories)]
 
 
+def read_rtc_logs(paths: Sequence[Path]) -> list[RtcLog]:
+    """Every `rtc.jsonl` at or under the given paths, read through `RTCInferenceRecord`."""
+    files: set[Path] = set()
+    for path in paths:
+        found = {path.resolve()} if path.is_file() else {f.resolve() for f in path.rglob(RTC_NAME)}
+        if not found:
+            raise TauError(f"không có `{RTC_NAME}` nào dưới `{path}`")
+        files |= found
+    logs = []
+    for file in sorted(files):
+        records = read_rtc_log(file)
+        logs.append(RtcLog(hashlib.sha256(file.read_bytes()).hexdigest(), records))
+    return logs
+
+
 def _candidate(directory: Path) -> Candidate:
     inputs = load_episode(directory)
     result_path = directory / ROLLOUT_NAME
@@ -276,6 +387,7 @@ def store_tau_report(report: TauReport, store_path: Path) -> tuple[str, Path]:
     line = {
         "report_sha256": digest,
         "episodes": len(report.episodes),
+        "rtc_logs": len(report.rtc_logs),
         "values": {
             item.key: {"value": item.value, "samples": item.samples} for item in report.values
         },
