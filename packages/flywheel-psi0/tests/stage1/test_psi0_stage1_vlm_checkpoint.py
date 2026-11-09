@@ -6,6 +6,7 @@ then the bytes, as `safetensors.torch.save_file` writes them.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import struct
 from pathlib import Path
@@ -80,13 +81,18 @@ def test_package_takes_the_weights_and_the_parents_other_files(tmp_path: Path) -
         "model.safetensors",
         "preprocessor_config.json",
         "tokenizer.json",
-        "vlm.json",
-    ]
+    ]  # nothing but the parent's files: DA-34's B refuses any other
+
     assert (out / "model.safetensors").read_bytes()[-1] == 7  # trained, not the parent's
     assert manifest["weights_sha256"] == sha256(out / "model.safetensors")
     assert manifest["files"]["config.json"] == sha256(parent / "config.json")
     assert manifest["loadable_as_model_name_or_path"] and manifest["step"] == 300
-    assert json.loads((out / "vlm.json").read_text()) == manifest
+    assert json.loads((tmp_path / "drive" / "vlm.json").read_text()) == manifest
+    lines = "".join(
+        f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n"
+        for p in sorted(out.iterdir(), key=lambda p: p.name)
+    )  # DA-34's tray.colab_train.manifest_sha256, written out
+    assert manifest["manifest_sha256"] == hashlib.sha256(lines.encode()).hexdigest()
     again = package(tmp_path / "ckpt_300", parent, out, {"step": 300})  # a second persist
     assert again["weights_sha256"] == manifest["weights_sha256"]
 
@@ -97,6 +103,19 @@ def test_package_flags_weights_stage_3_would_not_load(tmp_path: Path) -> None:
     manifest = package(tmp_path / "ckpt", parent, tmp_path / "out", {})
     assert not manifest["loadable_as_model_name_or_path"]
     assert len(manifest["header_problems"]) == 2
+
+
+def test_a_stray_file_in_the_folder_is_a_problem(tmp_path: Path) -> None:
+    parent = parent_dir(tmp_path / "parent")
+    (parent / ".cache").mkdir()
+    (parent / ".cache" / "lock").write_text("")  # dot entries are not the VLM's
+    write_safetensors(tmp_path / "ckpt" / "model.safetensors", TENSORS, fill=7)
+    out = tmp_path / "vlm"
+    out.mkdir()
+    (out / "optimizer.pt").write_text("state")
+    manifest = package(tmp_path / "ckpt", parent, out, {})
+    assert manifest["header_problems"] == ["optimizer.pt: in the folder but not in the parent's"]
+    assert not (out / ".cache").exists()
 
 
 def test_package_needs_the_weights(tmp_path: Path) -> None:
@@ -128,13 +147,15 @@ def test_persist_keeps_the_vlm_when_the_plan_asks(work: Path, tmp_path: Path) ->
     drive = tmp_path / "drive"
     colab.persist(work, plan_path, drive)
     vlm = drive / plan.job.id / "vlm"
-    manifest = json.loads((vlm / "vlm.json").read_text())
+    manifest = json.loads((drive / plan.job.id / "vlm.json").read_text())
     assert manifest["run_plan_id"] == run_plan_id(plan) and manifest["step"] == 200
     assert manifest["final"] and manifest["loadable_as_model_name_or_path"]
     assert manifest["parent"]["sha256"] == plan.parent.vlm.sha256
     assert (vlm / "config.json").exists() and (drive / plan.job.id / "metrics.jsonl").exists()
     report = json.loads((work / "report.json").read_text())["phases"]["persist"]
     assert report["vlm"]["saved"] and report["vlm"]["header_problems"] == []
+    assert report["vlm"]["manifest_sha256"] == manifest["manifest_sha256"]
+    assert report["vlm"]["drive_dir"] == str(vlm)  # not under MyDrive in this test
 
 
 def test_persist_without_a_checkpoint_keeps_the_logs(work: Path, tmp_path: Path) -> None:
