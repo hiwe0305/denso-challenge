@@ -112,8 +112,9 @@ pose_ea:
                              # is not measured (translation is vo_step_m per moving frame)
     flip_deg: 30             # turn a wrist frame pi about an axis when that is > 30 deg
                              # closer to the previous seen frame; giả định (2.8)
-    jump_mad: 5.0            # interpolate frames whose wrist step is > median + 5 MAD
-                             # (MAD x 1.4826) of the clip; never drop; giả định (2.8)
+    jump_mad: 5.0            # steps > median + 5 MAD (x 1.4826) of the clip (wrist,
+    jump_burst: 4            # rotation, tips) cut runs; pieces of <= 4 frames that are not
+                             # the longest are interpolated, never dropped; giả định (2.8)
     savgol_window: 21        # Savitzky-Golay frames (0.7 s at 30 fps) on wrist position,
     savgol_order: 2          # tips and quaternion; window 9 gave 10.6 %, 15 gave 6.0 %,
                              # 21 gave 3.9 % clipped on the trial export; giả định (2.8)

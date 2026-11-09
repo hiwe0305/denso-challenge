@@ -23,12 +23,17 @@ only these steps together brought it under 5 % (2.8):
               off the palm plane). Reflecting those tips in depth about the wrist, along
               the camera ray, was tried and made the export worse (4.0 % of actions
               clipped instead of 3.5 % with the other steps then in place).
-    jumps     a frame whose wrist moved (translation or rotation) from the previous
-              frame by more than median + `jump_mad` x MAD of the clip's steps (MAD
-              scaled by 1.4826, a standard deviation for normal noise) is replaced:
+    jumps     steps between seen frames (wrist position, wrist rotation, mean tip
+              position) above median + `jump_mad` x MAD of the clip's steps (MAD x
+              1.4826) cut each run of seen frames into pieces; a piece of at most
+              `jump_burst` frames that is not the run's longest is bad and is replaced:
               position and tips linearly, rotation by slerp, between the nearest good
-              frames of the same run of seen frames. A run edge holds the nearest good
-              frame. Never dropped.
+              frames of its run; a run edge holds the nearest good frame. A spike, a
+              burst and an outlier first or last frame are caught; one real fast step
+              splits a run into two long pieces and marks nothing. Review of PR 174: the
+              first version marked the frame after each big step, which widened bursts
+              and never judged a run's first frame. A centred-median (Hampel) test was
+              tried and marked the ends of every moving run. Never dropped.
     smooth    Savitzky-Golay of order `savgol_order` over `savgol_window` frames on each
               run of seen frames: wrist position, tips, and wrist quaternion (signs made
               continuous, renormalized after). A run shorter than the window uses the
@@ -63,6 +68,7 @@ class CleanParams:
     frame: str = "world"
     flip_deg: float | None = None  # None: no continuity guard, no track sign
     jump_mad: float | None = None  # None: no jump interpolation
+    jump_burst: int = 4  # longest piece of frames the jump test may mark as bad
     savgol_window: int | None = None  # frames, odd; None: no smoothing
     savgol_order: int = 2
 
@@ -205,20 +211,42 @@ def slerp(a: F64, b: F64, u: float) -> F64:
     return out / np.linalg.norm(out)
 
 
-def jump_frames(wrist: F64, k: float) -> NDArray[np.bool_]:
-    """(T,) True where the step from the previous frame, both seen, is above median +
-    k x 1.4826 x MAD of the clip's steps, in translation or in rotation."""
-    seen = finite_frames(wrist)
-    steps = np.flatnonzero(seen[1:] & seen[:-1]) + 1  # frame t with t - 1 seen
-    bad = np.zeros(len(wrist), dtype=bool)
+def big_steps(wrist: F64, tips: F64, k: float) -> NDArray[np.bool_]:
+    """(T,) True at frame t when the step from t - 1 (both seen) is above median + k x
+    1.4826 x MAD of the clip's steps, in wrist position, wrist rotation or mean tip
+    position."""
+    seen = finite_frames(wrist) & finite_frames(tips)
+    steps = np.flatnonzero(seen[1:] & seen[:-1]) + 1
+    big = np.zeros(len(wrist), dtype=bool)
     if len(steps) < 3:
-        return bad
-    moved = np.linalg.norm(wrist[steps, :3, 3] - wrist[steps - 1, :3, 3], axis=1)
-    turned = angle(wrist[steps, :3, :3], wrist[steps - 1, :3, :3])
-    for size in (moved, turned):
+        return big
+    sizes = (
+        np.linalg.norm(wrist[steps, :3, 3] - wrist[steps - 1, :3, 3], axis=1),
+        angle(wrist[steps, :3, :3], wrist[steps - 1, :3, :3]),
+        np.linalg.norm(tips[steps] - tips[steps - 1], axis=2).mean(axis=1),
+    )
+    for size in sizes:
         median = np.median(size)
         mad = 1.4826 * np.median(np.abs(size - median)) + 1e-9
-        bad[steps[size > median + k * mad]] = True
+        big[steps[size > median + k * mad]] = True
+    return big
+
+
+def jump_frames(wrist: F64, tips: F64, k: float, burst: int) -> NDArray[np.bool_]:
+    """(T,) True for the frames of a piece of at most `burst` frames that big steps
+    (`big_steps`) cut off from the rest of its run of seen frames, unless the piece is
+    the run's longest. A spike, a burst of up to `burst` frames and an outlier at either
+    end of a run are caught; one real fast step only splits a run into two long pieces
+    and marks nothing."""
+    big = big_steps(wrist, tips, k)
+    bad = np.zeros(len(wrist), dtype=bool)
+    for start, stop in seen_runs(finite_frames(wrist) & finite_frames(tips)):
+        edges = [start, *(t for t in range(start + 1, stop) if big[t]), stop]
+        pieces = list(zip(edges, edges[1:]))
+        longest = max(pieces, key=lambda piece: piece[1] - piece[0])
+        for a, b in pieces:
+            if (a, b) != longest and b - a <= burst:
+                bad[a:b] = True
     return bad
 
 
@@ -319,7 +347,7 @@ def clean_pose(pose: EgoPose, params: CleanParams) -> tuple[EgoPose, dict[str, A
             wrist, done["track_turn"] = one_sign(wrist, tips, side)
         if params.jump_mad is not None:
             wrist, tips, done["interpolated_frames"] = interpolate(
-                wrist, tips, jump_frames(wrist, params.jump_mad))
+                wrist, tips, jump_frames(wrist, tips, params.jump_mad, params.jump_burst))
         if params.savgol_window is not None:
             wrist, tips, done["smoothed_runs"] = smooth(wrist, tips, params.savgol_window,
                                                         params.savgol_order)
