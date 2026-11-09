@@ -258,6 +258,32 @@ Một episode có thể có nhiều lý do. Hai phép kiểm mới:
 
 `fw egocentric report` ghi `DatasetReport` của hợp đồng (qua `dataset_report`, `render_html` của API làn) và thêm phần egocentric vào trang `report/index.html` và `report/egocentric.json`: số đoạn theo bước và theo nguồn nhãn, pass, flag, reject theo phép kiểm, giờ video, giấy phép và lý do miễn, độ lệch E-A so với E-B. Hợp đồng không thêm trường nào. `qa` chạy 1,15 s (ước tính 4,14 s), `report` 0,85 s (ước tính 0,2 s).
 
+### 6.1 Phiếu duyệt của người trong QA (nhiệm vụ 9, 9/11/2026)
+
+153 clip khay của đội (`src_805804635f9af7f7`, mỗi clip 2–3 giây, trung vị 77 khung ở 30 Hz) chứa cả task hai bàn, hai bàn đặt sát nhau. Luật 6 bước chỉ tìm được một lần gắp. **[Đã chốt]** Hiếu (9/11/2026): mỗi clip là một mẫu, mang câu của cả task. Phiếu `fwdata/egocentric-raw/review-whole-clip-480p.jsonl` ghi quyết định đó qua `fw egocentric review --apply`: 132 `fix` (đoạn đầu thành đoạn dài nhất mà pose hữu hạn liên tục, tối thiểu 30 khung, câu là câu lệnh của episode), 174 `reject`.
+
+Trước nhiệm vụ 9, QA từ chối cả 153 episode: `segment_count` đòi ít nhất 2 đoạn, và `segment_ambiguous` vẫn đọc `unresolved_share` của `labels.json` dù mọi đoạn đã do người duyệt. Từ nhiệm vụ 9 (`qa/egocentric.py`):
+
+| Trường hợp | `segment_ambiguous` | `segment_count` |
+|---|---|---|
+| Mọi đoạn có `label_source = human` | 0: người đã chốt | như cũ, ngưỡng 2 |
+| Một đoạn duy nhất, `human`, câu trùng câu lệnh của episode (so sau khi gộp khoảng trắng, không phân biệt hoa thường) | 0 | ngưỡng 1; `QACheck.threshold` ghi 1 |
+| Một đoạn `human` mang câu của một bước (EgoDex: giữ `pick`, bỏ `place`) | 0 | ngưỡng 2: vẫn `reject`, vì mất lần đặt |
+| Một đoạn `rule` hoặc `model`, dù câu trùng câu lệnh | `unresolved_share` | ngưỡng 2: vẫn `reject` |
+
+Chọn cách này thay vì thêm bố cục `whole_clip` vào cấu hình: dấu hiệu "cả clip là một mẫu" là quyết định của người, đã nằm trong `segments.parquet` (nguồn nhãn và câu), nên không cần đổi bộ cắt đoạn hay `sources`. Câu của EgoDex là mẫu câu từng bước (`pick up the {object}`), không bao giờ trùng câu lệnh, nên EgoDex không đổi; test cũ giữ nguyên. Cấu hình chỉ thêm một dòng chú thích, nên `threshold_version` thành `ego-1@4439a2eb166e`.
+
+Chạy lại `fw egocentric qa` trên thư mục đó với cấu hình của repo (9/11/2026): **0 `pass`, 132 `flag`, 21 `reject`**, trùng từng episode với lần thử bằng bản sao cấu hình có `segment_count` ngưỡng 1.
+
+| Phép kiểm hỏng | Episode | Ghi chú |
+|---|---|---|
+| `camera_jitter_deg_s` | 153 | trung vị 572°/s so với ngưỡng 60°/s (giả định đọc từ EgoDex ngồi yên); VO một camera trên clip cầm tay ngắn. Chỉ `flag` |
+| `hand_pose_nan` | 143 | E-A mất tay ở một số khung; chỉ `flag`. DA-18 bỏ khung NaN |
+| `hand_out_of_frame` | 1 | |
+| `segments`, `segment_count`, `segment_ambiguous` | 21 | 21 clip không còn đoạn nào: `reject` |
+
+21 clip bị bỏ vì đoạn pose hữu hạn liên tục dài nhất của chúng dưới 30 khung (từ 6 tới 29 khung). Trên 132 clip giữ lại, đoạn giữ chiếm trung vị 83 % clip (trung bình 77 %); tính cả 21 clip bỏ là 0 thì trung vị 78 %. Tổng 7 804 trên 11 847 khung (66 %) đi tiếp sang xuất stage 1, khớp bản xuất `egx_fb3d1401dac0bd4c` (132 mẫu, 7 804 khung). Lấp khoảng trống pose (nội suy qua khung NaN) để giữ thêm clip nằm ngoài nhiệm vụ này (mục 9, dòng 18).
+
 ## 7. Vòng thử model gán nhãn (design mục 6.7.4)
 
 Mục tiêu: chọn model cho hai việc trước khi dựa vào nó (D3, D6): gợi ý ranh giới khi luật mơ hồ, và chỉ điểm gắp. Code ở `ingest/egocentric/trial.py`, lệnh `fw egocentric trial`. Test chạy với model giả; trên dữ liệu thật thì vòng thử **chưa xong**.
@@ -322,7 +348,7 @@ Tới 7/11/2026 đội chưa quay video nào. Phép thử trên file thật: m�
 | 2 | Hợp đồng: `read_segments` từ chối hai cột `frame_start`, `frame_end` mà kế hoạch 4.2a thêm vào `segments.parquet` | DA-18 phải đọc bằng pyarrow, không qua `read_segments` | **[Đề xuất]** PR hợp đồng: cho phép cột khung, hoặc thêm hai trường vào `Segment` |
 | 3 | Model và revision nằm trong `configs/data/egocentric.yaml`, story ghi `configs/models/` | Ngoài phạm vi file của story | PR riêng của chủ `configs/models/` |
 | 4 | ~~Chưa có bước làm mờ (D2)~~ Đã có từ 8/11/2026: `fw egocentric deid`, YuNet (mục 3.1) | Video đội tự quay qua cổng sau khi chạy `deid` | Xong (nhiệm vụ 8); chờ Hiếu duyệt PR |
-| 5 | Mẫu duyệt của người (`fw egocentric review`) chưa có ai điền; `label_source = human` mới chạy trong test | Chưa có số đo độ đúng của nhãn luật và nhãn model | Hiếu hoặc người được giao điền `review/sheet.jsonl` |
+| 5 | Mẫu duyệt của người (`fw egocentric review`) chưa có ai điền trên EgoDex. Trên clip khay (9/11/2026) phiếu là một quy tắc Hiếu chốt cho cả 153 clip, không phải mẫu duyệt từng đoạn (mục 6.1) | Chưa có số đo độ đúng của nhãn luật và nhãn model | Hiếu hoặc người được giao điền `review/sheet.jsonl` |
 | 6 | Ngưỡng luật cắt đoạn và QA là giả định đọc từ 20 episode | Đổi ngưỡng là đổi `threshold_version` | Hiệu chỉnh khi có mẫu duyệt |
 | 7 | Cổ tay E-A lệch nhiều hơn đầu ngón (63 và 115 px so với 43 và 51 px); chưa kiểm hai điểm cổ tay có cùng định nghĩa không | Action 48 chiều của DA-18 dùng cổ tay | Kiểm khi DA-18 xuất E-A |
 | 8 | Phần tịnh tiến của VO chưa đo được trên EgoDex (người ngồi) | Chưa biết E-A dùng được cho bước đi của task hai bàn | Đo trên video hai bàn đầu tiên |
@@ -335,6 +361,7 @@ Tới 7/11/2026 đội chưa quay video nào. Phép thử trên file thật: m�
 | 15 | Bước làm mờ chỉ che mặt; thẻ tên, màn hình, giấy tờ (AC 2) chưa che | Video quay trong nhà máy hay văn phòng có thể lộ chữ trên thẻ hoặc màn hình | **[Đề xuất]** quay sao cho không có màn hình, thẻ trong khung; thêm detector chữ (ví dụ EAST của OpenCV) sau demo |
 | 16 | Ngưỡng `deid` (0,6, nới 25 %, giữ 5 khung) là giả định; mới đo trên một mặt dán vào video, chưa đo trên người thật đứng xa, nghiêng, đeo khẩu trang | Có thể sót mặt nhỏ hoặc nghiêng | Hiếu xem nhanh `frames_with_faces` trong `source.json` và vài khung của bản sao trước khi dùng; người duyệt mẫu thì đặt `verified` |
 | 17 | Xuất stage 1 của DA-18 (`export/egodex.py`) đọc `bundle.mp4`, nên dùng bản sao, nhưng chưa tự kiểm sha256 của bản sao như cổng | Bản sao bị thay sau `deid` mà không chạy lại bước nào của DA-04 thì DA-18 không biết | **[Đề xuất]** DA-18 gọi `annotate_allowed` với `deid_copies`; PR riêng của DA-18 |
+| 18 | 21 trên 153 clip khay bị bỏ vì đoạn pose hữu hạn liên tục dài nhất dưới 30 khung (mục 6.1) | Mất 14 % số clip; tính cả phần cắt bớt ở clip giữ lại thì mất 34 % số khung của nhánh B | Lấp khoảng trống pose nằm ngoài nhiệm vụ 9; **[Đề xuất]** quyết định sau khi có kết quả nhánh B |
 
 ## 10. Việc để chạy sau
 
@@ -414,6 +441,7 @@ Chưa thử cài MediaPipe trên laptop. Gói có wheel sẵn nên không cần 
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 9/11/2026 | Thêm mục 6.1: QA tôn trọng phiếu duyệt của người (nhiệm vụ 9), số QA trên 153 clip khay; sửa dòng 5, thêm dòng 18 mục 9 | Claude (phiên DA-04 QA), theo yêu cầu của phiên điều phối DA-34 nhánh B |
 | 9/11/2026 | Video tự quay đổi sang `public` theo quyết định của Hiếu (mục 8.1); bước làm mờ không đổi | Claude, theo quyết định của Hiếu |
 | 8/11/2026 | Thêm bước làm mờ `fw egocentric deid` (nhiệm vụ 8, mục 3.1); cổng chỉ cho episode `blurred` qua khi mọi video có bản sao đúng sha256; dòng 4 mục 9 xong, thêm dòng 15–17 | Claude (phiên DA-04 deid), theo yêu cầu của Hiếu |
 | 7/11/2026 | Sửa theo review PR 152 (mục 3, 5, 6, 1.2, 10.5) | Claude (phiên DA-04), theo review của Hiếu |
