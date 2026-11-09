@@ -8,6 +8,7 @@ docs/g0/ledger/DA-30.csv:
     .venv-psi/bin/python -m flywheel_psi0.stage1.colab run    --work /content/da30 --plan <plan>
     .venv-psi/bin/python -m flywheel_psi0.stage1.colab repeat --work /content/da30 --plan <plan>
     python3 -m flywheel_psi0.stage1.colab persist --work /content/da30 --plan <plan>
+    .venv-psi/bin/python -m flywheel_psi0.stage1.colab check-vlm --work /content/da30 --plan <plan>
 
 `setup` builds Psi0's environment with DA-19's `setup` (which also fetches the stage 3
 parents and the two-table data: a few minutes not needed here, kept to reuse it as
@@ -17,7 +18,8 @@ refuses fails in a minute instead of after the model load, downloads the plan's
 `pre.*` parent at the pinned revision, fetches the EgoDex stand-in and runs the
 authors' `actions_48d` script on it. `run` trains the plan's
 job; `repeat` reruns its first steps under another job id and checks the first loss;
-`persist` copies logs and metrics (not the weights) to Google Drive.
+`persist` copies logs and metrics to Google Drive, and the trained VLM when the plan
+sets `persist_vlm`; `check-vlm` then loads that Drive copy as stage 3 does.
 """
 
 from __future__ import annotations
@@ -34,6 +36,8 @@ from typing import Any
 from flywheel_psi0.stage1.egodex_sample import fetch, layout_problems
 from flywheel_psi0.stage1.export_source import fetch as fetch_export
 from flywheel_psi0.stage1.export_source import sha256
+from flywheel_psi0.stage1.vlm_checkpoint import load_check
+from flywheel_psi0.stage1.vlm_checkpoint import package as package_vlm
 from flywheel_psi0.trainer.colab import Report, sh
 from flywheel_psi0.trainer.colab import setup as setup_psi0_env
 from flywheel_psi0.trainer.psi0_trainer import _src_dir
@@ -270,7 +274,12 @@ def train(work: Path, plan_path: Path, repeat: bool) -> None:
 
 
 def persist(work: Path, plan_path: Path, durable: Path) -> None:
-    """Copy each job's logs and metrics, without Psi0's run folder, to `durable`."""
+    """Copy each job's logs and metrics, without Psi0's run folder, to `durable`.
+
+    Logs go first, so they are kept even if the session stops while the weights copy.
+    With the plan's `persist_vlm`, the run's last checkpoint then goes to
+    `durable/<job_id>/vlm` in the layout stage 3 loads (`vlm_checkpoint.package`).
+    """
     plan = _plan(plan_path)
     start = time.monotonic()
     for job_id in (plan.job.id, plan.repeat_job_id):
@@ -278,15 +287,62 @@ def persist(work: Path, plan_path: Path, durable: Path) -> None:
         if job_dir.exists():
             (durable / job_id).mkdir(parents=True, exist_ok=True)
             sh(f"rsync -a --exclude 'psi0/' {job_dir}/ {durable / job_id}/")
-    for name in ("report.json", "data/egodex/manifest.json"):
+    for name in ("report.json", "data/egodex/manifest.json", "data/egodex/meta.json"):
         if (work / name).exists():
             sh(f"cp {work / name} {durable}/")
-    Report(work).phase("persist", time.monotonic() - start, target=str(durable))
+    details: dict[str, Any] = {"target": str(durable)}
+    if plan.persist_vlm:
+        details["vlm"] = persist_vlm(work, plan, durable / plan.job.id / "vlm")
+    Report(work).phase("persist", time.monotonic() - start, **details)
+
+
+def persist_vlm(work: Path, plan: Any, out: Path) -> dict[str, Any]:
+    """Package the main job's last checkpoint at `out`; what was done, for the report."""
+    from flywheel_psi0.tray.runplan import run_plan_id
+
+    result_path = work / "runs" / plan.job.id / "result.json"
+    launched = json.loads(result_path.read_text(encoding="utf-8")) if result_path.exists() else {}
+    if not launched.get("checkpoint_dir"):
+        return {"saved": False, "reason": "no checkpoint in result.json"}
+    steps = plan.load_recipe(work / "fw").int_arg("train.max_training_steps", 0)
+    parent_dir = work / "Psi0" / "cache" / "checkpoints" / plan.parent.vlm.path.rsplit("/", 1)[0]
+    manifest = package_vlm(
+        Path(launched["checkpoint_dir"]),
+        parent_dir,
+        out,
+        {
+            "run_plan_id": run_plan_id(plan),
+            "job_id": plan.job.id,
+            "step": launched.get("checkpoint_step"),
+            "final": launched.get("checkpoint_step") == steps,
+            "dataset_id": plan.dataset.id,
+            "psi0_commit": plan.code.psi0.commit,
+            "parent": {"id": plan.parent.id, **plan.parent.vlm.model_dump()},
+        },
+    )
+    return {
+        "saved": True,
+        "path": str(out),
+        "step": manifest["step"],
+        "final": manifest["final"],
+        "weights_sha256": manifest["weights_sha256"],
+        "header_problems": manifest["header_problems"],
+    }
+
+
+def check_vlm(work: Path, plan_path: Path, durable: Path) -> None:
+    """Load the persisted VLM from Drive as stage 3 would; run in Psi0's environment."""
+    plan = _plan(plan_path)
+    start = time.monotonic()
+    result = load_check(durable / plan.job.id / "vlm")
+    Report(work).phase("check_vlm", time.monotonic() - start, **result)
+    if result["problems"]:
+        raise SystemExit("\n".join(result["problems"]))
 
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
-    parser.add_argument("phase", choices=["setup", "run", "repeat", "persist"])
+    parser.add_argument("phase", choices=["setup", "run", "repeat", "persist", "check-vlm"])
     parser.add_argument("--work", type=Path, default=Path("/content/da30"))
     parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--to", type=Path, default=DRIVE, help="durable directory")
@@ -297,6 +353,8 @@ def main(argv: list[str] | None = None) -> None:
         setup(args.work, args.plan, args.drive_root)
     elif args.phase in ("run", "repeat"):
         train(args.work, args.plan, repeat=args.phase == "repeat")
+    elif args.phase == "check-vlm":
+        check_vlm(args.work, args.plan, args.to)
     else:
         persist(args.work, args.plan, args.to)
 
