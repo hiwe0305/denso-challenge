@@ -178,12 +178,14 @@ def fetch(
     export_id: str,
     split_dir: str,
     data_class: str | None = None,
+    samples: int | None = None,
 ) -> dict[str, Any]:
     """Copy `tarball` beside `root`, check it, unpack it and verify the export.
 
     `root` must be missing or empty: an export is never unpacked over another one. The
     tarball is unpacked into `<root>.unverified` and renamed to `root` only once
-    `verify_export` passes, so a refused export never sits where the loader reads.
+    `verify_export` passes and `meta.json` counts the plan's `samples` (when given), so a
+    refused export never sits where the loader reads.
     """
     if root.exists() and any(root.iterdir()):
         raise ExportRefused([f"{root} is not empty"])
@@ -204,6 +206,13 @@ def fetch(
             for member in _safe_members(tar):
                 tar.extract(member, staging, set_attrs=False, filter="data")
         problems = verify_export(staging, export_id, split_dir, data_class)
+        meta_path = staging / META_FILE
+        if samples is not None and meta_path.is_file():
+            counts = json.loads(meta_path.read_text(encoding="utf-8")).get("counts") or {}
+            if counts.get("samples") != samples:
+                problems.append(
+                    f"meta.json counts {counts.get('samples')} samples, the plan pins {samples}"
+                )
         if problems:
             raise ExportRefused(problems)
     except BaseException:

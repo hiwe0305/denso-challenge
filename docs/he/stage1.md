@@ -215,13 +215,13 @@ RunPlan của B không tải mẫu EgoDex mà nhận bản export của DA-18 (`
 - Ghim bằng `export_id` (định danh theo nội dung, do export tính từ sha256 các file) và sha256 của **một tarball** do `python -m flywheel_psi0.stage1.export_source pack` ghi. Tarball chỉ phụ thuộc nội dung file (thứ tự cố định, mtime 0, không chủ sở hữu), nên cùng một export luôn cho cùng sha256.
 - Tarball nằm trên Google Drive, dưới `/content/drive/MyDrive/<source.tarball>`. Vì vậy với B, **Drive phải mount trước `setup`**, không phải sau như mục 1.6.
 - `setup` chép tarball sang đĩa VM, từ chối nếu sha256 khác plan, giải nén chỉ file thường và thư mục (bộ lọc `data` của `tarfile`), rồi từ chối bản export nếu một trong các điều sau sai ([`export_source.py`](../../packages/flywheel-psi0/src/flywheel_psi0/stage1/export_source.py)): `export_id` trong `meta.json` đúng plan và đúng giá trị mà danh sách file băm ra; mỗi file khớp sha256 trong `meta.json`; không có file nào ngoài danh sách (loader của Ψ₀ sẽ train cả file thừa); `data_class` khớp plan; nguồn không có miễn trừ che danh tính; số mẫu khớp plan; `layout_problems` rỗng.
-- Giải nén vào `data/egodex.unverified` và chỉ đổi tên thành `data/egodex` khi mọi kiểm tra trên đều đạt; bản bị từ chối bị xóa, nên không bao giờ nằm ở chỗ loader đọc (review PR #171).
+- Giải nén vào `data/egodex.unverified` và chỉ đổi tên thành `data/egodex` khi mọi kiểm tra trên đều đạt, kể cả số mẫu (kiểm trên thư mục chưa đổi tên từ review PR #171 lần hai; trước đó số mẫu được so sau khi đổi tên). Bản bị từ chối bị xóa, nên không bao giờ nằm ở chỗ loader đọc, và lần `setup` sau không bị từ chối vì thư mục "not empty".
 - Trước khi cài hay tải bất cứ gì (chưa tốn thời gian GPU), `setup` dừng nếu: plan là bản nháp hoặc còn giá trị giữ chỗ; `data_class` không phải `public` (CLAUDE.md: dữ liệu `internal` và `restricted` không bao giờ lên dịch vụ hosted, kể cả Colab), áp cho cả hai loại dataset; tarball không có trên Drive ở đường dẫn của plan, hoặc khác cỡ `bytes` đã ghim. sha256 kiểm trên bản chép sang VM.
 - Bản export đã có `actions_48d` (DA-18 ghi), nên không chạy script `precompute` của tác giả.
 - Che danh tính: nguồn `export` chỉ nạp được khi `identity_masked: true`. Miễn trừ ngày 4/11/2026 chỉ áp cho zip EgoDex của Apple (mục 1.4), không áp cho bản export, kể cả export của EgoDex. Test: `test_an_export_must_be_identity_masked`.
 - `setup` giờ cũng kiểm sha256 của trọng số cha sau khi tải, cho mọi plan.
 
-Bản export thật chưa có: phiên điều phối dữ liệu sẽ đưa đường dẫn và sha256. Đến lúc đó RunPlan [`tray-ego-b.yaml`](../../configs/runplans/stage1/tray-ego-b.yaml) chưa đóng băng được (mục 2.4).
+Bản export đã làm sạch của DA-04 đã được ghim vào RunPlan [`tray-ego-b.yaml`](../../configs/runplans/stage1/tray-ego-b.yaml) ngày 9/11/2026 (mục 2.9). Plan vẫn là bản nháp tới khi PR #173 và #174 merge (mục 2.4).
 
 ### 2.3 Checkpoint stage 1 có nạp được vào stage 3 không (Q-28C)
 
@@ -256,7 +256,7 @@ Một điều cần ghi cạnh kết quả của B: action header `postpre.*` đ
 
 [`tray-ego-b.yaml`](../../configs/runplans/stage1/tray-ego-b.yaml), `run_plan_id` `rp_ecd2bb11c415` từ khi ghim bản export đã làm sạch ngày 9/11/2026 (mục 2.9); trước đó, với giá trị giữ chỗ, là `rp_6a66a6ff082c`. `runplan check` qua và in "draft" kèm lý do.
 
-**Bản nháp cho tới khi có bản export.** Khối `dataset.source` giữ giá trị giữ chỗ (`egx_0000000000000000`, sha256 toàn số 0) và plan có `status: draft`. `colab setup` từ chối plan nháp trước khi làm bất cứ gì (không tốn CU). `runplan check` báo lỗi nếu giá trị giữ chỗ còn mà plan không ghi `draft`. Từ 9/11/2026, plan đã ghim đủ vẫn được giữ `draft` (mã tạo ra dữ liệu chưa merge, mục 2.9); `check` và `setup` in lý do "marked `status: draft` with every pin set". `status` nằm ngoài `run_plan_id` (như plan của DA-34), nên bỏ nó đi không đổi id. Để đóng băng: chạy `pack` trên bản export, chép `export_id`, `sha256`, `bytes` và đường dẫn tarball trên Drive vào plan, bỏ `status: draft`, chạy lại `runplan check`.
+**Bản nháp.** Khối `dataset.source` đã ghim bản export thật (`egx_b6e974e46e8222e8`, mục 2.9); plan vẫn có `status: draft` vì bản export do mã của PR #173 và #174 tạo ra, chưa merge. `colab setup` từ chối plan nháp trước khi làm bất cứ gì (không tốn CU); `check` và `setup` in lý do "marked `status: draft` with every pin set". Quy tắc chung: plan có giá trị giữ chỗ (`egx_0000000000000000`, sha256 toàn số 0) bắt buộc ghi `draft`, nếu không `runplan check` báo lỗi; plan đã ghim đủ được phép giữ `draft`. `status` nằm ngoài `run_plan_id` (như plan của DA-34), nên bỏ nó đi không đổi id. Để chạy: làm theo mục 2.6 bước 3.
 
 | Khối | Giá trị | Lý do |
 |---|---|---|
@@ -308,6 +308,7 @@ Chưa chạy. Điều kiện trước:
 2. PR #170 (`data_class` `public` cho video của đội) đã merge.
 3. Bản export đã ghim (mục 2.9). Sau khi PR #173 và #174 merge: đưa `fwdata/egocentric-export/tarballs/egx_b6e974e46e8222e8.tar` (sha256 `61c3497a…afc8`, 48 701 440 byte) lên `MyDrive/denso/da30/exports/`; một PR nhỏ bỏ `status: draft` khỏi `tray-ego-b.yaml`; `runplan check` in `OK rp_ecd2bb11c415` không còn chữ "draft".
 4. Đọc `stats_coverage` của bản export trên CPU trước khi tốn GPU (mục 2.4).
+   - Che danh tính: `identity_masked: true` là lời khẳng định của plan, không phải điều `setup` kiểm được. `verify_export` chỉ kiểm `source.deid_waiver` là null và `data_class` khớp plan; việc làm mờ mặt trước mọi bước khác là mã của DA-04 (`fw egocentric deid`), cần đúng trước khi bỏ `draft`.
 5. `colab sessions` trống: một đợt một lúc trên tài khoản (mục 1.6).
 
 Bộ canh CU như mục 1.6, đổi tên phiên và trần:

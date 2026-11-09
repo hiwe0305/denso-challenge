@@ -211,9 +211,8 @@ def _setup_export(plan: Any, root: Path, drive_root: Path) -> dict[str, Any]:
         source.export_id,
         plan.dataset.split_dir,
         plan.dataset.data_class,
+        source.samples,
     )
-    if got["samples"] != source.samples:
-        raise SystemExit(f"export has {got['samples']} samples, the plan pins {source.samples}")
     seconds = time.monotonic() - start
     return {
         "seconds": seconds,
