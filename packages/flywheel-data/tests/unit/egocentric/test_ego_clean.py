@@ -7,6 +7,7 @@ then flipped, jumped or shaken on purpose.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -14,7 +15,15 @@ import pytest
 from ego_data import FRAMES, make_videos
 from flywheel.data.annotate.deid.blur import BlurParams, Box, Frame
 from flywheel.data.ingest.egocentric import api
-from flywheel.data.ingest.egocentric.clean import CleanParams
+from flywheel.data.ingest.egocentric.clean import (
+    FLIPS,
+    CleanParams,
+    angle,
+    chirality,
+    clean_pose,
+    keep_continuous,
+    one_sign,
+)
 from flywheel.data.ingest.egocentric.config import EgoConfig, load_config
 from flywheel.data.ingest.egocentric.episodes import (
     POSE,
@@ -38,15 +47,16 @@ def axis_angle(axis: np.ndarray, radians: float) -> np.ndarray:
     return np.eye(3) + np.sin(radians) * k + (1 - np.cos(radians)) * k @ k
 
 
-def hand_points() -> np.ndarray:
-    """21 landmarks of a right hand, palm towards -z, fingers curled to +z (wrist frame)."""
+def hand_points(side: str = "right") -> np.ndarray:
+    """21 landmarks of a hand in its wrist frame, fingers curled to +z for a right hand;
+    a left hand is its mirror image (x negated)."""
     rng = np.random.default_rng(3)
     points = rng.normal(0, 0.01, (21, 3))
     points[0], points[5], points[17], points[9] = (0, 0, 0), (0.04, 0.08, 0), (-0.03, 0.07, 0), (
         0.005, 0.09, 0)
     for tip in TIPS[1:]:
         points[tip] = points[tip] * [1, 0, 0] + [0, 0.1, 0.03]  # curled: palm side, +z
-    return points
+    return points if side == "right" else points * [-1, 1, 1]
 
 
 def estimate(frames: int = FRAMES, seed: int = 0) -> Estimate:
@@ -61,7 +71,7 @@ def estimate(frames: int = FRAMES, seed: int = 0) -> Estimate:
         track = np.empty((frames, 21, 3))
         for t in range(frames):
             turn = axis_angle([0, 0, 1], 0.01 * t)
-            track[t] = hand_points() @ turn.T + [x + 0.001 * t, 0.05, 0.5]
+            track[t] = hand_points(side) @ turn.T + [x + 0.001 * t, 0.05, 0.5]
         points[side] = track + rng.normal(0, 1e-4, track.shape)
     return Estimate(camera=camera, pixels={s: np.zeros((frames, 21, 2)) for s in points},
                     points=points, score={s: np.full(frames, 0.9) for s in points},
@@ -142,3 +152,58 @@ def test_eb_is_never_cleaned(tmp_path: Path, store: Path, cfg: EgoConfig) -> Non
     api.import_estimates(work, estimates, CleanParams(frame="camera"))
     assert ((folder / POSE).read_bytes(), (folder / "bundle.json").read_bytes()) == before
     assert (folder / POSE_EA).is_file()
+
+
+def test_the_test_hands_have_their_sides_chirality() -> None:
+    pose = to_pose(estimate(), "camera")
+    for side, sign in (("left", -1), ("right", 1)):
+        votes = chirality(pose.wrist(side).astype(float), pose.tips(side).astype(float))
+        assert (votes == sign).all(), side
+
+
+def test_flipped_frames_are_turned_back_and_unseen_frames_stay_nan() -> None:
+    truth = to_pose(estimate(), "camera").left_wrist.astype(float)[:, :3, :3]
+    noisy = truth.copy()
+    for t in (10, 11, 12, 70):
+        noisy[t] = noisy[t] @ FLIPS[1]  # a mirrored hand: pi about y
+    noisy[30] = noisy[30] @ FLIPS[0]
+    noisy[40:45] = np.nan  # the hand was not seen
+    noisy[45:48] = noisy[45:48] @ FLIPS[2]  # and came back flipped about z
+    fixed, turned = keep_continuous(noisy, 30.0)
+    assert turned == 8
+    seen = np.isfinite(noisy.reshape(len(noisy), -1)).all(axis=1)
+    assert np.isnan(fixed[~seen]).all()
+    assert np.degrees(angle(fixed[seen], truth[seen])).max() < 0.1  # arccos of float32 input
+
+
+def test_a_real_turn_is_not_taken_for_a_flip() -> None:
+    """A wrist turning 20 degrees a frame is fast but not a flip; nothing is turned."""
+    turning = np.stack([axis_angle([1, 0, 0], np.radians(20) * t) for t in range(20)])
+    fixed, turned = keep_continuous(turning, 30.0)
+    assert turned == 0 and np.allclose(fixed, turning)
+
+
+def test_a_mirrored_track_gets_its_sides_sign() -> None:
+    pose = to_pose(estimate(), "camera")
+    right, tips = pose.right_wrist.astype(float), pose.right_tips.astype(float)
+    mirrored = right.copy()
+    mirrored[:, :3, :3] = right[:, :3, :3] @ FLIPS[1]  # the whole track the other way
+    fixed, turned = one_sign(mirrored, tips, "right")
+    assert turned and np.allclose(fixed, right)
+    same, turned = one_sign(right, tips, "right")
+    assert not turned and same is right
+    # the left hand's chirality is the other one: a correct left track stays
+    left = pose.left_wrist.astype(float)
+    assert not one_sign(left, pose.left_tips.astype(float), "left")[1]
+
+
+def test_clean_pose_reports_what_it_turned() -> None:
+    pose = to_pose(estimate(), "camera")
+    noisy = pose.right_wrist.copy()
+    noisy[5, :3, :3] = noisy[5, :3, :3] @ FLIPS[1].astype(np.float32)
+    out, report = clean_pose(replace(pose, right_wrist=noisy), CleanParams("camera", 30.0))
+    assert report["right"] == {"seen_frames": FRAMES, "flipped_frames": 1, "track_turned": False}
+    assert report["left"]["flipped_frames"] == 0
+    np.testing.assert_allclose(out.right_wrist, pose.right_wrist, atol=1e-5)
+    untouched, _ = clean_pose(replace(pose, right_wrist=noisy), CleanParams("camera"))
+    assert np.array_equal(untouched.right_wrist, noisy)

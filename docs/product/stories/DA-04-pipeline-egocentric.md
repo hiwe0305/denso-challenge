@@ -42,7 +42,7 @@ Là kỹ sư dữ liệu, tôi muốn video egocentric của người đi qua c�
   - [x] 9.2 Ghi số QA trên 153 clip khay và 21 clip bị bỏ vì pose vào docs/g0/egocentric.md
 - [ ] 10. Làm sạch pose E-A trước khi xuất stage 1 (AC 4, 5; thêm 9/11/2026; số 9 dùng ở PR 173)
   - [x] 10.1 Pose E-A trong hệ camera (`camera` đơn vị) khi chưa đo được quỹ đạo đầu; ghi nguồn gốc trong `bundle.json`
-  - [ ] 10.2 Trục cổ tay có dấu xác định theo tay, và bước giữ liên tục (xoay π khi gần khung trước hơn 30°)
+  - [x] 10.2 Trục cổ tay có dấu xác định theo tay, và bước giữ liên tục (xoay π khi gần khung trước hơn 30°)
   - [ ] 10.3 Nội suy khung có bước nhảy cổ tay trên trung vị + 5 × MAD của clip; không bỏ khung
   - [ ] 10.4 Savitzky–Golay bậc 2, cửa sổ 21 khung, trên vị trí cổ tay, đầu ngón và quaternion cổ tay
   - [ ] 10.5 Chạy lại trên 153 clip khay, xuất stage 1, đo phần action bị cắt (ngưỡng 5 %), ghi vào docs/g0/egocentric.md
