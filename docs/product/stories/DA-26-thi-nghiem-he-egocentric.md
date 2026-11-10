@@ -37,6 +37,7 @@ Là trưởng nhóm, tôi muốn đo Ψ₀ có và không có prior egocentric �
 - [ ] 5. Fine-tune và eval phần còn lại của lưới, seed thứ hai (AC 2)
 - [ ] 6. Báo cáo HE-1 và video (AC 4, 5)
 - [ ] 7. HE-2 trên dataset tự xây (AC 7)
+- [x] 8. Cho task hai bàn qua vòng Failure → Data, không train lại (Hiếu chọn 11/11/2026 "chẩn đoán + kế hoạch dữ liệu"): gom rollout Isaac, chạy công cụ chẩn đoán đã merge, bảng lỗi, evidence card, kế hoạch dữ liệu có chi phí ([two-table-diagnosis.md](../../he/two-table-diagnosis.md))
 
 ## Phạm vi file
 
@@ -83,6 +84,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 5/11/2026 | Review lại #109: train hỏng không còn bị báo là xong (thoát 5, dừng phiên); tốc độ và `ALERT` chỉ tính trên checkpoint; `ready` chặn được bước sau; mọi lần dừng có xác nhận (thoát 6 nếu không), mọi lệnh có thời hạn; dự báo dừng sớm tính thêm độ trễ lượt cuối và thời gian băm, bảng ngưỡng tính lại. Chưa chạy | Hiếu (soạn với Claude) |
 | 5/11/2026 | `Decision` Hiếu 4/11: caps 18/18/16 (cùng 52 CU, trong tier 2). Lệnh watcher, bảng ngưỡng ở `docs/he/he-1.md` mục 7 và dòng ước tính mới trong `ledger/DA-26.csv` (append, trỏ về dòng cũ). Chưa chạy | Hiếu (soạn với Claude) |
 | 5/11/2026 | Review lại lần hai #109: train chết trước khi có `runs/<job>` là `failed` (thoát 5); lần liệt kê phiên chỉ tính khi tin được như `cu_watch.py`; SIGTERM chỉ tới watcher `cu_watch.py` còn sống; mã thoát của `follow` ghi vào log. Chưa chạy | Hiếu (soạn với Claude) |
+| 11/11/2026 | Nhiệm vụ 8: `docs/he/two-table-diagnosis.md`, task hai bàn qua vòng Failure → Data trên rollout Isaac có sẵn (S1-03 6/10, HE-1 0/2 + 0/2); hệ thống chưa kiểm được nên mọi lỗi là CHƯA RÕ; kế hoạch dữ liệu có chi phí và power. Không chạy job GPU | Hiếu (soạn với Claude) |
 
 ## Ghi chép khi làm
 
