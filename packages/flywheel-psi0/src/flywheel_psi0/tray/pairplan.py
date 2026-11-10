@@ -22,7 +22,14 @@ stage 1 pins are null: `check` passes as a draft, `freeze` and `check --launch` 
 and list what is missing (`pending`).
 
 The recipe overrides may set `train.max_training_steps` (the plan's step count, for
-both branches) besides the training-neutral ones of `runplan`. The eval is the eval of
+both branches) besides the training-neutral ones of `runplan`. `checkpoints` names the
+saved checkpoints the rules read (rule e of the block): `primary`, the metric, is the
+last step; `early` an early read only (Hiếu 11/11/2026 01:50: ckpt_40000 of the 60k
+runs, persisted to Drive while training goes on). `schedule` says whether the runs share
+the account at once (`parallel`, one Colab session each, one cu_watch batch) or one after
+the other, and `balance_needed` the CU the account must hold for the guard's floor never
+to stop them. `he-tray-pair40k-seq.yaml` is the fallback: the same pair, 40000 steps
+each, sequential; only one of the two plans is frozen and run. The eval is the eval of
 a frozen plan (`eval_of`: same conditions, same stats, same code pins), so the eval set
 of that plan pairs the two branches condition by condition.
 
@@ -73,6 +80,7 @@ from flywheel_psi0.tray.runplan import (
 
 STEPS = "train.max_training_steps"
 BATCH = "train.train_batch_size"
+SAVE_EVERY = "train.checkpointing_steps"
 PAIR_OVERRIDES = TRAINING_NEUTRAL_OVERRIDES | {STEPS}
 
 
@@ -99,6 +107,21 @@ class SharedCut(_Frozen):
     episodes: int | None = Field(default=None, gt=0)
     frames: int | None = Field(default=None, gt=0)  # meta/info.json total_frames
     stats_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+
+
+class PairCheckpoints(_Frozen):
+    """Which saved checkpoints the reading rules read (rule (e) of the plan's block)."""
+
+    primary: int = Field(gt=0)  # the metric: the last step, so it equals the step count
+    early: int | None = Field(default=None, gt=0)  # an early read, never a verdict
+
+
+class Schedule(_Frozen):
+    """How the runs share the Colab account, so the guard's floor never stops them."""
+
+    mode: Literal["parallel", "sequential"]  # parallel: one session per branch at once
+    floor_cu: float = Field(gt=0)  # the account balance at which guard and watchers stop
+    persist: str  # how each complete ckpt_<step> reaches Drive while training runs
 
 
 class PairBranch(_Frozen):
@@ -137,6 +160,8 @@ class TrayPairPlan(_Frozen):
     interpretation: Interpretation
     pricebook: str
     budget: Budget
+    checkpoints: PairCheckpoints
+    schedule: Schedule
     pinned_files: dict[str, str] | None = None  # pinned at freeze, with W1's revision
 
     @model_validator(mode="after")
@@ -162,6 +187,16 @@ def epochs(steps: int, batch: int, frames: int) -> float:
     return steps * batch / frames
 
 
+def balance_needed(plan: TrayPairPlan) -> float:
+    """CU the account must hold when the runs start: the floor plus every cap at stake.
+
+    Parallel runs spend at the same time, so the guard's floor is safe only above the
+    caps of all of them; sequential runs need one cap at a time (before each run).
+    """
+    runs = len(plan.budget.runs) if plan.schedule.mode == "parallel" else 1
+    return plan.schedule.floor_cu + plan.budget.cap_cu_per_run * runs
+
+
 def check(plan: TrayPairPlan, repo: Path = REPO) -> list[str]:
     """Everything wrong between the plan and the files it names; empty when it holds."""
     problems: list[str] = []
@@ -179,6 +214,7 @@ def check(plan: TrayPairPlan, repo: Path = REPO) -> list[str]:
             problems.append(f"override {key} must be a positive step count, not {value!r}")
     if STEPS not in plan.recipe.overrides:
         problems.append(f"the plan states its step count: recipe.overrides.{STEPS}")
+    problems += checkpoint_problems(plan, recipe)
 
     problems += parent_problems(plan.parents, recipe, plan.recipe.file)
     used = {b.parent for b in plan.branches.values()}
@@ -250,6 +286,26 @@ def check(plan: TrayPairPlan, repo: Path = REPO) -> list[str]:
             f"budget: {len(budget.runs)} runs x {budget.cap_cu_per_run:g} CU = {total:g} CU"
             f" over the ceiling of {budget.ceiling_cu:g}"
         )
+    for flag in (f"--cap {budget.cap_cu_per_run:g}", f"--floor {plan.schedule.floor_cu:g}"):
+        if flag not in budget.watcher:
+            problems.append(f"budget.watcher does not say {flag}")
+    return problems
+
+
+def checkpoint_problems(plan: TrayPairPlan, recipe: Psi0Recipe) -> list[str]:
+    """The read checkpoints exist: saved by the recipe, the primary one the last step."""
+    reads = plan.checkpoints
+    problems = []
+    if reads.primary != plan.steps():
+        problems.append(f"checkpoints.primary {reads.primary} is not the step count {plan.steps()}")
+    if reads.early is not None and reads.early >= reads.primary:
+        problems.append(f"checkpoints.early {reads.early} is not before {reads.primary}")
+    every = recipe.args.get(SAVE_EVERY)
+    if not isinstance(every, int) or isinstance(every, bool):
+        return [*problems, f"{plan.recipe.file} has no integer {SAVE_EVERY}"]
+    for name, step in (("primary", reads.primary), ("early", reads.early)):
+        if step is not None and step % every:
+            problems.append(f"checkpoints.{name} {step}: Psi0 saves every {every} steps only")
     return problems
 
 
@@ -321,6 +377,10 @@ def summary(plan: TrayPairPlan, repo: Path = REPO) -> str:
     if steps and isinstance(batch, int) and plan.cut.frames:
         passes = epochs(steps, batch * plan.recipe.nproc_per_node, plan.cut.frames)
         text += f", {passes:.2f} epochs of {plan.cut.name}"
+    early = plan.checkpoints.early
+    text += f", read ckpt {plan.checkpoints.primary}" + (f" (early {early})" if early else "")
+    when = "at launch" if plan.schedule.mode == "parallel" else "before each run"
+    text += f", {plan.schedule.mode}, balance >= {balance_needed(plan):g} CU {when}"
     return text
 
 

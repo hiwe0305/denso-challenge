@@ -140,16 +140,29 @@ eval_of:
 interpretation:
   doc: docs/he/tray.md
   rules_marker: pair60k-rules
-  rules_sha256: c9a9625211b55cef15b7a50130075284633b72a6bdc40ba2a59d0596b8e40aec # section 19.2 block
+  rules_sha256: 24747738624e926d4678fb875744bdc3e7b7c0916d1d0559f99b836c41587017 # section 19.2 block
 pricebook: "assumption: Colab 100 CU pack, 0.0999 USD per CU (docs/g0/ledger/DA-19.csv)"
 
-# Two runs, one after the other on one account (tray.md 19.5): about 23.8 CU each
-# (assumption from C and C+ measured), cap 28, balance floor 14, so 42 CU before each run.
+# Hiếu 11/11/2026 01:50 (via the coordinator): both runs at once, about 12:00 on 11/11,
+# one Colab L4 each, so the success numbers land on 12/11 (tray.md 19.5). About 23.8 CU
+# each (assumption from C and C+ measured), cap 28. One cu_watch batch: one guard and one
+# session watcher per run in one registry (cu_watch.py supports N sessions per batch);
+# the floor 14 is safe only while the balance holds both caps: 14 + 2 x 28 = 70 CU.
 budget:
   ceiling_cu: 56
   cap_cu_per_run: 28
   runs: [B_ALL, C_ALL]
-  watcher: "scripts/colab/cu_watch.py session --cap 28 --floor 14, under one guard per batch; one batch per account"
+  watcher: "scripts/colab/cu_watch.py session --cap 28 --floor 14, one per run, under one guard for the batch; one batch per account"
+
+# Rule (e) of the 19.2 block: ckpt_60000 is the metric; ckpt_40000 an early read only.
+checkpoints:
+  primary: 60000
+  early: 40000
+
+schedule:
+  mode: parallel
+  floor_cu: 14
+  persist: "persist --watch 600 --pid <train pid> to the mounted Drive: every complete ckpt_<step> (trainer/colab.py sync_job, no --delete), so ckpt_40000 stays on Drive while training goes on"
 
 # Pinned at freeze with W1's scene (visuals.py and the rest of v2's list, re-hashed).
 pinned_files: null
