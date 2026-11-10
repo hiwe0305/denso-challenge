@@ -1,8 +1,15 @@
 # Agent QA/QC (DA-20): models, prompt and limits.
 # Design 27/10/2026 section 9.1; 03 ADR-19, ADR-24, ADR-26.
 #
-# Changing the prompt file or any model line is a new version of the agent: its
-# reports must be scored on the injected-defect bench again (DA-31) before use.
+# Changing the prompt file, any model line or the facts code gives the model is a
+# new version of the agent: its reports must be scored on the injected-defect bench
+# again (DA-31) before use. Bump `version` and say what changed.
+#
+#   1  7/11/2026  #151, first merge; scored only with EchoModel
+#   2  11/11/2026 #175: facts per group/dim, <code>_flag_when direction facts,
+#                 cleared_by_code, a reason for every dropped code candidate,
+#                 window 16384 tokens at 2.5 chars/token. Not yet scored with Nemotron.
+version: 2
 
 # Hosts of our network the endpoints may name besides loopback and private IPs.
 # Any other host is refused when the config is read (endpoint.check_local_url).
