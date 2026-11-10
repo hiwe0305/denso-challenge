@@ -674,3 +674,95 @@ def test_probe_times_a_pull_and_cleans_both_ends(tmp_path: Path) -> None:
     mb_s = probe(LocalRemote(vm), tmp_path, megabytes=8)
     assert mb_s > 0
     assert not (vm / "probe.bin").exists() and not (tmp_path / ".probe.bin").exists()
+
+
+# -- the job's shape: --total-steps and --gpu (DA-34's 60k on A100, tray.md 19.8) ---------
+
+A100_60K = he1_fetch.Job(60000, "A100")
+
+
+def test_the_defaults_are_da26s_40000_steps_on_l4() -> None:
+    from cu_watch import RATES
+
+    job = he1_fetch.Job()
+    assert (job.total_steps, job.gpu, job.near_end) == (40000, "L4", 38000)
+    assert job.rate == he1_fetch.RATE_CU_H == RATES["L4"]  # cu_watch's number, not a copy
+    assert job.last_checkpoint == "ckpt_40000" and job.save_s == 60.0
+    assert pause(600, 37999, []) == 600 and pause(600, 38000, []) == 60
+    vm = Remote("s", Path("/c"), work="/content/da34")
+    assert vm.stage()[-1].endswith("he1_colab.py stage --work /content/da34")  # as before
+
+
+def test_a_60k_a100_job_takes_its_rate_from_cu_watch_and_its_own_last_step() -> None:
+    from cu_watch import RATES
+
+    assert A100_60K.rate == RATES["A100"] and A100_60K.save_s == 31.0
+    # step 59000 at 1 s/step: 1000 s, one save on A100, the final lag, the hashes, the pull
+    seconds = 1000 + 31 + 60 + 60 + 1e9 / 10e6
+    assert projected_cu(2.0, 59000, 1.0, 10.0, 1e9, A100_60K) == pytest.approx(
+        2.0 + RATES["A100"] * seconds / 3600 + 0.1
+    )
+    assert stop_line(61.0, A100_60K) == pytest.approx(61.0 - RATES["A100"] * 430 / 3600)
+    assert pause(600, 39000, [], A100_60K) == 600  # 38000 is not near the end of 60k
+    assert pause(600, 58000, [], A100_60K) == 60
+    vm = Remote("s", Path("/c"), work="/content/da34")
+    assert vm.stage(60000)[-1].endswith("stage --work /content/da34 --total-steps 60000")
+
+
+def test_the_60k_early_stop_projects_to_ckpt_60000_at_the_a100_rate() -> None:
+    # s/step as metrics.jsonl gives it, vals included: 0.47 + 50 s / 2000 steps = 0.495
+    # fits cap 61 (tray.md 19.8); 0.52 cannot reach ckpt_60000 under it
+    spent = 0.2 * 6.73 + 2200 * 0.52 * 6.73 / 3600
+    fits = judge(running(2200, 0.495), (spent, 61.0), 11.0, A100_60K)
+    slow = judge(running(2200, 0.52), (spent, 61.0), 11.0, A100_60K)
+    assert fits is not None and fits["verdict"] == "ok"
+    assert slow is not None and slow["verdict"] == "stop"
+    # the default (40000 steps at the L4 rate) would not stop the slow 60k run
+    assert judge(running(2200, 0.52), (spent, 61.0), 11.0)["verdict"] == "ok"  # type: ignore[index]
+
+
+@pytest.mark.parametrize(
+    ("steps", "gpu"), [(40000, "H100"), (40000, "T4"), (65000, "A100"), (0, "L4")]
+)
+def test_a_gpu_without_a_rate_or_an_odd_step_count_is_refused(
+    tmp_path: Path, steps: int, gpu: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(ValueError):
+        he1_fetch.Job(steps, gpu)
+    args = ["once", "--session", JOB, "--registry", str(tmp_path), "--dest", str(tmp_path / "l")]
+    with pytest.raises(SystemExit) as refused:
+        main([*args, "--total-steps", str(steps), "--gpu", gpu])
+    assert refused.value.code == 2
+    assert not (tmp_path / "l").exists()  # refused before any pull
+
+
+def test_a_60k_job_that_ended_at_60000_is_done_and_follow_stops_it_with_exit_0(
+    tmp_path: Path,
+) -> None:
+    vm = fake_vm(tmp_path / "vm", saved=(40000, 50000, 60000), complete=60000, train_done=True)
+    args = ["follow", "--session", JOB, "--registry", str(tmp_path), "--stop-when-done"]
+    shape = ["--total-steps", "60000", "--gpu", "A100", "--local-vm", str(vm)]
+    with deadline(60):
+        assert main([*args, "--dest", str(tmp_path / "l"), *shape]) == 0
+    status = json.loads((tmp_path / "l" / JOB / "fetched.json").read_text())
+    assert status["final"] and status["train"] == "done"
+    assert status["checkpoint"] == "ckpt_60000" and status["bad_or_missing"] == []
+    pulled = tmp_path / "l" / JOB / MODEL.format(60000)
+    assert pulled.read_bytes() == weights(60000)
+    # without the flags the same job reads as a failed 40k run: pulled, stopped, exit 5
+    with deadline(60):
+        assert main([*args, "--dest", str(tmp_path / "l2"), "--local-vm", str(vm)]) == 5
+
+
+def test_a_60k_job_short_of_60000_is_not_done(tmp_path: Path) -> None:
+    vm = fake_vm(tmp_path / "vm", saved=(40000,), complete=40000, train_done=True)
+    staged = he1_colab.stage(vm, 60000)
+    assert staged["jobs"][0]["train"] == "failed"  # ended ok, but at 40000 of 60000
+    assert he1_colab.stage(vm)["jobs"][0]["train"] == "done"  # a 40k job: done
+
+
+def test_stage_alone_reads_total_steps() -> None:
+    with pytest.raises(SystemExit):
+        he1_colab.main(["serve", "--total-steps", "60000"])
+    with pytest.raises(SystemExit):
+        he1_colab.main(["stage", "--total-steps", "0"])
