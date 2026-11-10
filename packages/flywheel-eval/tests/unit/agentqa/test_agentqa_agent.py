@@ -185,3 +185,34 @@ def test_train_and_rtc_findings_come_from_the_lane_detectors(tmp_path: Path) -> 
     assert "R1" in {c.code for c in rtc.candidates}
     report = run_agent(rtc, EchoModel(), config(), now=NOW)
     assert report.stage == "inference" and report.findings[0].code == "R1"
+
+
+def test_dropping_a_code_candidate_needs_a_reason(tmp_path: Path) -> None:
+    analysis = _dataset(tmp_path, {1: [NAN]})
+    (c1,) = analysis.candidates
+    silent = {"decisions": [{"cid": c1.cid, "keep": False}]}
+    report = run_agent(analysis, ScriptedModel([silent, silent]), config(), now=NOW)
+    assert report.status == "broken" and "reason missing" in report.problems[0]
+    guessed = {"decisions": [{"cid": c1.cid, "keep": False, "reason": "only 2 frames"}]}
+    report = run_agent(analysis, ScriptedModel([guessed, guessed]), config(), now=NOW)
+    assert report.status == "broken" and "reason states numbers" in report.problems[0]
+
+
+def test_a_dropped_code_candidate_comes_back_beside_the_report(tmp_path: Path) -> None:
+    """#175: every T6 dropped left an ok report with nothing in it and no word why."""
+    from flywheel.eval.agentqa.agent import review_subject
+
+    analysis = _dataset(tmp_path, {1: [NAN], 3: [NAN]})
+    c1, c2 = analysis.candidates
+    reply = {"decisions": [
+        {"cid": c1.cid, "keep": False, "reason": f"below the threshold {{{c1.evidence[1]}}}"},
+        {"cid": c2.cid, "keep": False, "reason": "same episode as the other"},
+    ]}
+    run = review_subject(analysis, ScriptedModel([reply]), config(), now=NOW)
+    assert run.report.status == "ok" and run.report.findings == []
+    assert [(d.cid, d.code, d.target) for d in run.dropped] == [
+        (c1.cid, "D1", "episode_000001"), (c2.cid, "D1", "episode_000003")
+    ]
+    assert run.dropped[0].evidence == c1.evidence
+    # an EchoModel drops hints only: nothing a detector raised is reported dropped
+    assert review_subject(analysis, EchoModel(), config(), now=NOW).dropped == ()

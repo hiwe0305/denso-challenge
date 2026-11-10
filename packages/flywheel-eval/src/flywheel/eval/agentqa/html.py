@@ -3,8 +3,10 @@
 The page shows, per finding in rank order: the design 10 code, the target, the
 insight and the suggestion with each `{F#}` replaced by the fact's value and unit
 (the raw id stays as a tooltip), the evidence table and the figures. A broken
-report says so at the top with its problems. If the engineer's `AgentReview` is
-given, each finding shows the decision and the reason.
+report says so at the top with its problems. Candidates a lane detector raised
+and the model dropped are listed at the top too, with the model's reason (#175),
+so an empty report is never mistaken for a clean subject. If the engineer's
+`AgentReview` is given, each finding shows the decision and the reason.
 
 The page holds nothing the JSON does not, so the report's hash vouches for it.
 """
@@ -13,15 +15,17 @@ from __future__ import annotations
 
 import html
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from flywheel.contracts.agentqa import AgentFact, AgentReport, AgentReview
+from flywheel.eval.agentqa.facts import DroppedCandidate
 
 _PLACEHOLDER = re.compile(r"\{(F[0-9]+)\}")
 
 _STYLE = """
 body{font-family:sans-serif;max-width:1000px;margin:2em auto;color:#222}
 h1{font-size:1.4em} .broken{background:#fde2e1;border:1px solid #d9534f;padding:.6em}
+.dropped{background:#fff4d6;border:1px solid #e0a800;padding:.6em;margin:1em 0}
 .finding{border:1px solid #ccc;border-radius:6px;padding:.8em;margin:1em 0}
 .code{font-weight:bold;background:#eef;padding:0 .4em;border-radius:3px}
 table{border-collapse:collapse;font-size:.9em} td,th{border:1px solid #ddd;padding:2px 6px}
@@ -54,7 +58,10 @@ def render_text(text: str, facts: dict[str, AgentFact]) -> str:
 
 
 def render_report(
-    report: AgentReport, review: AgentReview | None = None, inline_svgs: Sequence[str] = ()
+    report: AgentReport,
+    review: AgentReview | None = None,
+    inline_svgs: Sequence[str] = (),
+    dropped: Sequence[DroppedCandidate] = (),
 ) -> str:
     facts = {f.fact_id: f for f in report.facts}
     decisions = {d.finding_id: d for d in review.decisions} if review else {}
@@ -71,6 +78,18 @@ def render_report(
     if report.status == "broken":
         items = "".join(f"<li>{_e(p)}</li>" for p in report.problems)
         parts.append(f'<div class="broken"><b>Report broken</b><ul>{items}</ul></div>')
+    if dropped:
+        rows = "".join(
+            f"<tr><td>{_e(d.cid)}</td><td>{_e(d.code)}</td><td>{_e(d.target)}</td>"
+            f"<td>{_e(d.detail)}</td><td>{render_text(d.reason, facts)}</td></tr>"
+            for d in dropped
+        )
+        parts.append(
+            f'<div class="dropped"><b>{len(dropped)} candidate(s) a detector raised were '
+            "dropped by the model.</b> Check each reason before reading the findings below "
+            "as the whole story.<table><tr><th>cid</th><th>code</th><th>target</th>"
+            f"<th>detector</th><th>model's reason</th></tr>{rows}</table></div>"
+        )
     if not report.findings:
         parts.append("<p>No findings.</p>")
     for finding in report.findings:
@@ -121,21 +140,25 @@ def render_report(
     return "".join(parts)
 
 
-def render_index(reports: Sequence[tuple[str, AgentReport]]) -> str:
-    """One line per report: its page, stage, status and the top finding."""
+def render_index(
+    reports: Sequence[tuple[str, AgentReport]], dropped: Mapping[str, int] | None = None
+) -> str:
+    """One line per report: its page, stage, status, findings, dropped code candidates."""
     rows = []
     for page, report in reports:
         top = report.findings[0] if report.findings else None
+        n = (dropped or {}).get(report.report_id, 0)
         rows.append(
             f"<tr><td><a href=\"{_e(page)}\">{_e(report.subject_ref)}</a></td>"
             f"<td>{_e(report.stage)}</td><td>{_e(report.status)}</td>"
-            f"<td>{len(report.findings)}</td>"
+            f"<td>{len(report.findings)}</td><td>{n or ''}</td>"
             f"<td>{_e(top.code + ' ' + top.target_ref) if top else ''}</td></tr>"
         )
     return (
         f"<!doctype html><html><head><meta charset='utf-8'><title>Agent QA/QC</title>"
         f"<style>{_STYLE}</style></head><body><h1>Agent QA/QC reports</h1><table>"
-        "<tr><th>subject</th><th>stage</th><th>status</th><th>findings</th><th>top</th></tr>"
+        "<tr><th>subject</th><th>stage</th><th>status</th><th>findings</th>"
+        "<th>dropped by model</th><th>top</th></tr>"
         + "".join(rows)
         + "</table></body></html>\n"
     )

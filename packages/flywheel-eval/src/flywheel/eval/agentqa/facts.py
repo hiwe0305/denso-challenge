@@ -38,6 +38,18 @@ class Candidate:
     detail: str
 
 
+@dataclass(frozen=True)
+class DroppedCandidate:
+    """A candidate a lane detector raised and the model dropped, with the model's reason."""
+
+    cid: str
+    code: str
+    target: str
+    detail: str
+    reason: str
+    evidence: tuple[str, ...]
+
+
 class FactClash(ValueError):
     """Two values under one fact name: the second would have been dropped (issue #175)."""
 

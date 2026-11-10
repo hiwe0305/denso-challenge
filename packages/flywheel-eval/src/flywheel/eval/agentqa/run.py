@@ -12,6 +12,8 @@ Subjects are found by what the paths hold:
 Output, in a new directory (never overwritten):
 
     reports.jsonl        every AgentReport, one per line (what DA-31 reads)
+    dropped.jsonl        each candidate a lane detector raised that the model dropped,
+                         with its reason (#175); empty when none was dropped
     <n>-<stage>.html     one page per report; index.html lists them
     figures/*.svg        the figures the pages show
     estimates.jsonl      the estimates of this run (append-only rows)
@@ -22,6 +24,7 @@ Like every job, the run writes an estimated and a measured `LedgerEntry`
 
 from __future__ import annotations
 
+import json
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -32,7 +35,7 @@ from flywheel.contracts.agentqa import AgentReport
 from flywheel.contracts.base import new_ulid
 from flywheel.contracts.entities import LedgerEntry
 from flywheel.eval.agentqa import figures
-from flywheel.eval.agentqa.agent import AgentConfig, run_agent
+from flywheel.eval.agentqa.agent import AgentConfig, review_subject
 from flywheel.eval.agentqa.analyze import (
     OfflineThresholds,
     analyze_dataset,
@@ -45,7 +48,7 @@ from flywheel.eval.agentqa.analyze import (
 )
 from flywheel.eval.agentqa.endpoint import ChatModel
 from flywheel.eval.agentqa.estimates import record_estimates
-from flywheel.eval.agentqa.facts import Analysis
+from flywheel.eval.agentqa.facts import Analysis, DroppedCandidate
 from flywheel.eval.agentqa.html import render_index, render_report
 from flywheel.eval.agentqa.inputs import InputSet, Loaded, collect, refuse_forbidden
 from flywheel.eval.agentqa.vision import observe
@@ -64,6 +67,8 @@ class RunResult:
     out: Path
     reports: list[AgentReport] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
+    # report_id -> code candidates the model dropped in that report
+    dropped: dict[str, tuple[DroppedCandidate, ...]] = field(default_factory=dict)
 
 
 def subjects(found: InputSet, offline: OfflineThresholds,
@@ -174,17 +179,24 @@ def run(
             if vision_model is not None and images:
                 observe(analysis, [(p, p.as_posix()) for p in images], vision_model,
                         int((config.raw.get("vision") or {}).get("max_images", 6)))
-            report = run_agent(analysis, model, config, now=now)
+            reviewed = review_subject(analysis, model, config, now=now)
+            report = reviewed.report
             result.reports.append(report)
+            result.dropped[report.report_id] = reviewed.dropped
             page = f"{n:03d}-{analysis.stage}.html"
             inline = [(out / f).read_text(encoding="utf-8") for f in analysis.figures]
-            (out / page).write_text(render_report(report, inline_svgs=inline), encoding="utf-8")
+            (out / page).write_text(
+                render_report(report, inline_svgs=inline, dropped=reviewed.dropped),
+                encoding="utf-8",
+            )
             pages.append((page, report))
             record_estimates(report, out / "estimates.jsonl")
         with (out / "reports.jsonl").open("w", encoding="utf-8") as f:
             for report in result.reports:
                 f.write(report.model_dump_json() + "\n")
-        (out / "index.html").write_text(render_index(pages), encoding="utf-8")
+        _write_dropped(result, out / "dropped.jsonl")
+        counts = {k: len(v) for k, v in result.dropped.items()}
+        (out / "index.html").write_text(render_index(pages, counts), encoding="utf-8")
         return result
     except BaseException as error:
         outcome = f"failed: {type(error).__name__}"
@@ -198,6 +210,30 @@ def run(
                     estimate.id),
             ledger,
         )
+
+
+def _write_dropped(result: RunResult, path: Path) -> None:
+    """One row per dropped code candidate, with the facts it cited, for the reviewer."""
+    with path.open("w", encoding="utf-8") as f:
+        for report in result.reports:
+            facts = {x.fact_id: x for x in report.facts}
+            for d in result.dropped.get(report.report_id, ()):
+                row = {
+                    "report_id": report.report_id,
+                    "subject_ref": report.subject_ref,
+                    "stage": report.stage,
+                    "cid": d.cid,
+                    "code": d.code,
+                    "target": d.target,
+                    "detail": d.detail,
+                    "reason": d.reason,
+                    "evidence": [
+                        {"id": e, "name": facts[e].name, "value": facts[e].value,
+                         "unit": facts[e].unit}
+                        for e in d.evidence if e in facts
+                    ],
+                }
+                f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
 def _ledger(plan: str, job_id: str, seconds: float, kind: str, note: str,

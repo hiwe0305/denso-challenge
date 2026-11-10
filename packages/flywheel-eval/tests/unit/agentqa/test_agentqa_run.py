@@ -73,3 +73,26 @@ def test_the_cli_keeps_a_broken_run_and_exits_1(
                                       "--store", str(tmp_path / "store")])
     assert result.exit_code == 1
     assert json.loads((out / "reports.jsonl").read_text())["status"] == "broken"
+
+
+def test_a_run_shows_the_code_candidates_the_model_dropped(tmp_path: Path) -> None:
+    from flywheel.eval.agentqa.cli import app
+    from typer.testing import CliRunner
+
+    rtc_job(tmp_path / "in" / "rtc" / "job-slow", latency=0.3)
+    reply = {"decisions": [{"cid": "C1", "keep": False, "reason": "latency looks fine"}]}
+    replay = tmp_path / "replies.jsonl"
+    replay.write_text(json.dumps({"model": "m", "reply": json.dumps(reply)}) + "\n")
+    out = tmp_path / "out"
+    result = CliRunner().invoke(app, ["run", "--input", str(tmp_path / "in"), "--out", str(out),
+                                      "--replay", str(replay), "--store", str(tmp_path / "s")])
+    assert result.exit_code == 0, result.output
+    assert "1 code candidate(s) dropped" in result.output
+    assert "see dropped.jsonl" in result.output
+    (row,) = [json.loads(x) for x in (out / "dropped.jsonl").read_text().splitlines()]
+    assert (row["code"], row["target"], row["reason"]) == ("R1", "rtc/job-slow",
+                                                           "latency looks fine")
+    assert {e["name"] for e in row["evidence"]} >= {"R1_value", "R1_threshold", "R1_flag_when"}
+    page = next(out.glob("*-inference.html")).read_text()
+    assert "dropped by the model" in page and "latency looks fine" in page
+    assert ">1<" in (out / "index.html").read_text()

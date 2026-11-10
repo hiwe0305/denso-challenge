@@ -12,6 +12,13 @@ A reply that fails is sent back once with what was wrong; failing again gives a
 report with `status = broken`, the reasons in `problems` and no findings, so a
 model that cannot follow the rules never scores what code found as its own.
 
+A candidate a lane detector raised (`origin = code`) that the model drops needs a
+`reason`, held to the same number rule; the drop comes back beside the report
+(`AgentRun.dropped`) so the run can show it to the reviewer. An `ok` report may
+not carry `problems` (contract), and a drop is a verdict, not a failure; but a
+detector's finding must never vanish without a word (#175: 36 T6 candidates
+dropped on a misread threshold left an `ok` report with nothing in it).
+
 Subjects with more candidates than `candidates_per_call` are split into calls;
 findings of all calls are ranked together by the priority the model gave, then
 by the order it wrote them in.
@@ -39,7 +46,7 @@ from flywheel.contracts.agentqa import (
 )
 from flywheel.contracts.base import new_ulid
 from flywheel.eval.agentqa.endpoint import DEFAULT_AGENT_CONFIG, ChatModel, EndpointError
-from flywheel.eval.agentqa.facts import Analysis, Candidate
+from flywheel.eval.agentqa.facts import Analysis, Candidate, DroppedCandidate
 from flywheel.eval.agentqa.numbers import unsupported_numbers
 from pydantic import ValidationError
 
@@ -78,6 +85,14 @@ def load_agent_config(path: Path = DEFAULT_AGENT_CONFIG) -> AgentConfig:
 
 class ReplyError(ValueError):
     """A reply the agent cannot keep; the message goes back to the model."""
+
+
+@dataclass(frozen=True)
+class AgentRun:
+    """The report of one subject and the code candidates the model dropped in it."""
+
+    report: AgentReport
+    dropped: tuple[DroppedCandidate, ...] = ()
 
 
 @dataclass
@@ -157,7 +172,7 @@ def _parse_reply(
     batch: Sequence[Candidate],
     facts: Sequence[AgentFact],
     order_base: int,
-) -> tuple[list[_Drafted], list[dict[str, Any]]]:
+) -> tuple[list[_Drafted], list[dict[str, Any]], list[DroppedCandidate]]:
     match = re.search(r"\{.*\}", text, flags=re.S)
     if not match:
         raise ReplyError("the reply holds no JSON object")
@@ -174,6 +189,7 @@ def _parse_reply(
     allowed = set(_allowed_codes(analysis.stage))
     problems: list[str] = []
     drafted: list[_Drafted] = []
+    dropped: list[DroppedCandidate] = []
     order = order_base
 
     def scope(item: dict[str, Any], extra: Sequence[str] = ()) -> list[AgentFact]:
@@ -227,10 +243,15 @@ def _parse_reply(
         if not isinstance(keep, bool):
             problems.append(f"{item['cid']}: keep must be true or false, not {keep!r:.20}")
             continue
-        if not keep:
-            continue
         candidate = by_cid[item["cid"]]
         where = str(item["cid"])
+        if not keep:
+            if candidate.origin == "code":
+                cited = scope(item, candidate.evidence)
+                reason = text_field(item, "reason", where, cited)
+                dropped.append(DroppedCandidate(candidate.cid, candidate.code, candidate.target,
+                                                candidate.detail, reason, candidate.evidence))
+            continue
         cited = scope(item, candidate.evidence)
         insight = text_field(item, "insight", where, cited)
         suggestion = text_field(item, "suggestion", where, cited)
@@ -285,7 +306,7 @@ def _parse_reply(
             problems.append(f"estimates[{n}]: needs quantity, low, high")
     if problems:
         raise ReplyError("; ".join(problems))
-    return drafted, estimates
+    return drafted, estimates, dropped
 
 
 def _priority(item: dict[str, Any]) -> int:
@@ -310,8 +331,21 @@ def run_agent(
     report_id: str | None = None,
 ) -> AgentReport:
     """The AgentReport of one subject: ok with ranked findings, or broken with why."""
+    return review_subject(analysis, model, config, now=now, report_id=report_id).report
+
+
+def review_subject(
+    analysis: Analysis,
+    model: ChatModel,
+    config: AgentConfig,
+    *,
+    now: datetime | None = None,
+    report_id: str | None = None,
+) -> AgentRun:
+    """`run_agent` with the code candidates the model dropped, for the run to show."""
     drafted: list[_Drafted] = []
     estimates: list[dict[str, Any]] = []
+    dropped: list[DroppedCandidate] = []
     problems: list[str] = []
     for batch in _batches(analysis.candidates, config.candidates_per_call):
         if not batch and not analysis.book.facts:
@@ -320,7 +354,7 @@ def run_agent(
         for attempt in range(config.retries + 1):
             try:
                 reply = model.complete(messages)
-                got, est = _parse_reply(reply, analysis, batch, facts, len(drafted))
+                got, est, drop = _parse_reply(reply, analysis, batch, facts, len(drafted))
             except ReplyError as exc:
                 if attempt == config.retries:
                     problems.append(f"model reply rejected: {exc}")
@@ -337,8 +371,11 @@ def run_agent(
                 break
             drafted += got
             estimates += est
+            dropped += drop
             break
-    return _assemble(analysis, model, config, drafted, estimates, problems, now, report_id)
+    report = _assemble(analysis, model, config, drafted, estimates, problems, now, report_id)
+    # A broken report keeps no verdict of the model, drops included.
+    return AgentRun(report, tuple(dropped) if report.status == "ok" else ())
 
 
 def _assemble(

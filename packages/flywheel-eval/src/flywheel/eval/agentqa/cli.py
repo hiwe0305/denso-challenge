@@ -83,9 +83,16 @@ def run_command(
     for report in result.reports:
         top = report.findings[0] if report.findings else None
         head = f"{top.code} {top.target_ref}" if top else "-"
+        n = len(result.dropped.get(report.report_id, ()))
+        gone = f"  {n} code candidate(s) dropped" if n else ""
         typer.echo(f"{report.stage:9} {report.status:6} {len(report.findings):3} findings  "
-                   f"top {head}  {report.subject_ref}")
+                   f"top {head}  {report.subject_ref}{gone}")
     typer.echo(f"{len(result.reports)} reports in {out}; {len(result.skipped)} files skipped")
+    dropped = sum(len(d) for d in result.dropped.values())
+    if dropped:
+        # Not a failure: the model may judge a detector wrong. It must not go unseen (#175).
+        typer.echo(f"{dropped} candidate(s) a detector raised were dropped by the model; "
+                   "see dropped.jsonl", err=True)
     broken = sum(1 for r in result.reports if r.status == "broken")
     if broken:
         # The run is kept; a script still has to see that the model part failed.
