@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-from flywheel.data.export.human1m.frames import SIDES, EpisodeFrames
+from flywheel.data.export.human1m.frames import SIDES, EpisodeFrames, known_frames
 from flywheel.data.export.human1m.layout import BONES
 from flywheel.data.export.human1m.subtasks import Subtask
 from numpy.typing import NDArray
@@ -70,7 +70,7 @@ def measure(frames: EpisodeFrames, fps: float, height: int, subtasks: Sequence[S
         "subtasks_in_range": float(np.mean(within)) if within else 0.0,
     }
     for side in SIDES:
-        known = np.isfinite(frames.hands[side]).all(axis=(1, 2))
+        known = known_frames(frames.hands[side])
         out[f"{side}_bone_cv"] = bone_cv(frames.hands[side], known)
         out[f"{side}_accel_m_s2"] = acceleration(frames.hands[side], known, fps)
     out["checks"] = {
