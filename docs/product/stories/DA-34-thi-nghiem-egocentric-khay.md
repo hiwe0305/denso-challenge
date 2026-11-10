@@ -73,6 +73,13 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
   - [x] 5.5 Đo eval 2 worker trên cùng server (thông lượng, độ lệch kết quả), đề xuất cho eval C+. Bằng chứng (tray.md 17.7): đề xuất không dùng 2 worker trên một server, vì client `psi0_decoupled_wbc.py` không gửi `session_id` nên hai client là một phiên RTC (`previous_action` chung, `reset` của bên này xóa trạng thái bên kia, nhiễu gieo theo episode xen nhau); log server chỉ có `{}` và `{reset, seed}`, không 409. Phép đo dừng theo lệnh phiên điều phối sau 1 episode mỗi bên (7 phút); seed 1000105 cho kết quả khác 1 worker. Sửa câu "409" của 17.4; dòng ước lượng và thực đo trong sổ
   - [ ] 5.6 Eval C+ và đọc theo quy tắc 1–2 (8/11: chuẩn bị sẵn, chưa chạy; `serve-cplus.sh`, `launch-eval-cplus.sh` trên `rtx3060`, tray.md 17.6; chạy khi checkpoint đã về và Hiếu bảo)
 
+- [ ] 6. Cặp 60k trên cut ALL có vùng đích: VLM sau stage 1 (`B_ALL`) so với VLM của C (`C_ALL`), mục tiêu thành công ≥ 80 % (AC 5; Hiếu 11/11/2026 qua phiên điều phối, tray.md mục 19). Phụ thuộc W1 (DA-33: vẽ vùng đích, sinh lại hai kho, cut ALL) và W2 (DA-30: stage 1 trên `egx_7b43c30dc5d88cd7`)
+  - [x] 6.1 RunPlan cặp nháp `he-tray-pair60k.yaml` (schema `pairplan`: một cut, một recipe 60 000 bước, một seed, một file stats; hai nhánh chỉ khác cha), chỗ trống của W1 và W2 để `null`, luật đọc 19.2 ghim `rules_sha256` trước mọi lượt chạy; số epoch; ngân sách và dòng `estimated`; `place_error --curve` cho luật (c)
+  - [ ] 6.2 Khi W1, W2 xong: điền ghim, Hiếu duyệt 19.2, `Decision` nháp, bỏ `draft`, `pairplan freeze`
+  - [ ] 6.3 Mã chạy: `colab_train` cho hai nhánh của plan cặp, nối hai phần thành cut ALL, runbook Colab
+  - [ ] 6.4 Hai run stage 3 trên Colab L4 (Hiếu launch), dòng thực đo
+  - [ ] 6.5 Eval hai giai đoạn của cả hai run trên `rtx3060`, đọc theo 19.2, điền `Decision`
+
 ## Phạm vi file
 
 Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
@@ -110,6 +117,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 5/11/2026 | Hiếu chốt: mã sim ghim (`pinned_files`) kiểm lúc khởi chạy job (`runplan check --release … --launch`), CI chỉ cảnh báo; id `rp_a04c14e79dfd` không đổi (tray.md mục 11) | PO (Hiếu) |
 | 9/11/2026 | Hiếu chốt 4 mặc định cho nhánh B: viết nhiệm vụ con 4.1–4.8 (B là C với VLM sau stage 1 của DA-30; luật đọc viết trước ở tray.md mục 18) | Claude cho Hiếu |
 | 10/11/2026 | Hiếu chốt eval B hai giai đoạn ("Ghi Decision"): thêm và làm nhiệm vụ con 4.9, sửa 4.8 | Claude cho Hiếu |
+| 11/11/2026 | Hiếu duyệt W1, W2 và cặp 60k (qua phiên điều phối): thêm nhiệm vụ 6, làm 6.1 | Claude cho Hiếu |
 
 ## Ghi chép khi làm
 
@@ -118,3 +126,4 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - 5/11/2026 (nhiệm vụ con 1.7): kho planner-5 `s1-pool-1104` sinh xong (610 lượt, 542 ghi, QA phát lại 542/542). Release `tray_s1_f9433b028c52` có 541 episode. QA của DA-03 ra 534 pass, 0 flag, 7 reject; bộ lọc giữ 436, còn 429 sau khi loại reject. **[Đã chốt 5/11/2026, Hiếu] loại 7 reject DA-03 khỏi tập demo**; `demo_sets --qa-work` làm việc này và dừng nếu thiếu report. 1.7 chưa đánh dấu xong: nếu planner-6 được nhận thì kho sinh lại (tray.md mục 10).
 - 5/11/2026 (nhiệm vụ con 1.8–1.9): planner-6 của DA-33 được 38/50 (planner-5 44/50), nên bản 2 đóng băng trên release planner-5. Tập cắt trên `rtx3060` bằng code của 4848b70, trùng từng byte với lần cắt thử: `C` = `a202cc028a2e…`, `A` = `b914d6412f59…` ([`demo_sets-v2.json`](../../../configs/runplans/tray/demo_sets-v2.json)). RunPlan [`he-tray-v2.yaml`](../../../configs/runplans/tray/he-tray-v2.yaml) đóng băng lần đầu là `rp_301f08e73358`; sau review #116 đóng băng lại thành `rp_a04c14e79dfd`. `quality-s1-pool-1104.jsonl` (số đo theo seed, không có dữ liệu episode) commit cạnh plan để `runplan check` chạy trên CI. Sổ chi phí thêm 4 dòng ước lượng eval 270 episode (C và C+ mỗi nhánh 4,5 giờ 3060; A và C-NOEGO 0). Ba ca `joint_limit` không kiểm lại, vì việc đó chỉ cần khi nhận planner-6. Train chờ PR này merge và lô của DA-26.
 - 10/11/2026 (nhiệm vụ con 4.9): Hiếu chốt eval B hai giai đoạn trước mọi lượt của B (tray.md mục 18.9). Đếm lại trên outcome của eval C SimReady: 6 lô đầu cho C 7/60 (mức 1: 4/30, mức 2: 3/30), `L-PLACE-POSE` 33/60; cả mức 1–2 vẫn 20/240. Cây client của eval C (`079160d`) không có `--max-chunks`, nên `launch-eval-b.sh` chạy bộ điều phối từ master mới và giữ `--pythonpath` của cây client cũ (mục 18.5). Chạy lại mô phỏng đặc tính của phiên điều phối: số gần như vậy.
+- 11/11/2026 (nhiệm vụ con 6.1): cut ALL trải trên hai release, nên plan cặp dùng schema riêng (`pairplan`); `runplan check` và `freeze` chuyển plan `paired_train` sang đó. Ước lượng ALL từ hai kho hiện tại theo cùng luật cắt: 429 + 177 = 606 episode, 861 624 frame (cách đếm cho đúng 429 episode, 610 069 frame của CMAX). 60 000 bước là 1,11 epoch, ít hơn C+ (1,41) và C (2,80); bằng C+ cần khoảng 75 700 bước. Đã báo trong tray.md 19.4, plan giữ 60 000 như đã duyệt.

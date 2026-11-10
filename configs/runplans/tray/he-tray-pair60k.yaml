@@ -1,0 +1,155 @@
+# DA-34 task 6: paired stage 3 RunPlan, two 60k-step runs on one cut (cut ALL, target
+# zone drawn) that differ only in the VLM. DRAFT: written before the data (W1) and the
+# stage 1 checkpoint (W2) exist; not frozen, not launched.
+#
+# Hiếu 11/11/2026 (via the coordinator session; docs/he/tray.md section 19): eval C is low
+# because table B's target zone is not drawn, so the policy cannot see where the planner
+# lined up. W1: DA-33 draws the zone (new visuals revision) and regenerates both demo
+# pools, same seeds and planner; cut ALL. W2: DA-30 runs stage 1 on egx_7b43c30dc5d88cd7.
+# Then B_ALL (stage 1 VLM) and C_ALL (C's VLM) train on ALL with one recipe, one step
+# count, one train seed and one stats file, and are compared on v2's eval conditions.
+#
+# Schema and checks: flywheel_psi0.tray.pairplan (not runplan: the cut spans two
+# releases). `pairplan check` passes as a draft and lists the pins still null;
+# `freeze` and `check --launch` refuse until every one is filled and status is dropped.
+name: he-tray-psi0-pair60k
+purpose: paired_train
+story: DA-34
+status: draft
+site_id: local
+task:
+  id: g1_wholebody_tray_transfer_teleop # TASK_UID of flywheel_simple.tray.simple_task
+  env_id: simple/G1WholebodyTrayTransferTeleop-v0
+  config: configs/sim/tray.yaml
+embodiment: g1_sonic_dwbc@1
+
+code:
+  simple: {repo: physical-superintelligence-lab/SIMPLE, commit: b75c6786f87b4a7f43b52b0ac5b83a1d9ea62e11}
+  psi0: {repo: physical-superintelligence-lab/Psi0, commit: cda3fdfafe47cb6fa75400d013de1bd36e3cea05}
+
+# Revision pinned by S1-03 (docs/g0/psi0-eval.md 1.1), as in version 1.
+psi_model: {repo: USC-PSI-Lab/psi-model, revision: cb1480f50d9764ab2f6261bc2e651a67ad54da17}
+
+# C's parent (branch C_ALL) and its stage 1 child (branch B_ALL), same action header.
+parents:
+  psi0-baseline-egodex-he:
+    vlm:
+      path: psi0/pre.fast.1by1.2601091803.ckpt.ego200k.he30k/model.safetensors
+      sha256: 6e63da17bdd22430bc07c40e4b14ebb96c9d124d014c532449142862c186d3f9
+    action_header:
+      path: psi0/postpre.1by1.pad36.2601131206.ckpt.he30k/action_header.safetensors
+      sha256: 238b4d95862b0eb44bffa75a2ae69e120aeda3d159fd6f29802dd9338019e14d
+    clean_for_main_task: true
+    note: >-
+      Pretrained on EgoDex 200k + HE 30k steps; the pair the authors fine-tuned their SIMPLE
+      checkpoints from. The tray task is new (DA-32), so no tray data is in pretraining.
+
+  psi0-ego-stage1-egx:
+    vlm_stage1:
+      from_parent: psi0-baseline-egodex-he
+      story: DA-30
+      ledger: docs/g0/ledger/DA-30.csv
+      job_id: null # W2: DA-30's stage 1 job on egx_7b43c30dc5d88cd7
+      drive_dir: null # folder under MyDrive: every file of the parent's VLM folder, weights replaced
+      weights_sha256: null # model.safetensors of that folder
+      manifest_sha256: null # colab_train manifest of the whole folder
+      # header of the parent VLM's model.safetensors at psi-model cb1480f (625 BF16 tensors,
+      # no lm_head, embed_tokens 153792 x 2048): the stage 1 weights must match it
+      parent_header_sha256: 53d000d9626a13faf4bcb5268517b8441c34b187c88c9dee0b4c250dc19d6d59
+    action_header:
+      path: psi0/postpre.1by1.pad36.2601131206.ckpt.he30k/action_header.safetensors
+      sha256: 238b4d95862b0eb44bffa75a2ae69e120aeda3d159fd6f29802dd9338019e14d
+    clean_for_main_task: true
+    note: >-
+      Stage 1 of C's VLM on the E-A cleaned export egx_7b43c30dc5d88cd7 of the team's 153
+      egocentric clips (DA-04 10.5; people carrying a red box, not the sim tray), so no
+      tray scene is in its data; action header as C's.
+
+# W1 regenerates both pools with the target zone drawn: same seeds, same planner. ALL
+# joins one part per pool, in this order, as cplus_cut joined C's and the targeted cut.
+# Expected size from today's pools under the same rule: 429 + 177 = 606 episodes,
+# 861624 frames (assumption until W1 pins the real counts; tray.md 19.4).
+cut:
+  name: ALL
+  rule: >-
+    Every episode of each regenerated release that DA-03 QA keeps (rejects out) and that
+    passes the quality filter of 3/11/2026 (max_tilt_carry_deg 10, max_part_shift_end_mm
+    20), the filter C, C+ and CMAX were cut with; no size cap, no ranking, no selection.
+    Parts joined in order; stats computed once on the joined cut and used by both branches.
+  visuals_revision: null # W1: DA-33's revision that draws the target zone
+  parts:
+    - regenerates: tray_s1_f9433b028c52 # pool s1-pool-1104, seeds 1000-1609
+      release: null # W1
+      demo_sets: null # W1: demo-set file of the new release, with quality and qa pins
+      set_name: null # W1
+    - regenerates: tray_s1_6c0fd7d37f77 # targeted pool of C+ (229 episodes)
+      release: null
+      demo_sets: null
+      set_name: null
+  episodes: null # W1: episodes of the joined cut
+  frames: null # W1: meta/info.json total_frames of the joined cut
+  stats_sha256: null # W1: meta/stats_psi0.json of the joined cut, shared by both branches
+
+recipe:
+  file: configs/models/psi0-stage3.yaml # batch 16, lr 1e-4 cosine, warmup 1000, VLM frozen, RTC
+  sha256: 71ba5de8ef22a11432a829e86e93b7e662f5f38f453cca27f73d6fbe777a1dbd # recipe_sha256, no `estimate`
+  overrides:
+    train.validation_steps: 2000 # PO 4/11/2026 (S1-04 4.1), as v2
+    train.max_training_steps: 60000 # Hiếu 11/11/2026: both branches; the cosine runs over 60k
+  nproc_per_node: 1 # one Colab L4: global batch 16
+  dataset_stats: own_train_set # the train set of both branches is ALL: one stats file
+train_seeds: [0]
+
+branches:
+  B_ALL: {parent: psi0-ego-stage1-egx, role: "run 1: stage 1 VLM (W2) on ALL; vs C_ALL"}
+  C_ALL: {parent: psi0-baseline-egodex-he, role: "run 2: C's VLM on ALL; the baseline of B_ALL"}
+
+# v2's eval, unchanged (eval_of): 270 episodes per branch (docs/he/tray.md 8.2). Level 0 has one scene: 30 replicates,
+# reported apart. Levels 1 and 2: 120 dev seeds each, 240 scenes pooled into the primary
+# metric. [1000000, 1000100) is left out: tests and view_scene use seeds there.
+# Sim time, the condition seed on reset and lazy frame decode are on master (hotfix
+# ee02e0b, flywheel_simple/tray/run.py); the seeded server is docker/psi0/
+# serve_psi0_seeded.py (#97), used by scripts/g0/serve_psi0.sh serve (3fc46c5). Still
+# open: the GPU determinism check of tray.md 8.5.
+eval:
+  cli: eval-decoupled-wbc
+  sim_mode: mujoco
+  renderer: mujoco
+  synchronous: true
+  split: dev
+  clock: sim
+  policy_noise: per_episode_condition_seed
+  by_level:
+    - {level: 0, seeds: {start: 1000100, stop: 1000130}, unit: replicate, headline: false}
+    - {level: 1, seeds: {start: 1000100, stop: 1000220}, unit: condition, headline: true}
+    - {level: 2, seeds: {start: 1000100, stop: 1000220}, unit: condition, headline: true}
+  episode_limit_s: 90.0 # configs/sim/tray.yaml episode_limit_s
+
+metric: {primary: sim_success, per_stage: scorer_7_steps, failure_kinds: design_3_3}
+stats: {method: bootstrap_by_condition, resamples: 10000, seed: 20261103, ci: 0.95}
+
+# The eval of v2, condition by condition: its eval set pairs B_ALL with C_ALL. The scene
+# is W1's (target zone drawn), pinned by pinned_files at freeze, so neither run is
+# paired with eval C or C+ (tray.md 19.2 rule d).
+eval_of:
+  plan: configs/runplans/tray/he-tray-v2.yaml
+  run_plan_id: rp_a04c14e79dfd
+  eval_set: rp_a04c14e79dfd-2e57f60
+  conditions_sha256: b9c38b37afa6fbdd4027be287df85fe7b016130bd32227f97c876f6bae7d3dfb
+
+interpretation:
+  doc: docs/he/tray.md
+  rules_marker: pair60k-rules
+  rules_sha256: c9a9625211b55cef15b7a50130075284633b72a6bdc40ba2a59d0596b8e40aec # section 19.2 block
+pricebook: "assumption: Colab 100 CU pack, 0.0999 USD per CU (docs/g0/ledger/DA-19.csv)"
+
+# Two runs, one after the other on one account (tray.md 19.5): about 23.8 CU each
+# (assumption from C and C+ measured), cap 28, balance floor 14, so 42 CU before each run.
+budget:
+  ceiling_cu: 56
+  cap_cu_per_run: 28
+  runs: [B_ALL, C_ALL]
+  watcher: "scripts/colab/cu_watch.py session --cap 28 --floor 14, under one guard per batch; one batch per account"
+
+# Pinned at freeze with W1's scene (visuals.py and the rest of v2's list, re-hashed).
+pinned_files: null

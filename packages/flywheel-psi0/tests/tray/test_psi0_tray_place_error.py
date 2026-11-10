@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from typing import Any
 
 import numpy as np
 import pytest
@@ -71,3 +72,19 @@ def test_a_tray_left_on_the_target_is_in_tolerance() -> None:
     t = sample_episode(cfg, 1, 1_000_003).target_pose
     _, y = pe.pose_error([t.x, t.y, 0.85], quat_of_yaw(t.yaw), (t.x, t.y, t.yaw))
     assert y == pytest.approx(0.0, abs=1e-9)
+
+
+def test_relaxed_curve_relaxes_place_pose_only_and_never_yaw() -> None:
+    # tray.md 19.2 (c): a side figure; only L-PLACE-POSE moves in, within distance and 10 deg
+    rows: list[dict[str, Any]] = [
+        {"success": True, "failure": None, "distance_m": 0.01, "yaw_error_deg": 2.0},
+        {"success": False, "failure": "L-PLACE-POSE", "distance_m": 0.07, "yaw_error_deg": 5.0},
+        {"success": False, "failure": "L-PLACE-POSE", "distance_m": 0.12, "yaw_error_deg": 9.0},
+        {"success": False, "failure": "L-PLACE-POSE", "distance_m": 0.06, "yaw_error_deg": 25.0},
+        {"success": False, "failure": "L-TRAY-TILT", "distance_m": 0.02, "yaw_error_deg": 1.0},
+        {"success": False, "failure": "L-TIMEOUT", "distance_m": 0.03, "yaw_error_deg": 1.0},
+    ]
+    curve = pe.tolerance_curve(rows, 10.0)
+    assert [c["distance_m"] for c in curve] == [0.05, 0.075, 0.10, 0.15, 0.20]
+    assert [c["relaxed_successes"] for c in curve] == [1, 2, 2, 3, 3]
+    assert {c["n"] for c in curve} == {6} and {c["yaw_error_deg"] for c in curve} == {10.0}
