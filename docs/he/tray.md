@@ -1683,7 +1683,7 @@ Luật này không đổi sau khi thấy kết quả. Muốn đổi thì ghi `De
 
 ### 19.3 RunPlan cặp (nhiệm vụ con 6.1)
 
-[`he-tray-pair60k.yaml`](../../configs/runplans/tray/he-tray-pair60k.yaml), `status: draft`, id nháp `rp_92ab06fe3fff` (cap 61 ngày 11/11/2026; trước đó `rp_d44e3e6262b4` khi đổi sang A100, `rp_350a28bb7245` khi ghim cảnh `+zone1`, `rp_01c132b8d3b0` lúc đầu). Id đổi khi điền ghim.
+[`he-tray-pair60k.yaml`](../../configs/runplans/tray/he-tray-pair60k.yaml), `status: draft`, id nháp `rp_d44e3e6262b4` (A100, cap 70; cap 61 từng cho `rp_92ab06fe3fff`, rồi nâng lại 70 ngày 11/11/2026, 19.8; trước đó `rp_350a28bb7245` khi ghim cảnh `+zone1`, `rp_01c132b8d3b0` lúc đầu). Id đổi khi điền ghim.
 
 **Schema riêng.** Cut ALL trải trên hai release, mà `TrayRunPlan` chỉ có một release. Vì vậy plan cặp dùng schema riêng [`pairplan`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/pairplan.py) (`purpose: paired_train`).
 - Cut, recipe kèm override, seed train, eval và stats nằm một lần ở cấp plan. Mỗi nhánh chỉ chọn cha. Vì vậy "giống hệt trừ VLM" đúng theo cấu trúc.
@@ -1730,7 +1730,7 @@ Một epoch là một lượt qua mọi frame của cut (batch 16, `observation-
 
 **Hai run song song trên một tài khoản.** `scripts/colab/cu_watch.py` cho một đợt nhiều phiên: một `guard` cho cả đợt, mỗi phiên một `session` watcher trong cùng registry, hai lệnh `new` nối nhau qua `new.lock`, và khi nhiều phiên cùng chạy thì phần tụt số dư chia theo tỉ lệ rate của từng phiên. Ngày 3/11 tài khoản đã chạy 3 phiên song song ([psi0-finetune-cost.md](../g0/psi0-finetune-cost.md)). Vì vậy không cần sửa bộ canh. Ba điều phải giữ:
 - **Một đợt mỗi lúc.** Guard từ chối chạy khi đã có guard khác, và dừng mọi phiên không có watcher đăng ký. Đợt stage 1 của W2 phải xong (guard của nó đã thoát) trước khi mở đợt train. Phiên serve của eval (làn 2 bên dưới) vào **cùng** registry với đợt train, có watcher riêng.
-- **Sàn chỉ an toàn khi số dư đủ cho mọi cap cùng lúc**: lúc launch ít nhất 14 + 2 × 61 = 136 CU (`pairplan check` in số này), cộng cap của phiên serve nếu nó vào đợt.
+- **Sàn chỉ an toàn khi số dư đủ cho mọi cap cùng lúc**: lúc launch ít nhất 14 + 2 × 70 = 154 CU (`pairplan check` in số này), cộng cap của phiên serve nếu nó vào đợt.
 - **Mỗi phiên mount Drive riêng** (`colab drivemount -s <phiên>`), cần Hiếu đồng ý trên trình duyệt cho từng phiên. Trên mỗi VM, `persist --watch 600 --pid <pid train>` chép mọi `ckpt_<step>` đã lưu xong lên Drive (`sync_job` của `trainer/colab.py`, không `--delete`). Vì vậy `ckpt_40000` còn trên Drive khi VM chỉ giữ 5 checkpoint gần nhất. Mỗi run lưu 6 checkpoint (mỗi 10 000 bước), nên phải xem chỗ trống trên Drive trước khi launch.
 
 **`he1_fetch.py` và `he1_colab.py` (DA-26) cố định 40 000 bước** (`TOTAL_STEPS`). Với run 60k, `he1_fetch follow` chiếu chi phí tới `ckpt_40000`, và `stage` báo job 60k là `failed`. Vì vậy hai run 60k không dùng `follow`: checkpoint đi qua Drive. Muốn dùng `follow` thì đổi `TOTAL_STEPS` thành tham số, trong một PR riêng cho chủ của `scripts/he/` (ngoài phạm vi story này).
@@ -1768,13 +1768,13 @@ Giờ trong bảng là số giờ sau T0; trong ngoặc là giờ ví dụ với
 | Khoản | Ước lượng | Cap | Căn cứ |
 |---|---|---|---|
 | Stage 1 của W2 (sổ DA-30) | 2,5 | 4 | `tray-ego-b.yaml` |
-| Train `B_ALL`, `C_ALL` trên A100 | 2 × 57 = 114 | 2 × 61 = 122 | 8,45 giờ × 6,73 CU/giờ (`RATES` của `cu_watch.py`). Cap sát ước lượng, xem 19.8 |
+| Train `B_ALL`, `C_ALL` trên A100 | 2 × 57 = 114 | 2 × 70 = 140 | 8,45 giờ × 6,73 CU/giờ (`RATES` của `cu_watch.py`). Cap là lưới an toàn, xem 19.8 |
 | Serve làn 2, M | khoảng 9,5 | 12 | 4,9 giờ trên L4, 1,94 CU/giờ |
 | Serve làn 2, M+ | khoảng 19 | 22 | hai checkpoint |
-| **Tổng, M+** | **khoảng 135** | **148** | |
+| **Tổng, M+** | **khoảng 135** | **166** | |
 
-- **Số dư cần có.** Stage 1 chạy trong đợt riêng trước: cần ít nhất 14 + 4 = 18 CU. Đợt train có phiên serve của M+ nhập vào: lúc mở đợt cần ít nhất 14 + 122 + 22 = 158 CU, để không phiên nào chạm sàn kể cả khi mọi cap tiêu hết.
-- **Số dư 500,00 CU của tài khoản mới đủ**: 14 + 2 × 61 = 136 ≤ 500, cộng serve là 158. Hết đợt còn khoảng 500 − 135 ≈ 365 CU theo ước lượng, ít nhất 500 − 148 = 352 nếu mọi cap tiêu hết. Vẫn đủ chạy lại một run 60k ở cap (cần 14 + 61 = 75).
+- **Số dư cần có.** Stage 1 chạy trong đợt riêng trước: cần ít nhất 14 + 4 = 18 CU. Đợt train có phiên serve của M+ nhập vào: lúc mở đợt cần ít nhất 14 + 140 + 22 = 176 CU, để không phiên nào chạm sàn kể cả khi mọi cap tiêu hết.
+- **Số dư 500,00 CU của tài khoản mới đủ**: 14 + 2 × 70 = 154 ≤ 500, cộng serve là 176. Hết đợt còn khoảng 500 − 135 ≈ 365 CU theo ước lượng, ít nhất 500 − 166 = 334 nếu mọi cap tiêu hết. Vẫn đủ chạy lại một run 60k ở cap (cần 14 + 70 = 84).
 - **Plan dự phòng** [`he-tray-pair40k-seq.yaml`](../../configs/runplans/tray/he-tray-pair40k-seq.yaml) (L4, lần lượt, 40 000 bước) không còn cần, vì tài khoản mới chạy được hai phiên cùng lúc. File và id `rp_862e049c8d29` giữ nguyên, không sửa theo A100.
 - Dòng `estimated` trong [sổ chi phí](../g0/ledger/DA-34.csv), ghi trước mọi lượt chạy.
 
@@ -1824,18 +1824,16 @@ python -m flywheel_psi0.tray.evidence configs/runplans/tray/he-tray-pair60k.yaml
 
 Yêu cầu của Hiếu: không để phiên nào chạy không mà vẫn tính CU. `cu_watch.py` chỉ dừng phiên ở cap, ở sàn, hoặc khi nhận tín hiệu; nó **không** dừng khi train xong. Trên A100 (6,73 CU/giờ), một run xong sớm hơn cap 2 giờ là khoảng 13 CU mất không. Vì vậy mỗi phiên phải dừng ngay khi việc của nó xong hoặc hỏng, và cap chỉ là lưới cuối.
 
-**Cap sát ước lượng.** Cap 61 CU mỗi run (plan `rp_92ab06fe3fff`, trần 122), ước lượng chưa đo:
+**Cap 70 là lưới an toàn, không phải số chi** (plan `rp_d44e3e6262b4`, trần 140; phiên điều phối 11/11/2026). Không tốn CU khi phiên chạy không: vòng fetch bên dưới dừng phiên ngay khi `ckpt_60000` đã khớp sha256 trên laptop, nên mỗi run tiêu khoảng 57 CU (ước lượng 19.5) dù cap là bao nhiêu.
 
-| Phần | Giờ | Căn cứ |
+Cap còn đặt mức dừng sớm của `follow`. Ở bước 2 200, `follow` dự báo CU tới lúc `ckpt_60000` về laptop và dừng phiên nếu vượt mức dừng của cap. Ngưỡng tính bằng `projected_cu` và `stop_line` của PR #186, với s/bước như `metrics.jsonl` đo (cửa sổ tính cả val):
+
+| Cap mỗi run | Dừng sớm khi s/bước trên (pull 11 MB/s) | (pull 6 MB/s) |
 |---|---|---|
-| Setup, 60 000 bước, 30 lần val | 8,45 | 19.5 |
-| 6 lần lưu checkpoint | 0,05 | 31 s mỗi lần trên A100 (DA-19) |
-| Lượt pull cuối và kiểm sha256 | 0,19 | 60 s chờ lượt, 60 s kiểm, 6,25 GB ở khoảng 11 MB/s |
-| Biên dừng của watcher | 0,12 | `Timing.margin` 430 s |
-| 2 % thời gian train cho tốc độ bước | 0,16 | trên L4, đo ngắn 0,71 s và run C đủ 0,724 s lệch khoảng 2 % |
-| **Tổng** | **8,97** | × 6,73 = 60,4 CU, làm tròn lên **61** |
+| 61 (bản trước, sát ước lượng) | 0,509 | 0,501 |
+| **70** | **0,589** | **0,582** |
 
-Không có biên nào khác. Nếu tốc độ bước chậm hơn khoảng 2 %, luật dừng sớm ở bước 2 200 sẽ dừng phiên với khoảng 2 CU, trước khi run cháy tới cap.
+Tốc độ khả dĩ là khoảng 0,505 s/bước. Trên L4, run C đủ chậm hơn số đo ngắn khoảng 2 % (0,724 so với 0,71); áp cùng tỉ lệ cho A100 được 0,47 × 1,02 = 0,48, cộng khoảng 0,025 cho val. Với cap 61, con số này nằm ngay ở mức dừng, nên cả hai run có thể bị dừng oan ở bước 2 200 và lỡ hạn 12/11. Cap 70 để dư khoảng 15 % trên tốc độ đó. Lúc launch cần 14 + 2 × 70 = 154 CU, vẫn dưới số dư 500.
 
 **Dừng khi xong.** Bên cạnh mỗi run, từ lúc launch, chạy một vòng fetch trên laptop:
 
@@ -1860,10 +1858,10 @@ Run `C_ALL` dùng lệnh giống hệt với `da34-c-all` và `C_ALL`.
 | Điều kiện kiểm | Việc |
 |---|---|
 | `fwdata/tray/pair60k/<run>/fetched.json` có `"checkpoint": "ckpt_60000"`, `"bad_or_missing": []` và `"train": "done"`, và `fetched.json` của lượt có `ckpt_40000` cũng sạch như vậy | `colab stop <phiên>` ngay |
-| Từ bước 2 200, s/bước trung bình đọc từ `metrics.jsonl` (cửa sổ tính cả val, như `follow` đo) trên **0,50** | Dừng ngay. Ở tốc độ đó, 60 000 bước cộng setup, val, lưu và pull không còn vừa cap 61 |
+| Từ bước 2 200, s/bước trung bình đọc từ `metrics.jsonl` (cửa sổ tính cả val, như `follow` đo) trên **0,58** | Dừng ngay. Ở tốc độ đó, 60 000 bước cộng setup, val, lưu và pull không còn vừa cap 70 |
 | Train crash, hoặc không có bước mới trong 15 phút | Dừng ngay, sau khi lấy checkpoint đã có |
 
-Ngưỡng 0,50 là chỗ dự báo của `follow` (PR #186) vượt mức dừng của cap 61: 0,509 s/bước khi pull 11 MB/s, 0,501 khi pull 6 MB/s. Tốc độ dự kiến là 0,47 + 50 s / 2 000 bước = 0,495, nên còn khoảng 3 %.
+Ngưỡng 0,58 là mức dừng sớm của `follow` ở cap 70 khi pull chậm nhất (6 MB/s), theo bảng trên.
 
 **Phiên serve của làn 2** (M hoặc M+): dừng ngay khi lô eval cuối của checkpoint cuối đã ghi xong kết quả trên `rtx3060`. Không chờ cap 12 hay 22.
 
@@ -1917,3 +1915,4 @@ Ngưỡng 0,50 là chỗ dự báo của `follow` (PR #186) vượt mức dừng
 | 11/11/2026 | Mục 19 (Hiếu 11/11/2026 "Chốt A100" qua phiên điều phối): cặp 60k chạy song song trên A100. Plan 60k đổi ghi chú, watcher `--gpu A100 --cap 70 --floor 14`, cap 70 mỗi run, trần 140; recipe không đổi. Mục 19.5 tính lại theo ước lượng: 8,45 giờ và khoảng 57 CU mỗi run, số dư 500 CU đủ; mốc tính theo T0. Plan dự phòng không còn cần. Khối 19.2 không đổi. Id nháp mới `rp_d44e3e6262b4` | Hiếu (soạn với Claude) |
 | 11/11/2026 | Mục 19.8 (Hiếu 11/11/2026 qua phiên điều phối: "không để treo session mà tốn CU"): runbook dừng phiên khi xong và khi hỏng sớm (vòng `he1_fetch follow --stop-when-done`, bước bắt buộc khi không có nó), cap 61 sát ước lượng (trần 122, id nháp `rp_92ab06fe3fff`), bước cuối `colab sessions` trống. Mục 19.5 theo cap mới | Hiếu (soạn với Claude) |
 | 11/11/2026 | Mục 19.8: vòng fetch tự dừng là đường chính (`follow --stop-when-done --total-steps 60000 --gpu A100`, PR #186 merge trước #181); bước dừng tay chỉ là dự phòng, ngưỡng s/bước sửa thành 0,50 tính cả val như `follow` đo (trước ghi 0,485 không tính val) | Hiếu (soạn với Claude) |
+| 11/11/2026 | Mục 19.8, 19.5, 19.3 (phiên điều phối 11/11/2026): cap mỗi run nâng lại từ 61 lên 70, trần 140, lúc launch cần 154 CU. Lý do: ở cap 61, dừng sớm của `follow` ở bước 2 200 cắt run trên 0,50–0,51 s/bước, sát tốc độ khả dĩ 0,505; ở cap 70 mức đó là 0,58–0,59. Không tốn thêm CU vì phiên dừng khi `ckpt_60000` đã kiểm. Ngưỡng dừng tay thành 0,58. Id nháp về lại `rp_d44e3e6262b4` | Hiếu (soạn với Claude) |
