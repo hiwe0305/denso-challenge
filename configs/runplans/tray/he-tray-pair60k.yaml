@@ -148,15 +148,19 @@ pricebook: "assumption: Colab 100 CU pack, 0.0999 USD per CU (docs/g0/ledger/DA-
 # branches alike; the new account ran an A100 and an L4 session at once (balance 500 CU).
 # Estimate, not measured on this cut: 60000 x 0.47 s/step (A100, S1-04) = 7.83 h, plus
 # 30 vals (every 2000 steps) x about 50 s = 0.42 h, plus about 0.2 h setup = about 8.45 h
-# at 6.73 CU/h (cu_watch RATES) = about 57 CU each; cap 70 (about 10.4 h). One cu_watch
-# batch: one guard and one session watcher per run in one registry (cu_watch.py supports
-# N sessions per batch); the floor 14 is safe only while the balance holds both caps:
-# 14 + 2 x 70 = 154 CU.
+# at 6.73 CU/h (cu_watch RATES) = about 57 CU each. Cap close to it (Hiếu 11/11/2026:
+# no idle session billing; tray.md 19.8): + 6 saves x 31 s + the final pull and check
+# (about 0.19 h) = 8.69 h = 58.5 CU, + the watcher's stop margin (430 s, 0.8 CU), + 2 %
+# of train time for the step rate (L4: short probe 0.71 s, full run C 0.724 s) = 60.4:
+# cap 61. The session stops when ckpt_60000 is verified on the laptop, not at the cap.
+# One cu_watch batch: one guard and one session watcher per run in one registry
+# (cu_watch.py supports N sessions per batch); the floor 14 is safe only while the
+# balance holds both caps: 14 + 2 x 61 = 136 CU.
 budget:
-  ceiling_cu: 140
-  cap_cu_per_run: 70
+  ceiling_cu: 122
+  cap_cu_per_run: 61
   runs: [B_ALL, C_ALL]
-  watcher: "scripts/colab/cu_watch.py session --gpu A100 --cap 70 --floor 14, one per run, under one guard for the batch; one batch per account"
+  watcher: "scripts/colab/cu_watch.py session --gpu A100 --cap 61 --floor 14, one per run, under one guard for the batch; one batch per account"
 
 # Rule (e) of the 19.2 block: ckpt_60000 is the metric; ckpt_40000 an early read only.
 checkpoints:
