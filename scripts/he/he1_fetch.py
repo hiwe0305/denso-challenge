@@ -26,19 +26,28 @@ job of another story passes its own, e.g. DA-34's `--remote-work /content/da34`.
 from launch: it pulls every new complete checkpoint as it appears, so the cap-time
 pull only has the last one left, and ends once training is done and its final
 checkpoint is verified here (with `--stop-when-done` it then stops the session, so
-the minutes left before the cap are not billed). From step 38000, and once training
-has ended, it pulls every FINAL_EVERY_S instead of `--every`.
+the minutes left before the cap are not billed). From 2000 steps before the last one
+(step 38000 by default), and once training has ended, it pulls every FINAL_EVERY_S
+instead of `--every`.
 
 `probe` times a 1 GB rsync from the VM before setup, so a slow proxy shows at
 minute 10, not at the first checkpoint: it writes `<dest>/.<session>.probe.json`
 (not in the registry: the guard reads every `*.json` there as a watcher entry) and
 exits 4 under SLOW_MB_S.
 
+`--total-steps` and `--gpu` say what job is watched: its last step (default 40000,
+recipe R1) and its GPU, whose CU rate comes from cu_watch.py's `RATES` (default L4,
+DA-26's). A GPU with no rate there, or no checkpoint write time here, is refused. Any
+other step count goes to the VM's `stage` too, so a job that ends at that step is
+`done` (DA-34's 60k runs on A100, docs/he/tray.md 19.8); the defaults run exactly the
+commands they ran before.
+
 `follow` also enforces the early stop of docs/he/he-1.md section 7 (mandatory, review
 of #109): from step 2200 (the window then spans one validation pass) every pass
-projects the CU the job will have used once ckpt_40000 is written and pulled here,
+projects the CU the job will have used once its last checkpoint (`ckpt_<total steps>`)
+is written and pulled here,
 
-    spent + rate x (steps_left x s_per_step + saves_left x SAVE_S + FINAL_EVERY_S
+    spent + rate x (steps_left x s_per_step + saves_left x save_s + FINAL_EVERY_S
                     + VERIFY_S + final_bytes / MB/s) / 3600 + SAFETY_CU
 
 Until the first checkpoint, a projection over the watcher's stop line, cap - rate x
@@ -51,7 +60,7 @@ spent, while the watcher's cap still bounds the spend (and the guard stops a ses
 whose watcher stopped beating). A stop at step 2200 costs about 1.3 CU; letting the
 cap stop it costs about 17 CU for a ckpt_30000 the plan has no use for.
 
-A train that ended without ckpt_40000 (`stage` says `failed`) is pulled as far as it
+A train that ended without its last checkpoint (`stage` says `failed`) is pulled as far as it
 got, then its session is stopped (exit 5); so is a train that died before it made
 `runs/<job>` (`stage`'s top-level `train`). Every stop is confirmed: `colab stop` up
 to three times until two trusted listings in a row lack the session, then SIGTERM to
@@ -86,12 +95,13 @@ import subprocess
 import sys
 import time
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "colab"))
-from cu_watch import LIVE_STATES, parse_sessions, parse_usage  # noqa: E402
+from cu_watch import LIVE_STATES, RATES, parse_sessions, parse_usage  # noqa: E402
 
 COLAB = Path(
     os.environ.get("COLAB_CLI", "~/project/wm-wam-review/.venv-colab-cli/bin/colab")
@@ -101,13 +111,15 @@ REMOTE_WORK = "/content/da26"  # default of --remote-work
 PLAIN_PATH = re.compile(r"/[A-Za-z0-9._/-]+")
 SLOW_MB_S = 6.0  # 2.9 MB/s fills the ~36 min left at cap 18; 6 keeps the early-stop room
 # Recipe R1 (configs/models/psi0-stage3.yaml, checked by test_he1_fetch.py).
-TOTAL_STEPS, SAVE_EVERY = 40000, 10000
-RATE_CU_H = 1.94  # L4 (docs/g0/psi0-finetune-cost.md section 3)
+TOTAL_STEPS, SAVE_EVERY = 40000, 10000  # default of --total-steps; the save interval
+GPU = "L4"  # default of --gpu: DA-26's runs
+RATE_CU_H = RATES[GPU]  # the default GPU's rate (he1_eval.py's serve runs on L4)
 MARGIN_S = 430.0  # scripts/colab/cu_watch.py Timing().margin, checked by the tests
-SAVE_S = 60.0  # assumption: one ckpt_<step> write on L4 (31 s on A100, DA-19)
+# One ckpt_<step> write: an assumption on L4; 31 s measured on A100 (DA-19)
+SAVE_S_BY_GPU = {"L4": 60.0, "A100": 31.0}
 VERIFY_S = 60.0  # assumption: sha256 of the final checkpoint on the VM, then here
 FINAL_EVERY_S = 60.0  # pass interval near and after the end: the final pull's lag
-NEAR_END = TOTAL_STEPS - 2000
+NEAR_END_STEPS = 2000  # from this many steps before the last one, pass every FINAL_EVERY_S
 SAFETY_CU = 0.1
 FINAL_BYTES = 6.25e9  # model.safetensors of a stage 3 checkpoint (S1-03), until staged
 DECIDE_FROM = 2200  # first pass whose rate window spans the validation at step 2000
@@ -117,6 +129,42 @@ PULL_TIMEOUT_S = 3600.0  # 6.25 GB at 2 MB/s; a cut pull resumes from --partial-
 UNTRUSTED_RETRY_S = 20.0  # `once` retries an untrusted listing three times
 
 Run = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
+
+
+@dataclass(frozen=True)
+class Job:
+    """The job `follow` watches: its last step and the GPU it bills on."""
+
+    total_steps: int = TOTAL_STEPS
+    gpu: str = GPU
+
+    def __post_init__(self) -> None:
+        if self.total_steps <= 0 or self.total_steps % SAVE_EVERY:
+            raise ValueError(f"total steps {self.total_steps}: not a multiple of {SAVE_EVERY}")
+        if self.gpu not in RATES:
+            raise ValueError(f"GPU {self.gpu!r}: cu_watch.py has rates for {sorted(RATES)}")
+        if self.gpu not in SAVE_S_BY_GPU:
+            raise ValueError(f"GPU {self.gpu!r}: no checkpoint write time in SAVE_S_BY_GPU")
+
+    @property
+    def rate(self) -> float:
+        """CU per hour, cu_watch.py's own."""
+        return RATES[self.gpu]
+
+    @property
+    def save_s(self) -> float:
+        return SAVE_S_BY_GPU[self.gpu]
+
+    @property
+    def near_end(self) -> int:
+        return self.total_steps - NEAR_END_STEPS
+
+    @property
+    def last_checkpoint(self) -> str:
+        return f"ckpt_{self.total_steps}"
+
+
+DEFAULT_JOB = Job()
 
 
 def run(argv: Sequence[str]) -> subprocess.CompletedProcess[str]:
@@ -158,9 +206,10 @@ class Remote:
     def shell(self, command: str) -> list[str]:
         return [*self.ssh, command]
 
-    def stage(self) -> list[str]:
+    def stage(self, total_steps: int = TOTAL_STEPS) -> list[str]:
         work = shlex.quote(self.work)
-        return self.shell(f"cd {work} && python3 fw/scripts/he/he1_colab.py stage --work {work}")
+        command = f"cd {work} && python3 fw/scripts/he/he1_colab.py stage --work {work}"
+        return self.shell(command + steps_flag(total_steps))
 
 
 class LocalRemote(Remote):
@@ -174,9 +223,18 @@ class LocalRemote(Remote):
     def shell(self, command: str) -> list[str]:
         return ["bash", "-c", command]
 
-    def stage(self) -> list[str]:
+    def stage(self, total_steps: int = TOTAL_STEPS) -> list[str]:
         script = Path(__file__).resolve().parent / "he1_colab.py"
-        return self.shell(f"{self.python} {script} stage --work {self.work}")
+        command = f"{self.python} {script} stage --work {self.work}"
+        return self.shell(command + steps_flag(total_steps))
+
+
+def steps_flag(total_steps: int) -> str:
+    """`stage`'s flag for a job that does not end at the default step, else nothing.
+
+    The default sends the command as before, so a VM on an older checkout still runs it.
+    """
+    return "" if total_steps == TOTAL_STEPS else f" --total-steps {int(total_steps)}"
 
 
 def sha256(path: Path) -> str:
@@ -222,9 +280,10 @@ def fetch_once(
     dest_root: Path,
     runner: Run = run,
     clock: Callable[[], float] = time.monotonic,
+    job_shape: Job = DEFAULT_JOB,
 ) -> list[dict[str, Any]]:
     """Pull what `stage` lists and is not here yet; return one status per job."""
-    staged = runner(remote.stage())
+    staged = runner(remote.stage(job_shape.total_steps))
     if staged.returncode != 0:
         raise RuntimeError(f"stage failed ({staged.returncode}): {staged.stderr[-500:]}")
     listing = json.loads(staged.stdout)
@@ -279,7 +338,7 @@ def fetch_once(
             "seconds": round(seconds, 1),
             "mb_per_s": round(ckpt_size / 1e6 / seconds, 2) if ckpt_ok and seconds else None,
             "final": job["train"] == "done"
-            and job["checkpoint"] == f"ckpt_{TOTAL_STEPS}"
+            and job["checkpoint"] == job_shape.last_checkpoint
             and not bad,
             "progress": job.get("progress", {}),
             "checkpoint_bytes": sum(f["size"] for f in files if in_checkpoint(f)),
@@ -336,22 +395,31 @@ def watcher_meter(
 
 
 def projected_cu(
-    spent: float, step: int, s_per_step: float, mb_s: float, final_bytes: float
+    spent: float,
+    step: int,
+    s_per_step: float,
+    mb_s: float,
+    final_bytes: float,
+    job: Job = DEFAULT_JOB,
 ) -> float:
     """CU the job will have used once its last checkpoint is written and pulled here."""
-    saves_left = len(range((step // SAVE_EVERY + 1) * SAVE_EVERY, TOTAL_STEPS + 1, SAVE_EVERY))
-    seconds = (TOTAL_STEPS - step) * s_per_step + saves_left * SAVE_S
+    last = job.total_steps
+    saves_left = len(range((step // SAVE_EVERY + 1) * SAVE_EVERY, last + 1, SAVE_EVERY))
+    seconds = (last - step) * s_per_step + saves_left * job.save_s
     seconds += FINAL_EVERY_S + VERIFY_S + final_bytes / (mb_s * 1e6)
-    return spent + RATE_CU_H * seconds / 3600 + SAFETY_CU
+    return spent + job.rate * seconds / 3600 + SAFETY_CU
 
 
-def stop_line(cap: float) -> float:
+def stop_line(cap: float, job: Job = DEFAULT_JOB) -> float:
     """Spend at which the watcher stops the session (`over` of cu_watch.py)."""
-    return cap - RATE_CU_H * MARGIN_S / 3600
+    return cap - job.rate * MARGIN_S / 3600
 
 
 def judge(
-    status: dict[str, Any], meter: tuple[float, float] | None, mb_s: float
+    status: dict[str, Any],
+    meter: tuple[float, float] | None,
+    mb_s: float,
+    job: Job = DEFAULT_JOB,
 ) -> dict[str, Any] | None:
     """The early-stop verdict of one pass, or None before DECIDE_FROM or after training.
 
@@ -366,8 +434,8 @@ def judge(
         return {"verdict": "blind", "step": step, "reason": reason}
     spent, cap = meter
     final = status["checkpoint_bytes"] or FINAL_BYTES
-    projected = projected_cu(spent, step, rate, mb_s, final)
-    over = projected > stop_line(cap)
+    projected = projected_cu(spent, step, rate, mb_s, final, job)
+    over = projected > stop_line(cap, job)
     return {
         "verdict": ("stop" if step < SAVE_EVERY else "late") if over else "ok",
         "step": step,
@@ -375,7 +443,7 @@ def judge(
         "spent": spent,
         "mb_s": mb_s,
         "projected_cu": round(projected, 2),
-        "stop_line": round(stop_line(cap), 3),
+        "stop_line": round(stop_line(cap, job), 3),
     }
 
 
@@ -488,9 +556,11 @@ def stop_session(
     return False
 
 
-def pause(every: float, last_step: int, statuses: list[dict[str, Any]]) -> float:
-    """Seconds to the next pass: FINAL_EVERY_S from NEAR_END or once training ended."""
-    ending = last_step >= NEAR_END or any(s["train"] != "running" for s in statuses)
+def pause(
+    every: float, last_step: int, statuses: list[dict[str, Any]], job: Job = DEFAULT_JOB
+) -> float:
+    """Seconds to the next pass: FINAL_EVERY_S near the last step or once training ended."""
+    ending = last_step >= job.near_end or any(s["train"] != "running" for s in statuses)
     return min(every, FINAL_EVERY_S) if ending else every
 
 
@@ -523,6 +593,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="`once`: a job with no train (the eval), done once a pass pulled it",
     )
+    parser.add_argument(
+        "--total-steps",
+        type=int,
+        default=TOTAL_STEPS,
+        help=f"the job's last step, a multiple of {SAVE_EVERY} (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--gpu",
+        default=GPU,
+        help=f"the session's GPU, one of cu_watch.py's RATES {sorted(RATES)} (default: L4)",
+    )
     parser.add_argument("--local-vm", type=Path, help="dry run: a VM work dir on this disk")
     parser.add_argument(
         "--remote-work",
@@ -531,6 +612,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="the job's folder on the VM, a plain absolute path (default: %(default)s)",
     )
     args = parser.parse_args(argv)
+    try:
+        job_shape = Job(args.total_steps, args.gpu)
+    except ValueError as error:
+        parser.error(str(error))
     remote = (
         LocalRemote(args.local_vm)
         if args.local_vm
@@ -587,11 +672,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 alert(f"{args.session}: {untrusted} untrusted listings in a row; check colab")
                 if args.mode == "once":
                     return 2
-            wait(UNTRUSTED_RETRY_S if args.mode == "once" else pause(args.every, last_step, []))
+            retry = pause(args.every, last_step, [], job_shape)
+            wait(UNTRUSTED_RETRY_S if args.mode == "once" else retry)
             continue
         untrusted = 0
         try:
-            statuses = fetch_once(remote, args.dest)
+            statuses = fetch_once(remote, args.dest, job_shape=job_shape)
         except TrainFailed as error:
             alert(f"{args.session}: {error}")
             return stopped(5) if args.mode == "follow" else 5
@@ -611,7 +697,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.mode == "follow":
             meter = watcher_meter(args.registry, args.session)
             for status in statuses:
-                verdict = judge(status, meter, mb_s)
+                verdict = judge(status, meter, mb_s, job_shape)
                 if verdict is None or verdict["verdict"] == "ok":
                     continue
                 if verdict["verdict"] == "stop":
@@ -623,7 +709,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return stopped(0)
         if done or args.mode == "once":
             return 0 if done else 1
-        wait(pause(args.every, last_step, statuses))
+        wait(pause(args.every, last_step, statuses, job_shape))
 
 
 if __name__ == "__main__":
