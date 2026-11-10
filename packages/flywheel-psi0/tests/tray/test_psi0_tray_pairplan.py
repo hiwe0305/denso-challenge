@@ -189,3 +189,51 @@ def test_epochs_of_c_cplus_and_all() -> None:
     assert epochs(40000, 16, 228247) == pytest.approx(2.804, abs=1e-3)
     assert epochs(40000, 16, 455372) == pytest.approx(1.405, abs=1e-3)
     assert epochs(60000, 16, 861624) == pytest.approx(1.114, abs=1e-3)
+
+
+FALLBACK = PLANS / "he-tray-pair40k-seq.yaml"
+
+
+def test_the_60k_plan_reads_60k_and_40k_early_and_needs_both_caps_at_once() -> None:
+    plan = TrayPairPlan.load(PAIR)
+    assert (plan.checkpoints.primary, plan.checkpoints.early) == (60000, 40000)
+    assert plan.schedule.mode == "parallel" and pairplan.balance_needed(plan) == 14 + 2 * 28
+    assert "early 40000" in pairplan.summary(plan, REPO)
+
+
+@pytest.mark.parametrize(
+    ("change", "seen"),
+    [
+        ({"primary": 50000}, "is not the step count 60000"),
+        ({"early": 60000}, "is not before 60000"),
+        ({"early": 45000}, "saves every 10000 steps only"),
+    ],
+)
+def test_the_checkpoints_read_are_ones_psi0_saves(change: dict[str, int], seen: str) -> None:
+    raw = _raw()
+    raw["checkpoints"].update(change)
+    assert any(seen in p for p in _problems(raw))
+
+
+def test_the_watcher_line_states_the_cap_and_floor() -> None:
+    raw = _raw()
+    raw["schedule"]["floor_cu"] = 20
+    assert "budget.watcher does not say --floor 20" in _problems(raw)
+
+
+def test_the_fallback_is_the_60k_plan_with_40k_steps_run_one_after_the_other() -> None:
+    main, fallback = _raw(), yaml.safe_load(FALLBACK.read_text(encoding="utf-8"))
+    differs = {k for k in main.keys() | fallback.keys() if main.get(k) != fallback.get(k)}
+    assert differs == {"name", "recipe", "budget", "checkpoints", "schedule"}
+    assert {k for k in main["recipe"] if main["recipe"][k] != fallback["recipe"][k]} == {
+        "overrides"
+    }
+    assert fallback["recipe"]["overrides"] == {
+        **main["recipe"]["overrides"], "train.max_training_steps": 40000
+    }  # fmt: skip
+    plan = TrayPairPlan.model_validate(fallback)
+    assert check(plan, REPO) == [] and len(pending(plan)) == 15
+    assert (plan.checkpoints.primary, plan.checkpoints.early) == (40000, None)
+    assert plan.schedule.mode == "sequential" and pairplan.balance_needed(plan) == 14 + 18
+    assert plan.interpretation == TrayPairPlan.load(PAIR).interpretation  # one rules block
+    assert run_plan_id(plan) != run_plan_id(TrayPairPlan.load(PAIR))
