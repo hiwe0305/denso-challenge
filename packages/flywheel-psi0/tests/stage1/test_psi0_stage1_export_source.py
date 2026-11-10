@@ -193,6 +193,7 @@ def test_setup_gets_the_export_from_drive(
     (work / "fw").symlink_to(REPO)
     commands: list[str] = []
     monkeypatch.setattr(colab, "setup_psi0_env", lambda work: None)
+    monkeypatch.setattr(colab, "match_cuda_toolchain", lambda venv_bin, sh: {"env": {}})
     monkeypatch.setattr(colab, "check_parent", lambda psi0, plan: None)
     monkeypatch.setattr(colab, "sh", lambda command, cwd=None, env=None: commands.append(command))
     colab.setup(work, plan_path, drive)
@@ -266,6 +267,7 @@ def test_setup_refuses_a_plan_that_pins_another_sample_count(
     work.mkdir()
     (work / "fw").symlink_to(REPO)
     monkeypatch.setattr(colab, "setup_psi0_env", lambda work: None)
+    monkeypatch.setattr(colab, "match_cuda_toolchain", lambda venv_bin, sh: {"env": {}})
     monkeypatch.setattr(colab, "check_parent", lambda psi0, plan: None)
     monkeypatch.setattr(colab, "sh", lambda command, cwd=None, env=None: None)
     with pytest.raises(ExportRefused, match="the plan pins 4"):
