@@ -73,3 +73,29 @@ Chạy trên `rtx3060` đêm 10–11/11/2026 (giờ UTC của máy), trong scope
 | Khác bản cũ | Parquet (state, action) trùng từng byte; chỉ video khác |
 
 Hai sha khác nhau vì lô sinh trước khi có commit ghi `code_sha` vào meta export; commit duy nhất giữa chúng chỉ đổi `export.py` và test của nó, không đổi đường sinh.
+
+### 5.2 QA của DA-03 và cut ALL (13.4)
+
+| Mục | Giá trị |
+|---|---|
+| QA của DA-03 | `fw data ingest` + `replay_check reports` (DA-17) + `fw data qa --replay`, ngưỡng `qa-1@fb6ddaf9f48c`, `replay-1@cf2515483a8c`: 534 pass / 7 reject và 226 pass / 3 reject, như bản cũ |
+| Bộ lọc như C | `demo_sets --qa-work --quality`, nghiêng ≤ 10°, linh kiện trượt ≤ 20 mm |
+| Tập qua QA | Kho planner-5: 429 (bản cũ 429). Kho C+ có đích: 177 (bản cũ 177). Không seed nào chỉ có ở một bên |
+| Cut | `rtx3060:~/denso-da34-pool/fwdata/cut-all-zone1/ALL/G1WholebodyTrayTransferTeleop-v0`, nhãn tập `ALL`; dựng bằng `demo_sets`, `scripts/he/demo_subset.py`, `flywheel_psi0.tray.cplus_cut` ở master `7b0defd1` |
+| Nội dung | 606 episode, 861 624 frame. Index 0–428: 429 episode của `tray_s1_41899efb4b27`, set_hash `a919ce21…`. Index 429–605: 177 episode của `tray_s1_4a8f4a8c6a8d`, set_hash `19ed50d2…`. Stats là own_train_set của 606 episode |
+| Kiểm | `cut-all-zone1.sha256`: 1226 file, 5,30 GB, sha256 của danh sách `87048974…`; `meta/flywheel_subset.json` sha256 `c58f41a5…`; nguồn gốc đầy đủ trong `CUT_INFO.json` cạnh cut |
+
+Lưu ý cho người train và chạy eval:
+- Phần kho planner-5 là cả 429 episode qua lọc, không phải tập C 160.
+- Nhãn tập là `ALL`, nên `colab_train --branch C` hay `C_PLUS` không nhận cut này; cần plan mới.
+- Eval trên cảnh có vùng đích cần guard so với revision `+zone1` (mục 3).
+
+### 5.3 Chi phí
+
+| Việc | Ước tính | Thực đo |
+|---|---|---|
+| Sinh lô (giờ-worker GPU) | 20,6 | 20,0 |
+| QA phát lại (giờ-worker GPU) | 16,0 | 18,9 |
+| Release, QA DA-03, cut (giờ CPU) | 0,4 | 0,1 |
+| Lưu trữ (GB) | 14,0 | 23,5 (lô thô 7,2; release 6,4; thư mục cut 9,9 gồm hai phần trung gian 5,0) |
+| Giờ làm của phiên Claude | 6,0 | 5,5 |
