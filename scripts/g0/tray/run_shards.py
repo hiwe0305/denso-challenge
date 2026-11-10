@@ -12,7 +12,10 @@ command (`generate.py --shard k --workers W`) from a queue:
 - a shard that exits with attempts left is started again (generate.py resumes from
   its log), at most --max-starts times; one whose gen_log has not changed for
   --stale seconds is killed and started again (video writer deadlock, D-28);
-- at the end each batch gets summary.json as generate.py writes it.
+- at the end each batch gets summary.json as generate.py writes it;
+- `--adopt` takes over shards an earlier run of this script left running (found by
+  their command line), so a run can be restarted with another --max-live without
+  starting a shard twice; adopted shards are watched by pid.
 
     MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/python \
         scripts/g0/tray/run_shards.py --batches batches.json --max-live 10
@@ -54,6 +57,7 @@ class Shard:
     share: int
     starts: int = 0
     proc: subprocess.Popen[bytes] | None = None
+    pid: int | None = None  # adopted from an earlier run, no Popen
     started_at: float = 0.0
     exits: list[int] = field(default_factory=list)
 
@@ -75,6 +79,32 @@ class Shard:
         if b.get("targeted"):
             return cmd + ["--targeted"]
         return cmd + ["--level", str(b["level"]), "--seed-start", str(b["seed_start"])]
+
+
+def running_shards() -> dict[tuple[str, int], int]:
+    """(out, shard) -> pid of every generate.py shard process alive on this machine."""
+    found = {}
+    for proc in Path("/proc").iterdir():
+        if not proc.name.isdigit():
+            continue
+        try:
+            argv = (proc / "cmdline").read_bytes().decode().split("\0")
+        except OSError:
+            continue
+        if not any(a.endswith("generate.py") for a in argv) or "--shard" not in argv:
+            continue
+        out = argv[argv.index("--out") + 1]
+        found[(str(Path(out)), int(argv[argv.index("--shard") + 1]))] = int(proc.name)
+    return found
+
+
+def alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    stat = Path(f"/proc/{pid}/stat")
+    return not (stat.exists() and stat.read_text().split(") ")[-1].startswith("Z"))
 
 
 def shares(batch: dict[str, Any]) -> list[int]:
@@ -112,6 +142,7 @@ def main() -> int:
     ap.add_argument("--stale", type=float, default=900.0)
     ap.add_argument("--stagger", type=float, default=8.0)
     ap.add_argument("--poll", type=float, default=30.0)
+    ap.add_argument("--adopt", action="store_true", help="watch shards already running")
     args = ap.parse_args()
     batches = json.loads(args.batches.read_text())
     log = args.batches.with_suffix(".log")
@@ -131,20 +162,37 @@ def main() -> int:
         env.setdefault(var, "1")
     live: list[Shard] = []
     done: list[Shard] = []
+    if args.adopt:
+        running = running_shards()
+        for sh in list(queue):
+            pid = running.get((str(sh.out), sh.k))
+            if pid is not None:
+                sh.pid, sh.starts, sh.started_at = pid, 1, time.time()
+                queue.remove(sh)
+                live.append(sh)
+                say(log, f"{sh.out.name} shard {sh.k} adopted pid {pid}, {sh.left()} left")
     while queue or live:
         for s in list(live):
-            assert s.proc is not None
-            rc = s.proc.poll()
+            if s.proc is not None:
+                rc = s.proc.poll()
+            else:  # adopted: no exit code, only whether it is alive
+                assert s.pid is not None
+                rc = None if alive(s.pid) else 0
             now = time.time()
             if rc is None:
                 age = now - (s.log.stat().st_mtime if s.log.exists() else s.started_at)
                 if age > args.stale and now - s.started_at > args.stale:
                     say(log, f"{s.out.name} shard {s.k} stale {age:.0f}s: kill")
-                    s.proc.kill()
-                    s.proc.wait()
+                    if s.proc is not None:
+                        s.proc.kill()
+                        s.proc.wait()
+                    else:
+                        assert s.pid is not None
+                        os.kill(s.pid, 9)
                     rc = -9
                 else:
                     continue
+            s.proc, s.pid = None, None
             s.exits.append(rc)
             live.remove(s)
             left = s.left()
