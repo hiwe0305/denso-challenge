@@ -1588,6 +1588,8 @@ _**[Đã chốt 11/11/2026, Hiếu]** (qua phiên điều phối): vẽ vùng đ
 
 _**[Đã chốt 11/11/2026 01:50, Hiếu]** (qua phiên điều phối): cần số thành công trong ngày 12/11. Hai run chạy **song song** từ khoảng 12:00 ngày 11/11, mỗi run một L4; `ckpt_40000` lên Drive để đọc sớm trong lúc train tiếp tới 60 000; nếu không chạy song song được thì hai run lần lượt, mỗi run 40 000 bước. Lịch, eval và ngân sách ở 19.5 là **[Đề xuất]**._
 
+_**[Đã chốt 11/11/2026, Hiếu]** ("Chốt A100", qua phiên điều phối): hai run vẫn song song, mỗi run một **A100**, hai nhánh như nhau; batch 16 và `nproc_per_node` 1 giữ nguyên, chỉ đổi phần cứng. Căn cứ: lúc 04:2x Hiếu thử trên tài khoản Colab mới (số dư 500,00 CU). `colab new --gpu A100` READY (A100-SXM4-40GB, 12 vCPU); trong lúc phiên đó còn chạy, `colab new --gpu L4` cũng READY, và `colab sessions` liệt kê cả hai. H100 trả 503 nên không dùng. Plan dự phòng 40k lần lượt không còn cần. VLM stage 1 nằm trên Drive của tài khoản mới (DA-30 chạy stage 1 trên tài khoản đó)._
+
 ### 19.1 Thiết lập
 
 **Lý do** (số của phiên điều phối, 11/11/2026). Eval C thấp vì vùng đích trên bàn B không được vẽ. Planner căn ngang theo đích ẩn, còn policy chỉ thấy ảnh. Độ lệch chuẩn của độ lệch ngang base − đích là 13 cm ở lượt hỏng, 5,3 cm ở lượt thành công.
@@ -1681,7 +1683,7 @@ Luật này không đổi sau khi thấy kết quả. Muốn đổi thì ghi `De
 
 ### 19.3 RunPlan cặp (nhiệm vụ con 6.1)
 
-[`he-tray-pair60k.yaml`](../../configs/runplans/tray/he-tray-pair60k.yaml), `status: draft`, id nháp `rp_350a28bb7245` (ghim cảnh `+zone1` ngày 11/11/2026; trước đó `rp_01c132b8d3b0`). Id đổi khi điền ghim.
+[`he-tray-pair60k.yaml`](../../configs/runplans/tray/he-tray-pair60k.yaml), `status: draft`, id nháp `rp_d44e3e6262b4` (A100 ngày 11/11/2026; trước đó `rp_350a28bb7245` khi ghim cảnh `+zone1`, `rp_01c132b8d3b0` lúc đầu). Id đổi khi điền ghim.
 
 **Schema riêng.** Cut ALL trải trên hai release, mà `TrayRunPlan` chỉ có một release. Vì vậy plan cặp dùng schema riêng [`pairplan`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/pairplan.py) (`purpose: paired_train`).
 - Cut, recipe kèm override, seed train, eval và stats nằm một lần ở cấp plan. Mỗi nhánh chỉ chọn cha. Vì vậy "giống hệt trừ VLM" đúng theo cấu trúc.
@@ -1728,49 +1730,52 @@ Một epoch là một lượt qua mọi frame của cut (batch 16, `observation-
 
 **Hai run song song trên một tài khoản.** `scripts/colab/cu_watch.py` cho một đợt nhiều phiên: một `guard` cho cả đợt, mỗi phiên một `session` watcher trong cùng registry, hai lệnh `new` nối nhau qua `new.lock`, và khi nhiều phiên cùng chạy thì phần tụt số dư chia theo tỉ lệ rate của từng phiên. Ngày 3/11 tài khoản đã chạy 3 phiên song song ([psi0-finetune-cost.md](../g0/psi0-finetune-cost.md)). Vì vậy không cần sửa bộ canh. Ba điều phải giữ:
 - **Một đợt mỗi lúc.** Guard từ chối chạy khi đã có guard khác, và dừng mọi phiên không có watcher đăng ký. Đợt stage 1 của W2 phải xong (guard của nó đã thoát) trước khi mở đợt train. Phiên serve của eval (làn 2 bên dưới) vào **cùng** registry với đợt train, có watcher riêng.
-- **Sàn chỉ an toàn khi số dư đủ cho mọi cap cùng lúc**: lúc launch ít nhất 14 + 2 × 28 = 70 CU (`pairplan check` in số này), cộng cap của phiên serve nếu nó vào đợt.
+- **Sàn chỉ an toàn khi số dư đủ cho mọi cap cùng lúc**: lúc launch ít nhất 14 + 2 × 70 = 154 CU (`pairplan check` in số này), cộng cap của phiên serve nếu nó vào đợt.
 - **Mỗi phiên mount Drive riêng** (`colab drivemount -s <phiên>`), cần Hiếu đồng ý trên trình duyệt cho từng phiên. Trên mỗi VM, `persist --watch 600 --pid <pid train>` chép mọi `ckpt_<step>` đã lưu xong lên Drive (`sync_job` của `trainer/colab.py`, không `--delete`). Vì vậy `ckpt_40000` còn trên Drive khi VM chỉ giữ 5 checkpoint gần nhất. Mỗi run lưu 6 checkpoint (mỗi 10 000 bước), nên phải xem chỗ trống trên Drive trước khi launch.
 
 **`he1_fetch.py` và `he1_colab.py` (DA-26) cố định 40 000 bước** (`TOTAL_STEPS`). Với run 60k, `he1_fetch follow` chiếu chi phí tới `ckpt_40000`, và `stage` báo job 60k là `failed`. Vì vậy hai run 60k không dùng `follow`: checkpoint đi qua Drive. Muốn dùng `follow` thì đổi `TOTAL_STEPS` thành tham số, trong một PR riêng cho chủ của `scripts/he/` (ngoài phạm vi story này).
 
-**Mốc thời gian** (giả định; giờ Việt Nam):
+**Thời gian mỗi run trên A100** (ước lượng, chưa đo trên cut ALL): 60 000 × 0,47 s = 7,83 giờ train (A100, batch 16, đo 400 bước liên tục ở [psi0-finetune-cost.md](../g0/psi0-finetune-cost.md) mục 3), cộng 30 lần val (mỗi 2 000 bước) × khoảng 50 s = 0,42 giờ, cộng khoảng 0,2 giờ setup như C: **khoảng 8,45 giờ**, trong khoảng 8–9 giờ. Job bị chặn ở CPU nạp dữ liệu, và VM A100 mới cũng có 12 vCPU như lúc đo. Trên L4, số đo ngắn (0,71 s) và run C đầy đủ (0,724 s mỗi bước, gồm val và setup) chỉ lệch khoảng 2 %, nên số ngắn của A100 là căn cứ dùng được.
 
-| Mốc | Khoảng | Căn cứ |
-|---|---|---|
-| Cut ALL sẵn (W1) | 12:00 ngày 11/11 | phiên điều phối |
-| Train bắt đầu, cả hai phiên | 12:20 | setup khoảng 0,2 giờ như C; hai `new` nối nhau |
-| `ckpt_40000` trên Drive | 20:25 | 40 000 × 0,724 s = 8,04 giờ; `persist` mỗi 10 phút |
-| `ckpt_40000` trên `rtx3060` | 20:45 | 6,25 GB ở khoảng 11 MB/s, khoảng 10 phút, kiểm sha256 |
-| `ckpt_60000` trên Drive, hết train | 00:30 ngày 12/11 | 60 000 × 0,724 s = 12,07 giờ |
-| `ckpt_60000` trên `rtx3060` | 00:50 | như trên |
+**Mốc thời gian** (ước lượng). T0 là lúc cả hai phiên bắt đầu train, sau khi cut ALL (W1), VLM stage 1 (W2) và mã chạy của 6.3 đã có, và đợt stage 1 đã đóng. Giờ ví dụ lấy T0 = 06:00 ngày 11/11 (giả định; DA-33 dự kiến xong cut ALL khoảng 04:45–05:15).
 
-**Eval.** Giai đoạn 1 (6 lô, 60 điều kiện) mất khoảng 4,1 giờ mỗi model trên `rtx3060` (6 lô đó của eval C SimReady đo 4,07 giờ). `rtx3060` chỉ chạy **một** server Ψ₀ (server thứ hai không vừa GPU 12 GB), và mỗi server chỉ một client (mục 17.7). Muốn hai model chạy cùng lúc thì server thứ hai phải ở Colab: server Ψ₀ trên một L4, client trên `rtx3060` qua SSH forward (đã chạy được ngày 3/11, RTT 460 ms). `rtx3060` khi đó chạy một server và hai client, đúng tải của phép đo 17.7 (hai client không chung server nên không dính lỗi RTC của 17.7). Giả định mỗi episode qua Colab chậm hơn khoảng 10 %: giai đoạn 1 khoảng 4,5 giờ. Ngày 4/11 tài khoản bị từ chối L4 thứ ba khi đã có hai phiên, nên trong lúc hai run còn train (tới 00:30), không chắc mở được phiên serve.
+| Mốc | Sau T0 | Ví dụ | Căn cứ |
+|---|---|---|---|
+| `ckpt_40000` trên Drive | 5,7 giờ | 11:40 | 0,2 + 40 000 × 0,47 s + 20 val; `persist` mỗi 10 phút |
+| `ckpt_40000` trên `rtx3060` | 6,0 giờ | 12:00 | 6,25 GB ở khoảng 11 MB/s, khoảng 10 phút, kiểm sha256 |
+| `ckpt_60000` trên Drive, hết train | 8,45 giờ | 14:30 | như trên, 60 000 bước, 30 val |
+| `ckpt_60000` trên `rtx3060` | 8,8 giờ | 14:50 | như trên |
+
+Luật đọc không đổi khi đổi phần cứng: (e) vẫn lấy `ckpt_60000` làm số chính và `ckpt_40000` chỉ để đọc sớm. Cosine vẫn trải trên 60 000 bước vì recipe và override không đổi; GPU chỉ đổi tốc độ, không đổi bước nào được lưu (mỗi 10 000 bước).
+
+**Eval.** Giai đoạn 1 (6 lô, 60 điều kiện) mất khoảng 4,1 giờ mỗi model trên `rtx3060` (6 lô đó của eval C SimReady đo 4,07 giờ). `rtx3060` chỉ chạy **một** server Ψ₀ (server thứ hai không vừa GPU 12 GB), và mỗi server chỉ một client (mục 17.7). Muốn hai model chạy cùng lúc thì server thứ hai phải ở Colab: server Ψ₀ trên một L4, client trên `rtx3060` qua SSH forward (đã chạy được ngày 3/11, RTT 460 ms). `rtx3060` khi đó chạy một server và hai client, đúng tải của phép đo 17.7 (hai client không chung server nên không dính lỗi RTC của 17.7). Giả định mỗi episode qua Colab chậm hơn khoảng 10 %: giai đoạn 1 khoảng 4,5 giờ, cộng khoảng 0,4 giờ setup và nạp. Tài khoản mới đã chạy hai phiên cùng lúc. Phiên thứ ba (serve L4 trong lúc hai A100 còn train) chưa thử, nên không chắc mở được trước T0 + 8,45 giờ.
 
 | Phương án | Làn 1: `rtx3060`, server tại chỗ | Làn 2: server Colab L4, client `rtx3060` | Đọc sớm 40k, cả hai | Số chính 60k, cả hai | CU serve |
 |---|---|---|---|---|---|
-| R: chỉ `rtx3060` | B40 20:45–00:50, C40 –04:55, B60 –09:00, C60 –13:05 | Không | 04:55 | 13:05 | 0 |
-| M: thêm làn 2 sau khi train xong | B40 20:45–00:50, B60 –04:55, C40 –09:00 | C60 00:50–05:20 | 09:00 | 05:20 | khoảng 9,5 (cap 12) |
-| M+: làn 2 mở được ngay lúc 40k | B40 20:45–00:50, B60 –04:55 | C40 20:55–01:25, C60 –05:55 | 01:25 | 05:55 | khoảng 19 (cap 22) |
+| R: chỉ `rtx3060` | B40 +6,0–10,1, C40 –14,2, B60 –18,3, C60 –22,4 | Không | +14,2 (20:10) | +22,4 (04:25 ngày 12/11) | 0 |
+| M: thêm làn 2 sau khi train xong | B40 +6,0–10,1, B60 –14,2, C40 –18,3 | C60 +8,9–13,4 | +18,3 (00:15 ngày 12/11) | +14,2 (20:10) | khoảng 9,5 (cap 12) |
+| M+: làn 2 mở được ngay lúc 40k | B40 +6,0–10,1, B60 –14,2 | C40 +6,1–10,6, C60 –15,1 | +10,6 (16:35) | +15,1 (21:05) | khoảng 19 (cap 22) |
 
-- **Đề xuất: thử M+, lùi về M.** Lúc 20:15 mở phiên serve bằng `cu_watch session --new` trong registry của đợt train. Nếu Colab từ chối L4, watcher thoát mã 6, không mở phiên nào và không dừng phiên khác (test `test_a_refused_new_stops_nothing`). Khi đó chạy M từ 00:50, lúc hai phiên train đã đóng.
-- Cả ba phương án có số chính trong ngày 12/11. Mốc 00:30 và 04:00 của phiên điều phối cần hai server cùng lúc ngay từ 20:45; M+ gần nhất.
+Giờ trong bảng là số giờ sau T0; trong ngoặc là giờ ví dụ với T0 = 06:00.
+
+- **Đề xuất: thử M+, lùi về M.** Khoảng T0 + 5,3 giờ, mở phiên serve bằng `cu_watch session --new --gpu L4` trong registry của đợt train. Nếu Colab từ chối L4, watcher thoát mã 6, không mở phiên nào và không dừng phiên khác (test `test_a_refused_new_stops_nothing`). Khi đó chạy M từ T0 + 8,9 giờ, lúc hai phiên train đã đóng.
+- Với T0 = 06:00, cả ba phương án có số chính trước 04:30 ngày 12/11; M và M+ có ngay tối 11/11.
 - Server Colab phải chạy cùng lệnh với server tại chỗ (`serve_psi0.sh serve`: seeded, `Ta` 24, `--rtc`) và kiểm sha256 checkpoint trước khi nạp. Phần này chưa có mã: việc 6.3.
-- Giai đoạn 2 (đủ 240): theo 19.2, chỉ khi giai đoạn 1 của số chính ra "đi tiếp". Mỗi model thêm khoảng 13 giờ `rtx3060` (11,4 giờ lô mức 1–2, 1,7 giờ mức 0), nên với hai làn thì xong khoảng 19:00 ngày 12/11. Chạy thêm sau E1, E3, F chỉ để thu hẹp khoảng của (b) thì cần `Decision`.
+- Giai đoạn 2 (đủ 240): theo 19.2, chỉ khi giai đoạn 1 của số chính ra "đi tiếp". Mỗi model thêm khoảng 13 giờ `rtx3060` (11,4 giờ lô mức 1–2, 1,7 giờ mức 0). Với hai làn, xong khoảng T0 + 28 giờ (10:00 ngày 12/11 nếu T0 = 06:00). Chạy thêm sau E1, E3, F chỉ để thu hẹp khoảng của (b) thì cần `Decision`.
 
-**Ngân sách** (CU Colab; giá 0,0999 USD mỗi CU):
+**Ngân sách** (CU Colab, ước lượng; giá 0,0999 USD mỗi CU):
 
 | Khoản | Ước lượng | Cap | Căn cứ |
 |---|---|---|---|
 | Stage 1 của W2 (sổ DA-30) | 2,5 | 4 | `tray-ego-b.yaml` |
-| Train `B_ALL`, `C_ALL` | 2 × 23,8 = 47,6 | 2 × 28 = 56 | 12,07 giờ train + khoảng 0,2 giờ setup, 1,93 CU/giờ (C: 15,99 CU / 8,27 giờ; C+: 16,11 / 8,37) |
-| Serve làn 2, M | khoảng 9,5 | 12 | 4,5 giờ eval + khoảng 0,4 giờ setup và nạp, 1,94 CU/giờ |
+| Train `B_ALL`, `C_ALL` trên A100 | 2 × 57 = 114 | 2 × 70 = 140 | 8,45 giờ × 6,73 CU/giờ (`RATES` của `cu_watch.py`); cap 70 là khoảng 10,4 giờ, dư khoảng 23 % |
+| Serve làn 2, M | khoảng 9,5 | 12 | 4,9 giờ trên L4, 1,94 CU/giờ |
 | Serve làn 2, M+ | khoảng 19 | 22 | hai checkpoint |
-| **Tổng, M+** | **khoảng 69** | **82** | |
+| **Tổng, M+** | **khoảng 135** | **166** | |
 
-- **Số dư cần có.** Stage 1 chạy trong đợt riêng trước: cần ít nhất 14 + 4 = 18 CU. Đợt train có phiên serve của M+ nhập vào: lúc mở đợt cần ít nhất 14 + 56 + 22 = 92 CU, để không phiên nào chạm sàn kể cả khi mọi cap tiêu hết.
-- **Cần mua.** Số dư hiện là 14,88 CU (mục 17.8). Tối thiểu khoảng 92 + 4 − 14,88 ≈ 81 CU. **Gói 100 CU đủ**: 114,88, còn ít nhất 110,88 sau stage 1 (≥ 92). Hết đợt còn khoảng 114,88 − 69 ≈ 46 CU theo ước lượng, ít nhất 32,88 nếu mọi cap tiêu hết.
-- 100 CU **không** đủ để chạy lại một run 60k nếu mọi cap đều tiêu hết (cần 14 + 28 = 42 > 32,88). Chạy lại cần mua thêm.
-- **Plan dự phòng** (lần lượt, 40 000 bước): khoảng 16 CU mỗi run (C đo 15,99), cap 18, cần 14 + 18 = 32 CU trước mỗi run, không có phiên serve. B 12:20–20:30, C 20:40–04:50. Eval trên `rtx3060`: B 20:50–00:55, C 05:10–09:15, nên số chính có khoảng 09:15 ngày 12/11. Gói 100 CU dư.
+- **Số dư cần có.** Stage 1 chạy trong đợt riêng trước: cần ít nhất 14 + 4 = 18 CU. Đợt train có phiên serve của M+ nhập vào: lúc mở đợt cần ít nhất 14 + 140 + 22 = 176 CU, để không phiên nào chạm sàn kể cả khi mọi cap tiêu hết.
+- **Số dư 500,00 CU của tài khoản mới đủ**: 14 + 2 × 70 = 154 ≤ 500, cộng serve là 176. Hết đợt còn khoảng 500 − 135 ≈ 365 CU theo ước lượng, ít nhất 500 − 166 = 334 nếu mọi cap tiêu hết. Vẫn đủ chạy lại một run 60k ở cap (cần 14 + 70 = 84).
+- **Plan dự phòng** [`he-tray-pair40k-seq.yaml`](../../configs/runplans/tray/he-tray-pair40k-seq.yaml) (L4, lần lượt, 40 000 bước) không còn cần, vì tài khoản mới chạy được hai phiên cùng lúc. File và id `rp_862e049c8d29` giữ nguyên, không sửa theo A100.
 - Dòng `estimated` trong [sổ chi phí](../g0/ledger/DA-34.csv), ghi trước mọi lượt chạy.
 
 ### 19.6 Gói bằng chứng (chuẩn bị trước, điền bằng một lệnh)
@@ -1805,7 +1810,7 @@ python -m flywheel_psi0.tray.evidence configs/runplans/tray/he-tray-pair60k.yaml
 ### 19.7 Việc còn lại
 
 - **W1, W2:** điền các chỗ trống ở 19.3, cho plan sẽ chạy.
-- **6.2:** Hiếu duyệt 19.2 (nhãn ngoài khối, không đổi sha256) và chọn plan 60k song song hay plan dự phòng; `Decision` nháp; bỏ `draft`, `pairplan freeze` plan đã chọn.
+- **6.2:** Hiếu duyệt 19.2 (nhãn ngoài khối, không đổi sha256) (Hiếu đã chốt plan 60k song song trên A100); `Decision` nháp; bỏ `draft`, `pairplan freeze`.
 - **6.3, phải xong trước 12:00 ngày 11/11:** mã chạy.
   - `colab_train` cho hai nhánh của plan cặp: dữ liệu từ cut ALL, VLM stage 1 lấy từ Drive như B, override số bước. Hai lệnh train trên hai VM, mỗi VM một `persist --watch`.
   - Nối hai phần thành ALL như `cplus_cut`.
@@ -1853,3 +1858,4 @@ python -m flywheel_psi0.tray.evidence configs/runplans/tray/he-tray-pair60k.yaml
 | 11/11/2026 | Mục 19 (Hiếu 11/11/2026 01:50 qua phiên điều phối: cần số trong ngày 12/11): hai run song song, `ckpt_40000` lên Drive để đọc sớm. Khối `pair60k-rules` thêm luật (e) (60k là số chính, 40k chỉ đọc sớm; plan dự phòng đọc 40k) và điều kiện server đúng checkpoint, nên `rules_sha256` đổi thành `24747738…`. 19.3: trường `checkpoints`, `schedule`, plan dự phòng `he-tray-pair40k-seq.yaml` (`rp_1160d977dd9f`); id nháp của plan 60k thành `rp_01c132b8d3b0`. 19.5 viết lại: bộ canh CU cho một đợt nhiều phiên; lịch; ba phương án eval R, M, M+; ngân sách và số dư cần mua (gói 100 CU đủ). 19.6 mới: gói bằng chứng `evidence`, chạy thử trên số thật của C và C+. 19.7: việc còn lại | Claude cho Hiếu |
 | 11/11/2026 | Mục 18 (quyết định của Hiếu 11/11/2026): B và C-max đã thay thế bởi cặp trên cut ALL, vì cảnh `+zone1` (DA-33, PR #182) đổi file hai plan ghim; `superseded_by` đặt ngoài id, id giữ nguyên. Test tray không còn đọc trạng thái file sống: `tests/tray/conftest.py` bỏ qua độ lệch mà cây sống đã có, giữ độ lệch do test tạo | Claude cho Hiếu |
 | 11/11/2026 | Mục 19.3 (#182 đã merge, master `7b0defd1`): hai plan cặp ghim `pinned_files` (danh sách của bản 2, băm lại; chỉ `mjcf.py`, nơi đặt `TARGET_ZONE_REVISION`, và `simple_task.py` đổi) và `cut.visuals_revision` `…+zone1`. Id nháp mới `rp_350a28bb7245` (60k) và `rp_862e049c8d29` (dự phòng); còn 13 ghim chờ W1 và W2 | Hiếu (soạn với Claude) |
+| 11/11/2026 | Mục 19 (Hiếu 11/11/2026 "Chốt A100" qua phiên điều phối): cặp 60k chạy song song trên A100. Plan 60k đổi ghi chú, watcher `--gpu A100 --cap 70 --floor 14`, cap 70 mỗi run, trần 140; recipe không đổi. Mục 19.5 tính lại theo ước lượng: 8,45 giờ và khoảng 57 CU mỗi run, số dư 500 CU đủ; mốc tính theo T0. Plan dự phòng không còn cần. Khối 19.2 không đổi. Id nháp mới `rp_d44e3e6262b4` | Hiếu (soạn với Claude) |
