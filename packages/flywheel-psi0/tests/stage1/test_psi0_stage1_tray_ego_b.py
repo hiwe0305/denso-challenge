@@ -30,7 +30,9 @@ def plan() -> Stage1Plan:
     return Stage1Plan.load(PLAN)
 
 
-RUN_PLAN_ID = "rp_64bde22a5dda"  # pinned 9/11/2026; DA-34 branch B reads its output
+# A100, cap 8 CU since 11/11/2026 (the L4 ran out of memory, docs/he/stage1.md 2.10);
+# rp_64bde22a5dda on the L4. DA-34 branch B reads its output.
+RUN_PLAN_ID = "rp_1d7627234111"
 
 
 def drafted(tmp_path: Path) -> Path:
@@ -53,6 +55,10 @@ def test_the_plan_is_ready_and_keeps_its_id(capsys: pytest.CaptureFixture[str]) 
     assert run_plan_id(plan()) == RUN_PLAN_ID
     assert main(["check", str(PLAN)]) == 0
     assert capsys.readouterr().out.strip() == f"OK {RUN_PLAN_ID}"
+
+
+def test_the_run_is_on_an_a100_under_8_cu() -> None:
+    assert plan().compute.gpu == "A100" and plan().compute.max_compute_units == 8.0
 
 
 def test_setup_preflight_passes_once_the_tarball_is_on_drive(tmp_path: Path) -> None:
