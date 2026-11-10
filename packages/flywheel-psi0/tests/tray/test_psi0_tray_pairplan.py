@@ -201,7 +201,9 @@ FALLBACK = PLANS / "he-tray-pair40k-seq.yaml"
 def test_the_60k_plan_reads_60k_and_40k_early_and_needs_both_caps_at_once() -> None:
     plan = TrayPairPlan.load(PAIR)
     assert (plan.checkpoints.primary, plan.checkpoints.early) == (60000, 40000)
-    assert plan.schedule.mode == "parallel" and pairplan.balance_needed(plan) == 14 + 2 * 28
+    assert plan.schedule.mode == "parallel" and pairplan.balance_needed(plan) == 14 + 2 * 70
+    # Hiếu 11/11/2026 "Chốt A100": both runs on A100, cap 70 each, recipe unchanged
+    assert "--gpu A100" in plan.budget.watcher and plan.budget.ceiling_cu == 140
     assert "early 40000" in pairplan.summary(plan, REPO)
 
 

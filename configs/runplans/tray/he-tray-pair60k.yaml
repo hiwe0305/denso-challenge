@@ -96,7 +96,7 @@ recipe:
   overrides:
     train.validation_steps: 2000 # PO 4/11/2026 (S1-04 4.1), as v2
     train.max_training_steps: 60000 # Hiếu 11/11/2026: both branches; the cosine runs over 60k
-  nproc_per_node: 1 # one Colab L4: global batch 16
+  nproc_per_node: 1 # one Colab A100 per branch (Hiếu 11/11/2026): global batch 16, recipe as on L4
   dataset_stats: own_train_set # the train set of both branches is ALL: one stats file
 train_seeds: [0]
 
@@ -143,16 +143,20 @@ interpretation:
   rules_sha256: 24747738624e926d4678fb875744bdc3e7b7c0916d1d0559f99b836c41587017 # section 19.2 block
 pricebook: "assumption: Colab 100 CU pack, 0.0999 USD per CU (docs/g0/ledger/DA-19.csv)"
 
-# Hiếu 11/11/2026 01:50 (via the coordinator): both runs at once, about 12:00 on 11/11,
-# one Colab L4 each, so the success numbers land on 12/11 (tray.md 19.5). About 23.8 CU
-# each (assumption from C and C+ measured), cap 28. One cu_watch batch: one guard and one
-# session watcher per run in one registry (cu_watch.py supports N sessions per batch);
-# the floor 14 is safe only while the balance holds both caps: 14 + 2 x 28 = 70 CU.
+# Hiếu 11/11/2026 01:50 (via the coordinator): both runs at once, so the success numbers
+# land on 12/11 (tray.md 19.5). Hiếu 11/11/2026 ("Chốt A100"): one Colab A100 each, both
+# branches alike; the new account ran an A100 and an L4 session at once (balance 500 CU).
+# Estimate, not measured on this cut: 60000 x 0.47 s/step (A100, S1-04) = 7.83 h, plus
+# 30 vals (every 2000 steps) x about 50 s = 0.42 h, plus about 0.2 h setup = about 8.45 h
+# at 6.73 CU/h (cu_watch RATES) = about 57 CU each; cap 70 (about 10.4 h). One cu_watch
+# batch: one guard and one session watcher per run in one registry (cu_watch.py supports
+# N sessions per batch); the floor 14 is safe only while the balance holds both caps:
+# 14 + 2 x 70 = 154 CU.
 budget:
-  ceiling_cu: 56
-  cap_cu_per_run: 28
+  ceiling_cu: 140
+  cap_cu_per_run: 70
   runs: [B_ALL, C_ALL]
-  watcher: "scripts/colab/cu_watch.py session --cap 28 --floor 14, one per run, under one guard for the batch; one batch per account"
+  watcher: "scripts/colab/cu_watch.py session --gpu A100 --cap 70 --floor 14, one per run, under one guard for the batch; one batch per account"
 
 # Rule (e) of the 19.2 block: ckpt_60000 is the metric; ckpt_40000 an early read only.
 checkpoints:
