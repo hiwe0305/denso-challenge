@@ -1,4 +1,4 @@
-"""The paired 60k plan of DA-34 task 6: one cut, two VLMs, pins pending (tray.md 19)."""
+"""The paired 60k plan of DA-34 task 6: one cut, two VLMs x two data sizes (tray.md 19)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,16 @@ from typing import Any
 import pytest
 import yaml
 from flywheel_psi0.tray import pairplan, runplan
-from flywheel_psi0.tray.pairplan import TrayPairPlan, check, epochs, pending
+from flywheel_psi0.tray.pairplan import (
+    TrayPairPlan,
+    check,
+    epochs,
+    pending,
+    seeds_sha256,
+    subset_lists,
+    subset_seeds,
+    subset_size,
+)
 from flywheel_psi0.tray.runplan import run_plan_id
 
 REPO = Path(__file__).resolve().parents[4]
@@ -48,6 +57,15 @@ def _pinned(raw: dict[str, Any]) -> dict[str, Any]:
         weights_sha256="b" * 64, manifest_sha256="c" * 64,
     )  # fmt: skip
     raw["pinned_files"] = {}
+    for subset in raw["subsets"]:
+        subset["parts"][0]["regenerates"], subset["parts"][1]["regenerates"] = "pool-a", "pool-b"
+    plan = TrayPairPlan.model_validate(raw)
+    lists = subset_lists(plan, REPO)
+    for subset in raw["subsets"]:
+        for sp in subset["parts"]:
+            seeds = lists[subset["name"]][sp["regenerates"]]
+            sp.update(episodes=len(seeds), seeds_sha256=seeds_sha256(seeds))
+        subset.update(episodes=sum(sp["episodes"] for sp in subset["parts"]), frames=580000)
     return raw
 
 
@@ -56,8 +74,9 @@ def test_the_draft_holds_and_lists_what_w1_and_w2_owe() -> None:
     assert check(plan, REPO) == []
     assert plan.status == "draft" and plan.steps() == 60000
     todo = pending(plan)
-    assert len(todo) == 13
+    assert len(todo) == 19  # 13 of the pair + 6 of S70 (two parts x two pins, two totals)
     assert sum("(W1)" in p for p in todo) == 9 and sum("(DA-30)" in p for p in todo) == 4
+    assert sum("subset S70" in p and "(after W1)" in p for p in todo) == 6
     assert plan.interpretation.rules_marker == "pair60k-rules"
     text = (REPO / plan.interpretation.doc).read_text(encoding="utf-8")
     assert runplan.rules_sha256(text, "pair60k-rules") == plan.interpretation.rules_sha256
@@ -66,8 +85,18 @@ def test_the_draft_holds_and_lists_what_w1_and_w2_owe() -> None:
     assert runplan.rules_sha256(text, "branch-b-rules") == b.interpretation.rules_sha256
 
 
-def test_only_the_vlm_differs_by_construction() -> None:
+def test_only_the_vlm_and_the_subset_differ_by_construction() -> None:
     plan = TrayPairPlan.load(PAIR)
+    cells = {n: (b.parent, plan.data_of(b)) for n, b in plan.branches.items()}
+    assert cells == {
+        "B_ALL": ("psi0-ego-stage1-egx", "ALL"),
+        "C_ALL": ("psi0-baseline-egodex-he", "ALL"),
+        "B_70": ("psi0-ego-stage1-egx", "S70"),
+        "C_70": ("psi0-baseline-egodex-he", "S70"),
+    }
+    s70 = plan.subset("S70")
+    assert s70 is not None and (s70.fraction, s70.order, s70.stats) == (0.7, "sha256_seed", "cut")
+    assert [p.regenerates for p in s70.parts] == [p.regenerates for p in plan.cut.parts]
     b_all, c_all = (
         plan.parents[plan.branches["B_ALL"].parent],
         plan.parents["psi0-baseline-egodex-he"],
@@ -101,7 +130,12 @@ def test_only_the_vlm_differs_by_construction() -> None:
         ),
         (("eval_of", "eval_set"), "rp_366283071c4a-x", "is not an eval set of"),
         (("budget", "runs"), ["B_ALL"], "runs are exactly the branches"),
-        (("budget", "ceiling_cu"), 40, "over the ceiling"),
+        (("budget", "ceiling_cu"), 140, "over the ceiling"),
+        (("schedule", "waves"), [["B_ALL", "C_ALL"], ["B_70"]], "every branch in exactly one wave"),
+        (("comparisons", 0, "kind"), "secondary", "exactly one primary"),
+        (("comparisons", 0, "baseline"), "C_ALL", "the primary compares one data size"),
+        (("comparisons", 1, "margin"), None, "a margin goes with noninferiority only"),
+        (("subsets", 0, "parts", 1, "regenerates"), "pool-x", "parts are not the cut's"),
         (("interpretation", "rules_sha256"), "0" * 64, "reading rules"),
         (
             ("parents", "psi0-ego-stage1-egx", "vlm_stage1", "from_parent"),
@@ -125,18 +159,81 @@ def test_any_second_difference_is_refused(path: tuple[str, ...], value: object, 
     assert any(seen in p for p in problems), problems
 
 
-def test_the_step_count_is_stated_and_a_pair_is_two_branches_two_parents() -> None:
+def test_the_step_count_is_stated_and_the_branches_are_two_vlms_on_every_data() -> None:
     raw = _raw()
     del raw["recipe"]["overrides"]["train.max_training_steps"]
     assert any("states its step count" in p for p in _problems(raw))
-    raw = _raw()
-    raw["branches"]["C_ALL"]["parent"] = "psi0-ego-stage1-egx"
-    with pytest.raises(ValueError, match="two parents"):
-        TrayPairPlan.model_validate(raw)
+    for name, parent in (("C_ALL", "psi0-ego-stage1-egx"), ("C_70", "psi0-other")):
+        raw = _raw()
+        raw["branches"][name]["parent"] = parent
+        with pytest.raises(ValueError, match="parent|two parents"):
+            TrayPairPlan.model_validate(raw)
     raw = _raw()
     raw["branches"]["C2"] = {"parent": "psi0-baseline-egodex-he", "role": "x"}
-    with pytest.raises(ValueError, match="two branches"):
+    with pytest.raises(ValueError, match="every \\(parent, data\\) pair once"):
         TrayPairPlan.model_validate(raw)
+    raw = _raw()
+    del raw["branches"]["C_70"]  # B_70 alone has no paired baseline on S70
+    with pytest.raises(ValueError, match="every \\(parent, data\\) pair once"):
+        TrayPairPlan.model_validate(raw)
+    raw = _raw()
+    raw["branches"]["B_70"]["data"] = "S60"
+    with pytest.raises(ValueError, match="is no subset"):
+        TrayPairPlan.model_validate(raw)
+    # the plain pair still holds: two branches on the cut, no subsets, no comparisons
+    raw = _raw()
+    for key in ("B_70", "C_70"):
+        del raw["branches"][key]
+    for key in ("subsets", "comparisons"):
+        del raw[key]
+    with pytest.raises(ValueError, match="pinned but unused"):
+        TrayPairPlan.model_validate({**_raw(), "branches": raw["branches"]})
+    raw["schedule"].pop("waves")
+    raw["budget"].update(runs=["B_ALL", "C_ALL"], ceiling_cu=140)
+    assert _problems(raw) == []
+
+
+def test_subset_size_rounds_up_exactly() -> None:
+    assert [subset_size(n, 0.7) for n in (10, 20, 429, 177, 1)] == [7, 14, 301, 124, 1]
+    assert subset_size(3, 0.7) == 3  # 2.1 rounds up to 3
+
+
+def test_the_subset_is_the_seeds_by_sha256_alone() -> None:
+    seeds = list(range(1000, 1610))
+    chosen = subset_seeds(seeds, 0.7)
+    assert len(chosen) == 427 and chosen == sorted(chosen) and set(chosen) <= set(seeds)
+    # the order of the input and any other seed in the pool change nothing for a seed
+    assert subset_seeds(list(reversed(seeds)), 0.7) == chosen
+    assert subset_seeds(seeds[:10], 0.7) == subset_seeds(list(reversed(seeds[:10])), 0.7)
+    # pinned by its list; one seed more or less is another list
+    assert seeds_sha256(chosen) == seeds_sha256(list(reversed(chosen)))
+    assert seeds_sha256(chosen) != seeds_sha256(chosen[1:])
+    with pytest.raises(ValueError, match="twice"):
+        subset_seeds([1, 1, 2], 0.7)
+
+
+def test_subset_pins_are_checked_against_the_pinned_parts(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    raw = _pinned(_raw())
+    assert _problems(raw) == []
+    s70 = raw["subsets"][0]
+    assert [sp["episodes"] for sp in s70["parts"]] == [subset_size(n, 0.7) for n in (
+        len(pairplan.part_seeds(TrayPairPlan.model_validate(raw).cut.parts[0], REPO) or []),
+        len(pairplan.part_seeds(TrayPairPlan.model_validate(raw).cut.parts[1], REPO) or []),
+    )]  # fmt: skip
+    wrong = copy.deepcopy(raw)
+    wrong["subsets"][0]["parts"][0]["seeds_sha256"] = "e" * 64
+    assert any("seeds_sha256 is not the list" in p for p in _problems(wrong))
+    wrong = copy.deepcopy(raw)
+    wrong["subsets"][0]["parts"][1]["episodes"] += 1
+    assert any("episodes pinned" in p for p in _problems(wrong))
+    wrong = copy.deepcopy(raw)
+    wrong["subsets"][0]["episodes"] += 1
+    assert any("is not the parts' sum" in p for p in _problems(wrong))
+    early = _raw()
+    early["subsets"][0]["parts"][0]["seeds_sha256"] = "e" * 64
+    assert any("pinned before the part" in p for p in _problems(early))
 
 
 def test_cut_parts_pin_whole_and_new() -> None:
@@ -157,15 +254,16 @@ def test_no_launch_and_no_freeze_until_pinned(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert pairplan.main(["check", str(PAIR)]) == 0
-    assert "draft, 13 pins pending" in capsys.readouterr().out
+    assert "draft, 19 pins pending" in capsys.readouterr().out
     assert pairplan.main(["check", str(PAIR), "--launch"]) == 1
     err = capsys.readouterr().err
-    assert "DRAFT" in err and err.count("PENDING:") == 13 and "not frozen" in err
+    assert "DRAFT" in err and err.count("PENDING:") == 19 and "not frozen" in err
+    assert pairplan.main(["subset", str(PAIR)]) == 1  # nothing to list before W1
     with pytest.raises(ValueError, match="status draft"):
         pairplan.freeze(PAIR, REPO)
     # runplan hands a paired plan over, and refuses a --release it would not read
     assert runplan.main(["check", str(PAIR)]) == 0
-    assert "13 pins pending" in capsys.readouterr().out
+    assert "19 pins pending" in capsys.readouterr().out
     with pytest.raises(SystemExit):
         runplan.main(["check", str(PAIR), "--release", str(tmp_path)])
 
@@ -186,6 +284,12 @@ def test_freezes_once_pinned_and_released_from_draft(
     assert pairplan.main(["check", str(plan_path), "--launch"]) == 0
     out = capsys.readouterr().out
     assert "launch OK" in out and "1.15 epochs of ALL" in out  # 60000 x 16 / 837194
+    assert "1.66 epochs of S70" in out  # 60000 x 16 / 580000
+    assert pairplan.main(["subset", str(plan_path)]) == 0
+    listed = json.loads(capsys.readouterr().out)["S70"]
+    for sp in raw["subsets"][0]["parts"]:
+        part = listed[sp["regenerates"]]
+        assert (part["episodes"], part["seeds_sha256"]) == (sp["episodes"], sp["seeds_sha256"])
 
 
 def test_epochs_of_c_cplus_and_all() -> None:
@@ -195,17 +299,22 @@ def test_epochs_of_c_cplus_and_all() -> None:
     assert epochs(60000, 16, 861624) == pytest.approx(1.114, abs=1e-3)
 
 
-FALLBACK = PLANS / "he-tray-pair40k-seq.yaml"
-
-
-def test_the_60k_plan_reads_60k_and_40k_early_and_needs_both_caps_at_once() -> None:
+def test_the_60k_plan_reads_60k_and_40k_early_and_needs_every_cap_at_once() -> None:
     plan = TrayPairPlan.load(PAIR)
     assert (plan.checkpoints.primary, plan.checkpoints.early) == (60000, 40000)
-    assert plan.schedule.mode == "parallel" and pairplan.balance_needed(plan) == 14 + 2 * 70
-    # Hiếu 11/11/2026 "Chốt A100": both runs on A100, recipe unchanged; cap 70 each as a
+    assert plan.schedule.mode == "parallel" and pairplan.balance_needed(plan) == 14 + 4 * 70
+    assert plan.schedule.waves == [["B_ALL", "C_ALL"], ["B_70", "C_70"]]
+    # Hiếu 11/11/2026 "Chốt A100": every run on A100, recipe unchanged; cap 70 each as a
     # safety net (the fetch loop stops a session once ckpt_60000 is verified)
-    assert "--gpu A100 --cap 70" in plan.budget.watcher and plan.budget.ceiling_cu == 140
+    assert "--gpu A100 --cap 70" in plan.budget.watcher and plan.budget.ceiling_cu == 280
     assert "early 40000" in pairplan.summary(plan, REPO)
+    assert plan.comparisons is not None
+    assert [(c.rule, c.variant, c.baseline, c.kind, c.margin) for c in plan.comparisons] == [
+        ("a′", "B_70", "C_70", "primary", None),
+        ("f", "B_70", "C_ALL", "noninferiority", 0.10),
+        ("g", "C_70", "C_ALL", "noninferiority", 0.10),
+        ("h", "B_ALL", "C_ALL", "secondary", None),
+    ]
 
 
 @pytest.mark.parametrize(
@@ -226,21 +335,3 @@ def test_the_watcher_line_states_the_cap_and_floor() -> None:
     raw = _raw()
     raw["schedule"]["floor_cu"] = 20
     assert "budget.watcher does not say --floor 20" in _problems(raw)
-
-
-def test_the_fallback_is_the_60k_plan_with_40k_steps_run_one_after_the_other() -> None:
-    main, fallback = _raw(), yaml.safe_load(FALLBACK.read_text(encoding="utf-8"))
-    differs = {k for k in main.keys() | fallback.keys() if main.get(k) != fallback.get(k)}
-    assert differs == {"name", "recipe", "budget", "checkpoints", "schedule"}
-    assert {k for k in main["recipe"] if main["recipe"][k] != fallback["recipe"][k]} == {
-        "overrides"
-    }
-    assert fallback["recipe"]["overrides"] == {
-        **main["recipe"]["overrides"], "train.max_training_steps": 40000
-    }  # fmt: skip
-    plan = TrayPairPlan.model_validate(fallback)
-    assert check(plan, REPO) == [] and len(pending(plan)) == 13
-    assert (plan.checkpoints.primary, plan.checkpoints.early) == (40000, None)
-    assert plan.schedule.mode == "sequential" and pairplan.balance_needed(plan) == 14 + 18
-    assert plan.interpretation == TrayPairPlan.load(PAIR).interpretation  # one rules block
-    assert run_plan_id(plan) != run_plan_id(TrayPairPlan.load(PAIR))

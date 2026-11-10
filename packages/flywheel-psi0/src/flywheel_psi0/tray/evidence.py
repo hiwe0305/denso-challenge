@@ -1,6 +1,7 @@
 """Evidence pack of the paired tray plan: one command, re-run as each result lands (DA-34 6).
 
-Hiếu needs the success numbers of B_ALL and C_ALL on 12/11/2026 (docs/he/tray.md 19.6).
+Hiếu needs the success numbers of the four runs (B_ALL, C_ALL, B_70, C_70) on 12/11/2026
+(docs/he/tray.md 19.6).
 This module writes the whole pack from whatever exists, and names what is still missing
 in place of each part it cannot fill yet, so the same command runs before the first
 checkpoint and after the last rollout:
@@ -9,7 +10,9 @@ checkpoint and after the last rollout:
         --set <eval set rp_a04c14e79dfd-2e57f60> \\
         --eval B_ALL@40000=<eval_batch dir> --eval C_ALL@40000=<eval_batch dir> \\
         --eval B_ALL@60000=<eval_batch dir> --eval C_ALL@60000=<eval_batch dir> \\
+        --eval B_70@60000=<eval_batch dir> --eval C_70@60000=<eval_batch dir> \\
         --train B_ALL=<job dir from Drive> --train C_ALL=<job dir from Drive> \\
+        --train B_70=<job dir from Drive> --train C_70=<job dir from Drive> \\
         --out fwdata/tray/evidence/<run_plan_id>
 
 `<out>` gets README.md (Vietnamese, as the docs), evidence.json, loss.csv, loss.svg and
@@ -19,12 +22,17 @@ videos/. The parts, in the order of the reading rules (19.2):
   cut's releases and stats, the rules' sha256, this checkout's commit, each job's last
   checkpoint step;
 - per checkpoint read (rule e: `checkpoints.primary` is the metric, `checkpoints.early`
-  an early read and labelled so): which stage the rollouts cover (stage 1, the first
-  6 chunks, or all 27), success of each run on levels 1-2 with Wilson 95 % against 80 %
-  (rule b), the paired difference with its bootstrap CI and exact McNemar (rule a; the
-  stage 1 outcome E1/E3/F/continue only for the primary checkpoint), failure labels and
-  per-step pass rates, and the relaxed success by tolerance (rule c, always "nới");
-- the loss curves of both jobs (`metrics.jsonl`), a few rollout videos of each run (the
+  an early read and labelled so): per run, the widest stage its rollouts cover (stage 1,
+  the first 6 chunks, or all 27), success on levels 1-2 with Wilson 95 % against 80 %
+  and on level 1 and level 2 apart against 70 % (rule b); per comparison of the plan
+  (`comparisons`), on the widest stage both its runs cover, the paired difference with
+  its bootstrap CI and exact McNemar and its reading: CI against 0, or for a
+  noninferiority one CI low against -margin; the stage 1 outcome E1/E3/F/continue of the
+  primary comparison at the primary checkpoint only, and there the joint readings of
+  rule f (egocentric makes up for the cut demos: f holds and the primary's CI low > 0)
+  and rule g (the baseline VLM alone keeps up on the subset); failure labels and per-step
+  pass rates, and the relaxed success by tolerance (rule c, always "nới");
+- the loss curves of every job (`metrics.jsonl`), a few rollout videos of each run (the
   successes and one failure per label first), and the plan's ledger rows.
 
 Eval results are read through the frozen plan of `eval_of`: `pairplan.check` holds the
@@ -60,6 +68,7 @@ from flywheel_psi0.tray.place_error import RELAXED_M, rows_for, tolerance_curve
 from flywheel_psi0.tray.runplan import REPO, Parent, TrayRunPlan, lock_path, run_plan_id
 
 GOAL = 0.80  # Hiếu's target success rate (rule b)
+LEVEL_GOAL = 0.70  # the organisers' level 3 bar, read on level 1 and level 2 apart (rule b)
 LOSS_BIN = 500  # steps per point of the train loss curve (median of the bin)
 LEDGER = "docs/g0/ledger/DA-34.csv"
 TargetOf = Callable[[int, int], "tuple[float, float, float]"]
@@ -120,6 +129,7 @@ def provenance(plan: TrayPairPlan, trains: dict[str, Path], repo: Path = REPO) -
                 "vlm_manifest_sha256": vlm.manifest_sha256,
             }
         parents[name]["action_header_sha256"] = parent.action_header.sha256
+        parents[name]["data"] = plan.data_of(branch)
     jobs = {}
     for name, job in sorted(trains.items()):
         result = job / "result.json"
@@ -146,6 +156,7 @@ def provenance(plan: TrayPairPlan, trains: dict[str, Path], repo: Path = REPO) -
             "frames": plan.cut.frames,
             "stats_sha256": plan.cut.stats_sha256,
         },
+        "subsets": [s.model_dump(mode="json") for s in plan.subsets or []],
         "steps": plan.steps(),
         "checkpoints": plan.checkpoints.model_dump(),
         "rules_sha256": plan.interpretation.rules_sha256,
@@ -176,9 +187,34 @@ def stage_of(
     return "incomplete", first, {}, done
 
 
-def against_goal(wilson: Sequence[float]) -> str:
+def against_goal(wilson: Sequence[float], goal: float = GOAL) -> str:
     low, high = wilson
-    return "đạt mốc 80 %" if low >= GOAL else "chưa đạt" if high < GOAL else "chưa rõ"
+    return f"đạt mốc {100 * goal:g} %" if low >= goal else "chưa đạt" if high < goal else "chưa rõ"
+
+
+@dataclass(frozen=True)
+class Comparison:
+    rule: str
+    variant: str
+    baseline: str
+    kind: str  # primary, noninferiority or secondary
+    margin: float | None = None
+
+
+def comparisons_of(plan: TrayPairPlan) -> list[Comparison]:
+    """The plan's comparisons; a plain pair without them compares stage 1 against C (a)."""
+    if plan.comparisons is None:
+        variant, baseline = pair_roles(plan)
+        return [Comparison("a", variant, baseline, "primary")]
+    return [Comparison(c.rule, c.variant, c.baseline, c.kind, c.margin) for c in plan.comparisons]
+
+
+def reading(c: Comparison, diff: dict[str, Any]) -> str:
+    """CI against 0, or for a noninferiority comparison CI low against -margin."""
+    if c.margin is None:
+        return str(diff["ci_vs_0"])
+    low, high = diff["ci"]
+    return "không kém" if low > -c.margin else "kém" if high < -c.margin else "chưa rõ"
 
 
 def read_checkpoint(
@@ -190,7 +226,8 @@ def read_checkpoint(
     target_of: TargetOf | None,
     tolerance: tuple[float, float] | None,
 ) -> dict[str, Any]:
-    """Rules (a), (b), (c) at one checkpoint, on the stage every run covers."""
+    """Rules (a′)-(c), (f), (g) at one checkpoint: each run and each comparison on the
+    widest stage its rollouts cover, so a second wave lagging behind holds back no read."""
     primary = step == plan.checkpoints.primary
     read: dict[str, Any] = {
         "step": step,
@@ -201,22 +238,33 @@ def read_checkpoint(
     missing_runs = sorted(set(plan.branches) - set(outs))
     if missing_runs:
         read["pending"] = f"chưa có eval của {', '.join(missing_runs)}"
-    stage, part, chosen, done = stage_of(outs, chunks)
-    read["stage"] = stage
-    if stage == "incomplete":
-        read["done_stage1"] = done
-        return read
     headline = [c.level for c in base.eval.by_level or [] if c.headline]
-    runs = {}
-    for name, rollouts in sorted(chosen.items()):
+    runs, incomplete = {}, {}
+    for name, out in sorted(outs.items()):
+        stage, _, chosen, done = stage_of({name: out}, chunks)
+        if stage == "incomplete":
+            incomplete[name] = done[name]
+            continue
+        rollouts = chosen[name]
         result = summarize(base, rollouts, {}, [], None, full=stage == "full")
         h = result["headline"]
         runs[name] = {
+            "stage": stage,
             "n": h["n"],
             "successes": h["successes"],
             "p": h["p"],
             "wilson": h["wilson"],
             "goal": against_goal(h["wilson"]),
+            "by_level": {
+                str(lv): {
+                    "n": result["levels"][str(lv)]["n"],
+                    "successes": result["levels"][str(lv)]["successes"],
+                    "wilson": result["levels"][str(lv)]["wilson"],
+                    "goal": against_goal(result["levels"][str(lv)]["wilson"], LEVEL_GOAL),
+                }
+                for lv in headline
+                if result["levels"].get(str(lv), {}).get("n")
+            },
             "failures": h["failures"],
             "step_pass": h["step_pass"],
             "level0": result["levels"].get("0") if stage == "full" else None,
@@ -224,26 +272,78 @@ def read_checkpoint(
         if target_of is not None and tolerance is not None:
             rows = rows_for([r for r in rollouts if r.level in headline], target_of, *tolerance)
             runs[name]["relaxed"] = tolerance_curve(rows, tolerance[1])
-    read["by_run"] = runs
-    variant, baseline = pair_roles(plan)
-    if not missing_runs:
-        diff = paired_diff(chosen[variant], chosen[baseline], headline, base.stats)
-        read["paired"] = diff
-        if primary:
+    if incomplete:
+        read["incomplete"] = incomplete
+    if runs:
+        read["by_run"] = runs
+    compared = []
+    for c in comparisons_of(plan):
+        if c.variant not in outs or c.baseline not in outs:
+            continue
+        entry: dict[str, Any] = {
+            "rule": c.rule, "variant": c.variant, "baseline": c.baseline,
+            "kind": c.kind, "margin": c.margin,
+        }  # fmt: skip
+        pair = {n: outs[n] for n in (c.variant, c.baseline)}
+        stage, part, chosen, done = stage_of(pair, chunks)
+        entry["stage"] = stage
+        if stage == "incomplete":
+            entry["done_stage1"] = done
+            compared.append(entry)
+            continue
+        diff = paired_diff(chosen[c.variant], chosen[c.baseline], headline, base.stats)
+        counts = {"variant_successes": diff["variant"], "baseline_successes": diff["baseline"]}
+        rest = {k: v for k, v in diff.items() if k not in ("variant", "baseline")}
+        entry.update(rest, **counts, reading=reading(c, diff), chunks=[ch.id for ch in part])
+        if primary and c.kind == "primary":
             # The stop rule reads the first 6 chunks even once all 27 have run: an E1, E3
             # or F there is the verdict, and the 240-condition rule is then descriptive.
             first = diff
             if stage == "full":
                 part1 = list(chunks[:STAGE1_CHUNKS])
-                b1, c1 = (collect(outs[n], part1)[0] for n in (variant, baseline))
-                first = paired_diff(b1, c1, headline, base.stats)
-            read["stage1_outcome"] = stage1_outcome(first)
+                v1, b1 = (collect(outs[n], part1)[0] for n in (c.variant, c.baseline))
+                first = paired_diff(v1, b1, headline, base.stats)
+            entry["stage1_outcome"] = stage1_outcome(first)
             if stage == "full":
                 rule = {"above": 1, "contains": 2, "below": 3}[diff["ci_vs_0"]]
-                verdict = read["stage1_outcome"] == "continue"
-                read["rule" if verdict else "rule_descriptive"] = rule
-    read["chunks"] = [c.id for c in part]
+                verdict = entry["stage1_outcome"] == "continue"
+                entry["rule_of_240" if verdict else "rule_descriptive"] = rule
+        compared.append(entry)
+    if compared:
+        read["comparisons"] = compared
+    if primary:
+        read.update(joint_readings(compared))
     return read
+
+
+def joint_readings(compared: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """Rule f with (a′), and rule g, at the primary checkpoint (tray.md 19.2).
+
+    "Egocentric makes up for the cut demos" only when the noninferiority comparison of
+    the primary's variant holds and the primary's CI low is above 0. When the primary's
+    baseline keeps up as well (its own noninferiority comparison holds), f holding is not
+    the egocentric data's doing, and the pack says so.
+    """
+    done = {e["rule"]: e for e in compared if "reading" in e}
+    prim = next((e for e in done.values() if e["kind"] == "primary"), None)
+    out: dict[str, Any] = {}
+    if prim is None:
+        return out
+    out["stage1_outcome"] = prim["stage1_outcome"]
+    for key in ("rule_of_240", "rule_descriptive"):
+        if key in prim:
+            out["rule" if key == "rule_of_240" else key] = prim[key]
+    for e in done.values():
+        if e["kind"] != "noninferiority":
+            continue
+        if e["variant"] == prim["variant"]:
+            out["compensates"] = {
+                "rules": [e["rule"], prim["rule"]],
+                "holds": e["reading"] == "không kém" and prim["ci"][0] > 0,
+            }
+        elif e["variant"] == prim["baseline"] and e["reading"] == "không kém":
+            out["data_not_bottleneck"] = e["rule"]
+    return out
 
 
 def pair_roles(plan: TrayPairPlan) -> tuple[str, str]:
@@ -376,7 +476,8 @@ def build(
     for step in reads_at:
         outs = {b: d for (b, s), d in inputs.evals.items() if s == step}
         if not outs:
-            pack["reads"].append({"step": step, "pending": "chưa có eval nào"})
+            label = "số chính" if step == plan.checkpoints.primary else "đọc sớm"
+            pack["reads"].append({"step": step, "label": label, "pending": "chưa có eval nào"})
             continue
         pack["reads"].append(read_checkpoint(plan, base, step, outs, chunks, target_of, tolerance))
     curves = {name: loss_points(job) for name, job in sorted(inputs.trains.items())}
@@ -424,6 +525,10 @@ def copy_videos(
     return copied
 
 
+SCOPE = {"stage1": "giai đoạn 1, 60 điều kiện", "full": "đủ 240 điều kiện"}
+KIND = {"primary": "so sánh chính", "noninferiority": "không kém", "secondary": "so sánh phụ"}
+
+
 def pct(value: float | None) -> str:
     return "—" if value is None else f"{100 * value:.1f} %"
 
@@ -457,58 +562,98 @@ def render(plan: TrayPairPlan, pack: dict[str, Any]) -> str:
         f"| Số bước, checkpoint đọc | {prov['steps']}; số chính "
         f"{prov['checkpoints']['primary']}, đọc sớm {prov['checkpoints']['early'] or 'không'} |",
     ]
+    for sub in prov["subsets"]:
+        lines.append(
+            f"| Tập con {sub['name']} | {100 * sub['fraction']:g} % mỗi phần, theo sha256 seed; "
+            + "; ".join(
+                f"{sp['regenerates']} → {sp['episodes'] or '?'} episode, danh sách "
+                f"`{str(sp['seeds_sha256'] or 'chưa ghim')[:12]}`"
+                for sp in sub["parts"]
+            )
+            + f"; stats của cut {prov['cut']['name']} |"
+        )
     for name, parent in prov["parents"].items():
         vlm = parent.get("vlm_sha256") or parent.get("vlm_weights_sha256")
-        lines.append(f"| VLM {name} | `{parent['parent']}`: `{str(vlm or 'chưa ghim')[:12]}` |")
+        lines.append(
+            f"| VLM {name} (dữ liệu {parent['data']}) | `{parent['parent']}`: "
+            f"`{str(vlm or 'chưa ghim')[:12]}` |"
+        )
     for name, job in prov["jobs"].items():
         state = "chưa có `result.json`" if job is None else f"bước {job['checkpoint_step']}"
         lines.append(f"| Job {name} | {state} |")
     for read in pack["reads"]:
         lines += ["", f"## Checkpoint {read['step']} ({read.get('label', '')})", ""]
-        if "pending" in read and "stage" not in read:
+        if "runs" not in read:
             lines.append(f"Chưa có: {read['pending']}.")
             continue
         if read.get("pending"):
             lines.append(f"Chưa đủ: {read['pending']}.")
-        if read["stage"] == "incomplete":
-            lines.append(
-                "Giai đoạn 1 chưa đủ 60 điều kiện: "
-                + ", ".join(f"{b} {n}/60" for b, n in read["done_stage1"].items())
-                + ". Chưa đọc."
-            )
+        for name, done in read.get("incomplete", {}).items():
+            lines.append(f"{name}: giai đoạn 1 mới {done}/60 điều kiện, chưa đọc.")
+        if "by_run" not in read:
             continue
-        scope = "giai đoạn 1, 60 điều kiện" if read["stage"] == "stage1" else "đủ 240 điều kiện"
         lines += [
-            f"Phạm vi: {scope} (mức 1–2 gộp).",
             "",
-            "| Run | Thành công | Wilson 95 % | So với 80 % (luật b) |",
-            "|---|---|---|---|",
+            "Mỗi run trên phạm vi rộng nhất nó đã chạy đủ (giai đoạn 1: 60 điều kiện; đủ: 240);"
+            " mức 1–2 gộp so với 80 %, từng mức so với 70 % (luật b).",
+            "",
+            "| Run | Phạm vi | Thành công | Wilson 95 % | So với 80 % | Mức 1, 2 so với 70 % |",
+            "|---|---|---|---|---|---|",
         ]
         for name, run in read["by_run"].items():
             low, high = run["wilson"]
-            lines.append(
-                f"| {name} | {run['successes']}/{run['n']} ({pct(run['p'])}) | "
-                f"{pct(low)} – {pct(high)} | {run['goal']} |"
+            levels = "; ".join(
+                f"mức {lv}: {v['successes']}/{v['n']}, {pct(v['wilson'][0])} – "
+                f"{pct(v['wilson'][1])}, {v['goal']}"
+                for lv, v in run["by_level"].items()
             )
-        if "paired" in read:
-            d = read["paired"]
+            lines.append(
+                f"| {name} | {SCOPE[run['stage']]} | {run['successes']}/{run['n']} "
+                f"({pct(run['p'])}) | {pct(low)} – {pct(high)} | {run['goal']} | {levels} |"
+            )
+        for e in read.get("comparisons", []):
+            head = f"**({e['rule']}) {e['variant']} − {e['baseline']}**, {KIND[e['kind']]}"
+            if e["stage"] == "incomplete":
+                done = ", ".join(f"{b} {n}/60" for b, n in e["done_stage1"].items())
+                lines += ["", f"{head}: giai đoạn 1 chưa đủ ({done}), chưa đọc."]
+                continue
+            margin = f", biên −{100 * e['margin']:g} điểm %" if e["margin"] is not None else ""
             lines += [
                 "",
-                f"**Ghép cặp (luật a)**: hiệu {d['diff']:+.3f}, CI 95 % {d['ci'][0]:+.3f} … "
-                f"{d['ci'][1]:+.3f} ({d['ci_vs_0']}); cặp bất đồng b = {d['variant_only']}, "
-                f"c = {d['baseline_only']}; McNemar chính xác p = {d['mcnemar_exact_p']}.",
+                f"{head} ({SCOPE[e['stage']]}): hiệu {e['diff']:+.3f}, CI 95 % "
+                f"{e['ci'][0]:+.3f} … {e['ci'][1]:+.3f}; đọc: **{e['reading']}**{margin}; "
+                f"cặp bất đồng b = {e['variant_only']}, c = {e['baseline_only']}; McNemar "
+                f"chính xác p = {e['mcnemar_exact_p']}.",
             ]
-            if "stage1_outcome" in read:
-                lines.append(f"Kết quả giai đoạn 1: **{read['stage1_outcome']}** (bảng 19.2).")
-            if "rule" in read:
-                lines.append(f"Đọc trên 240 điều kiện: **luật {read['rule']}** (bảng 19.2).")
-            elif "rule_descriptive" in read:
+            if "stage1_outcome" in e:
+                lines.append(f"Kết quả giai đoạn 1: **{e['stage1_outcome']}** (bảng 19.2).")
+            if "rule_of_240" in e:
+                lines.append(f"Đọc trên 240 điều kiện: **luật {e['rule_of_240']}** (bảng 19.2).")
+            elif "rule_descriptive" in e:
                 lines.append(
-                    f"Trên 240 điều kiện CI ứng với luật {read['rule_descriptive']}, chỉ để mô tả:"
-                    " giai đoạn 1 đã dừng, kết luận (a) là của giai đoạn 1."
+                    f"Trên 240 điều kiện CI ứng với luật {e['rule_descriptive']}, chỉ để mô tả:"
+                    " giai đoạn 1 đã dừng, kết luận là của giai đoạn 1."
                 )
-            if read["role"] == "early":
-                lines.append("Đọc sớm: không cho E1, E3, F hay đi tiếp (luật e).")
+        if "compensates" in read:
+            f_rule, a_rule = read["compensates"]["rules"]
+            holds = "có" if read["compensates"]["holds"] else "không đọc được"
+            lines += [
+                "",
+                f"Egocentric bù phần demo bị cắt: **{holds}** (cần ({f_rule}) không kém"
+                f" và cận dưới CI của ({a_rule}) > 0).",
+            ]
+        if "data_not_bottleneck" in read:
+            f_rule = read["compensates"]["rules"][0] if "compensates" in read else "f"
+            lines.append(
+                f"({read['data_not_bottleneck']}) không kém: VLM gốc trên tập con cũng theo kịp,"
+                f" nên lượng dữ liệu không phải nút thắt; ({f_rule}) đạt cũng không nhờ"
+                " egocentric."
+            )
+        if read["role"] == "early":
+            lines.append("")
+            lines.append(
+                "Đọc sớm: không cho E1, E3, F hay đi tiếp, không kết luận (f), (g) (luật e)."
+            )
         lines += [
             "",
             "| Run | Nhãn lỗi | Qua từng bước (approach … release_stand) |",
@@ -594,7 +739,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     target_of, tolerance = targets if targets else (None, None)
     pack = build(inputs, args.out, target_of, tolerance)
     for read in pack["reads"]:
-        state = read.get("stage", read.get("pending"))
+        compared = {e["rule"]: e.get("reading", e["stage"]) for e in read.get("comparisons", [])}
+        state = compared or read.get("pending")
         print(f"ckpt {read['step']}: {state}", read.get("stage1_outcome", read.get("rule", "")))
     print(f"wrote {args.out / 'README.md'}")
     return 0

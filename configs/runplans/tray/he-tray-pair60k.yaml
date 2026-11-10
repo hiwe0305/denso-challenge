@@ -1,13 +1,15 @@
-# DA-34 task 6: paired stage 3 RunPlan, two 60k-step runs on one cut (cut ALL, target
-# zone drawn) that differ only in the VLM. DRAFT: written before the data (W1) and the
-# stage 1 checkpoint (W2) exist; not frozen, not launched.
+# DA-34 task 6: paired stage 3 RunPlan, four 60k-step runs on one cut (cut ALL, target
+# zone drawn): two VLMs x two data sizes (ALL, and S70: 70 % of ALL's seeds), identical
+# otherwise. DRAFT: written before the data (W1) and the stage 1 checkpoint (W2) exist;
+# not frozen, not launched.
 #
 # Hiếu 11/11/2026 (via the coordinator session; docs/he/tray.md section 19): eval C is low
 # because table B's target zone is not drawn, so the policy cannot see where the planner
 # lined up. W1: DA-33 draws the zone (new visuals revision) and regenerates both demo
 # pools, same seeds and planner; cut ALL. W2: DA-30 runs stage 1 on egx_7b43c30dc5d88cd7.
-# Then B_ALL (stage 1 VLM) and C_ALL (C's VLM) train on ALL with one recipe, one step
-# count, one train seed and one stats file, and are compared on v2's eval conditions.
+# Then B_ALL (stage 1 VLM) and C_ALL (C's VLM) train on ALL, and (Hiếu 11/11/2026 "Thêm
+# hai run 70%") B_70 and C_70 on the subset S70 of ALL, with one recipe, one step count,
+# one train seed and one stats file, and are compared on v2's eval conditions.
 #
 # Schema and checks: flywheel_psi0.tray.pairplan (not runplan: the cut spans two
 # releases). `pairplan check` passes as a draft and lists the pins still null;
@@ -30,7 +32,7 @@ code:
 # Revision pinned by S1-03 (docs/g0/psi0-eval.md 1.1), as in version 1.
 psi_model: {repo: USC-PSI-Lab/psi-model, revision: cb1480f50d9764ab2f6261bc2e651a67ad54da17}
 
-# C's parent (branch C_ALL) and its stage 1 child (branch B_ALL), same action header.
+# C's parent (branches C_ALL, C_70) and its stage 1 child (B_ALL, B_70), same action header.
 parents:
   psi0-baseline-egodex-he:
     vlm:
@@ -75,7 +77,8 @@ cut:
     Every episode of each regenerated release that DA-03 QA keeps (rejects out) and that
     passes the quality filter of 3/11/2026 (max_tilt_carry_deg 10, max_part_shift_end_mm
     20), the filter C, C+ and CMAX were cut with; no size cap, no ranking, no selection.
-    Parts joined in order; stats computed once on the joined cut and used by both branches.
+    Parts joined in order; stats computed once on the joined cut and used by all four
+    branches, the S70 ones included.
   visuals_revision: 4763fbfaa4f8e97658e68b57d01b4c86659e08b5+zone1 # DA-33 #182, master 7b0defd1; W1 releases must record it
   parts:
     - regenerates: tray_s1_f9433b028c52 # pool s1-pool-1104, seeds 1000-1609
@@ -88,7 +91,30 @@ cut:
       set_name: null
   episodes: null # W1: episodes of the joined cut
   frames: null # W1: meta/info.json total_frames of the joined cut
-  stats_sha256: null # W1: meta/stats_psi0.json of the joined cut, shared by both branches
+  stats_sha256: null # W1: meta/stats_psi0.json of the joined cut, shared by all four branches
+
+# Hiếu 11/11/2026 ("Thêm hai run 70%"): the 70 % runs take 70 % of each part's seeds,
+# chosen by the seed alone (pairplan.subset_seeds: seeds ordered by sha256 of str(seed),
+# the first ceil(0.7 x n)), never by outcome or quality. Expected from the assumed sizes
+# of tray.md 19.4: ceil(0.7 x 429) + ceil(0.7 x 177) = 301 + 124 = 425 episodes. Each
+# part's list is pinned by its sha256 once W1 pins the part (`pairplan subset` prints
+# them), before any run. B_70 and C_70 train on the same list.
+subsets:
+  - name: S70
+    fraction: 0.7
+    rule: >-
+      From each part of ALL, in the cut's order, the first ceil(0.7 x n) seeds of the
+      part's set ordered by sha256 of the seed as a decimal string; n is the part's set
+      size. No choice by outcome, quality or release order. Normalised with ALL's
+      meta/stats_psi0.json (cut.stats_sha256), copied into the subset's dataset, so the
+      70 % runs differ from the ALL runs in the amount of data only.
+    order: sha256_seed
+    stats: cut
+    parts:
+      - {regenerates: tray_s1_f9433b028c52, episodes: null, seeds_sha256: null} # W1, then `pairplan subset`
+      - {regenerates: tray_s1_6c0fd7d37f77, episodes: null, seeds_sha256: null}
+    episodes: null # sum of the parts
+    frames: null # meta/info.json total_frames of the subset's dataset
 
 recipe:
   file: configs/models/psi0-stage3.yaml # batch 16, lr 1e-4 cosine, warmup 1000, VLM frozen, RTC
@@ -97,12 +123,21 @@ recipe:
     train.validation_steps: 2000 # PO 4/11/2026 (S1-04 4.1), as v2
     train.max_training_steps: 60000 # Hiếu 11/11/2026: both branches; the cosine runs over 60k
   nproc_per_node: 1 # one Colab A100 per branch (Hiếu 11/11/2026): global batch 16, recipe as on L4
-  dataset_stats: own_train_set # the train set of both branches is ALL: one stats file
+  dataset_stats: own_train_set # ALL's: computed on ALL, used by all four (subsets[].stats: cut)
 train_seeds: [0]
 
 branches:
-  B_ALL: {parent: psi0-ego-stage1-egx, role: "run 1: stage 1 VLM (W2) on ALL; vs C_ALL"}
-  C_ALL: {parent: psi0-baseline-egodex-he, role: "run 2: C's VLM on ALL; the baseline of B_ALL"}
+  B_ALL: {parent: psi0-ego-stage1-egx, role: "run 1: stage 1 VLM (W2) on ALL"}
+  C_ALL: {parent: psi0-baseline-egodex-he, role: "run 2: C's VLM on ALL; the full-demo mark"}
+  B_70: {parent: psi0-ego-stage1-egx, data: S70, role: "run 3: stage 1 VLM on S70"}
+  C_70: {parent: psi0-baseline-egodex-he, data: S70, role: "run 4: C's VLM on S70; the baseline of B_70"}
+
+# The paired differences the 19.2 block reads (evidence computes exactly these).
+comparisons:
+  - {rule: "a′", variant: B_70, baseline: C_70, kind: primary}
+  - {rule: f, variant: B_70, baseline: C_ALL, kind: noninferiority, margin: 0.10}
+  - {rule: g, variant: C_70, baseline: C_ALL, kind: noninferiority, margin: 0.10}
+  - {rule: h, variant: B_ALL, baseline: C_ALL, kind: secondary}
 
 # v2's eval, unchanged (eval_of): 270 episodes per branch (docs/he/tray.md 8.2). Level 0 has one scene: 30 replicates,
 # reported apart. Levels 1 and 2: 120 dev seeds each, 240 scenes pooled into the primary
@@ -128,7 +163,7 @@ eval:
 metric: {primary: sim_success, per_stage: scorer_7_steps, failure_kinds: design_3_3}
 stats: {method: bootstrap_by_condition, resamples: 10000, seed: 20261103, ci: 0.95}
 
-# The eval of v2, condition by condition: its eval set pairs B_ALL with C_ALL. The scene
+# The eval of v2, condition by condition: its eval set pairs the four runs. The scene
 # is the +zone1 scene of DA-33 #182 (target zone drawn), pinned by pinned_files, so neither run is
 # paired with eval C or C+ (tray.md 19.2 rule d).
 eval_of:
@@ -140,7 +175,7 @@ eval_of:
 interpretation:
   doc: docs/he/tray.md
   rules_marker: pair60k-rules
-  rules_sha256: 24747738624e926d4678fb875744bdc3e7b7c0916d1d0559f99b836c41587017 # section 19.2 block
+  rules_sha256: e7f903963f515a63da27ce7c94b825d6310406be2e39dfca445a36be51f2f518 # section 19.2 block, four runs
 pricebook: "assumption: Colab 100 CU pack, 0.0999 USD per CU (docs/g0/ledger/DA-19.csv)"
 
 # Hiếu 11/11/2026 01:50 (via the coordinator): both runs at once, so the success numbers
@@ -157,11 +192,12 @@ pricebook: "assumption: Colab 100 CU pack, 0.0999 USD per CU (docs/g0/ledger/DA-
 # be stopped for nothing and miss 12/11. At cap 70 the line is about 0.58-0.59 s/step.
 # One cu_watch batch: one guard and one session watcher per run in one registry
 # (cu_watch.py supports N sessions per batch); the floor 14 is safe only while the
-# balance holds both caps: 14 + 2 x 70 = 154 CU.
+# balance holds every cap: 14 + 4 x 70 = 294 CU at launch (plus the serve lanes' caps
+# once eval starts, tray.md 19.5). Four runs x about 57 CU = about 228 CU (estimate).
 budget:
-  ceiling_cu: 140
+  ceiling_cu: 280
   cap_cu_per_run: 70
-  runs: [B_ALL, C_ALL]
+  runs: [B_ALL, C_ALL, B_70, C_70]
   watcher: "scripts/colab/cu_watch.py session --gpu A100 --cap 70 --floor 14, one per run, under one guard for the batch; one batch per account"
 
 # Rule (e) of the 19.2 block: ckpt_60000 is the metric; ckpt_40000 an early read only.
@@ -173,6 +209,9 @@ schedule:
   mode: parallel
   floor_cu: 14
   persist: "persist --watch 600 --pid <train pid> to the mounted Drive: every complete ckpt_<step> (trainer/colab.py sync_job, no --delete), so ckpt_40000 stays on Drive while training goes on"
+  # All four at once; if Colab refuses the 3rd or 4th session (cu_watch exits 6), the
+  # 70 % pair runs as a second wave as soon as the first ends (tray.md 19.5).
+  waves: [[B_ALL, C_ALL], [B_70, C_70]]
 
 # Re-pinned 11/11/2026 on master 7b0defd1, after DA-33 #182 (target zone, +zone1): v2's
 # list; mjcf.py (TARGET_ZONE_REVISION) and simple_task.py are the two that changed.
