@@ -1335,6 +1335,8 @@ Muốn eval nhanh hơn thì cần một trong hai đường trên, kèm luật �
 
 ## 18. Nhánh B: stage 1 trên egocentric của đội (nhiệm vụ 4, AC 5; soạn 9/11/2026, chưa chạy)
 
+_**Đã thay thế, không chạy** (quyết định của Hiếu 11/11/2026, qua phiên điều phối)._ Cảnh `4763fbfaa4f8e97658e68b57d01b4c86659e08b5+zone1` của DA-33 (PR #182) vẽ vùng đích trên bàn B và sửa `mjcf.py`, `simple_task.py` mà plan B và plan C-max ghim. Câu hỏi egocentric chuyển sang cặp `B_ALL`, `C_ALL` trên cut ALL tái sinh (`he-tray-pair60k.yaml`). Hai plan `he-tray-b.yaml` (`rp_128aec169e12`) và `he-tray-cmax.yaml` (`rp_366283071c4a`) có `superseded_by`; trường này nằm ngoài id, nên id và lịch sử giữ nguyên, còn `runplan check` thoát 1. B và C-max chưa từng đóng băng hay chạy.
+
 _**[Đã chốt 9/11/2026, Hiếu]** "Chốt 4 mặc định" (qua phiên điều phối): chuẩn bị nhánh B để so "egocentric + demo robot" với "chỉ demo robot". Mục này viết và commit **trước** mọi lượt train hay eval của B. Story DA-34 nhiệm vụ con 4.1–4.8. Stage 1 là việc của [DA-30](../product/stories/DA-30-stage1-egocentric.md) nhiệm vụ 2; mục này dùng checkpoint của nó, không chạy nó._
 
 ### 18.1 Thiết lập
@@ -1614,3 +1616,4 @@ _**[Đã chốt 10/11/2026, Hiếu]** "Ghi Decision" (qua phiên điều phối)
 | 9/11/2026 | Mục 18.7–18.8: ước lượng stage 3 B (16,0 CU, cap 18, sàn 14) và eval B (17,3 giờ `rtx3060`), stage 1 ở sổ DA-30; dạng checkpoint stage 1 mà B nhận và việc còn lại (4.7, 4.8) | Hiếu (soạn với Claude) |
 | 9/11/2026 | Mục 18.3, 18.4, 18.6, 18.8 (review PR #172): ghim `parent_header_sha256` (header safetensors của VLM C) và `colab_train` kiểm header của trọng số stage 1 trước khi train; `budget.runs` phải là `[B]`; thêm `superseded_by` vào danh sách trường được khác; id nháp đổi thành `rp_a3d3f96260d9`. Luật 18.2 không đổi | Hiếu (soạn với Claude) |
 | 10/11/2026 | Mục 18.9 (quyết định của Hiếu 10/11/2026 "Ghi Decision"): eval B hai giai đoạn, giai đoạn 1 là 6 lô đầu (60 điều kiện), dừng E1, E3 hoặc F, còn lại chạy tiếp tới 240; mức 0 chỉ khi đi tiếp. Mục 18.2: khối `branch-b-rules` sửa trước mọi lượt của B (sha256 `6c0eb9c9…` thành `52f3385b…`), nhãn ngoài khối. Mục 18.5: `eval_batch --max-chunks 6`, `eval_results --stage1`, thời gian từng giai đoạn. Mục 18.3, 18.6, 18.7, 18.8: id nháp mới, `Decision`, dòng ước lượng giai đoạn 1 | Hiếu (soạn với Claude) |
+| 11/11/2026 | Mục 18 (quyết định của Hiếu 11/11/2026): B và C-max đã thay thế bởi cặp trên cut ALL, vì cảnh `+zone1` (DA-33, PR #182) đổi file hai plan ghim; `superseded_by` đặt ngoài id, id giữ nguyên. Test tray không còn đọc trạng thái file sống: `tests/tray/conftest.py` bỏ qua độ lệch mà cây sống đã có, giữ độ lệch do test tạo | Claude cho Hiếu |
