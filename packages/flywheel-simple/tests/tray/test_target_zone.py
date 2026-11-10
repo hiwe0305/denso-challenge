@@ -127,6 +127,7 @@ def test_tray_drops_the_same_with_and_without_the_zone(
     assert np.array_equal(runs[0], runs[1])
 
 
+
 @pytest.fixture(scope="module")
 def env() -> Iterator[Any]:
     from flywheel_simple.tray.simple_task import make_env
@@ -144,7 +145,7 @@ def _episode(env: Any, level: int, seed: int) -> tuple[Any, np.ndarray]:
     states: list[np.ndarray] = []
 
     def on_step(obs: Any, info: Any, action: Any) -> None:
-        states.append(np.concatenate([sim.mjData.qpos, sim.mjData.qvel, np.asarray(action)]))
+        states.append(np.concatenate([sim.mjData.qpos, sim.mjData.qvel, sim.mjData.ctrl]))
 
     result = run_episode(env, TrayAgent(env, PlannerConfig.load()), seed, level, on_step=on_step)
     return result, np.array(states)
@@ -163,8 +164,10 @@ def test_env_has_the_zone_at_the_target_pose_and_the_episode_is_unchanged(
     sim = env.unwrapped
     target = sim.task.target_pose
     zone = sim.mjData.body("target_zone")
-    assert zone.xpos[:2] == pytest.approx([target.x, target.y], abs=1e-6)
-    assert _yaw(zone.xquat) == pytest.approx(target.yaw, abs=1e-6)
+    # The scene reaches SIMPLE as MJCF text, which keeps 6 significant digits (the
+    # tray's pose too): micrometres off, not more.
+    assert zone.xpos[:2] == pytest.approx([target.x, target.y], abs=1e-5)
+    assert _yaw(zone.xquat) == pytest.approx(target.yaw, abs=1e-5)
 
     monkeypatch.setattr(mjcf, "add_target_zone", lambda *a, **k: None)
     without, b = _episode(env, 1, 1279)
