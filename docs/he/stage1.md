@@ -221,7 +221,7 @@ RunPlan của B không tải mẫu EgoDex mà nhận bản export của DA-18 (`
 - Che danh tính: nguồn `export` chỉ nạp được khi `identity_masked: true`. Miễn trừ ngày 4/11/2026 chỉ áp cho zip EgoDex của Apple (mục 1.4), không áp cho bản export, kể cả export của EgoDex. Test: `test_an_export_must_be_identity_masked`.
 - `setup` giờ cũng kiểm sha256 của trọng số cha sau khi tải, cho mọi plan.
 
-Bản export đã làm sạch của DA-04 đã được ghim vào RunPlan [`tray-ego-b.yaml`](../../configs/runplans/stage1/tray-ego-b.yaml) ngày 9/11/2026 (mục 2.9). Plan vẫn là bản nháp tới khi PR #173 và #174 merge (mục 2.4).
+Bản export đã làm sạch của DA-04 đã được ghim vào RunPlan [`tray-ego-b.yaml`](../../configs/runplans/stage1/tray-ego-b.yaml) ngày 9/11/2026 (mục 2.9). Plan sẵn sàng chạy từ 11/11/2026, khi PR #173 và #176 (thay #174) đã merge (mục 2.4).
 
 ### 2.3 Checkpoint stage 1 có nạp được vào stage 3 không (Q-28C)
 
@@ -256,7 +256,7 @@ Một điều cần ghi cạnh kết quả của B: action header `postpre.*` đ
 
 [`tray-ego-b.yaml`](../../configs/runplans/stage1/tray-ego-b.yaml), `run_plan_id` `rp_64bde22a5dda` từ khi ghim bản export đã làm sạch ngày 9/11/2026 (mục 2.9; lần ghim đầu là `rp_ecd2bb11c415`); trước đó, với giá trị giữ chỗ, là `rp_6a66a6ff082c`. `runplan check` qua và in "draft" kèm lý do.
 
-**Bản nháp.** Khối `dataset.source` đã ghim bản export thật (`egx_7b43c30dc5d88cd7`, mục 2.9); plan vẫn có `status: draft` vì bản export do mã của PR #173 và #174 tạo ra, chưa merge. `colab setup` từ chối plan nháp trước khi làm bất cứ gì (không tốn CU); `check` và `setup` in lý do "marked `status: draft` with every pin set". Quy tắc chung: plan có giá trị giữ chỗ (`egx_0000000000000000`, sha256 toàn số 0) bắt buộc ghi `draft`, nếu không `runplan check` báo lỗi; plan đã ghim đủ được phép giữ `draft`. `status` nằm ngoài `run_plan_id` (như plan của DA-34), nên bỏ nó đi không đổi id. Để chạy: làm theo mục 2.6 bước 3.
+**Sẵn sàng chạy (11/11/2026).** Khối `dataset.source` ghim bản export thật (`egx_7b43c30dc5d88cd7`, mục 2.9). Plan giữ `status: draft` từ 9/11 tới 11/11/2026 vì bản export do mã của PR #173 và #174 tạo ra, khi đó chưa merge. Ngày 11/11, PR #173 và PR #176 (thay #174, cùng mã `ac3637da`) đã merge, và Hiếu xác nhận người trong 153 clip đã đồng ý cho đưa tarball lên Drive và chạy stage 1; `status: draft` được bỏ, `run_plan_id` vẫn là `rp_64bde22a5dda`. Quy tắc chung: plan có giá trị giữ chỗ (`egx_0000000000000000`, sha256 toàn số 0) bắt buộc ghi `draft`, nếu không `runplan check` báo lỗi; plan đã ghim đủ được phép giữ `draft`, khi đó `check` và `setup` in lý do "marked `status: draft` with every pin set" và `colab setup` từ chối trước khi làm bất cứ gì (không tốn CU). `status` nằm ngoài `run_plan_id` (như plan của DA-34), nên thêm hay bỏ nó không đổi id. Để chạy: mục 2.6.
 
 | Khối | Giá trị | Lý do |
 |---|---|---|
@@ -302,13 +302,13 @@ Với `--cap 4`, bộ canh dừng phiên ở khoảng 3,77 CU (biên 430 s, kho�
 
 ### 2.6 Việc Hiếu làm để chạy
 
-Chưa chạy. Điều kiện trước:
+Chưa chạy. Điều kiện trước (trạng thái 11/11/2026):
 
-1. PR này merge vào `master`; chạy từ `master`, không từ nhánh.
+1. Chạy từ `master`, không từ nhánh. PR #171 (mục 2) và PR bỏ `draft` đã hoặc phải merge trước.
 2. PR #170 (`data_class` `public` cho video của đội) đã merge.
-3. Bản export đã ghim (mục 2.9). Sau khi PR #173 và #174 merge: đưa `fwdata/egocentric-export/tarballs/egx_7b43c30dc5d88cd7.tar` (sha256 `666a67fc…f84a`, 48 701 440 byte) lên `MyDrive/denso/da30/exports/`; một PR nhỏ bỏ `status: draft` khỏi `tray-ego-b.yaml`; `runplan check` in `OK rp_64bde22a5dda` không còn chữ "draft".
+3. Bản export đã ghim (mục 2.9); PR #173 và #176 (thay #174) đã merge; plan không còn `draft`, `runplan check` in `OK rp_64bde22a5dda`. **Còn lại:** đưa `fwdata/egocentric-export/tarballs/egx_7b43c30dc5d88cd7.tar` (sha256 `666a67fc…f84a`, 48 701 440 byte, đã kiểm lại ngày 11/11) lên `MyDrive/denso/da30/exports/egx_7b43c30dc5d88cd7.tar`. `setup` kiểm cỡ file trên Drive trước khi cài gì, rồi kiểm sha256 trên bản chép sang VM.
 4. Đọc `stats_coverage` của bản export trên CPU trước khi tốn GPU (mục 2.4).
-   - Che danh tính: `identity_masked: true` là lời khẳng định của plan, không phải điều `setup` kiểm được. `verify_export` chỉ kiểm `source.deid_waiver` là null và `data_class` khớp plan; việc làm mờ mặt trước mọi bước khác là mã của DA-04 (`fw egocentric deid`), cần đúng trước khi bỏ `draft`.
+   - Che danh tính: `identity_masked: true` là lời khẳng định của plan, không phải điều `setup` kiểm được. `verify_export` chỉ kiểm `source.deid_waiver` là null và `data_class` khớp plan; việc làm mờ mặt trước mọi bước khác là mã của DA-04 (`fw egocentric deid`). Hiếu xác nhận ngày 11/11/2026 rằng người trong 153 clip đã đồng ý cho đưa dữ liệu lên Drive và chạy stage 1.
 5. `colab sessions` trống: một đợt một lúc trên tài khoản (mục 1.6).
 
 Bộ canh CU như mục 1.6, đổi tên phiên và trần:
@@ -463,7 +463,7 @@ Còn lại sau đề xuất: 3,9 % là trên bản thử, không phải bản th
 
 ### 2.9 Ghim bản export đã làm sạch (9/11/2026)
 
-DA-04 làm sạch tư thế theo đề xuất của mục 2.8 (PR #174; QA ở PR #173) và xuất lại cùng 132 clip. Lần ghim đầu (`egx_b6e974e46e8222e8`) dùng mã làm sạch có lỗi mà review của PR #174 tìm ra. DA-04 đã sửa: khung nhảy giờ được dò so với một mốc cục bộ bền (bắt cả chuỗi khung lệch từ đầu clip và các đợt nhảy liền nhau), và bước nhảy của đầu ngón cũng được xét. Plan giờ ghim bản xuất lại bằng mã đã sửa (PR #174 ở `ac3637da`): `egx_7b43c30dc5d88cd7`, 7804 khung, `data_class` `public`, không miễn trừ che danh tính, `verify_export` qua. DA-04 đo 3,3 % giá trị bị cắt bằng cách đo của mục 2.8.
+DA-04 làm sạch tư thế theo đề xuất của mục 2.8 (PR #174, sau thay bằng PR #176 cùng mã; QA ở PR #173) và xuất lại cùng 132 clip. Lần ghim đầu (`egx_b6e974e46e8222e8`) dùng mã làm sạch có lỗi mà review của PR #174 tìm ra. DA-04 đã sửa: khung nhảy giờ được dò so với một mốc cục bộ bền (bắt cả chuỗi khung lệch từ đầu clip và các đợt nhảy liền nhau), và bước nhảy của đầu ngón cũng được xét. Plan giờ ghim bản xuất lại bằng mã đã sửa (PR #174 ở `ac3637da`): `egx_7b43c30dc5d88cd7`, 7804 khung, `data_class` `public`, không miễn trừ che danh tính, `verify_export` qua. DA-04 đo 3,3 % giá trị bị cắt bằng cách đo của mục 2.8.
 
 **Loader check, như mục 2.7** (cùng image, cùng mã `cda3fdf`, chỉ CPU, argv của `tray-ego-b.yaml`, 8 CPU, 4 worker, trên một bản chép ghi được):
 
@@ -496,6 +496,6 @@ DA-04 làm sạch tư thế theo đề xuất của mục 2.8 (PR #174; QA ở P
 
 `dataset.id` là `team-ego-tray-clean-132`. Dòng `estimated` của sổ chi phí vẫn ghi id của bản nháp đầu `rp_6a66a6ff082c` (sổ là append-only; ước lượng CU không đổi). Tarball của lần ghim đầu không dùng nữa; không đưa nó lên Drive.
 
-**Plan vẫn là bản nháp.** Bản export do mã của PR #173 và #174 tạo ra, chưa merge, mà lần chạy chỉ khởi động từ `master`. Trước đây `runplan check` coi plan nháp đã ghim đủ là lỗi; giờ điều đó được phép, và `check` lẫn `setup` in lý do "marked `status: draft` with every pin set". `setup` vẫn từ chối trước khi cài hay tải gì. `status` nằm ngoài `run_plan_id`, nên khi bỏ `draft` id vẫn là `rp_64bde22a5dda` (test `test_dropping_the_draft_keeps_the_checks_and_the_id`). Việc còn lại trước khi chạy ở mục 2.6 bước 3. Nếu PR #174 còn đổi mã làm sạch trước khi merge, bản export phải xuất và ghim lại.
+**Plan vẫn là bản nháp.** Bản export do mã của PR #173 và #174 tạo ra, chưa merge, mà lần chạy chỉ khởi động từ `master`. Trước đây `runplan check` coi plan nháp đã ghim đủ là lỗi; giờ điều đó được phép, và `check` lẫn `setup` in lý do "marked `status: draft` with every pin set". `setup` vẫn từ chối trước khi cài hay tải gì. `status` nằm ngoài `run_plan_id`, nên khi bỏ `draft` id vẫn là `rp_64bde22a5dda` (test `test_dropping_the_draft_keeps_the_checks_and_the_id`). Việc còn lại trước khi chạy ở mục 2.6 bước 3. Nếu PR #174 còn đổi mã làm sạch trước khi merge, bản export phải xuất và ghim lại. **Cập nhật 11/11/2026:** mã được merge qua PR #176, giống hệt `ac3637da` (chỉ khác tài liệu và một comment trong `configs/data/egocentric.yaml` từ PR #173), nên bản export không phải xuất lại; `status: draft` đã bỏ, id không đổi (mục 2.4).
 
 Lưu ý: 3,3–3,6 % là trên chính 132 clip đã dùng để chọn cách làm sạch ở mục 2.8, nên không phải số đo độc lập. Video quay thêm sau này cần đo lại bằng `loader_check`.
