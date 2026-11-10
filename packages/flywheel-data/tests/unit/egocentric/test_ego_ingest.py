@@ -112,3 +112,20 @@ def test_read_meta(tmp_path: Path) -> None:
 def test_a_config_with_another_subset(tmp_path: Path, store: Path) -> None:
     cfg = load_config(config_for(tmp_path, tasks=("stack_cups",), per_task=3))
     assert len(register_egodex(store, cfg).episodes) == 3
+
+
+def test_all_tasks_takes_every_task_of_the_sample(store: Path, cfg: EgoConfig) -> None:
+    """DA-04 11.1: --all-tasks reads every task folder, a short one gives what it has;
+    the waiver still needs every video in the pin."""
+    from ego_data import write_hdf5, write_mp4
+    from flywheel.data.ingest.egocentric.source import register_egodex
+
+    extra = store / "egodex" / "part1" / "fry_bread"
+    write_hdf5(extra / "0.hdf5")
+    write_mp4(extra / "0.mp4")
+    pinned = register_egodex(store, cfg)
+    every = register_egodex(store, cfg, all_tasks=True)
+    assert len(pinned.episodes) == 4
+    assert len(every.episodes) == 5
+    assert {e.task for e in every.episodes} == {"basic_pick_place", "stack_cups", "fry_bread"}
+    assert every.deid_waiver is None  # fry_bread/0.mp4 is not in the test pin

@@ -68,8 +68,10 @@ class EgoSourceRecord:
         return Path(self.root) / relative
 
 
-def select_egodex(split: Path, tasks: tuple[str, ...], per_task: int) -> list[EgoEpisodeFile]:
-    """The first `per_task` complete episodes of each task, tasks in name order."""
+def select_egodex(split: Path, tasks: tuple[str, ...], per_task: int,
+                  at_most: bool = False) -> list[EgoEpisodeFile]:
+    """The first `per_task` complete episodes of each task, tasks in name order; with
+    `at_most`, a task with fewer complete episodes gives what it has."""
     chosen = []
     for task in sorted(tasks):
         folder = split / task
@@ -79,7 +81,7 @@ def select_egodex(split: Path, tasks: tuple[str, ...], per_task: int) -> list[Eg
             int(p.stem) for p in folder.glob("*.hdf5")
             if _INDEX.match(p.stem) and p.with_suffix(".mp4").is_file()
         )
-        if len(indices) < per_task:
+        if len(indices) < per_task and not (at_most and indices):
             raise ValueError(f"{folder}: {len(indices)} complete episodes, {per_task} pinned")
         base = split.name
         chosen += [EgoEpisodeFile(task, i, f"{base}/{task}/{i}.mp4", f"{base}/{task}/{i}.hdf5")
@@ -87,13 +89,24 @@ def select_egodex(split: Path, tasks: tuple[str, ...], per_task: int) -> list[Eg
     return chosen
 
 
-def register_egodex(store: Path, cfg: EgoConfig) -> EgoSourceRecord:
-    """EgoDexSource: the pinned subset of the EgoDex sample under the store."""
+def sample_tasks(split: Path) -> tuple[str, ...]:
+    """Every task folder of the downloaded sample that holds an HDF5."""
+    return tuple(sorted(p.name for p in split.iterdir()
+                        if p.is_dir() and any(p.glob("*.hdf5"))))
+
+
+def register_egodex(store: Path, cfg: EgoConfig, all_tasks: bool = False) -> EgoSourceRecord:
+    """EgoDexSource: the pinned subset of the EgoDex sample under the store; with
+    `all_tasks`, every task of the downloaded sample (DA-04 Human-1M view, 11/11/2026),
+    still `episodes_per_task` each. The de-identification waiver is unchanged: it holds
+    only while every video matches the pin (`deid_waiver`)."""
     source = cfg.sources["egodex"]
     if source.root is None or source.split_dir is None or source.episodes_per_task is None:
         raise ValueError("sources.egodex needs root, split_dir and episodes_per_task")
     root = (store / source.root).resolve()
-    chosen = select_egodex(root / source.split_dir, source.tasks, source.episodes_per_task)
+    split = root / source.split_dir
+    tasks = sample_tasks(split) if all_tasks else source.tasks
+    chosen = select_egodex(split, tasks, source.episodes_per_task, at_most=all_tasks)
     return make_record("egodex", source, root, chosen, cfg, {})
 
 
