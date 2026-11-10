@@ -118,6 +118,9 @@ class Analysis:
     units: tuple[str, ...] = ()  # targets a finding may name (episodes, jobs)
     figures: list[str] = field(default_factory=list)  # paths relative to the report dir
     notes: list[str] = field(default_factory=list)  # what the code could not judge
+    # Codes a detector judged on this subject and found clean. The agent may not add
+    # one (#175: an added T1 "diverges" on a clean job, its own text saying converged).
+    cleared: tuple[str, ...] = ()
 
     def propose(
         self, code: str, target: str, evidence: Sequence[str], origin: Origin, detail: str

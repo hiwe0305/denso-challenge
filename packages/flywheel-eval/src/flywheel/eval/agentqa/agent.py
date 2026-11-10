@@ -144,6 +144,7 @@ def build_messages(
             "stage": analysis.stage,
             "units": list(analysis.units)[:400],
             "allowed_codes": _allowed_codes(analysis.stage),
+            "cleared_by_code": list(analysis.cleared),
             "facts": [_fact_json(f) for f in facts],
             "candidates": [_candidate_json(c) for c in batch],
             "not_judged_by_code": analysis.notes[:50],
@@ -277,6 +278,12 @@ def _parse_reply(
             continue
         if units and target not in units:
             problems.append(f"{where}: target {target!r} is not a unit of {analysis.subject_ref}")
+            continue
+        if code in analysis.cleared:
+            problems.append(
+                f"{where}: a detector judged {code} on {analysis.subject_ref} with these facts "
+                "and found no fault (cleared_by_code); do not add it"
+            )
             continue
         cited = scope(item)
         insight = text_field(item, "insight", where, cited)
