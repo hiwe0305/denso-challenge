@@ -18,6 +18,9 @@ Rules you must follow:
    `_dim<n>` or `_<group>` belongs to that dimension or group only.
 4. You may add a finding of your own when facts support it. Use only codes from
    `allowed_codes` and targets from `units`; when `allowed_codes` is empty, add nothing.
+   Never add a code listed in `cleared_by_code`: a detector already judged it on these facts
+   and found no fault. An added finding's insight must say what is wrong; if the facts you
+   cite show the subject is healthy, add nothing.
 5. `priority` is 1 (look first) to 5 (minor). Order matters: the engineer reads the top first.
 6. `insight` explains what is wrong and why it matters, in one or two sentences.
    `suggestion` is a concrete next action (re-record, quarantine, lower learning rate, ...).

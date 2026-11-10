@@ -3,6 +3,7 @@ never becomes findings."""
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -216,3 +217,29 @@ def test_a_dropped_code_candidate_comes_back_beside_the_report(tmp_path: Path) -
     assert run.dropped[0].evidence == c1.evidence
     # an EchoModel drops hints only: nothing a detector raised is reported dropped
     assert review_subject(analysis, EchoModel(), config(), now=NOW).dropped == ()
+
+
+def test_an_added_finding_may_not_overrule_a_detector_that_found_nothing(tmp_path: Path) -> None:
+    """#175, clean job: an added T1 "diverges" whose own text said the loss converged."""
+    metrics = train_job(tmp_path / "train" / "job-clean")
+    analysis = analyze_train(load_file(metrics), "train/job-clean", TRAIN_YAML)
+    assert analysis.candidates == [] and "T1" in analysis.cleared
+    assert "T2" not in analysis.cleared  # skipped: too few val measurements to judge
+    fid = next(f.fact_id for f in analysis.book.facts if f.name == "train_loss_last")
+    t1 = {"added": [{"code": "T1", "target": "train/job-clean", "priority": 1,
+                     "insight": f"Loss ended at {{{fid}}}, indicating convergence.",
+                     "suggestion": "Stop the job.", "evidence": [fid]}]}
+    model = ScriptedModel([t1, t1])
+    report = run_agent(analysis, model, config(), now=NOW)
+    assert report.status == "broken" and "found no fault" in report.problems[0]
+    payload = json.loads(model.messages[0][1]["content"])
+    assert "T1" in payload["cleared_by_code"]
+    t2 = {"added": [{**t1["added"][0], "code": "T2"}]}
+    report = run_agent(analysis, ScriptedModel([t2]), config(), now=NOW)
+    assert [(f.code, f.target_ref) for f in report.findings] == [("T2", "train/job-clean")]
+
+
+def test_rtc_clears_only_what_it_judged(tmp_path: Path) -> None:
+    log = rtc_job(tmp_path / "rtc" / "job-slow", latency=0.3)
+    rtc = analyze_rtc(load_file(log), "rtc/job-slow", SYSTEM_YAML)
+    assert rtc.cleared == ("R2",)

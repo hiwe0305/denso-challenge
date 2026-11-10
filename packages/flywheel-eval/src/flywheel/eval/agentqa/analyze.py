@@ -43,6 +43,18 @@ from flywheel.eval.api import DEFAULT_SYSTEM_CONFIG, DEFAULT_TRAIN_CONFIG, diagn
 # A QA reason starts "<check> (<code>): ..." (flywheel.data.qa.checks._judge).
 _REASON = re.compile(r"^(?P<check>\S+) \((?P<code>[A-Z][0-9]+)\):\s*(?P<detail>.*)$")
 _CODE = re.compile(FINDING_CODE)
+_BASE = re.compile(r"^[A-Z][0-9]+")  # "T8a", a branch of T8, is T8
+
+
+def cleared(judged: Sequence[str], flagged: Sequence[str], skipped: Sequence[str]) -> tuple[
+    str, ...
+]:
+    """Codes of `judged` with no finding and no skip, not even of one branch."""
+    out = set(flagged)
+    for code in skipped:
+        m = _BASE.match(code)
+        out.add(m.group(0) if m else code)
+    return tuple(c for c in judged if c not in out)
 
 
 # Which side of its threshold a lane detector flags (#175: Nemotron read T6's
@@ -257,6 +269,9 @@ def analyze_train(
         analysis.propose(code, unit, evidence, "code", f"DA-08 {code}{where}")
     for skip in diagnosis.skipped:
         analysis.notes.append(f"{skip.code} not judged: {skip.reason}")
+    analysis.cleared = cleared([f"T{i}" for i in range(1, 9)],
+                               [f.code for f in diagnosis.findings],
+                               [s.code for s in diagnosis.skipped])
     return analysis
 
 
@@ -291,6 +306,8 @@ def analyze_rtc(log: Loaded, unit: str, config: Path = DEFAULT_SYSTEM_CONFIG) ->
         jumps = np.array([r.boundary_jump for r in after])
         book.add("boundary_jump_p99", float(np.percentile(jumps, 99)), log.ref)
     system, _ = load_system_thresholds(config)
+    flagged: list[str] = []
+    skipped: list[str] = []
     for check, cfg in ((check_r1, system.r1), (check_r2, system.r2)):
         result = check(records, cfg)  # type: ignore[arg-type]
         for finding in result.findings:
@@ -306,6 +323,9 @@ def analyze_rtc(log: Loaded, unit: str, config: Path = DEFAULT_SYSTEM_CONFIG) ->
             )
         for skip in result.skipped:
             analysis.notes.append(f"{skip.code} not judged: {skip.reason}")
+        flagged += [f.code for f in result.findings]
+        skipped += [s.code for s in result.skipped]
+    analysis.cleared = cleared(["R1", "R2"], flagged, skipped)
     return analysis
 
 
@@ -345,6 +365,10 @@ def analyze_stage3(probe: Loaded, thresholds: OfflineThresholds) -> Analysis:
     if p3.out_of_limit_dims:
         fid = book.add("p3_out_of_limit_dims", len(p3.out_of_limit_dims), probe.ref, "dims")
         analysis.propose("O4", unit, [fid], "code", f"dims {p3.out_of_limit_dims}")
+    judged = ["O3", "O4"]
+    judged += ["O1"] if p3.error_by_group else []
+    judged += ["O2"] if len(pos) >= 2 and pos[0] > 0 else []
+    analysis.cleared = cleared(sorted(judged), [c.code for c in analysis.candidates], [])
     return analysis
 
 
