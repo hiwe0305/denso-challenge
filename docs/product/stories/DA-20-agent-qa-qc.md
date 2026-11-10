@@ -37,7 +37,7 @@ Là AI Engineer, tôi muốn một agent đọc báo cáo dataset, log và outpu
 - [ ] 5. Bộ ca mẫu, chấm agent, lưu ước lượng (AC 6) — code, 13 ca và chấm lớp code xong 6/11; còn chấm agent với Nemotron trên bộ lỗi cấy
   - Sửa issue #175 (11/11/2026), trước khi chấm lại agent với Nemotron:
   - [x] 5.1 Mỗi phát hiện giữ fact riêng theo nhóm, chiều; `FactBook` từ chối một tên mang hai giá trị
-  - [ ] 5.2 Fact chiều so sánh (`<mã>_flag_when`) cho mỗi mã có ngưỡng
+  - [x] 5.2 Fact chiều so sánh (`<mã>_flag_when`) cho mỗi mã có ngưỡng
   - [ ] 5.3 Ứng viên `origin = code` bị model bỏ phải có lý do và hiện cho người duyệt
   - [ ] 5.4 Phát hiện `added` không được nêu mã mà code đã xét và không thấy lỗi
   - [ ] 5.5 Ngân sách context khớp server; prompt vượt cửa sổ thì từ chối, không để server cắt
