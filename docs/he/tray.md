@@ -1582,13 +1582,15 @@ _**[Đã chốt 10/11/2026, Hiếu]** "Ghi Decision" (qua phiên điều phối)
 
 Đọc bảng: tiết kiệm nhiều nhất khi B không hơn C, trường hợp hay gặp nhất. Đổi lại mất khoảng 5 điểm power ở mức cải thiện vừa (B 16 %). Tỉ lệ báo nhầm khi B = C không tăng (2,1 % so với 2,3 %).
 
-## 19. Cặp 60k trên cut ALL có vùng đích: VLM sau stage 1 so với VLM gốc (nhiệm vụ 6; soạn 11/11/2026, chưa chạy)
+## 19. Bốn run 60k trên cut ALL có vùng đích: VLM sau stage 1 so với VLM gốc, đủ demo và 70 % (nhiệm vụ 6; soạn 11/11/2026, chưa chạy)
 
 _**[Đã chốt 11/11/2026, Hiếu]** (qua phiên điều phối): vẽ vùng đích và sinh lại demo (W1), stage 1 trên bản xuất đã làm sạch (W2), rồi hai run stage 3 60 000 bước ghép cặp; mục tiêu thành công ≥ 80 % trên task khay. Luật đọc 19.2 là **[Đề xuất]**, viết và commit **trước** mọi lượt train hay eval của hai run._
 
 _**[Đã chốt 11/11/2026 01:50, Hiếu]** (qua phiên điều phối): cần số thành công trong ngày 12/11. Hai run chạy **song song** từ khoảng 12:00 ngày 11/11, mỗi run một L4; `ckpt_40000` lên Drive để đọc sớm trong lúc train tiếp tới 60 000; nếu không chạy song song được thì hai run lần lượt, mỗi run 40 000 bước. Lịch, eval và ngân sách ở 19.5 là **[Đề xuất]**._
 
 _**[Đã chốt 11/11/2026, Hiếu]** ("Chốt A100", qua phiên điều phối): hai run vẫn song song, mỗi run một **A100**, hai nhánh như nhau; batch 16 và `nproc_per_node` 1 giữ nguyên, chỉ đổi phần cứng. Căn cứ: lúc 04:2x Hiếu thử trên tài khoản Colab mới (số dư 500,00 CU). `colab new --gpu A100` READY (A100-SXM4-40GB, 12 vCPU); trong lúc phiên đó còn chạy, `colab new --gpu L4` cũng READY, và `colab sessions` liệt kê cả hai. H100 trả 503 nên không dùng. Plan dự phòng 40k lần lượt không còn cần. VLM stage 1 nằm trên Drive của tài khoản mới (DA-30 chạy stage 1 trên tài khoản đó)._
+
+_**[Đã chốt 11/11/2026, Hiếu]** ("Thêm hai run 70%", qua phiên điều phối): thêm `B_70` và `C_70`, thành **bốn run** (hai VLM × hai lượng dữ liệu), cùng recipe, 60 000 bước, seed train 0 và tập eval. Tập con 70 % lấy theo seed, cùng một danh sách cho cả hai run 70 %. Cả bốn run dùng chung stats của ALL (đề xuất của phiên điều phối; Ψ₀ không bắt stats theo tập train, xem 19.1). Thử bốn phiên A100 cùng lúc, lùi về hai đợt nếu Colab từ chối. Luật đọc 19.2 viết lại cho bốn run là **[Đề xuất]**, chờ Hiếu duyệt. Plan dự phòng 40k đã xóa._
 
 ### 19.1 Thiết lập
 
@@ -1598,117 +1600,154 @@ _**[Đã chốt 11/11/2026, Hiếu]** ("Chốt A100", qua phiên điều phối)
 - **W1** (DA-33): vẽ vùng đích (revision mới của `visuals`), rồi sinh lại toàn bộ demo của hai kho `tray_s1_f9433b028c52` (kho `s1-pool-1104`, seed 1000–1609) và `tray_s1_6c0fd7d37f77` (kho nhắm lỗi của C+), cùng seed và planner. Cắt tập ALL.
 - **W2** (DA-30): stage 1 của VLM C trên bản xuất `egx_7b43c30dc5d88cd7` (153 clip egocentric của đội, đã qua làm sạch E-A của DA-04 nhiệm vụ con 10.5).
 
-**Hai run**, chỉ khác VLM:
+**Bốn run**, chỉ khác VLM và lượng dữ liệu:
 
-| Mục | Run 1 `B_ALL` | Run 2 `C_ALL` |
-|---|---|---|
-| VLM | VLM của C sau stage 1 của W2 | VLM của C (`pre.fast.1by1.2601091803.ckpt.ego200k.he30k`) |
-| Action header | `postpre.1by1.pad36.2601131206.ckpt.he30k` | Giống run 1 |
-| Dữ liệu | Cut ALL của W1, một file stats chung | Giống run 1 |
-| Recipe | `psi0-stage3.yaml`: batch 16, LR 1e-4, cosine, warmup 1 000; 60 000 bước; seed train 0; `validation_steps` 2 000 | Giống run 1 |
-| Eval | 270 điều kiện của bản 2, tập `rp_a04c14e79dfd-2e57f60`, cảnh có vùng đích của W1 | Giống run 1 |
+| Mục | Run 1 `B_ALL` | Run 2 `C_ALL` | Run 3 `B_70` | Run 4 `C_70` |
+|---|---|---|---|---|
+| VLM | VLM của C sau stage 1 của W2 | VLM của C (`pre.fast.1by1.2601091803.ckpt.ego200k.he30k`) | Như run 1 | Như run 2 |
+| Action header | `postpre.1by1.pad36.2601131206.ckpt.he30k` | Giống run 1 | Giống run 1 | Giống run 1 |
+| Dữ liệu | Cut ALL của W1 | Cut ALL (mốc "đủ demo") | Tập con S70 của ALL | Đúng tập con S70 đó |
+| Stats | `meta/stats_psi0.json` của ALL | Giống run 1 | Giống run 1 | Giống run 1 |
+| Recipe | `psi0-stage3.yaml`: batch 16, LR 1e-4, cosine, warmup 1 000; 60 000 bước; seed train 0; `validation_steps` 2 000 | Giống run 1 | Giống run 1 | Giống run 1 |
+| Eval | 270 điều kiện của bản 2, tập `rp_a04c14e79dfd-2e57f60`, cảnh có vùng đích của W1 | Giống run 1 | Giống run 1 | Giống run 1 |
 
-- **Không phải nhánh B.** B (mục 18) là C với VLM stage 1: 160 demo cũ, 40 000 bước, cảnh không có vùng đích. `B_ALL` khác B ở dữ liệu, số bước và cảnh. Hai plan độc lập.
+- **Tập con S70.** Lấy theo seed, không theo kết quả hay chất lượng. Trong mỗi phần của ALL (kho `s1-pool-1104` và kho nhắm lỗi), xếp seed của tập demo theo sha256 của seed (chuỗi thập phân) rồi lấy ceil(0,7 × n) seed đầu (`pairplan.subset_seeds`). Làm tròn lên trong từng phần, nên mỗi kho giữ đúng phần của nó. Với cỡ ước lượng ở 19.4: ceil(0,7 × 429) + ceil(0,7 × 177) = 301 + 124 = **425 episode** (giả định tới khi W1 ghim cỡ thật). Danh sách của từng phần được ghim bằng sha256 (`subsets` của plan) trước mọi lượt chạy; `B_70` và `C_70` dùng đúng một danh sách.
+- **Stats chung.** Ψ₀ đọc `meta/stats_psi0.json` trong thư mục dữ liệu (`psi0_trainer.py`), không tự tính lại theo tập train. Vì vậy tập con S70 mang đúng file stats của ALL, và chuẩn hóa (cùng pose mở tay) giống hệt ở cả bốn run. Hai run 70 % chỉ khác hai run ALL ở lượng dữ liệu. Mã 6.3 phải chép file đó vào dữ liệu S70 và kiểm sha256 bằng `cut.stats_sha256`; server eval dùng đúng file đó.
+
+- **Không phải nhánh B.** B (mục 18) là C với VLM stage 1: 160 demo cũ, 40 000 bước, cảnh không có vùng đích. `B_ALL` và `B_70` khác B ở dữ liệu, số bước và cảnh. Hai plan độc lập.
 - **Cut ALL.** Mỗi kho tái sinh là một phần: mọi episode mà QA của DA-03 giữ và qua bộ lọc chất lượng ngày 3/11 (nghiêng khay khi mang ≤ 10°, vật lệch cuối ≤ 20 mm). Đây là bộ lọc C, C+ và CMAX đã dùng; không giới hạn số, không xếp hạng, không chọn lọc thêm. Hai phần nối theo thứ tự như `cplus_cut` đã nối C và tập nhắm lỗi.
 
-### 19.2 Luật đọc cặp 60k (viết trước khi chạy)
+### 19.2 Luật đọc bốn run 60k (viết trước khi chạy)
 
-**[Đề xuất]**, chờ Hiếu duyệt. Khối giữa hai dấu `pair60k-rules` được ghim bằng sha256 ở `interpretation.rules_sha256` của cả [`he-tray-pair60k.yaml`](../../configs/runplans/tray/he-tray-pair60k.yaml) lẫn plan dự phòng [`he-tray-pair40k-seq.yaml`](../../configs/runplans/tray/he-tray-pair40k-seq.yaml); nhãn này nằm ngoài khối.
+**[Đề xuất]**, chờ Hiếu duyệt. Viết lại ngày 11/11/2026 cho bốn run (Hiếu: "Thêm hai run 70%"); khối cũ cho hai run (`rules_sha256` `24747738…`) chưa được duyệt và không còn dùng. Khối giữa hai dấu `pair60k-rules` được ghim bằng sha256 ở `interpretation.rules_sha256` của [`he-tray-pair60k.yaml`](../../configs/runplans/tray/he-tray-pair60k.yaml); nhãn này nằm ngoài khối. Các so sánh (a′), (f), (g), (h) là trường `comparisons` của plan; gói bằng chứng (19.6) tính đúng các so sánh đó.
 
 <!-- pair60k-rules -->
 
-**(a) So sánh chính: `B_ALL` so với `C_ALL`.**
-- Phép đo: hiệu ghép cặp `B_ALL` − `C_ALL` theo điều kiện, trên tập eval `rp_a04c14e79dfd-2e57f60` (`conditions.sha256` `b9c38b37…`). Cả hai run chạy trên cảnh có vùng đích của W1.
-- Cách tính như luật nhánh B (mục 18.2): d_i = s_B_ALL,i − s_C_ALL,i. CI 95 % bootstrap theo điều kiện: lấy mẫu lại d_i trong từng mức, 10 000 lần, hạt giống 20261103 (`stats` của plan). McNemar chính xác hai phía, với b là số cặp `B_ALL` làm được mà `C_ALL` hỏng, c là số cặp ngược lại.
+**Bốn run**, cùng recipe, 60 000 bước, seed train 0, cùng file stats của ALL, cùng tập eval:
+
+| Run | VLM | Dữ liệu |
+|---|---|---|
+| `B_ALL` | VLM của C sau stage 1 (W2) | Cut ALL |
+| `C_ALL` | VLM của C | Cut ALL (mốc "đủ demo") |
+| `B_70` | VLM của C sau stage 1 (W2) | Tập con S70: 70 % của ALL |
+| `C_70` | VLM của C | Đúng tập con S70 đó |
+
+S70 lấy theo seed, không theo kết quả hay chất lượng: trong mỗi phần của ALL, xếp seed theo sha256 của seed (chuỗi thập phân) và lấy ceil(0,7 × n) seed đầu. Danh sách của từng phần được ghim bằng sha256 trong plan trước mọi lượt chạy.
+
+**(a′) So sánh chính: `B_70` so với `C_70`.**
+- Phép đo: hiệu ghép cặp `B_70` − `C_70` theo điều kiện, trên tập eval `rp_a04c14e79dfd-2e57f60` (`conditions.sha256` `b9c38b37…`). Mọi run chạy trên cảnh có vùng đích của W1.
+- Cách tính như luật nhánh B (mục 18.2): d_i = s_B_70,i − s_C_70,i. CI 95 % bootstrap theo điều kiện: lấy mẫu lại d_i trong từng mức, 10 000 lần, hạt giống 20261103 (`stats` của plan). McNemar chính xác hai phía, với b là số cặp `B_70` làm được mà `C_70` hỏng, c là số cặp ngược lại.
 
 **Hai giai đoạn**, như mục 18.2:
-- Giai đoạn 1 là 6 lô đầu (`l1-000`, `l2-000`, `l1-010`, `l2-010`, `l1-020`, `l2-020`): 60 điều kiện, chạy cho **cả hai** run.
-- Đọc trên 60 điều kiện đó (`eval_results --stage1`, biến thể `B_ALL`, mốc `C_ALL`):
+- Giai đoạn 1 là 6 lô đầu (`l1-000`, `l2-000`, `l1-010`, `l2-010`, `l1-020`, `l2-020`): 60 điều kiện, chạy cho **cả bốn** run.
+- Đọc trên 60 điều kiện đó (`eval_results --stage1`, biến thể `B_70`, mốc `C_70`):
 
 | Kết quả | Điều kiện | Làm gì |
 |---|---|---|
 | E1 | McNemar p < 0,001, b > c, cận dưới CI 95 % > 0 | Dừng. Đọc luật 1 |
 | E3 | McNemar p < 0,001, b < c, cận trên CI 95 % < 0 | Dừng. Đọc luật 3 |
-| F | Không phải E1 hay E3, và b ≤ c | Dừng. Đọc như luật 2: "không thấy `B_ALL` hơn `C_ALL` trên 60 điều kiện". Không đọc luật 3 |
-| Đi tiếp | Còn lại: b > c | Cả hai run chạy 18 lô còn lại của mức 1–2, rồi mức 0. Đọc luật 1–3 trên 240 điều kiện; 60 lượt của giai đoạn 1 tính vào 240 |
+| F | Không phải E1 hay E3, và b ≤ c | Dừng. Đọc như luật 2: "không thấy `B_70` hơn `C_70` trên 60 điều kiện". Không đọc luật 3 |
+| Đi tiếp | Còn lại: b > c | Cả bốn run chạy 18 lô còn lại của mức 1–2, rồi mức 0. Đọc luật 1–3 trên 240 điều kiện; 60 lượt của giai đoạn 1 tính vào 240 |
 
-- Mức 0 (30 lượt lặp) chỉ chạy khi đi tiếp. Không có điểm đọc nào khác.
+- Mức 0 (30 lượt lặp) chỉ chạy khi đi tiếp. Chỉ (a′) quyết định dừng hay đi tiếp; (f), (g), (h) đọc trên cùng giai đoạn với (a′). Không có điểm đọc nào khác.
 
 | # | Điều kiện, trên 240 điều kiện (hoặc 60 khi dừng ở E1, E3) | Đọc là |
 |---|---|---|
-| 1 | Cận dưới CI 95 % của (`B_ALL` − `C_ALL`) > 0 | VLM sau stage 1 egocentric giúp, với cùng cut ALL, cùng 60 000 bước, trên cảnh có vùng đích (sơ bộ, trên dev) |
+| 1 | Cận dưới CI 95 % của (`B_70` − `C_70`) > 0 | Với cùng 70 % demo, VLM sau stage 1 egocentric giúp, cùng 60 000 bước, trên cảnh có vùng đích (sơ bộ, trên dev) |
 | 2 | CI 95 % chứa 0 | Không thấy tác động của stage 1 ở mức này. Không đọc thành "egocentric không giúp" |
-| 3 | Cận trên CI 95 % < 0 | `B_ALL` kém hơn `C_ALL`. Đây là kết quả âm hợp lệ, phải báo |
+| 3 | Cận trên CI 95 % < 0 | `B_70` kém hơn `C_70`. Đây là kết quả âm hợp lệ, phải báo |
 | 4 | McNemar | Báo p cạnh luật 1–3, không đổi quyết định. Khi McNemar (p < 0,05 hay không) và CI cho hai kết luận khác nhau, báo cả hai |
 
-**(b) Số tuyệt đối của từng run so với mốc 80 %.**
-- Với mỗi run: tỉ lệ thành công trên các điều kiện mức 1–2 đã chạy (60 hoặc 240), kèm khoảng Wilson 95 %. Mức 0 báo riêng nếu đã chạy.
-- Đọc: "đạt mốc 80 %" khi cận dưới Wilson ≥ 0,80; "chưa đạt" khi cận trên < 0,80; còn lại là "chưa rõ".
-- (b) không đổi việc dừng hay đi tiếp của (a). Muốn chạy thêm chỉ để thu hẹp khoảng của (b) thì ghi `Decision` mới.
+**(f) Không kém mốc đủ demo: `B_70` so với `C_ALL`.**
+- Phép đo: hiệu ghép cặp `B_70` − `C_ALL`, cùng cách tính CI và McNemar như (a′).
+- Biên không kém là 10 điểm %, biên của HS (spec mục 3). Đọc "không kém" khi cận dưới CI 95 % > −0,10; "kém" khi cận trên < −0,10; còn lại là "chưa rõ".
+- Đọc "egocentric bù phần demo bị cắt" **chỉ khi** (f) không kém **và** cận dưới CI 95 % của (a′) > 0. Thiếu một trong hai thì không đọc câu đó, kể cả khi (f) không kém.
+
+**(g) Lượng demo có phải nút thắt: `C_70` so với `C_ALL`.**
+- Phép đo: hiệu ghép cặp `C_70` − `C_ALL`, cùng cách tính và cùng biên 10 điểm % như (f).
+- Nếu `C_70` không kém `C_ALL` thì ghi rõ: 30 % demo cắt đi không phải nút thắt ở mức này, và (f) không kém **cũng không nhờ egocentric** (như ghi chú của HS, spec mục 3).
+- Nếu `C_70` kém `C_ALL` thì phần demo cắt đi có giá trị, và (f) mới là phép thử "egocentric bù demo".
+
+**(h) Phụ: `B_ALL` so với `C_ALL`.** Hiệu ghép cặp, CI 95 % so với 0 và McNemar như (a′). Chỉ mô tả: không quyết định dừng hay đi tiếp, không thay (a′).
+
+**(b) Số tuyệt đối của từng run.**
+- Mức 1–2 gộp, so với mốc 80 %: tỉ lệ thành công trên các điều kiện mức 1–2 đã chạy (60 hoặc 240), kèm khoảng Wilson 95 %. Đọc "đạt mốc 80 %" khi cận dưới Wilson ≥ 0,80; "chưa đạt" khi cận trên < 0,80; còn lại là "chưa rõ".
+- Mức 1 và mức 2 tách riêng, so với 70 % (Cấp 3 của BTC, spec mục 3): mỗi mức một tỉ lệ kèm Wilson 95 %, cùng cách đọc với mốc 0,70. Không gộp với mức 0.
+- Mức 0 báo riêng nếu đã chạy.
+- (b) không đổi việc dừng hay đi tiếp của (a′). Muốn chạy thêm chỉ để thu hẹp khoảng của (b) thì ghi `Decision` mới.
 
 **(c) Phụ, không tốn CU: thành công theo dung sai nới.**
-- Không phải chỉ số chính; không đổi (a) hay (b). Mọi câu báo số này phải có chữ "nới".
+- Không phải chỉ số chính; không đổi (a′), (b), (f) hay (g). Mọi câu báo số này phải có chữ "nới".
 - Với mỗi run, trên các điều kiện đã chạy: số lượt "thành công nới" ở dung sai vị trí 5 cm (dung sai của bộ chấm), 7,5, 10, 15 và 20 cm. Dung sai góc giữ 10° ở mọi điểm.
 - Một lượt là "thành công nới" ở dung sai r khi nó thành công, hoặc khi nó hỏng với nhãn `L-PLACE-POSE` mà khoảng cách cuối của khay tới đích ≤ r và sai số góc ≤ 10° (`place_error --curve`, cách tính của mục 16.4).
 - Không nới lỗi khác (rơi vật, nghiêng khay, một tay, hết giờ). Lượt `L-PLACE-POSE` dừng trước bước `release_stand`, nên "nới" cũng bỏ qua bước đó.
 
-**(d) So với C và C+ cũ.** Lệch cấu hình ở cả cảnh (vùng đích vẽ hay không), số bước (60 000 so với 40 000) và dữ liệu (ALL tái sinh so với 160 hay 320 demo cũ). Chỉ đặt cạnh nhau để mô tả. Không quy hiệu nào cho một nguyên nhân, không ghép cặp với eval C hay C+.
+**(d) So với C và C+ cũ.** Lệch cấu hình ở cả cảnh (vùng đích vẽ hay không), số bước (60 000 so với 40 000) và dữ liệu (ALL tái sinh hay S70 so với 160 hay 320 demo cũ). Chỉ đặt cạnh nhau để mô tả. Không quy hiệu nào cho một nguyên nhân, không ghép cặp với eval C hay C+.
 
 **(e) Checkpoint nào là số chính.**
-- Số chính là checkpoint ở `checkpoints.primary` của plan đã đóng băng: `ckpt_60000` với `he-tray-pair60k.yaml` (hai run song song), `ckpt_40000` với plan dự phòng `he-tray-pair40k-seq.yaml` (hai run lần lượt, mỗi run 40 000 bước). Chỉ một trong hai plan được đóng băng và chạy. (a), (b) và (c) đọc trên checkpoint này.
-- `ckpt_40000` của plan 60k là **đọc sớm** (`checkpoints.early`). Đọc giai đoạn 1 (60 điều kiện) của cả hai run, cùng cách tính của (a), (b), (c), và mọi số đều ghi "đọc sớm, 40k".
-- Đọc sớm không cho E1, E3, F hay đi tiếp, không quyết định chạy giai đoạn 2, và không thay số chính, kể cả khi hai số khác nhau.
-- Bước 40 000 của run 60k không phải run 40 000 bước: LR cosine chạy trên 60 000 bước, nên ở bước 40 000 LR chưa giảm hết. Không so số đọc sớm với số của plan dự phòng, của C hay của C+.
-- Một run không có checkpoint số chính (hỏng sau 40k, chạm trần) thì cặp không có số chính. Số 40k vẫn chỉ là đọc sớm; chạy lại hay đọc số khác cần `Decision` mới.
+- Số chính là `ckpt_60000` (`checkpoints.primary` của plan đã đóng băng). (a′), (b), (c), (f), (g), (h) đọc trên checkpoint này.
+- `ckpt_40000` là **đọc sớm** (`checkpoints.early`). Đọc giai đoạn 1 (60 điều kiện) của các run đã có, cùng cách tính, và mọi số đều ghi "đọc sớm, 40k".
+- Đọc sớm không cho E1, E3, F hay đi tiếp, không đọc câu "egocentric bù" của (f) hay câu "không phải nút thắt" của (g), không quyết định chạy giai đoạn 2, và không thay số chính, kể cả khi hai số khác nhau.
+- Bước 40 000 của run 60k không phải run 40 000 bước: LR cosine chạy trên 60 000 bước, nên ở bước 40 000 LR chưa giảm hết. Không so số đọc sớm với số của C hay của C+.
+- Một run không có checkpoint số chính (hỏng sau 40k, chạm trần) thì mọi so sánh có run đó không có số chính. Số 40k vẫn chỉ là đọc sớm; chạy lại hay đọc số khác cần `Decision` mới.
 
 **Trước khi đọc.**
 - Plan đã đóng băng.
-- Hai run train trên cùng cut ALL: `stats_sha256` của plan bằng `meta/stats_psi0.json` của cả hai lần chạy.
+- Bốn run dùng cùng một file stats: `meta/stats_psi0.json` của cả bốn lần chạy có sha256 bằng `cut.stats_sha256` (stats của ALL; S70 dùng đúng file đó).
+- `B_70` và `C_70` train trên đúng danh sách S70: số episode và sha256 danh sách của từng phần bằng ghim `subsets` của plan.
 - Eval cùng cây client có vùng đích (`pinned_files` của plan), server `Ta` 24 + RTC, 1 worker. Mỗi run có đủ rollout của giai đoạn đang đọc.
 - Server của mỗi run nạp checkpoint đúng bước của (e), cùng sha256 với bản trên Drive. Server chạy trên `rtx3060` hay trên Colab qua SSH forward đều được, mỗi server một client; nơi chạy ghi cạnh số.
 
-Thiếu một điều thì không đọc (a): ghi `Decision` và báo. Lượt hỏng do hạ tầng chạy lại như mục 2; mỗi điều kiện lấy lần xong sớm nhất.
+Thiếu một điều thì không đọc so sánh có run đó: ghi `Decision` và báo. Lượt hỏng do hạ tầng chạy lại như mục 2; mỗi điều kiện lấy lần xong sớm nhất.
 
 **Giới hạn phải ghi cạnh mọi số.**
 - Sơ bộ, trên dev: 1 seed train mỗi run, 1 rollout mỗi điều kiện. Rollout trên EGL không lặp lại được (mục 13.2).
 - Chỉ trong sim, renderer MuJoCo.
+- Với 60 điều kiện, CI 95 % của một hiệu ghép cặp rộng khoảng ±15 điểm % (ước lượng). Vì vậy (f) và (g) gần như không thể đọc "không kém" ở giai đoạn 1: cần cận dưới > −0,10 trong khi nửa độ rộng đã khoảng 0,15. Dừng ở giai đoạn 1 thì (f) và (g) thường là "chưa rõ".
+- Bốn so sánh trên cùng bốn run, không hiệu chỉnh đa so sánh; chỉ (a′) quyết định.
 - Pose tay của 153 clip là pose giả, ước lượng từ một camera; người bê một hộp đỏ, không phải khay của sim.
 - Stage 1 tốn thêm compute (sổ chi phí của DA-30).
 - Cùng một đội dựng task, sinh demo và quay egocentric.
-- Dừng ở giai đoạn 1 là đọc trên 60 điều kiện. F không phải bằng chứng stage 1 không giúp: một cải thiện vừa vẫn có thể dừng ở F. Bảng đặc tính ở mục 18.9 giả định mốc 8,3 %; mốc `C_ALL` trên cảnh có vùng đích chưa biết, nên bảng đó không áp nguyên cho cặp này.
+- Dừng ở giai đoạn 1 là đọc trên 60 điều kiện. F không phải bằng chứng stage 1 không giúp: một cải thiện vừa vẫn có thể dừng ở F. Bảng đặc tính ở mục 18.9 giả định mốc 8,3 %; mốc `C_70` trên cảnh có vùng đích chưa biết, nên bảng đó không áp nguyên cho các run này.
 
 Luật này không đổi sau khi thấy kết quả. Muốn đổi thì ghi `Decision` mới và báo theo cả luật cũ lẫn luật mới.
 
 <!-- /pair60k-rules -->
 
-### 19.3 RunPlan cặp (nhiệm vụ con 6.1)
+### 19.3 RunPlan cặp (nhiệm vụ con 6.1, bốn run ở 6.10)
 
-[`he-tray-pair60k.yaml`](../../configs/runplans/tray/he-tray-pair60k.yaml), `status: draft`, id nháp `rp_d44e3e6262b4` (A100, cap 70; cap 61 từng cho `rp_92ab06fe3fff`, rồi nâng lại 70 ngày 11/11/2026, 19.8; trước đó `rp_350a28bb7245` khi ghim cảnh `+zone1`, `rp_01c132b8d3b0` lúc đầu). Id đổi khi điền ghim.
+[`he-tray-pair60k.yaml`](../../configs/runplans/tray/he-tray-pair60k.yaml), `status: draft`, id nháp `rp_9614ef46ed9d` (bốn run, khối luật mới `e7f90396…`; hai run cap 70 là `rp_d44e3e6262b4`, cap 61 từng cho `rp_92ab06fe3fff`; trước đó `rp_350a28bb7245` khi ghim cảnh `+zone1`, `rp_01c132b8d3b0` lúc đầu). Id đổi khi điền ghim.
 
 **Schema riêng.** Cut ALL trải trên hai release, mà `TrayRunPlan` chỉ có một release. Vì vậy plan cặp dùng schema riêng [`pairplan`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/pairplan.py) (`purpose: paired_train`).
-- Cut, recipe kèm override, seed train, eval và stats nằm một lần ở cấp plan. Mỗi nhánh chỉ chọn cha. Vì vậy "giống hệt trừ VLM" đúng theo cấu trúc.
+- Cut, tập con, recipe kèm override, seed train, eval và stats nằm một lần ở cấp plan. Mỗi nhánh chỉ chọn cha và dữ liệu (`data`: tên tập con, bỏ trống là cả cut). Vì vậy "giống hệt trừ VLM và tập con" đúng theo cấu trúc.
+- Schema chỉ nhận các nhánh là **mọi cặp (cha, dữ liệu) đúng một lần**: hai cha × (cut và các tập con). Thiếu `C_70` thì `B_70` không có mốc, nên plan bị từ chối ngay khi nạp. Plan hai nhánh không tập con vẫn hợp lệ.
 - `check` kiểm thêm:
-  - đúng hai nhánh, một nhánh có cha stage 1, nhánh kia có cha release; VLM stage 1 bắt đầu từ VLM của cha nhánh kia; hai cha cùng action header;
+  - hai cha, một cha stage 1 và một cha release; VLM stage 1 bắt đầu từ VLM của cha kia; hai cha cùng action header;
+  - mỗi tập con đi theo đúng các phần của cut, đúng thứ tự; khi phần đã ghim, `episodes` và `seeds_sha256` của tập con phải bằng danh sách `subset_seeds` tính lại từ file tập demo đã ghim; tổng episode bằng tổng các phần, nhỏ hơn cut; ghim tập con trước khi phần của nó được ghim thì bị từ chối;
+  - `comparisons`: đúng một so sánh chính, giữa hai nhánh cùng dữ liệu, biến thể là nhánh có VLM stage 1; so sánh "không kém" phải có biên, so sánh khác không có;
+  - `schedule.waves`, nếu có: chỉ cho lịch song song, mỗi nhánh ở đúng một đợt;
   - recipe đúng file và sha của bản 2; override chỉ được `train.validation_steps` và `train.max_training_steps`, và phải có `train.max_training_steps`;
   - `eval_of`: bản 2 đã đóng băng, đúng id; `eval`, `stats`, `metric`, `task`, `embodiment`, `code`, `psi_model`, recipe và seed train trùng bản 2; tên tập eval thuộc id đó;
   - mỗi phần của cut đã ghim: ghim release, file tập demo và tên tập cùng lúc; release mới, không phải release cũ; `data_class` `public`; file tập demo kiểm như `runplan` (sha256 của file, hash tính lại từ seed, ghim chất lượng và QA);
-  - khối luật 19.2 trùng `rules_sha256`; ngân sách là đúng hai run, cap × 2 không quá trần; dòng watcher ghi đúng `--cap` và `--floor`;
+  - khối luật 19.2 trùng `rules_sha256`; ngân sách là đúng các nhánh, cap × số run không quá trần (4 × 70 = 280); dòng watcher ghi đúng `--cap` và `--floor`;
   - `checkpoints` (luật e): `primary` bằng số bước; `early`, nếu có, trước `primary`; cả hai là bội của `train.checkpointing_steps` (10 000) của recipe, tức Ψ₀ có lưu checkpoint đó.
-- `schedule`: `parallel` (một phiên mỗi run cùng lúc) hay `sequential`, sàn số dư, và cách checkpoint lên Drive. Dòng tóm tắt của `check` in số dư cần có: sàn cộng cap của mọi run chạy cùng lúc.
+- `schedule`: `parallel` (một phiên mỗi run cùng lúc) hay `sequential`, sàn số dư, cách checkpoint lên Drive, và `waves` (`[[B_ALL, C_ALL], [B_70, C_70]]`: hai đợt khi Colab từ chối phiên thứ ba hay thứ tư). Dòng tóm tắt của `check` in số dư cần có: sàn cộng cap của mọi run chạy cùng lúc, 14 + 4 × 70 = 294 CU.
+- `pairplan subset <plan>` in danh sách seed, số episode và sha256 của từng phần mỗi tập con, khi W1 đã ghim phần đó; số này chép vào `subsets` của plan.
 
-**Plan dự phòng** [`he-tray-pair40k-seq.yaml`](../../configs/runplans/tray/he-tray-pair40k-seq.yaml), id nháp `rp_862e049c8d29` (trước đó `rp_1160d977dd9f`). Giống plan 60k ở mọi trường trừ tên, số bước (40 000), `checkpoints` (số chính 40 000, không đọc sớm), `schedule` (`sequential`) và ngân sách (cap 18 như C, trần 36). Test so từng trường. Cùng khối luật 19.2. Chỉ một trong hai plan được đóng băng và chạy.
+**Plan dự phòng 40k đã xóa** (11/11/2026). `he-tray-pair40k-seq.yaml` (`rp_862e049c8d29`) chỉ có hai nhánh và ghim khối luật cũ; plan 60k chạy trên A100 nên không còn cần nó.
 
-**Chỗ trống.** `pairplan check` qua và ghi "draft, 13 pins pending". `freeze` và `check --launch` từ chối, kèm từng chỗ trống:
+**Chỗ trống.** `pairplan check` qua và ghi "draft, 19 pins pending". `freeze` và `check --launch` từ chối, kèm từng chỗ trống:
 
 | Chỗ trống | Ai điền |
 |---|---|
 | Mỗi phần của cut: `release`, `demo_sets` (file tập demo commit cạnh plan, có ghim chất lượng và QA), `set_name` | W1 (DA-33), rồi DA-34 cắt |
 | `cut.episodes`, `frames`, `stats_sha256` | W1 |
 | `vlm_stage1.job_id`, `drive_dir`, `weights_sha256`, `manifest_sha256`; header phải trùng `parent_header_sha256` `53d000d9…` như B | W2 (DA-30) |
+| Tập con S70, mỗi phần: `episodes`, `seeds_sha256` (`pairplan subset`); cả tập: `episodes`, `frames` | DA-34, ngay sau W1 |
 | `pinned_files`: danh sách của bản 2, băm lại trên cây có vùng đích | **Đã ghim** 11/11/2026 trên master `7b0defd1` (sau #182); chỉ `mjcf.py` và `simple_task.py` khác bản 2 |
 | `cut.visuals_revision` `4763fbfaa4f8e97658e68b57d01b4c86659e08b5+zone1` | **Đã ghim** 11/11/2026; release của W1 phải ghi đúng revision này |
 
-Lệnh: `python -m flywheel_psi0.tray.pairplan check configs/runplans/tray/he-tray-pair60k.yaml`; với `--launch` trước mọi job; `freeze` khi đủ ghim và đã bỏ `draft`. Chỗ trống của plan dự phòng giống hệt.
+Lệnh: `python -m flywheel_psi0.tray.pairplan check configs/runplans/tray/he-tray-pair60k.yaml`; với `--launch` trước mọi job; `freeze` khi đủ ghim và đã bỏ `draft`.
 
 ### 19.4 Số epoch với 60 000 bước
 
@@ -1719,64 +1758,69 @@ Một epoch là một lượt qua mọi frame của cut (batch 16, `observation-
 | C | 160 | 228 247 | 40 000 | 2,80 |
 | C+ | 320 | 455 372 | 40 000 | 1,41 |
 | ALL (ước lượng: 429 + 177) | 606 | 861 624 | 60 000 | 1,11 |
+| S70 (ước lượng: 301 + 124) | 425 | khoảng 604 000 | 60 000 | khoảng 1,59 |
 
 - **Điểm Hiếu cần xem.** 60 000 bước trên ALL cho mỗi demo **ít** lượt hơn C+ và chỉ khoảng 40 % của C.
   - Muốn bằng số epoch của C+ cần khoảng 75 700 bước, khoảng 30 CU một run.
   - Muốn bằng C cần khoảng 151 000 bước, khoảng 59 CU một run.
   - Plan giữ 60 000 bước như đã duyệt. Đổi số bước thì sửa override trước khi đóng băng (plan còn nháp).
-- Số thật đọc từ `cut.frames` khi W1 xong: `pairplan check` in số epoch vào dòng tóm tắt.
+- **Run 70 % cùng số bước, không cùng số epoch.** Với 60 000 bước, mỗi demo của S70 được thấy khoảng 1,43 lần nhiều hơn ở ALL. So sánh 70 % với ALL là "ít demo hơn, cùng compute", như HS (spec mục 3). Frame của S70 là ước lượng: 425 episode × trung bình 1 422 frame mỗi episode của ALL.
+- Số thật đọc từ `cut.frames` và `subsets[].frames` khi W1 xong: `pairplan check` in số epoch của ALL và S70 vào dòng tóm tắt.
 
 ### 19.5 Lịch, eval và ngân sách (ước lượng, chưa đo) [Đề xuất]
 
-**Hai run song song trên một tài khoản.** `scripts/colab/cu_watch.py` cho một đợt nhiều phiên: một `guard` cho cả đợt, mỗi phiên một `session` watcher trong cùng registry, hai lệnh `new` nối nhau qua `new.lock`, và khi nhiều phiên cùng chạy thì phần tụt số dư chia theo tỉ lệ rate của từng phiên. Ngày 3/11 tài khoản đã chạy 3 phiên song song ([psi0-finetune-cost.md](../g0/psi0-finetune-cost.md)). Vì vậy không cần sửa bộ canh. Ba điều phải giữ:
-- **Một đợt mỗi lúc.** Guard từ chối chạy khi đã có guard khác, và dừng mọi phiên không có watcher đăng ký. Đợt stage 1 của W2 phải xong (guard của nó đã thoát) trước khi mở đợt train. Phiên serve của eval (làn 2 bên dưới) vào **cùng** registry với đợt train, có watcher riêng.
-- **Sàn chỉ an toàn khi số dư đủ cho mọi cap cùng lúc**: lúc launch ít nhất 14 + 2 × 70 = 154 CU (`pairplan check` in số này), cộng cap của phiên serve nếu nó vào đợt.
-- **Mỗi phiên mount Drive riêng** (`colab drivemount -s <phiên>`), cần Hiếu đồng ý trên trình duyệt cho từng phiên. Trên mỗi VM, `persist --watch 600 --pid <pid train>` chép mọi `ckpt_<step>` đã lưu xong lên Drive (`sync_job` của `trainer/colab.py`, không `--delete`). Vì vậy `ckpt_40000` còn trên Drive khi VM chỉ giữ 5 checkpoint gần nhất. Mỗi run lưu 6 checkpoint (mỗi 10 000 bước), nên phải xem chỗ trống trên Drive trước khi launch.
+**Bốn run song song trên một tài khoản.** `scripts/colab/cu_watch.py` cho một đợt nhiều phiên: một `guard` cho cả đợt, mỗi phiên một `session` watcher trong cùng registry, các lệnh `new` nối nhau qua `new.lock`, và khi nhiều phiên cùng chạy thì phần tụt số dư chia theo tỉ lệ rate của từng phiên. Ngày 3/11 tài khoản cũ đã chạy 3 phiên song song ([psi0-finetune-cost.md](../g0/psi0-finetune-cost.md)); tài khoản mới mới thử hai phiên (một A100, một L4). Bốn phiên A100 cùng lúc **chưa thử**. Ba điều phải giữ:
+- **Một đợt mỗi lúc.** Guard từ chối chạy khi đã có guard khác, và dừng mọi phiên không có watcher đăng ký. Đợt stage 1 của W2 phải xong (guard của nó đã thoát) trước khi mở đợt train. Các phiên serve của eval vào **cùng** registry với đợt train, mỗi phiên một watcher.
+- **Sàn chỉ an toàn khi số dư đủ cho mọi cap cùng lúc**: lúc launch ít nhất 14 + 4 × 70 = 294 CU (`pairplan check` in số này), cộng cap của các phiên serve khi chúng vào đợt: 294 + 3 × 22 = 360 CU.
+- **Mỗi phiên mount Drive riêng** (`colab drivemount -s <phiên>`), cần Hiếu đồng ý trên trình duyệt cho từng phiên. Trên mỗi VM, `persist --watch 600 --pid <pid train>` chép mọi `ckpt_<step>` đã lưu xong lên Drive (`sync_job` của `trainer/colab.py`, không `--delete`). Vì vậy `ckpt_40000` còn trên Drive khi VM chỉ giữ 5 checkpoint gần nhất. Mỗi run lưu 6 checkpoint (mỗi 10 000 bước), bốn run là 24 checkpoint, nên phải xem chỗ trống trên Drive trước khi launch.
 
-**`he1_fetch.py` và `he1_colab.py` (DA-26) cố định 40 000 bước** (`TOTAL_STEPS`). Với run 60k, `he1_fetch follow` chiếu chi phí tới `ckpt_40000`, và `stage` báo job 60k là `failed`. Vì vậy hai run 60k không dùng `follow`: checkpoint đi qua Drive. Muốn dùng `follow` thì đổi `TOTAL_STEPS` thành tham số, trong một PR riêng cho chủ của `scripts/he/` (ngoài phạm vi story này).
+**Hai đợt nếu Colab từ chối** (`schedule.waves`). Launch lần lượt `B_ALL`, `C_ALL`, `B_70`, `C_70`. Nếu `cu_watch session --new` của phiên thứ ba hay thứ tư thoát mã 6 (Colab từ chối, không mở phiên nào, không dừng phiên khác), thì dừng phiên đã mở của đợt hai nếu có, và chạy `B_70`, `C_70` thành đợt hai ngay khi hai phiên của đợt một đã dừng.
 
-**Thời gian mỗi run trên A100** (ước lượng, chưa đo trên cut ALL): 60 000 × 0,47 s = 7,83 giờ train (A100, batch 16, đo 400 bước liên tục ở [psi0-finetune-cost.md](../g0/psi0-finetune-cost.md) mục 3), cộng 30 lần val (mỗi 2 000 bước) × khoảng 50 s = 0,42 giờ, cộng khoảng 0,2 giờ setup như C: **khoảng 8,45 giờ**, trong khoảng 8–9 giờ. Job bị chặn ở CPU nạp dữ liệu, và VM A100 mới cũng có 12 vCPU như lúc đo. Trên L4, số đo ngắn (0,71 s) và run C đầy đủ (0,724 s mỗi bước, gồm val và setup) chỉ lệch khoảng 2 %, nên số ngắn của A100 là căn cứ dùng được.
+**`he1_fetch.py follow`** (PR #186) nhận `--total-steps 60000 --gpu A100`, nên cả bốn phiên dùng vòng fetch tự dừng của 19.8.
 
-**Mốc thời gian** (ước lượng). T0 là lúc cả hai phiên bắt đầu train, sau khi cut ALL (W1), VLM stage 1 (W2) và mã chạy của 6.3 đã có, và đợt stage 1 đã đóng. Giờ ví dụ lấy T0 = 06:00 ngày 11/11 (giả định; DA-33 dự kiến xong cut ALL khoảng 04:45–05:15).
+**Thời gian mỗi run trên A100** (ước lượng, chưa đo trên cut ALL): 60 000 × 0,47 s = 7,83 giờ train (A100, batch 16, đo 400 bước liên tục ở [psi0-finetune-cost.md](../g0/psi0-finetune-cost.md) mục 3), cộng 30 lần val (mỗi 2 000 bước) × khoảng 50 s = 0,42 giờ, cộng khoảng 0,2 giờ setup như C: **khoảng 8,45 giờ**, trong khoảng 8–9 giờ. Job bị chặn ở CPU nạp dữ liệu, và VM A100 mới cũng có 12 vCPU như lúc đo. Trên L4, số đo ngắn (0,71 s) và run C đầy đủ (0,724 s mỗi bước, gồm val và setup) chỉ lệch khoảng 2 %, nên số ngắn của A100 là căn cứ dùng được. Run 70 % có cùng số bước nên cùng thời gian; ít episode hơn không làm nó nhanh hơn.
 
-| Mốc | Sau T0 | Ví dụ | Căn cứ |
-|---|---|---|---|
-| `ckpt_40000` trên Drive | 5,7 giờ | 11:40 | 0,2 + 40 000 × 0,47 s + 20 val; `persist` mỗi 10 phút |
-| `ckpt_40000` trên `rtx3060` | 6,0 giờ | 12:00 | 6,25 GB ở khoảng 11 MB/s, khoảng 10 phút, kiểm sha256 |
-| `ckpt_60000` trên Drive, hết train | 8,45 giờ | 14:30 | như trên, 60 000 bước, 30 val |
-| `ckpt_60000` trên `rtx3060` | 8,8 giờ | 14:50 | như trên |
+**Mốc thời gian** (ước lượng). T0 là lúc các phiên của đợt một bắt đầu train, sau khi cut ALL và S70 (W1, rồi `pairplan subset`), VLM stage 1 (W2) và mã chạy của 6.3 đã có, và đợt stage 1 đã đóng. Giờ ví dụ lấy T0 = 06:00 (giả định).
+
+| Mốc | Bốn phiên cùng lúc | Hai đợt: đợt một (`B_ALL`, `C_ALL`) | Hai đợt: đợt hai (`B_70`, `C_70`) | Căn cứ |
+|---|---|---|---|---|
+| `ckpt_40000` trên Drive | +5,7 giờ | +5,7 | +14,4 | 0,2 + 40 000 × 0,47 s + 20 val; `persist` mỗi 10 phút; đợt hai bắt đầu khoảng +8,7 (dừng đợt một, mở phiên, setup) |
+| `ckpt_40000` trên `rtx3060` | +6,0 | +6,0 | +14,7 | 6,25 GB ở khoảng 11 MB/s, khoảng 10 phút, kiểm sha256 |
+| `ckpt_60000` trên Drive, hết train | +8,45 | +8,45 | +17,2 | như trên, 60 000 bước, 30 val |
+| `ckpt_60000` trên `rtx3060` | +8,8 | +8,8 | +17,5 | như trên |
 
 Luật đọc không đổi khi đổi phần cứng: (e) vẫn lấy `ckpt_60000` làm số chính và `ckpt_40000` chỉ để đọc sớm. Cosine vẫn trải trên 60 000 bước vì recipe và override không đổi; GPU chỉ đổi tốc độ, không đổi bước nào được lưu (mỗi 10 000 bước).
 
-**Eval.** Giai đoạn 1 (6 lô, 60 điều kiện) mất khoảng 4,1 giờ mỗi model trên `rtx3060` (6 lô đó của eval C SimReady đo 4,07 giờ). `rtx3060` chỉ chạy **một** server Ψ₀ (server thứ hai không vừa GPU 12 GB), và mỗi server chỉ một client (mục 17.7). Muốn hai model chạy cùng lúc thì server thứ hai phải ở Colab: server Ψ₀ trên một L4, client trên `rtx3060` qua SSH forward (đã chạy được ngày 3/11, RTT 460 ms). `rtx3060` khi đó chạy một server và hai client, đúng tải của phép đo 17.7 (hai client không chung server nên không dính lỗi RTC của 17.7). Giả định mỗi episode qua Colab chậm hơn khoảng 10 %: giai đoạn 1 khoảng 4,5 giờ, cộng khoảng 0,4 giờ setup và nạp. Tài khoản mới đã chạy hai phiên cùng lúc. Phiên thứ ba (serve L4 trong lúc hai A100 còn train) chưa thử, nên không chắc mở được trước T0 + 8,45 giờ.
+**Eval: bốn làn, mỗi làn một model.** Giai đoạn 1 (6 lô, 60 điều kiện) mất khoảng 4,1 giờ mỗi model trên `rtx3060` (6 lô đó của eval C SimReady đo 4,07 giờ). `rtx3060` chỉ chạy **một** server Ψ₀ (server thứ hai không vừa GPU 12 GB), và mỗi server chỉ một client (mục 17.7). Vì vậy:
+- **Làn 1**: server và client trên `rtx3060`, cho `B_ALL`.
+- **Làn 2–4**: server Ψ₀ trên một Colab L4, client trên `rtx3060` qua SSH forward (đã chạy được ngày 3/11, RTT 460 ms), cho `B_70`, `C_70` và `C_ALL`. Hai run của so sánh chính (a′) cùng được serve trên Colab, nên chúng được phục vụ như nhau.
+- `rtx3060` khi đó chạy một server và bốn client. Phép đo 17.7 mới có một server và hai client; bốn client chưa đo, nên thời gian dưới đây có thể dài hơn (giả định). Giả định mỗi episode qua Colab chậm hơn khoảng 10 %: giai đoạn 1 khoảng 4,5 giờ, cộng khoảng 0,4 giờ setup và nạp.
 
-| Phương án | Làn 1: `rtx3060`, server tại chỗ | Làn 2: server Colab L4, client `rtx3060` | Đọc sớm 40k, cả hai | Số chính 60k, cả hai | CU serve |
-|---|---|---|---|---|---|
-| R: chỉ `rtx3060` | B40 +6,0–10,1, C40 –14,2, B60 –18,3, C60 –22,4 | Không | +14,2 (20:10) | +22,4 (04:25 ngày 12/11) | 0 |
-| M: thêm làn 2 sau khi train xong | B40 +6,0–10,1, B60 –14,2, C40 –18,3 | C60 +8,9–13,4 | +18,3 (00:15 ngày 12/11) | +14,2 (20:10) | khoảng 9,5 (cap 12) |
-| M+: làn 2 mở được ngay lúc 40k | B40 +6,0–10,1, B60 –14,2 | C40 +6,1–10,6, C60 –15,1 | +10,6 (16:35) | +15,1 (21:05) | khoảng 19 (cap 22) |
+| Làn | Model | Đọc sớm 40k | Số chính 60k |
+|---|---|---|---|
+| 1, `rtx3060` | `B_ALL` | +6,0–10,1 | +10,1–14,2 |
+| 2, Colab L4 | `B_70` | +6,1–10,6 | +10,6–15,1 |
+| 3, Colab L4 | `C_70` | +6,1–10,6 | +10,6–15,1 |
+| 4, Colab L4 | `C_ALL` | +6,1–10,6 | +10,6–15,1 |
 
-Giờ trong bảng là số giờ sau T0; trong ngoặc là giờ ví dụ với T0 = 06:00.
-
-- **Đề xuất: thử M+, lùi về M.** Khoảng T0 + 5,3 giờ, mở phiên serve bằng `cu_watch session --new --gpu L4` trong registry của đợt train. Nếu Colab từ chối L4, watcher thoát mã 6, không mở phiên nào và không dừng phiên khác (test `test_a_refused_new_stops_nothing`). Khi đó chạy M từ T0 + 8,9 giờ, lúc hai phiên train đã đóng.
-- Với T0 = 06:00, cả ba phương án có số chính trước 04:30 ngày 12/11; M và M+ có ngay tối 11/11.
-- Server Colab phải chạy cùng lệnh với server tại chỗ (`serve_psi0.sh serve`: seeded, `Ta` 24, `--rtc`) và kiểm sha256 checkpoint trước khi nạp. Phần này chưa có mã: việc 6.3.
-- Giai đoạn 2 (đủ 240): theo 19.2, chỉ khi giai đoạn 1 của số chính ra "đi tiếp". Mỗi model thêm khoảng 13 giờ `rtx3060` (11,4 giờ lô mức 1–2, 1,7 giờ mức 0). Với hai làn, xong khoảng T0 + 28 giờ (10:00 ngày 12/11 nếu T0 = 06:00). Chạy thêm sau E1, E3, F chỉ để thu hẹp khoảng của (b) thì cần `Decision`.
+- Với bốn phiên cùng lúc: đọc sớm của cả bốn khoảng **T0 + 10,6 giờ** (16:35 nếu T0 = 06:00), số chính khoảng **T0 + 15,1 giờ** (21:05).
+- Với hai đợt: số chính của `B_ALL`, `C_ALL` như trên, nhưng (a′) cần `B_70`, `C_70` ở 60k: eval giai đoạn 1 từ +17,5, xong khoảng **T0 + 22,4 giờ** (04:25 ngày hôm sau). Đọc sớm 40k của đợt hai rơi vào +14,7, sau khi các làn đã rảnh.
+- Các phiên serve mở khoảng T0 + 5,3 giờ bằng `cu_watch session --new --gpu L4` trong registry của đợt train, lúc bốn A100 còn train: tổng cộng bảy phiên, **chưa thử**. Phiên nào bị từ chối (mã 6) thì làn đó mở sau khi các phiên train đóng (+8,9 giờ) và chỉ đọc 60k; làn 1 làm thay đọc sớm của model đó nếu kịp.
+- Server Colab phải chạy cùng lệnh với server tại chỗ (`serve_psi0.sh serve`: seeded, `Ta` 24, `--rtc`), nạp đúng file stats của ALL và kiểm sha256 checkpoint trước khi nạp. Phần này chưa có mã: việc 6.3.
+- Giai đoạn 2 (đủ 240): theo 19.2, chỉ khi giai đoạn 1 của (a′) ở số chính ra "đi tiếp", và khi đó cho cả bốn run. Mỗi model thêm khoảng 13 giờ (11,4 giờ lô mức 1–2, 1,7 giờ mức 0), bốn làn song song: xong khoảng T0 + 29 giờ. Ba làn Colab thêm khoảng 3 × 14 × 1,94 ≈ 82 CU (ước lượng). Chạy thêm sau E1, E3, F chỉ để thu hẹp khoảng của (b) thì cần `Decision`.
 
 **Ngân sách** (CU Colab, ước lượng; giá 0,0999 USD mỗi CU):
 
 | Khoản | Ước lượng | Cap | Căn cứ |
 |---|---|---|---|
 | Stage 1 của W2 (sổ DA-30) | 2,5 | 4 | `tray-ego-b.yaml` |
-| Train `B_ALL`, `C_ALL` trên A100 | 2 × 57 = 114 | 2 × 70 = 140 | 8,45 giờ × 6,73 CU/giờ (`RATES` của `cu_watch.py`). Cap là lưới an toàn, xem 19.8 |
-| Serve làn 2, M | khoảng 9,5 | 12 | 4,9 giờ trên L4, 1,94 CU/giờ |
-| Serve làn 2, M+ | khoảng 19 | 22 | hai checkpoint |
-| **Tổng, M+** | **khoảng 135** | **166** | |
+| Train bốn run trên A100 | 4 × 57 = 228 | 4 × 70 = 280 | 8,45 giờ × 6,73 CU/giờ (`RATES` của `cu_watch.py`). Cap là lưới an toàn, xem 19.8 |
+| Serve ba làn Colab L4, giai đoạn 1 ở 40k và 60k | 3 × 19 = 57 | 3 × 22 = 66 | mỗi làn khoảng 2 × 4,5 giờ eval + 0,8 giờ setup và nạp, 1,94 CU/giờ |
+| **Tổng** | **khoảng 288** | **350** | |
 
-- **Số dư cần có.** Stage 1 chạy trong đợt riêng trước: cần ít nhất 14 + 4 = 18 CU. Đợt train có phiên serve của M+ nhập vào: lúc mở đợt cần ít nhất 14 + 140 + 22 = 176 CU, để không phiên nào chạm sàn kể cả khi mọi cap tiêu hết.
-- **Số dư 500,00 CU của tài khoản mới đủ**: 14 + 2 × 70 = 154 ≤ 500, cộng serve là 176. Hết đợt còn khoảng 500 − 135 ≈ 365 CU theo ước lượng, ít nhất 500 − 166 = 334 nếu mọi cap tiêu hết. Vẫn đủ chạy lại một run 60k ở cap (cần 14 + 70 = 84).
-- **Plan dự phòng** [`he-tray-pair40k-seq.yaml`](../../configs/runplans/tray/he-tray-pair40k-seq.yaml) (L4, lần lượt, 40 000 bước) không còn cần, vì tài khoản mới chạy được hai phiên cùng lúc. File và id `rp_862e049c8d29` giữ nguyên, không sửa theo A100.
-- Dòng `estimated` trong [sổ chi phí](../g0/ledger/DA-34.csv), ghi trước mọi lượt chạy.
+- **Số dư cần có.** Stage 1 chạy trong đợt riêng trước: cần ít nhất 14 + 4 = 18 CU. Đợt train lúc launch cần ít nhất 14 + 280 = 294 CU; khi ba phiên serve nhập vào cần 14 + 280 + 66 = 360 CU, để không phiên nào chạm sàn kể cả khi mọi cap tiêu hết.
+- **Số dư 500,00 CU của tài khoản mới đủ**: 360 ≤ 500. Hết đợt còn khoảng 500 − 288 ≈ 212 CU theo ước lượng, ít nhất 500 − 350 = 150 nếu mọi cap tiêu hết. Vẫn đủ chạy lại một run 60k ở cap (cần 14 + 70 = 84), hoặc giai đoạn 2 trên ba làn Colab (khoảng 82), nhưng không đủ cả hai khi mọi cap đã tiêu hết.
+- Dòng `estimated` trong [sổ chi phí](../g0/ledger/DA-34.csv), ghi trước mọi lượt chạy: bốn dòng train, tám dòng eval (40k và 60k của mỗi run), ba dòng serve.
 
 ### 19.6 Gói bằng chứng (chuẩn bị trước, điền bằng một lệnh)
 
@@ -1788,35 +1832,39 @@ python -m flywheel_psi0.tray.evidence configs/runplans/tray/he-tray-pair60k.yaml
     --set ~/denso-da34-pool/fwdata/tray/eval-sets/rp_a04c14e79dfd-2e57f60 \
     --eval B_ALL@40000=$EV/eval-b_all-40k --eval C_ALL@40000=$EV/eval-c_all-40k \
     --eval B_ALL@60000=$EV/eval-b_all-60k --eval C_ALL@60000=$EV/eval-c_all-60k \
-    --train B_ALL=<job dir của B_ALL từ Drive> --train C_ALL=<job dir của C_ALL từ Drive> \
+    --eval B_70@40000=$EV/eval-b_70-40k --eval C_70@40000=$EV/eval-c_70-40k \
+    --eval B_70@60000=$EV/eval-b_70-60k --eval C_70@60000=$EV/eval-c_70-60k \
+    --train B_ALL=<job dir từ Drive> --train C_ALL=<job dir> \
+    --train B_70=<job dir> --train C_70=<job dir> \
     --out fwdata/tray/evidence/<run_plan_id>
 ```
 
 | Phần | Lấy từ | Ghi chú |
 |---|---|---|
-| Nguồn gốc | plan và lock: `run_plan_id`, ghim code và psi-model, VLM của từng nhánh (sha256 stage 1 hay của release), release và stats của cut, `rules_sha256`; commit của repo; `result.json` của từng job | |
-| Thành công, Wilson 95 % so với 80 % | `eval_results` (`summarize`) trên mức 1–2 gộp | Luật (b). Phạm vi tự chọn: giai đoạn 1 khi đủ 6 lô của mọi run có mặt, đủ 240 khi đủ 27 lô; thiếu thì ghi số rollout đã xong và không đọc |
-| Ghép cặp, McNemar | `paired_diff`, `stage1_outcome` | Luật (a). E1, E3, F hay đi tiếp chỉ cho checkpoint số chính. Khi đã đủ 240 mà giai đoạn 1 đã dừng, luật 1–3 trên 240 chỉ để mô tả |
+| Nguồn gốc | plan và lock: `run_plan_id`, ghim code và psi-model, VLM và dữ liệu của từng nhánh (sha256 stage 1 hay của release; ALL hay S70), release và stats của cut, ghim của tập con, `rules_sha256`; commit của repo; `result.json` của từng job | |
+| Thành công, Wilson 95 % | `eval_results` (`summarize`) | Luật (b): mức 1–2 gộp so với 80 %, mức 1 và mức 2 riêng so với 70 %. Mỗi run trên phạm vi rộng nhất nó đã chạy đủ: giai đoạn 1 khi đủ 6 lô, đủ 240 khi đủ 27 lô; thiếu thì ghi số rollout đã xong và không đọc run đó. Đợt hai chạy chậm không giữ lại số của đợt một |
+| Ghép cặp, McNemar | `paired_diff`, `stage1_outcome`, trên mỗi so sánh của `comparisons` | (a′), (f), (g), (h), mỗi so sánh trên phạm vi rộng nhất cả hai run đã chạy đủ. Đọc: CI so với 0, hay với (f), (g) cận dưới so với −0,10. E1, E3, F hay đi tiếp chỉ cho (a′) ở checkpoint số chính; khi đã đủ 240 mà giai đoạn 1 đã dừng, luật 1–3 trên 240 chỉ để mô tả. Ở checkpoint số chính, gói ghi câu "egocentric bù phần demo bị cắt" chỉ khi (f) không kém và cận dưới của (a′) > 0, và ghi rõ khi (g) không kém |
 | Lỗi theo nhãn và theo bước | nhãn `failure` và `scorer_steps` | Tỉ lệ qua từng bước trong 7 bước của bộ chấm |
 | Thành công nới | `place_error` (`rows_for`, `tolerance_curve`) | Luật (c), luôn ghi "nới". Cần `flywheel_simple` để dựng pose đích; `--no-relaxed` bỏ qua phần này |
 | Loss | `metrics.jsonl` của từng job | `loss.csv`, `loss.svg`; train lấy trung vị mỗi 500 bước, val như log |
 | Video | `data/evals/…/episode_<i>/head_stereo_left_*.mp4` của SIMPLE | Mỗi run vài lượt thành công, rồi mỗi nhãn lỗi một lượt trước khi lặp nhãn (`--videos`) |
-| Sổ chi phí | dòng của `B_ALL` và `C_ALL` trong `DA-34.csv` | Ước lượng và thực đo |
+| Sổ chi phí | dòng của bốn run trong `DA-34.csv` | Ước lượng và thực đo |
 
 - Mỗi checkpoint có nhãn của luật (e): "số chính" hay "đọc sớm, 40k". Đầu gói ghi các giới hạn của 19.2.
-- Kết quả eval đọc qua plan của `eval_of` (bản 2): `pairplan check` giữ eval, stats và tập điều kiện của cặp trùng bản 2, và `eval_results` đọc kiểu plan đó.
-- **Chạy thử trên số thật** (11/11, bản sao output eval C và C+ kéo từ `rtx3060` về laptop, chỉ đọc). C+ đóng vai `B_ALL`, C đóng vai `C_ALL`, cả hai ở 60k. Kết quả: C 20/240, `L-PLACE-POSE` 131/240, đúng mốc 16.6. Giai đoạn 1 ra F, như lần kiểm công cụ ở 18.5; luật 3 trên 240 chỉ để mô tả. Video và pose đích tìm đúng. Đây là kiểm công cụ, không phải kết quả của cặp.
+- Kết quả eval đọc qua plan của `eval_of` (bản 2): `pairplan check` giữ eval, stats và tập điều kiện của bốn run trùng bản 2, và `eval_results` đọc kiểu plan đó.
+- **Chạy thử trên số thật** (11/11, trên bản hai run của gói; bản sao output eval C và C+ kéo từ `rtx3060` về laptop, chỉ đọc). C+ đóng vai `B_ALL`, C đóng vai `C_ALL`, cả hai ở 60k. Kết quả: C 20/240, `L-PLACE-POSE` 131/240, đúng mốc 16.6. Giai đoạn 1 ra F, như lần kiểm công cụ ở 18.5; luật 3 trên 240 chỉ để mô tả. Video và pose đích tìm đúng. Đây là kiểm công cụ, không phải kết quả của cặp.
 
 ### 19.7 Việc còn lại
 
 - **W1, W2:** điền các chỗ trống ở 19.3, cho plan sẽ chạy.
-- **6.2:** Hiếu duyệt 19.2 (nhãn ngoài khối, không đổi sha256); plan 60k song song trên A100 đã chốt; `Decision` nháp; bỏ `draft`, `pairplan freeze`.
-- **6.3, phải xong trước 12:00 ngày 11/11:** mã chạy.
-  - `colab_train` cho hai nhánh của plan cặp: dữ liệu từ cut ALL, VLM stage 1 lấy từ Drive như B, override số bước. Hai lệnh train trên hai VM, mỗi VM một `persist --watch`.
-  - Nối hai phần thành ALL như `cplus_cut`.
-  - Server eval trên Colab cho làn 2 (lệnh như `serve_psi0.sh serve`, kiểm sha256).
-  - Runbook một đợt `cu_watch` hai phiên (cộng phiên serve); phần dừng phiên ở 19.8.
-- **6.4:** hai run stage 3 (Hiếu launch), dòng thực đo.
+- **Ngay sau W1:** `pairplan subset` in danh sách S70 của từng phần; chép `episodes`, `seeds_sha256` vào plan, rồi `frames` khi đã cắt S70.
+- **6.2:** Hiếu duyệt khối 19.2 mới cho bốn run (nhãn ngoài khối, không đổi sha256); plan bốn run song song trên A100; `Decision` nháp; bỏ `draft`, `pairplan freeze`.
+- **6.3:** mã chạy, cho **cả bốn** nhánh.
+  - `colab_train` cho mọi nhánh của plan: dữ liệu từ cut ALL hay từ tập con S70 (theo `data` của nhánh), VLM stage 1 lấy từ Drive như B, override số bước. Bốn lệnh train trên bốn VM, mỗi VM một `persist --watch`.
+  - Nối hai phần thành ALL như `cplus_cut`; cắt S70 từ ALL đúng danh sách đã ghim, chép `meta/stats_psi0.json` của ALL vào và kiểm sha256 bằng `cut.stats_sha256` (không tính lại stats).
+  - Server eval trên Colab cho làn 2–4 (lệnh như `serve_psi0.sh serve`, kiểm sha256 checkpoint và stats).
+  - Runbook một đợt `cu_watch` bốn phiên (cộng ba phiên serve), đường lùi hai đợt của 19.5; phần dừng phiên ở 19.8.
+- **6.4:** bốn run stage 3 (Hiếu launch), dòng thực đo.
 - **6.5:** eval giai đoạn 1 ở 40k và 60k, đọc theo 19.2; chạy `evidence` sau mỗi phần kết quả.
 - **PR #186** (ngoài phạm vi story, merge trước #181): `he1_fetch.py` và `he1_colab.py` nhận `--total-steps` và `--gpu`, để `follow --stop-when-done` tự dừng phiên 60k trên A100 (19.8).
 
@@ -1824,7 +1872,7 @@ python -m flywheel_psi0.tray.evidence configs/runplans/tray/he-tray-pair60k.yaml
 
 Yêu cầu của Hiếu: không để phiên nào chạy không mà vẫn tính CU. `cu_watch.py` chỉ dừng phiên ở cap, ở sàn, hoặc khi nhận tín hiệu; nó **không** dừng khi train xong. Trên A100 (6,73 CU/giờ), một run xong sớm hơn cap 2 giờ là khoảng 13 CU mất không. Vì vậy mỗi phiên phải dừng ngay khi việc của nó xong hoặc hỏng, và cap chỉ là lưới cuối.
 
-**Cap 70 là lưới an toàn, không phải số chi** (plan `rp_d44e3e6262b4`, trần 140; phiên điều phối 11/11/2026). Không tốn CU khi phiên chạy không: vòng fetch bên dưới dừng phiên ngay khi `ckpt_60000` đã khớp sha256 trên laptop, nên mỗi run tiêu khoảng 57 CU (ước lượng 19.5) dù cap là bao nhiêu.
+**Cap 70 là lưới an toàn, không phải số chi** (cap 70 từ plan `rp_d44e3e6262b4`; nay bốn run, trần 280, plan `rp_9614ef46ed9d`; phiên điều phối 11/11/2026). Không tốn CU khi phiên chạy không: vòng fetch bên dưới dừng phiên ngay khi `ckpt_60000` đã khớp sha256 trên laptop, nên mỗi run tiêu khoảng 57 CU (ước lượng 19.5) dù cap là bao nhiêu.
 
 Cap còn đặt mức dừng sớm của `follow`. Ở bước 2 200, `follow` dự báo CU tới lúc `ckpt_60000` về laptop và dừng phiên nếu vượt mức dừng của cap. Ngưỡng tính bằng `projected_cu` và `stop_line` của PR #186, với s/bước như `metrics.jsonl` đo (cửa sổ tính cả val):
 
@@ -1833,7 +1881,7 @@ Cap còn đặt mức dừng sớm của `follow`. Ở bước 2 200, `follow` d
 | 61 (bản trước, sát ước lượng) | 0,509 | 0,501 |
 | **70** | **0,589** | **0,582** |
 
-Tốc độ khả dĩ là khoảng 0,505 s/bước. Trên L4, run C đủ chậm hơn số đo ngắn khoảng 2 % (0,724 so với 0,71); áp cùng tỉ lệ cho A100 được 0,47 × 1,02 = 0,48, cộng khoảng 0,025 cho val. Với cap 61, con số này nằm ngay ở mức dừng, nên cả hai run có thể bị dừng oan ở bước 2 200 và lỡ hạn 12/11. Cap 70 để dư khoảng 15 % trên tốc độ đó. Lúc launch cần 14 + 2 × 70 = 154 CU, vẫn dưới số dư 500.
+Tốc độ khả dĩ là khoảng 0,505 s/bước. Trên L4, run C đủ chậm hơn số đo ngắn khoảng 2 % (0,724 so với 0,71); áp cùng tỉ lệ cho A100 được 0,47 × 1,02 = 0,48, cộng khoảng 0,025 cho val. Với cap 61, con số này nằm ngay ở mức dừng, nên cả hai run có thể bị dừng oan ở bước 2 200 và lỡ hạn 12/11. Cap 70 để dư khoảng 15 % trên tốc độ đó. Lúc launch cần 14 + 4 × 70 = 294 CU, vẫn dưới số dư 500.
 
 **Dừng khi xong.** Bên cạnh mỗi run, từ lúc launch, chạy một vòng fetch trên laptop:
 
@@ -1843,7 +1891,7 @@ python3 scripts/he/he1_fetch.py follow --session da34-b-all --registry "$R" \
     --stop-when-done --total-steps 60000 --gpu A100   # hai cờ cuối: PR #186, merge trước #181
 ```
 
-Run `C_ALL` dùng lệnh giống hệt với `da34-c-all` và `C_ALL`.
+Ba run còn lại dùng lệnh giống hệt, mỗi run một vòng fetch: `da34-c-all` với `C_ALL`, `da34-b-70` với `B_70`, `da34-c-70` với `C_70`. Với hai đợt, vòng fetch của `B_70`, `C_70` chạy từ lúc đợt hai launch.
 - Mỗi lượt, vòng fetch tải checkpoint mới nhất đã lưu xong và kiểm sha256 với VM. Checkpoint cũ không bị xóa trên laptop, nên `ckpt_40000` của luật (e) vẫn còn đó.
 - Khi train xong và `ckpt_60000` đã khớp sha256, nó dừng đúng phiên đó. Lần dừng được xác nhận: `colab stop` tối đa ba lần, tới khi hai lần liệt kê liên tiếp không còn phiên, sau đó SIGTERM tới watcher của phiên.
 - Từ bước 58 000 trở đi, nó pull mỗi 60 s, nên phiên dừng khoảng vài phút sau checkpoint cuối.
@@ -1863,7 +1911,7 @@ Run `C_ALL` dùng lệnh giống hệt với `da34-c-all` và `C_ALL`.
 
 Ngưỡng 0,58 là mức dừng sớm của `follow` ở cap 70 khi pull chậm nhất (6 MB/s), theo bảng trên.
 
-**Phiên serve của làn 2** (M hoặc M+): dừng ngay khi lô eval cuối của checkpoint cuối đã ghi xong kết quả trên `rtx3060`. Không chờ cap 12 hay 22.
+**Các phiên serve của làn 2–4**: mỗi phiên dừng ngay khi lô eval cuối của checkpoint cuối của model đó đã ghi xong kết quả trên `rtx3060`. Không chờ cap 22.
 
 **Bước cuối của runbook.** `colab sessions` không còn phiên nào (lặp lại ít nhất hai lần cách nhau một phút; hai lần liệt kê liên tiếp mới tính). Guard của đợt thoát mã 0. Dòng thực đo vào sổ chi phí theo `colab usage`.
 
@@ -1916,3 +1964,4 @@ Ngưỡng 0,58 là mức dừng sớm của `follow` ở cap 70 khi pull chậm 
 | 11/11/2026 | Mục 19.8 (Hiếu 11/11/2026 qua phiên điều phối: "không để treo session mà tốn CU"): runbook dừng phiên khi xong và khi hỏng sớm (vòng `he1_fetch follow --stop-when-done`, bước bắt buộc khi không có nó), cap 61 sát ước lượng (trần 122, id nháp `rp_92ab06fe3fff`), bước cuối `colab sessions` trống. Mục 19.5 theo cap mới | Hiếu (soạn với Claude) |
 | 11/11/2026 | Mục 19.8: vòng fetch tự dừng là đường chính (`follow --stop-when-done --total-steps 60000 --gpu A100`, PR #186 merge trước #181); bước dừng tay chỉ là dự phòng, ngưỡng s/bước sửa thành 0,50 tính cả val như `follow` đo (trước ghi 0,485 không tính val) | Hiếu (soạn với Claude) |
 | 11/11/2026 | Mục 19.8, 19.5, 19.3 (phiên điều phối 11/11/2026): cap mỗi run nâng lại từ 61 lên 70, trần 140, lúc launch cần 154 CU. Lý do: ở cap 61, dừng sớm của `follow` ở bước 2 200 cắt run trên 0,50–0,51 s/bước, sát tốc độ khả dĩ 0,505; ở cap 70 mức đó là 0,58–0,59. Không tốn thêm CU vì phiên dừng khi `ckpt_60000` đã kiểm. Ngưỡng dừng tay thành 0,58. Id nháp về lại `rp_d44e3e6262b4` | Hiếu (soạn với Claude) |
+| 11/11/2026 | Mục 19 (Hiếu 11/11/2026 "Thêm hai run 70%" qua phiên điều phối): thành bốn run, hai VLM × hai lượng dữ liệu (`B_ALL`, `C_ALL`, `B_70`, `C_70`). Tập con S70: 70 % mỗi phần của ALL, chọn theo sha256 của seed, làm tròn lên, ghim sha256 danh sách; cả bốn run dùng stats của ALL. Khối `pair60k-rules` viết lại [Đề xuất]: (a′) chính `B_70` − `C_70` hai giai đoạn; (f) `B_70` − `C_ALL` không kém với biên 10 điểm %; (g) `C_70` − `C_ALL`; (h) phụ `B_ALL` − `C_ALL`; (b) thêm mức 1, mức 2 riêng so với 70 %; `rules_sha256` thành `e7f90396…`. 19.3: schema bốn nhánh (`data`, `subsets`, `comparisons`, `schedule.waves`), lệnh `pairplan subset`, 19 chỗ trống, id nháp `rp_9614ef46ed9d`; plan dự phòng 40k đã xóa. 19.4: epoch của S70 (ước lượng). 19.5: bốn phiên A100, đường lùi hai đợt, bốn làn eval (ba server Colab L4), ngân sách khoảng 288 CU, cap 350, cần 294 CU lúc launch và 360 khi có serve. 19.6: gói bằng chứng đọc mọi so sánh của plan. 19.7, 19.8: 6.3 và vòng fetch cho cả bốn run | Claude cho Hiếu |
