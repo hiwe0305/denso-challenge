@@ -92,17 +92,22 @@ def kept_episodes(shard: Path) -> list[int]:
     return sorted(e for e in gen_ok if verdicts[e])
 
 
+def _one_value(shards: Sequence[Path], key: str, what: str) -> str:
+    values = {str(r[key]) for shard in shards for r in read_log(shard / LOG_NAME) if r["recorded"]}
+    if len(values) > 1:
+        raise ValueError(f"recorded episodes mix {what} {sorted(values)}")
+    return values.pop() if values else ""
+
+
 def check_one_planner_version(shards: Sequence[Path]) -> str:
     """The one planner_version of the recorded episodes; a mixed batch is refused (D-28)."""
-    versions = {
-        str(r["planner_version"])
-        for shard in shards
-        for r in read_log(shard / LOG_NAME)
-        if r["recorded"]
-    }
-    if len(versions) > 1:
-        raise ValueError(f"recorded episodes mix planner versions {sorted(versions)}")
-    return versions.pop() if versions else ""
+    return _one_value(shards, "planner_version", "planner versions")
+
+
+def check_one_visuals_revision(shards: Sequence[Path]) -> str:
+    """The one visuals_revision of the recorded episodes; scenes with and without the
+    target zone are refused together."""
+    return _one_value(shards, "visuals_revision", "visuals revisions")
 
 
 def _episode_file(root: Path, index: int, kind: str) -> Path:
@@ -171,6 +176,7 @@ def export_psi0(
     simple = simple or simple_root()
     shards = [s for s in sorted(batch.glob("shard-*")) if (s / LOG_NAME).exists()]
     check_one_planner_version(shards)
+    check_one_visuals_revision(shards)
     exported: list[ExportedEpisode] = []
     out.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=out.parent, prefix=f".{out.name}.stage-") as tmp:

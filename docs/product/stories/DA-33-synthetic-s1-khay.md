@@ -43,6 +43,12 @@ Kế hoạch chi tiết: [docs/superpowers/plans/2026-10-31-da33-tray-synthetic.
 - [x] 11. Sửa bước nhảy action tay và crash x264 của bộ ghi theo [wrist-jump.md](../../g0/tray/wrist-jump.md): giới hạn vận tốc trong QP của IK tay (`arm_step_max` 0,08 rad/bước, `da33-planner-5`), `JoinedVideoWriter` trong `tray/recorder.py`, test sim (AC 4; PO chọn sinh lại 4/11/2026)
 - [x] 12. Thử planner-6 theo D-29: đường quintic trong không gian khớp cho APPROACH_A nâng tay và REACH, LOWER hạ min-jerk, `da33-planner-6`, test CPU; chạy 50 seed 300040–300089 qua cùng chuỗi QA và so với planner-5; nhận chỉ khi 0 cờ, 0 reject, ≥ 44/50 thành công, ≥ 85 % qua lọc (AC 4; PO cho thử 4/11/2026, hạn 12:00 5/11/2026). Đã thử 5/11/2026: trượt (38/50 thành công, 2 reject QA), không nhận; planner-5 v2 đóng băng ([wrist-jump.md](../../g0/tray/wrist-jump.md))
 
+- [ ] 13. Vẽ vùng đích lên bàn B và sinh lại demo trên cảnh có vùng đích (Hiếu duyệt 11/11/2026; chẩn đoán của phiên điều phối 10–11/11: planner căn ngang theo tư thế đích ẩn, ảnh không có tín hiệu nào cho vị trí dừng dọc bàn B). Planner, seed, bộ chấm, dung sai và eval set giữ nguyên; chỉ đổi hình ảnh ([target-zone.md](../../g0/tray/target-zone.md))
+  - [x] 13.1 Geom vùng đích chỉ để vẽ (không va chạm, không khối lượng) đúng footprint khay tại `target_pose`, hai vạch tối chỉ chỗ tay cầm; `visuals_revision` thêm hậu tố `+zone1`; `generate` và `export_psi0` từ chối lô trộn hai revision; test CPU và test sim (tư thế, không va chạm, quỹ đạo vật lý giống hệt)
+  - [ ] 13.2 Ảnh camera đầu trước/sau ở mức 0, 1, 2 và so quỹ đạo một episode đầy đủ qua SIMPLE trên `rtx3060`
+  - [ ] 13.3 Sinh lại cùng seed của `s1-pool-1104` (release `tray_s1_f9433b028c52`) và `cplus-tgt-1108` (release `tray_s1_6c0fd7d37f77`) trên cảnh mới, QA tối thiểu và QA phát lại, hai release mới
+  - [ ] 13.4 QA của DA-03 và bộ lọc chất lượng như C, cut "ALL" gồm mọi episode qua QA của cả hai kho; sổ chi phí dòng ước tính và thực đo
+
 ## Phạm vi file
 
 Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
@@ -80,6 +86,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 4/11/2026 | PO merge #93 và chọn sửa rồi sinh lại thay vì che bước vọt khi train; thêm nhiệm vụ 11 (giới hạn vận tốc IK tay, `JoinedVideoWriter`) | PO (Hiếu) |
 | 4/11/2026 | PO cho thử planner-6 (D-29); thêm nhiệm vụ 12, chưa đổi planner | PO (Hiếu) |
 | 5/11/2026 | Thử planner-6 trên 50 seed: trượt 2 trong 3 mức nhận của D-29 (38/50, 2 reject `replay_kinematic`), không nhận; planner-5 v2 đóng băng | Claude, chờ PO (Hiếu) |
+| 11/11/2026 | Thêm nhiệm vụ 13: vẽ vùng đích lên bàn B, sinh lại hai kho demo trên cảnh mới, cut ALL cho hai run train 60k | PO (Hiếu) duyệt qua phiên điều phối |
 
 ## Ghi chép khi làm
 

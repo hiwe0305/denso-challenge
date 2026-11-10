@@ -6,6 +6,7 @@ from dataclasses import asdict, replace
 
 import numpy as np
 import pytest
+from flywheel_simple.tray.mjcf import TARGET_ZONE_REVISION
 from flywheel_simple.tray.planner import PlannerConfig
 from flywheel_simple.tray.predicates import STEP_NAMES
 from flywheel_simple.tray.recorder import (
@@ -38,11 +39,14 @@ def test_planner_version_follows_the_config_values() -> None:
     assert planner_version(cfg) != planner_version(replace(cfg, lift_height=cfg.lift_height + 0.01))
 
 
-def test_visuals_revision_reads_the_manifest_or_says_none(tmp_path) -> None:  # type: ignore[no-untyped-def]
-    assert visuals_revision(None) == "none"
+def test_visuals_revision_reads_the_manifest_and_names_the_target_zone(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    # The zone suffix keeps scenes drawn with the target zone apart from the ones
+    # before it, which recorded the bare SimReady revision.
+    assert visuals_revision(None) == f"none+{TARGET_ZONE_REVISION}"
     manifest = tmp_path / "manifest.json"
     manifest.write_text('{"revision": "abc123", "assets": []}')
-    assert visuals_revision(manifest) == "abc123"
+    assert visuals_revision(manifest) == f"abc123+{TARGET_ZONE_REVISION}"
+    assert TARGET_ZONE_REVISION == "zone1"
 
 
 def test_tray_frame_matches_the_declared_features() -> None:

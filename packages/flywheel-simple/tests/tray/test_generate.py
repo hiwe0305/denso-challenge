@@ -11,6 +11,7 @@ from flywheel_simple.tray.generate import (
     append_attempt,
     batch_planner_versions,
     check_planner_version,
+    check_visuals_revision,
     episode_qa,
     logged_seeds,
     next_seeds,
@@ -18,6 +19,7 @@ from flywheel_simple.tray.generate import (
     shard_dir,
     split_attempts,
 )
+from flywheel_simple.tray.planner import PlannerConfig
 
 ROW = AttemptRow(
     seed=0,
@@ -83,6 +85,14 @@ def test_a_batch_of_another_planner_version_is_refused(tmp_path: Path) -> None:
         check_planner_version(tmp_path, "p")
 
 
+def test_a_batch_of_other_visuals_is_refused(tmp_path: Path) -> None:
+    # A batch started before the target zone was drawn must not be topped up with it.
+    check_visuals_revision(tmp_path, "rev+zone1")  # a new batch
+    append_attempt(shard_dir(tmp_path, 0) / "gen_log.jsonl", replace(ROW, visuals_revision="rev"))
+    with pytest.raises(RuntimeError, match=r"\['rev'\].*renders rev\+zone1.*new --out"):
+        check_visuals_revision(tmp_path, "rev+zone1")
+
+
 def test_generate_refuses_a_batch_of_another_planner_before_any_attempt(tmp_path: Path) -> None:
     # Resume goes by seed only: without this check a planner-5 run would top up a
     # planner-4 batch and the release would mix them (D-28). The check runs before the
@@ -92,6 +102,19 @@ def test_generate_refuses_a_batch_of_another_planner_before_any_attempt(tmp_path
     append_attempt(shard_dir(tmp_path, 0) / "gen_log.jsonl", replace(ROW, planner_version="old"))
     before = (shard_dir(tmp_path, 0) / "gen_log.jsonl").read_bytes()
     with pytest.raises(RuntimeError, match="generated with planner"):
+        gen.generate(tmp_path, 1, level=1, seed_start=100, allow_plain=True)
+    assert (shard_dir(tmp_path, 0) / "gen_log.jsonl").read_bytes() == before
+
+
+def test_generate_refuses_a_batch_of_other_visuals_before_any_attempt(tmp_path: Path) -> None:
+    from flywheel_simple.tray import generate as gen
+    from flywheel_simple.tray.recorder import planner_version
+
+    version = planner_version(PlannerConfig.load())
+    row = replace(ROW, planner_version=version, visuals_revision="old")
+    append_attempt(shard_dir(tmp_path, 0) / "gen_log.jsonl", row)
+    before = (shard_dir(tmp_path, 0) / "gen_log.jsonl").read_bytes()
+    with pytest.raises(RuntimeError, match="rendered with visuals"):
         gen.generate(tmp_path, 1, level=1, seed_start=100, allow_plain=True)
     assert (shard_dir(tmp_path, 0) / "gen_log.jsonl").read_bytes() == before
 
