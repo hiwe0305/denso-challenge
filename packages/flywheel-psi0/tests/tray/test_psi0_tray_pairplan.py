@@ -74,9 +74,8 @@ def test_the_draft_holds_and_lists_what_w1_and_w2_owe() -> None:
     assert check(plan, REPO) == []
     assert plan.status == "draft" and plan.steps() == 60000
     todo = pending(plan)
-    assert len(todo) == 19  # 13 of the pair + 6 of S70 (two parts x two pins, two totals)
-    assert sum("(W1)" in p for p in todo) == 9 and sum("(DA-30)" in p for p in todo) == 4
-    assert sum("subset S70" in p and "(after W1)" in p for p in todo) == 6
+    assert len(todo) == 4  # W1 and S70 pinned 11/11/2026; DA-30's stage 1 is left
+    assert all("(DA-30)" in p for p in todo)
     assert plan.interpretation.rules_marker == "pair60k-rules"
     text = (REPO / plan.interpretation.doc).read_text(encoding="utf-8")
     assert runplan.rules_sha256(text, "pair60k-rules") == plan.interpretation.rules_sha256
@@ -212,6 +211,23 @@ def test_the_subset_is_the_seeds_by_sha256_alone() -> None:
         subset_seeds([1, 1, 2], 0.7)
 
 
+def test_w1_pins_cut_all_and_s70_as_delivered(capsys: pytest.CaptureFixture[str]) -> None:
+    # DA-33's cut of 11/11/2026 05:11 (rtx3060 cut-all-zone1): 429 + 177 episodes
+    plan = TrayPairPlan.load(PAIR)
+    assert (plan.cut.episodes, plan.cut.frames) == (606, 861624)
+    assert [p.release.id for p in plan.cut.parts if p.release] == [
+        "tray_s1_41899efb4b27",
+        "tray_s1_4a8f4a8c6a8d",
+    ]
+    assert [len(pairplan.part_seeds(p, REPO) or []) for p in plan.cut.parts] == [429, 177]
+    s70 = plan.subset("S70")
+    assert s70 is not None and (s70.episodes, s70.frames) == (425, 603915)
+    assert [p.episodes for p in s70.parts] == [301, 124]
+    assert pairplan.main(["subset", str(PAIR)]) == 0
+    listed = json.loads(capsys.readouterr().out)["S70"]
+    assert [v["seeds_sha256"] for v in listed.values()] == [p.seeds_sha256 for p in s70.parts]
+
+
 def test_subset_pins_are_checked_against_the_pinned_parts(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -232,7 +248,7 @@ def test_subset_pins_are_checked_against_the_pinned_parts(
     wrong["subsets"][0]["episodes"] += 1
     assert any("is not the parts' sum" in p for p in _problems(wrong))
     early = _raw()
-    early["subsets"][0]["parts"][0]["seeds_sha256"] = "e" * 64
+    early["cut"]["parts"][0].update(release=None, demo_sets=None, set_name=None)
     assert any("pinned before the part" in p for p in _problems(early))
 
 
@@ -254,16 +270,15 @@ def test_no_launch_and_no_freeze_until_pinned(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert pairplan.main(["check", str(PAIR)]) == 0
-    assert "draft, 19 pins pending" in capsys.readouterr().out
+    assert "draft, 4 pins pending" in capsys.readouterr().out
     assert pairplan.main(["check", str(PAIR), "--launch"]) == 1
     err = capsys.readouterr().err
-    assert "DRAFT" in err and err.count("PENDING:") == 19 and "not frozen" in err
-    assert pairplan.main(["subset", str(PAIR)]) == 1  # nothing to list before W1
+    assert "DRAFT" in err and err.count("PENDING:") == 4 and "not frozen" in err
     with pytest.raises(ValueError, match="status draft"):
         pairplan.freeze(PAIR, REPO)
     # runplan hands a paired plan over, and refuses a --release it would not read
     assert runplan.main(["check", str(PAIR)]) == 0
-    assert "19 pins pending" in capsys.readouterr().out
+    assert "4 pins pending" in capsys.readouterr().out
     with pytest.raises(SystemExit):
         runplan.main(["check", str(PAIR), "--release", str(tmp_path)])
 
