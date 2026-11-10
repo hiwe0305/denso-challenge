@@ -5,6 +5,7 @@ prints it); its layout is the one DA-18 reads (`ingest/egocentric/episodes.py`).
 In order:
 
     fw egocentric ingest egodex                    pinned EgoDex subset (egocentric.yaml)
+    fw egocentric ingest egodex --all-tasks        every task of the sample (Human-1M view)
     fw egocentric ingest video --root <dir>        the team's recordings (EgoVideoSource)
     fw egocentric deid <work>                      faces covered on this machine (YuNet);
                                                    first, before anything reads a frame
@@ -83,6 +84,9 @@ def ingest(
     source: Annotated[str, typer.Argument(help="egodex or video")],
     root_dir: Annotated[Path | None, typer.Option("--root", help="video: recording root")] = None,
     split: Annotated[str, typer.Option(help="train or dev")] = "train",
+    all_tasks: Annotated[bool, typer.Option(
+        "--all-tasks", help="egodex: every task of the downloaded sample, not the pinned 10")]
+    = False,
     work: Annotated[Path | None, typer.Option(help="default $FW_ROOT/pipeline/<source_id>")] = None,
     config: Config = CONFIG,
     run_plan_id: RunPlan = None,
@@ -95,7 +99,7 @@ def ingest(
         if source == "egodex":
             spec = cfg.sources["egodex"]
             planned = len(spec.tasks) * (spec.episodes_per_task or 0)
-            register = partial(register_egodex, store, cfg)
+            register = partial(register_egodex, store, cfg, all_tasks)
         elif source == "video":
             if root_dir is None:
                 raise ValueError("ingest video needs --root <recording dir>")
