@@ -195,7 +195,7 @@ Quy tắc dừng [Đề xuất]: đọc s/bước trong `train.log` sau 20 bư�
 
 ## 2. Nhánh B của DA-34: stage 1 trên video đội tự quay (AC 2)
 
-_Soạn 9/11/2026, chưa chạy._ Nhánh B của thí nghiệm khay ([tray.md](tray.md) mục 4) giống hệt nhánh C, chỉ khác VLM: trước stage 3, VLM của C được fine-tune stage 1 trên video egocentric đội tự quay (người cầm hộp đỏ đi giữa hai bàn). So B với C trả lời câu hỏi "video người + demo robot" có hơn "chỉ demo robot" không. Ở Ψ₀, dữ liệu egocentric chỉ vào stage 1 (48 chiều tay và video), không bao giờ vào stage 3.
+_Soạn 9/11/2026. Lần 1 ngày 11/11/2026 trên L4 hết bộ nhớ trước bước train đầu (mục 2.10); lần 2 chạy trên A100._ Nhánh B của thí nghiệm khay ([tray.md](tray.md) mục 4) giống hệt nhánh C, chỉ khác VLM: trước stage 3, VLM của C được fine-tune stage 1 trên video egocentric đội tự quay (người cầm hộp đỏ đi giữa hai bàn). So B với C trả lời câu hỏi "video người + demo robot" có hơn "chỉ demo robot" không. Ở Ψ₀, dữ liệu egocentric chỉ vào stage 1 (48 chiều tay và video), không bao giờ vào stage 3.
 
 Lần chạy này cũng là **lần đầu stage 1 chạy hết đường đi** trong dự án: lần 1 của mục 1 hỏng trước bước train đầu (mục 1.7), lần 2 chưa chạy.
 
@@ -207,6 +207,8 @@ Lần chạy này cũng là **lần đầu stage 1 chạy hết đường đi** 
 2. Mỗi clip là một mẫu, mang câu mô tả cả task (như một episode EgoDex).
 3. Dữ liệu: 153 clip của đội (480p, hộp đỏ, hai bàn đặt lưng nhau), 30 fps, mặt đã làm mờ bằng `fw egocentric deid`; `data_class` `public` theo PR #170 (chờ merge). Bỏ 8 clip 1080p vì thấy bảng tên.
 4. Khoảng 300 bước train; trần cứng 4 CU (`compute.max_compute_units`), cùng bộ canh CU như mục 1.6.
+
+**[Đã chốt 11/11/2026, Hiếu]** "Chạy A100": lần 1 trên L4 hết bộ nhớ ở forward đầu (mục 2.10), nên chạy trên một A100 40 GB, trần cứng nâng từ 4 lên 8 CU. Recipe giữ nguyên (micro-batch 16, accumulation 2, 300 bước, `zero3_offload.json`).
 
 ### 2.2 Dữ liệu: bản export ghim bằng `export_id` và tarball
 
@@ -254,7 +256,7 @@ Một điều cần ghi cạnh kết quả của B: action header `postpre.*` đ
 
 ### 2.4 RunPlan `tray-ego-b.yaml`
 
-[`tray-ego-b.yaml`](../../configs/runplans/stage1/tray-ego-b.yaml), `run_plan_id` `rp_64bde22a5dda` từ khi ghim bản export đã làm sạch ngày 9/11/2026 (mục 2.9; lần ghim đầu là `rp_ecd2bb11c415`); trước đó, với giá trị giữ chỗ, là `rp_6a66a6ff082c`. `runplan check` qua và in "draft" kèm lý do.
+[`tray-ego-b.yaml`](../../configs/runplans/stage1/tray-ego-b.yaml), `run_plan_id` **`rp_1d7627234111`** từ 11/11/2026, khi plan chuyển sang A100 với trần 8 CU (mục 2.1, 2.10). Khối `compute` nằm trong id, nên id đổi; mọi khối khác giữ nguyên. Trước đó, trên L4 với trần 4 CU, id là `rp_64bde22a5dda` từ khi ghim bản export đã làm sạch ngày 9/11/2026 (mục 2.9; lần ghim đầu là `rp_ecd2bb11c415`); trước đó, với giá trị giữ chỗ, là `rp_6a66a6ff082c`. `runplan check` qua và in "draft" kèm lý do.
 
 **Sẵn sàng chạy (11/11/2026).** Khối `dataset.source` ghim bản export thật (`egx_7b43c30dc5d88cd7`, mục 2.9). Plan giữ `status: draft` từ 9/11 tới 11/11/2026 vì bản export do mã của PR #173 và #174 tạo ra, khi đó chưa merge. Ngày 11/11, PR #173 và PR #176 (thay #174, cùng mã `ac3637da`) đã merge, và Hiếu xác nhận người trong 153 clip đã đồng ý cho đưa tarball lên Drive và chạy stage 1; `status: draft` được bỏ, `run_plan_id` vẫn là `rp_64bde22a5dda`. Quy tắc chung: plan có giá trị giữ chỗ (`egx_0000000000000000`, sha256 toàn số 0) bắt buộc ghi `draft`, nếu không `runplan check` báo lỗi; plan đã ghim đủ được phép giữ `draft`, khi đó `check` và `setup` in lý do "marked `status: draft` with every pin set" và `colab setup` từ chối trước khi làm bất cứ gì (không tốn CU). `status` nằm ngoài `run_plan_id` (như plan của DA-34), nên thêm hay bỏ nó không đổi id. Để chạy: mục 2.6.
 
@@ -265,9 +267,10 @@ Một điều cần ghi cạnh kết quả của B: action header `postpre.*` đ
 | `train.max_training_steps` | 300 | Quyết định 4. 300 bước × 32 mẫu là khoảng 73 lượt qua 132 clip của bản export đã ghim (mỗi lượt một khung ngẫu nhiên mỗi clip). Loss sẽ giảm một phần do học thuộc; B được đánh giá bằng closed-loop của stage 3 so với C (DA-34), không bằng loss này |
 | `train.checkpointing_steps` | 300 | Một checkpoint ở cuối (Ψ₀ luôn lưu ở bước cuối: `scripts/train.py:304-310` gọi `should_save_training_checkpoint`, `trainer.py:30-41`). Checkpoint giữa tốn một lần lưu DeepSpeed khoảng 30 GB và vô dụng: phiên đã dừng không chạy tiếp |
 | `train.validation_steps` | 0 | Bản export không có split `test/`; val dạng sinh token của Ψ₀ nói ít trong 300 bước. Quên (P4) và hiểu cảnh (P1) là probe của DA-09, dời sau demo |
-| `deepspeed_config` | `zero3_offload.json` của mục 1.2 | Một L4; `runplan check` so với recipe; pre-flight của `setup` thử trên model nhỏ. File này bật gom trọng số 16 bit khi lưu, điều kiện của mục 2.3 |
+| `deepspeed_config` | `zero3_offload.json` của mục 1.2 | Một GPU; `runplan check` so với recipe; pre-flight của `setup` thử trên model nhỏ. File này bật gom trọng số 16 bit khi lưu, điều kiện của mục 2.3 |
 | `persist_vlm` | `true` | Giữ VLM cho stage 3 của B (mục 2.3) |
-| `compute.max_compute_units` | 4,0 | Quyết định 4 |
+| `compute.gpu` | `A100` (40 GB), từ 11/11/2026; trước là `L4` | L4 22 GiB hết bộ nhớ ở forward đầu của lần 1 (mục 2.10) |
+| `compute.max_compute_units` | 8,0 từ 11/11/2026; trước là 4,0 | Quyết định 4; Hiếu nâng lên 8 khi chuyển sang A100 (mục 2.1) |
 
 **Stats chuẩn hóa [Đề xuất, 9/11/2026]: dùng file của tác giả `egodex_stat_all.json`, không dùng `egodex_stat.json` của bản export.** Lý do:
 
@@ -287,37 +290,61 @@ Ba tiêu chí này là bằng chứng đường đi. Chúng không nói gì về
 
 ### 2.5 Ước lượng CU
 
-Giả định, chưa đo; dòng `job_da30_stage1_tray_ego_b` của [sổ chi phí](../g0/ledger/DA-30.csv). Một VM L4 ở 1,94 CU/giờ (S1-04). Phần cố định dùng số đo của lần 1 (mục 1.7): từ lúc nhận VM đến lúc nạp model xong khoảng 11 phút; bản export chép từ Drive thay cho phần tải EgoDex, giả định không lâu hơn. Phần còn lại là giả định: pre-flight khoảng 2 phút, khởi tạo ZeRO-3 offload khoảng 2 phút, checkpoint cuối 4 phút, chạy lại 3 bước 7 phút, `persist` kèm VLM 4,3 GB lên Drive 4 phút, `check-vlm` 3 phút. Cộng khoảng 33 phút cố định với 300 bước train:
+**A100, từ 11/11/2026.** Giả định, chưa đo; dòng `job_da30_stage1_tray_ego_b_a100` của [sổ chi phí](../g0/ledger/DA-30.csv). Một VM A100 ở 6,73 CU/giờ (đo ở DA-19 và S1-04).
 
-| s/bước | Train | Tổng | CU |
+Phần cố định khoảng 29 phút, một phần đo ở lần 1 (mục 2.10): `setup` của DA-19 1,9 phút; pre-flight 0,9 phút (build CPU Adam 44 s); tải cha và chép bản export 0,2 phút; `run` từ lúc gọi tới forward đầu 2 phút. Phần còn lại là giả định:
+
+- nhận VM và đưa mã lên khoảng 3 phút;
+- cài CUDA toolkit khoảng 2 phút (lần 1 cài bằng tay, không đo);
+- checkpoint cuối 4 phút;
+- `persist` kèm VLM 4 phút;
+- `check-vlm` 3 phút;
+- `repeat` 3 bước 7 phút (gồm nạp model và một lần lưu DeepSpeed);
+- `persist` lần hai 1 phút.
+
+Tức khoảng 10 phút trước bước train đầu và 19 phút sau bước cuối.
+
+Tốc độ train cũng là giả định: **6 s/bước**, tức 9 s/bước của L4 chia 1,5. Số 9 s là giả định cũ của L4, chưa đo. Hệ số 1,5 là tỉ lệ A100/L4 đo ở stage 3 (S1-04), nơi phần CPU chiếm nhiều thời gian. Với ZeRO-3 offload, Adam chạy trên CPU, nên GPU nhanh hơn không rút ngắn được phần đó.
+
+| s/bước | Train 300 bước | Tổng | CU |
 |---|---|---|---|
-| 5 | 25 phút | 58 phút | 1,9 |
-| 9 (giả định chính) | 45 phút | 78 phút | 2,5 |
-| 14 | 70 phút | 103 phút | 3,3 |
-| 17 | 85 phút | 118 phút | 3,8 (bộ canh dừng ở khoảng 3,77) |
+| 4 | 20 phút | 49 phút | 5,5 |
+| 6 (giả định chính) | 30 phút | 59 phút | 6,6 |
+| 7 | 35 phút | 64 phút | 7,2 (bộ canh dừng ở khoảng 7,20) |
+| 9 | 45 phút | 74 phút | 8,3, quá trần |
 
-Với `--cap 4`, bộ canh dừng phiên ở khoảng 3,77 CU (biên 430 s, khoảng 117 phút) và chạy `persist` sớm hơn 600 s (khoảng 107 phút). Nếu lúc đó run chưa tới checkpoint cuối, `persist` chỉ giữ được log, không có VLM.
+Bộ canh với `--cap 8` ở 6,73 CU/giờ:
 
-**Quy tắc dừng [Đề xuất]:** đọc s/bước trong `train.log` sau 20 bước; quá 14 s thì dừng VM và báo Hiếu (ở 14 s/bước, run xong khoảng 3,3 CU, còn chỗ cho `persist`). Thứ tự chạy cũng đổi so với mục 1.6 để trọng số lên Drive sớm nhất: `run`, `persist`, `check-vlm`, rồi mới `repeat` và `persist` lần nữa (lần thứ hai không chép lại trọng số đã có).
+- Biên 430 s là khoảng 0,80 CU, nên bộ canh dừng phiên ở khoảng 7,20 CU, tức khoảng 64 phút từ lúc mở phiên.
+- `persist` của bộ canh chạy sớm hơn 600 s (khoảng 1,12 CU), tức ở khoảng 6,08 CU, khoảng phút 54.
+- Nếu lúc đó run chưa tới checkpoint cuối, `persist` chỉ giữ được log, không có VLM.
+
+**Quy tắc dừng [Đề xuất]:** VLM phải lên Drive trước phút 54. Có 10 phút trước bước train đầu, và sau bước cuối còn checkpoint 4 phút và `persist` 4 phút, nên 300 bước phải xong trong 36 phút, tức 7,2 s/bước. Đọc s/bước trong `train.log` sau 20 bước:
+
+- Quá 7 s/bước: dừng VM và báo Hiếu.
+- Từ 6 đến 7 s/bước: chạy `run`, `persist`, `check-vlm`, rồi bỏ `repeat`. `repeat` mất 7 phút và sẽ đụng mốc dừng 64 phút. Ghi lý do vào mục 2.10.
+- Dưới 6 s/bước: chạy đủ, theo thứ tự `run`, `persist`, `check-vlm`, rồi mới `repeat` và `persist` lần nữa. Thứ tự này đưa trọng số lên Drive sớm nhất; `persist` lần hai không chép lại trọng số đã có.
+
+**L4, 9/11/2026 (bỏ).** Ước lượng 2,5 CU ở 9 s/bước, trần 4 CU, dòng `job_da30_stage1_tray_ego_b` của sổ chi phí. Lần 1 cho thấy model với recipe này không vừa L4 (mục 2.10).
 
 ### 2.6 Việc Hiếu làm để chạy
 
-Chưa chạy. Điều kiện trước (trạng thái 11/11/2026):
+Lần 1 (L4) hỏng ngày 11/11/2026 (mục 2.10); lần 2 trên A100 chưa chạy. Điều kiện trước (trạng thái 11/11/2026):
 
-1. Chạy từ `master`, không từ nhánh. PR #171 (mục 2) và PR bỏ `draft` đã hoặc phải merge trước.
+1. Chạy từ `master`, không từ nhánh. PR #171 (mục 2) và PR #179 (bỏ `draft`) đã merge. PR chuyển plan sang A100 và thêm bước `cuda_toolchain` (mục 2.10) phải merge trước.
 2. PR #170 (`data_class` `public` cho video của đội) đã merge.
-3. Bản export đã ghim (mục 2.9); PR #173 và #176 (thay #174) đã merge; plan không còn `draft`, `runplan check` in `OK rp_64bde22a5dda`. **Còn lại:** đưa `fwdata/egocentric-export/tarballs/egx_7b43c30dc5d88cd7.tar` (sha256 `666a67fc…f84a`, 48 701 440 byte, đã kiểm lại ngày 11/11) lên `MyDrive/denso/da30/exports/egx_7b43c30dc5d88cd7.tar`. `setup` kiểm cỡ file trên Drive trước khi cài gì, rồi kiểm sha256 trên bản chép sang VM.
+3. Bản export đã ghim (mục 2.9); PR #173 và #176 (thay #174) đã merge; plan không còn `draft`, `runplan check` in `OK rp_1d7627234111`. Tarball `egx_7b43c30dc5d88cd7.tar` (sha256 `666a67fc…f84a`, 48 701 440 byte) đã ở `MyDrive/denso/da30/exports/` từ lần 1, sha256 khớp. `setup` kiểm cỡ file trên Drive trước khi cài gì, rồi kiểm sha256 trên bản chép sang VM.
 4. Đọc `stats_coverage` của bản export trên CPU trước khi tốn GPU (mục 2.4).
    - Che danh tính: `identity_masked: true` là lời khẳng định của plan, không phải điều `setup` kiểm được. `verify_export` chỉ kiểm `source.deid_waiver` là null và `data_class` khớp plan; việc làm mờ mặt trước mọi bước khác là mã của DA-04 (`fw egocentric deid`). Hiếu xác nhận ngày 11/11/2026 rằng người trong 153 clip đã đồng ý cho đưa dữ liệu lên Drive và chạy stage 1.
 5. `colab sessions` trống: một đợt một lúc trên tài khoản (mục 1.6).
 
-Bộ canh CU như mục 1.6, đổi tên phiên và trần:
+Bộ canh CU như mục 1.6, đổi tên phiên, GPU và trần (A100, 8 CU). Mỗi lần chạy dùng một registry mới:
 
 ```bash
 export PATH=~/project/wm-wam-review/.venv-colab-cli/bin:$PATH
 R=fwdata/colab/da30b-$(date +%Y%m%d-%H%M%S); mkdir -p fwdata/colab && mkdir $R
 nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py guard --registry "$0" --floor 14 --log "$0/guard.jsonl"; echo "exit $?"' $R < /dev/null > $R/guard.out 2>&1 &
-nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py session --registry "$0" --new --name da30-stage1-b --gpu L4 --cap 4 --floor 14 --persist "colab exec -s da30-stage1-b -f configs/runplans/stage1/persist_cell.py" --log "$0/da30-stage1-b.jsonl"; echo "exit $?"' $R < /dev/null > $R/da30-stage1-b.out 2>&1 &
+nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py session --registry "$0" --new --name da30-stage1-b --gpu A100 --cap 8 --floor 14 --persist "colab exec -s da30-stage1-b -f configs/runplans/stage1/persist_cell.py" --log "$0/da30-stage1-b.jsonl"; echo "exit $?"' $R < /dev/null > $R/da30-stage1-b.out 2>&1 &
 ( until [ -f $R/da30-stage1-b.ready ]; do grep -q '^exit ' $R/da30-stage1-b.out && exit 1; sleep 5; done
   [ -f $R/guard.beat ] && [ $(( $(date +%s) - $(stat -c %Y $R/guard.beat) )) -lt 120 ] ) && echo READY || echo "NOT READY: do not start the job"
 ```
@@ -333,6 +360,15 @@ Trên VM, từ `/content/da30` (lệnh train chạy trong shell SSH, không qua 
 ```bash
 python3 -m flywheel_psi0.stage1.colab setup --work /content/da30 --plan fw/configs/runplans/stage1/tray-ego-b.yaml
 ```
+
+`setup` tự cài CUDA toolkit khớp torch khi VM có bản CUDA khác (mục 2.10), nên không cần sửa tay như lần 1. Pha `cuda_toolchain` của `report.json` ghi hai bản CUDA và các gói đã cài.
+
+Sau 20 bước của `run`, áp quy tắc dừng của mục 2.5:
+
+- quá 7 s/bước: dừng VM;
+- từ 6 đến 7 s/bước: bỏ `repeat`.
+
+Nếu `run` báo `out_of_memory`, dừng VM ngay và báo Hiếu (mục 2.10, [Option]). Hết các pha thì dừng VM ngay, không chờ bộ canh: bộ canh chỉ dừng phiên ở trần.
 
 ```bash
 Psi0/.venv-psi/bin/python -m flywheel_psi0.stage1.colab run --work /content/da30 --plan fw/configs/runplans/stage1/tray-ego-b.yaml
@@ -354,7 +390,7 @@ Psi0/.venv-psi/bin/python -m flywheel_psi0.stage1.colab repeat --work /content/d
 python3 -m flywheel_psi0.stage1.colab persist --work /content/da30 --plan fw/configs/runplans/stage1/tray-ego-b.yaml
 ```
 
-Sau lần chạy: tải `report.json` và log về `fwdata/colab/`, ghi dòng `measured` của sổ chi phí (`balance_drop` ở dòng `exit` của `da30-stage1-b.jsonl`), ghi kết quả vào mục 2.10. VLM nằm ở `MyDrive/denso/da30/da30-tray-ego-b/vlm/`, bản ghi ở `…/da30-tray-ego-b/vlm.json`. Bốn giá trị cần ghim vào `he-tray-b.yaml` của DA-34 (`parents.psi0-b-ego-stage1.vlm_stage1`) có sẵn trong mục `persist.vlm` của `report.json`: `job_id` `da30-tray-ego-b`, `drive_dir`, `weights_sha256`, `manifest_sha256`.
+Sau lần chạy: tải `report.json` và log về `fwdata/colab/`, ghi dòng `measured` của sổ chi phí (`balance_drop` ở dòng `exit` của `da30-stage1-b.jsonl`), ghi kết quả vào mục 2.10 (lần 2). VLM nằm ở `MyDrive/denso/da30/da30-tray-ego-b/vlm/`, bản ghi ở `…/da30-tray-ego-b/vlm.json`. Bốn giá trị cần ghim vào `he-tray-b.yaml` của DA-34 (`parents.psi0-b-ego-stage1.vlm_stage1`) có sẵn trong mục `persist.vlm` của `report.json`: `job_id` `da30-tray-ego-b`, `drive_dir`, `weights_sha256`, `manifest_sha256`.
 
 ### 2.7 Loader check trên bản export thử (9/11/2026)
 
@@ -488,14 +524,47 @@ DA-04 làm sạch tư thế theo đề xuất của mục 2.8 (PR #174, sau thay
 | Trường của `dataset.source` | Ghim hiện tại | Lần ghim đầu (bỏ, lịch sử) |
 |---|---|---|
 | `export_id` | `egx_7b43c30dc5d88cd7` | `egx_b6e974e46e8222e8` |
-| `tarball` dưới `MyDrive` | `denso/da30/exports/egx_7b43c30dc5d88cd7.tar` (chưa đưa lên Drive) | `denso/da30/exports/egx_b6e974e46e8222e8.tar` |
+| `tarball` dưới `MyDrive` | `denso/da30/exports/egx_7b43c30dc5d88cd7.tar` (trên Drive từ 11/11/2026, sha256 khớp) | `denso/da30/exports/egx_b6e974e46e8222e8.tar` |
 | `sha256` | `666a67fc47ff9da1218718d3926b88bb9d7b8ad433ae311c0f636fbe01aaf84a` | `61c3497aa48bd59182aebadcdb5816d5d8a7de11cec0aa393c90eb32906bafc8` |
 | `bytes` | 48 701 440 | 48 701 440 |
 | `samples` | 132 | 132 |
-| `run_plan_id` | `rp_64bde22a5dda` | `rp_ecd2bb11c415` |
+| `run_plan_id` | `rp_64bde22a5dda` trên L4; `rp_1d7627234111` trên A100 từ 11/11/2026 (mục 2.4) | `rp_ecd2bb11c415` |
 
 `dataset.id` là `team-ego-tray-clean-132`. Dòng `estimated` của sổ chi phí vẫn ghi id của bản nháp đầu `rp_6a66a6ff082c` (sổ là append-only; ước lượng CU không đổi). Tarball của lần ghim đầu không dùng nữa; không đưa nó lên Drive.
 
 **Plan vẫn là bản nháp.** Bản export do mã của PR #173 và #174 tạo ra, chưa merge, mà lần chạy chỉ khởi động từ `master`. Trước đây `runplan check` coi plan nháp đã ghim đủ là lỗi; giờ điều đó được phép, và `check` lẫn `setup` in lý do "marked `status: draft` with every pin set". `setup` vẫn từ chối trước khi cài hay tải gì. `status` nằm ngoài `run_plan_id`, nên khi bỏ `draft` id vẫn là `rp_64bde22a5dda` (test `test_dropping_the_draft_keeps_the_checks_and_the_id`). Việc còn lại trước khi chạy ở mục 2.6 bước 3. Nếu PR #174 còn đổi mã làm sạch trước khi merge, bản export phải xuất và ghim lại. **Cập nhật 11/11/2026:** mã được merge qua PR #176, giống hệt `ac3637da` (chỉ khác tài liệu và một comment trong `configs/data/egocentric.yaml` từ PR #173), nên bản export không phải xuất lại; `status: draft` đã bỏ, id không đổi (mục 2.4).
 
 Lưu ý: 3,3–3,6 % là trên chính 132 clip đã dùng để chọn cách làm sạch ở mục 2.8, nên không phải số đo độc lập. Video quay thêm sau này cần đo lại bằng `loader_check`.
+
+### 2.10 Kết quả
+
+**Lần 1, 11/11/2026: hết bộ nhớ ở forward đầu, chưa có bước train nào.**
+
+- Plan `rp_64bde22a5dda`, từ `master` `465e29b5`.
+- Một L4 (`gpu-l4-s-ass1a1-38t0ub1c6r3os`) của tài khoản Colab mới.
+- Registry `fwdata/colab/da30b-20261111-051241`; log trong `fwdata/colab/da30b-results/attempt1-logs.tgz`.
+- Tarball trên Drive khớp sha256.
+
+| Pha | Kết quả |
+|---|---|
+| `setup` lần 1 | Pre-flight hỏng: DeepSpeed 0.17.1 báo `CUDAMismatchException`. VM có CUDA 13.0, torch 2.7.0 là bản cu126. `setup` 112 s, pre-flight 22 s |
+| `setup` lần 2 | Pre-flight hỏng: "Ninja is required to load C++ extensions". `ninja` 1.13.0 có trong venv, nhưng thư mục `bin` của venv không nằm trong `PATH` |
+| Sửa tay | `apt-get install -y cuda-nvcc-12-6 cuda-cudart-dev-12-6 libcurand-dev-12-6 libcublas-dev-12-6`; `pip install ninja`; `CUDA_HOME=/usr/local/cuda-12.6` và `/usr/local/cuda-12.6/bin` đầu `PATH` |
+| `setup` lần 3 | Qua. Pre-flight 54 s (build CPU Adam 44 s), `group_lrs` [1e-4, 1e-5]. Cha và bản export 14 s: 132 tập, 7804 khung, `layout_problems` rỗng |
+| `run` | `out_of_memory` sau 123 s, ở forward đầu: attention của một lớp decoder trong mô hình ngôn ngữ Qwen3-VL (`flash_attn` `pad_input`). PyTorch đã cấp 19,63 GiB trong 22,03 GiB của L4. `train_lines` 0 |
+
+**Chi phí.** Số dư 500,00 → 499,62, tức **0,38 CU**: dòng `measured` của [sổ chi phí](../g0/ledger/DA-30.csv). Bộ canh ghi `wall_cu` 0,601 (22:12:44–22:31:21Z, 18,6 phút × 1,94 CU/giờ) và thoát mã 0.
+
+**Nguyên nhân OOM [giả định, chưa đo].** ZeRO-3 offload đã đưa trọng số và optimizer sang RAM. Phần còn trên GPU chủ yếu là activation của micro-batch 16, với gradient checkpointing tắt. A100 40 GB được kỳ vọng là vừa, nhưng chưa đo; `peak_vram_gb` của lần chạy A100 sẽ trả lời.
+
+**Sửa sau lần 1:**
+
+- **[Đã chốt 11/11/2026, Hiếu] "Chạy A100".** Plan sang A100, trần 8 CU, recipe giữ nguyên (`rp_1d7627234111`; mục 2.4, 2.5).
+- **`colab setup` tự làm bước sửa tay** (`stage1/cuda_toolchain.py`):
+  - Điều kiện: `nvcc` dưới `CUDA_HOME` của torch không qua luật của DeepSpeed. Luật đó cho qua khi hai bản cùng major.minor, hoặc khi cả hai nằm trong danh sách tương thích của cùng một major (`cuda_minor_mismatch_ok`). Bản 13.0 của lần 1 không qua.
+  - Khi đó, `setup` cài bốn gói trên cho bản CUDA của torch. Nếu cài hỏng, nó chạy `apt-get update` một lần rồi cài lại. Sau đó nó đặt `CUDA_HOME=/usr/local/cuda-X.Y`.
+  - Trong mọi trường hợp, `bin` của venv được đặt lên đầu `PATH`, nơi có `ninja`. Nếu vẫn không thấy `ninja`, `setup` cài nó bằng pip.
+  - Pha `cuda_toolchain` của `report.json` ghi hai bản CUDA và các gói đã cài.
+  - `CUDA_HOME` và `PATH` được truyền cho pre-flight và ghi vào `cuda_env.json`. `run` và `repeat` đọc lại file đó (trường `cuda_env` trong pha `run`).
+
+**Nếu A100 cũng hết bộ nhớ [Option]:** micro-batch 8 × accumulation 4 (vẫn 32 mẫu mỗi bước), hoặc bật gradient checkpointing. Cả hai đổi recipe và `run_plan_id`, nên cần Hiếu quyết.

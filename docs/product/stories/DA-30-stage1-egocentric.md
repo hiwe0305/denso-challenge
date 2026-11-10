@@ -41,7 +41,7 @@ Là kỹ sư robot learning, tôi muốn chạy stage 1 của Ψ₀ trên dữ l
   - [x] 2.8 Bỏ `status: draft` khỏi `tray-ego-b.yaml` sau khi PR #173 và #176 (thay #174, cùng mã `ac3637da`) merge và Hiếu xác nhận sự đồng ý của người trong clip (11/11/2026); `run_plan_id` giữ `rp_64bde22a5dda`; tarball cục bộ khớp sha256 ([stage1.md](../../he/stage1.md) mục 2.4, 2.6)
   - [x] 2.9 Lần 1 của nhánh B trên L4 (11/11/2026) hết bộ nhớ ở forward đầu, chưa có bước train nào; Hiếu quyết "Chạy A100": `tray-ego-b.yaml` đổi sang A100 (40 GB), trần 8 CU, recipe giữ nguyên (`rp_1d7627234111`, trước là `rp_64bde22a5dda`); test CPU
   - [x] 2.10 `colab setup` tự cài CUDA toolkit khớp bản CUDA của torch, cùng `ninja`, khi VM có bản CUDA khác (lần 1: CUDA 13.0, torch cu126); đặt `CUDA_HOME` và `PATH` cho pre-flight và `run`, ghi các bước vào `report.json`; test CPU (`test_psi0_stage1_cuda_toolchain.py`, 9 test)
-  - [ ] 2.11 Ghi kết quả lần 1 trên L4, cập nhật ước lượng và runbook cho A100 (trần 8 CU, quy tắc dừng ở 6,73 CU/giờ), dòng `measured` 0,38 CU và dòng `estimated` mới của sổ chi phí ([stage1.md](../../he/stage1.md) mục 2.5, 2.6, 2.10)
+  - [x] 2.11 Ghi kết quả lần 1 trên L4, cập nhật ước lượng và runbook cho A100 (trần 8 CU, quy tắc dừng ở 6,73 CU/giờ), dòng `measured` 0,38 CU và dòng `estimated` mới của sổ chi phí ([stage1.md](../../he/stage1.md) mục 2.5, 2.6, 2.10)
 - [ ] 3. Fine-tune, probe, closed-loop, báo cáo (AC 2, 3)
 
 ## Phạm vi file
