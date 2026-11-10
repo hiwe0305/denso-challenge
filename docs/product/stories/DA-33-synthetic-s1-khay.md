@@ -46,7 +46,7 @@ Kế hoạch chi tiết: [docs/superpowers/plans/2026-10-31-da33-tray-synthetic.
 - [ ] 13. Vẽ vùng đích lên bàn B và sinh lại demo trên cảnh có vùng đích (Hiếu duyệt 11/11/2026; chẩn đoán của phiên điều phối 10–11/11: planner căn ngang theo tư thế đích ẩn, ảnh không có tín hiệu nào cho vị trí dừng dọc bàn B). Planner, seed, bộ chấm, dung sai và eval set giữ nguyên; chỉ đổi hình ảnh ([target-zone.md](../../g0/tray/target-zone.md))
   - [x] 13.1 Geom vùng đích chỉ để vẽ (không va chạm, không khối lượng) đúng footprint khay tại `target_pose`, hai vạch tối chỉ chỗ tay cầm; `visuals_revision` thêm hậu tố `+zone1`; `generate` và `export_psi0` từ chối lô trộn hai revision; test CPU và test sim (tư thế, không va chạm, quỹ đạo vật lý giống hệt)
   - [x] 13.2 Ảnh camera đầu trước/sau ở mức 0, 1, 2 và so quỹ đạo một episode đầy đủ qua SIMPLE trên `rtx3060`
-  - [ ] 13.3 Sinh lại cùng seed của `s1-pool-1104` (release `tray_s1_f9433b028c52`) và `cplus-tgt-1108` (release `tray_s1_6c0fd7d37f77`) trên cảnh mới, QA tối thiểu và QA phát lại, hai release mới
+  - [x] 13.3 Sinh lại cùng seed của `s1-pool-1104` (release `tray_s1_f9433b028c52`) và `cplus-tgt-1108` (release `tray_s1_6c0fd7d37f77`) trên cảnh mới, QA tối thiểu và QA phát lại, hai release mới
   - [ ] 13.4 QA của DA-03 và bộ lọc chất lượng như C, cut "ALL" gồm mọi episode qua QA của cả hai kho; sổ chi phí dòng ước tính và thực đo
 
 ## Phạm vi file
