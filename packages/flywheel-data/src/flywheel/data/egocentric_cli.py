@@ -17,6 +17,9 @@ In order:
     fw egocentric report <work>
     fw egocentric review <work> --sample | --apply <sheet>
     fw egocentric trial <work> --simple <psi-data> --reference <marks> --robobrain --molmo
+    fw egocentric human1m <out> --work <w> ... --estimates <dir> ... --marks <jsonl>
+                                                   Human-1M-style shards, clip status, explorer
+    fw egocentric human1m-check <shard>            schema check of one written shard
 
 Every command is one job with its estimated and measured LedgerEntry (`job_ledger`);
 the estimate is an assumed cost per frame, named in its note. A refusal (the
@@ -39,6 +42,10 @@ from flywheel.data.annotate.deid.blur import FaceDetector, YuNet
 from flywheel.data.annotate.deid.gate import unpinned_videos
 from flywheel.data.api import ConfigError, dataset_report, job_ledger, render_html
 from flywheel.data.config import store_root
+from flywheel.data.export.human1m import build as h1m
+from flywheel.data.export.human1m import viewer as h1m_viewer
+from flywheel.data.export.human1m.check import check_shard
+from flywheel.data.export.human1m.video import Ffmpeg, find_ffmpeg
 from flywheel.data.ingest.egocentric import api
 from flywheel.data.ingest.egocentric import review as reviewing
 from flywheel.data.ingest.egocentric import trial as trials
@@ -65,7 +72,7 @@ STORY = "DA-04"
 ESTIMATE = {"ingest": (1e-3, "frame"), "deid": (5e-2, "frame"), "pose": (2e-3, "frame"),
             "annotate": (5e-3, "frame"),
             "qa": (1e-3, "frame"), "report": (1e-2, "episode"), "review": (1e-2, "episode"),
-            "trial": (20.0, "query")}
+            "trial": (20.0, "query"), "human1m": (2e-2, "frame")}
 EPISODE_FRAMES = 300  # assumed frames of an episode, before ingest has read the files
 
 Work = Annotated[Path, typer.Argument(help="work directory that `fw egocentric ingest` printed")]
@@ -320,6 +327,64 @@ def trial(
     _say(json.dumps(result["summary"], indent=1))
     _say(f"decision: {target / 'decision.json'}")
     _say(f"ledger: {job.run_plan_id}/{job.job_id}")
+
+
+H1M_CONFIG = Path("configs/data/egocentric-human1m.yaml")
+
+
+@app.command()
+def human1m(
+    out: Annotated[Path, typer.Argument(help="output folder, e.g. $FW_ROOT/human1m/<name>")],
+    work: Annotated[list[Path], typer.Option(help="pipeline work dir; repeat for each source")],
+    estimates: Annotated[list[Path] | None, typer.Option(
+        help="dir of E-A job .npz (21 joints); repeat")] = None,
+    marks: Annotated[Path | None, typer.Option(help="tray phase marks, JSON lines")] = None,
+    sample: Annotated[int, typer.Option(help="also write a small explorer of N episodes")] = 0,
+    sample_out: Annotated[Path | None, typer.Option(help="default <out>/viewer-sample")] = None,
+    workers: Annotated[int, typer.Option(help="episodes posed and encoded at once")] = 4,
+    h1m_config: Annotated[Path, typer.Option(help="Human-1M view config")] = H1M_CONFIG,
+    run_plan_id: RunPlan = None,
+) -> None:
+    """Every clip of the work dirs: status table, LeRobot v3.0 shards in the Human-1M
+    layout, and the static explorer (Hiếu 11/11/2026)."""
+
+    with _refusals():
+        cfg = h1m.load_h1m_config(h1m_config)
+        encoder = Ffmpeg(find_ffmpeg())
+        frames = sum(_frames(w) for w in work)
+        with _job("human1m", frames, run_plan_id) as job:
+            result = h1m.build(out, work, estimates or [], h1m.read_marks(marks), cfg, encoder,
+                               workers, _say)
+            rows = [i.row for i in result.items]
+            n = h1m_viewer.write_viewer(out / "viewer", result.items, result.summary, rows,
+                                        encoder)
+            if sample:
+                chosen = h1m_viewer.pick_sample(result.items, sample)
+                h1m_viewer.write_viewer(sample_out or out / "viewer-sample", chosen,
+                                        result.summary, rows, None, out / "viewer" / "media")
+            bad = {k: v for k, v in result.problems.items() if v}
+            job.notes.append(f"{len(rows)} clips, {n} exported; config {cfg.version};"
+                             f" shards {sorted(result.shards)}; problems {bad or 'none'}")
+    decisions = result.summary["all"]["decisions"]
+    _say(f"{len(rows)} clips: {decisions}; explorer {out / 'viewer' / 'index.html'}")
+    _say(f"ledger: {job.run_plan_id}/{job.job_id}")
+    if bad:
+        raise typer.Exit(1)
+
+
+@app.command("human1m-check")
+def human1m_check(
+    shard: Annotated[Path, typer.Argument(help="a shard folder written by `human1m`")],
+    video: Annotated[bool, typer.Option(help="count the video's frames by decoding")] = True,
+) -> None:
+    """Schema check of one Human-1M-style LeRobot v3.0 shard; exit 1 on a problem."""
+
+    problems = check_shard(shard, count_video=video)
+    for problem in problems:
+        _say(f"  {problem}")
+    _say(f"{shard}: {'ok' if not problems else f'{len(problems)} problems'}")
+    if problems:
+        raise typer.Exit(1)
 
 
 @contextmanager
