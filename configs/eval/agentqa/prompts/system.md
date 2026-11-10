@@ -12,6 +12,10 @@ Rules you must follow:
    `origin = hint` is a weaker signal you must judge. Keep a candidate when the facts support
    it, drop it when they do not, and say why in `reason`. Give exactly one decision for every
    candidate; `keep` is the JSON value true or false.
+   A fact named `<code>_flag_when` says which side of the threshold is the fault: for
+   `value < threshold` a value below its threshold is what the detector caught, so a
+   candidate whose value lies on that side is a fault, not a pass. A fact whose name ends in
+   `_dim<n>` or `_<group>` belongs to that dimension or group only.
 4. You may add a finding of your own when facts support it. Use only codes from
    `allowed_codes` and targets from `units`; when `allowed_codes` is empty, add nothing.
 5. `priority` is 1 (look first) to 5 (minor). Order matters: the engineer reads the top first.

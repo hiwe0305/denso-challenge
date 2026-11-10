@@ -45,6 +45,46 @@ _REASON = re.compile(r"^(?P<check>\S+) \((?P<code>[A-Z][0-9]+)\):\s*(?P<detail>.
 _CODE = re.compile(FINDING_CODE)
 
 
+# Which side of its threshold a lane detector flags (#175: Nemotron read T6's
+# "value below threshold" as healthy). DA-08's `Finding` and DA-13's
+# `SystemFinding` carry no direction, so it is copied here from the detectors
+# (diagnosis/train/*.py, diagnosis/system/runtime.py) and checked on every
+# finding they raise (`_direction`): a finding that disagrees gets no direction
+# fact and a note, never a wrong one.
+FLAG_WHEN: dict[str, str] = {
+    "T1": ">",   # loss above k times the minimum of its window
+    "T2": "<",   # val loss dropped less than min_relative_drop
+    "T3": ">=",  # val rose while train fell, at least m_measurements in a row
+    "T4": "<",   # a group's loss dropped less than min_group_drop
+    "T5": "<",   # predicted variance of a dim under epsilon
+    "T6": "<",   # pred_std / target_std under min_std_ratio
+    "T7": ">",   # relative drop of a P4 metric over max_relative_drop
+    "T8": ">",   # gradient norm over the frozen tolerance or max_grad_norm
+    "R1": ">",   # latency percentile over tau_lat_s
+    "R2": ">",   # chunks over the RTC delay, more than max_underruns
+}
+_HOLDS = {">": float.__gt__, "<": float.__lt__, ">=": float.__ge__}
+
+
+def flag_rule(op: str, left: str = "value") -> str:
+    """The text of a direction fact: `value < threshold` is the faulty side."""
+    return f"{left} {op} threshold"
+
+
+def _direction(analysis: Analysis, code: str, value: object, threshold: float,
+               ref: str) -> str | None:
+    """The direction fact of `code`, if the finding lies on the side the table says."""
+    op = FLAG_WHEN.get(code)
+    if op is None or not isinstance(value, (int, float)):
+        return None
+    if not _HOLDS[op](float(value), float(threshold)):
+        analysis.notes.append(
+            f"{code}: value {value} is not {op} threshold {threshold}; direction left out"
+        )
+        return None
+    return analysis.book.add(f"{code}_flag_when", flag_rule(op), ref)
+
+
 def episode_ref(index: int) -> str:
     """The parquet stem DA-27's manifest names an episode by."""
     return f"episode_{index:06d}"
@@ -106,6 +146,14 @@ def analyze_dataset(found: InputSet, subject_ref: str) -> Analysis:
                         f"{m['check']}_threshold", f"{m['check']}_threshold@{unit}",
                         qa_check.threshold, qa.ref,
                     ))
+                    # A QA check states no direction either; a failed one lies on its
+                    # faulty side (most fail above, min_frames below).
+                    if not qa_check.passed and qa_check.value != qa_check.threshold:
+                        op = ">" if qa_check.value > qa_check.threshold else "<"
+                        evidence.append(book.shared(
+                            f"{m['check']}_flag_when", f"{m['check']}_flag_when@{unit}",
+                            flag_rule(op), qa.ref,
+                        ))
                 evidence.append(book.add(f"decision@{unit}", r.decision, qa.ref))
                 analysis.propose(m["code"], unit, evidence, "code", reason)
         _duplicate_hint(analysis, reports, target, qa)
@@ -198,6 +246,9 @@ def analyze_train(
         if finding.threshold is not None:
             evidence.append(book.shared(f"{code}_threshold", f"{code}_threshold{suffix}",
                                         finding.threshold, metrics.ref))
+            flag = _direction(analysis, code, finding.value, finding.threshold, metrics.ref)
+            if flag is not None:
+                evidence.append(flag)
         evidence.append(
             book.add(f"{code}_start_step{suffix}", finding.start_step, metrics.ref, "steps")
         )
@@ -246,6 +297,10 @@ def analyze_rtc(log: Loaded, unit: str, config: Path = DEFAULT_SYSTEM_CONFIG) ->
             evidence = [book.add(f"{finding.code}_value", finding.value, log.ref)]
             if finding.threshold is not None:
                 evidence.append(book.add(f"{finding.code}_threshold", finding.threshold, log.ref))
+                flag = _direction(analysis, finding.code, finding.value, finding.threshold,
+                                  log.ref)
+                if flag is not None:
+                    evidence.append(flag)
             analysis.propose(
                 finding.code, unit, evidence, "code", f"DA-13 {finding.code} at {finding.where}"
             )
@@ -271,18 +326,22 @@ def analyze_stage3(probe: Loaded, thresholds: OfflineThresholds) -> Analysis:
     for group, error in sorted(p3.error_by_group.items()):
         fid = book.add(f"p3_error_{group}", error, probe.ref)
         if error > thresholds.group_error:
-            analysis.propose("O1", unit, [fid, limit], "code", f"P3 error of {group}")
+            flag = book.add("O1_flag_when", flag_rule(">", "p3_error"), probe.ref)
+            analysis.propose("O1", unit, [fid, limit, flag], "code", f"P3 error of {group}")
     pos = p3.error_by_chunk_pos
     if len(pos) >= 2 and pos[0] > 0:
         first = book.add("p3_error_chunk_first", pos[0], probe.ref)
         last = book.add("p3_error_chunk_last", pos[-1], probe.ref)
         if pos[-1] / pos[0] > thresholds.chunk_growth:
             growth = book.add("o2_growth_threshold", thresholds.chunk_growth, probe.ref)
-            analysis.propose("O2", unit, [first, last, growth], "code", "error grows in chunk")
+            flag = book.add("O2_flag_when", flag_rule(">", "last / first"), probe.ref)
+            analysis.propose("O2", unit, [first, last, growth, flag], "code",
+                             "error grows in chunk")
     hand = book.add("p3_hand_event_offset_steps", p3.hand_event_offset_steps, probe.ref, "steps")
     if abs(p3.hand_event_offset_steps) > thresholds.hand_event_steps:
         lim = book.add("o3_threshold_steps", thresholds.hand_event_steps, probe.ref, "steps")
-        analysis.propose("O3", unit, [hand, lim], "code", "hand open/close offset")
+        flag = book.add("O3_flag_when", flag_rule(">", "|offset|"), probe.ref)
+        analysis.propose("O3", unit, [hand, lim, flag], "code", "hand open/close offset")
     if p3.out_of_limit_dims:
         fid = book.add("p3_out_of_limit_dims", len(p3.out_of_limit_dims), probe.ref, "dims")
         analysis.propose("O4", unit, [fid], "code", f"dims {p3.out_of_limit_dims}")
