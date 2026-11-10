@@ -1611,7 +1611,7 @@ _**[Đã chốt 11/11/2026, Hiếu]** ("Thêm hai run 70%", qua phiên điều p
 | Recipe | `psi0-stage3.yaml`: batch 16, LR 1e-4, cosine, warmup 1 000; 60 000 bước; seed train 0; `validation_steps` 2 000 | Giống run 1 | Giống run 1 | Giống run 1 |
 | Eval | 270 điều kiện của bản 2, tập `rp_a04c14e79dfd-2e57f60`, cảnh có vùng đích của W1 | Giống run 1 | Giống run 1 | Giống run 1 |
 
-- **Tập con S70.** Lấy theo seed, không theo kết quả hay chất lượng. Trong mỗi phần của ALL (kho `s1-pool-1104` và kho nhắm lỗi), xếp seed của tập demo theo sha256 của seed (chuỗi thập phân) rồi lấy ceil(0,7 × n) seed đầu (`pairplan.subset_seeds`). Làm tròn lên trong từng phần, nên mỗi kho giữ đúng phần của nó. Với cỡ ước lượng ở 19.4: ceil(0,7 × 429) + ceil(0,7 × 177) = 301 + 124 = **425 episode** (giả định tới khi W1 ghim cỡ thật). Danh sách của từng phần được ghim bằng sha256 (`subsets` của plan) trước mọi lượt chạy; `B_70` và `C_70` dùng đúng một danh sách.
+- **Tập con S70.** Lấy theo seed, không theo kết quả hay chất lượng. Trong mỗi phần của ALL (kho `s1-pool-1104` và kho nhắm lỗi), xếp seed của tập demo theo sha256 của seed (chuỗi thập phân) rồi lấy ceil(0,7 × n) seed đầu (`pairplan.subset_seeds`). Làm tròn lên trong từng phần, nên mỗi kho giữ đúng phần của nó. Với cỡ W1 đã ghim: ceil(0,7 × 429) + ceil(0,7 × 177) = 301 + 124 = **425 episode**, 603 915 frame. Danh sách của từng phần được ghim bằng sha256 (`subsets` của plan) trước mọi lượt chạy: phần kho `5cd4a08a…`, phần nhắm lỗi `0aa1c409…`; `B_70` và `C_70` dùng đúng một danh sách.
 - **Stats chung.** Ψ₀ đọc `meta/stats_psi0.json` trong thư mục dữ liệu (`psi0_trainer.py`), không tự tính lại theo tập train. Vì vậy tập con S70 mang đúng file stats của ALL, và chuẩn hóa (cùng pose mở tay) giống hệt ở cả bốn run. Hai run 70 % chỉ khác hai run ALL ở lượng dữ liệu. Mã 6.3 phải chép file đó vào dữ liệu S70 và kiểm sha256 bằng `cut.stats_sha256`; server eval dùng đúng file đó.
 
 - **Không phải nhánh B.** B (mục 18) là C với VLM stage 1: 160 demo cũ, 40 000 bước, cảnh không có vùng đích. `B_ALL` và `B_70` khác B ở dữ liệu, số bước và cảnh. Hai plan độc lập.
@@ -1716,7 +1716,7 @@ Luật này không đổi sau khi thấy kết quả. Muốn đổi thì ghi `De
 
 ### 19.3 RunPlan cặp (nhiệm vụ con 6.1, bốn run ở 6.10)
 
-[`he-tray-pair60k.yaml`](../../configs/runplans/tray/he-tray-pair60k.yaml), `status: draft`, id nháp `rp_9614ef46ed9d` (bốn run, khối luật mới `e7f90396…`; hai run cap 70 là `rp_d44e3e6262b4`, cap 61 từng cho `rp_92ab06fe3fff`; trước đó `rp_350a28bb7245` khi ghim cảnh `+zone1`, `rp_01c132b8d3b0` lúc đầu). Id đổi khi điền ghim.
+[`he-tray-pair60k.yaml`](../../configs/runplans/tray/he-tray-pair60k.yaml), `status: draft`, id nháp `rp_9d89260a974d` (ghim W1 và S70 ngày 11/11/2026; bốn run trước khi ghim là `rp_9614ef46ed9d`, khối luật mới `e7f90396…`; hai run cap 70 là `rp_d44e3e6262b4`, cap 61 từng cho `rp_92ab06fe3fff`; trước đó `rp_350a28bb7245` khi ghim cảnh `+zone1`, `rp_01c132b8d3b0` lúc đầu). Id đổi khi điền ghim.
 
 **Schema riêng.** Cut ALL trải trên hai release, mà `TrayRunPlan` chỉ có một release. Vì vậy plan cặp dùng schema riêng [`pairplan`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/pairplan.py) (`purpose: paired_train`).
 - Cut, tập con, recipe kèm override, seed train, eval và stats nằm một lần ở cấp plan. Mỗi nhánh chỉ chọn cha và dữ liệu (`data`: tên tập con, bỏ trống là cả cut). Vì vậy "giống hệt trừ VLM và tập con" đúng theo cấu trúc.
@@ -1736,14 +1736,14 @@ Luật này không đổi sau khi thấy kết quả. Muốn đổi thì ghi `De
 
 **Plan dự phòng 40k đã xóa** (11/11/2026). `he-tray-pair40k-seq.yaml` (`rp_862e049c8d29`) chỉ có hai nhánh và ghim khối luật cũ; plan 60k chạy trên A100 nên không còn cần nó.
 
-**Chỗ trống.** `pairplan check` qua và ghi "draft, 19 pins pending". `freeze` và `check --launch` từ chối, kèm từng chỗ trống:
+**Chỗ trống.** `pairplan check` qua và ghi "draft, 4 pins pending" (trước khi ghim W1 là 19). `freeze` và `check --launch` từ chối, kèm từng chỗ trống:
 
 | Chỗ trống | Ai điền |
 |---|---|
-| Mỗi phần của cut: `release`, `demo_sets` (file tập demo commit cạnh plan, có ghim chất lượng và QA), `set_name` | W1 (DA-33), rồi DA-34 cắt |
-| `cut.episodes`, `frames`, `stats_sha256` | W1 |
-| `vlm_stage1.job_id`, `drive_dir`, `weights_sha256`, `manifest_sha256`; header phải trùng `parent_header_sha256` `53d000d9…` như B | W2 (DA-30) |
-| Tập con S70, mỗi phần: `episodes`, `seeds_sha256` (`pairplan subset`); cả tập: `episodes`, `frames` | DA-34, ngay sau W1 |
+| Mỗi phần của cut: `release`, `demo_sets` (file tập demo commit cạnh plan, có ghim chất lượng và QA), `set_name` | **Đã ghim** 11/11/2026 từ cut của W1 (DA-33, 05:11, `rtx3060:~/denso-da34-pool/fwdata/cut-all-zone1`): phần kho `tray_s1_41899efb4b27` (429, tập `ALL` `a919ce21…`, file `demo_sets-all-zone1-pool.json`), phần nhắm lỗi `tray_s1_4a8f4a8c6a8d` (177, `19ed50d2…`, `demo_sets-all-zone1-tgt.json`); file chất lượng là hai file cũ, vì parquet trùng từng byte; QA là báo cáo mới (`3db475f2…`, `ed6d274c…`) |
+| `cut.episodes`, `frames`, `stats_sha256` | **Đã ghim**: 606, 861 624, `meta/stats_psi0.json` `1c745091…` (stats của 606 episode, dùng cho cả bốn run) |
+| `vlm_stage1.job_id`, `drive_dir`, `weights_sha256`, `manifest_sha256`; header phải trùng `parent_header_sha256` `53d000d9…` như B | W2 (DA-30): **4 chỗ còn lại** |
+| Tập con S70, mỗi phần: `episodes`, `seeds_sha256` (`pairplan subset`); cả tập: `episodes`, `frames` | **Đã ghim**: 301 `5cd4a08a…`, 124 `0aa1c409…`; 425 episode, 603 915 frame (tổng `length` trong `meta/episodes.jsonl` của ALL trên các seed S70; dữ liệu S70 của 6.3 phải ghi đúng số này trong `meta/info.json`) |
 | `pinned_files`: danh sách của bản 2, băm lại trên cây có vùng đích | **Đã ghim** 11/11/2026 trên master `7b0defd1` (sau #182); chỉ `mjcf.py` và `simple_task.py` khác bản 2 |
 | `cut.visuals_revision` `4763fbfaa4f8e97658e68b57d01b4c86659e08b5+zone1` | **Đã ghim** 11/11/2026; release của W1 phải ghi đúng revision này |
 
@@ -1757,15 +1757,15 @@ Một epoch là một lượt qua mọi frame của cut (batch 16, `observation-
 |---|---|---|---|---|
 | C | 160 | 228 247 | 40 000 | 2,80 |
 | C+ | 320 | 455 372 | 40 000 | 1,41 |
-| ALL (ước lượng: 429 + 177) | 606 | 861 624 | 60 000 | 1,11 |
-| S70 (ước lượng: 301 + 124) | 425 | khoảng 604 000 | 60 000 | khoảng 1,59 |
+| ALL (W1: 429 + 177) | 606 | 861 624 | 60 000 | 1,11 |
+| S70 (301 + 124) | 425 | 603 915 | 60 000 | 1,59 |
 
 - **Điểm Hiếu cần xem.** 60 000 bước trên ALL cho mỗi demo **ít** lượt hơn C+ và chỉ khoảng 40 % của C.
   - Muốn bằng số epoch của C+ cần khoảng 75 700 bước, khoảng 30 CU một run.
   - Muốn bằng C cần khoảng 151 000 bước, khoảng 59 CU một run.
   - Plan giữ 60 000 bước như đã duyệt. Đổi số bước thì sửa override trước khi đóng băng (plan còn nháp).
-- **Run 70 % cùng số bước, không cùng số epoch.** Với 60 000 bước, mỗi demo của S70 được thấy khoảng 1,43 lần nhiều hơn ở ALL. So sánh 70 % với ALL là "ít demo hơn, cùng compute", như HS (spec mục 3). Frame của S70 là ước lượng: 425 episode × trung bình 1 422 frame mỗi episode của ALL.
-- Số thật đọc từ `cut.frames` và `subsets[].frames` khi W1 xong: `pairplan check` in số epoch của ALL và S70 vào dòng tóm tắt.
+- **Run 70 % cùng số bước, không cùng số epoch.** Với 60 000 bước, mỗi demo của S70 được thấy khoảng 1,43 lần nhiều hơn ở ALL. So sánh 70 % với ALL là "ít demo hơn, cùng compute", như HS (spec mục 3). Số episode và frame của ALL do W1 ghim khớp đúng ước lượng cũ (cùng seed, parquet trùng từng byte); frame của S70 đếm từ `meta/episodes.jsonl` của ALL.
+- `pairplan check` in số epoch của ALL và S70 vào dòng tóm tắt, từ `cut.frames` và `subsets[].frames`.
 
 ### 19.5 Lịch, eval và ngân sách (ước lượng, chưa đo) [Đề xuất]
 
@@ -1872,7 +1872,7 @@ python -m flywheel_psi0.tray.evidence configs/runplans/tray/he-tray-pair60k.yaml
 
 Yêu cầu của Hiếu: không để phiên nào chạy không mà vẫn tính CU. `cu_watch.py` chỉ dừng phiên ở cap, ở sàn, hoặc khi nhận tín hiệu; nó **không** dừng khi train xong. Trên A100 (6,73 CU/giờ), một run xong sớm hơn cap 2 giờ là khoảng 13 CU mất không. Vì vậy mỗi phiên phải dừng ngay khi việc của nó xong hoặc hỏng, và cap chỉ là lưới cuối.
 
-**Cap 70 là lưới an toàn, không phải số chi** (cap 70 từ plan `rp_d44e3e6262b4`; nay bốn run, trần 280, plan `rp_9614ef46ed9d`; phiên điều phối 11/11/2026). Không tốn CU khi phiên chạy không: vòng fetch bên dưới dừng phiên ngay khi `ckpt_60000` đã khớp sha256 trên laptop, nên mỗi run tiêu khoảng 57 CU (ước lượng 19.5) dù cap là bao nhiêu.
+**Cap 70 là lưới an toàn, không phải số chi** (cap 70 từ plan `rp_d44e3e6262b4`; nay bốn run, trần 280, plan `rp_9d89260a974d`; phiên điều phối 11/11/2026). Không tốn CU khi phiên chạy không: vòng fetch bên dưới dừng phiên ngay khi `ckpt_60000` đã khớp sha256 trên laptop, nên mỗi run tiêu khoảng 57 CU (ước lượng 19.5) dù cap là bao nhiêu.
 
 Cap còn đặt mức dừng sớm của `follow`. Ở bước 2 200, `follow` dự báo CU tới lúc `ckpt_60000` về laptop và dừng phiên nếu vượt mức dừng của cap. Ngưỡng tính bằng `projected_cu` và `stop_line` của PR #186, với s/bước như `metrics.jsonl` đo (cửa sổ tính cả val):
 
@@ -1966,3 +1966,4 @@ Ngưỡng 0,58 là mức dừng sớm của `follow` ở cap 70 khi pull chậm 
 | 11/11/2026 | Mục 19.8, 19.5, 19.3 (phiên điều phối 11/11/2026): cap mỗi run nâng lại từ 61 lên 70, trần 140, lúc launch cần 154 CU. Lý do: ở cap 61, dừng sớm của `follow` ở bước 2 200 cắt run trên 0,50–0,51 s/bước, sát tốc độ khả dĩ 0,505; ở cap 70 mức đó là 0,58–0,59. Không tốn thêm CU vì phiên dừng khi `ckpt_60000` đã kiểm. Ngưỡng dừng tay thành 0,58. Id nháp về lại `rp_d44e3e6262b4` | Hiếu (soạn với Claude) |
 | 11/11/2026 | Mục 19 (Hiếu 11/11/2026 "Thêm hai run 70%" qua phiên điều phối): thành bốn run, hai VLM × hai lượng dữ liệu (`B_ALL`, `C_ALL`, `B_70`, `C_70`). Tập con S70: 70 % mỗi phần của ALL, chọn theo sha256 của seed, làm tròn lên, ghim sha256 danh sách; cả bốn run dùng stats của ALL. Khối `pair60k-rules` viết lại [Đề xuất]: (a′) chính `B_70` − `C_70` hai giai đoạn; (f) `B_70` − `C_ALL` không kém với biên 10 điểm %; (g) `C_70` − `C_ALL`; (h) phụ `B_ALL` − `C_ALL`; (b) thêm mức 1, mức 2 riêng so với 70 %; `rules_sha256` thành `e7f90396…`. 19.3: schema bốn nhánh (`data`, `subsets`, `comparisons`, `schedule.waves`), lệnh `pairplan subset`, 19 chỗ trống, id nháp `rp_9614ef46ed9d`; plan dự phòng 40k đã xóa. 19.4: epoch của S70 (ước lượng). 19.5: bốn phiên A100, đường lùi hai đợt, bốn làn eval (ba server Colab L4), ngân sách khoảng 288 CU, cap 350, cần 294 CU lúc launch và 360 khi có serve. 19.6: gói bằng chứng đọc mọi so sánh của plan. 19.7, 19.8: 6.3 và vòng fetch cho cả bốn run | Claude cho Hiếu |
 | 11/11/2026 | Mục 19.7, 19.8: PR #186 đã merge (`465e29b5`) và đã nhập vào nhánh của #181 | Claude cho Hiếu |
+| 11/11/2026 | Mục 19.1, 19.3, 19.4 (W1 xong, cut ALL của DA-33 lúc 05:11, qua phiên điều phối): ghim hai phần của cut (release `tray_s1_41899efb4b27`, `tray_s1_4a8f4a8c6a8d`, file tập demo commit cạnh plan, ghim chất lượng và QA), 606 episode, 861 624 frame, stats `1c745091…`; ghim S70 (301 + 124 = 425 episode, 603 915 frame, sha256 hai danh sách). Còn 4 chỗ trống, đều của W2; id nháp `rp_9d89260a974d` | Claude cho Hiếu |
