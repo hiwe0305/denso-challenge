@@ -11,7 +11,12 @@ The target pose is rebuilt from (level, seed) with `sample_episode`, as the env 
 Rollouts are the ones `eval_results` reads: per condition, the earliest finished attempt.
 
     python -m flywheel_psi0.tray.place_error <plan> --set <eval set> --out <eval_batch dir>
-        [--json <file>]
+        [--json <file>] [--curve]
+
+`--curve` adds the relaxed success of rule (c) of the 60k pair (tray.md 19.2): per position
+tolerance of RELAXED_M, the rollouts that succeeded or failed as L-PLACE-POSE within that
+distance and the scorer's yaw tolerance. Other failures are never relaxed. A side figure,
+"relaxed" ("nới") wherever it is reported, never the primary metric.
 
 `flywheel_simple` is imported when the command runs, as `eval_driver` does.
 """
@@ -30,6 +35,8 @@ import numpy as np
 
 from flywheel_psi0.tray.eval_batch import chunk_plan, phases_for
 from flywheel_psi0.tray.eval_results import Rollout, collect
+
+RELAXED_M = (0.05, 0.075, 0.10, 0.15, 0.20)  # tray.md 19.2 (c): 5 cm is the scorer's own
 
 
 def yaw_of(quat: Sequence[float]) -> float:
@@ -93,6 +100,29 @@ def summary(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def tolerance_curve(
+    rows: Sequence[dict[str, Any]], yaw_tol_deg: float, tolerances_m: Sequence[float] = RELAXED_M
+) -> list[dict[str, Any]]:
+    """Relaxed successes per position tolerance; only L-PLACE-POSE is relaxed, yaw is not."""
+
+    def relaxed(r: dict[str, Any], tol: float) -> bool:
+        return bool(r["success"]) or (
+            r["failure"] == "L-PLACE-POSE"
+            and r["distance_m"] <= tol
+            and r["yaw_error_deg"] <= yaw_tol_deg
+        )
+
+    return [
+        {
+            "distance_m": tol,
+            "yaw_error_deg": yaw_tol_deg,
+            "n": len(rows),
+            "relaxed_successes": sum(relaxed(r, tol) for r in rows),
+        }
+        for tol in tolerances_m
+    ]
+
+
 def groups(rows: Sequence[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     """Summaries by level, for rollouts that reached table B, and by failure label."""
     out: dict[str, dict[str, Any]] = {}
@@ -122,6 +152,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, required=True, help="eval_batch directory")
     parser.add_argument("--chunk", type=int, default=10)
     parser.add_argument("--json", type=Path, help="write the rows and the summaries here")
+    parser.add_argument(
+        "--curve", action="store_true", help="relaxed success per tolerance (tray.md 19.2 c)"
+    )
     args = parser.parse_args(argv)
     TrayRunPlan.load(args.plan)  # same plan check as eval_results
     rows = [json.loads(line) for line in (args.set / "conditions.jsonl").read_text().splitlines()]
@@ -139,6 +172,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         "groups": groups(result_rows),
         "rows": result_rows,
     }
+    if args.curve:
+        headline = [r for r in result_rows if r["level"] in (1, 2)]
+        result["relaxed_curve"] = {
+            "label": "relaxed (nới): a side figure, not the primary metric",
+            "levels 1-2": tolerance_curve(headline, cfg.target_yaw_tol_deg),
+            **{
+                f"level {lv}": tolerance_curve(
+                    [r for r in result_rows if r["level"] == lv], cfg.target_yaw_tol_deg
+                )
+                for lv in sorted({r["level"] for r in result_rows})
+            },
+        }
     if args.json is not None:
         args.json.write_text(json.dumps(result, indent=1) + "\n")
     print(
@@ -151,6 +196,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             d = " / ".join(f"{100 * v:.1f}" for v in s["distance_m"])
             y = " / ".join(f"{v:.1f}" for v in s["yaw_error_deg"])
             print(f"| {name} | {s['n']} | {d} | {y} | {s['in_tolerance']} |")
+    if args.curve:
+        print("\nThành công nới (không phải chỉ số chính), góc giữ 10°:")
+        print("| Nhóm | n | " + " | ".join(f"{100 * t:g} cm" for t in RELAXED_M) + " |")
+        print("|---|---|" + "---|" * len(RELAXED_M))
+        for name, curve in result["relaxed_curve"].items():
+            if name != "label" and curve and curve[0]["n"]:
+                cells = " | ".join(str(c["relaxed_successes"]) for c in curve)
+                print(f"| {name} | {curve[0]['n']} | {cells} |")
     return 0
 
 
