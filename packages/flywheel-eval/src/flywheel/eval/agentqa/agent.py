@@ -22,6 +22,11 @@ dropped on a misread threshold left an `ok` report with nothing in it).
 Subjects with more candidates than `candidates_per_call` are split into calls;
 findings of all calls are ranked together by the priority the model gave, then
 by the order it wrote them in.
+
+Every call must fit the window the server really runs (`limits` in agent.yaml):
+facts no candidate cites are dropped first, and a prompt still over the budget,
+or a retry turn that would push it over, is refused with the sizes in `problems`.
+A server given more than its window cuts the prompt without saying so (#175).
 """
 
 from __future__ import annotations
@@ -58,9 +63,9 @@ _PLACEHOLDER = re.compile(r"\{(F[0-9]+)\}")
 class AgentConfig:
     prompt: str
     prompt_sha256: str
-    context_tokens: int = 64000
+    context_tokens: int = 16384
     reply_tokens: int = 4096
-    chars_per_token: float = 3.5
+    chars_per_token: float = 2.5
     candidates_per_call: int = 20
     retries: int = 1
     raw: dict[str, Any] = field(default_factory=dict)
@@ -74,9 +79,9 @@ def load_agent_config(path: Path = DEFAULT_AGENT_CONFIG) -> AgentConfig:
     return AgentConfig(
         prompt=prompt,
         prompt_sha256=hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
-        context_tokens=int(limits.get("context_tokens", 64000)),
+        context_tokens=int(limits.get("context_tokens", 16384)),
         reply_tokens=int(limits.get("reply_tokens", 4096)),
-        chars_per_token=float(limits.get("chars_per_token", 3.5)),
+        chars_per_token=float(limits.get("chars_per_token", 2.5)),
         candidates_per_call=int(limits.get("candidates_per_call", 20)),
         retries=int(limits.get("retries", 1)),
         raw=raw,
@@ -85,6 +90,25 @@ def load_agent_config(path: Path = DEFAULT_AGENT_CONFIG) -> AgentConfig:
 
 class ReplyError(ValueError):
     """A reply the agent cannot keep; the message goes back to the model."""
+
+
+class PromptTooLong(ValueError):
+    """A prompt the server's window cannot hold; it is refused, never sent to be cut."""
+
+
+def prompt_budget(config: AgentConfig) -> int:
+    """Characters every message of one call may take, leaving room for the reply."""
+    return int((config.context_tokens - config.reply_tokens) * config.chars_per_token)
+
+
+def _check_fits(messages: Sequence[dict[str, Any]], config: AgentConfig, what: str) -> None:
+    size = sum(len(str(m["content"])) for m in messages)
+    if size > prompt_budget(config):
+        raise PromptTooLong(
+            f"{what} is {size} chars, over the budget of {prompt_budget(config)} "
+            f"((context_tokens {config.context_tokens} - reply_tokens {config.reply_tokens}) "
+            f"x chars_per_token {config.chars_per_token:g}); the server would cut it"
+        )
 
 
 @dataclass(frozen=True)
@@ -133,9 +157,7 @@ def _relevant_facts(analysis: Analysis, batch: Sequence[Candidate], cap: int) ->
 def build_messages(
     analysis: Analysis, batch: Sequence[Candidate], config: AgentConfig
 ) -> tuple[list[dict[str, Any]], list[AgentFact]]:
-    budget_chars = int(
-        (config.context_tokens - config.reply_tokens) * config.chars_per_token
-    ) - len(config.prompt)
+    budget_chars = prompt_budget(config) - len(config.prompt)
     cap = len(analysis.book.facts)
     while True:
         facts = _relevant_facts(analysis, batch, cap)
@@ -157,6 +179,7 @@ def build_messages(
         {"role": "system", "content": config.prompt},
         {"role": "user", "content": text},
     ]
+    _check_fits(messages, config, "the prompt, with only the facts its candidates cite,")
     return messages, facts
 
 
@@ -357,9 +380,14 @@ def review_subject(
     for batch in _batches(analysis.candidates, config.candidates_per_call):
         if not batch and not analysis.book.facts:
             continue
-        messages, facts = build_messages(analysis, batch, config)
+        try:
+            messages, facts = build_messages(analysis, batch, config)
+        except PromptTooLong as exc:
+            problems.append(str(exc))
+            continue
         for attempt in range(config.retries + 1):
             try:
+                _check_fits(messages, config, "the retry turn")
                 reply = model.complete(messages)
                 got, est, drop = _parse_reply(reply, analysis, batch, facts, len(drafted))
             except ReplyError as exc:
@@ -375,6 +403,9 @@ def review_subject(
                 continue
             except EndpointError as exc:
                 problems.append(f"endpoint failed: {exc}")
+                break
+            except PromptTooLong as exc:
+                problems.append(str(exc))
                 break
             drafted += got
             estimates += est

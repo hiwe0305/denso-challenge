@@ -243,3 +243,32 @@ def test_rtc_clears_only_what_it_judged(tmp_path: Path) -> None:
     log = rtc_job(tmp_path / "rtc" / "job-slow", latency=0.3)
     rtc = analyze_rtc(load_file(log), "rtc/job-slow", SYSTEM_YAML)
     assert rtc.cleared == ("R2",)
+
+
+def test_a_prompt_over_the_window_is_refused_not_sent(tmp_path: Path) -> None:
+    """#175: the server ran 16K while the budget assumed 64K; Ollama cuts without a word."""
+    from flywheel.eval.agentqa.agent import prompt_budget
+
+    analysis = _dataset(tmp_path, {i: [NAN] for i in range(5)})
+    for c in analysis.candidates:  # every candidate cites a long fact: nothing left to drop
+        analysis.book.facts[int(c.evidence[0][1:]) - 1] = analysis.book.get(
+            c.evidence[0]).model_copy(update={"value": "x" * 8000})
+    model = ScriptedModel([])
+    report = run_agent(analysis, model, config(), now=NOW)
+    assert report.status == "broken" and model.messages == []
+    assert f"over the budget of {prompt_budget(config())}" in report.problems[0]
+    assert "context_tokens 16384" in report.problems[0]
+
+
+def test_a_retry_that_would_overflow_the_window_is_not_sent(tmp_path: Path) -> None:
+    analysis = _dataset(tmp_path, {1: [NAN]})
+    rambling = "no json here " * 3000  # a reply that breaks the rules and fills the window
+    model = ScriptedModel([rambling, rambling])
+    report = run_agent(analysis, model, config(), now=NOW)
+    assert report.status == "broken" and len(model.messages) == 1
+    assert "the retry turn is" in report.problems[0]
+
+
+def test_the_budget_is_the_served_window() -> None:
+    cfg = config()
+    assert (cfg.context_tokens, cfg.chars_per_token) == (16384, 2.5)
