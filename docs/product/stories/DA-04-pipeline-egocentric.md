@@ -49,7 +49,7 @@ Là kỹ sư dữ liệu, tôi muốn video egocentric của người đi qua c�
 - [ ] 11. Bộ dữ liệu và trình xem kiểu Human-1M cho toàn bộ dữ liệu egocentric (Hiếu yêu cầu 11/11/2026)
   - [x] 11.1 `fw egocentric ingest egodex --all-tasks`: cả 218 episode của mẫu EgoDex qua pose E-B, cắt đoạn, QA; chạy lại làm sạch E-A và QA của 8 clip 1080p
   - [x] 11.2 Chú thích task và subtask có thời gian, ghi tay: clip khay theo mốc đọc từ khung hình chính, EgoDex theo đoạn của luật
-  - [ ] 11.3 Exporter LeRobot v3.0 theo bố cục Human-1M (`export/human1m/`): 21 khớp × 3 mỗi tay trong khung camera, quaternion khớp, mask, confidence, tư thế camera, intrinsics, id ẩn danh, bốn từ điển, kiểm schema; trường không có để trống và ghi lý do
+  - [x] 11.3 Exporter LeRobot v3.0 theo bố cục Human-1M (`export/human1m/`): 21 khớp × 3 mỗi tay trong khung camera, quaternion khớp, mask, confidence, tư thế camera, intrinsics, id ẩn danh, bốn từ điển, kiểm schema; trường không có để trống và ghi lý do
   - [ ] 11.4 Trình xem tĩnh (HTML + three.js, không server): gallery, tìm kiếm, video kèm khung xương tay, timeline subtask, 3D, trang chất lượng, bảng mọi clip
   - [ ] 11.5 Chạy trên toàn bộ dữ liệu: trạng thái từng clip, shard trong `fwdata/human1m/`, số liệu vào docs/g0/egocentric.md
 
