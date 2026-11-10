@@ -1866,7 +1866,7 @@ python -m flywheel_psi0.tray.evidence configs/runplans/tray/he-tray-pair60k.yaml
   - Runbook một đợt `cu_watch` bốn phiên (cộng ba phiên serve), đường lùi hai đợt của 19.5; phần dừng phiên ở 19.8.
 - **6.4:** bốn run stage 3 (Hiếu launch), dòng thực đo.
 - **6.5:** eval giai đoạn 1 ở 40k và 60k, đọc theo 19.2; chạy `evidence` sau mỗi phần kết quả.
-- **PR #186** (ngoài phạm vi story, merge trước #181): `he1_fetch.py` và `he1_colab.py` nhận `--total-steps` và `--gpu`, để `follow --stop-when-done` tự dừng phiên 60k trên A100 (19.8).
+- **PR #186** (ngoài phạm vi story, **đã merge** 11/11/2026, `465e29b5`, và đã nhập vào nhánh của #181): `he1_fetch.py` và `he1_colab.py` nhận `--total-steps` và `--gpu`, để `follow --stop-when-done` tự dừng phiên 60k trên A100 (19.8).
 
 ### 19.8 Không để phiên treo tốn CU (Hiếu 11/11/2026) [Đề xuất]
 
@@ -1888,7 +1888,7 @@ Tốc độ khả dĩ là khoảng 0,505 s/bước. Trên L4, run C đủ chậm
 ```
 python3 scripts/he/he1_fetch.py follow --session da34-b-all --registry "$R" \
     --dest fwdata/tray/pair60k/B_ALL --remote-work /content/da34 --every 600 \
-    --stop-when-done --total-steps 60000 --gpu A100   # hai cờ cuối: PR #186, merge trước #181
+    --stop-when-done --total-steps 60000 --gpu A100   # hai cờ cuối: PR #186 (đã merge, 465e29b5)
 ```
 
 Ba run còn lại dùng lệnh giống hệt, mỗi run một vòng fetch: `da34-c-all` với `C_ALL`, `da34-b-70` với `B_70`, `da34-c-70` với `C_70`. Với hai đợt, vòng fetch của `B_70`, `C_70` chạy từ lúc đợt hai launch.
@@ -1915,7 +1915,7 @@ Ngưỡng 0,58 là mức dừng sớm của `follow` ở cap 70 khi pull chậm 
 
 **Bước cuối của runbook.** `colab sessions` không còn phiên nào (lặp lại ít nhất hai lần cách nhau một phút; hai lần liệt kê liên tiếp mới tính). Guard của đợt thoát mã 0. Dòng thực đo vào sổ chi phí theo `colab usage`.
 
-**PR #186** (`chore-he1-fetch-steps`, phương án (a) của phiên điều phối, merge trước #181):
+**PR #186** (`chore-he1-fetch-steps`, phương án (a) của phiên điều phối; đã merge 11/11/2026, `465e29b5`):
 - `he1_fetch.py` nhận `--total-steps` và `--gpu`; `he1_colab.py stage` nhận `--total-steps`.
 - Rate lấy từ `RATES` của `cu_watch.py`; GPU không có trong đó bị từ chối, không đoán.
 - Mặc định 40 000 và L4 giữ nguyên, nên DA-26 không đổi.
@@ -1965,3 +1965,4 @@ Ngưỡng 0,58 là mức dừng sớm của `follow` ở cap 70 khi pull chậm 
 | 11/11/2026 | Mục 19.8: vòng fetch tự dừng là đường chính (`follow --stop-when-done --total-steps 60000 --gpu A100`, PR #186 merge trước #181); bước dừng tay chỉ là dự phòng, ngưỡng s/bước sửa thành 0,50 tính cả val như `follow` đo (trước ghi 0,485 không tính val) | Hiếu (soạn với Claude) |
 | 11/11/2026 | Mục 19.8, 19.5, 19.3 (phiên điều phối 11/11/2026): cap mỗi run nâng lại từ 61 lên 70, trần 140, lúc launch cần 154 CU. Lý do: ở cap 61, dừng sớm của `follow` ở bước 2 200 cắt run trên 0,50–0,51 s/bước, sát tốc độ khả dĩ 0,505; ở cap 70 mức đó là 0,58–0,59. Không tốn thêm CU vì phiên dừng khi `ckpt_60000` đã kiểm. Ngưỡng dừng tay thành 0,58. Id nháp về lại `rp_d44e3e6262b4` | Hiếu (soạn với Claude) |
 | 11/11/2026 | Mục 19 (Hiếu 11/11/2026 "Thêm hai run 70%" qua phiên điều phối): thành bốn run, hai VLM × hai lượng dữ liệu (`B_ALL`, `C_ALL`, `B_70`, `C_70`). Tập con S70: 70 % mỗi phần của ALL, chọn theo sha256 của seed, làm tròn lên, ghim sha256 danh sách; cả bốn run dùng stats của ALL. Khối `pair60k-rules` viết lại [Đề xuất]: (a′) chính `B_70` − `C_70` hai giai đoạn; (f) `B_70` − `C_ALL` không kém với biên 10 điểm %; (g) `C_70` − `C_ALL`; (h) phụ `B_ALL` − `C_ALL`; (b) thêm mức 1, mức 2 riêng so với 70 %; `rules_sha256` thành `e7f90396…`. 19.3: schema bốn nhánh (`data`, `subsets`, `comparisons`, `schedule.waves`), lệnh `pairplan subset`, 19 chỗ trống, id nháp `rp_9614ef46ed9d`; plan dự phòng 40k đã xóa. 19.4: epoch của S70 (ước lượng). 19.5: bốn phiên A100, đường lùi hai đợt, bốn làn eval (ba server Colab L4), ngân sách khoảng 288 CU, cap 350, cần 294 CU lúc launch và 360 khi có serve. 19.6: gói bằng chứng đọc mọi so sánh của plan. 19.7, 19.8: 6.3 và vòng fetch cho cả bốn run | Claude cho Hiếu |
+| 11/11/2026 | Mục 19.7, 19.8: PR #186 đã merge (`465e29b5`) và đã nhập vào nhánh của #181 | Claude cho Hiếu |
