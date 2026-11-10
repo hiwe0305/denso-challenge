@@ -38,6 +38,7 @@ Là kỹ sư robot learning, tôi muốn chạy stage 1 của Ψ₀ trên dữ l
   - [x] 2.5 Loader check của Ψ₀ trên bản export thử `egx_fb3d1401dac0bd4c` (132 mẫu, chỉ CPU); `loader_check` báo phần action bị cắt ở [−1, 1] và số mẫu một token; ghi kết quả và đề xuất cho plan ([stage1.md](../../he/stage1.md) mục 2.7); test CPU (`test_psi0_stage1_loader_check.py`, 3 test)
   - [x] 2.6 Đo offline, trên bản export thử, làm sạch tư thế có đưa phần action bị cắt xuống dưới 5 % không (liên tục góc, làm mượt, khung nhảy, camera); bảng và đề xuất cho PR của DA-04 ([stage1.md](../../he/stage1.md) mục 2.8)
   - [x] 2.7 Ghim bản export đã làm sạch `egx_7b43c30dc5d88cd7` (132 mẫu, mã làm sạch đã sửa sau review PR #174; thay lần ghim đầu `egx_b6e974e46e8222e8`) vào `tray-ego-b.yaml` sau loader check (3,6 % bị cắt, ngưỡng 5 %); plan giữ `status: draft` tới khi PR #173 và #174 merge (`rp_64bde22a5dda`); test CPU ([stage1.md](../../he/stage1.md) mục 2.9)
+  - [x] 2.8 Bỏ `status: draft` khỏi `tray-ego-b.yaml` sau khi PR #173 và #176 (thay #174, cùng mã `ac3637da`) merge và Hiếu xác nhận sự đồng ý của người trong clip (11/11/2026); `run_plan_id` giữ `rp_64bde22a5dda`; tarball cục bộ khớp sha256 ([stage1.md](../../he/stage1.md) mục 2.4, 2.6)
 - [ ] 3. Fine-tune, probe, closed-loop, báo cáo (AC 2, 3)
 
 ## Phạm vi file
@@ -76,6 +77,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 4/11/2026 | Bộ canh CU dùng chung đổi thiết kế (PR #108): mỗi phiên một watcher theo endpoint, cộng một guard cho cả đợt; một đợt một lúc trên tài khoản, DA-30 chạy trước rồi đến DA-26 ([stage1.md](../../he/stage1.md) mục 1.6) | Review PR #108 |
 | 4/11/2026 | Lần chạy 1 hỏng ở `accelerator.prepare` (`betas: "auto"` trong `zero3_offload.json` của tác giả). RunPlan dùng file DeepSpeed của repo, khớp recipe và giữ lr riêng của từng nhóm; `setup` chạy pre-flight DeepSpeed trên model nhỏ trước mọi lần tải ([stage1.md](../../he/stage1.md) mục 1.2, 1.6) | Lần chạy 1 |
 | 9/11/2026 | "Chốt 4 mặc định" cho nhánh B của DA-34: VLM cha là VLM của C (`ego200k.he30k`), mỗi clip một mẫu với câu mô tả cả task, 153 clip 480p đã làm mờ mặt (`public` theo PR #170, bỏ 8 clip 1080p), khoảng 300 bước, trần 4 CU ([stage1.md](../../he/stage1.md) mục 2.1) | PO (Hiếu) |
+| 11/11/2026 | Người trong 153 clip đã đồng ý cho đưa tarball lên Drive và chạy stage 1; PR #173 và #176 (thay #174) đã merge, nên plan nhánh B bỏ `status: draft` (`rp_64bde22a5dda`, [stage1.md](../../he/stage1.md) mục 2.4) | PO (Hiếu) |
 
 ## Ghi chép khi làm
 

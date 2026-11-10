@@ -10,15 +10,15 @@
 # (PR #170); about 300 steps, hard cap 4 CU. The export holds 132 of the 153 clips
 # (QA kept pass and flag), with DA-04's pose cleaning (docs/he/stage1.md 2.8, 2.9).
 #
-# Pinned 9/11/2026, still DRAFT: the export comes from code in PR #173 (QA) and PR #174
-# (pose cleaning), not yet merged, and a run starts only from master. `colab setup`
-# refuses a draft. Once both are merged: put the tarball on Drive at `tarball`, drop
-# `status: draft` (the run_plan_id stays the same), check again.
+# Pinned 9/11/2026. Ready to run since 11/11/2026: the code that made the export is on
+# master (PR #173, QA; PR #176, pose cleaning, the same code as ac3637da of the closed
+# PR #174), and Hiếu confirmed the people in the clips agreed to the upload and the run.
+# `status: draft` dropped; the run_plan_id is unchanged. The tarball must be on Drive at
+# `tarball` before `colab setup` (docs/he/stage1.md 2.6).
 #
 #   uv run python -m flywheel_psi0.stage1.runplan check configs/runplans/stage1/tray-ego-b.yaml
 name: stage1-tray-ego-b
 story: DA-30
-status: draft
 
 code:
   psi0: {repo: physical-superintelligence-lab/Psi0, commit: cda3fdfafe47cb6fa75400d013de1bd36e3cea05}
@@ -48,7 +48,7 @@ dataset:
   id: team-ego-tray-clean-132
   source:
     name: team-ego
-    # fwdata/egocentric-export/tray-ego-b-480p-clean2 (PR #174 at ac3637da);
+    # fwdata/egocentric-export/tray-ego-b-480p-clean2 (PR #176, = ac3637da);
     # loader_check 3.6 % clipped (docs/he/stage1.md 2.9)
     export_id: egx_7b43c30dc5d88cd7
     tarball: denso/da30/exports/egx_7b43c30dc5d88cd7.tar # under /content/drive/MyDrive

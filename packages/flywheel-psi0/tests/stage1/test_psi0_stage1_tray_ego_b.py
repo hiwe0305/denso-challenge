@@ -1,4 +1,4 @@
-"""The stage 1 RunPlan of DA-34 branch B (DA-30 task 2): C's parent, the cleaned export."""
+"""The stage 1 RunPlan of DA-34 branch B (DA-30 task 2): C's parent, the cleaned export, ready."""
 
 from __future__ import annotations
 
@@ -30,10 +30,12 @@ def plan() -> Stage1Plan:
     return Stage1Plan.load(PLAN)
 
 
-def frozen(tmp_path: Path) -> Path:
-    """The plan as it will be once PRs #173 and #174 are merged: `status` dropped."""
-    raw = yaml.safe_load(PLAN.read_text())
-    raw.pop("status")
+RUN_PLAN_ID = "rp_64bde22a5dda"  # pinned 9/11/2026; DA-34 branch B reads its output
+
+
+def drafted(tmp_path: Path) -> Path:
+    """The plan marked `status: draft` again, as it was until 11/11/2026."""
+    raw = yaml.safe_load(PLAN.read_text()) | {"status": "draft"}
     path = tmp_path / "tray-ego-b.yaml"
     path.write_text(yaml.safe_dump(raw))
     return path
@@ -44,13 +46,25 @@ def with_placeholders(raw: dict[str, Any]) -> dict[str, Any]:
     return raw
 
 
-def test_the_pinned_draft_checks_out_and_says_why_it_is_a_draft(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    assert check(plan(), REPO) == []
+def test_the_plan_is_ready_and_keeps_its_id(capsys: pytest.CaptureFixture[str]) -> None:
+    assert plan().status is None
+    assert check(plan(), REPO) == [] and draft_reasons(plan()) == []
     assert placeholder_pins(plan()) == []
+    assert run_plan_id(plan()) == RUN_PLAN_ID
     assert main(["check", str(PLAN)]) == 0
-    assert "draft: marked `status: draft` with every pin set" in capsys.readouterr().out
+    assert capsys.readouterr().out.strip() == f"OK {RUN_PLAN_ID}"
+
+
+def test_setup_preflight_passes_once_the_tarball_is_on_drive(tmp_path: Path) -> None:
+    source = plan().dataset.source  # type: ignore[union-attr]
+    tarball = tmp_path / "MyDrive" / source.tarball
+    assert colab.preflight_plan_problems(plan(), tmp_path / "MyDrive") == [
+        f"{tarball} not found (mount Drive before setup)"
+    ]
+    tarball.parent.mkdir(parents=True)
+    with tarball.open("wb") as f:  # sparse: only the size is checked before the copy
+        f.truncate(source.bytes)
+    assert colab.preflight_plan_problems(plan(), tmp_path / "MyDrive") == []
 
 
 def test_the_pin_is_the_cleaned_export() -> None:
@@ -83,14 +97,15 @@ def test_the_run_is_the_egodex_script_on_the_export() -> None:
     assert isinstance(plan().dataset, ExportDataset) and plan().persist_vlm
 
 
-def test_dropping_the_draft_keeps_the_checks_and_the_id(tmp_path: Path) -> None:
-    pinned = Stage1Plan.load(frozen(tmp_path))
-    assert draft_reasons(pinned) == [] and check(pinned, REPO) == []
-    assert run_plan_id(pinned) == run_plan_id(plan())
+def test_a_draft_with_every_pin_set_still_checks_and_keeps_the_id(tmp_path: Path) -> None:
+    draft = Stage1Plan.load(drafted(tmp_path))
+    assert check(draft, REPO) == []
+    assert draft_reasons(draft) == ["marked `status: draft` with every pin set"]
+    assert run_plan_id(draft) == RUN_PLAN_ID
 
 
-def test_a_placeholder_pin_must_be_marked_draft(tmp_path: Path) -> None:
-    raw = with_placeholders(yaml.safe_load(frozen(tmp_path).read_text()))
+def test_a_placeholder_pin_must_be_marked_draft() -> None:
+    raw = with_placeholders(yaml.safe_load(PLAN.read_text()))
     assert any("not marked `status: draft`" in p for p in check(Stage1Plan.model_validate(raw)))
     draft = Stage1Plan.model_validate(raw | {"status": "draft"})
     assert check(draft, REPO) == []
@@ -100,18 +115,12 @@ def test_a_placeholder_pin_must_be_marked_draft(tmp_path: Path) -> None:
     ]
 
 
-def test_the_status_is_not_part_of_the_id(tmp_path: Path) -> None:
-    pinned = yaml.safe_load(frozen(tmp_path).read_text())
-    with_status = Stage1Plan.model_validate(pinned | {"status": "draft"})
-    assert run_plan_id(with_status) == run_plan_id(Stage1Plan.model_validate(pinned))
-
-
-def test_setup_refuses_the_draft_before_anything_runs(
+def test_setup_refuses_a_draft_before_anything_runs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ran: list[str] = []
     monkeypatch.setattr(colab, "setup_psi0_env", lambda work: ran.append("env"))
     monkeypatch.setattr(colab, "sh", lambda command, cwd=None, env=None: ran.append(command))
     with pytest.raises(SystemExit, match="draft: marked `status: draft` with every pin set"):
-        colab.setup(tmp_path, PLAN)
+        colab.setup(tmp_path / "work", drafted(tmp_path))
     assert ran == []
