@@ -624,8 +624,19 @@ PLAN_CMAX = PLANS / "he-tray-cmax.yaml"
 def test_cmax_draft_matches_the_files_it_names(capsys: pytest.CaptureFixture[str]) -> None:
     plan_cmax = TrayRunPlan.load(PLAN_CMAX)
     assert plan_cmax.status == "draft" and check(plan_cmax) == []
-    assert main(["check", str(PLAN_CMAX)]) == 0
-    assert capsys.readouterr().out.endswith(", draft\n")
+    # superseded by the paired runs (Decision 11/11/2026): check holds, the CLI refuses
+    assert main(["check", str(PLAN_CMAX)]) == 1
+    assert "SUPERSEDED by configs/runplans/tray/he-tray-pair60k.yaml" in capsys.readouterr().err
+
+
+def test_b_and_cmax_are_superseded_by_the_pair_with_their_ids_kept() -> None:
+    # Decision 11/11/2026: the +zone1 scene (DA-33, PR #182) changes files both pin, and
+    # the egocentric question moves to he-tray-pair60k.yaml; superseded_by is out of the id
+    for path, rp in ((PLAN_B, "rp_128aec169e12"), (PLAN_CMAX, "rp_366283071c4a")):
+        plan = TrayRunPlan.load(path)
+        assert plan.superseded_by == "configs/runplans/tray/he-tray-pair60k.yaml"
+        assert run_plan_id(plan) == rp
+        assert run_plan_id(plan.model_copy(update={"superseded_by": None})) == rp
 
 
 def test_cmax_is_v2_with_the_whole_pool_as_its_one_branch(plan_v2: TrayRunPlan) -> None:
@@ -771,8 +782,10 @@ def _b_repo(tmp_path: Path) -> Path:
 
 
 def _b_raw(**pins: object) -> dict[str, Any]:
+    """B as task 4.7 would have pinned it, before the Decision of 11/11/2026 superseded it."""
     raw: dict[str, Any] = yaml.safe_load(PLAN_B.read_text())
     raw["parents"]["psi0-b-ego-stage1"]["vlm_stage1"].update(pins)
+    del raw["superseded_by"]
     return raw
 
 
@@ -860,8 +873,8 @@ def test_b_refuses_a_second_branch_and_a_release_vlm() -> None:
 def test_b_neither_launches_nor_freezes_until_stage1_is_pinned(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert main(["check", str(PLAN_B)]) == 0
-    assert "draft, 4 stage 1 pins pending" in capsys.readouterr().out
+    assert main(["check", str(PLAN_B)]) == 1  # superseded (Decision 11/11/2026)
+    assert "SUPERSEDED by" in capsys.readouterr().err
     monkeypatch.setattr(runplan, "check_release", lambda *args: [])
     assert main(["check", str(PLAN_B), "--release", str(tmp_path), "--launch"]) == 1
     err = capsys.readouterr().err
