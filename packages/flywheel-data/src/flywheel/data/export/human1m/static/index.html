@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Egocentric Explorer</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="mark" aria-hidden="true"></span>
+    <div>
+      <div class="name">Egocentric Explorer</div>
+      <div class="sub">Humanoid Data Flywheel · team recordings and the EgoDex sample, in a Human-1M-style layout</div>
+    </div>
+  </div>
+  <nav>
+    <a href="#/" data-route="gallery">Gallery</a>
+    <a href="#/stats" data-route="stats">Quality</a>
+    <a href="#/clips" data-route="clips">All clips</a>
+  </nav>
+</header>
+<main id="app"></main>
+<footer class="foot">Static page: open index.html from disk. Video is de-identified (faces covered) before any other step; the EgoDex sample is used as Apple published it.</footer>
+<script src="data/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

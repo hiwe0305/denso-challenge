@@ -7,6 +7,10 @@ visible because the SimReady crate has neither.
 
 World frame as in geometry.py; `tray_handle_left` is on the robot's left as it
 faces table A. The tray body's origin is the centre of its underside.
+
+The target zone on table B is drawn as a flat render-only rectangle at the
+episode's target pose (design 3.1: "Hình chữ nhật hiển thị trên bàn B"); it has no
+collision and no mass, so the physics is the same with or without it.
 """
 
 from __future__ import annotations
@@ -36,6 +40,14 @@ TRAY_RGBA = (0.25, 0.55, 0.30, 1.0)
 HANDLE_RGBA = (0.15, 0.15, 0.17, 1.0)
 PART_RGBA = (0.72, 0.72, 0.75, 1.0)
 TABLE_RGBA = (0.60, 0.62, 0.65, 1.0)
+# Target zone: orange against the grey steel table and the green crate, dark tabs
+# where the handles go so the yaw reads from the head camera.
+TARGET_ZONE_RGBA = (1.0, 0.42, 0.0, 1.0)
+TARGET_TAB_RGBA = (0.05, 0.05, 0.08, 1.0)
+TARGET_TAB_DEPTH = 0.04  # m, past the zone's short edges, under the handles
+TARGET_ZONE_THICKNESS = 0.001  # m, lying on the table top
+# Bumped whenever the drawn zone changes; part of visuals_revision.
+TARGET_ZONE_REVISION = "zone1"
 
 Visuals = dict[str, list[VisualAsset]]
 
@@ -249,16 +261,57 @@ def add_tables(
             dresser.dress(body, "table", 0, (d, ln, h), (0, 0, h / 2), "stretch")
 
 
+def _target_zone_boxes(cfg: TrayConfig) -> list[_Box]:
+    """Zone rectangle and the two handle tabs, in the zone frame (origin on the table top).
+
+    The rectangle is the tray footprint itself: randomize.py keeps that footprint on
+    table B, and a margin would hang over the edge at levels 1-2. A tray placed
+    exactly on target hides it.
+    """
+    t = TARGET_ZONE_THICKNESS
+    hx, hy = cfg.tray_width / 2, cfg.tray_length / 2
+    boxes = [_Box("target_zone", (hx, hy, t / 2), (0, 0, t / 2), TARGET_ZONE_RGBA, False)]
+    half_tab = (cfg.handle_length / 2, TARGET_TAB_DEPTH / 2, t / 2)
+    for side, sign in (("left", 1.0), ("right", -1.0)):  # same sides as the tray's handles
+        pos = (0, sign * (hy + TARGET_TAB_DEPTH / 2), t / 2)
+        boxes.append(_Box(f"target_zone_tab_{side}", half_tab, pos, TARGET_TAB_RGBA, False))
+    return boxes
+
+
+def add_target_zone(spec: Any, cfg: TrayConfig, pose: Pose2D) -> None:
+    """Static body `target_zone` on table B at `pose`: render-only, no contact, no mass."""
+    mj = _mujoco()
+    body = spec.worldbody.add_body(
+        name="target_zone", pos=[pose.x, pose.y, cfg.table_height], quat=_yaw_quat(pose.yaw)
+    )
+    for box in _target_zone_boxes(cfg):
+        body.add_geom(
+            name=box.name,
+            type=mj.mjtGeom.mjGEOM_BOX,
+            size=list(box.half),
+            pos=list(box.pos),
+            rgba=list(box.rgba),
+            contype=0,
+            conaffinity=0,
+            group=VISUAL_GROUP,
+            density=0,
+        )
+
+
 def task_scene_spec(
     cfg: TrayConfig,
     tray_pose: Pose2D | None = None,
     visuals: Visuals | None = None,
     table_gap: float | None = None,
     light_diffuse: float | None = None,
+    target_pose: Pose2D | None = None,
 ) -> Any:
-    """Both tables and the tray with its parts on table A (default pose unless `tray_pose`).
+    """Both tables, the tray with its parts on table A and the target zone on table B.
 
-    `light_diffuse` adds a directional light `tray_scene_light` over the scene.
+    Tray and zone take their default poses (for `table_gap`) unless `tray_pose` /
+    `target_pose` are given. `light_diffuse` adds a directional light
+    `tray_scene_light` over the scene. The zone body comes last so the moving
+    bodies keep their indices.
     """
     mj = _mujoco()
     visuals = _resolve(visuals)
@@ -276,6 +329,8 @@ def task_scene_spec(
         )
     pose = tray_pose or scene_geometry(cfg).tray_pose
     add_tray(spec, cfg, pose, cfg.table_height + SPAWN_GAP, visuals)
+    gap = cfg.corridor if table_gap is None else table_gap
+    add_target_zone(spec, cfg, target_pose or scene_geometry_with_gap(cfg, gap).target_pose)
     return spec
 
 
@@ -299,9 +354,10 @@ def write_scene_mjcf(
     visuals: Visuals | None = None,
     table_gap: float | None = None,
     light_diffuse: float | None = None,
+    target_pose: Pose2D | None = None,
 ) -> Path:
     """Write task_scene_spec as MJCF (absolute asset paths) for SIMPLE's articulated actor."""
-    spec = task_scene_spec(cfg, tray_pose, visuals, table_gap, light_diffuse)
+    spec = task_scene_spec(cfg, tray_pose, visuals, table_gap, light_diffuse, target_pose)
     spec.compile()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(spec.to_xml())

@@ -295,6 +295,7 @@ def _frozen_b(tmp_path: Path, plan: TrayRunPlan, pins: dict[str, str]) -> tuple[
     raw = yaml.safe_load((REPO / B_PLAN).read_text())
     raw["parents"]["psi0-b-ego-stage1"]["vlm_stage1"].update(pins)
     del raw["status"]
+    del raw["superseded_by"]  # B as task 4.7 would have left it, before the Decision of 11/11
     (repo / B_PLAN).write_text(yaml.safe_dump(raw, allow_unicode=True, sort_keys=False))
     lock = json.loads(runplan.freeze(repo / B_PLAN, repo).read_text())
     return repo, lock["run_plan_id"]
@@ -305,6 +306,7 @@ def test_b_does_not_run_from_the_draft_plan() -> None:
         colab_train.load_job("B")
     message = str(stop.value)
     assert "is a draft" in message and "B_FROZEN is unset" in message
+    assert "superseded by configs/runplans/tray/he-tray-pair60k.yaml" in message
     assert "vlm_stage1.weights_sha256 is not pinned yet (DA-30)" in message
 
 

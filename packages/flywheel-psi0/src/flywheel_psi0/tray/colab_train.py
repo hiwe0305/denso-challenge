@@ -156,6 +156,8 @@ def load_b(repo: Path = REPO) -> tuple[TrayRunPlan, str]:
     plan = TrayRunPlan.load(repo / B_PLAN)
     problems = check(plan, repo)
     problems += [f"{d}: re-freeze or record a Decision" for d in pinned_file_drift(plan, repo)]
+    if plan.superseded_by is not None:
+        problems.append(f"superseded by {plan.superseded_by}")
     if plan.status == "draft":
         problems.append(f"{B_PLAN} is a draft: no B job runs before task 4.7")
     problems += stage1_pending(plan)

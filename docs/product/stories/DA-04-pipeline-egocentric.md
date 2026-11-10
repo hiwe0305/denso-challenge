@@ -46,6 +46,12 @@ Là kỹ sư dữ liệu, tôi muốn video egocentric của người đi qua c�
   - [x] 10.3 Nội suy khung có bước nhảy cổ tay trên trung vị + 5 × MAD của clip; không bỏ khung
   - [x] 10.4 Savitzky–Golay bậc 2, cửa sổ 21 khung, trên vị trí cổ tay, đầu ngón và quaternion cổ tay
   - [x] 10.5 Chạy lại trên 153 clip khay, xuất stage 1, đo phần action bị cắt (ngưỡng 5 %), ghi vào docs/g0/egocentric.md
+- [x] 11. Bộ dữ liệu và trình xem kiểu Human-1M cho toàn bộ dữ liệu egocentric (Hiếu yêu cầu 11/11/2026)
+  - [x] 11.1 `fw egocentric ingest egodex --all-tasks`: cả 218 episode của mẫu EgoDex qua pose E-B, cắt đoạn, QA; chạy lại làm sạch E-A và QA của 8 clip 1080p
+  - [x] 11.2 Chú thích task và subtask có thời gian, ghi tay: clip khay theo mốc đọc từ khung hình chính, EgoDex theo đoạn của luật
+  - [x] 11.3 Exporter LeRobot v3.0 theo bố cục Human-1M (`export/human1m/`): 21 khớp × 3 mỗi tay trong khung camera, quaternion khớp, mask, confidence, tư thế camera, intrinsics, id ẩn danh, bốn từ điển, kiểm schema; trường không có để trống và ghi lý do
+  - [x] 11.4 Trình xem tĩnh (HTML + three.js, không server): gallery, tìm kiếm, video kèm khung xương tay, timeline subtask, 3D, trang chất lượng, bảng mọi clip
+  - [x] 11.5 Chạy trên toàn bộ dữ liệu: trạng thái từng clip, shard trong `fwdata/human1m/`, số liệu vào docs/g0/egocentric.md
 
 ## Phạm vi file
 
@@ -58,6 +64,8 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `configs/data/egocentric.yaml`
 - `packages/flywheel-data/src/flywheel/data/egocentric_cli.py` (lệnh `fw egocentric`; thêm 6/11/2026)
 - `docs/g0/egocentric.md`
+- `packages/flywheel-data/src/flywheel/data/export/human1m/` (exporter v3 và trình xem kiểu Human-1M; thêm 11/11/2026, Hiếu yêu cầu, chờ Hiếu duyệt trong PR)
+- `configs/data/egocentric-human1m.yaml` (thêm 11/11/2026, như trên)
 
 ## Ghi chú cho người làm
 
@@ -91,6 +99,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 8/11/2026 | Thêm nhiệm vụ 8: `fw egocentric deid` che mặt bằng YuNet trên máy của đội, để video Hiếu quay ngày 8/11/2026 qua được cổng; trong phạm vi file sẵn có | Claude (phiên DA-04 deid), theo yêu cầu của Hiếu |
 | 9/11/2026 | Thêm nhiệm vụ 9: sau khi Hiếu chốt mỗi clip khay là một mẫu với câu cả task, QA từ chối cả 153 episode vì `segment_count` và `segment_ambiguous` không đọc `label_source = human`; trong phạm vi file sẵn có | Claude (phiên DA-04 QA), theo yêu cầu của phiên điều phối DA-34 nhánh B |
 | 9/11/2026 | Thêm nhiệm vụ 10: làm sạch pose E-A theo đề xuất ở docs/he/stage1.md mục 2.8 (PR 171), vì bản xuất thử của clip khay có 41,6 % action bị cắt ở ±1; trong phạm vi file sẵn có | Claude (phiên DA-04 QA), theo giao việc của Hiếu qua phiên điều phối |
+| 11/11/2026 | Thêm nhiệm vụ 11 và hai dòng Phạm vi file (`export/human1m/`, `configs/data/egocentric-human1m.yaml`): bộ dữ liệu LeRobot v3.0 và trình xem kiểu Human-1M cho toàn bộ dữ liệu egocentric. Hiếu yêu cầu 11/11/2026; phạm vi mới chờ Hiếu duyệt trong PR | Claude (phiên DA-04 Human-1M), theo yêu cầu của Hiếu qua phiên điều phối |
 | 7/11/2026 | Sửa theo review PR 152: miễn che danh tính theo sha256 của video đã ghim, bỏ câu trả lời ở mép cửa sổ, QA `segment_count` và `hand_pose_nan`, endpoint chỉ máy của đội, ghi file trọn vẹn, phiếu duyệt khớp theo đoạn | Claude (phiên DA-04), theo review của Hiếu |
 
 ## Ghi chép khi làm
@@ -101,4 +110,5 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - Nhiệm vụ 8 (8/11/2026): YuNet của OpenCV Zoo chạy cục bộ (không thêm gói), bản sao `<i>.deid.mp4`, cổng kiểm sha256 của bản sao. Thử trên clip EgoDex có dán mặt: che 80 trên 80 khung có mặt, không che nhầm tay; pipeline qua cổng tới `report`. Chi tiết: mục 3.1 của docs/g0/egocentric.md.
 - Nhiệm vụ 9 (9/11/2026): QA đọc `label_source = human`; trên 153 clip khay của đội cho 0 `pass`, 132 `flag`, 21 `reject` (trước đó 153 `reject`). Chọn quy tắc trong code thay vì bố cục `whole_clip` trong cấu hình, để EgoDex không đổi. Chi tiết: mục 6.1 của docs/g0/egocentric.md.
 - Nhiệm vụ 10 (9/11/2026): `ingest/egocentric/clean.py` làm sạch E-A ở bước `pose --estimates`; trên 153 clip khay, bản xuất `egx_7b43c30dc5d88cd7` (132 mẫu, 7 804 khung, sau review PR 174) có 3,3 % action bị cắt, lần một `egx_b6e974e46e8222e8` 3,8 %, bản thử 42,7 %. QA của lần chạy dùng mã gộp tạm với PR 173. Chi tiết: mục 4.1 của docs/g0/egocentric.md.
+- Nhiệm vụ 11 (11/11/2026, Hiếu yêu cầu): cả 379 clip egocentric (161 clip khay, 218 EgoDex) có trạng thái: 317 xuất, 54 `rejected_qa`, 8 `excluded` (clip 1080p có thẻ khách). Hai shard LeRobot v3.0 kiểu Human-1M (`team_tray` 132 episode, `egodex` 185 episode) qua kiểm schema; trình xem tĩnh trong `fwdata/human1m/ego-h1m-20261111/viewer/`. Mốc subtask của clip khay do Claude đọc khung chính của bản đã làm mờ, chưa có người duyệt. Pin stage 1 không đổi. Chi tiết: mục 11 của docs/g0/egocentric.md.
 - File đã tạo hoặc sửa: `ingest/egocentric/` (17 file), `annotate/deid/gate.py`, `qa/egocentric.py`, `egocentric_cli.py`, `configs/data/egocentric.yaml`, test trong `tests/unit/egocentric/` và `tests/contract/egocentric/`, `docs/g0/egocentric.md`, file story này. Không sửa `flywheel.data.api`, `cli.py`, `config.py`, hợp đồng hay `flywheel-eval`.

@@ -65,6 +65,7 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
   - [ ] 4.7 Khi DA-30 có checkpoint: điền ghim VLM, bỏ `draft`, đóng băng, ghi id vào `colab_train`; Hiếu launch stage 3 B
   - [ ] 4.8 Eval B trên `rtx3060` theo hai giai đoạn (4.9): giai đoạn 1, Hiếu đọc, giai đoạn 2 nếu đi tiếp; đọc theo luật 18.2, điền `Decision`; dòng thực đo
   - [x] 4.9 Eval B hai giai đoạn (Hiếu 10/11/2026 "Ghi Decision", tray.md mục 18.9), trước mọi lượt của B: sửa khối luật 18.2 (giai đoạn 1 là 6 lô đầu, 60 điều kiện; dừng E1, E3, F hoặc chạy tiếp tới 240; mức 0 chỉ khi đi tiếp), `rules_sha256` mới trong plan B và `Decision`; `eval_batch --max-chunks`, `eval_results --stage1` có test CPU; 18.5 chạy và đọc theo hai giai đoạn; dòng `estimated` giai đoạn 1 trong sổ
+  - [x] 4.10 B và C-max đã thay thế (Hiếu 11/11/2026: cảnh `+zone1` của DA-33 đổi `mjcf.py`, `simple_task.py` mà hai plan ghim; câu hỏi egocentric chuyển sang cặp trên cut ALL): `superseded_by` ngoài id, `colab_train` từ chối B đã thay thế; test tray tách khỏi trạng thái file sống (`tests/tray/conftest.py`), xanh trên master và trên master + #182
 - [ ] 5. Vòng Failure → Data trên lỗi của C: chẩn đoán, sinh nhắm lỗi, fine-tune và eval C+ (AC 6; trước 12/11/2026)
   - [x] 5.1 `Decision` mở lại C+ sau quy tắc 0 trên eval C SimReady (Hiếu 8/11/2026 "Làm tiếp đi từ kết quả và phân tích kia. tôi muốn làm nó nhanh hơn"): sửa luật sau khi thấy kết quả, luật đọc C+ là quy tắc 1–2 không đổi, chờ Hiếu ký · **8/11/2026:** `round-tray-cplus.rule0-override.decision.json` (tray.md mục 17.1)
   - [x] 5.2 Evidence card cụm `L-PLACE-POSE` và luật chọn điều kiện nhắm lỗi, viết trước khi sinh · **8/11/2026:** 131 điều kiện, mỗi điều kiện 2 seed train (`cplus-conditions.jsonl`, sha256 `64d97c4e…`); card: vùng đích không render, không tham số cảnh nào gắn với lỗi (tray.md mục 17.2–17.3)
@@ -120,6 +121,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 10/11/2026 | Hiếu chốt eval B hai giai đoạn ("Ghi Decision"): thêm và làm nhiệm vụ con 4.9, sửa 4.8 | Claude cho Hiếu |
 | 11/11/2026 | Hiếu duyệt W1, W2 và cặp 60k (qua phiên điều phối): thêm nhiệm vụ 6, làm 6.1 | Claude cho Hiếu |
 | 11/11/2026 | Hiếu đặt hạn số trong ngày 12/11 (qua phiên điều phối, 01:50): thêm và làm 6.6, sửa 6.2, 6.3, 6.5 | Claude cho Hiếu |
+| 11/11/2026 | Hiếu: B và C-max đã thay thế bởi cặp trên cut ALL (cảnh `+zone1`, PR #182): thêm và làm nhiệm vụ con 4.10 | Claude cho Hiếu |
 
 ## Ghi chép khi làm
 
