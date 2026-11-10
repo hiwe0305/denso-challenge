@@ -1,0 +1,94 @@
+# Human-1M-style view of the egocentric data (DA-04, Hiếu yêu cầu 11/11/2026):
+# `fw egocentric human1m` turns posed and checked pipeline work dirs into LeRobot v3.0
+# shards laid out like NVIDIA's Human-1M release, a clip status table and a static
+# explorer. Kept apart from egocentric.yaml so the QA threshold_version does not move.
+# Numbers not measured on data are marked "giả định" (assumption).
+version: h1m-1
+data_format_version: flywheel-human1m-0.1
+
+video:
+  height: 480            # Human-1M floor is 480p; EgoDex 1080p is scaled down to it
+  crf: 23                # libx264 quality; giả định, looks clean on the tray clips
+  preset: veryfast
+  gop: 15                # key frame every 0.5 s at 30 fps, for seeking in the explorer
+
+# Human-1M episode requirements (QUALITY_STANDARDS). Measured and reported per episode;
+# an episode that misses one is still exported, with the failed check in its metadata.
+requirements:
+  min_fps: 30
+  min_height: 480
+  min_hands_visible: 0.95
+  subtask_seconds: [1.0, 10.0]
+
+# Cleaning of the 21 E-A joints; the same numbers as `pose_ea.clean` of egocentric.yaml
+# (task 10), applied to all 21 joints instead of the wrist and tips.
+joint_clean:
+  jump_mad: 5.0
+  jump_burst: 4
+  savgol_window: 21
+  savgol_order: 2
+
+# The tray clips last 2-4 s, so their reach (median 0.4 s) and release (0.6 s) are
+# shorter than Human-1M's 1 s floor. A phase merges into a neighbour only under this;
+# giả định, chosen so the three phases stay apart in most clips.
+min_subtask_seconds: 0.3
+
+# Sources posed and checked but kept out of the shards and the explorer, with the reason.
+exclude:
+  src_60e3f454316d2553: >-
+    1080p tray clips 154-161: a visitor badge on the chest is in view and
+    `fw egocentric deid` covers faces only; left out as at stage 1 (docs/he/stage1.md 2.1)
+    until the badge is covered
+
+annotation_sources:
+  tray-keyframes-20261111: >-
+    Claude (Opus 5.5) read 16 evenly spaced keyframes of each tray clip and marked when the
+    tray leaves the first table (lift) and starts down onto the second (place); about one
+    keyframe (0.1-0.25 s) of resolution; 6 clips checked against frames at the marks;
+    not yet audited by a person
+  tray-task-template: one task sentence written for the tray task (all clips are the same task)
+  egodex-llm: EgoDex's own episode description (llm_description of its HDF5), as published
+  rule-grasp-release: >-
+    `fw egocentric annotate` rules: grasp and release events from wrist speed and hand
+    aperture; the active hand from wrist travel; gaps closed at their midpoints; not audited
+  fallback-whole-episode: no subtask marks; the task sentence spans the episode
+
+sources:
+  ego_video:
+    shard: team_tray
+    vendor: team-ilovephysicalintelligence
+    rig: chest camera, 640x480 at 30 fps; intrinsic assumed (90 deg HFOV)
+    environment: indoor room with two white tables back to back
+    environment_category: Studio/workbench
+    scene: two white tables back to back, red tray, tiled floor
+    country: null           # not recorded with the clips
+    capture_privacy: null   # not recorded with the clips
+    task: >-
+      The person grasps a red tray on a table with both hands, turns around to carry it
+      to a second table behind them, and places it there.
+    task_source: tray-task-template
+    subtask_source: tray-keyframes-20261111
+    subtasks:
+      grasp: Reach for the red tray on the first table and grasp it with both hands.
+      carry: Lift the red tray with both hands and turn around to carry it to the second table.
+      place: Lower the red tray onto the second table with both hands and release it.
+      grasp+carry: >-
+        Grasp the red tray on the first table with both hands, lift it, and turn around to
+        carry it to the second table.
+      carry+place: >-
+        Carry the red tray with both hands to the second table, lower it onto the table, and
+        release it.
+      grasp+carry+place: >-
+        Grasp the red tray on the first table with both hands, carry it to the second table,
+        and place it there.
+  egodex:
+    shard: egodex
+    vendor: apple-egodex
+    rig: Apple Vision Pro, 1920x1080 at 30 fps, ARKit head and hand tracking
+    environment: seated at a table (EgoDex)
+    environment_category: Studio/workbench
+    scene: null             # per episode, from the HDF5 `environment` attribute
+    country: null
+    capture_privacy: null
+    task_source: egodex-llm
+    subtask_source: rule-grasp-release
