@@ -10,6 +10,7 @@ import pytest
 from flywheel_simple.tray.export import (
     action_layout,
     check_one_planner_version,
+    check_one_visuals_revision,
     export_psi0,
     kept_episodes,
     stage_shard,
@@ -42,14 +43,15 @@ def _shard(
     replay: list[tuple[int, bool]] | None,
     name: str = "shard-00",
     planner: str = "p5",
+    visuals: str = "v+zone1",
 ) -> Path:
     """A shard whose log records episodes with these minimal-QA results and replay verdicts."""
     shard = root / name
-    row = {"recorded": True, "planner_version": planner}
+    row = {"recorded": True, "planner_version": planner, "visuals_revision": visuals}
     _jsonl(shard / "gen_log.jsonl", [
         {**row, "seed": 100 + e, "episode_index": e, "qa": qa} for e, qa in gen
     ] + [{"seed": 99, "recorded": False, "episode_index": None, "qa": "not_recorded",
-          "planner_version": "unrecorded"}])
+          "planner_version": "unrecorded", "visuals_revision": "unrecorded"}])
     if replay is not None:
         _jsonl(shard / "replay" / "replay_qa.jsonl", [
             {"episode": e, "seed": 100 + e, "passed": ok} for e, ok in replay
@@ -65,6 +67,16 @@ def test_one_planner_version_per_release(tmp_path: Path) -> None:
     c = _shard(tmp_path, [(0, "pass")], [(0, True)], name="shard-02", planner="p4")
     with pytest.raises(ValueError, match=r"\['p4', 'p5'\]"):
         check_one_planner_version([a, b, c])
+
+
+def test_one_visuals_revision_per_release(tmp_path: Path) -> None:
+    # Episodes rendered without the target zone (bare SimReady revision) must not
+    # share a release with ones rendered with it.
+    a = _shard(tmp_path, [(0, "pass")], [(0, True)])
+    assert check_one_visuals_revision([a]) == "v+zone1"
+    b = _shard(tmp_path, [(0, "pass")], [(0, True)], name="shard-01", visuals="v")
+    with pytest.raises(ValueError, match=r"visuals revisions \['v', 'v\+zone1'\]"):
+        check_one_visuals_revision([a, b])
 
 
 def test_export_refuses_a_batch_of_two_planner_versions_before_staging(tmp_path: Path) -> None:

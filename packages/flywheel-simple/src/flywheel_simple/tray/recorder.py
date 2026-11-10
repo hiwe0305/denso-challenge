@@ -39,6 +39,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
+from flywheel_simple.tray.mjcf import TARGET_ZONE_REVISION
 from flywheel_simple.tray.planner import PLANNER_VERSION, PlannerConfig
 from flywheel_simple.tray.predicates import STEP_NAMES, StepReport
 from flywheel_simple.tray.randomize import split_of
@@ -199,10 +200,17 @@ def planner_version(cfg: PlannerConfig) -> str:
 
 
 def visuals_revision(manifest: Path | None) -> str:
-    """SimReady revision the scene was rendered with, or "none" for plain boxes."""
+    """What the scene was rendered with: `<SimReady revision or "none">+<target zone revision>`.
+
+    "none" means plain boxes. The suffix changes whenever the drawn target zone does,
+    so episodes and eval runs on scenes without the zone (bare SimReady revision)
+    never match ones with it.
+    """
     if manifest is None or not manifest.is_file():
-        return "none"
-    return str(json.loads(manifest.read_text())["revision"])
+        base = "none"
+    else:
+        base = str(json.loads(manifest.read_text())["revision"])
+    return f"{base}+{TARGET_ZONE_REVISION}"
 
 
 def tray_frame(
