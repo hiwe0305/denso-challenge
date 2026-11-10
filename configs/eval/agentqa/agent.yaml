@@ -33,9 +33,13 @@ models:
 prompt: prompts/system.md
 
 limits:
-  context_tokens: 64000       # Nemotron's window (NVIDIA)
-  reply_tokens: 4096
-  chars_per_token: 3.5        # assumption for the budget check, English JSON
+  # The window the server runs, not the model's 64K: Ollama serves OLLAMA_CONTEXT_LENGTH
+  # (default by VRAM, 4096 on the 8 GB laptop of #175) and its /v1 endpoint cannot ask
+  # for more per request. Start the server with OLLAMA_CONTEXT_LENGTH=16384
+  # (docs/g0/agent-qa.md). A prompt over the budget is refused, never sent to be cut.
+  context_tokens: 16384
+  reply_tokens: 4096          # #175 measured 3281-3742 reply tokens for 20 candidates
+  chars_per_token: 2.5        # #175 measured 2.67 (7042 chars, 2642 tokens, one prompt); kept below
   candidates_per_call: 20     # larger subjects are split into several calls
   retries: 1                  # one more turn when the reply is not valid
 
