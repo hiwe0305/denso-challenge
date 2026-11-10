@@ -56,8 +56,8 @@ def test_the_draft_holds_and_lists_what_w1_and_w2_owe() -> None:
     assert check(plan, REPO) == []
     assert plan.status == "draft" and plan.steps() == 60000
     todo = pending(plan)
-    assert len(todo) == 15
-    assert sum("(W1)" in p for p in todo) == 10 and sum("(DA-30)" in p for p in todo) == 4
+    assert len(todo) == 13
+    assert sum("(W1)" in p for p in todo) == 9 and sum("(DA-30)" in p for p in todo) == 4
     assert plan.interpretation.rules_marker == "pair60k-rules"
     text = (REPO / plan.interpretation.doc).read_text(encoding="utf-8")
     assert runplan.rules_sha256(text, "pair60k-rules") == plan.interpretation.rules_sha256
@@ -78,6 +78,10 @@ def test_only_the_vlm_differs_by_construction() -> None:
     v2 = runplan.TrayRunPlan.load(PLANS / "he-tray-v2.yaml")
     assert (plan.eval, plan.stats, plan.train_seeds) == (v2.eval, v2.stats, v2.train_seeds)
     assert c_all == v2.parents["psi0-baseline-egodex-he"]
+    # the +zone1 scene (DA-33 #182): v2's file list, re-hashed; the cut records the revision
+    assert plan.pinned_files is not None and v2.pinned_files is not None
+    assert list(plan.pinned_files) == list(v2.pinned_files)
+    assert plan.cut.visuals_revision == "4763fbfaa4f8e97658e68b57d01b4c86659e08b5+zone1"
     assert dict(plan.recipe.overrides) == {
         "train.validation_steps": 2000,
         "train.max_training_steps": 60000,
@@ -153,15 +157,15 @@ def test_no_launch_and_no_freeze_until_pinned(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert pairplan.main(["check", str(PAIR)]) == 0
-    assert "draft, 15 pins pending" in capsys.readouterr().out
+    assert "draft, 13 pins pending" in capsys.readouterr().out
     assert pairplan.main(["check", str(PAIR), "--launch"]) == 1
     err = capsys.readouterr().err
-    assert "DRAFT" in err and err.count("PENDING:") == 15 and "not frozen" in err
+    assert "DRAFT" in err and err.count("PENDING:") == 13 and "not frozen" in err
     with pytest.raises(ValueError, match="status draft"):
         pairplan.freeze(PAIR, REPO)
     # runplan hands a paired plan over, and refuses a --release it would not read
     assert runplan.main(["check", str(PAIR)]) == 0
-    assert "15 pins pending" in capsys.readouterr().out
+    assert "13 pins pending" in capsys.readouterr().out
     with pytest.raises(SystemExit):
         runplan.main(["check", str(PAIR), "--release", str(tmp_path)])
 
@@ -232,7 +236,7 @@ def test_the_fallback_is_the_60k_plan_with_40k_steps_run_one_after_the_other() -
         **main["recipe"]["overrides"], "train.max_training_steps": 40000
     }  # fmt: skip
     plan = TrayPairPlan.model_validate(fallback)
-    assert check(plan, REPO) == [] and len(pending(plan)) == 15
+    assert check(plan, REPO) == [] and len(pending(plan)) == 13
     assert (plan.checkpoints.primary, plan.checkpoints.early) == (40000, None)
     assert plan.schedule.mode == "sequential" and pairplan.balance_needed(plan) == 14 + 18
     assert plan.interpretation == TrayPairPlan.load(PAIR).interpretation  # one rules block

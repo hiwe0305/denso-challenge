@@ -1681,7 +1681,7 @@ Luật này không đổi sau khi thấy kết quả. Muốn đổi thì ghi `De
 
 ### 19.3 RunPlan cặp (nhiệm vụ con 6.1)
 
-[`he-tray-pair60k.yaml`](../../configs/runplans/tray/he-tray-pair60k.yaml), `status: draft`, id nháp `rp_01c132b8d3b0`. Id đổi khi điền ghim.
+[`he-tray-pair60k.yaml`](../../configs/runplans/tray/he-tray-pair60k.yaml), `status: draft`, id nháp `rp_350a28bb7245` (ghim cảnh `+zone1` ngày 11/11/2026; trước đó `rp_01c132b8d3b0`). Id đổi khi điền ghim.
 
 **Schema riêng.** Cut ALL trải trên hai release, mà `TrayRunPlan` chỉ có một release. Vì vậy plan cặp dùng schema riêng [`pairplan`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/pairplan.py) (`purpose: paired_train`).
 - Cut, recipe kèm override, seed train, eval và stats nằm một lần ở cấp plan. Mỗi nhánh chỉ chọn cha. Vì vậy "giống hệt trừ VLM" đúng theo cấu trúc.
@@ -1694,16 +1694,17 @@ Luật này không đổi sau khi thấy kết quả. Muốn đổi thì ghi `De
   - `checkpoints` (luật e): `primary` bằng số bước; `early`, nếu có, trước `primary`; cả hai là bội của `train.checkpointing_steps` (10 000) của recipe, tức Ψ₀ có lưu checkpoint đó.
 - `schedule`: `parallel` (một phiên mỗi run cùng lúc) hay `sequential`, sàn số dư, và cách checkpoint lên Drive. Dòng tóm tắt của `check` in số dư cần có: sàn cộng cap của mọi run chạy cùng lúc.
 
-**Plan dự phòng** [`he-tray-pair40k-seq.yaml`](../../configs/runplans/tray/he-tray-pair40k-seq.yaml), id nháp `rp_1160d977dd9f`. Giống plan 60k ở mọi trường trừ tên, số bước (40 000), `checkpoints` (số chính 40 000, không đọc sớm), `schedule` (`sequential`) và ngân sách (cap 18 như C, trần 36). Test so từng trường. Cùng khối luật 19.2. Chỉ một trong hai plan được đóng băng và chạy.
+**Plan dự phòng** [`he-tray-pair40k-seq.yaml`](../../configs/runplans/tray/he-tray-pair40k-seq.yaml), id nháp `rp_862e049c8d29` (trước đó `rp_1160d977dd9f`). Giống plan 60k ở mọi trường trừ tên, số bước (40 000), `checkpoints` (số chính 40 000, không đọc sớm), `schedule` (`sequential`) và ngân sách (cap 18 như C, trần 36). Test so từng trường. Cùng khối luật 19.2. Chỉ một trong hai plan được đóng băng và chạy.
 
-**Chỗ trống.** `pairplan check` qua và ghi "draft, 15 pins pending". `freeze` và `check --launch` từ chối, kèm từng chỗ trống:
+**Chỗ trống.** `pairplan check` qua và ghi "draft, 13 pins pending". `freeze` và `check --launch` từ chối, kèm từng chỗ trống:
 
 | Chỗ trống | Ai điền |
 |---|---|
 | Mỗi phần của cut: `release`, `demo_sets` (file tập demo commit cạnh plan, có ghim chất lượng và QA), `set_name` | W1 (DA-33), rồi DA-34 cắt |
-| `cut.visuals_revision`, `episodes`, `frames`, `stats_sha256` | W1 |
+| `cut.episodes`, `frames`, `stats_sha256` | W1 |
 | `vlm_stage1.job_id`, `drive_dir`, `weights_sha256`, `manifest_sha256`; header phải trùng `parent_header_sha256` `53d000d9…` như B | W2 (DA-30) |
-| `pinned_files`: danh sách của bản 2, băm lại trên cây có vùng đích | Lúc đóng băng |
+| `pinned_files`: danh sách của bản 2, băm lại trên cây có vùng đích | **Đã ghim** 11/11/2026 trên master `7b0defd1` (sau #182); chỉ `mjcf.py` và `simple_task.py` khác bản 2 |
+| `cut.visuals_revision` `4763fbfaa4f8e97658e68b57d01b4c86659e08b5+zone1` | **Đã ghim** 11/11/2026; release của W1 phải ghi đúng revision này |
 
 Lệnh: `python -m flywheel_psi0.tray.pairplan check configs/runplans/tray/he-tray-pair60k.yaml`; với `--launch` trước mọi job; `freeze` khi đủ ghim và đã bỏ `draft`. Chỗ trống của plan dự phòng giống hệt.
 
@@ -1851,3 +1852,4 @@ python -m flywheel_psi0.tray.evidence configs/runplans/tray/he-tray-pair60k.yaml
 | 11/11/2026 | Mục 19 (Hiếu 11/11/2026 qua phiên điều phối: W1, W2, cặp 60k, mục tiêu ≥ 80 %): thiết lập hai run `B_ALL` và `C_ALL` chỉ khác VLM; khối luật `pair60k-rules` [Đề xuất] viết trước mọi lượt chạy (so sánh chính hai giai đoạn như 18.2, số tuyệt đối so mốc 80 % có Wilson, thành công nới theo dung sai, không quy hiệu so với C và C+); RunPlan cặp nháp `rp_edf5bb2c7808`; số epoch (60 000 bước là 1,11 epoch của ALL ước lượng); ngân sách (khoảng 23,8 CU mỗi run, cap 28, sàn 14) | Hiếu (soạn với Claude) |
 | 11/11/2026 | Mục 19 (Hiếu 11/11/2026 01:50 qua phiên điều phối: cần số trong ngày 12/11): hai run song song, `ckpt_40000` lên Drive để đọc sớm. Khối `pair60k-rules` thêm luật (e) (60k là số chính, 40k chỉ đọc sớm; plan dự phòng đọc 40k) và điều kiện server đúng checkpoint, nên `rules_sha256` đổi thành `24747738…`. 19.3: trường `checkpoints`, `schedule`, plan dự phòng `he-tray-pair40k-seq.yaml` (`rp_1160d977dd9f`); id nháp của plan 60k thành `rp_01c132b8d3b0`. 19.5 viết lại: bộ canh CU cho một đợt nhiều phiên; lịch; ba phương án eval R, M, M+; ngân sách và số dư cần mua (gói 100 CU đủ). 19.6 mới: gói bằng chứng `evidence`, chạy thử trên số thật của C và C+. 19.7: việc còn lại | Claude cho Hiếu |
 | 11/11/2026 | Mục 18 (quyết định của Hiếu 11/11/2026): B và C-max đã thay thế bởi cặp trên cut ALL, vì cảnh `+zone1` (DA-33, PR #182) đổi file hai plan ghim; `superseded_by` đặt ngoài id, id giữ nguyên. Test tray không còn đọc trạng thái file sống: `tests/tray/conftest.py` bỏ qua độ lệch mà cây sống đã có, giữ độ lệch do test tạo | Claude cho Hiếu |
+| 11/11/2026 | Mục 19.3 (#182 đã merge, master `7b0defd1`): hai plan cặp ghim `pinned_files` (danh sách của bản 2, băm lại; chỉ `mjcf.py`, nơi đặt `TARGET_ZONE_REVISION`, và `simple_task.py` đổi) và `cut.visuals_revision` `…+zone1`. Id nháp mới `rp_350a28bb7245` (60k) và `rp_862e049c8d29` (dự phòng); còn 13 ghim chờ W1 và W2 | Hiếu (soạn với Claude) |
