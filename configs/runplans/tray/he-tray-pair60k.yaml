@@ -69,8 +69,9 @@ parents:
 
 # W1 regenerates both pools with the target zone drawn: same seeds, same planner. ALL
 # joins one part per pool, in this order, as cplus_cut joined C's and the targeted cut.
-# Expected size from today's pools under the same rule: 429 + 177 = 606 episodes,
-# 861624 frames (assumption until W1 pins the real counts; tray.md 19.4).
+# W1 (DA-33, cut 11/11/2026 05:11): 429 + 177 = 606 episodes, 861624 frames, as estimated
+# (tray.md 19.4); same seeds as the old QA'd sets, parquet byte-identical, videos redrawn.
+# File list of the cut: cut-all-zone1.sha256 (1226 files), sha256 8704897447e16f4d...
 cut:
   name: ALL
   rule: >-
@@ -81,24 +82,56 @@ cut:
     branches, the S70 ones included.
   visuals_revision: 4763fbfaa4f8e97658e68b57d01b4c86659e08b5+zone1 # DA-33 #182, master 7b0defd1; W1 releases must record it
   parts:
-    - regenerates: tray_s1_f9433b028c52 # pool s1-pool-1104, seeds 1000-1609
-      release: null # W1
-      demo_sets: null # W1: demo-set file of the new release, with quality and qa pins
-      set_name: null # W1
-    - regenerates: tray_s1_6c0fd7d37f77 # targeted pool of C+ (229 episodes)
-      release: null
-      demo_sets: null
-      set_name: null
-  episodes: null # W1: episodes of the joined cut
-  frames: null # W1: meta/info.json total_frames of the joined cut
-  stats_sha256: null # W1: meta/stats_psi0.json of the joined cut, shared by all four branches
+    - regenerates: tray_s1_f9433b028c52 # pool s1-pool-1104, seeds 1000-1609; W1 batch s1-pool-1104-zone1, cut index 0-428
+      release:
+        id: tray_s1_41899efb4b27
+        release_hash: 41899efb4b27c0f1c9be5d71bcebde19dc133804f7cef4bc2de21c5903d0bc5b
+        location: rtx3060:~/denso-da34-pool/fwdata/releases/tray_s1_41899efb4b27
+        data_class: public
+      demo_sets:
+        file: configs/runplans/tray/demo_sets-all-zone1-pool.json # sets-pool.json of the cut, rtx3060
+        file_sha256: 33f451b0a8254edb2c7f9ca040992cae508874cd2141ca0ff32768553eeb2851
+        salt: DA-34/demo-sets/v1
+        hashes:
+          ALL: a919ce21acb0aa481d4f0d5224133e59cfb716e2f0cd810d886af278b1463e81
+        quality:
+          file: configs/runplans/tray/quality-s1-pool-1104.jsonl # the same per-seed measures: parquet byte-identical
+          sha256: 49c26d25418b448aec3d8dabbe0cb010e9c9a6c5e285fadeafeb09104bb8fa40
+          filter: {max_tilt_carry_deg: 10.0, max_part_shift_end_mm: 20.0}
+        qa:
+          reports_sha256: 3db475f22a2240c638effae07016afbe98fd1166d1dc3d378b6c73a753867f1c
+          threshold_version: qa-1@fb6ddaf9f48c
+      set_name: ALL
+    - regenerates: tray_s1_6c0fd7d37f77 # targeted pool of C+; W1 batch cplus-tgt-1108-zone1, cut index 429-605
+      release:
+        id: tray_s1_4a8f4a8c6a8d
+        release_hash: 4a8f4a8c6a8ddddc3d656b54d07642b363069d31e0d6cf93147e33aec7a20c6e
+        location: rtx3060:~/denso-da34-pool/fwdata/releases/tray_s1_4a8f4a8c6a8d
+        data_class: public
+      demo_sets:
+        file: configs/runplans/tray/demo_sets-all-zone1-tgt.json # sets-tgt.json of the cut, rtx3060
+        file_sha256: d2b99e3e524f5aaa52cee509e3cc549c7e8f79126d269c9a43f2e97ac9771d84
+        salt: DA-34/demo-sets/v1
+        hashes:
+          ALL: 19ed50d2db7581e4d5f8648d274c3f2b53d1bbe099a16bccab586fee0d002336
+        quality:
+          file: configs/runplans/tray/quality-cplus-tgt-1108.jsonl # the same per-seed measures: parquet byte-identical
+          sha256: 3c1d853cc0d90b3cbd35e268f20f3f387a6266459d22cfb824dd97c586275c2d
+          filter: {max_tilt_carry_deg: 10.0, max_part_shift_end_mm: 20.0}
+        qa:
+          reports_sha256: ed6d274c5acd26da19a94683a1576b0f0ffd937a37f611ac023e9cbab9bbf1fc
+          threshold_version: qa-1@fb6ddaf9f48c
+      set_name: ALL
+  episodes: 606 # W1, meta/info.json of the cut (rtx3060:~/denso-da34-pool/fwdata/cut-all-zone1/ALL, 11/11/2026 05:11)
+  frames: 861624 # meta/info.json total_frames
+  stats_sha256: 1c745091bc7dcfc9912d3c3ee0d4d8b1e1ee16ed6e9c7f7d6b5fd9c16b600243 # meta/stats_psi0.json of the 606 episodes, shared by all four branches
 
 # Hiếu 11/11/2026 ("Thêm hai run 70%"): the 70 % runs take 70 % of each part's seeds,
 # chosen by the seed alone (pairplan.subset_seeds: seeds ordered by sha256 of str(seed),
-# the first ceil(0.7 x n)), never by outcome or quality. Expected from the assumed sizes
-# of tray.md 19.4: ceil(0.7 x 429) + ceil(0.7 x 177) = 301 + 124 = 425 episodes. Each
-# part's list is pinned by its sha256 once W1 pins the part (`pairplan subset` prints
-# them), before any run. B_70 and C_70 train on the same list.
+# the first ceil(0.7 x n)), never by outcome or quality. From the sizes W1 pinned
+# below: ceil(0.7 x 429) + ceil(0.7 x 177) = 301 + 124 = 425 episodes, as W1
+# gave. Each part's list is pinned by its sha256 (`pairplan subset` prints the lists),
+# before any run. B_70 and C_70 train on the same list.
 subsets:
   - name: S70
     fraction: 0.7
@@ -111,10 +144,13 @@ subsets:
     order: sha256_seed
     stats: cut
     parts:
-      - {regenerates: tray_s1_f9433b028c52, episodes: null, seeds_sha256: null} # W1, then `pairplan subset`
-      - {regenerates: tray_s1_6c0fd7d37f77, episodes: null, seeds_sha256: null}
-    episodes: null # sum of the parts
-    frames: null # meta/info.json total_frames of the subset's dataset
+      # `pairplan subset` on the W1 pins, 11/11/2026; check re-derives both from the sets files
+      - {regenerates: tray_s1_f9433b028c52, episodes: 301, seeds_sha256: 5cd4a08ad3c74854a7d82940550f5e2b180870f8ed7643e9f5e2e7d2c572b401}
+      - {regenerates: tray_s1_6c0fd7d37f77, episodes: 124, seeds_sha256: 0aa1c409e3866232e7d1c3bf9a680778ab6e95126e0e5b93bd36a5589331c7d4}
+    episodes: 425 # 301 + 124
+    # sum of `length` in ALL's meta/episodes.jsonl over the S70 seeds (427758 + 176157);
+    # the S70 dataset of task 6.3 must report this as meta/info.json total_frames
+    frames: 603915
 
 recipe:
   file: configs/models/psi0-stage3.yaml # batch 16, lr 1e-4 cosine, warmup 1000, VLM frozen, RTC
