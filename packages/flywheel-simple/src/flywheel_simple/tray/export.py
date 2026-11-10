@@ -21,6 +21,7 @@ from __future__ import annotations
 import importlib
 import json
 import math
+import os
 import shutil
 import subprocess
 import sys
@@ -202,6 +203,24 @@ def export_psi0(
     return exported
 
 
+def code_sha() -> str | None:
+    """Commit of the code that generated and exported the batch: $FLYWHEEL_CODE_SHA, else git.
+
+    Runs on rtx3060 come from `git archive` trees without .git, so the launcher sets
+    the variable; None when neither is known.
+    """
+    if os.environ.get("FLYWHEEL_CODE_SHA"):
+        return os.environ["FLYWHEEL_CODE_SHA"]
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=Path(__file__).parent, capture_output=True, text=True, timeout=10, check=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return out.stdout.strip() or None
+
+
 def _write_meta(out: Path, batch: Path, exported: list[ExportedEpisode]) -> None:
     joints = importlib.import_module("simple.robots.g1_sonic").WHOLE_BODY_JOINTS
     layout = action_layout(joints)
@@ -216,6 +235,10 @@ def _write_meta(out: Path, batch: Path, exported: list[ExportedEpisode]) -> None
         "controller": CONTROLLER,
         "postprocess": f"SIMPLE {POSTPROCESS} --skip 0 --downsample 1",
         "source_batch": str(batch.resolve()),
+        "code_sha": code_sha(),
+        "visuals_revision": check_one_visuals_revision(
+            [s for s in sorted(batch.glob("shard-*")) if (s / LOG_NAME).exists()]
+        ),
         "episodes": [asdict(e) for e in exported],
     }
     (out / "meta" / "flywheel_export.json").write_text(json.dumps(meta, indent=2) + "\n")

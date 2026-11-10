@@ -149,3 +149,13 @@ def test_state_names_follow_the_action_order_without_commands() -> None:
     assert len(names) == 32
     assert names[:31] == [d["name"] for d in action_layout(NAMES_43)["dimensions"][:31]]
     assert names[31] == "prev_base_height_command"
+
+
+def test_code_sha_comes_from_the_launcher_first(monkeypatch: pytest.MonkeyPatch) -> None:
+    from flywheel_simple.tray.export import code_sha
+
+    monkeypatch.setenv("FLYWHEEL_CODE_SHA", "abc123")
+    assert code_sha() == "abc123"
+    monkeypatch.delenv("FLYWHEEL_CODE_SHA")
+    sha = code_sha()  # this checkout's HEAD, or None outside git
+    assert sha is None or len(sha) == 40
