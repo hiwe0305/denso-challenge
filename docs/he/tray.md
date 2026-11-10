@@ -1818,7 +1818,7 @@ python -m flywheel_psi0.tray.evidence configs/runplans/tray/he-tray-pair60k.yaml
   - Runbook một đợt `cu_watch` hai phiên (cộng phiên serve); phần dừng phiên ở 19.8.
 - **6.4:** hai run stage 3 (Hiếu launch), dòng thực đo.
 - **6.5:** eval giai đoạn 1 ở 40k và 60k, đọc theo 19.2; chạy `evidence` sau mỗi phần kết quả.
-- **Ngoài phạm vi, chờ phiên điều phối:** `he1_fetch.py` và `he1_colab.py` nhận `--total-steps` và `--gpu`, để `follow --stop-when-done` tự dừng phiên 60k trên A100 (19.8).
+- **PR #186** (ngoài phạm vi story, merge trước #181): `he1_fetch.py` và `he1_colab.py` nhận `--total-steps` và `--gpu`, để `follow --stop-when-done` tự dừng phiên 60k trên A100 (19.8).
 
 ### 19.8 Không để phiên treo tốn CU (Hiếu 11/11/2026) [Đề xuất]
 
@@ -1842,7 +1842,7 @@ Không có biên nào khác. Nếu tốc độ bước chậm hơn khoảng 2 %,
 ```
 python3 scripts/he/he1_fetch.py follow --session da34-b-all --registry "$R" \
     --dest fwdata/tray/pair60k/B_ALL --remote-work /content/da34 --every 600 \
-    --stop-when-done --total-steps 60000 --gpu A100   # hai cờ cuối: chờ duyệt, xem dưới
+    --stop-when-done --total-steps 60000 --gpu A100   # hai cờ cuối: PR #186, merge trước #181
 ```
 
 Run `C_ALL` dùng lệnh giống hệt với `da34-c-all` và `C_ALL`.
@@ -1855,26 +1855,26 @@ Run `C_ALL` dùng lệnh giống hệt với `da34-c-all` và `C_ALL`.
 - Từ bước 2 200, nếu dự báo CU tới lúc `ckpt_60000` về laptop vượt mức dừng của watcher thì dừng phiên trước checkpoint đầu (mã 3). Sau checkpoint đầu thì chỉ báo ALERT.
 - Không dự báo được (không có số đo từ watcher, không có s/bước) thì báo ALERT, không dừng.
 
-**Bước bắt buộc khi không có vòng fetch tự dừng.** Áp dụng khi chưa có hai cờ trên, hoặc vòng fetch đã thoát. Người trực phải tự dừng phiên trong các trường hợp sau:
+**Dự phòng: dừng tay khi vòng fetch không chạy.** Chỉ dùng khi vòng fetch đã thoát với mã khác 0 mà phiên còn trong `colab sessions`, hoặc khi không chạy được vòng fetch. Khi đó người trực phải tự dừng phiên trong các trường hợp sau:
 
 | Điều kiện kiểm | Việc |
 |---|---|
 | `fwdata/tray/pair60k/<run>/fetched.json` có `"checkpoint": "ckpt_60000"`, `"bad_or_missing": []` và `"train": "done"`, và `fetched.json` của lượt có `ckpt_40000` cũng sạch như vậy | `colab stop <phiên>` ngay |
-| Từ bước 2 200, s/bước trung bình (không tính val, đọc từ `metrics.jsonl`) trên **0,485** | Dừng ngay. Ở tốc độ đó, 60 000 bước cộng setup, val, lưu và pull không còn vừa cap 61 |
+| Từ bước 2 200, s/bước trung bình đọc từ `metrics.jsonl` (cửa sổ tính cả val, như `follow` đo) trên **0,50** | Dừng ngay. Ở tốc độ đó, 60 000 bước cộng setup, val, lưu và pull không còn vừa cap 61 |
 | Train crash, hoặc không có bước mới trong 15 phút | Dừng ngay, sau khi lấy checkpoint đã có |
 
-Ngưỡng 0,485 tính như sau: (61 − 0,8) / 6,73 = 8,95 giờ, trừ 0,86 giờ setup, val, lưu và pull, còn 8,09 giờ cho 60 000 bước.
+Ngưỡng 0,50 là chỗ dự báo của `follow` (PR #186) vượt mức dừng của cap 61: 0,509 s/bước khi pull 11 MB/s, 0,501 khi pull 6 MB/s. Tốc độ dự kiến là 0,47 + 50 s / 2 000 bước = 0,495, nên còn khoảng 3 %.
 
 **Phiên serve của làn 2** (M hoặc M+): dừng ngay khi lô eval cuối của checkpoint cuối đã ghi xong kết quả trên `rtx3060`. Không chờ cap 12 hay 22.
 
 **Bước cuối của runbook.** `colab sessions` không còn phiên nào (lặp lại ít nhất hai lần cách nhau một phút; hai lần liệt kê liên tiếp mới tính). Guard của đợt thoát mã 0. Dòng thực đo vào sổ chi phí theo `colab usage`.
 
-**Chờ phiên điều phối** (ngoài phạm vi story): `he1_fetch.py` và `he1_colab.py` hiện cố định 40 000 bước và rate L4 (1,94 CU/giờ). Với run 60k trên A100:
-- dự báo dừng sớm tính tới `ckpt_40000` với rate L4, nên dừng muộn;
-- lượt pull dày bắt đầu từ bước 38 000;
-- lúc train xong, `stage` ghi `failed` vì bước cuối không phải 40 000. Phiên vẫn được dừng sau khi tải `ckpt_60000`, nhưng thoát mã 5 như một lần hỏng.
-
-Đề xuất thêm `--total-steps` và `--gpu`, mặc định giữ 40 000 và L4 để DA-26 không đổi. `cu_watch.py` không cần sửa. Tới khi có quyết định, dùng bảng bước bắt buộc ở trên.
+**PR #186** (`chore-he1-fetch-steps`, phương án (a) của phiên điều phối, merge trước #181):
+- `he1_fetch.py` nhận `--total-steps` và `--gpu`; `he1_colab.py stage` nhận `--total-steps`.
+- Rate lấy từ `RATES` của `cu_watch.py`; GPU không có trong đó bị từ chối, không đoán.
+- Mặc định 40 000 và L4 giữ nguyên, nên DA-26 không đổi.
+- Test: với job 60k xong ở 60 000, `follow --stop-when-done --total-steps 60000 --gpu A100` tải và kiểm `ckpt_60000`, dừng phiên rồi thoát 0; không có hai cờ thì thoát 5.
+- `cu_watch.py` không đổi.
 
 ## Change log
 
@@ -1916,3 +1916,4 @@ Ngưỡng 0,485 tính như sau: (61 − 0,8) / 6,73 = 8,95 giờ, trừ 0,86 gi�
 | 11/11/2026 | Mục 19.3 (#182 đã merge, master `7b0defd1`): hai plan cặp ghim `pinned_files` (danh sách của bản 2, băm lại; chỉ `mjcf.py`, nơi đặt `TARGET_ZONE_REVISION`, và `simple_task.py` đổi) và `cut.visuals_revision` `…+zone1`. Id nháp mới `rp_350a28bb7245` (60k) và `rp_862e049c8d29` (dự phòng); còn 13 ghim chờ W1 và W2 | Hiếu (soạn với Claude) |
 | 11/11/2026 | Mục 19 (Hiếu 11/11/2026 "Chốt A100" qua phiên điều phối): cặp 60k chạy song song trên A100. Plan 60k đổi ghi chú, watcher `--gpu A100 --cap 70 --floor 14`, cap 70 mỗi run, trần 140; recipe không đổi. Mục 19.5 tính lại theo ước lượng: 8,45 giờ và khoảng 57 CU mỗi run, số dư 500 CU đủ; mốc tính theo T0. Plan dự phòng không còn cần. Khối 19.2 không đổi. Id nháp mới `rp_d44e3e6262b4` | Hiếu (soạn với Claude) |
 | 11/11/2026 | Mục 19.8 (Hiếu 11/11/2026 qua phiên điều phối: "không để treo session mà tốn CU"): runbook dừng phiên khi xong và khi hỏng sớm (vòng `he1_fetch follow --stop-when-done`, bước bắt buộc khi không có nó), cap 61 sát ước lượng (trần 122, id nháp `rp_92ab06fe3fff`), bước cuối `colab sessions` trống. Mục 19.5 theo cap mới | Hiếu (soạn với Claude) |
+| 11/11/2026 | Mục 19.8: vòng fetch tự dừng là đường chính (`follow --stop-when-done --total-steps 60000 --gpu A100`, PR #186 merge trước #181); bước dừng tay chỉ là dự phòng, ngưỡng s/bước sửa thành 0,50 tính cả val như `follow` đo (trước ghi 0,485 không tính val) | Hiếu (soạn với Claude) |

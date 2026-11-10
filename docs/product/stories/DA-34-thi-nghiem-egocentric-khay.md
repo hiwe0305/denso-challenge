@@ -83,7 +83,7 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
   - [x] 6.6 Hạn mới (Hiếu 11/11/2026 01:50: số trong ngày 12/11): hai run song song, `ckpt_40000` đọc sớm, 60k là số chính (luật e); plan dự phòng `he-tray-pair40k-seq.yaml` (lần lượt, 40 000 bước); lịch, ba phương án eval, ngân sách và số dư cần mua (tray.md 19.5); gói bằng chứng `evidence` một lệnh (19.6)
   - [x] 6.7 (11/11/2026, sau #182) Ghim cảnh `+zone1` vào hai plan cặp: `pinned_files` là danh sách của bản 2 băm lại trên master `7b0defd1`, `cut.visuals_revision` `4763fbfaa4f8e97658e68b57d01b4c86659e08b5+zone1`; cut ALL và VLM stage 1 vẫn chờ W1, W2 (tray.md 19.3)
   - [x] 6.8 (11/11/2026, Hiếu "Chốt A100") Cặp 60k chạy song song trên A100: watcher `--gpu A100 --cap 70 --floor 14`, trần 140, recipe không đổi; lịch và ngân sách 19.5 tính lại (khoảng 8,45 giờ, 57 CU mỗi run; số dư 500 CU đủ); plan dự phòng không còn cần
-  - [x] 6.9 (11/11/2026, Hiếu "không để treo session mà tốn CU") Runbook dừng phiên khi xong và khi hỏng sớm, bước bắt buộc khi không có vòng fetch tự dừng, bước cuối `colab sessions` trống (tray.md 19.8); cap 61 sát ước lượng. Tự dừng cho run 60k A100 chờ quyết định về `he1_fetch.py`, `he1_colab.py` (ngoài phạm vi)
+  - [x] 6.9 (11/11/2026, Hiếu "không để treo session mà tốn CU") Runbook dừng phiên khi xong và khi hỏng sớm, bước bắt buộc khi không có vòng fetch tự dừng, bước cuối `colab sessions` trống (tray.md 19.8); cap 61 sát ước lượng. Tự dừng cho run 60k A100 qua PR #186 (`he1_fetch.py`, `he1_colab.py`, ngoài phạm vi; merge trước #181)
 
 ## Phạm vi file
 
