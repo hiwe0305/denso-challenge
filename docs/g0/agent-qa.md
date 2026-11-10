@@ -4,6 +4,8 @@ Agent đọc artifact của từng stage (dataset, train, stage 1, stage 3, infe
 
 Trạng thái 7/11/2026: code và test của cả 7 nhiệm vụ con đã có; nhiệm vụ 1–4 xong. Nhiệm vụ 5, 6, 7 còn mở vì AC 6, 7, 8 đòi chạy model thật (Nemotron, Qwen3.5-4B), mà mọi lần chạy dưới đây đều dùng model giả (`EchoModel`) trên laptop. **Chưa có số đo nào với Nemotron**; runbook ở mục 5. Ngày 7/11 sửa theo review của #151: chặn endpoint ngoài mạng, link vào `vault/`, số mượn fact không trích (mục 1).
 
+Cập nhật 11/11/2026: sửa issue #175 (lần đầu chạy Nemotron thật, Hưng 9/11). Agent lên **bản 2** (`version` trong `agent.yaml`): đổi fact, prompt và cửa sổ. Bản 2 **chưa chấm** với Nemotron trên bộ lỗi cấy, nên chưa được dùng cho demo trước khi chạy lại theo mục 5.1 và chấm bằng DA-31. Chi tiết ở mục 3.5.
+
 ## 1. Luồng chạy
 
 ```
@@ -16,18 +18,22 @@ analyze.py (code): mỗi chủ thể (dataset, train/<job>, rtc/<job>, probe, ev
   · ứng viên "hint": dấu hiệu code thấy nhưng không kết luận (ví dụ D5: hai episode cùng dấu vân QA)
   │
   ▼
-agent.py (model): gửi fact + ứng viên theo lô, vừa ngữ cảnh 64K
+agent.py (model): gửi fact + ứng viên theo lô, vừa cửa sổ server (16K token, tính 2,5 ký tự/token);
+  bỏ fact không ứng viên nào trích trước; vẫn vượt thì từ chối, không gửi để server cắt
   model trả {decisions, added, estimates}; code kiểm từng câu:
   · số trong câu phải khớp một fact mà chính mục đó trích (hoặc dạng % của fact tỉ lệ);
     `12,000`, `120ms`, `10x`, hai vế của `45/90` đều là số; sai thì gửi lại 1 lần
   · mỗi ứng viên cần đúng một decision, `keep` là true hoặc false
   · mã phát hiện phải hợp với stage (stage không có mã thì không được thêm); target phải là
     một đơn vị có trong đầu vào
+  · bỏ ứng viên code phải có `reason` (cùng luật số); ứng viên bị bỏ ghi vào dropped.jsonl
+  · không được thêm mã có trong `cleared_by_code` (bộ phát hiện đã xét và không thấy lỗi)
   · ước lượng phải có basis là fact
   sai hai lần thì báo cáo "broken", không có phát hiện nào
   │
   ▼
 AgentReport (reports.jsonl) → NNN-<stage>.html + figures/*.svg + index.html
+                            → dropped.jsonl (ứng viên code model bỏ, kèm lý do và fact)
                             → estimates.jsonl (ước lượng; số đo thật ghi dòng riêng)
                             → LedgerEntry: một dòng estimated, một dòng measured (activity agent_qa)
 kỹ sư: fw agentqa review → <report_id>.review.json (AgentReview, append-only)
@@ -112,39 +118,87 @@ Bộ log cấy cho 0 báo nhầm trên bản sạch (mục 3.2), nhưng log th�
 
 `FW_AGENTQA_AGENT_URL=http://127.0.0.1:9/v1 fw agentqa run …` cho báo cáo `broken` với lý do `endpoint failed: … Connection refused`, không có phát hiện nào, thoát mã 1. Laptop chưa có Ollama nên đây là đường mặc định nếu chạy thật trên laptop.
 
+### 3.5 Sửa issue #175 (11/11/2026, agent bản 2)
+
+Issue #175 chạy Nemotron thật trên hai job của bộ log cấy và thấy ba lỗi. Bảng dưới ghi cách sửa; mỗi dòng là một commit `DA-20/5.x`.
+
+| Lỗi trong #175 | Nguyên nhân | Sửa |
+|---|---|---|
+| 36 ứng viên T6 cùng trỏ F19–F21 (giá trị chiều 0) | Tên fact không có nhóm, chiều; `FactBook.add` gộp theo tên và bỏ giá trị mới (Châu tìm ra) | Tên fact mang nhóm, chiều (`T6_value_dim3`, `T6_start_step_dim3`); ngưỡng chung giữ một fact. `FactBook` từ chối một tên mang hai giá trị (`FactClash`) |
+| Model đọc ngược T6 ("dưới ngưỡng nên không lỗi") | Fact ngưỡng không ghi phía nào là lỗi | Fact `<mã>_flag_when`, ví dụ `T6_flag_when = "value < threshold"`. Bảng chiều `FLAG_WHEN` ở `analyze.py` chép từ bộ phát hiện DA-08, DA-13 (Finding không có trường chiều) và được kiểm trên từng phát hiện: lệch bảng thì bỏ fact chiều, ghi chú. Prompt luật 3 giải thích fact này |
+| Bỏ hết ứng viên code mà báo cáo vẫn `ok`, 0 phát hiện, không lời nào | Bỏ ứng viên không cần lý do, không ghi lại | Bỏ ứng viên `origin = code` phải có `reason`. Ứng viên bị bỏ ghi vào `dropped.jsonl`, hiện ở đầu trang HTML, có cột trong `index.html`, và CLI cảnh báo. Hợp đồng không cho báo cáo `ok` có `problems`, và bỏ là quyền của model (DA-31 tính), nên không đánh `broken` |
+| Thêm T1 "phân kỳ" trên job sạch, câu lại nói "hội tụ" | Model được thêm cả mã mà bộ phát hiện đã xét và thấy sạch | `cleared_by_code` trong payload: mã bộ phát hiện đã xét, không bắt, không bỏ qua nhánh nào. Thêm mã đó thì câu trả lời bị gửi lại, lần hai thành `broken`. Mã bị bỏ qua (thiếu số đo) vẫn được thêm |
+| Cấu hình 64K token, 3,5 ký tự/token; server chạy 16K, đo được 2,67 | Ngân sách theo cửa sổ của model, không theo server | `context_tokens: 16384`, `chars_per_token: 2.5`. Prompt vượt ngân sách (kể cả lượt gửi lại) bị từ chối, báo cáo `broken` kèm kích thước |
+
+Kiểm trên bộ log cấy dựng lại bằng `log_defects` (cấu hình mặc định, cùng id bản sao với #175), chỉ lớp code, không gọi model:
+
+- 80 chủ thể không chủ thể nào gặp `FactClash`. 3 job có 36 ứng viên T6, mỗi ứng viên trỏ giá trị riêng.
+- Mọi ứng viên có ngưỡng đều kèm fact chiều. T6 cả 108 ứng viên là `value < threshold`. Không ứng viên nào lệch bảng.
+- Job sạch `job-ffc08ff2de79` của #175: `cleared_by_code` = T1–T8. 36 trên 60 chủ thể train xóa đủ 8 mã, 24 chủ thể xóa 7 mã.
+- 83 lượt gọi: prompt lớn nhất 13.087 ký tự (job T6 của #175, lô 20 ứng viên), trung vị 4.666, ngân sách 30.720.
+
+Việc mở theo sau, ngoài phạm vi DA-20: DA-08 `detect_t5` cho `start_step` âm khi job ngắn hơn `t5.window_steps` (1000 step), và `DiagnosisFinding` từ chối giá trị đó. Job thật dài 40k step nên chưa gặp. Báo cho Châu.
+
 ## 4. Nhìn hình (nhiệm vụ 6)
 
 Q-M trả lời không cho tới demo, nên `vision.enabled: false`. Code đã có: `--vision --image <png>` gửi từng ảnh (tối đa `max_images` = 6) tới model thứ hai kèm câu hỏi cố định. Câu mô tả được thêm thành fact chữ `vision_observation:<model>` với nguồn là ảnh. Câu nào có số thì bị bỏ, vì số phải do code đo. Model chính sau đó được phép trích fact này như mọi fact khác. Bộ ca mẫu chạy được với lượt nhìn hình bằng `ScriptedModel`. Với Qwen3.5-4B thật thì chưa chạy.
 
 ## 5. Runbook: chạy với model thật
 
-Chưa chạy. Laptop (RTX 3050 4 GB) không có Ollama. Cài Ollama cần tải bộ cài và quyền root, nên để Hiếu làm.
+Lần chạy thật đầu tiên là của Hưng trên laptop RTX 4060 8 GB, 9/11/2026 (#175), với agent bản 1. Bản 2 chưa chạy với model thật.
 
 | Model | Vai | Tag Ollama (giả định, cần kiểm tên thật khi pull) | VRAM (ước lượng) |
 |---|---|---|---|
-| Nemotron 3.5 Bolt E4B, Q4_K_M | agent, chỉ đọc chữ | `nemotron-3.5-bolt-e4b` | 3–4 GB theo tài liệu NVIDIA; thêm KV cache cho ngữ cảnh 64K |
+| Nemotron 3.5 Bolt E4B, Q4_K_M | agent, chỉ đọc chữ | `nemotron-3.5-bolt:e4b`, chép thành `nemotron-3.5-bolt-e4b` (#175) | 3–4 GB theo tài liệu NVIDIA; #175 đo 6,6 GB khi nạp với cửa sổ 16K |
 | Qwen3.5-4B | nhìn hình (tùy chọn) | `qwen3.5:4b` | khoảng 3–4 GB ở Q4 (giả định) |
 
 Hai model cùng lúc không vừa 4 GB của laptop. Trên máy 3060 (12 GB) thì vừa.
 
-```bash
-# trên máy serve (3060 hoặc laptop, đã cài Ollama)
-ollama pull <tag Nemotron>
-OLLAMA_CONTEXT_LENGTH=65536 ollama serve
-```
+Server phải chạy đúng cửa sổ `limits.context_tokens` của `agent.yaml` (16384). Endpoint `/v1` của Ollama không đặt được `num_ctx` theo request, và server không đặt `OLLAMA_CONTEXT_LENGTH` thì dùng mặc định theo VRAM (4096 trên máy của #175). Muốn cửa sổ lớn hơn thì sửa cả hai nơi, và đó là một phiên bản agent mới.
 
 ```bash
-# trên máy chạy agent; URL mặc định trong agent.yaml là http://ubuntu-desktop.local:11434/v1
-export FW_AGENTQA_AGENT_URL=http://<máy serve>:11434/v1
-uv run fw agentqa run --input <bộ log cấy>/copies/bench-c6da75e9ff36 \
-    --out fwdata/agentqa/nemotron-logs-defect --record fwdata/agentqa/nemotron-logs-defect.replies.jsonl
-uv run fw agentqa run --input <bộ log cấy>/copies/bench-cfcb0ba66776 \
-    --out fwdata/agentqa/nemotron-logs-clean --record fwdata/agentqa/nemotron-logs-clean.replies.jsonl
+# trên máy serve (đã cài Ollama); cấu hình của #175
+ollama pull nemotron-3.5-bolt:e4b
+ollama cp nemotron-3.5-bolt:e4b nemotron-3.5-bolt-e4b
+OLLAMA_HOST=127.0.0.1:11434 OLLAMA_CONTEXT_LENGTH=16384 OLLAMA_NUM_PARALLEL=1 \
+    OLLAMA_MAX_LOADED_MODELS=1 ollama serve
 ```
 
-Sau đó chấm bằng lệnh ở mục 5 của [defect-bench](defect-bench.md), với `agent_reports` trỏ vào hai file `reports.jsonl`. Ghi kết quả vào mục 3.2 thành một cột mới "Nemotron", kèm revision của model và sha256 của prompt. File `--record` cho phép chạy lại đúng lần đó bằng `--replay` mà không cần GPU. Đổi tag hay quant thì sửa `models.agent.model` / `revision` trong `agent.yaml`.
+#### 5.1 Chạy lại sau khi sửa #175 (Hiếu hoặc Hưng)
+
+Bước 1, hai job của #175, để so với lần chạy bản 1. Job có lỗi phải giữ được các ứng viên T6 (hoặc ghi lý do bỏ trong `dropped.jsonl`). Job sạch không được có T1 thêm vào.
+
+```bash
+python -m flywheel.data.inject.log_defects --out ~/agentqa-bench/logs --store ~/agentqa-bench/store
+export FW_AGENTQA_AGENT_URL=http://127.0.0.1:11434/v1
+B=~/agentqa-bench/logs/copies
+uv run fw agentqa run --input $B/bench-c6da75e9ff36/train/job-9c5054483b9a \
+  --out ~/agentqa-bench/v2-calib-defect --record ~/agentqa-bench/v2-calib-defect.replies.jsonl \
+  --store ~/agentqa-bench/store
+uv run fw agentqa run --input $B/bench-cfcb0ba66776/train/job-ffc08ff2de79 \
+  --out ~/agentqa-bench/v2-calib-clean --record ~/agentqa-bench/v2-calib-clean.replies.jsonl \
+  --store ~/agentqa-bench/store
+cat ~/agentqa-bench/v2-calib-defect/dropped.jsonl
+```
+
+Bước 2, cả bộ log cấy (#175 ước lượng 12–22 phút trên laptop RTX 4060, chưa đo):
+
+```bash
+uv run fw agentqa run --input $B/bench-c6da75e9ff36 \
+  --out ~/agentqa-bench/v2-defect --record ~/agentqa-bench/v2-defect.replies.jsonl \
+  --store ~/agentqa-bench/store
+uv run fw agentqa run --input $B/bench-cfcb0ba66776 \
+  --out ~/agentqa-bench/v2-clean --record ~/agentqa-bench/v2-clean.replies.jsonl \
+  --store ~/agentqa-bench/store
+```
+
+Bước 3, chấm bằng lệnh ở mục 5 của [defect-bench](defect-bench.md), với `agent_reports` trỏ vào hai file `reports.jsonl` của bước 2. Lần chạy có báo cáo `broken` thoát mã 1 nhưng vẫn ghi đủ file; xem `problems` trước khi chấm. Ghi số ứng viên trong `dropped.jsonl` cùng kết quả chấm.
+
+Ghi kết quả vào mục 3.2 thành một cột mới "Nemotron", kèm `version` của agent, revision của model và sha256 của prompt. File `--record` cho phép chạy lại đúng lần đó bằng `--replay` mà không cần GPU. Đổi tag hay quant thì sửa `models.agent.model` / `revision` trong `agent.yaml`.
 
 Thứ tự đề xuất: bộ log cấy trước, rồi log thật ở mục 3.3, rồi hai bản sao psi-data khi DA-27 có QA work dir.
+
+Không chạy trên máy 3060 khi Hiếu chưa đồng ý; máy dùng chung.
 
 ## 6. Khoảng trống hợp đồng (đề xuất, chưa làm)
 
@@ -160,7 +214,9 @@ Thứ tự đề xuất: bộ log cấy trước, rồi log thật ở mục 3.3
 
 | Việc | Ở đâu | Ghi chú |
 |---|---|---|
-| Chạy Nemotron trên bộ log cấy và log thật | máy có Ollama | Theo mục 5; cột "Nemotron" của mục 3.2 |
+| Chạy agent bản 2 với Nemotron trên bộ log cấy, chấm bằng DA-31 | máy có Ollama | Theo mục 5.1; cột "Nemotron" của mục 3.2. Bản 2 chưa dùng được trước bước này |
+| Chạy Nemotron trên log thật | máy có Ollama | Sau mục 5.1 |
+| `start_step` âm của T5 trên job ngắn | làn Đánh giá (DA-08) | Mục 3.5 |
 | Sửa T2 và hiệu chỉnh T8 trên log thật | làn Đánh giá | Mục 3.3 |
 | Kỹ sư duyệt 30 phát hiện | `fw agentqa review` | Để bộ chấm có điểm cho phần giải thích và đề xuất |
 | Qwen3.5-4B | sau demo | Q-M = không |

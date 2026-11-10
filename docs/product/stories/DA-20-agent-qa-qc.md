@@ -41,7 +41,7 @@ Là AI Engineer, tôi muốn một agent đọc báo cáo dataset, log và outpu
   - [x] 5.3 Ứng viên `origin = code` bị model bỏ phải có lý do và hiện cho người duyệt
   - [x] 5.4 Phát hiện `added` không được nêu mã mà code đã xét và không thấy lỗi
   - [x] 5.5 Ngân sách context khớp server; prompt vượt cửa sổ thì từ chối, không để server cắt
-  - [ ] 5.6 Tăng phiên bản agent; ghi lệnh chạy lại trong `docs/g0/agent-qa.md`
+  - [x] 5.6 Tăng phiên bản agent; ghi lệnh chạy lại trong `docs/g0/agent-qa.md`
 - [ ] 6. Qwen3.5-4B nếu Q-M là có (AC 7) — code và test với model kịch bản xong 6/11; còn chạy Qwen3.5-4B thật trên bộ ca mẫu
 - [ ] 7. Chạy trên log thật, báo riêng (AC 8) — lớp code đã chạy trên log DA-26, DA-34 (6/11); còn chạy với Nemotron
 
@@ -86,10 +86,11 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 28/10/2026 | Sửa hạn PR `chore-restructure` theo 07 mục 3.6 bản 0.6: mở 28/10, merge 29/10 | PO (Hiếu) |
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 | 6/11/2026 | Chuyển sang Hiếu làm cùng Claude theo [plan chia lại việc của Hưng](../../superpowers/plans/2026-11-06-hung-reassignment.md); bỏ bước che danh tính chỉ cho mẫu EgoDex công bố (D2); làm đủ mọi nhiệm vụ con (D3) | PO (Hiếu) |
+| 11/11/2026 | Thêm nhiệm vụ con 5.1–5.6 sửa issue #175 (agent bản 2); nhiệm vụ 5 vẫn mở tới khi chấm bản 2 với Nemotron | Hiếu, cùng Claude |
 
 ## Ghi chép khi làm
 
-- Giờ thực: 20 giờ (tổng `Time-spent` của 13 commit: 17 giờ ngày 6/11, 3 giờ sửa theo review ngày 7/11; làm thay Hưng theo phân công lại 6/11/2026)
+- Giờ thực: 27 giờ (tổng `Time-spent` của 19 commit: 17 giờ ngày 6/11, 3 giờ sửa theo review ngày 7/11, 7 giờ sửa issue #175 ngày 11/11; làm thay Hưng theo phân công lại 6/11/2026)
 - Công cụ AI đã dùng: Claude Code (Opus 5.5)
 - Ghi chú hoàn thành: code và test của 7 nhiệm vụ con đã có; nhiệm vụ 5, 6, 7 còn mở tới khi chạy Nemotron và Qwen3.5-4B thật. Mọi lần chạy tới 7/11 trên laptop bằng model giả. Bộ log cấy DA-27 chấm bằng DA-31: precision 3/3 mỗi mã T1–T8, R1, R2; 0/40 báo nhầm trên bản sạch. Đây là kiểm lớp code, chưa phải số của Nemotron. Log thật (DA-26, DA-34): bộ phát hiện F-TRAIN báo T1, T2, T8 trên cả ba job; T2 là lỗi logic khi val đo thưa, T8 là ngưỡng giả định thấp (chuyển cho làn Đánh giá). Chưa chạy Nemotron hay Qwen3.5-4B vì laptop không có Ollama; runbook và khoảng trống hợp đồng ở [agent-qa](../../g0/agent-qa.md)
 - File đã tạo hoặc sửa: `packages/flywheel-eval/src/flywheel/eval/agentqa/` (12 module), `tests/unit/agentqa/`, `tests/contract/agentqa/`, `configs/eval/agentqa/`, `docs/g0/agent-qa.md`

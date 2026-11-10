@@ -204,7 +204,8 @@ def run(
     finally:
         broken = sum(1 for r in result.reports if r.status == "broken")
         note = (f"wall seconds of Agent QA/QC, {outcome}; {len(result.reports)} reports, "
-                f"{broken} broken; model {model.name}@{model.revision}")
+                f"{broken} broken; model {model.name}@{model.revision}, "
+                f"agent v{config.raw.get('version', '?')}")
         append_ledger_entry(
             _ledger(plan, job_id, max(time.monotonic() - start, 0.0), "measured", note,
                     estimate.id),
