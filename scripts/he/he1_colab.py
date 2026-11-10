@@ -66,7 +66,8 @@ REPO = Path(__file__).resolve().parents[2]
 PLAN = REPO / "configs/runplans/he/he-1.yaml"
 DRIVE = Path("/content/drive/MyDrive/denso/da26")
 FROZEN = "rp_95c98a476499"  # he-1.lock.json, signed by Hiếu 4/11/2026 (tier 2)
-TOTAL_STEPS = 40000  # recipe R1 train.max_training_steps, checked by the tests
+TOTAL_STEPS = 40000  # recipe R1 train.max_training_steps, checked by the tests; `stage`'s
+# default: another story's job passes its own (`--total-steps`, DA-34's 60k)
 for package in ("flywheel-psi0", "flywheel-contracts", "flywheel-data"):
     if str(REPO / "packages" / package / "src") not in sys.path:
         sys.path.insert(0, str(REPO / "packages" / package / "src"))
@@ -317,7 +318,7 @@ def persist(work: Path, durable: Path, watch: float | None = None, pid: int | No
     )
 
 
-def stage(work: Path) -> dict[str, Any]:
+def stage(work: Path, total_steps: int = TOTAL_STEPS) -> dict[str, Any]:
     """What the laptop fetches from each job, with sizes and sha256 (cached by mtime).
 
     Every file outside `checkpoints/` (metrics, results, the run's argv and config)
@@ -331,6 +332,8 @@ def stage(work: Path) -> dict[str, Any]:
     A symlink that resolves outside the job dir is not listed but named in `skipped`:
     rsync copies the link, which dangles on the laptop and could never verify (W&B's
     `logs/debug-core.log` points into `/root/.cache`).
+
+    A job is `done` only once it trained to `total_steps`.
     """
     cache_path = work / "stage_cache.json"
     cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
@@ -370,7 +373,7 @@ def stage(work: Path) -> dict[str, Any]:
             {
                 "job": job.name,
                 "checkpoint": complete[-1].name if complete else None,
-                "train": train_state(trained, job.name, exit_code),
+                "train": train_state(trained, job.name, exit_code, total_steps),
                 "progress": progress(job / "metrics.jsonl"),
                 "files": entries,
                 "skipped": [str(p.relative_to(job)) for p in outside],
@@ -399,17 +402,19 @@ def run_state(code: int | None, staged: list[dict[str, Any]]) -> str:
     return "failed" if code != 0 or not staged else "ended"
 
 
-def train_state(trained: dict[str, Any], job: str, exit_code: int | None) -> str:
+def train_state(
+    trained: dict[str, Any], job: str, exit_code: int | None, total_steps: int = TOTAL_STEPS
+) -> str:
     """`done`, `failed` or `running`.
 
-    `done` only when the train phase of this job ended ok at the plan's last step:
-    `train` writes its phase before it raises, so a crash at 25k with ckpt_20000 on
+    `done` only when the train phase of this job ended ok at the plan's last step,
+    `total_steps`: `train` writes its phase before it raises, so a crash at 25k with ckpt_20000 on
     disk also has one. A `train exit` line in the launch log with no such phase is a
     failure too (the process died before writing it).
     """
     if trained.get("job_id") == job:
         ok = trained.get("infra_status") == "ok"
-        return "done" if ok and trained.get("checkpoint_step") == TOTAL_STEPS else "failed"
+        return "done" if ok and trained.get("checkpoint_step") == total_steps else "failed"
     if exit_code is not None:
         return "failed"
     return "running"
@@ -714,7 +719,17 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--to", type=Path, default=DRIVE, help="durable directory (Drive)")
     parser.add_argument("--watch", type=float, help="`persist`: sync every N seconds")
     parser.add_argument("--pid", type=int, help="`persist --watch`: until this process ends")
+    parser.add_argument(
+        "--total-steps",
+        type=int,
+        default=TOTAL_STEPS,
+        help="`stage`: the job's last step (default: %(default)s)",
+    )
     args = parser.parse_args(argv)
+    if args.total_steps <= 0:
+        parser.error(f"--total-steps {args.total_steps}: not a step count")
+    if args.total_steps != TOTAL_STEPS and args.phase != "stage":
+        parser.error(f"--total-steps is read by `stage` only, not by `{args.phase}`")
     if args.phase in ("setup", "train", "restore") and not args.point:
         parser.error(f"{args.phase} needs --point")
     args.work.mkdir(parents=True, exist_ok=True)
@@ -726,7 +741,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     elif args.phase == "persist":
         persist(args.work, args.to, args.watch, args.pid)
     elif args.phase == "stage":
-        print(json.dumps(stage(args.work)))
+        print(json.dumps(stage(args.work, args.total_steps)))
     elif args.phase == "serve-setup":
         serve_setup(args.work)
     elif args.phase == "serve":
