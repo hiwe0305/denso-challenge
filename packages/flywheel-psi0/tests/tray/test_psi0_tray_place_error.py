@@ -23,7 +23,7 @@ def test_yaw_matches_the_scorer() -> None:
     for _ in range(50):
         q = rng.normal(size=4)
         rot = quat_to_mat(q)
-        assert pe.yaw_of(q) == pytest.approx(math.atan2(rot[1, 0], rot[0, 0]), abs=1e-12)
+        assert pe.yaw_of(q.tolist()) == pytest.approx(math.atan2(rot[1, 0], rot[0, 0]), abs=1e-12)
         a, b = rng.uniform(-10, 10, size=2)
         assert pe.wrapped(a, b) == pytest.approx(yaw_error(a, b), abs=1e-12)
 

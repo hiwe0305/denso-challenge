@@ -81,6 +81,7 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
   - [ ] 6.4 Hai run stage 3 trên Colab L4 (Hiếu launch), dòng thực đo
   - [ ] 6.5 Eval giai đoạn 1 ở 40k (đọc sớm) và 60k (số chính) của cả hai run, đọc theo 19.2, chạy `evidence`, điền `Decision`
   - [x] 6.6 Hạn mới (Hiếu 11/11/2026 01:50: số trong ngày 12/11): hai run song song, `ckpt_40000` đọc sớm, 60k là số chính (luật e); plan dự phòng `he-tray-pair40k-seq.yaml` (lần lượt, 40 000 bước); lịch, ba phương án eval, ngân sách và số dư cần mua (tray.md 19.5); gói bằng chứng `evidence` một lệnh (19.6)
+  - [x] 6.7 (11/11/2026, sau #182) Ghim cảnh `+zone1` vào hai plan cặp: `pinned_files` là danh sách của bản 2 băm lại trên master `7b0defd1`, `cut.visuals_revision` `4763fbfaa4f8e97658e68b57d01b4c86659e08b5+zone1`; cut ALL và VLM stage 1 vẫn chờ W1, W2 (tray.md 19.3)
 
 ## Phạm vi file
 
@@ -121,6 +122,8 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 10/11/2026 | Hiếu chốt eval B hai giai đoạn ("Ghi Decision"): thêm và làm nhiệm vụ con 4.9, sửa 4.8 | Claude cho Hiếu |
 | 11/11/2026 | Hiếu duyệt W1, W2 và cặp 60k (qua phiên điều phối): thêm nhiệm vụ 6, làm 6.1 | Claude cho Hiếu |
 | 11/11/2026 | Hiếu đặt hạn số trong ngày 12/11 (qua phiên điều phối, 01:50): thêm và làm 6.6, sửa 6.2, 6.3, 6.5 | Claude cho Hiếu |
+| 11/11/2026 | Hiếu: B và C-max đã thay thế bởi cặp trên cut ALL (cảnh `+zone1`, PR #182): thêm và làm nhiệm vụ con 4.10 | Claude cho Hiếu |
+| 11/11/2026 | #182 đã merge (qua phiên điều phối): thêm và làm 6.7, ghim cảnh `+zone1` vào hai plan cặp | Claude cho Hiếu |
 
 ## Ghi chép khi làm
 
