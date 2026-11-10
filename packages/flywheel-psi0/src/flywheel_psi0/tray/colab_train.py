@@ -42,6 +42,18 @@ the recipe with the stage 1 parent added in memory (the recipe file is not edite
 The action header is C's.
 `manifest --folder <dir>` prints what the plan pins, for whoever fills them (task 4.7).
 
+CUDA toolkit (11/11/2026): the Colab image of that day ships only CUDA 13.0 and no
+`nvcc` on PATH, while Psi0's torch is 2.7.0+cu126. A job that builds a C++/CUDA op at
+run time (DeepSpeed's ZeRO-3 of stage 1) then fails its pre-flight: DeepSpeed's
+CUDAMismatchException, then "Ninja is required". Stage 3 builds none: Psi0 at
+PSI0_COMMIT trains it under torchrun with `train.data_parallel ddp` and
+`torch.optim.AdamW`, creates the DeepSpeed plugin only for `deepspeed`, imports no
+DeepSpeed, triton or `cpp_extension` under `src/psi`, and flash-attn comes as a
+prebuilt cu12 wheel. `setup` checks this on the recipe before anything is installed
+(`extension_builds`), and records it; a recipe that would build ops is refused unless
+`CUDA_HOME` is a CUDA TORCH_CUDA toolkit with `nvcc` and `ninja` is on PATH
+(`toolchain_problems`, with the commands that fixed stage 1 in the message).
+
 What happens after is DA-26's code: `scripts/he/he1_colab.py stage` and
 `persist` read only `<work>/runs`, `report.json` and `train.log`, and
 `scripts/he/he1_fetch.py --remote-work /content/da34` pulls the checkpoints to the
@@ -103,6 +115,48 @@ STAGE1_DIR = "cache/checkpoints/stage1"  # under Psi0, beside the psi-model snap
 WEIGHTS = "model.safetensors"  # the one file a stage 1 VLM folder changes
 WORK = Path("/content/da34")
 MARKER = "flywheel_subset.json"  # written by scripts/he/demo_subset.py and cplus_cut
+TORCH_CUDA = "12.6"  # torch 2.7.0+cu126 of Psi0's lock at PSI0_COMMIT (trainer/colab.py)
+# Data-parallel modes under which Psi0 builds ops at run time (DeepSpeed's op builder)
+BUILDS_OPS = frozenset({"deepspeed"})
+TOOLCHAIN_FIX = (
+    "apt-get install -y cuda-nvcc-12-6 cuda-cudart-dev-12-6 libcurand-dev-12-6 "
+    "libcublas-dev-12-6 && pip install ninja, then run with "
+    "CUDA_HOME=/usr/local/cuda-12.6 PATH=/usr/local/cuda-12.6/bin:$PATH "
+    "(the fix of DA-30's stage 1 on 11/11/2026)"
+)
+
+
+def extension_builds(recipe: Psi0Recipe, overrides: dict[str, Any]) -> bool:
+    """Whether the job builds C++/CUDA ops at run time: only under DeepSpeed in Psi0."""
+    mode = overrides.get("train.data_parallel", recipe.args.get("train.data_parallel"))
+    return mode in BUILDS_OPS
+
+
+def cuda_toolkit_version(home: Path) -> str | None:
+    """major.minor of the toolkit at `home`, from its version.json (None if unreadable)."""
+    try:
+        version = json.loads((home / "version.json").read_text())["cuda"]["version"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    return ".".join(str(version).split(".")[:2])
+
+
+def toolchain_problems(env: dict[str, str] | None = None) -> list[str]:
+    """For a job that builds ops: CUDA_HOME a TORCH_CUDA toolkit with nvcc, ninja on PATH."""
+    env = dict(os.environ) if env is None else env
+    home = env.get("CUDA_HOME")
+    problems = []
+    if not home:
+        problems.append("CUDA_HOME is not set")
+    else:
+        found = cuda_toolkit_version(Path(home))
+        if found != TORCH_CUDA:
+            problems.append(f"CUDA_HOME {home} is CUDA {found}, torch is cu{TORCH_CUDA}")
+        if not (Path(home) / "bin" / "nvcc").is_file():
+            problems.append(f"no nvcc in {home}/bin")
+    if shutil.which("ninja", path=env.get("PATH")) is None:
+        problems.append("ninja is not on PATH")
+    return problems
 
 
 def load_plan(repo: Path = REPO, plan_file: str = PLAN) -> tuple[TrayRunPlan, str]:
@@ -555,6 +609,13 @@ def setup(work: Path, branch: str = BRANCH, repo: Path = REPO) -> None:
     plan = job.plan
     if plan.code["psi0"].commit != PSI0_COMMIT:
         raise SystemExit(f"plan pins Psi0 {plan.code['psi0'].commit}, DA-19 setup {PSI0_COMMIT}")
+    recipe = Psi0Recipe.load(repo / plan.recipe.file)
+    builds = extension_builds(recipe, dict(plan.recipe.overrides))
+    if builds and (problems := toolchain_problems()):  # before any install or download
+        raise SystemExit(
+            f"{plan.recipe.file} builds CUDA ops at run time and the toolchain does not hold:"
+            f"\n  " + "\n  ".join(problems) + f"\nfix: {TOOLCHAIN_FIX}"
+        )
     data = job.data(work)
     problems = job.cut_problems(data, repo)  # before the env: a wrong upload costs no install
     if problems:
@@ -589,6 +650,7 @@ def setup(work: Path, branch: str = BRANCH, repo: Path = REPO) -> None:
         sha256_checked={str(p.relative_to(work)): h for p, h in pinned.items()},
         demo_set_hash=job.set_hash,
         dataset=str(data),
+        cuda_ops_built=builds,  # False: no nvcc or ninja needed (ddp, torch AdamW)
         **extra,
     )
 

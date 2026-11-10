@@ -188,6 +188,47 @@ def test_setup_refuses_a_wrong_cut_before_any_install(
     assert installs == []
 
 
+def test_stage_3_builds_no_cuda_op_so_a_cuda_13_vm_needs_no_toolkit() -> None:
+    # 11/11/2026: the Colab image has only CUDA 13.0; stage 1 (DeepSpeed ZeRO-3) failed
+    # until a 12.6 toolkit and ninja were installed. Stage 3 trains under ddp.
+    stage3 = Psi0Recipe.load(REPO / "configs/models/psi0-stage3.yaml")
+    stage1 = Psi0Recipe.load(REPO / "configs/models/psi0-stage1.yaml")
+    assert not colab_train.extension_builds(stage3, {})
+    assert colab_train.extension_builds(stage1, {})
+    assert colab_train.extension_builds(stage3, {"train.data_parallel": "deepspeed"})
+
+
+def test_a_job_that_builds_ops_needs_the_12_6_toolchain(tmp_path: Path) -> None:
+    cuda13, cuda126, bin_dir = tmp_path / "cuda-13.0", tmp_path / "cuda-12.6", tmp_path / "bin"
+    for home, version in ((cuda13, "13.0.48"), (cuda126, "12.6.77")):
+        (home / "bin").mkdir(parents=True)
+        (home / "version.json").write_text(json.dumps({"cuda": {"version": version}}))
+    (cuda126 / "bin/nvcc").write_text("")
+    bin_dir.mkdir()
+    ninja = bin_dir / "ninja"
+    ninja.write_text("#!/bin/sh\n")
+    ninja.chmod(0o755)
+    assert colab_train.toolchain_problems({"PATH": ""}) == [
+        "CUDA_HOME is not set",
+        "ninja is not on PATH",
+    ]
+    assert colab_train.toolchain_problems({"CUDA_HOME": str(cuda13), "PATH": str(bin_dir)}) == [
+        f"CUDA_HOME {cuda13} is CUDA 13.0, torch is cu12.6",
+        f"no nvcc in {cuda13}/bin",
+    ]
+    assert colab_train.toolchain_problems({"CUDA_HOME": str(cuda126), "PATH": str(bin_dir)}) == []
+
+
+def test_setup_refuses_an_op_building_recipe_without_the_toolchain_before_any_install(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(colab_train, "extension_builds", lambda recipe, overrides: True)
+    monkeypatch.setattr(colab_train, "toolchain_problems", lambda: ["CUDA_HOME is not set"])
+    monkeypatch.setattr(colab_train, "install_env", lambda work: pytest.fail("installed"))
+    with pytest.raises(SystemExit, match="(?s)builds CUDA ops.*cuda-nvcc-12-6"):
+        colab_train.setup(tmp_path)
+
+
 class _FakeTrainer:
     seen: dict[str, Any] = {}
 
