@@ -5,7 +5,7 @@ once on the scene as built now (target zone drawn, visuals_revision `...+zone1`)
 once with `mjcf.add_target_zone` switched off (the scene before). It saves what
 the policy sees (`head_stereo_left`, 320x180) at the start of TURN, CARRY, 1 s
 and 2 s into CARRY, ARRIVE_B and LOWER as one PNG per episode (top row before,
-bottom row after), and compares the two runs' qpos, qvel and action at every step.
+bottom row after), and compares the two runs' qpos, qvel and actuator ctrl at every step.
 
     MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/python \
         scripts/g0/tray/target_zone_views.py --out fwdata/simple/tray/target-zone \
@@ -42,6 +42,7 @@ MOMENTS = [
 ]
 
 
+
 def run(env: Any, level: int, seed: int, zone: bool) -> dict[str, Any]:
     original = mjcf.add_target_zone
     if not zone:
@@ -64,7 +65,7 @@ def run(env: Any, level: int, seed: int, zone: bool) -> dict[str, Any]:
         step += 1
 
     def on_step(obs: Any, info: Any, action: Any) -> None:
-        states.append(np.concatenate([sim.mjData.qpos, sim.mjData.qvel, np.asarray(action)]))
+        states.append(np.concatenate([sim.mjData.qpos, sim.mjData.qvel, sim.mjData.ctrl]))
 
     try:
         result = run_episode(env, agent, seed, level, on_step=on_step, on_frame=on_frame)

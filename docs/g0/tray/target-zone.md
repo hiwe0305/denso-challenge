@@ -28,7 +28,31 @@ Ngày 11/11/2026. Hiếu duyệt qua phiên điều phối: vẽ vùng đích l�
 
 ## 4. Kiểm
 
-_Điền ở nhiệm vụ con 13.2._
+### 4.1 Vật lý không đổi
+
+| Kiểm | Kết quả |
+|---|---|
+| Test CPU (workspace) | `pytest packages/flywheel-simple/tests/tray`: 1318 qua, 1 bỏ qua (thiếu `av`) |
+| Test sim, MuJoCo thuần ([`test_target_zone.py`](../../../packages/flywheel-simple/tests/tray/test_target_zone.py)) | Vùng đích nằm đúng (x, y, yaw) của `target_pose` ở 5 cặp (mức, seed), trên mặt bàn B, trong bàn; ba geom `contype = conaffinity = 0`, body khối lượng 0, không khớp; `nq`, `nv`, tổng khối lượng như cũ; mọi body khác giữ chỉ số. Thả khay cạnh và **lên trên** vùng đích: qpos, qvel giống từng bit qua 400 bước |
+| Test sim qua SIMPLE trên `rtx3060` | 13/13 qua (163 s), gồm một episode planner đầy đủ (mức 1, seed 1279) có và không có vùng đích: qpos, qvel, ctrl giống từng số ở mọi bước. Tư thế vùng đích trong env lệch `target_pose` 1,9 µm vì MJCF dạng chữ giữ 6 chữ số có nghĩa (khay cũng vậy từ trước) |
+| [`target_zone_views.py`](../../../scripts/g0/tray/target_zone_views.py), 3 episode (mức 0 seed 0, mức 1 seed 1279, mức 2 seed 125195) | Cả 3: cùng thành công, cùng chuỗi pha và thời điểm, cùng số bước (1600, 1370, 1499), chênh lớn nhất của qpos/qvel/ctrl là **0,0** |
+| Sinh lại (mục 5) | So từng seed với sổ lô cũ: cùng shard, cùng kết quả, cùng số bước |
+
+### 4.2 Thấy trong camera đầu
+
+Camera `head_stereo_left` ra 640×360 (video của release cũng vậy). Ảnh dưới thu về 320×180 mỗi khung. Hàng trên là cảnh cũ, hàng dưới là cảnh có vùng đích; cột là đầu pha TURN, đầu CARRY, CARRY + 1 s, CARRY + 2 s, đầu ARRIVE_B, đầu LOWER.
+
+![Mức 0, seed 0](img/target-zone-L0-s0.jpg)
+
+![Mức 1, seed 1279](img/target-zone-L1-s1279.jpg)
+
+![Mức 2, seed 125195](img/target-zone-L2-s125195.jpg)
+
+Đọc ảnh:
+- Từ đầu CARRY (vừa rẽ xong sang bàn B), vùng đích cam hiện rõ ở mép trên ảnh, phía sau khay đang bưng, cả hai vạch tối.
+- Từ khoảng CARRY + 2 s, khay đang bưng che phần lớn vùng đích; chỉ còn thấy qua lưới thành thùng.
+- Ở ARRIVE_B và LOWER vùng đích thấy qua đáy lưới của thùng, và phần cam thò ra ngoài mép khay cho thấy khay đang lệch về phía nào.
+- Giới hạn: khay che vùng đích trong một đoạn khi đi. Đây là hình học của camera đầu với khay bưng trước ngực, không đổi được nếu không đổi task.
 
 ## 5. Sinh lại
 
