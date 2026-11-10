@@ -85,12 +85,14 @@ def train_job(
     job: Path,
     loss: Callable[[int], float | str] = lambda step: 1.0 / (step + 1),
     steps: Sequence[int] = range(0, 100, 10),
+    **extra: Any,
 ) -> Path:
+    """A train job's metrics.jsonl; `extra` sets more fields on every row (pred_std...)."""
     rows = [
         TrainingMetric(
             run_plan_id="rp", job_id=job.name, checkpoint_id="ck", release_id="rel", attempt=0,
             step=step, epoch=0, split="train", loss=loss(step), lr=1e-4, vlm_frozen=True,
-            wall_time_s=float(step),
+            wall_time_s=float(step), **extra,
         )
         for step in steps
     ]

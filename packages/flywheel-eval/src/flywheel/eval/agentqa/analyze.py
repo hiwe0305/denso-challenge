@@ -102,9 +102,10 @@ def analyze_dataset(found: InputSet, subject_ref: str) -> Analysis:
                 evidence = []
                 if qa_check is not None:
                     evidence.append(book.add(f"{m['check']}_value@{unit}", qa_check.value, qa.ref))
-                    evidence.append(
-                        book.add(f"{m['check']}_threshold", qa_check.threshold, qa.ref)
-                    )
+                    evidence.append(book.shared(
+                        f"{m['check']}_threshold", f"{m['check']}_threshold@{unit}",
+                        qa_check.threshold, qa.ref,
+                    ))
                 evidence.append(book.add(f"decision@{unit}", r.decision, qa.ref))
                 analysis.propose(m["code"], unit, evidence, "code", reason)
         _duplicate_hint(analysis, reports, target, qa)
@@ -148,7 +149,9 @@ def _replay(analysis: Analysis, rr: ReplayReport, unit: str, item: Loaded) -> No
         evidence = [analysis.book.add(f"replay_{rr.mode}_{issue.code}_frames@{unit}",
                                       len(issue.frames), item.ref, "frames")]
         for group, error in sorted(rr.error_by_group.items()):
-            evidence.append(analysis.book.add(f"replay_error_{group}@{unit}", error, item.ref))
+            evidence.append(
+                analysis.book.add(f"replay_{rr.mode}_error_{group}@{unit}", error, item.ref)
+            )
         analysis.propose(issue.code, unit, evidence, "code", f"replay {rr.mode}: {issue.detail}")
 
 
@@ -182,17 +185,34 @@ def analyze_train(
         for group, loss in sorted(last.loss_by_group.items()):
             book.add(f"loss_last_{group}", loss, metrics.ref)
     diagnosis = diagnose_train(metrics.path, config)
+    seen: Counter[str] = Counter()
     for finding in diagnosis.findings:
-        evidence = [book.add(f"{finding.code}_value", _num(finding.value), metrics.ref)]
+        # Each finding's own value and start step under its own name (#175): one T6 per
+        # dimension used to share the facts of dimension 0. Thresholds are shared.
+        code = finding.code
+        suffix = fact_suffix(finding.group, finding.dim)
+        seen[code + suffix] += 1
+        if seen[code + suffix] > 1:  # two findings of one code on no group or dim (T8 a, b)
+            suffix += f"_{seen[code + suffix]}"
+        evidence = [book.add(f"{code}_value{suffix}", _num(finding.value), metrics.ref)]
         if finding.threshold is not None:
-            evidence.append(book.add(f"{finding.code}_threshold", finding.threshold, metrics.ref))
-        evidence.append(book.add(f"{finding.code}_start_step", finding.start_step, metrics.ref))
+            evidence.append(book.shared(f"{code}_threshold", f"{code}_threshold{suffix}",
+                                        finding.threshold, metrics.ref))
+        evidence.append(
+            book.add(f"{code}_start_step{suffix}", finding.start_step, metrics.ref, "steps")
+        )
         where = f" group {finding.group}" if finding.group else ""
         where += f" dim {finding.dim}" if finding.dim is not None else ""
-        analysis.propose(finding.code, unit, evidence, "code", f"DA-08 {finding.code}{where}")
+        analysis.propose(code, unit, evidence, "code", f"DA-08 {code}{where}")
     for skip in diagnosis.skipped:
         analysis.notes.append(f"{skip.code} not judged: {skip.reason}")
     return analysis
+
+
+def fact_suffix(group: str | None, dim: int | None) -> str:
+    """`_<group>`, `_dim<n>` or both: what tells one finding's facts from another's."""
+    suffix = f"_{group}" if group else ""
+    return suffix + (f"_dim{dim}" if dim is not None else "")
 
 
 def _num(value: float | str) -> float | str:

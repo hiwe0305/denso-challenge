@@ -38,25 +38,54 @@ class Candidate:
     detail: str
 
 
+class FactClash(ValueError):
+    """Two values under one fact name: the second would have been dropped (issue #175)."""
+
+
 @dataclass
 class FactBook:
-    """Numbers facts F1.. in the order they are added; the same name and source twice is one."""
+    """Numbers facts F1.. in the order they are added; the same name and source twice is one.
+
+    Adding a name again with the same value returns the first id. Adding it with
+    another value raises `FactClash`: until 11/11/2026 the book returned the old id
+    and dropped the new value, so 36 T6 findings, one per dimension, all cited the
+    ratio of dimension 0 (#175). Callers name per-group and per-dim facts apart.
+    """
 
     facts: list[AgentFact] = field(default_factory=list)
     _index: dict[tuple[str, str], str] = field(default_factory=dict)
 
     def add(self, name: str, value: FactValue, source_ref: str, unit: str = "") -> str:
-        key = (name, source_ref)
-        if key in self._index:
-            return self._index[key]
         if isinstance(value, float) and not math.isfinite(value):
             value = str(value)  # NaN and Inf travel as text: JSON has no spelling for them
+        key = (name, source_ref)
+        if key in self._index:
+            fact_id = self._index[key]
+            old = self.get(fact_id).value
+            if type(old) is not type(value) or old != value:
+                raise FactClash(
+                    f"fact {name!r} of {source_ref} holds {old!r}; {value!r} needs its own name"
+                )
+            return fact_id
         fact_id = f"F{len(self.facts) + 1}"
         self.facts.append(
             AgentFact(fact_id=fact_id, name=name, value=value, unit=unit, source_ref=source_ref)
         )
         self._index[key] = fact_id
         return fact_id
+
+    def value_of(self, name: str, source_ref: str) -> FactValue | None:
+        """The value already held under this name and source, or None."""
+        fact_id = self._index.get((name, source_ref))
+        return None if fact_id is None else self.get(fact_id).value
+
+    def shared(self, name: str, own: str, value: FactValue, source_ref: str,
+               unit: str = "") -> str:
+        """One fact for a value many findings share (a threshold); `own` when it differs."""
+        held = self.value_of(name, source_ref)
+        if held is None or (type(held) is type(value) and held == value):
+            return self.add(name, value, source_ref, unit)
+        return self.add(own, value, source_ref, unit)
 
     def get(self, fact_id: str) -> AgentFact:
         for fact in self.facts:
