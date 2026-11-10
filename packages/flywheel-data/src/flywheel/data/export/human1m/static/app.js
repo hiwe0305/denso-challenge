@@ -403,7 +403,7 @@
       ["fps", function (b) { return (b.fps || []).join(", "); }], ["Resolution", function (b) { return (b.resolutions || []).join(", "); }],
       ["Median clip length", function (b) { return secs(b.seconds_median); }], ["Hands in frame, median", function (b) { return pct(b.hands_visible_median); }],
       ["Clips with hands ≥ 95 %", function (b) { return pct(b.hands_visible_ge_95); }], ["Bone-length CV, median", function (b) { return num(b.bone_cv_median, 3); }]];
-    app.appendChild(el("div", { "class": "panel scroll" }, [el("table", {}, [
+    app.appendChild(el("div", { "class": "panel scroll" }, [el("table", { "class": "clips" }, [
       el("tr", {}, [el("th", { text: "" })].concat(keys.map(function (k) { return el("th", { "class": "num", text: label[k] || k }); }))),
     ].concat(lines.map(function (l) {
       return el("tr", {}, [el("td", { text: l[0] })].concat(keys.map(function (k) {
@@ -413,7 +413,7 @@
     })))]));
     app.appendChild(el("h2", { text: "Shards (LeRobot v3.0)" }));
     var sh = S.shards || {};
-    app.appendChild(el("div", { "class": "panel scroll" }, [el("table", {}, [
+    app.appendChild(el("div", { "class": "panel scroll" }, [el("table", { "class": "clips" }, [
       el("tr", {}, ["Shard", "Episodes", "Frames", "Tasks", "Subtask texts", "Schema check"].map(function (t, i) { return el("th", { "class": i ? "num" : "", text: t }); }))
     ].concat(Object.keys(sh).map(function (k) {
       var x = sh[k];
@@ -423,7 +423,7 @@
     })))]));
     app.appendChild(el("h2", { text: "QA reasons (all clips)" }));
     var reasons = A.qa_reasons || {};
-    app.appendChild(el("div", { "class": "panel scroll" }, [el("table", {}, [el("tr", {}, [el("th", { text: "Reason" }), el("th", { "class": "num", text: "Clips" })])].concat(
+    app.appendChild(el("div", { "class": "panel scroll" }, [el("table", { "class": "clips" }, [el("tr", {}, [el("th", { text: "Reason" }), el("th", { "class": "num", text: "Clips" })])].concat(
       Object.keys(reasons).map(function (r) { return el("tr", {}, [el("td", { text: r }), el("td", { "class": "num", text: String(reasons[r]) })]); })))]));
     app.appendChild(el("h2", { text: "Exported episode length" }));
     app.appendChild(hist(INDEX.episodes.map(function (e) { return e.seconds; }), 24, " s"));
@@ -464,12 +464,12 @@
         body.appendChild(el("tr", {}, [el("td", {}, [link]), el("td", { text: r.source }), el("td", { "class": "num", text: secs(r.seconds) }),
           el("td", { "class": "num", text: r.fps + " · " + r.width + "×" + r.height }), el("td", { text: r.deid }), el("td", { text: r.pose_source }),
           el("td", { text: r.qa || "–" }), el("td", { "class": "num", text: pct(r.hands_visible) }),
-          el("td", { "class": r.decision === "exported" ? "ok" : "no", text: r.decision }), el("td", { text: r.reason })]));
+          el("td", { "class": r.decision === "exported" ? "ok" : "no", text: r.decision }), el("td", { "class": "reason", text: r.reason })]));
       });
     }
     q.addEventListener("input", draw);
     app.appendChild(el("div", { "class": "controls" }, [q, count]));
-    app.appendChild(el("div", { "class": "panel scroll" }, [el("table", {}, [
+    app.appendChild(el("div", { "class": "panel scroll" }, [el("table", { "class": "clips" }, [
       el("thead", {}, [el("tr", {}, ["Clip", "Source", "Length", "fps · size", "De-identification", "Pose", "QA", "Hands", "Decision", "Reason"].map(function (t) { return el("th", { text: t }); }))]), body])]));
     draw();
   }

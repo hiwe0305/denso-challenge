@@ -70,13 +70,18 @@ class EpisodeFrames:
     def mask(self, side: str) -> NDArray[np.bool_]:
         """Known and in the image (at least one joint in front of the camera inside it)."""
         points = self.hands[side].astype(np.float64)
-        known = np.isfinite(points).all(axis=(1, 2))
+        known = known_frames(points)
         pixels, front = project(points, self.intrinsic)
         w, h = self.image_size
         inside = (front & (pixels[..., 0] >= 0) & (pixels[..., 0] < w)
                   & (pixels[..., 1] >= 0) & (pixels[..., 1] < h)).any(axis=1)
         result: NDArray[np.bool_] = known & inside
         return result
+
+
+def known_frames(points: NDArray[Any]) -> NDArray[np.bool_]:
+    """(T,) True where every joint of a (T, J, 3) array is finite."""
+    return np.asarray(np.isfinite(points).all(axis=(1, 2)), dtype=np.bool_)
 
 
 def project(points: F64, intrinsic: F64) -> tuple[F64, NDArray[np.bool_]]:
@@ -96,7 +101,7 @@ def clean_joints(points: F64, params: JointClean) -> tuple[F64, dict[str, int]]:
     linear interpolation from the rest of the run; then Savitzky-Golay per run."""
     out = np.array(points, dtype=np.float64)
     t = len(out)
-    seen = np.isfinite(out).all(axis=(1, 2))
+    seen = known_frames(out)
     bad = np.zeros(t, dtype=bool)
     runs = seen_runs(seen)
     for start, stop in runs:
@@ -154,7 +159,7 @@ def from_estimates(path: Path, frames: int, intrinsic: F64, image_size: tuple[in
         cleaned, cleaning[side] = clean_joints(points, params)
         hands[side] = cleaned.astype(np.float32)
         score = _fit(arrays[f"{side}_score"], frames)
-        seen = np.isfinite(cleaned).all(axis=(1, 2))
+        seen = known_frames(cleaned)
         confidence[side] = np.where(seen, np.nan_to_num(score), 0.0).astype(np.float32)
     return EpisodeFrames(
         hands=hands, rotations={"left": None, "right": None},
