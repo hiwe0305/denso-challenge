@@ -43,7 +43,7 @@ Là kỹ sư robot learning, tôi muốn chạy stage 1 của Ψ₀ trên dữ l
   - [x] 2.10 `colab setup` tự cài CUDA toolkit khớp bản CUDA của torch, cùng `ninja`, khi VM có bản CUDA khác (lần 1: CUDA 13.0, torch cu126); đặt `CUDA_HOME` và `PATH` cho pre-flight và `run`, ghi các bước vào `report.json`; test CPU (`test_psi0_stage1_cuda_toolchain.py`, 9 test)
   - [x] 2.11 Ghi kết quả lần 1 trên L4, cập nhật ước lượng và runbook cho A100 (trần 8 CU, quy tắc dừng ở 6,73 CU/giờ), dòng `measured` 0,38 CU và dòng `estimated` mới của sổ chi phí ([stage1.md](../../he/stage1.md) mục 2.5, 2.6, 2.10)
   - [x] 2.12 Sửa `colab check-vlm`: `load_check` trả khóa `seconds` trùng tham số của `Report.phase`, nên pha hỏng sau khi kiểm xong và `report.json` thiếu pha `check_vlm` (lần 2, 11/11/2026); ghi thành `load_seconds`; test với stub cùng khóa như `load_check` thật
-  - [ ] 2.13 Ghi kết quả lần 2 trên A100 (300/300 bước, VLM lên Drive) và dòng `measured` của sổ chi phí ([stage1.md](../../he/stage1.md) mục 2.10)
+  - [x] 2.13 Ghi kết quả lần 2 trên A100 (300/300 bước, VLM lên Drive) và dòng `measured` của sổ chi phí ([stage1.md](../../he/stage1.md) mục 2.10)
 - [ ] 3. Fine-tune, probe, closed-loop, báo cáo (AC 2, 3)
 
 ## Phạm vi file

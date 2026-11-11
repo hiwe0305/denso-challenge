@@ -195,7 +195,7 @@ Quy tắc dừng [Đề xuất]: đọc s/bước trong `train.log` sau 20 bư�
 
 ## 2. Nhánh B của DA-34: stage 1 trên video đội tự quay (AC 2)
 
-_Soạn 9/11/2026. Lần 1 ngày 11/11/2026 trên L4 hết bộ nhớ trước bước train đầu (mục 2.10); lần 2 chạy trên A100._ Nhánh B của thí nghiệm khay ([tray.md](tray.md) mục 4) giống hệt nhánh C, chỉ khác VLM: trước stage 3, VLM của C được fine-tune stage 1 trên video egocentric đội tự quay (người cầm hộp đỏ đi giữa hai bàn). So B với C trả lời câu hỏi "video người + demo robot" có hơn "chỉ demo robot" không. Ở Ψ₀, dữ liệu egocentric chỉ vào stage 1 (48 chiều tay và video), không bao giờ vào stage 3.
+_Soạn 9/11/2026. Lần 1 ngày 11/11/2026 trên L4 hết bộ nhớ trước bước train đầu (mục 2.10); lần 2 trên A100 cùng ngày chạy hết đường đi: 300/300 bước, VLM lên Drive, đạt cả ba tiêu chí chốt trước (mục 2.10)._ Nhánh B của thí nghiệm khay ([tray.md](tray.md) mục 4) giống hệt nhánh C, chỉ khác VLM: trước stage 3, VLM của C được fine-tune stage 1 trên video egocentric đội tự quay (người cầm hộp đỏ đi giữa hai bàn). So B với C trả lời câu hỏi "video người + demo robot" có hơn "chỉ demo robot" không. Ở Ψ₀, dữ liệu egocentric chỉ vào stage 1 (48 chiều tay và video), không bao giờ vào stage 3.
 
 Lần chạy này cũng là **lần đầu stage 1 chạy hết đường đi** trong dự án: lần 1 của mục 1 hỏng trước bước train đầu (mục 1.7), lần 2 chưa chạy.
 
@@ -329,7 +329,7 @@ Bộ canh với `--cap 8` ở 6,73 CU/giờ:
 
 ### 2.6 Việc Hiếu làm để chạy
 
-Lần 1 (L4) hỏng ngày 11/11/2026 (mục 2.10); lần 2 trên A100 chưa chạy. Điều kiện trước (trạng thái 11/11/2026):
+Lần 1 (L4) hỏng ngày 11/11/2026; lần 2 (A100) xong cùng ngày (mục 2.10). Phần dưới là runbook đã dùng cho lần 2, giữ để chạy lại. Điều kiện trước (trạng thái 11/11/2026):
 
 1. Chạy từ `master`, không từ nhánh. PR #171 (mục 2) và PR #179 (bỏ `draft`) đã merge. PR chuyển plan sang A100 và thêm bước `cuda_toolchain` (mục 2.10) phải merge trước.
 2. PR #170 (`data_class` `public` cho video của đội) đã merge.
@@ -567,4 +567,50 @@ Lưu ý: 3,3–3,6 % là trên chính 132 clip đã dùng để chọn cách là
   - Pha `cuda_toolchain` của `report.json` ghi hai bản CUDA và các gói đã cài.
   - `CUDA_HOME` và `PATH` được truyền cho pre-flight và ghi vào `cuda_env.json`. `run` và `repeat` đọc lại file đó (trường `cuda_env` trong pha `run`).
 
-**Nếu A100 cũng hết bộ nhớ [Option]:** micro-batch 8 × accumulation 4 (vẫn 32 mẫu mỗi bước), hoặc bật gradient checkpointing. Cả hai đổi recipe và `run_plan_id`, nên cần Hiếu quyết.
+**Nếu A100 cũng hết bộ nhớ [Option]:** micro-batch 8 × accumulation 4 (vẫn 32 mẫu mỗi bước), hoặc bật gradient checkpointing. Cả hai đổi recipe và `run_plan_id`, nên cần Hiếu quyết. (Không cần: lần 2 vừa 40 GB, đỉnh 28,86 GB.)
+
+**Lần 2, 11/11/2026: chạy hết đường đi trên A100, đạt cả ba tiêu chí chốt trước.**
+
+- Plan `rp_1d7627234111`, từ `master` có PR #188.
+- Một A100 (`gpu-a100-s-euw4a0-3kgmf3y2s0xyq`); registry `fwdata/colab/da30b-20261111-062238`.
+- Log, `report.json`, `metrics.jsonl` và `vlm.json` trong `fwdata/colab/da30b-results/attempt2/`.
+
+| Pha | Thời gian | Kết quả |
+|---|---|---|
+| `setup` lần 1 | — | Từ chối trước khi cài gì: tarball "not found (mount Drive before setup)". Lần mount Drive đầu hết giờ sau 120 s; lần `colab drivemount` thứ hai mount được |
+| `setup` | 118,3 s | Môi trường của DA-19 60,8 s, tải 57,5 s |
+| `cuda_toolchain` | 47,4 s | VM có CUDA 13.0, torch 12.6: cài bốn gói `cuda-12-6`, `CUDA_HOME=/usr/local/cuda-12.6`. Không sửa tay |
+| pre-flight | 59,7 s | Qua |
+| `setup_stage1` | 13,8 s | 132 tập, 7804 khung, `layout_problems` rỗng; `stats_coverage` như lần 1 |
+| `run` | 1139,8 s | 300/300 bước, 18:10 cho vòng train, **3,63 s/bước** (giả định 6 s). Đỉnh VRAM **28,86 GB** trên 40 GB. `infra_status` ok, checkpoint bước 300 |
+| `persist` | 35,6 s | VLM 4 262 742 488 byte lên `MyDrive/denso/da30/da30-tray-ego-b/vlm/`, `header_problems` rỗng |
+| `check-vlm` | 34,4 s (nạp) | Nạp bản trên Drive như stage 3, `problems` rỗng; vocab 153 792, tokenizer 151 669, 2 131 333 120 tham số. Pha hỏng **sau** khi kiểm, do lỗi ghi báo cáo (`seconds` trùng tên, sửa ở PR này); kết quả lấy từ `vlm_checkpoint load-check` chạy lại bằng tay |
+| `repeat` | 175,6 s | 3 bước dưới `da30-tray-ego-b-repeat` |
+| `persist` lần hai | — | Log của cả hai job lên Drive |
+
+Tiêu chí chốt trước (mục 2.4):
+
+| Tiêu chí | Ngưỡng | Đo | Kết quả |
+|---|---|---|---|
+| Loss giảm | trung vị 30 bước cuối < trung vị 30 bước đầu | 2,86 < 3,77 (loss bước đầu 5,83, bước cuối 2,99) | Đạt |
+| Chạy lại | loss bước đầu lệch ≤ 2 % | 5,8310 và 5,8310, lệch 0,0 | Đạt |
+| Nạp được ở stage 3 | `check-vlm` không báo vấn đề | `problems` rỗng | Đạt |
+
+Loss giảm là bằng chứng đường đi, không phải kết quả: 300 bước là khoảng 73 lượt qua 132 clip, nên một phần là học thuộc (mục 2.4). B được đánh giá bằng closed-loop của stage 3 so với C (DA-34).
+
+**VLM cho DA-34** (`parents.psi0-b-ego-stage1.vlm_stage1` của `he-tray-b.yaml`), cùng giá trị trong `vlm.json` cạnh thư mục và trong `report.json` mục `persist.vlm`:
+
+| Trường | Giá trị |
+|---|---|
+| `job_id` | `da30-tray-ego-b` |
+| `drive_dir` | `denso/da30/da30-tray-ego-b/vlm` |
+| `weights_sha256` | `c48ec2df761d8badc30508f9dca9b3e8378c7ed4d340a6f5c8401a3d3d4ad252` |
+| `manifest_sha256` | `019daa801041bc7ccc8076cf99488159c09b38d2dded1aef9451e14d1570a524` |
+
+**Chi phí.** Số dư 499,62 → 495,52, tức **4,10 CU** (dòng `measured` của [sổ chi phí](../g0/ledger/DA-30.csv)), so với ước lượng 6,6 CU. Trần 8 CU không bị chạm.
+
+- Bộ canh ghi `wall_cu` 4,605: 23:22:41Z–00:03:45Z, 41,1 phút × 6,73 CU/giờ. VM được nhận lúc 23:23:58Z.
+- Khoảng 6 phút trong đó là chờ Drive cho phép mount.
+- Bộ canh thoát mã 6, lý do `signal`: nó nhận tín hiệu dừng và dừng phiên trong `finally`, sau khi các pha đã xong.
+
+So với ước lượng của mục 2.5: train nhanh hơn giả định (3,63 thay vì 6 s/bước, 18 thay vì 30 phút), và phần cố định gần đúng (`setup`, `cuda_toolchain`, pre-flight, `setup_stage1` cộng khoảng 4 phút, giả định 5 phút).
