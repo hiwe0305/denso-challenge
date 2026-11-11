@@ -33,7 +33,7 @@ Là kỹ sư của đội, tôi muốn Flywheel Console nằm trong repo thành 
 Theo [plan DA-40](../../superpowers/plans/2026-11-11-da40-flywheel-console.md); mỗi nhiệm vụ một commit.
 
 - [x] 1. Khung package, `ConsolePaths`, lệnh `fw console`, đăng ký trong workspace và import-linter (AC 1, 8)
-- [ ] 2. Chỉ mục catalog và dữ liệu trích dẫn (AC 2, 3)
+- [x] 2. Chỉ mục catalog và dữ liệu trích dẫn (AC 2, 3)
 - [ ] 3. Chỉ mục dataset robot, egocentric và ảnh đại diện (AC 2)
 - [ ] 4. Chỉ mục run, eval, vòng lặp, chi phí; lệnh `fw console index` (AC 2)
 - [ ] 5. Server, media và bộ chạy việc (AC 4)
