@@ -23,6 +23,11 @@ so a rerun is a fresh rollout of the same condition and the attempt count is rep
 branch B's two-stage eval (docs/he/tray.md 18.2) is `--max-chunks 6`. Rerunning without
 it resumes with chunk N + 1; the order does not depend on the flag.
 
+`--chunks a,b` runs only the named chunks of that (cut) order, still in plan order: one
+serve lane each when stage 1 is split over several servers (C70_R1, docs/he/tray.md
+20.15). Lanes may share `--out`: each chunk has its own directory, and `runs.jsonl` gets
+one short appended line per attempt. An id twice, or one not in the order, is refused.
+
     python -m flywheel_psi0.tray.eval_batch --set <eval set> --conditions-sha256 <sha> \
         --out <dir> --server 127.0.0.1:22185 --simple-python <SIMPLE venv>/bin/python \
         --pythonpath <repo>/packages/*/src joined by ':'
@@ -284,9 +289,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--max-chunks", type=int, help="run the first N chunks of the order only, then stop"
     )
+    parser.add_argument("--chunks", help="comma-separated chunk ids: run only these (one lane)")
     args = parser.parse_args(argv)
     if args.max_chunks is not None and args.max_chunks < 1:
         parser.error("--max-chunks must be at least 1")
+    only = args.chunks.split(",") if args.chunks else None
+    if only is not None and len(set(only)) != len(only):
+        parser.error(f"--chunks names a chunk twice: {args.chunks}")
 
     rows = [json.loads(line) for line in (args.set / "conditions.jsonl").read_text().splitlines()]
     digest = conditions_sha256(rows)
@@ -298,6 +307,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"set mixes run plans {sorted(plan_ids)}", file=sys.stderr)
         return 1
     chunks = chunk_plan(rows, args.chunk, phases_for(rows))[: args.max_chunks]
+    if only is not None:
+        unknown = sorted(set(only) - {c.id for c in chunks})
+        if unknown:
+            parser.error(f"--chunks {unknown} not in the order {[c.id for c in chunks]}")
+        chunks = [c for c in chunks if c.id in only]
     if args.dry_run:
         for chunk in chunks:
             print(chunk.id, chunk.seeds[0], chunk.seeds[-1], len(chunk.seeds))

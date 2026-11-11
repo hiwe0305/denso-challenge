@@ -2496,6 +2496,78 @@ Cụm chỉ báo cáo (c4–c7, lẻ) không tiêu ngân sách dữ liệu (20.3
 
 Sau khi chọn: dựng bản cắt `C70_R1` bằng `round_cut join` (S70 giữ nguyên từng byte, kiểm bounds với stats của ALL), điền `targets` và `rules_sha256` của plan vòng, ghi `Decision` của R3, đóng băng plan. Sổ chi phí: dòng ước lượng `job_da34_c70r1_gen` và `job_da34_c70r1_qa` ghi trước khi chạy; bước 5 của 20.12 có dòng thực đo `job_da34_c70r1_step5` (thiếu dòng ước lượng trước, ghi lại là sót).
 
+### 20.15 Train và eval giai đoạn 1 trên ba làn trong ngày 12/11/2026 (runbook, chưa chạy)
+
+**[Đã chốt 12/11/2026, Hiếu]** "Duyệt 3 làn" (R12): eval giai đoạn 1 của `C70_R1` chạy trên **ba** làn serve song song thay vì một, để cả vòng xong trong ngày 12/11/2026. Mỗi làn là một phiên Colab L4 serve cùng checkpoint `ckpt_60000` của `C70_R1`, cộng một client trên `rtx3060`; mỗi làn chạy 2 trong 6 lô của giai đoạn 1. Luật 20.7 không đổi: vẫn đúng 60 điều kiện, mỗi điều kiện một rollout, cùng tập eval, cùng server (`Ta` 24, RTC, 1 worker). Chỉ đổi số server chạy cùng lúc.
+
+**Vì sao không đổi kết quả.** Mỗi lô tự chứa: điều kiện, seed và thư mục output của nó cố định theo thứ tự chia lô, không phụ thuộc lô khác. Làn `C_70` của 11/11 cũng chạy một client cho một server; ba server chạy cùng một checkpoint thì cùng bộ trọng số, cùng tham số serve. Rollout trên EGL vốn không tái lập (8.5), nên hai cách chạy cho cùng phân phối.
+
+**Mã cho ba làn** (nhiệm vụ con 7.6, PR #197):
+- `eval_batch --chunks a,b`: chỉ chạy các lô có tên, trong số các lô `--max-chunks 6` cho phép, theo thứ tự của kế hoạch chia lô. Tên lô lạ, lô ngoài giai đoạn 1 hay tên lặp bị từ chối. Ba làn dùng chung `--out`: mỗi lô có thư mục riêng, `runs.jsonl` chỉ nhận một dòng ngắn mỗi lượt.
+- `colab_serve expect --branch C70_R1`: job `da34-t7-ft-c70-r1-s0` (`colab_train.round_job_id`), bước duy nhất được serve là `eval.checkpoint` của plan vòng (60 000), stats phải có sha256 bằng `train.stats_sha256` của plan vòng (stats của ALL), bounds trong `run_config.json` phải là stats đó.
+
+**Số đo làm căn cứ** (làn `C_70`, 11/11/2026, `runs.jsonl` trên `rtx3060`): một lô 10 rollout mất 3 014–3 648 s, tức 50–61 phút. Ba làn `B_70`, `C_70`, `C_ALL` đã chạy cùng lúc trên `rtx3060` đêm 11/11, mỗi làn một client.
+
+| Làn | Lô (`--chunks`) | Phiên Colab | `LP` (laptop) | `RP` (`rtx3060`) | `--listen` |
+|---|---|---|---|---|---|
+| 1 | `l1-000,l2-000` | `da34-serve-c70r1-1` | 22291 | 22201 | 22202 |
+| 2 | `l1-010,l2-010` | `da34-serve-c70r1-2` | 22293 | 22203 | 22204 |
+| 3 | `l1-020,l2-020` | `da34-serve-c70r1-3` | 22295 | 22205 | 22206 |
+
+**Lịch và ngân sách** (ước lượng, chưa đo):
+
+| Việc | Giờ (12/11/2026, +07) | CU |
+|---|---|---|
+| Chọn, cắt, đóng gói tar, đóng băng plan (7.5) | xong khoảng 09:30 | 0 |
+| Hiếu merge #197, đưa `C70_R1.tar` lên Drive | 09:30–10:30 | 0 |
+| Train trên một A100, 60 000 bước (20.8) | khoảng 10:30–21:15 | khoảng 75 (cap 80, sàn 14) |
+| Mở ba phiên serve và `serve-setup` khi train còn khoảng 40 phút | khoảng 20:35 | — |
+| Eval: 2 lô mỗi làn | khoảng 21:45–23:45 | 3 × khoảng 5,4 = khoảng 16 (cap 7 mỗi làn) |
+
+- CU của một làn: khoảng 2 giờ eval và 0,8 giờ cài, nạp, chờ checkpoint, ở 1,94 CU/giờ của L4. Ba làn tốn hơn một làn khoảng 4 CU (ba lần cài), đổi lấy khoảng 4 giờ.
+- Số dư lúc 04:34 khoảng 195 CU; `B_ALL` còn khoảng 30 CU. Sau vòng này còn khoảng 75 CU.
+- Mở serve trước khi train xong tốn khoảng 1,3 CU mỗi làn khi chờ, nhưng kéo giờ xong về trước nửa đêm. Nếu Colab từ chối phiên thứ ba (mã 6), chạy làn đó sau làn 1 trên cùng phiên: `--chunks l1-020,l2-020` sau khi làn 1 xong, giờ xong lùi khoảng 2 giờ.
+
+**A. Train** (laptop, bản checkout master có `ROUND_C70_FROZEN`; như 19.9 C và D, một phiên):
+
+```bash
+colab sessions; colab usage   # số dư >= 100
+R=fwdata/colab/batch-$(date +%Y%m%d-%H%M%S); mkdir -p $R && git rev-parse HEAD > $R/master.sha
+S=da34-c70r1; B=C70_R1
+nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py guard --registry "$0" --floor 14 --log "$0/guard.jsonl"; echo "exit $?"' $R < /dev/null > $R/guard.out 2>&1 &
+nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py session --registry "$0" --new --name "$1" --gpu A100 --cap 80 --floor 14 --persist "python3 scripts/he/he1_fetch.py once --session $1 --registry $0 --dest fwdata/tray/pair60k/$2 --remote-work /content/da34 --total-steps 60000 --gpu A100" --log "$0/$1.jsonl"; echo "exit $?"' $R $S $B < /dev/null > $R/$S.out 2>&1 &
+# rồi đúng các lệnh của 19.9 D với S, B trên: ready, git archive, drivemount, setup --branch C70_R1, train, persist, follow --stop-when-done
+```
+
+`setup --branch C70_R1` lấy `MyDrive/denso/da34/cuts/C70_R1.tar` và kiểm bằng `round_cut.round_problems` trước mọi bước cài. `colab_train` từ chối nếu plan vòng không phải bản đã đóng băng có id bằng `ROUND_C70_FROZEN`.
+
+**B. Ba làn serve** (laptop, cùng registry `R`; lặp cho `k` = 1, 2, 3 với cổng của bảng trên). Khi `fetched.json` báo `ckpt_60000` sạch:
+
+```bash
+export PYTHONPATH=$(ls -d $PWD/packages/*/src | paste -sd:)
+python3 -m flywheel_psi0.tray.colab_serve expect --runs fwdata/tray/pair60k/C70_R1 --branch C70_R1 \
+    --step 60000 --stats fwdata/tray/pair-cuts/ALL-stats_psi0.json   # ghi .../da34-t7-ft-c70-r1-s0/expected-60000.json
+k=1; S=da34-serve-c70r1-$k; J=da34-t7-ft-c70-r1-s0; STEP=60000; LP=22291; RP=22201
+nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py session --registry "$0" --new --name "$1" --gpu L4 --cap 7 --floor 14 --log "$0/$1.jsonl"; echo "exit $?"' $R $S < /dev/null > $R/$S.out 2>&1 &
+# rồi đúng các lệnh của 19.9 E: ready, git archive, drivemount, serve-setup, gửi expected-60000.json của fwdata/tray/pair60k/C70_R1/$J, fetch, serve, hai đường ssh -L/-R, curl /health
+```
+
+`serve-setup` và `drivemount` chạy được trước khi train xong; `fetch` và `serve` chỉ sau `expect`.
+
+**C. Ba client trên `rtx3060`** (cây `git archive` của master sau khi merge #197, như `launch-eval-lane.sh` của 11/11 với `simple-guard-zone1.sh`). Mỗi làn một scope, cùng `--out`:
+
+```bash
+# launch-eval-round-lane.sh <chunks> <RP> <LISTEN>
+... eval_batch --set ~/denso-da34-pool/fwdata/tray/eval-sets/rp_a04c14e79dfd-2e57f60 \
+  --conditions-sha256 b9c38b37afa6fbdd4027be287df85fe7b016130bd32227f97c876f6bae7d3dfb \
+  --out ~/denso-da34-pool/fwdata/tray/eval/pair60k-C70_R1-60000-rp_a04c14e79dfd \
+  --server 127.0.0.1:$RP --listen $LISTEN --chunk 10 --attempts 3 --max-chunks 6 --chunks $CHUNKS ...
+```
+
+Trước khi chạy, mỗi làn in thứ tự bằng `--dry-run`: ba làn hợp lại phải đúng 6 lô `l1-000 … l2-020`, không lô nào lặp. Phiên serve của làn nào dừng ngay khi lô cuối của làn đó ghi xong (19.8); không đợi hai làn kia.
+
+**D. Đọc.** Khi `runs.jsonl` đủ 6 lô, 60 rollout: đọc (r1) `C70_R1 − C_ALL` và (r2) `C70_R1 − C_70` theo 20.7, ghép cặp theo điều kiện với thư mục eval của hai run kia trên `rtx3060`. Sổ chi phí: dòng ước lượng `job_da34_ft_C70_R1`, `job_da34_serve_C70_R1_l1`…`_l3`, `job_da34_eval_C70_R1` ghi trước khi chạy (PR #197); dòng thực đo ghi khi xong.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -2552,3 +2624,4 @@ Sau khi chọn: dựng bản cắt `C70_R1` bằng `round_cut join` (S70 giữ n
 | 12/11/2026 | Mục 20.12 mới (nhiệm vụ con 7.3, phần đầu): đại diện của c1, c2, c3, c8; bước 8 trên mọi lỗi (τ_cov mức 1 là 1,143, mức 2 là 1,524); bước 5 trên 16 đại diện (13 xong, 3 KHÔNG KHẢ THI); bước 7 không làm được như 20.4 (chỉ ánh sáng mức 2 là hình ảnh); quyết định mới R9–R11 chờ Hiếu. Luật 20.7 không đổi | Claude cho Hiếu |
 | 12/11/2026 | Mục 20.13 mới (nhiệm vụ con 7.3 xong): Hiếu "Duyệt theo đề xuất" R9–R11; evidence card của c1, c2, c3, c8; 23 lỗi nhận dữ liệu (3 ở `approach_a`, 10 + 10 ở `place`). Luật 20.7 không đổi | Claude cho Hiếu |
 | 12/11/2026 | Mục 20.14 mới (nhiệm vụ con 7.5, viết trước lần sinh đầu tiên): file điều kiện 23 lỗi, kế hoạch 290 seed không trùng 693 seed đã dùng, sinh và QA như phần nhắm lỗi của ALL, luật chọn theo bể (`round_select`), một lô thêm nếu thiếu. Luật 20.7 không đổi | Claude cho Hiếu |
+| 12/11/2026 | Mục 20.15 mới: Hiếu "Duyệt 3 làn" (R12): eval giai đoạn 1 của `C70_R1` trên ba làn serve L4 song song, 2 lô mỗi làn; mã `eval_batch --chunks` và `colab_serve expect --branch C70_R1`; runbook train và ba làn, lịch và CU ước lượng. Luật 20.7 không đổi | Claude cho Hiếu |

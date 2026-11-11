@@ -325,6 +325,11 @@ def pair_job_id(branch: str, seed: int = 0) -> str:
     return f"da34-t6-ft-{branch.lower().replace('_', '-')}-s{seed}"
 
 
+def round_job_id(branch: str, seed: int = 0) -> str:
+    """`da34-t7-ft-c70-r1-s0`: a round branch of task 7 on the pair (C70_R1)."""
+    return f"da34-t7-ft-{branch.lower().replace('_', '-')}-s{seed}"
+
+
 @dataclass(frozen=True)
 class Job:
     """One fine-tune of the tray experiment: C of v2, C+ of its round, B, or a pair run."""
@@ -343,8 +348,7 @@ class Job:
     @property
     def job_id(self) -> str:
         if self.pair_round is not None:
-            branch = self.branch.lower().replace("_", "-")
-            return f"da34-t7-ft-{branch}-s{self.plan.train_seeds[0]}"
+            return round_job_id(self.branch, self.plan.train_seeds[0])
         if self.data_name is not None:
             return pair_job_id(self.branch, self.plan.train_seeds[0])
         if self.branch == BRANCH:
