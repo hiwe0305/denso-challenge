@@ -87,6 +87,7 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
   - [x] 6.10 (11/11/2026, Hiếu "Thêm hai run 70%") Bốn run: hai VLM × (ALL, S70). Schema `pairplan` bốn nhánh (`data`, `subsets`, `comparisons`, `schedule.waves`), tập con S70 chọn theo sha256 của seed và kiểm lại từ file tập demo, lệnh `pairplan subset`; stats của ALL cho cả bốn; khối luật 19.2 viết lại [Đề xuất] ((a′) `B_70` − `C_70`, (f) không kém `C_ALL` biên 10 điểm %, (g) `C_70` − `C_ALL`, (h) phụ, (b) thêm mức 1, 2 so với 70 %); `evidence` đọc mọi so sánh của plan; plan dự phòng 40k xóa; trần 280, lúc launch 294 CU; lịch, bốn làn eval và ngân sách 19.5 (ước lượng); dòng sổ chi phí của `B_70`, `C_70` và ba làn serve
   - [x] 6.11 (11/11/2026, W1 xong) Ghim cut ALL của DA-33 vào plan bốn run: hai phần (release `tray_s1_41899efb4b27`, `tray_s1_4a8f4a8c6a8d`, file tập demo `demo_sets-all-zone1-*.json` kèm ghim chất lượng và QA), 606 episode, 861 624 frame, stats `1c745091…`; S70 301 + 124 = 425 episode, 603 915 frame, sha256 hai danh sách; còn 4 chỗ trống của W2 (tray.md 19.3)
   - [x] 6.12 (11/11/2026, ảnh VM Colab chỉ có CUDA 13.0) Kiểm stage 3 có build extension CUDA không: không (ddp, `torch.optim.AdamW`, mã Ψ₀ `cda3fdf`); `colab_train setup` kiểm trên recipe trước mọi bước cài, ghi `cuda_ops_built`, và từ chối recipe build op khi `CUDA_HOME` không phải bộ 12.6 có `nvcc` hoặc thiếu `ninja` (tray.md 19.7)
+  - [x] 6.13 (11/11/2026, W2 xong) Ghim VLM stage 1 của DA-30 vào plan bốn run: job `da30-tray-ego-b` (`rp_1d7627234111`, A100, bước 300), `denso/da30/da30-tray-ego-b/vlm`, trọng số `c48ec2df…`, manifest `019daa80…` (tính lại từ `vlm.json` khớp), kiểm nạp không lỗi; plan hết chỗ trống, id nháp `rp_e2fb9f62c223`; số đo mount Drive trên A100 vào 19.5 (tray.md 19.3)
 
 ## Phạm vi file
 
@@ -134,6 +135,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 11/11/2026 | Hiếu: thêm hai run 70 % (qua phiên điều phối): thêm và làm 6.10, sửa 6.3, 6.4, 6.5 | Claude cho Hiếu |
 | 11/11/2026 | W1 xong (qua phiên điều phối): thêm và làm 6.11 | Claude cho Hiếu |
 | 11/11/2026 | Cảnh báo CUDA 13.0 trên VM Colab (qua phiên điều phối): thêm và làm 6.12 | Claude cho Hiếu |
+| 11/11/2026 | W2 xong (qua phiên điều phối): thêm và làm 6.13 | Claude cho Hiếu |
 
 ## Ghi chép khi làm
 

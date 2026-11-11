@@ -1,6 +1,6 @@
 # DA-34 task 6: paired stage 3 RunPlan, four 60k-step runs on one cut (cut ALL, target
 # zone drawn): two VLMs x two data sizes (ALL, and S70: 70 % of ALL's seeds), identical
-# otherwise. DRAFT: written before the data (W1) and the stage 1 checkpoint (W2) exist;
+# otherwise. DRAFT: W1 (cut ALL, S70) and W2 (stage 1 VLM) are pinned;
 # not frozen, not launched.
 #
 # Hiếu 11/11/2026 (via the coordinator session; docs/he/tray.md section 19): eval C is low
@@ -51,10 +51,15 @@ parents:
       from_parent: psi0-baseline-egodex-he
       story: DA-30
       ledger: docs/g0/ledger/DA-30.csv
-      job_id: null # W2: DA-30's stage 1 job on egx_7b43c30dc5d88cd7
-      drive_dir: null # folder under MyDrive: every file of the parent's VLM folder, weights replaced
-      weights_sha256: null # model.safetensors of that folder
-      manifest_sha256: null # colab_train manifest of the whole folder
+      # W2 (DA-30, A100, 11/11/2026): RunPlan rp_1d7627234111 (configs/runplans/stage1/
+      # tray-ego-b.yaml), dataset team-ego-tray-clean-132 = egx_7b43c30dc5d88cd7, step 300
+      # (final), from parent sha256 6e63da17... (this plan's C VLM), Psi0 cda3fdf. Pins
+      # copied from its vlm.json (persist); header_problems [], and the stage 3 load-check
+      # (vlm_checkpoint load-check) found no problems: vocab 153792, 2131333120 params.
+      job_id: da30-tray-ego-b
+      drive_dir: denso/da30/da30-tray-ego-b/vlm # 12 files, 4262742488-byte weights
+      weights_sha256: c48ec2df761d8badc30508f9dca9b3e8378c7ed4d340a6f5c8401a3d3d4ad252
+      manifest_sha256: 019daa801041bc7ccc8076cf99488159c09b38d2dded1aef9451e14d1570a524
       # header of the parent VLM's model.safetensors at psi-model cb1480f (625 BF16 tensors,
       # no lm_head, embed_tokens 153792 x 2048): the stage 1 weights must match it
       parent_header_sha256: 53d000d9626a13faf4bcb5268517b8441c34b187c88c9dee0b4c250dc19d6d59
