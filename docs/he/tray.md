@@ -1806,7 +1806,7 @@ Luật đọc không đổi khi đổi phần cứng: (e) vẫn lấy `ckpt_6000
 - Với bốn phiên cùng lúc: đọc sớm của cả bốn khoảng **T0 + 10,6 giờ** (16:35 nếu T0 = 06:00), số chính khoảng **T0 + 15,1 giờ** (21:05).
 - Với hai đợt: số chính của `B_ALL`, `C_ALL` như trên, nhưng (a′) cần `B_70`, `C_70` ở 60k: eval giai đoạn 1 từ +17,5, xong khoảng **T0 + 22,4 giờ** (04:25 ngày hôm sau). Đọc sớm 40k của đợt hai rơi vào +14,7, sau khi các làn đã rảnh.
 - Các phiên serve mở khoảng T0 + 5,3 giờ bằng `cu_watch session --new --gpu L4` trong registry của đợt train, lúc bốn A100 còn train: tổng cộng bảy phiên, **chưa thử**. Phiên nào bị từ chối (mã 6) thì làn đó mở sau khi các phiên train đóng (+8,9 giờ) và chỉ đọc 60k; làn 1 làm thay đọc sớm của model đó nếu kịp.
-- Server Colab phải chạy cùng lệnh với server tại chỗ (`serve_psi0.sh serve`: seeded, `Ta` 24, `--rtc`), nạp đúng file stats của ALL và kiểm sha256 checkpoint trước khi nạp. Phần này chưa có mã: việc 6.3.
+- Server Colab phải chạy cùng lệnh với server tại chỗ (`serve_psi0.sh serve`: seeded, `Ta` 24, `--rtc`), nạp đúng file stats của ALL và kiểm sha256 checkpoint trước khi nạp. Mã ở `colab_serve`, lệnh ở 19.9.
 - Giai đoạn 2 (đủ 240): theo 19.2, chỉ khi giai đoạn 1 của (a′) ở số chính ra "đi tiếp", và khi đó cho cả bốn run. Mỗi model thêm khoảng 13 giờ (11,4 giờ lô mức 1–2, 1,7 giờ mức 0), bốn làn song song: xong khoảng T0 + 29 giờ. Ba làn Colab thêm khoảng 3 × 14 × 1,94 ≈ 82 CU (ước lượng). Chạy thêm sau E1, E3, F chỉ để thu hẹp khoảng của (b) thì cần `Decision`.
 
 **Ngân sách** (CU Colab, ước lượng; giá 0,0999 USD mỗi CU):
@@ -1858,11 +1858,9 @@ python -m flywheel_psi0.tray.evidence configs/runplans/tray/he-tray-pair60k.yaml
 
 - **W1, W2:** đã ghim hết (19.3, 11/11/2026).
 - **6.2:** Hiếu duyệt khối 19.2 mới cho bốn run (nhãn ngoài khối, không đổi sha256); plan bốn run song song trên A100; `Decision` nháp; bỏ `draft`, `pairplan freeze`.
-- **6.3:** mã chạy, cho **cả bốn** nhánh.
-  - `colab_train` cho mọi nhánh của plan: dữ liệu từ cut ALL hay từ tập con S70 (theo `data` của nhánh), VLM stage 1 lấy từ Drive như B, override số bước. Bốn lệnh train trên bốn VM, mỗi VM một `persist --watch`.
-  - Nối hai phần thành ALL như `cplus_cut`; cắt S70 từ ALL đúng danh sách đã ghim, chép `meta/stats_psi0.json` của ALL vào và kiểm sha256 bằng `cut.stats_sha256` (không tính lại stats).
-  - Server eval trên Colab cho làn 2–4 (lệnh như `serve_psi0.sh serve`, kiểm sha256 checkpoint và stats).
-  - Runbook một đợt `cu_watch` bốn phiên (cộng ba phiên serve), đường lùi hai đợt của 19.5; phần dừng phiên ở 19.8.
+- **6.3:** mã và runbook cho **cả bốn** nhánh đã có (19.9), chưa chạy.
+  - Code: `pair_cut` dựng S70 từ ALL theo seed của từng episode, giữ stats của ALL, và kiểm dữ liệu; `colab_train --branch B_ALL|C_ALL|B_70|C_70` lấy dữ liệu từ Drive; `colab_serve` cho làn 2–4.
+  - Làm lúc launch: dựng S70 trên `rtx3060` và đưa hai tar lên Drive (19.9 A, B); PR đặt `PAIR_FROZEN` sau khi plan đóng băng.
 - **CUDA trên VM Colab (11/11/2026).** Ảnh VM hôm đó chỉ có CUDA 13.0 (không có `nvcc` trong PATH), còn torch của Ψ₀ là 2.7.0+cu126. Stage 1 của DA-30 (DeepSpeed ZeRO-3) hỏng pre-flight hai lần (`CUDAMismatchException`, rồi "Ninja is required"), và chạy được sau khi cài bộ CUDA 12.6 (`cuda-nvcc-12-6`, `cuda-cudart-dev-12-6`, `libcurand-dev-12-6`, `libcublas-dev-12-6`), `pip install ninja`, và đặt `CUDA_HOME=/usr/local/cuda-12.6`.
   - **Stage 3 không build extension nào**, nên bốn VM A100 không cần các bước đó. Căn cứ là mã Ψ₀ ở `cda3fdf`: stage 3 chạy dưới `torchrun` với `train.data_parallel: ddp` và `torch.optim.AdamW`; plugin DeepSpeed chỉ được tạo khi `data_parallel` là `deepspeed`; `src/psi` không import DeepSpeed, triton hay `cpp_extension`; flash-attn là wheel cu12 dựng sẵn. Chưa chạy thử trên ảnh CUDA 13.0: đây là kết luận từ mã.
   - `colab_train setup` kiểm điều này trên recipe **trước mọi bước cài hay tải** (`extension_builds`) và ghi `cuda_ops_built` vào report. Recipe nào build op (DeepSpeed) thì bị từ chối, trừ khi `CUDA_HOME` là bộ 12.6 có `nvcc` và `ninja` có trong PATH (`toolchain_problems`); thông điệp lỗi ghi đúng các lệnh sửa ở trên. Mã 6.3 cho plan bốn run phải giữ kiểm này.
@@ -1924,6 +1922,157 @@ Ngưỡng 0,58 là mức dừng sớm của `follow` ở cap 70 khi pull chậm 
 - Test: với job 60k xong ở 60 000, `follow --stop-when-done --total-steps 60000 --gpu A100` tải và kiểm `ckpt_60000`, dừng phiên rồi thoát 0; không có hai cờ thì thoát 5.
 - `cu_watch.py` không đổi.
 
+### 19.9 Runbook bốn run (nhiệm vụ con 6.3) [Đề xuất]
+
+Mã đã có, **chưa chạy trên Colab**. Không bước nào dưới đây chạy trước khi Hiếu cho launch.
+- [`pair_cut`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/pair_cut.py): dựng S70 từ ALL, kiểm dữ liệu với plan, đóng gói lên Drive.
+- `colab_train --branch B_ALL|C_ALL|B_70|C_70`: train.
+- [`colab_serve`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/colab_serve.py): làn eval 2–4.
+
+**Điều kiện trước launch.**
+1. Hiếu duyệt 19.2 và ghi `Decision` (6.2). Plan bỏ `draft`, `pairplan freeze` ghi `he-tray-pair60k.lock.json`.
+2. Một PR nhỏ đặt `PAIR_FROZEN` trong `colab_train.py` bằng id đã đóng băng, như `B_FROZEN` của B. Trước khi có PR đó, cả bốn nhánh đều từ chối: `colab_train check --branch B_70` trên plan nháp báo "draft", "not frozen", "PAIR_FROZEN is unset".
+3. Đợt stage 1 đã đóng: guard của nó đã thoát.
+4. Số dư ít nhất 294 CU, hoặc 360 CU khi ba phiên serve vào cùng đợt (19.5).
+5. Hai tar đã lên Drive (bước B).
+
+**Dữ liệu theo seed của chính episode.** Một episode vào S70 khi seed của nó, lấy từ `environment_config.flywheel.seed` ở dòng của nó trong `meta/episodes.jsonl` của ALL, nằm trong danh sách đã ghim của phần nó.
+
+File tập demo liệt kê `seeds` và `episode_indices`, mỗi danh sách tự sắp xếp riêng. Ghép hai danh sách theo vị trí sẽ ra seed sai: episode 0 của cut có chỉ số nguồn 1 và seed 1014, không phải 1001. Đếm frame theo cách ghép đó ra 604 317, không phải 603 915. `pair_cut` không bao giờ ghép hai danh sách này.
+
+Trên dữ liệu thật (sao `meta/` của ALL từ `rtx3060`, chỉ đọc):
+- `cut_problems(ALL)` rỗng: seed của từng phần khớp tập của nó, khớp tổng, khớp stats `1c745091…`.
+- Lựa chọn S70 ra 301 + 124 episode, 427 758 + 176 157 = 603 915 frame, đúng pin.
+
+Stats của S70 là file của ALL chép nguyên byte, không tính lại. `cut_problems` kiểm sha256 này cho cả hai cỡ dữ liệu.
+
+**A. `rtx3060`: dựng S70, kiểm, đóng gói** (0 CU, chạy từ bản `git archive` của master có `PAIR_FROZEN`, như 17.6). Cần khoảng 13 GB đĩa; ngày 11/11 máy còn 84 GB.
+
+```bash
+cd $D && export PYTHONPATH=$(ls -d $PWD/packages/*/src | paste -sd:)
+PY=~/denso-da34-pool/.venv/bin/python
+CUT=~/denso-da34-pool/fwdata/cut-all-zone1
+E=G1WholebodyTrayTransferTeleop-v0
+P=configs/runplans/tray/he-tray-pair60k.yaml
+$PY -m flywheel_psi0.tray.pairplan check $P --launch || { echo "plan does not hold: do not launch"; exit 1; }
+$PY -m flywheel_psi0.tray.pair_cut check --plan $P --name ALL --data $CUT/ALL/$E
+$PY -m flywheel_psi0.tray.pair_cut subset --plan $P --cut $CUT/ALL/$E --subset S70 --out $CUT/S70/$E
+$PY -m flywheel_psi0.tray.pair_cut check --plan $P --name S70 --data $CUT/S70/$E   # "S70: dataset and plan hold"
+mkdir -p $CUT/work/sets $CUT/drive && ln -sfn $CUT/ALL $CUT/work/sets/ALL && ln -sfn $CUT/S70 $CUT/work/sets/S70
+for B in B_ALL C_ALL B_70 C_70; do $PY -m flywheel_psi0.tray.colab_train check --branch $B --work $CUT/work || exit 1; done
+$PY -m flywheel_psi0.tray.pair_cut pack --plan $P --data $CUT/ALL/$E --name ALL --out $CUT/drive/ALL.tar
+$PY -m flywheel_psi0.tray.pair_cut pack --plan $P --data $CUT/S70/$E --name S70 --out $CUT/drive/S70.tar
+```
+
+`subset` không ghi đè thư mục đã có. Lệnh này kiểm lại S70 sau khi ghi, gồm cả cách đánh số `index` của LeRobot v2.1. `pack` từ chối nếu dữ liệu không qua `check`. Tar là bản tái lập được: cùng file thì ra cùng byte. File `.json` đi kèm ghi số byte và sha256.
+
+**B. Đưa hai tar lên Drive** (0 CU). Laptop kéo `drive/` về và kiểm sha256 với `.json`. Sau đó Hiếu đưa bốn file lên `MyDrive/denso/da34/cuts/` bằng trình duyệt, đúng tên: `ALL.tar`, `ALL.tar.json`, `S70.tar`, `S70.tar.json`. Khoảng 9 GB.
+
+```bash
+rsync -a --partial-dir=.rsync-partial rtx3060:denso-da34-pool/fwdata/cut-all-zone1/drive/ fwdata/tray/pair-cuts/
+for n in ALL S70; do python3 -c "import hashlib,json,sys; m=json.load(open(sys.argv[1]+'.json')); h=hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest(); print(sys.argv[1], 'OK' if h==m['sha256'] else 'DIFFERS')" fwdata/tray/pair-cuts/$n.tar; done
+rsync -a rtx3060:denso-da34-pool/fwdata/cut-all-zone1/ALL/G1WholebodyTrayTransferTeleop-v0/meta/stats_psi0.json fwdata/tray/pair-cuts/ALL-stats_psi0.json
+```
+
+Trên VM, `setup` so cỡ file trên Drive với `.json` **trước** khi chép, rồi sha256 sau khi chép, giải nén an toàn và chạy `cut_problems`. Tất cả trước mọi bước cài. Drive chưa đồng bộ xong thì cỡ lệch, và `setup` dừng mà chưa tốn gì ngoài vài giây A100.
+
+**C. Laptop: một đợt `cu_watch`, guard và bốn watcher** (thư mục gốc là bản checkout master, `PATH` có `colab` như 17.6). Hàm `ready` và `vm` như mục 12. Thứ tự launch: `B_ALL`, `C_ALL`, `B_70`, `C_70`.
+
+```bash
+colab sessions; colab usage   # số dư >= 294 (360 nếu serve vào cùng đợt)
+R=fwdata/colab/batch-$(date +%Y%m%d-%H%M%S); mkdir -p $R && git rev-parse HEAD > $R/master.sha
+nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py guard --registry "$0" --floor 14 --log "$0/guard.jsonl"; echo "exit $?"' $R < /dev/null > $R/guard.out 2>&1 &
+watch_run() {  # $1 session, $2 branch
+  nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py session --registry "$0" --new --name "$1" --gpu A100 --cap 70 --floor 14 --persist "python3 scripts/he/he1_fetch.py once --session $1 --registry $0 --dest fwdata/tray/pair60k/$2 --remote-work /content/da34 --total-steps 60000 --gpu A100" --log "$0/$1.jsonl"; echo "exit $?"' $R $1 $2 < /dev/null > $R/$1.out 2>&1 &
+}
+watch_run da34-b-all B_ALL; watch_run da34-c-all C_ALL; watch_run da34-b-70 B_70; watch_run da34-c-70 C_70
+```
+
+**Đường lùi hai đợt** (`schedule.waves`). Watcher của `da34-b-70` hay `da34-c-70` thoát mã 6 nghĩa là Colab từ chối, không mở phiên nào và không dừng phiên khác. Khi đó:
+- dừng phiên còn lại của đợt hai nếu nó đã mở (`colab stop`), cùng watcher của nó;
+- chạy đợt một như dưới đây;
+- khi `colab sessions` không còn `da34-b-all` và `da34-c-all`, gọi lại `watch_run` cho `B_70`, `C_70` trong cùng registry `R`, rồi làm các bước D cho hai phiên đó.
+
+Không mở đợt hai bằng registry mới khi guard cũ còn chạy: guard dừng mọi phiên không có watcher đăng ký.
+
+**D. Mỗi phiên train** (lặp cho từng cặp `S`/`B`; mỗi bước chỉ chạy khi bước trước xong):
+
+```bash
+S=da34-b-all; B=B_ALL
+VMPP=fw/packages/flywheel-psi0/src:fw/packages/flywheel-contracts/src
+ready $S || { colab stop -s $S; echo "$S: not ready, session stopped"; }
+git archive --format=tar.gz HEAD | vm $S 'mkdir -p /content/da34/fw && tar -xz -C /content/da34/fw'
+colab drivemount -s $S /content/drive || colab drivemount -s $S /content/drive
+vm $S 'mountpoint -q /content/drive && ls -l /content/drive/MyDrive/denso/da34/cuts/'
+vm $S "cd /content/da34; nohup setsid bash -c 'PYTHONPATH=$VMPP python3 -m flywheel_psi0.tray.colab_train setup --branch $B; echo setup exit \$?' > setup.log 2>&1 < /dev/null &"
+vm $S 'tail -2 /content/da34/setup.log'   # chờ "setup exit 0"
+vm $S "cd /content/da34; nohup setsid bash -c 'echo \$\$ > train.pid; PYTHONPATH=$VMPP Psi0/.venv-psi/bin/python -m flywheel_psi0.tray.colab_train train --branch $B; echo train exit \$?' > train.log 2>&1 < /dev/null &"
+vm $S "cd /content/da34; nohup setsid bash -c 'python3 fw/scripts/he/he1_colab.py persist --work /content/da34 --to /content/drive/MyDrive/denso/da34 --watch 600 --pid \$(cat train.pid); echo persist exit \$?' > persist.log 2>&1 < /dev/null &"
+nohup setsid bash -c 'python3 scripts/he/he1_fetch.py follow --session "$1" --registry "$0" --dest fwdata/tray/pair60k/"$2" --remote-work /content/da34 --every 600 --stop-when-done --total-steps 60000 --gpu A100; echo "exit $?"' $R $S $B < /dev/null > $R/$S.fetch.log 2>&1 &
+```
+
+- **Đồng ý Drive trên mỗi VM**, đo trên A100 của DA-30 ngày 11/11/2026: VM mới nào cũng hỏi. Hiếu bấm trong 120 s; lệnh mount trong VM hết giờ sau 120 s. Bấm muộn thì `colab drivemount` chạy lại đúng một lần (vế sau `||`), lần đó mount được mà không hỏi lại. Drive phải mount **trước** `setup` vì dữ liệu nằm trên Drive. B còn lấy VLM stage 1 từ `denso/da30/da30-tray-ego-b/vlm`.
+- `setup` ghi `data_fetched` (cỡ, sha256, số giây chép) và `cuda_ops_built: false` vào `report.json`. Stage 3 không build extension (19.7), nên không cần bộ CUDA 12.6.
+- `persist --watch 600 --pid` chép mọi `ckpt_<step>` đã lưu xong lên `MyDrive/denso/da34/<job>/`. Làn serve lấy checkpoint từ chỗ này.
+- Vòng fetch tự dừng phiên khi `ckpt_60000` đã khớp sha256 trên laptop, hoặc khi hỏng sớm (19.8). Job trên VM tên `da34-t6-ft-b-all-s0`, `da34-t6-ft-c-all-s0`, `da34-t6-ft-b-70-s0`, `da34-t6-ft-c-70-s0`; sổ chi phí ghi `job_da34_ft_<nhánh>`.
+
+**E. Làn eval** (giai đoạn 1 theo 19.2; mỗi checkpoint đọc 40k rồi 60k).
+
+`colab_serve expect` chạy trên laptop cho **cả bốn** model, cả làn 1. Nó kiểm hai điều:
+- file stats đưa vào là stats của ALL (sha256 bằng pin);
+- bounds trong `run_config.json` của run đúng là stats đó, bỏ qua phần đệm số 0 của Ψ₀.
+
+Run nào chuẩn hóa bằng stats riêng (ví dụ S70 đã tính lại stats) thì không được serve. Đã thử trên một run thật: `run_config.json` của C+ khớp stats của bản cắt C+, và bị từ chối khi so với stats của ALL.
+
+```bash
+export PYTHONPATH=$(ls -d $PWD/packages/*/src | paste -sd:)
+python3 -m flywheel_psi0.tray.colab_serve expect --runs fwdata/tray/pair60k/$B --branch $B --step 40000 \
+    --stats fwdata/tray/pair-cuts/ALL-stats_psi0.json   # ghi fwdata/tray/pair60k/$B/<job>/expected-40000.json
+```
+
+- **Làn 1, `B_ALL`, trên `rtx3060`.** Như B ở mục 18: chép `serve-b.sh` và `launch-eval-b.sh` thành `serve-b-all.sh` và `launch-eval-b-all.sh`. Job là `da34-t6-ft-b-all-s0`, checkpoint từ `fwdata/tray/pair60k/B_ALL`. Ba điều chặn giữ nguyên. Điều thứ ba so bounds với `stats_psi0.json` của ALL.
+- **Làn 2–4, `B_70`, `C_70`, `C_ALL`, mỗi làn một phiên Colab L4** trong **cùng** registry `R`, cap 22, sàn 14, tên `da34-serve-b-70`, `da34-serve-c-70`, `da34-serve-c-all`. Mở lúc khoảng T0 + 5,3 giờ (19.5). Bảy phiên cùng lúc **chưa thử**: phiên nào bị từ chối (mã 6) thì mở lại sau khi các phiên train đóng.
+
+```bash
+S=da34-serve-c-70; B=C_70; J=da34-t6-ft-c-70-s0; STEP=40000; LP=22287; RP=22197   # cổng: bảng dưới
+nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py session --registry "$0" --new --name "$1" --gpu L4 --cap 22 --floor 14 --log "$0/$1.jsonl"; echo "exit $?"' $R $S < /dev/null > $R/$S.out 2>&1 &
+ready $S || { colab stop -s $S; echo "$S: not ready, session stopped"; }
+git archive --format=tar.gz HEAD | vm $S 'mkdir -p /content/da34s/fw && tar -xz -C /content/da34s/fw'
+colab drivemount -s $S /content/drive || colab drivemount -s $S /content/drive
+vm $S "cd /content/da34s; nohup setsid bash -c 'python3 fw/scripts/he/he1_colab.py serve-setup --work /content/da34s; echo serve-setup exit \$?' > serve-setup.log 2>&1 < /dev/null &"
+vm $S 'tail -2 /content/da34s/serve-setup.log'   # chờ "serve-setup exit 0"
+vm $S "cat > /content/da34s/expected-$STEP.json" < fwdata/tray/pair60k/$B/$J/expected-$STEP.json
+vm $S "cd /content/da34s && PYTHONPATH=$VMPP python3 -m flywheel_psi0.tray.colab_serve fetch --expected expected-$STEP.json"
+vm $S "cd /content/da34s; nohup setsid bash -c 'PYTHONPATH=$VMPP python3 -m flywheel_psi0.tray.colab_serve serve --expected expected-$STEP.json; echo serve exit \$?' > serve-$STEP.log 2>&1 < /dev/null &"
+vm $S "tail -3 /content/da34s/serve-$STEP.log"   # chờ dòng JSON có "pid", rồi "serve exit 0"
+nohup ssh -N -o ProxyCommand="colab ssh --proxy-mode -s $S" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=15 -L $LP:127.0.0.1:22085 root@colab > $R/$S.fwd.log 2>&1 &
+nohup ssh -N -o ServerAliveInterval=15 -R $RP:127.0.0.1:$LP rtx3060 > $R/$S.rfwd.log 2>&1 &
+ssh rtx3060 "curl -s 127.0.0.1:$RP/health"   # "ok"
+```
+
+Rồi trên `rtx3060`, `launch-eval-<làn>.sh` chép từ `launch-eval-b.sh`, với `eval_batch --server 127.0.0.1:$RP --listen <cổng proxy của làn>` và thư mục output riêng. Mỗi làn kiểm thứ tự bằng `--dry-run --max-chunks 6` như mục 18.
+
+| Làn | Model | Server (máy, cổng) | Cổng laptop `LP` | Cổng trên `rtx3060` `RP` | `--listen` [Đề xuất] |
+|---|---|---|---|---|---|
+| 1 | `B_ALL` | `rtx3060`, 22185 | — | 22185 | 22186 |
+| 2 | `B_70` | Colab L4, 22085 | 22285 | 22195 | 22196 |
+| 3 | `C_70` | Colab L4, 22085 | 22287 | 22197 | 22198 |
+| 4 | `C_ALL` | Colab L4, 22085 | 22289 | 22199 | 22200 |
+
+**Chuyển từ 40k sang 60k trên cùng phiên serve.**
+1. Khi lô cuối giai đoạn 1 của 40k đã ghi xong, chạy `expect --step 60000` trên laptop sau khi `fetched.json` báo `ckpt_60000` sạch.
+2. Gửi file mới lên VM, rồi `fetch`.
+3. Dừng server 40k bằng `kill <pid>`, lấy pid ở `report.json` phase `serve_<nhánh>_40000`. `serve` từ chối khi cổng còn server trả lời.
+4. Chạy `serve --expected expected-60000.json`.
+
+Phiên serve dừng ngay khi lô cuối của 60k đã ghi kết quả (19.8).
+
+**Chưa thử, phải theo dõi lần đầu.**
+- Bốn A100 cùng lúc, và bảy phiên khi ba phiên serve vào.
+- Đường Drive cho tar 5,3 GB: cỡ trên Drive phải khớp `.json` ngay khi VM thấy file.
+- Bốn client trên `rtx3060` cùng lúc.
+- Cổng `--listen` của từng làn; ghi ở bảng là đề xuất.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -1971,3 +2120,4 @@ Ngưỡng 0,58 là mức dừng sớm của `follow` ở cap 70 khi pull chậm 
 | 11/11/2026 | Mục 19.1, 19.3, 19.4 (W1 xong, cut ALL của DA-33 lúc 05:11, qua phiên điều phối): ghim hai phần của cut (release `tray_s1_41899efb4b27`, `tray_s1_4a8f4a8c6a8d`, file tập demo commit cạnh plan, ghim chất lượng và QA), 606 episode, 861 624 frame, stats `1c745091…`; ghim S70 (301 + 124 = 425 episode, 603 915 frame, sha256 hai danh sách). Còn 4 chỗ trống, đều của W2; id nháp `rp_9d89260a974d` | Claude cho Hiếu |
 | 11/11/2026 | Mục 19.7 (phiên điều phối: ảnh VM Colab chỉ có CUDA 13.0, stage 1 hỏng pre-flight): stage 3 không build extension (ddp, `torch.optim.AdamW`, theo mã Ψ₀ `cda3fdf`); `colab_train setup` kiểm trước khi cài và từ chối recipe build op khi thiếu bộ CUDA 12.6 và `ninja` | Claude cho Hiếu |
 | 11/11/2026 | Mục 19.3, 19.5, 19.7, 19.8 (W2 xong, stage 1 của DA-30 trên A100, qua phiên điều phối): ghim bốn chỗ của `vlm_stage1` từ `vlm.json` (job `da30-tray-ego-b`, `rp_1d7627234111`, bước 300; trọng số `c48ec2df…`, manifest `019daa80…`, kiểm nạp không lỗi); plan hết chỗ trống, id nháp `rp_e2fb9f62c223`; 19.5 thêm số đo mount Drive trên A100 (đồng ý mỗi VM, hết giờ 120 s, chạy lại một lần) | Claude cho Hiếu |
+| 11/11/2026 | Mục 19.9 mới, 19.5, 19.7 (nhiệm vụ con 6.3, qua phiên điều phối): runbook bốn run. Gồm: dựng S70 theo seed của chính episode và giữ stats của ALL (`pair_cut`); hai tar lên Drive; `colab_train` cho bốn nhánh, dữ liệu từ Drive được kiểm trước khi cài; một đợt `cu_watch` và đường lùi hai đợt; bước đồng ý Drive trên mỗi VM; làn serve Colab (`colab_serve`, kiểm sha256 và bounds của stats ALL); bảng cổng. Chưa chạy | Claude cho Hiếu |
