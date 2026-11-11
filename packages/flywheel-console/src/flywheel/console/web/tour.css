@@ -1,0 +1,45 @@
+/* demo intro (ring) + legacy v4 helper styles kept until pages convert */
+#intro { position: fixed; inset: 0; z-index: 120; background: var(--bg); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; }
+#intro svg { width: min(86vw, 820px); height: auto; }
+#intro .go { font: 12px var(--mono); color: var(--text-2); }
+#intro .node rect { fill: var(--surface); stroke: var(--line-strong); }
+#intro .node text { fill: var(--text); font: 600 15px var(--sans); }
+#intro .node text.s { fill: var(--text-2); font: 12px var(--mono); }
+#intro .arc { fill: none; stroke: var(--line-strong); stroke-width: 2; }
+#intro .arc.run { stroke: var(--run); stroke-dasharray: 8 8; animation: flow .9s linear infinite; }
+#intro .arc.done { stroke: var(--ok); } #intro .arc.waiting { stroke: var(--warn); }
+@keyframes flow { to { stroke-dashoffset: -16; } }
+.tour-btn { font: 12px var(--mono); }
+/* ---- legacy ---- */
+/* glossary, plain-language headers, flywheel ring, demo mode, tour bar */
+:root { --run-soft: color-mix(in srgb, var(--run) 14%, var(--panel)); }
+.small { font-size: 12.5px; }
+
+/* ---- glossary ---- */
+.term { border-bottom: 1.5px dotted var(--muted); cursor: help; }
+.term:hover, .term:focus-visible { border-bottom-color: var(--accent); color: var(--accent); outline: none; }
+.term-tip { position: fixed; z-index: 60; display: none; max-width: 340px; background: var(--ink); color: var(--bg); padding: 9px 12px; border-radius: 8px; font-size: 13.5px; line-height: 1.45; box-shadow: 0 8px 26px rgba(0,0,0,.25); pointer-events: none; }
+.term-tip b { display: block; margin-bottom: 2px; font-size: 12px; opacity: .75; letter-spacing: .02em; }
+
+/* ---- plain question / answer header ---- */
+.qa-head { background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); border-left: 4px solid var(--accent); border-radius: 8px; padding: 10px 14px; margin: 0 0 16px; }
+.qa-head .q { font-size: 14.5px; } .qa-head .q b { color: var(--accent); }
+.qa-head .a { margin-top: 3px; font-size: 15.5px; font-weight: 500; line-height: 1.45; }
+.panel-q { font-size: 13.5px; color: var(--muted); margin: 0 0 4px; } .panel-q b { color: var(--accent); }
+.panel-a { font-size: 14.5px; font-weight: 500; margin: 0 0 10px; line-height: 1.45; }
+.where { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 0 0 14px; font-size: 13.5px; }
+.mchip2 { display: inline-flex; gap: 6px; align-items: center; border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 3px 12px; font-size: 13.5px; font-weight: 600; }
+.mchip2 i { width: 8px; height: 8px; border-radius: 50%; background: var(--idle); }
+.mchip2.colab i { background: var(--run); } .mchip2.rtx i { background: var(--t-tele); } .mchip2.lap i { background: var(--accent); }
+.ch.xl { height: 440px; } .ch.xxl { height: 520px; }
+.chain.big .step { padding: 14px 16px; } .chain.big .step .v { font-size: 26px; } .chain.big .step .l { font-size: 14px; } .chain.big .step .no { font-size: 12.5px; }
+.chain .step .mach { display: inline-block; margin-top: 6px; font-size: 11.5px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.rs-head h3 { margin: 0; font-size: 19px; } .rs-no { font-size: 12px; color: var(--muted); }
+.issue:hover { box-shadow: 0 6px 18px rgba(0,0,0,.09); }
+.issue.waiting { border-left-color: var(--warn); } .issue.running { border-left-color: var(--run); } .issue.done { border-left-color: var(--accent); } .issue.blocked { border-left-color: var(--bad); }
+.is-head { display: flex; gap: 6px; align-items: center; }
+.is-problem { font-size: 17px; font-weight: 700; line-height: 1.3; }
+.is-row { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; padding: 4px 0; border-top: 1px dashed var(--line); font-size: 14px; line-height: 1.4; }
+.is-k { color: var(--muted); font-size: 12.5px; padding-top: 1px; } .is-link { font-size: 13.5px; text-decoration: none; justify-self: start; }
+.grid3.compact .panel { padding: 12px 14px; } .tl-row { padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; } .tl-row.act { display: flex; gap: 8px; align-items: baseline; }
+

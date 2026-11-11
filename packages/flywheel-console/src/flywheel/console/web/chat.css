@@ -1,0 +1,50 @@
+/* chat dock (right, 420 px). Rails: CODE = deterministic tool output, LLM = model prose. */
+#chat .ch-head { height: 32px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 12px; border-bottom: 1px solid var(--line); font: 600 11px var(--sans); text-transform: uppercase; letter-spacing: .06em; color: var(--text-2); }
+#chat .ch-head .sp { flex: 1; }
+#chat .ch-pill { font: 11px var(--mono); text-transform: none; letter-spacing: 0; color: var(--text-2); cursor: pointer; padding: 0 4px; border-radius: 2px; }
+#chat .ch-pill:hover { background: var(--surface-2); }
+#chat .ch-ib { background: none; border: 0; color: var(--text-2); cursor: pointer; padding: 2px 6px; border-radius: 4px; font: 12px var(--mono); text-transform: none; letter-spacing: 0; }
+#chat .ch-ib:hover { background: var(--surface-2); color: var(--text); }
+#chat .ch-list { flex: 1; overflow: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+#chat .ch-empty { color: var(--text-3); font: 12px var(--mono); display: flex; flex-direction: column; gap: 2px; }
+#chat .ch-empty a { color: var(--text-2); cursor: pointer; } #chat .ch-empty a:hover { color: var(--accent); text-decoration: none; }
+#chat .ch-me { display: flex; gap: 8px; align-items: baseline; }
+#chat .ch-me .who { font: 11px var(--mono); color: var(--text-3); flex: none; width: 36px; }
+#chat .ch-me .tx { flex: 1; white-space: pre-wrap; word-break: break-word; }
+#chat .ch-me .ts { font: 11px var(--mono); color: var(--text-3); }
+#chat .ch-turn { display: flex; flex-direction: column; gap: 6px; }
+#chat .ch-trace { display: flex; gap: 8px; align-items: center; font: 11.5px var(--mono); color: var(--text-2); cursor: pointer; }
+#chat .ch-trace:hover { color: var(--text); }
+#chat .ch-trace .open { margin-left: auto; color: var(--accent); }
+#chat .ch-tree { border: 1px solid var(--line); border-radius: 4px; background: var(--surface-2); padding: 4px 8px; font: 11.5px/16px var(--mono); max-height: 280px; overflow: auto; }
+#chat .ch-node { padding: 1px 0; } #chat .ch-node .hd { display: flex; gap: 8px; cursor: pointer; } #chat .ch-node .hd:hover { color: var(--accent); }
+#chat .ch-node .ms { margin-left: auto; color: var(--text-2); }
+#chat .ch-node pre { margin: 2px 0 4px 12px; padding: 4px 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 2px; font: 11px/14px var(--mono); max-height: 180px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+#chat .ch-node.l1 { margin-left: 12px; }
+#chat .ch-code { border-left: 2px solid var(--code); padding: 2px 0 2px 8px; min-width: 0; }
+#chat .ch-llm { border-left: 2px solid var(--llm); padding: 2px 0 2px 8px; white-space: pre-wrap; word-break: break-word; }
+#chat .ch-cap { display: flex; gap: 6px; align-items: center; font: 11px var(--mono); color: var(--text-2); margin-bottom: 4px; }
+#chat .ch-cap .ms { margin-left: auto; color: var(--text-3); }
+#chat .ch-wait { color: var(--text-3); font: 12px var(--mono); }
+#chat .ch-wait::after { content: ""; display: inline-block; width: 6px; height: 12px; background: var(--text-3); margin-left: 4px; vertical-align: -2px; animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+#chat .ungr { border-bottom: 1px dotted var(--warn); }
+#chat .ch-unv { font: 11px var(--mono); color: var(--warn); margin-top: 2px; }
+#chat .ch-err { font: 12px/16px var(--mono); color: var(--bad); border-left: 2px solid var(--bad); padding: 2px 0 2px 8px; }
+#chat .ch-err .hint { color: var(--text-2); display: block; margin-top: 2px; }
+#chat .ch-err .hint a { cursor: pointer; }
+#chat .ch-foot { flex: none; border-top: 1px solid var(--line); padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 6px; position: relative; }
+#chat .ch-ctx { display: flex; flex-wrap: wrap; gap: 4px; }
+#chat .ch-ctx .u-chip { cursor: pointer; } #chat .ch-ctx .u-chip.off { opacity: .45; text-decoration: line-through; }
+#chat .ch-ctx .u-chip.ref { border-color: var(--accent); }
+#chat .ch-row { display: flex; gap: 6px; align-items: flex-end; }
+#chat textarea { flex: 1; resize: none; min-height: 28px; max-height: 120px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; color: var(--text); padding: 5px 8px; font: 13px/18px var(--sans); outline: none; }
+#chat textarea:focus { border-color: var(--line-strong); outline: 1px solid var(--accent); outline-offset: 1px; }
+#chat .ch-sug { position: absolute; left: 8px; right: 8px; bottom: 100%; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 4px; box-shadow: var(--pop-shadow); z-index: 6; }
+#chat .ch-sug div { display: flex; gap: 8px; height: 24px; align-items: center; padding: 0 8px; cursor: pointer; font: 12px var(--mono); }
+#chat .ch-sug div:hover, #chat .ch-sug div.on { background: var(--surface-2); }
+#chat .ch-sug .d { color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#chat .ch-traces { position: absolute; inset: 32px 0 0 0; background: var(--surface); z-index: 7; overflow: auto; padding: 8px 12px; }
+#chat .ch-code { overflow-x: auto; }
+#chat .ch-code table.u td { max-width: 180px; }
+#chat .ch-code table.u th { position: static; }
