@@ -71,7 +71,7 @@ rows:
   title: Tray đội 1109 · 480p30 (cũ)
   kind: raw source
   data_type: egocentric
-  task: two_table
+  task: tray
   episodes: 153
   frames: 11847
   hours: 0.11
@@ -93,7 +93,7 @@ rows:
   title: Tray đội 1109 · 30fps 480p
   kind: raw source
   data_type: egocentric
-  task: two_table
+  task: tray
   episodes: 153
   frames: 11847
   hours: 0.11
@@ -116,7 +116,7 @@ rows:
   title: Tray đội 1109 · 1080p50 (cũ)
   kind: raw source
   data_type: egocentric
-  task: two_table
+  task: tray
   episodes: 8
   frames: 2517
   hours: 0.014
@@ -137,7 +137,7 @@ rows:
   title: Tray đội 1109 · 30fps 1080p
   kind: raw source
   data_type: egocentric
-  task: two_table
+  task: tray
   episodes: 8
   frames: 1508
   hours: 0.014
@@ -159,7 +159,7 @@ rows:
   title: Pipeline · deid e2e (test)
   kind: pipeline source
   data_type: egocentric
-  task: two_table
+  task: tray
   episodes: 2
   frames: null
   hours: null
@@ -225,7 +225,7 @@ rows:
   title: Pipeline · tray 1109 (153, cũ)
   kind: pipeline source
   data_type: egocentric
-  task: two_table
+  task: tray
   episodes: 153
   frames: 11847
   hours: 0.11
@@ -247,7 +247,7 @@ rows:
   title: Pipeline · tray 1109 30fps (153)
   kind: pipeline source
   data_type: egocentric
-  task: two_table
+  task: tray
   episodes: 153
   frames: 11847
   hours: 0.11
@@ -270,7 +270,7 @@ rows:
   title: Pipeline · tray 1080p (8, cũ)
   kind: pipeline source
   data_type: egocentric
-  task: two_table
+  task: tray
   episodes: 8
   frames: 2517
   hours: 0.014
@@ -292,7 +292,7 @@ rows:
   title: Pipeline · tray 1080p 30fps (8)
   kind: pipeline source
   data_type: egocentric
-  task: two_table
+  task: tray
   episodes: 8
   frames: 1508
   hours: 0.014
@@ -315,7 +315,7 @@ rows:
   title: Export egx_948a (thiếu)
   kind: export
   data_type: egocentric
-  task: other
+  task: tray
   episodes: null
   frames: null
   hours: null
@@ -337,7 +337,7 @@ rows:
   title: Export egx_0b4a (thiếu)
   kind: export
   data_type: egocentric
-  task: other
+  task: tray
   episodes: null
   frames: null
   hours: null
@@ -359,7 +359,7 @@ rows:
   title: Export tray 480p · trial (132)
   kind: export
   data_type: egocentric
-  task: two_table
+  task: tray
   episodes: 132
   frames: 7804
   hours: 0.072
@@ -382,7 +382,7 @@ rows:
   title: Export tray 480p · clean (132)
   kind: export
   data_type: egocentric
-  task: two_table
+  task: tray
   episodes: 132
   frames: 7804
   hours: 0.072
@@ -406,7 +406,7 @@ rows:
   title: Export tray 480p · clean2 (132)
   kind: export
   data_type: egocentric
-  task: two_table
+  task: tray
   episodes: 132
   frames: 7804
   hours: 0.072
@@ -430,7 +430,7 @@ rows:
   title: Ego H1M · tray đội (132)
   kind: export
   data_type: egocentric
-  task: two_table
+  task: tray
   episodes: 132
   frames: 10237
   hours: 0.095
@@ -448,7 +448,7 @@ rows:
   - src_805804635f9af7f7
   - src_60e3f454316d2553
   aliases: []
-  ego_viewer: fwdata/human1m/ego-h1m-20261111/viewer
+  ego_viewer: human1m/ego-h1m-20261111/viewer
 - id: h1m-egodex
   name: ego-h1m-20261111/egodex
   title: Ego H1M · EgoDex (185)
@@ -471,7 +471,7 @@ rows:
   parents:
   - src_158ec3c813ffe9a6
   aliases: []
-  ego_viewer: fwdata/human1m/ego-h1m-20261111/viewer
+  ego_viewer: human1m/ego-h1m-20261111/viewer
 - id: psi-two-table
   name: psi-data@e78fb93 two_table (G1WholebodyLocomotionPickBetweenTablesTeleop-v0)
   title: psi-data · two_table (99)
@@ -997,7 +997,7 @@ rows:
   - tray_s1_4a8f4a8c6a8d
   aliases:
   - ALL
-  lerobot: fwdata/da34-dryrun/cut-all-zone1/ALL/G1WholebodyTrayTransferTeleop-v0
+  lerobot: da34-dryrun/cut-all-zone1/ALL/G1WholebodyTrayTransferTeleop-v0
 - id: S70
   name: S70 (#S70:8ab4e33b657f)
   title: Tray S1 · S70 cut (425 ep)
@@ -1023,7 +1023,7 @@ rows:
   - ALL
   aliases:
   - S70
-  lerobot: fwdata/da34-dryrun/cut-all-zone1/S70/G1WholebodyTrayTransferTeleop-v0
+  lerobot: da34-dryrun/cut-all-zone1/S70/G1WholebodyTrayTransferTeleop-v0
 - id: evalset-rp_a04c
   name: tray eval set rp_a04c14e79dfd
   title: Tray eval set rp_a04c (270)

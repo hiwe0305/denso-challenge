@@ -52,3 +52,21 @@ def test_aliases_resolve_s1(tmp_path: Path) -> None:
 def test_no_absolute_home_paths(tmp_path: Path) -> None:
     _, doc = _build(tmp_path)
     assert "/home/" not in json.dumps(doc)
+
+
+def test_lerobot_and_viewer_are_fw_relative(tmp_path: Path) -> None:
+    paths = _paths(tmp_path)
+    _, doc = _build(tmp_path)
+    linked = [(r[k], r["id"]) for r in doc["rows"] for k in ("lerobot", "ego_viewer") if r[k]]
+    assert len(linked) == 4
+    for rel, _rid in linked:
+        assert not rel.startswith("fwdata/")
+        assert (paths.fw_root / rel).is_relative_to(paths.fw_root)
+
+
+def test_team_egocentric_rows_are_tray(tmp_path: Path) -> None:
+    _, doc = _build(tmp_path)
+    by = {r["id"]: r for r in doc["rows"]}
+    assert by["h1m-team"]["task"] == "tray"
+    assert by["team-1109-480p"]["task"] == "tray"
+    assert by["egodex-da30"]["task"] == "other"
