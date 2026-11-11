@@ -1,4 +1,3 @@
-# ruff: noqa: E501, UP031
 """Chat tools of the Jobs and QA page groups, navigation, and the one proposal tool.
 
 Nothing here writes a file or starts a process: ``propose_job`` returns a confirm card, and the
@@ -72,7 +71,7 @@ def job_list(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     rows = [
         {"job_id": j["id"], "kind": j["kind"], "state": j["state"], "host": j.get("host"),
          "created": j.get("created", "")[5:19],
-         "duration_s": round(j["_dur"], 1) if j.get("_dur") is not None else None, "rc": j.get("rc")}
+         "duration_s": round(j["_dur"], 1) if j.get("_dur") is not None else None, "rc": j.get("rc")}  # noqa: E501
         for j in js[:limit]
     ]  # fmt: skip
     ui = table(
@@ -85,7 +84,7 @@ def job_list(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     )
     return result(
         ui,
-        "%d jobs match; showing the first %d.\n%s"
+        "%d jobs match; showing the first %d.\n%s"  # noqa: UP031
         % (
             len(js),
             len(rows),
@@ -123,7 +122,7 @@ def job_get(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     ]
     return result(
         {"type": "group", "items": specs},
-        "job {} kind={} state={} rc={} host={} duration_s={} created={} note={}\nlast log lines:\n{}".format(
+        "job {} kind={} state={} rc={} host={} duration_s={} created={} note={}\nlast log lines:\n{}".format(  # noqa: E501
             jid,
             j.get("kind"),
             j.get("state"),
@@ -200,7 +199,7 @@ def findings(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     )
     return result(
         ui,
-        "%d findings (rule-layer statuses are final; LLM findings are suggestions).\n%s"
+        "%d findings (rule-layer statuses are final; LLM findings are suggestions).\n%s"  # noqa: UP031
         % (len(rows), rows_text(rows, ["source", "code", "target", "status", "insight"], 10)),
     )
 
@@ -243,7 +242,7 @@ def propose_job(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
             params = {}
     if kind not in KINDS or kind not in runner.KINDS:
         return fail(
-            "kind '{}' is not allowed. Allowed: {}. Training, holdout and shell are never available.".format(
+            "kind '{}' is not allowed. Allowed: {}. Training, holdout and shell are never available.".format(  # noqa: E501
                 kind, ", ".join(KINDS)
             )
         )
@@ -285,5 +284,5 @@ def propose_job(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     }
     return result(
         spec,
-        f"Proposed (not started): {kind} on {host}, estimate {est} s from past jobs. A human must press Run.",
+        f"Proposed (not started): {kind} on {host}, estimate {est} s from past jobs. A human must press Run.",  # noqa: E501
     )

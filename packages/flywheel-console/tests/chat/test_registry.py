@@ -11,14 +11,19 @@ from flywheel.console.paths import ConsolePaths
 from flywheel.console.server import runner
 
 
-def snapshot(root: Path) -> set[str]:
-    return {str(p.relative_to(root)) for p in root.rglob("*")}
+def snapshot(root: Path) -> dict[str, tuple[int, int]]:
+    """Every path under root with its size and mtime, so an in-place rewrite shows up too."""
+    out: dict[str, tuple[int, int]] = {}
+    for p in root.rglob("*"):
+        st = p.stat()
+        out[str(p.relative_to(root))] = (st.st_size, st.st_mtime_ns)
+    return out
 
 
 def test_resolve_alias_s1(idx: ConsolePaths) -> None:
-    assert resolve_dataset("S1") == ("ok", "cut-all-zone1")
-    assert resolve_dataset("S70") == ("ok", "S70")
-    assert resolve_dataset("all") == ("ok", "cut-all-zone1")
+    assert resolve_dataset("S1") == ("ok", "tray_s1_41899efb4b27")
+    assert resolve_dataset("s70") == ("ok", "S70")
+    assert resolve_dataset("all") == ("ok", "ALL")
     assert resolve_dataset("nonexistent-zzz")[0] == "none"
 
 
@@ -26,6 +31,16 @@ def test_offered_names_cross_page(idx: ConsolePaths) -> None:
     names = registry.offered_names("runs", "loss của C_70 và lỗi QA của S70")
     assert "run_metrics" in names and "qa_summary" in names
     assert names[-1] == "open_page"
+
+
+def test_offered_names_union_needs_two_topics(idx: ConsolePaths) -> None:
+    # route eval offers eval tools only; two topics (data, runs) pull in their pages' tools,
+    # so catalog_search (data page only) is offered; without the union eval_summary would be.
+    names = registry.offered_names("eval", "lỗi QA của S70 và loss của C_70")
+    assert "catalog_search" in names and "eval_summary" not in names
+    assert len(names) <= 8 and names[-1] == "open_page"
+    single = registry.offered_names("eval", "loss của C_70")
+    assert "eval_summary" in single
 
 
 def test_offered_names_cap(idx: ConsolePaths) -> None:
@@ -42,15 +57,31 @@ def test_s1_question_offers_dataset_tools(idx: ConsolePaths) -> None:
 
 
 def test_qa_status_from_rule_layer(idx: ConsolePaths) -> None:
-    res = registry.call("qa_summary", {"dataset_id": "S70"}, {"route": "#/data"})
+    res = registry.call("qa_summary", {"dataset_id": "T1"}, {"route": "#/data"})
     assert res["ok"]
-    raw: dict[str, Any] = res["raw"]
-    assert raw["qa"]["decisions"] == {"pass": 425, "flag": 0, "reject": 0}
+    assert res["raw"]["qa"]["decisions"] == {"pass": 10, "flag": 2, "reject": 1}
+    # a cut with generation failures: the batch is reported apart and marked NOT QA
+    cut = registry.call("qa_summary", {"dataset_id": "S70"})
+    raw: dict[str, Any] = cut["raw"]
+    assert "decisions" not in raw.get("qa", {})
     gen = raw["generation_failures"]
     assert gen["failed"] == 68 and "L-ONE-HAND" in gen["reasons"]
-    assert "NOT QA" in res["model"]
-    # via the alias too
-    assert registry.call("qa_summary", {"dataset_id": "S1"})["ok"]
+    assert "NOT QA" in cut["model"]
+
+
+def test_qa_summary_cut_reports_parent_decisions(idx: ConsolePaths) -> None:
+    res = registry.call("qa_summary", {"dataset_id": "S70"})
+    assert "parent tray_s1_41899efb4b27" in res["model"]
+    assert "534 pass / 7 reject" in res["model"]
+    assert "425 pass" not in res["model"]  # a cut never gets an invented pass count
+
+
+def test_qa_summary_s1_reports_child_batch(idx: ConsolePaths) -> None:
+    res = registry.call("qa_summary", {"dataset_id": "S1"})
+    assert res["ok"]
+    assert "generation batch recorded on ALL" in res["model"] and "NOT QA" in res["model"]
+    assert res["raw"]["generation_failures"]["failed"] == 68
+    assert "534 pass / 7 reject" in res["model"]  # the release's own QA note
 
 
 def test_episode_frames_deid_only(idx: ConsolePaths) -> None:
@@ -58,11 +89,11 @@ def test_episode_frames_deid_only(idx: ConsolePaths) -> None:
     assert res["ok"]
     thumbs = [s for s in res["ui"]["items"] if s["type"] == "thumbs"]
     srcs = [t["src"] for s in thumbs for t in s["items"]]
-    assert srcs == ["/data/ds/egx_aaaa1111/posters/ep_1.jpg"]
-    from flywheel.console.chat.tools_data import deid_frame_source
-
-    assert deid_frame_source("x/raw.mp4") is None
-    assert deid_frame_source("x/a.deid.mp4") == Path("x/a.deid.mp4")
+    assert srcs == ["/data/ds/egx_aaaa1111/posters/ep_1.jpg"]  # missing file and /ego/ raw dropped
+    for ep, want in (("ep_1", 1), ("ep_2", 0), ("ep_3", 0)):
+        got = registry.call("episode_get", {"dataset_id": "egx_aaaa1111", "episode_id": ep})
+        n = sum(len(s["items"]) for s in got["ui"]["items"] if s["type"] == "thumbs")
+        assert n == want, ep
 
 
 def test_propose_job_starts_nothing(idx: ConsolePaths, monkeypatch: pytest.MonkeyPatch) -> None:

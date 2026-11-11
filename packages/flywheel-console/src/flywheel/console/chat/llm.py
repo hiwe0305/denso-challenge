@@ -1,4 +1,4 @@
-# ruff: noqa: E501, UP031
+# ruff: noqa: E501, UP031  (ported prompt, guard-regex and tool-schema strings stay on one line)
 """Chat backend: Nemotron over the loopback ssh tunnel, tools in ``registry``.
 
 ``events(body)`` yields ``(event, data)`` pairs; ``stream(body)`` yields them as SSE bytes for
@@ -257,7 +257,11 @@ def build_messages(
 
 
 def _chunks(resp: Any, deadline: float) -> Iterator[dict[str, Any]]:
-    """Yield parsed ndjson objects of an Ollama stream; stop at the deadline."""
+    """Yield parsed ndjson objects of an Ollama stream; stop at the deadline.
+
+    The turn cap is checked between reads, so a read that blocks is bounded by the socket
+    timeout of the request (``HTTP_TIMEOUT_S``), not by the deadline itself.
+    """
     buf = b""
     while True:
         if time.time() > deadline:
@@ -424,7 +428,6 @@ def events(body: dict[str, Any]) -> Iterator[tuple[str, dict[str, Any]]]:
     lang = lang_of(question)
     tool_rounds = 0
     try:
-        final_needed = True
         for rnd in range(MAX_ROUNDS + 1):
             offered = registry.schemas(context.get("route"), names) if rnd < MAX_ROUNDS else None
             g0 = time.time()
@@ -447,10 +450,10 @@ def events(body: dict[str, Any]) -> Iterator[tuple[str, dict[str, Any]]]:
             )
             tr["tokens_in"] += tin
             tr["tokens_out"] += tout
-            if not tcalls:
+            if not tcalls or rnd == MAX_ROUNDS:
+                # the last round offers no tools: calls parsed from text markup are ignored too
                 if content.strip():
                     answer_parts.append(content)
-                final_needed = False
                 break
             # a round that asks for tools: run them; any preamble text is dropped
             tool_rounds += 1
@@ -514,28 +517,6 @@ def events(body: dict[str, Any]) -> Iterator[tuple[str, dict[str, Any]]]:
             msgs[-1]["content"] += (
                 f"\n[Answer the user now in {lang}, at most 60 words. Use only numbers shown above. Do not call more tools unless a different lookup is clearly needed.]"
             )
-        if final_needed or (not answer_parts and tool_rounds):
-            # the tool-round budget ended with tool output and no prose: narrate without tools
-            g0 = time.time()
-            content, tin, tout = "", 0, 0
-            for kind, val in generate(msgs, None, deadline):
-                if kind == "tok":
-                    yield "token", {"text": val}
-                else:
-                    content, _c, tin, tout = val
-            nodes.append(
-                {
-                    "type": "generation",
-                    "round": "final",
-                    "ms": int((time.time() - g0) * 1000),
-                    "tokens_in": tin,
-                    "tokens_out": tout,
-                    "content": content[:500],
-                }
-            )
-            tr["tokens_in"] += tin
-            tr["tokens_out"] += tout
-            answer_parts.append(content)
     except TimeoutError:
         tr["error"] = "timeout"
         yield "token", {"text": ""}

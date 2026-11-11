@@ -1,4 +1,3 @@
-# ruff: noqa: E501, UP031
 """Chat tools of the Runs, Eval and Loop page groups: training runs, logs, eval, cost."""
 
 from __future__ import annotations
@@ -109,7 +108,7 @@ def run_list(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     )
     res = result(
         ui,
-        "%d runs (loss_ema50 = EMA over the last 50 train steps; running = file touched < 20 min ago).\n%s"
+        "%d runs (loss_ema50 = EMA over the last 50 train steps; running = file touched < 20 min ago).\n%s"  # noqa: E501, UP031
         % (len(rows), rows_text(rows, keys)),
     )
     res["raw"] = {"runs": raw}
@@ -181,7 +180,7 @@ def run_metrics(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     series: list[dict[str, Any]] = []
     raw: dict[str, Any] = {}
     lines = [
-        "run %s (branch %s): %d logged rows, last step %s"
+        "run %s (branch %s): %d logged rows, last step %s"  # noqa: UP031
         % (run["id"], run["branch"], len(rows), rows[-1].get("step"))
     ]
     for k in keys:
@@ -193,7 +192,7 @@ def run_metrics(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         series.append({"name": k, "points": pts})
         raw[k] = pts
         lines.append(
-            f"{k}: first={vals[0]} last={vals[-1]} min={min(vals)} max={max(vals)} (step {pts[0][0]}..{pts[-1][0]})"
+            f"{k}: first={vals[0]} last={vals[-1]} min={min(vals)} max={max(vals)} (step {pts[0][0]}..{pts[-1][0]})"  # noqa: E501
         )
     if not series:
         return fail(
@@ -319,7 +318,7 @@ def log_tail(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     text = text[-3500:]
     return result(
         {"type": "log", "job_id": label, "text": text, "truncated": cut},
-        "last %d lines of %s%s:\n%s" % (n, label, f" (grep {grep})" if grep else "", text[-2800:]),
+        "last %d lines of %s%s:\n%s" % (n, label, f" (grep {grep})" if grep else "", text[-2800:]),  # noqa: UP031
     )
 
 
@@ -346,13 +345,13 @@ def eval_summary(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         {
             "label": x["level"],
             "value": "%.1f%%" % (100.0 * x["successes"] / x["n"]),
-            "delta": "%d/%d" % (x["successes"], x["n"]),
+            "delta": "%d/%d" % (x["successes"], x["n"]),  # noqa: UP031
         }
         for x in lv
     ]
     funnel = {
         "type": "line", "title": "Pass rate by stage", "x_label": "stage", "y_label": "% passing",
-        "series": [{"name": x["level"], "points": [[i, v] for i, v in enumerate(x["steps_pct"])]} for x in lv],
+        "series": [{"name": x["level"], "points": [[i, v] for i, v in enumerate(x["steps_pct"])]} for x in lv],  # noqa: E501
     }  # fmt: skip
     fl = ev["failure_labels"]
     rows = [
@@ -367,7 +366,7 @@ def eval_summary(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     lines = ["eval policy {} on dev ({})".format(ev.get("policy", "C"), ev.get("source", ""))]
     for x in lv:
         lines.append(
-            "%s: %d/%d success = %.1f%%; stage pass %% = %s"
+            "%s: %d/%d success = %.1f%%; stage pass %% = %s"  # noqa: UP031
             % (
                 x["level"],
                 x["successes"],
@@ -383,7 +382,7 @@ def eval_summary(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     )
     if rows:
         top = max(rows, key=lambda r: r["L1-2"])
-        lines.append("top failure label at L1-2: %s %d of %d" % (top["label"], top["L1-2"], g["n"]))
+        lines.append("top failure label at L1-2: %s %d of %d" % (top["label"], top["L1-2"], g["n"]))  # noqa: UP031
     return result({"type": "group", "items": specs}, "\n".join(lines))
 
 
@@ -404,7 +403,7 @@ def eval_failures(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     lines = [
         "failures (all levels): "
         + "; ".join(
-            "%s=%d (L0 %d, L1 %d, L2 %d)" % (r["label"], r["total"], r["L0"], r["L1"], r["L2"])
+            "%s=%d (L0 %d, L1 %d, L2 %d)" % (r["label"], r["total"], r["L0"], r["L1"], r["L2"])  # noqa: UP031
             for r in rows
         )
     ]
@@ -492,7 +491,7 @@ def ledger_query(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         )
         return result(
             ui,
-            "ledger by story, estimate and measured are separate rows. total estimated={} USD, total measured={} USD.\n{}".format(
+            "ledger by story, estimate and measured are separate rows. total estimated={} USD, total measured={} USD.\n{}".format(  # noqa: E501
                 te, tm, rows_text(rows, ["story", "measure_kind", "usd"], 24)
             ),
         )
