@@ -1,9 +1,8 @@
 # DA-34 task 7: one Failure -> Data round on C_70, the policy pi_0 of branch C (spec v10.5
 # sections 6.1 and 7.2), on the +zone1 scene. Drafted 12/11/2026, before any diagnosis
 # rollout, generation or train; docs/he/tray.md section 20 is the prose and the reading
-# rules. DRAFT: no loader reads this file yet. TrayRoundPlan (runplan.py) takes a
-# branch_train parent and C+'s shape; a round on a branch of the paired plan needs its own
-# model (task 7.4). Until then `runplan check` does not apply and nothing launches from it.
+# rules. Loaded by flywheel_psi0.tray.pairround (task 7.4): `runplan check` and `freeze`
+# read it; colab_train --branch C70_R1 runs only once it is frozen and approved.
 #
 # Mapping onto the PoC branches of spec 7.2, on the paired plan's four runs:
 #   C_ALL  = S70 + the other 181 episodes of ALL, picked by seed hash: uniform add-on
@@ -18,6 +17,7 @@ status: draft
 inherits: configs/runplans/tray/he-tray-pair60k.yaml # frozen, rp_e2fb9f62c223
 base_branch: C_70
 branch: C70_R1
+uniform_branch: C_ALL # (r1) compares with the same budget added uniformly
 max_rounds: 1
 
 # Steps 1-3 of spec 6.1, already run: C_70's stage 1 eval of the paired plan, 60
@@ -27,6 +27,7 @@ failures:
   runs_sha256: 9cc9cab084db1162b0a61239f70d49a8195e4a127e469e2cfa5f2f23be36f55b
   eval_set: rp_a04c14e79dfd-2e57f60
   conditions_sha256: b9c38b37afa6fbdd4027be287df85fe7b016130bd32227f97c876f6bae7d3dfb
+  checkpoint: 60000
   rows:
     file: configs/runplans/tray/round-c70-rollouts.jsonl
     sha256: aff514b54a3fe31595ff45077cf8dbeeb5eda16327951cea69c69751c86bbea9
@@ -68,7 +69,7 @@ targets:
   generator: "flywheel_simple.tray.targets via scripts/g0/tray/generate.py --conditions"
   seed_window: [100000, 199999]
   quality_filter: {max_tilt_carry_deg: 10.0, max_part_shift_end_mm: 20.0}
-  seeds: null # filled at freeze
+  seeds: [] # filled at freeze, ascending, in seed_window, at most n_add_max
   set_hash: null
   release: null
 
@@ -77,7 +78,7 @@ targets:
 train:
   parent: psi0-baseline-egodex-he # C's VLM, as C_70
   data: "S70 (425, index 0-424 byte for byte) + targeted set (index 425-)"
-  stats: "meta/stats_psi0.json of ALL, sha256 1c745091bc7dcfc9912d3c3ee0d4d8b1e1ee16ed6e9c7f7d6b5fd9c16b600243"
+  stats_sha256: 1c745091bc7dcfc9912d3c3ee0d4d8b1e1ee16ed6e9c7f7d6b5fd9c16b600243 # ALL's meta/stats_psi0.json
   recipe: "as the paired plan: psi0-stage3.yaml, batch 16, LR 1e-4 cosine, warmup 1000"
   steps: 60000
   train_seed: 0
@@ -89,6 +90,12 @@ eval:
   stages: "as 19.2: stage 1 = the first 6 chunks (60 conditions); stage 2 only on continue"
   server: "Colab L4 over SSH forward, 1 worker, Ta 24 + RTC"
 
+# tray.md 20.7: (r1) is the primary reading, (r2) the secondary.
+comparisons:
+  - {rule: r1, variant: C70_R1, baseline: C_ALL, kind: primary}
+  - {rule: r2, variant: C70_R1, baseline: C_70, kind: secondary}
+
 interpretation:
-  rules: "docs/he/tray.md section 20.7, block round-c70-rules"
+  doc: docs/he/tray.md # section 20.7
+  rules_marker: round-c70-rules
   rules_sha256: null # pinned at freeze

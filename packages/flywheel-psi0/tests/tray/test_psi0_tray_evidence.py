@@ -270,3 +270,60 @@ def test_once_all_chunks_ran_a_stopped_stage_1_stays_the_verdict(tmp_path: Path)
     assert primary["n"] == 240 and primary["ci_vs_0"] == "above"
     assert read["rule_descriptive"] == 1 and "rule" not in read
     assert "chỉ để mô tả" in (tmp_path / "pack/README.md").read_text()
+
+
+def _round_plan(tmp_path: Path) -> Path:
+    """The draft round on C_70 (tray.md 20), on the live frozen pair plan."""
+    import yaml
+    from test_psi0_tray_pairround import _raw
+
+    (tmp_path / "configs/runplans/tray").mkdir(parents=True)
+    (tmp_path / "configs/runplans/tray/round-c70-rollouts.jsonl").write_text("")
+    path = tmp_path / "round-tray-c70.yaml"
+    path.write_text(yaml.safe_dump(_raw(tmp_path), sort_keys=False))
+    return path
+
+
+def test_a_round_reads_r1_against_the_uniform_branch_and_r2_against_its_base(
+    tmp_path: Path,
+) -> None:
+    from flywheel_psi0.tray.pairround import TrayPairRoundPlan
+
+    chunks = chunks_of(tmp_path)
+    plan = _round_plan(tmp_path)
+    run(tmp_path / "r1", chunks, wins_per_chunk=8)  # 48/60
+    run(tmp_path / "call", chunks, wins_per_chunk=1)  # 6/60
+    run(tmp_path / "c70", chunks, wins_per_chunk=2)  # 12/60
+    evals = {
+        ("C70_R1", 60000): tmp_path / "r1", ("C_ALL", 60000): tmp_path / "call",
+        ("C_70", 60000): tmp_path / "c70",
+    }  # fmt: skip
+    pack = build(Inputs(plan, tmp_path / "set", evals), tmp_path / "pack")
+    prov = pack["provenance"]
+    assert prov["run_plan_id"] == run_plan_id(TrayPairRoundPlan.load(plan))
+    assert prov["status"] == "draft" and prov["rules_section"] == "20.7"
+    assert prov["round"]["pair_run_plan_id"] == "rp_e2fb9f62c223"
+    assert prov["parents"]["C70_R1"] == {
+        **prov["parents"]["C_70"], "data": "C70_R1"
+    }  # C_70's VLM, the round's data
+    [read] = pack["reads"]  # one checkpoint: the round's eval.checkpoint, no early read
+    assert (read["step"], read["role"]) == (60000, "primary")
+    rules = by_rule(read)
+    assert set(rules) == {"r1", "r2"} and "pending" not in read
+    assert (rules["r1"]["variant"], rules["r1"]["baseline"]) == ("C70_R1", "C_ALL")
+    assert (rules["r2"]["variant"], rules["r2"]["baseline"]) == ("C70_R1", "C_70")
+    # the stop rule of 19.2 applies to (r1), the primary, and only to it
+    assert read["stage1_outcome"] == "E1" and "stage1_outcome" not in rules["r2"]
+    assert rules["r1"]["reading"] == rules["r2"]["reading"] == "above"
+    readme = (tmp_path / "pack/README.md").read_text()
+    assert "Luật đọc: docs/he/tray.md 20.7" in readme and "| Vòng C70_R1 |" in readme
+    assert "**(r1) C70_R1 − C_ALL**, so sánh chính" in readme
+
+
+def test_a_round_refuses_runs_outside_it(tmp_path: Path) -> None:
+    chunks_of(tmp_path)
+    plan = _round_plan(tmp_path)
+    with pytest.raises(ValueError, match="B_70"):
+        build(Inputs(plan, tmp_path / "set", {("B_70", 60000): tmp_path}), tmp_path / "pack")
+    with pytest.raises(ValueError, match="40000"):
+        build(Inputs(plan, tmp_path / "set", {("C70_R1", 40000): tmp_path}), tmp_path / "pack")

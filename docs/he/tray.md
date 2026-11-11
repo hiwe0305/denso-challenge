@@ -2094,7 +2094,7 @@ Phiên serve dừng ngay khi lô cuối của 60k đã ghi kết quả (19.8).
 
 ## 20. Nhiệm vụ 7: một vòng Failure → Data trên `C_70` (soạn 12/11/2026, chưa chạy) [Đề xuất]
 
-_Hiếu 12/11/2026, qua phiên điều phối: "Có, soạn RunPlan", sau khi đọc giai đoạn 1 của bốn run 60k. Mục này viết và commit **trước** mọi rollout chẩn đoán, mọi lần sinh, train hay eval của vòng. Plan nháp: [`round-tray-c70.yaml`](../../configs/runplans/tray/round-tray-c70.yaml). Chưa có loader đọc plan này (20.10); không job nào chạy từ nó._
+_Hiếu 12/11/2026, qua phiên điều phối: "Có, soạn RunPlan", sau khi đọc giai đoạn 1 của bốn run 60k. Mục này viết và commit **trước** mọi rollout chẩn đoán, mọi lần sinh, train hay eval của vòng. Plan nháp: [`round-tray-c70.yaml`](../../configs/runplans/tray/round-tray-c70.yaml). Chưa có loader đọc plan này (20.10); không job nào chạy từ nó. Cập nhật 12/11/2026: loader có từ nhiệm vụ con 7.4 (20.10); plan vẫn là bản nháp, chưa job nào chạy từ nó._
 
 ### 20.1 Vì sao, và vòng này đứng ở đâu trong PoC
 
@@ -2293,12 +2293,18 @@ Luật này không đổi sau khi thấy kết quả. Muốn đổi thì ghi `De
 
 - 7.2 Bước 4 (H1–H3) và phiếu sửa cho DA-37 (ngưỡng `approach_a`) và DA-38 (ghi thời điểm lỗi): **xong 12/11/2026**, kết quả ở 20.11; hai phiếu soạn sẵn, chưa mở.
 - 7.3 Bước 5, 7, 8, evidence card của từng cụm, chọn cụm nhận dữ liệu.
-- 7.4 Mã:
+- 7.4 Mã (**xong 12/11/2026**; `runplan check` đọc plan nháp, còn 8 chỗ chờ 7.5 và lúc đóng băng):
   - loader cho plan vòng có cha là một nhánh của plan cặp (`purpose: round`, `inherits` plan cặp, `base_branch: C_70`);
   - `runplan check` và `freeze` cho plan đó;
   - bản cắt S70 + tập nhắm lỗi (như `cplus_cut`);
   - `colab_train --branch C70_R1`;
   - `evidence` đọc (r1), (r2).
+
+  Mã nằm ở `flywheel_psi0.tray`:
+  - `pairround`: model, `check`, `freeze`. `check` buộc vòng chỉ khác nhánh gốc ở dữ liệu: cùng cha, số bước, seed train và sha256 của stats; B_add bằng phần `C_ALL` thêm so với S70 (606 − 425 = 181); seed của tập nhắm lỗi nằm trong cửa sổ seed train.
+  - `round_cut`: dựng `C70_R1` từ S70 giữ nguyên từng byte (index 0–424), nối tập nhắm lỗi từ index 425, dùng stats của ALL. Có kiểm bounds trước: tập nhắm lỗi ra ngoài [min, max] của ALL thì dừng (20.6), không tính lại stats.
+  - `colab_train --branch C70_R1`: từ chối chạy khi plan vòng chưa đóng băng và chưa được duyệt.
+  - `evidence`: đọc (r1) `C70_R1` − `C_ALL` và (r2) `C70_R1` − `C_70` theo luật 20.7.
 - 7.5 Sinh, QA, chọn, đóng băng plan (điền `targets`, `rules_sha256`).
 - 7.6 Train; 7.7 eval giai đoạn 1 và đọc theo 20.7.
 
@@ -2425,3 +2431,4 @@ Phiếu DA-38 (soạn sẵn, chưa mở):
 | 11/11/2026 | Mục 19.9 (phiên điều phối chạy thử 6.3 trên cut thật): ghi sha256 phải ra của `ALL.tar` (`bea55b14…`) và `S70.tar` (`f87bfecb…`), sha khác thì dừng; bước A chạy được trên laptop từ bản sao đã kiểm | Claude cho Hiếu |
 | 12/11/2026 | Mục 20 mới (nhiệm vụ 7, Hiếu "Có, soạn RunPlan" qua phiên điều phối): một vòng Failure → Data trên `C_70` ([Đề xuất], viết trước mọi rollout chẩn đoán, sinh, train hay eval). Đặt vòng vào hình PoC của spec 7.2 (`C_70` = A₀.₇, `C_ALL` = thêm đều, `C70_R1` = C, B_add 181 episode); đầu vào `round-c70-rollouts.jsonl` (`aff514b5…`) và 8 cụm; kiểm hệ thống H1–H3 trước dữ liệu; bước 6 không làm được (S1-06), bước 7 3 lượt mỗi đại diện; ghi đè KỸ NĂNG YẾU sang sinh S1; luật đọc `round-c70-rules` ((r1) `C70_R1` − `C_ALL` quyết định, hai giai đoạn như 19.2); ngân sách khoảng 92 CU tới giai đoạn 1 (ước lượng); bảy quyết định R1–R7 chờ Hiếu. Plan nháp `round-tray-c70.yaml`, chưa có loader | Claude cho Hiếu |
 | 12/11/2026 | Mục 20.11 mới (nhiệm vụ con 7.2, qua phiên điều phối): kết quả bước 4, chỉ đọc trên `rtx3060`, 0 CU. H1: 7/60 lượt của `C_70` gãy chuỗi bước ở `approach_a` mà vẫn mang khay (1 thành công), suy ra vế lòng bàn tay–tay cầm; CHƯA RÕ (ngưỡng bộ chấm), phiếu DA-37. H2: τ_track tạm (p99 trên 10 lượt thành công, thân trên 2,640, thân dưới 0,387) vượt ở 4/6 lượt hết giờ, chủ yếu kênh yaw, và ở 21/43 lượt lỗi không hết giờ; policy ra lệnh đi và rời vùng tiếp cận; đề xuất đọc là lỗi của policy, thêm R8 vào 20.9. H3: outcome và trace không có thời điểm lỗi hay tiếp xúc; CHƯA RÕ (thiếu tín hiệu), phiếu DA-38. Luật 20.7 không đổi | Claude cho Hiếu |
+| 12/11/2026 | Mục 20, 20.10 (nhiệm vụ con 7.4): có loader cho plan vòng; `round-tray-c70.yaml` đổi theo model (`uniform_branch`, `failures.checkpoint`, `train.stats_sha256`, `comparisons`, `interpretation`), giá trị không đổi. Luật 20.7 không đổi | Claude cho Hiếu |

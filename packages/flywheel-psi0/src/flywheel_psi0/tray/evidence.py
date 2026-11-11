@@ -35,6 +35,18 @@ videos/. The parts, in the order of the reading rules (19.2):
 - the loss curves of every job (`metrics.jsonl`), a few rollout videos of each run (the
   successes and one failure per label first), and the plan's ledger rows.
 
+The same command reads a Failure -> Data round on a branch of the pair (task 7,
+`pairround`, rules block `round-c70-rules` of tray.md 20.7) when given the round plan:
+
+    python -m flywheel_psi0.tray.evidence configs/runplans/tray/round-tray-c70.yaml \\
+        --set <eval set> --eval C70_R1@60000=<dir> --eval C_ALL@60000=<dir> \\
+        --eval C_70@60000=<dir> --train C70_R1=<job dir> --out <dir>
+
+Its runs are the round's branch and the baselines of its comparisons: (r1) C70_R1 -
+C_ALL, the primary, with the stage 1 outcome E1/E3/F/continue of 19.2, and (r2) C70_R1 -
+C_70, secondary. One checkpoint is read, the round's `eval.checkpoint`; provenance names
+the round's id, its base and uniform branches and its targeted set.
+
 Eval results are read through the frozen plan of `eval_of`: `pairplan.check` holds the
 pair's eval, stats and conditions equal to it, and `eval_results` reads that plan's type.
 `flywheel_simple` (the target pose of rule c) is imported only when that part runs.
@@ -54,6 +66,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import yaml
+
+from flywheel_psi0.tray import pairround
 from flywheel_psi0.tray.eval_batch import Chunk, chunk_plan, phases_for
 from flywheel_psi0.tray.eval_results import (
     STAGE1_CHUNKS,
@@ -63,7 +78,7 @@ from flywheel_psi0.tray.eval_results import (
     stage1_outcome,
     summarize,
 )
-from flywheel_psi0.tray.pairplan import TrayPairPlan, balance_needed
+from flywheel_psi0.tray.pairplan import PairBranch, PairCheckpoints, TrayPairPlan, balance_needed
 from flywheel_psi0.tray.place_error import RELAXED_M, rows_for, tolerance_curve
 from flywheel_psi0.tray.runplan import REPO, Parent, TrayRunPlan, lock_path, run_plan_id
 
@@ -346,6 +361,55 @@ def joint_readings(compared: Sequence[dict[str, Any]]) -> dict[str, Any]:
     return out
 
 
+def round_view(round_plan: pairround.TrayPairRoundPlan, pair: TrayPairPlan) -> TrayPairPlan:
+    """The pair as the round reads it: its branch, its comparisons' baselines, its rules.
+
+    The round's branch is the base branch's VLM on the round's data; the reads, videos and
+    ledger rows then go through the same code as the pair's. Not validated as a pair (it
+    is no (VLM x data) grid): a view for reading only, never frozen or launched.
+    """
+    base = pair.branches[round_plan.base_branch]
+    names = sorted({c.baseline for c in round_plan.comparisons} - {round_plan.branch})
+    branches = {name: pair.branches[name] for name in names}
+    branches[round_plan.branch] = PairBranch(
+        parent=base.parent,
+        role=f"round on {round_plan.base_branch}: its data plus the targeted set",
+        data=round_plan.branch,
+    )
+    return pair.model_copy(
+        update={
+            "name": round_plan.name,
+            "branches": branches,
+            "comparisons": round_plan.comparisons,
+            "interpretation": round_plan.interpretation,
+            "checkpoints": PairCheckpoints(primary=round_plan.eval.checkpoint),
+        }
+    )
+
+
+def round_provenance(
+    round_plan: pairround.TrayPairRoundPlan, pair: TrayPairPlan
+) -> dict[str, Any]:
+    """What a round's pack names on top of the pair's provenance."""
+    targets = round_plan.targets
+    return {
+        "run_plan_id": run_plan_id(round_plan),
+        "status": round_plan.status,
+        "rules_section": "20.7",
+        "round": {
+            "inherits": round_plan.inherits,
+            "pair_run_plan_id": run_plan_id(pair),
+            "base_branch": round_plan.base_branch,
+            "uniform_branch": round_plan.uniform_branch,
+            "branch": round_plan.branch,
+            "b_add_episodes": round_plan.budget.b_add_episodes,
+            "targeted_episodes": len(targets.seeds),
+            "targets_set_hash": targets.set_hash,
+            "targets_release": targets.release.id if targets.release else None,
+        },
+    }
+
+
 def pair_roles(plan: TrayPairPlan) -> tuple[str, str]:
     """(variant, baseline): the stage 1 branch against the release-parent branch."""
     names = sorted(plan.branches)
@@ -454,7 +518,14 @@ def build(
     tolerance: tuple[float, float] | None = None,
     repo: Path = REPO,
 ) -> dict[str, Any]:
-    plan = TrayPairPlan.load(inputs.plan_path)
+    raw = yaml.safe_load(inputs.plan_path.read_text(encoding="utf-8"))
+    round_plan = None
+    if pairround.on_paired_plan(raw, repo):
+        round_plan = pairround.TrayPairRoundPlan.model_validate(raw)
+        pair = TrayPairPlan.load(repo / round_plan.inherits)
+        plan = round_view(round_plan, pair)
+    else:
+        plan = TrayPairPlan.model_validate(raw)
     base = TrayRunPlan.load(repo / plan.eval_of.plan)
     out.mkdir(parents=True, exist_ok=True)
     rows = [
@@ -473,6 +544,8 @@ def build(
         "lock": lock_path(inputs.plan_path).is_file(),
         "reads": [],
     }
+    if round_plan is not None:
+        pack["provenance"].update(round_provenance(round_plan, pair))
     for step in reads_at:
         outs = {b: d for (b, s), d in inputs.evals.items() if s == step}
         if not outs:
@@ -540,7 +613,7 @@ def render(plan: TrayPairPlan, pack: dict[str, Any]) -> str:
         f"# Gói bằng chứng {plan.name} ({prov['run_plan_id']})",
         "",
         "Sơ bộ, trên dev: 1 seed train mỗi run, 1 rollout mỗi điều kiện; chỉ trong sim, "
-        "renderer MuJoCo. Luật đọc: docs/he/tray.md 19.2 "
+        f"renderer MuJoCo. Luật đọc: docs/he/tray.md {prov.get('rules_section', '19.2')} "
         f"(`rules_sha256` `{str(prov['rules_sha256'])[:12]}…`). Sinh bởi "
         "`python -m flywheel_psi0.tray.evidence`; chạy lại khi có thêm kết quả.",
         "",
@@ -562,6 +635,15 @@ def render(plan: TrayPairPlan, pack: dict[str, Any]) -> str:
         f"| Số bước, checkpoint đọc | {prov['steps']}; số chính "
         f"{prov['checkpoints']['primary']}, đọc sớm {prov['checkpoints']['early'] or 'không'} |",
     ]
+    if "round" in prov:
+        r = prov["round"]
+        lines.append(
+            f"| Vòng {r['branch']} | trên `{r['base_branch']}` của `{r['pair_run_plan_id']}`;"
+            f" ngân sách {r['b_add_episodes']} episode như `{r['uniform_branch']}`; tập nhắm"
+            f" lỗi {r['targeted_episodes']} episode,"
+            f" `{str(r['targets_set_hash'] or 'chưa ghim')[:12]}`"
+            f" ({r['targets_release'] or 'chưa có release'}) |"
+        )
     for sub in prov["subsets"]:
         lines.append(
             f"| Tập con {sub['name']} | {100 * sub['fraction']:g} % mỗi phần, theo sha256 seed; "

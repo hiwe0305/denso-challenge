@@ -846,8 +846,13 @@ def freeze_round(plan_path: Path, repo: Path = REPO) -> Path:
 
 
 def freeze(plan_path: Path, repo: Path = REPO) -> Path:
-    purpose = yaml.safe_load(plan_path.read_text(encoding="utf-8")).get("purpose")
+    raw = yaml.safe_load(plan_path.read_text(encoding="utf-8"))
+    purpose = raw.get("purpose")
     if purpose == "round":
+        from flywheel_psi0.tray import pairround  # imports this module: no top-level cycle
+
+        if pairround.on_paired_plan(raw, repo):
+            return pairround.freeze(plan_path, repo)
         return freeze_round(plan_path, repo)
     if purpose == "paired_train":
         from flywheel_psi0.tray import pairplan  # imports this module: no top-level cycle
@@ -894,11 +899,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         out = freeze(args.plan)
         print(f"wrote {out}: {json.loads(out.read_text())['run_plan_id']}")
         return 0
-    paired = yaml.safe_load(args.plan.read_text(encoding="utf-8")).get("purpose") == "paired_train"
-    if args.launch and args.release is None and not paired:
-        parser.error("--launch needs --release: a job checks the episode indices too")
     repo = REPO  # read at call time, so a test can point it at a copy
     raw = yaml.safe_load(args.plan.read_text(encoding="utf-8"))
+    from flywheel_psi0.tray import pairround
+
+    if pairround.on_paired_plan(raw, repo):  # a round on a branch of the paired plan
+        if args.release is not None:
+            parser.error("a round on a paired plan checks its cut itself: no --release")
+        rest = ["--targets-release", str(args.targets_release)] if args.targets_release else []
+        return pairround.main(
+            ["check", str(args.plan), *(["--launch"] if args.launch else []), *rest]
+        )
+    paired = raw.get("purpose") == "paired_train"
+    if args.launch and args.release is None and not paired:
+        parser.error("--launch needs --release: a job checks the episode indices too")
     if raw.get("purpose") == "paired_train":
         from flywheel_psi0.tray import pairplan
 
