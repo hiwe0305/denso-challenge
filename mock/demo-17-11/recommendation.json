@@ -1,0 +1,14 @@
+{
+  "budget_gpu_hours": 24.0,
+  "budget_human_minutes": 480.0,
+  "budget_usd": 400.0,
+  "checkpoint_ref": "ckpt_B",
+  "evaluation_ref": "ev_B_dev",
+  "finished_at": null,
+  "recommendation_ref": "rec_round1",
+  "round_no": 1,
+  "run_plan_ref": "rp_round1",
+  "started_at": "2026-11-08T09:00:00Z",
+  "status": "AWAITING_REVIEW",
+  "task_id": "two_table"
+}

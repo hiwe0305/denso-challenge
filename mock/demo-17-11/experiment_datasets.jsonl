@@ -1,0 +1,16 @@
+{"episodes_used": 164, "experiment_code": "exp_A", "mix_weight": 1.0, "release_ref": "rel_two_table_v1"}
+{"episodes_used": 115, "experiment_code": "exp_A07", "mix_weight": 1.0, "release_ref": "rel_two_table_a07"}
+{"episodes_used": 164, "experiment_code": "exp_B", "mix_weight": 1.0, "release_ref": "rel_two_table_v1"}
+{"episodes_used": 164, "experiment_code": "exp_BFAIL", "mix_weight": 1.0, "release_ref": "rel_two_table_v1"}
+{"episodes_used": 30, "experiment_code": "exp_HE_V_EGO_10", "mix_weight": 1.0, "release_ref": "rel_he_v_ego_10"}
+{"episodes_used": 40, "experiment_code": "exp_HE_V_EGO_20", "mix_weight": 1.0, "release_ref": "rel_he_v_ego_20"}
+{"episodes_used": 60, "experiment_code": "exp_HE_V_EGO_40", "mix_weight": 1.0, "release_ref": "rel_he_v_ego_40"}
+{"episodes_used": 100, "experiment_code": "exp_HE_V_EGO_80", "mix_weight": 1.0, "release_ref": "rel_he_v_ego_80"}
+{"episodes_used": 20, "experiment_code": "exp_HE_V_EGO10_10", "mix_weight": 1.0, "release_ref": "rel_he_v_ego10_10"}
+{"episodes_used": 30, "experiment_code": "exp_HE_V_EGO10_20", "mix_weight": 1.0, "release_ref": "rel_he_v_ego10_20"}
+{"episodes_used": 50, "experiment_code": "exp_HE_V_EGO10_40", "mix_weight": 1.0, "release_ref": "rel_he_v_ego10_40"}
+{"episodes_used": 90, "experiment_code": "exp_HE_V_EGO10_80", "mix_weight": 1.0, "release_ref": "rel_he_v_ego10_80"}
+{"episodes_used": 10, "experiment_code": "exp_HE_V_NOEGO_10", "mix_weight": 1.0, "release_ref": "rel_he_v_noego_10"}
+{"episodes_used": 20, "experiment_code": "exp_HE_V_NOEGO_20", "mix_weight": 1.0, "release_ref": "rel_he_v_noego_20"}
+{"episodes_used": 40, "experiment_code": "exp_HE_V_NOEGO_40", "mix_weight": 1.0, "release_ref": "rel_he_v_noego_40"}
+{"episodes_used": 80, "experiment_code": "exp_HE_V_NOEGO_80", "mix_weight": 1.0, "release_ref": "rel_he_v_noego_80"}
