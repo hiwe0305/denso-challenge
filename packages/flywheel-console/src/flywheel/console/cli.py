@@ -13,9 +13,14 @@ def index(
 ) -> None:
     """Build the console index."""
     from flywheel.console.index import build_all
+    from flywheel.console.paths import ConsolePaths
 
+    paths = ConsolePaths.from_env()
     parts = [s for s in only.split(",") if s]
-    build_all(only=parts or None)
+    counts = build_all(paths, only=parts or None)
+    for name, part in counts.items():
+        typer.echo(f"{name}: " + " ".join(f"{k}={v}" for k, v in part.items()))
+    typer.echo(f"index: {paths.index}")
 
 
 @app.command()
