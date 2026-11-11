@@ -449,6 +449,9 @@ rows:
   - src_60e3f454316d2553
   aliases: []
   ego_viewer: human1m/ego-h1m-20261111/viewer
+  ego_source: Team tray
+  qa_work: src_805804635f9af7f7
+  ego_dir: team_tray
 - id: h1m-egodex
   name: ego-h1m-20261111/egodex
   title: Ego H1M · EgoDex (185)
@@ -472,6 +475,9 @@ rows:
   - src_158ec3c813ffe9a6
   aliases: []
   ego_viewer: human1m/ego-h1m-20261111/viewer
+  ego_source: EgoDex
+  qa_work: src_158ec3c813ffe9a6
+  ego_dir: egodex
 - id: psi-two-table
   name: psi-data@e78fb93 two_table (G1WholebodyLocomotionPickBetweenTablesTeleop-v0)
   title: psi-data · two_table (99)
