@@ -84,3 +84,38 @@ def test_seed_rows_sharing_a_viewer_split_by_source(fw: ConsolePaths) -> None:
         assert None not in labels and len(set(labels)) == len(labels), labels
         for r in group:
             assert r.get("qa_work", "").startswith("src_") and r.get("ego_dir")
+
+
+def test_ego_deid_symlink_to_raw_clip_gets_no_poster(
+    fw: ConsolePaths, work: Path, tmp_path: Path
+) -> None:
+    raw = write_mp4(fw.fw_root / "vid" / "c.mp4")
+    link = fw.fw_root / "vid" / "link.deid.mp4"
+    link.symlink_to(raw)
+    b = work / "egocentric" / "ep_raw" / "bundle.json"
+    b.write_text(json.dumps({"mp4": str(link)}))
+    egocentric.build(fw, tmp_path / "out", [])
+    assert not (tmp_path / "out/ds/src_test/posters/ep_raw.jpg").exists()
+
+
+def test_ego_viewer_poster_outside_fw_root_or_vault_is_skipped(
+    fw: ConsolePaths, tmp_path: Path
+) -> None:
+    viewer = fw.fw_root / "human1m" / "v" / "viewer"
+    (viewer / "data").mkdir(parents=True)
+    (fw.fw_root / "vault").mkdir()
+    (fw.fw_root / "vault" / "x.jpg").write_bytes(b"\xff\xd8secret")
+    (tmp_path / "leak.jpg").write_bytes(b"\xff\xd8leak")
+    eps = [
+        {"id": "e1", "title": "A", "seconds": 3.0, "qa": "pass", "hands": 0.9, "pose": "E-A",
+         "n_subtasks": 1, "source": "Team", "poster": "../../../vault/x.jpg"},
+        {"id": "e2", "title": "B", "seconds": 3.0, "qa": "pass", "hands": 0.9, "pose": "E-A",
+         "n_subtasks": 1, "source": "Team", "poster": "../../../../leak.jpg"},
+    ]  # fmt: skip
+    (viewer / "data" / "index.json").write_text(json.dumps({"episodes": eps}))
+    out = tmp_path / "out"
+    rows = [{"id": "h1m-team", "ego_viewer": "human1m/v/viewer", "ego_source": "Team"}]
+    egocentric.build(fw, out, rows)
+    assert not list((out / "ds/h1m-team").glob("posters/*"))
+    got = json.loads((out / "ds/h1m-team/episodes.json").read_text())
+    assert all(e["poster"] is None for e in got)

@@ -65,3 +65,13 @@ def loop_chain(paths: ConsolePaths) -> list[int]:
         by[k]
         for k in ("loop.eval_n", "loop.failures", "loop.targets", "loop.recorded", "loop.kept")
     ]
+
+
+def loop_detail(paths: ConsolePaths) -> dict[str, int]:
+    """Cited Failure → Data numbers outside the main chain: QA pass count and the cut size."""
+    by = {c.key: c.value for c in load(paths)}
+    return {"qa_pass": by["loop.qa_pass"], "in_cut": by["loop.in_cut"]}
+
+
+def loop_in_cut(paths: ConsolePaths) -> int:
+    return loop_detail(paths)["in_cut"]

@@ -46,6 +46,7 @@ def build_all(
         for name in PARTS:  # story reads catalog.json, so keep this order
             if name in chosen:
                 counts[name] = runners[name](paths, tmp)
+        catalog.enrich(tmp)  # after robot and ego, also on partial runs
         if final.is_dir():
             final.rename(old)
         try:

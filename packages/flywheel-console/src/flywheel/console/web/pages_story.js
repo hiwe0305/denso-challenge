@@ -348,9 +348,10 @@ async function runsPage(main, params, qs) {
 }
 
 /* ============================================================ EVAL */
-let STAGES = [], LV = [], FAIL = {}, PLACE_CM = {}, EV = {};
+let STAGES = [], LV = [], FAIL = {}, PLACE_CM = {}, EV = {}, LC = [], LD = {};
 function useEval(S) {
   EV = S.eval || {};
+  LC = S.loop_chain || []; LD = S.loop_detail || {};
   STAGES = EV.stages || [];
   LV = (EV.levels || []).map(l => ({ id: l.level, n: l.n, s: l.successes, f: l.steps_pct }));
   FAIL = {}; Object.keys(EV.failure_labels || {}).forEach(k => { const v = EV.failure_labels[k]; FAIL[k] = [v.L0, v.L1, v.L2]; });
@@ -398,7 +399,7 @@ async function evalPage(main, params, qs) {
   const legend = h("div", { class: "ops-row ops-mono", style: { gap: "12px", fontSize: "11px" } }, LV.map(l => h("span", { class: "ops-row", style: { gap: "4px" } }, [h("span", { class: "ops-dot", style: { background: (typeof UI !== "undefined" && UI.color) ? UI.color(l.id + " " + l.s + "/" + l.n) : col.acc() } }), l.id])));
   if (funBox.instance) { let tries = 0; const fix = () => { const c = funBox.instance(); if (c) c.setOption({ xAxis: { axisLabel: { interval: 0, fontSize: 10 } } }); else if (tries++ < 40) setTimeout(fix, 100); }; fix(); }
   /* failures */
-  const frows = Object.keys(FAIL).map(k => ({ id: k, l0: failAt(k, "L0"), l1: failAt(k, "L1"), l2: failAt(k, "L2"), all: failAt(k, "L1–2"), share: failAt(k, "L1–2") / 240 }));
+  const frows = Object.keys(FAIL).map(k => ({ id: k, l0: failAt(k, "L0"), l1: failAt(k, "L1"), l2: failAt(k, "L2"), all: failAt(k, "L1–2"), share: failAt(k, "L1–2") / LC[0] }));
   const failTable = table({
     columns: [{ key: "id", label: "label", mono: true }, { key: "l0", label: "L0", align: "right", mono: true }, { key: "l1", label: "L1", align: "right", mono: true }, { key: "l2", label: "L2", align: "right", mono: true },
       { key: "all", label: "L1–2", align: "right", mono: true }, { key: "share", align: "right", mono: true, fmt: v => pctS(v) }],
@@ -446,15 +447,15 @@ async function loopPage(main) {
   main.appendChild(pageHead("Loop", [{ label: "measured", value: num(meas, "float1"), unit: "$" }, { label: "estimated", value: num(est, "float1"), unit: "$" }, { label: "CU", value: num(bal, "float1") }]));
   /* chain strip (docs/he/tray.md §16.6, §17.5) */
   const chain = [
-    [String(LV[LV.length - 1].n), "eval", "ok", "eval"], [String(failAt("L-PLACE-POSE", "L1–2")), "place-pose", "bad", "eval"], ["262", "generated", "ok", "data/tray_s1_4a8f4a8c6a8d"], ["229", "recorded", "ok", "data/tray_s1_4a8f4a8c6a8d"],
-    ["177", "kept", "ok", "data/ALL"], ["160", "in cut", "ok", "data/cut-C"], ["C+ 40k", "trained", "ok", "runs"], ["—", "re-eval", "pending", "eval"]
+    [String(LC[0]), "eval", "ok", "eval"], [String(failAt("L-PLACE-POSE", "L1–2")), "place-pose", "bad", "eval"], [String(LC[2]), "generated", "ok", "data/tray_s1_4a8f4a8c6a8d"], [String(LC[3]), "recorded", "ok", "data/tray_s1_4a8f4a8c6a8d"],
+    [String(LC[4]), "kept", "ok", "data/ALL"], [String(LD.in_cut), "in cut", "ok", "data/cut-C"], ["C+ 40k", "trained", "ok", "runs"], ["—", "re-eval", "pending", "eval"]
   ];
   const strip = h("div", { class: "ops-strip" }, chain.map(([v, l, st, link]) => h("a", { class: "ops-node", href: "#/" + link }, [
     h("span", { class: "v ops-mono", style: { color: st === "bad" ? col.bad() : st === "pending" ? col.warn() : col.text() }, text: v }), h("span", { class: "l", text: l }), st === "pending" ? stateTag("pending", "wait") : null])));
   /* cluster table */
   const rows = (EV.clusters || []).map(c => ({ id: c.label, stage: c.stage, n: failAt(c.label, "L1–2"), diag: c.diagnosis, interv: c.intervention, eps: c.episodes }));
   const clusters = table({
-    columns: [{ key: "id", label: "cluster", mono: true }, { key: "stage", mono: true }, { key: "n", label: "n/240", align: "right", mono: true },
+    columns: [{ key: "id", label: "cluster", mono: true }, { key: "stage", mono: true }, { key: "n", label: "n/" + (LC[0] != null ? LC[0] : "…"), align: "right", mono: true },
       { key: "diag", label: "diagnosis", fmt: (v, r) => stateTag(r.diag === "data" ? "run" : "todo", v) }, { key: "interv", label: "intervention" }, { key: "eps", label: "episodes", mono: true }],
     rows, qsKey: "cluster", onRow: r => ctx({ route: "loop", selection: { cluster: r.id } })
   });
@@ -472,15 +473,15 @@ async function loopPage(main) {
     panel("Clusters", clusters),
     panel("Ledger", ledger)
   ]));
-  const pp = failAt("L-PLACE-POSE", "L1–2"), nT = LV[LV.length - 1].n;
-  const nodes = ["rollouts", "place-pose", "other", "generated", "failed", "recorded", "filtered", "kept", "C+", "re-eval"].map(name => ({ name }));
+  const pp = failAt("L-PLACE-POSE", "L1–2"), nT = LC[0], [gen, rec, kept] = [LC[2], LC[3], LC[4]], qaPass = LD.qa_pass, inCut = LD.in_cut;
+  const nodes = ["rollouts", "place-pose", "other", "generated", "failed", "recorded", "rejected", "passed", "filtered", "kept", "spare", "C+", "re-eval"].map(name => ({ name }));
   const lk = (source, target, value) => ({ source, target, value });
-  const CHAIN = { rollouts: 0, "place-pose": 1, generated: 2, recorded: 3, kept: 4, "C+": 5 };
+  const CHAIN = { rollouts: 0, "place-pose": 1, generated: 2, recorded: 3, "passed": 4, kept: 5, "C+": 6 };
   ec(flowBox, { tooltip: { trigger: "item" }, series: [{ type: "sankey", left: 24, right: 60, top: 40, bottom: 40, nodeWidth: 10, nodeGap: 14, emphasis: { focus: "adjacency" },
     label: { color: col.text(), fontSize: 11, formatter: p => (p.value != null ? p.value + "\n" : "") + p.name }, lineStyle: { color: "gradient", opacity: .35 }, itemStyle: { borderWidth: 0 },
     /* main chain alternates label side by column so neighbours never share a row; sinks sit in the last column, labelled to the right */
     data: nodes.map((n, i) => Object.assign(n, { label: { position: n.name in CHAIN ? (CHAIN[n.name] % 2 ? "top" : "bottom") : "right" }, itemStyle: { color: n.name === "re-eval" ? col.warn() : n.name === "place-pose" ? col.bad() : ser(i) } })),
-    links: [lk("rollouts", "place-pose", pp), lk("rollouts", "other", nT - pp), lk("place-pose", "generated", 262), lk("generated", "recorded", 229), lk("generated", "failed", 33), lk("recorded", "kept", 177), lk("recorded", "filtered", 52), lk("kept", "C+", 177), lk("C+", "re-eval", 177)] }] });
+    links: [lk("rollouts", "place-pose", pp), lk("rollouts", "other", nT - pp), lk("place-pose", "generated", gen), lk("generated", "recorded", rec), lk("generated", "failed", gen - rec), lk("recorded", "passed", qaPass), lk("recorded", "rejected", rec - qaPass), lk("passed", "kept", kept), lk("passed", "filtered", qaPass - kept), lk("kept", "C+", inCut), lk("kept", "spare", kept - inCut), lk("C+", "re-eval", inCut)] }] });
   ec(costBox, { grid: { left: 54, right: 10, top: 16, bottom: 22 }, tooltip: { trigger: "axis", axisPointer: { type: "shadow" } }, legend: { top: 0, right: 0, textStyle: { color: col.t2(), fontSize: 11 } },
     xAxis: axis({ type: "category", data: L.map(r => r[0]), axisLabel: { color: col.t2(), fontSize: 10, interval: 0, rotate: 30 } }), yAxis: axis({ type: "value" }),
     series: [{ name: "estimated", type: "bar", barMaxWidth: 12, data: L.map(r => r[1]), itemStyle: { color: col.t3() } }, { name: "measured", type: "bar", barMaxWidth: 12, data: L.map(r => r[2]), itemStyle: { color: col.ok() } }] });

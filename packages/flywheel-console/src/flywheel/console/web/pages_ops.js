@@ -3,7 +3,6 @@
 (function () {
 "use strict";
 const P = window.PAGES_OPS = window.PAGES_OPS || {};
-const FWDIR = "/home/hiwe/project/denso-challenge/fwdata";
 const NODES = ["ingest", "deid", "ea", "pose", "annotate", "qa", "report"];
 const GATED = ["ea", "pose", "annotate", "qa", "report"];
 const VIDEO_RE = /\.(mp4|mov|mkv|avi|webm)$/i;
@@ -231,7 +230,7 @@ async function importPanel(K) {
       } catch (e) { list.appendChild(h("div", { class: "ops-mono", style: { color: col.bad() }, text: e.message })); }
     }
     pickHold.replaceChildren(h("div", { class: "ops-wrap", style: { gap: "6px" } }, [h("div", { class: "ops-row" }, [pathIn, h("button", { class: "ops-btn", text: "Open", onclick: () => open(pathIn.value.trim()) })]), list]));
-    open(FWDIR + "/egocentric-raw");
+    api("/api/status").then(st => open(st.fw_root + "/egocentric-raw"), () => {});
   }
   const srcSel = h("select", { class: "ops-in", onchange: e => { S.source = e.target.value; } }, [h("option", { value: "video", text: "video" }), h("option", { value: "egodex", text: "egodex" })]);
   const splitSel = h("select", { class: "ops-in", onchange: e => { S.split = e.target.value; } }, [h("option", { value: "train", text: "train" }), h("option", { value: "dev", text: "dev" })]);
@@ -265,7 +264,7 @@ async function exportPanel(K) {
     h("input", { type: "checkbox", onchange: e => { e.target.checked ? picked.add(w.path) : picked.delete(w.path); } }), h("span", { class: "ops-mono", text: w.name }),
     h("span", { class: "ops-mono", style: { color: col.t2() }, text: w.source_detail + " · " + w.episodes + " ep" }), K.stateTag(w.summary && w.summary.has_report ? "done" : "todo", w.summary && w.summary.has_report ? "report" : "no report")]));
   const rows = cat && cat.rows ? cat.rows.filter(r => r.laptop_dir) : [];
-  const dsSel = h("select", { class: "ops-in", style: { maxWidth: "280px" } }, rows.map(r => h("option", { value: FWDIR + "/" + r.laptop_dir.replace(/^fwdata\//, ""), text: r.id })));
+  const dsSel = h("select", { class: "ops-in", style: { maxWidth: "280px" } }, rows.map(r => h("option", { value: r.laptop_dir.replace(/^fwdata\//, ""), text: r.id })));
   async function go(kind, params, box) {
     box.textContent = "";
     try { const j = await startJob(kind, params); location.hash = "#/jobs?job=" + j.id; } catch (e) { box.textContent = e.message; }

@@ -29,6 +29,8 @@ from flywheel.console.paths import ConsolePaths, active, guard
 VIDEO_EXT = (".mp4", ".mov", ".mkv", ".avi", ".webm")
 TUNNEL_PORT = 11435
 TUNNEL_URL = f"http://127.0.0.1:{TUNNEL_PORT}"
+# loopback calls must never go through http_proxy
+LOOPBACK = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 AGENT_MODEL = "hf.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB:Q4_K_M"
 AGENT_REVISION = "1db54d5b12533ff1bcaa8e42cf4c667988a1f1be"
 
@@ -177,7 +179,7 @@ class Tunnel:
         if not fresh and time.time() - t < 4:
             return v
         try:
-            with urllib.request.urlopen(TUNNEL_URL + "/api/tags", timeout=3) as r:
+            with LOOPBACK.open(TUNNEL_URL + "/api/tags", timeout=3) as r:
                 v = [m["name"] for m in json.load(r).get("models", [])]
         except Exception:
             v = None
@@ -433,6 +435,23 @@ def auto_estimates(work: str | Path, explicit: str | None) -> list[str]:
     return ["--estimates", str(ed)] if ed.is_dir() and next(ed.glob("ep_*.npz"), None) else []
 
 
+def _reviewer() -> str:
+    """Reviewer name: ``FW_REVIEWER``, else the repo's ``git config user.name``, else refuse."""
+    name = os.environ.get("FW_REVIEWER", "").strip()
+    if not name:
+        try:
+            r = subprocess.run(
+                ["git", "-C", str(_repo()), "config", "user.name"],
+                capture_output=True, text=True, timeout=5, check=False,
+            )  # fmt: skip
+            name = r.stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            name = ""
+    if not name:
+        raise ValueError("no reviewer: set FW_REVIEWER or git config user.name")
+    return name
+
+
 def _plan_agentqa_review(p: dict[str, Any], fw: list[str]) -> dict[str, Any]:
     rep = under(p.get("reports") or "", _fw())
     if not rep.is_file():
@@ -459,7 +478,7 @@ def _plan_agentqa_review(p: dict[str, Any], fw: list[str]) -> dict[str, Any]:
             raise ValueError("decide must be agree or override")
     out = aqa_dir() / "reviews"
     argv = fw + ["agentqa", "review", "--reports", str(rep), "--report-id", rid]
-    argv += ["--reviewer", "Hiếu"]
+    argv += ["--reviewer", _reviewer()]
     argv += [x for d in ds for x in ("--decide", d)] + ["--out", str(out)]
     return {"argv": argv, "outputs": {"out": str(out)}}
 
@@ -548,7 +567,8 @@ def plan(kind: str, p: dict[str, Any] | None, job_id: str) -> dict[str, Any]:
             argv += ["--sample", str(sample)]
         return {"argv": argv, "outputs": {"out": str(fwr / "human1m" / name)}}
     if kind == "export.zip":
-        d = under(p.get("path") or "", fwr)
+        raw = str(p.get("path") or "")
+        d = under(raw if Path(raw).is_absolute() else fwr / raw, fwr)
         if not d.is_dir():
             raise ValueError("not a folder")
         if "console" in d.relative_to(fwr.resolve()).parts:
@@ -1317,6 +1337,7 @@ def status() -> dict[str, Any]:
     keys = ("id", "kind", "stage", "state", "created", "started", "ended", "rc", "chain_id")
     return {
         "time": tm,
+        "fw_root": str(_fw()),
         "stages": [stages[k] for k in ("collect", "process", "release", "train", "eval", "loop")],
         "jobs": [{k: j.get(k) for k in keys} for j in jobs],
         "machines": {

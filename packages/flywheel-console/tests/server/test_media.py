@@ -90,3 +90,37 @@ def test_episode_json_downsamples(fw: ConsolePaths, lerobot: Path) -> None:
         media.episode_json("nope", 1)
     with pytest.raises(ValueError):
         media.episode_json("S70", 10**6)
+
+
+def _parquet(path: Path, scale: float) -> None:
+    n = 10
+    cols = {
+        "action": [[scale * i, 0.0] for i in range(n)],
+        "timestamp": [i / 50 for i in range(n)],
+        "observation.hand_joints": [[1.0] for _ in range(n)],
+        "observation.arm_joints": [[1.0] for _ in range(n)],
+        "observation.leg_joints": [[0.0] for _ in range(n)],
+        "observation.prev_torso_rpy": [[0.0] for _ in range(n)],
+    }
+    pq.write_table(pa.table(cols), path)
+
+
+def test_robot_caches_rebuild_when_source_changes(fw: ConsolePaths, lerobot: Path) -> None:
+    import os
+
+    pf = lerobot / "data" / "chunk-000" / "episode_000001.parquet"
+    _parquet(pf, 1.0)
+    first = json.loads(media.episode_json("S70", 1))
+    assert first["action"]["left_hand"]["v"][0][1] == 5.0
+    _parquet(pf, 2.0)
+    os.utime(pf, (pf.stat().st_atime, pf.stat().st_mtime + 10))
+    assert json.loads(media.episode_json("S70", 1))["action"]["left_hand"]["v"][0][1] == 10.0
+    mp4 = next((lerobot / "videos").rglob("episode_000001.mp4"))
+    s1 = media.strip_jpeg("S70", 1)
+    write_mp4(mp4, w=96)
+    os.utime(mp4, (mp4.stat().st_atime, mp4.stat().st_mtime + 10))
+    assert media.strip_jpeg("S70", 1) != s1
+    lay = lerobot / "meta" / "action_layout.json"
+    lay.write_text(json.dumps({"dimensions": [{"group": "zzz"}]}))
+    os.utime(lay, (lay.stat().st_atime, lay.stat().st_mtime + 10))
+    assert list(media.layout("S70")) == ["zzz"]

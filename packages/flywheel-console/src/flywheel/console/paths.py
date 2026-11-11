@@ -61,7 +61,7 @@ class ConsolePaths:
     def from_env(cls, repo: Path | None = None) -> ConsolePaths:
         root = repo if repo is not None else _find_repo(Path.cwd())
         env = os.environ.get("FW_ROOT")
-        return cls(repo=root, fw_root=Path(env) if env else root / "fwdata")
+        return cls(repo=root, fw_root=Path(env).resolve() if env else root / "fwdata")
 
 
 def _is_workspace(pyproject: Path) -> bool:
@@ -99,7 +99,7 @@ def guard(p: Path | str, roots: Sequence[Path]) -> Path:
     """Resolve ``p`` (following symlinks) and require it to sit under one of ``roots``."""
     resolved = Path(p).resolve()
     for part in resolved.parts:
-        if part == "vault" or "holdout" in part.lower():
+        if part.lower() == "vault" or "holdout" in part.lower():
             raise PathDenied(f"protected path: {p}")
     for root in roots:
         if resolved.is_relative_to(root.resolve()):

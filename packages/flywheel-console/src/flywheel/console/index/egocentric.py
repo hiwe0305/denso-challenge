@@ -36,7 +36,7 @@ def _deid_video(paths: ConsolePaths, work: Path, ep: str) -> Path | None:
     if not p.is_absolute():
         p = paths.fw_root / p
     try:
-        p = guard(deid_only(p), [paths.fw_root])
+        p = deid_only(guard(p, [paths.fw_root]))
     except PathDenied:
         return None
     return p if p.is_file() else None
@@ -122,9 +122,12 @@ def _viewer(paths: ConsolePaths, out: Path, row: dict[str, Any]) -> int | None:
             pq[q["episode_id"]] = q
     rows: list[dict[str, Any]] = []
     for e in es:
-        src = viewer / e["poster"]
-        has = src.is_file()
-        if has:
+        try:
+            src = guard(viewer / e["poster"], [paths.fw_root])
+        except PathDenied:
+            src = None
+        has = src is not None and src.is_file()
+        if has and src is not None:
             (d / "posters").mkdir(parents=True, exist_ok=True)
             shutil.copy(src, d / "posters" / f"{e['id']}.jpg")
         qrow = pq.get(e["id"])

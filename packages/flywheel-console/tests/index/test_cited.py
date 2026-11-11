@@ -37,3 +37,8 @@ def test_verify_flags_bad_quote(tmp_path: Path) -> None:
     p = ConsolePaths(repo=tmp_path, fw_root=tmp_path / "fw")
     assert p.seed == seed
     assert "loop.kept" in cited.verify(p)
+
+
+def test_loop_in_cut_is_cited() -> None:
+    assert cited.loop_in_cut(_paths()) == 160
+    assert cited.verify(_paths()) == []
