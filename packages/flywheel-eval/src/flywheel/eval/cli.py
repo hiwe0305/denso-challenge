@@ -190,12 +190,18 @@ def tau(
     demos: bool = typer.Option(
         False,
         "--demos",
-        help="Khai các episode không có cờ SIMPLE là demo teleop thành công.",
+        help="Khai các trace không có `rollout_result.json` là demo teleop thành công.",
+    ),
+    mixed_runs: bool = typer.Option(
+        False,
+        "--mixed-runs",
+        help="Khai các episode của nhiều run (`run_plan_id`) là một tập; báo cáo ghi lại.",
     ),
     config: Path = typer.Option(
         DEFAULT_SYSTEM_CONFIG,
         "--config",
-        help="`system.yaml` để in giá trị đang dùng bên cạnh; không sửa file.",
+        help="`system.yaml`: thống kê từng episode của các check, và giá trị đang dùng để in "
+        "bên cạnh; không sửa file.",
     ),
     store: Path | None = typer.Option(
         None, "--store", help="Thư mục store để lưu báo cáo. Không có thì không ghi gì."
@@ -204,7 +210,7 @@ def tau(
     """Hiệu chỉnh τ_track, τ_sync (episode thành công), τ_lat (chạy chuẩn G0), phân vị 99."""
     use_utf8()
     try:
-        report = calibrate_tau(teleop, g0, demos)
+        report = calibrate_tau(teleop, g0, demos, config, mixed_runs)
         current = _current_taus(config)
     except (SystemReaderError, TauError, ConfigError) as error:
         typer.echo(f"không hiệu chỉnh được: {error}", err=True)
@@ -234,20 +240,40 @@ def _current_taus(config: Path) -> dict[str, float]:
 def _print_tau(report: TauReport, current: dict[str, float]) -> None:
     if report.episodes or report.left_out:
         sources = sorted({episode.success for episode in report.episodes})
-        typer.echo(f"episode dùng: {len(report.episodes)} ({', '.join(sources)})")
+        adapters = sorted({episode.adapter or "demo" for episode in report.episodes})
+        runs = sorted({run for episode in report.episodes for run in episode.run_plan_ids})
+        typer.echo(
+            f"episode dùng: {len(report.episodes)} ({', '.join(sources)}; "
+            f"{', '.join(adapters)}; run {', '.join(runs)})"
+        )
+        if any(episode.adapter for episode in report.episodes):
+            typer.echo(
+                "  episode có cờ SIMPLE là rollout ghi bởi adapter trên; AC 4 hiệu chỉnh "
+                "τ_track, τ_sync trên teleop, nên kiểm đó không phải rollout của policy"
+            )
     if report.rtc_logs:
         chunks = sum(log.chunks for log in report.rtc_logs)
         typer.echo(f"log RTC của G0: {len(report.rtc_logs)} file, {chunks} chunk")
+        unchecked = sorted({t for log in report.rtc_logs for t in log.unchecked_traces})
+        if unchecked:
+            typer.echo(
+                f"  {len(unchecked)} trace không có `rollout_result.json` cạnh log RTC, "
+                "không kiểm được lỗi hạ tầng"
+            )
     for item in report.values:
         value = "chưa có (không có mẫu nào)" if item.value is None else f"{item.value:.6g}"
+        unit = _EPISODE_UNIT[item.key]
         typer.echo(
-            f"{item.key}: {value} {item.unit}; phân vị {item.percentile:g} trên "
-            f"{item.samples} mẫu từ {item.episodes} episode"
-            f" (bỏ {item.skipped_cycles} chu kỳ thiếu tín hiệu); đang dùng {current[item.key]:g}"
+            f"{item.key}: {value} {item.unit}; phân vị {item.percentile:g} qua {item.samples} "
+            f"{unit}, mỗi {unit} lấy {_statistic(item.episode_percentile)} của "
+            f"{item.cycles} {_CYCLE_UNIT[item.key]} (bỏ {item.skipped_cycles} "
+            f"{_SKIPPED[item.key]}); đang dùng {current[item.key]:g}"
         )
+        if item.value is not None:
+            typer.echo(f"  {item.exceeded}/{item.samples} {unit} hiệu chỉnh vượt ngưỡng này")
         if item.few_samples:
             typer.echo(
-                f"  ít mẫu (dưới {FEW_SAMPLES}): phân vị {item.percentile:g} "
+                f"  ít mẫu (dưới {FEW_SAMPLES} {unit}): phân vị {item.percentile:g} "
                 "gần bằng giá trị lớn nhất"
             )
         if item.key == "tau_sync_s" and item.value == 0.0:
@@ -257,6 +283,30 @@ def _print_tau(report: TauReport, current: dict[str, float]) -> None:
             )
     for left in report.left_out:
         typer.echo(f"không dùng {left.trace_id}: {left.reason}")
+
+
+_EPISODE_UNIT = {
+    "tau_track_upper": "episode",
+    "tau_track_lower": "episode",
+    "tau_sync_s": "episode",
+    "tau_lat_s": "trace G0",
+}
+_CYCLE_UNIT = {
+    "tau_track_upper": "chu kỳ",
+    "tau_track_lower": "chu kỳ",
+    "tau_sync_s": "chu kỳ",
+    "tau_lat_s": "chunk",
+}
+_SKIPPED = {
+    "tau_track_upper": "chu kỳ thiếu tín hiệu",
+    "tau_track_lower": "chu kỳ thiếu tín hiệu",
+    "tau_sync_s": "chu kỳ không có khung ảnh mới hoặc thiếu tín hiệu",
+    "tau_lat_s": "chunk",
+}
+
+
+def _statistic(which: float) -> str:
+    return "giá trị lớn nhất" if which == 100.0 else f"phân vị {which:g}"
 
 
 @app.command("score")
