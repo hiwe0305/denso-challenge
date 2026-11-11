@@ -1966,7 +1966,20 @@ $PY -m flywheel_psi0.tray.pair_cut pack --plan $P --data $CUT/S70/$E --name S70 
 
 `subset` không ghi đè thư mục đã có. Lệnh này kiểm lại S70 sau khi ghi, gồm cả cách đánh số `index` của LeRobot v2.1. `pack` từ chối nếu dữ liệu không qua `check`. Tar là bản tái lập được: cùng file thì ra cùng byte. File `.json` đi kèm ghi số byte và sha256.
 
-**B. Đưa hai tar lên Drive** (0 CU). Laptop kéo `drive/` về và kiểm sha256 với `.json`. Sau đó Hiếu đưa bốn file lên `MyDrive/denso/da34/cuts/` bằng trình duyệt, đúng tên: `ALL.tar`, `ALL.tar.json`, `S70.tar`, `S70.tar.json`. Khoảng 9 GB.
+**Tar phải ra đúng các giá trị sau.** Phiên điều phối chạy thử bước A ngày 11/11/2026 trên laptop, từ bản sao cut ALL đã kiểm khớp `cut-all-zone1.sha256` (1 226 file), mã ở `8462c287`. Đóng gói S70 hai lần ra cùng sha256.
+
+| Tar | Byte | sha256 |
+|---|---|---|
+| `ALL.tar` | 5 298 288 640 | `bea55b14bffa5c72d96fba0fb3439b7d0ddb90e5636eaf6fb798a5357608ccc8` |
+| `S70.tar` | 3 707 822 080 | `f87bfecb25c6cdf32bb72ccbaa13e9212639ae18617947098c9edc79c27b864b` |
+
+Ai đóng gói lại từ master, trên laptop hay trên `rtx3060`, phải ra đúng hai giá trị này. Ra sha256 khác nghĩa là đầu vào khác hoặc đường mã khác: **dừng**, không đưa lên Drive, báo phiên điều phối.
+
+Lần chạy thử đó còn so từng episode của S70 với episode nguồn trong ALL, độc lập với `pair_cut`. Cả 425 episode khớp mọi cột trừ `episode_index` và `index`; `index` chạy liền 0..603 914; video trùng từng byte; `stats_psi0.json` và `stats.json` là byte của ALL. `subset` mất 33 s.
+
+**Chạy bước A trên laptop cũng được.** Kéo cut ALL về, kiểm với `cut-all-zone1.sha256`, rồi chạy cùng các lệnh với `CUT` trỏ vào bản sao đó và `PY` là Python của workspace. Như vậy bước B không phải kéo 9 GB tar từ `rtx3060`.
+
+**B. Đưa hai tar lên Drive** (0 CU). Nếu bước A chạy trên `rtx3060`, laptop kéo `drive/` về. Dù chạy ở đâu, kiểm sha256 của tar với `.json` và với bảng trên. Sau đó Hiếu đưa bốn file lên `MyDrive/denso/da34/cuts/` bằng trình duyệt, đúng tên: `ALL.tar`, `ALL.tar.json`, `S70.tar`, `S70.tar.json`. Khoảng 9 GB.
 
 ```bash
 rsync -a --partial-dir=.rsync-partial rtx3060:denso-da34-pool/fwdata/cut-all-zone1/drive/ fwdata/tray/pair-cuts/
@@ -2121,3 +2134,4 @@ Phiên serve dừng ngay khi lô cuối của 60k đã ghi kết quả (19.8).
 | 11/11/2026 | Mục 19.7 (phiên điều phối: ảnh VM Colab chỉ có CUDA 13.0, stage 1 hỏng pre-flight): stage 3 không build extension (ddp, `torch.optim.AdamW`, theo mã Ψ₀ `cda3fdf`); `colab_train setup` kiểm trước khi cài và từ chối recipe build op khi thiếu bộ CUDA 12.6 và `ninja` | Claude cho Hiếu |
 | 11/11/2026 | Mục 19.3, 19.5, 19.7, 19.8 (W2 xong, stage 1 của DA-30 trên A100, qua phiên điều phối): ghim bốn chỗ của `vlm_stage1` từ `vlm.json` (job `da30-tray-ego-b`, `rp_1d7627234111`, bước 300; trọng số `c48ec2df…`, manifest `019daa80…`, kiểm nạp không lỗi); plan hết chỗ trống, id nháp `rp_e2fb9f62c223`; 19.5 thêm số đo mount Drive trên A100 (đồng ý mỗi VM, hết giờ 120 s, chạy lại một lần) | Claude cho Hiếu |
 | 11/11/2026 | Mục 19.9 mới, 19.5, 19.7 (nhiệm vụ con 6.3, qua phiên điều phối): runbook bốn run. Gồm: dựng S70 theo seed của chính episode và giữ stats của ALL (`pair_cut`); hai tar lên Drive; `colab_train` cho bốn nhánh, dữ liệu từ Drive được kiểm trước khi cài; một đợt `cu_watch` và đường lùi hai đợt; bước đồng ý Drive trên mỗi VM; làn serve Colab (`colab_serve`, kiểm sha256 và bounds của stats ALL); bảng cổng. Chưa chạy | Claude cho Hiếu |
+| 11/11/2026 | Mục 19.9 (phiên điều phối chạy thử 6.3 trên cut thật): ghi sha256 phải ra của `ALL.tar` (`bea55b14…`) và `S70.tar` (`f87bfecb…`), sha khác thì dừng; bước A chạy được trên laptop từ bản sao đã kiểm | Claude cho Hiếu |
