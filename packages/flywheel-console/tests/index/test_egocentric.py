@@ -16,7 +16,10 @@ def test_ego_poster_only_from_deid(fw: ConsolePaths, work: Path, tmp_path: Path)
     assert (d / "posters/ep_deid.jpg").read_bytes()[:2] == b"\xff\xd8"
     assert not (d / "posters/ep_raw.jpg").exists()
     eps = {e["id"]: e for e in json.loads((d / "episodes.json").read_text())}
-    assert eps["ep_deid"]["poster"] == "posters/ep_deid.jpg" and eps["ep_deid"]["ego"] is True
+    assert (
+        eps["ep_deid"]["poster"] == "/data/ds/src_test/posters/ep_deid.jpg"
+        and eps["ep_deid"]["ego"] is True
+    )
     assert eps["ep_raw"]["poster"] is None and eps["ep_raw"]["ego"] is False
     assert eps["ep_deid"]["n"] == 30.0 and eps["ep_deid"]["s"] == 1.0
     for name in ("qa", "quality", "method"):
@@ -48,7 +51,9 @@ def test_ego_viewer_row(fw: ConsolePaths, tmp_path: Path) -> None:
     rows = [{"id": "h1m-team", "ego_viewer": "human1m/v/viewer", "ego_source": "Team"}]
     assert egocentric.build(fw, out, rows) == {"h1m-team": 1}
     got = json.loads((out / "ds/h1m-team/episodes.json").read_text())
-    assert [e["id"] for e in got] == ["ep_a"] and got[0]["poster"] == "posters/ep_a.jpg"
+    assert [e["id"] for e in got] == ["ep_a"] and got[0][
+        "poster"
+    ] == "/data/ds/h1m-team/posters/ep_a.jpg"
     assert (out / "ds/h1m-team/posters/ep_a.jpg").is_file()
     q = json.loads((out / "ds/h1m-team/quality.json").read_text())
     assert q["qa"] == {"pass": 1}

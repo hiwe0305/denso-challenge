@@ -69,7 +69,7 @@ def _work_dir(paths: ConsolePaths, out: Path, sd: Path, note: str | None) -> int
                 "out": ck.get("hand_out_of_frame", {}).get("value"),
                 "jit": ck.get("camera_jitter_deg_s", {}).get("value"),
                 "lowc": ck.get("pose_low_confidence", {}).get("value"),
-                "ego": has, "poster": f"posters/{ep}.jpg" if has else None,
+                "ego": has, "poster": f"/data/ds/{sid}/posters/{ep}.jpg" if has else None,
             }
         )  # fmt: skip
         checks[ep] = [
@@ -133,7 +133,7 @@ def _viewer(paths: ConsolePaths, out: Path, row: dict[str, Any]) -> int | None:
                 "id": e["id"], "title": e["title"], "s": e["seconds"], "qa": e["qa"],
                 "hands": round(e["hands"], 3), "pose": e["pose"], "nsub": e["n_subtasks"],
                 "reasons": [_reason(x) for x in (qrow["reasons"] if qrow else [])],
-                "poster": f"posters/{e['id']}.jpg" if has else None,
+                "poster": f"/data/ds/{d.name}/posters/{e['id']}.jpg" if has else None,
             }
         )  # fmt: skip
     qc = collections.Counter(r["qa"] for r in rows)
