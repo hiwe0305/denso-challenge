@@ -26,9 +26,7 @@ def index(
 @app.command()
 def serve(port: int = typer.Option(4178, help="Port on 127.0.0.1.")) -> None:
     """Serve the console on 127.0.0.1."""
-    from flywheel.console.server.app import (  # type: ignore[import-not-found,import-untyped,unused-ignore]
-        serve as run,
-    )
+    from flywheel.console.server.app import serve as run
 
     run(port=port)
 

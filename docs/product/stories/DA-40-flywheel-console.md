@@ -36,7 +36,7 @@ Theo [plan DA-40](../../superpowers/plans/2026-11-11-da40-flywheel-console.md); 
 - [x] 2. Chỉ mục catalog và dữ liệu trích dẫn (AC 2, 3)
 - [x] 3. Chỉ mục dataset robot, egocentric và ảnh đại diện (AC 2)
 - [x] 4. Chỉ mục run, eval, vòng lặp, chi phí; lệnh `fw console index` (AC 2)
-- [ ] 5. Server, media và bộ chạy việc (AC 4)
+- [x] 5. Server, media và bộ chạy việc (AC 4)
 - [ ] 6. Chatbot, công cụ và bench (AC 5, 6)
 - [x] 7. Giao diện, bốn điểm hở và giới hạn chữ (AC 6, 7)
 - [ ] 8. Ghép trên dữ liệu thật, kiểm trên trình duyệt, bench (AC 1–8)
