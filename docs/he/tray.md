@@ -2479,6 +2479,23 @@ Cụm chỉ báo cáo (c4–c7, lẻ) không tiêu ngân sách dữ liệu (20.3
 | `place`, c1 (10 trên 14) | (1, 1000109), (1, 1000127), (1, 1000121), (1, 1000128), (1, 1000112), (1, 1000124), (1, 1000107), (1, 1000122), (1, 1000117), (1, 1000125) |
 | `place`, c2 (10 trên 11) | (2, 1000107), (2, 1000117), (2, 1000124), (2, 1000112), (2, 1000116), (2, 1000110), (2, 1000103), (2, 1000102), (2, 1000121), (2, 1000108) |
 
+### 20.14 Sinh và chọn tập nhắm lỗi (viết 12/11/2026, trước lần sinh đầu tiên)
+
+**[Đề xuất]** theo 20.5 và các quyết định R1–R11 đã duyệt. Viết và commit trước lần sinh đầu tiên, không sửa sau khi thấy episode.
+
+| Bước | Cách làm |
+|---|---|
+| Điều kiện | 23 lỗi của 20.13, mỗi lỗi một dòng trong [`round-c70-conditions.jsonl`](../../configs/runplans/tray/round-c70-conditions.jsonl), sha256 `1a4a50cf…`. `cluster_id` bắt đầu bằng bể của lỗi (`approach_a-…` hoặc `place-…`). Thứ tự: 3 lỗi `approach_a` theo (mức, seed), rồi 20 lỗi `place` xen kẽ c1, c2 theo thứ tự đã chọn. `n` = 30 cho `approach_a` và 10 cho `place`: khoảng 1,5 lần số cần, với hiệu suất 67,6 % của lô C+ (17.5) |
+| Seed | `round_select plan`: các seed train gần nhất của mỗi điều kiện, đúng như `flywheel_simple.tray.targets` (cửa sổ 100 000–199 999, nhóm tham số theo mức), **trừ 693 seed đã dùng**: 606 seed của ALL (từ plan cặp) và mọi seed các lô trên `rtx3060` đã ghi trong cửa sổ ([`round-c70-exclude-seeds.json`](../../configs/runplans/tray/round-c70-exclude-seeds.json), sha256 `9d20eeb6…`). Không loại thì 31/290 seed trùng seed đã dùng, 19 trong đó đã nằm trong ALL. Planner là tất định, nên seed trùng là episode trùng. Kế hoạch: [`round-c70-targets.jsonl`](../../configs/runplans/tray/round-c70-targets.jsonl), sha256 `9664ccb9…`; 290 seed, khoảng cách trung vị 0,41, lớn nhất 1,01 |
+| Sinh | `rtx3060`, cây `~/denso-da33-zone` (`62899695`, là cây đã sinh lại phần nhắm lỗi của ALL với `+zone1`; `randomize`, `targets`, `planner`, `config`, `generate` giống từng byte master). Planner `da33-planner-5+cfg.4e2a4505`, hình ảnh `4763fbf…+zone1`. `run_shards.py` với lô `targeted` (dùng `targets.jsonl` đã ghi sẵn), tối đa 6 worker vì máy dùng chung |
+| QA | `zone-qa.sh`, đúng chuỗi của phần nhắm lỗi của ALL: QA phát lại, `quality.jsonl`, release, QA của DA-03 (`qa-1@fb6ddaf9f48c`, `replay-1@cf2515483a8c`, cây `3e45bb6`). Qua QA là: có trong release, không `reject` hay `quarantine`, nghiêng ≤ 10°, xê dịch ≤ 20 mm. Không thêm bộ lọc nào |
+| Chọn ([`round_select`](../../packages/flywheel-psi0/src/flywheel_psi0/tray/round_select.py)) | (1) Bể `approach_a` trước: mỗi lỗi lấy tối đa 20 seed qua QA gần nhất, theo thứ tự file. (2) Phần còn lại của B_add = 181 chia cho bể `place` theo vòng tròn trong thứ tự file: mỗi vòng, mỗi lỗi lấy thêm seed qua QA gần nhất kế tiếp, tới khi đủ 181 hoặc hết seed. Phần `approach_a` không dùng hết chuyển cho `place` |
+| Nếu thiếu | Một lô thêm, đúng một lần: cùng file điều kiện, lập kế hoạch lại có loại thêm mọi seed của lô 1, chỉ giữ dòng của các lỗi thiếu, rồi chọn lại trên cả hai lô. Sau lô đó thì dừng ở số đã có và báo cáo; không lấy episode của S70 hay ALL để bù |
+| Tập | Một tập `R<k>` trên release nhắm lỗi (k = số đã chọn), file `demo_sets-c70r1.json`; danh sách chọn `round-c70-selection.jsonl` (mỗi dòng: điều kiện, seed, bể, hạng, khoảng cách) |
+| Ước lượng | Giả định theo lô C+: khoảng 196 episode qua QA trên 290 lượt, đủ 181. Bể `approach_a` sát mức: 30 × 0,676 ≈ 20 mỗi lỗi |
+
+Sau khi chọn: dựng bản cắt `C70_R1` bằng `round_cut join` (S70 giữ nguyên từng byte, kiểm bounds với stats của ALL), điền `targets` và `rules_sha256` của plan vòng, ghi `Decision` của R3, đóng băng plan. Sổ chi phí: dòng ước lượng `job_da34_c70r1_gen` và `job_da34_c70r1_qa` ghi trước khi chạy; bước 5 của 20.12 có dòng thực đo `job_da34_c70r1_step5` (thiếu dòng ước lượng trước, ghi lại là sót).
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -2534,3 +2551,4 @@ Cụm chỉ báo cáo (c4–c7, lẻ) không tiêu ngân sách dữ liệu (20.3
 | 12/11/2026 | Mục 20.9: Hiếu "Duyệt theo đề xuất" R1–R8 (R4 = A, R7 duyệt luật 20.7, R8 = c3, c8 là lỗi của policy). Luật 20.7 không đổi | Claude cho Hiếu |
 | 12/11/2026 | Mục 20.12 mới (nhiệm vụ con 7.3, phần đầu): đại diện của c1, c2, c3, c8; bước 8 trên mọi lỗi (τ_cov mức 1 là 1,143, mức 2 là 1,524); bước 5 trên 16 đại diện (13 xong, 3 KHÔNG KHẢ THI); bước 7 không làm được như 20.4 (chỉ ánh sáng mức 2 là hình ảnh); quyết định mới R9–R11 chờ Hiếu. Luật 20.7 không đổi | Claude cho Hiếu |
 | 12/11/2026 | Mục 20.13 mới (nhiệm vụ con 7.3 xong): Hiếu "Duyệt theo đề xuất" R9–R11; evidence card của c1, c2, c3, c8; 23 lỗi nhận dữ liệu (3 ở `approach_a`, 10 + 10 ở `place`). Luật 20.7 không đổi | Claude cho Hiếu |
+| 12/11/2026 | Mục 20.14 mới (nhiệm vụ con 7.5, viết trước lần sinh đầu tiên): file điều kiện 23 lỗi, kế hoạch 290 seed không trùng 693 seed đã dùng, sinh và QA như phần nhắm lỗi của ALL, luật chọn theo bể (`round_select`), một lô thêm nếu thiếu. Luật 20.7 không đổi | Claude cho Hiếu |
