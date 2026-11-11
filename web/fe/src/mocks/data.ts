@@ -347,12 +347,15 @@ export interface RawLedger {
   recommendation_ref?: string | null;
   cluster_ref?: string | null;
   intervention_ref?: string | null;
-  estimated_usd?: number | null;
-  estimated_human_minutes?: number | null;
-  estimated_gpu_hours?: number | null;
-  measured_usd?: number | null;
-  measured_human_minutes?: number | null;
-  measured_gpu_hours?: number | null;
+  run_plan_ref?: string | null;
+  job_id?: string | null;
+  /** One row per entry: an estimate and its measurement are two rows (R5). */
+  measure_kind: "estimated" | "measured";
+  /** On a measured row, the estimate it measures. */
+  estimate_entry_ref: string | null;
+  usd_amount: number;
+  human_minutes?: number | null;
+  gpu_hours?: number | null;
   reverses_entry_ref: string | null;
   note?: string | null;
 }

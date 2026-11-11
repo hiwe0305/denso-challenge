@@ -89,6 +89,105 @@ def _require_key(key: str | None) -> str:
     return key
 
 
+#: Intervention statuses whose cost is committed though perhaps not yet measured.
+COMMITTED_STATUSES = ("APPROVED", "IN_PROGRESS")
+#: Budget line → (estimate column, measured column) of an intervention row.
+BUDGET_COLUMNS = {
+    "usd": ("estimated_usd", "measured_usd"),
+    "human_minutes": ("estimated_human_minutes", "measured_human_minutes"),
+    "gpu_hours": ("estimated_gpu_hours", "measured_gpu_hours"),
+}
+
+
+def _decision_items(body: dict[str, Any]) -> list[dict[str, Any]]:
+    """`items` of a decision: a non-empty list of objects, one per intervention.
+
+    Review #72 point 9: an empty list, a repeated intervention or an item that
+    is not an object used to answer 202, 202 and 500.
+    """
+    items = body.get("items")
+    if not isinstance(items, list) or not items:
+        raise ApiError(422, "ITEMS_REQUIRED", "`items` phải là danh sách không rỗng")
+    seen: set[str] = set()
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            raise ApiError(422, "BAD_ITEM", f"items[{index}] phải là một đối tượng")
+        iv_id = item.get("intervention_id")
+        if not isinstance(iv_id, str) or not iv_id:
+            raise ApiError(422, "BAD_ITEM", f"items[{index}] thiếu intervention_id")
+        if iv_id in seen:
+            raise ApiError(422, "DUPLICATE_INTERVENTION",
+                           f"can thiệp {iv_id} xuất hiện hai lần trong cùng một quyết định")
+        seen.add(iv_id)
+    return items
+
+
+def _decided(rows: list[dict[str, Any]]) -> dict[str, tuple[str, dict[str, Any]]]:
+    """intervention_id → (action_id, item) over decisions the core has not refused."""
+    out: dict[str, tuple[str, dict[str, Any]]] = {}
+    for row in rows:
+        for item in (row.get("payload") or {}).get("items") or []:
+            if isinstance(item, dict) and item.get("intervention_id"):
+                out.setdefault(str(item["intervention_id"]), (str(row["id"]), item))
+    return out
+
+
+def _share(iv: dict[str, Any], quantity: float, column: str) -> float:
+    return float(iv[column] or 0) * quantity / float(iv["target_quantity"])
+
+
+def _asked(item: dict[str, Any], iv: dict[str, Any]) -> float:
+    if item.get("decision") == "APPROVE_EDITED":
+        return float(item["approved_quantity"])
+    return float(iv["target_quantity"])
+
+
+def br07_overrun(
+    rec: dict[str, Any], decided: list[dict[str, Any]], items: list[dict[str, Any]]
+) -> str | None:
+    """BR-07 against everything already committed; the reason, or None if it fits.
+
+    Per ceiling, four parts (review #72 point 5):
+
+    * ``used``: measured rows of the ledger for this round;
+    * approved but not yet spent: each APPROVED or IN_PROGRESS intervention's
+      estimate at its approved quantity, less what is already measured on it;
+    * decided but not yet reflected: approvals in earlier decisions the core
+      has not refused, on interventions the projection still shows PROPOSED;
+    * this request's approvals.
+
+    Comparing ``used`` with this request alone let two approvals of $300 and
+    $200 pass a $400 ceiling.
+    """
+    known = {iv["id"]: iv for iv in rec["interventions"]}
+
+    def approvals(rows: list[dict[str, Any]], column: str) -> float:
+        total = 0.0
+        for item in rows:
+            iv = known.get(str(item.get("intervention_id")))
+            if iv is None or item.get("decision") == "REJECT" or iv["status"] != "PROPOSED":
+                continue
+            total += _share(iv, _asked(item, iv), column)
+        return total
+
+    for line in rec["budget"]:
+        estimate, measured = BUDGET_COLUMNS[line["resource"]]
+        committed = sum(
+            max(0.0, _share(iv, iv.get("approved_quantity") or iv["target_quantity"], estimate)
+                - float(iv.get(measured) or 0))
+            for iv in rec["interventions"] if iv["status"] in COMMITTED_STATUSES
+        )
+        waiting = approvals(decided, estimate)
+        asked = approvals(items, estimate)
+        if line["used"] + committed + waiting + asked > line["cap"] + 1e-9:
+            return (
+                f"vượt trần {line['resource']}: đã chi {round(line['used'], 2)}, "
+                f"đã duyệt chưa chi {round(committed + waiting, 2)}, "
+                f"lần này {round(asked, 2)}, trần {line['cap']}"
+            )
+    return None
+
+
 def create_app(
     model: ReadModel,
     actions: ActionStore,
@@ -408,6 +507,7 @@ def create_app(
             "finished_at": action_log.now_iso(),
             "exported": result.exported,
             "applied": result.applied,
+            "rejected": result.rejected,
             "fake_core": sync.fake_core,
             "errors": [
                 *result.export.errors,
@@ -419,13 +519,20 @@ def create_app(
     @r.post("/recommendations/{rec_id}/decision", status_code=202)
     def decide(rec_id: str, body: dict[str, Any], idempotency_key: str | None = Key) -> Any:
         key = _require_key(idempotency_key)
+        # C16: the same click retried gets its action back before any check
+        # that depends on state, since its own decision now counts as "decided".
+        previous = actions.by_key(key)
+        if previous is not None:
+            return {"action_id": previous["action_id"], "sync_status": previous["sync_status"]}
         rec = _found(model.recommendation(rec_id), "đề xuất")
-        items = body.get("items") or []
+        items = _decision_items(body)
         known = {iv["id"]: iv for iv in rec["interventions"]}
+        decided = _decided(actions.live("RECOMMENDATION_DECISION", rec_id))
         for item in items:
-            if item.get("intervention_id") not in known:
+            iv_id = item["intervention_id"]
+            if iv_id not in known:
                 raise ApiError(422, "UNKNOWN_INTERVENTION",
-                               f"can thiệp {item.get('intervention_id')} không thuộc đề xuất này")
+                               f"can thiệp {iv_id} không thuộc đề xuất này")
             if item.get("decision") not in INTERVENTION_DECISIONS:
                 raise ApiError(422, "BAD_DECISION",
                                f"quyết định {item.get('decision')} không hợp lệ")
@@ -433,25 +540,23 @@ def create_app(
                 raise ApiError(422, "REASON_REQUIRED", "duyệt có sửa và từ chối phải ghi lý do")
             if item["decision"] == "APPROVE_EDITED" and not (
                 isinstance(item.get("approved_quantity"), (int, float))
+                and not isinstance(item.get("approved_quantity"), bool)
                 and item["approved_quantity"] > 0
             ):
                 raise ApiError(422, "QUANTITY_REQUIRED", "duyệt có sửa phải có số lượng > 0")
-        # BR-07: approval may not push any of the three ceilings below zero.
-        approved = {"usd": 0.0, "human_minutes": 0.0, "gpu_hours": 0.0}
-        for item in items:
-            if item["decision"] == "REJECT":
-                continue
-            iv = known[item["intervention_id"]]
-            quantity = (item["approved_quantity"] if item["decision"] == "APPROVE_EDITED"
-                        else iv["target_quantity"])
-            factor = quantity / iv["target_quantity"]
-            approved["usd"] += iv["estimated_usd"] * factor
-            approved["human_minutes"] += iv["estimated_human_minutes"] * factor
-            approved["gpu_hours"] += iv["estimated_gpu_hours"] * factor
-        for line in rec["budget"]:
-            if line["used"] + approved[line["resource"]] > line["cap"] + 1e-9:
-                raise ApiError(422, "BR-07", f"vượt trần {line['resource']}",
-                               "giảm số lượng hoặc từ chối bớt can thiệp")
+            if known[iv_id]["status"] != "PROPOSED":
+                raise ApiError(409, "NOT_PROPOSED",
+                               f"can thiệp {iv_id} đang {known[iv_id]['status']}; "
+                               "chỉ quyết định được can thiệp còn PROPOSED")
+            if iv_id in decided:
+                raise ApiError(409, "ALREADY_DECIDED",
+                               f"can thiệp {iv_id} đã có quyết định {decided[iv_id][0]} "
+                               "chưa phản ánh vào đề xuất",
+                               "đợi lõi áp dụng quyết định trước rồi xem lại")
+        # BR-07 on everything already committed, not only what is spent.
+        over = br07_overrun(rec, [entry for _, entry in decided.values()], items)
+        if over:
+            raise ApiError(422, "BR-07", over, "giảm số lượng hoặc từ chối bớt can thiệp")
         row = actions.record(key, "RECOMMENDATION_DECISION", "flywheel_recommendations",
                              rec_id, {"items": items}, None)
         return {"action_id": row["id"], "sync_status": row["sync_status"]}

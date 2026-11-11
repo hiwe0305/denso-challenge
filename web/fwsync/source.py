@@ -11,22 +11,29 @@ này, và một file lạ không phải lý do để dừng (§9.4, "bộ nạp 
 
 **Hai mức khoan dung, khác nhau có chủ ý:**
 
-* Bảng có model hợp đồng (`episodes`, `episode_qa_reports`, `training_metrics`,
-  `train_diagnoses`, `probe_results`, `defect_manifests`, cùng
-  `bench_result.json` của DA-31) đi qua
-  `mapping.py` và bị **từ chối** nếu sai schema. Đây là phần hợp đồng đã chốt,
-  nên sai là lỗi thật.
-* Bảng chưa có file schema (`Source`, `Condition`, `Release`, `Checkpoint`,
-  `RunPlan`, `Score`, `Cluster`, `FixRateEvent`, `LedgerEntry`, `Decision` —
-  đều nằm ở S1-10 #36, chưa merge) đi qua đường khoan dung: cột lạ bị bỏ kèm
-  log, cột thiếu để None. Phụ lục B nói rõ phải như vậy cho tới khi #36 merge.
-  Chuyển một bảng sang đường nghiêm là xoá một dòng ở `TOLERANT_TABLES`.
+* Artifact có hình dạng hợp đồng đi qua `mapping.py` và bị **từ chối** nếu
+  sai schema. Đó là `episodes`, `episode_qa_reports`, `training_metrics`,
+  `train_diagnoses`, `probe_results`, `defect_manifests`, `bench_result.json`
+  của DA-31, và mọi thứ lõi ghi theo bố cục store của nó: catalog
+  `catalog/<bảng số ít>/part-<ulid>.jsonl` (`CORE_CATALOG`, khớp
+  `flywheel.store.views.CATALOG_TABLES`) và sổ chi phí
+  `runs/<run_plan>/<job>/ledger.jsonl`. Model hợp đồng của chín thực thể S1-10
+  đã merge, nên sai là lỗi thật (review #72 điểm 1).
+* Bộ mock ghi các bảng đó bằng **dòng web** (`sources.jsonl`,
+  `decisions.jsonl`, `ledger.jsonl`…, tên số nhiều, khoá `*_ref`). Chúng đi
+  đường khoan dung: cột lạ bị bỏ kèm log, cột thiếu để None. Bố cục quyết định
+  đường đi, không phải nội dung, nên một dòng mock không bao giờ bị đọc như
+  hợp đồng và ngược lại.
+
+**Một dòng hỏng không làm đổ cả lần nạp** (review #72 điểm 6). Dòng JSONL
+không đọc được vào `SourceScan.errors` rồi quét tiếp. Dòng cuối không có
+`\\n` mà cũng không phải JSON là dòng lõi đang ghi dở: nó bị bỏ kèm log, như
+`flywheel.store.tables.complete_lines`, và lần nạp sau sẽ đọc nó.
 """
 
 from __future__ import annotations
 
 import json
-from collections.abc import Iterator
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
@@ -88,9 +95,37 @@ CONTRACT_PATHS: dict[tuple[str, str], str] = {
     ("diagnosis", "system"): "system_diagnoses",
 }
 
-#: Bảng đi qua đường khoan dung vì thực thể của nó chưa có file schema trong
-#: `flywheel-contracts` (S1-10 #36). Xoá một dòng ở đây khi #36 merge và bảng
-#: đó có model, để nó chuyển sang đường nghiêm.
+#: Thư mục catalog của lõi → bảng web. Lõi đặt tên bảng **số ít**
+#: (`flywheel.store.views.CATALOG_TABLES`) và ghi bằng model hợp đồng, nên mọi
+#: dòng dưới `catalog/<tên>/` đi đường nghiêm. `None`: lõi có bảng đó nhưng web
+#: chưa có chỗ chứa; file được liệt kê trong `ignored` kèm lý do, không im lặng.
+CORE_CATALOG: dict[str, str | None] = {
+    "source": "sources",
+    "release": "releases",
+    "checkpoint": "model_checkpoints",
+    "run_plan": "run_plans",
+    "cluster": "failure_clusters",
+    "fix_rate_event": "fix_rate_events",
+    "decision": "decisions",
+    "episode": "episodes",
+    "qa_report": "episode_qa_reports",
+    # `Score` theo episode chưa có bảng web: `eval_episodes` dựng từ lượt eval,
+    # và eval thật hiện chưa ghi Score vào store.
+    "score": None,
+    # Điều kiện ban đầu chưa có màn nào đọc.
+    "condition": None,
+}
+
+#: Lý do một bảng catalog của lõi chưa nạp, cho dòng `ignored`.
+NOT_LOADED_YET = "lõi có bảng này nhưng web chưa có bảng chứa nó"
+
+#: Thư mục chứa sổ chi phí của lõi: `runs/<run_plan>/<job>/ledger*.jsonl`
+#: (`flywheel.store.ledger_append`). Sổ không nằm trong catalog.
+CORE_LEDGER_DIR = "runs"
+
+#: Bảng có dòng mock đi đường khoan dung. Dòng của chính lõi cho các bảng này
+#: (catalog, sổ chi phí, `diagnosis/system.jsonl`) vẫn đi đường nghiêm, vì
+#: `Record.contract` được đặt theo bố cục.
 TOLERANT_TABLES: frozenset[str] = frozenset(
     {
         "sources",
@@ -146,6 +181,9 @@ class SourceScan:
 
     records: list[Record] = field(default_factory=list)
     ignored: list[str] = field(default_factory=list)
+    #: Dòng hoặc file không đọc được, hình dạng `sync_runs.errors`. Quét vẫn
+    #: chạy tiếp các dòng khác.
+    errors: list[dict[str, Any]] = field(default_factory=list)
 
     def by_table(self, table: str) -> list[Record]:
         return [record for record in self.records if record.table == table]
@@ -160,74 +198,112 @@ def table_of(path: Path) -> str | None:
 
     Lõi ghi `catalog/<bảng>/part-<ulid>.jsonl`, nên tên thư mục cha được thử
     trước tên file: một file `part-01.jsonl` chỉ nói được nó thuộc bảng nào
-    qua thư mục.
+    qua thư mục. Truyền đường dẫn **tương đối** với thư mục nguồn, như `scan`.
     """
     return _classify(path)[0]
 
 
-def _classify(path: Path) -> tuple[str | None, bool]:
-    """(bảng đích, có phải đường hợp đồng không) của một file.
+def _classify(path: Path) -> tuple[str | None, bool, str | None]:
+    """(bảng đích, có phải đường hợp đồng không, lý do bỏ) của một file.
 
-    Cặp (thư mục, tên) của `CONTRACT_PATHS` được thử trước, vì nó cụ thể hơn
-    cả tên thư mục lẫn tên file.
+    `path` tương đối với thư mục nguồn, để một thư mục `runs` nằm **trên**
+    thư mục nguồn không biến mọi file thành sổ chi phí. Thứ tự thử đi từ cụ
+    thể tới chung: cặp (thư mục, tên) của `CONTRACT_PATHS`, catalog của lõi,
+    sổ chi phí của lõi, rồi tên thư mục, rồi tên file.
     """
     pair = (path.parent.name, path.stem)
     if pair in CONTRACT_PATHS:
-        return CONTRACT_PATHS[pair], True
+        return CONTRACT_PATHS[pair], True, None
+    if path.parent.parent.name == "catalog" and path.parent.name in CORE_CATALOG:
+        table = CORE_CATALOG[path.parent.name]
+        return table, True, None if table else NOT_LOADED_YET
+    if (
+        CORE_LEDGER_DIR in path.parts[:-1]
+        and path.stem.startswith("ledger")
+        and path.suffix == ".jsonl"
+    ):
+        return "cost_ledger_entries", True, None
     if path.parent.name in FILE_TO_TABLE:
-        return FILE_TO_TABLE[path.parent.name], False
-    return FILE_TO_TABLE.get(path.stem), False
+        return FILE_TO_TABLE[path.parent.name], False, None
+    return FILE_TO_TABLE.get(path.stem), False, None
 
 
 def scan(directory: Path) -> SourceScan:
-    """Đọc mọi file `.json` và `.jsonl` dưới một thư mục, kể cả thư mục con."""
+    """Đọc mọi file `.json` và `.jsonl` dưới một thư mục, kể cả thư mục con.
+
+    Chỉ một thư mục không tồn tại mới làm hàm này ném lỗi: đó là cấu hình
+    sai, không phải dữ liệu sai. File hay dòng không đọc được vào `errors`.
+    """
     if not directory.is_dir():
         raise SourceError(f"`{directory}` không phải thư mục")
     result = SourceScan()
     for path in sorted(directory.rglob("*")):
         if not path.is_file() or path.suffix not in (".json", ".jsonl"):
             continue
-        table, contract = _classify(path)
+        relative = path.relative_to(directory)
+        table, contract, note = _classify(relative)
         if table is None:
             # Lõi còn thêm artifact mới; một file lạ không phải lý do để dừng.
-            result.ignored.append(str(path.relative_to(directory)))
+            result.ignored.append(f"{relative}: {note}" if note else str(relative))
             continue
+        try:
+            text = _text(path)
+        except SourceError as error:
+            result.errors.append(_unreadable(table, path.name, error))
+            continue
+        records = (
+            _read_jsonl(path, table, text, result)
+            if path.suffix == ".jsonl"
+            else _read_json(path, table, text, result)
+        )
         result.records.extend(
-            replace(record, contract=contract) if contract else record
-            for record in _read(path, table)
+            replace(record, contract=contract) if contract else record for record in records
         )
     return result
 
 
-def _read(path: Path, table: str) -> Iterator[Record]:
-    if path.suffix == ".jsonl":
-        yield from _read_jsonl(path, table)
-    else:
-        yield from _read_json(path, table)
+def _unreadable(table: str, where: str, error: Exception) -> dict[str, Any]:
+    return {"table": table, "ref": where, "code": "SourceError", "message": str(error)}
 
 
-def _read_jsonl(path: Path, table: str) -> Iterator[Record]:
-    for number, line in enumerate(_text(path).splitlines(), start=1):
+def _read_jsonl(path: Path, table: str, text: str, scan: SourceScan) -> list[Record]:
+    records: list[Record] = []
+    lines = text.split("\n")
+    for number, line in enumerate(lines, start=1):
         if not line.strip():
             continue
         try:
             payload = json.loads(line)
         except json.JSONDecodeError as error:
-            raise SourceError(f"`{path.name}` dòng {number} không phải JSON: {error}") from error
-        yield Record(table=table, payload=payload, path=path, line=number)
+            if number == len(lines):
+                # Không có `\n` ở cuối và không phải JSON: lõi đang ghi dở dòng
+                # này. Lần nạp sau đọc lại nó; ghi vào `ignored` để thấy được.
+                scan.ignored.append(f"{path.name}:{number}: dòng cuối đang ghi dở, bỏ qua")
+                continue
+            scan.errors.append(
+                _unreadable(table, f"{path.name}:{number}",
+                            SourceError(f"`{path.name}` dòng {number} không phải JSON: {error}"))
+            )
+            continue
+        records.append(Record(table=table, payload=payload, path=path, line=number))
+    return records
 
 
-def _read_json(path: Path, table: str) -> Iterator[Record]:
+def _read_json(path: Path, table: str, text: str, scan: SourceScan) -> list[Record]:
     try:
-        payload = json.loads(_text(path))
+        payload = json.loads(text)
     except json.JSONDecodeError as error:
-        raise SourceError(f"`{path.name}` không phải JSON: {error}") from error
+        scan.errors.append(
+            _unreadable(table, path.name, SourceError(f"`{path.name}` không phải JSON: {error}"))
+        )
+        return []
     # Một file `.json` có thể là một đối tượng hoặc một danh sách đối tượng.
     if isinstance(payload, list):
-        for index, item in enumerate(payload):
-            yield Record(table=table, payload=item, path=path, line=index + 1)
-    else:
-        yield Record(table=table, payload=payload, path=path)
+        return [
+            Record(table=table, payload=item, path=path, line=index + 1)
+            for index, item in enumerate(payload)
+        ]
+    return [Record(table=table, payload=payload, path=path)]
 
 
 def _text(path: Path) -> str:

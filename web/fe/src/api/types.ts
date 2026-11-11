@@ -90,6 +90,8 @@ export interface SyncRunRow {
   finished_at: string;
   exported: string[];
   applied: string[];
+  /** Actions whose answer the loader refused; they end REJECTED with its reason. */
+  rejected: string[];
   fake_core: boolean;
   errors: Array<Record<string, unknown>>;
 }
@@ -581,12 +583,15 @@ export interface LedgerRow {
   recommendation_id: string | null;
   cluster_id: string | null;
   intervention_id: string | null;
-  estimated_usd: number | null;
-  estimated_human_minutes: number | null;
-  estimated_gpu_hours: number | null;
-  measured_usd: number | null;
-  measured_human_minutes: number | null;
-  measured_gpu_hours: number | null;
+  run_plan_id: string | null;
+  job_id: string | null;
+  /** One row per entry: an estimate and its measurement are two rows (R5). */
+  measure_kind: "estimated" | "measured";
+  /** On a measured row, the estimate it measures. */
+  estimate_entry_id: string | null;
+  usd_amount: number;
+  human_minutes: number | null;
+  gpu_hours: number | null;
   reverses_entry_id: string | null;
   note: string | null;
   origin: Origin;

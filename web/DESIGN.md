@@ -1,6 +1,6 @@
 # Web Humanoid Data Flywheel · thiết kế
 
-Bản v0.10. Tài liệu này là nguồn duy nhất cho tầng web: API, Postgres, bộ nạp `fwsync` và FE. Lõi `flywheel` vẫn là nơi duy nhất chạy pipeline, train, eval và engine Failure → Data.
+Bản v0.11. Tài liệu này là nguồn duy nhất cho tầng web: API, Postgres, bộ nạp `fwsync` và FE. Lõi `flywheel` vẫn là nơi duy nhất chạy pipeline, train, eval và engine Failure → Data.
 
 ## Change log
 
@@ -23,6 +23,7 @@ Bản v0.10. Tài liệu này là nguồn duy nhất cho tầng web: API, Postgr
 | 8/11/2026 | 0.8 | W14 theo DA-31 nhiệm vụ 5 (PR #166, dạng `da31-3`): `defect_bench_groups` thêm cột `agent_models` (NULL được), bộ nạp nhận `da31-2` lẫn `da31-3` và với `da31-3` từ chối nhóm thiếu `agent_models`, dòng thiếu khoá, bản sao không thuộc nhóm, hash prompt sai dạng. API và MSW trả `agent_models` trong mỗi nhóm của `/defects/scoreboard`; M3 hiện model, hash prompt theo bản sao và cảnh báo khi bản có lỗi và bản sạch không cùng model (recall và báo nhầm phải từ một agent). Kết quả `da31-2` vẫn ghi "chưa có". Bộ mock lên `da31-3`, một model đọc cả bốn bản | Châu |
 | 8/11/2026 | 0.9 | Ngăn chat bản tối thiểu chỉ đọc (§5.4, §6.2): `POST /chat/sessions`, `GET /chat/sessions/{id}`, `POST /chat/sessions/{id}/messages` trên sink (`agent_chat_sessions.jsonl`, `agent_chat_messages.jsonl` trong thư mục state). Mỗi lượt nạp màn hình đang mở và bản ghi đang chọn **như `agent_ro`**: không gọi hàm nào của nhóm S, M3 không nạp gì (R8), đọc eval bằng vai khác ADMIN nên bản niêm phong vào `missing` dù ADMIN hỏi (BR-10), bỏ mọi bản ghi `data_class` khác `public` trước khi dựng prompt và ghi id của nó vào `withheld` (R6). Tin nhắn giữ id đã nạp và `prompt_sha256`, không giữ prompt (§5.4 điểm 3); `proposed_action` luôn NULL, chưa có `POST /chat/actions/{id}/confirm`. Model là endpoint OpenAI-style trên máy của đội (loopback, mạng riêng hoặc host khai báo), bỏ proxy và từ chối redirect, cùng luật với Agent QA/QC; API mở không kèm `--chat-url` thì chat trả 503. FE: nút Chat trên thanh trên cùng, ngăn bên phải hiện ngữ cảnh, mỗi ngữ cảnh một phiên; M2, M5, M6, M7 báo bản ghi đang chọn. MSW trả câu `(mock)` không có model | Châu |
 | 9/11/2026 | 0.10 | W14 đóng: #166 merge 8/11/2026, nhánh web rebase lên master; `test_bench_result.py` dựng kết quả thật bằng `ModelUse` của DA-31 và bỏ cờ `MODEL_USE`, và đòi lõi cài ghi đúng bản mới nhất bộ nạp biết (`da31-3`). Bộ nạp vẫn nhận `da31-2` (`agent_models` NULL) cho kết quả cũ | Châu |
+| 11/11/2026 | 0.11 | Sửa theo review #72 của Hiếu (mười điểm). **Bộ nạp đọc store thật của lõi**: catalog `catalog/<bảng số ít>/part-*.jsonl` (`CORE_CATALOG`, khớp `CATALOG_TABLES`) và sổ `runs/<run_plan>/<job>/ledger.jsonl` đi đường nghiêm, validate bằng model S1-10 (`Source`, `RunPlan`, `Release`, `Checkpoint`, `Cluster`, `FixRateEvent`, `Decision`, `LedgerEntry`; `Episode`, `QAReport` bằng model catalog). Dòng mock dạng web vẫn đi đường khoan dung; bố cục, không phải nội dung, quyết định đường. `Score`, `Condition` chưa có bảng web, vào `ignored` kèm lý do. `MAPPED_FIELDS` cùng `DROPPED_FIELDS` phải phủ mọi trường của model. **Sổ chi phí mỗi bút toán một dòng** (R5 theo CLAUDE.md, 03 bản 0.9): `measure_kind`, `estimate_entry_id`, `usd_amount`, `human_minutes`, `gpu_hours` thay sáu cột ước tính/thực đo; sai số dự báo là phép nối dòng thực đo về dòng ước tính; C9, C10, C11 và bốn view theo đó; bộ mock ghi cặp ước tính → thực đo và `run_plan_ref` (PO D4). Các điểm khác: hành động chỉ APPLIED khi câu trả lời đã vào sink, câu trả lời bị từ chối làm hành động REJECTED kèm lý do; khoá tra trùng (hai lô một nguồn, hai thí nghiệm một run plan) bị từ chối; dòng JSONL hỏng là một dòng bị từ chối, dòng cuối đang ghi dở bị bỏ kèm log; sink ghi file tạm, `fsync`, `os.replace`; `verify` chạy lại ánh xạ để có số dòng theo bảng đích; sink tra khoá bằng chỉ mục. API: BR-07 tính cả can thiệp đã duyệt chưa chi và quyết định chưa phản ánh, chỉ quyết định được can thiệp `PROPOSED`, `items` phải là danh sách đối tượng không rỗng, không trùng; `--import-from` chỉ dừng khi `failed`. Schema: `fix_rate_events.event_ref`, `sources.path`, `sources.data_class`, `model_checkpoints.experiment_id` cho NULL | Châu |
 | 5/11/2026 | 0.4 | Mốc M0 xong phần FE: thêm §7.4 hình dạng response cho 5 màn hình lõi (nguồn là `fe/src/api/types.ts`); §7.1 thêm `GET /recommendations` và `GET /evaluations/{id}`; quy ước trang, header vai tạm `X-Fw-Role`, id trong mock là mã `*_ref`. Dựng `fe/`: Vite, MSW đọc thẳng `mock/demo-17-11/`, type hợp đồng sinh bằng `json-schema-to-typescript`, màn hình M7 | Châu |
 | 5/11/2026 | 0.4 | Dựng `api/` trước khi có Postgres: FastAPI với mọi endpoint đọc của §7.1 và hai endpoint ghi của M7, trên lớp đọc thay được (`SinkReadModel` đọc sink JSONL của `fwsync`; `PostgresReadModel` chờ M1). Hành động ghi vào `human_actions.jsonl`, đầu vào của `fwsync export`. Test đối chiếu 38 request với response của MSW. Đi trước W8: thêm một dịch vụ ở L0, chờ PO | Châu |
 | 5/11/2026 | 0.4 | Hai view sửa: `v_branch_comparison` bỏ thí nghiệm HE và HE_T (mọi điểm HE chung một nhánh, nên `DISTINCT ON` sẽ lấy một điểm bất kỳ làm "nhánh"); `v_he_curve` thêm cột `he_variant` để vẽ một đường cho mỗi biến thể. Bộ mock thêm lượt eval cho A_07, B_FAIL và lưới HE; M9 vẽ đường cong HE có khoảng tin cậy Wilson 95% và N₅₀ | Châu |
@@ -100,7 +101,7 @@ Có ba role Postgres: `fw_api` (API), `fw_sync` (bộ nạp) và `agent_ro` (k�
 | R2 | Một đường ghi: thao tác của người → bảng nhóm W → artifact trong outbox → lõi | API không có endpoint nào ghi bảng P; review PR |
 | R3 | Tên trường và enum theo `flywheel-contracts`. Thêm trường mới phải qua PR hợp đồng | Test so enum trong DB với JSON Schema (`web/tests/test_enum_sync.py`) |
 | R4 | Sổ chi phí chỉ được thêm. Sai thì thêm bút toán đảo | Trigger chặn `UPDATE`/`DELETE`, cộng `REVOKE UPDATE, DELETE` khỏi cả `fw_api` lẫn `fw_sync` |
-| R5 | Ước tính và thực đo là hai cột riêng trên cùng một bút toán | Schema |
+| R5 | Ước tính và thực đo là hai bút toán riêng (`measure_kind`), không ghi đè nhau; dòng thực đo trỏ về dòng ước tính (`estimate_entry_id`) | Schema |
 | R6 | Dữ liệu `restricted` và `internal` không đi tới dịch vụ ngoài máy | Cột `data_class`; lớp gọi model lọc trước khi dựng prompt |
 | R7 | Episode egocentric `deid_status = 'raw'` không rời tầng Annotate | Trigger trên `episodes` và `release_items` (C14) |
 | R8 | Bản sao có lỗi cấy không bao giờ vào thí nghiệm; agent không đọc được đáp án lỗi cấy | **Bản 0.3:** `episodes` không mang đáp án, chỉ mang `benchmark_copy_id`; đáp án nằm trong nhóm S mà `agent_ro` bị `REVOKE`. Cộng validation khi submit bản nháp (C7) |
@@ -763,15 +764,14 @@ ALTER TABLE cost_ledger_entries
   ADD COLUMN intervention_id UUID REFERENCES interventions(id),
   ADD COLUMN job_id VARCHAR(64),
   ADD COLUMN operator_code VARCHAR(16),        -- mã giả danh, không phải tên
-  ADD COLUMN estimated_usd NUMERIC(12,2),
-  ADD COLUMN measured_usd NUMERIC(12,2),
-  ADD COLUMN estimated_human_minutes NUMERIC(10,2),
-  ADD COLUMN measured_human_minutes NUMERIC(10,2),
-  ADD COLUMN estimated_gpu_hours NUMERIC(10,3),
-  ADD COLUMN measured_gpu_hours NUMERIC(10,3);
+  ADD COLUMN measure_kind VARCHAR(10) NOT NULL,  -- estimated | measured
+  ADD COLUMN estimate_entry_id UUID REFERENCES cost_ledger_entries(id),
+  ADD COLUMN usd_amount NUMERIC(12,2) NOT NULL,
+  ADD COLUMN human_minutes NUMERIC(10,2),
+  ADD COLUMN gpu_hours NUMERIC(10,3);
 ```
 
-Ước tính và thực đo nằm **cùng một dòng, hai cột**, nên sai số dự báo chi phí là một phép trừ. `entry_kind` còn hai giá trị: `ENTRY` và `REVERSAL`.
+Mỗi bút toán **một dòng**, đúng như lõi ghi `LedgerEntry` (bản 0.11, review #72 điểm 2): ước tính và thực đo là hai dòng, dòng thực đo trỏ về dòng ước tính qua `estimate_entry_id`, nên sai số dự báo chi phí là phép nối hai dòng đó (bản 0.4 để hai cột trên một dòng, trái R5 và không biểu diễn được cặp hai dòng của lõi). `entry_kind` còn hai giá trị: `ENTRY` và `REVERSAL`.
 
 **Không lưu tên người trong sổ.** `operator_code` là mã giả danh; bảng ánh xạ sang tên nằm ngoài DB này.
 
@@ -850,8 +850,8 @@ Cột `layer` và `split` cho phép M3 nói "code bắt được 6/10, agent b�
 | C7 | Mỗi release trong bản nháp phải: đã đóng băng, chưa xoá, **không chứa episode có `benchmark_copy_id`**, không thuộc dataset có lỗi cấy. Checkpoint gốc phải trỏ `sources` có `clean_for_main_task <> 'false'`. `branch` phải hợp lệ với `task_id` | Trigger khi chuyển `SUBMITTED`; lỗi trả mã BR-01 | W |
 | C8 | Sổ chi phí chỉ thêm | Trigger chặn `UPDATE`/`DELETE` **và** `REVOKE UPDATE, DELETE` khỏi mọi role | P |
 | C9 | Bút toán đảo đúng dấu, đúng đối tượng, chỉ đảo một lần | Trigger so với `reverses_entry_id` | P |
-| C10 | Bút toán ước tính phải gắn khuyến nghị hoặc can thiệp | `CHECK (estimated_usd IS NULL OR num_nonnulls(recommendation_id, intervention_id) >= 1)` | P |
-| C11 | Mỗi bút toán gắn ít nhất một đối tượng | `CHECK (num_nonnulls(dataset_id, experiment_id, evaluation_id, recommendation_id, intervention_id) >= 1)` | P |
+| C10 | Bút toán ước tính phải gắn khuyến nghị, can thiệp hoặc run plan | `CHECK (measure_kind <> 'estimated' OR num_nonnulls(recommendation_id, intervention_id, run_plan_id) >= 1)` | P |
+| C11 | Mỗi bút toán gắn ít nhất một đối tượng | `CHECK (num_nonnulls(dataset_id, experiment_id, evaluation_id, recommendation_id, intervention_id, cluster_id, run_plan_id) >= 1)` | P |
 | C12 | Xoá mềm phải có lý do | `CHECK (NOT is_deleted OR delete_reason IS NOT NULL)` | P |
 | C13 | Số đếm eval hợp lệ; cột đếm `NOT NULL DEFAULT 0` | `CHECK c13_counts` trên `sim_evaluations` | P |
 | C14 | Egocentric raw không được gán split khác `unassigned` và không vào release | Trigger trên `episodes` và `release_items` | P |
@@ -1308,7 +1308,7 @@ Nguồn duy nhất cho cả BE và FE là `web/fe/src/contracts/enums.ts` và `w
 | **`system_diagnoses`** | `SystemDiagnosis` của `flywheel.contracts.diagnosis` (`SystemDiagnosisRecord` của DA-13 khớp từng trường) | `SystemDiagnosis.json` | có (issue #70; `timing`, `recorded`, `recorded_skipped` từ PR #146, bản 0.5) |
 | Giả thuyết stage (M7) | `StageAttributionRecord` của `flywheel.eval.diagnosis.stage.artifact` | **chưa có** | Issue #70 |
 
-Các thực thể còn lại (`Source`, `Condition`, `Release`, `Checkpoint`, `RunPlan`, `Score`, `Cluster`, `FixRateEvent`, `LedgerEntry`, `Decision`) do story S1-10 (#36, **chưa merge**) giao; tên cột theo [03 §4.3](../docs/product/03-architecture.md). Chúng chưa có file schema, nên **bộ nạp phải khoan dung** với phần này cho tới khi S1-10 merge.
+Các thực thể còn lại (`Source`, `Condition`, `Release`, `Checkpoint`, `RunPlan`, `Score`, `Cluster`, `FixRateEvent`, `LedgerEntry`, `Decision`) do story S1-10 (#36, **đã merge**) giao; tên cột theo [03 §4.3](../docs/product/03-architecture.md). Từ bản 0.11, dòng lõi ghi theo bố cục store (`catalog/<bảng số ít>/`, `runs/**/ledger.jsonl`) đi đường nghiêm bằng các model này; chỉ dòng mock dạng web còn đi đường khoan dung. `Score` và `Condition` chưa có bảng web và được liệt kê trong `ignored`.
 
 ## Phụ lục C · Bộ mock kịch bản demo
 

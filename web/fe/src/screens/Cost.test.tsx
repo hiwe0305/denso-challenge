@@ -24,10 +24,18 @@ describe("M8 screen", () => {
     expect(screen.getByTestId("ledger-led_train_A_dup").textContent).toContain("đã bị đảo");
   });
 
+  it("shows an estimate and its measurement as two entries, linked (R5)", async () => {
+    renderApp("/chi-phi");
+    const measured = await screen.findByTestId("ledger-led_train_A");
+    expect(screen.getByTestId("ledger-led_train_A_est")).toBeTruthy();
+    expect(within(measured).getByTestId("measures-led_train_A").textContent).toBe("đo led_train_A_est");
+  });
+
   it("says which indicators have no data instead of showing 0", async () => {
     renderApp("/chi-phi");
     await waitFor(() => expect(screen.getByTestId("ind-demos").textContent).toContain("N = 20"));
-    expect(screen.getByTestId("ind-forecast").textContent).toContain("chưa có");
+    // Every measured job of the mock has its estimate row, so the error is known.
+    expect(screen.getByTestId("ind-forecast").textContent).toContain("cặp ước tính → thực đo");
     expect(screen.getByTestId("ind-c-vs-b").textContent).toContain("nhánh C chưa có");
     expect(screen.getByTestId("ind-minutes").textContent).not.toContain("chưa có");
   });

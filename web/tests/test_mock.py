@@ -465,19 +465,32 @@ def test_the_reversal_negates_its_original_exactly(data: dict[str, Any]) -> None
     assert len(reversals) == 1
     reversal = reversals[0]
     original = ledger[reversal["reverses_entry_ref"]]
-    for field in ("quantity", "measured_usd", "measured_gpu_hours"):
+    for field in ("quantity", "usd_amount", "gpu_hours"):
         assert reversal[field] == -original[field]
-    for field in ("activity", "resource_type", "experiment_code", "branch"):
+    for field in ("activity", "resource_type", "experiment_code", "branch",
+                  "measure_kind", "estimate_entry_ref"):
         assert reversal.get(field) == original.get(field)
 
 
 def test_every_ledger_entry_has_a_target_and_estimates_have_an_owner(data: dict[str, Any]) -> None:
     targets = ("dataset_code", "experiment_code", "evaluation_ref", "recommendation_ref",
-               "intervention_ref")
+               "intervention_ref", "cluster_ref", "run_plan_ref")
     for row in data["ledger.jsonl"]:
         assert any(row.get(name) for name in targets), row["entry_ref"]  # C11
-        if row.get("estimated_usd") is not None:  # C10
-            assert row.get("recommendation_ref") or row.get("intervention_ref")
+        assert row.get("run_plan_ref"), row["entry_ref"]  # PO D4, like the core
+        if row["measure_kind"] == "estimated":  # C10
+            owners = ("recommendation_ref", "intervention_ref", "run_plan_ref")
+            assert any(row.get(name) for name in owners)
+
+
+def test_every_measured_entry_points_at_an_estimate_of_the_mock(data: dict[str, Any]) -> None:
+    # R5: an estimate and its measurement are two rows; the measured one names its estimate.
+    ledger = {row["entry_ref"]: row for row in data["ledger.jsonl"]}
+    for row in ledger.values():
+        if row["measure_kind"] == "measured":
+            assert ledger[row["estimate_entry_ref"]]["measure_kind"] == "estimated"
+        else:
+            assert row["estimate_entry_ref"] is None
 
 
 def test_code_catches_six_of_ten_and_the_agent_two_more(data: dict[str, Any]) -> None:

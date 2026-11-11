@@ -31,6 +31,8 @@ Hai cách ghi, khác nhau đúng ở chỗ có được sửa hay không:
 from __future__ import annotations
 
 import json
+import os
+import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -76,7 +78,7 @@ NATURAL_KEY: dict[str, tuple[str, ...]] = {
         "start_step", "group_name", "dim",
     ),
     "train_diagnosis_skips": ("experiment_code", "config_sha256", "code"),
-    "fix_rate_events": ("cluster_ref", "intervention_ref"),
+    "fix_rate_events": ("event_ref",),
 }
 
 #: Bảng chỉ được thêm (luật R4, 03 §4.4, trigger C8): chèn nếu chưa có,
@@ -139,14 +141,22 @@ class Sink(Protocol):
 class JsonlSink:
     """Ghi mỗi bảng thành một file JSONL dưới `directory`.
 
-    Giữ dòng trong bộ nhớ tới `commit()` vì upsert cần tra khoá tự nhiên, và
-    đọc lại file sau mỗi dòng sẽ chậm bậc hai. Bộ nạp mỗi lần chạy xử lý vài
-    nghìn dòng nên giữ hết trong bộ nhớ là đủ.
+    Giữ dòng trong bộ nhớ tới `commit()` vì upsert cần tra khoá tự nhiên. Mỗi
+    bảng có một chỉ mục từ bộ khoá tự nhiên sang dòng, dựng một lần khi mở,
+    nên một lần nạp là tuyến tính theo số dòng (review #72 điểm 10: quét
+    tuyến tính từng dòng làm 8.000 dòng mất 15,8 s).
+
+    `persist=False` cho một sink chỉ trong bộ nhớ: không đọc thư mục, không
+    ghi gì. `fwsync verify` dùng nó để chạy lại phần ánh xạ mà không chạm đĩa.
     """
 
     directory: Path
+    persist: bool = True
     rows: dict[str, list[dict[str, Any]]] = field(default_factory=lambda: defaultdict(list))
     _counts: dict[str, WriteCounts] = field(default_factory=lambda: defaultdict(WriteCounts))
+    _index: dict[str, dict[tuple[Any, ...], dict[str, Any]]] = field(
+        default_factory=lambda: defaultdict(dict)
+    )
 
     def __post_init__(self) -> None:
         """Đọc lại dòng đã ghi lần trước, nếu thư mục đã có.
@@ -157,13 +167,15 @@ class JsonlSink:
         chuyện khác nhau về cùng một lần nạp. Nội dung file vẫn như nhau cả
         hai cách; chỉ con số là sai.
         """
-        if not self.directory.is_dir():
+        if not self.persist or not self.directory.is_dir():
             return
         for path in sorted(self.directory.glob("*.jsonl")):
             table = path.stem
             for line in path.read_text(encoding="utf-8").splitlines():
                 if line.strip():
-                    self.rows[table].append(json.loads(line))
+                    row = json.loads(line)
+                    self.rows[table].append(row)
+                    self._remember(table, row)
 
     def write(self, table: str, row: dict[str, Any]) -> str:
         key = NATURAL_KEY.get(table)
@@ -176,6 +188,7 @@ class JsonlSink:
         existing = self._find(table, key, row)
         if existing is None:
             self.rows[table].append(row)
+            self._remember(table, row)
             self._counts[table].inserted += 1
             return "inserted"
         if table in APPEND_ONLY:
@@ -192,14 +205,31 @@ class JsonlSink:
         return {table: count.as_dict() for table, count in sorted(self._counts.items())}
 
     def commit(self) -> None:
+        """Ghi từng bảng ra file tạm, `fsync`, rồi `os.replace` (review #72 điểm 7).
+
+        Ghi đè tại chỗ cắt file về 0 trước khi ghi lại, nên một tiến trình
+        chết giữa chừng làm mất bút toán append-only, và một người đọc
+        (`SinkReadModel`, watcher SSE) đọc trúng lúc đó thấy một file cụt.
+        `os.replace` thì nguyên tử: người đọc thấy file cũ hoặc file mới.
+        """
+        if not self.persist:
+            return
         self.directory.mkdir(parents=True, exist_ok=True)
         for table, rows in sorted(self.rows.items()):
             path = self.directory / f"{table}.jsonl"
-            path.write_text(
-                "".join(json.dumps(row, ensure_ascii=False, default=str) + "\n" for row in rows),
-                encoding="utf-8",
-                newline="\n",
-            )
+            temporary = path.with_name(f"{path.name}.tmp")
+            with temporary.open("w", encoding="utf-8", newline="\n") as handle:
+                handle.write(
+                    "".join(json.dumps(row, ensure_ascii=False, default=str) + "\n" for row in rows)
+                )
+                handle.flush()
+                os.fsync(handle.fileno())
+            _replace(temporary, path)
+
+    def _remember(self, table: str, row: dict[str, Any]) -> None:
+        key = NATURAL_KEY.get(table)
+        if key is not None and all(name in row for name in key):
+            self._index[table].setdefault(_key_of(row, key), row)
 
     def _find(
         self, table: str, key: tuple[str, ...], row: dict[str, Any]
@@ -208,11 +238,35 @@ class JsonlSink:
             # Khoá tự nhiên thiếu thì không tra được; thêm dòng mới và để
             # CHECK của Postgres bắt nếu nó thật sự trùng.
             return None
-        wanted = tuple(row[name] for name in key)
-        for candidate in self.rows[table]:
-            if tuple(candidate.get(name) for name in key) == wanted:
-                return candidate
-        return None
+        return self._index[table].get(_key_of(row, key))
+
+
+def _key_of(row: dict[str, Any], key: tuple[str, ...]) -> tuple[Any, ...]:
+    """Bộ khoá tự nhiên của một dòng, băm được.
+
+    Giá trị khoá thường là chuỗi hay số; một giá trị list hay dict (hiếm, nhưng
+    JSON cho phép) được chuẩn hoá thành chuỗi JSON để vẫn làm khoá dict được.
+    """
+    return tuple(
+        json.dumps(row[name], sort_keys=True) if isinstance(row[name], (list, dict)) else row[name]
+        for name in key
+    )
+
+
+def _replace(source: Path, target: Path, attempts: int = 20) -> None:
+    """`os.replace`, thử lại khi Windows còn giữ file đích.
+
+    Trên Windows một người đọc đang mở file đích làm `os.replace` ném
+    `PermissionError` trong chốc lát. POSIX không có chuyện này.
+    """
+    for attempt in range(attempts):
+        try:
+            os.replace(source, target)
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(0.05)
 
 
 @dataclass

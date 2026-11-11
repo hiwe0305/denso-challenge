@@ -323,7 +323,9 @@ function OverrideForm({ clusterId, current }: { clusterId: string; current: Clus
   const [reason, setReason] = useState("");
   const [actionId, setActionId] = useState<string | null>(null);
   const [err, setErr] = useState<unknown>(null);
-  const key = useRef<string | null>(null);
+  // A retry of the same content reuses its key (C16); edited content is a new
+  // request and gets a new key, like the decision form below.
+  const attempt = useRef<{ payload: string; key: string } | null>(null);
 
   if (actionId) return <ActionStatus actionId={actionId} />;
   if (!open) {
@@ -338,9 +340,10 @@ function OverrideForm({ clusterId, current }: { clusterId: string; current: Clus
       className="space-y-2 rounded border border-slate-200 bg-white p-2"
       onSubmit={async (e) => {
         e.preventDefault();
-        key.current ??= newIdempotencyKey();
+        const payload = JSON.stringify({ diagnosis, reason });
+        if (attempt.current?.payload !== payload) attempt.current = { payload, key: newIdempotencyKey() };
         try {
-          const r = await apiAction(`/clusters/${clusterId}/diagnosis-override`, { diagnosis, reason }, key.current);
+          const r = await apiAction(`/clusters/${clusterId}/diagnosis-override`, { diagnosis, reason }, attempt.current.key);
           setActionId(r.action_id);
         } catch (error) {
           setErr(error);
@@ -414,7 +417,8 @@ function ProposalColumn({ rec }: { rec: Recommendation }) {
   const reviewable = rec.status === "AWAITING_REVIEW" && actionId === null;
 
   async function submit(kind: "approve" | "edited" | "reject") {
-    const items = rec.interventions.map((iv) => {
+    // Only what is still open: the API refuses a decision on anything else (409).
+    const items = rec.interventions.filter((iv) => iv.status === "PROPOSED").map((iv) => {
       const c = choices[iv.id] ?? { quantity: iv.target_quantity, rejected: false };
       if (kind === "reject" || c.rejected) return { intervention_id: iv.id, decision: "REJECT", reason };
       if (kind === "edited" && c.quantity !== iv.target_quantity) {

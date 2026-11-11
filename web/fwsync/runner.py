@@ -23,17 +23,30 @@ from typing import Any
 
 from web.fwsync import actions as log
 from web.fwsync.mapping import (
+    CatalogLookups,
     DatasetLookup,
     MappingError,
+    NotLoaded,
+    RefLookup,
     TraceLookup,
+    check_ledger_row,
     map_bench_result,
+    map_checkpoint,
+    map_cluster,
+    map_decision,
     map_defect_manifest,
     map_episode,
+    map_fix_rate_event,
+    map_ledger_entry,
     map_probe_result,
     map_qa_report,
+    map_release,
+    map_run_plan,
+    map_source,
     map_system_diagnosis,
     map_train_diagnosis,
     map_training_metric,
+    refuse_ambiguous,
 )
 from web.fwsync.sink import NATURAL_KEY, JsonlSink, Sink
 from web.fwsync.source import TOLERANT_TABLES, Record, SourceScan, scan, tolerant_row
@@ -202,6 +215,9 @@ TOLERANT_COLUMNS: dict[str, frozenset[str]] = {
     ),
     "fix_rate_events": frozenset(
         {
+            # Khoá tự nhiên: hai lần đo cùng (cụm, can thiệp) ở hai vòng là hai
+            # sự kiện, nên cặp đó không làm khoá được.
+            "event_ref",
             "intervention_kind", "cluster_ref", "intervention_ref", "failure_code",
             "failure_class", "n_conditions", "p_parent", "p_candidate",
             "fixed_count",
@@ -226,12 +242,15 @@ TOLERANT_COLUMNS: dict[str, frozenset[str]] = {
             "criteria", "conclusion", "reason", "source_action_id",
         }
     ),
+    # Một bút toán một dòng: ước tính và thực đo là hai dòng, dòng thực đo trỏ
+    # về dòng ước tính (R5, review #72 điểm 2). `check_ledger_row` kiểm luật đó
+    # cho cả dòng mock.
     "cost_ledger_entries": frozenset(
         {
             "entry_ref", "entry_kind", "reverses_entry_ref", "activity",
             "resource_type", "quantity", "unit", "price_book_name",
-            "estimated_usd", "measured_usd", "estimated_human_minutes",
-            "measured_human_minutes", "estimated_gpu_hours", "measured_gpu_hours",
+            "measure_kind", "estimate_entry_ref", "usd_amount", "human_minutes",
+            "gpu_hours",
             "dataset_code", "experiment_code", "evaluation_ref",
             "recommendation_ref", "intervention_ref", "cluster_ref",
             "run_plan_ref", "branch", "job_id", "operator_code", "note",
@@ -250,17 +269,27 @@ class SyncResult:
     errors: list[dict[str, Any]] = field(default_factory=list)
     ignored: list[str] = field(default_factory=list)
     unknown_fields: dict[str, list[str]] = field(default_factory=dict)
+    #: `source_action_id` của artifact mà **mọi** dòng đã vào sink. Chỉ những
+    #: hành động này được đánh APPLIED (review #72 điểm 3).
+    applied_actions: list[str] = field(default_factory=list)
+    #: `source_action_id` → lý do, cho artifact trả lời bị từ chối. Hành động
+    #: đó thành REJECTED kèm lý do, không thành APPLIED.
+    rejected_actions: dict[str, str] = field(default_factory=dict)
 
     @property
     def status(self) -> str:
         """`ok`, `partial` hay `failed`, đúng CHECK của bảng `sync_runs`.
 
         Có lỗi mà vẫn báo `ok` là cách che mất dòng bị từ chối, nên `ok` đòi
-        `errors` rỗng.
+        `errors` rỗng. Dòng append-only đã có (`unchanged`) cũng là dòng đã
+        nạp: một lần nạp lại có một dòng hỏng là `partial`, không `failed`.
         """
         if not self.errors:
             return "ok"
-        if any(count["inserted"] or count["updated"] for count in self.counts.values()):
+        if any(
+            count["inserted"] or count["updated"] or count.get("unchanged")
+            for count in self.counts.values()
+        ):
             return "partial"
         return "failed"
 
@@ -295,10 +324,15 @@ class ExperimentLookup:
 
     by_run_plan: dict[str, str]
     by_checkpoint: dict[str, str]
+    #: Khoá mà hai thí nghiệm khác nhau cùng khai (review #72 điểm 4).
+    ambiguous_run_plans: frozenset[str] = frozenset()
+    ambiguous_checkpoints: frozenset[str] = frozenset()
 
     def for_metric(self, payload: Any, where: str) -> str:
         run_plan = payload.get("run_plan_id") if isinstance(payload, dict) else None
         checkpoint = payload.get("checkpoint_id") if isinstance(payload, dict) else None
+        refuse_ambiguous(run_plan, self.ambiguous_run_plans, f"{where}: run_plan_id")
+        refuse_ambiguous(checkpoint, self.ambiguous_checkpoints, f"{where}: checkpoint_id")
         if run_plan in self.by_run_plan:
             return self.by_run_plan[run_plan]
         if checkpoint in self.by_checkpoint:
@@ -311,6 +345,7 @@ class ExperimentLookup:
 
     def for_diagnosis(self, payload: Any, where: str) -> str:
         checkpoint = payload.get("checkpoint_id") if isinstance(payload, dict) else None
+        refuse_ambiguous(checkpoint, self.ambiguous_checkpoints, f"{where}: checkpoint_id")
         if checkpoint in self.by_checkpoint:
             return self.by_checkpoint[checkpoint]
         raise MappingError(
@@ -326,6 +361,7 @@ class Lookups:
     dataset: DatasetLookup
     experiment: ExperimentLookup
     trace: TraceLookup
+    catalog: CatalogLookups = CatalogLookups()
 
 
 def run_import(source_dir: Path, sink: Sink, origin: str = "core") -> SyncResult:
@@ -343,20 +379,44 @@ def run_import(source_dir: Path, sink: Sink, origin: str = "core") -> SyncResult
     if origin not in ORIGINS:
         raise ValueError(f"origin `{origin}` không có; chỉ {ORIGINS}")
     found: SourceScan = scan(source_dir)
-    result = SyncResult(direction="import", source_dir=str(source_dir), ignored=found.ignored)
+    result = SyncResult(direction="import", source_dir=str(source_dir))
+    _load(found, sink, origin, result)
+    sink.commit()
+    result.counts = sink.counts()
+    return result
+
+
+def _load(found: SourceScan, sink: Sink, origin: str, result: SyncResult) -> None:
+    """Ánh xạ mọi bản ghi đã quét rồi ghi vào sink, **không** commit.
+
+    Tách khỏi `run_import` để `run_verify` chạy đúng đường này trên một sink
+    chỉ trong bộ nhớ: số dòng kỳ vọng là số dòng mà lần nạp thật sẽ ghi.
+    """
+    result.ignored.extend(found.ignored)
+    for error in found.errors:
+        result.errors.append(error)
+        if isinstance(sink, JsonlSink):
+            sink.reject(str(error["table"]))
     lookups = Lookups(
         dataset=_dataset_lookup(found),
         experiment=_experiment_lookup(found),
         trace=_trace_lookup(found),
+        catalog=_catalog_lookups(found),
     )
     loaded_episodes: set[str] = set()
 
     for table in _ordered(found.tables):
         for record in found.by_table(table):
+            action = _source_action(record)
             try:
                 rows = _map(record, lookups, loaded_episodes)
+            except NotLoaded as skipped:
+                result.ignored.append(f"{record.where}: {skipped}")
+                continue
             except (MappingError, ValueError) as error:
                 result.errors.append(_error(record, error))
+                if action:
+                    result.rejected_actions.setdefault(action, str(error))
                 if isinstance(sink, JsonlSink):
                     sink.reject(record.table)
                 continue
@@ -374,10 +434,16 @@ def run_import(source_dir: Path, sink: Sink, origin: str = "core") -> SyncResult
                     # bị từ chối kéo theo báo cáo của nó thay vì để một dòng
                     # QA trỏ vào khoảng trống.
                     loaded_episodes.add(row["episode_ref"])
+            if action and action not in result.applied_actions:
+                result.applied_actions.append(action)
 
-    sink.commit()
-    result.counts = sink.counts()
-    return result
+
+def _source_action(record: Record) -> str | None:
+    """`source_action_id` mà một artifact trả lời mang theo, nếu có (W7)."""
+    payload = record.payload
+    if isinstance(payload, dict) and payload.get("source_action_id"):
+        return str(payload["source_action_id"])
+    return None
 
 
 def _ordered(tables: list[str]) -> list[str]:
@@ -387,16 +453,36 @@ def _ordered(tables: list[str]) -> list[str]:
 
 
 def _dataset_lookup(found: SourceScan) -> DatasetLookup:
+    by_source = _pairs(found, "datasets", "source_ref", "dataset_code")
+    by_intervention = _pairs(found, "interventions", "intervention_ref", "dataset_code")
     return DatasetLookup(
-        by_source=_pairs(found, "datasets", "source_ref", "dataset_code"),
-        by_intervention=_pairs(found, "interventions", "intervention_ref", "dataset_code"),
+        by_source=by_source.pairs,
+        by_intervention=by_intervention.pairs,
+        ambiguous_sources=by_source.ambiguous,
+        ambiguous_interventions=by_intervention.ambiguous,
     )
 
 
 def _experiment_lookup(found: SourceScan) -> ExperimentLookup:
+    by_run_plan = _pairs(found, "experiments", "run_plan_ref", "experiment_code")
+    by_checkpoint = _pairs(found, "model_checkpoints", "checkpoint_ref", "experiment_code")
     return ExperimentLookup(
-        by_run_plan=_pairs(found, "experiments", "run_plan_ref", "experiment_code"),
-        by_checkpoint=_pairs(found, "model_checkpoints", "checkpoint_ref", "experiment_code"),
+        by_run_plan=by_run_plan.pairs,
+        by_checkpoint=by_checkpoint.pairs,
+        ambiguous_run_plans=by_run_plan.ambiguous,
+        ambiguous_checkpoints=by_checkpoint.ambiguous,
+    )
+
+
+def _catalog_lookups(found: SourceScan) -> CatalogLookups:
+    return CatalogLookups(
+        recommendation_by_run_plan=_pairs(
+            found, "flywheel_recommendations", "run_plan_ref", "recommendation_ref"
+        ),
+        recommendation_by_intervention=_pairs(
+            found, "interventions", "intervention_ref", "recommendation_ref"
+        ),
+        experiment_by_run_plan=_pairs(found, "experiments", "run_plan_ref", "experiment_code"),
     )
 
 
@@ -418,14 +504,50 @@ def _trace_lookup(found: SourceScan) -> TraceLookup:
     )
 
 
-def _pairs(found: SourceScan, table: str, key: str, value: str) -> dict[str, str]:
-    pairs: dict[str, str] = {}
+def _pairs(found: SourceScan, table: str, key: str, value: str) -> RefLookup:
+    """`key → value` qua mọi dòng của một bảng nguồn, khoá trùng thì vào `ambiguous`.
+
+    Trước đây giá trị cuối cùng thắng: hai lô cùng `source_ref` (lô thật và
+    bản sao chấm cắt từ nó) thì episode vào lô đọc sau, không ai biết (review
+    #72 điểm 4). Cùng một cặp xuất hiện hai lần thì không trùng.
+    """
+    seen: dict[str, set[str]] = {}
     for record in found.by_table(table):
         if isinstance(record.payload, dict):
             left, right = record.payload.get(key), record.payload.get(value)
             if left and right:
-                pairs[str(left)] = str(right)
-    return pairs
+                seen.setdefault(str(left), set()).add(str(right))
+    return RefLookup(
+        pairs={left: next(iter(rights)) for left, rights in seen.items() if len(rights) == 1},
+        ambiguous=frozenset(left for left, rights in seen.items() if len(rights) > 1),
+    )
+
+
+#: Mapper của dòng hợp đồng theo bảng đích, cho bản ghi đến từ catalog hay sổ
+#: chi phí của lõi (`Record.contract`). Mỗi mapper trả danh sách (bảng, dòng).
+def _contract_rows(record: Record, lookups: Lookups) -> list[tuple[str, dict[str, Any]]] | None:
+    table, payload = record.table, record.payload
+    if table == "sources":
+        return [("sources", map_source(payload))]
+    if table == "run_plans":
+        return [("run_plans", map_run_plan(payload))]
+    if table == "releases":
+        return map_release(payload)
+    if table == "model_checkpoints":
+        return [("model_checkpoints", map_checkpoint(payload))]
+    if table == "failure_clusters":
+        return [("failure_clusters", map_cluster(payload, lookups.catalog))]
+    if table == "fix_rate_events":
+        return [("fix_rate_events", map_fix_rate_event(payload))]
+    if table == "decisions":
+        return [("decisions", map_decision(payload))]
+    if table == "cost_ledger_entries":
+        return [("cost_ledger_entries", map_ledger_entry(payload, lookups.catalog))]
+    if table == "system_diagnoses":
+        # `diagnosis/system.jsonl` của làn DA-13. Dòng `system_diagnoses.jsonl`
+        # của bộ mock đi đường khoan dung.
+        return [("system_diagnoses", map_system_diagnosis(payload, lookups.trace))]
+    return None
 
 
 def _map(
@@ -434,9 +556,15 @@ def _map(
     """Một artifact thành một hoặc nhiều dòng, kèm bảng đích của từng dòng."""
     table = record.table
     if table == "episodes":
-        return [("episodes", map_episode(record.payload, lookups.dataset))]
+        episode = map_episode(record.payload, lookups.dataset, catalog=record.contract)
+        return [("episodes", episode)]
     if table == "episode_qa_reports":
-        return [("episode_qa_reports", map_qa_report(record.payload, loaded_episodes))]
+        report = map_qa_report(record.payload, loaded_episodes, catalog=record.contract)
+        return [("episode_qa_reports", report)]
+    if record.contract:
+        contract_rows = _contract_rows(record, lookups)
+        if contract_rows is not None:
+            return contract_rows
     if table == "training_metrics":
         experiment = lookups.experiment.for_metric(record.payload, record.where)
         return [("training_metrics", map_training_metric(record.payload, experiment))]
@@ -456,11 +584,6 @@ def _map(
     if table == "defect_bench_groups":
         bench = map_bench_result(record.payload, _bench_sha256(record))
         return [(target, row) for target, rows in bench.items() for row in rows]
-    if table == "system_diagnoses" and record.contract:
-        # `diagnosis/system.jsonl` của làn DA-13: hình dạng hợp đồng, đi đường
-        # nghiêm. Dòng `system_diagnoses.jsonl` của bộ mock đi tiếp xuống
-        # đường khoan dung bên dưới.
-        return [("system_diagnoses", map_system_diagnosis(record.payload, lookups.trace))]
     if table in TOLERANT_TABLES:
         allowed = TOLERANT_COLUMNS.get(table)
         if allowed is None:
@@ -474,6 +597,8 @@ def _map(
             # Không cột khoá nào: dòng không tra lại được, nạp lần hai sẽ thành
             # dòng thứ hai, và Postgres sẽ chết ở NOT NULL. Từ chối ở đây.
             raise MappingError(f"{record.where}: thiếu khoá tự nhiên {list(key)} của `{table}`")
+        if table == "cost_ledger_entries":
+            check_ledger_row(row, record.where)
         if unknown:
             row["__unknown__"] = unknown
         return [(table, row)]
@@ -570,16 +695,22 @@ def run_export(actions: list[dict[str, Any]], outbox: Path) -> SyncResult:
 
 
 def run_verify(source_dir: Path, loaded: dict[str, int]) -> SyncResult:
-    """So số dòng giữa nguồn và những gì đã nạp. Báo chênh, **không tự sửa**.
+    """So số dòng **kỳ vọng theo bảng đích** với những gì đã nạp. Báo chênh, không tự sửa.
+
+    Số kỳ vọng có được bằng cách chạy lại đúng phần ánh xạ của `run_import`
+    trên một sink chỉ trong bộ nhớ (review #72 điểm 8). Đếm bản ghi nguồn
+    theo bảng nguồn thì sai ngay sau một lần nạp sạch: một `bench_result.json`
+    sinh hai dòng nhóm và hàng chục dòng điểm, một chẩn đoán train sinh dòng ở
+    hai bảng, và dòng nguồn bị từ chối thì không bao giờ vào sink.
 
     Tự sửa là cách một lỗi của bộ nạp biến thành một con số sai mà không ai
     truy được (§9.4, "không bao giờ sửa số trong DB bằng tay").
     """
     found = scan(source_dir)
+    dry = JsonlSink(directory=source_dir, persist=False)
+    _load(found, dry, "core", SyncResult(direction="import", source_dir=str(source_dir)))
     result = SyncResult(direction="verify", source_dir=str(source_dir), ignored=found.ignored)
-    in_source: dict[str, int] = {}
-    for record in found.records:
-        in_source[record.table] = in_source.get(record.table, 0) + 1
+    in_source = {table: len(rows) for table, rows in dry.rows.items() if rows}
     for table in sorted(set(in_source) | set(loaded)):
         expected = in_source.get(table, 0)
         actual = loaded.get(table, 0)
@@ -590,10 +721,19 @@ def run_verify(source_dir: Path, loaded: dict[str, int]) -> SyncResult:
                     "table": table,
                     "ref": str(source_dir),
                     "code": "CountMismatch",
-                    "message": f"nguồn có {expected} dòng, đã nạp {actual}",
+                    "message": f"nguồn sinh {expected} dòng, đã nạp {actual}",
                 }
             )
     return result
+
+
+def loaded_counts(directory: Path) -> dict[str, int]:
+    """Số dòng mỗi bảng trong thư mục của một `JsonlSink`, cho `fwsync verify`."""
+    counts: dict[str, int] = {}
+    for path in sorted(directory.glob("*.jsonl")):
+        text = path.read_text(encoding="utf-8")
+        counts[path.stem] = sum(1 for line in text.splitlines() if line.strip())
+    return counts
 
 
 # ---------------------------------------------------------------------------
@@ -690,6 +830,7 @@ class CycleResult:
     export: SyncResult
     fake_core: SyncResult | None
     imported: SyncResult | None
+    rejected: list[str] = field(default_factory=list)
 
     @property
     def status(self) -> str:
@@ -697,6 +838,23 @@ class CycleResult:
         if all(r.status == "ok" for r in parts):
             return "ok"
         return "partial" if self.exported or self.applied else "failed"
+
+
+def settle_actions(actions: Path, imported: SyncResult) -> tuple[list[str], list[str]]:
+    """Đánh APPLIED hay REJECTED các hành động mà một lần nạp vừa trả lời (W7).
+
+    Chỉ artifact đã vào sink mới làm hành động APPLIED (review #72 điểm 3).
+    Câu trả lời bị bộ nạp từ chối làm hành động REJECTED kèm lý do, trừ khi
+    một câu trả lời khác của cùng hành động đã vào sink. Trạng thái chỉ đi
+    tới, nên chạy lại lần nạp không đổi gì.
+    """
+    applied = log.mark(actions, imported.applied_actions, "APPLIED")
+    rejected: list[str] = []
+    for action_id, reason in imported.rejected_actions.items():
+        if action_id in imported.applied_actions:
+            continue
+        rejected += log.mark(actions, [action_id], "REJECTED", f"bộ nạp từ chối: {reason}")
+    return applied, rejected
 
 
 def run_cycle(
@@ -723,10 +881,11 @@ def run_cycle(
     replies = run_fake_core(outbox, inbox) if fake_core else None
     imported: SyncResult | None = None
     applied: list[str] = []
+    rejected: list[str] = []
     if inbox.is_dir():
         imported = run_import(inbox, sink, origin=origin)
-        applied = log.mark(actions, log.answered_ids(scan(inbox).records), "APPLIED")
-    return CycleResult(exported, applied, export, replies, imported)
+        applied, rejected = settle_actions(actions, imported)
+    return CycleResult(exported, applied, export, replies, imported, rejected)
 
 
 def _decision_kind(action_kind: str) -> str:

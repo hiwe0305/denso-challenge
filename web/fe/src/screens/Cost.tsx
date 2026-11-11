@@ -1,7 +1,7 @@
 // M8 · Sổ chi phí và kinh tế (DESIGN.md §6.1).
 //
-// Estimate and measurement side by side; a reversal is shown as such, never
-// hidden (BR-06). Human minutes and GPU hours are two separate constraints,
+// Estimate and measurement are two entries, the measured one naming the
+// estimate it measures (R5); a reversal is shown as such, never hidden (BR-06). Human minutes and GPU hours are two separate constraints,
 // never folded into dollars. A branch carries its direct entries plus its
 // BR-05 share of the data it trained on. An indicator with no data behind it
 // says so instead of showing 0.
@@ -15,14 +15,22 @@ import { n50 } from "./HeCurve";
 const TASK = "two_table";
 const HE = new Set(["HE", "HE_T"]);
 
+// `LedgerEntry.activity` of the contract; anything else shows its raw name.
 const activityLabel: Record<string, string> = {
-  ingest: "nạp dữ liệu",
-  teleop: "teleop",
-  synthetic: "sinh synthetic",
+  data_download: "tải dữ liệu",
+  teleop_session: "teleop",
+  data_generation: "sinh dữ liệu",
+  pipeline: "pipeline",
+  qa: "QA",
+  agent_qa: "Agent QA/QC",
   train: "train",
+  probe: "probe",
   eval: "eval",
   diagnosis: "chẩn đoán",
-  intervention_estimate: "ước tính can thiệp",
+  holdout: "holdout",
+  storage: "lưu trữ",
+  review: "review",
+  other: "khác",
 };
 
 export interface BranchCost {
@@ -109,7 +117,7 @@ export function Cost() {
           note={c ? "chênh $/điểm, C trừ B" : "nhánh C chưa có lượt eval dev"} />
         <Indicator label="Sai số dự báo chi phí" testId="ind-forecast"
           value={pairs > 0 ? `${fmt(forecastError, 2)} $` : null}
-          note={pairs > 0 ? `trên ${pairs} bút toán có cả ước tính lẫn thực đo` : "chưa bút toán nào có cả ước tính lẫn thực đo"} />
+          note={pairs > 0 ? `trên ${pairs} cặp ước tính → thực đo` : "chưa job nào có cả dòng ước tính lẫn dòng thực đo"} />
       </div>
 
       <Panel title="Chi phí theo nhánh · thực đo, kèm phần dữ liệu chia theo BR-05">
@@ -216,14 +224,15 @@ function LedgerTable() {
                     <td className="py-1 font-mono">{r.id}</td>
                     <td>{activityLabel[r.activity] ?? r.activity}</td>
                     <td className="text-slate-600">
-                      {r.branch ? `nhánh ${r.branch}` : r.dataset_id ?? r.intervention_id ?? r.recommendation_id ?? "—"}
+                      {r.branch ? `nhánh ${r.branch}` : r.dataset_id ?? r.intervention_id ?? r.recommendation_id ?? r.run_plan_id ?? "—"}
                     </td>
                     <td className="text-right">{fmt(r.quantity)} {r.unit}</td>
-                    <td className="text-right">{fmt(r.estimated_usd)}</td>
-                    <td className="text-right">{fmt(r.measured_usd)}</td>
-                    <td className="text-right">{fmt(r.measured_human_minutes ?? r.estimated_human_minutes, 0)}</td>
-                    <td className="text-right">{fmt(r.measured_gpu_hours ?? r.estimated_gpu_hours, 2)}</td>
+                    <td className="text-right">{r.measure_kind === "estimated" ? fmt(r.usd_amount) : null}</td>
+                    <td className="text-right">{r.measure_kind === "measured" ? fmt(r.usd_amount) : null}</td>
+                    <td className="text-right">{fmt(r.human_minutes, 0)}</td>
+                    <td className="text-right">{fmt(r.gpu_hours, 2)}</td>
                     <td className="no-underline">
+                      {r.estimate_entry_id ? <span className="rounded bg-sky-100 px-1 text-[10px] text-sky-900" data-testid={`measures-${r.id}`}>đo {r.estimate_entry_id}</span> : null}
                       {isReversal ? <span className="rounded bg-amber-200 px-1 text-[10px] text-amber-900" title={r.note ?? ""}>đảo {r.reverses_entry_id}</span> : null}
                       {wasReversed ? <span className="rounded bg-slate-200 px-1 text-[10px] text-slate-600">đã bị đảo</span> : null}
                       <MockBadge origin={r.origin} />

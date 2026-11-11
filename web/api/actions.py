@@ -89,6 +89,18 @@ class ActionStore:
             "applied_at": row.get("applied_at"),
         }
 
+    def live(self, kind: str, target_id: str) -> list[Row]:
+        """Every action of this kind on this target that the core has not refused.
+
+        PENDING, EXPORTED and APPLIED all count: an applied decision whose
+        effect has not reached the projection yet still binds the budget.
+        """
+        return [
+            row for row in self._state().values()
+            if row["action_kind"] == kind and row.get("target_id") == target_id
+            and row["sync_status"] != "REJECTED"
+        ]
+
     def by_key(self, key: str) -> Row | None:
         """The action already recorded under an Idempotency-Key, in the shape of `status`."""
         row = next((r for r in self._state().values() if r.get("idempotency_key") == key), None)

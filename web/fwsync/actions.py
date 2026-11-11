@@ -15,8 +15,10 @@ The lifecycle is ``PENDING → EXPORTED → APPLIED`` (or ``REJECTED``):
 
 * ``fwsync export`` writes an outbox artifact for each PENDING action and
   marks it EXPORTED;
-* ``fwsync import --actions`` marks APPLIED every EXPORTED action whose
-  ``source_action_id`` comes back in an imported artifact.
+* ``fwsync import --actions`` marks APPLIED every action whose
+  ``source_action_id`` comes back in an artifact the import **loaded**, and
+  REJECTED (with the loader's reason) one whose answer it refused
+  (``runner.settle_actions``, review #72 point 3).
 
 A status only moves forward. Seeing ``source_action_id`` for an action that
 is already APPLIED changes nothing, so re-running import is harmless (§5.5).
@@ -102,13 +104,3 @@ def mark(path: Path, ids: Iterable[str], status: str, reason: str | None = None)
 
 def pending(path: Path) -> list[Row]:
     return [row for row in fold(read_lines(path)).values() if row["sync_status"] == "PENDING"]
-
-
-def answered_ids(records: Iterable[Any]) -> list[str]:
-    """``source_action_id`` of every imported artifact that carries one (W7)."""
-    out: list[str] = []
-    for record in records:
-        payload = getattr(record, "payload", record)
-        if isinstance(payload, dict) and payload.get("source_action_id"):
-            out.append(str(payload["source_action_id"]))
-    return out

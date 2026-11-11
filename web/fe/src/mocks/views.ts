@@ -133,7 +133,17 @@ const sumOrNull = (values: Array<number | null | undefined>): number | null => {
   return present.length === 0 ? null : present.reduce((a, b) => a + b, 0);
 };
 
-const round = (value: number, digits = 4): number => {
+// The ledger keeps one row per entry: an estimate and its measurement are two
+// rows, the measured one pointing back through `estimate_entry_ref` (R5).
+const measuredRows = (rows: RawLedger[]): RawLedger[] => rows.filter((l) => l.measure_kind === "measured");
+const estimatedRows = (rows: RawLedger[]): RawLedger[] => rows.filter((l) => l.measure_kind === "estimated");
+/** Each job counted once: its measured rows, or its estimate while nothing is measured. */
+const settledRows = (rows: RawLedger[]): RawLedger[] => {
+  const answered = new Set(measuredRows(rows).map((l) => l.estimate_entry_ref));
+  return [...measuredRows(rows), ...estimatedRows(rows).filter((l) => !answered.has(l.entry_ref))];
+};
+
+const round =(value: number, digits = 4): number => {
   const f = 10 ** digits;
   return Math.round(value * f) / f;
 };
@@ -488,7 +498,7 @@ export class MockViews {
    */
   private budget(id: string, interventions: InterventionRow[]): BudgetLine[] {
     const r = this.d.recommendation;
-    const spent = this.d.ledger.filter((l) => l.recommendation_ref === id);
+    const spent = measuredRows(this.d.ledger).filter((l) => l.recommendation_ref === id);
     const live = interventions.filter((iv) => iv.status !== "REJECTED" && iv.status !== "CANCELLED");
     const line = (
       resource: BudgetLine["resource"],
@@ -505,18 +515,18 @@ export class MockViews {
     const scaled = (iv: InterventionRow, value: number) =>
       (value * (iv.approved_quantity ?? iv.target_quantity)) / iv.target_quantity;
     return [
-      line("usd", r.budget_usd, sum(spent.map((l) => l.measured_usd)),
+      line("usd", r.budget_usd, sum(spent.map((l) => l.usd_amount)),
         sum(live.map((iv) => scaled(iv, iv.estimated_usd)))),
-      line("human_minutes", r.budget_human_minutes, sum(spent.map((l) => l.measured_human_minutes)),
+      line("human_minutes", r.budget_human_minutes, sum(spent.map((l) => l.human_minutes)),
         sum(live.map((iv) => scaled(iv, iv.estimated_human_minutes)))),
-      line("gpu_hours", r.budget_gpu_hours, sum(spent.map((l) => l.measured_gpu_hours)),
+      line("gpu_hours", r.budget_gpu_hours, sum(spent.map((l) => l.gpu_hours)),
         sum(live.map((iv) => scaled(iv, iv.estimated_gpu_hours)))),
     ];
   }
 
   /** v_cost_by_intervention, plus g/c. */
   private interventionRow(iv: RawIntervention): InterventionRow {
-    const measured = this.d.ledger.filter((l) => l.intervention_ref === iv.intervention_ref);
+    const measured = measuredRows(this.d.ledger).filter((l) => l.intervention_ref === iv.intervention_ref);
     return {
       id: iv.intervention_ref,
       recommendation_id: iv.recommendation_ref,
@@ -535,9 +545,9 @@ export class MockViews {
       estimated_gpu_hours: iv.estimated_gpu_hours,
       gain_pp_per_100usd:
         iv.estimated_usd > 0 ? round(iv.expected_gain_pp / (iv.estimated_usd / 100), 3) : null,
-      measured_usd: sumOrNull(measured.map((l) => l.measured_usd)),
-      measured_human_minutes: sumOrNull(measured.map((l) => l.measured_human_minutes)),
-      measured_gpu_hours: sumOrNull(measured.map((l) => l.measured_gpu_hours)),
+      measured_usd: sumOrNull(measured.map((l) => l.usd_amount)),
+      measured_human_minutes: sumOrNull(measured.map((l) => l.human_minutes)),
+      measured_gpu_hours: sumOrNull(measured.map((l) => l.gpu_hours)),
       spec: iv.spec,
       origin: ORIGIN,
     };
@@ -1110,16 +1120,17 @@ export class MockViews {
       const ev = evs[0];
       if (!ev) continue;
       const ledger = this.ledgerOfExperiment(x.experiment_code);
+      const measured = measuredRows(ledger);
       const scored = ev.total_episodes - ev.infra_failed_count;
       rows.push({
         task_id: x.task_id, branch: x.branch, method: x.method, experiment_id: x.experiment_code,
         evaluation_id: ev.evaluation_ref, level: ev.level,
         sim_success_rate: scored > 0 ? round(ev.success_count / scored) : null,
         total_episodes: ev.total_episodes, infra_failed_count: ev.infra_failed_count,
-        measured_usd: sumOrNull(ledger.map((l) => l.measured_usd)),
-        measured_human_minutes: sumOrNull(ledger.map((l) => l.measured_human_minutes)),
-        measured_gpu_hours: sumOrNull(ledger.map((l) => l.measured_gpu_hours)),
-        estimated_usd: sumOrNull(ledger.map((l) => l.estimated_usd)),
+        measured_usd: sumOrNull(measured.map((l) => l.usd_amount)),
+        measured_human_minutes: sumOrNull(measured.map((l) => l.human_minutes)),
+        measured_gpu_hours: sumOrNull(measured.map((l) => l.gpu_hours)),
+        estimated_usd: sumOrNull(estimatedRows(ledger).map((l) => l.usd_amount)),
         origin: ORIGIN,
       });
     }
@@ -1186,12 +1197,13 @@ export class MockViews {
       recommendation_id: l.recommendation_ref ?? null,
       cluster_id: l.cluster_ref ?? null,
       intervention_id: l.intervention_ref ?? null,
-      estimated_usd: l.estimated_usd ?? null,
-      estimated_human_minutes: l.estimated_human_minutes ?? null,
-      estimated_gpu_hours: l.estimated_gpu_hours ?? null,
-      measured_usd: l.measured_usd ?? null,
-      measured_human_minutes: l.measured_human_minutes ?? null,
-      measured_gpu_hours: l.measured_gpu_hours ?? null,
+      run_plan_id: l.run_plan_ref ?? null,
+      job_id: l.job_id ?? null,
+      measure_kind: l.measure_kind,
+      estimate_entry_id: l.estimate_entry_ref ?? null,
+      usd_amount: l.usd_amount,
+      human_minutes: l.human_minutes ?? null,
+      gpu_hours: l.gpu_hours ?? null,
       reverses_entry_id: l.reverses_entry_ref,
       note: l.note ?? null,
       origin: ORIGIN,
@@ -1236,22 +1248,30 @@ export class MockViews {
       }
       g.entries.push(l);
     }
+    const estimates = new Map(estimatedRows(this.d.ledger).map((l) => [l.entry_ref, l]));
     const rows = [...groups.values()].map(({ row, entries }) => {
-      // Forecast error only on rows carrying both an estimate and a measurement.
-      const paired = entries.filter(
-        (l) => l.measured_usd != null && l.estimated_usd != null,
-      );
+      const estimated = estimatedRows(entries);
+      const measured = measuredRows(entries);
+      // Forecast error: each estimate against the sum of the measured rows
+      // (reversals included) that point at it. One pair per estimate.
+      const byEstimate = new Map<string, number>();
+      for (const l of measured) {
+        const ref = l.estimate_entry_ref;
+        if (ref && estimates.has(ref)) byEstimate.set(ref, (byEstimate.get(ref) ?? 0) + l.usd_amount);
+      }
       return {
         ...row,
         entry_count: entries.length,
-        estimated_usd: sumOrNull(entries.map((l) => l.estimated_usd)),
-        measured_usd: sumOrNull(entries.map((l) => l.measured_usd)),
-        usd_forecast_error: sumOrNull(paired.map((l) => (l.measured_usd as number) - (l.estimated_usd as number))),
-        forecast_pairs: paired.length,
-        estimated_human_minutes: sumOrNull(entries.map((l) => l.estimated_human_minutes)),
-        measured_human_minutes: sumOrNull(entries.map((l) => l.measured_human_minutes)),
-        estimated_gpu_hours: sumOrNull(entries.map((l) => l.estimated_gpu_hours)),
-        measured_gpu_hours: sumOrNull(entries.map((l) => l.measured_gpu_hours)),
+        estimated_usd: sumOrNull(estimated.map((l) => l.usd_amount)),
+        measured_usd: sumOrNull(measured.map((l) => l.usd_amount)),
+        usd_forecast_error: sumOrNull(
+          [...byEstimate.entries()].map(([ref, spent]) => spent - (estimates.get(ref) as RawLedger).usd_amount),
+        ),
+        forecast_pairs: byEstimate.size,
+        estimated_human_minutes: sumOrNull(estimated.map((l) => l.human_minutes)),
+        measured_human_minutes: sumOrNull(measured.map((l) => l.human_minutes)),
+        estimated_gpu_hours: sumOrNull(estimated.map((l) => l.gpu_hours)),
+        measured_gpu_hours: sumOrNull(measured.map((l) => l.gpu_hours)),
         reversal_count: entries.filter((l) => l.entry_kind === "REVERSAL").length,
       };
     });
@@ -1277,12 +1297,12 @@ export class MockViews {
   private dataAllocation(): DataAllocationRow[] {
     type Cost = { usd: number | null; human_minutes: number | null; gpu_hours: number | null };
     const cost = new Map<string, Cost>();
-    for (const l of this.d.ledger) {
+    for (const l of measuredRows(this.d.ledger)) {
       if (!l.dataset_code) continue;
       const c = cost.get(l.dataset_code) ?? { usd: null, human_minutes: null, gpu_hours: null };
-      if (l.measured_usd != null) c.usd = (c.usd ?? 0) + l.measured_usd;
-      if (l.measured_human_minutes != null) c.human_minutes = (c.human_minutes ?? 0) + l.measured_human_minutes;
-      if (l.measured_gpu_hours != null) c.gpu_hours = (c.gpu_hours ?? 0) + l.measured_gpu_hours;
+      c.usd = (c.usd ?? 0) + l.usd_amount;
+      if (l.human_minutes != null) c.human_minutes = (c.human_minutes ?? 0) + l.human_minutes;
+      if (l.gpu_hours != null) c.gpu_hours = (c.gpu_hours ?? 0) + l.gpu_hours;
       cost.set(l.dataset_code, c);
     }
     // Episode → dataset the way fwsync resolves it (W12): by source.
@@ -1334,9 +1354,9 @@ export class MockViews {
       .filter((b) => priceBook === undefined || b.name === priceBook)
       .map((book) => {
         const byBranch = new Map<string | null, number>();
-        for (const l of this.d.ledger) {
+        for (const l of settledRows(this.d.ledger)) {
           const base = l.price_book_name ? books.get(l.price_book_name) : undefined;
-          const usd = l.measured_usd ?? l.estimated_usd ?? 0;
+          const usd = l.usd_amount ?? 0;
           const baseRate = base?.rates[l.resource_type]?.usd_per_unit;
           const newRate = book.rates[l.resource_type]?.usd_per_unit;
           const repriced = baseRate && newRate !== undefined ? (usd * newRate) / baseRate : usd;

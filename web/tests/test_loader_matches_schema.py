@@ -133,6 +133,8 @@ REF_OWNER: dict[str, tuple[str, str]] = {
     "decision_ref": ("decisions", "decision_ref"),
     "entry_ref": ("cost_ledger_entries", "entry_ref"),
     "reverses_entry_ref": ("cost_ledger_entries", "entry_ref"),
+    "estimate_entry_ref": ("cost_ledger_entries", "entry_ref"),
+    "event_ref": ("fix_rate_events", "event_ref"),
     "manifest_ref": ("defect_manifests", "manifest_ref"),
 }
 

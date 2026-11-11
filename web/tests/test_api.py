@@ -134,7 +134,7 @@ def test_sealed_holdout_is_admin_only(client: TestClient) -> None:
 
 def test_pages_have_a_cursor(client: TestClient) -> None:
     first = client.get("/api/cost/ledger?limit=5").json()
-    assert len(first["items"]) == 5 and first["total"] == 14
+    assert len(first["items"]) == 5 and first["total"] == 22
     second = client.get(f"/api/cost/ledger?limit=5&cursor={first['next_cursor']}").json()
     assert {r["id"] for r in first["items"]}.isdisjoint({r["id"] for r in second["items"]})
 
@@ -175,6 +175,87 @@ def test_decision_rules(client: TestClient) -> None:
         headers={"Idempotency-Key": "k3"},
     )
     assert over.status_code == 422 and over.json()["code"] == "BR-07"
+
+
+DECIDE = "/api/recommendations/rec_round1/decision"
+
+
+def _edited(iv: str, quantity: int) -> dict[str, Any]:
+    return {"items": [{"intervention_id": iv, "decision": "APPROVE_EDITED",
+                       "approved_quantity": quantity, "reason": "x"}]}
+
+
+def _sink_with(sink: Path, tmp_path: Path, **changes: dict[str, Any]) -> Path:
+    """A copy of the mock sink with some interventions changed (as the core would)."""
+    copy = tmp_path / "sink"
+    shutil.copytree(sink, copy)
+    path = copy / "interventions.jsonl"
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+    for row in rows:
+        row.update(changes.get(row["intervention_ref"], {}))
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+    return copy
+
+
+def test_an_approved_unspent_intervention_counts_against_the_ceiling(
+    sink: Path, tmp_path: Path
+) -> None:
+    # Review #72 point 5: iv_2 approved at 30 episodes ($240, nothing measured
+    # yet) plus iv_3 at 20 ($160) is over the $400 ceiling, though each fits.
+    copy = _sink_with(sink, tmp_path, iv_2={"status": "APPROVED", "approved_quantity": 30})
+    client = make_client(copy, tmp_path / "state")
+    over = client.post(DECIDE, json=_edited("iv_3", 20), headers={"Idempotency-Key": "a"})
+    assert over.status_code == 422 and over.json()["code"] == "BR-07"
+    assert "đã duyệt chưa chi 240" in over.json()["message"]
+    fits = client.post(DECIDE, json=_edited("iv_3", 15), headers={"Idempotency-Key": "b"})
+    assert fits.status_code == 202
+
+
+def test_only_a_proposed_intervention_can_be_decided(sink: Path, tmp_path: Path) -> None:
+    copy = _sink_with(sink, tmp_path, iv_2={"status": "APPROVED", "approved_quantity": 8},
+                      iv_3={"status": "REJECTED"})
+    client = make_client(copy, tmp_path / "state")
+    for iv, key in (("iv_2", "c"), ("iv_3", "d")):
+        body = {"items": [{"intervention_id": iv, "decision": "APPROVE"}]}
+        again = client.post(DECIDE, json=body, headers={"Idempotency-Key": key})
+        assert again.status_code == 409 and again.json()["code"] == "NOT_PROPOSED"
+
+
+def test_two_decisions_cannot_pass_the_ceiling_together(client: TestClient) -> None:
+    # The first decision is still PENDING: the projection shows iv_2 PROPOSED,
+    # but its approval binds the budget and it cannot be decided again.
+    first = client.post(DECIDE, json=_edited("iv_2", 30), headers={"Idempotency-Key": "p1"})
+    assert first.status_code == 202
+    second = client.post(DECIDE, json=_edited("iv_3", 20), headers={"Idempotency-Key": "p2"})
+    assert second.status_code == 422 and second.json()["code"] == "BR-07"
+    again = client.post(DECIDE, json={"items": [{"intervention_id": "iv_2", "decision": "REJECT",
+                                                 "reason": "đổi ý"}]},
+                        headers={"Idempotency-Key": "p3"})
+    assert again.status_code == 409 and again.json()["code"] == "ALREADY_DECIDED"
+    # Retrying the first click still answers with its own action (C16).
+    retry = client.post(DECIDE, json=_edited("iv_2", 30), headers={"Idempotency-Key": "p1"})
+    assert retry.status_code == 202 and retry.json()["action_id"] == first.json()["action_id"]
+
+
+@pytest.mark.parametrize(
+    ("body", "code"),
+    [
+        ({}, "ITEMS_REQUIRED"),
+        ({"items": []}, "ITEMS_REQUIRED"),
+        ({"items": "iv_3"}, "ITEMS_REQUIRED"),
+        ({"items": ["iv_3"]}, "BAD_ITEM"),
+        ({"items": [{"decision": "APPROVE"}]}, "BAD_ITEM"),
+        ({"items": [{"intervention_id": "iv_3", "decision": "APPROVE"},
+                    {"intervention_id": "iv_3", "decision": "REJECT", "reason": "x"}]},
+         "DUPLICATE_INTERVENTION"),
+    ],
+)
+def test_decision_items_are_checked_before_anything_else(
+    client: TestClient, body: dict[str, Any], code: str
+) -> None:
+    # Review #72 point 9: these answered 202, 202 and a 500.
+    response = client.post(DECIDE, json=body, headers={"Idempotency-Key": f"i-{code}-{body}"})
+    assert response.status_code == 422 and response.json()["code"] == code
 
 
 def test_override_needs_a_reason(client: TestClient) -> None:

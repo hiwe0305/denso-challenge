@@ -102,6 +102,25 @@ def _sum_or_none(values: Iterable[float | None]) -> float | None:
     return sum(present) if present else None
 
 
+# The ledger keeps one row per entry: an estimate and its measurement are two
+# rows, the measured one pointing back through `estimate_entry_ref` (R5).
+
+
+def _measured(entries: Iterable[Row]) -> list[Row]:
+    return [e for e in entries if e.get("measure_kind") == "measured"]
+
+
+def _estimated(entries: Iterable[Row]) -> list[Row]:
+    return [e for e in entries if e.get("measure_kind") == "estimated"]
+
+
+def _settled(entries: Iterable[Row]) -> list[Row]:
+    """Each job counted once: its measured rows, or its estimate while nothing is measured."""
+    rows = list(entries)
+    answered = {e.get("estimate_entry_ref") for e in _measured(rows)}
+    return [*_measured(rows), *(e for e in _estimated(rows) if e["entry_ref"] not in answered)]
+
+
 def _parse_ts(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
@@ -221,9 +240,9 @@ class SinkReadModel:
         }
 
     def _budget(self, r: Row, interventions: list[Row]) -> list[Row]:
-        """BR-07: three parallel ceilings. `used` is measured in the ledger."""
+        """BR-07: three parallel ceilings. `used` is the measured rows of the ledger."""
         spent = [
-            entry for entry in self.t("cost_ledger_entries")
+            entry for entry in _measured(self.t("cost_ledger_entries"))
             if entry.get("recommendation_ref") == r["recommendation_ref"]
         ]
         live = [iv for iv in interventions if iv["status"] not in ("REJECTED", "CANCELLED")]
@@ -242,20 +261,21 @@ class SinkReadModel:
             }
 
         return [
-            line("usd", r["budget_usd"], _sum(e.get("measured_usd") for e in spent),
+            line("usd", r["budget_usd"], _sum(e.get("usd_amount") for e in spent),
                  _sum(scaled(iv, iv["estimated_usd"]) for iv in live)),
             line("human_minutes", r["budget_human_minutes"],
-                 _sum(e.get("measured_human_minutes") for e in spent),
+                 _sum(e.get("human_minutes") for e in spent),
                  _sum(scaled(iv, iv["estimated_human_minutes"]) for iv in live)),
             line("gpu_hours", r["budget_gpu_hours"],
-                 _sum(e.get("measured_gpu_hours") for e in spent),
+                 _sum(e.get("gpu_hours") for e in spent),
                  _sum(scaled(iv, iv["estimated_gpu_hours"]) for iv in live)),
         ]
 
     def _intervention_row(self, iv: Row) -> Row:
         """v_cost_by_intervention, plus g/c."""
         ref = iv["intervention_ref"]
-        measured = [e for e in self.t("cost_ledger_entries") if e.get("intervention_ref") == ref]
+        measured = [e for e in _measured(self.t("cost_ledger_entries"))
+                    if e.get("intervention_ref") == ref]
         usd = iv["estimated_usd"]
         return {
             "id": ref,
@@ -278,11 +298,9 @@ class SinkReadModel:
             "gain_pp_per_100usd": (
                 js_round(iv["expected_gain_pp"] / (usd / 100), 3) if usd > 0 else None
             ),
-            "measured_usd": _sum_or_none(e.get("measured_usd") for e in measured),
-            "measured_human_minutes": _sum_or_none(
-                e.get("measured_human_minutes") for e in measured
-            ),
-            "measured_gpu_hours": _sum_or_none(e.get("measured_gpu_hours") for e in measured),
+            "measured_usd": _sum_or_none(e.get("usd_amount") for e in measured),
+            "measured_human_minutes": _sum_or_none(e.get("human_minutes") for e in measured),
+            "measured_gpu_hours": _sum_or_none(e.get("gpu_hours") for e in measured),
             "spec": iv.get("spec") or {},
             "origin": iv["origin"],
         }
@@ -900,6 +918,7 @@ class SinkReadModel:
                 e for e in self.t("cost_ledger_entries")
                 if e.get("experiment_code") == x["experiment_code"]
             ]
+            measured, estimated = _measured(ledger), _estimated(ledger)
             scored = ev["total_episodes"] - ev["infra_failed_count"]
             rows.append({
                 "task_id": x["task_id"], "branch": x["branch"], "method": x["method"],
@@ -908,12 +927,10 @@ class SinkReadModel:
                 "sim_success_rate": js_round(ev["success_count"] / scored) if scored > 0 else None,
                 "total_episodes": ev["total_episodes"],
                 "infra_failed_count": ev["infra_failed_count"],
-                "measured_usd": _sum_or_none(e.get("measured_usd") for e in ledger),
-                "measured_human_minutes": _sum_or_none(
-                    e.get("measured_human_minutes") for e in ledger
-                ),
-                "measured_gpu_hours": _sum_or_none(e.get("measured_gpu_hours") for e in ledger),
-                "estimated_usd": _sum_or_none(e.get("estimated_usd") for e in ledger),
+                "measured_usd": _sum_or_none(e.get("usd_amount") for e in measured),
+                "measured_human_minutes": _sum_or_none(e.get("human_minutes") for e in measured),
+                "measured_gpu_hours": _sum_or_none(e.get("gpu_hours") for e in measured),
+                "estimated_usd": _sum_or_none(e.get("usd_amount") for e in estimated),
                 "origin": x["origin"],
             })
         return rows
@@ -980,12 +997,13 @@ class SinkReadModel:
                 "recommendation_id": e.get("recommendation_ref"),
                 "cluster_id": e.get("cluster_ref"),
                 "intervention_id": e.get("intervention_ref"),
-                "estimated_usd": e.get("estimated_usd"),
-                "estimated_human_minutes": e.get("estimated_human_minutes"),
-                "estimated_gpu_hours": e.get("estimated_gpu_hours"),
-                "measured_usd": e.get("measured_usd"),
-                "measured_human_minutes": e.get("measured_human_minutes"),
-                "measured_gpu_hours": e.get("measured_gpu_hours"),
+                "run_plan_id": e.get("run_plan_ref"),
+                "job_id": e.get("job_id"),
+                "measure_kind": e["measure_kind"],
+                "estimate_entry_id": e.get("estimate_entry_ref"),
+                "usd_amount": e["usd_amount"],
+                "human_minutes": e.get("human_minutes"),
+                "gpu_hours": e.get("gpu_hours"),
                 "reverses_entry_id": e.get("reverses_entry_ref"),
                 "note": e.get("note"),
                 "origin": e["origin"],
@@ -1015,32 +1033,35 @@ class SinkReadModel:
 
     def cost_by_branch(self) -> Row:
         """v_cost_by_branch, v_r_demo and v_cost_data_allocation (BR-05)."""
+        ledger = self.t("cost_ledger_entries")
+        estimates = {e["entry_ref"]: e for e in _estimated(ledger)}
         groups: dict[tuple[Any, Any, Any], list[Row]] = {}
-        for e in self.t("cost_ledger_entries"):
+        for e in ledger:
             key = (e.get("branch"), self._ledger_task(e), e.get("price_book_name"))
             groups.setdefault(key, []).append(e)
         rows = []
         for (branch, task, book), entries in groups.items():
-            # Forecast error only on rows carrying both an estimate and a measurement.
-            paired = [e for e in entries
-                      if e.get("measured_usd") is not None and e.get("estimated_usd") is not None]
+            estimated, measured = _estimated(entries), _measured(entries)
+            # Forecast error: each estimate against the sum of the measured rows
+            # (reversals included) that point at it. One pair per estimate.
+            by_estimate: dict[str, float] = {}
+            for e in measured:
+                ref = e.get("estimate_entry_ref")
+                if isinstance(ref, str) and ref in estimates:
+                    by_estimate[ref] = by_estimate.get(ref, 0.0) + e["usd_amount"]
             rows.append({
                 "branch": branch, "task_id": task, "price_book_name": book,
                 "entry_count": len(entries),
-                "estimated_usd": _sum_or_none(e.get("estimated_usd") for e in entries),
-                "measured_usd": _sum_or_none(e.get("measured_usd") for e in entries),
+                "estimated_usd": _sum_or_none(e.get("usd_amount") for e in estimated),
+                "measured_usd": _sum_or_none(e.get("usd_amount") for e in measured),
                 "usd_forecast_error": _sum_or_none(
-                    e["measured_usd"] - e["estimated_usd"] for e in paired
+                    spent - estimates[ref]["usd_amount"] for ref, spent in by_estimate.items()
                 ),
-                "forecast_pairs": len(paired),
-                "estimated_human_minutes": _sum_or_none(
-                    e.get("estimated_human_minutes") for e in entries
-                ),
-                "measured_human_minutes": _sum_or_none(
-                    e.get("measured_human_minutes") for e in entries
-                ),
-                "estimated_gpu_hours": _sum_or_none(e.get("estimated_gpu_hours") for e in entries),
-                "measured_gpu_hours": _sum_or_none(e.get("measured_gpu_hours") for e in entries),
+                "forecast_pairs": len(by_estimate),
+                "estimated_human_minutes": _sum_or_none(e.get("human_minutes") for e in estimated),
+                "measured_human_minutes": _sum_or_none(e.get("human_minutes") for e in measured),
+                "estimated_gpu_hours": _sum_or_none(e.get("gpu_hours") for e in estimated),
+                "measured_gpu_hours": _sum_or_none(e.get("gpu_hours") for e in measured),
                 "reversal_count": sum(1 for e in entries if e["entry_kind"] == "REVERSAL"),
                 "origin": entries[0]["origin"],
             })
@@ -1064,13 +1085,14 @@ class SinkReadModel:
     def _data_allocation(self) -> list[Row]:
         """v_cost_data_allocation: each dataset's measured cost, shared by episodes used."""
         cost: dict[str, dict[str, float | None]] = {}
-        for e in self.t("cost_ledger_entries"):
+        for e in _measured(self.t("cost_ledger_entries")):
             code = e.get("dataset_code")
             if not code:
                 continue
             c = cost.setdefault(code, {"usd": None, "human_minutes": None, "gpu_hours": None})
-            for k in ("usd", "human_minutes", "gpu_hours"):
-                v = e.get(f"measured_{k}")
+            for k, column in (("usd", "usd_amount"), ("human_minutes", "human_minutes"),
+                              ("gpu_hours", "gpu_hours")):
+                v = e.get(column)
                 if v is not None:
                     c[k] = (c[k] or 0) + v
         dataset_of = {e["episode_ref"]: e.get("dataset_code") for e in self.t("episodes")}
@@ -1124,12 +1146,9 @@ class SinkReadModel:
             if price_book is not None and book["name"] != price_book:
                 continue
             by_branch: dict[str | None, float] = {}
-            for e in self.t("cost_ledger_entries"):
+            for e in _settled(self.t("cost_ledger_entries")):
                 base = books.get(e.get("price_book_name") or "")
-                usd = e.get("measured_usd")
-                if usd is None:
-                    usd = e.get("estimated_usd")
-                usd = usd or 0
+                usd = e["usd_amount"] or 0
                 base_rate = (base or {}).get("rates", {}).get(e["resource_type"], {}).get(
                     "usd_per_unit"
                 )

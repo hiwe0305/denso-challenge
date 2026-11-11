@@ -28,13 +28,15 @@ from web.fwsync import actions as action_log
 from web.fwsync.runner import (
     SyncResult,
     digest_of,
+    loaded_counts,
     run_export,
     run_fake_core,
     run_import,
     run_verify,
+    settle_actions,
 )
 from web.fwsync.sink import JsonlSink, PostgresSink, Sink
-from web.fwsync.source import SourceError, scan
+from web.fwsync.source import SourceError
 
 app = typer.Typer(help="Bộ nạp giữa lõi flywheel và tầng web.")
 
@@ -105,7 +107,7 @@ def import_(
         None,
         "--actions",
         help="File `human_actions.jsonl`: hành động có `source_action_id` trong artifact "
-        "vừa nạp được đánh dấu APPLIED.",
+        "vừa nạp được đánh dấu APPLIED; câu trả lời bị từ chối thì REJECTED.",
     ),
 ) -> None:
     """Nạp artifact vào bảng nhóm P. Chạy lại từ đầu cho cùng kết quả."""
@@ -124,10 +126,10 @@ def import_(
         raise typer.Exit(code=2) from error
     _report(result)
     if actions is not None:
-        applied = action_log.mark(
-            actions, action_log.answered_ids(scan(source).records), "APPLIED"
-        )
+        applied, rejected = settle_actions(actions, result)
         typer.echo(f"hành động APPLIED: {len(applied)} {applied[:5]}")
+        if rejected:
+            typer.echo(f"hành động REJECTED: {len(rejected)} {rejected[:5]}")
     raise typer.Exit(code=EXIT_CODE[result.status])
 
 
@@ -160,13 +162,19 @@ def export(
 def verify(
     source: Path = typer.Option(..., "--from", help="Thư mục artifact của lõi."),
     loaded: Path = typer.Option(
-        ..., "--loaded", help="File JSON {bảng: số dòng} của những gì đã nạp."
+        ...,
+        "--loaded",
+        help="Thư mục của sink `jsonl` (`--out` của `import`), hoặc file JSON "
+        "{bảng: số dòng} của những gì đã nạp.",
     ),
 ) -> None:
-    """So số dòng giữa nguồn và những gì đã nạp. Báo chênh, không tự sửa."""
+    """So số dòng kỳ vọng theo bảng đích với những gì đã nạp. Báo chênh, không tự sửa."""
     use_utf8()
     try:
-        counts = json.loads(loaded.read_text(encoding="utf-8"))
+        counts = (
+            loaded_counts(loaded) if loaded.is_dir()
+            else json.loads(loaded.read_text(encoding="utf-8"))
+        )
         result = run_verify(source, counts)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         typer.echo(f"không đọc được `{loaded}`: {error}", err=True)

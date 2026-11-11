@@ -251,10 +251,10 @@ FROM (
    ORDER BY e.task_id, e.branch, e.method, ev.level, ev.finished_at DESC
 ) x
 LEFT JOIN LATERAL (
-  SELECT sum(l.measured_usd)            AS measured_usd,
-         sum(l.measured_human_minutes)  AS measured_human_minutes,
-         sum(l.measured_gpu_hours)      AS measured_gpu_hours,
-         sum(l.estimated_usd)           AS estimated_usd
+  SELECT sum(l.usd_amount)    FILTER (WHERE l.measure_kind = 'measured')  AS measured_usd,
+         sum(l.human_minutes) FILTER (WHERE l.measure_kind = 'measured')  AS measured_human_minutes,
+         sum(l.gpu_hours)     FILTER (WHERE l.measure_kind = 'measured')  AS measured_gpu_hours,
+         sum(l.usd_amount)    FILTER (WHERE l.measure_kind = 'estimated') AS estimated_usd
     FROM cost_ledger_entries l
    WHERE l.experiment_id = x.experiment_id
 ) cost ON TRUE;
@@ -325,39 +325,54 @@ JOIN flywheel_recommendations fr ON fr.id = fc.recommendation_id;
 -- ---------------------------------------------------------------------------
 -- v_cost_by_branch và v_cost_by_intervention (M8)
 -- ---------------------------------------------------------------------------
--- Ước tính và thực đo cạnh nhau, phút người và GPU-giờ tách riêng: ba trần
+-- Ước tính và thực đo cạnh nhau (hai dòng nối nhau), phút người và GPU-giờ tách riêng: ba trần
 -- ngân sách là ba ràng buộc song song, nên không quy đổi về một con số.
 CREATE VIEW v_cost_by_branch AS
-SELECT
-  l.branch,
+WITH keyed AS (
   -- Nhánh luôn đi kèm task (§6.4). Bút toán eval hay chẩn đoán không gắn thí
   -- nghiệm, nên task lấy theo thứ tự thí nghiệm → lượt eval → khuyến nghị;
   -- chỉ lấy từ thí nghiệm thì nhánh B tách làm hai dòng (bản 0.4).
-  COALESCE(e.task_id, ev.task_id, fr.task_id)  AS task_id,
-  l.price_book_id,
-  pb.name             AS price_book_name,
-  count(*)                                     AS entry_count,
-  sum(l.estimated_usd)                         AS estimated_usd,
-  sum(l.measured_usd)                          AS measured_usd,
-  -- Sai số dự báo chỉ trên dòng có cả ước tính lẫn thực đo: hiệu của một
-  -- dòng thiếu một cột là NULL và sum bỏ qua nó. Trừ hai tổng (bản 0.3) lấy
-  -- ước tính của can thiệp chưa làm trừ vào thực đo của việc khác (bản 0.4).
-  sum(l.measured_usd - l.estimated_usd)        AS usd_forecast_error,
-  count(*) FILTER (WHERE l.measured_usd IS NOT NULL
-                     AND l.estimated_usd IS NOT NULL) AS forecast_pairs,
-  sum(l.estimated_human_minutes)               AS estimated_human_minutes,
-  sum(l.measured_human_minutes)                AS measured_human_minutes,
-  sum(l.estimated_gpu_hours)                   AS estimated_gpu_hours,
-  sum(l.measured_gpu_hours)                    AS measured_gpu_hours,
-  count(*) FILTER (WHERE l.entry_kind = 'REVERSAL') AS reversal_count,
-  l.origin
-FROM cost_ledger_entries l
-LEFT JOIN experiments e ON e.id = l.experiment_id
-LEFT JOIN sim_evaluations ev ON ev.id = l.evaluation_id
-LEFT JOIN flywheel_recommendations fr ON fr.id = l.recommendation_id
-LEFT JOIN price_books pb ON pb.id = l.price_book_id
-GROUP BY l.branch, COALESCE(e.task_id, ev.task_id, fr.task_id), l.price_book_id, pb.name,
-         l.origin;
+  SELECT l.*, COALESCE(e.task_id, ev.task_id, fr.task_id) AS task_id,
+         pb.name AS price_book_name
+    FROM cost_ledger_entries l
+    LEFT JOIN experiments e ON e.id = l.experiment_id
+    LEFT JOIN sim_evaluations ev ON ev.id = l.evaluation_id
+    LEFT JOIN flywheel_recommendations fr ON fr.id = l.recommendation_id
+    LEFT JOIN price_books pb ON pb.id = l.price_book_id
+), pairs AS (
+  -- Sai số dự báo: mỗi dòng ước tính so với tổng các dòng thực đo trỏ về nó
+  -- (kể cả bút toán đảo), một cặp mỗi ước tính. Ước tính và thực đo là hai
+  -- dòng (R5, review #72 điểm 2), nên đây là phép nối, không phải phép trừ
+  -- hai cột; ước tính của can thiệp chưa làm không có cặp nên không tính.
+  SELECT m.branch, m.task_id, m.price_book_id, m.origin,
+         sum(m.usd_amount) - est.usd_amount AS error
+    FROM keyed m
+    JOIN cost_ledger_entries est ON est.id = m.estimate_entry_id
+   WHERE m.measure_kind = 'measured'
+   GROUP BY m.branch, m.task_id, m.price_book_id, m.origin, est.id, est.usd_amount
+)
+SELECT
+  k.branch,
+  k.task_id,
+  k.price_book_id,
+  k.price_book_name,
+  count(*)                                                         AS entry_count,
+  sum(k.usd_amount) FILTER (WHERE k.measure_kind = 'estimated')    AS estimated_usd,
+  sum(k.usd_amount) FILTER (WHERE k.measure_kind = 'measured')     AS measured_usd,
+  (SELECT sum(p.error) FROM pairs p
+    WHERE p.branch IS NOT DISTINCT FROM k.branch AND p.task_id IS NOT DISTINCT FROM k.task_id
+      AND p.price_book_id = k.price_book_id AND p.origin = k.origin) AS usd_forecast_error,
+  (SELECT count(*) FROM pairs p
+    WHERE p.branch IS NOT DISTINCT FROM k.branch AND p.task_id IS NOT DISTINCT FROM k.task_id
+      AND p.price_book_id = k.price_book_id AND p.origin = k.origin) AS forecast_pairs,
+  sum(k.human_minutes) FILTER (WHERE k.measure_kind = 'estimated') AS estimated_human_minutes,
+  sum(k.human_minutes) FILTER (WHERE k.measure_kind = 'measured')  AS measured_human_minutes,
+  sum(k.gpu_hours)     FILTER (WHERE k.measure_kind = 'estimated') AS estimated_gpu_hours,
+  sum(k.gpu_hours)     FILTER (WHERE k.measure_kind = 'measured')  AS measured_gpu_hours,
+  count(*) FILTER (WHERE k.entry_kind = 'REVERSAL')                AS reversal_count,
+  k.origin
+FROM keyed k
+GROUP BY k.branch, k.task_id, k.price_book_id, k.price_book_name, k.origin;
 
 -- ---------------------------------------------------------------------------
 -- v_cost_data_allocation · BR-05, chi phí dữ liệu chia cho thí nghiệm (M8)
@@ -374,11 +389,11 @@ WITH used AS (
    GROUP BY ed.experiment_id, ep.dataset_id
 ), cost AS (
   SELECT dataset_id,
-         sum(measured_usd)           AS usd,
-         sum(measured_human_minutes) AS human_minutes,
-         sum(measured_gpu_hours)     AS gpu_hours
+         sum(usd_amount)    AS usd,
+         sum(human_minutes) AS human_minutes,
+         sum(gpu_hours)     AS gpu_hours
     FROM cost_ledger_entries
-   WHERE dataset_id IS NOT NULL
+   WHERE dataset_id IS NOT NULL AND measure_kind = 'measured'
    GROUP BY dataset_id
 )
 SELECT
@@ -423,10 +438,11 @@ SELECT
   iv.origin
 FROM interventions iv
 LEFT JOIN LATERAL (
-  SELECT sum(measured_usd) AS measured_usd,
-         sum(measured_human_minutes) AS measured_human_minutes,
-         sum(measured_gpu_hours) AS measured_gpu_hours
-    FROM cost_ledger_entries l WHERE l.intervention_id = iv.id
+  SELECT sum(usd_amount) AS measured_usd,
+         sum(human_minutes) AS measured_human_minutes,
+         sum(gpu_hours) AS measured_gpu_hours
+    FROM cost_ledger_entries l
+   WHERE l.intervention_id = iv.id AND l.measure_kind = 'measured'
 ) cost ON TRUE;
 
 -- ---------------------------------------------------------------------------

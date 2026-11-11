@@ -989,65 +989,99 @@ class Mock:
         ]
 
     # ------------------------------------------------------------- ledger
+    #: Activity của bút toán ước tính một can thiệp, theo loại can thiệp. Tên là
+    #: Literal `LedgerEntry.activity` của hợp đồng, như mọi dòng khác của sổ.
+    INTERVENTION_ACTIVITY: dict[str, str] = {
+        "SIM_AROUND_FAILURE": "data_generation",
+        "TELEOP_CORRECTION": "teleop_session",
+        "RECOVERY_DATA": "teleop_session",
+    }
+
     def ledger(self) -> None:
+        """Sổ chi phí như lõi ghi: mỗi bút toán một dòng (R5, review #72 điểm 2).
+
+        Mỗi job có một dòng `estimated` viết trước khi chạy và một dòng
+        `measured` viết sau, trỏ về dòng ước tính qua `estimate_entry_ref`.
+        Ước tính lệch thực đo có chủ ý, để M8 có sai số dự báo để hiện. Số đo
+        giữ như bản trước, nên ngân sách và phân bổ BR-05 không đổi.
+        """
         gpu, operator, storage, _ = self.price["pitch_v10"]
         diag_hours = round(self.diag_gpu_seconds / 3600, 3)
+        rate = {"gpu_hours": gpu, "operator_minutes": operator, "storage_gb": storage}
 
-        def entry(ref: str, activity: str, resource: str, quantity: float, unit: str,
-                  usd: float, **extra: Any) -> Row:
-            row: Row = {"entry_ref": ref, "entry_kind": "ENTRY", "reverses_entry_ref": None,
-                        "activity": activity, "resource_type": resource, "quantity": quantity,
-                        "unit": unit, "price_book_name": "pitch_v10", "measured_usd": usd}
+        def entry(ref: str, kind: str, activity: str, resource: str, quantity: float,
+                  unit: str, estimate: str | None, **extra: Any) -> Row:
+            row: Row = {
+                "entry_ref": ref, "entry_kind": "ENTRY", "reverses_entry_ref": None,
+                "activity": activity, "resource_type": resource, "quantity": quantity,
+                "unit": unit, "price_book_name": "pitch_v10",
+                "measure_kind": kind, "estimate_entry_ref": estimate,
+                "usd_amount": round(quantity * rate[resource], 2),
+                "human_minutes": float(quantity) if resource == "operator_minutes" else None,
+                "gpu_hours": float(quantity) if resource == "gpu_hours" else None,
+            }
             row.update(extra)
             return row
 
+        def job(ref: str, activity: str, resource: str, estimated: float, measured: float,
+                unit: str, **extra: Any) -> list[Row]:
+            return [
+                entry(f"{ref}_est", "estimated", activity, resource, estimated, unit, None,
+                      **extra),
+                entry(ref, "measured", activity, resource, measured, unit, f"{ref}_est",
+                      **extra),
+            ]
+
         rows = [
-            entry("led_psi_ingest", "ingest", "storage_gb", 12, "GB", round(12 * storage, 2),
-                  dataset_code="ds_psi_teleop"),
-            entry("led_kbd_teleop", "teleop", "operator_minutes", 240, "minute",
-                  round(240 * operator, 2), measured_human_minutes=240.0,
-                  dataset_code="ds_kbd_teleop"),
-            entry("led_s1_generate", "synthetic", "gpu_hours", 4, "hour", 4 * gpu,
-                  measured_gpu_hours=4.0, dataset_code="ds_synth_s1"),
-            entry("led_train_A", "train", "gpu_hours", 10, "hour", 10 * gpu,
-                  measured_gpu_hours=10.0, experiment_code="exp_A", branch="A"),
-            entry("led_train_B", "train", "gpu_hours", 12, "hour", 12 * gpu,
-                  measured_gpu_hours=12.0, experiment_code="exp_B", branch="B"),
-            entry("led_train_BFAIL", "train", "gpu_hours", 9, "hour", 9 * gpu,
-                  measured_gpu_hours=9.0, experiment_code="exp_BFAIL", branch="B_FAIL"),
-            entry("led_eval_B", "eval", "gpu_hours", 2, "hour", 2 * gpu,
-                  measured_gpu_hours=2.0, evaluation_ref="ev_B_dev", branch="B"),
-            entry("led_diag_round1", "diagnosis", "gpu_hours", diag_hours, "hour",
-                  round(diag_hours * gpu, 2), measured_gpu_hours=diag_hours,
-                  recommendation_ref="rec_round1"),
-            # Ghi trùng một lần train, rồi sửa bằng bút toán đảo (BR-06, C9).
-            entry("led_train_A_dup", "train", "gpu_hours", 10, "hour", 10 * gpu,
-                  measured_gpu_hours=10.0, experiment_code="exp_A", branch="A",
-                  note="ghi trùng job train A"),
+            # Mọi bút toán gắn một run plan (PO D4), như `LedgerEntry.run_plan_id`.
+            *job("led_psi_ingest", "data_download", "storage_gb", 10, 12, "GB",
+                 dataset_code="ds_psi_teleop", run_plan_ref="rp_ingest_g0"),
+            *job("led_kbd_teleop", "teleop_session", "operator_minutes", 200, 240, "minute",
+                 dataset_code="ds_kbd_teleop", run_plan_ref="rp_ingest_g0"),
+            *job("led_s1_generate", "data_generation", "gpu_hours", 4, 4, "hour",
+                 dataset_code="ds_synth_s1", run_plan_ref="rp_ingest_g0"),
+            *job("led_train_A", "train", "gpu_hours", 8, 10, "hour",
+                 experiment_code="exp_A", branch="A", run_plan_ref="rp_A"),
+            *job("led_train_B", "train", "gpu_hours", 10, 12, "hour",
+                 experiment_code="exp_B", branch="B", run_plan_ref="rp_B"),
+            *job("led_train_BFAIL", "train", "gpu_hours", 10, 9, "hour",
+                 experiment_code="exp_BFAIL", branch="B_FAIL", run_plan_ref="rp_BFAIL"),
+            *job("led_eval_B", "eval", "gpu_hours", 2, 2, "hour",
+                 evaluation_ref="ev_B_dev", branch="B", run_plan_ref="rp_round1"),
+            *job("led_diag_round1", "diagnosis", "gpu_hours", 0.5, diag_hours, "hour",
+                 recommendation_ref="rec_round1", run_plan_ref="rp_round1"),
+            # Ghi trùng thực đo của job train A, rồi sửa bằng bút toán đảo (BR-06,
+            # C9). Bản trùng trỏ về cùng dòng ước tính với bản đúng.
+            entry("led_train_A_dup", "measured", "train", "gpu_hours", 10, "hour",
+                  "led_train_A_est", experiment_code="exp_A", branch="A",
+                  run_plan_ref="rp_A", note="ghi trùng job train A"),
         ]
         rows.append(
             {**rows[-1], "entry_ref": "led_train_A_dup_rev", "entry_kind": "REVERSAL",
-             "reverses_entry_ref": "led_train_A_dup", "quantity": -10, "measured_usd": -10 * gpu,
-             "measured_gpu_hours": -10.0, "note": "đảo bút toán ghi trùng"}
+             "reverses_entry_ref": "led_train_A_dup", "quantity": -10,
+             "usd_amount": round(-10 * gpu, 2), "gpu_hours": -10.0,
+             "note": "đảo bút toán ghi trùng"}
         )
-        # Ước tính của bốn can thiệp: cùng dòng với cột thực đo để trống (R5),
-        # và gắn khuyến nghị lẫn can thiệp (C10).
+        # Ước tính của bốn can thiệp, chưa có thực đo: gắn khuyến nghị lẫn can
+        # thiệp (C10). Dòng thực đo sẽ đến khi can thiệp được thu.
         for intervention in self.files["interventions.jsonl"]:
             assert isinstance(intervention, dict)
             rows.append(
                 {"entry_ref": f"led_est_{intervention['intervention_ref']}", "entry_kind": "ENTRY",
-                 "reverses_entry_ref": None, "activity": "intervention_estimate",
+                 "reverses_entry_ref": None,
+                 "activity": self.INTERVENTION_ACTIVITY[str(intervention["kind"])],
                  "resource_type": (
                      "gpu_hours" if intervention["estimated_gpu_hours"] else "operator_minutes"
                  ),
                  "quantity": intervention["target_quantity"], "unit": "episode",
-                 "price_book_name": "pitch_v10", "measured_usd": None,
-                 "estimated_usd": intervention["estimated_usd"],
-                 "estimated_human_minutes": intervention["estimated_human_minutes"],
-                 "estimated_gpu_hours": intervention["estimated_gpu_hours"],
+                 "price_book_name": "pitch_v10",
+                 "measure_kind": "estimated", "estimate_entry_ref": None,
+                 "usd_amount": intervention["estimated_usd"],
+                 "human_minutes": intervention["estimated_human_minutes"],
+                 "gpu_hours": intervention["estimated_gpu_hours"],
                  "recommendation_ref": "rec_round1",
                  "intervention_ref": intervention["intervention_ref"],
-                 "cluster_ref": intervention["cluster_ref"]}
+                 "cluster_ref": intervention["cluster_ref"], "run_plan_ref": "rp_round1"}
             )
         self.files["ledger.jsonl"] = rows
 

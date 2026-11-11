@@ -53,7 +53,9 @@ CREATE TABLE experiment_datasets (
 CREATE TABLE model_checkpoints (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   checkpoint_ref VARCHAR(64) NOT NULL UNIQUE,  -- ckpt_<hash>
-  experiment_id UUID NOT NULL REFERENCES experiments(id),
+  -- NULL được: `Checkpoint` của lõi không nối với thí nghiệm (khái niệm của
+  -- web), và checkpoint upstream của tác giả không thuộc thí nghiệm nào.
+  experiment_id UUID REFERENCES experiments(id),
   parent_checkpoint_id UUID REFERENCES model_checkpoints(id),
   release_id UUID REFERENCES releases(id),
   method VARCHAR(24) NOT NULL,
@@ -470,6 +472,9 @@ ALTER TABLE episodes
 -- ---------------------------------------------------------------------------
 CREATE TABLE fix_rate_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  -- fre_<ULID> của lõi. Hai lần đo cùng (cụm, can thiệp) ở hai vòng là hai sự
+  -- kiện, nên cặp đó không làm khoá tự nhiên được.
+  event_ref VARCHAR(64) NOT NULL UNIQUE,
   intervention_kind VARCHAR(24) NOT NULL,
   cluster_id UUID NOT NULL REFERENCES failure_clusters(id),
   intervention_id UUID NOT NULL REFERENCES interventions(id),
@@ -571,14 +576,17 @@ CREATE TABLE cost_ledger_entries (
   quantity NUMERIC(14,4) NOT NULL,
   unit VARCHAR(16) NOT NULL,
   price_book_id UUID NOT NULL REFERENCES price_books(id),
-  -- Ước tính và thực đo cùng một dòng, hai cột (luật R5), nên sai số dự báo
-  -- chi phí là một phép trừ, không phải một phép join.
-  estimated_usd NUMERIC(12,2),
-  measured_usd NUMERIC(12,2),
-  estimated_human_minutes NUMERIC(10,2),
-  measured_human_minutes NUMERIC(10,2),
-  estimated_gpu_hours NUMERIC(10,3),
-  measured_gpu_hours NUMERIC(10,3),
+  -- Mỗi bút toán một dòng, đúng như lõi ghi `LedgerEntry` (luật R5, CLAUDE.md,
+  -- 03 bản 0.9): ước tính và thực đo là hai dòng riêng, không ghi đè nhau, và
+  -- dòng thực đo trỏ về dòng ước tính. Sai số dự báo là phép nối hai dòng đó
+  -- (v_cost_by_branch), không phải phép trừ hai cột (review #72 điểm 2).
+  measure_kind VARCHAR(10) NOT NULL CHECK (measure_kind IN ('estimated','measured')),
+  estimate_entry_id UUID REFERENCES cost_ledger_entries(id),
+  usd_amount NUMERIC(12,2) NOT NULL,
+  -- Lõi ghi giờ người (`human_hours`); web giữ phút như ba trần của BR-07.
+  human_minutes NUMERIC(10,2),
+  -- Giờ GPU khi dòng là tài nguyên GPU tính bằng giờ; NULL khi không phải.
+  gpu_hours NUMERIC(10,3),
   dataset_id UUID REFERENCES datasets(id),
   experiment_id UUID REFERENCES experiments(id),
   evaluation_id UUID REFERENCES sim_evaluations(id),
@@ -592,14 +600,21 @@ CREATE TABLE cost_ledger_entries (
   operator_code VARCHAR(16),
   note TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  -- C10: bút toán ước tính phải gắn khuyến nghị hoặc can thiệp, nếu không thì
-  -- không ai biết nó ước tính cho việc gì.
+  -- R5: dòng thực đo trỏ về đúng một dòng ước tính, dòng ước tính thì không
+  -- trỏ về đâu (như `LedgerEntry` của hợp đồng). Dòng được trỏ tới là
+  -- `estimated` thì do bộ nạp kiểm, CHECK không nhìn được dòng khác.
+  CONSTRAINT r5_measured_points_at_estimate CHECK (
+    (measure_kind = 'measured') = (estimate_entry_id IS NOT NULL)),
+  -- C10: bút toán ước tính phải gắn khuyến nghị, can thiệp hoặc run plan, nếu
+  -- không thì không ai biết nó ước tính cho việc gì. Lõi ước tính theo run
+  -- plan (PO D4: mọi bút toán đều gắn một run plan).
   CONSTRAINT c10_estimate_has_owner CHECK (
-    estimated_usd IS NULL OR num_nonnulls(recommendation_id, intervention_id) >= 1),
+    measure_kind <> 'estimated'
+    OR num_nonnulls(recommendation_id, intervention_id, run_plan_id) >= 1),
   -- C11: mỗi bút toán gắn ít nhất một đối tượng.
   CONSTRAINT c11_entry_has_target CHECK (
     num_nonnulls(dataset_id, experiment_id, evaluation_id,
-                 recommendation_id, intervention_id) >= 1),
+                 recommendation_id, intervention_id, cluster_id, run_plan_id) >= 1),
   CONSTRAINT c9_reversal_has_target CHECK (
     (entry_kind = 'REVERSAL') = (reverses_entry_id IS NOT NULL))
 );

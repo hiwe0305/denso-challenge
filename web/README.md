@@ -158,8 +158,11 @@ uv run python -m web.fwsync.cli export --actions fwdata/web-state/human_actions.
 # lõi giả: đọc outbox, sinh kết quả mang source_action_id (mốc M4)
 uv run python -m web.fwsync.cli fake-core --outbox fwdata/outbox --to fwdata/inbox
 
-# so số dòng giữa nguồn và những gì đã nạp; báo chênh, không tự sửa
-uv run python -m web.fwsync.cli verify --from mock/demo-17-11 --loaded counts.json
+# so số dòng nguồn sinh ra theo bảng đích với sink đã nạp; báo chênh, không tự sửa
+uv run python -m web.fwsync.cli verify --from mock/demo-17-11 --loaded fwdata/web-sink
+
+# nạp thẳng store của lõi: catalog/<bảng>/part-*.jsonl và runs/**/ledger.jsonl đi đường nghiêm
+uv run python -m web.fwsync.cli import --from fwdata/sites/local --out fwdata/web-sink
 ```
 
 Mã thoát: `0` khi sạch, `1` khi có dòng bị từ chối, `2` khi không đọc được

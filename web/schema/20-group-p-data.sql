@@ -17,7 +17,12 @@ CREATE TABLE sources (
   sha256 CHAR(64),
   license VARCHAR(64) NOT NULL,
   downloaded_at TIMESTAMPTZ,
-  kind VARCHAR(16) NOT NULL CHECK (kind IN ('dataset','checkpoint','model','other')),
+  -- Bốn giá trị đầu là `Source.kind` của hợp đồng; `model`, `other` là của bộ mock.
+  kind VARCHAR(16) NOT NULL CHECK (kind IN (
+    'dataset','checkpoint','video_upload','code','model','other')),
+  path TEXT,                                   -- đường dẫn trong repo nguồn
+  -- Lớp dữ liệu của nguồn (R6): NULL khi nguồn không khai (dòng mock).
+  data_class VARCHAR(12) CHECK (data_class IN ('public','internal','restricted')),
   -- Dữ liệu đã dùng để train nếu là checkpoint, cộng bằng chứng. Ba trạng thái
   -- vì "không biết" khác "sạch": BR-01 chỉ chặn `false`, nên một checkpoint
   -- chưa ai kiểm vẫn vào được thí nghiệm và điều đó phải thấy được.

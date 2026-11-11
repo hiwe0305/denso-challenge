@@ -49,17 +49,70 @@ from flywheel.contracts.artifacts import (
     QAReport,
 )
 from flywheel.contracts.diagnosis import SystemDiagnosis
+from flywheel.contracts.entities import (
+    Checkpoint,
+    Cluster,
+    Decision,
+    FixRateEvent,
+    LedgerEntry,
+    Release,
+    RunPlan,
+    Source,
+)
+from flywheel.contracts.entities import Episode as CatalogEpisode
+from flywheel.contracts.entities import QAReport as CatalogQAReport
 from flywheel.contracts.training import TrainDiagnosis, TrainingMetric
 from pydantic import BaseModel, ValidationError
 
+#: Trường chung của mọi bản ghi catalog (`BaseRecord`) mà bảng web không có
+#: cột. `site_id` luôn là `local` ở L0; `schema_version` là phiên bản hợp đồng,
+#: không phải dữ liệu.
+_BASE_DROPPED = {
+    "site_id": "L0 chỉ có một site (`local`); web chưa phân site",
+    "schema_version": "phiên bản hợp đồng của dòng, không phải dữ liệu nghiệp vụ",
+    "embodiment_id": "bảng web của thực thể này chưa có cột embodiment hay meta",
+    "task_id": "bảng web của thực thể này chưa có cột task hay meta",
+    "meta": "bảng web của thực thể này chưa có cột meta",
+}
+#: Thực thể mà bảng web **không** có cột `meta`: `task_id`, `embodiment_id`,
+#: `meta` của chúng bị bỏ. Bốn thực thể còn lại (Release, Checkpoint, RunPlan,
+#: Decision) giữ ba trường đó trong cột `meta` của bảng web.
+_NO_META = ("Source", "Cluster", "FixRateEvent", "LedgerEntry")
+_ENTITIES = (*_NO_META, "Release", "Checkpoint", "RunPlan", "Decision")
+
 #: Trường của hợp đồng bị bỏ có chủ ý, và lý do. Test kiểm danh sách này, nên
-#: một trường bị bỏ âm thầm sẽ không lọt.
+#: một trường bị bỏ âm thầm sẽ không lọt: mọi trường của model mà mapper
+#: không đọc phải có tên ở đây (`test_every_contract_field_is_mapped_or_dropped`).
 #: Khoá là `<Model>.<trường>`; mapper bỏ trường đó khỏi mọi cột và `meta`.
 DROPPED_FIELDS: dict[str, str] = {
     "SystemDiagnosis.episode_id": (
         "tên `episode_N` của dòng thống kê SIMPLE, đếm lại ở mỗi lượt eval nên không "
         "duy nhất; bản ghi nối với `eval_episodes` bằng `trace_sha256` (W13)"
     ),
+    # Dòng `catalog/episode/` và `catalog/qa_report/` mang thêm trường của
+    # `BaseRecord` mà model artifact không có.
+    "Episode.site_id": _BASE_DROPPED["site_id"],
+    "Episode.task_id": "bảng episodes chưa có cột task; task suy từ lô hay run plan",
+    "Episode.schema_version": _BASE_DROPPED["schema_version"],
+    "QAReport.site_id": _BASE_DROPPED["site_id"],
+    "QAReport.task_id": "báo cáo QA thuộc một episode; task là của episode",
+    "QAReport.embodiment_id": "báo cáo QA thuộc một episode; embodiment là của episode",
+    "QAReport.schema_version": _BASE_DROPPED["schema_version"],
+    "QAReport.meta": "episode_qa_reports chưa có cột meta",
+    **{f"{model}.{name}": _BASE_DROPPED[name]
+       for model in _ENTITIES for name in ("site_id", "schema_version")},
+    **{f"{model}.{name}": _BASE_DROPPED[name]
+       for model in _NO_META for name in ("task_id", "embodiment_id", "meta")},
+    "Cluster.run_plan_id": (
+        "chỉ dùng để tra đề xuất (`flywheel_recommendations.run_plan_ref`); "
+        "failure_clusters gắn đề xuất, không gắn run plan"
+    ),
+    "Cluster.failure_class": "failure_clusters chưa có cột failure_class",
+    "Cluster.card_uri": "hợp đồng không đặt trường này nữa (DA-39); đường dẫn suy từ id",
+    "FixRateEvent.round_id": "fix_rate_events chưa có cột vòng",
+    "FixRateEvent.diagnosis": "chẩn đoán là của cụm (`failure_clusters.diagnosis`)",
+    "FixRateEvent.task_family": "fix_rate_events chưa có cột họ task",
+    "Release.items": "đi sang bảng release_items, mỗi item một dòng",
 }
 
 NON_FINITE = ("NaN", "Infinity", "-Infinity")
@@ -69,6 +122,29 @@ _MODEL = TypeVar("_MODEL", bound=BaseModel)
 
 class MappingError(ValueError):
     """Một artifact không nạp được, kèm lý do để ghi vào `sync_runs.errors`."""
+
+
+class NotLoaded(Exception):
+    """Một artifact hợp lệ mà web cố ý không nạp, kèm lý do.
+
+    Khác `MappingError`: không có gì sai, nên nó vào `ignored` chứ không vào
+    `errors`, và không làm lần nạp thành `partial`. Ví dụ: một RunPlan còn
+    `draft` (bảng `run_plans` chỉ giữ plan đã đóng băng).
+    """
+
+
+def refuse_ambiguous(key: str | None, ambiguous: frozenset[str], what: str) -> None:
+    """Từ chối một khoá mà hai dòng nguồn trỏ về hai giá trị khác nhau (review #72 điểm 4).
+
+    Giữ giá trị cuối cùng là gán bừa một trong hai, đúng điều W12 cấm: hai lô
+    cùng `source_ref` (lô thật và bản sao chấm cắt từ nó) thì episode không
+    biết thuộc lô nào.
+    """
+    if key is not None and key in ambiguous:
+        raise MappingError(
+            f"{what} `{key}` trỏ về nhiều dòng khác nhau trong cùng lần nạp; "
+            f"không gán vào dòng nào"
+        )
 
 
 @dataclass(frozen=True)
@@ -90,8 +166,15 @@ class DatasetLookup:
 
     by_source: dict[str, str]
     by_intervention: dict[str, str]
+    #: Khoá mà hai lô khác nhau cùng khai: tra vào đó là từ chối.
+    ambiguous_sources: frozenset[str] = frozenset()
+    ambiguous_interventions: frozenset[str] = frozenset()
 
     def resolve(self, episode: Episode) -> str:
+        refuse_ambiguous(episode.source_id, self.ambiguous_sources,
+                         f"episode `{episode.episode_id}`: source_id")
+        refuse_ambiguous(episode.intervention_id, self.ambiguous_interventions,
+                         f"episode `{episode.episode_id}`: intervention_id")
         if episode.source_id and episode.source_id in self.by_source:
             return self.by_source[episode.source_id]
         if episode.intervention_id and episode.intervention_id in self.by_intervention:
@@ -111,9 +194,29 @@ def _validated(model: type[_MODEL], payload: Any, what: str) -> _MODEL:
         raise MappingError(f"{what} không hợp schema {model.__name__}: {error}") from error
 
 
-def map_episode(payload: Any, lookup: DatasetLookup) -> dict[str, Any]:
-    """Một `Episode` thành một dòng `episodes`."""
-    episode: Episode = _validated(Episode, payload, "episode")
+def _catalog_id(payload: Any, field: str, what: str) -> None:
+    """Dòng catalog phải mang id của nó.
+
+    Model catalog (`entities.Episode`, `entities.QAReport`) **tự sinh** id
+    khi thiếu, nên một dòng thiếu id sẽ thành một bản ghi mới mỗi lần nạp.
+    """
+    if not isinstance(payload, dict) or not str(payload.get(field) or "").strip():
+        raise MappingError(f"{what} catalog thiếu `{field}`; không nạp lại được cùng một dòng")
+
+
+def map_episode(payload: Any, lookup: DatasetLookup, *, catalog: bool = False) -> dict[str, Any]:
+    """Một `Episode` thành một dòng `episodes`.
+
+    `catalog`: dòng đến từ `catalog/episode/` của lõi, ghi bằng
+    `entities.Episode` (thêm `site_id`, `task_id`, `schema_version`, xem
+    `DROPPED_FIELDS`). Model artifact từ chối ba trường đó.
+    """
+    episode: Episode
+    if catalog:
+        _catalog_id(payload, "episode_id", "episode")
+        episode = _validated(CatalogEpisode, payload, "episode")
+    else:
+        episode = _validated(Episode, payload, "episode")
     meta = episode.meta
     row: dict[str, Any] = {
         "episode_ref": episode.episode_id,
@@ -181,9 +284,19 @@ def _reject_raw_egocentric(row: dict[str, Any]) -> None:
         )
 
 
-def map_qa_report(payload: Any, known_episodes: set[str]) -> dict[str, Any]:
-    """Một `QAReport` thành một dòng `episode_qa_reports` (append-only)."""
-    report: QAReport = _validated(QAReport, payload, "qa report")
+def map_qa_report(
+    payload: Any, known_episodes: set[str], *, catalog: bool = False
+) -> dict[str, Any]:
+    """Một `QAReport` thành một dòng `episode_qa_reports` (append-only).
+
+    `catalog`: như `map_episode`, dòng `catalog/qa_report/` của lõi.
+    """
+    report: QAReport
+    if catalog:
+        _catalog_id(payload, "report_id", "qa report")
+        report = _validated(CatalogQAReport, payload, "qa report")
+    else:
+        report = _validated(QAReport, payload, "qa report")
     if report.episode_id not in known_episodes:
         raise MappingError(
             f"qa report `{report.report_id}` trỏ episode `{report.episode_id}` chưa nạp"
@@ -577,3 +690,396 @@ def _rate(value: Any, where: str) -> dict[str, int]:
     if not isinstance(hit, int) or not isinstance(total, int) or not 0 <= hit <= total:
         raise MappingError(f"{where}: hit={hit!r}, total={total!r} không phải 0 <= hit <= total")
     return {"hit": hit, "total": total}
+
+
+# ---------------------------------------------------------------------------
+# Thực thể catalog của lõi (S1-10) → bảng web (review #72 điểm 1, 2)
+# ---------------------------------------------------------------------------
+#
+# Lõi ghi chín thực thể này bằng model hợp đồng vào `catalog/<bảng>/` và sổ
+# chi phí vào `runs/<run_plan>/<job>/ledger.jsonl`. Khoá tự nhiên của web
+# (`source_ref`, `decision_ref`, `entry_ref`…) là chính `id` của hợp đồng, nên
+# nạp lại cùng artifact trúng đúng dòng cũ.
+#
+# Mỗi mapper chỉ đặt cột nó biết. Bảng không append-only được upsert bằng
+# `dict.update`, nên một cột mà hợp đồng không mang (chẩn đoán của cụm, thí
+# nghiệm của checkpoint) không bị một lần nạp lại xoá về None.
+
+#: Trường mỗi mapper đọc, theo model. Cùng `DROPPED_FIELDS` nó phải phủ đúng
+#: mọi trường của model (`test_every_contract_field_is_mapped_or_dropped`), nên
+#: lõi thêm một trường thì test đỏ cho tới khi có người quyết định nó đi đâu.
+MAPPED_FIELDS: dict[str, frozenset[str]] = {
+    "Source": frozenset({
+        "id", "kind", "uri", "repo", "revision", "path", "sha256", "license",
+        "data_class", "clean_for_main_task", "provenance", "downloaded_at",
+    }),
+    "RunPlan": frozenset({
+        "id", "name", "purpose", "branch", "method", "status", "lock_path",
+        "lock_sha256", "frozen_at", "body", "task_id", "embodiment_id", "meta",
+    }),
+    "Release": frozenset({
+        "id", "name", "kind", "parent_release_id", "split_plan_cfg_id", "status",
+        "manifest_sha256", "holdout_guard_passed", "combined_license", "counts",
+        "frozen_at", "task_id", "embodiment_id", "meta",
+    }),
+    "Checkpoint": frozenset({
+        "id", "origin", "method", "branch", "base_source_id", "parent_checkpoint_id",
+        "release_id", "seed", "step", "weights_sha256", "uri", "is_final",
+        "task_id", "embodiment_id", "meta",
+    }),
+    "Cluster": frozenset({
+        "id", "first_failed_step", "failure_kind", "level", "parent_cluster_id",
+        "representative_seed", "member_episode_ids",
+    }),
+    "FixRateEvent": frozenset({
+        "id", "cluster_id", "intervention_id", "intervention_type", "failure_kind",
+        "failure_class", "n_conditions", "p_parent", "p_candidate", "fixed",
+    }),
+    "Decision": frozenset({
+        "id", "kind", "subject_kind", "subject_id", "verdict", "metrics", "criteria",
+        "signed_by", "reason", "supersedes_decision_id", "task_id", "embodiment_id", "meta",
+    }),
+    "LedgerEntry": frozenset({
+        "id", "activity", "resource_type", "quantity", "unit", "pricebook_id",
+        "usd_amount", "human_hours", "measure_kind", "estimate_entry_id", "branch",
+        "run_plan_id", "cluster_id", "intervention_id", "job_id", "person_code",
+        "reverses_entry_id", "note",
+    }),
+}
+
+#: Bảng web của mỗi model, cho test so cột với schema.
+ENTITY_TABLES: dict[str, str] = {
+    "Source": "sources",
+    "RunPlan": "run_plans",
+    "Release": "releases",
+    "Checkpoint": "model_checkpoints",
+    "Cluster": "failure_clusters",
+    "FixRateEvent": "fix_rate_events",
+    "Decision": "decisions",
+    "LedgerEntry": "cost_ledger_entries",
+}
+
+
+@dataclass(frozen=True)
+class RefLookup:
+    """Một bảng tra `khoá → ref` dựng từ artifact của cùng lần nạp.
+
+    Khoá mà hai dòng nguồn trỏ về hai ref khác nhau nằm ở `ambiguous`.
+    `require` từ chối khoá đó (và khoá không có); `find` trả None cho cả hai,
+    cho chỗ mà việc tra chỉ làm giàu dòng chứ không bắt buộc.
+    """
+
+    pairs: dict[str, str]
+    ambiguous: frozenset[str] = frozenset()
+
+    def find(self, key: str | None) -> str | None:
+        if key is None or key in self.ambiguous:
+            return None
+        return self.pairs.get(key)
+
+    def require(self, key: str | None, what: str) -> str:
+        refuse_ambiguous(key, self.ambiguous, what)
+        found = self.find(key)
+        if found is None:
+            raise MappingError(f"{what} `{key}` không tra được trong lần nạp này")
+        return found
+
+
+_EMPTY = RefLookup({})
+
+
+@dataclass(frozen=True)
+class CatalogLookups:
+    """Các bảng tra mà thực thể catalog cần, vì hợp đồng nối chúng khác web.
+
+    * ``recommendation_by_run_plan`` — `flywheel_recommendations.run_plan_ref`
+      → `recommendation_ref`. Cụm của lõi gắn run plan; cụm của web gắn đề xuất.
+    * ``recommendation_by_intervention`` — `interventions.intervention_ref` →
+      `recommendation_ref`, để bút toán của một can thiệp vào ngân sách BR-07.
+    * ``experiment_by_run_plan`` — `experiments.run_plan_ref` →
+      `experiment_code`, để chi phí train vào đúng thí nghiệm trên M8.
+    """
+
+    recommendation_by_run_plan: RefLookup = _EMPTY
+    recommendation_by_intervention: RefLookup = _EMPTY
+    experiment_by_run_plan: RefLookup = _EMPTY
+
+
+def _with_meta(entity: BaseModel, extra: dict[str, Any]) -> dict[str, Any]:
+    """Cột `meta` của bảng web: trường hợp đồng không có cột riêng, cộng
+    `task_id`, `embodiment_id` và `meta` gốc của `BaseRecord`."""
+    base = {
+        "task_id": getattr(entity, "task_id", None),
+        "embodiment_id": getattr(entity, "embodiment_id", None),
+        "meta": dict(getattr(entity, "meta", {}) or {}),
+    }
+    return {**extra, **base}
+
+
+def map_source(payload: Any) -> dict[str, Any]:
+    """Một `Source` thành một dòng `sources`."""
+    source: Source = _validated(Source, payload, "source")
+    return {
+        "source_ref": source.id,
+        "url": source.uri,
+        "repo": source.repo,
+        "revision": source.revision,
+        "path": source.path,
+        "sha256": source.sha256,
+        "license": source.license,
+        "data_class": source.data_class,
+        "downloaded_at": source.downloaded_at,
+        "kind": source.kind,
+        "clean_for_main_task": source.clean_for_main_task,
+        "provenance": dict(source.provenance),
+    }
+
+
+def map_run_plan(payload: Any) -> dict[str, Any]:
+    """Một `RunPlan` **đã đóng băng** thành một dòng `run_plans`.
+
+    `run_plans` chỉ giữ plan đã khoá: `lock_uri`, `config_sha256` và
+    `frozen_at` là NOT NULL, vì một job chạy trên plan chưa khoá thì không tái
+    lập được. Plan `draft` không sai, nên nó vào `ignored`, không vào `errors`.
+    """
+    plan: RunPlan = _validated(RunPlan, payload, "run plan")
+    if plan.status != "frozen":
+        raise NotLoaded(f"run plan `{plan.id}` còn `{plan.status}`; run_plans chỉ giữ plan đã khoá")
+    missing = [name for name in ("lock_path", "lock_sha256", "frozen_at")
+               if getattr(plan, name) is None]
+    if missing:
+        raise MappingError(f"run plan `{plan.id}` đã `frozen` mà thiếu {missing}")
+    return {
+        "run_plan_ref": plan.id,
+        "purpose": plan.purpose,
+        "branch": plan.branch,
+        "method": plan.method,
+        "task_id": plan.task_id,
+        "lock_uri": plan.lock_path,
+        "config_sha256": plan.lock_sha256,
+        "frozen_at": plan.frozen_at,
+        "meta": _with_meta(plan, {"name": plan.name, "status": plan.status, "body": plan.body}),
+    }
+
+
+def map_release(payload: Any) -> list[tuple[str, dict[str, Any]]]:
+    """Một `Release` thành một dòng `releases` và mỗi item một dòng `release_items`.
+
+    Item là dạng của `flywheel.data.release.build._item`: `episode_id`,
+    `weight`, `excluded`, `reasons`. Item không có `episode_id` là từ chối cả
+    release: bỏ một item là đổi nội dung một release đã băm.
+    """
+    release: Release = _validated(Release, payload, "release")
+    if release.status == "frozen" and (release.manifest_sha256 is None
+                                       or release.frozen_at is None):
+        raise MappingError(
+            f"release `{release.id}` đã `frozen` mà thiếu manifest_sha256 hoặc frozen_at"
+        )
+    rows: list[tuple[str, dict[str, Any]]] = [("releases", {
+        "release_ref": release.id,
+        "name": release.name,
+        "parent_release_ref": release.parent_release_id,
+        "status": release.status,
+        "manifest_sha256": release.manifest_sha256,
+        "license_summary": release.combined_license,
+        "frozen_at": release.frozen_at,
+        "meta": _with_meta(release, {
+            "kind": release.kind,
+            "split_plan_cfg_id": release.split_plan_cfg_id,
+            "holdout_guard_passed": release.holdout_guard_passed,
+            "counts": dict(release.counts),
+        }),
+    })]
+    for index, item in enumerate(release.items):
+        episode = item.get("episode_id")
+        if not episode:
+            raise MappingError(f"release `{release.id}` items[{index}] thiếu `episode_id`")
+        excluded = bool(item.get("excluded", False))
+        reasons = "; ".join(str(reason) for reason in item.get("reasons") or [])
+        rows.append(("release_items", {
+            "release_ref": release.id,
+            "episode_ref": str(episode),
+            "sample_weight": float(item.get("weight", 1.0)),
+            "excluded": excluded,
+            "exclude_reason": (reasons or "excluded") if excluded else None,
+        }))
+    return rows
+
+
+def map_checkpoint(payload: Any) -> dict[str, Any]:
+    """Một `Checkpoint` thành một dòng `model_checkpoints`.
+
+    Hợp đồng không nối checkpoint với thí nghiệm (thí nghiệm là khái niệm của
+    web), nên dòng không mang `experiment_code`: không gán thí nghiệm mặc
+    định. Upsert giữ `experiment_code` mà một artifact web khác đã đặt.
+    """
+    checkpoint: Checkpoint = _validated(Checkpoint, payload, "checkpoint")
+    return {
+        "checkpoint_ref": checkpoint.id,
+        "parent_checkpoint_ref": checkpoint.parent_checkpoint_id,
+        "release_ref": checkpoint.release_id,
+        "method": checkpoint.method,
+        "step": checkpoint.step,
+        "weights_sha256": checkpoint.weights_sha256,
+        "uri": checkpoint.uri,
+        "train_seed": checkpoint.seed,
+        "meta": _with_meta(checkpoint, {
+            "origin": checkpoint.origin,
+            "branch": checkpoint.branch,
+            "base_source_id": checkpoint.base_source_id,
+            "is_final": checkpoint.is_final,
+        }),
+    }
+
+
+#: Số đại diện tối đa của một cụm (CHECK của `failure_clusters`).
+MAX_REPRESENTATIVES = 5
+
+
+def map_cluster(payload: Any, lookups: CatalogLookups) -> dict[str, Any]:
+    """Một `Cluster` thành một dòng `failure_clusters`.
+
+    Đề xuất của cụm tra qua run plan; không tra được thì từ chối (như W12).
+    Hợp đồng không chọn episode đại diện, nên `representative_refs` là tối đa
+    năm thành viên đầu theo thứ tự lõi ghi. Chẩn đoán không có trong hợp đồng
+    và không bị đặt ở đây.
+    """
+    cluster: Cluster = _validated(Cluster, payload, "cluster")
+    if not cluster.member_episode_ids:
+        raise MappingError(f"cluster `{cluster.id}` không có thành viên nào")
+    if cluster.representative_seed is None:
+        raise MappingError(f"cluster `{cluster.id}` thiếu representative_seed")
+    return {
+        "cluster_ref": cluster.id,
+        "recommendation_ref": lookups.recommendation_by_run_plan.require(
+            cluster.run_plan_id, f"cluster `{cluster.id}`: run_plan_id"
+        ),
+        "failed_step": cluster.first_failed_step,
+        "failure_code": cluster.failure_kind,
+        "level": cluster.level,
+        "member_count": len(cluster.member_episode_ids),
+        "representative_refs": list(cluster.member_episode_ids[:MAX_REPRESENTATIVES]),
+        "representative_seed": cluster.representative_seed,
+        "parent_cluster_ref": cluster.parent_cluster_id,
+    }
+
+
+def map_fix_rate_event(payload: Any) -> dict[str, Any]:
+    """Một `FixRateEvent` thành một dòng `fix_rate_events` (append-only)."""
+    event: FixRateEvent = _validated(FixRateEvent, payload, "fix rate event")
+    if event.cluster_id is None:
+        raise MappingError(f"fix rate event `{event.id}` thiếu cluster_id")
+    if not 0 <= event.fixed <= event.n_conditions:
+        raise MappingError(
+            f"fix rate event `{event.id}`: fixed={event.fixed} ngoài [0, {event.n_conditions}]"
+        )
+    return {
+        "event_ref": event.id,
+        "intervention_kind": event.intervention_type,
+        "cluster_ref": event.cluster_id,
+        "intervention_ref": event.intervention_id,
+        "failure_code": event.failure_kind,
+        "failure_class": event.failure_class,
+        "n_conditions": event.n_conditions,
+        "p_parent": event.p_parent,
+        "p_candidate": event.p_candidate,
+        "fixed_count": event.fixed,
+    }
+
+
+def map_decision(payload: Any) -> dict[str, Any]:
+    """Một `Decision` thành một dòng `decisions`.
+
+    Hợp đồng không mang `source_action_id`, nên một quyết định của lõi không
+    tự đánh dấu hành động nào là APPLIED; chỉ câu trả lời trong inbox (dạng
+    web, xem `run_fake_core`) làm được việc đó. Người ký là mã người, không
+    phải id `app_users`, nên nó vào `meta`.
+    """
+    decision: Decision = _validated(Decision, payload, "decision")
+    return {
+        "decision_ref": decision.id,
+        "kind": decision.kind,
+        "target_kind": decision.subject_kind,
+        "target_id": decision.subject_id,
+        "measures": dict(decision.metrics),
+        "criteria": dict(decision.criteria),
+        "conclusion": decision.verdict,
+        "reason": decision.reason,
+        "meta": _with_meta(decision, {
+            "signed_by": decision.signed_by,
+            "supersedes_decision_id": decision.supersedes_decision_id,
+        }),
+    }
+
+
+#: Đơn vị mà một dòng GPU tính bằng giờ. Lõi ghi `resource_type:
+#: gpu_hour_<card>`, `unit: hour` (fixture `LedgerEntry.json`).
+GPU_HOUR_UNITS = ("hour", "hours", "h")
+MEASURE_KINDS = ("estimated", "measured")
+
+
+def _gpu_hours(resource_type: str, unit: str, quantity: float) -> float | None:
+    if resource_type.startswith("gpu") and unit in GPU_HOUR_UNITS:
+        return float(quantity)
+    return None
+
+
+def map_ledger_entry(payload: Any, lookups: CatalogLookups) -> dict[str, Any]:
+    """Một `LedgerEntry` thành **một** dòng `cost_ledger_entries` (review #72 điểm 2).
+
+    Ước tính và thực đo là hai bút toán riêng (`measure_kind`), dòng thực đo
+    trỏ về dòng ước tính qua `estimate_entry_ref` (CLAUDE.md, 03 bản 0.9). Sai
+    số dự báo là phép nối hai dòng đó, không phải phép trừ hai cột.
+
+    Giờ người đổi sang phút (cột của web); giờ GPU là `quantity` khi dòng là
+    tài nguyên GPU tính bằng giờ, None khi không phải. Thí nghiệm và đề xuất
+    chỉ được điền khi tra ra đúng một; không ra thì để trống, không từ chối.
+    """
+    entry: LedgerEntry = _validated(LedgerEntry, payload, "ledger entry")
+    recommendation = (lookups.recommendation_by_intervention.find(entry.intervention_id)
+                      or lookups.recommendation_by_run_plan.find(entry.run_plan_id))
+    row = {
+        "entry_ref": entry.id,
+        "entry_kind": "REVERSAL" if entry.reverses_entry_id else "ENTRY",
+        "reverses_entry_ref": entry.reverses_entry_id,
+        "activity": entry.activity,
+        "resource_type": entry.resource_type,
+        "quantity": entry.quantity,
+        "unit": entry.unit,
+        "price_book_name": entry.pricebook_id,
+        "measure_kind": entry.measure_kind,
+        "estimate_entry_ref": entry.estimate_entry_id,
+        "usd_amount": entry.usd_amount,
+        "human_minutes": entry.human_hours * 60,
+        "gpu_hours": _gpu_hours(entry.resource_type, entry.unit, entry.quantity),
+        "experiment_code": lookups.experiment_by_run_plan.find(entry.run_plan_id),
+        "recommendation_ref": recommendation,
+        "intervention_ref": entry.intervention_id,
+        "cluster_ref": entry.cluster_id,
+        "run_plan_ref": entry.run_plan_id,
+        "branch": entry.branch,
+        "job_id": entry.job_id,
+        "operator_code": entry.person_code,
+        "note": entry.note,
+    }
+    check_ledger_row(row, f"ledger entry `{entry.id}`")
+    return row
+
+
+def check_ledger_row(row: dict[str, Any], where: str) -> None:
+    """Luật R5 trên một dòng sổ chi phí, cho cả dòng lõi lẫn dòng mock.
+
+    Model hợp đồng đã cưỡng chế nó cho dòng lõi; dòng mock đi đường khoan
+    dung nên phải kiểm ở đây, nếu không M8 sẽ hiện một sổ mà lõi không bao
+    giờ ghi ra được.
+    """
+    kind = row.get("measure_kind")
+    if kind not in MEASURE_KINDS:
+        raise MappingError(f"{where}: measure_kind {kind!r} phải là một trong {MEASURE_KINDS}")
+    if not isinstance(row.get("usd_amount"), (int, float)):
+        raise MappingError(f"{where}: thiếu usd_amount")
+    linked = row.get("estimate_entry_ref")
+    if kind == "measured" and not linked:
+        raise MappingError(f"{where}: dòng thực đo phải trỏ về dòng ước tính (estimate_entry_ref)")
+    if kind == "estimated" and linked:
+        raise MappingError(f"{where}: dòng ước tính không trỏ về dòng ước tính nào")

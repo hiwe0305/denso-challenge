@@ -195,12 +195,19 @@ BEGIN
       USING ERRCODE = 'check_violation';
   END IF;
 
+  -- Cùng loại đo và cùng dòng ước tính: đảo một dòng thực đo bằng một dòng
+  -- ước tính thì sai số dự báo của job đó lệch.
+  IF NEW.measure_kind <> original.measure_kind
+     OR NEW.estimate_entry_id IS DISTINCT FROM original.estimate_entry_id THEN
+    RAISE EXCEPTION 'C9: bút toán đảo phải cùng measure_kind và cùng dòng ước tính với bút toán gốc'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
   -- Đúng dấu: tổng của gốc và đảo phải bằng 0 trên mọi cột tiền và lượng.
   IF NEW.quantity <> -original.quantity
-     OR COALESCE(NEW.measured_usd, 0) <> -COALESCE(original.measured_usd, 0)
-     OR COALESCE(NEW.estimated_usd, 0) <> -COALESCE(original.estimated_usd, 0)
-     OR COALESCE(NEW.measured_human_minutes, 0) <> -COALESCE(original.measured_human_minutes, 0)
-     OR COALESCE(NEW.measured_gpu_hours, 0) <> -COALESCE(original.measured_gpu_hours, 0) THEN
+     OR NEW.usd_amount <> -original.usd_amount
+     OR COALESCE(NEW.human_minutes, 0) <> -COALESCE(original.human_minutes, 0)
+     OR COALESCE(NEW.gpu_hours, 0) <> -COALESCE(original.gpu_hours, 0) THEN
     RAISE EXCEPTION 'C9: bút toán đảo phải mang đúng số đối của bút toán gốc'
       USING ERRCODE = 'check_violation';
   END IF;

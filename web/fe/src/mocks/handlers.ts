@@ -11,7 +11,9 @@ import type {
   ChatMessage,
   ChatSession,
   ExperimentDraft,
+  InterventionRow,
   Page,
+  Recommendation,
   SyncRunRow,
 } from "../api/types";
 import {
@@ -85,9 +87,11 @@ const json = <T extends DefaultBodyType>(body: T | null, what: string) =>
 class ActionStore {
   private byKey = new Map<string, string>();
   private rows = new Map<string, ActionStatusRow>();
+  private payloads = new Map<string, unknown>();
   private seq = 0;
 
-  record(key: string, kind: string, targetKind: string, targetId: string, reason: string | null) {
+  record(key: string, kind: string, targetKind: string, targetId: string, reason: string | null,
+    payload: unknown = null) {
     const existing = this.byKey.get(key);
     if (existing) return this.rows.get(existing) as ActionStatusRow;
     this.seq += 1;
@@ -105,7 +109,15 @@ class ActionStore {
     };
     this.byKey.set(key, row.action_id);
     this.rows.set(row.action_id, row);
+    this.payloads.set(row.action_id, payload);
     return row;
+  }
+
+  /** Actions of this kind on this target the core has not refused, with their payload. */
+  live(kind: string, targetId: string): Array<{ action_id: string; payload: unknown }> {
+    return [...this.rows.values()]
+      .filter((r) => r.action_kind === kind && r.target_id === targetId && r.sync_status !== "REJECTED")
+      .map((r) => ({ action_id: r.action_id, payload: this.payloads.get(r.action_id) }));
   }
 
   get(id: string) {
@@ -138,7 +150,7 @@ class ActionStore {
     const ids = moved.map((r) => r.action_id);
     const run: SyncRunRow = {
       id: `sync_${String(this.runs.length + 1).padStart(4, "0")}`, direction: "cycle", status: "ok",
-      started_at: at, finished_at: at, exported: ids, applied: ids, fake_core: true, errors: [],
+      started_at: at, finished_at: at, exported: ids, applied: ids, rejected: [], fake_core: true, errors: [],
     };
     this.runs.unshift(run);
     return run;
@@ -152,6 +164,78 @@ interface DecisionItem {
   decision: string;
   approved_quantity?: number;
   reason?: string;
+}
+
+/** `items` of a decision: a non-empty list of objects, one per intervention (as the API). */
+function decisionItems(raw: unknown): { items: DecisionItem[] } | { code: string; message: string } {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return { code: "ITEMS_REQUIRED", message: "`items` phải là danh sách không rỗng" };
+  }
+  const seen = new Set<string>();
+  for (const [i, item] of raw.entries()) {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) {
+      return { code: "BAD_ITEM", message: `items[${i}] phải là một đối tượng` };
+    }
+    const id = (item as { intervention_id?: unknown }).intervention_id;
+    if (typeof id !== "string" || !id) return { code: "BAD_ITEM", message: `items[${i}] thiếu intervention_id` };
+    if (seen.has(id)) {
+      return { code: "DUPLICATE_INTERVENTION", message: `can thiệp ${id} xuất hiện hai lần trong cùng một quyết định` };
+    }
+    seen.add(id);
+  }
+  return { items: raw as DecisionItem[] };
+}
+
+/** intervention_id → (action, item) over decisions the core has not refused. */
+function decidedItems(rows: Array<{ action_id: string; payload: unknown }>) {
+  const out = new Map<string, { action_id: string; item: DecisionItem }>();
+  for (const r of rows) {
+    const items = (r.payload as { items?: DecisionItem[] } | null)?.items ?? [];
+    for (const item of items) if (!out.has(item.intervention_id)) out.set(item.intervention_id, { action_id: r.action_id, item });
+  }
+  return out;
+}
+
+const BUDGET_COLUMNS = {
+  usd: ["estimated_usd", "measured_usd"],
+  human_minutes: ["estimated_human_minutes", "measured_human_minutes"],
+  gpu_hours: ["estimated_gpu_hours", "measured_gpu_hours"],
+} as const;
+
+/**
+ * BR-07 against everything already committed (as web/api/app.py br07_overrun):
+ * spent, approved but not yet spent, decided but not yet reflected, and this request.
+ */
+function br07Overrun(rec: Recommendation, decided: DecisionItem[], items: DecisionItem[]): string | null {
+  const known = new Map(rec.interventions.map((iv) => [iv.id, iv]));
+  const share = (iv: InterventionRow, quantity: number, column: (typeof BUDGET_COLUMNS)[keyof typeof BUDGET_COLUMNS][0]) =>
+    ((iv[column] ?? 0) * quantity) / iv.target_quantity;
+  const approvals = (rows: DecisionItem[], column: (typeof BUDGET_COLUMNS)[keyof typeof BUDGET_COLUMNS][0]) => {
+    let total = 0;
+    for (const item of rows) {
+      const iv = known.get(item.intervention_id);
+      if (!iv || item.decision === "REJECT" || iv.status !== "PROPOSED") continue;
+      const qty = item.decision === "APPROVE_EDITED" ? Number(item.approved_quantity) : iv.target_quantity;
+      total += share(iv, qty, column);
+    }
+    return total;
+  };
+  const r2 = (v: number) => Math.round(v * 100) / 100;
+  for (const line of rec.budget) {
+    const [estimate, measured] = BUDGET_COLUMNS[line.resource];
+    let committed = 0;
+    for (const iv of rec.interventions) {
+      if (iv.status !== "APPROVED" && iv.status !== "IN_PROGRESS") continue;
+      committed += Math.max(0, share(iv, iv.approved_quantity ?? iv.target_quantity, estimate) - (iv[measured] ?? 0));
+    }
+    const waiting = approvals(decided, estimate);
+    const asked = approvals(items, estimate);
+    if (line.used + committed + waiting + asked > line.cap + 1e-9) {
+      return `vượt trần ${line.resource}: đã chi ${r2(line.used)}, đã duyệt chưa chi ${r2(committed + waiting)}, `
+        + `lần này ${r2(asked)}, trần ${line.cap}`;
+    }
+  }
+  return null;
 }
 
 const CHAT_SCREENS = ["M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10"];
@@ -419,13 +503,20 @@ export function createHandlers(views = new MockViews(loadMockData())) {
     http.post(url("/recommendations/:id/decision"), async ({ params, request }) => {
       const key = request.headers.get("idempotency-key");
       if (!key) return error(400, "IDEMPOTENCY_KEY_REQUIRED", "thiếu header Idempotency-Key (§7.3)");
+      // C16: the same click retried gets its action back before any state check.
+      const previous = actions.findByKey(key);
+      if (previous) return accepted(previous);
       const rec = views.recommendation(String(params.id));
       if (!rec) return notFound("đề xuất");
-      const body = (await request.json()) as { items?: DecisionItem[] };
-      const items = body.items ?? [];
+      const body = (await request.json()) as { items?: unknown };
+      const parsed = decisionItems(body.items);
+      if ("code" in parsed) return error(422, parsed.code, parsed.message);
+      const items = parsed.items;
       const known = new Map(rec.interventions.map((iv) => [iv.id, iv]));
+      const decided = decidedItems(actions.live("RECOMMENDATION_DECISION", rec.id));
       for (const item of items) {
-        if (!known.has(item.intervention_id)) {
+        const iv = known.get(item.intervention_id);
+        if (!iv) {
           return error(422, "UNKNOWN_INTERVENTION", `can thiệp ${item.intervention_id} không thuộc đề xuất này`);
         }
         if (!(interventionDecision as readonly string[]).includes(item.decision)) {
@@ -437,26 +528,21 @@ export function createHandlers(views = new MockViews(loadMockData())) {
         if (item.decision === "APPROVE_EDITED" && !(Number(item.approved_quantity) > 0)) {
           return error(422, "QUANTITY_REQUIRED", "duyệt có sửa phải có số lượng > 0");
         }
-      }
-      // BR-07: approval may not push any of the three ceilings below zero.
-      const used = new Map(rec.budget.map((b) => [b.resource, b.used]));
-      const approved = { usd: 0, human_minutes: 0, gpu_hours: 0 };
-      for (const item of items) {
-        if (item.decision === "REJECT") continue;
-        const iv = known.get(item.intervention_id);
-        if (!iv) continue;
-        const qty = item.decision === "APPROVE_EDITED" ? Number(item.approved_quantity) : iv.target_quantity;
-        const f = qty / iv.target_quantity;
-        approved.usd += iv.estimated_usd * f;
-        approved.human_minutes += iv.estimated_human_minutes * f;
-        approved.gpu_hours += iv.estimated_gpu_hours * f;
-      }
-      for (const line of rec.budget) {
-        if ((used.get(line.resource) ?? 0) + approved[line.resource] > line.cap + 1e-9) {
-          return error(422, "BR-07", `vượt trần ${line.resource}`, "giảm số lượng hoặc từ chối bớt can thiệp");
+        if (iv.status !== "PROPOSED") {
+          return error(409, "NOT_PROPOSED",
+            `can thiệp ${iv.id} đang ${iv.status}; chỉ quyết định được can thiệp còn PROPOSED`);
+        }
+        const earlier = decided.get(iv.id);
+        if (earlier) {
+          return error(409, "ALREADY_DECIDED",
+            `can thiệp ${iv.id} đã có quyết định ${earlier.action_id} chưa phản ánh vào đề xuất`,
+            "đợi lõi áp dụng quyết định trước rồi xem lại");
         }
       }
-      const row = actions.record(key, "RECOMMENDATION_DECISION", "flywheel_recommendations", rec.id, null);
+      const over = br07Overrun(rec, [...decided.values()].map((d) => d.item), items);
+      if (over) return error(422, "BR-07", over, "giảm số lượng hoặc từ chối bớt can thiệp");
+      const row = actions.record(key, "RECOMMENDATION_DECISION", "flywheel_recommendations", rec.id, null,
+        { items });
       return accepted(row);
     }),
 

@@ -17,8 +17,13 @@ import type {
   SensitivityRow,
 } from "../api/types";
 import { dataBudgetDiagnosis } from "../contracts/enums";
+import { DEMO_DAY, server } from "../test/setup";
 import { loadMockData } from "./data";
+import { createHandlers } from "./handlers";
 import { MockViews } from "./views";
+
+/** Handlers with an empty action store, for tests whose answer depends on earlier decisions. */
+const freshActions = () => server.use(...createHandlers(new MockViews(loadMockData(), () => DEMO_DAY)));
 
 const get = async <T>(path: string, role?: string) => {
   const response = await fetch(`/api${path}`, role ? { headers: { "X-Fw-Role": role } } : {});
@@ -117,6 +122,7 @@ describe("M7 · write actions", () => {
   });
 
   it("refuses an edit or rejection without a reason, and an approval over a ceiling (BR-07)", async () => {
+    freshActions();
     const noReason = await post<ApiError>("/recommendations/rec_round1/decision",
       { items: [{ intervention_id: "iv_2", decision: "REJECT" }] }, "k-2");
     expect(noReason.status).toBe(422);
@@ -126,6 +132,39 @@ describe("M7 · write actions", () => {
       "k-3");
     expect(over.status).toBe(422);
     expect(over.body.code).toBe("BR-07");
+  });
+
+  it("counts an earlier approval against the ceiling and refuses deciding twice", async () => {
+    freshActions();
+    // iv_2 at 30 episodes is $240, iv_3 at 20 is $160: each fits $400, both do not.
+    const first = await post<ActionAccepted>("/recommendations/rec_round1/decision",
+      { items: [{ intervention_id: "iv_2", decision: "APPROVE_EDITED", approved_quantity: 30, reason: "x" }] },
+      "k-30");
+    expect(first.status).toBe(202);
+    const second = await post<ApiError>("/recommendations/rec_round1/decision",
+      { items: [{ intervention_id: "iv_3", decision: "APPROVE_EDITED", approved_quantity: 20, reason: "x" }] },
+      "k-31");
+    expect(second.status).toBe(422);
+    expect(second.body.code).toBe("BR-07");
+    expect(second.body.message).toContain("đã duyệt chưa chi 240");
+    const again = await post<ApiError>("/recommendations/rec_round1/decision",
+      { items: [{ intervention_id: "iv_2", decision: "REJECT", reason: "đổi ý" }] }, "k-32");
+    expect(again.status).toBe(409);
+    expect(again.body.code).toBe("ALREADY_DECIDED");
+    const retry = await post<ActionAccepted>("/recommendations/rec_round1/decision", {}, "k-30");
+    expect(retry.body.action_id).toBe(first.body.action_id);
+  });
+
+  it("refuses items that are empty, not objects or repeated", async () => {
+    freshActions();
+    const send = (items: unknown, key: string) =>
+      post<ApiError>("/recommendations/rec_round1/decision", { items }, key);
+    expect((await send([], "k-40")).body.code).toBe("ITEMS_REQUIRED");
+    expect((await send(["iv_3"], "k-41")).body.code).toBe("BAD_ITEM");
+    const twice = await send([{ intervention_id: "iv_3", decision: "APPROVE" },
+      { intervention_id: "iv_3", decision: "REJECT", reason: "x" }], "k-42");
+    expect(twice.status).toBe(422);
+    expect(twice.body.code).toBe("DUPLICATE_INTERVENTION");
   });
 
   it("refuses a diagnosis override without a reason", async () => {
@@ -207,8 +246,21 @@ describe("M9 and M8", () => {
     const rows = (await get<SensitivityRow[]>("/cost/sensitivity")).body;
     expect(rows).toHaveLength(4);
     const base = rows.find((r) => r.price_book_name === "pitch_v10");
+    // Each job once: its measured rows, or its estimate while nothing measures it.
     const ledger = loadMockData().ledger;
-    const booked = ledger.reduce((a, l) => a + (l.measured_usd ?? l.estimated_usd ?? 0), 0);
+    const measured = ledger.filter((l) => l.measure_kind === "measured");
+    const answered = new Set(measured.map((l) => l.estimate_entry_ref));
+    const open = ledger.filter((l) => l.measure_kind === "estimated" && !answered.has(l.entry_ref));
+    const booked = [...measured, ...open].reduce((a, l) => a + l.usd_amount, 0);
     expect(base?.total_usd).toBeCloseTo(booked, 2);
+  });
+
+  it("pairs each measured job with its estimate for the forecast error", async () => {
+    const c = (await get<CostByBranch>("/cost/by-branch")).body;
+    const a = c.rows.find((r) => r.branch === "A");
+    // Train A: estimate 8 h, measured 10 h, a duplicate measurement and its reversal net out.
+    expect(a?.forecast_pairs).toBe(1);
+    expect(a?.estimated_usd).toBe(16);
+    expect(a?.usd_forecast_error).toBe(4);
   });
 });

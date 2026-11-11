@@ -397,7 +397,7 @@ def test_verify_reports_a_mismatch_and_does_not_fix_it(source: Path) -> None:
 
     assert result.status == "partial"
     mismatch = next(error for error in result.errors if error["table"] == "episodes")
-    assert "nguồn có 1 dòng, đã nạp 0" in mismatch["message"]
+    assert "nguồn sinh 1 dòng, đã nạp 0" in mismatch["message"]
 
 
 def test_verify_is_quiet_when_the_counts_agree(source: Path) -> None:
@@ -494,7 +494,9 @@ LEDGER_ENTRY: dict[str, Any] = {
     "quantity": 30,
     "unit": "minute",
     "price_book_name": "pitch_v10",
-    "measured_usd": 25.0,
+    "measure_kind": "estimated",
+    "estimate_entry_ref": None,
+    "usd_amount": 25.0,
     "dataset_code": "ds_psi_teleop",
 }
 
@@ -506,12 +508,12 @@ def test_a_ledger_entry_is_never_updated_by_a_reimport(source: Path, tmp_path: P
     _write_jsonl(source / "ledger.jsonl", [LEDGER_ENTRY])
     sink = JsonlSink(directory=tmp_path / "sink")
     run_import(source, sink)
-    _write_jsonl(source / "ledger.jsonl", [{**LEDGER_ENTRY, "measured_usd": 999.0}])
+    _write_jsonl(source / "ledger.jsonl", [{**LEDGER_ENTRY, "usd_amount": 999.0}])
     run_import(source, sink)
 
     rows = _rows(sink.directory, "cost_ledger_entries")
     assert len(rows) == 1
-    assert rows[0]["measured_usd"] == 25.0
+    assert rows[0]["usd_amount"] == 25.0
     assert sink.counts()["cost_ledger_entries"]["updated"] == 0
 
 

@@ -59,6 +59,11 @@ def main(argv: list[str] | None = None) -> int:
         if result.status != "ok":
             print(f"fwsync import: {result.status}, {len(result.errors)} dòng bị từ chối",
                   file=sys.stderr)
+            for error in result.errors[:10]:
+                print(f"  {error['table']} {error['ref']}: {error['message']}", file=sys.stderr)
+        # A rejected row is reported, not a reason to keep the whole web down:
+        # only an import that loaded nothing stops here.
+        if result.status == "failed":
             return 1
     if not args.sink.is_dir():
         print(f"không thấy sink `{args.sink}`; chạy `fwsync import --out {args.sink}` trước "
