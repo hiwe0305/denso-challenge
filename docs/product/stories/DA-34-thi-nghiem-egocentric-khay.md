@@ -77,7 +77,11 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
 - [ ] 6. Cặp 60k trên cut ALL có vùng đích: VLM sau stage 1 (`B_ALL`) so với VLM của C (`C_ALL`), mục tiêu thành công ≥ 80 % (AC 5; Hiếu 11/11/2026 qua phiên điều phối, tray.md mục 19). Phụ thuộc W1 (DA-33: vẽ vùng đích, sinh lại hai kho, cut ALL) và W2 (DA-30: stage 1 trên `egx_7b43c30dc5d88cd7`)
   - [x] 6.1 RunPlan cặp nháp `he-tray-pair60k.yaml` (schema `pairplan`: một cut, một recipe 60 000 bước, một seed, một file stats; hai nhánh chỉ khác cha), chỗ trống của W1 và W2 để `null`, luật đọc 19.2 ghim `rules_sha256` trước mọi lượt chạy; số epoch; ngân sách và dòng `estimated`; `place_error --curve` cho luật (c)
   - [ ] 6.2 Khi W1, W2 xong: điền ghim, Hiếu duyệt 19.2, `Decision` nháp, bỏ `draft`, chọn plan 60k hay dự phòng, `pairplan freeze`
-  - [ ] 6.3 Mã chạy cho cả bốn nhánh: `colab_train` theo `data` của nhánh (cut ALL hay tập con S70), nối hai phần thành cut ALL, cắt S70 đúng danh sách đã ghim kèm stats của ALL, server eval trên Colab cho làn 2–4, runbook một đợt `cu_watch` nhiều phiên và đường lùi hai đợt
+  - [x] 6.3 Mã chạy cho cả bốn nhánh: `colab_train` theo `data` của nhánh (cut ALL hay tập con S70), nối hai phần thành cut ALL, cắt S70 đúng danh sách đã ghim kèm stats của ALL, server eval trên Colab cho làn 2–4, runbook một đợt `cu_watch` nhiều phiên và đường lùi hai đợt. Xong 11/11/2026, chưa chạy (tray.md 19.9):
+    - `pair_cut`: S70 theo seed của chính episode, stats của ALL; kiểm trên `meta/` thật của ALL: 301 + 124 episode, 603 915 frame.
+    - `colab_train --branch B_ALL|C_ALL|B_70|C_70`: dữ liệu lấy từ Drive và được kiểm trước mọi bước cài.
+    - `colab_serve`: kiểm sha256 và bounds của stats ALL.
+    - Cut ALL đã có từ W1. S70 dựng và tar đưa lên Drive lúc launch. `PAIR_FROZEN` đặt sau 6.2
   - [ ] 6.4 Bốn run stage 3 trên Colab A100 (Hiếu launch), dòng thực đo
   - [ ] 6.5 Eval giai đoạn 1 ở 40k (đọc sớm) và 60k (số chính) của cả bốn run, đọc theo 19.2, chạy `evidence`, điền `Decision`
   - [x] 6.6 Hạn mới (Hiếu 11/11/2026 01:50: số trong ngày 12/11): hai run song song, `ckpt_40000` đọc sớm, 60k là số chính (luật e); plan dự phòng `he-tray-pair40k-seq.yaml` (lần lượt, 40 000 bước); lịch, ba phương án eval, ngân sách và số dư cần mua (tray.md 19.5); gói bằng chứng `evidence` một lệnh (19.6)
@@ -136,6 +140,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 11/11/2026 | W1 xong (qua phiên điều phối): thêm và làm 6.11 | Claude cho Hiếu |
 | 11/11/2026 | Cảnh báo CUDA 13.0 trên VM Colab (qua phiên điều phối): thêm và làm 6.12 | Claude cho Hiếu |
 | 11/11/2026 | W2 xong (qua phiên điều phối): thêm và làm 6.13 | Claude cho Hiếu |
+| 11/11/2026 | Phiên điều phối: làm 6.3 trên nhánh riêng `DA-34-pair60k-runner`, mở PR sau khi #181 merge | Claude cho Hiếu |
 
 ## Ghi chép khi làm
 
