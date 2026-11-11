@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "flywheel-console"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["numpy", "opencv-python-headless>=4.10", "pyarrow", "pyyaml", "typer"]
+
+[project.entry-points."flywheel.commands"]
+console = "flywheel.console.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/flywheel"]

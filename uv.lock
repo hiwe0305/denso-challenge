@@ -24,6 +24,7 @@ resolution-markers = [
 members = [
     "denso-humanoid-data-flywheel",
     "flywheel-cli",
+    "flywheel-console",
     "flywheel-contracts",
     "flywheel-data",
     "flywheel-eval",
@@ -149,6 +150,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "flywheel-cli" },
+    { name = "flywheel-console" },
     { name = "flywheel-contracts" },
     { name = "flywheel-data", extra = ["egocentric"] },
     { name = "flywheel-eval" },
@@ -173,6 +175,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "flywheel-cli", editable = "packages/flywheel-cli" },
+    { name = "flywheel-console", editable = "packages/flywheel-console" },
     { name = "flywheel-contracts", editable = "packages/flywheel-contracts" },
     { name = "flywheel-data", extras = ["egocentric"], editable = "packages/flywheel-data" },
     { name = "flywheel-eval", extras = ["agentqa"], editable = "packages/flywheel-eval" },
@@ -299,6 +302,30 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "typer" }]
+
+[[package]]
+name = "flywheel-console"
+version = "0.1.0"
+source = { editable = "packages/flywheel-console" }
+dependencies = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
+    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "opencv-python-headless" },
+    { name = "pyarrow", version = "25.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "pyarrow", version = "26.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pyyaml" },
+    { name = "typer" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "numpy" },
+    { name = "opencv-python-headless", specifier = ">=4.10" },
+    { name = "pyarrow" },
+    { name = "pyyaml" },
+    { name = "typer" },
+]
 
 [[package]]
 name = "flywheel-contracts"

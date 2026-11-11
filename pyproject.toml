@@ -2,7 +2,7 @@
 name = "denso-humanoid-data-flywheel"
 version = "0.1.0"
 requires-python = ">=3.10"
-dependencies = ["flywheel-contracts", "flywheel-store", "flywheel-testkit", "flywheel-cli", "flywheel-data[egocentric]", "flywheel-eval[agentqa]", "flywheel-loop", "flywheel-simple", "flywheel-psi0"]
+dependencies = ["flywheel-contracts", "flywheel-store", "flywheel-testkit", "flywheel-cli", "flywheel-data[egocentric]", "flywheel-eval[agentqa]", "flywheel-loop", "flywheel-console", "flywheel-simple", "flywheel-psi0"]
 
 [tool.uv]
 package = false
@@ -15,6 +15,7 @@ flywheel-cli = { workspace = true }
 flywheel-data = { workspace = true }
 flywheel-eval = { workspace = true }
 flywheel-loop = { workspace = true }
+flywheel-console = { workspace = true }
 flywheel-simple = { workspace = true }
 flywheel-psi0 = { workspace = true }
 
@@ -36,7 +37,7 @@ select = ["E", "F", "I", "UP"]
 python_version = "3.10"
 strict = true
 explicit_package_bases = true
-mypy_path = ["packages/flywheel-contracts/src", "packages/flywheel-testkit/src", "packages/flywheel-cli/src", "packages/flywheel-store/src", "packages/flywheel-data/src", "packages/flywheel-eval/src", "packages/flywheel-loop/src", "packages/flywheel-simple/src", "packages/flywheel-psi0/src"]
+mypy_path = ["packages/flywheel-contracts/src", "packages/flywheel-testkit/src", "packages/flywheel-cli/src", "packages/flywheel-store/src", "packages/flywheel-data/src", "packages/flywheel-eval/src", "packages/flywheel-loop/src", "packages/flywheel-console/src", "packages/flywheel-simple/src", "packages/flywheel-psi0/src"]
 
 # h5py ships no type stubs (egocentric extra, DA-04 and DA-18).
 [[tool.mypy.overrides]]
@@ -68,3 +69,9 @@ name = "Lanes independent of adapters and runtimes"
 type = "forbidden"
 source_modules = ["flywheel.data", "flywheel.eval", "flywheel.loop"]
 forbidden_modules = ["flywheel_simple", "flywheel_psi0", "flywheel_lerobot", "flywheel_nim", "mujoco", "torch", "lerobot", "simple", "psi0", "isaacsim"]
+
+[[tool.importlinter.contracts]]
+name = "Console reads files, never lanes or adapters"
+type = "forbidden"
+source_modules = ["flywheel.console"]
+forbidden_modules = ["flywheel.data", "flywheel.eval", "flywheel.loop", "flywheel.cli", "flywheel_simple", "flywheel_psi0", "torch", "mujoco", "lerobot", "isaacsim"]
