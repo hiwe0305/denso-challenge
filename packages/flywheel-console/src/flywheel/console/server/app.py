@@ -26,6 +26,11 @@ MAX_UPLOAD = 8 << 30
 _lock = threading.Lock()
 
 
+def _chat_missing(e: ModuleNotFoundError) -> bool:
+    """True only when the missing module is a ``flywheel.console.chat`` one."""
+    return (e.name or "").startswith("flywheel.console.chat")
+
+
 def _chat(mod: str) -> Any:
     """Lazy import of ``flywheel.console.chat.<mod>`` (Task 6 module; absent until it lands)."""
     return importlib.import_module(f"flywheel.console.chat.{mod}")
@@ -115,9 +120,11 @@ class Handler(BaseHTTPRequestHandler):
                 runner.TUNNEL.ensure(15)
                 return self.jok(runner.models_info())
             return self.jerr(404, "unknown api")
-        except ModuleNotFoundError:
-            return self.jerr(503, "chat module not available")
-        except KeyError:
+        except ModuleNotFoundError as e:
+            if _chat_missing(e):
+                return self.jerr(503, "chat module not available")
+            return self.jerr(500, str(e))
+        except runner.NotFound:
             return self.jerr(404, "not found")
         except ValueError as e:
             return self.jerr(400, str(e))
@@ -133,8 +140,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Accel-Buffering", "no")
         self.send_header("Connection", "close")
         self.end_headers()
-        gen = llm.stream(body)
+        gen = None
         try:
+            gen = llm.stream(body)
             for chunk in gen:
                 self.wfile.write(chunk)
                 self.wfile.flush()
@@ -221,7 +229,7 @@ class Handler(BaseHTTPRequestHandler):
             ds, _, rest = up[len("/media/") :].partition("/")
             try:
                 return _safe_join(media.media_root(ds), rest)
-            except KeyError:
+            except runner.NotFound:
                 return None
         for pre, root in mounts:
             if up.startswith(pre):
@@ -299,11 +307,13 @@ class Handler(BaseHTTPRequestHandler):
             if u.path in ("/api/episode", "/api/strip"):
                 return self.api_robot(u.path, q)
             return self.jerr(404, "unknown api")
-        except ModuleNotFoundError:
-            return self.jerr(503, "chat module not available")
+        except ModuleNotFoundError as e:
+            if _chat_missing(e):
+                return self.jerr(503, "chat module not available")
+            return self.jerr(500, str(e))
         except FileNotFoundError:
             return self.jerr(404, "episode not on disk")
-        except KeyError:
+        except runner.NotFound:
             return self.jerr(404, "not found")
         except (ValueError, OSError) as e:
             return self.jerr(400, str(e))
@@ -347,7 +357,9 @@ class Handler(BaseHTTPRequestHandler):
             d = runner.models_info()
             try:
                 d["nemotron"] = _chat("llm").nemotron_status()
-            except ModuleNotFoundError:
+            except ModuleNotFoundError as e:
+                if not _chat_missing(e):
+                    raise
                 d["nemotron"] = "down"
             self.jok(d)
         elif path == "/api/work_episodes":
@@ -355,14 +367,14 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/poster":
             try:
                 jpg = media.poster_jpeg(arg("work"), arg("ep"), int(arg("w", "320")))
-            except KeyError:
+            except runner.NotFound:
                 self.jerr(404, "no deid video for this episode")
                 return True
             self.send_bytes(jpg, ctype="image/jpeg")
         elif path == "/api/ego_strip":
             try:
                 jpg = media.ego_strip_jpeg(arg("work"), arg("ep"), int(arg("n", "8")))
-            except KeyError:
+            except runner.NotFound:
                 self.jerr(404, "no deid video for this episode")
                 return True
             self.send_bytes(jpg, ctype="image/jpeg")

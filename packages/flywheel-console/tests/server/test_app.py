@@ -249,13 +249,22 @@ def _stub(monkeypatch: pytest.MonkeyPatch, name: str, **attrs: Any) -> None:
     monkeypatch.setitem(sys.modules, m.__name__, m)
 
 
-def test_chat_routes_use_lazy_modules(srv: Srv, monkeypatch: pytest.MonkeyPatch) -> None:
-    sys.modules.pop("flywheel.console.chat.llm", None)
-    sys.modules.pop("flywheel.console.chat.registry", None)
-    st, b = srv.get("/api/models")
-    assert st == 200 and json.loads(b)["nemotron"] == "down"
-    assert srv.get("/api/tools")[0] == 503
+def _no_chat(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make every ``flywheel.console.chat.*`` import fail as if the module were absent."""
 
+    def missing(name: str) -> Any:
+        raise ModuleNotFoundError(f"No module named 'flywheel.console.chat.{name}'",
+                                  name=f"flywheel.console.chat.{name}")  # fmt: skip
+
+    monkeypatch.setattr(app, "_chat", missing)
+
+
+def test_chat_routes_use_lazy_modules(srv: Srv, monkeypatch: pytest.MonkeyPatch) -> None:
+    with monkeypatch.context() as m:
+        _no_chat(m)
+        assert json.loads(srv.get("/api/models")[1])["nemotron"] == "down"
+        assert srv.get("/api/tools")[0] == 503
+    st, b = srv.get("/api/models")
     seen: dict[str, Any] = {}
 
     def stream(body: dict[str, Any]) -> Iterator[bytes]:
@@ -288,3 +297,47 @@ def test_chat_routes_use_lazy_modules(srv: Srv, monkeypatch: pytest.MonkeyPatch)
     assert st == 200 and hd["content-type"].startswith("text/event-stream")
     assert b == b"event: token\ndata: {}\n\nevent: done\ndata: {}\n\n"
     assert seen["body"] == {"messages": []}
+
+
+def test_missing_chat_module_is_503_other_import_errors_are_500(
+    srv: Srv, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with monkeypatch.context() as m:
+        _no_chat(m)
+        assert srv.get("/api/tools")[0] == 503
+        assert srv.post("/api/models/prewarm", {})[0] == 503
+
+    def broken(name: str) -> Any:
+        raise ModuleNotFoundError("No module named 'numpyy'", name="numpyy")
+
+    monkeypatch.setattr(app, "_chat", broken)
+    assert srv.get("/api/tools")[0] == 500
+    assert srv.get("/api/models")[0] == 500
+    assert srv.post("/api/models/prewarm", {})[0] == 500
+
+
+def test_unexpected_key_error_is_500_not_404(srv: Srv, monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom() -> Any:
+        raise KeyError("runner bug")
+
+    monkeypatch.setattr(app.runner, "list_works", boom)
+    assert srv.get("/api/works")[0] == 500
+    with monkeypatch.context() as m:
+        m.setattr(app.runner, "cancel", lambda jid: boom())
+        assert srv.post("/api/jobs/j-1/cancel", {})[0] == 500
+    assert srv.get("/api/jobs/nope/log")[0] == 404
+    assert srv.post("/api/jobs/nope/cancel", {})[0] == 404
+
+
+def test_chat_stream_failing_before_first_chunk_sends_error_event(
+    srv: Srv, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def stream(body: dict[str, Any]) -> Iterator[bytes]:
+        raise RuntimeError("no model")
+
+    _stub(monkeypatch, "llm", stream=stream)
+    h = {"Origin": f"http://127.0.0.1:{srv.port}"}
+    st, hd, b = srv.req("POST", "/api/chat", b'{"messages":[]}', h)
+    assert st == 200 and hd["content-type"].startswith("text/event-stream")
+    assert b.startswith(b"event: error\n") and b"no model" in b
+    assert b.count(b"HTTP/") == 0

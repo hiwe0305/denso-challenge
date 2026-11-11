@@ -16,6 +16,7 @@ from typing import Any
 
 from flywheel.console.index import posters
 from flywheel.console.paths import PathDenied, active, deid_only, guard
+from flywheel.console.server.runner import NotFound
 
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,80}$")
 _lock = threading.Lock()
@@ -77,13 +78,13 @@ def ego_viewer_dir() -> Path | None:
 
 
 def lerobot_dir(ds: str) -> Path:
-    """LeRobot folder of dataset ``ds``; ``KeyError`` when the id has no ``lerobot`` field."""
+    """LeRobot folder of dataset ``ds``; ``NotFound`` when the id has no ``lerobot`` field."""
     for r in seed_rows():
         if str(r.get("id")) == ds and r.get("lerobot"):
             p = active().fw_root / str(r["lerobot"])
             if _allowed(p):
                 return p
-    raise KeyError(ds)
+    raise NotFound(ds)
 
 
 def media_root(ds: str) -> Path:
@@ -96,7 +97,7 @@ def work_dir(work: str) -> Path:
         raise ValueError("bad work name")
     d = active().fw_root / "pipeline" / work
     if not _allowed(d) or not (d / "egocentric").is_dir():
-        raise KeyError(work)
+        raise NotFound(work)
     return d
 
 
@@ -109,8 +110,9 @@ def deid_path(d: Path, ep: str) -> Path | None:
         return None
     p = Path(b["mp4"])
     try:
-        deid_only(p)
-    except PathDenied:
+        # judge the resolved file: a ``*.deid.mp4`` symlink to a raw clip must not pass
+        deid_only(guard(p, [active().fw_root]))
+    except (PathDenied, OSError, ValueError):
         return None
     return p if _allowed(p) and p.is_file() else None
 
@@ -133,7 +135,7 @@ def work_episodes(work: str) -> list[dict[str, Any]]:
 def episode_video(work: str, ep: str) -> Path:
     """De-identified video of an episode, for a pipeline work dir or a viewer dataset id.
 
-    ``KeyError`` (404) when there is none. Pipeline: the ``mp4`` of ``bundle.json`` when it is a
+    ``NotFound`` (404) when there is none. Pipeline: the ``mp4`` of ``bundle.json`` when it is a
     ``*.deid.mp4``. Viewer row: ``<ego_viewer>/media/<ep>.mp4`` (the Human-1M export, built
     from de-identified clips only).
     """
@@ -141,7 +143,7 @@ def episode_video(work: str, ep: str) -> Path:
         raise ValueError("bad work or episode id")
     try:
         vp = deid_path(work_dir(work), ep)
-    except KeyError:
+    except NotFound:
         vp = None
         for r in seed_rows():
             if str(r.get("id")) == work and r.get("ego_viewer"):
@@ -150,7 +152,7 @@ def episode_video(work: str, ep: str) -> Path:
                     vp = p
                 break
     if vp is None:
-        raise KeyError("no deid video")
+        raise NotFound("no deid video")
     return vp
 
 
@@ -171,7 +173,7 @@ def _write(cf: Path, body: bytes) -> None:
 
 
 def poster_jpeg(work: str, ep: str, w: int = 320) -> bytes:
-    """Middle-frame JPEG of the episode's de-identified video; ``KeyError`` when none."""
+    """Middle-frame JPEG of the episode's de-identified video; ``NotFound`` when none."""
     vp = episode_video(work, ep)
     w = max(64, min(1280, int(w)))
     cf = _cached(f"{work}_{ep}_{w}.jpg")
@@ -180,13 +182,13 @@ def poster_jpeg(work: str, ep: str, w: int = 320) -> bytes:
     try:
         body = posters.poster_jpeg(vp, w)
     except (FileNotFoundError, ValueError) as e:
-        raise KeyError("unreadable deid video") from e
+        raise NotFound("unreadable deid video") from e
     _write(cf, body)
     return body
 
 
 def ego_strip_jpeg(work: str, ep: str, n: int = 8) -> bytes:
-    """Filmstrip JPEG of ``n`` frames of the de-identified video; ``KeyError`` when none."""
+    """Filmstrip JPEG of ``n`` frames of the de-identified video; ``NotFound`` when none."""
     vp = episode_video(work, ep)
     n = max(2, min(24, int(n)))
     cf = _cached(f"strip_{work}_{ep}_{n}.jpg")
@@ -195,7 +197,7 @@ def ego_strip_jpeg(work: str, ep: str, n: int = 8) -> bytes:
     try:
         body = posters.strip_jpeg(vp, n)
     except (FileNotFoundError, ValueError) as e:
-        raise KeyError("unreadable deid video") from e
+        raise NotFound("unreadable deid video") from e
     _write(cf, body)
     return body
 

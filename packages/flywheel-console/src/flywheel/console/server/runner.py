@@ -33,6 +33,13 @@ AGENT_MODEL = "hf.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB:Q4_K_M"
 AGENT_REVISION = "1db54d5b12533ff1bcaa8e42cf4c667988a1f1be"
 
 MAX_SLOTS = 2
+_atexit_done = False
+
+
+class NotFound(LookupError):
+    """A requested job, work or episode does not exist (the server maps it to HTTP 404)."""
+
+
 _slots = threading.BoundedSemaphore(MAX_SLOTS)
 _model_lock = threading.Lock()
 _lock = threading.RLock()
@@ -544,6 +551,8 @@ def plan(kind: str, p: dict[str, Any] | None, job_id: str) -> dict[str, Any]:
         d = under(p.get("path") or "", fwr)
         if not d.is_dir():
             raise ValueError("not a folder")
+        if "console" in d.relative_to(fwr.resolve()).parts:
+            raise ValueError("the console's own folder is not exportable")
         return {"argv": ["python:export.zip", str(d)], "outputs": {"dir": str(d)}, "python": True}
     if kind == "agentqa.run":
         inp = under(p.get("input") or "", fwr)
@@ -830,8 +839,13 @@ ZIP_SKIP_DIRS = {
 }
 
 
+def _skip_dir(name: str) -> bool:
+    """Directories an export never enters: the vault, holdouts, hidden dirs, the console's own."""
+    return _hidden(name) or name == "console" or name in ZIP_SKIP_DIRS
+
+
 def run_python(job: dict[str, Any], rt: dict[str, Any]) -> str:
-    d = Path(job["params"]["path"])
+    d = Path(job["outputs"]["dir"])  # the path plan() resolved and checked, never the raw param
     exports_dir().mkdir(parents=True, exist_ok=True)
     stem = re.sub(r"[^A-Za-z0-9_.-]", "_", d.name)[:60]
     name = "{}-{}.zip".format(stem, datetime.now().strftime("%Y%m%d-%H%M%S"))
@@ -839,7 +853,7 @@ def run_python(job: dict[str, Any], rt: dict[str, Any]) -> str:
     n = tot = 0
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         for dp, dns, fns in os.walk(d):
-            dns[:] = [x for x in dns if x not in ZIP_SKIP_DIRS and "holdout" not in x.lower()]
+            dns[:] = [x for x in dns if not _skip_dir(x)]
             for fn in sorted(fns):
                 fp = Path(dp) / fn
                 if fp.suffix.lower() not in ZIP_EXT or fp.is_symlink():
@@ -1054,7 +1068,7 @@ def list_jobs(limit: int = 100) -> list[dict[str, Any]]:
 def cancel(jid: str) -> dict[str, Any]:
     job = JOBREG.get(jid)
     if not job:
-        raise KeyError(jid)
+        raise NotFound(jid)
     rt = RT[jid]
     rt["cancel"].set()
     child = rt.get("child")
@@ -1068,7 +1082,7 @@ def cancel(jid: str) -> dict[str, Any]:
 def read_log(jid: str, offset: int) -> dict[str, Any]:
     f = jobs_dir() / jid / "log.txt"
     if jid not in JOBREG or not f.exists():
-        raise KeyError(jid)
+        raise NotFound(jid)
     with open(f, "rb") as fh:
         fh.seek(offset)
         b = fh.read(1 << 20)
@@ -1298,7 +1312,8 @@ def status() -> dict[str, Any]:
                           how="Xem trang Vòng lặp")  # fmt: skip
     jobs = list_jobs(10)
     mi = models_info()
-    n_run = sum(1 for j in all_jobs if j["state"] == "running")
+    # an ego.pipeline parent holds no slot; only its child jobs do
+    n_run = sum(1 for j in all_jobs if j["state"] == "running" and j["kind"] != "ego.pipeline")
     keys = ("id", "kind", "stage", "state", "created", "started", "ended", "rc", "chain_id")
     return {
         "time": tm,
@@ -1315,7 +1330,7 @@ def status() -> dict[str, Any]:
 
 def init(paths: ConsolePaths | None = None) -> None:
     """Bind the runner to ``paths``, create its folders, reload the job registry."""
-    global _P
+    global _P, _atexit_done
     _P = paths if paths is not None else active()
     for d in (jobs_dir(), exports_dir(), aqa_dir(), _p().config, _p().uploads):
         d.mkdir(parents=True, exist_ok=True)
@@ -1325,7 +1340,9 @@ def init(paths: ConsolePaths | None = None) -> None:
     # port 11435 may already serve Ollama (another server's ssh): reuse it, spawn nothing
     TUNNEL.external = TUNNEL.tags(True) is not None
     load_registry()
-    atexit.register(TUNNEL.close)
+    if not _atexit_done:
+        _atexit_done = True
+        atexit.register(TUNNEL.close)
 
 
 # ------------------------------------------------------------------ folder picker + upload helpers
