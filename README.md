@@ -46,7 +46,7 @@ Lệnh trên in một file cũ ra màn hình. Muốn lấy lại cả thư mục
 uv sync --locked
 uv run fw --version
 uv run ruff check
-uv run mypy -p flywheel.contracts -p flywheel.store -p flywheel.testkit -p flywheel.cli -p flywheel.data -p flywheel.eval -p flywheel.loop -p flywheel_simple -p flywheel_psi0
+uv run mypy -p flywheel.contracts -p flywheel.store -p flywheel.testkit -p flywheel.cli -p flywheel.data -p flywheel.eval -p flywheel.loop -p flywheel.console -p flywheel_simple -p flywheel_psi0
 uv run pytest
 uv run lint-imports
 python scripts/repo/check_links.py
