@@ -97,7 +97,7 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
   - [x] 7.1 RunPlan nháp và luật đọc trước mọi rollout của vòng · **12/11/2026:** `round-tray-c70.yaml` (`draft`, chưa có loader), `round-c70-rollouts.jsonl` (60 lượt, sha256 `aff514b5…`), tray.md mục 20, khối `round-c70-rules`; R1–R7 chờ Hiếu
   - [x] 7.2 Bước 4: kiểm H1–H3 (chuỗi bước ở `approach_a`, hết giờ, nghiêng lúc hạ và buông); phiếu cho DA-37 và DA-38 · **12/11/2026:** chỉ đọc trên `rtx3060`, 0 CU (tray.md 20.11). H1: 7/60 lượt gãy ở `approach_a` mà vẫn mang khay, CHƯA RÕ (ngưỡng bộ chấm), phiếu DA-37. H2: τ_track tạm vượt ở 4/6 lượt hết giờ, chủ yếu kênh yaw, nhưng không phân biệt (vượt cả 21/43 lượt lỗi khác); đề xuất đọc là lỗi của policy, chờ Hiếu (R8). H3: thiếu thời điểm lỗi và tiếp xúc, CHƯA RÕ, phiếu DA-38. Hai phiếu soạn sẵn, chưa mở
   - [ ] 7.3 Bước 5, 7, 8 trên các cụm còn lại; evidence card; chọn cụm nhận dữ liệu theo 20.5
-  - [ ] 7.4 Mã: loader và `runplan check`/`freeze` cho plan vòng có cha là nhánh của plan cặp; bản cắt S70 + tập nhắm lỗi; `colab_train --branch C70_R1`; `evidence` đọc (r1), (r2)
+  - [x] 7.4 Mã: loader và `runplan check`/`freeze` cho plan vòng có cha là nhánh của plan cặp; bản cắt S70 + tập nhắm lỗi; `colab_train --branch C70_R1`; `evidence` đọc (r1), (r2) · **12/11/2026:** `pairround.py`, `round_cut.py`, sửa `runplan.py`, `colab_train.py`, `evidence.py`; `round-tray-c70.yaml` đổi theo model, `runplan check` đọc được (nháp, 8 chỗ chờ 7.5). `colab_train --branch C70_R1` chưa chạy được cho tới khi plan đóng băng và Hiếu duyệt (`ROUND_C70_FROZEN`). Bằng chứng: pytest, ruff, mypy, import-linter (thân commit)
   - [ ] 7.5 Sinh, QA, chọn, đóng băng plan vòng (điền `targets`, `rules_sha256`); dòng ước lượng và thực đo
   - [ ] 7.6 Train `C70_R1` (phương án A của 20.6, chờ R4)
   - [ ] 7.7 Eval giai đoạn 1 và đọc theo 20.7
@@ -153,6 +153,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 11/11/2026 | Hiếu "Duyệt 19.2": làm 6.2 (Decision nháp, đóng băng plan bốn run, `PAIR_FROZEN`) | Claude cho Hiếu |
 | 12/11/2026 | Hiếu "Có, soạn RunPlan" (qua phiên điều phối, sau giai đoạn 1 của bốn run): thêm nhiệm vụ 7 và làm 7.1 | Claude cho Hiếu |
 | 12/11/2026 | Hiếu merge #196 và bảo "làm tiếp đi": làm 7.2 (H1–H3) | Claude cho Hiếu |
+| 12/11/2026 | Làm 7.4 (mã của vòng `C70_R1`), cùng đợt "làm tiếp đi" | Claude cho Hiếu |
 
 ## Ghi chép khi làm
 

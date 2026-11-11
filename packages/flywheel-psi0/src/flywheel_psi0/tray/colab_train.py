@@ -54,6 +54,15 @@ subset's list, totals, and ALL's `stats_psi0.json` for both data sizes), all bef
 install. Recipe, override (60 000 steps), train seed and action header are the plan's,
 the same for all four.
 
+Branch C70_R1 (task 7, `--branch C70_R1`) is the Failure -> Data round on C_70
+(`pairround`, `configs/runplans/tray/round-tray-c70.yaml`, docs/he/tray.md 20). It runs
+only once that round is frozen with its targets and rules pinned and its id is set as
+`ROUND_C70_FROZEN` (the approval, as PAIR_FROZEN was for the four runs); until then it
+refuses, whatever the plan file says. Everything but the data is C_70's job: the pair
+plan's recipe, overrides and train seed, C_70's parent. The data is
+`MyDrive/denso/da34/cuts/C70_R1.tar` (`round_cut pack`), S70 then the targeted set with
+ALL's stats, checked by `round_cut.round_problems` before any install.
+
 CUDA toolkit (11/11/2026): the Colab image of that day ships only CUDA 13.0 and no
 `nvcc` on PATH, while Psi0's torch is 2.7.0+cu126. A job that builds a C++/CUDA op at
 run time (DeepSpeed's ZeRO-3 of stage 1) then fails its pre-flight: DeepSpeed's
@@ -95,7 +104,7 @@ from flywheel_psi0.trainer.colab import (
     sh,
 )
 from flywheel_psi0.trainer.recipe import ParentCheckpoint, Psi0Recipe
-from flywheel_psi0.tray import pair_cut
+from flywheel_psi0.tray import pair_cut, pairround, round_cut
 from flywheel_psi0.tray.demo_sets import DemoSets, canonical_sha256
 from flywheel_psi0.tray.pairplan import TrayPairPlan
 from flywheel_psi0.tray.pairplan import check as pair_check
@@ -132,6 +141,11 @@ PAIR_PLAN = "configs/runplans/tray/he-tray-pair60k.yaml"
 # four runs runs any other plan id, whatever the plan file says.
 PAIR_FROZEN: str | None = "rp_e2fb9f62c223"
 PAIR = ("B_ALL", "C_ALL", "B_70", "C_70")  # the branches of PAIR_PLAN, checked on load
+ROUND_C70_PLAN = "configs/runplans/tray/round-tray-c70.yaml"
+# Set to the round's id once Hiếu approves the round (R1-R7 of tray.md 20.9) and it is
+# frozen with its targets (task 7.5); until then no C70_R1 job runs.
+ROUND_C70_FROZEN: str | None = None
+ROUND_C70 = "C70_R1"
 DRIVE = Path("/content/drive/MyDrive")  # `colab drivemount -s <session> /content/drive`
 STAGE1_DIR = "cache/checkpoints/stage1"  # under Psi0, beside the psi-model snapshot
 WEIGHTS = "model.safetensors"  # the one file a stage 1 VLM folder changes
@@ -284,6 +298,28 @@ def load_pair(repo: Path = REPO) -> tuple[TrayPairPlan, str]:
     return plan, PAIR_FROZEN
 
 
+def load_pair_round(repo: Path = REPO) -> tuple[TrayPairPlan, pairround.TrayPairRoundPlan, str]:
+    """The frozen pair plan (all of load_pair's checks), the frozen round on C_70, its id."""
+    path = repo / ROUND_C70_PLAN
+    if not path.is_file():
+        raise SystemExit(f"{ROUND_C70_PLAN} is missing: no C70_R1 job without the round plan")
+    pair, _ = load_pair(repo)
+    plan = pairround.TrayPairRoundPlan.load(path)
+    problems = pairround.check(plan, repo) + pairround.launch_problems(plan, path)
+    if plan.inherits != PAIR_PLAN or plan.branch != ROUND_C70:
+        problems.append(f"{ROUND_C70_PLAN} is not branch {ROUND_C70} of {PAIR_PLAN}")
+    if ROUND_C70_FROZEN is None:
+        problems.append("no round is approved yet: ROUND_C70_FROZEN is unset (tray.md 20.9)")
+    elif run_plan_id(plan) != ROUND_C70_FROZEN:
+        problems.append(
+            f"{ROUND_C70_PLAN} is {run_plan_id(plan)}; only {ROUND_C70_FROZEN} is approved"
+        )
+    if problems:
+        raise SystemExit("round does not hold, no training:\n  " + "\n  ".join(problems))
+    assert ROUND_C70_FROZEN is not None
+    return pair, plan, ROUND_C70_FROZEN
+
+
 def pair_job_id(branch: str, seed: int = 0) -> str:
     """`da34-t6-ft-b-all-s0`: Colab session and run folder; ledger job_da34_ft_B_ALL."""
     return f"da34-t6-ft-{branch.lower().replace('_', '-')}-s{seed}"
@@ -302,9 +338,13 @@ class Job:
     round_plan: TrayRoundPlan | None = None
     plan_branch: str = BRANCH  # the plan's branch whose parent and demo set the job uses
     data_name: str | None = None  # pair runs: the cut (ALL) or the subset (S70) it trains on
+    pair_round: pairround.TrayPairRoundPlan | None = None  # C70_R1: the round on C_70
 
     @property
     def job_id(self) -> str:
+        if self.pair_round is not None:
+            branch = self.branch.lower().replace("_", "-")
+            return f"da34-t7-ft-{branch}-s{self.plan.train_seeds[0]}"
         if self.data_name is not None:
             return pair_job_id(self.branch, self.plan.train_seeds[0])
         if self.branch == BRANCH:
@@ -323,6 +363,9 @@ class Job:
         return work / "sets" / folder / self.plan.task["env_id"].rsplit("/", 1)[-1]
 
     def cut_problems(self, data: Path, repo: Path = REPO) -> list[str]:
+        if self.pair_round is not None:
+            assert isinstance(self.plan, TrayPairPlan)
+            return round_cut.round_problems(data, self.pair_round, self.plan, repo)
         if isinstance(self.plan, TrayPairPlan):
             assert self.data_name is not None
             return pair_cut.cut_problems(data, self.plan, self.data_name, repo)
@@ -380,6 +423,22 @@ def load_job(branch: str = BRANCH, repo: Path = REPO) -> Job:
             "+".join(p.release.id for p in pair.cut.parts if p.release),
             plan_branch=branch,
             data_name=data_name,
+        )
+    if branch == ROUND_C70:
+        pair, pair_round, run_plan = load_pair_round(repo)
+        targets = pair_round.targets
+        assert targets.set_hash is not None and targets.release is not None
+        releases = [p.release.id for p in pair.cut.parts if p.release]
+        return Job(
+            pair,
+            run_plan,
+            ROUND_C70,
+            ROUND_C70,
+            targets.set_hash,
+            "+".join([*releases, targets.release.id]),
+            plan_branch=pair_round.base_branch,
+            data_name=ROUND_C70,
+            pair_round=pair_round,
         )
     raise SystemExit(f"no fine-tune for branch {branch}")
 
@@ -864,7 +923,9 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     parser.add_argument("phase", choices=["setup", "train", "check", "manifest"])
     parser.add_argument("--work", type=Path, default=WORK)
-    parser.add_argument("--branch", choices=[BRANCH, CPLUS, B, *PAIR], default=BRANCH)
+    parser.add_argument(
+        "--branch", choices=[BRANCH, CPLUS, B, *PAIR, ROUND_C70], default=BRANCH
+    )
     parser.add_argument("--folder", type=Path, help="manifest: a stage 1 VLM folder")
     args = parser.parse_args(argv)
     os.environ.setdefault("PYTHONUNBUFFERED", "1")

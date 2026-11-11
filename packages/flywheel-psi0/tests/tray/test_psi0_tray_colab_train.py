@@ -727,3 +727,79 @@ def test_pair_train_uses_the_plans_recipe_steps_and_parent(
         "cache/checkpoints/stage1/vlm-ego"
     )
     assert seen["run_plan_id"] == frozen and seen["nproc_per_node"] == 1
+
+
+ROUND_C70 = "configs/runplans/tray/round-tray-c70.yaml"
+ROUND_RULES = "\n<!-- round-c70-rules -->\n\n(r1) C70_R1 - C_ALL.\n\n<!-- /round-c70-rules -->\n"
+
+
+def _frozen_round(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, str, str]:
+    """The frozen fake pair, and on it a round on C_70 frozen with fake target pins.
+
+    The targeted set's own files are runplan.check_targets' (its own tests); here it is
+    set aside, so the test is about what colab_train asks of the round.
+    """
+    import yaml
+    from flywheel_psi0.tray import pairround
+    from flywheel_psi0.tray.runplan import rules_sha256
+    from test_psi0_tray_pairround import ROWS, _raw, _rows
+
+    stage1, _ = _vlm_folders(tmp_path / "vlm")
+    repo, pair_id, _ = _frozen_pair(tmp_path, stage1)
+    (repo / ROWS).write_text("".join(json.dumps(r) + "\n" for r in _rows()))
+    doc = repo / "docs/he/tray.md"
+    if "<!-- round-c70-rules -->" not in doc.read_text():  # the live tray.md has it since #196
+        doc.write_text(doc.read_text() + ROUND_RULES)
+    pair = yaml.safe_load((repo / PAIR_PLAN).read_text())
+    raw = _raw(repo)
+    raw["status"] = "frozen"
+    raw["train"]["stats_sha256"] = pair["cut"]["stats_sha256"]
+    raw["interpretation"]["rules_sha256"] = rules_sha256(doc.read_text(), "round-c70-rules")
+    pin = {"file": ROWS, "sha256": "0" * 64}
+    raw["targets"].update(
+        seeds=[100001, 100002], set_hash="t" * 64, conditions=pin, selection=pin,
+        release={"id": "tray_s1_r1", "release_hash": "r" * 64, "location": "here",
+                 "data_class": "public"},
+        demo_sets={"file": ROWS, "salt": "s", "hashes": {"T": "t" * 64},
+                   "quality": {**pin, "filter": raw["targets"]["quality_filter"]}},
+        set_name="T",
+    )  # fmt: skip
+    (repo / ROUND_C70).write_text(yaml.safe_dump(raw, allow_unicode=True, sort_keys=False))
+    monkeypatch.setattr(pairround, "check_targets", lambda targets, repo: [])
+    lock = json.loads(pairround.freeze(repo / ROUND_C70, repo).read_text())
+    return repo, pair_id, lock["run_plan_id"]
+
+
+def test_c70_r1_does_not_run_before_the_round_is_approved() -> None:
+    assert colab_train.ROUND_C70_FROZEN is None  # R1-R7 of tray.md 20.9 are open
+    with pytest.raises(SystemExit, match="C70_R1|ROUND_C70_FROZEN"):
+        colab_train.load_job("C70_R1")
+
+
+def test_c70_r1_runs_only_the_approved_frozen_round_as_c70s_job(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, pair_id, round_id = _frozen_round(tmp_path, monkeypatch)
+    monkeypatch.setattr(colab_train, "PAIR_FROZEN", pair_id)
+    with pytest.raises(SystemExit, match="ROUND_C70_FROZEN is unset"):
+        colab_train.load_job("C70_R1", repo)
+    monkeypatch.setattr(colab_train, "ROUND_C70_FROZEN", "rp_000000000000")
+    with pytest.raises(SystemExit, match="only rp_000000000000 is approved"):
+        colab_train.load_job("C70_R1", repo)
+    monkeypatch.setattr(colab_train, "ROUND_C70_FROZEN", round_id)
+    job = colab_train.load_job("C70_R1", repo)
+    c70 = colab_train.load_job("C_70", repo)
+    assert (job.job_id, job.run_plan_id, job.data_name) == (
+        "da34-t7-ft-c70-r1-s0", round_id, "C70_R1"
+    )
+    assert job.parent_name == c70.parent_name == "psi0-baseline-egodex-he"
+    assert job.plan is not None and job.plan.recipe == c70.plan.recipe
+    assert job.release_id == "tray_s1_41899efb4b27+tray_s1_4a8f4a8c6a8d+tray_s1_r1"
+    work = tmp_path / "work"
+    assert job.data(work) == work / "sets" / "C70_R1" / ENV
+    assert any("not a demo-set cut" in p for p in job.cut_problems(job.data(work), repo))
+    # a round edited after the freeze is refused, even with its id approved
+    text = (repo / ROUND_C70).read_text().replace("100002", "100003")
+    (repo / ROUND_C70).write_text(text)
+    with pytest.raises(SystemExit, match="changed since it was frozen"):
+        colab_train.load_job("C70_R1", repo)
