@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flywheel Console</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="chat.css">
+<link rel="stylesheet" href="tour.css">
+<script>try{var t=localStorage.getItem("v5theme");document.documentElement.setAttribute("data-theme",t||"dark");if(/(^|[?&#])demo=1/.test(location.search+location.hash)||sessionStorage.getItem("v5demo")==="1")document.documentElement.classList.add("demo")}catch(e){document.documentElement.setAttribute("data-theme","dark")}</script>
+</head>
+<body>
+<header id="hdr">
+  <a class="logo" href="#/home">FW</a>
+  <div class="srch" id="srch"><span>&#8981;</span><span>Search</span><kbd>&#8984;K</kbd></div>
+  <select id="task" title="task"><option>tray</option><option>two_table</option></select>
+  <div id="meta"></div>
+</header>
+<div id="body">
+  <nav id="side"></nav>
+  <main id="main"></main>
+  <aside id="rp"><div id="chat" class="rp-pane"></div></aside>
+</div>
+<div id="pal"><div class="box"><input id="pal-in" placeholder="go to, dataset, run, job, /tool" autocomplete="off"><div class="res" id="pal-res"></div></div></div>
+<div id="keys"><div class="box" id="keys-box"></div></div>
+<div id="cap"></div>
+<div class="drawer-bg" id="drawer-bg"></div>
+<aside class="drawer" id="drawer"><header><b id="dtitle"></b><button class="iconbtn" id="dclose">Esc</button></header>
+<div class="dtabs" id="dtabs"><a data-t="method">repro</a><a data-t="log">log</a><a data-t="src">src</a></div><div class="dbody" id="dbody"></div></aside>
+<script src="vendor/echarts.min.js"></script>
+<script src="core.js"></script>
+<script src="pages_data.js"></script>
+<script src="pages_story.js"></script>
+<script src="pages_ops.js"></script>
+<script src="ring.js"></script>
+<script src="tour.js"></script>
+<script src="chat.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
