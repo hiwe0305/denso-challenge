@@ -43,9 +43,9 @@ The action header is C's.
 `manifest --folder <dir>` prints what the plan pins, for whoever fills them (task 4.7).
 
 The four runs of task 6 (`--branch B_ALL|C_ALL|B_70|C_70`) run the paired plan
-`configs/runplans/tray/he-tray-pair60k.yaml` (`pairplan`) once it is frozen as
-`PAIR_FROZEN` (task 6.2); until then every one refuses. A branch names its parent (C's
-VLM, or DA-30's stage 1 VLM, handled as B's) and its data: the cut ALL or the subset
+`configs/runplans/tray/he-tray-pair60k.yaml` (`pairplan`), frozen as `PAIR_FROZEN`
+(task 6.2, `rp_e2fb9f62c223`); any other plan id is refused. A branch names its parent
+(C's VLM, or DA-30's stage 1 VLM, handled as B's) and its data: the cut ALL or the subset
 S70 (`pair_cut`). The data comes from Drive (Drive is mounted before `setup`):
 `MyDrive/denso/da34/cuts/<ALL|S70>.tar` with its `.json`, checked for size before and
 sha256 after the copy, extracted to `<work>/sets/<name>/<env name>`, then checked
@@ -128,9 +128,9 @@ B_PLAN = "configs/runplans/tray/he-tray-b.yaml"
 B_FROZEN: str | None = None
 B = "B"
 PAIR_PLAN = "configs/runplans/tray/he-tray-pair60k.yaml"
-# Set when he-tray-pair60k.yaml is frozen on Hiếu's Decision (task 6.2); until then no
-# job of the four runs, whatever the plan file says.
-PAIR_FROZEN: str | None = None
+# he-tray-pair60k.yaml frozen on Hiếu's Decision (task 6.2, 11/11/2026); no job of the
+# four runs runs any other plan id, whatever the plan file says.
+PAIR_FROZEN: str | None = "rp_e2fb9f62c223"
 PAIR = ("B_ALL", "C_ALL", "B_70", "C_70")  # the branches of PAIR_PLAN, checked on load
 DRIVE = Path("/content/drive/MyDrive")  # `colab drivemount -s <session> /content/drive`
 STAGE1_DIR = "cache/checkpoints/stage1"  # under Psi0, beside the psi-model snapshot

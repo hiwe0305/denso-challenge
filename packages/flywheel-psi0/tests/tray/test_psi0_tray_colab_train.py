@@ -617,7 +617,7 @@ def _frozen_pair(tmp_path: Path, stage1: Path) -> tuple[Path, str, Path]:
     marker = {"demo_set": "S70", "n": new, "from_cut": origin, "parts": s70_parts}
     _pair_meta(sets / "S70" / ENV, marker, s70_rows)
     raw["parents"]["psi0-ego-stage1-egx"]["vlm_stage1"].update(_pins(stage1))
-    del raw["status"]
+    raw.pop("status", None)  # the live plan is frozen since task 6.2
     (repo / PAIR_PLAN).write_text(yaml.safe_dump(raw, allow_unicode=True, sort_keys=False))
     lock = json.loads(pairplan.freeze(repo / PAIR_PLAN, repo).read_text())
     drive = tmp_path / "drive"
@@ -627,14 +627,17 @@ def _frozen_pair(tmp_path: Path, stage1: Path) -> tuple[Path, str, Path]:
     return repo, lock["run_plan_id"], drive
 
 
-def test_no_pair_run_from_the_draft_plan() -> None:
-    for branch in colab_train.PAIR:
-        with pytest.raises(SystemExit) as stop:
-            colab_train.load_job(branch)
-        message = str(stop.value)
-        assert "is a draft: no pair job runs before task 6.2" in message
-        assert "PAIR_FROZEN is unset" in message and "not frozen" in message
-        assert "PENDING" not in message  # W1 and W2 are pinned
+def test_the_four_runs_load_the_frozen_plan() -> None:
+    # task 6.2 (11/11/2026): Hiếu's Decision, draft dropped, frozen as PAIR_FROZEN
+    assert colab_train.PAIR_FROZEN == "rp_e2fb9f62c223"
+    jobs = {b: colab_train.load_job(b) for b in colab_train.PAIR}
+    assert {j.run_plan_id for j in jobs.values()} == {colab_train.PAIR_FROZEN}
+    assert {b: j.data_name for b, j in jobs.items()} == {
+        "B_ALL": "ALL",
+        "C_ALL": "ALL",
+        "B_70": "S70",
+        "C_70": "S70",
+    }
 
 
 def test_pair_runs_only_the_approved_frozen_plan(
@@ -642,6 +645,7 @@ def test_pair_runs_only_the_approved_frozen_plan(
 ) -> None:
     stage1, _ = _vlm_folders(tmp_path / "vlm")
     repo, frozen, _ = _frozen_pair(tmp_path, stage1)
+    monkeypatch.setattr(colab_train, "PAIR_FROZEN", None)
     with pytest.raises(SystemExit, match="PAIR_FROZEN is unset"):
         colab_train.load_job("B_70", repo)
     monkeypatch.setattr(colab_train, "PAIR_FROZEN", "rp_000000000000")

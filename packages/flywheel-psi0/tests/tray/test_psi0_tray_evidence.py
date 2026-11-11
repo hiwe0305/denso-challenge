@@ -76,9 +76,10 @@ def test_an_empty_pack_names_what_is_missing(tmp_path: Path) -> None:
         (60000, "chưa có eval nào"),
     ]
     readme = (tmp_path / "pack/README.md").read_text()
-    assert "Chưa có: chưa có eval nào" in readme and "chưa đóng băng" in readme
+    assert "Chưa có: chưa có eval nào" in readme
+    assert "(ready; đã đóng băng)" in readme  # the live plan, frozen at task 6.2
     assert "Chưa có `metrics.jsonl`" in readme and "Chưa có video." in readme
-    assert json.loads((tmp_path / "pack/evidence.json").read_text())["lock"] is False
+    assert json.loads((tmp_path / "pack/evidence.json").read_text())["lock"] is True
 
 
 def test_stage1_of_the_primary_checkpoint_gives_the_outcome_and_rule_b(tmp_path: Path) -> None:

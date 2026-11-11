@@ -1,7 +1,7 @@
 # DA-34 task 6: paired stage 3 RunPlan, four 60k-step runs on one cut (cut ALL, target
 # zone drawn): two VLMs x two data sizes (ALL, and S70: 70 % of ALL's seeds), identical
-# otherwise. DRAFT: W1 (cut ALL, S70) and W2 (stage 1 VLM) are pinned;
-# not frozen, not launched.
+# otherwise. W1 (cut ALL, S70) and W2 (stage 1 VLM) are pinned. Frozen on Hiếu's
+# Decision (11/11/2026, "Duyệt 19.2", task 6.2): he-tray-pair60k.lock.json.
 #
 # Hiếu 11/11/2026 (via the coordinator session; docs/he/tray.md section 19): eval C is low
 # because table B's target zone is not drawn, so the policy cannot see where the planner
@@ -17,7 +17,6 @@
 name: he-tray-psi0-pair60k
 purpose: paired_train
 story: DA-34
-status: draft
 site_id: local
 task:
   id: g1_wholebody_tray_transfer_teleop # TASK_UID of flywheel_simple.tray.simple_task

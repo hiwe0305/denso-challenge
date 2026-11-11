@@ -1619,7 +1619,7 @@ _**[Đã chốt 11/11/2026, Hiếu]** ("Thêm hai run 70%", qua phiên điều p
 
 ### 19.2 Luật đọc bốn run 60k (viết trước khi chạy)
 
-**[Đề xuất]**, chờ Hiếu duyệt. Viết lại ngày 11/11/2026 cho bốn run (Hiếu: "Thêm hai run 70%"); khối cũ cho hai run (`rules_sha256` `24747738…`) chưa được duyệt và không còn dùng. Khối giữa hai dấu `pair60k-rules` được ghim bằng sha256 ở `interpretation.rules_sha256` của [`he-tray-pair60k.yaml`](../../configs/runplans/tray/he-tray-pair60k.yaml); nhãn này nằm ngoài khối. Các so sánh (a′), (f), (g), (h) là trường `comparisons` của plan; gói bằng chứng (19.6) tính đúng các so sánh đó.
+**[Đã duyệt 11/11/2026, Hiếu]** ("Duyệt 19.2", qua phiên điều phối), trước mọi lượt của bốn run. Viết lại ngày 11/11/2026 cho bốn run (Hiếu: "Thêm hai run 70%"); khối cũ cho hai run (`rules_sha256` `24747738…`) chưa được duyệt và không còn dùng. Khối giữa hai dấu `pair60k-rules` được ghim bằng sha256 ở `interpretation.rules_sha256` của [`he-tray-pair60k.yaml`](../../configs/runplans/tray/he-tray-pair60k.yaml); nhãn này nằm ngoài khối. Các so sánh (a′), (f), (g), (h) là trường `comparisons` của plan; gói bằng chứng (19.6) tính đúng các so sánh đó.
 
 <!-- pair60k-rules -->
 
@@ -1935,6 +1935,12 @@ Mã đã có, **chưa chạy trên Colab**. Không bước nào dưới đây ch
 3. Đợt stage 1 đã đóng: guard của nó đã thoát.
 4. Số dư ít nhất 294 CU, hoặc 360 CU khi ba phiên serve vào cùng đợt (19.5).
 5. Hai tar đã lên Drive (bước B).
+
+**Ngày 11/11/2026** (nhiệm vụ con 6.2):
+- Điều kiện 1 và 2 xong. Hiếu duyệt 19.2. `Decision` nháp ở `he-tray-pair60k.decision.json`. Plan bỏ `draft`, chọn 60k. `pairplan freeze` ghi `he-tray-pair60k.lock.json` với id `rp_e2fb9f62c223`, trùng id nháp vì `status` không vào id. `PAIR_FROZEN` đặt bằng id này.
+- Điều kiện 3 xong: guard của đợt stage 1 đã thoát. Phiên `da30-stage1-b` đã được trả máy; tài khoản không còn phiên nào.
+- Điều kiện 5 xong: phiên điều phối đưa bốn file lên `MyDrive/denso/da34/cuts/` qua một máy Colab CPU (0,08 CU/giờ, đẩy qua ssh khoảng 21 MB/s). Đọc lại từ Drive ra sha256 `bea55b14…` (ALL) và `f87bfecb…` (S70), khớp bảng ở bước A.
+- Còn điều kiện 4 (số dư), kiểm lúc launch.
 
 **Dữ liệu theo seed của chính episode.** Một episode vào S70 khi seed của nó, lấy từ `environment_config.flywheel.seed` ở dòng của nó trong `meta/episodes.jsonl` của ALL, nằm trong danh sách đã ghim của phần nó.
 
