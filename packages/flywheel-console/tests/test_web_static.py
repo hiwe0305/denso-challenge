@@ -35,3 +35,17 @@ def test_sankey_labels_carry_numbers() -> None:
         src = (WEB / name).read_text(encoding="utf-8")
         assert 'type: "sankey"' in src
         assert re.search(r"nodeGap: (\d{2,})", src), name
+
+
+def test_story_sankey_labels_alternate_by_column() -> None:
+    """Neighbouring columns put labels on opposite sides; index parity did not (DA-40/8)."""
+    src = (WEB / "pages_story.js").read_text(encoding="utf-8")
+    assert "const CHAIN = {" in src and "CHAIN[n.name] % 2" in src
+    assert "i % 2 ?" not in src
+
+
+def test_episode_bracket_keys_go_through_ui_keys() -> None:
+    """A raw keydown listener for [ ran alongside the global sidebar toggle (DA-40/8)."""
+    src = (WEB / "pages_data.js").read_text(encoding="utf-8")
+    assert 'UI.keys.bind({ "[":' in src
+    assert 'ev.key === "["' not in src

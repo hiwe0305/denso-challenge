@@ -482,14 +482,10 @@ const PAGES_DATA = (() => {
       else main.appendChild(line("none"));
     } catch (e) { main.appendChild(line(e.message, "bad")); }
   }
+  /* [ / ] step episodes; bound through UI.keys so the newest binding wins over the global [ (sidebar) */
   const navKeys = (prevHref, nextHref) => {
-    const h0 = location.hash.split("?")[0];
-    const fn = ev => {
-      if (location.hash.split("?")[0] !== h0 || /^(INPUT|SELECT|TEXTAREA)$/.test((ev.target || {}).tagName || "")) return;
-      if (ev.key === "[" && prevHref) location.hash = prevHref; else if (ev.key === "]" && nextHref) location.hash = nextHref;
-    };
-    document.addEventListener("keydown", fn);
-    teardownFns.push(() => document.removeEventListener("keydown", fn));
+    const go = href => { if (href) location.hash = href; };
+    teardownFns.push(UI.keys.bind({ "[": () => go(prevHref), "]": () => go(nextHref) }));
   };
   const navBtns = (prev, next) => [prev ? E("a", { class: "pd-btn", href: prev.href, text: "◀ " + prev.label }) : null, next ? E("a", { class: "pd-btn", href: next.href, text: next.label + " ▶" }) : null].filter(Boolean);
 

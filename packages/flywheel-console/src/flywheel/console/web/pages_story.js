@@ -475,9 +475,11 @@ async function loopPage(main) {
   const pp = failAt("L-PLACE-POSE", "L1–2"), nT = LV[LV.length - 1].n;
   const nodes = ["rollouts", "place-pose", "other", "generated", "failed", "recorded", "filtered", "kept", "C+", "re-eval"].map(name => ({ name }));
   const lk = (source, target, value) => ({ source, target, value });
-  ec(flowBox, { tooltip: { trigger: "item" }, series: [{ type: "sankey", left: 24, right: 60, top: 24, bottom: 24, nodeWidth: 10, nodeGap: 14, emphasis: { focus: "adjacency" },
-    label: { color: col.text(), fontSize: 11, formatter: p => (p.value != null ? p.value + " " : "") + p.name }, lineStyle: { color: "gradient", opacity: .35 }, itemStyle: { borderWidth: 0 },
-    data: nodes.map((n, i) => Object.assign(n, { label: { position: i % 2 ? "top" : "bottom" }, itemStyle: { color: n.name === "re-eval" ? col.warn() : n.name === "place-pose" ? col.bad() : ser(i) } })),
+  const CHAIN = { rollouts: 0, "place-pose": 1, generated: 2, recorded: 3, kept: 4, "C+": 5 };
+  ec(flowBox, { tooltip: { trigger: "item" }, series: [{ type: "sankey", left: 24, right: 60, top: 40, bottom: 40, nodeWidth: 10, nodeGap: 14, emphasis: { focus: "adjacency" },
+    label: { color: col.text(), fontSize: 11, formatter: p => (p.value != null ? p.value + "\n" : "") + p.name }, lineStyle: { color: "gradient", opacity: .35 }, itemStyle: { borderWidth: 0 },
+    /* main chain alternates label side by column so neighbours never share a row; sinks sit in the last column, labelled to the right */
+    data: nodes.map((n, i) => Object.assign(n, { label: { position: n.name in CHAIN ? (CHAIN[n.name] % 2 ? "top" : "bottom") : "right" }, itemStyle: { color: n.name === "re-eval" ? col.warn() : n.name === "place-pose" ? col.bad() : ser(i) } })),
     links: [lk("rollouts", "place-pose", pp), lk("rollouts", "other", nT - pp), lk("place-pose", "generated", 262), lk("generated", "recorded", 229), lk("generated", "failed", 33), lk("recorded", "kept", 177), lk("recorded", "filtered", 52), lk("kept", "C+", 177), lk("C+", "re-eval", 177)] }] });
   ec(costBox, { grid: { left: 54, right: 10, top: 16, bottom: 22 }, tooltip: { trigger: "axis", axisPointer: { type: "shadow" } }, legend: { top: 0, right: 0, textStyle: { color: col.t2(), fontSize: 11 } },
     xAxis: axis({ type: "category", data: L.map(r => r[0]), axisLabel: { color: col.t2(), fontSize: 10, interval: 0, rotate: 30 } }), yAxis: axis({ type: "value" }),
