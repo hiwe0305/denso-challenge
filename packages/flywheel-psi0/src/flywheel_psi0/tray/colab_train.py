@@ -42,6 +42,18 @@ the recipe with the stage 1 parent added in memory (the recipe file is not edite
 The action header is C's.
 `manifest --folder <dir>` prints what the plan pins, for whoever fills them (task 4.7).
 
+The four runs of task 6 (`--branch B_ALL|C_ALL|B_70|C_70`) run the paired plan
+`configs/runplans/tray/he-tray-pair60k.yaml` (`pairplan`) once it is frozen as
+`PAIR_FROZEN` (task 6.2); until then every one refuses. A branch names its parent (C's
+VLM, or DA-30's stage 1 VLM, handled as B's) and its data: the cut ALL or the subset
+S70 (`pair_cut`). The data comes from Drive (Drive is mounted before `setup`):
+`MyDrive/denso/da34/cuts/<ALL|S70>.tar` with its `.json`, checked for size before and
+sha256 after the copy, extracted to `<work>/sets/<name>/<env name>`, then checked
+against the plan's pins (`pair_cut.cut_problems`: parts, each episode's own seed, the
+subset's list, totals, and ALL's `stats_psi0.json` for both data sizes), all before any
+install. Recipe, override (60 000 steps), train seed and action header are the plan's,
+the same for all four.
+
 CUDA toolkit (11/11/2026): the Colab image of that day ships only CUDA 13.0 and no
 `nvcc` on PATH, while Psi0's torch is 2.7.0+cu126. A job that builds a C++/CUDA op at
 run time (DeepSpeed's ZeRO-3 of stage 1) then fails its pre-flight: DeepSpeed's
@@ -83,7 +95,11 @@ from flywheel_psi0.trainer.colab import (
     sh,
 )
 from flywheel_psi0.trainer.recipe import ParentCheckpoint, Psi0Recipe
+from flywheel_psi0.tray import pair_cut
 from flywheel_psi0.tray.demo_sets import DemoSets, canonical_sha256
+from flywheel_psi0.tray.pairplan import TrayPairPlan
+from flywheel_psi0.tray.pairplan import check as pair_check
+from flywheel_psi0.tray.pairplan import pending as pair_pending
 from flywheel_psi0.tray.runplan import (
     REPO,
     Parent,
@@ -93,6 +109,7 @@ from flywheel_psi0.tray.runplan import (
     TrayRunPlan,
     check,
     check_round,
+    file_pin_drift,
     lock_path,
     pinned_file_drift,
     run_plan_id,
@@ -110,6 +127,11 @@ B_PLAN = "configs/runplans/tray/he-tray-b.yaml"
 # then no B job runs, whatever the plan file says.
 B_FROZEN: str | None = None
 B = "B"
+PAIR_PLAN = "configs/runplans/tray/he-tray-pair60k.yaml"
+# Set when he-tray-pair60k.yaml is frozen on Hiếu's Decision (task 6.2); until then no
+# job of the four runs, whatever the plan file says.
+PAIR_FROZEN: str | None = None
+PAIR = ("B_ALL", "C_ALL", "B_70", "C_70")  # the branches of PAIR_PLAN, checked on load
 DRIVE = Path("/content/drive/MyDrive")  # `colab drivemount -s <session> /content/drive`
 STAGE1_DIR = "cache/checkpoints/stage1"  # under Psi0, beside the psi-model snapshot
 WEIGHTS = "model.safetensors"  # the one file a stage 1 VLM folder changes
@@ -235,11 +257,43 @@ def load_b(repo: Path = REPO) -> tuple[TrayRunPlan, str]:
     return plan, B_FROZEN
 
 
+def load_pair(repo: Path = REPO) -> tuple[TrayPairPlan, str]:
+    """The frozen four-run plan and its id, or SystemExit with every reason not to run."""
+    plan = TrayPairPlan.load(repo / PAIR_PLAN)
+    problems = pair_check(plan, repo) + [f"PENDING: {p}" for p in pair_pending(plan)]
+    problems += [
+        f"{d}: re-freeze or record a Decision" for d in file_pin_drift(plan.pinned_files, repo)
+    ]
+    if plan.status == "draft":
+        problems.append(f"{PAIR_PLAN} is a draft: no pair job runs before task 6.2")
+    lock = lock_path(repo / PAIR_PLAN)
+    frozen = json.loads(lock.read_text(encoding="utf-8"))["run_plan_id"] if lock.is_file() else None
+    if frozen is None:
+        problems.append(f"{lock.name} missing: the pair plan is not frozen")
+    elif frozen != run_plan_id(plan):
+        problems.append(f"{PAIR_PLAN} changed since it was frozen as {frozen}")
+    if PAIR_FROZEN is None:
+        problems.append("no pair plan is approved yet: PAIR_FROZEN is unset (task 6.2)")
+    elif frozen is not None and frozen != PAIR_FROZEN:
+        problems.append(f"{lock.name} holds {frozen}; only {PAIR_FROZEN} is approved")
+    if sorted(plan.branches) != sorted(PAIR):
+        problems.append(f"the pair plan's branches are {sorted(plan.branches)}, not {PAIR}")
+    if problems:
+        raise SystemExit("pair plan does not hold, no training:\n  " + "\n  ".join(problems))
+    assert PAIR_FROZEN is not None
+    return plan, PAIR_FROZEN
+
+
+def pair_job_id(branch: str, seed: int = 0) -> str:
+    """`da34-t6-ft-b-all-s0`: Colab session and run folder; ledger job_da34_ft_B_ALL."""
+    return f"da34-t6-ft-{branch.lower().replace('_', '-')}-s{seed}"
+
+
 @dataclass(frozen=True)
 class Job:
-    """One fine-tune of the tray experiment: branch C of v2, C+ of its round, or B."""
+    """One fine-tune of the tray experiment: C of v2, C+ of its round, B, or a pair run."""
 
-    plan: TrayRunPlan  # the frozen plan: recipe, parent, train seed, task
+    plan: TrayRunPlan | TrayPairPlan  # the frozen plan: recipe, parent, train seed, task
     run_plan_id: str
     branch: str
     demo_set: str  # what the release id of the run names
@@ -247,10 +301,14 @@ class Job:
     release_id: str
     round_plan: TrayRoundPlan | None = None
     plan_branch: str = BRANCH  # the plan's branch whose parent and demo set the job uses
+    data_name: str | None = None  # pair runs: the cut (ALL) or the subset (S70) it trains on
 
     @property
     def job_id(self) -> str:
+        if self.data_name is not None:
+            return pair_job_id(self.branch, self.plan.train_seeds[0])
         if self.branch == BRANCH:
+            assert isinstance(self.plan, TrayRunPlan)
             return job_id(self.plan)
         if self.branch == B:
             return f"da34-t4-ft-b-s{self.plan.train_seeds[0]}"
@@ -261,9 +319,13 @@ class Job:
         return self.plan.branches[self.plan_branch].parent
 
     def data(self, work: Path) -> Path:
-        return work / "sets" / self.branch / self.plan.task["env_id"].rsplit("/", 1)[-1]
+        folder = self.data_name or self.branch
+        return work / "sets" / folder / self.plan.task["env_id"].rsplit("/", 1)[-1]
 
     def cut_problems(self, data: Path, repo: Path = REPO) -> list[str]:
+        if isinstance(self.plan, TrayPairPlan):
+            assert self.data_name is not None
+            return pair_cut.cut_problems(data, self.plan, self.data_name, repo)
         if self.round_plan is None:
             return cut_problems(data, self.plan, repo, self.plan_branch)
         return cplus_cut_problems(data, self.plan, self.round_plan, repo)
@@ -299,6 +361,25 @@ def load_job(branch: str = BRANCH, repo: Path = REPO) -> Job:
             plan.demo_sets.hashes[demo_set],
             plan.release.id,
             plan_branch=B,
+        )
+    if branch in PAIR:
+        pair, run_plan = load_pair(repo)
+        data_name = pair.data_of(pair.branches[branch])
+        subset = pair.subset(data_name)
+        hashes = (
+            [p.demo_sets.hashes[p.set_name] for p in pair.cut.parts if p.demo_sets and p.set_name]
+            if subset is None
+            else [sp.seeds_sha256 for sp in subset.parts]
+        )
+        return Job(
+            pair,
+            run_plan,
+            branch,
+            data_name,
+            canonical_sha256(hashes),
+            "+".join(p.release.id for p in pair.cut.parts if p.release),
+            plan_branch=branch,
+            data_name=data_name,
         )
     raise SystemExit(f"no fine-tune for branch {branch}")
 
@@ -549,7 +630,9 @@ def stage1_vlm_problems(folder: Path, base: Path, vlm: Stage1Vlm) -> list[str]:
     return problems
 
 
-def stage1_paths(plan: TrayRunPlan, parent_name: str, psi0: Path) -> tuple[Path, Path, Stage1Vlm]:
+def stage1_paths(
+    plan: TrayRunPlan | TrayPairPlan, parent_name: str, psi0: Path
+) -> tuple[Path, Path, Stage1Vlm]:
     """(stage 1 folder on the VM, parent VLM folder of the snapshot, pins) of a B parent."""
     parent = plan.parents[parent_name]
     if not isinstance(parent, Stage1Parent) or parent.vlm_stage1.drive_dir is None:
@@ -617,6 +700,17 @@ def setup(work: Path, branch: str = BRANCH, repo: Path = REPO) -> None:
             f"\n  " + "\n  ".join(problems) + f"\nfix: {TOOLCHAIN_FIX}"
         )
     data = job.data(work)
+    fetched: dict[str, Any] = {}
+    if job.data_name is not None and not (data / "meta").is_dir():  # a pair run: from Drive
+        start = time.monotonic()
+        fetched = pair_cut.fetch(
+            DRIVE / pair_cut.DRIVE_CUTS / f"{job.data_name}.tar", work / "sets"
+        )
+        if fetched["root"] != f"{job.data_name}/{data.name}":
+            raise SystemExit(
+                f"the tar holds {fetched['root']}, the job reads {job.data_name}/{data.name}"
+            )
+        fetched["seconds"] = round(time.monotonic() - start, 1)
     problems = job.cut_problems(data, repo)  # before the env: a wrong upload costs no install
     if problems:
         raise SystemExit(
@@ -651,6 +745,7 @@ def setup(work: Path, branch: str = BRANCH, repo: Path = REPO) -> None:
         demo_set_hash=job.set_hash,
         dataset=str(data),
         cuda_ops_built=builds,  # False: no nvcc or ninja needed (ddp, torch AdamW)
+        **({"data_fetched": fetched} if fetched else {}),
         **extra,
     )
 
@@ -769,7 +864,7 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     parser.add_argument("phase", choices=["setup", "train", "check", "manifest"])
     parser.add_argument("--work", type=Path, default=WORK)
-    parser.add_argument("--branch", choices=[BRANCH, CPLUS, B], default=BRANCH)
+    parser.add_argument("--branch", choices=[BRANCH, CPLUS, B, *PAIR], default=BRANCH)
     parser.add_argument("--folder", type=Path, help="manifest: a stage 1 VLM folder")
     args = parser.parse_args(argv)
     os.environ.setdefault("PYTHONUNBUFFERED", "1")
