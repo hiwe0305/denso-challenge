@@ -43,11 +43,11 @@ Kế hoạch chi tiết: [docs/superpowers/plans/2026-10-31-da33-tray-synthetic.
 - [x] 11. Sửa bước nhảy action tay và crash x264 của bộ ghi theo [wrist-jump.md](../../g0/tray/wrist-jump.md): giới hạn vận tốc trong QP của IK tay (`arm_step_max` 0,08 rad/bước, `da33-planner-5`), `JoinedVideoWriter` trong `tray/recorder.py`, test sim (AC 4; PO chọn sinh lại 4/11/2026)
 - [x] 12. Thử planner-6 theo D-29: đường quintic trong không gian khớp cho APPROACH_A nâng tay và REACH, LOWER hạ min-jerk, `da33-planner-6`, test CPU; chạy 50 seed 300040–300089 qua cùng chuỗi QA và so với planner-5; nhận chỉ khi 0 cờ, 0 reject, ≥ 44/50 thành công, ≥ 85 % qua lọc (AC 4; PO cho thử 4/11/2026, hạn 12:00 5/11/2026). Đã thử 5/11/2026: trượt (38/50 thành công, 2 reject QA), không nhận; planner-5 v2 đóng băng ([wrist-jump.md](../../g0/tray/wrist-jump.md))
 
-- [ ] 13. Vẽ vùng đích lên bàn B và sinh lại demo trên cảnh có vùng đích (Hiếu duyệt 11/11/2026; chẩn đoán của phiên điều phối 10–11/11: planner căn ngang theo tư thế đích ẩn, ảnh không có tín hiệu nào cho vị trí dừng dọc bàn B). Planner, seed, bộ chấm, dung sai và eval set giữ nguyên; chỉ đổi hình ảnh ([target-zone.md](../../g0/tray/target-zone.md))
+- [x] 13. Vẽ vùng đích lên bàn B và sinh lại demo trên cảnh có vùng đích (Hiếu duyệt 11/11/2026; chẩn đoán của phiên điều phối 10–11/11: planner căn ngang theo tư thế đích ẩn, ảnh không có tín hiệu nào cho vị trí dừng dọc bàn B). Planner, seed, bộ chấm, dung sai và eval set giữ nguyên; chỉ đổi hình ảnh ([target-zone.md](../../g0/tray/target-zone.md))
   - [x] 13.1 Geom vùng đích chỉ để vẽ (không va chạm, không khối lượng) đúng footprint khay tại `target_pose`, hai vạch tối chỉ chỗ tay cầm; `visuals_revision` thêm hậu tố `+zone1`; `generate` và `export_psi0` từ chối lô trộn hai revision; test CPU và test sim (tư thế, không va chạm, quỹ đạo vật lý giống hệt)
   - [x] 13.2 Ảnh camera đầu trước/sau ở mức 0, 1, 2 và so quỹ đạo một episode đầy đủ qua SIMPLE trên `rtx3060`
-  - [ ] 13.3 Sinh lại cùng seed của `s1-pool-1104` (release `tray_s1_f9433b028c52`) và `cplus-tgt-1108` (release `tray_s1_6c0fd7d37f77`) trên cảnh mới, QA tối thiểu và QA phát lại, hai release mới
-  - [ ] 13.4 QA của DA-03 và bộ lọc chất lượng như C, cut "ALL" gồm mọi episode qua QA của cả hai kho; sổ chi phí dòng ước tính và thực đo
+  - [x] 13.3 Sinh lại cùng seed của `s1-pool-1104` (release `tray_s1_f9433b028c52`) và `cplus-tgt-1108` (release `tray_s1_6c0fd7d37f77`) trên cảnh mới, QA tối thiểu và QA phát lại, hai release mới
+  - [x] 13.4 QA của DA-03 và bộ lọc chất lượng như C, cut "ALL" gồm mọi episode qua QA của cả hai kho; sổ chi phí dòng ước tính và thực đo
 
 ## Phạm vi file
 
@@ -105,3 +105,4 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
     - CLI phát lại của SIMPLE nuốt lỗi framebuffer và thoát 0.
     - Nay `replay_qa()` raise `ReplayIncomplete` khi có episode không có kết quả, và không ghi verdict.
     - `scripts/g0/tray/replay_qa.py` thoát 1 và liệt kê `unjudged_shards`.
+- 11/11/2026, nhiệm vụ 13: vùng đích vẽ lên bàn B (`visuals_revision` `…+zone1`), vật lý không đổi. Sinh lại 872 lượt cùng seed trên `rtx3060`: mọi lượt trùng sổ cũ, QA phát lại 771/771, chỉ video khác. Release `tray_s1_41899efb4b27` (541) và `tray_s1_4a8f4a8c6a8d` (229); cut ALL 606 episode (429 + 177, tập QA trùng bản cũ) ([target-zone.md](../../g0/tray/target-zone.md) mục 5).

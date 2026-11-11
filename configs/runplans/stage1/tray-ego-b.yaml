@@ -16,6 +16,12 @@
 # `status: draft` dropped; the run_plan_id is unchanged. The tarball must be on Drive at
 # `tarball` before `colab setup` (docs/he/stage1.md 2.6).
 #
+# 11/11/2026, attempt 1 on an L4 (rp_64bde22a5dda): pre-flight passed after the CUDA
+# toolkit fix, then the first forward ran out of memory (19.6 of 22 GiB, attention of
+# the language model); no train step, 0.38 CU (docs/he/stage1.md 2.10). Hiếu, 11/11:
+# "Chạy A100". gpu A100 (40 GB), cap 8 CU; the recipe is unchanged, so the id changes
+# only through `compute`.
+#
 #   uv run python -m flywheel_psi0.stage1.runplan check configs/runplans/stage1/tray-ego-b.yaml
 name: stage1-tray-ego-b
 story: DA-30
@@ -65,7 +71,7 @@ job:
   nproc_per_node: 1
 
 # The DeepSpeed config of section 1.2 (checked against the recipe by `runplan check`,
-# tried on a tiny model by `setup`'s pre-flight): one L4, ZeRO-3 with CPU offload.
+# tried on a tiny model by `setup`'s pre-flight): one GPU, ZeRO-3 with CPU offload.
 deepspeed_config: configs/runplans/stage1/zero3_offload.json
 
 # Normalization: the recipe's `assets/stats/egodex_stat_all.json`, not the export's
@@ -86,8 +92,8 @@ overrides:
   train.validation_steps: 0
 
 compute:
-  gpu: L4
-  max_compute_units: 4.0 # Hiếu's hard cap; estimate in docs/g0/ledger/DA-30.csv
+  gpu: A100 # 40 GB; the L4's 22 GiB ran out at the first forward (attempt 1, 11/11)
+  max_compute_units: 8.0 # Hiếu's hard cap, 11/11; estimate in docs/g0/ledger/DA-30.csv
 
 # Fixed before the run, as egodex-short: the median train loss of the last
 # `loss_window` steps is below that of the first (one line per optimizer step); a rerun

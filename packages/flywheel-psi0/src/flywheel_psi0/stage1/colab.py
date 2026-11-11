@@ -12,7 +12,9 @@ docs/g0/ledger/DA-30.csv:
 
 `setup` builds Psi0's environment with DA-19's `setup` (which also fetches the stage 3
 parents and the two-table data: a few minutes not needed here, kept to reuse it as
-is), tries the plan's DeepSpeed config on a tiny model (`flywheel_psi0.stage1.preflight`:
+is), installs the CUDA toolkit of torch's CUDA when the VM has another one
+(`cuda_toolchain`; `run` gets the same CUDA_HOME and PATH), tries the plan's
+DeepSpeed config on a tiny model (`flywheel_psi0.stage1.preflight`:
 CPU Adam build, `accelerator.prepare`, two steps) so a config the pinned accelerate
 refuses fails in a minute instead of after the model load, downloads the plan's
 `pre.*` parent at the pinned revision, fetches the EgoDex stand-in and runs the
@@ -33,6 +35,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from flywheel_psi0.stage1.cuda_toolchain import match as match_cuda_toolchain
 from flywheel_psi0.stage1.egodex_sample import fetch, layout_problems
 from flywheel_psi0.stage1.export_source import STATS_FILE, sha256, stats_coverage
 from flywheel_psi0.stage1.export_source import fetch as fetch_export
@@ -45,6 +48,7 @@ from flywheel_psi0.trainer.psi0_trainer import _src_dir
 DRIVE_ROOT = Path("/content/drive/MyDrive")
 DRIVE = DRIVE_ROOT / "denso" / "da30"
 PLAN_POINTER = "plan.path"  # in the work dir, written by setup
+CUDA_ENV = "cuda_env.json"  # in the work dir: setup's CUDA_HOME and PATH, applied by run
 
 
 def _plan(path: Path) -> Any:
@@ -121,8 +125,17 @@ def setup(work: Path, plan_path: Path, drive_root: Path = DRIVE_ROOT) -> None:
     setup_psi0_env(work)
     psi0 = work / "Psi0"
     start = time.monotonic()
+    # Before the pre-flight, whose CPU Adam build needs nvcc to match torch's CUDA.
+    toolchain = match_cuda_toolchain(psi0 / ".venv-psi" / "bin", sh=sh)
+    (work / CUDA_ENV).write_text(json.dumps(toolchain["env"], indent=2), encoding="utf-8")
+    Report(work).phase("cuda_toolchain", time.monotonic() - start, **toolchain)
+    start = time.monotonic()
     try:
-        sh(preflight_command(plan, psi0, work / "fw"), cwd=psi0, env=preflight_env())
+        sh(
+            preflight_command(plan, psi0, work / "fw"),
+            cwd=psi0,
+            env=preflight_env() | toolchain["env"],
+        )
     except subprocess.CalledProcessError as error:
         Report(work).phase("preflight", time.monotonic() - start, error=str(error))
         raise
@@ -247,6 +260,18 @@ def logging_runner(log_path: Path) -> Any:
     return run
 
 
+def apply_cuda_env(work: Path) -> dict[str, str]:
+    """Give this process, and the job it launches, the CUDA_HOME and PATH of `setup`.
+
+    The job's DeepSpeed builds CPU Adam again, and `Psi0Trainer.environment` starts from
+    `os.environ`. Empty when `setup` wrote none (a work dir from before 11/11/2026).
+    """
+    path = work / CUDA_ENV
+    env: dict[str, str] = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    os.environ.update(env)
+    return env
+
+
 def train(work: Path, plan_path: Path, repeat: bool) -> None:
     from flywheel.contracts import CheckpointRef, DatasetRef, TrainSpec
 
@@ -256,6 +281,7 @@ def train(work: Path, plan_path: Path, repeat: bool) -> None:
     from flywheel_psi0.tray.runplan import run_plan_id
 
     plan = _plan(plan_path)
+    cuda_env = apply_cuda_env(work)
     repo = work / "fw"
     overrides = plan.overrides_at(repo)
     job_id = plan.job.id
@@ -301,6 +327,7 @@ def train(work: Path, plan_path: Path, repeat: bool) -> None:
         "first_losses": losses[:5],
         "last_losses": losses[-5:],
         "peak_vram_gb": max(vram, default=None),
+        "cuda_env": cuda_env,
     }
     if repeat:
         run_losses = train_losses(runs / plan.job.id / "metrics.jsonl")
