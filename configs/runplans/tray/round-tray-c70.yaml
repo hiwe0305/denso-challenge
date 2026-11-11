@@ -1,0 +1,94 @@
+# DA-34 task 7: one Failure -> Data round on C_70, the policy pi_0 of branch C (spec v10.5
+# sections 6.1 and 7.2), on the +zone1 scene. Drafted 12/11/2026, before any diagnosis
+# rollout, generation or train; docs/he/tray.md section 20 is the prose and the reading
+# rules. DRAFT: no loader reads this file yet. TrayRoundPlan (runplan.py) takes a
+# branch_train parent and C+'s shape; a round on a branch of the paired plan needs its own
+# model (task 7.4). Until then `runplan check` does not apply and nothing launches from it.
+#
+# Mapping onto the PoC branches of spec 7.2, on the paired plan's four runs:
+#   C_ALL  = S70 + the other 181 episodes of ALL, picked by seed hash: uniform add-on
+#   C_70   = A0.7, the starting policy pi_0 of branch C
+#   C70_R1 = branch C: S70 + up to B_add episodes chosen by Failure -> Data on C_70's failures
+# ALL is not a measured D* (spec 7.1); it is the cut that exists. All demos are planner
+# episodes (S1), so "teleop" in the spec reads "S70" here.
+name: round-tray-c70-psi0
+purpose: round
+story: DA-34
+status: draft
+inherits: configs/runplans/tray/he-tray-pair60k.yaml # frozen, rp_e2fb9f62c223
+base_branch: C_70
+branch: C70_R1
+max_rounds: 1
+
+# Steps 1-3 of spec 6.1, already run: C_70's stage 1 eval of the paired plan, 60
+# conditions, levels 1-2, ckpt_60000, one rollout each. One row per rollout.
+failures:
+  eval_dir: "rtx3060:~/denso-da34-pool/fwdata/tray/eval/pair60k-C_70-60000-rp_a04c14e79dfd"
+  runs_sha256: 9cc9cab084db1162b0a61239f70d49a8195e4a127e469e2cfa5f2f23be36f55b
+  eval_set: rp_a04c14e79dfd-2e57f60
+  conditions_sha256: b9c38b37afa6fbdd4027be287df85fe7b016130bd32227f97c876f6bae7d3dfb
+  rows:
+    file: configs/runplans/tray/round-c70-rollouts.jsonl
+    sha256: aff514b54a3fe31595ff45077cf8dbeeb5eda16327951cea69c69751c86bbea9
+  counts: {rollouts: 60, success: 10, failures: 50}
+  cluster_key: [first_fail_step, failure, level] # spec 6.3
+
+# Spec 6.15 defaults, unchanged.
+diagnosis:
+  representatives_per_cluster: 5 # R
+  representative_seed: 20261112
+  reset_runs: 10 # M; step 6 needs a saved sim state at the start of step k
+  tau_k: 0.8
+  knn_k: 5
+  tau_cov: "p95 leave-one-out kNN distance over S70's conditions"
+  # Step 6 (reset) is not available: restoring a SIMPLE state at a step boundary is
+  # S1-06, cut until after the demo. Clusters go on "not localised" (spec 6.6).
+  step6: unavailable
+  # Step 7 reruns each representative with level 0 visuals, 3 rollouts each, since one
+  # rollout per condition is close to a coin toss on this task (tray.md 18.9).
+  step7_rollouts_per_representative: 3
+
+# Spec 7.3 rule 5: C's data budget is B_add. Every demo here is an S1 episode at one unit
+# cost, so B_add is counted in episodes: the 181 episodes C_ALL has on top of S70.
+budget:
+  b_add_episodes: 181 # 606 (ALL) - 425 (S70)
+  per_failure_rollouts: 20 # spec 6.10, sim generation around a failure
+  per_cluster_cap: 200
+  failures_per_cluster_max: 10 # L_t
+  order: "g/c with Beta(1,1) priors, ties by earlier first_fail_step; same step: one pool, round-robin per failure"
+  train_cap_cu: 80
+  eval_cap_cu: 14 # per serve lane
+  diagnosis_cap_cu: 8 # step 7 rollouts on one L4 lane
+
+# Generation keeps everything ALL's targeted part had: same generator, planner, scene,
+# QA and quality filter, train seed window. Only the conditions it is aimed at change.
+targets:
+  n_add_max: 181
+  from_failures_of: C_70
+  generator: "flywheel_simple.tray.targets via scripts/g0/tray/generate.py --conditions"
+  seed_window: [100000, 199999]
+  quality_filter: {max_tilt_carry_deg: 10.0, max_part_shift_end_mm: 20.0}
+  seeds: null # filled at freeze
+  set_hash: null
+  release: null
+
+# Option A of tray.md 20.6 [Đề xuất]: retrain from the base like the four runs, so
+# C70_R1 differs from C_70 and C_ALL only in the data.
+train:
+  parent: psi0-baseline-egodex-he # C's VLM, as C_70
+  data: "S70 (425, index 0-424 byte for byte) + targeted set (index 425-)"
+  stats: "meta/stats_psi0.json of ALL, sha256 1c745091bc7dcfc9912d3c3ee0d4d8b1e1ee16ed6e9c7f7d6b5fd9c16b600243"
+  recipe: "as the paired plan: psi0-stage3.yaml, batch 16, LR 1e-4 cosine, warmup 1000"
+  steps: 60000
+  train_seed: 0
+  gpu: A100
+
+eval:
+  eval_set: rp_a04c14e79dfd-2e57f60
+  checkpoint: 60000
+  stages: "as 19.2: stage 1 = the first 6 chunks (60 conditions); stage 2 only on continue"
+  server: "Colab L4 over SSH forward, 1 worker, Ta 24 + RTC"
+
+interpretation:
+  rules: "docs/he/tray.md section 20.7, block round-c70-rules"
+  rules_sha256: null # pinned at freeze

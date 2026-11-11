@@ -93,6 +93,15 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
   - [x] 6.12 (11/11/2026, ảnh VM Colab chỉ có CUDA 13.0) Kiểm stage 3 có build extension CUDA không: không (ddp, `torch.optim.AdamW`, mã Ψ₀ `cda3fdf`); `colab_train setup` kiểm trên recipe trước mọi bước cài, ghi `cuda_ops_built`, và từ chối recipe build op khi `CUDA_HOME` không phải bộ 12.6 có `nvcc` hoặc thiếu `ninja` (tray.md 19.7)
   - [x] 6.13 (11/11/2026, W2 xong) Ghim VLM stage 1 của DA-30 vào plan bốn run: job `da30-tray-ego-b` (`rp_1d7627234111`, A100, bước 300), `denso/da30/da30-tray-ego-b/vlm`, trọng số `c48ec2df…`, manifest `019daa80…` (tính lại từ `vlm.json` khớp), kiểm nạp không lỗi; plan hết chỗ trống, id nháp `rp_e2fb9f62c223`; số đo mount Drive trên A100 vào 19.5 (tray.md 19.3)
 
+- [ ] 7. Một vòng Failure → Data trên `C_70` (π₀ của nhánh C): chẩn đoán lỗi giai đoạn 1 của `C_70`, sinh tối đa B_add = 181 episode nhắm lỗi, train `C70_R1` và so với `C_ALL` (thêm đều cùng ngân sách) (AC 6; Hiếu 12/11/2026 "Có, soạn RunPlan" qua phiên điều phối, tray.md mục 20)
+  - [x] 7.1 RunPlan nháp và luật đọc trước mọi rollout của vòng · **12/11/2026:** `round-tray-c70.yaml` (`draft`, chưa có loader), `round-c70-rollouts.jsonl` (60 lượt, sha256 `aff514b5…`), tray.md mục 20, khối `round-c70-rules`; R1–R7 chờ Hiếu
+  - [ ] 7.2 Bước 4: kiểm H1–H3 (chuỗi bước ở `approach_a`, hết giờ, nghiêng lúc hạ và buông); phiếu cho DA-37 và DA-38
+  - [ ] 7.3 Bước 5, 7, 8 trên các cụm còn lại; evidence card; chọn cụm nhận dữ liệu theo 20.5
+  - [ ] 7.4 Mã: loader và `runplan check`/`freeze` cho plan vòng có cha là nhánh của plan cặp; bản cắt S70 + tập nhắm lỗi; `colab_train --branch C70_R1`; `evidence` đọc (r1), (r2)
+  - [ ] 7.5 Sinh, QA, chọn, đóng băng plan vòng (điền `targets`, `rules_sha256`); dòng ước lượng và thực đo
+  - [ ] 7.6 Train `C70_R1` (phương án A của 20.6, chờ R4)
+  - [ ] 7.7 Eval giai đoạn 1 và đọc theo 20.7
+
 ## Phạm vi file
 
 Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file story luôn được sửa.
@@ -142,6 +151,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 11/11/2026 | W2 xong (qua phiên điều phối): thêm và làm 6.13 | Claude cho Hiếu |
 | 11/11/2026 | Phiên điều phối: làm 6.3 trên nhánh riêng `DA-34-pair60k-runner`, mở PR sau khi #181 merge | Claude cho Hiếu |
 | 11/11/2026 | Hiếu "Duyệt 19.2": làm 6.2 (Decision nháp, đóng băng plan bốn run, `PAIR_FROZEN`) | Claude cho Hiếu |
+| 12/11/2026 | Hiếu "Có, soạn RunPlan" (qua phiên điều phối, sau giai đoạn 1 của bốn run): thêm nhiệm vụ 7 và làm 7.1 | Claude cho Hiếu |
 
 ## Ghi chép khi làm
 

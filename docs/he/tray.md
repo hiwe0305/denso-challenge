@@ -2092,6 +2092,215 @@ Phiên serve dừng ngay khi lô cuối của 60k đã ghi kết quả (19.8).
 - Bốn client trên `rtx3060` cùng lúc.
 - Cổng `--listen` của từng làn; ghi ở bảng là đề xuất.
 
+## 20. Nhiệm vụ 7: một vòng Failure → Data trên `C_70` (soạn 12/11/2026, chưa chạy) [Đề xuất]
+
+_Hiếu 12/11/2026, qua phiên điều phối: "Có, soạn RunPlan", sau khi đọc giai đoạn 1 của bốn run 60k. Mục này viết và commit **trước** mọi rollout chẩn đoán, mọi lần sinh, train hay eval của vòng. Plan nháp: [`round-tray-c70.yaml`](../../configs/runplans/tray/round-tray-c70.yaml). Chưa có loader đọc plan này (20.10); không job nào chạy từ nó._
+
+### 20.1 Vì sao, và vòng này đứng ở đâu trong PoC
+
+Bốn run 60k đã có đủ hình của PoC ở spec mục 7.2, trừ nhánh C:
+
+| Nhánh của spec 7.2 | Ở đây | Dữ liệu |
+|---|---|---|
+| A₀.₇, policy khởi đầu π₀ của C | `C_70` | S70: 425 episode |
+| Bổ sung đều cùng ngân sách | `C_ALL` | S70 cộng 181 episode còn lại của ALL, chọn theo sha256 của seed, không theo lỗi |
+| C | **`C70_R1`** (vòng này) | S70 cộng tối đa 181 episode do một vòng Failure → Data chọn trên lỗi của `C_70` |
+
+- Ở task khay, mọi demo đều là episode planner (S1), nên "teleop" của spec đọc là S70.
+- ALL không phải D\* đã đo (spec 7.1); đó là bản cắt đang có.
+- Theo spec 7.3 luật 5, ngân sách thu dữ liệu của C là B_add. Mọi episode ở đây là S1 cùng đơn giá, nên B_add đếm bằng episode: **606 − 425 = 181**, đúng phần `C_ALL` có thêm so với S70.
+
+Câu hỏi của vòng: **181 episode do Failure → Data chọn có giúp hơn 181 episode thêm đều không?** Đây là dạng của HT (C so với bổ sung đều, cùng ngân sách), ở mức sơ bộ: 1 seed train, trên dev, không holdout.
+
+**Ba điều đã biết, ảnh hưởng thiết kế:**
+- **Thêm đều không giúp.** Giai đoạn 1 của 19.2: (g) `C_70` − `C_ALL` +8,3 điểm %, CI 95 % −1,7 đến +18,3. Thêm 181 episode đều không làm `C_70` tốt lên.
+- **Thành công gần như không gắn với điều kiện** (18.9). C và C+ cùng thành công ở đúng 1 trong 240 điều kiện; kỳ vọng ngẫu nhiên khoảng 0,75. Một rollout mỗi điều kiện vì vậy gần như tung đồng xu. Phép kiểm nào cần "chạy lại một điều kiện" phải chạy nhiều lượt.
+- **Sinh S1 quanh điều kiện lỗi, như C+ làm, gần với rải đều** (17.2, 17.5). C+ ở giai đoạn 1 được 3 so với 7 của C, kết quả F. Vòng này dùng lại cách sinh đó (20.5), nên kỳ vọng không cao. Nếu lại ra F thì đó là bằng chứng loại can thiệp này không hợp với lỗi kỹ năng ở bước đặt, và là căn cứ cho dữ liệu sửa lỗi (correction) sau demo.
+
+### 20.2 Đầu vào: lỗi của `C_70` (bước 1–3 của spec 6.1, đã chạy)
+
+- Nguồn: giai đoạn 1 của `C_70` (60 điều kiện mức 1–2, `ckpt_60000`, một rollout mỗi điều kiện), lô `pair60k-C_70-60000-rp_a04c14e79dfd` trên `rtx3060`, `runs.jsonl` sha256 `9cc9cab0…`.
+- Mỗi rollout một dòng trong [`round-c70-rollouts.jsonl`](../../configs/runplans/tray/round-c70-rollouts.jsonl), sha256 `aff514b5…`. Các trường:
+  - mức, seed, thành công, nhãn lỗi;
+  - bước hỏng đầu tiên: bước đầu tiên chưa qua trong chuỗi bước của bộ chấm;
+  - độ lệch cuối tới đích (`place_error`);
+  - `on_table_b`: tâm khay cuối nằm trên mặt bàn B, đáy cách mặt bàn ≤ 3 cm, nghiêng < 15°.
+- 10 thành công, 50 lỗi. Gom cụm theo khóa (bước hỏng đầu tiên, nhãn lỗi, mức) của spec 6.3:
+
+| Cụm | Bước hỏng đầu tiên | Nhãn | Mức | Số lỗi | Đi tiếp |
+|---|---|---|---|---|---|
+| c1 | `place` | `L-PLACE-POSE` | 1 | 14 | Bước 5–8 |
+| c2 | `place` | `L-PLACE-POSE` | 2 | 12 | Bước 5–8 |
+| c3 | `approach_a` | `L-TIMEOUT` | 1 | 4 | Kiểm H2 |
+| c4 | `release_stand` | `L-TRAY-TILT` | 2 | 4 | Kiểm H3 |
+| c5 | `place` | `L-TRAY-TILT` | 2 | 3 | Kiểm H3 |
+| c6 | `approach_a` | `L-PLACE-POSE` | 2 | 3 | Kiểm H1 |
+| c7 | `approach_a` | `L-PLACE-POSE` | 1 | 2 | Kiểm H1 |
+| c8 | `approach_a` | `L-TIMEOUT` | 2 | 2 | Kiểm H2 |
+| Lẻ | `place`, `release_stand`, `carry`, `approach_a` | `L-TRAY-TILT` 3, `L-TIMEOUT` 1, `L-PLACE-POSE` 1, `L-PART-DROP` 1 | 1–2 | 6 | Chỉ báo cáo |
+
+8 trong 10 lượt `L-TRAY-TILT` kết thúc với khay nằm phẳng trên bàn B.
+
+### 20.3 Bước 4: kiểm hệ thống và bộ chấm, trước mọi dữ liệu (0 CU)
+
+Theo spec 6.4 và 6.9: hệ thống trước, dữ liệu sau. Cụm có chẩn đoán hệ thống thành phiếu sửa và không tiêu ngân sách dữ liệu. **Bộ chấm không đổi trong vòng này.** Đổi bộ chấm thì phép đo của `C_70` và `C_ALL` hết giá trị (spec 6.4), nên mọi sửa bộ chấm đi phiếu riêng cho DA-37.
+
+| Kiểm | Cụm | Dấu hiệu | Cách kiểm | Chẩn đoán nếu đúng |
+|---|---|---|---|---|
+| H1: chuỗi bước ở `approach_a` | c6, c7 (5) và lượt `L-PART-DROP` | Khay đã sang và nằm trên bàn B, mà bước `approach_a` chưa bao giờ qua | `approach_a` cần cùng lúc: base trong `approach_zone` trước mép bàn A, và hai lòng bàn tay trong `r_reach` của tay cầm. Trace không có tư thế tay hay khay, nên chỉ đọc được từ nhãn và tư thế cuối | CHƯA RÕ (ngưỡng bộ chấm); phiếu cho DA-37. Nhãn lỗi cuối (`L-PLACE-POSE`) vẫn đúng, chỉ bước hỏng đầu tiên sai |
+| H2: hết giờ ở `approach_a` | c3, c8 (6) | Khay cuối còn cách đích khoảng 2,2 m, tức chưa rời bàn A | Sai số bám lệnh thân trên và thân dưới (lệnh − đo) trong `steps.jsonl`, so với phân vị 99 trên 10 lượt thành công của `C_70`. Đây là τ_track **tạm**: spec lấy τ_track từ teleop thành công, mà task khay chưa có teleop. Xem thêm lệnh thân dưới: policy có ra lệnh đi không | Vượt τ_track: LỖI CONTROLLER, phiếu sửa. Không vượt, và policy không ra lệnh đi: lỗi của policy, sang bước 5–8 |
+| H3: nghiêng lúc hạ và buông | c4, c5 và hai lượt lẻ | Khay đã chạm đúng đích (c4) hoặc đã tới bàn B, rồi bị gắn `L-TRAY-TILT`. Nhãn này chỉ ghi khi khay **không chạm bàn nào** mà nghiêng > 15° | Cần thời điểm lỗi và tiếp xúc của khay lúc lỗi; outcome và trace không ghi hai thứ này. Chạy lại không thay được, vì rollout trên EGL không lặp lại (13.2) | CHƯA RÕ (thiếu tín hiệu, spec 6.4 mục 1); đề xuất ghi `failure_t`, tiếp xúc và độ nghiêng lúc lỗi vào outcome (phiếu cho DA-38). Không tiêu ngân sách dữ liệu trong vòng này |
+| Độ trễ, đồng bộ, camera | Mọi cụm | — | Eval chạy `timing: sync`: sim chờ server, nên độ trễ không đổi hành vi. Cây eval, cảnh `+zone1` và camera ghim như bốn run | Ghi "đạt", kèm lý do |
+
+### 20.4 Bước 5–8 trên c1, c2 (và c3, c8 nếu H2 trả về policy)
+
+Mỗi cụm R = 5 đại diện, chọn ngẫu nhiên với hạt giống `20261112` (spec 6.3). Tham số theo spec 6.15, không đổi.
+
+| Bước | Làm gì | Chi phí |
+|---|---|---|
+| 5. Kiểm khả thi | planner-5 của SIMPLE chạy từ đúng điều kiện đầu của từng đại diện, trên `rtx3060`. Episode chỉ dùng để kiểm, **không** vào dữ liệu, vì dữ liệu không bao giờ sinh trên điều kiện dev (Q-33A) | 0 CU, vài phút CPU |
+| 6. Khoanh vùng bằng reset | **Không làm được.** Nạp lại trạng thái SIMPLE ở đầu một bước là S1-06, đã cắt tới sau demo. Cụm ghi "chưa khoanh vùng" (spec 6.6), nên không có chẩn đoán TRẠNG THÁI ĐẦU XẤU | — |
+| 7. Kiểm thị giác | Chạy lại mỗi đại diện với hình ảnh mức 0, **3 lượt** mỗi đại diện. Spec cho 1 lượt, nhưng 1 lượt gần như tung đồng xu ở task này (20.1). NHẬN THỨC khi ít nhất 2 trên 3 lượt thành công | 2 cụm × 5 × 3 = 30 rollout, khoảng 2,8 giờ trên một L4, khoảng 6 CU (ước lượng) |
+| 8. Kiểm vùng phủ | Miền train là [min, max] từng tham số vật lý trên điều kiện của S70. Khoảng cách kNN (K = 5) tới điều kiện S70, theo cách đo của `flywheel_simple.tray.targets`; τ_cov là phân vị 95 leave-one-out trong S70 | 0 CU |
+
+Dự đoán, chưa phải kết quả: c1 và c2 ra KỸ NĂNG YẾU (trong miền, gần dữ liệu train), như card của C ở 17.2.
+
+### 20.5 Can thiệp và chọn theo ngân sách
+
+| Chẩn đoán | Can thiệp theo spec 6.9 | Ở vòng này |
+|---|---|---|
+| KỸ NĂNG YẾU | Teleop correction ở bước k | **Không có.** Teleop khay chỉ có PICO, đội không có thiết bị. Correction do planner sinh từ trạng thái đã lưu cần S1-06. Kỹ sư ghi đè (spec 6.14) sang sinh S1 quanh điều kiện lỗi, ghi lý do vào card. Đây là chỗ lệch spec lớn nhất của vòng |
+| THIẾU VÙNG PHỦ | Sinh S1 quanh điều kiện lỗi | Đúng như spec |
+| TRẠNG THÁI ĐẦU XẤU | Dữ liệu phục hồi | Không xảy ra được (không có bước 6) |
+| NHẬN THỨC, NGOÀI MIỀN, chẩn đoán hệ thống, CHƯA RÕ | Không tiêu ngân sách | Ghi và báo cáo |
+
+**Sinh.** Giữ mọi thứ phần nhắm lỗi của ALL đã có:
+- `generate.py --conditions` với `flywheel_simple.tray.targets`, cửa sổ seed train 100 000–199 999, planner-5, cảnh `+zone1`;
+- QA phát lại, QA của DA-03, bộ lọc chất lượng ngày 3/11 (nghiêng ≤ 10°, xê dịch ≤ 20 mm).
+
+Chỉ đổi điều kiện được nhắm tới. **Không thêm bộ lọc chặt hơn ở bước đặt.** Thêm bộ lọc thì hiệu với `C_ALL` gộp cả "dữ liệu tốt hơn" lẫn "nhắm theo lỗi".
+
+**Lệch spec 7.3 luật 7.** Luật 7 cấm sinh với tham số của mức 1–2, nhưng phần nhắm lỗi của ALL (từ C+) đã sinh như vậy. Vòng này theo tiền lệ của ALL để `C_ALL` và `C70_R1` cùng phân bố sinh. Điều này cần `Decision`.
+
+**Chọn theo ngân sách** (spec 6.10–6.11, prior Beta(1, 1)):
+- Mọi đề xuất cùng loại, cùng đơn giá, nên g/c bằng nhau. Thứ tự là bước hỏng sớm hơn trước. Các cụm cùng bước gộp một bể, chia vòng tròn theo từng lỗi.
+- Mỗi cụm xử lý tối đa L_t = 10 lỗi, chọn ngẫu nhiên với hạt giống `20261112`; 20 rollout đạt QA mỗi lỗi, trần 200 mỗi cụm. Tổng bị chặn ở B_add = 181.
+
+Hai kịch bản, tính trước để thấy luật cho ra gì:
+
+| Kịch bản | Cụm nhận dữ liệu | Phân bổ 181 episode |
+|---|---|---|
+| H2 ra lỗi hệ thống (hoặc chỉ c1, c2 vào nhánh dữ liệu) | c1, c2: 10 + 10 lỗi | Một bể 20 lỗi, khoảng 9 episode mỗi lỗi |
+| H2 trả về policy, c3 và c8 ra chẩn đoán dữ liệu | c3 + c8 (6 lỗi, bước `approach_a`) trước, rồi c1, c2 | 6 × 20 = 120 cho c3, c8; 61 còn lại cho 20 lỗi của c1, c2 (khoảng 3 mỗi lỗi) |
+
+Nếu sinh xong mà chưa đủ số đạt QA, sinh thêm một lô cho các lỗi còn thiếu, như bước (3) của 17.3. Sau lô đó thì dừng ở số đã có và báo cáo, không lấy thêm episode của S70 hay ALL để bù.
+
+### 20.6 Train
+
+| | **A. Train lại từ gốc, như bốn run [Đề xuất]** | B. Fine-tune tiếp từ `C_70` |
+|---|---|---|
+| Làm gì | VLM của C (cha `psi0-baseline-egodex-he`), dữ liệu S70 + tập nhắm lỗi, 60 000 bước, seed 0, recipe và stats ALL như bốn run | `ckpt_60000` của `C_70`, thêm khoảng 20 000 bước trên S70 + tập nhắm lỗi |
+| So được với | `C_ALL` và `C_70`: chỉ khác dữ liệu (spec 6.1: model cuối của C train lại từ gốc với cùng S) | Chỉ với `C_70`, và gộp thêm 20 000 bước |
+| Chi phí (ước lượng theo số đo bốn run) | Một A100, khoảng 10,7 giờ, 74–76 CU | Khoảng 25 CU |
+
+- Dữ liệu ghép như `cplus_cut`: index 0–424 là S70, giống từng byte bản đã train `C_70`; tập nhắm lỗi từ index 425.
+- Stats là file của ALL (`1c745091…`), như bốn run. Trước khi train phải kiểm action và state của tập nhắm lỗi nằm trong biên của stats đó. Ra ngoài biên thì dừng và ghi `Decision`.
+
+### 20.7 Luật đọc (viết trước khi chạy)
+
+<!-- round-c70-rules -->
+
+**(r1) So sánh chính: `C70_R1` so với `C_ALL`.**
+- Cùng 181 episode thêm vào S70: nhắm theo lỗi so với thêm đều.
+- Hiệu ghép cặp theo điều kiện trên tập eval `rp_a04c14e79dfd-2e57f60`, cách tính như (a′) của 19.2: CI 95 % bootstrap theo điều kiện (lấy mẫu lại trong từng mức, 10 000 lần, hạt giống 20261103), McNemar chính xác hai phía.
+- Hai giai đoạn như 19.2, bảng E1, E3, F, đi tiếp áp cho (r1). Giai đoạn 1 là 6 lô đầu, 60 điều kiện; `C_ALL` đã có đủ 60 điều kiện này.
+
+| # | Điều kiện | Đọc là |
+|---|---|---|
+| 1 | Cận dưới CI 95 % của (`C70_R1` − `C_ALL`) > 0 | Trên task khay, 181 episode do một vòng Failure → Data chọn giúp hơn 181 episode thêm đều (sơ bộ, dev, 1 seed) |
+| 2 | CI chứa 0 | Không thấy khác ở mức này. Không đọc thành "nhắm theo lỗi không giúp" |
+| 3 | Cận trên CI 95 % < 0 | Nhắm theo lỗi kém hơn thêm đều. Kết quả âm hợp lệ, phải báo |
+| 4 | McNemar | Báo cạnh 1–3, không đổi kết luận. CI và McNemar khác nhau thì báo cả hai |
+
+**(r2) Phụ: `C70_R1` so với `C_70`.** Cùng cách tính. Mô tả vòng có làm π₀ tốt lên không. Không quyết định dừng hay đi tiếp.
+
+**(r3) Mô tả theo cụm.** Thành công của `C70_R1` trên các điều kiện thuộc cụm đã nhận dữ liệu, so với các điều kiện còn lại. Phép đo này thiên lệch hồi quy về trung bình (spec 6.13), nên không phải tỉ lệ sửa được và không cập nhật f_t.
+
+**(b) Số tuyệt đối.** Như (b) của 19.2: mức 1–2 gộp so với 80 %, từng mức so với 70 %, khoảng Wilson 95 %.
+
+**(c) Chỉ số phụ, không đổi (r1), (r2).**
+- Thành công nới ở 5, 7,5, 10, 15, 20 cm như (c) của 19.2.
+- Tỉ lệ khay nằm trên bàn B ở cuối lượt, cách tính của cột `on_table_b`.
+- Số `L-TRAY-TILT` ở bước `place` và `release_stand`.
+
+Mọi câu báo các số này phải có chữ "nới" hoặc "chỉ số phụ".
+
+**Trước khi đọc.**
+- Plan vòng đã đóng băng; `rules_sha256` ghim khối này.
+- Phần S70 của bản cắt giống từng byte bản cắt của `C_70`. Stats bằng `1c745091…`.
+- Checkpoint `ckpt_60000` của `C70_R1` trên server cùng sha256 với bản trên Drive.
+- Eval cùng cây, cảnh `+zone1`, server `Ta` 24 + RTC, 1 worker, mỗi server một client, như bốn run.
+
+Thiếu một điều thì không đọc: ghi `Decision` và báo.
+
+**Lệch so với spec, ghi cạnh mọi số.**
+- 1 seed train, không phải 3 (spec 7.3 luật 6). Trên dev, không holdout.
+- Cổng dev của spec 6.12 (90 điều kiện mới, ≥ 3 lượt mỗi điều kiện, sàn A/A) được thay bằng hai giai đoạn trên tập eval chung. Đo tỉ lệ sửa được của spec 6.13 không làm; Ψ₀ 1 vòng nên f_t cũng không dùng lại.
+- Bước 6 không chạy. KỸ NĂNG YẾU dùng sinh S1 thay teleop correction (ghi đè của kỹ sư, 20.5). Sinh với tham số mức 1–2 theo tiền lệ của ALL (20.5).
+
+**Giới hạn ghi cạnh mọi số.**
+- Như 19.2: sơ bộ, chỉ trong sim, renderer MuJoCo, rollout EGL không lặp lại, CI của 60 điều kiện rộng khoảng ±15 điểm %.
+- `C_ALL` và `C_70` train trước vòng này, cùng recipe và seed. GPU không tất định, nên hai lần train cùng dữ liệu cũng khác nhau một chút.
+- Cùng một đội dựng task, sinh dữ liệu, chẩn đoán và đọc kết quả.
+
+Luật này không đổi sau khi thấy kết quả. Muốn đổi thì ghi `Decision` mới và báo theo cả luật cũ lẫn luật mới.
+
+<!-- /round-c70-rules -->
+
+### 20.8 Ngân sách và lịch (ước lượng, chưa đo)
+
+| Việc | Ở đâu | Thời gian | CU |
+|---|---|---|---|
+| H1–H3, bước 5, bước 8 | `rtx3060` CPU, laptop | Nửa ngày | 0 |
+| Bước 7, 30 rollout | Một L4 serve + client `rtx3060` | Khoảng 2,8 giờ | Khoảng 6 (cap 8) |
+| Sinh, QA, chọn, đóng băng | `rtx3060` CPU, ≤ 10 worker | Khoảng 300 lượt ≈ 1,2 giờ sinh (theo lô C+: 262 lượt, 0,93 giờ) + 0,5 giờ QA phát lại | 0 |
+| Train phương án A | Một A100 | Khoảng 10,7 giờ | 74–76 (cap 80) |
+| Eval giai đoạn 1 | Một L4 serve + client `rtx3060` | Khoảng 6 giờ (đo được ở làn `C_70`) | Khoảng 11 (cap 14) |
+| **Tổng nếu dừng ở giai đoạn 1** | | Khoảng 2,5 ngày | **Khoảng 92** |
+| Nếu đi tiếp | 18 lô còn lại cho `C70_R1`, `C_ALL`, `C_70` (hai run sau chưa có giai đoạn 2) | Khoảng 17 giờ mỗi làn, ba làn song song | Khoảng 100 thêm |
+
+- Số dư Colab lúc 04:34 ngày 12/11 khoảng 195 CU. `B_ALL` còn khoảng 30 CU tới 60k. Đường giai đoạn 1 vừa đủ; đi tiếp thì không đủ, cần `Decision`.
+- Lịch, nếu duyệt trong ngày 12/11:
+  - 12/11: H1–H3, bước 5, 7, 8.
+  - Sáng 13/11: sinh và đóng băng; train từ trưa 13/11.
+  - 14/11: eval giai đoạn 1, có số trong ngày 14/11, trước demo 17/11.
+- Mỗi job có dòng ước lượng trong sổ chi phí và watcher cap như 19.8, dừng phiên ngay khi xong.
+
+### 20.9 Quyết định cần Hiếu
+
+| # | Quyết định | Đề xuất |
+|---|---|---|
+| R1 | B_add = 181 episode (phần `C_ALL` có thêm so với S70) | Đồng ý |
+| R2 | KỸ NĂNG YẾU dùng sinh S1 quanh điều kiện lỗi thay teleop correction (ghi đè của kỹ sư) | Đồng ý; correction thật để sau demo |
+| R3 | Sinh với tham số mức 1–2 theo tiền lệ của ALL, lệch spec 7.3 luật 7 | Đồng ý |
+| R4 | Train phương án A (từ gốc, 60 000 bước, cap 80 CU) | A |
+| R5 | Thay cổng dev 6.12 và phép đo 6.13 bằng hai giai đoạn ghép cặp với `C_ALL` (20.7) | Đồng ý |
+| R6 | Chạy H1–H3, bước 5, sinh và QA trên `rtx3060` (CPU, ≤ 10 worker); bước 7 trên một L4 (cap 8) | Đồng ý |
+| R7 | Duyệt luật 20.7 | — |
+
+### 20.10 Việc còn lại
+
+- 7.2 Bước 4 (H1–H3) và phiếu sửa cho DA-37 (ngưỡng `approach_a`) và DA-38 (ghi thời điểm lỗi).
+- 7.3 Bước 5, 7, 8, evidence card của từng cụm, chọn cụm nhận dữ liệu.
+- 7.4 Mã:
+  - loader cho plan vòng có cha là một nhánh của plan cặp (`purpose: round`, `inherits` plan cặp, `base_branch: C_70`);
+  - `runplan check` và `freeze` cho plan đó;
+  - bản cắt S70 + tập nhắm lỗi (như `cplus_cut`);
+  - `colab_train --branch C70_R1`;
+  - `evidence` đọc (r1), (r2).
+- 7.5 Sinh, QA, chọn, đóng băng plan (điền `targets`, `rules_sha256`).
+- 7.6 Train; 7.7 eval giai đoạn 1 và đọc theo 20.7.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -2141,3 +2350,4 @@ Phiên serve dừng ngay khi lô cuối của 60k đã ghi kết quả (19.8).
 | 11/11/2026 | Mục 19.3, 19.5, 19.7, 19.8 (W2 xong, stage 1 của DA-30 trên A100, qua phiên điều phối): ghim bốn chỗ của `vlm_stage1` từ `vlm.json` (job `da30-tray-ego-b`, `rp_1d7627234111`, bước 300; trọng số `c48ec2df…`, manifest `019daa80…`, kiểm nạp không lỗi); plan hết chỗ trống, id nháp `rp_e2fb9f62c223`; 19.5 thêm số đo mount Drive trên A100 (đồng ý mỗi VM, hết giờ 120 s, chạy lại một lần) | Claude cho Hiếu |
 | 11/11/2026 | Mục 19.9 mới, 19.5, 19.7 (nhiệm vụ con 6.3, qua phiên điều phối): runbook bốn run. Gồm: dựng S70 theo seed của chính episode và giữ stats của ALL (`pair_cut`); hai tar lên Drive; `colab_train` cho bốn nhánh, dữ liệu từ Drive được kiểm trước khi cài; một đợt `cu_watch` và đường lùi hai đợt; bước đồng ý Drive trên mỗi VM; làn serve Colab (`colab_serve`, kiểm sha256 và bounds của stats ALL); bảng cổng. Chưa chạy | Claude cho Hiếu |
 | 11/11/2026 | Mục 19.9 (phiên điều phối chạy thử 6.3 trên cut thật): ghi sha256 phải ra của `ALL.tar` (`bea55b14…`) và `S70.tar` (`f87bfecb…`), sha khác thì dừng; bước A chạy được trên laptop từ bản sao đã kiểm | Claude cho Hiếu |
+| 12/11/2026 | Mục 20 mới (nhiệm vụ 7, Hiếu "Có, soạn RunPlan" qua phiên điều phối): một vòng Failure → Data trên `C_70` ([Đề xuất], viết trước mọi rollout chẩn đoán, sinh, train hay eval). Đặt vòng vào hình PoC của spec 7.2 (`C_70` = A₀.₇, `C_ALL` = thêm đều, `C70_R1` = C, B_add 181 episode); đầu vào `round-c70-rollouts.jsonl` (`aff514b5…`) và 8 cụm; kiểm hệ thống H1–H3 trước dữ liệu; bước 6 không làm được (S1-06), bước 7 3 lượt mỗi đại diện; ghi đè KỸ NĂNG YẾU sang sinh S1; luật đọc `round-c70-rules` ((r1) `C70_R1` − `C_ALL` quyết định, hai giai đoạn như 19.2); ngân sách khoảng 92 CU tới giai đoạn 1 (ước lượng); bảy quyết định R1–R7 chờ Hiếu. Plan nháp `round-tray-c70.yaml`, chưa có loader | Claude cho Hiếu |
