@@ -377,10 +377,14 @@ def qa_summary(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
             note = _decisions_text(pc) if pc else prow.get("qa")
             if note:
                 raw.setdefault("qa", {}).setdefault("parents", {})[pid] = pc or note
-                lines.append(f"parent {pid}: {note} (QA decisions of the parent, not of {ds}).")
+                what = "QA decisions" if pc else "QA note"
+                lines.append(f"parent {pid}: {note} ({what} of the parent, not of {ds}).")
                 specs.append({"type": "text", "text": f"parent {pid}: {note}"})
+        if not q.get("reasons"):
+            kind = row.get("kind") or "dataset"
+            lines.append(f"{ds} ({kind}) records no QA decisions or QA failure reasons of its own.")
         if row.get("qa"):
-            lines.append(f"QA note of {ds}: {row['qa']}")
+            lines.append(f"QA note of {ds} (free text, not a failure count): {row['qa']}")
     reasons = q.get("reasons")  # rule-layer reasons of egocentric data
     if reasons:
         rs = [(r[0], r[1]) for r in reasons]

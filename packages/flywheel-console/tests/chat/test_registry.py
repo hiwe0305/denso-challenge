@@ -143,3 +143,18 @@ def test_slash_describe_and_schemas(idx: ConsolePaths) -> None:
     d = registry.describe("#/runs")
     assert d[-1]["name"] == "open_page" and len(d) <= 6
     assert registry.schemas("runs")[0]["type"] == "function"
+
+
+def test_loop_proposals_reads_the_index_cluster_shape(idx: ConsolePaths) -> None:
+    """Index clusters carry no n/budget; n is L1+L2 failures of the label (live bench b42)."""
+    res = registry.call("loop_proposals", {}, {"route": "#/loop"})
+    assert res["ok"], res
+    assert "L-PLACE-POSE n=70" in res["model"]
+    assert "targeted gen" in res["model"]
+
+
+def test_qa_summary_cut_says_it_has_no_reasons(idx: ConsolePaths) -> None:
+    """A cut's free-text qa note was read as a QA failure (live bench b47)."""
+    res = registry.call("qa_summary", {"dataset_id": "S70"})
+    assert "records no QA decisions or QA failure reasons of its own" in res["model"]
+    assert "free text, not a failure count" in res["model"]

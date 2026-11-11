@@ -432,19 +432,26 @@ def loop_proposals(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     ev = eval_data()
     if not ev or not ev.get("clusters"):
         return fail("No loop data available.")
+    fl = ev.get("failure_labels") or {}
+
+    def n_l12(label: str) -> int | None:  # failures of the label at L1-2, as the loop page shows
+        lv = fl.get(label)
+        return lv["L1"] + lv["L2"] if lv else None
+
     rows = [
         {
             "cluster": c["label"],
-            "stage": c["stage"],
-            "n": c["n"],
-            "diagnosis": c["diagnosis"],
-            "budget": c["budget"],
+            "stage": c.get("stage"),
+            "n": n_l12(c["label"]),
+            "diagnosis": c.get("diagnosis"),
+            "intervention": c.get("intervention"),
+            "episodes": c.get("episodes"),
         }
         for c in ev["clusters"]
     ]
     ui = table(
         "Failure clusters",
-        cols("cluster", "stage", "n", "diagnosis", "budget"),
+        cols("cluster", "stage", "n", "diagnosis", "intervention", "episodes"),
         rows,
         link="#/loop",
     )
@@ -453,8 +460,8 @@ def loop_proposals(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         ui,
         head
         + "; ".join(
-            "{} n={} diagnosis={} budget={}".format(
-                r["cluster"], r["n"], r["diagnosis"], r["budget"]
+            "{} n={} diagnosis={} intervention={} episodes={}".format(
+                r["cluster"], r["n"], r["diagnosis"], r["intervention"], r["episodes"]
             )
             for r in rows
         ),

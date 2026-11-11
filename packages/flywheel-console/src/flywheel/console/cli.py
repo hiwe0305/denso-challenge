@@ -34,6 +34,10 @@ def serve(port: int = typer.Option(4178, help="Port on 127.0.0.1.")) -> None:
 @app.command()
 def bench(tag: str = typer.Option("", help="Label for this run.")) -> None:
     """Run the chat benchmark."""
-    from flywheel.console.chat.bench import run  # type: ignore[import-not-found,import-untyped,unused-ignore]
+    from flywheel.console.chat import bench as chat_bench
 
-    run(tag=tag)
+    try:
+        chat_bench.run(tag=tag)
+    except RuntimeError as e:  # tunnel down: one line, no traceback
+        typer.echo(f"bench: {e}", err=True)
+        raise typer.Exit(1) from e
