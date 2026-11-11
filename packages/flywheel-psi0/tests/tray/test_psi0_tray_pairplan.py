@@ -65,10 +65,12 @@ def _pinned(raw: dict[str, Any]) -> dict[str, Any]:
     return raw
 
 
-def test_the_draft_holds_with_every_pin_set() -> None:
+def test_the_frozen_plan_holds_with_every_pin_set() -> None:
     plan = TrayPairPlan.load(PAIR)
     assert check(plan, REPO) == []
-    assert plan.status == "draft" and plan.steps() == 60000
+    assert plan.status is None and plan.steps() == 60000  # task 6.2, Hiếu 11/11/2026
+    lock = json.loads(PAIR.with_name("he-tray-pair60k.lock.json").read_text(encoding="utf-8"))
+    assert lock["run_plan_id"] == run_plan_id(plan) == "rp_e2fb9f62c223"
     assert pending(plan) == []  # W1 and S70 pinned 11/11/2026, then DA-30's stage 1 VLM
     assert plan.interpretation.rules_marker == "pair60k-rules"
     text = (REPO / plan.interpretation.doc).read_text(encoding="utf-8")
@@ -270,19 +272,39 @@ def test_w2_pins_the_stage1_vlm_as_delivered() -> None:
     assert vlm.manifest_sha256 is not None and vlm.manifest_sha256.startswith("019daa801041")
 
 
+def test_the_decision_draft_reads_the_frozen_plan_by_its_rules() -> None:
+    from flywheel.contracts.entities import Decision
+
+    plan = TrayPairPlan.load(PAIR)
+    decision = Decision.model_validate_json(
+        PAIR.with_name("he-tray-pair60k.decision.json").read_text(encoding="utf-8")
+    )
+    assert (decision.subject_id, decision.verdict) == (run_plan_id(plan), "open")
+    assert decision.criteria["rules_sha256"] == plan.interpretation.rules_sha256
+    assert set(decision.metrics["comparisons"]) == {c.rule for c in plan.comparisons}
+    assert set(decision.metrics["runs"]) == set(plan.branches)
+
+
 def test_no_launch_and_no_freeze_until_pinned(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert pairplan.main(["check", str(PAIR)]) == 0
+    # the live plan is frozen (task 6.2): it launches
+    assert pairplan.main(["check", str(PAIR), "--launch"]) == 0
+    assert "launch OK" in capsys.readouterr().out
+    # the same plan as a draft: no launch, no freeze
+    draft = tmp_path / "draft" / "he-tray-pair60k.yaml"
+    draft.parent.mkdir()
+    draft.write_text(yaml.safe_dump({**_raw(), "status": "draft"}, allow_unicode=True))
+    assert pairplan.main(["check", str(draft)]) == 0
     out = capsys.readouterr().out
     assert out.rstrip().endswith(", draft") and "pending" not in out
-    assert pairplan.main(["check", str(PAIR), "--launch"]) == 1
+    assert pairplan.main(["check", str(draft), "--launch"]) == 1
     err = capsys.readouterr().err
     assert "DRAFT" in err and "PENDING:" not in err and "not frozen" in err
     with pytest.raises(ValueError, match="status draft"):
-        pairplan.freeze(PAIR, REPO)
+        pairplan.freeze(draft, REPO)
     # a plan with W2's pins null lists them, and only them
-    raw = _raw()
+    raw = {**_raw(), "status": "draft"}
     raw["parents"]["psi0-ego-stage1-egx"]["vlm_stage1"].update(
         job_id=None, drive_dir=None, weights_sha256=None, manifest_sha256=None
     )
@@ -303,7 +325,7 @@ def test_no_launch_and_no_freeze_until_pinned(
 def test_freezes_once_pinned_and_released_from_draft(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    raw = _pinned(_raw())
+    raw = _pinned({**_raw(), "status": "draft"})
     plan_path = tmp_path / "he-tray-pair60k.yaml"
     plan_path.write_text(yaml.safe_dump(raw, allow_unicode=True), encoding="utf-8")
     with pytest.raises(ValueError, match="status draft"):
