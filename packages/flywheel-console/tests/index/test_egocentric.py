@@ -61,3 +61,26 @@ def test_ego_viewer_row(fw: ConsolePaths, tmp_path: Path) -> None:
 
 def test_rows_none_reads_seed_catalog(fw: ConsolePaths, tmp_path: Path) -> None:
     assert egocentric.build(fw, tmp_path / "out") == {}
+
+
+def test_seed_rows_sharing_a_viewer_split_by_source(fw: ConsolePaths) -> None:
+    """Rows that read one viewer export must each pick a distinct source label.
+
+    Without ``ego_source`` every such row shows the whole viewer (DA-40 Ruling O).
+    """
+    import collections
+
+    from flywheel.console.index.egocentric import load_rows
+
+    rows = [r for r in load_rows(fw) if r.get("ego_viewer")]
+    assert len(rows) >= 2
+    by_viewer: dict[str, list[dict[str, str]]] = collections.defaultdict(list)
+    for r in rows:
+        by_viewer[r["ego_viewer"]].append(r)
+    for group in by_viewer.values():
+        if len(group) < 2:
+            continue
+        labels = [r.get("ego_source") for r in group]
+        assert None not in labels and len(set(labels)) == len(labels), labels
+        for r in group:
+            assert r.get("qa_work", "").startswith("src_") and r.get("ego_dir")
