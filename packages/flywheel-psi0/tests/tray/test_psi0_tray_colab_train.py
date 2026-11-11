@@ -526,3 +526,200 @@ def test_the_plan_pins_the_header_of_cs_vlm() -> None:
     assert stage1.vlm_stage1.parent_header_sha256 == (
         "53d000d9626a13faf4bcb5268517b8441c34b187c88c9dee0b4c250dc19d6d59"
     )
+
+
+# --- the four runs of task 6 (he-tray-pair60k.yaml) ---------------------------------
+
+PAIR_PLAN = "configs/runplans/tray/he-tray-pair60k.yaml"
+ENV = "G1WholebodyTrayTransferTeleop-v0"
+
+
+def _pair_meta(root: Path, marker: dict[str, Any], rows: list[dict[str, Any]]) -> None:
+    """The meta files pair_cut checks: marker, info totals, rows with their own seed, stats."""
+    meta = root / "meta"
+    meta.mkdir(parents=True)
+    (meta / colab_train.MARKER).write_text(json.dumps(marker))
+    frames = sum(r["length"] for r in rows)
+    (meta / "info.json").write_text(
+        json.dumps({"total_episodes": len(rows), "total_frames": frames})
+    )
+    (meta / "episodes.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+    (meta / "stats_psi0.json").write_text('{"stats": "of ALL"}')
+
+
+def _row(index: int, seed: int) -> dict[str, Any]:
+    config = {"flywheel": {"seed": seed}}
+    return {
+        "episode_index": index,
+        "length": 1000 + seed % 7,
+        "environment_config": json.dumps(config),
+    }
+
+
+def _frozen_pair(tmp_path: Path, stage1: Path) -> tuple[Path, str, Path]:
+    """A repo copy whose pair plan pins fake ALL and S70 meta and a fake stage 1 VLM, frozen.
+
+    Returns (repo, run_plan_id, drive): the real W1 pins (releases, demo-set files, seeds)
+    with the totals and stats of the fake datasets, packed under drive/denso/da34/cuts.
+    """
+    import yaml
+    from flywheel_psi0.tray import pair_cut, pairplan
+
+    repo = tmp_path / "repo"
+    shutil.copytree(REPO / "configs", repo / "configs")
+    raw = yaml.safe_load((REPO / PAIR_PLAN).read_text())
+    for rel in [raw["interpretation"]["doc"], *(raw.get("pinned_files") or {})]:
+        (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(REPO / rel, repo / rel)
+    plan = pairplan.TrayPairPlan.model_validate(raw)
+    lists = pairplan.subset_lists(plan, REPO)["S70"]
+    # ALL: each part's episodes in a release order that is not seed order
+    all_parts: list[dict[str, Any]] = []
+    all_rows: list[dict[str, Any]] = []
+    start = 0
+    for part in plan.cut.parts:
+        assert part.demo_sets and part.release and part.set_name
+        demo = DemoSets.model_validate_json((REPO / part.demo_sets.file).read_text())
+        seeds = list(reversed(demo.sets[part.set_name].seeds))
+        all_parts.append({
+            "release_id": part.release.id, "release_hash": part.release.release_hash,
+            "set_hash": part.demo_sets.hashes[part.set_name], "n": len(seeds),
+            "first_episode_index": start,
+            "episodes": [{"episode_index": start + i, "source_episode_index": o}
+                         for i, o in enumerate(demo.sets[part.set_name].episode_indices)],
+        })  # fmt: skip
+        all_rows += [_row(start + i, s) for i, s in enumerate(seeds)]
+        start += len(seeds)
+    sets = tmp_path / "sets-src"
+    _pair_meta(sets / "ALL" / ENV, {"demo_set": "ALL", "n": start, "parts": all_parts}, all_rows)
+    stats = colab_train.sha256(sets / "ALL" / ENV / "meta" / "stats_psi0.json")
+    frames = sum(r["length"] for r in all_rows)
+    raw["cut"].update(frames=frames, stats_sha256=stats)
+    # S70: kept by each row's own seed, in ALL's order
+    s70_parts: list[dict[str, Any]] = []
+    s70_rows: list[dict[str, Any]] = []
+    new = 0
+    for mark, part in zip(all_parts, plan.cut.parts, strict=True):
+        keep = set(lists[part.regenerates])
+        rows = [r for r in all_rows[mark["first_episode_index"] :][: mark["n"]]
+                if pair_cut.episode_seed(r) in keep]  # fmt: skip
+        s70_parts.append({
+            **{k: mark[k] for k in ("release_id", "release_hash", "set_hash")},
+            "n": len(rows), "seeds_sha256": pairplan.seeds_sha256(sorted(keep)),
+            "first_episode_index": new,
+            "episodes": [{"episode_index": new + i, "cut_episode_index": r["episode_index"],
+                          "seed": pair_cut.episode_seed(r)} for i, r in enumerate(rows)],
+        })  # fmt: skip
+        s70_rows += [{**r, "episode_index": new + i} for i, r in enumerate(rows)]
+        new += len(rows)
+    raw["subsets"][0]["frames"] = sum(r["length"] for r in s70_rows)
+    origin = {"name": "ALL", "episodes": start, "frames": frames, "stats_sha256": stats}
+    marker = {"demo_set": "S70", "n": new, "from_cut": origin, "parts": s70_parts}
+    _pair_meta(sets / "S70" / ENV, marker, s70_rows)
+    raw["parents"]["psi0-ego-stage1-egx"]["vlm_stage1"].update(_pins(stage1))
+    del raw["status"]
+    (repo / PAIR_PLAN).write_text(yaml.safe_dump(raw, allow_unicode=True, sort_keys=False))
+    lock = json.loads(pairplan.freeze(repo / PAIR_PLAN, repo).read_text())
+    drive = tmp_path / "drive"
+    (drive / pair_cut.DRIVE_CUTS).mkdir(parents=True)
+    for name in ("ALL", "S70"):
+        pair_cut.pack(sets / name / ENV, name, drive / pair_cut.DRIVE_CUTS / f"{name}.tar")
+    return repo, lock["run_plan_id"], drive
+
+
+def test_no_pair_run_from_the_draft_plan() -> None:
+    for branch in colab_train.PAIR:
+        with pytest.raises(SystemExit) as stop:
+            colab_train.load_job(branch)
+        message = str(stop.value)
+        assert "is a draft: no pair job runs before task 6.2" in message
+        assert "PAIR_FROZEN is unset" in message and "not frozen" in message
+        assert "PENDING" not in message  # W1 and W2 are pinned
+
+
+def test_pair_runs_only_the_approved_frozen_plan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stage1, _ = _vlm_folders(tmp_path / "vlm")
+    repo, frozen, _ = _frozen_pair(tmp_path, stage1)
+    with pytest.raises(SystemExit, match="PAIR_FROZEN is unset"):
+        colab_train.load_job("B_70", repo)
+    monkeypatch.setattr(colab_train, "PAIR_FROZEN", "rp_000000000000")
+    with pytest.raises(SystemExit, match="only rp_000000000000 is approved"):
+        colab_train.load_job("B_70", repo)
+    monkeypatch.setattr(colab_train, "PAIR_FROZEN", frozen)
+    jobs = {b: colab_train.load_job(b, repo) for b in colab_train.PAIR}
+    assert {b: (j.job_id, j.parent_name, j.data_name) for b, j in jobs.items()} == {
+        "B_ALL": ("da34-t6-ft-b-all-s0", "psi0-ego-stage1-egx", "ALL"),
+        "C_ALL": ("da34-t6-ft-c-all-s0", "psi0-baseline-egodex-he", "ALL"),
+        "B_70": ("da34-t6-ft-b-70-s0", "psi0-ego-stage1-egx", "S70"),
+        "C_70": ("da34-t6-ft-c-70-s0", "psi0-baseline-egodex-he", "S70"),
+    }
+    work = tmp_path / "work"
+    assert jobs["C_70"].data(work) == work / "sets" / "S70" / ENV
+    assert jobs["B_70"].release_id == "tray_s1_41899efb4b27+tray_s1_4a8f4a8c6a8d"
+    assert jobs["B_70"].set_hash == jobs["C_70"].set_hash != jobs["B_ALL"].set_hash
+
+
+def test_pair_setup_takes_the_data_from_drive_and_checks_it_before_any_install(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stage1, _ = _vlm_folders(tmp_path / "vlm")
+    repo, frozen, drive = _frozen_pair(tmp_path, stage1)
+    monkeypatch.setattr(colab_train, "PAIR_FROZEN", frozen)
+    monkeypatch.setattr(colab_train, "DRIVE", drive)
+
+    class Installed(Exception):
+        pass
+
+    def install_env(work: Path) -> float:
+        raise Installed
+
+    monkeypatch.setattr(colab_train, "install_env", install_env)
+    work = tmp_path / "work"
+    # C_70: S70 from Drive, extracted, checked against the plan, then the install
+    with pytest.raises(Installed):
+        colab_train.setup(work, "C_70", repo)
+    assert (work / "sets" / "S70" / ENV / "meta" / colab_train.MARKER).is_file()
+    # B_70 also needs the stage 1 VLM on Drive, checked before the install too
+    with pytest.raises(SystemExit, match="mount Drive first"):
+        colab_train.setup(tmp_path / "work-b", "B_70", repo)
+    # a tar whose rows were zipped by position (seed order) is refused before the install
+    rows = work / "sets" / "S70" / ENV / "meta" / "episodes.jsonl"
+    loaded = [json.loads(line) for line in rows.read_text().splitlines()]
+    first, second = loaded[0]["environment_config"], loaded[1]["environment_config"]
+    loaded[0]["environment_config"], loaded[1]["environment_config"] = second, first
+    rows.write_text("".join(json.dumps(r) + "\n" for r in loaded))
+    with pytest.raises(SystemExit, match="does not hold"):
+        colab_train.setup(work, "C_70", repo)
+    # no Drive copy: refused with what to do
+    monkeypatch.setattr(colab_train, "DRIVE", tmp_path / "unmounted")
+    with pytest.raises(SystemExit, match="upload it to Drive first"):
+        colab_train.setup(tmp_path / "work-c", "C_ALL", repo)
+
+
+def test_pair_train_uses_the_plans_recipe_steps_and_parent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import flywheel_psi0.trainer as trainer_package
+    from flywheel_psi0.tray import pair_cut
+
+    stage1, base = _vlm_folders(tmp_path / "vlm")
+    repo, frozen, drive = _frozen_pair(tmp_path, stage1)
+    monkeypatch.setattr(colab_train, "PAIR_FROZEN", frozen)
+    monkeypatch.setattr(trainer_package, "Psi0Trainer", _FakeTrainer)
+    work = tmp_path / "work"
+    pair_cut.fetch(drive / pair_cut.DRIVE_CUTS / "S70.tar", work / "sets")
+    psi0 = work / "Psi0"
+    shutil.copytree(stage1, psi0 / colab_train.STAGE1_DIR / "vlm-ego")
+    shutil.copytree(base, psi0 / "cache/checkpoints" / BASE_VLM)
+    colab_train.train(work, "B_70", repo)
+    seen = _FakeTrainer.seen
+    spec = seen["spec"]
+    assert (spec.job_id, spec.parent.checkpoint_id) == ("da34-t6-ft-b-70-s0", "psi0-ego-stage1-egx")
+    assert spec.dataset.uri == str(work / "sets" / "S70" / ENV)
+    assert seen["overrides"] == {"train.validation_steps": 2000, "train.max_training_steps": 60000}
+    assert seen["recipe"].parents["psi0-ego-stage1-egx"].model_name_or_path == (
+        "cache/checkpoints/stage1/vlm-ego"
+    )
+    assert seen["run_plan_id"] == frozen and seen["nproc_per_node"] == 1
