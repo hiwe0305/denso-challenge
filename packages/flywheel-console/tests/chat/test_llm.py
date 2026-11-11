@@ -126,3 +126,63 @@ def test_latest_bench_reads_written_summary(idx: ConsolePaths) -> None:
         and b["p50_ms"] == 1500
         and b["by_group"]["vi"] == {"ok": 1, "n": 2}
     )
+
+
+def test_tool_round_cap_ignores_markup_on_last_round(
+    idx: ConsolePaths, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = {"n": 0}
+
+    def fake_generate(msgs: Any, schemas: Any, deadline: float) -> Any:
+        calls["n"] += 1
+        yield "end", ("", [{"name": "job_list", "arguments": {}}], 1, 1)
+
+    monkeypatch.setattr(llm, "generate", fake_generate)
+    monkeypatch.setattr(runner, "TUNNEL", FakeTunnel(up=True))
+    evs = list(llm.events({"messages": [{"role": "user", "content": "list the jobs"}],
+                           "context": {"route": "#/jobs"}}))  # fmt: skip
+    assert sum(1 for e, _ in evs if e == "tool_start") <= llm.MAX_ROUNDS
+    assert calls["n"] <= llm.MAX_ROUNDS + 1
+    assert evs[-1][0] == "done"
+
+
+def test_bench_any_of_dataset_ids(idx: ConsolePaths) -> None:
+    item = next(i for i in bench.load_items() if i["id"] == "b48")
+    assert isinstance(item["expect_tools"][0]["args_subset"]["dataset_id"], list)
+
+    def ev(ds: str) -> list[tuple[str, dict[str, Any]]]:
+        return [("tool_start", {"name": "qa_summary", "args": {"dataset_id": ds}}),
+                ("token", {"text": "x"}), ("done", {})]  # fmt: skip
+
+    for ok in ("S1", "S70", "ALL", "all"):
+        assert bench.score(item, ev(ok))["arg_ok"], ok
+    assert not bench.score(item, ev("T1"))["arg_ok"]
+
+
+def test_bench_aborts_when_tunnel_down(idx: ConsolePaths, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(runner, "TUNNEL", FakeTunnel(up=False))
+    with pytest.raises(RuntimeError, match="tunnel"):
+        bench.run(tag="x")
+    assert not idx.chat.exists() or not list(idx.chat.glob("bench-*.json"))
+
+
+def test_numbers_parity_with_agentqa() -> None:
+    from flywheel.console.chat.numbers import numbers_in as local
+    from flywheel.eval.agentqa.numbers import numbers_in as upstream
+
+    corpus = [
+        "425 episodes pass and 0 flag",
+        "loss 0.0449 at step 4,000",
+        "45/90 rollouts, 50.0% success",
+        "job-cf631ab2655c took 120ms",
+        "episode_000012 and T1 and p99",
+        "12k frames, 3.355 hours at 50 fps",
+        "dated 6/11/2026 in train/job-1",
+        "-3.5e-2 then +7",
+        "no numbers here",
+        "S70 has 68 failures (18 + 50)",
+        "4GB size, 10x faster",
+    ]
+    assert len(corpus) >= 10
+    for s in corpus:
+        assert local(s) == upstream(s), s

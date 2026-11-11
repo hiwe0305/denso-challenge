@@ -1,4 +1,3 @@
-# ruff: noqa: E501, UP031
 """Chat tools of the Data page group: catalog, stats, episodes, QA, lineage.
 
 Frames and posters come only from the index's ``/data/`` poster URLs, which the index builds
@@ -9,10 +8,9 @@ rule-layer files, and the failures of a generation batch are reported apart from
 from __future__ import annotations
 
 import re
-from pathlib import Path
 from typing import Any
 
-from flywheel.console.paths import PathDenied, active, deid_only
+from flywheel.console.paths import active
 
 from .common import (
     Result,
@@ -29,14 +27,6 @@ from .common import (
 from .resolve import want_dataset
 
 POSTER_PREFIX = "/data/"
-
-
-def deid_frame_source(p: str | Path) -> Path | None:
-    """The path of a frame source, only when it is a ``*.deid.mp4``; else None."""
-    try:
-        return deid_only(Path(p))
-    except PathDenied:
-        return None
 
 
 def poster_ok(url: Any) -> bool:
@@ -88,7 +78,7 @@ def catalog_search(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     show = ["id", "type", "task", "episodes", "hours", "status"]
     return result(
         ui,
-        "%d catalog rows match; showing the first %d.\n%s"
+        "%d catalog rows match; showing the first %d.\n%s"  # noqa: UP031
         % (len(hits), len(rows), rows_text(rows, show, 15)),
     )
 
@@ -99,9 +89,9 @@ def dataset_stats(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         return err or fail("dataset_id is required.")
     r = _row(ds)
     items = [
-        {"label": "episodes", "value": r.get("episodes")}, {"label": "frames", "value": r.get("frames")},
+        {"label": "episodes", "value": r.get("episodes")}, {"label": "frames", "value": r.get("frames")},  # noqa: E501
         {"label": "hours", "value": r.get("hours")}, {"label": "fps", "value": r.get("fps")},
-        {"label": "size", "value": r.get("size")}, {"label": "data class", "value": r.get("data_class")},
+        {"label": "size", "value": r.get("size")}, {"label": "data class", "value": r.get("data_class")},  # noqa: E501
     ]  # fmt: skip
     items = [i for i in items if i["value"] not in (None, "")]
     specs: list[dict[str, Any]] = [{"type": "stat", "items": items}]
@@ -126,7 +116,7 @@ def dataset_stats(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         tot = sum(b["c"] for b in h["bins"])
         mid = max(h["bins"], key=lambda b: b["c"])
         lines.append(
-            "histogram '%s': %d values, mode bin %.4g-%.4g (%d)"
+            "histogram '%s': %d values, mode bin %.4g-%.4g (%d)"  # noqa: UP031
             % (h.get("label"), tot, mid["lo"], mid["hi"], mid["c"])
         )
     return result({"type": "group", "items": specs}, "\n".join(lines))
@@ -169,14 +159,14 @@ def episode_list(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     if ego:
         rows = [
             {"episode_id": e["id"], "qa": e.get("qa"), "len_s": e.get("s"),
-             "reasons": ", ".join(e.get("reasons") or []), "hands_out": e.get("out"), "jitter": e.get("jit")}
+             "reasons": ", ".join(e.get("reasons") or []), "hands_out": e.get("out"), "jitter": e.get("jit")}  # noqa: E501
             for e in shown
         ]  # fmt: skip
         cs = cols("episode_id", "qa", "len_s", "reasons", "hands_out", "jitter")
         keys, rl = ["episode_id", "qa", "len_s", "reasons"], f"#/data/{ds}/ep/{{episode_id}}"
     else:
         rows = [
-            {"episode_index": e["i"], "len_s": e.get("s"), "frames": e.get("n"), "level": e.get("lv"),
+            {"episode_index": e["i"], "len_s": e.get("s"), "frames": e.get("n"), "level": e.get("lv"),  # noqa: E501
              "ok": e.get("ok"), "dist": e.get("dist"), "outcome": e.get("out") or "-"}
             for e in shown
         ]  # fmt: skip
@@ -209,7 +199,7 @@ def episode_list(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     note = "" if ego or not qa else " (simulator data: no QA flags, ok means the rollout succeeded)"
     return result(
         {"type": "group", "items": specs},
-        "%d episodes of %s match%s; showing the first %d.\n%s"
+        "%d episodes of %s match%s; showing the first %d.\n%s"  # noqa: UP031
         % (len(out), ds, note, len(shown), rows_text(rows, keys, 15)),
     )
 
@@ -295,9 +285,9 @@ def episode_get(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         env = (ds_file(ds, "env") or {}).get(str(e.get("i")), {})
         smp = env.get("sample", {})
         items = [
-            {"label": "frames", "value": e.get("n")}, {"label": "length", "value": e.get("s"), "unit": "s"},
+            {"label": "frames", "value": e.get("n")}, {"label": "length", "value": e.get("s"), "unit": "s"},  # noqa: E501
             {"label": "level", "value": e.get("lv")}, {"label": "seed", "value": e.get("seed")},
-            {"label": "ok", "value": e.get("ok")}, {"label": "tray dist", "value": e.get("dist"), "unit": "m"},
+            {"label": "ok", "value": e.get("ok")}, {"label": "tray dist", "value": e.get("dist"), "unit": "m"},  # noqa: E501
         ]  # fmt: skip
         specs.append({"type": "stat", "items": [i for i in items if i["value"] is not None]})
         lines.append(
@@ -330,12 +320,44 @@ def _qa_counts(row: dict[str, Any], q: dict[str, Any]) -> dict[str, Any] | None:
     return base | {k: v for k, v in c.items() if k not in base}
 
 
+def _children(ds: str) -> list[str]:
+    """Descendants of ``ds`` in the catalog, nearest first (breadth first)."""
+    rows = {r["id"]: r for r in catalog().get("rows", [])}
+    out: list[str] = []
+    frontier = [ds]
+    while frontier:
+        nxt: list[str] = []
+        for d in frontier:
+            for c in (rows.get(d) or {}).get("children") or []:
+                if c not in out and c != ds:
+                    out.append(c)
+                    nxt.append(c)
+        frontier = nxt
+    return out
+
+
+def _generation_batch(ds: str, q: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
+    """(owner id, quality doc) of the nearest dataset, itself first, that records failures."""
+    if q.get("failures"):
+        return ds, q
+    for c in _children(ds):
+        cq = ds_file(c, "quality") or {}
+        if cq.get("failures"):
+            return c, cq
+    return None
+
+
+def _decisions_text(c: dict[str, Any]) -> str:
+    return ", ".join(f"{v} {k}" for k, v in c.items())
+
+
 def qa_summary(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     ds, err = want_dataset(args, ctx)
     if err or ds is None:
         return err or fail("dataset_id is required.")
     q = ds_file(ds, "quality") or {}
     row = _row(ds)
+    rows_by_id = {r["id"]: r for r in catalog().get("rows", [])}
     specs: list[dict[str, Any]] = []
     lines: list[str] = []
     raw: dict[str, Any] = {}
@@ -345,7 +367,20 @@ def qa_summary(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         specs.append(
             {"type": "stat", "items": [{"label": "QA " + k, "value": v} for k, v in counts.items()]}
         )
-        lines.append("QA of {}: {}.".format(ds, ", ".join(f"{v} {k}" for k, v in counts.items())))
+        lines.append(f"QA of {ds}: {_decisions_text(counts)}.")
+    else:  # no decisions of its own (a cut): the parents' decisions, one hop, each labelled
+        for pid in row.get("parents") or []:
+            prow = rows_by_id.get(pid)
+            if prow is None:
+                continue
+            pc = _qa_counts(prow, ds_file(pid, "quality") or {})
+            note = _decisions_text(pc) if pc else prow.get("qa")
+            if note:
+                raw.setdefault("qa", {}).setdefault("parents", {})[pid] = pc or note
+                lines.append(f"parent {pid}: {note} (QA decisions of the parent, not of {ds}).")
+                specs.append({"type": "text", "text": f"parent {pid}: {note}"})
+        if row.get("qa"):
+            lines.append(f"QA note of {ds}: {row['qa']}")
     reasons = q.get("reasons")  # rule-layer reasons of egocentric data
     if reasons:
         rs = [(r[0], r[1]) for r in reasons]
@@ -362,14 +397,21 @@ def qa_summary(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         lines.append("QA reasons: " + ", ".join("{}={}".format(*x) for x in rs[:12]))
     elif counts and counts.get("flag", 0) + counts.get("reject", 0) == 0:
         lines.append("There are no QA failures: no episode is flagged or rejected.")
-    if q.get("failures"):  # simulator data: failures of the generation batch, not QA
-        fl = q["failures"]
-        funnel = q.get("funnel", [])
+    batch = _generation_batch(ds, q)
+    if batch:  # simulator data: failures of the generation batch, not QA
+        owner, bq = batch
+        fl = bq["failures"]
+        funnel = bq.get("funnel", [])
         att = next((n for a, n in funnel if "chạy" in a.lower()), None)
         failed = sum(n for _, n in fl)
-        scope = "generation batch shared by ALL and S70, not this cut"
+        scope = (
+            f"generation batch recorded on {owner}"
+            if owner != ds
+            else f"generation batch recorded on {ds}, shared with its sibling cuts"
+        )
         raw["generation_failures"] = {
             "scope": scope,
+            "owner": owner,
             "attempts": att,
             "failed": failed,
             "reasons": {a: n for a, n in fl},
@@ -383,14 +425,15 @@ def qa_summary(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
                 table("Funnel", cols("stage", "n"), [{"stage": a, "n": b} for a, b in funnel])
             )
         lines.append(
-            "generation batch (%s attempts, %d failed; scope: %s; these are NOT QA results): %s"
-            % (att, failed, scope, ", ".join("{}={}".format(*tuple(x)) for x in fl))
+            "%s (%s attempts, %d failed; these are NOT QA results): %s"  # noqa: UP031
+            % (scope, att, failed, ", ".join("{}={}".format(*tuple(x)) for x in fl))
         )
         lines.append("funnel: " + " > ".join(f"{a}={b}" for a, b in funnel))
     if not specs:
         s = row.get("qa") or "no QA recorded"
         specs.append({"type": "text", "text": f"QA for {ds}: {s}"})
-        lines.append(f"QA for {ds}: {s}")
+        if not lines:
+            lines.append(f"QA for {ds}: {s}")
     res = result({"type": "group", "items": specs}, "\n".join(lines))
     res["raw"] = raw
     return res

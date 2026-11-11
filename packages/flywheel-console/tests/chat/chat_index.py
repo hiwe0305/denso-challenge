@@ -20,18 +20,34 @@ def make_idx(fw: ConsolePaths) -> ConsolePaths:
     set_active(fw)
     ix = fw.index
     rows = [
-        {"id": "cut-all-zone1", "name": "ALL (#ALL:113520c517a0)", "title": "Tray S1 ALL",
+        {"id": "tray_s1_41899efb4b27", "name": "tray_s1_41899efb4b27 (release)",
+         "title": "Tray S1 release", "data_type": "synthetic S1", "task": "tray",
+         "episodes": 541, "status": "current", "aliases": ["S1"], "parents": [],
+         "children": ["ALL", "S70"], "qa": "534 pass / 7 reject"},
+        {"id": "ALL", "name": "ALL (#ALL:113520c517a0)", "title": "Tray S1 ALL",
          "data_type": "synthetic S1", "task": "tray", "episodes": 606, "status": "current",
-         "aliases": ["S1", "ALL"], "qa": "seed-hash", "qa_counts": {"pass": 606}},
+         "aliases": ["ALL"], "parents": ["tray_s1_41899efb4b27"], "children": [],
+         "qa": "seed-hash"},
         {"id": "S70", "name": "S70 (#S70:8ab4e33b657f)", "title": "Tray S1 S70 cut",
          "data_type": "synthetic S1", "task": "tray", "episodes": 425, "frames": 603915,
          "hours": 3.355, "fps": 50, "status": "current", "aliases": ["S70"],
-         "qa": "seed-hash 70% (301+124)", "qa_counts": {"pass": 425}},
+         "parents": ["tray_s1_41899efb4b27"], "children": [], "qa": "seed-hash 70% (301+124)"},
+        {"id": "T1", "name": "T1 teleop", "title": "Teleop sample", "data_type": "teleop",
+         "task": "two_table", "episodes": 13, "status": "current", "aliases": [],
+         "parents": [], "children": [], "qa": "rule layer",
+         "qa_counts": {"pass": 10, "flag": 2, "reject": 1}},
         {"id": "egx_aaaa1111", "name": "egx_aaaa1111", "title": "Ego sample",
          "data_type": "egocentric", "task": "two_table", "episodes": 3, "status": "current",
          "aliases": [], "qa": "rule layer"},
     ]  # fmt: skip
-    wj(ix / "catalog.json", {"rows": rows, "edges": [["cut-all-zone1", "S70"]], "runs": []})
+    wj(
+        ix / "catalog.json",
+        {
+            "rows": rows,
+            "edges": [["tray_s1_41899efb4b27", "ALL"], ["tray_s1_41899efb4b27", "S70"]],
+            "runs": [],
+        },
+    )
     wj(ix / "story.json", {
         "ledger": [["DA-34", 12.0, 9.5]],
         "reasons": [["hand_out_of_frame", 2, ["ep_1"]]],
@@ -60,6 +76,10 @@ def make_idx(fw: ConsolePaths) -> ConsolePaths:
         "dist": 2.2,
         "out": "",
     }
+    wj(ix / "ds" / "ALL" / "quality.json", {
+        "hists": [], "failures": [["L-ONE-HAND", 18], ["L-DROP", 50]],
+        "funnel": [["chạy", 606 + 68], ["thành công", 606]],
+    })  # fmt: skip
     wj(ix / "ds" / "S70" / "episodes.json", [sim_ep])
     ego = [
         {"id": "ep_1", "qa": "flag", "reasons": ["hand_out_of_frame"], "s": 5.0,

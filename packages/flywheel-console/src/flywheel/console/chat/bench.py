@@ -1,4 +1,3 @@
-# ruff: noqa: E501, UP031
 """Chat bench: runs every item of ``bench.jsonl`` through the live model and scores it.
 
 Scores: tool accuracy (expected tool names, in order, nothing extra; order ignored for the
@@ -64,7 +63,8 @@ def args_match(expect: dict[str, Any], actual: dict[str, Any], ctx: dict[str, An
             got = d.get(k)
         if got in (None, "", []):
             return False
-        if _norm_id(k, got) != _norm_id(k, v):
+        want = v if isinstance(v, list) else [v]  # a list means any of
+        if _norm_id(k, got) not in [_norm_id(k, x) for x in want]:
             return False
     return True
 
@@ -165,7 +165,8 @@ def run_item(item: dict[str, Any]) -> tuple[list[Event], float]:
 
 def run(tag: str | None = None, limit: int = 0, groups: str = "") -> dict[str, Any]:
     """Run the bench against the live model; writes ``<chat>/bench-<ts>.json`` for a full run."""
-    runner.TUNNEL.ensure(15)
+    if not runner.TUNNEL.ensure(15):
+        raise RuntimeError("model tunnel to rtx3060 is down; bench not run, no file written")
     rows: list[dict[str, Any]] = []
     lat: list[float] = []
     for it in load_items(groups, limit):
@@ -174,12 +175,12 @@ def run(tag: str | None = None, limit: int = 0, groups: str = "") -> dict[str, A
             r = score(it, events)
         except Exception as e:
             wall = 0.0
-            r = {"id": it["id"], "group": it["group"], "question": it["question"], "tools": [], "expected": [x["name"] for x in it["expect_tools"]], "tool_ok": False, "arg_ok": False, "no_action_ok": False, "error": str(e), "numbers": 0, "grounded": 0, "answer": ""}  # fmt: skip
+            r = {"id": it["id"], "group": it["group"], "question": it["question"], "tools": [], "expected": [x["name"] for x in it["expect_tools"]], "tool_ok": False, "arg_ok": False, "no_action_ok": False, "error": str(e), "numbers": 0, "grounded": 0, "answer": ""}  # fmt: skip  # noqa: E501
         r["wall_s"] = round(wall, 2)
         lat.append(wall)
         rows.append(r)
         print(
-            "%s %-5s tool=%s %5.1fs  %s -> %s"
+            "%s %-5s tool=%s %5.1fs  %s -> %s"  # noqa: UP031
             % (
                 r["id"],
                 r["group"],

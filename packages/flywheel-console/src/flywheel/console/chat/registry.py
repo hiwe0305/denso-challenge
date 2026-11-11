@@ -1,4 +1,4 @@
-# ruff: noqa: E501, UP031
+# ruff: noqa: E501, UP031  (ported prompt, guard-regex and tool-schema strings stay on one line)
 """Tool registry of the chat: schemas, which tools a page and a question offer, and ``call``."""
 
 from __future__ import annotations
