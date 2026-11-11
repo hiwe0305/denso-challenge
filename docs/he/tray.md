@@ -2448,6 +2448,37 @@ Nếu duyệt cả ba theo đề xuất, phân bổ theo 20.5 là:
 
 Nguồn: `step8.py` (`79ae4d48…`), `step8-C_70.json` (`7c3f5f89…`), `step5.py` (`35a6708d…`), `step5-C_70.jsonl` (`77c00195…`), `all-levels.jsonl` (`4567fe8f…`). Các file để ngoài repo, cùng ghi chép của phiên điều phối, và trên `rtx3060` ở `~/denso-da34-round-c70/`.
 
+### 20.13 Evidence card từng cụm và cụm nhận dữ liệu (12/11/2026)
+
+**[Đã chốt 12/11/2026, Hiếu]** "Duyệt theo đề xuất" R9–R11 của 20.12:
+- R9 (a): bước 7 không chạy.
+- R10: lượt c3, seed 1000118 đọc theo chữ là NGOÀI MIỀN.
+- R11: c3, c8 chẩn đoán theo từng lỗi.
+
+Bước 6 không chạy được ở mọi cụm (S1-06), nên mọi cụm ghi "chưa khoanh vùng". Bước 4 cho c1, c2 là các kiểm chung của 20.3 (độ trễ, đồng bộ, camera: đạt).
+
+| | c1 | c2 | c3 | c8 |
+|---|---|---|---|---|
+| Khóa (bước hỏng, nhãn, mức) | `place`, `L-PLACE-POSE`, 1 | `place`, `L-PLACE-POSE`, 2 | `approach_a`, `L-TIMEOUT`, 1 | `approach_a`, `L-TIMEOUT`, 2 |
+| Số lỗi / đại diện | 14 / 5 | 12 / 5 | 4 / 4 | 2 / 2 |
+| Bước 4 | Đạt | Đạt | H2: vượt τ_track tạm ở kênh yaw; đọc là lỗi của policy (R8) | Như c3 |
+| Bước 5 (planner, 1 lượt) | 5/5 xong | 4/5 xong; 1000119 hết giờ ở `ARRIVE_B` | 3/4 xong; 1000113 hết giờ ở `RELEASE` | 1/2 xong; 1000114 `L-PLACE-POSE` |
+| Bước 6 | Chưa khoanh vùng | Chưa khoanh vùng | Chưa khoanh vùng | Chưa khoanh vùng |
+| Bước 7 | Không áp dụng (mức 1) | Không chạy (R9) | Không áp dụng (mức 1) | Không chạy (R9) |
+| Bước 8, d (τ_cov) | 0,43–0,95 (1,143); trong miền | 0,72–1,57 (1,524); 3 lỗi d > τ_cov | 0,60–0,87 (1,143); 1000118 ngoài miền 0,003° | 1,25–1,36 (1,524) |
+| Chẩn đoán | KỸ NĂNG YẾU (5/5) | KỸ NĂNG YẾU (4/5) | Theo lỗi: 1000114, 1000126 KỸ NĂNG YẾU; 1000113 KHÔNG KHẢ THI; 1000118 NGOÀI MIỀN | Theo lỗi: 1000120 KỸ NĂNG YẾU; 1000114 KHÔNG KHẢ THI |
+| Can thiệp | Sinh S1 quanh điều kiện lỗi (ghi đè của kỹ sư, 20.5) | Như c1 | Như c1, cho 2 lỗi | Như c1, cho 1 lỗi |
+
+Cụm chỉ báo cáo (c4–c7, lẻ) không tiêu ngân sách dữ liệu (20.3, 20.11).
+
+**Lỗi nhận dữ liệu.** Mỗi cụm tối đa L_t = 10 lỗi, chọn bằng `random.Random(20261112).sample` trên danh sách lỗi đủ điều kiện xếp theo (mức, seed). Lỗi KHÔNG KHẢ THI và NGOÀI MIỀN không đủ điều kiện.
+
+| Bể (theo bước hỏng) | Lỗi (mức, seed) |
+|---|---|
+| `approach_a` (c3, c8) | (1, 1000114), (1, 1000126), (2, 1000120) |
+| `place`, c1 (10 trên 14) | (1, 1000109), (1, 1000127), (1, 1000121), (1, 1000128), (1, 1000112), (1, 1000124), (1, 1000107), (1, 1000122), (1, 1000117), (1, 1000125) |
+| `place`, c2 (10 trên 11) | (2, 1000107), (2, 1000117), (2, 1000124), (2, 1000112), (2, 1000116), (2, 1000110), (2, 1000103), (2, 1000102), (2, 1000121), (2, 1000108) |
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -2502,3 +2533,4 @@ Nguồn: `step8.py` (`79ae4d48…`), `step8-C_70.json` (`7c3f5f89…`), `step5.p
 | 12/11/2026 | Mục 20, 20.10 (nhiệm vụ con 7.4): có loader cho plan vòng; `round-tray-c70.yaml` đổi theo model (`uniform_branch`, `failures.checkpoint`, `train.stats_sha256`, `comparisons`, `interpretation`), giá trị không đổi. Luật 20.7 không đổi | Claude cho Hiếu |
 | 12/11/2026 | Mục 20.9: Hiếu "Duyệt theo đề xuất" R1–R8 (R4 = A, R7 duyệt luật 20.7, R8 = c3, c8 là lỗi của policy). Luật 20.7 không đổi | Claude cho Hiếu |
 | 12/11/2026 | Mục 20.12 mới (nhiệm vụ con 7.3, phần đầu): đại diện của c1, c2, c3, c8; bước 8 trên mọi lỗi (τ_cov mức 1 là 1,143, mức 2 là 1,524); bước 5 trên 16 đại diện (13 xong, 3 KHÔNG KHẢ THI); bước 7 không làm được như 20.4 (chỉ ánh sáng mức 2 là hình ảnh); quyết định mới R9–R11 chờ Hiếu. Luật 20.7 không đổi | Claude cho Hiếu |
+| 12/11/2026 | Mục 20.13 mới (nhiệm vụ con 7.3 xong): Hiếu "Duyệt theo đề xuất" R9–R11; evidence card của c1, c2, c3, c8; 23 lỗi nhận dữ liệu (3 ở `approach_a`, 10 + 10 ở `place`). Luật 20.7 không đổi | Claude cho Hiếu |
