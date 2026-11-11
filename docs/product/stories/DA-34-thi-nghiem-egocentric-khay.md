@@ -95,7 +95,7 @@ Là trưởng nhóm, tôi muốn so Ψ₀ fine-tune với đủ demo robot, vớ
 
 - [ ] 7. Một vòng Failure → Data trên `C_70` (π₀ của nhánh C): chẩn đoán lỗi giai đoạn 1 của `C_70`, sinh tối đa B_add = 181 episode nhắm lỗi, train `C70_R1` và so với `C_ALL` (thêm đều cùng ngân sách) (AC 6; Hiếu 12/11/2026 "Có, soạn RunPlan" qua phiên điều phối, tray.md mục 20)
   - [x] 7.1 RunPlan nháp và luật đọc trước mọi rollout của vòng · **12/11/2026:** `round-tray-c70.yaml` (`draft`, chưa có loader), `round-c70-rollouts.jsonl` (60 lượt, sha256 `aff514b5…`), tray.md mục 20, khối `round-c70-rules`; R1–R7 chờ Hiếu
-  - [ ] 7.2 Bước 4: kiểm H1–H3 (chuỗi bước ở `approach_a`, hết giờ, nghiêng lúc hạ và buông); phiếu cho DA-37 và DA-38
+  - [x] 7.2 Bước 4: kiểm H1–H3 (chuỗi bước ở `approach_a`, hết giờ, nghiêng lúc hạ và buông); phiếu cho DA-37 và DA-38 · **12/11/2026:** chỉ đọc trên `rtx3060`, 0 CU (tray.md 20.11). H1: 7/60 lượt gãy ở `approach_a` mà vẫn mang khay, CHƯA RÕ (ngưỡng bộ chấm), phiếu DA-37. H2: τ_track tạm vượt ở 4/6 lượt hết giờ, chủ yếu kênh yaw, nhưng không phân biệt (vượt cả 21/43 lượt lỗi khác); đề xuất đọc là lỗi của policy, chờ Hiếu (R8). H3: thiếu thời điểm lỗi và tiếp xúc, CHƯA RÕ, phiếu DA-38. Hai phiếu soạn sẵn, chưa mở
   - [ ] 7.3 Bước 5, 7, 8 trên các cụm còn lại; evidence card; chọn cụm nhận dữ liệu theo 20.5
   - [ ] 7.4 Mã: loader và `runplan check`/`freeze` cho plan vòng có cha là nhánh của plan cặp; bản cắt S70 + tập nhắm lỗi; `colab_train --branch C70_R1`; `evidence` đọc (r1), (r2)
   - [ ] 7.5 Sinh, QA, chọn, đóng băng plan vòng (điền `targets`, `rules_sha256`); dòng ước lượng và thực đo
@@ -152,6 +152,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 11/11/2026 | Phiên điều phối: làm 6.3 trên nhánh riêng `DA-34-pair60k-runner`, mở PR sau khi #181 merge | Claude cho Hiếu |
 | 11/11/2026 | Hiếu "Duyệt 19.2": làm 6.2 (Decision nháp, đóng băng plan bốn run, `PAIR_FROZEN`) | Claude cho Hiếu |
 | 12/11/2026 | Hiếu "Có, soạn RunPlan" (qua phiên điều phối, sau giai đoạn 1 của bốn run): thêm nhiệm vụ 7 và làm 7.1 | Claude cho Hiếu |
+| 12/11/2026 | Hiếu merge #196 và bảo "làm tiếp đi": làm 7.2 (H1–H3) | Claude cho Hiếu |
 
 ## Ghi chép khi làm
 

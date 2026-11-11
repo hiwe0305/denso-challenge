@@ -2287,10 +2287,11 @@ Luật này không đổi sau khi thấy kết quả. Muốn đổi thì ghi `De
 | R5 | Thay cổng dev 6.12 và phép đo 6.13 bằng hai giai đoạn ghép cặp với `C_ALL` (20.7) | Đồng ý |
 | R6 | Chạy H1–H3, bước 5, sinh và QA trên `rtx3060` (CPU, ≤ 10 worker); bước 7 trên một L4 (cap 8) | Đồng ý |
 | R7 | Duyệt luật 20.7 | — |
+| R8 | Đọc H2 (c3, c8) theo số đo là lỗi của policy, đi tiếp bước 5–8; hay theo chữ của luật 20.3 là phiếu sửa controller, không nhận dữ liệu (20.11) | Lỗi của policy |
 
 ### 20.10 Việc còn lại
 
-- 7.2 Bước 4 (H1–H3) và phiếu sửa cho DA-37 (ngưỡng `approach_a`) và DA-38 (ghi thời điểm lỗi).
+- 7.2 Bước 4 (H1–H3) và phiếu sửa cho DA-37 (ngưỡng `approach_a`) và DA-38 (ghi thời điểm lỗi): **xong 12/11/2026**, kết quả ở 20.11; hai phiếu soạn sẵn, chưa mở.
 - 7.3 Bước 5, 7, 8, evidence card của từng cụm, chọn cụm nhận dữ liệu.
 - 7.4 Mã:
   - loader cho plan vòng có cha là một nhánh của plan cặp (`purpose: round`, `inherits` plan cặp, `base_branch: C_70`);
@@ -2300,6 +2301,78 @@ Luật này không đổi sau khi thấy kết quả. Muốn đổi thì ghi `De
   - `evidence` đọc (r1), (r2).
 - 7.5 Sinh, QA, chọn, đóng băng plan (điền `targets`, `rules_sha256`).
 - 7.6 Train; 7.7 eval giai đoạn 1 và đọc theo 20.7.
+
+### 20.11 Kết quả bước 4: H1–H3 (12/11/2026, 0 CU)
+
+Đọc trên `rtx3060`, chỉ đọc file, không chạy rollout. Nguồn là lô stage 1 của `C_70` (20.2) và, để so, lô cùng điều kiện của `C_ALL` và `B_70`. Script `h123.py` (sha256 `4eb90372…`) dựng lại vị trí base bằng cách cộng dồn vận tốc đo (`meas_lower` vx, vy theo hướng, yaw) từ điểm spawn. Đây là ước lượng: trace không có tư thế base, tay hay khay. Kiểm độ tin: 10 lượt thành công của `C_70` dừng cách mép bàn B 0,28–0,46 m, với y ≈ 0, đúng chỗ khay được đặt. Số trong mục này là số đo trên các lô đã chạy, không phải lượt mới.
+
+**H1: chuỗi bước gãy ở `approach_a`.** CHƯA RÕ (ngưỡng bộ chấm), phiếu cho DA-37.
+
+- Trong `C_70` có 7 lượt chưa bao giờ qua `approach_a` mà không hết giờ:
+  - 5 lượt `L-PLACE-POSE` (c6, c7);
+  - 1 lượt `L-PART-DROP`;
+  - 1 lượt **thành công** (mức 2, seed 1000115).
+- Cả 7 lượt có base nằm trong `approach_zone` trước mép bàn A gần như suốt lúc tiếp cận (tỉ lệ thời gian trong vùng ≥ 0,947), như 47 lượt đã qua `approach_a` (≥ 0,993). Vế base của `approach_a` vì thế có giữ. Theo loại trừ, vế còn lại không bao giờ giữ: hai lòng bàn tay trong `r_reach` 0,10 m của tâm tay cầm cùng một chu kỳ. Robot vẫn cầm và mang được khay. Đây là suy ra, không đo được, vì trace không có tư thế tay.
+- Lượt H1 đứng xa bàn A hơn một chút. Khoảng cách nhỏ nhất tới mép bàn A trước lúc quay, trung vị: H1 0,076 m, lượt đã qua 0,031 m. `C_ALL` 0,044 so với 0,031; `B_70` 0,043 so với 0,027.
+- Hiện tượng lặp ở run khác:
+
+| Run | Lượt gãy ở `approach_a` không hết giờ | Trong đó thành công |
+|---|---|---|
+| `C_70` | 7/60 | 1 |
+| `C_ALL` | 10/60 | 1 (mức 1, seed 1000127) |
+| `B_70` | 7/60 | 0 |
+
+- Hệ quả cho vòng này: nhãn cuối của các lượt này vẫn đúng. Chỉ bước hỏng đầu tiên sai, và chuỗi gãy làm tắt hai nhãn cần `carrying` (`L-TRAY-TILT`, `L-ONE-HAND`). c6, c7 không vào ngân sách dữ liệu; bộ chấm không đổi trong vòng (20.3).
+
+Phiếu DA-37 (soạn sẵn, chưa mở):
+
+> **`approach_a` gãy khi tay cầm khay ở xa tâm tay cầm.** Trong `flywheel_simple/tray/predicates.py`, `approach_a` cần cùng một chu kỳ: base trong `approach_zone` trước mép bàn A, và hai điểm lòng bàn tay (trung điểm `wrist_yaw_link` và `hand_middle_0_link`) cách tâm tay cầm ≤ `r_reach` 0,10 m. Ở stage 1 của bốn run cặp 60k, 7/60 lượt của `C_70`, 10/60 của `C_ALL` và 7/60 của `B_70` không bao giờ qua bước này mà vẫn mang khay sang bàn B; 2 lượt thành công không qua bước nào. Vì các bước chốt theo thứ tự, mọi bước sau ghi sai, và `L-TRAY-TILT`, `L-ONE-HAND` (cần `carrying`) không bao giờ bật. Đề xuất: (1) ghi khoảng cách lòng bàn tay–tâm tay cầm nhỏ nhất vào outcome (cùng phiếu DA-38); (2) từ số đó, chọn giữa nới `r_reach`, đo tới cạnh tay cầm thay vì tâm, hoặc cho `approach_a` chốt khi `grasp` đã qua. Đổi bộ chấm làm số đo của các run đã chấm hết so được (spec 6.4), nên chỉ áp từ vòng sau và ghi phiên bản bộ chấm.
+
+**H2: hết giờ ở `approach_a` (c3, c8, 6 lượt).** Theo chữ của luật 20.3: vượt τ_track ở 4/6. Đọc theo số đo: lỗi của policy. Hai cách đọc khác nhau, nên cần Hiếu chọn (R8 ở 20.9).
+
+- τ_track **tạm**: phân vị 99 của sai số bám (chuẩn của lệnh − đo mỗi chu kỳ, yaw quấn về ±π) trên 10 lượt thành công của `C_70`, chỉ các chu kỳ trước lần quay đầu tiên quá 90° (7 384 chu kỳ):
+  - thân trên 2,640;
+  - thân dưới 0,387.
+  
+  Lấy cả episode thì gần như bằng (2,641 và 0,385). Tạm vì spec lấy τ_track từ teleop thành công, mà task khay chưa có teleop.
+- Từng lượt, phân vị 99 trước lần quay:
+
+| Mức, seed | Thân trên | Thân dưới | Kênh lớn nhất ở thân dưới | Vượt τ |
+|---|---|---|---|---|
+| 1, 1000113 | 1,363 | 0,373 | — | Không |
+| 1, 1000114 | 2,662 | 0,410 | — | Có, sát ngưỡng |
+| 1, 1000118 | 2,447 | 1,330 | yaw 1,311 | Có |
+| 1, 1000126 | 2,044 | 0,346 | — | Không |
+| 2, 1000114 | 2,299 | 0,702 | yaw 0,67 | Có |
+| 2, 1000120 | 2,510 | 0,511 | yaw 0,40 | Có |
+
+- Vì sao không đọc là LỖI CONTROLLER:
+  - Phần vượt nằm ở kênh hướng (yaw). Đó là độ trễ đã biết của yaw đo so với lệnh khi quay, điểm mở của DA-13. Sai số vx, vy giống lượt thành công.
+  - Cùng τ đó bị vượt ở 21 trong 43 lượt lỗi không hết giờ của `C_70` (17 trong 37 lượt đã qua `approach_a`). Nó cũng bị vượt ở 4 trong 10 lượt thành công; phần này một phần do cách lấy τ (phân vị 99 gộp, nên phân vị 99 từng lượt có thể cao hơn). τ tạm không phân biệt được lượt hết giờ với lượt khác.
+- Policy có ra lệnh đi, và đi sai:
+  - Trong 20 s đầu, tỉ lệ chu kỳ có lệnh vận tốc > 0,05 m/s là 0,59–0,78; trung vị của lượt thành công là 0,35.
+  - Base rời vùng tiếp cận: tỉ lệ thời gian trong vùng 0,18–0,59 ở 5/6 lượt (seed 1000126 mức 1 ở trong vùng suốt).
+  - Lần quay đầu tiên tới muộn: 24,6–66,9 s, so với trung vị 17,7 s ở lượt thành công.
+  - Robot đi 10,7–16,7 m, khay vẫn nằm trên bàn A (cách đích khoảng 2,1–2,5 m).
+- Bảng 20.3 không có ô "vượt nhưng policy ra lệnh đi". **[Đề xuất]** đọc c3, c8 là lỗi của policy: đi tiếp bước 5–8 như c1, c2, với ngân sách chẩn đoán đã ghi ở 20.8. Đọc theo chữ của luật thì c3, c8 thành phiếu sửa controller và không nhận dữ liệu.
+
+**H3: nghiêng lúc hạ và buông.** CHƯA RÕ (thiếu tín hiệu, spec 6.4 mục 1), phiếu cho DA-38.
+
+- Outcome có các trường `failure`, `level`, `scorer_steps`, `seed`, `sim_time_s`, `steps`, `success`, `tray_pos`, `tray_quat`. Trace có `cmd_lower`, `cmd_upper`, `dropped_frames`, `episode_id`, `meas_lower`, `meas_upper`, `run_plan_id`, `step`, `t_image`, `t_state`, `trace_id`. Không trường nào cho thời điểm lỗi, tiếp xúc của khay hay độ nghiêng lúc lỗi.
+- Thời điểm kết thúc cũng không thay được. Lượt lỗi chạy hết giờ (`sim_time_s` 92,1–93,3 s), lượt thành công dừng ở 28,6–39,4 s. Lúc kết thúc vì thế không cho biết lỗi xảy ra khi nào.
+- c4, c5 và hai lượt lẻ không vào ngân sách dữ liệu (20.3).
+
+Phiếu DA-38 (soạn sẵn, chưa mở):
+
+> **Outcome của task khay thiếu tín hiệu để chẩn đoán lỗi.** Bước 4 của vòng Failure → Data trên `C_70` (docs/he/tray.md 20.11) không phân biệt được lỗi nghiêng thật với lỗi do bộ chấm, vì outcome chỉ có trạng thái cuối. Đề xuất thêm vào outcome:
+> - `failure_t`: thời điểm nhãn lỗi bật;
+> - tại `failure_t`: `tray_on_table` (bàn nào), tiếp xúc tay–khay theo từng tay, độ nghiêng khay, tư thế khay;
+> - thời điểm chốt của từng bước trong chuỗi bước của bộ chấm;
+> - khoảng cách lòng bàn tay–tâm tay cầm nhỏ nhất của từng tay (cho phiếu DA-37).
+>
+> Chỉ ghi thêm, không đổi cách chấm, nên số đo cũ vẫn so được.
+
+**Hệ quả cho các bước sau.** Cụm đi bước 5–8 là c1, c2, cộng c3, c8 nếu Hiếu chọn cách đọc **[Đề xuất]** của H2. c4, c5, c6, c7 và lượt `L-PART-DROP` thành phiếu, không tiêu ngân sách dữ liệu. Số đo của từng lượt ở `h123-C_70.json` (sha256 `0cf439c9…`), `h123-C_ALL.json` (`ecdfda67…`) và `h123-B_70.json` (`21aaf223…`), để ngoài repo cùng các ghi chép của phiên điều phối.
 
 ## Change log
 
@@ -2351,3 +2424,4 @@ Luật này không đổi sau khi thấy kết quả. Muốn đổi thì ghi `De
 | 11/11/2026 | Mục 19.9 mới, 19.5, 19.7 (nhiệm vụ con 6.3, qua phiên điều phối): runbook bốn run. Gồm: dựng S70 theo seed của chính episode và giữ stats của ALL (`pair_cut`); hai tar lên Drive; `colab_train` cho bốn nhánh, dữ liệu từ Drive được kiểm trước khi cài; một đợt `cu_watch` và đường lùi hai đợt; bước đồng ý Drive trên mỗi VM; làn serve Colab (`colab_serve`, kiểm sha256 và bounds của stats ALL); bảng cổng. Chưa chạy | Claude cho Hiếu |
 | 11/11/2026 | Mục 19.9 (phiên điều phối chạy thử 6.3 trên cut thật): ghi sha256 phải ra của `ALL.tar` (`bea55b14…`) và `S70.tar` (`f87bfecb…`), sha khác thì dừng; bước A chạy được trên laptop từ bản sao đã kiểm | Claude cho Hiếu |
 | 12/11/2026 | Mục 20 mới (nhiệm vụ 7, Hiếu "Có, soạn RunPlan" qua phiên điều phối): một vòng Failure → Data trên `C_70` ([Đề xuất], viết trước mọi rollout chẩn đoán, sinh, train hay eval). Đặt vòng vào hình PoC của spec 7.2 (`C_70` = A₀.₇, `C_ALL` = thêm đều, `C70_R1` = C, B_add 181 episode); đầu vào `round-c70-rollouts.jsonl` (`aff514b5…`) và 8 cụm; kiểm hệ thống H1–H3 trước dữ liệu; bước 6 không làm được (S1-06), bước 7 3 lượt mỗi đại diện; ghi đè KỸ NĂNG YẾU sang sinh S1; luật đọc `round-c70-rules` ((r1) `C70_R1` − `C_ALL` quyết định, hai giai đoạn như 19.2); ngân sách khoảng 92 CU tới giai đoạn 1 (ước lượng); bảy quyết định R1–R7 chờ Hiếu. Plan nháp `round-tray-c70.yaml`, chưa có loader | Claude cho Hiếu |
+| 12/11/2026 | Mục 20.11 mới (nhiệm vụ con 7.2, qua phiên điều phối): kết quả bước 4, chỉ đọc trên `rtx3060`, 0 CU. H1: 7/60 lượt của `C_70` gãy chuỗi bước ở `approach_a` mà vẫn mang khay (1 thành công), suy ra vế lòng bàn tay–tay cầm; CHƯA RÕ (ngưỡng bộ chấm), phiếu DA-37. H2: τ_track tạm (p99 trên 10 lượt thành công, thân trên 2,640, thân dưới 0,387) vượt ở 4/6 lượt hết giờ, chủ yếu kênh yaw, và ở 21/43 lượt lỗi không hết giờ; policy ra lệnh đi và rời vùng tiếp cận; đề xuất đọc là lỗi của policy, thêm R8 vào 20.9. H3: outcome và trace không có thời điểm lỗi hay tiếp xúc; CHƯA RÕ (thiếu tín hiệu), phiếu DA-38. Luật 20.7 không đổi | Claude cho Hiếu |
