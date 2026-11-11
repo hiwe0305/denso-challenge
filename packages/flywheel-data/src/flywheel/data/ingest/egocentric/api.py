@@ -36,6 +36,7 @@ from flywheel.data.annotate.deid.gate import (
     deid_copy,
     require_annotate,
 )
+from flywheel.data.ingest.egocentric.clean import CleanParams, clean_pose
 from flywheel.data.ingest.egocentric.compare import compare
 from flywheel.data.ingest.egocentric.config import EgoConfig
 from flywheel.data.ingest.egocentric.episodes import (
@@ -233,12 +234,19 @@ def estimate_jobs(work: Path, source: EgoSourceRecord) -> list[dict[str, object]
     return jobs
 
 
-def import_estimates(work: Path, estimates: Path) -> dict[str, dict[str, object]]:
+def import_estimates(work: Path, estimates: Path, cleaning: CleanParams | None = None) -> dict[
+        str, dict[str, object]]:
     """E-A: pose_ea.npz from each job output; pose.npz too when there is no tracking;
     compare.json where E-B exists. Returns the deviations by episode.
 
+    `cleaning` (`pose_ea.clean` of the config; task 10) sets the frame of the pose and
+    cleans it (`clean.py`); `bundle.json` records both, or for an episode with E-B, whose
+    bundle describes E-B, `compare.json` `pose_ea` does. compare.json compares the raw
+    estimate, so cleaning does not change it. E-B is never touched.
+
     Every estimate is read and compared before any file is written, so a bad one leaves
     the work dir as it was."""
+    cleaning = cleaning or CleanParams()
     deviations = {}
     source = read_source(work)
     on_disk = deid_hashes(source)
@@ -251,18 +259,22 @@ def import_estimates(work: Path, estimates: Path) -> dict[str, dict[str, object]
         bundle = read_bundle(work, episode.episode_id)
         folder = bundle_dir(work, episode.episode_id)
         estimate = read_estimate(raw)
-        pose = to_pose(estimate)
+        pose, done_cleaning = clean_pose(to_pose(estimate, cleaning.frame), cleaning)
         deviation = None
         if bundle.hdf5 is not None:
             deviation = compare(load_pose(folder / POSE), estimate, _intrinsic(bundle),
                                 bundle.image_size).to_dict()
             deviation["meta"] = estimate.meta
+            # pose_ea.npz of a tracked episode follows the config too; trial.py reads it
+            deviation["pose_ea"] = {"frame": cleaning.frame, "cleaning": done_cleaning}
             deviations[episode.episode_id] = deviation
-        done.append((bundle, folder, pose, deviation))
-    for bundle, folder, pose, deviation in done:
+        done.append((bundle, folder, pose, deviation, done_cleaning))
+    for bundle, folder, pose, deviation, done_cleaning in done:
         save_pose(pose, folder / POSE_EA, _intrinsic(bundle))
         if deviation is None:
             save_pose(pose, folder / POSE, _intrinsic(bundle))
+            write_text(folder / BUNDLE, replace(
+                bundle, pose_frame=cleaning.frame, pose_cleaning=done_cleaning).to_json() + "\n")
         else:
             write_text(folder / COMPARE, json.dumps(deviation, indent=2) + "\n")
     return deviations

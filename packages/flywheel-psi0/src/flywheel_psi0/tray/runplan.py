@@ -27,10 +27,22 @@ before the first job (design 6.4) cannot drift silently.
 (section 6.6, task 5): it inherits everything from the frozen plan and stays a
 draft until its targeted episodes exist.
 
+`he-tray-pair60k.yaml` (task 6) is a paired plan of another shape, `purpose:
+paired_train`: its schema and checks are `flywheel_psi0.tray.pairplan`, and `check` and
+`freeze` here hand such a plan over to it.
+
+`he-tray-b.yaml` is branch B (task 4, AC 5): branch C of the frozen v2 plan with one
+change, the VLM parent, which is C's VLM fine-tuned at stage 1 by DA-30 on the team's
+egocentric clips (`Stage1Parent`). `variant_of` names the plan and branch it copies,
+and `check` fails on any other difference. Until DA-30's checkpoint is pinned (Drive
+folder, weights and folder sha256), `check` passes as a draft but `freeze` and
+`--launch` refuse (`stage1_pending`).
+
     python -m flywheel_psi0.tray.runplan check configs/runplans/tray/he-tray.yaml
     python -m flywheel_psi0.tray.runplan check configs/runplans/tray/he-tray-v2.yaml \
         --release ~/denso-da34-pool/fwdata/releases/tray_s1_f9433b028c52 --launch
     python -m flywheel_psi0.tray.runplan check configs/runplans/tray/round-tray-cplus.yaml
+    python -m flywheel_psi0.tray.runplan check configs/runplans/tray/he-tray-b.yaml
     python -m flywheel_psi0.tray.runplan freeze configs/runplans/tray/he-tray.yaml
 """
 
@@ -59,7 +71,13 @@ TRAINING_NEUTRAL_OVERRIDES = frozenset({"train.validation_steps"})
 STATUS_FIELDS = {"superseded_by", "status"}
 # The block of the interpretation doc that `Interpretation.rules_sha256` pins; the
 # label above it ([Đề xuất], [Đã chốt]) stays outside, so approving it keeps the id.
-RULES_MARKERS = ("<!-- tier2-rules -->", "<!-- /tier2-rules -->")
+# A plan names another block with `Interpretation.rules_marker` (branch B: branch-b-rules).
+RULES_MARKER = "tier2-rules"
+# Top-level fields a variant (`variant_of`) may set apart from the plan it copies.
+VARIANT_FIELDS = frozenset(
+    {"name", "status", "parents", "branches", "budget", "interpretation", "variant_of"}
+    | {"supersedes", "superseded_by"}
+)
 SPLIT_FILE = "configs/splits/default.yaml"
 
 
@@ -82,6 +100,49 @@ class Parent(_Frozen):
     action_header: Weights
     clean_for_main_task: bool  # Q0 (03 section 8.3 point 7)
     note: str = ""
+
+
+class Stage1Vlm(_Frozen):
+    """A VLM fine-tuned at stage 1 by another story's job, not a psi-model release file.
+
+    Branch B (docs/he/tray.md section 18): DA-30 fine-tunes the VLM of `from_parent` on
+    the team's egocentric clips and persists the whole folder (every file of the parent's
+    VLM folder, weights replaced) to Google Drive. The three pins stay null until that
+    checkpoint exists; `freeze` and `--launch` refuse while any is null.
+    """
+
+    from_parent: str  # parent of this plan whose VLM the stage 1 run started from
+    story: str  # the story whose job produced it (its cost is in that story's ledger)
+    ledger: str  # repo-relative ledger of that job
+    job_id: str | None = None
+    # Folder under MyDrive: what Qwen3VLForConditionalGeneration.from_pretrained loads.
+    drive_dir: str | None = None
+    weights_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    # sha256 of the folder manifest (colab_train.folder_manifest): every file, not only
+    # the weights, since no psi-model revision pins the config and tokenizer here.
+    manifest_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    # canonical sha256 of the parent VLM's safetensors header ({tensor: [dtype, shape]},
+    # colab_train.header_sha256), read at the plan's psi-model revision: the stage 1
+    # weights must have exactly these tensors, or Qwen3VL from_pretrained would only warn
+    # and stage 3 would train from freshly initialised weights.
+    parent_header_sha256: str = Field(min_length=64, max_length=64)
+
+
+class Stage1Parent(_Frozen):
+    """A parent whose VLM is a stage 1 checkpoint and whose action header is a release file."""
+
+    vlm_stage1: Stage1Vlm
+    action_header: Weights
+    clean_for_main_task: bool
+    note: str = ""
+
+
+class VariantOf(_Frozen):
+    """The frozen plan and branch a plan copies; `check` allows only VARIANT_FIELDS to differ."""
+
+    plan: str  # repo-relative
+    run_plan_id: str
+    branch: str
 
 
 class PsiModel(_Frozen):
@@ -215,6 +276,7 @@ class Interpretation(_Frozen):
     doc: str  # repo-relative
     delta_pp: float | None = Field(default=None, gt=0)  # delta of the HE-T rules (branch B)
     rules_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    rules_marker: str | None = None  # None: RULES_MARKER
 
 
 class Budget(_Frozen):
@@ -236,7 +298,7 @@ class TrayRunPlan(_Frozen):
     embodiment: str
     code: dict[str, Pin]
     psi_model: PsiModel
-    parents: dict[str, Parent]
+    parents: dict[str, Parent | Stage1Parent]
     release: Release
     demo_sets: DemoSetPins
     recipe: Recipe
@@ -260,6 +322,7 @@ class TrayRunPlan(_Frozen):
     # rules); no job launches it and it cannot be frozen until the status goes. Out of
     # the id and the lock like superseded_by.
     status: Literal["draft"] | None = None
+    variant_of: VariantOf | None = None  # branch B: branch C of v2 with one change
 
     @classmethod
     def load(cls, path: Path) -> TrayRunPlan:
@@ -340,9 +403,9 @@ def lock_path(plan_path: Path) -> Path:
     return plan_path.with_name(plan_path.name.removesuffix(".yaml") + ".lock.json")
 
 
-def rules_block(text: str) -> str:
-    """The text between the tier2-rules markers: exactly one pair, in order."""
-    begin, end = RULES_MARKERS
+def rules_block(text: str, marker: str | None = None) -> str:
+    """The text between the markers of one block (tier2-rules by default): one pair, in order."""
+    begin, end = f"<!-- {marker or RULES_MARKER} -->", f"<!-- /{marker or RULES_MARKER} -->"
     if text.count(begin) != 1 or text.count(end) != 1:
         raise ValueError(f"needs exactly one {begin} ... {end} block")
     start, stop = text.index(begin) + len(begin), text.index(end)
@@ -351,12 +414,95 @@ def rules_block(text: str) -> str:
     return text[start:stop]
 
 
-def rules_sha256(text: str) -> str:
-    return hashlib.sha256(rules_block(text).encode("utf-8")).hexdigest()
+def rules_sha256(text: str, marker: str | None = None) -> str:
+    return hashlib.sha256(rules_block(text, marker).encode("utf-8")).hexdigest()
 
 
 def file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def parent_problems(
+    parents: dict[str, Parent | Stage1Parent], recipe: Psi0Recipe, recipe_file: str
+) -> list[str]:
+    """Each parent against the recipe that loads it: paths, the stage 1 base, Q0."""
+    problems: list[str] = []
+    for name, parent in parents.items():
+        paired: list[tuple[str, str]]
+        if isinstance(parent, Stage1Parent):
+            # The VLM is not in the recipe; the action header is the one its base loads.
+            base_name = parent.vlm_stage1.from_parent
+            base = parents.get(base_name)
+            known = recipe.parents.get(base_name)
+            if not isinstance(base, Parent) or known is None:
+                problems.append(f"parent {name}: from_parent {base_name} is no release parent")
+                continue
+            if parent.action_header != base.action_header:
+                problems.append(f"parent {name}: action header is not {base_name}'s")
+            paired = [(parent.action_header.path, known.pretrained_action_header_path or "")]
+        else:
+            known = recipe.parents.get(name)
+            if known is None:
+                problems.append(f"parent {name} is not in {recipe_file}")
+                continue
+            paired = [
+                (parent.vlm.path, known.model_name_or_path),
+                (parent.action_header.path, known.pretrained_action_header_path or ""),
+            ]
+        for hf_path, local in paired:  # a weight file inside the folder the recipe loads
+            if Path(hf_path).parent.name != Path(local).name:
+                problems.append(f"parent {name}: {hf_path} is not {local} of the recipe")
+        if not parent.clean_for_main_task:
+            problems.append(f"parent {name} is not clean for the main task (Q0)")
+    return problems
+
+
+def demo_set_problems(pins: DemoSetPins, release: Release, repo: Path = REPO) -> list[str]:
+    """A demo-set file against its pins and its release: hashes recomputed, nesting."""
+    problems: list[str] = []
+    sets_path = repo / pins.file
+    sets = DemoSets.model_validate_json(sets_path.read_text(encoding="utf-8"))
+    pinned_file = pins.file_sha256
+    if pinned_file is not None and file_sha256(sets_path) != pinned_file:
+        problems.append(f"{pins.file} is not the demo-set file the plan pins")
+    if (sets.release_id, sets.release_hash) != (release.id, release.release_hash):
+        problems.append(f"{pins.file} is for another release: {sets.release_id}")
+    if sets.salt != pins.salt:
+        problems.append(f"{pins.file} uses salt {sets.salt!r}")
+    for name, pinned in pins.hashes.items():
+        got = sets.sets.get(name)
+        if got is None or got.set_hash != pinned:
+            problems.append(f"demo set {name}: file has {got and got.set_hash}, plan pins {pinned}")
+        elif (seeds_hash := set_hash(sets.release_hash, got.seeds)) != pinned:
+            problems.append(f"demo set {name}: its seeds hash to {seeds_hash}, plan pins {pinned}")
+    pinned_q, used_q = pins.quality, sets.quality
+    if (pinned_q is None) != (used_q is None):
+        problems.append("plan and demo-set file disagree on whether a quality filter was used")
+    elif pinned_q is not None and used_q is not None:
+        actual = hashlib.sha256((repo / pinned_q.file).read_bytes()).hexdigest()
+        if not pinned_q.sha256 == used_q.file_sha256 == actual:
+            problems.append(f"{pinned_q.file} is not the quality file the sets were cut from")
+        if pinned_q.filter != used_q.filter:
+            problems.append("plan pins other quality limits than the demo sets used")
+    pinned_qa, used_qa = pins.qa, sets.qa
+    if (pinned_qa is None) != (used_qa is None):
+        problems.append("plan and demo-set file disagree on whether DA-03 QA rejects were left out")
+    elif (
+        pinned_qa is not None
+        and used_qa is not None
+        and (
+            pinned_qa.reports_sha256 != used_qa.reports_sha256
+            or pinned_qa.threshold_version != used_qa.threshold_version
+        )
+    ):
+        problems.append("plan pins other DA-03 QA reports than the demo sets were cut after")
+    ordered = sorted(sets.sets.values(), key=lambda s: s.n)
+    for small, large in zip(ordered, ordered[1:]):
+        if not set(small.seeds) <= set(large.seeds):
+            problems.append(f"demo set of {small.n} is not inside the set of {large.n}")
+        if not set(small.episode_indices) <= set(large.episode_indices):
+            problems.append(f"episode indices of the set of {small.n} are not inside {large.n}'s")
+    return problems
 
 
 def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
@@ -375,63 +521,9 @@ def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
         elif isinstance(value, bool) or not isinstance(value, int) or value <= 0:
             problems.append(f"override {key} must be a positive step count, not {value!r}")
 
-    for name, parent in plan.parents.items():
-        known = recipe.parents.get(name)
-        if known is None:
-            problems.append(f"parent {name} is not in {plan.recipe.file}")
-            continue
-        paired = [
-            (parent.vlm.path, known.model_name_or_path),
-            (parent.action_header.path, known.pretrained_action_header_path or ""),
-        ]
-        for hf_path, local in paired:  # a weight file inside the folder the recipe loads
-            if Path(hf_path).parent.name != Path(local).name:
-                problems.append(f"parent {name}: {hf_path} is not {local} of the recipe")
-        if not parent.clean_for_main_task:
-            problems.append(f"parent {name} is not clean for the main task (Q0)")
+    problems += parent_problems(plan.parents, recipe, plan.recipe.file)
 
-    sets_path = repo / plan.demo_sets.file
-    sets = DemoSets.model_validate_json(sets_path.read_text(encoding="utf-8"))
-    pinned_file = plan.demo_sets.file_sha256
-    if pinned_file is not None and file_sha256(sets_path) != pinned_file:
-        problems.append(f"{plan.demo_sets.file} is not the demo-set file the plan pins")
-    if (sets.release_id, sets.release_hash) != (plan.release.id, plan.release.release_hash):
-        problems.append(f"{plan.demo_sets.file} is for another release: {sets.release_id}")
-    if sets.salt != plan.demo_sets.salt:
-        problems.append(f"{plan.demo_sets.file} uses salt {sets.salt!r}")
-    for name, pinned in plan.demo_sets.hashes.items():
-        got = sets.sets.get(name)
-        if got is None or got.set_hash != pinned:
-            problems.append(f"demo set {name}: file has {got and got.set_hash}, plan pins {pinned}")
-        elif (seeds_hash := set_hash(sets.release_hash, got.seeds)) != pinned:
-            problems.append(f"demo set {name}: its seeds hash to {seeds_hash}, plan pins {pinned}")
-    pinned_q, used_q = plan.demo_sets.quality, sets.quality
-    if (pinned_q is None) != (used_q is None):
-        problems.append("plan and demo-set file disagree on whether a quality filter was used")
-    elif pinned_q is not None and used_q is not None:
-        actual = hashlib.sha256((repo / pinned_q.file).read_bytes()).hexdigest()
-        if not pinned_q.sha256 == used_q.file_sha256 == actual:
-            problems.append(f"{pinned_q.file} is not the quality file the sets were cut from")
-        if pinned_q.filter != used_q.filter:
-            problems.append("plan pins other quality limits than the demo sets used")
-    pinned_qa, used_qa = plan.demo_sets.qa, sets.qa
-    if (pinned_qa is None) != (used_qa is None):
-        problems.append("plan and demo-set file disagree on whether DA-03 QA rejects were left out")
-    elif (
-        pinned_qa is not None
-        and used_qa is not None
-        and (
-            pinned_qa.reports_sha256 != used_qa.reports_sha256
-            or pinned_qa.threshold_version != used_qa.threshold_version
-        )
-    ):
-        problems.append("plan pins other DA-03 QA reports than the demo sets were cut after")
-    ordered = sorted(sets.sets.values(), key=lambda s: s.n)
-    for small, large in zip(ordered, ordered[1:]):
-        if not set(small.seeds) <= set(large.seeds):
-            problems.append(f"demo set of {small.n} is not inside the set of {large.n}")
-        if not set(small.episode_indices) <= set(large.episode_indices):
-            problems.append(f"episode indices of the set of {small.n} are not inside {large.n}'s")
+    problems += demo_set_problems(plan.demo_sets, plan.release, repo)
 
     for name, branch in plan.branches.items():
         if branch.demo_set not in plan.demo_sets.hashes:
@@ -466,7 +558,8 @@ def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
     if rules is not None:
         doc = plan.interpretation.doc
         try:
-            actual = rules_sha256((repo / doc).read_text(encoding="utf-8"))
+            text = (repo / doc).read_text(encoding="utf-8")
+            actual = rules_sha256(text, plan.interpretation.rules_marker)
         except (OSError, ValueError) as error:
             problems.append(f"{doc}: {error}")
         else:
@@ -477,6 +570,9 @@ def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
         for rel in (plan.task["config"], SPLIT_FILE):
             if rel not in plan.pinned_files:
                 problems.append(f"pinned_files lacks {rel}, which the eval reads")
+
+    if plan.variant_of is not None:
+        problems += check_variant(plan, repo)
 
     split = yaml.safe_load((repo / SPLIT_FILE).read_text(encoding="utf-8"))
     dev = split["seed_ranges"][plan.eval.split]
@@ -489,13 +585,107 @@ def check(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
     return problems
 
 
+def check_variant(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
+    """A variant against the frozen plan it copies: one branch, one stage 1 parent, nothing else.
+
+    Branch B is branch C of v2 with only the VLM parent changed: same demo set, same
+    action header, the stage 1 run started from C's VLM, and every field outside
+    VARIANT_FIELDS (recipe, release, demo sets, train seed, eval, stats, pins) equal.
+    """
+    assert plan.variant_of is not None
+    ref = plan.variant_of
+    path = repo / ref.plan
+    if not path.is_file():
+        return [f"variant_of: {ref.plan} is missing"]
+    base = TrayRunPlan.load(path)
+    problems = []
+    lock = lock_path(path)
+    if not lock.is_file():
+        problems.append(f"variant_of: {ref.plan} is not frozen")
+    elif json.loads(lock.read_text(encoding="utf-8"))["run_plan_id"] != run_plan_id(base):
+        problems.append(f"variant_of: {ref.plan} changed since it was frozen")
+    if run_plan_id(base) != ref.run_plan_id:
+        problems.append(f"variant_of: {ref.plan} is {run_plan_id(base)}, not {ref.run_plan_id}")
+    if base.superseded_by is not None or base.status is not None:
+        problems.append(f"variant_of: {ref.plan} is not a plan that runs")
+    mine, theirs = plan_json(plan), plan_json(base)
+    for key in sorted((set(mine) | set(theirs)) - VARIANT_FIELDS):
+        if mine.get(key) != theirs.get(key):
+            problems.append(f"variant_of: {key} differs from {ref.plan}")
+    base_branch = base.branches.get(ref.branch)
+    if base_branch is None:
+        return [*problems, f"variant_of: {ref.plan} has no branch {ref.branch}"]
+    extra = {k: v for k, v in plan.parents.items() if k not in base.parents}
+    for name, parent in base.parents.items():
+        if plan.parents.get(name) != parent:
+            problems.append(f"variant_of: parent {name} is not {ref.plan}'s")
+    if len(extra) != 1 or not isinstance(next(iter(extra.values())), Stage1Parent):
+        problems.append("variant_of: needs exactly one parent more, a stage 1 parent")
+        return problems
+    ((stage1_name, stage1),) = extra.items()
+    assert isinstance(stage1, Stage1Parent)
+    if stage1.vlm_stage1.from_parent != base_branch.parent:
+        problems.append(
+            f"variant_of: stage 1 starts from {stage1.vlm_stage1.from_parent},"
+            f" not {ref.branch}'s parent {base_branch.parent}"
+        )
+    if len(plan.branches) != 1:
+        problems.append(f"variant_of: one branch, not {sorted(plan.branches)}")
+    for name, branch in plan.branches.items():
+        if branch.demo_set != base_branch.demo_set:
+            problems.append(
+                f"variant_of: branch {name} trains on {branch.demo_set},"
+                f" not {ref.branch}'s {base_branch.demo_set}"
+            )
+        if branch.parent != stage1_name:
+            problems.append(f"variant_of: branch {name} does not use the stage 1 parent")
+    if plan.interpretation.doc != base.interpretation.doc:
+        problems.append("variant_of: the reading rules live in another doc")
+    if plan.budget is None or base.budget is None:
+        problems.append("variant_of: both plans need a budget")
+    elif (
+        plan.budget.cap_cu_per_run != base.budget.cap_cu_per_run
+        or plan.budget.round_runs
+        or plan.budget.runs != list(plan.branches)
+    ):
+        problems.append(
+            f"variant_of: the budget is not one run of {sorted(plan.branches)} at"
+            f" {ref.branch}'s cap"
+        )
+    return problems
+
+
+def stage1_pending(plan: TrayRunPlan) -> list[str]:
+    """Stage 1 pins still null: no freeze and no launch until DA-30's checkpoint is pinned."""
+    return parents_pending(plan.parents)
+
+
+def parents_pending(parents: dict[str, Parent | Stage1Parent]) -> list[str]:
+    """The null stage 1 pins of these parents (`stage1_pending` of any plan kind)."""
+    pending = []
+    for name, parent in parents.items():
+        if isinstance(parent, Stage1Parent):
+            vlm = parent.vlm_stage1
+            for field in ("job_id", "drive_dir", "weights_sha256", "manifest_sha256"):
+                if getattr(vlm, field) is None:
+                    pending.append(
+                        f"parent {name}: vlm_stage1.{field} is not pinned yet ({vlm.story})"
+                    )
+    return pending
+
+
 def pinned_file_drift(plan: TrayRunPlan, repo: Path = REPO) -> list[str]:
     """Pinned eval files that are missing or differ from their sha256 in the plan.
 
     Not part of `check`: a warning on CI, an error at job launch (`main --launch`).
     """
+    return file_pin_drift(plan.pinned_files, repo)
+
+
+def file_pin_drift(pins: dict[str, str] | None, repo: Path = REPO) -> list[str]:
+    """`pinned_file_drift` of a `pinned_files` map, for any plan kind."""
     drift = []
-    for rel, sha in (plan.pinned_files or {}).items():
+    for rel, sha in (pins or {}).items():
         path = repo / rel
         if not path.is_file():
             drift.append(f"pinned file {rel} is missing")
@@ -656,14 +846,20 @@ def freeze_round(plan_path: Path, repo: Path = REPO) -> Path:
 
 
 def freeze(plan_path: Path, repo: Path = REPO) -> Path:
-    if yaml.safe_load(plan_path.read_text(encoding="utf-8")).get("purpose") == "round":
+    purpose = yaml.safe_load(plan_path.read_text(encoding="utf-8")).get("purpose")
+    if purpose == "round":
         return freeze_round(plan_path, repo)
+    if purpose == "paired_train":
+        from flywheel_psi0.tray import pairplan  # imports this module: no top-level cycle
+
+        return pairplan.freeze(plan_path, repo)
     plan = TrayRunPlan.load(plan_path)
     problems = check(plan, repo) + pinned_file_drift(plan, repo)
     if plan.superseded_by is not None:
         problems.append(f"superseded by {plan.superseded_by}: freeze that plan instead")
     if plan.status == "draft":
         problems.append("status draft: drop it once a Decision orders this plan, then freeze")
+    problems += stage1_pending(plan)
     if not (repo / plan.interpretation.doc).is_file():
         problems.append(f"{plan.interpretation.doc} is missing: fix the reading rules first")
     if problems:
@@ -698,10 +894,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         out = freeze(args.plan)
         print(f"wrote {out}: {json.loads(out.read_text())['run_plan_id']}")
         return 0
-    if args.launch and args.release is None:
+    paired = yaml.safe_load(args.plan.read_text(encoding="utf-8")).get("purpose") == "paired_train"
+    if args.launch and args.release is None and not paired:
         parser.error("--launch needs --release: a job checks the episode indices too")
     repo = REPO  # read at call time, so a test can point it at a copy
     raw = yaml.safe_load(args.plan.read_text(encoding="utf-8"))
+    if raw.get("purpose") == "paired_train":
+        from flywheel_psi0.tray import pairplan
+
+        if args.release is not None or args.targets_release is not None:
+            parser.error("a paired plan checks its cut parts itself: no --release")
+        return pairplan.main(["check", str(args.plan), *(["--launch"] if args.launch else [])])
     plan: TrayRunPlan | None
     if raw.get("purpose") == "round":
         round_plan = TrayRoundPlan.model_validate(raw)
@@ -738,6 +941,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             summary += ", draft"
             if args.launch:
                 problems.append("DRAFT: no job runs a draft plan; it needs a Decision first")
+        pending = stage1_pending(plan)
+        if pending:
+            summary += f", {len(pending)} stage 1 pins pending"
+            if args.launch:
+                problems += [f"PENDING: {p}" for p in pending]
     warnings: list[str] = []
     if plan is not None:
         if args.release is not None:

@@ -1,0 +1,192 @@
+# SUPERSEDED - DO NOT RUN (Decision of Hiếu, 11/11/2026, via the coordinator session).
+# DA-33 draws table B's target zone (scene revision 4763fbfaa4f8e97658e68b57d01b4c86659e08b5
+# +zone1, PR #182), which changes mjcf.py and simple_task.py that this plan pins, and the
+# egocentric question moves to the paired runs B_ALL and C_ALL on the regenerated cut ALL
+# (he-tray-pair60k.yaml, docs/he/tray.md section 19). B was never frozen nor run. Kept so
+# rp_128aec169e12 and the rules of section 18 stay checkable; field superseded_by (out of
+# the id) says the same to `runplan check`, which then exits 1.
+#
+# DA-34 RunPlan of branch B of the tray experiment, task 4 (AC 5). DRAFT: prepared
+# before DA-30's stage 1 checkpoint exists; not frozen, not launched.
+#
+# Hiếu 9/11/2026 ("Chốt 4 mặc định"): B = branch C of he-tray-v2.yaml (rp_a04c14e79dfd)
+# with exactly one change, the VLM parent. B's VLM is C's VLM
+# (pre.fast.1by1.2601091803.ckpt.ego200k.he30k) fine-tuned at stage 1 by DA-30 on the
+# team's 153 egocentric clips (whole-task clips, faces blurred, data_class public,
+# PR #170); its action header, demo set C, recipe, steps, train seed, validation
+# override and eval are C's. `variant_of` makes `runplan check` compare every other
+# field with v2 and fail on any difference.
+#
+# Until DA-30 persists its checkpoint, the vlm_stage1 pins are null: `check` passes as
+# a draft, `freeze` and `check --launch` refuse (stage1_pending). Then (task 4.7): fill
+# job_id, drive_dir, weights_sha256 and manifest_sha256
+# (python -m flywheel_psi0.tray.colab_train manifest --folder <folder>, which also checks
+# the weights' header against parent_header_sha256), drop status, freeze,
+# and set B_FROZEN in colab_train. Reading rules: docs/he/tray.md section 18.2, the
+# branch-b-rules block, pinned by sha256 below.
+name: he-tray-psi0-b
+status: draft
+variant_of:
+  plan: configs/runplans/tray/he-tray-v2.yaml
+  run_plan_id: rp_a04c14e79dfd
+  branch: C
+purpose: branch_train
+story: DA-34
+site_id: local
+task:
+  id: g1_wholebody_tray_transfer_teleop # TASK_UID of flywheel_simple.tray.simple_task
+  env_id: simple/G1WholebodyTrayTransferTeleop-v0
+  config: configs/sim/tray.yaml
+embodiment: g1_sonic_dwbc@1
+
+code:
+  simple: {repo: physical-superintelligence-lab/SIMPLE, commit: b75c6786f87b4a7f43b52b0ac5b83a1d9ea62e11}
+  psi0: {repo: physical-superintelligence-lab/Psi0, commit: cda3fdfafe47cb6fa75400d013de1bd36e3cea05}
+
+# Revision pinned by S1-03 (docs/g0/psi0-eval.md 1.1), as in version 1.
+psi_model: {repo: USC-PSI-Lab/psi-model, revision: cb1480f50d9764ab2f6261bc2e651a67ad54da17}
+
+# C's parent, unchanged: B's stage 1 started from its VLM and B keeps its action header.
+parents:
+  psi0-baseline-egodex-he:
+    vlm:
+      path: psi0/pre.fast.1by1.2601091803.ckpt.ego200k.he30k/model.safetensors
+      sha256: 6e63da17bdd22430bc07c40e4b14ebb96c9d124d014c532449142862c186d3f9
+    action_header:
+      path: psi0/postpre.1by1.pad36.2601131206.ckpt.he30k/action_header.safetensors
+      sha256: 238b4d95862b0eb44bffa75a2ae69e120aeda3d159fd6f29802dd9338019e14d
+    clean_for_main_task: true
+    note: >-
+      Pretrained on EgoDex 200k + HE 30k steps; the pair the authors fine-tuned their SIMPLE
+      checkpoints from. The tray task is new (DA-32), so no tray data is in pretraining.
+
+  psi0-b-ego-stage1:
+    vlm_stage1:
+      from_parent: psi0-baseline-egodex-he
+      story: DA-30
+      ledger: docs/g0/ledger/DA-30.csv
+      job_id: null # DA-30's stage 1 job on the 153 clips (task 2)
+      drive_dir: null # folder under MyDrive: every file of the parent's VLM folder, weights replaced
+      weights_sha256: null # model.safetensors of that folder
+      manifest_sha256: null # colab_train manifest of the whole folder
+      # header of the parent VLM's model.safetensors at psi-model cb1480f (625 BF16 tensors,
+      # no lm_head, embed_tokens 153792 x 2048): the stage 1 weights must match it
+      parent_header_sha256: 53d000d9626a13faf4bcb5268517b8441c34b187c88c9dee0b4c250dc19d6d59
+    action_header:
+      path: psi0/postpre.1by1.pad36.2601131206.ckpt.he30k/action_header.safetensors
+      sha256: 238b4d95862b0eb44bffa75a2ae69e120aeda3d159fd6f29802dd9338019e14d
+    clean_for_main_task: true
+    note: >-
+      Stage 1 of C's VLM on the team's egocentric clips (people carrying a red box, not
+      the sim tray), so no tray scene is in its data either; action header as C's.
+
+# 541 episodes of batch gen/s1-pool-1104 (seeds 1000-1609, level 1), every row planner
+# da33-planner-5+cfg.4e2a4505; replay QA 542/542 (docs/he/tray.md section 10).
+release:
+  id: tray_s1_f9433b028c52
+  release_hash: f9433b028c520b4fd78b34469b389862f7b34de0bb185840aa18143d2d5d8461
+  location: rtx3060:~/denso-da34-pool/fwdata/releases/tray_s1_f9433b028c52
+  data_class: public
+
+# A = 320 > C = 160 > N80 > N40, one hash order (flywheel_psi0.tray.demo_sets). The salt
+# is the module's one salt; the order is new because the release hash is. Cut after
+# DA-03 QA (7 rejects out) and then the quality filter fixed on 3/11: 429 of 541 kept.
+# Only C trains in tier 2; A, N80 and N40 are pinned so a later run needs no new cut.
+demo_sets:
+  file: configs/runplans/tray/demo_sets-v2.json
+  file_sha256: b2cafa8f835b07ccaf9565b34b82f9864c08b5586a50a6e7ca5d7eeba6fb9d5a # any edit fails check
+  salt: DA-34/demo-sets/v1
+  hashes:
+    N40: 85278f2016d35e007f782520e124286afa8c67cd3c65143ffd37751874f0ab93
+    N80: fb28061125b8060e606c1d27dc5ca382488ba3aebf18fd5970f0e6270787ae3f
+    C: a202cc028a2e7c6cbd9ba99b609f0d54b41cdad7965ca3088eb4473681808766
+    A: b914d6412f59411ecb3e97f9ddeb8c476025b5617d2eda23debd4d8c6758ba4c
+  quality:
+    file: configs/runplans/tray/quality-s1-pool-1104.jsonl # per-seed measures, no episode data
+    sha256: 49c26d25418b448aec3d8dabbe0cb010e9c9a6c5e285fadeafeb09104bb8fa40
+    filter: {max_tilt_carry_deg: 10.0, max_part_shift_end_mm: 20.0}
+  qa: # rtx3060:~/denso-da34-pool/fwdata/pipeline/src_297dedb9d3d39a72/qa/reports.jsonl
+    reports_sha256: fb402300863e3ce07c61e07db7d7e00c5d8dc12ed257e9c9f45dc01f63e0c44c
+    threshold_version: qa-1@fb6ddaf9f48c
+
+recipe:
+  file: configs/models/psi0-stage3.yaml # 40k steps, batch 16, lr 1e-4 cosine, VLM frozen, RTC
+  sha256: 71ba5de8ef22a11432a829e86e93b7e662f5f38f453cca27f73d6fbe777a1dbd # recipe_sha256, no `estimate`
+  overrides: # PO 4/11/2026 (S1-04 4.1): val every 2000 steps, does not change training
+    train.validation_steps: 2000
+  nproc_per_node: 1 # one Colab GPU: global batch 16, not the authors' 16 x 4 GPUs = 64 (S1-04 section 1.4)
+  dataset_stats: own_train_set # each branch's stats_psi0.json is computed on its own episodes
+train_seeds: [0] # one seed per branch for the preliminary result (design 6.3)
+
+branches:
+  B: {demo_set: C, parent: psi0-b-ego-stage1, role: "C's 160 demos on the stage 1 VLM; vs C"}
+
+# 270 episodes per branch (docs/he/tray.md 8.2). Level 0 has one scene: 30 replicates,
+# reported apart. Levels 1 and 2: 120 dev seeds each, 240 scenes pooled into the primary
+# metric. [1000000, 1000100) is left out: tests and view_scene use seeds there.
+# Sim time, the condition seed on reset and lazy frame decode are on master (hotfix
+# ee02e0b, flywheel_simple/tray/run.py); the seeded server is docker/psi0/
+# serve_psi0_seeded.py (#97), used by scripts/g0/serve_psi0.sh serve (3fc46c5). Still
+# open: the GPU determinism check of tray.md 8.5.
+eval:
+  cli: eval-decoupled-wbc
+  sim_mode: mujoco
+  renderer: mujoco
+  synchronous: true
+  split: dev
+  clock: sim
+  policy_noise: per_episode_condition_seed
+  by_level:
+    - {level: 0, seeds: {start: 1000100, stop: 1000130}, unit: replicate, headline: false}
+    - {level: 1, seeds: {start: 1000100, stop: 1000220}, unit: condition, headline: true}
+    - {level: 2, seeds: {start: 1000100, stop: 1000220}, unit: condition, headline: true}
+  episode_limit_s: 90.0 # configs/sim/tray.yaml episode_limit_s
+
+metric: {primary: sim_success, per_stage: scorer_7_steps, failure_kinds: design_3_3}
+stats: {method: bootstrap_by_condition, resamples: 10000, seed: 20261103, ci: 0.95}
+
+# One branch here, as in v2: B vs C (and B vs C+, descriptive) pairs this plan's eval
+# with eval C SimReady under the rules of docs/he/tray.md section 18.2.
+comparisons: []
+
+# No delta_pp: without A the HE-T rules of section 4 do not apply; section 18.2 reads
+# the CI of B - C without a margin.
+interpretation:
+  doc: docs/he/tray.md
+  rules_marker: branch-b-rules
+  rules_sha256: 52f3385b78eb976ef729f591dda17bb10c3f0b74bc23ded8b37553c3fe2cd24d # section 18.2 block (two stages, Hiếu 10/11/2026)
+pricebook: "assumption: Colab 100 CU pack, 0.0999 USD per CU (docs/g0/ledger/DA-19.csv)"
+
+# B's own budget (Hiếu 9/11/2026), outside the 36 CU of tier 2: one stage 3 run at C's
+# cap. Stage 1 is DA-30's (its plan, cap and ledger).
+budget:
+  ceiling_cu: 18
+  cap_cu_per_run: 18
+  runs: [B]
+  watcher: "scripts/colab/cu_watch.py session --cap 18 --floor 14, under one guard per batch; one batch per account"
+
+# What the eval reads that no other pin covers: task config (level ranges,
+# episode_limit_s), the split, and the scene, scorer and eval-loop sources by sha256
+# rather than a repo commit, so check can verify them on CI without git history. They
+# belong to other stories, so a drift only warns on CI; `runplan check --release <dir>
+# --launch` fails on it, and every train or eval job runs that first (Hiếu 5/11/2026,
+# docs/he/tray.md section 11): re-freeze before the first job, else a Decision.
+pinned_files:
+  configs/sim/tray.yaml: 89ad4e8d381005cf7b642cc17b323f3f2c13cf39dc7aefe98e9843f2d5efc245
+  configs/splits/default.yaml: 081a3ee7eba6f7487ede965dae63dfaaffdce0bfae12d35d343fe305d07bf855
+  packages/flywheel-simple/src/flywheel_simple/tray/__init__.py: 5ce7ac61af2a0386989fbfc4ec1e810fcdd5d32088c1e68525b6a08e691db74b
+  packages/flywheel-simple/src/flywheel_simple/tray/config.py: 9f9d0ddd38014b2fa804b48940073c351926b40e4c6148bec18705e2319d226a
+  packages/flywheel-simple/src/flywheel_simple/tray/geometry.py: abda4691c69f63cd7fffc1f2fb3d53a706e7206d7282155c131af9d1c82c10a8
+  packages/flywheel-simple/src/flywheel_simple/tray/mjcf.py: ad89e2086693b56464f2bad338ff4790cb626966c392f854fc22ba27319e64ae
+  packages/flywheel-simple/src/flywheel_simple/tray/predicates.py: 057b70222c31ad7a4240556b5136fecaa1c8f9147a87b3b7c9b6a1c5c7ddfe53
+  packages/flywheel-simple/src/flywheel_simple/tray/randomize.py: 9927c81cdd84742f772313180100c27cdb565e5f96c59e03ec634294d27bae37
+  packages/flywheel-simple/src/flywheel_simple/tray/simple_task.py: 9e302f1ce92c946925d6ffbef1c9548ab1f04dc4df10d3e38cdabf9028c924b9
+  packages/flywheel-simple/src/flywheel_simple/tray/run.py: f6d9a690a47654cbc5ade1cc04bbbeb8cd68f5b12d97cd4a22f351c46b580b68
+  packages/flywheel-simple/src/flywheel_simple/tray/visuals.py: 931e5c09633887859309fbd10103c4ad3c01a24454223a3de2e2e4b98c6f1f3f
+  packages/flywheel-simple/src/flywheel_simple/wbc/__init__.py: 75b21319e28f898050c2a07777064c106f697d67c402609880e25234a52d62de
+  packages/flywheel-simple/src/flywheel_simple/wbc/drive.py: ed9ed9126663a6ae3d94a87c2bb8262e00de0b0df50a0d4459f38e10e5b55341
+  packages/flywheel-simple/src/flywheel_simple/wbc/navigate.py: 01c2c2b319da68d26e8ced80dbbe04f4209cff340b387ea140ec62e2dfa73958
+  packages/flywheel-simple/src/flywheel_simple/wbc/stand_walk.py: bc0ebcf99e30b0aedf74ff3d352d5e1eab672837fd435be9a3a598e26e206508
+  packages/flywheel-simple/src/flywheel_simple/wbc/upper_body.py: 9df557733d15a7b93c285364e732a50f6710701defc700680caf1efe339db132
+
+superseded_by: configs/runplans/tray/he-tray-pair60k.yaml # Decision 11/11/2026; not part of the id (runplan.STATUS_FIELDS)

@@ -1,0 +1,274 @@
+{
+ "site_id": "local",
+ "task_id": "g1_wholebody_tray_transfer_teleop",
+ "embodiment_id": "g1_sonic_dwbc@1",
+ "schema_version": "1.0.0",
+ "meta": {
+  "status": "draft",
+  "story": "DA-34",
+  "subtask": "6.2",
+  "gaps": [
+   "every metric is null until eval stage 1 of the four runs ends (task 6.5); stage 2 metrics stay null if stage 1 stops",
+   "Hiếu approved the reading rules (tray.md 19.2) and ordered the plan on 11/11/2026; he signs the verdict after eval"
+  ]
+ },
+ "id": "dec_01M74AGVSWASNE9CP9WP5V4DMF",
+ "kind": "dev_gate",
+ "subject_kind": "run_plan",
+ "subject_id": "rp_e2fb9f62c223",
+ "verdict": "open",
+ "metrics": {
+  "label": "preliminary, on dev",
+  "early_40k": {
+   "label": "đọc sớm, 40k",
+   "stage1": null,
+   "note": "rule (e): no E1/E3/F/continue, no stage 2, does not replace the primary"
+  },
+  "stage1": {
+   "chunks": [
+    "l1-000",
+    "l2-000",
+    "l1-010",
+    "l2-010",
+    "l1-020",
+    "l2-020"
+   ],
+   "n": 60,
+   "comparison": "a′",
+   "variant": "B_70",
+   "baseline": "C_70",
+   "diff": null,
+   "ci": null,
+   "variant_only": null,
+   "baseline_only": null,
+   "mcnemar_exact_p": null,
+   "outcome": null,
+   "level0_run": null,
+   "source": "eval_results --baseline <C_70 runs> --stage1 on ckpt_60000 (tray.md 19.2)"
+  },
+  "comparisons": {
+   "a′": {
+    "variant": "B_70",
+    "baseline": "C_70",
+    "kind": "primary",
+    "n": null,
+    "variant_successes": null,
+    "baseline_successes": null,
+    "diff": null,
+    "ci": null,
+    "variant_only": null,
+    "baseline_only": null,
+    "mcnemar_exact_p": null,
+    "reading": null
+   },
+   "f": {
+    "variant": "B_70",
+    "baseline": "C_ALL",
+    "kind": "noninferiority",
+    "margin": 0.1,
+    "n": null,
+    "variant_successes": null,
+    "baseline_successes": null,
+    "diff": null,
+    "ci": null,
+    "variant_only": null,
+    "baseline_only": null,
+    "mcnemar_exact_p": null,
+    "reading": null
+   },
+   "g": {
+    "variant": "C_70",
+    "baseline": "C_ALL",
+    "kind": "noninferiority",
+    "margin": 0.1,
+    "n": null,
+    "variant_successes": null,
+    "baseline_successes": null,
+    "diff": null,
+    "ci": null,
+    "variant_only": null,
+    "baseline_only": null,
+    "mcnemar_exact_p": null,
+    "reading": null
+   },
+   "h": {
+    "variant": "B_ALL",
+    "baseline": "C_ALL",
+    "kind": "secondary",
+    "n": null,
+    "variant_successes": null,
+    "baseline_successes": null,
+    "diff": null,
+    "ci": null,
+    "variant_only": null,
+    "baseline_only": null,
+    "mcnemar_exact_p": null,
+    "reading": null
+   }
+  },
+  "runs": {
+   "B_ALL": {
+    "levels_1_2": {
+     "n": null,
+     "successes": null,
+     "wilson95": null,
+     "vs_0_80": null
+    },
+    "level1": {
+     "n": null,
+     "successes": null,
+     "wilson95": null,
+     "vs_0_70": null
+    },
+    "level2": {
+     "n": null,
+     "successes": null,
+     "wilson95": null,
+     "vs_0_70": null
+    },
+    "level0": null,
+    "relaxed": null,
+    "checkpoint": null,
+    "server": null
+   },
+   "C_ALL": {
+    "levels_1_2": {
+     "n": null,
+     "successes": null,
+     "wilson95": null,
+     "vs_0_80": null
+    },
+    "level1": {
+     "n": null,
+     "successes": null,
+     "wilson95": null,
+     "vs_0_70": null
+    },
+    "level2": {
+     "n": null,
+     "successes": null,
+     "wilson95": null,
+     "vs_0_70": null
+    },
+    "level0": null,
+    "relaxed": null,
+    "checkpoint": null,
+    "server": null
+   },
+   "B_70": {
+    "levels_1_2": {
+     "n": null,
+     "successes": null,
+     "wilson95": null,
+     "vs_0_80": null
+    },
+    "level1": {
+     "n": null,
+     "successes": null,
+     "wilson95": null,
+     "vs_0_70": null
+    },
+    "level2": {
+     "n": null,
+     "successes": null,
+     "wilson95": null,
+     "vs_0_70": null
+    },
+    "level0": null,
+    "relaxed": null,
+    "checkpoint": null,
+    "server": null
+   },
+   "C_70": {
+    "levels_1_2": {
+     "n": null,
+     "successes": null,
+     "wilson95": null,
+     "vs_0_80": null
+    },
+    "level1": {
+     "n": null,
+     "successes": null,
+     "wilson95": null,
+     "vs_0_70": null
+    },
+    "level2": {
+     "n": null,
+     "successes": null,
+     "wilson95": null,
+     "vs_0_70": null
+    },
+    "level0": null,
+    "relaxed": null,
+    "checkpoint": null,
+    "server": null
+   }
+  },
+  "egocentric_compensates": null,
+  "evidence_pack": null
+ },
+ "criteria": {
+  "doc": "docs/he/tray.md",
+  "section": "19.2",
+  "rules_marker": "pair60k-rules",
+  "rules_sha256": "e7f903963f515a63da27ce7c94b825d6310406be2e39dfca445a36be51f2f518",
+  "rules_approved": "Hiếu 11/11/2026, 'Duyệt 19.2' (via the coordinator session), before any of the four runs",
+  "plan": {
+   "path": "configs/runplans/tray/he-tray-pair60k.yaml",
+   "lock": "configs/runplans/tray/he-tray-pair60k.lock.json",
+   "run_plan_id": "rp_e2fb9f62c223",
+   "chosen": "60k, four runs in parallel on Colab A100 (the 40k fallback plan was removed at 6.10)"
+  },
+  "primary": "paired B_70 - C_70 on the level 1-2 conditions run (60 of stage 1, or 240 if stage 2 runs), ckpt_60000; 95 % CI by bootstrap of the per-condition differences within level, 10000 resamples, seed 20261103; exact two-sided McNemar beside it",
+  "two_stage": {
+   "stage1_chunks": [
+    "l1-000",
+    "l2-000",
+    "l1-010",
+    "l2-010",
+    "l1-020",
+    "l2-020"
+   ],
+   "stage1_conditions": 60,
+   "all_four_runs": true,
+   "p_threshold": 0.001,
+   "outcomes": {
+    "E1": "p < 0.001, b > c, lower CI bound > 0: stop, read rule 1",
+    "E3": "p < 0.001, b < c, upper CI bound < 0: stop, read rule 3",
+    "F": "otherwise with b <= c: stop, read as rule 2 (no gain of B_70 over C_70 seen on 60); not rule 3",
+    "continue": "otherwise (b > c): all four runs run the other 18 level 1-2 chunks, then level 0; read on 240"
+   }
+  },
+  "rules": {
+   "1": "lower CI bound of (B_70 - C_70) > 0: stage 1 helps at 70 % of the demos",
+   "2": "CI contains 0: no effect seen; not 'egocentric does not help'",
+   "3": "upper CI bound < 0: B_70 worse than C_70, a valid negative result",
+   "4": "McNemar p reported beside rules 1-3; a disagreement is reported",
+   "f": "B_70 vs C_ALL, margin 0.10: not inferior if lower bound > -0.10, inferior if upper bound < -0.10, else unclear; 'egocentric compensates the cut demos' only if (f) not inferior AND rule 1",
+   "g": "C_70 vs C_ALL, same margin: if not inferior, the 30 % cut is not a bottleneck and (f) owes nothing to egocentric",
+   "h": "B_ALL vs C_ALL: descriptive only",
+   "b": "each run: levels 1-2 pooled vs 0.80 (Wilson 95 %: met if lower >= 0.80, not met if upper < 0.80, else unclear); levels 1 and 2 apart vs 0.70",
+   "c": "relaxed success at 5, 7.5, 10, 15, 20 cm for L-PLACE-POSE only, always labelled 'nới'",
+   "e": "primary ckpt_60000; ckpt_40000 is an early read only"
+  },
+  "verdict_map": {
+   "rule 1": "pass",
+   "rule 2": "recorded",
+   "rule 3": "fail",
+   "stage 1 E1": "pass",
+   "stage 1 E3": "fail",
+   "stage 1 F": "recorded"
+  },
+  "known_limits": [
+   "B runs spend extra compute at stage 1 (DA-30's ledger)",
+   "the 153 egocentric clips carry a red box, not the sim tray; hand pose is a pseudo pose from one camera",
+   "the same team builds the task, the robot demos and the egocentric clips",
+   "sim only, MuJoCo renderer",
+   "preliminary on dev: 1 train seed per run, 1 rollout per condition; EGL rollouts are not reproducible (tray.md 13.2)",
+   "a stop at stage 1 reads 60 conditions; F is no evidence that stage 1 does not help"
+  ]
+ },
+ "signed_by": "pending: Hiếu",
+ "reason": "DRAFT, written 11/11/2026 before any of the four runs. Hiếu approved the reading rules of docs/he/tray.md 19.2 (pair60k-rules, rules_sha256 above) and ordered he-tray-pair60k.yaml: draft dropped, frozen as rp_e2fb9f62c223 (60k, four runs B_ALL, C_ALL, B_70, C_70 in parallel on Colab A100). To fill after eval (task 6.5): metrics from eval_results and evidence, verdict by verdict_map on comparison a′, Hiếu's signature. Results stay 'preliminary, on dev'.",
+ "supersedes_decision_id": null
+}

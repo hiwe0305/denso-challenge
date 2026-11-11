@@ -192,3 +192,432 @@ Giả định, chưa đo. Một VM L4 ở 1,94 CU/giờ (S1-04). **Hơn một n�
 Quy tắc dừng [Đề xuất]: đọc s/bước trong `train.log` sau 20 bước; quá 20 s thì dừng VM và báo Hiếu trước khi chạy tiếp, trước khi bộ canh tự dừng ở khoảng 24 s (dưới đây). Bộ canh CU (mục 1.6) là chốt chặn cuối: phiên tự dừng trước 4 CU dù không ai đọc log. Biên của bộ canh là 430 s, khoảng 0,23 CU ở L4, nên phiên dừng ở khoảng 3,77 CU, tức khoảng 117 phút. Trừ 38 phút cố định, còn khoảng 79 phút train, tức khi s/bước vượt khoảng 24 s.
 
 **Lần chạy 2 [Ước lượng, 4/11/2026].** Khoảng 2,0 CU, khoảng 62 phút ([sổ chi phí](../g0/ledger/DA-30.csv), dòng `job_da30_stage1_short_run2`). Phần cố định dùng số đo của lần chạy 1 (mục 1.7): chuẩn bị VM khoảng 3 phút, môi trường 3,1 phút, mẫu EgoDex 4,5 phút. Phần còn lại là giả định: pre-flight khoảng 2 phút, nạp model và khởi tạo ZeRO-3 offload khoảng 5 phút, 200 bước ở 9 s/bước khoảng 30 phút, checkpoint 4 phút, chạy lại 3 bước 7 phút, persist và tải về 3 phút. Với `--cap 3.5`, watcher dừng ở khoảng 3,27 CU (khoảng 101 phút) và chạy `persist` ở khoảng 2,95 CU (600 s trước mốc dừng, sớm hơn 90% trần). Trừ khoảng 32 phút cố định, còn khoảng 69 phút train, tức phiên tự dừng khi s/bước vượt khoảng 21 s. Quy tắc dừng tay ở 20 s/bước giữ nguyên.
+
+## 2. Nhánh B của DA-34: stage 1 trên video đội tự quay (AC 2)
+
+_Soạn 9/11/2026. Lần 1 ngày 11/11/2026 trên L4 hết bộ nhớ trước bước train đầu (mục 2.10); lần 2 trên A100 cùng ngày chạy hết đường đi: 300/300 bước, VLM lên Drive, đạt cả ba tiêu chí chốt trước (mục 2.10)._ Nhánh B của thí nghiệm khay ([tray.md](tray.md) mục 4) giống hệt nhánh C, chỉ khác VLM: trước stage 3, VLM của C được fine-tune stage 1 trên video egocentric đội tự quay (người cầm hộp đỏ đi giữa hai bàn). So B với C trả lời câu hỏi "video người + demo robot" có hơn "chỉ demo robot" không. Ở Ψ₀, dữ liệu egocentric chỉ vào stage 1 (48 chiều tay và video), không bao giờ vào stage 3.
+
+Lần chạy này cũng là **lần đầu stage 1 chạy hết đường đi** trong dự án: lần 1 của mục 1 hỏng trước bước train đầu (mục 1.7), lần 2 chưa chạy.
+
+### 2.1 Quyết định
+
+**[Đã chốt 9/11/2026, Hiếu]** "Chốt 4 mặc định":
+
+1. VLM cha là VLM của nhánh C: `psi0/pre.fast.1by1.2601091803.ckpt.ego200k.he30k/model.safetensors` ở revision và sha256 ghim trong [`he-tray-v2.yaml`](../../configs/runplans/tray/he-tray-v2.yaml), không phải `ego390k` của mục 1. Như vậy B khác C đúng một bước stage 1.
+2. Mỗi clip là một mẫu, mang câu mô tả cả task (như một episode EgoDex).
+3. Dữ liệu: 153 clip của đội (480p, hộp đỏ, hai bàn đặt lưng nhau), 30 fps, mặt đã làm mờ bằng `fw egocentric deid`; `data_class` `public` theo PR #170 (chờ merge). Bỏ 8 clip 1080p vì thấy bảng tên.
+4. Khoảng 300 bước train; trần cứng 4 CU (`compute.max_compute_units`), cùng bộ canh CU như mục 1.6.
+
+**[Đã chốt 11/11/2026, Hiếu]** "Chạy A100": lần 1 trên L4 hết bộ nhớ ở forward đầu (mục 2.10), nên chạy trên một A100 40 GB, trần cứng nâng từ 4 lên 8 CU. Recipe giữ nguyên (micro-batch 16, accumulation 2, 300 bước, `zero3_offload.json`).
+
+### 2.2 Dữ liệu: bản export ghim bằng `export_id` và tarball
+
+RunPlan của B không tải mẫu EgoDex mà nhận bản export của DA-18 (`flywheel.data.export.egodex.export_stage1`): `part1/<task>/<i>.hdf5` và `.mp4`, `egodex_stat.json`, `meta.json` có `export_id` và sha256 của từng file. Khối `dataset` có `kind: export` ([`runplan.py`](../../packages/flywheel-psi0/src/flywheel_psi0/stage1/runplan.py), `ExportDataset`):
+
+- Ghim bằng `export_id` (định danh theo nội dung, do export tính từ sha256 các file) và sha256 của **một tarball** do `python -m flywheel_psi0.stage1.export_source pack` ghi. Tarball chỉ phụ thuộc nội dung file (thứ tự cố định, mtime 0, không chủ sở hữu), nên cùng một export luôn cho cùng sha256.
+- Tarball nằm trên Google Drive, dưới `/content/drive/MyDrive/<source.tarball>`. Vì vậy với B, **Drive phải mount trước `setup`**, không phải sau như mục 1.6.
+- `setup` chép tarball sang đĩa VM, từ chối nếu sha256 khác plan, giải nén chỉ file thường và thư mục (bộ lọc `data` của `tarfile`), rồi từ chối bản export nếu một trong các điều sau sai ([`export_source.py`](../../packages/flywheel-psi0/src/flywheel_psi0/stage1/export_source.py)): `export_id` trong `meta.json` đúng plan và đúng giá trị mà danh sách file băm ra; mỗi file khớp sha256 trong `meta.json`; không có file nào ngoài danh sách (loader của Ψ₀ sẽ train cả file thừa); `data_class` khớp plan; nguồn không có miễn trừ che danh tính; số mẫu khớp plan; `layout_problems` rỗng.
+- Giải nén vào `data/egodex.unverified` và chỉ đổi tên thành `data/egodex` khi mọi kiểm tra trên đều đạt, kể cả số mẫu (kiểm trên thư mục chưa đổi tên từ review PR #171 lần hai; trước đó số mẫu được so sau khi đổi tên). Bản bị từ chối bị xóa, nên không bao giờ nằm ở chỗ loader đọc, và lần `setup` sau không bị từ chối vì thư mục "not empty".
+- Trước khi cài hay tải bất cứ gì (chưa tốn thời gian GPU), `setup` dừng nếu: plan là bản nháp hoặc còn giá trị giữ chỗ; `data_class` không phải `public` (CLAUDE.md: dữ liệu `internal` và `restricted` không bao giờ lên dịch vụ hosted, kể cả Colab), áp cho cả hai loại dataset; tarball không có trên Drive ở đường dẫn của plan, hoặc khác cỡ `bytes` đã ghim. sha256 kiểm trên bản chép sang VM.
+- Bản export đã có `actions_48d` (DA-18 ghi), nên không chạy script `precompute` của tác giả.
+- Che danh tính: nguồn `export` chỉ nạp được khi `identity_masked: true`. Miễn trừ ngày 4/11/2026 chỉ áp cho zip EgoDex của Apple (mục 1.4), không áp cho bản export, kể cả export của EgoDex. Test: `test_an_export_must_be_identity_masked`.
+- `setup` giờ cũng kiểm sha256 của trọng số cha sau khi tải, cho mọi plan.
+
+Bản export đã làm sạch của DA-04 đã được ghim vào RunPlan [`tray-ego-b.yaml`](../../configs/runplans/stage1/tray-ego-b.yaml) ngày 9/11/2026 (mục 2.9). Plan sẵn sàng chạy từ 11/11/2026, khi PR #173 và #176 (thay #174) đã merge (mục 2.4).
+
+### 2.3 Checkpoint stage 1 có nạp được vào stage 3 không (Q-28C)
+
+Câu hỏi Q-28C của [design 28/10/2026](../superpowers/specs/2026-10-28-tray-transfer-he-design.md): mã Ψ₀ có cho ghép VLM đã fine-tune stage 1 với action header `postpre.*` gốc không. **Trả lời: có, nhưng thư mục checkpoint của stage 1 phải được đóng gói lại trước.** Dẫn chứng ở `cda3fdf`:
+
+| Điểm | Mã Ψ₀ | Hệ quả |
+|---|---|---|
+| Stage 1 lưu gì | `trainers/pretrain.py:441-447`: `accelerator.save_model(self.model, ckpt_dir)`, rồi `trainer.py:428-463` gọi `accelerator.save_state(ckpt_dir)` | Thư mục `ckpt_<bước>` có `model.safetensors` (chỉ trọng số Qwen3-VL) và trạng thái DeepSpeed (`pytorch_model/`, optimizer khoảng 25 GB). Không có `config.json`, không có file tokenizer hay processor |
+| Trọng số có gom đủ không | `zero3_offload.json` của repo đặt `gather_16bit_weights_on_model_save: true`; `accelerate` 1.7.0 `accelerator.py:3604` đọc cờ này từ engine và chỉ điền khóa này khi là `"auto"` (`utils/dataclasses.py:1275-1290`) | ZeRO-3 gom trọng số bf16 vào một file. `zero3.json` của tác giả cũng bật cờ này, và file `model.safetensors` của các checkpoint `pre.*` công bố có đúng dạng đó (625 tensor, `model.language_model.embed_tokens.weight` 153792 × 2048, không có `lm_head`, metadata `{"format": "pt"}`) |
+| Stage 3 đọc VLM thế nào | `trainers/finetune.py:266-288`: `Qwen3VLForConditionalGeneration.from_pretrained(model_name_or_path)` và `AutoProcessor.from_pretrained(model_name_or_path)` | Cần một thư mục có cả trọng số, `config.json` và file processor |
+| `vlm_ckpt_step` | Chỉ khai báo ở `config/model_psi0.py:119`; không chỗ nào trong `src/` hay `scripts/` đọc nó | Không dùng được để trỏ vào bước checkpoint; chỉ dùng `model_name_or_path` |
+| Action header | `trainers/finetune.py:333-337`: nạp `{pretrained_action_header_path}/action_header.safetensors`, độc lập với VLM | Ghép VLM mới với `postpre.1by1.pad36.2601131206.ckpt.he30k` gốc được, như nhánh C |
+| Kích thước vocab | `pretrain.py:63-72` đổi cỡ embedding về `len(tokenizer) + 2048`, làm tròn lên bội của 192. `config.json` của cha đã là 153792 = 151669 + 2048 làm tròn | Trên cha đã đổi cỡ, bước này không đổi gì; `config.json` của cha đúng cho checkpoint mới |
+| VLM trong stage 3 | `configs/models/psi0-stage3.yaml`: `model.no-tune-vlm: true` | VLM của B giữ nguyên trong stage 3; chỉ action header học tiếp |
+
+Cách làm ([`vlm_checkpoint.py`](../../packages/flywheel-psi0/src/flywheel_psi0/stage1/vlm_checkpoint.py)): khi RunPlan đặt `persist_vlm: true`, `persist` chép `model.safetensors` của checkpoint cuối, cùng mọi file khác của thư mục cha (`config.json`, `generation_config.json`, tokenizer, processor), vào `<Drive>/denso/da30/<job_id>/vlm/`. Thư mục `vlm/` chỉ chứa đúng các file của thư mục cha, cùng tên và giống từng byte, trừ `model.safetensors`: `colab_train --branch B` của DA-34 từ chối mọi file khác (PR #172, [tray.md](tray.md) mục 18.8 trên nhánh đó). Vì vậy bản ghi `vlm.json` nằm **cạnh** thư mục (`<Drive>/denso/da30/<job_id>/vlm.json`), không nằm trong nó. Bản ghi có sha256 từng file, bước, `run_plan_id`, cha, `drive_dir`, cùng hai giá trị mà plan stage 3 của B ghim: `weights_sha256` và `manifest_sha256`. `manifest_sha256` tính đúng như `tray.colab_train.manifest_sha256` của DA-34; đã so hai hàm trên thư mục của lần thử CPU dưới đây và chúng khớp. `package` cũng so header safetensors với file của cha (cùng tên, cỡ, kiểu tensor), và ghi là vấn đề mọi file lạ trong thư mục. Log và `metrics.jsonl` được chép trước trọng số, nên còn lại nếu phiên dừng giữa lúc chép. Sau đó pha `check-vlm`, trong môi trường Ψ₀, nạp bản trên Drive đúng như stage 3 (`from_pretrained` và `AutoProcessor`) và dừng nếu: sha256 của trọng số hoặc của cả thư mục khác `vlm.json`, transformers báo thiếu hay thừa khóa, embedding nạp vào khác giá trị trong file (tức bị khởi tạo lại), `lm_head` không buộc vào embedding, hoặc 2048 token FAST không vừa vocab. Nhánh B của stage 3 đặt `model_name_or_path` vào thư mục `vlm/` này (sau khi kiểm sha256), giữ `pretrained_action_header_path` của C.
+
+**Thử trên CPU, 9/11/2026** (môi trường Ψ₀ của laptop: transformers 4.57.1, accelerate 1.7.0, `DS_ACCELERATOR=cpu`). Một Qwen3-VL nhỏ dựng từ `config.json` của cha (2 lớp, vocab 153792 như cha), đổi cỡ embedding như `pretrain.py`, lưu bằng `Accelerator.save_model` như `pretrain.py:446`, file tokenizer và processor tải từ thư mục cha trên Hugging Face:
+
+| Bước | Kết quả |
+|---|---|
+| `save_model` ghi gì | chỉ `model.safetensors`; tên tensor cùng dạng file của cha (`model.language_model.*`, `model.visual.*`, không `lm_head`) |
+| `from_pretrained` trên thư mục checkpoint như đã lưu | lỗi (không có `config.json`) |
+| `package`, rồi `load_check` | không vấn đề nào: vocab 153792, tokenizer 151669, không thiếu hay thừa khóa, `lm_head` buộc vào embedding |
+| Mọi tensor nạp lại so với model đã lưu | bằng nhau |
+
+Phần chưa thử: bước gom ZeRO-3 trên GPU (dựa vào cờ ở trên và dạng file của cha) và nạp model thật 2,1 tỉ tham số. `check-vlm` trên Colab làm phần đó, ngay sau lần chạy.
+
+Một điều cần ghi cạnh kết quả của B: action header `postpre.*` được train (stage 2 của tác giả) trên đặc trưng của VLM cha. Sau 300 bước stage 1, đặc trưng của VLM lệch đi một chút, và stage 3 khởi đầu header từ chỗ lệch đó; stage 3 train header đủ lâu để thích nghi, nhưng đây là khác biệt thứ hai giữa B và C ngoài "VLM đã thấy video". Chạy lại stage 2 thì loại được khác biệt này, nhưng không nằm trong kế hoạch.
+
+### 2.4 RunPlan `tray-ego-b.yaml`
+
+[`tray-ego-b.yaml`](../../configs/runplans/stage1/tray-ego-b.yaml), `run_plan_id` **`rp_1d7627234111`** từ 11/11/2026, khi plan chuyển sang A100 với trần 8 CU (mục 2.1, 2.10). Khối `compute` nằm trong id, nên id đổi; mọi khối khác giữ nguyên. Trước đó, trên L4 với trần 4 CU, id là `rp_64bde22a5dda` từ khi ghim bản export đã làm sạch ngày 9/11/2026 (mục 2.9; lần ghim đầu là `rp_ecd2bb11c415`); trước đó, với giá trị giữ chỗ, là `rp_6a66a6ff082c`. `runplan check` qua và in "draft" kèm lý do.
+
+**Sẵn sàng chạy (11/11/2026).** Khối `dataset.source` ghim bản export thật (`egx_7b43c30dc5d88cd7`, mục 2.9). Plan giữ `status: draft` từ 9/11 tới 11/11/2026 vì bản export do mã của PR #173 và #174 tạo ra, khi đó chưa merge. Ngày 11/11, PR #173 và PR #176 (thay #174, cùng mã `ac3637da`) đã merge, và Hiếu xác nhận người trong 153 clip đã đồng ý cho đưa tarball lên Drive và chạy stage 1; `status: draft` được bỏ, `run_plan_id` vẫn là `rp_64bde22a5dda`. Quy tắc chung: plan có giá trị giữ chỗ (`egx_0000000000000000`, sha256 toàn số 0) bắt buộc ghi `draft`, nếu không `runplan check` báo lỗi; plan đã ghim đủ được phép giữ `draft`, khi đó `check` và `setup` in lý do "marked `status: draft` with every pin set" và `colab setup` từ chối trước khi làm bất cứ gì (không tốn CU). `status` nằm ngoài `run_plan_id` (như plan của DA-34), nên thêm hay bỏ nó không đổi id. Để chạy: mục 2.6.
+
+| Khối | Giá trị | Lý do |
+|---|---|---|
+| `recipe` | [`psi0-stage1-egodex.yaml`](../../configs/runplans/stage1/psi0-stage1-egodex.yaml), không đổi `args` | Bản export có bố cục EgoDex. Cha được train bằng `pretrain-mix-psi0-fast.sh` (HE và EgoDex 1:1, từ `ckpt200k`), với cùng tokenizer FAST `egodex-rel-50w-1x48-v2048-s100`, cùng `egodex_stat_all.json` và ảnh EgoDex 270×480 như script EgoDex. Recipe thêm cha `psi0-pre-egodex-he` vào `parents` |
+| `parent` | `pre.fast.1by1.2601091803.ckpt.ego200k.he30k`, sha256 `6e63…d3f9` | VLM của C (quyết định 1). Test so với `he-tray-v2.yaml`; `setup` kiểm sha256 sau khi tải |
+| `train.max_training_steps` | 300 | Quyết định 4. 300 bước × 32 mẫu là khoảng 73 lượt qua 132 clip của bản export đã ghim (mỗi lượt một khung ngẫu nhiên mỗi clip). Loss sẽ giảm một phần do học thuộc; B được đánh giá bằng closed-loop của stage 3 so với C (DA-34), không bằng loss này |
+| `train.checkpointing_steps` | 300 | Một checkpoint ở cuối (Ψ₀ luôn lưu ở bước cuối: `scripts/train.py:304-310` gọi `should_save_training_checkpoint`, `trainer.py:30-41`). Checkpoint giữa tốn một lần lưu DeepSpeed khoảng 30 GB và vô dụng: phiên đã dừng không chạy tiếp |
+| `train.validation_steps` | 0 | Bản export không có split `test/`; val dạng sinh token của Ψ₀ nói ít trong 300 bước. Quên (P4) và hiểu cảnh (P1) là probe của DA-09, dời sau demo |
+| `deepspeed_config` | `zero3_offload.json` của mục 1.2 | Một GPU; `runplan check` so với recipe; pre-flight của `setup` thử trên model nhỏ. File này bật gom trọng số 16 bit khi lưu, điều kiện của mục 2.3 |
+| `persist_vlm` | `true` | Giữ VLM cho stage 3 của B (mục 2.3) |
+| `compute.gpu` | `A100` (40 GB), từ 11/11/2026; trước là `L4` | L4 22 GiB hết bộ nhớ ở forward đầu của lần 1 (mục 2.10) |
+| `compute.max_compute_units` | 8,0 từ 11/11/2026; trước là 4,0 | Quyết định 4; Hiếu nâng lên 8 khi chuyển sang A100 (mục 2.1) |
+
+**Stats chuẩn hóa [Đề xuất, 9/11/2026]: dùng file của tác giả `egodex_stat_all.json`, không dùng `egodex_stat.json` của bản export.** Lý do:
+
+- Cha học token action FAST trên action đã chuẩn hóa bằng file của tác giả: cả script EgoDex lẫn script trộn tạo ra cha đều truyền `--data.transform.field.stat-path=assets/stats/egodex_stat_all.json` với khóa `egodex`, và tokenizer FAST được fit trên action ở thang đó. Chuẩn hóa bằng stats khác thì cùng một chuyển động tay cho ra chuỗi token khác, tức là đổi nghĩa của token mà cha đã học, và B sẽ khác C ở hai chỗ thay vì một.
+- Stats của 153 clip tư thế giả (MediaPipe) có q01 và q99 nhiễu hơn nhiều so với stats của EgoDex.
+- Docstring của export cũng ghi lần chạy của tác giả chuẩn hóa bằng file của họ; file của export dùng để so sánh.
+
+Giá phải trả: Ψ₀ cắt action đã chuẩn hóa về [−1, 1] (`config/transform.py:682`), nên phần đuôi của những chiều mà video của đội vượt khoảng q01–q99 của EgoDex bị cắt. `setup` đo việc này và ghi vào `report.json`, mục `setup_stage1.stats_coverage`: các chiều có q01 hoặc q99 của export nằm ngoài khoảng của tác giả, và tỉ lệ độ rộng khoảng (trung vị, lớn nhất). Chỉ ghi lại, không chặn. Số này đọc được ngay khi có bản export, trước khi tốn GPU (`export_source.stats_coverage` trên CPU). Đo trên bản export thử: phần bị cắt rất lớn (mục 2.7).
+
+**Tiêu chí chốt trước** (như mục 1.6, chỉ khác độ dài):
+
+- **Loss giảm**: trung vị loss train của 30 bước cuối thấp hơn trung vị của 30 bước đầu. Ψ₀ ghi một dòng mỗi bước optimizer (`scripts/train.py:298-301`), nên 30 là một phần mười lần chạy ở mỗi đầu.
+- **Chạy lại**: chạy lại 3 bước đầu dưới `da30-tray-ego-b-repeat`, cùng seed 7; loss bước đầu lệch không quá 2%.
+- **Nạp được ở stage 3**: `check-vlm` không báo vấn đề nào (mục 2.3).
+
+Ba tiêu chí này là bằng chứng đường đi. Chúng không nói gì về việc video của đội có giúp hay không: câu hỏi đó trả lời bằng closed-loop của stage 3 (B so với C), theo quy tắc của DA-34 ([tray.md](tray.md) mục 4).
+
+### 2.5 Ước lượng CU
+
+**A100, từ 11/11/2026.** Giả định, chưa đo; dòng `job_da30_stage1_tray_ego_b_a100` của [sổ chi phí](../g0/ledger/DA-30.csv). Một VM A100 ở 6,73 CU/giờ (đo ở DA-19 và S1-04).
+
+Phần cố định khoảng 29 phút, một phần đo ở lần 1 (mục 2.10): `setup` của DA-19 1,9 phút; pre-flight 0,9 phút (build CPU Adam 44 s); tải cha và chép bản export 0,2 phút; `run` từ lúc gọi tới forward đầu 2 phút. Phần còn lại là giả định:
+
+- nhận VM và đưa mã lên khoảng 3 phút;
+- cài CUDA toolkit khoảng 2 phút (lần 1 cài bằng tay, không đo);
+- checkpoint cuối 4 phút;
+- `persist` kèm VLM 4 phút;
+- `check-vlm` 3 phút;
+- `repeat` 3 bước 7 phút (gồm nạp model và một lần lưu DeepSpeed);
+- `persist` lần hai 1 phút.
+
+Tức khoảng 10 phút trước bước train đầu và 19 phút sau bước cuối.
+
+Tốc độ train cũng là giả định: **6 s/bước**, tức 9 s/bước của L4 chia 1,5. Số 9 s là giả định cũ của L4, chưa đo. Hệ số 1,5 là tỉ lệ A100/L4 đo ở stage 3 (S1-04), nơi phần CPU chiếm nhiều thời gian. Với ZeRO-3 offload, Adam chạy trên CPU, nên GPU nhanh hơn không rút ngắn được phần đó.
+
+| s/bước | Train 300 bước | Tổng | CU |
+|---|---|---|---|
+| 4 | 20 phút | 49 phút | 5,5 |
+| 6 (giả định chính) | 30 phút | 59 phút | 6,6 |
+| 7 | 35 phút | 64 phút | 7,2 (bộ canh dừng ở khoảng 7,20) |
+| 9 | 45 phút | 74 phút | 8,3, quá trần |
+
+Bộ canh với `--cap 8` ở 6,73 CU/giờ:
+
+- Biên 430 s là khoảng 0,80 CU, nên bộ canh dừng phiên ở khoảng 7,20 CU, tức khoảng 64 phút từ lúc mở phiên.
+- `persist` của bộ canh chạy sớm hơn 600 s (khoảng 1,12 CU), tức ở khoảng 6,08 CU, khoảng phút 54.
+- Nếu lúc đó run chưa tới checkpoint cuối, `persist` chỉ giữ được log, không có VLM.
+
+**Quy tắc dừng [Đề xuất]:** VLM phải lên Drive trước phút 54. Có 10 phút trước bước train đầu, và sau bước cuối còn checkpoint 4 phút và `persist` 4 phút, nên 300 bước phải xong trong 36 phút, tức 7,2 s/bước. Đọc s/bước trong `train.log` sau 20 bước:
+
+- Quá 7 s/bước: dừng VM và báo Hiếu.
+- Từ 6 đến 7 s/bước: chạy `run`, `persist`, `check-vlm`, rồi bỏ `repeat`. `repeat` mất 7 phút và sẽ đụng mốc dừng 64 phút. Ghi lý do vào mục 2.10.
+- Dưới 6 s/bước: chạy đủ, theo thứ tự `run`, `persist`, `check-vlm`, rồi mới `repeat` và `persist` lần nữa. Thứ tự này đưa trọng số lên Drive sớm nhất; `persist` lần hai không chép lại trọng số đã có.
+
+**L4, 9/11/2026 (bỏ).** Ước lượng 2,5 CU ở 9 s/bước, trần 4 CU, dòng `job_da30_stage1_tray_ego_b` của sổ chi phí. Lần 1 cho thấy model với recipe này không vừa L4 (mục 2.10).
+
+### 2.6 Việc Hiếu làm để chạy
+
+Lần 1 (L4) hỏng ngày 11/11/2026; lần 2 (A100) xong cùng ngày (mục 2.10). Phần dưới là runbook đã dùng cho lần 2, giữ để chạy lại. Điều kiện trước (trạng thái 11/11/2026):
+
+1. Chạy từ `master`, không từ nhánh. PR #171 (mục 2) và PR #179 (bỏ `draft`) đã merge. PR chuyển plan sang A100 và thêm bước `cuda_toolchain` (mục 2.10) phải merge trước.
+2. PR #170 (`data_class` `public` cho video của đội) đã merge.
+3. Bản export đã ghim (mục 2.9); PR #173 và #176 (thay #174) đã merge; plan không còn `draft`, `runplan check` in `OK rp_1d7627234111`. Tarball `egx_7b43c30dc5d88cd7.tar` (sha256 `666a67fc…f84a`, 48 701 440 byte) đã ở `MyDrive/denso/da30/exports/` từ lần 1, sha256 khớp. `setup` kiểm cỡ file trên Drive trước khi cài gì, rồi kiểm sha256 trên bản chép sang VM.
+4. Đọc `stats_coverage` của bản export trên CPU trước khi tốn GPU (mục 2.4).
+   - Che danh tính: `identity_masked: true` là lời khẳng định của plan, không phải điều `setup` kiểm được. `verify_export` chỉ kiểm `source.deid_waiver` là null và `data_class` khớp plan; việc làm mờ mặt trước mọi bước khác là mã của DA-04 (`fw egocentric deid`). Hiếu xác nhận ngày 11/11/2026 rằng người trong 153 clip đã đồng ý cho đưa dữ liệu lên Drive và chạy stage 1.
+5. `colab sessions` trống: một đợt một lúc trên tài khoản (mục 1.6).
+
+Bộ canh CU như mục 1.6, đổi tên phiên, GPU và trần (A100, 8 CU). Mỗi lần chạy dùng một registry mới:
+
+```bash
+export PATH=~/project/wm-wam-review/.venv-colab-cli/bin:$PATH
+R=fwdata/colab/da30b-$(date +%Y%m%d-%H%M%S); mkdir -p fwdata/colab && mkdir $R
+nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py guard --registry "$0" --floor 14 --log "$0/guard.jsonl"; echo "exit $?"' $R < /dev/null > $R/guard.out 2>&1 &
+nohup setsid bash -c 'trap "" TERM HUP INT; python3 scripts/colab/cu_watch.py session --registry "$0" --new --name da30-stage1-b --gpu A100 --cap 8 --floor 14 --persist "colab exec -s da30-stage1-b -f configs/runplans/stage1/persist_cell.py" --log "$0/da30-stage1-b.jsonl"; echo "exit $?"' $R < /dev/null > $R/da30-stage1-b.out 2>&1 &
+( until [ -f $R/da30-stage1-b.ready ]; do grep -q '^exit ' $R/da30-stage1-b.out && exit 1; sleep 5; done
+  [ -f $R/guard.beat ] && [ $(( $(date +%s) - $(stat -c %Y $R/guard.beat) )) -lt 120 ] ) && echo READY || echo "NOT READY: do not start the job"
+```
+
+Sau `READY`: đưa mã ở commit `master` vào `/content/da30/fw` như lần 1, rồi **mount Drive trước `setup`** (tarball nằm trên Drive):
+
+```bash
+colab drivemount -s da30-stage1-b /content/drive
+```
+
+Trên VM, từ `/content/da30` (lệnh train chạy trong shell SSH, không qua `colab exec`, để kernel rảnh cho `persist` của bộ canh):
+
+```bash
+python3 -m flywheel_psi0.stage1.colab setup --work /content/da30 --plan fw/configs/runplans/stage1/tray-ego-b.yaml
+```
+
+`setup` tự cài CUDA toolkit khớp torch khi VM có bản CUDA khác (mục 2.10), nên không cần sửa tay như lần 1. Pha `cuda_toolchain` của `report.json` ghi hai bản CUDA và các gói đã cài.
+
+Sau 20 bước của `run`, áp quy tắc dừng của mục 2.5:
+
+- quá 7 s/bước: dừng VM;
+- từ 6 đến 7 s/bước: bỏ `repeat`.
+
+Nếu `run` báo `out_of_memory`, dừng VM ngay và báo Hiếu (mục 2.10, [Option]). Hết các pha thì dừng VM ngay, không chờ bộ canh: bộ canh chỉ dừng phiên ở trần.
+
+```bash
+Psi0/.venv-psi/bin/python -m flywheel_psi0.stage1.colab run --work /content/da30 --plan fw/configs/runplans/stage1/tray-ego-b.yaml
+```
+
+```bash
+python3 -m flywheel_psi0.stage1.colab persist --work /content/da30 --plan fw/configs/runplans/stage1/tray-ego-b.yaml
+```
+
+```bash
+Psi0/.venv-psi/bin/python -m flywheel_psi0.stage1.colab check-vlm --work /content/da30 --plan fw/configs/runplans/stage1/tray-ego-b.yaml
+```
+
+```bash
+Psi0/.venv-psi/bin/python -m flywheel_psi0.stage1.colab repeat --work /content/da30 --plan fw/configs/runplans/stage1/tray-ego-b.yaml
+```
+
+```bash
+python3 -m flywheel_psi0.stage1.colab persist --work /content/da30 --plan fw/configs/runplans/stage1/tray-ego-b.yaml
+```
+
+Sau lần chạy: tải `report.json` và log về `fwdata/colab/`, ghi dòng `measured` của sổ chi phí (`balance_drop` ở dòng `exit` của `da30-stage1-b.jsonl`), ghi kết quả vào mục 2.10 (lần 2). VLM nằm ở `MyDrive/denso/da30/da30-tray-ego-b/vlm/`, bản ghi ở `…/da30-tray-ego-b/vlm.json`. Bốn giá trị DA-34 cần ghim (mục 2.10 ghi nơi đã ghim) có sẵn trong mục `persist.vlm` của `report.json`: `job_id` `da30-tray-ego-b`, `drive_dir`, `weights_sha256`, `manifest_sha256`.
+
+### 2.7 Loader check trên bản export thử (9/11/2026)
+
+Bản export **thử**, không để ghim: `egx_fb3d1401dac0bd4c`, 47 MB, 132 mẫu (`part1/two_table/<i>.hdf5` và `.mp4`), 7804 khung ở 30 fps, mỗi clip 30–99 khung (trung vị 59,5), một câu mô tả cho mọi mẫu, không có `test/`, `data_class` `public`, không miễn trừ che danh tính. Phiên điều phối giao bản này để thử loader; bản thật sẽ có `export_id` mới. `export_source verify` qua.
+
+Cách chạy như mục 1.5: image `psi0@sha256:0d58…80b2` trên `rtx3060`, `PYTHONPATH` trỏ vào bản clone ở `cda3fdf` (mã trong image khác commit ghim nên không dùng), chỉ CPU, container 8 CPU, 10 GB RAM, `--shm-size 4g`, 4 worker. Argv là argv của `tray-ego-b.yaml` (bản nháp), chỉ đổi đường dẫn dữ liệu và VLM cha sang chỗ mount; chỉ nạp processor của cha `ego200k.he30k`, không nạp trọng số. Để so sánh, chạy cùng argv trên 218 episode EgoDex của mục 1.4.
+
+| Mục | Bản export thử | EgoDex (218 episode) |
+|---|---|---|
+| Mẫu train, test | 132, 0 | 218, 0 |
+| Một epoch (`drop_last`) | 8 batch × 16 = 128 | 13 batch × 16 = 208 |
+| `input_ids` | 16 × 191–195 | như mục 1.5 |
+| Ảnh | lưới 1 × 16 × 30 (270×480), `pixel_values` 7680 × 1536 | như mục 1.5 |
+| Action thô | 1 × 48 | 1 × 48 |
+| Token action FAST mỗi mẫu | 1–44 | 1–43 |
+| NaN, `problems` | không có, rỗng | không có, rỗng |
+| Hàm gốc ở `cda3fdf` | vẫn `UnboundLocalError`; bản vá còn cần | như trên |
+| Thời gian | batch đầu 1,5–1,7 s (4 worker khởi động), sau đó 0,01–0,5 s mỗi batch | |
+| **Giá trị action bị cắt ở ±1** | **41,6 %** | **2,2 %** |
+| **Mẫu có ít nhất một chiều bị cắt** | **89,8 %** | 21,2 % |
+| Mẫu chỉ có 1 token | 9 / 128 (7,0 %) | 2 / 208 (1,0 %) |
+
+Hai dòng cuối là mục mới của `loader_check` (`actions` trong báo cáo, test `test_psi0_stage1_loader_check.py`), để kiểm bản export thật bằng đúng lệnh này. Một lần chạy riêng 5 epoch (640 mẫu) cho cùng kết quả: 41 % giá trị và 90 % mẫu bị cắt, 7,8 % mẫu một token.
+
+**Kết quả 1: action của bản thử phần lớn nằm ngoài stats của EgoDex.** Đường đi chạy được, nhưng 41,6 % giá trị action sau chuẩn hóa bằng `egodex_stat_all.json` nằm ở biên ±1, gấp 19 lần EgoDex. Với dữ liệu khớp stats, mỗi chiều có khoảng 2 % giá trị ngoài q01–q99, đúng như số đo trên EgoDex. Trên CPU, ngoài Ψ₀:
+
+- `stats_coverage`: cả 42 chiều không phải pad có q01 hoặc q99 của export ngoài khoảng của tác giả; tỉ lệ độ rộng khoảng trung vị 11,9, lớn nhất 26,0.
+- Delta tính như loader (khung i và i+3, trong hệ camera của khung i; 7408 delta): cổ tay trái theo x có trung vị |d| 0,030 m, gần bằng q99 của tác giả (0,030), nhưng p90 là 0,22 m mỗi 0,1 s. Góc roll cổ tay trái có p90 là 2,22 rad (q99 của tác giả 0,21); có delta gần ±π.
+- Thang đo không sai: cổ tay cách camera trung vị 0,54 m. Phần lớn delta có cỡ hợp lý; phần đuôi rất lớn. Đó là dạng của nhiễu tư thế (tư thế tay ước lượng nhảy giữa các khung, góc lật qua ±π), không phải của chuyển động thật.
+- Quỹ đạo camera không phải số đo: bước tịnh tiến mỗi khung chỉ có hai giá trị, 0 hoặc 0,005 (70 % số khung là 0,005). Quay của camera trung vị 2,2° mỗi khung, p90 19,6°, có bước gần 180°. Tư thế tay được đưa sang hệ thế giới bằng quỹ đạo này, nên chuyển động của nó đi vào mọi delta; mục 2.8 cho thấy phần quay là nguồn chính của phần bị cắt. (Bản đầu của mục này ghi bước tịnh tiến luôn là 0,005; sửa ngày 9/11/2026.)
+
+**Kết quả 2: mẫu một token là delta bằng 0, do clip ngắn.** Cả 9 mẫu một token có cùng một hàng action, đúng bằng giá trị 0 sau chuẩn hóa (token `<|a_378|>`). Loader bốc khung `index` trong [0, T−2] và cần khung `index + 3`; khi `index` rơi vào ba khung cuối không có khung đó, nó lặp lại `index` (`egodex_dataset.py:470-506` ở `cda3fdf`), nên delta bằng 0. Tỉ lệ kỳ vọng là 3/(T−1) trung bình trên các clip, tức 5,6 % với độ dài của bản thử (EgoDex: clip dài hàng trăm khung, dưới 1 %); đo được 6,6–7,8 %.
+
+**Kết quả 3: loader ghi file vào thư mục export.** Lần đọc đầu, `EgoDexDataset._load_file_list` ghi `part1/filelist_cache.pkl` (`egodex_dataset.py:249-282`); mount chỉ đọc thì dừng với `OSError`. Trên Colab thư mục export ghi được nên không sao. File này không có trong `meta.json`: `verify_export` chỉ chạy trong `setup` trước khi train, và `pack` từ chối thư mục đã bị loader đọc, nên phải đóng tarball từ bản export gốc.
+
+**Đề xuất cho plan [Đề xuất, 9/11/2026], chờ Hiếu duyệt:**
+
+| Câu hỏi | Đề xuất | Lý do |
+|---|---|---|
+| Stats | Giữ `egodex_stat_all.json` (mục 2.4) | Đổi sang stats của export sẽ giảm phần bị cắt nhưng đổi nghĩa token mà cha đã học. Với đuôi nhiễu thế này, q01–q99 của export phần lớn là nhiễu, nên khoảng chuẩn hóa sẽ rộng gấp khoảng 12 lần và chuyển động thật bị nén vào vài bin |
+| Phần bị cắt | **Không ghim bản export khi `actions.clipped_value_share` của `loader_check` trên 5 %** (EgoDex 2,2 %). Sửa ở pipeline egocentric trước bản export thật: làm mượt tư thế cổ tay theo thời gian, nối góc để không lật qua ±π, bỏ hoặc nội suy khung có bước nhảy lớn; ghi rõ quỹ đạo camera là đo hay đặt | Với 90 % mẫu bị cắt, token FAST chủ yếu mã hóa biên ±1; 300 bước sẽ dạy cha một phân bố action méo. B khi đó khác C vì nhiễu, không vì video của đội, và closed-loop của DA-34 không tách được hai thứ này. Ngưỡng 5 % là đề xuất; Hiếu chọn |
+| Không có `test/` | Không đổi | `validation_steps` đã là 0; loader đọc 0 file test và `create_dataloaders` chạy được |
+| `upsample_rate` 3 với clip ngắn | Giữ 3 | 3 khung ở 30 fps là 0,1 s, thang thời gian mà token của cha đã học. Giá là khoảng 6 % mẫu có đích bằng 0, phần lớn ở cuối clip, khi tay đã đặt khay xuống và gần như đứng yên |
+| Số mẫu | Plan ghi `samples` theo kết quả `pack` của bản thật | Bản thử có 132 mẫu, không phải 153 (export bỏ 21 clip); `setup` từ chối khi số mẫu lệch plan. 300 bước × 32 mẫu là khoảng 73 lượt mỗi clip ở 132 clip |
+
+Plan giữ `status: draft`. Không chạy Colab.
+
+### 2.8 Làm sạch tư thế có đưa phần bị cắt xuống dưới 5 % không [Đề xuất, 9/11/2026]
+
+Đo trên CPU, ngoài repo, trên cùng bản export thử (132 clip, 7804 khung). Không sửa bản export hay pipeline; thay đổi pipeline sẽ đi vào một PR của DA-04.
+
+**Cách đo.** Script đọc `transforms/` của 132 file HDF5, dựng lại `actions_48d` như script `precompute` của tác giả (trùng khớp tuyệt đối với `actions_48d` đã lưu), rồi tính delta đúng như loader ở `cda3fdf`. Mọi `index` trong [0, T−2] đều được lấy. Khung i và i+3 (hoặc i và i ở ba khung cuối) đều nằm trong hệ camera của khung i. Delta gồm vị trí, roll/pitch/yaw kiểu `xyz` của `R2 @ R1.T`, và đầu ngón. Sau đó chuẩn hóa bằng `egodex_stat_all.json`, cắt về [−1, 1], và cho mỗi clip trọng số bằng nhau như loader. Bản xuất như hiện có cho 42,7 % giá trị bị cắt; `loader_check` đo 41,6 % (mục 2.7). Bản dựng lại khớp với loader.
+
+Các bước làm sạch, áp cho từng tay:
+
+- **Liên tục của góc:** nếu xoay khung cổ tay π quanh một trục của nó làm khung gần khung trước hơn 30° trở lên, thì xoay.
+- **Làm mượt:** Savitzky–Golay bậc 2 trên vị trí cổ tay, đầu ngón, và quaternion của cổ tay (đã giữ dấu liên tục, chuẩn hóa lại). Cửa sổ 9 khung (0,3 s) và 21 khung (0,7 s).
+- **Khung nhảy:** khung có bước nhảy của cổ tay (tịnh tiến hoặc quay) lớn hơn trung vị + 5 × MAD của clip thì **nội suy** (tuyến tính cho vị trí, slerp cho quay), không bỏ. Loader đọc HDF5 và video theo cùng chỉ số khung, nên bỏ khung sẽ lệch ảnh với action.
+- **Camera:** 4a giữ quay của camera đã làm mượt, đặt tịnh tiến bằng 0. 4a+ làm sạch quay của camera như cổ tay. 4b dùng camera đơn vị: tư thế giữ trong hệ camera, delta không bù chuyển động đầu.
+
+Ngưỡng q01/q99 của tác giả: cổ tay trái x −0,029/0,030 m, roll trái −0,226/0,213 rad. Delta là cho 3 khung (0,1 s); trung vị và p90 tính trên các delta khác 0.
+
+| Biến thể | Cửa sổ | Giá trị bị cắt | Mẫu có chiều bị cắt | \|Δ\| cổ tay trái x, trung vị / p90 (m) | \|Δ\| roll trái, trung vị / p90 (rad) | Khung tay nội suy (trên 15 608) |
+|---|---|---|---|---|---|---|
+| 0 Như xuất | | 42,7 % | 92,5 % | 0,027 / 0,215 | 0,287 / 2,12 | 0 |
+| 1 Liên tục góc (sửa 5802 lần lật) | | 42,6 % | 92,5 % | 0,027 / 0,215 | 0,270 / 1,37 | 0 |
+| 2 = 1 + làm mượt | 9 | 41,3 % | 90,9 % | 0,032 / 0,170 | 0,189 / 0,83 | 0 |
+| 3 = 2 + khung nhảy | 9 | 40,7 % | 90,9 % | 0,032 / 0,164 | 0,188 / 0,79 | 1819 |
+| 4a = 3, quay camera làm mượt, tịnh tiến 0 | 9 | 41,1 % | 91,1 % | 0,038 / 0,195 | 0,215 / 0,94 | 988 |
+| 4a+ = 3, quay camera làm sạch như cổ tay | 9 | 39,2 % | 91,0 % | 0,037 / 0,175 | 0,204 / 0,77 | 748 |
+| 4b = 3, camera đơn vị | 9 | 10,6 % | 80,0 % | 0,008 / 0,021 | 0,135 / 0,58 | 816 |
+| 2 | 21 | 37,4 % | 87,5 % | 0,032 / 0,111 | 0,124 / 0,44 | 0 |
+| 3 | 21 | 37,1 % | 87,7 % | 0,031 / 0,111 | 0,125 / 0,43 | 1819 |
+| 4a | 21 | 36,8 % | 87,3 % | 0,039 / 0,152 | 0,142 / 0,50 | 679 |
+| 4a+ | 21 | 31,9 % | 86,9 % | 0,035 / 0,132 | 0,131 / 0,42 | 663 |
+| **4b** | **21** | **3,9 %** | **56,3 %** | **0,005 / 0,014** | **0,082 / 0,29** | **816** |
+
+Đối chứng, chỉ đổi camera, không làm sạch tay: quay làm mượt và tịnh tiến 0 cho 45,9 %; camera đơn vị cho 18,6 %. 4b với cửa sổ 15 cho 6,0 %. Theo nhóm chiều, 4b cửa sổ 21: vị trí cổ tay 5,5 %, góc cổ tay 13,3 %, đầu ngón x/y 1,1 %, đầu ngón z 2,7 %.
+
+**Làm mượt có xóa chuyển động thật không.** Đo cùng cách trên 73 episode EgoDex (một phần ba của mẫu 218 episode, 600 khung đầu mỗi episode, 23 646 khung). Camera của Vision Pro là số đo thật.
+
+| EgoDex | Giá trị bị cắt | Mẫu có chiều bị cắt | p90 \|Δ\| cổ tay trái x | p90 \|Δ\| roll trái |
+|---|---|---|---|---|
+| Như có | 1,9 % | 19,5 % | 0,0099 m | 0,084 rad |
+| Camera đơn vị | 1,8 % | 19,2 % | 0,0105 m | 0,084 rad |
+| Làm mượt cửa sổ 21 | 1,0 % | 11,5 % | 0,0095 m | 0,071 rad |
+| 4b cửa sổ 21 | 0,7 % | 9,9 % | 0,0098 m | 0,065 rad |
+
+Cửa sổ 21 giữ gần hết chuyển động của EgoDex: p90 giảm 4 % ở vị trí và 15 % ở roll. Bỏ phần bù chuyển động đầu gần như không đổi phần bị cắt trên EgoDex.
+
+**Kết luận.**
+
+- **Nguồn chính là quỹ đạo quay của camera, không phải nhiễu của tay.** Mọi biến thể còn giữ quay của camera đều ở 32–46 %, kể cả khi quay đó đã được làm sạch như cổ tay. Bỏ camera (đơn vị) một mình đưa 42,7 % xuống 18,6 %. Quay trung vị 2,2° mỗi khung, tức khoảng 65°/s, không hợp với người bê khay; ở khoảng cách tay 0,54 m, 3 khung quay như thế dời tay khoảng 6 cm, gấp đôi q99 của tác giả.
+- **Làm sạch tay chỉ có tác dụng khi bỏ camera.** Với camera đơn vị: lật góc, khung nhảy và làm mượt cửa sổ 9 đưa 18,6 % xuống 10,6 %; cửa sổ 21 xuống 3,9 %.
+- **Khung cổ tay lật rất thường xuyên:** 22 % số bước khung trong hệ camera (37 % trong hệ thế giới) cần xoay π mới liên tục. Đó là dấu hiệu cách dựng trục cổ tay từ landmark có chỗ mơ hồ về dấu; nên sửa ở chỗ dựng, không chỉ vá sau.
+
+**Đề xuất cho PR của DA-04 [Đề xuất]:**
+
+1. Ghi tư thế trong hệ camera (`transforms/camera` là ma trận đơn vị) cho tới khi có quỹ đạo đầu đo được và đã kiểm. Trên EgoDex, bỏ phần bù chuyển động đầu gần như không đổi gì.
+2. Dựng trục cổ tay có dấu xác định. Thêm bước giữ liên tục (xoay π khi gần khung trước hơn 30°) làm lưới an toàn.
+3. Nội suy khung có bước nhảy của cổ tay lớn hơn trung vị + 5 × MAD của clip; không bỏ khung.
+4. Savitzky–Golay bậc 2, cửa sổ 21 khung ở 30 fps, trên vị trí cổ tay, đầu ngón và quaternion cổ tay.
+5. Kiểm lại bằng `loader_check` trên bản export thật trước khi ghim, với ngưỡng 5 % của mục 2.7.
+
+Còn lại sau đề xuất: 3,9 % là trên bản thử, không phải bản thật. Góc cổ tay vẫn bị cắt 13 %, và 56 % mẫu có ít nhất một chiều bị cắt (EgoDex 19,5 %). Bản export qua ngưỡng nhưng vẫn nhiễu hơn EgoDex. Cửa sổ 21 có thể làm mờ những lúc tay đổi hướng nhanh (cầm và đặt khay); phần bị cắt không nói gì về chất lượng policy, closed-loop của B so với C mới trả lời.
+
+### 2.9 Ghim bản export đã làm sạch (9/11/2026)
+
+DA-04 làm sạch tư thế theo đề xuất của mục 2.8 (PR #174, sau thay bằng PR #176 cùng mã; QA ở PR #173) và xuất lại cùng 132 clip. Lần ghim đầu (`egx_b6e974e46e8222e8`) dùng mã làm sạch có lỗi mà review của PR #174 tìm ra. DA-04 đã sửa: khung nhảy giờ được dò so với một mốc cục bộ bền (bắt cả chuỗi khung lệch từ đầu clip và các đợt nhảy liền nhau), và bước nhảy của đầu ngón cũng được xét. Plan giờ ghim bản xuất lại bằng mã đã sửa (PR #174 ở `ac3637da`): `egx_7b43c30dc5d88cd7`, 7804 khung, `data_class` `public`, không miễn trừ che danh tính, `verify_export` qua. DA-04 đo 3,3 % giá trị bị cắt bằng cách đo của mục 2.8.
+
+**Loader check, như mục 2.7** (cùng image, cùng mã `cda3fdf`, chỉ CPU, argv của `tray-ego-b.yaml`, 8 CPU, 4 worker, trên một bản chép ghi được):
+
+| Mục | `egx_7b43…` (ghim) | `egx_b6e9…` (lần ghim đầu, bỏ) | Bản thử (mục 2.7) |
+|---|---|---|---|
+| Mẫu train, test | 132, 0 | 132, 0 | 132, 0 |
+| Một epoch | 8 batch × 16 = 128 | như vậy | như vậy |
+| `input_ids` | 16 × 192–195 | 16 × 193–195 | 16 × 191–195 |
+| Ảnh, action thô | lưới 1 × 16 × 30, `pixel_values` 7680 × 1536; 1 × 48 | như vậy | như vậy |
+| Token action FAST mỗi mẫu | 1–44 | 1–44 | 1–44 |
+| NaN, `problems` | không có, rỗng | không có, rỗng | không có, rỗng |
+| Thời gian | batch đầu 1,6 s, sau đó 0,01–0,3 s | batch đầu 1,5 s, sau đó 0,01–0,5 s | như vậy |
+| **`actions.clipped_value_share`** | **3,6 %** | 4,3 % | 41,6 % |
+| `actions.samples_with_a_clipped_dim` | 60,9 % | 61,7 % | 89,8 % |
+| `actions.one_token_samples` | 9 / 128 (7,0 %) | 9 / 128 | 9 / 128 |
+| 5 epoch (640 mẫu): giá trị / mẫu bị cắt | 3,3 % / 53,9 % | 3,7 % / 55,3 % | 41 % / 90 % |
+
+128 mẫu là ít cho một số gần ngưỡng, nên đo thêm 5 epoch (640 mẫu) bằng script riêng của mục 2.7. Loader có seed cố định (seed 7), nên chạy lại cho đúng cùng các mẫu đó: đây là một phép đo, không phải hai. (Bản đầu của mục này ghi "hai lần" như thể hai mẫu độc lập; sửa ngày 9/11/2026.) Với bản ghim, 3,3 % khớp với số của DA-04. Phần còn bị cắt vẫn nằm ở cổ tay trái: pitch 32 %, y 19 %, roll 16 %; cổ tay phải pitch 10 %; mọi chiều khác dưới 10 %. Mẫu một token vẫn là delta bằng 0 ở ba khung cuối mỗi clip (mục 2.7, kết quả 2); làm sạch không đổi điều này.
+
+**Qua ngưỡng 5 % của mục 2.7, nên ghim.** Tarball đóng bằng `pack` từ thư mục export gốc (chưa bị loader ghi `filelist_cache.pkl`); đóng hai lần cho cùng sha256, và `fetch` (kể cả kiểm số mẫu) nhận lại nó như `setup` sẽ làm (132 mẫu, 7804 khung).
+
+| Trường của `dataset.source` | Ghim hiện tại | Lần ghim đầu (bỏ, lịch sử) |
+|---|---|---|
+| `export_id` | `egx_7b43c30dc5d88cd7` | `egx_b6e974e46e8222e8` |
+| `tarball` dưới `MyDrive` | `denso/da30/exports/egx_7b43c30dc5d88cd7.tar` (trên Drive từ 11/11/2026, sha256 khớp) | `denso/da30/exports/egx_b6e974e46e8222e8.tar` |
+| `sha256` | `666a67fc47ff9da1218718d3926b88bb9d7b8ad433ae311c0f636fbe01aaf84a` | `61c3497aa48bd59182aebadcdb5816d5d8a7de11cec0aa393c90eb32906bafc8` |
+| `bytes` | 48 701 440 | 48 701 440 |
+| `samples` | 132 | 132 |
+| `run_plan_id` | `rp_64bde22a5dda` trên L4; `rp_1d7627234111` trên A100 từ 11/11/2026 (mục 2.4) | `rp_ecd2bb11c415` |
+
+`dataset.id` là `team-ego-tray-clean-132`. Dòng `estimated` của sổ chi phí vẫn ghi id của bản nháp đầu `rp_6a66a6ff082c` (sổ là append-only; ước lượng CU không đổi). Tarball của lần ghim đầu không dùng nữa; không đưa nó lên Drive.
+
+**Plan vẫn là bản nháp.** Bản export do mã của PR #173 và #174 tạo ra, chưa merge, mà lần chạy chỉ khởi động từ `master`. Trước đây `runplan check` coi plan nháp đã ghim đủ là lỗi; giờ điều đó được phép, và `check` lẫn `setup` in lý do "marked `status: draft` with every pin set". `setup` vẫn từ chối trước khi cài hay tải gì. `status` nằm ngoài `run_plan_id`, nên khi bỏ `draft` id vẫn là `rp_64bde22a5dda` (test `test_dropping_the_draft_keeps_the_checks_and_the_id`). Việc còn lại trước khi chạy ở mục 2.6 bước 3. Nếu PR #174 còn đổi mã làm sạch trước khi merge, bản export phải xuất và ghim lại. **Cập nhật 11/11/2026:** mã được merge qua PR #176, giống hệt `ac3637da` (chỉ khác tài liệu và một comment trong `configs/data/egocentric.yaml` từ PR #173), nên bản export không phải xuất lại; `status: draft` đã bỏ, id không đổi (mục 2.4).
+
+Lưu ý: 3,3–3,6 % là trên chính 132 clip đã dùng để chọn cách làm sạch ở mục 2.8, nên không phải số đo độc lập. Video quay thêm sau này cần đo lại bằng `loader_check`.
+
+### 2.10 Kết quả
+
+**Lần 1, 11/11/2026: hết bộ nhớ ở forward đầu, chưa có bước train nào.**
+
+- Plan `rp_64bde22a5dda`, từ `master` `465e29b5`.
+- Một L4 (`gpu-l4-s-ass1a1-38t0ub1c6r3os`) của tài khoản Colab mới.
+- Registry `fwdata/colab/da30b-20261111-051241`; log trong `fwdata/colab/da30b-results/attempt1-logs.tgz`.
+- Tarball trên Drive khớp sha256.
+
+| Pha | Kết quả |
+|---|---|
+| `setup` lần 1 | Pre-flight hỏng: DeepSpeed 0.17.1 báo `CUDAMismatchException`. VM có CUDA 13.0, torch 2.7.0 là bản cu126. `setup` 112 s, pre-flight 22 s |
+| `setup` lần 2 | Pre-flight hỏng: "Ninja is required to load C++ extensions". `ninja` 1.13.0 có trong venv, nhưng thư mục `bin` của venv không nằm trong `PATH` |
+| Sửa tay | `apt-get install -y cuda-nvcc-12-6 cuda-cudart-dev-12-6 libcurand-dev-12-6 libcublas-dev-12-6`; `pip install ninja`; `CUDA_HOME=/usr/local/cuda-12.6` và `/usr/local/cuda-12.6/bin` đầu `PATH` |
+| `setup` lần 3 | Qua. Pre-flight 54 s (build CPU Adam 44 s), `group_lrs` [1e-4, 1e-5]. Cha và bản export 14 s: 132 tập, 7804 khung, `layout_problems` rỗng |
+| `run` | `out_of_memory` sau 123 s, ở forward đầu: attention của một lớp decoder trong mô hình ngôn ngữ Qwen3-VL (`flash_attn` `pad_input`). PyTorch đã cấp 19,63 GiB trong 22,03 GiB của L4. `train_lines` 0 |
+
+**Chi phí.** Số dư 500,00 → 499,62, tức **0,38 CU**: dòng `measured` của [sổ chi phí](../g0/ledger/DA-30.csv). Bộ canh ghi `wall_cu` 0,601 (22:12:44–22:31:21Z, 18,6 phút × 1,94 CU/giờ) và thoát mã 0.
+
+**Nguyên nhân OOM [giả định, chưa đo].** ZeRO-3 offload đã đưa trọng số và optimizer sang RAM. Phần còn trên GPU chủ yếu là activation của micro-batch 16, với gradient checkpointing tắt. A100 40 GB được kỳ vọng là vừa, nhưng chưa đo; `peak_vram_gb` của lần chạy A100 sẽ trả lời.
+
+**Sửa sau lần 1:**
+
+- **[Đã chốt 11/11/2026, Hiếu] "Chạy A100".** Plan sang A100, trần 8 CU, recipe giữ nguyên (`rp_1d7627234111`; mục 2.4, 2.5).
+- **`colab setup` tự làm bước sửa tay** (`stage1/cuda_toolchain.py`):
+  - Điều kiện: `nvcc` dưới `CUDA_HOME` của torch không qua luật của DeepSpeed. Luật đó cho qua khi hai bản cùng major.minor, hoặc khi cả hai nằm trong danh sách tương thích của cùng một major (`cuda_minor_mismatch_ok`). Bản 13.0 của lần 1 không qua.
+  - Khi đó, `setup` cài bốn gói trên cho bản CUDA của torch. Nếu cài hỏng, nó chạy `apt-get update` một lần rồi cài lại. Sau đó nó đặt `CUDA_HOME=/usr/local/cuda-X.Y`.
+  - Trong mọi trường hợp, `bin` của venv được đặt lên đầu `PATH`, nơi có `ninja`. Nếu vẫn không thấy `ninja`, `setup` cài nó bằng pip.
+  - Pha `cuda_toolchain` của `report.json` ghi hai bản CUDA và các gói đã cài.
+  - `CUDA_HOME` và `PATH` được truyền cho pre-flight và ghi vào `cuda_env.json`. `run` và `repeat` đọc lại file đó (trường `cuda_env` trong pha `run`).
+
+**Nếu A100 cũng hết bộ nhớ [Option]:** micro-batch 8 × accumulation 4 (vẫn 32 mẫu mỗi bước), hoặc bật gradient checkpointing. Cả hai đổi recipe và `run_plan_id`, nên cần Hiếu quyết. (Không cần: lần 2 vừa 40 GB, đỉnh 28,86 GB.)
+
+**Lần 2, 11/11/2026: chạy hết đường đi trên A100, đạt cả ba tiêu chí chốt trước.**
+
+- Plan `rp_1d7627234111`, từ `master` có PR #188.
+- Một A100 (`gpu-a100-s-euw4a0-3kgmf3y2s0xyq`); registry `fwdata/colab/da30b-20261111-062238`.
+- Log, `report.json`, `metrics.jsonl` và `vlm.json` trong `fwdata/colab/da30b-results/attempt2/`.
+
+| Pha | Thời gian | Kết quả |
+|---|---|---|
+| `setup` lần 1 | — | Từ chối trước khi cài gì: tarball "not found (mount Drive before setup)". Lần mount Drive đầu hết giờ sau 120 s; lần `colab drivemount` thứ hai mount được |
+| `setup` | 118,3 s | Môi trường của DA-19 60,8 s, tải 57,5 s |
+| `cuda_toolchain` | 47,4 s | VM có CUDA 13.0, torch 12.6: cài bốn gói `cuda-12-6`, `CUDA_HOME=/usr/local/cuda-12.6`. Không sửa tay |
+| pre-flight | 59,7 s | Qua |
+| `setup_stage1` | 13,8 s | 132 tập, 7804 khung, `layout_problems` rỗng; `stats_coverage` như lần 1 |
+| `run` | 1139,8 s | 300/300 bước, 18:10 cho vòng train, **3,63 s/bước** (giả định 6 s). Đỉnh VRAM **28,86 GB** trên 40 GB. `infra_status` ok, checkpoint bước 300 |
+| `persist` | 35,6 s | VLM 4 262 742 488 byte lên `MyDrive/denso/da30/da30-tray-ego-b/vlm/`, `header_problems` rỗng |
+| `check-vlm` | 34,4 s (nạp) | Nạp bản trên Drive như stage 3, `problems` rỗng; vocab 153 792, tokenizer 151 669, 2 131 333 120 tham số. Pha hỏng **sau** khi kiểm, do lỗi ghi báo cáo (`seconds` trùng tên, sửa ở PR này); kết quả lấy từ `vlm_checkpoint load-check` chạy lại bằng tay |
+| `repeat` | 175,6 s | 3 bước dưới `da30-tray-ego-b-repeat` |
+| `persist` lần hai | — | Log của cả hai job lên Drive |
+
+Tiêu chí chốt trước (mục 2.4):
+
+| Tiêu chí | Ngưỡng | Đo | Kết quả |
+|---|---|---|---|
+| Loss giảm | trung vị 30 bước cuối < trung vị 30 bước đầu | 2,86 < 3,77 (loss bước đầu 5,83, bước cuối 2,99) | Đạt |
+| Chạy lại | loss bước đầu lệch ≤ 2 % | 5,8310 và 5,8310, lệch 0,0 | Đạt |
+| Nạp được ở stage 3 | `check-vlm` không báo vấn đề | `problems` rỗng | Đạt |
+
+Loss giảm là bằng chứng đường đi, không phải kết quả: 300 bước là khoảng 73 lượt qua 132 clip, nên một phần là học thuộc (mục 2.4). B được đánh giá bằng closed-loop của stage 3 so với C (DA-34).
+
+**VLM cho DA-34.** Bốn giá trị dưới đây trùng với `vlm.json` cạnh thư mục và với `report.json` mục `persist.vlm`.
+
+DA-34 đã ghim chúng ngày 11/11/2026 vào plan bốn run `he-tray-pair60k.yaml`, khóa `parents.psi0-ego-stage1-egx.vlm_stage1`, trên PR #181 (chưa merge; head `80a07a77`, id nháp `rp_e2fb9f62c223`). DA-34 cũng tính lại manifest từ sha256 từng file và thấy khớp; Drive có đúng 12 file; cha `6e63da17…` là VLM của C.
+
+`he-tray-b.yaml` không được điền, vì hai lý do:
+
+- Plan này đã `superseded_by: he-tray-pair60k.yaml` (quyết định của Hiếu ngày 11/11/2026), nên sẽ không chạy.
+- Id `rp_128aec169e12` của nó được giữ để luật mục 18 của DA-34 vẫn kiểm được; điền pin vào thì id đổi.
+
+| Trường | Giá trị |
+|---|---|
+| `job_id` | `da30-tray-ego-b` |
+| `drive_dir` | `denso/da30/da30-tray-ego-b/vlm` |
+| `weights_sha256` | `c48ec2df761d8badc30508f9dca9b3e8378c7ed4d340a6f5c8401a3d3d4ad252` |
+| `manifest_sha256` | `019daa801041bc7ccc8076cf99488159c09b38d2dded1aef9451e14d1570a524` |
+
+**Chi phí.** Số dư 499,62 → 495,52, tức **4,10 CU** (dòng `measured` của [sổ chi phí](../g0/ledger/DA-30.csv)), so với ước lượng 6,6 CU. Trần 8 CU không bị chạm.
+
+- Bộ canh ghi `wall_cu` 4,605: 23:22:41Z–00:03:45Z, 41,1 phút × 6,73 CU/giờ. VM được nhận lúc 23:23:58Z.
+- Khoảng 6 phút trong đó là chờ Drive cho phép mount.
+- Bộ canh thoát mã 6, lý do `signal`: nó nhận tín hiệu dừng và dừng phiên trong `finally`, sau khi các pha đã xong.
+
+So với ước lượng của mục 2.5: train nhanh hơn giả định (3,63 thay vì 6 s/bước, 18 thay vì 30 phút), và phần cố định gần đúng (`setup`, `cuda_toolchain`, pre-flight, `setup_stage1` cộng khoảng 4 phút, giả định 5 phút).

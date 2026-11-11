@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Nháp (Châu viết 2/11/2026; PO đặt mã DA-37 ngày 3/11/2026) |
+| Trạng thái | Đang làm (Châu viết 2/11/2026; PO đặt mã DA-37 ngày 3/11/2026; nhiệm vụ 1 và 6.1 làm sớm từ 7/11/2026 trên bộ episode dựng trong test) |
 | Người làm | Châu |
 | Làn | Đánh giá (`flywheel-eval`) |
 | Story PRD | 3.5 · Epic 3 · FR18; [spec v10.5](../../spec-v10-failure-to-data.md) mục 5.3, 6.4 |
@@ -28,12 +28,14 @@ Là kỹ sư đánh giá, tôi muốn đối chiếu scorer với cờ thành c�
 
 ## Nhiệm vụ
 
-- [ ] 1. Lệnh đối chiếu scorer với cờ SIMPLE trên một tập episode, báo cáo lệch (AC 1, 2)
+- [x] 1. Lệnh đối chiếu scorer với cờ SIMPLE trên một tập episode, báo cáo lệch (AC 1, 2)
 - [ ] 2. Lưu nhãn xác nhận của kỹ sư vào catalog (AC 3)
 - [ ] 3. Tính τ_track thân trên và thân dưới theo phân vị 99, kèm số mẫu (AC 4)
 - [ ] 4. Tính τ_sync và ghi τ_lat của G0, kèm số mẫu (AC 4)
 - [ ] 5. Ghi giá trị vào `system.yaml` và RunPlan, bỏ `null` (AC 5)
 - [ ] 6. Test chạy lại cho kết quả trùng trên bộ episode nhỏ (AC 6)
+  - [x] 6.1 Báo cáo đối chiếu: cùng bộ episode và cùng cấu hình cho cùng báo cáo, cùng hash, cùng blob
+  - [ ] 6.2 τ: cùng bộ episode teleop cho cùng τ_track, τ_sync (sau nhiệm vụ 3, 4)
 
 ## Phạm vi file
 
@@ -74,12 +76,20 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 7/11/2026 | Làm sớm nhiệm vụ 1 và 6.1 trên bộ episode dựng trong test (Châu chọn); tách nhiệm vụ 6 thành 6.1 báo cáo và 6.2 τ, vì τ chờ nhiệm vụ 3, 4 | Châu |
 | 3/11/2026 | Đặt mã DA-37; thêm phụ thuộc 3.2 và 3.4; dời sau 13/11 theo 07 mục 2.4; báo cáo hiệu chỉnh lưu qua kho thay `docs/g0/scorer/` | PO (Hiếu) |
 | 2/11/2026 | Nháp story theo PRD 3.5, spec mục 5.3, 6.4 và 04 mục 4.2; nêu bốn chỗ chờ | Châu (chờ SM, PO) |
 
 ## Ghi chép khi làm
 
-- Giờ thực:
-- Công cụ AI đã dùng:
+- Giờ thực: nhiệm vụ 1: 1h, cộng 1h sửa theo review #158 lần đầu, 1h theo lần hai; nhiệm vụ 6.1: 1h.
+- Công cụ AI đã dùng: Claude Code.
 - Ghi chú hoàn thành:
-- File đã tạo hoặc sửa:
+  - 7/11/2026, nhiệm vụ 1: `fw eval agree --scores <score.jsonl> --rollouts <thư mục eval> --release <release> [--store <store>]`. Phần thuần ở `scorer/agreement.py` (`compare`), phần đọc ghi ở `scorer/calibration.py`. Score ghép với `RolloutResult` theo `trace_ref.trace_id`, nên lúc chấm phải gọi `fw eval score --episode-id <trace_id>`: tên `episode_N` của SIMPLE đếm lại ở mỗi lượt eval nên không ghép được. Score hay rollout không có cặp được liệt kê trong báo cáo, không bị bỏ.
+  - Cách đếm (đề xuất, chờ PO xem): rollout có `infra_status` khác `ok`, hoặc `ok` mà `sim_success` là `None`, nằm ở `excluded` kèm lý do và không vào tỉ lệ. Scorer trả "chưa rõ" (`success = None`) **không** tính là trùng, là một loại lệch riêng (`scorer_unknown`): nếu không, một scorer né mọi episode sẽ không bao giờ lệch. Tỉ lệ trên 0 episode là `None`, không phải 0% hay 100%.
+  - Một báo cáo nói về đúng một bộ (`task_id`, `scorer_version`, `config_sha256`); bộ trộn hai scorer bị từ chối, hai `Score` khác nhau của một episode cũng vậy. "Hash của scorer" của AC 2 là `scorer_version` (bump mỗi lần đổi hình dạng bản ghi, DA-36 8.4); `release_id` do người chạy truyền vào vì cả `Score` lẫn `RolloutResult` đều không mang release.
+  - Lưu qua kho: byte của báo cáo vào blob store (`put_blob`, hash là báo cáo), và một dòng chỉ mục vào `<store>/scorer/agreement.jsonl`. Báo cáo không có thời gian hay đường dẫn, nên chạy lại cho cùng blob; chỉ mục chỉ thêm dòng.
+  - Review #158 (Hiếu, 7/11/2026) đồng ý bốn điểm trên và đòi sửa hai chỗ, đã sửa: (1) `passed` chỉ có giá trị trên bộ G1 xét được, tức ít nhất 100 episode tính được và có cả SIMPLE đạt lẫn trượt; ngoài ra `passed` là `None` và `unjudged` nêu lý do (`no_episodes`, `not_enough_episodes`, `no_sim_success`, `no_sim_failure`), `agreement` vẫn tính. (2) Rollout không có `trace_ref` (simulator chết trước khi ghi trace) được liệt kê ở `untraced_rollouts` theo `job_id`, kèm `infra_status`, không bị bỏ im lặng.
+  - Review #158 lần hai (tại `a062d47`, 8/11/2026), hai chỗ nên sửa, đã sửa 9/11/2026: (1) `score.jsonl` chỉ ghi thêm, nên episode chấm lại có nhiều `Score`; nay chọn scorer bằng `--task-id`, `--scorer-version`, `--config-sha256` (`ScorerKey`), `Score` của scorer khác bị bỏ trước khi ghép. Không chọn mà file có hai scorer thì vẫn từ chối, kèm danh sách scorer và tên cờ; chọn mà không khớp `Score` nào cũng từ chối và nêu file có gì. (2) Không `Score` nào ghép được với rollout nào (ví dụ chấm bằng `episode_N` của SIMPLE) thì từ chối, thoát 2, không lưu báo cáo; thông báo nêu vài id mỗi bên và cách chấm đúng (`--episode-id <trace_id>`). Có ít nhất một cặp thì vẫn ra báo cáo như cũ, kể cả khi mọi cặp bị loại vì lỗi hạ tầng (`no_episodes`).
+  - Chưa chạy trên dữ liệu thật: eval tray hiện ghi `scorer_steps` của vị từ SIMPLE trong dòng outcome, chưa có trace tín hiệu cho scorer của làn đọc. 100 episode thật vẫn chờ (Chỗ cần quyết, điểm 2).
+- File đã tạo hoặc sửa: `packages/flywheel-eval/src/flywheel/eval/scorer/agreement.py`, `scorer/calibration.py`, `api.py`, `cli.py`; `packages/flywheel-eval/tests/unit/scorer/test_agreement.py`, `test_agreement_rerun.py`.

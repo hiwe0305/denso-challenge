@@ -30,7 +30,9 @@ sources:
   ego_video:
     # the team's own recordings: <root>/device.json + <root>/<task>/<i>.mp4
     license: team-internal
-    data_class: internal
+    # public from 9/11/2026 (Hiếu): the team's own demo recordings, faces covered by
+    # `fw egocentric deid` before any other step; trainable on Colab (docs/g0/egocentric.md 8.1)
+    data_class: public
     layout: two_table
     embodiment_id: human_hands@ego_video
 
@@ -78,6 +80,9 @@ qa:
   # check: threshold and what failing it does. Values are fractions of frames unless
   # named otherwise; a check fails when its value is above the threshold, except
   # min_frames and segment_count (below).
+  # A person's review settles segments (DA-04 task 9, 9/11/2026): when every segment is
+  # `label_source = human`, segment_ambiguous is 0; one human segment whose sentence is
+  # the episode's instruction is a whole-task sample and segment_count needs 1 there.
   min_frames: {threshold: 30, on_fail: reject}                 # 1 s at 30 Hz; giả định
   segment_count: {threshold: 2, on_fail: reject}               # fewer segments than a pick and a place
   video_frames: {threshold: 0, on_fail: reject}                # |frames of the mp4 - frames of the pose|
@@ -99,6 +104,20 @@ pose_ea:
   vo_min_flow_px: 1.0        # below this median flow, rotation only; giả định
   vo_step_m: 0.005           # translation per frame when moving: monocular VO has no scale; giả định (0.15 m/s)
   max_side_px: 960           # frames are downscaled for MediaPipe and VO
+  clean:
+    # DA-04 task 10 (9/11/2026): `fw egocentric pose --estimates` cleans E-A before it
+    # writes pose.npz (ingest/egocentric/clean.py); E-B is never cleaned. Values from the
+    # offline test on the tray clips, docs/he/stage1.md 2.8 (PR 171).
+    frame: camera            # hands in the camera frame, camera = identity: the VO track
+                             # is not measured (translation is vo_step_m per moving frame)
+    flip_deg: 30             # turn a wrist frame pi about an axis when that is > 30 deg
+                             # closer to the previous seen frame; giả định (2.8)
+    jump_mad: 5.0            # steps > median + 5 MAD (x 1.4826) of the clip (wrist,
+    jump_burst: 4            # rotation, tips) cut runs; pieces of <= 4 frames that are not
+                             # the longest are interpolated, never dropped; giả định (2.8)
+    savgol_window: 21        # Savitzky-Golay frames (0.7 s at 30 fps) on wrist position,
+    savgol_order: 2          # tips and quaternion; window 9 gave 10.6 %, 15 gave 6.0 %,
+                             # 21 gave 3.9 % clipped on the trial export; giả định (2.8)
 
 models:
   # D6: rules first; RoboBrain suggests step boundaries when rules are ambiguous and

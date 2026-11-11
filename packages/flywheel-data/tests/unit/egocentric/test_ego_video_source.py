@@ -14,11 +14,11 @@ from flywheel.data.ingest.egocentric.episodes import read_bundle, read_episodes
 from flywheel.data.ingest.egocentric.video_source import read_device, register_videos
 
 
-def test_a_recording_root_registers_as_internal_without_a_waiver(
+def test_a_recording_root_registers_as_public_without_a_waiver(
     tmp_path: Path, cfg: EgoConfig
 ) -> None:
     record = register_videos(make_videos(tmp_path / "rec"), cfg)
-    assert record.source_detail == "ego_video" and record.data_class == "internal"
+    assert record.source_detail == "ego_video" and record.data_class == "public"
     assert record.deid_waiver is None
     assert [(e.task, e.index, e.hdf5) for e in record.episodes] == [("two_table", 0, None)]
     assert set(record.files) == {"device.json", "two_table/0.mp4"}

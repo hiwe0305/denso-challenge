@@ -37,10 +37,12 @@ from flywheel.eval.api import (
     DEFAULT_SYSTEM_CONFIG,
     DEFAULT_TRAIN_CONFIG,
     SCORER_CONFIG_DIR,
+    check_scorer_agreement,
     diagnose_episode_system,
     diagnose_train,
     score_trace,
     store_score,
+    store_scorer_agreement,
     store_system_diagnosis,
     store_train_diagnosis,
 )
@@ -54,6 +56,8 @@ from flywheel.eval.diagnosis.system.reader import (
 )
 from flywheel.eval.diagnosis.system.reader import ReaderError as SystemReaderError
 from flywheel.eval.diagnosis.train.reader import ReaderError
+from flywheel.eval.scorer.agreement import AgreementReport, ScorerKey
+from flywheel.eval.scorer.calibration import CalibrationInputError
 from flywheel.eval.scorer.reader import TraceError
 from flywheel.eval.scorer.score import EpisodeScore
 from flywheel.eval.scorer.status import ScorerError, StepStatus
@@ -210,6 +214,87 @@ def score(
         typer.echo(f"chấm được nhưng không ghi được vào `{store}`: {error}", err=True)
         raise typer.Exit(code=2) from error
     typer.echo(f"ghi vào: {written}")
+
+
+@app.command("agree")
+def agree(
+    scores: Path = typer.Option(
+        ..., "--scores", help="JSONL các `Score`, ví dụ `<store>/scorer/score.jsonl`."
+    ),
+    rollouts: Path = typer.Option(
+        ...,
+        "--rollouts",
+        help="Thư mục chứa `<trace_id>/rollout_result.json` của cùng lượt eval, hoặc một file.",
+    ),
+    release: str = typer.Option(
+        ..., "--release", help="Release mà checkpoint được chấm đã train trên đó."
+    ),
+    store: Path | None = typer.Option(
+        None, "--store", help="Thư mục store để lưu báo cáo. Không có thì không ghi gì."
+    ),
+    task_id: str | None = typer.Option(None, "--task-id", help="Chỉ xét `Score` của task này."),
+    scorer_version: str | None = typer.Option(
+        None,
+        "--scorer-version",
+        help="Chỉ xét `Score` của phiên bản scorer này (`score.jsonl` chỉ ghi thêm, "
+        "nên episode chấm lại có nhiều `Score`).",
+    ),
+    config_sha256: str | None = typer.Option(
+        None, "--config-sha256", help="Chỉ xét `Score` chấm bằng cấu hình có hash này."
+    ),
+) -> None:
+    """Đối chiếu kết luận toàn task của scorer với cờ `check_success` của SIMPLE."""
+    use_utf8()
+    key = ScorerKey(task_id=task_id, scorer_version=scorer_version, config_sha256=config_sha256)
+    try:
+        report = check_scorer_agreement(scores, rollouts, release, key)
+    except (CalibrationInputError, ScorerError) as error:
+        # A set that cannot be read or cannot make one report is not a rate,
+        # so nothing is printed as one and nothing is stored.
+        typer.echo(f"không đối chiếu được: {error}", err=True)
+        raise typer.Exit(code=2) from error
+    _print_agreement(report)
+    if store is None:
+        return
+    try:
+        digest, index = store_scorer_agreement(report, store)
+    except OSError as error:
+        typer.echo(f"đối chiếu được nhưng không ghi được vào `{store}`: {error}", err=True)
+        raise typer.Exit(code=2) from error
+    typer.echo(f"report_sha256: {digest}")
+    typer.echo(f"ghi vào: {index}")
+
+
+def _print_agreement(report: AgreementReport) -> None:
+    typer.echo(f"task: {report.task_id} {report.scorer_version}; release: {report.release_id}")
+    typer.echo(f"config_sha256: {report.config_sha256}")
+    typer.echo(
+        f"tính: {report.counted} episode ({report.sim_successes} SIMPLE đạt, "
+        f"{report.sim_failures} SIMPLE trượt); trùng: {report.agreed}"
+    )
+    if report.agreement is None:
+        typer.echo("tỉ lệ trùng: chưa có (không episode nào tính được)")
+    else:
+        verdict = {True: "đạt", False: "KHÔNG đạt", None: "chưa kết luận G1"}[report.passed]
+        typer.echo(f"tỉ lệ trùng: {report.agreement:.1%} (ngưỡng {report.bar:.0%}): {verdict}")
+    if report.unjudged:
+        typer.echo(
+            f"chưa kết luận G1 (cần ít nhất {report.min_episodes} episode có cả đạt lẫn trượt): "
+            + ", ".join(report.unjudged)
+        )
+    for mismatch in report.mismatches:
+        typer.echo(f"lệch {mismatch.episode_id} [{mismatch.kind}]: {mismatch.reason}")
+    for item in report.excluded:
+        typer.echo(f"không tính {item.episode_id}: {item.reason}")
+    if report.unpaired_scores:
+        typer.echo("Score không có rollout: " + ", ".join(report.unpaired_scores))
+    if report.unpaired_rollouts:
+        typer.echo("rollout không có Score: " + ", ".join(report.unpaired_rollouts))
+    for untraced in report.untraced_rollouts:
+        typer.echo(
+            f"rollout không có trace, job {untraced.job_id} "
+            f"({untraced.infra_status}): {untraced.reason}"
+        )
 
 
 def load_task(reference: str) -> TaskDefinition:

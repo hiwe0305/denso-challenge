@@ -36,6 +36,7 @@ from pathlib import Path
 from flywheel_simple.tray.generate import (
     LOG_NAME,
     check_planner_version,
+    check_visuals_revision,
     generate,
     read_log,
     shard_dir,
@@ -43,7 +44,8 @@ from flywheel_simple.tray.generate import (
     summarize,
 )
 from flywheel_simple.tray.planner import PlannerConfig
-from flywheel_simple.tray.recorder import planner_version
+from flywheel_simple.tray.recorder import planner_version, visuals_revision
+from flywheel_simple.tray.visuals import default_manifest_path
 
 
 def main() -> int:
@@ -78,6 +80,7 @@ def main() -> int:
 
     # Refuse before starting workers; each worker checks again (generate()).
     check_planner_version(args.out, planner_version(PlannerConfig.load()))
+    check_visuals_revision(args.out, visuals_revision(default_manifest_path()))
     env = dict(os.environ)
     for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
         env.setdefault(var, "1")

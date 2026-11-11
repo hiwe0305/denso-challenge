@@ -13,8 +13,11 @@ from flywheel_psi0.tray.eval_results import (
     STEP_NAMES,
     bootstrap_ci,
     collect,
+    mcnemar_exact,
     paired,
+    paired_diff,
     reached,
+    stage1_outcome,
     summarize,
     table,
     trace_of,
@@ -199,3 +202,121 @@ def test_paired_counts_per_condition_and_the_gains(tmp_path: Path) -> None:
     assert result["steps"]["place"]["variant_only"] == 3 and result["place_gain"] == 2
     with pytest.raises(ValueError):
         paired(var[:3], base)
+
+
+def test_mcnemar_exact_two_sided() -> None:
+    assert mcnemar_exact(0, 0) == 1.0
+    assert mcnemar_exact(5, 0) == mcnemar_exact(0, 5) == pytest.approx(2 / 32)
+    assert mcnemar_exact(10, 2) == pytest.approx(2 * (1 + 12 + 66) / 4096)  # 0.0386
+    assert mcnemar_exact(3, 3) == 1.0  # capped
+
+
+def _two_level_runs(
+    tmp_path: Path, var_ok: dict[int, list[bool]], base_ok: dict[int, list[bool]]
+) -> tuple[Any, Any]:
+    chunks = [
+        Chunk(f"l{lv}-000", lv, 0, tuple(1000100 + i for i in range(len(var_ok[lv]))))
+        for lv in var_ok
+    ]
+    for name, oks in (("var", var_ok), ("base", base_ok)):
+        for chunk in chunks:
+            for i, ok in enumerate(oks[chunk.level]):
+                episode(tmp_path / name, chunk, 0, i, success=ok, steps=5)
+    var, _, _ = collect(tmp_path / "var", chunks)
+    base, _, _ = collect(tmp_path / "base", chunks)
+    return var, base
+
+
+def test_paired_diff_resamples_the_differences_within_each_level(tmp_path: Path) -> None:
+    # level 1: variant 3/4 vs 0/4; level 2: variant 1/4 vs 1/4 (one swap)
+    var, base = _two_level_runs(
+        tmp_path,
+        {1: [True, True, True, False], 2: [True, False, False, False]},
+        {1: [False, False, False, False], 2: [False, True, False, False]},
+    )
+    result = paired_diff(var, base, [1, 2], PLAN.stats)
+    assert (result["n"], result["variant"], result["baseline"]) == (8, 4, 1)
+    assert result["diff"] == pytest.approx(3 / 8)
+    assert (result["variant_only"], result["baseline_only"]) == (4, 1)
+    assert result["mcnemar_exact_p"] == pytest.approx(round(mcnemar_exact(4, 1), 4))
+    groups = [[1, 1, 1, 0], [1, -1, 0, 0]]
+    expected = bootstrap_ci(groups, PLAN.stats.resamples, PLAN.stats.seed, PLAN.stats.ci)
+    assert result["ci"] == pytest.approx(expected, abs=1e-4)
+    assert result["ci_vs_0"] == ("above" if expected[0] > 0 else "contains")
+    only_2 = paired_diff(var, base, [2], PLAN.stats)
+    assert (only_2["n"], only_2["diff"], only_2["ci_vs_0"]) == (4, 0.0, "contains")
+
+
+def test_paired_diff_reads_below_zero_and_refuses_other_conditions(tmp_path: Path) -> None:
+    var, base = _two_level_runs(tmp_path, {1: [False] * 6}, {1: [True] * 6})
+    result = paired_diff(var, base, [1], PLAN.stats)
+    assert (result["diff"], result["ci"], result["ci_vs_0"]) == (-1.0, (-1.0, -1.0), "below")
+    with pytest.raises(ValueError, match="different conditions"):
+        paired_diff(var[:5], base, [1], PLAN.stats)
+    with pytest.raises(ValueError, match="no condition"):
+        paired_diff(var, base, [2], PLAN.stats)
+
+
+@pytest.mark.parametrize(
+    ("b", "c", "ci", "outcome"),
+    [
+        (11, 0, (0.1, 0.3), "E1"),  # p 0.00098: paired_diff rounds it to 0.001
+        (12, 1, (0.1, 0.3), "continue"),  # p 0.0034: not clear yet, B ahead
+        (11, 0, (0.0, 0.3), "continue"),  # clear p but the CI touches 0
+        (0, 11, (-0.3, -0.1), "E3"),
+        (0, 11, (-0.3, 0.0), "F"),
+        (3, 3, (-0.1, 0.1), "F"),  # b = c: no gain, stop
+        (1, 4, (-0.1, 0.02), "F"),
+        (4, 1, (-0.02, 0.1), "continue"),
+    ],
+)
+def test_stage1_stop_rule(b: int, c: int, ci: tuple[float, float], outcome: str) -> None:
+    # tray.md 18.2, Hiếu 10/11/2026: E1 / E3 stop on a clear difference, F on no gain
+    diff = {"variant_only": b, "baseline_only": c, "ci": ci}
+    assert stage1_outcome(diff) == outcome
+
+
+def _stage1_set(tmp_path: Path) -> list[Chunk]:
+    from flywheel_psi0.tray.eval_batch import chunk_plan
+
+    rows = [
+        {"level": lv, "seed": 1000100 + i}
+        for lv, n in ((0, 30), (1, 120), (2, 120))
+        for i in range(n)
+    ]
+    (tmp_path / "set").mkdir()
+    (tmp_path / "set/conditions.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+    return chunk_plan(rows, 10)
+
+
+def test_stage1_reads_the_first_six_chunks_of_both_sides(tmp_path: Path) -> None:
+    from flywheel_psi0.tray import eval_results
+
+    chunks = _stage1_set(tmp_path)
+    for chunk in chunks[:6]:
+        for i in range(10):
+            # B: the first 2 of each chunk (12/60), C: none; C's 7th chunk is not read
+            episode(tmp_path / "b", chunk, 0, chunk.start + i, success=i < 2)
+            episode(tmp_path / "c", chunk, 0, chunk.start + i, success=False)
+    for i in range(10):
+        episode(tmp_path / "c", chunks[6], 0, chunks[6].start + i, success=True)
+    common = [
+        str(ROOT / "configs/runplans/tray/he-tray-b.yaml"), "--set", str(tmp_path / "set"),
+        "--out", str(tmp_path / "b"), "--no-yaw",
+    ]  # fmt: skip
+    out = tmp_path / "b-vs-c.json"
+    assert eval_results.main([*common, "--baseline", str(tmp_path / "c"), "--stage1",
+                              "--json", str(out)]) == 0  # fmt: skip
+    result = json.loads(out.read_text())
+    assert result["stage1"]["chunks"] == [c.id for c in chunks[:6]]
+    assert result["stage1"]["conditions"] == 60 and result["stage1"]["outcome"] == "E1"
+    headline = result["paired"]["headline"]
+    assert (headline["n"], headline["variant_only"], headline["baseline_only"]) == (60, 12, 0)
+    assert result["rule0"] is None and result["full_eval_set"] is False
+    assert list(result["levels"]) == ["1", "2"] and result["rollouts"] == 60
+    assert sorted(result["paired"]["by_level"]) == ["1", "2"]
+    with pytest.raises(SystemExit):
+        eval_results.main([*common, "--stage1"])  # stage 1 pairs with a baseline
+    (tmp_path / "b/l2-020/attempt-0/eval/eval_stats.txt").write_text("")
+    with pytest.raises(ValueError, match="stage 1 misses"):
+        eval_results.main([*common, "--baseline", str(tmp_path / "c"), "--stage1"])

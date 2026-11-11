@@ -19,6 +19,21 @@ is the RunPlan's interpretation doc, not this module.
 
     python -m flywheel_psi0.tray.eval_results configs/runplans/tray/he-tray-v2.yaml \
         --set <eval set> --out <eval_batch dir> --json results.json
+
+With `--baseline <eval_batch dir of the same set>`, `paired` adds the per-condition
+counts and, for the headline levels pooled and for each level, the paired difference
+variant - baseline with its bootstrap CI (the per-condition differences resampled within
+each level, the plan's `stats`) and the exact two-sided McNemar p on the discordant
+pairs: the measures of branch B's reading rules (docs/he/tray.md 18.2). `ci_vs_0` says
+where the CI lies; reading it is the doc's.
+
+With `--stage1` (needs `--baseline`), only the first STAGE1_CHUNKS chunks of the run
+order are read, on both sides: stage 1 of branch B's two-stage eval (tray.md 18.2, Hiếu
+10/11/2026), l1-000, l2-000, l1-010, l2-010, l1-020, l2-020, 60 conditions. A missing
+rollout in them is an error. `stage1.outcome` applies the stage 1 stop rule to the
+paired headline: E1 and E3 stop on a clear difference, F stops when B shows no gain,
+`continue` runs the remaining chunks. It is the rule's arithmetic for a run against C;
+against C+ (rule 5) it is not read.
 """
 
 from __future__ import annotations
@@ -36,7 +51,7 @@ from typing import Any
 import numpy as np
 
 from flywheel_psi0.tray.eval_batch import Chunk, attempts, chunk_plan, finished, phases_for
-from flywheel_psi0.tray.runplan import TrayRunPlan
+from flywheel_psi0.tray.runplan import Stats, TrayRunPlan
 
 # flywheel_simple.tray.predicates.STEP_NAMES; SIMPLE's venv is not this package's.
 STEP_NAMES = ("approach_a", "grasp", "lift", "carry", "reach_b", "place", "release_stand")
@@ -44,6 +59,8 @@ RULE0_P = 0.10  # tier 2 rule 0: p_C < 10% on the headline levels
 YAW = 6  # index of yaw in TraceStep.cmd_lower / meas_lower (flywheel.contracts.trace)
 YAW_LARGE = 2.5  # rad, the threshold the yaw counts are reported against
 Z95 = 1.959963984540054  # two-sided 95 % normal quantile, for the Wilson interval
+STAGE1_CHUNKS = 6  # branch B's stage 1 (tray.md 18.2): 3 chunks of level 1, 3 of level 2
+STAGE1_P = 0.001  # stage 1 stops on a clear difference: exact McNemar p below this
 
 
 @dataclass(frozen=True)
@@ -94,6 +111,68 @@ def bootstrap_ci(
     means = sums / total
     tail = (1 - ci) / 2
     return float(np.quantile(means, tail)), float(np.quantile(means, 1 - tail))
+
+
+def mcnemar_exact(variant_only: int, baseline_only: int) -> float:
+    """Exact two-sided McNemar p: the smaller discordant count under Binomial(n, 1/2)."""
+    n = variant_only + baseline_only
+    if n == 0:
+        return 1.0
+    tail = sum(math.comb(n, i) for i in range(min(variant_only, baseline_only) + 1))
+    return min(1.0, 2.0 * tail / float(2**n))
+
+
+def paired_diff(
+    variant: Sequence[Rollout], baseline: Sequence[Rollout], levels: Sequence[int], stats: Stats
+) -> dict[str, Any]:
+    """Paired success difference variant - baseline over the conditions of `levels`.
+
+    d_i = s_variant,i - s_baseline,i per condition (level, seed); the difference is the
+    mean of d_i and its CI resamples d_i within each level, with the plan's resamples,
+    seed and level, so the two sides stay paired (docs/he/tray.md 2, 9 and 18.2).
+    """
+    a = {(r.level, r.seed): int(bool(r.row["success"])) for r in variant if r.level in levels}
+    b = {(r.level, r.seed): int(bool(r.row["success"])) for r in baseline if r.level in levels}
+    if a.keys() != b.keys():
+        raise ValueError("variant and baseline cover different conditions")
+    groups = [[a[k] - b[k] for k in sorted(a) if k[0] == level] for level in levels]
+    groups = [g for g in groups if g]
+    n = sum(len(g) for g in groups)
+    if n == 0:
+        raise ValueError(f"no condition at levels {list(levels)}")
+    variant_only = sum(1 for k in a if a[k] > b[k])
+    baseline_only = sum(1 for k in a if a[k] < b[k])
+    low, high = bootstrap_ci(groups, stats.resamples, stats.seed, stats.ci)
+    return {
+        "levels": list(levels),
+        "n": n,
+        "variant": sum(a.values()),
+        "baseline": sum(b.values()),
+        "diff": round(sum(sum(g) for g in groups) / n, 4),
+        "ci": (round(low, 4), round(high, 4)),
+        "ci_vs_0": "above" if low > 0 else "below" if high < 0 else "contains",
+        "variant_only": variant_only,
+        "baseline_only": baseline_only,
+        "mcnemar_exact_p": round(mcnemar_exact(variant_only, baseline_only), 4),
+    }
+
+
+def stage1_outcome(diff: dict[str, Any]) -> str:
+    """Branch B's stage 1 stop rule (tray.md 18.2) on `paired_diff` of its 60 conditions.
+
+    b and c are the discordant pairs (variant only, baseline only). E1: p < STAGE1_P,
+    b > c and the CI above 0. E3: p < STAGE1_P, b < c and the CI below 0. F: otherwise
+    with b <= c. `continue`: otherwise (b > c). p is recomputed: the rounded p of
+    `paired_diff` would put 11 against 0 (p 0.00098) at 0.001.
+    """
+    b, c = diff["variant_only"], diff["baseline_only"]
+    low, high = diff["ci"]
+    clear = mcnemar_exact(b, c) < STAGE1_P
+    if clear and b > c and low > 0:
+        return "E1"
+    if clear and b < c and high < 0:
+        return "E3"
+    return "F" if b <= c else "continue"
 
 
 def wilson(k: int, n: int, z: float = Z95) -> tuple[float, float]:
@@ -312,11 +391,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--baseline", type=Path, help="eval_batch directory of the same set to pair with"
     )
+    parser.add_argument(
+        "--stage1",
+        action="store_true",
+        help=f"read the first {STAGE1_CHUNKS} chunks only: stage 1 of branch B (tray.md 18.2)",
+    )
     args = parser.parse_args(argv)
+    if args.stage1 and args.baseline is None:
+        parser.error("--stage1 pairs with a baseline: give --baseline")
     plan = TrayRunPlan.load(args.plan)
     rows = [json.loads(line) for line in (args.set / "conditions.jsonl").read_text().splitlines()]
-    chosen, extra, missing = collect(args.out, chunk_plan(rows, args.chunk, phases_for(rows)))
-    full = sorted((int(r["level"]), int(r["seed"])) for r in rows) == sorted(plan.eval_conditions())
+    chunks = chunk_plan(rows, args.chunk, phases_for(rows))
+    if args.stage1:
+        chunks = chunks[:STAGE1_CHUNKS]
+    chosen, extra, missing = collect(args.out, chunks)
+    if args.stage1 and missing:
+        raise ValueError(f"stage 1 misses {missing}: do not read it (tray.md 18.2)")
+    full = not args.stage1 and sorted((int(r["level"]), int(r["seed"])) for r in rows) == sorted(
+        plan.eval_conditions()
+    )
     yaw = None
     if not args.no_yaw:
         yaw = {}
@@ -325,18 +418,36 @@ def main(argv: Sequence[str] | None = None) -> int:
                 yaw[(r.level, r.seed)] = yaw_errors(steps)
     result = summarize(plan, chosen, extra, missing, yaw, full)
     if args.baseline is not None:
-        base, _, base_missing = collect(
-            args.baseline, chunk_plan(rows, args.chunk, phases_for(rows))
-        )
+        base, _, base_missing = collect(args.baseline, chunks)
         if base_missing:
             raise ValueError(f"baseline misses {base_missing}")
         result["paired"] = paired(chosen, base)
+        if plan.eval.by_level is not None:
+            headline = [c.level for c in plan.eval.by_level if c.headline]
+            result["paired"]["headline"] = paired_diff(chosen, base, headline, plan.stats)
+            result["paired"]["by_level"] = {
+                str(c.level): paired_diff(chosen, base, [c.level], plan.stats)
+                for c in plan.eval.by_level
+                if any(r.level == c.level for r in chosen)
+            }
+            if args.stage1:
+                result["stage1"] = {
+                    "chunks": [chunk.id for chunk in chunks],
+                    "conditions": result["paired"]["headline"]["n"],
+                    "p_threshold": STAGE1_P,
+                    "outcome": stage1_outcome(result["paired"]["headline"]),
+                }
     if args.json is not None:
         args.json.write_text(json.dumps(result, indent=1) + "\n")
     print(table(result))
-    counts = {"missing": len(result["missing"]), "yaw": result.get("yaw")}
+    counts: dict[str, Any] = {"missing": len(result["missing"]), "yaw": result.get("yaw")}
     if "paired" in result:
-        counts["paired"] = {k: result["paired"][k] for k in ("success_gain", "place_gain")}
+        brief = {k: result["paired"][k] for k in ("success_gain", "place_gain")}
+        if "headline" in result["paired"]:
+            brief["headline"] = result["paired"]["headline"]
+        counts["paired"] = brief
+    if "stage1" in result:
+        counts["stage1"] = result["stage1"]
     print(json.dumps({k: result[k] for k in ("rule0", "rollouts", "extra_rollouts")} | counts))
     return 0
 

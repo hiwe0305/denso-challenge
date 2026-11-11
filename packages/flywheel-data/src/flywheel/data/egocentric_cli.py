@@ -5,6 +5,7 @@ prints it); its layout is the one DA-18 reads (`ingest/egocentric/episodes.py`).
 In order:
 
     fw egocentric ingest egodex                    pinned EgoDex subset (egocentric.yaml)
+    fw egocentric ingest egodex --all-tasks        every task of the sample (Human-1M view)
     fw egocentric ingest video --root <dir>        the team's recordings (EgoVideoSource)
     fw egocentric deid <work>                      faces covered on this machine (YuNet);
                                                    first, before anything reads a frame
@@ -16,6 +17,9 @@ In order:
     fw egocentric report <work>
     fw egocentric review <work> --sample | --apply <sheet>
     fw egocentric trial <work> --simple <psi-data> --reference <marks> --robobrain --molmo
+    fw egocentric human1m <out> --work <w> ... --estimates <dir> ... --marks <jsonl>
+                                                   Human-1M-style shards, clip status, explorer
+    fw egocentric human1m-check <shard>            schema check of one written shard
 
 Every command is one job with its estimated and measured LedgerEntry (`job_ledger`);
 the estimate is an assumed cost per frame, named in its note. A refusal (the
@@ -38,9 +42,14 @@ from flywheel.data.annotate.deid.blur import FaceDetector, YuNet
 from flywheel.data.annotate.deid.gate import unpinned_videos
 from flywheel.data.api import ConfigError, dataset_report, job_ledger, render_html
 from flywheel.data.config import store_root
+from flywheel.data.export.human1m import build as h1m
+from flywheel.data.export.human1m import viewer as h1m_viewer
+from flywheel.data.export.human1m.check import check_shard
+from flywheel.data.export.human1m.video import Ffmpeg, find_ffmpeg
 from flywheel.data.ingest.egocentric import api
 from flywheel.data.ingest.egocentric import review as reviewing
 from flywheel.data.ingest.egocentric import trial as trials
+from flywheel.data.ingest.egocentric.clean import CleanParams
 from flywheel.data.ingest.egocentric.config import EgoConfig, load_config
 from flywheel.data.ingest.egocentric.episodes import (
     COMPARE,
@@ -63,7 +72,7 @@ STORY = "DA-04"
 ESTIMATE = {"ingest": (1e-3, "frame"), "deid": (5e-2, "frame"), "pose": (2e-3, "frame"),
             "annotate": (5e-3, "frame"),
             "qa": (1e-3, "frame"), "report": (1e-2, "episode"), "review": (1e-2, "episode"),
-            "trial": (20.0, "query")}
+            "trial": (20.0, "query"), "human1m": (2e-2, "frame")}
 EPISODE_FRAMES = 300  # assumed frames of an episode, before ingest has read the files
 
 Work = Annotated[Path, typer.Argument(help="work directory that `fw egocentric ingest` printed")]
@@ -82,6 +91,9 @@ def ingest(
     source: Annotated[str, typer.Argument(help="egodex or video")],
     root_dir: Annotated[Path | None, typer.Option("--root", help="video: recording root")] = None,
     split: Annotated[str, typer.Option(help="train or dev")] = "train",
+    all_tasks: Annotated[bool, typer.Option(
+        "--all-tasks", help="egodex: every task of the downloaded sample, not the pinned 10")]
+    = False,
     work: Annotated[Path | None, typer.Option(help="default $FW_ROOT/pipeline/<source_id>")] = None,
     config: Config = CONFIG,
     run_plan_id: RunPlan = None,
@@ -94,7 +106,7 @@ def ingest(
         if source == "egodex":
             spec = cfg.sources["egodex"]
             planned = len(spec.tasks) * (spec.episodes_per_task or 0)
-            register = partial(register_egodex, store, cfg)
+            register = partial(register_egodex, store, cfg, all_tasks)
         elif source == "video":
             if root_dir is None:
                 raise ValueError("ingest video needs --root <recording dir>")
@@ -149,9 +161,11 @@ def pose(
     job_file: Annotated[Path | None, typer.Option("--job", help="write the E-A job manifest")]
     = None,
     estimates: Annotated[Path | None, typer.Option(help="dir of the E-A job's .npz")] = None,
+    config: Config = CONFIG,
     run_plan_id: RunPlan = None,
 ) -> None:
-    """E-B from tracking; or the E-A job manifest; or E-A from the job, compared with E-B."""
+    """E-B from tracking; or the E-A job manifest; or E-A from the job, compared with E-B
+    and cleaned as `pose_ea.clean` of the config says."""
 
     with _refusals():
         source = api.read_source(work)
@@ -162,7 +176,8 @@ def pose(
                 job_file.write_text(json.dumps(jobs, indent=1) + "\n")
                 message = f"E-A job manifest: {len(jobs)} episodes -> {job_file}"
             elif estimates is not None:
-                deviations = api.import_estimates(work, estimates)
+                cleaning = CleanParams.from_config(load_config(config).pose_ea)
+                deviations = api.import_estimates(work, estimates, cleaning)
                 message = f"E-A read for {len(deviations)} episodes with E-B; compare.json"
             else:
                 message = f"E-B pose of {api.write_eb_poses(work)} episodes"
@@ -312,6 +327,64 @@ def trial(
     _say(json.dumps(result["summary"], indent=1))
     _say(f"decision: {target / 'decision.json'}")
     _say(f"ledger: {job.run_plan_id}/{job.job_id}")
+
+
+H1M_CONFIG = Path("configs/data/egocentric-human1m.yaml")
+
+
+@app.command()
+def human1m(
+    out: Annotated[Path, typer.Argument(help="output folder, e.g. $FW_ROOT/human1m/<name>")],
+    work: Annotated[list[Path], typer.Option(help="pipeline work dir; repeat for each source")],
+    estimates: Annotated[list[Path] | None, typer.Option(
+        help="dir of E-A job .npz (21 joints); repeat")] = None,
+    marks: Annotated[Path | None, typer.Option(help="tray phase marks, JSON lines")] = None,
+    sample: Annotated[int, typer.Option(help="also write a small explorer of N episodes")] = 0,
+    sample_out: Annotated[Path | None, typer.Option(help="default <out>/viewer-sample")] = None,
+    workers: Annotated[int, typer.Option(help="episodes posed and encoded at once")] = 4,
+    h1m_config: Annotated[Path, typer.Option(help="Human-1M view config")] = H1M_CONFIG,
+    run_plan_id: RunPlan = None,
+) -> None:
+    """Every clip of the work dirs: status table, LeRobot v3.0 shards in the Human-1M
+    layout, and the static explorer (Hiếu 11/11/2026)."""
+
+    with _refusals():
+        cfg = h1m.load_h1m_config(h1m_config)
+        encoder = Ffmpeg(find_ffmpeg())
+        frames = sum(_frames(w) for w in work)
+        with _job("human1m", frames, run_plan_id) as job:
+            result = h1m.build(out, work, estimates or [], h1m.read_marks(marks), cfg, encoder,
+                               workers, _say)
+            rows = [i.row for i in result.items]
+            n = h1m_viewer.write_viewer(out / "viewer", result.items, result.summary, rows,
+                                        encoder)
+            if sample:
+                chosen = h1m_viewer.pick_sample(result.items, sample)
+                h1m_viewer.write_viewer(sample_out or out / "viewer-sample", chosen,
+                                        result.summary, rows, None, out / "viewer" / "media")
+            bad = {k: v for k, v in result.problems.items() if v}
+            job.notes.append(f"{len(rows)} clips, {n} exported; config {cfg.version};"
+                             f" shards {sorted(result.shards)}; problems {bad or 'none'}")
+    decisions = result.summary["all"]["decisions"]
+    _say(f"{len(rows)} clips: {decisions}; explorer {out / 'viewer' / 'index.html'}")
+    _say(f"ledger: {job.run_plan_id}/{job.job_id}")
+    if bad:
+        raise typer.Exit(1)
+
+
+@app.command("human1m-check")
+def human1m_check(
+    shard: Annotated[Path, typer.Argument(help="a shard folder written by `human1m`")],
+    video: Annotated[bool, typer.Option(help="count the video's frames by decoding")] = True,
+) -> None:
+    """Schema check of one Human-1M-style LeRobot v3.0 shard; exit 1 on a problem."""
+
+    problems = check_shard(shard, count_video=video)
+    for problem in problems:
+        _say(f"  {problem}")
+    _say(f"{shard}: {'ok' if not problems else f'{len(problems)} problems'}")
+    if problems:
+        raise typer.Exit(1)
 
 
 @contextmanager

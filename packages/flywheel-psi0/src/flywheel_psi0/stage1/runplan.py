@@ -106,6 +106,39 @@ class Dataset(_Frozen):
         return self
 
 
+class ExportSource(_Frozen):
+    """A DA-18 export, pinned by its id and by the sha256 of `pack`'s tarball."""
+
+    name: str  # who recorded it, e.g. "team-ego" for the team's own videos
+    export_id: str = Field(pattern=r"^egx_[0-9a-f]{16}$")
+    tarball: str  # under the Drive root (/content/drive/MyDrive on Colab)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    bytes: int = Field(gt=0)
+    samples: int = Field(gt=0)
+
+
+class ExportDataset(_Frozen):
+    """The team's export (`flywheel_psi0.stage1.export_source`); it carries `actions_48d`."""
+
+    kind: Literal["export"]
+    id: str
+    source: ExportSource
+    split_dir: str
+    data_class: Literal["public", "internal", "restricted"]
+    identity_masked: bool
+
+    @model_validator(mode="after")
+    def _masked(self) -> ExportDataset:
+        # The EgoDex waiver of 4/11/2026 is for Apple's zip only; an export of any
+        # source, the team's own video first, must have passed identity masking.
+        if not self.identity_masked:
+            raise ValueError(
+                f"{self.id}: an export must pass identity masking first (CLAUDE.md); "
+                "the EgoDex waiver covers only Apple's published sample"
+            )
+        return self
+
+
 class Job(_Frozen):
     id: str
     seed: int
@@ -130,12 +163,20 @@ class Stage1Plan(_Frozen):
     psi_model: PsiModel
     recipe: str  # path from the repo root
     parent: Parent
-    dataset: Dataset
+    dataset: Dataset | ExportDataset  # Apple's EgoDex sample, or a DA-18 export
     job: Job
     deepspeed_config: str  # path from the repo root; replaces the recipe's
     overrides: dict[str, ArgValue]
     compute: Compute
     criteria: Criteria
+    # `persist` also keeps the trained VLM in the layout stage 3 loads
+    # (`flywheel_psi0.stage1.vlm_checkpoint`). Unset (not False) when not wanted, so
+    # plans written before the field keep their run_plan_id.
+    persist_vlm: bool | None = None
+    # "draft": not to run yet; `colab setup` refuses it. Required while a pin is a
+    # placeholder; also allowed with every pin set (the data's code is not merged yet).
+    # Out of the run_plan_id (STATUS_FIELDS), so dropping it keeps the id.
+    status: Literal["draft"] | None = None
 
     @classmethod
     def load(cls, path: Path) -> Stage1Plan:
@@ -151,6 +192,33 @@ class Stage1Plan(_Frozen):
     @property
     def repeat_job_id(self) -> str:
         return f"{self.job.id}-repeat"
+
+
+# The pin of an export not yet delivered: valid in form, refused by `setup` and, unless
+# the plan says `status: draft`, by `check`.
+PLACEHOLDER_EXPORT_ID = "egx_" + "0" * 16
+PLACEHOLDER_SHA256 = "0" * 64
+
+
+def placeholder_pins(plan: Stage1Plan) -> list[str]:
+    """The pins that are still placeholders."""
+    if not isinstance(plan.dataset, ExportDataset):
+        return []
+    source = plan.dataset.source
+    reasons = []
+    if source.export_id == PLACEHOLDER_EXPORT_ID:
+        reasons.append("export_id is the placeholder")
+    if source.sha256 == PLACEHOLDER_SHA256:
+        reasons.append("tarball sha256 is the placeholder")
+    return reasons
+
+
+def draft_reasons(plan: Stage1Plan) -> list[str]:
+    """What keeps the plan from running: placeholder pins, or `status: draft` alone."""
+    reasons = placeholder_pins(plan)
+    if not reasons and plan.status == "draft":
+        reasons.append("marked `status: draft` with every pin set")
+    return reasons
 
 
 def _leaves(config: dict[str, Any], prefix: str = "") -> dict[str, Any]:
@@ -268,6 +336,10 @@ def check(plan: Stage1Plan, repo: Path = REPO) -> list[str]:
         problems.append("the rerun must be shorter than the run")
     config = json.loads((repo / plan.deepspeed_config).read_text(encoding="utf-8"))
     problems += [f"{plan.deepspeed_config}: {p}" for p in deepspeed_problems(config, recipe)]
+    if plan.status != "draft":
+        problems += [
+            f"{r}, but the plan is not marked `status: draft`" for r in placeholder_pins(plan)
+        ]
     return problems
 
 
@@ -318,7 +390,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"FAIL {problem}", file=sys.stderr)
     if problems:
         return 1
-    print(f"OK {run_plan_id(plan)}")
+    reasons = draft_reasons(plan)
+    print(f"OK {run_plan_id(plan)}" + (f" (draft: {'; '.join(reasons)})" if reasons else ""))
     return 0
 
 

@@ -19,6 +19,10 @@ its first missing episode, same conditions and seeds, in a new attempt directory
 finished episodes are not run again. Rollouts are not reproducible on EGL (tray.md 8.5),
 so a rerun is a fresh rollout of the same condition and the attempt count is reported.
 
+`--max-chunks N` runs the first N chunks of that order only, then exits: stage 1 of
+branch B's two-stage eval (docs/he/tray.md 18.2) is `--max-chunks 6`. Rerunning without
+it resumes with chunk N + 1; the order does not depend on the flag.
+
     python -m flywheel_psi0.tray.eval_batch --set <eval set> --conditions-sha256 <sha> \
         --out <dir> --server 127.0.0.1:22185 --simple-python <SIMPLE venv>/bin/python \
         --pythonpath <repo>/packages/*/src joined by ':'
@@ -277,7 +281,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--chunk", type=int, default=10)
     parser.add_argument("--attempts", type=int, default=3)
     parser.add_argument("--dry-run", action="store_true", help="print the chunk order only")
+    parser.add_argument(
+        "--max-chunks", type=int, help="run the first N chunks of the order only, then stop"
+    )
     args = parser.parse_args(argv)
+    if args.max_chunks is not None and args.max_chunks < 1:
+        parser.error("--max-chunks must be at least 1")
 
     rows = [json.loads(line) for line in (args.set / "conditions.jsonl").read_text().splitlines()]
     digest = conditions_sha256(rows)
@@ -288,7 +297,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if len(plan_ids) != 1:
         print(f"set mixes run plans {sorted(plan_ids)}", file=sys.stderr)
         return 1
-    chunks = chunk_plan(rows, args.chunk, phases_for(rows))
+    chunks = chunk_plan(rows, args.chunk, phases_for(rows))[: args.max_chunks]
     if args.dry_run:
         for chunk in chunks:
             print(chunk.id, chunk.seeds[0], chunk.seeds[-1], len(chunk.seeds))

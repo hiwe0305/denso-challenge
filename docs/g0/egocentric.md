@@ -19,7 +19,7 @@ fw egocentric ingest egodex                       # in ra thư mục làm việc
 fw egocentric deid $W                             # video tự quay: che mặt trước mọi bước khác (mục 3.1)
 fw egocentric pose $W                             # E-B từ HDF5
 fw egocentric pose $W --job ea_jobs.json          # manifest cho job E-A
-fw egocentric pose $W --estimates <thư mục .npz>  # đọc E-A, so với E-B
+fw egocentric pose $W --estimates <thư mục .npz>  # đọc E-A, làm sạch (mục 4.1), so với E-B
 fw egocentric annotate $W --endpoint http://127.0.0.1:11434/v1
 fw egocentric qa $W
 fw egocentric report $W
@@ -123,7 +123,7 @@ Hiếu quay video task hai bàn ngày 8/11/2026 và cần dùng ngay, nên bư�
 | Nơi để | `$FW_ROOT/models/yunet/face_detection_yunet_2023mar.onnx`, ngoài git; thiếu file thì lệnh in câu `curl` để tải |
 | Tham số (`deid` trong cấu hình) | `score_threshold` 0,6 (mặc định của YuNet là 0,9; hạ để sót ít mặt hơn), `nms_threshold` 0,3, `detect_side_px` 960, `pad` 0,25, `hold_frames` 5, `mosaic_cells` 8. Trừ `nms_threshold`, các số đều là giả định |
 
-Không khung nào rời máy: model chạy cục bộ, dữ liệu `internal` không tới API hosted nào (CLAUDE.md).
+Bước làm mờ chạy cục bộ, nên khung gốc chưa che không rời máy. Dữ liệu `internal` không tới API hosted nào (CLAUDE.md); video tự quay là `public` từ 9/11/2026 (mục 8.1), nhưng chỉ bản sao đã che đi tiếp.
 
 **Cổng kiểm bản sao, không kiểm nhãn.** `episodes.jsonl` là file văn bản, nên `deid_status = blurred` một mình không đủ: trước đây cổng cho episode `blurred` qua ngay. Từ 8/11/2026, episode egocentric không ở `raw` chỉ qua khi **mọi** video của nguồn có bản sao trong `deid_copies`, và sha256 của bản sao trên đĩa (băm lại ở mỗi bước) đúng bằng số `deid` đã ghi. Episode `raw` vẫn chỉ qua bằng miễn D2 theo pin, như cũ. `api.video_of` từ chối mọi `bundle.mp4` không phải bản sao của một nguồn cần làm mờ, nên manifest E-A, `annotate` và `trial` không đọc được video gốc. `ingest` lại thì mất `deid_copies`, episode về `raw`, phải chạy `deid` lại. Test: `tests/unit/egocentric/test_ego_blur.py`, `test_ego_deid.py`.
 
@@ -188,6 +188,55 @@ So E-A với E-B trên cùng khung (`compare.json`), trung vị theo episode r�
 | Hướng tịnh tiến | Không đo được: VO coi 164/4.143 khung là có tịnh tiến, chỉ 1 trong số đó trùng bước E-B dịch ít nhất 2 mm |
 
 Đọc số: đầu ngón lệch khoảng 2,5% bề ngang ảnh, độ sâu lệch 5–6 cm. Cổ tay lệch nhiều hơn đầu ngón, nhiều khả năng vì điểm cổ tay của MediaPipe (nếp cổ tay) và khớp cổ tay của ARKit không cùng định nghĩa; chưa kiểm. Trên EgoDex người ngồi trước bàn nên camera gần như chỉ xoay; sai số xoay của VO lớn hơn chính chuyển động, tức tư thế camera E-A chưa dùng được để tính action trong khung thế giới. Video hai bàn có đi bộ sẽ là phép thử thật của phần tịnh tiến.
+
+### 4.1 Làm sạch E-A (nhiệm vụ 10, 9/11/2026)
+
+Lý do: bản xuất thử `egx_fb3d1401dac0bd4c` của 132 clip khay có 41,6 % giá trị action bị cắt ở ±1 khi chuẩn hóa bằng stats EgoDex (`loader_check`, [docs/he/stage1.md](../he/stage1.md) mục 2.7 ở PR 171; EgoDex 2,2 %). Phép đo ngoài repo ở mục 2.8 cho thấy chỉ tổ hợp "camera đơn vị + làm sạch tay, cửa sổ 21" xuống dưới 5 %. Hiếu giao làm trong DA-04 ngày 9/11/2026.
+
+Làm ở bước `fw egocentric pose --estimates` trên laptop (`ingest/egocentric/clean.py`, tham số `pose_ea.clean` của cấu hình), nên không cần chạy lại job E-A trên `rtx3060`. E-B không bao giờ bị làm sạch: với EgoDex chỉ `pose_ea.npz` đổi, `pose.npz` và `bundle.json` giữ nguyên; `compare.json` vẫn so ước lượng thô, và thêm khóa `pose_ea` ghi hệ tọa độ và báo cáo làm sạch của `pose_ea.npz` (như `pose_cleaning` của `bundle.json` với episode chỉ có E-A), vì `trial.py` đọc file đó. Không bỏ hay thêm khung nào; khung không thấy tay vẫn là NaN.
+
+| Bước | Làm gì | Tham số (giả định, từ mục 2.8) |
+|---|---|---|
+| Hệ tọa độ | Tay ở trong hệ camera của từng khung, `camera` là ma trận đơn vị. Quỹ đạo VO không phải số đo: tịnh tiến là bước cố định `vo_step_m` (0,005 m) mỗi khung "di chuyển", quay trôi. `bundle.json` ghi `pose_frame = camera` và `pose_cleaning` (tham số, số khung đã sửa) | `frame: camera` |
+| Liên tục góc | Khung cổ tay xoay π quanh một trục của nó khi việc đó làm nó gần khung thấy trước đó hơn 30°, nối qua khung không thấy tay | `flip_deg: 30` |
+| Dấu của cả track | Sau bước trên, hai phiếu trên các khung thấy tay: bốn đầu ngón ở đúng phía lòng bàn tay (+z của khung cổ tay với tay phải, −z với tay trái) và đầu ngón theo +y từ cổ tay. Cả track xoay π quanh đúng một trục x, y hoặc z để thỏa cả hai phiếu; `pose_cleaning` ghi `track_turn`. Xoay cả track không đổi delta nào | |
+| Khung nhảy | Bước giữa hai khung (tịnh tiến cổ tay, quay cổ tay, hoặc bước trung bình của đầu ngón) trên trung vị + 5 × MAD (nhân 1,4826) của clip cắt mỗi đoạn thấy tay thành mảnh. Mảnh dài tối đa 4 khung mà không phải mảnh dài nhất của đoạn là khung xấu, kể cả mảnh ở đầu hay cuối đoạn; cả mảnh được nội suy từ hai khung tốt gần nhất: vị trí, đầu ngón tuyến tính, quay bằng slerp; ở mép đoạn giữ khung tốt gần nhất. Một bước lớn đơn lẻ giữa hai mảnh dài (chuyển động nhanh thật) không đánh dấu khung nào | `jump_mad: 5.0`, `jump_burst: 4` |
+| Làm mượt | Savitzky–Golay trên từng đoạn thấy tay: vị trí cổ tay, đầu ngón, quaternion cổ tay (giữ dấu liên tục, chuẩn hóa lại). Đoạn ngắn hơn cửa sổ dùng cửa sổ lẻ dài nhất nó chứa. Viết bằng numpy (scipy không là phụ thuộc của `flywheel-data`); test so khớp `scipy.signal.savgol_filter(mode="interp")` tới 1e-12 | `savgol_window: 21`, `savgol_order: 2` |
+
+**Dấu trục cổ tay.** Đề xuất ở mục 2.8 là sửa dấu ngay khi dựng trục. `estimate_job.wrist_frame` đã có dấu cố định theo landmark: x từ khớp gốc ngón út tới ngón trỏ, z = x × y. Trên 153 file E-A của clip khay (trong hệ camera), 1 052 trên 21 474 bước giữa hai khung thấy tay (4,9 %) là lật π, 856 quanh y, 87 % kèm đổi chirality của bộ điểm: MediaPipe trả về tay phản chiếu. Ép mỗi khung theo chirality của bên tay cho 6,4 % bước lật (dùng bốn đầu ngón; 6,7 % với ngón cái, 6,9 % với khớp giữa ngón), tức tệ hơn. Vì vậy chirality chỉ dùng để bỏ phiếu cho cả track, còn bước giữ liên tục làm việc theo từng khung.
+
+Chạy trên 153 clip khay (`src_805804635f9af7f7`, 9/11/2026, 4 s), lần hai sau review của PR 174 (phép thử khung nhảy theo mảnh, dấu track theo hai phiếu). Bản lưu trước lần một: `fwdata/pipeline/backup/src_805804635f9af7f7-before-DA-04-10-20261109.tar`; trước lần hai: `...-before-DA-04-10-review-20261109.tar` cùng thư mục.
+
+| Đại lượng | Tay trái | Tay phải |
+|---|---|---|
+| Khung thấy tay | 10 960 | 11 324 |
+| Khung bị xoay π (gồm cả các khung theo sau một lần lật) | 4 095 | 4 201 |
+| Track xoay cả (quanh y / x / z) | 66 / 153 (53 / 11 / 2) | 56 / 153 (40 / 14 / 2) |
+| Khung nhảy được nội suy | 673 | 1 012 |
+| Đoạn thấy tay được làm mượt | 290 | 294 |
+
+- Mẫu NaN không đổi ở 612 / 612 mảng; `segments.parquet` không đổi byte nào; 132 đoạn vẫn trùng đoạn pose hữu hạn dài nhất, nên không cần áp lại phiếu duyệt.
+- QA, chạy bằng mã của nhánh này gộp tạm với PR 173 ở `d592a5bd` (chưa merge; không có PR 173 thì `segment_count` từ chối cả 153): **10 `pass`, 122 `flag`, 21 `reject`**, `threshold_version` `ego-1@024bb1b5a624` (cấu hình gộp của hai PR). `camera_jitter_deg_s` không còn hỏng vì camera là đơn vị; `flag` còn lại do `hand_pose_nan` (143).
+- Xuất stage 1 (`--include-flag`): **`egx_7b43c30dc5d88cd7`**, 132 mẫu, 7 804 khung, 47 MB, ở `fwdata/egocentric-export/tray-ego-b-480p-clean2`. `export_source verify` của PR 171 (`6226664d`): `OK`. Bản của lần một, `egx_b6e974e46e8222e8` ở `tray-ego-b-480p-clean`, được giữ để so, không dùng để ghim.
+
+Phần action bị cắt, đo bằng đúng script của mục 2.8 (dựng lại delta như loader ở `cda3fdf`, stats `egodex_stat_all.json`, mỗi clip trọng số bằng nhau):
+
+| Bản xuất | Giá trị bị cắt | Mẫu có chiều bị cắt | \|Δ\| cổ tay trái x, trung vị / p90 (m) | \|Δ\| roll trái, trung vị / p90 (rad) |
+|---|---|---|---|---|
+| Thử `egx_fb3d1401dac0bd4c` | 42,7 % | 92,5 % | 0,027 / 0,215 | 0,287 / 2,12 |
+| Lần một `egx_b6e974e46e8222e8` | 3,8 % | 56,5 % | 0,005 / 0,013 | 0,077 / 0,289 |
+| Sau review `egx_7b43c30dc5d88cd7` | **3,3 %** | 54,4 % | 0,005 / 0,013 | 0,074 / 0,266 |
+
+Theo nhóm chiều, gộp mọi delta (lần một → sau review): vị trí cổ tay 5,4 → 4,8 %, góc cổ tay 13,6 → 11,6 %, đầu ngón x/y 1,0 → 0,9 %, đầu ngón z 2,7 → 2,2 %. `stats_coverage` của lần một: tỉ lệ độ rộng khoảng q01–q99 so với của tác giả có trung vị 1,06, lớn nhất 4,6 (chiều 4, pitch cổ tay trái); bản thử là 11,9 và 26,0. Đo lại bằng một script gộp mọi delta (không cùng cách tính nên số khác một chút): lần một trung vị 0,98, lớn nhất 4,5; sau review 0,86 và 4,4, vẫn ở chiều 4. Bản mới qua ngưỡng 5 % đề xuất ở mục 2.7. **Chưa chạy `loader_check` trong image Ψ₀** (cần Docker trên `rtx3060`); trên bản thử, script này lệch `loader_check` 1,1 điểm (42,7 % so với 41,6 %). Vẫn nhiễu hơn EgoDex: 54,4 % mẫu có ít nhất một chiều bị cắt (EgoDex 19,5 %).
+
+Còn lại, ghi lại chứ không sửa: đầu ngón không xoay theo cổ tay, nên 14,9 % khung thấy tay có đầu ngón ở sai phía của khung cổ tay đã làm sạch (33 % số khung bị xoay, 8 % các khung khác; trung vị 2,6 cm khỏi mặt phẳng lòng bàn tay). Thử phản chiếu các đầu ngón đó theo chiều sâu quanh cổ tay làm phần bị cắt tăng từ 3,5 % lên 4,0 %, nên không làm (docstring của `clean.py`).
+
+Hệ quả cần biết (mục 9, dòng 19–20):
+
+- Delta là chuyển động tay so với đầu, không bù chuyển động đầu. Trên EgoDex, bỏ phần bù gần như không đổi phần bị cắt (mục 2.8).
+- `camera_jitter_deg_s` bằng 0 với E-A trong hệ camera: phép kiểm chỉ còn nghĩa với E-B.
+- Luật cắt đoạn `two_table` tìm bước `walk` từ tốc độ camera; với camera đơn vị, cắt lại sẽ không thấy bước đó. Clip khay dùng phiếu duyệt cả clip nên không bị ảnh hưởng; quỹ đạo VO thô vẫn ở file `.npz` của job.
+- `trial.py` đọc `pose_ea.npz` của EgoDex: chạy lại vòng thử (mục 10.3) sẽ dùng E-A đã làm sạch trong hệ camera.
 
 ## 5. Cắt đoạn và câu lệnh (nhiệm vụ 3)
 
@@ -258,6 +307,35 @@ Một episode có thể có nhiều lý do. Hai phép kiểm mới:
 
 `fw egocentric report` ghi `DatasetReport` của hợp đồng (qua `dataset_report`, `render_html` của API làn) và thêm phần egocentric vào trang `report/index.html` và `report/egocentric.json`: số đoạn theo bước và theo nguồn nhãn, pass, flag, reject theo phép kiểm, giờ video, giấy phép và lý do miễn, độ lệch E-A so với E-B. Hợp đồng không thêm trường nào. `qa` chạy 1,15 s (ước tính 4,14 s), `report` 0,85 s (ước tính 0,2 s).
 
+### 6.1 Phiếu duyệt của người trong QA (nhiệm vụ 9, 9/11/2026)
+
+153 clip khay của đội (`src_805804635f9af7f7`, mỗi clip 2–3 giây, trung vị 77 khung ở 30 Hz) chứa cả task hai bàn, hai bàn đặt sát nhau. Luật 6 bước chỉ tìm được một lần gắp. **[Đã chốt]** Hiếu (9/11/2026): mỗi clip là một mẫu, mang câu của cả task. Phiếu `fwdata/egocentric-raw/review-whole-clip-480p.jsonl` ghi quyết định đó qua `fw egocentric review --apply`: 132 `fix` (đoạn đầu thành đoạn dài nhất mà pose hữu hạn liên tục, tối thiểu 30 khung, câu là câu lệnh của episode), 174 `reject`.
+
+Trước nhiệm vụ 9, QA từ chối cả 153 episode: `segment_count` đòi ít nhất 2 đoạn, và `segment_ambiguous` vẫn đọc `unresolved_share` của `labels.json` dù mọi đoạn đã do người duyệt. Từ nhiệm vụ 9 (`qa/egocentric.py`):
+
+| Trường hợp | `segment_ambiguous` | `segment_count` |
+|---|---|---|
+| Mọi đoạn có `label_source = human` | 0: người đã chốt | như cũ, ngưỡng 2 |
+| Một đoạn duy nhất, `human`, dài ít nhất `min_frames` (30) khung, câu trùng câu lệnh của episode (so sau khi gộp khoảng trắng, không phân biệt hoa thường) | 0 | ngưỡng 1; `QACheck.threshold` ghi 1 |
+| Như trên nhưng ngắn hơn `min_frames` | 0 | ngưỡng 2: vẫn `reject` |
+| Một đoạn `human` mang câu của một bước (EgoDex: giữ `pick`, bỏ `place`) | 0 | ngưỡng 2: vẫn `reject`, vì mất lần đặt |
+| Một đoạn `rule` hoặc `model`, dù câu trùng câu lệnh | `unresolved_share` | ngưỡng 2: vẫn `reject` |
+
+Chọn cách này thay vì thêm bố cục `whole_clip` vào cấu hình: dấu hiệu "cả clip là một mẫu" là quyết định của người, đã nằm trong `segments.parquet` (nguồn nhãn và câu), nên không cần đổi bộ cắt đoạn hay `sources`. Câu của EgoDex là mẫu câu từng bước (`pick up the {object}`), không bao giờ trùng câu lệnh, nên EgoDex không đổi; test cũ giữ nguyên. Cấu hình chỉ thêm một dòng chú thích. Lần chạy dưới đây có `threshold_version` `ego-1@4439a2eb166e`; sau khi rebase lên `bff2fdff` (video tự quay thành `public`, cùng file cấu hình) version là `ego-1@f9b3a906ff85`, quy tắc QA không đổi.
+
+Chạy lại `fw egocentric qa` trên thư mục đó với cấu hình của repo (9/11/2026): **0 `pass`, 132 `flag`, 21 `reject`**, trùng từng episode với lần thử bằng bản sao cấu hình có `segment_count` ngưỡng 1.
+
+Số này là của pose E-A trước khi làm sạch. PR 174 (nhiệm vụ 10, làm sạch E-A, camera là ma trận đơn vị; mục 4.1 khi PR đó vào) đổi kết quả trên cùng 153 clip thành 10 `pass`, 122 `flag`, 21 `reject`: `camera_jitter_deg_s` không còn hỏng, `hand_pose_nan` vẫn `flag`. Bảng dưới là của lần chạy trước khi làm sạch.
+
+| Phép kiểm hỏng | Episode | Ghi chú |
+|---|---|---|
+| `camera_jitter_deg_s` | 153 | trung vị 572°/s so với ngưỡng 60°/s (giả định đọc từ EgoDex ngồi yên); VO một camera trên clip cầm tay ngắn. Chỉ `flag` |
+| `hand_pose_nan` | 143 | E-A mất tay ở một số khung; chỉ `flag`. DA-18 bỏ khung NaN |
+| `hand_out_of_frame` | 1 | |
+| `segments`, `segment_count`, `segment_ambiguous` | 21 | 21 clip không còn đoạn nào: `reject` |
+
+21 clip bị bỏ vì đoạn pose hữu hạn liên tục dài nhất của chúng dưới 30 khung (từ 6 tới 29 khung). Trên 132 clip giữ lại, đoạn giữ chiếm trung vị 83 % clip (trung bình 77 %); tính cả 21 clip bỏ là 0 thì trung vị 78 %. Tổng 7 804 trên 11 847 khung (66 %) đi tiếp sang xuất stage 1, khớp bản xuất `egx_fb3d1401dac0bd4c` (132 mẫu, 7 804 khung). Lấp khoảng trống pose (nội suy qua khung NaN) để giữ thêm clip nằm ngoài nhiệm vụ này (mục 9, dòng 18).
+
 ## 7. Vòng thử model gán nhãn (design mục 6.7.4)
 
 Mục tiêu: chọn model cho hai việc trước khi dựa vào nó (D3, D6): gợi ý ranh giới khi luật mơ hồ, và chỉ điểm gắp. Code ở `ingest/egocentric/trial.py`, lệnh `fw egocentric trial`. Test chạy với model giả; trên dữ liệu thật thì vòng thử **chưa xong**.
@@ -294,7 +372,7 @@ Chưa trả lời được câu của D3 ("model nào, có dùng không"). Trong
 
 ## 8. Video tự quay (nhiệm vụ 7)
 
-`fw egocentric ingest video --root <thư mục>` đọc `device.json` (tên thiết bị, fps, rộng, cao, ma trận nội 3 × 3; `tasks` và `objects` tùy chọn) và `<task>/<i>.mp4`, rồi ghi cùng thư mục làm việc như EgoDex: `source_detail = ego_video`, `data_class = internal`, không miễn che danh tính, `hdf5 = null`, `pose_source = E-A`, `action_quality = pseudo`, luật cắt đoạn `two_table` (6 bước: tiếp cận, gắp, đi, tới, đặt, thả; bước đi lấy từ tốc độ camera).
+`fw egocentric ingest video --root <thư mục>` đọc `device.json` (tên thiết bị, fps, rộng, cao, ma trận nội 3 × 3; `tasks` và `objects` tùy chọn) và `<task>/<i>.mp4`, rồi ghi cùng thư mục làm việc như EgoDex: `source_detail = ego_video`, `data_class = public` (từ 9/11/2026, mục 8.1; trước đó `internal`), không miễn che danh tính, `hdf5 = null`, `pose_source = E-A`, `action_quality = pseudo`, luật cắt đoạn `two_table` (6 bước: tiếp cận, gắp, đi, tới, đặt, thả; bước đi lấy từ tốc độ camera).
 
 ```json
 {"device": "iphone-15-wide", "fps": 30, "width": 1920, "height": 1080,
@@ -305,6 +383,15 @@ Chưa trả lời được câu của D3 ("model nào, có dùng không"). Trong
 
 Tới 7/11/2026 đội chưa quay video nào. Phép thử trên file thật: một thư mục giả làm video tự quay, chứa một mp4 thật của EgoDex (`basic_pick_place/0.mp4`, 126 khung) và `device.json`. `ingest video` ghi `src_20c38abea95118a4` với đúng các nhãn trên; `pose --job` và `annotate` đều trả mã 2 ở cổng che danh tính. Theo D2, video của đội không tới được model nào cho tới khi có bước làm mờ. Từ 8/11/2026 bước đó là `fw egocentric deid` (mục 3.1). Sau bước này, phần còn lại của pipeline chạy như EgoDex trên bản sao đã che: job E-A cho pose, rồi `annotate`, `qa`, `report`.
 
+### 8.1 Video tự quay là `public` (9/11/2026)
+
+**[Đã chốt 9/11/2026, Hiếu]:** "Bỏ cái internal đi được đưa lên colab thì tôi mới train được chứ". Nguồn `ego_video` trong `configs/data/egocentric.yaml` đổi từ `internal` sang `public`, để stage 1 của nhánh B (DA-34 nhiệm vụ 4, DA-30 nhiệm vụ 2) train được trên Colab như C và C+.
+
+- Video là của đội tự quay để làm demo, không phải dữ liệu DENSO; CLAUDE.md chỉ buộc dữ liệu DENSO là `internal` hoặc `restricted`.
+- **Không đổi:** bước làm mờ vẫn bắt buộc trước mọi bước khác. Cổng che danh tính xét `source_detail`, không xét `data_class`: miễn chỉ có cho `egodex` + `public` theo pin, nên `ego_video` + `public` vẫn bị chặn tới khi có bản sao `blurred` (test `test_ego_deid.py`). Chỉ bản sao đã che rời máy; video gốc ở lại laptop.
+- `source_id` băm cả `data_class`, nên nguồn đã ingest trước ngày này giữ id cũ và nhãn `internal`. Muốn dùng nhãn mới thì ingest lại, rồi chạy lại `deid`.
+- **Còn mở:** người xuất hiện trong video đồng ý cho dùng video (đã che mặt) để train trên dịch vụ hosted; Hiếu xác nhận trước lần train đầu.
+
 ## 9. Việc còn mở
 
 | # | Việc | Ảnh hưởng | Ai |
@@ -313,7 +400,7 @@ Tới 7/11/2026 đội chưa quay video nào. Phép thử trên file thật: m�
 | 2 | Hợp đồng: `read_segments` từ chối hai cột `frame_start`, `frame_end` mà kế hoạch 4.2a thêm vào `segments.parquet` | DA-18 phải đọc bằng pyarrow, không qua `read_segments` | **[Đề xuất]** PR hợp đồng: cho phép cột khung, hoặc thêm hai trường vào `Segment` |
 | 3 | Model và revision nằm trong `configs/data/egocentric.yaml`, story ghi `configs/models/` | Ngoài phạm vi file của story | PR riêng của chủ `configs/models/` |
 | 4 | ~~Chưa có bước làm mờ (D2)~~ Đã có từ 8/11/2026: `fw egocentric deid`, YuNet (mục 3.1) | Video đội tự quay qua cổng sau khi chạy `deid` | Xong (nhiệm vụ 8); chờ Hiếu duyệt PR |
-| 5 | Mẫu duyệt của người (`fw egocentric review`) chưa có ai điền; `label_source = human` mới chạy trong test | Chưa có số đo độ đúng của nhãn luật và nhãn model | Hiếu hoặc người được giao điền `review/sheet.jsonl` |
+| 5 | Mẫu duyệt của người (`fw egocentric review`) chưa có ai điền trên EgoDex. Trên clip khay (9/11/2026) phiếu là một quy tắc Hiếu chốt cho cả 153 clip, không phải mẫu duyệt từng đoạn (mục 6.1) | Chưa có số đo độ đúng của nhãn luật và nhãn model | Hiếu hoặc người được giao điền `review/sheet.jsonl` |
 | 6 | Ngưỡng luật cắt đoạn và QA là giả định đọc từ 20 episode | Đổi ngưỡng là đổi `threshold_version` | Hiệu chỉnh khi có mẫu duyệt |
 | 7 | Cổ tay E-A lệch nhiều hơn đầu ngón (63 và 115 px so với 43 và 51 px); chưa kiểm hai điểm cổ tay có cùng định nghĩa không | Action 48 chiều của DA-18 dùng cổ tay | Kiểm khi DA-18 xuất E-A |
 | 8 | Phần tịnh tiến của VO chưa đo được trên EgoDex (người ngồi) | Chưa biết E-A dùng được cho bước đi của task hai bàn | Đo trên video hai bàn đầu tiên |
@@ -326,6 +413,9 @@ Tới 7/11/2026 đội chưa quay video nào. Phép thử trên file thật: m�
 | 15 | Bước làm mờ chỉ che mặt; thẻ tên, màn hình, giấy tờ (AC 2) chưa che | Video quay trong nhà máy hay văn phòng có thể lộ chữ trên thẻ hoặc màn hình | **[Đề xuất]** quay sao cho không có màn hình, thẻ trong khung; thêm detector chữ (ví dụ EAST của OpenCV) sau demo |
 | 16 | Ngưỡng `deid` (0,6, nới 25 %, giữ 5 khung) là giả định; mới đo trên một mặt dán vào video, chưa đo trên người thật đứng xa, nghiêng, đeo khẩu trang | Có thể sót mặt nhỏ hoặc nghiêng | Hiếu xem nhanh `frames_with_faces` trong `source.json` và vài khung của bản sao trước khi dùng; người duyệt mẫu thì đặt `verified` |
 | 17 | Xuất stage 1 của DA-18 (`export/egodex.py`) đọc `bundle.mp4`, nên dùng bản sao, nhưng chưa tự kiểm sha256 của bản sao như cổng | Bản sao bị thay sau `deid` mà không chạy lại bước nào của DA-04 thì DA-18 không biết | **[Đề xuất]** DA-18 gọi `annotate_allowed` với `deid_copies`; PR riêng của DA-18 |
+| 18 | 21 trên 153 clip khay bị bỏ vì đoạn pose hữu hạn liên tục dài nhất dưới 30 khung (mục 6.1) | Mất 14 % số clip; tính cả phần cắt bớt ở clip giữ lại thì mất 34 % số khung của nhánh B | Lấp khoảng trống pose nằm ngoài nhiệm vụ 9; **[Đề xuất]** quyết định sau khi có kết quả nhánh B |
+| 19 | E-A trong hệ camera (mục 4.1): không có quỹ đạo đầu; luật `two_table` không tìm được bước `walk`; `camera_jitter_deg_s` không đo gì với E-A | Delta stage 1 là tay so với đầu; cắt lại video hai bàn bằng luật sẽ thiếu bước đi | Đo quỹ đạo đầu (IMU của điện thoại, hoặc VO có tỉ lệ) rồi đặt `frame: world`; tới lúc đó dùng phiếu duyệt |
+| 20 | Phần bị cắt 3,3 % đo bằng script của DA-30, chưa bằng `loader_check` trong image Ψ₀ | Script lệch `loader_check` khoảng 1 điểm trên bản thử | Phiên DA-30 chạy `loader_check` trên `egx_7b43c30dc5d88cd7` trước khi ghim |
 
 ## 10. Việc để chạy sau
 
@@ -401,10 +491,107 @@ Chưa thử cài MediaPipe trên laptop. Gói có wheel sẵn nên không cần 
 
 Điền `decision` (`accept`, `fix` hoặc `reject`; `fix` thì sửa `description`) và `reviewer` cho 8 đoạn trong `$W/review/sheet.jsonl` (phiếu ghi lại ngày 7/11/2026; không sửa `match`), rồi chạy `fw egocentric review $W --apply $W/review/sheet.jsonl`. Đoạn đã duyệt được ghi `label_source = human`. Việc này không cần máy mạnh.
 
+## 11. Bộ dữ liệu và trình xem kiểu Human-1M (nhiệm vụ 11, 11/11/2026)
+
+Hiếu yêu cầu 11/11/2026: đưa **toàn bộ** dữ liệu egocentric (161 clip khay của đội, 218 episode của mẫu EgoDex) qua che danh tính, pose, QA, rồi xuất thành bộ dữ liệu LeRobot v3.0 và trình xem tĩnh theo bố cục của NVIDIA PhysicalAI-Human-1M. Chỉ học bố cục (tên trường, cách chia shard, các trang của trình xem); không chép mã, chữ hay logo của NVIDIA. Mã: `packages/flywheel-data/src/flywheel/data/export/human1m/`, cấu hình [`configs/data/egocentric-human1m.yaml`](../../configs/data/egocentric-human1m.yaml). Dữ liệu và trình xem nằm trong `fwdata/human1m/ego-h1m-20261111/`, không commit.
+
+### 11.1 Trạng thái từng clip
+
+Mỗi clip có một dòng trong `status.csv` và `status.json`: `decision`, lý do, nguồn pose, kết quả QA, % khung thấy tay, các phép kiểm của Human-1M. Thứ tự kiểm: cổng che danh tính (`api.gate_open`) trước, rồi danh sách loại trừ trong cấu hình, rồi QA.
+
+| Nguồn | Clip | Giờ | Xuất | `rejected_qa` | `excluded` | QA pass / flag / reject |
+|---|---|---|---|---|---|---|
+| Clip khay của đội (`ego_video`) | 161 | 0,124 | 132 (0,095 giờ) | 21 | 8 | 10 / 130 / 21 |
+| Mẫu EgoDex | 218 | 0,842 | 185 (0,785 giờ) | 33 | 0 | 32 / 153 / 33 |
+| **Tổng** | **379** | **0,965** | **317 (0,879 giờ)** | **54** | **8** | **42 / 283 / 54** |
+
+- 21 clip khay `rejected_qa`: pose E-A có khoảng NaN quá dài (`hand_pose_nan`, quy tắc D1 của mục 6.1). Đúng 21 clip mục 6.1 đã bỏ.
+- 33 episode EgoDex `rejected_qa`: 27 vì số đoạn của luật cắt ngoài khoảng cho phép (`segment_count`), 3 vì `pose_low_confidence`, 3 vì `hand_out_of_frame`.
+- 8 clip khay 1080p (154–161) `excluded`: đã qua bước làm mờ, nhưng thẻ khách trên ngực nằm trong khung và `fw egocentric deid` chỉ che mặt (dòng 15 mục 9). Bỏ như ở stage 1 cho tới khi thẻ được che.
+- Không clip nào `blocked_deid` hay `no_qa`. EgoDex được miễn làm mờ theo D2 vì mọi mp4 khớp sha256 của pin; clip khay đọc bản sao `.deid.mp4`.
+- 132 clip khay được xuất chính là 132 mẫu của bản xuất stage 1 `egx_7b43c30dc5d88cd7`. Pin của RunPlan `tray-ego-b.yaml` không đổi.
+
+### 11.2 Số đo so với Human-1M
+
+| Phép kiểm | Yêu cầu | Đo được |
+|---|---|---|
+| fps | 30 | 30 ở cả 379 clip |
+| Độ phân giải | ≥ 480p | 640×480 (153 clip khay), 1920×1080 (8 clip khay, 218 EgoDex); video xuất thu về 480p |
+| Khung thấy tay | ≥ 95 % | 96,6 % số clip đạt; trong clip đã xuất: khay 99,2 %, EgoDex 96,2 % |
+| Độ dài subtask | 1–10 giây | 922 subtask, trung vị 1,78 giây; 62,4 % nằm trong 1–10 giây (xem 11.4) |
+| Hệ số biến thiên độ dài xương (trung vị) | (không có ngưỡng) | khay 0,093 (E-A từ RGB), EgoDex khoảng 1e-6 (tracking của Vision Pro) |
+
+Hai shard đều qua `fw egocentric human1m-check`: `team_tray` 132 episode, 10 237 khung; `egodex` 185 episode, 84 736 khung, 171 task, 230 subtask.
+
+### 11.3 Bố cục bộ dữ liệu
+
+Mỗi nguồn là một shard LeRobot v3.0 (`codebase_version` `v3.0`): `data/chunk-000/file-000.parquet`, `meta/info.json`, `meta/stats.json`, `meta/episodes/chunk-000/file-000.parquet`, bốn từ điển `meta/tasks|subtasks|environments|scenes.parquet`, và một file `videos/observation.images.main/chunk-000/file-000.mp4` nối các episode (H.264 480p, crf 23, GOP 15; episode tìm theo `from_timestamp`, `to_timestamp`).
+
+| Mức | Trường | Khay (E-A) | EgoDex (E-B) |
+|---|---|---|---|
+| Khung | `observation.state.hand_{left,right}_cam` (63) | 21 khớp × 3, hệ camera, mét | 21 khớp × 3, `inv(camera) @ joint` |
+| Khung | `observation.state.hand_{left,right}_cam_rotation` (84) | **để trống**: MediaPipe chỉ cho vị trí | quaternion (qx, qy, qz, qw) của ARKit |
+| Khung | `observation.state.camera_position` (3), `camera_rotation` (4) | **để trống**: chưa đo quỹ đạo đầu (dòng 19 mục 9) | tư thế camera trong world của ARKit |
+| Khung | `{left,right}_hand_mask`, `{left,right}_hand_confidence` | mask: khớp đã biết và chiếu vào ảnh; confidence: điểm handedness của MediaPipe | mask như bên trái; confidence: trung bình độ tin của khớp ARKit |
+| Khung | `scene_id`, `collector_id`, chỉ số task, subtask, environment, scene | id ẩn danh (băm) | id ẩn danh (băm) |
+| Episode | `camera_intrinsics/main` | **giả định** (HFOV 90°, `device.json`) | intrinsics của file HDF5, đổi theo cỡ 480p |
+| Episode | `rig_id`, `vendor_id` | có | có |
+| Episode | `country`, `capture_privacy` | để trống | để trống: EgoDex không công bố |
+
+Trường để trống được ghi tên và lý do trong `info.json` (`missing_fields`), không bịa giá trị. 21 khớp theo thứ tự MediaPipe. Với EgoDex: cổ tay là khớp `Hand`; ngón cái lấy Knuckle, IntermediateBase, IntermediateTip, Tip; bốn ngón còn lại cũng lấy bốn khớp đó. Bỏ các khớp Metacarpal và cẳng tay.
+
+### 11.4 Câu lệnh và subtask
+
+- Mỗi episode có một câu task. Clip khay dùng một câu viết tay cho task hai bàn; EgoDex dùng câu mô tả của chính file HDF5.
+- Subtask liền nhau, phủ hết episode, và ghi rõ tay trái hay tay phải.
+  - Clip khay: chia theo hai mốc nhấc khay và đặt khay. Hai mốc do Claude đọc 16 khung chính của mỗi clip đã làm mờ: 96 clip tin cậy cao, 54 trung bình, 3 thấp. Trung vị: nhấc ở 0,40 giây, đặt ở 1,97 giây. Mốc lưu ở `fwdata/human1m/annotations/tray-keyframe-marks-20261111.jsonl`. Đã kiểm 6 clip, **người chưa duyệt**.
+  - EgoDex: theo đoạn gắp và thả của luật cắt (mục 5).
+- **Lệch so với Human-1M:** clip khay chỉ dài 2–4 giây, nên một subtask 1–10 giây gần như bằng cả clip. Ngưỡng gộp subtask ngắn đặt 0,3 giây (`min_subtask_seconds`), không phải 1 giây. Vì vậy chỉ 62,4 % số subtask nằm trong 1–10 giây.
+- Tiêu đề episode EgoDex lấy theo tên thư mục task. Thuộc tính `task` trong HDF5 viết không thống nhất, ví dụ `build_unstake_lego` nằm trong thư mục `build_unstack_lego/`.
+
+### 11.5 Trình xem
+
+`viewer/index.html` là trang tĩnh: mở thẳng bằng `file://`, không cần server. Dữ liệu nằm trong các file `.js` gán biến toàn cục, vì trình duyệt chặn `fetch` trên `file://`.
+
+- **Gallery:** poster, tìm theo task và subtask, lọc theo nguồn và kết quả QA.
+- **Trang episode:** video có khung xương 2D của hai tay, timeline subtask bấm được, và khung 3D với quỹ đạo cổ tay (EgoDex có thêm quỹ đạo đầu và hướng nhìn). Khung 3D dùng three.js 0.147.0 từ jsdelivr. Khi không có WebGL thì tự vẽ bằng canvas 2D.
+- **Quality:** bảng số đo của mục 11.2.
+- **All clips:** mọi clip, kể cả clip bị bỏ, kèm lý do.
+
+Mẫu 12 clip để gửi Hiếu nằm trong `viewer-sample/` (8,1 MB). Ảnh chụp màn hình trong `screenshots/`.
+
+Cách chạy, trên laptop (CPU, 4 luồng, khoảng 5 phút cho 379 clip):
+
+```bash
+export FW_FFMPEG=<ffmpeg của imageio-ffmpeg>   # hoặc ffmpeg có trong PATH
+fw egocentric ingest egodex --all-tasks        # cả 218 episode của mẫu
+fw egocentric human1m fwdata/human1m/ego-h1m-20261111 \
+  --work <thư mục làm việc khay> --work <khay 1080p> --work <EgoDex> \
+  --estimates <out-ea-30fps-480p> --estimates <out-ea-30fps-1080p> \
+  --marks fwdata/human1m/annotations/tray-keyframe-marks-20261111.jsonl \
+  --sample 12 --workers 4
+fw egocentric human1m-check fwdata/human1m/ego-h1m-20261111/egodex
+```
+
+Lệnh trả mã 1 nếu một shard không qua kiểm schema. Job ghi hai dòng `LedgerEntry`; job của lần chạy này: `g0-DA-04-20261111/job_ego_human1m_<id>`.
+
+### 11.6 Còn mở
+
+- **Giấy phép:** mẫu EgoDex theo CC-BY-NC-ND-4.0, nên shard `egodex` chỉ dùng nội bộ, không phát hành lại.
+- Muốn đưa 8 clip 1080p vào bộ dữ liệu thì phải che thẻ khách trước (dòng 15 mục 9).
+- Clip khay chưa có quaternion khớp, tư thế camera và intrinsics đo thật.
+- Mốc subtask của clip khay chưa được người duyệt.
+- Ánh xạ sang G1 (tùy chọn trong yêu cầu) chưa làm.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 11/11/2026 | Thêm mục 11: bộ dữ liệu LeRobot v3.0 và trình xem kiểu Human-1M cho toàn bộ 379 clip egocentric (nhiệm vụ 11) | Claude (phiên DA-04 Human-1M), theo yêu cầu của Hiếu |
+| 9/11/2026 | Thêm mục 6.1: QA tôn trọng phiếu duyệt của người (nhiệm vụ 9), số QA trên 153 clip khay; sửa dòng 5, thêm dòng 18 mục 9 | Claude (phiên DA-04 QA), theo yêu cầu của phiên điều phối DA-34 nhánh B |
+| 9/11/2026 | Mục 4.1 sau review PR 174: khung nhảy theo mảnh (gồm đầu ngón, đầu đoạn), dấu track theo hai phiếu, `compare.json` ghi `pose_ea` của EgoDex; chạy lại, bản xuất `egx_7b43c30dc5d88cd7` có 3,3 % action bị cắt; dòng 20 mục 9 | Claude (phiên DA-04 QA), theo review của Hiếu |
+| 9/11/2026 | Thêm mục 4.1: làm sạch E-A (nhiệm vụ 10), chạy trên 153 clip khay, bản xuất `egx_b6e974e46e8222e8` có 3,8 % action bị cắt; dòng 19–20 mục 9 | Claude (phiên DA-04 QA), theo giao việc của Hiếu |
+| 9/11/2026 | Video tự quay đổi sang `public` theo quyết định của Hiếu (mục 8.1); bước làm mờ không đổi | Claude, theo quyết định của Hiếu |
 | 8/11/2026 | Thêm bước làm mờ `fw egocentric deid` (nhiệm vụ 8, mục 3.1); cổng chỉ cho episode `blurred` qua khi mọi video có bản sao đúng sha256; dòng 4 mục 9 xong, thêm dòng 15–17 | Claude (phiên DA-04 deid), theo yêu cầu của Hiếu |
 | 7/11/2026 | Sửa theo review PR 152 (mục 3, 5, 6, 1.2, 10.5) | Claude (phiên DA-04), theo review của Hiếu |
 | 6/11/2026 | Tạo file: 7 nhiệm vụ trên 20 episode EgoDex | Claude (phiên DA-04), theo phân công của Hiếu |

@@ -10,7 +10,9 @@ import json
 import os
 import shlex
 import subprocess
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
 import pytest
 from flywheel_psi0.stage1 import colab, preflight
@@ -29,6 +31,15 @@ def work(fake_psi0: Path, in_process: Runner, monkeypatch: pytest.MonkeyPatch) -
     (work / "data" / "egodex" / "part1").mkdir(parents=True)
     monkeypatch.setattr(colab, "logging_runner", lambda path: in_process)
     return work
+
+
+# What `cuda_toolchain.match` returned on attempt 1's VM (CUDA 13.0, torch cu126).
+TOOLCHAIN: dict[str, Any] = {
+    "torch_cuda": "12.6",
+    "system_cuda": "13.0",
+    "installed": ["cuda-nvcc-12-6", "cuda-cudart-dev-12-6", "libcurand-dev-12-6"],
+    "env": {"CUDA_HOME": "/usr/local/cuda-12.6", "PATH": "/usr/local/cuda-12.6/bin:/usr/bin"},
+}
 
 
 def phases(work: Path) -> dict[str, dict[str, object]]:
@@ -51,6 +62,27 @@ def test_run_then_repeat_reports_both_criteria(work: Path) -> None:
     assert repeat["job_id"] == "da30-egodex-short-repeat"
     assert repeat["train_lines"] == 3 and repeat["checkpoint_step"] == 3
     assert repeat["first_loss"]["passed"]  # type: ignore[index]
+
+
+def test_run_gets_the_cuda_env_setup_wrote(
+    work: Path, in_process: Runner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Set first, so the monkeypatch teardown restores what `run` overwrites.
+    monkeypatch.setenv("CUDA_HOME", "/usr/local/cuda")
+    monkeypatch.setenv("PATH", os.environ["PATH"])
+    path = f"/usr/local/cuda-12.6/bin:{os.environ['PATH']}"
+    env = {"CUDA_HOME": "/usr/local/cuda-12.6", "PATH": path}
+    (work / colab.CUDA_ENV).write_text(json.dumps(env))
+    seen: list[Mapping[str, str]] = []
+
+    def runner(command: Sequence[str], cwd: Path, job_env: Mapping[str, str]) -> int:
+        seen.append(job_env)
+        return in_process(command, cwd, job_env)
+
+    monkeypatch.setattr(colab, "logging_runner", lambda path: runner)
+    colab.train(work, PLAN, repeat=False)
+    assert seen and {k: seen[0][k] for k in env} == env
+    assert phases(work)["run"]["cuda_env"] == env
 
 
 def test_a_launch_that_writes_no_result_is_reported(
@@ -114,11 +146,17 @@ def test_setup_runs_the_preflight_before_any_download(
         raise Fetched  # the EgoDex download: far enough for this test
 
     monkeypatch.setattr(colab, "setup_psi0_env", lambda work: None)
+    monkeypatch.setattr(colab, "match_cuda_toolchain", lambda venv_bin, sh: TOOLCHAIN)
+    monkeypatch.setattr(colab, "check_parent", lambda psi0, plan: None)
     monkeypatch.setattr(colab, "sh", sh)
     monkeypatch.setattr(colab, "fetch", fetch)
     with pytest.raises(subprocess.CalledProcessError if preflight_fails else Fetched):
         colab.setup(work, PLAN)
     assert "stage1.preflight" in commands[0]
+    # The toolkit step ran first; its CUDA_HOME and PATH reach the pre-flight and `run`.
+    assert phases(work)["cuda_toolchain"]["installed"] == TOOLCHAIN["installed"]
+    assert {k: (envs[0] or {})[k] for k in ("CUDA_HOME", "PATH")} == TOOLCHAIN["env"]
+    assert json.loads((work / colab.CUDA_ENV).read_text()) == TOOLCHAIN["env"]
     pythonpath = (envs[0] or {})["PYTHONPATH"].split(os.pathsep)
     assert str(REPO / "packages" / "flywheel-psi0" / "src") in pythonpath
     assert all(Path(entry).is_absolute() for entry in pythonpath[:2])

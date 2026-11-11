@@ -216,6 +216,7 @@ class G1WholebodyTrayTransferTeleop(Task):  # type: ignore[misc]
             tray_pose=self.sample.tray_pose,
             table_gap=self.sample.table_gap,
             light_diffuse=SCENE_LIGHT_DIFFUSE * self.sample.light_scale,
+            target_pose=self.target_pose,
         )
         spawn = self.sample.robot_spawn
         layout = Layout()

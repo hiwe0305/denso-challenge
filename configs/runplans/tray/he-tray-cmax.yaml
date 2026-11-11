@@ -1,3 +1,11 @@
+# SUPERSEDED - DO NOT RUN (Decision of Hiếu, 11/11/2026, via the coordinator session).
+# DA-33 draws table B's target zone (scene revision 4763fbfaa4f8e97658e68b57d01b4c86659e08b5
+# +zone1, PR #182), which changes mjcf.py and simple_task.py that this plan pins, and every
+# usable episode of the regenerated pools goes into cut ALL of the paired runs
+# (he-tray-pair60k.yaml, docs/he/tray.md section 19). C-max was never frozen nor run. Kept so
+# its id stays checkable; field superseded_by (out of the id) says the same to
+# `runplan check`, which then exits 1.
+#
 # DA-34 RunPlan C-max of the tray experiment, subtask 3.5. DRAFT: prepared before the
 # eval C result, not frozen, not launched (runplan check --launch refuses a draft).
 #
@@ -153,3 +161,4 @@ pinned_files:
   packages/flywheel-simple/src/flywheel_simple/wbc/stand_walk.py: bc0ebcf99e30b0aedf74ff3d352d5e1eab672837fd435be9a3a598e26e206508
   packages/flywheel-simple/src/flywheel_simple/wbc/upper_body.py: 9df557733d15a7b93c285364e732a50f6710701defc700680caf1efe339db132
 
+superseded_by: configs/runplans/tray/he-tray-pair60k.yaml # Decision 11/11/2026; not part of the id (runplan.STATUS_FIELDS)

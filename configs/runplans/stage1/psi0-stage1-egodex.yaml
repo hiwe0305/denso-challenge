@@ -74,11 +74,16 @@ args:
 # Hugging Face USC-PSI-Lab/psi-model. The README lists ego390k as the VLM pre-trained
 # on EgoDex for 390k steps; its timestamp 2605160748 is the one in this script, so it is
 # this recipe's own output. ckpt200k is the EgoDex-only ablation DA-19's stage 1 uses.
+# ego200k.he30k is the VLM of DA-34 branch C (configs/runplans/tray/he-tray-v2.yaml):
+# ckpt200k plus 30k steps of pretrain-mix-psi0-fast.sh (HE and EgoDex 1:1), which keeps
+# this recipe's FAST tokenizer, `egodex_stat_all.json` and 270x480 EgoDex images.
 parents:
   psi0-pre-egodex-390k:
     model_name_or_path: cache/checkpoints/psi0/pre.fast.2605160748.ckpt.ego390k
   psi0-pre-egodex-200k:
     model_name_or_path: cache/checkpoints/psi0/pre.fast.egodex.2512241941.ckpt200k
+  psi0-pre-egodex-he:
+    model_name_or_path: cache/checkpoints/psi0/pre.fast.1by1.2601091803.ckpt.ego200k.he30k
 
 estimate:
   seconds_per_step: 9.0 # assumption for one L4, full VLM with ZeRO-3 CPU offload, not measured (ledger DA-30)

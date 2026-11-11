@@ -178,13 +178,15 @@ def minimal_qa(dataset_root: Path, index: int, phases: Sequence[str]) -> str:
     )
 
 
+def batch_values(out: Path, key: str) -> set[str]:
+    """`key` of every attempt logged in any shard of the batch."""
+    logs = sorted(Path(out).glob(f"shard-*/{LOG_NAME}"))
+    return {str(row[key]) for log in logs for row in read_log(log)}
+
+
 def batch_planner_versions(out: Path) -> set[str]:
     """planner_version of every attempt logged in any shard of the batch."""
-    return {
-        str(row["planner_version"])
-        for log in sorted(Path(out).glob(f"shard-*/{LOG_NAME}"))
-        for row in read_log(log)
-    }
+    return batch_values(out, "planner_version")
 
 
 def check_planner_version(out: Path, version: str) -> None:
@@ -197,6 +199,20 @@ def check_planner_version(out: Path, version: str) -> None:
     if others:
         raise RuntimeError(
             f"{out} was generated with planner {others}, this code is {version}; "
+            "generate into a new --out"
+        )
+
+
+def check_visuals_revision(out: Path, revision: str) -> None:
+    """A batch holds one scene look: resuming it on other visuals would mix them.
+
+    The target zone (TARGET_ZONE_REVISION) changes what the policy sees on table B,
+    so episodes with and without it must not share a release.
+    """
+    others = sorted(batch_values(out, "visuals_revision") - {revision})
+    if others:
+        raise RuntimeError(
+            f"{out} was rendered with visuals {others}, this tree renders {revision}; "
             "generate into a new --out"
         )
 
@@ -249,9 +265,7 @@ def generate(
     version = planner_version(cfg)
     check_planner_version(out, version)  # before the simulator loads
 
-    from flywheel_simple.tray.agent import EpisodeResult, TrayAgent, run_episode
-    from flywheel_simple.tray.recorder import EpisodeRecorder, FlywheelMeta, visuals_revision
-    from flywheel_simple.tray.simple_task import make_env
+    from flywheel_simple.tray.recorder import visuals_revision
 
     manifest = default_manifest_path()
     if manifest is None and not allow_plain:
@@ -259,6 +273,11 @@ def generate(
             "SimReady manifest missing: run scripts/g0/tray/import_simready.py or pass allow_plain"
         )
     revision = visuals_revision(manifest)
+    check_visuals_revision(out, revision)  # before the simulator loads
+
+    from flywheel_simple.tray.agent import EpisodeResult, TrayAgent, run_episode
+    from flywheel_simple.tray.recorder import EpisodeRecorder, FlywheelMeta
+    from flywheel_simple.tray.simple_task import make_env
     work = shard_dir(out, shard)
     log, raw = work / LOG_NAME, work / "raw"
     _check_resume(raw, read_log(log))
