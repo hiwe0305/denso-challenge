@@ -390,7 +390,7 @@ Psi0/.venv-psi/bin/python -m flywheel_psi0.stage1.colab repeat --work /content/d
 python3 -m flywheel_psi0.stage1.colab persist --work /content/da30 --plan fw/configs/runplans/stage1/tray-ego-b.yaml
 ```
 
-Sau lần chạy: tải `report.json` và log về `fwdata/colab/`, ghi dòng `measured` của sổ chi phí (`balance_drop` ở dòng `exit` của `da30-stage1-b.jsonl`), ghi kết quả vào mục 2.10 (lần 2). VLM nằm ở `MyDrive/denso/da30/da30-tray-ego-b/vlm/`, bản ghi ở `…/da30-tray-ego-b/vlm.json`. Bốn giá trị cần ghim vào `he-tray-b.yaml` của DA-34 (`parents.psi0-b-ego-stage1.vlm_stage1`) có sẵn trong mục `persist.vlm` của `report.json`: `job_id` `da30-tray-ego-b`, `drive_dir`, `weights_sha256`, `manifest_sha256`.
+Sau lần chạy: tải `report.json` và log về `fwdata/colab/`, ghi dòng `measured` của sổ chi phí (`balance_drop` ở dòng `exit` của `da30-stage1-b.jsonl`), ghi kết quả vào mục 2.10 (lần 2). VLM nằm ở `MyDrive/denso/da30/da30-tray-ego-b/vlm/`, bản ghi ở `…/da30-tray-ego-b/vlm.json`. Bốn giá trị DA-34 cần ghim (mục 2.10 ghi nơi đã ghim) có sẵn trong mục `persist.vlm` của `report.json`: `job_id` `da30-tray-ego-b`, `drive_dir`, `weights_sha256`, `manifest_sha256`.
 
 ### 2.7 Loader check trên bản export thử (9/11/2026)
 
@@ -598,7 +598,14 @@ Tiêu chí chốt trước (mục 2.4):
 
 Loss giảm là bằng chứng đường đi, không phải kết quả: 300 bước là khoảng 73 lượt qua 132 clip, nên một phần là học thuộc (mục 2.4). B được đánh giá bằng closed-loop của stage 3 so với C (DA-34).
 
-**VLM cho DA-34** (`parents.psi0-b-ego-stage1.vlm_stage1` của `he-tray-b.yaml`), cùng giá trị trong `vlm.json` cạnh thư mục và trong `report.json` mục `persist.vlm`:
+**VLM cho DA-34.** Bốn giá trị dưới đây trùng với `vlm.json` cạnh thư mục và với `report.json` mục `persist.vlm`.
+
+DA-34 đã ghim chúng ngày 11/11/2026 vào plan bốn run `he-tray-pair60k.yaml`, khóa `parents.psi0-ego-stage1-egx.vlm_stage1`, trên PR #181 (chưa merge; head `80a07a77`, id nháp `rp_e2fb9f62c223`). DA-34 cũng tính lại manifest từ sha256 từng file và thấy khớp; Drive có đúng 12 file; cha `6e63da17…` là VLM của C.
+
+`he-tray-b.yaml` không được điền, vì hai lý do:
+
+- Plan này đã `superseded_by: he-tray-pair60k.yaml` (quyết định của Hiếu ngày 11/11/2026), nên sẽ không chạy.
+- Id `rp_128aec169e12` của nó được giữ để luật mục 18 của DA-34 vẫn kiểm được; điền pin vào thì id đổi.
 
 | Trường | Giá trị |
 |---|---|
