@@ -39,13 +39,13 @@ Theo [plan DA-40](../../superpowers/plans/2026-11-11-da40-flywheel-console.md); 
 - [x] 5. Server, media và bộ chạy việc (AC 4)
 - [x] 6. Chatbot, công cụ và bench (AC 5, 6)
 - [x] 7. Giao diện, bốn điểm hở và giới hạn chữ (AC 6, 7)
-- [ ] 8. Ghép trên dữ liệu thật, kiểm trên trình duyệt, bench (AC 1–8)
+- [x] 8. Ghép trên dữ liệu thật, kiểm trên trình duyệt, bench (AC 1–8)
 
 ## Phạm vi file
 
 Theo 07 mục 3.1. File story luôn được sửa.
 
-- `packages/flywheel-console/**` (package mới)
+- `packages/flywheel-console/` (package mới, mọi file bên trong)
 - `pyproject.toml` gốc: chỉ thêm `flywheel-console` vào `dependencies`, `tool.uv.sources`, `mypy_path`, overrides mypy của `cv2`, và một hợp đồng import-linter mới
 - `uv.lock`: chỉ phần do thêm package
 - `docs/superpowers/plans/2026-11-11-da40-flywheel-console.md`
@@ -70,4 +70,5 @@ Theo 07 mục 3.1. File story luôn được sửa.
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 11/11/2026 | Phạm vi file ghi `packages/flywheel-console/` thay cho `…/**`: `pr_guard` so khớp theo tiền tố, `**` không khớp file nào | Hiếu |
 | 11/11/2026 | Tạo story theo quyết định của PO; mã DA-40 chưa dùng trong `docs/` và trên các nhánh | Hiếu |

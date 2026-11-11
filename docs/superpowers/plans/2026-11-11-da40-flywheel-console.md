@@ -40,7 +40,7 @@
 **Files:**
 - Create: `packages/flywheel-console/pyproject.toml`, `README.md` (English, from v5 `CONTRACTS.md` + `DESIGN.md` merged and shortened), `src/flywheel/console/{__init__.py,py.typed,paths.py,cli.py}`
 - Modify: root `pyproject.toml` (dependency, `tool.uv.sources`, `mypy_path`, mypy override `cv2` `ignore_missing_imports` if needed, import-linter contract), `uv.lock` (`uv lock`)
-- Test: `packages/flywheel-console/tests/test_paths.py`, `tests/test_cli.py`
+- Test: `packages/flywheel-console/tests/test_console_paths.py`, `tests/test_cli.py`
 
 **Interfaces:**
 - Produces (`flywheel.console.paths`):

@@ -58,8 +58,8 @@ def make_idx(fw: ConsolePaths) -> ConsolePaths:
             "stages": ["reach", "grasp", "place"],
             "failure_labels": {"L-PLACE-POSE": {"L0": 0, "L1": 30, "L2": 40}},
             "place_error_cm": {"L1": {"min": 1, "p10": 2, "p50": 4, "p90": 9, "max": 15}},
-            "clusters": [{"label": "L-PLACE-POSE", "stage": "place", "n": "70/240",
-                          "diagnosis": "data", "budget": "yes"}],
+            "clusters": [{"label": "L-PLACE-POSE", "stage": "place", "diagnosis": "data",
+                          "intervention": "targeted gen", "episodes": "262 → 229 → 177"}],
         },
     })  # fmt: skip
     wj(ix / "ds" / "S70" / "quality.json", {

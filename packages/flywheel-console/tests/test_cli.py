@@ -17,3 +17,16 @@ def test_fw_console_index_prints_counts(tmp_path: Path, monkeypatch: pytest.Monk
     assert result.exit_code == 0, result.output
     assert "catalog: rows=" in result.output
     assert str(tmp_path / "console" / "index") in result.output
+
+
+def test_fw_console_bench_tunnel_down_is_one_line(monkeypatch: pytest.MonkeyPatch) -> None:
+    from flywheel.console.chat import bench
+
+    def down(tag: str | None = None) -> None:
+        raise RuntimeError("model tunnel to rtx3060 is down; bench not run, no file written")
+
+    monkeypatch.setattr(bench, "run", down)
+    result = CliRunner().invoke(app, ["console", "bench", "--tag", "x"])
+    assert result.exit_code == 1
+    assert "tunnel to rtx3060 is down" in result.output
+    assert "Traceback" not in result.output
