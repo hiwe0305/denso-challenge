@@ -2385,6 +2385,69 @@ Phiếu DA-38 (soạn sẵn, chưa mở):
 
 **Hệ quả cho các bước sau.** Cụm đi bước 5–8 là c1, c2, cộng c3, c8 nếu Hiếu chọn cách đọc **[Đề xuất]** của H2. c4, c5, c6, c7 và lượt `L-PART-DROP` thành phiếu, không tiêu ngân sách dữ liệu. Số đo của từng lượt ở `h123-C_70.json` (sha256 `0cf439c9…`), `h123-C_ALL.json` (`ecdfda67…`) và `h123-B_70.json` (`21aaf223…`), để ngoài repo cùng các ghi chép của phiên điều phối.
 
+### 20.12 Kết quả bước 5 và 8, và câu hỏi về bước 7 (12/11/2026, 0 CU)
+
+Đại diện chọn theo 20.4: mỗi cụm `random.Random(20261112).sample` trên danh sách lỗi xếp theo (mức, seed), tối đa 5; mỗi cụm một bộ sinh số mới. c3 (4 lỗi) và c8 (2 lỗi) ít hơn 5, nên mọi lỗi của hai cụm là đại diện.
+
+| Cụm | Đại diện (mức, seed) |
+|---|---|
+| c1 | (1, 1000109), (1, 1000127), (1, 1000121), (1, 1000128), (1, 1000112) |
+| c2 | (2, 1000107), (2, 1000117), (2, 1000124), (2, 1000112), (2, 1000119) |
+| c3 | (1, 1000114), (1, 1000118), (1, 1000113), (1, 1000126) |
+| c8 | (2, 1000114), (2, 1000120) |
+
+**Bước 8, kiểm vùng phủ, trên mọi lỗi** (spec 6.3: bước 4 và 8 rẻ nên chạy hết). Chạy trên laptop, CPU, vài giây.
+- Điều kiện train của `C_70` là đúng 425 seed của S70, lấy từ plan cặp (`pairplan.subset_lists`): 362 mức 1, 63 mức 2. Mức của từng seed đọc từ `environment_config` của ALL trên `rtx3060`.
+- Miền train: [min, max] trên S70 của các thành phần vật lý (khay x, y, yaw; đích x, y, yaw; khoảng cách hai bàn; vị trí xuất phát; khối lượng). Ánh sáng là thành phần hình ảnh, thuộc bước 7, nên không vào miền và khoảng cách.
+- d: trung bình khoảng cách tới 5 điều kiện S70 gần nhất, theo `flywheel_simple.tray.targets.distance`, trên các nhóm vật lý mà mức của lỗi dịch. τ_cov là phân vị 95 leave-one-out trong S70, cùng nhóm: mức 1 là 1,143, mức 2 là 1,524.
+
+| Cụm | KỸ NĂNG YẾU | THIẾU VÙNG PHỦ | NGOÀI MIỀN |
+|---|---|---|---|
+| c1 (14) | 14 | 0 | 0 |
+| c2 (12) | 9 | 3 (d 1,560–1,571) | 0 |
+| c3 (4) | 3 | 0 | 1 |
+| c8 (2) | 2 | 0 | 0 |
+
+Lượt NGOÀI MIỀN của c3 (mức 1, seed 1000118) có yaw của khay −0,17211 rad. Min của S70 là −0,17206 rad, nên lượt này vượt 0,003°. Nó vẫn nằm trong dải ±10° mà bộ sinh dùng. Theo chữ của spec 6.8 thì đây là ngoài miền. Các cụm chỉ báo cáo (c4–c7, lẻ) có thêm 1 NGOÀI MIỀN (c5, khay x ngoài khoảng của S70 vì khoảng cách hai bàn đổi) và 3 THIẾU VÙNG PHỦ.
+
+**Bước 5, kiểm khả thi, trên 16 đại diện.**
+- Cách chạy: planner-5 (`da33-planner-5+cfg.4e2a4505`, trùng bản đã sinh dữ liệu cho C) chạy một lượt từ đúng điều kiện dev của mỗi đại diện, cây `fd3fa09` có SimReady, trên `rtx3060`.
+  - 4 worker, vì máy đang chạy job khác và GPU đã dùng 6,1/12 GB.
+  - Không ghi episode nào.
+  - Chạy 06:03–06:08 ngày 12/11, mỗi lượt 58–85 s.
+- Kết quả: 13/16 xong. Ba lượt không xong:
+  - c2, seed 1000119: hết giờ ở `ARRIVE_B`;
+  - c3, seed 1000113: hết giờ ở `RELEASE`;
+  - c8, seed 1000114: `L-PLACE-POSE`.
+
+  Theo spec 6.5, ba lỗi này là KHÔNG KHẢ THI. Planner chạy trên trạng thái, không dùng ảnh, và vật lý MuJoCo trên CPU là tất định, nên chạy lại cùng điều kiện không cho thêm thông tin. Giới hạn: ở lô C+, planner cũng hỏng khoảng 13 % lượt trên điều kiện train (229 ghi được trên 262), nên một lượt hỏng không chứng minh điều kiện thật sự không làm được.
+
+**Gộp bước 5 và 8 theo đại diện** (bước 6 không chạy được; bước 7 chờ R9):
+
+| Cụm | KỸ NĂNG YẾU | KHÔNG KHẢ THI | NGOÀI MIỀN | Theo đa số (spec bước 9) |
+|---|---|---|---|---|
+| c1 | 5 | 0 | 0 | KỸ NĂNG YẾU |
+| c2 | 4 | 1 | 0 | KỸ NĂNG YẾU |
+| c3 | 2 | 1 | 1 | Không có đa số |
+| c8 | 1 | 1 | 0 | Hòa |
+
+**Bước 7 không làm được như 20.4 đã viết.** Trong `randomize.py`, thành phần hình ảnh duy nhất là `light_scale`, và nó chỉ đổi ở mức 2 (0,8–1,2). Ở mức 1, hình ảnh vốn đã là mức 0. Chạy lại đại diện của c1, c3 vì thế chỉ đo độ lặp lại, không đo thị giác. Ở mức 2 (c2, c8), đường eval chưa có cách đặt ánh sáng về 1,0 mà giữ nguyên phần vật lý; cần sửa `flywheel_simple`, ngoài phạm vi file của DA-34. Số đo có sẵn, chỉ quan sát: trên 30 lượt mức 2 của mỗi run, tỉ lệ thành công với `light_scale` < 1 và ≥ 1 là 3/20 và 2/10 (`C_70`), 1/20 và 1/10 (`C_ALL`), 1/20 và 0/10 (`B_70`). Không thấy ánh sáng gắn với thành công, nhưng số lượt ít.
+
+**Quyết định mới cho Hiếu** (bổ sung 20.9):
+
+| # | Quyết định | Đề xuất |
+|---|---|---|
+| R9 | Bước 7: (a) không chạy. Ghi "không áp dụng" cho c1, c3 (mức 1) và "không chạy" kèm số đo quan sát ở trên cho c2, c8; tiết kiệm khoảng 6 CU và nửa ngày. (b) Chạy cho 7 đại diện của c2, c8, mỗi đại diện 3 lượt với ánh sáng 1,0. Cách này cần một PR sửa `flywheel_simple` cho người giữ file đó, và khoảng 2 giờ, 4 CU trên một L4 | (a) |
+| R10 | Lượt NGOÀI MIỀN vượt 0,003° (c3, seed 1000118): đọc theo chữ (không nhận dữ liệu) | Theo chữ |
+| R11 | c3, c8 không có đa số. Mọi lỗi của hai cụm đã là đại diện, nên chẩn đoán theo từng lỗi: c3 seed 1000114 và 1000126, c8 seed 1000120 là KỸ NĂNG YẾU và nhận dữ liệu; các lỗi KHÔNG KHẢ THI và NGOÀI MIỀN không nhận | Đồng ý |
+
+Nếu duyệt cả ba theo đề xuất, phân bổ theo 20.5 là:
+- 3 lỗi ở bước `approach_a`, mỗi lỗi 20 episode: 60 episode.
+- 121 episode còn lại cho c1, c2, mỗi cụm L_t = 10 lỗi chọn với hạt giống `20261112`. Seed 1000119 của c2 là KHÔNG KHẢ THI nên không được chọn.
+- Khoảng 6 episode mỗi lỗi.
+
+Nguồn: `step8.py` (`79ae4d48…`), `step8-C_70.json` (`7c3f5f89…`), `step5.py` (`35a6708d…`), `step5-C_70.jsonl` (`77c00195…`), `all-levels.jsonl` (`4567fe8f…`). Các file để ngoài repo, cùng ghi chép của phiên điều phối, và trên `rtx3060` ở `~/denso-da34-round-c70/`.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -2438,3 +2501,4 @@ Phiếu DA-38 (soạn sẵn, chưa mở):
 | 12/11/2026 | Mục 20.11 mới (nhiệm vụ con 7.2, qua phiên điều phối): kết quả bước 4, chỉ đọc trên `rtx3060`, 0 CU. H1: 7/60 lượt của `C_70` gãy chuỗi bước ở `approach_a` mà vẫn mang khay (1 thành công), suy ra vế lòng bàn tay–tay cầm; CHƯA RÕ (ngưỡng bộ chấm), phiếu DA-37. H2: τ_track tạm (p99 trên 10 lượt thành công, thân trên 2,640, thân dưới 0,387) vượt ở 4/6 lượt hết giờ, chủ yếu kênh yaw, và ở 21/43 lượt lỗi không hết giờ; policy ra lệnh đi và rời vùng tiếp cận; đề xuất đọc là lỗi của policy, thêm R8 vào 20.9. H3: outcome và trace không có thời điểm lỗi hay tiếp xúc; CHƯA RÕ (thiếu tín hiệu), phiếu DA-38. Luật 20.7 không đổi | Claude cho Hiếu |
 | 12/11/2026 | Mục 20, 20.10 (nhiệm vụ con 7.4): có loader cho plan vòng; `round-tray-c70.yaml` đổi theo model (`uniform_branch`, `failures.checkpoint`, `train.stats_sha256`, `comparisons`, `interpretation`), giá trị không đổi. Luật 20.7 không đổi | Claude cho Hiếu |
 | 12/11/2026 | Mục 20.9: Hiếu "Duyệt theo đề xuất" R1–R8 (R4 = A, R7 duyệt luật 20.7, R8 = c3, c8 là lỗi của policy). Luật 20.7 không đổi | Claude cho Hiếu |
+| 12/11/2026 | Mục 20.12 mới (nhiệm vụ con 7.3, phần đầu): đại diện của c1, c2, c3, c8; bước 8 trên mọi lỗi (τ_cov mức 1 là 1,143, mức 2 là 1,524); bước 5 trên 16 đại diện (13 xong, 3 KHÔNG KHẢ THI); bước 7 không làm được như 20.4 (chỉ ánh sáng mức 2 là hình ảnh); quyết định mới R9–R11 chờ Hiếu. Luật 20.7 không đổi | Claude cho Hiếu |
