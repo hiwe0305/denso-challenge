@@ -8,7 +8,7 @@ import pyarrow.parquet as pq  # type: ignore[import-untyped]
 import pytest
 from conftest import write_mp4
 from flywheel.console.paths import ConsolePaths, set_active
-from flywheel.console.server import media
+from flywheel.console.server import media, runner
 
 ROWS = [{"id": "S70", "lerobot": "cut/S70"}, {"id": "vwr", "ego_viewer": "viewer"}]
 
@@ -37,13 +37,22 @@ def test_deid_path_refuses_paths_outside_fwdata(
     assert media.deid_path(media.work_dir("src_test"), "ep_deid") is None
 
 
+def test_deid_path_refuses_deid_named_symlink_to_raw(fw: ConsolePaths, work: Path) -> None:
+    b = work / "egocentric" / "ep_raw" / "bundle.json"
+    raw = Path(json.loads(b.read_text())["mp4"])
+    link = work / "egocentric" / "ep_raw" / "x.deid.mp4"
+    link.symlink_to(raw)
+    b.write_text(json.dumps({"mp4": str(link)}))
+    assert media.deid_path(media.work_dir("src_test"), "ep_raw") is None
+
+
 def test_episode_video_prefers_pipeline_then_viewer(fw: ConsolePaths, work: Path) -> None:
     assert media.episode_video("src_test", "ep_deid").name == "a.deid.mp4"
-    with pytest.raises(KeyError):
+    with pytest.raises(runner.NotFound):
         media.episode_video("src_test", "ep_raw")
     v = write_mp4(fw.fw_root / "viewer" / "media" / "ep_v1.mp4")
     assert media.episode_video("vwr", "ep_v1") == v
-    with pytest.raises(KeyError):
+    with pytest.raises(runner.NotFound):
         media.episode_video("other", "ep_v1")
 
 
@@ -77,7 +86,7 @@ def test_episode_json_downsamples(fw: ConsolePaths, lerobot: Path) -> None:
     assert (fw.cache / "ep_S70_000001.json").is_file()
     with pytest.raises(FileNotFoundError):
         media.episode_json("S70", 9)
-    with pytest.raises(KeyError):
+    with pytest.raises(runner.NotFound):
         media.episode_json("nope", 1)
     with pytest.raises(ValueError):
         media.episode_json("S70", 10**6)

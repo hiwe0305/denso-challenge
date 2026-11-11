@@ -163,12 +163,65 @@ def test_export_zip_skips_data_and_holdout(rn: ConsolePaths) -> None:
     (d / "holdout-b" / "h.json").write_text("{}")
     (d / "videos" / "v.json").write_text("{}")
     (d / "big.mp4").write_bytes(b"0")
+    (rn.fw_root / "vault").mkdir()
+    (rn.fw_root / "vault" / "conditions.json").write_text("{}")
+    (rn.fw_root / "console" / "jobs").mkdir(parents=True, exist_ok=True)
+    (rn.fw_root / "console" / "jobs" / "x.log").write_text("x")
+    (d / "a" / "holdout_x").mkdir(parents=True)
+    (d / "a" / "holdout_x" / "f.json").write_text("{}")
+    (d / "a" / "vault").mkdir()
+    (d / "a" / "vault" / "v.json").write_text("{}")
+    (d / "a" / ".hid").mkdir()
+    (d / "a" / ".hid" / "h.json").write_text("{}")
+    (d / "a" / "console").mkdir()
+    (d / "a" / "console" / "c.json").write_text("{}")
     jid = runner.submit("export.zip", {"path": str(d)})["id"]
     _wait(lambda: runner.JOBREG[jid]["state"] == "ok", "zip done")
     z = runner.JOBREG[jid]["outputs"]["zip"]
     assert Path(z).parent == rn.exports
     assert zipfile.ZipFile(z).namelist() == ["x/a.json"]
     assert [e["name"] for e in runner.list_exports() if e["kind"] == "zip"] == [Path(z).name]
+
+
+def test_export_zip_of_fw_root_skips_vault_and_console(rn: ConsolePaths) -> None:
+    (rn.fw_root / "vault").mkdir()
+    (rn.fw_root / "vault" / "conditions.json").write_text("{}")
+    (rn.fw_root / "console" / "jobs").mkdir(parents=True, exist_ok=True)
+    (rn.fw_root / "console" / "jobs" / "x.log").write_text("x")
+    (rn.fw_root / "keep.json").write_text("{}")
+    jid = runner.submit("export.zip", {"path": str(rn.fw_root)})["id"]
+    _wait(lambda: runner.JOBREG[jid]["state"] == "ok", "zip done")
+    names = zipfile.ZipFile(runner.JOBREG[jid]["outputs"]["zip"]).namelist()
+    assert names == [f"{rn.fw_root.name}/keep.json"]
+
+
+def test_export_zip_walks_the_planned_path(rn: ConsolePaths) -> None:
+    d = rn.fw_root / "tray" / "x"
+    d.mkdir(parents=True)
+    (d / "a.json").write_text("{}")
+    link = rn.fw_root / "link"
+    link.symlink_to(d)
+    jid = runner.submit("export.zip", {"path": str(link)})["id"]
+    _wait(lambda: runner.JOBREG[jid]["state"] == "ok", "zip done")
+    job = runner.JOBREG[jid]
+    assert job["outputs"]["dir"] == str(d)
+    assert zipfile.ZipFile(job["outputs"]["zip"]).namelist() == ["x/a.json"]
+
+
+def test_running_jobs_counts_leaf_jobs_once(rn: ConsolePaths) -> None:
+    parent = runner.make_job("ego.pipeline", {}, pl={"argv": ["chain"]})
+    child = runner.make_job("ego.deid", {}, chain_id=parent["id"], pl={"argv": ["x"]})
+    parent["state"] = child["state"] = "running"
+    assert runner.status()["machines"]["laptop"]["running_jobs"] == 1
+
+
+def test_init_registers_atexit_once(rn: ConsolePaths, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[Any] = []
+    monkeypatch.setattr(runner.atexit, "register", lambda f: calls.append(f))
+    monkeypatch.setattr(runner, "_atexit_done", False)
+    runner.init(rn)
+    runner.init(rn)
+    assert len(calls) == 1
 
 
 def test_registry_reload_marks_dead_running_job(rn: ConsolePaths) -> None:
