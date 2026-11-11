@@ -52,10 +52,6 @@ def _pinned(raw: dict[str, Any]) -> dict[str, Any]:
          "demo_sets": cplus["targets"]["demo_sets"], "set_name": "T160"},
     ]  # fmt: skip
     raw["cut"].update(visuals_revision="0" * 40, episodes=589, frames=837194, stats_sha256="a" * 64)
-    raw["parents"]["psi0-ego-stage1-egx"]["vlm_stage1"].update(
-        job_id="da30-t2-stage1-egx-s0", drive_dir="da30/vlm-egx",
-        weights_sha256="b" * 64, manifest_sha256="c" * 64,
-    )  # fmt: skip
     raw["pinned_files"] = {}
     for subset in raw["subsets"]:
         subset["parts"][0]["regenerates"], subset["parts"][1]["regenerates"] = "pool-a", "pool-b"
@@ -69,13 +65,11 @@ def _pinned(raw: dict[str, Any]) -> dict[str, Any]:
     return raw
 
 
-def test_the_draft_holds_and_lists_what_w1_and_w2_owe() -> None:
+def test_the_draft_holds_with_every_pin_set() -> None:
     plan = TrayPairPlan.load(PAIR)
     assert check(plan, REPO) == []
     assert plan.status == "draft" and plan.steps() == 60000
-    todo = pending(plan)
-    assert len(todo) == 4  # W1 and S70 pinned 11/11/2026; DA-30's stage 1 is left
-    assert all("(DA-30)" in p for p in todo)
+    assert pending(plan) == []  # W1 and S70 pinned 11/11/2026, then DA-30's stage 1 VLM
     assert plan.interpretation.rules_marker == "pair60k-rules"
     text = (REPO / plan.interpretation.doc).read_text(encoding="utf-8")
     assert runplan.rules_sha256(text, "pair60k-rules") == plan.interpretation.rules_sha256
@@ -266,19 +260,42 @@ def test_cut_parts_pin_whole_and_new() -> None:
     assert any(p.startswith("part pool-b: demo set T160") for p in _problems(wrong))
 
 
+def test_w2_pins_the_stage1_vlm_as_delivered() -> None:
+    # DA-30's stage 1 on A100 (rp_1d7627234111, job da30-tray-ego-b, step 300), vlm.json
+    parent = TrayPairPlan.load(PAIR).parents["psi0-ego-stage1-egx"]
+    assert isinstance(parent, runplan.Stage1Parent)
+    vlm = parent.vlm_stage1
+    assert (vlm.job_id, vlm.drive_dir) == ("da30-tray-ego-b", "denso/da30/da30-tray-ego-b/vlm")
+    assert vlm.weights_sha256 is not None and vlm.weights_sha256.startswith("c48ec2df761d")
+    assert vlm.manifest_sha256 is not None and vlm.manifest_sha256.startswith("019daa801041")
+
+
 def test_no_launch_and_no_freeze_until_pinned(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert pairplan.main(["check", str(PAIR)]) == 0
-    assert "draft, 4 pins pending" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert out.rstrip().endswith(", draft") and "pending" not in out
     assert pairplan.main(["check", str(PAIR), "--launch"]) == 1
     err = capsys.readouterr().err
-    assert "DRAFT" in err and err.count("PENDING:") == 4 and "not frozen" in err
+    assert "DRAFT" in err and "PENDING:" not in err and "not frozen" in err
     with pytest.raises(ValueError, match="status draft"):
         pairplan.freeze(PAIR, REPO)
+    # a plan with W2's pins null lists them, and only them
+    raw = _raw()
+    raw["parents"]["psi0-ego-stage1-egx"]["vlm_stage1"].update(
+        job_id=None, drive_dir=None, weights_sha256=None, manifest_sha256=None
+    )
+    unpinned = tmp_path / "he-tray-pair60k.yaml"
+    unpinned.write_text(yaml.safe_dump(raw, allow_unicode=True), encoding="utf-8")
+    assert pairplan.main(["check", str(unpinned)]) == 0
+    assert "draft, 4 pins pending" in capsys.readouterr().out
+    assert pairplan.main(["check", str(unpinned), "--launch"]) == 1
+    err = capsys.readouterr().err
+    assert err.count("PENDING:") == 4 and err.count("(DA-30)") == 4
     # runplan hands a paired plan over, and refuses a --release it would not read
     assert runplan.main(["check", str(PAIR)]) == 0
-    assert "4 pins pending" in capsys.readouterr().out
+    assert "pending" not in capsys.readouterr().out
     with pytest.raises(SystemExit):
         runplan.main(["check", str(PAIR), "--release", str(tmp_path)])
 
