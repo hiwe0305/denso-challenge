@@ -183,7 +183,15 @@ def test_check_vlm_loads_the_drive_copy_and_stops_on_a_problem(
 
     def load_check(path: Path) -> dict[str, object]:
         seen.append(path)
-        return {"vocab": 153792, "problems": problems}
+        # The keys of the real load_check, `seconds` included (11/11/2026: it clashed
+        # with Report.phase's own `seconds` and check-vlm crashed after the check).
+        return {
+            "seconds": 34.4,
+            "vocab": 153792,
+            "tokenizer": 151669,
+            "parameters": 2131333120,
+            "problems": problems,
+        }
 
     monkeypatch.setattr(colab, "load_check", load_check)
     work = tmp_path / "da30"
@@ -196,3 +204,4 @@ def test_check_vlm_loads_the_drive_copy_and_stops_on_a_problem(
     assert seen == [tmp_path / "drive" / "da30-egodex-short" / "vlm"]
     report = json.loads((work / "report.json").read_text())["phases"]["check_vlm"]
     assert report["problems"] == problems
+    assert report["load_seconds"] == 34.4 and report["vocab"] == 153792

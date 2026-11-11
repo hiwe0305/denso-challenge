@@ -407,7 +407,9 @@ def check_vlm(work: Path, plan_path: Path, durable: Path) -> None:
     plan = _plan(plan_path)
     start = time.monotonic()
     result = load_check(durable / plan.job.id / "vlm")
-    Report(work).phase("check_vlm", time.monotonic() - start, **result)
+    # load_check times its own load as `seconds`, which is the phase's own argument.
+    load_seconds = result.pop("seconds", None)
+    Report(work).phase("check_vlm", time.monotonic() - start, load_seconds=load_seconds, **result)
     if result["problems"]:
         raise SystemExit("\n".join(result["problems"]))
 
