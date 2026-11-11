@@ -466,7 +466,7 @@ async function loopPage(main) {
     columns: [{ key: "story", mono: true }, { key: "kind", fmt: v => stateTag(v === "measured" ? "ok" : "todo", v) }, { key: "usd", label: "USD", align: "right", mono: true, fmt: v => num(v, "float1") }],
     rows: lrows, qsKey: "ledger"
   });
-  const flowBox = box(300), costBox = box(200), cost = ((typeof UI !== "undefined" && UI.qs) ? UI.qs() : {}).tab === "cost";
+  const flowBox = box(360), costBox = box(200), cost = ((typeof UI !== "undefined" && UI.qs) ? UI.qs() : {}).tab === "cost";
   const parts = [panel("Flow", flowBox, srcTag()), panel("Cost", costBox)];
   main.appendChild(h("div", { class: "ops-wrap" }, [
     h("div", { class: "ops-grid", style: { gridTemplateColumns: GR.w32 } }, cost ? parts.reverse() : parts),
