@@ -1,0 +1,216 @@
+# Numbers that live only in docs. Each carries its source quote; `fw console` verifies it.
+cited:
+- key: eval.policy
+  value: 'C @40k, SimReady, dev, one train seed; rule 0: p_C < 10% at L1–2'
+  doc: docs/he/tray.md
+  section: '16.6'
+  quote: '**Quy tắc 0 xảy ra.**'
+- key: eval.level.L0
+  value:
+    level: L0
+    n: 30
+    successes: 5
+    succ: 5/30
+    wilson: 7.3–33.6
+    steps_pct: &id001
+    - 93.3
+    - 93.3
+    - 93.3
+    - 90.0
+    - 90.0
+    - 23.3
+    - 16.7
+  doc: docs/he/tray.md
+  section: '16.6'
+  quote: '| 0 (30 lượt lặp, một cảnh) | 30 | 5 | 16,7 % | 7,3–33,6 % | 3,3–30,0 % |'
+- key: eval.steps.L0
+  value: *id001
+  doc: docs/he/tray.md
+  section: '16.6'
+  quote: '| 0 | 93,3 % | 93,3 % | 93,3 % | 90,0 % | 90,0 % | 23,3 % | 16,7 % |'
+- key: eval.level.L1
+  value:
+    level: L1
+    n: 120
+    successes: 9
+    succ: 9/120
+    wilson: 4.0–13.6
+    steps_pct: &id002
+    - 60.8
+    - 60.8
+    - 60.8
+    - 60.8
+    - 60.8
+    - 10.8
+    - 7.5
+  doc: docs/he/tray.md
+  section: '16.6'
+  quote: '| 1 | 120 | 9 | 7,5 % | 4,0–13,6 % | 3,3–12,5 % |'
+- key: eval.steps.L1
+  value: *id002
+  doc: docs/he/tray.md
+  section: '16.6'
+  quote: '| 1 | 60,8 % | 60,8 % | 60,8 % | 60,8 % | 60,8 % | 10,8 % | 7,5 % |'
+- key: eval.level.L2
+  value:
+    level: L2
+    n: 120
+    successes: 11
+    succ: 11/120
+    wilson: 5.2–15.7
+    steps_pct: &id003
+    - 73.3
+    - 73.3
+    - 73.3
+    - 71.7
+    - 68.3
+    - 11.7
+    - 7.5
+  doc: docs/he/tray.md
+  section: '16.6'
+  quote: '| 2 | 120 | 11 | 9,2 % | 5,2–15,7 % | 4,2–15,0 % |'
+- key: eval.steps.L2
+  value: *id003
+  doc: docs/he/tray.md
+  section: '16.6'
+  quote: '| 2 | 73,3 % | 73,3 % | 73,3 % | 71,7 % | 68,3 % | 11,7 % | 7,5 % |'
+- key: eval.level.L1–2
+  value:
+    level: L1–2
+    n: 240
+    successes: 20
+    succ: 20/240
+    wilson: 5.5–12.5
+    steps_pct: &id004
+    - 67.1
+    - 67.1
+    - 67.1
+    - 66.2
+    - 64.6
+    - 11.2
+    - 7.5
+  doc: docs/he/tray.md
+  section: '16.6'
+  quote: '| **1–2 gộp (chỉ số chính)** | **240** | **20** | **8,3 %** | **5,5–12,5 %** | **5,0–12,1 %** |'
+- key: eval.steps.L1–2
+  value: *id004
+  doc: docs/he/tray.md
+  section: '16.6'
+  quote: '| 1–2 gộp | 67,1 % | 67,1 % | 67,1 % | 66,2 % | 64,6 % | 11,2 % | 7,5 % |'
+- key: eval.stages
+  value:
+  - approach_a
+  - grasp
+  - lift
+  - carry
+  - reach_b
+  - place
+  - release_stand
+  doc: docs/he/tray.md
+  section: '16.6'
+  quote: '| Mức | `approach_a` | `grasp` | `lift` | `carry` | `reach_b` | `place` | `release_stand` |'
+- key: eval.failure_labels.L1
+  value:
+    L-PLACE-POSE: 68
+    L-TIMEOUT: 24
+    L-TRAY-TILT: 10
+    L-PART-DROP: 6
+    L-ONE-HAND: 3
+  doc: docs/he/tray.md
+  section: '16.6'
+  quote: '| 1 | 68 | 24 | 10 | 6 | 3 |'
+- key: eval.failure_labels.L2
+  value:
+    L-PLACE-POSE: 63
+    L-TIMEOUT: 18
+    L-TRAY-TILT: 20
+    L-PART-DROP: 5
+    L-ONE-HAND: 3
+  doc: docs/he/tray.md
+  section: '16.6'
+  quote: '| 2 | 63 | 18 | 20 | 5 | 3 |'
+- key: eval.failure_labels.L0
+  value:
+    L-PLACE-POSE: 16
+    L-TIMEOUT: 1
+    L-TRAY-TILT: 8
+    L-PART-DROP: 0
+    L-ONE-HAND: 0
+  doc: docs/he/tray.md
+  section: '16.6'
+  quote: '| 0 | 16 | 1 | 8 | 0 | 0 |'
+- key: eval.failure_labels.L1-2
+  value:
+    L-PLACE-POSE: 131
+    L-TIMEOUT: 42
+    L-TRAY-TILT: 30
+    L-PART-DROP: 11
+    L-ONE-HAND: 6
+  doc: docs/he/tray.md
+  section: '16.6'
+  quote: '| 1–2 gộp | 131 (55 %) | 42 (18 %) | 30 (13 %) | 11 (5 %) | 6 (3 %) |'
+- key: eval.place_error_cm.L0
+  value:
+    min: 0.9
+    p10: 2.5
+    p50: 9.5
+    p90: 17.6
+    max: 28.6
+  doc: docs/he/tray.md
+  section: '16.6'
+  quote: '| 0 | 16 | 2,5 / 9,5 / 17,6 | 0,9–28,6 |'
+- key: eval.place_error_cm.L1
+  value:
+    min: 0.4
+    p10: 5.2
+    p50: 10.1
+    p90: 19.9
+    max: 36.1
+  doc: docs/he/tray.md
+  section: '16.6'
+  quote: '| 1 | 68 | 5,2 / 10,1 / 19,9 | 0,4–36,1 |'
+- key: eval.place_error_cm.L2
+  value:
+    min: 2.7
+    p10: 6.1
+    p50: 11.2
+    p90: 32.0
+    max: 54.7
+  doc: docs/he/tray.md
+  section: '16.6'
+  quote: '| 2 | 63 | 6,1 / 11,2 / 32,0 | 2,7–54,7 |'
+- key: eval.cluster.L-PLACE-POSE
+  value:
+    label: L-PLACE-POSE
+    stage: place
+    diagnosis: data
+    intervention: targeted gen
+    episodes: 262 → 229 → 177
+  doc: docs/he/tray.md
+  section: '17'
+  quote: 'bước hỏng đầu tiên `place` (bước 6), mức 1–2: 131/240 lượt'
+- key: loop.eval_n
+  value: 240
+  doc: docs/he/tray.md
+  section: '16.6'
+  quote: '| **1–2 gộp (chỉ số chính)** | **240** | **20** |'
+- key: loop.failures
+  value: 131
+  doc: docs/he/tray.md
+  section: '17'
+  quote: '`L-PLACE-POSE` (131/240)'
+- key: loop.targets
+  value: 262
+  doc: docs/he/tray.md
+  section: '17'
+  quote: 'Kế hoạch thử: 262 seed'
+- key: loop.recorded
+  value: 229
+  doc: docs/he/tray.md
+  section: '17'
+  quote: 262 lượt, **229 ghi được**
+- key: loop.kept
+  value: 177
+  doc: docs/he/tray.md
+  section: '17'
+  quote: 177 / 226 giữ lại

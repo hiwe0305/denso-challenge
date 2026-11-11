@@ -1,0 +1,1485 @@
+generated: '2026-11-11'
+rows:
+- id: egodex-test
+  name: egodex-test (Apple EgoDex test.zip)
+  title: Apple EgoDex test.zip (chỉ từ xa)
+  kind: raw source
+  data_type: egocentric
+  task: other
+  episodes: null
+  frames: null
+  hours: null
+  fps: 30
+  format: zip (mp4+hdf5)
+  licence: CC-BY-NC-ND-4.0
+  data_class: public
+  size: 17.3 GB (remote)
+  status: upstream
+  notes: never downloaded whole; read by HTTP range
+  qa: '-'
+  locations:
+  - https://ml-site.cdn-apple.com/datasets/egodex/test.zip (remote only, 17.3 GB)
+  parents: []
+  aliases: []
+- id: egodex-da30
+  name: egodex-test-first2 / egodex-test-da30-part1
+  title: EgoDex · 218 clip (DA-30)
+  kind: raw source
+  data_type: egocentric
+  task: other
+  episodes: 218
+  frames: 90906
+  hours: 0.842
+  fps: 30
+  format: EgoDex raw (mp4+hdf5, part1, 111 tasks x2)
+  licence: CC-BY-NC-ND-4.0
+  data_class: public
+  size: 2.1 GB
+  status: current
+  notes: frames from src_158e report; manifest pins D2 deid waiver
+  qa: '-'
+  locations:
+  - laptop:fwdata/egodex-da30
+  - rtx3060:~/denso-da30/data/egodex
+  parents:
+  - egodex-test
+  aliases: []
+- id: egodex-da30-probe
+  name: egodex-da30-probe
+  title: EgoDex probe · 20 clip
+  kind: raw source
+  data_type: egocentric
+  task: other
+  episodes: 20
+  frames: null
+  hours: null
+  fps: 30
+  format: EgoDex raw
+  licence: CC-BY-NC-ND-4.0
+  data_class: public
+  size: 25 MB
+  status: superseded
+  notes: 40 files, 10 tasks x2 probe
+  qa: '-'
+  locations:
+  - laptop:fwdata/egodex-da30-probe
+  parents:
+  - egodex-test
+  aliases: []
+- id: team-1109-480p30-old
+  name: team-tray-1109-480p30
+  title: Tray đội 1109 · 480p30 (cũ)
+  kind: raw source
+  data_type: egocentric
+  task: two_table
+  episodes: 153
+  frames: 11847
+  hours: 0.11
+  fps: 30
+  format: raw video mp4 (+deid.mp4)
+  licence: team-internal
+  data_class: internal
+  size: 163 MB
+  status: superseded
+  notes: original phone clips 640x480; deid copies alongside
+  qa: '-'
+  locations:
+  - laptop:fwdata/egocentric-raw/tray-1109-480p30
+  - rtx3060:~/denso-da04/tray-1109
+  parents: []
+  aliases: []
+- id: team-1109-480p
+  name: team-tray-1109-30fps-480p
+  title: Tray đội 1109 · 30fps 480p
+  kind: raw source
+  data_type: egocentric
+  task: two_table
+  episodes: 153
+  frames: 11847
+  hours: 0.11
+  fps: 30
+  format: raw video mp4 (+deid.mp4), resampled 30 fps
+  licence: team-internal
+  data_class: public
+  size: 110 MB
+  status: current
+  notes: ''
+  qa: '-'
+  locations:
+  - laptop:fwdata/egocentric-raw/tray-1109-30fps-480p
+  - rtx3060:~/denso-da04/tray-1109-30fps
+  parents:
+  - team-1109-480p30-old
+  aliases: []
+- id: team-1109-1080p50-old
+  name: team-tray-1109-1080p50
+  title: Tray đội 1109 · 1080p50 (cũ)
+  kind: raw source
+  data_type: egocentric
+  task: two_table
+  episodes: 8
+  frames: 2517
+  hours: 0.014
+  fps: 50
+  format: raw video mp4 (+deid.mp4)
+  licence: team-internal
+  data_class: internal
+  size: 276 MB
+  status: superseded
+  notes: 8 clips, guest badge -> excluded from h1m
+  qa: '-'
+  locations:
+  - laptop:fwdata/egocentric-raw/tray-1109-1080p50
+  parents: []
+  aliases: []
+- id: team-1109-1080p
+  name: team-tray-1109-30fps-1080p
+  title: Tray đội 1109 · 30fps 1080p
+  kind: raw source
+  data_type: egocentric
+  task: two_table
+  episodes: 8
+  frames: 1508
+  hours: 0.014
+  fps: 30
+  format: raw video mp4 (+deid.mp4), 30 fps
+  licence: team-internal
+  data_class: public
+  size: 172 MB
+  status: current
+  notes: ''
+  qa: '-'
+  locations:
+  - laptop:fwdata/egocentric-raw/tray-1109-30fps-1080p
+  parents:
+  - team-1109-1080p50-old
+  aliases: []
+- id: src_fa9bcf457f85ccaf
+  name: src_fa9bcf457f85ccaf (deid e2e test)
+  title: Pipeline · deid e2e (test)
+  kind: pipeline source
+  data_type: egocentric
+  task: two_table
+  episodes: 2
+  frames: null
+  hours: null
+  fps: 30
+  format: pipeline work dir
+  licence: team-internal
+  data_class: internal
+  size: 11 MB
+  status: test
+  notes: 'PR #163 deid end-to-end fixture'
+  qa: '?'
+  locations:
+  - laptop:fwdata/egocentric-deid-e2e
+  parents: []
+  aliases: []
+- id: src_050b9bf56a4e843c
+  name: src_050b9bf56a4e843c
+  title: Pipeline · EgoDex probe (20)
+  kind: pipeline source
+  data_type: egocentric
+  task: other
+  episodes: 20
+  frames: 4143
+  hours: 0.038
+  fps: 30
+  format: pipeline work dir (bundle/pose/segments)
+  licence: CC-BY-NC-ND-4.0
+  data_class: public
+  size: 3.2 MB (+7.4 MB x2 E-A poses)
+  status: superseded
+  notes: 20-episode subset; superseded by src_158e (all 218)
+  qa: 8 pass / 11 flag / 1 reject
+  locations:
+  - laptop:fwdata/pipeline/src_050b9bf56a4e843c
+  - laptop:fwdata/egocentric-ea/src_050b9bf56a4e843c{,-v2}
+  parents:
+  - egodex-da30
+  aliases: []
+- id: src_158ec3c813ffe9a6
+  name: src_158ec3c813ffe9a6
+  title: Pipeline · EgoDex (218)
+  kind: pipeline source
+  data_type: egocentric
+  task: other
+  episodes: 218
+  frames: 90906
+  hours: 0.842
+  fps: 30
+  format: pipeline work dir
+  licence: CC-BY-NC-ND-4.0
+  data_class: public
+  size: 33 MB
+  status: current
+  notes: ''
+  qa: 32 pass / 153 flag / 33 reject
+  locations:
+  - laptop:fwdata/pipeline/src_158ec3c813ffe9a6
+  parents:
+  - egodex-da30
+  aliases: []
+- id: src_4df0717b9b11cfc4
+  name: src_4df0717b9b11cfc4
+  title: Pipeline · tray 1109 (153, cũ)
+  kind: pipeline source
+  data_type: egocentric
+  task: two_table
+  episodes: 153
+  frames: 11847
+  hours: 0.11
+  fps: 30
+  format: pipeline work dir
+  licence: team-internal
+  data_class: internal
+  size: 12 MB
+  status: superseded
+  notes: ''
+  qa: 0 pass / 153 flag / 0 reject
+  locations:
+  - laptop:fwdata/pipeline/src_4df0717b9b11cfc4
+  parents:
+  - team-1109-480p30-old
+  aliases: []
+- id: src_805804635f9af7f7
+  name: src_805804635f9af7f7
+  title: Pipeline · tray 1109 30fps (153)
+  kind: pipeline source
+  data_type: egocentric
+  task: two_table
+  episodes: 153
+  frames: 11847
+  hours: 0.11
+  fps: 30
+  format: pipeline work dir
+  licence: team-internal
+  data_class: public
+  size: 12 MB
+  status: current
+  notes: ''
+  qa: '10 pass / 122 flag / 21 reject (qa jsonl; report/egocentric.json is stale: 153 reject)'
+  locations:
+  - laptop:fwdata/pipeline/src_805804635f9af7f7
+  - laptop:fwdata/pipeline/backup/*.tar (2 pre-change backups)
+  parents:
+  - team-1109-480p
+  aliases: []
+- id: src_824e9afec1d702a3
+  name: src_824e9afec1d702a3
+  title: Pipeline · tray 1080p (8, cũ)
+  kind: pipeline source
+  data_type: egocentric
+  task: two_table
+  episodes: 8
+  frames: 2517
+  hours: 0.014
+  fps: 50
+  format: pipeline work dir
+  licence: team-internal
+  data_class: internal
+  size: 1.8 MB
+  status: superseded
+  notes: ''
+  qa: 8 flag
+  locations:
+  - laptop:fwdata/pipeline/src_824e9afec1d702a3
+  parents:
+  - team-1109-1080p50-old
+  aliases: []
+- id: src_60e3f454316d2553
+  name: src_60e3f454316d2553
+  title: Pipeline · tray 1080p 30fps (8)
+  kind: pipeline source
+  data_type: egocentric
+  task: two_table
+  episodes: 8
+  frames: 1508
+  hours: 0.014
+  fps: 30
+  format: pipeline work dir
+  licence: team-internal
+  data_class: public
+  size: 1.2 MB
+  status: current
+  notes: all 8 excluded from h1m (guest badge)
+  qa: 8 flag
+  locations:
+  - laptop:fwdata/pipeline/src_60e3f454316d2553
+  - laptop:fwdata/pipeline/backup/src_60e3...-before-DA-04-human1m-20261111.tar
+  parents:
+  - team-1109-1080p
+  aliases: []
+- id: egx_948a6927d3bb8136
+  name: egx_948a6927d3bb8136
+  title: Export egx_948a (thiếu)
+  kind: export
+  data_type: egocentric
+  task: other
+  episodes: null
+  frames: null
+  hours: null
+  fps: 30
+  format: Psi0 stage1 EgoDex format (hdf5+mp4)
+  licence: CC-BY-NC-ND-4.0
+  data_class: public
+  size: '?'
+  status: missing
+  notes: referenced in DA-18 story
+  qa: include pass+flag
+  locations:
+  - '? (not found on disk)'
+  parents:
+  - src_050b9bf56a4e843c
+  aliases: []
+- id: egx_0b4a1daa411407da
+  name: egx_0b4a1daa411407da
+  title: Export egx_0b4a (thiếu)
+  kind: export
+  data_type: egocentric
+  task: other
+  episodes: null
+  frames: null
+  hours: null
+  fps: 30
+  format: Psi0 stage1 EgoDex format
+  licence: CC-BY-NC-ND-4.0
+  data_class: public
+  size: '?'
+  status: missing
+  notes: ''
+  qa: include pass+flag
+  locations:
+  - '? (not found on disk)'
+  parents:
+  - src_050b9bf56a4e843c
+  aliases: []
+- id: egx_fb3d1401dac0bd4c
+  name: egx_fb3d1401dac0bd4c (tray-ego-b-480p-trial)
+  title: Export tray 480p · trial (132)
+  kind: export
+  data_type: egocentric
+  task: two_table
+  episodes: 132
+  frames: 7804
+  hours: 0.072
+  fps: 30
+  format: Psi0 stage1 EgoDex format (part1/two_table/*.hdf5+mp4)
+  licence: team-internal
+  data_class: public
+  size: 47 MB
+  status: superseded
+  notes: ''
+  qa: pass+flag samples
+  locations:
+  - laptop:fwdata/egocentric-export/tray-ego-b-480p-trial
+  - rtx3060:~/denso-da30/data/tray-ego-b-trial
+  parents:
+  - src_805804635f9af7f7
+  aliases: []
+- id: egx_b6e974e46e8222e8
+  name: egx_b6e974e46e8222e8 (tray-ego-b-480p-clean)
+  title: Export tray 480p · clean (132)
+  kind: export
+  data_type: egocentric
+  task: two_table
+  episodes: 132
+  frames: 7804
+  hours: 0.072
+  fps: 30
+  format: Psi0 stage1 EgoDex format
+  licence: team-internal
+  data_class: public
+  size: 47 MB (+47 MB tar)
+  status: superseded
+  notes: ''
+  qa: pass+flag
+  locations:
+  - laptop:fwdata/egocentric-export/tray-ego-b-480p-clean
+  - laptop:fwdata/egocentric-export/tarballs/egx_b6e974e46e8222e8.tar
+  - Drive MyDrive/denso/da30/exports/egx_b6e974e46e8222e8.tar (first pin, unused)
+  parents:
+  - src_805804635f9af7f7
+  aliases: []
+- id: egx_7b43c30dc5d88cd7
+  name: egx_7b43c30dc5d88cd7 (tray-ego-b-480p-clean2, team-ego-tray-clean-132)
+  title: Export tray 480p · clean2 (132)
+  kind: export
+  data_type: egocentric
+  task: two_table
+  episodes: 132
+  frames: 7804
+  hours: 0.072
+  fps: 30
+  format: Psi0 stage1 EgoDex format
+  licence: team-internal
+  data_class: public
+  size: 47 MB (+47 MB tar, 48,701,440 B)
+  status: current
+  notes: ''
+  qa: pass+flag (one sample per clip, review-whole-clip rule 9/11)
+  locations:
+  - laptop:fwdata/egocentric-export/tray-ego-b-480p-clean2
+  - laptop:fwdata/egocentric-export/tarballs/egx_7b43c30dc5d88cd7.tar
+  - Drive MyDrive/denso/da30/exports/egx_7b43c30dc5d88cd7.tar
+  parents:
+  - src_805804635f9af7f7
+  aliases: []
+- id: h1m-team
+  name: ego-h1m-20261111/team_tray
+  title: Ego H1M · tray đội (132)
+  kind: export
+  data_type: egocentric
+  task: two_table
+  episodes: 132
+  frames: 10237
+  hours: 0.095
+  fps: 30
+  format: LeRobot v3.0 (Human-1M layout)
+  licence: team-internal
+  data_class: public
+  size: 41 MB
+  status: current
+  notes: ''
+  qa: '161 clips: 132 exported / 21 rejected_qa / 8 excluded'
+  locations:
+  - laptop:fwdata/human1m/ego-h1m-20261111/team_tray
+  parents:
+  - src_805804635f9af7f7
+  - src_60e3f454316d2553
+  aliases: []
+  ego_viewer: fwdata/human1m/ego-h1m-20261111/viewer
+- id: h1m-egodex
+  name: ego-h1m-20261111/egodex
+  title: Ego H1M · EgoDex (185)
+  kind: export
+  data_type: egocentric
+  task: other
+  episodes: 185
+  frames: 84736
+  hours: 0.785
+  fps: 30
+  format: LeRobot v3.0 (Human-1M layout), 171 tasks
+  licence: CC-BY-NC-ND-4.0
+  data_class: public
+  size: 286 MB
+  status: current
+  notes: ''
+  qa: '218 clips: 185 exported / 33 rejected_qa'
+  locations:
+  - laptop:fwdata/human1m/ego-h1m-20261111/egodex
+  parents:
+  - src_158ec3c813ffe9a6
+  aliases: []
+  ego_viewer: fwdata/human1m/ego-h1m-20261111/viewer
+- id: psi-two-table
+  name: psi-data@e78fb93 two_table (G1WholebodyLocomotionPickBetweenTablesTeleop-v0)
+  title: psi-data · two_table (99)
+  kind: raw source
+  data_type: teleop
+  task: two_table
+  episodes: 99
+  frames: 62764
+  hours: 0.349
+  fps: 50
+  format: LeRobot v2.1 (+zip)
+  licence: unknown (HSSD CC-BY-NC-4.0, GraspNet CC BY-NC-SA in video)
+  data_class: public
+  size: '53 MB unpacked laptop (videos partial: 3 mp4) / 207 MB rtx3060 / zip 203 MB'
+  status: current
+  notes: ''
+  qa: 'kin: 95 pass/4 flag; dyn: 21 pass/78 flag (DA-17 qa-runs-po)'
+  locations:
+  - HF USC-PSI-Lab/psi-data@e78fb93 simple/
+  - laptop:fwdata/psi-data/simple/...TeleopTables (+.zip 203 MB)
+  - rtx3060:~/denso-da27/fwdata/psi-data/e78fb93
+  - rtx3060:~/denso-qaqc-archive/.../denso-da17/fwdata/sources/psi-data-e78fb93 (meta only)
+  - rtx3060:~/denso-da33/fwdata/psi-data (meta stub)
+  parents: []
+  aliases: []
+- id: psi-hug
+  name: psi-data@e78fb93 hug (G1WholebodyPickAndPlaceAndHugContainerTeleop-v0)
+  title: psi-data · hug container (94)
+  kind: raw source
+  data_type: teleop
+  task: hug
+  episodes: 94
+  frames: 42688
+  hours: 0.237
+  fps: 50
+  format: LeRobot v2.1 (+zip, no videos unpacked)
+  licence: unknown
+  data_class: public
+  size: 34 MB + zip 119 MB
+  status: current
+  notes: ''
+  qa: '-'
+  locations:
+  - laptop:fwdata/psi-data/simple/...HugContainer (+.zip 119 MB)
+  parents: []
+  aliases: []
+- id: psi-eval-e78fb93
+  name: psi-data simple-eval two_table @e78fb93
+  title: Eval cond · simple two_table e78fb93 (30)
+  kind: eval conditions
+  data_type: teleop
+  task: two_table
+  episodes: 30
+  frames: 30
+  hours: 0.0
+  fps: 50
+  format: LeRobot v2.1 (initial states), levels 0-2 x10
+  licence: unknown
+  data_class: public
+  size: ~1 MB
+  status: archived
+  notes: ''
+  qa: '-'
+  locations:
+  - rtx3060:~/denso-qaqc-archive/.../2026-11-08-group3/denso-s103/.../simple-eval-e78fb93
+  parents: []
+  aliases: []
+- id: psi-eval-de140d6
+  name: psi-data simple-eval two_table @de140d6 (main)
+  title: Eval cond · simple two_table de140d6 (40)
+  kind: eval conditions
+  data_type: teleop
+  task: two_table
+  episodes: 40
+  frames: 40
+  hours: 0.0
+  fps: 50
+  format: LeRobot v2.1, levels 0,1,2,hard x10
+  licence: unknown
+  data_class: public
+  size: ~1 MB
+  status: superseded
+  notes: ''
+  qa: '-'
+  locations:
+  - rtx3060:~/denso-qaqc-archive/.../denso-s103/.../simple-eval-de140d6
+  parents: []
+  aliases: []
+- id: psi-n20
+  name: psi-data N20 (#N20:cf4d6e2c73e1)
+  title: Cut · psi-data N20
+  kind: subset-cut
+  data_type: teleop
+  task: two_table
+  episodes: 20
+  frames: 12367
+  hours: 0.069
+  fps: 50
+  format: LeRobot v2.1
+  licence: unknown
+  data_class: public
+  size: 39 MB
+  status: current
+  notes: ''
+  qa: '-'
+  locations:
+  - laptop:fwdata/he/subset-check/N20
+  - Colab /content/da26/sets/N20 (ephemeral)
+  parents:
+  - psi-two-table
+  aliases: []
+- id: psi-all-check
+  name: psi-data ALL (subset-check)
+  title: Cut · psi-data ALL (99, trùng)
+  kind: subset-cut
+  data_type: teleop
+  task: two_table
+  episodes: 99
+  frames: 62764
+  hours: 0.349
+  fps: 50
+  format: LeRobot v2.1
+  licence: unknown
+  data_class: public
+  size: 207 MB x2
+  status: duplicate
+  notes: src/ and ALL/ are full copies used to verify demo_subset
+  qa: '-'
+  locations:
+  - laptop:fwdata/he/subset-check/ALL
+  - laptop:fwdata/he/subset-check/src
+  parents:
+  - psi-two-table
+  aliases: []
+- id: bench-1e258c0a78ca
+  name: bench-1e258c0a78ca
+  title: Bench · bản sạch (99)
+  kind: bench copy
+  data_type: teleop
+  task: two_table
+  episodes: 99
+  frames: 62764
+  hours: 0.349
+  fps: 50
+  format: LeRobot v2.1 (+meta/benchmark_copy.json)
+  licence: unknown
+  data_class: public
+  size: 207 MB
+  status: current
+  notes: never in release train
+  qa: 'clean copy: 0 defects'
+  locations:
+  - rtx3060:~/denso-da27/fwdata/inject/copies/bench-1e258c0a78ca
+  parents:
+  - psi-two-table
+  aliases: []
+- id: bench-d19e112835e3
+  name: bench-d19e112835e3
+  title: Bench · 33 lỗi cấy (99)
+  kind: bench copy
+  data_type: teleop
+  task: two_table
+  episodes: 99
+  frames: 62643
+  hours: 0.348
+  fps: 50
+  format: LeRobot v2.1
+  licence: unknown
+  data_class: public
+  size: 206 MB
+  status: current
+  notes: ''
+  qa: 33 defects (11 types x3), answers sealed
+  locations:
+  - rtx3060:~/denso-da27/fwdata/inject/copies/bench-d19e112835e3
+  parents:
+  - psi-two-table
+  aliases: []
+- id: bench-old
+  name: bench-c6da75e9ff36 / bench-cfcb0ba66776
+  title: Bench · bản cũ (30/0 lỗi)
+  kind: bench copy
+  data_type: teleop
+  task: two_table
+  episodes: null
+  frames: null
+  hours: null
+  fps: 50
+  format: answers only
+  licence: unknown
+  data_class: public
+  size: answers only
+  status: superseded
+  notes: copies deleted, manifests kept
+  qa: 30 / 0 defects
+  locations:
+  - rtx3060:~/denso-da27/fwdata/ledger-check/logs/answers
+  parents:
+  - psi-two-table
+  aliases: []
+- id: he-dev-eval-v1
+  name: he/dev-eval-v1
+  title: Eval dev v1 (90 điều kiện)
+  kind: eval conditions
+  data_type: teleop
+  task: two_table
+  episodes: 90
+  frames: 90
+  hours: 0.001
+  fps: 50
+  format: conditions.jsonl + LeRobot v2.1 init states (L0-L2 x30)
+  licence: '-'
+  data_class: public
+  size: 6.3 MB
+  status: current
+  notes: ''
+  qa: '-'
+  locations:
+  - laptop:fwdata/he/dev-eval-v1
+  parents: []
+  aliases: []
+- id: he-dev-eval-v1-l0n10
+  name: he/dev-eval-v1-l0n10
+  title: Eval dev v1 · L0 n10
+  kind: eval conditions
+  data_type: teleop
+  task: two_table
+  episodes: 10
+  frames: 10
+  hours: 0.0
+  fps: 50
+  format: conditions.jsonl + v2.1
+  licence: '-'
+  data_class: public
+  size: 772 KB
+  status: current
+  notes: ''
+  qa: '-'
+  locations:
+  - laptop:fwdata/he/dev-eval-v1-l0n10
+  - laptop:fwdata/archive/da26-launch-b3-fwdata/he/dev-eval-v1-l0n10
+  - rtx3060:~/denso-da26/eval/dev-eval-v1-l0n10
+  parents:
+  - he-dev-eval-v1
+  aliases: []
+- id: he-eval-n20-interleaved
+  name: he/eval-n20-interleaved
+  title: Eval N20 xen kẽ
+  kind: eval conditions
+  data_type: teleop
+  task: two_table
+  episodes: 20
+  frames: 20
+  hours: 0.0
+  fps: 50
+  format: v2.1 + order.json (10 cond x 2 arms)
+  licence: '-'
+  data_class: public
+  size: 1.1 MB
+  status: current
+  notes: ''
+  qa: '-'
+  locations:
+  - laptop:fwdata/he/eval-n20-interleaved
+  - laptop:fwdata/archive/da26-launch-b3-fwdata/he/eval-n20-interleaved
+  - rtx3060:~/denso-da26/sets/interleaved
+  parents:
+  - he-dev-eval-v1-l0n10
+  aliases: []
+- id: tray_s1_0d84cc87b1e5
+  name: tray_s1_0d84cc87b1e5 (s1-prod-1103, planner-4)
+  title: Tray S1 · release 1103 (102)
+  kind: release
+  data_type: synthetic S1
+  task: tray
+  episodes: 102
+  frames: 148013
+  hours: 0.822
+  fps: 50
+  format: LeRobot v2.1 + release_manifest.json
+  licence: unknown (combined_license)
+  data_class: public
+  size: 861 MB
+  status: superseded
+  notes: not on HF (D-28)
+  qa: 'DA-17: 101 flag / 1 reject (action_jump.arm)'
+  locations:
+  - rtx3060:~/denso-da33/fwdata/releases/tray_s1_0d84cc87b1e5
+  - rtx3060:~/denso-da33/fwdata/simple/tray/gen/s1-prod-1103 (raw shards, 989 MB)
+  parents: []
+  aliases: []
+- id: gen-t7-t10
+  name: gen t7 / t10-cli (S1 trial batches)
+  title: Tray S1 · thử t7/t10 (36)
+  kind: raw source
+  data_type: synthetic S1
+  task: tray
+  episodes: 36
+  frames: 51467
+  hours: 0.286
+  fps: 50
+  format: LeRobot v2.1 shards
+  licence: unknown
+  data_class: public
+  size: 337 MB + 21 MB
+  status: test
+  notes: ''
+  qa: 34/42 and 2/2 succeeded
+  locations:
+  - rtx3060:~/denso-da33/fwdata/simple/tray/gen/t7
+  - rtx3060:~/denso-da33/fwdata/simple/tray/gen/t10-cli
+  parents: []
+  aliases: []
+- id: tray_s1_f9433b028c52
+  name: tray_s1_f9433b028c52 (s1-pool-1104, planner-5)
+  title: Tray S1 · pool 1104 (541)
+  kind: release
+  data_type: synthetic S1
+  task: tray
+  episodes: 541
+  frames: 769340
+  hours: 4.274
+  fps: 50
+  format: LeRobot v2.1 + release_manifest (1095 files)
+  licence: 'CC BY 4.0 on HF (manifest: unknown)'
+  data_class: public
+  size: 4.5 GB
+  status: superseded
+  notes: superseded by zone1 regen 41899efb4b27 for pair60k
+  qa: 'DA-03 src_297dedb9d3d39a72: 534 pass / 7 reject; gen 542/610 succ'
+  locations:
+  - rtx3060:~/denso-da34-pool/fwdata/releases/tray_s1_f9433b028c52
+  - rtx3060:~/denso-da34-pool/fwdata/gen/s1-pool-1104 (raw, 5.0 GB)
+  - HF hiwe0305/denso-hackrathon-g1-pick-and-place (df0074e, 1099 files)
+  parents: []
+  aliases: []
+- id: tray_s1_6c0fd7d37f77
+  name: tray_s1_6c0fd7d37f77 (cplus-tgt-1108)
+  title: Tray S1 · cplus target 1108 (229)
+  kind: release
+  data_type: synthetic S1
+  task: tray
+  episodes: 229
+  frames: 327723
+  hours: 1.821
+  fps: 50
+  format: LeRobot v2.1 + manifest
+  licence: unknown
+  data_class: public
+  size: 1.9 GB
+  status: superseded
+  notes: failure-targeted pool, 131 conditions
+  qa: 'src_7108bf1b3f7d6fe7: 226 pass / 3 reject'
+  locations:
+  - rtx3060:~/denso-da34-pool/fwdata/releases/tray_s1_6c0fd7d37f77
+  - rtx3060:~/denso-da34-pool/fwdata/gen/cplus-tgt-1108 (2.2 GB)
+  parents: []
+  aliases: []
+- id: tray_s1_41899efb4b27
+  name: tray_s1_41899efb4b27 (s1-pool-1104-zone1)
+  title: Tray S1 · pool 1104 zone1 (541)
+  kind: release
+  data_type: synthetic S1
+  task: tray
+  episodes: 541
+  frames: 769340
+  hours: 4.274
+  fps: 50
+  format: LeRobot v2.1 + manifest
+  licence: unknown
+  data_class: public
+  size: 4.5 GB
+  status: current
+  notes: same seeds+planner, target zone drawn
+  qa: 'src_ccb751b3ee3b6ec7: 534 pass / 7 reject'
+  locations:
+  - rtx3060:~/denso-da34-pool/fwdata/releases/tray_s1_41899efb4b27
+  - rtx3060:~/denso-da34-pool/fwdata/gen/s1-pool-1104-zone1 (5.0 GB)
+  parents:
+  - tray_s1_f9433b028c52
+  aliases:
+  - S1
+- id: tray_s1_4a8f4a8c6a8d
+  name: tray_s1_4a8f4a8c6a8d (cplus-tgt-1108-zone1)
+  title: Tray S1 · cplus target zone1 (229)
+  kind: release
+  data_type: synthetic S1
+  task: tray
+  episodes: 229
+  frames: 327723
+  hours: 1.821
+  fps: 50
+  format: LeRobot v2.1 + manifest
+  licence: unknown
+  data_class: public
+  size: 1.9 GB
+  status: current
+  notes: ''
+  qa: 'src_a5052b6064e5a872: 226 pass / 3 reject'
+  locations:
+  - rtx3060:~/denso-da34-pool/fwdata/releases/tray_s1_4a8f4a8c6a8d
+  - rtx3060:~/denso-da34-pool/fwdata/gen/cplus-tgt-1108-zone1 (2.2 GB)
+  parents:
+  - tray_s1_6c0fd7d37f77
+  aliases: []
+- id: cut-C
+  name: C (#C:a202cc028a2e)
+  title: Tray S1 · cut C (160)
+  kind: subset-cut
+  data_type: synthetic S1
+  task: tray
+  episodes: 160
+  frames: 228247
+  hours: 1.268
+  fps: 50
+  format: LeRobot v2.1 (own stats_psi0)
+  licence: unknown
+  data_class: public
+  size: 1.4 GB (x3 copies)
+  status: current
+  notes: N40/N80/A of demo_sets-v2 not materialised
+  qa: DA-03 rejects removed + quality filter
+  locations:
+  - rtx3060:~/denso-da34-pool/fwdata/cut-c-rp_a04c14e79dfd/sets/C
+  - rtx3060:~/denso-da34-pool/fwdata/cut-cplus-*/parts/C (x2)
+  - Colab /content/da34/sets/C
+  parents:
+  - tray_s1_f9433b028c52
+  aliases: []
+- id: cut-CMAX
+  name: CMAX (#CMAX:084ebc0353e7)
+  title: Tray S1 · cut CMAX (429)
+  kind: subset-cut
+  data_type: synthetic S1
+  task: tray
+  episodes: 429
+  frames: 610069
+  hours: 3.389
+  fps: 50
+  format: LeRobot v2.1
+  licence: unknown
+  data_class: public
+  size: 3.6 GB
+  status: superseded
+  notes: ''
+  qa: '-'
+  locations:
+  - rtx3060:~/denso-da34-pool/fwdata/cut-cmax-draft/sets/CMAX
+  parents:
+  - tray_s1_f9433b028c52
+  aliases: []
+- id: cut-T160
+  name: T160 (#T160:1104d00ea3ea)
+  title: Tray S1 · cut T160 (160)
+  kind: subset-cut
+  data_type: synthetic S1
+  task: tray
+  episodes: 160
+  frames: 227125
+  hours: 1.262
+  fps: 50
+  format: LeRobot v2.1
+  licence: unknown
+  data_class: public
+  size: 1.4 GB x2
+  status: current
+  notes: ''
+  qa: '-'
+  locations:
+  - rtx3060:~/denso-da34-pool/fwdata/cut-cplus-rp_71fee3fcff69/parts/T160
+  - rtx3060:~/denso-da34-pool/fwdata/cut-cplus-rp_71fee3fcff69-2363f70/parts/T160
+  parents:
+  - tray_s1_6c0fd7d37f77
+  aliases: []
+- id: cut-C_PLUS
+  name: C_PLUS
+  title: Tray S1 · cut C+ (320)
+  kind: subset-cut
+  data_type: synthetic S1
+  task: tray
+  episodes: 320
+  frames: 455372
+  hours: 2.53
+  fps: 50
+  format: LeRobot v2.1
+  licence: unknown
+  data_class: public
+  size: 2.7 GB x2
+  status: current
+  notes: -2363f70 is a rebuild at commit 2363f70 (duplicate)
+  qa: '-'
+  locations:
+  - rtx3060:~/denso-da34-pool/fwdata/cut-cplus-rp_71fee3fcff69/sets/C_PLUS
+  - rtx3060:~/denso-da34-pool/fwdata/cut-cplus-rp_71fee3fcff69-2363f70/sets/C_PLUS
+  parents:
+  - cut-C
+  - cut-T160
+  aliases: []
+- id: ALL
+  name: ALL (#ALL:113520c517a0, cut-all-zone1)
+  title: Tray S1 · ALL cut (606 ep)
+  kind: subset-cut
+  data_type: synthetic S1
+  task: tray
+  episodes: 606
+  frames: 861624
+  hours: 4.787
+  fps: 50
+  format: LeRobot v2.1 (+ALL.tar)
+  licence: unknown
+  data_class: public
+  size: 5.0 GB (+5.3 GB tar)
+  status: current
+  notes: ''
+  qa: 429 + 177 kept
+  locations:
+  - rtx3060:~/denso-da34-pool/fwdata/cut-all-zone1/ALL (+part-pool 429, part-tgt 177)
+  - laptop:fwdata/da34-dryrun/cut-all-zone1/ALL
+  - laptop:fwdata/da34-dryrun/cut-all-zone1/drive/ALL.tar
+  - Drive MyDrive/denso/da34/cuts/ALL.tar
+  parents:
+  - tray_s1_41899efb4b27
+  - tray_s1_4a8f4a8c6a8d
+  aliases:
+  - ALL
+  lerobot: fwdata/da34-dryrun/cut-all-zone1/ALL/G1WholebodyTrayTransferTeleop-v0
+- id: S70
+  name: S70 (#S70:8ab4e33b657f)
+  title: Tray S1 · S70 cut (425 ep)
+  kind: subset-cut
+  data_type: synthetic S1
+  task: tray
+  episodes: 425
+  frames: 603915
+  hours: 3.355
+  fps: 50
+  format: LeRobot v2.1 (+S70.tar), stats copied from ALL
+  licence: unknown
+  data_class: public
+  size: 3.5 GB (+3.7 GB tar)
+  status: current
+  notes: ''
+  qa: seed-hash 70% (301+124)
+  locations:
+  - laptop:fwdata/da34-dryrun/cut-all-zone1/S70
+  - laptop:fwdata/da34-dryrun/cut-all-zone1/drive/S70.tar
+  - Drive MyDrive/denso/da34/cuts/S70.tar
+  parents:
+  - ALL
+  aliases:
+  - S70
+  lerobot: fwdata/da34-dryrun/cut-all-zone1/S70/G1WholebodyTrayTransferTeleop-v0
+- id: evalset-rp_a04c
+  name: tray eval set rp_a04c14e79dfd
+  title: Tray eval set rp_a04c (270)
+  kind: eval conditions
+  data_type: synthetic S1
+  task: tray
+  episodes: 270
+  frames: 270
+  hours: 0.002
+  fps: 50
+  format: conditions.jsonl + v2.1 init states
+  licence: '-'
+  data_class: public
+  size: 64 KB-3.4 MB
+  status: current
+  notes: 'rp_a04c: L0 30 / L1 120 / L2 120'
+  qa: '-'
+  locations:
+  - rtx3060:~/denso-da34-pool/fwdata/tray/eval-sets/rp_a04c14e79dfd
+  parents: []
+  aliases: []
+- id: evalset-rp_a04c-dup
+  name: tray eval set rp_a04c14e79dfd-2e57f60
+  title: Tray eval set rp_a04c (trùng)
+  kind: eval conditions
+  data_type: synthetic S1
+  task: tray
+  episodes: 270
+  frames: 270
+  hours: 0.002
+  fps: 50
+  format: conditions.jsonl + v2.1 init states
+  licence: '-'
+  data_class: public
+  size: 64 KB-3.4 MB
+  status: duplicate
+  notes: 'rp_a04c: L0 30 / L1 120 / L2 120'
+  qa: '-'
+  locations:
+  - rtx3060:~/denso-da34-pool/fwdata/tray/eval-sets/rp_a04c14e79dfd-2e57f60
+  parents: []
+  aliases: []
+- id: evalset-t1
+  name: tray eval set t1-train-C20-bb4cef1
+  title: Tray eval set t1-train-C20
+  kind: eval conditions
+  data_type: synthetic S1
+  task: tray
+  episodes: 20
+  frames: 20
+  hours: 0.0
+  fps: 50
+  format: conditions.jsonl + v2.1 init states
+  licence: '-'
+  data_class: public
+  size: 64 KB-3.4 MB
+  status: test
+  notes: ''
+  qa: '-'
+  locations:
+  - rtx3060:~/denso-da34-pool/fwdata/tray/eval-sets/t1-train-C20-bb4cef1
+  parents: []
+  aliases: []
+- id: evalset-t2
+  name: tray eval set t2-dev-L1-20-bb4cef1
+  title: Tray eval set t2-dev-L1-20
+  kind: eval conditions
+  data_type: synthetic S1
+  task: tray
+  episodes: 20
+  frames: 20
+  hours: 0.0
+  fps: 50
+  format: conditions.jsonl + v2.1 init states
+  licence: '-'
+  data_class: public
+  size: 64 KB-3.4 MB
+  status: test
+  notes: ''
+  qa: '-'
+  locations:
+  - rtx3060:~/denso-da34-pool/fwdata/tray/eval-sets/t2-dev-L1-20-bb4cef1
+  parents: []
+  aliases: []
+- id: evalset-w2
+  name: tray eval set w2-probe-L1-1000100/1000105
+  title: Tray eval set w2-probe-L1
+  kind: eval conditions
+  data_type: synthetic S1
+  task: tray
+  episodes: 10
+  frames: 10
+  hours: 0.0
+  fps: 50
+  format: conditions.jsonl + v2.1 init states
+  licence: '-'
+  data_class: public
+  size: 64 KB-3.4 MB
+  status: test
+  notes: ''
+  qa: '-'
+  locations:
+  - rtx3060:~/denso-da34-pool/fwdata/tray/eval-sets/w2-probe-L1-*
+  parents: []
+  aliases: []
+- id: evalset-b-replay
+  name: tray eval set b-replay-C3-cb0a386
+  title: Tray eval set b-replay-C3
+  kind: eval conditions
+  data_type: synthetic S1
+  task: tray
+  episodes: 3
+  frames: 3
+  hours: 0.0
+  fps: 50
+  format: conditions.jsonl + v2.1 init states
+  licence: '-'
+  data_class: public
+  size: 64 KB-3.4 MB
+  status: test
+  notes: ''
+  qa: '-'
+  locations:
+  - rtx3060:~/denso-da34-pool/fwdata/tray/eval-sets/b-replay-C3-cb0a386
+  parents: []
+  aliases: []
+- id: parents-1105
+  name: parents-1105 (virtual-teleop parents)
+  title: Tray S2 · parents 1105 (125)
+  kind: raw source
+  data_type: synthetic S2
+  task: tray
+  episodes: 125
+  frames: 190928
+  hours: 1.061
+  fps: 50
+  format: LeRobot v2.1 shards + s2_segments.jsonl
+  licence: unknown
+  data_class: public
+  size: 1.2 GB
+  status: current
+  notes: virtual operator through PICO pipe; label teleop_pico
+  qa: 'DA-03 src_9f41831123bfd5e2: 120 pass / 5 reject'
+  locations:
+  - rtx3060:~/denso-da35/fwdata/simple/tray/virtual/parents-1105
+  parents: []
+  aliases: []
+- id: parents-smoke-1104
+  name: parents-smoke-1104
+  title: Tray S2 · parents smoke (16)
+  kind: raw source
+  data_type: synthetic S2
+  task: tray
+  episodes: 16
+  frames: 24721
+  hours: 0.137
+  fps: 50
+  format: LeRobot v2.1 shards
+  licence: unknown
+  data_class: public
+  size: 166 MB
+  status: test
+  notes: ''
+  qa: 'src_eb3c8ae6c974c1ab: 16 pass'
+  locations:
+  - rtx3060:~/denso-da35/fwdata/simple/tray/virtual/parents-smoke-1104
+  parents: []
+  aliases: []
+- id: virtual-probes
+  name: virtual teleop probes (d25, plainB, styled*, var*, probe1, dbg*, smoke1, prof)
+  title: Tray S2 · virtual probes
+  kind: raw source
+  data_type: synthetic S2
+  task: tray
+  episodes: null
+  frames: null
+  hours: null
+  fps: 50
+  format: LeRobot v2.1 per-run
+  licence: unknown
+  data_class: public
+  size: ~1.8 GB total
+  status: test
+  notes: tuning runs of the virtual operator
+  qa: '-'
+  locations:
+  - rtx3060:~/denso-da35/fwdata/simple/tray/virtual/*
+  parents: []
+  aliases: []
+- id: s2-prod-1105
+  name: s2/prod-1105
+  title: Tray S2 · prod 1105 (843)
+  kind: raw source
+  data_type: synthetic S2
+  task: tray
+  episodes: 843
+  frames: 1468949
+  hours: 8.161
+  fps: 50
+  format: LeRobot v2.1 shards (8)
+  licence: unknown
+  data_class: public
+  size: 9.3 GB
+  status: current
+  notes: ''
+  qa: 'DA-03 src_00b6d41f3e2ee6b5: 669 pass / 174 reject; gen 843/5300'
+  locations:
+  - rtx3060:~/denso-da35/fwdata/simple/tray/s2/prod-1105
+  parents:
+  - parents-1105
+  aliases: []
+- id: s2-release-669
+  name: S2 release 669 (prod-1105 pass)
+  title: Tray S2 · release 669 (thiếu)
+  kind: release
+  data_type: synthetic S2
+  task: tray
+  episodes: 669
+  frames: null
+  hours: null
+  fps: 50
+  format: LeRobot v2.1
+  licence: unknown
+  data_class: public
+  size: '?'
+  status: missing
+  notes: ''
+  qa: pass only
+  locations:
+  - '? (decided 5/11, no tray_s2_* dir found)'
+  parents:
+  - s2-prod-1105
+  aliases: []
+- id: s2-replay-1105
+  name: s2/replay-1105
+  title: Tray S2 · replay 1105 (125)
+  kind: raw source
+  data_type: synthetic S2
+  task: tray
+  episodes: 125
+  frames: 190883
+  hours: 1.06
+  fps: 50
+  format: LeRobot v2.1
+  licence: unknown
+  data_class: public
+  size: 1.2 GB
+  status: test
+  notes: ''
+  qa: 125/125 replay success
+  locations:
+  - rtx3060:~/denso-da35/fwdata/simple/tray/s2/replay-1105
+  parents:
+  - parents-1105
+  aliases: []
+- id: s2-measure-1105
+  name: s2/measure-1105
+  title: Tray S2 · measure 1105 (19)
+  kind: raw source
+  data_type: synthetic S2
+  task: tray
+  episodes: 19
+  frames: 32345
+  hours: 0.18
+  fps: 50
+  format: LeRobot v2.1
+  licence: unknown
+  data_class: public
+  size: 237 MB
+  status: test
+  notes: ''
+  qa: 19/100 succ
+  locations:
+  - rtx3060:~/denso-da35/fwdata/simple/tray/s2/measure-1105
+  parents:
+  - parents-1105
+  aliases: []
+- id: s2-wr-1105
+  name: s2/wr-1105 (wrist-roll margin A/B)
+  title: Tray S2 · wr 1105 A/B (212)
+  kind: raw source
+  data_type: synthetic S2
+  task: tray
+  episodes: 212
+  frames: 368247
+  hours: 2.046
+  fps: 50
+  format: LeRobot v2.1
+  licence: unknown
+  data_class: public
+  size: 5.4 MB (data deleted)
+  status: superseded
+  notes: ''
+  qa: 'src_7cae06a03722c95a: 178 pass / 34 reject'
+  locations:
+  - rtx3060:~/denso-qaqc-archive/rtx3060/denso-da35-s2-wr-1105 (metadata only)
+  parents:
+  - parents-1105
+  aliases: []
+- id: s2-gate-1105a
+  name: S2 first-600 gate (gate-s2-1105a)
+  title: Tray S2 · gate first-600 (92)
+  kind: raw source
+  data_type: synthetic S2
+  task: tray
+  episodes: 92
+  frames: 159966
+  hours: 0.889
+  fps: 50
+  format: LeRobot v2.1
+  licence: unknown
+  data_class: public
+  size: archive
+  status: superseded
+  notes: early half of prod-1105
+  qa: 72 pass / 20 reject
+  locations:
+  - rtx3060:~/denso-qaqc-archive/rtx3060/denso-da35-gate-s2-1105a
+  parents:
+  - s2-prod-1105
+  aliases: []
+edges:
+- - egodex-test
+  - egodex-da30
+- - egodex-test
+  - egodex-da30-probe
+- - team-1109-480p30-old
+  - team-1109-480p
+- - team-1109-1080p50-old
+  - team-1109-1080p
+- - egodex-da30
+  - src_050b9bf56a4e843c
+- - egodex-da30
+  - src_158ec3c813ffe9a6
+- - team-1109-480p30-old
+  - src_4df0717b9b11cfc4
+- - team-1109-480p
+  - src_805804635f9af7f7
+- - team-1109-1080p50-old
+  - src_824e9afec1d702a3
+- - team-1109-1080p
+  - src_60e3f454316d2553
+- - src_050b9bf56a4e843c
+  - egx_948a6927d3bb8136
+- - src_050b9bf56a4e843c
+  - egx_0b4a1daa411407da
+- - src_805804635f9af7f7
+  - egx_fb3d1401dac0bd4c
+- - src_805804635f9af7f7
+  - egx_b6e974e46e8222e8
+- - src_805804635f9af7f7
+  - egx_7b43c30dc5d88cd7
+- - src_805804635f9af7f7
+  - h1m-team
+- - src_60e3f454316d2553
+  - h1m-team
+- - src_158ec3c813ffe9a6
+  - h1m-egodex
+- - psi-two-table
+  - psi-n20
+- - psi-two-table
+  - psi-all-check
+- - psi-two-table
+  - bench-1e258c0a78ca
+- - psi-two-table
+  - bench-d19e112835e3
+- - psi-two-table
+  - bench-old
+- - he-dev-eval-v1
+  - he-dev-eval-v1-l0n10
+- - he-dev-eval-v1-l0n10
+  - he-eval-n20-interleaved
+- - tray_s1_f9433b028c52
+  - tray_s1_41899efb4b27
+- - tray_s1_6c0fd7d37f77
+  - tray_s1_4a8f4a8c6a8d
+- - tray_s1_f9433b028c52
+  - cut-C
+- - tray_s1_f9433b028c52
+  - cut-CMAX
+- - tray_s1_6c0fd7d37f77
+  - cut-T160
+- - cut-C
+  - cut-C_PLUS
+- - cut-T160
+  - cut-C_PLUS
+- - tray_s1_41899efb4b27
+  - ALL
+- - tray_s1_4a8f4a8c6a8d
+  - ALL
+- - ALL
+  - S70
+- - parents-1105
+  - s2-prod-1105
+- - s2-prod-1105
+  - s2-release-669
+- - parents-1105
+  - s2-replay-1105
+- - parents-1105
+  - s2-measure-1105
+- - parents-1105
+  - s2-wr-1105
+- - s2-prod-1105
+  - s2-gate-1105a
+- - egx_7b43c30dc5d88cd7
+  - run-da-30-da30-tray-ego-b-stage1-vlm
+- - run-da-30-da30-tray-ego-b-stage1-vlm
+  - run-da-34-b-all-b-70
+- - egodex-da30
+  - run-da-30-da30-egodex-short
+- - psi-n20
+  - run-da-26-v-ego-v-noego-n20
+- - cut-C
+  - run-da-34-da34-t2-ft-c-s0
+- - cut-C_PLUS
+  - run-da-34-da34-t5-ft-cplus-s0
+- - ALL
+  - run-da-34-c-all-b-all
+- - S70
+  - run-da-34-c-70-b-70
+- - tray_s1_f9433b028c52
+  - ext-hf-hiwe0305-denso-hackrathon-g1-pick
+runs:
+- id: run-da-30-da30-tray-ego-b-stage1-vlm
+  name: RUN DA-30 da30-tray-ego-b (stage1 VLM)
+  title: Run · DA-30 da30-tray-ego-b (stage1 VLM)
+  ext: false
+- id: run-da-34-b-all-b-70
+  name: RUN DA-34 B_ALL / B_70
+  title: Run · DA-34 B_ALL / B_70
+  ext: false
+- id: run-da-30-da30-egodex-short
+  name: RUN DA-30 da30-egodex-short
+  title: Run · DA-30 da30-egodex-short
+  ext: false
+- id: run-da-26-v-ego-v-noego-n20
+  name: RUN DA-26 V-EGO / V-NOEGO N20
+  title: Run · DA-26 V-EGO / V-NOEGO N20
+  ext: false
+- id: run-da-34-da34-t2-ft-c-s0
+  name: RUN DA-34 da34-t2-ft-c-s0
+  title: Run · DA-34 da34-t2-ft-c-s0
+  ext: false
+- id: run-da-34-da34-t5-ft-cplus-s0
+  name: RUN DA-34 da34-t5-ft-cplus-s0
+  title: Run · DA-34 da34-t5-ft-cplus-s0
+  ext: false
+- id: run-da-34-c-all-b-all
+  name: RUN DA-34 C_ALL / B_ALL
+  title: Run · DA-34 C_ALL / B_ALL
+  ext: false
+- id: run-da-34-c-70-b-70
+  name: RUN DA-34 C_70 / B_70
+  title: Run · DA-34 C_70 / B_70
+  ext: false
+- id: ext-hf-hiwe0305-denso-hackrathon-g1-pick
+  name: HF hiwe0305/denso-hackrathon-g1-pick-and-place
+  title: HF · hiwe0305/denso-hackrathon-g1-pick-and-place
+  ext: true
