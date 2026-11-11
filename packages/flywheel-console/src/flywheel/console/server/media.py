@@ -21,7 +21,7 @@ from flywheel.console.server.runner import NotFound
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,80}$")
 _lock = threading.Lock()
 _rows_cache: tuple[float, list[dict[str, Any]]] | None = None
-_layout: dict[str, dict[str, list[tuple[int, str]]]] = {}
+_layout: dict[str, tuple[float, dict[str, list[tuple[int, str]]]]] = {}
 
 
 def seed_rows() -> list[dict[str, Any]]:
@@ -210,27 +210,29 @@ def _check_ds_ep(ds: str, ep: int) -> None:
 
 
 def layout(ds: str) -> dict[str, list[tuple[int, str]]]:
-    if ds not in _layout:
-        al = _jload(lerobot_dir(ds) / "meta" / "action_layout.json") or {}
+    src = lerobot_dir(ds) / "meta" / "action_layout.json"
+    mt = src.stat().st_mtime if src.is_file() else 0.0
+    if ds not in _layout or _layout[ds][0] != mt:
+        al = _jload(src) or {}
         groups: dict[str, list[tuple[int, str]]] = {}
         for i, d in enumerate(al.get("dimensions") or []):
             groups.setdefault(d["group"], []).append((i, d.get("name") or f"{d['group']}[{i}]"))
-        _layout[ds] = groups
-    return _layout[ds]
+        _layout[ds] = (mt, groups)
+    return _layout[ds][1]
 
 
 def episode_json(ds: str, ep: int) -> bytes:
     """Downsampled (50 -> 10 Hz) action and state series of one robot episode, as JSON bytes."""
     _check_ds_ep(ds, ep)
     path = active().cache / f"ep_{ds}_{ep:06d}.json"
-    if path.is_file():
+    pf = lerobot_dir(ds) / "data" / "chunk-000" / f"episode_{ep:06d}.parquet"
+    if not pf.is_file():
+        raise FileNotFoundError(pf)
+    if _fresh(path, pf):
         return path.read_bytes()
     import numpy as np
     import pyarrow.parquet as pq  # type: ignore[import-untyped]
 
-    pf = lerobot_dir(ds) / "data" / "chunk-000" / f"episode_{ep:06d}.parquet"
-    if not pf.is_file():
-        raise FileNotFoundError(pf)
     cols = ["action", "timestamp", "observation.hand_joints", "observation.arm_joints",
             "observation.leg_joints", "observation.prev_torso_rpy"]  # fmt: skip
     t = pq.read_table(pf, columns=cols)
@@ -269,9 +271,10 @@ def strip_jpeg(ds: str, ep: int) -> bytes:
     """Filmstrip of 12 frames of a robot episode's egocentric video."""
     _check_ds_ep(ds, ep)
     cf = active().cache / f"strip_{ds}_{ep:06d}.jpg"
-    if cf.is_file():
+    src = media_root(ds) / f"episode_{ep:06d}.mp4"
+    if src.is_file() and _fresh(cf, src):
         return cf.read_bytes()
-    body = posters.strip_jpeg(media_root(ds) / f"episode_{ep:06d}.mp4", 12)
+    body = posters.strip_jpeg(src, 12)
     cf.parent.mkdir(parents=True, exist_ok=True)
     _write(cf, body)
     return body

@@ -50,3 +50,18 @@ def test_deid_only() -> None:
     assert deid_only(Path("a.deid.mp4")) == Path("a.deid.mp4")
     with pytest.raises(PathDenied):
         deid_only(Path("a.mp4"))
+
+
+def test_guard_rejects_vault_case_insensitive(tmp_path: Path) -> None:
+    (tmp_path / "Vault").mkdir()
+    with pytest.raises(PathDenied):
+        guard(tmp_path / "Vault" / "x", [tmp_path])
+
+
+def test_from_env_resolves_relative_fw_root(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "rel").mkdir()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("FW_ROOT", "rel")
+    assert ConsolePaths.from_env(repo=tmp_path).fw_root == (tmp_path / "rel").resolve()

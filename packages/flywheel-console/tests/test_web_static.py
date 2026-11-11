@@ -49,3 +49,32 @@ def test_episode_bracket_keys_go_through_ui_keys() -> None:
     src = (WEB / "pages_data.js").read_text(encoding="utf-8")
     assert 'UI.keys.bind({ "[":' in src
     assert 'ev.key === "["' not in src
+
+
+def test_no_machine_paths_in_package() -> None:
+    root = Path(budget.__file__).parent
+    bad: list[str] = []
+    for f in root.rglob("*"):
+        if not f.is_file() or "vendor" in f.parts or f.suffix not in {
+            ".py", ".js", ".yaml", ".yml", ".html", ".css", ".json", ".jsonl",
+        }:  # fmt: skip
+            continue
+        text = f.read_text(encoding="utf-8")
+        if "/home/" in text or "/Users/" in text:
+            bad.append(str(f.relative_to(root)))
+    assert not bad, bad
+
+
+def test_episode_page_maps_404_to_empty_state() -> None:
+    src = (WEB / "pages_data.js").read_text(encoding="utf-8")
+    assert '/ 404$/.test(e.message) ? "no data"' in src
+
+
+def test_loop_numbers_come_from_story_not_literals() -> None:
+    code = re.compile(r"""(?<![\w.])(?<!W = )(?:262|229|177|160|240)(?![\w.])|131/240""")
+    for name in ("pages_story.js", "ring.js"):
+        text = (WEB / name).read_text(encoding="utf-8")
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+        text = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("//"))
+        hits = [m.group(0) for m in code.finditer(text)]
+        assert not hits, f"{name}: hard-coded loop numbers {hits}"

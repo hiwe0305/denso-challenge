@@ -17,7 +17,11 @@ def index(
 
     paths = ConsolePaths.from_env()
     parts = [s for s in only.split(",") if s]
-    counts = build_all(paths, only=parts or None)
+    try:
+        counts = build_all(paths, only=parts or None)
+    except (ValueError, OSError) as e:
+        typer.echo(f"index: {e}", err=True)
+        raise typer.Exit(1) from e
     for name, part in counts.items():
         typer.echo(f"{name}: " + " ".join(f"{k}={v}" for k, v in part.items()))
     typer.echo(f"index: {paths.index}")
@@ -26,9 +30,17 @@ def index(
 @app.command()
 def serve(port: int = typer.Option(4178, help="Port on 127.0.0.1.")) -> None:
     """Serve the console on 127.0.0.1."""
+    from flywheel.console.paths import ConsolePaths
     from flywheel.console.server.app import serve as run
 
-    run(port=port)
+    paths = ConsolePaths.from_env()
+    typer.echo(f"repo: {paths.repo}")
+    typer.echo(f"fw_root: {paths.fw_root}")
+    try:
+        run(paths, port=port)
+    except OSError as e:
+        typer.echo(f"serve: {e}", err=True)
+        raise typer.Exit(1) from e
 
 
 @app.command()

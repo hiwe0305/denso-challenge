@@ -82,3 +82,11 @@ def test_story_ds_is_catalog(fw: ConsolePaths, tmp_path: Path) -> None:
 def test_downsample_tiny(n: int) -> None:
     pts = [(float(i), 0.0) for i in range(n)]
     assert story.downsample(pts, 2000) == pts
+
+
+def test_story_carries_every_number_the_loop_page_shows(fw: ConsolePaths, tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    story.build(_real(fw), out)
+    data = json.loads((out / "story.json").read_text())
+    assert data["loop_chain"] == [240, 131, 262, 229, 177]
+    assert data["loop_detail"] == {"qa_pass": 226, "in_cut": 160}

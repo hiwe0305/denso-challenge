@@ -242,3 +242,42 @@ def test_status_shape(rn: ConsolePaths) -> None:
         "collect", "process", "release", "train", "eval", "loop"
     ]  # fmt: skip
     assert st["machines"]["laptop"]["slots"] == 2
+
+
+def test_export_zip_relative_path_resolves_under_fw_root(rn: ConsolePaths) -> None:
+    d = rn.fw_root / "cut" / "S70"
+    d.mkdir(parents=True)
+    (d / "a.json").write_text("{}")
+    planned = runner.plan("export.zip", {"path": "cut/S70"}, "x")
+    assert planned["outputs"]["dir"] == str(d.resolve())
+    with pytest.raises(ValueError):
+        runner.plan("export.zip", {"path": "../escape"}, "x")
+
+
+def _review_params(rn: ConsolePaths) -> dict[str, Any]:
+    rep = rn.fw_root / "aqa" / "reports.jsonl"
+    rep.parent.mkdir(parents=True)
+    rep.write_text("{}\n")
+    return {
+        "reports": str(rep), "report_id": "r1",
+        "decisions": [{"finding_id": "f1", "decide": "agree"}],
+    }  # fmt: skip
+
+
+def test_agentqa_review_reviewer_from_env(
+    rn: ConsolePaths, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FW_REVIEWER", "Ada")
+    argv = runner.plan("agentqa.review", _review_params(rn), "x")["argv"]
+    assert argv[argv.index("--reviewer") + 1] == "Ada"
+    assert "Hiếu" not in argv
+
+
+def test_agentqa_review_refuses_without_reviewer(
+    rn: ConsolePaths, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delenv("FW_REVIEWER", raising=False)
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "none"))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    with pytest.raises(ValueError, match="FW_REVIEWER"):
+        runner.plan("agentqa.review", _review_params(rn), "x")

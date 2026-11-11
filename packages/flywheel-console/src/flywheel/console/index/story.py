@@ -247,8 +247,9 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
     try:
         eval_block: dict[str, Any] = cited.eval_block(paths)
         chain: list[int] = cited.loop_chain(paths)
+        detail: dict[str, int] = cited.loop_detail(paths)
     except (OSError, KeyError, TypeError, ValueError):
-        eval_block, chain = {}, []
+        eval_block, chain, detail = {}, [], {}
     ds = _catalog(out)
     data: dict[str, Any] = {
         "runs": runs,
@@ -262,6 +263,7 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
         "ds": ds,
         "eval": eval_block,
         "loop_chain": chain,
+        "loop_detail": detail,
     }
     out.mkdir(parents=True, exist_ok=True)
     (out / "story.json").write_text(

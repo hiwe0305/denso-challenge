@@ -66,6 +66,43 @@ def _qa_counts(q: str | None) -> dict[str, int] | None:
     return out or None
 
 
+def _rsync(r: dict[str, Any], locs: list[dict[str, str]], view: str, local: bool) -> dict[str, str]:
+    """Copy commands for a remote-only row; glob or elided paths are left out."""
+    rt = [x for x in locs if x["where"] == "rtx3060"]
+    if not rt or local or view not in ("remote", "cond", "meta"):
+        return {}
+    p = rt[0]["path"].rstrip("/")
+    if "*" in p or "..." in p:
+        return {}
+    dst = f"./fwdata/remote/{r['id']}/"
+    return {
+        "rsync": f"rsync -a rtx3060:{p}/meta {dst}",
+        "rsync_full": f"rsync -a rtx3060:{p}/ {dst}   # kích thước: {r['size']}",
+    }
+
+
+def enrich(index_dir: Path) -> None:
+    """Fill ``thumbs`` and ``qa_counts`` from the built ``ds/<id>/`` folders (idempotent)."""
+    cat = index_dir / "catalog.json"
+    if not cat.is_file():
+        return
+    doc = json.loads(cat.read_text(encoding="utf-8"))
+    for row in doc.get("rows", []):
+        d = index_dir / "ds" / row["id"]
+        files = sorted(p.name for p in (d / "posters").glob("*.jpg")) if d.is_dir() else []
+        if files:
+            n = min(4, len(files))
+            pick = [files[k * len(files) // n] for k in range(n)]
+            row["thumbs"] = [f"/data/ds/{row['id']}/posters/{f}" for f in pick]
+        try:
+            q = json.loads((d / "quality.json").read_text(encoding="utf-8")).get("qa")
+        except (OSError, ValueError, AttributeError):
+            q = None
+        if isinstance(q, dict) and any(k in q for k in ("pass", "flag", "reject")):
+            row["qa_counts"] = {k: int(v) for k, v in q.items() if k in ("pass", "flag", "reject")}
+    cat.write_text(json.dumps(doc, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+
+
 def _view(paths: ConsolePaths, r: dict[str, Any], laptop_dir: Path | None, has_laptop: bool) -> str:
     rid = r["id"]
     first = (r.get("locations") or [""])[0]
@@ -145,6 +182,7 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
                 "ego_viewer": r.get("ego_viewer"),
             }
         )
+        rows[-1].update(_rsync(r, locs, rows[-1]["view"], laptop_dir is not None))
     runs = list(seed["runs"])
     out.mkdir(parents=True, exist_ok=True)
     doc = {"generated": seed["generated"], "rows": rows, "edges": edges, "runs": runs}

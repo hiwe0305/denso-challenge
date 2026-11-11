@@ -5,7 +5,7 @@ const RING = { order: ["collect", "process", "release", "train", "eval", "loop"]
 function ringIssues(model) {
   const S = STORY, r70 = S.runs.find(r => r.branch === "C_70") || S.runs[0], h1 = S.h1m, rr = h1.qa_reasons || {};
   return [
-    { stage: "loop", problem: "L-PLACE-POSE 131/240", cause: "", action: "", status: "", st: "waiting", link: "#/loop" },
+    { stage: "loop", problem: "L-PLACE-POSE " + S.loop_chain[1] + "/" + S.loop_chain[0], cause: "", action: "", status: "", st: "waiting", link: "#/loop" },
     { stage: "process", problem: `${h1.qa.flag}/${h1.clips} clips flagged`, cause: `segment_ambiguous ${rr.segment_ambiguous}, hand_pose_nan ${rr.hand_pose_nan}`, action: "", status: "", st: "waiting", link: "#/qa" },
     { stage: "train", problem: "B_ALL stopped", cause: "", action: "", status: `C_70 ${fmt(r70.step)}/${fmt(r70.max_steps)}`, st: "running", link: "#/runs" },
   ];

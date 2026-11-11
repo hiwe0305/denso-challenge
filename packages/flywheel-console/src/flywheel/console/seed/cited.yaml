@@ -214,3 +214,13 @@ cited:
   doc: docs/he/tray.md
   section: '17'
   quote: 177 / 226 giữ lại
+- key: loop.qa_pass
+  value: 226
+  doc: docs/he/tray.md
+  section: '17.5'
+  quote: '**226 pass, 0 flag, 3 reject**'
+- key: loop.in_cut
+  value: 160
+  doc: docs/he/tray.md
+  section: '17.5 (change log 8/11/2026)'
+  quote: 'chọn 160 theo luật 17.3'

@@ -480,7 +480,7 @@ const PAGES_DATA = (() => {
       if (r.view === "robot") await robotEpisode(main, r, +ep, qs);
       else if (r.view === "ego" || r.view === "src") await egoEpisode(main, r, ep);
       else main.appendChild(line("none"));
-    } catch (e) { main.appendChild(line(e.message, "bad")); }
+    } catch (e) { main.appendChild(line(/ 404$/.test(e.message) ? "no data" : e.message, "bad")); }
   }
   /* [ / ] step episodes; bound through UI.keys so the newest binding wins over the global [ (sidebar) */
   const navKeys = (prevHref, nextHref) => {

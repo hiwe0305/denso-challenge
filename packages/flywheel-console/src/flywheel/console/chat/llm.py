@@ -107,7 +107,7 @@ def ground(answer: str, evidence_texts: list[str]) -> list[dict[str, Any]]:
 
 # ------------------------------------------------------------------ model status
 def _get(path: str, timeout: float = 2.5) -> Any:
-    with urllib.request.urlopen(ENDPOINT + path, timeout=timeout) as r:
+    with runner.LOOPBACK.open(ENDPOINT + path, timeout=timeout) as r:
         return json.load(r)
 
 
@@ -147,7 +147,7 @@ def prewarm() -> dict[str, Any]:
         ENDPOINT + "/api/generate", body, {"Content-Type": "application/json"}
     )
     try:
-        urllib.request.urlopen(req, timeout=90).read()
+        runner.LOOPBACK.open(req, timeout=90).read()
     except Exception as e:
         return {"ok": False, "nemotron": nemotron_status(), "error": str(e)}
     return {"ok": True, "nemotron": nemotron_status(), "ms": int((time.time() - t0) * 1000)}
@@ -327,7 +327,7 @@ def generate(
     )
     raw, sent, tin, tout = "", 0, 0, 0
     calls: list[dict[str, Any]] = []
-    with urllib.request.urlopen(req, timeout=min(remaining, HTTP_TIMEOUT_S)) as resp:
+    with runner.LOOPBACK.open(req, timeout=min(remaining, HTTP_TIMEOUT_S)) as resp:
         for ch in _chunks(resp, deadline):
             m = ch.get("message") or {}
             if m.get("content"):

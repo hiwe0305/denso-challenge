@@ -186,3 +186,34 @@ def test_numbers_parity_with_agentqa() -> None:
     assert len(corpus) >= 10
     for s in corpus:
         assert local(s) == upstream(s), s
+
+
+def test_loopback_calls_ignore_http_proxy(monkeypatch: pytest.MonkeyPatch) -> None:
+    import http.server
+    import threading
+    import urllib.request
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            body = json.dumps({"models": [{"name": "stub"}]}).encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *a: Any) -> None:
+            pass
+
+    srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_port}"
+    monkeypatch.setenv("http_proxy", f"http://127.0.0.1:{closed_port()}")
+    monkeypatch.setattr(urllib.request, "_opener", None)
+    monkeypatch.setattr(llm, "ENDPOINT", base)
+    monkeypatch.setattr(runner, "TUNNEL_URL", base)
+    try:
+        assert llm._get("/api/tags")["models"][0]["name"] == "stub"
+        assert runner.Tunnel().tags(fresh=True) == ["stub"]
+    finally:
+        srv.shutdown()
+        monkeypatch.setattr(urllib.request, "_opener", None)
