@@ -2289,6 +2289,11 @@ Luật này không đổi sau khi thấy kết quả. Muốn đổi thì ghi `De
 | R7 | Duyệt luật 20.7 | — |
 | R8 | Đọc H2 (c3, c8) theo số đo là lỗi của policy, đi tiếp bước 5–8; hay theo chữ của luật 20.3 là phiếu sửa controller, không nhận dữ liệu (20.11) | Lỗi của policy |
 
+**[Đã chốt 12/11/2026, Hiếu]** "Duyệt theo đề xuất": R1–R8 theo cột đề xuất của bảng trên.
+- R4: phương án A. R7: duyệt luật 20.7; khối `round-c70-rules` được ghim lúc đóng băng plan (7.5), sha256 hôm nay `e653aa71…`.
+- R8: c3, c8 đọc là lỗi của policy, đi bước 5–8 cùng c1, c2.
+- R3 (sinh với tham số mức 1–2) ghi thành `Decision` lúc đóng băng plan vòng.
+
 ### 20.10 Việc còn lại
 
 - 7.2 Bước 4 (H1–H3) và phiếu sửa cho DA-37 (ngưỡng `approach_a`) và DA-38 (ghi thời điểm lỗi): **xong 12/11/2026**, kết quả ở 20.11; hai phiếu soạn sẵn, chưa mở.
@@ -2432,3 +2437,4 @@ Phiếu DA-38 (soạn sẵn, chưa mở):
 | 12/11/2026 | Mục 20 mới (nhiệm vụ 7, Hiếu "Có, soạn RunPlan" qua phiên điều phối): một vòng Failure → Data trên `C_70` ([Đề xuất], viết trước mọi rollout chẩn đoán, sinh, train hay eval). Đặt vòng vào hình PoC của spec 7.2 (`C_70` = A₀.₇, `C_ALL` = thêm đều, `C70_R1` = C, B_add 181 episode); đầu vào `round-c70-rollouts.jsonl` (`aff514b5…`) và 8 cụm; kiểm hệ thống H1–H3 trước dữ liệu; bước 6 không làm được (S1-06), bước 7 3 lượt mỗi đại diện; ghi đè KỸ NĂNG YẾU sang sinh S1; luật đọc `round-c70-rules` ((r1) `C70_R1` − `C_ALL` quyết định, hai giai đoạn như 19.2); ngân sách khoảng 92 CU tới giai đoạn 1 (ước lượng); bảy quyết định R1–R7 chờ Hiếu. Plan nháp `round-tray-c70.yaml`, chưa có loader | Claude cho Hiếu |
 | 12/11/2026 | Mục 20.11 mới (nhiệm vụ con 7.2, qua phiên điều phối): kết quả bước 4, chỉ đọc trên `rtx3060`, 0 CU. H1: 7/60 lượt của `C_70` gãy chuỗi bước ở `approach_a` mà vẫn mang khay (1 thành công), suy ra vế lòng bàn tay–tay cầm; CHƯA RÕ (ngưỡng bộ chấm), phiếu DA-37. H2: τ_track tạm (p99 trên 10 lượt thành công, thân trên 2,640, thân dưới 0,387) vượt ở 4/6 lượt hết giờ, chủ yếu kênh yaw, và ở 21/43 lượt lỗi không hết giờ; policy ra lệnh đi và rời vùng tiếp cận; đề xuất đọc là lỗi của policy, thêm R8 vào 20.9. H3: outcome và trace không có thời điểm lỗi hay tiếp xúc; CHƯA RÕ (thiếu tín hiệu), phiếu DA-38. Luật 20.7 không đổi | Claude cho Hiếu |
 | 12/11/2026 | Mục 20, 20.10 (nhiệm vụ con 7.4): có loader cho plan vòng; `round-tray-c70.yaml` đổi theo model (`uniform_branch`, `failures.checkpoint`, `train.stats_sha256`, `comparisons`, `interpretation`), giá trị không đổi. Luật 20.7 không đổi | Claude cho Hiếu |
+| 12/11/2026 | Mục 20.9: Hiếu "Duyệt theo đề xuất" R1–R8 (R4 = A, R7 duyệt luật 20.7, R8 = c3, c8 là lỗi của policy). Luật 20.7 không đổi | Claude cho Hiếu |
