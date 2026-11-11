@@ -12,7 +12,7 @@ def index(
     only: str = typer.Option("", help="Comma list: catalog,robot,ego,story."),
 ) -> None:
     """Build the console index."""
-    from flywheel.console.index import build_all  # type: ignore[import-not-found,import-untyped,unused-ignore]
+    from flywheel.console.index import build_all
 
     parts = [s for s in only.split(",") if s]
     build_all(only=parts or None)
