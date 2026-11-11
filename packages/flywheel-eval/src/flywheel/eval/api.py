@@ -47,6 +47,7 @@ from flywheel.eval.scorer.calibration import read_rollouts, read_scores, store_r
 from flywheel.eval.scorer.reader import read_trace
 from flywheel.eval.scorer.score import EpisodeScore, score_episode
 from flywheel.eval.scorer.tau import (
+    EpisodeStatistics,
     TauReport,
     calibrate,
     read_candidates,
@@ -236,24 +237,39 @@ def calibrate_tau(
     teleop_paths: list[Path],
     g0_paths: list[Path] | None = None,
     declared_demos: bool = False,
+    config_path: Path = DEFAULT_SYSTEM_CONFIG,
+    mixed_runs: bool = False,
 ) -> TauReport:
     """τ_track, τ_sync from successful episodes and τ_lat from the G0 run (DA-37 AC 4).
 
     `teleop_paths` are trace directories `<trace_id>/` (DA-38's layout) or
     directories above them. An episode counts when its `rollout_result.json`
     says `infra_status` ok and `sim_success` true; teleop demonstrations,
-    which have no SIMPLE flag, count only with `declared_demos`. `g0_paths`
-    are the `rtc.jsonl` files of the G0 baseline run, or directories above
-    them. Either list may be empty, not both. Nothing is written;
-    `system.yaml` keeps its values until a person carries them over (AC 5).
+    which have no `rollout_result.json`, count only with `declared_demos`.
+    `g0_paths` are the `rtc.jsonl` files of the G0 baseline run, or
+    directories above them. Either list may be empty, not both.
 
-    Raises `ReaderError` on a trace or log that does not parse and `TauError`
-    on a set with no successful episode, with one trace in two versions, or
-    with no input at all.
+    Each good episode is reduced to the statistic its check takes, read from
+    `config_path` (`r3.percentile`, `r1.percentile`; R4 the largest), and τ
+    is the 99th percentile of those across episodes. Episodes of several runs
+    are one set only with `mixed_runs`. Nothing is written; `system.yaml`
+    keeps its values until a person carries them over (AC 5).
+
+    Raises `ReaderError` on a trace or log that does not parse, `ConfigError`
+    on a `system.yaml` that does not load, and `TauError` on a set no
+    threshold may come from: no successful episode, one trace in two
+    versions, a mixed set, a benchmark copy, nothing measured, no input.
     """
+    thresholds, _ = load_system_thresholds(config_path)
     candidates = read_candidates(teleop_paths) if teleop_paths else []
     logs = read_rtc_logs(g0_paths) if g0_paths else []
-    return calibrate(candidates, logs, declared_demos)
+    return calibrate(
+        candidates,
+        logs,
+        EpisodeStatistics.of(thresholds),
+        declared_demos=declared_demos,
+        mixed_runs=mixed_runs,
+    )
 
 
 def store_tau(report: TauReport, store_path: Path) -> tuple[str, Path]:

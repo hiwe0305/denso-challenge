@@ -33,7 +33,7 @@ Là kỹ sư đánh giá, tôi muốn đối chiếu scorer với cờ thành c�
 - [x] 3. Tính τ_track thân trên và thân dưới theo phân vị 99, kèm số mẫu (AC 4)
 - [x] 4. Tính τ_sync và ghi τ_lat của G0, kèm số mẫu (AC 4)
 - [ ] 5. Ghi giá trị vào `system.yaml` và RunPlan, bỏ `null` (AC 5)
-- [ ] 6. Test chạy lại cho kết quả trùng trên bộ episode nhỏ (AC 6)
+- [x] 6. Test chạy lại cho kết quả trùng trên bộ episode nhỏ (AC 6)
   - [x] 6.1 Báo cáo đối chiếu: cùng bộ episode và cùng cấu hình cho cùng báo cáo, cùng hash, cùng blob
   - [x] 6.2 τ: cùng bộ episode teleop cho cùng τ_track, τ_sync (sau nhiệm vụ 3, 4)
 
@@ -82,7 +82,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chép khi làm
 
-- Giờ thực: nhiệm vụ 1: 1h, cộng 1h sửa theo review #158 lần đầu, 1h theo lần hai; nhiệm vụ 6.1: 1h; nhiệm vụ 3: 1.5h; nhiệm vụ 4: 1.5h; nhiệm vụ 6.2: 0.5h.
+- Giờ thực: nhiệm vụ 1: 1h, cộng 1h sửa theo review #158 lần đầu, 1h theo lần hai; nhiệm vụ 6.1: 1h; nhiệm vụ 3: 1.5h; nhiệm vụ 4: 1.5h; nhiệm vụ 6.2: 0.5h; sửa theo review #169: 1.5h.
 - Công cụ AI đã dùng: Claude Code.
 - Ghi chú hoàn thành:
   - 7/11/2026, nhiệm vụ 1: `fw eval agree --scores <score.jsonl> --rollouts <thư mục eval> --release <release> [--store <store>]`. Phần thuần ở `scorer/agreement.py` (`compare`), phần đọc ghi ở `scorer/calibration.py`. Score ghép với `RolloutResult` theo `trace_ref.trace_id`, nên lúc chấm phải gọi `fw eval score --episode-id <trace_id>`: tên `episode_N` của SIMPLE đếm lại ở mỗi lượt eval nên không ghép được. Score hay rollout không có cặp được liệt kê trong báo cáo, không bị bỏ.
@@ -97,5 +97,11 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
   - Báo cáo lưu như báo cáo đối chiếu: byte vào blob store, một dòng vào `<store>/scorer/tau.jsonl`; không có thời gian hay đường dẫn. Lệnh không sửa `system.yaml` (nhiệm vụ 5) mà in giá trị đang dùng bên cạnh.
   - 9/11/2026, nhiệm vụ 4: cùng lệnh, thêm `--g0 <rtc.jsonl hoặc thư mục>`. τ_sync là phân vị 99 của |t_image - t_state| mọi chu kỳ có khung ảnh mới (`TraceLog.sync_offset` của DA-13) trên cùng các episode thành công; R4 vẫn so lệch **lớn nhất** của episode với nó (`system.yaml`, r4). Trên rollout SIMPLE mọi lệch bằng 0 theo cách dựng, nên τ_sync bằng 0 thì lệnh in cảnh báo rằng nó không nói gì về đồng bộ cảm biến. τ_lat là phân vị 99 của `chunk_received_s - observation_sent_s` mọi chunk trừ chunk 0 (như R1) trên log RTC của lần chạy chuẩn G0, nguồn riêng mà DA-13 AC 2 tách khỏi teleop; số episode của τ_lat là số trace có chunk. Báo cáo ghi hash và job của từng log RTC. Hai nguồn chạy riêng hay cùng lúc đều được; thiếu cả hai thì từ chối.
   - 9/11/2026, nhiệm vụ 6.2: cùng episode teleop và cùng log G0, ghi vào hai thư mục khác nhau theo thứ tự khác nhau, cho cùng byte và cùng hash; chạy hai lần cho cùng blob và chỉ mục thêm một dòng; thêm một episode thì báo cáo đổi.
+  - Review #169 (Hiếu, tại `46e949e`, 10/11/2026), đã sửa 11/11/2026:
+    - Chặn merge: ngưỡng và phép kiểm đo hai thống kê khác nhau. Bản đầu gộp mọi chu kỳ rồi lấy p99, còn R3, R1 lấy phân vị trên **từng episode** và R4 lấy max từng episode, nên khoảng một nửa episode tốt vượt ngưỡng do chính chúng tạo ra. Nay mỗi episode tốt được rút về đúng con số mà check của nó tính (R3: phân vị `r3.percentile` của các chu kỳ; R4: lệch lớn nhất; R1: phân vị `r1.percentile` của các chunk trừ chunk 0, theo từng trace G0), đọc từ `system.yaml` đang dùng; τ là phân vị 99 của các con số đó qua episode, số mẫu là số episode (`samples`), kèm số chu kỳ (`cycles`) và số episode hiệu chỉnh tự vượt ngưỡng (`exceeded`). Dưới 100 episode thì p99 nằm giữa hai giá trị lớn nhất nên `exceeded` tối đa là 1. Test chạy chính `check_r3`, `check_r4`, `check_r1` trên 20 episode và 20 trace G0 vừa hiệu chỉnh: số lần nổ bằng `exceeded`, mỗi check tối đa 1. Đề xuất bỏ cách gộp chu kỳ (điểm 2 của PO trong PR) theo ý reviewer.
+    - Trace trùng: cùng trace, cùng byte thì tính một lần và liệt kê bản sao trong `left_out`; khác byte thì từ chối như cũ. Log RTC trùng byte đọc một lần; một chunk có hai bản khác nhau thì từ chối.
+    - Tập trộn: từ chối trộn episode có cờ SIMPLE với demo khai bằng `--demos`, trộn rollout của hai adapter, và trộn nhiều `run_plan_id` trừ khi người chạy khai `--mixed-runs` (báo cáo ghi `mixed_runs`). Mỗi episode ghi `run_plan_ids` và `adapter`; lệnh in adapter và nhắc kiểm đó không phải rollout của policy. Hợp đồng chưa có trường nói trace là teleop hay rollout policy, nên chưa phân biệt được bằng dữ liệu; nếu cần thì là PR hợp đồng riêng cho Hiếu.
+    - τ_lat: trace G0 có `rollout_result.json` cạnh log báo lỗi hạ tầng thì bị bỏ và liệt kê; trace không có file đó được đếm và ghi ở `unchecked_traces`. Không đọc gì nằm dưới một bản sao benchmark (`meta/benchmark_copy.json` của DA-27), cả trace lẫn log RTC.
+    - Nhỏ: `--demos` chỉ áp cho trace không có `rollout_result.json`; rollout mà SIMPLE không kết luận (`sim_success` rỗng) bị bỏ. Tập không đo được giá trị nào thì từ chối, thoát 2, không lưu. Lệnh in "chu kỳ không có khung ảnh mới hoặc thiếu tín hiệu" cho τ_sync. Log RTC đọc một lần cho cả hash lẫn bản ghi.
   - Chưa chạy trên dữ liệu thật: cần trace teleop thành công có `cmd_*` và `meas_*` (dạng `TraceStep`), và log RTC của lần chạy chuẩn G0. Giới hạn τ_lat ≤ d / hz (0,12 s) chưa kiểm trong lệnh vì `system.yaml` không ghi hz; người chép giá trị sang ở nhiệm vụ 5 kiểm.
 - File đã tạo hoặc sửa: `packages/flywheel-eval/src/flywheel/eval/scorer/agreement.py`, `scorer/calibration.py`, `api.py`, `cli.py`; `packages/flywheel-eval/tests/unit/scorer/test_agreement.py`, `test_agreement_rerun.py`; `scorer/tau.py`, `test_tau.py`.
