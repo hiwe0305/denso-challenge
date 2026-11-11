@@ -26,6 +26,11 @@ own stats (an S70 run that recomputed them) is never served. `fetch` copies thos
 from the run's Drive copy (`persist` of the training VM, under
 `MyDrive/denso/da34/<job>/`), `serve` checks every sha256 against the laptop's before it
 starts the server, and starts only when no other server answers on the port.
+
+The round branch `C70_R1` (task 7, docs/he/tray.md 20.15) is served the same way: its
+job is `colab_train.round_job_id`, the only step is the round's `eval.checkpoint`, and the
+stats must hash to the round's `train.stats_sha256` (ALL's, as its cut is normalised
+with). Stage 1 then runs on three such servers, `eval_batch --chunks` two chunks each.
 """
 
 from __future__ import annotations
@@ -44,8 +49,9 @@ from pathlib import Path
 from typing import Any
 
 from flywheel_psi0.trainer.colab import Report
-from flywheel_psi0.tray.colab_train import pair_job_id
+from flywheel_psi0.tray.colab_train import ROUND_C70, ROUND_C70_PLAN, pair_job_id, round_job_id
 from flywheel_psi0.tray.pairplan import TrayPairPlan
+from flywheel_psi0.tray.pairround import TrayPairRoundPlan
 from flywheel_psi0.tray.runplan import REPO
 
 PAIR_PLAN = "configs/runplans/tray/he-tray-pair60k.yaml"
@@ -96,17 +102,34 @@ def bound_problems(run_config: dict[str, Any], stats: dict[str, Any]) -> list[st
     return problems
 
 
+def _job(branch: str, plan_path: Path, round_path: Path) -> tuple[str, tuple[int, ...], str | None]:
+    """The job, the steps the rules read and the stats sha256 of a pair or round branch."""
+    plan = TrayPairPlan.load(plan_path)
+    if branch in plan.branches:
+        both = (plan.checkpoints.primary, plan.checkpoints.early)
+        steps = tuple(s for s in both if s is not None)
+        return pair_job_id(branch, plan.train_seeds[0]), steps, plan.cut.stats_sha256
+    if branch == ROUND_C70:
+        rnd = TrayPairRoundPlan.load(round_path)
+        if rnd.branch == branch:
+            job = round_job_id(branch, rnd.train.train_seed)
+            return job, (rnd.eval.checkpoint,), rnd.train.stats_sha256
+    raise SystemExit(f"{branch} is not a branch of {plan_path.name} nor its round {ROUND_C70}")
+
+
 def expect(
-    runs: Path, branch: str, step: int, stats: Path, plan_path: Path = REPO / PAIR_PLAN
+    runs: Path,
+    branch: str,
+    step: int,
+    stats: Path,
+    plan_path: Path = REPO / PAIR_PLAN,
+    round_path: Path = REPO / ROUND_C70_PLAN,
 ) -> dict[str, Any]:
     """Laptop: the sha256 a serve VM must find, after the bounds check; written beside the job."""
-    plan = TrayPairPlan.load(plan_path)
-    if branch not in plan.branches:
-        raise SystemExit(f"{branch} is not a branch of {plan_path.name}")
-    if step not in (plan.checkpoints.primary, plan.checkpoints.early):
-        raise SystemExit(f"step {step}: the rules read {plan.checkpoints.model_dump()} only")
-    job = pair_job_id(branch, plan.train_seeds[0])
-    if sha256(stats) != plan.cut.stats_sha256:
+    job, steps, stats_sha256 = _job(branch, plan_path, round_path)
+    if step not in steps:
+        raise SystemExit(f"step {step}: the rules read {list(steps)} only for {branch}")
+    if sha256(stats) != stats_sha256:
         raise SystemExit(f"{stats}: not ALL's stats (sha256 {sha256(stats)})")
     src = run_dir(runs / job)
     config = json.loads((src / "run_config.json").read_text(encoding="utf-8"))
@@ -120,7 +143,7 @@ def expect(
         "job": job,
         "run": src.name,
         "ckpt_step": step,
-        "stats_sha256": plan.cut.stats_sha256,
+        "stats_sha256": stats_sha256,
         "files": {rel: sha256(src / rel) for rel in served(step)},
     }
     out = runs / job / f"expected-{step}.json"
@@ -238,7 +261,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     parser.add_argument("phase", choices=["expect", "fetch", "serve"])
     parser.add_argument("--runs", type=Path, help="expect: the laptop's fwdata/tray/runs")
-    parser.add_argument("--branch", help="expect: B_ALL, C_ALL, B_70 or C_70")
+    parser.add_argument("--branch", help="expect: B_ALL, C_ALL, B_70, C_70 or C70_R1")
     parser.add_argument("--step", type=int, help="expect: the checkpoint to serve")
     parser.add_argument("--stats", type=Path, help="expect: ALL's meta/stats_psi0.json")
     parser.add_argument("--expected", type=Path, help="fetch, serve: expected-<step>.json")

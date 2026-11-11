@@ -150,3 +150,36 @@ def test_max_chunks_runs_the_first_chunks_of_the_order_only(
     assert len(capsys.readouterr().out.splitlines()) == 27  # without it: the whole order
     with pytest.raises(SystemExit):
         eval_batch.main([*common, "--max-chunks", "0"])
+
+
+def test_chunks_splits_stage_1_into_lanes_that_share_one_out_dir(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # tray.md 20.15: stage 1 of C70_R1 on three serve lanes, two chunks each
+    from flywheel_psi0.tray import eval_batch
+    from flywheel_psi0.tray.eval_set import conditions_sha256
+
+    conditions = [
+        row | {"environment_config": {"flywheel": {"run_plan_id": "rp_a04c14e79dfd"}}}
+        for row in rows({0: 30, 1: 120, 2: 120})
+    ]
+    (tmp_path / "conditions.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in conditions)
+    )
+    common = [
+        "--set", str(tmp_path), "--conditions-sha256", conditions_sha256(conditions),
+        "--out", str(tmp_path / "out"), "--simple-python", "python", "--pythonpath", "x",
+        "--dry-run", "--max-chunks", "6",
+    ]  # fmt: skip
+    lanes = []
+    for lane in ("l2-000,l1-000", "l1-010,l2-010", "l1-020,l2-020"):
+        assert eval_batch.main([*common, "--chunks", lane]) == 0
+        lanes.append([line.split()[0] for line in capsys.readouterr().out.splitlines()])
+    assert lanes[0] == ["l1-000", "l2-000"]  # the plan's order, not the flag's
+    assert sorted(c for lane in lanes for c in lane) == sorted(
+        ["l1-000", "l2-000", "l1-010", "l2-010", "l1-020", "l2-020"]
+    )
+    with pytest.raises(SystemExit):
+        eval_batch.main([*common, "--chunks", "l1-030"])  # past --max-chunks: not stage 1
+    with pytest.raises(SystemExit):
+        eval_batch.main([*common, "--chunks", "l1-000,l1-000"])

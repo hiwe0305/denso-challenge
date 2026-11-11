@@ -85,6 +85,35 @@ def test_expect_writes_the_laptops_sha256_only_for_alls_stats(tmp_path: Path) ->
         expect(runs, "C_70", 40000, stats, plan)
 
 
+def test_expect_serves_the_round_run_at_the_rounds_checkpoint_only(tmp_path: Path) -> None:
+    # C70_R1 (tray.md 20.15): not a branch of the pair plan; job, step and stats are the round's
+    stats = tmp_path / "stats_psi0.json"
+    stats.write_text(json.dumps(STATS))
+    raw = yaml.safe_load((REPO / "configs/runplans/tray/round-tray-c70.yaml").read_text())
+    raw["train"]["stats_sha256"] = sha256(stats)
+    round_plan = tmp_path / "round.yaml"
+    round_plan.write_text(yaml.safe_dump(raw, allow_unicode=True))
+    runs = tmp_path / "runs"
+    run = RUN.replace("t6-ft-c-70", "t7-ft-c70-r1")
+    src = runs / "da34-t7-ft-c70-r1-s0" / "psi0" / "finetune" / run
+    (src / "checkpoints/ckpt_60000").mkdir(parents=True)
+    (src / "argv.txt").write_text("train ...")
+    (src / "run_config.json").write_text(json.dumps(_config(STATS)))
+    (src / "checkpoints/ckpt_60000/model.safetensors").write_bytes(b"weights")
+    pair = _plan(tmp_path, stats)
+    want = expect(runs, "C70_R1", 60000, stats, pair, round_plan)
+    assert (want["job"], want["run"], want["ckpt_step"]) == ("da34-t7-ft-c70-r1-s0", run, 60000)
+    assert (runs / want["job"] / "expected-60000.json").is_file()
+    with pytest.raises(SystemExit, match="the rules read"):
+        expect(runs, "C70_R1", 40000, stats, pair, round_plan)
+    other = tmp_path / "other.json"
+    other.write_text("{}")
+    with pytest.raises(SystemExit, match="not ALL's stats"):
+        expect(runs, "C70_R1", 60000, other, pair, round_plan)
+    with pytest.raises(SystemExit, match="not a branch"):
+        expect(runs, "C70_R2", 60000, stats, pair, round_plan)
+
+
 def test_fetch_copies_from_drive_and_checks_against_the_laptop(tmp_path: Path) -> None:
     stats = tmp_path / "stats_psi0.json"
     stats.write_text(json.dumps(STATS))
