@@ -2609,6 +2609,23 @@ R13 ghi thành [`round-tray-c70.bounds.decision.json`](../../configs/runplans/tr
 
 **Còn lại trước train:** Hiếu merge #197; đưa `C70_R1.tar` và `C70_R1.tar.json` lên `MyDrive/denso/da34/cuts/`; launch theo 20.15 A.
 
+### 20.17 Train `C70_R1`: lần 1 dừng sớm, chạy lại với cap 100 (12/11/2026)
+
+**Lần 1** (phiên `da34-c70r1`, A100, 10:26–11:42): watcher dừng phiên ở bước 2 703, tốn 8,55 CU, không có checkpoint dùng được. Lý do: cap 80 lấy từ `budget.train_cap_cu` của plan vòng, trong khi bốn run cặp đều chạy cap 82. Ở cap 80, vạch dừng là 80 − tốc độ × biên 430 s ≈ 79,20 CU; dự báo cả run là 79,78 CU, vượt vạch nên watcher dừng sớm như thiết kế. Lỗi của Claude khi chọn cap: lẽ ra phải so với cap của các run cặp trước khi launch.
+
+| # | Quyết định (12/11/2026) | Hiếu chọn |
+|---|---|---|
+| R15 | Chạy lại 60 000 bước từ đầu, hay bỏ vòng | **Chạy lại 60k**, cap 85 |
+| R15′ | Nâng cap tiếp (qua phiên điều phối: "sửa lại cái train_cap_cu lên 100 … chứ cứ dừng như này rất tốn time của tôi") | **Cap 100** |
+
+**Lần 2** (phiên `da34-c70r1`, A100, VM tạo 12:49): watcher khởi động ở cap 85, rồi gắn lại ở cap 100 lúc 12:52 mà không dừng VM (chỉ dừng tiến trình watcher, gắn lại bằng `--attach --started 2026-11-12T05:49:16+00:00`). Ở cap 100 vạch dừng khoảng 99,2 CU, cách dự báo khoảng 75–80 CU của một run 60k gần 20 CU.
+
+**Vì sao `budget.train_cap_cu` trong `round-tray-c70.yaml` vẫn là 80.** Trường này nằm trong plan đã đóng băng `rp_aae292bc79da` (có trong `round-tray-c70.lock.json`). Sửa nó đổi id của plan; `colab_train` chỉ chạy plan có id bằng `ROUND_C70_FROZEN`, nên run đang chạy và mọi lệnh sau (fetch, serve) sẽ không còn khớp plan. Cap thực tế của lần 2 là **100 CU**, ghi ở đây và ở dòng ước tính `job_da34_ft_C70_R1_try2` của ledger. Nếu cần cap trong yaml, làm một PR đóng băng lại sau khi run xong.
+
+**Chi phí train của vòng:** 8,55 CU (lần 1, đo) + khoảng 75 CU (lần 2, ước tính) ≈ 83,5 CU, so với 75 CU ước tính ban đầu. Số dư trước lần 2 là 152,1 CU; sau train và ba làn eval (3 × 5,4 CU) còn khoảng 55–60 CU.
+
+**Mốc giờ (ước tính):** train xong khoảng 00:10 ngày 13/11; eval giai đoạn 1 trên ba làn khoảng 00:40–02:40. Colab CLI cần đăng nhập lại khoảng 19:30–20:00 ngày 12/11 (token cấp 04:11, hết sau khoảng 16 giờ); không đăng nhập lại thì watcher và fetch không dừng được VM.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -2667,3 +2684,4 @@ R13 ghi thành [`round-tray-c70.bounds.decision.json`](../../configs/runplans/tr
 | 12/11/2026 | Mục 20.14 mới (nhiệm vụ con 7.5, viết trước lần sinh đầu tiên): file điều kiện 23 lỗi, kế hoạch 290 seed không trùng 693 seed đã dùng, sinh và QA như phần nhắm lỗi của ALL, luật chọn theo bể (`round_select`), một lô thêm nếu thiếu. Luật 20.7 không đổi | Claude cho Hiếu |
 | 12/11/2026 | Mục 20.15 mới: Hiếu "Duyệt 3 làn" (R12): eval giai đoạn 1 của `C70_R1` trên ba làn serve L4 song song, 2 lô mỗi làn; mã `eval_batch --chunks` và `colab_serve expect --branch C70_R1`; runbook train và ba làn, lịch và CU ước lượng. Luật 20.7 không đổi | Claude cho Hiếu |
 | 12/11/2026 | Mục 20.16 mới (nhiệm vụ con 7.5 xong): sinh 290 lượt, 262 ghi được; release `tray_s1_868cc130985d`, 204 qua QA và bộ lọc; chọn `R181` (56 `approach_a`, 125 `place`); kiểm biên ra ngoài ở 22/181 episode, Hiếu chọn R13 (giữ `R181`, stats ALL, `Decision` riêng) và R14 (giữ 56 + 125); bản cắt `C70_R1` 606 episode, tar `e84ec995…`; plan vòng đóng băng `rp_aae292bc79da`. Luật 20.7 không đổi | Claude cho Hiếu |
+| 12/11/2026 | Mục 20.17: train `C70_R1` lần 1 dừng sớm ở bước 2 703 (8,55 CU, cap 80 của plan thấp hơn cap 82 của các run cặp); R15 chạy lại 60k, R15′ cap 100; watcher gắn lại ở cap 100 không dừng VM; `budget.train_cap_cu` của plan đóng băng giữ 80 để không đổi id `rp_aae292bc79da` | Hiếu (soạn với Claude) |
