@@ -126,15 +126,16 @@ def _plan(raw: dict[str, Any]) -> TrayPairRoundPlan:
     return TrayPairRoundPlan.model_validate(raw)
 
 
-def test_the_live_round_plan_is_a_clean_draft_waiting_for_7_5() -> None:
-    """The committed round-tray-c70.yaml checks against the live repo: the frozen paired plan,
-    the pinned rows file and tray.md's rules block; only the targets and rules pin are left."""
+def test_the_live_round_plan_is_frozen_with_its_targets_and_rules() -> None:
+    """The committed round-tray-c70.yaml (task 7.5, 12/11/2026) checks against the live repo:
+    the frozen paired plan, the targeted set's pinned files and tray.md's rules block."""
     plan = TrayPairRoundPlan.load(LIVE / ROUND)
-    assert (plan.status, plan.base_branch, plan.branch) == ("draft", "C_70", "C70_R1")
+    assert (plan.status, plan.base_branch, plan.branch) == ("frozen", "C_70", "C70_R1")
     assert check(plan, LIVE) == []
-    todo = pending(plan)
-    assert todo and all(p.startswith(("targets.", "interpretation.rules_sha256")) for p in todo)
-    assert not lock_path(LIVE / ROUND).exists()
+    assert pending(plan) == []
+    assert (plan.targets.set_name, len(plan.targets.seeds)) == ("R181", 181)
+    lock = json.loads(lock_path(LIVE / ROUND).read_text())
+    assert lock["run_plan_id"] == "rp_aae292bc79da"
 
 
 def test_the_draft_round_holds_and_says_what_is_pending(repo: Path) -> None:

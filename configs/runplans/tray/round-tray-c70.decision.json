@@ -1,0 +1,79 @@
+{
+ "site_id": "local",
+ "task_id": "g1_wholebody_tray_transfer_teleop",
+ "embodiment_id": "g1_sonic_dwbc@1",
+ "schema_version": "1.0.0",
+ "meta": {
+  "status": "signed",
+  "story": "DA-34",
+  "subtask": "7.5",
+  "signed_at": "2026-11-12",
+  "signature_words": {
+   "R1-R8": "Duyệt theo đề xuất",
+   "R9-R11": "Duyệt theo đề xuất",
+   "R12": "Duyệt 3 làn",
+   "R13": "Giữ R181, stats ALL (Recommended)",
+   "R14": "Giữ 56 + 125 (Recommended)"
+  },
+  "signature_via": "DA-34 round session, Hiếu in chat, 12/11/2026"
+ },
+ "id": "dec_01M76W30D8F722V66G1TM3VGEY",
+ "kind": "plan_review",
+ "subject_kind": "round_plan",
+ "subject_id": "rp_aae292bc79da",
+ "verdict": "approved",
+ "metrics": {
+  "generation": {
+   "batch": "round-c70-tgt-1112",
+   "attempts": 290,
+   "recorded": 262,
+   "wall_h": 1.16,
+   "planner": "da33-planner-5+cfg.4e2a4505"
+  },
+  "release": {
+   "id": "tray_s1_868cc130985d",
+   "release_hash": "868cc130985d8e6466df7c1a07f8615d366e87b3b8e7c893d7675e9ed9131b20",
+   "episodes": 262,
+   "da03_qa": {
+    "pass": 261,
+    "reject": 1
+   }
+  },
+  "passing_qa_and_quality": 204,
+  "targeted_set": {
+   "name": "R181",
+   "n": 181,
+   "approach_a": 56,
+   "place": 125,
+   "set_hash": "04b0ecf87359d514494ea5d3f30042c938eaecf70e303b73d6e6293dc0484d46",
+   "short": [
+    "approach_a-L1-1000126 (16 of 20)"
+   ]
+  },
+  "cut": {
+   "name": "C70_R1",
+   "episodes": 606,
+   "tar_bytes": 5291223040,
+   "tar_sha256": "e84ec9953ebb69fbef06250f839a08c319c8c725a469f3c2ce4160f0ddc0aa46",
+   "stats_sha256": "1c745091bc7dcfc9912d3c3ee0d4d8b1e1ee16ed6e9c7f7d6b5fd9c16b600243"
+  }
+ },
+ "criteria": {
+  "doc": "docs/he/tray.md",
+  "sections": "20.5-20.7, 20.9, 20.13-20.16",
+  "round_plan": "configs/runplans/tray/round-tray-c70.yaml",
+  "rules_marker": "round-c70-rules",
+  "rules_sha256": "e653aa7179d939e9ed74c19a9a5d193713f3f654723eeafaabbd681802d07db8",
+  "R3": "targeted S1 generation with the level 1-2 parameters, as ALL's targeted part did; deviates from spec 7.3 rule 7",
+  "R12": "stage 1 eval on three Colab L4 serve lanes, 2 chunks each (eval_batch --chunks); rules of 20.7 unchanged",
+  "R13": {
+   "decision": "configs/runplans/tray/round-tray-c70.bounds.decision.json",
+   "sha256": "c9114d5950f3c3906712cf6e432dd34bbee3b93ba380cf3989a22c797d6c0d7c"
+  },
+  "R14": "approach_a-L1-1000126 has 16 of 20 passing seeds; the total reached 181, so no extra batch (round_select as committed before generation): 4 slots went to place",
+  "decided_after_seeing": "R13 and R14 after the QA'd batch and bounds report; no rollout of C70_R1 exists"
+ },
+ "signed_by": "Hiếu",
+ "reason": "Freeze of the Failure -> Data round C70_R1 on C_70 (task 7.5): 181 targeted episodes picked by the rule of 20.14 from 290 attempts aimed at 23 failures of C_70, on S70 with ALL's stats, read by the rules of 20.7 against C_ALL (r1, primary) and C_70 (r2). Records R3 (generation parameters) as 20.9 asked, and the decisions taken on 12/11/2026 after the data was seen: R12 (three eval lanes), R13 (keep R181 and ALL's stats, bounds decision), R14 (no extra batch). colab_train runs C70_R1 only from this plan id (ROUND_C70_FROZEN).",
+ "supersedes_decision_id": null
+}
