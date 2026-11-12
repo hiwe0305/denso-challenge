@@ -14,7 +14,10 @@ round, so C70_R1 differs from C_70 and C_ALL in the episodes only.
 - Before anything is written, `bounds_problems` checks that the targeted set's actions
   and states lie inside ALL's min and max, dimension by dimension: Psi0 normalises with
   those bounds, and a value outside them is one the model never saw scaled. Outside
-  means stop and record a Decision (20.6), so the join refuses.
+  means stop and record a Decision (20.6), so the join refuses, unless `--accept` names a
+  signed Decision (`verdict: approved`, subject the round plan) whose
+  `metrics.bounds_outside` is exactly what `bounds` reports: then it joins and records
+  the excess and the Decision's sha256 in the marker (R13 of tray.md 20.15).
 - `round_problems` checks a dataset against the round and the paired plan with JSON
   reads only (the Colab VM runs it before any install): marker, S70's seeds per part and
   row by row, the targeted seeds, renumbering, totals and the stats sha256.
@@ -26,7 +29,8 @@ On rtx3060 (workspace PYTHONPATH; `join` imports `flywheel.data`):
     python -m flywheel_psi0.tray.round_cut bounds --data <targeted cut> \
         --stats <S70>/meta/stats_psi0.json
     python -m flywheel_psi0.tray.round_cut join --round configs/runplans/tray/round-tray-c70.yaml \
-        --base <cut-all-zone1>/S70/<env> --targeted <targeted cut> --out <dir>/C70_R1/<env>
+        --base <cut-all-zone1>/S70/<env> --targeted <targeted cut> --out <dir>/C70_R1/<env> \
+        [--accept <bounds decision.json>]
     python -m flywheel_psi0.tray.round_cut check --round <plan> --data <dir>/C70_R1/<env> \
         --base <S70>
     python -m flywheel_psi0.tray.round_cut pack --round <plan> --data <dir>/C70_R1/<env> \
@@ -119,6 +123,21 @@ def _targeted_problems(
     return problems
 
 
+def accepted_bounds(decision: Path, plan: TrayPairRoundPlan, outside: list[str]) -> list[str]:
+    """Why the Decision at `decision` does not accept exactly `outside` for this round."""
+    from flywheel.contracts.entities import Decision
+
+    d = Decision.model_validate_json(decision.read_text(encoding="utf-8"))
+    problems = []
+    if d.verdict != "approved":
+        problems.append(f"verdict {d.verdict!r}, not 'approved'")
+    if (d.subject_kind, d.subject_id) != ("round_plan", plan.name):
+        problems.append(f"subject {d.subject_kind}:{d.subject_id}, not round_plan:{plan.name}")
+    if d.metrics.get("bounds_outside") != outside:
+        problems.append("metrics.bounds_outside is not what bounds reports now")
+    return problems
+
+
 def join_round(
     base: Path,
     targeted: Path,
@@ -126,8 +145,12 @@ def join_round(
     plan: TrayPairRoundPlan,
     pair: TrayPairPlan,
     repo: Path = REPO,
+    accept: Path | None = None,
 ) -> dict[str, Any]:
-    """Write S70 at `base` and the targeted cut at `targeted` as one dataset at `out`."""
+    """Write S70 at `base` and the targeted cut at `targeted` as one dataset at `out`.
+
+    `accept`: a signed Decision that lets exactly the reported bounds excess through.
+    """
     from flywheel.data.ingest.lerobot import check_index, iter_episodes, read_info, write_episode
 
     if out.exists():
@@ -149,11 +172,17 @@ def join_round(
     assert tmark is not None
     stats = json.loads((base / "meta" / STATS).read_text(encoding="utf-8"))
     outside = bounds_problems(targeted, stats)
-    if outside:
+    bounds: dict[str, Any] | None = None
+    if outside and accept is None:
         raise ValueError(
             "the targeted set leaves ALL's stats (tray.md 20.6: stop, record a Decision): "
             + "; ".join(outside)
         )
+    if outside and accept is not None:
+        refused = accepted_bounds(accept, plan, outside)
+        if refused:
+            raise ValueError(f"{accept} does not accept the excess: " + "; ".join(refused))
+        bounds = {"outside": outside, "decision": accept.name, "decision_sha256": sha256(accept)}
 
     bmark = read_marker(base)
     assert bmark is not None
@@ -204,6 +233,8 @@ def join_round(
         },
         "stats": f"cut: {STATS} of {pair.cut.name}, copied with {name}, not recomputed",
     }
+    if bounds is not None:
+        marker["bounds"] = bounds
     (out / "meta" / MARKER).write_text(json.dumps(marker, indent=2))
     problems = round_problems(out, plan, pair, repo) + base_problems(out, base)
     problems += [f"index of episode {f.episode_index} is off" for f in check_index(out)]
@@ -304,6 +335,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--data", type=Path, help="bounds, check, pack: a dataset")
     parser.add_argument("--stats", type=Path, help="bounds: ALL's meta/stats_psi0.json")
     parser.add_argument("--out", type=Path)
+    parser.add_argument("--accept", type=Path, help="join: a signed bounds Decision (20.6)")
     args = parser.parse_args(argv)
     repo = REPO
     if args.action == "bounds":
@@ -318,7 +350,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.action == "join":
         if args.base is None or args.targeted is None or args.out is None:
             parser.error("join needs --base, --targeted and --out")
-        marker = join_round(args.base, args.targeted, args.out, plan, pair, repo)
+        marker = join_round(args.base, args.targeted, args.out, plan, pair, repo, args.accept)
         print(json.dumps({k: marker[k] for k in ("demo_set", "n", "stats")}, indent=1))
         return 0
     if args.data is None:

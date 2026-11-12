@@ -142,9 +142,9 @@ PAIR_PLAN = "configs/runplans/tray/he-tray-pair60k.yaml"
 PAIR_FROZEN: str | None = "rp_e2fb9f62c223"
 PAIR = ("B_ALL", "C_ALL", "B_70", "C_70")  # the branches of PAIR_PLAN, checked on load
 ROUND_C70_PLAN = "configs/runplans/tray/round-tray-c70.yaml"
-# Set to the round's id once Hiếu approves the round (R1-R7 of tray.md 20.9) and it is
-# frozen with its targets (task 7.5); until then no C70_R1 job runs.
-ROUND_C70_FROZEN: str | None = None
+# round-tray-c70.lock.json, frozen 12/11/2026 with its targets (task 7.5) on Hiếu's
+# R1-R14 (tray.md 20.9, 20.13, 20.15, 20.16); no C70_R1 job runs any other plan id.
+ROUND_C70_FROZEN: str | None = "rp_aae292bc79da"
 ROUND_C70 = "C70_R1"
 DRIVE = Path("/content/drive/MyDrive")  # `colab drivemount -s <session> /content/drive`
 STAGE1_DIR = "cache/checkpoints/stage1"  # under Psi0, beside the psi-model snapshot

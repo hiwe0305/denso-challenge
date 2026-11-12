@@ -1,0 +1,57 @@
+{
+ "site_id": "local",
+ "task_id": "g1_wholebody_tray_transfer_teleop",
+ "embodiment_id": "g1_sonic_dwbc@1",
+ "schema_version": "1.0.0",
+ "meta": {
+  "status": "signed",
+  "story": "DA-34",
+  "subtask": "7.5",
+  "signed_at": "2026-11-12",
+  "signature_words": "Giữ R181, stats ALL (Recommended)",
+  "signature_via": "this session's question R13, answered by Hiếu"
+ },
+ "id": "dec_01M76VXGZ98W7N8KCSZDSJ94FG",
+ "kind": "dev_gate",
+ "subject_kind": "round_plan",
+ "subject_id": "round-tray-c70-psi0",
+ "verdict": "approved",
+ "metrics": {
+  "bounds_outside": [
+   "action: 305 of 257891 frames outside the stats' [min, max], dims [14, 16, 17, 19, 23, 24, 26, 35], up to 0.086 x the range beyond it",
+   "states: 1104 of 257891 frames outside the stats' [min, max], dims [0, 2, 4, 7, 8, 9, 14, 16, 17, 19, 24, 26, 29, 30], up to 0.193 x the range beyond it"
+  ],
+  "targeted_set": {
+   "name": "R181",
+   "set_hash": "04b0ecf87359d514494ea5d3f30042c938eaecf70e303b73d6e6293dc0484d46",
+   "release_id": "tray_s1_868cc130985d",
+   "frames": 257891
+  },
+  "episodes_with_frames_outside": 22,
+  "of_episodes": 181,
+  "frames_outside_any": 1409,
+  "frames_outside_share": 0.0055,
+  "episodes_over_4pct_of_range": 5,
+  "worst": {
+   "seed": 106289,
+   "condition": "approach_a-L1-1000126",
+   "excess_of_range": 0.193
+  }
+ },
+ "criteria": {
+  "doc": "docs/he/tray.md",
+  "section": "20.6, 20.15 (R13)",
+  "rule": "20.6: the targeted set's action and states inside ALL's stats, else stop and record a Decision",
+  "stats_sha256": "1c745091bc7dcfc9912d3c3ee0d4d8b1e1ee16ed6e9c7f7d6b5fd9c16b600243",
+  "psi0_clips": "Psi0 cda3fdf clips normalised states and actions to [-1, 1] (src/psi/config/transform.py 682, 712): out-of-range frames saturate at the edge, never extrapolate",
+  "options": {
+   "keep": "chosen",
+   "drop_22_and_refill": "not chosen: a post-hoc filter that favours easier conditions",
+   "recompute_stats": "not chosen: C70_R1 would normalise unlike C_70 and C_ALL"
+  },
+  "decided_after_seeing": "the bounds report only; no rollout of C70_R1 exists"
+ },
+ "signed_by": "Hiếu",
+ "reason": "The targeted set R181 of C70_R1 leaves ALL's stats in 22 of 181 episodes (1409 of 257891 frames, 17 episodes under 4 % of a dimension's range, worst 19.3 %). Rule 20.6 stops the join and asks for a Decision. Hiếu keeps R181 and ALL's stats (12/11/2026): Psi0 clips the normalised values to [-1, 1], so these frames train on the edge value, and C70_R1 still normalises exactly as C_70 and C_ALL, so the comparisons of 20.7 still differ in the data only. round_cut join --accept lets exactly the excess quoted in metrics.bounds_outside through and records it in the cut's marker.",
+ "supersedes_decision_id": null
+}

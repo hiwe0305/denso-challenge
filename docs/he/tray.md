@@ -2568,6 +2568,47 @@ Trước khi chạy, mỗi làn in thứ tự bằng `--dry-run`: ba làn hợp 
 
 **D. Đọc.** Khi `runs.jsonl` đủ 6 lô, 60 rollout: đọc (r1) `C70_R1 − C_ALL` và (r2) `C70_R1 − C_70` theo 20.7, ghép cặp theo điều kiện với thư mục eval của hai run kia trên `rtx3060`. Sổ chi phí: dòng ước lượng `job_da34_ft_C70_R1`, `job_da34_serve_C70_R1_l1`…`_l3`, `job_da34_eval_C70_R1` ghi trước khi chạy (PR #197); dòng thực đo ghi khi xong.
 
+### 20.16 Kết quả 7.5: sinh, QA, chọn, cắt và đóng băng (12/11/2026, 0 CU)
+
+**Sinh** (lô `round-c70-tgt-1112`, `rtx3060`, 6 worker): 290 lượt, 262 ghi được (90 %), 06:19–07:29, 1,16 giờ. Lỗi của planner: 8 `L-ONE-HAND`, 3 `L-PLACE-POSE`, 4 `L-TRAY-TILT`, 13 hết giờ. Lô C+ có 229/262.
+
+**QA** (`zone-qa.sh`, đúng chuỗi của phần nhắm lỗi của ALL), 07:29–08:09, 0,67 giờ:
+- QA phát lại 262/262 qua.
+- Release `tray_s1_868cc130985d` (`868cc130…`, 262 episode).
+- QA của DA-03: 261 pass, 1 reject (seed 153840, `joint_limit`).
+- Bộ lọc chất lượng (nghiêng ≤ 10°, xê dịch ≤ 20 mm) giữ 204, bỏ 57.
+
+**Chọn** (`round_select`, luật 20.14 đã commit trước khi sinh): 204 seed qua, chọn đủ 181. Tập `R181`, `set_hash` `04b0ecf8…`.
+
+| Bể | Lỗi | Chọn | Ghi chú |
+|---|---|---|---|
+| `approach_a` | 3 | 56 | `-L1-1000114` 20, `-L1-1000126` **16**, `-L2-1000120` 20 |
+| `place` | 20 | 125 | 4–7 mỗi lỗi; nhận 4 suất `approach_a` không dùng |
+
+Khoảng cách tới điều kiện lỗi: trung vị 0,40, lớn nhất 0,99. Danh sách chọn ở [`round-c70-selection.jsonl`](../../configs/runplans/tray/round-c70-selection.jsonl), tập ở [`demo_sets-c70r1.json`](../../configs/runplans/tray/demo_sets-c70r1.json).
+
+**Kiểm biên với stats ALL: ra ngoài, dừng như 20.6.** 22/181 episode có frame nằm ngoài [min, max] của stats ALL:
+- tổng 1 409/257 891 frame (0,55 %): action 305 frame trên 8 chiều, state 1 104 frame trên 14 chiều;
+- 17 episode lệch dưới 4 % khoảng của chiều; lớn nhất 19,3 % (seed 106289, `approach_a-L1-1000126`);
+- Ψ₀ ở `cda3fdf` cắt giá trị đã chuẩn hóa về [−1, 1] (`src/psi/config/transform.py` dòng 682, 712), nên các frame này được train ở giá trị biên, không ngoại suy.
+
+| # | Quyết định (12/11/2026, sau khi thấy lô đã QA) | Hiếu chọn |
+|---|---|---|
+| R13 | Giữ `R181` và stats ALL; hay bỏ 22 episode rồi bù bằng seed kế tiếp; hay tính lại stats | **Giữ `R181`, stats ALL.** Bỏ rồi bù là lọc sau khi thấy dữ liệu và nghiêng về điều kiện dễ; tính lại stats làm `C70_R1` chuẩn hóa khác `C_70`, `C_ALL` |
+| R14 | `approach_a-L1-1000126` chỉ có 16/20. Chạy thêm một lô cho lỗi này, hay giữ 56 + 125 vì tổng đã đủ 181 | **Giữ 56 + 125**, theo mã chọn đã commit trước khi sinh: lô thêm chỉ chạy khi tổng dưới 181 |
+
+R13 ghi thành [`round-tray-c70.bounds.decision.json`](../../configs/runplans/tray/round-tray-c70.bounds.decision.json). `round_cut join --accept <decision>` chỉ cho qua đúng phần lệch mà `Decision` trích trong `metrics.bounds_outside`, `verdict: approved`, chủ thể là plan vòng. Phần lệch và sha256 của `Decision` ghi vào marker của bản cắt. Lệch khác đi một dòng là từ chối.
+
+**Bản cắt `C70_R1`** (`rtx3060`, `~/denso-da34-round-c70/cut/`): S70 (425 episode, từng byte như bản `C_70` đã train) rồi 181 episode nhắm lỗi từ index 425; stats là file của ALL `1c745091…`. `round_cut check`: "dataset and round hold".
+
+| Tar | Byte | sha256 |
+|---|---|---|
+| `C70_R1.tar` | 5 291 223 040 | `e84ec9953ebb69fbef06250f839a08c319c8c725a469f3c2ce4160f0ddc0aa46` |
+
+**Đóng băng.** `round-tray-c70.yaml` điền `targets` (seed, `set_hash`, điều kiện, danh sách chọn, release, tập demo, `quality`, `qa`) và `rules_sha256` `e653aa71…`, `status: frozen`. `runplan freeze` ghi `round-tray-c70.lock.json`, id **`rp_aae292bc79da`**; `runplan check --launch` đạt. `colab_train.ROUND_C70_FROZEN` đặt bằng id này. `Decision` đóng băng (R3, R12–R14): [`round-tray-c70.decision.json`](../../configs/runplans/tray/round-tray-c70.decision.json).
+
+**Còn lại trước train:** Hiếu merge #197; đưa `C70_R1.tar` và `C70_R1.tar.json` lên `MyDrive/denso/da34/cuts/`; launch theo 20.15 A.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -2625,3 +2666,4 @@ Trước khi chạy, mỗi làn in thứ tự bằng `--dry-run`: ba làn hợp 
 | 12/11/2026 | Mục 20.13 mới (nhiệm vụ con 7.3 xong): Hiếu "Duyệt theo đề xuất" R9–R11; evidence card của c1, c2, c3, c8; 23 lỗi nhận dữ liệu (3 ở `approach_a`, 10 + 10 ở `place`). Luật 20.7 không đổi | Claude cho Hiếu |
 | 12/11/2026 | Mục 20.14 mới (nhiệm vụ con 7.5, viết trước lần sinh đầu tiên): file điều kiện 23 lỗi, kế hoạch 290 seed không trùng 693 seed đã dùng, sinh và QA như phần nhắm lỗi của ALL, luật chọn theo bể (`round_select`), một lô thêm nếu thiếu. Luật 20.7 không đổi | Claude cho Hiếu |
 | 12/11/2026 | Mục 20.15 mới: Hiếu "Duyệt 3 làn" (R12): eval giai đoạn 1 của `C70_R1` trên ba làn serve L4 song song, 2 lô mỗi làn; mã `eval_batch --chunks` và `colab_serve expect --branch C70_R1`; runbook train và ba làn, lịch và CU ước lượng. Luật 20.7 không đổi | Claude cho Hiếu |
+| 12/11/2026 | Mục 20.16 mới (nhiệm vụ con 7.5 xong): sinh 290 lượt, 262 ghi được; release `tray_s1_868cc130985d`, 204 qua QA và bộ lọc; chọn `R181` (56 `approach_a`, 125 `place`); kiểm biên ra ngoài ở 22/181 episode, Hiếu chọn R13 (giữ `R181`, stats ALL, `Decision` riêng) và R14 (giữ 56 + 125); bản cắt `C70_R1` 606 episode, tar `e84ec995…`; plan vòng đóng băng `rp_aae292bc79da`. Luật 20.7 không đổi | Claude cho Hiếu |

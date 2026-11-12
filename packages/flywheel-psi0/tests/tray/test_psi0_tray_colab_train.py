@@ -770,10 +770,13 @@ def _frozen_round(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path
     return repo, pair_id, lock["run_plan_id"]
 
 
-def test_c70_r1_does_not_run_before_the_round_is_approved() -> None:
-    assert colab_train.ROUND_C70_FROZEN is None  # R1-R7 of tray.md 20.9 are open
-    with pytest.raises(SystemExit, match="C70_R1|ROUND_C70_FROZEN"):
-        colab_train.load_job("C70_R1")
+def test_c70_r1_runs_the_live_round_frozen_on_12_11() -> None:
+    assert colab_train.ROUND_C70_FROZEN == "rp_aae292bc79da"  # round-tray-c70.lock.json
+    job = colab_train.load_job("C70_R1")
+    assert (job.job_id, job.run_plan_id, job.data_name) == (
+        "da34-t7-ft-c70-r1-s0", "rp_aae292bc79da", "C70_R1"
+    )
+    assert job.release_id.endswith("+tray_s1_868cc130985d")
 
 
 def test_c70_r1_runs_only_the_approved_frozen_round_as_c70s_job(
@@ -781,6 +784,7 @@ def test_c70_r1_runs_only_the_approved_frozen_round_as_c70s_job(
 ) -> None:
     repo, pair_id, round_id = _frozen_round(tmp_path, monkeypatch)
     monkeypatch.setattr(colab_train, "PAIR_FROZEN", pair_id)
+    monkeypatch.setattr(colab_train, "ROUND_C70_FROZEN", None)
     with pytest.raises(SystemExit, match="ROUND_C70_FROZEN is unset"):
         colab_train.load_job("C70_R1", repo)
     monkeypatch.setattr(colab_train, "ROUND_C70_FROZEN", "rp_000000000000")

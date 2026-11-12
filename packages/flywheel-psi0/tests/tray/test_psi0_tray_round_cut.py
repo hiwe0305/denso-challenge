@@ -126,6 +126,44 @@ def test_join_refuses_targets_outside_alls_stats_or_not_the_rounds(
     assert not (tmp_path / "out" / ENV).exists()
 
 
+def _bounds_decision(path: Path, plan: TrayPairRoundPlan, outside: list[str], **kw: Any) -> Path:
+    from flywheel.contracts.entities import Decision
+
+    fields: dict[str, Any] = {
+        "site_id": "local", "task_id": "t", "embodiment_id": "e", "kind": "dev_gate",
+        "subject_kind": "round_plan", "subject_id": plan.name, "verdict": "approved",
+        "metrics": {"bounds_outside": outside}, "signed_by": "Hiếu", "reason": "R13",
+    }  # fmt: skip
+    path.write_text(Decision(**{**fields, **kw}).model_dump_json(indent=1))
+    return path
+
+
+def test_a_signed_decision_lets_exactly_the_reported_excess_through(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # tray.md 20.6 / 20.15 R13: outside ALL's stats means stop and record a Decision; the
+    # join then goes on only for the very excess the Decision quotes, and records it
+    far = {**ROUND, "base": 0.0}
+    base, targeted, plan, pair, repo = _round_setup(tmp_path, monkeypatch, far)
+    outside = bounds_problems(targeted, json.loads((base / "meta" / STATS).read_text()))
+    wrong = _bounds_decision(tmp_path / "wrong.json", plan, outside[:1])
+    with pytest.raises(ValueError, match="does not accept"):
+        join_round(base, targeted, tmp_path / "o1" / ENV, plan, pair, repo, accept=wrong)
+    other = _bounds_decision(tmp_path / "other.json", plan, outside, subject_id="another-round")
+    with pytest.raises(ValueError, match="does not accept"):
+        join_round(base, targeted, tmp_path / "o2" / ENV, plan, pair, repo, accept=other)
+    unsigned = _bounds_decision(tmp_path / "open.json", plan, outside, verdict="open")
+    with pytest.raises(ValueError, match="does not accept"):
+        join_round(base, targeted, tmp_path / "o3" / ENV, plan, pair, repo, accept=unsigned)
+    good = _bounds_decision(tmp_path / "good.json", plan, outside)
+    out = tmp_path / "ok" / ENV
+    marker = join_round(base, targeted, out, plan, pair, repo, accept=good)
+    assert marker["bounds"]["outside"] == outside
+    assert marker["bounds"]["decision_sha256"] == sha256(good)
+    assert round_problems(out, plan, pair, repo) == []
+    assert not any((tmp_path / d).exists() for d in ("o1", "o2", "o3"))
+
+
 def test_bounds_are_float32_per_dimension(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     base, targeted, _, _, _ = _round_setup(tmp_path, monkeypatch)
     stats = json.loads((base / "meta" / STATS).read_text())

@@ -13,7 +13,7 @@
 name: round-tray-c70-psi0
 purpose: round
 story: DA-34
-status: draft
+status: frozen
 inherits: configs/runplans/tray/he-tray-pair60k.yaml # frozen, rp_e2fb9f62c223
 base_branch: C_70
 branch: C70_R1
@@ -69,9 +69,37 @@ targets:
   generator: "flywheel_simple.tray.targets via scripts/g0/tray/generate.py --conditions"
   seed_window: [100000, 199999]
   quality_filter: {max_tilt_carry_deg: 10.0, max_part_shift_end_mm: 20.0}
-  seeds: [] # filled at freeze, ascending, in seed_window, at most n_add_max
-  set_hash: null
-  release: null
+  seeds: [101783, 103238, 104316, 104550, 104620, 105603, 106289, 106663, 106978, 107073, 107339, 107421, 108699, 108846, 109232, 109632, 109749, 111491, 111674, 113132, 113561, 116030, 116130, 117439, 118297, 118445, 118731, 118792, 120286, 120680, 120695, 121057, 121333, 121576, 122870, 124648, 126309, 126313, 126494, 128279, 128624, 129064, 129470, 131082, 132217, 132994, 133022, 133627, 134341, 134592, 134598, 134637, 134651, 134699, 134875, 134897, 135179, 135390, 137275, 138215, 138698, 138809, 138869, 139018, 139808, 140335, 140760, 141934, 143729, 144884, 145329, 145429, 146151, 146305, 146589, 146671, 147350, 147427, 148841, 148904, 149836, 150074, 150655, 151126, 151568, 152005, 152810, 153681, 156304, 156601, 157341, 158465, 159679, 159912, 159960, 159971, 160458, 160669, 161168, 162223, 162439, 163640, 163737, 164025, 164481, 164499, 164552, 164975, 165291, 165410, 165669, 166510, 166604, 166774, 166960, 167003, 168575, 168764, 169550, 169836, 170188, 172436, 172446, 173088, 173805, 173806, 173938, 174866, 174914, 175059, 175977, 176593, 176835, 176934, 178176, 178361, 178588, 178706, 178787, 179693, 180135, 181450, 181836, 182070, 182169, 182806, 183567, 183726, 184049, 185180, 185280, 186214, 186512, 186650, 187957, 188429, 188511, 188758, 190800, 191069, 191545, 191636, 192521, 192642, 192781, 193039, 193345, 193612, 194260, 194660, 194701, 195553, 196006, 196297, 197075, 197354, 197570, 198011, 198337, 198624, 199571]
+  set_hash: 04b0ecf87359d514494ea5d3f30042c938eaecf70e303b73d6e6293dc0484d46
+  # Picked 12/11/2026 by round_select (tray.md 20.14) from the QA'd targeted batch
+  # round-c70-tgt-1112, on its own release.
+  conditions:
+    file: configs/runplans/tray/round-c70-conditions.jsonl
+    sha256: 1a4a50cfeda774bc2ab30be94768ef05de596247c04fb141882af9a792d4cf85
+  selection:
+    file: configs/runplans/tray/round-c70-selection.jsonl
+    sha256: a5a36785b99e3db867fe71a6c9f22d23e28a7a2babb7c6c6faf39198eeb3f000
+  release:
+    id: tray_s1_868cc130985d
+    release_hash: 868cc130985d8e6466df7c1a07f8615d366e87b3b8e7c893d7675e9ed9131b20
+    location: "rtx3060:~/denso-da34-pool/fwdata/releases/tray_s1_868cc130985d"
+    data_class: public
+  demo_sets:
+    file: configs/runplans/tray/demo_sets-c70r1.json
+    file_sha256: eec2a5fec606b1818582e0a1cf57f5fd0270d1db11b581156d98371e0b7819b4
+    salt: DA-34/demo-sets/v1
+    hashes:
+      R181: 04b0ecf87359d514494ea5d3f30042c938eaecf70e303b73d6e6293dc0484d46
+    quality:
+      file: configs/runplans/tray/quality-c70r1-tgt-1112.jsonl
+      sha256: 707edfa430945882a2db02215f3adfb35b5ce00a70e12cb62095ea318cd52323
+      filter:
+        max_tilt_carry_deg: 10.0
+        max_part_shift_end_mm: 20.0
+    qa:
+      reports_sha256: 728c8728043278f04b07165df9bf16e3a4d753bc9b2a7063df7203a28da02f77
+      threshold_version: qa-1@fb6ddaf9f48c
+  set_name: R181
 
 # Option A of tray.md 20.6 [Đề xuất]: retrain from the base like the four runs, so
 # C70_R1 differs from C_70 and C_ALL only in the data.
@@ -98,4 +126,4 @@ comparisons:
 interpretation:
   doc: docs/he/tray.md # section 20.7
   rules_marker: round-c70-rules
-  rules_sha256: null # pinned at freeze
+  rules_sha256: e653aa7179d939e9ed74c19a9a5d193713f3f654723eeafaabbd681802d07db8 # pinned at freeze, 12/11/2026
