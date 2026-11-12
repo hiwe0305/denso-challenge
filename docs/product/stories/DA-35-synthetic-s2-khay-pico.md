@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Đang làm (PO duyệt bản teleop ảo cộng S2 và việc tải psi-data, 3/11/2026). Nhiệm vụ 1–11 xong; demo cha cho S2 đã có |
+| Trạng thái | Đang làm (PO duyệt bản teleop ảo cộng S2 và việc tải psi-data, 3/11/2026). Nhiệm vụ 1–11 xong. Nhiệm vụ 12 (12/11/2026): release S2 `tray_s2_3618a579b15e` (669 episode, cảnh có vùng đích) và bảng so chuyển động đã có; còn PO chốt mục tiêu sản xuất ≥ 1000 và kiểm mắt video |
 | Người làm | Hiếu (đề xuất, PO giao) |
 | Làn | Adapter simulator (`flywheel-simple`) |
 | Story PRD | Story của [design 28/10/2026](../../superpowers/specs/2026-10-28-tray-transfer-he-design.md) mục 5 (dòng Synthetic S1, S2) · [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 5.3, 5.4 · spec mục 6.10, tuyến T2 ở mục 10 |
@@ -49,7 +49,7 @@ Kế hoạch ở mục "Kế hoạch teleop ảo" và "Kế hoạch generator S2
 - [x] 9. Streamer phát lại S2: phát lại demo không biến đổi qua ống teleop, đo tỉ lệ tái tạo (AC 5). Đo: 127/129 (98,4%) demo cha tái tạo đạt `check_success`, sau khi bù độ trễ của bản ghi (bàn tay 1 bước, cần gạt 1–2 bước), xem [s2.md](../../g0/tray/s2.md)
 - [x] 10. Biến đổi theo khung khay và vùng đích, sinh lại đoạn đi, nối đoạn (AC 5). Đo: tất định theo (demo cha, điều kiện, seed sinh), kể cả khi job chạy sau job khác (sau khi sửa trạng thái hiệu chuẩn rò giữa các episode); tỉ lệ đạt thử 2–4/12 trên mức 1, xem [s2.md](../../g0/tray/s2.md)
 - [x] 11. Lọc theo `check_success`, meta, lineage, sổ lượt sinh (AC 6). Đo: định dạng LeRobot và `modality.json` của biến thể giống hệt demo cha; lineage, biến đổi và khoảng cách điều kiện ở mọi lượt trong `attempts.jsonl` và trong khối `flywheel`, xem [s2.md](../../g0/tray/s2.md)
-- [ ] 12. Đo tỉ lệ đạt và chi phí, chạy lô, release, bảng so chuyển động (AC 7, 8)
+- [ ] 12. Đo tỉ lệ đạt và chi phí, chạy lô, release, bảng so chuyển động (AC 7, 8). Đến 12/11/2026: đo cả hai loại, lô `prod-1105`, release `tray_s2_3618a579b15e` có hash, bảng so chuyển động ([s2.md](../../g0/tray/s2.md#release-s2-trên-cảnh-có-vùng-đích-prod-1105-zone1-12112026)). Chưa đánh dấu xong: PO chốt mục tiêu sản xuất (843 đạt, 669 qua DA-03, dưới 1000) và kiểm mắt 10 video mỗi loại
 
 Khi có kính PICO (ngoài phần Done của story này): cài `xrobotoolkit_sdk` và XRoboToolkit PC service, thu 5–10 demo PICO bằng `--streamer pico`, cho chúng làm demo cha của S2.
 
