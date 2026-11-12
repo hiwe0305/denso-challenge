@@ -85,11 +85,13 @@ def test_flywheel_block() -> None:
         source_detail="teleop_pico",
         outcome="success",
         simple_commit="6d10628",
+        visuals_revision="rev+zone1",
     )
     assert block["story"] == "DA-35"
     assert block["source_kind"] == "teleop"
     assert (block["level"], block["seed"]) == (1, 7)
     assert block["operator"] == "op-02"
+    assert block["visuals_revision"] == "rev+zone1"
     json.dumps(block)  # goes into environment_config as JSON
 
 
@@ -101,6 +103,7 @@ def test_flywheel_block_of_a_virtual_teleop_episode() -> None:
         source_detail="virtual_teleop",
         outcome="success",
         simple_commit="6d10628",
+        visuals_revision="rev+zone1",
         source_kind="synthetic",
         extra={"synthetic_tier": "S1", "action_quality": "planned", "style_seed": 5},
     )
@@ -117,6 +120,7 @@ def test_flywheel_block_refuses_unknown_kinds_and_overwrites() -> None:
         source_detail="virtual_teleop",
         outcome="success",
         simple_commit="x",
+        visuals_revision="rev+zone1",
     )
     with pytest.raises(ValueError, match="source_kind"):
         flywheel_block(**kw, source_kind="human")
@@ -134,6 +138,7 @@ def test_operator_must_be_a_pseudonym(operator: str) -> None:
             source_detail="teleop_pico",
             outcome="success",
             simple_commit="x",
+            visuals_revision="rev+zone1",
         )
 
 

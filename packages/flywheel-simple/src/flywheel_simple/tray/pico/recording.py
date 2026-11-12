@@ -94,10 +94,15 @@ def flywheel_block(
     source_detail: str,
     outcome: Outcome,
     simple_commit: str,
+    visuals_revision: str,
     source_kind: str = "teleop",
     extra: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Meta stored as `environment_config["flywheel"]` of a saved episode.
+
+    `visuals_revision` is what the scene was drawn with (`tray.recorder
+    .visuals_revision`: SimReady revision plus the target zone's), so episodes
+    recorded on scenes with and without the zone can be told apart.
 
     `extra` adds fields of the source (the virtual operator's tier, style and
     versions); it may not overwrite the fields above.
@@ -117,6 +122,7 @@ def flywheel_block(
         "split": split_of(condition.seed),
         "outcome": outcome,
         "simple_commit": simple_commit,
+        "visuals_revision": visuals_revision,
         "wrapper_version": WRAPPER_VERSION,
         "embodiment_id": EMBODIMENT_ID,
         "renderer": "mujoco",
