@@ -49,6 +49,7 @@ from flywheel_simple.tray.pico.recording import (
     shard_mismatches,
     tray_frame,
 )
+from flywheel_simple.tray.visuals import default_manifest_path
 
 MAX_EPISODE_STEPS = 4500  # 90 s at 50 Hz, the task's limit (design 28/10 section 4)
 CONTROL_DT = 1.0 / 50
@@ -248,6 +249,7 @@ def run_session(
         raise ShardMismatch(f"{save_dir}: {'; '.join(problems)}")
     attempts_log = AttemptLog(save_dir / "attempts.jsonl")
     commit = simple_commit()
+    visuals = recorder.visuals_revision(default_manifest_path())
     started_at, t0 = datetime.now().isoformat(timespec="seconds"), time.monotonic()
     exporter: Any = None
     attempts = successes = saved = 0
@@ -272,7 +274,7 @@ def run_session(
             episode_index = _finish_episode(
                 exporter, task, result, keep_failed or success, condition,
                 operator=operator, session=session, source_detail=source_detail, commit=commit,
-                meta=streamer_meta(agent),
+                visuals=visuals, meta=streamer_meta(agent),
             )  # fmt: skip
             attempts += 1
             successes += success
@@ -339,6 +341,7 @@ def _finish_episode(
     session: str,
     source_detail: str,
     commit: str,
+    visuals: str,
     meta: dict[str, Any] | None = None,
 ) -> int | None:
     """Save the open episode with its meta, or drop it; the saved index or None."""
@@ -354,6 +357,7 @@ def _finish_episode(
         source_detail=source_detail,
         outcome=result.outcome,
         simple_commit=commit,
+        visuals_revision=visuals,
         source_kind=(meta or {}).get("source_kind", "teleop"),
         extra={k: v for k, v in (meta or {}).items() if k != "source_kind"},
     )

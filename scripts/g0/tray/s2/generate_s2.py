@@ -6,7 +6,11 @@ Job lists:
   played as recorded (task 9: how well the pipeline reproduces a demo);
 - `--tracked`: the same jobs replayed closed loop as identity variants (task 10);
 - `--variants N`: N variants drawn from `--gen-base` (flywheel_simple.tray.s2.jobs
-  .sample_jobs): parents uniformly, conditions in the train domain (tasks 10-12).
+  .sample_jobs): parents uniformly, conditions in the train domain (tasks 10-12);
+- `--jobs-file F`: the variant jobs listed in F (one JSON object per line with
+  parent_id, level, seed, gen_seed), e.g. the jobs of an earlier batch that DA-03
+  kept (`qa_pass_jobs.py`), run again on a newer tree (task 12). A job is a pure
+  function of these four keys, so it replays the same variant.
 
 Parents DA-03's QA rejected never seed a job (decision of 5/11/2026, as DA-34's
 pool): with `--qa-work` (the `fw data ingest` work directory of the parents'
@@ -17,7 +21,8 @@ report is `reject` or `quarantine` are left out of every job list; `pass` and
 parent needs exactly one export episode and one report, and the reports share
 one threshold version. `<out>/qa_parents.json` records the reports' sha256, the
 threshold version and the parents left out with their reasons. `--variants`
-needs the filter; `--no-qa` skips it for diagnostics only.
+needs the filter, and so does `--jobs-file`, which refuses a list with a job on a parent
+the filter left out, or the same job twice; `--no-qa` skips it for diagnostics only.
 
 The jobs go round-robin to `--workers` processes; each worker is one
 `flywheel_simple.tray.s2.session` with its own env and LeRobot dataset under
@@ -107,6 +112,25 @@ def variant_jobs(
         {"parent_id": j.parent_id, "level": j.level, "seed": j.seed, "gen_seed": j.gen_seed}
         for j in jobs
     ]
+
+
+def listed_jobs(path: Path, segments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The variant jobs of a --jobs-file, each on a parent of `segments` (fails closed)."""
+    parents = {seg["parent_id"] for seg in segments}
+    jobs, seen = [], set()
+    for n, row in enumerate(jsonl_rows(path), 1):
+        if missing := [k for k in JOB_KEYS if k not in row]:
+            raise ValueError(f"{path} line {n}: no {missing}")
+        job = {k: row[k] for k in JOB_KEYS}
+        if job["parent_id"] not in parents:
+            raise ValueError(f"{path} line {n}: parent {job['parent_id']} is not a kept parent")
+        if (key := job_key(job)) in seen:
+            raise ValueError(f"{path} line {n}: job {key} is listed twice")
+        seen.add(key)
+        jobs.append(job)
+    if not jobs:
+        raise ValueError(f"{path} lists no job")
+    return jobs
 
 
 def sha256_of(path: Path) -> str:
@@ -397,6 +421,7 @@ def main(argv: list[str] | None = None) -> int:
     jobs_from.add_argument("--replay", action="store_true", help="parents as recorded")
     jobs_from.add_argument("--tracked", action="store_true", help="parents closed loop")
     jobs_from.add_argument("--variants", type=int, default=None, help="N drawn variants")
+    jobs_from.add_argument("--jobs-file", type=Path, default=None, help="variant jobs listed")
     parser.add_argument("--gen-base", type=int, default=0, help="--variants: base of the draw")
     parser.add_argument("--config", type=Path, default=None, help="tray_s2.yaml for the workers")
     parser.add_argument("--worker-python", default=sys.executable, help="the SIMPLE venv's python")
@@ -420,8 +445,12 @@ def main(argv: list[str] | None = None) -> int:
     if not args.summarize:
         if (args.qa_work is None) != (args.qa_export is None):
             parser.error("--qa-work and --qa-export go together")
-        if args.variants is not None and args.qa_work is None and not args.no_qa:
-            parser.error("--variants needs the DA-03 filter (--qa-work, --qa-export) or --no-qa")
+        drawn = args.variants is not None or args.jobs_file is not None
+        if drawn and args.qa_work is None and not args.no_qa:
+            parser.error(
+                "--variants and --jobs-file need the DA-03 filter (--qa-work, --qa-export) "
+                "or --no-qa"
+            )
         segments = segments_of(args.parents)
         qa_record = None
         if args.qa_work is not None:
@@ -433,10 +462,16 @@ def main(argv: list[str] | None = None) -> int:
         if args.variants is not None:
             cfg = S2Config.load(args.config)
             jobs = variant_jobs(segments, args.variants, args.gen_base, cfg)
+        elif args.jobs_file is not None:
+            try:
+                jobs = listed_jobs(args.jobs_file, segments)
+            except (ValueError, KeyError, OSError) as error:
+                print(f"refused: --jobs-file: {error}")
+                return 1
         elif args.replay or args.tracked:
             jobs = replay_jobs(segments)
         else:
-            parser.error("choose a job list (--replay, --tracked or --variants)")
+            parser.error("choose a job list (--replay, --tracked, --variants or --jobs-file)")
         jobs = jobs[: args.limit]
         args.mode = "exact" if args.replay else "variant"
         args.out.mkdir(parents=True, exist_ok=True)
