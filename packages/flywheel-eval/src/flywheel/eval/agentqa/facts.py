@@ -40,7 +40,12 @@ class Candidate:
 
 @dataclass(frozen=True)
 class DroppedCandidate:
-    """A candidate a lane detector raised and the model dropped, with the model's reason."""
+    """What a reviewer must see that did not become a finding.
+
+    `dropped_by_model`: a candidate a lane detector raised, dropped with `reason`.
+    `refused_by_code`: a finding the model added on a code a detector judged clean;
+    `cid` is `added[n]`, `detail` why it was refused, `reason` the model's insight.
+    """
 
     cid: str
     code: str
@@ -48,6 +53,7 @@ class DroppedCandidate:
     detail: str
     reason: str
     evidence: tuple[str, ...]
+    kind: Literal["dropped_by_model", "refused_by_code"] = "dropped_by_model"
 
 
 class FactClash(ValueError):

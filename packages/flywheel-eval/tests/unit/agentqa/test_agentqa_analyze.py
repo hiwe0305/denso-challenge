@@ -97,7 +97,9 @@ def test_the_direction_table_agrees_with_the_detectors(tmp_path: Path) -> None:
         assert f"{c.code}_flag_when" in _named(rtc, c.evidence)
         seen.add(c.code)
     assert {"T1", "T5", "T6", "T8", "R1", "R2"} <= seen
-    assert set(FLAG_WHEN) == {f"T{i}" for i in range(1, 9)} | {"R1", "R2"}
+    assert set(FLAG_WHEN) == {f"T{i}" for i in range(1, 9)} | {"R1", "R2"} | {
+        f"O{i}" for i in range(1, 5)
+    }
 
 
 def test_a_finding_on_the_wrong_side_gets_a_note_not_a_direction(tmp_path: Path) -> None:
