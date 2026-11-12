@@ -157,10 +157,17 @@ def column(table: Any, name: str) -> np.ndarray:
     return np.stack(table.column(name).to_numpy(zero_copy_only=False)).astype(np.float64)
 
 
-def psi0_layout(f: Path, names: list[str]) -> np.ndarray:
-    """(T, 36) Psi0 action of an episode in either layout (only the columns used here)."""
-    if len(names) == 36:
-        return column(pq.read_table(f, columns=["action"]), "action")
+def psi0_layout(f: Path, names: list[str] | None) -> np.ndarray:
+    """(T, 36) Psi0 action of an episode in either layout (only the columns used here).
+
+    Psi0 exports (psi-data, the S1 and S2 releases) declare `action` by shape only,
+    with no joint names; the SIMPLE recorder names its 43 joints.
+    """
+    if names is None or len(names) == 36:
+        action = column(pq.read_table(f, columns=["action"]), "action")
+        if action.shape[1] != 36:
+            raise ValueError(f"{f}: action has {action.shape[1]} columns and no names")
+        return action
     table = pq.read_table(f, columns=["action", "teleop.navigate_command"])
     action, nav = column(table, "action"), column(table, "teleop.navigate_command")
     out = np.zeros((len(action), 36))
@@ -203,7 +210,7 @@ def measure(root: Path, model: Any, limit: int | None, seed: int = 0) -> dict[st
     meta = files[0].parents[2] / "meta" / "info.json"
     info = json.loads(meta.read_text())
     dt = 1.0 / info["fps"]
-    names = info["features"]["action"]["names"]
+    names = info["features"]["action"].get("names")
     actions = [psi0_layout(f, names) for f in files]
     episodes = [episode_metrics(model, a, dt) for a in actions]
     summary = summarise(episodes)
