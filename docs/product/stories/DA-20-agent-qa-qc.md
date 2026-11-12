@@ -34,7 +34,7 @@ Là AI Engineer, tôi muốn một agent đọc báo cáo dataset, log và outpu
 - [x] 2. Đọc artifact, chặn `vault/`, kiểm số trích dẫn (AC 2, 3)
 - [x] 3. Dựng hình từng stage (AC 4)
 - [x] 4. `AgentReport`, HTML, `AgentReview` (AC 5)
-- [ ] 5. Bộ ca mẫu, chấm agent, lưu ước lượng (AC 6) — code, 13 ca và chấm lớp code xong 6/11; còn chấm agent với Nemotron trên bộ lỗi cấy
+- [ ] 5. Bộ ca mẫu, chấm agent, lưu ước lượng (AC 6) — code, 13 ca và chấm lớp code xong 6/11; bộ log cấy chấm với Nemotron 12/11 (bản 3: recall 30/30, báo nhầm 1/40); còn hai bản sao psi-data và so ước lượng với kết quả đo
   - Sửa issue #175 (11/11/2026), trước khi chấm lại agent với Nemotron:
   - [x] 5.1 Mỗi phát hiện giữ fact riêng theo nhóm, chiều; `FactBook` từ chối một tên mang hai giá trị
   - [x] 5.2 Fact chiều so sánh (`<mã>_flag_when`) cho mỗi mã có ngưỡng
@@ -43,7 +43,7 @@ Là AI Engineer, tôi muốn một agent đọc báo cáo dataset, log và outpu
   - [x] 5.5 Ngân sách context khớp server; prompt vượt cửa sổ thì từ chối, không để server cắt
   - [x] 5.6 Tăng phiên bản agent; ghi lệnh chạy lại trong `docs/g0/agent-qa.md`
   - [x] 5.7 Sửa theo review PR #185 và lần chạy lại của Hưng (12/11): fact số chiều, giữ lô đã qua, câu trả lời bị cắt thì chia lô, từ chối riêng mục thêm trên mã đã xóa, `html` đọc `dropped.jsonl`, kiểm cửa sổ server; agent bản 3
-  - [ ] 5.8 Chạy bản 3 với Nemotron trên máy 3060: hai job của #175, rồi cả bộ log cấy, chấm DA-31
+  - [x] 5.8 Chạy bản 3 với Nemotron trên máy 3060: hai job của #175, rồi cả bộ log cấy, chấm DA-31
 - [ ] 6. Qwen3.5-4B nếu Q-M là có (AC 7) — code và test với model kịch bản xong 6/11; còn chạy Qwen3.5-4B thật trên bộ ca mẫu
 - [ ] 7. Chạy trên log thật, báo riêng (AC 8) — lớp code đã chạy trên log DA-26, DA-34 (6/11); còn chạy với Nemotron
 
@@ -90,10 +90,11 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 6/11/2026 | Chuyển sang Hiếu làm cùng Claude theo [plan chia lại việc của Hưng](../../superpowers/plans/2026-11-06-hung-reassignment.md); bỏ bước che danh tính chỉ cho mẫu EgoDex công bố (D2); làm đủ mọi nhiệm vụ con (D3) | PO (Hiếu) |
 | 11/11/2026 | Thêm nhiệm vụ con 5.1–5.6 sửa issue #175 (agent bản 2); nhiệm vụ 5 vẫn mở tới khi chấm bản 2 với Nemotron | Hiếu, cùng Claude |
 | 12/11/2026 | Thêm nhiệm vụ con 5.7, 5.8 theo review PR #185 và lần chạy lại của Hưng (agent bản 3) | Hiếu, cùng Claude |
+| 12/11/2026 | 5.8 xong: bản 3 chạy với Nemotron trên máy 3060 và chấm DA-31 trên bộ log cấy; nhiệm vụ 5 vẫn mở (bản sao psi-data, so ước lượng) | Hiếu, cùng Claude |
 
 ## Ghi chép khi làm
 
-- Giờ thực: 27 giờ (tổng `Time-spent` của 19 commit: 17 giờ ngày 6/11, 3 giờ sửa theo review ngày 7/11, 7 giờ sửa issue #175 ngày 11/11; làm thay Hưng theo phân công lại 6/11/2026)
+- Giờ thực: 31,5 giờ (tổng `Time-spent` của 21 commit: 17 giờ ngày 6/11, 3 giờ sửa theo review ngày 7/11, 7 giờ sửa issue #175 ngày 11/11, 4,5 giờ ngày 12/11 cho review PR #185 và lần chạy Nemotron; làm thay Hưng theo phân công lại 6/11/2026)
 - Công cụ AI đã dùng: Claude Code (Opus 5.5)
-- Ghi chú hoàn thành: code và test của 7 nhiệm vụ con đã có; nhiệm vụ 5, 6, 7 còn mở tới khi chạy Nemotron và Qwen3.5-4B thật. Mọi lần chạy tới 7/11 trên laptop bằng model giả. Bộ log cấy DA-27 chấm bằng DA-31: precision 3/3 mỗi mã T1–T8, R1, R2; 0/40 báo nhầm trên bản sạch. Đây là kiểm lớp code, chưa phải số của Nemotron. Log thật (DA-26, DA-34): bộ phát hiện F-TRAIN báo T1, T2, T8 trên cả ba job; T2 là lỗi logic khi val đo thưa, T8 là ngưỡng giả định thấp (chuyển cho làn Đánh giá). Chưa chạy Nemotron hay Qwen3.5-4B vì laptop không có Ollama; runbook và khoảng trống hợp đồng ở [agent-qa](../../g0/agent-qa.md)
+- Ghi chú hoàn thành: code và test của 7 nhiệm vụ con đã có; nhiệm vụ 5, 6, 7 còn mở tới khi chạy Nemotron và Qwen3.5-4B thật. Mọi lần chạy tới 7/11 trên laptop bằng model giả. Bộ log cấy DA-27 chấm bằng DA-31: precision 3/3 mỗi mã T1–T8, R1, R2; 0/40 báo nhầm trên bản sạch. Đây là kiểm lớp code, chưa phải số của Nemotron. Log thật (DA-26, DA-34): bộ phát hiện F-TRAIN báo T1, T2, T8 trên cả ba job; T2 là lỗi logic khi val đo thưa, T8 là ngưỡng giả định thấp (chuyển cho làn Đánh giá). Ngày 12/11 chạy agent bản 3 với Nemotron trên máy 3060: bộ log cấy, lớp agent recall 30/30, precision 3/3 ở 9 mã (T4 3/4), báo nhầm 1/40 trên bản sạch; hai phát hiện sai đều là T4 model tự thêm (agent-qa mục 3.7). Chưa chạy Qwen3.5-4B, chưa chạy Nemotron trên log thật; runbook và khoảng trống hợp đồng ở [agent-qa](../../g0/agent-qa.md)
 - File đã tạo hoặc sửa: `packages/flywheel-eval/src/flywheel/eval/agentqa/` (12 module), `tests/unit/agentqa/`, `tests/contract/agentqa/`, `configs/eval/agentqa/`, `docs/g0/agent-qa.md`

@@ -8,6 +8,8 @@ Cập nhật 11/11/2026: sửa issue #175 (lần đầu chạy Nemotron thật, 
 
 Cập nhật 12/11/2026: Hưng chạy lại bản 2 (comment cuối của #175); review PR #185 tìm thêm một lỗi chặn và bốn lỗi nên sửa. Agent lên **bản 3** (mục 3.6). Model serve trên máy 3060 là bản GGUF của NVIDIA trên Hugging Face, không phải bản Ollama library Hưng dùng.
 
+Cập nhật tối 12/11/2026: **bản 3 đã chạy với Nemotron trên máy 3060 và chấm bằng DA-31** (mục 3.7). Trên bộ log cấy, lớp agent bắt 30/30 lỗi cấy, precision 3/3 ở 9 mã, T4 là 3/4, báo nhầm trên bản sạch 1/40 (cận trên). Cả 82 báo cáo `ok`, không câu trả lời nào bị cắt. Hai phát hiện sai đều là T4 do model tự thêm, từ một lần đọc nhầm đơn vị (mục 3.7).
+
 ## 1. Luồng chạy
 
 ```
@@ -91,12 +93,14 @@ Tất cả dùng `EchoModel`: giữ mọi ứng viên code, bỏ mọi hint, câ
 
 Bộ log dựng bằng `python -m flywheel.data.inject.log_defects` (seed mặc định). Bản có lỗi là `bench-c6da75e9ff36`, 30 lỗi cấy (T1–T8, R1, R2, mỗi loại 3). Bản sạch là `bench-cfcb0ba66776`.
 
-| Đại lượng | Lớp agent (EchoModel) |
-|---|---|
-| Precision theo mã T1–T8, R1, R2 | 3/3 mỗi mã |
-| Báo nhầm trên bản sạch | 0/40 đơn vị (cận trên) |
-| Agent thêm so với code (`agent_adds`) | 0 ở mọi loại, đúng như mong đợi vì Echo không thêm gì |
-| Review | 30 phát hiện `unreviewed`, chưa ai duyệt |
+| Đại lượng | Lớp agent (EchoModel, 6/11) | Lớp agent (Nemotron, bản 3, 12/11; mục 3.7) |
+|---|---|---|
+| Recall theo loại T1–T8, R1, R2 | 3/3 mỗi loại | 3/3 mỗi loại (30/30) |
+| Precision theo mã T1–T8, R1, R2 | 3/3 mỗi mã | 3/3 ở 9 mã; T4 3/4 |
+| Báo nhầm trên bản sạch | 0/40 đơn vị (cận trên) | 1/40 đơn vị (cận trên): T4 trên `train/job-fd57c7341466` |
+| Agent thêm so với code (`agent_adds`) | 0 ở mọi loại, đúng như mong đợi vì Echo không thêm gì | 0 ở mọi loại; hai mục model tự thêm đều là T4 sai |
+| Review | 30 phát hiện `unreviewed`, chưa ai duyệt | 32 phát hiện `unreviewed` (30 đúng, 1 sai trên bản có lỗi, 1 trên bản sạch) |
+| Model, prompt | — | `hf.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB:Q4_K_M`, digest `139e7d57c1c3`, temperature 0; prompt sha256 `5cfb01aa…f0949dfa` |
 
 Vì `EchoModel` giữ mọi ứng viên code, precision và báo nhầm ở đây chỉ đo lớp code: chúng cho biết đường từ bộ phát hiện qua `AgentReport` tới bộ chấm không làm rơi hay lệch phát hiện nào. Chúng chưa nói gì về việc model giữ, bỏ, thêm hay giải thích đúng không.
 
@@ -165,13 +169,50 @@ Giới hạn còn biết:
 - `FactClash` dừng cả lần chạy. Đây là lỗi lập trình (đặt tên fact trùng), nên dừng to thay vì bỏ qua chủ thể.
 - `version` của agent không có trong `AgentReport` (mục 6); báo cáo phân biệt phiên bản qua sha256 của prompt và dòng ledger.
 
+### 3.7 Bản 3 với Nemotron trên máy 3060 (12/11/2026, nhiệm vụ con 5.8)
+
+Chạy theo mục 5.1 sau khi lô S2 của DA-35 xong và GPU rảnh. Mã ở đầu nhánh `DA-20-fix-175` (`d4da6d70`), chép vào `~/denso-da20` trên máy 3060, `uv sync --locked`. Bộ log cấy dựng lại bằng `log_defects` mặc định, ra đúng hai bản `bench-c6da75e9ff36`, `bench-cfcb0ba66776` của #175. Ollama 0.32.14 nạp model với `context_length` 16384 (đọc từ `/api/ps`), khớp `limits.context_tokens`; CLI ghi "server window 16384 tokens".
+
+| Mục | Giá trị (đo) |
+|---|---|
+| Model | `hf.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB:Q4_K_M`, digest `139e7d57c1c3…`, 3,4 GB VRAM khi nạp |
+| Agent | bản 3, prompt sha256 `5cfb01aa8da235846bdac4c8322fc920d1839b38c277381d8b1067c9f0949dfa` |
+| Câu trả lời | 96 câu (5 của bước 1, 91 của bước 2), cả 96 `finish_reason = stop`; prompt lớn nhất 6433 token, câu trả lời lớn nhất 3617 token (trần 6144); trung vị trên bản có lỗi 1936 và 1289 token |
+| Hash kết quả DA-31 | `9a8e094bc01e266aeef1997a27c7b4226e814e2c93322c4ff377452deb29b57a` (dạng `da31-3`) |
+
+**Bước 1, hai job của #175.** Cả hai đạt điều kiện của mục 5.1.
+
+| Job | Trạng thái | Phát hiện | Bỏ | Câu trả lời | Thời gian (ledger, thực đo) |
+|---|---|---|---|---|---|
+| Có lỗi `train/job-9c5054483b9a` | `ok` | 1 phát hiện T6; model giữ 36/36 ứng viên T6 | 0 | 4 lô (10, 10, 10, 6), cả 4 `stop` | 266 s (ước tính 20 s) |
+| Sạch `train/job-ffc08ff2de79` | `ok` | 0 | 0 | 1, `stop` | 18,6 s (ước tính 20 s) |
+
+36 quyết định giữ thành một phát hiện vì `_assemble` gộp theo `(mã, target)` và cả 36 có cùng target là job. Câu của các ứng viên khác không vào báo cáo; người duyệt chỉ thấy câu của chiều xếp đầu (mục 7).
+
+**Bước 2, cả bộ log cấy** (40 job mỗi bản: 30 train, 10 RTC). Cả 80 báo cáo `ok`.
+
+| Bản | Thời gian (ledger, thực đo) | Câu trả lời | Phát hiện | `dropped.jsonl` |
+|---|---|---|---|---|
+| Có lỗi | 1714 s (ước tính 800 s) | 51 | 31 trên 30 job | 6 ứng viên T6 của `train/job-14bb85c54181`, `dropped_by_model` |
+| Sạch | 757 s (ước tính 800 s) | 40 | 1 (T4 trên `train/job-fd57c7341466`) | 0 |
+
+**Bước 3, chấm DA-31** (`python -m flywheel.eval.agentqa.bench`, mã của Châu không sửa; 0,53 s): bảng mục 3.2. Lớp code giữ nguyên 30/30, precision 3/3 mỗi mã, 0/40 báo nhầm. Ở cả 10 loại, `together` = `by_code` = `agent_alone` = 3 và `agent_adds` = 0: model không làm rơi lỗi nào code đã bắt, cũng không bắt thêm lỗi cấy nào.
+
+Ba điều thấy được:
+
+1. **Hai T4 sai cùng một kiểu.** Trên `train/job-87bb15b95cc9` (bản có lỗi, lỗi cấy là T6) và `train/job-fd57c7341466` (bản sạch), model tự thêm T4 với câu "số bước ghi log thấp hơn bước cuối". Nó so `steps_logged` = 72 (đơn vị `rows`) với `train_last_step` = 3000 (đơn vị `steps`): log ghi thưa nên hai số khác đơn vị, không phải lỗi. Câu không nói gì về mất cân bằng nhóm, và cả hai job không có fact T4 nào. T4 thêm được vì T4 không bao giờ nằm trong `cleared_by_code` (mục 3.6, S2). Kiểm số không bắt được vì cả hai số đều là giá trị fact được trích.
+2. **Lý do bỏ tự mâu thuẫn.** 6 ứng viên T6 của `train/job-14bb85c54181` có `keep: false` nhưng lý do viết "value {F…} < threshold {F21} … confirming a fault". 30 ứng viên còn lại của job được giữ, nên job vẫn có phát hiện T6 và recall không đổi. `dropped.jsonl` hiện đủ 6 mục cho người duyệt. Đây là loại lỗi mục 3.6 đã ghi (không kiểm câu tự mâu thuẫn).
+3. **Ước lượng.** Model ghi 2 ước lượng (`estimates.jsonl`), cả hai `low` 0, `high` 0,1. Log tổng hợp không có kết quả đo sau, nên chưa so được (AC 6).
+
+Ledger (run plan `g0-DA-20-20261112`, store `~/denso-da20/fwdata/agentqa-bench/store` trên máy 3060): 5 cặp dòng ước tính và thực đo, mỗi dòng thực đo trỏ về dòng ước tính và ghi model, digest, "agent v3". Bản chép của báo cáo, `dropped.jsonl`, file `--record` và kết quả DA-31 ở `fwdata/agentqa-v3-3060/` trên laptop (không commit). File `--record` chạy lại được bằng `--replay` mà không cần GPU.
+
 ## 4. Nhìn hình (nhiệm vụ 6)
 
 Q-M trả lời không cho tới demo, nên `vision.enabled: false`. Code đã có: `--vision --image <png>` gửi từng ảnh (tối đa `max_images` = 6) tới model thứ hai kèm câu hỏi cố định. Câu mô tả được thêm thành fact chữ `vision_observation:<model>` với nguồn là ảnh. Câu nào có số thì bị bỏ, vì số phải do code đo. Model chính sau đó được phép trích fact này như mọi fact khác. Bộ ca mẫu chạy được với lượt nhìn hình bằng `ScriptedModel`. Với Qwen3.5-4B thật thì chưa chạy.
 
 ## 5. Runbook: chạy với model thật
 
-Lần chạy thật đầu tiên là của Hưng trên laptop RTX 4060 8 GB, 9/11/2026 (#175), với agent bản 1. Bản 2 chưa chạy với model thật.
+Lần chạy thật đầu tiên là của Hưng trên laptop RTX 4060 8 GB, 9/11/2026 (#175), với agent bản 1. Hưng chạy lại bản 2 ngày 12/11 (mục 3.6). Bản 3 chạy trên máy 3060 tối 12/11 (mục 3.7).
 
 | Model | Vai | Tag Ollama (giả định, cần kiểm tên thật khi pull) | VRAM (ước lượng) |
 |---|---|---|---|
@@ -242,8 +283,10 @@ Không chạy trên máy 3060 khi Hiếu chưa đồng ý; máy dùng chung.
 
 | Việc | Ở đâu | Ghi chú |
 |---|---|---|
-| Chạy agent bản 2 với Nemotron trên bộ log cấy, chấm bằng DA-31 | máy có Ollama | Theo mục 5.1; cột "Nemotron" của mục 3.2. Bản 2 chưa dùng được trước bước này |
-| Chạy Nemotron trên log thật | máy có Ollama | Sau mục 5.1 |
+| Quyết T4 tự thêm | Hiếu | Mục 3.7 điểm 1: hai báo nhầm duy nhất của bản 3. Hướng sửa (bản 4, phải chấm lại): mục thêm phải trích ít nhất một fact của chính mã đó (`T4_…`), hoặc đặt T4 vào `cleared_by_code` khi bộ phát hiện T4 xét được nhóm. Hoặc chấp nhận 1/40 cho demo |
+| Một phát hiện cho mỗi `(mã, target)` | làn Đánh giá | Mục 3.7 bước 1: câu của 35 chiều T6 còn lại không vào báo cáo. Gộp chiều vào bằng chứng của một phát hiện là đổi agent (bản mới) |
+| Chạy Nemotron trên hai bản sao psi-data | máy 3060 | Khi DA-27 có QA work dir; AC 6 còn phần này và phần so ước lượng với kết quả đo |
+| Chạy Nemotron trên log thật | máy 3060 | Nhiệm vụ 7; sau mục 3.7 |
 | `start_step` âm của T5 trên job ngắn | làn Đánh giá (DA-08) | Mục 3.5 |
 | Sửa T2 và hiệu chỉnh T8 trên log thật | làn Đánh giá | Mục 3.3 |
 | Kỹ sư duyệt 30 phát hiện | `fw agentqa review` | Để bộ chấm có điểm cho phần giải thích và đề xuất |
