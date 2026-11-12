@@ -96,3 +96,10 @@ def test_a_run_shows_the_code_candidates_the_model_dropped(tmp_path: Path) -> No
     page = next(out.glob("*-inference.html")).read_text()
     assert "dropped by the model" in page and "latency looks fine" in page
     assert ">1<" in (out / "index.html").read_text()
+    assert row["kind"] == "dropped_by_model"
+    # `fw agentqa html` re-renders from reports.jsonl and reads dropped.jsonl beside it
+    again = CliRunner().invoke(app, ["html", "--reports", str(out / "reports.jsonl"),
+                                     "--out", str(tmp_path / "pages")])
+    assert again.exit_code == 0, again.output
+    page = next((tmp_path / "pages").glob("*-inference.html")).read_text()
+    assert "dropped by the model" in page and "latency looks fine" in page

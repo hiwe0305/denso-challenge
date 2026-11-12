@@ -8,9 +8,15 @@ before anything is kept:
     - every number in an insight or a suggestion is a fact (`numbers.py`);
     - the AgentReport it builds validates against the contract.
 
-A reply that fails is sent back once with what was wrong; failing again gives a
-report with `status = broken`, the reasons in `problems` and no findings, so a
-model that cannot follow the rules never scores what code found as its own.
+A reply that fails is sent back once with what was wrong. A batch whose reply
+fails again contributes nothing: the report gets `status = broken` and the
+reasons, with the batch's candidate ids, in `problems`, so a model that cannot
+follow the rules never scores what code found as its own. Batches that passed
+keep their decisions (PR #185 review, Hưng's rerun: one rejected batch of 16 T6
+candidates used to throw away the 20 valid decisions of the other).
+
+A reply cut at `max_tokens` (`ReplyCut`) is not sent back with its cut half: the
+batch is split in two and each half asked again, down to one candidate.
 
 A candidate a lane detector raised (`origin = code`) that the model drops needs a
 `reason`, held to the same number rule; the drop comes back beside the report
@@ -23,10 +29,16 @@ Subjects with more candidates than `candidates_per_call` are split into calls;
 findings of all calls are ranked together by the priority the model gave, then
 by the order it wrote them in.
 
-Every call must fit the window the server really runs (`limits` in agent.yaml):
-facts no candidate cites are dropped first, and a prompt still over the budget,
-or a retry turn that would push it over, is refused with the sizes in `problems`.
-A server given more than its window cuts the prompt without saying so (#175).
+An added finding on a code a detector judged clean (`cleared_by_code`) is
+refused on its own, like a drop shown beside the report; the rest of the reply
+stands.
+
+Every call must fit the window the server really runs (`limits` in agent.yaml),
+less the reply (`models.agent.max_tokens`, the one number for both) and a safety
+margin: facts no candidate cites are dropped first, and a prompt still over the
+budget, or a retry turn that would push it over, is refused with the sizes in
+`problems`. A server given more than its window cuts the prompt without saying so
+(#175); the endpoint also checks the window the server reports.
 """
 
 from __future__ import annotations
@@ -50,7 +62,12 @@ from flywheel.contracts.agentqa import (
     AgentReport,
 )
 from flywheel.contracts.base import new_ulid
-from flywheel.eval.agentqa.endpoint import DEFAULT_AGENT_CONFIG, ChatModel, EndpointError
+from flywheel.eval.agentqa.endpoint import (
+    DEFAULT_AGENT_CONFIG,
+    ChatModel,
+    EndpointError,
+    ReplyCut,
+)
 from flywheel.eval.agentqa.facts import Analysis, Candidate, DroppedCandidate
 from flywheel.eval.agentqa.numbers import unsupported_numbers
 from pydantic import ValidationError
@@ -64,9 +81,10 @@ class AgentConfig:
     prompt: str
     prompt_sha256: str
     context_tokens: int = 16384
-    reply_tokens: int = 4096
+    reply_tokens: int = 6144
     chars_per_token: float = 2.5
-    candidates_per_call: int = 20
+    safety_tokens: int = 1024
+    candidates_per_call: int = 10
     retries: int = 1
     raw: dict[str, Any] = field(default_factory=dict)
 
@@ -76,13 +94,18 @@ def load_agent_config(path: Path = DEFAULT_AGENT_CONFIG) -> AgentConfig:
     prompt_path = path.parent / str(raw["prompt"])
     prompt = prompt_path.read_text(encoding="utf-8")
     limits = raw.get("limits", {})
+    if "reply_tokens" in limits:
+        # One number for what the server may answer and what the budget leaves for it.
+        raise ValueError(f"{path}: limits.reply_tokens is gone; set models.agent.max_tokens")
+    reply_tokens = int(((raw.get("models") or {}).get("agent") or {}).get("max_tokens", 6144))
     return AgentConfig(
         prompt=prompt,
         prompt_sha256=hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
         context_tokens=int(limits.get("context_tokens", 16384)),
-        reply_tokens=int(limits.get("reply_tokens", 4096)),
+        reply_tokens=reply_tokens,
         chars_per_token=float(limits.get("chars_per_token", 2.5)),
-        candidates_per_call=int(limits.get("candidates_per_call", 20)),
+        safety_tokens=int(limits.get("safety_tokens", 1024)),
+        candidates_per_call=int(limits.get("candidates_per_call", 10)),
         retries=int(limits.get("retries", 1)),
         raw=raw,
     )
@@ -98,7 +121,8 @@ class PromptTooLong(ValueError):
 
 def prompt_budget(config: AgentConfig) -> int:
     """Characters every message of one call may take, leaving room for the reply."""
-    return int((config.context_tokens - config.reply_tokens) * config.chars_per_token)
+    usable = config.context_tokens - config.reply_tokens - config.safety_tokens
+    return int(usable * config.chars_per_token)
 
 
 def _check_fits(messages: Sequence[dict[str, Any]], config: AgentConfig, what: str) -> None:
@@ -106,8 +130,9 @@ def _check_fits(messages: Sequence[dict[str, Any]], config: AgentConfig, what: s
     if size > prompt_budget(config):
         raise PromptTooLong(
             f"{what} is {size} chars, over the budget of {prompt_budget(config)} "
-            f"((context_tokens {config.context_tokens} - reply_tokens {config.reply_tokens}) "
-            f"x chars_per_token {config.chars_per_token:g}); the server would cut it"
+            f"((context_tokens {config.context_tokens} - reply_tokens {config.reply_tokens} "
+            f"- safety_tokens {config.safety_tokens}) x chars_per_token "
+            f"{config.chars_per_token:g}); the server would cut it"
         )
 
 
@@ -116,7 +141,7 @@ class AgentRun:
     """The report of one subject and the code candidates the model dropped in it."""
 
     report: AgentReport
-    dropped: tuple[DroppedCandidate, ...] = ()
+    dropped: tuple[DroppedCandidate, ...] = ()  # dropped by the model or refused by code
 
 
 @dataclass
@@ -303,10 +328,14 @@ def _parse_reply(
             problems.append(f"{where}: target {target!r} is not a unit of {analysis.subject_ref}")
             continue
         if code in analysis.cleared:
-            problems.append(
-                f"{where}: a detector judged {code} on {analysis.subject_ref} with these facts "
-                "and found no fault (cleared_by_code); do not add it"
-            )
+            # Refused on its own: the rest of the reply stands (PR #185 review).
+            said = item.get("insight")
+            dropped.append(DroppedCandidate(
+                where, code, target,
+                f"a detector judged {code} here and found no fault (cleared_by_code)",
+                said if isinstance(said, str) else "", tuple(f.fact_id for f in scope(item)),
+                kind="refused_by_code",
+            ))
             continue
         cited = scope(item)
         insight = text_field(item, "insight", where, cited)
@@ -377,13 +406,16 @@ def review_subject(
     estimates: list[dict[str, Any]] = []
     dropped: list[DroppedCandidate] = []
     problems: list[str] = []
-    for batch in _batches(analysis.candidates, config.candidates_per_call):
+    queue = _batches(analysis.candidates, config.candidates_per_call)
+    while queue:
+        batch = queue.pop(0)
         if not batch and not analysis.book.facts:
             continue
+        ids = _cids(batch)
         try:
             messages, facts = build_messages(analysis, batch, config)
         except PromptTooLong as exc:
-            problems.append(str(exc))
+            problems.append(f"{ids}: {exc}")
             continue
         for attempt in range(config.retries + 1):
             try:
@@ -392,7 +424,7 @@ def review_subject(
                 got, est, drop = _parse_reply(reply, analysis, batch, facts, len(drafted))
             except ReplyError as exc:
                 if attempt == config.retries:
-                    problems.append(f"model reply rejected: {exc}")
+                    problems.append(f"{ids}: model reply rejected: {exc}")
                     break
                 messages = [
                     *messages,
@@ -401,19 +433,32 @@ def review_subject(
                      "Answer again with one JSON object that follows every rule."},
                 ]
                 continue
+            except ReplyCut as exc:
+                if len(batch) > 1:  # ask again in two halves rather than resend the cut half
+                    half = len(batch) // 2
+                    queue[:0] = [batch[:half], batch[half:]]
+                else:
+                    problems.append(f"{ids}: {exc}; raise models.agent.max_tokens")
+                break
             except EndpointError as exc:
-                problems.append(f"endpoint failed: {exc}")
+                problems.append(f"{ids}: endpoint failed: {exc}")
                 break
             except PromptTooLong as exc:
-                problems.append(str(exc))
+                problems.append(f"{ids}: {exc}")
                 break
             drafted += got
             estimates += est
             dropped += drop
             break
     report = _assemble(analysis, model, config, drafted, estimates, problems, now, report_id)
-    # A broken report keeps no verdict of the model, drops included.
-    return AgentRun(report, tuple(dropped) if report.status == "ok" else ())
+    return AgentRun(report, tuple(dropped))
+
+
+def _cids(batch: Sequence[Candidate]) -> str:
+    """`C21-C30` or `C3`: the candidates a problem is about; `subject` when none."""
+    if not batch:
+        return "subject"
+    return batch[0].cid if len(batch) == 1 else f"{batch[0].cid}-{batch[-1].cid}"
 
 
 def _assemble(
@@ -426,8 +471,8 @@ def _assemble(
     now: datetime | None,
     report_id: str | None,
 ) -> AgentReport:
-    if problems:
-        drafted, estimates = [], []
+    # A batch that failed added nothing; what passing batches decided is kept, and the
+    # problems make the report broken.
     # One finding per (code, target): the model may keep a candidate and add it again.
     unique: dict[tuple[str, str], _Drafted] = {}
     for d in sorted(drafted, key=lambda d: (d.priority, d.order)):
@@ -476,7 +521,7 @@ def _assemble(
             problems=problems,
         )
     except ValidationError as exc:
-        if problems:
+        if not drafted and not estimates:
             raise
-        return _assemble(analysis, model, config, [], [], [f"report invalid: {exc}"], now,
-                         report_id)
+        return _assemble(analysis, model, config, [], [], [*problems, f"report invalid: {exc}"],
+                         now, report_id)

@@ -16,6 +16,7 @@ from flywheel.eval.agentqa.endpoint import (
     OpenAIEndpoint,
     RecordingModel,
     ReplayModel,
+    ReplyCut,
     load_endpoint,
 )
 
@@ -74,7 +75,12 @@ def test_the_config_names_both_models_and_the_url_can_be_overridden(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     agent = load_endpoint("agent", AGENT_YAML)
-    assert agent.model.startswith("nemotron") and agent.temperature == 0.0
+    assert "Nemotron-3.5-Bolt-E4B" in agent.model and agent.temperature == 0.0
+    assert agent.context_tokens == 16384  # the agent checks the server's window
+    monkeypatch.setenv("FW_AGENTQA_AGENT_MODEL", "nemotron-3.5-bolt:e4b")
+    monkeypatch.setenv("FW_AGENTQA_AGENT_REVISION", "69f2be39b309")
+    other = load_endpoint("agent", AGENT_YAML)
+    assert (other.model, other.revision) == ("nemotron-3.5-bolt:e4b", "69f2be39b309")
     vision = load_endpoint("vision", AGENT_YAML)
     assert vision.model.startswith("qwen3.5") and not vision.json_mode
     monkeypatch.setenv("FW_AGENTQA_AGENT_URL", "http://localhost:18080/v1")
@@ -139,3 +145,76 @@ def test_a_redirect_and_the_proxy_variables_are_not_followed(
             model.complete([{"role": "user", "content": "hi"}])
     finally:
         httpd.shutdown()
+
+
+class _Ollama(BaseHTTPRequestHandler):
+    """An Ollama-like server: `finish` for every reply, `window` in /api/ps (None: absent)."""
+
+    finish = "stop"
+    window: int | None = 16384
+
+    def _send(self, payload: dict[str, Any]) -> None:
+        data = json.dumps(payload).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_POST(self) -> None:  # noqa: N802 - http.server's name
+        self.rfile.read(int(self.headers["Content-Length"]))
+        self._send({"choices": [{"message": {"content": '{"decisions": [{"ci'},
+                                 "finish_reason": self.finish}],
+                    "usage": {"prompt_tokens": 2642, "completion_tokens": 6144}})
+
+    def do_GET(self) -> None:  # noqa: N802 - http.server's name
+        entry: dict[str, Any] = {"name": "nemotron", "model": "nemotron"}
+        if self.window is not None:
+            entry["context_length"] = self.window
+        self._send({"models": [entry]})
+
+    def log_message(self, *args: object) -> None:
+        pass
+
+
+@pytest.fixture
+def ollama() -> Iterator[tuple[str, type[_Ollama]]]:
+    handler = type("Handler", (_Ollama,), {})
+    httpd = HTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{httpd.server_address[1]}/v1", handler
+    httpd.shutdown()
+
+
+def test_a_reply_cut_at_max_tokens_is_its_own_error(
+    ollama: tuple[str, type[_Ollama]], tmp_path: Path
+) -> None:
+    """PR #185 review S1: a cut reply used to come back as half a JSON object."""
+    url, handler = ollama
+    handler.finish = "length"
+    live = RecordingModel(OpenAIEndpoint(base_url=url, model="nemotron", revision="q4"),
+                          tmp_path / "r.jsonl")
+    with pytest.raises(ReplyCut, match="max_tokens 4096") as cut:
+        live.complete([{"role": "user", "content": "hi"}])
+    assert cut.value.content == '{"decisions": [{"ci'
+    (row,) = [json.loads(x) for x in (tmp_path / "r.jsonl").read_text().splitlines()]
+    assert row["finish_reason"] == "length" and row["usage"]["completion_tokens"] == 6144
+    with pytest.raises(ReplyCut):  # a replay meets the same cut
+        ReplayModel.from_file(tmp_path / "r.jsonl").complete([])
+
+
+@pytest.mark.parametrize(("window", "refused"), [(4096, True), (16384, False), (None, False)])
+def test_the_servers_window_is_checked_once(
+    ollama: tuple[str, type[_Ollama]], window: int | None, refused: bool
+) -> None:
+    """PR #185 review S4: Ollama's default window was 4096 on the laptop of #175."""
+    url, handler = ollama
+    handler.window = window
+    model = OpenAIEndpoint(base_url=url, model="nemotron", revision="q4", context_tokens=16384)
+    if refused:
+        with pytest.raises(EndpointError, match="4096-token window"):
+            model.complete([{"role": "user", "content": "hi"}])
+        return
+    model.complete([{"role": "user", "content": "hi"}])
+    assert model.served_window == window and model.last_usage == {
+        "prompt_tokens": 2642, "completion_tokens": 6144}

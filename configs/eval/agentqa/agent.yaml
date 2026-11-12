@@ -8,8 +8,14 @@
 #   1  7/11/2026  #151, first merge; scored only with EchoModel
 #   2  11/11/2026 #175: facts per group/dim, <code>_flag_when direction facts,
 #                 cleared_by_code, a reason for every dropped code candidate,
-#                 window 16384 tokens at 2.5 chars/token. Not yet scored with Nemotron.
-version: 2
+#                 window 16384 tokens at 2.5 chars/token. Hưng's rerun 12/11 (#175):
+#                 broken on "dimension 20" and replies cut at 4096 tokens.
+#   3  12/11/2026 PR #185 review: <code>_dimension facts, 10 candidates per call,
+#                 replies up to 6144 tokens (one number, models.agent.max_tokens),
+#                 a cut reply splits its batch, valid batches survive a failed one,
+#                 an added cleared code is refused alone; the served model on the
+#                 3060 is NVIDIA's HF GGUF, not the Ollama library build Hưng ran.
+version: 3
 
 # Hosts of our network the endpoints may name besides loopback and private IPs.
 # Any other host is refused when the config is read (endpoint.check_local_url).
@@ -17,13 +23,17 @@ local_hosts: [ubuntu-desktop.local, rtx3060]
 
 models:
   agent:
-    # Nemotron 3.5 Bolt E4B, Q4, served by Ollama on the RTX 3060 (Hiếu). Text only.
-    # Licence OpenMDW-1.1: record in Source before any product delivered to DENSO.
+    # Nemotron 3.5 Bolt E4B, Q4_K_M, NVIDIA's GGUF on Hugging Face, served by Ollama on
+    # the RTX 3060 (Hiếu). Text only. Licence OpenMDW-1.1: record in Source before any
+    # product delivered to DENSO. Another build (Ollama library `nemotron-3.5-bolt:e4b`,
+    # digest 69f2be39b309, Hưng's laptop) is named with FW_AGENTQA_AGENT_MODEL/_REVISION.
     base_url: http://ubuntu-desktop.local:11434/v1
-    model: nemotron-3.5-bolt-e4b
-    revision: q4_K_M          # assumption until the served tag is pinned by digest
+    model: hf.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB:Q4_K_M
+    revision: 139e7d57c1c3    # Ollama digest on the 3060, 12/11/2026
     temperature: 0.0
-    max_tokens: 4096
+    # The reply budget, also left free in the window (limits). v2 wrote ~205 tokens per
+    # decision (4096 cut 20 decisions, #175); 10 per call need ~2100.
+    max_tokens: 6144
     timeout_s: 300
     json_mode: true
   vision:
@@ -45,9 +55,9 @@ limits:
   # for more per request. Start the server with OLLAMA_CONTEXT_LENGTH=16384
   # (docs/g0/agent-qa.md). A prompt over the budget is refused, never sent to be cut.
   context_tokens: 16384
-  reply_tokens: 4096          # #175 measured 3281-3742 reply tokens for 20 candidates
   chars_per_token: 2.5        # #175 measured 2.67 (7042 chars, 2642 tokens, one prompt); kept below
-  candidates_per_call: 20     # larger subjects are split into several calls
+  safety_tokens: 1024         # left free besides the reply: the ratio above is one sample
+  candidates_per_call: 10     # larger subjects are split; a cut reply halves its batch
   retries: 1                  # one more turn when the reply is not valid
 
 vision:

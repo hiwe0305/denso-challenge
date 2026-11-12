@@ -12,8 +12,11 @@ Subjects are found by what the paths hold:
 Output, in a new directory (never overwritten):
 
     reports.jsonl        every AgentReport, one per line (what DA-31 reads)
-    dropped.jsonl        each candidate a lane detector raised that the model dropped,
-                         with its reason (#175); empty when none was dropped
+    dropped.jsonl        what a reviewer must see that is not a finding (#175): each
+                         candidate a lane detector raised that the model dropped, with
+                         its reason (`dropped_by_model`), and each finding the model
+                         added on a code a detector cleared (`refused_by_code`); empty
+                         when there is none. `fw agentqa html` reads it beside reports.jsonl
     <n>-<stage>.html     one page per report; index.html lists them
     figures/*.svg        the figures the pages show
     estimates.jsonl      the estimates of this run (append-only rows)
@@ -220,6 +223,7 @@ def _write_dropped(result: RunResult, path: Path) -> None:
             facts = {x.fact_id: x for x in report.facts}
             for d in result.dropped.get(report.report_id, ()):
                 row = {
+                    "kind": d.kind,
                     "report_id": report.report_id,
                     "subject_ref": report.subject_ref,
                     "stage": report.stage,
@@ -235,6 +239,24 @@ def _write_dropped(result: RunResult, path: Path) -> None:
                     ],
                 }
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def read_dropped(path: Path) -> dict[str, tuple[DroppedCandidate, ...]]:
+    """`dropped.jsonl` back, by report id; empty when the file is not there."""
+    out: dict[str, list[DroppedCandidate]] = {}
+    if not path.is_file():
+        return {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        out.setdefault(str(row["report_id"]), []).append(DroppedCandidate(
+            cid=str(row["cid"]), code=str(row["code"]), target=str(row["target"]),
+            detail=str(row["detail"]), reason=str(row["reason"]),
+            evidence=tuple(str(e["id"]) for e in row.get("evidence") or []),
+            kind=row.get("kind", "dropped_by_model"),
+        ))
+    return {k: tuple(v) for k, v in out.items()}
 
 
 def _ledger(plan: str, job_id: str, seconds: float, kind: str, note: str,

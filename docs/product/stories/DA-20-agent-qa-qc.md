@@ -42,6 +42,8 @@ Là AI Engineer, tôi muốn một agent đọc báo cáo dataset, log và outpu
   - [x] 5.4 Phát hiện `added` không được nêu mã mà code đã xét và không thấy lỗi
   - [x] 5.5 Ngân sách context khớp server; prompt vượt cửa sổ thì từ chối, không để server cắt
   - [x] 5.6 Tăng phiên bản agent; ghi lệnh chạy lại trong `docs/g0/agent-qa.md`
+  - [x] 5.7 Sửa theo review PR #185 và lần chạy lại của Hưng (12/11): fact số chiều, giữ lô đã qua, câu trả lời bị cắt thì chia lô, từ chối riêng mục thêm trên mã đã xóa, `html` đọc `dropped.jsonl`, kiểm cửa sổ server; agent bản 3
+  - [ ] 5.8 Chạy bản 3 với Nemotron trên máy 3060: hai job của #175, rồi cả bộ log cấy, chấm DA-31
 - [ ] 6. Qwen3.5-4B nếu Q-M là có (AC 7) — code và test với model kịch bản xong 6/11; còn chạy Qwen3.5-4B thật trên bộ ca mẫu
 - [ ] 7. Chạy trên log thật, báo riêng (AC 8) — lớp code đã chạy trên log DA-26, DA-34 (6/11); còn chạy với Nemotron
 
@@ -87,6 +89,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | 3/11/2026 | Hạn mới theo lịch hoàn thiện 13/11/2026 (07 mục 2.4) | PO (Hiếu) |
 | 6/11/2026 | Chuyển sang Hiếu làm cùng Claude theo [plan chia lại việc của Hưng](../../superpowers/plans/2026-11-06-hung-reassignment.md); bỏ bước che danh tính chỉ cho mẫu EgoDex công bố (D2); làm đủ mọi nhiệm vụ con (D3) | PO (Hiếu) |
 | 11/11/2026 | Thêm nhiệm vụ con 5.1–5.6 sửa issue #175 (agent bản 2); nhiệm vụ 5 vẫn mở tới khi chấm bản 2 với Nemotron | Hiếu, cùng Claude |
+| 12/11/2026 | Thêm nhiệm vụ con 5.7, 5.8 theo review PR #185 và lần chạy lại của Hưng (agent bản 3) | Hiếu, cùng Claude |
 
 ## Ghi chép khi làm
 

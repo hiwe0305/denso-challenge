@@ -3,12 +3,14 @@
 The page shows, per finding in rank order: the design 10 code, the target, the
 insight and the suggestion with each `{F#}` replaced by the fact's value and unit
 (the raw id stays as a tooltip), the evidence table and the figures. A broken
-report says so at the top with its problems. Candidates a lane detector raised
-and the model dropped are listed at the top too, with the model's reason (#175),
-so an empty report is never mistaken for a clean subject. If the engineer's
-`AgentReview` is given, each finding shows the decision and the reason.
+report says so at the top with its problems. If the engineer's `AgentReview` is
+given, each finding shows the decision and the reason.
 
-The page holds nothing the JSON does not, so the report's hash vouches for it.
+What did not become a finding is listed at the top when given (#175): candidates
+a lane detector raised that the model dropped, with its reason, and findings the
+model added on a code a detector cleared. These come from `dropped.jsonl` beside
+`reports.jsonl`, not from the report: the contract has no field for them. The
+rest of the page holds nothing the report's JSON does not.
 """
 
 from __future__ import annotations
@@ -79,16 +81,19 @@ def render_report(
         items = "".join(f"<li>{_e(p)}</li>" for p in report.problems)
         parts.append(f'<div class="broken"><b>Report broken</b><ul>{items}</ul></div>')
     if dropped:
+        said = {"dropped_by_model": "dropped by the model", "refused_by_code": "refused by code"}
         rows = "".join(
-            f"<tr><td>{_e(d.cid)}</td><td>{_e(d.code)}</td><td>{_e(d.target)}</td>"
-            f"<td>{_e(d.detail)}</td><td>{render_text(d.reason, facts)}</td></tr>"
+            f"<tr><td>{_e(said[d.kind])}</td><td>{_e(d.cid)}</td><td>{_e(d.code)}</td>"
+            f"<td>{_e(d.target)}</td><td>{_e(d.detail)}</td>"
+            f"<td>{render_text(d.reason, facts)}</td></tr>"
             for d in dropped
         )
         parts.append(
-            f'<div class="dropped"><b>{len(dropped)} candidate(s) a detector raised were '
-            "dropped by the model.</b> Check each reason before reading the findings below "
-            "as the whole story.<table><tr><th>cid</th><th>code</th><th>target</th>"
-            f"<th>detector</th><th>model's reason</th></tr>{rows}</table></div>"
+            f'<div class="dropped"><b>{len(dropped)} item(s) did not become findings.</b> '
+            "A detector raised these and the model dropped them, or the model added them on a "
+            "code a detector had cleared. Check each before reading the findings below as the "
+            "whole story.<table><tr><th>what</th><th>id</th><th>code</th><th>target</th>"
+            f"<th>detector</th><th>model's text</th></tr>{rows}</table></div>"
         )
     if not report.findings:
         parts.append("<p>No findings.</p>")

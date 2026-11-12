@@ -74,7 +74,15 @@ FLAG_WHEN: dict[str, str] = {
     "T8": ">",   # gradient norm over the frozen tolerance or max_grad_norm
     "R1": ">",   # latency percentile over tau_lat_s
     "R2": ">",   # chunks over the RTC delay, more than max_underruns
+    # DA-08's offline checks, when probe results sit beside a train job
+    "O1": ">",   # a group's error over its budget
+    "O2": ">",   # error slope or last/first ratio along the chunk over its limit
+    "O3": ">",   # hand event offset over max_offset_steps
+    "O4": ">",   # fraction of frames out of joint limits over max_fraction
 }
+# Detectors that can end with no verdict and no skip, so "no finding" does not mean
+# clean: T4 when no group reached ref_group_drop (groups.py), so nothing to compare.
+NO_SILENT_CLEAR = frozenset({"T4"})
 _HOLDS = {">": float.__gt__, "<": float.__lt__, ">=": float.__ge__}
 
 
@@ -87,7 +95,10 @@ def _direction(analysis: Analysis, code: str, value: object, threshold: float,
                ref: str) -> str | None:
     """The direction fact of `code`, if the finding lies on the side the table says."""
     op = FLAG_WHEN.get(code)
-    if op is None or not isinstance(value, (int, float)):
+    if op is None:
+        analysis.notes.append(f"{code}: no direction known for its threshold")
+        return None
+    if not isinstance(value, (int, float)):
         return None
     if not _HOLDS[op](float(value), float(threshold)):
         analysis.notes.append(
@@ -253,8 +264,12 @@ def analyze_train(
         suffix = fact_suffix(finding.group, finding.dim)
         seen[code + suffix] += 1
         if seen[code + suffix] > 1:  # two findings of one code on no group or dim (T8 a, b)
-            suffix += f"_{seen[code + suffix]}"
+            suffix += f"_finding{seen[code + suffix]}"
         evidence = [book.add(f"{code}_value{suffix}", _num(finding.value), metrics.ref)]
+        if finding.dim is not None:
+            # The index as a value, so "dimension 20" in a sentence cites a fact (B1 of the
+            # PR #185 review: the index was only in names and detail, and broke the report).
+            evidence.append(book.add(f"{code}_dimension{suffix}", finding.dim, metrics.ref))
         if finding.threshold is not None:
             evidence.append(book.shared(f"{code}_threshold", f"{code}_threshold{suffix}",
                                         finding.threshold, metrics.ref))
@@ -269,7 +284,7 @@ def analyze_train(
         analysis.propose(code, unit, evidence, "code", f"DA-08 {code}{where}")
     for skip in diagnosis.skipped:
         analysis.notes.append(f"{skip.code} not judged: {skip.reason}")
-    analysis.cleared = cleared([f"T{i}" for i in range(1, 9)],
+    analysis.cleared = cleared([f"T{i}" for i in range(1, 9) if f"T{i}" not in NO_SILENT_CLEAR],
                                [f.code for f in diagnosis.findings],
                                [s.code for s in diagnosis.skipped])
     return analysis

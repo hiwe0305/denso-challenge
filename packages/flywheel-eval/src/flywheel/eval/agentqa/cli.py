@@ -24,12 +24,14 @@ from flywheel.eval.agentqa.agent import load_agent_config
 from flywheel.eval.agentqa.endpoint import (
     DEFAULT_AGENT_CONFIG,
     ChatModel,
+    OpenAIEndpoint,
     RecordingModel,
     ReplayModel,
     load_endpoint,
 )
 from flywheel.eval.agentqa.html import render_index, render_report
 from flywheel.eval.agentqa.review import make_review, write_review
+from flywheel.eval.agentqa.run import read_dropped
 from flywheel.eval.agentqa.run import run as run_agentqa
 
 app = typer.Typer(no_args_is_help=True)
@@ -83,16 +85,25 @@ def run_command(
     for report in result.reports:
         top = report.findings[0] if report.findings else None
         head = f"{top.code} {top.target_ref}" if top else "-"
-        n = len(result.dropped.get(report.report_id, ()))
+        items = result.dropped.get(report.report_id, ())
+        n = sum(1 for d in items if d.kind == "dropped_by_model")
         gone = f"  {n} code candidate(s) dropped" if n else ""
+        if len(items) > n:
+            gone += f"  {len(items) - n} addition(s) refused"
         typer.echo(f"{report.stage:9} {report.status:6} {len(report.findings):3} findings  "
                    f"top {head}  {report.subject_ref}{gone}")
     typer.echo(f"{len(result.reports)} reports in {out}; {len(result.skipped)} files skipped")
+    endpoint = getattr(model, "inner", model)
+    if isinstance(endpoint, OpenAIEndpoint) and endpoint.context_tokens:
+        window = endpoint.served_window
+        typer.echo(f"server window {window} tokens, budget {endpoint.context_tokens}"
+                   if window else f"server window not reported; budget assumes "
+                   f"{endpoint.context_tokens} tokens", err=window is None)
     dropped = sum(len(d) for d in result.dropped.values())
     if dropped:
         # Not a failure: the model may judge a detector wrong. It must not go unseen (#175).
-        typer.echo(f"{dropped} candidate(s) a detector raised were dropped by the model; "
-                   "see dropped.jsonl", err=True)
+        typer.echo(f"{dropped} item(s) did not become findings (dropped by the model or "
+                   "refused by code); see dropped.jsonl", err=True)
     broken = sum(1 for r in result.reports if r.status == "broken")
     if broken:
         # The run is kept; a script still has to see that the model part failed.
@@ -132,15 +143,19 @@ def html_command(
 ) -> None:
     out.mkdir(parents=True, exist_ok=True)
     pages = []
+    gone = read_dropped(reports.parent / "dropped.jsonl")  # beside reports.jsonl, if any
     for n, report in enumerate(_read_reports(reports), start=1):
         review = None
         path = reviews / f"{report.report_id}.review.json" if reviews is not None else None
         if path is not None and path.is_file():
             review = AgentReview.model_validate_json(path.read_text(encoding="utf-8"))
         page = f"{n:03d}-{report.stage}.html"
-        (out / page).write_text(render_report(report, review), encoding="utf-8")
+        dropped = gone.get(report.report_id, ())
+        (out / page).write_text(render_report(report, review, dropped=dropped),
+                                encoding="utf-8")
         pages.append((page, report))
-    (out / "index.html").write_text(render_index(pages), encoding="utf-8")
+    counts = {k: len(v) for k, v in gone.items()}
+    (out / "index.html").write_text(render_index(pages, counts), encoding="utf-8")
     typer.echo(f"{len(pages)} pages in {out}")
 
 

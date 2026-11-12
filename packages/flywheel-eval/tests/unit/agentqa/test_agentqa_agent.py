@@ -7,7 +7,9 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
 from agentqa_build import (
+    AGENT_YAML,
     SYSTEM_YAML,
     TRAIN_YAML,
     EchoModel,
@@ -168,12 +170,14 @@ def test_the_payload_fits_the_window_by_dropping_uncited_facts(tmp_path: Path) -
     analysis = _dataset(tmp_path, {1: [NAN]})
     for i in range(3000):
         analysis.book.add(f"filler_{i}", i, "x")
-    tight = config().__class__(**{**config().__dict__, "context_tokens": 6000})
+    from flywheel.eval.agentqa.agent import prompt_budget
+
+    tight = config().__class__(**{**config().__dict__, "context_tokens": 12000})
     messages, facts = build_messages(analysis, analysis.candidates, tight)
     cited = set(analysis.candidates[0].evidence)
     assert cited <= {f.fact_id for f in facts}
     assert len(facts) < len(analysis.book.facts)
-    assert len(messages[1]["content"]) <= (6000 - tight.reply_tokens) * tight.chars_per_token
+    assert sum(len(m["content"]) for m in messages) <= prompt_budget(tight)
 
 
 def test_train_and_rtc_findings_come_from_the_lane_detectors(tmp_path: Path) -> None:
@@ -229,14 +233,20 @@ def test_an_added_finding_may_not_overrule_a_detector_that_found_nothing(tmp_pat
     t1 = {"added": [{"code": "T1", "target": "train/job-clean", "priority": 1,
                      "insight": f"Loss ended at {{{fid}}}, indicating convergence.",
                      "suggestion": "Stop the job.", "evidence": [fid]}]}
-    model = ScriptedModel([t1, t1])
-    report = run_agent(analysis, model, config(), now=NOW)
-    assert report.status == "broken" and "found no fault" in report.problems[0]
+    from flywheel.eval.agentqa.agent import review_subject
+
+    # refused on its own, shown beside the report; the rest of the reply stands
+    t2 = {**t1["added"][0], "code": "T2", "insight": f"Val loss was never measured, {{{fid}}}."}
+    model = ScriptedModel([{"added": [t1["added"][0], t2]}])
+    run = review_subject(analysis, model, config(), now=NOW)
+    assert run.report.status == "ok" and len(model.messages) == 1
+    assert [(f.code, f.target_ref) for f in run.report.findings] == [("T2", "train/job-clean")]
+    (refused,) = run.dropped
+    assert (refused.kind, refused.cid, refused.code) == ("refused_by_code", "added[0]", "T1")
+    assert "found no fault" in refused.detail and "convergence" in refused.reason
     payload = json.loads(model.messages[0][1]["content"])
     assert "T1" in payload["cleared_by_code"]
-    t2 = {"added": [{**t1["added"][0], "code": "T2"}]}
-    report = run_agent(analysis, ScriptedModel([t2]), config(), now=NOW)
-    assert [(f.code, f.target_ref) for f in report.findings] == [("T2", "train/job-clean")]
+    assert "T4" not in payload["cleared_by_code"]  # T4 can end with no verdict and no skip
 
 
 def test_rtc_clears_only_what_it_judged(tmp_path: Path) -> None:
@@ -272,3 +282,90 @@ def test_a_retry_that_would_overflow_the_window_is_not_sent(tmp_path: Path) -> N
 def test_the_budget_is_the_served_window() -> None:
     cfg = config()
     assert (cfg.context_tokens, cfg.chars_per_token) == (16384, 2.5)
+
+
+def _t6_job(tmp_path: Path, n: int, collapsed: set[int]):  # type: ignore[no-untyped-def]
+    from test_agentqa_analyze import collapsed_job
+
+    ratios = [0.05 if d in collapsed else 0.9 for d in range(n)]
+    metrics = collapsed_job(tmp_path / "train" / "job-t6", ratios)
+    return analyze_train(load_file(metrics), "train/job-t6", TRAIN_YAML)
+
+
+def test_a_dimension_index_in_a_sentence_is_a_fact(tmp_path: Path) -> None:
+    """PR #185 review B1, Hưng's rerun: "dimension 20" broke the report; 20 was no fact."""
+    from flywheel.eval.agentqa.agent import review_subject
+
+    analysis = _t6_job(tmp_path, 21, {2, 20})
+    c2, c20 = [c for c in analysis.candidates if c.code == "T6"]
+    names = {f.fact_id: f.name for f in analysis.book.facts}
+    assert "T6_dimension_dim20" in {names[e] for e in c20.evidence}
+    reply = {"decisions": [
+        {"cid": c2.cid, "keep": True, "insight": "Mode collapse on dimension 2.",
+         "suggestion": "Check the action head for dimension 2.", "evidence": list(c2.evidence)},
+        {"cid": c20.cid, "keep": False, "reason": "dimension 20 is a gripper held still"},
+    ]}
+    run = review_subject(analysis, ScriptedModel([reply]), config(), now=NOW)
+    assert run.report.status == "ok" and run.report.findings[0].insight.endswith("dimension 2.")
+    assert run.dropped[0].reason.startswith("dimension 20")
+    # another candidate's index is still not this sentence's fact
+    borrowed = {"decisions": [{**reply["decisions"][0], "insight": "Dimensions 2 and 20."},
+                              reply["decisions"][1]]}
+    report = run_agent(analysis, ScriptedModel([borrowed, borrowed]), config(), now=NOW)
+    assert report.status == "broken" and "20" in report.problems[0]
+
+
+def test_a_failed_batch_keeps_what_the_other_batches_decided(tmp_path: Path) -> None:
+    """Hưng's proposal 2: one rejected batch no longer throws away the valid one."""
+    analysis = _dataset(tmp_path, {1: [NAN], 3: [NAN]})
+    c1, c3 = analysis.candidates
+    one = config().__class__(**{**config().__dict__, "candidates_per_call": 1})
+    good = {"decisions": [{"cid": c1.cid, "insight": f"NaN, see {{{c1.evidence[0]}}}",
+                           "suggestion": "Re-record."}]}
+    bad = {"decisions": [{"cid": c3.cid, "insight": "NaN in 42 frames", "suggestion": "fix"}]}
+    report = run_agent(analysis, ScriptedModel([good, bad, bad]), one, now=NOW)
+    assert report.status == "broken"
+    assert [(f.code, f.target_ref) for f in report.findings] == [("D1", "episode_000001")]
+    assert report.problems[0].startswith(f"{c3.cid}: model reply rejected")
+
+
+class CutModel(EchoModel):
+    """A server whose reply is cut whenever it is asked about more than `fits` candidates."""
+
+    def __init__(self, fits: int) -> None:
+        super().__init__()
+        self.fits, self.sizes = fits, []  # type: ignore[var-annotated]
+
+    def complete(self, messages):  # type: ignore[no-untyped-def]
+        from flywheel.eval.agentqa.endpoint import ReplyCut
+
+        n = len(json.loads(str(messages[1]["content"]))["candidates"])
+        self.sizes.append(n)
+        if n > self.fits:
+            raise ReplyCut("cut", '{"decisions": [{"cid": "C1", "insi')
+        return super().complete(messages)
+
+
+def test_a_cut_reply_splits_its_batch_instead_of_being_sent_back(tmp_path: Path) -> None:
+    """PR #185 review S1: both first replies of Hưng's rerun stopped at max_tokens."""
+    analysis = _dataset(tmp_path, {i: [NAN] for i in range(5)})
+    model = CutModel(fits=2)
+    report = run_agent(analysis, model, config(), now=NOW)
+    assert report.status == "ok" and len(report.findings) == 5
+    assert model.sizes == [5, 2, 3, 1, 2]
+    report = run_agent(analysis, CutModel(fits=0), config(), now=NOW)
+    assert report.status == "broken" and "raise models.agent.max_tokens" in report.problems[0]
+
+
+def test_the_reply_budget_is_one_number(tmp_path: Path) -> None:
+    import yaml
+    from flywheel.eval.agentqa.agent import load_agent_config
+
+    raw = yaml.safe_load(AGENT_YAML.read_text())
+    assert config().reply_tokens == raw["models"]["agent"]["max_tokens"]
+    raw["limits"]["reply_tokens"] = 4096
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "prompts" / "system.md").write_text("p")
+    (tmp_path / "agent.yaml").write_text(yaml.safe_dump(raw))
+    with pytest.raises(ValueError, match="models.agent.max_tokens"):
+        load_agent_config(tmp_path / "agent.yaml")

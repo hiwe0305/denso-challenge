@@ -15,7 +15,9 @@ Rules you must follow:
    A fact named `<code>_flag_when` says which side of the threshold is the fault: for
    `value < threshold` a value below its threshold is what the detector caught, so a
    candidate whose value lies on that side is a fault, not a pass. A fact whose name ends in
-   `_dim<n>` or `_<group>` belongs to that dimension or group only.
+   `_dim<n>` or `_<group>` belongs to that dimension or group only. To name a dimension, cite
+   its `<code>_dimension_dim<n>` fact ("dimension {F12}"); each decision speaks of its own
+   candidate only, so never write ranges or counts of other candidates' dimensions.
 4. You may add a finding of your own when facts support it. Use only codes from
    `allowed_codes` and targets from `units`; when `allowed_codes` is empty, add nothing.
    Never add a code listed in `cleared_by_code`: a detector already judged it on these facts

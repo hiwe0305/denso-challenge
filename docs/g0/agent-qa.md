@@ -6,6 +6,8 @@ Trạng thái 7/11/2026: code và test của cả 7 nhiệm vụ con đã có; n
 
 Cập nhật 11/11/2026: sửa issue #175 (lần đầu chạy Nemotron thật, Hưng 9/11). Agent lên **bản 2** (`version` trong `agent.yaml`): đổi fact, prompt và cửa sổ. Bản 2 **chưa chấm** với Nemotron trên bộ lỗi cấy, nên chưa được dùng cho demo trước khi chạy lại theo mục 5.1 và chấm bằng DA-31. Chi tiết ở mục 3.5.
 
+Cập nhật 12/11/2026: Hưng chạy lại bản 2 (comment cuối của #175); review PR #185 tìm thêm một lỗi chặn và bốn lỗi nên sửa. Agent lên **bản 3** (mục 3.6). Model serve trên máy 3060 là bản GGUF của NVIDIA trên Hugging Face, không phải bản Ollama library Hưng dùng.
+
 ## 1. Luồng chạy
 
 ```
@@ -18,8 +20,10 @@ analyze.py (code): mỗi chủ thể (dataset, train/<job>, rtc/<job>, probe, ev
   · ứng viên "hint": dấu hiệu code thấy nhưng không kết luận (ví dụ D5: hai episode cùng dấu vân QA)
   │
   ▼
-agent.py (model): gửi fact + ứng viên theo lô, vừa cửa sổ server (16K token, tính 2,5 ký tự/token);
-  bỏ fact không ứng viên nào trích trước; vẫn vượt thì từ chối, không gửi để server cắt
+agent.py (model): gửi fact + ứng viên theo lô 10, vừa cửa sổ server (16K token, trừ 6144 cho câu
+  trả lời và 1024 dự phòng, tính 2,5 ký tự/token); bỏ fact không ứng viên nào trích trước;
+  vẫn vượt thì từ chối, không gửi để server cắt; sau câu trả lời đầu, hỏi Ollama (`/api/ps`)
+  cửa sổ thật và từ chối nếu nhỏ hơn config; câu trả lời bị cắt ở max_tokens thì chia đôi lô
   model trả {decisions, added, estimates}; code kiểm từng câu:
   · số trong câu phải khớp một fact mà chính mục đó trích (hoặc dạng % của fact tỉ lệ);
     `12,000`, `120ms`, `10x`, hai vế của `45/90` đều là số; sai thì gửi lại 1 lần
@@ -27,9 +31,11 @@ agent.py (model): gửi fact + ứng viên theo lô, vừa cửa sổ server (16
   · mã phát hiện phải hợp với stage (stage không có mã thì không được thêm); target phải là
     một đơn vị có trong đầu vào
   · bỏ ứng viên code phải có `reason` (cùng luật số); ứng viên bị bỏ ghi vào dropped.jsonl
-  · không được thêm mã có trong `cleared_by_code` (bộ phát hiện đã xét và không thấy lỗi)
+  · phát hiện thêm trên mã có trong `cleared_by_code` (bộ phát hiện đã xét, không thấy lỗi)
+    bị từ chối riêng mục đó, ghi vào dropped.jsonl; phần còn lại của câu trả lời vẫn giữ
   · ước lượng phải có basis là fact
-  sai hai lần thì báo cáo "broken", không có phát hiện nào
+  lô nào sai hai lần thì không góp gì, báo cáo "broken" kèm mã ứng viên của lô đó;
+  quyết định của các lô đã qua vẫn giữ
   │
   ▼
 AgentReport (reports.jsonl) → NNN-<stage>.html + figures/*.svg + index.html
@@ -139,6 +145,26 @@ Kiểm trên bộ log cấy dựng lại bằng `log_defects` (cấu hình mặc
 
 Việc mở theo sau, ngoài phạm vi DA-20: DA-08 `detect_t5` cho `start_step` âm khi job ngắn hơn `t5.window_steps` (1000 step), và `DiagnosisFinding` từ chối giá trị đó. Job thật dài 40k step nên chưa gặp. Báo cho Châu.
 
+### 3.6 Sửa theo review PR #185 và lần chạy lại của Hưng (12/11/2026, agent bản 3)
+
+Hưng chạy lại bản 2 trên hai job của #175. Kết quả: job sạch hết báo nhầm; job có lỗi giữ cả 36 ứng viên T6 và chép đúng `value < threshold`, nhưng báo cáo vẫn `broken` vì hai lỗi mới. Review PR #185 thêm ba lỗi nên sửa.
+
+| Lỗi | Nguyên nhân | Sửa |
+|---|---|---|
+| B1 (lỗi A của Hưng): "dimension 20" làm cả báo cáo `broken` | Số chiều chỉ có trong tên fact và `detail`, không là giá trị fact nào | Mỗi phát hiện theo chiều có fact `<mã>_dimension_dim<n>` = n trong bằng chứng. Câu của một ứng viên được nêu số chiều của chính nó; nêu chiều của ứng viên khác ("dimensions 0-35") vẫn bị từ chối. Prompt dặn trích fact chiều |
+| Một lô sai làm mất mọi lô (đề xuất 2 của Hưng) | `_assemble` xóa hết phát hiện khi có `problems` | Lô sai hai lần không góp gì và mã ứng viên của lô ghi vào `problems`; lô đã qua giữ quyết định. Báo cáo vẫn `broken` (hợp đồng: `ok` không có `problems`), CLI vẫn thoát mã 1. Bộ chấm DA-31 không đọc `status`, nên phát hiện của lô đã qua được chấm như của agent; ứng viên của lô sai không thành phát hiện, tức là tính vào recall thấp của model |
+| S1 (lỗi B của Hưng): câu trả lời bị cắt ở 4096 token, không ai biết | Endpoint không đọc `finish_reason`; bản 2 viết khoảng 205 token mỗi quyết định | `finish_reason = length` thành lỗi riêng `ReplyCut`: lô chia đôi và hỏi lại, tới một ứng viên thì báo lỗi. Lô 10 ứng viên, câu trả lời tối đa 6144 token. `limits.reply_tokens` bỏ; chỉ còn `models.agent.max_tokens` |
+| S2: thêm mã đã xóa làm hỏng cả câu trả lời; xóa cả mã không có kết luận | `ReplyError` cho cả lô; T4 có nhánh không kết luận mà không ghi bỏ qua | Mục thêm đó bị từ chối riêng (`refused_by_code` trong `dropped.jsonl`). T4 không bao giờ được coi là đã xóa |
+| S3: `fw agentqa html` không thấy ứng viên bị bỏ | `dropped.jsonl` chỉ dùng lúc chạy | `html` đọc `dropped.jsonl` cạnh `reports.jsonl`; docstring sửa |
+| S4: cửa sổ chỉ giả định, không kiểm | `/v1` của Ollama không nhận `num_ctx`; biên an toàn bằng 0 | Sau câu trả lời đầu, endpoint hỏi `/api/ps` cửa sổ server đã nạp; nhỏ hơn `context_tokens` thì báo lỗi. Server không trả lời thì CLI ghi "not reported". Thêm `safety_tokens: 1024` |
+
+Giới hạn còn biết:
+
+- Không kiểm câu tự mâu thuẫn (ví dụ "hội tụ" trong phát hiện phân kỳ). `cleared_by_code` chỉ chặn mã bộ phát hiện đã xét; mã bị bỏ qua vẫn thêm được với câu bất kỳ, miễn số khớp fact.
+- T1 nhánh spike không kết luận ở cửa sổ có loss nhỏ nhất ≤ 0, mà không ghi bỏ qua; T1 vẫn được coi là đã xóa.
+- `FactClash` dừng cả lần chạy. Đây là lỗi lập trình (đặt tên fact trùng), nên dừng to thay vì bỏ qua chủ thể.
+- `version` của agent không có trong `AgentReport` (mục 6); báo cáo phân biệt phiên bản qua sha256 của prompt và dòng ledger.
+
 ## 4. Nhìn hình (nhiệm vụ 6)
 
 Q-M trả lời không cho tới demo, nên `vision.enabled: false`. Code đã có: `--vision --image <png>` gửi từng ảnh (tối đa `max_images` = 6) tới model thứ hai kèm câu hỏi cố định. Câu mô tả được thêm thành fact chữ `vision_observation:<model>` với nguồn là ảnh. Câu nào có số thì bị bỏ, vì số phải do code đo. Model chính sau đó được phép trích fact này như mọi fact khác. Bộ ca mẫu chạy được với lượt nhìn hình bằng `ScriptedModel`. Với Qwen3.5-4B thật thì chưa chạy.
@@ -149,24 +175,25 @@ Lần chạy thật đầu tiên là của Hưng trên laptop RTX 4060 8 GB, 9/1
 
 | Model | Vai | Tag Ollama (giả định, cần kiểm tên thật khi pull) | VRAM (ước lượng) |
 |---|---|---|---|
-| Nemotron 3.5 Bolt E4B, Q4_K_M | agent, chỉ đọc chữ | `nemotron-3.5-bolt:e4b`, chép thành `nemotron-3.5-bolt-e4b` (#175) | 3–4 GB theo tài liệu NVIDIA; #175 đo 6,6 GB khi nạp với cửa sổ 16K |
+| Nemotron 3.5 Bolt E4B, Q4_K_M | agent, chỉ đọc chữ | máy 3060: `hf.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB:Q4_K_M` (digest `139e7d57c1c3`, tên mặc định trong `agent.yaml`). Laptop của Hưng: `nemotron-3.5-bolt:e4b` (digest `69f2be39b309`, bản khác), đặt qua `FW_AGENTQA_AGENT_MODEL`, `FW_AGENTQA_AGENT_REVISION` | 3–4 GB theo tài liệu NVIDIA; #175 đo 6,6 GB khi nạp với cửa sổ 16K |
 | Qwen3.5-4B | nhìn hình (tùy chọn) | `qwen3.5:4b` | khoảng 3–4 GB ở Q4 (giả định) |
 
 Hai model cùng lúc không vừa 4 GB của laptop. Trên máy 3060 (12 GB) thì vừa.
 
 Server phải chạy đúng cửa sổ `limits.context_tokens` của `agent.yaml` (16384). Endpoint `/v1` của Ollama không đặt được `num_ctx` theo request, và server không đặt `OLLAMA_CONTEXT_LENGTH` thì dùng mặc định theo VRAM (4096 trên máy của #175). Muốn cửa sổ lớn hơn thì sửa cả hai nơi, và đó là một phiên bản agent mới.
 
+Máy 3060 chạy Ollama 0.32.14 dạng service với `OLLAMA_CONTEXT_LENGTH=16384` và `OLLAMA_KV_CACHE_TYPE=q4_0`. Laptop theo cấu hình của #175:
+
 ```bash
-# trên máy serve (đã cài Ollama); cấu hình của #175
 ollama pull nemotron-3.5-bolt:e4b
-ollama cp nemotron-3.5-bolt:e4b nemotron-3.5-bolt-e4b
 OLLAMA_HOST=127.0.0.1:11434 OLLAMA_CONTEXT_LENGTH=16384 OLLAMA_NUM_PARALLEL=1 \
     OLLAMA_MAX_LOADED_MODELS=1 ollama serve
+export FW_AGENTQA_AGENT_MODEL=nemotron-3.5-bolt:e4b FW_AGENTQA_AGENT_REVISION=69f2be39b309
 ```
 
 #### 5.1 Chạy lại sau khi sửa #175 (Hiếu hoặc Hưng)
 
-Bước 1, hai job của #175, để so với lần chạy bản 1. Job có lỗi phải giữ được các ứng viên T6 (hoặc ghi lý do bỏ trong `dropped.jsonl`). Job sạch không được có T1 thêm vào.
+Bước 1, hai job của #175, để so với lần chạy bản 1. Job có lỗi phải ra `ok`, giữ được các ứng viên T6 (hoặc ghi lý do bỏ trong `dropped.jsonl`), và không có câu trả lời bị cắt (`finish_reason` trong file `--record`). Job sạch không được có phát hiện sai. Tên thư mục `v2-…` dưới đây giữ như lần chạy của Hưng; lần chạy bản 3 dùng `v3-…`.
 
 ```bash
 python -m flywheel.data.inject.log_defects --out ~/agentqa-bench/logs --store ~/agentqa-bench/store
@@ -209,6 +236,7 @@ Không chạy trên máy 3060 khi Hiếu chưa đồng ý; máy dùng chung.
 | Hàm api cho R1/R2 chỉ từ log RTC | `analyze_rtc` import `diagnosis.system.runtime` giống cách bộ chấm làm | Châu (`flywheel.eval.api`) |
 | Endpoint khai trong `configs/models/` (AC 1) | Hiện khai trong `configs/eval/agentqa/agent.yaml` vì `configs/models/` thuộc Hiếu | Hiếu: chép khối `models` sang `configs/models/` hoặc trỏ tới đó |
 | Giấy phép OpenMDW-1.1 của Nemotron | Chưa ghi vào Source | Hiếu, trước khi giao DENSO |
+| `version` của agent và `origin` của phát hiện trong `AgentReport` | Báo cáo chỉ phân biệt phiên bản qua sha256 của prompt; ứng viên bị bỏ nằm ở `dropped.jsonl`, ngoài hợp đồng | Long (hợp đồng `AgentReport`) |
 
 ## 7. Còn lại
 
