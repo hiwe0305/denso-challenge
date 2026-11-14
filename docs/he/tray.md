@@ -2626,6 +2626,147 @@ R13 ghi thành [`round-tray-c70.bounds.decision.json`](../../configs/runplans/tr
 
 **Mốc giờ (ước tính):** train xong khoảng 00:10 ngày 13/11; eval giai đoạn 1 trên ba làn khoảng 00:40–02:40. Colab CLI cần đăng nhập lại khoảng 19:30–20:00 ngày 12/11 (token cấp 04:11, hết sau khoảng 16 giờ); không đăng nhập lại thì watcher và fetch không dừng được VM.
 
+### 20.18 Kết quả giai đoạn 1 của `C70_R1` (13–14/11/2026)
+
+Mọi số dưới đây là sơ bộ: dev, 1 seed train, chỉ trong sim (renderer MuJoCo, rollout EGL không lặp lại), 60 điều kiện, CI rộng khoảng ±15 điểm %. Các lệch so với spec và giới hạn của 20.7 áp cho mọi số.
+
+**Train lần 2 (thực đo).** Phiên `da34-c70r1` trên A100, 12/11 12:49 đến 13/11 00:18, đủ 60 000 bước. Watcher đo 77,27 CU, số dư giảm 82,83 CU. `ckpt_60000` về `rtx3060` và Drive; sha256 khớp, đánh dấu `final`, không thiếu file (`fetched.json`).
+
+**Eval (thực đo).** Có 6 lô của giai đoạn 1, 60/60 lượt, không thiếu, không chạy lại. Lượt chạy chia như sau:
+
+| Ngày | Làn | Lô | Thời gian client | Ghi chú |
+|---|---|---|---|---|
+| 13/11 | 1 | `l1-000`, `l2-000` | 3 114 s + 3 300 s | |
+| 13/11 | 2 | `l1-010`, `l2-010` | 2 576 s + 2 531 s | |
+| 13/11 | 3 | (không chạy) | | Lệnh ssh của chuỗi khởi động bị 429 vì tab mount đang nối cùng runtime; VM bị thu hồi lúc 09:48 khi chưa serve |
+| 14/11 | 3 | `l1-020` | 3 305 s | VM mới, cùng checkpoint và cây |
+| 14/11 | 4 | `l2-020` | 2 459 s | VM mới, cùng checkpoint và cây |
+
+Mọi server đều qua `colab_serve --expected` (sha256 checkpoint khớp Drive, stats `1c745091…`), `Ta` 24 + RTC, mỗi server một client, cảnh `+zone1`, cây `2b0aaa44`. `runs.jsonl` sha256 `83c8dd48…`. Bốn điều kiện "Trước khi đọc" của 20.7 đủ.
+
+**(r1) `C70_R1` so với `C_ALL` (chính).**
+
+| | Giá trị |
+|---|---|
+| Thành công | 4/60 so với 5/60 |
+| Hiệu ghép cặp | −1,7 điểm %, CI 95 % bootstrap −10,0 đến +6,7 |
+| Chỉ `C70_R1` thành công / chỉ `C_ALL` thành công | 3 / 4 |
+| McNemar chính xác | p = 1,0 |
+| Kết quả giai đoạn 1 (19.2) | F: b ≤ c, không phải E1 hay E3. Dừng, không chạy giai đoạn 2 |
+
+Đọc theo luật 2 của (r1): **CI chứa 0, không thấy khác ở mức này.** Đây không phải "nhắm theo lỗi không giúp": với 60 điều kiện, phép so này chỉ thấy được hiệu khoảng 15 điểm % trở lên. McNemar cùng hướng.
+
+**(r2) `C70_R1` so với `C_70` (phụ).** 4/60 so với 10/60. Hiệu −10,0 điểm %, CI −21,7 đến +1,7. Chỉ `C70_R1` thành công 3, chỉ `C_70` thành công 9, McNemar p = 0,146. CI chứa 0, nhưng hướng là âm: vòng này không cho thấy π₀ tốt lên so với `C_70`. Theo 20.7, (r2) chỉ mô tả, không quyết định gì.
+
+**(r3) Mô tả theo cụm (thiên lệch hồi quy về trung bình, spec 6.13; không phải tỉ lệ sửa được).**
+
+| Run | 23 điều kiện đã nhận dữ liệu (20.13) | 37 điều kiện còn lại |
+|---|---|---|
+| `C70_R1` | 2/23 | 2/37 |
+| `C_70` | 0/23 (theo cách chọn: đều là lỗi của `C_70`) | 10/37 |
+| `C_ALL` | 1/23 | 4/37 |
+| `B_ALL` | 3/23 | 3/37 |
+| `B_70` | 2/23 | 5/37 |
+
+Trên 23 điều kiện nhận dữ liệu, `C70_R1` được 2, cùng cỡ với các run không nhận dữ liệu nhắm lỗi (`C_ALL` 1, `B_70` 2, `B_ALL` 3). Trên 37 điều kiện còn lại, nơi `C_70` được 10, `C70_R1` chỉ được 2.
+
+**(b) Số tuyệt đối, kèm bốn run của mục 19 để so.** Mức 1–2 gộp, n = 60:
+
+| Bước (%) | `C_ALL` | `C_70` | `B_ALL` | `B_70` | `C70_R1` |
+|---|---|---|---|---|---|
+| `approach_a` | 73 | 78 | 67 | 83 | 77 |
+| `grasp` | 73 | 78 | 67 | 83 | 77 |
+| `lift` | 73 | 78 | 67 | 83 | 77 |
+| `carry` | 67 | 77 | 63 | 80 | 72 |
+| `reach_b` | 65 | 77 | 62 | 78 | 72 |
+| `place` | 10 | 25 | 15 | 27 | 20 |
+| `release_stand` | 7 | 15 | 7 | 12 | 7 |
+| **Thành công** | **5** (8 %) | **10** (17 %) | **6** (10 %) | **7** (12 %) | **4** (7 %) |
+| Wilson 95 % | 4–18 | 9–28 | 5–20 | 6–22 | 3–16 |
+
+Tách theo mức, n = 30 mỗi mức:
+
+| Mức | `C_ALL` | `C_70` | `B_ALL` | `B_70` | `C70_R1` |
+|---|---|---|---|---|---|
+| 1: thành công (Wilson 95 %) | 3 (3–26) | 5 (7–34) | 2 (2–21) | 6 (10–37) | 2 (2–21) |
+| 1: `reach_b` / `place` (%) | 57 / 10 | 77 / 23 | 60 / 10 | 73 / 23 | 77 / 20 |
+| 2: thành công (Wilson 95 %) | 2 (2–21) | 5 (7–34) | 4 (5–30) | 1 (1–17) | 2 (2–21) |
+| 2: `reach_b` / `place` (%) | 73 / 10 | 77 / 27 | 63 / 20 | 83 / 30 | 67 / 20 |
+
+So với các mốc: mức 1–2 gộp được 7 % (Wilson 3–16 %), xa mốc 80 %. Từng mức được 7 % (2–21 %), xa mốc 70 %.
+
+Nhãn lỗi, mức 1–2:
+
+| Nhãn | `C_ALL` | `C_70` | `B_ALL` | `B_70` | `C70_R1` |
+|---|---|---|---|---|---|
+| `L-PLACE-POSE` | 29 | 32 | 25 | 25 | 28 |
+| `L-TRAY-TILT` | 15 | 10 | 17 | 21 | 15 |
+| `L-TIMEOUT` | 7 | 7 | 5 | 4 | 8 |
+| `L-ONE-HAND` | 2 | 0 | 1 | 2 | 4 |
+| `L-PART-DROP` | 2 | 1 | 6 | 1 | 1 |
+
+**(c) Chỉ số phụ, không đổi (r1), (r2).**
+
+Thành công nới (dung sai vị trí; yaw giữ 10°), mức 1–2, n = 60:
+
+| Dung sai nới (cm) | `C_ALL` | `C_70` | `B_ALL` | `B_70` | `C70_R1` |
+|---|---|---|---|---|---|
+| 5 (bộ chấm) | 5 | 10 | 6 | 7 | 4 |
+| 7,5 | 9 | 14 | 10 | 11 | 15 |
+| 10 | 12 | 19 | 15 | 15 | 16 |
+| 15 | 14 | 23 | 18 | 19 | 19 |
+| 20 | 17 | 23 | 18 | 20 | 19 |
+
+Độ lệch cuối của các lượt `L-PLACE-POSE`, chỉ số phụ:
+- `C70_R1`: 28 lượt, trung vị 7,5 cm, tối thiểu 5,5 cm, tối đa 12,7 cm, yaw trung vị 8,4°.
+- `C_70`: 32 lượt, trung vị 7,5 cm, tối thiểu 5,0 cm, tối đa 16,1 cm, yaw trung vị 10,3°.
+
+Ở dung sai nới 7,5 cm, `C70_R1` được 15, nhiều nhất trong năm run. Nhưng ở dung sai 5 cm của bộ chấm, nó chỉ được 4. Nói cách khác, dữ liệu nhắm lỗi kéo khay về gần đích hơn, nhưng chưa vào được vòng 5 cm. Đây là chỉ số phụ, không phải kết quả chính.
+
+Khay trên bàn B ở cuối lượt (chỉ số phụ, cách tính của `on_table_b`, `onb.py`):
+
+| | `C_ALL` | `C_70` | `B_ALL` | `B_70` | `C70_R1` |
+|---|---|---|---|---|---|
+| Khay trên bàn B | 43/60 | 50/60 | 44/60 | 51/60 | 49/60 |
+| Tới `place` mà không thành công | 2 | 6 | 5 | 9 | 8 |
+
+`L-TRAY-TILT` theo bước hỏng đầu tiên (chỉ số phụ):
+
+| | `place` | `release_stand` | `carry` | Khay vẫn nằm trên bàn B |
+|---|---|---|---|---|
+| `C70_R1` | 8 | 5 | 2 | 14/15 |
+| `C_70` | 4 | 5 | 1 | 8/10 |
+
+Số nghiêng ở `place` tăng từ 4 lên 8. Lượt tới được `place` của `C70_R1` hỏng vì nghiêng nhiều hơn của `C_70`.
+
+**Đọc chung, trong giới hạn của 20.7.**
+- Kết luận chính theo luật: một vòng Failure → Data với 181 episode **không cho thấy khác** so với thêm đều 181 episode (r1, F).
+- So với `C_70` hướng là âm (r2), CI vẫn chứa 0.
+- Chỉ số phụ cho thấy hai thay đổi cùng lúc. Lượt `L-PLACE-POSE` dồn về gần đích hơn: tối đa 12,7 cm so với 16,1 cm, và nới 7,5 cm được 15 so với 14. Đồng thời nghiêng ở `place` tăng gấp đôi. Đây chỉ là mô tả, không phải nguyên nhân đã kiểm.
+- `C_ALL` và `C_70` train trước vòng này. GPU không tất định, nên khác biệt 1 seed cỡ vài lượt nằm trong nhiễu train.
+
+**Chi phí của 7.6–7.7 (thực đo, chi tiết trong ledger).**
+
+| Hạng mục | CU |
+|---|---|
+| Train lần 1 (dừng sớm) | 8,55 |
+| Train lần 2 | 77,27 |
+| Serve, lần mở 12/11 tối (3 VM bị thu hồi vì để không) | 2,94 |
+| Serve, lần mở 12/11 khuya (Hiếu bảo dừng) | khoảng 2,19 |
+| Serve 13/11 (làn 1, 2; làn 3 hỏng) | 6,42 + 6,42 + 0,93 |
+| Serve 14/11 (làn 3, 4) | 2,26 + 2,25 |
+| **Tổng serve** | **khoảng 23,4**, so với 16,2 ước tính |
+
+Khoảng 8 CU serve là phí:
+- 2,94 CU do VM để không bị thu hồi;
+- 0,93 CU ở làn 3 ngày 13/11;
+- khoảng 3 CU mỗi làn 1, 2 ngày 13/11, vì VM chạy không sau khi lô xong. Bộ theo dõi không nhận ra làn 3 hỏng, nên không báo để dừng VM; token Colab CLI hết hạn cũng làm watcher không tự dừng được VM ở cap.
+
+Hai VM ngày 13/11 không ghi được giờ tắt (watcher mất token sau 05:38Z). Số dư từ 65,30 (13/11 09:48) xuống 51,52 (14/11 10:37), nên phần đuôi không ghi tối đa khoảng 0,9 CU. Eval client trên `rtx3060`: 4,80 giờ client, 0 CU. Số dư Colab cuối: 47,30 CU.
+
+**Việc tiếp theo cần Hiếu (không tự làm).**
+- R16: theo F, vòng dừng ở giai đoạn 1. Có viết `Decision` đóng nhiệm vụ 7 với kết luận "không thấy khác" không, hay chạy thêm (giai đoạn 2, hoặc seed train thứ hai)? Giai đoạn 2 trái với bảng F của 19.2, nên cần `Decision` mới và báo theo cả luật cũ.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -2685,3 +2826,4 @@ R13 ghi thành [`round-tray-c70.bounds.decision.json`](../../configs/runplans/tr
 | 12/11/2026 | Mục 20.15 mới: Hiếu "Duyệt 3 làn" (R12): eval giai đoạn 1 của `C70_R1` trên ba làn serve L4 song song, 2 lô mỗi làn; mã `eval_batch --chunks` và `colab_serve expect --branch C70_R1`; runbook train và ba làn, lịch và CU ước lượng. Luật 20.7 không đổi | Claude cho Hiếu |
 | 12/11/2026 | Mục 20.16 mới (nhiệm vụ con 7.5 xong): sinh 290 lượt, 262 ghi được; release `tray_s1_868cc130985d`, 204 qua QA và bộ lọc; chọn `R181` (56 `approach_a`, 125 `place`); kiểm biên ra ngoài ở 22/181 episode, Hiếu chọn R13 (giữ `R181`, stats ALL, `Decision` riêng) và R14 (giữ 56 + 125); bản cắt `C70_R1` 606 episode, tar `e84ec995…`; plan vòng đóng băng `rp_aae292bc79da`. Luật 20.7 không đổi | Claude cho Hiếu |
 | 12/11/2026 | Mục 20.17: train `C70_R1` lần 1 dừng sớm ở bước 2 703 (8,55 CU, cap 80 của plan thấp hơn cap 82 của các run cặp); R15 chạy lại 60k, R15′ cap 100; watcher gắn lại ở cap 100 không dừng VM; `budget.train_cap_cu` của plan đóng băng giữ 80 để không đổi id `rp_aae292bc79da` | Hiếu (soạn với Claude) |
+| 14/11/2026 | Mục 20.18 mới (nhiệm vụ con 7.6, 7.7 xong): train `C70_R1` lần 2 đo 77,27 CU; eval giai đoạn 1 đủ 60 lượt trên bốn làn L4 (13–14/11). (r1) 4/60 so với `C_ALL` 5/60, hiệu −1,7 điểm %, CI −10,0 đến +6,7, McNemar p = 1,0, giai đoạn 1 ra F: không thấy khác. (r2) so với `C_70` 10/60: −10,0 điểm %, CI −21,7 đến +1,7. (r3), (b), (c) và chi phí serve thực đo (khoảng 23,4 CU, có khoảng 8 CU phí). Luật 20.7 không đổi; R16 chờ Hiếu | Claude cho Hiếu |
