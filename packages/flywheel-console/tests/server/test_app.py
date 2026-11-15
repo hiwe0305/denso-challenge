@@ -341,3 +341,107 @@ def test_chat_stream_failing_before_first_chunk_sends_error_event(
     assert st == 200 and hd["content-type"].startswith("text/event-stream")
     assert b.startswith(b"event: error\n") and b"no model" in b
     assert b.count(b"HTTP/") == 0
+
+
+# ---------------------------------------------------------------- --lock (one-site design 5.3)
+@pytest.fixture
+def locked_srv(fw: ConsolePaths, monkeypatch: pytest.MonkeyPatch) -> Iterator[Srv]:
+    monkeypatch.setattr(media, "seed_rows", lambda: ROWS)
+    httpd = app.make_server(fw, 0, lock=True)
+    t = threading.Thread(target=httpd.serve_forever, daemon=True)
+    t.start()
+    try:
+        yield Srv(httpd, fw)
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/jobs",
+        "/api/jobs/x/cancel",
+        "/api/upload",
+        "/api/chat",
+        "/api/models/prewarm",
+        "/api/models/connect",
+    ],
+)
+def test_locked_server_refuses_every_post(locked_srv: Srv, path: str) -> None:
+    st, body = locked_srv.post(path, {"kind": "ego.deid"})
+    assert st == 403 and body == {"error": "locked"}
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/fs?path=.",
+        "/api/dir_check?path=.",
+        "/api/tool?name=run_list",
+        "/api/exports/a.zip",
+        "/api/chat/traces?limit=20",
+        "/api/chat/traces/t1",
+    ],
+)
+def test_locked_server_refuses_internal_gets(locked_srv: Srv, path: str) -> None:
+    st, body = locked_srv.get(path)
+    assert st == 403 and json.loads(body) == {"error": "locked"}
+
+
+def test_locked_server_still_serves_pages_and_reports_lock(locked_srv: Srv) -> None:
+    (locked_srv.paths.index).mkdir(parents=True, exist_ok=True)
+    (locked_srv.paths.index / "catalog.json").write_text("{}")
+    assert locked_srv.get("/data/catalog.json")[0] == 200
+    st, body = locked_srv.get("/api/status")
+    assert st == 200 and json.loads(body)["locked"] is True
+
+
+def test_locked_server_hides_machine_paths(locked_srv: Srv) -> None:
+    st, body = locked_srv.get("/api/status")
+    text = body.decode() if isinstance(body, bytes) else body
+    assert st == 200 and str(locked_srv.paths.fw_root) not in text and "fwdata" in text
+    red = locked_srv.httpd.redact('{"cwd": "/home/ann/repo/.venv/bin/fw", "u": "/Users/bo/x"}')
+    assert red == '{"cwd": "~/repo/.venv/bin/fw", "u": "~/x"}'
+
+
+def test_locked_server_accepts_the_redacted_paths_it_hands_out(locked_srv: Srv) -> None:
+    """The QA page sends back the redacted ``out`` from /api/jobs; the server maps it back."""
+    out = locked_srv.paths.console_dir / "agentqa" / "j-1"
+    out.mkdir(parents=True)
+    (out / "reports.jsonl").write_text(json.dumps({"report_id": "r1", "findings": []}) + "\n")
+    rel = "fwdata/" + str(out.relative_to(locked_srv.paths.fw_root))
+    assert locked_srv.httpd.unredact(rel) == str(out)
+    st, body = locked_srv.get("/api/agent_result?out=" + rel)
+    text = body.decode() if isinstance(body, bytes) else body
+    assert st == 200 and '"r1"' in text and str(locked_srv.paths.fw_root) not in text
+    assert locked_srv.httpd.unredact("~/x") == str(Path.home() / "x")
+    assert locked_srv.httpd.unredact("plain") == "plain"
+
+
+def test_locked_server_errors_hide_machine_paths(locked_srv: Srv) -> None:
+    st, body = locked_srv.get("/api/agent_result?out=fwdata/../../etc")
+    text = body.decode() if isinstance(body, bytes) else body
+    assert st == 400 and str(locked_srv.paths.fw_root) not in text
+
+
+def test_unlocked_status_says_unlocked(srv: Srv) -> None:
+    st, body = srv.get("/api/status")
+    assert st == 200 and json.loads(body)["locked"] is False
+
+
+def test_simmedia_serves_ranges_and_refuses_escape(srv: Srv) -> None:
+    v = write_mp4(srv.paths.sim_media / "e84ec995" / "ep_000003.mp4")
+    st, hd, body = srv.req(
+        "GET", "/simmedia/e84ec995/ep_000003.mp4", headers={"Range": "bytes=0-9"}
+    )
+    assert st == 206 and len(body) == 10 and hd["content-range"].endswith(f"/{v.stat().st_size}")
+    assert srv.get("/simmedia/../index/catalog.json")[0] == 404
+    assert srv.get("/simmedia/%2e%2e/jobs/x.json")[0] == 404
+
+
+def test_demomedia_serves_ranges_and_refuses_escape(srv: Srv) -> None:
+    v = write_mp4(srv.paths.demo_media / "success-C_70.mp4")
+    st, hd, body = srv.req("GET", "/demomedia/success-C_70.mp4", headers={"Range": "bytes=0-9"})
+    assert st == 206 and len(body) == 10 and hd["content-range"].endswith(f"/{v.stat().st_size}")
+    assert srv.get("/demomedia/../index/catalog.json")[0] == 404

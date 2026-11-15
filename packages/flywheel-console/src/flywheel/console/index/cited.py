@@ -73,5 +73,39 @@ def loop_detail(paths: ConsolePaths) -> dict[str, int]:
     return {"qa_pass": by["loop.qa_pass"], "in_cut": by["loop.in_cut"]}
 
 
+def round_block(paths: ConsolePaths) -> dict[str, Any]:
+    """The cited half of the C70_R1 round (tray.md 20.11–20.16); empty when the seed lacks it."""
+    by = {c.key: c.value for c in load(paths)}
+    if "round.plan" not in by:
+        return {}
+    return {
+        "source": "docs/he/tray.md §20.11–20.16",
+        "plan": by["round.plan"],
+        "chain": {
+            k: by[f"round.{k}"]
+            for k in ("targets", "generated", "recorded", "qa_pass", "quality", "selected")
+        },
+        "clusters": by["round.clusters.data"] + by["round.clusters.tickets"],
+        # attempts asked of the planner per failure (by stage) and its failures in this batch
+        "per_case": by.get("round.per_case") or {},
+        "planner_failures": by.get("round.planner_failures") or {},
+    }
+
+
+def demo_groups(paths: ConsolePaths) -> dict[str, dict[str, dict[str, Any]]]:
+    """``demo.<group>.<name>`` entries as ``{group: {name: {value, source, quote}}}``."""
+    out: dict[str, dict[str, dict[str, Any]]] = {}
+    for c in load(paths):
+        parts = c.key.split(".", 2)
+        if len(parts) != 3 or parts[0] != "demo":
+            continue
+        out.setdefault(parts[1], {})[parts[2]] = {
+            "value": c.value,
+            "source": f"{c.doc} §{c.section}",
+            "quote": c.quote,
+        }
+    return out
+
+
 def loop_in_cut(paths: ConsolePaths) -> int:
     return loop_detail(paths)["in_cut"]

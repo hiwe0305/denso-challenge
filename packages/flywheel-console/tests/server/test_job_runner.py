@@ -281,3 +281,41 @@ def test_agentqa_review_refuses_without_reviewer(
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
     with pytest.raises(ValueError, match="FW_REVIEWER"):
         runner.plan("agentqa.review", _review_params(rn), "x")
+
+
+def test_status_eval_and_loop_wait_without_index(rn: ConsolePaths) -> None:
+    st = {s["id"]: s for s in runner.status()["stages"]}
+    assert st["eval"]["state"] == "waiting" and st["loop"]["state"] == "waiting"
+
+
+def test_status_reads_pair_round_from_index(rn: ConsolePaths) -> None:
+    pair = {
+        "best": "C_70",
+        "runs": [
+            {"run": "C_70", "successes": 10, "n": 60},
+            {"run": "C70_R1", "successes": 4, "n": 60},
+        ],
+        "comparisons": [
+            {"variant": "C70_R1", "baseline": "C_70", "outcome": "F"},
+            {"variant": "C70_R1", "baseline": "C_ALL", "outcome": "F"},
+            {"variant": "C_70", "baseline": "C_ALL", "outcome": "continue"},
+        ],
+    }  # fmt: skip
+    rn.index.mkdir(parents=True, exist_ok=True)
+    (rn.index / "story.json").write_text(
+        json.dumps({"pair": pair, "round": {"chain": {"selected": 181}}}), encoding="utf-8"
+    )
+    st = {s["id"]: s for s in runner.status()["stages"]}
+    # the home page reads the first fraction of eval.now as the success rate: the best run's
+    assert st["eval"]["state"] == "done"
+    assert st["eval"]["now"] == "Tốt nhất C_70 10/60 · vòng C70_R1 4/60"
+    assert st["loop"]["state"] == "done"
+    assert st["loop"]["now"] == "Vòng C70_R1: chọn 181 tập → 4/60 → dừng (F)"
+
+
+def test_train_runs_skip_abandoned_attempts(rn: ConsolePaths) -> None:
+    for branch in ("C70_R1", "C70_R1.attempt1"):
+        d = rn.fw_root / "tray/pair60k" / branch / "job"
+        d.mkdir(parents=True)
+        (d / "metrics.jsonl").write_text(json.dumps({"step": 60000, "loss": 0.1}) + "\n")
+    assert [r["branch"] for r in runner.train_runs()] == ["C70_R1"]

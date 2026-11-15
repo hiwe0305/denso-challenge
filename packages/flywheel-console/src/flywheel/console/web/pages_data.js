@@ -33,7 +33,7 @@ const PAGES_DATA = (() => {
   const jtry = url => jget(url).catch(() => null);
   const fmtN = (v, f) => (typeof UI !== "undefined" && UI.fmt) ? UI.fmt(v, f) : (v == null ? "—" : String(v));
   const int = v => v == null ? "—" : fmtN(v, "int");
-  const dec = (v, d) => v == null || Number.isNaN(v) ? "—" : Number(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const dec = (v, d) => v == null || Number.isNaN(v) ? "—" : Number(v).toLocaleString(UI.loc(), { minimumFractionDigits: d, maximumFractionDigits: d });
   const sig3 = v => v == null ? "—" : (Math.abs(v) >= 100 ? Math.round(v).toString() : Number(v.toPrecision(3)).toString());
   const mid = (s, n) => s && s.length > n ? s.slice(0, Math.ceil((n - 1) / 2)) + "…" + s.slice(-Math.floor((n - 1) / 2)) : s;
   const demoOn = () => !!(typeof UI !== "undefined" && (typeof UI.demo === "function" ? UI.demo() : UI.demo));
@@ -111,6 +111,12 @@ const PAGES_DATA = (() => {
     return parseFloat(m[1]) * ({ B: 1, KB: 1024, MB: 1048576, GB: 1073741824, TB: 1099511627776 })[m[2]];
   };
   const sizeShort = s => { const m = /~?\d[\d.,]*\s*(?:KB|MB|GB|TB|B)\b/.exec(s || ""); return m ? m[0] : null; };
+  /* distinct totals: only rows flagged unique by the indexer (current raw sources and releases);
+     pipeline sources, exports and cuts repeat their parents' episodes */
+  const sumU = (rows, k) => rows.filter(r => r.unique).reduce((a, r) => a + (r[k] || 0), 0);
+  /* a set with episodes but no recorded hours makes the hours total a lower bound */
+  const hoursU = (rows, d) => (rows.some(r => r.unique && r.episodes && r.hours == null) ? "≥ " : "") + dec(sumU(rows, "hours"), d);
+  const ORIGIN = r => r.kind === "raw source" || r.kind === "release";
   const qaStr = c => c ? `${c.pass || 0}/${c.flag || 0}/${c.reject || 0}` : null;
   let CAT = null;
   async function loadCat() {
@@ -223,11 +229,11 @@ const PAGES_DATA = (() => {
     const o1 = eopt({ legend: { show: false }, tooltip: { trigger: "axis", axisPointer: { type: "shadow" } } });
     const A = o1._ax; delete o1._ax;
     o1.xAxis = A({ type: "value" }); o1.yAxis = A({ type: "category", data: types, inverse: true });
-    o1.series = stat.map(st => ({ name: st, type: "bar", stack: "a", barMaxWidth: 16, itemStyle: { color: sc[st] }, data: types.map(t => rows.filter(r => r._type === t && r.status === st).reduce((a, r) => a + (r.episodes || 0), 0) || null) }));
+    o1.series = stat.map(st => ({ name: st, type: "bar", stack: "a", barMaxWidth: 16, itemStyle: { color: sc[st] }, data: types.map(t => rows.filter(r => ORIGIN(r) && r._type === t && r.status === st).reduce((a, r) => a + (r.episodes || 0), 0) || null) }));
     // hours by type
     const o2 = eopt({}); const A2 = o2._ax; delete o2._ax;
     o2.xAxis = A2({ type: "value" }); o2.yAxis = A2({ type: "category", data: types, inverse: true });
-    o2.series = [{ type: "bar", barMaxWidth: 16, data: types.map(t => ({ value: R2(rows.filter(r => r._type === t).reduce((a, r) => a + (r.hours || 0), 0)), itemStyle: { color: gcolor(GORDER.find(g => GROUP[g][0] === t)) } })) }];
+    o2.series = [{ type: "bar", barMaxWidth: 16, data: types.map(t => ({ value: R2(rows.filter(r => r.unique && r._type === t).reduce((a, r) => a + (r.hours || 0), 0)), itemStyle: { color: gcolor(GORDER.find(g => GROUP[g][0] === t)) } })) }];
     // qa per source
     const qr = rows.filter(r => r.qa_counts).sort((a, b) => (b.episodes || 0) - (a.episodes || 0)).slice(0, 8);
     const o3 = eopt({ tooltip: { trigger: "axis", axisPointer: { type: "shadow" } } }); const A3 = o3._ax; delete o3._ax;
@@ -266,7 +272,7 @@ const PAGES_DATA = (() => {
     const match = (r, f) => (!f.type || r._type === f.type) && (f.status === "all" || r.status === f.status) && (!f.task || r.task === f.task) && (!f.host || r._host.includes(f.host)) && (!f.q || (r.id + " " + r.name).toLowerCase().includes(f.q.toLowerCase()));
     const uniq = k => [...new Set(pool.map(r => k === "host" ? r._host : r[k === "type" ? "_type" : k]).flat())].filter(Boolean).sort();
     const statN = () => pool.length;
-    main.appendChild(pageHead({ title: "data", stat: UI.StatLine(statItems([{ unit: "sets", value: int(statN()) }, { unit: "eps", value: int(pool.reduce((a, r) => a + (r.episodes || 0), 0)) }, { unit: "hours", value: dec(pool.reduce((a, r) => a + (r.hours || 0), 0), 1) }])) }));
+    main.appendChild(pageHead({ title: "data", stat: UI.StatLine(statItems([{ unit: "sets", value: int(statN()) }, { unit: "eps", value: int(sumU(pool, "episodes")) }, { unit: "hours", value: hoursU(pool, 1) }])) }));
     const bar = E("div", { class: "pd-bar" }), body = E("div");
     const sumBox = E("div");
     main.appendChild(sumBox); main.appendChild(bar); main.appendChild(body);
@@ -283,7 +289,7 @@ const PAGES_DATA = (() => {
       const sf = Object.assign({}, f, { type: "" });
       const srows = pool.filter(r => match(r, sf));
       sumBox.innerHTML = "";
-      const tiles = tileRow([{ label: "sets", value: srows.length }, { label: "eps", value: srows.reduce((a, r) => a + (r.episodes || 0), 0) }, { label: "hours", value: dec(srows.reduce((a, r) => a + (r.hours || 0), 0), 1) },
+      const tiles = tileRow([{ label: "sets", value: srows.length }, { label: "eps", value: sumU(srows, "episodes") }, { label: "hours", value: hoursU(srows, 1) },
         { label: "missing", value: pool.filter(r => r.status === "missing").length, state: "bad" }]);
       if (tiles) sumBox.appendChild(tiles);
       sumBox.appendChild(summaryRow(srows));

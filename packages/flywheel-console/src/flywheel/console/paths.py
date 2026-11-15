@@ -26,6 +26,16 @@ class ConsolePaths:
         return self.console_dir / "index"
 
     @property
+    def sim_media(self) -> Path:
+        """Sampled simulation videos and posters, served at ``/simmedia/``."""
+        return self.console_dir / "media" / "sim"
+
+    @property
+    def demo_media(self) -> Path:
+        """Clips shown on the story pages (one successful run), served at ``/demomedia/``."""
+        return self.console_dir / "media" / "demo"
+
+    @property
     def cache(self) -> Path:
         return self.console_dir / "cache"
 

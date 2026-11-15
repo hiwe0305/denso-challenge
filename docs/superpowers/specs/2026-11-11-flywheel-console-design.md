@@ -2,6 +2,7 @@
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 15/11/2026 | 0.6 | Mục 7 (kiến trúc thông tin) và 15.1b (giới hạn chữ) được sửa bởi [Console một website](2026-11-15-console-one-site-design.md) bản 0.2, Hiếu duyệt 15/11: menu 6 trạm, phần giải thích đầu trang, VI/EN; luật chữ riêng cho từ điển `web/i18n/` (câu dẫn tối đa 30 từ, một trạm tối đa 90 từ), 15.1b giữ cho thân trang | Hiếu (soạn với Claude) |
 | 11/11/2026 | 0.5 | Bản v5 và ghép v3 + v5 theo yêu cầu của Hiếu tối 11/11: mục mới 15.1b (người dùng là AI Engineer, Agent là chatbot gọi công cụ, khung sidebar trái + panel phải, trực quan trước, giới hạn chữ, bench chatbot); ghi chú thay thế ở mục 6, 7, P6, 15.1a; câu hỏi 6 (mục 16); quyết định 6–8 (mục 17) | Hiếu (soạn với Claude) |
 | 11/11/2026 | 0.4 | Console chạy được việc, theo yêu cầu của Hiếu chiều 11/11: mục 11.1 (bộ chạy việc), 15.1 (bỏ "chỉ đọc"), mục mới 15.1a (bộ chạy việc, Nhập, Xuất, vòng flywheel, chế độ trình chiếu), 17.1 và 17.2 | Hiếu (soạn với Claude) |
 | 11/11/2026 | 0.3 | Thiết kế lại sau đánh giá của Fable, chuẩn hình thức là Egocentric Explorer: mục 6 (nguyên tắc, token sáng), mục 7 (sáu tab, bỏ menu trái và cột phải, các mức xem dữ liệu), 11.1 (server có Range, ảnh bằng `cv2`, thư viện đóng gói), 12 (chế độ trình chiếu), 15.1 (lộ trình demo, gói việc, lịch) | Hiếu (soạn với Claude) |

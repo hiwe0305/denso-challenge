@@ -7,12 +7,13 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 from collections import Counter, defaultdict
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from flywheel.console.index import cited
+from flywheel.console.index import cited, demo
 from flywheel.console.paths import ConsolePaths
 
 _SERIES_CAP = 400
@@ -232,6 +233,101 @@ def _colab(fw: Path) -> tuple[list[list[Any]], list[dict[str, Any]]]:
     return bal, sessions
 
 
+# stage1-C_ALL-table.json, stage1-a-B_70-vs-C_70.json: the headline is the first-named run's
+_STAGE1 = re.compile(r"^stage1-(?:([a-z])-)?([A-Za-z0-9_]+?)(?:-vs-([A-Za-z0-9_]+)|-table)$")
+_PAIR_ORDER = ("C_ALL", "C_70", "B_ALL", "B_70", "C70_R1")
+
+
+def _run_row(name: str, h: dict[str, Any], levels: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "run": name,
+        "n": h.get("n"),
+        "successes": h.get("successes"),
+        "p": h.get("p"),
+        "wilson": h.get("wilson"),
+        "failures": dict(sorted((h.get("failures") or {}).items(), key=lambda kv: -_num(kv[1]))),
+        "step_pass": h.get("step_pass") or {},
+        "levels": {
+            lv: {"n": v.get("n"), "successes": v.get("successes")}
+            for lv, v in sorted(levels.items())
+            if isinstance(v, dict)
+        },
+    }
+
+
+def _pair(fw: Path) -> dict[str, Any]:
+    """Stage-1 reads of the pair60k runs at 60k steps; empty when the folder is absent."""
+    folder = fw / "tray" / "pair60k" / "stage1-60k"
+    runs: dict[str, dict[str, Any]] = {}
+    comps: list[dict[str, Any]] = []
+    for f in sorted(folder.glob("stage1-*.json")):
+        m = _STAGE1.match(f.stem)
+        d = _dict(f)
+        h = d.get("headline")
+        if not m or not isinstance(h, dict):
+            continue
+        tag, first, second = m.groups()
+        runs.setdefault(first, _run_row(first, h, d.get("levels") or {}))
+        ph = (d.get("paired") or {}).get("headline")
+        if second and isinstance(ph, dict):
+            comps.append(
+                {
+                    "tag": tag,
+                    "variant": first,
+                    "baseline": second,
+                    "n": ph.get("n"),
+                    "variant_succ": ph.get("variant"),
+                    "baseline_succ": ph.get("baseline"),
+                    "diff": ph.get("diff"),
+                    "ci": ph.get("ci"),
+                    "mcnemar_p": ph.get("mcnemar_exact_p"),
+                    "variant_only": ph.get("variant_only"),
+                    "baseline_only": ph.get("baseline_only"),
+                    "outcome": (d.get("stage1") or {}).get("outcome"),
+                }
+            )
+    if not runs:
+        return {}
+    rank = {r: i for i, r in enumerate(_PAIR_ORDER)}
+    ordered = sorted(runs.values(), key=lambda r: (rank.get(r["run"], len(rank)), r["run"]))
+    best = max(ordered, key=lambda r: _num(r["successes"]))
+    return {
+        "source": "fwdata/tray/pair60k/stage1-60k",
+        "steps": list(ordered[0]["step_pass"]),
+        "runs": ordered,
+        "best": best["run"],
+        "comparisons": comps,
+    }
+
+
+# the trial that "Follow one failure" walks through (one-site design 6.7)
+FOLLOW = (1, 1000107)
+_FOLLOW_KEYS = ("success", "failure", "reach_b", "distance_m", "yaw_error_deg")
+
+
+def _follow(fw: Path) -> dict[str, Any]:
+    """One eval trial across every pair60k run, plus the targeted / other split (``r3.json``)."""
+    folder = fw / "tray" / "pair60k" / "stage1-60k"
+    runs: dict[str, dict[str, Any]] = {}
+    tol: dict[str, Any] = {}
+    for f in sorted(folder.glob("place-error-*.json")):
+        d = _dict(f)
+        for r in d.get("rows") or []:
+            if isinstance(r, dict) and (r.get("level"), r.get("seed")) == FOLLOW:
+                runs[f.stem[len("place-error-") :]] = {k: r.get(k) for k in _FOLLOW_KEYS}
+                tol = tol or dict(d.get("tolerance") or {})
+    if not runs:
+        return {}
+    return {
+        "source": "fwdata/tray/pair60k/stage1-60k",
+        "level": FOLLOW[0],
+        "seed": FOLLOW[1],
+        "tol": tol,
+        "runs": runs,
+        "r3": _dict(folder / "r3.json"),
+    }
+
+
 def _catalog(out: Path) -> dict[str, Any]:
     doc = _dict(out / "catalog.json")
     return doc or {"generated": "", "rows": [], "edges": [], "runs": []}
@@ -250,13 +346,23 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
         detail: dict[str, int] = cited.loop_detail(paths)
     except (OSError, KeyError, TypeError, ValueError):
         eval_block, chain, detail = {}, [], {}
+    try:
+        round_cited: dict[str, Any] = cited.round_block(paths)
+    except (OSError, KeyError, TypeError, ValueError):
+        round_cited = {}
     ds = _catalog(out)
+    try:
+        demo_cited = cited.demo_groups(paths)
+    except (OSError, KeyError, TypeError, ValueError):
+        demo_cited = {}
+    pair = _pair(fw)
+    h1m = _h1m(fw)
     data: dict[str, Any] = {
         "runs": runs,
         "train_log_tail": tail,
         "vm_phases": phases,
         **ego,
-        "h1m": _h1m(fw),
+        "h1m": h1m,
         "ledger": _ledger(paths.repo),
         "colab_balance": bal,
         "colab_sessions": sessions,
@@ -264,6 +370,10 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
         "eval": eval_block,
         "loop_chain": chain,
         "loop_detail": detail,
+        "pair": pair,
+        "round": round_cited,
+        "follow": _follow(fw),
+        "demo": demo.build(fw, pair, round_cited, h1m, demo_cited),
     }
     out.mkdir(parents=True, exist_ok=True)
     (out / "story.json").write_text(
@@ -272,5 +382,6 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
     return {
         k: len(v)
         for k, v in data.items()
-        if isinstance(v, (list, dict)) and k not in ("ds", "eval")
-    } | {"ds_rows": len(ds.get("rows", []))}
+        if isinstance(v, (list, dict))
+        and k not in ("ds", "eval", "pair", "round", "follow", "demo")
+    } | {"ds_rows": len(ds.get("rows", [])), "pair_runs": len(data["pair"].get("runs", []))}

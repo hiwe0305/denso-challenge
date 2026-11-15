@@ -17,6 +17,9 @@ _GROUPS = {
     "synthetic S2": "s2",
 }
 _ROBOT_IDS = ("S70", "ALL")
+# Kinds whose episodes are new data. Pipeline sources, exports, cuts and bench copies
+# repeat the episodes of their parents, so summing them counts one clip several times.
+_ORIGIN_KINDS = ("raw source", "release")
 _EGO_IDS = ("h1m-team", "h1m-egodex")
 _PSI_IDS = ("psi-two-table", "psi-hug")
 _COND_IDS = ("he-dev-eval-v1", "he-dev-eval-v1-l0n10", "he-eval-n20-interleaved")
@@ -123,6 +126,27 @@ def _view(paths: ConsolePaths, r: dict[str, Any], laptop_dir: Path | None, has_l
     return "meta"
 
 
+def _is_unique(row: dict[str, Any]) -> bool:
+    """True when the row's episodes are counted once in the catalog totals."""
+    return bool(
+        row["kind"] in _ORIGIN_KINDS and row["status"] == "current" and row["group"] != "eval"
+    )
+
+
+def _totals(rows: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
+    """Distinct episodes and hours per group and overall, from the unique rows only."""
+    out: dict[str, dict[str, float]] = {}
+    for r in rows:
+        if not r["unique"]:
+            continue
+        for key in (r["group"], "all"):
+            t = out.setdefault(key, {"sets": 0, "episodes": 0, "hours": 0.0})
+            t["sets"] += 1
+            t["episodes"] += r["episodes"] or 0
+            t["hours"] = round(t["hours"] + (r["hours"] or 0.0), 3)
+    return out
+
+
 def _load_seed(paths: ConsolePaths) -> dict[str, Any]:
     data = yaml.safe_load((paths.seed / "catalog.yaml").read_text(encoding="utf-8"))
     assert isinstance(data, dict)
@@ -182,10 +206,17 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
                 "ego_viewer": r.get("ego_viewer"),
             }
         )
+        rows[-1]["unique"] = _is_unique(rows[-1])
         rows[-1].update(_rsync(r, locs, rows[-1]["view"], laptop_dir is not None))
     runs = list(seed["runs"])
     out.mkdir(parents=True, exist_ok=True)
-    doc = {"generated": seed["generated"], "rows": rows, "edges": edges, "runs": runs}
+    doc = {
+        "generated": seed["generated"],
+        "rows": rows,
+        "edges": edges,
+        "runs": runs,
+        "totals": _totals(rows),
+    }
     (out / "catalog.json").write_text(
         json.dumps(doc, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
     )

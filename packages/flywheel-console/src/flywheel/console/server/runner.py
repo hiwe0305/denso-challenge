@@ -1192,6 +1192,8 @@ def agent_results(out_dir: str) -> dict[str, Any]:
 def train_runs() -> list[dict[str, Any]]:
     runs: list[dict[str, Any]] = []
     for f in sorted(_fw().glob("tray/pair60k/*/*/metrics.jsonl")):
+        if ".attempt" in f.parent.parent.name:  # an abandoned try, e.g. C70_R1.attempt1
+            continue
         try:
             ln = [x for x in tail_text(f, 6000).splitlines() if x.strip().startswith("{")]
             last = json.loads(ln[-1])
@@ -1249,11 +1251,46 @@ def _new_stage(sid: str, label: str, link: str, tm: str) -> dict[str, Any]:
             "how": None, "jobs": [], "link": link, "updated": tm}  # fmt: skip
 
 
+def _eval_loop_text() -> tuple[str, str]:
+    """Eval and loop lines from the indexed pair60k reads; the best run's fraction comes first."""
+    try:
+        doc = json.loads((_p().index / "story.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return "", ""
+    if not isinstance(doc, dict):
+        return "", ""
+    pair = doc.get("pair") or {}
+    runs = {r.get("run"): r for r in pair.get("runs") or [] if isinstance(r, dict)}
+    best = runs.get(pair.get("best"))
+    if not best:
+        return "", ""
+    frac = "{}/{}".format
+    ev = "Tốt nhất {} {}".format(best["run"], frac(best.get("successes"), best.get("n")))
+    rnd = next((r for name, r in runs.items() if re.search(r"_R\d+$", name or "")), None)
+    if not rnd:
+        return ev, ""
+    ev += " · vòng {} {}".format(rnd["run"], frac(rnd.get("successes"), rnd.get("n")))
+    outs = [
+        c.get("outcome") for c in pair.get("comparisons") or [] if c.get("variant") == rnd["run"]
+    ]
+    chain = (doc.get("round") or {}).get("chain") or {}
+    if not outs or not chain:
+        return ev, ""
+    stop = all(o == "F" for o in outs)
+    lp = "Vòng {}: chọn {} tập → {} → {}".format(
+        rnd["run"],
+        chain.get("selected", "?"),
+        frac(rnd.get("successes"), rnd.get("n")),
+        "dừng (F)" if stop else "tiếp (" + ", ".join(sorted({str(o) for o in outs})) + ")",
+    )
+    return ev, lp
+
+
 def status() -> dict[str, Any]:
     tm = now()
     stages = {
         "collect": _new_stage("collect", "Thu dữ liệu", "#/data/nhap", tm),
-        "process": _new_stage("process", "Xử lý", "#/process", tm),
+        "process": _new_stage("process", "Xử lý", "#/jobs?view=pipeline", tm),
         "release": _new_stage("release", "Phát hành", "#/data/xuat", tm),
         "train": _new_stage("train", "Huấn luyện", "#/training", tm),
         "eval": _new_stage("eval", "Đánh giá", "#/eval", tm),
@@ -1325,11 +1362,18 @@ def status() -> dict[str, Any]:
     else:
         s.update(state="idle", now="Chưa thấy metrics.jsonl của lần train nào")
     s["runs"] = runs
-    # eval and loop: no live source on the laptop; shown as waiting
-    stages["eval"].update(state="waiting", now="Eval chạy ở Colab hoặc 3060", static=True,
-                          how="Chờ checkpoint mới")  # fmt: skip
-    stages["loop"].update(state="waiting", now="Vòng lặp chờ kết quả eval", static=True,
-                          how="Xem trang Vòng lặp")  # fmt: skip
+    # eval and loop have no live source on the laptop: read the index, else show waiting
+    ev, lp = _eval_loop_text()
+    if ev:
+        stages["eval"].update(state="done", now=ev, static=True, how="Xem trang Eval")
+    else:
+        stages["eval"].update(state="waiting", now="Eval chạy ở Colab hoặc 3060", static=True,
+                              how="Chờ checkpoint mới")  # fmt: skip
+    if lp:
+        stages["loop"].update(state="done", now=lp, static=True, how="Xem trang Vòng lặp")
+    else:
+        stages["loop"].update(state="waiting", now="Vòng lặp chờ kết quả eval", static=True,
+                              how="Xem trang Vòng lặp")  # fmt: skip
     jobs = list_jobs(10)
     mi = models_info()
     # an ego.pipeline parent holds no slot; only its child jobs do

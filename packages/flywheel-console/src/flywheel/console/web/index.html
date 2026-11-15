@@ -1,17 +1,17 @@
 <!doctype html>
-<html lang="en">
+<html lang="vi">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Flywheel Console</title>
+<title>Humanoid Data Flywheel</title>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="chat.css">
 <link rel="stylesheet" href="tour.css">
-<script>try{var t=localStorage.getItem("v5theme");document.documentElement.setAttribute("data-theme",t||"dark");if(/(^|[?&#])demo=1/.test(location.search+location.hash)||sessionStorage.getItem("v5demo")==="1")document.documentElement.classList.add("demo")}catch(e){document.documentElement.setAttribute("data-theme","dark")}</script>
+<script>try{var t=localStorage.getItem("v5theme");document.documentElement.setAttribute("data-theme",t||"light");if(/(^|[?&#])demo=1/.test(location.search+location.hash)||sessionStorage.getItem("v5demo")==="1")document.documentElement.classList.add("demo")}catch(e){document.documentElement.setAttribute("data-theme","light")}</script>
 </head>
 <body>
 <header id="hdr">
-  <a class="logo" href="#/home">FW</a>
+  <a class="logo" href="#/home"><b>Humanoid Data Flywheel</b><span class="team">· ilovephysicalintelligence</span></a>
   <div class="srch" id="srch"><span>&#8981;</span><span>Search</span><kbd>&#8984;K</kbd></div>
   <select id="task" title="task"><option>tray</option><option>two_table</option></select>
   <div id="meta"></div>
@@ -28,10 +28,17 @@
 <aside class="drawer" id="drawer"><header><b id="dtitle"></b><button class="iconbtn" id="dclose">Esc</button></header>
 <div class="dtabs" id="dtabs"><a data-t="method">repro</a><a data-t="log">log</a><a data-t="src">src</a></div><div class="dbody" id="dbody"></div></aside>
 <script src="vendor/echarts.min.js"></script>
+<script src="i18n/vi.js"></script>
+<script src="i18n/en.js"></script>
 <script src="core.js"></script>
+<script src="explain.js"></script>
 <script src="pages_data.js"></script>
 <script src="pages_story.js"></script>
 <script src="pages_ops.js"></script>
+<script src="pages_sim.js"></script>
+<script src="pages_start.js"></script>
+<script src="pages_wheel.js"></script>
+<script src="pages_steps.js"></script>
 <script src="ring.js"></script>
 <script src="tour.js"></script>
 <script src="chat.js"></script>

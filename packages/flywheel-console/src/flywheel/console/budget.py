@@ -23,10 +23,20 @@ BUDGET: dict[str, int] = {
     "app.js": 130,
     "chat.js": 60,
     "core.js": 60,
-    "index.html": 20,
+    "index.html": 26,  # brand line in the top bar (flywheel v0.3 design 6)
     "tour.js": 10,
     "ring.js": 25,
+    "explain.js": 60,  # source labels of the numbers (tooltips built in code)
+    "pages_start.js": 30,  # SVG path templates and class ternaries count; text is in i18n
+    "pages_sim.js": 30,  # source labels of the card counts (tooltips built in code)
+    "pages_wheel.js": 30,  # SVG path templates and class names; text is in i18n
+    "pages_steps.js": 60,  # run ids used as index keys, units and source labels; text is in i18n
 }
+# Dictionary rule (one-site design 5.5, a change to BA 15.1b): a lead (key ending ".a" or ".lead")
+# has at most LEAD_WORDS words; all "st.N.*" text of one station has at most STATION_WORDS.
+LEAD_WORDS = 30
+STATION_WORDS = 90
+_ENTRY = re.compile(r'^\s*"([^"]+)":\s*"((?:[^"\\]|\\.)*)",?\s*$')
 PREFIX_SKIP = re.compile(
     r"(class|className|style|href|src|id|type|key|name|for|rel|target|role|method|cursor|display|color|background|position|width|height)\s*[:=]\s*$"
     r"|(querySelector|querySelectorAll|getElementById|classList\.\w+|closest|matches|getAttribute|setAttribute|addEventListener|createElement|createElementNS|getPropertyValue|setProperty|\$|\$\$|cssv|fetch|J|api|jget|require|include|startsWith|endsWith|indexOf|includes|replace|split|test|match|go|emit|on)\s*\(\s*$"
@@ -193,4 +203,31 @@ def long_literals(web: Path) -> list[tuple[str, int, int, str]]:
                 nw = len(_words(t))
                 if nw > MAX_WORDS:
                     bad.append((name, ln, nw, t[:90]))
+    return bad
+
+
+def dict_entries(path: Path) -> dict[str, str]:
+    """Entries of a ``web/i18n/*.js`` dictionary (one ``"key": "value",`` per line)."""
+    out: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        m = _ENTRY.match(line)
+        if m:
+            out[m.group(1)] = m.group(2)
+    return out
+
+
+def dict_violations(path: Path) -> list[str]:
+    """Leads over ``LEAD_WORDS`` words and stations over ``STATION_WORDS`` words."""
+    bad: list[str] = []
+    per: dict[str, int] = {}
+    for k, v in dict_entries(path).items():
+        n = len(_words(v))
+        if (k.endswith(".a") or k.endswith(".lead")) and n > LEAD_WORDS:
+            bad.append(f"{k}: {n} words > {LEAD_WORDS}")
+        m = re.match(r"st\.(\d+)\.", k)
+        if m:
+            per[m.group(1)] = per.get(m.group(1), 0) + n
+    bad += [
+        f"st.{s}: {n} words > {STATION_WORDS}" for s, n in sorted(per.items()) if n > STATION_WORDS
+    ]
     return bad

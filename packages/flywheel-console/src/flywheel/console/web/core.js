@@ -19,9 +19,17 @@ function h(tag, attrs, kids) {
   return e;
 }
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
-const nf = new Intl.NumberFormat("vi-VN");
-const fmt = (x, d) => x == null || x === "" || Number.isNaN(x) ? "–" : (typeof x === "number" ? (d != null ? x.toLocaleString("vi-VN", { minimumFractionDigits: d, maximumFractionDigits: d }) : nf.format(x)) : x);
-const pct = (x, d = 1) => x == null ? "–" : (x * 100).toLocaleString("vi-VN", { maximumFractionDigits: d, minimumFractionDigits: d }) + " %";
+/* ---------- language (one-site design 5.4): ?lang= beats localStorage, default vi ---------- */
+const LANG = (() => { let l = null; try { const m = /[?&#]lang=(vi|en)\b/.exec(location.search + location.hash); l = m ? m[1] : localStorage.getItem("v5lang"); } catch (e) { /* storage blocked */ } return l === "en" ? "en" : "vi"; })();
+const loc = () => (window.UI && UI.lang === "en") ? "en-US" : "vi-VN";
+/* dictionary lookup; {name} slots are filled from vars (numbers formatted for the language) */
+function t(key, vars) {
+  const I = window.I18N || {}, lang = window.UI ? UI.lang : LANG, d = I[lang] || {}, vi = I.vi || {};
+  const s = d[key] != null ? d[key] : vi[key] != null ? vi[key] : key;
+  return vars ? s.replace(/\{(\w+)\}/g, (m, k) => vars[k] == null ? m : typeof vars[k] === "number" ? (Number.isInteger(vars[k]) ? vars[k].toLocaleString(loc()) : vars[k].toLocaleString(loc(), { maximumFractionDigits: 1 })) : String(vars[k])) : s;
+}
+const fmt = (x, d) => x == null || x === "" || Number.isNaN(x) ? "–" : (typeof x === "number" ? (d != null ? x.toLocaleString(loc(), { minimumFractionDigits: d, maximumFractionDigits: d }) : x.toLocaleString(loc())) : x);
+const pct = (x, d = 1) => x == null ? "–" : (x * 100).toLocaleString(loc(), { maximumFractionDigits: d, minimumFractionDigits: d }) + " %";
 const wilson = (k, n, z = 1.96) => { const p = k / n, d = 1 + z * z / n, c = p + z * z / (2 * n), m = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)); return [(c - m) / d, (c + m) / d]; };
 
 const _cache = {};
@@ -38,7 +46,7 @@ function setTheme(t) {
   if (t) document.documentElement.setAttribute("data-theme", t); else document.documentElement.removeAttribute("data-theme");
   try { localStorage.setItem("v5theme", t || ""); } catch (e) {}
 }
-function curTheme() { return document.documentElement.getAttribute("data-theme") || "dark"; }
+function curTheme() { return document.documentElement.getAttribute("data-theme") || "light"; }
 
 /* ---- charts ---- */
 let CHARTS = [];
@@ -114,7 +122,7 @@ function openDrawer(spec) {
   // spec: {title, tabs: {method: node|string, log:..., src:...}}
   const d = $("#drawer"), bg = $("#drawer-bg");
   let cur = "method";
-  const body = $("#dbody"); $("#dtitle").textContent = spec.title || "Cách làm";
+  const body = $("#dbody"); $("#dtitle").textContent = spec.title || t("panel.method");
   function draw() {
     $$("#dtabs a").forEach(a => a.classList.toggle("on", a.dataset.t === cur));
     body.innerHTML = ""; const v = spec.tabs[cur]; if (v == null) body.appendChild(h("p", { class: "muted", text: "Chưa có." })); else if (typeof v === "string") body.innerHTML = v; else body.appendChild(v);
@@ -125,7 +133,7 @@ function openDrawer(spec) {
 }
 function closeDrawer() { $("#drawer").classList.remove("open"); $("#drawer-bg").classList.remove("open"); }
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeDrawer(); });
-function howBtn(spec) { return h("button", { class: "btn", text: "Cách làm", onclick: () => openDrawer(spec) }); }
+function howBtn(spec) { return h("button", { class: "btn", text: t("panel.method"), onclick: () => openDrawer(spec) }); }
 const pre = t => h("pre", { text: t });
 const J2 = o => JSON.stringify(o, null, 2);
 
@@ -136,14 +144,32 @@ const J2 = o => JSON.stringify(o, null, 2);
    UI.Table options select/onSelect/total/title/search, UI.fmt names "status|id|spark" for table cells.
    ===================================================================== */
 const UI = (() => {
-  const U = { demo: false };
+  const U = { demo: false, locked: false, lang: LANG };
+  U.loc = loc;
+  /* a locked (demo) server keeps visitor choices in memory only: the next visitor starts fresh (design 14.2) */
+  U.pref = (k, v) => { if (U.locked) return null; try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { /* storage blocked */ } return null; };
+  U.setLang = function (l) {
+    U.lang = l === "en" ? "en" : "vi"; document.documentElement.lang = U.lang;
+    U.pref("v5lang", U.lang);
+    /* drop ?lang= from both the query and the hash, so the choice is not overridden on reload */
+    const u = new URL(location.href); u.searchParams.delete("lang");
+    const hash = u.hash.replace(/([?&])lang=(vi|en)&?/, "$1").replace(/[?&]$/, "");
+    if (u.href !== location.href || hash !== u.hash) history.replaceState(null, "", u.pathname + u.search + hash);
+  };
+  /* write guard: refused while the server runs with --lock, else a confirm box (design 5.3) */
+  U.canWrite = function (what) {
+    if (U.locked) { window.alert(t("lock.refused")); return false; }
+    return window.confirm(t("lock.confirm") + "\n\n" + (what || ""));
+  };
+  /* hide machine paths in job commands shown on screen */
+  U.redact = s => String(s == null ? "" : s).replace(/\/home\/[^/\s]+\//g, "~/").replace(/\/Users\/[^/\s]+\//g, "~/");
   const text = (s) => document.createTextNode(s);
   const cssv = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const MONO = '"JetBrains Mono","Geist Mono",ui-monospace,"SF Mono",Menlo,monospace';
 
   /* ---------- fmt ---------- */
   const DASH = "—";
-  const grp = (n, d) => n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const grp = (n, d) => n.toLocaleString(loc(), { minimumFractionDigits: d, maximumFractionDigits: d });
   U.fmt = function (v, f) {
     if (v == null || v === "" || (typeof v === "number" && !isFinite(v))) return DASH;
     if (f === "date" || f === "time") {
@@ -451,7 +477,7 @@ const UI = (() => {
     function paint() {
       const n0 = lines.length, frag = document.createDocumentFragment(); let shown = 0;
       for (let i = Math.max(0, n0 - 1200); i < n0; i++) { const L = lines[i]; if (g && !L.toLowerCase().includes(g)) continue; shown++;
-        frag.appendChild(h("div", { class: "ln" + (/ERROR|Traceback|Exception/.test(L) ? " err" : /WARN/.test(L) ? " wrn" : "") }, [h("span", { class: "no", text: String(i + 1) }), h("span", { text: L })])); }
+        frag.appendChild(h("div", { class: "ln" + (/ERROR|Traceback|Exception/.test(L) ? " err" : /WARN/.test(L) ? " wrn" : "") }, [h("span", { class: "no", text: String(i + 1) }), h("span", { text: U.redact(L) })])); }
       ls.innerHTML = ""; ls.appendChild(frag); st.textContent = jid ? (state || "") : ""; if (follow) pin();
     }
     async function tick() {
@@ -472,7 +498,7 @@ const UI = (() => {
     const wrap = h("span", { class: "u-repro" });
     const close = () => { if (pop) { pop.remove(); pop = null; document.removeEventListener("mousedown", away, true); } };
     const away = e => { if (pop && !wrap.contains(e.target)) close(); };
-    const argv = Array.isArray(o.argv) ? o.argv.join(" ") : (o.argv || "");
+    const argv = U.redact(Array.isArray(o.argv) ? o.argv.join(" ") : (o.argv || ""));
     const row = (k, v, cp) => v == null || v === "" ? null : h("div", null, [h("span", { class: "k", text: k }), h("div", { class: "row" }, [h("span", { text: String(v) }), cp ? h("button", { class: "u-btn sm", text: "copy", onclick: () => U.copy(String(v)) }) : null])]);
     wrap.appendChild(h("button", { class: "u-btn sm", text: "repro ⧉", onclick: () => { if (pop) return close(); pop = h("div", { class: "u-pop", style: { top: "26px", left: 0 } }, [row("argv", argv, true), row("config", o.config, true), row("sha", o.sha), row("host", o.host), row("dur", o.dur)]); wrap.appendChild(pop); document.addEventListener("mousedown", away, true); } }));
     return wrap;
@@ -499,9 +525,10 @@ const UI = (() => {
     }
   };
   function confirmCard(s) {
-    const out = h("span", { class: "dim" }), run = h("button", { class: "u-btn pri", text: "Run" }), card = h("div", { class: "u-confirm" });
-    const argv = Array.isArray(s.argv_preview) ? s.argv_preview.join(" ") : (s.argv_preview || "");
+    const out = h("span", { class: "dim" }), run = h("button", { class: "u-btn pri wbtn", text: "Run" }), card = h("div", { class: "u-confirm" });
+    const argv = U.redact(Array.isArray(s.argv_preview) ? s.argv_preview.join(" ") : (s.argv_preview || ""));
     run.onclick = async () => {
+      if (!U.canWrite(s.kind)) return;
       run.disabled = true; out.textContent = "";
       try { const r = await fetch("/api/jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: s.kind, params: s.params || {} }) }); const d = await r.json();
         if (!r.ok) throw new Error(d.error || ("HTTP " + r.status)); out.className = "c-ok"; out.innerHTML = ""; out.appendChild(h("span", { text: "✓ " })); out.appendChild(h("a", { href: "#/jobs?job=" + d.id, text: d.id }));
@@ -549,13 +576,13 @@ const UI = (() => {
   };
 
   /* right panel: tabs Chat / Cách làm / Log / Nguồn. Pages call UI.panel.set({method, log, sources}); the router resets it per route. */
-  const PN = { method: null, log: null, sources: null, tab: "chat", inited: false }, TABS = [["chat", "Chat"], ["method", "Cách làm"], ["log", "Log"], ["src", "Nguồn"]];
+  const PN = { method: null, log: null, sources: null, tab: "chat", inited: false }, TABS = [["chat", "Chat"], ["method", "panel.method"], ["log", "Log"], ["src", "xb.src"]], tabName = l => l.includes(".") ? t(l) : l;
   let logEl = null, logTimer = 0;
   const pane = n => document.getElementById(n === "chat" ? "chat" : "rp-" + n);
   U.panel = {
     init() {
       const rp = document.getElementById("rp"); if (!rp || PN.inited) return; PN.inited = true;
-      const bar = h("div", { class: "rp-tabs" }, TABS.map(([k, l]) => h("a", { "data-k": k, text: l, onclick: () => U.panel.tab(k) })));
+      const bar = h("div", { class: "rp-tabs" }, TABS.map(([k, l]) => h("a", { "data-k": k, text: tabName(l), onclick: () => U.panel.tab(k) })));
       rp.insertBefore(bar, rp.firstChild); ["method", "log", "src"].forEach(k => rp.appendChild(h("div", { id: "rp-" + k, class: "rp-pane hide" })));
       const q = U.qs().rp; U.panel.tab(["chat", "method", "log", "src"].includes(q) ? q : "chat", true);
     },
@@ -570,12 +597,12 @@ const UI = (() => {
     set(o) { Object.keys(o || {}).forEach(k => { if (k in PN && k !== "tab") PN[k] = o[k]; }); if (o && o.sources !== undefined) PN.sources = o.sources; U.panel.render(); },
     render() {
       if (!PN.inited) return;
-      const cnt = { method: (PN.method || []).length, src: (PN.sources || []).length }; document.querySelectorAll("#rp .rp-tabs a").forEach(a => { const c = cnt[a.dataset.k]; const base = TABS.find(t => t[0] === a.dataset.k)[1]; a.textContent = c ? base + " " + c : base; });
+      const cnt = { method: (PN.method || []).length, src: (PN.sources || []).length }; document.querySelectorAll("#rp .rp-tabs a").forEach(a => { const c = cnt[a.dataset.k]; const base = tabName(TABS.find(x => x[0] === a.dataset.k)[1]); a.textContent = c ? base + " " + c : base; });
       const m = pane("method"), s = pane("src"), l = pane("log");
       m.innerHTML = ""; (PN.method || []).forEach((st, i) => m.appendChild(h("div", { class: "rp-step" }, [h("span", { class: "no", text: String(i + 1) }), h("div", { class: "bd" }, [h("div", { text: st.step || "" }),
-        st.cmd ? h("div", { class: "cmd" }, [h("code", { text: st.cmd }), h("button", { class: "u-btn sm", text: "copy", onclick: () => U.copy(st.cmd) })]) : null, st.cfg ? h("div", { class: "cfg", text: st.cfg }) : null, st.note ? h("div", { class: "nt", text: st.note }) : null])])));
+        st.cmd ? h("div", { class: "cmd" }, [h("code", { text: U.redact(st.cmd) }), h("button", { class: "u-btn sm", text: "copy", onclick: () => U.copy(st.cmd) })]) : null, st.cfg ? h("div", { class: "cfg", text: st.cfg }) : null, st.note ? h("div", { class: "nt", text: st.note }) : null])])));
       if (!(PN.method || []).length) m.appendChild(h("div", { class: "rp-empty", text: DASH }));
-      s.innerHTML = ""; (PN.sources || []).forEach(x => s.appendChild(h("div", { class: "rp-src", title: x.path, onclick: () => U.copy(x.path) }, [h("span", { text: x.label || "" }), h("code", { text: x.path })])));
+      s.innerHTML = ""; (PN.sources || []).forEach(x => s.appendChild(h("div", { class: "rp-src", title: U.redact(x.path), onclick: () => U.copy(x.path) }, [h("span", { text: x.label || "" }), h("code", { text: U.redact(x.path) })])));
       if (!(PN.sources || []).length) s.appendChild(h("div", { class: "rp-empty", text: DASH }));
       clearInterval(logTimer); l.innerHTML = "";
       if (PN.log && PN.log.jobId) { logEl = U.Log({ jobId: PN.log.jobId }); l.appendChild(logEl); }
