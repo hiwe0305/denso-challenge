@@ -79,9 +79,10 @@ const CHAT = (() => {
   C.setModelState = function (md) {
     S.model = md || S.model; if (!pill) return;
     const m = S.model, st = m ? (m.nemotron || (m.agent_ready ? "warm" : "down")) : "down"; S.state = st;
-    pill.innerHTML = ""; pill.appendChild(h("span", { class: "c-" + UI.stateClass(st === "down" ? "down" : st === "cold" ? "cold" : st === "busy" ? "run" : "ok"), text: st === "down" ? "✕" : st === "cold" ? "○" : st === "busy" ? "▶" : "●" })); pill.appendChild(document.createTextNode(" nemotron " + st));
+    pill.innerHTML = ""; pill.appendChild(h("span", { class: "c-" + UI.stateClass(st === "down" ? "down" : st === "cold" ? "cold" : st === "busy" ? "run" : "ok"), text: st === "down" ? "✕" : st === "cold" ? "○" : st === "busy" ? "▶" : "●" })); pill.appendChild(document.createTextNode(UI.locked ? " " + t("chat.offline") : " nemotron " + st));
   };
   C.prewarm = function (force) {
+    if (UI.locked) return;
     if ((S.warmed && !force) || S.state === "down" || S.state === "warm" && !force) return; S.warmed = true;
     fetch("/api/models/prewarm", { method: "POST" }).then(r => r.json()).then(() => fetch("/api/models").then(r => r.json()).then(C.setModelState)).catch(() => {});
   };
@@ -94,6 +95,7 @@ const CHAT = (() => {
   }
   const slashOf = t => (t.slash || "/" + t.name).replace(/^\/?/, "/");
   function suggest() {
+    if (UI.locked) { sug.classList.add("hide"); return; }
     const v = input.value; if (v[0] !== "/" || v.indexOf(" ") >= 0 || !S.tools) { sug.classList.add("hide"); return; }
     S.sug = S.tools.filter(t => slashOf(t).startsWith(v.toLowerCase())).slice(0, 6); S.sugI = 0; paintSug();
   }
@@ -173,6 +175,7 @@ const CHAT = (() => {
   async function send(text) {
     const v = (text != null ? text : input.value).trim(); if (!v || S.busy) return;
     input.value = ""; input.style.height = "auto"; sug.classList.add("hide"); S.last = v; userMsg(v);
+    if (UI.locked) { list.appendChild(errBlock(t("chat.offline"))); scrollEnd(); return; }   /* tools and model refuse on a locked server */
     if (v[0] === "/") return slash(v);
     return ask(v);
   }

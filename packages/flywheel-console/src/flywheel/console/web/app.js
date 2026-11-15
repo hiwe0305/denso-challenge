@@ -1,18 +1,28 @@
 /* shell: sidebar, top bar, right panel, router, command palette, shortcut sheet, Home page.
    Pages register with UI.route(pattern, fn). Unregistered routes fall back to the v4 page functions (LEGACY block at the bottom). */
 "use strict";
-const SIDE = [
-  { g: null, items: [{ id: "home", t: "Tổng quan", ic: "▣", href: "#/home" }] },
-  { g: "DỮ LIỆU", items: [{ id: "data", t: "Datasets", ic: "▤", href: "#/data", ct: () => ({ n: CAT ? CAT.rows.filter(r => r.status === "current").length : null }) },
-    { id: "pipeline", t: "Pipeline", ic: "▷", href: "#/jobs?view=pipeline", ct: () => ({ n: ST.jobs.filter(j => j.state === "running" && /^ego\./.test(j.kind)).length, run: 1 }) }] },
-  { g: "AGENT", items: [{ id: "qa", t: "QA/QC", ic: "✓", href: "#/qa", ct: () => ({ n: ST.agent ? ST.agent.findings : null, warn: 1 }) }] },
-  { g: "MODEL", items: [{ id: "runs", t: "Training", ic: "↗", href: "#/runs", ct: () => ({ n: trainRuns().filter(r => r.running).length, run: 1 }) },
-    { id: "eval", t: "Eval", ic: "◎", href: "#/eval", ct: () => { const e = evalSucc(); return { s: e == null ? null : UI.fmt(e, "pct") }; } }] },
-  { g: "VÒNG LẶP", items: [{ id: "loop", t: "Failure→Data", ic: "↺", href: "#/loop" }, { id: "cost", t: "Chi phí", ic: "$", href: "#/loop?tab=cost", ct: () => ({ s: ST.machines && ST.machines.colab && ST.machines.colab.balance != null ? UI.fmt(ST.machines.colab.balance, "int") : null }) }] },
-  { g: "HẠ TẦNG", items: [{ id: "jobs", t: "Jobs", ic: "☰", href: "#/jobs", ct: () => ({ n: ST.jobs.filter(j => j.state === "running" || j.state === "queued").length, run: 1 }) }, { id: "machines", t: "Máy", ic: "▦", href: "#/jobs?view=machines" }] },
+/* sidebar = the six steps of the data wheel and the cost ledger (flywheel v0.3 design 4), then more, then operations
+   (hidden in lock mode, pages stay reachable by URL); a function so labels follow the language */
+const SIDE = () => [
+  { g: null, items: [{ id: "home", t: t("nav.start"), ic: "◎", href: "#/home" }] },
+  { g: t("nav.stations"), items: [
+    ...EXPLAIN.STEPS.map(n => ({ id: "s" + n, t: EXPLAIN.name(n), ic: String(n), step: n, href: EXPLAIN.href(n),
+      ct: n === 1 ? () => ({ n: CAT && CAT.totals ? UI.fmt(CAT.totals.all.episodes, "int") : null })
+        : n === 2 ? () => ({ n: ST.agent && ST.agent.findings ? ST.agent.findings : null, warn: 1, tip: t("side.findings") })
+          : n === 3 ? () => ({ n: trainRuns().filter(r => r.running).length || null, run: 1 }) : null })),
+    { id: "cost", t: EXPLAIN.name(0), ic: "$", step: 0, href: EXPLAIN.href(0) }] },
+  { g: t("nav.more"), items: [
+    { id: "design", t: t("sb.de.nav"), ic: "◫", href: "#/design" }, { id: "base", t: t("sb.base.nav"), ic: "▣", href: "#/base" },
+    { id: "follow", t: t("fol.title"), ic: "▶", href: "#/follow" },
+    { id: "sim", t: t("sim.title"), ic: "▤", href: "#/sim" }] },
+  { g: t("nav.ops"), ops: 1, items: [
+    { id: "jobs", t: t("nav.jobs"), ic: "☰", href: "#/jobs", ct: () => ({ n: ST.jobs.filter(j => j.state === "running" || j.state === "queued").length, run: 1 }) },
+    { id: "machines", t: t("nav.machines"), ic: "▦", href: "#/jobs?view=machines", ct: () => ({ s: ST.machines && ST.machines.colab && ST.machines.colab.balance != null ? UI.fmt(ST.machines.colab.balance, "int") : null }) },
+    { id: "export", t: t("nav.export"), ic: "⇡", href: "#/jobs?panel=export" },
+    { id: "import", t: t("nav.import"), ic: "⇣", href: "#/jobs?panel=import" }] },
 ];
 const STRIP = [["collect", "col", "#/data"], ["process", "proc", "#/jobs"], ["release", "rel", "#/jobs?panel=export"], ["train", "train", "#/runs"], ["eval", "eval", "#/eval"], ["loop", "loop", "#/loop"]];
-const REDIRECT = { overview: "home", process: "jobs", training: "runs", agent: "qa", "data/nhap": "jobs?panel=import", "data/xuat": "jobs?panel=export" };
+const REDIRECT = { overview: "home", process: "jobs?view=pipeline", training: "runs", agent: "qa", "data/nhap": "jobs?panel=import", "data/xuat": "jobs?panel=export" };
 let CAT = null, STORY = null;
 const CATP = () => CAT ? Promise.resolve(CAT) : J("data/catalog.json").then(c => (CAT = c));
 const STORYP = () => STORY ? Promise.resolve(STORY) : J("data/story.json").then(s => (STORY = s));
@@ -31,16 +41,21 @@ function go(path) { location.hash = "#/" + path; }
 let RT = 0;
 function sideActive() {
   const { parts, qs } = parseHash(), p = parts[0] || "home";
-  if (p === "jobs") return qs.view === "pipeline" ? "pipeline" : qs.view === "machines" ? "machines" : "jobs";
-  if (p === "loop") return qs.tab === "cost" ? "cost" : "loop";
+  if (p === "jobs" && (qs.view === "machines" || qs.panel === "export" || qs.panel === "import")) return qs.view === "machines" ? "machines" : qs.panel;
+  if (p === "sim" || p === "follow") return p;
+  const n = EXPLAIN.stationOf(parts.join("/"), qs);
+  if (n === 0) return "cost";
+  if (n != null) return "s" + n;
   return p;
 }
 function drawSide() {
   const el = $("#side"); el.innerHTML = ""; const act = sideActive();
-  SIDE.forEach(g => {
-    if (g.g) el.appendChild(h("div", { class: "gh", text: g.g }));
+  SIDE().forEach(g => {
+    const box = h("div", { class: "sg" + (g.ops ? " ops" : "") }); el.appendChild(box);
+    if (g.g) box.appendChild(h("div", { class: "gh", text: g.g }));
     g.items.forEach(it => { const c = it.ct ? it.ct() : {}, txt = c.n != null ? String(c.n) : c.s != null ? c.s : "";
-      el.appendChild(h("a", { href: it.href, class: it.id === act ? "on" : "", title: it.t }, [h("span", { class: "ic", text: it.ic }), h("span", { class: "nm", text: it.t }), txt ? h("span", { class: "ct" + (c.run && c.n ? " run" : c.warn && c.n ? " warn" : ""), text: txt }) : null])); });
+      const ic = it.step != null ? "ic sn" + (it.step === 0 ? " cost" : it.step === EXPLAIN.KEEP ? " keep" : "") : "ic";
+      box.appendChild(h("a", { href: it.href, class: it.id === act ? "on" : "", title: it.t }, [h("span", { class: ic, text: it.ic }), h("span", { class: "nm", text: it.t }), txt ? h("span", { class: "ct" + (c.run && c.n ? " run" : c.warn && c.n ? " warn" : ""), title: c.tip || null, text: txt }) : null])); });
   });
 }
 function chatRoute() { const { parts } = parseHash(); return parts.join("/") || "home"; }
@@ -59,12 +74,16 @@ async function route() {
   main.appendChild(view); main.scrollTop = 0;
   if (window.CHAT) CHAT.touchContext();
   try {
-    await Promise.all([CATP(), STORYP()]);
+    await Promise.all([CATP(), STORYP(), typeof SIMP === "function" ? SIMP() : null, typeof EGOP === "function" && /^(data|sim)/.test(path) ? EGOP() : null]);
     if (tok !== RT) return;
     const body = h("div"); const m = UI.matchRoute(path || "home"); const qs = UI.qs();
     if (m) await m.fn(body, m.params, qs); else await legacyRoute(body, parts, qs);
     if (tok !== RT) return;
-    view.innerHTML = ""; view.appendChild(body);
+    view.innerHTML = "";
+    const stn = EXPLAIN.stationOf(path, qs);
+    view.classList.toggle("story", stn != null || /^(home|follow|sim)$/.test(parts[0] || "home"));
+    if (stn != null) EXPLAIN.page(stn, body, parts.length > 1 || parts[0] === "sim").forEach(x => view.appendChild(x));
+    else view.appendChild(body);
   } catch (e) {
     console.error(e); if (tok !== RT) return; view.innerHTML = "";
     view.appendChild(h("div", { class: "errline" }, ["✕ " + String(e.message || e) + " ", h("a", { href: "#/home", text: "[home]" })]));
@@ -76,7 +95,8 @@ window.addEventListener("hashchange", () => { route(); });
 /* ---------------- header + live state ---------------- */
 const ST = { stages: null, jobs: [], models: null, machines: null, agent: null };
 const trainRuns = () => { const t = (ST.stages || []).find(s => s.id === "train"); return t && t.runs ? t.runs : []; };
-const evalSucc = () => { const e = ((ST.stages || []).find(s => s.id === "eval") || {}).now, m = /(\d+)\/(\d+)/.exec(e || ""); return m ? +m[1] / +m[2] : null; };
+/* best run of the pair60k eval (story.pair), shown with its name: it is not the newest run */
+const evalBest = () => { const b = typeof EXPLAIN !== "undefined" ? EXPLAIN.read.best() : null; return b && b.n ? { v: b.successes / b.n, run: b.run, frac: b.successes + "/" + b.n } : null; };
 const waitingN = () => (ST.stages || []).filter(s => s.state === "waiting").length + (ST.agent ? ST.agent.findings || 0 : 0);
 function drawMeta() {
   const el = $("#meta"); el.innerHTML = "";
@@ -85,14 +105,17 @@ function drawMeta() {
   const dot = (s) => h("span", { class: "c-" + UI.stateClass(s), text: s === "down" ? "✕" : s === "cold" ? "○" : "●" });
   const pill = (kids, fn, title) => h(fn ? "button" : "span", { class: "pill", title, onclick: fn }, kids);
   [pill(["jobs ", h("span", { class: run ? "c-run" : "", text: String(run) })], () => go("jobs"), "running + queued"), pill(["3060 ", dot(rtx && rtx.tunnel === "up" ? "up" : "down")], null, "rtx3060 tunnel"),
-    pill(["nemotron ", dot(nm)], () => { if (window.CHAT) { CHAT.open(); CHAT.prewarm(); } }, nm), pill(["chờ duyệt ", h("span", { class: waitingN() ? "c-warn" : "", text: String(waitingN()) })], () => go("qa")),
-    h("button", { title: "demo", onclick: () => toggleDemo(), text: "demo" }), h("button", { title: "theme", onclick: () => { setTheme(curTheme() === "dark" ? "light" : "dark"); route(); }, text: "◐" }),
-    h("button", { title: "shortcuts", onclick: () => openKeys(), text: "?" })].forEach(x => el.appendChild(x));
+    pill(["nemotron ", dot(nm)], () => { if (window.CHAT) { CHAT.open(); CHAT.prewarm(); } }, nm), pill([t("hdr.waiting") + " ", h("span", { class: waitingN() ? "c-warn" : "", text: String(waitingN()) })], () => go("qa")),
+    UI.locked ? h("span", { class: "lockpill", title: t("lock.refused"), text: t("lock.badge") }) : null,
+    h("button", { class: "langbtn", title: "VI / EN", onclick: () => { UI.setLang(UI.lang === "vi" ? "en" : "vi"); PAL.built = false; drawSide(); drawMeta(); route(); } }, [h("span", { class: UI.lang === "vi" ? "on" : "", text: "VI" }), " | ", h("span", { class: UI.lang === "en" ? "on" : "", text: "EN" })]),
+    h("button", { class: "explainbtn" + (document.body.classList.contains("explain-off") ? "" : " on"), title: t("hdr.explain"), onclick: () => { EXPLAIN.toggle(); drawMeta(); }, text: "ⓘ " + t("hdr.explain") }), h("button", { class: "themebtn", title: "theme", onclick: () => { setTheme(curTheme() === "dark" ? "light" : "dark"); route(); }, text: "◐" }),
+    h("button", { class: "keysbtn", title: "shortcuts", onclick: () => openKeys(), text: "?" })].forEach(x => x && el.appendChild(x));
 }
 async function poll() {
   try {
     const [st, jb, md, ag] = await Promise.all([jget("/api/status"), jget("/api/jobs?limit=100").catch(() => []), jget("/api/models").catch(() => null), jget("/api/agent_stats").catch(() => null)]);
     ST.stages = st.stages; ST.machines = st.machines; ST.jobs = jb; ST.models = md; ST.agent = ag; ST.status = st; ST.at = Date.now();
+    UI.locked = !!st.locked; document.documentElement.classList.toggle("locked", UI.locked);
     if (window.CHAT) CHAT.setModelState(md);
   } catch (e) { ST.stages = ST.stages || null; }
   drawSide(); drawMeta();
@@ -106,7 +129,7 @@ function closeKeys() { $("#keys").classList.remove("open"); }
 const PAL = { items: [], sel: 0, built: false };
 async function buildPalette() {
   const it = []; const add = (k, t, d, fn) => it.push({ k, t, d, fn });
-  SIDE.forEach(g => g.items.forEach(x => add("go", x.t, x.href, () => { location.hash = x.href; })));
+  SIDE().forEach(g => g.items.forEach(x => add("go", x.t, x.href, () => { location.hash = x.href; })));
   await CATP().catch(() => {}); await STORYP().catch(() => {});
   if (CAT) CAT.rows.filter(r => !UI.demo || r.data_class === "public").forEach(r => add("data", r.id, r.title || r.name, () => go("data/" + r.id)));
   const runs = new Set(); (STORY ? STORY.runs : []).forEach(r => runs.add(r.branch)); runs.forEach(b => add("run", b, "#/runs?sel=" + b, () => go("runs?sel=" + b)));
@@ -139,7 +162,7 @@ function toggleDemo() { try { sessionStorage.setItem("v5demo", UI.demo ? "" : "1
 const dsec = (t, n, right) => h("div", { class: "u-sec", style: { justifyContent: "space-between" } }, [h("span", null, [t, n != null ? h("span", { class: "n", text: " " + n }) : null]), right || null]);
 const grow = (g, name, tx, act) => h("div", { class: "row" }, [g, h("span", { class: "nm", text: name }), h("span", { class: "tx", text: tx || "" }), act || null]);
 const jdur = j => j.started ? Math.max(0, ((j.ended ? new Date(j.ended) : new Date()) - new Date(j.started)) / 1000) : null;
-const k0 = n => n == null ? "—" : n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
+const k0 = n => n == null ? "—" : n >= 1000 ? UI.fmt(n / 1000, "float1") + "k" : String(n);
 const down = (a, n) => { if (a.length <= n) return a; const o = []; for (let i = 0; i < n; i++) o.push(a[Math.floor(i * (a.length - 1) / (n - 1))]); return o; };
 function timelineStrip(jobs) {
   const now = Date.now(), T0 = now - 24 * 3600e3, W = 900, L = 96, rh = 13;
@@ -159,34 +182,37 @@ async function pageHome(main) {
   if (st) { ST.stages = st.stages; ST.machines = st.machines; } ST.agent = ag || ST.agent;
   const stages = st ? st.stages : [], stage = id => stages.find(s => s.id === id) || {}, sv = id => stage(id).state || "idle";
   const S = STORY, h1 = S.h1m || {}, cur = CAT.rows.filter(r => r.status === "current"), byG = g => cur.filter(r => r.group === g);
-  main.appendChild(UI.page({ title: "Tổng quan", stat: [{ label: "jobs running", value: jobs.filter(j => j.state === "running").length, unit: "run" }, { label: "datasets", value: CAT.rows.length, unit: "sets" }] }));
+  main.appendChild(UI.page({ title: t("home.title"), stat: [{ label: "jobs running", value: jobs.filter(j => j.state === "running").length, unit: "run" }, { label: "datasets", value: CAT.rows.length, unit: "sets" }] }));
   UI.panel.set({ method: [{ step: "Status", cmd: "curl -s 127.0.0.1:4178/api/status" }, { step: "Jobs", cmd: "curl -s 127.0.0.1:4178/api/jobs?limit=100" }], sources: [{ label: "status", path: "/api/status" }, { label: "story", path: "v5/data/story.json" }, { label: "catalog", path: "v5/data/catalog.json" }] });
 
   /* tiles */
-  const live = trainRuns(), sr = S.runs || [], es = evalSucc();
+  /* an abandoned try (C70_R1.attempt1) stopped early: it is not a run to average */
+  const live = trainRuns().filter(r => !/\.attempt/.test(r.branch)), sr = (S.runs || []).filter(r => !/\.attempt/.test(r.branch)), es = evalBest();
   const L = S.ledger || [], est = L.reduce((a, r) => a + (r[1] || 0), 0), meas = L.reduce((a, r) => a + (r[2] || 0), 0), cu = (ST.machines || {}).colab, bal = S.colab_balance || [];
   let cum = 0; const cumS = L.filter(r => r[2]).map(r => (cum += r[2]));
   const avgStep = live.length ? live.reduce((a, r) => a + r.step, 0) / live.length : (sr.length ? sr.reduce((a, r) => a + r.step, 0) / sr.length : null);
   main.appendChild(UI.Tiles([
     { label: "Ego clips QA'd", value: h1.clips, state: (h1.qa && h1.qa.flag) ? "warn" : "ok", spark: (S.sources || []).map(x => x.episodes), href: "#/qa" },
-    { label: "Synthetic S1", value: byG("s1").reduce((a, r) => a + (r.episodes || 0), 0), unit: "ep", state: "ok", href: "#/data" },
-    { label: "Eval succ", value: es == null ? null : UI.fmt(es, "pct"), state: "warn", href: "#/eval" },
-    { label: "Training", value: avgStep == null ? null : k0(Math.round(avgStep)), unit: "/60k", state: live.some(r => r.running) ? "run" : "idle", spark: sr[0] && sr[0].loss ? down(sr[0].loss.map(p => p[1]), 40) : null, href: "#/runs" },
+    { label: "Synthetic S1", value: byG("s1").filter(r => r.unique).reduce((a, r) => a + (r.episodes || 0), 0), unit: "ep", state: "ok", href: "#/data" },
+    { label: t("home.evalBest"), value: es == null ? null : UI.fmt(es.v, "pct"), unit: es ? es.run : null, state: "warn", href: "#/eval" },
+    { label: "Training", value: avgStep == null ? null : k0(Math.round(avgStep)), unit: "/" + k0(60000), state: live.some(r => r.running) ? "run" : "idle", spark: sr[0] && sr[0].loss ? down(sr[0].loss.map(p => p[1]), 40) : null, href: "#/runs" },
     { label: "CU left", value: cu && cu.balance != null ? Math.round(cu.balance) : null, state: "ok", spark: down(bal.map(p => p[1]), 40), href: "#/loop?tab=cost" },
     { label: "Measured cost", value: "$" + UI.fmt(meas, "float1"), state: "idle", spark: cumS, unit: "est $" + UI.fmt(est, "int"), href: "#/loop?tab=cost" }]));
 
   /* flywheel + attention */
   const agDone = jobs.some(j => /^agentqa/.test(j.kind) && j.state === "ok"), fnd = ag ? ag.findings || 0 : 0, lp = /(L-[A-Z-]+)\s+(\d+)\/(\d+)/.exec(stage("loop").now || "");
+  /* the round line from runner.status: "… → 4/60 → dừng (F)" */
+  const lr = /→ (\d+\/\d+) → (\S+)/.exec(stage("loop").now || "");
   const fw = UI.Flywheel([
-    { id: "src", label: "Nguồn", state: sv("collect"), metric: cur.length + " sets", href: "#/data" },
+    { id: "src", label: t("home.src"), state: sv("collect"), metric: (CAT.totals && CAT.totals.all ? fmt(CAT.totals.all.episodes) + " ep" : cur.length + " sets"), href: "#/data" },
     { id: "pipe", label: "Pipeline", state: sv("process"), metric: (h1.clips || "—") + " clips", href: "#/jobs?view=pipeline" },
     { id: "qa", label: "Agent QA/QC", state: fnd ? "waiting" : agDone ? "done" : "idle", metric: fnd + " findings", href: "#/qa" },
     { id: "rel", label: "Release", state: sv("release"), metric: (h1.exported || "—") + " exported", href: "#/data" },
     { id: "train", label: "Training", state: sv("train"), metric: avgStep == null ? "—" : Math.round(avgStep / 600) + "%", href: "#/runs" },
     { id: "probe", label: "Probe", state: "idle", metric: "—", href: "#/eval" },
-    { id: "eval", label: "Eval", state: sv("eval"), metric: es == null ? "—" : UI.fmt(es, "pct"), href: "#/eval" },
-    { id: "loop", label: "Failure→Data", state: sv("loop"), metric: lp ? lp[1] + " " + lp[2] : "—", href: "#/loop" },
-    { id: "cost", label: "Chi phí", state: "done", metric: cu && cu.balance != null ? "CU " + Math.round(cu.balance) : "—", href: "#/loop?tab=cost" }], { height: 320 });
+    { id: "eval", label: "Eval", state: sv("eval"), metric: es == null ? "—" : es.run + " " + es.frac, href: "#/eval" },
+    { id: "loop", label: "Failure→Data", state: sv("loop"), metric: lp ? lp[1] + " " + lp[2] : lr ? lr[1] + " · " + (lr[2] === "dừng" ? t("home.stop") : lr[2] === "tiếp" ? t("home.go") : lr[2]) : "—", href: "#/loop" },
+    { id: "cost", label: t("home.cost"), state: "done", metric: cu && cu.balance != null ? "CU " + Math.round(cu.balance) : "—", href: "#/loop?tab=cost" }], { height: 320 });
 
   const att = [], pend = [];
   let ack = []; try { ack = JSON.parse(localStorage.getItem("v5ack") || "[]"); } catch (e) {}
@@ -203,7 +229,7 @@ async function pageHome(main) {
   works.filter(w => w.summary && w.summary.qa && w.summary.qa.flag > 0).slice(0, 3).forEach(w => att.push(grow(h("span", { class: "c-warn", text: "!" }), "QA " + w.summary.qa.flag + " flag", w.name, h("a", { class: "go", href: "#/jobs?work=" + encodeURIComponent(w.name), text: "[open]" }))));
   if (fnd) pend.push(grow(h("span", { class: "c-warn", text: "◷" }), "agentqa", fnd + " findings", h("a", { class: "go", href: "#/qa", text: "[review]" })));
   stages.filter(s => s.state === "waiting").forEach(s => pend.push(grow(h("span", { class: "c-warn", text: "◷" }), s.id, "waiting", h("a", { class: "go", href: (STRIP.find(x => x[0] === s.id) || [0, 0, "#/home"])[2], text: "[open]" }))));
-  const side = h("div", { class: "blk" }, [dsec("Chờ duyệt", pend.length), pend.length ? h("div", null, pend) : grow(h("span", { class: "c-ok", text: "✓" }), "none", ""), h("div", { style: { height: "12px" } }), dsec("Attention", att.length), att.length ? h("div", null, att) : grow(h("span", { class: "c-ok", text: "✓" }), "none", "")]);
+  const side = h("div", { class: "blk" }, [dsec(t("home.pending"), pend.length), pend.length ? h("div", null, pend) : grow(h("span", { class: "c-ok", text: "✓" }), "none", ""), h("div", { style: { height: "12px" } }), dsec("Attention", att.length), att.length ? h("div", null, att) : grow(h("span", { class: "c-ok", text: "✓" }), "none", "")]);
   main.appendChild(h("div", { class: "hm2" }, [h("div", { class: "blk" }, [dsec("Flywheel"), fw]), side]));
 
   /* 3 mini charts */
@@ -224,7 +250,7 @@ async function pageHome(main) {
   main.appendChild(h("div", { class: "blk" }, [dsec("Jobs 24h", jobs.length, h("a", { href: "#/jobs", text: "all →" })), timelineStrip(jobs)]));
   if (window.CHAT) CHAT.setContext({ route: "home" });
 }
-UI.route("home", pageHome);
+/* #/home is the wheel (pages_wheel.js); pageHome draws its "Today" section (not in lock mode) */
 
 /* @budget-skip-start legacy */
 /* ---------------- legacy v4 dispatch (delete when DATA/OPS pages register UI.route) ---------------- */
@@ -255,6 +281,8 @@ function initKeys() {
 }
 document.addEventListener("DOMContentLoaded", () => {
   UI.demo = document.documentElement.classList.contains("demo");
+  document.documentElement.lang = UI.lang;
+  if (!EXPLAIN.on()) document.body.classList.add("explain-off");
   $("#dclose").onclick = closeDrawer; $("#drawer-bg").onclick = closeDrawer;
   try { if (localStorage.getItem("v5side")) document.body.classList.add("side-min"); if (localStorage.getItem("v5dock") === "off") document.body.classList.add("dock-off"); UI.task = localStorage.getItem("v5task") || "tray"; $("#task").value = UI.task; } catch (e) { UI.task = "tray"; }
   $("#task").onchange = e => { UI.task = e.target.value; try { localStorage.setItem("v5task", UI.task); } catch (x) {} route(); };
@@ -262,7 +290,14 @@ document.addEventListener("DOMContentLoaded", () => {
   if (window.CHAT) CHAT.mount($("#chat"));
   UI.panel.init();
   if (window.DEMO) DEMO.init();
-  route(); poll(); setInterval(poll, 5000);
+  poll().then(() => {
+    /* locked demo laptop: ignore what an earlier visitor chose; only ?lang= counts (design 14.2) */
+    if (UI.locked) { const m = /[?&#]lang=(vi|en)\b/.exec(location.search + location.hash); UI.lang = m ? m[1] : "vi"; document.documentElement.lang = UI.lang; document.body.classList.remove("explain-off");
+      /* the demo opens in the deck's light look whatever an earlier visitor chose; ◐ still works for this visit */
+      if (!/[?&#]theme=dark\b/.test(location.search + location.hash)) document.documentElement.setAttribute("data-theme", "light");
+      if (window.CHAT) CHAT.close(true); drawSide(); drawMeta(); }
+    route();
+  }); setInterval(poll, 5000);  /* first status first: a locked server must not see /api/tool calls */
 });
 
 /* ---------------- LEGACY v4 helpers (lineage widget, hub, spark) ---------------- */

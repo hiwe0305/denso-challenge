@@ -23,6 +23,10 @@ from flywheel.console.server import media, runner
 
 MAX_JSON = 1 << 20
 MAX_UPLOAD = 8 << 30
+# GETs that expose machine internals; refused with every POST when the server runs with --lock
+LOCKED_GET = ("/api/fs", "/api/dir_check", "/api/tool", "/api/chat/traces")
+# home directories (home or Users, then the user name) in JSON answers of a locked server
+_HOME = re.compile(r"/(?:home|Users)/[^/\s\"]+/")
 _lock = threading.Lock()
 
 
@@ -39,9 +43,23 @@ def _chat(mod: str) -> Any:
 class ConsoleServer(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, paths: ConsolePaths, port: int) -> None:
+    def __init__(self, paths: ConsolePaths, port: int, lock: bool = False) -> None:
         self.paths = paths
+        self.locked = lock
         super().__init__(("127.0.0.1", port), Handler)
+
+    def unredact(self, value: str) -> str:
+        """Inverse of ``redact`` for a path a page sends back (e.g. ``out=fwdata/console/...``)."""
+        if value == "fwdata" or value.startswith("fwdata/"):
+            return str(self.paths.fw_root) + value[len("fwdata") :]
+        if value.startswith("~/"):
+            return str(Path.home()) + value[1:]
+        return value
+
+    def redact(self, text: str) -> str:
+        """Machine paths out of a JSON answer: fw_root becomes ``fwdata``, any home dir ``~``."""
+        root = json.dumps(str(self.paths.fw_root))[1:-1]
+        return _HOME.sub("~/", text.replace(root, "fwdata"))
 
     @property
     def port(self) -> int:
@@ -87,10 +105,16 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
     def jerr(self, code: int, msg: str) -> None:
-        self.send_bytes(json.dumps({"error": msg}, ensure_ascii=False).encode(), code)
+        text = json.dumps({"error": msg}, ensure_ascii=False)
+        if self.server.locked:  # error messages can carry the path that was refused
+            text = self.server.redact(text)
+        self.send_bytes(text.encode(), code)
 
     def jok(self, obj: Any, code: int = 200) -> None:
-        self.send_bytes(json.dumps(obj, ensure_ascii=False).encode(), code)
+        text = json.dumps(obj, ensure_ascii=False)
+        if self.server.locked:
+            text = self.server.redact(text)
+        self.send_bytes(text.encode(), code)
 
     # ------------------------------------------------------------ POST
     def do_POST(self) -> None:
@@ -99,6 +123,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.jerr(404, "not found")
         if not self.host_ok() or not self.origin_ok():
             return self.jerr(403, "forbidden origin")
+        if self.server.locked:
+            return self.jerr(403, "locked")
         try:
             if u.path == "/api/upload":
                 return self.upload(u)
@@ -221,6 +247,8 @@ class Handler(BaseHTTPRequestHandler):
         mounts: list[tuple[str, Path]] = [
             ("/data/", self.paths.index),
             ("/vendor/", self.paths.web / "vendor"),
+            ("/simmedia/", self.paths.sim_media),
+            ("/demomedia/", self.paths.demo_media),
         ]
         ego = media.ego_viewer_dir()
         if ego is not None:
@@ -299,7 +327,15 @@ class Handler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------ API
     def api(self, u: Any) -> None:
         q = parse_qs(u.query)
+        if self.server.locked:  # pages send back the redacted paths they were given
+            q = {k: [self.server.unredact(v) for v in vs] for k, vs in q.items()}
         parts = u.path.strip("/").split("/")
+        if self.server.locked and (
+            u.path in LOCKED_GET
+            or (len(parts) == 3 and parts[1] == "exports")
+            or u.path.startswith("/api/chat/traces/")
+        ):
+            return self.jerr(403, "locked")
         try:
             handled = self.api_get(u.path, parts, q)
             if handled:
@@ -332,7 +368,7 @@ class Handler(BaseHTTPRequestHandler):
             return q.get(k, [d])[0]
 
         simple: dict[str, Callable[[], Any]] = {
-            "/api/status": runner.status,
+            "/api/status": lambda: runner.status() | {"locked": self.server.locked},
             "/api/artifacts": runner.list_artifacts,
             "/api/works": runner.list_works,
             "/api/estimates": runner.list_estimates,
@@ -421,17 +457,21 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
 
-def make_server(paths: ConsolePaths | None = None, port: int = 4178) -> ConsoleServer:
-    """Bind the console to ``127.0.0.1:port`` (0 = any free port) and init the job runner."""
+def make_server(
+    paths: ConsolePaths | None = None, port: int = 4178, lock: bool = False
+) -> ConsoleServer:
+    """Bind the console to ``127.0.0.1:port`` (0 = any free port) and init the job runner.
+
+    ``lock`` refuses every POST and the internal GETs in ``LOCKED_GET`` (demo laptop)."""
     paths = paths if paths is not None else active()
     set_active(paths)
     runner.init(paths)
-    return ConsoleServer(paths, port)
+    return ConsoleServer(paths, port, lock)
 
 
-def serve(paths: ConsolePaths | None = None, port: int = 4178) -> None:
-    srv = make_server(paths, port)
-    print(f"console on http://127.0.0.1:{srv.port}", flush=True)
+def serve(paths: ConsolePaths | None = None, port: int = 4178, lock: bool = False) -> None:
+    srv = make_server(paths, port, lock)
+    print(f"console on http://127.0.0.1:{srv.port}" + (" (locked)" if lock else ""), flush=True)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

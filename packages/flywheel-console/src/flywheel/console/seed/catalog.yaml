@@ -1030,6 +1030,53 @@ rows:
   aliases:
   - S70
   lerobot: da34-dryrun/cut-all-zone1/S70/G1WholebodyTrayTransferTeleop-v0
+- id: tray_s1_868cc130985d
+  name: tray_s1_868cc130985d (round-c70-tgt-1112)
+  title: Tray S1 · release vòng C70 nhắm lỗi (262)
+  kind: release
+  data_type: synthetic S1
+  task: tray
+  episodes: 262
+  frames: null
+  hours: null
+  fps: 50
+  format: LeRobot v2.1
+  licence: unknown
+  data_class: public
+  size: '?'
+  status: current
+  notes: 290 lượt sinh, 262 ghi được; 261 qua QA, 204 qua lọc chất lượng, chọn 181 (tray.md 20.16)
+  qa: 261 pass, 1 reject
+  locations:
+  - rtx3060:~/denso-da34-round-c70 (release tray_s1_868cc130985d)
+  parents: []
+  aliases:
+  - R181 source
+- id: C70_R1
+  name: C70_R1 (S70 + R181, rp_aae292bc79da)
+  title: Tray S1 · C70_R1 cut (606 ep)
+  kind: subset-cut
+  data_type: synthetic S1
+  task: tray
+  episodes: 606
+  frames: 861806
+  hours: 4.787
+  fps: 50
+  format: LeRobot v2.1 tar, stats copied from ALL
+  licence: unknown
+  data_class: public
+  size: 5.3 GB tar
+  status: current
+  notes: 'S70 (425) rồi 181 tập nhắm lỗi từ index 425; sha256 e84ec995'
+  qa: 425 + 181 selected
+  locations:
+  - laptop:fwdata/tray/pair-cuts/C70_R1.tar
+  - Drive MyDrive/denso/da34/cuts/C70_R1.tar
+  parents:
+  - S70
+  - tray_s1_868cc130985d
+  aliases:
+  - C70_R1
 - id: evalset-rp_a04c
   name: tray eval set rp_a04c14e79dfd
   title: Tray eval set rp_a04c (270)
@@ -1422,6 +1469,10 @@ edges:
   - ALL
 - - ALL
   - S70
+- - S70
+  - C70_R1
+- - tray_s1_868cc130985d
+  - C70_R1
 - - parents-1105
   - s2-prod-1105
 - - s2-prod-1105

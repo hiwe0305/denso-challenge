@@ -28,7 +28,10 @@ def index(
 
 
 @app.command()
-def serve(port: int = typer.Option(4178, help="Port on 127.0.0.1.")) -> None:
+def serve(
+    port: int = typer.Option(4178, help="Port on 127.0.0.1."),
+    lock: bool = typer.Option(False, "--lock", help="Read-only: refuse jobs, uploads, chat."),
+) -> None:
     """Serve the console on 127.0.0.1."""
     from flywheel.console.paths import ConsolePaths
     from flywheel.console.server.app import serve as run
@@ -37,7 +40,7 @@ def serve(port: int = typer.Option(4178, help="Port on 127.0.0.1.")) -> None:
     typer.echo(f"repo: {paths.repo}")
     typer.echo(f"fw_root: {paths.fw_root}")
     try:
-        run(paths, port=port)
+        run(paths, port=port, lock=lock)
     except OSError as e:
         typer.echo(f"serve: {e}", err=True)
         raise typer.Exit(1) from e

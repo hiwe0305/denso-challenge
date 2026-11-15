@@ -1,4 +1,4 @@
-"""Console index: catalog, robot and egocentric datasets, and the story file."""
+"""Console index: catalog, robot and egocentric datasets, the story file and the sim library."""
 
 from __future__ import annotations
 
@@ -8,10 +8,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 from flywheel.console import paths as _paths
-from flywheel.console.index import catalog, egocentric, robot, story
+from flywheel.console.index import catalog, egocentric, robot, sim, story
 from flywheel.console.paths import ConsolePaths
 
-PARTS = ("catalog", "robot", "ego", "story")
+PARTS = ("catalog", "robot", "ego", "story", "sim")
 
 
 def build_all(
@@ -40,6 +40,7 @@ def build_all(
         "robot": robot.build,
         "ego": egocentric.build,
         "story": story.build,
+        "sim": sim.build,
     }
     counts: dict[str, dict[str, int]] = {}
     try:

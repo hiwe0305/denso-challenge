@@ -102,7 +102,7 @@ async function jobsPage(main, params, qs0) {
         h("span", { class: "v ops-mono", text: na ? "—" : (t.n != null && t.total != null ? t.n + "/" + t.total : "—") }),
         na ? null : h("span", { class: "ops-bar", style: { margin: "2px 0" } }, h("i", { style: { width: (t.total ? Math.min(100, t.n / t.total * 100) : 0) + "%", background: st === "done" ? col.ok() : col.warn() } })),
         h("span", { class: "m ops-mono", text: t.took != null ? secs(t.took) : "—" }),
-        na ? null : h("button", { class: "ops-btn" + (st !== "done" ? " pri" : ""), disabled: busy || gated, title: gated ? "deid first" : null, style: { marginTop: "4px" }, text: st === "done" ? "Re-run" : "Run", onclick: e => { e.stopPropagation(); runKind("ego." + id); } })]);
+        na ? null : h("button", { class: "ops-btn wbtn" + (st !== "done" ? " pri" : ""), disabled: busy || gated, title: gated ? "deid first" : null, style: { marginTop: "4px" }, text: st === "done" ? "Re-run" : "Run", onclick: e => { e.stopPropagation(); runKind("ego." + id); } })]);
     })));
     if (deid) {
       const tbox = h("div", { style: { marginTop: "6px" } });
@@ -135,8 +135,8 @@ async function jobsPage(main, params, qs0) {
     headBox.appendChild(h("span", { class: "ops-mono", style: { color: col.t2() }, text: secs(jobSecs(j)) + " · " + j.host }));
     headBox.appendChild(h("span", { class: "ops-mono", style: { color: col.t2() }, text: j.id }));
     const rp = K.repro({ argv: j.argv || [], config: j.params ? JSON.stringify(j.params) : undefined }); if (rp) headBox.appendChild(rp);
-    if (!rp) headBox.appendChild(h("button", { class: "ops-btn", text: "argv ⧉", onclick: () => navigator.clipboard && navigator.clipboard.writeText((j.argv || []).join(" ")) }));
-    if (isActive(j)) headBox.appendChild(h("button", { class: "ops-btn", text: "Cancel", onclick: () => api("/api/jobs/" + j.id + "/cancel", {}).then(() => refresh()) }));
+    if (!rp) headBox.appendChild(h("button", { class: "ops-btn", text: "argv ⧉", onclick: () => navigator.clipboard && navigator.clipboard.writeText(UI.redact((j.argv || []).join(" "))) }));
+    if (isActive(j)) headBox.appendChild(h("button", { class: "ops-btn wbtn", text: "Cancel", onclick: () => api("/api/jobs/" + j.id + "/cancel", {}).then(() => refresh()) }));
     const o = j.outputs || {};
     if (o.zip && o.name) headBox.appendChild(h("a", { class: "ops-btn", style: { textDecoration: "none", display: "inline-flex", alignItems: "center" }, href: "/api/exports/" + o.name, text: "Download " + mb(o.bytes) }));
     headBox.appendChild(msg);
@@ -156,7 +156,7 @@ async function jobsPage(main, params, qs0) {
   if (panelId === "import") right = await importPanel(K);
   else if (panelId === "export") right = await exportPanel(K);
   else right = h("div", { class: "ops-wrap", style: { minWidth: 0 } }, [
-    q.view === "jobs" ? null : panel("Pipeline", sbox, h("span", { class: "ops-row", style: { textTransform: "none", letterSpacing: 0 } }, [wsel, h("label", { class: "ops-row", style: { gap: "4px" } }, [annChk, "annotate"]), h("button", { class: "ops-btn pri", text: "Run pipeline", onclick: runAll })])),
+    q.view === "jobs" ? null : panel("Pipeline", sbox, h("span", { class: "ops-row", style: { textTransform: "none", letterSpacing: 0 } }, [wsel, h("label", { class: "ops-row", style: { gap: "4px" } }, [annChk, "annotate"]), h("button", { class: "ops-btn pri wbtn", text: "Run pipeline", onclick: runAll })])),
     panel("Log", h("div", { class: "ops-wrap", style: { gap: "6px", flex: 1 } }, [headBox, logBox]), null, { flex: 1, display: "flex", flexDirection: "column" })
   ]);
   const acts = h("span", { class: "ops-row" }, [h("a", { class: "ops-btn", style: { textDecoration: "none", display: "inline-flex", alignItems: "center" }, href: "#/jobs?panel=import", text: "Import" }),
@@ -193,6 +193,7 @@ async function importPanel(K) {
   async function upload(fl) {
     fl = fl.filter(f => VIDEO_RE.test(f.name));
     if (!fl.length) { out.textContent = "no video"; return; }
+    if (!UI.canWrite("upload · " + fl.length)) return;
     batch = batch || stamp();
     for (const f of fl) {
       const bar = h("i", { style: { width: "0%" } }), lab = h("span", { class: "ops-mono", text: "0%" });
@@ -246,7 +247,7 @@ async function importPanel(K) {
       h("div", { class: "ops-row" }, [h("span", { text: "task" }), taskIn]), zone, picker, files,
       h("div", { class: "ops-row" }, [h("button", { class: "ops-btn", text: "Folder…", onclick: folderPicker }), rootBox]), pickHold,
       h("div", { class: "ops-row" }, [srcSel, splitSel, h("label", { class: "ops-row", style: { gap: "4px" } }, [annChk, "annotate"]),
-        h("button", { class: "ops-btn", text: "Ingest", onclick: () => go("ego.ingest", ingP()) }), h("button", { class: "ops-btn pri", text: "Run pipeline", onclick: () => go("ego.pipeline", Object.assign(ingP(), { annotate: S.ann })) })]), out]),
+        h("button", { class: "ops-btn wbtn", text: "Ingest", onclick: () => go("ego.ingest", ingP()) }), h("button", { class: "ops-btn pri wbtn", text: "Run pipeline", onclick: () => go("ego.pipeline", Object.assign(ingP(), { annotate: S.ann })) })]), out]),
       h("a", { class: "ops-btn", style: { textDecoration: "none" }, href: "#/jobs", text: "×" }))
   ]);
 }
@@ -281,9 +282,9 @@ async function exportPanel(K) {
   loadHist();
   return h("div", { class: "ops-wrap", style: { minWidth: 0 } }, [
     panel("Export h1m", h("div", { class: "ops-wrap", style: { gap: "6px" } }, [h("div", null, wrows), h("div", { class: "ops-row" }, [nameIn, sampleIn, estSel,
-      h("button", { class: "ops-btn pri", text: "Export", onclick: () => go("ego.human1m", { name: nameIn.value.trim(), works: [...picked], sample: +sampleIn.value || 0, estimates: estSel.value ? [estSel.value] : undefined }, out1) })]), out1]),
+      h("button", { class: "ops-btn pri wbtn", text: "Export", onclick: () => go("ego.human1m", { name: nameIn.value.trim(), works: [...picked], sample: +sampleIn.value || 0, estimates: estSel.value ? [estSel.value] : undefined }, out1) })]), out1]),
       h("a", { class: "ops-btn", style: { textDecoration: "none" }, href: "#/jobs", text: "×" })),
-    panel("Metadata zip", h("div", { class: "ops-row" }, [dsSel, h("button", { class: "ops-btn", text: "Zip", onclick: () => go("export.zip", { path: dsSel.value }, out2) }), out2])),
+    panel("Metadata zip", h("div", { class: "ops-row" }, [dsSel, h("button", { class: "ops-btn wbtn", text: "Zip", onclick: () => go("export.zip", { path: dsSel.value }, out2) }), out2])),
     panel("Past exports", hist)
   ]);
 }

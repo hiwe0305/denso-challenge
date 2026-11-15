@@ -7,12 +7,12 @@ const DEMO = (() => {
     ["home", "Vòng flywheel: thu dữ liệu, xử lý, train, đánh giá, tìm lỗi."],
     ["data", "Mọi tập dữ liệu trong một bảng; bấm cột để lọc."],
     ["data/S70", "Một tập: số episode, chất lượng, nguồn gốc."],
-    ["data/S70/ep/278", "Một episode: video khớp quỹ đạo các khớp."],
+    ["data/h1m-team/ep/ep_77abee2eee5cfbb7", "Một clip người: video đã che mặt, tư thế tay, chia bước."],
     ["jobs", "Việc đang chạy: log thật và lệnh tái lập."],
-    ["runs", "Ba run train song song, cùng màu ở mọi trang."],
-    ["eval", "Eval: robot hỏng ở bước nào, nhãn lỗi nào."],
+    ["runs", "Năm run train, cùng màu ở mọi trang."],
+    ["eval", "Eval: năm run, robot hỏng ở bước nào, nhãn lỗi nào."],
+    ["loop", "Lỗi → Dữ liệu: sinh nhắm lỗi, dạy lại; luật viết trước bảo dừng."],
     ["qa", "Bộ kiểm bằng code quyết định; agent chỉ đề xuất."],
-    ["home", "Hỏi bằng lời: công cụ trả số, model chỉ diễn giải.", () => { if (window.CHAT) { CHAT.open(); CHAT.focus(); } }],
   ];
   /* @budget-skip-end */
   let i = 0;
@@ -22,7 +22,7 @@ const DEMO = (() => {
     b.appendChild(h("span", { class: "st", text: (i + 1) + "/" + STEPS.length })); b.appendChild(h("span", { class: "tx", text: STEPS[i][1] }));
     b.appendChild(h("button", { class: "u-btn sm", text: "←", onclick: () => step(-1) })); b.appendChild(h("button", { class: "u-btn sm pri", text: "→", onclick: () => step(1) }));
   }
-  function step(d) { const n = Math.max(0, Math.min(STEPS.length - 1, i + d)); if (n === i && d) return; i = n; const s = STEPS[i]; if (window.CHAT && i !== STEPS.length - 1) CHAT.close(true); go(s[0]); if (s[2]) s[2](); draw(); }
+  function step(d) { const n = Math.max(0, Math.min(STEPS.length - 1, i + d)); if (n === i && d) return; i = n; const s = STEPS[i]; if (window.CHAT) CHAT.close(true); go(s[0]); draw(); }
   function sync() { const r = chatRoute(); const k = STEPS.findIndex(s => s[0] === r); if (k >= 0 && STEPS[i][0] !== r) { i = k; } draw(); }
   return {
     steps: STEPS,

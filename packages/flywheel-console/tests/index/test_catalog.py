@@ -17,9 +17,9 @@ def _build(tmp_path: Path) -> tuple[dict[str, int], dict]:
     return counts, json.loads((tmp_path / "out" / "catalog.json").read_text(encoding="utf-8"))
 
 
-def test_catalog_has_60_rows_and_edges(tmp_path: Path) -> None:
+def test_catalog_has_62_rows_and_edges(tmp_path: Path) -> None:
     counts, doc = _build(tmp_path)
-    assert counts["rows"] == len(doc["rows"]) == 60
+    assert counts["rows"] == len(doc["rows"]) == 62
     ids = {r["id"] for r in doc["rows"]} | {r["id"] for r in doc["runs"]}
     assert doc["edges"] and counts["edges"] == len(doc["edges"])
     assert all(a in ids and b in ids for a, b in doc["edges"])
@@ -70,3 +70,33 @@ def test_team_egocentric_rows_are_tray(tmp_path: Path) -> None:
     assert by["h1m-team"]["task"] == "tray"
     assert by["team-1109-480p"]["task"] == "tray"
     assert by["egodex-da30"]["task"] == "other"
+
+
+def test_round_release_and_c70_r1_cut_are_catalogued(tmp_path: Path) -> None:
+    _, doc = _build(tmp_path)
+    by_id = {r["id"]: r for r in doc["rows"]}
+    assert by_id["tray_s1_868cc130985d"]["kind"] == "release"
+    assert by_id["tray_s1_868cc130985d"]["episodes"] == 262
+    cut = by_id["C70_R1"]
+    assert cut["episodes"] == 606 and cut["parents"] == ["S70", "tray_s1_868cc130985d"]
+    assert ["S70", "C70_R1"] in doc["edges"]
+
+
+def test_unique_counts_each_episode_once(tmp_path: Path) -> None:
+    """Derived rows (pipeline sources, exports, cuts, bench copies) repeat episodes of
+    their parents, so only current raw sources and releases outside eval count."""
+    _, doc = _build(tmp_path)
+    by_id = {r["id"]: r for r in doc["rows"]}
+    assert by_id["egodex-da30"]["unique"] is True
+    assert by_id["tray_s1_41899efb4b27"]["unique"] is True
+    for derived in ("src_158ec3c813ffe9a6", "h1m-egodex", "ALL", "S70", "C70_R1", "psi-n20"):
+        assert by_id[derived]["unique"] is False, derived
+    assert by_id["team-1109-480p30-old"]["unique"] is False  # superseded copy of the same clips
+    assert by_id["he-dev-eval-v1"]["unique"] is False  # eval conditions are not training data
+    t = doc["totals"]
+    assert t["egocentric"]["episodes"] == 379
+    assert t["teleop"]["episodes"] == 193
+    assert t["s1"]["episodes"] == 541 + 229 + 262
+    assert t["s2"]["episodes"] == 125 + 843
+    assert t["all"]["episodes"] == 379 + 193 + 1032 + 968
+    assert "eval" not in t

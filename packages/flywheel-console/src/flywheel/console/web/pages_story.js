@@ -5,7 +5,7 @@
 const P = window.PAGES_OPS = window.PAGES_OPS || {};
 const K = P.kit = {};
 /* @budget-skip-start */
-const GR = { w32: "minmax(0,3fr) minmax(0,2fr)", w21: "2fr 1fr", groups: "repeat(auto-fill, minmax(110px,1fr))", runs: "minmax(430px,38%) minmax(0,1fr)", jobs: "minmax(380px,40%) minmax(0,1fr)", h: "calc(100vh - 110px)", hair: "1px solid " };
+const GR = { w32: "minmax(0,3fr) minmax(0,2fr)", w21: "minmax(0,2fr) minmax(0,1fr)", groups: "repeat(auto-fill, minmax(110px,1fr))", runs: "minmax(430px,38%) minmax(0,1fr)", jobs: "minmax(380px,40%) minmax(0,1fr)", h: "calc(100vh - 110px)", hair: "1px solid " };
 const CMD = {
   train: "finetune_simple_psi0_config", evalRun: "python -m flywheel_psi0.tray.eval_batch --level 1,2", evalRead: "python -m flywheel_psi0.tray.eval_results --json", gen: "generate.py --conditions",
   qaRun: "fw agentqa run --model nemotron --out D", qaReview: "fw agentqa review --reports D/reports.jsonl", qaBench: "python -m flywheel.eval.agentqa.bench"
@@ -33,6 +33,7 @@ function h(tag, attrs, kids) {
   return e;
 }
 async function api(path, body) {
+  if (body !== undefined && !UI.canWrite(path.replace(/^\/api\//, "") + (body && body.kind ? " · " + body.kind : ""))) throw new Error("cancelled");
   const o = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
   const r = await fetch(path, o);
   let d = null; try { d = await r.json(); } catch (e) { /* not json */ }
@@ -94,7 +95,7 @@ function css() {
   document.head.appendChild(h("style", { id: "ops-css" }, `
 .ops-wrap{display:flex;flex-direction:column;gap:12px}
 .ops-grid{display:grid;gap:12px}
-.ops-panel{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:8px 12px;min-width:0}
+.ops-panel{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:8px 12px;min-width:0;overflow-x:auto}
 .ops-sec{font-size:11px;line-height:16px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;color:var(--text-2);display:flex;gap:12px;align-items:center;margin:0 0 6px}
 .ops-sec .sp{flex:1}
 .ops-tag{font-family:var(--mono,"JetBrains Mono",ui-monospace,monospace);font-size:12px;white-space:nowrap}
@@ -173,9 +174,10 @@ const ema = (pts, a) => { let m = null; return pts.map(([x, y]) => { m = m == nu
 /* ============================================================ RUNS */
 const STATIC_RUNS = [
   { id: "C", machine: "Colab", step: 40000, cu: 16.0 },
-  { id: "C+", machine: "Colab", step: 40000, cu: 16.1 },
-  { id: "B_ALL", machine: "A100", step: null, cu: 1.07 }
+  { id: "C+", machine: "Colab", step: 40000, cu: 16.1 }
 ];
+/* abandoned attempts (C70_R1.attempt1) were re-run in full; they are not runs of the experiment */
+const notAttempt = r => !/\.attempt/.test(r.branch || "");
 const IDENTITY_KEYS = new Set(["exp", "timestamp", "train.output_dir"]);
 function flatConfig(r) {
   const c = r.config || {}, o = Object.assign({}, c, c.flags || {});
@@ -189,12 +191,12 @@ function storyConfig(r) {
 }
 /* live runs: run_list + run_metrics tools; story.json as fallback */
 async function loadLive(S) {
-  const tool = (name, args) => tryApi("/api/tool?name=" + name + "&args=" + encodeURIComponent(JSON.stringify(args)));
+  const tool = (name, args) => UI.locked ? Promise.resolve(null) : tryApi("/api/tool?name=" + name + "&args=" + encodeURIComponent(JSON.stringify(args)));
   const rl = await tool("run_list", {});
   const runs = rl && rl.raw && rl.raw.runs;
-  if (!runs || !runs.length) return S.runs.map(r => ({ branch: r.branch, run: r.job, step: r.step, max_steps: r.max_steps, ema50: null, machine: AMACH, mtime: null, config: storyConfig(r),
+  if (!runs || !runs.length) return S.runs.filter(notAttempt).map(r => ({ branch: r.branch, run: r.job, step: r.step, max_steps: r.max_steps, ema50: null, machine: AMACH, mtime: null, config: storyConfig(r),
     loss: r.loss, thr: r.thr.filter(p => p[1] != null), vram: r.vram, groups: r.groups_last, gser: {} }));
-  return Promise.all(runs.map(async r => {
+  return Promise.all(runs.filter(notAttempt).map(async r => {
     const m = await tool("run_metrics", { run_id: r.run, keys: "all", points: 2000 }), x = (m && m.raw) || {}, groups = {}, gser = {};
     Object.keys(x).forEach(k => { if (k.startsWith("loss_by_group.")) { const v = x[k]; gser[k.slice(14)] = v; groups[k.slice(14)] = v.length ? v[v.length - 1][1] : null; } });
     return Object.assign({}, r, { loss: x.loss || [], thr: x.throughput || [], vram: x.vram_gb || [], groups, gser });
@@ -213,18 +215,20 @@ async function runsPage(main, params, qs) {
     smooth: q.smooth != null ? Math.min(.99, Math.max(0, +q.smooth)) : .9,
     logy: q.logy == null ? true : q.logy === "1" || q.logy === "true", raw: q.raw === "1",
     step: q.step != null ? +q.step : null,
+    old: q.old === "1",
     cur: null
   };
-  const setQs = () => { try { UI.setQs({ sel: [...state.sel].join(","), cmp: [...state.cmp].join(",") || null, smooth: state.smooth, logy: state.logy ? 1 : 0, raw: state.raw ? 1 : null }); } catch (e) { /* no router */ } };
+  const setQs = () => { try { UI.setQs({ sel: [...state.sel].join(","), cmp: [...state.cmp].join(",") || null, smooth: state.smooth, logy: state.logy ? 1 : 0, raw: state.raw ? 1 : null, old: state.old ? 1 : null }); } catch (e) { /* no router */ } };
   const lastEma = r => { const e = ema(r.loss, state.smooth); return e.length ? e[e.length - 1][1] : null; };
   const rowsOf = () => live.map(r => ({ id: r.branch, step: r.step, max: r.max_steps, loss: r.ema50 != null ? r.ema50 : lastEma(r), machine: r.machine, cu: null, updated: r.mtime, live: true }))
-    .concat(STATIC_RUNS.filter(r => !liveBy(r.id)).map(r => ({ id: r.id, step: r.step, max: 60000, loss: null, machine: r.machine, cu: r.cu, updated: null, live: false, done: true })));
+    .concat(STATIC_RUNS.filter(r => state.old && !liveBy(r.id)).map(r => ({ id: r.id, step: r.step, max: 60000, loss: null, machine: r.machine, cu: r.cu, updated: null, live: false, done: true })));
   const liveBy = id => live.find(r => r.branch === id);
 
   /* header */
-  const stat = [{ label: "runs", value: live.length + "/" + (live.length + STATIC_RUNS.length) }, { label: "live", value: String(live.length) },
-    { label: "CU", value: num((S.colab_balance.at(-1) || [])[1], "float1") }];
-  main.appendChild(pageHead("Runs", stat));
+  const stat = [{ label: "runs", value: String(live.length) }, { label: "CU", value: num((S.colab_balance.at(-1) || [])[1], "float1") }];
+  /* the two 40k runs (C, C+) predate the 60k experiment: hidden unless asked for */
+  const oldBtn = h("button", { class: "ops-btn" + (state.old ? " on" : ""), title: "C, C+ @40k", text: "40k", onclick: () => { state.old = !state.old; oldBtn.classList.toggle("on", state.old); drawTable(); setQs(); } });
+  main.appendChild(pageHead("Runs", stat, [oldBtn]));
 
   /* left: table */
   const tbox = h("div", { style: { overflowX: "auto" } });
@@ -372,11 +376,89 @@ function rangeCell(p) {
   return s;
 }
 
+/* bar per category with a Wilson whisker; ks successes of ns */
+function succChart(el, cats, ks, ns) {
+  ec(el, { grid: { left: 36, right: 10, top: 10, bottom: 22 }, tooltip: { trigger: "axis" }, xAxis: axis({ type: "category", data: cats, axisLabel: { color: col.t2(), fontSize: 11, interval: 0 } }), yAxis: axis({ type: "value", min: 0, axisLabel: { formatter: "{value}%", color: col.t2(), fontSize: 11 } }),
+    series: [{ type: "bar", barMaxWidth: 28, data: ks.map((k, i) => +(k / ns[i] * 100).toFixed(1)), itemStyle: { color: col.acc(), borderRadius: 2 } },
+      { type: "custom", z: 5, data: ks.map((k, i) => { const w = wilson(k, ns[i]); return [i, +(w[0] * 100).toFixed(1), +(w[1] * 100).toFixed(1)]; }), tooltip: { formatter: p => p.value[1] + "–" + p.value[2] + "%" },
+        renderItem: (p, a) => { const lo = a.coord([a.value(0), a.value(1)]), hi = a.coord([a.value(0), a.value(2)]), st = { stroke: col.text(), lineWidth: 1.5 };
+          return { type: "group", children: [{ type: "line", shape: { x1: lo[0], y1: lo[1], x2: hi[0], y2: hi[1] }, style: st }, { type: "line", shape: { x1: lo[0] - 5, y1: lo[1], x2: lo[0] + 5, y2: lo[1] }, style: st }, { type: "line", shape: { x1: hi[0] - 5, y1: hi[1], x2: hi[0] + 5, y2: hi[1] }, style: st }] }; } }] });
+}
+const STEP_SHORT = { approach_a: "appr", reach_b: "reach", release_stand: "release" };
+const L_CI = "CI 95%", L_D = "Δ", OUT_F = "F", PG_EVAL = "Eval";
+const [P_SUCC, P_STACK, P_EVALS, P_FUN, P_CMP] = ["Success", "Failure stack", "Evals", "Step pass %", "Compare"];
+/* "p" meant two things: the success rate in Evals and McNemar's p-value in Compare */
+const [L_RATE, L_MCN] = ["rate", "p McNemar"];
+/* the Failure → Data round run (C70_R1) and its stage-1 outcome against every baseline */
+function pairRound(PR) {
+  const rr = (PR.runs || []).find(r => /_R\d+$/.test(r.run)) || null;
+  const cs = rr ? (PR.comparisons || []).filter(c => c.variant === rr.run) : [];
+  const out = cs.length && cs.every(c => c.outcome === OUT_F) ? OUT_F : (cs[0] || {}).outcome;
+  return { rr, cs, out };
+}
+function funnel(cats, series) {
+  const fb = (typeof UI !== "undefined" && UI.Chart) ? UI.Chart({ type: "bar", categories: cats.map(x => STEP_SHORT[x] || x), series }, { height: 200 }) : h("div", { class: "ops-mono", text: "—" });
+  if (fb.instance) { let tries = 0; const fix = () => { const c = fb.instance(); if (c) c.setOption({ xAxis: { axisLabel: { interval: 0, fontSize: 10 } } }); else if (tries++ < 40) setTimeout(fix, 100); }; fix(); }
+  return fb;
+}
+
+/* five pair60k runs read at stage 1; the C/C+ view below stays as the fallback */
+/* the scorer marks each step on its own, so the last step can disagree with the success count */
+function stepGap(r, steps) {
+  const last = (steps || []).at(-1), k = last == null ? null : Math.round((r.step_pass[last] || 0) * r.n);
+  if (k == null || k === r.successes) return null;
+  return h("span", { style: { color: col.warn() }, title: `${r.run}: ${r.successes} successes, ${last} passed ${k}` }, "⚠");
+}
+function evalPair(main, PR) {
+  const R = PR.runs, best = R.find(r => r.run === PR.best) || R[0], { rr, cs, out } = pairRound(PR);
+  const frac = r => r.successes + "/" + r.n, lvS = (r, lv) => (r.levels || {})[lv] ? r.levels[lv].successes + "/" + r.levels[lv].n : "—";
+  const stat = [{ label: "runs", value: String(R.length) }, { label: "best", value: best.run + " " + frac(best) }];
+  if (rr) stat.push({ label: "round", value: rr.run + " " + frac(rr) + " · " + dash(out) });
+  main.appendChild(pageHead(PG_EVAL, stat));
+  const top = f => Object.keys(f || {}).slice(0, 2).map(k => k.replace("L-", "") + " " + f[k]).join(" · ");
+  const runTable = table({
+    columns: [
+      { key: "run", mono: true, fmt: (v, r) => h("span", { class: "ops-row", style: { gap: "6px" } }, [h("span", { class: "ops-dot", style: { background: runColor(v) } }), v,
+        v === best.run ? stateTag("ok", "best") : null, rr && v === rr.run ? stateTag("run", "round") : null]) },
+      { key: "succ", align: "right", mono: true, fmt: (v, r) => frac(r) }, { key: "p", label: L_RATE, align: "right", mono: true, fmt: v => pctS(v) },
+      { key: "wilson", label: L_CI, align: "right", mono: true, fmt: v => v ? (v[0] * 100).toFixed(1) + "–" + (v[1] * 100).toFixed(1) : "—" },
+      { key: "l1", align: "right", mono: true, fmt: (v, r) => lvS(r, "1") }, { key: "l2", align: "right", mono: true, fmt: (v, r) => lvS(r, "2") },
+      { key: "failures", mono: true, fmt: v => top(v) }
+    ], rows: R.map(r => Object.assign({ id: r.run, succ: r.successes, l1: 0, l2: 0 }, r)), qsKey: "run", onRow: r => ctx({ route: "eval", selection: { run: r.run } })
+  });
+  const funBox = funnel(PR.steps || [], R.map(r => ({ name: r.run + " " + frac(r), values: (PR.steps || []).map(s => +((r.step_pass[s] || 0) * 100).toFixed(1)) })));
+  const legend = h("div", { class: "ops-row ops-mono", style: { gap: "12px", fontSize: "11px" } }, R.map(r => h("span", { class: "ops-row", style: { gap: "4px" } }, [h("span", { class: "ops-dot", style: { background: (typeof UI !== "undefined" && UI.color) ? UI.color(r.run + " " + frac(r)) : col.acc() } }), r.run, stepGap(r, PR.steps)])));
+  /* the round's comparisons first: they carry the stop decision */
+  const crow = cs.concat((PR.comparisons || []).filter(c => cs.indexOf(c) < 0)).map(c => Object.assign({ id: c.variant + "·" + c.baseline, p: c.mcnemar_p }, c));
+  const cmpTable = table({
+    columns: [
+      { key: "pair", mono: true, fmt: (v, r) => r.variant + " vs " + r.baseline }, { key: "succ", align: "right", mono: true, fmt: (v, r) => r.variant_succ + " vs " + r.baseline_succ },
+      { key: "diff", label: L_D, align: "right", mono: true, fmt: v => v == null ? "—" : (v > 0 ? "+" : "") + (v * 100).toFixed(1) },
+      { key: "ci", label: L_CI, align: "right", mono: true, fmt: v => v ? (v[0] * 100).toFixed(1) + "–" + (v[1] * 100).toFixed(1) : "—" },
+      { key: "p", label: L_MCN, align: "right", mono: true, fmt: v => v == null ? "—" : String(v) },
+      { key: "outcome", fmt: v => stateTag(v === OUT_F ? "failed" : "ok", dash(v)) }
+    ], rows: crow, qsKey: "cmp"
+  });
+  const labels = []; R.forEach(r => Object.keys(r.failures || {}).forEach(k => { if (labels.indexOf(k) < 0) labels.push(k); }));
+  const sBox = box(170), fBox = box(170), src = h("span", { class: "ops-mono", style: { textTransform: "none", letterSpacing: 0, color: col.t3() } }, PR.source || "");
+  main.appendChild(h("div", { class: "ops-wrap" }, [
+    h("div", { class: "ops-grid", style: { gridTemplateColumns: "repeat(2,minmax(0,1fr))" } }, [panel(P_SUCC, sBox, src), panel(P_STACK, fBox)]),
+    panel(P_EVALS, runTable),
+    h("div", { class: "ops-grid", style: { gridTemplateColumns: GR.w32 } }, [panel(P_FUN, h("div", null, [legend, funBox])), panel(P_CMP, cmpTable)])
+  ]));
+  succChart(sBox, R.map(r => r.run), R.map(r => r.successes), R.map(r => r.n));
+  ec(fBox, { grid: { left: 36, right: 10, top: 10, bottom: 22 }, tooltip: { trigger: "axis", axisPointer: { type: "shadow" } }, xAxis: axis({ type: "category", data: R.map(r => r.run), axisLabel: { color: col.t2(), fontSize: 11, interval: 0 } }), yAxis: axis({ type: "value" }),
+    series: labels.map((k, i) => ({ name: k, type: "bar", stack: "f", barMaxWidth: 36, data: R.map(r => (r.failures || {})[k] || 0), itemStyle: { color: ser(i) } })) });
+  setPanel({ method: [{ step: "run", cmd: CMD.evalRun }, { step: "read", cmd: CMD.evalRead }], log: null, sources: [{ label: (PR.source || "").split("/").pop(), path: PR.source }] });
+  ctx({ route: "eval", selection: { run: best.run } });
+}
+
 async function evalPage(main, params, qs) {
   css(); chartsDispose(); main.replaceChildren();
-  useEval(await story());
+  const S = await story(); useEval(S);
+  if (S.pair && (S.pair.runs || []).length) return evalPair(main, S.pair);
   const T = LV[LV.length - 1], w = wilson(T.s, T.n);
-  main.appendChild(pageHead("Eval", [{ label: "n", value: String(T.n) }, { label: "succ", value: pctS(T.s / T.n) }, { label: "CI", value: (w[0] * 100).toFixed(1) + "–" + (w[1] * 100).toFixed(1), unit: "%" },
+  main.appendChild(pageHead(PG_EVAL, [{ label: "n", value: String(T.n) }, { label: "succ", value: pctS(T.s / T.n) }, { label: "CI", value: (w[0] * 100).toFixed(1) + "–" + (w[1] * 100).toFixed(1), unit: "%" },
     { label: "L-PLACE-POSE", value: String(FAIL["L-PLACE-POSE"][1] + FAIL["L-PLACE-POSE"][2]) }]));
   /* eval table */
   const rows = LV.map(l => { const ci = wilson(l.s, l.n); const top = Object.keys(FAIL).map(k => [k, failAt(k, l.id)]).sort((a, b) => b[1] - a[1]).slice(0, 2).filter(x => x[1] > 0);
@@ -387,17 +469,14 @@ async function evalPage(main, params, qs) {
       { key: "id", label: "eval", mono: true }, { key: "ckpt", mono: true },
       { key: "n", align: "right", mono: true, fmt: v => v == null ? "—" : String(v) },
       { key: "succ", align: "right", mono: true, fmt: (v, r) => r.pend ? stateTag("pending", "pending") : pctS(v) },
-      { key: "ci", label: "CI 95%", align: "right", mono: true, fmt: v => v ? (v[0] * 100).toFixed(1) + "–" + (v[1] * 100).toFixed(1) : "—" },
-      { key: "d", label: "Δ", align: "right", mono: true, fmt: () => "—" },
+      { key: "ci", label: L_CI, align: "right", mono: true, fmt: v => v ? (v[0] * 100).toFixed(1) + "–" + (v[1] * 100).toFixed(1) : "—" },
+      { key: "d", label: L_D, align: "right", mono: true, fmt: () => "—" },
       { key: "top", label: "top failures", mono: true }
     ], rows, qsKey: "eval", onRow: r => ctx({ route: "eval", selection: { eval: r.id } })
   });
   /* funnel */
-  const funBox = (typeof UI !== "undefined" && UI.Chart)
-    ? UI.Chart({ type: "bar", categories: STAGES.map(x => ({ approach_a: "appr", reach_b: "reach", release_stand: "release" }[x] || x)), series: LV.map(l => ({ name: l.id + " " + l.s + "/" + l.n, values: l.f })) }, { height: 200 })
-    : h("div", { class: "ops-mono", text: "—" });
+  const funBox = funnel(STAGES, LV.map(l => ({ name: l.id + " " + l.s + "/" + l.n, values: l.f })));
   const legend = h("div", { class: "ops-row ops-mono", style: { gap: "12px", fontSize: "11px" } }, LV.map(l => h("span", { class: "ops-row", style: { gap: "4px" } }, [h("span", { class: "ops-dot", style: { background: (typeof UI !== "undefined" && UI.color) ? UI.color(l.id + " " + l.s + "/" + l.n) : col.acc() } }), l.id])));
-  if (funBox.instance) { let tries = 0; const fix = () => { const c = funBox.instance(); if (c) c.setOption({ xAxis: { axisLabel: { interval: 0, fontSize: 10 } } }); else if (tries++ < 40) setTimeout(fix, 100); }; fix(); }
   /* failures */
   const frows = Object.keys(FAIL).map(k => ({ id: k, l0: failAt(k, "L0"), l1: failAt(k, "L1"), l2: failAt(k, "L2"), all: failAt(k, "L1–2"), share: failAt(k, "L1–2") / LC[0] }));
   const failTable = table({
@@ -419,17 +498,12 @@ async function evalPage(main, params, qs) {
 
   const sBox = box(170), fBox = box(170);
   main.appendChild(h("div", { class: "ops-wrap" }, [
-    h("div", { class: "ops-grid", style: { gridTemplateColumns: "repeat(2,minmax(0,1fr))" } }, [panel("Success", sBox, srcTag()), panel("Failure stack", fBox)]),
-    panel("Evals", evTable),
-    h("div", { class: "ops-grid", style: { gridTemplateColumns: GR.w32 } }, [panel("Funnel %", h("div", null, [legend, funBox])), panel("Failures", failTable)]),
-    h("div", { class: "ops-grid", style: { gridTemplateColumns: GR.w21 } }, [panel("Placement", placeTable), panel("Compare", cmpBox)])
+    h("div", { class: "ops-grid", style: { gridTemplateColumns: "repeat(2,minmax(0,1fr))" } }, [panel(P_SUCC, sBox, srcTag()), panel(P_STACK, fBox)]),
+    panel(P_EVALS, evTable),
+    h("div", { class: "ops-grid", style: { gridTemplateColumns: GR.w32 } }, [panel(P_FUN, h("div", null, [legend, funBox])), panel("Failures", failTable)]),
+    h("div", { class: "ops-grid", style: { gridTemplateColumns: GR.w21 } }, [panel("Placement", placeTable), panel(P_CMP, cmpBox)])
   ]));
-  const lvIds = LV.map(l => l.id);
-  ec(sBox, { grid: { left: 36, right: 10, top: 10, bottom: 22 }, tooltip: { trigger: "axis" }, xAxis: axis({ type: "category", data: lvIds }), yAxis: axis({ type: "value", min: 0, axisLabel: { formatter: "{value}%", color: col.t2(), fontSize: 11 } }),
-    series: [{ type: "bar", barMaxWidth: 28, data: LV.map(l => +(l.s / l.n * 100).toFixed(1)), itemStyle: { color: col.acc(), borderRadius: 2 } },
-      { type: "custom", z: 5, data: LV.map((l, i) => { const w = wilson(l.s, l.n); return [i, +(w[0] * 100).toFixed(1), +(w[1] * 100).toFixed(1)]; }), tooltip: { formatter: p => p.value[1] + "–" + p.value[2] + "%" },
-        renderItem: (p, a) => { const lo = a.coord([a.value(0), a.value(1)]), hi = a.coord([a.value(0), a.value(2)]), st = { stroke: col.text(), lineWidth: 1.5 };
-          return { type: "group", children: [{ type: "line", shape: { x1: lo[0], y1: lo[1], x2: hi[0], y2: hi[1] }, style: st }, { type: "line", shape: { x1: lo[0] - 5, y1: lo[1], x2: lo[0] + 5, y2: lo[1] }, style: st }, { type: "line", shape: { x1: hi[0] - 5, y1: hi[1], x2: hi[0] + 5, y2: hi[1] }, style: st }] }; } }] });
+  succChart(sBox, LV.map(l => l.id), LV.map(l => l.s), LV.map(l => l.n));
   ec(fBox, { grid: { left: 36, right: 10, top: 10, bottom: 22 }, tooltip: { trigger: "axis", axisPointer: { type: "shadow" } }, xAxis: axis({ type: "category", data: ["L0", "L1", "L2"] }), yAxis: axis({ type: "value" }),
     series: Object.keys(FAIL).map((k, i) => ({ name: k, type: "bar", stack: "f", barMaxWidth: 36, data: FAIL[k], itemStyle: { color: ser(i) } })) });
   setPanel({ method: [{ step: "run", cmd: CMD.evalRun }, { step: "read", cmd: CMD.evalRead }], log: null, sources: [{ label: EV_16, path: EV_SRC }] });
@@ -437,6 +511,29 @@ async function evalPage(main, params, qs) {
 }
 
 /* ============================================================ LOOP */
+/* the C70_R1 round: cited chain (tray.md §20.11–20.16) plus its stage-1 read from fwdata; null when either is missing */
+function roundLoop(S) {
+  const RC = S.round || {}, c = RC.chain, { rr, cs, out } = pairRound(S.pair || {});
+  if (!c || !rr) return null;
+  const tr = (S.runs || []).find(r => r.branch === rr.run), stop = out === OUT_F;
+  const vs = cs.map(x => x.variant_succ + " vs " + x.baseline_succ + " " + x.baseline).join(" · ");
+  const chain = [
+    [String(c.targets), "targets", "bad", "loop"], [String(c.generated), "generated", "ok", "data"], [String(c.recorded), "recorded", "ok", "data"],
+    [String(c.qa_pass), "qa", "ok", "qa"], [String(c.quality), "quality", "ok", "data"], [String(c.selected), "selected", "ok", "data"],
+    [tr ? Math.round(tr.step / 1000) + "k" : "—", rr.run, "ok", "runs"], [rr.successes + "/" + rr.n, "re-eval", "ok", "eval", vs], [stop ? "STOP" : dash(out), "stage1 " + dash(out), stop ? "bad" : "ok", "eval", vs]
+  ];
+  const rows = (RC.clusters || []).map(k => ({ id: k.id, stage: k.stage, n: k.n, diag: k.diagnosis, data: k.failures != null, interv: k.intervention + (k.failures != null ? "" : " · soạn sẵn, chưa mở"), eps: k.failures }));
+  const flow = lk => {
+    const [gen, rec, qa, q, sel] = [c.generated, c.recorded, c.qa_pass, c.quality, c.selected], R = rr.run;
+    const nodes = ["generated", "failed", "recorded", "rejected", "passed", "filtered", "quality", "spare", "selected", R, "stop"].map(name => ({ name }));
+    const links = [lk("generated", "recorded", rec), lk("generated", "failed", gen - rec), lk("recorded", "passed", qa), lk("recorded", "rejected", rec - qa), lk("passed", "quality", q), lk("passed", "filtered", qa - q),
+      lk("quality", "selected", sel), lk("quality", "spare", q - sel), lk("selected", R, sel), lk(R, "stop", sel)];
+    return { nodes, links, cols: { generated: 0, recorded: 1, passed: 2, quality: 3, selected: 4, [R]: 5, stop: 6 }, warn: "", bad: "stop" };
+  };
+  const src = h("span", { class: "ops-mono", style: { textTransform: "none", letterSpacing: 0, color: col.t3() }, title: RC.plan || "" }, RC.source || "");
+  return { chain, rows, flow, src };
+}
+
 async function loopPage(main) {
   css(); chartsDispose(); main.replaceChildren();
   const S = await story(); useEval(S);
@@ -445,18 +542,19 @@ async function loopPage(main) {
   const L = S.ledger.filter(r => r[1] || r[2]);
   const est = S.ledger.reduce((a, r) => a + r[1], 0), meas = S.ledger.reduce((a, r) => a + r[2], 0);
   main.appendChild(pageHead("Loop", [{ label: "measured", value: num(meas, "float1"), unit: "$" }, { label: "estimated", value: num(est, "float1"), unit: "$" }, { label: "CU", value: num(bal, "float1") }]));
-  /* chain strip (docs/he/tray.md §16.6, §17.5) */
-  const chain = [
+  const RD = roundLoop(S);
+  /* chain strip: the C70_R1 round when indexed, else the C+ round (docs/he/tray.md §16.6, §17.5) */
+  const chain = RD ? RD.chain : [
     [String(LC[0]), "eval", "ok", "eval"], [String(failAt("L-PLACE-POSE", "L1–2")), "place-pose", "bad", "eval"], [String(LC[2]), "generated", "ok", "data/tray_s1_4a8f4a8c6a8d"], [String(LC[3]), "recorded", "ok", "data/tray_s1_4a8f4a8c6a8d"],
     [String(LC[4]), "kept", "ok", "data/ALL"], [String(LD.in_cut), "in cut", "ok", "data/cut-C"], ["C+ 40k", "trained", "ok", "runs"], ["—", "re-eval", "pending", "eval"]
   ];
-  const strip = h("div", { class: "ops-strip" }, chain.map(([v, l, st, link]) => h("a", { class: "ops-node", href: "#/" + link }, [
+  const strip = h("div", { class: "ops-strip" }, chain.map(([v, l, st, link, m]) => h("a", { class: "ops-node", href: "#/" + link, title: m || "" }, [
     h("span", { class: "v ops-mono", style: { color: st === "bad" ? col.bad() : st === "pending" ? col.warn() : col.text() }, text: v }), h("span", { class: "l", text: l }), st === "pending" ? stateTag("pending", "wait") : null])));
   /* cluster table */
-  const rows = (EV.clusters || []).map(c => ({ id: c.label, stage: c.stage, n: failAt(c.label, "L1–2"), diag: c.diagnosis, interv: c.intervention, eps: c.episodes }));
+  const rows = RD ? RD.rows : (EV.clusters || []).map(c => ({ id: c.label, stage: c.stage, n: failAt(c.label, "L1–2"), diag: c.diagnosis, data: c.diagnosis === "data", interv: c.intervention, eps: c.episodes }));
   const clusters = table({
-    columns: [{ key: "id", label: "cluster", mono: true }, { key: "stage", mono: true }, { key: "n", label: "n/" + (LC[0] != null ? LC[0] : "…"), align: "right", mono: true },
-      { key: "diag", label: "diagnosis", fmt: (v, r) => stateTag(r.diag === "data" ? "run" : "todo", v) }, { key: "interv", label: "intervention" }, { key: "eps", label: "episodes", mono: true }],
+    columns: [{ key: "id", label: "cluster", mono: true }, { key: "stage", mono: true }, { key: "n", label: RD ? "n" : "n/" + (LC[0] != null ? LC[0] : "…"), align: "right", mono: true },
+      { key: "diag", label: "diagnosis", fmt: (v, r) => stateTag(r.data ? "run" : "todo", v) }, { key: "interv", label: "intervention" }, { key: "eps", label: RD ? "targets" : "episodes", mono: true }],
     rows, qsKey: "cluster", onRow: r => ctx({ route: "loop", selection: { cluster: r.id } })
   });
   /* ledger: estimates and measurements as separate rows */
@@ -467,26 +565,33 @@ async function loopPage(main) {
     rows: lrows, qsKey: "ledger"
   });
   const flowBox = box(360), costBox = box(200), cost = ((typeof UI !== "undefined" && UI.qs) ? UI.qs() : {}).tab === "cost";
-  const parts = [panel("Flow", flowBox, srcTag()), panel("Cost", costBox)];
+  const parts = [panel("Flow", flowBox, RD ? RD.src : srcTag()), panel("Cost", costBox)];
   main.appendChild(h("div", { class: "ops-wrap" }, [
+    strip,
     h("div", { class: "ops-grid", style: { gridTemplateColumns: GR.w32 } }, cost ? parts.reverse() : parts),
     panel("Clusters", clusters),
     panel("Ledger", ledger)
   ]));
-  const pp = failAt("L-PLACE-POSE", "L1–2"), nT = LC[0], [gen, rec, kept] = [LC[2], LC[3], LC[4]], qaPass = LD.qa_pass, inCut = LD.in_cut;
-  const nodes = ["rollouts", "place-pose", "other", "generated", "failed", "recorded", "rejected", "passed", "filtered", "kept", "spare", "C+", "re-eval"].map(name => ({ name }));
   const lk = (source, target, value) => ({ source, target, value });
-  const CHAIN = { rollouts: 0, "place-pose": 1, generated: 2, recorded: 3, "passed": 4, kept: 5, "C+": 6 };
+  let nodes, links, cols, warn = "re-eval", bad = "place-pose";
+  if (RD) ({ nodes, links, cols, warn, bad } = RD.flow(lk));
+  else {
+    const pp = failAt("L-PLACE-POSE", "L1–2"), nT = LC[0], [gen, rec, kept] = [LC[2], LC[3], LC[4]], qaPass = LD.qa_pass, inCut = LD.in_cut;
+    nodes = ["rollouts", "place-pose", "other", "generated", "failed", "recorded", "rejected", "passed", "filtered", "kept", "spare", "C+", "re-eval"].map(name => ({ name }));
+    cols = { rollouts: 0, "place-pose": 1, generated: 2, recorded: 3, "passed": 4, kept: 5, "C+": 6 };
+    links = [lk("rollouts", "place-pose", pp), lk("rollouts", "other", nT - pp), lk("place-pose", "generated", gen), lk("generated", "recorded", rec), lk("generated", "failed", gen - rec), lk("recorded", "passed", qaPass), lk("recorded", "rejected", rec - qaPass), lk("passed", "kept", kept), lk("passed", "filtered", qaPass - kept), lk("kept", "C+", inCut), lk("kept", "spare", kept - inCut), lk("C+", "re-eval", inCut)];
+  }
+  const CHAIN = { ...cols };
   ec(flowBox, { tooltip: { trigger: "item" }, series: [{ type: "sankey", left: 24, right: 60, top: 40, bottom: 40, nodeWidth: 10, nodeGap: 14, emphasis: { focus: "adjacency" },
     label: { color: col.text(), fontSize: 11, formatter: p => (p.value != null ? p.value + "\n" : "") + p.name }, lineStyle: { color: "gradient", opacity: .35 }, itemStyle: { borderWidth: 0 },
     /* main chain alternates label side by column so neighbours never share a row; sinks sit in the last column, labelled to the right */
-    data: nodes.map((n, i) => Object.assign(n, { label: { position: n.name in CHAIN ? (CHAIN[n.name] % 2 ? "top" : "bottom") : "right" }, itemStyle: { color: n.name === "re-eval" ? col.warn() : n.name === "place-pose" ? col.bad() : ser(i) } })),
-    links: [lk("rollouts", "place-pose", pp), lk("rollouts", "other", nT - pp), lk("place-pose", "generated", gen), lk("generated", "recorded", rec), lk("generated", "failed", gen - rec), lk("recorded", "passed", qaPass), lk("recorded", "rejected", rec - qaPass), lk("passed", "kept", kept), lk("passed", "filtered", qaPass - kept), lk("kept", "C+", inCut), lk("kept", "spare", kept - inCut), lk("C+", "re-eval", inCut)] }] });
+    data: nodes.map((n, i) => Object.assign(n, { label: { position: n.name in CHAIN ? (CHAIN[n.name] % 2 ? "top" : "bottom") : "right" }, itemStyle: { color: n.name === warn ? col.warn() : n.name === bad ? col.bad() : ser(i) } })),
+    links }] });
   ec(costBox, { grid: { left: 54, right: 10, top: 16, bottom: 22 }, tooltip: { trigger: "axis", axisPointer: { type: "shadow" } }, legend: { top: 0, right: 0, textStyle: { color: col.t2(), fontSize: 11 } },
     xAxis: axis({ type: "category", data: L.map(r => r[0]), axisLabel: { color: col.t2(), fontSize: 10, interval: 0, rotate: 30 } }), yAxis: axis({ type: "value" }),
     series: [{ name: "estimated", type: "bar", barMaxWidth: 12, data: L.map(r => r[1]), itemStyle: { color: col.t3() } }, { name: "measured", type: "bar", barMaxWidth: 12, data: L.map(r => r[2]), itemStyle: { color: col.ok() } }] });
   setPanel({ method: [{ step: "eval", cmd: CMD.evalRun }, { step: "generate", cmd: CMD.gen }, { step: "train", cmd: CMD.train }], log: null,
-    sources: [{ label: EV_17, path: EV_SRC }, { label: "ledger", path: "docs/g0/ledger" }] });
+    sources: [{ label: RD ? S.round.source : EV_17, path: EV_SRC }, { label: "ledger", path: "docs/g0/ledger" }] });
   ctx({ route: "loop" });
 }
 
@@ -549,7 +654,7 @@ async function qaPage(main) {
     else dec[r.id] = { finding_id: r.fid, decide: "agree", reason: null };
     msg.textContent = ""; drawInbox();
   }
-  const submit = h("button", { class: "ops-btn pri", text: "Submit", onclick: async () => {
+  const submit = h("button", { class: "ops-btn pri wbtn", text: "Submit", onclick: async () => {
     const byRep = {};
     rows.filter(r => r.source === "llm").forEach(r => { (byRep[r.report.report_id] = byRep[r.report.report_id] || { r, ds: [], total: 0 }).total++; if (dec[r.id] && !dec[r.id].locked) byRep[r.report.report_id].ds.push(dec[r.id]); });
     const todo = Object.values(byRep).filter(b => b.ds.length);

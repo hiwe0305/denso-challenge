@@ -224,3 +224,314 @@ cited:
   doc: docs/he/tray.md
   section: '17.5 (change log 8/11/2026)'
   quote: 'chọn 160 theo luật 17.3'
+# Failure → Data round on C_70 (C70_R1), tray.md 20.11–20.16; its eval is read from fwdata
+- key: round.plan
+  value: rp_aae292bc79da
+  doc: docs/he/tray.md
+  section: '20.16'
+  quote: id **`rp_aae292bc79da`**
+- key: round.targets
+  value: 23
+  doc: docs/he/tray.md
+  section: '20.14'
+  quote: 23 lỗi của 20.13
+- key: round.generated
+  value: 290
+  doc: docs/he/tray.md
+  section: '20.16'
+  quote: 290 lượt, 262 ghi được (90 %)
+- key: round.recorded
+  value: 262
+  doc: docs/he/tray.md
+  section: '20.16'
+  quote: 290 lượt, 262 ghi được (90 %)
+- key: round.qa_pass
+  value: 261
+  doc: docs/he/tray.md
+  section: '20.16'
+  quote: 261 pass, 1 reject
+- key: round.quality
+  value: 204
+  doc: docs/he/tray.md
+  section: '20.16'
+  quote: giữ 204, bỏ 57
+- key: round.selected
+  value: 181
+  doc: docs/he/tray.md
+  section: '20.16'
+  quote: 204 seed qua, chọn đủ 181
+- key: round.per_case
+  value: {approach_a: 30, place: 10}
+  doc: docs/he/tray.md
+  section: '20.14'
+  quote: '`n` = 30 cho `approach_a` và 10 cho `place`'
+- key: round.planner_failures
+  value: {L-ONE-HAND: 8, L-PLACE-POSE: 3, L-TRAY-TILT: 4, L-TIMEOUT: 13}
+  doc: docs/he/tray.md
+  section: '20.16'
+  quote: 'Lỗi của planner: 8 `L-ONE-HAND`, 3 `L-PLACE-POSE`, 4 `L-TRAY-TILT`, 13 hết giờ.'
+- key: round.clusters.data
+  value:
+  - {id: c1, stage: place, n: 14, diagnosis: KỸ NĂNG YẾU 5/5, intervention: sinh quanh lỗi, failures: 10}
+  - {id: c2, stage: place, n: 12, diagnosis: KỸ NĂNG YẾU 4/5, intervention: sinh quanh lỗi, failures: 10}
+  - {id: c3, stage: approach_a, n: 4, diagnosis: theo lỗi, intervention: sinh quanh lỗi, failures: 2}
+  - {id: c8, stage: approach_a, n: 2, diagnosis: theo lỗi, intervention: sinh quanh lỗi, failures: 1}
+  doc: docs/he/tray.md
+  section: '20.13'
+  quote: '| Chẩn đoán | KỸ NĂNG YẾU (5/5) | KỸ NĂNG YẾU (4/5) |'
+- key: round.clusters.tickets
+  value:
+  - {id: c4, stage: '—', diagnosis: thiếu tín hiệu đo, intervention: phiếu DA-38}
+  - {id: c5, stage: '—', diagnosis: thiếu tín hiệu đo, intervention: phiếu DA-38}
+  - {id: c6, stage: approach_a, diagnosis: ngưỡng bộ chấm, intervention: phiếu DA-37}
+  - {id: c7, stage: approach_a, diagnosis: ngưỡng bộ chấm, intervention: phiếu DA-37}
+  doc: docs/he/tray.md
+  section: '20.11'
+  quote: c4, c5, c6, c7 và lượt `L-PART-DROP` thành phiếu, không tiêu ngân sách dữ liệu
+# Story pages of the 17/11 demo (`story.json · demo`). Key: demo.<group>.<name>.
+# Every number in a value appears in its quote; test_cited checks it.
+- key: demo.ladder.on_table_b
+  value: {C_ALL: 43, C_70: 50, B_ALL: 44, B_70: 51, C70_R1: 49}
+  doc: docs/he/tray.md
+  section: '20.18 (c)'
+  quote: '| Khay trên bàn B | 43/60 | 50/60 | 44/60 | 51/60 | 49/60 |'
+- key: demo.round1.max_place_error_cm
+  value: {C_70: 16.1, C70_R1: 12.7}
+  doc: docs/he/tray.md
+  section: '20.18 (c)'
+  quote: 'tối đa 12,7 cm so với 16,1 cm, và nới 7,5 cm được 15 so với 14'
+- key: demo.round1.relaxed_7_5cm
+  value: {C_70: 14, C70_R1: 15}
+  doc: docs/he/tray.md
+  section: '20.18 (c)'
+  quote: 'tối đa 12,7 cm so với 16,1 cm, và nới 7,5 cm được 15 so với 14'
+- key: demo.round1.tilt_at_place
+  value: {C_70: 4, C70_R1: 8}
+  doc: docs/he/tray.md
+  section: '20.18 (c)'
+  quote: 'Số nghiêng ở `place` tăng từ 4 lên 8.'
+- key: demo.round1.not_a_cause
+  value: description only, not a tested cause
+  doc: docs/he/tray.md
+  section: '20.18'
+  quote: 'Đây chỉ là mô tả, không phải nguyên nhân đã kiểm.'
+- key: demo.round1.rule_r1
+  value: {variant: C70_R1, baseline: C_ALL, episodes: 181, outcome: F, reading: no difference}
+  doc: docs/he/tray.md
+  section: '20.18'
+  quote: 'một vòng Failure → Data với 181 episode **không cho thấy khác** so với thêm đều 181 episode (r1, F).'
+- key: demo.round1.rule_r2
+  value: {variant: C70_R1, baseline: C_70, direction: negative, ci_contains_zero: true}
+  doc: docs/he/tray.md
+  section: '20.18'
+  quote: '- So với `C_70` hướng là âm (r2), CI vẫn chứa 0.'
+- key: demo.round1.stop
+  value: {stage1: F, stop: true}
+  doc: docs/he/tray.md
+  section: '20.18 (r1)'
+  quote: 'F: b ≤ c, không phải E1 hay E3. Dừng, không chạy giai đoạn 2'
+- key: demo.qa.code_bench
+  value: {planted: 30, kinds: 10, clean_units: 40}
+  doc: docs/g0/defect-bench.md
+  section: '6'
+  quote: '`bench-c6da75e9ff36` (30 lỗi: 10 loại × 3), `bench-cfcb0ba66776`; mỗi bản 40 job (30 train, 10 RTC)'
+- key: demo.qa.code_date
+  value: 5/11/2026
+  doc: docs/g0/defect-bench.md
+  section: '6'
+  quote: '## 6. Lần chạy 5/11/2026 trên bộ log cấy'
+- key: demo.qa.code_false_alarms
+  value: {hit: 0, of: 40}
+  doc: docs/g0/defect-bench.md
+  section: '6'
+  quote: '| Lớp code, báo nhầm trên bản sạch | 0/40 job |'
+- key: demo.qa.code_caught
+  value: {hit: 30, of: 30}
+  doc: docs/g0/agent-qa.md
+  section: '3.7'
+  quote: 'Lớp code giữ nguyên 30/30, precision 3/3 mỗi mã, 0/40 báo nhầm.'
+- key: demo.qa.code_false_alarms_3_2
+  value: {hit: 0, of: 40}
+  doc: docs/g0/agent-qa.md
+  section: '3.2'
+  quote: '| Báo nhầm trên bản sạch | 0/40 đơn vị (cận trên) | 1/40 đơn vị (cận trên): T4 trên `train/job-fd57c7341466` |'
+- key: demo.qa.agent_nemotron
+  value: {caught: 30, planted: 30, false_alarms: 1, clean_units: 40, date: 12/11/2026}
+  doc: docs/g0/agent-qa.md
+  section: 'đầu file, 3.2, 3.7'
+  quote: 'Trên bộ log cấy, lớp agent bắt 30/30 lỗi cấy, precision 3/3 ở 9 mã, T4 là 3/4, báo nhầm trên bản sạch 1/40 (cận trên).'
+- key: demo.qa.psi_data_bench
+  value: {planted: 33, kinds: 11, per_kind: 3, scored: false}
+  doc: docs/g0/defect-inject.md
+  section: 'Chạy trên psi-data thật'
+  quote: 'một bản có 33 lỗi, đủ 11 loại × 3'
+- key: demo.qa.psi_data_not_scored
+  value: not scored yet
+  doc: docs/g0/defect-bench.md
+  section: '8'
+  quote: '| Chạy trên hai bản sao psi-data | Máy `rtx3060` |'
+- key: demo.diagnose.H1
+  value: {clusters: [c6, c7], result: unclear (scorer threshold), ticket: DA-37}
+  doc: docs/he/tray.md
+  section: '20.11'
+  quote: '**H1: chuỗi bước gãy ở `approach_a`.** CHƯA RÕ (ngưỡng bộ chấm), phiếu cho DA-37.'
+- key: demo.diagnose.H2
+  value: {clusters: [c3, c8], result: policy failure, goes_to: data}
+  doc: docs/he/tray.md
+  section: '20.9'
+  quote: '- R8: c3, c8 đọc là lỗi của policy, đi bước 5–8 cùng c1, c2.'
+- key: demo.diagnose.H3
+  value: {clusters: [c4, c5], result: unclear (missing signal), ticket: DA-38}
+  doc: docs/he/tray.md
+  section: '20.11'
+  quote: '**H3: nghiêng lúc hạ và buông.** CHƯA RÕ (thiếu tín hiệu, spec 6.4 mục 1), phiếu cho DA-38.'
+- key: demo.diagnose.delay_sync_camera
+  value: {clusters: all, result: pass}
+  doc: docs/he/tray.md
+  section: '20.3'
+  quote: 'Eval chạy `timing: sync`: sim chờ server, nên độ trễ không đổi hành vi. Cây eval, cảnh `+zone1` và camera ghim như bốn run | Ghi "đạt", kèm lý do |'
+- key: demo.diagnose.cost_cu
+  value: 0
+  doc: docs/he/tray.md
+  section: '20.11'
+  quote: '### 20.11 Kết quả bước 4: H1–H3 (12/11/2026, 0 CU)'
+- key: demo.cost.train_1
+  value: 8.55
+  doc: docs/he/tray.md
+  section: '20.18'
+  quote: '| Train lần 1 (dừng sớm) | 8,55 |'
+- key: demo.cost.train_2
+  value: 77.27
+  doc: docs/he/tray.md
+  section: '20.18'
+  quote: '| Train lần 2 | 77,27 |'
+- key: demo.cost.serve
+  value: 23.4
+  doc: docs/he/tray.md
+  section: '20.18'
+  quote: '| **Tổng serve** | **khoảng 23,4**, so với 16,2 ước tính |'
+- key: demo.cost.serve_waste
+  value: 8
+  doc: docs/he/tray.md
+  section: '20.18'
+  quote: 'Khoảng 8 CU serve là phí:'
+- key: demo.cost.eval_client
+  value: {hours: 4.80, cu: 0}
+  doc: docs/he/tray.md
+  section: '20.18'
+  quote: 'Eval client trên `rtx3060`: 4,80 giờ client, 0 CU.'
+- key: demo.cost.usd_per_cu
+  value: {cu: 100, usd: 9.99}
+  doc: docs/g0/ledger/S1-03.csv
+  section: 'job_s103_colab_cost'
+  quote: 'Colab Pro 100 CU = 9.99 USD'
+- key: demo.design.task
+  value: seven steps, success when the tray is within 5 cm and 10 degrees of the target
+  doc: docs/superpowers/specs/2026-11-15-console-one-site-design.md
+  section: '6'
+  quote: 'Bảy bước bằng lời thường: tới bàn A, cầm khay, nhấc lên, mang sang, tới bàn B, đặt xuống, buông tay và đứng. Lượt đạt khi khay nằm trong ô đích: lệch ≤ 5 cm và xoay ≤ 10°.'
+- key: demo.design.station
+  value: two facing tables, robot starts near table A
+  doc: docs/superpowers/specs/2026-10-28-tray-transfer-he-design.md
+  section: '3.1'
+  quote: 'Sàn phẳng, hai bàn đối diện, hành lang trống, robot đứng giữa gần bàn A'
+- key: demo.design.sim_episodes
+  value: {episodes: 606, frames: 861624}
+  doc: docs/he/tray.md
+  section: '19.1 (change log 11/11/2026)'
+  quote: '606 episode, 861 624 frame'
+- key: demo.design.keyboard_teleop
+  value: keyboard teleop
+  doc: CLAUDE.md
+  section: 'Dự án'
+  quote: 'dataset teleop của tác giả, teleop bàn phím, synthetic S1 và S2'
+- key: demo.design.sim_stack
+  value: {physics_and_generation: SIMPLE on MuJoCo, rendering: Isaac Sim}
+  doc: CLAUDE.md
+  section: 'Dự án'
+  quote: 'Thu và sinh dữ liệu chạy MuJoCo thuần của SIMPLE, Isaac Sim chỉ render.'
+- key: demo.design.robot_model
+  value: {robot: Unitree G1, model: Ψ₀}
+  doc: CLAUDE.md
+  section: 'Dự án'
+  quote: 'Model là Ψ₀ (dùng lại checkpoint của tác giả). Từ 27/10/2026 robot là Unitree G1 trong SIMPLE'
+- key: demo.design.lerobot
+  value: LeRobot v2.1
+  doc: docs/superpowers/specs/2026-10-27-g1-psi0-demo-design.md
+  section: 'M3'
+  quote: 'teleop và synthetic xuất LeRobot v2.1'
+- key: demo.design.laptop
+  value: laptop runs the console
+  doc: docs/superpowers/specs/2026-11-15-console-one-site-design.md
+  section: '1'
+  quote: '"tự mở, tự bấm", trên laptop'
+- key: demo.design.rtx3060
+  value: {device: rtx3060, role: simulation test client, hours: 4.80, cu: 0}
+  doc: docs/he/tray.md
+  section: '20.18'
+  quote: 'Eval client trên `rtx3060`: 4,80 giờ client, 0 CU.'
+- key: demo.design.colab_train_gpu
+  value: {gpu: A100, steps: 60000}
+  doc: docs/he/tray.md
+  section: '20.18'
+  quote: 'Phiên `da34-c70r1` trên A100, 12/11 12:49 đến 13/11 00:18, đủ 60 000 bước.'
+- key: demo.design.colab_serve_gpu
+  value: {gpu: L4, role: serving the model during the 60-run test}
+  doc: docs/he/tray.md
+  section: '20.15'
+  quote: 'Mỗi làn là một phiên Colab L4 serve cùng checkpoint `ckpt_60000` của `C70_R1`'
+- key: demo.design.head_camera
+  value: head-mounted phone or action camera
+  doc: docs/superpowers/specs/2026-10-28-tray-transfer-he-design.md
+  section: '4'
+  quote: 'Người đeo camera ở đầu (điện thoại gắn mũ hoặc camera hành động)'
+- key: demo.design.train_cu_estimate
+  value: {low: 74, high: 76, gpu: A100, hours: 10.7}
+  doc: docs/he/tray.md
+  section: '20.6'
+  quote: '| Chi phí (ước lượng theo số đo bốn run) | Một A100, khoảng 10,7 giờ, 74–76 CU | Khoảng 25 CU |'
+- key: demo.design.gen_hours
+  value: {hours: 1.16, attempts: 290, recorded: 262}
+  doc: docs/he/tray.md
+  section: '20.16'
+  quote: '290 lượt, 262 ghi được (90 %), 06:19–07:29, 1,16 giờ'
+- key: demo.design.qa_hours
+  value: {hours: 0.67}
+  doc: docs/he/tray.md
+  section: '20.16'
+  quote: '07:29–08:09, 0,67 giờ'
+- key: demo.design.gen_cu
+  value: 0
+  doc: docs/he/tray.md
+  section: '20.16'
+  quote: '### 20.16 Kết quả 7.5: sinh, QA, chọn, cắt và đóng băng (12/11/2026, 0 CU)'
+- key: demo.design.deid_first
+  value: face masking before any other step
+  doc: CLAUDE.md
+  section: 'Bất biến kiến trúc'
+  quote: 'Video egocentric phải qua bước che danh tính trước mọi bước xử lý khác'
+- key: demo.models.ALL
+  value: {episodes: 606}
+  doc: docs/he/tray.md
+  section: '19.1 (change log 11/11/2026)'
+  quote: '606 episode, 861 624 frame'
+- key: demo.models.S70
+  value: {episodes: 425}
+  doc: docs/he/tray.md
+  section: '19.1'
+  quote: 'ceil(0,7 × 429) + ceil(0,7 × 177) = 301 + 124 = **425 episode**'
+- key: demo.models.R181
+  value: {base: 425, targeted: 181}
+  doc: docs/he/tray.md
+  section: '20.16'
+  quote: 'S70 (425 episode, từng byte như bản `C_70` đã train) rồi 181 episode nhắm lỗi từ index 425'
+- key: demo.models.human_video
+  value: {clips: 153, used_by: [B_ALL, B_70]}
+  doc: docs/he/tray.md
+  section: '19.1'
+  quote: 'stage 1 của VLM C trên bản xuất `egx_7b43c30dc5d88cd7` (153 clip egocentric của đội'
+- key: demo.models.C70_R1_vlm
+  value: {vlm: C, human_video: false}
+  doc: docs/he/tray.md
+  section: '20.6'
+  quote: 'VLM của C (cha `psi0-baseline-egodex-he`), dữ liệu S70 + tập nhắm lỗi, 60 000 bước'
