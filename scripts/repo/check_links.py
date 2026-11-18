@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-SKIP_DIRS = {".git", "node_modules", "dist", "papers", ".remember", ".agents", ".codex"}
+SKIP_DIRS = {".git", ".venv", "node_modules", "dist", "papers", ".remember", ".agents", ".codex"}
 LINK = re.compile(r"\]\(([^)\s]+)\)")
 
 

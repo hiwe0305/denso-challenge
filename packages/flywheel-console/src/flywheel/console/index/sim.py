@@ -1,10 +1,12 @@
 """Simulation library index (one-site design 7): the episodes of the latest training cut and a
 fixed sample of their videos.
 
-Reads ``meta/`` of ``tray/pair-cuts/C70_R1.tar`` without unpacking the 5 GB tar, labels each
+Reads ``meta/`` of the round's training cut (``cut`` in seed/tasks.yaml, a tar of several GB)
+without unpacking it, labels each
 episode by the part of the cut it came from (``meta/flywheel_subset.json``), and copies about 40
 public videos plus posters to ``<console>/media/sim/<sha8>/`` (served at ``/simmedia/``). Eight
-teleop trials come from the psi-data zip. Files already on disk are kept.
+teleop trials come from the ``teleop_zip`` of a task (the authors' psi-data zip). Files already on
+disk are kept.
 
 Mid-episode frames of this task all look alike (the tray held in front of the camera), so the
 posters of one group step through ``POSTER_AT``: start, lift, carry, placed. The frame position is
@@ -24,11 +26,9 @@ from pathlib import Path
 from typing import IO, Any
 
 import cv2
-from flywheel.console.index.story import FOLLOW
+from flywheel.console.index import tasks
 from flywheel.console.paths import ConsolePaths
 
-CUT = "tray/pair-cuts/C70_R1.tar"
-TELEOP_ZIP = "psi-data/simple/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip"
 N_COVERAGE = 16
 N_TARGETED = 16
 N_TELEOP = 8
@@ -130,13 +130,16 @@ def _episode(e: dict[str, Any], label: str) -> dict[str, Any]:
     }
 
 
-def _sample(eps: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _sample(eps: list[dict[str, Any]], follow_case: tuple[int, int] | None) -> list[dict[str, Any]]:
     pub = [e for e in eps if e["public"]]
-    follow = [
-        e
-        for e in pub
-        if e["for"] == list(FOLLOW) or (e["cluster"] or "").endswith(f"L{FOLLOW[0]}-{FOLLOW[1]}")
-    ]
+    follow: list[dict[str, Any]] = []
+    if follow_case:
+        lv, seed = follow_case
+        follow = [
+            e
+            for e in pub
+            if e["for"] == [lv, seed] or (e["cluster"] or "").endswith(f"L{lv}-{seed}")
+        ]
     cov = _spread([e for e in pub if e["label"] == "coverage"], N_COVERAGE)
     first: dict[str, dict[str, Any]] = {}
     for e in pub:
@@ -149,8 +152,10 @@ def _sample(eps: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(seen.values(), key=lambda e: e["i"])
 
 
-def _cut(paths: ConsolePaths, media: Path) -> dict[str, Any]:
-    tar_path = paths.fw_root / CUT
+def _cut(paths: ConsolePaths, media: Path, rnd: tasks.Round) -> dict[str, Any]:
+    if not rnd.cut:
+        return {}
+    tar_path = paths.fw_root / rnd.cut
     if not tar_path.is_file():
         return {}
     side = tar_path.with_name(tar_path.name + ".json")
@@ -191,7 +196,7 @@ def _cut(paths: ConsolePaths, media: Path) -> dict[str, Any]:
                 lab[i] = name
         eps = [_episode(e, lab.get(int(e["episode_index"]), "coverage")) for e in rows]
         k: Counter[str] = Counter()
-        for e in _sample(eps):
+        for e in _sample(eps, rnd.follow):
             rel = f"{sha8}/ep_{e['i']:06d}.mp4"
             dest = media / rel
             if not dest.is_file():
@@ -205,13 +210,14 @@ def _cut(paths: ConsolePaths, media: Path) -> dict[str, Any]:
             jpg = _poster(dest, at)
             e["poster"] = f"{sha8}/{jpg}" if jpg else None
     base = subset.get("base") or {}
-    cuts = {"C70_R1": {"sha256": sha, "of": "tar"}}
+    cuts = {rnd.after_round: {"sha256": sha, "of": "tar"}}
     if base.get("marker_sha256"):
         cuts["S70"] = {"sha256": base["marker_sha256"], "of": "marker"}
     if (base.get("from_cut") or {}).get("marker_sha256"):
         cuts["ALL"] = {"sha256": base["from_cut"]["marker_sha256"], "of": "marker"}
     return {
-        "source": CUT,
+        "source": rnd.cut,
+        "round": rnd.id,
         "sha8": sha8,
         "parts": [{"label": a, "first": f, "n": n, "release": r} for a, f, n, r in parts],
         "cuts": cuts,
@@ -221,8 +227,10 @@ def _cut(paths: ConsolePaths, media: Path) -> dict[str, Any]:
     }
 
 
-def _teleop(paths: ConsolePaths, media: Path) -> list[dict[str, Any]]:
-    zp = paths.fw_root / TELEOP_ZIP
+def _teleop(paths: ConsolePaths, media: Path, task: tasks.Task) -> list[dict[str, Any]]:
+    if not task.teleop_zip:
+        return []
+    zp = paths.fw_root / task.teleop_zip
     if not zp.is_file():
         return []
     out: list[dict[str, Any]] = []
@@ -237,26 +245,27 @@ def _teleop(paths: ConsolePaths, media: Path) -> list[dict[str, Any]]:
                     _copy(src, dest)
             jpg = _poster(dest, POSTER_AT[k % len(POSTER_AT)])
             poster = f"teleop/{jpg}" if jpg else None
-            # the authors' teleop set is the two-table pick task, not tray carrying (design 6.1)
-            out.append(
-                {"i": i, "label": "teleop", "task": "two_table", "video": rel, "poster": poster}
-            )
+            # the authors' teleop set belongs to its own task, not the round's (design 6.1)
+            out.append({"i": i, "label": "teleop", "task": task.id, "video": rel, "poster": poster})
     return out
 
 
 def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
     """Write ``out/sim.json``; return the episode and sampled-media counts."""
     media = paths.sim_media
+    m = tasks.load(paths)
+    rnd = m.sim_round()
     doc: dict[str, Any] = {
-        "source": CUT,
+        "source": rnd.cut if rnd else None,
         "sha8": None,
         "parts": [],
         "cuts": {},
         "batch": {},
         "episodes": [],
     }
-    doc.update(_cut(paths, media))
-    doc["teleop"] = _teleop(paths, media)
+    if rnd is not None:
+        doc.update(_cut(paths, media, rnd))
+    doc["teleop"] = [x for t in m.tasks for x in _teleop(paths, media, t)]
     for e in doc["episodes"]:
         e.pop("public", None)
     out.mkdir(parents=True, exist_ok=True)

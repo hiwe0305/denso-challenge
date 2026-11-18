@@ -11,8 +11,9 @@ from flywheel.console.paths import ConsolePaths
 
 def test_build_all_on_empty_fw_root(fw: ConsolePaths) -> None:
     counts = index.build_all(fw)
-    assert set(counts) == {"catalog", "robot", "ego", "story", "sim"}
+    assert set(counts) == {"catalog", "robot", "ego", "story", "sim", "tasks"}
     assert (fw.index / "catalog.json").is_file()
+    assert (fw.index / "tasks.json").is_file()
     assert (fw.index / "story.json").is_file()
     assert (fw.index / "sim.json").is_file()
     assert [p.name for p in fw.console_dir.iterdir()] == ["index"]

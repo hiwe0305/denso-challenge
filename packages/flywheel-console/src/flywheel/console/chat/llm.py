@@ -23,8 +23,8 @@ from typing import Any
 from flywheel.console.paths import active
 from flywheel.console.server import runner
 
-from . import registry
-from .common import fail
+from . import providers, registry
+from .common import HOSTED, fail
 from .numbers import numbers_in, unsupported_numbers
 from .tools_ops import all_jobs
 
@@ -34,8 +34,9 @@ MODEL = runner.AGENT_MODEL
 NUM_CTX = 16384
 KEEP_ALIVE = "30m"
 MAX_ROUNDS = 3
-TURN_CAP_S = 20.0
-HTTP_TIMEOUT_S = 20.0
+NUM_PREDICT = 640
+TURN_CAP_S = 45.0  # 20 s until 16/11/2026: an analysis answer (three parts) needs more than a lookup
+HTTP_TIMEOUT_S = 30.0
 TUNNEL_WAIT_S = 8.0
 MAX_CALLS_PER_ROUND = 3
 
@@ -43,10 +44,17 @@ SYSTEM = (
     "You are the assistant of the Flywheel Console, a robot-learning data flywheel dashboard. "
     "For any question about datasets, episodes, QA, runs, eval, loop, jobs, findings or cost, call a tool first and never answer from memory. "
     "Pass IDs exactly as the user wrote them. Do not explain before calling a tool. "
-    "After the tool results, answer in the user's language in at most 60 words, plain text, no tables. "
+    "For a lookup question (how many, which, list, show) about one dataset, run or job, answer in the user's language in at most 60 words, plain text, no tables. "
+    "For a question about the results, the best model, where the robot fails, the cost of the round, why, or what to do next, call round_report; for egocentric or human-video clips as a whole call ego_summary. "
+    "Their result is already written in the user's language: open with its DIRECT ANSWER sentence, reuse its sentences word for word instead of rewording figures, and follow its HOW TO ANSWER line. At most 170 words, plain text. Never copy the upper-case headings of the tool result. "
     "Cite only numbers that appear in the tool results. Never give generic advice. "
     "Never claim to change a QA status, start a job, train a model or read holdout data. "
     "If the question is not about this console's data, say so in one short sentence and call no tool."
+)
+
+FORCE_ANSWER = (
+    "Stop looking things up. Write the answer now in {lang}, plain text, within the word limit of the instructions, "
+    "using only the tool results above. If they do not answer the question, say what is missing."
 )
 
 VI = re.compile(
@@ -92,6 +100,15 @@ def endpoint_ok(url: str | None = None) -> bool:
     return u.scheme == "http" and u.hostname == "127.0.0.1" and u.port == LOOPBACK_PORT
 
 
+def provider() -> providers.Provider:
+    """The model that answers: Nemotron over the tunnel, or the server ``FW_CHAT_BASE_URL`` names."""
+    return providers.active(ENDPOINT, MODEL)
+
+
+def needs_tunnel(p: providers.Provider) -> bool:
+    return not p.hosted and p.port == LOOPBACK_PORT
+
+
 def lang_of(q: str) -> str:
     return "Vietnamese" if VI.search(q) else "English"
 
@@ -123,6 +140,9 @@ def gpu_busy() -> str | None:
 
 
 def nemotron_status() -> str:
+    p = provider()
+    if p.kind == "openai" and not needs_tunnel(p):
+        return "down" if providers.problem(p) else "warm"  # nothing to load: ready when configured
     if runner.TUNNEL.tags() is None:
         return "down"
     if gpu_busy():
@@ -135,6 +155,10 @@ def nemotron_status() -> str:
 
 
 def prewarm() -> dict[str, Any]:
+    p = provider()
+    if p.kind == "openai" and not needs_tunnel(p):
+        why = providers.problem(p)
+        return {"ok": not why, "nemotron": nemotron_status(), "error": why, "ms": 0}
     if runner.TUNNEL.tags() is None and not runner.TUNNEL.ensure(10):
         return {"ok": False, "nemotron": "down", "error": "tunnel down"}
     busy = gpu_busy()
@@ -276,7 +300,16 @@ def _chunks(resp: Any, deadline: float) -> Iterator[dict[str, Any]]:
                 yield json.loads(ln)
 
 
-_MARK = re.compile(r"<\||<tool_call")
+# a call in text form: the model's special-token markup, or a bare ``name{...}`` at the very start
+# (seen 16/11/2026: ``round_report{task:<|"|>tray<|"|>}`` without the opening token)
+_MARK = re.compile(r"<\||<tool_call|^\s*(?:call:)?[a-z_]{3,}\{")
+
+
+def _maybe_call_start(raw: str) -> bool:
+    """True while the text so far could still grow into a bare ``name{`` call: do not show it yet."""
+    head = raw.strip().removeprefix("call:")
+    return bool(head) and head.replace("_", "").isalpha() and any(n.startswith(head) for n in registry.TOOLS)
+
 _CALL = re.compile(r"call:(\w+)\{(.*?)\}\s*(?:<tool_call\|>|$)", re.S)
 _ARG = re.compile(r'(\w+)\s*:\s*(?:<\|"\|>(.*?)<\|"\|>|"([^"]*)"|([^,}]*))', re.S)
 
@@ -311,6 +344,10 @@ def generate(
     messages: list[dict[str, Any]], tool_schemas: list[dict[str, Any]] | None, deadline: float
 ) -> Iterator[tuple[str, Any]]:
     """One streamed /api/chat call. Yields ("tok", text) live, then ("end", (content, calls, tin, tout))."""
+    p = provider()
+    if p.kind == "openai":
+        yield from providers.generate(p, messages, tool_schemas, deadline, NUM_PREDICT)
+        return
     if not endpoint_ok():
         raise RuntimeError("model endpoint must be the loopback tunnel")
     remaining = deadline - time.time()
@@ -318,7 +355,7 @@ def generate(
         raise TimeoutError("turn cap reached")
     payload: dict[str, Any] = {
         "model": MODEL, "messages": messages, "stream": True, "think": False,
-        "keep_alive": KEEP_ALIVE, "options": {"temperature": 0, "num_ctx": NUM_CTX, "num_predict": 320},
+        "keep_alive": KEEP_ALIVE, "options": {"temperature": 0, "num_ctx": NUM_CTX, "num_predict": NUM_PREDICT},
     }  # fmt: skip
     if tool_schemas:
         payload["tools"] = tool_schemas
@@ -338,7 +375,7 @@ def generate(
                 else:  # hold back a tail that could still grow into a special token
                     lt = raw.rfind("<")
                     safe = lt if lt >= max(sent, len(raw) - 12) else len(raw)
-                if safe > sent:
+                if safe > sent and not _maybe_call_start(raw):
                     yield "tok", raw[sent:safe]
                     sent = safe
             for tc in m.get("tool_calls") or []:
@@ -347,7 +384,10 @@ def generate(
                 tin, tout = ch.get("prompt_eval_count", 0), ch.get("eval_count", 0)
     mk = _MARK.search(raw)
     if mk:
-        calls += parse_markup_calls(raw[mk.start() :])
+        tail = raw[mk.start() :]
+        if not tail.startswith("<"):  # the bare form: give it the prefix the parser reads
+            tail = "call:" + tail.strip().removeprefix("call:")
+        calls += [c for c in parse_markup_calls(tail) if c["name"] in registry.TOOLS or tail.startswith("<")]
         content = raw[: mk.start()]
     else:
         content = raw
@@ -400,8 +440,17 @@ def events(body: dict[str, Any]) -> Iterator[tuple[str, dict[str, Any]]]:
             },
         )
         return
-    # 2. GPU busy / tunnel down -> slash fallback
-    busy = gpu_busy()
+    # 2. GPU busy / tunnel down -> slash fallback (only when the model sits behind the tunnel)
+    prov = provider()
+    tr["model"] = prov.model
+    tr["provider"] = prov.name
+    HOSTED.set(prov.hosted)
+    why_not = providers.problem(prov)
+    if why_not:
+        tr["error"] = why_not
+        yield finish("error", {"message": why_not + " Slash commands still work.", "fallback": "slash"})
+        return
+    busy = gpu_busy() if needs_tunnel(prov) else None
     if busy:
         tr["error"] = "gpu busy"
         yield finish(
@@ -409,7 +458,7 @@ def events(body: dict[str, Any]) -> Iterator[tuple[str, dict[str, Any]]]:
             {"message": f"GPU busy: {busy} annotate. Slash commands only.", "fallback": "slash"},
         )
         return
-    if runner.TUNNEL.tags() is None and not runner.TUNNEL.ensure(TUNNEL_WAIT_S):
+    if needs_tunnel(prov) and runner.TUNNEL.tags() is None and not runner.TUNNEL.ensure(TUNNEL_WAIT_S):
         tr["error"] = "tunnel down"
         yield finish(
             "error",
@@ -427,16 +476,28 @@ def events(body: dict[str, Any]) -> Iterator[tuple[str, dict[str, Any]]]:
     nodes: list[dict[str, Any]] = tr["nodes"]
     lang = lang_of(question)
     tool_rounds = 0
+    forced = registry.forced_tool(question)
+    if forced and forced not in names:
+        names = [forced] + names
     try:
         for rnd in range(MAX_ROUNDS + 1):
             offered = registry.schemas(context.get("route"), names) if rnd < MAX_ROUNDS else None
+            if forced:
+                offered = None  # the lookup is made by the code; the model only writes the answer
             g0 = time.time()
-            content, tcalls, tin, tout = "", [], 0, 0
-            for kind, val in generate(msgs, offered, deadline):
-                if kind == "tok":
-                    yield "token", {"text": val}
-                else:
-                    content, tcalls, tin, tout = val
+            content, tin, tout = "", 0, 0
+            tcalls: list[dict[str, Any]] = []
+            if forced and rnd == 0:
+                tcalls = [{"name": forced, "arguments": {}}]
+            else:
+                for kind, val in generate(msgs, offered, deadline):
+                    if kind == "tok":
+                        yield "token", {"text": val.replace("**", "")}  # the panel shows plain text
+                    else:
+                        content, tcalls, tin, tout = val
+                content = content.replace("**", "")
+                if forced:
+                    tcalls = []  # no tool is offered now: a call written as text is not run
             nodes.append(
                 {
                     "type": "generation",
@@ -446,6 +507,7 @@ def events(body: dict[str, Any]) -> Iterator[tuple[str, dict[str, Any]]]:
                     "tokens_out": tout,
                     "content": content[:500],
                     "tool_calls": tcalls,
+                    **({"by_code": True} if forced and rnd == 0 else {}),
                 }
             )
             tr["tokens_in"] += tin
@@ -469,6 +531,7 @@ def events(body: dict[str, Any]) -> Iterator[tuple[str, dict[str, Any]]]:
                 }
             )
             seen: set[tuple[str, str]] = set()
+            fixed = ""
             for i, c in enumerate(used):
                 name, args = c.get("name") or "", c.get("arguments") or {}
                 if isinstance(args, str):
@@ -485,7 +548,7 @@ def events(body: dict[str, Any]) -> Iterator[tuple[str, dict[str, Any]]]:
                 elif key in seen:
                     res = fail("Duplicate call ignored.")
                 else:
-                    res = registry.call(name, args, context)
+                    res = registry.call(name, args, {**context, "lang": "vi" if lang == "Vietnamese" else "en", "question": question})
                 seen.add(key)
                 ms = int((time.time() - k0) * 1000)
                 evidence.append(res["model"])
@@ -514,9 +577,42 @@ def events(body: dict[str, Any]) -> Iterator[tuple[str, dict[str, Any]]]:
                     ev["navigate"] = res["navigate"]
                 yield "tool_result", ev
                 msgs.append({"role": "tool", "tool_name": name, "content": res["model"]})
+                if res.get("answer"):
+                    fixed = str(res["answer"])  # the tool's own answer, shown as it stands
+            if fixed:
+                answer_parts.append(fixed)
+                yield "token", {"text": fixed}
+                break
             msgs[-1]["content"] += (
-                f"\n[Answer the user now in {lang}, at most 60 words. Use only numbers shown above. Do not call more tools unless a different lookup is clearly needed.]"
+                f"\n[Answer the user now in {lang}, within the word limit of the instructions. Use only numbers shown above. Do not call more tools unless a different lookup is clearly needed.]"
             )
+        if not answer_parts and tool_rounds:
+            # the model spent every round on lookups, or asked for one more on the round that
+            # offers none: ask once more, as the user, for the answer from what it already has
+            msgs.append({"role": "user", "content": FORCE_ANSWER.format(lang=lang)})
+            g0 = time.time()
+            content, tcalls, tin, tout = "", [], 0, 0
+            for kind, val in generate(msgs, None, deadline):
+                if kind == "tok":
+                    yield "token", {"text": val}
+                else:
+                    content, tcalls, tin, tout = val
+            nodes.append(
+                {
+                    "type": "generation",
+                    "round": MAX_ROUNDS + 1,
+                    "ms": int((time.time() - g0) * 1000),
+                    "tokens_in": tin,
+                    "tokens_out": tout,
+                    "content": content[:500],
+                    "tool_calls": tcalls,
+                    "forced": True,
+                }
+            )
+            tr["tokens_in"] += tin
+            tr["tokens_out"] += tout
+            if content.strip():
+                answer_parts.append(content)
     except TimeoutError:
         tr["error"] = "timeout"
         yield "token", {"text": ""}

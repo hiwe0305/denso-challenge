@@ -13,7 +13,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from flywheel.console.index import cited, demo
+from flywheel.console.index import cited, demo, tasks
 from flywheel.console.paths import ConsolePaths
 
 _SERIES_CAP = 400
@@ -76,10 +76,11 @@ def _series(rows: list[dict[str, Any]], key: str, nd: int | None = None) -> list
     ]
 
 
-def _runs(fw: Path) -> tuple[list[dict[str, Any]], list[Path]]:
+def _runs(fw: Path, train_dir: str, max_steps: int) -> tuple[list[dict[str, Any]], list[Path]]:
+    """Training runs of a round: ``<train_dir>/<run>/<job>/metrics.jsonl``."""
     runs: list[dict[str, Any]] = []
     dirs: list[Path] = []
-    for f in sorted(fw.glob("tray/pair60k/*/*/metrics.jsonl")):
+    for f in sorted(fw.glob(f"{train_dir}/*/*/metrics.jsonl")):
         rows = _jl(f)
         train = [r for r in rows if r.get("split") == "train" and "step" in r]
         if not train:
@@ -101,7 +102,7 @@ def _runs(fw: Path) -> tuple[list[dict[str, Any]], list[Path]]:
                 "release": train[-1].get("release_id"),
                 "run_plan_id": train[-1].get("run_plan_id"),
                 "step": train[-1]["step"],
-                "max_steps": 60000,
+                "max_steps": max_steps,
                 "loss_last": round(sum(_num(r.get("loss")) for r in tail) / len(tail), 3),
                 "loss": _series(train, "loss", 4),
                 "val": [[r["step"], round(_num(r.get("loss")), 4)] for r in val],
@@ -116,9 +117,9 @@ def _runs(fw: Path) -> tuple[list[dict[str, Any]], list[Path]]:
     return runs, dirs
 
 
-def _train_log(run_dirs: list[Path]) -> tuple[list[str], dict[str, float]]:
-    """Log tail and VM phase seconds of the C_70 run, else of the last run that has a VM log."""
-    pick = [d for d in run_dirs if d.parent.name == "C_70" and (d / "vm-logs").is_dir()]
+def _train_log(run_dirs: list[Path], log_run: str | None) -> tuple[list[str], dict[str, float]]:
+    """Log tail and VM phase seconds of the round's ``log_run``, else of a run with a VM log."""
+    pick = [d for d in run_dirs if d.parent.name == log_run and (d / "vm-logs").is_dir()]
     pick = pick or [d for d in run_dirs if (d / "vm-logs").is_dir()]
     if not pick:
         return [], {}
@@ -235,7 +236,6 @@ def _colab(fw: Path) -> tuple[list[list[Any]], list[dict[str, Any]]]:
 
 # stage1-C_ALL-table.json, stage1-a-B_70-vs-C_70.json: the headline is the first-named run's
 _STAGE1 = re.compile(r"^stage1-(?:([a-z])-)?([A-Za-z0-9_]+?)(?:-vs-([A-Za-z0-9_]+)|-table)$")
-_PAIR_ORDER = ("C_ALL", "C_70", "B_ALL", "B_70", "C70_R1")
 
 
 def _run_row(name: str, h: dict[str, Any], levels: dict[str, Any]) -> dict[str, Any]:
@@ -255,9 +255,9 @@ def _run_row(name: str, h: dict[str, Any], levels: dict[str, Any]) -> dict[str, 
     }
 
 
-def _pair(fw: Path) -> dict[str, Any]:
-    """Stage-1 reads of the pair60k runs at 60k steps; empty when the folder is absent."""
-    folder = fw / "tray" / "pair60k" / "stage1-60k"
+def _pair(fw: Path, eval_dir: str, order: tuple[str, ...]) -> dict[str, Any]:
+    """Stage-1 reads of a round's runs (``eval_dir``); empty when the folder is absent."""
+    folder = fw / eval_dir
     runs: dict[str, dict[str, Any]] = {}
     comps: list[dict[str, Any]] = []
     for f in sorted(folder.glob("stage1-*.json")):
@@ -288,11 +288,11 @@ def _pair(fw: Path) -> dict[str, Any]:
             )
     if not runs:
         return {}
-    rank = {r: i for i, r in enumerate(_PAIR_ORDER)}
+    rank = {r: i for i, r in enumerate(order)}
     ordered = sorted(runs.values(), key=lambda r: (rank.get(r["run"], len(rank)), r["run"]))
     best = max(ordered, key=lambda r: _num(r["successes"]))
     return {
-        "source": "fwdata/tray/pair60k/stage1-60k",
+        "source": f"fwdata/{eval_dir}",
         "steps": list(ordered[0]["step_pass"]),
         "runs": ordered,
         "best": best["run"],
@@ -300,28 +300,28 @@ def _pair(fw: Path) -> dict[str, Any]:
     }
 
 
-# the trial that "Follow one failure" walks through (one-site design 6.7)
-FOLLOW = (1, 1000107)
 _FOLLOW_KEYS = ("success", "failure", "reach_b", "distance_m", "yaw_error_deg")
 
 
-def _follow(fw: Path) -> dict[str, Any]:
-    """One eval trial across every pair60k run, plus the targeted / other split (``r3.json``)."""
-    folder = fw / "tray" / "pair60k" / "stage1-60k"
+def _follow(fw: Path, eval_dir: str, case: tuple[int, int] | None) -> dict[str, Any]:
+    """One eval trial (the round's follow case) across its runs, plus ``r3.json``."""
+    if case is None:
+        return {}
+    folder = fw / eval_dir
     runs: dict[str, dict[str, Any]] = {}
     tol: dict[str, Any] = {}
     for f in sorted(folder.glob("place-error-*.json")):
         d = _dict(f)
         for r in d.get("rows") or []:
-            if isinstance(r, dict) and (r.get("level"), r.get("seed")) == FOLLOW:
+            if isinstance(r, dict) and (r.get("level"), r.get("seed")) == case:
                 runs[f.stem[len("place-error-") :]] = {k: r.get(k) for k in _FOLLOW_KEYS}
                 tol = tol or dict(d.get("tolerance") or {})
     if not runs:
         return {}
     return {
-        "source": "fwdata/tray/pair60k/stage1-60k",
-        "level": FOLLOW[0],
-        "seed": FOLLOW[1],
+        "source": f"fwdata/{eval_dir}",
+        "level": case[0],
+        "seed": case[1],
         "tol": tol,
         "runs": runs,
         "r3": _dict(folder / "r3.json"),
@@ -336,8 +336,12 @@ def _catalog(out: Path) -> dict[str, Any]:
 def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
     """Write ``out/story.json``; return the size of each list-valued part."""
     fw = paths.fw_root
-    runs, run_dirs = _runs(fw)
-    tail, phases = _train_log(run_dirs)
+    rnd = tasks.load(paths).story_round()
+    if rnd is not None:
+        runs, run_dirs = _runs(fw, rnd.train_dir, rnd.max_steps)
+        tail, phases = _train_log(run_dirs, rnd.log_run)
+    else:
+        runs, run_dirs, tail, phases = [], [], [], {}
     ego = _sources(fw)
     bal, sessions = _colab(fw)
     try:
@@ -355,7 +359,7 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
         demo_cited = cited.demo_groups(paths)
     except (OSError, KeyError, TypeError, ValueError):
         demo_cited = {}
-    pair = _pair(fw)
+    pair = _pair(fw, rnd.eval_dir, rnd.run_ids) if rnd else {}
     h1m = _h1m(fw)
     data: dict[str, Any] = {
         "runs": runs,
@@ -372,8 +376,8 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
         "loop_detail": detail,
         "pair": pair,
         "round": round_cited,
-        "follow": _follow(fw),
-        "demo": demo.build(fw, pair, round_cited, h1m, demo_cited),
+        "follow": _follow(fw, rnd.eval_dir, rnd.follow) if rnd else {},
+        "demo": demo.build(fw, pair, round_cited, h1m, demo_cited, rnd),
     }
     out.mkdir(parents=True, exist_ok=True)
     (out / "story.json").write_text(

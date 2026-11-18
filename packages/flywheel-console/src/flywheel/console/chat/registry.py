@@ -18,6 +18,7 @@ from .tools_data import (
     qa_summary,
 )
 from .tools_ops import KINDS, findings, job_get, job_list, open_page, propose_job
+from .tools_round import asks_held, ego_summary, round_report
 from .tools_runs import (
     eval_failures,
     eval_summary,
@@ -46,6 +47,9 @@ def P(**props: tuple[str, str]) -> dict[str, Any]:
 
 
 TOOLS: dict[str, tuple[ToolFn, str, str, dict[str, Any]]] = {
+    "ego_summary": (ego_summary, "/ego", "The egocentric (human first-person video) pipeline in numbers: clips in, episodes exported, clips rejected by QA or left out, the QA reasons. Call this for any question about egocentric or human video clips as a whole (video người, clip egocentric, đã xuất, bị loại).", P()),
+    "round_report": (round_report, "/round", "ALL facts of the selected task and its Failure -> Data round in one call, already written in the user's language: each model's test result, the best model, where the robot fails, the diagnosis, the data order, the outcome, the decision, the cost of the round, the points worth raising and options for next steps. Also the status of a task that has no round yet: what was measured, which stages have no result, what is missing. Call this FIRST for results, status, 'which model is best', 'where does it fail', 'cost of the round', 'analyse', 'comment', 'assess', 'why', 'what next', 'summarise' (kết quả, bản nào tốt nhất, hỏng ở đâu, chi phí vòng, nhận xét, phân tích, đánh giá, vì sao, nên làm gì, tóm tắt).",
+                     P()),
     "catalog_search": (catalog_search, "/catalog", "List datasets in the catalog. Use for 'what datasets', 'which sets are teleop/egocentric/synthetic', find a dataset by text.",
                        P(q=("string", "free text"), data_type=("string", "egocentric | teleop | synthetic"), task=("string", "tray | two_table"), status=("string", "current | upstream"), limit=("integer", "max rows"))),
     "dataset_stats": (dataset_stats, "/stats", "Statistics of ONE dataset: episodes, hours, frames, fps, size, length histogram.",
@@ -63,7 +67,7 @@ TOOLS: dict[str, tuple[ToolFn, str, str, dict[str, Any]]] = {
                     P(run_ids_REQ=("array", "2 to 4 run ids or branches"), metric=("string", "default loss"))),
     "log_tail": (log_tail, "/log", "Last lines of a job log or a training run log, optional grep.",
                  P(job_id_REQ=("string", "job id j-... or run id"), n=("integer", "lines"), grep=("string", "filter text"))),
-    "eval_summary": (eval_summary, "/eval", "Evaluation of policy C: success per level, pass rate per stage, failure labels. Use for 'how did C do'.",
+    "eval_summary": (eval_summary, "/eval", "The EARLIER evaluation of policy C (before the round, per level): success per level, pass rate per stage, failure labels. Use only when the user names policy C or a level.",
                      P(eval_id=("string", "C"))),
     "eval_failures": (eval_failures, "/fails", "Failures of the evaluation by label (L-PLACE-POSE ...), placement error in cm.",
                       P(eval_id=("string", "C"), label=("string", "failure label"), limit=("integer", "max rows"))),
@@ -98,6 +102,9 @@ PAGE_TOOLS: dict[str, list[str]] = {
     "qa": ["findings", "job_get", "log_tail", "propose_job"],
     "home": ["catalog_search", "run_list", "eval_summary", "job_list", "findings", "ledger_query"],
 }
+
+
+ROUND_PAGES = {"home", "tasks", "report", "follow", "base", "design", "loop", "diagnose", "eval", "cost"}
 
 
 def page_of(route: Any) -> str:
@@ -138,6 +145,16 @@ _EVAL_RX = re.compile(
 _JOB_RX = re.compile(r"\b(job|jobs|log|logs|pipeline|duration)\b|chạy mất|việc", re.I)
 _COST_RX = re.compile(r"\b(cost|ledger|CU|budget)\b|chi phí|ngân sách", re.I)
 _LOOP_RX = re.compile(r"\b(loop|cluster)\b|sinh thêm|cụm|vòng lặp", re.I)
+_ANALYSE_RX = re.compile(
+    r"\b(analy[sz]e|analysis|comment|assess|review|why|summar\w+|conclusion|what next|next step|improve|insight|recommend\w*)\b|"
+    r"nhận xét|phân tích|đánh giá|vì sao|tại sao|nên làm|làm gì tiếp|tóm tắt|kết luận|cải thiện|bài học|có tốt|ổn không|"
+    r"\bround\b|vòng 1|vòng này|của vòng|kết quả|tốt nhất|\bbest\b|hỏng ở|hỏng nhiều|fails? (at|where|most)|where does .* fail|điểm mạnh|điểm yếu|task này|this task|"
+    r"đang ở đâu|còn thiếu|thiếu gì|tình hình|tiến độ|where does it stand|\bstatus\b|what is missing|\btốn\b|bao nhiêu tiền|"
+    r"so sánh|khác nhau|bước nào|từng bước|bài mẫu|dữ liệu|kiểm định|lỗi cấy|chẩn đoán|nhóm lỗi|cụm lỗi|"
+    r"\bcompare|which step|each step|demonstration|planted|diagnos|failure group",
+    re.I,
+)
+_EGO_RX = re.compile(r"egocentric|\bego\b|video người|human video|first-person|góc nhìn người", re.I)
 _QA_RX = re.compile(r"\bQA\b|flag|reject|\bfindings?\b|phát hiện", re.I)
 
 # Which page group a question topic belongs to (the page whose tool set it pulls in).
@@ -199,6 +216,36 @@ def intent_tools(question: Any) -> list[str]:
     return list(dict.fromkeys(names))
 
 
+_SPECIFIC_RX = re.compile(
+    r"\b(src_|ep_|egx_|j-)\w+|\b[A-Z][A-Za-z]*_?\d\w*\b|\b(B_70|C_70|C_ALL|B_ALL)\b|policy C|eval C|\bQA\b|\bloss\b|"
+    r"\bjobs?\b|\bruns?\b|dataset|\btập\b|liệt kê|\blist\b|story|ledger|sổ",
+    re.I,
+)
+_COUNT_RX = re.compile(r"bao nhiêu|how many|đã xuất|export|bị loại|reject|tổng|total|tóm tắt|summar", re.I)
+
+
+def _specific(q: str) -> bool:
+    """The question names one dataset, run, job or policy, or asks for a list: a lookup, not a reading."""
+    return bool(_dataset_in(q)) or bool(_SPECIFIC_RX.search(q))
+
+
+def forced_tool(question: Any) -> str | None:
+    """The tool the code runs itself, before the model writes anything.
+
+    For a question about the round, the task or the egocentric clips as a whole there is one
+    right lookup and it takes no argument. A small model asked to make that call sometimes writes
+    it as text instead (seen 16/11/2026), so the code makes it and the model only answers.
+    """
+    q = str(question or "")
+    if asks_held(q) and not re.search(r"\bloss\b|\blog\b|\bstep\b|checkpoint", q, re.I):
+        return "round_report"  # its test result is not presented: one fixed answer, no other lookup
+    if _specific(q):
+        return None  # a named dataset, run, job, policy or a list request: the model picks the lookup
+    if _EGO_RX.search(q):
+        return "ego_summary" if _COUNT_RX.search(q) else None
+    return "round_report" if _ANALYSE_RX.search(q) else None
+
+
 def offered_names(route: Any, question: Any) -> list[str]:
     """Question-driven tools first, then the page tools, at most 7 plus ``open_page``.
 
@@ -207,6 +254,15 @@ def offered_names(route: Any, question: Any) -> list[str]:
     """
     names = intent_tools(question)
     here = page_of(route)
+    # an analysis question, or a page about the task as a whole, gets the round's facts first
+    q = str(question or "")
+    has_id = _specific(q)
+    if _EGO_RX.search(q) and _COUNT_RX.search(q) and not has_id:
+        names = ["ego_summary"] + names
+    elif _ANALYSE_RX.search(q) and not has_id:
+        return ["round_report"]  # one tool: a small model otherwise picks a lookup or a page
+    elif here in ROUND_PAGES and not names:
+        names = ["round_report"] + names
     pages = list(dict.fromkeys(TOPIC_PAGE[t] for t in topics_of(question)))
     if len(pages) >= 2:
         pages = ([here] if here in pages else []) + [p for p in pages if p != here]
@@ -225,6 +281,9 @@ def context_defaults(context: Any) -> dict[str, Any]:
     context = context or {}
     route = str(context.get("route") or "")
     d: dict[str, Any] = {}
+    for k in ("task", "round", "lang", "question"):  # the (task, round) chosen in the top bar; the question's language
+        if isinstance(context.get(k), str) and context[k]:
+            d[k] = context[k]
     m = re.search(r"data/([^/?#]+)(?:/ep/([^/?#]+))?", route)
     if m:
         d["dataset_id"] = m.group(1)

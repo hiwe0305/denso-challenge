@@ -2,9 +2,10 @@
    Data: data/sim.json from index/sim.py; sampled media at /simmedia/; egocentric cards from the /ego/ viewer.
    Routes: #/sim (?tab=gallery|quality|all, ?tag=, ?lv=), #/sim/:i. */
 "use strict";
-var SIMD = null;
-const SIMP = () => SIMD ? Promise.resolve(SIMD) : fetch("data/sim.json").then(r => r.ok ? r.json() : null).catch(() => null)
-  .then(d => (SIMD = d || { episodes: [], teleop: [], parts: [], cuts: {}, batch: {} }));
+/* SIMD is sim.json as the current task sees it (TASK.scopeSim): the round's cut only for that round's task */
+var SIMD = null, SIMD_RAW = null;
+const SIMP = () => (SIMD_RAW ? Promise.resolve(SIMD_RAW) : fetch("data/sim.json").then(r => r.ok ? r.json() : null).catch(() => null)
+  .then(d => (SIMD_RAW = d || { episodes: [], teleop: [], parts: [], cuts: {}, batch: {} }))).then(d => (SIMD = TASK.scopeSim(d)));
 let EGO = null;
 const EGOP = () => EGO ? Promise.resolve(EGO) : fetch("/ego/data/index.js").then(r => r.ok ? r.text() : "").then(s => {
   try { return JSON.parse(s.slice(s.indexOf("=") + 1).trim().replace(/;\s*$/, "")); } catch (e) { return null; }
@@ -20,6 +21,8 @@ function hoverVideo(poster, video, cls) {
   box.onmouseleave = () => { if (v) v.pause(); box.classList.remove("on"); };
   return box;
 }
+/* a teleop clip: the selected task's own, or another task's (named from the manifest) */
+const teleLine = e => e.task === UI.task ? t("sim.teleop.own") : t("sim.teleop.task", { other: TASK.name(e.task) });
 const simSrc = rel => rel ? "/simmedia/" + rel : null;   /* a poster can be missing (unreadable video) */
 const simItems = () => [...SIMD.episodes.filter(e => e.video), ...(SIMD.teleop || [])];
 
@@ -37,7 +40,7 @@ const simStep = e => { const m = /^(.*)-L\d+-\d+$/.exec(e.cluster || ""); return
 const simLine = e => e.for && simStep(e) ? t("d1.redo", { s: String(e.for[1]), step: simStep(e) }) : t("d1.case", { s: String(e.seed == null ? "–" : e.seed), lv: e.level });
 const D1 = (() => {
   const N = v => v == null ? null : UI.fmt(v, "int");
-  const tot = g => CAT && CAT.totals && CAT.totals[g] ? CAT.totals[g].episodes : null;
+  const tot = g => EXPLAIN.read.tot(g);
   const rows = () => (CAT && CAT.rows) || [];
   const row = id => rows().find(r => r.id === id);
   const tip = s => t("xb.src") + ": " + s;
@@ -60,7 +63,7 @@ const D1 = (() => {
     const vis = rows().find(r => r.group === "egocentric" && r.kind === "export" && r.status === "current" && (r.children || []).some(c => /stage1/.test(c)));
     const withVideo = ids.filter(id => R[id].human_video), sizes = [...new Set(ids.map(id => R[id].episodes))].sort((a, b) => b - a);
     const two = row("psi-two-table"), hug = row("psi-hug");
-    const teleTray = rows().filter(r => r.group === "teleop" && r.unique && r.task === "tray").reduce((a, r) => a + (r.episodes || 0), 0);
+    const teleTray = rows().filter(r => r.group === "teleop" && r.unique && r.task === (TASK.cur() || {}).catalog_task).reduce((a, r) => a + (r.episodes || 0), 0);
     const sim = SIMD.episodes.find(e => e.video && e.label === "round") || SIMD.episodes.find(e => e.video), tel = (SIMD.teleop || [])[0];
     const K = { ego: ["d1.k.ego", "d1.k.ego.sub"], sim: ["d1.k.sim", "d1.k.sim.sub"], tele: ["d1.k.tele", "d1.k.tele.sub"] };
     const col = (k, media, n, unit, s, split, cost, lit, hk, use, extra, href) => h("div", { class: "d1-col d1-" + k }, [
@@ -78,16 +81,16 @@ const D1 = (() => {
         t("d1.sim.use", { n: ids.length, a: sizes[0], b: sizes[sizes.length - 1] }), null, "#/sim"),
       col("tele", autoVideo(tel ? simSrc(tel.poster) : null, tel ? "/simmedia/" + tel.video : null), tot("teleop"), t("d1.unit.ep"), "catalog.json · totals.teleop",
         t("d1.tele.split", { a: two ? two.episodes : null, b: hug ? hug.episodes : null }), t("d1.tele.cost"), 3, "d1.hours.tele",
-        t("d1.tele.use"), h("div", { class: "d1-zero", title: tip("catalog.json · teleop rows, task = tray") }, [h("b", { text: N(teleTray) }), h("span", { text: t("d1.tele.zero") })]), "#/sim?tag=teleop")]);
+        t("d1.tele.use"), h("div", { class: "d1-zero", title: tip("catalog.json · teleop rows, task = " + (TASK.cur() || {}).catalog_task) }, [h("b", { text: N(teleTray) }), h("span", { text: t("d1.tele.zero") })]), "#/sim?tag=teleop")]);
   }
 
   /* ---- what the latest training used: one bar, three parts ---- */
   function mix() {
-    const parts = SIMD.parts || [], all = parts.reduce((a, p) => a + p.n, 0), r = runs().C70_R1;
+    const parts = SIMD.parts || [], all = parts.reduce((a, p) => a + p.n, 0), r = runs()[TASK.after()];
     if (!all) return null;
     const tele = parts.filter(p => p.label === "teleop").reduce((a, p) => a + p.n, 0);
     return h("div", { class: "d1-mix" }, [
-      h("div", { class: "d1-mix-head" }, [h("h3", { text: t("d1.mix.t") }), h("span", { class: "d1-mix-n", title: tip("sim.json · parts (C70_R1)") }, [h("b", { text: N(all) }), t("d1.mix.unit")])]),
+      h("div", { class: "d1-mix-head" }, [h("h3", { text: t("d1.mix.t") }), h("span", { class: "d1-mix-n", title: tip("sim.json · parts (" + TASK.after() + ")") }, [h("b", { text: N(all) }), t("d1.mix.unit")])]),
       h("p", { class: "d1-mix-sub", text: t("d1.mix.sub", { v: r ? r.human_clips : null, p: tele }) }),
       h("div", { class: "d1-mix-bar" }, parts.map(p => h("div", { class: "lb-" + p.label, style: { flex: String(p.n) }, title: tip("sim.json · parts · " + p.release) }, [
         h("b", { text: N(p.n) }), h("span", { text: t(GRP[p.label] || GRP.coverage) }), h("small", { text: GRPD[p.label] ? t(GRPD[p.label]) : "" })])))]);
@@ -115,8 +118,8 @@ const D1 = (() => {
     const ok = [...pick(TEAM, "pass", 2), ...pick("EgoDex", "pass", 1)], note = pick(TEAM, "flag", 1);
     const grid = h("div", { class: "d1-ex-grid" }, [...ok.map(e => egoCard(e, [])), ...note.map(e => egoCard(e, []))]);
     /* reasons of the flagged clip and the rejected clips come from the index (data/ds/<id>/episodes.json) */
-    const exp = rows().find(r => r.group === "egocentric" && r.kind === "export" && r.view === "ego" && r.task === "tray" && r.status === "current");
-    const srcRow = rows().find(r => r.group === "egocentric" && r.kind === PIPE && r.status === "current" && r.task === "tray" && r.qa_counts && r.qa_counts.reject);
+    const exp = rows().find(r => r.group === "egocentric" && r.kind === "export" && r.view === "ego" && r.task === (TASK.cur() || {}).catalog_task && r.status === "current");
+    const srcRow = rows().find(r => r.group === "egocentric" && r.kind === PIPE && r.status === "current" && r.task === (TASK.cur() || {}).catalog_task && r.qa_counts && r.qa_counts.reject);
     if (note.length && exp) jget("data/ds/" + exp.id + "/episodes.json").then(xs => { const x = (xs || []).find(y => y.id === note[0].id);
       if (x && grid.children[ok.length]) grid.replaceChild(egoCard(note[0], reasons(x.reasons, 1).map(k => NOTE[k]).filter(Boolean)), grid.children[ok.length]); });
     if (srcRow) jget("data/ds/" + srcRow.id + "/episodes.json").then(xs => {
@@ -152,7 +155,7 @@ const D1 = (() => {
   function teleExamples() {
     const xs = (SIMD.teleop || []).slice(0, 4);
     return xs.length ? h("div", { class: "d1-sec" }, [h("div", { class: "d1-sec-head" }, [h("h3", { text: t("d1.ex.tele") }), h("a", { href: "#/sim?tag=teleop", text: t("d1.ex.all.tele") })]),
-      h("div", { class: "d1-ex-grid" }, xs.map(e => h("div", { class: "d1-ex" }, [hoverVideo(simSrc(e.poster), "/simmedia/" + e.video), h("div", { class: "d1-ex-b" }, [h("p", { class: "d1-why", text: t("sim.teleop.task") })])])))]) : null;
+      h("div", { class: "d1-ex-grid" }, xs.map(e => h("div", { class: "d1-ex" }, [hoverVideo(simSrc(e.poster), "/simmedia/" + e.video), h("div", { class: "d1-ex-b" }, [h("p", { class: "d1-why", text: teleLine(e) })])])))]) : null;
   }
   return { columns, mix, egoExamples, simExamples, teleExamples, tot };
 })();
@@ -170,7 +173,9 @@ UI.route("sim", async (body, params, qs) => {
   await Promise.all([SIMP(), EGOP()]); document.title = "FW · " + t("sim.title");
   const tab = qs.tab || "gallery";
   const tabs = h("div", { class: "sim-tabs" }, ["gallery", "quality", "all"].map(k => h("a", { class: k === tab ? "on" : "", href: "#/sim?tab=" + k, text: t("sim.tab." + k) })));
-  body.appendChild(h("div", { class: "sim-head" }, [h("h1", { text: t("sim.title") }), h("span", { class: "dim", title: "C70_R1" + (SIMD.sha8 ? " · sha256 " + SIMD.sha8 : ""), text: t("d1.lib.sub", { n: (SIMD.parts || []).reduce((a, p) => a + p.n, 0), v: SIMD.episodes.filter(e => e.video).length }) }), tabs]));
+  body.appendChild(h("div", { class: "sim-head" }, [h("h1", { text: t("sim.title") }), h("span", { class: "dim", title: (TASK.after() || "") + (SIMD.sha8 ? " · sha256 " + SIMD.sha8 : ""), text: TASK.has("sim") ? t("d1.lib.sub", { n: (SIMD.parts || []).reduce((a, p) => a + p.n, 0), v: SIMD.episodes.filter(e => e.video).length }) : null }), tabs]));
+  /* a task whose round has no generated training set: say so, never "0 demos" */
+  if (!TASK.has("sim")) body.appendChild(TASK.empty(1, t("sim.nosim")));
   if (!SIMD.episodes.length && !(SIMD.teleop || []).length) { body.appendChild(h("p", { class: "dim", text: t("sim.empty") })); return; }
   if (tab === "quality") return simQuality(body);
   if (tab === "all") return simAll(body);
@@ -182,7 +187,7 @@ UI.route("sim", async (body, params, qs) => {
   const items = simItems().filter(e => (!tag || e.label === tag) && (!lv || String(e.level) === lv));
   body.appendChild(h("div", { class: "sim-grid" }, items.map(e => h(e.label === "teleop" ? "div" : "a", { class: "sim-card", href: e.label === "teleop" ? null : "#/sim/" + e.i }, [
     hoverVideo(simSrc(e.poster), "/simmedia/" + e.video), h("div", { class: "sim-cap" }, [simTag(e.label), e.label === "teleop" ? null : h("b", { text: t("d1.ep", { i: e.i }) }), e.level ? h("span", { class: "dim", text: t("sim.level", { lv: e.level }) }) : null]),
-    h("div", { class: "dim", title: e.cluster || null, text: e.label === "teleop" ? t("sim.teleop.task") : simLine(e) })]))));
+    h("div", { class: "dim", title: e.cluster || null, text: e.label === "teleop" ? teleLine(e) : simLine(e) })]))));
 });
 
 /* both panels describe the same batch: this round's targeted generation (tray.md 20.16, via cited.yaml) */
@@ -231,5 +236,5 @@ UI.route("sim/:i", async (body, params) => {
   body.appendChild(h("div", { class: "sim-ep" }, [
     e.video ? h("video", { src: "/simmedia/" + e.video, controls: true, muted: true, loop: true, autoplay: true, playsinline: true, poster: simSrc(e.poster), class: "sim-video" }) : h("p", { class: "dim", text: t("sim.novideo") }),
     h("div", null, [h("div", { class: "xb-cap", text: t("sim.top") }), simTopView(e), h("div", { class: "xb-cap", text: t("sim.steps") }),
-      h("ol", { class: "sim-steps" }, (e.steps || []).map((ok, k) => h("li", { class: ok ? "ok" : "bad" }, [ok ? "✓ " : "✕ ", steps[k] ? t("fig.step." + steps[k]) : String(k + 1)])))])]));
+      h("ol", { class: "sim-steps" }, (e.steps || []).map((ok, k) => h("li", { class: ok ? "ok" : "bad" }, [ok ? "✓ " : "✕ ", steps[k] ? TASK.stageName(steps[k]) : String(k + 1)])))])]));
 });

@@ -4,13 +4,19 @@ import json
 from pathlib import Path
 
 import pytest
-from flywheel.console.index import cited, story
+from flywheel.console.index import cited, story, tasks
 from flywheel.console.paths import ConsolePaths
 
 KEYS = {
     "runs", "train_log_tail", "vm_phases", "sources", "heat", "reasons", "qa_sample", "h1m",
     "ledger", "colab_balance", "colab_sessions", "ds", "eval",
 }  # fmt: skip
+
+
+def _round(fw: ConsolePaths) -> tasks.Round:
+    rnd = tasks.load(fw).story_round()
+    assert rnd is not None
+    return rnd
 
 
 def test_downsample_cap() -> None:
@@ -113,7 +119,8 @@ def test_pair_reads_stage1_files(fw: ConsolePaths) -> None:
     _stage1(folder, "stage1-r-C70_R1-vs-C_ALL", 99, {"variant": 4, "baseline": 5})
     (folder / "stage1-broken.json").write_text("{not json")
     (folder / "place-error-C_70.json").write_text("{}")
-    d = story._pair(fw.fw_root)
+    rnd = _round(fw)
+    d = story._pair(fw.fw_root, rnd.eval_dir, rnd.run_ids)
     assert [r["run"] for r in d["runs"]] == ["C_ALL", "C_70", "C70_R1"]
     assert d["best"] == "C_70" and d["steps"] == ["approach_a", "place"]
     r1 = d["runs"][2]
@@ -161,7 +168,8 @@ def test_follow_reads_one_trial_across_runs(fw: ConsolePaths) -> None:
     (folder / "place-error-broken.json").write_text("{not json")
     r3 = {"C_70": {"n": 60, "got": [0, 23], "rest": [10, 37]}}
     (folder / "r3.json").write_text(json.dumps(r3))
-    d = story._follow(fw.fw_root)
+    rnd = _round(fw)
+    d = story._follow(fw.fw_root, rnd.eval_dir, rnd.follow)
     assert (d["level"], d["seed"]) == (1, 1000107) and d["tol"] == tol
     assert set(d["runs"]) == {"C_70", "B_ALL"}
     assert (
@@ -172,4 +180,6 @@ def test_follow_reads_one_trial_across_runs(fw: ConsolePaths) -> None:
 
 
 def test_follow_is_empty_without_the_folder(fw: ConsolePaths) -> None:
-    assert story._follow(fw.fw_root) == {}
+    rnd = _round(fw)
+    assert story._follow(fw.fw_root, rnd.eval_dir, rnd.follow) == {}
+    assert story._follow(fw.fw_root, rnd.eval_dir, None) == {}

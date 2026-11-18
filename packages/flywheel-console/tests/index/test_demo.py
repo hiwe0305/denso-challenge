@@ -4,8 +4,15 @@ import json
 from pathlib import Path
 from typing import Any
 
-from flywheel.console.index import cited, demo, story
+from flywheel.console.index import cited, demo, story, tasks
 from flywheel.console.paths import ConsolePaths
+
+# the packaged manifest's round (seed/tasks.yaml): run order, folders, roles, sessions
+_RND = tasks.load(
+    ConsolePaths(repo=Path(__file__).resolve().parents[4], fw_root=Path())
+).story_round()
+assert _RND is not None
+RND: tasks.Round = _RND
 
 REPO = Path(__file__).resolve().parents[4]
 
@@ -53,7 +60,7 @@ def test_ladder_reads_relaxed_curve_and_cited_row(tmp_path: Path) -> None:
     rows = [{"on_table_b": True}] * 3 + [{"on_table_b": False}]
     (folder / "c70r1-rollouts.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
     cites = {"on_table_b": {"value": {"C_70": 50, "C70_R1": 49}, "source": "s", "quote": "q"}}
-    d = demo.ladder(tmp_path, PAIR, cites)
+    d = demo.ladder(tmp_path, PAIR, cites, RND)
     assert d["relaxed_cm"] == ["20", "15", "10", "7.5", "5"]
     assert d["rows"] == ["on_table_b", "20", "15", "10", "7.5", "success"]
     assert d["n"] == 60 and d["yaw_tol_deg"] == 10.0
@@ -66,7 +73,7 @@ def test_ladder_reads_relaxed_curve_and_cited_row(tmp_path: Path) -> None:
 
 
 def test_ladder_empty_without_inputs(tmp_path: Path) -> None:
-    assert demo.ladder(tmp_path, {}, {}) == {}
+    assert demo.ladder(tmp_path, {}, {}, RND) == {}
 
 
 def test_round1_checks_max_error_against_file(tmp_path: Path) -> None:
@@ -74,13 +81,13 @@ def test_round1_checks_max_error_against_file(tmp_path: Path) -> None:
     folder.mkdir(parents=True)
     _place_error(folder, "C_70", (1, 1, 1, 1, 1), 0.1614)
     _place_error(folder, "C70_R1", (1, 1, 1, 1, 1), 0.1265)
-    d = demo.round1(tmp_path, _groups()["round1"])
+    d = demo.round1(tmp_path, _groups()["round1"], RND)
     assert d["max_place_error_cm"]["value"] == {"C_70": 16.1, "C70_R1": 12.7}
     assert d["max_place_error_cm"]["check_from_file"] == {"C_70": 16.14, "C70_R1": 12.65}
     assert d["tilt_at_place"]["value"] == {"C_70": 4, "C70_R1": 8}
     assert d["relaxed_7_5cm"]["value"] == {"C_70": 14, "C70_R1": 15}
     assert d["rule_r1"]["value"]["outcome"] == "F" and d["stop"]["value"]["stop"] is True
-    assert demo.round1(tmp_path, {}) == {}
+    assert demo.round1(tmp_path, {}, RND) == {}
 
 
 def test_qa_bench_code_and_agent_layers() -> None:
@@ -97,12 +104,12 @@ def test_qa_bench_code_and_agent_layers() -> None:
 
 
 def test_fail_share_base_models_only() -> None:
-    d = demo.fail_share(PAIR)
+    d = demo.fail_share(PAIR, RND)
     assert set(d["runs"]) == {"C_ALL", "C_70"}
     assert d["runs"]["C_ALL"]["failed"] == 55 and d["runs"]["C_ALL"]["share"] == 0.8
     assert d["runs"]["C_70"]["share"] == 0.84
     assert (d["min"], d["max"]) == (0.8, 0.84)
-    assert demo.fail_share({}) == {}
+    assert demo.fail_share({}, RND) == {}
 
 
 def test_diagnose_splits_clusters_by_ticket() -> None:
@@ -144,10 +151,10 @@ def test_design_reads_watcher_sessions(tmp_path: Path) -> None:
         batch, "da34-serve-c-70", "L4", [{"event": "exit", "reason": "signal", "wall_cu": 11.0}]
     )
     _session(batch, "da34-other", "T4", [ended])
-    s = demo.colab_sessions(tmp_path)
+    s = demo.colab_sessions(tmp_path, RND.sessions)
     assert s["C_ALL"]["train"]["wall_cu"] == 77.4 and s["B_ALL"]["train"]["wall_cu"] is None
     assert s["C_70"]["serve"]["gpu"] == "L4"
-    d = demo.design(tmp_path, PAIR, {"clips": 379, "exported": 317}, _groups()["design"])
+    d = demo.design(tmp_path, PAIR, {"clips": 379, "exported": 317}, _groups()["design"], RND)
     res = {x["id"]: x for x in d["resource"]}
     assert res["train_cu"]["per_model_cu"] == {"C_ALL": 77.4} and res["train_cu"]["gpu"] == ["A100"]
     assert res["test_cu"]["per_model_cu"] == {"C_70": 11.0}
@@ -173,7 +180,7 @@ def test_success_clip_needs_a_sidecar(tmp_path: Path) -> None:
 
 
 def test_models_give_facts_not_names() -> None:
-    d = demo.models(PAIR, _groups()["models"])
+    d = demo.models(PAIR, _groups()["models"], RND)
     r = d["runs"]
     assert (r["C_ALL"]["episodes"], r["C_70"]["episodes"], r["C70_R1"]["episodes"]) == (
         606,

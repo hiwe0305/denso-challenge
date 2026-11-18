@@ -147,6 +147,9 @@ def _totals(rows: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
     return out
 
 
+totals = _totals  # public: tasks.py totals the rows of one task the same way
+
+
 def _load_seed(paths: ConsolePaths) -> dict[str, Any]:
     data = yaml.safe_load((paths.seed / "catalog.yaml").read_text(encoding="utf-8"))
     assert isinstance(data, dict)

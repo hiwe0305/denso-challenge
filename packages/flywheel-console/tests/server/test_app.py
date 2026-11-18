@@ -185,6 +185,14 @@ def test_ego_strip_from_viewer_row(srv: Srv) -> None:
     assert srv.get("/api/poster?work=vwr&ep=ep_v1")[0] == 200
 
 
+def test_viewer_mount_serves_its_index_page(srv: Srv) -> None:
+    """``/ego/`` is linked from the data page: the folder URL serves the viewer's index.html."""
+    (srv.paths.fw_root / "viewer" / "index.html").write_text("<p>viewer</p>", encoding="utf-8")
+    assert srv.get("/ego/") == (200, b"<p>viewer</p>")
+    assert srv.get("/ego/index.html")[0] == 200
+    assert srv.get("/ego/media/")[0] == 404  # a folder without an index page lists nothing
+
+
 def test_work_episodes_flags_deid(srv: Srv) -> None:
     st, b = srv.get("/api/work_episodes?work=src_test")
     rows = {r["episode_id"]: r for r in json.loads(b)}
@@ -387,6 +395,30 @@ def test_locked_server_refuses_every_post(locked_srv: Srv, path: str) -> None:
 def test_locked_server_refuses_internal_gets(locked_srv: Srv, path: str) -> None:
     st, body = locked_srv.get(path)
     assert st == 403 and json.loads(body) == {"error": "locked"}
+
+
+def test_locked_server_with_chat_takes_only_the_chat_posts(
+    fw: ConsolePaths, lerobot: Path, work: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``--lock --chat``: the chat answers, everything else that writes is still refused."""
+    monkeypatch.setattr(media, "seed_rows", lambda: ROWS)
+    httpd = app.make_server(fw, 0, lock=True, chat=True)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    s = Srv(httpd, fw)
+    try:
+        _stub(monkeypatch, "llm", prewarm=lambda: {"ok": True},
+              stream=lambda body: iter([b"event: done\ndata: {}\n\n"]))  # fmt: skip
+        st = json.loads(s.get("/api/status")[1])
+        assert st["locked"] is True and st["chat_on"] is True
+        assert s.post("/api/models/prewarm", {}) == (200, {"ok": True})
+        assert s.req("POST", "/api/chat", b"{}", {"Content-Type": "application/json",
+                     "Origin": f"http://127.0.0.1:{s.port}"})[0] == 200  # fmt: skip
+        assert s.post("/api/jobs", {"kind": "data.qa", "params": {}})[0] == 403
+        assert s.post("/api/upload", {})[0] == 403
+        assert s.get("/api/chat/traces")[0] == 403 and s.get("/api/tool?name=x")[0] == 403
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
 
 
 def test_locked_server_still_serves_pages_and_reports_lock(locked_srv: Srv) -> None:

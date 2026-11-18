@@ -60,6 +60,14 @@ class ConsolePaths:
         return self.console_dir / "uploads"
 
     @property
+    def store(self) -> Path:
+        """The console's own store root: ``FW_ROOT`` of the ``data.*`` and ``eval.*`` jobs.
+
+        Datasets are staged (copied) here, so their sources, releases and ledger rows stay
+        inside the console folder and never add to the project's records."""
+        return self.console_dir / "store"
+
+    @property
     def web(self) -> Path:
         return Path(__file__).parent / "web"
 

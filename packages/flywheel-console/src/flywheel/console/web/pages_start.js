@@ -33,44 +33,46 @@ const fmtCm = d => UI.fmt(d * 100, "float1"), fmtDeg = y => UI.fmt(y, "float1");
 /* ---------- #/follow ---------- */
 UI.route("follow", async (body, params, qs) => {
   await SIMP(); document.title = "FW · " + t("fol.title");
-  const F = EXPLAIN.read.follow(), R = EXPLAIN.read, S = Math.min(5, Math.max(1, Math.round(+qs.s) || 1));
-  if (!F.runs) { body.appendChild(h("p", { class: "dim", text: t("sim.empty") })); return; }
+  /* without the retest result the story ends at the data order: three screens, not five */
+  const F = EXPLAIN.read.follow(), R = EXPLAIN.read, MAX = TASK.withheld().length ? 3 : 5, S = Math.min(MAX, Math.max(1, Math.round(+qs.s) || 1));
+  if (!F.runs || !F.runs[TASK.baseline()]) { body.appendChild(h("p", { class: "dim", text: t("sim.empty") })); return; }
   const go2 = s => go("follow?s=" + s);
-  UI.keys.bind({ ArrowRight: () => S < 5 && go2(S + 1), ArrowLeft: () => S > 1 && go2(S - 1) }, "page");
-  const steps = h("div", { class: "fol-steps" }, [1, 2, 3, 4, 5].map(i => h("a", { class: i === S ? "on" : i < S ? "done" : "", href: "#/follow?s=" + i, text: t("fol.s" + i + ".t") })));
+  UI.keys.bind({ ArrowRight: () => S < MAX && go2(S + 1), ArrowLeft: () => S > 1 && go2(S - 1) }, "page");
+  const steps = h("div", { class: "fol-steps" }, [1, 2, 3, 4, 5].slice(0, MAX).map(i => h("a", { class: i === S ? "on" : i < S ? "done" : "", href: "#/follow?s=" + i, text: t("fol.s" + i + ".t") })));
   body.appendChild(h("div", { class: "sim-head" }, [h("h1", { text: t("fol.title") }), h("span", { class: "dim", text: t("fol.case", { lv: F.level, seed: String(F.seed) }) }), steps]));
-  const tol = F.tol, td = UI.fmt(tol.distance_m * 100, "int"), ty = UI.fmt(tol.yaw_error_deg, "int"), c70 = F.runs.C_70;
+  const tol = F.tol, td = UI.fmt(tol.distance_m * 100, "int"), ty = UI.fmt(tol.yaw_error_deg, "int"), A = TASK.baseline(), B = TASK.after(), c70 = F.runs[A];
   const scr = h("div", { class: "fol-screen" }), link = n => h("div", { class: "fol-link" }, [h("span", { class: "sn", text: String(n) }), h("a", { href: EXPLAIN.href(n), text: t("fol.station", { n, name: EXPLAIN.name(n) }) })]);
   const cluster = SIMD.episodes.filter(e => e.for && e.for[0] === F.level && e.for[1] === F.seed);
   const prior = cluster.filter(e => e.label === "prev"), fresh = cluster.filter(e => e.label === "round");
   const vid = e => h("div", { class: "fol-vid" }, [hoverVideo(e.poster ? "/simmedia/" + e.poster : null, e.video ? "/simmedia/" + e.video : null), h("a", { href: "#/sim/" + e.i, text: t("sim.ep", { i: e.i }) })]);
   if (S === 1) {
-    scr.append(failRing(c70, tol), h("div", null, [h("p", { class: "fol-a", text: t("fol.s1.a", { run: EXPLAIN.runName("C_70"), d: fmtCm(c70.distance_m), y: fmtDeg(c70.yaw_error_deg), td, ty }) }),
+    scr.append(failRing(c70, tol), h("div", null, [h("p", { class: "fol-a", text: t("fol.s1.a", { run: EXPLAIN.runName(A), d: fmtCm(c70.distance_m), y: fmtDeg(c70.yaw_error_deg), td, ty }) }),
       h("p", { class: "dim", text: "◌ " + t("fol.ring") }), h("p", { class: "dim", text: "◔ " + t("fol.yaw", { y: fmtDeg(c70.yaw_error_deg), ty }) }), link(4)]));
   } else if (S === 2) {
     const c1 = ((STORY.round || {}).clusters || []).find(c => c.id === "c1") || {};
     scr.append(h("div", { class: "fol-loop" }, [1, 2, 3].map(i => h("span", { class: "on", text: i + " " + t("fig.loop." + i) }))), h("div", null, [h("p", { class: "fol-a", text: t("fol.s2.a", { k: c1.n, m: c1.failures }) }),
-      prior.length ? h("p", { text: t("fol.s2.b", { ep: String(prior[0].i) }) }) : null, h("div", { class: "fol-vids one" }, prior.slice(0, 1).map(vid)), link(5)]));
+      prior.length ? h("p", { text: t("fol.s2.b", { base: EXPLAIN.runName(A), ep: String(prior[0].i) }) }) : null, h("div", { class: "fol-vids one" }, prior.slice(0, 1).map(vid)), link(5)]));
   } else if (S === 3) {
     /* attempts per place failure come from the round plan (tray.md 20.14); the episodes shown are the ones selected into the cut */
     const per = ((STORY.round || {}).per_case || {}).place;
-    scr.append(h("div", { class: "fol-wide" }, [h("p", { class: "fol-a", text: t("fol.s3.a", { n: per, k: fresh.length }) }), h("p", { class: "dim", text: t("fol.hover") }), h("div", { class: "fol-vids" }, fresh.map(vid)), link(6)]));
+    scr.append(h("div", { class: "fol-wide" }, [h("p", { class: "fol-a", text: t("fol.s3.a", { n: per, k: fresh.length, after: EXPLAIN.runName(B) }) }), h("p", { class: "dim", text: t("fol.hover") }), h("div", { class: "fol-vids" }, fresh.map(vid)), MAX < 5 ? h("p", { class: "dim", text: t("wh.withheld") }) : null, link(6)]));
   } else if (S === 4) {
-    const order = ["C_70", "C70_R1", "C_ALL", "B_70", "B_ALL"].filter(id => F.runs[id]), CAP = 0.15;   /* one scale for the column: 15 cm */
+    const order = [A, B, ...TASK.controls()].filter(id => F.runs[id]), CAP = 0.15;   /* one scale for the column: 15 cm */
     const why = r => r.success ? "" : r.failure ? " · " + t("fail." + r.failure) : "";
     const tb = h("table", { class: "xb-tbl fol-tbl" }, [h("thead", null, h("tr", null, ["fol.col.run", "fol.col.res", "fol.col.d", "fol.col.y", "fol.col.data"].map(k => h("th", { text: t(k) })).concat([h("th")]))),
-      h("tbody", null, order.map(id => { const r = F.runs[id]; return h("tr", { class: id === "C70_R1" ? "hot" : "" }, [h("td", { title: id }, h("b", { text: EXPLAIN.runName(id) })),
+      h("tbody", null, order.map(id => { const r = F.runs[id]; return h("tr", { class: id === B ? "hot" : "" }, [h("td", { title: id }, h("b", { text: EXPLAIN.runName(id) })),
         h("td", { class: r.success ? "c-ok" : "c-bad", text: (r.success ? "✓ " + t("fol.pass") : "✕ " + t("fol.fail")) + why(r) }), h("td", { text: fmtCm(r.distance_m) }), h("td", { text: fmtDeg(r.yaw_error_deg) }),
-        h("td", { text: id === "C70_R1" ? t("fol.yes") : t("fol.no") }), h("td", null, failRing(r, tol, true, CAP))]); }))]);
-    const bAll = F.runs.B_ALL;
-    scr.append(h("div", { class: "fol-wide" }, [h("p", { class: "fol-a", text: t("fol.s4.a") }), tb, bAll && bAll.success && bAll.reach_b === false ? h("p", { class: "dim", text: "⚠ " + t("fol.s4.note") }) : null, h("p", { class: "dim", text: t("fol.ringScale", { c: Math.round(CAP * 100) }) }), link(4)]));
+        h("td", { text: id === B ? t("fol.yes") : t("fol.no") }), h("td", null, failRing(r, tol, true, CAP))]); }))]);
+    /* the human-video model on the largest set: it passed without reaching table B (L-REACH-B), noted under the table */
+    const bAllId = EXPLAIN.read.like(A, { episodes: "max", human_video: true }), bAll = F.runs[bAllId];
+    scr.append(h("div", { class: "fol-wide" }, [h("p", { class: "fol-a", text: t("fol.s4.a") }), tb, bAll && bAll.success && bAll.reach_b === false ? h("p", { class: "dim", text: "⚠ " + t("fol.s4.note", { ctl: EXPLAIN.runName(bAllId) }) }) : null, h("p", { class: "dim", text: t("fol.ringScale", { c: Math.round(CAP * 100) }) }), link(4)]));
   } else {
-    const a = R.run("C_70"), b = R.run("C70_R1");
+    const a = R.base(), b = R.after();
     scr.append(h("div", { class: "fol-wide" }, [a && b ? h("p", { class: "fol-a", text: t("fol.s5.a", { a: a.successes, b: b.successes, n: a.n }) }) : null, h("p", { class: "dim", text: t("wh.prelim") }), EXPLAIN.r3Table(), EXPLAIN.verdict()]));
   }
   body.appendChild(scr);
   /* one obvious next action on every screen: the big "Next →" (on the last screen: step 6) */
   body.appendChild(h("div", { class: "fol-nav" }, [S > 1 ? h("button", { class: "fol-back", text: t("fol.prev"), onclick: () => go2(S - 1) }) : h("span"),
-    h("span", { class: "dim fol-count", text: S + " / 5" }),
-    S < 5 ? h("button", { class: "fol-go", text: t("fol.next"), onclick: () => go2(S + 1) }) : h("a", { class: "fol-go", href: EXPLAIN.href(6), text: t("fol.station", { n: 6, name: EXPLAIN.name(6) }) })]));
+    h("span", { class: "dim fol-count", text: S + " / " + MAX }),
+    S < MAX ? h("button", { class: "fol-go", text: t("fol.next"), onclick: () => go2(S + 1) }) : h("a", { class: "fol-go", href: EXPLAIN.href(6), text: t("fol.station", { n: 6, name: EXPLAIN.name(6) }) })]));
 });

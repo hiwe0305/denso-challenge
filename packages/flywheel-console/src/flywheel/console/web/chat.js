@@ -16,7 +16,7 @@ const CHAT = (() => {
 
   /* ---------- context chips ---------- */
   function context() {
-    live(); const c = { route: route() }, auto = C.auto();
+    live(); const c = { route: route(), task: UI.task || undefined, round: UI.round || undefined }, auto = C.auto();
     if (!S.off.has("sel")) { const sel = S.refs.length ? S.refs.map(r => r.row || r.label) : auto.sel ? [auto.sel] : []; if (sel.length) c.selection = sel.length === 1 ? sel[0] : sel; }
     const f = Object.assign({}, auto.filters, S.ctx.filters || {}); if (!S.off.has("filter") && Object.keys(f).length) c.filters = f;
     if (S.ctx.selection && !c.selection && !S.off.has("sel")) c.selection = S.ctx.selection;
@@ -46,7 +46,7 @@ const CHAT = (() => {
   C.mount = function (el) {
     root = el; el.innerHTML = "";
     const w = parseInt(LS("v5dockw"), 10); if (w >= 320 && w <= 640) document.documentElement.style.setProperty("--dock", w + "px");
-    if (LS("v5dock") === "off") document.body.classList.add("dock-off");
+    if (LS("v5dock") !== "on") document.body.classList.add("dock-off");
     const grip = h("div", { class: "grip" });
     grip.addEventListener("mousedown", e => { e.preventDefault(); const mv = ev => { const nw = Math.max(320, Math.min(640, window.innerWidth - ev.clientX)); document.documentElement.style.setProperty("--dock", nw + "px"); LS("v5dockw", String(Math.round(nw))); }; const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); }; document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up); });
     pill = h("span", { class: "ch-pill", title: "model", onclick: () => C.prewarm(true) });
@@ -68,6 +68,13 @@ const CHAT = (() => {
   C.open = function (prefill) { document.body.classList.remove("dock-off"); if (UI.panel) UI.panel.tab("chat"); if (!UI.demo) LS("v5dock", "on"); if (prefill != null) { input.value = prefill; input.focus(); suggest(); } C.prewarm(); };
   C.close = function (temp) { document.body.classList.add("dock-off"); if (temp !== true) LS("v5dock", "off"); };
   C.toggle = function () { document.body.classList.contains("dock-off") ? C.open() : C.close(); if (!document.body.classList.contains("dock-off")) input.focus(); };
+  /* lock mode: the panel opens, says chat is off and takes no input (the model and the tools refuse on a locked server) */
+  C.locked = function (on) {
+    if (!input) return;
+    input.disabled = !!on; sendBtn.disabled = !!on; input.placeholder = on ? t("chat.locked") : "ask or /command";
+    const old = root.querySelector(".ch-lock"); if (old) old.remove();
+    if (on) list.insertBefore(h("div", { class: "ch-lock", text: "🔒 " + t("chat.locked") }), list.firstChild);
+  };
   C.focus = function () { if (document.body.classList.contains("dock-off")) C.open(); input.focus(); };
   C.esc = function () {
     if (S.busy && S.abort) { S.abort.abort(); return true; }
@@ -79,10 +86,12 @@ const CHAT = (() => {
   C.setModelState = function (md) {
     S.model = md || S.model; if (!pill) return;
     const m = S.model, st = m ? (m.nemotron || (m.agent_ready ? "warm" : "down")) : "down"; S.state = st;
-    pill.innerHTML = ""; pill.appendChild(h("span", { class: "c-" + UI.stateClass(st === "down" ? "down" : st === "cold" ? "cold" : st === "busy" ? "run" : "ok"), text: st === "down" ? "✕" : st === "cold" ? "○" : st === "busy" ? "▶" : "●" })); pill.appendChild(document.createTextNode(UI.locked ? " " + t("chat.offline") : " nemotron " + st));
+    pill.innerHTML = ""; pill.appendChild(UI.chatOff ? h("span", { class: "dim", text: "–" }) : h("span", { class: "c-" + UI.stateClass(st === "down" ? "down" : st === "cold" ? "cold" : st === "busy" ? "run" : "ok"), text: st === "down" ? "✕" : st === "cold" ? "○" : st === "busy" ? "▶" : "●" }));   /* lock mode: neutral, not a red cross */ /* the model that answers: Nemotron over the tunnel, or the one FW_CHAT_MODEL names (with its provider) */
+    const c = m && m.chat, who = c && c.provider !== "nemotron" && c.model ? String(c.model).split("/").pop().replace(/:free$/, "") + " · " + c.provider : "nemotron";
+    pill.appendChild(document.createTextNode(UI.chatOff ? " " + t("chat.offline") : " " + who + " " + st));
   };
   C.prewarm = function (force) {
-    if (UI.locked) return;
+    if (UI.chatOff) return;
     if ((S.warmed && !force) || S.state === "down" || S.state === "warm" && !force) return; S.warmed = true;
     fetch("/api/models/prewarm", { method: "POST" }).then(r => r.json()).then(() => fetch("/api/models").then(r => r.json()).then(C.setModelState)).catch(() => {});
   };
@@ -95,7 +104,7 @@ const CHAT = (() => {
   }
   const slashOf = t => (t.slash || "/" + t.name).replace(/^\/?/, "/");
   function suggest() {
-    if (UI.locked) { sug.classList.add("hide"); return; }
+    if (UI.locked) { sug.classList.add("hide"); return; }   /* slash commands read /api/tool, refused on any locked server */
     const v = input.value; if (v[0] !== "/" || v.indexOf(" ") >= 0 || !S.tools) { sug.classList.add("hide"); return; }
     S.sug = S.tools.filter(t => slashOf(t).startsWith(v.toLowerCase())).slice(0, 6); S.sugI = 0; paintSug();
   }
@@ -112,6 +121,8 @@ const CHAT = (() => {
   /* ---------- message blocks ---------- */
   function emptyState() {
     list.innerHTML = ""; const ex = h("div", { class: "ch-empty" }); S.empty = ex; list.appendChild(ex);
+    /* ready-made questions: one click asks (design: the chat explains the page, it does not only look numbers up) */
+    if (!UI.chatOff) ex.appendChild(h("div", { class: "ch-ask" }, [h("small", { text: t("chat.try") }), ...[1, 2, 3, 4, 5].map(i => h("button", { text: t("chat.q" + i), onclick: () => { if (!S.busy) send(t("chat.q" + i)); } }))]));
     (S.tools ? S.tools.slice(0, 5) : []).forEach(t => ex.appendChild(h("a", { text: slashOf(t), title: t.description || "", onclick: () => { input.value = slashOf(t) + " "; input.focus(); } })));
     if (!S.tools) loadTools().then(() => { if (S.empty && S.empty.isConnected && !S.empty.children.length) emptyState(); });
   }
@@ -163,6 +174,7 @@ const CHAT = (() => {
   async function showTraces() {
     if (traces && traces.isConnected) { traces.remove(); return; }
     traces = h("div", { class: "ch-traces" }, [UI.sec("Traces")]); root.appendChild(traces);
+    if (UI.locked) { traces.appendChild(h("p", { class: "dim", text: t("chat.locked") })); return; }   /* a locked server refuses /api/chat/traces */
     try {
       const l = await (await fetch("/api/chat/traces?limit=20")).json(); const rows = (Array.isArray(l) ? l : l.traces || []).map(t => ({ id: t.turn_id || t.id, time: t.time || t.ts || t.started, q: t.question || t.user || t.input || "", ms: t.ms_total != null ? t.ms_total / 1000 : null, tools: t.tools != null ? (Array.isArray(t.tools) ? t.tools.length : t.tools) : t.n_tools }));
       const holder = h("div");
@@ -175,7 +187,7 @@ const CHAT = (() => {
   async function send(text) {
     const v = (text != null ? text : input.value).trim(); if (!v || S.busy) return;
     input.value = ""; input.style.height = "auto"; sug.classList.add("hide"); S.last = v; userMsg(v);
-    if (UI.locked) { list.appendChild(errBlock(t("chat.offline"))); scrollEnd(); return; }   /* tools and model refuse on a locked server */
+    if (UI.chatOff) { list.appendChild(errBlock(t("chat.offline"))); scrollEnd(); return; }   /* tools and model refuse on a locked server */
     if (v[0] === "/") return slash(v);
     return ask(v);
   }
