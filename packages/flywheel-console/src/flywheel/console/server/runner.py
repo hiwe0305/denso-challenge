@@ -385,14 +385,35 @@ STEP_STAGE = {
     "ego.annotate": "process", "ego.qa": "process", "ego.report": "process",
     "ego.pipeline": "process", "ego.human1m": "release", "export.zip": "release",
     "agentqa.run": "process", "agentqa.review": "process",
+    "data.ingest": "collect", "data.qa": "process", "data.release": "release",
+    "data.report": "process", "data.pipeline": "process",
+    "eval.diag_system": "eval", "eval.diag_train": "eval",
 }  # fmt: skip
 KIND_LABEL = {
     "ego.ingest": "Ingest", "ego.deid": "Che mặt", "ego.ea": "E-A (bàn tay + camera)",
     "ego.pose": "Pose", "ego.annotate": "Gắn nhãn bước", "ego.qa": "QA", "ego.report": "Báo cáo",
     "ego.pipeline": "Cả pipeline", "ego.human1m": "Xuất Human-1M", "export.zip": "Zip metadata",
     "agentqa.run": "Agent QA", "agentqa.review": "Duyệt phát hiện",
+    "data.ingest": "Ingest robot", "data.qa": "QA robot", "data.release": "Release robot",
+    "data.report": "Báo cáo robot", "data.pipeline": "Pipeline robot",
+    "eval.diag_system": "Kiểm hệ thống", "eval.diag_train": "Kiểm lỗi train",
 }  # fmt: skip
 KINDS: frozenset[str] = frozenset(KIND_LABEL)
+# Process stage of each kind, as the console's six stages name them (one of
+# data, qa, train, eval, diagnose, loop, ops); /api/kinds and job.json carry it.
+PROCESS_STAGE = {
+    "ego.ingest": "data", "ego.deid": "data", "ego.ea": "data", "ego.pose": "data",
+    "ego.annotate": "data", "ego.qa": "qa", "ego.report": "data", "ego.pipeline": "data",
+    "ego.human1m": "data", "export.zip": "ops", "agentqa.run": "qa", "agentqa.review": "qa",
+    "data.ingest": "data", "data.qa": "qa", "data.release": "data", "data.report": "data",
+    "data.pipeline": "data", "eval.diag_system": "diagnose", "eval.diag_train": "diagnose",
+}  # fmt: skip
+CHAIN_KINDS = ("ego.pipeline", "data.pipeline")
+DATA_CHAIN = ["data.ingest", "data.qa", "data.release", "data.report"]
+SOURCE_DETAILS = ("psi_data", "planner_wbc", "teleop_pico")
+DATA_CLASSES = ("public", "internal", "restricted")
+LICENSE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._+-]{0,63}$")
+STAGE_MAX_BYTES = 2 << 30  # a dataset is copied into the console store; refuse larger ones
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
 ID_RE = re.compile(r"^[A-Za-z0-9_.-]{1,80}$")
 
@@ -481,6 +502,197 @@ def _plan_agentqa_review(p: dict[str, Any], fw: list[str]) -> dict[str, Any]:
     argv += ["--reviewer", _reviewer()]
     argv += [x for d in ds for x in ("--decide", d)] + ["--out", str(out)]
     return {"argv": argv, "outputs": {"out": str(out)}}
+
+
+# ------------------------------------------------------------------ robot data and eval kinds
+# `fw data` resolves every dataset against $FW_ROOT and appends LedgerEntry rows under
+# $FW_ROOT/sites/local/runs; `fw data release` freezes into $FW_ROOT/releases. A console
+# job runs with FW_ROOT set to the console's own store, so none of that touches the
+# project's sources, releases or ledger. A dataset outside the store is copied in first.
+def store_dir() -> Path:
+    return _p().store
+
+
+def trace_fixtures() -> Path:
+    """The testkit's recorded-trace fixtures (four two-table traces, not real runs)."""
+    return (
+        _repo() / "packages" / "flywheel-testkit" / "src" / "flywheel" / "testkit" / "fixtures"
+        / "trace"
+    )  # fmt: skip
+
+
+def task_of(path: Path) -> str | None:
+    """The task a LeRobot dataset or a train job is about, read from its path."""
+    s = str(path).lower()
+    if "tray" in s:
+        return "tray"
+    if "pickbetweentables" in s or "two_table" in s or "two-table" in s:
+        return "two_table"
+    return None
+
+
+def _tree_size(d: Path) -> tuple[int, int]:
+    n = tot = 0
+    for dp, _dns, fns in os.walk(d):
+        for fn in fns:
+            try:
+                tot += (Path(dp) / fn).stat().st_size
+                n += 1
+            except OSError:
+                continue
+    return n, tot
+
+
+def staged_path(ds: Path) -> Path:
+    """Where ``ds`` lives inside the console store (itself when it is already there)."""
+    store = store_dir().resolve()
+    if ds.is_relative_to(store):
+        return ds
+    rel = ds.relative_to(_fw().resolve()).as_posix()
+    return store / "datasets" / re.sub(r"[^A-Za-z0-9_.-]", "_", rel.replace("/", "__"))[:200]
+
+
+def lerobot_dataset(raw: Any) -> Path:
+    """A LeRobot v2.1 dataset under ``fw_root`` (not the vault, not other console folders)."""
+    raw = str(raw or "")
+    if not raw:
+        raise ValueError("dataset: cần đường dẫn tới một dataset LeRobot v2.1")
+    fwr = _fw()
+    ds = under(raw if Path(raw).is_absolute() else fwr / raw, fwr)
+    cd = _p().console_dir.resolve()
+    if ds.is_relative_to(cd) and not ds.is_relative_to(store_dir().resolve() / "datasets"):
+        raise ValueError("dataset: thư mục của console không phải dataset")
+    info = jread(ds / "meta" / "info.json")
+    if not isinstance(info, dict):
+        raise ValueError("dataset: không có meta/info.json")
+    if info.get("codebase_version") != "v2.1":
+        raise ValueError(
+            "dataset: codebase_version {} không phải v2.1".format(info.get("codebase_version"))
+        )
+    return ds
+
+
+def stage_needed(src: Path, dst: Path) -> bool:
+    """True unless ``dst`` already holds a copy with the same file count and bytes."""
+    if src == dst:
+        return False
+    if not (dst / "meta" / "info.json").is_file():
+        return True
+    return _tree_size(src) != _tree_size(dst)
+
+
+def data_work(raw: Any) -> Path:
+    """A work dir that a console ``data.ingest`` wrote (under the store, with source.json)."""
+    w = under(str(raw or "") or "/nonexistent", store_dir() / "work")
+    if not (w / "source.json").is_file():
+        raise ValueError(f"không phải work dir của data.ingest (thiếu source.json): {w.name}")
+    return w
+
+
+def _choice(p: dict[str, Any], key: str, choices: tuple[str, ...], default: str | None) -> str:
+    v = str(p.get(key) or default or "")
+    if v not in choices:
+        raise ValueError("{} phải là một trong {}".format(key, ", ".join(choices)))
+    return v
+
+
+def _plan_data(kind: str, p: dict[str, Any], job_id: str, fw: list[str]) -> dict[str, Any]:
+    store = store_dir()
+    base: dict[str, Any] = {"fw_root": str(store)}
+    if kind == "data.ingest":
+        ds = lerobot_dataset(p.get("dataset"))
+        sd = _choice(p, "source_detail", SOURCE_DETAILS, None)
+        dc = _choice(p, "data_class", DATA_CLASSES, "public")
+        split = _choice(p, "split", ("train", "dev"), "train")
+        lic = str(p.get("license") or "unknown").strip()
+        if not LICENSE_RE.match(lic):
+            raise ValueError("license: chữ, số, khoảng trắng và . _ + - (tối đa 64)")
+        dst = staged_path(ds)
+        steps: list[list[str]] = []
+        if stage_needed(ds, dst):
+            n, size = _tree_size(ds)
+            if size > STAGE_MAX_BYTES:
+                raise ValueError(
+                    "dataset %.1f GB, quá giới hạn chép %.0f GB vào store của console"
+                    % (size / 1e9, STAGE_MAX_BYTES / 1e9)
+                )
+            steps.append(["python:stage", str(ds), str(dst)])
+        work = store / "work" / job_id
+        steps.append(fw + ["data", "ingest", str(dst), "--source-detail", sd, "--license", lic,
+                           "--data-class", dc, "--split", split, "--work", str(work)])  # fmt: skip
+        return base | {
+            "argv": steps[-1], "steps": steps, "task": task_of(ds),
+            "outputs": {"work": str(work), "dataset": str(ds), "staged": str(dst)},
+        }  # fmt: skip
+    work = data_work(p.get("work"))
+    out: dict[str, Any] = {"work": str(work)}
+    if kind == "data.qa":
+        argv = fw + ["data", "qa", str(work)]
+        out["reports"] = str(work / "qa" / "reports.jsonl")
+    elif kind == "data.release":
+        if not (work / "qa" / "reports.jsonl").is_file():
+            raise ValueError("chưa có QA cho work dir này: chạy data.qa trước")
+        rel = store / "releases" / job_id
+        argv = fw + ["data", "release", str(work), "--out", str(rel)]
+        name = str(p.get("name") or "")
+        if name:
+            if not NAME_RE.match(name):
+                raise ValueError("name: chỉ chữ, số, - _ .")
+            argv += ["--name", name]
+        out["release"] = str(rel)
+    elif kind == "data.report":
+        if not (work / "qa" / "summary.json").is_file():
+            raise ValueError("chưa có QA cho work dir này: chạy data.qa trước")
+        argv = fw + ["data", "report", str(work)]
+        out["page"] = str(work / "report" / "index.html")
+    else:
+        raise ValueError(f"unknown kind: {kind}")
+    src = jread(work / "source.json", {}) or {}
+    return base | {"argv": argv, "outputs": out, "task": task_of(Path(str(src.get("root"))))}
+
+
+def trace_input(raw: Any) -> tuple[Path, bool]:
+    """A recorded trace for ``fw eval diag-system``: under fw_root, or a testkit fixture.
+
+    Returns the path and whether it is a fixture."""
+    raw = str(raw or "")
+    if not raw:
+        raise ValueError("episode: cần thư mục trace (steps.jsonl, rollout_result.json)")
+    inside = False
+    for root, is_fx in ((trace_fixtures(), True), (_fw(), False)):
+        cand = Path(raw) if Path(raw).is_absolute() else root / raw
+        try:
+            ep = under(cand, root)
+        except ValueError:
+            continue
+        inside = True
+        if ep.is_dir() and (ep / "steps.jsonl").is_file():
+            return ep, is_fx
+        if ep.is_file() and ep.name in ("steps.jsonl", "rollout_result.json"):
+            return ep, is_fx
+    if inside:
+        raise ValueError("episode: không thấy steps.jsonl hay rollout_result.json")
+    raise ValueError("episode: path outside allowed roots")
+
+
+def _plan_eval(kind: str, p: dict[str, Any], job_id: str, fw: list[str]) -> dict[str, Any]:
+    store = store_dir() / "eval" / job_id
+    if kind == "eval.diag_system":
+        ep, is_fx = trace_input(p.get("episode"))
+        argv = fw + ["eval", "diag-system", "--episode", str(ep), "--store", str(store)]
+        return {
+            "argv": argv, "fw_root": str(store_dir()), "task": "two_table" if is_fx else None,
+            "outputs": {"episode": str(ep), "store": str(store), "fixture": is_fx},
+        }  # fmt: skip
+    raw = str(p.get("job") or "")
+    if not raw:
+        raise ValueError("job: cần thư mục job train có metrics.jsonl")
+    j = under(raw if Path(raw).is_absolute() else _fw() / raw, _fw())
+    if not ((j.is_dir() and (j / "metrics.jsonl").is_file()) or j.name == "metrics.jsonl"):
+        raise ValueError("job: không thấy metrics.jsonl")
+    argv = fw + ["eval", "diag-train", "--job", str(j), "--store", str(store)]
+    return {"argv": argv, "fw_root": str(store_dir()), "task": task_of(j),
+            "outputs": {"job": str(j), "store": str(store)}}  # fmt: skip
 
 
 def plan(kind: str, p: dict[str, Any] | None, job_id: str) -> dict[str, Any]:
@@ -587,6 +799,10 @@ def plan(kind: str, p: dict[str, Any] | None, job_id: str) -> dict[str, Any]:
         }  # fmt: skip
     if kind == "agentqa.review":
         return _plan_agentqa_review(p, fw)
+    if kind in ("data.ingest", "data.qa", "data.release", "data.report"):
+        return _plan_data(kind, p, job_id, fw)
+    if kind in ("eval.diag_system", "eval.diag_train"):
+        return _plan_eval(kind, p, job_id, fw)
     raise ValueError(f"unknown kind: {kind}")
 
 
@@ -624,8 +840,11 @@ def make_job(
 ) -> dict[str, Any]:  # fmt: skip
     jid = job_id or new_id()
     (jobs_dir() / jid).mkdir(parents=True, exist_ok=True)
+    if pl and "task" in pl:  # data.* and eval.* kinds read the task from their input
+        task = pl["task"] or "unknown"
     job: dict[str, Any] = {
-        "id": jid, "kind": kind, "stage": STEP_STAGE.get(kind, "process"), "task": task,
+        "id": jid, "kind": kind, "stage": STEP_STAGE.get(kind, "process"),
+        "process_stage": PROCESS_STAGE.get(kind, "ops"), "task": task,
         "params": params, "argv": (pl or {}).get("argv", []), "cwd": str(_repo()),
         "host": "laptop", "state": "queued", "rc": None, "created": now(), "started": None,
         "ended": None, "outputs": dict((pl or {}).get("outputs") or {}),
@@ -649,6 +868,9 @@ def finish(job: dict[str, Any], state: str, rc: int | None = None, note: str | N
     job["state"] = state
     job["rc"] = rc
     job["ended"] = now()
+    t0 = job.pop("_t0", None)
+    if t0 is not None:  # wall seconds at sub-second precision, for /api/kinds durations
+        job["seconds"] = round(time.time() - t0, 2)
     if note:
         job["note"] = note
     save(job)
@@ -671,7 +893,7 @@ def job_alive(j: dict[str, Any]) -> bool:
     """A queued/running record whose process (or, for a chain, one of its children) is alive."""
     if pid_alive(j.get("pid")):
         return True
-    if j.get("kind") == "ego.pipeline":
+    if j.get("kind") in CHAIN_KINDS:
         for cid in (j.get("outputs") or {}).get("children", []):
             c = jread(jobs_dir() / cid / "job.json", {}) or {}
             if c.get("state") in ("queued", "running") and pid_alive(c.get("pid")):
@@ -728,6 +950,9 @@ def load_registry() -> None:
 
 def parse_outputs(job: dict[str, Any]) -> None:
     """Pick facts out of the log: the work dir that ingest printed."""
+    if job["kind"].startswith(("data.", "eval.")):
+        data_outputs(job)
+        return
     if job["kind"] != "ego.ingest":
         return
     txt = (jobs_dir() / job["id"] / "log.txt").read_text(errors="replace")
@@ -738,6 +963,71 @@ def parse_outputs(job: dict[str, Any]) -> None:
     m = re.findall(r"(pipeline/src_[0-9a-f]+)", txt)
     if m:
         job["outputs"]["work"] = str(_fw() / m[-1])
+
+
+def data_outputs(job: dict[str, Any]) -> None:
+    """Results of a data.* or eval.* job, read back from the files it wrote (only when ok)."""
+    out = job["outputs"]
+    kind = job["kind"]
+    if kind == "data.ingest":
+        ing = jread(Path(out["work"]) / "ingest.json", {}) or {}
+        for k in ("source_id", "episodes", "frames", "files", "bytes", "index_findings"):
+            if k in ing:
+                out[k] = ing[k]
+    elif kind == "data.qa":
+        counts = _qa_counts(Path(out["work"]) / "qa" / "reports.jsonl")
+        if counts:
+            out["decisions"] = counts
+    elif kind == "data.release":
+        rel = jread(Path(out["release"]) / "release.json", {}) or {}
+        if rel:
+            out.update(release_id=rel.get("id"), release_name=rel.get("name"),
+                       release_status=rel.get("status"), counts=rel.get("counts"),
+                       combined_license=rel.get("combined_license"))  # fmt: skip
+    elif kind == "data.report":
+        rep = jread(Path(out["work"]) / "report" / "dataset_report.json", {}) or {}
+        if rep:
+            out["dataset_report"] = str(Path(out["work"]) / "report" / "dataset_report.json")
+            out["episode_count"] = rep.get("episode_count")
+    else:
+        txt = tail_text(jobs_dir() / job["id"] / "log.txt", 20000)
+        m = re.search(r"^chẩn đoán: (.+)$", txt, re.M)
+        if m:
+            out["verdict"] = m.group(1).strip()
+        m = re.search(r"^phát hiện: (\d+); bỏ qua: (\d+)", txt, re.M)
+        if m:
+            out["findings"], out["skipped"] = int(m.group(1)), int(m.group(2))
+        recs = sorted(Path(out["store"]).glob("**/*.jsonl"))
+        if recs:
+            out["record"] = str(recs[0])
+    if kind.startswith("data."):
+        out["ledger"] = str(store_dir() / "sites" / "local" / "runs")
+
+
+def stage_dataset(job: dict[str, Any], rt: dict[str, Any], src: Path, dst: Path) -> int:
+    """Copy a dataset into the console store (``<dst>.part`` then rename); 0 when done."""
+    dst = under(dst, store_dir() / "datasets")
+    tmp = dst.with_name(dst.name + ".part")
+    shutil.rmtree(tmp, ignore_errors=True)
+    t0 = time.time()
+    n = tot = 0
+    for dp, dns, fns in os.walk(src):
+        dns.sort()
+        rel = Path(dp).relative_to(src)
+        (tmp / rel).mkdir(parents=True, exist_ok=True)
+        for fn in sorted(fns):
+            if rt["cancel"].is_set():
+                shutil.rmtree(tmp, ignore_errors=True)
+                return 1
+            fp = Path(dp) / fn
+            shutil.copyfile(fp, tmp / rel / fn)
+            n += 1
+            tot += fp.stat().st_size
+    shutil.rmtree(dst, ignore_errors=True)
+    os.replace(tmp, dst)
+    jlog(job, "[console] chép %d file (%.1f MB) vào store của console trong %.1f s: %s\n"
+         % (n, tot / 1e6, time.time() - t0, _rel_fw(dst)))  # fmt: skip
+    return 0
 
 
 def kill_group(proc: subprocess.Popen[Any]) -> None:
@@ -759,7 +1049,8 @@ def kill_group(proc: subprocess.Popen[Any]) -> None:
 
 def _run_steps(job: dict[str, Any], rt: dict[str, Any], pl: dict[str, Any]) -> str:
     kind = job["kind"]
-    env = dict(os.environ, FW_ROOT=str(_fw()), PYTHONUNBUFFERED="1", NO_COLOR="1", TERM="dumb")
+    fw_root = pl.get("fw_root") or str(_fw())  # data.* / eval.*: the console's own store
+    env = dict(os.environ, FW_ROOT=fw_root, PYTHONUNBUFFERED="1", NO_COLOR="1", TERM="dumb")
     if kind == "ego.human1m":
         ff = ffmpeg_path()
         if ff:
@@ -776,6 +1067,11 @@ def _run_steps(job: dict[str, Any], rt: dict[str, Any], pl: dict[str, Any]) -> s
                 tail = " ".join(argv[-6:])
                 lf.write(("[console] bước %d/%d: %s\n" % (si + 1, len(steps), tail)).encode())
                 lf.flush()
+            if argv[0] == "python:stage":
+                rc = stage_dataset(job, rt, Path(argv[1]), Path(argv[2]))
+                if rc != 0 or rt["cancel"].is_set():
+                    break
+                continue
             proc = subprocess.Popen(
                 argv, cwd=job["cwd"], env=env, stdin=subprocess.DEVNULL, stdout=lf,
                 stderr=subprocess.STDOUT, start_new_session=True,
@@ -816,6 +1112,7 @@ def execute(job: dict[str, Any]) -> str:
                 return "cancelled"
             job["state"] = "running"
             job["started"] = now()
+            job["_t0"] = time.time()
             save(job)
             if pl.get("tunnel"):
                 jlog(job, "[console] mở tunnel ssh tới rtx3060 (Ollama)…\n")
@@ -984,6 +1281,7 @@ def run_chain(job: dict[str, Any], params: dict[str, Any]) -> None:
     rt = RT[job["id"]]
     job["state"] = "running"
     job["started"] = now()
+    job["_t0"] = time.time()
     job["outputs"]["children"] = []
     save(job)
     work: Any = params.get("work")
@@ -1045,10 +1343,77 @@ def run_chain(job: dict[str, Any], params: dict[str, Any]) -> None:
     finish(job, state, 0 if state == "ok" else 1)
 
 
+def data_chain_steps(params: dict[str, Any]) -> list[str]:
+    steps = list(DATA_CHAIN)
+    if params.get("release") is False:
+        steps.remove("data.release")
+    return steps
+
+
+def run_data_chain(job: dict[str, Any], params: dict[str, Any]) -> None:
+    """data.ingest -> data.qa -> data.release -> data.report, each a child job.
+
+    Each step is planned right before it runs, since it reads what the previous one wrote."""
+    rt = RT[job["id"]]
+    job["state"] = "running"
+    job["started"] = now()
+    job["_t0"] = time.time()
+    job["outputs"]["children"] = []
+    save(job)
+    work: str | None = None
+    state = "ok"
+    for kind in data_chain_steps(params):
+        if rt["cancel"].is_set():
+            state = "cancelled"
+            break
+        if kind == "data.ingest":
+            keys = ("dataset", "source_detail", "license", "data_class", "split")
+            cp: dict[str, Any] = {k: params[k] for k in keys if k in params}
+        else:
+            cp = {"work": work}
+        if kind == "data.release" and params.get("name"):
+            cp["name"] = params["name"]
+        cid = new_id()
+        try:
+            pl = plan(kind, cp, cid)
+        except ValueError as e:
+            jlog(job, f"[{now()}] {kind}: không chạy được: {e}\n")
+            state = "failed"
+            break
+        child = make_job(kind, cp, chain_id=job["id"], pl=pl, job_id=cid)
+        child["_plan"] = pl
+        job["outputs"]["children"].append(cid)
+        job["outputs"]["current"] = cid
+        save(job)
+        jlog(job, f"[{now()}] {KIND_LABEL[kind]} -> {cid}\n")
+        rt["child"] = cid
+        res = execute(child)
+        jlog(job, "[{}] {}: {} (rc={})\n".format(now(), KIND_LABEL[kind], res, child.get("rc")))
+        if res != "ok":
+            state = res
+            break
+        if kind == "data.ingest":
+            work = child["outputs"]["work"]
+            job["outputs"].update(work=work, task=child.get("task"))
+        for k in ("release", "page", "decisions", "source_id", "release_id"):
+            if k in child["outputs"]:
+                job["outputs"][k] = child["outputs"][k]
+        save(job)
+    finish(job, state, 0 if state == "ok" else 1)
+
+
 def submit(kind: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
     """Create and start a job (or chain); returns the job dict. ``ValueError`` on bad input."""
     if kind not in KINDS:
         raise ValueError("unknown kind")
+    if kind == "data.pipeline":
+        params = dict(params or {})
+        if "release" in params and not isinstance(params["release"], bool):
+            raise ValueError("release phải là true hoặc false")
+        first = plan("data.ingest", params, "x")  # validates the input before anything starts
+        job = make_job(kind, params, pl={"argv": ["chain"], "task": first.get("task")})
+        threading.Thread(target=run_data_chain, args=(job, params), daemon=True).start()
+        return job
     if kind == "ego.pipeline":
         params = dict(params or {})
         if params.get("work"):
@@ -1111,6 +1476,18 @@ def read_log(jid: str, offset: int) -> dict[str, Any]:
 
 
 # ------------------------------------------------------------------ artifacts for agent QA
+def _train_dirs() -> list[tuple[str, str]]:
+    """Return ``(task_id, train_dir)`` pairs from the task manifest, or tray fallback."""
+    try:
+        from flywheel.console.index import tasks as task_idx
+
+        m = task_idx.load(_p())
+        dirs = list(dict.fromkeys((r.task, r.train_dir) for r in m.rounds if r.train_dir))
+    except Exception:
+        dirs = []
+    return dirs or [("tray", "tray/pair60k")]
+
+
 def list_artifacts() -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     fwr = _fw()
@@ -1121,9 +1498,11 @@ def list_artifacts() -> list[dict[str, Any]]:
                 d.parent.name, s.get("source_detail"), len(s.get("episodes") or []),
             )  # fmt: skip
             out.append({"label": label, "path": str(d), "kind": "dataset_report"})
-    for d in sorted(fwr.glob("tray/pair60k/*/*")):
-        if d.is_dir() and (d / "metrics.jsonl").is_file():
-            out.append({"label": f"Log train · {d.name}", "path": str(d), "kind": "train_job"})
+    for _task, tdir in _train_dirs():
+        for d in sorted(fwr.glob(f"{tdir}/*/*")):
+            if d.is_dir() and (d / "metrics.jsonl").is_file():
+                out.append({"label": f"Log train · {d.name}", "path": str(d),
+                            "kind": "train_job"})  # fmt: skip
     for f in sorted(fwr.glob("da34-dryrun/**/report/*.json"))[:20]:
         out.append({"label": f"Báo cáo · {f.relative_to(fwr)}", "path": str(f),
                     "kind": "report_json"})  # fmt: skip
@@ -1189,22 +1568,33 @@ def agent_results(out_dir: str) -> dict[str, Any]:
 
 
 # ------------------------------------------------------------------ status
+def max_steps(job_dir: Path) -> int | None:
+    """``--train.max_training_steps`` from the run's launch.json argv; None when absent."""
+    launch = jread(job_dir / "launch.json", {}) or {}
+    for a in launch.get("argv") or [] if isinstance(launch, dict) else []:
+        m = re.match(r"^--train\.max_training_steps=(\d+)$", str(a))
+        if m:
+            return int(m.group(1))
+    return None
+
+
 def train_runs() -> list[dict[str, Any]]:
     runs: list[dict[str, Any]] = []
-    for f in sorted(_fw().glob("tray/pair60k/*/*/metrics.jsonl")):
-        if ".attempt" in f.parent.parent.name:  # an abandoned try, e.g. C70_R1.attempt1
-            continue
-        try:
-            ln = [x for x in tail_text(f, 6000).splitlines() if x.strip().startswith("{")]
-            last = json.loads(ln[-1])
-        except Exception:
-            continue
-        age = time.time() - f.stat().st_mtime
-        runs.append(
-            {"name": f.parent.name, "branch": f.parent.parent.name, "step": last.get("step"),
-             "max": 60000, "loss": last.get("loss"), "running": age < 1200,
-             "age_min": round(age / 60, 1)}
-        )  # fmt: skip
+    for task_id, tdir in _train_dirs():
+        for f in sorted(_fw().glob(f"{tdir}/*/*/metrics.jsonl")):
+            if ".attempt" in f.parent.parent.name:  # an abandoned try, e.g. <run>.attempt1
+                continue
+            try:
+                ln = [x for x in tail_text(f, 6000).splitlines() if x.strip().startswith("{")]
+                last = json.loads(ln[-1])
+            except Exception:
+                continue
+            age = time.time() - f.stat().st_mtime
+            runs.append(
+                {"name": f.parent.name, "branch": f.parent.parent.name, "task": task_id,
+                 "step": last.get("step"), "max": max_steps(f.parent), "loss": last.get("loss"),
+                 "running": age < 1200, "age_min": round(age / 60, 1)}
+            )  # fmt: skip
     return runs
 
 
@@ -1251,6 +1641,17 @@ def _new_stage(sid: str, label: str, link: str, tm: str) -> dict[str, Any]:
             "how": None, "jobs": [], "link": link, "updated": tm}  # fmt: skip
 
 
+def _withheld_runs() -> set[str]:
+    """Run ids listed under ``withhold_eval`` of any round in the indexed manifest."""
+    try:
+        doc = json.loads((_p().index / "tasks.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return set()
+    rounds = doc.get("rounds") if isinstance(doc, dict) else None
+    rs = [r for r in rounds or [] if isinstance(r, dict)]
+    return {str(x) for r in rs for x in r.get("withhold_eval") or []}
+
+
 def _eval_loop_text() -> tuple[str, str]:
     """Eval and loop lines from the indexed pair60k reads; the best run's fraction comes first."""
     try:
@@ -1260,7 +1661,9 @@ def _eval_loop_text() -> tuple[str, str]:
     if not isinstance(doc, dict):
         return "", ""
     pair = doc.get("pair") or {}
-    runs = {r.get("run"): r for r in pair.get("runs") or [] if isinstance(r, dict)}
+    held = _withheld_runs()  # a run whose test result is not presented stays out of the status
+    runs = {r.get("run"): r for r in pair.get("runs") or []
+            if isinstance(r, dict) and r.get("run") not in held}  # fmt: skip
     best = runs.get(pair.get("best"))
     if not best:
         return "", ""
@@ -1268,6 +1671,9 @@ def _eval_loop_text() -> tuple[str, str]:
     ev = "Tốt nhất {} {}".format(best["run"], frac(best.get("successes"), best.get("n")))
     rnd = next((r for name, r in runs.items() if re.search(r"_R\d+$", name or "")), None)
     if not rnd:
+        sel = ((doc.get("round") or {}).get("chain") or {}).get("selected")
+        if held and sel:  # the round ran; its retest is not presented, which is not "waiting"
+            return ev, f"Đã chọn {sel} tập nhắm lỗi · kết quả thi lại không trình bày"
         return ev, ""
     ev += " · vòng {} {}".format(rnd["run"], frac(rnd.get("successes"), rnd.get("n")))
     outs = [
@@ -1313,7 +1719,7 @@ def status() -> dict[str, Any]:
                 jobs=[x["id"] for x in running],
                 updated=j.get("started") or j["created"],
             )
-            cur = RT.get(j["id"], {}).get("child") if j["kind"] == "ego.pipeline" else None
+            cur = RT.get(j["id"], {}).get("child") if j["kind"] in CHAIN_KINDS else None
             if cur and cur in JOBREG:
                 s["now"] = "Pipeline: {}".format(KIND_LABEL.get(JOBREG[cur]["kind"], ""))
                 if JOBREG[cur].get("stage") != sid:
@@ -1341,12 +1747,13 @@ def status() -> dict[str, Any]:
     with _lock:
         all_jobs = list(JOBREG.values())
     for j in all_jobs:
-        if j["kind"] == "ego.pipeline" and j["state"] == "running":
+        if j["kind"] in CHAIN_KINDS and j["state"] == "running":
             s = stages["process"]
             s["state"] = "running"
             cur = RT.get(j["id"], {}).get("child")
             kl = KIND_LABEL.get(JOBREG[cur]["kind"], "") if cur in JOBREG else "đang khởi động"
-            s["now"] = f"Pipeline egocentric: {kl}"
+            name = "egocentric" if j["kind"] == "ego.pipeline" else "robot"
+            s["now"] = f"Pipeline {name}: {kl}"
             s["jobs"] = [j["id"]] + ([cur] if cur else [])
     runs = train_runs()
     s = stages["train"]
@@ -1377,7 +1784,7 @@ def status() -> dict[str, Any]:
     jobs = list_jobs(10)
     mi = models_info()
     # an ego.pipeline parent holds no slot; only its child jobs do
-    n_run = sum(1 for j in all_jobs if j["state"] == "running" and j["kind"] != "ego.pipeline")
+    n_run = sum(1 for j in all_jobs if j["state"] == "running" and j["kind"] not in CHAIN_KINDS)
     keys = ("id", "kind", "stage", "state", "created", "started", "ended", "rc", "chain_id")
     return {
         "time": tm,
@@ -1478,10 +1885,12 @@ def ensure_device(d: Path, video_path: Path) -> None:
                 "height": hh,
                 "intrinsic": [[w / 2, 0, w / 2], [0, w / 2, hh / 2], [0, 0, 1]],
                 "tasks": {
-                    "two_table": "carry the tray with both hands from table A to table B "
-                    "and place it on the target zone"
+                    "tray": "carry the tray with both hands from table A to table B "
+                    "and place it on the target zone",
+                    "two_table": "pick a box on one table, walk to the other table "
+                    "and place it in the basket",
                 },
-                "objects": ["tray"],
+                "objects": ["tray", "box"],
             },
             indent=1,
         )  # fmt: skip

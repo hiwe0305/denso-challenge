@@ -1,38 +1,39 @@
-/* shell: sidebar, top bar, right panel, router, command palette, shortcut sheet, Home page.
-   Pages register with UI.route(pattern, fn). Unregistered routes fall back to the v4 page functions (LEGACY block at the bottom). */
+/* shell: sidebar, top bar (task and round selectors), right panel, router, command palette, shortcut sheet.
+   Pages register with UI.route(pattern, fn). Unregistered routes fall back to the v4 page functions (LEGACY block at the bottom).
+   Information architecture (brief 2 · T2): Tổng quan (#/home) · Quy trình (six stages and the cost ledger, one page template
+   with tabs, PROC in pages_proc.js) · Báo cáo vòng (#/report, #/follow, #/base, #/design) · Vận hành (jobs, machines, import).
+   Lock mode is read-only, not another site: every entry stays, write controls are switched off with a padlock and a tooltip. */
 "use strict";
-/* sidebar = the six steps of the data wheel and the cost ledger (flywheel v0.3 design 4), then more, then operations
-   (hidden in lock mode, pages stay reachable by URL); a function so labels follow the language */
+/* sidebar; a function so labels follow the language and the task (counts come from the index or /api/status, never typed) */
 const SIDE = () => [
-  { g: null, items: [{ id: "home", t: t("nav.start"), ic: "◎", href: "#/home" }] },
-  { g: t("nav.stations"), items: [
-    ...EXPLAIN.STEPS.map(n => ({ id: "s" + n, t: EXPLAIN.name(n), ic: String(n), step: n, href: EXPLAIN.href(n),
-      ct: n === 1 ? () => ({ n: CAT && CAT.totals ? UI.fmt(CAT.totals.all.episodes, "int") : null })
-        : n === 2 ? () => ({ n: ST.agent && ST.agent.findings ? ST.agent.findings : null, warn: 1, tip: t("side.findings") })
-          : n === 3 ? () => ({ n: trainRuns().filter(r => r.running).length || null, run: 1 }) : null })),
-    { id: "cost", t: EXPLAIN.name(0), ic: "$", step: 0, href: EXPLAIN.href(0) }] },
-  { g: t("nav.more"), items: [
-    { id: "design", t: t("sb.de.nav"), ic: "◫", href: "#/design" }, { id: "base", t: t("sb.base.nav"), ic: "▣", href: "#/base" },
-    { id: "follow", t: t("fol.title"), ic: "▶", href: "#/follow" },
-    { id: "sim", t: t("sim.title"), ic: "▤", href: "#/sim" }] },
+  { g: null, items: [{ id: "tasks", t: t("nav.tasks"), ic: "▦", href: "#/tasks" }] },
+  { g: TASK.name() || null, items: [{ id: "home", t: t("nav.overview"), ic: "◎", href: "#/home" }] },
+  { g: t("nav.process"), items: [
+    ...EXPLAIN.STEPS.map(n => ({ id: "s" + n, t: PROC.name(n), ic: String(n), step: n, href: EXPLAIN.href(n),
+      ct: n === 1 ? () => ({ n: EXPLAIN.read.tot("all") != null ? UI.fmt(EXPLAIN.read.tot("all"), "int") : null, tip: t("side.episodes") })
+        : n === 3 ? () => ({ n: trainRuns().filter(r => r.running).length || null, run: 1, tip: t("pr.s.run") }) : null })),
+    { id: "cost", t: PROC.name(0), ic: "$", step: 0, href: EXPLAIN.href(0) },
+    { id: "egoflow", t: t("nav.egoflow"), ic: "✋", href: "#/egoflow" }] },
+  { g: null, items: [{ id: "report", t: t("nav.report"), ic: "◷", href: "#/report" }] },
   { g: t("nav.ops"), ops: 1, items: [
-    { id: "jobs", t: t("nav.jobs"), ic: "☰", href: "#/jobs", ct: () => ({ n: ST.jobs.filter(j => j.state === "running" || j.state === "queued").length, run: 1 }) },
-    { id: "machines", t: t("nav.machines"), ic: "▦", href: "#/jobs?view=machines", ct: () => ({ s: ST.machines && ST.machines.colab && ST.machines.colab.balance != null ? UI.fmt(ST.machines.colab.balance, "int") : null }) },
-    { id: "export", t: t("nav.export"), ic: "⇡", href: "#/jobs?panel=export" },
+    { id: "jobs", t: t("nav.jobs"), ic: "☰", href: "#/jobs", ct: () => ({ n: ST.jobs.filter(j => j.state === "running" || j.state === "queued").length || null, run: 1 }) },
+    { id: "machines", t: t("nav.machines"), ic: "▦", href: "#/jobs?view=machines", ct: () => ({ s: ST.machines && ST.machines.colab && ST.machines.colab.balance != null ? UI.fmt(ST.machines.colab.balance, "int") : null, tip: "Colab CU" }) },
     { id: "import", t: t("nav.import"), ic: "⇣", href: "#/jobs?panel=import" }] },
 ];
-const STRIP = [["collect", "col", "#/data"], ["process", "proc", "#/jobs"], ["release", "rel", "#/jobs?panel=export"], ["train", "train", "#/runs"], ["eval", "eval", "#/eval"], ["loop", "loop", "#/loop"]];
 const REDIRECT = { overview: "home", process: "jobs?view=pipeline", training: "runs", agent: "qa", "data/nhap": "jobs?panel=import", "data/xuat": "jobs?panel=export" };
-let CAT = null, STORY = null;
+/* STORY is story.json as the current task sees it (TASK.scopeStory): another task's or round's numbers are left out */
+let CAT = null, STORY = null, STORY_RAW = null;
 const CATP = () => CAT ? Promise.resolve(CAT) : J("data/catalog.json").then(c => (CAT = c));
-const STORYP = () => STORY ? Promise.resolve(STORY) : J("data/story.json").then(s => (STORY = s));
+const STORYP = () => (STORY_RAW ? Promise.resolve(STORY_RAW) : J("data/story.json").then(s => (STORY_RAW = s))).then(s => (STORY = TASK.scopeStory(s)));
+/* pages of the round report (sub-navigation in PROC.reportHead); a task without a round gets an empty state there */
+const REPORT = /^(report|follow|base|design)$/;
 const rowById = id => CAT.rows.find(r => r.id === id);
 const nodeById = id => rowById(id) || (CAT.runs || []).find(r => r.id === id);
 const jget = (u) => fetch(u).then(r => { if (!r.ok) throw new Error(u + " " + r.status); return r.json(); });
 
 /* ---------------- router ---------------- */
 function parseHash() {
-  const raw = location.hash.replace(/^#\/?/, "") || "home";
+  const raw = location.hash.replace(/^#\/?/, "") || "tasks";
   const [p, q] = raw.split("?");
   const qs = {}; (q || "").split("&").filter(Boolean).forEach(kv => { const [k, v] = kv.split("="); qs[decodeURIComponent(k)] = decodeURIComponent(v || ""); });
   return { parts: p.split("/").filter(Boolean).map(decodeURIComponent), qs };
@@ -40,9 +41,9 @@ function parseHash() {
 function go(path) { location.hash = "#/" + path; }
 let RT = 0;
 function sideActive() {
-  const { parts, qs } = parseHash(), p = parts[0] || "home";
-  if (p === "jobs" && (qs.view === "machines" || qs.panel === "export" || qs.panel === "import")) return qs.view === "machines" ? "machines" : qs.panel;
-  if (p === "sim" || p === "follow") return p;
+  const { parts, qs } = parseHash(), p = parts[0] || "tasks";
+  if (p === "jobs") return qs.view === "machines" ? "machines" : qs.panel === "import" ? "import" : "jobs";
+  if (REPORT.test(p)) return "report";
   const n = EXPLAIN.stationOf(parts.join("/"), qs);
   if (n === 0) return "cost";
   if (n != null) return "s" + n;
@@ -54,36 +55,52 @@ function drawSide() {
     const box = h("div", { class: "sg" + (g.ops ? " ops" : "") }); el.appendChild(box);
     if (g.g) box.appendChild(h("div", { class: "gh", text: g.g }));
     g.items.forEach(it => { const c = it.ct ? it.ct() : {}, txt = c.n != null ? String(c.n) : c.s != null ? c.s : "";
-      const ic = it.step != null ? "ic sn" + (it.step === 0 ? " cost" : it.step === EXPLAIN.KEEP ? " keep" : "") : "ic";
+      const ic = it.step != null ? "ic sn" + (it.step === 0 ? " cost" : "") : "ic";
       box.appendChild(h("a", { href: it.href, class: it.id === act ? "on" : "", title: it.t }, [h("span", { class: ic, text: it.ic }), h("span", { class: "nm", text: it.t }), txt ? h("span", { class: "ct" + (c.run && c.n ? " run" : c.warn && c.n ? " warn" : ""), title: c.tip || null, text: txt }) : null])); });
   });
 }
 function chatRoute() { const { parts } = parseHash(); return parts.join("/") || "home"; }
+const qsOf = q => { const o = {}; q.replace(/^\?/, "").split("&").filter(Boolean).forEach(kv => { const [k, v] = kv.split("="); o[decodeURIComponent(k)] = decodeURIComponent(v || ""); }); return o; };
 async function route() {
   const tok = ++RT;
   UI.keys.clear("page"); disposeCharts(); if (window.opsStop) opsStop(); if (window.__raf) cancelAnimationFrame(window.__raf);
   UI.panel.reset();
-  let raw = location.hash.replace(/^#\/?/, "") || "home";
-  const qi = raw.indexOf("?"), path = qi < 0 ? raw : raw.slice(0, qi), q = qi < 0 ? "" : raw.slice(qi);
+  let raw = location.hash.replace(/^#\/?/, "") || "tasks";
+  const qi = raw.indexOf("?"), path = qi < 0 ? raw : raw.slice(0, qi), q = qi < 0 ? "" : raw.slice(qi), q0 = qsOf(q);
+  /* the wheel moved from #/home to the round report; the ledger left the loop page */
+  const moved = path === "home" && (q0.s != null || q0.tour != null) ? "report" : path === "loop" && q0.tab === "cost" ? "cost" : null;
+  if (moved) { history.replaceState(null, "", "#/" + moved + (moved === "cost" ? "" : q)); return route(); }
   const tgt = REDIRECT[path];
   if (tgt) { const [tp, tq] = tgt.split("?"), mq = [tq, q.slice(1)].filter(Boolean).join("&"); history.replaceState(null, "", "#/" + tp + (mq ? "?" + mq : "")); return route(); }
-  const parts = path.split("/").filter(Boolean).map(decodeURIComponent);
+  const parts = path.split("/").filter(Boolean).map(decodeURIComponent), p0 = parts[0] || "home";
   const main = $("#main"); main.innerHTML = "";
   drawSide();
   const view = h("div", { class: "view" }, [h("div", { class: "skel" }), h("div", { class: "skel" }), h("div", { class: "skel" })]);
   main.appendChild(view); main.scrollTop = 0;
   if (window.CHAT) CHAT.touchContext();
   try {
+    if (!TASK.loaded) { await TASK.load(); taskSelect(); drawSide(); }   /* the side labels carry task placeholders */
     await Promise.all([CATP(), STORYP(), typeof SIMP === "function" ? SIMP() : null, typeof EGOP === "function" && /^(data|sim)/.test(path) ? EGOP() : null]);
     if (tok !== RT) return;
-    const body = h("div"); const m = UI.matchRoute(path || "home"); const qs = UI.qs();
-    if (m) await m.fn(body, m.params, qs); else await legacyRoute(body, parts, qs);
+    const m = UI.matchRoute(path || "home"), qs = UI.qs(), stn = EXPLAIN.stationOf(path, qs), out = [];
+    const page = async () => { const body = h("div"); if (m) await m.fn(body, m.params, qs); else await legacyRoute(body, parts, qs); return body; };
+    let cls = "proc";
+    if (p0 === "home") { const body = h("div"); await PROC.home(body); out.push(body); }
+    else if (REPORT.test(p0)) {
+      cls = "story"; out.push(PROC.reportHead(p0, qs));
+      if (!TASK.round()) out.push(PROC.noRound());
+      else { const strip = resultStrip(); if (strip) out.push(strip); out.push(await page()); }
+    } else if (stn != null && parts.length < 2 && p0 !== "sim") {
+      /* a process stage: head, tabs (?tab=), then the tab */
+      const tab = PROC.tabOf(qs);
+      out.push(PROC.head(stn), PROC.tabs(stn, tab));
+      if (tab === "result") out.push(...PROC.result(stn, TASK.hasData(stn) ? await page() : TASK.empty(stn)));
+      else out.push(...await PROC.tab(stn, tab, qs));
+    } else if (stn != null) { out.push(PROC.crumb(stn), await page()); }   /* one dataset, one episode, the sim library */
+    else out.push(await page());
     if (tok !== RT) return;
-    view.innerHTML = "";
-    const stn = EXPLAIN.stationOf(path, qs);
-    view.classList.toggle("story", stn != null || /^(home|follow|sim)$/.test(parts[0] || "home"));
-    if (stn != null) EXPLAIN.page(stn, body, parts.length > 1 || parts[0] === "sim").forEach(x => view.appendChild(x));
-    else view.appendChild(body);
+    view.innerHTML = ""; view.classList.add(cls);
+    out.filter(Boolean).forEach(x => view.appendChild(x));
   } catch (e) {
     console.error(e); if (tok !== RT) return; view.innerHTML = "";
     view.appendChild(h("div", { class: "errline" }, ["✕ " + String(e.message || e) + " ", h("a", { href: "#/home", text: "[home]" })]));
@@ -92,23 +109,34 @@ async function route() {
 }
 window.addEventListener("hashchange", () => { route(); });
 
+/* ---------------- task and round selectors: kept as a stored preference and ?task= / ?round= ---------------- */
+const LBL = o => o == null ? "" : typeof o === "string" ? o : (o[UI.lang] || o.vi || "");
+function taskSelect() {
+  const sel = $("#task"); if (!sel) return;
+  sel.replaceChildren(...TASK.list().map(x => h("option", { value: x.id, selected: x.id === TASK.id, text: LBL(x.name) || x.id })));
+  sel.title = t("task.sel");
+  const rs = $("#round"), ids = (TASK.cur() || {}).rounds || []; if (!rs) return;
+  rs.hidden = !ids.length; rs.title = t("task.round");
+  rs.replaceChildren(...ids.map(id => { const r = (TASK.doc.rounds || []).find(x => x.id === id) || { id }; return h("option", { value: id, selected: id === TASK.roundId, text: LBL(r.title) || id }); }));
+}
+function retask() { taskSelect(); PAL.built = false; drawSide(); drawMeta(); route(); }
+
 /* ---------------- header + live state ---------------- */
 const ST = { stages: null, jobs: [], models: null, machines: null, agent: null };
-const trainRuns = () => { const t = (ST.stages || []).find(s => s.id === "train"); return t && t.runs ? t.runs : []; };
-/* best run of the pair60k eval (story.pair), shown with its name: it is not the newest run */
-const evalBest = () => { const b = typeof EXPLAIN !== "undefined" ? EXPLAIN.read.best() : null; return b && b.n ? { v: b.successes / b.n, run: b.run, frac: b.successes + "/" + b.n } : null; };
-const waitingN = () => (ST.stages || []).filter(s => s.state === "waiting").length + (ST.agent ? ST.agent.findings || 0 : 0);
+const trainRuns = () => { const s = (ST.stages || []).find(x => x.id === "train" && (!x.task || x.task === TASK.id)); return s && s.runs ? s.runs : []; };
 function drawMeta() {
   const el = $("#meta"); el.innerHTML = "";
   const run = ST.jobs.filter(j => j.state === "running" || j.state === "queued").length;
   const m = ST.machines || {}, rtx = m.rtx3060, nm = ST.models ? ST.models.nemotron || (ST.models.agent_ready ? "warm" : "down") : "down";
-  const dot = (s) => h("span", { class: "c-" + UI.stateClass(s), text: s === "down" ? "✕" : s === "cold" ? "○" : "●" });
-  const pill = (kids, fn, title) => h(fn ? "button" : "span", { class: "pill", title, onclick: fn }, kids);
-  [pill(["jobs ", h("span", { class: run ? "c-run" : "", text: String(run) })], () => go("jobs"), "running + queued"), pill(["3060 ", dot(rtx && rtx.tunnel === "up" ? "up" : "down")], null, "rtx3060 tunnel"),
-    pill(["nemotron ", dot(nm)], () => { if (window.CHAT) { CHAT.open(); CHAT.prewarm(); } }, nm), pill([t("hdr.waiting") + " ", h("span", { class: waitingN() ? "c-warn" : "", text: String(waitingN()) })], () => go("qa")),
+  /* lock mode: the server does not connect out, so a link it never tried is neutral, not a red cross */
+  const dot = (s, live) => UI.locked && !live ? h("span", { class: "dim", text: "–" }) : h("span", { class: "c-" + UI.stateClass(s), text: s === "down" ? "✕" : s === "cold" ? "○" : "●" });
+  const pill = (kids, fn, title) => h(fn ? "button" : "span", { class: "pill", title: UI.locked && !fn ? t("lock.off") : title, onclick: fn }, kids);
+  [pill([t("nav.jobs") + " ", h("span", { class: run ? "c-run" : "", text: String(run) })], () => go("jobs"), t("pr.home.running")),
+    pill(["3060 ", dot(rtx && rtx.tunnel === "up" ? "up" : "down")], null, "rtx3060 tunnel"),
+    pill([t("hdr.chat") + " ", dot(nm, !UI.chatOff)], () => { if (window.CHAT) CHAT.toggle(); }, UI.chatOff ? t("chat.locked") : nm),
     UI.locked ? h("span", { class: "lockpill", title: t("lock.refused"), text: t("lock.badge") }) : null,
-    h("button", { class: "langbtn", title: "VI / EN", onclick: () => { UI.setLang(UI.lang === "vi" ? "en" : "vi"); PAL.built = false; drawSide(); drawMeta(); route(); } }, [h("span", { class: UI.lang === "vi" ? "on" : "", text: "VI" }), " | ", h("span", { class: UI.lang === "en" ? "on" : "", text: "EN" })]),
-    h("button", { class: "explainbtn" + (document.body.classList.contains("explain-off") ? "" : " on"), title: t("hdr.explain"), onclick: () => { EXPLAIN.toggle(); drawMeta(); }, text: "ⓘ " + t("hdr.explain") }), h("button", { class: "themebtn", title: "theme", onclick: () => { setTheme(curTheme() === "dark" ? "light" : "dark"); route(); }, text: "◐" }),
+    h("button", { class: "langbtn", title: "VI / EN", onclick: () => { UI.setLang(UI.lang === "vi" ? "en" : "vi"); retask(); if (window.CHAT) CHAT.locked(UI.chatOff); } }, [h("span", { class: UI.lang === "vi" ? "on" : "", text: "VI" }), " | ", h("span", { class: UI.lang === "en" ? "on" : "", text: "EN" })]),
+    h("button", { class: "themebtn", title: "theme", onclick: () => { setTheme(curTheme() === "dark" ? "light" : "dark"); route(); }, text: "◐" }),
     h("button", { class: "keysbtn", title: "shortcuts", onclick: () => openKeys(), text: "?" })].forEach(x => x && el.appendChild(x));
 }
 async function poll() {
@@ -116,10 +144,14 @@ async function poll() {
     const [st, jb, md, ag] = await Promise.all([jget("/api/status"), jget("/api/jobs?limit=100").catch(() => []), jget("/api/models").catch(() => null), jget("/api/agent_stats").catch(() => null)]);
     ST.stages = st.stages; ST.machines = st.machines; ST.jobs = jb; ST.models = md; ST.agent = ag; ST.status = st; ST.at = Date.now();
     UI.locked = !!st.locked; document.documentElement.classList.toggle("locked", UI.locked);
-    if (window.CHAT) CHAT.setModelState(md);
+    UI.chatOff = UI.locked && !st.chat_on;   /* a locked server started with --chat keeps the chat */
+    if (window.CHAT) { CHAT.setModelState(md); CHAT.locked(UI.chatOff); }
   } catch (e) { ST.stages = ST.stages || null; }
   drawSide(); drawMeta();
 }
+/* lock mode: a write control stays in view, switched off, with a padlock (CSS) and a tooltip saying why */
+document.addEventListener("click", e => { const b = UI.locked && e.target.closest && e.target.closest(".wbtn"); if (b) { e.preventDefault(); e.stopPropagation(); } }, true);
+document.addEventListener("mouseover", e => { const b = UI.locked && e.target.closest && e.target.closest(".wbtn"); if (b && b.title !== t("lock.tip")) { b.title = t("lock.tip"); b.setAttribute("aria-disabled", "true"); } }, true);
 
 /* ---------------- shortcut sheet and palette ---------------- */
 const KEYS = [["g h/d/j/r/e/l/q", "go to page"], ["j / k", "row down / up"], ["Enter", "open row"], ["x", "select row"], ["c", "compare"], ["a", "ask chat about row"], ["[ ]", "prev / next"],
@@ -132,9 +164,9 @@ async function buildPalette() {
   SIDE().forEach(g => g.items.forEach(x => add("go", x.t, x.href, () => { location.hash = x.href; })));
   await CATP().catch(() => {}); await STORYP().catch(() => {});
   if (CAT) CAT.rows.filter(r => !UI.demo || r.data_class === "public").forEach(r => add("data", r.id, r.title || r.name, () => go("data/" + r.id)));
-  const runs = new Set(); (STORY ? STORY.runs : []).forEach(r => runs.add(r.branch)); runs.forEach(b => add("run", b, "#/runs?sel=" + b, () => go("runs?sel=" + b)));
+  const runs = new Set(); ((STORY && STORY.runs) || []).forEach(r => runs.add(r.branch)); runs.forEach(b => add("run", b, "#/runs?sel=" + b, () => go("runs?sel=" + b)));
   try { (await jget("/api/jobs?limit=20")).forEach(j => add("job", j.id, j.kind + " " + j.state, () => go("jobs?job=" + j.id))); } catch (e) {}
-  try { (await jget("/api/tools?route=" + encodeURIComponent(chatRoute()))).forEach(t => add("tool", "/" + String(t.slash || t.name).replace(/^\//, ""), t.description ? t.description.slice(0, 60) : "", () => { if (window.CHAT) CHAT.open("/" + String(t.slash || t.name).replace(/^\//, "") + " "); })); } catch (e) {}
+  if (!UI.locked) try { (await jget("/api/tools?route=" + encodeURIComponent(chatRoute()))).forEach(t => add("tool", "/" + String(t.slash || t.name).replace(/^\//, ""), t.description ? t.description.slice(0, 60) : "", () => { if (window.CHAT) CHAT.open("/" + String(t.slash || t.name).replace(/^\//, "") + " "); })); } catch (e) {}
   PAL.items = it;
 }
 function palRender() {
@@ -154,103 +186,6 @@ function initPal() {
   $("#keys").addEventListener("mousedown", e => { if (e.target.id === "keys") closeKeys(); });
   $("#srch").addEventListener("click", openPal);
 }
-
-/* ---------------- demo ---------------- */
-function toggleDemo() { try { sessionStorage.setItem("v5demo", UI.demo ? "" : "1"); } catch (e) {} const u = new URL(location.href); u.searchParams.delete("demo"); if (!UI.demo) u.searchParams.set("demo", "1"); location.href = u.toString(); }
-
-/* ---------------- Home ---------------- */
-const dsec = (t, n, right) => h("div", { class: "u-sec", style: { justifyContent: "space-between" } }, [h("span", null, [t, n != null ? h("span", { class: "n", text: " " + n }) : null]), right || null]);
-const grow = (g, name, tx, act) => h("div", { class: "row" }, [g, h("span", { class: "nm", text: name }), h("span", { class: "tx", text: tx || "" }), act || null]);
-const jdur = j => j.started ? Math.max(0, ((j.ended ? new Date(j.ended) : new Date()) - new Date(j.started)) / 1000) : null;
-const k0 = n => n == null ? "—" : n >= 1000 ? UI.fmt(n / 1000, "float1") + "k" : String(n);
-const down = (a, n) => { if (a.length <= n) return a; const o = []; for (let i = 0; i < n; i++) o.push(a[Math.floor(i * (a.length - 1) / (n - 1))]); return o; };
-function timelineStrip(jobs) {
-  const now = Date.now(), T0 = now - 24 * 3600e3, W = 900, L = 96, rh = 13;
-  const ok = jobs.filter(j => j.created && (j.ended ? new Date(j.ended) : now) >= T0);
-  const kinds = {}; ok.forEach(j => kinds[j.kind] = (kinds[j.kind] || 0) + 1);
-  const ks = Object.keys(kinds).sort((a, b) => kinds[b] - kinds[a]).slice(0, 8), ns = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(ns, "svg"); svg.setAttribute("viewBox", `0 0 ${W} ${Math.max(1, ks.length) * rh + 16}`); svg.setAttribute("class", "u-tl");
-  const e = (t, a, txt) => { const x = document.createElementNS(ns, t); for (const k in a) x.setAttribute(k, a[k]); if (txt != null) x.textContent = txt; svg.appendChild(x); return x; };
-  const X = t => L + (Math.max(T0, t) - T0) / (now - T0) * (W - L - 4);
-  for (let hh = 0; hh <= 24; hh += 6) { const x = L + hh / 24 * (W - L - 4); e("line", { x1: x, x2: x, y1: 0, y2: ks.length * rh, class: "gl" }); e("text", { x: x, y: ks.length * rh + 11, "text-anchor": hh === 0 ? "start" : hh === 24 ? "end" : "middle" }, hh === 24 ? "now" : "-" + (24 - hh) + "h"); }
-  ks.forEach((k, i) => { e("text", { x: 0, y: i * rh + 10 }, k);
-    ok.filter(j => j.kind === k).forEach(j => { const a = new Date(j.started || j.created).getTime(), b = j.ended ? new Date(j.ended).getTime() : now; const x0 = X(a), w = Math.max(2, X(b) - x0); const r = e("rect", { x: x0, y: i * rh + 2, width: w, height: rh - 4, rx: 1, class: "bk " + j.state }); const t = document.createElementNS(ns, "title"); t.textContent = j.id + " " + j.state; r.appendChild(t); r.style.cursor = "pointer"; r.addEventListener("click", () => go("jobs?job=" + j.id)); }); });
-  return svg;
-}
-async function pageHome(main) {
-  const [st, jobs, works, ag] = await Promise.all([jget("/api/status").catch(() => null), jget("/api/jobs?limit=100").catch(() => []), jget("/api/works").catch(() => []), jget("/api/agent_stats").catch(() => null)]);
-  if (st) { ST.stages = st.stages; ST.machines = st.machines; } ST.agent = ag || ST.agent;
-  const stages = st ? st.stages : [], stage = id => stages.find(s => s.id === id) || {}, sv = id => stage(id).state || "idle";
-  const S = STORY, h1 = S.h1m || {}, cur = CAT.rows.filter(r => r.status === "current"), byG = g => cur.filter(r => r.group === g);
-  main.appendChild(UI.page({ title: t("home.title"), stat: [{ label: "jobs running", value: jobs.filter(j => j.state === "running").length, unit: "run" }, { label: "datasets", value: CAT.rows.length, unit: "sets" }] }));
-  UI.panel.set({ method: [{ step: "Status", cmd: "curl -s 127.0.0.1:4178/api/status" }, { step: "Jobs", cmd: "curl -s 127.0.0.1:4178/api/jobs?limit=100" }], sources: [{ label: "status", path: "/api/status" }, { label: "story", path: "v5/data/story.json" }, { label: "catalog", path: "v5/data/catalog.json" }] });
-
-  /* tiles */
-  /* an abandoned try (C70_R1.attempt1) stopped early: it is not a run to average */
-  const live = trainRuns().filter(r => !/\.attempt/.test(r.branch)), sr = (S.runs || []).filter(r => !/\.attempt/.test(r.branch)), es = evalBest();
-  const L = S.ledger || [], est = L.reduce((a, r) => a + (r[1] || 0), 0), meas = L.reduce((a, r) => a + (r[2] || 0), 0), cu = (ST.machines || {}).colab, bal = S.colab_balance || [];
-  let cum = 0; const cumS = L.filter(r => r[2]).map(r => (cum += r[2]));
-  const avgStep = live.length ? live.reduce((a, r) => a + r.step, 0) / live.length : (sr.length ? sr.reduce((a, r) => a + r.step, 0) / sr.length : null);
-  main.appendChild(UI.Tiles([
-    { label: "Ego clips QA'd", value: h1.clips, state: (h1.qa && h1.qa.flag) ? "warn" : "ok", spark: (S.sources || []).map(x => x.episodes), href: "#/qa" },
-    { label: "Synthetic S1", value: byG("s1").filter(r => r.unique).reduce((a, r) => a + (r.episodes || 0), 0), unit: "ep", state: "ok", href: "#/data" },
-    { label: t("home.evalBest"), value: es == null ? null : UI.fmt(es.v, "pct"), unit: es ? es.run : null, state: "warn", href: "#/eval" },
-    { label: "Training", value: avgStep == null ? null : k0(Math.round(avgStep)), unit: "/" + k0(60000), state: live.some(r => r.running) ? "run" : "idle", spark: sr[0] && sr[0].loss ? down(sr[0].loss.map(p => p[1]), 40) : null, href: "#/runs" },
-    { label: "CU left", value: cu && cu.balance != null ? Math.round(cu.balance) : null, state: "ok", spark: down(bal.map(p => p[1]), 40), href: "#/loop?tab=cost" },
-    { label: "Measured cost", value: "$" + UI.fmt(meas, "float1"), state: "idle", spark: cumS, unit: "est $" + UI.fmt(est, "int"), href: "#/loop?tab=cost" }]));
-
-  /* flywheel + attention */
-  const agDone = jobs.some(j => /^agentqa/.test(j.kind) && j.state === "ok"), fnd = ag ? ag.findings || 0 : 0, lp = /(L-[A-Z-]+)\s+(\d+)\/(\d+)/.exec(stage("loop").now || "");
-  /* the round line from runner.status: "… → 4/60 → dừng (F)" */
-  const lr = /→ (\d+\/\d+) → (\S+)/.exec(stage("loop").now || "");
-  const fw = UI.Flywheel([
-    { id: "src", label: t("home.src"), state: sv("collect"), metric: (CAT.totals && CAT.totals.all ? fmt(CAT.totals.all.episodes) + " ep" : cur.length + " sets"), href: "#/data" },
-    { id: "pipe", label: "Pipeline", state: sv("process"), metric: (h1.clips || "—") + " clips", href: "#/jobs?view=pipeline" },
-    { id: "qa", label: "Agent QA/QC", state: fnd ? "waiting" : agDone ? "done" : "idle", metric: fnd + " findings", href: "#/qa" },
-    { id: "rel", label: "Release", state: sv("release"), metric: (h1.exported || "—") + " exported", href: "#/data" },
-    { id: "train", label: "Training", state: sv("train"), metric: avgStep == null ? "—" : Math.round(avgStep / 600) + "%", href: "#/runs" },
-    { id: "probe", label: "Probe", state: "idle", metric: "—", href: "#/eval" },
-    { id: "eval", label: "Eval", state: sv("eval"), metric: es == null ? "—" : es.run + " " + es.frac, href: "#/eval" },
-    { id: "loop", label: "Failure→Data", state: sv("loop"), metric: lp ? lp[1] + " " + lp[2] : lr ? lr[1] + " · " + (lr[2] === "dừng" ? t("home.stop") : lr[2] === "tiếp" ? t("home.go") : lr[2]) : "—", href: "#/loop" },
-    { id: "cost", label: t("home.cost"), state: "done", metric: cu && cu.balance != null ? "CU " + Math.round(cu.balance) : "—", href: "#/loop?tab=cost" }], { height: 320 });
-
-  const att = [], pend = [];
-  let ack = []; try { ack = JSON.parse(localStorage.getItem("v5ack") || "[]"); } catch (e) {}
-  const tgt = j => { const p = j.params || {}; return j.kind + "|" + (p.work || p.input || p.name || JSON.stringify(p)); };
-  const hushed = j => ack.includes(j.id) || jobs.some(o => o.state === "ok" && tgt(o) === tgt(j) && o.created > j.created);
-  let hov = null;
-  const doAck = (id, row) => { ack.push(id); try { localStorage.setItem("v5ack", JSON.stringify(ack)); } catch (e) {} row.remove(); };
-  jobs.filter(j => (j.state === "failed" || j.state === "cancelled") && !hushed(j)).slice(0, 4).forEach(j => {
-    const row = grow(h("span", { class: "c-bad", text: "✕" }), j.kind, "rc " + j.rc + " · " + j.id, h("span", null, [h("a", { class: "go", href: "#/jobs?job=" + j.id, text: "[log]" }), h("button", { class: "u-btn sm", title: "ack (e)", text: "×", onclick: () => doAck(j.id, row) })]));
-    row.addEventListener("mouseenter", () => hov = { id: j.id, row }); row.addEventListener("mouseleave", () => hov = null); att.push(row);
-  });
-  UI.keys.bind({ e: () => { if (!hov) return false; doAck(hov.id, hov.row); hov = null; } }, "page");
-  stages.filter(s => s.state === "blocked").forEach(s => att.push(grow(h("span", { class: "c-bad", text: "✕" }), s.id, "blocked")));
-  works.filter(w => w.summary && w.summary.qa && w.summary.qa.flag > 0).slice(0, 3).forEach(w => att.push(grow(h("span", { class: "c-warn", text: "!" }), "QA " + w.summary.qa.flag + " flag", w.name, h("a", { class: "go", href: "#/jobs?work=" + encodeURIComponent(w.name), text: "[open]" }))));
-  if (fnd) pend.push(grow(h("span", { class: "c-warn", text: "◷" }), "agentqa", fnd + " findings", h("a", { class: "go", href: "#/qa", text: "[review]" })));
-  stages.filter(s => s.state === "waiting").forEach(s => pend.push(grow(h("span", { class: "c-warn", text: "◷" }), s.id, "waiting", h("a", { class: "go", href: (STRIP.find(x => x[0] === s.id) || [0, 0, "#/home"])[2], text: "[open]" }))));
-  const side = h("div", { class: "blk" }, [dsec(t("home.pending"), pend.length), pend.length ? h("div", null, pend) : grow(h("span", { class: "c-ok", text: "✓" }), "none", ""), h("div", { style: { height: "12px" } }), dsec("Attention", att.length), att.length ? h("div", null, att) : grow(h("span", { class: "c-ok", text: "✓" }), "none", "")]);
-  main.appendChild(h("div", { class: "hm2" }, [h("div", { class: "blk" }, [dsec("Flywheel"), fw]), side]));
-
-  /* 3 mini charts */
-  const C = UI.colors(), groups = ["egocentric", "teleop", "s1", "s2", "eval"], statuses = [...new Set(CAT.rows.map(r => r.status))];
-  const sCol = { current: C.ok, superseded: C.text2, upstream: C.run, test: C.warn, duplicate: C.series[3], missing: C.bad, archived: C.line2 };
-  const epOpt = { grid: { left: 8, right: 8, top: 40, bottom: 4, containLabel: true }, legend: { top: 0, itemGap: 6, textStyle: { color: C.text2, fontSize: 10 }, itemWidth: 8, itemHeight: 8 }, tooltip: { trigger: "axis", axisPointer: { type: "shadow" }, confine: true, backgroundColor: C.surface, borderColor: C.line2, textStyle: { color: C.text, fontSize: 11 } },
-    xAxis: { type: "category", data: groups, axisLabel: { color: C.text2, fontSize: 10 }, axisLine: { lineStyle: { color: C.line2 } } }, yAxis: { type: "value", axisLabel: { color: C.text2, fontSize: 10 }, splitLine: { lineStyle: { color: C.line, type: "dashed" } } },
-    series: statuses.map(s => ({ name: s, type: "bar", stack: "e", barMaxWidth: 28, itemStyle: { color: sCol[s] || C.text3 }, data: groups.map(g => CAT.rows.filter(r => r.group === g && r.status === s).reduce((a, r) => a + (r.episodes || 0), 0)) })) };
-  const srcs = (S.sources || []).slice(0, 12), qaOpt = { grid: { left: 8, right: 8, top: 40, bottom: 4, containLabel: true }, legend: { top: 0, itemGap: 6, textStyle: { color: C.text2, fontSize: 10 }, itemWidth: 8, itemHeight: 8 }, tooltip: { trigger: "axis", axisPointer: { type: "shadow" }, confine: true, backgroundColor: C.surface, borderColor: C.line2, textStyle: { color: C.text, fontSize: 11 } },
-    yAxis: { type: "category", inverse: true, data: srcs.map(x => String(x.id).slice(0, 8)), axisLabel: { color: C.text2, fontSize: 10 }, axisLine: { lineStyle: { color: C.line2 } } }, xAxis: { type: "value", axisLabel: { color: C.text2, fontSize: 10 }, splitLine: { lineStyle: { color: C.line, type: "dashed" } } },
-    series: [["pass", C.ok], ["flag", C.warn], ["reject", C.bad]].map(([k, c]) => ({ name: k, type: "bar", stack: "q", barMaxWidth: 14, itemStyle: { color: c }, data: srcs.map(x => x[k] || 0) })) };
-  main.appendChild(h("div", { class: "hm3" }, [
-    h("div", { class: "blk" }, [dsec("Loss"), UI.Chart({ type: "line", x_label: "step", series: sr.map(r => ({ name: r.branch, points: down(r.loss || [], 120) })), log_y: true, smooth: 0.6 }, { height: 170 })]),
-    h("div", { class: "blk" }, [dsec("Episodes"), UI.Chart({ type: "echarts", option: epOpt }, { height: 170 })]),
-    h("div", { class: "blk" }, [dsec("QA by source"), UI.Chart({ type: "echarts", option: qaOpt }, { height: 170 })])]));
-
-  /* jobs timeline */
-  main.appendChild(h("div", { class: "blk" }, [dsec("Jobs 24h", jobs.length, h("a", { href: "#/jobs", text: "all →" })), timelineStrip(jobs)]));
-  if (window.CHAT) CHAT.setContext({ route: "home" });
-}
-/* #/home is the wheel (pages_wheel.js); pageHome draws its "Today" section (not in lock mode) */
 
 /* @budget-skip-start legacy */
 /* ---------------- legacy v4 dispatch (delete when DATA/OPS pages register UI.route) ---------------- */
@@ -284,18 +219,23 @@ document.addEventListener("DOMContentLoaded", () => {
   document.documentElement.lang = UI.lang;
   if (!EXPLAIN.on()) document.body.classList.add("explain-off");
   $("#dclose").onclick = closeDrawer; $("#drawer-bg").onclick = closeDrawer;
-  try { if (localStorage.getItem("v5side")) document.body.classList.add("side-min"); if (localStorage.getItem("v5dock") === "off") document.body.classList.add("dock-off"); UI.task = localStorage.getItem("v5task") || "tray"; $("#task").value = UI.task; } catch (e) { UI.task = "tray"; }
-  $("#task").onchange = e => { UI.task = e.target.value; try { localStorage.setItem("v5task", UI.task); } catch (x) {} route(); };
+  try { if (localStorage.getItem("v5side")) document.body.classList.add("side-min"); if (localStorage.getItem("v5dock") !== "on") document.body.classList.add("dock-off"); } catch (e) { /* storage blocked */ }
+  /* ?task= beats the stored choice; UI.task / UI.round read TASK (core.js) */
+  const tq = /[?&#]task=([\w-]+)/.exec(location.search + location.hash), rq = /[?&#]round=([\w-]+)/.exec(location.search + location.hash);
+  const tp = tq ? tq[1] : (() => { try { return localStorage.getItem("v5task"); } catch (e) { return null; } })();
+  if (tp) TASK.set(tp, rq ? rq[1] : null);
+  $("#task").onchange = e => { TASK.set(e.target.value); UI.pref("v5task", TASK.id); retask(); };
+  $("#round").onchange = e => { TASK.set(TASK.id, e.target.value); retask(); };
   initKeys(); initPal(); drawSide(); drawMeta();
   if (window.CHAT) CHAT.mount($("#chat"));
   UI.panel.init();
-  if (window.DEMO) DEMO.init();
   poll().then(() => {
     /* locked demo laptop: ignore what an earlier visitor chose; only ?lang= counts (design 14.2) */
     if (UI.locked) { const m = /[?&#]lang=(vi|en)\b/.exec(location.search + location.hash); UI.lang = m ? m[1] : "vi"; document.documentElement.lang = UI.lang; document.body.classList.remove("explain-off");
+      if (!tq) TASK.set(TASK.loaded && TASK.list().length ? TASK.list()[0].id : null, rq ? rq[1] : null);   /* the first task of the manifest, whatever an earlier visitor chose */
       /* the demo opens in the deck's light look whatever an earlier visitor chose; ◐ still works for this visit */
       if (!/[?&#]theme=dark\b/.test(location.search + location.hash)) document.documentElement.setAttribute("data-theme", "light");
-      if (window.CHAT) CHAT.close(true); drawSide(); drawMeta(); }
+      if (window.CHAT) { CHAT.close(true); CHAT.locked(UI.chatOff); } taskSelect(); drawSide(); drawMeta(); }   /* chat closed by default, can be opened */
     route();
   }); setInterval(poll, 5000);  /* first status first: a locked server must not see /api/tool calls */
 });
@@ -367,6 +307,8 @@ function lineageView(nodes, edges, opt) {
 const HUB = { sub: "cards", status: "current", type: "", task: "", loc: "", q: "" };
 async function pageHub(main, qs) {
   if (qs.type) HUB.type = qs.type;
+  /* a task that counts only its own rows (inventory "task") opens the store filtered to them */
+  const tk = TASK.cur(); if (!HUB.userTask) HUB.task = tk && tk.inventory === "task" ? tk.catalog_task : "";
   const R = CAT.rows;
   const body = h("div"), controls = h("div");
   const filt = (ignoreType) => R.filter(r => (HUB.status === "all" || r.status === HUB.status) && (ignoreType || !HUB.type || r.group === HUB.type) && (!HUB.task || r.task === HUB.task) &&
@@ -374,7 +316,7 @@ async function pageHub(main, qs) {
   function draw() {
     controls.innerHTML = "";
     const fl = filt(true);
-    const sel = (k, opts) => h("select", { onchange: e => { HUB[k] = e.target.value; draw(); } }, opts.map(([v, l]) => h("option", { value: v, selected: HUB[k] === v, text: l })));
+    const sel = (k, opts) => h("select", { onchange: e => { HUB[k] = e.target.value; if (k === "task") HUB.userTask = 1; draw(); } }, opts.map(([v, l]) => h("option", { value: v, selected: HUB[k] === v, text: l })));
     controls.appendChild(h("div", { class: "controls" }, [h("input", { type: "search", placeholder: "Tìm theo tên hoặc id…", value: HUB.q, oninput: e => { HUB.q = e.target.value; clearTimeout(window.__qt); window.__qt = setTimeout(() => { drawBody(); }, 150); } }),
       sel("status", [["current", "Trạng thái: hiện hành"], ["all", "Mọi trạng thái"], ["superseded", "đã thay"], ["test", "thử"], ["duplicate", "trùng"], ["missing", "thiếu"], ["upstream", "ngoài"], ["archived", "lưu trữ"]]),
       sel("task", [["", "Task: tất cả"], ["tray", "tray"], ["two_table", "two_table"], ["hug", "hug"], ["other", "other"]]),

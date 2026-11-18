@@ -26,12 +26,15 @@ const loc = () => (window.UI && UI.lang === "en") ? "en-US" : "vi-VN";
 function t(key, vars) {
   const I = window.I18N || {}, lang = window.UI ? UI.lang : LANG, d = I[lang] || {}, vi = I.vi || {};
   const s = d[key] != null ? d[key] : vi[key] != null ? vi[key] : key;
+  /* task placeholders ({task} {Task} {job} {stages} {desc}) come from the task manifest unless the caller gives them */
+  if (window.TASK && /\{(task|Task|job|stages|desc)\}/.test(s)) vars = Object.assign(TASK.vars(), vars || {});
   return vars ? s.replace(/\{(\w+)\}/g, (m, k) => vars[k] == null ? m : typeof vars[k] === "number" ? (Number.isInteger(vars[k]) ? vars[k].toLocaleString(loc()) : vars[k].toLocaleString(loc(), { maximumFractionDigits: 1 })) : String(vars[k])) : s;
 }
 const fmt = (x, d) => x == null || x === "" || Number.isNaN(x) ? "–" : (typeof x === "number" ? (d != null ? x.toLocaleString(loc(), { minimumFractionDigits: d, maximumFractionDigits: d }) : x.toLocaleString(loc())) : x);
 const pct = (x, d = 1) => x == null ? "–" : (x * 100).toLocaleString(loc(), { maximumFractionDigits: d, minimumFractionDigits: d }) + " %";
 const wilson = (k, n, z = 1.96) => { const p = k / n, d = 1 + z * z / n, c = p + z * z / (2 * n), m = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)); return [(c - m) / d, (c + m) / d]; };
 
+const LOG_TAIL = 64 * 1000;   /* characters of a job log kept in view */
 const _cache = {};
 function J(url) { return _cache[url] || (_cache[url] = fetch(url).then(r => { if (!r.ok) throw new Error(url + " " + r.status); return r.json(); })); }
 
@@ -257,6 +260,7 @@ const UI = (() => {
       const kids = it.unit ? [val, h("span", { class: "lb", text: it.unit })] : [h("span", { class: "lb", text: it.label || "" }), val];
       if (it.delta != null) kids.push(h("span", { class: "dl", text: String(it.delta) }));
       if (it.spark) kids.push(U.Spark(it.spark, { w: 48, h: 12 }));
+      if (it.origin) kids.push(U.origin(it.origin, it.src));
       return h("span", { class: "it", title: it.label || null }, kids);
     }));
   };
@@ -544,7 +548,7 @@ const UI = (() => {
   const EDGE = { ok: "ok", done: "ok", pass: "ok", running: "run", run: "run", waiting: "warn", warn: "warn", flag: "warn", partial: "warn", blocked: "bad", bad: "bad", failed: "bad", reject: "bad", idle: "idle" };
   U.Tile = function (o) {
     o = o || {}; const v = typeof o.value === "number" ? U.fmt(o.value, Number.isInteger(o.value) ? "int" : "float3") : (o.value == null ? DASH : String(o.value));
-    const kids = [h("div", { class: "lb", text: o.label || "" }), h("div", { class: "vl" }, [h("span", { class: "v", text: v }), o.unit ? h("span", { class: "un", text: o.unit }) : null, o.delta != null ? h("span", { class: "dl", text: String(o.delta) }) : null]),
+    const kids = [h("div", { class: "lb", text: o.label || "" }), h("div", { class: "vl" }, [h("span", { class: "v", text: v }), o.unit ? h("span", { class: "un", text: o.unit }) : null, o.delta != null ? h("span", { class: "dl", text: String(o.delta) }) : null, o.origin ? U.origin(o.origin, o.src) : null]),
       o.spark && o.spark.length > 1 ? U.Spark(o.spark, { w: 96, h: 22, color: o.color }) : h("div", { style: { height: "22px" } })];
     return h(o.href ? "a" : "div", { class: "u-tile e-" + (EDGE[o.state] || "idle"), href: o.href || null }, kids);
   };
@@ -606,11 +610,89 @@ const UI = (() => {
       if (!(PN.sources || []).length) s.appendChild(h("div", { class: "rp-empty", text: DASH }));
       clearInterval(logTimer); l.innerHTML = "";
       if (PN.log && PN.log.jobId) { logEl = U.Log({ jobId: PN.log.jobId }); l.appendChild(logEl); }
-      else if (PN.log && PN.log.url) { logEl = U.Log({ text: "" }); l.appendChild(logEl); const pull = () => fetch(PN.log.url).then(r => r.text()).then(t => { if (logEl && logEl.isConnected) logEl.setText(t.slice(-60000)); }).catch(() => {}); pull(); logTimer = setInterval(pull, 3000); }
+      else if (PN.log && PN.log.url) { logEl = U.Log({ text: "" }); l.appendChild(logEl); const pull = () => fetch(PN.log.url).then(r => r.text()).then(t => { if (logEl && logEl.isConnected) logEl.setText(t.slice(-LOG_TAIL)); }).catch(() => {}); pull(); logTimer = setInterval(pull, 3000); }
       else l.appendChild(h("div", { class: "rp-empty", text: DASH }));
     },
   };
 
+  /* origin of a number (brief 2): "file" = read from a run's own file under fwdata, "cited" = quoted from a document
+     (seed/cited.yaml). A small mark with the source in its tooltip; T2 styles it further. */
+  U.origin = (kind, src) => kind ? h("span", { class: "u-orig " + kind, title: t("orig." + kind + ".tip") + (src ? " · " + src : ""), text: t("orig." + kind) }) : null;
+  /* honest empty state (console design: a step that has not run says so, with the command or the missing input; never a 0) */
+  U.empty = function (o) {
+    o = o || {};
+    const cmds = (o.how || []).filter(x => x.kind === "cmd" && x.text), refs = (o.how || []).filter(x => x.kind !== "cmd" && x.path);
+    return h("div", { class: "u-empty" }, [h("div", { class: "u-empty-h" }, [h("span", { class: "u-empty-tag", text: o.tag || t("empty.tag") }), o.title ? h("b", { text: o.title }) : null]),
+      o.missing ? h("p", null, [h("span", { class: "dim", text: t("empty.missing") + " " }), o.missing]) : null,
+      o.where ? h("p", { class: "dim", text: t("empty.where", { w: o.where }) }) : null,
+      cmds.length ? h("div", { class: "u-empty-cmd" }, [h("small", { class: "dim", text: t("empty.run") }), ...cmds.map(x => h("code", { text: x.text }))]) : null,
+      refs.length ? h("div", { class: "u-empty-ref" }, [h("small", { class: "dim", text: t("empty.read") }), ...refs.map(x => h("code", { title: x.note || null, text: x.path + (x.section ? " §" + x.section : "") }))]) : null]);
+  };
+  /* the two styles above live with their components (style.css belongs to the layout workstream) */
+  document.head.appendChild(h("style", { id: "u-t1-css", text: ".u-orig{display:inline-block;margin-left:6px;padding:0 4px;border:1px solid var(--line);border-radius:3px;font:500 9.5px/14px var(--sans,system-ui);letter-spacing:.02em;color:var(--text-3,var(--text-2));vertical-align:middle;cursor:help;text-transform:none}.u-orig.cited{border-style:dashed}"
+    + ".u-empty{border:1px dashed var(--line-strong,var(--line));border-radius:8px;padding:12px 16px;margin:8px 0;background:var(--surface);display:flex;flex-direction:column;gap:6px}.u-empty p{margin:0}.u-empty-h{display:flex;gap:10px;align-items:center}"
+    + ".u-empty-tag{font:600 11px/18px var(--sans,system-ui);padding:0 8px;border-radius:9px;background:var(--surface-2);color:var(--text-2)}.u-empty-cmd,.u-empty-ref{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.u-empty code{font-size:12px;padding:1px 6px;background:var(--surface-2);border-radius:3px}" }));
+
   return U;
 })();
 window.UI = UI;
+
+/* =====================================================================
+   TASK: the (task, round) context, from data/tasks.json (index/tasks.py, seed/tasks.yaml).
+   Pages never type a task word, run id, seed or step count: they ask TASK.
+   TASK.load() · TASK.list() · TASK.set(id) · TASK.cur() · TASK.round() · TASK.name() · TASK.word()
+   TASK.stages() [{id, label}] · TASK.stageName(id) · TASK.vars() (i18n placeholders {task} {Task} {job} {stages} {desc})
+   TASK.has(key) · TASK.scopeStory(raw) · TASK.scopeSim(raw) · TASK.process(n) · TASK.hasData(n) · TASK.empty(n)
+   TASK.runs() · TASK.baseline() · TASK.after() · TASK.controls() · TASK.follow() · TASK.maxSteps() · TASK.trainDir()
+   ===================================================================== */
+const TASK = (() => {
+  const T = { doc: { tasks: [], rounds: [] }, id: "tray", roundId: null, loaded: false };
+  const L = o => o == null ? "" : typeof o === "string" ? o : (o[UI.lang] || o.vi || "");
+  T.load = () => J("data/tasks.json").catch(() => ({ tasks: [], rounds: [] })).then(d => { T.doc = d; T.loaded = true; if (!T.cur() && d.tasks.length) T.id = d.tasks[0].id; T.pickRound(); return d; });
+  T.list = () => T.doc.tasks || [];
+  T.cur = () => T.list().find(x => x.id === T.id) || null;
+  T.pickRound = () => { const c = T.cur(), rs = c ? c.rounds || [] : []; if (!rs.includes(T.roundId)) T.roundId = rs.length ? rs[rs.length - 1] : null; };
+  T.set = (id, rid) => { T.id = id; T.roundId = rid || null; if (T.loaded) T.pickRound(); };   /* before load, a ?round= waits for the manifest */
+  T.round = () => (T.doc.rounds || []).find(r => r.id === T.roundId) || null;
+  T.name = id => L(((id ? T.list().find(x => x.id === id) : T.cur()) || {}).name);
+  T.word = () => L((T.cur() || {}).word);
+  T.stages = () => ((T.cur() || {}).stages || []).map(s => ({ id: s.id, label: s[UI.lang] || s.vi }));
+  T.stageName = id => { const s = T.stages().find(x => x.id === id); return s ? s.label : String(id == null ? "" : id); };
+  T.vars = () => { const c = T.cur(); return c ? { task: T.word(), Task: T.name(), job: T.name().toLowerCase(), stages: (c.stages || []).length, desc: L(c.description) } : {}; };
+  /* index keys in scope: the task's own, its round's, and the catalog (one store for every task) */
+  T.keys = () => { const c = T.cur() || {}, r = T.round() || {}; return new Set(["catalog", ...(c.index || []), ...(r.index || [])]); };
+  T.has = k => T.keys().has(k);
+  /* story.json as the current task sees it: keys of another task or round are left out (never the other task's numbers) */
+  /* runs whose test result the round does not present (manifest withhold_eval): their rows leave every result block,
+     so no page, chart or tooltip can show them; training, data cut and cost of the run stay */
+  T.withheld = () => (T.round() || {}).withhold_eval || [];
+  const unhide = out => { const W = T.withheld(); if (!W.length) return out;
+    const hid = id => W.includes(id), omit = o => { const c = Object.assign({}, o || {}); W.forEach(id => delete c[id]); return c; };
+    if (out.pair) out.pair = Object.assign({}, out.pair, { runs: (out.pair.runs || []).filter(r => !hid(r.run)), comparisons: (out.pair.comparisons || []).filter(c => !hid(c.variant) && !hid(c.baseline)) });
+    if (out.follow) { out.follow = Object.assign({}, out.follow, { runs: omit(out.follow.runs) }); delete out.follow.r3; }
+    if (out.demo) { const d = Object.assign({}, out.demo); delete d.round1_reading;
+      if (d.ladder) { d.ladder = Object.assign({}, d.ladder, { runs: omit(d.ladder.runs) }); if (d.ladder.on_table_b) d.ladder.on_table_b = Object.assign({}, d.ladder.on_table_b, { value: omit(d.ladder.on_table_b.value), check_from_rollouts: omit(d.ladder.on_table_b.check_from_rollouts), quote: null });   /* the quoted table row has every run's figure */ }
+      out.demo = d; }
+    return out; };
+  T.scopeStory = raw => { const out = {}, ks = T.keys(); Object.keys(raw || {}).forEach(k => { if (ks.has("story." + k)) out[k] = raw[k]; }); return unhide(out); };
+  T.scopeSim = raw => { raw = raw || {}; const id = T.id;
+    return T.has("sim") ? raw : { episodes: [], parts: [], cuts: {}, batch: {}, teleop: (raw.teleop || []).filter(e => e.task === id) }; };
+  T.process = n => (((T.cur() || {}).process) || {})[String(n)] || null;
+  T.hasData = n => { const p = T.process(n); return !p || (p.needs || []).every(T.has); };
+  /* the empty state of one process stage: what is missing, where it runs, the command */
+  T.empty = (n, title) => { const p = T.process(n) || {}; return UI.empty({ title: title || t("empty.stage", { n: EXPLAIN.name(n) }), missing: L(p.missing), where: p.remote, how: p.how }); };
+  /* the round: runs in display order, roles, follow case, step count, folders */
+  const R = () => T.round() || {};
+  T.runs = () => (R().runs || []).map(r => r.id);
+  T.baseline = () => R().baseline || null;
+  T.after = () => R().after_round || null;
+  T.controls = () => R().controls || [];
+  T.follow = () => R().follow || null;
+  T.maxSteps = () => R().max_steps || null;
+  T.trainDir = () => R().train_dir || null;
+  T.totals = () => (T.cur() || {}).catalog_totals || {};
+  return T;
+})();
+window.TASK = TASK;
+Object.defineProperty(UI, "task", { get: () => TASK.id });
+Object.defineProperty(UI, "round", { get: () => TASK.roundId });

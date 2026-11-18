@@ -74,7 +74,7 @@ def loop_detail(paths: ConsolePaths) -> dict[str, int]:
 
 
 def round_block(paths: ConsolePaths) -> dict[str, Any]:
-    """The cited half of the C70_R1 round (tray.md 20.11–20.16); empty when the seed lacks it."""
+    """The cited half of the tray round (tray.md 20.11–20.16); empty when the seed lacks it."""
     by = {c.key: c.value for c in load(paths)}
     if "round.plan" not in by:
         return {}

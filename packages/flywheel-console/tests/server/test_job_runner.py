@@ -48,7 +48,8 @@ def _gated(monkeypatch: pytest.MonkeyPatch, gate: Path) -> None:
 def test_kinds_are_the_allowlist() -> None:
     assert runner.KINDS == frozenset(
         "ego.ingest ego.deid ego.ea ego.pose ego.annotate ego.qa ego.report ego.pipeline "
-        "ego.human1m agentqa.run agentqa.review export.zip".split()
+        "ego.human1m agentqa.run agentqa.review export.zip data.ingest data.qa data.release "
+        "data.report data.pipeline eval.diag_system eval.diag_train".split()
     )
 
 

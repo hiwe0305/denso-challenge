@@ -4,16 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Humanoid Data Flywheel</title>
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="chat.css">
-<link rel="stylesheet" href="tour.css">
 <script>try{var t=localStorage.getItem("v5theme");document.documentElement.setAttribute("data-theme",t||"light");if(/(^|[?&#])demo=1/.test(location.search+location.hash)||sessionStorage.getItem("v5demo")==="1")document.documentElement.classList.add("demo")}catch(e){document.documentElement.setAttribute("data-theme","light")}</script>
 </head>
 <body>
 <header id="hdr">
-  <a class="logo" href="#/home"><b>Humanoid Data Flywheel</b><span class="team">· ilovephysicalintelligence</span></a>
+  <a class="logo" href="#/tasks"><b>Humanoid Data Flywheel</b><span class="team">· ilovephysicalintelligence</span></a>
   <div class="srch" id="srch"><span>&#8981;</span><span>Search</span><kbd>&#8984;K</kbd></div>
-  <select id="task" title="task"><option>tray</option><option>two_table</option></select>
+  <select id="task" title="task"></select>
+  <select id="round" title="round" hidden></select>
   <div id="meta"></div>
 </header>
 <div id="body">
@@ -39,8 +40,9 @@
 <script src="pages_start.js"></script>
 <script src="pages_wheel.js"></script>
 <script src="pages_steps.js"></script>
-<script src="ring.js"></script>
-<script src="tour.js"></script>
+<script src="pages_proc.js"></script>
+<script src="pages_tasks.js"></script>
+<script src="pages_ego.js"></script>
 <script src="chat.js"></script>
 <script src="app.js"></script>
 </body>

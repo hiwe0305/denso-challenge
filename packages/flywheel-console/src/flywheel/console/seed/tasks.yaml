@@ -1,0 +1,232 @@
+# Tasks and rounds the console shows (brief 2, T1). Read by index/tasks.py, which validates this
+# file and writes `tasks.json` into the console index; story.py, demo.py and sim.py take run order,
+# follow case, folders and step counts from here instead of module constants.
+#
+# Paths under `fw:` are relative to FW_ROOT; `doc`, `config`, `module` paths are relative to the
+# repo root. Numbers are never typed here: a number comes from a file under FW_ROOT (read by the
+# indexer, origin "file") or from seed/cited.yaml through a `cited` key (origin "cited").
+version: 1
+
+tasks:
+  - id: tray
+    name: {vi: Bê khay, en: Carry the tray}
+    word: {vi: khay, en: tray}
+    description:
+      vi: Robot Unitree G1 mang khay từ bàn A sang bàn B trong nhà máy ảo.
+      en: A Unitree G1 robot carries a tray from table A to table B in a virtual factory.
+    robot: Unitree G1
+    model: Ψ₀
+    simulator: SIMPLE (MuJoCo physics, Isaac render)
+    catalog_task: tray
+    # step-1 counts: "store" = the whole catalog (the tray round was trained from it), "task" = only
+    # rows tagged with catalog_task
+    inventory: store
+    scorer_config: configs/eval/scorer/tray.yaml
+    stages_source: configs/eval/scorer/tray.yaml (header table), design 28/10/2026 §3.2
+    stages:
+      - {id: approach_a, vi: tới bàn A, en: reach table A}
+      - {id: grasp, vi: cầm khay, en: grasp tray}
+      - {id: lift, vi: nhấc lên, en: lift}
+      - {id: carry, vi: mang sang, en: carry}
+      - {id: reach_b, vi: tới bàn B, en: reach table B}
+      - {id: place, vi: đặt xuống, en: place}
+      - {id: release_stand, vi: "buông tay, đứng", en: "release, stand"}
+    success:
+      vi: khay trong ô đích trên bàn B, lệch tối đa target_pos_tol và target_yaw_tol_deg
+      en: tray inside the target zone on table B, within target_pos_tol and target_yaw_tol_deg
+      source: configs/eval/scorer/tray.yaml thresholds (giả định, chưa hiệu chỉnh)
+    rounds: [tray-r1]
+    # story.json keys that belong to this task (besides the keys of its rounds)
+    index: [story.runs, story.train_log_tail, story.vm_phases, story.sources, story.heat,
+            story.reasons, story.qa_sample, story.h1m, story.ledger, story.colab_balance,
+            story.colab_sessions, story.ds, story.eval, story.loop_chain, story.loop_detail]
+    evals: []
+    clusters: []
+    process:
+      "1":
+        needs: [catalog]
+        how:
+          - {kind: cmd, text: "fw egocentric ingest | deid | pose | annotate | qa | report"}
+          - {kind: cmd, text: "fw data ingest | qa | release | report"}
+          - {kind: module, path: packages/flywheel-simple/src/flywheel_simple/tray/generate.py, note: "sinh tập S1 bằng planner (MuJoCo thuần)"}
+          - {kind: config, path: configs/sim/tray_planner.yaml}
+          - {kind: doc, path: docs/superpowers/specs/2026-10-27-g1-psi0-demo-design.md, section: "pipeline 6 tầng"}
+        logs: [{label: egocentric work dirs, fw: pipeline/src_*/qa/egocentric.jsonl}]
+        results: [{label: catalog, index: catalog.json}, {label: sim library, index: sim.json}]
+      "2":
+        needs: [story.h1m]
+        how:
+          - {kind: cmd, text: "fw agentqa run --model nemotron --out D"}
+          - {kind: cmd, text: "fw agentqa review --reports D/reports.jsonl"}
+          - {kind: module, path: packages/flywheel-eval/src/flywheel/eval/agentqa}
+          - {kind: doc, path: docs/g0/agent-qa.md}
+        logs: [{label: QA decisions, fw: pipeline/src_*/qa/egocentric.jsonl}]
+        results: [{label: human video summary, fw: human1m/ego-h1m-*/summary.json}]
+      "3":
+        needs: [story.runs]
+        remote: Colab A100
+        how:
+          - {kind: module, path: packages/flywheel-psi0/src/flywheel_psi0/tray/colab_train.py}
+          - {kind: module, path: packages/flywheel-psi0/src/flywheel_psi0/tray/pair_cut.py, note: "cắt và đóng băng tập dạy"}
+          - {kind: doc, path: docs/he/tray.md, section: "19, 20.6"}
+        logs: [{label: train log, fw: tray/pair60k/<run>/<job>/vm-logs/train.log}]
+        results: [{label: metrics, fw: tray/pair60k/<run>/<job>/metrics.jsonl}]
+      "4":
+        needs: [story.pair]
+        remote: Colab L4 (server) + rtx3060 (client)
+        how:
+          - {kind: cmd, text: "python -m flywheel_psi0.tray.eval_batch --set S --conditions-sha256 H"}
+          - {kind: cmd, text: "python -m flywheel_psi0.tray.eval_results --json"}
+          - {kind: config, path: configs/eval/scorer/tray.yaml}
+          - {kind: cmd, text: "fw eval score --trace T --task tray"}
+        logs: [{label: rollouts, fw: tray/pair60k/stage1-60k/c70r1-rollouts.jsonl}]
+        results: [{label: stage-1 reads, fw: tray/pair60k/stage1-60k/stage1-*.json}]
+      "5":
+        needs: [story.round]
+        how:
+          - {kind: cmd, text: "fw eval diag-system --episode E"}
+          - {kind: config, path: configs/eval/diagnosis/system.yaml}
+          - {kind: doc, path: docs/he/tray.md, section: "20.3, 20.11, 20.12"}
+        logs: []
+        results: [{label: clusters, cited: round.clusters.data}]
+      "6":
+        needs: [story.round]
+        how:
+          - {kind: module, path: packages/flywheel-psi0/src/flywheel_psi0/tray/round_select.py}
+          - {kind: module, path: packages/flywheel-psi0/src/flywheel_psi0/tray/round_cut.py}
+          - {kind: doc, path: docs/he/tray.md, section: "20.13–20.18"}
+        logs: []
+        results: [{label: round cut, fw: tray/pair-cuts/C70_R1.tar}]
+      "0":
+        needs: [story.ledger]
+        how:
+          - {kind: doc, path: docs/g0/ledger, note: "một file CSV mỗi story"}
+        logs: []
+        results: [{label: ledger, doc: docs/g0/ledger/*.csv}]
+
+  - id: two_table
+    name: {vi: Gắp vật giữa hai bàn, en: Pick between two tables}
+    word: {vi: hộp, en: box}
+    description:
+      vi: Robot Unitree G1 gắp hộp ở bàn này, đi sang bàn kia và đặt vào giỏ (task của SIMPLE).
+      en: A Unitree G1 robot picks a box on one table, walks to the other and puts it in a basket (a SIMPLE task).
+    robot: Unitree G1
+    model: Ψ₀ (checkpoint của tác giả)
+    simulator: SIMPLE (MuJoCo physics, Isaac render)
+    catalog_task: two_table
+    inventory: task
+    scorer_config: configs/eval/scorer/two-table.yaml
+    stages_source: docs/spec-v10-failure-to-data.md §5.1; design 27/10/2026 §3
+    stages:
+      - {id: approach, vi: tiếp cận, en: approach}
+      - {id: grasp, vi: gắp, en: grasp}
+      - {id: walk, vi: đi, en: walk}
+      - {id: reach_target, vi: tới bàn đích, en: reach target table}
+      - {id: place, vi: đặt, en: place}
+      - {id: release_settle, vi: nhả và ổn định, en: release and settle}
+    success:
+      vi: cờ check_success của SIMPLE bật (ngưỡng từng bước trong scorer còn là giả định)
+      en: SIMPLE's check_success flag is set (per-step scorer thresholds are still assumptions)
+      source: configs/eval/scorer/two-table.yaml; docs/g0/psi0-eval.md §3.6
+    rounds: []
+    index: []
+    # data files of the task the sim library reads (authors' public teleop demonstrations)
+    teleop_zip: psi-data/simple/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip
+    evals:
+      - id: s103-isaac-l0
+        label: {vi: "checkpoint của tác giả, Isaac, mức 0", en: "authors' checkpoint, Isaac, level 0"}
+        fw: simple/s103/runs/simple-b75c678/eval-e78fb93/mujoco_isaac/level-0/pass-1/ep0-9/summary.json
+        doc: docs/he/two-table-diagnosis.md §1; docs/g0/psi0-eval.md §3.6
+    clusters:
+      cited: [tasks.two_table.cluster.A, tasks.two_table.cluster.B, tasks.two_table.cluster.C]
+      diagnosis: tasks.two_table.diagnosis
+    process:
+      "1":
+        needs: [catalog]
+        how:
+          - {kind: cmd, text: "fw data ingest | qa | release | report"}
+          - {kind: doc, path: docs/he/two-table-diagnosis.md, section: "5.2 (ba loại dữ liệu)"}
+        logs: []
+        results: [{label: catalog, index: catalog.json}]
+      "2":
+        needs: [story.h1m]
+        how:
+          - {kind: cmd, text: "fw data qa"}
+          - {kind: cmd, text: "fw agentqa run --model nemotron --out D"}
+        missing: {vi: chưa có tập dữ liệu mới của đội cho task này, en: no new team dataset for this task yet}
+        logs: []
+        results: []
+      "3":
+        needs: [story.runs]
+        remote: Colab
+        how:
+          - {kind: doc, path: docs/he/two-table-diagnosis.md, section: "5.2"}
+        missing: {vi: "chưa có tập dữ liệu nhắm lỗi để dạy (không có đường thu teleop cho task này)", en: "no targeted data to train on (no teleop path for this task)"}
+        logs: []
+        results: []
+      "4":
+        needs: [story.pair]
+        remote: Colab A100 (server) + rtx3060 (client Isaac)
+        how:
+          - {kind: cmd, text: "bash scripts/g0/eval_psi0.sh run --level L --sim-mode mujoco_isaac"}
+          - {kind: cmd, text: "fw eval score --trace T --task two-table"}
+          - {kind: config, path: configs/eval/scorer/two-table.yaml}
+        missing: {vi: "chấm từng bước chưa chạy được: thiếu TaskDefinition hai bàn và trace", en: "per-step scoring cannot run yet: no two-table TaskDefinition and no trace"}
+        logs: [{label: client log, fw: simple/s103/runs/simple-b75c678/eval-e78fb93/mujoco_isaac/level-0/pass-1/ep0-9/client.log}]
+        results: [{label: summary, fw: simple/s103/runs/simple-b75c678/eval-e78fb93/mujoco_isaac/level-0/pass-1/ep0-9/summary.json}]
+      "5":
+        needs: [story.round]
+        how:
+          - {kind: cmd, text: "fw eval diag-system --episode E"}
+          - {kind: config, path: configs/eval/diagnosis/system.yaml}
+          - {kind: doc, path: docs/he/two-table-diagnosis.md, section: "2, 3"}
+        missing: {vi: "lượt Isaac không ghi trace (steps.jsonl, rtc.jsonl): mọi kiểm hệ thống là not_judged", en: "the Isaac runs wrote no trace (steps.jsonl, rtc.jsonl): every system check is not_judged"}
+        logs: []
+        results: []
+      "6":
+        needs: [story.round]
+        how:
+          - {kind: doc, path: docs/he/two-table-diagnosis.md, section: "5.1 repair_ticket"}
+        missing: {vi: "chưa có vòng; bước bắt buộc trước tiên là ghi lại trace rồi chẩn đoán lại", en: "no round yet; the required first step is to record a trace and diagnose again"}
+        logs: []
+        results: []
+      "0":
+        needs: [story.ledger]
+        how:
+          - {kind: doc, path: docs/g0/ledger}
+        missing: {vi: sổ chi phí chưa tách theo task, en: the ledger is not split by task yet}
+        logs: []
+        results: []
+
+rounds:
+  - id: tray-r1
+    task: tray
+    number: 1
+    title: {vi: "Vòng 1 Failure → Data trên bản 425 bài", en: "Failure → Data round 1 on the 425-demo model"}
+    doc: docs/he/tray.md §19, §20
+    # evaluation set: runs per model and difficulty levels (names of the levels in the files)
+    eval: {levels: [1, 2], level_key: "levels 1-2"}
+    max_steps: 60000
+    train_dir: tray/pair60k          # <train_dir>/<run>/<job>/metrics.jsonl
+    eval_dir: tray/pair60k/stage1-60k
+    cut: tray/pair-cuts/C70_R1.tar   # the round's training cut (sim library)
+    rollouts: c70r1-rollouts.jsonl   # per-trial rows of the round's model (in eval_dir)
+    log_run: C_70                    # whose VM log tail the training page shows
+    rule_tag: r                      # stage1-<tag>-<variant>-vs-<baseline>.json of the round's rule
+    runs:                            # display order (grid, ladder, tables)
+      - {id: C_ALL, train_set: ALL, session: c-all}
+      - {id: C_70, train_set: S70, session: c-70}
+      - {id: B_ALL, train_set: ALL, session: b-all}
+      - {id: B_70, train_set: S70, session: b-70}
+      - {id: C70_R1, train_set: R181, session: c70r1}
+    baseline: C_70
+    after_round: C70_R1
+    # Hiếu, 16/11/2026: the test result of the model after the round is not presented (pages,
+    # chat, demo scripts). The run stays in the round (its data cut, training and cost are shown)
+    # and its result files stay in fwdata; the pages say "not shown", never "not run".
+    withhold_eval: [C70_R1]
+    controls: [C_ALL, B_70, B_ALL]
+    follow: {level: 1, seed: 1000107}
+    deck_corrections: true           # the box "số cập nhật sau khi nộp slide" (#/base)
+    # story.json / sim.json keys that hold the round's numbers
+    index: [story.pair, story.round, story.follow, story.demo, sim]

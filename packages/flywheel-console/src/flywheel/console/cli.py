@@ -9,7 +9,7 @@ app = typer.Typer(no_args_is_help=True, help="Local flywheel console.")
 
 @app.command()
 def index(
-    only: str = typer.Option("", help="Comma list: catalog,robot,ego,story."),
+    only: str = typer.Option("", help="Comma list: catalog,robot,ego,story,sim,tasks."),
 ) -> None:
     """Build the console index."""
     from flywheel.console.index import build_all
@@ -31,6 +31,9 @@ def index(
 def serve(
     port: int = typer.Option(4178, help="Port on 127.0.0.1."),
     lock: bool = typer.Option(False, "--lock", help="Read-only: refuse jobs, uploads, chat."),
+    chat: bool = typer.Option(
+        False, "--chat", help="With --lock: keep the chat on (it only reads)."
+    ),
 ) -> None:
     """Serve the console on 127.0.0.1."""
     from flywheel.console.paths import ConsolePaths
@@ -40,7 +43,7 @@ def serve(
     typer.echo(f"repo: {paths.repo}")
     typer.echo(f"fw_root: {paths.fw_root}")
     try:
-        run(paths, port=port, lock=lock)
+        run(paths, port=port, lock=lock, chat=chat)
     except OSError as e:
         typer.echo(f"serve: {e}", err=True)
         raise typer.Exit(1) from e

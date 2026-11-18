@@ -1,4 +1,5 @@
-"""Console index: catalog, robot and egocentric datasets, the story file and the sim library."""
+"""Console index: catalog, robot and egocentric datasets, the story file, the sim library and the
+task and round manifests (tasks.json)."""
 
 from __future__ import annotations
 
@@ -8,10 +9,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 from flywheel.console import paths as _paths
-from flywheel.console.index import catalog, egocentric, robot, sim, story
+from flywheel.console.index import catalog, egocentric, robot, sim, story, tasks
 from flywheel.console.paths import ConsolePaths
 
-PARTS = ("catalog", "robot", "ego", "story", "sim")
+PARTS = ("catalog", "robot", "ego", "story", "sim", "tasks")
 
 
 def build_all(
@@ -41,10 +42,11 @@ def build_all(
         "ego": egocentric.build,
         "story": story.build,
         "sim": sim.build,
+        "tasks": tasks.build,
     }
     counts: dict[str, dict[str, int]] = {}
     try:
-        for name in PARTS:  # story reads catalog.json, so keep this order
+        for name in PARTS:  # story and tasks read catalog.json, so keep this order
             if name in chosen:
                 counts[name] = runners[name](paths, tmp)
         catalog.enrich(tmp)  # after robot and ego, also on partial runs

@@ -10,13 +10,13 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-PAIR_ORDER = ("C_ALL", "C_70", "B_ALL", "B_70", "C70_R1")
-_STAGE1 = "fwdata/tray/pair60k/stage1-60k"
+if TYPE_CHECKING:
+    from flywheel.console.index.tasks import Round
+
+# run order, folders, roles and watcher session names come from the round (seed/tasks.yaml)
 _TILT_PLACE = ("L-PLACE-POSE", "L-TRAY-TILT")
-# watcher session name (fwdata/colab/batch-*/da34-<name>.json) -> model id
-_SESSIONS = {"c-all": "C_ALL", "b-all": "B_ALL", "b-70": "B_70", "c-70": "C_70", "c70r1": "C70_R1"}
 
 
 def _json(p: Path) -> Any:
@@ -62,19 +62,23 @@ def _item(c: dict[str, Any] | None, **extra: Any) -> dict[str, Any] | None:
 
 
 # ------------------------------------------------------------------ 1 · ladder
-def ladder(fw: Path, pair: dict[str, Any], cites: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def ladder(
+    fw: Path, pair: dict[str, Any], cites: dict[str, dict[str, Any]], rnd: Round
+) -> dict[str, Any]:
     """Runs out of n per model: tray on B (cited), relaxed placement, success at the 5 cm rule."""
-    folder = fw / "tray" / "pair60k" / "stage1-60k"
+    folder = fw / rnd.eval_dir
     succ = {r["run"]: r.get("successes") for r in pair.get("runs") or []}
     onb = (cites.get("on_table_b") or {}).get("value") or {}
     runs: dict[str, Any] = {}
     tols: list[str] = []
     n_all: set[Any] = set()
     yaws: list[dict[str, Any]] = []
-    for run in PAIR_ORDER:
+    for run in rnd.run_ids:
         d = _dict(folder / f"place-error-{run}.json")
         curve = [
-            c for c in (d.get("relaxed_curve") or {}).get("levels 1-2") or [] if isinstance(c, dict)
+            c
+            for c in (d.get("relaxed_curve") or {}).get(rnd.level_key) or []
+            if isinstance(c, dict)
         ]
         if not curve and run not in succ and run not in onb:
             continue
@@ -88,12 +92,13 @@ def ladder(fw: Path, pair: dict[str, Any], cites: dict[str, dict[str, Any]]) -> 
     if not runs:
         return {}
     tols.sort(key=float, reverse=True)
-    # cross-check the cited C70_R1 row against its rollout file (onb.py's column)
-    roll = _jl(folder / "c70r1-rollouts.jsonl")
-    check = {"C70_R1": sum(1 for r in roll if r.get("on_table_b") is True)} if roll else {}
+    # cross-check the cited row of the round's model against its rollout file (onb.py's column)
+    after = rnd.after_round
+    roll = _jl(folder / rnd.rollouts) if rnd.rollouts else []
+    check = {after: sum(1 for r in roll if r.get("on_table_b") is True)} if roll else {}
     yaw = {c.get("yaw_error_deg") for c in yaws}
     return {
-        "source": f"{_STAGE1}/place-error-<id>.json relaxed_curve['levels 1-2']; "
+        "source": f"fwdata/{rnd.eval_dir}/place-error-<id>.json relaxed_curve['{rnd.level_key}']; "
         "success = story.pair.runs[].successes",
         "n": next(iter(n_all)) if len(n_all) == 1 else None,
         "yaw_tol_deg": next(iter(yaw)) if len(yaw) == 1 else None,
@@ -105,19 +110,19 @@ def ladder(fw: Path, pair: dict[str, Any], cites: dict[str, dict[str, Any]]) -> 
         "omitted": [
             {
                 "row": "placed, released, tray still",
-                "reason": "no file or doc gives it for all five models (C70_R1 included)",
+                "reason": "no file or doc gives it for every model (the round's model included)",
             }
         ],
     }
 
 
 # ------------------------------------------------------------------ 2 · round 1 reading
-def round1(fw: Path, cites: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def round1(fw: Path, cites: dict[str, dict[str, Any]], rnd: Round) -> dict[str, Any]:
     if not cites:
         return {}
-    folder = fw / "tray" / "pair60k" / "stage1-60k"
+    folder = fw / rnd.eval_dir
     from_file: dict[str, Any] = {}
-    for run in ("C_70", "C70_R1"):
+    for run in (rnd.baseline, rnd.after_round):
         g = (_dict(folder / f"place-error-{run}.json").get("groups") or {}).get(
             "levels 1-2, L-PLACE-POSE"
         ) or {}
@@ -129,7 +134,7 @@ def round1(fw: Path, cites: dict[str, dict[str, Any]]) -> dict[str, Any]:
         "max_place_error_cm": _item(
             cites.get("max_place_error_cm"),
             check_from_file=from_file,
-            check_source=f"{_STAGE1}/place-error-<id>.json "
+            check_source=f"fwdata/{rnd.eval_dir}/place-error-<id>.json "
             "groups['levels 1-2, L-PLACE-POSE'].distance_m[2]",
         ),
         "relaxed_7_5cm": _item(cites.get("relaxed_7_5cm")),
@@ -182,11 +187,11 @@ def qa_bench(cites: dict[str, dict[str, Any]]) -> dict[str, Any]:
 
 
 # ------------------------------------------------------------------ 4 · failure share
-def fail_share(pair: dict[str, Any]) -> dict[str, Any]:
+def fail_share(pair: dict[str, Any], rnd: Round) -> dict[str, Any]:
     """Per base model, (L-PLACE-POSE + L-TRAY-TILT) / failed runs, from ``pair.runs[].failures``."""
     runs: dict[str, Any] = {}
     for r in pair.get("runs") or []:
-        if r.get("run") == "C70_R1":
+        if r.get("run") == rnd.after_round:
             continue
         f = r.get("failures") or {}
         failed = sum(int(v) for v in f.values() if isinstance(v, (int, float)))
@@ -203,7 +208,7 @@ def fail_share(pair: dict[str, Any]) -> dict[str, Any]:
         return {}
     shares = [v["share"] for v in runs.values()]
     return {
-        "source": "story.pair.runs[].failures (fwdata/tray/pair60k/stage1-60k)",
+        "source": f"story.pair.runs[].failures (fwdata/{rnd.eval_dir})",
         "labels": list(_TILT_PLACE),
         "runs": runs,
         "min": min(shares),
@@ -264,7 +269,7 @@ def round_cost(cites: dict[str, dict[str, Any]]) -> dict[str, Any]:
 
 
 # ------------------------------------------------------------------ 6 · design (slide 9)
-def colab_sessions(fw: Path) -> dict[str, dict[str, Any]]:
+def colab_sessions(fw: Path, sessions: dict[str, str]) -> dict[str, dict[str, Any]]:
     """Training and one-lane serve sessions of the pair runs: GPU and the watcher's wall CU.
 
     ``train`` counts only an exit with reason ``ended`` (the run finished); ``serve`` takes the
@@ -274,7 +279,7 @@ def colab_sessions(fw: Path) -> dict[str, dict[str, Any]]:
     for reg in sorted(fw.glob("colab/batch-*/da34-*.json")):
         stem = reg.stem[len("da34-") :]
         kind = "serve" if stem.startswith("serve-") else "train"
-        model = _SESSIONS.get(stem.removeprefix("serve-"))
+        model = sessions.get(stem.removeprefix("serve-"))
         if model is None:
             continue
         exits = [e for e in _jl(reg.with_suffix(".jsonl")) if e.get("event") == "exit"]
@@ -316,12 +321,13 @@ def design(
     pair: dict[str, Any],
     h1m: dict[str, Any],
     cites: dict[str, dict[str, Any]],
+    rnd: Round,
 ) -> dict[str, Any]:
     def c(name: str, kind: str, **extra: Any) -> dict[str, Any] | None:
         got = cites.get(name)
         return {"id": name, "kind": kind, **got, **extra} if got else None
 
-    sessions = colab_sessions(fw)
+    sessions = colab_sessions(fw, rnd.sessions)
     gen = (cites.get("gen_hours") or {}).get("value") or {}
     qa = (cites.get("qa_hours") or {}).get("value") or {}
     gen_h = gen.get("hours")
@@ -421,15 +427,17 @@ def success_clip(fw: Path) -> dict[str, Any]:
 
 
 # ------------------------------------------------------------------ 9 · model facts
-def models(pair: dict[str, Any], cites: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def models(pair: dict[str, Any], cites: dict[str, dict[str, Any]], rnd: Round) -> dict[str, Any]:
     """Facts to build plain names: episodes, human video, round-1 model. No names here."""
-    ep = {k: (cites.get(k) or {}).get("value") or {} for k in ("ALL", "S70", "R181")}
+    data = rnd.train_sets
+    ep = {k: (cites.get(k) or {}).get("value") or {} for k in sorted(set(data.values()))}
     human = (cites.get("human_video") or {}).get("value") or {}
     used_by = set(human.get("used_by") or [])
-    round_models = {c["variant"] for c in pair.get("comparisons") or [] if c.get("tag") == "r"}
-    data = {"C_ALL": "ALL", "B_ALL": "ALL", "C_70": "S70", "B_70": "S70", "C70_R1": "R181"}
+    round_models = {
+        c["variant"] for c in pair.get("comparisons") or [] if c.get("tag") == rnd.rule_tag
+    }
     runs: dict[str, Any] = {}
-    for m in PAIR_ORDER:
+    for m in rnd.run_ids:
         part = ep.get(data[m]) or {}
         episodes = part.get("episodes")
         if episodes is None and part.get("base") is not None and part.get("targeted") is not None:
@@ -455,20 +463,29 @@ def models(pair: dict[str, Any], cites: dict[str, dict[str, Any]]) -> dict[str, 
 def build(
     fw: Path,
     pair: dict[str, Any],
-    rnd: dict[str, Any],
+    rnd_block: dict[str, Any],
     h1m: dict[str, Any],
     groups: dict[str, dict[str, dict[str, Any]]],
+    rnd: Round | None = None,
 ) -> dict[str, Any]:
     g = groups.get
+    if rnd is None:  # no round holds the story numbers: nothing round-specific to read
+        return {
+            "source": "story.demo: no round in seed/tasks.yaml lists story.pair",
+            "qa_bench": qa_bench(g("qa") or {}),
+            "diagnose": diagnose(rnd_block, g("diagnose") or {}),
+            "round_cost": round_cost(g("cost") or {}),
+            "success_clip": success_clip(fw),
+        }
     return {
         "source": "story.demo: fwdata files read at index time and seed/cited.yaml demo.*",
-        "ladder": ladder(fw, pair, g("ladder") or {}),
-        "round1_reading": round1(fw, g("round1") or {}),
+        "ladder": ladder(fw, pair, g("ladder") or {}, rnd),
+        "round1_reading": round1(fw, g("round1") or {}, rnd),
         "qa_bench": qa_bench(g("qa") or {}),
-        "fail_share": fail_share(pair),
-        "diagnose": diagnose(rnd, g("diagnose") or {}),
-        "design": design(fw, pair, h1m, g("design") or {}),
+        "fail_share": fail_share(pair, rnd),
+        "diagnose": diagnose(rnd_block, g("diagnose") or {}),
+        "design": design(fw, pair, h1m, g("design") or {}, rnd),
         "round_cost": round_cost(g("cost") or {}),
         "success_clip": success_clip(fw),
-        "models": models(pair, g("models") or {}),
+        "models": models(pair, g("models") or {}, rnd),
     }

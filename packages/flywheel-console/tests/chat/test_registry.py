@@ -158,3 +158,155 @@ def test_qa_summary_cut_says_it_has_no_reasons(idx: ConsolePaths) -> None:
     res = registry.call("qa_summary", {"dataset_id": "S70"})
     assert "records no QA decisions or QA failure reasons of its own" in res["model"]
     assert "free text, not a failure count" in res["model"]
+
+
+def test_analysis_question_offers_the_round_report_first(idx: ConsolePaths) -> None:
+    assert registry.offered_names("data", "nhận xét kết quả vòng 1") == ["round_report"]
+    assert registry.offered_names("home", "what is here")[0] == "round_report"
+    assert "round_report" not in registry.offered_names("runs", "loss của C_70")
+
+
+def test_round_report_without_a_manifest_fails_cleanly(idx: ConsolePaths) -> None:
+    res = registry.call("round_report", {}, {"route": "#/home", "task": "tray"})
+    assert res["ok"] is False and "fw console index" in res["model"]
+
+
+def _round_index(idx: ConsolePaths) -> None:
+    """A two-model round in the index: a baseline and the model after the round."""
+    import json
+
+    run = {"n": 60, "failures": {"L-PLACE-POSE": 30, "L-TRAY-TILT": 9}}
+    story = {
+        "pair": {
+            "best": "M_BASE",
+            "runs": [{"run": "M_BASE", "successes": 12, **run},
+                     {"run": "M_NEW", "successes": 6, **run}],
+            "comparisons": [{"variant": "M_NEW", "baseline": "M_BASE", "n": 60, "variant_succ": 6,
+                             "baseline_succ": 12, "ci": [-0.2, 0.03]}],
+        },
+        "round": {"clusters": [{"id": "c1", "stage": "place", "n": 14}, {"id": "c4", "stage": "x"}],
+                  "chain": {"generated": 200, "selected": 100}},
+        "demo": {
+            "ladder": {"standard_cm": "5", "runs": {
+                "M_BASE": {"on_table_b": 50, "relaxed": {"7.5": 15}},
+                "M_NEW": {"on_table_b": 48, "relaxed": {"7.5": 16}}}},
+            "diagnose": {"to_data": ["c1"], "tickets": {"T-1": ["c4"]}},
+            "round_cost": {"total_cu": 50.0, "total_usd": 5.0},
+        },
+    }  # fmt: skip
+    tasks = {
+        "tasks": [
+            {"id": "box", "name": {"vi": "Bê hộp", "en": "Carry the box"}, "rounds": ["box-r1"],
+             "stages": [{"id": "place", "vi": "đặt", "en": "place"}]},
+            {"id": "new", "name": {"vi": "Task mới", "en": "New task"}, "rounds": [], "index": [],
+             "evals": [{"label": {"vi": "bản của tác giả", "en": "authors"},
+                        "n": 10, "successes": 6}],
+             "process": {"1": {"needs": ["catalog"]}, "3": {"needs": ["story.runs"]}}},
+        ],
+        "rounds": [{"id": "box-r1", "task": "box", "title": {"vi": "Vòng 1", "en": "Round 1"},
+                    "baseline": "M_BASE", "after_round": "M_NEW",
+                    "runs": [{"id": "M_BASE", "role": "baseline", "train_set": "A"},
+                             {"id": "M_NEW", "role": "after_round", "train_set": "B"}]}],
+    }  # fmt: skip
+    (idx.index / "story.json").write_text(json.dumps(story), encoding="utf-8")
+    (idx.index / "tasks.json").write_text(json.dumps(tasks), encoding="utf-8")
+
+
+def test_round_report_writes_the_round_in_the_language_asked(idx: ConsolePaths) -> None:
+    _round_index(idx)
+    ctx = {"route": "#/home", "task": "box", "lang": "vi", "question": "nhận xét vòng này"}
+    vi = registry.call("round_report", {}, ctx)
+    assert vi["ok"]
+    t = vi["model"]
+    # roles in plain words, counts from the index, the near-miss reading (15-12 -> 16-6) computed
+    assert "bản gốc M_BASE đạt 12/60 (20%)" in t and "bản sau vòng M_NEW" in t
+    assert "tăng từ 3 lên 10" in t and "từ -20.0 đến +3.0 điểm phần trăm" in t and "T-1" in t
+    assert "50.0 CU" in t and "ĐÃ LÀM RỒI" in t
+    en = registry.call("round_report", {}, {**ctx, "lang": "en", "question": "comment"})["model"]
+    assert "the baseline M_BASE passed 12/60 (20%)" in en and "went from 3 to 10" in en
+    assert "bản gốc" not in en
+
+
+def test_round_report_opens_with_what_the_question_asks(idx: ConsolePaths) -> None:
+    _round_index(idx)
+
+    def first(q: str) -> str:
+        ctx = {"task": "box", "lang": "vi", "question": q}
+        return registry.call("round_report", {}, ctx)["model"].split("\n")[2]
+
+    assert "Bản tốt nhất là bản gốc M_BASE" in first("bản nào tốt nhất?")
+    assert "Lỗi nhiều nhất là đặt lệch vị trí (L-PLACE-POSE): 30 trong 48" in first(
+        "robot hỏng ở đâu?"
+    )
+    assert "Chưa kết luận được" in first("vì sao kết quả chưa tốt lên?")
+    assert "50.0 CU" in first("vòng này tốn bao nhiêu?")
+    cost = registry.call("round_report", {}, {"task": "box", "lang": "vi", "question": "chi phí"})
+    assert "0.50 CU" in cost["model"] and "PHƯƠNG ÁN" not in cost["model"]  # no next steps
+
+
+def test_ego_summary_and_its_offer(idx: ConsolePaths) -> None:
+    assert registry.offered_names("data", "bao nhiêu clip egocentric bị loại?")[0] == "ego_summary"
+    assert registry.call("ego_summary", {}, {"lang": "vi"})["ok"] is False  # no h1m in this index
+
+
+def test_round_report_for_a_task_without_a_round(idx: ConsolePaths) -> None:
+    _round_index(idx)
+    # the task is named in the question; free text the model passes as "task" is ignored
+    ctx = {"lang": "vi", "task": "box", "question": "Task mới đang ở đâu, thiếu gì?"}
+    t = registry.call("round_report", {"task": "cái task mới ấy"}, ctx)["model"]
+    assert "chưa chạy vòng" in t and "đạt 6/10 (60%)" in t and "3 dạy model" in t
+    assert "M_BASE" not in t  # never another task's numbers
+
+
+def test_forced_lookup_only_for_whole_round_questions(idx: ConsolePaths) -> None:
+    f = registry.forced_tool
+    assert f("Nhận xét kết quả của vòng này") == "round_report"
+    assert f("Vòng này tốn bao nhiêu?") == "round_report"
+    assert f("Trong kho có bao nhiêu clip egocentric đã xuất?") == "ego_summary"
+    # a named dataset or policy, or a list request, stays a lookup the model chooses
+    lookups = [
+        "Liệt kê các dataset egocentric",
+        "Tóm tắt QA của tập src_158ec3c8",
+        "Policy C đánh giá ra sao?",
+        "eval C hỏng nhiều nhất ở bước nào",
+        "Chi phí ước tính và thực đo theo từng story là bao nhiêu?",
+        "loss của C_70",
+    ]
+    for q in lookups:
+        assert f(q) is None, q
+
+
+def test_round_report_covers_steps_comparison_and_diagnosis(idx: ConsolePaths) -> None:
+    _round_index(idx)
+
+    def ask(q: str) -> str:
+        assert registry.forced_tool(q) == "round_report", q
+        return registry.call("round_report", {}, {"task": "box", "lang": "vi", "question": q})[
+            "model"
+        ]
+
+    assert "bản gốc M_BASE đạt 12/60" in ask("So sánh các bản model").split("\n")[2]
+    assert "không cặp nào khác biệt chắc chắn" in ask("So sánh các bản model")
+    assert "Chẩn đoán chia lỗi của bản gốc thành 2 nhóm" in ask("Chẩn đoán ra những nhóm lỗi nào?")
+    assert "PHƯƠNG ÁN" not in ask("So sánh các bản model")
+
+
+def test_withheld_result_is_never_given_to_the_model(idx: ConsolePaths) -> None:
+    """Round with ``withhold_eval``: the run's test result leaves every answer of the chat."""
+    import json
+
+    _round_index(idx)
+    p = idx.index / "tasks.json"
+    m = json.loads(p.read_text(encoding="utf-8"))
+    m["rounds"][0]["withhold_eval"] = ["M_NEW"]
+    p.write_text(json.dumps(m), encoding="utf-8")
+    qs = ["nhận xét vòng này", "vì sao kết quả chưa tốt lên?", "M_NEW thi được bao nhiêu?"]
+    qs += ["bản sau vòng đạt bao nhiêu lượt?", "so sánh các bản model", "nên làm gì tiếp?"]
+    for q in qs:
+        assert registry.forced_tool(q) == "round_report", q
+        t = registry.call("round_report", {}, {"task": "box", "lang": "vi", "question": q})["model"]
+        assert "6/60" not in t and "M_NEW" not in t and "tăng từ" not in t, (q, t)
+    ctx = {"task": "box", "lang": "vi", "question": "M_NEW thi được bao nhiêu?"}
+    held = registry.call("round_report", {}, ctx)["model"]
+    assert "không trình bày" in held.split("\n")[2]
+    assert registry.forced_tool("loss của M_NEW") is None  # its training is still a normal lookup

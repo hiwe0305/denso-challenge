@@ -37,7 +37,7 @@ def test_endpoint_is_loopback_tunnel() -> None:
     assert not llm.endpoint_ok("http://example.com:11435")
     assert not llm.endpoint_ok("https://127.0.0.1:11435")
     assert not llm.endpoint_ok("http://127.0.0.1:11434")
-    assert (llm.NUM_CTX, llm.KEEP_ALIVE, llm.MAX_ROUNDS, llm.TURN_CAP_S) == (16384, "30m", 3, 20.0)
+    assert (llm.NUM_CTX, llm.KEEP_ALIVE, llm.MAX_ROUNDS, llm.TURN_CAP_S) == (16384, "30m", 3, 45.0)
 
 
 def test_stream_endpoint_down(idx: ConsolePaths, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -142,8 +142,31 @@ def test_tool_round_cap_ignores_markup_on_last_round(
     evs = list(llm.events({"messages": [{"role": "user", "content": "list the jobs"}],
                            "context": {"route": "#/jobs"}}))  # fmt: skip
     assert sum(1 for e, _ in evs if e == "tool_start") <= llm.MAX_ROUNDS
-    assert calls["n"] <= llm.MAX_ROUNDS + 1
+    assert calls["n"] <= llm.MAX_ROUNDS + 2  # the capped rounds, then one forced answer
     assert evs[-1][0] == "done"
+
+
+def test_lookups_without_an_answer_get_one_forced_answer_round(
+    idx: ConsolePaths, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Seen 16/11/2026: Nemotron asked for a lookup on every round and wrote nothing."""
+    seen: list[Any] = []
+
+    def fake_generate(msgs: Any, schemas: Any, deadline: float) -> Any:
+        seen.append((schemas is not None, msgs[-1]["role"]))
+        if len(seen) <= llm.MAX_ROUNDS + 1:
+            yield "end", ("", [{"name": "job_list", "arguments": {}}], 1, 1)
+        else:
+            yield "tok", "no jobs"
+            yield "end", ("no jobs", [], 1, 1)
+
+    monkeypatch.setattr(llm, "generate", fake_generate)
+    monkeypatch.setattr(runner, "TUNNEL", FakeTunnel(up=True))
+    evs = list(llm.events({"messages": [{"role": "user", "content": "list the jobs"}],
+                           "context": {"route": "#/jobs"}}))  # fmt: skip
+    assert seen[-1] == (False, "user") and len(seen) == llm.MAX_ROUNDS + 2
+    assert ("token", {"text": "no jobs"}) in evs
+    assert evs[-1][0] == "done" and not evs[-1][1].get("no_narration")
 
 
 def test_bench_any_of_dataset_ids(idx: ConsolePaths) -> None:
@@ -217,3 +240,61 @@ def test_loopback_calls_ignore_http_proxy(monkeypatch: pytest.MonkeyPatch) -> No
     finally:
         srv.shutdown()
         monkeypatch.setattr(urllib.request, "_opener", None)
+
+
+def test_bare_call_text_is_a_call_and_is_never_shown() -> None:
+    """Seen 16/11/2026: a call came as plain text ``round_report{task:...}`` in the chat."""
+    assert llm._maybe_call_start("round_rep") and llm._maybe_call_start("call:ego")
+    assert not llm._maybe_call_start("Số liệu") and not llm._maybe_call_start("round one was")
+    m = llm._MARK.search("round_report{task:")
+    assert m and m.start() == 0
+    assert llm._MARK.search("Kết quả {a}") is None  # a brace inside prose is not a call
+    calls = llm.parse_markup_calls('call:round_report{task:<|"|>tray<|"|>}')
+    assert calls == [{"name": "round_report", "arguments": {"task": "tray"}}]
+    bare = llm.parse_markup_calls("call:round_report{}")
+    assert bare == [{"name": "round_report", "arguments": {}}]
+
+
+def test_analysis_question_runs_the_round_lookup_in_code(
+    idx: ConsolePaths, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The model is never asked to call round_report: the code calls it, then asks to answer."""
+    seen: list[Any] = []
+
+    def fake_generate(msgs: Any, schemas: Any, deadline: float) -> Any:
+        seen.append((schemas, [m["role"] for m in msgs][-2:]))
+        yield "tok", "ok"
+        yield "end", ("ok", [{"name": "job_list", "arguments": {}}], 1, 1)
+
+    monkeypatch.setattr(llm, "generate", fake_generate)
+    monkeypatch.setattr(runner, "TUNNEL", FakeTunnel(up=True))
+    evs = list(llm.events({"messages": [{"role": "user", "content": "nhận xét kết quả vòng này"}],
+                           "context": {"route": "#/home"}}))  # fmt: skip
+    starts = [d["name"] for e, d in evs if e == "tool_start"]
+    assert starts == [
+        "round_report"
+    ]  # run once, by the code; the text call of the model is ignored
+    assert seen == [(None, ["assistant", "tool"])]
+    assert ("token", {"text": "ok"}) in evs and evs[-1][0] == "done"
+
+
+def test_tool_answer_is_shown_as_it_stands(
+    idx: ConsolePaths, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A tool may return the answer itself (a withheld result): no model call words it."""
+    called: list[Any] = []
+
+    def fake_generate(msgs: Any, schemas: Any, deadline: float) -> Any:
+        called.append(1)
+        yield "end", ("the model made something up", [], 1, 1)
+
+    def fake_call(name: str, args: Any, ctx: Any) -> dict[str, Any]:
+        ui = {"type": "text", "text": "x"}
+        return {"ok": True, "ui": ui, "model": "x", "answer": "Not shown."}
+
+    monkeypatch.setattr(llm, "generate", fake_generate)
+    monkeypatch.setattr(llm.registry, "call", fake_call)
+    monkeypatch.setattr(runner, "TUNNEL", FakeTunnel(up=True))
+    evs = list(llm.events({"messages": [{"role": "user", "content": "nhận xét kết quả vòng này"}],
+                           "context": {"route": "#/home"}}))  # fmt: skip
+    assert not called and ("token", {"text": "Not shown."}) in evs and evs[-1][0] == "done"

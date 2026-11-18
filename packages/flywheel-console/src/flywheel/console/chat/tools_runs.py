@@ -323,6 +323,18 @@ def log_tail(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
 
 
 # ------------------------------------------------------------------ eval and loop
+# said first in every answer built on story.json["eval"], so its numbers are not read as the round's
+EARLIER = (
+    "NOTE: this is the EARLIER evaluation of policy C (40k steps, per level), run before the "
+    "Failure -> Data round. Say so. The current round's results (60 runs per model) are in "
+    "round_report."
+)
+LEDGER_SCOPE = (
+    "NOTE: this is the ledger of every story of the project. The cost of the current round alone "
+    "is in round_report."
+)
+
+
 def eval_data() -> dict[str, Any] | None:
     """``story.json["eval"]`` (cited numbers of docs/he/tray.md); None when the index has none."""
     ev = story().get("eval")
@@ -363,7 +375,8 @@ def eval_summary(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         funnel,
         table("Failure labels", cols("label", "L0", "L1", "L2", "L1-2"), rows),
     ]
-    lines = ["eval policy {} on dev ({})".format(ev.get("policy", "C"), ev.get("source", ""))]
+    lines = [EARLIER]
+    lines.append("eval policy {} on dev ({})".format(ev.get("policy", "C"), ev.get("source", "")))
     for x in lv:
         lines.append(
             "%s: %d/%d success = %.1f%%; stage pass %% = %s"  # noqa: UP031
@@ -455,7 +468,9 @@ def loop_proposals(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         rows,
         link="#/loop",
     )
-    head = "clusters on eval {} (n of 240 rollouts at L1-2): ".format(ev.get("policy", "C"))
+    head = EARLIER + "\nclusters on eval {} (n of 240 rollouts at L1-2): ".format(
+        ev.get("policy", "C")
+    )
     return result(
         ui,
         head
@@ -498,7 +513,8 @@ def ledger_query(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         )
         return result(
             ui,
-            "ledger by story, estimate and measured are separate rows. total estimated={} USD, total measured={} USD.\n{}".format(  # noqa: E501
+            LEDGER_SCOPE
+            + "\nledger by story, estimate and measured are separate rows. total estimated={} USD, total measured={} USD.\n{}".format(  # noqa: E501
                 te, tm, rows_text(rows, ["story", "measure_kind", "usd"], 24)
             ),
         )

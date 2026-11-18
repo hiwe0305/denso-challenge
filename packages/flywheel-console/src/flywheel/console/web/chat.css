@@ -48,3 +48,8 @@
 #chat .ch-code { overflow-x: auto; }
 #chat .ch-code table.u td { max-width: 180px; }
 #chat .ch-code table.u th { position: static; }
+#chat .ch-ask { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 10px; font-family: var(--sans); }
+#chat .ch-ask small { color: var(--text-3); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+#chat .ch-ask button { text-align: left; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 13px; cursor: pointer; }
+#chat .ch-ask button:hover { border-color: var(--accent); color: var(--accent); }
+#chat .ch-llm { white-space: pre-wrap; font: 13.5px/1.55 var(--sans); }

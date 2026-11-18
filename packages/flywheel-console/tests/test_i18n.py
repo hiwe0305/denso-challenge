@@ -50,16 +50,28 @@ def test_word_rule_catches_long_lead_and_long_station(tmp_path: Path) -> None:
 # and every value the data can produce must have a key in both dictionaries.
 DYNAMIC = {
     "st.": [f"{n}.{k}" for n in range(0, 7) for k in ("name", "q", "a", "in", "do", "out", "risk")],
-    "run.": ["C_ALL", "C_70", "B_ALL", "B_70", "C70_R1"],
+    "orig.": ["file", "cited", "file.tip", "cited.tip"],
     "fig.step.": ["approach_a", "grasp", "lift", "carry", "reach_b", "place", "release_stand"],
     "fig.mix.": ["coverage", "prev", "round", "teleop"],
-    "fig.cut.": ["ALL", "S70", "C70_R1"],
+    "fig.cut.": ["ALL", "S70", "round"],
     "fig.sha.": ["tar", "marker"],
     "fig.loop.": [str(i) for i in range(1, 7)],
     "fig.src.": [f"{s}.{k}" for s in ("ego", "tele", "sim") for k in ("t", "d")],
     "sim.tab.": ["gallery", "quality", "all"],
     "fol.s": [f"{i}.t" for i in range(1, 6)],
     "fail.": ["L-PLACE-POSE", "L-TIMEOUT", "L-ONE-HAND", "L-TRAY-TILT", "L-PART-DROP"],
+    # brief 2 · T2: stage names and lines, tabs, run states, columns, job outputs
+    "pr.": [f"{n}.{k}" for n in range(0, 7) for k in ("name", "sub")],
+    "pr.s.": ["done", "ok", "run", "running", "queued", "none", "failed", "cancelled", "remote"],
+    "tab.": ["result", "how", "log", "runs", "try"],
+    "pr.c.": ["name", "task", "mach", "state", "when", "dur", "res", "open"],
+    "tk.new.": [f"{i}.{k}" for i in range(1, 5) for k in ("t", "d")],
+    "tk.u.": [str(n) for n in range(1, 7)],
+    "chat.q": [str(n) for n in range(1, 6)],
+    "eg.": [f"{i}.{k}" for i in range(1, 8) for k in ("t", "d", "m")],
+    "eg.m": [f"{i}.{k}" for i in range(1, 6) for k in ("n", "d")],
+    "pr.home.c.": ["step", "state", "last", "num", "cost", "wait"],
+    "pr.out.": ["findings", "skipped", "episodes", "passed", "failed", "clusters"],
 }
 
 
@@ -76,9 +88,9 @@ def test_dynamic_keys_are_listed_and_exist() -> None:
 
 
 def test_old_routes_redirect_to_their_station() -> None:
-    """Old hashes keep working (design 5.1); `process` belongs to step 2 (pipeline view).
-    Flywheel v0.3 design 4: the old station 3 "packaging" (export panel) is part of step 1,
-    #/diagnose is step 5."""
+    """Old hashes keep working (design 5.1). Brief 2 · T2: step 2 is the QA page, the jobs views
+    (pipeline, export, import, machines) are operations, #/cost is the ledger, #/diagnose is step 5,
+    and the wheel moved from #/home?s= to #/report?s=."""
     src = (WEB / "app.js").read_text(encoding="utf-8")
     m = re.search(r"const REDIRECT = \{(.*?)\};", src)
     assert m
@@ -86,9 +98,11 @@ def test_old_routes_redirect_to_their_station() -> None:
     assert red["process"] == "jobs?view=pipeline" and red["training"] == "runs"
     assert red["agent"] == "qa" and red["overview"] == "home"
     ex = (WEB / "explain.js").read_text(encoding="utf-8")
-    assert 'qs.view === "pipeline")) return 2' in ex and 'qs.panel === "export") return 1' in ex
+    assert 'p === "qa" || p === "agent") return 2' in ex and 'p === "cost") return 0' in ex
     assert 'p === "diagnose") return 5' in ex and 'p === "runs" || p === "training") return 3' in ex
-    assert 'qs.tab === "cost" ? 0 : 6' in ex
+    assert 'qs.tab === "cost" ? 0 : 6' in ex and 'p === "jobs"' not in ex
+    assert 'path === "home" && (q0.s != null || q0.tour != null) ? "report"' in src
+    assert 'path === "loop" && q0.tab === "cost" ? "cost"' in src
 
 
 def test_sidebar_uses_steps_not_stations() -> None:

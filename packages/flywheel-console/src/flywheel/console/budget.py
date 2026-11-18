@@ -24,13 +24,16 @@ BUDGET: dict[str, int] = {
     "chat.js": 60,
     "core.js": 60,
     "index.html": 26,  # brand line in the top bar (flywheel v0.3 design 6)
-    "tour.js": 10,
+    "tour.js": 10,  # removed in brief 2 · T2; entries kept for older checkouts and tests
     "ring.js": 25,
     "explain.js": 60,  # source labels of the numbers (tooltips built in code)
     "pages_start.js": 30,  # SVG path templates and class ternaries count; text is in i18n
     "pages_sim.js": 30,  # source labels of the card counts (tooltips built in code)
     "pages_wheel.js": 30,  # SVG path templates and class names; text is in i18n
     "pages_steps.js": 60,  # run ids used as index keys, units and source labels; text is in i18n
+    "pages_proc.js": 40,  # stage template, overview and Chạy thử (brief 2 · T2); text is in i18n
+    "pages_ego.js": 20,  # the seven fw egocentric commands; text is in i18n
+    "pages_tasks.js": 30,  # workspace cards, stage strip, add-a-task command names
 }
 # Dictionary rule (one-site design 5.5, a change to BA 15.1b): a lead (key ending ".a" or ".lead")
 # has at most LEAD_WORDS words; all "st.N.*" text of one station has at most STATION_WORDS.

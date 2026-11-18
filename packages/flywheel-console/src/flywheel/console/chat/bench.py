@@ -165,7 +165,7 @@ def run_item(item: dict[str, Any]) -> tuple[list[Event], float]:
 
 def run(tag: str | None = None, limit: int = 0, groups: str = "") -> dict[str, Any]:
     """Run the bench against the live model; writes ``<chat>/bench-<ts>.json`` for a full run."""
-    if not runner.TUNNEL.ensure(15):
+    if llm.needs_tunnel(llm.provider()) and not runner.TUNNEL.ensure(15):
         raise RuntimeError("model tunnel to rtx3060 is down; bench not run, no file written")
     rows: list[dict[str, Any]] = []
     lat: list[float] = []

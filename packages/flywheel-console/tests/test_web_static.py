@@ -72,9 +72,59 @@ def test_episode_page_maps_404_to_empty_state() -> None:
 
 def test_loop_numbers_come_from_story_not_literals() -> None:
     code = re.compile(r"""(?<![\w.])(?<!W = )(?:262|229|177|160|240)(?![\w.])|131/240""")
-    for name in ("pages_story.js", "ring.js"):
+    for name in ("pages_story.js",):
         text = (WEB / name).read_text(encoding="utf-8")
         text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
         text = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("//"))
         hits = [m.group(0) for m in code.finditer(text)]
         assert not hits, f"{name}: hard-coded loop numbers {hits}"
+
+
+def test_no_round_ids_seed_or_step_count_in_web() -> None:
+    """Run ids, follow seed and step count live in seed/tasks.yaml (read through TASK, core.js)."""
+    typed = re.compile(r"\b(?:C_70|C70_R1|C_ALL|B_ALL|B_70|1000107|60000|60_000)\b")
+    for f in sorted(WEB.glob("*.js")) + sorted((WEB / "i18n").glob("*.js")):
+        text = re.sub(r"/\*.*?\*/", "", f.read_text(encoding="utf-8"), flags=re.S)
+        text = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("//"))
+        hits = sorted({m.group(0) for m in typed.finditer(text)})
+        assert not hits, f"{f.name}: typed round facts {hits}; read them from TASK"
+
+
+def test_dead_demo_files_and_run_tables_are_gone() -> None:
+    """Brief 2 · T2: v4 ring, caption tour and the 40k C/C+ tables (dead code naming runs)."""
+    for name in ("ring.js", "tour.js", "tour.css"):
+        assert not (WEB / name).exists(), name
+    html = (WEB / "index.html").read_text(encoding="utf-8")
+    assert "ring.js" not in html and "tour.js" not in html and "pages_proc.js" in html
+    story = (WEB / "pages_story.js").read_text(encoding="utf-8")
+    assert "STATIC_RUNS" not in story and '"C+"' not in story
+
+
+def test_try_panels_come_from_the_kinds_endpoint() -> None:
+    """Chạy thử lists what /api/kinds returns; no kind or sample list is typed in the page."""
+    src = (WEB / "pages_proc.js").read_text(encoding="utf-8")
+    assert 'fetch("/api/kinds")' in src
+    assert '"/api/jobs", { method: "POST"' in src
+    assert not re.search(r'kind: "(?:data|eval|ego|agentqa)\.', src)
+
+
+def test_lock_mode_sends_no_refused_requests() -> None:
+    """A locked server answers 403 to /api/chat/traces: the QA page and the chat must not ask."""
+    story = (WEB / "pages_story.js").read_text(encoding="utf-8")
+    assert 'UI.locked ? Promise.resolve(null) : tryApi("/api/chat/traces' in story
+    chat = (WEB / "chat.js").read_text(encoding="utf-8")
+    body = chat.split("async function showTraces()", 1)[1]
+    assert body.index("if (UI.locked)") < body.index('fetch("/api/chat/traces')
+
+
+def test_lock_mode_hides_nothing() -> None:
+    """Lock mode is read-only, not another site: no rule hides side groups, panel or selectors."""
+    css = (WEB / "style.css").read_text(encoding="utf-8")
+    hidden = (
+        "html.locked #rp",
+        "html.locked #task",
+        "html.locked #side .sg.ops",
+        "html.locked #srch",
+    )
+    for sel in hidden:
+        assert sel not in css, sel

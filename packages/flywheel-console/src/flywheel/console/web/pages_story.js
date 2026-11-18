@@ -10,7 +10,7 @@ const CMD = {
   train: "finetune_simple_psi0_config", evalRun: "python -m flywheel_psi0.tray.eval_batch --level 1,2", evalRead: "python -m flywheel_psi0.tray.eval_results --json", gen: "generate.py --conditions",
   qaRun: "fw agentqa run --model nemotron --out D", qaReview: "fw agentqa review --reports D/reports.jsonl", qaBench: "python -m flywheel.eval.agentqa.bench"
 };
-const NUMCLS = "n ops-mono", AMACH = "colab A100", EV_SRC = "docs/he/tray.md", EV_16 = "tray.md §16.6", EV_17 = "tray.md §17.5";
+const NUMCLS = "n ops-mono", AMACH = "colab A100", EV_SRC = "docs/he/tray.md";
 K.GR = GR;
 /* @budget-skip-end */
 
@@ -48,7 +48,8 @@ function poll(fn, ms, owner) {
   return t;
 }
 let _story = null;
-const story = () => _story || (_story = fetch("data/story.json").then(r => r.json()));
+/* the same scoping as STORY (TASK.scopeStory): another task's keys and a round's withheld results are left out */
+const story = () => (_story || (_story = fetch("data/story.json").then(r => r.json()))).then(s => TASK.scopeStory(s));
 const cv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const col = {
   text: () => cv("--text"), t2: () => cv("--text-2"), t3: () => cv("--text-3"), line: () => cv("--line"),
@@ -58,8 +59,9 @@ const col = {
 /* series colour per run id, fixed order, shared by every page */
 /* series colour i, read from the active theme at call time */
 const ser = i => cv("--s" + (((i % 8) + 8) % 8 + 1));
-const RUN_ORDER = ["B_70", "C_70", "C_ALL", "C", "C+", "B_ALL"];
-const runColor = id => { if (typeof UI !== "undefined" && UI.color) return UI.color(id); const i = RUN_ORDER.indexOf(id); return ser(i < 0 ? RUN_ORDER.length : i); };
+/* fallback order when UI.color is missing: the round's runs (seed/tasks.yaml) */
+const runOrder = () => (typeof TASK !== "undefined" ? TASK.runs() : []);
+const runColor = id => { if (typeof UI !== "undefined" && UI.color) return UI.color(id); const o = runOrder(), i = o.indexOf(id); return ser(i < 0 ? o.length : i); };
 const num = (v, f) => (typeof UI !== "undefined" && UI.fmt) ? UI.fmt(v, f) : (v == null ? "—" : String(v));
 const dash = v => (v == null || v === "") ? "—" : v;
 function secs(s) {
@@ -134,6 +136,8 @@ function css() {
 
 /* tables: UI.Table with a safe fallback while core.js components land */
 function table(spec) {
+  const colLab = c => tt("ops.col." + (c.label || c.key).toLowerCase().replace(/[^a-z0-9]+/g, "_"), c.label || c.key);
+  spec = Object.assign({}, spec, { columns: spec.columns.map(c => Object.assign({}, c, { label: colLab(c) })) });
   if (typeof UI !== "undefined" && UI.Table) return UI.Table(spec);
   const t = h("table", { class: "ops-tbl" }, [
     h("thead", null, h("tr", null, spec.columns.map(c => h("th", { text: c.label })))),
@@ -141,11 +145,17 @@ function table(spec) {
       spec.columns.map(c => { const v = c.fmt ? c.fmt(r[c.key], r) : r[c.key]; return h("td", { class: c.align === "right" ? NUMCLS : (c.mono ? "ops-mono" : "") }, v instanceof Node ? v : dash(v)); }))))]);
   return h("div", null, t);
 }
-function sec(label, right) { return h("div", { class: "ops-sec" }, [label, h("span", { class: "sp" }), right || null]); }
+/* panel titles and column headers read the dictionary (ops.<label>, ops.col.<key>); an unknown one stays as written */
+const tt = (k, fb) => { const v = t(k); return v === k ? fb : v; };
+const lab = x => typeof x === "string" ? tt("ops." + x.toLowerCase().replace(/[^a-z0-9]+/g, "_"), x) : x;
+function sec(label, right) { return h("div", { class: "ops-sec" }, [lab(label), h("span", { class: "sp" }), right || null]); }
 function panel(label, body, right, style) { return h("div", { class: "ops-panel", style }, [sec(label, right), body]); }
 function pageHead(title, stat, actions) {
-  if (typeof UI !== "undefined" && UI.page) return UI.page({ title, stat, actions });
-  return h("div", { class: "ops-row", style: { height: "40px" } }, [h("b", { text: title })]);
+  const acts = actions == null ? [] : [].concat(actions), st = stat && stat.length ? stat.map(x => Object.assign({}, x, { label: lab(x.label) })) : null;
+  /* on a process stage the stage header (PROC.head) names the page; elsewhere (Jobs) the page keeps its title */
+  const stage = typeof EXPLAIN !== "undefined" && EXPLAIN.stationOf(location.hash.replace(/^#\/?/, "").split("?")[0], UI.qs()) != null;
+  if (!stage && typeof UI !== "undefined" && UI.page) return UI.page({ title: lab(title), stat: st, actions: acts.length ? acts : null });
+  return h("div", { class: "ops-row pr-statrow" }, [st ? statLine(st) : null, ...acts]);
 }
 function statLine(items) { return (typeof UI !== "undefined" && UI.StatLine) ? UI.StatLine(items) : h("div", { class: "ops-mono", text: items.map(i => i.label + " " + i.value).join(" · ") }); }
 function logView(spec) { return (typeof UI !== "undefined" && UI.Log) ? UI.Log(spec) : h("pre", { class: "ops-mono", text: spec.text || "" }); }
@@ -172,11 +182,7 @@ Object.assign(K, { ec, axis, setPanel, box, ser });
 const ema = (pts, a) => { let m = null; return pts.map(([x, y]) => { m = m == null ? y : a * m + (1 - a) * y; return [x, m]; }); };
 
 /* ============================================================ RUNS */
-const STATIC_RUNS = [
-  { id: "C", machine: "Colab", step: 40000, cu: 16.0 },
-  { id: "C+", machine: "Colab", step: 40000, cu: 16.1 }
-];
-/* abandoned attempts (C70_R1.attempt1) were re-run in full; they are not runs of the experiment */
+/* abandoned attempts (branch "<run>.attempt1") were re-run in full; they are not runs of the experiment */
 const notAttempt = r => !/\.attempt/.test(r.branch || "");
 const IDENTITY_KEYS = new Set(["exp", "timestamp", "train.output_dir"]);
 function flatConfig(r) {
@@ -215,20 +221,18 @@ async function runsPage(main, params, qs) {
     smooth: q.smooth != null ? Math.min(.99, Math.max(0, +q.smooth)) : .9,
     logy: q.logy == null ? true : q.logy === "1" || q.logy === "true", raw: q.raw === "1",
     step: q.step != null ? +q.step : null,
-    old: q.old === "1",
     cur: null
   };
-  const setQs = () => { try { UI.setQs({ sel: [...state.sel].join(","), cmp: [...state.cmp].join(",") || null, smooth: state.smooth, logy: state.logy ? 1 : 0, raw: state.raw ? 1 : null, old: state.old ? 1 : null }); } catch (e) { /* no router */ } };
+  const setQs = () => { try { UI.setQs({ sel: [...state.sel].join(","), cmp: [...state.cmp].join(",") || null, smooth: state.smooth, logy: state.logy ? 1 : 0, raw: state.raw ? 1 : null }); } catch (e) { /* no router */ } };
   const lastEma = r => { const e = ema(r.loss, state.smooth); return e.length ? e[e.length - 1][1] : null; };
-  const rowsOf = () => live.map(r => ({ id: r.branch, step: r.step, max: r.max_steps, loss: r.ema50 != null ? r.ema50 : lastEma(r), machine: r.machine, cu: null, updated: r.mtime, live: true }))
-    .concat(STATIC_RUNS.filter(r => state.old && !liveBy(r.id)).map(r => ({ id: r.id, step: r.step, max: 60000, loss: null, machine: r.machine, cu: r.cu, updated: null, live: false, done: true })));
+  const rowsOf = () => live.map(r => ({ id: r.branch, step: r.step, max: r.max_steps, loss: r.ema50 != null ? r.ema50 : lastEma(r), machine: r.machine, cu: cuOf(r.branch), updated: r.mtime, live: true }));
+  /* CU per model: story.demo.design.resource train_cu (index), never typed */
+  const cuOf = id => { const x = ((((S.demo || {}).design || {}).resource) || []).find(y => y.id === "train_cu"); return x && x.per_model_cu && x.per_model_cu[id] != null ? x.per_model_cu[id] : null; };
   const liveBy = id => live.find(r => r.branch === id);
 
   /* header */
   const stat = [{ label: "runs", value: String(live.length) }, { label: "CU", value: num((S.colab_balance.at(-1) || [])[1], "float1") }];
-  /* the two 40k runs (C, C+) predate the 60k experiment: hidden unless asked for */
-  const oldBtn = h("button", { class: "ops-btn" + (state.old ? " on" : ""), title: "C, C+ @40k", text: "40k", onclick: () => { state.old = !state.old; oldBtn.classList.toggle("on", state.old); drawTable(); setQs(); } });
-  main.appendChild(pageHead("Runs", stat, [oldBtn]));
+  main.appendChild(pageHead("Runs", stat));
 
   /* left: table */
   const tbox = h("div", { style: { overflowX: "auto" } });
@@ -242,8 +246,8 @@ async function runsPage(main, params, qs) {
         { key: "id", label: "run", mono: true, fmt: (v, r) => h("span", { class: "ops-row", style: { gap: "6px", flexWrap: "nowrap" } }, [
           h("span", { class: "ops-dot", style: { background: runColor(v) } }),
           r.live ? h("button", { class: "ops-eye" + (state.sel.has(v) ? "" : " off"), title: "show", onclick: e => { e.stopPropagation(); state.sel.has(v) ? state.sel.delete(v) : state.sel.add(v); drawTable(); drawCharts(); setQs(); } }, "◉") : h("span", { class: "ops-eye off" }, "◉"),
-          h("span", { class: "ops-mono", text: v }), state.cmp.has(v) ? h("span", { class: "ops-tag", style: { color: col.acc() } }, "x") : null]) },
-        { key: "step", label: "step/60k", align: "right", mono: true, fmt: (v, r) => v == null ? "—" : h("span", { class: "ops-row", style: { gap: "6px", flexWrap: "nowrap", justifyContent: "flex-end" } }, [h("span", { class: "ops-bar", style: { width: "44px" } }, h("i", { style: { width: Math.min(100, v / (r.max || 60000) * 100) + "%", background: runColor(r.id) } })), (v >= 1000 ? num(v / 1000, "float1") + "k" : String(v))]) },
+          h("span", { class: "ops-mono", title: v, text: EXPLAIN.runName(v) }), state.cmp.has(v) ? h("span", { class: "ops-tag", style: { color: col.acc() } }, "x") : null]) },
+        { key: "step", label: "step/" + (TASK.maxSteps() ? num(TASK.maxSteps() / 1000, "int") + "k" : "max"), align: "right", mono: true, fmt: (v, r) => v == null ? "—" : h("span", { class: "ops-row", style: { gap: "6px", flexWrap: "nowrap", justifyContent: "flex-end" } }, [h("span", { class: "ops-bar", style: { width: "44px" } }, h("i", { style: { width: Math.min(100, v / (r.max || TASK.maxSteps() || v || 1) * 100) + "%", background: runColor(r.id) } })), (v >= 1000 ? num(v / 1000, "float1") + "k" : String(v))]) },
         { key: "loss", align: "right", mono: true, fmt: v => v == null ? "—" : num(v, "float3") },
         { key: "machine", label: "host", fmt: v => v ? String(v).replace(/^colab /, "") : "—" },
         { key: "cu", label: "CU", align: "right", mono: true, fmt: v => v == null ? "—" : num(v, "float1") },
@@ -262,8 +266,8 @@ async function runsPage(main, params, qs) {
     ctx({ route: "runs", selection: { runs: [...state.sel], compare: [...state.cmp] } });
     const r = liveBy(state.cur) || live[0]; if (!r) return;
     const c = flatConfig(r);
-    setPanel({ method: [{ step: "train", cmd: CMD.train + " " + Object.keys(c.flags || c).filter(k => /^(seed|data\.root_dir|model\.model_name_or_path)$/.test(k)).map(k => "--" + k + "=" + c[k]).join(" ") }, { step: "metrics", cfg: "fwdata/tray/pair60k/" + r.branch + "/" + r.run + "/metrics.jsonl" }],
-      log: null, sources: [{ label: r.branch + " metrics", path: "fwdata/tray/pair60k/" + r.branch + "/" + r.run + "/metrics.jsonl" }, { label: "launch", path: "fwdata/tray/pair60k/" + r.branch + "/" + r.run + "/launch.json" }] });
+    setPanel({ method: [{ step: "train", cmd: CMD.train + " " + Object.keys(c.flags || c).filter(k => /^(seed|data\.root_dir|model\.model_name_or_path)$/.test(k)).map(k => "--" + k + "=" + c[k]).join(" ") }, { step: "metrics", cfg: "fwdata/" + TASK.trainDir() + "/" + r.branch + "/" + r.run + "/metrics.jsonl" }],
+      log: null, sources: [{ label: r.branch + " metrics", path: "fwdata/" + TASK.trainDir() + "/" + r.branch + "/" + r.run + "/metrics.jsonl" }, { label: "launch", path: "fwdata/" + TASK.trainDir() + "/" + r.branch + "/" + r.run + "/launch.json" }] });
   }
 
   /* right: charts */
@@ -287,7 +291,7 @@ async function runsPage(main, params, qs) {
     const rs = vis();
     const stepLine = state.step != null ? { silent: true, symbol: "none", lineStyle: { color: col.warn(), type: "dashed" }, label: { formatter: String(state.step), color: col.warn() }, data: [{ xAxis: state.step }] } : undefined;
     const xmax = Math.ceil(Math.max(1000, ...live.map(r => r.step || 0)) * 1.05);
-    const target = { silent: true, symbol: "none", lineStyle: { color: col.t3(), type: "dashed" }, label: { formatter: "target", color: col.t3() }, data: [{ xAxis: 60000 }] };
+    const target = { silent: true, symbol: "none", lineStyle: { color: col.t3(), type: "dashed" }, label: { formatter: "target", color: col.t3() }, data: TASK.maxSteps() ? [{ xAxis: TASK.maxSteps() }] : [] };
     const lossSeries = rs.flatMap((r, i) => {
       const c = runColor(r.branch);
       return (state.raw ? [{ name: r.branch + " raw", type: "line", showSymbol: false, data: r.loss, lineStyle: { width: 1, color: c, opacity: .15 }, silent: true, z: 1 }] : []).concat([
@@ -323,15 +327,10 @@ async function runsPage(main, params, qs) {
       ? h("table", { class: "ops-tbl" }, [h("thead", null, h("tr", null, [h("th", { text: "key" })].concat(ids.map(id => h("th", { style: { color: runColor(id) }, text: id }))))),
         h("tbody", null, keys.map(k => h("tr", null, [h("td", { class: "ops-mono", text: k })].concat(cfgs.map(c => h("td", { class: "ops-mono", title: dash(c[k]), text: c[k] == null ? "—" : tail(c[k]) }))))))])
       : h("span", { class: "ops-mono", style: { color: col.t2() }, text: "none" }),
-      h("button", { class: "ops-btn", text: "Clear", onclick: () => { state.cmp.clear(); drawTable(); drawDiff(); setQs(); } })));
+      h("button", { class: "ops-btn", text: lab("Clear"), onclick: () => { state.cmp.clear(); drawTable(); drawDiff(); setQs(); } })));
   }
 
-  /* log (always visible) */
-  const logSel = h("select", { class: "ops-in", onchange: e => drawLog(e.target.value) }, [{ id: "C_70", t: "train.log" }].map(o => h("option", { value: o.id, text: o.t })));
-  const logBox = h("div", { style: { height: "200px", display: "flex", flexDirection: "column" } });
-  function drawLog() { logBox.replaceChildren(logView({ text: (S.train_log_tail || []).join("\n"), follow: true })); logBox.firstChild && (logBox.firstChild.style.flex = "1"); }
-  drawLog();
-
+  /* the training log lives in the stage's Log tab (PROC.log), not under the charts */
   /* layout */
   const right = h("div", { class: "ops-wrap", style: { minWidth: 0 } }, [
     panel("Loss", lossBox, lossRight),
@@ -339,12 +338,11 @@ async function runsPage(main, params, qs) {
     h("div", { class: "ops-grid", style: { gridTemplateColumns: "repeat(3,minmax(0,1fr))" } }, [panel("Throughput", thrBox), panel("VRAM", vramBox), panel("CU burn", cuBox)])
   ]);
   const root = h("div", { class: "ops-wrap" }, [
-    h("div", { class: "ops-grid", style: { gridTemplateColumns: GR.runs, alignItems: "start" } }, [h("div", { class: "ops-wrap", style: { minWidth: 0 } }, [panel("Runs", tbox, h("button", { class: "ops-btn", text: "Compare", onclick: () => { if (state.cmp.size < 2) live.slice(0, 2).forEach(r => state.cmp.add(r.branch)); drawTable(); drawDiff(); setQs(); } })), diffBox]), right]),
-    h("div", { class: "ops-sticky" }, panel("Log", logBox, logSel))
+    h("div", { class: "ops-grid", style: { gridTemplateColumns: GR.runs, alignItems: "start" } }, [h("div", { class: "ops-wrap", style: { minWidth: 0 } }, [panel("Runs", tbox, h("button", { class: "ops-btn", text: lab("Compare"), onclick: () => { if (state.cmp.size < 2) live.slice(0, 2).forEach(r => state.cmp.add(r.branch)); drawTable(); drawDiff(); setQs(); } })), diffBox]), right])
   ]);
   main.appendChild(root);
   drawTable(); drawCharts(); drawDiff();
-  poll(async () => { live = await loadLive(S); drawTable(); drawCharts(); drawDiff(); }, 60000, root);
+  poll(async () => { live = await loadLive(S); drawTable(); drawCharts(); drawDiff(); }, 60 * 1000, root);
   bindKeys({
     x: () => { const r = curRow(); if (r) toggleCmp(r.id); },
     c: () => { if (state.cmp.size < 2) live.slice(0, 2).forEach(r => state.cmp.add(r.branch)); drawTable(); drawDiff(); setQs(); }
@@ -352,29 +350,7 @@ async function runsPage(main, params, qs) {
 }
 
 /* ============================================================ EVAL */
-let STAGES = [], LV = [], FAIL = {}, PLACE_CM = {}, EV = {}, LC = [], LD = {};
-function useEval(S) {
-  EV = S.eval || {};
-  LC = S.loop_chain || []; LD = S.loop_detail || {};
-  STAGES = EV.stages || [];
-  LV = (EV.levels || []).map(l => ({ id: l.level, n: l.n, s: l.successes, f: l.steps_pct }));
-  FAIL = {}; Object.keys(EV.failure_labels || {}).forEach(k => { const v = EV.failure_labels[k]; FAIL[k] = [v.L0, v.L1, v.L2]; });
-  PLACE_CM = {}; Object.keys(EV.place_error_cm || {}).forEach(k => { const v = EV.place_error_cm[k]; PLACE_CM[k] = [v.min, v.p10, v.p50, v.p90, v.max]; });
-}
-const srcTag = () => h("span", { class: "ops-mono", style: { textTransform: "none", letterSpacing: 0, color: col.t3() }, title: EV.policy || "" }, EV.source || "");
-const failAt = (k, lv) => lv === "L1–2" ? FAIL[k][1] + FAIL[k][2] : FAIL[k][["L0", "L1", "L2"].indexOf(lv)];
 const pctS = v => (v * 100).toFixed(1) + "%";
-
-function rangeCell(p) {
-  const W = 160, H = 16, M = 60, x = v => Math.min(W, v / M * W), ns = "http://www.w3.org/2000/svg";
-  const s = document.createElementNS(ns, "svg"); s.setAttribute("width", W); s.setAttribute("height", H); s.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  const add = (t, a) => { const e = document.createElementNS(ns, t); for (const k in a) e.setAttribute(k, a[k]); s.appendChild(e); };
-  add("line", { x1: x(p[0]), x2: x(p[4]), y1: 8, y2: 8, stroke: col.t3(), "stroke-width": 1 });
-  add("rect", { x: x(p[1]), y: 3, width: Math.max(1, x(p[3]) - x(p[1])), height: 10, fill: col.run(), "fill-opacity": .35 });
-  add("line", { x1: x(p[2]), x2: x(p[2]), y1: 1, y2: 15, stroke: col.run(), "stroke-width": 2 });
-  add("line", { x1: x(5), x2: x(5), y1: 0, y2: 16, stroke: col.bad(), "stroke-width": 1, "stroke-dasharray": "2 2" });
-  return s;
-}
 
 /* bar per category with a Wilson whisker; ks successes of ns */
 function succChart(el, cats, ks, ns) {
@@ -384,25 +360,24 @@ function succChart(el, cats, ks, ns) {
         renderItem: (p, a) => { const lo = a.coord([a.value(0), a.value(1)]), hi = a.coord([a.value(0), a.value(2)]), st = { stroke: col.text(), lineWidth: 1.5 };
           return { type: "group", children: [{ type: "line", shape: { x1: lo[0], y1: lo[1], x2: hi[0], y2: hi[1] }, style: st }, { type: "line", shape: { x1: lo[0] - 5, y1: lo[1], x2: lo[0] + 5, y2: lo[1] }, style: st }, { type: "line", shape: { x1: hi[0] - 5, y1: hi[1], x2: hi[0] + 5, y2: hi[1] }, style: st }] }; } }] });
 }
-const STEP_SHORT = { approach_a: "appr", reach_b: "reach", release_stand: "release" };
 const L_CI = "CI 95%", L_D = "Δ", OUT_F = "F", PG_EVAL = "Eval";
 const [P_SUCC, P_STACK, P_EVALS, P_FUN, P_CMP] = ["Success", "Failure stack", "Evals", "Step pass %", "Compare"];
 /* "p" meant two things: the success rate in Evals and McNemar's p-value in Compare */
 const [L_RATE, L_MCN] = ["rate", "p McNemar"];
-/* the Failure → Data round run (C70_R1) and its stage-1 outcome against every baseline */
+/* the Failure → Data round run (role after_round) and its stage-1 outcome against every baseline */
 function pairRound(PR) {
-  const rr = (PR.runs || []).find(r => /_R\d+$/.test(r.run)) || null;
+  const rr = (PR.runs || []).find(r => r.run === TASK.after()) || null;
   const cs = rr ? (PR.comparisons || []).filter(c => c.variant === rr.run) : [];
   const out = cs.length && cs.every(c => c.outcome === OUT_F) ? OUT_F : (cs[0] || {}).outcome;
   return { rr, cs, out };
 }
 function funnel(cats, series) {
-  const fb = (typeof UI !== "undefined" && UI.Chart) ? UI.Chart({ type: "bar", categories: cats.map(x => STEP_SHORT[x] || x), series }, { height: 200 }) : h("div", { class: "ops-mono", text: "—" });
+  const fb = (typeof UI !== "undefined" && UI.Chart) ? UI.Chart({ type: "bar", categories: cats.map(x => TASK.stageName(x)), series }, { height: 200 }) : h("div", { class: "ops-mono", text: "—" });
   if (fb.instance) { let tries = 0; const fix = () => { const c = fb.instance(); if (c) c.setOption({ xAxis: { axisLabel: { interval: 0, fontSize: 10 } } }); else if (tries++ < 40) setTimeout(fix, 100); }; fix(); }
   return fb;
 }
 
-/* five pair60k runs read at stage 1; the C/C+ view below stays as the fallback */
+/* the round's runs read at stage 1 (story.pair) */
 /* the scorer marks each step on its own, so the last step can disagree with the success count */
 function stepGap(r, steps) {
   const last = (steps || []).at(-1), k = last == null ? null : Math.round((r.step_pass[last] || 0) * r.n);
@@ -418,7 +393,7 @@ function evalPair(main, PR) {
   const top = f => Object.keys(f || {}).slice(0, 2).map(k => k.replace("L-", "") + " " + f[k]).join(" · ");
   const runTable = table({
     columns: [
-      { key: "run", mono: true, fmt: (v, r) => h("span", { class: "ops-row", style: { gap: "6px" } }, [h("span", { class: "ops-dot", style: { background: runColor(v) } }), v,
+      { key: "run", mono: true, fmt: (v, r) => h("span", { class: "ops-row", style: { gap: "6px" }, title: v }, [h("span", { class: "ops-dot", style: { background: runColor(v) } }), EXPLAIN.runName(v),
         v === best.run ? stateTag("ok", "best") : null, rr && v === rr.run ? stateTag("run", "round") : null]) },
       { key: "succ", align: "right", mono: true, fmt: (v, r) => frac(r) }, { key: "p", label: L_RATE, align: "right", mono: true, fmt: v => pctS(v) },
       { key: "wilson", label: L_CI, align: "right", mono: true, fmt: v => v ? (v[0] * 100).toFixed(1) + "–" + (v[1] * 100).toFixed(1) : "—" },
@@ -455,59 +430,9 @@ function evalPair(main, PR) {
 
 async function evalPage(main, params, qs) {
   css(); chartsDispose(); main.replaceChildren();
-  const S = await story(); useEval(S);
+  const S = await story();
   if (S.pair && (S.pair.runs || []).length) return evalPair(main, S.pair);
-  const T = LV[LV.length - 1], w = wilson(T.s, T.n);
-  main.appendChild(pageHead(PG_EVAL, [{ label: "n", value: String(T.n) }, { label: "succ", value: pctS(T.s / T.n) }, { label: "CI", value: (w[0] * 100).toFixed(1) + "–" + (w[1] * 100).toFixed(1), unit: "%" },
-    { label: "L-PLACE-POSE", value: String(FAIL["L-PLACE-POSE"][1] + FAIL["L-PLACE-POSE"][2]) }]));
-  /* eval table */
-  const rows = LV.map(l => { const ci = wilson(l.s, l.n); const top = Object.keys(FAIL).map(k => [k, failAt(k, l.id)]).sort((a, b) => b[1] - a[1]).slice(0, 2).filter(x => x[1] > 0);
-    return { id: l.id, ckpt: "C@40k", n: l.n, succ: l.s / l.n, ci: ci, d: null, top: top.map(x => x[0].replace("L-", "") + " " + x[1]).join(" · ") }; });
-  rows.push({ id: "C+ L1–2", ckpt: "C+@40k", n: null, succ: null, ci: null, d: null, top: "pending", pend: true });
-  const evTable = table({
-    columns: [
-      { key: "id", label: "eval", mono: true }, { key: "ckpt", mono: true },
-      { key: "n", align: "right", mono: true, fmt: v => v == null ? "—" : String(v) },
-      { key: "succ", align: "right", mono: true, fmt: (v, r) => r.pend ? stateTag("pending", "pending") : pctS(v) },
-      { key: "ci", label: L_CI, align: "right", mono: true, fmt: v => v ? (v[0] * 100).toFixed(1) + "–" + (v[1] * 100).toFixed(1) : "—" },
-      { key: "d", label: L_D, align: "right", mono: true, fmt: () => "—" },
-      { key: "top", label: "top failures", mono: true }
-    ], rows, qsKey: "eval", onRow: r => ctx({ route: "eval", selection: { eval: r.id } })
-  });
-  /* funnel */
-  const funBox = funnel(STAGES, LV.map(l => ({ name: l.id + " " + l.s + "/" + l.n, values: l.f })));
-  const legend = h("div", { class: "ops-row ops-mono", style: { gap: "12px", fontSize: "11px" } }, LV.map(l => h("span", { class: "ops-row", style: { gap: "4px" } }, [h("span", { class: "ops-dot", style: { background: (typeof UI !== "undefined" && UI.color) ? UI.color(l.id + " " + l.s + "/" + l.n) : col.acc() } }), l.id])));
-  /* failures */
-  const frows = Object.keys(FAIL).map(k => ({ id: k, l0: failAt(k, "L0"), l1: failAt(k, "L1"), l2: failAt(k, "L2"), all: failAt(k, "L1–2"), share: failAt(k, "L1–2") / LC[0] }));
-  const failTable = table({
-    columns: [{ key: "id", label: "label", mono: true }, { key: "l0", label: "L0", align: "right", mono: true }, { key: "l1", label: "L1", align: "right", mono: true }, { key: "l2", label: "L2", align: "right", mono: true },
-      { key: "all", label: "L1–2", align: "right", mono: true }, { key: "share", align: "right", mono: true, fmt: v => pctS(v) }],
-    rows: frows, qsKey: "label"
-  });
-  /* placement */
-  const prow = ["L0", "L1", "L2"].map(id => ({ id, q: PLACE_CM[id] }));
-  const placeTable = table({
-    columns: [{ key: "id", label: "level", mono: true }, { key: "min", align: "right", mono: true, fmt: (v, r) => String(r.q[0]) }, { key: "p10", align: "right", mono: true, fmt: (v, r) => String(r.q[1]) },
-      { key: "p50", align: "right", mono: true, fmt: (v, r) => String(r.q[2]) }, { key: "p90", align: "right", mono: true, fmt: (v, r) => String(r.q[3]) }, { key: "max", align: "right", mono: true, fmt: (v, r) => String(r.q[4]) },
-      { key: "dist", label: "cm", fmt: (v, r) => rangeCell(r.q) }],
-    rows: prow.map(r => Object.assign({ min: 0, p10: 0, p50: 0, p90: 0, max: 0, dist: 0 }, r)), qsKey: "lvl"
-  });
-  /* compare slot */
-  const cmp = (qs && qs.cmp) || (typeof UI !== "undefined" && UI.qs ? UI.qs().cmp : null) || "C,C+";
-  const cmpBox = h("div", { class: "ops-row ops-mono" }, [h("span", { text: cmp.split(",").join(" vs ") }), stateTag("pending", "pending")]);
-
-  const sBox = box(170), fBox = box(170);
-  main.appendChild(h("div", { class: "ops-wrap" }, [
-    h("div", { class: "ops-grid", style: { gridTemplateColumns: "repeat(2,minmax(0,1fr))" } }, [panel(P_SUCC, sBox, srcTag()), panel(P_STACK, fBox)]),
-    panel(P_EVALS, evTable),
-    h("div", { class: "ops-grid", style: { gridTemplateColumns: GR.w32 } }, [panel(P_FUN, h("div", null, [legend, funBox])), panel("Failures", failTable)]),
-    h("div", { class: "ops-grid", style: { gridTemplateColumns: GR.w21 } }, [panel("Placement", placeTable), panel(P_CMP, cmpBox)])
-  ]));
-  succChart(sBox, LV.map(l => l.id), LV.map(l => l.s), LV.map(l => l.n));
-  ec(fBox, { grid: { left: 36, right: 10, top: 10, bottom: 22 }, tooltip: { trigger: "axis", axisPointer: { type: "shadow" } }, xAxis: axis({ type: "category", data: ["L0", "L1", "L2"] }), yAxis: axis({ type: "value" }),
-    series: Object.keys(FAIL).map((k, i) => ({ name: k, type: "bar", stack: "f", barMaxWidth: 36, data: FAIL[k], itemStyle: { color: ser(i) } })) });
-  setPanel({ method: [{ step: "run", cmd: CMD.evalRun }, { step: "read", cmd: CMD.evalRead }], log: null, sources: [{ label: EV_16, path: EV_SRC }] });
-  ctx({ route: "eval", selection: { eval: "L1–2" } });
+  main.appendChild(TASK.empty(4));
 }
 
 /* ============================================================ LOOP */
@@ -534,72 +459,62 @@ function roundLoop(S) {
   return { chain, rows, flow, src };
 }
 
-async function loopPage(main) {
+async function loopPage(main, params, qs, mode) {
   css(); chartsDispose(); main.replaceChildren();
-  const S = await story(); useEval(S);
-  const live = await tryApi("/api/status");
-  const bal = (live && live.machines && live.machines.colab && live.machines.colab.balance) || (S.colab_balance.at(-1) || [])[1];
-  const L = S.ledger.filter(r => r[1] || r[2]);
-  const est = S.ledger.reduce((a, r) => a + r[1], 0), meas = S.ledger.reduce((a, r) => a + r[2], 0);
-  main.appendChild(pageHead("Loop", [{ label: "measured", value: num(meas, "float1"), unit: "$" }, { label: "estimated", value: num(est, "float1"), unit: "$" }, { label: "CU", value: num(bal, "float1") }]));
+  const S = await story();
+  const cost = mode === "cost";
+  if (cost) return costPage(main, S);
   const RD = roundLoop(S);
-  /* chain strip: the C70_R1 round when indexed, else the C+ round (docs/he/tray.md §16.6, §17.5) */
-  const chain = RD ? RD.chain : [
-    [String(LC[0]), "eval", "ok", "eval"], [String(failAt("L-PLACE-POSE", "L1–2")), "place-pose", "bad", "eval"], [String(LC[2]), "generated", "ok", "data/tray_s1_4a8f4a8c6a8d"], [String(LC[3]), "recorded", "ok", "data/tray_s1_4a8f4a8c6a8d"],
-    [String(LC[4]), "kept", "ok", "data/ALL"], [String(LD.in_cut), "in cut", "ok", "data/cut-C"], ["C+ 40k", "trained", "ok", "runs"], ["—", "re-eval", "pending", "eval"]
-  ];
-  const strip = h("div", { class: "ops-strip" }, chain.map(([v, l, st, link, m]) => h("a", { class: "ops-node", href: "#/" + link, title: m || "" }, [
-    h("span", { class: "v ops-mono", style: { color: st === "bad" ? col.bad() : st === "pending" ? col.warn() : col.text() }, text: v }), h("span", { class: "l", text: l }), st === "pending" ? stateTag("pending", "wait") : null])));
-  /* cluster table */
-  const rows = RD ? RD.rows : (EV.clusters || []).map(c => ({ id: c.label, stage: c.stage, n: failAt(c.label, "L1–2"), diag: c.diagnosis, data: c.diagnosis === "data", interv: c.intervention, eps: c.episodes }));
+  if (!RD) { main.appendChild(TASK.empty(6)); return; }
+  const strip = h("div", { class: "ops-strip" }, RD.chain.map(([v, l, st, link, m]) => h("a", { class: "ops-node", href: "#/" + link, title: m || "" }, [
+    h("span", { class: "v ops-mono", style: { color: st === "bad" ? col.bad() : st === "pending" ? col.warn() : col.text() }, text: v }), h("span", { class: "l", text: lab(l) }), st === "pending" ? stateTag("pending", "wait") : null])));
   const clusters = table({
-    columns: [{ key: "id", label: "cluster", mono: true }, { key: "stage", mono: true }, { key: "n", label: RD ? "n" : "n/" + (LC[0] != null ? LC[0] : "…"), align: "right", mono: true },
-      { key: "diag", label: "diagnosis", fmt: (v, r) => stateTag(r.data ? "run" : "todo", v) }, { key: "interv", label: "intervention" }, { key: "eps", label: RD ? "targets" : "episodes", mono: true }],
-    rows, qsKey: "cluster", onRow: r => ctx({ route: "loop", selection: { cluster: r.id } })
+    columns: [{ key: "id", label: "cluster", mono: true }, { key: "stage", mono: true, fmt: v => TASK.stageName(v) }, { key: "n", label: "n", align: "right", mono: true },
+      { key: "diag", label: "diagnosis", fmt: (v, r) => stateTag(r.data ? "run" : "todo", v) }, { key: "interv", label: "intervention" }, { key: "eps", label: "targets", mono: true }],
+    rows: RD.rows, qsKey: "cluster", onRow: r => ctx({ route: "loop", selection: { cluster: r.id } })
   });
-  /* ledger: estimates and measurements as separate rows */
-  const lrows = [];
-  L.forEach(r => { if (r[1]) lrows.push({ id: r[0] + "·e", story: r[0], kind: "estimated", usd: r[1] }); if (r[2]) lrows.push({ id: r[0] + "·m", story: r[0], kind: "measured", usd: r[2] }); });
-  const ledger = table({
-    columns: [{ key: "story", mono: true }, { key: "kind", fmt: v => stateTag(v === "measured" ? "ok" : "todo", v) }, { key: "usd", label: "USD", align: "right", mono: true, fmt: v => num(v, "float1") }],
-    rows: lrows, qsKey: "ledger"
-  });
-  const flowBox = box(360), costBox = box(200), cost = ((typeof UI !== "undefined" && UI.qs) ? UI.qs() : {}).tab === "cost";
-  const parts = [panel("Flow", flowBox, RD ? RD.src : srcTag()), panel("Cost", costBox)];
-  main.appendChild(h("div", { class: "ops-wrap" }, [
-    strip,
-    h("div", { class: "ops-grid", style: { gridTemplateColumns: GR.w32 } }, cost ? parts.reverse() : parts),
-    panel("Clusters", clusters),
-    panel("Ledger", ledger)
-  ]));
+  const flowBox = box(360);
+  main.appendChild(h("div", { class: "ops-wrap" }, [strip, panel("Flow", flowBox, RD.src), panel("Clusters", clusters)]));
   const lk = (source, target, value) => ({ source, target, value });
-  let nodes, links, cols, warn = "re-eval", bad = "place-pose";
-  if (RD) ({ nodes, links, cols, warn, bad } = RD.flow(lk));
-  else {
-    const pp = failAt("L-PLACE-POSE", "L1–2"), nT = LC[0], [gen, rec, kept] = [LC[2], LC[3], LC[4]], qaPass = LD.qa_pass, inCut = LD.in_cut;
-    nodes = ["rollouts", "place-pose", "other", "generated", "failed", "recorded", "rejected", "passed", "filtered", "kept", "spare", "C+", "re-eval"].map(name => ({ name }));
-    cols = { rollouts: 0, "place-pose": 1, generated: 2, recorded: 3, "passed": 4, kept: 5, "C+": 6 };
-    links = [lk("rollouts", "place-pose", pp), lk("rollouts", "other", nT - pp), lk("place-pose", "generated", gen), lk("generated", "recorded", rec), lk("generated", "failed", gen - rec), lk("recorded", "passed", qaPass), lk("recorded", "rejected", rec - qaPass), lk("passed", "kept", kept), lk("passed", "filtered", qaPass - kept), lk("kept", "C+", inCut), lk("kept", "spare", kept - inCut), lk("C+", "re-eval", inCut)];
-  }
+  const { nodes, links, cols, warn, bad } = RD.flow(lk);
   const CHAIN = { ...cols };
   ec(flowBox, { tooltip: { trigger: "item" }, series: [{ type: "sankey", left: 24, right: 60, top: 40, bottom: 40, nodeWidth: 10, nodeGap: 14, emphasis: { focus: "adjacency" },
-    label: { color: col.text(), fontSize: 11, formatter: p => (p.value != null ? p.value + "\n" : "") + p.name }, lineStyle: { color: "gradient", opacity: .35 }, itemStyle: { borderWidth: 0 },
+    label: { color: col.text(), fontSize: 11, formatter: p => (p.value != null ? p.value + "\n" : "") + lab(p.name) }, lineStyle: { color: "gradient", opacity: .35 }, itemStyle: { borderWidth: 0 },
     /* main chain alternates label side by column so neighbours never share a row; sinks sit in the last column, labelled to the right */
     data: nodes.map((n, i) => Object.assign(n, { label: { position: n.name in CHAIN ? (CHAIN[n.name] % 2 ? "top" : "bottom") : "right" }, itemStyle: { color: n.name === warn ? col.warn() : n.name === bad ? col.bad() : ser(i) } })),
     links }] });
-  ec(costBox, { grid: { left: 54, right: 10, top: 16, bottom: 22 }, tooltip: { trigger: "axis", axisPointer: { type: "shadow" } }, legend: { top: 0, right: 0, textStyle: { color: col.t2(), fontSize: 11 } },
-    xAxis: axis({ type: "category", data: L.map(r => r[0]), axisLabel: { color: col.t2(), fontSize: 10, interval: 0, rotate: 30 } }), yAxis: axis({ type: "value" }),
-    series: [{ name: "estimated", type: "bar", barMaxWidth: 12, data: L.map(r => r[1]), itemStyle: { color: col.t3() } }, { name: "measured", type: "bar", barMaxWidth: 12, data: L.map(r => r[2]), itemStyle: { color: col.ok() } }] });
-  setPanel({ method: [{ step: "eval", cmd: CMD.evalRun }, { step: "generate", cmd: CMD.gen }, { step: "train", cmd: CMD.train }], log: null,
-    sources: [{ label: RD ? S.round.source : EV_17, path: EV_SRC }, { label: "ledger", path: "docs/g0/ledger" }] });
+  setPanel({ method: [{ step: "eval", cmd: CMD.evalRun }, { step: "generate", cmd: CMD.gen }, { step: "train", cmd: CMD.train }], log: null, sources: [{ label: S.round.source, path: EV_SRC }] });
   ctx({ route: "loop" });
+}
+
+/* ============================================================ COST LEDGER (stage 0): estimates and measurements as separate rows */
+async function costPage(main, S) {
+  if (!S.ledger) { main.appendChild(TASK.empty(0)); return; }
+  const live = await tryApi("/api/status");
+  const bal = (live && live.machines && live.machines.colab && live.machines.colab.balance) || ((S.colab_balance || []).at(-1) || [])[1];
+  const L = S.ledger.filter(r => r[1] || r[2]);
+  const est = S.ledger.reduce((a, r) => a + r[1], 0), meas = S.ledger.reduce((a, r) => a + r[2], 0);
+  main.appendChild(pageHead("Ledger", [{ label: "measured", value: num(meas, "float1"), unit: "$" }, { label: "estimated", value: num(est, "float1"), unit: "$" }, { label: "CU", value: num(bal, "float1") }]));
+  const lrows = [];
+  L.forEach(r => { if (r[1]) lrows.push({ id: r[0] + "·e", story: r[0], kind: "estimated", usd: r[1] }); if (r[2]) lrows.push({ id: r[0] + "·m", story: r[0], kind: "measured", usd: r[2] }); });
+  const ledger = table({
+    columns: [{ key: "story", mono: true }, { key: "kind", fmt: v => stateTag(v === "measured" ? "ok" : "todo", lab(v)) }, { key: "usd", label: "USD", align: "right", mono: true, fmt: v => num(v, "float1") }],
+    rows: lrows, qsKey: "ledger"
+  });
+  const costBox = box(260);
+  main.appendChild(h("div", { class: "ops-wrap" }, [panel("Cost", costBox), panel("Ledger", ledger)]));
+  ec(costBox, { grid: { left: 54, right: 10, top: 24, bottom: 22, containLabel: true }, tooltip: { trigger: "axis", axisPointer: { type: "shadow" } }, legend: { top: 0, right: 0, textStyle: { color: col.t2(), fontSize: 11 } },
+    xAxis: axis({ type: "category", data: L.map(r => r[0]), axisLabel: { color: col.t2(), fontSize: 10, interval: 0, rotate: 30 } }), yAxis: axis({ type: "value", name: "USD" }),
+    series: [{ name: lab("estimated"), type: "bar", barMaxWidth: 12, data: L.map(r => r[1]), itemStyle: { color: col.t3() } }, { name: lab("measured"), type: "bar", barMaxWidth: 12, data: L.map(r => r[2]), itemStyle: { color: col.ok() } }] });
+  setPanel({ method: [], log: null, sources: [{ label: "ledger", path: "docs/g0/ledger" }] });
+  ctx({ route: "cost" });
 }
 
 /* ============================================================ QA */
 async function qaPage(main) {
   css(); chartsDispose(); main.replaceChildren();
   const S = await story();
-  const [jobs, bench, traces] = await Promise.all([tryApi("/api/jobs?limit=200"), tryApi("/api/chat/bench"), tryApi("/api/chat/traces?limit=20")]);
+  const [jobs, bench, traces] = await Promise.all([tryApi("/api/jobs?limit=200"), tryApi("/api/chat/bench"), UI.locked ? Promise.resolve(null) : tryApi("/api/chat/traces?limit=20")]);
   const runBy = job => S.runs.find(r => r.job === job);
   /* LLM findings: latest agentqa.run per subject */
   const aq = (jobs || []).filter(j => j.kind === "agentqa.run" && j.state === "ok" && j.outputs && j.outputs.out).sort((a, b) => (b.created > a.created ? 1 : -1));
@@ -654,7 +569,7 @@ async function qaPage(main) {
     else dec[r.id] = { finding_id: r.fid, decide: "agree", reason: null };
     msg.textContent = ""; drawInbox();
   }
-  const submit = h("button", { class: "ops-btn pri wbtn", text: "Submit", onclick: async () => {
+  const submit = h("button", { class: "ops-btn pri wbtn", text: lab("Submit"), onclick: async () => {
     const byRep = {};
     rows.filter(r => r.source === "llm").forEach(r => { (byRep[r.report.report_id] = byRep[r.report.report_id] || { r, ds: [], total: 0 }).total++; if (dec[r.id] && !dec[r.id].locked) byRep[r.report.report_id].ds.push(dec[r.id]); });
     const todo = Object.values(byRep).filter(b => b.ds.length);
@@ -668,12 +583,13 @@ async function qaPage(main) {
     }
     msg.textContent = "job " + out.join(","); drawInbox();
   } });
-  const bar = h("div", { class: "ops-row" }, [h("button", { class: "ops-btn", text: "Accept", onclick: () => decide("agree") }), h("button", { class: "ops-btn", text: "Reject", onclick: () => decide("override") }), reasonIn, submit, msg]);
+  const bar = h("div", { class: "ops-row" }, [h("button", { class: "ops-btn", text: lab("Accept"), onclick: () => decide("agree") }), h("button", { class: "ops-btn", text: lab("Reject"), onclick: () => decide("override") }), reasonIn, submit, msg]);
 
   /* bench + traces */
   const traceBox = h("div"), treeBox = h("div");
   function drawTraces() {
     const list = Array.isArray(traces) ? traces : (traces && traces.traces) || [];
+    if (UI.locked) { traceBox.replaceChildren(h("span", { class: "dim", text: t("lock.off") })); return; }
     if (!list.length) { traceBox.replaceChildren(h("span", { class: "ops-mono", style: { color: col.t2() }, text: "—" })); return; }
     traceBox.replaceChildren(table({
       columns: [{ key: "ts", label: "time", mono: true, fmt: v => v ? hhmm(String(v)) : "—" }, { key: "question", fmt: v => v ? String(v).slice(0, 48) : "—" },
@@ -700,7 +616,7 @@ async function qaPage(main) {
       series: [{ name: "CODE", type: "bar", stack: "s", barMaxWidth: 12, data: cnt("rule"), itemStyle: { color: col.code() } }, { name: "LLM", type: "bar", stack: "s", barMaxWidth: 12, data: cnt("llm"), itemStyle: { color: col.llm() } }] }, true);
     const d = Object.values(dec), acc = d.filter(x => x.decide === "agree").length, rej = d.filter(x => x.decide === "override").length;
     cDec.setOption({ tooltip: {}, series: [{ type: "pie", radius: ["55%", "78%"], label: { color: col.text(), fontSize: 11, formatter: "{b} {c}" }, data: [{ name: "accept", value: acc, itemStyle: { color: col.ok() } }, { name: "reject", value: rej, itemStyle: { color: col.bad() } }, { name: "open", value: Math.max(0, nLlm - acc - rej), itemStyle: { color: col.t3() } }].filter(x => x.value) }] }, true);
-    const bars = [["defects", 100, "30/30"], ["false pos", 100, "0/40"], ["tool acc", B ? B.tool_acc * 100 : 0, B ? pc(B.tool_acc) : "—"], ["guardrail", B && B.guardrail ? B.guardrail.pass / B.guardrail.n * 100 : 0, B && B.guardrail ? B.guardrail.pass + "/" + B.guardrail.n : "—"], ["grounded", B ? B.grounded_rate * 100 : 0, B ? pc(B.grounded_rate) : "—"]];
+    const QB = EXPLAIN.read.bench(), bars = [QB ? ["defects", QB.caught / QB.planted * 100, QB.caught + "/" + QB.planted] : null, QB && QB.clean != null ? ["false pos", QB.clean ? 100 - QB.false_alarms / QB.clean * 100 : 0, QB.false_alarms + "/" + QB.clean] : null, ["tool acc", B ? B.tool_acc * 100 : 0, B ? pc(B.tool_acc) : "—"], ["guardrail", B && B.guardrail ? B.guardrail.pass / B.guardrail.n * 100 : 0, B && B.guardrail ? B.guardrail.pass + "/" + B.guardrail.n : "—"], ["grounded", B ? B.grounded_rate * 100 : 0, B ? pc(B.grounded_rate) : "—"]].filter(Boolean);
     cBench.setOption({ grid: { left: 70, right: 56, top: 4, bottom: 4 }, xAxis: { type: "value", min: 0, max: 100, show: false }, yAxis: axis({ type: "category", data: bars.map(b => b[0]), inverse: true, splitLine: { show: false } }),
       series: [{ type: "bar", barMaxWidth: 10, showBackground: true, backgroundStyle: { color: col.line() }, data: bars.map(b => ({ value: b[1], itemStyle: { color: col.ok(), borderRadius: 2 } })), label: { show: true, position: "right", color: col.text(), fontSize: 11, formatter: p => bars[p.dataIndex][2] } }] }, true);
   }
@@ -720,7 +636,8 @@ if (typeof UI !== "undefined" && UI.route) {
   UI.route("runs", runsPage);
   UI.route("eval", evalPage);
   UI.route("loop", loopPage);
+  UI.route("cost", (main, params, qs) => loopPage(main, params, qs, "cost"));
   UI.route("qa", qaPage);
 }
-Object.assign(P, { runsPage, evalPage, loopPage, qaPage, chartsDispose });
+Object.assign(P, { runsPage, evalPage, loopPage, costPage, qaPage, chartsDispose });
 })();

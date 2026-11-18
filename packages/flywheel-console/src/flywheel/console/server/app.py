@@ -19,11 +19,13 @@ from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
 from flywheel.console.paths import ConsolePaths, PathDenied, active, guard, set_active
-from flywheel.console.server import media, runner
+from flywheel.console.server import kinds, media, runner
 
 MAX_JSON = 1 << 20
 MAX_UPLOAD = 8 << 30
 # GETs that expose machine internals; refused with every POST when the server runs with --lock
+# the only POSTs a locked server takes, and only when it was started with ``chat``
+CHAT_POST = ("/api/chat", "/api/models/prewarm", "/api/models/connect")
 LOCKED_GET = ("/api/fs", "/api/dir_check", "/api/tool", "/api/chat/traces")
 # home directories (home or Users, then the user name) in JSON answers of a locked server
 _HOME = re.compile(r"/(?:home|Users)/[^/\s\"]+/")
@@ -43,9 +45,14 @@ def _chat(mod: str) -> Any:
 class ConsoleServer(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, paths: ConsolePaths, port: int, lock: bool = False) -> None:
+    def __init__(
+        self, paths: ConsolePaths, port: int, lock: bool = False, chat: bool = False
+    ) -> None:
         self.paths = paths
         self.locked = lock
+        # the chat is on unless the server is locked; ``chat`` keeps it on while locked: it reads
+        # the index and starts nothing, so a recording can use one read-only server
+        self.chat_on = (not lock) or chat
         super().__init__(("127.0.0.1", port), Handler)
 
     def unredact(self, value: str) -> str:
@@ -123,7 +130,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.jerr(404, "not found")
         if not self.host_ok() or not self.origin_ok():
             return self.jerr(403, "forbidden origin")
-        if self.server.locked:
+        if self.server.locked and not (self.server.chat_on and u.path in CHAT_POST):
             return self.jerr(403, "locked")
         try:
             if u.path == "/api/upload":
@@ -273,6 +280,9 @@ class Handler(BaseHTTPRequestHandler):
         if u.path.startswith("/api/"):
             return self.api(u)
         fp = self.resolve(u.path)
+        # a mounted folder asked for by its own URL (/ego/, the viewer's home) serves its index.html
+        if fp is not None and fp.is_dir() and u.path.endswith("/"):
+            fp = fp / "index.html"
         if fp is None or not fp.is_file():
             return self.jerr(404, "not found")
         self.send_file(fp)
@@ -368,12 +378,14 @@ class Handler(BaseHTTPRequestHandler):
             return q.get(k, [d])[0]
 
         simple: dict[str, Callable[[], Any]] = {
-            "/api/status": lambda: runner.status() | {"locked": self.server.locked},
+            "/api/status": lambda: runner.status()
+            | {"locked": self.server.locked, "chat_on": self.server.chat_on},
             "/api/artifacts": runner.list_artifacts,
             "/api/works": runner.list_works,
             "/api/estimates": runner.list_estimates,
             "/api/exports": runner.list_exports,
             "/api/agent_stats": runner.agent_stats,
+            "/api/kinds": lambda: kinds.catalog(self.server.locked),
         }
         if path in simple:
             self.jok(simple[path]())
@@ -392,7 +404,11 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/models":
             d = runner.models_info()
             try:
-                d["nemotron"] = _chat("llm").nemotron_status()
+                llm = _chat("llm")
+                d["nemotron"] = llm.nemotron_status()
+                if hasattr(llm, "provider"):
+                    p = llm.provider()
+                    d["chat"] = {"provider": p.name, "model": p.model, "hosted": p.hosted}
             except ModuleNotFoundError as e:
                 if not _chat_missing(e):
                     raise
@@ -458,7 +474,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def make_server(
-    paths: ConsolePaths | None = None, port: int = 4178, lock: bool = False
+    paths: ConsolePaths | None = None, port: int = 4178, lock: bool = False, chat: bool = False
 ) -> ConsoleServer:
     """Bind the console to ``127.0.0.1:port`` (0 = any free port) and init the job runner.
 
@@ -466,12 +482,25 @@ def make_server(
     paths = paths if paths is not None else active()
     set_active(paths)
     runner.init(paths)
-    return ConsoleServer(paths, port, lock)
+    return ConsoleServer(paths, port, lock, chat)
 
 
-def serve(paths: ConsolePaths | None = None, port: int = 4178, lock: bool = False) -> None:
-    srv = make_server(paths, port, lock)
-    print(f"console on http://127.0.0.1:{srv.port}" + (" (locked)" if lock else ""), flush=True)
+def _warm_chat() -> None:
+    """Open the tunnel and load the chat model once, so the first question does not wait for it."""
+    try:
+        _chat("llm").prewarm()
+    except Exception:  # the chat is optional: a model that is down must not stop the server
+        pass
+
+
+def serve(
+    paths: ConsolePaths | None = None, port: int = 4178, lock: bool = False, chat: bool = False
+) -> None:
+    srv = make_server(paths, port, lock, chat)
+    mode = " (locked, chat on)" if lock and chat else " (locked)" if lock else ""
+    print(f"console on http://127.0.0.1:{srv.port}" + mode, flush=True)
+    if srv.chat_on:
+        threading.Thread(target=_warm_chat, daemon=True).start()
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

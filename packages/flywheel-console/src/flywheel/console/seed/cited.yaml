@@ -535,3 +535,24 @@ cited:
   doc: docs/he/tray.md
   section: '20.6'
   quote: 'VLM của C (cha `psi0-baseline-egodex-he`), dữ liệu S70 + tập nhắm lỗi, 60 000 bước'
+# two_table task (brief 2, T1): failure clusters read by eye from the Isaac videos, no scorer yet
+- key: tasks.two_table.cluster.A
+  value: {id: A, checkpoint: authors, level: 0, step: 5, stage: place, members: 4}
+  doc: docs/he/two-table-diagnosis.md
+  section: '3'
+  quote: '| A | Tác giả | 0 | 5 · đặt | S1-03 #4, #5, #6, #9 | 4 |'
+- key: tasks.two_table.cluster.B
+  value: {id: B, checkpoint: N20, level: 0, step: 2, stage: grasp, members: 2}
+  doc: docs/he/two-table-diagnosis.md
+  section: '3'
+  quote: '| B | N20 (V-EGO, V-NOEGO) | 0 | 2 · gắp | HE-1 #0, #1 (cùng seed 1000100) | 2 |'
+- key: tasks.two_table.cluster.C
+  value: {id: C, checkpoint: N20, level: 0, step: 5, stage: place, members: 2}
+  doc: docs/he/two-table-diagnosis.md
+  section: '3'
+  quote: '| C | N20 (V-EGO, V-NOEGO) | 0 | 5 · đặt | HE-1 #2, #3 (cùng seed 1000101) | 2 |'
+- key: tasks.two_table.diagnosis
+  value: unknown
+  doc: docs/he/two-table-diagnosis.md
+  section: '2.1'
+  quote: 'khi còn một mã hệ thống `not_judged`, chẩn đoán duy nhất hợp lệ là `unknown` (CHƯA RÕ).'

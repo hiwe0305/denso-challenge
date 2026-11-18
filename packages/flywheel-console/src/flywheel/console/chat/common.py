@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import re
 import threading
+from contextvars import ContextVar
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,10 @@ from flywheel.console.paths import PathDenied, active, guard
 Result = dict[str, Any]
 MODEL_CHARS = 4000  # about 1,200 tokens
 DENY_PARTS = ("vault", "holdout")
+
+# True while a hosted model answers the turn: rows that are not ``public`` are hidden from every
+# tool, so nothing internal or restricted can reach the service (design 27/10 section 8.4)
+HOSTED: ContextVar[bool] = ContextVar("fw_chat_hosted", default=False)
 
 _lock = threading.Lock()
 _cache: dict[str, tuple[float, Any]] = {}
@@ -83,7 +88,19 @@ def tail_lines(path: str | Path, n: int = 80, grep: str | None = None) -> tuple[
 
 def catalog() -> dict[str, Any]:
     d = jload(active().index / "catalog.json", {"rows": [], "edges": [], "runs": []})
-    return d if isinstance(d, dict) else {"rows": [], "edges": [], "runs": []}
+    d = d if isinstance(d, dict) else {"rows": [], "edges": [], "runs": []}
+    if not HOSTED.get():
+        return d
+    rows = [r for r in d.get("rows", []) if r.get("data_class") == "public"]
+    keep = {r.get("id") for r in rows}
+    edges = [e for e in d.get("edges", []) if not isinstance(e, dict)
+             or (e.get("from") in keep and e.get("to") in keep)]  # fmt: skip
+    return {**d, "rows": rows, "edges": edges}
+
+
+def public_ds(ds: str) -> bool:
+    """With a hosted model: only a dataset the (filtered) catalog lists may be read."""
+    return not HOSTED.get() or any(r.get("id") == ds for r in catalog().get("rows", []))
 
 
 def story() -> dict[str, Any]:
@@ -92,6 +109,8 @@ def story() -> dict[str, Any]:
 
 
 def ds_file(ds: str, name: str) -> Any:
+    if not public_ds(ds):
+        return None
     return jload(active().index / "ds" / ds / (name + ".json"))
 
 
