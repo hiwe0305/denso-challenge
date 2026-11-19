@@ -124,4 +124,7 @@ def test_the_shipped_yaml_marks_every_uncalibrated_number() -> None:
         body, _, comment = line.partition("#")
         if body.strip().endswith(":") or not body.strip():
             continue  # a section header or a comment line carries no value
-        assert "giả định" in comment or "chốt" in comment, f"no source on: {line}"
+        # "hiệu chỉnh": measured on real logs, with the rule and the jobs (DA-44)
+        assert any(mark in comment for mark in ("giả định", "chốt", "hiệu chỉnh")), (
+            f"no source on: {line}"
+        )

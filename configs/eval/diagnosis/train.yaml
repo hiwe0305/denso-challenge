@@ -3,7 +3,11 @@
 #
 # Mọi dòng `# giả định` phải hiệu chỉnh lại trên log thật của DA-19 (khoảng
 # 6/11/2026) trước cổng G2; cách hiệu chỉnh ghi ngay trên dòng. Dòng `# chốt`
-# là quyết định đã có, không phải số đo.
+# là quyết định đã có, không phải số đo. Dòng `# hiệu chỉnh` là số đo trên
+# log thật, kèm luật và tập job. DA-44 (19/11/2026) hiệu chỉnh t1.k và
+# t8.max_grad_norm trên log của 8 job Ψ₀ khỏe cùng một công thức (DA-26 hai job
+# 40k step, DA-34 launch C 40k, pair60k năm job 60k); công thức khác thì chạy
+# lại `fw eval calibrate-train`.
 #
 # Cửa sổ đếm theo `step`, không theo số dòng log (issue #5, chốt 29/10/2026):
 # hai job ghi log thưa dày khác nhau phải ra cùng kết luận.
@@ -11,9 +15,9 @@
 # giá trị mặc định ngầm (DA-08 AC 3).
 
 t1:
-  k: 10.0            # giả định; design mục 10 "loss tăng quá k lần"; hiệu chỉnh: lấy tỉ lệ loss lớn nhất trên job sạch của DA-19 rồi nhân 2
+  k: 4.0             # hiệu chỉnh DA-44 (19/11/2026): 2 × tỉ lệ lớn nhất của loss train đã làm mượt trên 8 job Ψ₀ khỏe của DA-26, DA-34 (1,80), làm tròn lên 0,5; `fw eval calibrate-train`
   window_steps: 500  # giả định; cửa sổ W tính lùi từ step đang xét, đơn vị step (issue #5, chốt 29/10/2026)
-  smooth_steps: 100  # chốt DA-44 (đề xuất, chờ PO); trung vị trượt của loss train mà nhánh spike so, thay cho từng batch
+  smooth_steps: 100  # giả định (DA-44, đề xuất chờ PO); trung vị trượt của loss train mà nhánh spike so, thay cho từng batch; k hiệu chỉnh theo giá trị này
 
 t2:
   n_steps: 2000             # giả định; "sau N step mà loss val chưa giảm"
@@ -40,7 +44,7 @@ t7:
 
 t8:
   frozen_tolerance: 0.0    # chốt: VLM khai đóng băng thì gradient của nó phải bằng 0
-  max_grad_norm: 10.0      # giả định; hiệu chỉnh: phân vị 99 của grad_norm_action trên job sạch của DA-19
+  max_grad_norm: 570.0     # hiệu chỉnh DA-44 (19/11/2026): 2 × giá trị lớn thứ (max_exceedances + 1) của grad_norm_action trên 8 job Ψ₀ khỏe của DA-26, DA-34 (282,9), làm tròn lên 10; không lấy p99 vì p99 cho hàng trăm bản ghi vượt mỗi job; `fw eval calibrate-train`
   max_exceedances: 5       # giả định; số bản ghi vượt max_grad_norm mới báo, để một spike đơn lẻ không báo
 
 o1:
