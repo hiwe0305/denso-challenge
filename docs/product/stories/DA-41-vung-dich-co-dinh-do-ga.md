@@ -21,7 +21,7 @@ Số đo dẫn tới story ([docs/he/tray.md](../../he/tray.md) mục 19–20): 
 
 ## Tiêu chí chấp nhận
 
-1. Tư thế đích cố định so với bàn B ở mọi mức; khay trên bàn A vẫn rung như cũ. Với cùng hạt giống, tư thế khay, khoảng cách bàn, chỗ đứng, khối lượng linh kiện và ánh sáng giữ nguyên giá trị trước DA-41. Tư thế đích kiểu cũ vẫn tính lại được cho episode ghi trước DA-41.
+1. Trên cảnh có đồ gá, tư thế đích cố định so với bàn B ở mọi mức; khay trên bàn A vẫn rung như cũ. Với cùng hạt giống, tư thế khay, khoảng cách bàn, chỗ đứng, khối lượng linh kiện và ánh sáng giữ nguyên giá trị trước DA-41. Cảnh cũ (`+zone1`) và tư thế đích rung của nó vẫn dựng lại được: các file mà run plan đã đóng băng của DA-34 ghim bằng sha256 không đổi một byte.
 2. Có lựa chọn 2–3 vị trí đồ gá rời rạc, tách riêng, mặc định tắt; khi tắt, hành vi đúng như AC 1.
 3. Đồ gá là body tĩnh ở tư thế đích: thanh dẫn thấp ở bốn góc, có vát, để trống chỗ hai tay cầm; kích thước và ma sát nằm trong `configs/sim/tray.yaml`; hình học tính từ cấu hình và có test CPU.
 4. `visuals_revision` có hậu tố mới; `generate` và `export` từ chối trộn episode cũ với episode mới như đã làm với `+zone1`.
@@ -31,15 +31,13 @@ Số đo dẫn tới story ([docs/he/tray.md](../../he/tray.md) mục 19–20): 
 
 ## Nhiệm vụ
 
-- [x] 1. Story và design
+- [ ] 1. Story và design
   - [x] 1.1 File story này (AC 1–7)
   - [ ] 1.2 Design 28/10/2026 mục 3.1, 3.5 và dòng sửa đổi (quyết định PO 19/11/2026)
-- [ ] 2. Vùng đích cố định
-  - [ ] 2.1 `sample_episode` giữ đích cố định, giữ nguyên dãy số ngẫu nhiên; hàm tính đích kiểu cũ (AC 1)
-  - [ ] 2.2 Lựa chọn vị trí rời rạc, mặc định tắt (AC 2)
-- [ ] 3. Đồ gá
-  - [ ] 3.1 Cấu hình và hình học thanh dẫn, test CPU (AC 3)
-  - [ ] 3.2 Body tĩnh trong MJCF, `visuals_revision` mới (AC 3, 4)
+- [x] 2. Đích cố định, vị trí rời rạc (tắt), hình học thanh dẫn trong `jig.py` và `configs/sim/tray_jig.yaml`, test CPU (AC 1–3)
+- [ ] 3. Đồ gá trong cảnh
+  - [ ] 3.1 Body tĩnh trong MJCF, `visuals_revision` có hậu tố `+jig1` (AC 3, 4)
+  - [ ] 3.2 Env SIMPLE có đồ gá, chọn cảnh trong `generate` (AC 4, 5)
 - [ ] 4. Kiểm trong sim
   - [ ] 4.1 Test `sim` MuJoCo thuần: khay đứng yên, khay thả lệch trượt vào (AC 5)
   - [ ] 4.2 Planner hạ khay vào đồ gá, test `sim` qua SIMPLE (AC 5)
@@ -53,13 +51,14 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 - `packages/flywheel-simple/src/flywheel_simple/tray/` trừ `predicates.py`, `run.py` (DA-42)
 - `packages/flywheel-simple/tests/tray/` trừ `test_predicates.py`, `test_run_*.py` (DA-42)
-- `configs/sim/tray.yaml`, `configs/sim/tray_planner.yaml`
+- `configs/sim/tray_jig.yaml`, `configs/sim/tray_planner.yaml`
 - `scripts/g0/tray/`
 - `docs/g0/tray/`
 - `docs/superpowers/specs/2026-10-28-tray-transfer-he-design.md` (chỉ mục 3.1, 3.5 và dòng sửa đổi)
 
 ## Ghi chú cho người làm
 
+- Run plan đã đóng băng của DA-34 (`configs/runplans/tray/*.yaml`, `pinned_files`) ghim `randomize.py`, `mjcf.py`, `simple_task.py`, `config.py`, `geometry.py`, `configs/sim/tray.yaml`. Sửa một file trong số đó làm job của plan ấy từ chối chạy và làm đỏ test của `flywheel-psi0`. Vì vậy DA-41 chỉ **thêm** file (`jig.py`, `jig_task.py`, `configs/sim/tray_jig.yaml`); `test_jig.py` giữ sha256 của sáu file đó.
 - Logic thuần (cấu hình, hình học, ngẫu nhiên hóa) không import `simple` hay `mujoco` và có test chạy trong CI. Test cần MuJoCo gắn marker `sim`.
 - Không chạy job trên `rtx3060` hay Colab khi chưa hỏi Hiếu. Việc cần máy đó viết thành runbook trong `jig.md`.
 - Không sinh lại dữ liệu và không train trong story này; cảnh mới cần lô mới, thuộc story sau.

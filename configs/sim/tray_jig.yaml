@@ -1,0 +1,29 @@
+# DA-41 locating jig on table B for the tray task (docs/g0/tray/jig.md).
+# Flat `key: number` lines only; read by flywheel_simple.tray.jig without PyYAML.
+# Kept apart from tray.yaml: frozen DA-34 run plans pin tray.yaml by sha256, and the
+# scene without the jig must stay buildable for their evals.
+# Jig frame: the target pose on table B; x across the tray (width), y along it (length),
+# z up from the table top. Units: metres, degrees.
+
+# Four corner guides. Each guide is two slanted arms: one along a long side (y), one along
+# a short end (x). Bottom inner edge `clearance` outside the tray footprint; inner face
+# leans outward by `chamfer_deg` from vertical up to `height`, so a tray lowered up to
+# clearance + height * tan(chamfer) off centre lands on a slope and slides in.
+clearance: 0.006
+height: 0.03
+chamfer_deg: 45.0
+thickness: 0.012
+side_arm: 0.08
+end_arm: 0.035
+# The end arms stop at least this far from the handle footprint (x), so the hands that
+# hold the handles from below never meet a guide.
+handle_gap: 0.02
+# Low-friction guide faces (acetal / PTFE strip). The guides take contact priority, so
+# this friction applies to tray-on-guide contacts instead of the tray's 1.0.
+friction: 0.2
+
+# Discrete jig positions along table B (y). 1 = one fixed pose (default, DA-41 decision);
+# 2 or 3 = the episode's seed picks one of that many slots `slot_spacing` apart. Off by
+# default; kept for a later story.
+slots: 1
+slot_spacing: 0.25
