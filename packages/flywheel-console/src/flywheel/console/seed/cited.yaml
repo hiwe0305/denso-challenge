@@ -442,9 +442,9 @@ cited:
   quote: '606 episode, 861 624 frame'
 - key: demo.design.keyboard_teleop
   value: keyboard teleop
-  doc: CLAUDE.md
-  section: 'Dự án'
-  quote: 'dataset teleop của tác giả, teleop bàn phím, synthetic S1 và S2'
+  doc: docs/superpowers/specs/2026-10-27-g1-psi0-demo-design.md
+  section: '0'
+  quote: 'dataset teleop của tác giả và teleop bàn phím trong SIMPLE'
 - key: demo.design.sim_stack
   value: {physics_and_generation: SIMPLE on MuJoCo, rendering: Isaac Sim}
   doc: CLAUDE.md
