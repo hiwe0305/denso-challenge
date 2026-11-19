@@ -44,7 +44,7 @@ Là người chạy vòng Failure → Data trên task khay, tôi muốn bộ ch�
   - [x] 3.3 `eval_results`, `place_error` ghi phiên bản và từ chối trộn
 - [ ] 4. Eval nhiều lượt mỗi điều kiện (AC 4)
   - [x] 4.1 `eval_batch --repeats N`, hạt nhiễu policy khác nhau theo lượt
-  - [ ] 4.2 `eval_results`: số thành công từng điều kiện, tỉ lệ từng bước, Wilson theo cỡ mẫu hiệu dụng
+  - [x] 4.2 `eval_results`: số thành công từng điều kiện, tỉ lệ từng bước, Wilson theo cỡ mẫu hiệu dụng
 - [ ] 5. Test MuJoCo và runbook (AC 5)
   - [ ] 5.1 Test `sim`: khay rơi nghiêng trên cảnh thật, bản 1 gắn `L-TRAY-TILT`, bản 2 không
   - [ ] 5.2 Runbook đo bộ chấm bản 2 trên một lô eval
