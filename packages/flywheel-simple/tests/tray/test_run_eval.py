@@ -88,3 +88,27 @@ def test_reset_request_carries_the_condition_seed(fake_simple: dict[str, types.M
         "reset": True,
         "seed": 1000123,
     }
+
+
+def test_a_repeat_sends_its_own_policy_seed(
+    fake_simple: dict[str, types.ModuleType], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from flywheel_simple.tray.run import REPEAT_SEED_STRIDE, prepare_eval
+
+    prepare_eval()
+    client = fake_simple["simple.baselines.client"].HttpActionClient()
+    monkeypatch.setenv("FLYWHEEL_TRAY_REPEAT", "0")
+    assert client.query_action({}, "carry", {}, {}, {"reset": True})["seed"] == 1000123
+    monkeypatch.setenv("FLYWHEEL_TRAY_REPEAT", "2")
+    sent = client.query_action({}, "carry", {}, {}, {"reset": True})
+    assert sent["seed"] == 1000123 + 2 * REPEAT_SEED_STRIDE
+    monkeypatch.setenv("FLYWHEEL_TRAY_REPEAT", "-1")
+    with pytest.raises(ValueError, match="FLYWHEEL_TRAY_REPEAT"):
+        client.query_action({}, "carry", {}, {}, {"reset": True})
+
+
+def test_the_repeat_stride_clears_every_seed_range() -> None:
+    from flywheel_simple.tray.randomize import SEED_RANGES
+    from flywheel_simple.tray.run import REPEAT_SEED_STRIDE
+
+    assert REPEAT_SEED_STRIDE >= max(r.stop for r in SEED_RANGES.values())

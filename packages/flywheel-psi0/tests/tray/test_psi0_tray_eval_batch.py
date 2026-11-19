@@ -14,6 +14,7 @@ from flywheel_psi0.tray.eval_batch import (
     missing,
     phases_for,
     run_batch,
+    with_repeats,
 )
 
 
@@ -183,3 +184,66 @@ def test_chunks_splits_stage_1_into_lanes_that_share_one_out_dir(
         eval_batch.main([*common, "--chunks", "l1-030"])  # past --max-chunks: not stage 1
     with pytest.raises(SystemExit):
         eval_batch.main([*common, "--chunks", "l1-000,l1-000"])
+
+
+# --- DA-42 4.1: repeats ------------------------------------------------------------
+
+
+def test_repeats_follow_their_chunk_and_one_repeat_is_the_old_order() -> None:
+    plan = chunk_plan(rows({1: 20, 2: 10}), 10, phases_for(rows({1: 20, 2: 10})))
+    assert with_repeats(plan, 1) == plan
+    assert [c.dir_id for c in plan] == [c.id for c in plan]  # repeat 0: the old directories
+    assert [c.dir_id for c in with_repeats(plan, 3)] == [
+        "l1-000", "l1-000.r1", "l1-000.r2", "l2-000", "l2-000.r1", "l2-000.r2",
+        "l1-010", "l1-010.r1", "l1-010.r2",
+    ]  # fmt: skip
+    assert {c.seeds for c in with_repeats(plan, 3) if c.id == "l1-000"} == {plan[0].seeds}
+    with pytest.raises(ValueError):
+        with_repeats(plan, 0)
+
+
+def test_each_repeat_runs_and_resumes_in_its_own_directory(tmp_path: Path) -> None:
+    calls: list[tuple[str, int]] = []
+
+    def launch(chunk: Chunk, start: int, n: int, attempt: Path) -> int:
+        calls.append((chunk.dir_id, chunk.repeat))
+        for episode in range(start, start + n):
+            write_episode(attempt, chunk, episode)
+        return 0
+
+    chunks = with_repeats([CHUNK], 2)
+    assert run_batch(tmp_path, chunks, launch, log=lambda _: None) == 0
+    assert calls == [("l1-010", 0), ("l1-010.r1", 1)]
+    assert (tmp_path / "l1-010/attempt-0").is_dir() and (tmp_path / "l1-010.r1/attempt-0").is_dir()
+    runs = [json.loads(line) for line in (tmp_path / "runs.jsonl").read_text().splitlines()]
+    assert [(r["chunk"], r["repeat"]) for r in runs] == [("l1-010", 0), ("l1-010", 1)]
+    assert run_batch(tmp_path, chunks, launch, log=lambda _: None) == 0  # resume: nothing left
+    assert len(calls) == 2
+
+
+def test_repeats_on_the_command_line(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from flywheel_psi0.tray import eval_batch
+    from flywheel_psi0.tray.eval_set import conditions_sha256
+
+    conditions = [
+        row | {"environment_config": {"flywheel": {"run_plan_id": "rp_a04c14e79dfd"}}}
+        for row in rows({1: 20, 2: 20})
+    ]
+    (tmp_path / "conditions.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in conditions)
+    )
+    common = [
+        "--set", str(tmp_path), "--conditions-sha256", conditions_sha256(conditions),
+        "--out", str(tmp_path / "out"), "--simple-python", "python", "--pythonpath", "x",
+        "--dry-run", "--max-chunks", "2",
+    ]  # fmt: skip
+    assert eval_batch.main([*common, "--repeats", "2"]) == 0
+    printed = [line.split()[0] for line in capsys.readouterr().out.splitlines()]
+    assert printed == ["l1-000", "l1-000.r1", "l2-000", "l2-000.r1"]
+    assert eval_batch.main([*common, "--chunks", "l2-000", "--repeats", "2"]) == 0
+    assert [line.split()[0] for line in capsys.readouterr().out.splitlines()] == [
+        "l2-000",
+        "l2-000.r1",
+    ]
+    with pytest.raises(SystemExit):
+        eval_batch.main([*common, "--repeats", "0"])
