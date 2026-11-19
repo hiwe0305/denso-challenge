@@ -11,6 +11,7 @@ module runs a model, a simulator or a train job.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 
 from flywheel.contracts import TaskDefinition
@@ -41,6 +42,8 @@ from flywheel.eval.diagnosis.train.artifact import (
     load_job,
     write_artifact,
 )
+from flywheel.eval.diagnosis.train.calibrate import Proposal
+from flywheel.eval.diagnosis.train.calibrate import calibrate as propose_train_thresholds
 from flywheel.eval.scorer.agreement import AgreementReport, ScorerKey, compare
 from flywheel.eval.scorer.artifact import build_record, write_record
 from flywheel.eval.scorer.calibration import read_rollouts, read_scores, store_report
@@ -76,6 +79,20 @@ def diagnose_train(job_path: Path, config_path: Path = DEFAULT_TRAIN_CONFIG) -> 
     thresholds, digest = load_train_thresholds(config_path)
     job = load_job(job_path)
     return build_artifact(job, diagnose_all(job, thresholds), digest)
+
+
+def calibrate_train(
+    job_paths: Sequence[Path], config_path: Path = DEFAULT_TRAIN_CONFIG
+) -> Proposal:
+    """Propose `t1.k` and `t8.max_grad_norm` from train jobs known to be healthy (DA-44).
+
+    Each path is a job directory or its `metrics.jsonl`. Nothing is written:
+    the proposal carries the rule and the per-job numbers, and a human edits
+    `train.yaml`. The other thresholds the rules depend on come from
+    `config_path`.
+    """
+    thresholds, _ = load_train_thresholds(config_path)
+    return propose_train_thresholds([load_job(path).series for path in job_paths], thresholds)
 
 
 def score_trace(
