@@ -4,6 +4,7 @@ _Ngày 23/10/2026. Vai trò BMAD: Scrum Master cộng Product Owner. Trưởng n
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 19/11/2026 | 0.6 | Sau demo 17/11/2026: tắt workflow `daily-report` và gỡ trang Tiến độ cùng website cũ (Hiếu chốt 19/11). Hai lịch tracking `denso-tracking`, `denso-cuoi-ngay` đã không còn trên máy của Hiếu. Mục 5 và 7 ghi lại; báo cáo ngày chỉ còn chạy tại máy bằng `daily_report.py`. Rule R1–R10 giữ nguyên, nguồn phát hiện "Báo cáo ngày" nay là lệnh chạy tại máy | PO (Hiếu) |
 | 4/11/2026 | 0.5 | Thêm R10: story chưa có commit nào khi hạn nội bộ ở [07 mục 2.4](07-team-workflow.md) còn ≤ 3 ngày (ngưỡng [Đề xuất]); báo cáo ngày 4/11 không nêu DA-04, DA-18, DA-20 của Hưng vì R4 chỉ xét story đã bắt đầu. Mục 3.1, 8: "Hôm qua theo người" đếm theo tác giả git của commit, không theo người làm của story (DA-13 có commit của cả hiwe0305 và HoangChau6179); k vẫn theo người làm | Claude, chờ PO (Hiếu) duyệt |
 | 3/11/2026 | 0.4 | Thông rút khỏi vai Scrum Master theo quyết định PO ([plan chia lại việc](../superpowers/plans/2026-11-03-thong-reassignment.md), Q1); vai SM và các việc của Thông ở R2, R4, R5, R8 (mục 3.2), nhịp thứ Sáu và review cổng G (mục 5), người viết file story (mục 2) chuyển sang Hiếu | PO (Hiếu) |
 | 3/11/2026 | 0.3 | Mục 3.2: R9 chỉ đếm dòng mã chạy và nâng ngưỡng từ 400 lên 1500 dòng; cả 6 PR gần nhất đều vượt 400 nên cờ `size:large` không còn phân biệt PR lớn thật | PO (Hiếu) |
@@ -96,12 +97,9 @@ Lỗi kỹ thuật của chính flywheel (D1–D8, T1–T8, O1–O4, R1–R6 ở
 
 | Khi nào | Việc | Ai |
 |---|---|---|
-| 9:00 giờ Việt Nam, thứ Hai đến thứ Sáu | Workflow `daily-report` đăng báo cáo vào issue có label `daily-report`; trang Tiến độ trên website cập nhật | Tự động |
-| Trước 10:00 | Mỗi người trả lời dưới báo cáo 3 dòng: **Xong**, **Tiếp theo**, **Bị chặn** | Cả đội |
+| Khi cần (bản 0.6) | Chạy `python3 scripts/repo/daily_report.py` tại máy. Từ 19/11/2026 không còn workflow đăng báo cáo vào issue và không còn trang Tiến độ | Hiếu |
 | Trong ngày | Xử lý rule đã kích hoạt theo cột "Hành động" | Theo cột "Ai" |
 | Thứ Sáu | Hiếu tổng hợp tuần (bản 0.4, thay Thông): xu hướng k, top nguyên nhân lỗi, can thiệp mới ở mục 6, đề xuất chỉnh ngưỡng | Hiếu |
-| 10:00, 14:00, 18:00 mỗi ngày (bản 0.2) | Tracking tự động trên máy của Hiếu (scheduled task `denso-tracking` của Claude desktop, chỉ đọc): chạy `daily_report.py`, `pr_guard.py` cho từng nhánh, liệt kê PR chờ Hiếu, ai bị chặn, vi phạm rule; ghi `~/denso-tracking/YYYY-MM-DD-HHMM.md` | Tự động |
-| 21:30 mỗi ngày (bản 0.2) | Tổng kết cuối ngày (`denso-cuoi-ngay`): việc đã xong, PR chờ duyệt kèm thứ tự đề xuất, rủi ro, câu hỏi cần Hiếu quyết; Hiếu và Claude thảo luận | Tự động, Hiếu |
 | Review mỗi cổng G | Xem lại ngưỡng và hệ số k của đội cho quyết định ở 04 mục 4.8–4.9 | Hiếu |
 
 ## 6. Sổ can thiệp
@@ -117,11 +115,9 @@ Mỗi lần R7 hoặc R8 kích hoạt, thêm một dòng. Đây là chỗ các "
 | Công cụ | Làm gì | Ở đâu |
 |---|---|---|
 | `pr-guard` | Kiểm tên nhánh, định dạng commit, `Time-spent`, phạm vi file (R6); gắn `size:large` (R9) | `.github/workflows/pr-guard.yml`, `scripts/repo/pr_guard.py` |
-| `daily-report` | Tính chỉ số mục 3.1, kiểm R1–R5, R7–R10, đăng báo cáo vào issue | `.github/workflows/daily-report.yml`, `scripts/repo/daily_report.py` |
-| Trang Tiến độ | Hiển thị báo cáo ngày mới nhất: rule kích hoạt, theo người, PR, story | `website/dist/progress.html`; dữ liệu `data/progress.json` sinh khi build Pages |
+| `daily_report.py` | Tính chỉ số mục 3.1, kiểm R1–R5, R7–R10, in báo cáo tại máy (bản 0.6: không còn workflow đăng lên issue) | `scripts/repo/daily_report.py` |
 | Label | Tạo đủ label ở mục 4 và 07 mục 3.5 | `bash scripts/repo/setup_labels.sh` (chạy một lần, cần `gh` đã đăng nhập) |
 | Tiến độ story tại máy | In tiến độ nhiệm vụ con theo story | `python3 scripts/repo/progress.py` |
-| Tracking và tổng kết cuối ngày (bản 0.2) | Đọc repo và GitHub, không đăng gì; báo cáo nằm trên máy của Hiếu | `~/.claude/scheduled-tasks/denso-tracking/`, `denso-cuoi-ngay/`; báo cáo ở `~/denso-tracking/` |
 
 Chạy thử báo cáo tại máy (không có token thì bỏ qua phần GitHub API):
 
@@ -135,7 +131,7 @@ Kiểm một nhánh trước khi mở PR:
 python3 scripts/repo/pr_guard.py --base origin/master --head HEAD --branch "$(git branch --show-current)"
 ```
 
-Việc Hiếu làm trên GitHub một lần: chạy `scripts/repo/setup_labels.sh`; tạo một issue tiêu đề "Báo cáo ngày" gắn label `daily-report` (workflow tự tạo nếu chưa có); thêm `pr-guard` vào status check bắt buộc của luật bảo vệ `master`; trong Settings → Pages chọn nguồn GitHub Actions nếu chưa chọn.
+Việc Hiếu làm trên GitHub một lần: chạy `scripts/repo/setup_labels.sh`; thêm `pr-guard` vào status check bắt buộc của luật bảo vệ `master`.
 
 ## 8. Giới hạn
 
