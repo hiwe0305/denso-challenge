@@ -19,6 +19,7 @@ G1 bê khay 6 linh kiện bằng hai tay từ bàn A sang vùng đích trên bà
 | `flywheel_simple.tray.release`, `scripts/g0/tray/release.py` | Xuất lô đã QA, ghi `release_manifest.json` (sha256 từng file, `release_hash`) và đặt tên thư mục `tray_s1_<release_hash[:12]>`; release đầu tiên ở [synthetic-s1.md](synthetic-s1.md) (DA-33) |
 | `flywheel_simple.tray.cut`, `scripts/g0/tray/cut_place.py` | Dữ liệu riêng cho bước đặt: làm lệch đích CARRY theo seed (`CarryJitter`), cắt release dẫn xuất `tray_s1place_<hash12>` từ ARRIVE_B; lô mẫu và runbook nháp ở [place-data.md](place-data.md) (DA-46) |
 | [huggingface.md](huggingface.md) | Release S1 planner-5 trên Hugging Face, giấy phép CC BY 4.0 (D-30) |
+| [scorer-v2.md](scorer-v2.md) | Bộ chấm khay bản 2 (`approach_a`, `L-TRAY-TILT`), tín hiệu lỗi trong outcome, eval nhiều lượt mỗi điều kiện (DA-42) |
 | `scripts/g0/tray/import_simready.py` | Tải và đổi mesh SimReady cho lớp hiển thị |
 | `scripts/g0/tray/view_scene.py` | Ghi video camera đầu và video toàn cảnh |
 | `scripts/g0/tray/measure_arm_pose.py` | Đo tư thế tay khi cầm khay (khuỷu so với vai và đường vai–cổ tay) và tỉ lệ thành công theo biến thể cấu hình, song song nhiều process (DA-33, D-25) |
