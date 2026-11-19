@@ -17,6 +17,7 @@ from flywheel_psi0.tray.eval_results import (
     paired,
     paired_diff,
     reached,
+    scorer_version,
     stage1_outcome,
     summarize,
     table,
@@ -39,6 +40,7 @@ def episode(
     steps: int = 3,
     stats: bool = True,
     failure: str = "L-TIMEOUT",
+    scorer_version: int | None = None,
 ) -> None:
     folder = out / chunk.id / f"attempt-{attempt}"
     (folder / "eval").mkdir(parents=True, exist_ok=True)
@@ -49,6 +51,8 @@ def episode(
         "failure": None if success else failure,
         "scorer_steps": [k < (7 if success else steps) for k in range(7)],
     }
+    if scorer_version is not None:
+        row["scorer_version"] = scorer_version
     with (folder / "outcomes.jsonl").open("a") as f:
         f.write(json.dumps(row) + "\n")
     if stats:
@@ -320,3 +324,60 @@ def test_stage1_reads_the_first_six_chunks_of_both_sides(tmp_path: Path) -> None
     (tmp_path / "b/l2-020/attempt-0/eval/eval_stats.txt").write_text("")
     with pytest.raises(ValueError, match="stage 1 misses"):
         eval_results.main([*common, "--baseline", str(tmp_path / "c"), "--stage1"])
+
+
+# --- DA-42 3.3: scorer version ------------------------------------------------------
+
+
+def _scored(out: Path, versions: list[int | None], ok: list[bool] | None = None) -> Any:
+    chunk = Chunk("l1-000", 1, 0, tuple(1000100 + i for i in range(len(versions))))
+    for i, v in enumerate(versions):
+        episode(out, chunk, 0, i, success=bool(ok and ok[i]), scorer_version=v)
+    return collect(out, [chunk])
+
+
+def test_results_name_the_scorer_version(tmp_path: Path) -> None:
+    chosen, extra, missing = _scored(tmp_path / "v2", [2, 2, 2])
+    result = summarize(PLAN, chosen, extra, missing, full=False)
+    assert result["scorer_version"] == 2 and result["scorer_version_note"] is None
+    assert table(result).startswith("Bộ chấm khay: phiên bản 2")
+
+
+def test_rows_without_a_version_are_unrecorded_not_version_1(tmp_path: Path) -> None:
+    chosen, extra, missing = _scored(tmp_path / "old", [None, None])
+    result = summarize(PLAN, chosen, extra, missing, full=False)
+    assert result["scorer_version"] is None
+    assert "before DA-42" in result["scorer_version_note"]
+    assert table(result).startswith("Bộ chấm khay: không ghi phiên bản")
+
+
+@pytest.mark.parametrize("versions", [[1, 2], [None, 2], [2, None, 2]])
+def test_a_directory_of_two_scorer_versions_is_refused(
+    tmp_path: Path, versions: list[int | None]
+) -> None:
+    chosen, extra, missing = _scored(tmp_path, versions)
+    with pytest.raises(ValueError, match="mix scorer versions"):
+        scorer_version(chosen)
+    with pytest.raises(ValueError, match="mix scorer versions"):
+        summarize(PLAN, chosen, extra, missing, full=False)
+
+
+def test_pairing_two_scorer_versions_needs_cross_scorer(tmp_path: Path) -> None:
+    var, _, _ = _scored(tmp_path / "var", [2, 2, 2, 2], [True, True, False, False])
+    base, _, _ = _scored(tmp_path / "base", [None] * 4, [True, False, False, False])
+    with pytest.raises(ValueError, match="--cross-scorer"):
+        paired(var, base)
+    with pytest.raises(ValueError, match="--cross-scorer"):
+        paired_diff(var, base, [1], PLAN.stats)
+    result = paired(var, base, cross_scorer=True)
+    assert result["cross_scorer"] is True
+    assert result["scorer_versions"] == {"variant": 2, "baseline": None}
+    diff = paired_diff(var, base, [1], PLAN.stats, cross_scorer=True)
+    assert diff["scorer_versions"] == {"variant": 2, "baseline": None}
+
+
+def test_same_scorer_pairs_say_so(tmp_path: Path) -> None:
+    var, _, _ = _scored(tmp_path / "var", [2, 2], [True, False])
+    base, _, _ = _scored(tmp_path / "base", [2, 2], [False, False])
+    result = paired(var, base)
+    assert result["cross_scorer"] is False and result["scorer_versions"]["baseline"] == 2

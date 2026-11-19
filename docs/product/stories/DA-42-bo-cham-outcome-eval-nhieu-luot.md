@@ -41,7 +41,7 @@ Là người chạy vòng Failure → Data trên task khay, tôi muốn bộ ch�
 - [ ] 3. Bộ chấm bản 2 (AC 2, 3)
   - [x] 3.1 Số phiên bản; `approach_a` đo tới đoạn tay cầm và chốt khi hai tay đã cầm
   - [x] 3.2 `L-TRAY-TILT` chỉ khi robot còn cầm khay bằng hai tay
-  - [ ] 3.3 `eval_results`, `place_error` ghi phiên bản và từ chối trộn
+  - [x] 3.3 `eval_results`, `place_error` ghi phiên bản và từ chối trộn
 - [ ] 4. Eval nhiều lượt mỗi điều kiện (AC 4)
   - [ ] 4.1 `eval_batch --repeats N`, hạt nhiễu policy khác nhau theo lượt
   - [ ] 4.2 `eval_results`: số thành công từng điều kiện, tỉ lệ từng bước, Wilson theo cỡ mẫu hiệu dụng

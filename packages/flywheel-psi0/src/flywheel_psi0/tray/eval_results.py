@@ -34,6 +34,12 @@ rollout in them is an error. `stage1.outcome` applies the stage 1 stop rule to t
 paired headline: E1 and E3 stop on a clear difference, F stops when B shows no gain,
 `continue` runs the remaining chunks. It is the rule's arithmetic for a run against C;
 against C+ (rule 5) it is not read.
+
+Scorer version (DA-42): every result names the version of the tray scorer that labelled
+its rollouts (`scorer_version` of the outcome rows, written by `eval_driver` since
+DA-42; rows without it are reported as unrecorded, `None`, never as a version). A
+directory whose rows mix versions is refused, and so is pairing two sides scored by
+different versions, unless `--cross-scorer` is given; the paired result then names both.
 """
 
 from __future__ import annotations
@@ -61,6 +67,10 @@ YAW_LARGE = 2.5  # rad, the threshold the yaw counts are reported against
 Z95 = 1.959963984540054  # two-sided 95 % normal quantile, for the Wilson interval
 STAGE1_CHUNKS = 6  # branch B's stage 1 (tray.md 18.2): 3 chunks of level 1, 3 of level 2
 STAGE1_P = 0.001  # stage 1 stops on a clear difference: exact McNemar p below this
+UNRECORDED = (
+    "scorer version not recorded: rows written before DA-42 (scorer version 1) or "
+    "outside eval_driver"
+)
 
 
 @dataclass(frozen=True)
@@ -97,6 +107,32 @@ def collect(
     return chosen, extra, missing
 
 
+def scorer_version(rollouts: Sequence[Rollout]) -> int | None:
+    """The one scorer version of the rollouts' outcome rows; None when none records it.
+
+    Refuses rows of two versions, and recorded rows mixed with unrecorded ones: results of
+    two scorer versions are not comparable (docs/g0/tray/scorer-v2.md).
+    """
+    versions = {r.row.get("scorer_version") for r in rollouts}
+    if len(versions) > 1:
+        shown = sorted(versions, key=lambda v: (v is None, v or 0))
+        raise ValueError(f"rollouts mix scorer versions {shown} (None: not recorded)")
+    return versions.pop() if versions else None
+
+
+def scorer_versions(
+    variant: Sequence[Rollout], baseline: Sequence[Rollout], cross_scorer: bool
+) -> dict[str, int | None]:
+    """Both sides' scorer versions; different versions only with `cross_scorer`."""
+    versions = {"variant": scorer_version(variant), "baseline": scorer_version(baseline)}
+    if versions["variant"] != versions["baseline"] and not cross_scorer:
+        raise ValueError(
+            f"variant scored by version {versions['variant']}, baseline by "
+            f"{versions['baseline']}: not comparable; --cross-scorer to pair them anyway"
+        )
+    return versions
+
+
 def bootstrap_ci(
     groups: Sequence[Sequence[int]], resamples: int, seed: int, ci: float
 ) -> tuple[float, float]:
@@ -123,7 +159,11 @@ def mcnemar_exact(variant_only: int, baseline_only: int) -> float:
 
 
 def paired_diff(
-    variant: Sequence[Rollout], baseline: Sequence[Rollout], levels: Sequence[int], stats: Stats
+    variant: Sequence[Rollout],
+    baseline: Sequence[Rollout],
+    levels: Sequence[int],
+    stats: Stats,
+    cross_scorer: bool = False,
 ) -> dict[str, Any]:
     """Paired success difference variant - baseline over the conditions of `levels`.
 
@@ -131,6 +171,7 @@ def paired_diff(
     mean of d_i and its CI resamples d_i within each level, with the plan's resamples,
     seed and level, so the two sides stay paired (docs/he/tray.md 2, 9 and 18.2).
     """
+    versions = scorer_versions(variant, baseline, cross_scorer)
     a = {(r.level, r.seed): int(bool(r.row["success"])) for r in variant if r.level in levels}
     b = {(r.level, r.seed): int(bool(r.row["success"])) for r in baseline if r.level in levels}
     if a.keys() != b.keys():
@@ -154,6 +195,7 @@ def paired_diff(
         "variant_only": variant_only,
         "baseline_only": baseline_only,
         "mcnemar_exact_p": round(mcnemar_exact(variant_only, baseline_only), 4),
+        "scorer_versions": versions,
     }
 
 
@@ -287,7 +329,10 @@ def summarize(
     everything = level_summary(chosen)
     everything["levels"] = [c.level for c in by_level_cfg]
     p = headline["p"]
+    version = scorer_version(chosen)
     result: dict[str, Any] = {
+        "scorer_version": version,
+        "scorer_version_note": UNRECORDED if version is None else None,
         "levels": levels,
         "headline": headline,
         "all": everything,
@@ -316,12 +361,15 @@ def summarize(
     return result
 
 
-def paired(variant: Sequence[Rollout], baseline: Sequence[Rollout]) -> dict[str, Any]:
+def paired(
+    variant: Sequence[Rollout], baseline: Sequence[Rollout], cross_scorer: bool = False
+) -> dict[str, Any]:
     """Per condition (level, seed) of both: success and each step, variant against baseline.
 
     Each side is one rollout per condition (EGL rollouts are not reproducible, tray.md
     13.2), so a pair compares two rollouts, not two measurements of one.
     """
+    versions = scorer_versions(variant, baseline, cross_scorer)
     a = {(r.level, r.seed): r.row for r in variant}
     b = {(r.level, r.seed): r.row for r in baseline}
     if a.keys() != b.keys():
@@ -347,6 +395,8 @@ def paired(variant: Sequence[Rollout], baseline: Sequence[Rollout]) -> dict[str,
         "steps": steps,
         "success_gain": success["variant_only"] - success["baseline_only"],
         "place_gain": steps["place"]["variant_only"] - steps["place"]["baseline_only"],
+        "scorer_versions": versions,
+        "cross_scorer": versions["variant"] != versions["baseline"],
     }
 
 
@@ -356,7 +406,12 @@ def table(result: dict[str, Any]) -> str:
     def pct(x: float | None) -> str:
         return "–" if x is None else f"{100 * x:.1f}"
 
+    version = result.get("scorer_version")
     lines = [
+        f"Bộ chấm khay: phiên bản {version}"
+        if version is not None
+        else "Bộ chấm khay: không ghi phiên bản (dòng trước DA-42 là bản 1)",
+        "",
         "| Mức | n | Thành công | p (%) | CI bootstrap (%) | Wilson 95 % (%) | "
         + " | ".join(STEP_NAMES)
         + " | Loại lỗi |",
@@ -396,6 +451,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help=f"read the first {STAGE1_CHUNKS} chunks only: stage 1 of branch B (tray.md 18.2)",
     )
+    parser.add_argument(
+        "--cross-scorer",
+        action="store_true",
+        help="pair with a baseline scored by another scorer version (not comparable)",
+    )
     args = parser.parse_args(argv)
     if args.stage1 and args.baseline is None:
         parser.error("--stage1 pairs with a baseline: give --baseline")
@@ -421,12 +481,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         base, _, base_missing = collect(args.baseline, chunks)
         if base_missing:
             raise ValueError(f"baseline misses {base_missing}")
-        result["paired"] = paired(chosen, base)
+        result["paired"] = paired(chosen, base, args.cross_scorer)
         if plan.eval.by_level is not None:
             headline = [c.level for c in plan.eval.by_level if c.headline]
-            result["paired"]["headline"] = paired_diff(chosen, base, headline, plan.stats)
+            result["paired"]["headline"] = paired_diff(
+                chosen, base, headline, plan.stats, args.cross_scorer
+            )
             result["paired"]["by_level"] = {
-                str(c.level): paired_diff(chosen, base, [c.level], plan.stats)
+                str(c.level): paired_diff(chosen, base, [c.level], plan.stats, args.cross_scorer)
                 for c in plan.eval.by_level
                 if any(r.level == c.level for r in chosen)
             }
@@ -440,9 +502,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.json is not None:
         args.json.write_text(json.dumps(result, indent=1) + "\n")
     print(table(result))
-    counts: dict[str, Any] = {"missing": len(result["missing"]), "yaw": result.get("yaw")}
+    counts: dict[str, Any] = {
+        "scorer_version": result["scorer_version"],
+        "missing": len(result["missing"]),
+        "yaw": result.get("yaw"),
+    }
     if "paired" in result:
-        brief = {k: result["paired"][k] for k in ("success_gain", "place_gain")}
+        brief = {
+            k: result["paired"][k]
+            for k in ("success_gain", "place_gain", "scorer_versions", "cross_scorer")
+        }
         if "headline" in result["paired"]:
             brief["headline"] = result["paired"]["headline"]
         counts["paired"] = brief
