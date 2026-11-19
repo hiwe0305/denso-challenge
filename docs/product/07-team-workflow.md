@@ -113,7 +113,6 @@ Hưng không cần chạy SIMPLE: pipeline egocentric và Agent QA/QC code trên
 | `scripts/demo/`, `docs/demo/` | Long | Hiếu |
 | `docs/spec-v10-failure-to-data.md`, `docs/product/01`–`08`, `docs/superpowers/`, `docs/mentor/` | Hiếu | Long (bản 1.6) |
 | `docs/product/stories/` | Hiếu (bản 1.6, thay Thông) | Long |
-| `website/`, `deliverables/` | Hiếu | Long |
 
 Chủ sở hữu không có nghĩa là người duy nhất được sửa. Người khác sửa được khi story của họ khai đường dẫn đó trong "Phạm vi file" và chủ sở hữu bình luận trên PR.
 

@@ -2,8 +2,6 @@
 # Thay placeholder bằng tài khoản GitHub thực trước khi kích hoạt từng dòng.
 * @hiwe0305
 /docs/ @hiwe0305
-/website/ @hiwe0305
-/deliverables/ @hiwe0305
 # /docs/product/stories/ @<github-thong>
 # /packages/flywheel-contracts/ @<github-long>
 # /packages/flywheel-store/ @<github-long>

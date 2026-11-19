@@ -1,34 +1,35 @@
 # Humanoid Data Flywheel
 
-Đề xuất của đội ilovephysicalintelligence cho thử thách H1 của DENSO Factory Hacks: huấn luyện humanoid nhanh, chính xác, ít công. Recipe hiện hành là **Ψ₀ + SIMPLE / G1**: fine-tune Ψ₀ trên dữ liệu teleop và dữ liệu sinh trong mô phỏng, rồi dùng thuật toán **Failure → Data** để chọn dữ liệu cần bổ sung sau mỗi lỗi, có đối chứng chất lượng và chi phí.
+Đề xuất của đội ilovephysicalintelligence cho thử thách H1 của DENSO Factory Hacks: huấn luyện humanoid nhanh, chính xác, ít công. Recipe là **Ψ₀ + SIMPLE / G1**: fine-tune Ψ₀ trên dữ liệu sinh trong mô phỏng và dữ liệu của người, rồi dùng thuật toán **Failure → Data** để chọn dữ liệu cần bổ sung sau mỗi lỗi, có đối chứng chất lượng và chi phí.
 
-Từ 27/10/2026, demo ngày 17/11/2026 và mọi thí nghiệm chạy trên **Unitree G1 trong SIMPLE**, task hai bàn: gắp vật ở bàn này, đi sang bàn kia, đặt lên. Hệ thống có ba loại dữ liệu: egocentric của người, teleop, synthetic; cả ba qua pipeline 6 tầng về một định dạng chung. Nguồn để test bây giờ là dữ liệu công bố và sim (mẫu EgoDex, dataset teleop của tác giả Ψ₀, teleop bàn phím, synthetic S1 và S2 trong SIMPLE), sau đó video egocentric đội tự quay. Thí nghiệm HE kiểm claim của Ψ₀ rằng dữ liệu egocentric của người giúp cần ít demo robot hơn. Agent QA/QC đọc báo cáo dataset, log và output từng stage.
+Mọi thí nghiệm chạy trên **Unitree G1 trong SIMPLE** (MuJoCo). Có hai task: task hai bàn của paper Ψ₀ (tái tạo kết quả của tác giả, thí nghiệm HE-1) và **task bê khay** (từ DA-32, task của vòng Failure → Data đầy đủ ở DA-34). Hệ thống có ba loại dữ liệu: egocentric của người, teleop, synthetic; cả ba qua cùng pipeline về định dạng LeRobot của Ψ₀. Agent QA/QC đọc báo cáo dataset, log và output từng stage.
 
-Trạng thái: đề xuất PoC, chưa chạy Ψ₀ hoặc robot thật. Số liệu hiệu quả là ước lượng có điều kiện. Website và hai file PowerPoint chưa cập nhật theo hướng 27/10/2026.
+Trạng thái 19/11/2026: demo ngày 17/11/2026 đã trình bày trên **Flywheel Console** (`packages/flywheel-console`). Số đo là sơ bộ trong sim (dev, 1 seed); chi tiết và giới hạn ở [docs/he/tray.md](docs/he/tray.md). Chưa chạy trên robot thật.
 
 ## Cấu trúc
 
 | Đường dẫn | Nội dung |
 |---|---|
-| [docs/spec-v10-failure-to-data.md](docs/spec-v10-failure-to-data.md) | Đặc tả hiện hành (v10.4): giả thuyết HS, HTa, HTb, HD, HE, thuật toán Failure → Data 12 bước, PoC với các nhánh A, A₀.₇, B, B-fail, C, thí nghiệm HE, sổ chi phí, lộ trình 12 tuần, glossary |
-| [docs/superpowers/specs/](docs/superpowers/specs/2026-10-27-g1-psi0-demo-design.md) | Design ngày 27/10/2026 (hiện hành duy nhất): task hai bàn, simulator, teleop bàn phím, sinh tự động, pipeline 6 tầng, thí nghiệm HE, Agent QA/QC và bộ lỗi cấy, bảng lỗi, kịch bản demo 17/11 |
+| [docs/spec-v10-failure-to-data.md](docs/spec-v10-failure-to-data.md) | Đặc tả hiện hành (v10.6): giả thuyết HS, HTa, HTb, HD, HE, thuật toán Failure → Data 12 bước, PoC có đối chứng, sổ chi phí, glossary |
+| [docs/superpowers/specs/](docs/superpowers/specs) | Design: [27/10/2026](docs/superpowers/specs/2026-10-27-g1-psi0-demo-design.md) (G1 + Ψ₀, pipeline dữ liệu, HE, Agent QA/QC), [28/10/2026](docs/superpowers/specs/2026-10-28-tray-transfer-he-design.md) (task bê khay), [11/11](docs/superpowers/specs/2026-11-11-flywheel-console-design.md) và [15/11/2026](docs/superpowers/specs/2026-11-15-console-one-site-design.md) (Flywheel Console) |
+| [docs/he/](docs/he/tray.md) | Thí nghiệm và số đo: task khay ([tray.md](docs/he/tray.md)), HE-1, stage 1, chẩn đoán task hai bàn |
+| [docs/g0/](docs/g0/README.md) | Runbook và ghi chép kỹ thuật: SIMPLE, Ψ₀, dữ liệu, Agent QA/QC, sổ chi phí theo story |
+| [docs/demo/](docs/demo) | Kịch bản video và script thuyết trình demo 17/11/2026 |
 | [docs/product/](docs/product/README.md) | Hồ sơ sản phẩm theo BMAD: brief, PRD, kiến trúc lõi flywheel, kế hoạch chia việc 5 người, phản biện và câu hỏi cho mentor, story Sprint 1 |
 | [RULE.md](RULE.md) | **Đọc đầu tiên nếu bạn là thành viên đội:** công việc của từng người, một ngày làm việc, cách làm một story, rule R1–R10, điều không được phá, hỏi ai |
-| [CLAUDE.md](CLAUDE.md) | Quy tắc chung cho mọi phiên Claude Code và cho người: đọc gì trước, phạm vi file, quy ước nhánh và commit, bất biến kiến trúc. Có thêm [docs/CLAUDE.md](docs/CLAUDE.md) và [website/CLAUDE.md](website/CLAUDE.md) |
-| [scripts/repo/](scripts/repo) | `check_links.py` kiểm liên kết nội bộ; `progress.py` in tiến độ theo story; `pr_guard.py` và `daily_report.py` cho rule kiểm soát theo ngày ([08](docs/product/08-daily-control.md)); `setup_labels.sh` tạo label GitHub |
+| [CLAUDE.md](CLAUDE.md) | Quy tắc chung cho mọi phiên Claude Code và cho người: đọc gì trước, phạm vi file, quy ước nhánh và commit, bất biến kiến trúc. Có thêm [docs/CLAUDE.md](docs/CLAUDE.md) |
+| [scripts/repo/](scripts/repo) | `check_links.py` kiểm liên kết nội bộ; `progress.py` in tiến độ theo story; `pr_guard.py` (workflow `pr-guard`) và `daily_report.py` (chạy tại máy) cho rule kiểm soát theo ngày ([08](docs/product/08-daily-control.md)); `setup_labels.sh` tạo label GitHub |
 | [docs/challenge/](docs/challenge/README.md) | Đề bài của BTC, kèm tiêu chí 3 cấp |
 | [docs/references/](docs/references/README.md) | Nguồn nghiên cứu; PDF giữ cục bộ, không commit |
-| [deliverables/](deliverables) | [Pitch v10](deliverables/DENSO-ilovephysicalintelligence-1.pptx) và [deck workflow kỹ thuật](deliverables/DENSO-Platform-Visual-Workflow-2026-10-08-v1.pptx) |
-| [website/](website/README.md) | Website trình bày 12 trang, build từ `website/content` và hai deck |
-| [.github/workflows/pages.yml](.github/workflows/pages.yml) | Build, kiểm tra và đăng website lên GitHub Pages |
 
-## Mở website
+## Mở Flywheel Console
 
 ```bash
-bash start-website.sh
+uv run fw console index
+uv run fw console serve
 ```
 
-Sau đó mở [website cục bộ](http://127.0.0.1:4175/#overview) và giữ cửa sổ máy chủ chạy trong lúc xem. Cách sửa nội dung và build lại nằm trong [website/README.md](website/README.md).
+Console đọc `fwdata/` (hoặc thư mục trong `FW_ROOT`). Cờ `--lock` từ chối mọi việc ghi; `--chat` bật chat. Cách dùng và giới hạn ở [design 15/11/2026](docs/superpowers/specs/2026-11-15-console-one-site-design.md) và [kịch bản video](docs/demo/2026-11-17-kich-ban-video.md).
 
 ## Hồ sơ cũ
 
@@ -39,6 +40,8 @@ git show archive/v3:IDEA.md
 ```
 
 Lệnh trên in một file cũ ra màn hình. Muốn lấy lại cả thư mục, dùng `git checkout archive/v3 -- <đường dẫn>`.
+
+Ngày 19/11/2026 gỡ thêm website trình bày cũ (`website/`, sửa lần cuối 29/10/2026), workflow đăng GitHub Pages và báo cáo ngày, hai deck trong `deliverables/`. Lấy lại từ commit cha của commit gỡ: `git log --diff-filter=D -- website/` cho biết commit đó.
 
 ## Thiết lập và kiểm tra workspace
 

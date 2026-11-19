@@ -29,7 +29,6 @@
 
 - [ ] Test và lint của package bị sửa
 - [ ] `python3 scripts/repo/check_links.py` (nếu sửa tài liệu)
-- [ ] `python3 website/build.py` và `python3 website/verify.py` (nếu sửa website)
 
 ## Ghi chú cho người review
 
