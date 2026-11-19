@@ -28,6 +28,14 @@ serve lane each when stage 1 is split over several servers (C70_R1, docs/he/tray
 20.15). Lanes may share `--out`: each chunk has its own directory, and `runs.jsonl` gets
 one short appended line per attempt. An id twice, or one not in the order, is refused.
 
+`--repeats N` (DA-42) runs every chunk N times: repeat 0 in `<out>/<chunk>/` as before,
+repeat r >= 1 in `<out>/<chunk>.r<r>/`, right after the chunk, so `--max-chunks` and
+`--chunks` (which name the chunks, not their repeats) still cut whole conditions. Each
+repeat is a fresh rollout of the same condition (same scene seed); the client sends the
+Psi0 server a different policy noise seed per repeat (`FLYWHEEL_TRAY_REPEAT`, see
+`flywheel_simple.tray.run`), so repeats differ by more than EGL noise when the server seeds
+its noise. N = 1 (default) is the order, directories and seeds of before.
+
     python -m flywheel_psi0.tray.eval_batch --set <eval set> --conditions-sha256 <sha> \
         --out <dir> --server 127.0.0.1:22185 --simple-python <SIMPLE venv>/bin/python \
         --pythonpath <repo>/packages/*/src joined by ':'
@@ -44,7 +52,7 @@ import subprocess
 import sys
 import time
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -64,9 +72,22 @@ class Chunk:
     level: int
     start: int  # episode index in dr-level-<level>
     seeds: tuple[int, ...]
+    repeat: int = 0  # DA-42: rollout r of each condition of the chunk
 
     def seed_of(self, episode: int) -> int:
         return self.seeds[episode - self.start]
+
+    @property
+    def dir_id(self) -> str:
+        """Directory name under `<out>`: the chunk id, `.r<repeat>` for repeats after the first."""
+        return self.id if self.repeat == 0 else f"{self.id}.r{self.repeat}"
+
+
+def with_repeats(chunks: Sequence[Chunk], repeats: int) -> list[Chunk]:
+    """Each chunk followed by its repeats 1 .. repeats - 1, in the chunks' order."""
+    if repeats < 1:
+        raise ValueError(f"repeats must be at least 1, not {repeats}")
+    return [replace(c, repeat=r) for c in chunks for r in range(repeats)]
 
 
 def phases_for(rows: Sequence[dict[str, Any]]) -> tuple[tuple[int, ...], ...]:
@@ -122,7 +143,7 @@ def finished(chunk: Chunk, attempt: Path) -> dict[int, dict[str, Any]]:
 
 
 def attempts(out: Path, chunk: Chunk) -> list[Path]:
-    return sorted((out / chunk.id).glob("attempt-*"), key=lambda p: int(p.name.split("-")[1]))
+    return sorted((out / chunk.dir_id).glob("attempt-*"), key=lambda p: int(p.name.split("-")[1]))
 
 
 def missing(out: Path, chunk: Chunk) -> list[int]:
@@ -191,7 +212,8 @@ def launcher(setup: Setup) -> Launch:
                 "FLYWHEEL_TRAY_OUTCOMES": str(attempt / "outcomes.jsonl"),
                 "FLYWHEEL_TRAY_DIR": str(attempt / "scene"),
                 "FW_TRACE_JOB_DIR": str(attempt / "traces"),
-                "FW_JOB_ID": f"job_da34_eval_{chunk.id}_{attempt.name}",
+                "FW_JOB_ID": f"job_da34_eval_{chunk.dir_id}_{attempt.name}",
+                "FLYWHEEL_TRAY_REPEAT": str(chunk.repeat),
                 "FW_RUN_PLAN_ID": setup.run_plan_id,
             }
             command = [
@@ -247,15 +269,16 @@ def run_batch(
         while left := missing(out, chunk):
             k = len(attempts(out, chunk))
             if k >= max_attempts:
-                log(f"{chunk.id}: episodes {left} still missing after {k} attempts; stopping")
+                log(f"{chunk.dir_id}: episodes {left} still missing after {k} attempts; stopping")
                 return 1
             start, n = left[0], chunk.start + len(chunk.seeds) - left[0]
-            attempt = out / chunk.id / f"attempt-{k}"
+            attempt = out / chunk.dir_id / f"attempt-{k}"
             began, t0 = datetime.now(timezone.utc), time.monotonic()
             code = launch(chunk, start, n, attempt)
             done = sorted(finished(chunk, attempt))
             row = {
                 "chunk": chunk.id,
+                "repeat": chunk.repeat,
                 "level": chunk.level,
                 "attempt": k,
                 "start": start,
@@ -290,9 +313,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--max-chunks", type=int, help="run the first N chunks of the order only, then stop"
     )
     parser.add_argument("--chunks", help="comma-separated chunk ids: run only these (one lane)")
+    parser.add_argument(
+        "--repeats", type=int, default=1, help="rollouts per condition (DA-42); default 1"
+    )
     args = parser.parse_args(argv)
     if args.max_chunks is not None and args.max_chunks < 1:
         parser.error("--max-chunks must be at least 1")
+    if args.repeats < 1:
+        parser.error("--repeats must be at least 1")
     only = args.chunks.split(",") if args.chunks else None
     if only is not None and len(set(only)) != len(only):
         parser.error(f"--chunks names a chunk twice: {args.chunks}")
@@ -312,9 +340,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         if unknown:
             parser.error(f"--chunks {unknown} not in the order {[c.id for c in chunks]}")
         chunks = [c for c in chunks if c.id in only]
+    chunks = with_repeats(chunks, args.repeats)
     if args.dry_run:
         for chunk in chunks:
-            print(chunk.id, chunk.seeds[0], chunk.seeds[-1], len(chunk.seeds))
+            print(chunk.dir_id, chunk.seeds[0], chunk.seeds[-1], len(chunk.seeds))
         return 0
     args.out.mkdir(parents=True, exist_ok=True)
     setup = Setup(

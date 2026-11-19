@@ -21,7 +21,10 @@ Its loop, the psi0 agent and the sonic WBC agent get the sim clock;
 FLYWHEEL_TRAY_EVAL_CLOCK=wall keeps SIMPLE's wall clock. On reset the eval client
 also sends the episode's condition seed as `history["seed"]`, so a Psi0 server can
 seed its policy noise per episode (DA-34 docs/he/tray.md 8.5); servers ignore
-unknown history keys.
+unknown history keys. With FLYWHEEL_TRAY_REPEAT=r (r >= 1, set by eval_batch --repeats,
+DA-42) the seed sent is the condition seed + r * REPEAT_SEED_STRIDE, so each repeat of a
+condition draws other policy noise; the scene still comes from the condition seed.
+Unset or 0 sends the condition seed as before.
 
 `eval-decoupled-wbc --num-workers N` starts its workers with the spawn context.
 A spawned worker imports this module as `__mp_main__` and never runs `main()`,
@@ -67,6 +70,8 @@ SIM_TIME_MODULES = {
     ),
 }
 EVAL_CLOCK_ENV = "FLYWHEEL_TRAY_EVAL_CLOCK"  # "sim" (default) or "wall"
+REPEAT_ENV = "FLYWHEEL_TRAY_REPEAT"  # rollout index of the condition, eval_batch --repeats
+REPEAT_SEED_STRIDE = 10_000_000  # above every seed range of randomize.SEED_RANGES
 
 
 class SimTime:
@@ -158,6 +163,19 @@ def condition_seed() -> int | None:
     return None if sample is None else int(sample.seed)
 
 
+def repeat_index() -> int:
+    """FLYWHEEL_TRAY_REPEAT as a non-negative int, 0 when unset."""
+    raw = os.environ.get(REPEAT_ENV, "0")
+    if not raw.isdigit():
+        raise ValueError(f"{REPEAT_ENV} must be a non-negative integer, not {raw!r}")
+    return int(raw)
+
+
+def policy_seed(seed: int, repeat: int) -> int:
+    """The noise seed sent to the policy server for repeat `repeat` of a condition."""
+    return seed + repeat * REPEAT_SEED_STRIDE
+
+
 def with_condition_seed(query_action: Callable[..., Any]) -> Callable[..., Any]:
     """HttpActionClient.query_action that adds the condition seed to a reset request."""
 
@@ -173,7 +191,7 @@ def with_condition_seed(query_action: Callable[..., Any]) -> Callable[..., Any]:
         **kwargs: Any,
     ) -> Any:
         if history and "reset" in history and (seed := condition_seed()) is not None:
-            history = {**history, "seed": seed}
+            history = {**history, "seed": policy_seed(seed, repeat_index())}
         return query_action(
             self, image_dict, instruction, state_dict, condition_dict, history, *args, **kwargs
         )
