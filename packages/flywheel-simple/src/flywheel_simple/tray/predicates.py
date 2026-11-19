@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 from numpy.typing import NDArray
@@ -24,6 +24,7 @@ Failure = Literal[
 ]
 STEP_NAMES = ("approach_a", "grasp", "lift", "carry", "reach_b", "place", "release_stand")
 PART_Z_MARGIN = (0.01, 0.03)  # below the tray floor, above the rim: still "in the tray"
+PALM_KEYS = ("centre_left", "centre_right", "centre_both")
 
 
 @dataclass(frozen=True)
@@ -76,6 +77,11 @@ class StepTracker:
     _stable_since: float | None = None
     _misplaced_since: float | None = None
     _one_hand_since: float | None = None
+    # Failure signals (DA-42): recorded only, never read by the predicates above.
+    _latch_t: list[float | None] = field(default_factory=lambda: [None] * 7)
+    _failure_t: float | None = None
+    _at_failure: dict[str, Any] | None = None
+    _palm_min: dict[str, float | None] = field(default_factory=lambda: dict.fromkeys(PALM_KEYS))
 
     def __post_init__(self) -> None:
         geo = scene_geometry_with_gap(self.cfg, self.sample.table_gap)
@@ -86,6 +92,35 @@ class StepTracker:
         self._steps = [False] * 7
         self._success, self._failure, self._prev = False, None, None
         self._stable_since = self._misplaced_since = self._one_hand_since = None
+        self._latch_t = [None] * 7
+        self._failure_t, self._at_failure = None, None
+        self._palm_min = dict.fromkeys(PALM_KEYS)
+
+    @property
+    def last_state(self) -> TrayState | None:
+        """The state of the last update, None before the first."""
+        return self._prev
+
+    def outcome_fields(self) -> dict[str, Any]:
+        """JSON-ready failure signals for the episode's outcome row (DA-42 AC 1).
+
+        `failure_t` is the sim time the failure label was set; `at_failure` is the
+        tray and hands in that cycle; `step_latch_t` the time each step first held, in
+        STEP_NAMES order; `palm_handle_min_m` the smallest distance from each palm
+        point to its handle's centre over the episode, and `both` the smallest of the
+        larger of the two in one cycle, the quantity scorer version 1's `approach_a`
+        compares with `r_reach`.
+        """
+        return {
+            "failure_t": self._failure_t,
+            "at_failure": self._at_failure,
+            "step_latch_t": list(self._latch_t),
+            "palm_handle_min_m": {
+                "left": self._palm_min["centre_left"],
+                "right": self._palm_min["centre_right"],
+                "both": self._palm_min["centre_both"],
+            },
+        }
 
     def update(self, s: TrayState) -> StepReport:
         rot = quat_to_mat(s.tray_quat)
@@ -105,6 +140,9 @@ class StepTracker:
             self._success = self._held(self._stable_since, s.t)
         if self._failure is None and not self._success:
             self._failure = self._first_failure(s, rot, parts_ok, both, standing)
+            if self._failure is not None:
+                self._failure_t, self._at_failure = s.t, self._snapshot(s, rot)
+        self._track_palms(s, rot)
 
         lifted = s.tray_pos[2] - self.cfg.table_height > self.cfg.h_lift
         reached = (
@@ -121,6 +159,8 @@ class StepTracker:
         )
         for k, now in enumerate(reached):
             if now and (k == 0 or self._steps[k - 1]):
+                if not self._steps[k]:
+                    self._latch_t[k] = s.t
                 self._steps[k] = True
         self._prev = s
         return StepReport(tuple(self._steps), self._success, self._failure)
@@ -186,12 +226,38 @@ class StepTracker:
         across = abs(float(s.base_xy[1]))
         return 0.0 <= gap <= self.cfg.approach_zone and across <= self.cfg.table_length / 2
 
-    def _palms_on_handles(self, s: TrayState, rot: NDArray[np.float64]) -> bool:
+    def _handle_centres(
+        self, s: TrayState, rot: NDArray[np.float64]
+    ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
         y = self.cfg.tray_length / 2 + self.cfg.handle_depth / 2
         z = self.cfg.tray_height - self.cfg.handle_thickness / 2
-        left = s.tray_pos + rot @ np.array([0.0, y, z])
-        right = s.tray_pos + rot @ np.array([0.0, -y, z])
-        r = self.cfg.r_reach
-        return bool(
-            np.linalg.norm(s.left_palm - left) <= r and np.linalg.norm(s.right_palm - right) <= r
+        return s.tray_pos + rot @ np.array([0.0, y, z]), s.tray_pos + rot @ np.array([0.0, -y, z])
+
+    def _palm_centre_distances(self, s: TrayState, rot: NDArray[np.float64]) -> tuple[float, float]:
+        left, right = self._handle_centres(s, rot)
+        return float(np.linalg.norm(s.left_palm - left)), float(
+            np.linalg.norm(s.right_palm - right)
         )
+
+    def _palms_on_handles(self, s: TrayState, rot: NDArray[np.float64]) -> bool:
+        r = self.cfg.r_reach
+        return all(d <= r for d in self._palm_centre_distances(s, rot))
+
+    def _track_palms(self, s: TrayState, rot: NDArray[np.float64]) -> None:
+        left, right = self._palm_centre_distances(s, rot)
+        for key, d in (
+            ("centre_left", left),
+            ("centre_right", right),
+            ("centre_both", max(left, right)),
+        ):
+            old = self._palm_min[key]
+            self._palm_min[key] = d if old is None else min(old, d)
+
+    def _snapshot(self, s: TrayState, rot: NDArray[np.float64]) -> dict[str, Any]:
+        return {
+            "tray_on_table": s.tray_on_table,
+            "hand_contacts": {"left": bool(s.hand_contacts[0]), "right": bool(s.hand_contacts[1])},
+            "tilt_deg": math.degrees(self._tilt(rot)),
+            "tray_pos": [float(v) for v in s.tray_pos],
+            "tray_quat": [float(v) for v in s.tray_quat],
+        }
