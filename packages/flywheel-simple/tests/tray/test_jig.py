@@ -163,3 +163,31 @@ def test_rotation_quat_round_trips() -> None:
         ])
         assert rot == pytest.approx(box.rot, abs=1e-12)
         assert np.linalg.det(box.rot) == pytest.approx(1.0)
+
+
+def test_jig_scenes_get_their_own_visuals_revision(tmp_path: Path) -> None:
+    from flywheel_simple.tray.jig import JIG_REVISION
+    from flywheel_simple.tray.mjcf import TARGET_ZONE_REVISION
+    from flywheel_simple.tray.recorder import visuals_revision
+
+    zone = f"none+{TARGET_ZONE_REVISION}"
+    assert visuals_revision(None) == zone  # the scene without the jig keeps its revision
+    assert visuals_revision(None, jig=True) == f"{zone}+{JIG_REVISION}"
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text('{"revision": "abc123", "assets": []}')
+    assert visuals_revision(manifest, jig=True) == f"abc123+{TARGET_ZONE_REVISION}+{JIG_REVISION}"
+
+
+def test_generate_refuses_to_mix_jig_and_zone1_episodes_in_one_batch(tmp_path: Path) -> None:
+    import json
+
+    from flywheel_simple.tray.generate import LOG_NAME, check_visuals_revision
+    from flywheel_simple.tray.recorder import visuals_revision
+
+    shard = tmp_path / "shard-0"
+    shard.mkdir()
+    row = {"seed": 1, "visuals_revision": visuals_revision(None)}
+    (shard / LOG_NAME).write_text(json.dumps(row) + "\n")
+    check_visuals_revision(tmp_path, visuals_revision(None))
+    with pytest.raises(RuntimeError, match="generate into a new --out"):
+        check_visuals_revision(tmp_path, visuals_revision(None, jig=True))

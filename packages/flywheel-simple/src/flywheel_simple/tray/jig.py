@@ -3,8 +3,15 @@
 Until DA-41 the target pose on table B was jittered by +-5 cm and +-10 degrees at
 levels 1-2 and shown only as a flat rectangle that the carried tray hides on the way
 in. Here the target is fixed to table B, and four low corner guides with chamfered
-inner faces stand around it: a tray lowered a few centimetres off centre lands on a
-slope and slides into place.
+inner faces stand around it on a thin low-friction slide pad: a tray lowered a few
+centimetres off centre lands on a slope and slides into place. Without the pad the
+far edge grips the steel table (friction 1.0) harder than the 45-degree slope pushes,
+and a dropped tray stays propped on the slope.
+
+The guides and the pad are geoms of the `table_b` body, not a body of their own:
+the step tracker counts a tray as on table B by its contacts with that body
+(`simple_task.tray_state`), so a tray resting on the pad or against a guide is on B.
+The pad is invisible, so the target zone under it shows as before.
 
 Everything here is added beside the scene of DA-32/33, not into it. `randomize.py`,
 `mjcf.py`, `simple_task.py` and `configs/sim/tray.yaml` stay byte for byte as the
@@ -52,6 +59,7 @@ class JigConfig:
     end_arm: float
     handle_gap: float
     friction: float
+    pad_thickness: float
     slots: int
     slot_spacing: float
 
@@ -79,6 +87,8 @@ class JigConfig:
             problems.append(f"slots must be 1, 2 or 3, got {self.slots}")
         if not 0.0 <= self.chamfer_deg < 60.0:
             problems.append(f"chamfer_deg must be in [0, 60), got {self.chamfer_deg}")
+        if self.pad_thickness < 0 or self.pad_thickness >= self.height:
+            problems.append(f"pad_thickness must be in [0, height), got {self.pad_thickness}")
         if min(self.clearance, self.height, self.thickness, self.side_arm, self.end_arm) <= 0:
             problems.append("clearance, height, thickness and arms must be positive")
         handle_edge = cfg.handle_length / 2 + self.handle_gap
@@ -233,27 +243,49 @@ def _mujoco() -> Any:
     return importlib.import_module("mujoco")
 
 
-def add_jig(spec: Any, cfg: TrayConfig, jig: JigConfig, pose: Pose2D) -> None:
-    """Static body `tray_jig` on table B at `pose`: the guide arms, colliding, visible."""
+def _yaw_matrix(yaw: float) -> NDArray[np.float64]:
+    c, s = math.cos(yaw), math.sin(yaw)
+    return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
+
+
+def add_jig(spec: Any, cfg: TrayConfig, jig: JigConfig, pose: Pose2D, table_gap: float) -> None:
+    """Guides `jig_*` and the slide pad `jig_pad` on body `table_b`, around `pose`."""
     problems = jig.check(cfg)
     if problems:
         raise ValueError("jig does not fit the tray: " + "; ".join(problems))
     mj = _mujoco()
-    yaw = [math.cos(pose.yaw / 2), 0.0, 0.0, math.sin(pose.yaw / 2)]
-    body = spec.worldbody.add_body(
-        name="tray_jig", pos=[pose.x, pose.y, cfg.table_height], quat=yaw
-    )
+    table = scene_geometry_with_gap(cfg, table_gap).table_b_center
+    body = spec.body("table_b")
+    yaw = _yaw_matrix(pose.yaw)
+    origin = np.array([pose.x - table[0], pose.y - table[1], cfg.table_height])
+    common = {
+        "type": mj.mjtGeom.mjGEOM_BOX,
+        "friction": [jig.friction, 0.005, 0.0001],
+        "priority": JIG_PRIORITY,
+        "condim": 3,
+    }
     for box in guide_boxes(cfg, jig):
         body.add_geom(
             name=box.name,
-            type=mj.mjtGeom.mjGEOM_BOX,
             size=list(box.half),
-            pos=list(box.pos),
-            quat=rotation_quat(box.rot),
+            pos=list(origin + yaw @ np.array(box.pos)),
+            quat=rotation_quat(yaw @ box.rot),
             rgba=list(JIG_RGBA),
-            friction=[jig.friction, 0.005, 0.0001],
-            priority=JIG_PRIORITY,
-            condim=3,
+            **common,
+        )
+    if jig.pad_thickness > 0:
+        half = (
+            cfg.tray_width / 2 + jig.clearance,
+            cfg.tray_length / 2 + jig.clearance,
+            jig.pad_thickness / 2,
+        )
+        body.add_geom(
+            name="jig_pad",
+            size=list(half),
+            pos=list(origin + np.array([0.0, 0.0, jig.pad_thickness / 2])),
+            quat=rotation_quat(yaw),
+            rgba=[0.0, 0.0, 0.0, 0.0],
+            **common,
         )
 
 
@@ -266,7 +298,7 @@ def jig_scene_spec(
     light_diffuse: float | None = None,
     target_pose: Pose2D | None = None,
 ) -> Any:
-    """`mjcf.task_scene_spec` with the zone at the jig target and the jig body last.
+    """`mjcf.task_scene_spec` with the zone at the jig target and the jig on table B.
 
     The target defaults to the jig pose for `table_gap` (slot 0 of seed 0 when slots
     > 1; pass `target_pose` from `sample_jig_episode` for an episode).
@@ -274,7 +306,7 @@ def jig_scene_spec(
     gap = cfg.corridor if table_gap is None else table_gap
     target = target_pose or jig_target_pose(cfg, jig, gap, 0)
     spec = task_scene_spec(cfg, tray_pose, visuals, table_gap, light_diffuse, target)
-    add_jig(spec, cfg, jig, target)
+    add_jig(spec, cfg, jig, target, gap)
     return spec
 
 
