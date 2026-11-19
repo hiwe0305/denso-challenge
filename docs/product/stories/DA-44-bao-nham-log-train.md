@@ -30,7 +30,7 @@ Bối cảnh: [agent-qa mục 3.3](../../g0/agent-qa.md) ghi rằng ngày 6–7/
 
 ## Nhiệm vụ
 
-- [ ] 1. T2 chấm sau cửa sổ baseline, test val mỗi 2000 step (AC 1)
+- [x] 1. T2 chấm sau cửa sổ baseline, test val mỗi 2000 step (AC 1)
 - [ ] 2. T5 không cho `start_step` trước bản ghi đầu, test job ngắn (AC 2)
 - [ ] 3. T1 và T8 theo dữ liệu (AC 3)
   - [ ] 3.1 T1 so loss đã làm mượt theo trung vị trượt (`t1.smooth_steps`), không so từng batch

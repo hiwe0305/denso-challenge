@@ -139,3 +139,41 @@ def test_a_clean_job_is_silent_without_skipping_anything(
     # having judged the job, not from having skipped it.
     for result in (detect_t2(clean_series, cfg), detect_t3(clean_series, cfg)):
         assert codes(result) == [] and skipped_codes(result) == []
+
+
+def sparse_val(values: list[float]) -> dict[int, float]:
+    """Val measured every 2000 steps from step 0, as the Psi0 fine-tunes of DA-26, DA-34 log it."""
+    return {2000 * index: value for index, value in enumerate(values)}
+
+
+def test_t2_scores_a_point_after_the_baseline_when_val_is_sparse(
+    series_from: SeriesBuilder, cfg: TrainThresholds, codes: Codes
+) -> None:
+    # The val curve of da26-t2-ft-vego-n20-s0 (agent-qa 3.3). The baseline is
+    # the median of the measurements at 0, 2000 and 4000; scoring the one at
+    # 2000 = n_steps compared a point with itself and read a drop of 0.
+    series = series_from(
+        train=falling_train(to=10000),
+        val=sparse_val([45.76, 2.28, 1.44, 0.85, 0.88, 0.77]),
+    )
+    result = detect_t2(series, cfg)
+    assert codes(result) == [] and result.skipped == []
+
+
+def test_t2_still_flags_a_flat_job_when_val_is_sparse(
+    series_from: SeriesBuilder, cfg: TrainThresholds, codes: Codes
+) -> None:
+    series = series_from(train=falling_train(to=10000), val=sparse_val([1.0, 1.0, 1.0, 0.99, 0.99]))
+    result = detect_t2(series, cfg)
+    assert codes(result) == ["T2"]
+    # the first measurement past both n_steps and the three baseline ones
+    assert result.findings[0].start_step == 6000
+
+
+def test_t2_skips_when_no_measurement_follows_the_baseline(
+    series_from: SeriesBuilder, cfg: TrainThresholds, codes: Codes, skipped_codes: Codes
+) -> None:
+    # three measurements, all of them the baseline: nothing is left to score
+    series = series_from(train=falling_train(to=5000), val=sparse_val([1.0, 1.0, 1.0]))
+    result = detect_t2(series, cfg)
+    assert codes(result) == [] and skipped_codes(result) == ["T2"]
