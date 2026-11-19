@@ -21,7 +21,7 @@ TRAIN_YAML = Path(__file__).resolve().parents[6] / "configs" / "eval" / "diagnos
 def complete() -> dict[str, Any]:
     """A mapping with every section and key the detectors ask for."""
     return {
-        "t1": {"k": 10.0, "window_steps": 500},
+        "t1": {"k": 10.0, "window_steps": 500, "smooth_steps": 100},
         "t2": {"n_steps": 2000, "min_relative_drop": 0.05, "baseline_val_count": 3},
         "t3": {"m_measurements": 3},
         "t4": {"window_steps": 2000, "min_group_drop": 0.05, "ref_group_drop": 0.30},

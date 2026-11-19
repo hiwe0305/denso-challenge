@@ -38,57 +38,91 @@ def test_t1_flags_an_infinite_loss_as_well_as_a_nan(
     assert codes(detect_t1(series_from(train=flat(0.5) | {700: loss}), cfg)) == ["T1"]
 
 
-def test_t1_flags_a_loss_over_k_times_the_window_minimum(
+def risen(cfg: TrainThresholds) -> float:
+    """A loss level well past `k` times the 0.5 baseline of `flat`."""
+    return 0.5 * cfg.t1.k * 1.6
+
+
+def test_t1_flags_a_loss_that_stays_over_k_times_the_window_minimum(
     series_from: SeriesBuilder, cfg: TrainThresholds, codes: Codes
 ) -> None:
-    # train.yaml: k = 10, window_steps = 500. The window of step 600 holds only
-    # 0.5 losses, so the limit is 5.0 and a loss of 8.0 is over it.
-    result = detect_t1(series_from(train=flat(0.5) | {600: 8.0}), cfg)
+    # From step 600 the loss sits at 1.6 k times the 0.5 it had. The trailing
+    # median over smooth_steps = 100 (ten records here) crosses once more than
+    # half the window is high: at step 650. The window minimum of the smoothed
+    # loss is 0.5, so the threshold is k * 0.5.
+    train = flat(0.5) | {step: risen(cfg) for step in range(600, 1001, 10)}
+    result = detect_t1(series_from(train=train), cfg)
     assert codes(result) == ["T1"]
-    assert result.findings[0].start_step == 600
-    assert result.findings[0].value == pytest.approx(8.0)
-    assert result.findings[0].threshold == pytest.approx(5.0)
+    assert result.findings[0].start_step == 650
+    assert result.findings[0].value == pytest.approx(risen(cfg))
+    assert result.findings[0].threshold == pytest.approx(cfg.t1.k * 0.5)
     assert result.findings[0].stop_job
+
+
+def test_t1_is_silent_on_one_bad_batch_however_high(
+    series_from: SeriesBuilder, cfg: TrainThresholds, codes: Codes
+) -> None:
+    # One batch at 200 times the window minimum. Healthy Psi0 fine-tunes do
+    # this thousands of times per job (DA-44), so a batch alone is not divergence.
+    assert codes(detect_t1(series_from(train=flat(0.5) | {600: 100.0}), cfg)) == []
 
 
 def test_t1_is_silent_on_a_rise_that_stays_under_k_times(
     series_from: SeriesBuilder, cfg: TrainThresholds, codes: Codes
 ) -> None:
-    # 4.0 is eight times the window minimum: a bad batch, not divergence
-    assert codes(detect_t1(series_from(train=flat(0.5) | {600: 4.0}), cfg)) == []
+    under = 0.5 * cfg.t1.k * 0.8
+    train = flat(0.5) | {step: under for step in range(600, 1001, 10)}
+    assert codes(detect_t1(series_from(train=train), cfg)) == []
 
 
 def test_t1_reaches_the_same_verdict_at_two_logging_rates(
     series_from: SeriesBuilder, cfg: TrainThresholds, codes: Codes
 ) -> None:
-    # the same job written every 10 steps and every 50 steps: the window is 500
-    # steps either way, so the spike at 600 is the same spike (plan, review point 2)
-    dense = detect_t1(series_from(train=flat(0.5, every=10) | {600: 8.0}), cfg)
-    sparse = detect_t1(series_from(train=flat(0.5, every=50) | {600: 8.0}), cfg)
+    # the same job written every 10 steps and every 50 steps: both windows
+    # count steps, so the rise from step 600 is caught at the same step
+    # (plan, review point 2)
+    def job(every: int) -> TrainSeries:
+        high = {step: risen(cfg) for step in range(600, 1001, every)}
+        return series_from(train=flat(0.5, every=every) | high)
+
+    dense, sparse = detect_t1(job(10), cfg), detect_t1(job(50), cfg)
     assert codes(dense) == codes(sparse) == ["T1"]
-    assert dense.findings[0].start_step == sparse.findings[0].start_step == 600
-    assert dense.findings[0].threshold == sparse.findings[0].threshold == pytest.approx(5.0)
+    assert dense.findings[0].start_step == sparse.findings[0].start_step == 650
+    assert (
+        dense.findings[0].threshold == sparse.findings[0].threshold == pytest.approx(cfg.t1.k * 0.5)
+    )
 
 
 def test_t1_forgets_a_low_loss_from_before_the_window(
     series_from: SeriesBuilder, cfg: TrainThresholds, codes: Codes
 ) -> None:
-    # 0.5 early on, then the job settles at 2.0 and takes an 8.0 batch at step
-    # 1000. Against the 500 steps before it the limit is 20.0, so there is no
-    # divergence; against the whole history it would have been 5.0 and flagged.
+    # 0.5 early on, then the job settles at 2.0 and rises to 1.6 k times 0.5 at
+    # step 1000. Against the 500 steps before it the limit is k * 2.0, so there
+    # is no divergence; against the whole history it would have been k * 0.5.
     early = {step: 0.5 for step in range(0, 101, 10)}
     settled = {step: 2.0 for step in range(110, 1001, 10)}
-    assert codes(detect_t1(series_from(train=early | settled | {1000: 8.0}), cfg)) == []
+    high = {step: risen(cfg) for step in range(1000, 1201, 10)}
+    assert codes(detect_t1(series_from(train=early | settled | high), cfg)) == []
 
 
 def test_t1_reports_only_the_first_divergence(
     series_from: SeriesBuilder, cfg: TrainThresholds, codes: Codes
 ) -> None:
-    # a spike at 300 and a NaN at 500: the job was already stopping at 300, and
-    # no measurement after that point was going to be trusted
-    result = detect_t1(series_from(train=flat(0.5) | {300: 8.0, 500: float("nan")}), cfg)
+    # a rise from 300 and a NaN at 500: the job was already stopping at 350,
+    # and no measurement after that point was going to be trusted
+    train = flat(0.5) | {step: risen(cfg) for step in range(300, 1001, 10)} | {500: float("nan")}
+    result = detect_t1(series_from(train=train), cfg)
     assert codes(result) == ["T1"]
-    assert result.findings[0].start_step == 300
+    assert result.findings[0].start_step == 350
+
+
+def test_t1_smoothing_skips_a_nan_rather_than_spreading_it(
+    series_from: SeriesBuilder, cfg: TrainThresholds
+) -> None:
+    # branch (a) reports the NaN; the median beside it must stay a number
+    result = detect_t1(series_from(train=flat(0.5) | {500: float("nan")}), cfg)
+    assert [finding.start_step for finding in result.findings] == [500]
+    assert result.findings[0].threshold is None
 
 
 def test_t1_is_silent_and_skips_nothing_on_a_clean_run(

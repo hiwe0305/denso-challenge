@@ -1,8 +1,14 @@
 """T1 - divergence: the loss left the range the job had been training in (design 10).
 
 Two branches, one verdict. A loss that is not finite is divergence by itself,
-and a loss over `k` times the smallest loss of the trailing window is
-divergence against the job's own recent history. Whichever comes first on the
+and a smoothed loss over `k` times the smallest smoothed loss of the trailing
+window is divergence against the job's own recent history.
+
+The spike branch reads the trailing median of the loss over `smooth_steps`,
+never single batches (DA-44). On the eight healthy Psi0 fine-tunes of DA-26
+and DA-34 one batch reaches over 100 times the smallest batch of the 500
+steps before it, thousands of times per job; a divergence keeps the loss up,
+which a median sees and one bad batch does not move. Whichever comes first on the
 step axis is the finding; nothing after it is reported, because T1 is the one
 code that marks a job to stop and no measurement past that point was going to
 be trusted anyway.
@@ -49,13 +55,13 @@ def _not_finite(series: TrainSeries) -> Finding | None:
 
 
 def _spike(series: TrainSeries, cfg: TrainThresholds) -> Finding | None:
-    """Branch (b): the first loss over `k` times the minimum of its trailing window."""
-    minima = _window_minima(series.step, series.loss_train, cfg.t1.window_steps)
-    limit = cfg.t1.k * minima
-    # A window minimum of zero or less carries no scale to multiply, and one
-    # that is not finite means the window held no usable loss: no verdict there.
-    over = np.isfinite(series.loss_train) & (minima > 0.0) & np.isfinite(limit)
-    over &= series.loss_train > limit
+    """Branch (b): the first smoothed loss over `k` times the minimum of its trailing window.
+
+    The finding's value is the smoothed loss and its threshold `k` times the
+    window minimum of the smoothed loss, so both numbers are on one curve.
+    """
+    smoothed, minima, ratio = smoothed_ratio(series.step, series.loss_train, cfg)
+    over = np.isfinite(ratio) & (ratio > cfg.t1.k)
     spikes = np.flatnonzero(over)
     if spikes.size == 0:
         return None
@@ -65,10 +71,48 @@ def _spike(series: TrainSeries, cfg: TrainThresholds) -> Finding | None:
         start_step=int(series.step[index]),
         group=None,
         dim=None,
-        value=float(series.loss_train[index]),
-        threshold=float(limit[index]),
+        value=float(smoothed[index]),
+        threshold=float(cfg.t1.k * minima[index]),
         stop_job=True,
     )
+
+
+def smoothed_ratio(
+    step: Steps, loss: Values, cfg: TrainThresholds
+) -> tuple[Values, Values, Values]:
+    """The smoothed loss, its window minimum, and the ratio of the two.
+
+    The ratio is what T1 compares against `k`, and what `calibrate` reads on
+    healthy jobs to propose `k`. It is nan where the window minimum is zero or
+    less (no scale to multiply) or not finite (no usable loss in the window):
+    no verdict there.
+    """
+    smoothed = trailing_median(step, loss, cfg.t1.smooth_steps)
+    minima = _window_minima(step, smoothed, cfg.t1.window_steps)
+    usable = np.isfinite(smoothed) & np.isfinite(minima) & (minima > 0.0)
+    ratio = np.full(step.size, np.nan)
+    np.divide(smoothed, minima, out=ratio, where=usable)
+    return smoothed, minima, ratio
+
+
+def trailing_median(step: Steps, value: Values, width: int) -> Values:
+    """Median of the finite values in the `width`-step window ending at each record.
+
+    The window of record `i` is `(step[i] - width, step[i]]`, counted in steps
+    like every window of this story. Values that are not finite are left out -
+    branch (a) reports those - and a window holding none is nan.
+    """
+    if width <= 0:
+        raise ValueError(f"window width must be positive, got {width}")
+    first = np.searchsorted(step, step - width + 1, side="left")
+    finite = np.isfinite(value)
+    out = np.full(step.size, np.nan)
+    for index in range(step.size):
+        window = value[first[index] : index + 1]
+        kept = window[finite[first[index] : index + 1]]
+        if kept.size:
+            out[index] = float(np.median(kept))
+    return out
 
 
 def _window_minima(step: Steps, value: Values, width: int) -> Values:
