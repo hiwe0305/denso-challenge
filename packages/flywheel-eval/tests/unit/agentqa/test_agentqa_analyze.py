@@ -74,7 +74,9 @@ def test_a_threshold_comes_with_the_side_that_is_the_fault(tmp_path: Path) -> No
 def test_the_direction_table_agrees_with_the_detectors(tmp_path: Path) -> None:
     """Every finding DA-08 and DA-13 raise here lies on the side FLAG_WHEN names."""
     jobs = [
-        train_job(tmp_path / "train" / "spike", loss=lambda s: 50.0 if s == 90 else 1.0),
+        # T1 reads a trailing median, so the loss has to stay up (DA-44)
+        train_job(tmp_path / "train" / "spike", loss=lambda s: 50.0 if s >= 150 else 1.0,
+                  steps=range(0, 300, 10)),
         train_job(tmp_path / "train" / "grad", grad_norm_vlm=0.5),
         collapsed_job(tmp_path / "train" / "collapse", [0.05, 0.1]),
         train_job(tmp_path / "train" / "dead", pred_var_by_dim=[0.0, 0.2],

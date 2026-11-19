@@ -53,7 +53,13 @@ def _nan(root: Path) -> None:
 
 
 def _diverge(root: Path) -> None:
-    train_job(root / "train" / "job-div", loss=lambda s: 1.0 / (s + 1) if s < 90 else 50.0)
+    # The loss leaves its range at step 150 and stays out: T1 reads a trailing
+    # median, so one high batch at the end is not divergence (DA-44).
+    train_job(
+        root / "train" / "job-div",
+        loss=lambda s: 1.0 / (s + 1) if s < 150 else 50.0,
+        steps=range(0, 300, 10),
+    )
 
 
 def _probe(root: Path, name: str, **fields: object) -> None:
