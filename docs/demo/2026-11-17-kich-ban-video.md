@@ -2,12 +2,13 @@
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 19/11/2026 | 0.8 | Bỏ khỏi dòng change log 0.2 cặp số của kết quả không trình bày (quyết định 16/11/2026); lệnh bật server dùng `$PWD/fwdata` thay cho đường dẫn máy; ghi chú rằng với model hosted, chat chỉ thấy dữ liệu `public` và không có tool đọc job, log, phát hiện QA, video người | Hiếu (soạn với Claude) |
 | 17/11/2026 | 0.7 | Trợ lý ở cảnh 12 chạy bằng model Nemotron của NVIDIA qua dịch vụ OpenRouter (quyết định của Hiếu), không còn là model tự host. Sửa lời cảnh 12, bảng yêu cầu, bảng nguồn và danh sách kiểm (cách bật server, giới hạn lượt gọi mỗi ngày của gói miễn phí) | Hiếu (soạn với Claude) |
 | 16/11/2026 | 0.6 | Theo quyết định của Hiếu ngày 16/11/2026: không trình bày kết quả thi lại của bản sau vòng 1. Bỏ mọi câu và số về kết quả đó (cảnh 1, 8, 9, 11, 12) và các dòng nguồn tương ứng; cảnh 9 còn ba màn; cảnh 11 nói vòng sửa lỗi là phần chưa chứng minh; cảnh 12 đổi câu hỏi cho trợ lý. Website nói "không trình bày", không nói "chưa chạy". Đếm lại thời lượng | Hiếu (soạn với Claude) |
 | 16/11/2026 | 0.5 | Cả 13 cảnh quay trên một server: bản khóa chạy thêm cờ `--chat` (`fw console serve --lock --chat`) giữ chat và vẫn từ chối mọi việc ghi. Server tự nối và nạp model khi khởi động. Sửa cảnh 12 và danh sách kiểm; lời nói không đổi | Hiếu (soạn với Claude) |
 | 16/11/2026 | 0.4 | Theo website mới: trang đầu là "Các task" (`#/tasks`), trang Tổng quan có dải sáu bước, thêm trang "Video người → dữ liệu" (`#/egoflow`). Cảnh 1 mở từ trang task; cảnh 3 thêm một câu về 21 khớp bàn tay; cảnh 9 và 10 rút gọn; thêm cảnh 12 "Hỏi trợ lý về kết quả" (chatbot Nemotron, quay ở bản không khóa); cảnh kết thành cảnh 13 và thêm câu về thêm task. Đếm lại thời lượng: 14:18. Đã mở lại cả 25 trang của kịch bản trên bản khóa, không trang nào lỗi | Hiếu (soạn với Claude) |
 | 15/11/2026 | 0.3 | Site dựng lại theo quy trình: các trang kể chuyện nằm trong mục "Báo cáo vòng". Đổi đường dẫn: `#/home?s=N` thành `#/report?s=N`, `#/loop?tab=cost` thành `#/cost`, bước 2 là `#/qa`. Lời nói không đổi. Chưa quay thử lại từng cảnh trên site mới | Hiếu (soạn với Claude) |
-| 15/11/2026 | 0.2 | Sửa sau khi site xong và sau lượt soát số: thêm "khay nằm trên bàn B 50/60 so với 43/60" (cảnh 6); thay cặp 16,1 → 12,7 cm bằng "trượt sát nút 4 → 11 lượt" (cảnh 11); sửa câu về 2 441; bỏ "0 giờ người"; cột màn hình theo route thật; đếm lại thời lượng; bảng việc mở thành bảng đã kiểm | Hiếu (soạn với Claude) |
+| 15/11/2026 | 0.2 | Sửa sau khi site xong và sau lượt soát số: thêm "khay nằm trên bàn B 50/60 so với 43/60" (cảnh 6); thay một cặp số đo ở cảnh 11 (bản 0.6 bỏ cả hai cặp, nên không ghi lại ở đây); sửa câu về 2 441; bỏ "0 giờ người"; cột màn hình theo route thật; đếm lại thời lượng; bảng việc mở thành bảng đã kiểm | Hiếu (soạn với Claude) |
 | 15/11/2026 | 0.1 | Bản đầu: 12 cảnh, lời nói đầy đủ, nguồn từng số, danh sách kiểm trước khi quay | Hiếu (soạn với Claude) |
 
 Video quay màn hình website Flywheel Console, tối đa 15 phút. Cả 13 cảnh quay trên một server ở chế độ khóa có chat (`fw console serve --lock --chat`, cổng 4190): mọi việc ghi bị từ chối, chat vẫn trả lời vì nó chỉ đọc. Kịch bản bám cấu trúc site hiện tại (trang "Các task", Tổng quan, các trang Quy trình, mục "Báo cáo vòng") và bộ số đã kiểm. Script thuyết trình cho phiên dịch ở [file riêng](2026-11-17-script-thuyet-trinh.md).
@@ -243,10 +244,10 @@ Số không dùng vì chưa tìm thấy nguồn trong repo: "thi 60 lượt kho�
 - [ ] Câu trả lời của trợ lý có thể đổi vài chữ giữa các lần hỏi. Quay xong đọc lại câu trả lời trên màn hình: câu đầu phải liệt kê bốn bản và có "Bản tốt nhất là bản gốc C_70, đạt 10/60"; câu hai phải có "Đóng các phiếu DA-38, DA-37"; nếu không thì hỏi lại rồi quay lại cảnh.
 - [ ] Thu âm riêng hoặc micro ngoài; đọc thử cảnh 2 và cảnh 11 (hai cảnh dài nhất) để kiểm tốc độ ≈ 130 từ một phút.
 
-Lệnh bật server cho buổi quay (một dòng; khóa không hiện ra màn hình):
+Lệnh bật server cho buổi quay (một dòng, chạy ở thư mục gốc của repo; khóa không hiện ra màn hình). Với model hosted, chat chỉ thấy dữ liệu `public` và không có các tool đọc job, log, phát hiện QA và dây chuyền video người (bản 0.8), nên cảnh 12 chỉ hỏi về kết quả vòng:
 
 ```bash
-. ~/.config/fw-chat.env && FW_CHAT_BASE_URL=https://openrouter.ai/api/v1 FW_CHAT_MODEL=nvidia/nemotron-3.5-super-vl:free FW_CHAT_NAME=openrouter FW_ROOT=/home/hiwe/project/denso-challenge/fwdata uv run fw console serve --lock --chat --port 4190
+. ~/.config/fw-chat.env && FW_CHAT_BASE_URL=https://openrouter.ai/api/v1 FW_CHAT_MODEL=nvidia/nemotron-3.5-super-vl:free FW_CHAT_NAME=openrouter FW_ROOT="$PWD/fwdata" uv run fw console serve --lock --chat --port 4190
 ```
 
 **Không được lộ trên màn hình**
