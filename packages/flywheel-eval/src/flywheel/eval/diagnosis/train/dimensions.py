@@ -39,6 +39,9 @@ def detect_t5(series: TrainSeries, cfg: TrainThresholds, layout: LayoutView) -> 
     width = cfg.t5.window_steps
     last = int(series.step[-1])
     inside = window_mask(series.step, last - width + 1, width)
+    # A job shorter than the window has no step before its first record; the
+    # window opens there, never at a negative step the contract refuses (DA-44).
+    start = max(last - width + 1, int(series.step[0]))
     variance = _mean_in_window(series.pred_var_by_dim, inside)
 
     findings: list[Finding] = []
@@ -60,7 +63,7 @@ def detect_t5(series: TrainSeries, cfg: TrainThresholds, layout: LayoutView) -> 
             findings.append(
                 Finding(
                     code="T5",
-                    start_step=last - width + 1,
+                    start_step=start,
                     group=None,
                     dim=dim,
                     value=value,

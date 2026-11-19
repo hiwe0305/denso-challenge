@@ -50,6 +50,20 @@ class TestT5Caught:
 
         assert [finding.dim for finding in result.findings] == [1]
 
+    def test_a_job_shorter_than_the_window_starts_at_its_first_record(
+        self, series_from: SeriesBuilder, cfg: TrainThresholds, layout: LayoutView
+    ) -> None:
+        """No step before the job's first record, and never a negative one (DA-44).
+
+        `DiagnosisFinding` refuses a negative `start_step` (agent-qa 3.5), so a
+        short job used to make the whole artifact fail to build.
+        """
+        short = {step: 1.0 - 0.0002 * step for step in range(0, 301, 10)}
+        assert 300 < cfg.t5.window_steps
+        result = detect_t5(series_from(train=short, pred_var=[0.2, 0.0, 0.3]), cfg, layout)
+
+        assert [finding.start_step for finding in result.findings] == [0]
+
     def test_only_the_trailing_window_decides(
         self, series_from: SeriesBuilder, cfg: TrainThresholds, layout: LayoutView
     ) -> None:
