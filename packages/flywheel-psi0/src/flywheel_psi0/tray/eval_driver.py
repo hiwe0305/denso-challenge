@@ -6,6 +6,11 @@ condition reader) with two runtime patches, so no pinned file of the plan change
 * each `FLYWHEEL_TRAY_OUTCOMES` row also gets the scorer's seven step flags
   (`scorer_steps`, in `predicates.STEP_NAMES` order) and the sim time at the end of the
   episode (`sim_time_s`): `TrayTransferEnv.outcome` keeps only the failure label;
+* and (DA-42) the scorer's version and failure signals (`StepTracker.outcome_fields`:
+  `scorer_version`, `failure_t`, `at_failure`, `step_latch_t`, palm-handle minima),
+  plus `scorer_v1`: steps, success, failure and failure time of scorer version 1 run
+  on the same states by a shadow tracker, so the two versions compare on one rollout
+  (rollouts do not repeat on EGL). Rows are only added to; old keys keep their meaning;
 * with `FW_TRACE_JOB_DIR` set, DA-38's trace hook (`flywheel_simple.trace.run`) records
   every control cycle (command, measured state, base yaw) under that directory, the
   input of `fw eval diag-system` and of Agent QA/QC.
@@ -31,6 +36,7 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 PATCHED = "flywheel_eval_driver"
+SHADOW_VERSION = 1  # the scorer version run beside the task's own (DA-42)
 
 
 def with_scorer_steps(outcome: Callable[[Any], dict[str, Any]]) -> Callable[[Any], dict[str, Any]]:
@@ -42,17 +48,75 @@ def with_scorer_steps(outcome: Callable[[Any], dict[str, Any]]) -> Callable[[Any
         report = self.task.report
         row["scorer_steps"] = None if report is None else [bool(s) for s in report.steps]
         row["sim_time_s"] = float(self.mujoco.mjData.time)
+        tracker = getattr(self.task, "tracker", None)
+        if tracker is not None:
+            row.update(tracker.outcome_fields())
+            row["scorer_v1"] = shadow_result(self.task)
         return row
 
     setattr(wrapped, PATCHED, True)
     return wrapped
 
 
+def shadow_tracker(task: Any) -> Any | None:
+    """The version 1 tracker beside `task.tracker`, new for each new task tracker.
+
+    The task builds one tracker per reset; the shadow follows it. None when the task's
+    tracker is version 1 itself.
+    """
+    tracker = task.tracker
+    if tracker.version == SHADOW_VERSION:
+        return None
+    shadow = getattr(task, "_fw_shadow", None)
+    if shadow is None or shadow[0] is not tracker:
+        shadow = (tracker, type(tracker)(tracker.cfg, tracker.sample, version=SHADOW_VERSION))
+        task._fw_shadow = shadow
+        task._fw_shadow_report = None
+    return shadow[1]
+
+
+def with_shadow_scorer(compute_reward: Callable[..., float]) -> Callable[..., float]:
+    """Task.compute_reward that also feeds the cycle's TrayState to the shadow tracker."""
+
+    @functools.wraps(compute_reward)
+    def wrapped(self: Any, *args: Any, **kwargs: Any) -> float:
+        reward = compute_reward(self, *args, **kwargs)
+        shadow = shadow_tracker(self)
+        state = self.tracker.last_state
+        if shadow is not None and state is not None:
+            self._fw_shadow_report = shadow.update(state)
+        return reward
+
+    setattr(wrapped, PATCHED, True)
+    return wrapped
+
+
+def shadow_result(task: Any) -> dict[str, Any] | None:
+    """Version 1's verdict on the episode, or None (task tracker is version 1, no step)."""
+    report = getattr(task, "_fw_shadow_report", None)
+    shadow = getattr(task, "_fw_shadow", None)
+    if report is None or shadow is None or shadow[0] is not task.tracker:
+        return None
+    fields = shadow[1].outcome_fields()
+    return {
+        "scorer_version": SHADOW_VERSION,
+        "steps": [bool(s) for s in report.steps],
+        "success": bool(report.success),
+        "failure": report.failure,
+        "failure_t": fields["failure_t"],
+        "at_failure": fields["at_failure"],
+        "step_latch_t": fields["step_latch_t"],
+    }
+
+
 def install(simple_task: Any) -> None:
-    """Patch `simple_task.TrayTransferEnv.outcome` once."""
+    """Patch `TrayTransferEnv.outcome` and the task's `compute_reward` once each."""
     env = simple_task.TrayTransferEnv
     if not getattr(env.outcome, PATCHED, False):
         env.outcome = with_scorer_steps(env.outcome)
+    task = simple_task.G1WholebodyTrayTransferTeleop
+    if not getattr(task.compute_reward, PATCHED, False):
+        task.compute_reward = with_shadow_scorer(task.compute_reward)
 
 
 def eval_args(argv: Sequence[str]) -> list[str]:

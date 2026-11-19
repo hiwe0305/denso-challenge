@@ -37,7 +37,7 @@ Là người chạy vòng Failure → Data trên task khay, tôi muốn bộ ch�
 - [x] 1. Viết story này (AC 1–6)
 - [ ] 2. Tín hiệu lỗi trong outcome (AC 1)
   - [x] 2.1 `StepTracker` ghi tín hiệu: `failure_t`, trạng thái lúc lỗi, thời điểm chốt từng bước, khoảng cách lòng bàn tay–tay cầm nhỏ nhất
-  - [ ] 2.2 `eval_driver` ghi tín hiệu, `scorer_version` và kết quả của bản 1 trên cùng rollout vào dòng outcome
+  - [x] 2.2 `eval_driver` ghi tín hiệu, `scorer_version` và kết quả của bản 1 trên cùng rollout vào dòng outcome
 - [ ] 3. Bộ chấm bản 2 (AC 2, 3)
   - [x] 3.1 Số phiên bản; `approach_a` đo tới đoạn tay cầm và chốt khi hai tay đã cầm
   - [x] 3.2 `L-TRAY-TILT` chỉ khi robot còn cầm khay bằng hai tay
