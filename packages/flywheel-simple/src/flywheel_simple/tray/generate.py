@@ -35,6 +35,7 @@ MAX_EPISODE_S = 90.0
 # Phases every kept episode passes through; BACK_OFF, TURN and ARRIVE_B may be skipped.
 REQUIRED_PHASES = ("APPROACH_A", "REACH", "GRASP", "LIFT", "CARRY", "LOWER", "RELEASE", "RETREAT")
 LOG_NAME = "gen_log.jsonl"
+SCENES = ("zone1", "jig")  # DA-33's scene; DA-41's fixed target with the locating jig
 
 
 @dataclass(frozen=True)
@@ -251,13 +252,18 @@ def generate(
     shard: int = 0,
     workers: int = 1,
     targeted: bool = False,
+    scene: str = "zone1",
 ) -> GenSummary:
     """Run n_attempts new seeds of this shard; record, QA and log each attempt.
 
     With `targeted`, the seeds and levels come from the batch's targets.jsonl
     (targets.write_targets): shard k takes rows k, k + W, ... not yet logged, and
-    `level` / `seed_start` are ignored.
+    `level` / `seed_start` are ignored. `scene` is "zone1" (DA-33's scene, target
+    jittered at levels 1-2) or "jig" (DA-41: fixed target in a locating jig); the two
+    have different visuals revisions, so one batch never holds both.
     """
+    if scene not in SCENES:
+        raise ValueError(f"scene must be one of {SCENES}, got {scene!r}")
     from flywheel_simple.tray.planner import PlannerConfig
     from flywheel_simple.tray.recorder import planner_version
 
@@ -272,12 +278,15 @@ def generate(
         raise RuntimeError(
             "SimReady manifest missing: run scripts/g0/tray/import_simready.py or pass allow_plain"
         )
-    revision = visuals_revision(manifest)
+    revision = visuals_revision(manifest, jig=scene == "jig")
     check_visuals_revision(out, revision)  # before the simulator loads
 
     from flywheel_simple.tray.agent import EpisodeResult, TrayAgent, run_episode
     from flywheel_simple.tray.recorder import EpisodeRecorder, FlywheelMeta
-    from flywheel_simple.tray.simple_task import make_env
+    if scene == "jig":
+        from flywheel_simple.tray.jig_task import make_env
+    else:
+        from flywheel_simple.tray.simple_task import make_env
     work = shard_dir(out, shard)
     log, raw = work / LOG_NAME, work / "raw"
     _check_resume(raw, read_log(log))

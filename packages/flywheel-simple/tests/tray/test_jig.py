@@ -54,7 +54,12 @@ def test_config_loads_and_fits_the_tray() -> None:
     cfg, jig = cfgs()
     assert jig.check(cfg) == []
     assert jig.slots == 1  # discrete positions are off by default
-    assert jig.lead_in == pytest.approx(jig.clearance + jig.height * math.tan(jig.chamfer))
+    rise = jig.height - jig.wall_height
+    assert jig.lead_in == pytest.approx(jig.clearance + rise * math.tan(jig.chamfer))
+    # The wall boxes the tray in before the planner lets go of it (lower_tray_clear).
+    from flywheel_simple.tray.planner import PlannerConfig
+
+    assert jig.wall_height >= PlannerConfig.load().lower_tray_clear
 
 
 @pytest.mark.parametrize(
@@ -66,6 +71,9 @@ def test_config_loads_and_fits_the_tray() -> None:
         ({"height": 0.08}, "reaches the handles"),
         ({"side_arm": 0.3}, "side_arm"),
         ({"clearance": 0.0}, "positive"),
+        ({"wall_height": 0.07}, "wall_height"),
+        ({"near_side_arm": 0.5}, "near_side_arm"),
+        ({"near_end_arm": 0.05}, "near_end_arm"),
     ],
 )
 def test_check_refuses_jigs_that_do_not_fit(change: dict[str, float], reason: str) -> None:
@@ -118,23 +126,34 @@ def test_every_slot_lies_on_table_b(slots: int, gap: float) -> None:
     assert jig_on_table(cfg, dataclasses.replace(jig, slots=slots), gap)
 
 
-def test_guide_inner_faces_start_at_the_clearance_and_lean_out_by_the_chamfer() -> None:
+def test_guides_are_a_stop_wall_then_a_chamfer_leaning_out() -> None:
     cfg, jig = cfgs()
     hx, hy = cfg.tray_width / 2, cfg.tray_length / 2
     boxes = guide_boxes(cfg, jig)
-    assert len(boxes) == 8
+    # Far side: two long-side and two end arms; robot side: end arms only by default.
+    arms = 4 + 2 * (jig.near_side_arm > 0) + 2 * (jig.near_end_arm > 0)
+    assert len(boxes) == 2 * arms  # each arm: wall and chamfer
+    assert not jig.near_side_arm and not any(
+        "_side" in b.name and b.pos[0] > 0 for b in boxes
+    )  # robot-side long side left open
     for box in boxes:
         pts = box.corners()
-        side = "side" in box.name
+        side = "_side" in box.name
         u = np.abs(pts[:, 0]) - hx if side else np.abs(pts[:, 1]) - hy  # outward of the tray
-        top = float(np.max(pts[:, 2]))
-        assert top == pytest.approx(jig.height, abs=1e-9)
-        # The innermost point is the bottom inner edge on the table top.
-        assert float(np.min(u)) == pytest.approx(jig.clearance, abs=1e-9)
-        assert pts[np.argmin(u), 2] == pytest.approx(0.0, abs=1e-9)
-        # The inner edge at the top lies lead_in outside the tray side.
-        inner_top = float(np.min(u[np.isclose(pts[:, 2], top)]))
-        assert inner_top == pytest.approx(jig.lead_in, abs=1e-9)
+        bottom, top = float(np.min(pts[:, 2])), float(np.max(pts[:, 2]))
+        innermost = float(np.min(u))
+        assert innermost == pytest.approx(jig.clearance, abs=1e-9), box.name
+        if box.name.endswith("_wall"):
+            # Vertical inner face at the clearance, table top to wall_height.
+            assert (bottom, top) == pytest.approx((0.0, jig.wall_height), abs=1e-9)
+            inner = pts[np.isclose(u, innermost)]
+            assert sorted(inner[:, 2]) == pytest.approx([0, 0, jig.wall_height, jig.wall_height])
+        else:
+            # Inner face from the wall top at the clearance out to lead_in at the top.
+            assert top == pytest.approx(jig.height, abs=1e-9)
+            assert pts[np.argmin(u), 2] == pytest.approx(jig.wall_height, abs=1e-9)
+            inner_top = float(np.min(u[np.isclose(pts[:, 2], top)]))
+            assert inner_top == pytest.approx(jig.lead_in, abs=1e-9)
 
 
 def test_guides_leave_the_footprint_and_the_handles_free() -> None:
@@ -191,3 +210,33 @@ def test_generate_refuses_to_mix_jig_and_zone1_episodes_in_one_batch(tmp_path: P
     check_visuals_revision(tmp_path, visuals_revision(None))
     with pytest.raises(RuntimeError, match="generate into a new --out"):
         check_visuals_revision(tmp_path, visuals_revision(None, jig=True))
+
+
+def test_generate_refuses_an_unknown_scene_before_loading_anything(tmp_path: Path) -> None:
+    from flywheel_simple.tray.generate import SCENES, generate
+
+    assert SCENES == ("zone1", "jig")
+    with pytest.raises(ValueError, match="scene must be one of"):
+        generate(tmp_path, n_attempts=1, level=1, seed_start=0, scene="jigs")
+
+
+def test_generate_on_the_jig_scene_refuses_a_zone1_batch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import json
+
+    from flywheel_simple.tray import generate as gen
+    from flywheel_simple.tray.planner import PlannerConfig
+    from flywheel_simple.tray.recorder import planner_version, visuals_revision
+
+    monkeypatch.setattr(gen, "default_manifest_path", lambda: None)
+    shard = tmp_path / "shard-0"
+    shard.mkdir()
+    row = {
+        "seed": 1,
+        "planner_version": planner_version(PlannerConfig.load()),
+        "visuals_revision": visuals_revision(None),
+    }
+    (shard / gen.LOG_NAME).write_text(json.dumps(row) + "\n")
+    with pytest.raises(RuntimeError, match=r"\+jig1"):
+        gen.generate(tmp_path, n_attempts=1, level=1, seed_start=0, allow_plain=True, scene="jig")
