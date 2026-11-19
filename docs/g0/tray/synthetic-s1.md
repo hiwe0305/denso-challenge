@@ -1,6 +1,6 @@
 # Release synthetic S1 đầu tiên của task bê khay (DA-33)
 
-Release `tray_s1_0d84cc87b1e5`: 102 episode G1 bê khay do planner kịch bản sinh trên decoupled WBC, đã qua QA tối thiểu và QA phát lại, ở định dạng Ψ₀ (LeRobot v2.1). Đây là dữ liệu robot của thí nghiệm DA-34 (nhánh A dùng đủ, nhánh C dùng tập con có hash). Story [DA-33](../../product/stories/DA-33-synthetic-s1-khay.md) nhiệm vụ 9, [plan](../../superpowers/plans/2026-10-31-da33-tray-synthetic.md), quyết định D-22 đến D-26 ở [decisions.md](decisions.md).
+Release `tray_s1_0d84cc87b1e5`: 102 episode G1 bê khay do planner kịch bản sinh trên decoupled WBC, đã qua QA tối thiểu và QA phát lại, ở định dạng Ψ₀ (LeRobot v2.1). Đây là dữ liệu robot của thí nghiệm DA-34 (nhánh A dùng đủ, nhánh C dùng tập con có hash). Story [DA-33](../../product/stories/DA-33-synthetic-s1-khay.md) nhiệm vụ 9, plan (đã gỡ 19/11/2026, bản cuối ở commit `917a20c4`), quyết định D-22 đến D-26 ở [decisions.md](decisions.md).
 
 ## Nhận dạng
 

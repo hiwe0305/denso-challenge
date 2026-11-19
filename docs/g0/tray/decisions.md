@@ -1,6 +1,6 @@
 # Quyết định của task bê khay (DA-32, DA-33)
 
-Quyết định nhỏ khi làm DA-32 và DA-33, theo [design 28/10/2026](../../superpowers/specs/2026-10-28-tray-transfer-he-design.md), [plan DA-32](../../superpowers/plans/2026-10-28-da32-tray-task.md) và [plan DA-33](../../superpowers/plans/2026-10-31-da33-tray-synthetic.md). Mỗi dòng ghi lý do và giá phải trả nếu sai.
+Quyết định nhỏ khi làm DA-32 và DA-33, theo [design 28/10/2026](../../superpowers/specs/2026-10-28-tray-transfer-he-design.md), plan DA-32 (đã gỡ 19/11/2026, bản cuối ở commit `7fb423af`) và plan DA-33 (đã gỡ 19/11/2026, bản cuối ở commit `917a20c4`). Mỗi dòng ghi lý do và giá phải trả nếu sai.
 
 | Mã | Ngày | Quyết định | Lý do | Nếu sai |
 |---|---|---|---|---|
