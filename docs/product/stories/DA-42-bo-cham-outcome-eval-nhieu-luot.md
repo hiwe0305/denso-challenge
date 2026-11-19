@@ -47,7 +47,7 @@ Là người chạy vòng Failure → Data trên task khay, tôi muốn bộ ch�
   - [x] 4.2 `eval_results`: số thành công từng điều kiện, tỉ lệ từng bước, Wilson theo cỡ mẫu hiệu dụng
 - [ ] 5. Test MuJoCo và runbook (AC 5)
   - [x] 5.1 Test `sim`: khay rơi nghiêng trên cảnh thật, bản 1 gắn `L-TRAY-TILT`, bản 2 không
-  - [ ] 5.2 Runbook đo bộ chấm bản 2 trên một lô eval
+  - [x] 5.2 Runbook đo bộ chấm bản 2 trên một lô eval
 - [x] 6. Tài liệu `docs/g0/tray/scorer-v2.md` (AC 6)
 
 ## Phạm vi file
@@ -97,3 +97,5 @@ Không chạm: `simple_task.py`, `randomize.py`, `mjcf.py`, planner và `configs
 ## Ghi chép khi làm
 
 - Công cụ AI đã dùng: Claude Code.
+- Giờ tập trung theo nhiệm vụ con (Claude tự đặt): 1 · 1 · 1,5 · 1,5 · 1 · 1 · 1,5 · 2 · 1 · 1,5 · 1,5 = 14,5 giờ (1, 2.1, 3.1, 3.2, 2.2, 3.3, 4.1, 4.2, 5.1, 6, 5.2).
+- Cổng phát lại trên laptop (19/11/2026): bản vá `eval_driver` chạy trong `eval-decoupled-wbc` thật; kết quả ở [scorer-v2.md](../../g0/tray/scorer-v2.md) mục 7.1.
