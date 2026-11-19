@@ -4,6 +4,15 @@ Pure logic over TrayState snapshots; the SIMPLE task extracts them from MuJoCo.
 Steps are reached in order and stay reached. Success is design 3.4 held without
 a break for `t_stable`, and stays once reached. The first failure seen is the
 episode's label and is final; there is no success after it.
+
+Scorer versions (DA-42, docs/g0/tray/scorer-v2.md); results of two versions are not
+comparable, so every eval outcome records `scorer_version`:
+
+* 1 (DA-32): `approach_a` needs both palm points within `r_reach` of their handle's
+  centre in one cycle.
+* 2 (default): `approach_a` measures to the handle bar (a segment `handle_length`
+  long), not its centre, and also holds once both hands touch their handles. Base in
+  front of table A is still required.
 """
 
 from __future__ import annotations
@@ -24,7 +33,16 @@ Failure = Literal[
 ]
 STEP_NAMES = ("approach_a", "grasp", "lift", "carry", "reach_b", "place", "release_stand")
 PART_Z_MARGIN = (0.01, 0.03)  # below the tray floor, above the rim: still "in the tray"
-PALM_KEYS = ("centre_left", "centre_right", "centre_both")
+PALM_KEYS = (
+    "centre_left",
+    "centre_right",
+    "centre_both",
+    "bar_left",
+    "bar_right",
+    "bar_both",
+)
+SCORER_VERSION = 2
+SCORER_VERSIONS = (1, 2)
 
 
 @dataclass(frozen=True)
@@ -70,6 +88,7 @@ class StepTracker:
 
     cfg: TrayConfig
     sample: EpisodeSample
+    version: int = SCORER_VERSION
     _steps: list[bool] = field(default_factory=lambda: [False] * 7)
     _success: bool = False
     _failure: Failure | None = None
@@ -84,6 +103,8 @@ class StepTracker:
     _palm_min: dict[str, float | None] = field(default_factory=lambda: dict.fromkeys(PALM_KEYS))
 
     def __post_init__(self) -> None:
+        if self.version not in SCORER_VERSIONS:
+            raise ValueError(f"scorer version {self.version} not in {SCORER_VERSIONS}")
         geo = scene_geometry_with_gap(self.cfg, self.sample.table_gap)
         self._edge_a = float(geo.table_a_center[0]) - self.cfg.table_depth / 2
         self._edge_b = float(geo.table_b_center[0]) + self.cfg.table_depth / 2
@@ -109,9 +130,11 @@ class StepTracker:
         STEP_NAMES order; `palm_handle_min_m` the smallest distance from each palm
         point to its handle's centre over the episode, and `both` the smallest of the
         larger of the two in one cycle, the quantity scorer version 1's `approach_a`
-        compares with `r_reach`.
+        compares with `r_reach`. `palm_handle_bar_min_m` is the same to the handle bar,
+        what version 2 compares.
         """
         return {
+            "scorer_version": self.version,
             "failure_t": self._failure_t,
             "at_failure": self._at_failure,
             "step_latch_t": list(self._latch_t),
@@ -119,6 +142,11 @@ class StepTracker:
                 "left": self._palm_min["centre_left"],
                 "right": self._palm_min["centre_right"],
                 "both": self._palm_min["centre_both"],
+            },
+            "palm_handle_bar_min_m": {
+                "left": self._palm_min["bar_left"],
+                "right": self._palm_min["bar_right"],
+                "both": self._palm_min["bar_both"],
             },
         }
 
@@ -146,7 +174,7 @@ class StepTracker:
 
         lifted = s.tray_pos[2] - self.cfg.table_height > self.cfg.h_lift
         reached = (
-            self._in_front(s, self._edge_a, -1.0) and self._palms_on_handles(s, rot),
+            self._in_front(s, self._edge_a, -1.0) and self._hands_at_handles(s, rot, both),
             both,
             lifted and s.tray_on_table == "none" and parts_ok,
             both
@@ -239,16 +267,35 @@ class StepTracker:
             np.linalg.norm(s.right_palm - right)
         )
 
-    def _palms_on_handles(self, s: TrayState, rot: NDArray[np.float64]) -> bool:
+    def _palm_bar_distances(self, s: TrayState, rot: NDArray[np.float64]) -> tuple[float, float]:
+        """Palm point to the nearest point of its handle bar (along the tray's x axis)."""
+        axis = rot @ np.array([1.0, 0.0, 0.0])
+        half = self.cfg.handle_length / 2
+
+        def to_bar(palm: NDArray[np.float64], centre: NDArray[np.float64]) -> float:
+            along = float(np.clip(np.dot(palm - centre, axis), -half, half))
+            return float(np.linalg.norm(palm - (centre + along * axis)))
+
+        left, right = self._handle_centres(s, rot)
+        return to_bar(s.left_palm, left), to_bar(s.right_palm, right)
+
+    def _hands_at_handles(self, s: TrayState, rot: NDArray[np.float64], both: bool) -> bool:
+        """The hand half of `approach_a`, by scorer version (module docstring)."""
         r = self.cfg.r_reach
-        return all(d <= r for d in self._palm_centre_distances(s, rot))
+        if self.version == 1:
+            return all(d <= r for d in self._palm_centre_distances(s, rot))
+        return both or all(d <= r for d in self._palm_bar_distances(s, rot))
 
     def _track_palms(self, s: TrayState, rot: NDArray[np.float64]) -> None:
         left, right = self._palm_centre_distances(s, rot)
+        bar_left, bar_right = self._palm_bar_distances(s, rot)
         for key, d in (
             ("centre_left", left),
             ("centre_right", right),
             ("centre_both", max(left, right)),
+            ("bar_left", bar_left),
+            ("bar_right", bar_right),
+            ("bar_both", max(bar_left, bar_right)),
         ):
             old = self._palm_min[key]
             self._palm_min[key] = d if old is None else min(old, d)

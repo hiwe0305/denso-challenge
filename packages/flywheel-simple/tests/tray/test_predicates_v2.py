@@ -113,3 +113,74 @@ def _handles_of(tracker: Any, s: Any) -> Any:
     from flywheel_simple.tray.predicates import quat_to_mat
 
     return tracker._handle_centres(s, quat_to_mat(s.tray_quat))
+
+
+# --- 3.1 scorer version and approach_a ----------------------------------------------
+
+
+def make_versioned(version: int) -> Any:
+    from flywheel_simple.tray import TrayConfig
+    from flywheel_simple.tray.predicates import StepTracker
+    from flywheel_simple.tray.randomize import sample_episode
+
+    cfg = TrayConfig.load()
+    return StepTracker(cfg, sample_episode(cfg, 0, 0), version=version)
+
+
+def shift_palms(states: Iterator[Any], along: float, out: float) -> Iterator[Any]:
+    """Palms of gripping hands moved `along` the handle bar and `out` above it.
+
+    Bars run along the tray's x axis; the fixture's tray is unturned, so world x.
+    """
+    from dataclasses import replace
+
+    for s in states:
+        if any(s.hand_contacts):
+            offset = [along, 0.0, out]
+            s = replace(s, left_palm=s.left_palm + offset, right_palm=s.right_palm + offset)
+        yield s
+
+
+def test_default_scorer_is_version_2_and_unknown_versions_are_refused() -> None:
+    from flywheel_simple.tray.predicates import SCORER_VERSION
+
+    assert SCORER_VERSION == 2 and make_versioned(SCORER_VERSION).version == 2
+    with pytest.raises(ValueError, match="scorer version 3"):
+        make_versioned(3)
+
+
+def test_grasp_at_the_bar_end_latches_approach_only_in_version_2(
+    full_episode: Callable[[], Iterator[Any]],
+) -> None:
+    # Palm point 0.06 m along the bar (its end) and 0.09 m off it: 0.108 m from the
+    # centre, over r_reach 0.10, but 0.09 m from the bar.
+    v1, v2 = make_versioned(1), make_versioned(2)
+    r1 = run(v1, shift_palms(full_episode(), along=0.06, out=0.09))
+    r2 = run(v2, shift_palms(full_episode(), along=0.06, out=0.09))
+    assert r1[-1].steps == (False,) * 7 and r1[-1].success  # success never needed the steps
+    assert r2[-1].steps == (True,) * 7 and r2[-1].success
+    bar = v2.outcome_fields()["palm_handle_bar_min_m"]["both"]
+    centre = v2.outcome_fields()["palm_handle_min_m"]["both"]
+    assert bar == pytest.approx(0.09) and centre == pytest.approx((0.06**2 + 0.09**2) ** 0.5)
+
+
+def test_both_hands_on_handles_latch_approach_whatever_the_palm_distance(
+    full_episode: Callable[[], Iterator[Any]],
+) -> None:
+    reports = run(make_versioned(2), shift_palms(full_episode(), along=0.0, out=0.25))
+    assert reports[-1].steps == (True,) * 7
+    assert (
+        run(make_versioned(1), shift_palms(full_episode(), along=0.0, out=0.25))[-1].steps[0]
+        is False
+    )
+
+
+def test_approach_still_needs_the_base_in_front_of_table_a(
+    make_tracker: Callable[[], Any], idle_state: Callable[..., Any]
+) -> None:
+    from dataclasses import replace
+
+    tracker = make_tracker()
+    far = replace(idle_state(t=0.0), hand_contacts=(True, True))
+    far = replace(far, base_xy=far.base_xy + [-2.0, 0.0])  # 2 m back from table A
+    assert tracker.update(far).steps[0] is False
