@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt 22/10/2026; sửa 25/10/2026; mở rộng lại 27/10/2026) |
+| Trạng thái | Làm dở (2/9 nhiệm vụ con; PR #9, 28/10/2026; còn nhiệm vụ 1.1 và 2–6. PO duyệt 22/10/2026; sửa 25/10/2026; mở rộng lại 27/10/2026) |
 | Người làm | Hiếu |
 | Story PRD | 1.2 · Epic 1 |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:sim` |

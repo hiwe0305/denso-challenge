@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt 3/11/2026) |
+| Trạng thái | Xong (PR #80, 6/11/2026; đủ 11/11 nhiệm vụ con. PO duyệt 3/11/2026) |
 | Người làm | Hiếu |
 | Làn | Adapter simulator (`flywheel-simple`) |
 | Story PRD | Phần hook của story 3.1a (04 mục S2: "`SimpleSimulator`, hook ghi tín hiệu, `t_state`, `t_image`, tham số camera"); issue #31; 07 mục 2.4 (bản 1.1) |

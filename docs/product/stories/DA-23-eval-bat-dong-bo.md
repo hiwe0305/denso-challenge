@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt 25/10/2026; sửa 27/10/2026) |
+| Trạng thái | Làm dở (2/5 nhiệm vụ con; PR #49, #81, #96, 3–4/11/2026; còn nhiệm vụ 1, 4, 5. PO duyệt 25/10/2026; sửa 27/10/2026) |
 | Người làm | Long |
 | Làn | Vòng quyết định |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 8.5 · Epic 9 |

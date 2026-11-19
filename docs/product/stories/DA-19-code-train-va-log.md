@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt 25/10/2026; sửa 27/10/2026) |
+| Trạng thái | Xong (PR #43, #56, #60, #61, 3/11/2026; đủ 5/5 nhiệm vụ con. PO duyệt 25/10/2026; sửa 27/10/2026) |
 | Người làm | Hiếu |
 | Làn | Model và phần cứng |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 8 · Epic 9 |

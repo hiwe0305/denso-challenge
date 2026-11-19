@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt 22/10/2026; sửa 25/10/2026, 27/10/2026) |
+| Trạng thái | Làm dở (5/10 nhiệm vụ con; PR #78, 3/11/2026; còn nhiệm vụ 2, 3, 4, 5, 7. PO duyệt 22/10/2026; sửa 25/10/2026, 27/10/2026) |
 | Người làm | Hiếu |
 | Story PRD | 1.4 · Epic 1 |
 | Nhãn | [Adapter] · `epic:1` · `gate:G0` · `area:rl` |
