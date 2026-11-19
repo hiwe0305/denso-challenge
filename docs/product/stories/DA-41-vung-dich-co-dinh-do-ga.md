@@ -40,7 +40,7 @@ Số đo dẫn tới story ([docs/he/tray.md](../../he/tray.md) mục 19–20): 
   - [x] 3.2 Env SIMPLE có đồ gá, chọn cảnh trong `generate` (AC 4, 5)
 - [ ] 4. Kiểm trong sim
   - [x] 4.1 Test `sim` MuJoCo thuần: khay đứng yên, khay thả lệch trượt vào (AC 5)
-  - [ ] 4.2 Planner hạ khay vào đồ gá, test `sim` qua SIMPLE (AC 5)
+  - [x] 4.2 Planner hạ khay vào đồ gá, test `sim` qua SIMPLE (AC 5)
   - [ ] 4.3 Script ảnh camera đầu và độ thấy đồ gá (AC 6)
 - [ ] 5. Tài liệu
   - [ ] 5.1 `docs/g0/tray/jig.md`: thay đổi, số đo, runbook `rtx3060` (AC 7)
