@@ -1,0 +1,115 @@
+# DA-43 · Hệ Agent QA/QC chẩn đoán một vòng
+
+## Trạng thái
+
+| Trường | Giá trị |
+|---|---|
+| Trạng thái | Chờ duyệt design (mở 19/11/2026). Chưa viết mã sản phẩm |
+| Người làm | Hiếu, làm cùng Claude |
+| Làn | Đánh giá (`flywheel.eval.agentqa`); một lệnh xuất trong adapter `flywheel_psi0` |
+| Nguồn yêu cầu | Ban giám khảo sau vòng 2: Agent QA/QC phải chạy tốt và phân tích nguyên nhân gốc của lỗi task, robot và kết quả. Design: [2026-11-19-agent-qaqc-system-design.md](../../superpowers/specs/2026-11-19-agent-qaqc-system-design.md) |
+| Nhãn | `area:core` · `epic:9` |
+| Sprint | Sau demo 17/11/2026 |
+| Ước lượng | Khoảng 10 ngày làm việc, 70–80 giờ (ước lượng); xem cột giờ của từng nhiệm vụ |
+| Phụ thuộc | Duyệt design (Q1–Q10 của design mục 14). PR hợp đồng K1 chung với DA-42; K2, K3 trên nhánh `DA-43-contract`. DA-44 cho bộ phát hiện log train đã sửa (không chặn: agent gọi `flywheel.eval.api.diagnose_train` như cũ). Chạy thật trên `rtx3060` chỉ khi Hiếu đồng ý |
+
+## Story
+
+Là AI Engineer, tôi muốn một agent đọc toàn bộ artifact của một vòng (ảnh và video, log train, kết quả eval, log inference) và trả lời "nguyên nhân gốc là gì, kiểm gì rẻ nhất để chắc, làm gì tiếp và tốn bao nhiêu", để quyết định của vòng Failure → Data nhanh hơn mà mọi con số vẫn do code tính và tôi vẫn là người quyết.
+
+## Tiêu chí chấp nhận
+
+1. Lớp công cụ có đủ các công cụ ở design mục 4, chỉ đọc artifact hợp đồng, chạy trên CPU, không import làn khác hay adapter. `step_pass_table`, `relaxed_sweep`, `coverage_distance` và `paired_compare` có test đối chiếu cho ra đúng số đã ghi ở tray.md 19.2, 20.2, 20.12 trên file mẫu dựng từ cùng dữ liệu.
+2. Công cụ thiếu đầu vào trả "không xét được" kèm lý do dưới dạng fact; không công cụ nào im lặng (có test).
+3. Bộ đề xuất giả thuyết (bảng luật trong `configs/eval/agentqa/`) dùng từ vựng `Diagnosis` và `INTERVENTIONS_OF_DIAGNOSIS` của hợp đồng evidence card; cụm còn giả thuyết hệ thống chưa bị loại thì không có đề xuất tiêu ngân sách dữ liệu (code chặn, có test).
+4. Luật trích số mở rộng theo design mục 6, luật 1–8, mỗi luật có test: tham số số viết tay trong lời gọi công cụ bị từ chối; câu của bộ tổng hợp không trích fact bị từ chối; mục model tự thêm không trích fact của chính mã đó bị từ chối; chi phí và lợi ích do code gắn.
+5. Ba lỗi đã đo của bản 3 có ca kiểm riêng và qua: hai T4 tự thêm sai (agent-qa 3.7 điểm 1), sáu lần bỏ tự mâu thuẫn (điểm 2), câu của các chiều ngoài chiều xếp đầu (agent-qa 7).
+6. Đầu ra là các `AgentReport` không đổi hợp đồng, cộng `RoundDiagnosis` theo PR hợp đồng đã merge (K2, K3), cộng trang HTML vòng mở đầu bằng ba dòng: nguyên nhân hạng 1, phép kiểm rẻ nhất, can thiệp kèm chi phí. Không thêm trường tạm trong mã làn khi PR chưa merge.
+7. Cổng dữ liệu: agent từ chối `vault/`, `answers/`, `docs/`; gói có bản ghi không phải `public` hoặc không rõ lớp thì không gọi model hosted, dừng trước lời gọi đầu với mã thoát khác 0 (có test). Gói giả của log robot thật trong test luôn là `internal`.
+8. Bộ ca lịch sử: đáp án có cấu trúc, niêm phong ngoài gói, chỉ `agentqa/casebench/` đọc, sau khi mọi báo cáo đã ghi; test rào quét các module khác. Có ít nhất 5 ca, chia tập phát triển và tập kiểm như design mục 11.2.
+9. Bảng kết quả của bốn phần đánh giá (design mục 11.1–11.4) ghi vào `docs/g0/agent-qa.md`, mỗi bảng tách lớp code, agent và phần model thêm, kèm phiên bản agent, model, revision, sha256 prompt và config. Bộ lỗi cấy không tụt so với bản 3.
+10. Đo ít nhất hai model cho bộ tổng hợp (M1 cục bộ; M3 hosted chỉ trên ca `public`, nếu Hiếu mở đường hosted) trên cùng bộ ca, cùng công cụ.
+11. `uv run ruff check`, `uv run mypy`, `uv run pytest`, `uv run lint-imports` sạch; `python3 scripts/repo/check_links.py` sạch.
+
+## Nhiệm vụ
+
+Mỗi nhiệm vụ con một commit; giờ là ước lượng.
+
+- [x] 0. Design và story (docs), chờ Hiếu duyệt
+- [ ] 1. Nền (1 ngày)
+  - [ ] 1.1 Issue "Contract change" cho K1 (cùng DA-42), K2, K3; soạn PR hợp đồng trên `DA-43-contract` kèm file mẫu và test (PR riêng, không thuộc phạm vi file dưới đây)
+  - [ ] 1.2 Lệnh xuất eval khay sang `scores.jsonl` theo `Score` trong adapter `flywheel_psi0`; test trên một lô mẫu
+  - [ ] 1.3 Gói vòng mẫu cho test: `Score`, `TraceStep`, `TrainingMetric`, `Condition`, outcome theo K1 khi có; dựng từ lô `C_70` giai đoạn 1, chỉ dữ liệu `public`
+- [ ] 2. Lớp công cụ, phần eval (2 ngày)
+  - [ ] 2.1 `ToolResult`, đăng ký công cụ, `task_lookup`, quy tắc "không xét được"
+  - [ ] 2.2 `step_pass_table`, `failure_clusters`, `paired_compare` và test đối chiếu số
+  - [ ] 2.3 `latch_consistency`, `signal_presence`
+  - [ ] 2.4 `relaxed_sweep` (chờ K1; trước đó chạy trên file mẫu)
+- [ ] 3. Lớp công cụ, phần trace, train, dữ liệu (1,5 ngày)
+  - [ ] 3.1 `trace_stats` gồm phép đo trên lượt thành công
+  - [ ] 3.2 `train_window`, `lineage`
+  - [ ] 3.3 `coverage_distance` và test đối chiếu với tray.md 20.12
+  - [ ] 3.4 `cost_lookup`, `history_lookup`
+- [ ] 4. Giả thuyết và chuyên viên (2 ngày)
+  - [ ] 4.1 Bảng luật giả thuyết, danh mục phép kiểm trong config; bộ đề xuất bằng code; chặn tiêu ngân sách khi còn giả thuyết hệ thống
+  - [ ] 4.2 Chuyên viên eval và bộ chấm, chuyên viên runtime và trace; prompt riêng
+  - [ ] 4.3 Ba sửa của mục 5.2 design (fact của chính mã, bỏ phải có fact phản bác, gộp chiều) và ca kiểm của AC 5
+  - [ ] 4.4 Báo cáo vòng chỉ bằng lớp code (`EchoModel`) chạy hết trên gói mẫu
+- [ ] 5. Bộ tổng hợp (1,5 ngày)
+  - [ ] 5.1 Lượt xếp hạng, chọn phép kiểm, chọn can thiệp; code gắn `Cost`, `ExpectedGain`
+  - [ ] 5.2 Luật 1–8 của design mục 6; cửa xin thêm công cụ (tắt mặc định)
+  - [ ] 5.3 Cổng dữ liệu và chặn hosted theo `data_class`; gói giả log robot thật
+  - [ ] 5.4 `RoundDiagnosis` (sau khi PR hợp đồng merge), trang HTML vòng, lệnh `fw agentqa round`
+- [ ] 6. Bộ ca lịch sử (1,5 ngày)
+  - [ ] 6.1 Kiểm artifact của từng ca ứng viên còn đủ; loại ca thiếu, ghi lý do
+  - [ ] 6.2 Đáp án có cấu trúc cho tập phát triển; tập kiểm do người không viết bảng luật soạn; niêm phong, sha256
+  - [ ] 6.3 `agentqa/casebench/`: rào đáp án, kiểm rò, chấm theo design mục 11.2, test rào
+- [ ] 7. Đo (1 ngày; lượt trên `rtx3060` theo runbook, khi Hiếu đồng ý)
+  - [ ] 7.1 Bộ lỗi cấy (DA-31), so với bản 3
+  - [ ] 7.2 Bộ ca lịch sử với M1, và M3 trên ca `public` nếu được mở
+  - [ ] 7.3 Báo nhầm trên gói khỏe; thời gian, chi phí, tỉ lệ `broken`, độ ổn định
+  - [ ] 7.4 Ghi bảng kết quả và runbook vào `docs/g0/agent-qa.md`
+- [ ] 8. Nhìn hình (0,5–1 ngày; rút được khỏi story)
+  - [ ] 8.1 `frames_at`, câu hỏi đóng trong config task
+  - [ ] 8.2 Hiệu chỉnh trên câu hỏi code đã biết đáp án; fact `vision` chỉ ủng hộ
+
+## Phạm vi file
+
+Theo 07 mục 3.1. File story luôn được sửa. PR hợp đồng (nhiệm vụ 1.1) đi nhánh riêng `DA-43-contract`, không thuộc danh sách này. Không sửa `agentqa/bench/` (DA-31, của Châu), file của DA-41, DA-42, DA-44.
+
+- `docs/superpowers/specs/2026-11-19-agent-qaqc-system-design.md`
+- `docs/g0/agent-qa.md`
+- `packages/flywheel-eval/src/flywheel/eval/agentqa/tools/`
+- `packages/flywheel-eval/src/flywheel/eval/agentqa/round/`
+- `packages/flywheel-eval/src/flywheel/eval/agentqa/casebench/`
+- `packages/flywheel-eval/src/flywheel/eval/agentqa/inputs.py`, `packages/flywheel-eval/src/flywheel/eval/agentqa/agent.py`, `packages/flywheel-eval/src/flywheel/eval/agentqa/analyze.py`, `packages/flywheel-eval/src/flywheel/eval/agentqa/endpoint.py`, `packages/flywheel-eval/src/flywheel/eval/agentqa/vision.py`, `packages/flywheel-eval/src/flywheel/eval/agentqa/html.py`, `packages/flywheel-eval/src/flywheel/eval/agentqa/cli.py`, `packages/flywheel-eval/src/flywheel/eval/agentqa/run.py`
+- `packages/flywheel-eval/tests/unit/agentqa/tools/`, `packages/flywheel-eval/tests/unit/agentqa/round/`, `packages/flywheel-eval/tests/unit/agentqa/casebench/`, `packages/flywheel-eval/tests/contract/agentqa/`
+- `packages/flywheel-eval/pyproject.toml`: chỉ thêm `opencv-python-headless` vào nhóm tùy chọn `agentqa`
+- `uv.lock`: chỉ phần do dòng trên sinh (gói đã có trong khóa)
+- `configs/eval/agentqa/`
+- `packages/flywheel-psi0/src/flywheel_psi0/tray/export_scores.py`, `packages/flywheel-psi0/tests/tray/test_psi0_tray_export_scores.py`
+
+## Ghi chú cho người làm
+
+- Đọc design trước, nhất là mục 4 (công cụ), 6 (luật trích số) và 11 (đánh giá).
+- Agent không đọc `docs/he/`: chẩn đoán của đội là đáp án của bộ ca lịch sử.
+- Kết quả thi lại của `C70_R1` không vào bộ ca và không vào báo cáo (quyết định 16/11/2026).
+- Không commit `fwdata/`, đáp án của bộ ca, file `--record` có dữ liệu không phải `public`, hay khóa API.
+- Khóa API của model hosted (nếu được mở) đọc từ biến môi trường qua `config.py`, không nằm trong repo.
+
+## Kiểm thử
+
+- `uv run pytest packages/flywheel-eval/tests/unit/agentqa packages/flywheel-eval/tests/contract/agentqa`
+- `uv run ruff check`, `uv run mypy`, `uv run lint-imports` theo README gốc
+- `python3 scripts/repo/check_links.py`
+
+## Người phụ trách
+
+- Làm: Dương Đình Hiếu, cùng Claude
+- Duyệt và merge: Dương Đình Hiếu (người duy nhất, 07 mục 3.4)
+
+## Change log
+
+| Ngày | Nội dung | Người |
+|---|---|---|
+| 19/11/2026 | Tạo story cùng design; mã DA-43 chưa dùng trên `origin/master` | Hiếu (soạn với Claude) |
