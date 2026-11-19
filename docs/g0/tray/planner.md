@@ -1,6 +1,6 @@
 # Planner kịch bản bê khay (DA-33 nhiệm vụ 3, 4)
 
-Planner thay luồng PICO: mỗi bước đọc trạng thái cảnh, sinh lệnh đi, hướng, hai tư thế cổ tay và độ nắm cho `StandWalkController` ([plan DA-33](../../superpowers/plans/2026-10-31-da33-tray-synthetic.md) Task 3–4, [story DA-33](../../product/stories/DA-33-synthetic-s1-khay.md) AC 2, 3). Mã ở `flywheel_simple.tray.planner` và `flywheel_simple.tray.agent`; mọi giá trị ở `configs/sim/tray_planner.yaml`. Quyết định đi kèm ở [decisions.md](decisions.md) D-14 đến D-21 và D-25.
+Planner thay luồng PICO: mỗi bước đọc trạng thái cảnh, sinh lệnh đi, hướng, hai tư thế cổ tay và độ nắm cho `StandWalkController` (plan DA-33 Task 3–4, đã gỡ 19/11/2026, bản cuối ở commit `917a20c4`; [story DA-33](../../product/stories/DA-33-synthetic-s1-khay.md) AC 2, 3). Mã ở `flywheel_simple.tray.planner` và `flywheel_simple.tray.agent`; mọi giá trị ở `configs/sim/tray_planner.yaml`. Quyết định đi kèm ở [decisions.md](decisions.md) D-14 đến D-21 và D-25.
 
 ## Kết quả (3/11/2026)
 

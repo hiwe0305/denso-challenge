@@ -1,6 +1,6 @@
 # Cổ tay và bàn tay của G1 trên decoupled WBC (DA-33 nhiệm vụ 2)
 
-Planner đưa hai tư thế cổ tay vào `TeleopRetargetingIK` của decoupled_wbc thay cho luồng PICO, và đóng mở bàn tay Dex3 bằng một hệ số 0–1 ([plan DA-33](../../superpowers/plans/2026-10-31-da33-tray-synthetic.md) Task 2, [story DA-33](../../product/stories/DA-33-synthetic-s1-khay.md) AC 1). Quyết định đi kèm ở [decisions.md](decisions.md) D-12, D-13.
+Planner đưa hai tư thế cổ tay vào `TeleopRetargetingIK` của decoupled_wbc thay cho luồng PICO, và đóng mở bàn tay Dex3 bằng một hệ số 0–1 (plan DA-33 Task 2, đã gỡ 19/11/2026, bản cuối ở commit `917a20c4`; [story DA-33](../../product/stories/DA-33-synthetic-s1-khay.md) AC 1). Quyết định đi kèm ở [decisions.md](decisions.md) D-12, D-13.
 
 ## Đường lệnh
 

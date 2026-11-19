@@ -1,6 +1,6 @@
 # Đi và quay của G1 trong cảnh khay (DA-33 nhiệm vụ 1)
 
-Số đo đi và quay của G1 trên decoupled WBC của SIMPLE ở `sim_mode=mujoco`, làm đầu vào cho planner ([plan DA-33](../../superpowers/plans/2026-10-31-da33-tray-synthetic.md) Task 1, [story DA-33](../../product/stories/DA-33-synthetic-s1-khay.md)). Quyết định đi kèm ở [decisions.md](decisions.md) D-10, D-11.
+Số đo đi và quay của G1 trên decoupled WBC của SIMPLE ở `sim_mode=mujoco`, làm đầu vào cho planner (plan DA-33 Task 1, đã gỡ 19/11/2026, bản cuối ở commit `917a20c4`; [story DA-33](../../product/stories/DA-33-synthetic-s1-khay.md)). Quyết định đi kèm ở [decisions.md](decisions.md) D-10, D-11.
 
 ## Cách đo
 

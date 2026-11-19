@@ -49,7 +49,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 
 ## Ghi chú cho người làm
 
-- Kế hoạch chi tiết: [docs/superpowers/plans/2026-10-28-da32-tray-task.md](../../superpowers/plans/2026-10-28-da32-tray-task.md).
+- Kế hoạch chi tiết: `docs/superpowers/plans/2026-10-28-da32-tray-task.md` (đã gỡ 19/11/2026, bản cuối ở commit `7fb423af`).
 - Logic thuần (cấu hình, hình học, ngẫu nhiên hóa, vị từ) không import `simple` hay `mujoco`, có test chạy trong CI. Mã import `simple` hoặc `mujoco` chỉ chạy trong môi trường SIMPLE; test của nó gắn marker `sim` (03 mục 7).
 - Nếu tay G1 không với tới tay cầm ở bàn 0,85 m, hạ bàn về 0,65 m như task hai bàn của SIMPLE và ghi `Decision` (AC 4).
 - Không commit dữ liệu, video, asset tải về; để trong `fwdata/`.

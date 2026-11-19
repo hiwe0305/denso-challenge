@@ -30,7 +30,7 @@ Là kỹ sư của đội, tôi muốn Flywheel Console nằm trong repo thành 
 
 ## Nhiệm vụ
 
-Theo [plan DA-40](../../superpowers/plans/2026-11-11-da40-flywheel-console.md); mỗi nhiệm vụ một commit.
+Theo plan DA-40 (đã gỡ 19/11/2026, bản cuối ở commit `ac5603b8`); mỗi nhiệm vụ một commit.
 
 - [x] 1. Khung package, `ConsolePaths`, lệnh `fw console`, đăng ký trong workspace và import-linter (AC 1, 8)
 - [x] 2. Chỉ mục catalog và dữ liệu trích dẫn (AC 2, 3)
