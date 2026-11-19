@@ -46,6 +46,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `packages/flywheel-eval/src/flywheel/eval/diagnosis/train/`
 - `packages/flywheel-eval/src/flywheel/eval/config.py`, `packages/flywheel-eval/src/flywheel/eval/api.py`, `packages/flywheel-eval/src/flywheel/eval/cli.py`
 - `packages/flywheel-eval/tests/unit/diagnosis/train/`
+- `packages/flywheel-eval/tests/contract/agentqa/test_agentqa_cases.py` (ca `train_divergence`) và `packages/flywheel-eval/tests/unit/agentqa/test_agentqa_analyze.py` (job `spike`): hai test này dựng T1 bằng một batch, nhánh spike mới không coi là phân kỳ. Hiếu (chủ file) duyệt sửa trên nhánh này ngày 19/11/2026
 - `configs/eval/diagnosis/train.yaml`
 - `docs/g0/agent-qa.md`
 
