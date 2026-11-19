@@ -6,7 +6,8 @@ checkpoint nobody could judge is not a clean checkpoint (FR21).
 
 T2 compares the val loss after `n_steps` against a baseline that is the median
 of the first few val measurements, so one noisy first measurement cannot set
-the scale and hide a flat run (issue #5, 29/10/2026). T3 reads the train loss
+the scale and hide a flat run (issue #5, 29/10/2026). The scored measurement
+always lies after the baseline ones (DA-44). T3 reads the train loss
 folded onto the val measurement steps, so the batch-to-batch jitter of a
 healthy run cannot look like a train loss that stopped falling.
 """
@@ -34,14 +35,22 @@ def detect_t2(series: TrainSeries, cfg: TrainThresholds) -> DetectorResult:
                 )
             ]
         )
-    after = np.flatnonzero(series.val_step >= cfg.t2.n_steps)
+    # The scored measurement is the first one at or past `n_steps` that is not
+    # itself one of the baseline measurements. With val every 2000 steps and
+    # n_steps = 2000, the first point at n_steps is the second baseline point,
+    # and comparing a median with one of its own inputs reads a drop of ~0
+    # however fast the job learned (DA-44, agent-qa 3.3).
+    after = np.flatnonzero(
+        (series.val_step >= cfg.t2.n_steps) & (np.arange(series.val_step.size) >= count)
+    )
     if after.size == 0:
         return DetectorResult(
             skipped=[
                 Skipped(
                     "T2",
-                    f"lần đo val cuối ở step {int(series.val_step[-1])}, chưa tới "
-                    f"step {cfg.t2.n_steps} nên chưa kết luận được",
+                    f"lần đo val cuối ở step {int(series.val_step[-1])}, chưa có lần đo nào "
+                    f"từ step {cfg.t2.n_steps} trở đi nằm sau {count} lần đo baseline "
+                    "nên chưa kết luận được",
                 )
             ]
         )
