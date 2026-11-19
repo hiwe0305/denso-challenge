@@ -35,6 +35,17 @@ paired headline: E1 and E3 stop on a clear difference, F stops when B shows no g
 `continue` runs the remaining chunks. It is the rule's arithmetic for a run against C;
 against C+ (rule 5) it is not read.
 
+Repeats (DA-42): with `--repeats N` (as given to eval_batch) each condition has N
+rollouts, repeat r of chunk c in `<out>/<c>.r<r>/`. Per level, `n` counts rollouts and
+`conditions` conditions; `per_condition` gives successes and rollouts of each. The
+rollouts of one condition share its scene and are not independent, so `wilson` uses an
+effective sample size (`wilson_n_eff`): rollouts / design effect, the design effect from
+the between-condition variance of a ratio estimator, at least 1; when p is 0 or 1 that
+variance is 0 and n_eff is the number of conditions (conservative). With one rollout per
+condition n_eff is n and `wilson` is the plain Wilson interval of before. The bootstrap CI
+resamples conditions (their mean success) within each level. `paired` and `paired_diff`
+pair repeat 0 of each condition only, the rollout an old one-per-condition run has.
+
 Scorer version (DA-42): every result names the version of the tray scorer that labelled
 its rollouts (`scorer_version` of the outcome rows, written by `eval_driver` since
 DA-42; rows without it are reported as unrecorded, `None`, never as a version). A
@@ -56,7 +67,14 @@ from typing import Any
 
 import numpy as np
 
-from flywheel_psi0.tray.eval_batch import Chunk, attempts, chunk_plan, finished, phases_for
+from flywheel_psi0.tray.eval_batch import (
+    Chunk,
+    attempts,
+    chunk_plan,
+    finished,
+    phases_for,
+    with_repeats,
+)
 from flywheel_psi0.tray.runplan import Stats, TrayRunPlan
 
 # flywheel_simple.tray.predicates.STEP_NAMES; SIMPLE's venv is not this package's.
@@ -78,16 +96,24 @@ class Rollout:
     level: int
     seed: int
     episode: int  # index in dr-level-<level>
-    chunk: str
+    chunk: str  # directory of the chunk's repeat under the eval_batch dir (Chunk.dir_id)
     attempt: int
     row: dict[str, Any]  # the outcome row
+    repeat: int = 0  # DA-42: rollout index of the condition
 
 
 def collect(
     out: Path, chunks: Sequence[Chunk]
 ) -> tuple[list[Rollout], dict[tuple[int, int], int], list[tuple[int, int]]]:
-    """(chosen rollouts in chunk order, extra rollouts per (level, seed), missing ones)."""
-    chosen, extra, missing = [], {}, []
+    """(chosen rollouts in chunk order, extra rollouts per (level, seed), missing ones).
+
+    One rollout per (condition, repeat): the chunks may include repeats (with_repeats);
+    extra rollouts of all repeats of a condition add up, and a condition is listed in
+    `missing` once per repeat it misses.
+    """
+    chosen: list[Rollout] = []
+    extra: dict[tuple[int, int], int] = {}
+    missing: list[tuple[int, int]] = []
     for chunk in chunks:
         runs: dict[int, list[tuple[int, dict[str, Any]]]] = {}
         for attempt in attempts(out, chunk):
@@ -101,9 +127,10 @@ def collect(
                 missing.append((chunk.level, seed))
                 continue
             k, row = done[0]
-            chosen.append(Rollout(chunk.level, seed, episode, chunk.id, k, row))
+            chosen.append(Rollout(chunk.level, seed, episode, chunk.dir_id, k, row, chunk.repeat))
             if len(done) > 1:
-                extra[(chunk.level, seed)] = len(done) - 1
+                key = (chunk.level, seed)
+                extra[key] = extra.get(key, 0) + len(done) - 1
     return chosen, extra, missing
 
 
@@ -134,7 +161,7 @@ def scorer_versions(
 
 
 def bootstrap_ci(
-    groups: Sequence[Sequence[int]], resamples: int, seed: int, ci: float
+    groups: Sequence[Sequence[float]], resamples: int, seed: int, ci: float
 ) -> tuple[float, float]:
     """Percentile CI of the pooled mean, each group resampled within itself."""
     rng = np.random.default_rng(seed)
@@ -171,6 +198,8 @@ def paired_diff(
     mean of d_i and its CI resamples d_i within each level, with the plan's resamples,
     seed and level, so the two sides stay paired (docs/he/tray.md 2, 9 and 18.2).
     """
+    single(variant)
+    single(baseline)
     versions = scorer_versions(variant, baseline, cross_scorer)
     a = {(r.level, r.seed): int(bool(r.row["success"])) for r in variant if r.level in levels}
     b = {(r.level, r.seed): int(bool(r.row["success"])) for r in baseline if r.level in levels}
@@ -217,14 +246,54 @@ def stage1_outcome(diff: dict[str, Any]) -> str:
     return "F" if b <= c else "continue"
 
 
-def wilson(k: int, n: int, z: float = Z95) -> tuple[float, float]:
-    """Wilson score interval of k successes in n trials."""
+def wilson(k: float, n: float, z: float = Z95) -> tuple[float, float]:
+    """Wilson score interval of k successes in n trials (n may be an effective size)."""
     if n == 0:
         raise ValueError("no trials")
     p = k / n
     centre = (p + z * z / (2 * n)) / (1 + z * z / n)
     half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
     return max(0.0, centre - half), min(1.0, centre + half)
+
+
+def by_condition(rollouts: Sequence[Rollout]) -> dict[tuple[int, int], list[int]]:
+    """Successes (0/1) of each condition's rollouts, keyed (level, seed), in rollout order."""
+    out: dict[tuple[int, int], list[int]] = {}
+    for r in rollouts:
+        out.setdefault((r.level, r.seed), []).append(int(bool(r.row["success"])))
+    return out
+
+
+def clustered_wilson(groups: Sequence[Sequence[int]], z: float = Z95) -> dict[str, Any]:
+    """Wilson interval of the pooled success rate of clustered rollouts (module docstring).
+
+    `groups` are the 0/1 successes of each condition. Design effect = the ratio
+    estimator's between-condition variance, C / (C - 1) * sum (k_i - p m_i)^2 / n^2, over
+    the binomial p (1 - p) / n, at least 1; n_eff = n / design effect. p of 0 or 1, or
+    fewer than two conditions: n_eff = conditions.
+    """
+    groups = [g for g in groups if g]
+    n = sum(len(g) for g in groups)
+    if n == 0:
+        raise ValueError("no trials")
+    k = sum(sum(g) for g in groups)
+    c = len(groups)
+    p = k / n
+    if c == n:
+        method, n_eff = "independent: one rollout per condition", float(n)
+    elif c < 2 or p in (0.0, 1.0):
+        method, n_eff = "clustered: no between-condition variance, n_eff = conditions", float(c)
+    else:
+        between = c / (c - 1) * sum((sum(g) - p * len(g)) ** 2 for g in groups) / n**2
+        deff = max(1.0, between / (p * (1 - p) / n))
+        method, n_eff = "clustered: n_eff = rollouts / design effect", n / deff
+    low, high = wilson(p * n_eff, n_eff, z)
+    return {
+        "interval": (low, high),
+        "n_eff": round(n_eff, 3),
+        "design_effect": round(n / n_eff, 3),
+        "method": method,
+    }
 
 
 def reached(steps: Sequence[bool]) -> int:
@@ -259,7 +328,7 @@ def yaw_errors(steps: Path) -> dict[str, float]:
 
 
 def trace_of(out: Path, rollout: Rollout) -> Path | None:
-    """steps.jsonl of the rollout's DA-38 trace, matched by `episode_<i>`."""
+    """steps.jsonl of the rollout's DA-38 trace, matched by `episode_<i>`, in its repeat's dir."""
     for result in (out / rollout.chunk / f"attempt-{rollout.attempt}" / "traces").glob(
         "*/rollout_result.json"
     ):
@@ -276,11 +345,16 @@ def level_summary(rollouts: Sequence[Rollout]) -> dict[str, Any]:
     success = [int(bool(r.row["success"])) for r in rollouts]
     steps = [r.row.get("scorer_steps") for r in rollouts]
     known = [s for s in steps if s is not None]
+    conditions = by_condition(rollouts)
+    interval = clustered_wilson(list(conditions.values())) if rollouts else None
     return {
         "n": len(rollouts),
+        "conditions": len(conditions),
         "successes": sum(success),
         "p": sum(success) / len(rollouts) if rollouts else None,
-        "wilson": wilson(sum(success), len(success)) if rollouts else None,
+        "wilson": interval["interval"] if interval else None,
+        "wilson_n_eff": interval["n_eff"] if interval else None,
+        "wilson_method": interval["method"] if interval else None,
         "failures": dict(Counter(r.row["failure"] for r in rollouts if not r.row["success"])),
         "step_pass": {
             name: (sum(bool(s[k]) for s in known) / len(known) if known else None)
@@ -291,12 +365,27 @@ def level_summary(rollouts: Sequence[Rollout]) -> dict[str, Any]:
     }
 
 
+def condition_means(rollouts: Sequence[Rollout]) -> list[float]:
+    """Mean success of each condition: what the bootstrap resamples (one value per condition)."""
+    return [sum(ok) / len(ok) for ok in by_condition(rollouts).values()]
+
+
+def repeat_0(rollouts: Sequence[Rollout]) -> list[Rollout]:
+    """The first rollout of each condition: what `paired` and `paired_diff` read."""
+    return [r for r in rollouts if r.repeat == 0]
+
+
+def single(rollouts: Sequence[Rollout]) -> None:
+    if any(r.repeat != 0 for r in rollouts):
+        raise ValueError("pairing reads repeat 0 of each condition: pass repeat_0(rollouts)")
+
+
 def summarize(
     plan: TrayRunPlan,
     chosen: Sequence[Rollout],
     extra: dict[tuple[int, int], int],
     missing: Sequence[tuple[int, int]],
-    yaw: dict[tuple[int, int], dict[str, float]] | None = None,
+    yaw: dict[tuple[int, int, int], dict[str, float]] | None = None,
     full: bool = True,
 ) -> dict[str, Any]:
     """With `full` False (a smaller set, tray.md 14), levels without rollouts are left out
@@ -313,17 +402,14 @@ def summarize(
         summary["unit"] = c.unit
         if by_level[c.level]:
             summary["ci"] = bootstrap_ci(
-                [[int(bool(r.row["success"])) for r in by_level[c.level]]],
-                stats.resamples,
-                stats.seed,
-                stats.ci,
+                [condition_means(by_level[c.level])], stats.resamples, stats.seed, stats.ci
             )
         levels[str(c.level)] = summary
     headline_levels = [c.level for c in by_level_cfg if c.headline]
     headline_rollouts = [r for level in headline_levels for r in by_level[level]]
     headline = level_summary(headline_rollouts)
     headline["levels"] = headline_levels
-    groups = [[int(bool(r.row["success"])) for r in by_level[lv]] for lv in headline_levels]
+    groups = [condition_means(by_level[lv]) for lv in headline_levels]
     if all(groups):
         headline["ci"] = bootstrap_ci(groups, stats.resamples, stats.seed, stats.ci)
     everything = level_summary(chosen)
@@ -345,6 +431,11 @@ def summarize(
         "extra_rollouts": sum(extra.values()),
         "extra_by_condition": {f"{lv}:{seed}": n for (lv, seed), n in sorted(extra.items())},
         "reruns": sum(1 for r in chosen if r.attempt > 0),
+        "repeats": 1 + max((r.repeat for r in chosen), default=0),
+        "per_condition": {
+            f"{lv}:{seed}": {"successes": sum(ok), "rollouts": len(ok)}
+            for (lv, seed), ok in sorted(by_condition(chosen).items())
+        },
         "stats": {"method": stats.method, "resamples": stats.resamples, "seed": stats.seed},
         "label": "preliminary, on dev",
     }
@@ -369,6 +460,8 @@ def paired(
     Each side is one rollout per condition (EGL rollouts are not reproducible, tray.md
     13.2), so a pair compares two rollouts, not two measurements of one.
     """
+    single(variant)
+    single(baseline)
     versions = scorer_versions(variant, baseline, cross_scorer)
     a = {(r.level, r.seed): r.row for r in variant}
     b = {(r.level, r.seed): r.row for r in baseline}
@@ -452,6 +545,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         help=f"read the first {STAGE1_CHUNKS} chunks only: stage 1 of branch B (tray.md 18.2)",
     )
     parser.add_argument(
+        "--repeats", type=int, default=1, help="rollouts per condition, as run (DA-42)"
+    )
+    parser.add_argument(
         "--cross-scorer",
         action="store_true",
         help="pair with a baseline scored by another scorer version (not comparable)",
@@ -464,6 +560,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     chunks = chunk_plan(rows, args.chunk, phases_for(rows))
     if args.stage1:
         chunks = chunks[:STAGE1_CHUNKS]
+    if args.repeats < 1:
+        parser.error("--repeats must be at least 1")
+    chunks = with_repeats(chunks, args.repeats)
     chosen, extra, missing = collect(args.out, chunks)
     if args.stage1 and missing:
         raise ValueError(f"stage 1 misses {missing}: do not read it (tray.md 18.2)")
@@ -475,26 +574,29 @@ def main(argv: Sequence[str] | None = None) -> int:
         yaw = {}
         for r in chosen:
             if (steps := trace_of(args.out, r)) is not None:
-                yaw[(r.level, r.seed)] = yaw_errors(steps)
+                yaw[(r.level, r.seed, r.repeat)] = yaw_errors(steps)
     result = summarize(plan, chosen, extra, missing, yaw, full)
     if args.baseline is not None:
-        base, _, base_missing = collect(args.baseline, chunks)
+        first = [c for c in chunks if c.repeat == 0]
+        base, _, base_missing = collect(args.baseline, first)
         if base_missing:
             raise ValueError(f"baseline misses {base_missing}")
-        result["paired"] = paired(chosen, base, args.cross_scorer)
+        variant = repeat_0(chosen)
+        result["paired"] = paired(variant, base, args.cross_scorer)
+        result["paired"]["on"] = "repeat 0 of each condition"
         if plan.eval.by_level is not None:
             headline = [c.level for c in plan.eval.by_level if c.headline]
             result["paired"]["headline"] = paired_diff(
-                chosen, base, headline, plan.stats, args.cross_scorer
+                variant, base, headline, plan.stats, args.cross_scorer
             )
             result["paired"]["by_level"] = {
-                str(c.level): paired_diff(chosen, base, [c.level], plan.stats, args.cross_scorer)
+                str(c.level): paired_diff(variant, base, [c.level], plan.stats, args.cross_scorer)
                 for c in plan.eval.by_level
-                if any(r.level == c.level for r in chosen)
+                if any(r.level == c.level for r in variant)
             }
             if args.stage1:
                 result["stage1"] = {
-                    "chunks": [chunk.id for chunk in chunks],
+                    "chunks": [chunk.id for chunk in first],
                     "conditions": result["paired"]["headline"]["n"],
                     "p_threshold": STAGE1_P,
                     "outcome": stage1_outcome(result["paired"]["headline"]),

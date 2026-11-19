@@ -8,15 +8,17 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from flywheel_psi0.tray.eval_batch import Chunk
+from flywheel_psi0.tray.eval_batch import Chunk, with_repeats
 from flywheel_psi0.tray.eval_results import (
     STEP_NAMES,
     bootstrap_ci,
+    clustered_wilson,
     collect,
     mcnemar_exact,
     paired,
     paired_diff,
     reached,
+    repeat_0,
     scorer_version,
     stage1_outcome,
     summarize,
@@ -42,7 +44,7 @@ def episode(
     failure: str = "L-TIMEOUT",
     scorer_version: int | None = None,
 ) -> None:
-    folder = out / chunk.id / f"attempt-{attempt}"
+    folder = out / chunk.dir_id / f"attempt-{attempt}"
     (folder / "eval").mkdir(parents=True, exist_ok=True)
     row = {
         "seed": chunk.seed_of(i),
@@ -381,3 +383,83 @@ def test_same_scorer_pairs_say_so(tmp_path: Path) -> None:
     base, _, _ = _scored(tmp_path / "base", [2, 2], [False, False])
     result = paired(var, base)
     assert result["cross_scorer"] is False and result["scorer_versions"]["baseline"] == 2
+
+
+# --- DA-42 4.2: repeats per condition -----------------------------------------------
+
+
+def _repeated(out: Path, wins: list[list[bool]]) -> Any:
+    """Level 1 conditions, wins[i][r]: success of repeat r of condition i."""
+    base = Chunk("l1-000", 1, 0, tuple(1000100 + i for i in range(len(wins))))
+    chunks = with_repeats([base], len(wins[0]))
+    for chunk in chunks:
+        for i, oks in enumerate(wins):
+            episode(out, chunk, 0, i, success=oks[chunk.repeat], scorer_version=2)
+    return collect(out, chunks)
+
+
+def test_one_rollout_per_condition_keeps_the_plain_wilson() -> None:
+    result = clustered_wilson([[1], [0], [0], [0], [0]])
+    assert result["interval"] == pytest.approx(wilson(1, 5))
+    assert result["n_eff"] == 5 and result["design_effect"] == 1
+    assert result["method"].startswith("independent")
+
+
+def test_conditions_that_always_agree_count_once() -> None:
+    # 4 conditions x 3 repeats, each condition all-or-nothing: 12 rollouts carry the
+    # information of 4 conditions
+    result = clustered_wilson([[1, 1, 1], [0, 0, 0], [0, 0, 0], [0, 0, 0]])
+    assert result["design_effect"] == pytest.approx(3 * 4 / 3, rel=1e-3)  # 4 / (4-1) * ...
+    assert result["n_eff"] < 4
+    plain = wilson(3, 12)
+    assert result["interval"][1] - result["interval"][0] > plain[1] - plain[0]
+
+
+def test_coin_flip_conditions_are_close_to_independent() -> None:
+    # every condition 1 of 2: no between-condition variance beyond chance
+    result = clustered_wilson([[1, 0]] * 10)
+    assert result["design_effect"] == 1 and result["n_eff"] == 20
+
+
+def test_all_failures_fall_back_to_one_per_condition() -> None:
+    result = clustered_wilson([[0, 0, 0]] * 5)
+    assert result["n_eff"] == 5 and "n_eff = conditions" in result["method"]
+    assert result["interval"] == pytest.approx(wilson(0, 5))
+
+
+def test_repeats_give_per_condition_counts_and_step_rates(tmp_path: Path) -> None:
+    chosen, extra, missing = _repeated(tmp_path, [[True, True], [False, True], [False, False]])
+    assert [(r.seed, r.repeat, r.chunk) for r in chosen] == [
+        (1000100, 0, "l1-000"), (1000101, 0, "l1-000"), (1000102, 0, "l1-000"),
+        (1000100, 1, "l1-000.r1"), (1000101, 1, "l1-000.r1"), (1000102, 1, "l1-000.r1"),
+    ]  # fmt: skip
+    result = summarize(PLAN, chosen, extra, missing, full=False)
+    level = result["levels"]["1"]
+    assert (level["n"], level["conditions"], level["successes"]) == (6, 3, 3)
+    assert level["p"] == 0.5 and level["wilson_n_eff"] <= 6
+    assert level["step_pass"]["approach_a"] == 1.0 and level["step_pass"]["place"] == 0.5
+    assert result["repeats"] == 2
+    assert result["per_condition"] == {
+        "1:1000100": {"successes": 2, "rollouts": 2},
+        "1:1000101": {"successes": 1, "rollouts": 2},
+        "1:1000102": {"successes": 0, "rollouts": 2},
+    }
+    # bootstrap over conditions: the CI can only reach the condition means' range
+    assert 0.0 <= level["ci"][0] <= 0.5 <= level["ci"][1] <= 1.0
+
+
+def test_a_missing_repeat_is_listed_per_repeat(tmp_path: Path) -> None:
+    base = Chunk("l1-000", 1, 0, (1000100,))
+    chunks = with_repeats([base], 2)
+    episode(tmp_path, chunks[0], 0, 0, success=True)
+    _, _, missing = collect(tmp_path, chunks)
+    assert missing == [(1, 1000100)]  # repeat 1 never ran
+
+
+def test_pairing_reads_repeat_0_only(tmp_path: Path) -> None:
+    var, _, _ = _repeated(tmp_path / "var", [[True, False], [False, True]])
+    base, _, _ = _repeated(tmp_path / "base", [[False, False], [False, False]])
+    with pytest.raises(ValueError, match="repeat 0"):
+        paired(var, base)
+    result = paired(repeat_0(var), repeat_0(base))
+    assert result["conditions"] == 2 and result["success"]["variant_only"] == 1
