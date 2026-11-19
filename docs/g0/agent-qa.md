@@ -124,6 +124,26 @@ Cả ba job đều có loss giảm bình thường, ví dụ train 46,4 → 0,12
 
 Bộ log cấy cho 0 báo nhầm trên bản sạch (mục 3.2), nhưng log thật thì báo trên cả ba job. Như vậy bản sạch của DA-27 chưa giống log Ψ₀ thật, ít nhất ở grad norm và nhịp đo val.
 
+**Đã sửa ở [DA-44](../product/stories/DA-44-bao-nham-log-train.md) (19/11/2026).** Log thật có sẵn trên laptop trong `fwdata/` (không commit): ba job trên và năm job pair60k của DA-34 (60k step). Kết quả của `fw eval diag-train` trên cả 8 job:
+
+| Mã | Trước | Sửa | Sau |
+|---|---|---|---|
+| T2 | Báo trên 8/8 job, step 2000, mức giảm 0 | Điểm chấm là lần đo val đầu tiên từ `n_steps` trở đi **nằm sau** các lần đo baseline; không có điểm như vậy thì bỏ qua | 0/8 |
+| T1 | Báo trên 8/8 job, step 3410–6191 | Nhánh spike so **trung vị trượt 100 step** của loss train (`t1.smooth_steps`, mới) với `k` lần giá trị nhỏ nhất của chính đường đã làm mượt trong 500 step. Loss từng batch của job khỏe lên tới 107–215 lần giá trị nhỏ nhất trong 500 step trước, 4000–8800 bản ghi mỗi job vượt 10 lần. Nhánh NaN, Inf giữ nguyên. `k` = 4, hiệu chỉnh (đường đã làm mượt lớn nhất 1,80 lần trên 8 job, nhân 2) | 0/8 |
+| T8 nhánh b | Báo trên 8/8 job, 12–18 nghìn bản ghi vượt 10 | `max_grad_norm` = 570, hiệu chỉnh: 2 × giá trị lớn thứ 6 (`max_exceedances` + 1) của `grad_norm_action` trên job tệ nhất (282,9). Không lấy p99 (42–50): T8 đếm số bản ghi vượt, ở p99 mỗi job có hàng trăm bản ghi vượt theo định nghĩa. Đỉnh lớn nhất nằm ở 2000 step khởi động (vài trăm) và một batch muộn 1224 | 0/8 |
+| T5 | `start_step` âm khi job ngắn hơn 1000 step | Không trước bản ghi đầu của job | có test |
+| T3 | Báo trên job không ego (step 18000) | Không sửa | Vẫn báo trên job đó và `da34-t6-ft-b-all-s0` (step 38000); cần người xem có phải overfit thật |
+
+Ngưỡng lấy bằng lệnh mới `fw eval calibrate-train --job <log> …`, in số của từng job và luật. Bộ log cấy DA-27 sau khi sửa (lớp code, bản `bench-c6da75e9ff36`): R1, R2, T1–T8 mỗi loại bắt 3/3, không phát hiện thừa; bản sạch `bench-cfcb0ba66776` 0 phát hiện.
+
+Còn chưa kiểm hoặc chờ quyết:
+
+- **Đổi nghĩa T1 [Đề xuất]**: so loss đã làm mượt thay vì từng batch, khác chữ của design mục 10; chờ PO. `smooth_steps` = 100 là giả định, và `k` = 4 chỉ đúng với giá trị này.
+- 8 job cùng một công thức train (Ψ₀ stage 3 của DA-26, DA-34). Công thức khác (stage 1 egocentric, batch hay lr khác) phải chạy lại `calibrate-train`.
+- T8 báo ở bản ghi đầu tiên vượt ngưỡng (DA-08); job có một batch lẻ vượt rồi mới hỏng thật sẽ báo ở batch lẻ đó.
+- Chưa chạy lại agent (Nemotron) trên 3 job thật sau khi sửa; agent hết thấy T1, T2, T8 vì code không còn báo, chưa đo.
+- Bản sạch của bộ log cấy (DA-27, `flywheel-data/inject`) vẫn có grad norm 0,5–2 và val mỗi 250 step; đề xuất PR riêng cho giống log thật.
+
 ### 3.4 Endpoint chết
 
 `FW_AGENTQA_AGENT_URL=http://127.0.0.1:9/v1 fw agentqa run …` cho báo cáo `broken` với lý do `endpoint failed: … Connection refused`, không có phát hiện nào, thoát mã 1. Laptop chưa có Ollama nên đây là đường mặc định nếu chạy thật trên laptop.
