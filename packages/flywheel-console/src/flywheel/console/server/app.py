@@ -19,7 +19,7 @@ from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
 from flywheel.console.paths import ConsolePaths, PathDenied, active, guard, set_active
-from flywheel.console.server import kinds, media, runner
+from flywheel.console.server import kinds, media, runner, withhold
 
 MAX_JSON = 1 << 20
 MAX_UPLOAD = 8 << 30
@@ -177,6 +177,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             gen = llm.stream(body)
             for chunk in gen:
+                if self.server.locked:  # tool results (a job's argv, a log) can carry machine paths
+                    chunk = self.server.redact(chunk.decode("utf-8")).encode("utf-8")
                 self.wfile.write(chunk)
                 self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError):
@@ -285,6 +287,11 @@ class Handler(BaseHTTPRequestHandler):
             fp = fp / "index.html"
         if fp is None or not fp.is_file():
             return self.jerr(404, "not found")
+        if unquote(u.path) == "/data/story.json":
+            held = runner._withheld_runs()
+            if held:  # the result blocks of a held run never reach the browser
+                doc = withhold.story(json.loads(fp.read_text(encoding="utf-8")), held)
+                return self.send_bytes(json.dumps(doc, ensure_ascii=False).encode())
         self.send_file(fp)
 
     def send_file(self, fp: Path) -> None:
@@ -443,9 +450,9 @@ class Handler(BaseHTTPRequestHandler):
             b = _chat("llm").latest_bench()
             self.jok(b) if b else self.jerr(404, "no bench run yet")
         elif path == "/api/chat/traces":
-            self.jok(_chat("llm").list_traces(int(arg("limit", "20"))))
+            self.jok(_chat("llm").list_traces(int(arg("limit", "20")), runner._withheld_runs()))
         elif len(parts) == 4 and parts[1] == "chat" and parts[2] == "traces":
-            t = _chat("llm").get_trace(parts[3])
+            t = _chat("llm").get_trace(parts[3], runner._withheld_runs())
             self.jok(t) if t else self.jerr(404, "no such turn")
         elif len(parts) == 3 and parts[1] == "exports":
             self.export_zip(parts[2])

@@ -18,7 +18,7 @@ import re
 import time
 import urllib.parse
 import urllib.request
-from collections.abc import Iterator
+from collections.abc import Collection, Iterator
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -199,10 +199,13 @@ def save_trace(tr: dict[str, Any]) -> None:
         f.write(json.dumps(tr, ensure_ascii=False) + "\n")
 
 
-def list_traces(limit: int = 20) -> list[dict[str, Any]]:
+def list_traces(limit: int = 20, hide: Collection[str] = ()) -> list[dict[str, Any]]:
+    """The newest turns; a turn that names a run in ``hide`` (held results) is left out."""
     out: list[dict[str, Any]] = []
     for f in _trace_files():
         for ln in reversed(f.read_text(encoding="utf-8").splitlines()):
+            if any(h in ln for h in hide):
+                continue
             try:
                 t = json.loads(ln)
             except ValueError:
@@ -246,10 +249,10 @@ def latest_bench() -> dict[str, Any] | None:
     return None
 
 
-def get_trace(turn_id: str) -> dict[str, Any] | None:
+def get_trace(turn_id: str, hide: Collection[str] = ()) -> dict[str, Any] | None:
     for f in _trace_files():
         for ln in f.read_text(encoding="utf-8").splitlines():
-            if turn_id in ln:
+            if turn_id in ln and not any(h in ln for h in hide):
                 try:
                     t = json.loads(ln)
                 except ValueError:

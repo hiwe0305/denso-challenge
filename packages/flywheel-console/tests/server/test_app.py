@@ -283,7 +283,7 @@ def test_chat_routes_use_lazy_modules(srv: Srv, monkeypatch: pytest.MonkeyPatch)
     _stub(
         monkeypatch, "llm", stream=stream, nemotron_status=lambda: "warm",
         prewarm=lambda: {"ok": True}, latest_bench=lambda: None,
-        list_traces=lambda limit: [{"limit": limit}], get_trace=lambda t: None,
+        list_traces=lambda limit, hide=(): [{"limit": limit}], get_trace=lambda t, hide=(): None,
     )  # fmt: skip
 
     def call(name: str, args: dict[str, Any], ctx: dict[str, Any] | None) -> dict[str, Any]:
@@ -477,3 +477,56 @@ def test_demomedia_serves_ranges_and_refuses_escape(srv: Srv) -> None:
     st, hd, body = srv.req("GET", "/demomedia/success-C_70.mp4", headers={"Range": "bytes=0-9"})
     assert st == 206 and len(body) == 10 and hd["content-range"].endswith(f"/{v.stat().st_size}")
     assert srv.get("/demomedia/../index/catalog.json")[0] == 404
+
+
+def test_locked_chat_stream_hides_machine_paths(
+    fw: ConsolePaths, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A tool result streamed to a ``--lock --chat`` page (a job's argv) carries no home dir."""
+    monkeypatch.setattr(media, "seed_rows", lambda: ROWS)
+    httpd = app.make_server(fw, 0, lock=True, chat=True)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    s = Srv(httpd, fw)
+    leak = json.dumps({"text": f"argv {fw.fw_root}/work/j-1 /home/someone/x"})
+    try:
+        chunk = f"event: tool\ndata: {leak}\n\n".encode()
+        _stub(monkeypatch, "llm", stream=lambda body: iter([chunk]))
+        st, _h, body = s.req("POST", "/api/chat", b"{}", {"Content-Type": "application/json",
+                             "Origin": f"http://127.0.0.1:{s.port}"})  # fmt: skip
+        text = body.decode()
+        assert st == 200 and str(fw.fw_root) not in text and "/home/someone" not in text
+        assert "fwdata/work/j-1" in text and "~/x" in text
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
+def test_held_results_never_leave_the_server(locked_srv: Srv) -> None:
+    """``withhold_eval``: /data/story.json loses the held run's result blocks before it is sent."""
+    ix = locked_srv.paths.index
+    ix.mkdir(parents=True, exist_ok=True)
+    held = {"rounds": [{"id": "r1", "withhold_eval": ["HELD"]}]}
+    (ix / "tasks.json").write_text(json.dumps(held))
+    story = {
+        "runs": [{"branch": "HELD", "loss": 0.1}],
+        "pair": {"runs": [{"run": "HELD", "f": "4/60"}, {"run": "A", "f": "10/60"}],
+                 "comparisons": [{"variant": "HELD", "baseline": "A"},
+                                 {"variant": "B", "baseline": "A"}]},
+        "follow": {"runs": {"HELD": 1, "A": 2}, "r3": {"HELD": 3}},
+        "demo": {"round1_reading": {"x": "4/60"}, "models": {"runs": {"HELD": {"episodes": 606}}},
+                 "ladder": {"runs": {"HELD": 4, "A": 10},
+                            "on_table_b": {"value": {"HELD": 51},
+                                           "check_from_rollouts": {"HELD": 51},
+                                           "quote": "| 43/60 | 51/60 |"}}},
+    }  # fmt: skip
+    (ix / "story.json").write_text(json.dumps(story))
+    st, body = locked_srv.get("/data/story.json")
+    out = json.loads(body)
+    assert st == 200 and "4/60" not in body.decode() and "51" not in body.decode()
+    assert out["pair"]["runs"] == [{"run": "A", "f": "10/60"}]
+    assert len(out["pair"]["comparisons"]) == 1
+    assert out["follow"] == {"runs": {"A": 2}} and "round1_reading" not in out["demo"]
+    # training and data facts of the run are not results: they stay
+    assert out["runs"] == story["runs"] and out["demo"]["models"] == story["demo"]["models"]
+    (ix / "tasks.json").write_text(json.dumps({"rounds": [{"id": "r1"}]}))
+    assert json.loads(locked_srv.get("/data/story.json")[1]) == story  # nothing held: file as it is

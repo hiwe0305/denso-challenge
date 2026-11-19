@@ -320,3 +320,23 @@ def test_train_runs_skip_abandoned_attempts(rn: ConsolePaths) -> None:
         d.mkdir(parents=True)
         (d / "metrics.jsonl").write_text(json.dumps({"step": 60000, "loss": 0.1}) + "\n")
     assert [r["branch"] for r in runner.train_runs()] == ["C70_R1"]
+
+
+def test_cancel_stops_a_job_left_by_an_earlier_server(rn: ConsolePaths) -> None:
+    """A running job reloaded from disk has no thread here: Cancel kills its process group."""
+    proc = subprocess.Popen(["sleep", "30"], start_new_session=True)
+    try:
+        jid = "j-left"
+        d = runner.jobs_dir() / jid
+        d.mkdir(parents=True)
+        rec = {"id": jid, "kind": "ego.qa", "state": "running", "created": runner.now(),
+               "pid": proc.pid}  # fmt: skip
+        (d / "job.json").write_text(json.dumps(rec))
+        runner.load_registry()
+        assert runner.JOBREG[jid]["state"] == "running"
+        runner.cancel(jid)
+        proc.wait(timeout=10)
+        _wait(lambda: runner.JOBREG[jid]["state"] == "cancelled", "cancelled")
+    finally:
+        if proc.poll() is None:
+            proc.kill()
