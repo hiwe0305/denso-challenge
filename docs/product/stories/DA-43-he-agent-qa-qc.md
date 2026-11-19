@@ -43,7 +43,7 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
 - [ ] 2. Lớp công cụ, phần eval (2 ngày)
   - [x] 2.1 `ToolResult`, đăng ký công cụ, `task_lookup`, quy tắc "không xét được"
   - [x] 2.2 `step_pass_table`, `failure_clusters`, `paired_compare` và test đối chiếu số
-  - [ ] 2.3 `latch_consistency`, `signal_presence`
+  - [x] 2.3 `latch_consistency`, `signal_presence`
   - [ ] 2.4 `relaxed_sweep` (chờ K1; trước đó chạy trên file mẫu)
 - [ ] 3. Lớp công cụ, phần trace, train, dữ liệu (1,5 ngày)
   - [ ] 3.1 `trace_stats` gồm phép đo trên lượt thành công
