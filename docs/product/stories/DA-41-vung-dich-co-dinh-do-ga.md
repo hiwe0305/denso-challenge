@@ -35,13 +35,13 @@ Số đo dẫn tới story ([docs/he/tray.md](../../he/tray.md) mục 19–20): 
   - [x] 1.1 File story này (AC 1–7)
   - [ ] 1.2 Design 28/10/2026 mục 3.1, 3.5 và dòng sửa đổi (quyết định PO 19/11/2026)
 - [x] 2. Đích cố định, vị trí rời rạc (tắt), hình học thanh dẫn trong `jig.py` và `configs/sim/tray_jig.yaml`, test CPU (AC 1–3)
-- [ ] 3. Đồ gá trong cảnh
+- [x] 3. Đồ gá trong cảnh
   - [x] 3.1 Thanh dẫn và tấm trượt là geom của `table_b` trong MJCF, `visuals_revision` có hậu tố `+jig1` (AC 3, 4)
   - [x] 3.2 Env SIMPLE có đồ gá, chọn cảnh trong `generate` (AC 4, 5)
-- [ ] 4. Kiểm trong sim
+- [x] 4. Kiểm trong sim
   - [x] 4.1 Test `sim` MuJoCo thuần: khay đứng yên, khay thả lệch trượt vào (AC 5)
   - [x] 4.2 Planner hạ khay vào đồ gá, test `sim` qua SIMPLE (AC 5)
-  - [ ] 4.3 Script ảnh camera đầu và độ thấy đồ gá (AC 6)
+  - [x] 4.3 Script ảnh camera đầu và độ thấy đồ gá (AC 6)
 - [ ] 5. Tài liệu
   - [ ] 5.1 `docs/g0/tray/jig.md`: thay đổi, số đo, runbook `rtx3060` (AC 7)
 
