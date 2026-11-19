@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Đang làm (PO duyệt 19/11/2026, kế hoạch hai tuần cho vòng chung kết) |
+| Trạng thái | Chờ duyệt: mọi nhiệm vụ con xong trên laptop; kiểm 50 seed trên `rtx3060` chờ Hiếu chạy (runbook ở jig.md mục 5). Mục tiêu planner ≥ 95 % chưa đạt (25/31 trên laptop) |
 | Người làm | Hiếu |
 | Làn | Adapter simulator (`flywheel-simple`) |
 | Story PRD | [Design 28/10/2026](../../superpowers/specs/2026-10-28-tray-transfer-he-design.md) mục 3.1, 3.5 (sửa 19/11/2026) |
@@ -23,7 +23,7 @@ Số đo dẫn tới story ([docs/he/tray.md](../../he/tray.md) mục 19–20): 
 
 1. Trên cảnh có đồ gá, tư thế đích cố định so với bàn B ở mọi mức; khay trên bàn A vẫn rung như cũ. Với cùng hạt giống, tư thế khay, khoảng cách bàn, chỗ đứng, khối lượng linh kiện và ánh sáng giữ nguyên giá trị trước DA-41. Cảnh cũ (`+zone1`) và tư thế đích rung của nó vẫn dựng lại được: các file mà run plan đã đóng băng của DA-34 ghim bằng sha256 không đổi một byte.
 2. Có lựa chọn 2–3 vị trí đồ gá rời rạc, tách riêng, mặc định tắt; khi tắt, hành vi đúng như AC 1.
-3. Đồ gá là body tĩnh ở tư thế đích: thanh dẫn thấp ở bốn góc, có vát, để trống chỗ hai tay cầm; kích thước và ma sát nằm trong `configs/sim/tray.yaml`; hình học tính từ cấu hình và có test CPU.
+3. Đồ gá là body tĩnh ở tư thế đích: thanh dẫn thấp ở bốn góc, có vát, để trống chỗ hai tay cầm; kích thước và ma sát nằm trong file cấu hình, không viết cứng (`configs/sim/tray_jig.yaml`, vì `tray.yaml` bị run plan ghim; sửa 19/11/2026); hình học tính từ cấu hình và có test CPU.
 4. `visuals_revision` có hậu tố mới; `generate` và `export` từ chối trộn episode cũ với episode mới như đã làm với `+zone1`.
 5. Trong MuJoCo: khay đặt đúng đích đứng yên trong đồ gá; khay thả lệch vài cm tự trượt vào trong dung sai; planner hạ được khay vào đồ gá và hoàn thành episode.
 6. Có script ghi ảnh camera đầu của episode planner trên cảnh có đồ gá, và đo đồ gá còn thấy bao nhiêu khi khay đang bưng.
@@ -42,8 +42,8 @@ Số đo dẫn tới story ([docs/he/tray.md](../../he/tray.md) mục 19–20): 
   - [x] 4.1 Test `sim` MuJoCo thuần: khay đứng yên, khay thả lệch trượt vào (AC 5)
   - [x] 4.2 Planner hạ khay vào đồ gá, test `sim` qua SIMPLE (AC 5)
   - [x] 4.3 Script ảnh camera đầu và độ thấy đồ gá (AC 6)
-- [ ] 5. Tài liệu
-  - [ ] 5.1 `docs/g0/tray/jig.md`: thay đổi, số đo, runbook `rtx3060` (AC 7)
+- [x] 5. Tài liệu
+  - [x] 5.1 `docs/g0/tray/jig.md`: thay đổi, số đo, runbook `rtx3060` (AC 7)
 
 ## Phạm vi file
 
@@ -79,5 +79,11 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 19/11/2026 | Tạo story theo quyết định PO 19/11/2026: vùng đích cố định, thêm đồ gá định vị | PO (Hiếu) |
+| 19/11/2026 | AC 3: cấu hình đồ gá ở `configs/sim/tray_jig.yaml` thay vì `tray.yaml` (file bị run plan DA-34 ghim sha256) | Hiếu (cùng Claude) |
 
 ## Ghi chép khi làm
+
+- 19/11/2026 · Chỉ thêm file; sáu file bị ghim không đổi (test sha256 trong `test_jig.py`). Đồ gá là geom của `table_b`, để `tray_state` tính khay trên đồ gá là trên bàn B.
+- 19/11/2026 · Hình học chốt sau nhiều vòng chạy planner: tường đứng 3,5 cm, vát tới 6,5 cm, bỏ cánh dài phía robot (khuỷu tay trái chạm). Lý do từng lựa chọn ở jig.md mục 3.
+- 19/11/2026 · Planner trên 31 lượt: 25/31 với đồ gá, 26/31 không đồ gá. Lỗi còn lại ở planner (cổ tay chạm cánh ngắn phía robot, xoay khi buông, REACH hết giờ); việc sau ở jig.md mục 6.
+- 19/11/2026 · Ảnh camera đầu: đồ gá thấy được từ CARRY trở đi nhưng dưới 0,7 % ảnh, ít hơn vùng đích 2–7 lần; lúc TURN không thấy cả hai.
