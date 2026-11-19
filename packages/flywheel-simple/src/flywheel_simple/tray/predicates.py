@@ -12,7 +12,9 @@ comparable, so every eval outcome records `scorer_version`:
   centre in one cycle.
 * 2 (default): `approach_a` measures to the handle bar (a segment `handle_length`
   long), not its centre, and also holds once both hands touch their handles. Base in
-  front of table A is still required.
+  front of table A is still required. `L-TRAY-TILT` needs both hands on the handles:
+  a tray off the tables after release (falling or bouncing onto table B) is not
+  carried.
 """
 
 from __future__ import annotations
@@ -200,7 +202,13 @@ class StepTracker:
         self._one_hand_since = self._since(self._one_hand_since, s.t, carrying and not both)
         if not standing:
             return "L-BALANCE"
-        if carrying and self._tilt(rot) > math.radians(self.cfg.tilt_max_deg):
+        # Version 1 counts any tray off both tables after the lift as carried, so a
+        # tray falling or bouncing after release over table B is "tilted while
+        # carrying", and the label is final: a tray that then settles in the target
+        # is never a success. Version 2 needs both hands on the handles: a tilt with
+        # one hand is L-ONE-HAND's (after contact_grace), with none it is no carry.
+        held = both if self.version >= 2 else True
+        if carrying and held and self._tilt(rot) > math.radians(self.cfg.tilt_max_deg):
             return "L-TRAY-TILT"
         if not parts_ok:
             return "L-PART-DROP"

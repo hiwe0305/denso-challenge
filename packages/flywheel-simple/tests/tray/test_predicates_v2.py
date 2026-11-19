@@ -184,3 +184,80 @@ def test_approach_still_needs_the_base_in_front_of_table_a(
     far = replace(idle_state(t=0.0), hand_contacts=(True, True))
     far = replace(far, base_xy=far.base_xy + [-2.0, 0.0])  # 2 m back from table A
     assert tracker.update(far).steps[0] is False
+
+
+# --- 3.2 L-TRAY-TILT only while held ------------------------------------------------
+
+
+def tilted(deg: float) -> Any:
+    import numpy as np
+
+    a = np.deg2rad(deg)
+    return np.array([np.cos(a / 2), np.sin(a / 2), 0.0, 0.0])
+
+
+def moved(s: Any, dz: float = 0.0, quat: Any = None) -> Any:
+    """The state with its unturned tray raised by dz and turned to quat, parts riding along."""
+    from dataclasses import replace
+
+    import numpy as np
+    from flywheel_simple.tray.predicates import quat_to_mat
+
+    q = s.tray_quat if quat is None else quat
+    pos = s.tray_pos + np.array([0.0, 0.0, dz])
+    parts = pos + (s.part_pos - s.tray_pos) @ quat_to_mat(q).T
+    return replace(s, tray_pos=pos, tray_quat=q, part_pos=parts)
+
+
+def dropped_onto_b(states: Iterator[Any], tilt_deg: float = 25.0) -> Iterator[Any]:
+    """The full episode with its set-down replaced by a release 0.1 m above the target:
+    the tray falls three cycles tilted, off both tables and out of both hands, then lies
+    flat in the target as before."""
+    from dataclasses import replace
+
+    released = False
+    for s in states:
+        if s.tray_on_table == "B" and any(s.hand_contacts):
+            yield replace(moved(s, dz=0.1), tray_on_table="none")
+            continue
+        if s.tray_on_table == "B" and not released:
+            released = True
+            for k in range(3):
+                falling = moved(s, dz=0.05, quat=tilted(tilt_deg))
+                yield replace(falling, t=s.t - 0.06 + 0.02 * k, tray_on_table="none")
+        yield s
+
+
+def test_release_above_table_b_is_tilt_in_version_1_success_in_version_2(
+    full_episode: Callable[[], Iterator[Any]],
+) -> None:
+    v1, v2 = make_versioned(1), make_versioned(2)
+    r1 = run(v1, dropped_onto_b(full_episode()))
+    r2 = run(v2, dropped_onto_b(full_episode()))
+    assert r1[-1].failure == "L-TRAY-TILT" and not r1[-1].success
+    at = v1.outcome_fields()["at_failure"]
+    assert at["hand_contacts"] == {"left": False, "right": False}
+    assert at["tray_on_table"] == "none" and at["tilt_deg"] == pytest.approx(25.0)
+    assert r2[-1].failure is None and r2[-1].success
+
+
+def test_tilt_while_held_with_both_hands_is_still_a_failure(
+    carry_sequence: Callable[..., Iterator[Any]],
+) -> None:
+
+    states = (moved(s, quat=tilted(20)) if s.t >= 1.0 else s for s in carry_sequence())
+    tracker = make_versioned(2)
+    assert run(tracker, states)[-1].failure == "L-TRAY-TILT"
+    assert tracker.outcome_fields()["failure_t"] == pytest.approx(1.0)
+
+
+def test_tilt_after_one_hand_lets_go_is_one_hand_in_version_2(
+    carry_sequence: Callable[..., Iterator[Any]],
+) -> None:
+
+    def states() -> Iterator[Any]:
+        for s in carry_sequence(release_left_at=2.0):
+            yield moved(s, quat=tilted(30)) if s.t >= 2.0 else s
+
+    assert run(make_versioned(1), states())[-1].failure == "L-TRAY-TILT"
+    assert run(make_versioned(2), states())[-1].failure == "L-ONE-HAND"
