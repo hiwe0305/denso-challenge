@@ -38,6 +38,7 @@ from flywheel.eval.api import (
     DEFAULT_TRAIN_CONFIG,
     SCORER_CONFIG_DIR,
     calibrate_tau,
+    calibrate_train,
     check_scorer_agreement,
     diagnose_episode_system,
     diagnose_train,
@@ -134,6 +135,48 @@ def diag_train(
     _print(diagnosis)
     if store is not None:
         typer.echo(f"ghi vào: {store_train_diagnosis(diagnosis, store)}")
+
+
+@app.command("calibrate-train")
+def calibrate_train_command(
+    jobs: list[Path] = typer.Option(
+        ...,
+        "--job",
+        help="A healthy train job (directory or its metrics.jsonl); repeat for each job.",
+    ),
+    config: Path = typer.Option(
+        DEFAULT_TRAIN_CONFIG,
+        "--config",
+        help="Threshold file the other numbers of the rules are read from.",
+    ),
+) -> None:
+    """Propose t1.k and t8.max_grad_norm from healthy jobs, with the rule used (DA-44).
+
+    Nothing is written: copy the numbers into the threshold file by hand, with
+    the rule and the jobs in its comment.
+    """
+    use_utf8()
+    try:
+        proposal = calibrate_train(jobs, config)
+    except (ReaderError, ConfigError, ValueError) as error:
+        typer.echo(f"không hiệu chỉnh được: {error}", err=True)
+        raise typer.Exit(code=2) from error
+    typer.echo("job\tn_train\tt1_max_ratio@step\tgrad_p50\tgrad_p99\tgrad_max\tgrad_top")
+    for job in proposal.jobs:
+        typer.echo(
+            f"{job.job_id}\t{job.n_train}\t{job.t1_max_ratio:.2f}@{job.t1_max_ratio_step}"
+            f"\t{job.grad_p50:.2f}\t{job.grad_p99:.2f}\t{job.grad_max:.2f}"
+            f"\t{job.grad_allowed_top:.2f}"
+        )
+    typer.echo(
+        f"t1.k = {proposal.k:g}  # {proposal.k_rule}; smooth_steps {proposal.smooth_steps}, "
+        f"window_steps {proposal.window_steps}"
+    )
+    typer.echo(
+        f"t8.max_grad_norm = {proposal.max_grad_norm:g}  # {proposal.max_grad_norm_rule}; "
+        f"max_exceedances {proposal.max_exceedances}"
+    )
+    typer.echo(f"jobs = {len(proposal.jobs)}")
 
 
 @app.command("diag-system")
