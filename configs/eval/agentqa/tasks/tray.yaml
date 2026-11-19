@@ -1,0 +1,82 @@
+# What Agent QA/QC's tools know about the tray task (DA-43, design 2026-11-19 section 4).
+#
+# Read by `flywheel.eval.agentqa.tools.task`. The tools never import the simulator, so
+# the step order, the label rules and the signals each label needs are written here.
+# Changing this file is a new version of the agent: score it again (design 11).
+#
+# Source of the step order and the classes: configs/eval/scorer/tray.yaml (header) and
+# design 28/10/2026 section 3.2-3.4. The `implies_step` and `signals` columns are
+# assumptions (giả định) taken from docs/he/tray.md 20.3 and 20.11; check them against
+# the scorer when DA-42 lands.
+
+task_id: tray
+scorer_config: ../../scorer/tray.yaml   # thresholds, relative to this file
+
+# The scorer's seven steps, in the order it latches them.
+steps: [approach_a, grasp, lift, carry, reach_b, place, release_stand]
+
+# Units of the thresholds of `scorer_config`, so no fact travels without one
+# (the two wrong T4 additions of agent v3 compared numbers of two units).
+threshold_units:
+  r_reach: m
+  approach_zone: m
+  h_lift: m
+  tilt_max_deg: deg
+  contact_grace: s
+  target_pos_tol: m
+  target_yaw_tol_deg: deg
+  still_speed: m/s
+  t_stable: s
+  episode_limit_s: s
+
+# A success means every step latched.
+success_implies_step: release_stand
+
+# Per failure label:
+#   implies_step  the last step the robot must have got through for the label to be
+#                 raised at all; a rollout with the label whose first unlatched step
+#                 comes before it has a broken step chain (tray.md 20.11, H1). null:
+#                 the label implies nothing (a timeout can happen anywhere).
+#   signals       what an engineer needs to tell a real failure of this kind from a
+#                 scorer artefact (tray.md 20.11 H3 and the DA-38 ticket there).
+labels:
+  L-PLACE-POSE:
+    implies_step: reach_b      # the tray ended on table B, off the target zone
+    signals: [final_tray_pose, target_pose]
+  L-TRAY-TILT:
+    implies_step: grasp        # raised only while carrying (tray.md 20.3)
+    signals: [failure_t, tray_tilt_at_failure, tray_contact_at_failure, tray_on_table_at_failure]
+  L-ONE-HAND:
+    implies_step: grasp        # raised only while carrying (tray.md 20.11)
+    signals: [failure_t, hand_tray_contact]
+  L-PART-DROP:
+    implies_step: lift         # a part fell off a tray already lifted
+    signals: [failure_t, part_positions]
+  L-TIMEOUT:
+    implies_step: null
+    signals: [cmd_lower, meas_lower, cmd_upper, meas_upper]
+  L-BALANCE:
+    implies_step: null
+    signals: [failure_t, pelvis_height, torso_tilt]
+  L-COLLIDE:
+    implies_step: null
+    signals: [failure_t, collision]
+  L-WALK:
+    implies_step: null
+    signals: [failure_t, cmd_lower, meas_lower]
+
+# The signal the step-latch check of approach_a needs (tray.md 20.11, DA-37 ticket).
+latch_signals:
+  approach_a: [palm_handle_distance_min]
+
+# What each artifact kind the agent reads carries, by signal name.
+provides:
+  scores: [success, step_status, first_failed_step, failure_kind, level]
+  trace: [cmd_upper, meas_upper, cmd_lower, meas_lower, t_state, t_image]
+
+# Relaxed success (tray.md 19.2 c): only this label is relaxed, on this grid; the
+# yaw tolerance stays the scorer's. The first position is the scorer's own.
+relaxed:
+  label: L-PLACE-POSE
+  position_m: [0.05, 0.075, 0.10, 0.15, 0.20]
+  yaw_deg: 10.0
