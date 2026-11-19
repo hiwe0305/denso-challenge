@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Đang làm (PO duyệt 19/11/2026) |
+| Trạng thái | Chờ review (PO duyệt làm 19/11/2026; nhiệm vụ 1–5 xong, chưa mở PR) |
 | Người làm | Hiếu, làm cùng Claude (làn Đánh giá; chủ làn là Châu) |
 | Làn | Đánh giá (`flywheel-eval`) |
 | Story PRD | Sửa DA-08 (F-TRAIN T1–T8); [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 10 |
@@ -37,7 +37,7 @@ Bối cảnh: [agent-qa mục 3.3](../../g0/agent-qa.md) ghi rằng ngày 6–7/
   - [x] 3.2 Lệnh `fw eval calibrate-train` đọc log khỏe, in ngưỡng đề xuất và luật; unit test trên log tổng hợp
   - [x] 3.3 Chạy lệnh trên log thật trong `fwdata/`, ghi ngưỡng vào `train.yaml` kèm luật và số job
 - [x] 4. Test hồi quy log khỏe hình thật; chạy bộ log cấy DA-27 với lớp code, ghi output (AC 4, 5)
-- [ ] 5. Cập nhật agent-qa mục 3.3 (AC 6)
+- [x] 5. Cập nhật agent-qa mục 3.3 (AC 6)
 
 ## Phạm vi file
 
@@ -76,5 +76,6 @@ Ngoài phạm vi, đề xuất PR riêng cho chủ file: bản sạch của bộ
 
 ## Ghi chép khi làm
 
-- Giờ thực: (ghi theo nhiệm vụ con)
+- Giờ thực (Claude đặt, theo `Time-spent` của từng commit): story 0,5h; nhiệm vụ 1: 0,5h; 2: 0,25h; 3.1: 1h; 3.2: 1h; 3.3: 0,75h; 4: 1h; 5: 0,5h. Tổng 5,5h.
 - Công cụ AI đã dùng: Claude Code.
+- Ghi chú hoàn thành: số đo trước và sau trên 8 log thật, kết quả bộ log cấy và việc còn mở ở [agent-qa mục 3.3](../../g0/agent-qa.md).
