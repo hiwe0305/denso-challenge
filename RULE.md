@@ -5,14 +5,14 @@
 ## 1. Dự án trong 3 câu
 
 1. Đội ilovephysicalintelligence làm **Humanoid Data Flywheel** cho DENSO Factory Hacks: khi policy robot hỏng trong mô phỏng, hệ thống kiểm lỗi hệ thống trước, rồi chọn dữ liệu cần thu theo chi phí thật (thuật toán **Failure → Data**).
-2. Model là Ψ₀ (dùng lại checkpoint và code train của tác giả). Từ 27/10/2026 robot là **Unitree G1 trong SIMPLE**, đúng robot và model của paper; task chính là **task hai bàn**: gắp vật ở bàn này, đi sang bàn kia, đặt lên. Thu và sinh dữ liệu chạy MuJoCo thuần, Isaac Sim chỉ render. Robot DENSO đã bỏ khỏi phạm vi.
-3. Trạng thái 27/10/2026: hướng G1 + Ψ₀ đã duyệt ([design 27/10/2026](docs/superpowers/specs/2026-10-27-g1-psi0-demo-design.md), design hiện hành duy nhất); S1-01 đã merge; Sprint 1 bắt đầu thứ Hai 26/10/2026; **demo ngày 17/11/2026**. **Hiếu là người duyệt và merge duy nhất vào `master`.**
+2. Model là Ψ₀ (dùng lại checkpoint và code train của tác giả). Từ 27/10/2026 robot là **Unitree G1 trong SIMPLE**, đúng robot và model của paper. Có hai task: **task hai bàn** của paper (gắp vật ở bàn này, đi sang bàn kia, đặt lên) và **task bê khay** (từ DA-32), nơi chạy vòng Failure → Data đầy đủ (DA-34). Thu và sinh dữ liệu chạy MuJoCo thuần, Isaac Sim chỉ render. Robot DENSO đã bỏ khỏi phạm vi.
+3. Trạng thái 19/11/2026: **demo ngày 17/11/2026 đã trình bày** trên Flywheel Console (`fw console`). Số đo là sơ bộ trong sim, ở [docs/he/tray.md](docs/he/tray.md). **Hiếu là người duyệt và merge duy nhất vào `master`.**
 
-Muốn hiểu sâu: [spec v10.5](docs/spec-v10-failure-to-data.md), [design 27/10/2026](docs/superpowers/specs/2026-10-27-g1-psi0-demo-design.md), [03 · Kiến trúc](docs/product/03-architecture.md).
+Muốn hiểu sâu: [spec v10.6](docs/spec-v10-failure-to-data.md), [design 27/10/2026](docs/superpowers/specs/2026-10-27-g1-psi0-demo-design.md), [design task khay 28/10/2026](docs/superpowers/specs/2026-10-28-tray-transfer-he-design.md), [03 · Kiến trúc](docs/product/03-architecture.md).
 
 ## 2. Công việc của từng người
 
-**Phân công ngày 27/10/2026** (07 mục 2.0; từ 3/11/2026 phần của Thông chuyển sang Hiếu, 07 bản 1.6): bốn người làm toàn bộ **data flywheel** (nhân và ba làn, chạy được trên CPU với bộ giả); Hiếu làm **phần còn lại** (SIMPLE, Ψ₀, GPU, thí nghiệm) và duyệt, merge mọi PR. Mỗi người chỉ sửa đường dẫn của mình (07 mục 2.1); dữ liệu giữa hai người chỉ đi qua artifact có schema trong `flywheel.contracts`; không import code bên trong phần của người khác. Giờ là ước lượng ở 07 mục 2.3.
+**Phân công ngày 27/10/2026** (07 mục 2.0; từ 3/11/2026 phần của Thông chuyển sang Hiếu, 07 bản 1.6; từ 6/11/2026 DA-04, DA-18, DA-20 của Hưng chuyển sang Hiếu làm cùng Claude, 07 bản 1.9): bốn người làm toàn bộ **data flywheel** (nhân và ba làn, chạy được trên CPU với bộ giả); Hiếu làm **phần còn lại** (SIMPLE, Ψ₀, GPU, thí nghiệm) và duyệt, merge mọi PR. Mỗi người chỉ sửa đường dẫn của mình (07 mục 2.1); dữ liệu giữa hai người chỉ đi qua artifact có schema trong `flywheel.contracts`; không import code bên trong phần của người khác. Giờ là ước lượng ở 07 mục 2.3.
 
 ### Nguyễn Thăng Long · Nhân và Vòng quyết định
 
@@ -51,11 +51,7 @@ Bảng đầy đủ: sở hữu đường dẫn ở [07 mục 2.1](docs/product/
 
 | Giờ | Việc |
 |---|---|
-| 9:00 | Bot đăng báo cáo ngày vào issue **"Báo cáo ngày"**; trang **Tiến độ** trên website cập nhật |
-| Trước 10:00 | Trả lời dưới báo cáo 3 dòng: **Xong**, **Tiếp theo**, **Bị chặn** |
-| Trong ngày | Làm story; xử lý rule có tên mình trong báo cáo |
-| 10:00, 14:00, 18:00 | Tracking tự động trên máy của Hiếu: PR chờ duyệt, ai bị chặn, vi phạm rule (08 mục 5) |
-| 21:30 | Tổng kết cuối ngày; Hiếu và Claude thảo luận, chốt thứ tự duyệt PR cho hôm sau |
+| Trong ngày | Làm story; khi cần, chạy `python3 scripts/repo/daily_report.py` để xem rule nào đang kích hoạt (từ 19/11/2026 không còn bot đăng báo cáo và tracking tự động; 08 bản 0.6) |
 | Thứ Sáu | Hiếu tổng hợp tuần: k, top nguyên nhân lỗi, can thiệp mới |
 
 ## 4. Làm một story từ đầu tới cuối
@@ -94,16 +90,16 @@ Bảng đầy đủ: sở hữu đường dẫn ở [07 mục 2.1](docs/product/
    ```
 
 7. **Mở PR** tiêu đề `[DA-03] ...`, điền template (nhiệm vụ con, bằng chứng cho từng AC). PR nên ≤ 1500 dòng mã (không tính test, tài liệu, schema JSON sinh ra, fixture).
-8. **Review:** **Hiếu duyệt và merge, là người duy nhất.** Chủ sở hữu đường dẫn bình luận, không chặn merge. PR phải xanh ở `core` và `guard` trước khi xin duyệt. Merge bằng **Rebase and merge**, không squash. PR đã xanh mà vẫn hiện **BLOCKED** là bình thường: ruleset "Only Hiếu merges into master" chỉ cho vai Admin cập nhật `master`, nên Hiếu merge bằng `gh pr merge <số> --admin --rebase` sau khi đã xem diff và CI, gom vào các khung 10:00, 14:00, 18:00 và 21:30. Trong lúc chờ duyệt, làm tiếp nhiệm vụ con khác trên bản giả và file mẫu; không tạo nhánh mới từ nhánh chưa merge.
+8. **Review:** **Hiếu duyệt và merge, là người duy nhất.** Chủ sở hữu đường dẫn bình luận, không chặn merge. PR phải xanh ở `core` và `guard` trước khi xin duyệt. Merge bằng **Rebase and merge**, không squash. PR đã xanh mà vẫn hiện **BLOCKED** là bình thường: ruleset "Only Hiếu merges into master" chỉ cho vai Admin cập nhật `master`, nên Hiếu merge bằng `gh pr merge <số> --admin --rebase` sau khi đã xem diff và CI. Trong lúc chờ duyệt, làm tiếp nhiệm vụ con khác trên bản giả và file mẫu; không tạo nhánh mới từ nhánh chưa merge.
 9. **Dọn:** `git worktree remove ../denso-DA-03 && git branch -d DA-03-teleop-pipeline`.
 
-Việc ngoài story dùng nhánh `docs-…` (chỉ sửa tài liệu và website), `chore-…` hoặc `hotfix-…`.
+Việc ngoài story dùng nhánh `docs-…` (chỉ sửa tài liệu), `chore-…` hoặc `hotfix-…`.
 
 ## 5. RULE
 
 ### 5.1 Rule kiểm soát theo ngày
 
-Máy phát hiện (pr-guard hoặc báo cáo ngày); người làm theo cột "Làm gì". Chi tiết và ngưỡng ở [08](docs/product/08-daily-control.md).
+Máy phát hiện (pr-guard, hoặc `daily_report.py` chạy tại máy); người làm theo cột "Làm gì". Chi tiết và ngưỡng ở [08](docs/product/08-daily-control.md).
 
 | # | Khi nào | Làm gì |
 |---|---|---|
@@ -116,7 +112,7 @@ Máy phát hiện (pr-guard hoặc báo cáo ngày); người làm theo cột "L
 | R7 | Lỗi `severity:high` (rò holdout, gửi dữ liệu DENSO ra ngoài, sai kết luận, mất dữ liệu) | Đổi thành `type:incident`; postmortem 1 trang trong 2 ngày |
 | R8 | Cùng một nguyên nhân lỗi ≥ 3 lần trong 7 ngày | Thêm một can thiệp (rule, test, sửa CLAUDE.md), ghi vào sổ can thiệp |
 | R9 | PR > 1500 dòng mã (không tính test, tài liệu, schema sinh ra, fixture) | Được gắn `size:large`; nên tách story |
-| R10 | Story của bạn chưa có commit nào, hạn nội bộ ([07 mục 2.4](docs/product/07-team-workflow.md)) còn ≤ 3 ngày (08 bản 0.5, ngưỡng đề xuất) | Trả lời dưới báo cáo ngày: bắt đầu khi nào, có kịp không; không kịp thì Hiếu chia lại hoặc dời hạn |
+| R10 | Story của bạn chưa có commit nào, hạn nội bộ ([07 mục 2.4](docs/product/07-team-workflow.md)) còn ≤ 3 ngày (08 bản 0.5, ngưỡng đề xuất) | Báo Hiếu: bắt đầu khi nào, có kịp không; không kịp thì Hiếu chia lại hoặc dời hạn |
 
 ### 5.2 Không bao giờ được phá
 
@@ -162,7 +158,7 @@ Label nguyên nhân quan trọng hơn số lượng lỗi: nhờ nó đội bi�
 | Báo cáo ngày tại máy | `python3 scripts/repo/daily_report.py` |
 | Kiểm nhánh trước PR | `python3 scripts/repo/pr_guard.py --base origin/master --head HEAD --branch "$(git branch --show-current)"` |
 | Kiểm liên kết tài liệu | `python3 scripts/repo/check_links.py` |
-| Xem website | `bash start-website.sh` |
+| Mở Flywheel Console | `uv run fw console index` rồi `uv run fw console serve` |
 
 ## 9. Tài liệu để đọc tiếp
 
@@ -173,5 +169,7 @@ Label nguyên nhân quan trọng hơn số lượng lỗi: nhờ nó đội bi�
 | Rule theo ngày, chỉ số, sổ can thiệp | [08](docs/product/08-daily-control.md) |
 | Sprint, Definition of Done | [04](docs/product/04-delivery-plan.md) |
 | Yêu cầu và story theo epic | [02 · PRD](docs/product/02-prd.md) |
-| Thuật toán và giả thuyết | [Spec v10.5](docs/spec-v10-failure-to-data.md) |
-| Task hai bàn, dữ liệu, HE, Agent QA/QC, demo 17/11 | [Design 27/10/2026](docs/superpowers/specs/2026-10-27-g1-psi0-demo-design.md) |
+| Thuật toán và giả thuyết | [Spec v10.6](docs/spec-v10-failure-to-data.md) |
+| Task hai bàn, dữ liệu, HE, Agent QA/QC | [Design 27/10/2026](docs/superpowers/specs/2026-10-27-g1-psi0-demo-design.md) |
+| Task bê khay, kết quả đo | [Design 28/10/2026](docs/superpowers/specs/2026-10-28-tray-transfer-he-design.md), [docs/he/tray.md](docs/he/tray.md) |
+| Flywheel Console, demo 17/11 | [Design 15/11/2026](docs/superpowers/specs/2026-11-15-console-one-site-design.md), [docs/demo/](docs/demo/2026-11-17-kich-ban-video.md) |
