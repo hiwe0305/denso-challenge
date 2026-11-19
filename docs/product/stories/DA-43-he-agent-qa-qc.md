@@ -4,14 +4,14 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Chờ duyệt design (mở 19/11/2026). Chưa viết mã sản phẩm |
+| Trạng thái | Đang làm. Design duyệt 19/11/2026 (Hiếu, "Approve as proposed": Q1–Q10 theo đề xuất, design bản 0.2) |
 | Người làm | Hiếu, làm cùng Claude |
 | Làn | Đánh giá (`flywheel.eval.agentqa`); một lệnh xuất trong adapter `flywheel_psi0` |
 | Nguồn yêu cầu | Ban giám khảo sau vòng 2: Agent QA/QC phải chạy tốt và phân tích nguyên nhân gốc của lỗi task, robot và kết quả. Design: [2026-11-19-agent-qaqc-system-design.md](../../superpowers/specs/2026-11-19-agent-qaqc-system-design.md) |
 | Nhãn | `area:core` · `epic:9` |
 | Sprint | Sau demo 17/11/2026 |
 | Ước lượng | Khoảng 10 ngày làm việc, 70–80 giờ (ước lượng); xem cột giờ của từng nhiệm vụ |
-| Phụ thuộc | Duyệt design (Q1–Q10 của design mục 14). PR hợp đồng K1 chung với DA-42; K2, K3 trên nhánh `DA-43-contract`. DA-44 cho bộ phát hiện log train đã sửa (không chặn: agent gọi `flywheel.eval.api.diagnose_train` như cũ). Chạy thật trên `rtx3060` chỉ khi Hiếu đồng ý |
+| Phụ thuộc | Design đã duyệt. PR hợp đồng K1 chung với DA-42; K2, K3 trên nhánh `DA-43-contract`. DA-44 cho bộ phát hiện log train đã sửa (không chặn: agent gọi `flywheel.eval.api.diagnose_train` như cũ). Chạy thật trên `rtx3060` chỉ khi Hiếu đồng ý |
 
 ## Story
 
@@ -112,4 +112,5 @@ Theo 07 mục 3.1. File story luôn được sửa. PR hợp đồng (nhiệm v�
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 19/11/2026 | Design duyệt theo đề xuất; story chuyển sang đang làm | Hiếu |
 | 19/11/2026 | Tạo story cùng design; mã DA-43 chưa dùng trên `origin/master` | Hiếu (soạn với Claude) |
