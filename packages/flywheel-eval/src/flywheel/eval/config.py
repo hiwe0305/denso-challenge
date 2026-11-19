@@ -47,10 +47,16 @@ class BalanceLimits:
 
 @dataclass(frozen=True)
 class T1Thresholds:
-    """Divergence: loss over `k` times the window minimum, or not finite at all."""
+    """Divergence: smoothed loss over `k` times its window minimum, or not finite at all.
+
+    `smooth_steps` is the width of the trailing median the spike branch reads
+    instead of single batches (DA-44): the per-batch loss of a healthy Psi0
+    fine-tune swings over a hundredfold inside 500 steps.
+    """
 
     k: float
     window_steps: int
+    smooth_steps: int
 
 
 @dataclass(frozen=True)
@@ -167,6 +173,7 @@ class TrainThresholds:
             t1=T1Thresholds(
                 k=_number(t1, "k", "t1"),
                 window_steps=_steps(t1, "window_steps", "t1"),
+                smooth_steps=_steps(t1, "smooth_steps", "t1"),
             ),
             t2=T2Thresholds(
                 n_steps=_steps(t2, "n_steps", "t2"),

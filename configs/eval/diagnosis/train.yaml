@@ -13,6 +13,7 @@
 t1:
   k: 10.0            # giả định; design mục 10 "loss tăng quá k lần"; hiệu chỉnh: lấy tỉ lệ loss lớn nhất trên job sạch của DA-19 rồi nhân 2
   window_steps: 500  # giả định; cửa sổ W tính lùi từ step đang xét, đơn vị step (issue #5, chốt 29/10/2026)
+  smooth_steps: 100  # chốt DA-44 (đề xuất, chờ PO); trung vị trượt của loss train mà nhánh spike so, thay cho từng batch
 
 t2:
   n_steps: 2000             # giả định; "sau N step mà loss val chưa giảm"
