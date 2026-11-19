@@ -18,7 +18,7 @@ from typing import Any
 
 from flywheel.console.paths import active
 
-from .common import Result, catalog, cols, fail, jload, result, story, table
+from .common import HOSTED, Result, catalog, cols, fail, jload, result, story, table, totals
 
 ROLE = {
     "baseline": ("bản gốc", "the baseline"),
@@ -76,7 +76,20 @@ def focus_of(question: Any) -> str:
 
 def manifest() -> dict[str, Any]:
     d = jload(active().index / "tasks.json", {})
-    return d if isinstance(d, dict) else {}
+    d = d if isinstance(d, dict) else {}
+    if not HOSTED.get():
+        return d
+    # with a hosted model each task lists and totals its public rows only, as catalog() does
+    rows = catalog().get("rows", [])
+    keep = {r.get("id") for r in rows}
+    tasks = []
+    for t in d.get("tasks") or []:
+        if isinstance(t, dict):
+            mine = [r for r in rows if r.get("task") == t.get("catalog_task")]
+            t = {**t, "catalog_totals": totals(mine) if mine else {},
+                 "catalog_rows": [r for r in t.get("catalog_rows") or [] if r.get("id") in keep]}  # fmt: skip
+        tasks.append(t)
+    return {**d, "tasks": tasks}
 
 
 class Say:
