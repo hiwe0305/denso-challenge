@@ -39,6 +39,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
+from flywheel_simple.tray.jig import JIG_REVISION
 from flywheel_simple.tray.mjcf import TARGET_ZONE_REVISION
 from flywheel_simple.tray.planner import PLANNER_VERSION, PlannerConfig
 from flywheel_simple.tray.predicates import STEP_NAMES, StepReport
@@ -199,18 +200,20 @@ def planner_version(cfg: PlannerConfig) -> str:
     return f"{PLANNER_VERSION}+cfg.{hashlib.sha256(values).hexdigest()[:8]}"
 
 
-def visuals_revision(manifest: Path | None) -> str:
-    """What the scene was rendered with: `<SimReady revision or "none">+<target zone revision>`.
+def visuals_revision(manifest: Path | None, jig: bool = False) -> str:
+    """What the scene was rendered with: `<SimReady revision or "none">+<target zone revision>`,
+    then `+<jig revision>` on the jig scene (DA-41).
 
     "none" means plain boxes. The suffix changes whenever the drawn target zone does,
     so episodes and eval runs on scenes without the zone (bare SimReady revision)
-    never match ones with it.
+    never match ones with it; the jig suffix keeps jig and pre-jig scenes apart too.
     """
     if manifest is None or not manifest.is_file():
         base = "none"
     else:
         base = str(json.loads(manifest.read_text())["revision"])
-    return f"{base}+{TARGET_ZONE_REVISION}"
+    revision = f"{base}+{TARGET_ZONE_REVISION}"
+    return f"{revision}+{JIG_REVISION}" if jig else revision
 
 
 def tray_frame(

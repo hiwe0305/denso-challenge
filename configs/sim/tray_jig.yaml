@@ -10,9 +10,9 @@
 # leans outward by `chamfer_deg` from vertical up to `height`, so a tray lowered up to
 # clearance + height * tan(chamfer) off centre lands on a slope and slides in.
 clearance: 0.006
-height: 0.03
+height: 0.035
 chamfer_deg: 45.0
-thickness: 0.012
+thickness: 0.010
 side_arm: 0.08
 end_arm: 0.035
 # The end arms stop at least this far from the handle footprint (x), so the hands that
@@ -21,6 +21,10 @@ handle_gap: 0.02
 # Low-friction guide faces (acetal / PTFE strip). The guides take contact priority, so
 # this friction applies to tray-on-guide contacts instead of the tray's 1.0.
 friction: 0.2
+# Slide pad under the nest, footprint plus clearance, same low friction (0 = no pad).
+# Without it the far edge of a tray dropped off centre grips the steel table (1.0) and
+# the tray stays propped on a slope. Invisible: the target zone under it still shows.
+pad_thickness: 0.002
 
 # Discrete jig positions along table B (y). 1 = one fixed pose (default, DA-41 decision);
 # 2 or 3 = the episode's seed picks one of that many slots `slot_spacing` apart. Off by
