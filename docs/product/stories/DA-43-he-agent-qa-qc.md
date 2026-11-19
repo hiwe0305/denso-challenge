@@ -42,7 +42,7 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
   - [ ] 1.3 Gói vòng mẫu cho test: `Score`, `TraceStep`, `TrainingMetric`, `Condition`, outcome theo K1 khi có; dựng từ lô `C_70` giai đoạn 1, chỉ dữ liệu `public`
 - [ ] 2. Lớp công cụ, phần eval (2 ngày)
   - [x] 2.1 `ToolResult`, đăng ký công cụ, `task_lookup`, quy tắc "không xét được"
-  - [ ] 2.2 `step_pass_table`, `failure_clusters`, `paired_compare` và test đối chiếu số
+  - [x] 2.2 `step_pass_table`, `failure_clusters`, `paired_compare` và test đối chiếu số
   - [ ] 2.3 `latch_consistency`, `signal_presence`
   - [ ] 2.4 `relaxed_sweep` (chờ K1; trước đó chạy trên file mẫu)
 - [ ] 3. Lớp công cụ, phần trace, train, dữ liệu (1,5 ngày)
