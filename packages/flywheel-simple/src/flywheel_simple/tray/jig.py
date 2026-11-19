@@ -53,10 +53,13 @@ SLOT_STREAM = 41
 class JigConfig:
     clearance: float
     height: float
+    wall_height: float
     chamfer_deg: float
     thickness: float
     side_arm: float
+    near_side_arm: float
     end_arm: float
+    near_end_arm: float
     handle_gap: float
     friction: float
     pad_thickness: float
@@ -78,17 +81,27 @@ class JigConfig:
     @property
     def lead_in(self) -> float:
         """Off-centre distance per axis that still lands the tray on a guide's slope."""
-        return self.clearance + self.height * math.tan(self.chamfer)
+        return self.clearance + (self.height - self.wall_height) * math.tan(self.chamfer)
 
     def check(self, cfg: TrayConfig) -> list[str]:
         """Reasons this jig does not fit the tray of `cfg`; empty when it does."""
         problems = []
         if self.slots not in (1, 2, 3):
             problems.append(f"slots must be 1, 2 or 3, got {self.slots}")
+        if not 0.0 <= self.wall_height < self.height:
+            problems.append(f"wall_height must be in [0, height), got {self.wall_height}")
         if not 0.0 <= self.chamfer_deg < 60.0:
             problems.append(f"chamfer_deg must be in [0, 60), got {self.chamfer_deg}")
-        if self.pad_thickness < 0 or self.pad_thickness >= self.height:
-            problems.append(f"pad_thickness must be in [0, height), got {self.pad_thickness}")
+        if self.pad_thickness < 0 or self.pad_thickness >= max(self.wall_height, 1e-9):
+            problems.append(
+                f"pad_thickness must be in [0, wall_height), got {self.pad_thickness}"
+            )
+        if self.near_side_arm < 0 or self.near_side_arm > cfg.tray_length / 2:
+            problems.append(
+                f"near_side_arm must be in [0, tray_length / 2], got {self.near_side_arm}"
+            )
+        if self.near_end_arm < 0 or self.near_end_arm > self.end_arm:
+            problems.append(f"near_end_arm must be in [0, end_arm], got {self.near_end_arm}")
         if min(self.clearance, self.height, self.thickness, self.side_arm, self.end_arm) <= 0:
             problems.append("clearance, height, thickness and arms must be positive")
         handle_edge = cfg.handle_length / 2 + self.handle_gap
@@ -137,10 +150,11 @@ def sample_jig_episode(cfg: TrayConfig, jig: JigConfig, level: int, seed: int) -
 
 @dataclass(frozen=True)
 class GuideBox:
-    """One slanted guide arm: a box in the jig frame (origin on the table top)."""
+    """One part of a guide arm (stop wall or chamfer): a box in the jig frame, origin on
+    the table top."""
 
     name: str
-    half: tuple[float, float, float]  # along the arm, thickness, slant length
+    half: tuple[float, float, float]  # along the arm, thickness, height or slant length
     pos: tuple[float, float, float]
     rot: NDArray[np.float64]  # 3 x 3, columns: arm axis, thickness axis, slant axis
 
@@ -157,42 +171,61 @@ def _arm(
     edge: float,
     centre: float,
     length: float,
-) -> GuideBox:
+) -> list[GuideBox]:
     """Arm on the footprint side with outward `normal`, the side `edge` from the centre.
 
     `centre` is the arm's middle on the jig axis the side runs along (y for a long
-    side, x for a short end). The inner face's bottom edge lies `clearance` outside
-    the side on the table top; the face leans outward by the chamfer up to `height`.
+    side, x for a short end). The arm is a vertical stop wall from the table top up
+    to `wall_height`, its inner face `clearance` outside the side, then a chamfer slab
+    whose inner face leans outward by `chamfer_deg` from there up to `height`. The
+    wall keeps a pushed tray from riding up the chamfer (the opening hands push the
+    placed tray by 2-3 cm, D-21); the chamfer turns a tray lowered off centre in.
     """
     z = np.array([0.0, 0.0, 1.0])
     n = np.array([normal[0], normal[1], 0.0])
     a = np.array([abs(normal[1]), abs(normal[0]), 0.0])  # +x or +y, along the side
     th, t = jig.chamfer, jig.thickness
-    slant = jig.height / math.cos(th)
-    up = math.sin(th) * n + math.cos(th) * z  # inner face, rising
-    out = math.cos(th) * n - math.sin(th) * z  # into the guide
-    bottom_inner = (edge + jig.clearance) * n + centre * a
-    middle = bottom_inner + up * slant / 2 + out * t / 2
-    rot = np.column_stack([a, out, up])
-    if np.linalg.det(rot) < 0:  # keep it a rotation: flip the arm axis
-        rot[:, 0] *= -1
-    pos = (float(middle[0]), float(middle[1]), float(middle[2]))
-    return GuideBox(name, (length / 2, t / 2, slant / 2), pos, rot)
+
+    def box(suffix: str, bottom_inner: NDArray[np.float64], up: NDArray[np.float64],
+            span: float) -> GuideBox:
+        out = np.cross(a, up)  # horizontal-ish, away from the tray
+        if float(out @ n) < 0:
+            out = -out
+        middle = bottom_inner + up * span / 2 + out * t / 2
+        rot = np.column_stack([a, out, up])
+        if np.linalg.det(rot) < 0:  # keep it a rotation: flip the arm axis
+            rot[:, 0] *= -1
+        pos = (float(middle[0]), float(middle[1]), float(middle[2]))
+        return GuideBox(f"{name}{suffix}", (length / 2, t / 2, span / 2), pos, rot)
+
+    inner = (edge + jig.clearance) * n + centre * a
+    boxes = []
+    if jig.wall_height > 0:
+        boxes.append(box("_wall", inner, z, jig.wall_height))
+    slope = math.sin(th) * n + math.cos(th) * z  # inner face, rising
+    slant = (jig.height - jig.wall_height) / math.cos(th)
+    boxes.append(box("", inner + jig.wall_height * z, slope, slant))
+    return boxes
 
 
 def guide_boxes(cfg: TrayConfig, jig: JigConfig) -> list[GuideBox]:
-    """The eight guide arms, two per corner, in the jig frame."""
+    """The guide arms in the jig frame: per corner one on the short end and one on the long
+    side. On the robot's side (+x) the arms are `near_side_arm` and `near_end_arm` long,
+    0 meaning none: G1's elbows and wrists come down there while lowering and releasing."""
     hx, hy = cfg.tray_width / 2, cfg.tray_length / 2
     c = jig.clearance
     boxes = []
     for sx, sy, corner in ((1, 1, "pp"), (1, -1, "pn"), (-1, 1, "np"), (-1, -1, "nn")):
         # Long side (x = sx * hx): from side_arm inside the corner out to the end clearance.
-        lo, hi = hy - jig.side_arm, hy + c
-        side = _arm(f"jig_{corner}_side", jig, (sx, 0.0), hx, sy * (lo + hi) / 2, hi - lo)
+        arm = jig.near_side_arm if sx > 0 else jig.side_arm
+        if arm > 0:
+            lo, hi = hy - arm, hy + c
+            boxes += _arm(f"jig_{corner}_side", jig, (sx, 0.0), hx, sy * (lo + hi) / 2, hi - lo)
         # Short end (y = sy * hy): from end_arm inside the corner out to the side clearance.
-        lo, hi = hx - jig.end_arm, hx + c
-        end = _arm(f"jig_{corner}_end", jig, (0.0, sy), hy, sx * (lo + hi) / 2, hi - lo)
-        boxes += [side, end]
+        end = jig.near_end_arm if sx > 0 else jig.end_arm
+        if end > 0:
+            lo, hi = hx - end, hx + c
+            boxes += _arm(f"jig_{corner}_end", jig, (0.0, sy), hy, sx * (lo + hi) / 2, hi - lo)
     return boxes
 
 

@@ -1,10 +1,13 @@
-"""Capture envelope of the DA-41 locating jig: which off-target drops it centres.
+"""Capture envelope of the DA-41 locating jig: which off-target placements it centres.
 
 Plain MuJoCo, no robot. For each offset radius, direction and yaw error the tray (parts
-in) is released `--drop` above the guide tops on the jig scene of one episode and left
-to settle for 3 s; a drop counts as centred when the tray ends within `--centred` of
-the target, within 3 degrees of its yaw and under 2 degrees of tilt. Prints one row per
-(radius, yaw) and writes every drop to `--out` as JSON.
+in) starts off target on the jig scene of one episode. `--mode lower` (default) does
+what the planner does: a soft weld to a mocap carrier lowers it from above the guides at
+the planner's `lower_speed` and lets go at `lower_tray_clear` above the table, so a
+chamfer can push the held tray sideways. `--mode drop` releases it `--drop` above the
+guide tops instead. A placement counts as centred when the tray ends within `--centred`
+of the target, within 3 degrees of its yaw and under 2 degrees of tilt, after 3 s.
+Prints one row per (radius, yaw) and writes every placement to `--out` as JSON.
 
     MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/python \
         scripts/g0/tray/jig_capture.py --out fwdata/simple/tray/jig/capture.json
@@ -24,16 +27,26 @@ import mujoco
 from flywheel_simple.tray import TrayConfig, mjcf
 from flywheel_simple.tray.geometry import Pose2D, scene_geometry
 from flywheel_simple.tray.jig import JigConfig, jig_scene_spec, sample_jig_episode
+from flywheel_simple.tray.planner import PlannerConfig
 
 SETTLE_S = 3.0
+WELD_SOLREF = (0.05, 1.0)  # soft: hands give way when a chamfer pushes the tray
 
 
-def drop(cfg: TrayConfig, jig: JigConfig, level: int, seed: int, offset: Pose2D,
-         height: float) -> dict[str, Any]:
-    """Release the tray at the target moved by `offset` (target frame), `height` above it."""
+def place(cfg: TrayConfig, jig: JigConfig, level: int, seed: int, offset: Pose2D,
+          height: float, lower_to: float | None = None, speed: float = 0.05) -> dict[str, Any]:
+    """Tray at the target moved by `offset` (target frame), underside `height` above the
+    table. With `lower_to`, lowered held at `speed` to that height and let go there;
+    without, released at once."""
     s = sample_jig_episode(cfg, jig, level, seed)
     spec = jig_scene_spec(cfg, jig, tray_pose=s.tray_pose, visuals={}, table_gap=s.table_gap,
                           target_pose=s.target_pose)
+    tray_spec = spec.body("tray")
+    spec.worldbody.add_body(name="carrier", mocap=True, pos=list(tray_spec.pos),
+                            quat=list(tray_spec.quat))
+    spec.add_equality(type=mujoco.mjtEq.mjEQ_WELD, name1="carrier", name2="tray",
+                      objtype=mujoco.mjtObj.mjOBJ_BODY, solref=list(WELD_SOLREF),
+                      active=lower_to is not None)
     model = spec.compile()
     data = mujoco.MjData(model)
     t = s.target_pose
@@ -50,7 +63,14 @@ def drop(cfg: TrayConfig, jig: JigConfig, level: int, seed: int, offset: Pose2D,
         adr = model.jnt_qposadr[model.joint(f"part_{i}_joint").id]
         data.qpos[adr : adr + 7] = [pose.x + cy * x - sy * y, pose.y + sy * x + cy * y, part_z,
                                     *quat]
+    data.mocap_pos[0], data.mocap_quat[0] = [pose.x, pose.y, z], quat
     mujoco.mj_forward(model, data)
+    if lower_to is not None:
+        bottom = cfg.table_height + lower_to
+        while data.mocap_pos[0][2] > bottom:
+            data.mocap_pos[0][2] = max(bottom, data.mocap_pos[0][2] - speed * model.opt.timestep)
+            mujoco.mj_step(model, data)
+        data.eq_active[0] = 0
     for _ in range(round(SETTLE_S / model.opt.timestep)):
         mujoco.mj_step(model, data)
     tray = data.body("tray")
@@ -73,19 +93,22 @@ def main() -> int:
     ap.add_argument("--radii", type=float, nargs="+", default=[0.01, 0.02, 0.03, 0.04, 0.05, 0.06])
     ap.add_argument("--yaws", type=float, nargs="+", default=[0.0, 4.0, 8.0], help="degrees")
     ap.add_argument("--directions", type=int, default=8)
+    ap.add_argument("--mode", choices=("lower", "drop"), default="lower")
+    ap.add_argument("--jig-config", type=Path, help="default configs/sim/tray_jig.yaml")
     ap.add_argument("--drop", type=float, default=0.02, help="m above the guide tops")
     ap.add_argument("--centred", type=float, default=0.012, help="m from the target")
     args = ap.parse_args()
-    cfg, jig = TrayConfig.load(), JigConfig.load()
+    cfg, jig, planner = TrayConfig.load(), JigConfig.load(args.jig_config), PlannerConfig.load()
+    lower_to = planner.lower_tray_clear if args.mode == "lower" else None
     level, seed = (int(v) for v in args.case.split(":"))
     rows = []
     for r, dyaw in itertools.product(args.radii, args.yaws):
         ok = 0
         for k in range(args.directions):
             a = 2 * math.pi * k / args.directions
-            res = drop(cfg, jig, level, seed,
-                       Pose2D(r * math.cos(a), r * math.sin(a), math.radians(dyaw)),
-                       jig.height + args.drop)
+            res = place(cfg, jig, level, seed,
+                        Pose2D(r * math.cos(a), r * math.sin(a), math.radians(dyaw)),
+                        jig.height + args.drop, lower_to, planner.lower_speed)
             res["centred"] = (res["err_m"] <= args.centred and res["yaw_err_deg"] <= 3.0
                               and res["tilt_deg"] <= 2.0)
             ok += res["centred"]
@@ -94,7 +117,8 @@ def main() -> int:
         print(f"radius {r * 100:.0f} cm, yaw {dyaw:g} deg: centred {ok}/{args.directions}, "
               f"worst end error {worst * 100:.1f} cm", flush=True)
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps({"jig": jig.__dict__, "case": args.case, "drop_m": args.drop,
+    args.out.write_text(json.dumps({"jig": jig.__dict__, "case": args.case, "mode": args.mode,
+                                    "drop_m": args.drop,
                                     "rows": rows}, indent=1) + "\n")
     return 0
 

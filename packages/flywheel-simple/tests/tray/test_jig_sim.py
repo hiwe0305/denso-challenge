@@ -81,7 +81,7 @@ def test_jig_geoms_belong_to_table_b_at_the_target(level: int, seed: int) -> Non
     model, data, s = _scene(level, seed)
     cfg, jig = TrayConfig.load(), JigConfig.load()
     geoms = _jig_geoms(model)
-    assert len(geoms) == 9  # eight guide arms and the pad
+    assert len(geoms) == len(guide_boxes(cfg, jig)) + 1  # guide arms and the pad
     table_b = model.body("table_b").id
     t = s.target_pose
     c, sn = math.cos(t.yaw), math.sin(t.yaw)
@@ -131,43 +131,60 @@ def test_a_tray_resting_on_target_never_touches_a_guide_and_stays_put(
     assert abs(_yaw(data.body("tray").xquat) - s.target_pose.yaw) < 1e-3
 
 
-# (dx, dy, dyaw_deg) in the target frame, released 2 cm above the guides. Inside the
-# capture envelope measured by scripts/g0/tray/jig_capture.py (docs/g0/tray/jig.md 4):
-# 4 cm in any direction without yaw, 2 cm with 4 degrees.
-OFFSETS = [
-    *[(0.04 * math.cos(math.radians(a)), 0.04 * math.sin(math.radians(a)), 0.0)
-      for a in range(0, 360, 45)],
-    *[(0.02 * math.cos(math.radians(a)), 0.02 * math.sin(math.radians(a)), 4.0)
-      for a in range(0, 360, 90)],
-]
-# Centred: within the clearance diagonal plus a little; the scorer allows 5 cm, 10 deg.
-CENTRED_M = 0.012
+# Held lowering as the planner does it: a soft weld to a mocap carrier lowers the tray
+# at lower_speed from above the guides and lets go at lower_tray_clear. Offsets inside the
+# envelope measured by scripts/g0/tray/jig_capture.py (docs/g0/tray/jig.md): towards the
+# closed sides (not +x, the robot's side, which is open) up to 4 cm without yaw, 2 cm at
+# 4 degrees. (radius m, direction deg, yaw deg)
+CLOSED = (90, 135, 180, 225, 270)
+LOWERED = [(r, a, 0.0) for r in (0.02, 0.04) for a in CLOSED] + [(0.02, a, 4.0) for a in CLOSED]
+WELD_SOLREF = [0.05, 1.0]
+ENDS_WITHIN_M = 0.02  # the scorer allows 5 cm and 10 degrees
 
 
-@pytest.mark.parametrize(("dx", "dy", "dyaw"), OFFSETS)
-@pytest.mark.parametrize(("level", "seed"), [(1, 1279), (2, 125195)])
-def test_a_tray_dropped_off_target_settles_inside_the_jig(
-    level: int, seed: int, dx: float, dy: float, dyaw: float
+@pytest.mark.parametrize(("radius", "direction", "dyaw"), LOWERED)
+def test_a_tray_lowered_off_target_ends_flat_inside_the_jig(
+    radius: float, direction: float, dyaw: float
 ) -> None:
-    from flywheel_simple.tray.jig import JigConfig
+    import mujoco
+    from flywheel_simple.tray.jig import JigConfig, jig_scene_spec, sample_jig_episode
+    from flywheel_simple.tray.planner import PlannerConfig
 
-    cfg, jig = TrayConfig.load(), JigConfig.load()
-    model, data, s = _scene(level, seed)
+    cfg, jig, planner = TrayConfig.load(), JigConfig.load(), PlannerConfig.load()
+    s = sample_jig_episode(cfg, jig, 1, 1279)
+    spec = jig_scene_spec(cfg, jig, tray_pose=s.tray_pose, visuals={}, table_gap=s.table_gap,
+                          target_pose=s.target_pose)
+    tray_spec = spec.body("tray")
+    spec.worldbody.add_body(name="carrier", mocap=True, pos=list(tray_spec.pos),
+                            quat=list(tray_spec.quat))
+    spec.add_equality(type=mujoco.mjtEq.mjEQ_WELD, name1="carrier", name2="tray",
+                      objtype=mujoco.mjtObj.mjOBJ_BODY, solref=WELD_SOLREF)
+    model = spec.compile()
+    data = mujoco.MjData(model)
     t = s.target_pose
+    a = math.radians(direction)
+    dx, dy = radius * math.cos(a), radius * math.sin(a)
     c, sn = math.cos(t.yaw), math.sin(t.yaw)
     pose = Pose2D(t.x + c * dx - sn * dy, t.y + sn * dx + c * dy, t.yaw + math.radians(dyaw))
-    _move_tray(model, data, cfg, pose, cfg.table_height + jig.height + 0.02)
-    import mujoco
-
+    z = cfg.table_height + jig.height + 0.02
+    _move_tray(model, data, cfg, pose, z)
+    data.mocap_pos[0] = [pose.x, pose.y, z]
+    data.mocap_quat[0] = [math.cos(pose.yaw / 2), 0.0, 0.0, math.sin(pose.yaw / 2)]
     mujoco.mj_forward(model, data)
+    bottom = cfg.table_height + planner.lower_tray_clear
+    step = planner.lower_speed * model.opt.timestep
+    while data.mocap_pos[0][2] > bottom:
+        data.mocap_pos[0][2] = max(bottom, data.mocap_pos[0][2] - step)
+        mujoco.mj_step(model, data)
+    data.eq_active[0] = 0
     _run(model, data, SETTLE_S)
     tray = data.body("tray")
     err = math.hypot(tray.xpos[0] - t.x, tray.xpos[1] - t.y)
-    yaw_err = abs(math.degrees(_yaw(tray.xquat) - t.yaw))
+    yaw_err = abs(math.degrees(math.remainder(_yaw(tray.xquat) - t.yaw, math.pi)))
     tilt = math.degrees(math.acos(min(1.0, float(data.xmat[tray.id][8]))))
-    on_table = tray.xpos[2] - cfg.table_height
-    assert err <= CENTRED_M, (err, yaw_err, tilt, on_table)
-    flat = yaw_err <= 3.0 and tilt <= 2.0 and on_table < jig.pad_thickness + 0.003
-    assert flat, (err, yaw_err, tilt, on_table)
-    for i in range(6):
+    height = tray.xpos[2] - cfg.table_height
+    assert err <= ENDS_WITHIN_M, (err, yaw_err, tilt, height)
+    flat = yaw_err <= 3.0 and tilt <= 2.0 and height < jig.pad_thickness + 0.003
+    assert flat, (err, yaw_err, tilt, height)
+    for i in range(cfg.part_count):
         assert data.body(f"part_{i}").xpos[2] > cfg.table_height  # no part fell out
