@@ -46,7 +46,7 @@ Là người chạy vòng Failure → Data trên task khay, tôi muốn bộ ch�
   - [x] 4.1 `eval_batch --repeats N`, hạt nhiễu policy khác nhau theo lượt
   - [x] 4.2 `eval_results`: số thành công từng điều kiện, tỉ lệ từng bước, Wilson theo cỡ mẫu hiệu dụng
 - [ ] 5. Test MuJoCo và runbook (AC 5)
-  - [ ] 5.1 Test `sim`: khay rơi nghiêng trên cảnh thật, bản 1 gắn `L-TRAY-TILT`, bản 2 không
+  - [x] 5.1 Test `sim`: khay rơi nghiêng trên cảnh thật, bản 1 gắn `L-TRAY-TILT`, bản 2 không
   - [ ] 5.2 Runbook đo bộ chấm bản 2 trên một lô eval
 - [ ] 6. Tài liệu `docs/g0/tray/scorer-v2.md` (AC 6)
 
