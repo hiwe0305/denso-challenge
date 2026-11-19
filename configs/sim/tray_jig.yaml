@@ -14,8 +14,10 @@
 # open: opening hands pushed it 2-3 cm (D-21) and turned it about 5 degrees, which a
 # 1.5 cm wall let it ride over (level 1 seeds 1, 2: 10.3 deg off, propped on a chamfer).
 # The chamfer then runs up to 6.5 cm, just under the handles (tray_height -
-# handle_thickness = 7 cm): with 5 cm (lead-in 2.4 cm) the tray came down on a guide top
-# on 3 of 31 planner episodes; with 6.5 cm (lead-in 4.2 cm) those seeds placed.
+# handle_thickness = 7 cm), lead-in 4.2 cm. Planner on 31 episodes: 25/31 at 6.5 cm,
+# 26/31 at 5 cm (lead-in 2.4 cm), 26/31 on the fixed target without the jig
+# (docs/g0/tray/jig.md 4.3). 6.5 cm is kept for the larger lead-in towards the policy's
+# place errors (median 7.5 cm, docs/he/tray.md 19-20).
 clearance: 0.006
 height: 0.065
 wall_height: 0.035
