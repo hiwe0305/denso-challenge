@@ -2,9 +2,10 @@
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 19/11/2026 | 0.2 | Hiếu duyệt theo đề xuất ("Approve as proposed"): Q1–Q10 của mục 14 thành **[Đã chốt]** | Hiếu (soạn với Claude) |
 | 19/11/2026 | 0.1 | Bản đầu, chờ Hiếu duyệt trước khi viết mã | Hiếu (soạn với Claude) |
 
-_Trạng thái: **nháp, chờ Product Owner duyệt**. Tài liệu này sửa và mở rộng mục 9 của [design 27/10/2026](2026-10-27-g1-psi0-demo-design.md); mục 9.2 (bộ lỗi cấy) giữ nguyên. Story: [DA-43](../../product/stories/DA-43-he-agent-qa-qc.md). Nhãn quyết định theo [docs/CLAUDE.md](../../CLAUDE.md): **[Đã chốt]** là quyết định của Hiếu, **[Đề xuất]** là lựa chọn của người viết, **[Option]** là các phương án song song. Số chưa đo ghi là giả định hoặc ước lượng._
+_Trạng thái: **đã duyệt 19/11/2026** (bản 0.2: Q1–Q10 của mục 14 chốt theo đề xuất). Các nhãn **[Đề xuất]** trong thân bài mà mục 14 có quyết định tương ứng nay đọc là đã chốt; ngưỡng ghi "chỉnh sau lần chạy đầu" vẫn là giả định cho tới khi có số đo._ Tài liệu này sửa và mở rộng mục 9 của [design 27/10/2026](2026-10-27-g1-psi0-demo-design.md); mục 9.2 (bộ lỗi cấy) giữ nguyên. Story: [DA-43](../../product/stories/DA-43-he-agent-qa-qc.md). Nhãn quyết định theo [docs/CLAUDE.md](../../CLAUDE.md): **[Đã chốt]** là quyết định của Hiếu, **[Đề xuất]** là lựa chọn của người viết, **[Option]** là các phương án song song. Số chưa đo ghi là giả định hoặc ước lượng._
 
 ## 0. Đọc nhanh
 
@@ -444,7 +445,9 @@ Thêm hai số: tỉ lệ báo cáo `broken`, và độ ổn định (chạy hai
 
 ## 14. Quyết định cần Hiếu
 
-| # | Quyết định | Đề xuất |
+**[Đã chốt 19/11/2026, Hiếu]** "Approve as proposed": mọi dòng dưới đây chốt theo cột đề xuất (bản 0.2).
+
+| # | Quyết định | Đề xuất (đã chốt) |
 |---|---|---|
 | Q1 | Cách tiếp cận | A, có cửa B hẹp, C là sàn (mục 3) |
 | Q2 | Model của bộ tổng hợp; có mở đường hosted cho gói `public` không | Đo M1 và M3 trên bộ ca lịch sử rồi chọn; nếu chọn ngay thì M4 (mục 8) |
