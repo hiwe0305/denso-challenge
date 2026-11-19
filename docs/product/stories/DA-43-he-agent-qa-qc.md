@@ -41,7 +41,7 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
   - [x] 1.2 Lệnh xuất eval khay sang `scores.jsonl` theo `Score` trong adapter `flywheel_psi0`; test trên một lô mẫu
   - [ ] 1.3 Gói vòng mẫu cho test: `Score`, `TraceStep`, `TrainingMetric`, `Condition`, outcome theo K1 khi có; dựng từ lô `C_70` giai đoạn 1, chỉ dữ liệu `public`
 - [ ] 2. Lớp công cụ, phần eval (2 ngày)
-  - [ ] 2.1 `ToolResult`, đăng ký công cụ, `task_lookup`, quy tắc "không xét được"
+  - [x] 2.1 `ToolResult`, đăng ký công cụ, `task_lookup`, quy tắc "không xét được"
   - [ ] 2.2 `step_pass_table`, `failure_clusters`, `paired_compare` và test đối chiếu số
   - [ ] 2.3 `latch_consistency`, `signal_presence`
   - [ ] 2.4 `relaxed_sweep` (chờ K1; trước đó chạy trên file mẫu)
