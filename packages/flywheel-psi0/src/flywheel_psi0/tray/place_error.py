@@ -34,7 +34,7 @@ from typing import Any
 import numpy as np
 
 from flywheel_psi0.tray.eval_batch import chunk_plan, phases_for
-from flywheel_psi0.tray.eval_results import Rollout, collect
+from flywheel_psi0.tray.eval_results import UNRECORDED, Rollout, collect, scorer_version
 
 RELAXED_M = (0.05, 0.075, 0.10, 0.15, 0.20)  # tray.md 19.2 (c): 5 cm is the scorer's own
 
@@ -166,7 +166,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return float(t.x), float(t.y), float(t.yaw)
 
     result_rows = rows_for(chosen, target_of, cfg.target_pos_tol, cfg.target_yaw_tol_deg)
+    version = scorer_version(chosen)  # refuses a directory of two scorer versions
     result: dict[str, Any] = {
+        "scorer_version": version,
+        "scorer_version_note": UNRECORDED if version is None else None,
         "tolerance": {"distance_m": cfg.target_pos_tol, "yaw_error_deg": cfg.target_yaw_tol_deg},
         "missing": missing,
         "groups": groups(result_rows),
@@ -186,6 +189,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         }
     if args.json is not None:
         args.json.write_text(json.dumps(result, indent=1) + "\n")
+    print(f"Bộ chấm khay: phiên bản {version}" if version is not None else UNRECORDED)
     print(
         "| Nhóm | n | Khoảng cách p10 / p50 / p90 (cm) | Sai số góc p10 / p50 / p90 (°) "
         "| Trong dung sai |"
