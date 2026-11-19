@@ -38,7 +38,7 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
 - [x] 0. Design và story (docs), chờ Hiếu duyệt
 - [ ] 1. Nền (1 ngày)
   - [ ] 1.1 Issue "Contract change" cho K1 (cùng DA-42), K2, K3; soạn PR hợp đồng trên `DA-43-contract` kèm file mẫu và test (PR riêng, không thuộc phạm vi file dưới đây)
-  - [ ] 1.2 Lệnh xuất eval khay sang `scores.jsonl` theo `Score` trong adapter `flywheel_psi0`; test trên một lô mẫu
+  - [x] 1.2 Lệnh xuất eval khay sang `scores.jsonl` theo `Score` trong adapter `flywheel_psi0`; test trên một lô mẫu
   - [ ] 1.3 Gói vòng mẫu cho test: `Score`, `TraceStep`, `TrainingMetric`, `Condition`, outcome theo K1 khi có; dựng từ lô `C_70` giai đoạn 1, chỉ dữ liệu `public`
 - [ ] 2. Lớp công cụ, phần eval (2 ngày)
   - [ ] 2.1 `ToolResult`, đăng ký công cụ, `task_lookup`, quy tắc "không xét được"
