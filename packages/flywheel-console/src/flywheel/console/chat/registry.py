@@ -7,7 +7,7 @@ import re
 from collections.abc import Callable
 from typing import Any
 
-from .common import Result, catalog, fail, norm
+from .common import HOSTED, Result, catalog, fail, norm
 from .resolve import resolve_dataset
 from .tools_data import (
     catalog_search,
@@ -32,6 +32,16 @@ from .tools_runs import (
 
 ToolFn = Callable[[dict[str, Any], dict[str, Any]], Result]
 MAX_OFFERED = 7  # plus open_page
+
+# Tools a hosted model never gets: they read jobs, logs, findings and the egocentric pipeline,
+# which name the team's own videos (internal data), and they have no public-only filter
+# (CLAUDE.md: internal data never goes to a hosted API)
+LOCAL_ONLY = frozenset({"ego_summary", "findings", "job_get", "job_list", "log_tail"})
+
+
+def usable(name: str) -> bool:
+    """False for a local-only tool while a hosted model answers the turn."""
+    return not (HOSTED.get() and name in LOCAL_ONLY)
 
 
 def P(**props: tuple[str, str]) -> dict[str, Any]:
@@ -242,7 +252,7 @@ def forced_tool(question: Any) -> str | None:
     if _specific(q):
         return None  # a named dataset, run, job, policy or a list request: the model picks the lookup
     if _EGO_RX.search(q):
-        return "ego_summary" if _COUNT_RX.search(q) else None
+        return "ego_summary" if _COUNT_RX.search(q) and usable("ego_summary") else None
     return "round_report" if _ANALYSE_RX.search(q) else None
 
 
@@ -273,7 +283,7 @@ def offered_names(route: Any, question: Any) -> list[str]:
         for n in PAGE_TOOLS.get(pg, PAGE_TOOLS["home"]):
             if n not in names:
                 names.append(n)
-    return [n for n in names if n != "open_page"][:MAX_OFFERED] + ["open_page"]
+    return [n for n in names if n != "open_page" and usable(n)][:MAX_OFFERED] + ["open_page"]
 
 
 def context_defaults(context: Any) -> dict[str, Any]:
@@ -319,6 +329,8 @@ def call(name: str, args: Any, context: Any = None) -> Result:
     """Run a tool. Never raises: errors come back as ``ok=False`` results."""
     if name not in TOOLS:
         return fail(f"Unknown tool '{name}'.")
+    if not usable(name):
+        return fail(f"{name} is not available while a hosted model answers: it reads data that stays on this machine.")
     if not isinstance(args, dict):
         args = {}
     try:

@@ -14,9 +14,16 @@ OpenRouter, OpenCode Zen, a NIM, or the same Ollama at ``/v1``.
                        600 of 600 tokens, empty answer); the chat phrases facts a tool computed,
                        so thinking is switched off unless asked for
 
-A server that is not on this machine is *hosted*. Data rule (design 27/10 section 8.4,
-CLAUDE.md): rows that are not ``data_class: public`` never leave for a hosted service, so while
-a hosted provider answers, the chat tools do not see those rows (``common.HOSTED``).
+    FW_CHAT_SELF_HOSTED  1 declares that the server runs on a machine of the team (a NIM, an
+                       Ollama on another port); without it the server counts as hosted
+
+Data rule (design 27/10 section 8.4, CLAUDE.md): rows that are not ``data_class: public`` never
+leave for a hosted service, so while a hosted provider answers, the chat tools do not see those
+rows (``common.HOSTED``) and the tools that cannot filter them are not offered. The test fails
+closed: a server counts as self-hosted only when it is the console's own tunnel to rtx3060 (the
+default endpoint's loopback port) or ``FW_CHAT_SELF_HOSTED=1`` says so. A loopback address alone
+proves nothing, since any port on this machine can forward to a hosted service. An Ollama model
+whose tag ends in ``cloud`` runs on ollama.com and is hosted whatever the address.
 """
 
 from __future__ import annotations
@@ -40,33 +47,55 @@ class Provider:
     model: str
     hosted: bool
     port: int | None = None
+    loopback: bool = False  # the address is this machine (a tunnel or a local server)
 
     @property
     def key(self) -> str:
         return os.environ.get("FW_CHAT_API_KEY", "")
 
 
+def cloud_model(model: str) -> bool:
+    """True for an Ollama model whose tag ends in ``cloud`` (``gpt-oss:120b-cloud``): Ollama
+    forwards it to ollama.com, so it is hosted even behind a loopback address."""
+    return ":" in model and model.rsplit(":", 1)[1].lower().endswith("cloud")
+
+
 def active(default_url: str, default_model: str) -> Provider:
+    tunnel = urllib.parse.urlparse(default_url)
     base = os.environ.get("FW_CHAT_BASE_URL", "").strip()
     if not base:
-        return Provider("nemotron", "ollama", default_url, default_model, False,
-                        urllib.parse.urlparse(default_url).port)  # fmt: skip
+        on_loopback = (tunnel.hostname or "") in LOCAL_HOSTS
+        hosted = cloud_model(default_model)
+        return Provider(
+            "nemotron", "ollama", default_url, default_model, hosted, tunnel.port, on_loopback
+        )
     u = urllib.parse.urlparse(base)
-    hosted = (u.hostname or "") not in LOCAL_HOSTS
+    model = os.environ.get("FW_CHAT_MODEL", "").strip()
+    loopback = (u.hostname or "") in LOCAL_HOSTS
+    own_tunnel = loopback and u.port is not None and u.port == tunnel.port
+    declared = os.environ.get("FW_CHAT_SELF_HOSTED", "").strip() == "1"
+    hosted = not (own_tunnel or declared) or cloud_model(model)
     name = os.environ.get("FW_CHAT_NAME", "").strip() or (u.hostname or "model")
-    return Provider(name, "openai", base.rstrip("/"), os.environ.get("FW_CHAT_MODEL", "").strip(),
-                    hosted, u.port)  # fmt: skip
+    return Provider(name, "openai", base.rstrip("/"), model, hosted, u.port, loopback)
 
 
 def problem(p: Provider) -> str | None:
-    """Why this provider cannot be called, in one sentence; None when it can."""
+    """Why this provider cannot be called, in one sentence; None when it can.
+
+    https and a key are asked of a remote hosted server only: a loopback address that counts as
+    hosted (an undeclared tunnel, a cloud model in a local Ollama) is called as it is, and the
+    data rule still applies through ``hosted``."""
     if p.kind != "openai":
         return None
     if not p.model:
         return "FW_CHAT_MODEL is not set."
-    if p.hosted and not p.base_url.startswith("https://"):
-        return "A hosted chat endpoint must use https."
-    if p.hosted and not p.key:
+    remote = p.hosted and not p.loopback
+    if remote and not p.base_url.startswith("https://"):
+        return (
+            "A hosted chat endpoint must use https"
+            " (set FW_CHAT_SELF_HOSTED=1 if the server runs on a machine of the team)."
+        )
+    if remote and not p.key:
         return "FW_CHAT_API_KEY is not set for the hosted chat model."
     return None
 

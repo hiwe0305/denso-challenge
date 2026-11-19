@@ -91,11 +91,41 @@ def catalog() -> dict[str, Any]:
     d = d if isinstance(d, dict) else {"rows": [], "edges": [], "runs": []}
     if not HOSTED.get():
         return d
-    rows = [r for r in d.get("rows", []) if r.get("data_class") == "public"]
-    keep = {r.get("id") for r in rows}
-    edges = [e for e in d.get("edges", []) if not isinstance(e, dict)
-             or (e.get("from") in keep and e.get("to") in keep)]  # fmt: skip
-    return {**d, "rows": rows, "edges": edges}
+    pub = [r for r in d.get("rows", []) if isinstance(r, dict) and r.get("data_class") == "public"]
+    keep = {r.get("id") for r in pub}
+    # a public row may name a parent or child that is not public (a superseded team video)
+    rows = [{**r, **{k: [x for x in r[k] if x in keep] for k in ("parents", "children")
+                     if isinstance(r.get(k), list)}} for r in pub]  # fmt: skip
+    edges = [e for e in d.get("edges", []) if all(x in keep for x in edge_ends(e))]
+    return {**d, "rows": rows, "edges": edges, "totals": totals(rows)}
+
+
+def totals(rows: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
+    """Distinct episodes and hours per group and overall, from the rows flagged ``unique``.
+
+    The same sums as ``flywheel.console.index.catalog.totals``, which the chat does not import
+    (the index package pulls in OpenCV); a test checks that both give the same sums."""
+    out: dict[str, dict[str, float]] = {}
+    for r in rows:
+        if not r.get("unique"):
+            continue
+        for key in (r.get("group"), "all"):
+            t = out.setdefault(str(key), {"sets": 0, "episodes": 0, "hours": 0.0})
+            t["sets"] += 1
+            t["episodes"] += r.get("episodes") or 0
+            t["hours"] = round(t["hours"] + (r.get("hours") or 0.0), 3)
+    return out
+
+
+def edge_ends(e: Any) -> tuple[Any, ...]:
+    """The two dataset ids of a catalog edge ([from, to] as the index writes it, or a dict).
+
+    Anything else gives ``(None,)``, which no filter keeps."""
+    if isinstance(e, dict):
+        return (e.get("from"), e.get("to"))
+    if isinstance(e, (list, tuple)) and len(e) == 2:
+        return tuple(e)
+    return (None,)
 
 
 def public_ds(ds: str) -> bool:

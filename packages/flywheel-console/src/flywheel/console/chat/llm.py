@@ -1,10 +1,13 @@
 # ruff: noqa: E501, UP031  (ported prompt, guard-regex and tool-schema strings stay on one line)
-"""Chat backend: Nemotron over the loopback ssh tunnel, tools in ``registry``.
+"""Chat backend: Nemotron over the loopback ssh tunnel by default, tools in ``registry``.
 
 ``events(body)`` yields ``(event, data)`` pairs; ``stream(body)`` yields them as SSE bytes for
-the HTTP server. Guardrails live in code: loopback endpoint only, per-turn caps, no tool that
-can train or write, GPU-busy fallback, and a request filter for the actions the console never
-performs. Traces go to ``<fw_root>/console/chat/<date>.jsonl``.
+the HTTP server. Guardrails live in code: per-turn caps, no tool that can train or write,
+GPU-busy fallback, and a request filter for the actions the console never performs. The model
+may be another server (``providers``); when it is hosted, the turn runs with ``common.HOSTED``
+set before anything is built, so the tools see public rows only, the local-only tools are not
+offered, and earlier answers stay out of the history sent. Traces go to
+``<fw_root>/console/chat/<date>.jsonl``.
 """
 
 from __future__ import annotations
@@ -76,8 +79,8 @@ GUARDS = [
      "No shell access: the console only runs its allowlisted fw jobs, and only after a human confirms.",
      "Không có quyền shell: console chỉ chạy các job fw trong allowlist, sau khi người xác nhận."),
     ("hosted_api", re.compile(r"(send|forward|paste|ask|share|upload|gửi|chuyển|hỏi|dán).{0,40}\b(gpt\S*|openai|chatgpt|gemini|claude|anthropic|hosted|external api|cloud api|api ngoài)\b", re.I),
-     "Data never leaves the machine: the only model is the local Nemotron over the loopback tunnel.",
-     "Dữ liệu không rời máy: chỉ dùng Nemotron cục bộ qua tunnel loopback."),
+     "Data never leaves the machine: the chat model runs on a machine of the team.",
+     "Dữ liệu không rời máy: model chat chạy trên máy của đội."),
     ("qa_status", re.compile(r"\b(mark|set|change|flip|override|force|đánh dấu|chuyển|sửa|đổi)\b.{0,40}\b(as\s+)?(pass|flag|reject)\b|\bqa status\b.{0,20}\b(to|thành)\b", re.I),
      "QA status comes only from the rule layer; chat cannot change it. Overrides go through agentqa.review with a reason.",
      "Trạng thái QA chỉ do tầng luật quyết định; chat không đổi được. Muốn ghi đè phải qua agentqa.review kèm lý do."),
@@ -87,9 +90,15 @@ GUARDS = [
 ]  # fmt: skip
 
 
-def guard_check(question: str) -> tuple[str | None, str | None]:
+def guard_check(question: str, prov: providers.Provider | None = None) -> tuple[str | None, str | None]:
+    """The guard a question trips and its refusal, worded for the model that answers ``prov``."""
     for name, rx, en, vi in GUARDS:
         if rx.search(question):
+            if name == "hosted_api" and prov is not None and prov.hosted:
+                en = (f"The console sends no data to an outside service on request. The model answering now ({prov.name}) "
+                      "is hosted, so the tools hand it public rows only.")
+                vi = (f"Console không gửi dữ liệu ra dịch vụ ngoài theo yêu cầu. Model đang trả lời ({prov.name}) "
+                      "là model hosted nên các tool chỉ đưa cho nó dữ liệu public.")  # fmt: skip
             return name, (vi if VI.search(question) else en)
     return None, None
 
@@ -106,7 +115,7 @@ def provider() -> providers.Provider:
 
 
 def needs_tunnel(p: providers.Provider) -> bool:
-    return not p.hosted and p.port == LOOPBACK_PORT
+    return p.loopback and p.port == LOOPBACK_PORT
 
 
 def lang_of(q: str) -> str:
@@ -273,8 +282,10 @@ def build_messages(
     users = [i for i, m in enumerate(prev) if m["role"] == "user"]
     keep_from = users[-4] if len(users) >= 4 else 0
     for i, m in enumerate(prev):
-        if i < keep_from and m["role"] == "assistant":
-            continue  # older answers reduced to the question
+        if m["role"] == "assistant" and (i < keep_from or HOSTED.get()):
+            # older answers reduced to the question; a hosted model gets no earlier answer at
+            # all, since a local model may have written it from rows that are not public
+            continue
         msgs.append({"role": m["role"], "content": str(m["content"])[:600]})
     msgs.append({"role": "user", "content": str(q)[:1500]})
     return msgs, str(q)
@@ -397,6 +408,20 @@ def generate(
 
 
 def events(body: dict[str, Any]) -> Iterator[tuple[str, dict[str, Any]]]:
+    # the provider decides HOSTED before anything is built: the history, the tools offered and
+    # every tool result of the turn depend on it; it is reset when the turn ends
+    prov = provider()
+    tok = HOSTED.set(prov.hosted)
+    try:
+        yield from _turn(body, prov)
+    finally:
+        try:
+            HOSTED.reset(tok)
+        except ValueError:
+            pass  # closed from another context, which never saw the value set
+
+
+def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str, dict[str, Any]]]:
     t0 = time.time()
     context = body.get("context") or {}
     conv = body.get("conversation_id") or f"c-{os.urandom(4).hex()}"
@@ -405,12 +430,12 @@ def events(body: dict[str, Any]) -> Iterator[tuple[str, dict[str, Any]]]:
     names = registry.offered_names(context.get("route"), question)
     tr: dict[str, Any] = {
         "turn_id": turn, "conversation_id": conv, "ts": datetime.now().astimezone().isoformat(timespec="seconds"),
-        "model": MODEL, "question": question, "context": context, "tools_offered": names, "nodes": [],
-        "answer": "", "tokens_in": 0, "tokens_out": 0,
+        "model": prov.model, "provider": prov.name, "hosted": prov.hosted, "question": question,
+        "context": context, "tools_offered": names, "nodes": [], "answer": "", "tokens_in": 0, "tokens_out": 0,
     }  # fmt: skip
     yield (
         "trace_start",
-        {"conversation_id": conv, "turn_id": turn, "model": MODEL, "tools_offered": names},
+        {"conversation_id": conv, "turn_id": turn, "model": prov.model, "tools_offered": names},
     )
 
     def finish(event: str, data: dict[str, Any]) -> tuple[str, dict[str, Any]]:
@@ -422,7 +447,7 @@ def events(body: dict[str, Any]) -> Iterator[tuple[str, dict[str, Any]]]:
         return event, data
 
     # 1. code-level guardrails (no model involved)
-    why, refusal = guard_check(question)
+    why, refusal = guard_check(question, prov)
     if why:
         tr["guard"] = why
         tr["answer"] = refusal
@@ -441,10 +466,6 @@ def events(body: dict[str, Any]) -> Iterator[tuple[str, dict[str, Any]]]:
         )
         return
     # 2. GPU busy / tunnel down -> slash fallback (only when the model sits behind the tunnel)
-    prov = provider()
-    tr["model"] = prov.model
-    tr["provider"] = prov.name
-    HOSTED.set(prov.hosted)
     why_not = providers.problem(prov)
     if why_not:
         tr["error"] = why_not
