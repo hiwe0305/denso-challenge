@@ -105,13 +105,85 @@ CI bootstrap lấy mẫu lại **điều kiện** (tỉ lệ thành công của 
 
 ## 7. Runbook: đo bộ chấm bản 2 (cho Hiếu)
 
-Mục này nhiệm vụ con 5.2 điền.
+Ba bước, từ rẻ tới đắt. A chạy trên laptop, không cần Ψ₀ hay GPU từ xa. B và C cần quyết định của Hiếu: một phiên serve Colab và client trên `rtx3060`, như các lô eval của DA-34.
+
+**A. Laptop: test MuJoCo và cổng phát lại** (venv SIMPLE, như [env-simple.md](../env-simple.md)).
+
+```bash
+MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/python -m pytest \
+    packages/flywheel-simple/tests/tray/test_predicates_sim.py -m sim -v
+```
+
+Cổng phát lại (tray.md 8.1) chạy `eval_driver` thật trong `eval-decoupled-wbc` với server giả trả action đã ghi của một episode S1, để thấy dòng outcome có đủ khóa của mục 4:
+
+```bash
+export PYTHONPATH=$(ls -d $PWD/packages/*/src | paste -sd:)
+R=<release S1, ví dụ tray_s1_0d84cc87b1e5>; O=fwdata/tray/da42-gate; mkdir -p $O/scene
+python -m flywheel_psi0.tray.replay_server --release $R --seed 1000 --port 22390 --log $O/requests.jsonl &
+DEBUG=1 MUJOCO_GL=egl FLYWHEEL_TRAY_OUTCOMES=$O/outcomes.jsonl FLYWHEEL_TRAY_DIR=$O/scene \
+  fwdata/simple/.venv/bin/python -m flywheel_psi0.tray.eval_driver \
+  simple/G1WholebodyTrayTransferTeleop-v0 psi0_decoupled_wbc --host 127.0.0.1 --port 22390 \
+  --data-format lerobot --data-dir $R --sim-mode mujoco --headless --num-episodes 1 \
+  --episode-start 0 --eval-dir $O/eval
+kill %1
+```
+
+Đạt khi: dòng outcome có `scorer_version` 2, `step_latch_t` tăng dần, `palm_handle_bar_min_m`, `scorer_v1`, và episode planner vẫn thành công ở cả hai bản. Kết quả lần chạy của DA-42 ở mục 7.1.
+
+**B. Một lô eval có `scorer_v1`** [Đề xuất]. Checkpoint `C_70` (`ckpt_60000`, checkpoint đã serve ở 20.2 của tray.md; DA-42 chưa kiểm nó còn ở đâu), 60 điều kiện của stage 1, hai lượt mỗi điều kiện. Serve và client như 19.9 E và 20.15 C của tray.md, với cây `git archive` của master **sau khi DA-42 merge**, thư mục output mới, và thêm `--repeats 2`:
+
+```bash
+... eval_batch --set ~/denso-da34-pool/fwdata/tray/eval-sets/rp_a04c14e79dfd-2e57f60 \
+  --conditions-sha256 b9c38b37afa6fbdd4027be287df85fe7b016130bd32227f97c876f6bae7d3dfb \
+  --out ~/denso-da34-pool/fwdata/tray/eval/da42-C_70-60000-r2 \
+  --server 127.0.0.1:$RP --listen $LISTEN --chunk 10 --attempts 3 --max-chunks 6 --repeats 2 --dry-run
+# 12 dòng: l1-000, l1-000.r1, l2-000, l2-000.r1, ...; bỏ --dry-run để chạy
+```
+
+Ước lượng, chưa đo: 12 lô × 50–61 phút (số đo một lô 10 lượt của 20.15) ≈ 10–12 giờ trên một làn; phiên serve L4 ở 1,94 CU/giờ ≈ 21–25 CU, cộng khoảng 1,5 CU cài đặt. Ba làn như 20.15 rút còn khoảng 4 giờ, tốn thêm khoảng 4 CU. Dừng phiên serve ngay khi lô cuối ghi xong (19.8).
+
+**C. Đọc** (laptop, sau khi chép thư mục output về):
+
+```bash
+python -m flywheel_psi0.tray.eval_results configs/runplans/tray/he-tray-v2.yaml \
+  --set <bản chép của eval-sets/rp_a04c14e79dfd-2e57f60> --out <thư mục output> --repeats 2 --json da42.json
+```
+
+Tập `--set` phải là tập của bước B (270 điều kiện, `conditions.sha256` b9c38b37…), không phải `fwdata/he/dev-eval-v1` (90 điều kiện, tập khác). Plan là `he-tray-v2.yaml` vì `he-tray-pair60k.yaml` không nạp được bằng `TrayRunPlan` (trường `schedule`); lệnh này với `--stage1 --no-yaw` trên lô `pair60k` `C_70` có sẵn ra lại 10/60 (19/11/2026).
+
+Luật đọc, viết trước khi chạy [Đề xuất]:
+
+| Câu hỏi | Đọc ở | Trả lời "có" khi |
+|---|---|---|
+| Bản 2 sửa được `approach_a`? | `scorer_v1_vs_v2.approach_a`; `palm_handle_bar_min_m.both` của các lượt có `lift` | Mọi lượt đã chốt `lift` ở bản 1 hay bản 2 đều chốt `approach_a` ở bản 2; số `approach_a` của bản 1 thấp hơn đúng ở các lượt có `both` tới tâm > 0,10 m |
+| Nhãn nghiêng bản 1 bật sau khi buông? | `scorer_v1_vs_v2.v1_tilt_released`; `scorer_v1.at_failure` | Phần lớn lượt bản 1 gắn `L-TRAY-TILT` mà khay cuối phẳng trên bàn B có `hand_contacts` cả hai `false` lúc lỗi |
+| Lỗi nào bản 2 thêm? | `scorer_v1_vs_v2.labels`, các cặp `… -> L-ONE-HAND`, `… -> L-TRAY-TILT` | Liệt kê và xem video từng lượt; không có ngưỡng |
+| Mỗi điều kiện có ổn định không? | `per_condition`, `wilson_n_eff` | Hệ số thiết kế (`n / wilson_n_eff`) gần 1: hai lượt của một điều kiện gần như độc lập; gần 2: lượt thứ hai không thêm thông tin |
+
+Số của lô này là bản 2, không so với số bản 1 của các lô cũ (`eval_results` từ chối ghép cặp khác phiên bản, trừ khi khai `--cross-scorer`).
+
+### 7.1 Kết quả bước A (19/11/2026, laptop)
+
+Test MuJoCo: 3 passed. Khay rơi nghiêng trên 15° trong 5 chu kỳ đầu, cuối cùng phẳng (0,0°) trên bàn B; bản 1 gắn `L-TRAY-TILT` lúc khay còn trên không, không tay nào chạm; bản 2 chấm thành công.
+
+Cổng phát lại: release `tray_s1_0d84cc87b1e5`, seed 1000, mức 1, episode 0. Client thoát mã 0, `eval_stats` báo `episode_0: True`. Dòng outcome:
+
+| Khóa | Giá trị |
+|---|---|
+| `scorer_version` | 2; thành công, `failure_t` null |
+| `scorer_v1` | thành công, 7 bước đều chốt |
+| `step_latch_t` bản 2 (s) | 7,645 · 8,085 · 10,585 · 14,865 · 23,405 · 28,285 · 31,725 |
+| `step_latch_t` bản 1 | `approach_a` 8,005; sáu bước sau bằng bản 2 |
+| `palm_handle_min_m` (tới tâm) | trái 0,069, phải 0,065, `both` 0,069 |
+| `palm_handle_bar_min_m` (tới thanh) | trái 0,032, phải 0,040, `both` 0,040 |
+
+Đọc: bản vá chạy trong `eval-decoupled-wbc` thật và không đổi kết quả của episode planner. Bản 2 chốt `approach_a` sớm hơn 0,36 s vì đo tới thanh. Episode planner luôn đưa tay sát tâm (0,069 m < 0,10 m) nên không phân biệt được hai bản ở `approach_a`; câu hỏi đó cần rollout của policy (bước B).
 
 ## 8. Điều chưa kiểm, tóm lại
 
 1. Bản 2 trên rollout thật của policy: chưa chạy lô nào (mục 7).
 2. `approach_a`: khoảng cách lòng bàn tay–thanh thật, và bản 2 có cho qua đủ 7–10 lượt/60 của tray.md 20.11 không.
 3. `L-TRAY-TILT`: các lượt cũ có bật nhãn sau khi buông không; outcome cũ không có `failure_t`.
-4. Bản vá `compute_reward` của `eval_driver` chỉ chạy với bản giả và với `StepTracker` thật ngoài SIMPLE; chưa chạy trong `eval-decoupled-wbc`.
+4. Bản vá `compute_reward` của `eval_driver` đã chạy trong `eval-decoupled-wbc` thật, nhưng chỉ một episode phát lại của planner (mục 7.1); chưa chạy với Ψ₀ serve thật hay khi có lỗi.
 5. Hệ số thiết kế thật của eval lặp.
 6. Plan đã đóng băng ghim `predicates.py` bằng sha256 (`he-tray-v2`, `he-tray-pair60k`, `he-tray-b`, `he-tray-cmax`): sửa bộ chấm làm `pairplan check --launch` và 7 test của `flywheel-psi0` báo "pinned file ... changed". Đó là chốt bảo vệ đúng chức năng; cần `Decision` của Hiếu (story, chỗ cần quyết 4).

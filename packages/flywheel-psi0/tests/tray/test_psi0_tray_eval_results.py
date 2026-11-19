@@ -11,6 +11,7 @@ import pytest
 from flywheel_psi0.tray.eval_batch import Chunk, with_repeats
 from flywheel_psi0.tray.eval_results import (
     STEP_NAMES,
+    Rollout,
     bootstrap_ci,
     clustered_wilson,
     collect,
@@ -19,6 +20,7 @@ from flywheel_psi0.tray.eval_results import (
     paired_diff,
     reached,
     repeat_0,
+    scorer_v1_vs_v2,
     scorer_version,
     stage1_outcome,
     summarize,
@@ -463,3 +465,53 @@ def test_pairing_reads_repeat_0_only(tmp_path: Path) -> None:
         paired(var, base)
     result = paired(repeat_0(var), repeat_0(base))
     assert result["conditions"] == 2 and result["success"]["variant_only"] == 1
+
+
+# --- DA-42 5.2: version 1 beside version 2 ------------------------------------------
+
+
+def _with_v1(level: int, seed: int, own: tuple[bool, Any], v1: tuple[bool, Any, bool]) -> Rollout:
+    ok, failure = own
+    v1_ok, v1_failure, hands = v1
+    row = {
+        "success": ok,
+        "failure": failure,
+        "scorer_version": 2,
+        "scorer_steps": [True] * 7 if ok else [True] * 5 + [False] * 2,
+        "scorer_v1": {
+            "success": v1_ok,
+            "failure": v1_failure,
+            "steps": [False] * 7 if v1_failure == "L-PLACE-POSE" else [True] * 5 + [False] * 2,
+            "at_failure": None
+            if v1_failure is None
+            else {"hand_contacts": {"left": hands, "right": hands}},
+        },
+    }
+    return Rollout(level, seed, 0, "l1-000", 0, row)
+
+
+def test_version_1_beside_version_2_counts_label_changes() -> None:
+    rollouts = [
+        _with_v1(1, 1, (True, None), (False, "L-TRAY-TILT", False)),  # released, then settled
+        _with_v1(1, 2, (False, "L-PLACE-POSE"), (False, "L-TRAY-TILT", False)),
+        _with_v1(1, 3, (False, "L-TRAY-TILT"), (False, "L-TRAY-TILT", True)),  # held: both
+        _with_v1(1, 4, (False, "L-ONE-HAND"), (False, "L-PLACE-POSE", True)),  # v1 approach_a gap
+        _with_v1(1, 5, (True, None), (True, None, False)),
+    ]
+    result = scorer_v1_vs_v2(rollouts)
+    assert result is not None
+    assert result["rollouts"] == 5 and result["versions"] == [2]
+    assert result["successes"] == {"v1": 1, "own": 2}
+    assert result["labels"] == {
+        "L-PLACE-POSE -> L-ONE-HAND": 1,
+        "L-TRAY-TILT -> L-PLACE-POSE": 1,
+        "L-TRAY-TILT -> success": 1,
+    }
+    assert result["v1_tilt_released"] == 2
+    assert result["approach_a"] == {"v1": 4, "own": 5}
+
+
+def test_rows_without_version_1_have_no_comparison(tmp_path: Path) -> None:
+    chosen, extra, missing = _scored(tmp_path, [2, 2])
+    assert scorer_v1_vs_v2(chosen) is None
+    assert summarize(PLAN, chosen, extra, missing, full=False)["scorer_v1_vs_v2"] is None

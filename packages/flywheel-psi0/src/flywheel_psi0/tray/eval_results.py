@@ -51,6 +51,8 @@ its rollouts (`scorer_version` of the outcome rows, written by `eval_driver` sin
 DA-42; rows without it are reported as unrecorded, `None`, never as a version). A
 directory whose rows mix versions is refused, and so is pairing two sides scored by
 different versions, unless `--cross-scorer` is given; the paired result then names both.
+Rows that carry `scorer_v1` (version 1 run beside version 2 on the same rollout) add
+`scorer_v1_vs_v2`: successes under each, label changes and approach_a latches.
 """
 
 from __future__ import annotations
@@ -365,6 +367,49 @@ def level_summary(rollouts: Sequence[Rollout]) -> dict[str, Any]:
     }
 
 
+def label(success: Any, failure: Any) -> str:
+    return "success" if success else str(failure)
+
+
+def scorer_v1_vs_v2(rollouts: Sequence[Rollout]) -> dict[str, Any] | None:
+    """Version 1 against the row's own version on the same rollouts (rows with `scorer_v1`).
+
+    `labels` counts each (version 1 -> own) label pair that differs; `v1_tilt_released`
+    counts version 1 L-TRAY-TILT with no hand on the tray at its failure time, the case
+    version 2 no longer labels (docs/g0/tray/scorer-v2.md 3).
+    """
+    rows = [r.row for r in rollouts if isinstance(r.row.get("scorer_v1"), dict)]
+    if not rows:
+        return None
+    v1 = [row["scorer_v1"] for row in rows]
+    changes = Counter(
+        f"{label(a['success'], a['failure'])} -> {label(row['success'], row['failure'])}"
+        for a, row in zip(v1, rows, strict=True)
+        if label(a["success"], a["failure"]) != label(row["success"], row["failure"])
+    )
+    released = sum(
+        1
+        for a in v1
+        if a["failure"] == "L-TRAY-TILT"
+        and a.get("at_failure")
+        and not any(a["at_failure"]["hand_contacts"].values())
+    )
+    return {
+        "rollouts": len(rows),
+        "versions": sorted({row.get("scorer_version") for row in rows}, key=str),
+        "successes": {
+            "v1": sum(bool(a["success"]) for a in v1),
+            "own": sum(bool(row["success"]) for row in rows),
+        },
+        "labels": dict(sorted(changes.items())),
+        "v1_tilt_released": released,
+        "approach_a": {
+            "v1": sum(bool(a["steps"][0]) for a in v1),
+            "own": sum(bool((row.get("scorer_steps") or [False])[0]) for row in rows),
+        },
+    }
+
+
 def condition_means(rollouts: Sequence[Rollout]) -> list[float]:
     """Mean success of each condition: what the bootstrap resamples (one value per condition)."""
     return [sum(ok) / len(ok) for ok in by_condition(rollouts).values()]
@@ -431,6 +476,7 @@ def summarize(
         "extra_rollouts": sum(extra.values()),
         "extra_by_condition": {f"{lv}:{seed}": n for (lv, seed), n in sorted(extra.items())},
         "reruns": sum(1 for r in chosen if r.attempt > 0),
+        "scorer_v1_vs_v2": scorer_v1_vs_v2(chosen),
         "repeats": 1 + max((r.repeat for r in chosen), default=0),
         "per_condition": {
             f"{lv}:{seed}": {"successes": sum(ok), "rollouts": len(ok)}
@@ -606,6 +652,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(table(result))
     counts: dict[str, Any] = {
         "scorer_version": result["scorer_version"],
+        "scorer_v1_vs_v2": result["scorer_v1_vs_v2"],
         "missing": len(result["missing"]),
         "yaw": result.get("yaw"),
     }
