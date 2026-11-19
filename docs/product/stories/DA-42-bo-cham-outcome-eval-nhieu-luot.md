@@ -48,7 +48,7 @@ Là người chạy vòng Failure → Data trên task khay, tôi muốn bộ ch�
 - [ ] 5. Test MuJoCo và runbook (AC 5)
   - [x] 5.1 Test `sim`: khay rơi nghiêng trên cảnh thật, bản 1 gắn `L-TRAY-TILT`, bản 2 không
   - [ ] 5.2 Runbook đo bộ chấm bản 2 trên một lô eval
-- [ ] 6. Tài liệu `docs/g0/tray/scorer-v2.md` (AC 6)
+- [x] 6. Tài liệu `docs/g0/tray/scorer-v2.md` (AC 6)
 
 ## Phạm vi file
 
@@ -67,7 +67,8 @@ Không chạm: `simple_task.py`, `randomize.py`, `mjcf.py`, planner và `configs
 
 1. **Outcome ngoài eval không có phiên bản.** `TrayTransferEnv.outcome()` nằm trong `simple_task.py` (DA-41 đang giữ). DA-42 thêm trường bằng bản vá lúc chạy trong `eval_driver`, như `scorer_steps` đã làm, nên chỉ outcome của eval có `scorer_version`. Outcome của replay QA và sinh dữ liệu vẫn chấm bằng bản 2 (bộ chấm mặc định đổi) mà không ghi phiên bản. Đề xuất PR riêng sau DA-41: `outcome()` thêm `**self.task.tracker.outcome_fields()`.
 2. **Đổi bộ chấm làm số cũ hết so được** (spec 6.4, tray.md 20.3). Bản 2 không áp lại cho các lô đã chấm; số của chúng vẫn là bản 1. Mọi so sánh bản 1 và bản 2 dùng cặp kết quả trên cùng rollout mà eval ghi (AC 2), không so hai lô.
-3. **Bộ chấm mặc định đổi cho mọi nơi dùng `StepTracker`**, gồm `check_success` khi sinh S1, S2 và replay QA. Cả hai sửa chỉ nới (không làm lượt nào đang thành công thành thất bại), nên episode đã nhận vẫn nhận.
+3. **Bộ chấm mặc định đổi cho mọi nơi dùng `StepTracker`**, gồm `check_success` khi sinh S1, S2 và replay QA. Ở episode mà bản 1 đã cho qua `approach_a`, lỗi của bản 2 là tập con lỗi của bản 1, nên episode planner đã nhận vẫn nhận. Ở lượt bản 1 không cho qua `approach_a`, bản 2 bật được `L-TRAY-TILT`, `L-ONE-HAND` mà bản 1 không bật, kể cả ở lượt bản 1 tính là thành công ([scorer-v2.md](../../g0/tray/scorer-v2.md) mục 2).
+4. **Plan đã đóng băng ghim `predicates.py` bằng sha256** (`configs/runplans/tray/he-tray-v2`, `he-tray-pair60k`, `he-tray-b`, `he-tray-cmax`). Sửa bộ chấm làm `python -m flywheel_psi0.tray.pairplan check <plan> --launch` báo "pinned file ... changed since the plan pinned it" và 7 test của `packages/flywheel-psi0/tests/tray` (`test_psi0_tray_colab_train.py` 6, `test_psi0_tray_pairplan.py` 1) thất bại; trên `origin/master` chúng qua. Đây là chốt bảo vệ làm đúng việc (spec 6.4), không phải lỗi của DA-42. Cần `Decision` của Hiếu: đóng các plan đó hay đóng băng lại. DA-42 không sửa `configs/runplans/`. DA-41 sửa `simple_task.py`, `randomize.py`, `mjcf.py`, cũng bị ghim, nên gặp cùng chốt này.
 
 ## Ghi chú cho người làm
 
