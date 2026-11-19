@@ -914,8 +914,12 @@ def watch_foreign(jid: str) -> None:
                     JOBREG[jid].update(j)
                 return
             if not job_alive(j):
-                j["state"], j["ended"] = "failed", now()
-                j["note"] = "process ended without a recorded result"
+                if RT.get(jid, {}).get("cancel") and RT[jid]["cancel"].is_set():
+                    j["state"], j["ended"] = "cancelled", now()
+                    j["note"] = "cancelled from the console"
+                else:
+                    j["state"], j["ended"] = "failed", now()
+                    j["note"] = "process ended without a recorded result"
                 save(j)
                 JOBREG[jid].update(j)
                 return
@@ -1005,14 +1009,20 @@ def data_outputs(job: dict[str, Any]) -> None:
 
 
 def stage_dataset(job: dict[str, Any], rt: dict[str, Any], src: Path, dst: Path) -> int:
-    """Copy a dataset into the console store (``<dst>.part`` then rename); 0 when done."""
+    """Copy a dataset into the console store (``<dst>.part-<job>`` then rename); 0 when done.
+
+    Each job copies into its own temporary dir, and the swap into ``dst`` holds a lock, so two
+    jobs staging the same dataset never write into one copy. Symlinks are not followed: a link
+    may point outside the dataset (into ``vault/``, say), so it is skipped and logged."""
     dst = under(dst, store_dir() / "datasets")
-    tmp = dst.with_name(dst.name + ".part")
+    tmp = dst.with_name(f"{dst.name}.part-{job['id']}")
     shutil.rmtree(tmp, ignore_errors=True)
     t0 = time.time()
     n = tot = 0
+    links: list[str] = []
     for dp, dns, fns in os.walk(src):
-        dns.sort()
+        links += [str(Path(dp, d).relative_to(src)) for d in dns if Path(dp, d).is_symlink()]
+        dns[:] = sorted(d for d in dns if not Path(dp, d).is_symlink())
         rel = Path(dp).relative_to(src)
         (tmp / rel).mkdir(parents=True, exist_ok=True)
         for fn in sorted(fns):
@@ -1020,14 +1030,24 @@ def stage_dataset(job: dict[str, Any], rt: dict[str, Any], src: Path, dst: Path)
                 shutil.rmtree(tmp, ignore_errors=True)
                 return 1
             fp = Path(dp) / fn
+            if fp.is_symlink():
+                links.append(str(rel / fn))
+                continue
             shutil.copyfile(fp, tmp / rel / fn)
             n += 1
             tot += fp.stat().st_size
-    shutil.rmtree(dst, ignore_errors=True)
-    os.replace(tmp, dst)
+    with _stage_lock:
+        shutil.rmtree(dst, ignore_errors=True)
+        os.replace(tmp, dst)
+    if links:
+        shown = ", ".join(links[:10])
+        jlog(job, "[console] bỏ qua %d symlink (không chép): %s\n" % (len(links), shown))
     jlog(job, "[console] chép %d file (%.1f MB) vào store của console trong %.1f s: %s\n"
          % (n, tot / 1e6, time.time() - t0, _rel_fw(dst)))  # fmt: skip
     return 0
+
+
+_stage_lock = threading.Lock()
 
 
 def kill_group(proc: subprocess.Popen[Any]) -> None:
@@ -1459,9 +1479,30 @@ def cancel(jid: str) -> dict[str, Any]:
     child = rt.get("child")
     if child and child in RT:
         RT[child]["cancel"].set()
+    if rt.get("proc") is None and job["state"] in ("queued", "running"):
+        _kill_foreign(job)  # left by an earlier server: no thread here watches the cancel flag
     if job["state"] == "queued":
         finish(job, "cancelled", note="cancelled while queued")
     return pub(job)
+
+
+def _kill_foreign(job: dict[str, Any]) -> None:
+    """SIGTERM the process groups of a job (and its chain children) this server did not start.
+
+    Each step runs with ``start_new_session``, so its pid is its group id; ``watch_foreign`` then
+    records the job as cancelled once the processes are gone."""
+    pids = [job.get("pid")]
+    if job.get("kind") in CHAIN_KINDS:
+        for cid in (job.get("outputs") or {}).get("children", []):
+            c = jread(jobs_dir() / cid / "job.json", {}) or {}
+            if c.get("state") in ("queued", "running"):
+                pids.append(c.get("pid"))
+    for pid in pids:
+        if pid is not None and pid_alive(pid):  # never killpg(0): that is this server's group
+            try:
+                os.killpg(int(pid), signal.SIGTERM)
+            except (ProcessLookupError, PermissionError, ValueError):
+                pass
 
 
 def read_log(jid: str, offset: int) -> dict[str, Any]:

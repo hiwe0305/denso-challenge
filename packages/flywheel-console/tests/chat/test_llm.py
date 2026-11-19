@@ -298,3 +298,12 @@ def test_tool_answer_is_shown_as_it_stands(
     evs = list(llm.events({"messages": [{"role": "user", "content": "nhận xét kết quả vòng này"}],
                            "context": {"route": "#/home"}}))  # fmt: skip
     assert not called and ("token", {"text": "Not shown."}) in evs and evs[-1][0] == "done"
+
+
+def test_stored_turns_that_name_a_held_run_are_not_listed(idx: ConsolePaths) -> None:
+    idx.chat.mkdir(parents=True, exist_ok=True)
+    turns = [{"turn_id": "t-1", "question": "q", "answer": "C70_R1 đạt 4/60"},
+             {"turn_id": "t-2", "question": "q", "answer": "C_70 đạt 10/60"}]  # fmt: skip
+    (idx.chat / "2026-11-16.jsonl").write_text("\n".join(json.dumps(t) for t in turns) + "\n")
+    assert [t["turn_id"] for t in llm.list_traces(10, {"C70_R1"})] == ["t-2"]
+    assert llm.get_trace("t-1", {"C70_R1"}) is None and llm.get_trace("t-1") is not None

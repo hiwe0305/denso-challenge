@@ -379,3 +379,26 @@ def test_locked_server_lists_kinds_read_only(klocked: Srv) -> None:
     assert st == 200 and d["locked"] is True
     assert all(k["available"] is False for k in d["kinds"])
     assert "/home/" not in body.decode()
+
+
+def test_staging_skips_symlinks_and_jobs_never_share_a_copy(
+    rn: ConsolePaths, ds: Path, tmp_path: Path
+) -> None:
+    secret = tmp_path / "vault" / "holdout.json"
+    secret.parent.mkdir()
+    secret.write_text("{}")
+    (ds / "meta" / "leak.json").symlink_to(secret)
+    (ds / "linked_dir").symlink_to(secret.parent)
+    dst = runner.staged_path(ds.resolve())
+    rt = {"cancel": threading.Event()}
+    a = runner.make_job("data.ingest", {}, pl={"argv": ["x"]})
+    b = runner.make_job("data.ingest", {}, pl={"argv": ["x"]})
+    # a's copy is under way when b starts: b must not clear or write into it
+    part_a = dst.with_name(f"{dst.name}.part-{a['id']}")
+    part_a.mkdir(parents=True)
+    (part_a / "marker").write_text("a")
+    assert runner.stage_dataset(b, rt, ds.resolve(), dst) == 0
+    assert (part_a / "marker").is_file()
+    assert (dst / "meta" / "info.json").is_file()
+    assert not (dst / "meta" / "leak.json").exists() and not (dst / "linked_dir").exists()
+    assert "symlink" in (runner.jobs_dir() / b["id"] / "log.txt").read_text()
