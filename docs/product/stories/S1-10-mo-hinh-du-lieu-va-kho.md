@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Hoàn thành (Chờ review và merge) |
+| Trạng thái | Xong (PR #36, 3/11/2026; đủ 21/21 nhiệm vụ con) |
 | Người làm | Long |
 | Story PRD | 2.1, phần a · Epic 2. Phần b (RunPlan, `fw plan freeze`, test NFR7) làm ở S3 |
 | Nhãn | [Lõi] · `epic:2` · `gate:G1` · `area:data` |

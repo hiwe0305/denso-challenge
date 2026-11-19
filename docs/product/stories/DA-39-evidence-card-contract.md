@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Đang làm (Hiếu mở ngày 4/11/2026: "Mở session làm luôn") |
+| Trạng thái | Xong (PR #82, 3/11/2026; đủ 6/6 nhiệm vụ con. Hiếu mở ngày 4/11/2026) |
 | Người làm | Hiếu |
 | Làn | Nhân (`flywheel-contracts`, chủ là Hiếu, 07 mục 2.1) |
 | Story PRD | Epic 3 · FR21 (không im lặng thành đạt); [spec v10.5](../../spec-v10-failure-to-data.md) mục 4.5 (Evidence card), 6.4 (bước 4b), 6.9, 6.10, 6.11, 6.13, 6.14; [03](../03-architecture.md) mục 2.4 (dòng Evidence card), 4.3, 7.3; [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 10, mục 11 phần 6 |

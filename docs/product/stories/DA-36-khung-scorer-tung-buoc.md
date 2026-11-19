@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Nháp (Châu viết 2/11/2026; PO đặt mã DA-36 ngày 3/11/2026) |
+| Trạng thái | Xong (PR #58, #124, #139, 3–5/11/2026; đủ 15/15 nhiệm vụ con. Châu viết 2/11/2026; PO đặt mã DA-36 ngày 3/11/2026) |
 | Người làm | Châu (nhiệm vụ 1–7); Hiếu (nhiệm vụ 8, 9, từ 5/11/2026) |
 | Làn | Đánh giá (`flywheel-eval`) |
 | Story PRD | 3.3 · Epic 3 · FR16, FR17; [spec v10.5](../../spec-v10-failure-to-data.md) mục 5.1, 5.2; [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 3 (bảng 6 bước), mục 10 |

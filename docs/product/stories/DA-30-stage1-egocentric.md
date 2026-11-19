@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt 27/10/2026) |
+| Trạng thái | Làm dở (16/20 nhiệm vụ con; PR #102, #111, #112, #171, #179, #188, #189, 4–11/11/2026; còn nhiệm vụ 1.4, 2, 3. PO duyệt 27/10/2026) |
 | Người làm | Hiếu |
 | Làn | Adapter `flywheel-psi0` |
 | Story PRD | 9.25 · Epic 9 · [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 7.8, 8.1 |

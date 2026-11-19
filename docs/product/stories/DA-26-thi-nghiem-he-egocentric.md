@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt hướng 27/10/2026) |
+| Trạng thái | Làm dở (2/8 nhiệm vụ con; PR #99, #109, #120, #127, #128, #129, #136, #137, #143, #180, 4–10/11/2026; còn nhiệm vụ 2–7. PO duyệt hướng 27/10/2026) |
 | Người làm | Hiếu |
 | Làn | Model và phần cứng (chạy job GPU); kết quả đi qua làn Đánh giá |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 7 · spec mục 3 (HE), 7.9 |

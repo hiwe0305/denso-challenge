@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt 28/10/2026) |
+| Trạng thái | Xong (PR #20, 31/10/2026; đủ 7/7 nhiệm vụ con. PO duyệt 28/10/2026) |
 | Người làm | Hiếu |
 | Làn | Adapter simulator (`flywheel-simple`) |
 | Story PRD | Story của [design 28/10/2026](../../superpowers/specs/2026-10-28-tray-transfer-he-design.md) mục 3, 4, 7 (M0, M1) |

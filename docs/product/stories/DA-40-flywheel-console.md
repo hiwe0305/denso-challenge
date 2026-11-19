@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Đang làm (Hiếu mở ngày 11/11/2026: "Vào repo, story DA-40") |
+| Trạng thái | Xong (PR #194, 11/11/2026; đủ 8/8 nhiệm vụ con; phần sửa sau demo gom ở PR #201, 19/11/2026. Hiếu mở ngày 11/11/2026) |
 | Người làm | Hiếu |
 | Làn | Ngoài ba làn: công cụ của đội, đọc file và gọi lệnh `fw`, không import làn hay adapter |
 | Nguồn yêu cầu | BA Flywheel Console bản 0.5 (`docs/superpowers/specs/2026-11-11-flywheel-console-design.md`, PR #193 chưa merge), mục 11, 12, 15.1a, 15.1b, 17 |

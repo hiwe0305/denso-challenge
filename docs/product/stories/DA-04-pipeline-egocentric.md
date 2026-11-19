@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt 27/10/2026) |
+| Trạng thái | Xong (PR #152, #163, #173, #176, #184, 7–10/11/2026; đủ 23/23 nhiệm vụ con. PO duyệt 27/10/2026) |
 | Người làm | Hiếu, làm cùng Claude (từ 6/11/2026, thay Hưng; 07 bản 1.9) |
 | Làn | Dữ liệu |
 | Story PRD | 9.4 · Epic 9 · [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 5.0, 6.6 |

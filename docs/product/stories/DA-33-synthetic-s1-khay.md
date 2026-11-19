@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Đang làm. Nhiệm vụ 1–4 đã merge (PR #28, 2/11/2026); nhiệm vụ 5, 6, 7 đã merge (PR #39, 3/11/2026); nhiệm vụ 8, 9, 10 xong trên nhánh `DA-33-tray-release`. PO duyệt kế hoạch nhiệm vụ 5–9 và mặc định Q-33A, Q-33B, Q-33D (3/11/2026) |
+| Trạng thái | Xong (PR #28, #39, #47, 2–3/11/2026, release `tray_s1_0d84cc87b1e5`; sửa sau đó: #93, #103, #105, #117, #182, #187, 4–10/11/2026; đủ 17/17 nhiệm vụ con. PO duyệt kế hoạch nhiệm vụ 5–9 và mặc định Q-33A, Q-33B, Q-33D 3/11/2026) |
 | Người làm | Hiếu |
 | Làn | Adapter simulator (`flywheel-simple`) |
 | Story PRD | Story của [design 28/10/2026](../../superpowers/specs/2026-10-28-tray-transfer-he-design.md) mục 4, 5, 7 (M2) |

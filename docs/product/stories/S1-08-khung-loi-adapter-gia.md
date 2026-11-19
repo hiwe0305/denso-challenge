@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt 22/10/2026) |
+| Trạng thái | Xong (PR #13, 28/10/2026; đủ 11/11 nhiệm vụ con. PO duyệt 22/10/2026) |
 | Người làm | Long |
 | Story PRD | 1.7 · Epic 1 |
 | Nhãn | [Lõi] · `epic:1` · `gate:G0` · `area:data` |

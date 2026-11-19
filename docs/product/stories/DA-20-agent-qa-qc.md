@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt 25/10/2026; sửa 27/10/2026) |
+| Trạng thái | Làm dở (12/15 nhiệm vụ con; PR #151, 7/11/2026; #185, 12/11/2026; còn nhiệm vụ 5, 6, 7. PO duyệt 25/10/2026; sửa 27/10/2026) |
 | Người làm | Hiếu, làm cùng Claude (từ 6/11/2026, thay Hưng; 07 bản 1.9) |
 | Làn | Đánh giá |
 | Story PRD | Story của [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 9 · Epic 9 |

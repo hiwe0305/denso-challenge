@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Sẵn sàng (PO duyệt 27/10/2026) |
+| Trạng thái | Xong (PR #132, #166, 5–8/11/2026; đủ 7/7 nhiệm vụ con. PO duyệt 27/10/2026) |
 | Người làm | Châu (từ 3/11/2026; trước đó Hưng) |
 | Làn | Đánh giá |
 | Story PRD | 9.23 · Epic 9 · [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 9.2 · 03 ADR-26 |

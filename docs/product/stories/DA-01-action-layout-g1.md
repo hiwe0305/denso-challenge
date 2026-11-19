@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Đang làm (Hiếu viết cùng Claude 3/11/2026, theo quyết định PO 3/11/2026: Hiếu và Claude làm song song mọi việc đang mở) |
+| Trạng thái | Xong (PR #76, 3/11/2026; #94, 4/11/2026; đủ 5/5 nhiệm vụ con. Hiếu viết cùng Claude theo quyết định PO 3/11/2026) |
 | Người làm | Long (chủ story, 07 mục 2.2); phần `configs/embodiments/g1.yaml` do Hiếu và Claude làm |
 | Làn | Nhân (`flywheel-contracts`) và cấu hình embodiment (`configs/embodiments/`, chủ là Hiếu, 07 mục 2.1) |
 | Story PRD | 9.1 · Epic 9 · FR48; [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 6.1, 6.2, 9.2 |
