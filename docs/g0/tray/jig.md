@@ -411,6 +411,121 @@ So với cảnh không đồ gá cùng planner thì không có lệnh sẵn (s�
 cd ~/denso-da41 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/python scripts/g0/tray/jig_views.py --out fwdata/simple/tray/jig-views --cases 0:0 1:1279 2:125195
 ```
 
+### 5.1 Sinh lô khoảng 600 episode trên cảnh đồ gá (nhiệm vụ 8.4)
+
+**[Đề xuất]**, Hiếu chạy. Claude không chạy trên `rtx3060`. Đây là **lô mới**, tách khỏi kho planner-5 (`~/denso-da34-pool`): thư mục riêng, `FW_ROOT` riêng, planner `da41-planner-8`, cảnh `jig2`. Không gộp release, catalog hay ledger của lô này với kho cũ. Mọi lệnh đã chạy trên laptop với lô mẫu 19 episode (mục 4.9), trừ số worker.
+
+| Mục | Giá trị |
+|---|---|
+| Thư mục | `~/denso-da41/fwdata/da41-jig-600/` (`$B`): `gen-l1/`, `gen-l2/`, `releases/`, `pipeline/`, `replay17/`, `reports/`, ledger `fw/` và `sites/` (append-only, giữ) |
+| Số lượt | 632 lượt, để còn khoảng 600 episode với tỉ lệ giữ 95 % của lô mẫu |
+| Chia mức | Theo lô 606 cũ: phần kho 429 episode toàn mức 1; phần nhắm lỗi 177 episode, 82 mức 1 và 78 mức 2 theo `cplus-selection.jsonl`, 17 không rõ mức. Tổng khoảng 86 % mức 1, 14 % mức 2. Lô mới: **544 lượt mức 1, 88 lượt mức 2** |
+| Seed | Train, chưa dùng ở đâu: mức 1 `500000–500543`, mức 2 `501000–501087`. Đã dùng: 0–143, 1000–1609, 100000–199999, 300000–300089, 400000–400109 (lô mẫu), 400200–400202 (đối chứng 8.2) |
+| Worker | Mức 1: 12, mức 2: 2, chạy cùng lúc, tổng 14 (giới hạn máy dùng chung là 22) |
+| Thời gian (ước lượng) | Sinh 632 × 82 s ≈ 14,4 giờ-worker, khoảng 1,1 giờ đồng hồ. QA phát lại 600 × 88 s ≈ 14,7 giờ-worker, khoảng 1,1 giờ. Phát lại DA-17 cỡ QA phát lại (trên laptop 30–34 s mỗi episode, ngang QA phát lại), khoảng 1,1 giờ. Tổng khoảng 3,5–4 giờ. Số giây mỗi lượt lấy từ lô 872 lượt của mục 5.1 [target-zone.md](target-zone.md); chưa đo trên cảnh đồ gá ở `rtx3060` |
+| Dung lượng (ước lượng) | Lô mẫu: thô 8,9 MB, release 8,2 MB mỗi episode. 600 episode: thô khoảng 5,4 GB, release khoảng 4,9 GB, cộng thư mục làm việc, tổng khoảng 11 GB |
+| Chưa gồm | Dữ liệu riêng cho bước đặt (đoạn hạ và nhả). Đây là việc sau |
+
+Điều kiện dừng: sau mỗi bước, nếu tỉ lệ giữ dưới **85 %** thì dừng, không chạy bước sau, gửi lại output của lệnh đọc kết quả. Tỉ lệ giữ là số episode còn lại chia cho số lượt sinh của mức đó. Lô mẫu giữ 95 %.
+
+Chuẩn bị: code ở mục 5 (nhánh `DA-41-tray-fixed-target-jig`, phải in `da41-planner-8` và `jig2`). Nên chạy trước phần kiểm 50 seed mỗi mức của mục 5; nếu một mức dưới 95 % (dưới 48/50) thì chưa sinh lô này, gửi số cho Claude. Mỗi lệnh sim chạy trong một scope `systemd-run` có `MemoryMax` (một worker cần khoảng 3,7 GB; trên laptop đo được), như các lô trước trên máy này.
+
+```bash
+mkdir -p ~/denso-da41/fwdata/da41-jig-600 && df -h ~/denso-da41/fwdata
+```
+
+**Bước 1. Sinh**, hai mức chạy cùng lúc:
+
+```bash
+cd ~/denso-da41 && B=$PWD/fwdata/da41-jig-600 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src nohup setsid systemd-run --user --scope -p MemoryMax=48G -p MemorySwapMax=0 fwdata/simple/.venv/bin/python scripts/g0/tray/generate.py --scene jig --out $B/gen-l1 --n 544 --level 1 --seed-start 500000 --workers 12 > $B/gen-l1.log 2>&1 < /dev/null &
+```
+
+```bash
+cd ~/denso-da41 && B=$PWD/fwdata/da41-jig-600 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src nohup setsid systemd-run --user --scope -p MemoryMax=8G -p MemorySwapMax=0 fwdata/simple/.venv/bin/python scripts/g0/tray/generate.py --scene jig --out $B/gen-l2 --n 88 --level 2 --seed-start 501000 --workers 2 > $B/gen-l2.log 2>&1 < /dev/null &
+```
+
+Đọc kết quả (tiến độ, và khi xong): số lượt, số ghi được, tỉ lệ, phiên bản planner (phải chỉ có `da41-planner-8+cfg.bee61399`), lỗi:
+
+```bash
+cd ~/denso-da41/fwdata/da41-jig-600 && for L in 1 2; do cat gen-l$L/shard-*/gen_log.jsonl | python3 -c "import sys,json,collections; r=[json.loads(l) for l in sys.stdin]; ok=sum(x['recorded'] for x in r); print('L$L', len(r), 'lượt', ok, 'ghi', f'{ok/max(len(r),1):.1%}', {x['planner_version'] for x in r}, collections.Counter(x['failure'] or x['abort_reason'] for x in r if not x['success']))"; done
+```
+
+Dừng nếu một mức ghi được dưới 85 %. Lô mẫu: 19/20.
+
+**Bước 2. QA phát lại** (dựng lại trong cảnh đồ gá theo `uid` đã ghi, mục 4.9):
+
+```bash
+cd ~/denso-da41 && B=$PWD/fwdata/da41-jig-600 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src nohup setsid systemd-run --user --scope -p MemoryMax=48G -p MemorySwapMax=0 bash -c "fwdata/simple/.venv/bin/python scripts/g0/tray/replay_qa.py --out $B/gen-l1 --workers 12 > $B/replay-l1.log 2>&1; fwdata/simple/.venv/bin/python scripts/g0/tray/replay_qa.py --out $B/gen-l2 --workers 12 > $B/replay-l2.log 2>&1" < /dev/null > /dev/null 2>&1 &
+```
+
+```bash
+cd ~/denso-da41/fwdata/da41-jig-600 && for L in 1 2; do echo L$L; python3 -m json.tool gen-l$L/replay_summary.json | head -20; grep -c "mismatch" replay-l$L.log; done
+```
+
+Phải qua gần hết, lệch 0,0 mm, và không có dòng `mismatch` (số 0). Có dòng `mismatch` là dựng sai cảnh: dừng.
+
+**Bước 3. Release** (không cần GPU):
+
+```bash
+cd ~/denso-da41 && B=$PWD/fwdata/da41-jig-600 && for L in 1 2; do PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/python scripts/g0/tray/release.py --batch $B/gen-l$L --releases $B/releases 2>&1 | tail -3; done; ls $B/releases
+```
+
+**Bước 4. Ingest** vào store riêng của lô (release phải nằm dưới `FW_ROOT`):
+
+```bash
+cd ~/denso-da41 && export FW_ROOT=$PWD/fwdata/da41-jig-600 && for R in $FW_ROOT/releases/tray_s1_*; do uv run fw data ingest $R --source-detail planner_wbc --license unknown --data-class public --split train 2>&1 | tail -2; done; ls -d $FW_ROOT/pipeline/src_*
+```
+
+Ghi lại cặp `src_…` và `tray_s1_…` của từng mức. Release mức 1 có khoảng 520 episode, mức 2 khoảng 85. Các bước sau dùng hai biến `SRC` (cột đầu) và `REL` (tên thư mục sau `releases/`) cho từng mức:
+
+```bash
+cd ~/denso-da41/fwdata/da41-jig-600 && for W in pipeline/src_*; do python3 -c "import json; d=json.load(open('$W/ingest.json')); print(d['source_id'], d['store_path'], d['episodes'], 'episode')"; done
+```
+
+**Bước 5. Phát lại DA-17 trong cảnh đồ gá** (chạy sim; thay `SRC` và `REL` bằng cặp của từng mức, chạy lần lượt hai mức):
+
+```bash
+cd ~/denso-da41 && B=$PWD/fwdata/da41-jig-600 && SRC=src_XXXX && REL=tray_s1_XXXX && export FW_ROOT=$B MUJOCO_GL=egl PYTHONPATH=$PWD/packages/flywheel-simple/src && nohup setsid systemd-run --user --scope -p MemoryMax=48G -p MemorySwapMax=0 uv run python -m flywheel.data.replay_check replay $B/releases/$REL --work $B/replay17/$REL --python $PWD/fwdata/simple/.venv/bin/python --env-id simple/G1WholebodyTrayTransferJigTeleop-v0 --workers 12 > $B/replay17-$REL.log 2>&1 < /dev/null &
+```
+
+`--env-id` phải là env đồ gá. Adapter dừng với lỗi `SceneMismatch` nếu env khác cảnh đã ghi (nhiệm vụ 8.1). Kiểm không có dòng `mismatch` và đủ một dòng mỗi episode:
+
+```bash
+cd ~/denso-da41/fwdata/da41-jig-600 && for R in releases/tray_s1_*; do R=$(basename $R); echo $R $(wc -l < releases/$R/meta/episodes.jsonl) episode, $(cat replay17/$R/replay_outcomes.jsonl 2>/dev/null | wc -l) outcomes, $(cat replay17/$R/shard-*/replay.log | grep -c mismatch) mismatch; done
+```
+
+**Bước 6. Report và QA DA-03** (không cần GPU; thay `SRC`, `REL` như bước 5):
+
+```bash
+cd ~/denso-da41 && B=$PWD/fwdata/da41-jig-600 && SRC=src_XXXX && REL=tray_s1_XXXX && export FW_ROOT=$B && uv run python -m flywheel.data.replay_check reports $B/pipeline/$SRC --out $B/reports/$REL --outcomes $B/replay17/$REL/replay_outcomes.jsonl 2>&1 | tail -1 && uv run fw data qa $B/pipeline/$SRC --replay $B/reports/$REL 2>&1 | tail -1
+```
+
+```bash
+cd ~/denso-da41/fwdata/da41-jig-600 && for W in pipeline/src_*; do python3 -c "import json,collections,sys; r=[json.loads(l) for l in open('$W/qa/reports.jsonl')]; print('$W', collections.Counter(x['decision'] for x in r), collections.Counter(s.split(' (')[1].split(')')[0] for x in r for s in x['reasons']))"; done
+```
+
+`reject` và `quarantine` bị bỏ ở bước 8; `flag` được giữ. Cờ D7 (`replay_dynamic`) và D8 dự kiến có ở nhiều episode (mục 4.9, nhiệm vụ 8.2), không phải lý do dừng. Dừng nếu `reject` cộng `quarantine` làm tỉ lệ giữ dưới 85 %.
+
+**Bước 7. Bộ lọc chất lượng** (không cần GPU):
+
+```bash
+cd ~/denso-da41 && B=$PWD/fwdata/da41-jig-600 && for L in 1 2; do uv run python -m flywheel_psi0.tray.quality --batch $B/gen-l$L --out $B/gen-l$L/quality.jsonl 2>&1 | tail -1; done
+```
+
+**Bước 8. Tập demo** (thay `SRC`, `REL`, mức `L` và số episode của release `N` cho từng mức):
+
+```bash
+cd ~/denso-da41 && B=$PWD/fwdata/da41-jig-600 && SRC=src_XXXX && REL=tray_s1_XXXX && L=1 && N=$(wc -l < $B/releases/$REL/meta/episodes.jsonl) && uv run python -m flywheel_psi0.tray.demo_sets --release $B/releases/$REL --size ALL=$N --qa-work $B/pipeline/$SRC --quality $B/gen-l$L/quality.jsonl --max-tilt-carry-deg 10 --max-part-shift-end-mm 20 --out $B/demo_sets-l$L.json 2>&1 | tail -3
+```
+
+Đọc tỉ lệ giữ cuối của từng mức (số trong tập `ALL` chia số lượt sinh):
+
+```bash
+cd ~/denso-da41/fwdata/da41-jig-600 && for L in 1 2; do python3 -c "import json,glob; n=json.load(open('demo_sets-l$L.json'))['sets']['ALL']['n']; a=sum(len(open(p).readlines()) for p in glob.glob('gen-l$L/shard-*/gen_log.jsonl')); print('L$L', n, '/', a, f'{n/a:.1%}')"; done
+```
+
+Dừng nếu một mức dưới 85 %. Nếu `demo_sets` báo thiếu episode cho `ALL=$N`, giảm `N` về số nó báo còn lại. Gửi Claude bốn output: bước 1, 2, 6 và 8.
+
 ## 6. Việc tiếp theo (ngoài DA-41)
 
 - Driver eval của DA-42 (`run.py`) cần chọn env `jig_task.make_env` và guard theo `visuals_revision(..., jig=True)` để eval trên cảnh có đồ gá.
