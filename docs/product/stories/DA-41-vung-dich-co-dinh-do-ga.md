@@ -60,7 +60,7 @@ Số đo dẫn tới story ([docs/he/tray.md](../../he/tray.md) mục 19–20): 
 - [ ] 8. Sửa phát lại động học DA-17 cho cảnh đồ gá và soạn runbook sinh lô 600 (PO 20/11/2026: "Làm đi")
   - [x] 8.1 Adapter `flywheel_simple/replay/run.py` chọn env theo `uid` đã ghi; dừng với lỗi rõ khi episode sẽ phát lại trên cảnh khác; giữ hành vi với cảnh cũ (có test)
   - [x] 8.2 Chạy lại phát lại động học và `fw data qa --replay` trên lô mẫu 19 episode; cờ D7, D8 trước và sau trong jig.md mục 4.9. Kết quả ở mục 4.10: không còn dòng `mismatch`; D8 15 → 7, D7 19 → 19. Cờ còn lại do ngưỡng `replay-1` (hiệu chỉnh trên psi-data) và bộ phát lại của SIMPLE, không do đồ gá: đối chứng 3 episode cảnh cũ cho cùng kết quả (việc của DA-17, mục 6)
-  - [ ] 8.3 Kết luận ngắn: (a) seed 400005 `timeout:RELEASE`; (b) độ lệch +1,0 cm theo trục dọc, có sửa được bằng một tham số không
+  - [x] 8.3 Kết luận ngắn: (a) seed 400005 `timeout:RELEASE`; (b) độ lệch +1,0 cm theo trục dọc, có sửa được bằng một tham số không. jig.md mục 4.10: (a) cùng lớp lỗi nhả 1:10, ngón cái cạy khay rồi khay mắc trên cổ tay phải; (b) sinh ra ở 5 cm cuối và lúc nhả, không do chỗ đứng; đồ gá góp khoảng 0,5 cm. Ngắm xa 0,8 cm chỉ giảm 1,00 → 0,78 cm (19/19 vẫn đạt), nên để nguyên, không đổi `PLANNER_VERSION`
   - [ ] 8.4 Runbook `rtx3060` cho lô khoảng 632 lượt (khoảng 600 episode qua lọc), từ sinh tới `demo_sets`, kèm điều kiện dừng; Hiếu chạy
 
 ## Phạm vi file

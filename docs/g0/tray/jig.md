@@ -322,7 +322,7 @@ Vùng đích luôn thấy được lúc hạ: thấp nhất 3,2 % ở một epis
 **Thời gian.** Laptop, một worker: sinh trung bình 36,4 s mỗi lượt (p95 49 s), QA phát lại 32–33 s, phát lại động học 30–34 s mỗi episode. Ước lượng cho 600 episode qua lọc trên `rtx3060`, dựa trên số giờ-worker của lô 872 lượt (mục 5.1 của target-zone.md: 82 s mỗi lượt sinh, 88 s mỗi lượt QA phát lại): khoảng 632 lượt sinh (95 % giữ được), 14 giờ-worker sinh, 15 giờ-worker QA phát lại, thêm phát lại động học cỡ đó. Với 14 worker, khoảng 3–3,5 giờ đồng hồ. Đây là ước lượng, chưa đo.
 
 **Bất thường.**
-1. Seed 400005 (mức 1) hỏng `timeout:RELEASE`, kiểu lỗi không gặp trên 61 episode của mục 4.8. Mất một lượt sinh, không vào dữ liệu. Chưa tìm nguyên nhân.
+1. Seed 400005 (mức 1) hỏng `timeout:RELEASE`, kiểu lỗi không gặp trên 61 episode của mục 4.8. Mất một lượt sinh, không vào dữ liệu. Nguyên nhân ở mục 4.10 (a): cùng lớp lỗi nhả 1:10.
 2. Phát lại DA-17 (`flywheel_simple/replay/run.py`) chỉ đăng ký env cảnh cũ, nên cũng dựng lại episode không có đồ gá. Mọi episode bị `flag` vì D7 (sai số trạng thái tay tới 1,36 rad lúc nhả, phát lại không thành công) và D8. Các kiểm tĩnh đều qua. `demo_sets` giữ `flag`, nên lô vẫn đủ 19. Đã sửa ở nhiệm vụ 8.1 và chạy lại ở 8.2 (mục 4.10).
 3. Khay dừng lệch theo trục dọc của đích trung bình +1,0 cm (16/19 episode lệch dương, thấp nhất −0,2 cm), cả hai mức; lệch ngang trung bình −0,2 cm. Nằm trong dung sai, nhưng là độ lệch có hệ thống của planner trong dữ liệu.
 4. Câu lệnh task vẫn nói "target zone". Nếu muốn policy phân biệt hai cảnh bằng lời thì phải đổi câu, nhưng như vậy sẽ khác dữ liệu cũ.
@@ -348,6 +348,22 @@ Sau sửa vẫn còn cờ, nên tìm nguyên nhân, không coi là qua:
 
 Theo quyết định PO 4/11/2026, D7 động lực học và D8 chỉ là `flag`; `demo_sets` giữ `flag`, nên cả 19 episode vẫn ở lại. Muốn D7 có ý nghĩa trên dữ liệu khay thì phải hiệu chỉnh lại ngưỡng `replay-1` trên dữ liệu planner khay. Đó là việc của chủ `configs/data/replay.yaml`, ngoài DA-41 (mục 6).
 
+**(a) Seed 400005, `timeout:RELEASE` (8.3).** Chạy lại seed (planner tất định, cùng chuỗi pha và thời điểm như `gen_log`) với vết tiếp xúc của tay theo từng bước (`fwdata/da-41-samples/evidence/r8/trace-400005.txt`, không commit). LOWER kết thúc như thường: khay cao 3,5 cm trên bàn B, nghiêng 1,5°. Khi tay mở, ngón cái và ngón giữa phải còn móc quai phải. Trong 0,4 s khay bị cạy lên: nghiêng 11°, nâng thêm 0,7 cm, trượt 3 cm theo trục dọc. Sau đó khay nằm yên, nghiêng 4°, cách mặt bàn 1,8 cm, lệch 4,0 cm dọc và 7,9 cm ngang, tựa lên cổ tay phải. Cổ tay chạm quai không lúc nào rời, nên RELEASE (chờ hai tay hết chạm 0,5 s) hết 4 s và hủy. **Kết luận: cùng lớp với lỗi nhả 1:10** (mục 4.7: khay tựa trên cổ tay và ngón cái, ngón cái quẹt lên dưới quai khi bàn tay mở và nâng lệch một bên). Ở 1:10 lực nâng lệch làm khay nghiêng 12–19° và bị chấm `L-TRAY-TILT`. Ở đây khay mắc lại trên cổ tay phải, nên cùng cơ chế hiện thành `timeout:RELEASE`. Mục 4.7 đo lớp này khoảng 1/7 quanh 1:10; trên 81 lượt planner-8 trên đồ gá (61 của mục 4.8 và 20 của lô mẫu) nó gặp 1 lần, chính là 400005. Không sửa trong DA-41; lớp này đã ghi ở mục 6.
+
+**(b) Độ lệch dọc +1,0 cm (8.3).** Đo trên 19 episode thô của lô mẫu: độ lệch dọc của khay (dương là khay dừng ngắn, lệch về phía robot) tại frame cuối mà khay còn cao hơn mỗi mức so với lúc nằm yên.
+
+| Khay còn cao | 5 cm | 4 cm | 3,5 cm | 3 cm | 2 cm | 1 cm | Cuối |
+|---|---|---|---|---|---|---|---|
+| Lệch dọc trung bình (cm) | 0,20 | 0,37 | 0,67 | 0,74 | 0,95 | 1,03 | 1,00 |
+
+Nguồn:
+- **Không phải chỗ đứng.** Khi khay còn cao 5 cm, ARRIVE_B đã xong và tay đang hạ, khay chỉ lệch 0,2 cm. Đế lùi 4–13 cm sau khi khay chạm bàn (RETREAT), nhưng khay không dịch thêm (1,02 cm lúc chạm, 1,00 cm cuối).
+- **Phần lớn ở 5 cm cuối, quanh điểm buông.** Khoảng 0,5 cm sinh ra trong 1,5 cm cuối của LOWER (từ 5 xuống 3,5 cm). Giả thuyết, chưa kiểm bằng vết tiếp xúc: cổ tay dưới quai chạm bàn (D-25) và đẩy tay về phía robot. Khoảng 0,35 cm sinh ra sau khi buông ở 3,5 cm (`lower_tray_clear`), khi tay mở và khay rơi. Vòng kín `place_shift` chỉ cập nhật khi khay chưa chạm bàn, nên không bù được phần sau.
+- **Đồ gá chỉ góp phần nhỏ.** Trên 61 episode của mục 4.8, không đồ gá vẫn lệch +0,8 cm (tập mới) đến +1,1 cm (tập cũ); có đồ gá +1,3 cm và +1,7 cm. Đồ gá thêm khoảng 0,5 cm.
+
+Thử sửa bằng một tham số, ngoài repo: ngắm xa hơn 0,8 cm theo trục dọc trong vòng kín của LOWER (`aim_probe.py`, vá `_place_error`, không đổi planner). Trên đúng 19 seed: 19/19 vẫn đạt, nhưng độ lệch trung bình chỉ giảm từ 1,00 xuống 0,78 cm, trung vị 0,74. Từng seed đổi từ −1,6 đến +1,1 cm. Lệch ngang từ −0,22 thành −0,04 cm. Dời đích 0,8 cm chỉ dời kết quả 0,2 cm, vì phần lệch đến từ tiếp xúc lúc chạm và lúc nhả, không phải một độ dời cố định.
+
+**Kết luận: để nguyên, không đổi `PLANNER_VERSION`.** Lý do: (1) không có tham số đơn nào bù được, vì phép ngắm xa đã thử chỉ gỡ một phần năm; (2) nếu hiệu ứng tuyến tính thì muốn bù hết phải ngắm xa khoảng 3,5 cm (ước lượng). Lúc đó khay buông sát tường đồ gá phía xa, chính chỗ sinh lỗi nhả 1:10, và phải đo lại 61 episode ở cả hai cảnh; (3) 1,0 cm nằm trong dung sai đặt, và có cả ở cảnh không đồ gá. Muốn sửa tận gốc thì phải đổi pha nhả (buông thấp hơn, mở tay chậm hơn, mục 4.7), cùng việc với lớp lỗi 1:10 ở mục 6. Số thô: `fwdata/da-41-samples/evidence/r8/aim-0.008.jsonl` (không commit).
 
 ## 5. Runbook cho Hiếu trên `rtx3060`
 
@@ -403,4 +419,5 @@ cd ~/denso-da41 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/
 - Sinh lô mới trên cảnh đồ gá và train lại: story sau, cần duyệt ngân sách.
 - Planner (nếu kiểm 50 seed dưới 95 %): hai lớp lỗi còn lại của mục 4.8. Cầm lệch một tay (1:16; độ lệch lòng bàn tay cuối GRASP không dự báo được lỗi, cần tín hiệu khác). Ngón cái cạy khay lên khi nhả trong đồ gá (1:10, khoảng 1/7 quanh seed đó).
 - Phát lại DA-17 trên dữ liệu khay (chủ `configs/data/replay.yaml`, DA-17): ngưỡng `state_error.hand` và `hand_event_offset_steps` của `replay-1` hiệu chỉnh trên psi-data teleop, nên D7 động lực học bật ở mọi episode planner khay, cả cảnh cũ lẫn đồ gá (mục 4.10). `replay_decoupled_wbc` của SIMPLE còn trượt khoảng 1/3 số episode (D8) dù `replay_qa` tái tạo đúng từng bit. Cần hiệu chỉnh ngưỡng trên dữ liệu khay, hoặc ghi rằng hai phép kiểm này không dùng cho nguồn `planner_wbc`. Phần chọn đúng cảnh đã sửa ở 8.1.
+- Pha nhả (planner): lớp lỗi 1:10 (mục 4.7, 400005 ở mục 4.10) và độ lệch dọc +1,0 cm có chung chỗ, là 5 cm cuối và lúc mở tay. Sửa cùng một lần (buông thấp hơn hoặc mở tay chậm hơn), rồi đo lại 61 episode ở cả hai cảnh.
 - Thí nghiệm: policy train trên cảnh đồ gá có dùng đồ gá làm mốc không (ví dụ che đồ gá lúc eval). Đồ gá chỉ chiếm dưới 0,7 % ảnh camera đầu (mục 4.4).
