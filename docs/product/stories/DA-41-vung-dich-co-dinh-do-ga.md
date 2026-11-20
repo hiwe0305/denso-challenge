@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Chờ duyệt: mọi nhiệm vụ con xong trên laptop; kiểm 50 seed trên `rtx3060` chờ Hiếu chạy (runbook ở jig.md mục 5). Mục tiêu planner ≥ 95 % chưa đạt (25/31 trên laptop) |
+| Trạng thái | Đang làm nhiệm vụ 6 (sửa planner, PO 20/11/2026). Nhiệm vụ 1–5 xong trên laptop; kiểm 50 seed trên `rtx3060` chờ Hiếu chạy (runbook ở jig.md mục 5). Mục tiêu planner ≥ 95 % chưa đạt (25/31 trên laptop) |
 | Người làm | Hiếu |
 | Làn | Adapter simulator (`flywheel-simple`) |
 | Story PRD | [Design 28/10/2026](../../superpowers/specs/2026-10-28-tray-transfer-he-design.md) mục 3.1, 3.5 (sửa 19/11/2026) |
@@ -28,6 +28,7 @@ Số đo dẫn tới story ([docs/he/tray.md](../../he/tray.md) mục 19–20): 
 5. Trong MuJoCo: khay đặt đúng đích đứng yên trong đồ gá; khay thả lệch vài cm tự trượt vào trong dung sai; planner hạ được khay vào đồ gá và hoàn thành episode.
 6. Có script ghi ảnh camera đầu của episode planner trên cảnh có đồ gá, và đo đồ gá còn thấy bao nhiêu khi khay đang bưng.
 7. [docs/g0/tray/jig.md](../../g0/tray/jig.md) ghi thay đổi, lý do, số đo, và runbook chạy test `sim` cùng kiểm planner (mục tiêu ≥ 95 % trên khoảng 50 hạt giống) trên `rtx3060`.
+8. (Thêm 20/11/2026) Planner tìm và sửa nguyên nhân gốc của các lỗi còn lại trên cảnh đồ gá, không nới dung sai chấm và không sửa bộ chấm (DA-42). Mục tiêu ≥ 95 % trên 31 episode laptop và khoảng 50 hạt giống trên `rtx3060`; không đạt thì ghi số thật, không đánh dấu xong.
 
 ## Nhiệm vụ
 
@@ -44,6 +45,10 @@ Số đo dẫn tới story ([docs/he/tray.md](../../he/tray.md) mục 19–20): 
   - [x] 4.3 Script ảnh camera đầu và độ thấy đồ gá (AC 6)
 - [x] 5. Tài liệu
   - [x] 5.1 `docs/g0/tray/jig.md`: thay đổi, số đo, runbook `rtx3060` (AC 7)
+- [ ] 6. Sửa planner cho đạt ≥ 95 % trên cảnh đích cố định có đồ gá (PO 20/11/2026: "Sửa planner trước", trước khi sinh lại dữ liệu; AC 8)
+  - [x] 6.1 Nguyên nhân gốc của từng nhóm lỗi còn lại, từ trace của episode hỏng, ghi trong jig.md
+  - [ ] 6.2 Sửa planner (căn góc trước khi hạ và trong lúc hạ, tư thế tay giơ sẵn) và hạ thấp cánh ngắn phía robot của đồ gá (nguyên nhân (a) ở hình học), test CPU và test `sim`
+  - [ ] 6.3 Đo lại đúng 31 episode cũ trên laptop, có và không đồ gá; bảng trước/sau và runbook 50 seed mới trong jig.md
 
 ## Phạm vi file
 
@@ -55,6 +60,8 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `scripts/g0/tray/`
 - `docs/g0/tray/`
 - `docs/superpowers/specs/2026-10-28-tray-transfer-he-design.md` (chỉ mục 3.1, 3.5 và dòng sửa đổi)
+
+Nhiệm vụ 6 (20/11/2026) sửa `planner.py`, `jig.py` (trong `flywheel_simple/tray/`), `configs/sim/tray_planner.yaml`, `configs/sim/tray_jig.yaml` và test trong `tests/tray/`; mọi file đều đã nằm trong danh sách trên, nên không cần mở rộng phạm vi. Không file nào bị run plan ghim. Planner mới đổi `PLANNER_VERSION` (`da41-planner-7`) và đồ gá đổi revision (`jig2`), nên episode sinh bằng chúng tách khỏi lô cũ. Hình học đồ gá chỉ đổi ở cánh ngắn phía robot, vì nguyên nhân gốc của nhóm lỗi (a) nằm ở đó (jig.md mục 4.5).
 
 ## Ghi chú cho người làm
 
@@ -79,6 +86,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 19/11/2026 | Tạo story theo quyết định PO 19/11/2026: vùng đích cố định, thêm đồ gá định vị | PO (Hiếu) |
+| 20/11/2026 | Thêm AC 8 và nhiệm vụ 6: sửa planner trước khi sinh lại dữ liệu (PO: "Sửa planner trước") | PO (Hiếu) |
 | 19/11/2026 | AC 3: cấu hình đồ gá ở `configs/sim/tray_jig.yaml` thay vì `tray.yaml` (file bị run plan DA-34 ghim sha256) | Hiếu (cùng Claude) |
 
 ## Ghi chép khi làm

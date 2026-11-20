@@ -146,6 +146,17 @@ Test qua SIMPLE ([`test_jig_task_sim.py`](../../../packages/flywheel-simple/test
 - Từ CARRY trở đi, đồ gá luôn hiện, nhưng nhỏ: dưới 0,7 % ảnh, ít hơn vùng đích 2–7 lần. Lúc CARRY + 2 s, khi khay che bớt vùng đích, số pixel của hai thứ gần bằng nhau.
 - Đồ gá **thấy được** từ camera đầu (AC đạt), nhưng là tín hiệu phụ. Mốc thị giác chính vẫn là vùng đích. Policy có học được vị trí từ đồ gá hay không cần thí nghiệm riêng (mục 6). Nếu cần đồ gá nổi hơn, có thể làm cạnh dẫn cao hoặc dày hơn; đổi hình học thì phải đo lại vùng bắt và planner (mục 4.2, 4.3).
 
+### 4.5 Nguyên nhân gốc của lỗi còn lại (nhiệm vụ 6.1, 20/11/2026)
+
+Hiếu chọn "Sửa planner trước" (20/11/2026). Mỗi nhóm lỗi ở mục 4.3 được xem lại từ trace từng bước của episode hỏng: pha, tư thế khay, pelvis, cổ tay trong hệ khay, tiếp xúc của khay và đồ gá với robot. Script trace để ngoài repo; bảng dưới là điều thấy được.
+
+| Nhóm lỗi | Seed | Thấy trong trace | Nguyên nhân gốc |
+|---|---|---|---|
+| (a) Cổ tay chạm cánh ngắn phía robot | 1:5, 1:7, 1:11; sau khi sửa (c) thêm 1:8, 1:12, 2:109 | Kiểu cầm ngửa tay giữ cổ tay dưới tay cầm, cách góc gần của khay 2–3 cm ra ngoài: hệ đồ gá x ≈ 0,17–0,19 m, y ≈ ±0,25 m, đúng trên mặt vát của cánh ngắn phía robot (3,5–6,5 cm). Link cổ tay chạm mặt vát từ khi khay còn cao 6,1 cm: khay bị chống ở 4,3–4,8 cm (nghiêng tới 22°) hoặc bị đẩy 4–8 cm theo y lên mặt vát phía xa | **Hình học đồ gá**: cánh ngắn phía robot cao bằng phía xa nằm dưới đường hạ của cổ tay. Planner không có chỗ hạ cổ tay khác với kiểu cầm này |
+| (b) REACH hết giờ | 2:102 | Hai tay giơ sẵn lệch khoảng 3 cm so với trục khay (trong hệ khay, tay trái y +0,30, tay phải −0,36). Ngón giữa tay trái móc tay cầm trái trong APPROACH_A, đẩy khay ra xa 2,5 cm (x 1,041 → 1,066), ra ngoài tầm với | Tay giơ sẵn (`ready_y` 0,32 m) chỉ rộng hơn đầu ngoài tay cầm (0,265 m) 5,5 cm. Chỗ đứng lệch ngang 3 cm cộng dao động của bước đưa ngón tay vào đúng hàng tay cầm |
+| (c) Lệch góc 10,1–10,7° | 1:1, 1:2, 1:12 (không đồ gá); 1:3 (RELEASE hết giờ, đồ gá) | Lúc buông khay đã lệch −4 đến −5,5°: pelvis trôi −1 đến −3° khi đứng ở ARRIVE_B, và góc khay trong tay khác với góc đã tính lúc LIFT. Mở tay xoay thêm khoảng −5° so với pelvis, cộng lại khoảng −10,6° | ARRIVE_B giữ hướng tính từ lúc LIFT; không đo lại góc khay trước khi hạ, và trong LOWER không có gì sửa góc |
+| (d) Khay trượt 6 cm về phía robot | 1:5, 1:11 | Khay đã kẹt trên tường hoặc mặt vát vì (a) hoặc (c); RELEASE đưa tay ra rồi lùi (`release_back` 0,05 m) kéo khay trên tấm trượt ma sát 0,2, phía robot không có gì chặn | Hệ quả của (a) và (c), không phải lỗi riêng của cách nhả: khi khay nằm đúng trong đồ gá, cùng chuyển động nhả không kéo khay |
+
 ## 5. Runbook cho Hiếu trên `rtx3060`
 
 Chưa chạy trên `rtx3060` (không chạy job ở đó khi chưa hỏi). Mọi lệnh dưới đây đã chạy trên laptop, trừ kiểm 50 seed.
