@@ -221,6 +221,25 @@ Trong các lượt đạt, sai lệch cuối: đồ gá trung vị 1,5 cm, lớn
   - **1:10, L-TRAY-TILT (đồ gá)**: khay buông đúng chỗ (lệch 0,5 cm, 0°) ở 3,5 cm. Khi tay mở, khay dội giữa hai tường cạnh dài phía xa, nghiêng tới 14,5° và rời tiếp xúc, nên bị chấm là còn đang bưng. Đây là động lực khi nhả, không phải vị trí đặt. Hướng: buông thấp hơn hoặc mở tay chậm hơn khi khay đã trong tường.
   - **1:20, ARRIVE_B hết giờ (không đồ gá)**: pelvis bước tới bước lui ±2–4 cm quanh chỗ đứng đã tính, không giữ được trong `arrive_lat_tol` 2 cm. Chưa tìm nguyên nhân gốc; có thể liên quan việc ARRIVE_B nay xoay hướng trong lúc bước. Chưa kiểm.
 
+### 4.7 Ba lượt còn hỏng: tỉ lệ lặp lại và nguyên nhân gốc (nhiệm vụ 6.4, 20/11/2026)
+
+Hiếu xem video mẫu và chọn "Sửa tiếp" (20/11/2026). Trước khi sửa, mỗi lượt hỏng được chạy lại với nhiễu nhỏ: chỗ đứng của robot lệch ±1 cm và ±0,5°, tư thế khay trên bàn A lệch ±3 mm và ±0,5°. Nhiễu rút từ dãy số riêng; mọi thứ khác của hạt giống giữ nguyên (khối lượng, ánh sáng, khoảng cách bàn, đích). k = 0 là lượt gốc, k = 1–7 là bảy lần nhiễu. Planner `da41-planner-7` (trước 6.5).
+
+| Lượt | Cảnh | Hỏng ở k = 0 | Hỏng ở k = 1–7 |
+|---|---|---|---|
+| 1:10 | Đồ gá | L-TRAY-TILT 18° | 1/7 (k = 6, L-TRAY-TILT 19°) |
+| 1:16 | Đồ gá | L-ONE-HAND | 0/7 |
+| 1:16 | Không đồ gá | L-ONE-HAND | 0/7 |
+| 1:20 | Không đồ gá | ARRIVE_B hết giờ | 0/7 |
+
+Đọc: cả ba là lỗi xác suất thấp, không gắn với hạt giống. Mỗi cơ chế lặp lại khoảng 0–15 % quanh lượt gốc, đúng như giả thuyết ở mục 4.6. Vì thế không chỉnh riêng cho seed nào. Mỗi cơ chế được sửa ở nguyên nhân, rồi kiểm trên tập lớn hơn có nhiễu và trên tập seed chưa dùng (mục 4.8).
+
+| Lượt | Thấy trong trace | Nguyên nhân gốc |
+|---|---|---|
+| 1:10 (k = 0 và 6) | Khay buông ở 2,5–3 cm, nhưng vẫn tựa trên cổ tay (`wrist_yaw`–`tray_base`) và ngón cái (`thumb`–`tray_handle`), không rơi xuống. Cổ tay giữ nguyên độ cao, nhưng khi bàn tay ngửa mở ra, ngón cái quẹt lên dưới tay cầm và nâng khay thêm 1–2,5 cm. Lượt đạt (k = 4) cũng bị nâng tới 4 cm nhưng đều hai bên, nên khay rơi phẳng khi tay rút ra. Ở hai lượt hỏng, lực nâng lệch: khay nghiêng 12–19° trong khi chỉ chạm tay | Mở tay tại chỗ (`release_dz` 0) khi khay còn trên không. Nhận định của bộ chấm đúng: khay đang được tay nâng, không nằm trên đồ gá. Đây không phải việc cho DA-42 |
+| 1:16 (cả hai cảnh) | Tay phải chạm tay cầm trước, đẩy khay 3 cm theo y trước khi tay trái kẹp. Lòng bàn tay trái khép lệch 2,6–4,5 cm khỏi điểm cầm, tiếp xúc chập chờn rồi mất lúc LIFT. Cùng kiểu với 1:15 và 2:107 khi thử dời tay (mục 4.6) | Không kiểm chất lượng cái cầm trước khi nâng: LIFT bắt đầu ngay khi cả hai tay báo chạm, dù một tay chỉ móc vào đầu tay cầm |
+| 1:20 (không đồ gá) | Lệnh hướng (179,0°) khớp hướng pelvis trong vòng 0,5°: **không phải** do ARRIVE_B xoay hướng. Pelvis đứng bưng khay đung đưa ±2 cm theo x, chu kỳ khoảng 1,6 s, quanh chỗ đứng đích (lệch trung bình chỉ 0,8 cm) | ARRIVE_B xét vị trí tức thời: biên độ đung đưa bằng `arrive_lat_tol` 2 cm, nên mỗi lần đung đưa ra ngoài lại bắt đầu một bước, làm đung đưa tiếp. Tốc độ đung đưa (khoảng 0,08 m/s) cao hơn `arrive_speed` 0,05, nên robot không bao giờ được coi là đứng yên |
+
 ## 5. Runbook cho Hiếu trên `rtx3060`
 
 Chưa chạy trên `rtx3060` (không chạy job ở đó khi chưa hỏi). Mọi lệnh dưới đây đã chạy trên laptop, trừ kiểm 50 seed. Cập nhật 20/11/2026 cho planner `da41-planner-7` và đồ gá `jig2` (nhiệm vụ 6). Lô `jig1-check`, nếu đã chạy theo bản trước, dùng planner-5 và `jig1`: không gộp với lô mới (`generate` từ chối trộn hai `planner_version` trong một thư mục).
