@@ -49,6 +49,10 @@ Số đo dẫn tới story ([docs/he/tray.md](../../he/tray.md) mục 19–20): 
   - [x] 6.1 Nguyên nhân gốc của từng nhóm lỗi còn lại, từ trace của episode hỏng, ghi trong jig.md
   - [x] 6.2 Sửa planner (căn góc trước khi hạ và trong lúc hạ, tư thế tay giơ sẵn) và hạ thấp cánh ngắn phía robot của đồ gá (nguyên nhân (a) ở hình học), test CPU và test `sim`
   - [x] 6.3 Đo lại đúng 31 episode cũ trên laptop, có và không đồ gá; bảng trước/sau và runbook 50 seed mới trong jig.md
+  - [x] 6.4 (Thêm 20/11/2026, PO xem video mẫu và chọn "Sửa tiếp") Đo tỉ lệ lặp lại của ba lỗi còn lại (1:10, 1:16, 1:20) bằng nhiễu nhỏ ở chỗ đứng và tư thế khay; nguyên nhân gốc, ghi trong jig.md
+  - [ ] 6.5 Sửa theo nguyên nhân, theo thứ tự 1:10 (nhả khay trong đồ gá), 1:16 (cầm lệch một tay), 1:20 (ARRIVE_B); test CPU
+  - [ ] 6.6 Đo lại 31 episode cũ và một tập seed chưa dùng để chỉnh (mức 1 seed 21–40, mức 2 seed 110–119), có và không đồ gá; bảng, n và khoảng tin cậy trong jig.md; runbook
+  - [ ] 6.7 Bộ video mẫu mới trong `fwdata/da-41-samples/` (ngoài repo) cho Hiếu xem; dọn file tạm
 
 ## Phạm vi file
 
@@ -87,6 +91,7 @@ Nhiệm vụ 6 (20/11/2026) sửa `planner.py`, `jig.py` (trong `flywheel_simple
 |---|---|---|
 | 19/11/2026 | Tạo story theo quyết định PO 19/11/2026: vùng đích cố định, thêm đồ gá định vị | PO (Hiếu) |
 | 20/11/2026 | Thêm AC 8 và nhiệm vụ 6: sửa planner trước khi sinh lại dữ liệu (PO: "Sửa planner trước") | PO (Hiếu) |
+| 20/11/2026 | Thêm nhiệm vụ 6.4–6.7: sửa tiếp ba lượt còn hỏng sau khi xem video mẫu (PO: "Sửa tiếp") | PO (Hiếu) |
 | 19/11/2026 | AC 3: cấu hình đồ gá ở `configs/sim/tray_jig.yaml` thay vì `tray.yaml` (file bị run plan DA-34 ghim sha256) | Hiếu (cùng Claude) |
 
 ## Ghi chép khi làm
