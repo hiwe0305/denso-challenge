@@ -38,6 +38,10 @@ import numpy as np
 from flywheel_simple.tray.generate import read_log
 
 ENV_ID = "simple/G1WholebodyTrayTransferTeleop-v0"
+# DA-41's jig scene (= jig_task.JIG_TASK_UID / JIG_ENV_ID; that module needs SIMPLE). Its
+# episodes replay through `jig_run`: through `run` they were rebuilt without the jig.
+JIG_TASK_UID = "g1_wholebody_tray_transfer_jig_teleop"
+JIG_ENV_ID = "simple/G1WholebodyTrayTransferJigTeleop-v0"
 OUTCOMES_ENV = "FLYWHEEL_TRAY_OUTCOMES"  # = simple_task.OUTCOMES_ENV (that module needs SIMPLE)
 TRAY_TOL_M = 0.02
 YAW_TOL_DEG = 3.0
@@ -105,12 +109,26 @@ def recorded_finals(raw_root: Path) -> dict[int, tuple[int, list[float]]]:
     return out
 
 
+def replay_target(raw_root: Path) -> tuple[str, str]:
+    """(runner module, env id) for the scene raw_root's episodes were recorded in."""
+    uids = {
+        json.loads(entry["environment_config"])["uid"]
+        for entry in read_log(raw_root / "meta" / "episodes.jsonl")
+    }
+    if len(uids) != 1:
+        raise ValueError(f"{raw_root} mixes task uids {sorted(uids)}")
+    if uids == {JIG_TASK_UID}:
+        return "flywheel_simple.tray.jig_run", JIG_ENV_ID
+    return "flywheel_simple.tray.run", ENV_ID
+
+
 def run_replay(raw_root: Path, work: Path, python: str = sys.executable) -> Path:
     """Replay every episode of raw_root (no new dataset); returns the outcomes file."""
     work.mkdir(parents=True, exist_ok=True)
     outcomes = work / "replay_outcomes.jsonl"
     outcomes.unlink(missing_ok=True)
-    cmd = [python, "-m", "flywheel_simple.tray.run", "replay-decoupled-wbc", ENV_ID]
+    runner, env_id = replay_target(raw_root)
+    cmd = [python, "-m", runner, "replay-decoupled-wbc", env_id]
     cmd += ["--data-dir", str(raw_root), "--sim-mode", "mujoco", "--headless", "--no-webrtc"]
     cmd += ["--render-hz", "50", "--no-record", "--save-dir", str(work / "unused")]
     env = {**os.environ, OUTCOMES_ENV: str(outcomes)}

@@ -53,6 +53,10 @@ Số đo dẫn tới story ([docs/he/tray.md](../../he/tray.md) mục 19–20): 
   - [x] 6.5 Sửa theo nguyên nhân, theo thứ tự 1:10 (nhả khay trong đồ gá), 1:16 (cầm lệch một tay), 1:20 (ARRIVE_B); test CPU. Kết quả: sửa được 1:20 (ARRIVE_B quyết bước trên base đã lọc, `da41-planner-8`); 1:10 và 1:16 chưa có cách sửa nào qua được kiểm tra (`release_dz` −0,02 làm hỏng hai lượt khác, độ lệch cầm không dự báo lỗi), ghi là lỗi còn lại trong jig.md 4.8
   - [x] 6.6 Đo lại 31 episode cũ và một tập seed chưa dùng để chỉnh (mức 1 seed 21–40, mức 2 seed 110–119), có và không đồ gá; bảng, n và khoảng tin cậy trong jig.md; runbook
   - [x] 6.7 Bộ video mẫu mới trong `fwdata/da-41-samples/` (ngoài repo) cho Hiếu xem; dọn file tạm. Bốn video planner-8: 1:20 không đồ gá, 1:10 và 2:115 đồ gá (trước hỏng, nay đạt), 1:16 đồ gá (còn hỏng); xóa bốn video planner-7 cũ và file tạm (khoảng 26 MB)
+- [ ] 7. Lô mẫu dữ liệu nhỏ với `da41-planner-8` trên cảnh có đồ gá (PO 20/11/2026: "Oke và mục tiêu của tôi là nâng các chỉ số của nó lên được 9x"), xem mẫu trước khi sinh cả lô
+  - [ ] 7.1 Trên laptop, sinh khoảng 20 episode bằng đường S1 thật (`generate.py --scene jig`, QA phát lại, bộ lọc chất lượng, export Ψ₀), mức 1 và mức 2, seed train chưa dùng; thư mục riêng ngoài repo, không phải release
+  - [ ] 7.2 Kiểm lô như dữ liệu train: số episode qua lọc, độ dài, chiều action và state, camera đầu, `visuals_revision`, `planner_version`, cờ 7 bước; so với lô 606 episode cũ
+  - [ ] 7.3 Mẫu xem: 4 episode (2 mỗi mức) camera đầu đúng như policy thấy cạnh góc nhìn ngoài; ảnh tổng hợp cả lô: vị trí và góc đặt cuối so với đích, độ thấy đồ gá và vùng đích trong camera đầu lúc hạ và nhả; thời gian sinh mỗi episode; dọn file tạm
 
 ## Phạm vi file
 
@@ -91,6 +95,7 @@ Nhiệm vụ 6 (20/11/2026) sửa `planner.py`, `jig.py` (trong `flywheel_simple
 |---|---|---|
 | 19/11/2026 | Tạo story theo quyết định PO 19/11/2026: vùng đích cố định, thêm đồ gá định vị | PO (Hiếu) |
 | 20/11/2026 | Thêm AC 8 và nhiệm vụ 6: sửa planner trước khi sinh lại dữ liệu (PO: "Sửa planner trước") | PO (Hiếu) |
+| 20/11/2026 | Thêm nhiệm vụ 7: lô mẫu dữ liệu nhỏ với planner-8 (PO đồng ý sinh thử) | PO (Hiếu) |
 | 20/11/2026 | Thêm nhiệm vụ 6.4–6.7: sửa tiếp ba lượt còn hỏng sau khi xem video mẫu (PO: "Sửa tiếp") | PO (Hiếu) |
 | 19/11/2026 | AC 3: cấu hình đồ gá ở `configs/sim/tray_jig.yaml` thay vì `tray.yaml` (file bị run plan DA-34 ghim sha256) | Hiếu (cùng Claude) |
 
