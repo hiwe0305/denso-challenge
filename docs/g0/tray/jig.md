@@ -240,9 +240,51 @@ Hiếu xem video mẫu và chọn "Sửa tiếp" (20/11/2026). Trước khi sử
 | 1:16 (cả hai cảnh) | Tay phải chạm tay cầm trước, đẩy khay 3 cm theo y trước khi tay trái kẹp. Lòng bàn tay trái khép lệch 2,6–4,5 cm khỏi điểm cầm, tiếp xúc chập chờn rồi mất lúc LIFT. Cùng kiểu với 1:15 và 2:107 khi thử dời tay (mục 4.6) | Không kiểm chất lượng cái cầm trước khi nâng: LIFT bắt đầu ngay khi cả hai tay báo chạm, dù một tay chỉ móc vào đầu tay cầm |
 | 1:20 (không đồ gá) | Lệnh hướng (179,0°) khớp hướng pelvis trong vòng 0,5°: **không phải** do ARRIVE_B xoay hướng. Pelvis đứng bưng khay đung đưa ±2 cm theo x, chu kỳ khoảng 1,6 s, quanh chỗ đứng đích (lệch trung bình chỉ 0,8 cm) | ARRIVE_B xét vị trí tức thời: biên độ đung đưa bằng `arrive_lat_tol` 2 cm, nên mỗi lần đung đưa ra ngoài lại bắt đầu một bước, làm đung đưa tiếp. Tốc độ đung đưa (khoảng 0,08 m/s) cao hơn `arrive_speed` 0,05, nên robot không bao giờ được coi là đứng yên |
 
+### 4.8 Sửa 1:20 và đo lại trên tập seed mới (nhiệm vụ 6.5, 6.6, 20/11/2026)
+
+**Sửa (6.5).** Chỉ lỗi 1:20 có cách sửa qua được kiểm tra. ARRIVE_B nay lọc thông thấp vị trí pelvis (`arrive_filter_tau` 1 s). Bước sửa được quyết trên vị trí đã lọc: chọn trục nào lệch quá `arrive_lat_tol` và chiều bước. Sau đó bước chạy theo vị trí tức thời, mỗi trục dừng hẳn khi còn lệch dưới nửa dung sai hoặc đã vượt đích. Lần quyết tiếp theo chờ 2 hằng số thời gian để bộ lọc bắt kịp. `PLANNER_VERSION` = `da41-planner-8`. Test CPU mới: thế giới đồ chơi có pelvis đung đưa 2 cm, 0,6 Hz; ARRIVE_B không bước tới bước lui.
+
+Thử và bỏ:
+- Bước theo vị trí tức thời tới nửa dung sai (bản đầu của 6.5): đung đưa ngang làm lệnh bước ngang đổi chiều liên tục trong 1,3 s.
+- `release_dz` −0,02 (buông thấp hơn 2 cm) cho lỗi nhả khay 1:10: sửa được 1:10 nhưng làm khay bị cạy lên ở hai lượt khác trong 31 (1:5, 1:14, nhiễu k = 1). Giữ 0. Hạ thấp hơn nữa (−0,03) thì cổ tay chạm cánh ngắn phía robot, RELEASE hết giờ.
+- Kiểm độ lệch lòng bàn tay khỏi điểm cầm cuối GRASP rồi cầm lại (cho 1:16): độ lệch không phân biệt lượt hỏng. Chín lượt đạt lệch 2,5–3,3 cm, lượt hỏng 1:18 (nhiễu k = 1) chỉ lệch 1,5 cm. Không thêm.
+
+Hai lượt có nhiễu k = 1 hỏng L-ONE-HAND với cả planner-7 lẫn planner-8: 1:7 và 1:18 (đồ gá). Lỗi không do 6.5 gây ra.
+
+**Đo lại (6.6).** Laptop, một tiến trình, đúng 31 episode cũ (mức 0 seed 0, mức 1 seed 1–20, mức 2 seed 100–109) và một tập seed chưa dùng để chỉnh trong DA-41: mức 1 seed 21–40, mức 2 seed 110–119 (30 episode). Một chú thích cũ trong `planner.py` (từ trước DA-41) có nhắc seed 22, nên tập mới chưa hẳn sạch hoàn toàn. Khoảng tin cậy là Wilson 95 %. Planner-7 trên 31 episode cũ lấy từ mục 4.6.
+
+| Tập | Cảnh | `da41-planner-7` (trước) | `da41-planner-8` (sau) |
+|---|---|---|---|
+| 31 episode cũ | Đồ gá | 29/31, 94 % (79–98 %) | **30/31, 97 % (84–99 %)** |
+| 31 episode cũ | Không đồ gá | 29/31, 94 % (79–98 %) | **30/31, 97 % (84–99 %)** |
+| 30 seed mới | Đồ gá | 29/30, 97 % (83–99 %) | **30/30, 100 % (89–100 %)** |
+| 30 seed mới | Không đồ gá | 29/30, 97 % (83–99 %) | **30/30, 100 % (89–100 %)** |
+| Gộp 61 | Đồ gá | 58/61, 95 % (87–98 %) | **60/61, 98 % (91–100 %)** |
+| Gộp 61 | Không đồ gá | 58/61, 95 % (87–98 %) | **60/61, 98 % (91–100 %)** |
+
+Lỗi theo seed (planner-7 → planner-8):
+
+| Seed | Đồ gá | Không đồ gá |
+|---|---|---|
+| 1:10 | L-TRAY-TILT 18° → đạt | đạt → đạt |
+| 1:20 | đạt → đạt | ARRIVE_B hết giờ → **đạt** |
+| 2:115 | L-ONE-HAND → đạt | L-ONE-HAND → đạt |
+| 1:16 | L-ONE-HAND → **L-ONE-HAND** | L-ONE-HAND → **L-ONE-HAND** |
+
+Trong các lượt đạt của planner-8, sai lệch cuối: đồ gá trung vị 1,8 cm (cũ) và 1,3 cm (mới), lớn nhất 3,7 cm; không đồ gá trung vị 2,1 cm và 1,4 cm, lớn nhất 4,0 cm. Lệch góc lớn nhất 7,6°.
+
+Đọc:
+- **Đạt mục tiêu ≥ 95 % theo số điểm** ở cả hai cảnh, trên cả tập cũ lẫn tập mới. **Chưa chứng minh được theo khoảng tin cậy**: cận dưới của 60/61 là 91 %. Muốn cận dưới vượt 95 % cần khoảng 100 episode không hỏng lượt nào; kiểm 50 seed mỗi mức trên `rtx3060` (mục 5) chưa chạy.
+- Tập mới không kém tập cũ (100 % so với 97 %), nên không thấy dấu hiệu chỉnh khớp riêng cho 31 episode cũ.
+- **Hết**: 1:20 (sửa ở nguyên nhân).
+- **Đạt nhưng không do sửa trực tiếp**: 1:10 và 2:115. Không đổi gì ở pha nhả hay pha cầm; quỹ đạo đổi chút ít sau khi sửa ARRIVE_B. Mục 4.7 đo lỗi nhả khay khoảng 1/7 quanh 1:10, nên lớp lỗi này vẫn có thể gặp ở seed khác.
+- **Còn**: 1:16 (cầm lệch một tay, cả hai cảnh) và lớp lỗi L-ONE-HAND tỉ lệ thấp (1:7, 1:18 khi có nhiễu). Chưa có cách sửa đã kiểm.
+
+Số liệu thô: `fwdata/da-41-samples/evidence/m66/` (không commit).
+
 ## 5. Runbook cho Hiếu trên `rtx3060`
 
-Chưa chạy trên `rtx3060` (không chạy job ở đó khi chưa hỏi). Mọi lệnh dưới đây đã chạy trên laptop, trừ kiểm 50 seed. Cập nhật 20/11/2026 cho planner `da41-planner-7` và đồ gá `jig2` (nhiệm vụ 6). Lô `jig1-check`, nếu đã chạy theo bản trước, dùng planner-5 và `jig1`: không gộp với lô mới (`generate` từ chối trộn hai `planner_version` trong một thư mục).
+Chưa chạy trên `rtx3060` (không chạy job ở đó khi chưa hỏi). Mọi lệnh dưới đây đã chạy trên laptop, trừ kiểm 50 seed. Cập nhật 20/11/2026 cho planner `da41-planner-8` và đồ gá `jig2` (nhiệm vụ 6.6). Lô `jig1-check`, nếu đã chạy theo bản trước, dùng planner-5 và `jig1`: không gộp với lô mới (`generate` từ chối trộn hai `planner_version` trong một thư mục).
 
 Chuẩn bị (một lần), trong một thư mục làm việc riêng, rồi kiểm phiên bản:
 
@@ -254,7 +296,7 @@ git -C ~/denso-da41 fetch origin && git -C ~/denso-da41 checkout DA-41-tray-fixe
 cd ~/denso-da41 && grep -n "^PLANNER_VERSION\|^JIG_REVISION" packages/flywheel-simple/src/flywheel_simple/tray/planner.py packages/flywheel-simple/src/flywheel_simple/tray/jig.py
 ```
 
-Phải in `da41-planner-7` và `jig2`.
+Phải in `da41-planner-8` và `jig2`.
 
 Test `sim` (khoảng 2 s cho MuJoCo thuần, khoảng 5 phút cho test qua SIMPLE):
 
@@ -262,7 +304,7 @@ Test `sim` (khoảng 2 s cho MuJoCo thuần, khoảng 5 phút cho test qua SIMPL
 cd ~/denso-da41 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/python -m pytest packages/flywheel-simple/tests/tray/test_jig_sim.py packages/flywheel-simple/tests/tray/test_jig_task_sim.py -m sim -v
 ```
 
-Kiểm planner 50 seed mỗi mức 1 và 2 (mục tiêu ≥ 95 %, tức ≥ 48/50; trên laptop 31 episode cho 29/31, mục 4.6). Một worker khoảng 35 s một episode trên laptop; ước lượng mỗi lô 50 seed khoảng 30 phút một worker, chia 5 shard khoảng 6 phút. Máy dùng chung: tổng worker trên `rtx3060` không quá 22, nên chạy lần lượt hai lô. Sinh vào thư mục mới (episode thành công được ghi kèm; thư mục chỉ để kiểm, xóa được sau khi đọc số):
+Kiểm planner 50 seed mỗi mức 1 và 2 (mục tiêu ≥ 95 %, tức ≥ 48/50; trên laptop 60/61 ở mỗi cảnh, mục 4.8). Một worker khoảng 35 s một episode trên laptop; ước lượng mỗi lô 50 seed khoảng 30 phút một worker, chia 5 shard khoảng 6 phút. Máy dùng chung: tổng worker trên `rtx3060` không quá 22, nên chạy lần lượt hai lô. Sinh vào thư mục mới (episode thành công được ghi kèm; thư mục chỉ để kiểm, xóa được sau khi đọc số):
 
 ```bash
 cd ~/denso-da41 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src nohup setsid fwdata/simple/.venv/bin/python scripts/g0/tray/generate.py --scene jig --out fwdata/simple/tray/gen/jig2-check-l1 --n 50 --level 1 --seed-start 1000 --workers 5 --allow-plain > jig2-check-l1.log 2>&1 &
@@ -272,7 +314,7 @@ cd ~/denso-da41 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src nohup s
 cd ~/denso-da41 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src nohup setsid fwdata/simple/.venv/bin/python scripts/g0/tray/generate.py --scene jig --out fwdata/simple/tray/gen/jig2-check-l2 --n 50 --level 2 --seed-start 1000 --workers 5 --allow-plain > jig2-check-l2.log 2>&1 &
 ```
 
-Đọc kết quả: `gen_log.jsonl` của mỗi shard có `success`, `failure`, `abort_reason`, `planner_version` cho từng seed. Lệnh dưới in số đạt, các phiên bản planner trong lô (phải chỉ có `da41-planner-7`) và đếm lỗi:
+Đọc kết quả: `gen_log.jsonl` của mỗi shard có `success`, `failure`, `abort_reason`, `planner_version` cho từng seed. Lệnh dưới in số đạt, các phiên bản planner trong lô (phải chỉ có `da41-planner-8`) và đếm lỗi:
 
 ```bash
 cd ~/denso-da41 && for L in l1 l2; do cat fwdata/simple/tray/gen/jig2-check-$L/shard-*/gen_log.jsonl | python3 -c "import sys,json,collections; r=[json.loads(l) for l in sys.stdin]; print('$L', sum(x['success'] for x in r), '/', len(r), {x['planner_version'] for x in r}, collections.Counter(x['failure'] or x['abort_reason'] for x in r if not x['success']))"; done
@@ -292,5 +334,5 @@ cd ~/denso-da41 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/
 - `flywheel_psi0/tray/place_error.py` và `evidence.py` tính lại đích từ `sample_episode`; đúng cho run `+zone1`, sai cho run trên đồ gá. Cần chọn hàm theo revision.
 - S2 (`tray/s2/streamer.py`) dựng lại mẫu cha bằng `sample_episode`; biến thể trên cảnh đồ gá cần `sample_jig_episode`.
 - Sinh lô mới trên cảnh đồ gá và train lại: story sau, cần duyệt ngân sách.
-- Planner (nếu kiểm 50 seed dưới 95 %): ba lỗi còn lại của mục 4.6. Cầm lệch một tay ở bàn A (1:16): kiểm hai lòng bàn tay đối xứng trước LIFT, lệch thì cầm lại. Khay dội khi nhả trong đồ gá (1:10). ARRIVE_B bước tới bước lui (1:20, không đồ gá).
+- Planner (nếu kiểm 50 seed dưới 95 %): hai lớp lỗi còn lại của mục 4.8. Cầm lệch một tay (1:16; độ lệch lòng bàn tay cuối GRASP không dự báo được lỗi, cần tín hiệu khác). Ngón cái cạy khay lên khi nhả trong đồ gá (1:10, khoảng 1/7 quanh seed đó).
 - Thí nghiệm: policy train trên cảnh đồ gá có dùng đồ gá làm mốc không (ví dụ che đồ gá lúc eval). Đồ gá chỉ chiếm dưới 0,7 % ảnh camera đầu (mục 4.4).
