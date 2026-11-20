@@ -307,6 +307,18 @@ Hiếu đồng ý sinh thử một lô nhỏ để xem mẫu trước khi sinh c
 | Cờ 7 bước (lô thô) | đủ 7 cột; 6 bước đầu đạt ở mọi episode; cờ thứ 7 (`release_stand` = thành công) bằng 0 ở frame cuối | cùng code ghi, chưa so trên dữ liệu cũ (không có trên laptop) |
 | Sai lệch đặt cuối | trung vị 1,2 cm, lớn nhất 3,3 cm; góc trung vị 0,7°, lớn nhất 5,9° | |
 
+**Camera đầu lúc hạ và nhả.** Đo bằng ảnh phân đoạn của MuJoCo từ đúng camera `head_stereo_left`, chạy lại 19 seed (planner tất định: số bước trùng bản ghi ở 19/19, ảnh RGB khớp video đã xuất, kiểm bằng mắt ở 3 frame). Đo màu trên video cho số sai: lưới đáy khay là hình học thật, nên vùng đích màu cam hiện qua lỗ lưới, và mặt nạ màu tưởng là khay. Trung vị trên 19 episode, phần trăm điểm ảnh:
+
+| Pha | Đồ gá | Vùng đích | Khay |
+|---|---|---|---|
+| CARRY | 0,38 | 0,78 | 22,1 |
+| ARRIVE_B | 0,57 | 4,83 | 22,7 |
+| LOWER (hạ) | 0,67 | 3,58 | 22,1 |
+| RELEASE (nhả) | 0,61 | 3,00 | 17,8 |
+| RETREAT | 0,55 | 1,84 | 13,3 |
+
+Vùng đích luôn thấy được lúc hạ: thấp nhất 3,2 % ở một episode. Phần thấy được là dải cam trước mép gần của khay và vùng đích qua lưới đáy. Đồ gá chỉ chiếm 0,4–0,7 % (bốn góc xanh), như mục 4.4.
+
 **Thời gian.** Laptop, một worker: sinh trung bình 36,4 s mỗi lượt (p95 49 s), QA phát lại 32–33 s, phát lại động học 30–34 s mỗi episode. Ước lượng cho 600 episode qua lọc trên `rtx3060`, dựa trên số giờ-worker của lô 872 lượt (mục 5.1 của target-zone.md: 82 s mỗi lượt sinh, 88 s mỗi lượt QA phát lại): khoảng 632 lượt sinh (95 % giữ được), 14 giờ-worker sinh, 15 giờ-worker QA phát lại, thêm phát lại động học cỡ đó. Với 14 worker, khoảng 3–3,5 giờ đồng hồ. Đây là ước lượng, chưa đo.
 
 **Bất thường.**
@@ -314,6 +326,8 @@ Hiếu đồng ý sinh thử một lô nhỏ để xem mẫu trước khi sinh c
 2. Phát lại động học DA-17 (`flywheel_simple/replay/run.py`, ngoài phạm vi DA-41) chỉ đăng ký env cảnh cũ, nên cũng dựng lại episode không có đồ gá. Mọi episode bị `flag` vì D7 (sai số trạng thái tay tới 1,36 rad lúc nhả, phát lại không thành công) và D8. Các kiểm tĩnh đều qua. `demo_sets` giữ `flag`, nên lô vẫn đủ 19. Cần sửa adapter đó như `replay_qa` rồi chạy lại trước khi tin D7 trên lô lớn.
 3. Khay dừng lệch theo trục dọc của đích trung bình +1,0 cm (16/19 episode lệch dương, thấp nhất −0,2 cm), cả hai mức; lệch ngang trung bình −0,2 cm. Nằm trong dung sai, nhưng là độ lệch có hệ thống của planner trong dữ liệu.
 4. Câu lệnh task vẫn nói "target zone". Nếu muốn policy phân biệt hai cảnh bằng lời thì phải đổi câu, nhưng như vậy sẽ khác dữ liệu cũ.
+
+Mẫu xem: `fwdata/da-41-sample-batch/xem-mau/` (bốn video camera đầu cạnh góc nhìn ngoài, ảnh tổng hợp cả lô).
 
 ## 5. Runbook cho Hiếu trên `rtx3060`
 
