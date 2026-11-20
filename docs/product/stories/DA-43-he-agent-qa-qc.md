@@ -52,7 +52,7 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
   - [ ] 3.3 `coverage_distance` và test đối chiếu với tray.md 20.12
   - [ ] 3.4 `cost_lookup`, `history_lookup`
 - [ ] 4. Khung đường ống, sàn code (2 ngày; kiến trúc 20/11 mục 5–7, 15)
-  - [ ] 4.1 B0 và B1: `round.yaml`, `pack.json`, nhận, lớp dữ liệu của gói; gói giả log robot thật
+  - [x] 4.1 B0 và B1: `round.yaml`, `pack.json`, nhận, lớp dữ liệu của gói; gói giả log robot thật
   - [ ] 4.2 B2 thành một bước: đăng ký công cụ (`ToolSpec`), kế hoạch công cụ, thư mục lần chạy, `run.json`, `--from`
   - [ ] 4.3 B3: bảng luật giả thuyết, danh mục phép kiểm, hạng của code; chặn tiêu ngân sách khi còn giả thuyết hệ thống
   - [ ] 4.4 B6 và B7 với `--no-model`, ghi `assembly.json`; lệnh `fw agentqa round`; báo cáo vòng chạy hết trên gói mẫu

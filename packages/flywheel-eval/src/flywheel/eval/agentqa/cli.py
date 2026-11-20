@@ -7,6 +7,7 @@
         --decide find_001=agree --decide find_002=override:"reason"   writes AgentReview
     fw agentqa html --reports <reports.jsonl> --out <dir> [--reviews <dir>]
     fw agentqa estimates --path <estimates.jsonl> [--measure <ref>=<value> --source <ref>]
+    fw agentqa pack --round <round.yaml>                   freeze a round into pack.json (DA-43)
 
 Errors exit 2 with one line, as `fw eval` does. A run whose model part broke a
 report still writes everything and exits 1.
@@ -31,6 +32,7 @@ from flywheel.eval.agentqa.endpoint import (
 )
 from flywheel.eval.agentqa.html import render_index, render_report
 from flywheel.eval.agentqa.review import make_review, write_review
+from flywheel.eval.agentqa.round.pack import PackRefused, build_pack, write_pack
 from flywheel.eval.agentqa.run import read_dropped
 from flywheel.eval.agentqa.run import run as run_agentqa
 
@@ -50,6 +52,19 @@ def _fail(message: str) -> None:
 def _read_reports(path: Path) -> list[AgentReport]:
     text = path.read_text(encoding="utf-8")
     return [AgentReport.model_validate_json(line) for line in text.splitlines() if line.strip()]
+
+
+@app.command("pack")
+def pack_command(
+    declaration: Path = typer.Option(..., "--round", help="The round.yaml of the round."),
+) -> None:
+    """Step B0: check and hash the files `round.yaml` names, write pack.json beside it."""
+    try:
+        pack = build_pack(declaration)
+        out = write_pack(pack, declaration.parent)
+    except PackRefused as error:
+        _fail(str(error))
+    typer.echo(f"{pack.pack_id}: {len(pack.entries)} files, {len(pack.links)} links -> {out}")
 
 
 @app.command("run")
