@@ -282,6 +282,39 @@ Trong các lượt đạt của planner-8, sai lệch cuối: đồ gá trung v�
 
 Số liệu thô: `fwdata/da-41-samples/evidence/m66/` (không commit).
 
+### 4.9 Lô mẫu dữ liệu với planner-8 (nhiệm vụ 7, 20/11/2026)
+
+Hiếu đồng ý sinh thử một lô nhỏ để xem mẫu trước khi sinh cả lô. Đây không phải release. Laptop, một worker, `da41-planner-8+cfg.bee61399`, cảnh `jig2`, seed train chưa dùng ở đâu: mức 1 seed 400000–400009, mức 2 seed 400100–400109. Chạy đúng đường của lô 606 episode (mục 5.1–5.2 của [target-zone.md](target-zone.md)): `generate.py --scene jig`, `replay_qa.py`, `release.py`, `fw data ingest`, phát lại động học DA-17 (`replay_check replay`, `reports`), `fw data qa --replay`, `flywheel_psi0.tray.quality`, `demo_sets --qa-work --quality` (nghiêng ≤ 10°, linh kiện trượt ≤ 20 mm). Mọi file nằm trong `fwdata/da-41-sample-batch/` (không commit), có `FW_ROOT` riêng nên không chạm kho thật.
+
+**Lỗi đường ống tìm thấy và đã sửa.** QA phát lại (`replay_qa`) chạy mọi lô qua `flywheel_simple.tray.run`, chỉ đăng ký env của cảnh cũ. Episode ghi trên đồ gá được dựng lại không có đồ gá và với đích rung; SIMPLE chỉ in cảnh báo "env/dataset task mismatch" rồi chạy tiếp. Kết quả lần đầu: qua 2/9 và 4/10, khay lệch trung vị 1,1–1,7 cm. Sửa: `jig_run` đăng ký thêm env đồ gá, `replay_qa` chọn theo `uid` đã ghi. Sau sửa: qua 9/9 và 10/10, lệch 0,0 mm, trùng từng bit như các lô cũ. `run.py` (DA-42) không đổi.
+
+**Kiểm như dữ liệu train**
+
+| Mục | Lô mẫu (19 episode) | Lô 606 episode cũ (ALL) |
+|---|---|---|
+| Lượt sinh → ghi được | 20 → 19 (95 %); hỏng 1: seed 400005, `timeout:RELEASE` | 610 → 542 (89 %), kho planner-5 |
+| QA phát lại | 19/19, lệch 0,0 mm | 542/542, lệch 0,0 mm |
+| QA DA-03 | 0 reject; 19 `flag`, chỉ do D7 và D8 (phát lại động học, xem bất thường 2) | 534 pass, 7 reject (D7) |
+| Bộ lọc chất lượng | 19/19 giữ: nghiêng khi bưng lớn nhất 7,4°, linh kiện trượt lớn nhất 18,4 mm | 534 → 429 |
+| Còn lại sau mọi bước | 19/20 lượt sinh (95 %) | 429/610 (70 %) |
+| Độ dài | 1322–1602 frame, trung bình 1412 (26,4–32,0 s ở 50 Hz) | trung bình 1422 frame |
+| `action`, `states` | 36 và 32 chiều, không NaN, mọi episode | 36 và 32 |
+| Camera đầu | `egocentric` 640 × 360, 50 fps; số frame video bằng số dòng parquet ở mọi episode | như vậy |
+| `visuals_revision` | `4763fbf…+zone1+jig2` | `4763fbf…+zone1` |
+| `planner_version` | `da41-planner-8+cfg.bee61399` | planner-5 |
+| Task `uid` | `g1_wholebody_tray_transfer_jig_teleop` | `g1_wholebody_tray_transfer_teleop` |
+| Câu lệnh task | giống hệt (vẫn nói "target zone", không nhắc đồ gá) | |
+| Cờ 7 bước (lô thô) | đủ 7 cột; 6 bước đầu đạt ở mọi episode; cờ thứ 7 (`release_stand` = thành công) bằng 0 ở frame cuối | cùng code ghi, chưa so trên dữ liệu cũ (không có trên laptop) |
+| Sai lệch đặt cuối | trung vị 1,2 cm, lớn nhất 3,3 cm; góc trung vị 0,7°, lớn nhất 5,9° | |
+
+**Thời gian.** Laptop, một worker: sinh trung bình 36,4 s mỗi lượt (p95 49 s), QA phát lại 32–33 s, phát lại động học 30–34 s mỗi episode. Ước lượng cho 600 episode qua lọc trên `rtx3060`, dựa trên số giờ-worker của lô 872 lượt (mục 5.1 của target-zone.md: 82 s mỗi lượt sinh, 88 s mỗi lượt QA phát lại): khoảng 632 lượt sinh (95 % giữ được), 14 giờ-worker sinh, 15 giờ-worker QA phát lại, thêm phát lại động học cỡ đó. Với 14 worker, khoảng 3–3,5 giờ đồng hồ. Đây là ước lượng, chưa đo.
+
+**Bất thường.**
+1. Seed 400005 (mức 1) hỏng `timeout:RELEASE`, kiểu lỗi không gặp trên 61 episode của mục 4.8. Mất một lượt sinh, không vào dữ liệu. Chưa tìm nguyên nhân.
+2. Phát lại động học DA-17 (`flywheel_simple/replay/run.py`, ngoài phạm vi DA-41) chỉ đăng ký env cảnh cũ, nên cũng dựng lại episode không có đồ gá. Mọi episode bị `flag` vì D7 (sai số trạng thái tay tới 1,36 rad lúc nhả, phát lại không thành công) và D8. Các kiểm tĩnh đều qua. `demo_sets` giữ `flag`, nên lô vẫn đủ 19. Cần sửa adapter đó như `replay_qa` rồi chạy lại trước khi tin D7 trên lô lớn.
+3. Khay dừng lệch theo trục dọc của đích trung bình +1,0 cm (16/19 episode lệch dương, thấp nhất −0,2 cm), cả hai mức; lệch ngang trung bình −0,2 cm. Nằm trong dung sai, nhưng là độ lệch có hệ thống của planner trong dữ liệu.
+4. Câu lệnh task vẫn nói "target zone". Nếu muốn policy phân biệt hai cảnh bằng lời thì phải đổi câu, nhưng như vậy sẽ khác dữ liệu cũ.
+
 ## 5. Runbook cho Hiếu trên `rtx3060`
 
 Chưa chạy trên `rtx3060` (không chạy job ở đó khi chưa hỏi). Mọi lệnh dưới đây đã chạy trên laptop, trừ kiểm 50 seed. Cập nhật 20/11/2026 cho planner `da41-planner-8` và đồ gá `jig2` (nhiệm vụ 6.6). Lô `jig1-check`, nếu đã chạy theo bản trước, dùng planner-5 và `jig1`: không gộp với lô mới (`generate` từ chối trộn hai `planner_version` trong một thư mục).
@@ -335,4 +368,5 @@ cd ~/denso-da41 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/
 - S2 (`tray/s2/streamer.py`) dựng lại mẫu cha bằng `sample_episode`; biến thể trên cảnh đồ gá cần `sample_jig_episode`.
 - Sinh lô mới trên cảnh đồ gá và train lại: story sau, cần duyệt ngân sách.
 - Planner (nếu kiểm 50 seed dưới 95 %): hai lớp lỗi còn lại của mục 4.8. Cầm lệch một tay (1:16; độ lệch lòng bàn tay cuối GRASP không dự báo được lỗi, cần tín hiệu khác). Ngón cái cạy khay lên khi nhả trong đồ gá (1:10, khoảng 1/7 quanh seed đó).
+- Phát lại động học DA-17 (`flywheel_simple/replay/run.py`) cần đăng ký env đồ gá như `replay_qa` (mục 4.9); trước đó D7 và D8 của `fw data qa --replay` không đúng trên dữ liệu đồ gá.
 - Thí nghiệm: policy train trên cảnh đồ gá có dùng đồ gá làm mốc không (ví dụ che đồ gá lúc eval). Đồ gá chỉ chiếm dưới 0,7 % ảnh camera đầu (mục 4.4).
