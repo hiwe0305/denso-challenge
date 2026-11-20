@@ -57,6 +57,11 @@ Số đo dẫn tới story ([docs/he/tray.md](../../he/tray.md) mục 19–20): 
   - [x] 7.1 Trên laptop, sinh khoảng 20 episode bằng đường S1 thật (`generate.py --scene jig`, QA phát lại, bộ lọc chất lượng, export Ψ₀), mức 1 và mức 2, seed train chưa dùng; thư mục riêng ngoài repo, không phải release. Lô `fwdata/da-41-sample-batch/`: 20 lượt, 19 ghi được, 19 qua QA phát lại (sau khi sửa `replay_qa` chạy đúng cảnh đồ gá), QA DA-03, bộ lọc chất lượng
   - [x] 7.2 Kiểm lô như dữ liệu train: số episode qua lọc, độ dài, chiều action và state, camera đầu, `visuals_revision`, `planner_version`, cờ 7 bước; so với lô 606 episode cũ. Bảng ở jig.md mục 4.9; đủ chiều, không NaN, video khớp số dòng. Bất thường: phát lại động học DA-17 chạy cảnh cũ nên mọi episode bị `flag` D7/D8 (việc ngoài DA-41)
   - [x] 7.3 Mẫu xem: 4 episode (2 mỗi mức) camera đầu đúng như policy thấy cạnh góc nhìn ngoài; ảnh tổng hợp cả lô: vị trí và góc đặt cuối so với đích, độ thấy đồ gá và vùng đích trong camera đầu lúc hạ và nhả; thời gian sinh mỗi episode; dọn file tạm. `fwdata/da-41-sample-batch/xem-mau/`: 4 video, ảnh tổng hợp; vùng đích chiếm 3,2–6 % ảnh camera đầu lúc hạ, đồ gá 0,4–0,7 %
+- [ ] 8. Sửa phát lại động học DA-17 cho cảnh đồ gá và soạn runbook sinh lô 600 (PO 20/11/2026: "Làm đi")
+  - [x] 8.1 Adapter `flywheel_simple/replay/run.py` chọn env theo `uid` đã ghi; dừng với lỗi rõ khi episode sẽ phát lại trên cảnh khác; giữ hành vi với cảnh cũ (có test)
+  - [ ] 8.2 Chạy lại phát lại động học và `fw data qa --replay` trên lô mẫu 19 episode; cờ D7, D8 trước và sau trong jig.md mục 4.9
+  - [ ] 8.3 Kết luận ngắn: (a) seed 400005 `timeout:RELEASE`; (b) độ lệch +1,0 cm theo trục dọc, có sửa được bằng một tham số không
+  - [ ] 8.4 Runbook `rtx3060` cho lô khoảng 632 lượt (khoảng 600 episode qua lọc), từ sinh tới `demo_sets`, kèm điều kiện dừng; Hiếu chạy
 
 ## Phạm vi file
 
@@ -68,6 +73,7 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `scripts/g0/tray/`
 - `docs/g0/tray/`
 - `docs/superpowers/specs/2026-10-28-tray-transfer-he-design.md` (chỉ mục 3.1, 3.5 và dòng sửa đổi)
+- `packages/flywheel-simple/src/flywheel_simple/replay/run.py` và test của nó `packages/flywheel-simple/tests/replay/test_replay_trace.py`: PO (Hiếu) mở rộng phạm vi ngày 20/11/2026 cho nhiệm vụ 8.1, chỉ hai file này
 
 Nhiệm vụ 6 (20/11/2026) sửa `planner.py`, `jig.py` (trong `flywheel_simple/tray/`), `configs/sim/tray_planner.yaml`, `configs/sim/tray_jig.yaml` và test trong `tests/tray/`; mọi file đều đã nằm trong danh sách trên, nên không cần mở rộng phạm vi. Không file nào bị run plan ghim. Planner mới đổi `PLANNER_VERSION` (`da41-planner-7`) và đồ gá đổi revision (`jig2`), nên episode sinh bằng chúng tách khỏi lô cũ. Hình học đồ gá chỉ đổi ở cánh ngắn phía robot, vì nguyên nhân gốc của nhóm lỗi (a) nằm ở đó (jig.md mục 4.5).
 
@@ -95,6 +101,7 @@ Nhiệm vụ 6 (20/11/2026) sửa `planner.py`, `jig.py` (trong `flywheel_simple
 |---|---|---|
 | 19/11/2026 | Tạo story theo quyết định PO 19/11/2026: vùng đích cố định, thêm đồ gá định vị | PO (Hiếu) |
 | 20/11/2026 | Thêm AC 8 và nhiệm vụ 6: sửa planner trước khi sinh lại dữ liệu (PO: "Sửa planner trước") | PO (Hiếu) |
+| 20/11/2026 | Thêm nhiệm vụ 8 và mở rộng phạm vi file cho `replay/run.py` và test của nó (PO: "Làm đi") | PO (Hiếu) |
 | 20/11/2026 | Thêm nhiệm vụ 7: lô mẫu dữ liệu nhỏ với planner-8 (PO đồng ý sinh thử) | PO (Hiếu) |
 | 20/11/2026 | Thêm nhiệm vụ 6.4–6.7: sửa tiếp ba lượt còn hỏng sau khi xem video mẫu (PO: "Sửa tiếp") | PO (Hiếu) |
 | 19/11/2026 | AC 3: cấu hình đồ gá ở `configs/sim/tray_jig.yaml` thay vì `tray.yaml` (file bị run plan DA-34 ghim sha256) | Hiếu (cùng Claude) |
