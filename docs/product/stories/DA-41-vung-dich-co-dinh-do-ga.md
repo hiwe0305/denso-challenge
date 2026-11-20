@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Đang làm nhiệm vụ 6 (sửa planner, PO 20/11/2026). Nhiệm vụ 1–5 xong trên laptop; kiểm 50 seed trên `rtx3060` chờ Hiếu chạy (runbook ở jig.md mục 5). Mục tiêu planner ≥ 95 % chưa đạt (25/31 trên laptop) |
+| Trạng thái | Nhiệm vụ 6 chưa xong: planner sửa xong nguyên nhân gốc các nhóm lỗi cũ, nhưng đo lại 31 episode laptop được 29/31 (94 %) cả có và không đồ gá, dưới mục tiêu ≥ 95 % (jig.md mục 4.6). Kiểm 50 seed trên `rtx3060` chờ Hiếu chạy (runbook jig.md mục 5) |
 | Người làm | Hiếu |
 | Làn | Adapter simulator (`flywheel-simple`) |
 | Story PRD | [Design 28/10/2026](../../superpowers/specs/2026-10-28-tray-transfer-he-design.md) mục 3.1, 3.5 (sửa 19/11/2026) |
@@ -48,7 +48,7 @@ Số đo dẫn tới story ([docs/he/tray.md](../../he/tray.md) mục 19–20): 
 - [ ] 6. Sửa planner cho đạt ≥ 95 % trên cảnh đích cố định có đồ gá (PO 20/11/2026: "Sửa planner trước", trước khi sinh lại dữ liệu; AC 8)
   - [x] 6.1 Nguyên nhân gốc của từng nhóm lỗi còn lại, từ trace của episode hỏng, ghi trong jig.md
   - [x] 6.2 Sửa planner (căn góc trước khi hạ và trong lúc hạ, tư thế tay giơ sẵn) và hạ thấp cánh ngắn phía robot của đồ gá (nguyên nhân (a) ở hình học), test CPU và test `sim`
-  - [ ] 6.3 Đo lại đúng 31 episode cũ trên laptop, có và không đồ gá; bảng trước/sau và runbook 50 seed mới trong jig.md
+  - [x] 6.3 Đo lại đúng 31 episode cũ trên laptop, có và không đồ gá; bảng trước/sau và runbook 50 seed mới trong jig.md
 
 ## Phạm vi file
 
@@ -95,3 +95,5 @@ Nhiệm vụ 6 (20/11/2026) sửa `planner.py`, `jig.py` (trong `flywheel_simple
 - 19/11/2026 · Hình học chốt sau nhiều vòng chạy planner: tường đứng 3,5 cm, vát tới 6,5 cm, bỏ cánh dài phía robot (khuỷu tay trái chạm). Lý do từng lựa chọn ở jig.md mục 3.
 - 19/11/2026 · Planner trên 31 lượt: 25/31 với đồ gá, 26/31 không đồ gá. Lỗi còn lại ở planner (cổ tay chạm cánh ngắn phía robot, xoay khi buông, REACH hết giờ); việc sau ở jig.md mục 6.
 - 19/11/2026 · Ảnh camera đầu: đồ gá thấy được từ CARRY trở đi nhưng dưới 0,7 % ảnh, ít hơn vùng đích 2–7 lần; lúc TURN không thấy cả hai.
+- 20/11/2026 · Nhiệm vụ 6: nguyên nhân gốc ở jig.md mục 4.5; cổ tay chạm cánh ngắn phía robot là do hình học, nên cánh đó thấp hơn (`jig2`). Planner `da41-planner-7`: căn góc ở ARRIVE_B và trong LOWER, tay giơ sẵn rộng hơn.
+- 20/11/2026 · Đo lại 31 episode (laptop): đồ gá 25/31 → 29/31, không đồ gá 26/31 → 29/31. Lỗi cũ hết; còn 1:16 (cầm lệch một tay, cả hai cảnh), 1:10 (khay dội khi nhả trong đồ gá), 1:20 (ARRIVE_B hết giờ, không đồ gá). Chưa đạt ≥ 95 % nên nhiệm vụ 6 chưa đánh dấu xong.

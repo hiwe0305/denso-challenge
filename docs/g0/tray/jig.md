@@ -39,7 +39,7 @@ Sửa nhỏ ở file không bị ghim: `recorder.visuals_revision(manifest, jig=
 | Tường đứng | Cao 3,5 cm, dày 1 cm | Cao hơn độ cao planner buông khay (`lower_tray_clear` 3,5 cm): khay đã nằm trong tường trước khi tay mở |
 | Vát | Từ 3,5 cm lên 6,5 cm, nghiêng 50° so với phương đứng; lead-in 4,2 cm mỗi trục | Khay hạ lệch tới khoảng 4 cm rơi lên mặt vát và trượt vào; 6,5 cm còn thấp hơn mặt dưới tay cầm (7 cm) |
 | Cánh | Cạnh dài phía xa 8 cm từ mỗi góc; cạnh ngắn 3,5 cm từ mỗi góc, dừng cách tay cầm ≥ 2 cm | Để trống chỗ tay cầm |
-| Phía robot | Không có cánh cạnh dài (`near_side_arm: 0`); giữ cánh cạnh ngắn (`near_end_arm: 0.035`) | Xem mục 3 |
+| Phía robot | Không có cánh cạnh dài (`near_side_arm: 0`); giữ cánh cạnh ngắn (`near_end_arm: 0.035`) nhưng thấp hơn: tường 1,5 cm, vát tới 3 cm, lead-in 2,4 cm (`near_end_wall`, `near_end_height`; từ `jig2`, nhiệm vụ 6) | Cổ tay đi qua phía trên khi hạ; xem mục 3 và 4.5 |
 | Tấm trượt | Dày 2 mm, phủ footprint + khe hở, vô hình | Không có tấm, mép xa của khay bám mặt bàn thép (ma sát 1,0) và khay kẹt trên mặt vát |
 | Ma sát | 0,2 (nhựa acetal / PTFE), ưu tiên tiếp xúc 1 | Ma sát của thanh dẫn và tấm thắng ma sát 1,0 của khay |
 | Màu | Xanh lam `(0.05, 0.40, 0.95)`, nhóm vẽ 0 | Khác cam của vùng đích, xanh lá của thùng, xám của bàn |
@@ -48,7 +48,7 @@ Vùng đích cam vẫn được vẽ ở tư thế đích (dưới tấm trượ
 
 ### 2.4 Revision hình ảnh
 
-`visuals_revision` của cảnh có đồ gá là `<revision SimReady>+zone1+jig1` (cảnh hộp trơn: `none+zone1+jig1`). `generate` từ chối viết tiếp vào lô `+zone1` bằng cảnh `jig` và ngược lại; `export` từ chối lô có hai revision (như với `+zone1`). Guard eval ngoài repo trên `rtx3060` (`simple-guard.sh`) cần so với revision mới khi eval trên cảnh có đồ gá.
+`visuals_revision` của cảnh có đồ gá là `<revision SimReady>+zone1+jig2` (cảnh hộp trơn: `none+zone1+jig2`). `jig1` là hình học trước nhiệm vụ 6 (cánh ngắn phía robot cao bằng phía xa); không lô nào được ghi bằng nó. `generate` từ chối viết tiếp vào lô `+zone1` bằng cảnh `jig` và ngược lại; `export` từ chối lô có hai revision (như với `+zone1`). Guard eval ngoài repo trên `rtx3060` (`simple-guard.sh`) cần so với revision mới khi eval trên cảnh có đồ gá.
 
 ## 3. Quyết định hình học khi làm [Đề xuất, cần Hiếu xem]
 
@@ -64,17 +64,19 @@ Mỗi dòng là một lần thử trên laptop (RTX 3050, venv SIMPLE `fwdata/si
 | Tường 1,5 cm | Tay mở xoay khay khoảng 5° khi buông ở 3,3 cm; khay vượt tường (mức 1 seed 1, 2: lệch góc 10,3°) | Tường 3,5 cm |
 | Vát tới 5 cm (lead-in 2,4 cm) | 26/31 episode planner; 3 lượt khay rơi lên đỉnh thanh dẫn | Vát tới 6,5 cm (lead-in 4,2 cm): 25/31, sửa 2 lượt đó nhưng thêm 2 lượt khay trượt 6 cm về phía robot (mục 4.3). Giữ 6,5 cm vì lead-in lớn hơn hợp với sai lệch của policy (trung vị 7,5 cm), không vì planner |
 | Bỏ cả cánh cạnh ngắn phía robot | Cổ tay không còn chạm, nhưng khay không được căn theo y và góc: 3/8 seed khó đạt, so với 5/8 khi giữ | Giữ `near_end_arm: 0.035` |
+| (Nhiệm vụ 6) Cánh ngắn phía robot có vát, dời vào 3,5 cm từ góc | Thanh dẫn nằm dưới lòng bàn tay thay vì cổ tay: 5/8 seed khó nghiêng 15° | Bỏ |
+| (Nhiệm vụ 6) Cánh ngắn phía robot chỉ có tường 3,5 cm, không vát | Planner 7/8 seed khó; nhưng trong test MuJoCo thuần, khay thả lệch ≥ 1,5 cm theo y rơi lên đỉnh tường (12/23 test hỏng) | Tường 1,5 cm, vát tới 3 cm (dòng sau) |
+| (Nhiệm vụ 6) Cánh ngắn phía robot: tường 1,5 cm, vát tới 3 cm (`jig2`) | Dưới cổ tay còn khoảng 1 cm khi buông ở 3,5 cm; vùng bắt ở mục 4.2; planner ở mục 4.6 | Giữ |
 
 Lựa chọn còn mở:
-- Cổ tay G1 vẫn chạm cánh cạnh ngắn phía robot ở mức 1 seed 7 và mức 2 seed 107 (khay bị nâng một đầu, L-TRAY-TILT). Hướng cho story sau: planner hạ cổ tay theo đường tránh thanh dẫn, hoặc cánh cạnh ngắn phía robot thấp hơn phía xa.
-- Phía robot để trống nên khay lệch về phía robot không được đẩy lại (mức 1 seed 5, 11: lệch 6 cm). Hướng: planner nhắm hơi về phía xa (dựa vào thanh dẫn phía xa), hoặc một gờ thấp phía robot dưới tầm khuỷu tay.
-- Chọn 5 cm hay 6,5 cm: trên 31 episode, khác 1 lượt, trong nhiễu. Cần kiểm 50 seed (mục 5) trước khi sinh lô.
+- Phía robot để trống nên khay lệch về phía robot không được đẩy lại. Sau nhiệm vụ 6, planner đặt trong khoảng 1,5 cm (mục 4.6) nên chưa gặp lại; với policy (sai lệch trung vị 7,5 cm) có thể còn gặp. Hướng: một gờ thấp phía robot dưới tầm khuỷu tay.
+- Chọn 5 cm hay 6,5 cm cho vát phía xa: trên 31 episode planner-5, khác 1 lượt, trong nhiễu. Giữ 6,5 cm; kiểm 50 seed (mục 5) trước khi sinh lô.
 
 ## 4. Số đo
 
 ### 4.1 Test CPU
 
-`uv run pytest packages/flywheel-simple/tests/tray/test_jig.py`: 38 qua. Kiểm cấu hình và `check` (từ chối đồ gá không vừa), đích cố định và mọi trường khác giữ nguyên ở 3 mức × 200 seed, vị trí rời rạc 2 và 3 không đổi dãy số, mọi vị trí nằm trên bàn B với khoảng cách bàn 1,6–2,0 m, mặt trong của tường ở đúng khe hở, mặt vát ra tới lead-in, cánh tránh tay cầm, `visuals_revision` và `generate` từ chối trộn lô, sha256 của sáu file bị ghim.
+`uv run pytest packages/flywheel-simple/tests/tray/test_jig.py`: 38 qua (19/11/2026); 42 qua sau nhiệm vụ 6 (thêm kiểm cánh ngắn phía robot thấp hơn). Kiểm cấu hình và `check` (từ chối đồ gá không vừa), đích cố định và mọi trường khác giữ nguyên ở 3 mức × 200 seed, vị trí rời rạc 2 và 3 không đổi dãy số, mọi vị trí nằm trên bàn B với khoảng cách bàn 1,6–2,0 m, mặt trong của tường ở đúng khe hở, mặt vát ra tới lead-in, cánh tránh tay cầm, `visuals_revision` và `generate` từ chối trộn lô, sha256 của sáu file bị ghim.
 
 ### 4.2 Test `sim` MuJoCo thuần
 
@@ -82,7 +84,7 @@ Lựa chọn còn mở:
 
 - 4 cặp (mức, seed): mọi geom đồ gá thuộc `table_b` đúng tư thế đích, va chạm, ưu tiên 1, ma sát 0,2; không thêm body, khớp hay khối lượng.
 - Khay đặt đúng đích không bao giờ chạm thanh dẫn và dịch < 1 mm trong 3 s.
-- Khay được giữ và hạ như planner (mối hàn mềm tới một mocap, hạ 5 cm/s, buông ở 3,5 cm) với độ lệch về phía các cạnh có thanh dẫn: 2 và 4 cm không lệch góc, 2 cm lệch 4°. Mọi lượt kết thúc phẳng, cách đích ≤ 2 cm, lệch góc ≤ 3°, đủ 6 linh kiện.
+- Khay được giữ và hạ như planner (mối hàn mềm tới một mocap, hạ 5 cm/s, buông ở 3,5 cm) với độ lệch về phía các cạnh có thanh dẫn. Với `jig1`: 2 và 4 cm không lệch góc, 2 cm lệch 4°. Từ `jig2` (nhiệm vụ 6, cánh ngắn phía robot thấp hơn): 1 và 2 cm không lệch góc, 1 cm lệch 2°; 23 test qua trong 2,1 s (20/11/2026). Mọi lượt kết thúc phẳng, cách đích ≤ 2 cm, lệch góc ≤ 3°, đủ 6 linh kiện.
 
 Vùng bắt ([`jig_capture.py`](../../../scripts/g0/tray/jig_capture.py), mức 1 seed 1279, hạ có giữ, 8 hướng; "căn" = cách đích ≤ 1,2 cm, lệch góc ≤ 3°, nghiêng ≤ 2°):
 
@@ -95,6 +97,19 @@ Vùng bắt ([`jig_capture.py`](../../../scripts/g0/tray/jig_capture.py), mức 
 | 5 cm | 0/8 | 0/8 | 0/8 |
 
 Ba trong tám hướng nghiêng về phía robot (cạnh để trống): đồ gá không đẩy khay về phía xa robot. Với 4–8° lệch góc, mối hàn giữ góc cứng nên khay không được xoay thẳng; phần lớn vẫn nằm phẳng trong dung sai 5 cm, 10° của bộ chấm, chỉ không "căn".
+
+Vùng bắt của `jig2` (20/11/2026, cùng cách đo, hạ có giữ, 8 hướng). Ô ghi "căn / phẳng trong dung sai bộ chấm" (phẳng = nghiêng ≤ 2°, cao < 5 mm; dung sai = cách đích ≤ 5 cm, lệch góc ≤ 10°):
+
+| Lệch | 0° | 2° | 4° |
+|---|---|---|---|
+| 0,5 cm | 7/8, 8/8 | 8/8, 8/8 | 3/8, 8/8 |
+| 1 cm | 6/8, 8/8 | 8/8, 8/8 | 3/8, 8/8 |
+| 1,5 cm | 6/8, 8/8 | 6/8, 8/8 | 4/8, 6/8 |
+| 2 cm | 5/8, 8/8 | 4/8, 8/8 | 3/8, 7/8 |
+| 3 cm | 1/8, 8/8 | 3/8, 8/8 | 1/8, 6/8 |
+| 4 cm | 1/8, 8/8 | 1/8, 7/8 | 0/8, 4/8 |
+
+Cánh ngắn phía robot thấp hơn dẫn ít hơn: số lượt "căn" ở 3–4 cm giảm so với `jig1`. Nhưng tới 3 cm và 2°, mọi lượt vẫn nằm phẳng trong dung sai của bộ chấm. Các lượt không phẳng (nghiêng 3,4°, cao 1,6 cm) đều ở lệch góc 4° và lệch về phía +y hoặc chéo: góc khay tựa lên thanh dẫn. Planner sau nhiệm vụ 6 buông trong khoảng 1 cm và 2° (mục 4.6), trong vùng này.
 
 ### 4.3 Planner qua SIMPLE
 
@@ -128,7 +143,7 @@ Test qua SIMPLE ([`test_jig_task_sim.py`](../../../packages/flywheel-simple/test
 
 ### 4.4 Camera đầu
 
-[`jig_views.py`](../../../scripts/g0/tray/jig_views.py) chạy planner trên ba lượt (0:0, 1:1279, 2:125195): cả ba đạt, `visuals_revision` là `4763fbfa…+zone1+jig1`. Script đếm số pixel màu xanh của đồ gá và màu cam của vùng đích trên `head_stereo_left`; bảng dưới là khoảng của ba lượt. PNG và `report.json` để ngoài repo (`fwdata/simple/tray/jig-views`).
+[`jig_views.py`](../../../scripts/g0/tray/jig_views.py) chạy planner trên ba lượt (0:0, 1:1279, 2:125195): cả ba đạt, `visuals_revision` là `4763fbfa…+zone1+jig1` (hình học trước nhiệm vụ 6; cánh ngắn phía robot nay thấp hơn nên còn ít pixel xanh hơn, chưa chạy lại). Script đếm số pixel màu xanh của đồ gá và màu cam của vùng đích trên `head_stereo_left`; bảng dưới là khoảng của ba lượt. PNG và `report.json` để ngoài repo (`fwdata/simple/tray/jig-views`).
 
 | Thời điểm | Pixel xanh (đồ gá) | Pixel cam (vùng đích) |
 |---|---|---|
@@ -157,15 +172,70 @@ Hiếu chọn "Sửa planner trước" (20/11/2026). Mỗi nhóm lỗi ở mục
 | (c) Lệch góc 10,1–10,7° | 1:1, 1:2, 1:12 (không đồ gá); 1:3 (RELEASE hết giờ, đồ gá) | Lúc buông khay đã lệch −4 đến −5,5°: pelvis trôi −1 đến −3° khi đứng ở ARRIVE_B, và góc khay trong tay khác với góc đã tính lúc LIFT. Mở tay xoay thêm khoảng −5° so với pelvis, cộng lại khoảng −10,6° | ARRIVE_B giữ hướng tính từ lúc LIFT; không đo lại góc khay trước khi hạ, và trong LOWER không có gì sửa góc |
 | (d) Khay trượt 6 cm về phía robot | 1:5, 1:11 | Khay đã kẹt trên tường hoặc mặt vát vì (a) hoặc (c); RELEASE đưa tay ra rồi lùi (`release_back` 0,05 m) kéo khay trên tấm trượt ma sát 0,2, phía robot không có gì chặn | Hệ quả của (a) và (c), không phải lỗi riêng của cách nhả: khi khay nằm đúng trong đồ gá, cùng chuyển động nhả không kéo khay |
 
+### 4.6 Sửa và đo lại (nhiệm vụ 6.2, 6.3, 20/11/2026)
+
+Sửa theo nguyên nhân ở mục 4.5. Không đổi bộ chấm, dung sai hay `predicates.py`.
+
+| Nhóm | Sửa | File |
+|---|---|---|
+| (a) | Cánh ngắn phía robot thấp hơn: tường 1,5 cm, vát tới 3 cm (`jig2`). Hai cách khác đã thử và bỏ (mục 3) | `jig.py`, `tray_jig.yaml` |
+| (b) | Tay giơ sẵn rộng hơn: `ready_y` 0,32 → 0,35 m, cách đầu ngoài tay cầm 8,5 cm | `tray_planner.yaml` |
+| (c) | ARRIVE_B tính lại hướng và chỗ đứng từ góc khay đo được khi bắt đầu pha (không giữ hướng tính lúc LIFT); trong LOWER, hai tay xoay khay quanh trục đứng qua trung điểm hai tay về đúng góc đích, tối đa 8° (`place_yaw_max_deg`), chỉ khi khay còn trên không | `planner.py`, `tray_planner.yaml` |
+| (d) | Không sửa riêng: hết khi (a) và (c) hết (1:5, 1:11 đạt). `release_back` giữ nguyên | |
+
+`PLANNER_VERSION` = `da41-planner-7` (6 là thử nghiệm D-29 chưa merge). Thử và bỏ khi làm:
+- ARRIVE_B bước tới khi lệch hướng ≤ 1–2°: robot bước tới bước lui (nhiễu bước ±1°), lắc tuột một tay (1:12 L-ONE-HAND). Góc nhỏ còn lại giao cho tay trong LOWER.
+- Dời tay giơ sẵn theo độ lệch ngang đo được của khay, có lọc thông thấp 1 s, thay cho tay rộng hơn: sửa được 2:102, nhưng tín hiệu dao động theo bước hoặc trễ khi robot còn bước ngang, và tay chạm khay ở chỗ khác. Hai seed hỏng: 1:15 và 2:107 (L-ONE-HAND, một lòng bàn tay khép lệch khỏi điểm cầm 2 cm). Bỏ, thay bằng `ready_y` 0,35.
+
+Test CPU: `packages/flywheel-simple/tests/tray` 1 389 qua (20/11/2026). Thêm thế giới đồ chơi xoay khay theo đường nối hai tay, kèm trượt trong tay một lần. Thêm test: tay xoay khay về góc đích khi hạ, ARRIVE_B tính đúng hướng và chỗ đứng, tay giơ sẵn tránh tay cầm, hình học cánh ngắn phía robot. Test `sim` MuJoCo thuần 23 qua (mục 4.2).
+
+**Đo lại trên laptop**: cùng 31 episode như mục 4.3 (mức 0 seed 0, mức 1 seed 1–20, mức 2 seed 100–109), một tiến trình. **Chỉ 31 episode, khoảng tin cậy rộng**: 29/31 là 94 %, khoảng tin cậy Wilson 95 % khoảng 79–98 %; khác 1–2 lượt nằm trong nhiễu.
+
+| Cảnh | Planner | Mức 0 | Mức 1 | Mức 2 | Tổng |
+|---|---|---|---|---|---|
+| Đồ gá (cấu hình giao) | planner-5, `jig1` (trước) | 1/1 | 16/20 | 8/10 | 25/31 (81 %) |
+| Đồ gá (cấu hình giao) | `da41-planner-7`, `jig2` (sau) | 1/1 | 18/20 | 10/10 | **29/31 (94 %)** |
+| Đích cố định, không đồ gá | planner-5 (trước) | 1/1 | 16/20 | 9/10 | 26/31 (84 %) |
+| Đích cố định, không đồ gá | `da41-planner-7` (sau) | 1/1 | 18/20 | 10/10 | **29/31 (94 %)** |
+
+Lỗi theo seed (trước → sau):
+
+| Seed | Đồ gá | Không đồ gá |
+|---|---|---|
+| 1:1, 1:2, 1:12 | đạt → đạt | L-PLACE-POSE 10,1–10,7° → đạt |
+| 1:3 | RELEASE hết giờ, 13° → đạt | RELEASE hết giờ → đạt |
+| 1:5, 1:11 | L-PLACE-POSE, lệch 6 cm → đạt | đạt → đạt |
+| 1:7 | L-TRAY-TILT 22° → đạt | đạt → đạt |
+| 2:102 | REACH hết giờ → đạt | REACH hết giờ → đạt |
+| 2:107 | L-TRAY-TILT 15° → đạt | đạt → đạt |
+| 1:10 | đạt → **L-TRAY-TILT 18°** | đạt → đạt |
+| 1:16 | đạt → **L-ONE-HAND** | đạt → **L-ONE-HAND** |
+| 1:20 | đạt → đạt | đạt → **ARRIVE_B hết giờ** |
+
+Trong các lượt đạt, sai lệch cuối: đồ gá trung vị 1,5 cm, lớn nhất 3,8 cm, lệch góc trung vị 0,3°, lớn nhất 5,8°; không đồ gá trung vị 1,9 cm, lớn nhất 3,6 cm, lệch góc trung vị 2,0°, lớn nhất 6,2° (trước: lệch góc trung vị 0,8° và 3,1°).
+
+Đọc:
+- **Chưa đạt mục tiêu ≥ 95 %**: 29/31 ở cả hai cảnh; cần 30/31. Bốn nhóm lỗi (a)–(d) của mục 4.5 không còn trên 31 episode này. Lệch góc lúc đặt giảm rõ: không lượt nào lệch quá 6,2°.
+- Ba lượt mới hỏng, mỗi lượt một kiểu, đều đạt với planner-5. Có thể chúng là cùng lớp lỗi với trước, chỉ hiện ở seed khác khi quỹ đạo đổi chút ít. Chưa kiểm bằng cách chạy lại có nhiễu.
+  - **1:16, L-ONE-HAND (cả hai cảnh, lúc LIFT ở bàn A)**: tay phải chạm tay cầm trước và đẩy khay 3 cm theo y trước khi tay trái kẹp. Lòng bàn tay trái khép lệch 2,6–4,5 cm ra ngoài điểm cầm, tiếp xúc chập chờn rồi mất. Cùng lớp với 1:15 và 2:107 khi thử dời tay. Hướng: kiểm hai lòng bàn tay đối xứng trước LIFT, lệch thì nhả và cầm lại.
+  - **1:10, L-TRAY-TILT (đồ gá)**: khay buông đúng chỗ (lệch 0,5 cm, 0°) ở 3,5 cm. Khi tay mở, khay dội giữa hai tường cạnh dài phía xa, nghiêng tới 14,5° và rời tiếp xúc, nên bị chấm là còn đang bưng. Đây là động lực khi nhả, không phải vị trí đặt. Hướng: buông thấp hơn hoặc mở tay chậm hơn khi khay đã trong tường.
+  - **1:20, ARRIVE_B hết giờ (không đồ gá)**: pelvis bước tới bước lui ±2–4 cm quanh chỗ đứng đã tính, không giữ được trong `arrive_lat_tol` 2 cm. Chưa tìm nguyên nhân gốc; có thể liên quan việc ARRIVE_B nay xoay hướng trong lúc bước. Chưa kiểm.
+
 ## 5. Runbook cho Hiếu trên `rtx3060`
 
-Chưa chạy trên `rtx3060` (không chạy job ở đó khi chưa hỏi). Mọi lệnh dưới đây đã chạy trên laptop, trừ kiểm 50 seed.
+Chưa chạy trên `rtx3060` (không chạy job ở đó khi chưa hỏi). Mọi lệnh dưới đây đã chạy trên laptop, trừ kiểm 50 seed. Cập nhật 20/11/2026 cho planner `da41-planner-7` và đồ gá `jig2` (nhiệm vụ 6). Lô `jig1-check`, nếu đã chạy theo bản trước, dùng planner-5 và `jig1`: không gộp với lô mới (`generate` từ chối trộn hai `planner_version` trong một thư mục).
 
-Chuẩn bị (một lần), trong một thư mục làm việc riêng:
+Chuẩn bị (một lần), trong một thư mục làm việc riêng, rồi kiểm phiên bản:
 
 ```bash
-git -C ~/denso-da41 fetch origin && git -C ~/denso-da41 checkout DA-41-tray-fixed-target-jig
+git -C ~/denso-da41 fetch origin && git -C ~/denso-da41 checkout DA-41-tray-fixed-target-jig && git -C ~/denso-da41 pull --ff-only
 ```
+
+```bash
+cd ~/denso-da41 && grep -n "^PLANNER_VERSION\|^JIG_REVISION" packages/flywheel-simple/src/flywheel_simple/tray/planner.py packages/flywheel-simple/src/flywheel_simple/tray/jig.py
+```
+
+Phải in `da41-planner-7` và `jig2`.
 
 Test `sim` (khoảng 2 s cho MuJoCo thuần, khoảng 5 phút cho test qua SIMPLE):
 
@@ -173,19 +243,23 @@ Test `sim` (khoảng 2 s cho MuJoCo thuần, khoảng 5 phút cho test qua SIMPL
 cd ~/denso-da41 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/simple/.venv/bin/python -m pytest packages/flywheel-simple/tests/tray/test_jig_sim.py packages/flywheel-simple/tests/tray/test_jig_task_sim.py -m sim -v
 ```
 
-Kiểm planner 50 seed (mục tiêu ≥ 95 %; một worker khoảng 35 s một episode trên laptop, ước lượng khoảng 30 phút một worker; chia 5 shard thì khoảng 6 phút), sinh vào thư mục mới (episode thành công được ghi kèm; thư mục này chỉ để kiểm, xóa được sau khi đọc số):
+Kiểm planner 50 seed mỗi mức 1 và 2 (mục tiêu ≥ 95 %, tức ≥ 48/50; trên laptop 31 episode cho 29/31, mục 4.6). Một worker khoảng 35 s một episode trên laptop; ước lượng mỗi lô 50 seed khoảng 30 phút một worker, chia 5 shard khoảng 6 phút. Máy dùng chung: tổng worker trên `rtx3060` không quá 22, nên chạy lần lượt hai lô. Sinh vào thư mục mới (episode thành công được ghi kèm; thư mục chỉ để kiểm, xóa được sau khi đọc số):
 
 ```bash
-cd ~/denso-da41 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src nohup setsid fwdata/simple/.venv/bin/python scripts/g0/tray/generate.py --scene jig --out fwdata/simple/tray/gen/jig1-check --n 50 --level 1 --seed-start 1000 --workers 5 --allow-plain > jig1-check.log 2>&1 &
+cd ~/denso-da41 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src nohup setsid fwdata/simple/.venv/bin/python scripts/g0/tray/generate.py --scene jig --out fwdata/simple/tray/gen/jig2-check-l1 --n 50 --level 1 --seed-start 1000 --workers 5 --allow-plain > jig2-check-l1.log 2>&1 &
 ```
-
-Đọc kết quả: `gen_log.jsonl` của mỗi shard có `success`, `failure`, `abort_reason` cho từng seed.
 
 ```bash
-cd ~/denso-da41 && cat fwdata/simple/tray/gen/jig1-check/shard-*/gen_log.jsonl | python3 -c "import sys,json; r=[json.loads(l) for l in sys.stdin]; print(sum(x['success'] for x in r), '/', len(r))"
+cd ~/denso-da41 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src nohup setsid fwdata/simple/.venv/bin/python scripts/g0/tray/generate.py --scene jig --out fwdata/simple/tray/gen/jig2-check-l2 --n 50 --level 2 --seed-start 1000 --workers 5 --allow-plain > jig2-check-l2.log 2>&1 &
 ```
 
-So với cảnh cũ cùng seed (cùng planner, đích rung): đổi `--scene zone1` và `--out .../zone1-check`.
+Đọc kết quả: `gen_log.jsonl` của mỗi shard có `success`, `failure`, `abort_reason`, `planner_version` cho từng seed. Lệnh dưới in số đạt, các phiên bản planner trong lô (phải chỉ có `da41-planner-7`) và đếm lỗi:
+
+```bash
+cd ~/denso-da41 && for L in l1 l2; do cat fwdata/simple/tray/gen/jig2-check-$L/shard-*/gen_log.jsonl | python3 -c "import sys,json,collections; r=[json.loads(l) for l in sys.stdin]; print('$L', sum(x['success'] for x in r), '/', len(r), {x['planner_version'] for x in r}, collections.Counter(x['failure'] or x['abort_reason'] for x in r if not x['success']))"; done
+```
+
+So với cảnh không đồ gá cùng planner thì không có lệnh sẵn (số laptop ở mục 4.6 dùng `add_jig` tắt trong script ngoài repo). So với cảnh cũ cùng seed (đích rung): đổi `--scene zone1` và `--out .../zone1-check-l1`.
 
 Ảnh camera đầu (3 episode, khoảng 2 phút):
 
@@ -199,5 +273,5 @@ cd ~/denso-da41 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/
 - `flywheel_psi0/tray/place_error.py` và `evidence.py` tính lại đích từ `sample_episode`; đúng cho run `+zone1`, sai cho run trên đồ gá. Cần chọn hàm theo revision.
 - S2 (`tray/s2/streamer.py`) dựng lại mẫu cha bằng `sample_episode`; biến thể trên cảnh đồ gá cần `sample_jig_episode`.
 - Sinh lô mới trên cảnh đồ gá và train lại: story sau, cần duyệt ngân sách.
-- Planner: cổ tay chạm cánh cạnh ngắn phía robot (mục 3) và lỗi REACH hết giờ ở mức 2 seed 102 (có cả trên cảnh cũ).
+- Planner (nếu kiểm 50 seed dưới 95 %): ba lỗi còn lại của mục 4.6. Cầm lệch một tay ở bàn A (1:16): kiểm hai lòng bàn tay đối xứng trước LIFT, lệch thì cầm lại. Khay dội khi nhả trong đồ gá (1:10). ARRIVE_B bước tới bước lui (1:20, không đồ gá).
 - Thí nghiệm: policy train trên cảnh đồ gá có dùng đồ gá làm mốc không (ví dụ che đồ gá lúc eval). Đồ gá chỉ chiếm dưới 0,7 % ảnh camera đầu (mục 4.4).

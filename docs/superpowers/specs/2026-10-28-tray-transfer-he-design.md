@@ -62,7 +62,7 @@ Task gần nhất có sẵn trong SIMPLE là `G1WholebodyXMoveBendCarryBoxSonic-
 | Khay | 0,45 × 0,30 × 0,06 m, rigid body, hai tay cầm hai bên, khối lượng và ma sát thật | Kiểm cầm được bằng bàn tay G1 trước khi chốt kích thước (mục 7, mốc M0) |
 | Linh kiện | 6 vật nhỏ trong 6 ô của khay | Rigid body tự do, không khóa vào khay |
 | Vùng đích | Hình chữ nhật hiển thị trên bàn B: tư thế đích, dung sai vị trí, dung sai góc | |
-| Đồ gá định vị (sửa 19/11/2026) | Thanh dẫn ở góc quanh vùng đích: tường đứng thấp, vát phía trên; cạnh dài phía robot để trống; tấm trượt ma sát thấp | Chỉ trên cảnh có đồ gá (`+jig1`); kích thước trong `configs/sim/tray_jig.yaml`. Lý do và số đo: [docs/g0/tray/jig.md](../../g0/tray/jig.md) |
+| Đồ gá định vị (sửa 19/11/2026) | Thanh dẫn ở góc quanh vùng đích: tường đứng thấp, vát phía trên; cạnh dài phía robot để trống; cạnh ngắn phía robot thấp hơn để cổ tay đi qua (sửa 20/11/2026); tấm trượt ma sát thấp | Chỉ trên cảnh có đồ gá (`+jig2`); kích thước trong `configs/sim/tray_jig.yaml`. Lý do và số đo: [docs/g0/tray/jig.md](../../g0/tray/jig.md) |
 
 Mọi kích thước, khối lượng, ma sát, dung sai nằm trong file cấu hình của task, không viết cứng.
 
