@@ -1,0 +1,216 @@
+"""The tools a plan may call, and the closed domains of their parameters (DA-43 task 4.2).
+
+A plan (`configs/eval/agentqa/plans/<task>.yaml`) names tools and gives them parameters.
+No parameter is a free number: each takes its value from a closed domain (a run of the
+pack, a level that occurs in it, a label of the task view), and a plan value outside its
+domain is refused when the plan is checked, before anything runs (architecture 20/11
+section 6, B2; section 7).
+
+Tools are registered explicitly: nothing is discovered, so the list of what the agent can
+call is read from this file.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from itertools import combinations
+from typing import Any
+
+from flywheel.eval.agentqa.facts import FactBook
+from flywheel.eval.agentqa.tools.base import RunScores, ToolResult, merge, not_judged
+from flywheel.eval.agentqa.tools.clusters import failure_clusters
+from flywheel.eval.agentqa.tools.latch import latch_consistency
+from flywheel.eval.agentqa.tools.paired import paired_compare
+from flywheel.eval.agentqa.tools.signals import labels_seen, signal_presence
+from flywheel.eval.agentqa.tools.steps import step_pass_table
+from flywheel.eval.agentqa.tools.task import TaskView, task_lookup
+
+
+@dataclass(frozen=True)
+class MeasureContext:
+    task: TaskView
+    runs: Mapping[str, RunScores]  # run name -> scores, in pack order
+    kinds: frozenset[str]  # artifact kinds accepted in the pack
+
+
+@dataclass(frozen=True)
+class ToolSpec:
+    name: str
+    version: int
+    needs: tuple[str, ...]  # artifact kinds that must be in ctx.kinds
+    params: Mapping[str, str]  # param name -> domain name
+    run: Callable[[FactBook, MeasureContext, Mapping[str, Any]], ToolResult]
+    reads_all: bool = False  # the result depends on every accepted entry, not only `needs`
+
+
+# Domains a plan must give a value for; the others may be left out.
+OPTIONAL = frozenset({"levels", "step"})
+
+
+def _is_int(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _names(value: object) -> bool:
+    return isinstance(value, list) and bool(value) and all(isinstance(v, str) for v in value)
+
+
+def concerned_runs(params: Mapping[str, Any], ctx: MeasureContext) -> list[str]:
+    """Names of the runs a call reads, in pack order; every run when it names none."""
+    named: set[str] = set()
+    constrained = False
+    for key in ("runs", "run", "pairs"):
+        if key not in params:
+            continue
+        constrained = True
+        value = params[key]
+        if value == "all":
+            return list(ctx.runs)
+        if isinstance(value, str):
+            named.add(value)
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, str):
+                    named.add(item)
+                elif isinstance(item, list):
+                    named.update(n for n in item if isinstance(n, str))
+    if not constrained:
+        return list(ctx.runs)
+    return [r for r in ctx.runs if r in named]
+
+
+def _check_one(domain: str, name: str, value: object, params: Mapping[str, Any],
+               ctx: MeasureContext) -> list[str]:
+    known = ", ".join(ctx.runs) or "none"
+    if domain == "runs":
+        if value == "all":
+            return []
+        if not _names(value):
+            return [f"{name}: 'all' or a list of run names, got {value!r}"]
+        assert isinstance(value, list)
+        return [f"{name}: run {v!r} is not in the pack (runs: {known})"
+                for v in value if v not in ctx.runs]
+    if domain == "run":
+        if not isinstance(value, str):
+            return [f"{name}: one run name, got {value!r}"]
+        return [] if value in ctx.runs else [
+            f"{name}: run {value!r} is not in the pack (runs: {known})"]
+    if domain == "pairs":
+        if value == "all":
+            return []
+        if not isinstance(value, list) or not value:
+            return [f"{name}: 'all' or a list of [a, b] run names, got {value!r}"]
+        problems: list[str] = []
+        for pair in value:
+            if not (isinstance(pair, list) and len(pair) == 2
+                    and all(isinstance(p, str) for p in pair)):
+                problems.append(f"{name}: {pair!r} is not a pair [a, b] of run names")
+                continue
+            problems += [f"{name}: run {p!r} is not in the pack (runs: {known})"
+                         for p in pair if p not in ctx.runs]
+            if pair[0] == pair[1]:
+                problems.append(f"{name}: {pair!r} compares a run with itself")
+        return problems
+    if domain == "levels":
+        if value == "all":
+            return []
+        if not isinstance(value, list) or not value or not all(_is_int(v) for v in value):
+            return [f"{name}: 'all' or a list of integer levels, got {value!r}"]
+        present = {lv for r in concerned_runs(params, ctx) for lv in ctx.runs[r].levels()}
+        return [f"{name}: level {v} does not occur in the runs concerned "
+                f"(levels: {sorted(present)})" for v in value if v not in present]
+    if domain == "labels":
+        if value in ("seen", "all"):
+            return []
+        if not _names(value):
+            return [f"{name}: 'seen', 'all' or a list of labels, got {value!r}"]
+        assert isinstance(value, list)
+        return [f"{name}: label {v!r} is not a label of {ctx.task.task_id}"
+                for v in value if v not in ctx.task.labels]
+    if domain == "step":
+        if isinstance(value, str) and value in ctx.task.steps:
+            return []
+        return [f"{name}: {value!r} is not a step of {ctx.task.task_id} "
+                f"(steps: {', '.join(ctx.task.steps)})"]
+    return [f"{name}: unknown domain {domain!r}"]
+
+
+def check_params(spec: ToolSpec, params: Mapping[str, Any], ctx: MeasureContext) -> list[str]:
+    """What is wrong with `params` for `spec`: unknown, missing, or outside its domain."""
+    problems = [f"{spec.name}: unknown parameter {p!r}" for p in params if p not in spec.params]
+    for name, domain in spec.params.items():
+        if name not in params:
+            if name not in OPTIONAL:
+                problems.append(f"{spec.name}: parameter {name!r} is missing")
+            continue
+        problems += [f"{spec.name}: {p}"
+                     for p in _check_one(domain, name, params[name], params, ctx)]
+    return problems
+
+
+def _runs(params: Mapping[str, Any], ctx: MeasureContext) -> list[RunScores]:
+    value = params.get("runs", "all")
+    names = list(ctx.runs) if value == "all" else list(value)
+    return [ctx.runs[n] for n in names]
+
+
+def _task_lookup(book: FactBook, ctx: MeasureContext, params: Mapping[str, Any]) -> ToolResult:
+    return task_lookup(book, ctx.task, params.get("step"))
+
+
+def _step_pass_table(book: FactBook, ctx: MeasureContext,
+                     params: Mapping[str, Any]) -> ToolResult:
+    return step_pass_table(book, ctx.task, _runs(params, ctx))
+
+
+def _failure_clusters(book: FactBook, ctx: MeasureContext,
+                      params: Mapping[str, Any]) -> ToolResult:
+    return failure_clusters(book, ctx.task, _runs(params, ctx))
+
+
+def _latch_consistency(book: FactBook, ctx: MeasureContext,
+                       params: Mapping[str, Any]) -> ToolResult:
+    return latch_consistency(book, ctx.task, _runs(params, ctx))
+
+
+def _signal_presence(book: FactBook, ctx: MeasureContext,
+                     params: Mapping[str, Any]) -> ToolResult:
+    value = params["labels"]
+    if value == "seen":
+        labels = labels_seen(list(ctx.runs.values()))
+    elif value == "all":
+        labels = sorted(ctx.task.labels)
+    else:
+        labels = list(value)
+    return signal_presence(book, ctx.task, ctx.kinds, labels)
+
+
+def pairs_of(params: Mapping[str, Any], ctx: MeasureContext) -> list[tuple[str, str]]:
+    value = params["pairs"]
+    if value == "all":
+        return list(combinations(ctx.runs, 2))
+    return [(p[0], p[1]) for p in value]
+
+
+def _paired_compare(book: FactBook, ctx: MeasureContext,
+                    params: Mapping[str, Any]) -> ToolResult:
+    pairs = pairs_of(params, ctx)
+    if not pairs:
+        return not_judged(book, "paired_compare", "fewer than two runs, so no pair", "-")
+    levels = params.get("levels", "all")
+    chosen = None if levels == "all" else list(levels)
+    return merge("paired_compare", [
+        paired_compare(book, ctx.runs[a], ctx.runs[b], chosen) for a, b in pairs])
+
+
+REGISTRY: dict[str, ToolSpec] = {spec.name: spec for spec in (
+    ToolSpec("task_lookup", 1, (), {"step": "step"}, _task_lookup),
+    ToolSpec("step_pass_table", 1, ("scores",), {"runs": "runs"}, _step_pass_table),
+    ToolSpec("failure_clusters", 1, ("scores",), {"runs": "runs"}, _failure_clusters),
+    ToolSpec("latch_consistency", 1, ("scores",), {"runs": "runs"}, _latch_consistency),
+    ToolSpec("signal_presence", 1, ("scores",), {"labels": "labels"}, _signal_presence,
+             reads_all=True),
+    ToolSpec("paired_compare", 1, ("scores",), {"pairs": "pairs", "levels": "levels"},
+             _paired_compare),
+)}
