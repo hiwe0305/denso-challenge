@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from flywheel.contracts.evidence import Diagnosis, InterventionKind
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 DataClass = Literal["public", "internal", "restricted"]
@@ -126,3 +127,48 @@ class RunRecord(Record):
     status: Status
     steps: list[StepRecord] = Field(default_factory=list)
     problems: list[str] = Field(default_factory=list)
+
+
+# Groups of hypothesis rules, in the order spec 6.4 asks for: system and scorer first,
+# data last. `code_rank` sorts by this order first.
+Group = Literal["scorer", "runtime", "train", "data", "coverage"]
+
+
+class ClusterRef(Record):
+    """A failure cluster of the `failure_clusters` table, by its key."""
+
+    cluster_id: str = Field(min_length=1, description='"<run>/<step>/<label>/l<level>"')
+    run: str = Field(min_length=1)
+    step: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    level: int
+    size: int = Field(ge=0)
+
+
+class CheckRef(Record):
+    """A check of the catalog that tells this hypothesis from another one of its cluster."""
+
+    check_id: str = Field(min_length=1)
+    separates: list[list[str]] = Field(default_factory=list)
+    cost_key: str = Field(min_length=1)
+    cost_rank: int
+
+
+class HypothesisRecord(Record):
+    """One line of `hypotheses.jsonl` (step B3): a rule that matched a cluster.
+
+    It carries no number of its own, only ids of facts in `facts.jsonl`.
+    """
+
+    hypothesis_id: str = Field(pattern=r"^H[1-9][0-9]*$")
+    cluster: ClusterRef
+    rule_id: str = Field(min_length=1)
+    group: Group
+    diagnosis: Diagnosis
+    note: str = Field(min_length=1)
+    support: list[str] = Field(default_factory=list)
+    contra: list[str] = Field(default_factory=list)
+    interventions: list[InterventionKind] = Field(min_length=1)
+    code_rank: int = Field(ge=1)
+    blocked_data_spend: bool
+    checks: list[CheckRef] = Field(default_factory=list)

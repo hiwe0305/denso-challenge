@@ -1,0 +1,52 @@
+# Hypothesis rules of the scorer group (DA-43 task 4.3, architecture 20/11/2026 section 6, B3).
+#
+# Read by `flywheel.eval.agentqa.round.hypotheses`: every *.yaml of this directory, in
+# file-name order. Each rule cites its source in the spec or a design, never a single
+# case. Changing this file is a new version of the agent: score it again (design 11).
+#
+# Fields:
+#   id             unique across the rule files
+#   source         where the rule comes from
+#   group          scorer | runtime | train | data | coverage (spec 6.4 order: system and
+#                  scorer before data)
+#   diagnosis      a `Diagnosis` of flywheel.contracts.evidence
+#   note           short slug of the reason
+#   system         true: while a hypothesis of this rule stands, the cluster spends no
+#                  data budget
+#   interventions  a subset of INTERVENTIONS_OF_DIAGNOSIS[diagnosis]
+#   when           all must hold: {cluster: chain_broken}, or
+#                  {fact: <name template>, is: true | false | positive | zero | present}
+#                  (no numeric literal: a threshold is a fact, not a rule constant)
+#   support/contra fact-name templates; a missing fact is left out
+# Templates may use {run}, {step} (the cluster's first failed step), {label}, {level}.
+
+rules:
+  - id: scorer_latch_too_strict
+    source: "spec 6.4 (system and scorer first); design 19/11 section 5.3 row 1"
+    group: scorer
+    diagnosis: unknown
+    note: scorer_threshold
+    system: true
+    interventions: [repair_ticket]
+    when:
+      - {cluster: chain_broken}
+    support:
+      - "{run}_chain_broken_at_{step}"
+      - "{run}_chain_broken_successes"
+      - "chain_broken_at_{step}_runs"
+      - "latch_{step}_signals_missing"
+    contra: []
+
+  - id: label_signal_missing
+    source: "spec 6.4 item 1; design 19/11 section 5.3 row 2"
+    group: scorer
+    diagnosis: unknown
+    note: missing_signal
+    system: true
+    interventions: [repair_ticket]
+    when:
+      - {fact: "{label}_judgeable", is: false}
+    support:
+      - "{label}_judgeable"
+      - "{label}_signals_missing"
+    contra: []

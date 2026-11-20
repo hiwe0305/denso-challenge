@@ -1,0 +1,28 @@
+# Checks that tell hypotheses of one cluster apart (DA-43 task 4.3, architecture 20/11/2026
+# section 6, B3). Read by `flywheel.eval.agentqa.round.hypotheses`.
+#
+#   separates  pairs of rule ids the check tells apart; `none` = no rule matched
+#   needs      what running the check takes
+#   cost_key   key of the cost lookup (task 3.4)
+#   cost_rank  ascending = cheaper. An assumed order (giả định) until the ledger lookup
+#              of task 3.4 replaces it.
+# Changing this file is a new version of the agent: score it again (design 11).
+
+checks:
+  - id: log_missing_signals
+    name: "Record the signals the label needs in the eval outcome and rerun the cluster's conditions"
+    separates:
+      - [label_signal_missing, none]
+      - [scorer_latch_too_strict, none]
+    needs: "an eval rerun of the cluster's conditions with the missing signals logged"
+    cost_key: eval_rerun_cluster
+    cost_rank: 2
+
+  - id: inspect_latch_on_successes
+    name: "Compare the latch signal of the unlatched step on successful rollouts with the scorer threshold"
+    separates:
+      - [scorer_latch_too_strict, label_signal_missing]
+      - [scorer_latch_too_strict, none]
+    needs: "the latch signal of the step on the run's successful rollouts (CPU analysis)"
+    cost_key: cpu_analysis
+    cost_rank: 1

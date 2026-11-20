@@ -20,6 +20,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from flywheel.eval.agentqa.round.admit import ADMISSION_FILE, Admitted, admit, write_admission
+from flywheel.eval.agentqa.round.hypotheses import (
+    HYPOTHESES_FILE,
+    RulesRefused,
+    hypothesize,
+    missing_clusters_reason,
+)
 from flywheel.eval.agentqa.round.measure import (
     CALLS_FILE,
     FACTS_FILE,
@@ -35,11 +41,12 @@ from flywheel.eval.agentqa.round.records import Admission, Pack, RunRecord, Stat
 from pydantic import ValidationError
 
 RUN_FILE = "run.json"
-STEPS = ("pack", "admit", "measure")  # later: hypothesize, judge, verify, assemble, render
+STEPS = ("pack", "admit", "measure", "hypothesize")  # later: judge, verify, assemble, render
 STEP_FILES: dict[str, tuple[str, ...]] = {
     "pack": (PACK_FILE,),
     "admit": (ADMISSION_FILE,),
     "measure": (FACTS_FILE, CALLS_FILE),
+    "hypothesize": (HYPOTHESES_FILE,),
 }
 STEP_DIRS: dict[str, tuple[str, ...]] = {"measure": (TABLES_DIR,)}
 SEVERITY: dict[str, int] = {"ok": 0, "degraded": 1, "broken": 2}
@@ -108,7 +115,17 @@ def _step_measure(w: _Work) -> int:
     return len(result.facts)
 
 
-RUNNERS = {"pack": _step_pack, "admit": _step_admit, "measure": _step_measure}
+def _step_hypothesize(w: _Work) -> int:
+    assert w.pack is not None
+    hypotheses = hypothesize(w.out, w.pack.task_id)
+    reason = missing_clusters_reason(w.out)
+    if reason:
+        w.degraded.append(reason)
+    return len(hypotheses)
+
+
+RUNNERS = {"pack": _step_pack, "admit": _step_admit, "measure": _step_measure,
+           "hypothesize": _step_hypothesize}
 
 
 def _write(out: Path, record: RunRecord) -> None:
@@ -191,7 +208,7 @@ def run_round(pack_path: Path, out: Path, *, plan_path: Path | None = None,
             if work.degraded:
                 status = "degraded"
                 problems = [f"{name}: {d}" for d in work.degraded]
-        except (PackRefused, PlanRefused) as error:
+        except (PackRefused, PlanRefused, RulesRefused) as error:
             record = record.model_copy(update={
                 "steps": [*record.steps, StepRecord(
                     name=name, status="broken", seconds=time.monotonic() - began, rows=0)],
