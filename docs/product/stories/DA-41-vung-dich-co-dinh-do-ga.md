@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Nhiệm vụ 6 chưa xong: planner sửa xong nguyên nhân gốc các nhóm lỗi cũ, nhưng đo lại 31 episode laptop được 29/31 (94 %) cả có và không đồ gá, dưới mục tiêu ≥ 95 % (jig.md mục 4.6). Kiểm 50 seed trên `rtx3060` chờ Hiếu chạy (runbook jig.md mục 5) |
+| Trạng thái | Nhiệm vụ 6 chưa đánh dấu xong: planner `da41-planner-8` trên laptop được 60/61 ở mỗi cảnh (98 %, Wilson 95 % 91–100 %), gồm 31 episode cũ 30/31 và 30 seed mới 30/30 (jig.md mục 4.8). Đạt ≥ 95 % theo số điểm, chưa theo cận dưới khoảng tin cậy. Kiểm 50 seed trên `rtx3060` chờ Hiếu chạy (runbook jig.md mục 5) |
 | Người làm | Hiếu |
 | Làn | Adapter simulator (`flywheel-simple`) |
 | Story PRD | [Design 28/10/2026](../../superpowers/specs/2026-10-28-tray-transfer-he-design.md) mục 3.1, 3.5 (sửa 19/11/2026) |
@@ -51,7 +51,7 @@ Số đo dẫn tới story ([docs/he/tray.md](../../he/tray.md) mục 19–20): 
   - [x] 6.3 Đo lại đúng 31 episode cũ trên laptop, có và không đồ gá; bảng trước/sau và runbook 50 seed mới trong jig.md
   - [x] 6.4 (Thêm 20/11/2026, PO xem video mẫu và chọn "Sửa tiếp") Đo tỉ lệ lặp lại của ba lỗi còn lại (1:10, 1:16, 1:20) bằng nhiễu nhỏ ở chỗ đứng và tư thế khay; nguyên nhân gốc, ghi trong jig.md
   - [x] 6.5 Sửa theo nguyên nhân, theo thứ tự 1:10 (nhả khay trong đồ gá), 1:16 (cầm lệch một tay), 1:20 (ARRIVE_B); test CPU. Kết quả: sửa được 1:20 (ARRIVE_B quyết bước trên base đã lọc, `da41-planner-8`); 1:10 và 1:16 chưa có cách sửa nào qua được kiểm tra (`release_dz` −0,02 làm hỏng hai lượt khác, độ lệch cầm không dự báo lỗi), ghi là lỗi còn lại trong jig.md 4.8
-  - [ ] 6.6 Đo lại 31 episode cũ và một tập seed chưa dùng để chỉnh (mức 1 seed 21–40, mức 2 seed 110–119), có và không đồ gá; bảng, n và khoảng tin cậy trong jig.md; runbook
+  - [x] 6.6 Đo lại 31 episode cũ và một tập seed chưa dùng để chỉnh (mức 1 seed 21–40, mức 2 seed 110–119), có và không đồ gá; bảng, n và khoảng tin cậy trong jig.md; runbook
   - [ ] 6.7 Bộ video mẫu mới trong `fwdata/da-41-samples/` (ngoài repo) cho Hiếu xem; dọn file tạm
 
 ## Phạm vi file
@@ -102,3 +102,4 @@ Nhiệm vụ 6 (20/11/2026) sửa `planner.py`, `jig.py` (trong `flywheel_simple
 - 19/11/2026 · Ảnh camera đầu: đồ gá thấy được từ CARRY trở đi nhưng dưới 0,7 % ảnh, ít hơn vùng đích 2–7 lần; lúc TURN không thấy cả hai.
 - 20/11/2026 · Nhiệm vụ 6: nguyên nhân gốc ở jig.md mục 4.5; cổ tay chạm cánh ngắn phía robot là do hình học, nên cánh đó thấp hơn (`jig2`). Planner `da41-planner-7`: căn góc ở ARRIVE_B và trong LOWER, tay giơ sẵn rộng hơn.
 - 20/11/2026 · Đo lại 31 episode (laptop): đồ gá 25/31 → 29/31, không đồ gá 26/31 → 29/31. Lỗi cũ hết; còn 1:16 (cầm lệch một tay, cả hai cảnh), 1:10 (khay dội khi nhả trong đồ gá), 1:20 (ARRIVE_B hết giờ, không đồ gá). Chưa đạt ≥ 95 % nên nhiệm vụ 6 chưa đánh dấu xong.
+- 20/11/2026 · Nhiệm vụ 6.4–6.6: ba lỗi còn lại là lỗi xác suất thấp (0–15 % khi chạy lại có nhiễu). Sửa được 1:20 ở nguyên nhân (pelvis đung đưa ±2 cm, ARRIVE_B nay quyết bước trên vị trí đã lọc, `da41-planner-8`). Đo lại: 31 episode cũ 30/31, 30 seed mới (mức 1 seed 21–40, mức 2 seed 110–119) 30/30, ở cả hai cảnh. Còn 1:16 (cầm lệch một tay).
