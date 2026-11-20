@@ -74,6 +74,8 @@ def test_config_loads_and_fits_the_tray() -> None:
         ({"wall_height": 0.07}, "wall_height"),
         ({"near_side_arm": 0.5}, "near_side_arm"),
         ({"near_end_arm": 0.05}, "near_end_arm"),
+        ({"near_end_height": 0.01}, "near_end_wall"),
+        ({"near_end_height": 0.07}, "near_end_wall"),
     ],
 )
 def test_check_refuses_jigs_that_do_not_fit(change: dict[str, float], reason: str) -> None:
@@ -131,29 +133,60 @@ def test_guides_are_a_stop_wall_then_a_chamfer_leaning_out() -> None:
     hx, hy = cfg.tray_width / 2, cfg.tray_length / 2
     boxes = guide_boxes(cfg, jig)
     # Far side: two long-side and two end arms; robot side: end arms only by default.
-    arms = 4 + 2 * (jig.near_side_arm > 0) + 2 * (jig.near_end_arm > 0)
-    assert len(boxes) == 2 * arms  # each arm: wall and chamfer
+    near_ends = 2 * (jig.near_end_arm > 0)
+    arms = 4 + 2 * (jig.near_side_arm > 0) + near_ends
+    # Each arm: a wall, and a chamfer unless it stops at the wall (the near end arms).
+    chamfers = arms - near_ends * (jig.near_end_height <= jig.near_end_wall)
+    assert len(boxes) == arms + chamfers
+    assert sum(b.name.endswith("_wall") for b in boxes) == arms
     assert not jig.near_side_arm and not any(
         "_side" in b.name and b.pos[0] > 0 for b in boxes
     )  # robot-side long side left open
+    near_end = [b for b in boxes if "_end" in b.name and b.pos[0] > 0]
+    assert max(float(np.max(b.corners()[:, 2])) for b in near_end) == pytest.approx(
+        jig.near_end_height
+    )  # the wrists come down over them (DA-41 task 6)
     for box in boxes:
         pts = box.corners()
         side = "_side" in box.name
+        low = "_end" in box.name and box.pos[0] > 0  # near end arms: lower profile
+        wall = jig.near_end_wall if low else jig.wall_height
+        height = jig.near_end_height if low else jig.height
+        # Same chamfer angle, so a shorter rise leads in less.
+        lead_in = jig.clearance + (jig.lead_in - jig.clearance) * (height - wall) / (
+            jig.height - jig.wall_height
+        )
         u = np.abs(pts[:, 0]) - hx if side else np.abs(pts[:, 1]) - hy  # outward of the tray
         bottom, top = float(np.min(pts[:, 2])), float(np.max(pts[:, 2]))
         innermost = float(np.min(u))
         assert innermost == pytest.approx(jig.clearance, abs=1e-9), box.name
         if box.name.endswith("_wall"):
-            # Vertical inner face at the clearance, table top to wall_height.
-            assert (bottom, top) == pytest.approx((0.0, jig.wall_height), abs=1e-9)
+            # Vertical inner face at the clearance, table top to the wall height.
+            assert (bottom, top) == pytest.approx((0.0, wall), abs=1e-9)
             inner = pts[np.isclose(u, innermost)]
-            assert sorted(inner[:, 2]) == pytest.approx([0, 0, jig.wall_height, jig.wall_height])
+            assert sorted(inner[:, 2]) == pytest.approx([0, 0, wall, wall])
         else:
             # Inner face from the wall top at the clearance out to lead_in at the top.
-            assert top == pytest.approx(jig.height, abs=1e-9)
-            assert pts[np.argmin(u), 2] == pytest.approx(jig.wall_height, abs=1e-9)
+            assert top == pytest.approx(height, abs=1e-9)
+            assert pts[np.argmin(u), 2] == pytest.approx(wall, abs=1e-9)
             inner_top = float(np.min(u[np.isclose(pts[:, 2], top)]))
-            assert inner_top == pytest.approx(jig.lead_in, abs=1e-9)
+            assert inner_top == pytest.approx(lead_in, abs=1e-9), box.name
+
+
+def test_near_end_arms_can_stop_at_the_wall() -> None:
+    cfg, jig = cfgs()
+    flat = dataclasses.replace(jig, near_end_height=jig.near_end_wall)
+    near = [b for b in guide_boxes(cfg, flat) if "_end" in b.name and b.pos[0] > 0]
+    assert len(near) == 2 and all(b.name.endswith("_wall") for b in near)
+
+
+def test_near_end_arms_can_keep_a_lower_chamfer() -> None:
+    cfg, jig = cfgs()
+    for top in (jig.near_end_wall + 0.005, jig.height):
+        boxes = guide_boxes(cfg, dataclasses.replace(jig, near_end_height=top))
+        near = [b for b in boxes if "_end" in b.name and b.pos[0] > 0]
+        assert len(near) == 4  # wall and chamfer per corner
+        assert max(float(np.max(b.corners()[:, 2])) for b in near) == pytest.approx(top)
 
 
 def test_guides_leave_the_footprint_and_the_handles_free() -> None:
@@ -238,5 +271,5 @@ def test_generate_on_the_jig_scene_refuses_a_zone1_batch(
         "visuals_revision": visuals_revision(None),
     }
     (shard / gen.LOG_NAME).write_text(json.dumps(row) + "\n")
-    with pytest.raises(RuntimeError, match=r"\+jig1"):
+    with pytest.raises(RuntimeError, match=r"\+jig2"):
         gen.generate(tmp_path, n_attempts=1, level=1, seed_start=0, allow_plain=True, scene="jig")

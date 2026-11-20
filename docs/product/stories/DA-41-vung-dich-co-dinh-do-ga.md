@@ -47,7 +47,7 @@ Số đo dẫn tới story ([docs/he/tray.md](../../he/tray.md) mục 19–20): 
   - [x] 5.1 `docs/g0/tray/jig.md`: thay đổi, số đo, runbook `rtx3060` (AC 7)
 - [ ] 6. Sửa planner cho đạt ≥ 95 % trên cảnh đích cố định có đồ gá (PO 20/11/2026: "Sửa planner trước", trước khi sinh lại dữ liệu; AC 8)
   - [x] 6.1 Nguyên nhân gốc của từng nhóm lỗi còn lại, từ trace của episode hỏng, ghi trong jig.md
-  - [ ] 6.2 Sửa planner (căn góc trước khi hạ và trong lúc hạ, tư thế tay giơ sẵn) và hạ thấp cánh ngắn phía robot của đồ gá (nguyên nhân (a) ở hình học), test CPU và test `sim`
+  - [x] 6.2 Sửa planner (căn góc trước khi hạ và trong lúc hạ, tư thế tay giơ sẵn) và hạ thấp cánh ngắn phía robot của đồ gá (nguyên nhân (a) ở hình học), test CPU và test `sim`
   - [ ] 6.3 Đo lại đúng 31 episode cũ trên laptop, có và không đồ gá; bảng trước/sau và runbook 50 seed mới trong jig.md
 
 ## Phạm vi file
