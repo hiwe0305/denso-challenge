@@ -58,7 +58,7 @@ from flywheel_simple.tray.randomize import EpisodeSample
 PLANNER_CONFIG_RELPATH = Path("configs/sim/tray_planner.yaml")
 # Bump when the phase logic changes; config values are hashed into the recorded
 # planner_version separately (recorder.planner_version).
-PLANNER_VERSION = "da41-planner-7"  # 6 is the unmerged D-29 trial
+PLANNER_VERSION = "da41-planner-8"  # 6 is the unmerged D-29 trial
 MIRROR = np.diag([1.0, -1.0, 1.0])  # left <-> right across the xz plane
 # Measured-palm correction per phase: axes it acts on. GRASP and LIFT correct height
 # only: across the handles the squeezing hands are blocked on purpose.
@@ -144,6 +144,7 @@ class PlannerConfig:
     arrive_speed: float
     arrive_hold: float
     arrive_lat_tol: float
+    arrive_filter_tau: float
     lower_speed: float
     place_shift_max: float
     place_gain: float
@@ -388,6 +389,9 @@ class TrayPlanner:
     _level_angle: float = 0.0  # hands' turn against the tray's pitch (rad)
     _arrive_goal: NDArray[np.float64] | None = None  # ARRIVE_B base goal, world xy
     _arrive_heading: float | None = None  # ARRIVE_B base heading (DA-41)
+    _arrive_mean: NDArray[np.float64] | None = None  # ARRIVE_B low-passed base xy (DA-41)
+    _arrive_axes: tuple[float, float] | None = None  # ARRIVE_B step under way: signs ahead, side
+    _arrive_rest_t: float | None = None  # ARRIVE_B: end of the last step
     _place_shift: NDArray[np.float64] | None = None  # hands' shift while lowering, base frame
     _place_yaw: float | None = None  # hands' turn while lowering, rad (DA-41)
     _carry: _Carry | None = None
@@ -609,24 +613,66 @@ class TrayPlanner:
                 self._arrive_goal, self._arrive_heading = self._arrive_plan(state, base)
             heading = self._arrive_heading
             assert heading is not None
-            d = self._arrive_goal - np.array([base.x, base.y])
+            # DA-41: standing with the tray the pelvis rocks +-2 cm (~0.6 Hz), as much as
+            # arrive_lat_tol and faster than arrive_speed: judged on the raw base, every
+            # swing started a step and the base never counted as still (level 1 seed 20
+            # timed out). A step is decided on the low-passed base: it picks the axes off by
+            # more than the tolerance and their directions, then runs on the raw base, each
+            # axis stopping for good at half the tolerance or past the goal. Running on the
+            # raw base alone, the sway flipped the side step for 1.3 s and shook a hand off
+            # the handle (level 1 seed 18, noise draw 1). The next decision waits 2 filter
+            # time constants, until the filter has caught up with the step.
+            xy = np.array([base.x, base.y])
+            speed = 0.0
+            if self._arrive_mean is None or self._prev is None:
+                self._arrive_mean = xy
+            else:
+                dt = max(0.0, state.t - self._prev[0])
+                mean = self._arrive_mean + min(1.0, dt / cfg.arrive_filter_tau) * (
+                    xy - self._arrive_mean
+                )
+                speed = float(np.linalg.norm(mean - self._arrive_mean)) / dt if dt else 0.0
+                self._arrive_mean = mean
             c, s = math.cos(base.yaw), math.sin(base.yaw)
-            along, lateral = c * d[0] + s * d[1], -s * d[0] + c * d[1]
+
+            def ahead_and_side(at: NDArray[np.float64]) -> tuple[float, float]:
+                assert self._arrive_goal is not None
+                d = self._arrive_goal - at
+                return c * d[0] + s * d[1], -s * d[0] + c * d[1]
+
+            def step(axes: tuple[float, float]) -> PlannerCommand:
+                self._arrive_axes = axes
+                self._since = None
+                nav = (axes[0] * cfg.keep_vx, axes[1] * cfg.keep_vx, cfg.heading_hold)
+                return self._emit(state, base, carry.palms, nav, closure=True, heading=heading)
+
             assert self._entered_t is not None
             budget = state.t - self._entered_t < cfg.timeout_arrive_b - cfg.arrive_hold - 1.0
-            if budget and max(abs(along), abs(lateral)) > cfg.arrive_lat_tol:
-                self._since = None
-                vx = math.copysign(cfg.keep_vx, along) if abs(along) > cfg.arrive_lat_tol else 0.0
-                vy = (
-                    math.copysign(cfg.keep_vx, lateral)
-                    if abs(lateral) > cfg.arrive_lat_tol
-                    else 0.0
+            tol = cfg.arrive_lat_tol
+            if self._arrive_axes is not None:
+                errs = ahead_and_side(xy)
+                axes = (
+                    self._arrive_axes[0] if self._arrive_axes[0] * errs[0] > tol / 2 else 0.0,
+                    self._arrive_axes[1] if self._arrive_axes[1] * errs[1] > tol / 2 else 0.0,
                 )
-                nav = (vx, vy, cfg.heading_hold)
-                return self._emit(state, base, carry.palms, nav, closure=True, heading=heading)
-            if self._held(
-                self._base_speed(state, base) < cfg.arrive_speed, state.t, cfg.arrive_hold
-            ):
+                if budget and any(axes):
+                    return step(axes)
+                self._arrive_axes = None
+                self._arrive_rest_t = state.t
+            settled = (
+                not budget  # out of time to step: stand and lower
+                or self._arrive_rest_t is None
+                or state.t - self._arrive_rest_t >= 2 * cfg.arrive_filter_tau
+            )
+            if settled and budget:
+                errs = ahead_and_side(self._arrive_mean)
+                axes = (
+                    math.copysign(1.0, errs[0]) if abs(errs[0]) > tol else 0.0,
+                    math.copysign(1.0, errs[1]) if abs(errs[1]) > tol else 0.0,
+                )
+                if any(axes):
+                    return step(axes)
+            if self._held(settled and speed < cfg.arrive_speed, state.t, cfg.arrive_hold):
                 self._enter(Phase.LOWER, state, base)
                 return self._command(state, base)
             return self._emit(state, base, carry.palms, (0.0, 0.0, 0.0), closure=True)
