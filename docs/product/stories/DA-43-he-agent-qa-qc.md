@@ -4,10 +4,10 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Đang làm. Design duyệt 19/11/2026 (Hiếu, "Approve as proposed": Q1–Q10 theo đề xuất, design bản 0.2) |
+| Trạng thái | Đang làm. Design duyệt 19/11/2026 (Hiếu, "Approve as proposed": Q1–Q10, design bản 0.2). Kiến trúc duyệt 20/11/2026 (Hiếu, "Duyệt theo đề xuất": Q1–Q9, kiến trúc bản 0.3) |
 | Người làm | Hiếu, làm cùng Claude |
 | Làn | Đánh giá (`flywheel.eval.agentqa`); một lệnh xuất trong adapter `flywheel_psi0` |
-| Nguồn yêu cầu | Ban giám khảo sau vòng 2: Agent QA/QC phải chạy tốt và phân tích nguyên nhân gốc của lỗi task, robot và kết quả. Design: [2026-11-19-agent-qaqc-system-design.md](../../superpowers/specs/2026-11-19-agent-qaqc-system-design.md) |
+| Nguồn yêu cầu | Ban giám khảo sau vòng 2: Agent QA/QC phải chạy tốt và phân tích nguyên nhân gốc của lỗi task, robot và kết quả. Design: [2026-11-19-agent-qaqc-system-design.md](../../superpowers/specs/2026-11-19-agent-qaqc-system-design.md); kiến trúc: [2026-11-20-agent-qaqc-architecture-design.md](../../superpowers/specs/2026-11-20-agent-qaqc-architecture-design.md) |
 | Nhãn | `area:core` · `epic:9` |
 | Sprint | Sau demo 17/11/2026 |
 | Ước lượng | Khoảng 10 ngày làm việc, 70–80 giờ (ước lượng); xem cột giờ của từng nhiệm vụ |
@@ -29,7 +29,8 @@ Là AI Engineer, tôi muốn một agent đọc toàn bộ artifact của một 
 8. Bộ ca lịch sử: đáp án có cấu trúc, niêm phong ngoài gói, chỉ `agentqa/casebench/` đọc, sau khi mọi báo cáo đã ghi; test rào quét các module khác. Có ít nhất 5 ca, chia tập phát triển và tập kiểm như design mục 11.2.
 9. Bảng kết quả của bốn phần đánh giá (design mục 11.1–11.4) ghi vào `docs/g0/agent-qa.md`, mỗi bảng tách lớp code, agent và phần model thêm, kèm phiên bản agent, model, revision, sha256 prompt và config. Bộ lỗi cấy không tụt so với bản 3.
 10. Đo ít nhất hai model cho bộ tổng hợp (M1 cục bộ; M3 hosted chỉ trên ca `public`, nếu Hiếu mở đường hosted) trên cùng bộ ca, cùng công cụ.
-11. `uv run ruff check`, `uv run mypy`, `uv run pytest`, `uv run lint-imports` sạch; `python3 scripts/repo/check_links.py` sạch.
+11. Đường ống theo kiến trúc 20/11: mỗi bước ghi file của mình vào thư mục lần chạy, có `run.json`; `--no-model` ra báo cáo chỉ bằng code; `--from <bước>` chạy lại từ một bước; `--replay` phát lại lời gọi model. Mục của model trượt kiểm thì về sàn code và lần chạy là `degraded` (có test); `AgentReport` giữ nghĩa `broken` của bản 3.
+12. `uv run ruff check`, `uv run mypy`, `uv run pytest`, `uv run lint-imports` sạch; `python3 scripts/repo/check_links.py` sạch.
 
 ## Nhiệm vụ
 
@@ -50,16 +51,17 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
   - [ ] 3.2 `train_window`, `lineage`
   - [ ] 3.3 `coverage_distance` và test đối chiếu với tray.md 20.12
   - [ ] 3.4 `cost_lookup`, `history_lookup`
-- [ ] 4. Giả thuyết và chuyên viên (2 ngày)
-  - [ ] 4.1 Bảng luật giả thuyết, danh mục phép kiểm trong config; bộ đề xuất bằng code; chặn tiêu ngân sách khi còn giả thuyết hệ thống
-  - [ ] 4.2 Chuyên viên eval và bộ chấm, chuyên viên runtime và trace; prompt riêng
-  - [ ] 4.3 Ba sửa của mục 5.2 design (fact của chính mã, bỏ phải có fact phản bác, gộp chiều) và ca kiểm của AC 5
-  - [ ] 4.4 Báo cáo vòng chỉ bằng lớp code (`EchoModel`) chạy hết trên gói mẫu
-- [ ] 5. Bộ tổng hợp (1,5 ngày)
-  - [ ] 5.1 Lượt xếp hạng, chọn phép kiểm, chọn can thiệp; code gắn `Cost`, `ExpectedGain`
-  - [ ] 5.2 Luật 1–8 của design mục 6; cửa xin thêm công cụ (tắt mặc định)
-  - [ ] 5.3 Cổng dữ liệu và chặn hosted theo `data_class`; gói giả log robot thật
-  - [ ] 5.4 `RoundDiagnosis` (sau khi PR hợp đồng merge), trang HTML vòng, lệnh `fw agentqa round`
+- [ ] 4. Khung đường ống, sàn code (2 ngày; kiến trúc 20/11 mục 5–7, 15)
+  - [ ] 4.1 B0 và B1: `round.yaml`, `pack.json`, nhận, lớp dữ liệu của gói; gói giả log robot thật
+  - [ ] 4.2 B2 thành một bước: đăng ký công cụ (`ToolSpec`), kế hoạch công cụ, thư mục lần chạy, `run.json`, `--from`
+  - [ ] 4.3 B3: bảng luật giả thuyết, danh mục phép kiểm, hạng của code; chặn tiêu ngân sách khi còn giả thuyết hệ thống
+  - [ ] 4.4 B6 và B7 với `--no-model`, ghi `assembly.json`; lệnh `fw agentqa round`; báo cáo vòng chạy hết trên gói mẫu
+- [ ] 5. Lớp model (2 ngày; kiến trúc 20/11 mục 8, 19–25)
+  - [ ] 5.1 Cổng model: hồ sơ, bảng vai × lớp dữ liệu, chặn hosted, ngân sách, ghi và phát lại
+  - [ ] 5.2 Vai `adjudicate` và `rank`: prompt, schema câu trả lời
+  - [ ] 5.3 B5: các phép kiểm của kiến trúc mục 25 (luật của design mục 6), ba sửa của bản 3 và ca kiểm của AC 5, phán quyết và sàn code
+  - [ ] 5.4 Lớp hosted kiểu OpenAI (OpenRouter) và lớp Anthropic
+  - [ ] 5.5 Xuất `round_diagnosis.json` theo `RoundDiagnosis` sau khi PR hợp đồng K2 merge
 - [ ] 6. Bộ ca lịch sử (1,5 ngày)
   - [ ] 6.1 Kiểm artifact của từng ca ứng viên còn đủ; loại ca thiếu, ghi lý do
   - [ ] 6.2 Đáp án có cấu trúc cho tập phát triển; tập kiểm do người không viết bảng luật soạn; niêm phong, sha256
@@ -70,7 +72,7 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
   - [ ] 7.3 Báo nhầm trên gói khỏe; thời gian, chi phí, tỉ lệ `broken`, độ ổn định
   - [ ] 7.4 Ghi bảng kết quả và runbook vào `docs/g0/agent-qa.md`
 - [ ] 8. Nhìn hình (0,5–1 ngày; rút được khỏi story)
-  - [ ] 8.1 `frames_at`, câu hỏi đóng trong config task
+  - [ ] 8.1 `frames_at`, câu hỏi đóng trong config task (vai `look`)
   - [ ] 8.2 Hiệu chỉnh trên câu hỏi code đã biết đáp án; fact `vision` chỉ ủng hộ
 
 ## Phạm vi file
@@ -85,14 +87,15 @@ Theo 07 mục 3.1. File story luôn được sửa. PR hợp đồng (nhiệm v�
 - `packages/flywheel-eval/src/flywheel/eval/agentqa/casebench/`
 - `packages/flywheel-eval/src/flywheel/eval/agentqa/inputs.py`, `packages/flywheel-eval/src/flywheel/eval/agentqa/agent.py`, `packages/flywheel-eval/src/flywheel/eval/agentqa/analyze.py`, `packages/flywheel-eval/src/flywheel/eval/agentqa/endpoint.py`, `packages/flywheel-eval/src/flywheel/eval/agentqa/vision.py`, `packages/flywheel-eval/src/flywheel/eval/agentqa/html.py`, `packages/flywheel-eval/src/flywheel/eval/agentqa/cli.py`, `packages/flywheel-eval/src/flywheel/eval/agentqa/run.py`
 - `packages/flywheel-eval/tests/unit/agentqa/tools/`, `packages/flywheel-eval/tests/unit/agentqa/round/`, `packages/flywheel-eval/tests/unit/agentqa/casebench/`, `packages/flywheel-eval/tests/contract/agentqa/`
-- `packages/flywheel-eval/pyproject.toml`: chỉ thêm `opencv-python-headless` vào nhóm tùy chọn `agentqa`
-- `uv.lock`: chỉ phần do dòng trên sinh (gói đã có trong khóa)
+- `packages/flywheel-eval/pyproject.toml`: chỉ thêm `opencv-python-headless` vào nhóm tùy chọn `agentqa`, và `anthropic` vào nhóm tùy chọn mới `agentqa-hosted` (kiến trúc 20/11, Q3)
+- `uv.lock`: chỉ phần do hai dòng trên sinh
 - `configs/eval/agentqa/`
 - `packages/flywheel-psi0/src/flywheel_psi0/tray/export_scores.py`, `packages/flywheel-psi0/tests/tray/test_psi0_tray_export_scores.py`
 
 ## Ghi chú cho người làm
 
-- Đọc design trước, nhất là mục 4 (công cụ), 6 (luật trích số) và 11 (đánh giá).
+- Đọc design trước, nhất là mục 4 (công cụ), 6 (luật trích số) và 11 (đánh giá); rồi kiến trúc 20/11 (đường ống, cổng model, phần B). Chỗ hai tài liệu khác nhau thì kiến trúc thắng.
+- Không dựng chat trong DA-43: hỏi đáp đi qua chat của Console, đọc file của đường ống (kiến trúc Q8).
 - Agent không đọc `docs/he/`: chẩn đoán của đội là đáp án của bộ ca lịch sử.
 - Kết quả thi lại của `C70_R1` không vào bộ ca và không vào báo cáo (quyết định 16/11/2026).
 - Không commit `fwdata/`, đáp án của bộ ca, file `--record` có dữ liệu không phải `public`, hay khóa API.
@@ -113,6 +116,7 @@ Theo 07 mục 3.1. File story luôn được sửa. PR hợp đồng (nhiệm v�
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 20/11/2026 | Hiếu duyệt kiến trúc 20/11 (Q1–Q9). Sắp lại nhiệm vụ 4 và 5 theo đường ống; thêm AC 11; phạm vi file thêm `anthropic` trong nhóm tùy chọn `agentqa-hosted`; cửa xin thêm công cụ rút khỏi story | Hiếu |
 | 20/11/2026 | Thêm [kiến trúc 20/11/2026](../../superpowers/specs/2026-11-20-agent-qaqc-architecture-design.md) vào phạm vi file (đề xuất, chờ duyệt). Nhiệm vụ 4 và 5 sẽ sắp lại theo mục 15 của tài liệu đó sau khi Hiếu duyệt | Hiếu (soạn với Claude) |
 | 19/11/2026 | Design duyệt theo đề xuất; story chuyển sang đang làm | Hiếu |
 | 19/11/2026 | Tạo story cùng design; mã DA-43 chưa dùng trên `origin/master` | Hiếu (soạn với Claude) |

@@ -2,10 +2,11 @@
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 20/11/2026 | 0.3 | Hiếu duyệt ("Duyệt theo đề xuất"): Q1–Q9 của mục 16 thành **[Đã chốt]** | Hiếu (soạn với Claude) |
 | 20/11/2026 | 0.2 | Thêm phần B (mục 18–26): hai bề mặt (báo cáo vòng và chat của Console), tool calling, vòng lặp, bộ nhớ, gói kiến thức (skill), điểm mở rộng (plugin), schema bản ghi, prompt và config. Thêm Q8, Q9 | Hiếu (soạn với Claude) |
 | 20/11/2026 | 0.1 | Bản đầu, chờ Hiếu duyệt. Thay mục 5.1, 5.4, 12 và phần chọn model của mục 8 của [design 19/11/2026](2026-11-19-agent-qaqc-system-design.md) | Hiếu (soạn với Claude) |
 
-_Trạng thái: **[Đề xuất], chờ Hiếu duyệt.** Tài liệu này trả lời yêu cầu ngày 20/11/2026 của Hiếu: thiết kế kiến trúc agent rõ ràng, sạch từ dữ liệu, xử lý tới đầu ra, theo chuẩn production; và có model nào rẻ mà tốt hơn không. Design 19/11/2026 vẫn giữ phần "làm gì và vì sao" (công cụ ở mục 4, luật trích số ở mục 6, hợp đồng ở mục 7, đánh giá ở mục 11). Tài liệu này quyết "dựng thế nào". Chỗ hai tài liệu khác nhau thì tài liệu này thắng, sau khi được duyệt. Số chưa đo ghi là ước lượng._
+_Trạng thái: **đã duyệt 20/11/2026** (bản 0.3: Q1–Q9 của mục 16 chốt theo đề xuất). Các nhãn **[Đề xuất]** trong thân bài có quyết định tương ứng ở mục 16 nay đọc là đã chốt; số ghi ước lượng vẫn là ước lượng tới khi đo. Tài liệu này trả lời yêu cầu ngày 20/11/2026 của Hiếu: thiết kế kiến trúc agent rõ ràng, sạch từ dữ liệu, xử lý tới đầu ra, theo chuẩn production; và có model nào rẻ mà tốt hơn không. Design 19/11/2026 vẫn giữ phần "làm gì và vì sao" (công cụ ở mục 4, luật trích số ở mục 6, hợp đồng ở mục 7, đánh giá ở mục 11). Tài liệu này quyết "dựng thế nào". Chỗ hai tài liệu khác nhau thì tài liệu này thắng. Số chưa đo ghi là ước lượng._
 
 ## 0. Đọc nhanh
 
@@ -355,11 +356,13 @@ Việc đã xong (1.2, 2.1–2.3) giữ nguyên và nằm đúng ở B2. Nhiệm
 | 5.4 | Lớp hosted kiểu OpenAI (OpenRouter); lớp Anthropic nếu Q3 được duyệt | Chạy với model thuê trên gói `public` |
 | 5.5 | Xuất `round_diagnosis.json` theo `RoundDiagnosis` sau khi PR K2 merge | Console đọc được |
 
-Nhiệm vụ 6 (bộ ca), 7 (đo) và 8 (nhìn hình, vai `look`) giữ nguyên. Story sẽ được sửa theo bảng này sau khi Hiếu duyệt.
+Nhiệm vụ 6 (bộ ca), 7 (đo) và 8 (nhìn hình, vai `look`) giữ nguyên. Story đã sửa theo bảng này ngày 20/11/2026.
 
 ## 16. Quyết định cần Hiếu
 
-| # | Quyết định | Đề xuất |
+**[Đã chốt 20/11/2026, Hiếu]** "Duyệt theo đề xuất": mọi dòng dưới đây chốt theo cột đề xuất (bản 0.3).
+
+| # | Quyết định | Đề xuất (đã chốt) |
 |---|---|---|
 | Q1 | Dựng theo đường ống 8 bước của tài liệu này, thay mục 5.1, 5.4, 12 và phần chọn model của mục 8 của design 19/11 (sáu điều chặn cứng của mục 8 giữ nguyên) | Có |
 | Q2 | Model trượt kiểm thì mục đó về sàn code và lần chạy là `degraded`, thay cho "cả phần tổng hợp `broken`" (design 19/11 mục 6, luật 8) | Có |

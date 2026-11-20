@@ -2,6 +2,7 @@
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 20/11/2026 | 0.4 | Hiếu duyệt [kiến trúc 20/11/2026](2026-11-20-agent-qaqc-architecture-design.md) bản 0.3. Từ nay mục 5.1, 5.4, 12, phần chọn model của mục 8 và luật 8 của mục 6 đọc theo tài liệu đó; cửa xin thêm công cụ rút khỏi DA-43; bản ghi lời gọi công cụ rút khỏi K3. Thân bài ở đây giữ nguyên làm lịch sử | Hiếu (soạn với Claude) |
 | 20/11/2026 | 0.3 | Thêm con trỏ tới [kiến trúc 20/11/2026](2026-11-20-agent-qaqc-architecture-design.md) (**[Đề xuất]**, chờ duyệt): tài liệu đó đề xuất thay mục 5.1, 5.4, 8, 12 và luật 8 của mục 6. Nội dung các mục ở đây chưa sửa | Hiếu (soạn với Claude) |
 | 19/11/2026 | 0.2 | Hiếu duyệt theo đề xuất ("Approve as proposed"): Q1–Q10 của mục 14 thành **[Đã chốt]** | Hiếu (soạn với Claude) |
 | 19/11/2026 | 0.1 | Bản đầu, chờ Hiếu duyệt trước khi viết mã | Hiếu (soạn với Claude) |
