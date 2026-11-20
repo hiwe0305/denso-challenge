@@ -54,8 +54,8 @@ Số đo dẫn tới story ([docs/he/tray.md](../../he/tray.md) mục 19–20): 
   - [x] 6.6 Đo lại 31 episode cũ và một tập seed chưa dùng để chỉnh (mức 1 seed 21–40, mức 2 seed 110–119), có và không đồ gá; bảng, n và khoảng tin cậy trong jig.md; runbook
   - [x] 6.7 Bộ video mẫu mới trong `fwdata/da-41-samples/` (ngoài repo) cho Hiếu xem; dọn file tạm. Bốn video planner-8: 1:20 không đồ gá, 1:10 và 2:115 đồ gá (trước hỏng, nay đạt), 1:16 đồ gá (còn hỏng); xóa bốn video planner-7 cũ và file tạm (khoảng 26 MB)
 - [ ] 7. Lô mẫu dữ liệu nhỏ với `da41-planner-8` trên cảnh có đồ gá (PO 20/11/2026: "Oke và mục tiêu của tôi là nâng các chỉ số của nó lên được 9x"), xem mẫu trước khi sinh cả lô
-  - [ ] 7.1 Trên laptop, sinh khoảng 20 episode bằng đường S1 thật (`generate.py --scene jig`, QA phát lại, bộ lọc chất lượng, export Ψ₀), mức 1 và mức 2, seed train chưa dùng; thư mục riêng ngoài repo, không phải release
-  - [ ] 7.2 Kiểm lô như dữ liệu train: số episode qua lọc, độ dài, chiều action và state, camera đầu, `visuals_revision`, `planner_version`, cờ 7 bước; so với lô 606 episode cũ
+  - [x] 7.1 Trên laptop, sinh khoảng 20 episode bằng đường S1 thật (`generate.py --scene jig`, QA phát lại, bộ lọc chất lượng, export Ψ₀), mức 1 và mức 2, seed train chưa dùng; thư mục riêng ngoài repo, không phải release. Lô `fwdata/da-41-sample-batch/`: 20 lượt, 19 ghi được, 19 qua QA phát lại (sau khi sửa `replay_qa` chạy đúng cảnh đồ gá), QA DA-03, bộ lọc chất lượng
+  - [x] 7.2 Kiểm lô như dữ liệu train: số episode qua lọc, độ dài, chiều action và state, camera đầu, `visuals_revision`, `planner_version`, cờ 7 bước; so với lô 606 episode cũ. Bảng ở jig.md mục 4.9; đủ chiều, không NaN, video khớp số dòng. Bất thường: phát lại động học DA-17 chạy cảnh cũ nên mọi episode bị `flag` D7/D8 (việc ngoài DA-41)
   - [ ] 7.3 Mẫu xem: 4 episode (2 mỗi mức) camera đầu đúng như policy thấy cạnh góc nhìn ngoài; ảnh tổng hợp cả lô: vị trí và góc đặt cuối so với đích, độ thấy đồ gá và vùng đích trong camera đầu lúc hạ và nhả; thời gian sinh mỗi episode; dọn file tạm
 
 ## Phạm vi file
