@@ -402,3 +402,14 @@ def test_ready_hands_clear_the_handles_with_the_robot_off_centre() -> None:
     # palms walk on beside the handles' outer ends, not over them (DA-41).
     outer = tray.tray_length / 2 + tray.handle_depth
     assert cfg.ready_y - outer >= 0.08
+
+
+def test_arrive_b_does_not_hunt_on_the_standing_sway() -> None:
+    # Standing with the tray, G1's pelvis rocks +-2 cm at about 0.6 Hz (level 1 seed 20).
+    # ARRIVE_B stepped whenever a swing crossed arrive_lat_tol and never saw the base
+    # still (sway speed ~0.08 m/s over arrive_speed): it timed out (DA-41).
+    world = ToyWorld(level=1, seed=20, sway=(0.02, 0.6))
+    records = world.run()
+    arrive = [r for r in records if r.cmd.phase is Phase.ARRIVE_B]
+    assert any(r.cmd.phase is Phase.LOWER for r in records)
+    assert arrive[-1].state.t - arrive[0].state.t < world.planner_cfg.timeout_arrive_b - 2.0

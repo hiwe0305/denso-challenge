@@ -9,7 +9,8 @@ while the hands stay no further apart than when they gripped (plus SLACK), so
 spreading them releases it as opening does; while both grip, the tray moves
 rigidly with the palms, turning with the line between them (DA-41: so hands that
 turn the tray in LOWER turn it here too). `slip_deg` turns the held tray in the
-hands once, when `slip_at` starts, as it does in SIMPLE (2-5 deg). Released over a
+hands once, when `slip_at` starts, as it does in SIMPLE (2-5 deg); `sway` rocks the
+base the planner sees. Released over a
 table, the tray rests on it; elsewhere it falls to the floor. DA-32's StepTracker
 scores every step. The arms start hanging at rest (`start_wrists`), where the
 planner's first targets start from.
@@ -60,12 +61,16 @@ class ToyWorld:
         planner_cfg: PlannerConfig | None = None,
         slip_deg: float = 0.0,
         slip_at: Phase = Phase.CARRY,
+        sway: tuple[float, float] = (0.0, 0.0),
     ) -> None:
         self.cfg = TrayConfig.load()
         self.planner_cfg = planner_cfg or PlannerConfig.load()
         self.vy_scale = vy_scale  # 0 blocks sideways steps, leaving a lateral error
         self.slip = math.radians(slip_deg)
         self.slip_at = slip_at
+        # (amplitude m, frequency Hz): the pelvis rocks back and forth along the base x
+        # in the pose the planner sees, as G1 does standing with the tray (DA-41).
+        self.sway = sway
         self.sample = sample_episode(self.cfg, level, seed)
         self.geo = scene_geometry_with_gap(self.cfg, self.sample.table_gap)
         spawn = self.sample.robot_spawn
@@ -112,7 +117,10 @@ class ToyWorld:
         records: list[Record] = []
         linger = 0.0
         while self.t < max_s and linger < LINGER_S:
-            base = self.base
+            amp, freq = self.sway
+            rock = amp * math.sin(2 * math.pi * freq * self.t)
+            c, s = math.cos(self.base.yaw), math.sin(self.base.yaw)
+            base = Pose2D(self.base.x + c * rock, self.base.y + s * rock, self.base.yaw)
             cmd = planner.step(state, base, report)
             self._apply(cmd)
             state = self._state()
