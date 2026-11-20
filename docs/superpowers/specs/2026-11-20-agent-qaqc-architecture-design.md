@@ -2,6 +2,7 @@
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 20/11/2026 | 0.2 | Thêm phần B (mục 18–26): hai bề mặt (báo cáo vòng và chat của Console), tool calling, vòng lặp, bộ nhớ, gói kiến thức (skill), điểm mở rộng (plugin), schema bản ghi, prompt và config. Thêm Q8, Q9 | Hiếu (soạn với Claude) |
 | 20/11/2026 | 0.1 | Bản đầu, chờ Hiếu duyệt. Thay mục 5.1, 5.4, 12 và phần chọn model của mục 8 của [design 19/11/2026](2026-11-19-agent-qaqc-system-design.md) | Hiếu (soạn với Claude) |
 
 _Trạng thái: **[Đề xuất], chờ Hiếu duyệt.** Tài liệu này trả lời yêu cầu ngày 20/11/2026 của Hiếu: thiết kế kiến trúc agent rõ ràng, sạch từ dữ liệu, xử lý tới đầu ra, theo chuẩn production; và có model nào rẻ mà tốt hơn không. Design 19/11/2026 vẫn giữ phần "làm gì và vì sao" (công cụ ở mục 4, luật trích số ở mục 6, hợp đồng ở mục 7, đánh giá ở mục 11). Tài liệu này quyết "dựng thế nào". Chỗ hai tài liệu khác nhau thì tài liệu này thắng, sau khi được duyệt. Số chưa đo ghi là ước lượng._
@@ -13,7 +14,8 @@ _Trạng thái: **[Đề xuất], chờ Hiếu duyệt.** Tài liệu này trả
 3. Dữ liệu vào qua một cửa duy nhất: **gói vòng** có bảng kê (file nào, loại gì, sha256, lớp dữ liệu, nối với nhau thế nào). Agent không đoán loại file theo tên như hiện nay.
 4. Model gọi qua một **cổng model** duy nhất: chọn model theo lớp dữ liệu, giữ ngân sách, ghi lại mọi lời gọi, phát lại được. Đổi nhà cung cấp là đổi config.
 5. Câu trả lời của model không tới báo cáo trực tiếp. Một bước **kiểm** bằng code duyệt từng mục; mục trượt thì báo cáo dùng kết quả của code cho mục đó và ghi rõ. Báo cáo luôn ra, kể cả khi model hỏng.
-6. Về model: `claude-haiku-5-5` (0,10 và 0,50 USD mỗi triệu token) đã ở nhóm rẻ nhất thị trường. "Rẻ mà tốt hơn" chỉ trả lời được bằng số đo trên bộ ca lịch sử; kiến trúc này làm cho việc đo ba, bốn model chỉ là đổi config (mục 12).
+6. Hệ có **hai bề mặt**: báo cáo vòng (DA-43, đường ống này) và hỏi đáp (chat của Console, đã có). Chat không tính lại chẩn đoán; nó đọc file mà đường ống ghi ra. Tool calling, vòng lặp, bộ nhớ, skill và plugin áp vào hệ này thế nào: phần B, mục 18–23.
+7. Về model: `claude-haiku-5-5` (0,10 và 0,50 USD mỗi triệu token) đã ở nhóm rẻ nhất thị trường. "Rẻ mà tốt hơn" chỉ trả lời được bằng số đo trên bộ ca lịch sử; kiến trúc này làm cho việc đo ba, bốn model chỉ là đổi config (mục 12).
 
 ## 1. Vì sao cách hiện tại chưa ổn
 
@@ -366,19 +368,244 @@ Nhiệm vụ 6 (bộ ca), 7 (đo) và 8 (nhìn hình, vai `look`) giữ nguyên.
 | Q5 | Rút cửa "model xin thêm công cụ" khỏi DA-43 | Có |
 | Q6 | Rút bản ghi lời gọi công cụ khỏi PR hợp đồng K3 (để riêng trong làn) | Có |
 | Q7 | Sắp lại nhiệm vụ 4 và 5 của story theo mục 15 | Có |
+| Q8 | Hỏi đáp về chẩn đoán đi qua chat của Console (đã có), đọc file của đường ống; DA-43 không dựng chat thứ hai. Tool chat đọc chẩn đoán làm ở một story Console sau | Có |
+| Q9 | Bộ nhớ dài hạn chỉ là bản ghi có cấu trúc do code và kỹ sư ghi (mục 21); không có ghi chú tự do do model viết | Có |
 
 ## 17. Để lại cho người dựng
 
-- Tên trường cụ thể của các model trong `round/records.py`, miễn mỗi file ở mục 7 có một model và một test đọc ghi.
+- Tên trường ở mục 24 là đề xuất; đổi được, miễn mỗi file ở mục 7 có một model pydantic và một test đọc ghi.
 - Dạng của `round.yaml` và của `assembly.json`, miễn `round.yaml` khai đủ: task, run, checkpoint, job, release, dataset, đường dẫn, lớp dữ liệu.
 - Công thức chính xác của hạng code ở B3, miễn tất định, theo thứ tự spec 6.4, và có test.
 - Giá trị trần ngân sách mặc định; chỉnh sau lần đo đầu.
 - Cách cắt chuỗi lấy từ artifact trước khi vào prompt.
+
+---
+
+# Phần B. Thiết kế chi tiết (bản 0.2)
+
+## 18. Hai bề mặt: báo cáo vòng và hỏi đáp
+
+Câu hỏi "đây là agent chat đúng không" có hai nửa câu trả lời, vì dự án có **hai** thứ đều gọi là agent:
+
+| | Báo cáo vòng (DA-43, tài liệu này) | Hỏi đáp (chat của Flywheel Console) |
+|---|---|---|
+| Đã có chưa | Đang dựng | **Đã có**, chạy trong demo 17/11/2026: `packages/flywheel-console/src/flywheel/console/chat/` |
+| Ai khởi động | Một lệnh, sau khi một vòng xong | Người dùng gõ câu hỏi trên Console |
+| Dạng | Đường ống cố định, không hội thoại | Agent chat: model chọn tool, đọc kết quả, trả lời |
+| Tool calling | Code gọi công cụ theo kế hoạch; model không gọi | Có: khoảng 20 tool trong `registry.py` (`eval_summary`, `eval_failures`, `run_compare`, `lineage`, `round_report`…), mỗi lượt mời tối đa 7 |
+| Vòng lặp | Không; chỉ một lần gửi lại khi trượt kiểm | Có, tối đa 3 vòng gọi tool rồi một lượt trả lời (`MAX_ROUNDS = 3`) |
+| Bộ nhớ hội thoại | Không cần | Có: lịch sử cuộc trò chuyện |
+| Trả lời câu gì | "Vòng này hỏng vì đâu, kiểm gì, làm gì tiếp" cho cả vòng | "Run A khác run B thế nào", "cụm c1 gồm lượt nào", và sau này "vì sao agent xếp H1 trước" |
+
+**Vì sao không gộp thành một agent chat.** Chẩn đoán một vòng cần chạy 14 công cụ trên hàng trăm lượt và phải cho cùng kết quả mỗi lần chạy. Nếu để model chat tự quyết gọi gì, hai lần hỏi sẽ ra hai chẩn đoán, và không chấm điểm được. Vì vậy phần nặng làm một lần, ngoài hội thoại, rồi ghi ra file; chat chỉ **tra** file đó.
+
+**Hai bề mặt nối nhau bằng file, không bằng import.** Repo có luật import "Console reads files, never lanes or adapters": Console không được import `flywheel.eval`. Nên:
+
+- Đường ống ghi `round_diagnosis.json` (hợp đồng K2) và thư mục lần chạy.
+- Chat của Console thêm một tool đọc file đó (ví dụ `diagnosis_get`: giả thuyết của một cụm, fact ủng hộ, phép kiểm, can thiệp). Tool này thuộc package Console, làm ở **story Console sau** (Q8); DA-43 chỉ bảo đảm file đủ thông tin.
+- Câu hỏi đào sâu cần phép tính mới (ví dụ "nới dung sai lên 15 cm thì sao") được phục vụ bằng cách đường ống **tính sẵn cả lưới** tham số của config task và ghi vào `tables/`; chat tra bảng, không tính.
+
+## 19. Tool calling
+
+"Tool" là một hàm mà hệ gọi để lấy dữ kiện. Câu hỏi thiết kế là **ai quyết gọi** và **tham số từ đâu**. Hệ này có ba mức:
+
+| Mức | Ai quyết gọi tool | Ở đâu | Trạng thái |
+|---|---|---|---|
+| 1. Code gọi theo kế hoạch | Code, theo file kế hoạch của task | B2 của đường ống | Dựng trong DA-43 |
+| 2. Model chọn trong tập đóng | Model trả id (giả thuyết, phép kiểm, can thiệp); code thực thi | B4, vai `rank` | Dựng trong DA-43 |
+| 3. Model gọi tool tự do trong vòng lặp | Model, mỗi vòng | Chat của Console | Đã có; không dựng lại |
+
+Mức 2 là một dạng tool calling bị thu hẹp: model vẫn "ra lệnh" (chọn phép kiểm nào), nhưng chỉ chọn được trong danh sách code đưa, và không có tham số tự do. Nó giữ được lợi ích chính của tool calling (model quyết việc cần phán đoán) mà bỏ rủi ro chính (model bịa tham số).
+
+### 19.1 Hợp đồng của một công cụ (mức 1)
+
+Mỗi công cụ đăng ký một `ToolSpec` trong `tools/registry.py`:
+
+| Trường | Nội dung | Ví dụ (`relaxed_sweep`) |
+|---|---|---|
+| `name`, `version` | Tên và số phiên bản; đổi cách tính thì tăng phiên bản | `relaxed_sweep`, 1 |
+| `needs` | Loại artifact bắt buộc phải có | `scores`, `outcomes` |
+| `params` | Từng tham số và **miền đóng** của nó: tập giá trị của config task, id đơn vị trong gói, hoặc id fact | `label` ∈ nhãn của task; `grid` = lưới `relaxed.position_m` của task |
+| `fn` | Hàm thuần `(book, task, inputs, params) -> ToolResult` | |
+| `fact_names` | Mẫu tên fact nó sinh, để luật giả thuyết tham chiếu | `{run}_relaxed_{grid}_successes` |
+
+Luật thiết kế công cụ, áp cho mọi công cụ mới:
+
+1. **Một việc.** Một công cụ trả lời một câu hỏi đo lường. Không có công cụ "phân tích tổng hợp".
+2. **Chỉ đọc, thuần, tất định.** Cùng đầu vào thì cùng đầu ra; không ghi gì ngoài `FactBook`.
+3. **Trả fact, không trả văn.** Kết quả là số và nhãn có đơn vị và nguồn. Câu chữ là việc của bước sau.
+4. **So sánh là một fact.** Công cụ nào so với ngưỡng thì tự ra fact boolean (ví dụ `tracking_p99_exceeds_tau`), để model không phải tự so hai số (luật 6 của design 19/11).
+5. **Lỗi là giá trị.** Thiếu đầu vào ra fact "không xét được" kèm lý do; chỉ lỗi lập trình mới ném ngoại lệ.
+6. **Không tham số tự do.** Mọi tham số thuộc miền đóng; số viết tay bị từ chối khi nạp kế hoạch.
+7. **Có test đối chiếu** với một số đã công bố, khi có số như vậy.
+
+### 19.2 Kế hoạch công cụ
+
+`configs/eval/agentqa/plans/<task>.yaml` liệt kê lời gọi: công cụ, tham số, chạy trên run nào. B2 thực thi như sau:
+
+- nạp kế hoạch, kiểm mọi tham số thuộc miền đóng của `ToolSpec`;
+- với mỗi lời gọi: thiếu `needs` thì ghi fact "không xét được" và đi tiếp; đủ thì chạy;
+- ghi một dòng `tool_calls.jsonl` cho mỗi lời gọi, kể cả lời gọi không chạy được;
+- khóa nhớ đệm là (tên, phiên bản, tham số, sha256 đầu vào): chạy lại với `--from` không tính lại lời gọi đã có.
+
+### 19.3 Tool của chat (mức 3)
+
+Chat của Console giữ registry riêng và các rào đã có: mỗi lượt mời tối đa 7 tool theo trang và câu hỏi; tool đọc dữ liệu `internal` không được mời khi model là hosted (`LOCAL_ONLY`); với model nhỏ, code tự chạy tra cứu và model chỉ viết câu trả lời; số trong câu trả lời được đối chiếu với kết quả tool. DA-43 không sửa các rào này. Tool đọc chẩn đoán (Q8) phải theo đúng chúng: chỉ đọc, tham số là id (vòng, cụm, giả thuyết), và ẩn với model hosted khi vòng không phải `public`.
+
+## 20. Vòng lặp
+
+"Vòng lặp agent" là: model trả lời → code làm theo → kết quả quay lại model → lặp tới khi dừng. Rủi ro của nó là không dừng, tốn tiền, và đi lạc. Luật của hệ này: **mọi vòng lặp có trần cứng do code giữ**, không vòng nào dừng vì "model thấy đủ".
+
+| Vòng | Ở đâu | Lặp cái gì | Trần | Dừng khi |
+|---|---|---|---|---|
+| Đường ống | B0 → B7 | Không lặp; đi thẳng một chiều | 8 bước | Hết bước, hoặc một bước `broken` |
+| Sửa câu trả lời | Trong B4 | Gửi lại một mục kèm lỗi kiểm | 1 lần mỗi mục | Qua kiểm, hoặc đã gửi lại một lần |
+| Thử lại mạng | Trong cổng model | Lời gọi lỗi mạng, quá tải | 2 lần, giãn cách tăng dần | Thành công, hết lượt, hoặc quá hạn thời gian |
+| Ngân sách | Cổng model, cả lần chạy | Mọi lời gọi | Số lời gọi, token, tiền trong config | Chạm trần: các mục còn lại về sàn code |
+| Gọi tool của chat | Console | Model gọi tool, đọc kết quả | 3 vòng, rồi một lượt trả lời không tool | Model trả lời, hoặc hết vòng |
+| Vòng ngoài (flywheel) | Giữa các vòng dữ liệu | Báo cáo → kỹ sư duyệt → can thiệp → kết quả → lịch sử | Một lượt mỗi vòng dữ liệu; người quyết | Kỹ sư ký `Decision` |
+
+Vòng ngoài là vòng quan trọng nhất và là vòng duy nhất có người ở trong: agent đề xuất, kỹ sư quyết, kết quả thật quay lại thành dữ kiện của vòng sau (mục 21). Agent tốt lên nhờ vòng này, không nhờ model tự lặp lâu hơn.
+
+**Khi nào mới thêm vòng điều tra tự do** (model tự gọi công cụ nhiều vòng trong đường ống, tức cửa đã rút ở Q5). Cần đủ ba điều: (1) bộ ca lịch sử có ca mà sàn code và vai `rank` cùng trượt vì thiếu một phép đo mà công cụ sẵn có tính được; (2) có model gọi tool ổn định dùng được cho lớp dữ liệu của ca đó; (3) vòng đó chạy sau B5, kết quả của nó lại qua B5. Khi thêm, nó là một vai thứ tư với trần số vòng, không đổi các bước khác.
+
+## 21. Bộ nhớ
+
+"Bộ nhớ" của một hệ dùng model là mọi thứ nó biết ngoài câu hỏi hiện tại. Có bốn loại, và hệ này dùng mỗi loại một cách khác:
+
+| Loại | Là gì ở hệ này | Ai ghi | Sống bao lâu |
+|---|---|---|---|
+| Ngữ cảnh của một lời gọi | Prompt của lời gọi đó: luật của vai, ứng viên, các fact liên quan. Dựng mới mỗi lần từ file | Code | Một lời gọi |
+| Trạng thái lần chạy | Thư mục lần chạy (mục 7) | Code | Vĩnh viễn, bất biến |
+| Bộ nhớ dài hạn | **Lịch sử có cấu trúc**: kết quả can thiệp (`EvidenceCard.result`), tỉ lệ sửa được (`FixRateEvent`), quyết định của kỹ sư (`AgentReview`), sổ chi phí | Kỹ sư và code, qua `flywheel.store` | Vĩnh viễn, append-only |
+| Bộ nhớ hội thoại | Lịch sử cuộc trò chuyện của chat | Console | Một cuộc trò chuyện |
+
+Ba quyết định thiết kế:
+
+**Lời gọi model không mang trạng thái.** Mỗi lời gọi ở B4 là độc lập: không có "cuộc hội thoại" giữa các lời gọi, không có tóm tắt lượt trước. Thứ nối các lời gọi là file (phát hiện đã qua kiểm của vai `adjudicate` thành đầu vào của vai `rank`). Lợi: phát lại được từng lời gọi, chạy song song được, và một câu trả lời sai không nhiễm sang lời gọi sau.
+
+**Bộ nhớ dài hạn là bản ghi, không phải ghi chú** (Q9). Model không được tự viết "bài học" để vòng sau đọc. Lý do: ghi chú tự do mang số không kiểm được, có thể kéo dữ liệu `internal` sang một vòng `public`, và sai một lần thì sai mãi. Thay vào đó, công cụ `history_lookup` tra bản ghi theo **khóa** (task, chẩn đoán, loại can thiệp, dấu hiệu của cụm: bước hỏng và nhãn), không theo độ giống ngữ nghĩa, và trả về fact có nguồn gốc `history`, ví dụ "can thiệp `sim_s1` cho `weak_skill` ở task khay: 1 lần, kết quả F". Fact `history` chỉ kéo từ vòng cùng lớp dữ liệu hoặc lớp thấp hơn.
+
+**Bộ nhớ về chính agent là bảng điểm.** Mỗi phiên bản agent có điểm kèm hash (mục 11). Mỗi lần kỹ sư `override` một phát hiện là một ứng viên ca mới cho bộ ca lịch sử. Đó là cách hệ "nhớ" lỗi của mình: thành một ca kiểm chạy lại mãi, không thành một dòng nhắc trong prompt.
+
+Không dựng trong DA-43: cơ sở dữ liệu vector, tìm kiếm ngữ nghĩa trên báo cáo cũ. Với vài chục vòng, tra theo khóa là đủ và kiểm được; 03 mục 2.4 cũng không cho thêm dịch vụ ở L0.
+
+## 22. Gói kiến thức (skill)
+
+"Skill" là một gói hướng dẫn và dữ liệu mà hệ **chỉ nạp khi việc cần tới**, để prompt cố định nhỏ và thêm việc mới không phải sửa mã. Hệ này có đúng khái niệm đó, dưới dạng config:
+
+| Gói | File | Nạp khi nào | Thêm cái mới nghĩa là |
+|---|---|---|---|
+| Gói task | `tasks/<task>.yaml` (đã có `tray.yaml`): bước, ngưỡng và đơn vị, nhãn lỗi và tín hiệu cần, lưới nới | Gói vòng khai task đó | Thêm task: thêm một file |
+| Kế hoạch công cụ | `plans/<task>.yaml` | B2 | Thêm phép đo cho task |
+| Bộ luật giả thuyết | `rules/<nhóm>.yaml`: bộ chấm, runtime, train, dữ liệu, vùng phủ | B3; chỉ luật có dấu hiệu khớp mới sinh giả thuyết | Thêm một nguyên nhân biết nhận diện |
+| Danh mục phép kiểm | `checks.yaml`: tên, tách cặp chẩn đoán nào, cần gì, khóa chi phí | B3 | Thêm một phép kiểm |
+| Prompt của vai | `prompts/<vai>.md` cộng mảnh `prompts/sources/<nguồn>.md` | B4; mỗi lời gọi chỉ ghép mảnh của nguồn và chẩn đoán có mặt trong lời gọi đó | Chỉnh cách model lập luận về một nguồn |
+| Câu hỏi nhìn hình | `vision/<task>.yaml` | Vai `look` | Thêm câu hỏi đóng |
+
+Quy tắc ghép prompt: **phần cố định trước, phần thay đổi sau**. Luật của vai và schema câu trả lời đứng đầu và giống nhau giữa các lời gọi; ứng viên và fact đứng cuối. Model nhỏ bám luật tốt hơn khi luật ngắn, và với model hosted phần đầu giống nhau được tính giá đọc đệm rẻ hơn.
+
+Mỗi luật giả thuyết ghi **nguồn** là một mục của spec hoặc design, không phải một ca cụ thể, để bảng luật không thành bản chép đáp án (rủi ro ở design 19/11 mục 13).
+
+Không dùng sản phẩm "Agent Skills" của nhà cung cấp: nó chạy trong môi trường hosted, nên không dùng được cho model cục bộ và dữ liệu `internal`. Config của mình cho cùng lợi ích và chạy ở cả hai đường.
+
+## 23. Điểm mở rộng (plugin)
+
+"Plugin" là cách thêm khả năng mà không sửa lõi. Hệ này có bảy điểm mở rộng; mỗi điểm là một giao diện cố định cộng một chỗ đăng ký tường minh:
+
+| Thêm | Viết gì | Đăng ký ở | Phải kèm | Thành phiên bản agent mới? |
+|---|---|---|---|---|
+| Công cụ | Một file trong `tools/`, một `ToolSpec` | `tools/registry.py`, rồi kế hoạch của task | Test đơn vị; test "không xét được" | Có |
+| Task | Gói task, kế hoạch, câu hỏi nhìn hình | `configs/eval/agentqa/` | Gói vòng mẫu chạy hết `--no-model` | Có |
+| Luật giả thuyết, phép kiểm | Dòng trong `rules/`, `checks.yaml` | Config | Test trên fact mẫu; nguồn của luật | Có |
+| Nguồn dữ liệu (ví dụ log robot DENSO) | Một adapter **ngoài làn** đổi log sang artifact hợp đồng, đóng dấu `internal` | Lệnh xuất của adapter; kỹ sư khai trong `round.yaml` | Test hợp đồng; gói giả thiếu kênh | Không (đầu vào, không phải agent) |
+| Nhà cung cấp model | Một lớp trong `round/providers/` thực hiện `ChatModel` | Bảng nhà cung cấp của cổng; hồ sơ trong config | Test với câu trả lời giả; test chặn lớp dữ liệu | Có (hồ sơ model nằm trong hash) |
+| Vai | Prompt, schema câu trả lời, phạm vi fact, luật kiểm | `round/roles.py` | Test phát lại; ca trong bộ ca lịch sử | Có |
+| Cách trình bày | Một hàm đọc `assembly.json` | `round/render.py` | Test ảnh chụp đầu ra | Không |
+
+**Đăng ký tường minh, không tự dò.** Không dùng cơ chế tự phát hiện plugin lúc chạy (entry point, quét thư mục). Lý do: mọi thứ agent dùng phải nằm trong hash phiên bản và trong lượt review mã; một plugin tự nạp là một thay đổi không ai chấm.
+
+Nguồn dữ liệu là điểm mở rộng quan trọng nhất cho DENSO: lõi và công cụ không biết gì về định dạng log của robot thật. Adapter đổi log sang hợp đồng; tín hiệu thiếu thì `signal_presence` báo và báo cáo ghi CHƯA RÕ.
+
+## 24. Schema các bản ghi giữa bước
+
+Riêng của làn Đánh giá (`round/records.py`). Trường là đề xuất.
+
+| File | Một dòng là | Trường chính |
+|---|---|---|
+| `pack.json` | Cả gói | `pack_id`, `task_id`, `created_at`, `declared_by`; `entries[]`: `ref`, `kind`, `schema`, `sha256`, `bytes`, `data_class`, `subject` (run, job, checkpoint, release hoặc dataset); `links[]`: `from`, `to`, `relation` |
+| `admission.json` | Cả gói | `pack_sha256`; `accepted[]`; `rejected[]`: `ref`, `reason`; `missing_kinds[]`; `data_class`; `data_class_basis` (bản ghi nguồn nào xác nhận); `hosted_allowed` |
+| `facts.jsonl` | Một fact | `fact_id`, `name`, `value`, `unit`, `source_ref`, `provenance` (`code`, `vision`, `history`), `tool_call_id` |
+| `tool_calls.jsonl` | Một lời gọi công cụ | `call_id`, `tool`, `version`, `params`, `input_sha256[]`, `fact_ids[]`, `not_judged[]`, `seconds` |
+| `hypotheses.jsonl` | Một giả thuyết của một cụm | `hypothesis_id`, `cluster`, `rule_id`, `diagnosis`, `note`, `support[]`, `contra[]`, `interventions[]`, `checks[]` (id phép kiểm, cặp tách được, khóa chi phí), `code_rank`, `blocked_data_spend` |
+| `model_calls.jsonl` | Một lời gọi model | `call_id`, `role`, `unit` (nguồn hoặc cụm), `attempt` (1 hoặc 2), `request_sha256`, `prompt_sha256`, `profile`, `model`, `revision`, `host`, `tokens_in`, `tokens_out`, `usd`, `seconds`, `status`, `reply` |
+| `verdicts.jsonl` | Một mục của model | `item_id`, `role`, `unit`, `verdict` (`accepted`, `repaired`, `rejected`), `failed_rules[]`, `call_ids[]` |
+| `assembly.json` | Cả báo cáo | `status`; `agent_version`, `agent_hash`; theo cụm: giả thuyết đã xếp hạng, mỗi cái có `source` (`model` hoặc `code`), câu giải thích, fact; phép kiểm rẻ nhất và `Cost`; can thiệp và `InterventionProposal`; `not_judged[]`; `report_ids[]` |
+| `run.json` | Cả lần chạy | `run_id`, `command`, `git_sha`, `agent_version`, `agent_hash`, `pack_sha256`, `data_class`; `steps[]`: `name`, `status`, `seconds`, `rows`; `totals`: lời gọi, token, tiền; `model_hosts[]` |
+
+## 25. Prompt và câu trả lời của từng vai
+
+Mọi lời gọi có cùng khung: một tin nhắn hệ thống (luật của vai, schema, ghép theo mục 22) và một tin nhắn người dùng chứa **một khối JSON** dữ liệu. Không có ví dụ câu trả lời chứa số thật, để model không chép số.
+
+**Vai `adjudicate`.** Dùng lại dạng của bản 3 để `AgentReport` không đổi:
+
+```json
+{"decisions": [{"candidate": "C1", "keep": true, "cites": ["F3", "F9"],
+                "insight": "Loss val tăng {F3} lần sau bước {F9}.", "suggestion": "..."}],
+ "added": []}
+```
+
+**Vai `rank`.** Một cụm một lời gọi:
+
+```json
+{"cluster": "approach_a/L-PLACE-POSE",
+ "order": ["H2", "H1", "H4"],
+ "why": [{"hypothesis": "H2", "cites": ["F41", "F57"],
+          "text": "Chuỗi bước gãy ở {F41} lượt, trong đó {F57} lượt thành công."}],
+ "check": {"id": "K3", "cites": ["F41"], "text": "..."},
+ "intervention": {"id": "repair_ticket", "for": "H2", "cites": ["F41"], "text": "..."},
+ "other": []}
+```
+
+**Vai `look`.** `{"answers": [{"question": "Q1", "answer": "không rõ"}]}`.
+
+B5 kiểm mỗi mục theo danh sách cố định; mỗi dòng là một hàm và một test:
+
+| Kiểm | Trượt khi |
+|---|---|
+| Đúng schema | Thiếu trường, sai kiểu, JSON bị cắt |
+| Id thuộc tập đã đưa | Giả thuyết, phép kiểm, can thiệp hay fact không có trong lời gọi đó |
+| `order` là hoán vị | Thiếu hoặc lặp giả thuyết của cụm |
+| Can thiệp được phép | Không thuộc `INTERVENTIONS_OF_DIAGNOSIS` của giả thuyết nó nhắm; hoặc tiêu ngân sách dữ liệu khi cụm bị chặn |
+| Mỗi câu có trích | `cites` rỗng |
+| Số trong câu | Có chữ số ngoài chỗ chèn `{F#}`; hoặc `{F#}` không nằm trong `cites` |
+| So sánh | Câu có từ so sánh, trích hai fact khác đơn vị, mà không trích fact so sánh nào |
+| Fact đúng chủ | Mục model tự thêm không trích fact nào của chính mã hay giả thuyết đó |
+| Bỏ có lý do | Bỏ ứng viên có fact chiều đang đúng mà không trích fact phản bác |
+| Nguồn gốc | Giả thuyết hạng 1 chỉ có fact `vision` ủng hộ |
+
+## 26. Config
+
+```text
+configs/eval/agentqa/
+  agent.yaml          phiên bản; hồ sơ model cục bộ (đã có)
+  hosted.yaml         hồ sơ hosted, tắt mặc định; tên biến môi trường của khóa
+  routing.yaml        vai × lớp dữ liệu → hồ sơ; trần ngân sách; số lời gọi song song
+  tasks/<task>.yaml   gói task (đã có tray.yaml)
+  plans/<task>.yaml   kế hoạch công cụ
+  rules/*.yaml        luật giả thuyết theo nhóm
+  checks.yaml         danh mục phép kiểm
+  prompts/            <vai>.md và sources/<nguồn>.md
+  vision/<task>.yaml  câu hỏi đóng
+```
+
+Mọi file trên, trừ `hosted.yaml` phần khóa, vào hash phiên bản agent (mục 11). Đổi một dòng là phiên bản mới, phải chấm lại.
+
 
 ## Nguồn
 
 - [Design 19/11/2026](2026-11-19-agent-qaqc-system-design.md) mục 1.2, 3–7, 11; [story DA-43](../../product/stories/DA-43-he-agent-qa-qc.md)
 - [Agent QA/QC bản 3 (DA-20)](../../g0/agent-qa.md); [thí nghiệm khay](../../he/tray.md) mục 20.11–20.13
 - [03 · Kiến trúc](../../product/03-architecture.md) mục 2.4, 7.3; [07 · Chia việc](../../product/07-team-workflow.md) mục 3.2
-- Mã: `packages/flywheel-eval/src/flywheel/eval/agentqa/` (`inputs.py`, `run.py`, `endpoint.py`, `agent.py`)
+- Mã: `packages/flywheel-eval/src/flywheel/eval/agentqa/` (`inputs.py`, `run.py`, `endpoint.py`, `agent.py`); chat của Console: `packages/flywheel-console/src/flywheel/console/chat/` (`llm.py`, `registry.py`, `providers.py`); luật import trong `pyproject.toml` gốc
 - Giá Anthropic: bảng giá của Anthropic, bản lưu ngày 3/11/2026. Giá chưa kiểm của nhà cung cấp khác: [benchlm.ai](https://benchlm.ai/llm-pricing), [morphllm.com](https://www.morphllm.com/llm-api), [getnadir.com](https://getnadir.com/blog/llm-api-pricing-june-2026-complete-comparison/), [iotdigitaltwinplm.com](https://iotdigitaltwinplm.com/llm-api-pricing-november-2026-gpt-claude-gemini-grok-deepseek-mistral/), [getmaxim.ai](https://www.getmaxim.ai/bifrost/model-library/provider/openrouter), tra ngày 20/11/2026
