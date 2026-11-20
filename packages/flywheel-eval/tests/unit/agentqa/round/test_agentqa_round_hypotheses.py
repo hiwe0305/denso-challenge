@@ -17,7 +17,13 @@ from flywheel.eval.agentqa.round.hypotheses import (
 )
 from flywheel.eval.agentqa.round.pipeline import STEPS, run_round
 from flywheel.eval.agentqa.round.records import HypothesisRecord, RunRecord
-from helpers_round import NOW, PackMaker, facts_of, pack_maker
+from helpers_round import (  # noqa: F401  (isolated_store is an autouse fixture)
+    NOW,
+    PackMaker,
+    facts_of,
+    isolated_store,
+    pack_maker,
+)
 
 
 @pytest.fixture
@@ -155,7 +161,7 @@ def test_without_a_cluster_table_the_step_is_degraded(
         make_pack: PackMaker, tmp_path: Path) -> None:
     out = tmp_path / "out"
     record = run_round(make_pack(scores=False), out, now=NOW)
-    step = record.steps[-1]
+    step = record.steps[3]
     assert step.name == "hypothesize" and step.status == "degraded" and step.rows == 0
     assert (out / HYPOTHESES_FILE).read_text() == ""
     assert any(p.startswith("hypothesize:") and "failure_clusters" in p
@@ -164,7 +170,7 @@ def test_without_a_cluster_table_the_step_is_degraded(
 
 def test_from_hypothesize_rewrites_only_the_hypotheses(round_out: Path,
                                                       make_pack: PackMaker) -> None:
-    assert STEPS == ("pack", "admit", "measure", "hypothesize")
+    assert STEPS[:4] == ("pack", "admit", "measure", "hypothesize")
     first = RunRecord.model_validate_json((round_out / "run.json").read_text())
     assert [s.name for s in first.steps] == list(STEPS)
     kept = {p: p.read_bytes() for p in round_out.rglob("*")

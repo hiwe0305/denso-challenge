@@ -11,7 +11,15 @@ from flywheel.eval.agentqa.round.measure import PlanRefused
 from flywheel.eval.agentqa.round.pack import sha256_of
 from flywheel.eval.agentqa.round.pipeline import STEPS, RunRefused, run_round
 from flywheel.eval.agentqa.round.records import RunRecord
-from helpers_round import NOW, PackMaker, calls_of, edited_plan, facts_of, pack_maker
+from helpers_round import (  # noqa: F401  (isolated_store is an autouse fixture)
+    NOW,
+    PackMaker,
+    calls_of,
+    edited_plan,
+    facts_of,
+    isolated_store,
+    pack_maker,
+)
 
 
 @pytest.fixture
@@ -23,8 +31,9 @@ def test_a_round_writes_every_file_and_the_published_numbers(
         make_pack: PackMaker, tmp_path: Path) -> None:
     out = tmp_path / "out"
     record = run_round(make_pack(), out, command="test", now=NOW)
-    assert record.status == "ok" and [s.name for s in record.steps] == list(STEPS)
-    assert {s.status for s in record.steps} == {"ok"} and record.data_class == "public"
+    assert record.status == "degraded" and [s.name for s in record.steps] == list(STEPS)
+    assert {s.status for s in record.steps[:4]} == {"ok"}  # assemble: no model, degraded
+    assert record.data_class == "public"
     for name in ("pack.json", "admission.json", "facts.jsonl", "tool_calls.jsonl", "run.json"):
         assert (out / name).is_file()
     assert RunRecord.model_validate_json((out / "run.json").read_text()) == record
@@ -135,7 +144,7 @@ def test_unknown_step_and_existing_directory(make_pack: PackMaker, tmp_path: Pat
     with pytest.raises(FileExistsError):
         run_round(pack, out)
     with pytest.raises(RunRefused, match="unknown step"):
-        run_round(pack, out, from_step="render")
+        run_round(pack, out, from_step="nonsense")
     shutil.rmtree(out)
     with pytest.raises(RunRefused, match="run.json"):
         run_round(pack, out, from_step="measure")

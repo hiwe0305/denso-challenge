@@ -73,6 +73,7 @@ latch_signals:
 provides:
   scores: [success, step_status, first_failed_step, failure_kind, level]
   trace: [cmd_upper, meas_upper, cmd_lower, meas_lower, t_state, t_image]
+  sources: []       # provenance records: no signal of a rollout (listed so it is not "unknown")
 
 # Relaxed success (tray.md 19.2 c): only this label is relaxed, on this grid; the
 # yaw tolerance stays the scorer's. The first position is the scorer's own.
