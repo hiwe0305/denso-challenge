@@ -6,6 +6,7 @@
 #
 # Fields:
 #   id             unique across the rule files
+#   title          one sentence shown on the page; no digit (a number is a fact)
 #   source         where the rule comes from
 #   group          scorer | runtime | train | data | coverage (spec 6.4 order: system and
 #                  scorer before data)
@@ -22,6 +23,7 @@
 
 rules:
   - id: scorer_latch_too_strict
+    title: "The scorer's latch condition for this step looks too strict: rollouts got past it without latching it"
     source: "spec 6.4 (system and scorer first); design 19/11 section 5.3 row 1"
     group: scorer
     diagnosis: unknown
@@ -38,6 +40,7 @@ rules:
     contra: []
 
   - id: label_signal_missing
+    title: "The inputs lack the signals needed to judge this failure label"
     source: "spec 6.4 item 1; design 19/11 section 5.3 row 2"
     group: scorer
     diagnosis: unknown

@@ -16,10 +16,12 @@ import hashlib
 import shutil
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
+from flywheel.contracts.base import new_ulid
 from flywheel.eval.agentqa.round.admit import ADMISSION_FILE, Admitted, admit, write_admission
+from flywheel.eval.agentqa.round.assemble import ASSEMBLY_FILE, assemble
 from flywheel.eval.agentqa.round.hypotheses import (
     HYPOTHESES_FILE,
     RulesRefused,
@@ -38,15 +40,26 @@ from flywheel.eval.agentqa.round.measure import (
 )
 from flywheel.eval.agentqa.round.pack import PACK_FILE, PackRefused, read_pack, sha256_of
 from flywheel.eval.agentqa.round.records import Admission, Pack, RunRecord, Status, StepRecord
+from flywheel.eval.agentqa.round.render import INDEX_FILE, render
+from flywheel.eval.agentqa.round.version import agent_hash, agent_version
+from flywheel.eval.agentqa.run import _ledger
+from flywheel.store.ledger_append import append_ledger_entry
+from flywheel.store.paths import StorePaths
 from pydantic import ValidationError
 
 RUN_FILE = "run.json"
-STEPS = ("pack", "admit", "measure", "hypothesize")  # later: judge, verify, assemble, render
+STEPS = ("pack", "admit", "measure", "hypothesize", "assemble", "render")
+# Later: judge and verify arrive with task 5, between hypothesize and assemble.
+STORY = "DA-43"
+SECONDS_NO_MODEL = 5.0
+NO_MODEL_ONLY = "the model steps (judge, verify) arrive with task 5; run with no_model"
 STEP_FILES: dict[str, tuple[str, ...]] = {
     "pack": (PACK_FILE,),
     "admit": (ADMISSION_FILE,),
     "measure": (FACTS_FILE, CALLS_FILE),
     "hypothesize": (HYPOTHESES_FILE,),
+    "assemble": (ASSEMBLY_FILE,),
+    "render": (INDEX_FILE,),
 }
 STEP_DIRS: dict[str, tuple[str, ...]] = {"measure": (TABLES_DIR,)}
 SEVERITY: dict[str, int] = {"ok": 0, "degraded": 1, "broken": 2}
@@ -61,6 +74,8 @@ class _Work:
     pack_path: Path
     out: Path
     plan_path: Path | None
+    no_model: bool = True
+    run: RunRecord | None = None
     pack: Pack | None = None
     admitted: Admitted | None = None
     degraded: list[str] = field(default_factory=list)
@@ -124,8 +139,23 @@ def _step_hypothesize(w: _Work) -> int:
     return len(hypotheses)
 
 
+def _step_assemble(w: _Work) -> int:
+    assert w.run is not None
+    assembly = assemble(w.out, w.run, w.no_model)
+    if assembly.not_judged:
+        w.degraded.append(f"{len(assembly.not_judged)} item(s) not judged")
+    w.degraded += [n for n in assembly.notes if n.startswith("No model")]
+    return len(assembly.clusters)
+
+
+def _step_render(w: _Work) -> int:
+    render(w.out)
+    return 1
+
+
 RUNNERS = {"pack": _step_pack, "admit": _step_admit, "measure": _step_measure,
-           "hypothesize": _step_hypothesize}
+           "hypothesize": _step_hypothesize, "assemble": _step_assemble,
+           "render": _step_render}
 
 
 def _write(out: Path, record: RunRecord) -> None:
@@ -174,11 +204,14 @@ def _resume(pack_path: Path, out: Path, from_step: str, plan_path: Path | None,
 
 def run_round(pack_path: Path, out: Path, *, plan_path: Path | None = None,
               from_step: str | None = None, command: str = "",
-              now: datetime | None = None) -> RunRecord:
+              now: datetime | None = None, no_model: bool = True,
+              store: Path | None = None, run_plan_id: str | None = None) -> RunRecord:
     """Run the pipeline on the pack `pack_path` into `out`; see the module docstring."""
+    if not no_model:
+        raise RunRefused(NO_MODEL_ONLY)
     if from_step is not None and from_step not in STEPS:
         raise RunRefused(f"unknown step {from_step!r} (steps: {', '.join(STEPS)})")
-    work = _Work(pack_path, out, plan_path)
+    work = _Work(pack_path, out, plan_path, no_model=no_model)
     if from_step is None:
         if out.exists():
             raise FileExistsError(f"{out} exists: a run directory is written once")
@@ -197,6 +230,27 @@ def run_round(pack_path: Path, out: Path, *, plan_path: Path | None = None,
         start = STEPS.index(from_step)
     _write(out, record)
 
+    ledger = StorePaths(store)
+    plan = run_plan_id or f"g0-{STORY}-{date.today():%Y%m%d}"
+    job_id = f"job_agentqa_{new_ulid()}"
+    estimate = _ledger(plan, job_id, SECONDS_NO_MODEL, "estimated",
+                       f"assumed {SECONDS_NO_MODEL:g} s for a round without a model", None)
+    append_ledger_entry(estimate, ledger)
+    began_run, outcome = time.monotonic(), "ok"
+    try:
+        return _run_steps(work, record, start)
+    except BaseException as error:
+        outcome = f"failed: {type(error).__name__}"
+        raise
+    finally:
+        append_ledger_entry(
+            _ledger(plan, job_id, max(time.monotonic() - began_run, 0.0), "measured",
+                    f"wall seconds of an Agent QA/QC round, {outcome}, from step "
+                    f"{STEPS[start]}", estimate.id), ledger)
+
+
+def _run_steps(work: _Work, record: RunRecord, start: int) -> RunRecord:
+    out = work.out
     for name in STEPS[start:]:
         began = time.monotonic()
         problems: list[str] = []
@@ -204,6 +258,7 @@ def run_round(pack_path: Path, out: Path, *, plan_path: Path | None = None,
         rows = 0
         try:
             work.degraded = []
+            work.run = record
             rows = RUNNERS[name](work)
             if work.degraded:
                 status = "degraded"
@@ -218,6 +273,9 @@ def run_round(pack_path: Path, out: Path, *, plan_path: Path | None = None,
         update: dict[str, object] = {}
         if work.pack is not None:
             update["pack_id"] = work.pack.pack_id
+        if name == "pack" and work.pack is not None:
+            update["agent_version"] = agent_version()
+            update["agent_hash"] = agent_hash(work.pack.task_id)
         if name == "admit" and work.admitted is not None:
             update["data_class"] = work.admitted.admission.data_class
         steps = [*record.steps, StepRecord(

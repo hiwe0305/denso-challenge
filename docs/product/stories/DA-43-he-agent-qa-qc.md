@@ -55,7 +55,7 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
   - [x] 4.1 B0 và B1: `round.yaml`, `pack.json`, nhận, lớp dữ liệu của gói; gói giả log robot thật
   - [x] 4.2 B2 thành một bước: đăng ký công cụ (`ToolSpec`), kế hoạch công cụ, thư mục lần chạy, `run.json`, `--from`
   - [x] 4.3 B3: bảng luật giả thuyết, danh mục phép kiểm, hạng của code; chặn tiêu ngân sách khi còn giả thuyết hệ thống
-  - [ ] 4.4 B6 và B7 với `--no-model`, ghi `assembly.json`; lệnh `fw agentqa round`; báo cáo vòng chạy hết trên gói mẫu
+  - [x] 4.4 B6 và B7 với `--no-model`, ghi `assembly.json`; lệnh `fw agentqa round`; báo cáo vòng chạy hết trên gói mẫu
 - [ ] 5. Lớp model (2 ngày; kiến trúc 20/11 mục 8, 19–25)
   - [ ] 5.1 Cổng model: hồ sơ, bảng vai × lớp dữ liệu, chặn hosted, ngân sách, ghi và phát lại
   - [ ] 5.2 Vai `adjudicate` và `rank`: prompt, schema câu trả lời

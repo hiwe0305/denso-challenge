@@ -11,6 +11,7 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
 import yaml
 from flywheel.contracts.entities import Score, Source
 from flywheel.eval.agentqa.round.pack import build_pack, write_pack
@@ -51,7 +52,8 @@ def _score_line(row: dict[str, object]) -> str:
 def pack_maker(tmp_path: Path) -> PackMaker:
     """`make(name, scores=True)` -> path of a `pack.json` under tmp_path/name."""
 
-    def make(name: str = "round", *, scores: bool = True) -> Path:
+    def make(name: str = "round", *, scores: bool = True,
+             rename: dict[str, str] | None = None) -> Path:
         root = tmp_path / name
         root.mkdir()
         by_run: dict[str, list[str]] = defaultdict(list)
@@ -67,7 +69,7 @@ def pack_maker(tmp_path: Path) -> PackMaker:
             (root / run).mkdir()
             (root / run / "scores.jsonl").write_text("\n".join(lines) + "\n")
             entries.append({"path": f"{run}/scores.jsonl", "kind": "scores",
-                            "subject": {"run": run}})
+                            "subject": {"run": (rename or {}).get(run, run)}})
             links.append({"source": f"{run}/scores.jsonl", "target": "sources.jsonl",
                           "relation": "data_of"})
         decl = root / "round.yaml"
@@ -77,6 +79,12 @@ def pack_maker(tmp_path: Path) -> PackMaker:
         return write_pack(build_pack(decl), root)
 
     return make
+
+
+@pytest.fixture(autouse=True)
+def isolated_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Rounds append ledger entries; none may reach the real store."""
+    monkeypatch.setenv("FW_ROOT", str(tmp_path / "fwroot"))
 
 
 def facts_of(out: Path) -> dict[str, FactRecord]:

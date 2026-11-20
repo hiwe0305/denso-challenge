@@ -8,6 +8,8 @@
     fw agentqa html --reports <reports.jsonl> --out <dir> [--reviews <dir>]
     fw agentqa estimates --path <estimates.jsonl> [--measure <ref>=<value> --source <ref>]
     fw agentqa pack --round <round.yaml>                   freeze a round into pack.json (DA-43)
+    fw agentqa round --pack <pack.json> --out <dir> --no-model [--from <step>]
+        [--plan <yaml>] [--store <dir>]                    run a round into index.html (DA-43)
 
 Errors exit 2 with one line, as `fw eval` does. A run whose model part broke a
 report still writes everything and exits 1.
@@ -15,6 +17,7 @@ report still writes everything and exits 1.
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -32,7 +35,11 @@ from flywheel.eval.agentqa.endpoint import (
 )
 from flywheel.eval.agentqa.html import render_index, render_report
 from flywheel.eval.agentqa.review import make_review, write_review
+from flywheel.eval.agentqa.round.hypotheses import RulesRefused
+from flywheel.eval.agentqa.round.measure import PlanRefused
 from flywheel.eval.agentqa.round.pack import PackRefused, build_pack, write_pack
+from flywheel.eval.agentqa.round.pipeline import NO_MODEL_ONLY, RunRefused, run_round
+from flywheel.eval.agentqa.round.render import INDEX_FILE
 from flywheel.eval.agentqa.run import read_dropped
 from flywheel.eval.agentqa.run import run as run_agentqa
 
@@ -65,6 +72,29 @@ def pack_command(
     except PackRefused as error:
         _fail(str(error))
     typer.echo(f"{pack.pack_id}: {len(pack.entries)} files, {len(pack.links)} links -> {out}")
+
+
+@app.command("round")
+def round_command(
+    pack: Path = typer.Option(..., "--pack", help="The pack.json of the round."),
+    out: Path = typer.Option(..., "--out", help="New directory for this run."),
+    from_step: str | None = typer.Option(None, "--from", help="Redo from this step."),
+    plan: Path | None = typer.Option(None, "--plan", help="Plan yaml instead of the task's."),
+    no_model: bool = typer.Option(False, "--no-model", help="Code floor only (needed now)."),
+    store: Path | None = typer.Option(None, "--store"),
+) -> None:
+    """Run a round: pack, admit, measure, hypothesize, assemble, render."""
+    if not no_model:
+        _fail(NO_MODEL_ONLY)
+    try:
+        record = run_round(pack, out, plan_path=plan, from_step=from_step,
+                           command="fw agentqa round", no_model=True, store=store)
+    except (PackRefused, PlanRefused, RulesRefused, RunRefused, FileExistsError) as error:
+        _fail(str(error))
+        return
+    assembly = (out / "assembly.json").read_text(encoding="utf-8")
+    clusters = len(json.loads(assembly)["clusters"])
+    typer.echo(f"{record.run_id}: {record.status}, {clusters} clusters -> {out / INDEX_FILE}")
 
 
 @app.command("run")

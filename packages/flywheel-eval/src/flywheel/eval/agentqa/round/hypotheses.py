@@ -81,6 +81,7 @@ Cond = ClusterCond | FactCond
 
 class Rule(Record):
     id: str = Field(min_length=1)
+    title: str = Field(min_length=1)
     source: str = Field(min_length=1)
     group: Group
     diagnosis: Diagnosis
@@ -95,6 +96,8 @@ class Rule(Record):
     def consistent(self) -> Self:
         if self.id == NONE_RULE:
             raise ValueError(f"rule id {NONE_RULE!r} is reserved")
+        if any(ch.isdigit() for ch in self.title):
+            raise ValueError(f"rule {self.id}: the title holds a digit (a number is a fact)")
         allowed = INTERVENTIONS_OF_DIAGNOSIS[self.diagnosis]
         wrong = [k for k in self.interventions if k not in allowed]
         if wrong:

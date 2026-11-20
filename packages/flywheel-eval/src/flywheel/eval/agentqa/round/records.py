@@ -127,6 +127,8 @@ class RunRecord(Record):
     status: Status
     steps: list[StepRecord] = Field(default_factory=list)
     problems: list[str] = Field(default_factory=list)
+    agent_version: str = ""
+    agent_hash: str = ""
 
 
 # Groups of hypothesis rules, in the order spec 6.4 asks for: system and scorer first,
@@ -172,3 +174,52 @@ class HypothesisRecord(Record):
     code_rank: int = Field(ge=1)
     blocked_data_spend: bool
     checks: list[CheckRef] = Field(default_factory=list)
+
+
+class HypothesisView(Record):
+    """A hypothesis as the page shows it: the code floor now, a model's choice later."""
+
+    hypothesis_id: str
+    rule_id: str
+    title: str
+    group: Group
+    diagnosis: Diagnosis
+    note: str
+    rank: int
+    source: Literal["model", "code"]
+    support: list[str] = Field(default_factory=list)
+    contra: list[str] = Field(default_factory=list)
+    explanation: str = ""
+
+
+class ClusterView(Record):
+    cluster: ClusterRef
+    hypotheses: list[HypothesisView]
+    blocked_data_spend: bool
+    check: CheckRef | None = None
+    intervention: str | None = None
+    intervention_source: Literal["model", "code"] = "code"
+    costed: bool = False
+
+
+class NotJudged(Record):
+    what: str
+    reason: str
+    fact_id: str = ""
+
+
+class Assembly(Record):
+    """`assembly.json` (step B6): everything the page shows, with no new number."""
+
+    run_id: str
+    pack_id: str
+    task_id: str
+    data_class: DataClass
+    status: Status
+    agent_version: str
+    agent_hash: str
+    model: str = ""
+    clusters: list[ClusterView]
+    headline: ClusterView | None = None
+    not_judged: list[NotJudged] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
