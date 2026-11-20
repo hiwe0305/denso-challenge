@@ -78,6 +78,7 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
 Theo 07 mục 3.1. File story luôn được sửa. PR hợp đồng (nhiệm vụ 1.1) đi nhánh riêng `DA-43-contract`, không thuộc danh sách này. Không sửa `agentqa/bench/` (DA-31, của Châu), file của DA-41, DA-42, DA-44.
 
 - `docs/superpowers/specs/2026-11-19-agent-qaqc-system-design.md`
+- `docs/superpowers/specs/2026-11-20-agent-qaqc-architecture-design.md`
 - `docs/g0/agent-qa.md`
 - `packages/flywheel-eval/src/flywheel/eval/agentqa/tools/`
 - `packages/flywheel-eval/src/flywheel/eval/agentqa/round/`
@@ -112,5 +113,6 @@ Theo 07 mục 3.1. File story luôn được sửa. PR hợp đồng (nhiệm v�
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 20/11/2026 | Thêm [kiến trúc 20/11/2026](../../superpowers/specs/2026-11-20-agent-qaqc-architecture-design.md) vào phạm vi file (đề xuất, chờ duyệt). Nhiệm vụ 4 và 5 sẽ sắp lại theo mục 15 của tài liệu đó sau khi Hiếu duyệt | Hiếu (soạn với Claude) |
 | 19/11/2026 | Design duyệt theo đề xuất; story chuyển sang đang làm | Hiếu |
 | 19/11/2026 | Tạo story cùng design; mã DA-43 chưa dùng trên `origin/master` | Hiếu (soạn với Claude) |

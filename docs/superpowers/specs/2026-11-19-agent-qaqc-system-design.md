@@ -2,6 +2,7 @@
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 20/11/2026 | 0.3 | Thêm con trỏ tới [kiến trúc 20/11/2026](2026-11-20-agent-qaqc-architecture-design.md) (**[Đề xuất]**, chờ duyệt): tài liệu đó đề xuất thay mục 5.1, 5.4, 8, 12 và luật 8 của mục 6. Nội dung các mục ở đây chưa sửa | Hiếu (soạn với Claude) |
 | 19/11/2026 | 0.2 | Hiếu duyệt theo đề xuất ("Approve as proposed"): Q1–Q10 của mục 14 thành **[Đã chốt]** | Hiếu (soạn với Claude) |
 | 19/11/2026 | 0.1 | Bản đầu, chờ Hiếu duyệt trước khi viết mã | Hiếu (soạn với Claude) |
 
