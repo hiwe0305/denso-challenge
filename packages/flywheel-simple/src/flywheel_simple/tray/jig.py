@@ -40,7 +40,7 @@ from flywheel_simple.tray.randomize import EpisodeSample, sample_episode
 JIG_CONFIG_RELPATH = Path("configs/sim/tray_jig.yaml")
 # Appended to visuals_revision for scenes with the jig (recorder.visuals_revision).
 # Bump whenever the jig's look or place changes.
-JIG_REVISION = "jig1"
+JIG_REVISION = "jig2"  # jig1: near end arms chamfered (no episodes recorded)
 # Blue: apart from the orange zone, the green crate and the grey steel table.
 JIG_RGBA = (0.05, 0.40, 0.95, 1.0)
 JIG_PRIORITY = 1  # above the tray's 0: tray-on-guide contacts take the guide's friction
@@ -60,6 +60,8 @@ class JigConfig:
     near_side_arm: float
     end_arm: float
     near_end_arm: float
+    near_end_wall: float
+    near_end_height: float
     handle_gap: float
     friction: float
     pad_thickness: float
@@ -102,6 +104,11 @@ class JigConfig:
             )
         if self.near_end_arm < 0 or self.near_end_arm > self.end_arm:
             problems.append(f"near_end_arm must be in [0, end_arm], got {self.near_end_arm}")
+        if not 0.0 < self.near_end_wall <= self.near_end_height <= self.height:
+            problems.append(
+                "need 0 < near_end_wall <= near_end_height <= height, got "
+                f"{self.near_end_wall}, {self.near_end_height}"
+            )
         if min(self.clearance, self.height, self.thickness, self.side_arm, self.end_arm) <= 0:
             problems.append("clearance, height, thickness and arms must be positive")
         handle_edge = cfg.handle_length / 2 + self.handle_gap
@@ -171,6 +178,8 @@ def _arm(
     edge: float,
     centre: float,
     length: float,
+    wall: float | None = None,
+    top: float | None = None,
 ) -> list[GuideBox]:
     """Arm on the footprint side with outward `normal`, the side `edge` from the centre.
 
@@ -180,6 +189,8 @@ def _arm(
     whose inner face leans outward by `chamfer_deg` from there up to `height`. The
     wall keeps a pushed tray from riding up the chamfer (the opening hands push the
     placed tray by 2-3 cm, D-21); the chamfer turns a tray lowered off centre in.
+    `wall` and `top` (default `wall_height`, `height`) give the arm a lower profile; with
+    `top` equal to `wall` it has no chamfer.
     """
     z = np.array([0.0, 0.0, 1.0])
     n = np.array([normal[0], normal[1], 0.0])
@@ -199,19 +210,24 @@ def _arm(
         return GuideBox(f"{name}{suffix}", (length / 2, t / 2, span / 2), pos, rot)
 
     inner = (edge + jig.clearance) * n + centre * a
+    wall = jig.wall_height if wall is None else wall
     boxes = []
-    if jig.wall_height > 0:
-        boxes.append(box("_wall", inner, z, jig.wall_height))
-    slope = math.sin(th) * n + math.cos(th) * z  # inner face, rising
-    slant = (jig.height - jig.wall_height) / math.cos(th)
-    boxes.append(box("", inner + jig.wall_height * z, slope, slant))
+    if wall > 0:
+        boxes.append(box("_wall", inner, z, wall))
+    rise = (jig.height if top is None else top) - wall
+    if rise > 0:
+        slope = math.sin(th) * n + math.cos(th) * z  # inner face, rising
+        boxes.append(box("", inner + wall * z, slope, rise / math.cos(th)))
     return boxes
 
 
 def guide_boxes(cfg: TrayConfig, jig: JigConfig) -> list[GuideBox]:
     """The guide arms in the jig frame: per corner one on the short end and one on the long
     side. On the robot's side (+x) the arms are `near_side_arm` and `near_end_arm` long,
-    0 meaning none: G1's elbows and wrists come down there while lowering and releasing."""
+    0 meaning none: G1's elbows and wrists come down there while lowering and releasing.
+    The near end arms are lower (`near_end_wall`, `near_end_height`): the wrists, under
+    the handles 2-3 cm past the tray's near corners, came down on a full-height chamfer
+    there (DA-41 task 6)."""
     hx, hy = cfg.tray_width / 2, cfg.tray_length / 2
     c = jig.clearance
     boxes = []
@@ -225,7 +241,11 @@ def guide_boxes(cfg: TrayConfig, jig: JigConfig) -> list[GuideBox]:
         end = jig.near_end_arm if sx > 0 else jig.end_arm
         if end > 0:
             lo, hi = hx - end, hx + c
-            boxes += _arm(f"jig_{corner}_end", jig, (0.0, sy), hy, sx * (lo + hi) / 2, hi - lo)
+            low = sx > 0
+            boxes += _arm(
+                f"jig_{corner}_end", jig, (0.0, sy), hy, sx * (lo + hi) / 2, hi - lo,
+                jig.near_end_wall if low else None, jig.near_end_height if low else None,
+            )
     return boxes
 
 

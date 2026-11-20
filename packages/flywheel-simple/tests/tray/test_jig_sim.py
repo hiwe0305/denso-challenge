@@ -134,10 +134,12 @@ def test_a_tray_resting_on_target_never_touches_a_guide_and_stays_put(
 # Held lowering as the planner does it: a soft weld to a mocap carrier lowers the tray
 # at lower_speed from above the guides and lets go at lower_tray_clear. Offsets inside the
 # envelope measured by scripts/g0/tray/jig_capture.py (docs/g0/tray/jig.md): towards the
-# closed sides (not +x, the robot's side, which is open) up to 4 cm without yaw, 2 cm at
-# 4 degrees. (radius m, direction deg, yaw deg)
+# closed sides (not +x, the robot's side, which is open) up to 2 cm without yaw, 1 cm at
+# 2 degrees. Since jig2 the near end arms are low (the wrists pass over them), which
+# leads less in: at 4 degrees, 1.5 cm towards +y ends propped on a guide; the planner
+# places within about 1 cm and 2 degrees (DA-41 task 6). (radius m, direction deg, yaw deg)
 CLOSED = (90, 135, 180, 225, 270)
-LOWERED = [(r, a, 0.0) for r in (0.02, 0.04) for a in CLOSED] + [(0.02, a, 4.0) for a in CLOSED]
+LOWERED = [(r, a, 0.0) for r in (0.01, 0.02) for a in CLOSED] + [(0.01, a, 2.0) for a in CLOSED]
 WELD_SOLREF = [0.05, 1.0]
 ENDS_WITHIN_M = 0.02  # the scorer allows 5 cm and 10 degrees
 

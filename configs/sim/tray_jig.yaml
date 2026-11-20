@@ -14,10 +14,11 @@
 # open: opening hands pushed it 2-3 cm (D-21) and turned it about 5 degrees, which a
 # 1.5 cm wall let it ride over (level 1 seeds 1, 2: 10.3 deg off, propped on a chamfer).
 # The chamfer then runs up to 6.5 cm, just under the handles (tray_height -
-# handle_thickness = 7 cm), lead-in 4.2 cm. Planner on 31 episodes: 25/31 at 6.5 cm,
+# handle_thickness = 7 cm), lead-in 4.2 cm. Planner-5 on 31 episodes: 25/31 at 6.5 cm,
 # 26/31 at 5 cm (lead-in 2.4 cm), 26/31 on the fixed target without the jig
-# (docs/g0/tray/jig.md 4.3). 6.5 cm is kept for the larger lead-in towards the policy's
-# place errors (median 7.5 cm, docs/he/tray.md 19-20).
+# (docs/g0/tray/jig.md 4.3; the planner after DA-41 task 6 in 4.6). 6.5 cm is kept for
+# the larger lead-in towards the policy's place errors (median 7.5 cm, docs/he/tray.md
+# 19-20).
 clearance: 0.006
 height: 0.065
 wall_height: 0.035
@@ -30,10 +31,21 @@ side_arm: 0.08
 # three-sided nest. A tray left short towards the robot is not pushed back.
 near_side_arm: 0.0
 end_arm: 0.035
-# End arms on the robot's side (+x corners); 0 = none. G1's wrists come down on them when
-# lowering (level 1 seed 7, level 2 seed 107: tray propped, L-TRAY-TILT), but without them
-# the tray is not centred along y or in yaw: 3 of 8 hard seeds placed against 5 of 8 with.
+# End arms on the robot's side (+x corners); 0 = none. Without them the tray is not
+# centred along y or in yaw: 3 of 8 hard seeds placed against 5 of 8 with (planner-5).
 near_end_arm: 0.035
+# Near end arms, lower than the rest (DA-41 task 6): a wall to near_end_wall, then the
+# chamfer up to near_end_height (lead-in 2.4 cm). The palm-up hold keeps each wrist under
+# its handle 2-3 cm past the tray's near corner (jig x 0.17-0.19), right over these arms,
+# its lowest point ~4 mm above the tray origin. On the full-height chamfer (3.5-6.5 cm)
+# the wrists propped the held tray at 4-6 cm or pushed it 4-8 cm sideways onto the far
+# chamfer (level 1 seeds 5, 7, 8, 12; level 2 seeds 107, 109). Topping out at 3 cm keeps
+# ~1 cm under the wrists when the tray is released at 3.5 cm, and the falling tray's near
+# corners still get a lead-in. Tried and dropped (jig.md 3): the chamfered arms moved
+# 3.5 cm in from the corner (under the palms: 5 of 8 hard seeds tilted 15 deg); a 3.5 cm
+# wall only (trays released 1.5 cm or more off in y landed on its top).
+near_end_wall: 0.015
+near_end_height: 0.030
 # The end arms stop at least this far from the handle footprint (x), so the hands that
 # hold the handles from below never meet a guide.
 handle_gap: 0.02

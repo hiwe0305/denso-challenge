@@ -7,9 +7,12 @@ sagging. A hand grips its handle when closed past half with the palm within
 CONTACT_R of its squeezed grasp point (`grasp_palms_world`). A squeeze holds
 while the hands stay no further apart than when they gripped (plus SLACK), so
 spreading them releases it as opening does; while both grip, the tray moves
-rigidly with the palms. Released over a table, the tray rests on it; elsewhere it falls to the
-floor. DA-32's StepTracker scores every step. The arms start hanging at rest
-(`start_wrists`), where the planner's first targets start from.
+rigidly with the palms, turning with the line between them (DA-41: so hands that
+turn the tray in LOWER turn it here too). `slip_deg` turns the held tray in the
+hands once, when `slip_at` starts, as it does in SIMPLE (2-5 deg). Released over a
+table, the tray rests on it; elsewhere it falls to the floor. DA-32's StepTracker
+scores every step. The arms start hanging at rest (`start_wrists`), where the
+planner's first targets start from.
 """
 
 from __future__ import annotations
@@ -55,10 +58,14 @@ class ToyWorld:
         palm_sag: float = 0.0,
         vy_scale: float = 1.0,
         planner_cfg: PlannerConfig | None = None,
+        slip_deg: float = 0.0,
+        slip_at: Phase = Phase.CARRY,
     ) -> None:
         self.cfg = TrayConfig.load()
         self.planner_cfg = planner_cfg or PlannerConfig.load()
         self.vy_scale = vy_scale  # 0 blocks sideways steps, leaving a lateral error
+        self.slip = math.radians(slip_deg)
+        self.slip_at = slip_at
         self.sample = sample_episode(self.cfg, level, seed)
         self.geo = scene_geometry_with_gap(self.cfg, self.sample.table_gap)
         spawn = self.sample.robot_spawn
@@ -77,7 +84,9 @@ class ToyWorld:
         rest = base_transform(self.base, PELVIS_Z)
         self.palms = [(rest @ w @ np.r_[o, 1.0])[:3] for w, o in zip(self.start_wrists, offsets)]
         self.contacts = (False, False)
-        self.grip: tuple[float, np.ndarray] | None = None  # tray yaw - base yaw, tray - palm mid
+        # Tray yaw minus the palm line's, and the tray centre from the palms' midpoint in
+        # the palm line's frame.
+        self.grip: tuple[float, np.ndarray] | None = None
         self.grip_width = 0.0
         self.blocked = False
         self.drop_left_in: Phase | None = None
@@ -152,18 +161,22 @@ class ToyWorld:
         self.contacts = (gripping[0], gripping[1])
 
         mid = (self.palms[0] + self.palms[1]) / 2
+        across = self.palms[0] - self.palms[1]
+        line = math.atan2(float(across[1]), float(across[0])) - math.pi / 2
+        c, s = math.cos(line), math.sin(line)
         if self.grip is None and all(gripping):
-            self.grip = (self.tray_yaw - self.base.yaw, self.tray_pos - mid)
+            d = self.tray_pos - mid
+            local = np.array([c * d[0] + s * d[1], -s * d[0] + c * d[1], d[2]])
+            self.grip = (self.tray_yaw - line, local)
             self.grip_width = width
         if self.grip is not None and (gripping[1] or all(gripping)):
-            rel_yaw, offset = self.grip
-            turn = self.base.yaw + rel_yaw - self.tray_yaw
-            c, s = math.cos(turn), math.sin(turn)
-            offset = np.array(
-                [c * offset[0] - s * offset[1], s * offset[0] + c * offset[1], offset[2]]
-            )
-            self.grip = (rel_yaw, offset)
-            self.tray_yaw = self.base.yaw + rel_yaw
+            rel_yaw, local = self.grip
+            if self.slip and cmd.phase is self.slip_at:
+                rel_yaw += self.slip
+                self.slip = 0.0
+                self.grip = (rel_yaw, local)
+            offset = np.array([c * local[0] - s * local[1], s * local[0] + c * local[1], local[2]])
+            self.tray_yaw = math.atan2(math.sin(line + rel_yaw), math.cos(line + rel_yaw))
             self.tray_pos = mid + offset
             if self._over_table() is not None:
                 self.tray_pos[2] = max(self.tray_pos[2], self.cfg.table_height)

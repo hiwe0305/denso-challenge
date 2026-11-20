@@ -344,3 +344,61 @@ def test_release_pulls_the_hands_back_as_they_move_out() -> None:
     for side in (0, 1):
         path = palm_path(world, records, side)[1:]
         assert path[-1, 0] - path[0, 0] == pytest.approx(-0.05, abs=0.005)  # base x: back
+
+
+def yaw_miss(world: ToyWorld) -> float:
+    """|tray yaw - target yaw| modulo a half turn (D-14), degrees."""
+    error = math.remainder(world.tray_yaw - world.sample.target_pose.yaw, math.pi)
+    return abs(math.degrees(error))
+
+
+def test_hands_turn_the_tray_onto_the_target_yaw_while_lowering() -> None:
+    from dataclasses import replace
+
+    # DA-41: the tray turns 2-5 deg in the hands; here 4 deg as LOWER starts, so only
+    # the hands can take it up (the base no longer steps).
+    def miss(yaw_max: float) -> float:
+        cfg = replace(PlannerConfig.load(), place_yaw_max_deg=yaw_max)
+        world = ToyWorld(level=1, seed=1, planner_cfg=cfg, slip_deg=4.0, slip_at=Phase.LOWER)
+        records = world.run()
+        assert records[-1].cmd.phase is Phase.DONE and records[-1].report.success
+        return yaw_miss(world)
+
+    assert miss(0.0) > 3.5 and miss(8.0) < 0.5
+
+
+def test_arrive_b_plans_the_heading_and_goal_that_put_the_tray_on_the_target() -> None:
+    from dataclasses import replace
+
+    from flywheel_simple.tray.geometry import Pose2D
+
+    world = ToyWorld(level=1, seed=3)
+    planner = TrayPlanner(world.planner_cfg, world.cfg, world.sample)
+    target = world.sample.target_pose
+    base = Pose2D(target.x + 0.45, target.y - 0.02, math.pi - 0.05)
+    tray_yaw = target.yaw + math.pi + math.radians(4.0)  # held a half turn round, 4 deg off
+    tray = np.array([target.x + 0.06, target.y + 0.03, world.cfg.table_height + 0.1])
+    state = replace(
+        world._state(),
+        tray_pos=tray,
+        tray_quat=np.array([math.cos(tray_yaw / 2), 0.0, 0.0, math.sin(tray_yaw / 2)]),
+    )
+    goal, heading = planner._arrive_plan(state, base)
+    # Move the base to (goal, heading) carrying the tray rigidly: it lands on the target.
+    turn = heading - base.yaw
+    c, s = math.cos(turn), math.sin(turn)
+    d = tray[:2] - [base.x, base.y]
+    landed = goal + [c * d[0] - s * d[1], s * d[0] + c * d[1]]
+    assert landed == pytest.approx([target.x, target.y], abs=1e-9)
+    assert abs(math.remainder(tray_yaw + turn - target.yaw, math.pi)) < 1e-9
+    assert abs(math.degrees(turn)) == pytest.approx(4.0)
+
+
+def test_ready_hands_clear_the_handles_with_the_robot_off_centre() -> None:
+    from flywheel_simple.tray.config import TrayConfig
+
+    cfg, tray = PlannerConfig.load(), TrayConfig.load()
+    # Standing 3 cm off the tray's centreline (level 2 seed 102) and swaying 2-3 cm, the
+    # palms walk on beside the handles' outer ends, not over them (DA-41).
+    outer = tray.tray_length / 2 + tray.handle_depth
+    assert cfg.ready_y - outer >= 0.08
