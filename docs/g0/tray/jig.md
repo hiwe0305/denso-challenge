@@ -323,11 +323,31 @@ Vùng đích luôn thấy được lúc hạ: thấp nhất 3,2 % ở một epis
 
 **Bất thường.**
 1. Seed 400005 (mức 1) hỏng `timeout:RELEASE`, kiểu lỗi không gặp trên 61 episode của mục 4.8. Mất một lượt sinh, không vào dữ liệu. Chưa tìm nguyên nhân.
-2. Phát lại động học DA-17 (`flywheel_simple/replay/run.py`, ngoài phạm vi DA-41) chỉ đăng ký env cảnh cũ, nên cũng dựng lại episode không có đồ gá. Mọi episode bị `flag` vì D7 (sai số trạng thái tay tới 1,36 rad lúc nhả, phát lại không thành công) và D8. Các kiểm tĩnh đều qua. `demo_sets` giữ `flag`, nên lô vẫn đủ 19. Cần sửa adapter đó như `replay_qa` rồi chạy lại trước khi tin D7 trên lô lớn.
+2. Phát lại DA-17 (`flywheel_simple/replay/run.py`) chỉ đăng ký env cảnh cũ, nên cũng dựng lại episode không có đồ gá. Mọi episode bị `flag` vì D7 (sai số trạng thái tay tới 1,36 rad lúc nhả, phát lại không thành công) và D8. Các kiểm tĩnh đều qua. `demo_sets` giữ `flag`, nên lô vẫn đủ 19. Đã sửa ở nhiệm vụ 8.1 và chạy lại ở 8.2 (mục 4.10).
 3. Khay dừng lệch theo trục dọc của đích trung bình +1,0 cm (16/19 episode lệch dương, thấp nhất −0,2 cm), cả hai mức; lệch ngang trung bình −0,2 cm. Nằm trong dung sai, nhưng là độ lệch có hệ thống của planner trong dữ liệu.
 4. Câu lệnh task vẫn nói "target zone". Nếu muốn policy phân biệt hai cảnh bằng lời thì phải đổi câu, nhưng như vậy sẽ khác dữ liệu cũ.
 
 Mẫu xem: `fwdata/da-41-sample-batch/xem-mau/` (bốn video camera đầu cạnh góc nhìn ngoài, ảnh tổng hợp cả lô).
+
+### 4.10 Phát lại DA-17 trên cảnh đồ gá và hai điều còn mở của lô mẫu (nhiệm vụ 8, 20/11/2026)
+
+**Sửa adapter (8.1).** `flywheel_simple/replay/run.py` chọn env theo `uid` đã ghi, như `replay_qa` ở 7.1: `uid` khay cũ đăng ký `tray.run`, `uid` đồ gá đăng ký `tray.jig_run`. `--env-id` của cảnh khác, hay một dải episode trộn hai `uid`, bị từ chối trước khi dựng env. Với mọi dataset, khi một episode sắp được dựng trong cảnh khác `uid` đã ghi, adapter dừng tiến trình (`SceneMismatch`, một `SystemExit`; `except Exception` của SIMPLE không bắt nó) thay vì chạy tiếp như SIMPLE vẫn làm. Làm trong adapter của repo, không sửa SIMPLE. `--allow-uid-override` giữ cách cũ để chẩn đoán. Episode của cảnh cũ chạy như trước (test).
+
+**Chạy lại trên lô mẫu (8.2).** `replay_check replay --env-id simple/G1WholebodyTrayTransferJigTeleop-v0`, `reports --outcomes`, `fw data qa --replay`, trên đúng hai release của mục 4.9. Không còn dòng "env/dataset task mismatch" nào trong log. Bản QA trước sửa được giữ ở `pipeline/src_*/qa-oldscene/`.
+
+| Mức | Trước sửa (cảnh cũ) | Sau sửa (cảnh đồ gá) |
+|---|---|---|
+| Mức 1 (9 episode) | 9 `flag`: D7 9, D8 7 | 9 `flag`: D7 9, D8 3 |
+| Mức 2 (10 episode) | 10 `flag`: D7 10, D8 8 | 10 `flag`: D7 10, D8 4 |
+| Cả lô | D7 19, D8 15; phát lại đạt 4/19 | D7 19, D8 7; phát lại đạt 12/19 |
+
+Sau sửa vẫn còn cờ, nên tìm nguyên nhân, không coi là qua:
+- **D7 ở cả 19 episode** do hai issue của phép kiểm động lực học (`replay_dynamic`), cả hai có ở mọi episode, trước và sau sửa: `state_error` của tay 1,36 rad (ngưỡng 0,75) và `hand_event_offset` 3–9 bước (ngưỡng 2). Hai ngưỡng hiệu chỉnh trên psi-data teleop (`replay-1`, [replay.md](../replay.md)), nơi tay đóng mở chậm. Planner khay đóng và mở tay trọn hành trình trong 0,5 s (`hand_close_s`), nên lệch vài bước giữa bản ghi và lần phát lại cho sai số bằng gần cả hành trình khớp (1,36 rad, đỉnh ở frame đóng tay lúc cầm hoặc mở tay lúc nhả). Phần động học của D7 (`replay_kinematic`) qua ở 19/19, như lô 606 cũ.
+- **D8 ở 7 episode** là phát lại không đạt. Không tương quan với độ lệch đặt đã ghi: episode lệch 0,24 cm vẫn trượt, episode lệch 2,2 cm vẫn đạt. Cùng các episode đó, `replay_qa` (phát lại từng frame của DA-33) tái tạo đúng từng bit, lệch 0,0 mm. Vậy D8 đến từ bộ phát lại của SIMPLE (`replay_decoupled_wbc`: đứng ổn định 162 bước, đệm 10 frame, lệch 3–9 bước), không phải từ dữ liệu. Psi-data teleop cũng trượt 73/99 qua đúng bộ này (replay.md mục 3.3).
+- Lô 606 cũ chưa từng chạy phần động lực học: QA của nó dùng `replay_check reports` không có `--outcomes` (replay.md mục 3.3, "khay S1, chỉ động học"). Vì thế không có số D7 động lực học hay D8 của lô cũ để so. Đối chứng thay thế: 3 episode planner-8 trên cảnh cũ (không đồ gá, mức 1, seed 400200–400202, 3/3 thành công), qua QA phát lại, release và `replay_check replay --env-id simple/G1WholebodyTrayTransferTeleop-v0`. Kết quả giống hệt cảnh đồ gá: sai số tay 1,358–1,359 rad, lệch 4–8 bước ở cả 3, phát lại trượt 1/3, không có dòng `mismatch`. Vậy cờ còn lại không do đồ gá. Số thô: `fwdata/da-41-samples/evidence/r8/zone1-ctl-*.jsonl` (không commit).
+
+Theo quyết định PO 4/11/2026, D7 động lực học và D8 chỉ là `flag`; `demo_sets` giữ `flag`, nên cả 19 episode vẫn ở lại. Muốn D7 có ý nghĩa trên dữ liệu khay thì phải hiệu chỉnh lại ngưỡng `replay-1` trên dữ liệu planner khay. Đó là việc của chủ `configs/data/replay.yaml`, ngoài DA-41 (mục 6).
+
 
 ## 5. Runbook cho Hiếu trên `rtx3060`
 
@@ -382,5 +402,5 @@ cd ~/denso-da41 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/
 - S2 (`tray/s2/streamer.py`) dựng lại mẫu cha bằng `sample_episode`; biến thể trên cảnh đồ gá cần `sample_jig_episode`.
 - Sinh lô mới trên cảnh đồ gá và train lại: story sau, cần duyệt ngân sách.
 - Planner (nếu kiểm 50 seed dưới 95 %): hai lớp lỗi còn lại của mục 4.8. Cầm lệch một tay (1:16; độ lệch lòng bàn tay cuối GRASP không dự báo được lỗi, cần tín hiệu khác). Ngón cái cạy khay lên khi nhả trong đồ gá (1:10, khoảng 1/7 quanh seed đó).
-- Phát lại động học DA-17 (`flywheel_simple/replay/run.py`) cần đăng ký env đồ gá như `replay_qa` (mục 4.9); trước đó D7 và D8 của `fw data qa --replay` không đúng trên dữ liệu đồ gá.
+- Phát lại DA-17 trên dữ liệu khay (chủ `configs/data/replay.yaml`, DA-17): ngưỡng `state_error.hand` và `hand_event_offset_steps` của `replay-1` hiệu chỉnh trên psi-data teleop, nên D7 động lực học bật ở mọi episode planner khay, cả cảnh cũ lẫn đồ gá (mục 4.10). `replay_decoupled_wbc` của SIMPLE còn trượt khoảng 1/3 số episode (D8) dù `replay_qa` tái tạo đúng từng bit. Cần hiệu chỉnh ngưỡng trên dữ liệu khay, hoặc ghi rằng hai phép kiểm này không dùng cho nguồn `planner_wbc`. Phần chọn đúng cảnh đã sửa ở 8.1.
 - Thí nghiệm: policy train trên cảnh đồ gá có dùng đồ gá làm mốc không (ví dụ che đồ gá lúc eval). Đồ gá chỉ chiếm dưới 0,7 % ảnh camera đầu (mục 4.4).

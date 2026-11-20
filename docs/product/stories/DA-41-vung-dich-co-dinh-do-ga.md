@@ -59,7 +59,7 @@ Số đo dẫn tới story ([docs/he/tray.md](../../he/tray.md) mục 19–20): 
   - [x] 7.3 Mẫu xem: 4 episode (2 mỗi mức) camera đầu đúng như policy thấy cạnh góc nhìn ngoài; ảnh tổng hợp cả lô: vị trí và góc đặt cuối so với đích, độ thấy đồ gá và vùng đích trong camera đầu lúc hạ và nhả; thời gian sinh mỗi episode; dọn file tạm. `fwdata/da-41-sample-batch/xem-mau/`: 4 video, ảnh tổng hợp; vùng đích chiếm 3,2–6 % ảnh camera đầu lúc hạ, đồ gá 0,4–0,7 %
 - [ ] 8. Sửa phát lại động học DA-17 cho cảnh đồ gá và soạn runbook sinh lô 600 (PO 20/11/2026: "Làm đi")
   - [x] 8.1 Adapter `flywheel_simple/replay/run.py` chọn env theo `uid` đã ghi; dừng với lỗi rõ khi episode sẽ phát lại trên cảnh khác; giữ hành vi với cảnh cũ (có test)
-  - [ ] 8.2 Chạy lại phát lại động học và `fw data qa --replay` trên lô mẫu 19 episode; cờ D7, D8 trước và sau trong jig.md mục 4.9
+  - [x] 8.2 Chạy lại phát lại động học và `fw data qa --replay` trên lô mẫu 19 episode; cờ D7, D8 trước và sau trong jig.md mục 4.9. Kết quả ở mục 4.10: không còn dòng `mismatch`; D8 15 → 7, D7 19 → 19. Cờ còn lại do ngưỡng `replay-1` (hiệu chỉnh trên psi-data) và bộ phát lại của SIMPLE, không do đồ gá: đối chứng 3 episode cảnh cũ cho cùng kết quả (việc của DA-17, mục 6)
   - [ ] 8.3 Kết luận ngắn: (a) seed 400005 `timeout:RELEASE`; (b) độ lệch +1,0 cm theo trục dọc, có sửa được bằng một tham số không
   - [ ] 8.4 Runbook `rtx3060` cho lô khoảng 632 lượt (khoảng 600 episode qua lọc), từ sinh tới `demo_sets`, kèm điều kiện dừng; Hiếu chạy
 
