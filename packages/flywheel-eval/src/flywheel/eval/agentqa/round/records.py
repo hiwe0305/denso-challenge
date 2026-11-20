@@ -6,7 +6,7 @@ crosses a lane boundary (`RoundDiagnosis`, the eval outcome) goes to `flywheel.c
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
@@ -75,3 +75,54 @@ class Admission(Record):
         default_factory=list,
         description="Accepted entries no source record vouches for, directly or by a link.")
     hosted_allowed: bool
+
+
+Status = Literal["ok", "degraded", "broken"]
+
+
+class FactRecord(Record):
+    """One line of `facts.jsonl`: a number the code computed, and the call that made it."""
+
+    fact_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    value: float | int | str | bool
+    unit: str = ""
+    source_ref: str = Field(min_length=1)
+    provenance: Literal["code", "vision", "history"]
+    tool_call_id: str = Field(min_length=1)
+
+
+class ToolCallRecord(Record):
+    """One line of `tool_calls.jsonl`: a call of the plan, what it read and what it made."""
+
+    call_id: str = Field(min_length=1)
+    tool: str = Field(min_length=1)
+    version: int = Field(ge=1)
+    params: dict[str, Any] = Field(default_factory=dict)
+    input_sha256: list[str] = Field(default_factory=list)
+    fact_ids: list[str] = Field(default_factory=list)
+    not_judged: list[str] = Field(default_factory=list)
+    status: Literal["ran", "skipped", "refused"]
+    reason: str = ""
+
+
+class StepRecord(Record):
+    name: str = Field(min_length=1)
+    status: Status
+    seconds: float = Field(ge=0)
+    rows: int = Field(ge=0)
+    outputs: dict[str, str] = Field(default_factory=dict, description="file name -> sha256")
+
+
+class RunRecord(Record):
+    """`run.json`: what happened in one run directory, rewritten after every step."""
+
+    run_id: str = Field(min_length=1)
+    command: str = ""
+    started_at: AwareDatetime
+    pack_id: str = ""
+    pack_sha256: str = ""
+    data_class: DataClass = "restricted"
+    status: Status
+    steps: list[StepRecord] = Field(default_factory=list)
+    problems: list[str] = Field(default_factory=list)

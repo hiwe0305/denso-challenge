@@ -2,6 +2,7 @@
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 20/11/2026 | 0.4 | Mục 19.2: bỏ nhớ đệm lời gọi công cụ (khi dựng nhiệm vụ 4.2) | Hiếu (soạn với Claude) |
 | 20/11/2026 | 0.3 | Hiếu duyệt ("Duyệt theo đề xuất"): Q1–Q9 của mục 16 thành **[Đã chốt]** | Hiếu (soạn với Claude) |
 | 20/11/2026 | 0.2 | Thêm phần B (mục 18–26): hai bề mặt (báo cáo vòng và chat của Console), tool calling, vòng lặp, bộ nhớ, gói kiến thức (skill), điểm mở rộng (plugin), schema bản ghi, prompt và config. Thêm Q8, Q9 | Hiếu (soạn với Claude) |
 | 20/11/2026 | 0.1 | Bản đầu, chờ Hiếu duyệt. Thay mục 5.1, 5.4, 12 và phần chọn model của mục 8 của [design 19/11/2026](2026-11-19-agent-qaqc-system-design.md) | Hiếu (soạn với Claude) |
@@ -449,7 +450,7 @@ Luật thiết kế công cụ, áp cho mọi công cụ mới:
 - nạp kế hoạch, kiểm mọi tham số thuộc miền đóng của `ToolSpec`;
 - với mỗi lời gọi: thiếu `needs` thì ghi fact "không xét được" và đi tiếp; đủ thì chạy;
 - ghi một dòng `tool_calls.jsonl` cho mỗi lời gọi, kể cả lời gọi không chạy được;
-- khóa nhớ đệm là (tên, phiên bản, tham số, sha256 đầu vào): chạy lại với `--from` không tính lại lời gọi đã có.
+- không nhớ đệm giữa các lời gọi (bản 0.4): công cụ chạy trong vài giây, nên `--from measure` tính lại cả bước; mỗi dòng vẫn ghi (tên, phiên bản, tham số, sha256 đầu vào) để đối chiếu hai lần chạy.
 
 ### 19.3 Tool của chat (mức 3)
 

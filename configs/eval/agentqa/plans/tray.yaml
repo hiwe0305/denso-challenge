@@ -1,0 +1,14 @@
+# The measure plan of the tray task: which tools step B2 runs on a round, in this order
+# (DA-43, architecture 20/11/2026 section 6). Read by `flywheel.eval.agentqa.round.measure`.
+# Parameters come from closed domains (a run of the pack, a level that occurs in it, a
+# label of the task view); a value outside its domain refuses the plan before anything runs.
+# Changing this file is a new version of the agent: score it again (design 11).
+
+task_id: tray
+calls:
+  - {tool: task_lookup, params: {}}                       # steps and scorer thresholds
+  - {tool: step_pass_table, params: {runs: all}}          # how far each run got, step by step
+  - {tool: failure_clusters, params: {runs: all}}         # failures by (step, label, level)
+  - {tool: latch_consistency, params: {runs: all}}        # outcomes the step chain contradicts
+  - {tool: signal_presence, params: {labels: seen}}       # can the inputs judge each label?
+  - {tool: paired_compare, params: {pairs: all, levels: all}}  # run vs run, paired by condition
