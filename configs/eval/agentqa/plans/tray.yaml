@@ -12,3 +12,6 @@ calls:
   - {tool: latch_consistency, params: {runs: all}}        # outcomes the step chain contradicts
   - {tool: signal_presence, params: {labels: seen}}       # can the inputs judge each label?
   - {tool: paired_compare, params: {pairs: all, levels: all}}  # run vs run, paired by condition
+  - {tool: trace_stats, params: {runs: all}}              # tracking of failed vs succeeded rollouts
+  - {tool: train_window, params: {jobs: all, window: all}}  # loss, gradients, val cadence per job
+  - {tool: lineage, params: {}}                           # run -> checkpoint -> job -> release -> dataset

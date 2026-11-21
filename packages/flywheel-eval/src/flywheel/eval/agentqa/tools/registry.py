@@ -13,18 +13,32 @@ call is read from this file.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from itertools import combinations
 from typing import Any
 
+from flywheel.contracts.artifacts import DatasetReport, Episode
 from flywheel.eval.agentqa.facts import FactBook
-from flywheel.eval.agentqa.tools.base import RunScores, ToolResult, merge, not_judged
+from flywheel.eval.agentqa.tools.base import (
+    EntryView,
+    JobMetrics,
+    RunScores,
+    RunTrace,
+    ToolResult,
+    merge,
+    not_judged,
+)
 from flywheel.eval.agentqa.tools.clusters import failure_clusters
 from flywheel.eval.agentqa.tools.latch import latch_consistency
+from flywheel.eval.agentqa.tools.lineage import lineage
 from flywheel.eval.agentqa.tools.paired import paired_compare
 from flywheel.eval.agentqa.tools.signals import labels_seen, signal_presence
 from flywheel.eval.agentqa.tools.steps import step_pass_table
 from flywheel.eval.agentqa.tools.task import TaskView, task_lookup
+from flywheel.eval.agentqa.tools.trace import no_tolerance, trace_stats
+from flywheel.eval.agentqa.tools.train import logged_steps, train_window
+from flywheel.eval.api import DEFAULT_SYSTEM_CONFIG
+from flywheel.eval.config import ConfigError, load_system_thresholds
 
 
 @dataclass(frozen=True)
@@ -32,6 +46,12 @@ class MeasureContext:
     task: TaskView
     runs: Mapping[str, RunScores]  # run name -> scores, in pack order
     kinds: frozenset[str]  # artifact kinds accepted in the pack
+    # What the other accepted kinds hold; empty when the pack has none of them.
+    traces: Mapping[str, RunTrace] = field(default_factory=dict)  # run name -> its trace
+    jobs: Mapping[str, JobMetrics] = field(default_factory=dict)  # job_id -> its training log
+    episodes: tuple[Episode, ...] = ()
+    reports: Mapping[str, DatasetReport] = field(default_factory=dict)  # entry ref -> report
+    entries: tuple[EntryView, ...] = ()  # every accepted entry as the pack declares it
 
 
 @dataclass(frozen=True)
@@ -128,6 +148,26 @@ def _check_one(domain: str, name: str, value: object, params: Mapping[str, Any],
         assert isinstance(value, list)
         return [f"{name}: label {v!r} is not a label of {ctx.task.task_id}"
                 for v in value if v not in ctx.task.labels]
+    if domain == "jobs":
+        if value == "all":
+            return []
+        if not _names(value):
+            return [f"{name}: 'all' or a list of job ids, got {value!r}"]
+        assert isinstance(value, list)
+        known = ", ".join(ctx.jobs) or "none"
+        return [f"{name}: job {v!r} is not in the pack (jobs: {known})"
+                for v in value if v not in ctx.jobs]
+    if domain == "window":
+        if value in ("all", "last"):
+            return []
+        if not _is_int(value):
+            return [f"{name}: 'all', 'last' or a logged step of the jobs, got {value!r}"]
+        chosen = params.get("jobs", "all")
+        names = (list(ctx.jobs) if chosen == "all" else
+                 [j for j in chosen if isinstance(j, str) and j in ctx.jobs]
+                 if isinstance(chosen, list) else [])
+        return [f"{name}: step {value} is not a logged step of job {j}"
+                for j in names if value not in logged_steps(ctx.jobs[j])]
     if domain == "step":
         if isinstance(value, str) and value in ctx.task.steps:
             return []
@@ -186,6 +226,31 @@ def _signal_presence(book: FactBook, ctx: MeasureContext,
     return signal_presence(book, ctx.task, ctx.kinds, labels)
 
 
+def _trace_stats(book: FactBook, ctx: MeasureContext,
+                 params: Mapping[str, Any]) -> ToolResult:
+    try:
+        cfg, _ = load_system_thresholds(DEFAULT_SYSTEM_CONFIG)
+    except ConfigError as error:
+        return no_tolerance(book, f"tau_track cannot be read: {str(error)[:150]}")
+    return trace_stats(book, _runs(params, ctx), dict(ctx.traces), cfg.r3,
+                       f"{DEFAULT_SYSTEM_CONFIG.as_posix()} (r3)")
+
+
+def _train_window(book: FactBook, ctx: MeasureContext,
+                  params: Mapping[str, Any]) -> ToolResult:
+    value = params["jobs"]
+    names = list(ctx.jobs) if value == "all" else list(value)
+    if not names:
+        return not_judged(book, "train_window", "no job log in the pack", "pack.json")
+    return merge("train_window", [train_window(book, ctx.jobs[n], params["window"])
+                                  for n in names])
+
+
+def _lineage(book: FactBook, ctx: MeasureContext, params: Mapping[str, Any]) -> ToolResult:
+    return lineage(book, list(ctx.runs.values()), ctx.entries, ctx.episodes, ctx.jobs,
+                   ctx.reports)
+
+
 def pairs_of(params: Mapping[str, Any], ctx: MeasureContext) -> list[tuple[str, str]]:
     value = params["pairs"]
     if value == "all":
@@ -213,4 +278,8 @@ REGISTRY: dict[str, ToolSpec] = {spec.name: spec for spec in (
              reads_all=True),
     ToolSpec("paired_compare", 1, ("scores",), {"pairs": "pairs", "levels": "levels"},
              _paired_compare),
+    ToolSpec("trace_stats", 1, ("scores", "trace"), {"runs": "runs"}, _trace_stats),
+    ToolSpec("train_window", 1, ("metrics",), {"jobs": "jobs", "window": "window"},
+             _train_window),
+    ToolSpec("lineage", 1, ("scores",), {}, _lineage, reads_all=True),
 )}

@@ -6,6 +6,8 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 
 from flywheel.contracts.entities import Score
+from flywheel.contracts.trace import TraceStep
+from flywheel.contracts.training import TrainingMetric
 from flywheel.eval.agentqa.facts import FactBook, FactValue
 
 Row = Mapping[str, FactValue]
@@ -68,3 +70,30 @@ class RunScores:
 
     def levels(self) -> list[int]:
         return sorted({s.level for s in self.scores if s.level is not None})
+
+
+@dataclass(frozen=True)
+class RunTrace:
+    """The control cycles of the rollouts of one run, from one `trace` entry of the pack."""
+
+    run: str
+    ref: str
+    steps: tuple[TraceStep, ...]
+
+
+@dataclass(frozen=True)
+class JobMetrics:
+    """The training log of one job (`TrainingMetric.job_id`), in file order."""
+
+    job: str
+    ref: str
+    rows: tuple[TrainingMetric, ...]
+
+
+@dataclass(frozen=True)
+class EntryView:
+    """What the pack declares about an accepted entry: its file, kind and subject."""
+
+    ref: str
+    kind: str
+    subject: Mapping[str, str]
