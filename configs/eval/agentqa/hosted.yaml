@@ -1,0 +1,20 @@
+# The hosted block of the model gateway (DA-43; design 19/11 section 8, hard block 1).
+#
+# Off by default. While `enabled` is false no hosted profile can be called, whatever
+# routing.yaml says. When on, a hosted profile is still refused for any pack that B1
+# did not confirm as public (hard blocks 2 and 3). Keys are never written here: a
+# profile names the environment variable that holds its key.
+#
+# Hosted providers are built from task 5.4; until then a hosted route is refused.
+enabled: false
+
+profiles:
+  haiku:
+    provider: anthropic
+    hosted: true
+    model: claude-haiku-5-5
+    api_key_env: ANTHROPIC_API_KEY
+    max_tokens: 6144
+    timeout_s: 120
+    usd_per_mtok_in: 0.10     # Anthropic price list, checked 3/11/2026 (architecture 12)
+    usd_per_mtok_out: 0.50

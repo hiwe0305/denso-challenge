@@ -57,7 +57,7 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
   - [x] 4.3 B3: bảng luật giả thuyết, danh mục phép kiểm, hạng của code; chặn tiêu ngân sách khi còn giả thuyết hệ thống
   - [x] 4.4 B6 và B7 với `--no-model`, ghi `assembly.json`; lệnh `fw agentqa round`; báo cáo vòng chạy hết trên gói mẫu
 - [ ] 5. Lớp model (2 ngày; kiến trúc 20/11 mục 8, 19–25)
-  - [ ] 5.1 Cổng model: hồ sơ, bảng vai × lớp dữ liệu, chặn hosted, ngân sách, ghi và phát lại
+  - [x] 5.1 Cổng model: hồ sơ, bảng vai × lớp dữ liệu, chặn hosted, ngân sách, ghi và phát lại
   - [ ] 5.2 Vai `adjudicate` và `rank`: prompt, schema câu trả lời
   - [ ] 5.3 B5: các phép kiểm của kiến trúc mục 25 (luật của design mục 6), ba sửa của bản 3 và ca kiểm của AC 5, phán quyết và sàn code
   - [ ] 5.4 Lớp hosted kiểu OpenAI (OpenRouter) và lớp Anthropic

@@ -131,6 +131,51 @@ class RunRecord(Record):
     agent_hash: str = ""
 
 
+class ModelRequest(Record):
+    """What a role asks the model gateway for one unit (a source or a cluster)."""
+
+    unit: str = Field(min_length=1)
+    attempt: Literal[1, 2] = 1
+    system: str = Field(min_length=1)
+    user: str = Field(min_length=1)
+    reply_schema: dict[str, Any] | None = None
+    max_tokens: int = Field(ge=1)
+
+
+CallStatus = Literal["ok", "cut", "failed", "budget_exhausted"]
+
+
+class ModelCallRecord(Record):
+    """One line of `model_calls.jsonl` (step B4): one request through the gateway.
+
+    The only file of a run that holds durations; no key or header is ever in it.
+    `tries` counts provider calls (0 when the budget stopped the request).
+    """
+
+    call_id: str = Field(pattern=r"^M[1-9][0-9]*$")
+    role: str = Field(min_length=1)
+    unit: str = Field(min_length=1)
+    attempt: Literal[1, 2]
+    request_sha256: str = Field(pattern=SHA256)
+    prompt_sha256: str = Field(pattern=SHA256)
+    data_class: DataClass
+    profile: str = Field(min_length=1)
+    provider: str = Field(min_length=1)
+    hosted: bool
+    model: str
+    revision: str
+    host: str
+    tokens_in: int = Field(ge=0)
+    tokens_out: int = Field(ge=0)
+    tokens_estimated: bool = False
+    usd: float = Field(ge=0)
+    seconds: float = Field(ge=0)
+    tries: int = Field(ge=0)
+    status: CallStatus
+    reply: str = ""
+    error: str = ""
+
+
 # Groups of hypothesis rules, in the order spec 6.4 asks for: system and scorer first,
 # data last. `code_rank` sorts by this order first.
 Group = Literal["scorer", "runtime", "train", "data", "coverage"]
