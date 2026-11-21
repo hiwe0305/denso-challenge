@@ -365,9 +365,28 @@ Thử sửa bằng một tham số, ngoài repo: ngắm xa hơn 0,8 cm theo tr�
 
 **Kết luận: để nguyên, không đổi `PLANNER_VERSION`.** Lý do: (1) không có tham số đơn nào bù được, vì phép ngắm xa đã thử chỉ gỡ một phần năm; (2) nếu hiệu ứng tuyến tính thì muốn bù hết phải ngắm xa khoảng 3,5 cm (ước lượng). Lúc đó khay buông sát tường đồ gá phía xa, chính chỗ sinh lỗi nhả 1:10, và phải đo lại 61 episode ở cả hai cảnh; (3) 1,0 cm nằm trong dung sai đặt, và có cả ở cảnh không đồ gá. Muốn sửa tận gốc thì phải đổi pha nhả (buông thấp hơn, mở tay chậm hơn, mục 4.7), cùng việc với lớp lỗi 1:10 ở mục 6. Số thô: `fwdata/da-41-samples/evidence/r8/aim-0.008.jsonl` (không commit).
 
+### 4.11 Kiểm 50 seed mỗi mức trên `rtx3060` (nhiệm vụ 6.8, 21/11/2026)
+
+PO (Hiếu) cho Claude tự chạy ngày 21/11/2026 ("Chạy đi"). Thực đo, một lần chạy, đúng lệnh của mục 5: commit `0594d2dd`, SIMPLE `b75c678`, cảnh đồ gá, seed 1000–1049 mỗi mức, 5 worker, trong scope `systemd-run` `MemoryMax=24G`. Máy đang có job của người khác (tải trung bình 6–12). Khoảng tin cậy là Wilson 95 %.
+
+| Mức | Đạt | Tỉ lệ | Lỗi (seed) |
+|---|---|---|---|
+| 1 | 46/50 | 92 % (81–97 %) | L-ONE-HAND (1006, 1011), L-TRAY-TILT (1028), L-PLACE-POSE (1037) |
+| 2 | 45/50 | 90 % (79–96 %) | L-PLACE-POSE (1015, 1023), L-ONE-HAND (1010), L-TRAY-TILT (1030), RELEASE hết giờ (1000) |
+| Gộp | 91/100 | 91 % (84–95 %) | L-ONE-HAND 3, L-PLACE-POSE 3, L-TRAY-TILT 2, RELEASE hết giờ 1 |
+
+Mọi lượt mang `da41-planner-8+cfg.bee61399` và `none+zone1+jig2`. Trung vị 47 s một lượt (mức 1: 47,2 s; mức 2: 47,9 s) khi 5 worker chạy cùng lúc. Test `sim` của mục 5 trên máy này: 28/28 qua, 282 s.
+
+Đọc:
+- **Chưa đạt AC 8 (≥ 95 %)**: cả hai mức dưới 48/50. Số laptop 60/61 (mục 4.8) cao hơn số này; khoảng tin cậy của hai phép đo chồng nhau (91–100 % và 84–95 %), nên chưa kết luận được là hai máy khác nhau. Chưa chạy lại cùng seed trên laptop.
+- Lỗi thuộc các lớp đã biết của mục 4.7 và 4.8 (cầm lệch một tay, khay dội hoặc nghiêng khi nhả, sai lệch đặt), không có lớp mới. Nguyên nhân của từng lượt ở đây chưa xem trace.
+- Cả hai mức trên ngưỡng dừng 85 % của lô 600 (mục 5.1), nhưng dưới điều kiện "≥ 48/50 mới sinh lô". Nếu sinh với tỉ lệ này, 632 lượt cho khoảng 575 episode ghi được trước QA [Ước lượng], không phải khoảng 600.
+
+Dựng máy: `rtx3060` không còn thư mục `~/denso-*` (đã xóa 15/11/2026). `~/denso-da41` là checkout git của nhánh này, `bash scripts/g0/setup_simple.sh` rồi chép tay `scripts/g0/simple/curobo_stub/curobo` vào `site-packages` của venv (máy có `nvcc` nên script không tự chép). Số liệu thô: `~/denso-da41/fwdata/simple/tray/gen/jig2-check-l{1,2}/` trên `rtx3060` (540 MB, xóa được) và bản sao `gen_log` ở `fwdata/da-41-samples/evidence/rtx3060-check/` (không commit).
+
 ## 5. Runbook cho Hiếu trên `rtx3060`
 
-Chưa chạy trên `rtx3060` (không chạy job ở đó khi chưa hỏi). Mọi lệnh dưới đây đã chạy trên laptop, trừ kiểm 50 seed. Cập nhật 20/11/2026 cho planner `da41-planner-8` và đồ gá `jig2` (nhiệm vụ 6.6). Lô `jig1-check`, nếu đã chạy theo bản trước, dùng planner-5 và `jig1`: không gộp với lô mới (`generate` từ chối trộn hai `planner_version` trong một thư mục).
+Test `sim` và kiểm 50 seed đã chạy trên `rtx3060` ngày 21/11/2026 (mục 4.11: 46/50 và 45/50, dưới mục tiêu); mục 5.1 chưa chạy. Mọi lệnh dưới đây đã chạy trên laptop. Cập nhật 20/11/2026 cho planner `da41-planner-8` và đồ gá `jig2` (nhiệm vụ 6.6). Lô `jig1-check`, nếu đã chạy theo bản trước, dùng planner-5 và `jig1`: không gộp với lô mới (`generate` từ chối trộn hai `planner_version` trong một thư mục).
 
 Chuẩn bị (một lần), trong một thư mục làm việc riêng, rồi kiểm phiên bản:
 
