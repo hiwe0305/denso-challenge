@@ -62,6 +62,7 @@ Số đo dẫn tới story ([docs/he/tray.md](../../he/tray.md) mục 19–20): 
   - [x] 8.2 Chạy lại phát lại động học và `fw data qa --replay` trên lô mẫu 19 episode; cờ D7, D8 trước và sau trong jig.md mục 4.9. Kết quả ở mục 4.10: không còn dòng `mismatch`; D8 15 → 7, D7 19 → 19. Cờ còn lại do ngưỡng `replay-1` (hiệu chỉnh trên psi-data) và bộ phát lại của SIMPLE, không do đồ gá: đối chứng 3 episode cảnh cũ cho cùng kết quả (việc của DA-17, mục 6)
   - [x] 8.3 Kết luận ngắn: (a) seed 400005 `timeout:RELEASE`; (b) độ lệch +1,0 cm theo trục dọc, có sửa được bằng một tham số không. jig.md mục 4.10: (a) cùng lớp lỗi nhả 1:10, ngón cái cạy khay rồi khay mắc trên cổ tay phải; (b) sinh ra ở 5 cm cuối và lúc nhả, không do chỗ đứng; đồ gá góp khoảng 0,5 cm. Ngắm xa 0,8 cm chỉ giảm 1,00 → 0,78 cm (19/19 vẫn đạt), nên để nguyên, không đổi `PLANNER_VERSION`
   - [x] 8.4 Runbook `rtx3060` cho lô khoảng 632 lượt (khoảng 600 episode qua lọc), từ sinh tới `demo_sets`, kèm điều kiện dừng; Hiếu chạy. jig.md mục 5.1: 544 lượt mức 1 + 88 lượt mức 2 (tỉ lệ 86/14 của lô 606), seed 500000–500543 và 501000–501087, 14 worker, dừng nếu giữ dưới 85 %; ước lượng 3,5–4 giờ, khoảng 11 GB. Lệnh đọc kết quả đã chạy thử trên lô mẫu; lệnh sinh và phát lại chưa chạy ở `rtx3060`
+  - [x] 8.5 (Thêm 21/11/2026, PO: "Tăng lên 30 %") Đổi chia mức của runbook 5.1 từ 86/14 sang khoảng 70/30: 442 lượt mức 1 (seed 500000–500441, 10 worker) + 190 lượt mức 2 (seed 501000–501189, 4 worker), tổng vẫn 632 lượt và 14 worker. Số ở dòng 8.4 là bản trước khi đổi
 
 ## Phạm vi file
 
@@ -100,6 +101,7 @@ Nhiệm vụ 6 (20/11/2026) sửa `planner.py`, `jig.py` (trong `flywheel_simple
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 19/11/2026 | Tạo story theo quyết định PO 19/11/2026: vùng đích cố định, thêm đồ gá định vị | PO (Hiếu) |
+| 21/11/2026 | Thêm nhiệm vụ 8.5: lô 600 tăng phần mức 2 lên khoảng 30 % (PO: "Tăng lên 30 %"), vì eval chia đều hai mức | PO (Hiếu) |
 | 20/11/2026 | Thêm AC 8 và nhiệm vụ 6: sửa planner trước khi sinh lại dữ liệu (PO: "Sửa planner trước") | PO (Hiếu) |
 | 20/11/2026 | Thêm nhiệm vụ 8 và mở rộng phạm vi file cho `replay/run.py` và test của nó (PO: "Làm đi") | PO (Hiếu) |
 | 20/11/2026 | Thêm nhiệm vụ 7: lô mẫu dữ liệu nhỏ với planner-8 (PO đồng ý sinh thử) | PO (Hiếu) |
