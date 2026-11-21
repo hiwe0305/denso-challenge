@@ -60,3 +60,16 @@ def test_a_threshold_without_a_unit_is_refused(tmp_path: Path) -> None:
         "labels: {}\n")
     with pytest.raises(ValueError, match="no unit"):
         load_task("t", tmp_path)
+
+
+def test_the_view_thresholds_agree_with_the_sim_config_scores_carry(tray: TaskView) -> None:
+    """The view reads configs/eval/scorer/tray.yaml; each Score carries the sha256 of
+    configs/sim/tray.yaml. Every threshold the two share must hold the same number."""
+    sim: dict[str, float] = {}
+    for line in Path("configs/sim/tray.yaml").read_text().splitlines():
+        key, sep, value = line.partition("#")[0].partition(":")
+        if sep and value.strip():
+            sim[key.strip()] = float(value)
+    shared = set(tray.thresholds) & set(sim)
+    assert len(shared) >= 9
+    assert {k: tray.thresholds[k] for k in shared} == {k: sim[k] for k in shared}

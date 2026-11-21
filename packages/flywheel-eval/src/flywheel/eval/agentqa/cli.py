@@ -38,7 +38,7 @@ from flywheel.eval.agentqa.review import make_review, write_review
 from flywheel.eval.agentqa.round.hypotheses import RulesRefused
 from flywheel.eval.agentqa.round.measure import PlanRefused
 from flywheel.eval.agentqa.round.pack import PackRefused, build_pack, write_pack
-from flywheel.eval.agentqa.round.pipeline import NO_MODEL_ONLY, RunRefused, run_round
+from flywheel.eval.agentqa.round.pipeline import NO_MODEL_ONLY, RunRefused, failure, run_round
 from flywheel.eval.agentqa.round.render import INDEX_FILE
 from flywheel.eval.agentqa.run import read_dropped
 from flywheel.eval.agentqa.run import run as run_agentqa
@@ -54,6 +54,14 @@ def root() -> None:
 def _fail(message: str) -> None:
     typer.echo(f"error: {message}", err=True)
     raise typer.Exit(2)
+
+
+def _recorded_broken(out: Path) -> bool:
+    try:
+        return bool(json.loads((out / "run.json").read_text(encoding="utf-8"))
+                    .get("status") == "broken")
+    except (OSError, ValueError, AttributeError):
+        return False
 
 
 def _read_reports(path: Path) -> list[AgentReport]:
@@ -91,6 +99,13 @@ def round_command(
                            command="fw agentqa round", no_model=True, store=store)
     except (PackRefused, PlanRefused, RulesRefused, RunRefused, FileExistsError) as error:
         _fail(str(error))
+        return
+    except Exception as error:
+        # A step that failed is recorded in run.json as broken: one line, no traceback.
+        # A failure the runner did not record is a bug and keeps its traceback.
+        if not _recorded_broken(out):
+            raise
+        _fail(f"{failure(error)} (recorded in {out / 'run.json'})")
         return
     assembly = (out / "assembly.json").read_text(encoding="utf-8")
     clusters = len(json.loads(assembly)["clusters"])

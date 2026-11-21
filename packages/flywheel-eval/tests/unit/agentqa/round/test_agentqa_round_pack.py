@@ -177,3 +177,15 @@ def test_fw_agentqa_pack_writes_the_manifest_and_fails_cleanly(tmp_path: Path) -
     assert (tmp_path / "pack.json").is_file()
     again = runner.invoke(app, ["pack", "--round", str(decl)])
     assert again.exit_code == 2
+
+
+def test_scores_of_another_task_are_rejected_with_a_reason(tmp_path: Path) -> None:
+    other = Score(episode_id="X/l1-s1", task_id="two_table", config_sha256=SHA,
+                  trace_sha256=SHA, success=False, level=1).model_dump_json()
+    (tmp_path / "other.jsonl").write_text(other + "\n")
+    pack_path = packed(tmp_path, extra=[{"path": "other.jsonl", "kind": "scores",
+                                         "subject": {"run": "X"}}])
+    a = admit(pack_path).admission
+    reasons = {r.ref: r.reason for r in a.rejected}
+    assert "two_table" in reasons["other.jsonl"] and "tray" in reasons["other.jsonl"]
+    assert a.accepted == ["C_70/scores.jsonl", "sources.jsonl"]

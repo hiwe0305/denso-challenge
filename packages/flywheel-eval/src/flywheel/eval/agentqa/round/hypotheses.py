@@ -37,6 +37,7 @@ from flywheel.eval.agentqa.round.records import (
     Record,
     ToolCallRecord,
 )
+from flywheel.eval.agentqa.tools.clusters import NO_LEVEL
 from flywheel.eval.agentqa.tools.task import TaskView, load_task
 from pydantic import Field, ValidationError, model_validator
 from typing_extensions import Self
@@ -225,9 +226,14 @@ def _holds(cond: Cond, cluster: ClusterRef, task: TaskView, facts: _Facts) -> bo
     return value > 0 if want == "positive" else value == 0
 
 
+def _level(cluster: ClusterRef) -> int | None:
+    """The cluster table spells a missing level -1 (an int column); facts spell it None."""
+    return None if cluster.level == NO_LEVEL else cluster.level
+
+
 def _name(template: str, cluster: ClusterRef) -> str:
     return template.format(run=cluster.run, step=cluster.step, label=cluster.label,
-                           level=cluster.level)
+                           level=_level(cluster))
 
 
 def _ids(templates: Sequence[str], cluster: ClusterRef, facts: _Facts) -> list[str]:
@@ -239,36 +245,41 @@ def _ids(templates: Sequence[str], cluster: ClusterRef, facts: _Facts) -> list[s
     return ids
 
 
-def _cluster_call(out: Path) -> ToolCallRecord | None:
+def _cluster_calls(out: Path) -> list[ToolCallRecord]:
     path = out / CALLS_FILE
     if not path.is_file():
-        return None
+        return []
     calls = [ToolCallRecord.model_validate_json(x)
              for x in path.read_text(encoding="utf-8").splitlines()]
-    return next((c for c in calls if c.tool == CLUSTER_TOOL and c.status == "ran"), None)
+    return [c for c in calls if c.tool == CLUSTER_TOOL and c.status == "ran"]
 
 
 def missing_clusters_reason(out: Path) -> str:
     """Why there is no cluster table to explain in `out`; "" when there is one."""
-    call = _cluster_call(out)
-    if call is None:
+    if not _cluster_calls(out):
         return f"no {CLUSTER_TOOL} call ran, so no cluster was explained"
     # A call that ran and left no table found no failure: nothing to explain is not a fault.
     return ""
 
 
 def _clusters(out: Path) -> list[ClusterRef]:
-    call = _cluster_call(out)
-    if call is None:
-        return []
-    table = out / TABLES_DIR / f"{call.call_id}-{CLUSTER_TOOL}.json"
-    if not table.is_file():
-        return []
-    rows = json.loads(table.read_text(encoding="utf-8"))
-    return [ClusterRef(
-        cluster_id=f"{r['run']}/{r['first_failed_step']}/{r['label']}/l{r['level']}",
-        run=r["run"], step=r["first_failed_step"], label=r["label"], level=int(r["level"]),
-        size=int(r["size"])) for r in rows]
+    """The union of every failure_clusters table, each (run, step, label, level) once."""
+    found: dict[tuple[str, str, str, int], ClusterRef] = {}
+    for call in _cluster_calls(out):
+        table = out / TABLES_DIR / f"{call.call_id}-{CLUSTER_TOOL}.json"
+        if not table.is_file():
+            continue
+        for r in json.loads(table.read_text(encoding="utf-8")):
+            level = int(r["level"])
+            key = (r["run"], r["first_failed_step"], r["label"], level)
+            if key in found:
+                continue
+            spelled = None if level == NO_LEVEL else level
+            found[key] = ClusterRef(
+                cluster_id=f"{r['run']}/{r['first_failed_step']}/{r['label']}/l{spelled}",
+                run=r["run"], step=r["first_failed_step"], label=r["label"], level=level,
+                size=int(r["size"]))
+    return list(found.values())
 
 
 @dataclass(frozen=True)

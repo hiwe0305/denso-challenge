@@ -20,6 +20,7 @@ from flywheel.eval.agentqa.round.records import HypothesisRecord, RunRecord
 from helpers_round import (  # noqa: F401  (isolated_store is an autouse fixture)
     NOW,
     PackMaker,
+    edited_plan,
     facts_of,
     isolated_store,
     pack_maker,
@@ -181,3 +182,42 @@ def test_from_hypothesize_rewrites_only_the_hypotheses(round_out: Path,
     assert again.steps[:3] == first.steps[:3] and again.steps[3].rows == first.steps[3].rows
     assert again.steps[3].outputs == first.steps[3].outputs
     assert {p: p.read_bytes() for p in kept} == kept
+
+
+def _two_cluster_calls(second: list[str]) -> object:
+    def edit(plan: dict[str, list[dict[str, object]]]) -> None:
+        plan["calls"][2]["params"] = {"runs": ["C_70"]}
+        plan["calls"].insert(3, {"tool": "failure_clusters", "params": {"runs": second}})
+    return edit
+
+
+def test_every_failure_clusters_call_yields_hypotheses(make_pack: PackMaker,
+                                                       tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    run_round(make_pack(), out, plan_path=edited_plan(tmp_path, _two_cluster_calls(["C_ALL"])),
+              now=NOW)
+    runs = {h.cluster.run for h in read(out)}
+    assert runs == {"C_70", "C_ALL"}
+
+
+def test_overlapping_cluster_calls_give_each_cluster_once(make_pack: PackMaker,
+                                                          tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    run_round(make_pack(), out, plan_path=edited_plan(tmp_path, _two_cluster_calls(
+        ["C_70", "C_ALL"])), now=NOW)
+    ranks = defaultdict(list)
+    for h in read(out):
+        ranks[h.cluster.cluster_id].append(h.code_rank)
+    assert all(sorted(r) == list(range(1, len(r) + 1)) for r in ranks.values())
+    assert {c.split("/")[0] for c in ranks} == {"C_70", "C_ALL"}
+
+
+def test_a_cluster_without_level_is_named_as_its_facts() -> None:
+    from flywheel.eval.agentqa.round.hypotheses import _name
+    from flywheel.eval.agentqa.round.records import ClusterRef
+    from flywheel.eval.agentqa.tools.clusters import slug
+
+    cluster = ClusterRef(cluster_id="X/place/L-PLACE-POSE/lNone", run="X", step="place",
+                         label="L-PLACE-POSE", level=-1, size=2)
+    assert (_name("{run}_cluster_{step}_{label}_l{level}_size", cluster)
+            == f"X_cluster_{slug(('place', 'L-PLACE-POSE', None))}_size")

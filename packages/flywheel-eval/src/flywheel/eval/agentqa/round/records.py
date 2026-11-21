@@ -124,6 +124,8 @@ class RunRecord(Record):
     pack_id: str = ""
     pack_sha256: str = ""
     data_class: DataClass = "restricted"
+    plan_path: str = Field(default="", description="The measure plan this run used.")
+    plan_sha256: str = ""
     status: Status
     steps: list[StepRecord] = Field(default_factory=list)
     problems: list[str] = Field(default_factory=list)

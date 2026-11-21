@@ -175,7 +175,7 @@ def _inputs(spec: ToolSpec, params: dict[str, Any], ctx: MeasureContext,
     for entry in entries:
         if not (spec.reads_all or entry.kind in spec.needs):
             continue
-        if (entry.kind in ("scores", "trace") and not spec.reads_all
+        if (entry.kind in ("scores", "trace") and not (spec.reads_all or spec.context_runs)
                 and entry.subject.get("run") not in runs):
             continue
         shas.add(entry.sha256)

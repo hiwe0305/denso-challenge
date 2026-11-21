@@ -25,6 +25,18 @@ attempt. For each:
     trace_sha256       sha256 of the rollout's DA-38 `steps.jsonl`; a rollout without one
                        is refused, since a Score must name what it scored
 
+Limit of the stamp: `config_sha256` and `scorer_version` describe the files at EXPORT
+time, not at eval time. The eval batch records no stamp of either: `runs.jsonl` holds
+chunk, seeds, start time, wall time and exit code; each outcome row holds the scorer's
+step flags but no config hash or code version; `rollout_result.json` (DA-38) names only
+the trace writer (`adapter_info`). So a batch evaluated before `configs/sim/tray.yaml`
+or the SIMPLE tray predicates changed, and exported after, carries the new stamp. Export
+a batch with the config and code it was evaluated with. To lift the limit, the eval
+side would have to record, per attempt (in `runs.jsonl`) or per outcome row, the sha256
+of the tray config the env loaded and a version of the predicates (the git SHA of
+`flywheel_simple.tray.predicates`, or its file sha256); this command would then copy
+those values instead of hashing the files it finds now.
+
     python -m flywheel_psi0.tray.export_scores --set <eval set> --out <eval_batch dir> \
         --run C_70 --scores <file> [--max-chunks 6] [--chunk 10]
 

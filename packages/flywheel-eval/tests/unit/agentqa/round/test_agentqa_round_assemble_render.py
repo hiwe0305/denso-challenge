@@ -201,11 +201,11 @@ def test_the_model_path_is_refused_before_anything_happens(
 def test_the_agent_hash_follows_the_rule_files(tmp_path: Path) -> None:
     root = tmp_path / "cfg"
     shutil.copytree(CONFIG_ROOT, root)
-    first = agent_hash("tray", root)
-    assert first == agent_hash("tray", root) and first != agent_hash("two_table", root)
+    first = agent_hash("tray", root=root)
+    assert first == agent_hash("tray", root=root) and first != agent_hash("two_table", root=root)
     rules = root / "rules" / "scorer.yaml"
     rules.write_text(rules.read_text() + "\n# touched\n")
-    assert agent_hash("tray", root) != first
+    assert agent_hash("tray", root=root) != first
     assert agent_version() == "3"
 
 
