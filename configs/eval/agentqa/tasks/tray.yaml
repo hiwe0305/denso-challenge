@@ -81,3 +81,36 @@ relaxed:
   label: L-PLACE-POSE
   position_m: [0.05, 0.075, 0.10, 0.15, 0.20]
   yaw_deg: 10.0
+
+# How `coverage_distance` reads `Condition.vector` (spec 6.8 step 8): d is the mean distance
+# to the k nearest TRAIN conditions of the same level, tau_cov the percentile of the same
+# quantity over the train conditions, leave-one-out. k and the percentile are the round
+# plan's (`knn_k: 5`, "p95 leave-one-out kNN distance", configs/runplans/tray/round-c70.yaml).
+# The scales are the adapter's randomisation widths (flywheel_simple.tray.randomize:
+# POSE_JITTER 0.05 m, YAW_JITTER 10 deg, half of GAP_RANGE, SPAWN_JITTER, half of
+# PART_MASS_RANGE, half of LIGHT_RANGE), the units its own `distance` counts in.
+# Each component is read BY NAME from `Condition.values`, so the order of `vector` does not
+# matter. ASSUMPTION (giả định): the component NAMES below, the scales, and the components
+# each level varies. No code in flywheel_simple or flywheel_psi0 builds the contract
+# `Condition` for the tray (the adapter has its own `Condition` class in
+# tray/targets.py and tray/pico/conditions.py), so no file fixes the key names in `values`;
+# check them against the conditions entries of a real pack. A missing name makes the level
+# not judged, with the name in the reason.
+coverage:
+  k: 5
+  percentile: 95
+  components:
+    - {name: tray_x, scale: 0.05}
+    - {name: tray_y, scale: 0.05}
+    - {name: tray_yaw, scale: 0.17453292519943295, periodic: true}   # 10 deg in rad
+    - {name: target_x, scale: 0.05}
+    - {name: target_y, scale: 0.05}
+    - {name: target_yaw, scale: 0.17453292519943295, periodic: true}
+    - {name: table_gap, scale: 0.2}      # m, half of 1.6-2.0
+    - {name: spawn_x, scale: 0.10}       # m
+    - {name: part_mass, scale: 0.025}    # kg, half of 0.03-0.08
+    - {name: light_scale, scale: 0.2}    # half of 0.8-1.2
+  level_components:
+    1: [tray_x, tray_y, tray_yaw, target_x, target_y, target_yaw]
+    2: [tray_x, tray_y, tray_yaw, target_x, target_y, target_yaw, table_gap, spawn_x,
+        part_mass, light_scale]

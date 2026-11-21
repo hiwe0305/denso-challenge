@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -21,7 +22,16 @@ PARAMS: dict[str, dict[str, Any]] = {
     "trace_stats": {"runs": "all"},
     "train_window": {"jobs": "all", "window": "last"},
     "lineage": {},
+    "coverage_distance": {"runs": "all"},
+    "cost_lookup": {"checks": "all", "interventions": "all"},
+    "history_lookup": {"interventions": "all"},
 }
+
+
+@pytest.fixture(autouse=True)
+def empty_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The cost and history tools read the site store; none may be the real one."""
+    monkeypatch.setenv("FW_ROOT", str(tmp_path / "fwroot"))
 
 
 @pytest.fixture
@@ -115,3 +125,25 @@ def test_trace_stats_refuses_a_run_that_is_not_in_the_pack(ctx: MeasureContext) 
     assert any("not in the pack" in p for p in problems)
     assert any("unknown parameter" in p
                for p in check_params(REGISTRY["lineage"], {"depth": 3}, ctx))
+
+
+@pytest.mark.parametrize(("name", "params", "text"), [
+    ("cost_lookup", {"checks": ["rm -rf"], "interventions": "all"}, "'rm -rf' is not one of"),
+    ("cost_lookup", {"checks": "all", "interventions": ["sim_s9"]}, "'sim_s9' is not one of"),
+    ("cost_lookup", {"checks": "some", "interventions": "all"}, "list of checks"),
+    ("cost_lookup", {"interventions": "all"}, "'checks' is missing"),
+    ("history_lookup", {"interventions": 3}, "list of interventions"),
+    ("history_lookup", {"interventions": ["report_only", "free text"]}, "'free text' is not"),
+    ("coverage_distance", {"runs": ["NOPE"]}, "not in the pack"),
+])
+def test_cost_history_and_coverage_refuse_what_is_outside_their_domains(
+        name: str, params: dict[str, Any], text: str, ctx: MeasureContext) -> None:
+    problems = check_params(REGISTRY[name], params, ctx)
+    assert problems and any(text in p for p in problems), problems
+
+
+def test_cost_and_history_take_the_closed_domains(ctx: MeasureContext) -> None:
+    for name, params in (("cost_lookup", {"checks": ["cpu_analysis_x"], "interventions": "all"}),):
+        assert check_params(REGISTRY[name], params, ctx)  # a cost key is not a check id
+    good = {"checks": ["log_missing_signals"], "interventions": ["sim_s1", "report_only"]}
+    assert check_params(REGISTRY["cost_lookup"], good, ctx) == []

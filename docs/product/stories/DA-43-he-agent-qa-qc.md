@@ -46,11 +46,11 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
   - [x] 2.2 `step_pass_table`, `failure_clusters`, `paired_compare` và test đối chiếu số
   - [x] 2.3 `latch_consistency`, `signal_presence`
   - [ ] 2.4 `relaxed_sweep` (chờ K1; trước đó chạy trên file mẫu)
-- [ ] 3. Lớp công cụ, phần trace, train, dữ liệu (1,5 ngày)
+- [x] 3. Lớp công cụ, phần trace, train, dữ liệu (1,5 ngày)
   - [x] 3.1 `trace_stats` gồm phép đo trên lượt thành công (thời điểm quay đầu không tính được: `TraceStep` không có vị trí trong thế giới)
   - [x] 3.2 `train_window`, `lineage`
-  - [ ] 3.3 `coverage_distance` và test đối chiếu với tray.md 20.12
-  - [ ] 3.4 `cost_lookup`, `history_lookup`
+  - [x] 3.3 `coverage_distance` (đọc theo tên trong `Condition.values`); test đối chiếu với tray.md 20.12 còn nợ: repo không có vector điều kiện train
+  - [x] 3.4 `cost_lookup`, `history_lookup` (bảng giá trong `costs.yaml` để trống, chờ Hiếu điền)
 - [ ] 4. Khung đường ống, sàn code (2 ngày; kiến trúc 20/11 mục 5–7, 15)
   - [x] 4.1 B0 và B1: `round.yaml`, `pack.json`, nhận, lớp dữ liệu của gói; gói giả log robot thật
   - [x] 4.2 B2 thành một bước: đăng ký công cụ (`ToolSpec`), kế hoạch công cụ, thư mục lần chạy, `run.json`, `--from`

@@ -35,6 +35,29 @@ class RelaxedSpec(_Frozen):
     yaw_deg: float
 
 
+class Component(_Frozen):
+    name: str
+    scale: float = Field(gt=0)  # the unit the distance counts this component in
+    periodic: bool = False  # an angle: the difference is the shorter way round
+
+
+class CoverageSpec(_Frozen):
+    """How `coverage_distance` reads `Condition.vector` (spec 6.8)."""
+
+    k: int = Field(gt=0)
+    percentile: float = Field(gt=0, le=100)
+    components: list[Component] = Field(min_length=1)  # in the order of the vector
+    level_components: dict[int, list[str]]  # the physical components each level varies
+
+    @model_validator(mode="after")
+    def names_known(self) -> Self:
+        known = {c.name for c in self.components}
+        unknown = sorted({n for names in self.level_components.values() for n in names} - known)
+        if unknown:
+            raise ValueError(f"level_components name {unknown}, not components")
+        return self
+
+
 class TaskView(_Frozen):
     task_id: str
     scorer_config: str
@@ -45,6 +68,7 @@ class TaskView(_Frozen):
     latch_signals: dict[str, list[str]] = Field(default_factory=dict)
     provides: dict[str, list[str]] = Field(default_factory=dict)
     relaxed: RelaxedSpec | None = None
+    coverage: CoverageSpec | None = None
     thresholds: dict[str, Any] = Field(default_factory=dict)  # filled from scorer_config
     source_ref: str = ""
 

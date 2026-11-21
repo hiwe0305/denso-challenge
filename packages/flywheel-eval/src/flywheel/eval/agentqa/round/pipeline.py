@@ -75,6 +75,7 @@ class _Work:
     out: Path
     plan_path: Path | None
     no_model: bool = True
+    store: Path | None = None
     run: RunRecord | None = None
     pack: Pack | None = None
     admitted: Admitted | None = None
@@ -124,7 +125,7 @@ def _step_admit(w: _Work) -> int:
 
 def _step_measure(w: _Work) -> int:
     assert w.pack is not None and w.admitted is not None
-    result = measure(w.pack, w.admitted, w.plan(), w.out)
+    result = measure(w.pack, w.admitted, w.plan(), w.out, w.store)
     w.degraded += [f"{c.call_id} {c.tool} skipped: {c.reason}" for c in result.calls
                    if c.status == "skipped"]
     return len(result.facts)
@@ -211,7 +212,7 @@ def run_round(pack_path: Path, out: Path, *, plan_path: Path | None = None,
         raise RunRefused(NO_MODEL_ONLY)
     if from_step is not None and from_step not in STEPS:
         raise RunRefused(f"unknown step {from_step!r} (steps: {', '.join(STEPS)})")
-    work = _Work(pack_path, out, plan_path, no_model=no_model)
+    work = _Work(pack_path, out, plan_path, no_model=no_model, store=store)
     if from_step is None:
         if out.exists():
             raise FileExistsError(f"{out} exists: a run directory is written once")

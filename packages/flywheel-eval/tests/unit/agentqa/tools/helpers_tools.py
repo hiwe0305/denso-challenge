@@ -9,7 +9,7 @@ from collections.abc import Sequence
 from typing import Literal
 
 from flywheel.contracts.artifacts import DatasetReport, Episode
-from flywheel.contracts.entities import Score
+from flywheel.contracts.entities import Condition, LedgerEntry, Score
 from flywheel.contracts.trace import LOWER_BODY, UPPER_BODY, FloatOrNonFinite, TraceStep
 from flywheel.contracts.training import TrainingMetric
 from flywheel.eval.agentqa.tools.base import JobMetrics, RunScores, RunTrace
@@ -85,3 +85,16 @@ def episode(episode_id: str, checkpoint: str | None) -> Episode:
 
 def report(dataset_id: str) -> DatasetReport:
     return DatasetReport(dataset_id=dataset_id, episode_count=1)
+
+
+def condition(level: int, seed: int, values: dict[str, object]) -> Condition:
+    """A condition whose components are read by name from `values` (`vector` stays empty)."""
+    return Condition(condition_seed=seed, level=level, values=values, layout_hash="h")
+
+
+def ledger_row(kind: str, activity: str, resource: str, unit: str, quantity: float,
+               usd: float, estimate: str | None = None, job: str = "job-1") -> LedgerEntry:
+    return LedgerEntry.model_validate({
+        "activity": activity, "resource_type": resource, "quantity": quantity, "unit": unit,
+        "usd_amount": usd, "measure_kind": kind, "estimate_entry_id": estimate,
+        "run_plan_id": "g0-DA-43-20261121", "job_id": job})

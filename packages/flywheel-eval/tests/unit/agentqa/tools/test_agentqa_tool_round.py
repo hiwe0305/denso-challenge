@@ -11,11 +11,15 @@ from pathlib import Path
 
 import pytest
 import yaml
+from flywheel.contracts.entities import FixRateEvent, Score
 from flywheel.eval.agentqa.round.admit import admit
 from flywheel.eval.agentqa.round.measure import PlanRefused, measure
 from flywheel.eval.agentqa.round.pack import build_pack, read_pack, write_pack
 from flywheel.eval.agentqa.round.records import FactRecord, ToolCallRecord
-from helpers_tools import episode, metric, report, rollout, score
+from flywheel.store.ledger_append import append_ledger_entry
+from flywheel.store.paths import StorePaths
+from flywheel.store.tables import write_record
+from helpers_tools import SHA, condition, episode, ledger_row, metric, report, rollout, score
 
 PLAN = {"task_id": "tray", "calls": [
     {"tool": "trace_stats", "params": {"runs": "all"}},
@@ -111,3 +115,59 @@ def test_a_window_step_that_is_not_logged_refuses_the_plan(tmp_path: Path) -> No
     bad = plan(tmp_path, [{"tool": "train_window", "params": {"jobs": "all", "window": 15}}])
     with pytest.raises(PlanRefused, match="not a logged step of job J"):
         run(make(tmp_path / "pack"), bad, tmp_path / "out")
+
+
+def make_coverage(root: Path) -> Path:
+    root.mkdir()
+    fails = [Score(episode_id=f"R/{n}", task_id="tray", config_sha256=SHA, trace_sha256=SHA,
+                   success=False, failure_kind="L-A", first_failed_step=1, level=1)
+             for n in ("l1-s20", "l1-s21")]
+    (root / "scores.jsonl").write_text(lines(fails))
+    def at(x: float) -> dict[str, object]:
+        names = ["tray_x", "tray_y", "tray_yaw", "target_x", "target_y", "target_yaw"]
+        return {n: (x if n == "tray_x" else 0.0) for n in names}
+
+    train = [condition(1, s, at(float(s))) for s in range(7)]
+    eval_ = [condition(1, 20, at(3.0)), condition(1, 21, at(30.0))]
+    (root / "train.jsonl").write_text(lines(train))
+    (root / "eval.jsonl").write_text(lines(eval_))
+    entries = [
+        {"path": "scores.jsonl", "kind": "scores", "subject": {"run": "R"}},
+        {"path": "train.jsonl", "kind": "conditions", "subject": {"role": "train"}},
+        {"path": "eval.jsonl", "kind": "conditions", "subject": {"role": "eval"}}]
+    decl = root / "round.yaml"
+    decl.write_text(yaml.safe_dump({"task_id": "tray", "declared_by": "test",
+                                    "data_class": "public", "entries": entries}))
+    return write_pack(build_pack(decl), root)
+
+
+def test_coverage_cost_and_history_land_in_the_run_directory(tmp_path: Path) -> None:
+    store = tmp_path / "store"
+    paths = StorePaths(store)
+    estimate = ledger_row("estimated", "eval", "gpu_seconds", "s", 600.0, 0.24)
+    append_ledger_entry(estimate, paths)
+    append_ledger_entry(ledger_row("measured", "eval", "gpu_seconds", "s", 450.0, 0.18,
+                                   estimate=estimate.id), paths)
+    write_record("fix_rate_event", FixRateEvent(intervention_type="sim_s1", n_conditions=10,
+                                                fixed=4), paths)
+    calls: list[dict[str, object]] = [{"tool": "coverage_distance", "params": {"runs": "all"}},
+             {"tool": "cost_lookup", "params": {"checks": "all", "interventions": ["sim_s1"]}},
+             {"tool": "history_lookup", "params": {"interventions": ["sim_s1", "sim_s2"]}}]
+    pack, out = make_coverage(tmp_path / "pack"), tmp_path / "out"
+    measure(read_pack(pack), admit(pack), plan(tmp_path, calls), out, store)
+    facts = {f.name: f for f in map(FactRecord.model_validate_json,
+                                    (out / "facts.jsonl").read_text().splitlines())}
+    cluster = "R_cluster_grasp_L-A_l1_coverage"
+    assert facts["tau_cov_l1"].tool_call_id == "T1" and facts["tau_cov_l1"].unit == "jitter"
+    assert facts[f"{cluster}_matched"].value == 2 and facts[f"{cluster}_in_domain"].value is False
+    assert facts["cost_log_missing_signals_measured_quantity_median"].value == 450.0
+    assert facts["cost_log_missing_signals_measured_quantity_median"].tool_call_id == "T2"
+    assert facts["cost_sim_s1_measured_rows"].value == 0
+    assert facts["history_sim_s1_fix_rate"].value == pytest.approx(0.4)
+    assert "history_lookup_not_judged" in facts  # sim_s2 was never tried
+    assert sorted(p.name for p in (out / "tables").glob("*.json")) == [
+        "T1-coverage_distance.json", "T3-history_lookup.json"]
+    calls_back = [ToolCallRecord.model_validate_json(x)
+                  for x in (out / "tool_calls.jsonl").read_text().splitlines()]
+    assert [c.status for c in calls_back] == ["ran"] * 3
+    assert len(calls_back[0].input_sha256) == 3 and calls_back[1].input_sha256 == []

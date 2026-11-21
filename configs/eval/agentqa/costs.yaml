@@ -1,0 +1,35 @@
+# Prices and ledger keys for `cost_lookup` (DA-43 task 3.4, design 19/11 section 4).
+# Read by `flywheel.eval.agentqa.tools.cost`. Changing this file is a new version of the
+# agent: score it again (design 11).
+#
+# `pricebook` is a `PriceBookConfig`. There is no price book in the repo, and no price is
+# invented here: `rates` is empty until the Product Owner fills it. A key whose resource_type
+# has no rate is reported as "no price in the price book" (not judged); its ledger rows are
+# still reported.
+#
+# `kinds` says which ledger rows are "a job of the same kind" for each key: the cost key of
+# a check in checks.yaml and each `InterventionKind`. A row matches when its `activity` and
+# `resource_type` are these and its `unit` is the rate's. ASSUMPTION: `LedgerEntry` has no
+# field for an intervention kind, so the writer of an intervention's rows must use the
+# resource_type named here; no row exists yet, so the measured facts will say "not judged"
+# until one does. `cpu_analysis` uses activity `diagnosis`, not `agent_qa`, so the ledger
+# rows of the agent's own rounds are never counted as the cost of a check. The tiers sim_s1 to
+# sim_s4 (and teleop_correction with recovery_data) share rows until a ledger field tells
+# them apart, so their measured facts are equal.
+
+pricebook:
+  name: agentqa
+  version: "1.0.0"
+  rates: []   # the Product Owner fills it: {resource_type, unit, usd_per_unit, ...} per row
+
+kinds:
+  eval_rerun_cluster: {activity: eval, resource_type: gpu_seconds}
+  cpu_analysis: {activity: diagnosis, resource_type: cpu_seconds}
+  sim_s1: {activity: data_generation, resource_type: sim_episode}
+  sim_s2: {activity: data_generation, resource_type: sim_episode}
+  sim_s3: {activity: data_generation, resource_type: sim_episode}
+  sim_s4: {activity: data_generation, resource_type: sim_episode}
+  teleop_correction: {activity: teleop_session, resource_type: teleop_episode}
+  recovery_data: {activity: teleop_session, resource_type: teleop_episode}
+  repair_ticket: {activity: review, resource_type: review_hour}
+  report_only: {activity: review, resource_type: review_hour}

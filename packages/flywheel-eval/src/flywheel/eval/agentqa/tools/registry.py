@@ -15,11 +15,14 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from itertools import combinations
-from typing import Any
+from pathlib import Path
+from typing import Any, get_args
 
 from flywheel.contracts.artifacts import DatasetReport, Episode
+from flywheel.contracts.evidence import InterventionKind
 from flywheel.eval.agentqa.facts import FactBook
 from flywheel.eval.agentqa.tools.base import (
+    ConditionSet,
     EntryView,
     JobMetrics,
     RunScores,
@@ -29,6 +32,15 @@ from flywheel.eval.agentqa.tools.base import (
     not_judged,
 )
 from flywheel.eval.agentqa.tools.clusters import failure_clusters
+from flywheel.eval.agentqa.tools.cost import (
+    check_costs,
+    cost_lookup,
+    load_costs,
+    no_costs,
+    read_ledger,
+)
+from flywheel.eval.agentqa.tools.coverage import coverage_distance
+from flywheel.eval.agentqa.tools.history import history_lookup, read_events
 from flywheel.eval.agentqa.tools.latch import latch_consistency
 from flywheel.eval.agentqa.tools.lineage import lineage
 from flywheel.eval.agentqa.tools.paired import paired_compare
@@ -39,6 +51,7 @@ from flywheel.eval.agentqa.tools.trace import no_tolerance, trace_stats
 from flywheel.eval.agentqa.tools.train import logged_steps, train_window
 from flywheel.eval.api import DEFAULT_SYSTEM_CONFIG
 from flywheel.eval.config import ConfigError, load_system_thresholds
+from flywheel.store.paths import StorePaths
 
 
 @dataclass(frozen=True)
@@ -52,6 +65,8 @@ class MeasureContext:
     episodes: tuple[Episode, ...] = ()
     reports: Mapping[str, DatasetReport] = field(default_factory=dict)  # entry ref -> report
     entries: tuple[EntryView, ...] = ()  # every accepted entry as the pack declares it
+    conditions: tuple[ConditionSet, ...] = ()  # `conditions` entries with their declared role
+    store: Path | None = None  # root of the site store the cost and history tools read
 
 
 @dataclass(frozen=True)
@@ -168,6 +183,15 @@ def _check_one(domain: str, name: str, value: object, params: Mapping[str, Any],
                  if isinstance(chosen, list) else [])
         return [f"{name}: step {value} is not a logged step of job {j}"
                 for j in names if value not in logged_steps(ctx.jobs[j])]
+    if domain in ("checks", "interventions"):
+        valid = list(check_costs()) if domain == "checks" else list(get_args(InterventionKind))
+        if value == "all":
+            return []
+        if not _names(value):
+            return [f"{name}: 'all' or a list of {domain}, got {value!r}"]
+        assert isinstance(value, list)
+        return [f"{name}: {v!r} is not one of {', '.join(valid)}" for v in value
+                if v not in valid]
     if domain == "step":
         if isinstance(value, str) and value in ctx.task.steps:
             return []
@@ -251,6 +275,33 @@ def _lineage(book: FactBook, ctx: MeasureContext, params: Mapping[str, Any]) -> 
                    ctx.reports)
 
 
+def _coverage_distance(book: FactBook, ctx: MeasureContext,
+                       params: Mapping[str, Any]) -> ToolResult:
+    return coverage_distance(book, ctx.task, _runs(params, ctx), ctx.conditions)
+
+
+def _chosen(value: Any, known: list[str]) -> list[str]:
+    return known if value == "all" else list(value)
+
+
+def _cost_lookup(book: FactBook, ctx: MeasureContext, params: Mapping[str, Any]) -> ToolResult:
+    try:
+        costs, checks = load_costs(), check_costs()
+    except (OSError, ValueError, KeyError) as error:
+        return no_costs(book, f"costs.yaml or checks.yaml cannot be read: {str(error)[:150]}")
+    ledger, bad = read_ledger(StorePaths(ctx.store))
+    return cost_lookup(book, costs, checks, _chosen(params["checks"], list(checks)),
+                       _chosen(params["interventions"], list(get_args(InterventionKind))),
+                       ledger, bad, "configs/eval/agentqa/costs.yaml")
+
+
+def _history_lookup(book: FactBook, ctx: MeasureContext,
+                    params: Mapping[str, Any]) -> ToolResult:
+    events, bad = read_events(StorePaths(ctx.store))
+    return history_lookup(book, _chosen(params["interventions"],
+                                        list(get_args(InterventionKind))), events, bad)
+
+
 def pairs_of(params: Mapping[str, Any], ctx: MeasureContext) -> list[tuple[str, str]]:
     value = params["pairs"]
     if value == "all":
@@ -282,4 +333,9 @@ REGISTRY: dict[str, ToolSpec] = {spec.name: spec for spec in (
     ToolSpec("train_window", 1, ("metrics",), {"jobs": "jobs", "window": "window"},
              _train_window),
     ToolSpec("lineage", 1, ("scores",), {}, _lineage, reads_all=True),
+    ToolSpec("coverage_distance", 1, ("scores", "conditions"), {"runs": "runs"},
+             _coverage_distance),
+    ToolSpec("cost_lookup", 1, (), {"checks": "checks", "interventions": "interventions"},
+             _cost_lookup),
+    ToolSpec("history_lookup", 1, (), {"interventions": "interventions"}, _history_lookup),
 )}

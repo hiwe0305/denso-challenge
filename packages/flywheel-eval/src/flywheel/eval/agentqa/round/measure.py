@@ -21,7 +21,7 @@ from typing import Any
 
 import yaml
 from flywheel.contracts.artifacts import DatasetReport, Episode
-from flywheel.contracts.entities import Score
+from flywheel.contracts.entities import Condition, Score
 from flywheel.contracts.trace import TraceStep
 from flywheel.contracts.training import TrainingMetric
 from flywheel.eval.agentqa.facts import FactBook
@@ -34,6 +34,7 @@ from flywheel.eval.agentqa.round.records import (
     ToolCallRecord,
 )
 from flywheel.eval.agentqa.tools.base import (
+    ConditionSet,
     EntryView,
     JobMetrics,
     RunScores,
@@ -110,12 +111,14 @@ def _declared_run(entry: PackEntry, seen: dict[str, str]) -> str:
     return name
 
 
-def _context(pack: Pack, admitted: Admitted) -> tuple[MeasureContext, list[PackEntry]]:
+def _context(pack: Pack, admitted: Admitted,
+             store: Path | None = None) -> tuple[MeasureContext, list[PackEntry]]:
     entries = [e for e in pack.entries if e.ref in admitted.records]
     runs: dict[str, RunScores] = {}
     traces: dict[str, RunTrace] = {}
     jobs: dict[str, JobMetrics] = {}
     episodes: list[Episode] = []
+    conditions: list[ConditionSet] = []
     reports: dict[str, DatasetReport] = {}
     seen: dict[str, dict[str, str]] = {"scores": {}, "trace": {}, "metrics": {}}
     for entry in entries:
@@ -138,6 +141,9 @@ def _context(pack: Pack, admitted: Admitted) -> tuple[MeasureContext, list[PackE
                     raise PlanRefused(f"{entry.ref}: job {job!r} is already logged by "
                                       f"{jobs[job].ref}")
                 jobs[job] = JobMetrics(job, entry.ref, tuple(rows))
+        elif entry.kind == "conditions":
+            found = tuple(r for r in records if isinstance(r, Condition))
+            conditions.append(ConditionSet(entry.ref, entry.subject.get("role", ""), found))
         elif entry.kind == "episodes":
             episodes += [r for r in records if isinstance(r, Episode)]
         elif entry.kind == "dataset_report":
@@ -145,7 +151,7 @@ def _context(pack: Pack, admitted: Admitted) -> tuple[MeasureContext, list[PackE
     task = load_task(pack.task_id)
     views = tuple(EntryView(e.ref, e.kind, e.subject) for e in entries)
     ctx = MeasureContext(task, runs, frozenset(e.kind for e in entries), traces, jobs,
-                         tuple(episodes), reports, views)
+                         tuple(episodes), reports, views, tuple(conditions), store)
     return ctx, entries
 
 
@@ -180,12 +186,13 @@ def _jsonl(lines: Sequence[Record]) -> str:
     return "".join(r.model_dump_json() + "\n" for r in lines)
 
 
-def measure(pack: Pack, admitted: Admitted, plan_path: Path, out: Path) -> MeasureResult:
+def measure(pack: Pack, admitted: Admitted, plan_path: Path, out: Path,
+            store: Path | None = None) -> MeasureResult:
     plan = read_plan(plan_path)
     if plan.task_id != pack.task_id:
         raise PlanRefused(f"{plan_path}: the plan is for {plan.task_id!r}, the pack for "
                           f"{pack.task_id!r}")
-    ctx, entries = _context(pack, admitted)
+    ctx, entries = _context(pack, admitted, store)
     problems = check_plan(plan, ctx)
     if problems:
         raise PlanRefused("; ".join(problems))
