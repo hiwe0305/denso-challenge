@@ -58,9 +58,13 @@ raise_at: 0.50
 # Ready pose: wide enough that the thumbs clear the tray handles (outer ends at +-0.265 m).
 # Swept over 48 episodes with the halfway wrists below (y, z): 0.30, 0.26 -> 34;
 # 0.32, 0.26 -> 39; 0.34, 0.26 -> 37; 0.30, 0.24 -> 28 (D-20's 0.15, 0.30, 0.30 had the
-# wrists at the grasp orientation).
+# wrists at the grasp orientation). DA-41: 0.35. At 0.32, standing 3 cm off the tray's
+# centreline (level 2 seed 102), the left fingers caught the handle while walking on and
+# pushed the tray 2.5 cm out of reach (REACH timed out). Shifting the hands by the
+# measured offset instead followed the gait sway or lagged the sidestep and spoiled the
+# grasp (level 1 seed 15, level 2 seed 107: one palm closed 2 cm off its grasp point).
 ready_x: 0.15
-ready_y: 0.32
+ready_y: 0.35
 ready_z: 0.26
 ready_clear: 0.08
 # Ready wrists halfway from the standing pose (10, 10, 0 deg measured) to the grasp; REACH
@@ -136,6 +140,11 @@ arrive_hold: 0.5
 # opening hands push the placed tray 2-3 cm, so it needs the margin: 0.04 / 0.03 / 0.02 ->
 # 40 / 42 / 48 of 48.
 arrive_lat_tol: 0.02
+# DA-41: ARRIVE_B judges the base low-passed over this (s): standing with the tray the
+# pelvis rocks +-2 cm at ~0.6 Hz, as much as arrive_lat_tol (level 1 seed 20 hunted).
+arrive_filter_tau: 1.0
+# DA-41: ARRIVE_B steps on the heading that turns the tray onto the target yaw, planned
+# with the goal when it starts (the tray turns 2-5 deg in the hands while walking).
 
 # LOWER, RELEASE, RETREAT.
 lower_speed: 0.05
@@ -146,6 +155,9 @@ place_shift_max: 0.05
 # The shift keeps tracking the tray's error while it is in the air (gain per step): the
 # loaded arms pull the tray back as they bend down.
 place_gain: 0.1
+# DA-41: the hands also turn the tray onto the target yaw while lowering, by the yaw error
+# (same gain), at most this (deg) about the vertical through the palms' midpoint.
+place_yaw_max_deg: 8.0
 place_height_tol: 0.005
 place_tilt_deg: 3.0
 lower_hold: 0.2
@@ -158,6 +170,8 @@ release_hold: 0.5
 # RELEASE moves the hands this far up (m) as they open and move out; negative drops the
 # fingers out from under the handle lip. Palm-up hold over 22 episodes: 0 / -0.02 / -0.035
 # -> 14 / 14 / 15 (the wrists under the lip touch table B and tilt the placed tray).
+# DA-41: -0.02 fixed the thumbs prying the tray up on level 1 seed 10 but caused it on
+# two other episodes of 31 (0 with 0.0); kept at 0 (docs/g0/tray/jig.md 4.8).
 release_dz: 0.0
 # ...and this far back toward the robot (m) as they move out (D-25: the palm-up hold's
 # wrists caught under the near end of the handle); 0 for the pinch.

@@ -11,7 +11,13 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
-from flywheel_simple.replay.run import hold_agent_class, recorder_class
+from flywheel_simple.replay.run import (
+    SceneMismatch,
+    hold_agent_class,
+    recorder_class,
+    tray_env_for,
+)
+from flywheel_simple.tray import replay_qa
 
 UID = "g1_wholebody_locomotion_pick_between_tables_teleop"
 NAMES = [f"j{i}" for i in range(32)]
@@ -122,13 +128,15 @@ def dataset(root: Path, uid: str = UID) -> Path:
 
 def replay(
     tmp_path: Path, trace: Path | None, *, uid: str = UID, success_at: int | None = 4,
-    hold_steps: int = 0, steps: int = STEPS,
+    hold_steps: int = 0, steps: int = STEPS, strict_uid: bool = False,
 ) -> tuple[dict[str, Any], FakeSim]:
     """What SIMPLE's CLI does with the env: the uid override, reset, `steps` steps, close."""
     data = dataset(tmp_path / "data", uid)
     out = tmp_path / "outcomes.jsonl"
     sim = FakeSim(success_at)
-    env = recorder_class(Wrapper)(sim, data, out, NAMES, trace=trace, hold_steps=hold_steps)
+    env = recorder_class(Wrapper)(
+        sim, data, out, NAMES, trace=trace, hold_steps=hold_steps, strict_uid=strict_uid
+    )
     conf = env_conf(uid)
     conf["uid"] = UID  # the CLI overrides a mismatched uid before reset
     env.reset(options={"state_dict": conf, "task_id": "episode_0", "dr_level": None})
@@ -218,3 +226,47 @@ def test_hold_steps_repeats_the_last_action_then_reads_success(tmp_path: Path) -
     assert line["hold_steps"] == 5 and line["success_at_step"] == STEPS + 2  # 0-based, as the trace
     line, _ = replay(tmp_path / "never", None, success_at=None, hold_steps=5, steps=STEPS + 5)
     assert line["success"] is False and line["success_at_step"] is None
+
+
+# DA-41 (20/11/2026): episodes replay in the scene they were recorded in.
+
+OLD_TRAY_UID = "g1_wholebody_tray_transfer_teleop"
+
+
+def test_strict_replay_of_a_matching_uid_is_unchanged(tmp_path: Path) -> None:
+    strict, _ = replay(tmp_path / "a", None, strict_uid=True)
+    loose, _ = replay(tmp_path / "b", None)
+    assert strict == loose
+
+
+def test_strict_replay_stops_before_replaying_in_another_scene(tmp_path: Path) -> None:
+    # SIMPLE's CLI would override the uid and replay in its own scene (D7/D8 on every
+    # jig episode); a SystemExit gets through its `except Exception`.
+    with pytest.raises(SceneMismatch, match="would replay in another scene") as err:
+        replay(tmp_path, None, uid=replay_qa.JIG_TASK_UID, strict_uid=True)
+    assert isinstance(err.value, SystemExit)
+    assert not (tmp_path / "outcomes.jsonl").exists()
+
+
+def test_old_tray_scene_registers_as_before() -> None:
+    module = tray_env_for({OLD_TRAY_UID}, replay_qa.ENV_ID)
+    assert module == "flywheel_simple.tray.run"
+
+
+def test_jig_scene_registers_the_jig_env() -> None:
+    module = tray_env_for({replay_qa.JIG_TASK_UID}, replay_qa.JIG_ENV_ID)
+    assert module == "flywheel_simple.tray.jig_run"
+
+
+def test_jig_episodes_with_the_old_env_id_are_refused() -> None:
+    with pytest.raises(SceneMismatch, match="TrayTransferJigTeleop-v0', not --env-id"):
+        tray_env_for({replay_qa.JIG_TASK_UID}, replay_qa.ENV_ID)
+
+
+def test_mixed_tray_uids_are_refused() -> None:
+    with pytest.raises(SceneMismatch, match="mix task uids"):
+        tray_env_for({OLD_TRAY_UID, replay_qa.JIG_TASK_UID}, replay_qa.ENV_ID)
+
+
+def test_other_datasets_register_nothing() -> None:
+    assert tray_env_for({UID}, f"simple/{UID}") is None

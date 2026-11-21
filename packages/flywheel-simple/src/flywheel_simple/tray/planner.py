@@ -58,7 +58,7 @@ from flywheel_simple.tray.randomize import EpisodeSample
 PLANNER_CONFIG_RELPATH = Path("configs/sim/tray_planner.yaml")
 # Bump when the phase logic changes; config values are hashed into the recorded
 # planner_version separately (recorder.planner_version).
-PLANNER_VERSION = "da33-planner-5"
+PLANNER_VERSION = "da41-planner-8"  # 6 is the unmerged D-29 trial
 MIRROR = np.diag([1.0, -1.0, 1.0])  # left <-> right across the xz plane
 # Measured-palm correction per phase: axes it acts on. GRASP and LIFT correct height
 # only: across the handles the squeezing hands are blocked on purpose.
@@ -144,9 +144,11 @@ class PlannerConfig:
     arrive_speed: float
     arrive_hold: float
     arrive_lat_tol: float
+    arrive_filter_tau: float
     lower_speed: float
     place_shift_max: float
     place_gain: float
+    place_yaw_max_deg: float
     place_height_tol: float
     place_tilt_deg: float
     lower_hold: float
@@ -386,7 +388,12 @@ class TrayPlanner:
     _on_b_since: float | None = None  # LOWER: tray resting on table B since
     _level_angle: float = 0.0  # hands' turn against the tray's pitch (rad)
     _arrive_goal: NDArray[np.float64] | None = None  # ARRIVE_B base goal, world xy
+    _arrive_heading: float | None = None  # ARRIVE_B base heading (DA-41)
+    _arrive_mean: NDArray[np.float64] | None = None  # ARRIVE_B low-passed base xy (DA-41)
+    _arrive_axes: tuple[float, float] | None = None  # ARRIVE_B step under way: signs ahead, side
+    _arrive_rest_t: float | None = None  # ARRIVE_B: end of the last step
     _place_shift: NDArray[np.float64] | None = None  # hands' shift while lowering, base frame
+    _place_yaw: float | None = None  # hands' turn while lowering, rad (DA-41)
     _carry: _Carry | None = None
     _lowered: tuple[NDArray[np.float64], NDArray[np.float64]] | None = None
     _prev: tuple[float, Pose2D] | None = None
@@ -597,30 +604,75 @@ class TrayPlanner:
             # goal comes from the tray's error when ARRIVE_B starts, not from LIFT: the
             # tray shifts in the hands on the way (5.7 cm short on seed 22). Stepping
             # on the live tray error chased its sway and timed out.
+            # DA-41: the heading is re-planned here too, from the tray's yaw error, which
+            # carry.heading (planned at LIFT) misses: the tray turns 2-5 deg in the hands
+            # on the way. Steps only for the xy error: stepping until the heading was
+            # within 1-2 deg hunted (+-1 deg of step noise) and shook a hand off the
+            # handle (level 1 seed 12). LOWER turns the hands for the rest.
             if self._arrive_goal is None:
-                target = self.sample.target_pose
-                error = np.array([target.x, target.y]) - state.tray_pos[:2]
-                self._arrive_goal = np.array([base.x, base.y]) + error
-            d = self._arrive_goal - np.array([base.x, base.y])
+                self._arrive_goal, self._arrive_heading = self._arrive_plan(state, base)
+            heading = self._arrive_heading
+            assert heading is not None
+            # DA-41: standing with the tray the pelvis rocks +-2 cm (~0.6 Hz), as much as
+            # arrive_lat_tol and faster than arrive_speed: judged on the raw base, every
+            # swing started a step and the base never counted as still (level 1 seed 20
+            # timed out). A step is decided on the low-passed base: it picks the axes off by
+            # more than the tolerance and their directions, then runs on the raw base, each
+            # axis stopping for good at half the tolerance or past the goal. Running on the
+            # raw base alone, the sway flipped the side step for 1.3 s and shook a hand off
+            # the handle (level 1 seed 18, noise draw 1). The next decision waits 2 filter
+            # time constants, until the filter has caught up with the step.
+            xy = np.array([base.x, base.y])
+            speed = 0.0
+            if self._arrive_mean is None or self._prev is None:
+                self._arrive_mean = xy
+            else:
+                dt = max(0.0, state.t - self._prev[0])
+                mean = self._arrive_mean + min(1.0, dt / cfg.arrive_filter_tau) * (
+                    xy - self._arrive_mean
+                )
+                speed = float(np.linalg.norm(mean - self._arrive_mean)) / dt if dt else 0.0
+                self._arrive_mean = mean
             c, s = math.cos(base.yaw), math.sin(base.yaw)
-            along, lateral = c * d[0] + s * d[1], -s * d[0] + c * d[1]
+
+            def ahead_and_side(at: NDArray[np.float64]) -> tuple[float, float]:
+                assert self._arrive_goal is not None
+                d = self._arrive_goal - at
+                return c * d[0] + s * d[1], -s * d[0] + c * d[1]
+
+            def step(axes: tuple[float, float]) -> PlannerCommand:
+                self._arrive_axes = axes
+                self._since = None
+                nav = (axes[0] * cfg.keep_vx, axes[1] * cfg.keep_vx, cfg.heading_hold)
+                return self._emit(state, base, carry.palms, nav, closure=True, heading=heading)
+
             assert self._entered_t is not None
             budget = state.t - self._entered_t < cfg.timeout_arrive_b - cfg.arrive_hold - 1.0
-            if budget and max(abs(along), abs(lateral)) > cfg.arrive_lat_tol:
-                self._since = None
-                vx = math.copysign(cfg.keep_vx, along) if abs(along) > cfg.arrive_lat_tol else 0.0
-                vy = (
-                    math.copysign(cfg.keep_vx, lateral)
-                    if abs(lateral) > cfg.arrive_lat_tol
-                    else 0.0
+            tol = cfg.arrive_lat_tol
+            if self._arrive_axes is not None:
+                errs = ahead_and_side(xy)
+                axes = (
+                    self._arrive_axes[0] if self._arrive_axes[0] * errs[0] > tol / 2 else 0.0,
+                    self._arrive_axes[1] if self._arrive_axes[1] * errs[1] > tol / 2 else 0.0,
                 )
-                nav = (vx, vy, cfg.heading_hold)
-                return self._emit(
-                    state, base, carry.palms, nav, closure=True, heading=carry.heading
+                if budget and any(axes):
+                    return step(axes)
+                self._arrive_axes = None
+                self._arrive_rest_t = state.t
+            settled = (
+                not budget  # out of time to step: stand and lower
+                or self._arrive_rest_t is None
+                or state.t - self._arrive_rest_t >= 2 * cfg.arrive_filter_tau
+            )
+            if settled and budget:
+                errs = ahead_and_side(self._arrive_mean)
+                axes = (
+                    math.copysign(1.0, errs[0]) if abs(errs[0]) > tol else 0.0,
+                    math.copysign(1.0, errs[1]) if abs(errs[1]) > tol else 0.0,
                 )
-            if self._held(
-                self._base_speed(state, base) < cfg.arrive_speed, state.t, cfg.arrive_hold
-            ):
+                if any(axes):
+                    return step(axes)
+            if self._held(settled and speed < cfg.arrive_speed, state.t, cfg.arrive_hold):
                 self._enter(Phase.LOWER, state, base)
                 return self._command(state, base)
             return self._emit(state, base, carry.palms, (0.0, 0.0, 0.0), closure=True)
@@ -634,9 +686,26 @@ class TrayPlanner:
                 self._place_shift = error
             elif state.tray_on_table == "none":
                 self._place_shift = self._capped(self._place_shift + cfg.place_gain * error)
+            # DA-41: the hands also turn the tray onto the target yaw, about the vertical
+            # through the palms' midpoint (the tray centre), closed loop like the shift.
+            # Standing still before LOWER the body drifts 1-3 deg, and opening hands
+            # twist the tray ~5 deg more: arriving 4-5 deg off failed the 10 deg tolerance
+            # (level 1 seeds 1, 2, 12), and past 2.3 deg a corner lands on a jig end wall.
+            turn = math.remainder(
+                self.sample.target_pose.yaw - tray_yaw_of(state.tray_quat), math.pi
+            )
+            cap = math.radians(cfg.place_yaw_max_deg)
+            if self._place_yaw is None:
+                self._place_yaw = float(np.clip(turn, -cap, cap))
+            elif state.tray_on_table == "none":
+                self._place_yaw = float(
+                    np.clip(self._place_yaw + cfg.place_gain * turn, -cap, cap)
+                )
             down = np.array([0.0, 0.0, cfg.lower_speed * (state.t - self._entered_t)])
             move = self._place_shift - down
-            palms = (carry.palms[0] + move, carry.palms[1] + move)
+            palms = self._turned(
+                (carry.palms[0] + move, carry.palms[1] + move), self._place_yaw
+            )
             # Release only once the tray sits flat: a corner touching first counted as
             # "on B", and opening then dropped the tray off target.
             flat = (
@@ -733,6 +802,20 @@ class TrayPlanner:
         rotations = (self._wrist_rotation(0, state, base), self._wrist_rotation(1, state, base))
         return _Carry(palms, rotations, heading, goal)
 
+    def _arrive_plan(self, state: TrayState, base: Pose2D) -> tuple[NDArray[np.float64], float]:
+        """ARRIVE_B's base goal and heading that put the held tray on the target pose.
+
+        The heading turns the base by the tray's yaw error (modulo a half turn, D-14);
+        turning about the pelvis also swings the tray sideways (5 deg at 0.35 m ahead
+        is 3 cm), so the goal is the target minus the turned pelvis-to-tray offset.
+        """
+        target = self.sample.target_pose
+        turn = math.remainder(target.yaw - tray_yaw_of(state.tray_quat), math.pi)
+        c, s = math.cos(turn), math.sin(turn)
+        d = state.tray_pos[:2] - np.array([base.x, base.y])
+        turned = np.array([c * d[0] - s * d[1], s * d[0] + c * d[1]])
+        return np.array([target.x, target.y]) - turned, _wrap(base.yaw + turn)
+
     def _place_error(self, state: TrayState, base: Pose2D) -> NDArray[np.float64]:
         """Tray-to-target xy error in the base frame, capped at `place_shift_max`.
 
@@ -743,6 +826,15 @@ class TrayPlanner:
         d = np.array([target.x, target.y]) - state.tray_pos[:2]
         c, s = math.cos(base.yaw), math.sin(base.yaw)
         return self._capped(np.array([c * d[0] + s * d[1], -s * d[0] + c * d[1], 0.0]))
+
+    @staticmethod
+    def _turned(
+        palms: tuple[NDArray[np.float64], NDArray[np.float64]], angle: float
+    ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """Both palms turned by `angle` about the vertical through their midpoint."""
+        rot = rpy_matrix(0.0, 0.0, angle)
+        mid = (palms[0] + palms[1]) / 2
+        return mid + rot @ (palms[0] - mid), mid + rot @ (palms[1] - mid)
 
     def _capped(self, shift: NDArray[np.float64]) -> NDArray[np.float64]:
         norm = float(np.linalg.norm(shift))
@@ -870,6 +962,9 @@ class TrayPlanner:
                 # `level_max_deg`), and that turn is smoothed like any other jump.
                 corrected = [palms[k] + self._correction[k] for k in range(2)]
                 rots = self._level(state, corrected, rots)
+            if self.phase is Phase.LOWER and self._place_yaw:
+                turn = rpy_matrix(0.0, 0.0, self._place_yaw)
+                rots = [turn @ r for r in rots]
         smooth_palms, smooth_rots = self._smoothed(state.t, (self.phase, segment), palms, rots)
         axes = CORRECTED.get(self.phase.name)
         # The measured palms answer the last step's smoothed targets; correcting against

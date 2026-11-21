@@ -81,3 +81,38 @@ def test_a_full_replay_writes_one_verdict_per_episode(
     verdicts = rq.replay_qa(tmp_path / "raw", tmp_path / "replay")
     assert [v.reason for v in verdicts] == ["pass", "pass"]
     assert len((tmp_path / "replay" / "replay_qa.jsonl").read_text().splitlines()) == 2
+
+
+def _episodes(root: Path, uids: list[str]) -> Path:
+    meta = root / "meta"
+    meta.mkdir(parents=True)
+    rows = [
+        {"episode_index": i, "environment_config": json.dumps({"uid": uid})}
+        for i, uid in enumerate(uids)
+    ]
+    (meta / "episodes.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+    return root
+
+
+def test_jig_episodes_replay_in_the_jig_scene(tmp_path: Path) -> None:
+    # DA-41: through `run` they were rebuilt in DA-33's scene (no jig, target jittered).
+    raw = _episodes(tmp_path, [rq.JIG_TASK_UID, rq.JIG_TASK_UID])
+    assert rq.replay_target(raw) == ("flywheel_simple.tray.jig_run", rq.JIG_ENV_ID)
+
+
+def test_zone1_episodes_replay_as_before(tmp_path: Path) -> None:
+    raw = _episodes(tmp_path, ["g1_wholebody_tray_transfer_teleop"])
+    assert rq.replay_target(raw) == ("flywheel_simple.tray.run", rq.ENV_ID)
+
+
+def test_a_batch_mixing_scenes_is_refused(tmp_path: Path) -> None:
+    raw = _episodes(tmp_path, [rq.JIG_TASK_UID, "g1_wholebody_tray_transfer_teleop"])
+    with pytest.raises(ValueError, match="mixes task uids"):
+        rq.replay_target(raw)
+
+
+def test_jig_ids_match_the_jig_task() -> None:
+    # jig_task needs SIMPLE to import, so its constants are read from the source.
+    source = (Path(rq.__file__).parent / "jig_task.py").read_text()
+    assert f'JIG_TASK_UID = "{rq.JIG_TASK_UID}"' in source
+    assert f'JIG_ENV_ID = "{rq.JIG_ENV_ID}"' in source

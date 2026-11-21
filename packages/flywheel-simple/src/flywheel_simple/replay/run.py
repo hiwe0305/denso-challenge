@@ -40,6 +40,16 @@ also holds `hold_steps` and `success_at_step` (index of the step at which
 `_success` first read true, as the trace counts steps, or null); with N = 0 it
 is the line of today's replay, which `replay_check` reads.
 
+Episodes replay in the scene they were recorded in (DA-41, 20/11/2026). SIMPLE's
+CLI only warns when an episode's `uid` is not the env's task and replays it in
+the env's scene anyway: tray episodes of DA-41's jig scene were rebuilt without
+the jig and every one failed D7/D8. For the tray tasks `--env-id` must be the
+env of the recorded uid (`tray_env_for`), and the right env id is registered.
+For any dataset, the recorder stops the process at a reset whose recorded uid is
+not the env's task (`SystemExit`, which SIMPLE's `except Exception` lets through,
+so the shard fails); `--allow-uid-override` keeps SIMPLE's override, for
+diagnosis with `--trace` (`uid_overridden`).
+
 SIMPLE writes `meta/replay.txt` into --data-dir; `outcomes.replay_lerobot`
 points it at a staged copy, never at the source dataset.
 """
@@ -98,6 +108,41 @@ def dataset_uids(root: Path) -> dict[int, str | None]:
             conf = json.loads(conf) if isinstance(conf, str) else conf or {}
             uids[int(row["episode_index"])] = conf.get("uid")
     return uids
+
+
+# Tray tasks: recorded uid -> (env id, module whose prepare() registers it). The ids are
+# the constants of flywheel_simple.tray.replay_qa (simple_task/jig_task need SIMPLE).
+def _tray_envs() -> dict[str, tuple[str, str]]:
+    from flywheel_simple.tray import replay_qa
+
+    return {
+        "g1_wholebody_tray_transfer_teleop": (replay_qa.ENV_ID, "flywheel_simple.tray.run"),
+        replay_qa.JIG_TASK_UID: (replay_qa.JIG_ENV_ID, "flywheel_simple.tray.jig_run"),
+    }
+
+
+class SceneMismatch(SystemExit):
+    """An episode would replay in another scene than it was recorded in.
+
+    A SystemExit, so SIMPLE's CLI (`except Exception`) does not swallow it."""
+
+
+def tray_env_for(uids: set[str | None], env_id: str) -> str | None:
+    """The module that registers env_id for these recorded tray uids, or None if they are
+    not tray episodes. Refuses mixed uids and an env id of another tray scene."""
+    envs = _tray_envs()
+    tray = {u for u in uids if u in envs}
+    if not tray:
+        return None
+    if len(uids) != 1:
+        raise SceneMismatch(f"episodes mix task uids {sorted(map(str, uids))}; replay each alone")
+    (uid,) = tray
+    want, module = envs[uid]
+    if env_id != want:
+        raise SceneMismatch(
+            f"episodes recorded in {uid!r} replay in {want!r}, not --env-id {env_id!r}"
+        )
+    return module
 
 
 def _xyz(values: Any) -> list[float]:
@@ -188,14 +233,15 @@ def recorder_class(base: type | None = None) -> type:
 
         def __init__(
             self, env: Any, data_dir: Path, out: Path, state_names: list[str],
-            trace: Path | None = None, hold_steps: int = 0,
+            trace: Path | None = None, hold_steps: int = 0, strict_uid: bool = False,
         ) -> None:  # fmt: skip
             global _live
             super().__init__(env)
             self.data_dir, self.out, self.state_names = data_dir, out, state_names
             self.trace, self.hold_steps = trace, hold_steps
             self.success_at: int | None = None
-            self.uids = dataset_uids(data_dir) if trace is not None else {}
+            self.strict_uid = strict_uid
+            self.uids = dataset_uids(data_dir) if trace is not None or strict_uid else {}
             self.episode: int | None = None
             self.rows: list[Any] = []
             self.trace_rows: list[dict[str, Any]] = []
@@ -206,6 +252,14 @@ def recorder_class(base: type | None = None) -> type:
             self.flush()
             task_id = str((options or {}).get("task_id", ""))
             self.episode = int(task_id[8:]) if task_id.startswith("episode_") else None
+            if self.strict_uid and self.episode is not None:
+                recorded, task = self.uids.get(self.episode), self.env.unwrapped.task.uid
+                if recorded != task:
+                    raise SceneMismatch(
+                        f"episode {self.episode} was recorded in {recorded!r} but the env's"
+                        f" task is {task!r}: it would replay in another scene"
+                        " (--allow-uid-override replays it anyway)"
+                    )
             result = self.env.reset(seed=seed, options=options)
             if self.trace is not None and self.episode is not None:
                 row = reset_row(
@@ -263,13 +317,19 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--clock", choices=CLOCKS, required=True)
     ap.add_argument("--trace", type=Path, help="per-step trace, one JSON row per step")
     ap.add_argument("--hold-steps", type=int, default=0, help="extra steps on the last command")
+    ap.add_argument(
+        "--allow-uid-override", action="store_true",
+        help="replay episodes whose recorded uid is not the env's task (SIMPLE overrides it)",
+    )  # fmt: skip
     args = ap.parse_args(argv)
 
     from flywheel_simple.tray.export import state_names
-    from flywheel_simple.tray.replay_qa import ENV_ID as TRAY_ENV_ID
 
-    if args.env_id == TRAY_ENV_ID:
-        importlib.import_module("flywheel_simple.tray.run").prepare()  # registers the env id
+    first, last = args.episode_start, args.episode_start + args.num_episodes
+    uids = {u for i, u in dataset_uids(args.data_dir).items() if first <= i < last}
+    tray_module = tray_env_for(uids, args.env_id)
+    if tray_module is not None:
+        importlib.import_module(tray_module).prepare()  # registers the env id
     joints = importlib.import_module("simple.robots.g1_sonic").WHOLE_BODY_JOINTS
     names = state_names(joints)
     for name in SIM_TIME_MODULES if args.clock == "sim" else ():
@@ -279,7 +339,10 @@ def main(argv: list[str]) -> int:
 
     def wrapped_make(*a: Any, **kw: Any) -> Any:
         env = make(*a, **kw)
-        return recorder(env, args.data_dir, args.outcomes, names, args.trace, args.hold_steps)
+        return recorder(
+            env, args.data_dir, args.outcomes, names, args.trace, args.hold_steps,
+            strict_uid=not args.allow_uid_override,
+        )  # fmt: skip
 
     setattr(gym, "make", wrapped_make)  # the CLI looks gym.make up when it calls it
     cli = importlib.import_module("simple.cli.replay_decoupled_wbc")

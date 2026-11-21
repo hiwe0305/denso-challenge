@@ -1,6 +1,6 @@
 # Design: task bê khay công nghiệp trên SIMPLE (MuJoCo) và thí nghiệm egocentric thay một phần demo robot
 
-_Ngày 28/10/2026. Trạng thái: **nháp, chờ trưởng nhóm duyệt**. Tài liệu này **thêm** một nhánh việc chạy song song với [design 27/10/2026](2026-10-27-g1-psi0-demo-design.md) [Đã chốt: song song]. Task hai bàn vẫn là task chính của data flywheel và của demo; Long, Thông, Hưng, Châu không đổi việc. Task bê khay và thí nghiệm của nó là nhánh của trưởng nhóm. Khi duyệt, thêm story mới và sửa story của trưởng nhóm kèm dòng change log; design 27/10 chỉ thêm một dòng trỏ tới tài liệu này. **Sửa chiều 28/10/2026** [Đã chốt]: bộ điều khiển đổi từ đường MP với AMO sang decoupled WBC (mục 4), sau khi S1-02 chạy được task hai bàn với decoupled WBC trên máy dev._
+_Ngày 28/10/2026. Trạng thái: **nháp, chờ trưởng nhóm duyệt**. Tài liệu này **thêm** một nhánh việc chạy song song với [design 27/10/2026](2026-10-27-g1-psi0-demo-design.md) [Đã chốt: song song]. Task hai bàn vẫn là task chính của data flywheel và của demo; Long, Thông, Hưng, Châu không đổi việc. Task bê khay và thí nghiệm của nó là nhánh của trưởng nhóm. Khi duyệt, thêm story mới và sửa story của trưởng nhóm kèm dòng change log; design 27/10 chỉ thêm một dòng trỏ tới tài liệu này. **Sửa chiều 28/10/2026** [Đã chốt]: bộ điều khiển đổi từ đường MP với AMO sang decoupled WBC (mục 4), sau khi S1-02 chạy được task hai bàn với decoupled WBC trên máy dev. **Sửa 19/11/2026** [Đã chốt, Hiếu 19/11/2026]: vùng đích cố định trên bàn B, thêm đồ gá định vị (mục 3.1, 3.5; story DA-41, [docs/g0/tray/jig.md](../../g0/tray/jig.md)). Cảnh cũ giữ nguyên cho các run plan đã đóng băng._
 
 Quy ước như design 27/10: **[Đã chốt]** là quyết định của trưởng nhóm (Hiếu). **[Đề xuất]** là lựa chọn của người viết, cần duyệt. Số chưa đo là ước lượng.
 
@@ -62,6 +62,7 @@ Task gần nhất có sẵn trong SIMPLE là `G1WholebodyXMoveBendCarryBoxSonic-
 | Khay | 0,45 × 0,30 × 0,06 m, rigid body, hai tay cầm hai bên, khối lượng và ma sát thật | Kiểm cầm được bằng bàn tay G1 trước khi chốt kích thước (mục 7, mốc M0) |
 | Linh kiện | 6 vật nhỏ trong 6 ô của khay | Rigid body tự do, không khóa vào khay |
 | Vùng đích | Hình chữ nhật hiển thị trên bàn B: tư thế đích, dung sai vị trí, dung sai góc | |
+| Đồ gá định vị (sửa 19/11/2026) | Thanh dẫn ở góc quanh vùng đích: tường đứng thấp, vát phía trên; cạnh dài phía robot để trống; cạnh ngắn phía robot thấp hơn để cổ tay đi qua (sửa 20/11/2026); tấm trượt ma sát thấp | Chỉ trên cảnh có đồ gá (`+jig2`); kích thước trong `configs/sim/tray_jig.yaml`. Lý do và số đo: [docs/g0/tray/jig.md](../../g0/tray/jig.md) |
 
 Mọi kích thước, khối lượng, ma sát, dung sai nằm trong file cấu hình của task, không viết cứng.
 
@@ -98,6 +99,8 @@ Ba mức, giống cách SIMPLE chia Level 0, 1, 2 [Đề xuất]:
 | 0 | Chỉ hạt giống vật lý; khay và vùng đích ở vị trí mặc định |
 | 1 | Vị trí và góc khay trên bàn A, vị trí vùng đích trên bàn B, trong khoảng nhỏ |
 | 2 | Thêm khoảng cách giữa hai bàn, vị trí đứng ban đầu, ánh sáng, khối lượng linh kiện |
+
+**Sửa 19/11/2026** [Đã chốt, Hiếu 19/11/2026]: trên cảnh có đồ gá, vùng đích **không** ngẫu nhiên hóa ở mức nào; nó gắn cố định với bàn B (cách mép phía hành lang `tray_edge_offset`), nên ở mức 2 chỉ dời theo khoảng cách hai bàn. Mọi giá trị khác của một hạt giống giữ như bảng trên. Lý do: policy tới bàn B ở 62–80 % lượt nhưng hỏng ở bước đặt, sai lệch trung vị 7,5 cm ([docs/he/tray.md](../../he/tray.md) mục 19–20), trong khi vùng đích rung ±5 cm, ±10° và bị khay che khi đến gần. Tùy chọn 2–3 vị trí đồ gá rời rạc có sẵn nhưng tắt. Cảnh cũ (đích rung) vẫn dựng lại được cho các run plan đã đóng băng.
 
 Dải hạt giống của train, dev, holdout rời nhau, theo spec mục 7.3.
 

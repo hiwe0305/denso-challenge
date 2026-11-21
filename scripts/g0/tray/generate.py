@@ -35,6 +35,7 @@ from pathlib import Path
 
 from flywheel_simple.tray.generate import (
     LOG_NAME,
+    SCENES,
     check_planner_version,
     check_visuals_revision,
     generate,
@@ -60,6 +61,10 @@ def main() -> int:
     ap.add_argument("--shard", type=int, help="run one shard in this process (set by --workers)")
     ap.add_argument("--allow-plain", action="store_true", help="record without SimReady visuals")
     ap.add_argument("--stagger", type=float, default=5.0, help="seconds between worker starts")
+    ap.add_argument(
+        "--scene", choices=SCENES, default="zone1",
+        help="zone1: DA-33 scene, target jittered; jig: DA-41 fixed target in a locating jig",
+    )
     args = ap.parse_args()
     if args.n is None and args.conditions is None and not args.targeted:
         ap.error("give --n or --conditions")
@@ -74,13 +79,16 @@ def main() -> int:
             shard=args.shard,
             workers=args.workers,
             targeted=args.targeted,
+            scene=args.scene,
         )
         print(json.dumps({"shard": args.shard, **summary.__dict__}))
         return 0
 
     # Refuse before starting workers; each worker checks again (generate()).
     check_planner_version(args.out, planner_version(PlannerConfig.load()))
-    check_visuals_revision(args.out, visuals_revision(default_manifest_path()))
+    check_visuals_revision(
+        args.out, visuals_revision(default_manifest_path(), jig=args.scene == "jig")
+    )
     env = dict(os.environ)
     for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
         env.setdefault(var, "1")
@@ -92,6 +100,7 @@ def main() -> int:
         cmd += ["--level", str(args.level), "--seed-start", str(args.seed_start)]
         cmd += ["--workers", str(args.workers), "--shard", str(shard)]
         cmd += ["--allow-plain"] if args.allow_plain else []
+        cmd += ["--scene", args.scene]
         cmd += ["--targeted"] if args.conditions is not None else []
         with (work / "worker.log").open("a") as log:
             return subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=env)
