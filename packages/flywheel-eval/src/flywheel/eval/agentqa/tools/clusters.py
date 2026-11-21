@@ -1,9 +1,11 @@
 """`failure_clusters`: failures grouped by (first failed step, label, level) (DA-43 task 2.2).
 
 The key of spec 6.3, as the team grouped `C_70`'s 50 failures into c1-c8 and the rest
-(docs/he/tray.md 20.2). Per cluster: its size, its members, and how many other runs
-given have a cluster with the same key, so a fault that repeats across checkpoints
-(a scorer fault, say) shows as such. Successes are left out; a success whose steps
+(docs/he/tray.md 20.2). Per cluster: its size, its members, and how many other runs of
+the context (in a round, every run of the pack, whatever runs the call names) have a
+cluster with the same key, so a fault that repeats across checkpoints (a scorer fault,
+say) shows as such. Since the count does not depend on the call, two calls over
+different runs give the same fact the same value. Successes are left out; a success whose steps
 did not all latch is the business of `latch_consistency`.
 """
 
@@ -19,6 +21,7 @@ from flywheel.eval.agentqa.tools.task import TaskView
 
 TOOL = "failure_clusters"
 Key = tuple[str, str, int | None]
+NO_LEVEL = -1  # how the table's int column spells a rollout without a level
 
 
 def keys_of(task: TaskView, run: RunScores) -> dict[Key, list[Score]]:
@@ -36,10 +39,12 @@ def slug(key: Key) -> str:
 
 
 def failure_clusters(book: FactBook, task: TaskView, runs: Sequence[RunScores],
-                     min_size: int = 1) -> ToolResult:
+                     min_size: int = 1,
+                     context: Sequence[RunScores] | None = None) -> ToolResult:
+    """Rows for `runs`; "other runs" are counted over `context` (default: `runs`)."""
     if not runs:
         return not_judged(book, TOOL, "no run given", "-")
-    by_run = {run.run: keys_of(task, run) for run in runs}
+    by_run = {run.run: keys_of(task, run) for run in [*(context or runs), *runs]}
     facts: list[str] = []
     rows: list[Row] = []
     for run in runs:
@@ -60,7 +65,7 @@ def failure_clusters(book: FactBook, task: TaskView, runs: Sequence[RunScores],
             facts.append(book.add(f"{name}_in_other_runs", others, run.ref, "runs"))
             step, label, level = key
             rows.append({"run": run.run, "first_failed_step": step, "label": label,
-                         "level": -1 if level is None else level, "size": len(members),
+                         "level": NO_LEVEL if level is None else level, "size": len(members),
                          "in_other_runs": others,
                          "members": " ".join(s.episode_id for s in members)})
     return ToolResult(TOOL, tuple(facts), tuple(rows))

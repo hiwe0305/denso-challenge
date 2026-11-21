@@ -160,3 +160,15 @@ def test_unknown_step_and_existing_directory(make_pack: PackMaker, tmp_path: Pat
     shutil.rmtree(out)
     with pytest.raises(RunRefused, match="run.json"):
         run_round(pack, out, from_step="measure")
+
+
+def test_two_cluster_calls_over_different_runs_do_not_clash(
+        make_pack: PackMaker, tmp_path: Path) -> None:
+    def edit(plan: dict[str, list[dict[str, object]]]) -> None:
+        plan["calls"].insert(3, {"tool": "failure_clusters", "params": {"runs": ["C_70"]}})
+
+    out = tmp_path / "out"
+    record = run_round(make_pack(), out, plan_path=edited_plan(tmp_path, edit), now=NOW)
+    assert record.status != "broken"
+    # "other runs" counts over every run of the pack, whatever runs the call names
+    assert facts_of(out)["C_70_cluster_approach_a_L-PLACE-POSE_l2_in_other_runs"].value == 3

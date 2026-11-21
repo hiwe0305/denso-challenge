@@ -24,7 +24,6 @@ from flywheel.eval.agentqa.round.admit import ADMISSION_FILE, Admitted, admit, w
 from flywheel.eval.agentqa.round.assemble import ASSEMBLY_FILE, assemble
 from flywheel.eval.agentqa.round.hypotheses import (
     HYPOTHESES_FILE,
-    RulesRefused,
     hypothesize,
     missing_clusters_reason,
 )
@@ -32,13 +31,12 @@ from flywheel.eval.agentqa.round.measure import (
     CALLS_FILE,
     FACTS_FILE,
     TABLES_DIR,
-    PlanRefused,
     measure,
     needed_kinds,
     plan_of,
     read_plan,
 )
-from flywheel.eval.agentqa.round.pack import PACK_FILE, PackRefused, read_pack, sha256_of
+from flywheel.eval.agentqa.round.pack import PACK_FILE, read_pack, sha256_of
 from flywheel.eval.agentqa.round.records import Admission, Pack, RunRecord, Status, StepRecord
 from flywheel.eval.agentqa.round.render import INDEX_FILE, render
 from flywheel.eval.agentqa.round.version import agent_hash, agent_version
@@ -67,6 +65,13 @@ SEVERITY: dict[str, int] = {"ok": 0, "degraded": 1, "broken": 2}
 
 class RunRefused(ValueError):
     """A run directory cannot be continued: it is not what its run.json says it is."""
+
+
+def failure(error: BaseException) -> str:
+    """`<ExceptionType>: <first line>`, as run.json and the CLI show a failed step."""
+    text = error.args[0] if isinstance(error, KeyError) and error.args else error
+    lines = str(text).strip().splitlines()
+    return f"{type(error).__name__}: {lines[0][:200] if lines else ''}"
 
 
 @dataclass
@@ -114,12 +119,16 @@ def _admit(w: _Work) -> Admitted:
     return admit(w.pack_path, expected_kinds=needed_kinds(plan))
 
 
+def _admit_problems(admission: Admission) -> list[str]:
+    return ([f"{r.ref} rejected: {r.reason}" for r in admission.rejected]
+            + [f"no accepted entry of kind {k}" for k in admission.missing_kinds])
+
+
 def _step_admit(w: _Work) -> int:
     w.admitted = _admit(w)
     admission = w.admitted.admission
     write_admission(admission, w.out)
-    w.degraded += [f"{r.ref} rejected: {r.reason}" for r in admission.rejected]
-    w.degraded += [f"no accepted entry of kind {k}" for k in admission.missing_kinds]
+    w.degraded += _admit_problems(admission)
     return len(admission.accepted)
 
 
@@ -163,15 +172,31 @@ def _write(out: Path, record: RunRecord) -> None:
     (out / RUN_FILE).write_text(record.model_dump_json(indent=2) + "\n", encoding="utf-8")
 
 
-def _resume(pack_path: Path, out: Path, from_step: str, plan_path: Path | None,
+def _pack_part(admission: Admission) -> dict[str, object]:
+    """What admit derives from the pack alone; `missing_kinds` follows the plan."""
+    return admission.model_dump(exclude={"missing_kinds"})
+
+
+def _resume(pack_path: Path, out: Path, from_step: str, plan: dict[str, str],
             work: _Work) -> RunRecord:
-    """The record of `out` cut back to the steps before `from_step`, checked."""
+    """The record of `out` cut back to the steps before `from_step`, checked.
+
+    A run directory belongs to one pack. Steps after measure are kept only with the
+    plan that measured them; admit's plan-derived part is worked out for the plan in use.
+    """
     start = STEPS.index(from_step)
     try:
         old = RunRecord.model_validate_json((out / RUN_FILE).read_text(encoding="utf-8"))
     except (OSError, ValidationError) as error:
         raise RunRefused(f"{out / RUN_FILE}: {str(error).strip().splitlines()[0][:200]}"
                          ) from error
+    if old.pack_sha256 != sha256_of(pack_path):
+        raise RunRefused(f"{pack_path} is not the pack of run {old.run_id} in {out}; a run "
+                         "directory belongs to one pack: use a new --out")
+    if start > STEPS.index("measure") and old.plan_sha256 != plan["plan_sha256"]:
+        raise RunRefused(f"{out}: the kept measure outputs come from plan "
+                         f"{old.plan_path or '(not recorded)'}, not {plan['plan_path']}; "
+                         "redo from measure, or pass that plan")
     if start > len(old.steps) or [s.name for s in old.steps[:start]] != list(STEPS[:start]):
         raise RunRefused(f"{out}: the steps before {from_step} are not all recorded")
     kept = old.steps[:start]
@@ -183,24 +208,31 @@ def _resume(pack_path: Path, out: Path, from_step: str, plan_path: Path | None,
             if not path.is_file() or sha256_of(path) != sha:
                 raise RunRefused(f"{out}: {name} is not the file step {step.name} wrote")
     if start >= 1:
-        if old.pack_sha256 != sha256_of(pack_path):
-            raise RunRefused(f"{pack_path} is not the pack of run {old.run_id}")
         work.pack = read_pack(out / PACK_FILE)
+    names = [s.name for s in kept]
+    problems = [p for p in old.problems if p.split(":", 1)[0] in names]
     if start >= 2:
         stored = Admission.model_validate_json((out / ADMISSION_FILE).read_text("utf-8"))
         work.admitted = _admit(work)
-        if work.admitted.admission != stored:
+        fresh = work.admitted.admission
+        if _pack_part(fresh) != _pack_part(stored):
             raise RunRefused(f"{out}: the admission worked out again differs from "
                              f"{ADMISSION_FILE}")
+        if fresh != stored:  # another plan wants other kinds
+            write_admission(fresh, out)
+            mine = [f"admit: {p}" for p in _admit_problems(fresh)]
+            kept[1] = kept[1].model_copy(update={
+                "outputs": _outputs(out, "admit"), "status": "degraded" if mine else "ok"})
+            problems = ([p for p in problems if p.startswith("pack:")] + mine
+                        + [p for p in problems if p.split(":", 1)[0] not in ("pack", "admit")])
     for step_name in STEPS[start:]:
         for name in STEP_FILES[step_name]:
             (out / name).unlink(missing_ok=True)
         for d in STEP_DIRS.get(step_name, ()):
             shutil.rmtree(out / d, ignore_errors=True)
-    names = [s.name for s in kept]
     return old.model_copy(update={
-        "steps": kept, "status": _worst([s.status for s in kept]),
-        "problems": [p for p in old.problems if p.split(":", 1)[0] in names]})
+        **plan, "steps": kept, "status": _worst([s.status for s in kept]),
+        "problems": problems})
 
 
 def run_round(pack_path: Path, out: Path, *, plan_path: Path | None = None,
@@ -212,6 +244,15 @@ def run_round(pack_path: Path, out: Path, *, plan_path: Path | None = None,
         raise RunRefused(NO_MODEL_ONLY)
     if from_step is not None and from_step not in STEPS:
         raise RunRefused(f"unknown step {from_step!r} (steps: {', '.join(STEPS)})")
+    # Checked before anything is created, so a typo leaves nothing behind.
+    if not pack_path.is_file():
+        raise RunRefused(f"{pack_path}: no pack file there")
+    task_id = read_pack(pack_path).task_id
+    plan_file = plan_path or plan_of(task_id)
+    if not plan_file.is_file():
+        raise RunRefused(f"{plan_file}: no plan file there")
+    planned = {"plan_path": plan_file.as_posix(), "plan_sha256": sha256_of(plan_file),
+            "agent_version": agent_version(), "agent_hash": agent_hash(task_id, plan_file)}
     work = _Work(pack_path, out, plan_path, no_model=no_model, store=store)
     if from_step is None:
         if out.exists():
@@ -221,12 +262,13 @@ def run_round(pack_path: Path, out: Path, *, plan_path: Path | None = None,
         sha = sha256_of(pack_path)
         record = RunRecord(
             run_id="run_" + hashlib.sha256((sha + started.isoformat()).encode()).hexdigest()[:16],
-            command=command, started_at=started, pack_sha256=sha, status="ok")
+            command=command, started_at=started, pack_sha256=sha, status="ok",
+        ).model_copy(update=planned)
         start = 0
     else:
         if not (out / RUN_FILE).is_file():
             raise RunRefused(f"{out}: no {RUN_FILE} to continue from")
-        record = _resume(pack_path, out, from_step, plan_path, work)
+        record = _resume(pack_path, out, from_step, planned, work)
         record = record.model_copy(update={"command": command or record.command})
         start = STEPS.index(from_step)
     _write(out, record)
@@ -264,19 +306,16 @@ def _run_steps(work: _Work, record: RunRecord, start: int) -> RunRecord:
             if work.degraded:
                 status = "degraded"
                 problems = [f"{name}: {d}" for d in work.degraded]
-        except (PackRefused, PlanRefused, RulesRefused) as error:
+        except Exception as error:  # every failure is recorded, then raised again
             record = record.model_copy(update={
                 "steps": [*record.steps, StepRecord(
                     name=name, status="broken", seconds=time.monotonic() - began, rows=0)],
-                "status": "broken", "problems": [*record.problems, f"{name}: {error}"]})
+                "status": "broken", "problems": [*record.problems, f"{name}: {failure(error)}"]})
             _write(out, record)
             raise
         update: dict[str, object] = {}
         if work.pack is not None:
             update["pack_id"] = work.pack.pack_id
-        if name == "pack" and work.pack is not None:
-            update["agent_version"] = agent_version()
-            update["agent_hash"] = agent_hash(work.pack.task_id)
         if name == "admit" and work.admitted is not None:
             update["data_class"] = work.admitted.admission.data_class
         steps = [*record.steps, StepRecord(

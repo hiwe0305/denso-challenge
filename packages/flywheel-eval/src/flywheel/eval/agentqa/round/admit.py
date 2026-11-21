@@ -137,6 +137,12 @@ def admit(pack_path: Path, expected_kinds: Sequence[str] = ()) -> Admitted:
             rejected.append(Rejected(ref=entry.ref, reason="does not parse as "
                                      f"{entry.kind}: {_first_line(error)}"))
             continue
+        other = sorted({r.task_id for r in parsed if isinstance(r, Score)
+                        and r.task_id != pack.task_id})
+        if other:
+            rejected.append(Rejected(ref=entry.ref, reason=f"scores of task "
+                                     f"{', '.join(other)}, the pack is for {pack.task_id}"))
+            continue
         records[entry.ref] = parsed
         own = [r.data_class for r in parsed if hasattr(r, "data_class")]
         classes.extend(own)

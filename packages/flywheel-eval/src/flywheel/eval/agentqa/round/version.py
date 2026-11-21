@@ -19,14 +19,20 @@ def agent_version(config: Path = AGENT_CONFIG) -> str:
     return str(raw["version"])
 
 
-def agent_hash(task_id: str, root: Path = CONFIG_ROOT) -> str:
-    """sha256 over the (relative path, file sha256) pairs of what decides a round's verdict.
+def agent_hash(task_id: str, plan: Path | None = None, root: Path = CONFIG_ROOT) -> str:
+    """sha256 over the (name, file sha256) pairs of what decides a round's verdict.
 
-    The task view and the plan of `task_id`, every rule file, the check catalog and the cost keys; a
-    file that does not exist is skipped.
+    The task view of `task_id`, the plan actually used (`plan`, by default the task's plan
+    under `root`), every rule file, the check catalog, the cost keys and the model
+    gateway's `routing.yaml` and `hosted.yaml` (architecture section 11; the hosted file
+    holds key variable names, never keys). A file that does not exist is skipped.
     """
-    files = [root / "tasks" / f"{task_id}.yaml", root / "plans" / f"{task_id}.yaml",
-             *sorted((root / "rules").glob("*.yaml")), root / "checks.yaml", root / "costs.yaml"]
+    plan = plan if plan is not None else root / "plans" / f"{task_id}.yaml"
+    files = [root / "tasks" / f"{task_id}.yaml", *sorted((root / "rules").glob("*.yaml")),
+             root / "checks.yaml", root / "costs.yaml", root / "routing.yaml",
+             root / "hosted.yaml"]
     pairs = sorted((f.relative_to(root).as_posix(), hashlib.sha256(f.read_bytes()).hexdigest())
                    for f in files if f.is_file())
+    if plan.is_file():
+        pairs.append(("plan", hashlib.sha256(plan.read_bytes()).hexdigest()))
     return hashlib.sha256("\n".join(f"{p} {h}" for p, h in pairs).encode()).hexdigest()

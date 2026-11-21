@@ -77,6 +77,7 @@ class ToolSpec:
     params: Mapping[str, str]  # param name -> domain name
     run: Callable[[FactBook, MeasureContext, Mapping[str, Any]], ToolResult]
     reads_all: bool = False  # the result depends on every accepted entry, not only `needs`
+    context_runs: bool = False  # reads every run of its kinds, whatever runs it names
 
 
 # Domains a plan must give a value for; the others may be left out.
@@ -230,7 +231,7 @@ def _step_pass_table(book: FactBook, ctx: MeasureContext,
 
 def _failure_clusters(book: FactBook, ctx: MeasureContext,
                       params: Mapping[str, Any]) -> ToolResult:
-    return failure_clusters(book, ctx.task, _runs(params, ctx))
+    return failure_clusters(book, ctx.task, _runs(params, ctx), context=list(ctx.runs.values()))
 
 
 def _latch_consistency(book: FactBook, ctx: MeasureContext,
@@ -323,7 +324,8 @@ def _paired_compare(book: FactBook, ctx: MeasureContext,
 REGISTRY: dict[str, ToolSpec] = {spec.name: spec for spec in (
     ToolSpec("task_lookup", 1, (), {"step": "step"}, _task_lookup),
     ToolSpec("step_pass_table", 1, ("scores",), {"runs": "runs"}, _step_pass_table),
-    ToolSpec("failure_clusters", 1, ("scores",), {"runs": "runs"}, _failure_clusters),
+    ToolSpec("failure_clusters", 2, ("scores",), {"runs": "runs"}, _failure_clusters,
+             context_runs=True),
     ToolSpec("latch_consistency", 1, ("scores",), {"runs": "runs"}, _latch_consistency),
     ToolSpec("signal_presence", 1, ("scores",), {"labels": "labels"}, _signal_presence,
              reads_all=True),
