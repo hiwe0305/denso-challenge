@@ -13,7 +13,7 @@ call is read from this file.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from itertools import combinations
 from pathlib import Path
 from typing import Any, get_args
@@ -30,6 +30,7 @@ from flywheel.eval.agentqa.tools.base import (
     ToolResult,
     merge,
     not_judged,
+    store_read,
 )
 from flywheel.eval.agentqa.tools.clusters import failure_clusters
 from flywheel.eval.agentqa.tools.cost import (
@@ -78,6 +79,10 @@ class ToolSpec:
     run: Callable[[FactBook, MeasureContext, Mapping[str, Any]], ToolResult]
     reads_all: bool = False  # the result depends on every accepted entry, not only `needs`
     context_runs: bool = False  # reads every run of its kinds, whatever runs it names
+    # Reads the site store (ledger, catalog), outside the pack: its facts depend on the store
+    # state, which the call record holds as `store_reads`. Every fact of such a call is
+    # told apart from pack-derived ones by `FactRecord.tool_call_id` -> that record.
+    reads_store: bool = False
 
 
 # Domains a plan must give a value for; the others may be left out.
@@ -291,16 +296,23 @@ def _cost_lookup(book: FactBook, ctx: MeasureContext, params: Mapping[str, Any])
     except (OSError, ValueError, KeyError) as error:
         return no_costs(book, f"costs.yaml or checks.yaml cannot be read: {str(error)[:150]}")
     ledger, bad = read_ledger(StorePaths(ctx.store))
-    return cost_lookup(book, costs, checks, _chosen(params["checks"], list(checks)),
-                       _chosen(params["interventions"], list(get_args(InterventionKind))),
-                       ledger, bad, "configs/eval/agentqa/costs.yaml")
+    result = cost_lookup(book, costs, checks, _chosen(params["checks"], list(checks)),
+                         _chosen(params["interventions"], list(get_args(InterventionKind))),
+                         ledger, bad, "configs/eval/agentqa/costs.yaml")
+    return replace(result, store_reads=(store_read("ledger", (
+        {"activity": r.activity, "resource_type": r.resource_type, "unit": r.unit,
+         "measure_kind": r.measure_kind, "quantity": r.quantity, "usd_amount": r.usd_amount}
+        for r in ledger), bad),))
 
 
 def _history_lookup(book: FactBook, ctx: MeasureContext,
                     params: Mapping[str, Any]) -> ToolResult:
     events, bad = read_events(StorePaths(ctx.store))
-    return history_lookup(book, _chosen(params["interventions"],
-                                        list(get_args(InterventionKind))), events, bad)
+    result = history_lookup(book, _chosen(params["interventions"],
+                                          list(get_args(InterventionKind))), events, bad)
+    return replace(result, store_reads=(store_read("fix_rate_event", (
+        {"intervention_type": e.intervention_type, "n_conditions": e.n_conditions,
+         "fixed": e.fixed} for e in events), bad),))
 
 
 def pairs_of(params: Mapping[str, Any], ctx: MeasureContext) -> list[tuple[str, str]]:
@@ -338,6 +350,7 @@ REGISTRY: dict[str, ToolSpec] = {spec.name: spec for spec in (
     ToolSpec("coverage_distance", 1, ("scores", "conditions"), {"runs": "runs"},
              _coverage_distance),
     ToolSpec("cost_lookup", 1, (), {"checks": "checks", "interventions": "interventions"},
-             _cost_lookup),
-    ToolSpec("history_lookup", 1, (), {"interventions": "interventions"}, _history_lookup),
+             _cost_lookup, reads_store=True),
+    ToolSpec("history_lookup", 1, (), {"interventions": "interventions"}, _history_lookup,
+             reads_store=True),
 )}

@@ -6,11 +6,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from flywheel.contracts.entities import FixRateEvent
 from flywheel.eval.agentqa.facts import FactBook
 from flywheel.eval.agentqa.tools.base import RunScores
 from flywheel.eval.agentqa.tools.registry import REGISTRY, MeasureContext, check_params
 from flywheel.eval.agentqa.tools.task import TaskView
-from helpers_tools import job_of, metric
+from flywheel.store.paths import StorePaths
+from flywheel.store.tables import write_record
+from helpers_tools import job_of, metric, rollout, trace_of
 
 PARAMS: dict[str, dict[str, Any]] = {
     "task_lookup": {},
@@ -147,3 +150,79 @@ def test_cost_and_history_take_the_closed_domains(ctx: MeasureContext) -> None:
         assert check_params(REGISTRY[name], params, ctx)  # a cost key is not a check id
     good = {"checks": ["log_missing_signals"], "interventions": ["sim_s1", "report_only"]}
     assert check_params(REGISTRY["cost_lookup"], good, ctx) == []
+
+
+# a fact's name fixes its value within a round, whatever the parameters of a call --------
+
+def _full(ctx: MeasureContext) -> MeasureContext:
+    runs = list(ctx.runs)
+    traces = {r: trace_of(r, [step for e in ("l1-s0", "l1-s1") for step in rollout(r, e)])
+              for r in runs}
+    jobs = {j: job_of(j, [metric(j, 10, 1.0), metric(j, 20, 2.0, split="val")])
+            for j in ("J", "K")}
+    return MeasureContext(ctx.task, ctx.runs, frozenset({"scores", "trace", "metrics"}),
+                          traces=traces, jobs=jobs)
+
+
+def _param_sets(ctx: MeasureContext) -> dict[str, list[dict[str, Any]]]:
+    first, second = list(ctx.runs)[:2]
+    step = ctx.task.steps[0]
+    return {
+        "task_lookup": [{}, {"step": step}],
+        "step_pass_table": [{"runs": "all"}, {"runs": [first]}],
+        "failure_clusters": [{"runs": "all"}, {"runs": [first]}],
+        "latch_consistency": [{"runs": "all"}, {"runs": [second]}],
+        "signal_presence": [{"labels": "seen"}, {"labels": "all"}],
+        "paired_compare": [{"pairs": "all", "levels": "all"},
+                           {"pairs": [[first, second]], "levels": [1]},
+                           {"pairs": [[second, first]], "levels": [2]}],
+        "trace_stats": [{"runs": "all"}, {"runs": [first]}],
+        "train_window": [{"jobs": "all", "window": "last"}, {"jobs": ["J"], "window": "all"},
+                         {"jobs": "all", "window": 20}],
+        "lineage": [{}, {}],
+        "coverage_distance": [{"runs": "all"}, {"runs": [first]}],
+        "cost_lookup": [{"checks": "all", "interventions": "all"},
+                        {"checks": ["log_missing_signals"], "interventions": ["sim_s1"]},
+                        {"checks": ["inspect_latch_on_successes"], "interventions": ["sim_s2"]}],
+        "history_lookup": [{"interventions": "all"}, {"interventions": ["sim_s1"]},
+                           {"interventions": ["sim_s2", "sim_s3"]}],
+    }
+
+
+@pytest.mark.parametrize("name", sorted(PARAMS))
+def test_a_tool_run_twice_with_other_parameters_never_clashes_in_one_book(
+        name: str, ctx: MeasureContext) -> None:
+    full = _full(ctx)
+    book = FactBook()
+    for params in _param_sets(full)[name]:
+        assert check_params(REGISTRY[name], params, full) == [], params
+        REGISTRY[name].run(book, full, params)  # FactClash would raise here
+    assert book.facts
+
+
+def test_the_param_sets_cover_every_registered_tool(ctx: MeasureContext) -> None:
+    assert sorted(_param_sets(ctx)) == sorted(REGISTRY)
+
+
+# the store tools: what they read is recorded, and they are told apart ---------------------
+
+def test_only_the_cost_and_history_tools_read_the_store(ctx: MeasureContext) -> None:
+    assert sorted(n for n, spec in REGISTRY.items() if spec.reads_store) == [
+        "cost_lookup", "history_lookup"]
+    for name, spec in REGISTRY.items():
+        result = spec.run(FactBook(), ctx, PARAMS[name])
+        assert bool(result.store_reads) == spec.reads_store, name
+
+
+def test_the_store_read_holds_the_rows_and_a_hash_that_follows_the_store(
+        tmp_path: Path, ctx: MeasureContext) -> None:
+    store = tmp_path / "fwroot"
+    full = MeasureContext(ctx.task, ctx.runs, ctx.kinds, store=store)
+    spec = REGISTRY["history_lookup"]
+    empty = spec.run(FactBook(), full, PARAMS["history_lookup"]).store_reads[0]
+    assert (empty.table, empty.rows) == ("fix_rate_event", 0)
+    assert spec.run(FactBook(), full, PARAMS["history_lookup"]).store_reads == (empty,)
+    write_record("fix_rate_event", FixRateEvent(intervention_type="sim_s1", n_conditions=10,
+                                                fixed=4), StorePaths(store))
+    after = spec.run(FactBook(), full, PARAMS["history_lookup"]).store_reads[0]
+    assert after.rows == 1 and after.sha256 != empty.sha256

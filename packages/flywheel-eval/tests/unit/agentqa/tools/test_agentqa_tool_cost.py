@@ -83,13 +83,15 @@ def test_a_kind_with_no_measured_row_is_one_not_judged_fact_naming_it(paths: Sto
     result, got = lookup(paths, ["inspect_latch_on_successes"], KINDS)
     assert got["cost_sim_s1_measured_rows"] == 0 and got["cost_sim_s1_estimated_rows"] == 0
     assert "cost_sim_s1_measured_quantity_median" not in got
-    assert got["cost_lookup_measured_not_judged"] == (
-        "no measured ledger row of the kind for inspect_latch_on_successes, sim_s1, "
-        "teleop_correction")
+    for name in ("inspect_latch_on_successes", "sim_s1", "teleop_correction"):
+        assert got[f"cost_{name}_measured_not_judged"] == (
+            f"no measured ledger row of the kind for {name}")
     assert got["cost_teleop_correction_human_hours_per_unit"] == 0.05
-    assert got["cost_lookup_price_not_judged"] == (
-        "no price in the price book for cpu_seconds, sim_episode")
-    assert len(result.not_judged) == 2
+    assert got["cost_price_cpu_seconds_not_judged"] == (
+        "no price in the price book for cpu_seconds")
+    assert got["cost_price_sim_episode_not_judged"] == (
+        "no price in the price book for sim_episode")
+    assert len(result.not_judged) == 5
 
 
 def test_the_shipped_price_book_holds_no_invented_rate() -> None:
@@ -108,8 +110,8 @@ def test_with_no_price_there_is_no_price_fact_but_the_ledger_rows_are_reported(
     p = "cost_log_missing_signals"
     assert (got[f"{p}_measured_rows"], got[f"{p}_measured_quantity_median"]) == (1, 450.0)
     assert got[f"{p}_estimated_quantity_median"] == 600.0
-    assert got["cost_lookup_price_not_judged"] == (
-        "no price in the price book for cpu_seconds, gpu_seconds, sim_episode")
+    for rt in ("cpu_seconds", "gpu_seconds", "sim_episode"):
+        assert got[f"cost_price_{rt}_not_judged"] == f"no price in the price book for {rt}"
     assert "price" in result.not_judged[0]
 
 
@@ -120,7 +122,7 @@ def test_a_key_the_cost_file_does_not_know_is_not_judged(paths: StorePaths) -> N
     book = FactBook()
     result = cost_lookup(book, costs, CHECKS, [], ["sim_s2"], [], 0, "costs.yaml")
     got = values(book, result)
-    assert got["cost_lookup_kind_not_judged"] == "no ledger kind in costs.yaml for sim_s2"
+    assert got["cost_sim_s2_kind_not_judged"] == "no ledger kind in costs.yaml for sim_s2"
     assert "cost_sim_s2_measured_rows" not in got
 
 
@@ -144,7 +146,7 @@ def test_history_gives_the_recorded_fix_rate_of_each_kind(paths: StorePaths) -> 
     assert got["history_sim_s1_events"] == 2 and got["history_sim_s1_conditions"] == 15
     assert got["history_sim_s1_fixed"] == 5
     assert got["history_sim_s1_fix_rate"] == pytest.approx(5 / 15)
-    assert got["history_lookup_not_judged"] == "sim_s3: no FixRateEvent of the kind in the store"
+    assert got["history_sim_s3_not_judged"] == "sim_s3: no FixRateEvent of the kind in the store"
     assert got["history_sim_s3_events"] == 0 and "history_sim_s3_fix_rate" not in got
     assert "history_sim_s2_events" not in got  # only the kinds asked for
 

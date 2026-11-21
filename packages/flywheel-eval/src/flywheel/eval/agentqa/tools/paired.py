@@ -71,13 +71,13 @@ def paired_compare(book: FactBook, a: RunScores, b: RunScores,
     chosen = list(levels) if levels is not None else a.levels()
     sa = {(s.level, a.key(s)): int(bool(s.success)) for s in a.scores if s.level in chosen}
     sb = {(s.level, b.key(s)): int(bool(s.success)) for s in b.scores if s.level in chosen}
+    name = f"{a.run}_vs_{b.run}_l{'+'.join(str(lv) for lv in chosen)}"
     if sa.keys() != sb.keys():
         only = sorted(str(k) for k in sa.keys() ^ sb.keys())[:5]
         return not_judged(book, TOOL, f"{a.run} and {b.run} cover different conditions, "
-                          f"e.g. {', '.join(only)}", ref, f"{a.run}_vs_{b.run}")
+                          f"e.g. {', '.join(only)}", ref, name)
     if not sa:
-        return not_judged(book, TOOL, f"no condition at levels {chosen}", ref,
-                          f"{a.run}_vs_{b.run}")
+        return not_judged(book, TOOL, f"no condition at levels {chosen}", ref, name)
     # Condition order fixes the bootstrap draws: (level, condition), as eval_results does.
     groups = [[sa[k] - sb[k] for k in sorted(sa) if k[0] == level]
               for level in chosen]
@@ -87,7 +87,6 @@ def paired_compare(book: FactBook, a: RunScores, b: RunScores,
     b_only = sum(1 for k in sa if sa[k] < sb[k])
     low, high = bootstrap_ci(groups, stats)
     diff = sum(sum(g) for g in groups) / n
-    name = f"{a.run}_vs_{b.run}_l{'+'.join(str(lv) for lv in chosen)}"
     wa, wb = wilson(sum(sa.values()), n), wilson(sum(sb.values()), n)
     facts = [
         book.add(f"{name}_conditions", n, ref, "conditions"),

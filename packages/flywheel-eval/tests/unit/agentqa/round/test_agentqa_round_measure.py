@@ -62,8 +62,10 @@ def test_a_round_writes_every_file_and_the_published_numbers(
 
 def test_same_pack_and_plan_give_the_same_bytes(make_pack: PackMaker, tmp_path: Path) -> None:
     pack = make_pack()
-    run_round(pack, tmp_path / "a", now=NOW)
-    run_round(pack, tmp_path / "b", now=NOW)
+    # each round appends to the ledger it reads, so two rounds see the same store state
+    # only from two empty stores
+    run_round(pack, tmp_path / "a", now=NOW, store=tmp_path / "store-a")
+    run_round(pack, tmp_path / "b", now=NOW, store=tmp_path / "store-b")
     for name in ("facts.jsonl", "tool_calls.jsonl", "tables/T6-paired_compare.json"):
         assert (tmp_path / "a" / name).read_bytes() == (tmp_path / "b" / name).read_bytes()
 

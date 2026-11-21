@@ -122,7 +122,11 @@ class GatewayReply:
 
 @dataclass
 class Usage:
-    """Provider calls of this gateway (replays cost nothing), for run.json and the ledger."""
+    """Provider calls of the run directory (replays cost nothing), for run.json and the ledger.
+
+    Rebuilt from `model_calls.jsonl` when a gateway is built, so the caps of the budget
+    hold across commands on one run directory, not per command.
+    """
 
     calls: int = 0
     tokens_in: int = 0
@@ -134,7 +138,7 @@ class Usage:
 
 
 class Gateway:
-    """See the module docstring. One gateway per run directory and command."""
+    """See the module docstring. One gateway per command; usage and caps are the run directory's."""
 
     def __init__(self, run_dir: Path, config: GatewayConfig, *,
                  factory: ProviderFactory | None = None,
@@ -157,8 +161,19 @@ class Gateway:
             for line in path.read_text(encoding="utf-8").splitlines():
                 record = ModelCallRecord.model_validate_json(line)
                 self._lines += 1
+                self._recount(record)
                 if record.status in REPLAYABLE:
                     self._answered[record.request_sha256] = record
+
+    def _recount(self, record: ModelCallRecord) -> None:
+        """Add a recorded line to the usage: the caps are those of the run directory."""
+        used = self.usage
+        used.calls += record.tries
+        used.tokens_in += record.tokens_in
+        used.tokens_out += record.tokens_out
+        used.usd += record.usd
+        if record.tries:
+            used.hosts.add(record.host)
 
     @property
     def data_class(self) -> str:

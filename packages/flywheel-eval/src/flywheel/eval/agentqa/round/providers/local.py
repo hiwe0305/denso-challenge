@@ -7,6 +7,7 @@ the timeout below the endpoint's own; it never raises them.
 
 from __future__ import annotations
 
+import urllib.error
 from dataclasses import dataclass, replace
 from typing import Any
 from urllib.parse import urlparse
@@ -18,6 +19,21 @@ from flywheel.eval.agentqa.round.providers import ProviderError, ProviderReply
 def _count(usage: dict[str, Any] | None, key: str) -> int | None:
     value = usage.get(key) if usage else None
     return value if isinstance(value, int) and value >= 0 else None
+
+
+def retryable(error: EndpointError) -> bool:
+    """Whether sending the same request again can help: a network error, a timeout, 429, 5xx.
+
+    `EndpointError` carries no status code or kind of its own; `endpoint.complete` raises it
+    `from` the urllib exception, so the cause is read, never the message. An HTTP status
+    other than 429 and 5xx (a 400 for a bad request, a refused redirect) and a reply that
+    is not a chat reply (bad JSON, no message) are not retried. Cleaner would be a
+    `status` attribute on `EndpointError` in `endpoint.py`.
+    """
+    cause = error.__cause__
+    if isinstance(cause, urllib.error.HTTPError):  # before URLError and OSError, its bases
+        return cause.code == 429 or cause.code >= 500
+    return isinstance(cause, urllib.error.URLError | OSError)  # incl. TimeoutError
 
 
 @dataclass(frozen=True)
@@ -65,7 +81,7 @@ class LocalEndpointModel:
         except ReplyCut as error:
             text, cut = error.content, True
         except EndpointError as error:
-            raise ProviderError(str(error), retryable=not self._window_too_small()) from error
+            raise ProviderError(str(error), retryable=retryable(error)) from error
         usage = call.last_usage
         return ProviderReply(text=text, tokens_in=_count(usage, "prompt_tokens"),
                              tokens_out=_count(usage, "completion_tokens"), cut=cut)

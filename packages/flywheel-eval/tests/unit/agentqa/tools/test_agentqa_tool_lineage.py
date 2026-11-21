@@ -72,3 +72,26 @@ def test_a_checkpoint_in_two_jobs_is_ambiguous() -> None:
     jobs = {**JOBS, "K": job_of("K", [metric("K", 10, 1.0)])}
     _, got = run(entries(), jobs=jobs)
     assert "more than one job" in str(got["lineage_R_job_not_judged"])
+
+
+def _unset(job: str, **ids: str | None):  # type: ignore[no-untyped-def]
+    """A log row whose ids are None, as a record that skipped validation would be."""
+    row = metric(job, 10, 1.0)
+    return job_of(job, [type(row).model_construct(**{**row.model_dump(), **ids})])
+
+
+def test_a_broken_link_is_not_followed_by_rows_whose_id_is_none() -> None:
+    jobs = {"N": _unset("N", checkpoint_id=None, release_id=None)}
+    result, got = run(entries(checkpoint=None), jobs=jobs)  # no checkpoint anywhere
+    assert [n for n in got if n.endswith("_not_judged")] == ["lineage_R_checkpoint_not_judged"]
+    assert "lineage_R_job" not in got and "lineage_R_job_not_judged" not in got
+    assert dict(result.rows[0])["job"] == "blocked"
+
+
+def test_a_release_id_of_none_is_a_reason_not_an_empty_string() -> None:
+    jobs = {"N": _unset("N", release_id=None)}
+    result, got = run(entries(), jobs=jobs)
+    assert got["lineage_R_job"] == "N" and "lineage_R_release" not in got
+    assert str(got["lineage_R_release_not_judged"]).strip()
+    assert all(r.strip() for r in result.not_judged)
+    assert all(str(book_value).strip() for book_value in got.values())
