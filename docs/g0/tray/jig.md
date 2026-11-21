@@ -419,10 +419,10 @@ cd ~/denso-da41 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src fwdata/
 |---|---|
 | Thư mục | `~/denso-da41/fwdata/da41-jig-600/` (`$B`): `gen-l1/`, `gen-l2/`, `releases/`, `pipeline/`, `replay17/`, `reports/`, ledger `fw/` và `sites/` (append-only, giữ) |
 | Số lượt | 632 lượt, để còn khoảng 600 episode với tỉ lệ giữ 95 % của lô mẫu |
-| Chia mức | Theo lô 606 cũ: phần kho 429 episode toàn mức 1; phần nhắm lỗi 177 episode, 82 mức 1 và 78 mức 2 theo `cplus-selection.jsonl`, 17 không rõ mức. Tổng khoảng 86 % mức 1, 14 % mức 2. Lô mới: **544 lượt mức 1, 88 lượt mức 2** |
-| Seed | Train, chưa dùng ở đâu: mức 1 `500000–500543`, mức 2 `501000–501087`. Đã dùng: 0–143, 1000–1609, 100000–199999, 300000–300089, 400000–400109 (lô mẫu), 400200–400202 (đối chứng 8.2) |
-| Worker | Mức 1: 12, mức 2: 2, chạy cùng lúc, tổng 14 (giới hạn máy dùng chung là 22) |
-| Thời gian (ước lượng) | Sinh 632 × 82 s ≈ 14,4 giờ-worker, khoảng 1,1 giờ đồng hồ. QA phát lại 600 × 88 s ≈ 14,7 giờ-worker, khoảng 1,1 giờ. Phát lại DA-17 cỡ QA phát lại (trên laptop 30–34 s mỗi episode, ngang QA phát lại), khoảng 1,1 giờ. Tổng khoảng 3,5–4 giờ. Số giây mỗi lượt lấy từ lô 872 lượt của mục 5.1 [target-zone.md](target-zone.md); chưa đo trên cảnh đồ gá ở `rtx3060` |
+| Chia mức | Theo lô 606 cũ: phần kho 429 episode toàn mức 1; phần nhắm lỗi 177 episode, 82 mức 1 và 78 mức 2 theo `cplus-selection.jsonl`, 17 không rõ mức. Tổng khoảng 86 % mức 1, 14 % mức 2. **PO (Hiếu) chọn ngày 21/11/2026 tăng mức 2 lên khoảng 30 %**, vì eval chia đều hai mức và mục tiêu là nâng chỉ số của policy, không phải so với lô cũ; đổi lại, kết quả train trên lô này không so thẳng được với lô 606. Lô mới: **442 lượt mức 1, 190 lượt mức 2** |
+| Seed | Train, chưa dùng ở đâu: mức 1 `500000–500441`, mức 2 `501000–501189`. Đã dùng: 0–143, 1000–1609, 100000–199999, 300000–300089, 400000–400109 (lô mẫu), 400200–400202 (đối chứng 8.2) |
+| Worker | Mức 1: 10, mức 2: 4, chạy cùng lúc, tổng 14 (giới hạn máy dùng chung là 22) |
+| Thời gian (ước lượng) | Sinh 632 × 82 s ≈ 14,4 giờ-worker, khoảng 1,1 giờ đồng hồ (mức 1: 442 lượt trên 10 worker, mức 2: 190 lượt trên 4 worker, mỗi mức khoảng 1,0–1,1 giờ nếu hai mức tốn cùng số giây mỗi lượt; chưa đo riêng mức 2). QA phát lại 600 × 88 s ≈ 14,7 giờ-worker, khoảng 1,1 giờ. Phát lại DA-17 cỡ QA phát lại (trên laptop 30–34 s mỗi episode, ngang QA phát lại), khoảng 1,1 giờ. Tổng khoảng 3,5–4 giờ. Số giây mỗi lượt lấy từ lô 872 lượt của mục 5.1 [target-zone.md](target-zone.md); chưa đo trên cảnh đồ gá ở `rtx3060` |
 | Dung lượng (ước lượng) | Lô mẫu: thô 8,9 MB, release 8,2 MB mỗi episode. 600 episode: thô khoảng 5,4 GB, release khoảng 4,9 GB, cộng thư mục làm việc, tổng khoảng 11 GB |
 | Chưa gồm | Dữ liệu riêng cho bước đặt (đoạn hạ và nhả). Đây là việc sau |
 
@@ -437,11 +437,11 @@ mkdir -p ~/denso-da41/fwdata/da41-jig-600 && df -h ~/denso-da41/fwdata
 **Bước 1. Sinh**, hai mức chạy cùng lúc:
 
 ```bash
-cd ~/denso-da41 && B=$PWD/fwdata/da41-jig-600 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src nohup setsid systemd-run --user --scope -p MemoryMax=48G -p MemorySwapMax=0 fwdata/simple/.venv/bin/python scripts/g0/tray/generate.py --scene jig --out $B/gen-l1 --n 544 --level 1 --seed-start 500000 --workers 12 > $B/gen-l1.log 2>&1 < /dev/null &
+cd ~/denso-da41 && B=$PWD/fwdata/da41-jig-600 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src nohup setsid systemd-run --user --scope -p MemoryMax=48G -p MemorySwapMax=0 fwdata/simple/.venv/bin/python scripts/g0/tray/generate.py --scene jig --out $B/gen-l1 --n 442 --level 1 --seed-start 500000 --workers 10 > $B/gen-l1.log 2>&1 < /dev/null &
 ```
 
 ```bash
-cd ~/denso-da41 && B=$PWD/fwdata/da41-jig-600 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src nohup setsid systemd-run --user --scope -p MemoryMax=8G -p MemorySwapMax=0 fwdata/simple/.venv/bin/python scripts/g0/tray/generate.py --scene jig --out $B/gen-l2 --n 88 --level 2 --seed-start 501000 --workers 2 > $B/gen-l2.log 2>&1 < /dev/null &
+cd ~/denso-da41 && B=$PWD/fwdata/da41-jig-600 && MUJOCO_GL=egl PYTHONPATH=packages/flywheel-simple/src nohup setsid systemd-run --user --scope -p MemoryMax=16G -p MemorySwapMax=0 fwdata/simple/.venv/bin/python scripts/g0/tray/generate.py --scene jig --out $B/gen-l2 --n 190 --level 2 --seed-start 501000 --workers 4 > $B/gen-l2.log 2>&1 < /dev/null &
 ```
 
 Đọc kết quả (tiến độ, và khi xong): số lượt, số ghi được, tỉ lệ, phiên bản planner (phải chỉ có `da41-planner-8+cfg.bee61399`), lỗi:
@@ -476,7 +476,7 @@ cd ~/denso-da41 && B=$PWD/fwdata/da41-jig-600 && for L in 1 2; do PYTHONPATH=pac
 cd ~/denso-da41 && export FW_ROOT=$PWD/fwdata/da41-jig-600 && for R in $FW_ROOT/releases/tray_s1_*; do uv run fw data ingest $R --source-detail planner_wbc --license unknown --data-class public --split train 2>&1 | tail -2; done; ls -d $FW_ROOT/pipeline/src_*
 ```
 
-Ghi lại cặp `src_…` và `tray_s1_…` của từng mức. Release mức 1 có khoảng 520 episode, mức 2 khoảng 85. Các bước sau dùng hai biến `SRC` (cột đầu) và `REL` (tên thư mục sau `releases/`) cho từng mức:
+Ghi lại cặp `src_…` và `tray_s1_…` của từng mức. Release mức 1 có khoảng 420 episode, mức 2 khoảng 180. Các bước sau dùng hai biến `SRC` (cột đầu) và `REL` (tên thư mục sau `releases/`) cho từng mức:
 
 ```bash
 cd ~/denso-da41/fwdata/da41-jig-600 && for W in pipeline/src_*; do python3 -c "import json; d=json.load(open('$W/ingest.json')); print(d['source_id'], d['store_path'], d['episodes'], 'episode')"; done
