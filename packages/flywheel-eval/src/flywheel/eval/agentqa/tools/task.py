@@ -108,7 +108,8 @@ def task_lookup(book: FactBook, task: TaskView, step: str | None = None) -> Tool
     tool = "task_lookup"
     ref = task.source_ref
     if step is not None and step not in task.steps:
-        return not_judged(book, tool, f"{step!r} is not a step of {task.task_id}", ref)
+        return not_judged(book, tool, f"{step!r} is not a step of {task.task_id}", ref,
+                          step)
     facts = [book.add("task_steps", len(task.steps), ref, "steps")]
     rows: list[Row] = []
     for k, name in enumerate(task.steps):

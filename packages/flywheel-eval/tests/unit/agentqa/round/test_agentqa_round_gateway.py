@@ -140,6 +140,32 @@ def test_max_calls_stops_the_gateway_without_raising(tmp_path: Path) -> None:
     assert [x.tries for x in lines(run)] == [1, 1, 0, 0]
 
 
+def test_the_budget_holds_across_commands_on_one_run_directory(tmp_path: Path) -> None:
+    run = admitted_run(tmp_path)
+    budget = Budget(max_calls=2, max_input_tokens=10_000, max_usd=0, chars_per_token=2)
+    local = ScriptedChat([ProviderError("down")] * 10)
+    for command in range(3):  # three commands, each builds its own gateway
+        gateway = Gateway(run, make_config(budget=budget, retries=0),
+                          factory=Factory(local=local), sleep=lambda s: None)
+        gateway.call("rank", request(unit=f"u{command}"))
+    assert len(local.calls) == 2  # not 3 (one per command) and not 6
+    assert gateway.usage.calls == 2 and gateway.usage.exhausted == "max_calls 2"
+
+
+def test_recorded_tokens_and_dollars_are_counted_again_on_a_new_command(
+        tmp_path: Path) -> None:
+    run = admitted_run(tmp_path)
+    first = Gateway(run, make_config(), factory=Factory(local=ScriptedChat(["a", "b"])))
+    first.call("rank", request(unit="a"))
+    first.call("rank", request(unit="b"))
+    local = ScriptedChat(["c"])
+    again = Gateway(run, make_config(), factory=Factory(local=local))
+    assert (again.usage.calls, again.usage.tokens_in) == (2, 200)
+    assert again.usage.tokens_out == 40 and again.usage.usd == first.usage.usd
+    again.call("rank", request(unit="a"))  # replayed: costs nothing new
+    assert again.usage.calls == 2 and again.usage.replayed == 1 and local.calls == []
+
+
 def test_input_tokens_are_capped_before_the_call(tmp_path: Path) -> None:
     budget = Budget(max_calls=10, max_input_tokens=50, max_usd=0, chars_per_token=2)
     local = ScriptedChat(["a"])
@@ -203,7 +229,7 @@ def test_a_recorded_request_is_answered_from_the_file(tmp_path: Path) -> None:
     second = Gateway(run, make_config(), factory=Factory(local=again))
     replayed = second.call("rank", request())
     assert (replayed.text, replayed.replayed, replayed.call_id) == ("A", True, "M1")
-    assert again.calls == [] and second.usage.calls == 0
+    assert again.calls == [] and second.usage.calls == 1  # the recorded one, no new call
     assert second.call("rank", request(max_tokens=300)).text == "B"  # another request
     records = lines(run)
     assert [r.call_id for r in records] == ["M1", "M2"]

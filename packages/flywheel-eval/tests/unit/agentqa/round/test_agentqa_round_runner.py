@@ -104,6 +104,19 @@ def test_the_agent_hash_covers_the_gateway_config(tmp_path: Path, name: str) -> 
     assert agent_hash("tray", plan, root) != first
 
 
+@pytest.mark.parametrize("name", ["agentqa/agent.yaml", "diagnosis/system.yaml"])
+def test_the_agent_hash_covers_the_agent_and_system_configs(tmp_path: Path, name: str) -> None:
+    import shutil
+
+    configs = tmp_path / "configs" / "eval"
+    shutil.copytree(CONFIG_ROOT, configs / "agentqa")
+    shutil.copytree(CONFIG_ROOT.parent / "diagnosis", configs / "diagnosis")
+    root = configs / "agentqa"
+    first = agent_hash("tray", root=root)
+    (configs / name).write_text((configs / name).read_text() + "\n# touched\n")
+    assert agent_hash("tray", root=root) != first
+
+
 # point 5 -------------------------------------------------------------------------------
 
 def test_a_wrong_pack_or_plan_path_leaves_nothing(make_pack: PackMaker, tmp_path: Path) -> None:
