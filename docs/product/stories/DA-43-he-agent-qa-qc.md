@@ -38,7 +38,7 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
 
 - [x] 0. Design và story (docs), chờ Hiếu duyệt
 - [ ] 1. Nền (1 ngày)
-  - [ ] 1.1 Issue "Contract change" cho K1 (cùng DA-42), K2, K3; soạn PR hợp đồng trên `DA-43-contract` kèm file mẫu và test (PR riêng, không thuộc phạm vi file dưới đây)
+  - [x] 1.1 Issue "Contract change" cho K1 (cùng DA-42), K2, K3; soạn PR hợp đồng trên `DA-43-contract` kèm file mẫu và test (PR riêng, không thuộc phạm vi file dưới đây)
   - [x] 1.2 Lệnh xuất eval khay sang `scores.jsonl` theo `Score` trong adapter `flywheel_psi0`; test trên một lô mẫu
   - [ ] 1.3 Gói vòng mẫu cho test: `Score`, `TraceStep`, `TrainingMetric`, `Condition`, outcome theo K1 khi có; dựng từ lô `C_70` giai đoạn 1, chỉ dữ liệu `public`
 - [ ] 2. Lớp công cụ, phần eval (2 ngày)
@@ -79,6 +79,16 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
 ## Phạm vi file
 
 Theo 07 mục 3.1. File story luôn được sửa. PR hợp đồng (nhiệm vụ 1.1) đi nhánh riêng `DA-43-contract`, không thuộc danh sách này. Không sửa `agentqa/bench/` (DA-31, của Châu), file của DA-41, DA-42, DA-44.
+
+Nhánh `DA-43-contract` (nhiệm vụ 1.1; K1–K3 đã được Hiếu duyệt trong design 19/11 mục 7.2 và kiến trúc 20/11 mục 14) chỉ sửa:
+
+- `packages/flywheel-contracts/src/flywheel/contracts/outcome.py`, `packages/flywheel-contracts/src/flywheel/contracts/agentqa.py`
+- `packages/flywheel-contracts/schemas/`
+- `packages/flywheel-contracts/tests/`
+- `packages/flywheel-testkit/src/flywheel/testkit/fixtures/artifacts/`
+- `docs/product/03-architecture.md`
+
+Danh sách chung của story:
 
 - `docs/superpowers/specs/2026-11-19-agent-qaqc-system-design.md`
 - `docs/superpowers/specs/2026-11-20-agent-qaqc-architecture-design.md`

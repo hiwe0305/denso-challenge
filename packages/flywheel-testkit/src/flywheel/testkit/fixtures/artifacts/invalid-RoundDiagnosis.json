@@ -1,0 +1,133 @@
+{
+  "round_id": "round_example",
+  "task_id": "tray_transfer",
+  "data_class": "public",
+  "created_at": "2026-11-21T10:00:00Z",
+  "agent_version": "4.0.0",
+  "agent_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "status": "degraded",
+  "problems": [
+    "no model profile was configured: every item is the code floor"
+  ],
+  "report_ids": [
+    "rep_eval_001"
+  ],
+  "facts": [
+    {
+      "fact_id": "F1",
+      "name": "carry_pass_rate",
+      "value": 0.5,
+      "unit": "",
+      "source_ref": "eval/example_run/outcomes.jsonl",
+      "origin": "code"
+    },
+    {
+      "fact_id": "F2",
+      "name": "tracking_p99_exceeds_tau",
+      "value": true,
+      "unit": "",
+      "source_ref": "eval/example_run/outcomes.jsonl"
+    },
+    {
+      "fact_id": "F3",
+      "name": "scorer_versions_agree",
+      "value": false,
+      "unit": "",
+      "source_ref": "eval/example_run/outcomes.jsonl"
+    },
+    {
+      "fact_id": "F4",
+      "name": "tray_tilted_in_frame",
+      "value": true,
+      "unit": "",
+      "source_ref": "eval/example_run/outcomes.jsonl",
+      "origin": "vision"
+    }
+  ],
+  "clusters": [
+    {
+      "cluster_id": "example_run/carry/L-TRAY-TILT/l1",
+      "run": "example_run",
+      "step": "carry",
+      "label": "L-TRAY-TILT",
+      "level": 1,
+      "size": 6,
+      "blocked_data_spend": true
+    }
+  ],
+  "headline_cluster_id": "example_run/carry/L-TRAY-TILT/l1",
+  "hypotheses": [
+    {
+      "hypothesis_id": "H1",
+      "cluster_id": "example_run/carry/L-TRAY-TILT/l1",
+      "diagnosis": "controller",
+      "note": "arm tracking lags the command while carrying",
+      "rule_id": "runtime.tracking",
+      "rank": 1,
+      "support": [
+        "F2",
+        "F4"
+      ],
+      "contra": [],
+      "explanation": "Tracking exceeds its bound ({F2}) while only {F1} of rollouts pass.",
+      "source": "code"
+    },
+    {
+      "hypothesis_id": "H2",
+      "cluster_id": "example_run/carry/L-TRAY-TILT/l1",
+      "diagnosis": "weak_skill",
+      "note": "the policy tilts the tray when it turns",
+      "rule_id": "data.weak_skill",
+      "rank": 2,
+      "support": [
+        "F1"
+      ],
+      "contra": [
+        "F2",
+        "F3"
+      ],
+      "explanation": "Only 3 of 6 rollouts pass the carry step.",
+      "source": "code"
+    }
+  ],
+  "checks": [
+    {
+      "check_id": "C1",
+      "name": "replay_command_open_loop",
+      "cluster_id": "example_run/carry/L-TRAY-TILT/l1",
+      "separates": [
+        [
+          "H1",
+          "H2"
+        ]
+      ],
+      "cost": {
+        "measure_kind": "estimated",
+        "usd_amount": 0.5,
+        "human_hours": 0.0,
+        "ledger_entry_ids": [
+          "led_01JD0000000000000000000000"
+        ]
+      },
+      "source": "code"
+    }
+  ],
+  "proposals": [
+    {
+      "proposal_id": "P1",
+      "hypothesis_id": "H1",
+      "proposal": {
+        "kind": "repair_ticket",
+        "description": "Open a ticket on the arm tracking gains of the controller.",
+        "consumes_budget": false
+      },
+      "source": "code"
+    }
+  ],
+  "not_judged": [
+    {
+      "what": "camera calibration",
+      "reason": "no camera reference in the pack"
+    }
+  ]
+}

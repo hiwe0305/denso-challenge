@@ -14,6 +14,8 @@ from flywheel.contracts.agentqa import (
     AgentReport,
     AgentReview,
     FindingDecision,
+    RoundDiagnosis,
+    bare_numbers,
 )
 from pydantic import ValidationError
 
@@ -284,8 +286,109 @@ def test_check_against_refuses_unknown_findings_and_other_reports() -> None:
 
 
 def test_schemas_match_committed_files() -> None:
-    for model in (AgentReport, AgentReview):
+    for model in (AgentReport, AgentReview, RoundDiagnosis):
         schema_path = SCHEMAS_DIR / f"{model.__name__}.json"
         assert schema_path.is_file(), f"Missing schema file: {schema_path}"
         committed = json.loads(schema_path.read_text(encoding="utf-8"))
         assert committed == model.model_json_schema()
+
+
+# --- DA-43 K3: origin and agent version, optional ------------------------------------
+
+
+@pytest.mark.parametrize("name", sorted(p.name for p in FIXTURES_DIR.glob("AgentReport*.json")))
+def test_reports_without_k3_fields_default_to_code(name: str) -> None:
+    raw = json.loads((FIXTURES_DIR / name).read_text(encoding="utf-8"))
+    assert "agent_version" not in raw
+    report = AgentReport.model_validate(raw)
+    assert report.agent_version is None
+    assert all(f.origin == "code" for f in report.facts)
+    assert all(f.origin == "code" for f in report.findings)
+
+
+def test_k3_fields_round_trip_and_refuse_unknown_origin() -> None:
+    raw = json.loads((FIXTURES_DIR / "AgentReport.json").read_text(encoding="utf-8"))
+    raw["agent_version"] = "4.0.0"
+    raw["facts"][0]["origin"] = "vision"
+    raw["findings"][0]["origin"] = "hint"
+    report = AgentReport.model_validate(raw)
+    assert AgentReport.model_validate_json(report.model_dump_json()) == report
+    raw["facts"][0]["origin"] = "guess"
+    with pytest.raises(ValidationError):
+        AgentReport.model_validate(raw)
+
+
+# --- DA-43 K2: RoundDiagnosis ---------------------------------------------------------
+
+
+def _round() -> dict:
+    return json.loads((FIXTURES_DIR / "RoundDiagnosis.json").read_text(encoding="utf-8"))
+
+
+def test_round_fixture_validates_and_round_trips() -> None:
+    value = RoundDiagnosis.model_validate(_round())
+    assert value.status == "degraded"
+    assert [h.rank for h in value.hypotheses] == [1, 2]
+    assert RoundDiagnosis.model_validate_json(value.model_dump_json()) == value
+
+
+def test_invalid_round_fixture_fails_on_a_bare_number() -> None:
+    raw = json.loads((FIXTURES_DIR / "invalid-RoundDiagnosis.json").read_text(encoding="utf-8"))
+    with pytest.raises(ValidationError, match="writes number"):
+        RoundDiagnosis.model_validate(raw)
+
+
+@pytest.mark.parametrize(
+    ("text", "numbers"),
+    [
+        ("{F1} of rollouts pass", []),
+        ("p99 of H2 on episode_000012 and T1", []),
+        ("Only 3 of 6 pass", ["3", "6"]),
+        ("tilt above 0.4 rad", ["0", "4"]),
+        ("45/90", ["4", "9"]),
+    ],
+)
+def test_bare_numbers(text: str, numbers: list[str]) -> None:
+    assert bare_numbers(text) == numbers
+
+
+def _broken(mutate) -> dict:  # type: ignore[no-untyped-def]
+    raw = _round()
+    mutate(raw)
+    return raw
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (lambda r: r["facts"].append(dict(r["facts"][0])), "fact ids must be unique"),
+        (lambda r: r["report_ids"].append("rep_eval_001"), "report ids must be unique"),
+        (lambda r: r["hypotheses"][1].update(hypothesis_id="H1"), "hypothesis ids must be unique"),
+        (lambda r: r["hypotheses"][1].update(rank=1), "rank 1 is taken"),
+        (lambda r: r["hypotheses"][0].update(cluster_id="nope"), "unknown cluster"),
+        (lambda r: r["hypotheses"][0].update(support=["F9"]), "unknown fact"),
+        (lambda r: r["hypotheses"][0].update(explanation="see {F9}"), "unknown fact"),
+        (lambda r: r["hypotheses"][0].update(support=["F4"]), "beyond vision facts"),
+        (lambda r: r["checks"][0].update(separates=[["H1", "H9"]]), "unknown hypothesis"),
+        (lambda r: r["checks"][0].update(separates=[["H1", "H1"]]), "two different"),
+        (lambda r: r["checks"][0].update(cluster_id="nope"), "unknown cluster"),
+        (lambda r: r["proposals"][0].update(hypothesis_id="H9"), "unknown hypothesis"),
+        (lambda r: r["proposals"][0].update(hypothesis_id="H2"), "weak_skill may propose"),
+        (lambda r: r["not_judged"][0].update(fact_id="F9"), "unknown fact"),
+        (lambda r: r.update(headline_cluster_id="nope"), "headline cluster"),
+        (lambda r: r.update(problems=[]), "degraded or broken needs at least one"),
+        (lambda r: r.update(status="ok"), "status ok needs no problems"),
+        (lambda r: r.update(agent_hash="abc"), "agent_hash"),
+        (lambda r: r.update(created_at="2026-11-21T10:00:00"), "timezone"),
+        (lambda r: r["facts"][0].update(source_ref="vault/x.json"), "vault"),
+    ],
+)
+def test_round_rules(mutate, message: str) -> None:  # type: ignore[no-untyped-def]
+    with pytest.raises(ValidationError, match=message):
+        RoundDiagnosis.model_validate(_broken(mutate))
+
+
+def test_round_ok_with_no_hypotheses() -> None:
+    raw = _round()
+    raw.update(status="ok", problems=[], hypotheses=[], checks=[], proposals=[])
+    assert RoundDiagnosis.model_validate(raw).status == "ok"

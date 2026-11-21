@@ -1,0 +1,668 @@
+{
+  "$defs": {
+    "AgentFact": {
+      "additionalProperties": false,
+      "description": "A deterministic fact computed by code that the agent's prose can reference.",
+      "properties": {
+        "fact_id": {
+          "pattern": "^F[0-9]+$",
+          "title": "Fact Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "title": "Value"
+        },
+        "unit": {
+          "default": "",
+          "title": "Unit",
+          "type": "string"
+        },
+        "source_ref": {
+          "minLength": 1,
+          "title": "Source Ref",
+          "type": "string"
+        },
+        "origin": {
+          "default": "code",
+          "enum": [
+            "code",
+            "hint",
+            "vision",
+            "history"
+          ],
+          "title": "Origin",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fact_id",
+        "name",
+        "value",
+        "source_ref"
+      ],
+      "title": "AgentFact",
+      "type": "object"
+    },
+    "Cost": {
+      "additionalProperties": false,
+      "description": "Money and hours, estimated or measured, as the ledger rows add them up.",
+      "properties": {
+        "measure_kind": {
+          "enum": [
+            "estimated",
+            "measured"
+          ],
+          "title": "Measure Kind",
+          "type": "string"
+        },
+        "usd_amount": {
+          "minimum": 0,
+          "title": "Usd Amount",
+          "type": "number"
+        },
+        "human_hours": {
+          "default": 0.0,
+          "minimum": 0,
+          "title": "Human Hours",
+          "type": "number"
+        },
+        "ledger_entry_ids": {
+          "items": {
+            "pattern": "^led_[0-9A-HJKMNP-TV-Z]{26}$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Ledger Entry Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "measure_kind",
+        "usd_amount",
+        "ledger_entry_ids"
+      ],
+      "title": "Cost",
+      "type": "object"
+    },
+    "ExpectedGain": {
+      "additionalProperties": false,
+      "description": "g_j of spec section 6.11, in points of dev success.",
+      "properties": {
+        "n_failures": {
+          "minimum": 1,
+          "title": "N Failures",
+          "type": "integer"
+        },
+        "cap": {
+          "minimum": 1,
+          "title": "Cap",
+          "type": "integer"
+        },
+        "n_effective": {
+          "minimum": 1,
+          "title": "N Effective",
+          "type": "integer"
+        },
+        "n_dev": {
+          "minimum": 1,
+          "title": "N Dev",
+          "type": "integer"
+        },
+        "fix_rate_alpha": {
+          "exclusiveMinimum": 0,
+          "title": "Fix Rate Alpha",
+          "type": "number"
+        },
+        "fix_rate_beta": {
+          "exclusiveMinimum": 0,
+          "title": "Fix Rate Beta",
+          "type": "number"
+        },
+        "expected_gain_pp": {
+          "minimum": 0,
+          "title": "Expected Gain Pp",
+          "type": "number"
+        }
+      },
+      "required": [
+        "n_failures",
+        "cap",
+        "n_effective",
+        "n_dev",
+        "fix_rate_alpha",
+        "fix_rate_beta",
+        "expected_gain_pp"
+      ],
+      "title": "ExpectedGain",
+      "type": "object"
+    },
+    "InterventionProposal": {
+      "additionalProperties": false,
+      "description": "What the algorithm proposes for the cluster (spec sections 6.9-6.11).",
+      "properties": {
+        "kind": {
+          "enum": [
+            "sim_s1",
+            "sim_s2",
+            "sim_s3",
+            "sim_s4",
+            "teleop_correction",
+            "recovery_data",
+            "repair_ticket",
+            "report_only"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "consumes_budget": {
+          "title": "Consumes Budget",
+          "type": "boolean"
+        },
+        "quantity": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quantity"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        },
+        "gain": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExpectedGain"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "cost": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Cost"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "intervention_id": {
+          "anyOf": [
+            {
+              "pattern": "^iv_[0-9A-HJKMNP-TV-Z]{26}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Intervention Id"
+        }
+      },
+      "required": [
+        "kind",
+        "description",
+        "consumes_budget"
+      ],
+      "title": "InterventionProposal",
+      "type": "object"
+    },
+    "NotJudged": {
+      "additionalProperties": false,
+      "description": "Something the round could not judge, and why (missing signal or artifact).",
+      "properties": {
+        "what": {
+          "minLength": 1,
+          "title": "What",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "fact_id": {
+          "anyOf": [
+            {
+              "pattern": "^F[0-9]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fact Id"
+        }
+      },
+      "required": [
+        "what",
+        "reason"
+      ],
+      "title": "NotJudged",
+      "type": "object"
+    },
+    "RoundCluster": {
+      "additionalProperties": false,
+      "description": "A failure cluster of the round: which run, step, label and level, and how many.",
+      "properties": {
+        "cluster_id": {
+          "minLength": 1,
+          "title": "Cluster Id",
+          "type": "string"
+        },
+        "run": {
+          "minLength": 1,
+          "title": "Run",
+          "type": "string"
+        },
+        "step": {
+          "minLength": 1,
+          "title": "Step",
+          "type": "string"
+        },
+        "label": {
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "level": {
+          "minimum": 0,
+          "title": "Level",
+          "type": "integer"
+        },
+        "size": {
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        },
+        "blocked_data_spend": {
+          "title": "Blocked Data Spend",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "cluster_id",
+        "run",
+        "step",
+        "label",
+        "level",
+        "size",
+        "blocked_data_spend"
+      ],
+      "title": "RoundCluster",
+      "type": "object"
+    },
+    "RoundHypothesis": {
+      "additionalProperties": false,
+      "description": "A ranked cause of one cluster; its text writes no number, only `{F#}` placeholders.",
+      "properties": {
+        "hypothesis_id": {
+          "pattern": "^H[1-9][0-9]*$",
+          "title": "Hypothesis Id",
+          "type": "string"
+        },
+        "cluster_id": {
+          "minLength": 1,
+          "title": "Cluster Id",
+          "type": "string"
+        },
+        "diagnosis": {
+          "enum": [
+            "unknown",
+            "infra",
+            "controller",
+            "runtime",
+            "sync",
+            "calibration",
+            "infeasible",
+            "bad_start_state",
+            "perception",
+            "out_of_domain",
+            "coverage_gap",
+            "weak_skill"
+          ],
+          "title": "Diagnosis",
+          "type": "string"
+        },
+        "note": {
+          "description": "Subtype of the diagnosis, as the rule names it.",
+          "minLength": 1,
+          "title": "Note",
+          "type": "string"
+        },
+        "rule_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rule Id"
+        },
+        "rank": {
+          "minimum": 1,
+          "title": "Rank",
+          "type": "integer"
+        },
+        "support": {
+          "items": {
+            "pattern": "^F[0-9]+$",
+            "type": "string"
+          },
+          "title": "Support",
+          "type": "array"
+        },
+        "contra": {
+          "items": {
+            "pattern": "^F[0-9]+$",
+            "type": "string"
+          },
+          "title": "Contra",
+          "type": "array"
+        },
+        "explanation": {
+          "default": "",
+          "title": "Explanation",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "code",
+            "model"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "hypothesis_id",
+        "cluster_id",
+        "diagnosis",
+        "note",
+        "rank",
+        "source"
+      ],
+      "title": "RoundHypothesis",
+      "type": "object"
+    },
+    "RoundProposal": {
+      "additionalProperties": false,
+      "description": "An intervention proposed for one hypothesis; the engineer decides on the card.",
+      "properties": {
+        "proposal_id": {
+          "minLength": 1,
+          "title": "Proposal Id",
+          "type": "string"
+        },
+        "hypothesis_id": {
+          "pattern": "^H[1-9][0-9]*$",
+          "title": "Hypothesis Id",
+          "type": "string"
+        },
+        "proposal": {
+          "$ref": "#/$defs/InterventionProposal"
+        },
+        "source": {
+          "enum": [
+            "code",
+            "model"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "proposal_id",
+        "hypothesis_id",
+        "proposal",
+        "source"
+      ],
+      "title": "RoundProposal",
+      "type": "object"
+    },
+    "SeparatingCheck": {
+      "additionalProperties": false,
+      "description": "A check that tells two hypotheses of one cluster apart, and what it would cost.",
+      "properties": {
+        "check_id": {
+          "minLength": 1,
+          "title": "Check Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "cluster_id": {
+          "minLength": 1,
+          "title": "Cluster Id",
+          "type": "string"
+        },
+        "separates": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "minItems": 1,
+          "title": "Separates",
+          "type": "array"
+        },
+        "cost": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Cost"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "source": {
+          "enum": [
+            "code",
+            "model"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "check_id",
+        "name",
+        "cluster_id",
+        "separates",
+        "source"
+      ],
+      "title": "SeparatingCheck",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The agent's diagnosis of one round, read by the Console and the loop lane (DA-43 K2).\n\n`status` is the run status of architecture 20/11/2026 section 9: `ok` needs no\nproblem, `degraded` and `broken` need at least one that says why.",
+  "properties": {
+    "round_id": {
+      "minLength": 1,
+      "title": "Round Id",
+      "type": "string"
+    },
+    "task_id": {
+      "minLength": 1,
+      "title": "Task Id",
+      "type": "string"
+    },
+    "data_class": {
+      "enum": [
+        "public",
+        "internal",
+        "restricted"
+      ],
+      "title": "Data Class",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "agent_version": {
+      "minLength": 1,
+      "title": "Agent Version",
+      "type": "string"
+    },
+    "agent_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Agent Hash",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "degraded",
+        "broken"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "problems": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Problems",
+      "type": "array"
+    },
+    "report_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Report Ids",
+      "type": "array"
+    },
+    "facts": {
+      "items": {
+        "$ref": "#/$defs/AgentFact"
+      },
+      "title": "Facts",
+      "type": "array"
+    },
+    "clusters": {
+      "items": {
+        "$ref": "#/$defs/RoundCluster"
+      },
+      "title": "Clusters",
+      "type": "array"
+    },
+    "headline_cluster_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Headline Cluster Id"
+    },
+    "hypotheses": {
+      "items": {
+        "$ref": "#/$defs/RoundHypothesis"
+      },
+      "title": "Hypotheses",
+      "type": "array"
+    },
+    "checks": {
+      "items": {
+        "$ref": "#/$defs/SeparatingCheck"
+      },
+      "title": "Checks",
+      "type": "array"
+    },
+    "proposals": {
+      "items": {
+        "$ref": "#/$defs/RoundProposal"
+      },
+      "title": "Proposals",
+      "type": "array"
+    },
+    "not_judged": {
+      "items": {
+        "$ref": "#/$defs/NotJudged"
+      },
+      "title": "Not Judged",
+      "type": "array"
+    }
+  },
+  "required": [
+    "round_id",
+    "task_id",
+    "data_class",
+    "created_at",
+    "agent_version",
+    "agent_hash",
+    "status"
+  ],
+  "title": "RoundDiagnosis",
+  "type": "object"
+}

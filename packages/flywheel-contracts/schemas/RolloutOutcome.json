@@ -1,0 +1,262 @@
+{
+  "$defs": {
+    "ScorerVerdict": {
+      "additionalProperties": false,
+      "description": "One scorer version's verdict on a rollout: latched steps, success, failure.",
+      "properties": {
+        "scorer_version": {
+          "minLength": 1,
+          "title": "Scorer Version",
+          "type": "string"
+        },
+        "step_names": {
+          "items": {
+            "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Step Names",
+          "type": "array"
+        },
+        "step_latched": {
+          "items": {
+            "type": "boolean"
+          },
+          "title": "Step Latched",
+          "type": "array"
+        },
+        "step_latch_t": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Step Latch T"
+        },
+        "success": {
+          "title": "Success",
+          "type": "boolean"
+        },
+        "failure_label": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failure Label"
+        },
+        "failure_t": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failure T"
+        },
+        "at_failure": {
+          "anyOf": [
+            {
+              "patternProperties": {
+                "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$": {
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "items": {
+                        "type": "number"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "At Failure"
+        }
+      },
+      "required": [
+        "scorer_version",
+        "step_names",
+        "step_latched",
+        "success"
+      ],
+      "title": "ScorerVerdict",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The outcome of one eval rollout: who it is, what the scorers said, what was measured.",
+  "properties": {
+    "episode_id": {
+      "minLength": 1,
+      "title": "Episode Id",
+      "type": "string"
+    },
+    "run_plan_id": {
+      "minLength": 1,
+      "title": "Run Plan Id",
+      "type": "string"
+    },
+    "task_id": {
+      "minLength": 1,
+      "title": "Task Id",
+      "type": "string"
+    },
+    "run": {
+      "minLength": 1,
+      "title": "Run",
+      "type": "string"
+    },
+    "seed": {
+      "title": "Seed",
+      "type": "integer"
+    },
+    "level": {
+      "minimum": 0,
+      "title": "Level",
+      "type": "integer"
+    },
+    "repeat": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Repeat",
+      "type": "integer"
+    },
+    "sim_time_s": {
+      "minimum": 0,
+      "title": "Sim Time S",
+      "type": "number"
+    },
+    "control_steps": {
+      "minimum": 0,
+      "title": "Control Steps",
+      "type": "integer"
+    },
+    "verdict": {
+      "$ref": "#/$defs/ScorerVerdict"
+    },
+    "other_verdicts": {
+      "items": {
+        "$ref": "#/$defs/ScorerVerdict"
+      },
+      "title": "Other Verdicts",
+      "type": "array"
+    },
+    "final": {
+      "patternProperties": {
+        "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "title": "Final",
+      "type": "object"
+    },
+    "extrema": {
+      "patternProperties": {
+        "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "title": "Extrema",
+      "type": "object"
+    },
+    "videos": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Videos",
+      "type": "array"
+    }
+  },
+  "required": [
+    "episode_id",
+    "run_plan_id",
+    "task_id",
+    "run",
+    "seed",
+    "level",
+    "sim_time_s",
+    "control_steps",
+    "verdict"
+  ],
+  "title": "RolloutOutcome",
+  "type": "object"
+}
