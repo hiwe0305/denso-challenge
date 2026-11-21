@@ -164,10 +164,15 @@ def test_coverage_cost_and_history_land_in_the_run_directory(tmp_path: Path) -> 
     assert facts["cost_log_missing_signals_measured_quantity_median"].tool_call_id == "T2"
     assert facts["cost_sim_s1_measured_rows"].value == 0
     assert facts["history_sim_s1_fix_rate"].value == pytest.approx(0.4)
-    assert "history_lookup_not_judged" in facts  # sim_s2 was never tried
+    assert "history_sim_s2_not_judged" in facts  # sim_s2 was never tried
     assert sorted(p.name for p in (out / "tables").glob("*.json")) == [
         "T1-coverage_distance.json", "T3-history_lookup.json"]
     calls_back = [ToolCallRecord.model_validate_json(x)
                   for x in (out / "tool_calls.jsonl").read_text().splitlines()]
     assert [c.status for c in calls_back] == ["ran"] * 3
-    assert len(calls_back[0].input_sha256) == 3 and calls_back[1].input_sha256 == []
+    assert len(calls_back[0].input_sha256) == 3 and calls_back[0].store_reads == []
+    # the store tools hold no pack entry; what they read is in the record: table, rows, sha
+    for call, table, rows in ((calls_back[1], "ledger", 2), (calls_back[2], "fix_rate_event", 1)):
+        (read,) = call.store_reads
+        assert (read.table, read.rows, read.unreadable) == (table, rows, 0)
+        assert call.input_sha256 == [read.sha256]

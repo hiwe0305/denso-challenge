@@ -20,6 +20,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from flywheel.contracts.artifacts import DatasetReport, Episode
+from flywheel.contracts.training import TrainingMetric
 from flywheel.eval.agentqa.facts import FactBook, FactValue
 from flywheel.eval.agentqa.tools.base import (
     EntryView,
@@ -33,11 +34,12 @@ TOOL = "lineage"
 LINKS = ("checkpoint", "job", "release", "dataset")
 
 
-def _one(found: set[str], missing: str, ambiguous: str) -> tuple[str | None, str]:
-    """The single value of `found`, or None and why not."""
-    if len(found) == 1:
-        return next(iter(found)), ""
-    return None, missing if not found else f"{ambiguous}: {', '.join(sorted(found))}"
+def _one(found: set[str | None], missing: str, ambiguous: str) -> tuple[str | None, str]:
+    """The single id of `found`, or None and why not; an empty or None id is no id."""
+    ids = {i for i in found if i}
+    if len(ids) == 1:
+        return next(iter(ids)), ""
+    return None, missing if not ids else f"{ambiguous}: {', '.join(sorted(ids))}"
 
 
 def lineage(book: FactBook, runs: Sequence[RunScores], entries: Sequence[EntryView],
@@ -54,37 +56,41 @@ def lineage(book: FactBook, runs: Sequence[RunScores], entries: Sequence[EntryVi
         refs = dict.fromkeys(LINKS, run.ref)
         ids = {s.episode_id for s in run.scores}
         declared = by_ref[run.ref].subject.get("checkpoint") if run.ref in by_ref else None
-        recorded = {e.checkpoint_id for e in episodes
+        recorded: set[str | None] = {e.checkpoint_id for e in episodes
                     if e.episode_id in ids and e.checkpoint_id}
-        found = recorded | ({declared} if declared else set())
         got["checkpoint"], why["checkpoint"] = _one(
-            found, f"run {run.run}: no checkpoint is declared on its scores entry and no "
-            "Episode record of its rollouts carries one",
+            recorded | {declared}, f"run {run.run}: no checkpoint is declared on its scores "
+            "entry and no Episode record of its rollouts carries one",
             f"run {run.run}: declared and recorded checkpoints disagree")
-        rows_of = [r for j in jobs.values() for r in j.rows
-                   if r.checkpoint_id == got["checkpoint"]]
-        job_ids = {r.job_id for r in rows_of}
-        got["job"], why["job"] = _one(
-            job_ids, f"checkpoint {got['checkpoint']}: no TrainingMetric row carries it",
-            f"checkpoint {got['checkpoint']} is in more than one job")
-        job = got["job"]
+        # Each link is made from the one before it; once one is missing nothing is computed
+        # behind it, so no id of None is ever looked up.
+        checkpoint = got["checkpoint"]
+        rows_of: list[TrainingMetric] = []
+        if checkpoint:
+            rows_of = [r for j in jobs.values() for r in j.rows if r.checkpoint_id == checkpoint]
+            got["job"], why["job"] = _one(
+                {r.job_id for r in rows_of}, f"checkpoint {checkpoint}: no TrainingMetric row "
+                "carries it", f"checkpoint {checkpoint} is in more than one job")
+        job = got.get("job")
         if job:
             refs["job"] = refs["release"] = jobs[job].ref
-        got["release"], why["release"] = _one(
-            {r.release_id for r in rows_of if r.job_id == got["job"]},
-            f"job {got['job']}: no release_id", f"job {got['job']} has several releases")
-        wanted = [e for e in entries if e.kind == "dataset_report"
-                  and e.subject.get("release") == got["release"]]
-        got["dataset"], why["dataset"] = _one(
-            {reports[e.ref].dataset_id for e in wanted if e.ref in reports},
-            f"release {got['release']}: no dataset_report entry declares it as its release",
-            f"release {got['release']} has several dataset reports")
-        if wanted:
-            refs["dataset"] = wanted[0].ref
+            got["release"], why["release"] = _one(
+                {r.release_id for r in rows_of if r.job_id == job},
+                f"job {job}: no release_id", f"job {job} has several releases")
+        release = got.get("release")
+        if release:
+            wanted = [e for e in entries if e.kind == "dataset_report"
+                      and e.subject.get("release") == release]
+            got["dataset"], why["dataset"] = _one(
+                {reports[e.ref].dataset_id for e in wanted if e.ref in reports},
+                f"release {release}: no dataset_report entry declares it as its release",
+                f"release {release} has several dataset reports")
+            if wanted:
+                refs["dataset"] = wanted[0].ref
         broken = False
         row: dict[str, FactValue] = {"run": run.run}
         for link in LINKS:
-            value = got[link]
+            value = got.get(link)
             if broken:
                 row[link] = "blocked"
             elif value:

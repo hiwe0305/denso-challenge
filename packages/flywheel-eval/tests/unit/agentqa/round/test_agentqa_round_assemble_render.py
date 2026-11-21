@@ -109,12 +109,13 @@ def test_not_judged_collects_the_unjudged_things(round_out: Path) -> None:
         *((f"lineage_{r}_checkpoint_not_judged", f"run {r}: {no_ckpt}")
           for r in ("B_ALL", "C_ALL", "B_70", "C_70")),
         ("coverage_distance_not_judged", "no entry of kind conditions in the pack"),
-        ("cost_lookup_price_not_judged", "no price in the price book for cpu_seconds, "
-         "gpu_seconds, review_hour, sim_episode, teleop_episode"),
-        ("cost_lookup_measured_not_judged",
-         f"no measured ledger row of the kind for {unmeasured}"),
-        ("history_lookup_not_judged",
-         f"{untried_all}: no FixRateEvent of the kind in the store"),
+        *((f"cost_price_{rt}_not_judged", f"no price in the price book for {rt}")
+          for rt in ("cpu_seconds", "gpu_seconds", "review_hour", "sim_episode",
+                     "teleop_episode")),
+        *((f"cost_{n}_measured_not_judged", f"no measured ledger row of the kind for {n}")
+          for n in unmeasured.split(", ")),
+        *((f"history_{k}_not_judged", f"{k}: no FixRateEvent of the kind in the store")
+          for k in untried_all.split(", ")),
         ("trace_stats", "no entry of kind trace in the pack"),
         ("train_window", "no entry of kind metrics in the pack"),
         ("coverage_distance", "no entry of kind conditions in the pack"),

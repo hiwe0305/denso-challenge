@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+import hashlib
+import json
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 
 from flywheel.contracts.entities import Condition, Score
@@ -11,6 +13,29 @@ from flywheel.contracts.training import TrainingMetric
 from flywheel.eval.agentqa.facts import FactBook, FactValue
 
 Row = Mapping[str, FactValue]
+
+
+@dataclass(frozen=True)
+class StoreRead:
+    """What a store-reading tool read: the table, the rows that parsed, a hash over them.
+
+    `sha256` is over the canonical JSON of the rows read, projected on the fields the tool
+    uses (ids and timestamps are noise to it) and sorted, so it does not move with the order
+    of files; `unreadable` counts the rows that did not parse and are not in the hash.
+    """
+
+    table: str
+    rows: int
+    sha256: str
+    unreadable: int = 0
+
+
+def store_read(table: str, rows: Iterable[Mapping[str, object]],
+               unreadable: int = 0) -> StoreRead:
+    lines = sorted(json.dumps(r, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+                   for r in rows)
+    return StoreRead(table, len(lines), hashlib.sha256("\n".join(lines).encode()).hexdigest(),
+                     unreadable)
 
 
 @dataclass(frozen=True)
@@ -26,6 +51,7 @@ class ToolResult:
     facts: tuple[str, ...] = ()
     rows: tuple[Row, ...] = ()
     not_judged: tuple[str, ...] = ()
+    store_reads: tuple[StoreRead, ...] = ()  # set only by tools registered `reads_store`
 
     @property
     def judged(self) -> bool:
@@ -34,7 +60,12 @@ class ToolResult:
 
 def not_judged(book: FactBook, tool: str, reason: str, source_ref: str,
                part: str = "") -> ToolResult:
-    """A result that says, as a fact, why the tool (or `part` of it) judged nothing."""
+    """A result that says, as a fact, why the tool (or `part` of it) judged nothing.
+
+    The fact's name is `<tool>[_<part>]_not_judged` and a name fixes its value within a
+    round: `reason` must depend only on the tool and on `part`, never on the parameters of
+    the call. Put whatever varies (a run, a job, a pair and its levels) into `part`.
+    """
     name = f"{tool}_{part}_not_judged" if part else f"{tool}_not_judged"
     return ToolResult(tool, (book.add(name, reason, source_ref),), (), (reason,))
 
@@ -46,6 +77,7 @@ def merge(tool: str, results: Sequence[ToolResult]) -> ToolResult:
         tuple(f for r in results for f in r.facts),
         tuple(row for r in results for row in r.rows),
         tuple(reason for r in results for reason in r.not_judged),
+        tuple(read for r in results for read in r.store_reads),
     )
 
 

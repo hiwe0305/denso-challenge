@@ -8,7 +8,10 @@ programming error and propagates.
 
 Written into the run directory: `facts.jsonl` (every fact, with the call that first made
 it), `tool_calls.jsonl` (what each call read and produced), `tables/<call>-<tool>.json`
-(the rows behind each call's facts). Same pack and same plan give the same bytes.
+(the rows behind each call's facts). Same pack and same plan give the same bytes, except
+for a tool registered `reads_store` (`cost_lookup`, `history_lookup`): it reads the site
+store outside the pack, so its result depends on the store state, which its call record
+holds as `store_reads` (table, rows, sha256 of the rows read).
 """
 
 from __future__ import annotations
@@ -31,6 +34,7 @@ from flywheel.eval.agentqa.round.records import (
     Pack,
     PackEntry,
     Record,
+    StoreReadRecord,
     ToolCallRecord,
 )
 from flywheel.eval.agentqa.tools.base import (
@@ -213,6 +217,8 @@ def measure(pack: Pack, admitted: Admitted, plan_path: Path, out: Path,
             status = "skipped"
         else:
             result = spec.run(book, ctx, call.params)
+            if result.store_reads and not spec.reads_store:
+                raise ValueError(f"{spec.name} read the store but is not registered reads_store")
             status = "ran"
             reason = ""
         facts += [FactRecord(fact_id=f.fact_id, name=f.name, value=f.value, unit=f.unit,
@@ -222,7 +228,10 @@ def measure(pack: Pack, admitted: Admitted, plan_path: Path, out: Path,
             tables[f"{call_id}-{spec.name}.json"] = [dict(row) for row in result.rows]
         calls.append(ToolCallRecord(
             call_id=call_id, tool=spec.name, version=spec.version, params=call.params,
-            input_sha256=[] if missing else _inputs(spec, call.params, ctx, entries),
+            input_sha256=[] if missing else [
+                *_inputs(spec, call.params, ctx, entries), *(r.sha256 for r in result.store_reads)],
+            store_reads=[StoreReadRecord(table=r.table, rows=r.rows, sha256=r.sha256,
+                                         unreadable=r.unreadable) for r in result.store_reads],
             fact_ids=list(dict.fromkeys(result.facts)), not_judged=list(result.not_judged),
             status=status, reason=reason))  # type: ignore[arg-type]
 
