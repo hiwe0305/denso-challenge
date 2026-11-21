@@ -50,11 +50,12 @@ def test_a_round_writes_every_file_and_the_published_numbers(
     assert facts["C_70_chain_broken"].tool_call_id == "T4"
     assert all(f.provenance == "code" for f in facts.values())
     calls = calls_of(out)
-    assert [c.call_id for c in calls] == [f"T{k}" for k in range(1, 10)]
+    assert [c.call_id for c in calls] == [f"T{k}" for k in range(1, 13)]
     assert [(c.tool, c.status) for c in calls] == [
         ("task_lookup", "ran"), ("step_pass_table", "ran"), ("failure_clusters", "ran"),
         ("latch_consistency", "ran"), ("signal_presence", "ran"), ("paired_compare", "ran"),
-        ("trace_stats", "skipped"), ("train_window", "skipped"), ("lineage", "ran")]
+        ("trace_stats", "skipped"), ("train_window", "skipped"), ("lineage", "ran"),
+        ("coverage_distance", "skipped"), ("cost_lookup", "ran"), ("history_lookup", "ran")]
     assert calls[0].input_sha256 == [] and len(calls[1].input_sha256) == 4
     assert len(json.loads((out / "tables" / "T6-paired_compare.json").read_text())) == 6
 
@@ -82,8 +83,9 @@ def test_a_plan_naming_an_unknown_run_is_refused_before_measure_writes(
     assert [(s.name, s.status) for s in record.steps] == [
         ("pack", "ok"), ("admit", "degraded"), ("measure", "broken")]
     assert record.problems[0] == "admit: no accepted entry of kind trace"
-    assert record.problems[1] == "admit: no accepted entry of kind metrics"
-    assert "NOPE" in record.problems[2]
+    assert record.problems[1:3] == ["admit: no accepted entry of kind metrics",
+                                    "admit: no accepted entry of kind conditions"]
+    assert "NOPE" in record.problems[3]
 
 
 def test_a_plan_for_another_task_is_refused(make_pack: PackMaker, tmp_path: Path) -> None:
@@ -100,9 +102,9 @@ def test_a_pack_without_scores_skips_calls_and_says_why(
     record = run_round(make_pack(scores=False), out, now=NOW)
     assert record.status == "degraded"
     calls = calls_of(out)
-    assert [c.status for c in calls] == ["ran"] + ["skipped"] * 8
+    assert [c.status for c in calls] == ["ran"] + ["skipped"] * 9 + ["ran"] * 2  # cost, history
     facts = facts_of(out)
-    for call in calls[1:]:
+    for call in calls[1:10]:
         assert call.not_judged and call.reason and len(call.fact_ids) == 1
         assert f"{call.tool}_not_judged" in facts
     assert any("scores" in p for p in record.problems)

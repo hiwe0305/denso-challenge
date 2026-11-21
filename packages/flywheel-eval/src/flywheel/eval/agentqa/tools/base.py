@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 
-from flywheel.contracts.entities import Score
+from flywheel.contracts.entities import Condition, Score
 from flywheel.contracts.trace import TraceStep
 from flywheel.contracts.training import TrainingMetric
 from flywheel.eval.agentqa.facts import FactBook, FactValue
@@ -97,3 +97,12 @@ class EntryView:
     ref: str
     kind: str
     subject: Mapping[str, str]
+
+
+@dataclass(frozen=True)
+class ConditionSet:
+    """The `Condition` records of one `conditions` entry and the role the pack declares."""
+
+    ref: str
+    role: str  # subject.role: "train" or "eval"; "" when the pack does not say
+    conditions: tuple[Condition, ...]

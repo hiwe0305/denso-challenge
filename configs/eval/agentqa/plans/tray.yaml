@@ -15,3 +15,6 @@ calls:
   - {tool: trace_stats, params: {runs: all}}              # tracking of failed vs succeeded rollouts
   - {tool: train_window, params: {jobs: all, window: all}}  # loss, gradients, val cadence per job
   - {tool: lineage, params: {}}                           # run -> checkpoint -> job -> release -> dataset
+  - {tool: coverage_distance, params: {runs: all}}        # is each failure cluster near the train conditions?
+  - {tool: cost_lookup, params: {checks: all, interventions: all}}  # unit prices; estimated and measured cost apart
+  - {tool: history_lookup, params: {interventions: all}}  # what past interventions of each kind fixed
