@@ -1,0 +1,122 @@
+{
+  "episode_id": "ep_eval_0002",
+  "run_plan_id": "rp_example",
+  "task_id": "tray_transfer",
+  "run": "example_run",
+  "seed": 102,
+  "level": 1,
+  "repeat": 1,
+  "sim_time_s": 30.0,
+  "control_steps": 1500,
+  "verdict": {
+    "scorer_version": "2",
+    "step_names": [
+      "approach_a",
+      "grasp",
+      "lift",
+      "carry",
+      "reach_b",
+      "place",
+      "release_stand"
+    ],
+    "step_latched": [
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ],
+    "step_latch_t": [
+      2.5,
+      3.5,
+      5.0,
+      null,
+      null,
+      null,
+      null
+    ],
+    "success": false,
+    "failure_label": "L-TRAY-TILT",
+    "failure_t": 7.5,
+    "at_failure": {
+      "tray_on_table": "none",
+      "hand_contact_left": true,
+      "hand_contact_right": false,
+      "tilt_deg": 25.0,
+      "tray_pos_m": [
+        0.9,
+        0.1,
+        0.9
+      ],
+      "tray_quat": [
+        0.98,
+        0.2,
+        0.0,
+        0.0
+      ]
+    }
+  },
+  "other_verdicts": [
+    {
+      "scorer_version": "1",
+      "step_names": [
+        "approach_a",
+        "grasp",
+        "lift",
+        "carry",
+        "reach_b",
+        "place",
+        "release_stand"
+      ],
+      "step_latched": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "step_latch_t": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "success": false,
+      "failure_label": "L-TRAY-TILT",
+      "failure_t": 7.5,
+      "at_failure": null
+    }
+  ],
+  "final": {
+    "tray_to_target_m": 0.6,
+    "yaw_error_deg": 40.0,
+    "tray_on_target_table": false,
+    "tray_pos_m": [
+      0.9,
+      0.1,
+      0.0
+    ],
+    "tray_quat": [
+      0.7,
+      0.7,
+      0.0,
+      0.0
+    ]
+  },
+  "extrema": {
+    "palm_handle_min_left_m": 0.02,
+    "palm_handle_min_right_m": 0.04,
+    "palm_handle_min_both_m": 0.04,
+    "palm_handle_bar_min_left_m": 0.01,
+    "palm_handle_bar_min_right_m": 0.03,
+    "palm_handle_bar_min_both_m": 0.03
+  },
+  "videos": []
+}
