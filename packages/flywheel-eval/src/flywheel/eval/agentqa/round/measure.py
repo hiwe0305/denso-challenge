@@ -20,7 +20,10 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from flywheel.contracts.artifacts import DatasetReport, Episode
 from flywheel.contracts.entities import Score
+from flywheel.contracts.trace import TraceStep
+from flywheel.contracts.training import TrainingMetric
 from flywheel.eval.agentqa.facts import FactBook
 from flywheel.eval.agentqa.round.admit import Admitted
 from flywheel.eval.agentqa.round.records import (
@@ -30,7 +33,14 @@ from flywheel.eval.agentqa.round.records import (
     Record,
     ToolCallRecord,
 )
-from flywheel.eval.agentqa.tools.base import RunScores, ToolResult, not_judged
+from flywheel.eval.agentqa.tools.base import (
+    EntryView,
+    JobMetrics,
+    RunScores,
+    RunTrace,
+    ToolResult,
+    not_judged,
+)
 from flywheel.eval.agentqa.tools.registry import (
     REGISTRY,
     MeasureContext,
@@ -90,22 +100,53 @@ def needed_kinds(plan: Plan) -> list[str]:
     return kinds
 
 
+def _declared_run(entry: PackEntry, seen: dict[str, str]) -> str:
+    name = entry.subject.get("run")
+    if not name:
+        raise PlanRefused(f"{entry.ref}: a {entry.kind} entry must declare subject.run")
+    if name in seen:
+        raise PlanRefused(f"{entry.ref}: run {name!r} is already declared by {seen[name]}")
+    seen[name] = entry.ref
+    return name
+
+
 def _context(pack: Pack, admitted: Admitted) -> tuple[MeasureContext, list[PackEntry]]:
     entries = [e for e in pack.entries if e.ref in admitted.records]
     runs: dict[str, RunScores] = {}
+    traces: dict[str, RunTrace] = {}
+    jobs: dict[str, JobMetrics] = {}
+    episodes: list[Episode] = []
+    reports: dict[str, DatasetReport] = {}
+    seen: dict[str, dict[str, str]] = {"scores": {}, "trace": {}, "metrics": {}}
     for entry in entries:
-        if entry.kind != "scores":
-            continue
-        name = entry.subject.get("run")
-        if not name:
-            raise PlanRefused(f"{entry.ref}: a scores entry must declare subject.run")
-        if name in runs:
-            raise PlanRefused(f"{entry.ref}: run {name!r} is already declared by "
-                              f"{runs[name].ref}")
-        scores = tuple(r for r in admitted.records[entry.ref] if isinstance(r, Score))
-        runs[name] = RunScores(run=name, ref=entry.ref, scores=scores)
+        records = admitted.records[entry.ref]
+        if entry.kind == "scores":
+            name = _declared_run(entry, seen["scores"])
+            scores = tuple(r for r in records if isinstance(r, Score))
+            runs[name] = RunScores(run=name, ref=entry.ref, scores=scores)
+        elif entry.kind == "trace":
+            name = _declared_run(entry, seen["trace"])
+            steps = tuple(r for r in records if isinstance(r, TraceStep))
+            traces[name] = RunTrace(name, entry.ref, steps)
+        elif entry.kind == "metrics":
+            by_job: dict[str, list[TrainingMetric]] = {}
+            for r in records:
+                if isinstance(r, TrainingMetric):
+                    by_job.setdefault(r.job_id, []).append(r)
+            for job, rows in by_job.items():
+                if job in jobs:
+                    raise PlanRefused(f"{entry.ref}: job {job!r} is already logged by "
+                                      f"{jobs[job].ref}")
+                jobs[job] = JobMetrics(job, entry.ref, tuple(rows))
+        elif entry.kind == "episodes":
+            episodes += [r for r in records if isinstance(r, Episode)]
+        elif entry.kind == "dataset_report":
+            reports[entry.ref] = next(r for r in records if isinstance(r, DatasetReport))
     task = load_task(pack.task_id)
-    return MeasureContext(task, runs, frozenset(e.kind for e in entries)), entries
+    views = tuple(EntryView(e.ref, e.kind, e.subject) for e in entries)
+    ctx = MeasureContext(task, runs, frozenset(e.kind for e in entries), traces, jobs,
+                         tuple(episodes), reports, views)
+    return ctx, entries
 
 
 def check_plan(plan: Plan, ctx: MeasureContext) -> list[str]:
@@ -128,7 +169,8 @@ def _inputs(spec: ToolSpec, params: dict[str, Any], ctx: MeasureContext,
     for entry in entries:
         if not (spec.reads_all or entry.kind in spec.needs):
             continue
-        if entry.kind == "scores" and not spec.reads_all and entry.subject.get("run") not in runs:
+        if (entry.kind in ("scores", "trace") and not spec.reads_all
+                and entry.subject.get("run") not in runs):
             continue
         shas.add(entry.sha256)
     return sorted(shas)

@@ -97,9 +97,20 @@ def test_every_fact_of_the_headline_is_shown_with_its_value(round_out: Path) -> 
 
 def test_not_judged_collects_the_unjudged_things(round_out: Path) -> None:
     a = assembly_of(round_out)
-    # the fixture round gives every tool what it needs: `sources` is a kind the task
-    # view knows (it carries no signal), so nothing is left unjudged
-    assert a.not_judged == []
+    # the fixture is scores only: no trace, no metrics, and no checkpoint declared
+    no_ckpt = ("no checkpoint is declared on its scores entry and no Episode record of "
+               "its rollouts carries one")
+    assert sorted((n.what, n.reason) for n in a.not_judged) == sorted([
+        ("trace_stats_not_judged", "no entry of kind trace in the pack"),
+        ("train_window_not_judged", "no entry of kind metrics in the pack"),
+        *((f"lineage_{r}_checkpoint_not_judged", f"run {r}: {no_ckpt}")
+          for r in ("B_ALL", "C_ALL", "B_70", "C_70")),
+        ("trace_stats", "no entry of kind trace in the pack"),
+        ("train_window", "no entry of kind metrics in the pack"),
+        ("trace", "no accepted entry of this kind"),
+        ("metrics", "no accepted entry of this kind"),
+    ])
+    assert a.status == "degraded"
     assert "No model was called: every hypothesis, rank and choice is the code floor." in a.notes
     assert any("Costs are not attached" in n for n in a.notes)
 

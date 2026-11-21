@@ -32,22 +32,29 @@ def test_a_round_writes_every_file_and_the_published_numbers(
     out = tmp_path / "out"
     record = run_round(make_pack(), out, command="test", now=NOW)
     assert record.status == "degraded" and [s.name for s in record.steps] == list(STEPS)
-    assert {s.status for s in record.steps[:4]} == {"ok"}  # assemble: no model, degraded
+    # the fixture has no trace and no metrics: admit and measure say so; assemble: no model
+    assert [(s.name, s.status) for s in record.steps] == [
+        ("pack", "ok"), ("admit", "degraded"), ("measure", "degraded"),
+        ("hypothesize", "ok"), ("assemble", "degraded"), ("render", "ok")]
     assert record.data_class == "public"
     for name in ("pack.json", "admission.json", "facts.jsonl", "tool_calls.jsonl", "run.json"):
         assert (out / name).is_file()
     assert RunRecord.model_validate_json((out / "run.json").read_text()) == record
     assert sorted(p.name for p in (out / "tables").glob("*.json")) == [
         "T1-task_lookup.json", "T2-step_pass_table.json", "T3-failure_clusters.json",
-        "T4-latch_consistency.json", "T5-signal_presence.json", "T6-paired_compare.json"]
+        "T4-latch_consistency.json", "T5-signal_presence.json", "T6-paired_compare.json",
+        "T9-lineage.json"]
     facts = facts_of(out)
     assert facts["C_70_chain_broken"].value == 7
     assert facts["C_ALL_all_pass_place"].value == pytest.approx(0.1)
     assert facts["C_70_chain_broken"].tool_call_id == "T4"
     assert all(f.provenance == "code" for f in facts.values())
     calls = calls_of(out)
-    assert [c.call_id for c in calls] == ["T1", "T2", "T3", "T4", "T5", "T6"]
-    assert all(c.status == "ran" for c in calls)
+    assert [c.call_id for c in calls] == [f"T{k}" for k in range(1, 10)]
+    assert [(c.tool, c.status) for c in calls] == [
+        ("task_lookup", "ran"), ("step_pass_table", "ran"), ("failure_clusters", "ran"),
+        ("latch_consistency", "ran"), ("signal_presence", "ran"), ("paired_compare", "ran"),
+        ("trace_stats", "skipped"), ("train_window", "skipped"), ("lineage", "ran")]
     assert calls[0].input_sha256 == [] and len(calls[1].input_sha256) == 4
     assert len(json.loads((out / "tables" / "T6-paired_compare.json").read_text())) == 6
 
@@ -63,7 +70,8 @@ def test_same_pack_and_plan_give_the_same_bytes(make_pack: PackMaker, tmp_path: 
 def test_a_plan_naming_an_unknown_run_is_refused_before_measure_writes(
         make_pack: PackMaker, tmp_path: Path) -> None:
     def edit(plan: dict[str, list[dict[str, object]]]) -> None:
-        plan["calls"][-1]["params"] = {"pairs": [["C_70", "NOPE"]], "levels": "all"}
+        call = next(c for c in plan["calls"] if c["tool"] == "paired_compare")
+        call["params"] = {"pairs": [["C_70", "NOPE"]], "levels": "all"}
 
     out = tmp_path / "out"
     with pytest.raises(PlanRefused, match="NOPE"):
@@ -72,8 +80,10 @@ def test_a_plan_naming_an_unknown_run_is_refused_before_measure_writes(
     record = RunRecord.model_validate_json((out / "run.json").read_text())
     assert record.status == "broken"
     assert [(s.name, s.status) for s in record.steps] == [
-        ("pack", "ok"), ("admit", "ok"), ("measure", "broken")]
-    assert "NOPE" in record.problems[0]
+        ("pack", "ok"), ("admit", "degraded"), ("measure", "broken")]
+    assert record.problems[0] == "admit: no accepted entry of kind trace"
+    assert record.problems[1] == "admit: no accepted entry of kind metrics"
+    assert "NOPE" in record.problems[2]
 
 
 def test_a_plan_for_another_task_is_refused(make_pack: PackMaker, tmp_path: Path) -> None:
@@ -90,7 +100,7 @@ def test_a_pack_without_scores_skips_calls_and_says_why(
     record = run_round(make_pack(scores=False), out, now=NOW)
     assert record.status == "degraded"
     calls = calls_of(out)
-    assert [c.status for c in calls] == ["ran"] + ["skipped"] * 5
+    assert [c.status for c in calls] == ["ran"] + ["skipped"] * 8
     facts = facts_of(out)
     for call in calls[1:]:
         assert call.not_judged and call.reason and len(call.fact_ids) == 1
