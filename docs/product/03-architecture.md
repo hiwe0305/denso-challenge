@@ -4,6 +4,7 @@ _Vai trò: Architect (Winston), quy trình BMAD. Ngày 22/10/2026. Đầu vào: 
 
 | Ngày | Phiên bản | Thay đổi | Tác giả |
 |---|---|---|---|
+| 21/11/2026 | 1.4 | Mục 7.3: thêm hai artifact `RolloutOutcome` (outcome của một lượt eval, chung mọi task, thay dòng `outcomes.jsonl` riêng của adapter khay, gồm các trường DA-42) và `RoundDiagnosis` (chẩn đoán một vòng của Agent QA/QC); `AgentReport` thêm `agent_version`, fact và phát hiện thêm `origin`, cả ba tùy chọn. Theo K1–K3 của design 19/11/2026 của hệ Agent QA/QC (`docs/superpowers/specs/2026-11-19-agent-qaqc-system-design.md`, nhánh DA-43) mục 7.2, PO duyệt; DA-43 nhiệm vụ 1.1 | PO (Hiếu) |
 | 7/11/2026 | 1.3 | Mục 4.3: ghi ngoại lệ che danh tính cho mẫu EgoDex công bố (D2 của [plan chia lại việc của Hưng](../superpowers/plans/2026-11-06-hung-reassignment.md); mở rộng miễn trừ "Waive for EgoDex" của DA-30 ngày 4/11/2026). Miễn chỉ cho cặp (`egodex`, `public`) và chỉ khi mọi mp4 của nguồn khớp sha256 trong pin `egodex_pin.json`; khớp code đã merge ở #152, #153 | PO (Hiếu) |
 | 4/11/2026 | 1.2 | Mục 2.4, 4.3, 7.1, chốt khi review #82 (DA-39): EvidenceCard là artifact dẫn xuất theo hợp đồng `flywheel.contracts.evidence`, sinh lại từ Cluster, Score, bản ghi chẩn đoán hệ thống và Decision, lưu ở `runs/<run_plan_id>/cards/<cluster_id>/card.json`; không nằm trong `meta` của Cluster hay `Cluster.card_uri` (cả hai nằm trong hash nội dung), `Cluster.card_uri` bỏ dùng ở L0-lite; ghi đè chẩn đoán hoặc can thiệp của kỹ sư nằm trong `Decision.criteria` theo khóa của module EvidenceCard (P4), trường riêng để sau 17/11 | PO (Hiếu) |
 | 3/11/2026 | 1.1 | Mục 1.2, 4.1, 4.3, 4.4, 5.2, chốt khi review #36, #49, #69: ID của `Score` là hash của cả bản ghi, gồm `config_sha256` và `level` (D3); một ID dùng lại cho nội dung khác bị từ chối lúc ghi, view lọc trùng theo ID (D1); ID episode do bên ghi đặt, tất định, theo DA-25, bỏ `ep_<ULID>` bắt buộc (Q5); ledger tra dòng ước tính trên cả site (D2); `LedgerEntry` bắt buộc `run_plan_id`, dòng thực đo bắt buộc thêm `job_id` (D4); `RolloutResult.timing_verdict` tách khỏi `sim_success` (E2) | PO (Hiếu) |
@@ -658,6 +659,8 @@ Artifact giữa các làn (Pydantic model trong `flywheel.contracts`, lưu trong
 | `QAReport` (kết quả QA theo episode) | Dữ liệu | Đánh giá, Vòng |
 | `Score`, `Cluster`, `EvidenceCard`, `AgentReport` (báo cáo Agent QA/QC theo job, bản 0.8) | Đánh giá | Vòng |
 | `AgentReview` (đồng ý hoặc ghi đè của kỹ sư trên `AgentReport`, ghi trong `fw review`, bản 0.8) | Vòng | Đánh giá (bộ chấm lỗi cấy) |
+| `RolloutOutcome` (outcome của một lượt eval: phán quyết từng phiên bản scorer, số đo cuối lượt và cực trị có tên kèm đơn vị, đường video tương đối; bản 1.4) | Adapter simulator | Đánh giá |
+| `RoundDiagnosis` (chẩn đoán một vòng: cụm, giả thuyết xếp hạng, phép kiểm tách, đề xuất, thứ không xét được; câu chữ chỉ trích số qua `{F#}`; bản 1.4) | Đánh giá | Vòng, Console |
 | `Decision`, `LedgerEntry`, `FixRateEvent` | Vòng | Mọi làn |
 
 ## 8. Tái lập và theo dõi thí nghiệm

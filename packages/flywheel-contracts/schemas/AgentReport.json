@@ -87,6 +87,17 @@
           "minLength": 1,
           "title": "Source Ref",
           "type": "string"
+        },
+        "origin": {
+          "default": "code",
+          "enum": [
+            "code",
+            "hint",
+            "vision",
+            "history"
+          ],
+          "title": "Origin",
+          "type": "string"
         }
       },
       "required": [
@@ -145,6 +156,17 @@
         "suggestion": {
           "minLength": 1,
           "title": "Suggestion",
+          "type": "string"
+        },
+        "origin": {
+          "default": "code",
+          "enum": [
+            "code",
+            "hint",
+            "vision",
+            "history"
+          ],
+          "title": "Origin",
           "type": "string"
         }
       },
@@ -299,6 +321,19 @@
       },
       "title": "Problems",
       "type": "array"
+    },
+    "agent_version": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Agent Version"
     }
   },
   "required": [
