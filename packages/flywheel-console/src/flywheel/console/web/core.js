@@ -71,7 +71,7 @@ window.addEventListener("resize", () => CHARTS.forEach(c => c.resize()));
 /* ---- ui atoms ---- */
 function tag(text, cls) { return h("span", { class: "tag " + (cls || ""), text }); }
 function qaTag(q) { return tag(q, q === "pass" ? "" : q === "flag" ? "flag" : q === "reject" ? "reject" : "idle"); }
-function statusTag(s) { const m = { current: ["hiện hành", ""], superseded: ["đã thay", "idle"], test: ["thử", "idle"], duplicate: ["trùng", "flag"], missing: ["thiếu", "reject"], upstream: ["nguồn ngoài", "run"], archived: ["lưu trữ", "idle"] }; const x = m[s] || [s, "idle"]; return tag(x[0], x[1]); }
+function statusTag(s) { const m = { current: ["hiện hành", ""], superseded: ["đã thay", "idle"], test: ["thử", "idle"], duplicate: ["trùng", "flag"], missing: ["thiếu", "reject"], upstream: ["nguồn ngoài", "run"], archived: ["lưu trữ", "idle"], reference: ["tham chiếu", "run"], benchmark: ["chuẩn đo", "idle"] }; const x = m[s] || [s, "idle"]; return tag(x[0], x[1]); }
 const illus = () => tag("minh hoạ", "ill");
 function src(text, extra) { return h("div", { class: "src" }, ["nguồn: " + text, extra || null]); }
 function panel(title, cap, body, source, cls) {

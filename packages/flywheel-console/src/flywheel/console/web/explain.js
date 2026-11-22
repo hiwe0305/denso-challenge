@@ -281,7 +281,7 @@ const EXPLAIN = (() => {
     stats: () => [{ v: N(tot("all")), k: t("st.1.k1"), src: "tasks.json · catalog_totals.all (catalog rows of this task)", origin: "file" },
       { v: N(tot("egocentric")), k: t("st.1.k2"), src: "tasks.json · catalog_totals.egocentric", origin: "file" },
       { v: N((tot("s1") || 0) + (tot("s2") || 0) || null), k: t("st.1.k3"), src: "tasks.json · catalog_totals.s1 + s2", origin: "file" }],
-    fig: () => { const rs = (TK().catalog_rows || []).filter(r => r.status === "current"); if (!rs.length) return null;
+    fig: () => { const rs = (TK().catalog_rows || []).filter(r => r.status === "current" || r.status === "reference"); if (!rs.length) return null;
       return h("table", { class: "xb-tbl" }, h("tbody", null, rs.map(r => h("tr", null, [h("td", null, h("a", { href: "#/data/" + r.id, text: r.title || r.id })), h("td", { text: String(r.group || "") }),
         h("td", { class: "n" }, [r.episodes == null ? "–" : N(r.episodes), UI.origin("file", "catalog.json · " + r.id)])])))); },
   };

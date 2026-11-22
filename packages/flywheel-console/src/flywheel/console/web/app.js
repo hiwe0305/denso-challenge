@@ -283,7 +283,7 @@ function lineageView(nodes, edges, opt) {
   nodes.forEach(n => {
     const p = pos[n.id]; const col = gcol(n.group || (n.ext ? "s1" : "eval"));
     const t = n.title.length > 28 ? n.title.slice(0, 27) + "…" : n.title;
-    const sub = n.episodes != null ? `${fmt(n.episodes)} ep · ${({ current: "hiện hành", superseded: "đã thay", test: "thử", duplicate: "trùng", missing: "thiếu", upstream: "ngoài", archived: "lưu trữ" })[n.status] || n.status}` : (n.ext ? "xuất bản" : "run");
+    const sub = n.episodes != null ? `${fmt(n.episodes)} ep · ${({ current: "hiện hành", superseded: "đã thay", test: "thử", duplicate: "trùng", missing: "thiếu", upstream: "ngoài", archived: "lưu trữ", reference: "tham chiếu", benchmark: "chuẩn đo" })[n.status] || n.status}` : (n.ext ? "xuất bản" : "run");
     const g = svgEl("g", { class: "node" + (n.id === opt.focus ? " focus" : ""), transform: `translate(${p.x},${p.y})` }, [
       svgEl("title", {}, []), svgEl("rect", { class: "bg", width: W, height: H, rx: 7 }), svgEl("rect", { width: 5, height: H, rx: 2, fill: col }),
     ]);
@@ -311,14 +311,14 @@ async function pageHub(main, qs) {
   const tk = TASK.cur(); if (!HUB.userTask) HUB.task = tk && tk.inventory === "task" ? tk.catalog_task : "";
   const R = CAT.rows;
   const body = h("div"), controls = h("div");
-  const filt = (ignoreType) => R.filter(r => (HUB.status === "all" || r.status === HUB.status) && (ignoreType || !HUB.type || r.group === HUB.type) && (!HUB.task || r.task === HUB.task) &&
+  const filt = (ignoreType) => R.filter(r => (HUB.status === "all" || r.status === HUB.status || (HUB.status === "current" && r.status === "reference")) && (ignoreType || !HUB.type || r.group === HUB.type) && (!HUB.task || r.task === HUB.task) &&
     (!HUB.loc || r.locations.some(l => l.where === HUB.loc)) && (!HUB.q || (r.title + " " + r.name + " " + r.id).toLowerCase().includes(HUB.q.toLowerCase())));
   function draw() {
     controls.innerHTML = "";
     const fl = filt(true);
     const sel = (k, opts) => h("select", { onchange: e => { HUB[k] = e.target.value; if (k === "task") HUB.userTask = 1; draw(); } }, opts.map(([v, l]) => h("option", { value: v, selected: HUB[k] === v, text: l })));
     controls.appendChild(h("div", { class: "controls" }, [h("input", { type: "search", placeholder: "Tìm theo tên hoặc id…", value: HUB.q, oninput: e => { HUB.q = e.target.value; clearTimeout(window.__qt); window.__qt = setTimeout(() => { drawBody(); }, 150); } }),
-      sel("status", [["current", "Trạng thái: hiện hành"], ["all", "Mọi trạng thái"], ["superseded", "đã thay"], ["test", "thử"], ["duplicate", "trùng"], ["missing", "thiếu"], ["upstream", "ngoài"], ["archived", "lưu trữ"]]),
+      sel("status", [["current", "Trạng thái: hiện hành"], ["all", "Mọi trạng thái"], ["superseded", "đã thay"], ["test", "thử"], ["duplicate", "trùng"], ["missing", "thiếu"], ["upstream", "ngoài"], ["archived", "lưu trữ"], ["reference", "tham chiếu"], ["benchmark", "chuẩn đo"]]),
       sel("task", [["", "Task: tất cả"], ["tray", "tray"], ["two_table", "two_table"], ["hug", "hug"], ["other", "other"]]),
       sel("loc", [["", "Nơi lưu: tất cả"], ["laptop", "laptop"], ["rtx3060", "rtx3060"], ["hf", "HF"], ["colab", "Colab"], ["remote", "từ xa"]])]));
     const chips = h("div", { class: "controls" }, [h("button", { class: "chip" + (!HUB.type ? " on" : ""), text: `Tất cả ${fl.length}`, onclick: () => { HUB.type = ""; draw(); } })]
@@ -336,7 +336,7 @@ async function pageHub(main, qs) {
       mos = h("div", { class: "mosaic one", style: { "--stripe": r.view === "missing" ? "var(--bad)" : stripe } }, h("div", { class: "ph", text: msg }));
     }
     const eps = r.episodes != null ? fmt(r.episodes) + " ep" : "? ep";
-    return h("a", { class: "dcard" + (r.status !== "current" ? " dim" : ""), href: "#/data/" + r.id, style: { "--stripe": stripe } }, [mos, h("div", { class: "corner" }, r.status !== "current" ? statusTag(r.status) : null),
+    return h("a", { class: "dcard" + (r.status !== "current" && r.status !== "reference" ? " dim" : ""), href: "#/data/" + r.id, style: { "--stripe": stripe } }, [mos, h("div", { class: "corner" }, r.status !== "current" ? statusTag(r.status) : null),
       h("div", { class: "body" }, [h("div", { class: "t", text: r.title }), h("div", { class: "m", text: [eps, r.hours != null ? fmt(r.hours, 2) + " h" : null, r.fps ? r.fps + " fps" : null, r.task !== "other" ? r.task : null].filter(Boolean).join(" · ") }), qabar(r.qa_counts), locChips(r.locations)])]);
   }
   function drawBody() {
