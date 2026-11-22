@@ -112,7 +112,7 @@ def test_ingest_stages_into_the_console_store(rn: ConsolePaths, ds: Path) -> Non
     assert argv[argv.index("ingest") + 1] == str(staged)
     assert argv[argv.index("--work") + 1] == str(rn.store / "work" / "j-1")
     assert argv[argv.index("--license") + 1] == "CC BY 4.0"
-    assert argv[argv.index("--data-class") + 1] == "public"
+    assert argv[argv.index("--data-class") + 1] == "restricted"  # no card: restricted (DA-45)
     assert pl["task"] == "two_table"
 
 
@@ -402,3 +402,73 @@ def test_staging_skips_symlinks_and_jobs_never_share_a_copy(
     assert (dst / "meta" / "info.json").is_file()
     assert not (dst / "meta" / "leak.json").exists() and not (dst / "linked_dir").exists()
     assert "symlink" in (runner.jobs_dir() / b["id"] / "log.txt").read_text()
+
+
+# ---------------------------------------------------------------- dataset cards (DA-45 AC 5)
+STORE_CARD = """\
+schema: dataset-card/1
+id: tray_s1_aaaaaaaaaaaa
+alias: tray.s1.jig2.l1.p8.20261122
+status: current
+task: tray
+kind: synthetic_s1
+source_detail: planner_wbc
+data_class: internal
+license: "CC BY 4.0 on HF (manifest: unknown)"
+counts: {episodes: 3, frames: 30, hours: 0.001}
+files: {release: releases/tray_s1_aaaaaaaaaaaa}
+store: tray-s1-test
+locations:
+  - {host: laptop, root: "fwdata/datasets/tray-s1-test", role: mirror}
+"""
+
+
+@pytest.fixture
+def carded(rn: ConsolePaths) -> Path:
+    cards_dir = rn.fw_root / "datasets" / "tray-s1-test" / "cards"
+    cards_dir.mkdir(parents=True)
+    (cards_dir / "tray_s1_aaaaaaaaaaaa.yaml").write_text(STORE_CARD)
+    return make_lerobot(rn.fw_root / "datasets/tray-s1-test/releases/tray_s1_aaaaaaaaaaaa")
+
+
+def test_store_release_is_a_sample_with_card_values(rn: ConsolePaths, carded: Path) -> None:
+    by = {s["params"]["dataset"]: s for s in kinds.dataset_samples()}
+    s = by["datasets/tray-s1-test/releases/tray_s1_aaaaaaaaaaaa"]
+    assert s["params"]["data_class"] == "internal"
+    assert s["params"]["license"] == "CC BY 4.0 on HF manifest unknown"
+    assert runner.LICENSE_RE.match(s["params"]["license"])
+    assert s["params"]["source_detail"] == "planner_wbc" and s["task"] == "tray"
+    assert s["available"] is True
+
+
+def test_sample_without_card_is_restricted(rn: ConsolePaths, ds: Path) -> None:
+    (s,) = kinds.dataset_samples()
+    assert s["params"]["data_class"] == "restricted" and s["params"]["license"] == "unknown"
+    assert s["params"]["source_detail"] == "psi_data"  # path fallback
+
+
+def test_ingest_defaults_follow_the_card(rn: ConsolePaths, carded: Path) -> None:
+    p = {"dataset": str(carded), "source_detail": "planner_wbc"}
+    argv = runner.plan("data.ingest", p, "j-c")["steps"][-1]
+    assert argv[argv.index("--data-class") + 1] == "internal"
+    assert argv[argv.index("--license") + 1] == "CC BY 4.0 on HF manifest unknown"
+    p |= {"data_class": "public", "license": "CC0"}  # explicit params still win
+    argv = runner.plan("data.ingest", p, "j-d")["steps"][-1]
+    assert argv[argv.index("--data-class") + 1] == "public"
+    assert argv[argv.index("--license") + 1] == "CC0"
+
+
+def test_bad_card_falls_back_to_restricted(rn: ConsolePaths, carded: Path) -> None:
+    f = rn.fw_root / "datasets/tray-s1-test/cards/tray_s1_aaaaaaaaaaaa.yaml"
+    f.write_text(STORE_CARD.replace("status: current", "status: live"))
+    argv = runner.plan("data.ingest", {"dataset": str(carded), "source_detail": "planner_wbc"},
+                       "j-e")["steps"][-1]  # fmt: skip
+    assert argv[argv.index("--data-class") + 1] == "restricted"
+
+
+def test_safe_license() -> None:
+    assert runner.safe_license("CC BY 4.0 on HF (manifest: unknown)") == (
+        "CC BY 4.0 on HF manifest unknown"
+    )
+    assert runner.safe_license(None) == "unknown" and runner.safe_license("();") == "unknown"
+    assert len(runner.safe_license("x" * 99)) == 64
