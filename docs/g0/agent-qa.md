@@ -291,3 +291,41 @@ Không chạy trên máy 3060 khi Hiếu chưa đồng ý; máy dùng chung.
 | Sửa T2 và hiệu chỉnh T8 trên log thật | làn Đánh giá | Mục 3.3 |
 | Kỹ sư duyệt 30 phát hiện | `fw agentqa review` | Để bộ chấm có điểm cho phần giải thích và đề xuất |
 | Qwen3.5-4B | sau demo | Q-M = không |
+
+## 8. Đường ống vòng (DA-43): mốc đầu trên bộ ca lịch sử, 22/11/2026
+
+Số đo đầu tiên của đường ống vòng (`fw agentqa round`) theo bộ metric của [design 19/11 mục 11.5](../superpowers/specs/2026-11-19-agent-qaqc-system-design.md). Mới có **một ca của tập phát triển** và **chỉ cột sàn code** (`--no-model`); chưa có lần gọi model nào, nên chưa có cột agent và cột model thêm.
+
+| Mục | Giá trị |
+|---|---|
+| Gói | Giai đoạn 1 ở 60k của `C_70`, `C_ALL`, `B_70`, `B_ALL`: 240 `Score`, 240 trace, 4 log train; `pack_6e302385f4c9ab1a`; lớp `public`; dựng trong `fwdata/agentqa/cases/stage1-60k` (ngoài repo) |
+| Ca | `tray-c70-step4`, tập phát triển; đáp án 26 điểm chốt từ [tray.md](../he/tray.md) 20.2 và 20.11; sha256 `3f8e03b2…` |
+| Phiên bản agent | hash `2bddfca9…`, commit `84792763` cộng `casebench/` |
+| Thời gian | 80 s trên laptop, CPU |
+
+| Metric | Sàn code |
+|---|---|
+| A1 điểm chốt tới được | 22/24; điểm bắt buộc 7/9 |
+| A2 hạng của chẩn đoán đúng | hạng 1: 4/4 |
+| A3 khẳng định sai | hạng 1: 0; ba hạng đầu: 0 |
+| A4 phép kiểm | chưa có điểm chốt loại này |
+| A5 can thiệp | 2/2 |
+| E1 không xét được | 7 fact: 4 thiếu `dataset_report`, 1 thiếu điều kiện, 1 thiếu sổ chi phí, 1 thiếu lịch sử |
+
+Đối chiếu số với phân tích tay: số lượt gãy ở `approach_a` mà không hết giờ là 7, 10, 7 trên 60 ở `C_70`, `C_ALL`, `B_70`; cỡ tám cụm c1–c8 của `C_70` là 14, 12, 4, 4, 3, 3, 2, 2; phân vị 99 sai số bám của lượt thành công ở `C_70` là 2,641 và 0,385. Cả ba khớp tray.md 20.2 và 20.11.
+
+Cách đọc, và giới hạn:
+
+- Hai điểm bắt buộc trượt là cùng một lỗi: cụm `place`/`L-PLACE-POSE` mức 1 và 2 (c1, c2) bị chặn tiêu ngân sách dữ liệu vì "thiếu tín hiệu", trong khi đội cho hai cụm này đi tiếp bước 5–8. `Score` không mang tư thế khay cuối và đích; outcome gốc có. Sửa được khi K1 (`RolloutOutcome`) merge và có lệnh xuất.
+- A3 bằng 0 ở đây chưa nói được nhiều: sàn code chưa có luật nào ra chẩn đoán `controller`, nên nó không thể khẳng định sai điều đó.
+- Tên fact trong đáp án được viết sau khi đã thấy tên fact của agent, và người viết luật đã đọc chẩn đoán gốc. Đây là số của tập phát triển; nó không đo khả năng tổng quát.
+- Một ca, 26 điểm: mọi số là số đếm.
+
+Chạy lại:
+
+```bash
+uv run fw agentqa round --pack fwdata/agentqa/cases/stage1-60k/pack.json --out <thư mục mới> --no-model
+uv run python -m flywheel.eval.agentqa.casebench --answer fwdata/agentqa/answers/tray-c70-step4.yaml \
+    --run <thư mục chạy> --out <report.json>
+```
+
