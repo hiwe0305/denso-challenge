@@ -413,6 +413,44 @@ Lỗi lúc sinh (37 lượt): `timeout:RELEASE` 18 (mức 1: 10, mức 2: 8), `L
 
 Khác với runbook 5.1 khi chạy: (1) sinh dùng 8 + 3 worker thay vì 10 + 4, `MemoryMax` 36G và 14G, vì RAM trống không đủ cho 14 worker lúc đó; (2) hình ảnh SimReady phải có sẵn ở `fwdata/simple/tray/simready/` (chép từ laptop, 17 MB, khớp hash cây thư mục), nếu không `generate` dừng với `SimReady manifest missing`; (3) `uv` cần `export PATH=$HOME/.local/bin:$PATH`; (4) bước 8 dùng `--size ALL=403` và `ALL=165`, vì release còn ít episode hơn sau QA và lọc. Sổ chi phí: `g0-DA-03-20261122` (ingest) và `g0-DA-17-20261122` (phát lại, report) trong `$B`.
 
+### 4.13 Bốn chỗ chưa đo của lô 600 (nhiệm vụ 8.7, 22/11/2026)
+
+PO (Hiếu) yêu cầu ngày 22/11/2026 ("Sửa những điểm yếu và chỗ chưa đo"). Thực đo trên cả 595 episode đã ghi, chỉ đọc dữ liệu có sẵn, trừ một lần chạy lại 6 seed để kiểm cách tách pha. Script và output ở `~/denso-da41/fwdata/da41-jig-600/analysis/` trên `rtx3060` (`q1`–`q4`); script không nằm trong repo.
+
+**(a) Sai lệch đặt cuối.** Tư thế khay ở khung cuối (`observation.tray_pose`) so với `target_pose` ghi trong từng episode, theo công thức của bộ chấm. "Dọc" là trục x, dương là khay dừng phía robot (chưa tới đích).
+
+| Tập | n | Khoảng cách (cm): trung vị / p90 / max | Lệch dọc (cm): trung bình (độ lệch chuẩn) | Lệch ngang (cm): trung bình | Góc (°): trung vị / p90 / max | Ngoài 5 cm hoặc 10° |
+|---|---|---|---|---|---|---|
+| Mức 1, mọi episode | 420 | 1,61 / 2,81 / 4,70 | +1,54 (0,87) | −0,01 | 0,83 / 2,15 / 8,44 | 0 |
+| Mức 2, mọi episode | 175 | 1,48 / 2,98 / 4,75 | +1,30 (1,08) | +0,02 | 0,80 / 2,19 / 9,66 | 0 |
+| Mức 1, tập `ALL` | 403 | 1,61 / 2,81 / 4,70 | +1,54 | −0,02 | 0,83 / 2,11 / 8,44 | 0 |
+| Mức 2, tập `ALL` | 165 | 1,48 / 2,98 / 4,75 | +1,31 | +0,01 | 0,80 / 2,65 / 9,66 | 0 |
+
+Đọc: độ lệch dọc có thật và lớn hơn lô mẫu cho thấy (khoảng +1,5 cm, không phải +1,0 cm của mục 4.10); 96 % episode mức 1 dừng ngắn. Lệch ngang gần 0. Không episode nào ngoài dung sai, nhưng 12 episode trên 4 cm và trường hợp xấu nhất sát ngưỡng (4,75 cm; 9,66°). Policy học từ lô này sẽ học luôn độ lệch dọc đó. `place_error.py` trong repo chưa dùng được cho cảnh đồ gá: nó dựng lại đích từ `sample_episode`, ở mức 2 khác với đích đã ghi (đồ gá đi theo khoảng cách bàn).
+
+**(b) Tỉ trọng pha đặt.** Dữ liệu thô không ghi mốc pha (`gen_log` chỉ có `phase_reached`), nên mốc được dựng lại từ lệnh đã ghi (lệnh đi, đích cổ tay, lệnh đóng tay). Kiểm bằng cách chạy lại 6 seed có ghi mốc thật: mọi mốc từ ARRIVE_B tới RETREAT khớp đúng khung ở 6/6; mốc GRASP/LIFT chỉ gần đúng (một lượt lệch 77 khung).
+
+| Pha (tập `ALL`) | Mức 1: khung trung vị (% episode) | Mức 2 |
+|---|---|---|
+| APPROACH_A … BACK_OFF | 536 (38,6 %) | 543 (39,5 %) |
+| TURN | 328 (23,4 %) | 330 (23,5 %) |
+| CARRY | 203 (14,5 %) | 202 (14,3 %) |
+| ARRIVE_B | 135 (11,9 %) | 135 (11,4 %) |
+| LOWER | 51 (3,7 %) | 47 (3,5 %) |
+| RELEASE | 68 (4,9 %) | 68 (4,9 %) |
+| RETREAT | 41 (3,0 %) | 40 (3,0 %) |
+
+Đọc: ARRIVE_B + LOWER + RELEASE chiếm trung vị 18,8 % mỗi episode (257 khung); riêng LOWER + RELEASE là 8,5 % (118 khung, khoảng 2,4 s). TURN một mình chiếm khoảng 24 %. Đây là con số đứng sau đề xuất dữ liệu riêng cho bước đặt: phần policy yếu nhất chiếm chưa tới một phần mười dữ liệu.
+
+**(c) 5 episode `reject`.** Cả 5 đều thành công và qua replay QA.
+- `joint_limit` (seed 500325, 500020, mức 1): `right_wrist_roll` vượt giới hạn 2,6 và 2,1 mrad (dung sai 1,93 mrad) trong pha LOWER và RELEASE. Planner giữ khớp này đúng tại giới hạn (1,97222 rad, tư thế ngửa lòng bàn tay) ở mọi episode; state thỉnh thoảng lún qua giới hạn mềm của MuJoCo khi tay chịu tải. Đây là ngưỡng bắt sát, không phải ghi sai; điều đáng sửa nếu có là tư thế cầm nằm ngay tại giới hạn khớp.
+- `joint_mapping` (seed 501038, 501140 và một episode nữa, mức 2): tương quan lệnh–state của `right_hand_middle_0` là 0,43–0,48, dưới sàn 0,5 (hằng số trong code, chưa hiệu chỉnh). Ngón giữa bị chặn trên tay cầm hoặc trượt khi đang đóng; không phải khớp bị hoán đổi hay đảo dấu, là thứ phép kiểm này nhằm bắt. 9 episode không bị loại có tương quan dưới 0,6.
+- Loại 5 episode này không sai, nhưng lý do ghi trong QA không đúng bản chất. Việc của DA-17 (ngưỡng `replay-1`), không sửa ở DA-41.
+
+**(d) Cờ D4 ở `stats.json`.** Báo nhầm của QA. `states[31]` là `prev_base_height_command`, hằng số 0,74 ở mọi khung (kiểm lại độc lập trên 590 957 khung mức 1: min = max = 0,74). Số trong `stats.json` đúng (0,7400005); phép tính lại của QA cộng dồn float32 qua 591 nghìn khung nên ra 0,7425. Thống kê action "khớp tuyệt đối" vì SIMPLE tính cũng bằng cách cộng dồn đó, nên cả hai cùng lệch so với float64 (lớn nhất 0,011 rad ở `action.mean[25]`). Ψ₀ chuẩn hóa bằng min/max trong `stats_psi0.json`, và min/max thì chính xác, nên **dùng được cho train**. `states[31]` có min = max; các release cũ cũng vậy và đã train được, nhưng cách Ψ₀ xử lý khoảng bằng 0 chưa đọc trong mã. Sửa phép tính lại của QA là việc của DA-03.
+
+Thêm ngày 22/11/2026: `fw data report` đã chạy cho cả hai source, sinh `pipeline/src_*/report/dataset_report.json` (file mà Agent QA/QC đọc).
+
 ## 5. Runbook cho Hiếu trên `rtx3060`
 
 Test `sim` và kiểm 50 seed đã chạy trên `rtx3060` ngày 21/11/2026 (mục 4.11: 46/50 và 45/50, dưới mục tiêu); mục 5.1 đã chạy ngày 21–22/11/2026 (mục 4.12: 568 episode trong tập `ALL`). Mọi lệnh dưới đây đã chạy trên laptop. Cập nhật 20/11/2026 cho planner `da41-planner-8` và đồ gá `jig2` (nhiệm vụ 6.6). Lô `jig1-check`, nếu đã chạy theo bản trước, dùng planner-5 và `jig1`: không gộp với lô mới (`generate` từ chối trộn hai `planner_version` trong một thư mục).
