@@ -1292,7 +1292,7 @@ rows:
   aliases: []
 - id: tray_s2_3618a579b15e
   name: S2 release 669 (prod-1105 pass)
-  title: Tray S2 · release 669 (thiếu)
+  title: Tray S2 · release 669
   kind: release
   data_type: synthetic S2
   task: tray
