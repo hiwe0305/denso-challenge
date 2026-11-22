@@ -384,9 +384,38 @@ Mọi lượt mang `da41-planner-8+cfg.bee61399` và `none+zone1+jig2`. Trung v�
 
 Dựng máy: `rtx3060` không còn thư mục `~/denso-*` (đã xóa 15/11/2026). `~/denso-da41` là checkout git của nhánh này, `bash scripts/g0/setup_simple.sh` rồi chép tay `scripts/g0/simple/curobo_stub/curobo` vào `site-packages` của venv (máy có `nvcc` nên script không tự chép). Số liệu thô: `~/denso-da41/fwdata/simple/tray/gen/jig2-check-l{1,2}/` trên `rtx3060` (540 MB, xóa được) và bản sao `gen_log` ở `fwdata/da-41-samples/evidence/rtx3060-check/` (không commit).
 
+### 4.12 Lô khoảng 600 episode trên `rtx3060` (nhiệm vụ 8.6, 21–22/11/2026)
+
+PO (Hiếu) cho sinh lô ngày 21/11/2026 ("Sinh lô luôn"), dù kiểm 50 seed dưới mục tiêu (mục 4.11). Claude chạy đủ tám bước của mục 5.1. Thực đo, một lần chạy: commit `0594d2dd`, SIMPLE `b75c678`, cảnh đồ gá, hình ảnh SimReady (`4763fbfa…+zone1+jig2`), một `planner_version` duy nhất `da41-planner-8+cfg.bee61399`. Thư mục lô: `~/denso-da41/fwdata/da41-jig-600/` trên `rtx3060` (10 GB, chưa chép đi đâu).
+
+| | Mức 1 | Mức 2 | Tổng |
+|---|---|---|---|
+| Lượt chạy (seed) | 442 (500000–500441) | 190 (501000–501189) | 632 |
+| Ghi được (bước 1) | 420 (95,0 %) | 175 (92,1 %) | 595 (94,1 %) |
+| Replay QA (bước 2) | 420/420 | 175/175 | 595/595 |
+| Release (bước 3) | `tray_s1_bfbdcbcf719e` | `tray_s1_8631ace9b1b3` | |
+| Source (bước 4) | `src_5c88f3ceeb78f61b` | `src_ee534d6641712877` | |
+| Phát lại DA-17 (bước 5): dòng `mismatch` | 0 | 0 | 0 |
+| Phát lại DA-17: rollout đạt | 256/420 | 101/175 | 357/595 |
+| QA (bước 6): `flag` / `reject` | 418 / 2 | 172 / 3 | 590 / 5 |
+| Lọc chất lượng (bước 7): loại | 15 | 7 | 22 |
+| Tập `ALL` (bước 8) | 403 | 165 | 568 |
+| **Tỉ lệ giữ cuối (trên lượt chạy)** | **91,2 %** | **86,8 %** | **89,9 %** |
+
+Lỗi lúc sinh (37 lượt): `timeout:RELEASE` 18 (mức 1: 10, mức 2: 8), `L-ONE-HAND` 10 (8, 2), `L-TRAY-TILT` 5 (2, 3), `timeout:LOWER` 2 (1, 1), `L-PLACE-POSE` 2 (1, 1). Không có shard hỏng. Thời gian một lượt: trung bình 72,6 s (mức 1) và 70,3 s (mức 2), p95 85,7 s và 84,1 s; tổng thời gian worker 32 108 s và 13 362 s.
+
+Đọc:
+- **Cả hai mức trên ngưỡng dừng 85 %**, nên lô dùng được theo điều kiện của mục 5.1. Mức 2 chỉ cách ngưỡng 1,8 điểm.
+- Tập `ALL` có 568 episode, dưới con số khoảng 600 của kế hoạch, và tỉ lệ mức 2 là 29 % (165/568).
+- 5 episode `reject` đều do phát lại động học: `joint_limit` (2, mức 1) và `joint_mapping` (3, mức 2). Chưa xem từng episode để biết nguyên nhân.
+- Mọi episode còn lại mang `flag` D7, và 237 mang thêm D8 (phát lại không đạt). Đây là cùng hiện tượng của mục 4.10 (ngưỡng `replay-1` hiệu chỉnh trên psi-data và bộ phát lại của SIMPLE); `demo_sets` giữ `flag` theo quyết định PO 4/11/2026. `stats_json.states` báo FAIL D4 ở cả hai release (lệch lớn nhất 0,0025 và 0,0011); chưa tìm nguyên nhân.
+- `timeout:RELEASE` là lỗi nhiều nhất (18/37), cùng lớp lỗi nhả của mục 4.7.
+
+Khác với runbook 5.1 khi chạy: (1) sinh dùng 8 + 3 worker thay vì 10 + 4, `MemoryMax` 36G và 14G, vì RAM trống không đủ cho 14 worker lúc đó; (2) hình ảnh SimReady phải có sẵn ở `fwdata/simple/tray/simready/` (chép từ laptop, 17 MB, khớp hash cây thư mục), nếu không `generate` dừng với `SimReady manifest missing`; (3) `uv` cần `export PATH=$HOME/.local/bin:$PATH`; (4) bước 8 dùng `--size ALL=403` và `ALL=165`, vì release còn ít episode hơn sau QA và lọc. Sổ chi phí: `g0-DA-03-20261122` (ingest) và `g0-DA-17-20261122` (phát lại, report) trong `$B`.
+
 ## 5. Runbook cho Hiếu trên `rtx3060`
 
-Test `sim` và kiểm 50 seed đã chạy trên `rtx3060` ngày 21/11/2026 (mục 4.11: 46/50 và 45/50, dưới mục tiêu); mục 5.1 chưa chạy. Mọi lệnh dưới đây đã chạy trên laptop. Cập nhật 20/11/2026 cho planner `da41-planner-8` và đồ gá `jig2` (nhiệm vụ 6.6). Lô `jig1-check`, nếu đã chạy theo bản trước, dùng planner-5 và `jig1`: không gộp với lô mới (`generate` từ chối trộn hai `planner_version` trong một thư mục).
+Test `sim` và kiểm 50 seed đã chạy trên `rtx3060` ngày 21/11/2026 (mục 4.11: 46/50 và 45/50, dưới mục tiêu); mục 5.1 đã chạy ngày 21–22/11/2026 (mục 4.12: 568 episode trong tập `ALL`). Mọi lệnh dưới đây đã chạy trên laptop. Cập nhật 20/11/2026 cho planner `da41-planner-8` và đồ gá `jig2` (nhiệm vụ 6.6). Lô `jig1-check`, nếu đã chạy theo bản trước, dùng planner-5 và `jig1`: không gộp với lô mới (`generate` từ chối trộn hai `planner_version` trong một thư mục).
 
 Chuẩn bị (một lần), trong một thư mục làm việc riêng, rồi kiểm phiên bản:
 
