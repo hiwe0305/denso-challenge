@@ -65,6 +65,7 @@ Số đo dẫn tới story ([docs/he/tray.md](../../he/tray.md) mục 19–20): 
   - [x] 8.4 Runbook `rtx3060` cho lô khoảng 632 lượt (khoảng 600 episode qua lọc), từ sinh tới `demo_sets`, kèm điều kiện dừng; Hiếu chạy. jig.md mục 5.1: 544 lượt mức 1 + 88 lượt mức 2 (tỉ lệ 86/14 của lô 606), seed 500000–500543 và 501000–501087, 14 worker, dừng nếu giữ dưới 85 %; ước lượng 3,5–4 giờ, khoảng 11 GB. Lệnh đọc kết quả đã chạy thử trên lô mẫu; lệnh sinh và phát lại chưa chạy ở `rtx3060`
   - [x] 8.5 (Thêm 21/11/2026, PO: "Tăng lên 30 %") Đổi chia mức của runbook 5.1 từ 86/14 sang khoảng 70/30: 442 lượt mức 1 (seed 500000–500441, 10 worker) + 190 lượt mức 2 (seed 501000–501189, 4 worker), tổng vẫn 632 lượt và 14 worker. Số ở dòng 8.4 là bản trước khi đổi
   - [x] 8.6 (Thêm 21/11/2026, PO: "Sinh lô luôn") Claude chạy đủ tám bước của runbook 5.1 trên `rtx3060` và ghi số vào jig.md mục 4.12. Kết quả: 632 lượt → 595 ghi được → tập `ALL` 403 (mức 1) + 165 (mức 2) = 568 episode; tỉ lệ giữ cuối 91,2 % và 86,8 %, trên ngưỡng dừng 85 %
+  - [x] 8.7 (Thêm 22/11/2026, PO: "Sửa những điểm yếu và chỗ chưa đo") Đo bốn chỗ còn thiếu của lô 600 và ghi vào jig.md mục 4.13: sai lệch đặt cuối (trung vị 1,6 cm, lệch dọc +1,5 cm, 0/595 ngoài dung sai), tỉ trọng pha đặt (LOWER + RELEASE 8,5 % mỗi episode), nguyên nhân 5 `reject` (ngưỡng bắt sát, không phải ghi sai), cờ D4 (QA báo nhầm do cộng dồn float32)
 
 ## Phạm vi file
 
@@ -104,6 +105,7 @@ Nhiệm vụ 6 (20/11/2026) sửa `planner.py`, `jig.py` (trong `flywheel_simple
 |---|---|---|
 | 19/11/2026 | Tạo story theo quyết định PO 19/11/2026: vùng đích cố định, thêm đồ gá định vị | PO (Hiếu) |
 | 21/11/2026 | Thêm nhiệm vụ 6.8: Claude chạy kiểm 50 seed mỗi mức trên `rtx3060` (PO: "Chạy đi") | PO (Hiếu) |
+| 22/11/2026 | Thêm nhiệm vụ 8.7: đo các chỗ chưa đo của lô 600 (PO: "Sửa những điểm yếu và chỗ chưa đo") | PO (Hiếu) |
 | 21/11/2026 | Thêm nhiệm vụ 8.6: Claude sinh lô khoảng 600 trên `rtx3060` dù kiểm 50 seed dưới mục tiêu (PO: "Sinh lô luôn") | PO (Hiếu) |
 | 21/11/2026 | Thêm nhiệm vụ 8.5: lô 600 tăng phần mức 2 lên khoảng 30 % (PO: "Tăng lên 30 %"), vì eval chia đều hai mức | PO (Hiếu) |
 | 20/11/2026 | Thêm AC 8 và nhiệm vụ 6: sửa planner trước khi sinh lại dữ liệu (PO: "Sửa planner trước") | PO (Hiếu) |
@@ -124,3 +126,4 @@ Nhiệm vụ 6 (20/11/2026) sửa `planner.py`, `jig.py` (trong `flywheel_simple
 - 20/11/2026 · Nhiệm vụ 8: phát lại DA-17 chạy đúng cảnh đồ gá; trên lô mẫu D8 15 → 7, D7 vẫn 19 do ngưỡng hiệu chỉnh trên psi-data (cảnh cũ cũng vậy, việc của DA-17). Seed 400005 cùng lớp lỗi nhả 1:10. Độ lệch dọc +1,0 cm sinh ở pha hạ cuối và lúc nhả; không sửa bằng một tham số được, planner giữ nguyên. Runbook lô 600 ở jig.md mục 5.1 cho Hiếu chạy.
 - 21/11/2026 · Nhiệm vụ 6.8: kiểm 50 seed trên `rtx3060` cho 46/50 (mức 1) và 45/50 (mức 2), dưới mục tiêu 48/50; lỗi thuộc các lớp đã biết (L-ONE-HAND 3, L-PLACE-POSE 3, L-TRAY-TILT 2, RELEASE hết giờ 1). Chưa sinh lô 600; chờ PO chọn sửa tiếp hay sinh với tỉ lệ này.
 - 22/11/2026 · Nhiệm vụ 8.6: lô `da41-jig-600` trên `rtx3060` xong tám bước. 595/632 ghi được, 5 `reject` (phát lại động học), 22 bị lọc chất lượng, tập `ALL` 568 episode (403 + 165). Mức 2 giữ 86,8 %, sát ngưỡng 85 %. Lô còn nằm trên `rtx3060`, chưa chép đi; AC 8 vẫn chưa đạt.
+- 22/11/2026 · Nhiệm vụ 8.7: lô 600 lệch dọc +1,5 cm (dừng ngắn), lớn hơn lô mẫu; pha hạ và buông chỉ chiếm 8,5 % mỗi episode. 5 `reject` và cờ D4 là do phép kiểm, không do dữ liệu: việc sau cho DA-17 và DA-03. Script đo nằm ở `analysis/` của lô trên `rtx3060`, chưa vào repo.
