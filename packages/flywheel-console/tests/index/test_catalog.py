@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from flywheel.console.index import catalog
+from flywheel.console.index.cards import CardError
 from flywheel.console.paths import ConsolePaths
 
 
@@ -100,3 +102,197 @@ def test_unique_counts_each_episode_once(tmp_path: Path) -> None:
     assert t["s2"]["episodes"] == 125 + 843
     assert t["all"]["episodes"] == 379 + 193 + 1032 + 968
     assert "eval" not in t
+
+
+# ---------------------------------------------------------------- dataset cards (DA-45)
+OVERRIDE_CARD = """\
+schema: dataset-card/1
+id: tray_s1_41899efb4b27
+alias: tray.s1.zone1.l1.p5.20261111
+status: superseded
+superseded_by: [tray_s1_aaaaaaaaaaaa]
+task: tray
+kind: synthetic_s1
+source_detail: planner_wbc
+data_class: public
+license: unknown
+format: LeRobot v2.1 (Psi0 layout, 50 fps)
+counts: {attempts: 610, episodes: 541, frames: 769340, hours: 4.27}
+quality:
+  replay_qa: 542/542 pass
+  qa_decisions: {pass: 534, reject: 7}
+  known_issues: ["first issue", "second issue"]
+lineage: {parents: [tray_s1_f9433b028c52], story: DA-34}
+files: {release: .}
+locations:
+  - {host: laptop, root: "fwdata/mirror/releases/tray_s1_41899efb4b27", role: mirror}
+  - {host: rtx3060, role: deleted-20261115,
+     root: "~/denso-da34-pool/fwdata/releases/tray_s1_41899efb4b27"}
+"""
+
+ALL_CARD = """\
+schema: dataset-card/1
+id: cut-all-zone1.ALL
+alias: tray.cut.zone1.l12.p5.20261111
+status: superseded
+task: tray
+kind: cut
+source_detail: planner_wbc
+data_class: public
+license: unknown
+format: LeRobot v2.1 (50 fps)
+counts: {episodes: 606, frames: 861624, hours: 4.79}
+quality: {qa_decisions: {kept: 606}}
+lineage: {parents: [tray_s1_41899efb4b27, tray_s1_4a8f4a8c6a8d], story: DA-34}
+files: {cut: G1Env-v0}
+locations:
+  - {host: laptop, root: "fwdata/mirror/cut-all-zone1/ALL", role: mirror}
+  - {host: rtx3060, root: "~/denso-da34-pool/fwdata/cut-all-zone1/ALL", role: deleted-20261115}
+"""
+
+S70_CARD = (
+    ALL_CARD.replace("cut-all-zone1.ALL", "round-c70.S70")
+    .replace(
+        "parents: [tray_s1_41899efb4b27, tray_s1_4a8f4a8c6a8d]", "parents: [cut-all-zone1.ALL]"
+    )
+    .replace("fwdata/mirror/cut-all-zone1/ALL", "fwdata/mirror/cut/S70")
+)
+
+PSI_REF_CARD = """\
+schema: dataset-card/1
+id: psi-two-table
+alias: two_table.teleop.plain.l0.teleop.20260914
+status: reference
+task: two_table
+kind: teleop
+data_class: public
+license: unknown
+format: LeRobot v2.1 (state 32, action 36, 50 fps)
+counts: {episodes: 99, frames: 62764, hours: 0.35}
+quality: {qa_decisions: {pass: 95, flag: 4}}
+lineage: {parents: []}
+locations:
+  - {host: laptop, root: "fwdata/psi-data/simple/Env-v0", role: mirror}
+  - {host: huggingface, root: "USC-PSI-Lab/psi-data", role: upstream}
+"""
+
+S2_CARD = """\
+schema: dataset-card/1
+id: tray_s2_3618a579b15e
+alias: tray.s2.zone1.l01.s2.20261112
+status: superseded
+task: tray
+kind: synthetic_s2
+source_detail: s2
+data_class: public
+license: unknown
+format: LeRobot v2.1 (state 32, action 36, 50 fps, head camera 360x640)
+counts: {episodes: 669, frames: 1158899, hours: 6.44}
+quality: {qa_decisions: {pass: 669}}
+lineage: {parents: [parents-1105], story: DA-35}
+files: {release: .}
+locations:
+  - {host: laptop, root: "fwdata/mirror/releases/tray_s2_3618a579b15e", role: mirror}
+"""
+
+
+def _with_cards(tmp_path: Path) -> dict:
+    from test_cards import STORE_CARD, write_card
+
+    fw = tmp_path / "fw"
+    write_card(fw, STORE_CARD, store="tray-s1-test")
+    for text in (OVERRIDE_CARD, ALL_CARD, S70_CARD, PSI_REF_CARD, S2_CARD):
+        write_card(fw, text)
+    rel = fw / "datasets/tray-s1-test/releases/tray_s1_aaaaaaaaaaaa"
+    (rel / "meta").mkdir(parents=True)
+    (rel / "meta" / "info.json").write_text("{}")
+    (rel / "blob.bin").write_bytes(b"\0" * 3_000_000)
+    (fw / "mirror/cut-all-zone1/ALL/G1Env-v0/meta").mkdir(parents=True)
+    (fw / "mirror/cut-all-zone1/ALL/G1Env-v0/meta/info.json").write_text("{}")
+    return _build(tmp_path)[1]
+
+
+def test_card_overrides_the_seed_row_with_its_id(tmp_path: Path) -> None:
+    by = {r["id"]: r for r in _with_cards(tmp_path)["rows"]}
+    r = by["tray_s1_41899efb4b27"]
+    assert r["status"] == "superseded" and r["frames"] == 769340
+    assert r["title"] == "Tray S1 · pool 1104 zone1 (541)"  # seed title kept
+    assert [loc["where"] for loc in r["locations"]] == ["laptop"]  # deleted rtx3060 dropped
+    assert r["name"] == "tray.s1.zone1.l1.p5.20261111"
+    assert {"S1", "tray.s1.zone1.l1.p5.20261111"} <= set(r["aliases"])
+    assert r["qa"] == "534 pass, 7 reject" and r["qa_counts"] == {"pass": 534, "reject": 7}
+    assert r["replay_qa"] == "542/542 pass" and r["notes"] == "first issue; second issue"
+    assert r["superseded_by"] == ["tray_s1_aaaaaaaaaaaa"] and r["story"] == "DA-34"
+    assert r["card"] == "fwdata/datasets/_cards/tray_s1_41899efb4b27.yaml"
+    assert r["unique"] is False  # superseded releases leave the totals
+    assert r["size"] == "4.5 GB"  # seed size kept
+
+
+def test_new_card_adds_a_row_with_a_generated_title(tmp_path: Path) -> None:
+    doc = _with_cards(tmp_path)
+    r = next(x for x in doc["rows"] if x["id"] == "tray_s1_aaaaaaaaaaaa")
+    assert r["title"] == "Tray S1 · jig2 · l1 (10)"
+    assert r["status"] == "current" and r["kind"] == "release" and r["group"] == "s1"
+    assert r["fps"] == 50 and r["scene"] == {"jig": "jig2", "level": 1}
+    assert [loc["raw"] for loc in r["locations"]] == [
+        "rtx3060:~/fwdata/datasets/tray-s1-test/releases/tray_s1_aaaaaaaaaaaa",
+        "laptop:fwdata/datasets/tray-s1-test/releases/tray_s1_aaaaaaaaaaaa",
+    ]
+    assert r["laptop_dir"] == "fwdata/datasets/tray-s1-test/releases/tray_s1_aaaaaaaaaaaa"
+    assert r["view"] == "meta" and r["size"] == "3 MB"  # measured from the laptop copy
+    assert r["lerobot"] is None  # no poster index for card-only rows
+    assert r["unique"] is True
+    assert doc["cards"] == 6
+
+
+def test_linked_rows_keep_their_seed_id(tmp_path: Path) -> None:
+    doc = _with_cards(tmp_path)
+    by = {r["id"]: r for r in doc["rows"]}
+    assert "cut-all-zone1.ALL" not in by and "round-c70.S70" not in by
+    a, s = by["ALL"], by["S70"]
+    assert a["episodes"] == 606 and a["frames"] == 861624 and a["status"] == "superseded"
+    assert "cut-all-zone1.ALL" in a["aliases"] and "ALL" in a["aliases"]
+    assert a["data_type"] == "synthetic S1" and a["kind"] == "subset-cut"
+    assert a["qa"] == "606 kept" and a["qa_counts"] is None
+    assert a["lerobot"] == "mirror/cut-all-zone1/ALL/G1Env-v0"  # seed folder gone: card cut
+    assert s["lerobot"] == "da34-dryrun/cut-all-zone1/S70/G1WholebodyTrayTransferTeleop-v0"
+    assert s["parents"] == ["ALL"] and ["ALL", "S70"] in doc["edges"]
+    assert a["view"] == "robot" and a["unique"] is False
+
+
+def test_s2_row_takes_the_card_and_its_parent_edge(tmp_path: Path) -> None:
+    doc = _with_cards(tmp_path)
+    by = {r["id"]: r for r in doc["rows"]}
+    r = by["tray_s2_3618a579b15e"]
+    assert r["status"] == "superseded" and r["group"] == "s2" and r["frames"] == 1158899
+    assert "s2-release-669" in r["aliases"] and r["parents"] == ["parents-1105"]
+    assert ["parents-1105", "tray_s2_3618a579b15e"] in doc["edges"]
+    assert ["s2-prod-1105", "tray_s2_3618a579b15e"] in doc["edges"]  # seed edge kept
+
+
+def test_reference_rows_count_like_current(tmp_path: Path) -> None:
+    doc = _with_cards(tmp_path)
+    r = next(x for x in doc["rows"] if x["id"] == "psi-two-table")
+    assert r["status"] == "reference" and r["unique"] is True and r["view"] == "psi"
+    assert [loc["raw"] for loc in r["locations"]][-1] == "HF USC-PSI-Lab/psi-data"
+    assert doc["totals"]["teleop"]["episodes"] == 193
+
+
+def test_card_catalog_edges_are_known_and_paths_relative(tmp_path: Path) -> None:
+    doc = _with_cards(tmp_path)
+    ids = {r["id"] for r in doc["rows"]} | {r["id"] for r in doc["runs"]}
+    assert len(ids) == len(doc["rows"]) + len(doc["runs"])
+    assert all(a in ids and b in ids for a, b in doc["edges"])
+    assert len({tuple(e) for e in doc["edges"]}) == len(doc["edges"])
+    assert "/home/" not in json.dumps(doc) and str(tmp_path) not in json.dumps(doc)
+    seed_only = next(r for r in doc["rows"] if r["id"] == "egodex-da30")
+    assert seed_only["card"] is None and seed_only["superseded_by"] == []
+
+
+def test_invalid_card_stops_the_catalog_build(tmp_path: Path) -> None:
+    from test_cards import write_card
+
+    write_card(tmp_path / "fw", OVERRIDE_CARD.replace("status: superseded", "status: live"))
+    with pytest.raises(CardError, match="status"):
+        catalog.build(_paths(tmp_path), tmp_path / "out")
+    assert not (tmp_path / "out" / "catalog.json").exists()

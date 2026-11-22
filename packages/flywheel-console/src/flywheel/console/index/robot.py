@@ -9,7 +9,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-import yaml
+from flywheel.console.index.cards import merged
 from flywheel.console.index.posters import write_posters
 from flywheel.console.paths import ConsolePaths
 
@@ -18,17 +18,12 @@ RELEASE_TAG = {"41899efb4b27": "pool", "4a8f4a8c6a8d": "tgt"}
 DEFAULT_VIDEO = "videos/chunk-{episode_chunk:03d}/egocentric/episode_{episode_index:06d}.mp4"
 
 
-def load_rows(paths: ConsolePaths) -> list[dict[str, Any]]:
-    """Seed catalog rows (a YAML list, or a mapping with ``rows``); absent file means none."""
-    p = paths.seed / "catalog.yaml"
-    if not p.is_file():
-        return []
-    data = yaml.safe_load(p.read_text(encoding="utf-8"))
-    if isinstance(data, dict):
-        data = data.get("rows")
-    if not isinstance(data, list):
-        raise ValueError(f"{p}: expected a YAML list of rows")
-    return [r for r in data if isinstance(r, dict)]
+def load_rows(paths: ConsolePaths, strict: bool = True) -> list[dict[str, Any]]:
+    """Catalog rows: the seed rows overlaid with the dataset cards under ``fw_root``.
+
+    Absent seed file and no cards means none. ``strict`` raises ``CardError`` on a bad card;
+    live server paths pass ``strict=False`` so one bad card is skipped instead."""
+    return merged(paths, strict=strict)[0]
 
 
 def read_jsonl(p: Path) -> list[dict[str, Any]]:

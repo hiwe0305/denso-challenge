@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any
 
 import yaml
+from flywheel.console.index import cards
 from flywheel.console.paths import ConsolePaths, PathDenied, guard
 
 _GROUPS = {
@@ -23,6 +25,8 @@ _ORIGIN_KINDS = ("raw source", "release")
 _EGO_IDS = ("h1m-team", "h1m-egodex")
 _PSI_IDS = ("psi-two-table", "psi-hug")
 _COND_IDS = ("he-dev-eval-v1", "he-dev-eval-v1-l0n10", "he-eval-n20-interleaved")
+# Statuses whose rows count in the totals; ``reference`` (the authors' psi-data) counts too.
+LIVE_STATUSES = ("current", "reference")
 
 
 def _parse_loc(raw: str) -> dict[str, str]:
@@ -129,7 +133,7 @@ def _view(paths: ConsolePaths, r: dict[str, Any], laptop_dir: Path | None, has_l
 def _is_unique(row: dict[str, Any]) -> bool:
     """True when the row's episodes are counted once in the catalog totals."""
     return bool(
-        row["kind"] in _ORIGIN_KINDS and row["status"] == "current" and row["group"] != "eval"
+        row["kind"] in _ORIGIN_KINDS and row["status"] in LIVE_STATUSES and row["group"] != "eval"
     )
 
 
@@ -156,12 +160,31 @@ def _load_seed(paths: ConsolePaths) -> dict[str, Any]:
     return data
 
 
+def _human_size(n: int) -> str:
+    return "%.0f MB" % (n / 1e6) if n < 1e9 else "%.1f GB" % (n / 1e9)
+
+
+def _dir_size(d: Path) -> str:
+    """Total bytes of the files under ``d``, written like ``4.4 GB``."""
+    tot = 0
+    for dp, _dns, fns in os.walk(d):
+        for fn in fns:
+            try:
+                tot += (Path(dp) / fn).stat().st_size
+            except OSError:
+                continue
+    return _human_size(tot)
+
+
 def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
-    """Write ``out/catalog.json`` and return the counts of rows, edges and runs."""
+    """Write ``out/catalog.json`` and return the counts of rows, edges, runs and cards.
+
+    Rows are the seed rows overlaid with the dataset cards (a bad card raises ``CardError``).
+    Only ``out`` is written; nothing under ``fw_root`` changes."""
     seed = _load_seed(paths)
-    edges: list[list[str]] = [list(e) for e in seed["edges"]]
+    merged, edges = cards.merged(paths, strict=True)
     rows: list[dict[str, Any]] = []
-    for r in seed["rows"]:
+    for r in merged:
         locs = [_parse_loc(x) for x in r["locations"]]
         laptop_dir: Path | None = None
         has_laptop = False
@@ -171,6 +194,9 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
                 has_laptop = True
                 if laptop_dir is None:
                     laptop_dir = _local_dir(paths, loc["path"])
+        size = r["size"]
+        if size is None:  # a card row without a seed size: measure the laptop copy
+            size = _dir_size(laptop_dir) if laptop_dir is not None else "?"
         rows.append(
             {
                 "id": r["id"],
@@ -190,7 +216,7 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
                 "licence": r["licence"],
                 "data_class": r["data_class"],
                 "locations": locs,
-                "size": r["size"],
+                "size": size,
                 "status": r["status"],
                 "notes": r["notes"],
                 "qa": r["qa"],
@@ -207,14 +233,21 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
                 "aliases": list(r.get("aliases", [])),
                 "lerobot": r.get("lerobot"),
                 "ego_viewer": r.get("ego_viewer"),
+                "scene": r.get("scene"),
+                "superseded_by": list(r.get("superseded_by") or []),
+                "story": r.get("story"),
+                "replay_qa": r.get("replay_qa"),
+                "card": r.get("card"),
             }
         )
         rows[-1]["unique"] = _is_unique(rows[-1])
-        rows[-1].update(_rsync(r, locs, rows[-1]["view"], laptop_dir is not None))
+        rows[-1].update(_rsync({**r, "size": size}, locs, rows[-1]["view"], laptop_dir is not None))
     runs = list(seed["runs"])
+    n_cards = sum(1 for r in rows if r["card"])
     out.mkdir(parents=True, exist_ok=True)
     doc = {
         "generated": seed["generated"],
+        "cards": n_cards,
         "rows": rows,
         "edges": edges,
         "runs": runs,
@@ -223,4 +256,4 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
     (out / "catalog.json").write_text(
         json.dumps(doc, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
     )
-    return {"rows": len(rows), "edges": len(edges), "runs": len(runs)}
+    return {"rows": len(rows), "edges": len(edges), "runs": len(runs), "cards": n_cards}
