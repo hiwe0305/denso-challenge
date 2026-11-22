@@ -126,7 +126,7 @@ _DROP = object()
 def test_no_datasets_dir_means_no_cards(tmp_path: Path) -> None:
     assert cards.load_cards(tmp_path) == []
     assert cards.load_cards_lenient(tmp_path) == []
-    assert cards.cards_stamp(tmp_path) == (0, 0.0)
+    assert cards.cards_stamp(tmp_path) == (0, 0)
 
 
 def test_store_and_loose_cards_load_sorted(tmp_path: Path) -> None:
@@ -251,3 +251,23 @@ def test_server_rows_follow_card_changes_and_skip_bad_cards(tmp_path: Path) -> N
     after = {r["id"] for r in media.seed_rows()}
     assert after == before | {"tray_s1_aaaaaaaaaaaa"}
     media._rows_cache = None
+
+
+def test_cards_stamp_changes_when_a_card_is_replaced_by_an_older_copy(tmp_path: Path) -> None:
+    """``rsync -a`` keeps mtimes, so the newest mtime alone would miss this edit."""
+    import os
+
+    d = tmp_path / "datasets" / "_cards"
+    d.mkdir(parents=True)
+    a, b = d / "a.yaml", d / "b.yaml"
+    a.write_text("id: a\n")
+    b.write_text("id: b\n")
+    os.utime(a, (2000, 2000))
+    os.utime(b, (3000, 3000))
+    before = cards.cards_stamp(tmp_path)
+    a.write_text("id: a\nstatus: superseded\n")
+    os.utime(a, (1000, 1000))  # older than b: count and newest mtime are unchanged
+    assert cards.cards_stamp(tmp_path) != before
+    a.rename(d / "c.yaml")  # a rename keeps mtime, size and count
+    assert cards.cards_stamp(tmp_path)[0] == before[0]
+    assert cards.cards_stamp(tmp_path) != before

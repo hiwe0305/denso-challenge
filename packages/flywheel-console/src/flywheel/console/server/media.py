@@ -20,7 +20,7 @@ from flywheel.console.server.runner import NotFound
 
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,80}$")
 _lock = threading.Lock()
-_rows_cache: tuple[tuple[float, int, float], list[dict[str, Any]]] | None = None
+_rows_cache: tuple[tuple[float, int, int], list[dict[str, Any]]] | None = None
 _layout: dict[str, tuple[float, dict[str, list[tuple[int, str]]]]] = {}
 
 
