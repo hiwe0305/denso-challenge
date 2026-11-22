@@ -7,7 +7,7 @@
         --decide find_001=agree --decide find_002=override:"reason"   writes AgentReview
     fw agentqa html --reports <reports.jsonl> --out <dir> [--reviews <dir>]
     fw agentqa estimates --path <estimates.jsonl> [--measure <ref>=<value> --source <ref>]
-    fw agentqa pack --round <round.yaml>                   freeze a round into pack.json (DA-43)
+    fw agentqa pack --round <round.yaml> [--store <dir>]   freeze a round into pack.json (DA-43)
     fw agentqa round --pack <pack.json> --out <dir> --no-model [--from <step>]
         [--plan <yaml>] [--store <dir>]                    run a round into index.html (DA-43)
 
@@ -72,10 +72,12 @@ def _read_reports(path: Path) -> list[AgentReport]:
 @app.command("pack")
 def pack_command(
     declaration: Path = typer.Option(..., "--round", help="The round.yaml of the round."),
+    store: Path | None = typer.Option(
+        None, "--store", help="The site store the store_snapshot block copies rows from."),
 ) -> None:
     """Step B0: check and hash the files `round.yaml` names, write pack.json beside it."""
     try:
-        pack = build_pack(declaration)
+        pack = build_pack(declaration, store=store)
         out = write_pack(pack, declaration.parent)
     except PackRefused as error:
         _fail(str(error))

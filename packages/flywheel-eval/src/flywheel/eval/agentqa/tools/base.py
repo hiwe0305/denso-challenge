@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from typing import Any
 
 from flywheel.contracts.entities import Condition, Score
 from flywheel.contracts.trace import TraceStep
@@ -16,26 +15,12 @@ Row = Mapping[str, FactValue]
 
 
 @dataclass(frozen=True)
-class StoreRead:
-    """What a store-reading tool read: the table, the rows that parsed, a hash over them.
+class StoreRows:
+    """The rows of a store snapshot entry of the pack, and the rows it could not parse."""
 
-    `sha256` is over the canonical JSON of the rows read, projected on the fields the tool
-    uses (ids and timestamps are noise to it) and sorted, so it does not move with the order
-    of files; `unreadable` counts the rows that did not parse and are not in the hash.
-    """
-
-    table: str
-    rows: int
-    sha256: str
+    ref: str
+    rows: tuple[Any, ...]
     unreadable: int = 0
-
-
-def store_read(table: str, rows: Iterable[Mapping[str, object]],
-               unreadable: int = 0) -> StoreRead:
-    lines = sorted(json.dumps(r, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-                   for r in rows)
-    return StoreRead(table, len(lines), hashlib.sha256("\n".join(lines).encode()).hexdigest(),
-                     unreadable)
 
 
 @dataclass(frozen=True)
@@ -51,7 +36,6 @@ class ToolResult:
     facts: tuple[str, ...] = ()
     rows: tuple[Row, ...] = ()
     not_judged: tuple[str, ...] = ()
-    store_reads: tuple[StoreRead, ...] = ()  # set only by tools registered `reads_store`
 
     @property
     def judged(self) -> bool:
@@ -77,7 +61,6 @@ def merge(tool: str, results: Sequence[ToolResult]) -> ToolResult:
         tuple(f for r in results for f in r.facts),
         tuple(row for r in results for row in r.rows),
         tuple(reason for r in results for reason in r.not_judged),
-        tuple(read for r in results for read in r.store_reads),
     )
 
 

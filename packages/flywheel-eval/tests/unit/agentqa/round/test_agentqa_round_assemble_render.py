@@ -98,9 +98,6 @@ def test_every_fact_of_the_headline_is_shown_with_its_value(round_out: Path) -> 
 def test_not_judged_collects_the_unjudged_things(round_out: Path) -> None:
     a = assembly_of(round_out)
     # the fixture is scores only: no trace, no metrics, and no checkpoint declared
-    untried_all = ("sim_s1, sim_s2, sim_s3, sim_s4, teleop_correction, recovery_data, "
-                   "repair_ticket, report_only")
-    unmeasured = "log_missing_signals, inspect_latch_on_successes, " + untried_all
     no_ckpt = ("no checkpoint is declared on its scores entry and no Episode record of "
                "its rollouts carries one")
     assert sorted((n.what, n.reason) for n in a.not_judged) == sorted([
@@ -109,19 +106,18 @@ def test_not_judged_collects_the_unjudged_things(round_out: Path) -> None:
         *((f"lineage_{r}_checkpoint_not_judged", f"run {r}: {no_ckpt}")
           for r in ("B_ALL", "C_ALL", "B_70", "C_70")),
         ("coverage_distance_not_judged", "no entry of kind conditions in the pack"),
-        *((f"cost_price_{rt}_not_judged", f"no price in the price book for {rt}")
-          for rt in ("cpu_seconds", "gpu_seconds", "review_hour", "sim_episode",
-                     "teleop_episode")),
-        *((f"cost_{n}_measured_not_judged", f"no measured ledger row of the kind for {n}")
-          for n in unmeasured.split(", ")),
-        *((f"history_{k}_not_judged", f"{k}: no FixRateEvent of the kind in the store")
-          for k in untried_all.split(", ")),
+        ("cost_lookup_not_judged", "no entry of kind ledger in the pack"),
+        ("history_lookup_not_judged", "no entry of kind fix_rate in the pack"),
         ("trace_stats", "no entry of kind trace in the pack"),
         ("train_window", "no entry of kind metrics in the pack"),
         ("coverage_distance", "no entry of kind conditions in the pack"),
         ("trace", "no accepted entry of this kind"),
         ("metrics", "no accepted entry of this kind"),
         ("conditions", "no accepted entry of this kind"),
+        ("cost_lookup", "no entry of kind ledger in the pack"),
+        ("history_lookup", "no entry of kind fix_rate in the pack"),
+        ("ledger", "no accepted entry of this kind"),
+        ("fix_rate", "no accepted entry of this kind"),
     ])
     assert a.status == "degraded"
     assert "No model was called: every hypothesis, rank and choice is the code floor." in a.notes

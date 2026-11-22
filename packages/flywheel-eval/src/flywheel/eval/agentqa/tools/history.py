@@ -1,6 +1,6 @@
 """`history_lookup`: what past interventions of a kind fixed (task 3.4).
 
-From the `FixRateEvent` rows of the site catalog, read through `flywheel.store`: per
+From the `FixRateEvent` rows of the pack's `fix_rate` entry (the store snapshot): per
 intervention kind, how many events, how many conditions they measured, how many were fixed,
 and the fixed share. Evidence cards are read nowhere: a card sits under its run plan in the
 store and is not an admitted kind of the pack, so `EvidenceCard.result` is out of reach
@@ -15,29 +15,13 @@ from collections.abc import Sequence
 from flywheel.contracts.entities import FixRateEvent
 from flywheel.eval.agentqa.facts import FactBook
 from flywheel.eval.agentqa.tools.base import Row, ToolResult
-from flywheel.store.paths import StorePaths
-from flywheel.store.tables import read_table_records
-from pydantic import ValidationError
 
 TOOL = "history_lookup"
-TABLE = "fix_rate_event"
-
-
-def read_events(paths: StorePaths) -> tuple[list[FixRateEvent], int]:
-    """The fix-rate events of the site, and how many rows did not parse."""
-    events: list[FixRateEvent] = []
-    bad = 0
-    for record in read_table_records(TABLE, paths):
-        try:
-            events.append(FixRateEvent.model_validate(record))
-        except ValidationError:
-            bad += 1
-    return events, bad
 
 
 def history_lookup(book: FactBook, kinds: Sequence[str], events: Sequence[FixRateEvent],
-                   unreadable: int) -> ToolResult:
-    ref = f"catalog/{TABLE}"
+                   unreadable: int, ref: str = "store_snapshot/fix_rate.jsonl") -> ToolResult:
+    """`ref`: the pack entry (the store snapshot of step B0) the events come from."""
     facts = [book.add("history_unreadable_rows", unreadable, ref, "rows")]
     rows: list[Row] = []
     reasons: list[str] = []
@@ -45,7 +29,7 @@ def history_lookup(book: FactBook, kinds: Sequence[str], events: Sequence[FixRat
         mine = [e for e in events if e.intervention_type == kind]
         facts.append(book.add(f"history_{kind}_events", len(mine), ref, "events"))
         if not mine:
-            reason = f"{kind}: no FixRateEvent of the kind in the store"
+            reason = f"{kind}: no FixRateEvent of the kind in the pack"
             facts.append(book.add(f"history_{kind}_not_judged", reason, ref))
             reasons.append(reason)
             continue

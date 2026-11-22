@@ -8,15 +8,10 @@ import pytest
 from flywheel.contracts.configs import PriceBookConfig, PriceRateConfig
 from flywheel.contracts.entities import FixRateEvent
 from flywheel.eval.agentqa.facts import FactBook
+from flywheel.eval.agentqa.round.snapshot import read_events, read_ledger
 from flywheel.eval.agentqa.tools.base import ToolResult
-from flywheel.eval.agentqa.tools.cost import (
-    Costs,
-    check_costs,
-    cost_lookup,
-    load_costs,
-    read_ledger,
-)
-from flywheel.eval.agentqa.tools.history import history_lookup, read_events
+from flywheel.eval.agentqa.tools.cost import Costs, check_costs, cost_lookup, load_costs
+from flywheel.eval.agentqa.tools.history import history_lookup
 from flywheel.store.ledger_append import append_ledger_entry
 from flywheel.store.paths import StorePaths
 from flywheel.store.tables import write_record
@@ -146,7 +141,7 @@ def test_history_gives_the_recorded_fix_rate_of_each_kind(paths: StorePaths) -> 
     assert got["history_sim_s1_events"] == 2 and got["history_sim_s1_conditions"] == 15
     assert got["history_sim_s1_fixed"] == 5
     assert got["history_sim_s1_fix_rate"] == pytest.approx(5 / 15)
-    assert got["history_sim_s3_not_judged"] == "sim_s3: no FixRateEvent of the kind in the store"
+    assert got["history_sim_s3_not_judged"] == "sim_s3: no FixRateEvent of the kind in the pack"
     assert got["history_sim_s3_events"] == 0 and "history_sim_s3_fix_rate" not in got
     assert "history_sim_s2_events" not in got  # only the kinds asked for
 

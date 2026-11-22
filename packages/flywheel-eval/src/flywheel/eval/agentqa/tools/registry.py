@@ -13,9 +13,8 @@ call is read from this file.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from itertools import combinations
-from pathlib import Path
 from typing import Any, get_args
 
 from flywheel.contracts.artifacts import DatasetReport, Episode
@@ -27,10 +26,10 @@ from flywheel.eval.agentqa.tools.base import (
     JobMetrics,
     RunScores,
     RunTrace,
+    StoreRows,
     ToolResult,
     merge,
     not_judged,
-    store_read,
 )
 from flywheel.eval.agentqa.tools.clusters import failure_clusters
 from flywheel.eval.agentqa.tools.cost import (
@@ -38,10 +37,9 @@ from flywheel.eval.agentqa.tools.cost import (
     cost_lookup,
     load_costs,
     no_costs,
-    read_ledger,
 )
 from flywheel.eval.agentqa.tools.coverage import coverage_distance
-from flywheel.eval.agentqa.tools.history import history_lookup, read_events
+from flywheel.eval.agentqa.tools.history import history_lookup
 from flywheel.eval.agentqa.tools.latch import latch_consistency
 from flywheel.eval.agentqa.tools.lineage import lineage
 from flywheel.eval.agentqa.tools.paired import paired_compare
@@ -52,7 +50,6 @@ from flywheel.eval.agentqa.tools.trace import no_tolerance, trace_stats
 from flywheel.eval.agentqa.tools.train import logged_steps, train_window
 from flywheel.eval.api import DEFAULT_SYSTEM_CONFIG
 from flywheel.eval.config import ConfigError, load_system_thresholds
-from flywheel.store.paths import StorePaths
 
 
 @dataclass(frozen=True)
@@ -67,7 +64,8 @@ class MeasureContext:
     reports: Mapping[str, DatasetReport] = field(default_factory=dict)  # entry ref -> report
     entries: tuple[EntryView, ...] = ()  # every accepted entry as the pack declares it
     conditions: tuple[ConditionSet, ...] = ()  # `conditions` entries with their declared role
-    store: Path | None = None  # root of the site store the cost and history tools read
+    ledger: StoreRows | None = None  # the pack's store snapshot of the ledger
+    fix_rate: StoreRows | None = None  # and of the fix-rate events
 
 
 @dataclass(frozen=True)
@@ -79,10 +77,6 @@ class ToolSpec:
     run: Callable[[FactBook, MeasureContext, Mapping[str, Any]], ToolResult]
     reads_all: bool = False  # the result depends on every accepted entry, not only `needs`
     context_runs: bool = False  # reads every run of its kinds, whatever runs it names
-    # Reads the site store (ledger, catalog), outside the pack: its facts depend on the store
-    # state, which the call record holds as `store_reads`. Every fact of such a call is
-    # told apart from pack-derived ones by `FactRecord.tool_call_id` -> that record.
-    reads_store: bool = False
 
 
 # Domains a plan must give a value for; the others may be left out.
@@ -295,24 +289,20 @@ def _cost_lookup(book: FactBook, ctx: MeasureContext, params: Mapping[str, Any])
         costs, checks = load_costs(), check_costs()
     except (OSError, ValueError, KeyError) as error:
         return no_costs(book, f"costs.yaml or checks.yaml cannot be read: {str(error)[:150]}")
-    ledger, bad = read_ledger(StorePaths(ctx.store))
-    result = cost_lookup(book, costs, checks, _chosen(params["checks"], list(checks)),
-                         _chosen(params["interventions"], list(get_args(InterventionKind))),
-                         ledger, bad, "configs/eval/agentqa/costs.yaml")
-    return replace(result, store_reads=(store_read("ledger", (
-        {"activity": r.activity, "resource_type": r.resource_type, "unit": r.unit,
-         "measure_kind": r.measure_kind, "quantity": r.quantity, "usd_amount": r.usd_amount}
-        for r in ledger), bad),))
+    held = ctx.ledger
+    assert held is not None  # `needs` holds the kind, so measure skipped the call otherwise
+    return cost_lookup(book, costs, checks, _chosen(params["checks"], list(checks)),
+                       _chosen(params["interventions"], list(get_args(InterventionKind))),
+                       held.rows, held.unreadable, "configs/eval/agentqa/costs.yaml", held.ref)
 
 
 def _history_lookup(book: FactBook, ctx: MeasureContext,
                     params: Mapping[str, Any]) -> ToolResult:
-    events, bad = read_events(StorePaths(ctx.store))
-    result = history_lookup(book, _chosen(params["interventions"],
-                                          list(get_args(InterventionKind))), events, bad)
-    return replace(result, store_reads=(store_read("fix_rate_event", (
-        {"intervention_type": e.intervention_type, "n_conditions": e.n_conditions,
-         "fixed": e.fixed} for e in events), bad),))
+    held = ctx.fix_rate
+    assert held is not None
+    return history_lookup(book, _chosen(params["interventions"],
+                                        list(get_args(InterventionKind))), held.rows,
+                          held.unreadable, held.ref)
 
 
 def pairs_of(params: Mapping[str, Any], ctx: MeasureContext) -> list[tuple[str, str]]:
@@ -349,8 +339,8 @@ REGISTRY: dict[str, ToolSpec] = {spec.name: spec for spec in (
     ToolSpec("lineage", 1, ("scores",), {}, _lineage, reads_all=True),
     ToolSpec("coverage_distance", 1, ("scores", "conditions"), {"runs": "runs"},
              _coverage_distance),
-    ToolSpec("cost_lookup", 1, (), {"checks": "checks", "interventions": "interventions"},
-             _cost_lookup, reads_store=True),
-    ToolSpec("history_lookup", 1, (), {"interventions": "interventions"}, _history_lookup,
-             reads_store=True),
+    ToolSpec("cost_lookup", 2, ("ledger",),
+             {"checks": "checks", "interventions": "interventions"}, _cost_lookup),
+    ToolSpec("history_lookup", 2, ("fix_rate",), {"interventions": "interventions"},
+             _history_lookup),
 )}

@@ -8,10 +8,7 @@ programming error and propagates.
 
 Written into the run directory: `facts.jsonl` (every fact, with the call that first made
 it), `tool_calls.jsonl` (what each call read and produced), `tables/<call>-<tool>.json`
-(the rows behind each call's facts). Same pack and same plan give the same bytes, except
-for a tool registered `reads_store` (`cost_lookup`, `history_lookup`): it reads the site
-store outside the pack, so its result depends on the store state, which its call record
-holds as `store_reads` (table, rows, sha256 of the rows read).
+(the rows behind each call's facts). Same pack and same plan give the same bytes.
 """
 
 from __future__ import annotations
@@ -34,7 +31,6 @@ from flywheel.eval.agentqa.round.records import (
     Pack,
     PackEntry,
     Record,
-    StoreReadRecord,
     ToolCallRecord,
 )
 from flywheel.eval.agentqa.tools.base import (
@@ -43,6 +39,7 @@ from flywheel.eval.agentqa.tools.base import (
     JobMetrics,
     RunScores,
     RunTrace,
+    StoreRows,
     ToolResult,
     not_judged,
 )
@@ -115,8 +112,7 @@ def _declared_run(entry: PackEntry, seen: dict[str, str]) -> str:
     return name
 
 
-def _context(pack: Pack, admitted: Admitted,
-             store: Path | None = None) -> tuple[MeasureContext, list[PackEntry]]:
+def _context(pack: Pack, admitted: Admitted) -> tuple[MeasureContext, list[PackEntry]]:
     entries = [e for e in pack.entries if e.ref in admitted.records]
     runs: dict[str, RunScores] = {}
     traces: dict[str, RunTrace] = {}
@@ -124,6 +120,8 @@ def _context(pack: Pack, admitted: Admitted,
     episodes: list[Episode] = []
     conditions: list[ConditionSet] = []
     reports: dict[str, DatasetReport] = {}
+    ledger: StoreRows | None = None
+    events: StoreRows | None = None
     seen: dict[str, dict[str, str]] = {"scores": {}, "trace": {}, "metrics": {}}
     for entry in entries:
         records = admitted.records[entry.ref]
@@ -150,12 +148,20 @@ def _context(pack: Pack, admitted: Admitted,
             conditions.append(ConditionSet(entry.ref, entry.subject.get("role", ""), found))
         elif entry.kind == "episodes":
             episodes += [r for r in records if isinstance(r, Episode)]
+        elif entry.kind in ("ledger", "fix_rate"):
+            if (ledger if entry.kind == "ledger" else events) is not None:
+                raise PlanRefused(f"{entry.ref}: the pack holds two {entry.kind} entries")
+            held = StoreRows(entry.ref, tuple(records), int(entry.subject.get("unreadable", 0)))
+            if entry.kind == "ledger":
+                ledger = held
+            else:
+                events = held
         elif entry.kind == "dataset_report":
             reports[entry.ref] = next(r for r in records if isinstance(r, DatasetReport))
     task = load_task(pack.task_id)
     views = tuple(EntryView(e.ref, e.kind, e.subject) for e in entries)
     ctx = MeasureContext(task, runs, frozenset(e.kind for e in entries), traces, jobs,
-                         tuple(episodes), reports, views, tuple(conditions), store)
+                         tuple(episodes), reports, views, tuple(conditions), ledger, events)
     return ctx, entries
 
 
@@ -190,13 +196,12 @@ def _jsonl(lines: Sequence[Record]) -> str:
     return "".join(r.model_dump_json() + "\n" for r in lines)
 
 
-def measure(pack: Pack, admitted: Admitted, plan_path: Path, out: Path,
-            store: Path | None = None) -> MeasureResult:
+def measure(pack: Pack, admitted: Admitted, plan_path: Path, out: Path) -> MeasureResult:
     plan = read_plan(plan_path)
     if plan.task_id != pack.task_id:
         raise PlanRefused(f"{plan_path}: the plan is for {plan.task_id!r}, the pack for "
                           f"{pack.task_id!r}")
-    ctx, entries = _context(pack, admitted, store)
+    ctx, entries = _context(pack, admitted)
     problems = check_plan(plan, ctx)
     if problems:
         raise PlanRefused("; ".join(problems))
@@ -217,8 +222,6 @@ def measure(pack: Pack, admitted: Admitted, plan_path: Path, out: Path,
             status = "skipped"
         else:
             result = spec.run(book, ctx, call.params)
-            if result.store_reads and not spec.reads_store:
-                raise ValueError(f"{spec.name} read the store but is not registered reads_store")
             status = "ran"
             reason = ""
         facts += [FactRecord(fact_id=f.fact_id, name=f.name, value=f.value, unit=f.unit,
@@ -228,10 +231,7 @@ def measure(pack: Pack, admitted: Admitted, plan_path: Path, out: Path,
             tables[f"{call_id}-{spec.name}.json"] = [dict(row) for row in result.rows]
         calls.append(ToolCallRecord(
             call_id=call_id, tool=spec.name, version=spec.version, params=call.params,
-            input_sha256=[] if missing else [
-                *_inputs(spec, call.params, ctx, entries), *(r.sha256 for r in result.store_reads)],
-            store_reads=[StoreReadRecord(table=r.table, rows=r.rows, sha256=r.sha256,
-                                         unreadable=r.unreadable) for r in result.store_reads],
+            input_sha256=[] if missing else _inputs(spec, call.params, ctx, entries),
             fact_ids=list(dict.fromkeys(result.facts)), not_judged=list(result.not_judged),
             status=status, reason=reason))  # type: ignore[arg-type]
 

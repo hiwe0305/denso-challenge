@@ -6,15 +6,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from flywheel.contracts.entities import FixRateEvent
 from flywheel.eval.agentqa.facts import FactBook
-from flywheel.eval.agentqa.tools.base import RunScores
+from flywheel.eval.agentqa.tools.base import RunScores, StoreRows
 from flywheel.eval.agentqa.tools.registry import REGISTRY, MeasureContext, check_params
 from flywheel.eval.agentqa.tools.task import TaskView
-from flywheel.store.paths import StorePaths
-from flywheel.store.tables import write_record
 from helpers_tools import job_of, metric, rollout, trace_of
 
+EMPTY_LEDGER = StoreRows("store_snapshot/ledger.jsonl", ())
+EMPTY_EVENTS = StoreRows("store_snapshot/fix_rate.jsonl", ())
 PARAMS: dict[str, dict[str, Any]] = {
     "task_lookup": {},
     "step_pass_table": {"runs": "all"},
@@ -31,15 +30,10 @@ PARAMS: dict[str, dict[str, Any]] = {
 }
 
 
-@pytest.fixture(autouse=True)
-def empty_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """The cost and history tools read the site store; none may be the real one."""
-    monkeypatch.setenv("FW_ROOT", str(tmp_path / "fwroot"))
-
-
 @pytest.fixture
 def ctx(runs: dict[str, RunScores], tray: TaskView) -> MeasureContext:
-    return MeasureContext(tray, runs, frozenset({"scores"}))
+    return MeasureContext(tray, runs, frozenset({"scores", "ledger", "fix_rate"}),
+                          ledger=EMPTY_LEDGER, fix_rate=EMPTY_EVENTS)
 
 
 def test_every_tool_is_registered() -> None:
@@ -160,8 +154,8 @@ def _full(ctx: MeasureContext) -> MeasureContext:
               for r in runs}
     jobs = {j: job_of(j, [metric(j, 10, 1.0), metric(j, 20, 2.0, split="val")])
             for j in ("J", "K")}
-    return MeasureContext(ctx.task, ctx.runs, frozenset({"scores", "trace", "metrics"}),
-                          traces=traces, jobs=jobs)
+    return MeasureContext(ctx.task, ctx.runs, ctx.kinds | {"trace", "metrics"},
+                          traces=traces, jobs=jobs, ledger=EMPTY_LEDGER, fix_rate=EMPTY_EVENTS)
 
 
 def _param_sets(ctx: MeasureContext) -> dict[str, list[dict[str, Any]]]:
@@ -204,25 +198,16 @@ def test_the_param_sets_cover_every_registered_tool(ctx: MeasureContext) -> None
     assert sorted(_param_sets(ctx)) == sorted(REGISTRY)
 
 
-# the store tools: what they read is recorded, and they are told apart ---------------------
+# the tools read the pack, never the live store ----------------------------------------------
 
-def test_only_the_cost_and_history_tools_read_the_store(ctx: MeasureContext) -> None:
-    assert sorted(n for n, spec in REGISTRY.items() if spec.reads_store) == [
-        "cost_lookup", "history_lookup"]
-    for name, spec in REGISTRY.items():
-        result = spec.run(FactBook(), ctx, PARAMS[name])
-        assert bool(result.store_reads) == spec.reads_store, name
+def test_no_tool_module_imports_the_store() -> None:
+    import flywheel.eval.agentqa.tools as tools
+
+    for path in Path(tools.__file__).parent.glob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        assert "flywheel.store" not in text, path.name
 
 
-def test_the_store_read_holds_the_rows_and_a_hash_that_follows_the_store(
-        tmp_path: Path, ctx: MeasureContext) -> None:
-    store = tmp_path / "fwroot"
-    full = MeasureContext(ctx.task, ctx.runs, ctx.kinds, store=store)
-    spec = REGISTRY["history_lookup"]
-    empty = spec.run(FactBook(), full, PARAMS["history_lookup"]).store_reads[0]
-    assert (empty.table, empty.rows) == ("fix_rate_event", 0)
-    assert spec.run(FactBook(), full, PARAMS["history_lookup"]).store_reads == (empty,)
-    write_record("fix_rate_event", FixRateEvent(intervention_type="sim_s1", n_conditions=10,
-                                                fixed=4), StorePaths(store))
-    after = spec.run(FactBook(), full, PARAMS["history_lookup"]).store_reads[0]
-    assert after.rows == 1 and after.sha256 != empty.sha256
+def test_cost_and_history_need_their_snapshot_kinds() -> None:
+    assert REGISTRY["cost_lookup"].needs == ("ledger",)
+    assert REGISTRY["history_lookup"].needs == ("fix_rate",)
