@@ -37,6 +37,7 @@ Là AI Engineer, tôi muốn một agent đọc toàn bộ artifact của một 
 Mỗi nhiệm vụ con một commit; giờ là ước lượng.
 
 - [x] 0. Design và story (docs), chờ Hiếu duyệt
+  - [x] 0.1 Bộ metric, cổng qua và hiện trạng so với design (design bản 0.5, mục 11.5 và 15; **[Đề xuất]**, chờ Hiếu duyệt)
 - [ ] 1. Nền (1 ngày)
   - [x] 1.1 Issue "Contract change" cho K1 (cùng DA-42), K2, K3; soạn PR hợp đồng trên `DA-43-contract` kèm file mẫu và test (PR riêng, không thuộc phạm vi file dưới đây)
   - [x] 1.2 Lệnh xuất eval khay sang `scores.jsonl` theo `Score` trong adapter `flywheel_psi0`; test trên một lô mẫu
@@ -129,6 +130,7 @@ Danh sách chung của story:
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 22/11/2026 | Thêm nhiệm vụ 0.1: bộ metric và hiện trạng (design 19/11 bản 0.5) | Hiếu (soạn với Claude) |
 | 20/11/2026 | Hiếu duyệt kiến trúc 20/11 (Q1–Q9). Sắp lại nhiệm vụ 4 và 5 theo đường ống; thêm AC 11; phạm vi file thêm `anthropic` trong nhóm tùy chọn `agentqa-hosted`; cửa xin thêm công cụ rút khỏi story | Hiếu |
 | 20/11/2026 | Thêm [kiến trúc 20/11/2026](../../superpowers/specs/2026-11-20-agent-qaqc-architecture-design.md) vào phạm vi file (đề xuất, chờ duyệt). Nhiệm vụ 4 và 5 sẽ sắp lại theo mục 15 của tài liệu đó sau khi Hiếu duyệt | Hiếu (soạn với Claude) |
 | 19/11/2026 | Design duyệt theo đề xuất; story chuyển sang đang làm | Hiếu |

@@ -2,6 +2,7 @@
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 22/11/2026 | 0.5 | Thêm mục 11.5 (bộ metric và cổng qua của một phiên bản, **[Đề xuất]**) và mục 15 (hiện trạng mã so với design, thứ tự làm tiếp). Không sửa mục nào khác | Hiếu (soạn với Claude) |
 | 20/11/2026 | 0.4 | Hiếu duyệt [kiến trúc 20/11/2026](2026-11-20-agent-qaqc-architecture-design.md) bản 0.3. Từ nay mục 5.1, 5.4, 12, phần chọn model của mục 8 và luật 8 của mục 6 đọc theo tài liệu đó; cửa xin thêm công cụ rút khỏi DA-43; bản ghi lời gọi công cụ rút khỏi K3. Thân bài ở đây giữ nguyên làm lịch sử | Hiếu (soạn với Claude) |
 | 20/11/2026 | 0.3 | Thêm con trỏ tới [kiến trúc 20/11/2026](2026-11-20-agent-qaqc-architecture-design.md) (**[Đề xuất]**, chờ duyệt): tài liệu đó đề xuất thay mục 5.1, 5.4, 8, 12 và luật 8 của mục 6. Nội dung các mục ở đây chưa sửa | Hiếu (soạn với Claude) |
 | 19/11/2026 | 0.2 | Hiếu duyệt theo đề xuất ("Approve as proposed"): Q1–Q10 của mục 14 thành **[Đã chốt]** | Hiếu (soạn với Claude) |
@@ -424,6 +425,45 @@ Từ sổ chi phí (dòng ước tính và dòng thực đo riêng) và file `--
 
 Thêm hai số: tỉ lệ báo cáo `broken`, và độ ổn định (chạy hai lần cùng gói, giả thuyết hạng 1 có đổi không).
 
+### 11.5 Bộ metric và cổng qua (bản 0.5)
+
+**[Đề xuất]**, chờ Hiếu duyệt. Mục này gom 11.1–11.4 thành một bảng điểm duy nhất cho mỗi phiên bản agent (hash của kiến trúc 20/11 mục 11). Mục tiêu Hiếu nêu ngày 22/11/2026: agent phải tới mức phân tích mà đội đã làm tay. Mốc so vì vậy là **đáp án của bộ ca lịch sử**: một phiên bản "ngang phân tích tay" khi nó tới được các điểm chốt của đáp án mà không khẳng định sai. Mọi số đếm báo theo ba cột của mục 11: sàn code, agent, model thêm.
+
+| # | Metric | Trả lời câu hỏi | Cách tính | Nguồn |
+|---|---|---|---|---|
+| A1 | Điểm chốt tới được | Agent có thấy điều đội đã thấy không | Số điểm chốt của đáp án có một giả thuyết, phép kiểm hay đề xuất khớp đối tượng và giá trị, trên tổng số điểm; theo ca và theo loại điểm | Bộ ca (11.2) |
+| A2 | Hạng của chẩn đoán đúng | Điều đúng có đứng đầu không | Với mỗi cụm có đáp án: số cụm chẩn đoán đúng ở hạng 1, số cụm trong ba hạng đầu | Bộ ca |
+| A3 | Khẳng định sai | Agent có nói điều đội đã bác không | Số giả thuyết ở hạng 1, và ở ba hạng đầu, mà đáp án ghi rõ là không đúng | Bộ ca |
+| A4 | Phép kiểm tách | Bước kiểm tiếp theo có hợp lý không | Số cặp mà phép kiểm agent chọn nằm trong các phép đội đã chạy; chi phí của nó so với phép đội chọn (số của code) | Bộ ca |
+| A5 | Can thiệp | Lời khuyên cuối có khớp không | Số cụm mà `InterventionKind` đề xuất khớp đáp án | Bộ ca |
+| B1 | Rò số và câu không trích | Luật cứng có giữ không | Số câu trong báo cáo cuối có số không thuộc fact đã trích, hoặc không trích fact nào. Đếm bằng bộ kiểm chạy lại trên `assembly.json`, độc lập với B5 | Mọi lần chạy |
+| B2 | Mục model bị từ chối | Model có tuân luật không | Số mục B5 từ chối ở lần đầu, và sau một lần gửi lại, trên tổng số mục model trả | `model_calls.jsonl`, file của B5 |
+| B3 | Về sàn và hỏng | Báo cáo dựa vào model được bao nhiêu | Số cụm về sàn code; lần chạy `degraded`, `broken` trên tổng số lần chạy | `run.json` |
+| C1 | Bộ lỗi cấy | Bản mới có tụt so với bản 3 không | Recall, báo nhầm trên bản sạch, precision theo mã; mốc 30/30, 1/40, 3/3 và 3/4 ở T4 | DA-31 (11.1) |
+| C2 | Báo nhầm trên gói khỏe | Agent có vẽ lỗi khi không có lỗi | Số giả thuyết hạng 1 trên bốn loại gói khỏe của 11.3 | 11.3 |
+| D1 | Model thêm | Tiền model mua được gì | Điểm chốt agent tới được mà sàn code không tới (thêm đúng); khẳng định sai chỉ có ở cột agent (thêm sai); số cụm model đổi hạng 1 đúng hướng và sai hướng | A1–A3, hai cột |
+| D2 | Kỹ sư duyệt | Lời giải thích có dùng được không | Số `agree` và `override` của `AgentReview` trên các mục của tập kiểm | `AgentReview` |
+| E1 | Không xét được | Thiếu ở agent hay thiếu ở dữ liệu | Số fact `not_judged` theo lý do: thiếu artifact, thiếu tín hiệu trong artifact, thiếu config (bảng giá, ngưỡng) | `facts.jsonl` |
+| E2 | Thời gian | Có dùng được trong một buổi không | Thời gian tường theo bước; tổng một báo cáo | `run.json` |
+| E3 | Chi phí | Một báo cáo tốn bao nhiêu | Số lời gọi, token vào và ra, tiền theo nhà cung cấp; dòng ước tính và dòng thực đo riêng | `model_calls.jsonl`, sổ chi phí |
+| E4 | Ổn định | Chạy lại có ra kết luận khác không | Chạy hai lần cùng gói với model thật: số cụm đổi hạng 1. Với `--replay`: file ra phải giống từng byte | Hai lần chạy |
+
+**Cổng qua của một phiên bản.** Ba cổng, xét theo thứ tự; trượt cổng trước thì không xét cổng sau. Ngưỡng của cổng 3 là giả định, chỉnh sau lần đo đầu và ghi `Decision`.
+
+| Cổng | Điều kiện | Loại |
+|---|---|---|
+| 1. An toàn | B1 bằng 0. Không lời gọi hosted nào trên gói không phải `public`. Kiểm rò đáp án (`AnswerLeak`) sạch | Cứng, không có ngưỡng |
+| 2. Không tụt | C1: recall không dưới 30/30, báo nhầm bản sạch không quá 1/40. C2: không giả thuyết stage train hạng 1 trên ba job khỏe; không "khác nhau có ý nghĩa" khi CI chứa 0 | Cứng |
+| 3. Chất lượng, tập phát triển | A1: sàn code một mình tới được H1, H3 và mức rơi ở `place`; agent tới thêm H2 và KỸ NĂNG YẾU của c1. A3: 0 ở hạng 1. D1: thêm sai bằng 0 | Giả định |
+| 3. Chất lượng, tập kiểm | Chỉ báo số ở bản đầu. "Ngang phân tích tay" khi A3 hạng 1 bằng 0 và A1 không thiếu điểm chốt loại chẩn đoán nào | Giả định |
+
+Ghi chú về cách đọc:
+
+- A1 và A3 phải đọc cùng nhau. Một agent nêu mọi giả thuyết sẽ có A1 cao; A3 và A2 phạt việc đó.
+- D1 là số quyết định có trả tiền model hay không. Nếu sau lần đo đầu "thêm đúng" bằng 0 thì vấn đề nằm ở vai của model, không ở model nào; khi đó xét điều kiện mở vòng điều tra của kiến trúc 20/11 mục 20.
+- E1 tách lỗi của agent khỏi lỗi của dữ liệu. Trên gói mẫu chỉ có điểm số, 64 trên 64 cụm bị chặn vì thiếu tín hiệu (đo, 21/11/2026): đó là E1, không phải A1.
+- Với 7 ca, mọi số là số đếm. Không báo tỉ lệ phần trăm.
+
 ## 12. Kiến trúc mã
 
 - Mọi mã mới nằm trong làn Đánh giá, dưới `packages/flywheel-eval/src/flywheel/eval/agentqa/`: `tools/` (lớp công cụ), `round/` (giả thuyết, chuyên viên, bộ tổng hợp, cổng dữ liệu), `casebench/` (bộ ca lịch sử). Không sửa `bench/` (DA-31, của Châu).
@@ -461,6 +501,44 @@ Thêm hai số: tỉ lệ báo cáo `broken`, và độ ổn định (chạy hai
 | Q8 | Cho chạy trên `rtx3060` các lượt đo của mục 11 | Theo runbook, khi máy rảnh |
 | Q9 | Khoảng cách vùng phủ viết lại trong làn | Có, kèm test đối chiếu với số của 20.12 |
 | Q10 | Ngưỡng qua của mục 11.1–11.3 | Như đề xuất, chỉnh sau lần chạy đầu và ghi `Decision` |
+
+## 15. Hiện trạng so với design (bản 0.5, 22/11/2026)
+
+Đối chiếu trên `origin/master` `95cd051c` cộng hai PR đang mở: 208 (sửa lượt review hai, bản chụp kho) và 207 (hợp đồng K1–K3). "Xong" nghĩa là có mã và test trên CPU; chưa mục nào có số đo chất lượng.
+
+| Mục | Design yêu cầu | Hiện trạng | Còn thiếu |
+|---|---|---|---|
+| 4 | 14 công cụ | 12 xong | `relaxed_sweep` (chờ K1), `frames_at` (nhiệm vụ 8). `trace_stats` chưa ghép được trace thật với `Score` vì hai kiểu `episode_id`. `coverage_distance` còn nợ test đối chiếu 20.12. `cost_lookup` chưa có bảng giá |
+| 5.1 | Đường ống | Sáu bước của kiến trúc 20/11 chạy với `--no-model` | B4 (xét) và B5 (kiểm): chưa có lời gọi model nào trong đường ống |
+| 5.2 | Chuyên viên | Agent bản 3 theo từng chủ thể vẫn chạy riêng | Vai `adjudicate`, `rank` (5.2); ba sửa của bản 3 (5.3) |
+| 5.3 | Bảng luật giả thuyết, 8 dòng | **2 luật**: chuỗi bước gãy, thiếu tín hiệu. Chặn tiêu ngân sách dữ liệu có | 6 luật: controller, policy không phải controller, kỹ năng yếu, thiếu vùng phủ, ngoài miền, nguyên nhân ở stage trước |
+| 5.3 | Danh mục phép kiểm có chi phí | 2 phép, thứ tự chi phí là giả định | Phép của bước 5, 7, 8; chi phí từ sổ |
+| 5.3 | Can thiệp kèm chi phí và lợi ích | Loại can thiệp do code chọn, ghi "chưa tính chi phí" | `InterventionProposal`, `Cost`, `ExpectedGain`; fact lịch sử cạnh đề xuất |
+| 5.4 | Cửa xin thêm công cụ | Rút khỏi DA-43 (kiến trúc 20/11, Q5) | Điều kiện mở lại ở kiến trúc mục 20 |
+| 6 | Luật 1–8 | Luật 1, 2, 3 có từ registry và FactBook | Luật 5, 6, 8 chờ B5; luật 4 chờ K3; luật 7 chờ chi phí |
+| 7.2 | K1, K2, K3 | PR 207 mở; lệnh xuất `scores.jsonl` xong | Merge; bốn câu hỏi của issue 206; xuất `round_diagnosis.json` (5.5) |
+| 7.3 | Trang HTML ba dòng đầu | Có trang, dòng đầu là cụm lớn nhất | Phép kiểm rẻ nhất và chi phí thật; nói "chỉ có điểm số" một lần ở đầu trang |
+| 8 | Chọn model bằng số | Cổng model xong (định tuyến, chặn theo lớp, ngân sách, ghi và phát lại) | Lớp hosted (5.4); đo M1 và M3 |
+| 9 | Nhìn hình | Chưa làm | Nhiệm vụ 8 |
+| 10 | Chỗ cắm log robot thật | Gói giả `internal` trong test | Chờ câu trả lời của mentor |
+| 11.1–11.4 | Bốn phần đánh giá | **Chưa có phần nào** | `casebench/`, đáp án, bốn lượt đo, bảng trong `docs/g0/agent-qa.md` |
+| 1.3 | Gói vòng thật | Chưa có; gói mẫu chỉ có `Score` | Dựng từ lô `C_70` |
+
+**Dữ liệu cho bộ ca có trên máy** (kiểm 22/11/2026 trong `fwdata/`, chưa mở từng file): outcome và trace của bốn run 60k (`B_70`, `B_ALL`, `C_70`, `C_ALL`), của eval C, C trên SimReady, C+ trên SimReady, và các lô `check-*` của kiểm chuỗi; log train của các job fine-tune; điều kiện của vòng `C_70`. Hai ca chưa kiểm: task hai bàn và ba job fine-tune khỏe. Nhiệm vụ 6.1 kiểm từng ca.
+
+**Thứ tự làm tiếp [Đề xuất].** Đo trước, rồi mới thêm model: không có bộ ca thì không biết một thay đổi là tốt lên hay xấu đi.
+
+| Bước | Việc | Nhiệm vụ | Cho ra |
+|---|---|---|---|
+| 1 | Gói vòng thật `C_70` và quy ước `episode_id` | 1.3, issue 206 | E1 trên dữ liệu thật |
+| 2 | Bộ ca: kiểm artifact, đáp án tập phát triển, `casebench/` | 6.1–6.3 | A1–A5 của sàn code: mốc đầu tiên |
+| 3 | Sáu luật giả thuyết còn thiếu, phép kiểm, chi phí can thiệp | 4.3 mở rộng | A1 của sàn code tăng; cổng 3 phần code |
+| 4 | Lớp hosted, vai `adjudicate` và `rank`, B5 | 5.2–5.4 | D1: model thêm được gì |
+| 5 | Đo đủ bốn phần, hai model | 7.1–7.4 | Bảng điểm đầy đủ, Hiếu chọn model |
+| 6 | Nếu D1 "thêm đúng" bằng 0 hoặc còn điểm chốt trượt vì thiếu phép đo: vòng điều tra | Kiến trúc mục 20 | Quyết định riêng của Hiếu |
+| 7 | Nhìn hình | 8 | Rút được |
+
+Bước 1–3 không cần khóa API. Bước 4 cần `ANTHROPIC_API_KEY` trong biến môi trường; chỉ gói `public` được gửi đi.
 
 ## Nguồn
 
