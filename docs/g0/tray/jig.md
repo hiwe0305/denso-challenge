@@ -386,7 +386,7 @@ Dựng máy: `rtx3060` không còn thư mục `~/denso-*` (đã xóa 15/11/2026)
 
 ### 4.12 Lô khoảng 600 episode trên `rtx3060` (nhiệm vụ 8.6, 21–22/11/2026)
 
-PO (Hiếu) cho sinh lô ngày 21/11/2026 ("Sinh lô luôn"), dù kiểm 50 seed dưới mục tiêu (mục 4.11). Claude chạy đủ tám bước của mục 5.1. Thực đo, một lần chạy: commit `0594d2dd`, SIMPLE `b75c678`, cảnh đồ gá, hình ảnh SimReady (`4763fbfa…+zone1+jig2`), một `planner_version` duy nhất `da41-planner-8+cfg.bee61399`. Thư mục lô: `~/denso-da41/fwdata/da41-jig-600/` trên `rtx3060` (10 GB, chưa chép đi đâu).
+PO (Hiếu) cho sinh lô ngày 21/11/2026 ("Sinh lô luôn"), dù kiểm 50 seed dưới mục tiêu (mục 4.11). Claude chạy đủ tám bước của mục 5.1. Thực đo, một lần chạy: commit `0594d2dd`, SIMPLE `b75c678`, cảnh đồ gá, hình ảnh SimReady (`4763fbfa…+zone1+jig2`), một `planner_version` duy nhất `da41-planner-8+cfg.bee61399`. Thư mục lô lúc chạy: `~/denso-da41/fwdata/da41-jig-600/` trên `rtx3060` (10 GB). Từ 22/11/2026 lô nằm ở `~/fwdata/datasets/tray-s1-jig2-20261122/` (đường dẫn cũ còn là symlink) và có bản sao ở laptop, xem mục 4.14.
 
 | | Mức 1 | Mức 2 | Tổng |
 |---|---|---|---|
@@ -450,6 +450,20 @@ PO (Hiếu) yêu cầu ngày 22/11/2026 ("Sửa những điểm yếu và chỗ 
 **(d) Cờ D4 ở `stats.json`.** Báo nhầm của QA. `states[31]` là `prev_base_height_command`, hằng số 0,74 ở mọi khung (kiểm lại độc lập trên 590 957 khung mức 1: min = max = 0,74). Số trong `stats.json` đúng (0,7400005); phép tính lại của QA cộng dồn float32 qua 591 nghìn khung nên ra 0,7425. Thống kê action "khớp tuyệt đối" vì SIMPLE tính cũng bằng cách cộng dồn đó, nên cả hai cùng lệch so với float64 (lớn nhất 0,011 rad ở `action.mean[25]`). Ψ₀ chuẩn hóa bằng min/max trong `stats_psi0.json`, và min/max thì chính xác, nên **dùng được cho train**. `states[31]` có min = max; các release cũ cũng vậy và đã train được, nhưng cách Ψ₀ xử lý khoảng bằng 0 chưa đọc trong mã. Sửa phép tính lại của QA là việc của DA-03.
 
 Thêm ngày 22/11/2026: `fw data report` đã chạy cho cả hai source, sinh `pipeline/src_*/report/dataset_report.json` (file mà Agent QA/QC đọc).
+
+### 4.14 Nơi lưu và cách đặt tên lô (nhiệm vụ 8.8, 22/11/2026)
+
+PO (Hiếu) duyệt ngày 22/11/2026 ("Áp dụng"). Lô là một kho tự chứa (một `FW_ROOT` đầy đủ, mọi đường dẫn bên trong là tương đối), đặt tên theo nội dung thay vì story: `tray-s1-jig2-20261122`.
+
+| Máy | Đường dẫn | Vai |
+|---|---|---|
+| `rtx3060` | `~/fwdata/datasets/tray-s1-jig2-20261122/` | Bản gốc; `~/denso-da41/fwdata/da41-jig-600` là symlink tới đây |
+| Laptop | `fwdata/datasets/tray-s1-jig2-20261122/` (thư mục gốc của repo, không commit) | Bản sao; 1216 file của hai release khớp sha256 trong `release_manifest.json`, 4719 file ở cả hai máy |
+
+- ID release giữ nguyên (`tray_s1_bfbdcbcf719e`, `tray_s1_8631ace9b1b3`). Tên đọc được: `tray.s1.jig2.l1.p8.20261122` và `tray.s1.jig2.l2.p8.20261122` (task.loại.cảnh.mức.planner.ngày).
+- `cards/<release_id>.yaml`: thẻ dataset (ID, hash, cảnh, planner, seed, số đếm, số đo chất lượng, lỗi đã biết, nguồn gốc, nơi lưu).
+- `round.yaml` và `agent/replay_reports-<release_id>.jsonl`: khai báo cho Agent QA/QC. Đã thử bằng mã của nhánh DA-43 (`584f2738`): `fw agentqa pack` ra `pack_97edb25d4f2c511b`, bước nhận đầu vào nhận cả 8 file, lớp dữ liệu `public`, không file nào bị từ chối. Lượt chạy báo `degraded` vì kho chưa có `scores` và `metrics` (chưa train trên lô này).
+- Mọi lệnh ở mục 5.1 và 4.13 vẫn chạy với đường dẫn cũ qua symlink.
 
 ## 5. Runbook cho Hiếu trên `rtx3060`
 
