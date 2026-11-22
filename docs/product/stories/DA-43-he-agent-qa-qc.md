@@ -70,7 +70,7 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
 - [ ] 6. Bộ ca lịch sử (1,5 ngày)
   - [ ] 6.1 Kiểm artifact của từng ca ứng viên còn đủ; loại ca thiếu, ghi lý do
   - [ ] 6.2 Đáp án có cấu trúc cho tập phát triển; tập kiểm do người không viết bảng luật soạn; niêm phong, sha256
-  - [ ] 6.3 `agentqa/casebench/`: rào đáp án, kiểm rò, chấm theo design mục 11.2, test rào
+  - [x] 6.3 `agentqa/casebench/`: rào đáp án, kiểm rò, chấm theo design mục 11.2 và 11.5 (A1–A5, D1), test rào; mốc đầu của sàn code trên ca `tray-c70-step4` ghi ở agent-qa mục 8
 - [ ] 7. Đo (1 ngày; lượt trên `rtx3060` theo runbook, khi Hiếu đồng ý)
   - [ ] 7.1 Bộ lỗi cấy (DA-31), so với bản 3
   - [ ] 7.2 Bộ ca lịch sử với M1, và M3 trên ca `public` nếu được mở
