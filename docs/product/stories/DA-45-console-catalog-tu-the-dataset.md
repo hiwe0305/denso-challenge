@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Đang làm (Hiếu mở ngày 22/11/2026) |
+| Trạng thái | Xong (PR #209, 23/11/2026; đủ 7/7 nhiệm vụ con. Hiếu mở ngày 22/11/2026) |
 | Người làm | Hiếu |
 | Làn | Ngoài ba làn: công cụ của đội (`flywheel.console`), không import làn hay adapter |
 | Nguồn yêu cầu | Quyết định tổ chức dataset của Hiếu ngày 22/11/2026: mỗi lô là một kho tự chứa `fwdata/datasets/<store>/`, mỗi release có thẻ `cards/<release_id>.yaml` (schema `dataset-card/1`) |
@@ -37,6 +37,7 @@ Hiện trạng ngày 22/11/2026: seed viết tay ngày 11/11/2026 thiếu hai re
 - [x] 3.1 `DATASET_GLOBS` và `data_class`, `license`, `source_detail` từ thẻ trong `server/kinds.py`, `server/runner.py`, có test (AC 5)
 - [x] 3.2 Nhãn trạng thái `reference`, `benchmark` trên giao diện; README của package (AC 4)
 - [x] 4.1 Chạy đủ kiểm tra, dựng catalog trên dữ liệu thật của laptop, `pr_guard` (AC 6, 7)
+- [x] 4.2 Sửa theo review PR #209: khóa cache dòng catalog của server tính trên từng file thẻ (đường dẫn, mtime, kích thước)
 
 ## Phạm vi file
 
@@ -83,4 +84,5 @@ Bảng ánh xạ thẻ sang dòng catalog (Hiếu duyệt 22/11/2026):
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 23/11/2026 | Review PR #209: thêm nhiệm vụ 4.2 (khóa cache thẻ); story xong | Hiếu (soạn với Claude) |
 | 22/11/2026 | Tạo story; Hiếu chọn mã DA-45, duyệt bảng ánh xạ, giữ dòng không thẻ trong seed, giữ `id` `ALL`/`S70`, đổi `id` dòng S2 | Hiếu (soạn với Claude) |

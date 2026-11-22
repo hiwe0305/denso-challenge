@@ -206,16 +206,19 @@ def load_cards_lenient(fw_root: Path) -> list[Card]:
     return [c for c in cards if ids.count(c.id) == 1]
 
 
-def cards_stamp(fw_root: Path) -> tuple[int, float]:
-    """Number of card files and their latest mtime: a cheap cache key."""
-    mt = 0.0
-    files = card_files(fw_root)
-    for f in files:
+def cards_stamp(fw_root: Path) -> tuple[int, int]:
+    """Number of card files and a hash of every file's path, mtime and size: a cheap cache key.
+
+    Hashing each file (not the newest mtime alone) also catches a card replaced by an older
+    copy (``rsync -a`` keeps mtimes) and a renamed card."""
+    marks: list[tuple[str, int, int]] = []
+    for f in card_files(fw_root):
         try:
-            mt = max(mt, f.stat().st_mtime)
+            st = f.stat()
         except OSError:
             continue
-    return len(files), mt
+        marks.append((str(f), st.st_mtime_ns, st.st_size))
+    return len(marks), hash(tuple(marks)) if marks else 0
 
 
 def _resolved(p: Path) -> Path | None:
