@@ -207,7 +207,7 @@ const PAGES_DATA = (() => {
 
   /* ---------- visual helpers ---------- */
   const cv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-  const SC = () => ({ current: cv("--ok"), superseded: cv("--text-3"), test: cv("--line-strong"), duplicate: cv("--warn"), missing: cv("--bad"), upstream: cv("--run"), archived: cv("--line-strong") });
+  const SC = () => ({ current: cv("--ok"), superseded: cv("--text-3"), test: cv("--line-strong"), duplicate: cv("--warn"), missing: cv("--bad"), upstream: cv("--run"), archived: cv("--line-strong"), reference: cv("--run"), benchmark: cv("--line-strong") });
   const QC = () => ({ pass: cv("--ok"), flag: cv("--warn"), reject: cv("--bad") });
   const eopt = (extra, horizontal) => {
     const t2 = cv("--text-2"), ln = cv("--line"), tx = cv("--text");
@@ -223,7 +223,7 @@ const PAGES_DATA = (() => {
   function summaryRow(rows) {
     const wrap = E("div", { class: "pd-sum" });
     const types = GORDER.map(g => GROUP[g][0]).filter(t => rows.some(r => r._type === t));
-    const stat = ["current", "superseded", "test", "duplicate", "missing", "upstream", "archived"].filter(x => rows.some(r => r.status === x));
+    const stat = ["current", "reference", "superseded", "benchmark", "test", "duplicate", "missing", "upstream", "archived"].filter(x => rows.some(r => r.status === x));
     const sc = SC(), qc = QC();
     // episodes by type x status
     const o1 = eopt({ legend: { show: false }, tooltip: { trigger: "axis", axisPointer: { type: "shadow" } } });
@@ -269,7 +269,7 @@ const PAGES_DATA = (() => {
     const pool = demoOn() ? cat.rows.filter(r => r.data_class === "public") : cat.rows;
     const view = () => ["table", "grid", "lineage", "flow"].includes(q().view) ? q().view : "grid";
     const F = () => { const s = q(); return { type: s.type || "", status: s.status || "current", task: s.task || "", host: s.host || "", q: s.q || "" }; };
-    const match = (r, f) => (!f.type || r._type === f.type) && (f.status === "all" || r.status === f.status) && (!f.task || r.task === f.task) && (!f.host || r._host.includes(f.host)) && (!f.q || (r.id + " " + r.name).toLowerCase().includes(f.q.toLowerCase()));
+    const match = (r, f) => (!f.type || r._type === f.type) && (f.status === "all" || r.status === f.status || (f.status === "current" && r.status === "reference")) && (!f.task || r.task === f.task) && (!f.host || r._host.includes(f.host)) && (!f.q || (r.id + " " + r.name).toLowerCase().includes(f.q.toLowerCase()));
     const uniq = k => [...new Set(pool.map(r => k === "host" ? r._host : r[k === "type" ? "_type" : k]).flat())].filter(Boolean).sort();
     const statN = () => pool.length;
     main.appendChild(pageHead({ title: "data", stat: UI.StatLine(statItems([{ unit: "sets", value: int(statN()) }, { unit: "eps", value: int(sumU(pool, "episodes")) }, { unit: "hours", value: hoursU(pool, 1) }])) }));

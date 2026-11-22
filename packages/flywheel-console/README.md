@@ -11,6 +11,21 @@ fixed set of laptop jobs, and offers a chat over a local model.
   read-only (no jobs, uploads or chat); `--lock --chat` keeps the chat, which only reads.
 - `fw console bench [--tag TEXT]` run the chat benchmark.
 
+## Dataset catalogue
+
+- Rows come from dataset cards (`schema: dataset-card/1`) laid over the hand-written seed
+  `src/flywheel/console/seed/catalog.yaml`. Cards are read from
+  `$FW_ROOT/datasets/*/cards/*.yaml` (store cards) and `$FW_ROOT/datasets/_cards/*.yaml`
+  (loose cards); nothing under `fwdata/` is written.
+- A card wins over the seed row with the same `id`, or over the row whose `card:` field names
+  it (that row keeps its seed id, e.g. `ALL`, `S70`). A card without a row adds one. The seed
+  keeps `title`, `size` and the viewer hints (`lerobot`, `ego_viewer`); rows without a card
+  (egocentric, pipeline, eval conditions, bench copies, old cuts) stay as written.
+- `fw console index` stops on an invalid card and names file and field; the server skips a bad
+  card instead. Cards live outside git, so a machine or CI without cards gets the seed alone.
+- Jobs that ingest a dataset take `data_class`, `license` and `source_detail` from its card;
+  without a card `data_class` is `restricted` and `license` is `unknown`.
+
 ## Rules
 
 - Binds `127.0.0.1` only; POST only when `Host` and `Origin` are the console itself.
