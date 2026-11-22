@@ -7,10 +7,11 @@ import shutil
 from pathlib import Path
 
 import pytest
-from flywheel.eval.agentqa.round.measure import PlanRefused
+from flywheel.eval.agentqa.round.admit import Admitted
+from flywheel.eval.agentqa.round.measure import PlanRefused, _context
 from flywheel.eval.agentqa.round.pack import sha256_of
 from flywheel.eval.agentqa.round.pipeline import STEPS, RunRefused, run_round
-from flywheel.eval.agentqa.round.records import RunRecord
+from flywheel.eval.agentqa.round.records import Admission, Pack, PackEntry, RunRecord
 from helpers_round import (  # noqa: F401  (isolated_store is an autouse fixture)
     NOW,
     PackMaker,
@@ -176,3 +177,29 @@ def test_two_cluster_calls_over_different_runs_do_not_clash(
     assert record.status != "broken"
     # "other runs" counts over every run of the pack, whatever runs the call names
     assert facts_of(out)["C_70_cluster_approach_a_L-PLACE-POSE_l2_in_other_runs"].value == 3
+
+
+def _entry(ref: str, kind: str, run: str = "C_70") -> PackEntry:
+    return PackEntry(ref=ref, kind=kind, sha256=ref.count("/") * "a" + "b" * (64 - ref.count("/")),
+                     bytes=1, data_class="public", subject={"run": run})
+
+
+def _declared(*entries: PackEntry) -> tuple[Pack, Admitted]:
+    pack = Pack(pack_id="p", task_id="tray", created_at=NOW, declared_by="test",
+                entries=list(entries))
+    admission = Admission(pack_id="p", pack_sha256="0" * 64, accepted=[e.ref for e in entries],
+                          hosted_allowed=True, data_class="public")
+    return pack, Admitted(admission, {e.ref: () for e in entries})
+
+
+def test_a_run_may_declare_several_trace_entries() -> None:
+    first, second = _entry("C_70/r1/steps.jsonl", "trace"), _entry("C_70/r2/steps.jsonl", "trace")
+    ctx, _ = _context(*_declared(first, second))
+    files = ctx.traces["C_70"].files
+    assert [f.ref for f in files] == [first.ref, second.ref]
+    assert [f.sha256 for f in files] == [first.sha256, second.sha256]
+
+
+def test_a_run_still_may_not_declare_two_scores_entries() -> None:
+    with pytest.raises(PlanRefused, match="already declared"):
+        _context(*_declared(_entry("a/scores.jsonl", "scores"), _entry("b/scores.jsonl", "scores")))

@@ -4,7 +4,8 @@ The plan is checked as a whole first: an unknown tool, a missing or unknown para
 value outside its closed domain refuses it before anything runs. Then each call runs in
 plan order; a call whose artifact kind is not in the pack is skipped, and the reason is
 written as a fact, so silence is never read as "clean". A tool that raises is a
-programming error and propagates.
+programming error and propagates. A run has one `scores` entry but any number of `trace`
+entries (real data: one `steps.jsonl` per rollout, told apart by sha256, see `trace_stats`).
 
 Written into the run directory: `facts.jsonl` (every fact, with the call that first made
 it), `tool_calls.jsonl` (what each call read and produced), `tables/<call>-<tool>.json`
@@ -41,6 +42,7 @@ from flywheel.eval.agentqa.tools.base import (
     RunTrace,
     StoreRows,
     ToolResult,
+    TraceFile,
     not_judged,
 )
 from flywheel.eval.agentqa.tools.registry import (
@@ -102,10 +104,16 @@ def needed_kinds(plan: Plan) -> list[str]:
     return kinds
 
 
-def _declared_run(entry: PackEntry, seen: dict[str, str]) -> str:
+def _run_of(entry: PackEntry) -> str:
     name = entry.subject.get("run")
     if not name:
         raise PlanRefused(f"{entry.ref}: a {entry.kind} entry must declare subject.run")
+    return name
+
+
+def _declared_run(entry: PackEntry, seen: dict[str, str]) -> str:
+    """The run of a `scores` entry; a run has one such entry (traces are not held to this)."""
+    name = _run_of(entry)
     if name in seen:
         raise PlanRefused(f"{entry.ref}: run {name!r} is already declared by {seen[name]}")
     seen[name] = entry.ref
@@ -122,7 +130,7 @@ def _context(pack: Pack, admitted: Admitted) -> tuple[MeasureContext, list[PackE
     reports: dict[str, DatasetReport] = {}
     ledger: StoreRows | None = None
     events: StoreRows | None = None
-    seen: dict[str, dict[str, str]] = {"scores": {}, "trace": {}, "metrics": {}}
+    seen: dict[str, dict[str, str]] = {"scores": {}}
     for entry in entries:
         records = admitted.records[entry.ref]
         if entry.kind == "scores":
@@ -130,9 +138,10 @@ def _context(pack: Pack, admitted: Admitted) -> tuple[MeasureContext, list[PackE
             scores = tuple(r for r in records if isinstance(r, Score))
             runs[name] = RunScores(run=name, ref=entry.ref, scores=scores)
         elif entry.kind == "trace":
-            name = _declared_run(entry, seen["trace"])
+            name = _run_of(entry)  # a run may declare any number of trace files
             steps = tuple(r for r in records if isinstance(r, TraceStep))
-            traces[name] = RunTrace(name, entry.ref, steps)
+            earlier = traces[name].files if name in traces else ()
+            traces[name] = RunTrace(name, earlier + (TraceFile(entry.ref, entry.sha256, steps),))
         elif entry.kind == "metrics":
             by_job: dict[str, list[TrainingMetric]] = {}
             for r in records:

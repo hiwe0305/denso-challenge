@@ -88,12 +88,20 @@ class RunScores:
 
 
 @dataclass(frozen=True)
+class TraceFile:
+    """One `trace` entry of the pack: its ref, the sha256 the pack records, its cycles."""
+
+    ref: str
+    sha256: str
+    steps: tuple[TraceStep, ...]
+
+
+@dataclass(frozen=True)
 class RunTrace:
-    """The control cycles of the rollouts of one run, from one `trace` entry of the pack."""
+    """The trace files of one run, in pack order (real data: one file per rollout)."""
 
     run: str
-    ref: str
-    steps: tuple[TraceStep, ...]
+    files: tuple[TraceFile, ...]
 
 
 @dataclass(frozen=True)

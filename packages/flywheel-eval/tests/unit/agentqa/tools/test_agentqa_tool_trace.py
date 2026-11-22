@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 from flywheel.eval.agentqa.facts import FactBook
-from flywheel.eval.agentqa.tools.base import ToolResult
+from flywheel.eval.agentqa.tools.base import RunScores, RunTrace, ToolResult
 from flywheel.eval.agentqa.tools.trace import trace_stats
 from flywheel.eval.config import R3Thresholds
-from helpers_tools import rollout, run_of, trace_of
+from helpers_tools import rollout, run_of, scored, trace_file, trace_of
 
 CFG = R3Thresholds(tau_track_upper=0.10, tau_track_lower=0.15, percentile=99.0)
 REF = "system.yaml (r3)"
@@ -93,3 +93,61 @@ def test_rollouts_without_a_verdict_are_counted_not_grouped() -> None:
     assert got["R_trace_undecided_rollouts"] == 2  # "lost" has no score, "open" has no verdict
     assert got["R_scored_without_trace"] == 1  # "gone"
     assert got["R_succeeded_rollouts"] == 1 and got["R_failed_rollouts"] == 0
+
+
+def local(steps: list, name: str = "episode_0") -> list:  # type: ignore[type-arg]
+    """The cycles of one rollout as a real chunk file names it: a chunk-local episode id."""
+    return [s.model_copy(update={"episode_id": name}) for s in steps]
+
+
+def per_rollout_run(outcomes: dict, gaps: dict) -> tuple[RunScores, RunTrace]:  # type: ignore[type-arg]
+    """One file per rollout, every file calling its rollout `episode_0`, joined by sha256."""
+    scores = tuple(scored("R", n, ok, str(k) * 64) for k, (n, ok) in enumerate(outcomes.items()))
+    files = tuple(trace_file(f"R/rollouts/{n}/steps.jsonl", str(k) * 64,
+                             local(rollout("R", n, upper_gap=gaps[n])))
+                  for k, n in enumerate(outcomes))
+    return RunScores("R", "R/scores.jsonl", scores), RunTrace("R", files)
+
+
+def test_one_file_per_rollout_joins_by_sha256_not_by_episode_id() -> None:
+    outcomes = {"l1-s1": True, "l1-s2": False, "l2-s1": False}
+    run, trace = per_rollout_run(outcomes, {"l1-s1": 0.01, "l1-s2": 0.5, "l2-s1": 0.6})
+    book = FactBook()
+    result = trace_stats(book, [run], {"R": trace}, CFG, REF)
+    got = values(book, result)
+    assert got["R_trace_undecided_rollouts"] == 0 and got["R_scored_without_trace"] == 0
+    assert got["R_succeeded_rollouts"] == 1 and got["R_failed_rollouts"] == 2
+    assert got["R_succeeded_track_error_upper"] == pytest.approx(0.01)
+    assert got["R_failed_track_error_upper"] == pytest.approx(0.6, abs=0.02)
+    assert got["R_tau_separates_upper"] is True
+    assert result.judged
+    # several files: the facts cite the directory the files share
+    cited = {book.get(f).source_ref for f in result.facts if book.get(f).name == "R_failed_cycles"}
+    assert cited == {"R/rollouts"}
+
+
+def test_a_file_matching_no_score_by_sha256_still_joins_by_episode_id() -> None:
+    run, trace = per_rollout_run({"l1-s1": True, "l1-s2": False}, {"l1-s1": 0.01, "l1-s2": 0.5})
+    plain = trace_file("R/old/trace.jsonl", "e" * 64,
+                       rollout("R", "ok", upper_gap=0.02) + rollout("R", "bad", upper_gap=0.7))
+    mixed = RunScores("R", run.ref, run.scores + (scored("R", "ok", True, "9" * 64),
+                                                  scored("R", "bad", False, "8" * 64)))
+    book = FactBook()
+    got = values(book, trace_stats(
+        book, [mixed], {"R": RunTrace("R", trace.files + (plain,))}, CFG, REF))
+    assert got["R_succeeded_rollouts"] == 2 and got["R_failed_rollouts"] == 2
+    assert got["R_trace_undecided_rollouts"] == 0 and got["R_scored_without_trace"] == 0
+    assert got["R_failed_track_error_upper"] == pytest.approx(0.7, abs=0.01)
+
+
+def test_two_files_claiming_the_same_rollout_are_named_and_the_second_skipped() -> None:
+    run, trace = per_rollout_run({"l1-s1": True}, {"l1-s1": 0.01})
+    twin = trace_file("R/copy/steps.jsonl", "0" * 64, local(rollout("R", "x", upper_gap=0.9)))
+    book = FactBook()
+    result = trace_stats(book, [run], {"R": RunTrace("R", trace.files + (twin,))}, CFG, REF)
+    got = values(book, result)
+    assert got["R_succeeded_rollouts"] == 1
+    assert got["R_succeeded_track_error_upper"] == pytest.approx(0.01)  # the copy not merged
+    (reason,) = [r for r in result.not_judged if "claims" in r]
+    assert "R/copy/steps.jsonl" in reason and "R/rollouts/l1-s1/steps.jsonl" in reason
+    assert any(n.endswith("_duplicate_not_judged") for n in got)
