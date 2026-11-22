@@ -34,7 +34,7 @@ Hiện trạng ngày 22/11/2026: seed viết tay ngày 11/11/2026 thiếu hai re
 - [x] 1.1 Viết story (file này)
 - [x] 2.1 Bộ đọc và kiểm thẻ `index/cards.py`, có test (AC 1)
 - [x] 2.2 Ghép thẻ vào dòng catalog: `load_rows`, `catalog.build`, sửa seed (`card:` cho `ALL`, `S70`; đổi `id` dòng S2), trạng thái `reference`, có test (AC 2, 3, 4)
-- [ ] 3.1 `DATASET_GLOBS` và `data_class`, `license`, `source_detail` từ thẻ trong `server/kinds.py`, `server/runner.py`, có test (AC 5)
+- [x] 3.1 `DATASET_GLOBS` và `data_class`, `license`, `source_detail` từ thẻ trong `server/kinds.py`, `server/runner.py`, có test (AC 5)
 - [ ] 3.2 Nhãn trạng thái `reference`, `benchmark` trên giao diện; README của package (AC 4)
 - [ ] 4.1 Chạy đủ kiểm tra, dựng catalog trên dữ liệu thật của laptop, `pr_guard` (AC 6, 7)
 

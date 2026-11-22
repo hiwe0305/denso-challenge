@@ -15,6 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from flywheel.console.index import cards
 from flywheel.console.server import runner
 
 STAGES = ("data", "qa", "train", "eval", "diagnose", "loop", "ops")
@@ -67,8 +68,9 @@ A_DATASET = [
          choices=list(runner.SOURCE_DETAILS)),
     _arg("license", "string", False, "Giấy phép; 'unknown' khi chưa rõ",
          "Licence; 'unknown' when not known", default="unknown"),
-    _arg("data_class", "enum", False, "Lớp dữ liệu", "Data class",
-         choices=list(runner.DATA_CLASSES), default="public"),
+    _arg("data_class", "enum", False, "Lớp dữ liệu; mặc định theo thẻ dataset, không có thẻ "
+         "thì restricted", "Data class; defaults to the dataset card, restricted without one",
+         choices=list(runner.DATA_CLASSES), default="restricted"),
     _arg("split", "enum", False, "Tách", "Split", choices=["train", "dev"], default="train"),
 ]  # fmt: skip
 ROBOT_OUT = _t(
@@ -469,6 +471,7 @@ DATASET_GLOBS = (
     "psi-data/*/*/meta/info.json",
     "rtx3060/*/fwdata/releases/*/meta/info.json",
     "rtx3060/*/cut/*/*/meta/info.json",
+    "datasets/*/releases/*/meta/info.json",
 )
 
 
@@ -487,6 +490,7 @@ def _mb(n: int) -> str:
 
 def dataset_samples() -> list[dict[str, Any]]:
     fw = runner._fw()
+    found = cards.load_cards_lenient(fw)
     out: list[dict[str, Any]] = []
     seen: set[Path] = set()
     for pat in DATASET_GLOBS:
@@ -503,14 +507,15 @@ def dataset_samples() -> list[dict[str, Any]]:
             n_files, size = runner._tree_size(ds)
             vids = info.get("total_videos") or 0
             n_mp4 = sum(1 for _ in ds.glob("videos/**/*.mp4")) if vids else 0
-            sd = _source_detail(ds)
+            dc, lic, card_sd = runner.card_defaults(ds, found)
+            sd = card_sd or _source_detail(ds)
             rel = str(ds.relative_to(fw.resolve()))
             eps = info.get("total_episodes")
             label = f"{rel} · {eps} tập · {_mb(size)}"
             s: dict[str, Any] = {
                 "label": _t(label, label.replace(" tập", " episodes")),
-                "params": {"dataset": rel, "source_detail": sd, "license": "unknown",
-                           "data_class": "public", "split": "train"},
+                "params": {"dataset": rel, "source_detail": sd, "license": lic,
+                           "data_class": dc, "split": "train"},
                 "task": runner.task_of(ds), "fixture": False, "available": True,
                 "episodes": eps, "frames": info.get("total_frames"), "bytes": size,
                 "staged": not runner.stage_needed(ds, runner.staged_path(ds)),
@@ -524,7 +529,7 @@ def dataset_samples() -> list[dict[str, Any]]:
                 s.update(available=False, reason=_t(
                     f"{_mb(size)} lớn hơn giới hạn chép 2 GB",
                     f"{_mb(size)} is over the 2 GB copy limit"))  # fmt: skip
-            elif sd is None:
+            elif sd not in runner.SOURCE_DETAILS:
                 s.update(available=False, reason=_t("không rõ loại nguồn",
                                                     "unknown source kind"))  # fmt: skip
             out.append(s)

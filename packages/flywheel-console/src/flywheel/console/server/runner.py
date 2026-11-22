@@ -24,6 +24,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from flywheel.console.index import cards
 from flywheel.console.paths import ConsolePaths, active, guard
 
 VIDEO_EXT = (".mp4", ".mov", ".mkv", ".avi", ".webm")
@@ -589,6 +590,27 @@ def data_work(raw: Any) -> Path:
     return w
 
 
+def safe_license(raw: Any) -> str:
+    """A card licence made fit for ``--license``: characters outside ``LICENSE_RE`` dropped,
+    spaces collapsed, at most 64; ``unknown`` when nothing is left. The catalogue keeps the
+    card's own string."""
+    s = re.sub(r"[^A-Za-z0-9 ._+-]", "", str(raw or ""))
+    s = re.sub(r"\s+", " ", s).strip(" ._+-")[:64].strip()
+    return s if LICENSE_RE.match(s) else "unknown"
+
+
+def card_defaults(ds: Path, found: list[cards.Card] | None = None) -> tuple[str, str, str | None]:
+    """``(data_class, license, source_detail)`` of a dataset from its card under ``fw_root``.
+
+    No card: ``restricted``, ``unknown`` and no source detail. Bad cards are skipped."""
+    found = cards.load_cards_lenient(_fw()) if found is None else found
+    c = cards.card_for_path(found, _fw(), ds)
+    if c is None:
+        return "restricted", "unknown", None
+    sd = c.data.get("source_detail")
+    return str(c.data["data_class"]), safe_license(c.data["license"]), sd or None
+
+
 def _choice(p: dict[str, Any], key: str, choices: tuple[str, ...], default: str | None) -> str:
     v = str(p.get(key) or default or "")
     if v not in choices:
@@ -602,9 +624,10 @@ def _plan_data(kind: str, p: dict[str, Any], job_id: str, fw: list[str]) -> dict
     if kind == "data.ingest":
         ds = lerobot_dataset(p.get("dataset"))
         sd = _choice(p, "source_detail", SOURCE_DETAILS, None)
-        dc = _choice(p, "data_class", DATA_CLASSES, "public")
+        card_dc, card_lic, _sd = card_defaults(ds)  # omitted params follow the dataset card
+        dc = _choice(p, "data_class", DATA_CLASSES, card_dc)
         split = _choice(p, "split", ("train", "dev"), "train")
-        lic = str(p.get("license") or "unknown").strip()
+        lic = str(p.get("license") or card_lic).strip()
         if not LICENSE_RE.match(lic):
             raise ValueError("license: chữ, số, khoảng trắng và . _ + - (tối đa 64)")
         dst = staged_path(ds)
