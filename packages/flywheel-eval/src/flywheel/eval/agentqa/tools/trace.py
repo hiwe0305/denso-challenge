@@ -1,8 +1,11 @@
 """`trace_stats`: does the tracking threshold tell failed rollouts from succeeded ones? (task 3.1)
 
-For each run, the rollouts of its trace are split by the `Score` of the same `episode_id`,
-and both groups get the same measurements, because a threshold that the successes also
-cross says nothing about the failures (H2, tray.md 20.11):
+For each run, the rollouts of its trace files are told apart and split by their `Score`.
+A file whose sha256 is the `trace_sha256` of exactly one `Score` of the run is that one
+rollout (real data: one `steps.jsonl` per rollout, whatever its `TraceStep.episode_id` says,
+a name local to a chunk). Any other file is split by `TraceStep.episode_id` and joined to the
+scores by `episode_id`. Both groups get the same measurements, because a threshold that
+the successes also cross says nothing about the failures (H2, tray.md 20.11):
 
 - the statistic of R3 (`flywheel.eval.diagnosis.system`): the norm of (command - measured)
   per control cycle for the upper and the lower body, at the percentile `system.yaml`
@@ -24,12 +27,20 @@ leaves the statistic, and a group with nothing finite is not judged rather than 
 from __future__ import annotations
 
 import math
+import posixpath
 from collections.abc import Sequence
 
 import numpy as np
 from flywheel.contracts.trace import LOWER_BODY, UPPER_BODY, FloatOrNonFinite, TraceStep
 from flywheel.eval.agentqa.facts import FactBook
-from flywheel.eval.agentqa.tools.base import Row, RunScores, RunTrace, ToolResult, not_judged
+from flywheel.eval.agentqa.tools.base import (
+    Row,
+    RunScores,
+    RunTrace,
+    ToolResult,
+    TraceFile,
+    not_judged,
+)
 from flywheel.eval.config import R3Thresholds
 from flywheel.eval.diagnosis.system.reader import PERIODIC_CHANNELS, TraceLog, Values, percentile
 
@@ -69,6 +80,44 @@ def _by_episode(steps: Sequence[TraceStep]) -> dict[str, list[TraceStep]]:
     for s in sorted(steps, key=lambda s: (s.episode_id, s.step)):
         out.setdefault(s.episode_id, []).append(s)
     return out
+
+
+def _source_ref(files: Sequence[TraceFile]) -> str:
+    """The file the numbers come from; with several files, the directory they share."""
+    if len(files) == 1:
+        return files[0].ref
+    return posixpath.commonpath([f.ref for f in files]) or "."
+
+
+def _rollouts(book: FactBook, run: RunScores, trace: RunTrace,
+              facts: list[str], reasons: list[str]) -> dict[str, list[TraceStep]]:
+    """Rollout key -> its cycles, over all files of the run.
+
+    A file that is the `trace_sha256` of exactly one score is that rollout; any other file
+    is split by `TraceStep.episode_id`. A file that claims a rollout an earlier file holds
+    is skipped whole and named in a fact, never merged.
+    """
+    by_sha: dict[str, list[str]] = {}
+    for sc in run.scores:
+        by_sha.setdefault(sc.trace_sha256, []).append(sc.episode_id)
+    held: dict[str, tuple[str, list[TraceStep]]] = {}
+    for file in trace.files:
+        owners = by_sha.get(file.sha256, [])
+        if len(owners) == 1:
+            found = {owners[0]: sorted(file.steps, key=lambda s: s.step)}
+        else:
+            found = _by_episode(file.steps)
+        clash = sorted(k for k in found if k in held)
+        if clash:
+            reason = (f"run {run.run}: {file.ref} claims rollout(s) {', '.join(clash)} already "
+                      f"held by {', '.join(sorted({held[k][0] for k in clash}))}; file skipped")
+            facts.append(book.add(f"{TOOL}_{run.run}_{file.ref}_duplicate_not_judged", reason,
+                                  file.ref))
+            reasons.append(reason)
+            continue
+        for key, steps in found.items():
+            held[key] = (file.ref, steps)
+    return {k: steps for k, (_, steps) in held.items()}
 
 
 def _velocity_share(steps: Sequence[TraceStep]) -> tuple[int, int]:
@@ -162,16 +211,17 @@ def trace_stats(book: FactBook, runs: Sequence[RunScores], traces: dict[str, Run
             reasons.append(reason)
             continue
         outcome = {s.episode_id: s.success for s in run.scores}
-        episodes = _by_episode(trace.steps)
+        episodes = _rollouts(book, run, trace, facts, reasons)
+        ref = _source_ref(trace.files)
         undecided = [e for e in episodes if outcome.get(e) is None]
-        facts += [book.add(f"{run.run}_trace_undecided_rollouts", len(undecided), trace.ref,
+        facts += [book.add(f"{run.run}_trace_undecided_rollouts", len(undecided), ref,
                            "rollouts"),
                   book.add(f"{run.run}_scored_without_trace",
                            sum(1 for e in outcome if e not in episodes), run.ref, "rollouts")]
         stats: dict[str, dict[str, float]] = {}
         for group, flag in GROUPS:
             chosen = {e: ep for e, ep in episodes.items() if outcome.get(e) is flag}
-            new, stats[group], why = _group(book, f"{run.run}_{group}", trace.ref, chosen, cfg,
+            new, stats[group], why = _group(book, f"{run.run}_{group}", ref, chosen, cfg,
                                             tau_ref, group)
             facts += new
             reasons += why

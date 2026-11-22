@@ -333,7 +333,7 @@ REGISTRY: dict[str, ToolSpec] = {spec.name: spec for spec in (
              reads_all=True),
     ToolSpec("paired_compare", 1, ("scores",), {"pairs": "pairs", "levels": "levels"},
              _paired_compare),
-    ToolSpec("trace_stats", 1, ("scores", "trace"), {"runs": "runs"}, _trace_stats),
+    ToolSpec("trace_stats", 2, ("scores", "trace"), {"runs": "runs"}, _trace_stats),
     ToolSpec("train_window", 1, ("metrics",), {"jobs": "jobs", "window": "window"},
              _train_window),
     ToolSpec("lineage", 1, ("scores",), {}, _lineage, reads_all=True),

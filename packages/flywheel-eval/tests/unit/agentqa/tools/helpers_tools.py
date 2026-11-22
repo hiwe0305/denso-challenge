@@ -12,7 +12,7 @@ from flywheel.contracts.artifacts import DatasetReport, Episode
 from flywheel.contracts.entities import Condition, LedgerEntry, Score
 from flywheel.contracts.trace import LOWER_BODY, UPPER_BODY, FloatOrNonFinite, TraceStep
 from flywheel.contracts.training import TrainingMetric
-from flywheel.eval.agentqa.tools.base import JobMetrics, RunScores, RunTrace
+from flywheel.eval.agentqa.tools.base import JobMetrics, RunScores, RunTrace, TraceFile
 
 SHA = "0" * 64
 
@@ -56,8 +56,20 @@ def run_of(run: str, outcomes: dict[str, bool | None]) -> RunScores:
                      tuple(score(run, n, ok) for n, ok in outcomes.items()))
 
 
+FILE_SHA = "f" * 64  # matches no score: such a file is split by episode_id
+
+
 def trace_of(run: str, steps: Sequence[TraceStep]) -> RunTrace:
-    return RunTrace(run, f"{run}/trace.jsonl", tuple(steps))
+    return RunTrace(run, (TraceFile(f"{run}/trace.jsonl", FILE_SHA, tuple(steps)),))
+
+
+def trace_file(ref: str, sha: str, steps: Sequence[TraceStep]) -> TraceFile:
+    return TraceFile(ref, sha, tuple(steps))
+
+
+def scored(run: str, name: str, success: bool | None, sha: str) -> Score:
+    """A score whose rollout file has sha256 `sha`."""
+    return score(run, name, success).model_copy(update={"trace_sha256": sha})
 
 
 def metric(job: str, step: int, loss: float | Literal["NaN"], *, split: str = "train",
