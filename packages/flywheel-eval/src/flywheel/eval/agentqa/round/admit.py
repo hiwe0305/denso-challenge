@@ -29,7 +29,14 @@ from flywheel.contracts.artifacts import (
     ReplayReport,
     RTCInferenceRecord,
 )
-from flywheel.contracts.entities import Cluster, Condition, Score, Source
+from flywheel.contracts.entities import (
+    Cluster,
+    Condition,
+    FixRateEvent,
+    LedgerEntry,
+    Score,
+    Source,
+)
 from flywheel.contracts.trace import TraceStep
 from flywheel.contracts.training import TrainingMetric
 from flywheel.eval.agentqa.round.pack import PACK_FILE, PackRefused, refused_path, sha256_of
@@ -74,6 +81,8 @@ KINDS: dict[str, Parse] = {
     "qa_reports": _lines(QAReport),
     "replay_reports": _lines(ReplayReport),
     "dataset_report": _one(DatasetReport),
+    "ledger": _lines(LedgerEntry),  # a store snapshot (task 4.7); rows carry no data class
+    "fix_rate": _lines(FixRateEvent),
 }
 
 

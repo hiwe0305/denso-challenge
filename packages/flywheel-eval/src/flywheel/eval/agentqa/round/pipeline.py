@@ -134,7 +134,7 @@ def _step_admit(w: _Work) -> int:
 
 def _step_measure(w: _Work) -> int:
     assert w.pack is not None and w.admitted is not None
-    result = measure(w.pack, w.admitted, w.plan(), w.out, w.store)
+    result = measure(w.pack, w.admitted, w.plan(), w.out)
     w.degraded += [f"{c.call_id} {c.tool} skipped: {c.reason}" for c in result.calls
                    if c.status == "skipped"]
     return len(result.facts)

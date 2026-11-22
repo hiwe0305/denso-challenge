@@ -2,6 +2,7 @@
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 22/11/2026 | 0.5 | Mục 6, B0: bản chụp kho trong pack (`store_snapshot`); `cost_lookup` và `history_lookup` chỉ đọc pack. Hiếu chốt 22/11/2026 ("Chụp vào pack") | Hiếu (soạn với Claude) |
 | 20/11/2026 | 0.4 | Mục 19.2: bỏ nhớ đệm lời gọi công cụ (khi dựng nhiệm vụ 4.2) | Hiếu (soạn với Claude) |
 | 20/11/2026 | 0.3 | Hiếu duyệt ("Duyệt theo đề xuất"): Q1–Q9 của mục 16 thành **[Đã chốt]** | Hiếu (soạn với Claude) |
 | 20/11/2026 | 0.2 | Thêm phần B (mục 18–26): hai bề mặt (báo cáo vòng và chat của Console), tool calling, vòng lặp, bộ nhớ, gói kiến thức (skill), điểm mở rộng (plugin), schema bản ghi, prompt và config. Thêm Q8, Q9 | Hiếu (soạn với Claude) |
@@ -124,6 +125,8 @@ Kỹ sư viết một file `round.yaml` ngắn: task, các run eval, checkpoint 
 - Artifact chưa ở dạng hợp đồng thì phải xuất trước bằng lệnh của adapter, ví dụ `export_scores` (nhiệm vụ 1.2, đã xong). Bước đóng gói không đọc dạng riêng của adapter.
 - Gói là bất biến: đổi một file là gói mới, sha256 mới.
 - Trong DA-43, `round.yaml` chỉ do người viết. Để RunPlan (làn Vòng) tự sinh file này là dữ liệu qua ranh giới làn, cần hợp đồng; việc đó để story sau.
+
+**Bản chụp kho (bản 0.5) [Đã chốt].** Sổ chi phí và sự kiện fix-rate nằm trong kho của site, ngoài pack. Để một vòng chỉ phụ thuộc pack, `round.yaml` có khối tùy chọn `store_snapshot` (bắt buộc khai `data_class`, liệt kê bảng `ledger`, `fix_rate`). Lệnh `fw agentqa pack --store <kho>` chép các dòng vào `store_snapshot/` trong pack, mỗi bảng một entry có sha256; dòng không đọc được thì đếm và ghi trên entry. `cost_lookup` và `history_lookup` chỉ đọc hai entry này; không công cụ nào đọc kho. Dòng của hai bảng không mang lớp dữ liệu riêng, nên theo luật của B1 một bản chụp khai `public` vẫn là chưa xác nhận và pack không được gọi model hosted, trừ khi `round.yaml` khai liên kết tới một entry có bản ghi nói `public`. Không có miễn trừ nào cho bản chụp.
 
 ### B1 Nhận
 

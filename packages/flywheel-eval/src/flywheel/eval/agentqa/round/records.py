@@ -93,15 +93,6 @@ class FactRecord(Record):
     tool_call_id: str = Field(min_length=1)
 
 
-class StoreReadRecord(Record):
-    """What a store-reading tool read: the table, the rows that parsed, a sha256 over them."""
-
-    table: str = Field(min_length=1)
-    rows: int = Field(ge=0)
-    sha256: str = Field(pattern=SHA256)
-    unreadable: int = Field(default=0, ge=0)
-
-
 class ToolCallRecord(Record):
     """One line of `tool_calls.jsonl`: a call of the plan, what it read and what it made."""
 
@@ -109,12 +100,7 @@ class ToolCallRecord(Record):
     tool: str = Field(min_length=1)
     version: int = Field(ge=1)
     params: dict[str, Any] = Field(default_factory=dict)
-    input_sha256: list[str] = Field(
-        default_factory=list,
-        description="Accepted pack entries read, then the sha256 of each store table read.")
-    store_reads: list[StoreReadRecord] = Field(
-        default_factory=list,
-        description="Set only for tools that read the site store; empty means pack only.")
+    input_sha256: list[str] = Field(default_factory=list)
     fact_ids: list[str] = Field(default_factory=list)
     not_judged: list[str] = Field(default_factory=list)
     status: Literal["ran", "skipped", "refused"]

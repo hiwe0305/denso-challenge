@@ -61,7 +61,8 @@ def pack_maker(tmp_path: Path) -> PackMaker:
     """`make(name, scores=True)` -> path of a `pack.json` under tmp_path/name."""
 
     def make(name: str = "round", *, scores: bool = True,
-             rename: dict[str, str] | None = None) -> Path:
+             rename: dict[str, str] | None = None, snapshot_of: Path | None = None,
+             snapshot_class: DataClass = "internal", link_snapshot: bool = False) -> Path:
         root = tmp_path / name
         root.mkdir()
         by_run: dict[str, list[str]] = defaultdict(list)
@@ -80,11 +81,20 @@ def pack_maker(tmp_path: Path) -> PackMaker:
                             "subject": {"run": (rename or {}).get(run, run)}})
             links.append({"source": f"{run}/scores.jsonl", "target": "sources.jsonl",
                           "relation": "data_of"})
+        declared: dict[str, object] = {
+            "task_id": "tray", "declared_by": "test", "data_class": "public",
+            "entries": entries, "links": links}
+        if snapshot_of is not None:  # copy the ledger and fix-rate rows of that store in
+            declared["store_snapshot"] = {"data_class": snapshot_class,
+                                          "tables": ["ledger", "fix_rate"]}
+            if link_snapshot:
+                links.append({"source": "store_snapshot/ledger.jsonl",
+                              "target": "sources.jsonl", "relation": "data_of"})
+                links.append({"source": "store_snapshot/fix_rate.jsonl",
+                              "target": "sources.jsonl", "relation": "data_of"})
         decl = root / "round.yaml"
-        decl.write_text(yaml.safe_dump({"task_id": "tray", "declared_by": "test",
-                                        "data_class": "public", "entries": entries,
-                                        "links": links}))
-        return write_pack(build_pack(decl), root)
+        decl.write_text(yaml.safe_dump(declared))
+        return write_pack(build_pack(decl, store=snapshot_of), root)
 
     return make
 

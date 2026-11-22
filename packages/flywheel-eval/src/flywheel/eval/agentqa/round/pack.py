@@ -14,6 +14,9 @@ run evaluated: both are declared here (architecture 20/11 section 6, B0).
       - {path: release/sources.jsonl, kind: sources}
     links:
       - {source: C_70/scores.jsonl, target: release/sources.jsonl, relation: data_of}
+    store_snapshot:               # optional: ledger and fix-rate rows copied into the pack
+      data_class: internal        # required; the rows carry no class of their own
+      tables: [ledger, fix_rate]  # `fw agentqa pack --store <dir>` reads them (task 4.7)
 
 Paths are relative to the directory of `round.yaml`, which is the pack root, and stay
 inside it. A pack is immutable: change a file and it is a new pack with a new id.
@@ -30,6 +33,13 @@ from typing import Any
 import yaml
 from flywheel.eval.agentqa.inputs import forbidden_part
 from flywheel.eval.agentqa.round.records import DataClass, Pack, PackEntry, PackLink, Record
+from flywheel.eval.agentqa.round.snapshot import (
+    TABLES,
+    canonical_lines,
+    read_table,
+    snapshot_path,
+)
+from flywheel.store.paths import StorePaths
 from pydantic import Field, ValidationError
 
 PACK_FILE = "pack.json"
@@ -49,6 +59,13 @@ class DeclaredEntry(Record):
     subject: dict[str, str] = Field(default_factory=dict)
 
 
+class StoreSnapshot(Record):
+    """Which tables of the site store go into the pack, and the class the engineer gives them."""
+
+    data_class: DataClass  # no default: nobody classified the rows until the engineer does
+    tables: list[str] = Field(min_length=1)
+
+
 class Declaration(Record):
     """`round.yaml`, as the engineer wrote it."""
 
@@ -57,6 +74,7 @@ class Declaration(Record):
     data_class: DataClass | None = None
     entries: list[DeclaredEntry] = Field(min_length=1)
     links: list[PackLink] = Field(default_factory=list)
+    store_snapshot: StoreSnapshot | None = None
 
 
 def refused_path(root: Path, ref: str) -> str | None:
@@ -99,8 +117,46 @@ def sha256_of(path: Path) -> str:
     return digest.hexdigest()
 
 
-def build_pack(declaration: Path, now: datetime | None = None) -> Pack:
-    """Read `round.yaml`, check and hash every file it names, return the manifest."""
+def _snapshot_entries(decl: Declaration, root: Path, store: Path | None) -> list[PackEntry]:
+    """Write the store snapshot files under `root` and describe them as pack entries."""
+    block = decl.store_snapshot
+    if block is None:
+        return []
+    unknown = [t for t in block.tables if t not in TABLES]
+    if unknown:
+        raise PackRefused(f"store_snapshot: unknown table {', '.join(unknown)} "
+                          f"(tables: {', '.join(TABLES)})")
+    if len(set(block.tables)) != len(block.tables):
+        raise PackRefused("store_snapshot: a table is listed twice")
+    if store is None:
+        raise PackRefused("round.yaml has a store_snapshot block: give the store with --store")
+    for table in block.tables:
+        if snapshot_path(root, table).exists():
+            raise PackRefused(f"{snapshot_path(root, table)} exists: a snapshot is written "
+                              "once, declare the round in a new directory")
+    if (root / PACK_FILE).exists():
+        raise PackRefused(f"{root / PACK_FILE} exists: a pack is immutable")
+    entries: list[PackEntry] = []
+    for table in block.tables:
+        taken = read_table(table, StorePaths(store))
+        path = snapshot_path(root, table)
+        path.parent.mkdir(exist_ok=True)
+        path.write_text(canonical_lines(taken.rows), encoding="utf-8")
+        entries.append(PackEntry(
+            ref=path.relative_to(root).as_posix(), kind=taken.kind, sha256=sha256_of(path),
+            bytes=path.stat().st_size, data_class=block.data_class,
+            subject={"table": table, "rows": str(len(taken.rows)),
+                     "unreadable": str(taken.unreadable)}))
+    return entries
+
+
+def build_pack(declaration: Path, now: datetime | None = None,
+               store: Path | None = None) -> Pack:
+    """Read `round.yaml`, check and hash every file it names, return the manifest.
+
+    With a `store_snapshot` block the rows of the named tables are copied from `store` into
+    the pack first; rows that do not parse are counted in the entry's `subject.unreadable`.
+    """
     decl = read_declaration(declaration)
     root = declaration.parent
     entries: list[PackEntry] = []
@@ -118,6 +174,7 @@ def build_pack(declaration: Path, now: datetime | None = None) -> Pack:
             data_class=item.data_class or decl.data_class or "restricted",
             subject=item.subject,
         ))
+    entries += _snapshot_entries(decl, root, store)
     refs = [e.ref for e in entries]
     if len(set(refs)) != len(refs):
         raise PackRefused("an entry is declared twice")

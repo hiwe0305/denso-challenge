@@ -117,7 +117,7 @@ def test_a_window_step_that_is_not_logged_refuses_the_plan(tmp_path: Path) -> No
         run(make(tmp_path / "pack"), bad, tmp_path / "out")
 
 
-def make_coverage(root: Path) -> Path:
+def make_coverage(root: Path, store: Path | None = None) -> Path:
     root.mkdir()
     fails = [Score(episode_id=f"R/{n}", task_id="tray", config_sha256=SHA, trace_sha256=SHA,
                    success=False, failure_kind="L-A", first_failed_step=1, level=1)
@@ -135,10 +135,13 @@ def make_coverage(root: Path) -> Path:
         {"path": "scores.jsonl", "kind": "scores", "subject": {"run": "R"}},
         {"path": "train.jsonl", "kind": "conditions", "subject": {"role": "train"}},
         {"path": "eval.jsonl", "kind": "conditions", "subject": {"role": "eval"}}]
+    declared: dict[str, object] = {"task_id": "tray", "declared_by": "test",
+                                   "data_class": "public", "entries": entries}
+    if store is not None:
+        declared["store_snapshot"] = {"data_class": "public", "tables": ["ledger", "fix_rate"]}
     decl = root / "round.yaml"
-    decl.write_text(yaml.safe_dump({"task_id": "tray", "declared_by": "test",
-                                    "data_class": "public", "entries": entries}))
-    return write_pack(build_pack(decl), root)
+    decl.write_text(yaml.safe_dump(declared))
+    return write_pack(build_pack(decl, store=store), root)
 
 
 def test_coverage_cost_and_history_land_in_the_run_directory(tmp_path: Path) -> None:
@@ -153,8 +156,8 @@ def test_coverage_cost_and_history_land_in_the_run_directory(tmp_path: Path) -> 
     calls: list[dict[str, object]] = [{"tool": "coverage_distance", "params": {"runs": "all"}},
              {"tool": "cost_lookup", "params": {"checks": "all", "interventions": ["sim_s1"]}},
              {"tool": "history_lookup", "params": {"interventions": ["sim_s1", "sim_s2"]}}]
-    pack, out = make_coverage(tmp_path / "pack"), tmp_path / "out"
-    measure(read_pack(pack), admit(pack), plan(tmp_path, calls), out, store)
+    pack, out = make_coverage(tmp_path / "pack", store), tmp_path / "out"
+    measure(read_pack(pack), admit(pack), plan(tmp_path, calls), out)
     facts = {f.name: f for f in map(FactRecord.model_validate_json,
                                     (out / "facts.jsonl").read_text().splitlines())}
     cluster = "R_cluster_grasp_L-A_l1_coverage"
@@ -170,9 +173,10 @@ def test_coverage_cost_and_history_land_in_the_run_directory(tmp_path: Path) -> 
     calls_back = [ToolCallRecord.model_validate_json(x)
                   for x in (out / "tool_calls.jsonl").read_text().splitlines()]
     assert [c.status for c in calls_back] == ["ran"] * 3
-    assert len(calls_back[0].input_sha256) == 3 and calls_back[0].store_reads == []
-    # the store tools hold no pack entry; what they read is in the record: table, rows, sha
-    for call, table, rows in ((calls_back[1], "ledger", 2), (calls_back[2], "fix_rate_event", 1)):
-        (read,) = call.store_reads
-        assert (read.table, read.rows, read.unreadable) == (table, rows, 0)
-        assert call.input_sha256 == [read.sha256]
+    assert len(calls_back[0].input_sha256) == 3
+    # the store tools read the snapshot entries of the pack, and only those
+    shas = {e.kind: e.sha256 for e in read_pack(pack).entries}
+    assert calls_back[1].input_sha256 == [shas["ledger"]]
+    assert calls_back[2].input_sha256 == [shas["fix_rate"]]
+    assert facts["cost_ledger_unreadable_rows"].source_ref == "store_snapshot/ledger.jsonl"
+    assert facts["history_sim_s1_events"].source_ref == "store_snapshot/fix_rate.jsonl"

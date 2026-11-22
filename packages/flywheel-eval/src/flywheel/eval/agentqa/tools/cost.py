@@ -8,7 +8,8 @@ For each check of `configs/eval/agentqa/checks.yaml` (by its `cost_key`) and eac
   how many, the median quantity, the USD they add up to. A measured figure is never a
   stand-in for the estimate or the other way round.
 
-The ledger is read, never written, through `flywheel.store`. The price book may be empty:
+The ledger rows come from the pack's `ledger` entry (the store snapshot of step B0);
+the tool never touches the live store. The price book may be empty:
 a resource_type with no rate has no price fact (nothing is invented), is `not_judged`
 once (`cost_price_<resource_type>_not_judged`), and its ledger rows are still reported. A
 kind with no measured row is `not_judged` too (`cost_<name>_measured_not_judged`), so
@@ -18,7 +19,6 @@ second call with other checks or kinds adds facts and never clashes with the fir
 
 from __future__ import annotations
 
-import json
 from collections.abc import Sequence
 from pathlib import Path
 from statistics import median
@@ -28,9 +28,7 @@ from flywheel.contracts.configs import PriceBookConfig
 from flywheel.contracts.entities import LedgerEntry
 from flywheel.eval.agentqa.facts import FactBook
 from flywheel.eval.agentqa.tools.base import ToolResult, not_judged
-from flywheel.store.paths import StorePaths
-from flywheel.store.tables import complete_lines
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict
 
 TOOL = "cost_lookup"
 COSTS_FILE = Path("configs") / "eval" / "agentqa" / "costs.yaml"
@@ -61,19 +59,6 @@ def check_costs(path: Path = CHECKS_FILE) -> dict[str, str]:
     return {c["id"]: c["cost_key"] for c in raw["checks"]}
 
 
-def read_ledger(paths: StorePaths) -> tuple[list[LedgerEntry], int]:
-    """Every ledger row of the site, and how many lines did not parse."""
-    rows: list[LedgerEntry] = []
-    bad = 0
-    for file in sorted(paths.runs_dir.glob("**/ledger*.jsonl")):
-        for line in complete_lines(file):
-            try:
-                rows.append(LedgerEntry.model_validate(json.loads(line)))
-            except (ValueError, ValidationError):
-                bad += 1
-    return rows, bad
-
-
 def _figures(book: FactBook, name: str, kind: str, rows: Sequence[LedgerEntry],
              unit: str, ref: str) -> list[str]:
     facts = [book.add(f"cost_{name}_{kind}_rows", len(rows), ref, "rows")]
@@ -87,10 +72,13 @@ def _figures(book: FactBook, name: str, kind: str, rows: Sequence[LedgerEntry],
 
 def cost_lookup(book: FactBook, costs: Costs, checks: dict[str, str], names: Sequence[str],
                 kinds: Sequence[str], ledger: Sequence[LedgerEntry], unreadable: int,
-                ref: str) -> ToolResult:
-    """`names`: check ids; `kinds`: intervention kinds (both from closed domains)."""
+                ref: str, ledger_ref: str = "store_snapshot/ledger.jsonl") -> ToolResult:
+    """`names`: check ids; `kinds`: intervention kinds (both from closed domains).
+
+    `ref` is the price file; `ledger_ref` the pack entry the ledger rows come from.
+    """
     rates = {r.resource_type: r for r in costs.pricebook.rates}
-    facts = [book.add("cost_ledger_unreadable_rows", unreadable, "store", "rows"),
+    facts = [book.add("cost_ledger_unreadable_rows", unreadable, ledger_ref, "rows"),
              book.add("cost_pricebook_hash", costs.pricebook.cfg_hash(), ref)]
     # Each thing left unjudged is a fact of its own, named by what it is about, so the
     # fact's name fixes its reason whatever checks and kinds one call asks for.
@@ -122,7 +110,7 @@ def cost_lookup(book: FactBook, costs: Costs, checks: dict[str, str], names: Seq
                       book.add(f"cost_{name}_price_is_assumption", rate.is_assumption, ref)]
         for measure in ("estimated", "measured"):
             rows = [r for r in same if r.measure_kind == measure]
-            facts += _figures(book, name, measure, rows, unit, "store")
+            facts += _figures(book, name, measure, rows, unit, ledger_ref)
             if measure == "measured" and not rows:
                 skipped[f"cost_{name}_measured_not_judged"] = (
                     f"no measured ledger row of the kind for {name}")
