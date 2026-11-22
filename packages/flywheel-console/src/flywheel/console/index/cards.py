@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from flywheel.console.paths import ConsolePaths
 
 SCHEMA = "dataset-card/1"
 CARD_GLOBS = ("datasets/*/cards/*.yaml", "datasets/_cards/*.yaml")
@@ -233,3 +234,205 @@ def card_for_path(cards: Iterable[Card], fw_root: Path, dataset_dir: Path) -> Ca
         if any(_resolved(d) == target for d in c.lerobot_dirs(fw_root)):
             return c
     return None
+
+
+# ------------------------------------------------------------------ overlay on the seed rows
+_KIND = {
+    "synthetic_s1": "release", "synthetic_s2": "release", "cut": "subset-cut",
+    "teleop": "raw source", "egocentric": "raw source",
+}  # fmt: skip
+_DATA_TYPE = {
+    "synthetic_s1": "synthetic S1", "synthetic_s2": "synthetic S2",
+    "teleop": "teleop", "egocentric": "egocentric",
+}  # fmt: skip
+_SOURCE_TYPE = {
+    "planner_wbc": "synthetic S1", "s2": "synthetic S2",
+    "psi_data": "teleop", "teleop_pico": "teleop",
+}  # fmt: skip
+_QA_ORDER = ("pass", "flag", "reject")
+_FPS_RE = re.compile(r"(\d+)\s*fps")
+# Row fields a card brings; seed-only rows get them empty so every row has the same keys.
+CARD_FIELDS: dict[str, Any] = {
+    "scene": None, "superseded_by": [], "story": None, "replay_qa": None, "card": None,
+}  # fmt: skip
+
+
+def seed_doc(paths: ConsolePaths) -> dict[str, Any]:
+    """The seed catalog as a mapping (``rows``, ``edges``, ...); absent file means empty."""
+    p = paths.seed / "catalog.yaml"
+    if not p.is_file():
+        return {"rows": [], "edges": []}
+    data = yaml.safe_load(p.read_text(encoding="utf-8"))
+    if isinstance(data, list):
+        data = {"rows": data, "edges": []}
+    if not isinstance(data, dict) or not isinstance(data.get("rows"), list):
+        raise ValueError(f"{p}: expected a YAML list of rows")
+    return data
+
+
+def _title(d: dict[str, Any]) -> str:
+    """``Tray S1 · jig2 · l1 (420)`` from the alias ``task.kind.scene.level.generator.date``."""
+    alias = str(d["alias"])
+    seg = alias.split(".")
+    if len(seg) < 4 or not all(seg[:4]):
+        return alias
+    task = seg[0].replace("_", " ")
+    kind = seg[1].upper() if re.fullmatch(r"s\d+", seg[1]) else seg[1].capitalize()
+    out = f"{task[:1].upper()}{task[1:]} {kind} · {seg[2]} · {seg[3]}"
+    eps = (d.get("counts") or {}).get("episodes")
+    return out + (f" ({eps})" if eps is not None else "")
+
+
+def _qa(dec: dict[str, Any] | None) -> str:
+    if not dec:
+        return "-"
+    keys = [k for k in _QA_ORDER if k in dec] + [k for k in dec if k not in _QA_ORDER]
+    return ", ".join(f"{dec[k]} {k}" for k in keys if dec[k] is not None) or "-"
+
+
+def _locations(card: Card) -> list[str]:
+    """Seed-style location strings; copies whose ``role`` starts with ``deleted`` are dropped."""
+    d = card.data
+    rel = card.files.get("release")
+    join = d["kind"] != "cut" and isinstance(rel, str) and rel not in ("", ".")
+    out: list[str] = []
+    for loc in d["locations"]:
+        if str(loc.get("role") or "").startswith("deleted"):
+            continue
+        host, root = str(loc["host"]), str(loc["root"])
+        if host == "huggingface":
+            out.append(f"HF {root}")
+            continue
+        path = f"{root.rstrip('/')}/{rel}" if join else root
+        out.append(f"{host}:{path}")
+    return out
+
+
+def _fw_rel(fw_root: Path, p: Path) -> str | None:
+    """``p`` relative to ``fw_root`` (no ``fwdata/`` prefix), or None when outside."""
+    try:
+        if not p.resolve().is_relative_to(fw_root.resolve()):
+            return None
+        return p.relative_to(fw_root).as_posix()
+    except (OSError, ValueError):
+        return None
+
+
+def _lerobot(card: Card, seed: dict[str, Any], fw_root: Path) -> Any:
+    """Seed ``lerobot``; for a ``card:``-linked row whose seed folder is gone, the card's
+    laptop cut folder when it holds ``meta/info.json``."""
+    cur = seed.get("lerobot")
+    if cur and (fw_root / str(cur)).is_dir():
+        return cur
+    for d in card.lerobot_dirs(fw_root):
+        if (d / "meta" / "info.json").is_file():
+            rel = _fw_rel(fw_root, d)
+            if rel:
+                return rel
+    return cur
+
+
+def _card_row(card: Card, seed: dict[str, Any] | None, fw_root: Path) -> dict[str, Any]:
+    """One catalog row in seed shape: the card wins; the seed keeps title, size, viewer hints."""
+    d = card.data
+    s = seed or {}
+    linked = seed is not None and seed["id"] != card.id
+    rid = seed["id"] if seed is not None else card.id
+    aliases = list(s.get("aliases") or [])
+    for a in (d["alias"], card.id if linked else None):
+        if a and a not in aliases:
+            aliases.append(a)
+    kind = d["kind"]
+    if kind == "cut":
+        data_type = (s.get("data_type") if seed is not None else None) or _SOURCE_TYPE.get(
+            str(d.get("source_detail") or ""), "teleop"
+        )
+    else:
+        data_type = _DATA_TYPE[kind]
+    fmt = d.get("format")
+    m = _FPS_RE.search(fmt or "")
+    counts = d["counts"]
+    q = d.get("quality") or {}
+    size = s.get("size")
+    lin = d.get("lineage") or {}
+    return {
+        **s,
+        "id": rid,
+        "name": d["alias"],
+        "title": s.get("title") or _title(d),
+        "kind": _KIND[kind],
+        "data_type": data_type,
+        "task": d["task"],
+        "episodes": counts.get("episodes"),
+        "frames": counts.get("frames"),
+        "hours": counts.get("hours"),
+        "fps": int(m.group(1)) if m else s.get("fps"),
+        "format": fmt,
+        "licence": d["license"],
+        "data_class": d["data_class"],
+        "size": None if size in (None, "?") else size,
+        "status": d["status"],
+        "notes": "; ".join(q.get("known_issues") or []),
+        "qa": _qa(q.get("qa_decisions")),
+        "locations": _locations(card),
+        "parents": card.parents,
+        "aliases": aliases,
+        "lerobot": _lerobot(card, s, fw_root) if linked else s.get("lerobot"),
+        "ego_viewer": s.get("ego_viewer"),
+        "scene": d.get("scene"),
+        "superseded_by": list(d.get("superseded_by") or []),
+        "story": lin.get("story"),
+        "replay_qa": q.get("replay_qa"),
+        "card": "fwdata/" + card.path.relative_to(fw_root).as_posix(),
+    }
+
+
+def merged(
+    paths: ConsolePaths, strict: bool = True
+) -> tuple[list[dict[str, Any]], list[list[str]]]:
+    """Seed rows overlaid with the cards under ``paths.fw_root``, and the catalog edges.
+
+    A card overrides the seed row with its ``id``, or the row whose ``card:`` names it (that
+    row keeps its seed id). A card without a row adds one. Seed rows without a card are kept
+    as they are. ``strict`` raises ``CardError`` on a bad card; otherwise bad cards are
+    skipped. Edges are the seed edges plus ``[parent, id]`` for each card parent that is a
+    row of the merged catalog."""
+    doc = seed_doc(paths)
+    fw = paths.fw_root
+    seed_rows = [r for r in doc["rows"] if isinstance(r, dict)]
+    edges: list[list[str]] = [list(e) for e in doc.get("edges") or []]
+    rows: list[dict[str, Any]] = [{**r, **CARD_FIELDS} for r in seed_rows]
+    found = load_cards(fw) if strict else load_cards_lenient(fw)
+    if not found:
+        return rows, edges
+    by_id = {str(r["id"]): k for k, r in enumerate(seed_rows)}
+    by_link = {str(r["card"]): k for k, r in enumerate(seed_rows) if r.get("card")}
+    taken: set[int] = set()
+    link: dict[str, str] = {}
+    for c in found:
+        k = by_link.get(c.id, by_id.get(c.id))
+        if k is not None and k in taken:
+            if strict:
+                raise _fail(c.path, "id", f"seed row '{seed_rows[k]['id']}' has another card")
+            continue
+        if k is None:
+            if any(r["id"] == c.id for r in rows):
+                if strict:
+                    raise _fail(c.path, "id", f"'{c.id}' is already a catalog row")
+                continue
+            rows.append(_card_row(c, None, fw))
+        else:
+            taken.add(k)
+            rows[k] = _card_row(c, seed_rows[k], fw)
+            link[c.id] = rows[k]["id"]
+    ids = {str(r["id"]) for r in rows}
+    seen = {tuple(e) for e in edges}
+    for r in rows:
+        if r["card"] is None:
+            continue
+        r["parents"] = [link.get(p, p) for p in r["parents"]]
+        for p in r["parents"]:
+            if p in ids and (p, r["id"]) not in seen:
+                seen.add((p, r["id"]))
+                edges.append([p, r["id"]])
+    return rows, edges

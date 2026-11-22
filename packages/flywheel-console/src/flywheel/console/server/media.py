@@ -2,7 +2,7 @@
 
 Egocentric frames come only from ``*.deid.mp4`` files of a pipeline work dir, or from the
 viewer export that the console mounts at ``/ego/``. Robot episodes come from the LeRobot
-folders named by the ``lerobot`` field of the seed catalog rows.
+folders named by the ``lerobot`` field of the catalog rows (seed plus dataset cards).
 """
 
 from __future__ import annotations
@@ -20,21 +20,24 @@ from flywheel.console.server.runner import NotFound
 
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,80}$")
 _lock = threading.Lock()
-_rows_cache: tuple[float, list[dict[str, Any]]] | None = None
+_rows_cache: tuple[tuple[float, int, float], list[dict[str, Any]]] | None = None
 _layout: dict[str, tuple[float, dict[str, list[tuple[int, str]]]]] = {}
 
 
 def seed_rows() -> list[dict[str, Any]]:
-    """Seed catalog rows, re-read when the seed file changes."""
+    """Catalog rows (seed overlaid with dataset cards), re-read when the seed or a card changes.
+
+    A bad card is skipped here (lenient), so it cannot take the server down."""
     global _rows_cache
+    from flywheel.console.index.cards import cards_stamp
     from flywheel.console.index.robot import load_rows
 
     paths = active()
     f = paths.seed / "catalog.yaml"
-    mt = f.stat().st_mtime if f.is_file() else 0.0
+    key = (f.stat().st_mtime if f.is_file() else 0.0, *cards_stamp(paths.fw_root))
     with _lock:
-        if _rows_cache is None or _rows_cache[0] != mt:
-            _rows_cache = (mt, load_rows(paths))
+        if _rows_cache is None or _rows_cache[0] != key:
+            _rows_cache = (key, load_rows(paths, strict=False))
         return _rows_cache[1]
 
 

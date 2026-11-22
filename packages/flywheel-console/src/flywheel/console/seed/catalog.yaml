@@ -977,6 +977,7 @@ rows:
   - cut-T160
   aliases: []
 - id: ALL
+  card: cut-all-zone1.ALL
   name: ALL (#ALL:113520c517a0, cut-all-zone1)
   title: Tray S1 · ALL cut (606 ep)
   kind: subset-cut
@@ -1005,6 +1006,7 @@ rows:
   - ALL
   lerobot: da34-dryrun/cut-all-zone1/ALL/G1WholebodyTrayTransferTeleop-v0
 - id: S70
+  card: round-c70.S70
   name: S70 (#S70:8ab4e33b657f)
   title: Tray S1 · S70 cut (425 ep)
   kind: subset-cut
@@ -1288,7 +1290,7 @@ rows:
   parents:
   - parents-1105
   aliases: []
-- id: s2-release-669
+- id: tray_s2_3618a579b15e
   name: S2 release 669 (prod-1105 pass)
   title: Tray S2 · release 669 (thiếu)
   kind: release
@@ -1309,7 +1311,8 @@ rows:
   - '? (decided 5/11, no tray_s2_* dir found)'
   parents:
   - s2-prod-1105
-  aliases: []
+  aliases:
+  - s2-release-669
 - id: s2-replay-1105
   name: s2/replay-1105
   title: Tray S2 · replay 1105 (125)
@@ -1476,7 +1479,7 @@ edges:
 - - parents-1105
   - s2-prod-1105
 - - s2-prod-1105
-  - s2-release-669
+  - tray_s2_3618a579b15e
 - - parents-1105
   - s2-replay-1105
 - - parents-1105

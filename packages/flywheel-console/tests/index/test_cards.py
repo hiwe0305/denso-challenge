@@ -234,3 +234,20 @@ def test_card_for_path_three_layouts(tmp_path: Path) -> None:
     assert hit(tmp_path / "mirror/cut-x/ALL") is None  # nor is a cut root
     # the deleted rtx3060 copy is not a laptop folder
     assert all(d.is_relative_to(tmp_path) for c in loaded for d in c.lerobot_dirs(tmp_path))
+
+
+def test_server_rows_follow_card_changes_and_skip_bad_cards(tmp_path: Path) -> None:
+    from flywheel.console.paths import ConsolePaths, set_active
+    from flywheel.console.server import media
+
+    fw = tmp_path / "fw"
+    fw.mkdir()
+    set_active(ConsolePaths(repo=tmp_path, fw_root=fw))
+    media._rows_cache = None
+    before = {r["id"] for r in media.seed_rows()}
+    assert "tray_s1_aaaaaaaaaaaa" not in before
+    write_card(fw, STORE_CARD, store="tray-s1-test")
+    write_card(fw, _edit(CUT_CARD, status="live"))  # invalid: skipped, not raised
+    after = {r["id"] for r in media.seed_rows()}
+    assert after == before | {"tray_s1_aaaaaaaaaaaa"}
+    media._rows_cache = None
