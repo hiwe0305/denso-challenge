@@ -19,6 +19,8 @@ Là người train policy Ψ₀ cho task bê khay, tôi muốn có thêm dữ li
 
 Hiện trạng ngày 23/11/2026 (thực đo trên lô DA-41, [jig.md](../../g0/tray/jig.md) mục 4.13): trong 568 episode, ARRIVE_B + LOWER + RELEASE chiếm trung vị 18,8 % số khung, riêng LOWER + RELEASE 8,5 %. Planner luôn tới gần đúng chỗ (lệch ngang trung bình gần 0), nên dữ liệu gần như không có trường hợp "tới lệch, sửa, rồi đặt".
 
+Đính chính sau lô mẫu ngày 23/11/2026 ([place-data.md](../../g0/tray/place-data.md) mục 3.2): theo trục dọc, planner luôn tới ngắn khoảng 3,6 cm rồi bước tới, nên lô gốc có ca sửa nhưng chỉ một kiểu; cái thiếu là lệch ngang, tới quá đích và lệch lớn.
+
 ## Cách làm
 
 **[Claude đề xuất 23/11/2026; Hiếu đã xem dàn ý, chưa duyệt chính thức.]** Ba phương án đã cân nhắc:
@@ -46,7 +48,7 @@ Vì sao C: pha ARRIVE_B của planner đã có sẵn vòng sửa (bước tới 
 - [x] 2.1 `gen_log.jsonl` ghi `phases` và `carry_offset` của từng lượt, có test (AC 1)
 - [x] 2.2 Tùy chọn làm lệch đích CARRY theo seed trong planner, agent, `generate` và `planner_version`, có test (AC 2)
 - [x] 3.1 Lệnh cắt release dẫn xuất từ ARRIVE_B, có test trên dữ liệu nhỏ (AC 3)
-- [ ] 4.1 Lô mẫu trên laptop, số đo và runbook nháp cho `rtx3060` trong `docs/g0/tray/place-data.md` (AC 4)
+- [x] 4.1 Lô mẫu trên laptop, số đo và runbook nháp cho `rtx3060` trong `docs/g0/tray/place-data.md` (AC 4)
 - [ ] 4.2 Chạy đủ kiểm tra, `pr_guard`, mở PR (AC 6)
 - [ ] 5.1 Lô trên `rtx3060`, kho, thẻ dataset, `round.yaml` (AC 5; sau khi Hiếu xem mẫu)
 
@@ -86,4 +88,5 @@ Theo 07 mục 3.1. File story luôn được sửa.
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 23/11/2026 | Lô mẫu laptop (4.1): đính chính mục Story về độ lệch dọc sẵn có; đề xuất biên độ ±10 cm | Hiếu (soạn với Claude) |
 | 23/11/2026 | Tạo story theo quyết định của Hiếu ngày 23/11/2026 (sinh dữ liệu bước đặt trước, train một lần); phương án C do Claude đề xuất | Hiếu (soạn với Claude) |

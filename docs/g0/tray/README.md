@@ -17,6 +17,7 @@ G1 bê khay 6 linh kiện bằng hai tay từ bàn A sang vùng đích trên bà
 | `flywheel_simple.tray.replay_qa`, `scripts/g0/tray/replay_qa.py` | QA: phát lại episode đã ghi qua `replay-decoupled-wbc` của SIMPLE theo đồng hồ mô phỏng, so tư thế khay cuối với bản ghi; chạy song song theo shard (DA-33, D-24) |
 | `flywheel_simple.tray.export`, `scripts/g0/tray/export_psi0.py` | Xuất episode qua cả hai bước QA sang định dạng Ψ₀ (LeRobot v2.1, action 36, state 32) bằng `postprocess_psi0_sonic.py` của SIMPLE, kèm `meta/action_layout.json` và `meta/flywheel_export.json` (DA-33, D-26) |
 | `flywheel_simple.tray.release`, `scripts/g0/tray/release.py` | Xuất lô đã QA, ghi `release_manifest.json` (sha256 từng file, `release_hash`) và đặt tên thư mục `tray_s1_<release_hash[:12]>`; release đầu tiên ở [synthetic-s1.md](synthetic-s1.md) (DA-33) |
+| `flywheel_simple.tray.cut`, `scripts/g0/tray/cut_place.py` | Dữ liệu riêng cho bước đặt: làm lệch đích CARRY theo seed (`CarryJitter`), cắt release dẫn xuất `tray_s1place_<hash12>` từ ARRIVE_B; lô mẫu và runbook nháp ở [place-data.md](place-data.md) (DA-46) |
 | [huggingface.md](huggingface.md) | Release S1 planner-5 trên Hugging Face, giấy phép CC BY 4.0 (D-30) |
 | `scripts/g0/tray/import_simready.py` | Tải và đổi mesh SimReady cho lớp hiển thị |
 | `scripts/g0/tray/view_scene.py` | Ghi video camera đầu và video toàn cảnh |
