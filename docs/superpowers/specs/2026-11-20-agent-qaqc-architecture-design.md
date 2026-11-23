@@ -2,6 +2,7 @@
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 23/11/2026 | 0.6 | Thêm mục 27: hiện trạng mã so với tài liệu này và chỗ mã khác tài liệu. Không sửa mục nào khác | Hiếu (soạn với Claude) |
 | 22/11/2026 | 0.5 | Mục 6, B0: bản chụp kho trong pack (`store_snapshot`); `cost_lookup` và `history_lookup` chỉ đọc pack. Hiếu chốt 22/11/2026 ("Chụp vào pack") | Hiếu (soạn với Claude) |
 | 20/11/2026 | 0.4 | Mục 19.2: bỏ nhớ đệm lời gọi công cụ (khi dựng nhiệm vụ 4.2) | Hiếu (soạn với Claude) |
 | 20/11/2026 | 0.3 | Hiếu duyệt ("Duyệt theo đề xuất"): Q1–Q9 của mục 16 thành **[Đã chốt]** | Hiếu (soạn với Claude) |
@@ -608,6 +609,39 @@ configs/eval/agentqa/
 
 Mọi file trên, trừ `hosted.yaml` phần khóa, vào hash phiên bản agent (mục 11). Đổi một dòng là phiên bản mới, phải chấm lại.
 
+
+## 27. Hiện trạng so với kiến trúc (bản 0.6, 23/11/2026)
+
+Trên `origin/master` `dae6b13c` cộng PR 210. Bảng số đo và nguyên nhân ở [design 19/11](2026-11-19-agent-qaqc-system-design.md) mục 15.
+
+| Mục | Kiến trúc yêu cầu | Hiện trạng |
+|---|---|---|
+| 6, B0 | Gói bất biến, bản chụp kho | Xong. Gói thật `stage1-60k-src` có bản ghi `Source` xác nhận lớp `public` |
+| 6, B1 | Nhận, lớp dữ liệu, từ chối file đổi | Xong. B1 đọc và kiểm từng dòng, không giữ bản ghi của file lớn; mỗi lần công cụ đọc lại đều kiểm sha256 (đỉnh RAM 5,8 GB xuống 377 MB) |
+| 6, B2 | Kế hoạch công cụ | Xong, 12 công cụ |
+| 6, B3 | Bảng luật, phép kiểm, hạng của code, chặn ngân sách dữ liệu | 7 luật, 6 phép kiểm. Thiếu dòng "policy, không phải controller" (vướng hợp đồng) |
+| 6, B4 | Ba vai | `rank` xong. `adjudicate`, `look` chưa |
+| 6, B5 | Kiểm chính thức, phán quyết | Xong cho `rank`: 10 hàm kiểm, phán quyết `accepted`, `repaired`, `rejected`. `--from verify` không gọi model |
+| 6, B6 | Lắp, `Cost`, `ExpectedGain`, `reports.jsonl`, sổ chi phí | `assembly.json` và hai dòng sổ: xong. `Cost`, `ExpectedGain`, `reports.jsonl`, `round_diagnosis.json`: chưa |
+| 6, B7 | Trang HTML | Xong; ghi nguồn từng mục và lý do về sàn code |
+| 8 | Cổng model | Xong: định tuyến, chặn theo lớp hai lần, ngân sách trên cả thư mục chạy, thử lại, ghi và phát lại, hai lớp hosted. Chưa có: gọi song song |
+| 9 | Trạng thái và lỗi | Xong: `ok`, `degraded`, `broken`; mọi lỗi của bước được ghi rồi mới ném |
+| 10 | Quan sát và chi phí | `run.json` có tổng lời gọi, token, tiền, host. Tiền là số tính từ giá khai trong hồ sơ, chưa phải số thật |
+| 11 | Phiên bản | `agent_hash` phủ task, plan, luật, phép kiểm, chi phí, config cổng thực dùng, `roles.yaml`, `prompts/rank.md` |
+| 12 | So model | Chưa. Một model đã chạy thật |
+| 13 | Kiểm thử | Năm tầng đầu có test (4525 test của repo qua). Tầng chất lượng: một ca lịch sử; bộ lỗi cấy và báo nhầm chưa đo trên đường mới |
+| 14 | Hợp đồng K1–K3 | Đã merge. Chưa nối K2 (`round_diagnosis.json`) và K3 vào đường ống |
+| 19–23 | Tool calling mức 1, vòng lặp, bộ nhớ, skill, plugin | Mức 1 (kế hoạch công cụ cố định) xong. Vòng điều tra (mục 20), gói kiến thức theo nguồn (mục 22), điểm mở rộng (mục 23): chưa, theo đúng thứ tự đã chốt |
+
+**Chỗ mã khác tài liệu này.**
+
+| Chỗ | Tài liệu | Mã | Lý do |
+|---|---|---|---|
+| Mục 14 | B4 ở `roles.py` | B4 ở `judge.py`; luật kiểm ở `reply_rules.py` | Tên theo việc của bước; mục 17 cho phép |
+| Mục 24 | `verdicts.jsonl` có ba phán quyết | Thêm `not_ranked` cho cụm ngoài trần 8 | Cụm đó chưa hề được gửi cho model, nên không phải `rejected` |
+| Mục 24 | Không có file giữa B4 và B5 | Thêm `judged.jsonl`: tập id đã đưa cho model ở từng lời gọi | B5 kiểm được "id thuộc tập đã đưa" mà không dựng lại prompt |
+| Mục 9 | Mục về sàn code thì `degraded` | Giữ đúng; hệ quả là mọi lần chạy có model trên gói hơn 8 cụm đều `degraded` | **[Đề xuất]** Hiếu xem có tách "ngoài trần" khỏi `degraded` không |
+| Mục 8 | Hồ sơ hosted mặc định `claude-haiku-5-5` | Thêm hồ sơ `ckey_opus` (cổng bán lại do Hiếu chọn 23/11/2026) | Khóa hiện có là của cổng này |
 
 ## Nguồn
 

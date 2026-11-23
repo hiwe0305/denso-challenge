@@ -382,3 +382,29 @@ Cách đọc:
 - Token và tiền là số cổng báo, chưa xác minh. Một ca, một lần chạy: chưa đo độ ổn định (E4).
 - **RAM 5,8 GB là lỗi, đã sửa ở nhiệm vụ 4.9.** Trước đó B1 nạp mọi file của gói (240 trace, khoảng 1,5 GB, và bốn log train 71 MB) thành bản ghi pydantic và giữ suốt lần chạy. Sau khi sửa: đỉnh 365 MB, 65 giây, mọi file đầu ra giống hệt lần chạy cũ (so từng byte; `assembly.json` chỉ khác `run_id`).
 
+### 9.2 Chạy lại sau khi sửa bộ nhớ và thêm luật, 23/11/2026
+
+Cùng gói `stage1-60k-src`, cùng ca, mã ở nhiệm vụ 4.9 và 4.10.
+
+| Số đo | Sàn code | Có model |
+|---|---|---|
+| A1, A2, A3, A5, D1 | như mục 9.1 | như mục 9.1 |
+| Phán quyết | | 8 `accepted`, 56 `not_ranked` |
+| Thời gian cả lệnh | 79 giây | 188 giây (bước `judge` 99 giây) |
+| Đỉnh RAM | 377 MB | 378 MB |
+| Giả thuyết theo luật | `label_signal_missing` 53, `scorer_latch_too_strict` 14, không luật nào 11 | |
+
+Năm luật mới không bắn lần nào trên gói này, và lý do là đầu vào:
+
+- `controller_tracking`: sai số bám của lượt hỏng vượt τ ở cả hai phần thân, nhưng lượt thành công cũng vượt (`tau_separates` là sai ở cả bốn run). Code vì thế không kết luận controller, khớp H2 của tray.md 20.11. Chưa có luật nào ghi lại việc loại trừ này.
+- `weak_skill`, `coverage_gap`, `out_of_domain`: gói không có mục `conditions`.
+- `earlier_stage_train`: bốn job không có loss vô hạn.
+
+Chạy lại có model:
+
+```bash
+set -a; . /home/hiwe/project/denso-challenge/.env; set +a
+uv run fw agentqa round --pack fwdata/agentqa/cases/stage1-60k-src/pack.json --out <thư mục mới> \
+    --gateway-config fwdata/agentqa/gateway-ckey
+```
+
