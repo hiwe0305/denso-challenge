@@ -2,6 +2,7 @@
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 23/11/2026 | 0.6 | Mục 15 viết lại theo hiện trạng 23/11/2026 (sau PR 207, 208 và nhánh `DA-43-model-layer`): bảng đối chiếu, số đo đầu, việc chờ quyết định. Không sửa mục nào khác | Hiếu (soạn với Claude) |
 | 22/11/2026 | 0.5 | Thêm mục 11.5 (bộ metric và cổng qua của một phiên bản, **[Đề xuất]**) và mục 15 (hiện trạng mã so với design, thứ tự làm tiếp). Không sửa mục nào khác | Hiếu (soạn với Claude) |
 | 20/11/2026 | 0.4 | Hiếu duyệt [kiến trúc 20/11/2026](2026-11-20-agent-qaqc-architecture-design.md) bản 0.3. Từ nay mục 5.1, 5.4, 12, phần chọn model của mục 8 và luật 8 của mục 6 đọc theo tài liệu đó; cửa xin thêm công cụ rút khỏi DA-43; bản ghi lời gọi công cụ rút khỏi K3. Thân bài ở đây giữ nguyên làm lịch sử | Hiếu (soạn với Claude) |
 | 20/11/2026 | 0.3 | Thêm con trỏ tới [kiến trúc 20/11/2026](2026-11-20-agent-qaqc-architecture-design.md) (**[Đề xuất]**, chờ duyệt): tài liệu đó đề xuất thay mục 5.1, 5.4, 8, 12 và luật 8 của mục 6. Nội dung các mục ở đây chưa sửa | Hiếu (soạn với Claude) |
@@ -502,43 +503,65 @@ Ghi chú về cách đọc:
 | Q9 | Khoảng cách vùng phủ viết lại trong làn | Có, kèm test đối chiếu với số của 20.12 |
 | Q10 | Ngưỡng qua của mục 11.1–11.3 | Như đề xuất, chỉnh sau lần chạy đầu và ghi `Decision` |
 
-## 15. Hiện trạng so với design (bản 0.5, 22/11/2026)
+## 15. Hiện trạng so với design (bản 0.6, 23/11/2026)
 
-Đối chiếu trên `origin/master` `95cd051c` cộng hai PR đang mở: 208 (sửa lượt review hai, bản chụp kho) và 207 (hợp đồng K1–K3). "Xong" nghĩa là có mã và test trên CPU; chưa mục nào có số đo chất lượng.
+Đối chiếu trên `origin/master` `dae6b13c` (PR 207 và 208 đã merge) cộng PR 210 đang mở (`DA-43-model-layer`). "Xong" nghĩa là có mã và test trên CPU. Số đo là sơ bộ: một ca của tập phát triển, một lần chạy.
 
 | Mục | Design yêu cầu | Hiện trạng | Còn thiếu |
 |---|---|---|---|
-| 4 | 14 công cụ | 12 xong | `relaxed_sweep` (chờ K1), `frames_at` (nhiệm vụ 8). `trace_stats` chưa ghép được trace thật với `Score` vì hai kiểu `episode_id`. `coverage_distance` còn nợ test đối chiếu 20.12. `cost_lookup` chưa có bảng giá |
-| 5.1 | Đường ống | Sáu bước của kiến trúc 20/11 chạy với `--no-model` | B4 (xét) và B5 (kiểm): chưa có lời gọi model nào trong đường ống |
-| 5.2 | Chuyên viên | Agent bản 3 theo từng chủ thể vẫn chạy riêng | Vai `adjudicate`, `rank` (5.2); ba sửa của bản 3 (5.3) |
-| 5.3 | Bảng luật giả thuyết, 8 dòng | **2 luật**: chuỗi bước gãy, thiếu tín hiệu. Chặn tiêu ngân sách dữ liệu có | 6 luật: controller, policy không phải controller, kỹ năng yếu, thiếu vùng phủ, ngoài miền, nguyên nhân ở stage trước |
-| 5.3 | Danh mục phép kiểm có chi phí | 2 phép, thứ tự chi phí là giả định | Phép của bước 5, 7, 8; chi phí từ sổ |
-| 5.3 | Can thiệp kèm chi phí và lợi ích | Loại can thiệp do code chọn, ghi "chưa tính chi phí" | `InterventionProposal`, `Cost`, `ExpectedGain`; fact lịch sử cạnh đề xuất |
+| 4 | 14 công cụ | 12 xong. `trace_stats` ghép trace thật với `Score` theo sha256 | `relaxed_sweep` (K1 đã merge, chưa có lệnh xuất outcome), `frames_at` (nhiệm vụ 8). `coverage_distance` nợ test đối chiếu 20.12. `cost_lookup` chưa có bảng giá |
+| 5.1 | Đường ống | Tám bước của kiến trúc 20/11 chạy; với `--no-model` chạy sáu bước. Đỉnh RAM trên gói thật 377 MB (đo) | Song song lời gọi hosted |
+| 5.2 | Chuyên viên | Vai `rank` chạy với model thật, có gửi lại một lần | Vai `adjudicate` (dùng lại ứng viên của bản 3), vai `look` |
+| 5.3 | Bảng luật giả thuyết, 8 dòng | **7 luật**: chuỗi bước gãy, thiếu tín hiệu, controller, kỹ năng yếu, thiếu vùng phủ, ngoài miền, lỗi ở stage train. Luật mang được danh sách chẩn đoán nó loại trừ | Dòng "policy, không phải controller": vướng hợp đồng (xem dưới bảng). Trên gói thật 5 luật mới chưa bắn lần nào |
+| 5.3 | Danh mục phép kiểm có chi phí | 6 phép; thứ tự chi phí là giả định | Chi phí từ sổ: chờ bảng giá |
+| 5.3 | Can thiệp kèm chi phí và lợi ích | Loại can thiệp do code hoặc model chọn trong tập được phép; ghi "chưa tính chi phí" | `InterventionProposal`, `Cost`, `ExpectedGain`; fact lịch sử cạnh đề xuất |
 | 5.4 | Cửa xin thêm công cụ | Rút khỏi DA-43 (kiến trúc 20/11, Q5) | Điều kiện mở lại ở kiến trúc mục 20 |
-| 6 | Luật 1–8 | Luật 1, 2, 3 có từ registry và FactBook | Luật 5, 6, 8 chờ B5; luật 4 chờ K3; luật 7 chờ chi phí |
-| 7.2 | K1, K2, K3 | PR 207 mở; lệnh xuất `scores.jsonl` xong | Merge; bốn câu hỏi của issue 206; xuất `round_diagnosis.json` (5.5) |
-| 7.3 | Trang HTML ba dòng đầu | Có trang, dòng đầu là cụm lớn nhất | Phép kiểm rẻ nhất và chi phí thật; nói "chỉ có điểm số" một lần ở đầu trang |
-| 8 | Chọn model bằng số | Cổng model xong (định tuyến, chặn theo lớp, ngân sách, ghi và phát lại) | Lớp hosted (5.4); đo M1 và M3 |
+| 6 | Luật 1–8 | Luật 1, 2, 3 từ registry và FactBook. Luật 5, 6, 8 có trong thư viện kiểm của vai `rank` (10 hàm) | Luật 4 (nguồn gốc fact trong `AgentReport`, K3) chưa nối; luật 7 chờ chi phí; các luật riêng của `adjudicate` |
+| 7.2 | K1, K2, K3 | Đã merge (PR 207) | Lệnh xuất outcome theo K1 (adapter, ngoài phạm vi file của story); xuất `round_diagnosis.json` (5.5) |
+| 7.3 | Trang HTML ba dòng đầu | Có trang; ghi mục nào của model, mục nào của code, lý do về sàn code | Phép kiểm rẻ nhất kèm chi phí thật; nói "chỉ có điểm số" một lần ở đầu trang |
+| 8 | Chọn model bằng số | Cổng model và hai lớp hosted xong. Một model đã chạy thật: `claude-opus-5-5` qua cổng bán lại ckey.vn (không xác minh được model đứng sau) | Đo M1 (Nemotron cục bộ) và so hai model |
 | 9 | Nhìn hình | Chưa làm | Nhiệm vụ 8 |
 | 10 | Chỗ cắm log robot thật | Gói giả `internal` trong test | Chờ câu trả lời của mentor |
-| 11.1–11.4 | Bốn phần đánh giá | **Chưa có phần nào** | `casebench/`, đáp án, bốn lượt đo, bảng trong `docs/g0/agent-qa.md` |
-| 1.3 | Gói vòng thật | Chưa có; gói mẫu chỉ có `Score` | Dựng từ lô `C_70` |
+| 11.1 | Bộ lỗi cấy, chống tụt | Chưa đo lại trên đường mới | Vai `adjudicate`, rồi một lượt đo |
+| 11.2 | Bộ ca lịch sử | Bộ chấm xong. **1 ca** tập phát triển, 26 điểm | Tối thiểu 5 ca; tập kiểm do người khác soạn |
+| 11.3 | Báo nhầm trên job khỏe | Chưa có | Ba job khỏe cần xác định |
+| 11.4 | Thời gian và chi phí | Đo được trên gói thật (bảng dưới) | Chi phí thật: chỉ có số cổng báo |
+| 1.3 | Gói vòng thật | Có: `stage1-60k-src`, 249 file, được xác nhận `public` bằng bản ghi `Source` (Hiếu, 23/11/2026) | Điều kiện train theo `Condition`; outcome theo K1 |
 
-**Dữ liệu cho bộ ca có trên máy** (kiểm 22/11/2026 trong `fwdata/`, chưa mở từng file): outcome và trace của bốn run 60k (`B_70`, `B_ALL`, `C_70`, `C_ALL`), của eval C, C trên SimReady, C+ trên SimReady, và các lô `check-*` của kiểm chuỗi; log train của các job fine-tune; điều kiện của vòng `C_70`. Hai ca chưa kiểm: task hai bàn và ba job fine-tune khỏe. Nhiệm vụ 6.1 kiểm từng ca.
+**Số đo đầu (23/11/2026, ca `tray-c70-step4`, gói `stage1-60k-src`, laptop).** Chi tiết ở [agent-qa.md](../../g0/agent-qa.md) mục 8 và 9.
 
-**Thứ tự làm tiếp [Đề xuất].** Đo trước, rồi mới thêm model: không có bộ ca thì không biết một thay đổi là tốt lên hay xấu đi.
+| Metric | Sàn code | Có model |
+|---|---|---|
+| A1 điểm chốt tới được | 22/24; bắt buộc 7/9 | 22/24; bắt buộc 7/9 |
+| A2 chẩn đoán đúng ở hạng 1 | 4/4 | 4/4 |
+| A3 khẳng định sai | 0 | 0 |
+| A5 can thiệp | 2/2 | 2/2 |
+| B2 mục của model bị loại | | 0 trên 8 |
+| D1 phần model thêm | | 0 ở mọi cột |
+| E2 thời gian | 79 giây | 188 giây (8 lời gọi, 99 giây) |
+| Đỉnh RAM | 377 MB | 378 MB |
 
-| Bước | Việc | Nhiệm vụ | Cho ra |
-|---|---|---|---|
-| 1 | Gói vòng thật `C_70` và quy ước `episode_id` | 1.3, issue 206 | E1 trên dữ liệu thật |
-| 2 | Bộ ca: kiểm artifact, đáp án tập phát triển, `casebench/` | 6.1–6.3 | A1–A5 của sàn code: mốc đầu tiên |
-| 3 | Sáu luật giả thuyết còn thiếu, phép kiểm, chi phí can thiệp | 4.3 mở rộng | A1 của sàn code tăng; cổng 3 phần code |
-| 4 | Lớp hosted, vai `adjudicate` và `rank`, B5 | 5.2–5.4 | D1: model thêm được gì |
-| 5 | Đo đủ bốn phần, hai model | 7.1–7.4 | Bảng điểm đầy đủ, Hiếu chọn model |
-| 6 | Nếu D1 "thêm đúng" bằng 0 hoặc còn điểm chốt trượt vì thiếu phép đo: vòng điều tra | Kiến trúc mục 20 | Quyết định riêng của Hiếu |
-| 7 | Nhìn hình | 8 | Rút được |
+**Vì sao số chưa nhúc nhích.** Hai điểm bắt buộc còn trượt và D1 bằng 0 có chung ba nguyên nhân, đều nằm ngoài lớp model:
 
-Bước 1–3 không cần khóa API. Bước 4 cần `ANTHROPIC_API_KEY` trong biến môi trường; chỉ gói `public` được gửi đi.
+| Nguyên nhân | Hậu quả | Ai gỡ |
+|---|---|---|
+| `Score` không mang tư thế khay cuối và đích | Cụm lớn nhất (`place`/`L-PLACE-POSE`) chỉ ra được "thiếu tín hiệu" và bị chặn; hai điểm bắt buộc trượt | Lệnh xuất outcome theo K1 trong adapter: ngoài phạm vi file của DA-43 |
+| Gói không có điều kiện train theo `Condition` | Ba luật vùng phủ và bước 8 không chạy | Lệnh xuất điều kiện trong adapter: ngoài phạm vi file |
+| `INTERVENTIONS_OF_DIAGNOSIS["unknown"]` chỉ cho `repair_ticket` | Không viết được luật "policy, không phải controller" (design 5.3 dòng 4): mở phiếu sửa cho lỗi của policy là sai | Hiếu: PR hợp đồng (cho `unknown` thêm `report_only`, hoặc thêm một chẩn đoán) |
+
+Khi mỗi cụm chỉ có một giả thuyết thì model không có gì để xếp hạng; D1 bằng 0 vì thế chưa nói gì về model.
+
+**Thứ tự làm tiếp [Đề xuất].**
+
+| Bước | Việc | Chờ ai |
+|---|---|---|
+| 1 | Ba quyết định ở bảng trên | Hiếu |
+| 2 | Vai `adjudicate`, rồi đo lại bộ lỗi cấy (11.1) | Không chờ |
+| 3 | Thêm ca: bốn run 60k, eval C trên SimReady, ba job khỏe (11.2, 11.3); tập kiểm | Người soạn tập kiểm |
+| 4 | Chi phí can thiệp và phép kiểm | Bảng giá trong `costs.yaml` |
+| 5 | Đo đủ bốn phần với hai model (M1 cục bộ cần rtx3060) | Hiếu đồng ý dùng rtx3060 |
+| 6 | Vòng điều tra tự do, chỉ khi D1 vẫn bằng 0 sau bước 1–3 | Quyết định riêng của Hiếu |
+| 7 | Nhìn hình | Rút được |
 
 ## Nguồn
 
