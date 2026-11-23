@@ -20,7 +20,6 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from flywheel.contracts.artifacts import DatasetReport, Episode
-from flywheel.contracts.training import TrainingMetric
 from flywheel.eval.agentqa.facts import FactBook, FactValue
 from flywheel.eval.agentqa.tools.base import (
     EntryView,
@@ -42,6 +41,15 @@ def _one(found: set[str | None], missing: str, ambiguous: str) -> tuple[str | No
     return None, missing if not ids else f"{ambiguous}: {', '.join(sorted(ids))}"
 
 
+def _by_checkpoint(jobs: Mapping[str, JobMetrics]) -> dict[str, set[tuple[str, str]]]:
+    """checkpoint_id -> the (job_id, release_id) of its rows, over one read of every log."""
+    out: dict[str, set[tuple[str, str]]] = {}
+    for j in jobs.values():
+        for r in j.iter_rows():
+            out.setdefault(r.checkpoint_id, set()).add((r.job_id, r.release_id))
+    return out
+
+
 def lineage(book: FactBook, runs: Sequence[RunScores], entries: Sequence[EntryView],
             episodes: Sequence[Episode], jobs: Mapping[str, JobMetrics],
             reports: Mapping[str, DatasetReport]) -> ToolResult:
@@ -50,6 +58,7 @@ def lineage(book: FactBook, runs: Sequence[RunScores], entries: Sequence[EntryVi
     reasons: list[str] = []
     by_ref = {e.ref: e for e in entries}
     complete = 0
+    index: dict[str, set[tuple[str, str]]] | None = None  # read once, when first needed
     for run in runs:
         got: dict[str, str | None] = {}
         why: dict[str, str] = {}
@@ -65,17 +74,20 @@ def lineage(book: FactBook, runs: Sequence[RunScores], entries: Sequence[EntryVi
         # Each link is made from the one before it; once one is missing nothing is computed
         # behind it, so no id of None is ever looked up.
         checkpoint = got["checkpoint"]
-        rows_of: list[TrainingMetric] = []
+        rows_of: set[tuple[str, str]] = set()  # (job_id, release_id) of its rows
         if checkpoint:
-            rows_of = [r for j in jobs.values() for r in j.rows if r.checkpoint_id == checkpoint]
+            if index is None:
+                index = _by_checkpoint(jobs)
+            rows_of = index.get(checkpoint, set())
             got["job"], why["job"] = _one(
-                {r.job_id for r in rows_of}, f"checkpoint {checkpoint}: no TrainingMetric row "
+                {job_id for job_id, _ in rows_of},
+                f"checkpoint {checkpoint}: no TrainingMetric row "
                 "carries it", f"checkpoint {checkpoint} is in more than one job")
         job = got.get("job")
         if job:
             refs["job"] = refs["release"] = jobs[job].ref
             got["release"], why["release"] = _one(
-                {r.release_id for r in rows_of if r.job_id == job},
+                {release for job_id, release in rows_of if job_id == job},
                 f"job {job}: no release_id", f"job {job} has several releases")
         release = got.get("release")
         if release:

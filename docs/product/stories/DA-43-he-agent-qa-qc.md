@@ -61,6 +61,7 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
   - [x] 4.6 Sửa theo review lượt hai của PR 204 (21/11/2026): trần ngân sách của cổng model tính trên cả thư mục chạy, tên fact `not_judged` không phụ thuộc tham số lời gọi, ghi dấu những gì công cụ đọc từ kho, `agent_hash` thêm `agent.yaml` và `diagnosis/system.yaml`, chỉ thử lại lỗi mạng, 429 và 5xx, `lineage` không tính tiếp sau liên kết đứt
   - [x] 4.7 Bản chụp kho trong pack (`store_snapshot`, kiến trúc bản 0.5): `cost_lookup` và `history_lookup` đọc entry `ledger`, `fix_rate` của pack, không đọc kho
   - [x] 4.8 Trace thật: một run khai được nhiều entry `trace` (một file mỗi lượt); `trace_stats` ghép lượt với `Score` theo `Score.trace_sha256` bằng sha256 của entry, không theo `episode_id`; `metrics` vào `provides` của task khay
+  - [x] 4.9 Bộ nhớ: B1 đọc và kiểm từng file theo dòng, không giữ bản ghi của `trace`, `metrics`, `rtc_log`; công cụ đọc lại khi cần và kiểm lại sha256 (23/11/2026; đỉnh RAM trên gói thật từ 5,8 GB xuống 365 MB)
 - [ ] 5. Lớp model (2 ngày; kiến trúc 20/11 mục 8, 19–25)
   - [x] 5.1 Cổng model: hồ sơ, bảng vai × lớp dữ liệu, chặn hosted, ngân sách, ghi và phát lại
   - [ ] 5.2 Vai `adjudicate` và `rank`: prompt, schema câu trả lời

@@ -15,8 +15,9 @@ it), `tool_calls.jsonl` (what each call read and produced), `tables/<call>-<tool
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -120,6 +121,16 @@ def _declared_run(entry: PackEntry, seen: dict[str, str]) -> str:
     return name
 
 
+def _traced(admitted: Admitted, ref: str) -> Iterator[TraceStep]:
+    """The cycles of a trace entry, read again (and its sha256 checked) on each call."""
+    return (r for r in admitted.stream(ref) if isinstance(r, TraceStep))
+
+
+def _logged(admitted: Admitted, ref: str, job: str) -> Iterator[TrainingMetric]:
+    """The rows of one job in a metrics entry, read again on each call."""
+    return (r for r in admitted.stream(ref) if isinstance(r, TrainingMetric) and r.job_id == job)
+
+
 def _context(pack: Pack, admitted: Admitted) -> tuple[MeasureContext, list[PackEntry]]:
     entries = [e for e in pack.entries if e.ref in admitted.records]
     runs: dict[str, RunScores] = {}
@@ -132,41 +143,43 @@ def _context(pack: Pack, admitted: Admitted) -> tuple[MeasureContext, list[PackE
     events: StoreRows | None = None
     seen: dict[str, dict[str, str]] = {"scores": {}}
     for entry in entries:
-        records = admitted.records[entry.ref]
         if entry.kind == "scores":
             name = _declared_run(entry, seen["scores"])
-            scores = tuple(r for r in records if isinstance(r, Score))
+            scores = tuple(r for r in admitted.records[entry.ref] if isinstance(r, Score))
             runs[name] = RunScores(run=name, ref=entry.ref, scores=scores)
         elif entry.kind == "trace":
             name = _run_of(entry)  # a run may declare any number of trace files
-            steps = tuple(r for r in records if isinstance(r, TraceStep))
             earlier = traces[name].files if name in traces else ()
-            traces[name] = RunTrace(name, earlier + (TraceFile(entry.ref, entry.sha256, steps),))
+            loaded = TraceFile(entry.ref, entry.sha256, load=partial(_traced, admitted, entry.ref))
+            traces[name] = RunTrace(name, earlier + (loaded,))
         elif entry.kind == "metrics":
-            by_job: dict[str, list[TrainingMetric]] = {}
-            for r in records:
+            logged: dict[str, None] = {}  # the jobs of the file, in order of their first row
+            for r in admitted.stream(entry.ref):
                 if isinstance(r, TrainingMetric):
-                    by_job.setdefault(r.job_id, []).append(r)
-            for job, rows in by_job.items():
+                    logged.setdefault(r.job_id)
+            for job in logged:
                 if job in jobs:
                     raise PlanRefused(f"{entry.ref}: job {job!r} is already logged by "
                                       f"{jobs[job].ref}")
-                jobs[job] = JobMetrics(job, entry.ref, tuple(rows))
+                jobs[job] = JobMetrics(job, entry.ref,
+                                       load=partial(_logged, admitted, entry.ref, job))
         elif entry.kind == "conditions":
-            found = tuple(r for r in records if isinstance(r, Condition))
+            found = tuple(r for r in admitted.records[entry.ref] if isinstance(r, Condition))
             conditions.append(ConditionSet(entry.ref, entry.subject.get("role", ""), found))
         elif entry.kind == "episodes":
-            episodes += [r for r in records if isinstance(r, Episode)]
+            episodes += [r for r in admitted.records[entry.ref] if isinstance(r, Episode)]
         elif entry.kind in ("ledger", "fix_rate"):
             if (ledger if entry.kind == "ledger" else events) is not None:
                 raise PlanRefused(f"{entry.ref}: the pack holds two {entry.kind} entries")
-            held = StoreRows(entry.ref, tuple(records), int(entry.subject.get("unreadable", 0)))
+            held = StoreRows(entry.ref, tuple(admitted.records[entry.ref]),
+                             int(entry.subject.get("unreadable", 0)))
             if entry.kind == "ledger":
                 ledger = held
             else:
                 events = held
         elif entry.kind == "dataset_report":
-            reports[entry.ref] = next(r for r in records if isinstance(r, DatasetReport))
+            reports[entry.ref] = next(r for r in admitted.records[entry.ref]
+                                      if isinstance(r, DatasetReport))
     task = load_task(pack.task_id)
     views = tuple(EntryView(e.ref, e.kind, e.subject) for e in entries)
     ctx = MeasureContext(task, runs, frozenset(e.kind for e in entries), traces, jobs,

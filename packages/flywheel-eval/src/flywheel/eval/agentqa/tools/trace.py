@@ -29,6 +29,7 @@ from __future__ import annotations
 import math
 import posixpath
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 import numpy as np
 from flywheel.contracts.trace import LOWER_BODY, UPPER_BODY, FloatOrNonFinite, TraceStep
@@ -89,24 +90,53 @@ def _source_ref(files: Sequence[TraceFile]) -> str:
     return posixpath.commonpath([f.ref for f in files]) or "."
 
 
+@dataclass(frozen=True)
+class Rollout:
+    """What the groups need of one rollout's cycles, so the cycles themselves are not kept."""
+
+    cycles: int
+    gaps: int  # cycles with a non-finite value (`_gap_cycles`)
+    norms: dict[str, Values]  # part -> tracking error norm per cycle (R3)
+    errors: dict[str, Values]  # part -> |command - measured| per cycle and channel
+    moving: int  # `_velocity_share`
+    judged: int
+    path: float  # `_path_length`
+
+
+def summarize(key: str, steps: Sequence[TraceStep]) -> Rollout:
+    """The numbers of one rollout, its cycles in step order."""
+    moving, judged = _velocity_share(steps)
+    return Rollout(
+        cycles=len(steps), gaps=_gap_cycles(steps),
+        norms={part: TraceLog(key, key, tuple(steps), {}, 0, "").tracking_error(part)
+               for part in CHANNELS},
+        errors={part: channel_errors(steps, part) if steps
+                else np.empty((0, len(names)), dtype=np.float64)
+                for part, names in CHANNELS.items()},
+        moving=moving, judged=judged, path=_path_length(steps))
+
+
 def _rollouts(book: FactBook, run: RunScores, trace: RunTrace,
-              facts: list[str], reasons: list[str]) -> dict[str, list[TraceStep]]:
-    """Rollout key -> its cycles, over all files of the run.
+              facts: list[str], reasons: list[str]) -> dict[str, Rollout]:
+    """Rollout key -> its numbers, over all files of the run.
 
     A file that is the `trace_sha256` of exactly one score is that rollout; any other file
     is split by `TraceStep.episode_id`. A file that claims a rollout an earlier file holds
-    is skipped whole and named in a fact, never merged.
+    is skipped whole and named in a fact, never merged. Files are read one at a time and
+    only the numbers of their rollouts are kept (real data: 1.5 GB of cycles).
     """
     by_sha: dict[str, list[str]] = {}
     for sc in run.scores:
         by_sha.setdefault(sc.trace_sha256, []).append(sc.episode_id)
-    held: dict[str, tuple[str, list[TraceStep]]] = {}
+    held: dict[str, tuple[str, Rollout]] = {}
     for file in trace.files:
+        steps = file.read()
         owners = by_sha.get(file.sha256, [])
         if len(owners) == 1:
-            found = {owners[0]: sorted(file.steps, key=lambda s: s.step)}
+            found = {owners[0]: sorted(steps, key=lambda s: s.step)}
         else:
-            found = _by_episode(file.steps)
+            found = _by_episode(steps)
+        del steps
         clash = sorted(k for k in found if k in held)
         if clash:
             reason = (f"run {run.run}: {file.ref} claims rollout(s) {', '.join(clash)} already "
@@ -115,9 +145,9 @@ def _rollouts(book: FactBook, run: RunScores, trace: RunTrace,
                                   file.ref))
             reasons.append(reason)
             continue
-        for key, steps in found.items():
-            held[key] = (file.ref, steps)
-    return {k: steps for k, (_, steps) in held.items()}
+        for key, cycles in found.items():
+            held[key] = (file.ref, summarize(key, cycles))
+    return {k: rollout for k, (_, rollout) in held.items()}
 
 
 def _velocity_share(steps: Sequence[TraceStep]) -> tuple[int, int]:
@@ -148,23 +178,23 @@ def _unit(part: str, channel: str) -> str:
     return _CHANNEL_UNIT.get(channel, "rad")
 
 
-def _group(book: FactBook, prefix: str, ref: str, rollouts: dict[str, list[TraceStep]],
+def _group(book: FactBook, prefix: str, ref: str, rollouts: dict[str, Rollout],
            cfg: R3Thresholds, tau_ref: str, group: str) -> tuple[list[str], dict[str, float],
                                                                  list[str]]:
     """Facts of one group; the part statistics (for the separation test); what was not judged."""
-    steps = [s for ep in rollouts.values() for s in ep]
+    cycles = sum(r.cycles for r in rollouts.values())
     facts = [book.add(f"{prefix}_rollouts", len(rollouts), ref, "rollouts"),
-             book.add(f"{prefix}_cycles", len(steps), ref, "cycles"),
-             book.add(f"{prefix}_nonfinite_cycles", _gap_cycles(steps), ref, "cycles")]
+             book.add(f"{prefix}_cycles", cycles, ref, "cycles"),
+             book.add(f"{prefix}_nonfinite_cycles", sum(r.gaps for r in rollouts.values()), ref,
+                      "cycles")]
     stats: dict[str, float] = {}
     reasons: list[str] = []
-    if not steps:
+    if not cycles:
         reason = f"{prefix}: no {group} rollout has a trace"
         facts.append(book.add(f"{prefix}_not_judged", reason, ref))
         return facts, stats, [reason]
     for part, names in CHANNELS.items():
-        norms = np.concatenate([TraceLog(e, e, tuple(ep), {}, 0, "").tracking_error(part)
-                                for e, ep in rollouts.items()])
+        norms = np.concatenate([r.norms[part] for r in rollouts.values()])
         stat = percentile(norms, cfg.percentile)
         if not math.isfinite(stat):
             reason = f"{prefix}_{part}: every cycle has a non-finite command or measurement"
@@ -174,7 +204,7 @@ def _group(book: FactBook, prefix: str, ref: str, rollouts: dict[str, list[Trace
         tau = cfg.tau_track_upper if part == "upper" else cfg.tau_track_lower
         stats[part] = stat
         unit = "rad" if part == "upper" else "mixed"  # the lower norm mixes rad, m and m/s
-        errors = np.concatenate([channel_errors(ep, part) for ep in rollouts.values()])
+        errors = np.concatenate([r.errors[part] for r in rollouts.values()])
         by_channel = [percentile(errors[:, k], cfg.percentile) for k in range(len(names))]
         worst = max((k for k, v in enumerate(by_channel) if math.isfinite(v)),
                     key=lambda k: by_channel[k])
@@ -183,14 +213,15 @@ def _group(book: FactBook, prefix: str, ref: str, rollouts: dict[str, list[Trace
                   book.add(f"{prefix}_worst_channel_{part}", names[worst], ref),
                   book.add(f"{prefix}_worst_channel_error_{part}", by_channel[worst], ref,
                            _unit(part, names[worst]))]
-    moving, judged = _velocity_share(steps)
+    moving = sum(r.moving for r in rollouts.values())
+    judged = sum(r.judged for r in rollouts.values())
     if judged:
         facts.append(book.add(f"{prefix}_velocity_command_share", moving / judged, ref))
     else:
         reason = f"{prefix}: no cycle has a finite velocity command"
         facts.append(book.add(f"{prefix}_velocity_command_not_judged", reason, ref))
         reasons.append(reason)
-    lengths = [_path_length(ep) for ep in rollouts.values()]
+    lengths = [r.path for r in rollouts.values()]
     facts.append(book.add(f"{prefix}_path_length_mean", sum(lengths) / len(lengths), ref, "m"))
     return facts, stats, reasons
 

@@ -21,11 +21,11 @@ carry, or a split with no row in the window, is `not_judged` with the reason.
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import NamedTuple
 
 import numpy as np
-from flywheel.contracts.training import TrainingMetric
 from flywheel.eval.agentqa.facts import FactBook
 from flywheel.eval.agentqa.tools.base import JobMetrics, Row, ToolResult, not_judged
 from flywheel.eval.diagnosis.system.reader import percentile
@@ -41,14 +41,30 @@ class Window:
     hi: int
 
 
+class _Row(NamedTuple):
+    """What the facts use of one `TrainingMetric` row (the log has per-dim lists too)."""
+
+    step: int
+    split: str
+    loss: float
+    loss_by_group: Mapping[str, float]
+    grad_norm_vlm: float | None
+    grad_norm_action: float | None
+
+
+def _rows(job: JobMetrics) -> list[_Row]:
+    """The job's rows reduced while they are read, in file order."""
+    return [_Row(r.step, r.split, float(r.loss), r.loss_by_group, r.grad_norm_vlm,
+                 r.grad_norm_action) for r in job.iter_rows()]
+
+
 def logged_steps(job: JobMetrics) -> list[int]:
-    return sorted({r.step for r in job.rows})
+    return sorted({r.step for r in job.iter_rows()})
 
 
-def window_of(job: JobMetrics, which: str | int) -> Window | None:
-    """The window `which` names in `job`; None when `val` has no step to end it."""
-    steps = logged_steps(job)
-    val = sorted({r.step for r in job.rows if r.split == "val"})
+def _window(rows: Sequence[_Row], which: str | int) -> Window | None:
+    steps = sorted({r.step for r in rows})
+    val = sorted({r.step for r in rows if r.split == "val"})
     if which == "all":
         return Window("all", steps[0] - 1, steps[-1])
     anchor = steps[-1] if which == "last" else int(which)
@@ -58,8 +74,9 @@ def window_of(job: JobMetrics, which: str | int) -> Window | None:
     return Window(label, lo, hi)
 
 
-def _loss(row: TrainingMetric) -> float:
-    return float(row.loss)
+def window_of(job: JobMetrics, which: str | int) -> Window | None:
+    """The window `which` names in `job`; None when `val` has no step to end it."""
+    return _window(_rows(job), which)
 
 
 def _gap(steps: Sequence[int]) -> float | None:
@@ -69,12 +86,13 @@ def _gap(steps: Sequence[int]) -> float | None:
 
 def train_window(book: FactBook, job: JobMetrics, which: str | int) -> ToolResult:
     """Facts and a one-row table of `job` over the window `which`."""
-    window = window_of(job, which)
+    log = _rows(job)  # one read of the job's file
+    window = _window(log, which)
     ref = job.ref
-    if window is None or not job.rows:
+    if window is None or not log:
         return not_judged(book, TOOL, f"job {job.job}: no logged row", ref, job.job)
     prefix = f"train_{job.job}_{window.label}"
-    rows = [r for r in job.rows if window.lo < r.step <= window.hi]
+    rows = [r for r in log if window.lo < r.step <= window.hi]
     train = [r for r in rows if r.split == "train"]
     val = [r for r in rows if r.split == "val"]
     facts = [book.add(f"{prefix}_first_step", min(r.step for r in rows), ref, "steps"),
@@ -87,7 +105,7 @@ def train_window(book: FactBook, job: JobMetrics, which: str | int) -> ToolResul
         facts.append(book.add(f"{prefix}_{name}_not_judged", reason, ref))
         reasons.append(reason)
 
-    losses = np.array([_loss(r) for r in train], dtype=np.float64)
+    losses = np.array([r.loss for r in train], dtype=np.float64)
     if losses.size == 0:
         skip("train_loss", "no train row in the window")
     else:
@@ -111,7 +129,7 @@ def train_window(book: FactBook, job: JobMetrics, which: str | int) -> ToolResul
                 continue
             facts += [book.add(f"{prefix}_{name}_median", percentile(norms, 50.0), ref),
                       book.add(f"{prefix}_{name}_p99", percentile(norms, 99.0), ref)]
-    val_losses = [_loss(r) for r in val]
+    val_losses = [r.loss for r in val]
     facts.append(book.add(f"{prefix}_val_rows", len(val), ref, "rows"))
     if val_losses:
         facts += [book.add(f"{prefix}_val_loss_first", val_losses[0], ref),
@@ -119,7 +137,7 @@ def train_window(book: FactBook, job: JobMetrics, which: str | int) -> ToolResul
     else:
         skip("val_loss", "no val row in the window")
     in_window = _gap(sorted({r.step for r in val}))
-    whole = _gap(sorted({r.step for r in job.rows if r.split == "val"}))
+    whole = _gap(sorted({r.step for r in log if r.split == "val"}))
     if in_window is not None:
         facts.append(book.add(f"{prefix}_val_gap_median", in_window, ref, "steps"))
     elif whole is not None:
