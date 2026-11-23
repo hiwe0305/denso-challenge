@@ -380,5 +380,5 @@ Cách đọc:
 - **D1 bằng 0 là do bảng luật, chưa nói gì về model.** Cả 8 cụm lớn nhất chỉ có một giả thuyết (`label_signal_missing`), nên model không có gì để xếp lại. Nó viết được câu giải thích đúng luật (không số, có trích fact), nhưng bộ chấm không cho điểm câu chữ.
 - Muốn D1 khác 0 phải có nhiều giả thuyết cạnh tranh trong một cụm: sáu luật còn thiếu (bước 3 của thứ tự việc) và tín hiệu tư thế khay (K1).
 - Token và tiền là số cổng báo, chưa xác minh. Một ca, một lần chạy: chưa đo độ ổn định (E4).
-- **RAM 5,8 GB là lỗi cần sửa.** B1 nạp mọi file của gói (240 trace, khoảng 1,5 GB, và bốn log train 71 MB) thành bản ghi pydantic và giữ suốt lần chạy.
+- **RAM 5,8 GB là lỗi, đã sửa ở nhiệm vụ 4.9.** Trước đó B1 nạp mọi file của gói (240 trace, khoảng 1,5 GB, và bốn log train 71 MB) thành bản ghi pydantic và giữ suốt lần chạy. Sau khi sửa: đỉnh 365 MB, 65 giây, mọi file đầu ra giống hệt lần chạy cũ (so từng byte; `assembly.json` chỉ khác `run_id`).
 

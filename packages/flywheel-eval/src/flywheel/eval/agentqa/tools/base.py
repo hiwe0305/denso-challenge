@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -89,11 +89,24 @@ class RunScores:
 
 @dataclass(frozen=True)
 class TraceFile:
-    """One `trace` entry of the pack: its ref, the sha256 the pack records, its cycles."""
+    """One `trace` entry of the pack: its ref, the sha256 the pack records, its cycles.
+
+    The cycles are either `held` or read by `load` each time they are asked for (step B2:
+    a real trace is too large to keep, so a tool reads one file at a time).
+    """
 
     ref: str
     sha256: str
-    steps: tuple[TraceStep, ...]
+    held: tuple[TraceStep, ...] = ()
+    load: Callable[[], Iterable[TraceStep]] | None = field(default=None, compare=False)
+
+    def read(self) -> list[TraceStep]:
+        """The cycles of the file, in file order; nothing keeps them but the caller."""
+        return list(self.held if self.load is None else self.load())
+
+    @property
+    def steps(self) -> tuple[TraceStep, ...]:
+        return tuple(self.read())
 
 
 @dataclass(frozen=True)
@@ -106,11 +119,23 @@ class RunTrace:
 
 @dataclass(frozen=True)
 class JobMetrics:
-    """The training log of one job (`TrainingMetric.job_id`), in file order."""
+    """The training log of one job (`TrainingMetric.job_id`), in file order.
+
+    The rows are either `held` or read by `load` each time they are asked for (a real log
+    is 60k rows): a tool iterates `iter_rows` and keeps only what it reduces them to.
+    """
 
     job: str
     ref: str
-    rows: tuple[TrainingMetric, ...]
+    held: tuple[TrainingMetric, ...] = ()
+    load: Callable[[], Iterable[TrainingMetric]] | None = field(default=None, compare=False)
+
+    def iter_rows(self) -> Iterator[TrainingMetric]:
+        return iter(self.held if self.load is None else self.load())
+
+    @property
+    def rows(self) -> tuple[TrainingMetric, ...]:
+        return tuple(self.iter_rows())
 
 
 @dataclass(frozen=True)
