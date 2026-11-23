@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
+import json
+from dataclasses import asdict, replace
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,7 @@ from flywheel_simple.tray.generate import (
     read_log,
     shard_dir,
     split_attempts,
+    summarize,
 )
 from flywheel_simple.tray.planner import PlannerConfig
 
@@ -66,6 +68,33 @@ def test_log_is_append_only(tmp_path: Path) -> None:
     append_attempt(log, replace(ROW, seed=1))
     assert log.read_bytes().startswith(before)
     assert [r["seed"] for r in read_log(log)] == [0, 1]
+
+
+def test_a_row_keeps_phase_times_and_carry_offset(tmp_path: Path) -> None:
+    log = tmp_path / "gen_log.jsonl"
+    phases = [("APPROACH_A", 0.0), ("CARRY", 12.5), ("LOWER", 21.04)]
+    append_attempt(log, replace(ROW, phases=phases, carry_offset=(0.03, -0.02)))
+    [row] = read_log(log)
+    assert row["phases"] == [["APPROACH_A", 0.0], ["CARRY", 12.5], ["LOWER", 21.04]]
+    assert row["carry_offset"] == [0.03, -0.02]
+
+
+def test_a_row_without_them_logs_the_defaults(tmp_path: Path) -> None:
+    log = tmp_path / "gen_log.jsonl"
+    append_attempt(log, ROW)
+    [row] = read_log(log)
+    assert row["phases"] == [] and row["carry_offset"] == [0.0, 0.0]
+
+
+def test_rows_before_da46_are_still_read_and_counted(tmp_path: Path) -> None:
+    old = {k: v for k, v in asdict(ROW).items() if k not in ("phases", "carry_offset")}
+    log = shard_dir(tmp_path, 0) / "gen_log.jsonl"
+    log.parent.mkdir(parents=True)
+    log.write_text(json.dumps(old) + "\n")
+    append_attempt(log, replace(ROW, seed=1, phases=[("APPROACH_A", 0.0)]))
+    assert logged_seeds(tmp_path) == {0, 1}
+    counts = summarize(tmp_path)
+    assert (counts["attempts"], counts["successes"], counts["qa_pass"]) == (2, 2, 2)
 
 
 def test_logged_seeds_cover_every_shard(tmp_path: Path) -> None:

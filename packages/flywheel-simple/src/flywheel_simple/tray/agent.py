@@ -44,6 +44,7 @@ class EpisodeResult:
     steps: int = 0
     sim_s: float = 0.0
     wall_s: float = 0.0
+    carry_offset: tuple[float, float] = (0.0, 0.0)  # carry goal shift (m): ahead, sideways
 
 
 class TrayAgent:
