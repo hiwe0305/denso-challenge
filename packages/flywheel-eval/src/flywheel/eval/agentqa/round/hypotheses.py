@@ -47,6 +47,7 @@ RULES_DIR = Path("configs") / "eval" / "agentqa" / "rules"  # from the repo root
 CHECKS_FILE = Path("configs") / "eval" / "agentqa" / "checks.yaml"
 GROUPS: tuple[str, ...] = get_args(Group)
 NONE_RULE = "none"
+NO_RULE_TITLE = "No rule of the agent explains this cluster"
 CLUSTER_TOOL = "failure_clusters"
 _TEMPLATE_KEYS = {"run": "r", "step": "s", "label": "l", "level": "0"}
 
@@ -175,6 +176,11 @@ def load_rules(rules_dir: Path | None = None) -> list[Rule]:
                 raise RulesRefused(f"{path}: rule id {rule.id!r} is used twice")
             rules.append(rule)
     return rules
+
+
+def rule_title(rule_id: str, titles: dict[str, str]) -> str:
+    """The title a hypothesis of `rule_id` is shown with (`titles`: rule id -> title)."""
+    return NO_RULE_TITLE if rule_id == NONE_RULE else titles.get(rule_id, rule_id)
 
 
 def load_checks(rules: Sequence[Rule], checks_path: Path | None = None) -> list[Check]:

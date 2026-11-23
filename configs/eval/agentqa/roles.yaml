@@ -1,0 +1,8 @@
+# Limits of the model roles of the round pipeline (DA-43 task 5.2; architecture 20/11 B4).
+#
+# Part of the agent hash: changing a value is a new agent version. The prompt of a role
+# is prompts/<role>.md.
+
+rank:
+  max_clusters: 8     # clusters ranked per round, largest first; the rest stay on the code floor
+  max_facts: 60       # facts offered per cluster: cited ones first, then by fact id

@@ -8,8 +8,9 @@
     fw agentqa html --reports <reports.jsonl> --out <dir> [--reviews <dir>]
     fw agentqa estimates --path <estimates.jsonl> [--measure <ref>=<value> --source <ref>]
     fw agentqa pack --round <round.yaml> [--store <dir>]   freeze a round into pack.json (DA-43)
-    fw agentqa round --pack <pack.json> --out <dir> --no-model [--from <step>]
-        [--plan <yaml>] [--store <dir>]                    run a round into index.html (DA-43)
+    fw agentqa round --pack <pack.json> --out <dir> [--no-model] [--from <step>]
+        [--plan <yaml>] [--store <dir>] [--gateway-config <dir>]
+                                                           run a round into index.html (DA-43)
 
 Errors exit 2 with one line, as `fw eval` does. A run whose model part broke a
 report still writes everything and exits 1.
@@ -38,7 +39,7 @@ from flywheel.eval.agentqa.review import make_review, write_review
 from flywheel.eval.agentqa.round.hypotheses import RulesRefused
 from flywheel.eval.agentqa.round.measure import PlanRefused
 from flywheel.eval.agentqa.round.pack import PackRefused, build_pack, write_pack
-from flywheel.eval.agentqa.round.pipeline import NO_MODEL_ONLY, RunRefused, failure, run_round
+from flywheel.eval.agentqa.round.pipeline import RunRefused, failure, run_round
 from flywheel.eval.agentqa.round.render import INDEX_FILE
 from flywheel.eval.agentqa.run import read_dropped
 from flywheel.eval.agentqa.run import run as run_agentqa
@@ -90,15 +91,19 @@ def round_command(
     out: Path = typer.Option(..., "--out", help="New directory for this run."),
     from_step: str | None = typer.Option(None, "--from", help="Redo from this step."),
     plan: Path | None = typer.Option(None, "--plan", help="Plan yaml instead of the task's."),
-    no_model: bool = typer.Option(False, "--no-model", help="Code floor only (needed now)."),
+    no_model: bool = typer.Option(
+        False, "--no-model", help="Code floor only: no judge, no verify. With --from, the "
+        "run directory's recorded mode is used when this is not given."),
     store: Path | None = typer.Option(None, "--store"),
+    gateway_config: Path | None = typer.Option(
+        None, "--gateway-config", help="Directory with routing.yaml and hosted.yaml."),
 ) -> None:
-    """Run a round: pack, admit, measure, hypothesize, assemble, render."""
-    if not no_model:
-        _fail(NO_MODEL_ONLY)
+    """Run a round: pack, admit, measure, hypothesize, judge, verify, assemble, render."""
+    mode: bool | None = True if no_model else (None if from_step is not None else False)
     try:
         record = run_round(pack, out, plan_path=plan, from_step=from_step,
-                           command="fw agentqa round", no_model=True, store=store)
+                           command="fw agentqa round", no_model=mode, store=store,
+                           gateway_root=gateway_config)
     except (PackRefused, PlanRefused, RulesRefused, RunRefused, FileExistsError) as error:
         _fail(str(error))
         return

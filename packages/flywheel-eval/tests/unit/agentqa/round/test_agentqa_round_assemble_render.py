@@ -12,7 +12,7 @@ from flywheel.contracts.entities import LedgerEntry
 from flywheel.eval.agentqa.cli import app
 from flywheel.eval.agentqa.round.assemble import ASSEMBLY_FILE
 from flywheel.eval.agentqa.round.hypotheses import RULES_DIR, RulesRefused, load_rules
-from flywheel.eval.agentqa.round.pipeline import STEPS, RunRefused, run_round
+from flywheel.eval.agentqa.round.pipeline import NO_MODEL_STEPS, run_round
 from flywheel.eval.agentqa.round.records import Assembly, FactRecord
 from flywheel.eval.agentqa.round.version import CONFIG_ROOT, agent_hash, agent_version
 from helpers_round import (  # noqa: F401  (isolated_store is an autouse fixture)
@@ -58,7 +58,8 @@ def ledger_entries(store: Path) -> list[LedgerEntry]:
 
 def test_a_no_model_round_runs_six_steps_and_is_degraded(round_out: Path) -> None:
     record = json.loads((round_out / "run.json").read_text())
-    assert [s["name"] for s in record["steps"]] == list(STEPS) and len(STEPS) == 6
+    assert [s["name"] for s in record["steps"]] == list(NO_MODEL_STEPS)
+    assert len(NO_MODEL_STEPS) == 6 and record["no_model"] is True
     assert record["status"] == "degraded"
     assert record["agent_version"] == agent_version() and len(record["agent_hash"]) == 64
     a = assembly_of(round_out)
@@ -175,7 +176,7 @@ def test_from_render_rewrites_only_the_page(round_out: Path, store: Path) -> Non
     (round_out / "index.html").write_text("stale")
     record = run_round(round_out.parent / "round" / "pack.json", round_out,
                        from_step="render", store=store)
-    assert [s.name for s in record.steps] == list(STEPS)
+    assert [s.name for s in record.steps] == list(NO_MODEL_STEPS)
     assert "stale" not in (round_out / "index.html").read_text()
     assert {p: p.read_bytes() for p in kept} == kept
 
@@ -185,14 +186,6 @@ def test_from_assemble_works_too(round_out: Path, store: Path) -> None:
     run_round(round_out.parent / "round" / "pack.json", round_out, from_step="assemble",
               store=store)
     assert (round_out / ASSEMBLY_FILE).read_bytes() == before
-
-
-def test_the_model_path_is_refused_before_anything_happens(
-        make_pack: PackMaker, tmp_path: Path, store: Path) -> None:
-    out = tmp_path / "never"
-    with pytest.raises(RunRefused, match="task 5"):
-        run_round(make_pack(), out, no_model=False, store=store)
-    assert not out.exists() and not store.exists()
 
 
 def test_the_agent_hash_follows_the_rule_files(tmp_path: Path) -> None:
@@ -226,6 +219,5 @@ def test_cli_success_and_refusals(make_pack: PackMaker, tmp_path: Path, store: P
     assert ok.exit_code == 0, ok.output
     assert "degraded" in ok.output and "64 clusters" in ok.output
     assert str(out / "index.html") in ok.output
-    assert runner.invoke(app, [*base, "--out", str(tmp_path / "x")]).exit_code == 2
     again = runner.invoke(app, [*base, "--out", str(out), "--no-model"])
     assert again.exit_code == 2 and "exists" in again.output

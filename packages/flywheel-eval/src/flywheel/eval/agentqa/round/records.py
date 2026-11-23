@@ -115,6 +115,16 @@ class StepRecord(Record):
     outputs: dict[str, str] = Field(default_factory=dict, description="file name -> sha256")
 
 
+class RunTotals(Record):
+    """Model use of a run directory, from the gateway after step B4 (replays cost nothing)."""
+
+    calls: int = Field(default=0, ge=0, description="Provider calls, retries included.")
+    replayed: int = Field(default=0, ge=0, description="Requests answered from the file.")
+    tokens_in: int = Field(default=0, ge=0)
+    tokens_out: int = Field(default=0, ge=0)
+    usd: float = Field(default=0.0, ge=0)
+
+
 class RunRecord(Record):
     """`run.json`: what happened in one run directory, rewritten after every step."""
 
@@ -131,6 +141,10 @@ class RunRecord(Record):
     problems: list[str] = Field(default_factory=list)
     agent_version: str = ""
     agent_hash: str = ""
+    no_model: bool = Field(
+        default=True, description="The code floor only (no judge, no verify); old files: true.")
+    totals: RunTotals = Field(default_factory=RunTotals)
+    model_hosts: list[str] = Field(default_factory=list)
 
 
 class ModelRequest(Record):
@@ -239,6 +253,49 @@ class HypothesisView(Record):
     explanation: str = ""
 
 
+class OfferedFact(Record):
+    unit: str = ""
+    provenance: Literal["code", "vision", "history"]
+
+
+class Offered(Record):
+    """What one rank call offered the model: everything B5 needs to check its reply."""
+
+    cluster_id: str = Field(min_length=1)
+    hypotheses: list[str] = Field(description="Hypothesis ids in code order.")
+    interventions: dict[str, list[str]] = Field(description="hypothesis id -> its interventions")
+    checks: list[str] = Field(default_factory=list, description="Check ids, cheapest first.")
+    facts: dict[str, OfferedFact] = Field(default_factory=dict)
+    blocked_data_spend: bool
+
+
+class JudgedItem(Record):
+    """One line of `judged.jsonl` (step B4): one unit of a role and the calls made for it."""
+
+    item_id: str = Field(min_length=1)
+    role: str = Field(min_length=1)
+    unit: str = Field(min_length=1)
+    call_ids: list[str] = Field(default_factory=list, description="In attempt order.")
+    offered: Offered
+    skipped_reason: str = Field(default="", description='"" or "over_cap".')
+
+
+Verdict = Literal["accepted", "repaired", "rejected", "not_ranked"]
+
+
+class VerdictRecord(Record):
+    """One line of `verdicts.jsonl` (step B5): whether a model item stands."""
+
+    item_id: str = Field(min_length=1)
+    role: str = Field(min_length=1)
+    unit: str = Field(min_length=1)
+    verdict: Verdict
+    failed_rules: list[str] = Field(default_factory=list, description="Of the last reply checked.")
+    call_ids: list[str] = Field(default_factory=list)
+    accepted_call_id: str = ""
+    reason: str = ""
+
+
 class ClusterView(Record):
     cluster: ClusterRef
     hypotheses: list[HypothesisView]
@@ -247,6 +304,13 @@ class ClusterView(Record):
     intervention: str | None = None
     intervention_source: Literal["model", "code"] = "code"
     costed: bool = False
+    verdict: str = Field(default="", description='The B5 verdict; "" in a no-model run.')
+    ranked_by: str = Field(default="", description='The model id; "" on the code floor.')
+    check_text: str = ""
+    intervention_text: str = ""
+    intervention_for: str = ""
+    model_cites: list[str] = Field(default_factory=list)
+    floor_reason: str = ""
 
 
 class NotJudged(Record):

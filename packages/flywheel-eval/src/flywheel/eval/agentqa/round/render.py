@@ -2,6 +2,8 @@
 
 One self-contained file, standard library only, no script and no external resource.
 Nothing is computed here beyond formatting: every number is a fact or a table cell.
+A model sentence carries `{F#}` placeholders; each is replaced by that fact's value and
+unit from `facts.jsonl`, and a placeholder no fact fills stops the page (`ValueError`).
 Every string that comes from an artifact or a config is data and goes through
 `html.escape` before it enters the page.
 """
@@ -9,6 +11,7 @@ Every string that comes from an artifact or a config is data and goes through
 from __future__ import annotations
 
 import json
+import re
 from html import escape
 from pathlib import Path
 
@@ -17,6 +20,7 @@ from flywheel.eval.agentqa.round.measure import FACTS_FILE, TABLES_DIR
 from flywheel.eval.agentqa.round.records import Assembly, ClusterView, FactRecord
 
 INDEX_FILE = "index.html"
+_PLACEHOLDER = re.compile(r"\{(F[0-9]+)\}")
 MAX_ROWS = 200
 STYLE = """
 body{font:15px/1.45 system-ui,sans-serif;margin:0 auto;max-width:72rem;padding:1rem;
@@ -38,6 +42,17 @@ th{background:#161b22}th,td,details.cluster,h2{border-color:#30363d}
 
 def _e(value: object) -> str:
     return escape(str(value))
+
+
+def fill(text: str, facts: dict[str, FactRecord]) -> str:
+    """`text` with every `{F#}` replaced by the fact's value and unit; escaped for HTML."""
+    def one(match: re.Match[str]) -> str:
+        fact = facts.get(match.group(1))
+        if fact is None:
+            raise ValueError(f"placeholder {match.group(0)} names no fact of facts.jsonl")
+        return f"{fact.value} {fact.unit}".strip()
+
+    return _e(_PLACEHOLDER.sub(one, text))
 
 
 def _cell(value: object) -> str:
@@ -71,6 +86,8 @@ def _top(a: Assembly) -> str:
         return "<h2>Top of the round</h2><p>No failure cluster to explain.</p>"
     first = head.hypotheses[0]
     where = f"{head.cluster.cluster_id}, size {head.cluster.size}"
+    if head.verdict:
+        where += f", ranked by {f'model {head.ranked_by}' if head.ranked_by else 'code'}"
     check = (f"{head.check.check_id} (cost {head.check.cost_key})" if head.check
              else "no check in the catalog")
     return (
@@ -96,12 +113,18 @@ def _cluster(c: ClusterView, facts: dict[str, FactRecord]) -> str:
              f"size {_e(c.cluster.size)}"
              f"{' <span class=blocked>data spend blocked</span>' if c.blocked_data_spend else ''}"
              "</summary>"]
+    if c.verdict:  # a model run: say who ranked this cluster
+        who = f"model {c.ranked_by}" if c.ranked_by else "code"
+        parts.append(f"<p>Ranked by: <span class='badge {'model' if c.ranked_by else 'code'}'>"
+                     f"{_e(who)}</span> ({_e(c.verdict)})</p>")
+    if c.floor_reason:
+        parts.append(f"<p class=muted>{_e(c.floor_reason)}</p>")
     for h in c.hypotheses:
         parts.append(
             f"<h4>{_e(h.rank)}. {_e(h.title)} <span class='badge {_e(h.source)}'>"
             f"{_e(h.source)}</span></h4><p>{_e(h.diagnosis)}: {_e(h.note)}</p>")
         if h.explanation:
-            parts.append(f"<p>{_e(h.explanation)}</p>")
+            parts.append(f"<p>{fill(h.explanation, facts)}</p>")
         rows: list[list[object]] = []
         for side, ids in (("support", h.support), ("contra", h.contra)):
             for fid in ids:
@@ -115,10 +138,15 @@ def _cluster(c: ClusterView, facts: dict[str, FactRecord]) -> str:
     top = c.hypotheses[0] if c.hypotheses else None
     if c.check is not None and top is not None:
         parts.append(f"<p>Check: {_e(c.check.check_id)} (cost {_e(c.check.cost_key)})</p>")
+    if c.check_text:
+        parts.append(f"<p>{fill(c.check_text, facts)}</p>")
     if c.intervention is not None:
-        parts.append(f"<p>Intervention: {_e(c.intervention)} "
+        target = f" for {_e(c.intervention_for)}" if c.intervention_for else ""
+        parts.append(f"<p>Intervention: {_e(c.intervention)}{target} "
                      f"<span class='badge {_e(c.intervention_source)}'>"
                      f"{_e(c.intervention_source)}</span></p>")
+    if c.intervention_text:
+        parts.append(f"<p>{fill(c.intervention_text, facts)}</p>")
     parts.append("</details>")
     return "".join(parts)
 

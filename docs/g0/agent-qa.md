@@ -329,3 +329,32 @@ uv run python -m flywheel.eval.agentqa.casebench --answer fwdata/agentqa/answers
     --run <thư mục chạy> --out <report.json>
 ```
 
+## 9. Lớp model của đường ống vòng (DA-43 5.4, 5.6): lần chạy thật đầu, 23/11/2026
+
+Từ 23/11/2026 `fw agentqa round` có thêm hai bước giữa `hypothesize` và `assemble`: `judge` (gọi model, vai `rank`) và `verify` (kiểm câu trả lời, không gọi model). Với `--no-model` hai bước này không chạy và kết quả như cũ.
+
+| Việc | Cách làm |
+|---|---|
+| Đơn vị một lời gọi | Một cụm lỗi; tối đa 8 cụm lớn nhất (`roles.yaml`). Cụm còn lại ở sàn code, phán quyết `not_ranked` |
+| Model thấy gì | Một khối JSON: cụm, giả thuyết ứng viên, phép kiểm, tối đa 60 fact. Prompt ở `prompts/rank.md` |
+| Model trả gì | Thứ tự id giả thuyết, một phép kiểm, một can thiệp, mỗi câu có trích fact. Không viết số |
+| Kiểm | 10 luật trong `round/reply_rules.py`. Trượt thì gửi lại một lần kèm danh sách lỗi |
+| Phán quyết | `accepted`, `repaired`, `rejected` (về sàn code, ghi lý do), `not_ranked` |
+| Bật model thuê | Không sửa config trong repo. Chép `routing.yaml` và `hosted.yaml` ra thư mục riêng, bật `enabled`, trỏ `rank.public` sang hồ sơ hosted, rồi chạy với `--gateway-config <thư mục>` |
+
+**Lần chạy thật (sơ bộ).** Gói mẫu của bộ test (240 `Score` của bốn run 60k, một bản ghi `Source` lớp `public`), model `claude-opus-5-5` qua cổng bán lại ckey.vn (`api.xah.io`), laptop:
+
+| Số đo | Giá trị |
+|---|---|
+| Lời gọi model | 8, không lời nào phải gửi lại |
+| Phán quyết | 8 `accepted`, 0 `repaired`, 0 `rejected`, 56 `not_ranked` |
+| Thời gian bước `judge` | 81 giây |
+| Token cổng báo về | 12 435 vào, 2 607 ra |
+
+Giới hạn của lần chạy này:
+
+- Gói mẫu chỉ có `Score`, nên cả 8 cụm chỉ có một giả thuyết (`label_signal_missing`). Model không có gì để xếp hạng; lần chạy chỉ chứng minh đường ống và các rào chạy được với model thật, chưa đo chất lượng.
+- Cổng là bên bán lại: không xác minh được model đứng sau id `claude-opus-5-5`. Trong một lần gọi thử, cổng báo 1 token vào cho prompt khoảng 40 token; cổng model nay dùng ước lượng của chính nó khi số báo về thấp hơn một phần tư ước lượng.
+- Gói vòng thật `stage1-60k` **chưa chạy được với model thuê**: B1 ghi 248 trên 248 mục chưa có bản ghi nguồn xác nhận lớp `public`, nên cổng từ chối (điều chặn cứng 2 và 3). Chờ Hiếu quyết cách xác nhận.
+- Chưa có số D1 (phần model thêm) trên ca lịch sử nào.
+

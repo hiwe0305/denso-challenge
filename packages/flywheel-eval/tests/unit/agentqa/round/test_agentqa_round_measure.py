@@ -10,7 +10,7 @@ import pytest
 from flywheel.eval.agentqa.round.admit import Admitted
 from flywheel.eval.agentqa.round.measure import PlanRefused, _context
 from flywheel.eval.agentqa.round.pack import sha256_of
-from flywheel.eval.agentqa.round.pipeline import STEPS, RunRefused, run_round
+from flywheel.eval.agentqa.round.pipeline import NO_MODEL_STEPS, RunRefused, run_round
 from flywheel.eval.agentqa.round.records import Admission, Pack, PackEntry, RunRecord
 from helpers_round import (  # noqa: F401  (isolated_store is an autouse fixture)
     NOW,
@@ -32,7 +32,7 @@ def test_a_round_writes_every_file_and_the_published_numbers(
         make_pack: PackMaker, tmp_path: Path) -> None:
     out = tmp_path / "out"
     record = run_round(make_pack(), out, command="test", now=NOW)
-    assert record.status == "degraded" and [s.name for s in record.steps] == list(STEPS)
+    assert record.status == "degraded" and [s.name for s in record.steps] == list(NO_MODEL_STEPS)
     # the fixture has no trace and no metrics: admit and measure say so; assemble: no model
     assert [(s.name, s.status) for s in record.steps] == [
         ("pack", "ok"), ("admit", "degraded"), ("measure", "degraded"),

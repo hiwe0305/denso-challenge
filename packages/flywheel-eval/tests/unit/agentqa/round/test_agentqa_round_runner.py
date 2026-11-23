@@ -92,7 +92,8 @@ def test_the_agent_hash_covers_the_plan_used(make_pack: PackMaker, tmp_path: Pat
     assert (b.plan_path, b.plan_sha256) == (plan.as_posix(), sha256_of(plan))
 
 
-@pytest.mark.parametrize("name", ["routing.yaml", "hosted.yaml"])
+@pytest.mark.parametrize("name", ["routing.yaml", "hosted.yaml", "roles.yaml",
+                                  "prompts/rank.md"])
 def test_the_agent_hash_covers_the_gateway_config(tmp_path: Path, name: str) -> None:
     import shutil
 
@@ -102,6 +103,21 @@ def test_the_agent_hash_covers_the_gateway_config(tmp_path: Path, name: str) -> 
     first = agent_hash("tray", plan, root)
     (root / name).write_text((root / name).read_text() + "\n# touched\n")
     assert agent_hash("tray", plan, root) != first
+
+
+def test_the_agent_hash_covers_the_gateway_root_used(tmp_path: Path) -> None:
+    import shutil
+
+    plan = CONFIG_ROOT / "plans" / "tray.yaml"
+    default = agent_hash("tray", plan)
+    assert agent_hash("tray", plan, gateway_root=CONFIG_ROOT) == default
+    other = tmp_path / "gw"
+    other.mkdir()
+    for name in ("routing.yaml", "hosted.yaml"):
+        shutil.copyfile(CONFIG_ROOT / name, other / name)
+    copied = agent_hash("tray", plan, gateway_root=other)
+    (other / "routing.yaml").write_text((other / "routing.yaml").read_text() + "\n# touched\n")
+    assert agent_hash("tray", plan, gateway_root=other) != copied
 
 
 @pytest.mark.parametrize("name", ["agentqa/agent.yaml", "diagnosis/system.yaml"])
