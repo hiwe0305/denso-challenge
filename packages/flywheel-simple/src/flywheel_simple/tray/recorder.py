@@ -41,7 +41,7 @@ from numpy.typing import NDArray
 
 from flywheel_simple.tray.jig import JIG_REVISION
 from flywheel_simple.tray.mjcf import TARGET_ZONE_REVISION
-from flywheel_simple.tray.planner import PLANNER_VERSION, PlannerConfig
+from flywheel_simple.tray.planner import PLANNER_VERSION, CarryJitter, PlannerConfig
 from flywheel_simple.tray.predicates import STEP_NAMES, StepReport
 from flywheel_simple.tray.randomize import split_of
 
@@ -194,10 +194,12 @@ class FlywheelMeta:
         object.__setattr__(self, "split", split)
 
 
-def planner_version(cfg: PlannerConfig) -> str:
-    """PLANNER_VERSION plus a hash of every config value, so tuned configs stay apart."""
+def planner_version(cfg: PlannerConfig, jitter: CarryJitter | None = None) -> str:
+    """PLANNER_VERSION plus a hash of every config value, so tuned configs stay apart, then
+    the carry jitter's tag (DA-46; empty without jitter, so plain versions are unchanged)."""
     values = json.dumps(asdict(cfg), sort_keys=True).encode()
-    return f"{PLANNER_VERSION}+cfg.{hashlib.sha256(values).hexdigest()[:8]}"
+    tag = jitter.tag() if jitter is not None else ""
+    return f"{PLANNER_VERSION}+cfg.{hashlib.sha256(values).hexdigest()[:8]}{tag}"
 
 
 def visuals_revision(manifest: Path | None, jig: bool = False) -> str:

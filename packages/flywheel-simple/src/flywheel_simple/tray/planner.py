@@ -224,6 +224,47 @@ class PlannerConfig:
         )
 
 
+# First entropy word of the carry-jitter draw: keeps it apart from other per-seed draws.
+CARRY_JITTER_STREAM = 46
+
+
+@dataclass(frozen=True)
+class CarryJitter:
+    """Half-ranges (m) of a uniform shift of the CARRY goal, ahead along the carry heading
+    (toward table B) and to its left (DA-46).
+
+    The robot then arrives off the target and ARRIVE_B corrects it: the recoveries the
+    training data lacks. Not a PlannerConfig field, so the config hash and the yaml stay
+    as they are; recorder.planner_version appends `tag()` instead.
+    """
+
+    ahead: float = 0.0
+    side: float = 0.0
+
+    def __post_init__(self) -> None:
+        if self.ahead < 0 or self.side < 0:
+            raise ValueError(f"carry jitter half-ranges must be >= 0, got {self}")
+
+    @property
+    def enabled(self) -> bool:
+        return self.ahead > 0 or self.side > 0
+
+    def offset(self, seed: int) -> tuple[float, float]:
+        """The episode's shift (ahead, side), from the seed alone; rounded to 0.1 mm so the
+        logged value is the applied one. Both numbers are always drawn, so changing one
+        range leaves the other's draw as it was."""
+        if not self.enabled:
+            return (0.0, 0.0)
+        u = np.random.default_rng([CARRY_JITTER_STREAM, seed]).uniform(-1.0, 1.0, 2)
+        return (round(float(u[0]) * self.ahead, 4), round(float(u[1]) * self.side, 4))
+
+    def tag(self) -> str:
+        """Suffix of the planner version: jittered batches never mix with plain ones."""
+        if not self.enabled:
+            return ""
+        return f"+cj.a{round(self.ahead * 1000):03d}s{round(self.side * 1000):03d}"
+
+
 @dataclass(frozen=True)
 class PlannerCommand:
     phase: Phase
@@ -375,6 +416,7 @@ class TrayPlanner:
     cfg: PlannerConfig
     tray_cfg: TrayConfig
     sample: EpisodeSample
+    carry_offset: tuple[float, float] = (0.0, 0.0)  # CARRY goal shift (m): ahead, left (DA-46)
     phase: Phase = Phase.APPROACH_A
     _entered_t: float | None = None
     _entry_base: Pose2D | None = None
@@ -420,7 +462,7 @@ class TrayPlanner:
         self._edge_a = float(geo.table_a_center[0]) - self.tray_cfg.table_depth / 2
 
     def reset(self) -> None:
-        fresh = TrayPlanner(self.cfg, self.tray_cfg, self.sample)
+        fresh = TrayPlanner(self.cfg, self.tray_cfg, self.sample, self.carry_offset)
         for f in fields(self):
             setattr(self, f.name, getattr(fresh, f.name))
 
@@ -799,6 +841,9 @@ class TrayPlanner:
         goal = np.array([target.x, target.y]) - np.array(
             [ch * offset[0] - sh * offset[1], sh * offset[0] + ch * offset[1]]
         )
+        if self.carry_offset != (0.0, 0.0):  # branch: unjittered goals stay bit-identical
+            ahead, side = self.carry_offset
+            goal = goal + np.array([ch * ahead - sh * side, sh * ahead + ch * side])
         rotations = (self._wrist_rotation(0, state, base), self._wrist_rotation(1, state, base))
         return _Carry(palms, rotations, heading, goal)
 

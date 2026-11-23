@@ -25,10 +25,13 @@ import time
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from flywheel_simple.tray.randomize import SEED_RANGES
 from flywheel_simple.tray.visuals import default_manifest_path
+
+if TYPE_CHECKING:
+    from flywheel_simple.tray.planner import CarryJitter
 
 FPS = 50
 MIN_EPISODE_S = 5.0
@@ -257,6 +260,7 @@ def generate(
     workers: int = 1,
     targeted: bool = False,
     scene: str = "zone1",
+    carry_jitter: CarryJitter | None = None,
 ) -> GenSummary:
     """Run n_attempts new seeds of this shard; record, QA and log each attempt.
 
@@ -264,7 +268,9 @@ def generate(
     (targets.write_targets): shard k takes rows k, k + W, ... not yet logged, and
     `level` / `seed_start` are ignored. `scene` is "zone1" (DA-33's scene, target
     jittered at levels 1-2) or "jig" (DA-41: fixed target in a locating jig); the two
-    have different visuals revisions, so one batch never holds both.
+    have different visuals revisions, so one batch never holds both. `carry_jitter` shifts
+    each episode's CARRY goal by seed (DA-46); its tag is part of the planner version, so a
+    batch never mixes jittered and plain episodes.
     """
     if scene not in SCENES:
         raise ValueError(f"scene must be one of {SCENES}, got {scene!r}")
@@ -272,7 +278,7 @@ def generate(
     from flywheel_simple.tray.recorder import planner_version
 
     cfg = PlannerConfig.load()
-    version = planner_version(cfg)
+    version = planner_version(cfg, carry_jitter)
     check_planner_version(out, version)  # before the simulator loads
 
     from flywheel_simple.tray.recorder import visuals_revision
@@ -305,7 +311,7 @@ def generate(
 
     gpu = gpu_name()
     env = make_env(seed=jobs[0][0], level=jobs[0][1])
-    agent = TrayAgent(env, cfg)
+    agent = TrayAgent(env, cfg, carry_jitter)
     recorder = EpisodeRecorder.for_env(env, agent, raw)
     successes = recorded = qa_pass = 0
     try:

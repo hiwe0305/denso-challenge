@@ -20,7 +20,13 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from flywheel_simple.tray.geometry import Pose2D
-from flywheel_simple.tray.planner import Phase, PlannerCommand, PlannerConfig, TrayPlanner
+from flywheel_simple.tray.planner import (
+    CarryJitter,
+    Phase,
+    PlannerCommand,
+    PlannerConfig,
+    TrayPlanner,
+)
 from flywheel_simple.tray.simple_task import tray_state
 from flywheel_simple.wbc import NavIntegrator, StandWalkController
 from flywheel_simple.wbc.drive import pelvis_pose
@@ -50,9 +56,12 @@ class EpisodeResult:
 class TrayAgent:
     """PlannerCommand -> ActionCmd for one env; `reset` after each env reset."""
 
-    def __init__(self, env: Any, planner_cfg: PlannerConfig) -> None:
+    def __init__(
+        self, env: Any, planner_cfg: PlannerConfig, carry_jitter: CarryJitter | None = None
+    ) -> None:
         self.env = env
         self.planner_cfg = planner_cfg
+        self.carry_jitter = carry_jitter  # DA-46: shift each episode's CARRY goal by seed
         self.ctrl = StandWalkController(
             env.unwrapped.task.robot, max_joint_step=planner_cfg.arm_step_max
         )
@@ -60,10 +69,18 @@ class TrayAgent:
         self.planner: TrayPlanner | None = None
         self.last_command: PlannerCommand | None = None
 
-    def reset(self) -> None:
-        """New planner for the task's current episode sample; fresh WBC pipeline."""
+    def reset(self, seed: int | None = None) -> None:
+        """New planner for the task's current episode sample; fresh WBC pipeline.
+
+        With carry jitter the episode's seed picks the CARRY goal shift (DA-46).
+        """
         task = self.env.unwrapped.task
-        self.planner = TrayPlanner(self.planner_cfg, task.cfg, task.sample)
+        offset = (0.0, 0.0)
+        if self.carry_jitter is not None and self.carry_jitter.enabled:
+            if seed is None:
+                raise ValueError("carry jitter needs the episode seed: reset(seed=...)")
+            offset = self.carry_jitter.offset(seed)
+        self.planner = TrayPlanner(self.planner_cfg, task.cfg, task.sample, offset)
         self.ctrl.reset()
         self.last_command = None
 
@@ -128,7 +145,7 @@ def run_episode(
     """
     wall0 = time.perf_counter()
     env.reset(seed=seed, options={"level": level})
-    agent.reset()
+    agent.reset(seed=seed)
     obs, info, _ = stabilize(env, agent)
     agent.start()
     sim = env.unwrapped
@@ -157,6 +174,7 @@ def run_episode(
             if float(sim.mjData.time) - done_since >= SUCCESS_WINDOW_S:
                 break
     cmd = agent.last_command
+    assert agent.planner is not None
     return EpisodeResult(
         success=bool(report.success),
         failure=report.failure,
@@ -165,4 +183,5 @@ def run_episode(
         steps=steps,
         sim_s=round(float(sim.mjData.time) - t0, 2),
         wall_s=round(time.perf_counter() - wall0, 1),
+        carry_offset=agent.planner.carry_offset,
     )

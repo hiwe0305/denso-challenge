@@ -15,6 +15,10 @@ episode, and 5 of 22 started at once failed in eglMakeCurrent (EGL_NOT_INITIALIZ
         scripts/g0/tray/generate.py --out fwdata/simple/tray/gen/<run> --n 130 --level 1 \
         --seed-start 100 --workers 14
 
+With --carry-jitter-ahead/--carry-jitter-side (DA-46), e.g. `--scene jig
+--carry-jitter-ahead 0.05 --carry-jitter-side 0.05`, each episode's CARRY goal is
+shifted by seed so the robot arrives off the target and ARRIVE_B corrects it.
+
 With --conditions <file.jsonl> (Task 10, a Failure -> Data round), the batch
 records the train seeds nearest to each failure condition instead
 (flywheel_simple.tray.targets): the plan is written once to <out>/targets.jsonl,
@@ -44,7 +48,7 @@ from flywheel_simple.tray.generate import (
     split_attempts,
     summarize,
 )
-from flywheel_simple.tray.planner import PlannerConfig
+from flywheel_simple.tray.planner import CarryJitter, PlannerConfig
 from flywheel_simple.tray.recorder import planner_version, visuals_revision
 from flywheel_simple.tray.visuals import default_manifest_path
 
@@ -65,7 +69,13 @@ def main() -> int:
         "--scene", choices=SCENES, default="zone1",
         help="zone1: DA-33 scene, target jittered; jig: DA-41 fixed target in a locating jig",
     )
+    for axis, where in (("ahead", "along the carry heading"), ("side", "to its left")):
+        ap.add_argument(
+            f"--carry-jitter-{axis}", type=float, default=0.0,
+            help=f"m: half-range of the uniform CARRY goal shift {where} (DA-46)",
+        )
     args = ap.parse_args()
+    jitter = CarryJitter(args.carry_jitter_ahead, args.carry_jitter_side)
     if args.n is None and args.conditions is None and not args.targeted:
         ap.error("give --n or --conditions")
 
@@ -80,12 +90,13 @@ def main() -> int:
             workers=args.workers,
             targeted=args.targeted,
             scene=args.scene,
+            carry_jitter=jitter,
         )
         print(json.dumps({"shard": args.shard, **summary.__dict__}))
         return 0
 
     # Refuse before starting workers; each worker checks again (generate()).
-    check_planner_version(args.out, planner_version(PlannerConfig.load()))
+    check_planner_version(args.out, planner_version(PlannerConfig.load(), jitter))
     check_visuals_revision(
         args.out, visuals_revision(default_manifest_path(), jig=args.scene == "jig")
     )
@@ -101,6 +112,7 @@ def main() -> int:
         cmd += ["--workers", str(args.workers), "--shard", str(shard)]
         cmd += ["--allow-plain"] if args.allow_plain else []
         cmd += ["--scene", args.scene]
+        cmd += ["--carry-jitter-ahead", repr(jitter.ahead), "--carry-jitter-side", repr(jitter.side)]
         cmd += ["--targeted"] if args.conditions is not None else []
         with (work / "worker.log").open("a") as log:
             return subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=env)

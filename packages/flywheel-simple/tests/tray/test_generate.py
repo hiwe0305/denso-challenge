@@ -114,6 +114,21 @@ def test_a_batch_of_another_planner_version_is_refused(tmp_path: Path) -> None:
         check_planner_version(tmp_path, "p")
 
 
+def test_a_jittered_run_refuses_a_plain_batch(tmp_path: Path) -> None:
+    # DA-46: the jitter's tag is part of the version, so a plain batch is not topped up
+    # with jittered episodes (or the other way round).
+    from flywheel_simple.tray.planner import CarryJitter
+    from flywheel_simple.tray.recorder import planner_version
+
+    cfg = PlannerConfig.load()
+    append_attempt(
+        shard_dir(tmp_path, 0) / "gen_log.jsonl", replace(ROW, planner_version=planner_version(cfg))
+    )
+    check_planner_version(tmp_path, planner_version(cfg, CarryJitter()))
+    with pytest.raises(RuntimeError, match="new --out"):
+        check_planner_version(tmp_path, planner_version(cfg, CarryJitter(0.05, 0.05)))
+
+
 def test_a_batch_of_other_visuals_is_refused(tmp_path: Path) -> None:
     # A batch started before the target zone was drawn must not be topped up with it.
     check_visuals_revision(tmp_path, "rev+zone1")  # a new batch
