@@ -2,6 +2,11 @@
 
     run_round(pack.json, out)                       a fresh run into a new directory
     run_round(pack.json, out, from_step="measure")  redo from a step, keep what is before
+    run_round(pack.json, out, no_model=False)       with the model steps judge and verify
+
+A no-model run executes `NO_MODEL_STEPS` only; `run.json` records the mode and `--from`
+keeps it (a different mode is refused). `model_calls.jsonl` is never deleted by a redo:
+`--from judge` replays its answered requests, `--from verify` makes no call at all.
 
 Each step reads files and writes files. After every step its record is appended to
 `run.json`, so a crash leaves a run record that says how far the run got. Kept steps are
@@ -22,11 +27,20 @@ from pathlib import Path
 from flywheel.contracts.base import new_ulid
 from flywheel.eval.agentqa.round.admit import ADMISSION_FILE, Admitted, admit, write_admission
 from flywheel.eval.agentqa.round.assemble import ASSEMBLY_FILE, assemble
+from flywheel.eval.agentqa.round.gateway import (
+    MODEL_CALLS_FILE,
+    Gateway,
+    ProviderFactory,
+    Usage,
+)
+from flywheel.eval.agentqa.round.gateway_config import CONFIG_ROOT as GATEWAY_ROOT
+from flywheel.eval.agentqa.round.gateway_config import load_gateway_config
 from flywheel.eval.agentqa.round.hypotheses import (
     HYPOTHESES_FILE,
     hypothesize,
     missing_clusters_reason,
 )
+from flywheel.eval.agentqa.round.judge import JUDGED_FILE, MAX_RANK_CLUSTERS, judge
 from flywheel.eval.agentqa.round.measure import (
     CALLS_FILE,
     FACTS_FILE,
@@ -37,8 +51,16 @@ from flywheel.eval.agentqa.round.measure import (
     read_plan,
 )
 from flywheel.eval.agentqa.round.pack import PACK_FILE, read_pack, sha256_of
-from flywheel.eval.agentqa.round.records import Admission, Pack, RunRecord, Status, StepRecord
+from flywheel.eval.agentqa.round.records import (
+    Admission,
+    Pack,
+    RunRecord,
+    RunTotals,
+    Status,
+    StepRecord,
+)
 from flywheel.eval.agentqa.round.render import INDEX_FILE, render
+from flywheel.eval.agentqa.round.verify import VERDICTS_FILE, verify
 from flywheel.eval.agentqa.round.version import agent_hash, agent_version
 from flywheel.eval.agentqa.run import _ledger
 from flywheel.store.ledger_append import append_ledger_entry
@@ -46,19 +68,24 @@ from flywheel.store.paths import StorePaths
 from pydantic import ValidationError
 
 RUN_FILE = "run.json"
-STEPS = ("pack", "admit", "measure", "hypothesize", "assemble", "render")
-# Later: judge and verify arrive with task 5, between hypothesize and assemble.
+STEPS = ("pack", "admit", "measure", "hypothesize", "judge", "verify", "assemble", "render")
+MODEL_STEPS = ("judge", "verify")
+NO_MODEL_STEPS = tuple(s for s in STEPS if s not in MODEL_STEPS)
 STORY = "DA-43"
 SECONDS_NO_MODEL = 5.0
-NO_MODEL_ONLY = "the model steps (judge, verify) arrive with task 5; run with no_model"
+SECONDS_PER_MODEL_CALL = 30.0  # an assumption until a model round is measured
 STEP_FILES: dict[str, tuple[str, ...]] = {
     "pack": (PACK_FILE,),
     "admit": (ADMISSION_FILE,),
     "measure": (FACTS_FILE, CALLS_FILE),
     "hypothesize": (HYPOTHESES_FILE,),
+    "judge": (JUDGED_FILE, MODEL_CALLS_FILE),
+    "verify": (VERDICTS_FILE,),
     "assemble": (ASSEMBLY_FILE,),
     "render": (INDEX_FILE,),
 }
+# Kept when a step is redone: the gateway replays answered requests from it.
+KEPT_ON_REDO: frozenset[str] = frozenset({MODEL_CALLS_FILE})
 STEP_DIRS: dict[str, tuple[str, ...]] = {"measure": (TABLES_DIR,)}
 SEVERITY: dict[str, int] = {"ok": 0, "degraded": 1, "broken": 2}
 
@@ -81,6 +108,9 @@ class _Work:
     plan_path: Path | None
     no_model: bool = True
     store: Path | None = None
+    gateway_root: Path = GATEWAY_ROOT
+    factory: ProviderFactory | None = None
+    usage: Usage | None = None
     run: RunRecord | None = None
     pack: Pack | None = None
     admitted: Admitted | None = None
@@ -158,14 +188,37 @@ def _step_assemble(w: _Work) -> int:
     return len(assembly.clusters)
 
 
+def _step_judge(w: _Work) -> int:
+    # Built first: a refused config or a hosted route the pack may not take stops the
+    # step before any call (GatewayRefused, recorded as broken like any failure).
+    gateway = Gateway(w.out, load_gateway_config(w.gateway_root), factory=w.factory)
+    w.usage = gateway.usage
+    result = judge(w.out, gateway)
+    w.degraded += result.problems
+    return len(result.items)
+
+
+def _step_verify(w: _Work) -> int:
+    verdicts = verify(w.out)
+    # Any cluster on the code floor in a model run degrades it (architecture section 9).
+    w.degraded += [f"{v.unit}: {v.reason}" for v in verdicts
+                   if v.verdict in ("rejected", "not_ranked")]
+    return len(verdicts)
+
+
 def _step_render(w: _Work) -> int:
     render(w.out)
     return 1
 
 
 RUNNERS = {"pack": _step_pack, "admit": _step_admit, "measure": _step_measure,
-           "hypothesize": _step_hypothesize, "assemble": _step_assemble,
-           "render": _step_render}
+           "hypothesize": _step_hypothesize, "judge": _step_judge, "verify": _step_verify,
+           "assemble": _step_assemble, "render": _step_render}
+
+
+def steps_of(no_model: bool) -> tuple[str, ...]:
+    """The steps a run of this mode executes, in order."""
+    return NO_MODEL_STEPS if no_model else STEPS
 
 
 def _write(out: Path, record: RunRecord) -> None:
@@ -177,27 +230,39 @@ def _pack_part(admission: Admission) -> dict[str, object]:
     return admission.model_dump(exclude={"missing_kinds"})
 
 
-def _resume(pack_path: Path, out: Path, from_step: str, plan: dict[str, str],
-            work: _Work) -> RunRecord:
-    """The record of `out` cut back to the steps before `from_step`, checked.
-
-    A run directory belongs to one pack. Steps after measure are kept only with the
-    plan that measured them; admit's plan-derived part is worked out for the plan in use.
-    """
-    start = STEPS.index(from_step)
+def _recorded(out: Path) -> RunRecord:
     try:
-        old = RunRecord.model_validate_json((out / RUN_FILE).read_text(encoding="utf-8"))
+        return RunRecord.model_validate_json((out / RUN_FILE).read_text(encoding="utf-8"))
     except (OSError, ValidationError) as error:
         raise RunRefused(f"{out / RUN_FILE}: {str(error).strip().splitlines()[0][:200]}"
                          ) from error
+
+
+def _mode(no_model: bool) -> str:
+    return "no-model" if no_model else "model"
+
+
+def _resume(pack_path: Path, out: Path, from_step: str, plan: dict[str, object],
+            work: _Work, old: RunRecord) -> RunRecord:
+    """The record `old` of `out` cut back to the steps before `from_step`, checked.
+
+    A run directory belongs to one pack and one mode. Steps after measure are kept only
+    with the plan that measured them; admit's plan-derived part is worked out for the
+    plan in use.
+    """
+    steps = steps_of(old.no_model)
+    if from_step not in steps:
+        raise RunRefused(f"{out}: step {from_step} is not a step of this {_mode(old.no_model)} "
+                         f"run (steps: {', '.join(steps)})")
+    start = steps.index(from_step)
     if old.pack_sha256 != sha256_of(pack_path):
         raise RunRefused(f"{pack_path} is not the pack of run {old.run_id} in {out}; a run "
                          "directory belongs to one pack: use a new --out")
-    if start > STEPS.index("measure") and old.plan_sha256 != plan["plan_sha256"]:
+    if start > steps.index("measure") and old.plan_sha256 != plan["plan_sha256"]:
         raise RunRefused(f"{out}: the kept measure outputs come from plan "
                          f"{old.plan_path or '(not recorded)'}, not {plan['plan_path']}; "
                          "redo from measure, or pass that plan")
-    if start > len(old.steps) or [s.name for s in old.steps[:start]] != list(STEPS[:start]):
+    if start > len(old.steps) or [s.name for s in old.steps[:start]] != list(steps[:start]):
         raise RunRefused(f"{out}: the steps before {from_step} are not all recorded")
     kept = old.steps[:start]
     for step in kept:
@@ -225,9 +290,10 @@ def _resume(pack_path: Path, out: Path, from_step: str, plan: dict[str, str],
                 "outputs": _outputs(out, "admit"), "status": "degraded" if mine else "ok"})
             problems = ([p for p in problems if p.startswith("pack:")] + mine
                         + [p for p in problems if p.split(":", 1)[0] not in ("pack", "admit")])
-    for step_name in STEPS[start:]:
+    for step_name in steps[start:]:
         for name in STEP_FILES[step_name]:
-            (out / name).unlink(missing_ok=True)
+            if name not in KEPT_ON_REDO:
+                (out / name).unlink(missing_ok=True)
         for d in STEP_DIRS.get(step_name, ()):
             shutil.rmtree(out / d, ignore_errors=True)
     return old.model_copy(update={
@@ -237,11 +303,17 @@ def _resume(pack_path: Path, out: Path, from_step: str, plan: dict[str, str],
 
 def run_round(pack_path: Path, out: Path, *, plan_path: Path | None = None,
               from_step: str | None = None, command: str = "",
-              now: datetime | None = None, no_model: bool = True,
-              store: Path | None = None, run_plan_id: str | None = None) -> RunRecord:
-    """Run the pipeline on the pack `pack_path` into `out`; see the module docstring."""
-    if not no_model:
-        raise RunRefused(NO_MODEL_ONLY)
+              now: datetime | None = None, no_model: bool | None = None,
+              store: Path | None = None, run_plan_id: str | None = None,
+              gateway_root: Path | None = None,
+              gateway_factory: ProviderFactory | None = None) -> RunRecord:
+    """Run the pipeline on the pack `pack_path` into `out`; see the module docstring.
+
+    `no_model`: None means the code floor for a fresh run and the recorded mode for
+    `from_step`; a value that differs from the recorded mode is refused. `gateway_root`
+    holds `routing.yaml` and `hosted.yaml` (default: the repo's config root);
+    `gateway_factory` builds providers in place of the real ones (tests).
+    """
     if from_step is not None and from_step not in STEPS:
         raise RunRefused(f"unknown step {from_step!r} (steps: {', '.join(STEPS)})")
     # Checked before anything is created, so a typo leaves nothing behind.
@@ -251,9 +323,25 @@ def run_round(pack_path: Path, out: Path, *, plan_path: Path | None = None,
     plan_file = plan_path or plan_of(task_id)
     if not plan_file.is_file():
         raise RunRefused(f"{plan_file}: no plan file there")
-    planned = {"plan_path": plan_file.as_posix(), "plan_sha256": sha256_of(plan_file),
-            "agent_version": agent_version(), "agent_hash": agent_hash(task_id, plan_file)}
-    work = _Work(pack_path, out, plan_path, no_model=no_model, store=store)
+    old: RunRecord | None = None
+    if from_step is not None:
+        if not (out / RUN_FILE).is_file():
+            raise RunRefused(f"{out}: no {RUN_FILE} to continue from")
+        old = _recorded(out)
+        if no_model is not None and no_model != old.no_model:
+            raise RunRefused(f"{out} is a {_mode(old.no_model)} run; it cannot be continued "
+                             f"as a {_mode(no_model)} run: use a new --out")
+        mode = old.no_model
+    else:
+        mode = True if no_model is None else no_model
+    groot = gateway_root if gateway_root is not None else GATEWAY_ROOT
+    planned: dict[str, object] = {
+        "plan_path": plan_file.as_posix(), "plan_sha256": sha256_of(plan_file),
+        "agent_version": agent_version(),
+        "agent_hash": agent_hash(task_id, plan_file, gateway_root=gateway_root)}
+    work = _Work(pack_path, out, plan_path, no_model=mode, store=store, gateway_root=groot,
+                 factory=gateway_factory)
+    steps = steps_of(mode)
     if from_step is None:
         if out.exists():
             raise FileExistsError(f"{out} exists: a run directory is written once")
@@ -263,38 +351,55 @@ def run_round(pack_path: Path, out: Path, *, plan_path: Path | None = None,
         record = RunRecord(
             run_id="run_" + hashlib.sha256((sha + started.isoformat()).encode()).hexdigest()[:16],
             command=command, started_at=started, pack_sha256=sha, status="ok",
+            no_model=mode,
         ).model_copy(update=planned)
         start = 0
     else:
-        if not (out / RUN_FILE).is_file():
-            raise RunRefused(f"{out}: no {RUN_FILE} to continue from")
-        record = _resume(pack_path, out, from_step, planned, work)
+        assert old is not None
+        record = _resume(pack_path, out, from_step, planned, work, old)
         record = record.model_copy(update={"command": command or record.command})
-        start = STEPS.index(from_step)
+        start = steps.index(from_step)
     _write(out, record)
 
     ledger = StorePaths(store)
     plan = run_plan_id or f"g0-{STORY}-{date.today():%Y%m%d}"
     job_id = f"job_agentqa_{new_ulid()}"
-    estimate = _ledger(plan, job_id, SECONDS_NO_MODEL, "estimated",
-                       f"assumed {SECONDS_NO_MODEL:g} s for a round without a model", None)
+    if mode:
+        seconds = SECONDS_NO_MODEL
+        said = f"assumed {SECONDS_NO_MODEL:g} s for a round without a model"
+    else:
+        most = 2 * MAX_RANK_CLUSTERS  # the default cap, one resend per cluster at most
+        seconds = SECONDS_NO_MODEL + most * SECONDS_PER_MODEL_CALL
+        said = (f"assumed {seconds:g} s for a round with up to {most} model calls of "
+                f"{SECONDS_PER_MODEL_CALL:g} s")
+    estimate = _ledger(plan, job_id, seconds, "estimated", said, None)
     append_ledger_entry(estimate, ledger)
     began_run, outcome = time.monotonic(), "ok"
     try:
-        return _run_steps(work, record, start)
+        return _run_steps(work, record, steps[start:])
     except BaseException as error:
         outcome = f"failed: {type(error).__name__}"
         raise
     finally:
+        model_note = "" if mode else (
+            f", {work.usage.calls if work.usage is not None else 0} model calls "
+            f"({work.usage.replayed if work.usage is not None else 0} replayed)")
         append_ledger_entry(
             _ledger(plan, job_id, max(time.monotonic() - began_run, 0.0), "measured",
                     f"wall seconds of an Agent QA/QC round, {outcome}, from step "
-                    f"{STEPS[start]}", estimate.id), ledger)
+                    f"{steps[start]}{model_note}", estimate.id), ledger)
 
 
-def _run_steps(work: _Work, record: RunRecord, start: int) -> RunRecord:
+def _usage_update(usage: Usage) -> dict[str, object]:
+    return {"totals": RunTotals(calls=usage.calls, replayed=usage.replayed,
+                                tokens_in=usage.tokens_in, tokens_out=usage.tokens_out,
+                                usd=usage.usd),
+            "model_hosts": sorted(usage.hosts)}
+
+
+def _run_steps(work: _Work, record: RunRecord, names: tuple[str, ...]) -> RunRecord:
     out = work.out
-    for name in STEPS[start:]:
+    for name in names:
         began = time.monotonic()
         problems: list[str] = []
         status: Status = "ok"
@@ -307,6 +412,8 @@ def _run_steps(work: _Work, record: RunRecord, start: int) -> RunRecord:
                 status = "degraded"
                 problems = [f"{name}: {d}" for d in work.degraded]
         except Exception as error:  # every failure is recorded, then raised again
+            if name == "judge" and work.usage is not None:
+                record = record.model_copy(update=_usage_update(work.usage))
             record = record.model_copy(update={
                 "steps": [*record.steps, StepRecord(
                     name=name, status="broken", seconds=time.monotonic() - began, rows=0)],
@@ -318,6 +425,8 @@ def _run_steps(work: _Work, record: RunRecord, start: int) -> RunRecord:
             update["pack_id"] = work.pack.pack_id
         if name == "admit" and work.admitted is not None:
             update["data_class"] = work.admitted.admission.data_class
+        if name == "judge" and work.usage is not None:
+            update.update(_usage_update(work.usage))
         steps = [*record.steps, StepRecord(
             name=name, status=status, seconds=time.monotonic() - began, rows=rows,
             outputs=_outputs(out, name))]

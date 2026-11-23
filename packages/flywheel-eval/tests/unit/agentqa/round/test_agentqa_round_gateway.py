@@ -283,3 +283,20 @@ def test_local_endpoint_sends_the_key_but_no_file_holds_it(
     for path in run.rglob("*"):
         text = path.read_text()
         assert secret not in text and "Authorization" not in text and "Bearer" not in text
+
+
+# --- under-reported input tokens -------------------------------------------------------
+
+def test_an_under_reported_input_count_is_replaced_by_the_estimate(tmp_path: Path) -> None:
+    run = admitted_run(tmp_path)
+    user = '{"facts": "' + "x" * 400 + '"}'
+    est = -(-(len("You rank.") + len(user)) // 2)  # chars_per_token 2.0, rounded up
+    chat = ScriptedChat([ProviderReply(text="{}", tokens_in=1, tokens_out=5),
+                         ProviderReply(text="{}", tokens_in=est // 4 + 1, tokens_out=5)])
+    gateway = Gateway(run, make_config(), factory=Factory(local=chat))
+    gateway.call("rank", request(unit="u1", user=user))
+    gateway.call("rank", request(unit="u2", user=user))
+    first, second = lines(run)
+    assert (first.tokens_in, first.tokens_estimated) == (est, True)
+    assert (second.tokens_in, second.tokens_estimated) == (est // 4 + 1, False)
+    assert gateway.usage.tokens_in == est + est // 4 + 1

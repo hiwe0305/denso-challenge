@@ -66,6 +66,7 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
   - [ ] 5.2 Vai `adjudicate` và `rank`: prompt, schema câu trả lời
   - [ ] 5.3 B5: các phép kiểm của kiến trúc mục 25 (luật của design mục 6), ba sửa của bản 3 và ca kiểm của AC 5, phán quyết và sàn code
   - [x] 5.4 Lớp hosted kiểu OpenAI (OpenRouter) và lớp Anthropic
+  - [x] 5.6 Vai `rank` chạy được trong đường ống vòng (23/11/2026; phần `rank` của 5.2 và 5.3): bước `judge` và `verify`, thư viện luật kiểm, phán quyết và sàn code, `--gateway-config`. Vai `adjudicate`, `look` và các luật kiểm riêng của chúng còn mở ở 5.2, 5.3
   - [ ] 5.5 Xuất `round_diagnosis.json` theo `RoundDiagnosis` sau khi PR hợp đồng K2 merge
 - [ ] 6. Bộ ca lịch sử (1,5 ngày)
   - [ ] 6.1 Kiểm artifact của từng ca ứng viên còn đủ; loại ca thiếu, ghi lý do
@@ -131,6 +132,7 @@ Danh sách chung của story:
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 23/11/2026 | Thêm nhiệm vụ 5.6 (vai `rank` trong đường ống); 5.4 xong. Hiếu chọn cổng ckey.vn và model `claude-opus-5-5` cho lần chạy thật | Hiếu (soạn với Claude) |
 | 22/11/2026 | Thêm nhiệm vụ 0.1: bộ metric và hiện trạng (design 19/11 bản 0.5) | Hiếu (soạn với Claude) |
 | 20/11/2026 | Hiếu duyệt kiến trúc 20/11 (Q1–Q9). Sắp lại nhiệm vụ 4 và 5 theo đường ống; thêm AC 11; phạm vi file thêm `anthropic` trong nhóm tùy chọn `agentqa-hosted`; cửa xin thêm công cụ rút khỏi story | Hiếu |
 | 20/11/2026 | Thêm [kiến trúc 20/11/2026](../../superpowers/specs/2026-11-20-agent-qaqc-architecture-design.md) vào phạm vi file (đề xuất, chờ duyệt). Nhiệm vụ 4 và 5 sẽ sắp lại theo mục 15 của tài liệu đó sau khi Hiếu duyệt | Hiếu (soạn với Claude) |

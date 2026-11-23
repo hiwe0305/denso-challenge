@@ -15,7 +15,7 @@ from flywheel.eval.agentqa.round.hypotheses import (
     RulesRefused,
     hypothesize,
 )
-from flywheel.eval.agentqa.round.pipeline import STEPS, run_round
+from flywheel.eval.agentqa.round.pipeline import NO_MODEL_STEPS, run_round
 from flywheel.eval.agentqa.round.records import HypothesisRecord, RunRecord
 from helpers_round import (  # noqa: F401  (isolated_store is an autouse fixture)
     NOW,
@@ -171,9 +171,9 @@ def test_without_a_cluster_table_the_step_is_degraded(
 
 def test_from_hypothesize_rewrites_only_the_hypotheses(round_out: Path,
                                                       make_pack: PackMaker) -> None:
-    assert STEPS[:4] == ("pack", "admit", "measure", "hypothesize")
+    assert NO_MODEL_STEPS[:4] == ("pack", "admit", "measure", "hypothesize")
     first = RunRecord.model_validate_json((round_out / "run.json").read_text())
-    assert [s.name for s in first.steps] == list(STEPS)
+    assert [s.name for s in first.steps] == list(NO_MODEL_STEPS)
     kept = {p: p.read_bytes() for p in round_out.rglob("*")
             if p.is_file() and p.name not in (HYPOTHESES_FILE, "run.json")}
     (round_out / HYPOTHESES_FILE).write_text("stale\n")

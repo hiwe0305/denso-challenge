@@ -21,6 +21,8 @@ Architecture 20/11 section 8. In order, for every call:
    `failed`, never raises.
 5. One line per request goes to `model_calls.jsonl`, the only file holding durations.
    Values of the key variables are scrubbed from the reply and the error before writing.
+   A reported input token count below a quarter of the gateway's estimate is replaced
+   by the estimate and marked `tokens_estimated` (a reseller under-reported it).
 
 Calls are sequential (one local GPU); hosted concurrency comes with task 5.4.
 """
@@ -57,6 +59,9 @@ from pydantic import ValidationError
 
 MODEL_CALLS_FILE = "model_calls.jsonl"
 REPLAYABLE: frozenset[str] = frozenset({"ok", "cut"})  # a failure is tried again on a rerun
+# A reported input count below 1/UNDER_REPORT of the gateway's own estimate is not
+# believed: the estimate is recorded instead, with `tokens_estimated`.
+UNDER_REPORT = 4
 ProviderFactory = Callable[[str, Profile], ChatModel]
 
 
@@ -271,6 +276,8 @@ class Gateway:
             break
 
         tokens_in = reply.tokens_in if reply and reply.tokens_in is not None else None
+        if tokens_in is not None and tokens_in * UNDER_REPORT < est_in:
+            tokens_in = None  # under-reported (a reseller said 1 for ~40): use the estimate
         tokens_out = reply.tokens_out if reply and reply.tokens_out is not None else None
         if reply is not None:
             self.usage.tokens_in += tokens_in if tokens_in is not None else est_in
