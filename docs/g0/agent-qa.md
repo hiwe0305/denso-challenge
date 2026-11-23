@@ -355,6 +355,30 @@ Giới hạn của lần chạy này:
 
 - Gói mẫu chỉ có `Score`, nên cả 8 cụm chỉ có một giả thuyết (`label_signal_missing`). Model không có gì để xếp hạng; lần chạy chỉ chứng minh đường ống và các rào chạy được với model thật, chưa đo chất lượng.
 - Cổng là bên bán lại: không xác minh được model đứng sau id `claude-opus-5-5`. Trong một lần gọi thử, cổng báo 1 token vào cho prompt khoảng 40 token; cổng model nay dùng ước lượng của chính nó khi số báo về thấp hơn một phần tư ước lượng.
-- Gói vòng thật `stage1-60k` **chưa chạy được với model thuê**: B1 ghi 248 trên 248 mục chưa có bản ghi nguồn xác nhận lớp `public`, nên cổng từ chối (điều chặn cứng 2 và 3). Chờ Hiếu quyết cách xác nhận.
-- Chưa có số D1 (phần model thêm) trên ca lịch sử nào.
+- Gói vòng thật `stage1-60k` bị cổng từ chối với model thuê: B1 ghi 248 trên 248 mục chưa có bản ghi nguồn xác nhận lớp `public` (điều chặn cứng 2 và 3). Xem mục 9.1.
+
+### 9.1 Gói thật và số D1 đầu tiên, 23/11/2026
+
+**[Đã chốt]** Hiếu, 23/11/2026: gói thật được thêm bản ghi `Source` lớp `public`. Gói mới `stage1-60k-src` (`pack_73cacf8029b618d4`, 249 file, 252 liên kết) có `sources.jsonl` gồm hai bản ghi, mỗi bản là một bản phát hành dataset khay S1 mà bốn job fine-tune khai trong `launch.json`, mang hash phát hành; căn cứ là design 27/10 mục 8.4 (dữ liệu demo trong sim là `public`). Mọi mục của gói nối tới file này, nên B1 ghi `hosted_allowed: true`, không mục nào chưa xác nhận. Gói cũ `stage1-60k` giữ nguyên.
+
+Ca `tray-c70-step4`, hai lần chạy trên gói mới: sàn code và có model (`claude-opus-5-5` qua ckey.vn).
+
+| Metric | Sàn code | Có model |
+|---|---|---|
+| A1 điểm chốt tới được | 22/24; bắt buộc 7/9 | 22/24; bắt buộc 7/9 |
+| A2 chẩn đoán đúng ở hạng 1 | 4/4 | 4/4 |
+| A3 khẳng định sai | 0 | 0 |
+| A5 can thiệp | 2/2 | 2/2 |
+| D1 phần model thêm | | đúng thêm 0, sai thêm 0, lên hạng 0, xuống hạng 0 |
+| B2 mục của model bị loại | | 0 trên 8 |
+| B3 mục về sàn code | | 56 cụm ngoài trần 8 |
+| E2 thời gian | 60 giây | bước `judge` 104 giây cho 8 lời gọi |
+| RAM đỉnh của một lần chạy | 5,8 GB | chưa đo |
+
+Cách đọc:
+
+- **D1 bằng 0 là do bảng luật, chưa nói gì về model.** Cả 8 cụm lớn nhất chỉ có một giả thuyết (`label_signal_missing`), nên model không có gì để xếp lại. Nó viết được câu giải thích đúng luật (không số, có trích fact), nhưng bộ chấm không cho điểm câu chữ.
+- Muốn D1 khác 0 phải có nhiều giả thuyết cạnh tranh trong một cụm: sáu luật còn thiếu (bước 3 của thứ tự việc) và tín hiệu tư thế khay (K1).
+- Token và tiền là số cổng báo, chưa xác minh. Một ca, một lần chạy: chưa đo độ ổn định (E4).
+- **RAM 5,8 GB là lỗi cần sửa.** B1 nạp mọi file của gói (240 trace, khoảng 1,5 GB, và bốn log train 71 MB) thành bản ghi pydantic và giữ suốt lần chạy.
 
