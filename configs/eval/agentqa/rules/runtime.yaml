@@ -1,0 +1,43 @@
+# Hypothesis rules of the runtime group (DA-43 task 4.3, design 19/11 section 5.3 rows 3-4).
+# Field reference: the header of scorer.yaml. Changing this file is a new version of the
+# agent: score it again (design 11).
+#
+# `trace_stats` measures a whole run (failed rollouts against successful ones), not one
+# cluster, so these rules only speak for clusters the task view says the controller may
+# explain: a label of `runtime_labels` whose first failed step is a `motion_steps` step.
+#
+# Row 4 of the design table ("tracking exceeds tau, but tau is exceeded on successes too;
+# commands were issued: policy, not controller -> go on to steps 5-8") is NOT here. It has
+# no diagnosis of its own; `unknown` allows only `repair_ticket` in the evidence contract
+# (INTERVENTIONS_OF_DIAGNOSIS), and a repair ticket for a policy fault would be wrong. It
+# waits for a decision of the Product Owner (a contract change, or another diagnosis).
+
+rules:
+  - id: controller_tracking
+    title: "The controller does not track the command: failed rollouts exceed the tracking tolerance and successful ones stay within it"
+    source: "spec 6.4 (system first) and 6.9 (controller); design 19/11 section 5.3 row 3; tray.md 20.11 H2"
+    group: runtime
+    diagnosis: controller
+    note: tracking_error
+    system: true
+    interventions: [repair_ticket]
+    when:
+      - {cluster: label_in, set: runtime_labels}
+      - {cluster: step_in, set: motion_steps}
+      - any:
+          - - {fact: "{run}_failed_exceeds_tau_upper", is: true}
+            - {fact: "{run}_tau_separates_upper", is: true}
+          - - {fact: "{run}_failed_exceeds_tau_lower", is: true}
+            - {fact: "{run}_tau_separates_lower", is: true}
+    support:
+      - "{run}_failed_track_error_upper"
+      - "{run}_failed_track_error_lower"
+      - "tau_track_upper"
+      - "tau_track_lower"
+      - "{run}_failed_exceeds_tau_upper"
+      - "{run}_failed_exceeds_tau_lower"
+      - "{run}_tau_separates_upper"
+      - "{run}_tau_separates_lower"
+      - "{run}_succeeded_track_error_upper"
+      - "{run}_succeeded_track_error_lower"
+    contra: []

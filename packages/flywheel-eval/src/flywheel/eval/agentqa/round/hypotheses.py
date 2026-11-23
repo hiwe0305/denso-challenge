@@ -9,6 +9,17 @@ For each cluster of the `failure_clusters` table, every rule whose `when` holds 
 hypothesis. A cluster no rule matches gets the `none` hypothesis: silence is never
 "clean". While a system rule (`system: true`) stands for a cluster, none of its
 hypotheses may spend the data budget (spec 6.4: system and scorer before data).
+
+A rule may name diagnoses it `refutes`: its facts rule them out for the cluster (for
+instance tracking that fails as often on successes as on failures rules out the
+controller). The hypothesis carries the list, so the page and the case bench can say
+"ruled out by" with the rule's support, instead of reading silence as a refutation.
+
+Templates may use {run}, {step}, {label}, {level}, {cluster_slug} (the key as
+`failure_clusters` and `coverage_distance` spell it in fact names) and {job} (the train job
+of the run's checkpoint, the value of the `lineage_{run}_job` fact). A template whose key
+cannot be resolved (no lineage fact) names no fact: its condition does not hold and its
+support is left out.
 """
 
 from __future__ import annotations
@@ -17,7 +28,7 @@ import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, get_args
+from typing import Annotated, Any, Literal, get_args
 
 import yaml
 from flywheel.contracts.evidence import (
@@ -37,9 +48,10 @@ from flywheel.eval.agentqa.round.records import (
     Record,
     ToolCallRecord,
 )
-from flywheel.eval.agentqa.tools.clusters import NO_LEVEL
+from flywheel.eval.agentqa.tools.clusters import NO_LEVEL, slug
+from flywheel.eval.agentqa.tools.lineage import TOOL as LINEAGE_TOOL
 from flywheel.eval.agentqa.tools.task import TaskView, load_task
-from pydantic import Field, ValidationError, model_validator
+from pydantic import Discriminator, Field, Tag, ValidationError, model_validator
 from typing_extensions import Self
 
 HYPOTHESES_FILE = "hypotheses.jsonl"
@@ -49,7 +61,11 @@ GROUPS: tuple[str, ...] = get_args(Group)
 NONE_RULE = "none"
 NO_RULE_TITLE = "No rule of the agent explains this cluster"
 CLUSTER_TOOL = "failure_clusters"
-_TEMPLATE_KEYS = {"run": "r", "step": "s", "label": "l", "level": "0"}
+_TEMPLATE_KEYS = {"run": "r", "step": "s", "label": "l", "level": "0", "cluster_slug": "c",
+                  "job": "j"}
+# Sets of the task view a cluster condition may test, and what each set holds.
+TASK_SETS: dict[str, Literal["label", "step"]] = {"runtime_labels": "label",
+                                                  "motion_steps": "step"}
 
 
 class RulesRefused(ValueError):
@@ -61,11 +77,27 @@ def _check_template(template: str) -> None:
         template.format(**_TEMPLATE_KEYS)
     except (KeyError, IndexError, ValueError) as error:
         raise ValueError(f"template {template!r}: only {{run}}, {{step}}, {{label}}, "
-                         f"{{level}} may be used ({error!r})") from error
+                         f"{{level}}, {{cluster_slug}}, {{job}} may be used ({error!r})"
+                         ) from error
 
 
 class ClusterCond(Record):
-    cluster: Literal["chain_broken"]
+    """A test of the cluster's key: its step chain, or its label or step in a task set."""
+
+    cluster: Literal["chain_broken", "label_in", "step_in"]
+    set: str | None = None
+
+    @model_validator(mode="after")
+    def set_fits(self) -> Self:
+        if self.cluster == "chain_broken":
+            if self.set is not None:
+                raise ValueError("chain_broken takes no set")
+            return self
+        want = "label" if self.cluster == "label_in" else "step"
+        if self.set is None or TASK_SETS.get(self.set) != want:
+            known = sorted(k for k, v in TASK_SETS.items() if v == want)
+            raise ValueError(f"{self.cluster} needs a set of {want}s: one of {known}")
+        return self
 
 
 class FactCond(Record):
@@ -78,7 +110,30 @@ class FactCond(Record):
         return self
 
 
-Cond = ClusterCond | FactCond
+def _cond_kind(value: Any) -> str:
+    """Which condition a raw item is, so a bad one is refused with its own error."""
+    keys = value if isinstance(value, dict) else getattr(value, "__dict__", {})
+    return "any" if "any" in keys else "cluster" if "cluster" in keys else "fact"
+
+
+Simple = Annotated[Annotated[ClusterCond, Tag("cluster")] | Annotated[FactCond, Tag("fact")],
+                   Discriminator(_cond_kind)]
+
+
+class AnyCond(Record):
+    """Holds when every condition of at least one of its groups holds."""
+
+    any: list[list[Simple]] = Field(min_length=2)
+
+    @model_validator(mode="after")
+    def groups_not_empty(self) -> Self:
+        if any(not group for group in self.any):
+            raise ValueError("an `any` group is empty")
+        return self
+
+
+Cond = Annotated[Annotated[ClusterCond, Tag("cluster")] | Annotated[FactCond, Tag("fact")]
+                 | Annotated[AnyCond, Tag("any")], Discriminator(_cond_kind)]
 
 
 class Rule(Record):
@@ -93,6 +148,7 @@ class Rule(Record):
     when: list[Cond] = Field(min_length=1)
     support: list[str] = Field(default_factory=list)
     contra: list[str] = Field(default_factory=list)
+    refutes: list[Diagnosis] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def consistent(self) -> Self:
@@ -107,6 +163,8 @@ class Rule(Record):
                              f"{self.diagnosis} (allowed: {sorted(allowed)})")
         for template in [*self.support, *self.contra]:
             _check_template(template)
+        if self.diagnosis in self.refutes:
+            raise ValueError(f"rule {self.id}: it refutes its own diagnosis {self.diagnosis}")
         return self
 
 
@@ -214,12 +272,20 @@ class _Facts:
 
 
 def _holds(cond: Cond, cluster: ClusterRef, task: TaskView, facts: _Facts) -> bool:
-    if isinstance(cond, ClusterCond):  # tools/latch.py `broken`, on the cluster's key
+    if isinstance(cond, AnyCond):
+        return any(all(_holds(c, cluster, task, facts) for c in group) for group in cond.any)
+    if isinstance(cond, ClusterCond):
+        if cond.cluster == "label_in":
+            return cluster.label in task.runtime_labels
+        if cond.cluster == "step_in":
+            return cluster.step in task.motion_steps
+        # tools/latch.py `broken`, on the cluster's key
         spec = task.labels.get(cluster.label)
         implied = None if spec is None else spec.implies_step
         return (implied is not None and cluster.step in task.steps
                 and task.index(cluster.step) <= task.index(implied))
-    fact = facts.get(_name(cond.fact, cluster), cluster.run)
+    name = _name(cond.fact, cluster, facts)
+    fact = None if name is None else facts.get(name, cluster.run)
     if fact is None:
         return False
     value, want = fact.value, cond.is_
@@ -237,15 +303,33 @@ def _level(cluster: ClusterRef) -> int | None:
     return None if cluster.level == NO_LEVEL else cluster.level
 
 
-def _name(template: str, cluster: ClusterRef) -> str:
-    return template.format(run=cluster.run, step=cluster.step, label=cluster.label,
-                           level=_level(cluster))
+def _job(cluster: ClusterRef, facts: _Facts | None) -> str | None:
+    """The train job behind the run's checkpoint, from the `lineage` fact; None if unknown."""
+    fact = None if facts is None else facts.get(f"{LINEAGE_TOOL}_{cluster.run}_job",
+                                                cluster.run)
+    return fact.value if fact is not None and isinstance(fact.value, str) else None
+
+
+def _name(template: str, cluster: ClusterRef, facts: _Facts | None = None) -> str | None:
+    """The fact name `template` gives for `cluster`; None when it needs a key not resolved."""
+    keys: dict[str, object] = {
+        "run": cluster.run, "step": cluster.step, "label": cluster.label,
+        "level": _level(cluster),
+        "cluster_slug": slug((cluster.step, cluster.label, _level(cluster)))}
+    job = _job(cluster, facts) if "{job}" in template else None
+    if job is not None:
+        keys["job"] = job
+    try:
+        return template.format(**keys)
+    except KeyError:
+        return None
 
 
 def _ids(templates: Sequence[str], cluster: ClusterRef, facts: _Facts) -> list[str]:
     ids: list[str] = []
     for template in templates:
-        fact = facts.get(_name(template, cluster), cluster.run)
+        name = _name(template, cluster, facts)
+        fact = None if name is None else facts.get(name, cluster.run)
         if fact is not None and fact.fact_id not in ids:
             ids.append(fact.fact_id)
     return ids
@@ -299,6 +383,7 @@ class _Draft:
     support: list[str]
     contra: list[str]
     order: int
+    refutes: list[Diagnosis]
 
 
 def _checks(rule_id: str, present: set[str], checks: Sequence[Check]) -> list[CheckRef]:
@@ -346,12 +431,12 @@ def hypothesize(out: Path, task_id: str, rules_dir: Path | None = None,
         drafts = [
             _Draft(rule.id, rule.group, rule.diagnosis, rule.note, rule.system,
                    list(rule.interventions), _ids(rule.support, cluster, facts),
-                   _ids(rule.contra, cluster, facts), k)
+                   _ids(rule.contra, cluster, facts), k, list(rule.refutes))
             for k, rule in enumerate(rules)
             if all(_holds(c, cluster, task, facts) for c in rule.when)]
         if not drafts:
             drafts = [_Draft(NONE_RULE, "data", "unknown", "no_rule_matched", False,
-                             ["report_only"], [], [], len(rules))]
+                             ["report_only"], [], [], len(rules), [])]
         drafts.sort(key=lambda d: (GROUPS.index(d.group),
                                    -(len(d.support) - len(d.contra)), d.order))
         blocked = any(d.system for d in drafts)
@@ -360,7 +445,7 @@ def hypothesize(out: Path, task_id: str, rules_dir: Path | None = None,
             records.append(HypothesisRecord(
                 hypothesis_id=f"H{len(records) + 1}", cluster=cluster, rule_id=d.rule_id,
                 group=d.group, diagnosis=d.diagnosis, note=d.note, support=d.support,
-                contra=d.contra,
+                contra=d.contra, refutes=d.refutes,
                 interventions=_keep_budget(d.interventions) if blocked else d.interventions,
                 code_rank=rank, blocked_data_spend=blocked,
                 checks=_checks(d.rule_id, present, checks)))

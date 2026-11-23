@@ -123,6 +123,9 @@ def _cluster(c: ClusterView, facts: dict[str, FactRecord]) -> str:
         parts.append(
             f"<h4>{_e(h.rank)}. {_e(h.title)} <span class='badge {_e(h.source)}'>"
             f"{_e(h.source)}</span></h4><p>{_e(h.diagnosis)}: {_e(h.note)}</p>")
+        if h.refutes:
+            parts.append(f"<p>Rules out: {_e(', '.join(h.refutes))} (by the support facts "
+                         "below)</p>")
         if h.explanation:
             parts.append(f"<p>{fill(h.explanation, facts)}</p>")
         rows: list[list[object]] = []

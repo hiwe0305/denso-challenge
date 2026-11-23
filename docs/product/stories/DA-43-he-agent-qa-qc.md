@@ -62,6 +62,7 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
   - [x] 4.7 Bản chụp kho trong pack (`store_snapshot`, kiến trúc bản 0.5): `cost_lookup` và `history_lookup` đọc entry `ledger`, `fix_rate` của pack, không đọc kho
   - [x] 4.8 Trace thật: một run khai được nhiều entry `trace` (một file mỗi lượt); `trace_stats` ghép lượt với `Score` theo `Score.trace_sha256` bằng sha256 của entry, không theo `episode_id`; `metrics` vào `provides` của task khay
   - [x] 4.9 Bộ nhớ: B1 đọc và kiểm từng file theo dòng, không giữ bản ghi của `trace`, `metrics`, `rtc_log`; công cụ đọc lại khi cần và kiểm lại sha256 (23/11/2026; đỉnh RAM trên gói thật từ 5,8 GB xuống 365 MB)
+  - [x] 4.10 Bảng luật giả thuyết lên 7 trên 8 dòng của design 5.3 (23/11/2026): controller, kỹ năng yếu, thiếu vùng phủ, ngoài miền, lỗi ở stage train; 4 phép kiểm mới; luật mang danh sách chẩn đoán nó loại trừ. Dòng "policy, không phải controller" chờ quyết định hợp đồng của Hiếu
 - [ ] 5. Lớp model (2 ngày; kiến trúc 20/11 mục 8, 19–25)
   - [x] 5.1 Cổng model: hồ sơ, bảng vai × lớp dữ liệu, chặn hosted, ngân sách, ghi và phát lại
   - [ ] 5.2 Vai `adjudicate` và `rank`: prompt, schema câu trả lời
@@ -133,6 +134,7 @@ Danh sách chung của story:
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 23/11/2026 | Thêm nhiệm vụ 4.9 (bộ nhớ) và 4.10 (bảng luật); design 19/11 bản 0.6 và kiến trúc 20/11 bản 0.6 ghi hiện trạng | Hiếu (soạn với Claude) |
 | 23/11/2026 | Thêm nhiệm vụ 5.6 (vai `rank` trong đường ống); 5.4 xong. Hiếu chọn cổng ckey.vn và model `claude-opus-5-5` cho lần chạy thật | Hiếu (soạn với Claude) |
 | 22/11/2026 | Thêm nhiệm vụ 0.1: bộ metric và hiện trạng (design 19/11 bản 0.5) | Hiếu (soạn với Claude) |
 | 20/11/2026 | Hiếu duyệt kiến trúc 20/11 (Q1–Q9). Sắp lại nhiệm vụ 4 và 5 theo đường ống; thêm AC 11; phạm vi file thêm `anthropic` trong nhóm tùy chọn `agentqa-hosted`; cửa xin thêm công cụ rút khỏi story | Hiếu |

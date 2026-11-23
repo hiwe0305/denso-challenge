@@ -65,6 +65,18 @@ labels:
     implies_step: null
     signals: [failure_t, cmd_lower, meas_lower]
 
+# Scope of the run-level tracking rules (rules/runtime.yaml, design 19/11 section 5.3 rows
+# 3-4; tray.md 20.11 H2). `trace_stats` measures a whole run, so these rules only speak for
+# clusters whose label may come from the controller not following the command and whose
+# first failed step is one where the robot walks.
+#   runtime_labels  a timeout, or a walking failure, may be a controller that does not
+#                   track the command. ASSUMPTION (giả định): L-BALANCE and L-COLLIDE are
+#                   left out until a case shows the controller behind them.
+#   motion_steps    the steps the scorer checks with `approach_zone` (body in front of a
+#                   table edge, scorer config: steps 1, 4, 5), i.e. the robot walks.
+runtime_labels: [L-TIMEOUT, L-WALK]
+motion_steps: [approach_a, carry, reach_b]
+
 # The signal the step-latch check of approach_a needs (tray.md 20.11, DA-37 ticket).
 latch_signals:
   approach_a: [palm_handle_distance_min]

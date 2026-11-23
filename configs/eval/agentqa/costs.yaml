@@ -25,6 +25,7 @@ pricebook:
 kinds:
   eval_rerun_cluster: {activity: eval, resource_type: gpu_seconds}
   cpu_analysis: {activity: diagnosis, resource_type: cpu_seconds}
+  planner_rerun: {activity: diagnosis, resource_type: sim_seconds}   # ASSUMPTION: no ledger row yet
   sim_s1: {activity: data_generation, resource_type: sim_episode}
   sim_s2: {activity: data_generation, resource_type: sim_episode}
   sim_s3: {activity: data_generation, resource_type: sim_episode}

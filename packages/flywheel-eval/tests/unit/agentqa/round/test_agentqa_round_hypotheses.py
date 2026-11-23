@@ -118,14 +118,20 @@ def _rules_dir(tmp_path: Path, edit: object = None, keep: tuple[str, ...] = ()) 
     return root
 
 
+def _checks_of(rule_ids: set[str]) -> dict[str, object]:
+    """The check catalog cut to the pairs of `rule_ids` (and `none`)."""
+    raw = yaml.safe_load(CHECKS_FILE.read_text())
+    for check in raw["checks"]:
+        check["separates"] = [p for p in check["separates"] if set(p) <= rule_ids | {"none"}]
+    raw["checks"] = [c for c in raw["checks"] if c["separates"]]
+    return raw  # type: ignore[no-any-return]
+
+
 def test_a_cluster_no_rule_matches_gets_the_none_hypothesis(
         round_out: Path, tmp_path: Path) -> None:
     rules = _rules_dir(tmp_path, keep=("scorer_latch_too_strict",))
     checks = tmp_path / "checks.yaml"
-    raw = yaml.safe_load(CHECKS_FILE.read_text())
-    for check in raw["checks"]:
-        check["separates"] = [p for p in check["separates"] if "label_signal_missing" not in p]
-    checks.write_text(yaml.safe_dump(raw))
+    checks.write_text(yaml.safe_dump(_checks_of({"scorer_latch_too_strict"})))
     hyps = hypothesize(round_out, "tray", rules_dir=rules, checks_path=checks)
     place = [h for h in hyps if h.cluster.cluster_id == "C_70/place/L-PLACE-POSE/l1"]
     assert [(h.rule_id, h.group, h.diagnosis, h.note) for h in place] == [

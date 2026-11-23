@@ -235,6 +235,8 @@ class HypothesisRecord(Record):
     code_rank: int = Field(ge=1)
     blocked_data_spend: bool
     checks: list[CheckRef] = Field(default_factory=list)
+    refutes: list[Diagnosis] = Field(
+        default_factory=list, description="Diagnoses this rule's facts rule out; old files: [].")
 
 
 class HypothesisView(Record):
@@ -251,6 +253,8 @@ class HypothesisView(Record):
     support: list[str] = Field(default_factory=list)
     contra: list[str] = Field(default_factory=list)
     explanation: str = ""
+    refutes: list[Diagnosis] = Field(
+        default_factory=list, description="Ruled out by this hypothesis's support.")
 
 
 class OfferedFact(Record):

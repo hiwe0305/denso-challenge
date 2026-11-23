@@ -1,0 +1,30 @@
+# Hypothesis rules of the train group (DA-43 task 4.3, design 19/11 section 5.3 row 8:
+# "a finding T or D on the very job and dataset of the checkpoint, through lineage").
+# Field reference: the header of scorer.yaml. Changing this file is a new version of the
+# agent: score it again (design 11).
+#
+# {job} is the train job behind the run's checkpoint (fact lineage_{run}_job). Without it
+# the rule does not match; lineage's `_not_judged` fact says why.
+#
+# The evidence contract has no Diagnosis for a training fault, so the rule says `unknown`
+# with the note `train_fault`, as a system hypothesis with a repair ticket (the model must
+# be retrained before data is bought for it). One signal only: a loss that is not finite.
+# No threshold on the shape of a loss curve is set here; it would be a rule constant.
+
+rules:
+  - id: earlier_stage_train
+    title: "The train job behind this checkpoint logged a loss that is not finite"
+    source: "spec 6.4 (system first); design 19/11 section 5.3 row 8; design 19/11 section 4 (lineage)"
+    group: train
+    diagnosis: unknown
+    note: train_fault
+    system: true
+    interventions: [repair_ticket]
+    when:
+      - {fact: "train_{job}_all_train_nonfinite_losses", is: positive}
+    support:
+      - "lineage_{run}_job"
+      - "lineage_{run}_checkpoint"
+      - "train_{job}_all_train_nonfinite_losses"
+      - "train_{job}_all_rows"
+    contra: []

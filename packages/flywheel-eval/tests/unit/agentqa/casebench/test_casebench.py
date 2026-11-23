@@ -63,6 +63,20 @@ def test_refuted_clean_rank1_top3(tmp_path: Path) -> None:
     assert got == {"a": "wrong_rank1", "b": "wrong_top3", "c": "clean", "d": "clean"}
 
 
+def test_refuted_by_a_rule_is_clean_with_its_reason(tmp_path: Path) -> None:
+    ruling = view(TIMEOUT, [("unknown", "policy"), ("weak_skill", "x")])
+    ruling = ruling.model_copy(update={"hypotheses": [
+        ruling.hypotheses[0].model_copy(update={"refutes": ["controller"]}),
+        ruling.hypotheses[1]]})
+    report = score_case(write_answer(tmp_path, [
+        pt("a", "refuted", cluster=TIMEOUT, diagnosis="controller"),
+        pt("b", "refuted", cluster=TIMEOUT, diagnosis="sync")]),
+        make_run(tmp_path, clusters=[ruling]))
+    assert [(p.verdict, p.reason) for p in report.points] == [
+        ("clean", "refuted_by_rule"), ("clean", "")]
+    assert report.counts.a3_refuted_by_rule == 1 and report.counts.a3_wrong_top3 == 0
+
+
 def test_intervention_blocked_not_blocked_check(tmp_path: Path) -> None:
     got = verdicts(tmp_path, [
         pt("i1", "intervention", cluster=PLACE, intervention="repair_ticket"),

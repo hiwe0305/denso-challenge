@@ -65,6 +65,10 @@ class TaskView(_Frozen):
     threshold_units: dict[str, str] = Field(default_factory=dict)
     success_implies_step: str
     labels: dict[str, LabelSpec]
+    # Labels whose cause may be the whole-body controller, and steps in which the robot
+    # walks: the scope of the run-level tracking rules (design 19/11 section 5.3 rows 3-4).
+    runtime_labels: list[str] = Field(default_factory=list)
+    motion_steps: list[str] = Field(default_factory=list)
     latch_signals: dict[str, list[str]] = Field(default_factory=dict)
     provides: dict[str, list[str]] = Field(default_factory=dict)
     relaxed: RelaxedSpec | None = None
@@ -74,11 +78,14 @@ class TaskView(_Frozen):
 
     @model_validator(mode="after")
     def steps_known(self) -> Self:
-        named = [self.success_implies_step, *self.latch_signals]
+        named = [self.success_implies_step, *self.latch_signals, *self.motion_steps]
         named += [s.implies_step for s in self.labels.values() if s.implies_step]
         unknown = sorted({n for n in named if n not in self.steps})
         if unknown:
             raise ValueError(f"steps {unknown} are not steps of {self.task_id}")
+        strange = sorted(set(self.runtime_labels) - set(self.labels))
+        if strange:
+            raise ValueError(f"runtime_labels {strange} are not labels of {self.task_id}")
         missing = sorted(set(self.thresholds) - set(self.threshold_units))
         if missing:
             raise ValueError(f"thresholds {missing} have no unit in threshold_units")
