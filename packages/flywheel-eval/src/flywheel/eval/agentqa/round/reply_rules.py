@@ -84,9 +84,46 @@ def unwrap(text: str) -> str:
     return fenced.group(1).strip() if fenced else stripped
 
 
+def strip_trailing_commas(text: str) -> str:
+    """`text` without a comma directly before `}` or `]` (whitespace between allowed).
+
+    A small state machine: commas inside a JSON string are never touched.
+    """
+    out: list[str] = []
+    in_string = escaped = False
+    for ch in text:
+        if in_string:
+            out.append(ch)
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch in "}]":
+            k = len(out)
+            while k > 0 and out[k - 1] in " \t\r\n":
+                k -= 1
+            if k > 0 and out[k - 1] == ",":
+                del out[k - 1]
+        elif ch == '"':
+            in_string = True
+        out.append(ch)
+    return "".join(out)
+
+
+def _loads(text: str) -> Any:
+    body = unwrap(text)
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError:
+        return json.loads(strip_trailing_commas(body))  # the one repair; may raise again
+
+
 def parse_rank(text: str) -> RankReply:
     """Raises `ValueError` (pydantic's `ValidationError` included) on any wrong shape."""
-    raw = json.loads(unwrap(text))
+    raw = _loads(text)
     if not isinstance(raw, dict):
         raise ValueError("the reply is not a JSON object")
     return RankReply.model_validate(raw)
@@ -186,17 +223,18 @@ def rule_numbers(reply: RankReply, offered: Offered) -> list[str]:
 
 
 def rule_comparison(reply: RankReply, offered: Offered) -> list[str]:
-    """A comparison word with cited facts of two or more different units.
+    """A comparison word with cited facts of two or more different units, and no cited
+    comparison fact (one the code compared itself: a boolean or a marked name).
 
-    Deliberately simple: the round's facts have no "comparison fact" (a difference or a
-    ratio computed by code) yet, so any comparison across units is refused. Uncited or
-    unknown facts are `rule_ids_offered`'s and are ignored here.
+    Uncited or unknown facts are `rule_ids_offered`'s and are ignored here.
     """
     out = []
     for where, cites, text in _sentences(reply):
         units = {offered.facts[f].unit for f in cites if f in offered.facts}
-        if _COMPARISON.search(text) and len(units) >= 2:
-            out.append(f"{where} compares facts of different units {sorted(units)}")
+        compared = any(offered.facts[f].comparison for f in cites if f in offered.facts)
+        if _COMPARISON.search(text) and len(units) >= 2 and not compared:
+            out.append(f"{where} compares facts of different units {sorted(units)} "
+                       "without citing a comparison fact")
     return out
 
 

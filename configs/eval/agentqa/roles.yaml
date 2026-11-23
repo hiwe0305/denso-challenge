@@ -6,3 +6,15 @@
 rank:
   max_clusters: 8     # clusters ranked per round, largest first; the rest stay on the code floor
   max_facts: 60       # facts offered per cluster: cited ones first, then by fact id
+  # A fact whose value is a boolean, or whose name holds one of these, is a comparison
+  # fact: the code compared, so a sentence citing it may compare across units.
+  comparison_markers:
+    - _above_tau
+    - _exceeds_tau
+    - _separates_
+    - _in_domain
+    - _near_miss
+    - _within_
+    - _matches_
+    - _judgeable
+    - _largest_drop

@@ -408,3 +408,26 @@ uv run fw agentqa round --pack fwdata/agentqa/cases/stage1-60k-src/pack.json --o
     --gateway-config fwdata/agentqa/gateway-ckey
 ```
 
+### 9.3 Gói có điều kiện train, 23/11/2026
+
+Gói `stage1-60k-k1` (`pack_26ef5704e43fdbc2`, 254 file): gói 9.1 cộng 60 điều kiện eval và điều kiện train theo từng run (`C_70`, `B_70`: 425; `C_ALL`, `B_ALL`: 606), xuất bằng `flywheel_psi0.tray.export_conditions`. Tập train của mỗi run lấy theo lát cắt ghi trong `launch.json`; không điều kiện eval nào trùng dữ liệu train. Chưa có outcome (K1): lệnh xuất đã viết, chờ PR 211 sửa một luật của hợp đồng.
+
+| Số đo | Sàn code | Có model (`claude-opus-5-5` qua ckey.vn) |
+|---|---|---|
+| Giả thuyết theo luật | `label_signal_missing` 53, `weak_skill` 32, `out_of_domain` 17, `coverage_gap` 15, `scorer_latch_too_strict` 14 | |
+| Cụm có từ hai giả thuyết | 53 trên 64 | |
+| A1 | 22/24; bắt buộc 7/9 | 22/24; bắt buộc 7/9 |
+| A2, A3, A5 | 4/4; 0; 2/2 | 4/4; 0; 2/2 |
+| D1 | | 0 ở mọi cột: model giữ thứ tự của code |
+| Lời gọi model | | 13 (8 lần đầu, 5 lần gửi lại); bước `judge` 264 giây |
+| Phán quyết, luật kiểm lúc chạy | | 3 `accepted`, 5 `rejected` |
+| Phán quyết, luật kiểm đã sửa (`--from verify`, không gọi lại model) | | 8 `accepted` |
+| Thời gian cả lệnh, đỉnh RAM | 95 giây, 371 MB | 360 giây, 385 MB |
+
+Cách đọc:
+
+- **Năm câu bị loại lúc chạy là lỗi của rào, không phải của model.** Ba câu trượt luật "so sánh": model viết rằng một lượt vượt ngưỡng nhưng trung bình cụm dưới ngưỡng và mọi lượt trong miền, nên giả thuyết thiếu vùng phủ yếu hơn. Luật khi đó cấm mọi câu so sánh trích hai fact khác đơn vị; design 19/11 cho phép khi câu trích một fact mà code đã tự so sánh. Hai câu hỏng JSON vì dấu phẩy thừa ở lần gửi lại. Sau khi sửa (luật theo đúng design; bỏ dấu phẩy thừa ngoài chuỗi), cả 8 câu lần đầu đều qua.
+- **Model lập luận được trên fact khi có giả thuyết cạnh tranh, nhưng chưa đổi kết luận nào.** Trên ca này thứ tự của code đã khớp đáp án, nên D1 bằng 0 chưa phân biệt được "model không giúp" với "không còn gì để giúp".
+- **τ_cov chưa khớp số của đội.** Công cụ ra 0,868 (mức 1) và 1,920 (mức 2) cho `C_70`; design 19/11 mục 4 ghi số của đội là 1,143 và 1,524. Định nghĩa khoảng cách của công cụ (chuẩn hóa theo thành phần khai trong config task) khác của adapter. Cho tới khi đối chiếu xong, các giả thuyết `weak_skill`, `coverage_gap`, `out_of_domain` trên gói thật là **chưa kiểm chứng**.
+- Cả 8 cụm được xếp hạng vẫn bị chặn tiêu ngân sách dữ liệu vì thiếu tư thế khay; hai điểm bắt buộc còn trượt nằm ở đây.
+
