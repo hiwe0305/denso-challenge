@@ -10,6 +10,7 @@ dependencies = ["flywheel-contracts", "flywheel-store", "numpy", "pyarrow", "pyy
 
 [project.optional-dependencies]
 agentqa = []
+agentqa-hosted = ["anthropic>=2.12"]
 test = ["flywheel-testkit"]
 
 [project.entry-points."flywheel.commands"]

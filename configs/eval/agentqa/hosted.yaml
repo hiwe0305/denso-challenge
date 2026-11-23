@@ -5,7 +5,8 @@
 # did not confirm as public (hard blocks 2 and 3). Keys are never written here: a
 # profile names the environment variable that holds its key.
 #
-# Hosted providers are built from task 5.4; until then a hosted route is refused.
+# Hosted providers are built by the gateway from the profile (round/providers/anthropic.py,
+# openai_hosted.py). The `anthropic` kind needs the agentqa-hosted dependency group.
 enabled: false
 
 profiles:
@@ -18,3 +19,18 @@ profiles:
     timeout_s: 120
     usd_per_mtok_in: 0.10     # Anthropic price list, checked 3/11/2026 (architecture 12)
     usd_per_mtok_out: 0.50
+
+  ckey_opus:
+    # ckey.vn reseller gateway; listed 800 VND per 1M tokens on 23/11/2026, converted at an
+    # assumed 25,000 VND per USD; the model behind the id is not verified and reported token
+    # counts are not reliable.
+    provider: anthropic
+    hosted: true
+    model: claude-opus-5-5
+    base_url: https://api.xah.io
+    api_key_env: CKEY_API_KEY
+    thinking: false
+    max_tokens: 6144
+    timeout_s: 180
+    usd_per_mtok_in: 0.032
+    usd_per_mtok_out: 0.032
