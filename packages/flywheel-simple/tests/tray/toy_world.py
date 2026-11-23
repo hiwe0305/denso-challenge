@@ -108,8 +108,11 @@ class ToyWorld:
     def drop_left_contact_at(self, phase: Phase) -> None:
         self.drop_left_in = phase
 
-    def run(self, max_s: float = 150.0) -> list[Record]:
-        planner = TrayPlanner(self.planner_cfg, self.cfg, self.sample)
+    def run(self, max_s: float = 150.0, planner: TrayPlanner | None = None) -> list[Record]:
+        """One episode; `planner` defaults to a plain one for this world's sample."""
+        if planner is None:
+            planner = TrayPlanner(self.planner_cfg, self.cfg, self.sample)
+        self.planner = planner
         planner.start(self.start_wrists[0], self.start_wrists[1])
         tracker = StepTracker(self.cfg, self.sample)
         state = self._state()

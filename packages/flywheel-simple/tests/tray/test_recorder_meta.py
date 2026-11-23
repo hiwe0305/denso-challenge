@@ -7,7 +7,7 @@ from dataclasses import asdict, replace
 import numpy as np
 import pytest
 from flywheel_simple.tray.mjcf import TARGET_ZONE_REVISION
-from flywheel_simple.tray.planner import PlannerConfig
+from flywheel_simple.tray.planner import CarryJitter, PlannerConfig
 from flywheel_simple.tray.predicates import STEP_NAMES
 from flywheel_simple.tray.recorder import (
     TRAY_FEATURES,
@@ -37,6 +37,19 @@ def test_planner_version_follows_the_config_values() -> None:
     cfg = PlannerConfig.load()
     assert planner_version(cfg) == planner_version(PlannerConfig.load())
     assert planner_version(cfg) != planner_version(replace(cfg, lift_height=cfg.lift_height + 0.01))
+
+
+def test_carry_jitter_tags_the_planner_version_and_leaves_plain_ones_alone() -> None:
+    # DA-46: the jitter is not a PlannerConfig field, so the plain version (and the 600
+    # jig batch logged under it) stays exactly as before; a jittered one gets a tag.
+    plain = "da41-planner-8+cfg.bee61399"
+    cfg = PlannerConfig.load()
+    assert planner_version(cfg) == planner_version(cfg, None) == plain
+    assert planner_version(cfg, CarryJitter()) == plain
+    assert planner_version(cfg, CarryJitter(0.05, 0.05)) == plain + "+cj.a050s050"
+    assert planner_version(cfg, CarryJitter(0.05, 0.03)) != planner_version(
+        cfg, CarryJitter(0.03, 0.05)
+    )
 
 
 def test_visuals_revision_reads_the_manifest_and_names_the_target_zone(tmp_path) -> None:  # type: ignore[no-untyped-def]

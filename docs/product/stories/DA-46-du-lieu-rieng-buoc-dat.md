@@ -44,7 +44,7 @@ Vì sao C: pha ARRIVE_B của planner đã có sẵn vòng sửa (bước tới 
 
 - [x] 1.1 Viết story (file này)
 - [x] 2.1 `gen_log.jsonl` ghi `phases` và `carry_offset` của từng lượt, có test (AC 1)
-- [ ] 2.2 Tùy chọn làm lệch đích CARRY theo seed trong planner, agent, `generate` và `planner_version`, có test (AC 2)
+- [x] 2.2 Tùy chọn làm lệch đích CARRY theo seed trong planner, agent, `generate` và `planner_version`, có test (AC 2)
 - [x] 3.1 Lệnh cắt release dẫn xuất từ ARRIVE_B, có test trên dữ liệu nhỏ (AC 3)
 - [ ] 4.1 Lô mẫu trên laptop, số đo và runbook nháp cho `rtx3060` trong `docs/g0/tray/place-data.md` (AC 4)
 - [ ] 4.2 Chạy đủ kiểm tra, `pr_guard`, mở PR (AC 6)

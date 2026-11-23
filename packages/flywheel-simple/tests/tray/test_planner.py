@@ -6,7 +6,14 @@ import math
 
 import numpy as np
 import pytest
-from flywheel_simple.tray.planner import Phase, PlannerConfig, TrayPlanner, base_transform
+from flywheel_simple.tray.planner import (
+    CarryJitter,
+    Phase,
+    PlannerCommand,
+    PlannerConfig,
+    TrayPlanner,
+    base_transform,
+)
 from flywheel_simple.tray.predicates import StepTracker
 from toy_world import PELVIS_Z, Record, ToyWorld
 
@@ -413,3 +420,90 @@ def test_arrive_b_does_not_hunt_on_the_standing_sway() -> None:
     arrive = [r for r in records if r.cmd.phase is Phase.ARRIVE_B]
     assert any(r.cmd.phase is Phase.LOWER for r in records)
     assert arrive[-1].state.t - arrive[0].state.t < world.planner_cfg.timeout_arrive_b - 2.0
+
+
+# -- carry jitter (DA-46) ------------------------------------------------------
+
+
+def test_carry_jitter_offset_is_seeded_and_within_its_half_ranges() -> None:
+    jitter = CarryJitter(0.05, 0.03)
+    offsets = [jitter.offset(seed) for seed in range(20)]
+    assert offsets == [jitter.offset(seed) for seed in range(20)]
+    assert all(abs(a) <= 0.05 and abs(s) <= 0.03 for a, s in offsets)
+    assert len(set(offsets)) == 20
+    assert all(round(v, 4) == v for o in offsets for v in o)  # logged = applied
+
+
+def test_carry_jitter_ahead_draw_ignores_the_side_range() -> None:
+    for seed in range(5):
+        ahead = CarryJitter(0.05, 0.0).offset(seed)[0]
+        assert ahead != 0.0
+        assert CarryJitter(0.05, 0.02).offset(seed)[0] == ahead
+        assert CarryJitter(0.05, 0.08).offset(seed)[0] == ahead
+
+
+def test_carry_jitter_off_gives_no_shift_and_no_tag() -> None:
+    assert not CarryJitter().enabled
+    assert CarryJitter().offset(7) == (0.0, 0.0) and CarryJitter().tag() == ""
+    assert CarryJitter(0.05, 0.05).tag() == "+cj.a050s050"
+    assert CarryJitter(0.0, 0.02).enabled and CarryJitter(0.0, 0.02).tag() == "+cj.a000s020"
+    with pytest.raises(ValueError, match=">= 0"):
+        CarryJitter(-0.01, 0.0)
+
+
+def numbers(cmd: PlannerCommand) -> list[object]:
+    return [
+        cmd.phase,
+        cmd.nav,
+        cmd.heading,
+        cmd.left_wrist.tolist(),
+        cmd.right_wrist.tolist(),
+        cmd.hand_closure,
+        cmd.abort_reason,
+    ]
+
+
+def jittered_run(offset: tuple[float, float] | None) -> tuple[ToyWorld, list[Record]]:
+    world = ToyWorld(level=1, seed=2)
+    planner = (
+        TrayPlanner(world.planner_cfg, world.cfg, world.sample)
+        if offset is None
+        else TrayPlanner(world.planner_cfg, world.cfg, world.sample, carry_offset=offset)
+    )
+    return world, world.run(planner=planner)
+
+
+def test_a_zero_carry_offset_changes_no_command() -> None:
+    _, plain = jittered_run(None)
+    _, zero = jittered_run((0.0, 0.0))
+    assert [numbers(r.cmd) for r in zero] == [numbers(r.cmd) for r in plain]
+
+
+def test_carry_offset_shifts_the_goal_and_arrive_b_corrects_it() -> None:
+    plain_world, plain = jittered_run(None)
+    world, records = jittered_run((0.05, 0.05))
+    # Identical up to the end of LIFT, where the carry is planned.
+    before = [r for r in plain if r.cmd.phase.value <= Phase.LIFT.value]
+    assert [numbers(r.cmd) for r in records[: len(before)]] == [numbers(r.cmd) for r in before]
+    assert records[len(before)].cmd.phase is Phase.BACK_OFF
+    carry, plain_carry = world.planner._carry, plain_world.planner._carry
+    assert carry is not None and plain_carry is not None
+    h = plain_carry.heading
+    assert carry.heading == h
+    shift = [0.05 * math.cos(h) - 0.05 * math.sin(h), 0.05 * math.sin(h) + 0.05 * math.cos(h)]
+    assert carry.goal == pytest.approx(plain_carry.goal + shift, abs=1e-12)
+    # Arrived 5 cm past and 5 cm left: ARRIVE_B steps back and right, then it places.
+    arrive = [r.cmd.nav for r in records if r.cmd.phase is Phase.ARRIVE_B]
+    assert any(vx < 0 for vx, _, _ in arrive) and any(vy < 0 for _, vy, _ in arrive)
+    assert records[-1].cmd.phase is Phase.DONE and records[-1].report.success
+    target = world.sample.target_pose
+    miss = math.hypot(world.tray_pos[0] - target.x, world.tray_pos[1] - target.y)
+    assert miss < world.cfg.target_pos_tol
+
+
+def test_reset_keeps_the_carry_offset() -> None:
+    world = ToyWorld()
+    planner = TrayPlanner(world.planner_cfg, world.cfg, world.sample, carry_offset=(0.01, -0.02))
+    planner.phase = Phase.CARRY
+    planner.reset()
+    assert planner.carry_offset == (0.01, -0.02) and planner.phase is Phase.APPROACH_A

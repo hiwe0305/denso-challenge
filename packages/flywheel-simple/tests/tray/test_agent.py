@@ -68,3 +68,17 @@ def test_arm_commands_move_at_most_arm_step_max_per_step(env: Any) -> None:
     steps = np.abs(np.diff(np.array(goals), axis=0))
     assert len(arms) == 14 and len(goals) > 500
     assert steps.max() <= cfg.arm_step_max + 1e-6, (steps.max(), np.argmax(steps.max(axis=1)))
+
+
+def test_carry_jitter_shifts_the_episode_by_its_seed(env: Any) -> None:
+    # DA-46: the returned (and logged) offset is the seed's draw, applied to the CARRY goal.
+    from flywheel_simple.tray.agent import TrayAgent, run_episode
+    from flywheel_simple.tray.planner import CarryJitter, PlannerConfig
+
+    jitter = CarryJitter(0.05, 0.05)
+    agent = TrayAgent(env, PlannerConfig.load(), jitter)
+    result = run_episode(env, agent, seed=1, level=1)
+    assert result.carry_offset == jitter.offset(1) != (0.0, 0.0)
+    assert agent.planner is not None and agent.planner.carry_offset == jitter.offset(1)
+    with pytest.raises(ValueError, match="seed"):
+        agent.reset()
