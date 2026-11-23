@@ -35,6 +35,8 @@ class Counts(Strict):
     a2_total: int
     a3_wrong_rank1: int
     a3_wrong_top3: int
+    a3_refuted_by_rule: int = Field(
+        default=0, description="Clean refuted points a hypothesis rules out by its facts.")
     a4_reached: int
     a4_total: int
     a5_reached: int

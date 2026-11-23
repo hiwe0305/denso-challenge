@@ -1,0 +1,67 @@
+# Hypothesis rules of the coverage group (DA-43 task 4.3, design 19/11 section 5.3 rows 5-7;
+# spec 6.8 step 8). Field reference: the header of scorer.yaml. Changing this file is a new
+# version of the agent: score it again (design 11).
+#
+# The facts are `coverage_distance`'s, per cluster: `_in_domain` (every matched eval
+# condition lies within the train range of its level) and `_above_tau` (how many lie
+# farther than tau_cov from their k nearest train conditions). A cluster without these
+# facts (no conditions entry, a level not judged) matches none of these rules; the tool's
+# `_not_judged` fact says why.
+#
+# Row 5 of the design also asks "the planner succeeds" for a weak skill. No tool computes
+# it yet: the check `planner_on_failed_conditions` is what tells weak_skill apart.
+
+rules:
+  - id: weak_skill
+    title: "The failed conditions lie within the trained region: the policy has the coverage but not the skill"
+    source: "spec 6.8 step 8 and 6.9 (weak_skill); design 19/11 section 5.3 row 5; tray.md 20.12-20.13"
+    group: coverage
+    diagnosis: weak_skill
+    note: within_coverage
+    system: false
+    interventions: [teleop_correction]
+    when:
+      - {fact: "{run}_cluster_{cluster_slug}_coverage_in_domain", is: true}
+      - {fact: "{run}_cluster_{cluster_slug}_coverage_above_tau", is: zero}
+    support:
+      - "{run}_cluster_{cluster_slug}_coverage_in_domain"
+      - "{run}_cluster_{cluster_slug}_coverage_above_tau"
+      - "{run}_cluster_{cluster_slug}_coverage_d_mean"
+      - "{run}_cluster_{cluster_slug}_coverage_matched"
+      - "tau_cov_l{level}"
+    contra: []
+
+  - id: coverage_gap
+    title: "Some failed conditions lie farther from the train conditions than the coverage tolerance"
+    source: "spec 6.8 step 8 and 6.9 (coverage_gap); design 19/11 section 5.3 row 6"
+    group: coverage
+    diagnosis: coverage_gap
+    note: beyond_tau_cov
+    system: false
+    interventions: [sim_s1, sim_s2, sim_s3, sim_s4]
+    when:
+      - {fact: "{run}_cluster_{cluster_slug}_coverage_in_domain", is: true}
+      - {fact: "{run}_cluster_{cluster_slug}_coverage_above_tau", is: positive}
+    support:
+      - "{run}_cluster_{cluster_slug}_coverage_above_tau"
+      - "{run}_cluster_{cluster_slug}_coverage_d_mean"
+      - "tau_cov_l{level}"
+      - "{run}_cluster_{cluster_slug}_coverage_matched"
+      - "{run}_cluster_{cluster_slug}_coverage_in_domain"
+    contra: []
+
+  - id: out_of_domain
+    title: "Some failed conditions lie outside the range the policy was trained on"
+    source: "spec 6.8 step 8 and 6.9 (out_of_domain); design 19/11 section 5.3 row 7"
+    group: coverage
+    diagnosis: out_of_domain
+    note: outside_train_range
+    system: false
+    interventions: [report_only]
+    when:
+      - {fact: "{run}_cluster_{cluster_slug}_coverage_in_domain", is: false}
+    support:
+      - "{run}_cluster_{cluster_slug}_coverage_in_domain"
+      - "{run}_cluster_{cluster_slug}_coverage_matched"
+      - "{run}_cluster_{cluster_slug}_coverage_d_mean"
+    contra: []

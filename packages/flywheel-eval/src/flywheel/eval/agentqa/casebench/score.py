@@ -14,6 +14,9 @@ from flywheel.eval.agentqa.casebench.report import (
 from flywheel.eval.agentqa.casebench.rundir import Run
 from flywheel.eval.agentqa.round.records import ClusterView, FactRecord
 
+# Reason of a clean `refuted` point that a hypothesis of the cluster rules out explicitly.
+REFUTED_BY_RULE = "refuted_by_rule"
+
 
 def _cluster(run: Run, key: ClusterKey) -> ClusterView | None:
     for view in run.assembly.clusters:
@@ -73,7 +76,9 @@ def _match(run: Run, point: Point) -> PointResult:
             return _result(point, "wrong_rank1", rank=1)
         if rank is not None and rank <= 3:
             return _result(point, "wrong_top3", rank=rank)
-        return _result(point, "clean", rank=rank)
+        # Clean either way; a hypothesis whose facts rule the diagnosis out says so.
+        ruled_out = any(point.diagnosis in h.refutes for h in view.hypotheses)
+        return _result(point, "clean", REFUTED_BY_RULE if ruled_out else "", rank=rank)
     if point.kind == "intervention":
         ok = view.intervention == point.intervention
         return _result(point, "reached" if ok else "missed",
@@ -116,6 +121,7 @@ def count(results: list[PointResult]) -> Counts:
         a2_top3=sum(r.rank is not None and r.rank <= 3 for r in diag), a2_total=len(diag),
         a3_wrong_rank1=sum(r.verdict == "wrong_rank1" for r in refuted),
         a3_wrong_top3=sum(r.verdict in ("wrong_rank1", "wrong_top3") for r in refuted),
+        a3_refuted_by_rule=sum(r.reason == REFUTED_BY_RULE for r in refuted),
         a4_reached=sum(r.verdict == reached for r in checks), a4_total=len(checks),
         a5_reached=sum(r.verdict == reached for r in fixes), a5_total=len(fixes))
 

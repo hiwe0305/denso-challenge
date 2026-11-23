@@ -26,3 +26,43 @@ checks:
     needs: "the latch signal of the step on the run's successful rollouts (CPU analysis)"
     cost_key: cpu_analysis
     cost_rank: 1
+
+  # Design 19/11 section 5.3 (catalog of checks) and tray.md 20.12. The design's pair
+  # "policy vs infeasible" of step 5 has no rule on either side yet, so it is not listed.
+  - id: planner_on_failed_conditions
+    name: "Run the motion planner on the cluster's failed conditions (spec 6.8 step 5)"
+    separates:
+      - [weak_skill, coverage_gap]
+      - [weak_skill, out_of_domain]
+      - [weak_skill, none]
+    needs: "a planner run per failed condition of the cluster in the simulator (no GPU)"
+    cost_key: planner_rerun
+    cost_rank: 3
+
+  - id: coverage_distance_check
+    name: "Measure the distance of the cluster's failed conditions to the train conditions against tau_cov (spec 6.8 step 8)"
+    separates:
+      - [coverage_gap, weak_skill]
+      - [coverage_gap, out_of_domain]
+      - [weak_skill, out_of_domain]
+      - [coverage_gap, none]
+      - [out_of_domain, none]
+    needs: "the train and eval conditions of the run in the pack (CPU analysis)"
+    cost_key: cpu_analysis
+    cost_rank: 1
+
+  - id: tracking_error_on_successes
+    name: "Compare the tracking error of failed and successful rollouts with the tracking tolerance"
+    separates:
+      - [controller_tracking, none]
+    needs: "the traces of the run's failed and successful rollouts (CPU analysis)"
+    cost_key: cpu_analysis
+    cost_rank: 1
+
+  - id: inspect_train_log_window
+    name: "Read the train log of the checkpoint's job around the non-finite losses"
+    separates:
+      - [earlier_stage_train, none]
+    needs: "the train metrics of the job lineage names for the run (CPU analysis)"
+    cost_key: cpu_analysis
+    cost_rank: 1

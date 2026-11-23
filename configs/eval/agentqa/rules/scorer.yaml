@@ -15,11 +15,19 @@
 #   system         true: while a hypothesis of this rule stands, the cluster spends no
 #                  data budget
 #   interventions  a subset of INTERVENTIONS_OF_DIAGNOSIS[diagnosis]
-#   when           all must hold: {cluster: chain_broken}, or
-#                  {fact: <name template>, is: true | false | positive | zero | present}
+#   when           all must hold: {cluster: chain_broken},
+#                  {cluster: label_in, set: runtime_labels} (a label set of the task view),
+#                  {cluster: step_in, set: motion_steps} (a step set of the task view),
+#                  {fact: <name template>, is: true | false | positive | zero | present},
+#                  or {any: [[cond, ...], [cond, ...]]} (every condition of one group holds)
 #                  (no numeric literal: a threshold is a fact, not a rule constant)
 #   support/contra fact-name templates; a missing fact is left out
-# Templates may use {run}, {step} (the cluster's first failed step), {label}, {level}.
+#   refutes        optional: diagnoses the rule's facts rule out for the cluster (the page
+#                  says "rules out" with the support facts; the case bench reads it)
+# Templates may use {run}, {step} (the cluster's first failed step), {label}, {level},
+# {cluster_slug} (the cluster key as fact names spell it: <step>_<label>_l<level>) and
+# {job} (the train job of the run's checkpoint, from the fact lineage_{run}_job; a rule
+# whose condition needs {job} does not match while lineage has not resolved it).
 
 rules:
   - id: scorer_latch_too_strict

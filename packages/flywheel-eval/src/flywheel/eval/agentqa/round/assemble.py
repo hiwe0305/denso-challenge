@@ -54,7 +54,7 @@ def _view(h: HypothesisRecord, titles: dict[str, str]) -> HypothesisView:
         hypothesis_id=h.hypothesis_id, rule_id=h.rule_id,
         title=rule_title(h.rule_id, titles),
         group=h.group, diagnosis=h.diagnosis, note=h.note, rank=h.code_rank, source="code",
-        support=h.support, contra=h.contra)
+        support=h.support, contra=h.contra, refutes=h.refutes)
 
 
 def _not_judged(facts: list[FactRecord], calls: list[ToolCallRecord],
