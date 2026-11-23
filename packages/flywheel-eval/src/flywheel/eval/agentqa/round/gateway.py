@@ -63,8 +63,8 @@ ProviderFactory = Callable[[str, Profile], ChatModel]
 def build_provider(name: str, profile: Profile, agent_config: Path = AGENT_CONFIG) -> ChatModel:
     """The provider of `profile`. Only the gateway calls this, after the class check.
 
-    The seam of task 5.4: hosted kinds (`openai_compatible`, `anthropic`) are built
-    here from `round/providers/`, and nowhere else.
+    The one seam: hosted kinds (`openai_compatible`, `anthropic`) are built here from
+    `round/providers/`, and nowhere else. A missing key variable or SDK is a refusal.
     """
     if profile.provider == "local_openai" and not profile.hosted:
         assert profile.endpoint is not None  # the profile validator requires it
@@ -72,8 +72,17 @@ def build_provider(name: str, profile: Profile, agent_config: Path = AGENT_CONFI
             return LocalEndpointModel(load_endpoint(profile.endpoint, agent_config))
         except (ValueError, KeyError, OSError) as error:
             raise GatewayRefused(f"profile {name}: {error}") from error
-    raise GatewayRefused(f"profile {name}: hosted provider {profile.provider} is not built "
-                         "yet (task 5.4)")
+    assert profile.model is not None and profile.api_key_env is not None  # validator
+    try:
+        if profile.provider == "anthropic":
+            from flywheel.eval.agentqa.round.providers.anthropic import AnthropicModel
+            return AnthropicModel(profile.model, profile.api_key_env,
+                                  base_url=profile.base_url, thinking=profile.thinking)
+        assert profile.base_url is not None  # validator
+        from flywheel.eval.agentqa.round.providers.openai_hosted import OpenAICompatibleModel
+        return OpenAICompatibleModel(profile.model, profile.api_key_env, profile.base_url)
+    except GatewayRefused as error:
+        raise GatewayRefused(f"profile {name}: {error}") from error
 
 
 def hosted_refusal(admission: Admission, hosted_enabled: bool) -> str | None:

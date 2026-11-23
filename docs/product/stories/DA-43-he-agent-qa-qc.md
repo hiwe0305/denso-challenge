@@ -65,7 +65,7 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
   - [x] 5.1 Cổng model: hồ sơ, bảng vai × lớp dữ liệu, chặn hosted, ngân sách, ghi và phát lại
   - [ ] 5.2 Vai `adjudicate` và `rank`: prompt, schema câu trả lời
   - [ ] 5.3 B5: các phép kiểm của kiến trúc mục 25 (luật của design mục 6), ba sửa của bản 3 và ca kiểm của AC 5, phán quyết và sàn code
-  - [ ] 5.4 Lớp hosted kiểu OpenAI (OpenRouter) và lớp Anthropic
+  - [x] 5.4 Lớp hosted kiểu OpenAI (OpenRouter) và lớp Anthropic
   - [ ] 5.5 Xuất `round_diagnosis.json` theo `RoundDiagnosis` sau khi PR hợp đồng K2 merge
 - [ ] 6. Bộ ca lịch sử (1,5 ngày)
   - [ ] 6.1 Kiểm artifact của từng ca ứng viên còn đủ; loại ca thiếu, ghi lý do

@@ -26,7 +26,8 @@ from helpers_round import ScriptedChat, admitted_run
 LOCAL = Profile(provider="local_openai", hosted=False, endpoint="agent", max_tokens=500,
                 timeout_s=30)
 HOSTED = Profile(provider="openai_compatible", hosted=True, model="m",
-                 api_key_env="FW_TEST_HOSTED_KEY", max_tokens=500, timeout_s=30,
+                 base_url="https://h.example/v1", api_key_env="FW_TEST_HOSTED_KEY",
+                 max_tokens=500, timeout_s=30,
                  usd_per_mtok_in=1000.0, usd_per_mtok_out=1000.0)
 ROLES = ("adjudicate", "rank", "look")
 
@@ -119,12 +120,6 @@ def test_confirmed_public_pack_may_reach_a_hosted_profile(tmp_path: Path) -> Non
     (line,) = lines(run)
     assert line.hosted and line.host == "api.example" and line.data_class == "public"
     assert line.usd == pytest.approx((100 + 10) * 1000.0 / 1e6)
-
-
-def test_the_default_factory_builds_no_hosted_provider_yet(tmp_path: Path) -> None:
-    gateway = Gateway(admitted_run(tmp_path), make_config(rank_public="hosted", hosted=True))
-    with pytest.raises(GatewayRefused, match="task 5.4"):
-        gateway.call("rank", request())
 
 
 # --- budget --------------------------------------------------------------------------

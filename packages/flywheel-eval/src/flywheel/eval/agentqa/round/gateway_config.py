@@ -59,6 +59,7 @@ class Profile(_Config):
         default=None, pattern=ENV_NAME,
         description="Hosted only: the NAME of the variable that holds the key, never the key.")
     max_tokens: int = Field(ge=1, description="Reply cap per call; a request asking more is cut.")
+    thinking: bool = Field(default=False, description="Hosted `anthropic` only: adaptive thinking.")
     timeout_s: float = Field(gt=0, le=600)
     usd_per_mtok_in: float = Field(default=0.0, ge=0)
     usd_per_mtok_out: float = Field(default=0.0, ge=0)
@@ -70,10 +71,16 @@ class Profile(_Config):
         if self.hosted:
             if not self.model or not self.api_key_env or self.endpoint:
                 raise ValueError("a hosted profile names model and api_key_env, no endpoint")
+            if self.provider == "openai_compatible" and not self.base_url:
+                raise ValueError("an openai_compatible profile needs a base_url")
+            if self.thinking and self.provider != "anthropic":
+                raise ValueError("thinking is for the anthropic provider only")
         else:
             if not self.endpoint or self.model or self.base_url or self.api_key_env:
                 raise ValueError("a local profile names only an endpoint of agent.yaml; its "
                                  "model, URL and key variable live there")
+            if self.thinking:
+                raise ValueError("thinking is for the anthropic provider only")
             if self.usd_per_mtok_in or self.usd_per_mtok_out:
                 raise ValueError("a local profile costs nothing per token")
         return self
