@@ -36,6 +36,14 @@ def test_two_attempts_are_logged_and_recorded_then_resume_skips_them(tmp_path: P
     assert summary.attempts == 2 and summary.recorded == sum(r["recorded"] for r in rows)
     assert all(r["qa"] == "pass" for r in rows if r["recorded"]), rows
     assert all(r["wall_s"] > 0 and r["gpu_name"] for r in rows)
+    for r in rows:  # phase entry times (DA-46)
+        names, times = [p[0] for p in r["phases"]], [p[1] for p in r["phases"]]
+        assert r["phases"][0] == ["APPROACH_A", 0.0], r["phases"]
+        assert times == sorted(times) and len(set(times)) == len(times), r["phases"]
+        assert names[-1] == r["phase_reached"]
+        if r["success"]:
+            assert {"ARRIVE_B", "LOWER"} & set(names), names
+        assert len(r["carry_offset"]) == 2
 
     info = json.loads((shard_dir(tmp_path, 0) / "raw/meta/info.json").read_text())
     assert info["total_episodes"] == summary.recorded

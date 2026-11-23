@@ -9,6 +9,7 @@ SIMPLE's `postprocess_psi0_sonic.py` merges shards by glob (Task 8).
 
 Only successful attempts are recorded; each gets `minimal_qa`. Recorded episodes
 that fail QA stay in the dataset and are dropped downstream by their log row.
+Each row also holds the attempt's phase entry times and carry-goal offset (DA-46).
 
 The pure parts (seeds, log, QA rules) import in the workspace; `generate` and
 `minimal_qa` run in the SIMPLE venv.
@@ -22,7 +23,7 @@ import math
 import subprocess
 import time
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -60,6 +61,9 @@ class AttemptRow:
     qa: str  # "pass", the first failing check, or "not_recorded"
     purpose: str = "coverage"  # or targets.PURPOSE (Task 10)
     cluster_id: str | None = None
+    # (phase, sim s since the planner started) as entered; absent in rows before DA-46
+    phases: list[tuple[str, float]] = field(default_factory=list)
+    carry_offset: tuple[float, float] = (0.0, 0.0)  # carry goal shift (m): ahead, sideways
 
 
 @dataclass(frozen=True)
@@ -347,6 +351,8 @@ def generate(
                     qa=qa,
                     purpose=purpose,
                     cluster_id=cluster_id,
+                    phases=list(result.phases),
+                    carry_offset=result.carry_offset,
                 ),
             )
     finally:
