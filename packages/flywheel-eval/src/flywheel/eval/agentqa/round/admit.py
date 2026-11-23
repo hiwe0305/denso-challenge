@@ -38,6 +38,7 @@ from flywheel.contracts.entities import (
     Score,
     Source,
 )
+from flywheel.contracts.outcome import RolloutOutcome
 from flywheel.contracts.trace import TraceStep
 from flywheel.contracts.training import TrainingMetric
 from flywheel.eval.agentqa.round.pack import PACK_FILE, PackRefused, refused_path, sha256_of
@@ -67,6 +68,7 @@ class Kind:
 # agent only reads artifacts that have a contract (03 section 7.3).
 KINDS: dict[str, Kind] = {
     "scores": Kind(Score),
+    "outcomes": Kind(RolloutOutcome),  # K1: one line per rollout, joins scores by episode_id
     "clusters": Kind(Cluster),
     "conditions": Kind(Condition),
     "trace": Kind(TraceStep),
@@ -265,7 +267,7 @@ def admit(pack_path: Path, expected_kinds: Sequence[str] = ()) -> Admitted:
         tasks: set[str] = set()
         try:
             for r in Reader(path, entry.ref, kind, entry.sha256):
-                if isinstance(r, Score):
+                if isinstance(r, (Score, RolloutOutcome)):
                     tasks.add(r.task_id)
                 if hasattr(r, "data_class"):
                     own.add(r.data_class)
@@ -275,7 +277,7 @@ def admit(pack_path: Path, expected_kinds: Sequence[str] = ()) -> Admitted:
             continue
         other = sorted(t for t in tasks if t != pack.task_id)
         if other:
-            rejected.append(Rejected(ref=entry.ref, reason=f"scores of task "
+            rejected.append(Rejected(ref=entry.ref, reason=f"{entry.kind} of task "
                                      f"{', '.join(other)}, the pack is for {pack.task_id}"))
             continue
         accepted_entries.append(entry)

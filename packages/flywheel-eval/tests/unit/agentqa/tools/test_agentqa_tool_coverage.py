@@ -146,3 +146,68 @@ def test_the_tray_task_view_declares_the_block() -> None:
     spec = load_task("tray").coverage
     assert spec is not None and (spec.k, spec.percentile) == (5, 95.0)
     assert len(spec.components) == 10 and sorted(spec.level_components) == [1, 2]
+
+
+# Train conditions per run (subject.run)
+
+def named(run_id: str, role: str, conds: tuple[Condition, ...]) -> ConditionSet:
+    return ConditionSet(f"{role}-{run_id}.jsonl", role, conds, run=run_id)
+
+
+def two_runs(*sets: ConditionSet) -> tuple[ToolResult, dict[str, object]]:
+    book = FactBook()
+    rolls = [failures({"l1-s20": "L-A"}), failures({"l1-s20": "L-A"})]
+    rolls = [RunScores(n, f"{n}/scores.jsonl", r.scores) for n, r in zip(("R", "S"), rolls)]
+    result = coverage_distance(book, task(), rolls, sets)
+    return result, {book.get(f).name: book.get(f).value for f in result.facts}
+
+
+WIDE = tuple(condition(1, s, xy(10.0 * s)) for s in range(5))  # x = 0, 10, .. 40
+
+
+def test_pooled_output_is_unchanged_when_no_entry_names_a_run() -> None:
+    result, got = run(failures({"l1-s20": "L-A"}), TRAIN, evals(condition(1, 20, xy(2.5, 0.0))))
+    assert [f for f in got if "tau_cov" in f or "coverage_train" in f] == [
+        "coverage_train_l1", "tau_cov_l1"]
+    assert list(got)[:2] == ["coverage_k", "coverage_percentile"]
+    assert got["tau_cov_l1"] == pytest.approx(1.5) and result.rows[0]["tau_cov"] == 1.5
+
+
+def test_runs_with_different_train_sets_get_different_tau_and_verdicts() -> None:
+    probe = evals(condition(1, 20, xy(15.0)))
+    _, got = two_runs(named("R", "train", TRAIN.conditions[:5]), named("S", "train", WIDE),
+                      probe)
+    assert got["R_tau_cov_l1"] == pytest.approx(1.5) and got["S_tau_cov_l1"] == pytest.approx(15.0)
+    assert got["R_coverage_train_l1"] == 5 and got["S_coverage_train_l1"] == 5
+    assert "tau_cov_l1" not in got and "coverage_train_l1" not in got
+    a, b = "R_cluster_grasp_L-A_l1_coverage", "S_cluster_grasp_L-A_l1_coverage"
+    assert got[f"{a}_in_domain"] is False and got[f"{a}_above_tau"] == 1
+    assert got[f"{b}_in_domain"] is True and got[f"{b}_above_tau"] == 0
+
+
+def test_a_run_no_train_entry_names_falls_back_to_the_undeclared_train_entries() -> None:
+    probe = evals(condition(1, 20, xy(15.0)))
+    _, got = two_runs(named("S", "train", WIDE), TRAIN, probe)
+    assert got["R_tau_cov_l1"] == pytest.approx(1.5)  # R reads the undeclared TRAIN
+    assert got["S_tau_cov_l1"] == pytest.approx(15.0)
+    assert "tau_cov_l1" not in got
+
+
+def test_a_run_with_no_train_conditions_at_all_is_not_judged() -> None:
+    result, got = two_runs(named("S", "train", WIDE), evals(condition(1, 20, xy(15.0))))
+    assert "no conditions entry of the role train" in got["coverage_distance_R_not_judged"]  # type: ignore[operator]
+    assert "S_tau_cov_l1" in got and "R_tau_cov_l1" not in got and not result.judged
+
+
+def test_eval_entries_naming_a_run_win_over_the_undeclared_ones() -> None:
+    _, got = two_runs(TRAIN, named("S", "eval", (condition(1, 20, xy(40.0)),)),
+                      evals(condition(1, 20, xy(2.5))))
+    assert got["R_cluster_grasp_L-A_l1_coverage_in_domain"] is True
+    assert got["S_cluster_grasp_L-A_l1_coverage_in_domain"] is False
+    assert got["tau_cov_l1"] == pytest.approx(1.5)  # train still pooled: names no run
+
+
+def test_a_train_entry_naming_a_run_not_in_the_pack_is_said_not_ignored() -> None:
+    result, got = two_runs(named("ghost", "train", WIDE), TRAIN, evals(condition(1, 20, xy(2.5))))
+    assert "not in the pack" in got["coverage_distance_train_run_ghost_not_judged"]  # type: ignore[operator]
+    assert any("ghost" in r for r in result.not_judged)

@@ -10,9 +10,16 @@ from typing import Literal
 
 from flywheel.contracts.artifacts import DatasetReport, Episode
 from flywheel.contracts.entities import Condition, LedgerEntry, Score
+from flywheel.contracts.outcome import RolloutOutcome, ScorerVerdict
 from flywheel.contracts.trace import LOWER_BODY, UPPER_BODY, FloatOrNonFinite, TraceStep
 from flywheel.contracts.training import TrainingMetric
-from flywheel.eval.agentqa.tools.base import JobMetrics, RunScores, RunTrace, TraceFile
+from flywheel.eval.agentqa.tools.base import (
+    JobMetrics,
+    RunOutcomes,
+    RunScores,
+    RunTrace,
+    TraceFile,
+)
 
 SHA = "0" * 64
 
@@ -110,3 +117,29 @@ def ledger_row(kind: str, activity: str, resource: str, unit: str, quantity: flo
         "activity": activity, "resource_type": resource, "quantity": quantity, "unit": unit,
         "usd_amount": usd, "measure_kind": kind, "estimate_entry_id": estimate,
         "run_plan_id": "g0-DA-43-20261121", "job_id": job})
+
+
+def labelled(run: str, name: str, success: bool, label: str | None = None, level: int = 1,
+             first_failed: int | None = None) -> Score:
+    """A score with a failure label and a level; `first_failed` defaults to `place` (5)."""
+    return Score(episode_id=f"{run}/{name}", task_id="tray", config_sha256=SHA,
+                 trace_sha256=SHA, success=success, failure_kind=label, level=level,
+                 first_failed_step=None if success else (5 if first_failed is None
+                                                         else first_failed))
+
+
+def outcome(run: str, name: str, success: bool, label: str | None = None, level: int = 1, *,
+            final: dict[str, object] | None = None, failure_t: float | None = None,
+            task_id: str = "tray") -> RolloutOutcome:
+    """The K1 outcome of episode `<run>/<name>`; a failure gets `failure_t` 1 s by default."""
+    t = (1.0 if failure_t is None else failure_t) if label is not None else None
+    verdict = ScorerVerdict(scorer_version="2", step_names=["approach_a", "place"],
+                            step_latched=[True, success], success=success,
+                            failure_label=label, failure_t=t)
+    return RolloutOutcome(episode_id=f"{run}/{name}", run_plan_id="rp-1", task_id=task_id,
+                          run=run, seed=1, level=level, sim_time_s=10.0, control_steps=500,
+                          verdict=verdict, final=final or {})  # type: ignore[arg-type]
+
+
+def outcomes_of(run: str, rows: Sequence[RolloutOutcome]) -> RunOutcomes:
+    return RunOutcomes(run, f"{run}/outcomes.jsonl", tuple(rows))

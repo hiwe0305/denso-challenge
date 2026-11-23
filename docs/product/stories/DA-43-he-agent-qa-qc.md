@@ -42,11 +42,12 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
   - [x] 1.1 Issue "Contract change" cho K1 (cùng DA-42), K2, K3; soạn PR hợp đồng trên `DA-43-contract` kèm file mẫu và test (PR riêng, không thuộc phạm vi file dưới đây)
   - [x] 1.2 Lệnh xuất eval khay sang `scores.jsonl` theo `Score` trong adapter `flywheel_psi0`; test trên một lô mẫu
   - [ ] 1.3 Gói vòng mẫu cho test: `Score`, `TraceStep`, `TrainingMetric`, `Condition`, outcome theo K1 khi có; dựng từ lô `C_70` giai đoạn 1, chỉ dữ liệu `public`
+  - [ ] 1.4 Lệnh xuất eval khay sang `outcomes.jsonl` theo `RolloutOutcome` (K1) và điều kiện eval, train sang `Condition`, trong adapter `flywheel_psi0`; test trên lô mẫu (23/11/2026)
 - [ ] 2. Lớp công cụ, phần eval (2 ngày)
   - [x] 2.1 `ToolResult`, đăng ký công cụ, `task_lookup`, quy tắc "không xét được"
   - [x] 2.2 `step_pass_table`, `failure_clusters`, `paired_compare` và test đối chiếu số
   - [x] 2.3 `latch_consistency`, `signal_presence`
-  - [ ] 2.4 `relaxed_sweep` (chờ K1; trước đó chạy trên file mẫu)
+  - [x] 2.4 `relaxed_sweep`; gói nhận loại `outcomes` (K1); `signal_presence` xét theo số đo có trong outcome; `coverage_distance` tính theo điều kiện train của từng run; luật `near_miss_placement` (23/11/2026; chạy trên file mẫu, file outcome thật chờ PR 211)
 - [x] 3. Lớp công cụ, phần trace, train, dữ liệu (1,5 ngày)
   - [x] 3.1 `trace_stats` gồm phép đo trên lượt thành công (thời điểm quay đầu không tính được: `TraceStep` không có vị trí trong thế giới)
   - [x] 3.2 `train_window`, `lineage`
@@ -109,6 +110,7 @@ Danh sách chung của story:
 - `uv.lock`: chỉ phần do hai dòng trên sinh
 - `configs/eval/agentqa/`
 - `packages/flywheel-psi0/src/flywheel_psi0/tray/export_scores.py`, `packages/flywheel-psi0/tests/tray/test_psi0_tray_export_scores.py`
+- `packages/flywheel-psi0/src/flywheel_psi0/tray/export_outcomes.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/export_conditions.py` và test của hai file này trong `packages/flywheel-psi0/tests/tray/` (Hiếu mở rộng 23/11/2026: lệnh xuất outcome theo K1 và điều kiện theo `Condition`; chỉ thêm file mới, không sửa file adapter đang có)
 
 ## Ghi chú cho người làm
 
@@ -134,6 +136,7 @@ Danh sách chung của story:
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 23/11/2026 | Hiếu mở rộng phạm vi file sang hai lệnh xuất mới trong adapter psi0 (`export_outcomes.py`, `export_conditions.py`); thêm nhiệm vụ 1.4 | Hiếu |
 | 23/11/2026 | Thêm nhiệm vụ 4.9 (bộ nhớ) và 4.10 (bảng luật); design 19/11 bản 0.6 và kiến trúc 20/11 bản 0.6 ghi hiện trạng | Hiếu (soạn với Claude) |
 | 23/11/2026 | Thêm nhiệm vụ 5.6 (vai `rank` trong đường ống); 5.4 xong. Hiếu chọn cổng ckey.vn và model `claude-opus-5-5` cho lần chạy thật | Hiếu (soạn với Claude) |
 | 22/11/2026 | Thêm nhiệm vụ 0.1: bộ metric và hiện trạng (design 19/11 bản 0.5) | Hiếu (soạn với Claude) |

@@ -24,6 +24,7 @@ from typing import Any
 import yaml
 from flywheel.contracts.artifacts import DatasetReport, Episode
 from flywheel.contracts.entities import Condition, Score
+from flywheel.contracts.outcome import RolloutOutcome
 from flywheel.contracts.trace import TraceStep
 from flywheel.contracts.training import TrainingMetric
 from flywheel.eval.agentqa.facts import FactBook
@@ -39,6 +40,7 @@ from flywheel.eval.agentqa.tools.base import (
     ConditionSet,
     EntryView,
     JobMetrics,
+    RunOutcomes,
     RunScores,
     RunTrace,
     StoreRows,
@@ -113,7 +115,7 @@ def _run_of(entry: PackEntry) -> str:
 
 
 def _declared_run(entry: PackEntry, seen: dict[str, str]) -> str:
-    """The run of a `scores` entry; a run has one such entry (traces are not held to this)."""
+    """The run of a `scores` or `outcomes` entry; a run has one of each (traces may be many)."""
     name = _run_of(entry)
     if name in seen:
         raise PlanRefused(f"{entry.ref}: run {name!r} is already declared by {seen[name]}")
@@ -141,12 +143,17 @@ def _context(pack: Pack, admitted: Admitted) -> tuple[MeasureContext, list[PackE
     reports: dict[str, DatasetReport] = {}
     ledger: StoreRows | None = None
     events: StoreRows | None = None
-    seen: dict[str, dict[str, str]] = {"scores": {}}
+    outcomes: dict[str, RunOutcomes] = {}
+    seen: dict[str, dict[str, str]] = {"scores": {}, "outcomes": {}}
     for entry in entries:
         if entry.kind == "scores":
             name = _declared_run(entry, seen["scores"])
             scores = tuple(r for r in admitted.records[entry.ref] if isinstance(r, Score))
             runs[name] = RunScores(run=name, ref=entry.ref, scores=scores)
+        elif entry.kind == "outcomes":
+            name = _declared_run(entry, seen["outcomes"])
+            rows = tuple(r for r in admitted.records[entry.ref] if isinstance(r, RolloutOutcome))
+            outcomes[name] = RunOutcomes(run=name, ref=entry.ref, outcomes=rows)
         elif entry.kind == "trace":
             name = _run_of(entry)  # a run may declare any number of trace files
             earlier = traces[name].files if name in traces else ()
@@ -165,7 +172,8 @@ def _context(pack: Pack, admitted: Admitted) -> tuple[MeasureContext, list[PackE
                                        load=partial(_logged, admitted, entry.ref, job))
         elif entry.kind == "conditions":
             found = tuple(r for r in admitted.records[entry.ref] if isinstance(r, Condition))
-            conditions.append(ConditionSet(entry.ref, entry.subject.get("role", ""), found))
+            conditions.append(ConditionSet(entry.ref, entry.subject.get("role", ""), found,
+                                        entry.subject.get("run", "")))
         elif entry.kind == "episodes":
             episodes += [r for r in admitted.records[entry.ref] if isinstance(r, Episode)]
         elif entry.kind in ("ledger", "fix_rate"):
@@ -183,7 +191,8 @@ def _context(pack: Pack, admitted: Admitted) -> tuple[MeasureContext, list[PackE
     task = load_task(pack.task_id)
     views = tuple(EntryView(e.ref, e.kind, e.subject) for e in entries)
     ctx = MeasureContext(task, runs, frozenset(e.kind for e in entries), traces, jobs,
-                         tuple(episodes), reports, views, tuple(conditions), ledger, events)
+                         tuple(episodes), reports, views, tuple(conditions), ledger, events,
+                         outcomes)
     return ctx, entries
 
 

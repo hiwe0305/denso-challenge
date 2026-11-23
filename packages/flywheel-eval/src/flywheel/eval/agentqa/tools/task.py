@@ -9,9 +9,10 @@ scorer's own config the view names, each with the unit the view gives it.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any, Literal
 
 import yaml
+from flywheel.contracts.outcome import MEASURE_NAME, ScorerVerdict
 from flywheel.eval.agentqa.facts import FactBook
 from flywheel.eval.agentqa.tools.base import Row, ToolResult, not_judged
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -29,10 +30,40 @@ class LabelSpec(_Frozen):
     signals: list[str] = Field(default_factory=list)
 
 
+MeasureName = Annotated[str, Field(pattern=MEASURE_NAME)]
+# Fields of a `ScorerVerdict` that a rollout may leave null: what `where: verdict` may name.
+VERDICT_FIELDS = ("failure_label", "failure_t", "step_latch_t", "at_failure")
+
+
+class SignalMeasures(_Frozen):
+    """Where a signal sits in a `RolloutOutcome` (K1): the measures that carry it.
+
+    `where`: `final` and `extrema` are the outcome's measure maps, `at_failure` the
+    verdict's, `verdict` the verdict's own fields (`failure_t`). The signal is there for
+    a rollout when every name is there and not null.
+    """
+
+    where: Literal["final", "extrema", "at_failure", "verdict"]
+    names: list[MeasureName] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def verdict_fields(self) -> Self:
+        if self.where == "verdict":
+            wrong = [n for n in self.names
+                     if n not in VERDICT_FIELDS or n not in ScorerVerdict.model_fields]
+            if wrong:
+                raise ValueError(f"{wrong} is not a field a verdict may leave null "
+                                 f"(fields: {', '.join(VERDICT_FIELDS)})")
+        return self
+
+
 class RelaxedSpec(_Frozen):
     label: str
     position_m: list[float] = Field(min_length=1)
     yaw_deg: float
+    # A `signal_measures` entry, `where: final`, with one name in `_m` (the distance to
+    # the target) and one in `_deg` (the yaw error): the measures the sweep compares.
+    signal: str
 
 
 class Component(_Frozen):
@@ -71,6 +102,7 @@ class TaskView(_Frozen):
     motion_steps: list[str] = Field(default_factory=list)
     latch_signals: dict[str, list[str]] = Field(default_factory=dict)
     provides: dict[str, list[str]] = Field(default_factory=dict)
+    signal_measures: dict[str, SignalMeasures] = Field(default_factory=dict)
     relaxed: RelaxedSpec | None = None
     coverage: CoverageSpec | None = None
     thresholds: dict[str, Any] = Field(default_factory=dict)  # filled from scorer_config
@@ -89,7 +121,30 @@ class TaskView(_Frozen):
         missing = sorted(set(self.thresholds) - set(self.threshold_units))
         if missing:
             raise ValueError(f"thresholds {missing} have no unit in threshold_units")
+        if self.relaxed is not None:
+            self.relaxed_measures()
         return self
+
+    def relaxed_measures(self) -> tuple[str, str]:
+        """(distance, yaw) measure names of `final` the relaxed sweep reads.
+
+        Read by unit from the `signal_measures` entry `relaxed.signal` names, so each
+        measure name is written once in the task view.
+        """
+        if self.relaxed is None:
+            raise ValueError(f"{self.task_id} declares no relaxed block")
+        spec = self.signal_measures.get(self.relaxed.signal)
+        if spec is None:
+            raise ValueError(f"relaxed.signal {self.relaxed.signal!r} is not in signal_measures")
+        if spec.where != "final":
+            raise ValueError(f"relaxed.signal {self.relaxed.signal!r}: the measures must be "
+                             "final ones (where: final)")
+        dist = [n for n in spec.names if n.endswith("_m")]
+        yaw = [n for n in spec.names if n.endswith("_deg")]
+        if len(dist) != 1 or len(yaw) != 1:
+            raise ValueError(f"relaxed.signal {self.relaxed.signal!r}: one name in _m and one "
+                             f"in _deg are needed, got {spec.names}")
+        return dist[0], yaw[0]
 
     def index(self, step: str) -> int:
         return self.steps.index(step)

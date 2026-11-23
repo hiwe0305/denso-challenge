@@ -1,0 +1,36 @@
+# Hypothesis rules of the data group (DA-43 task 2.4, design 19/11 section 4 `relaxed_sweep`;
+# tray.md 19.2 c). Field reference: the header of scorer.yaml. Changing this file is a new
+# version of the agent: score it again (design 11).
+#
+# The facts are `relaxed_sweep`'s, per cluster of the task's relaxed label. `_near_miss` is
+# true when the members within the WIDEST tolerance of the task's relaxed grid (position
+# widened, yaw kept the scorer's) are a MAJORITY of the cluster; both words are defined by
+# the tool, so the rule holds no number. The rule also asks that the measures reproduce the
+# scorer at its own tolerance (`_first_grid_matches_scorer`): otherwise the distances it
+# reads are not the ones the scorer judged, and the cluster says nothing about precision.
+#
+# What the rule does not tell apart: a scorer tolerance that is too strict for the task
+# also gives near misses. That is a decision on the task's tolerance (the relaxed table is
+# shown for it), not a fault the rules can see; the hypothesis spends no data budget while
+# a system rule stands for the cluster.
+
+rules:
+  - id: near_miss_placement
+    title: "Most failed placements of this cluster land near the target: the skill lacks precision rather than aiming at a wrong destination"
+    source: "design 19/11 section 4 (relaxed_sweep); spec 6.9 (weak_skill); tray.md 19.2 c"
+    group: data
+    diagnosis: weak_skill
+    note: near_miss_placement
+    system: false
+    interventions: [teleop_correction]
+    when:
+      - {fact: "{run}_cluster_{cluster_slug}_near_miss", is: true}
+      - {fact: "{run}_relaxed_first_grid_matches_scorer", is: true}
+    support:
+      - "{run}_cluster_{cluster_slug}_near_miss"
+      - "{run}_cluster_{cluster_slug}_relaxed_within_widest"
+      - "{run}_cluster_{cluster_slug}_relaxed_distance_median"
+      - "{run}_cluster_{cluster_slug}_relaxed_distance_max"
+      - "relaxed_position_widest"
+      - "{run}_relaxed_first_grid_matches_scorer"
+    contra: []

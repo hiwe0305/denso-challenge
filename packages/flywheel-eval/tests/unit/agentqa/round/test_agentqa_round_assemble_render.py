@@ -119,6 +119,9 @@ def test_not_judged_collects_the_unjudged_things(round_out: Path) -> None:
         ("history_lookup", "no entry of kind fix_rate in the pack"),
         ("ledger", "no accepted entry of this kind"),
         ("fix_rate", "no accepted entry of this kind"),
+        ("relaxed_sweep_not_judged", "no entry of kind outcomes in the pack"),
+        ("relaxed_sweep", "no entry of kind outcomes in the pack"),
+        ("outcomes", "no accepted entry of this kind"),
     ])
     assert a.status == "degraded"
     assert "No model was called: every hypothesis, rank and choice is the code floor." in a.notes

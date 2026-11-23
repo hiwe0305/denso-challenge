@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from flywheel.contracts.entities import Condition, Score
+from flywheel.contracts.outcome import RolloutOutcome
 from flywheel.contracts.trace import TraceStep
 from flywheel.contracts.training import TrainingMetric
 from flywheel.eval.agentqa.facts import FactBook, FactValue
@@ -88,6 +89,21 @@ class RunScores:
 
 
 @dataclass(frozen=True)
+class RunOutcomes:
+    """The K1 outcomes of one run (`RolloutOutcome`, one per rollout), from one pack entry.
+
+    They pair with the run's scores by `episode_id`; small (one line per rollout), so held.
+    """
+
+    run: str
+    ref: str  # the `outcomes` entry they came from, as recorded in facts
+    outcomes: tuple[RolloutOutcome, ...]
+
+    def by_episode(self) -> dict[str, RolloutOutcome]:
+        return {o.episode_id: o for o in self.outcomes}
+
+
+@dataclass(frozen=True)
 class TraceFile:
     """One `trace` entry of the pack: its ref, the sha256 the pack records, its cycles.
 
@@ -154,3 +170,4 @@ class ConditionSet:
     ref: str
     role: str  # subject.role: "train" or "eval"; "" when the pack does not say
     conditions: tuple[Condition, ...]
+    run: str = ""  # subject.run: the run of the pack the entry belongs to; "" when not declared

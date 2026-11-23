@@ -24,6 +24,7 @@ from flywheel.eval.agentqa.tools.base import (
     ConditionSet,
     EntryView,
     JobMetrics,
+    RunOutcomes,
     RunScores,
     RunTrace,
     StoreRows,
@@ -43,6 +44,7 @@ from flywheel.eval.agentqa.tools.history import history_lookup
 from flywheel.eval.agentqa.tools.latch import latch_consistency
 from flywheel.eval.agentqa.tools.lineage import lineage
 from flywheel.eval.agentqa.tools.paired import paired_compare
+from flywheel.eval.agentqa.tools.relaxed import relaxed_sweep
 from flywheel.eval.agentqa.tools.signals import labels_seen, signal_presence
 from flywheel.eval.agentqa.tools.steps import step_pass_table
 from flywheel.eval.agentqa.tools.task import TaskView, task_lookup
@@ -66,6 +68,7 @@ class MeasureContext:
     conditions: tuple[ConditionSet, ...] = ()  # `conditions` entries with their declared role
     ledger: StoreRows | None = None  # the pack's store snapshot of the ledger
     fix_rate: StoreRows | None = None  # and of the fix-rate events
+    outcomes: Mapping[str, RunOutcomes] = field(default_factory=dict)  # run -> its K1 outcomes
 
 
 @dataclass(frozen=True)
@@ -247,7 +250,13 @@ def _signal_presence(book: FactBook, ctx: MeasureContext,
         labels = sorted(ctx.task.labels)
     else:
         labels = list(value)
-    return signal_presence(book, ctx.task, ctx.kinds, labels)
+    return signal_presence(book, ctx.task, ctx.kinds, labels, list(ctx.runs.values()),
+                           ctx.outcomes)
+
+
+def _relaxed_sweep(book: FactBook, ctx: MeasureContext,
+                   params: Mapping[str, Any]) -> ToolResult:
+    return relaxed_sweep(book, ctx.task, _runs(params, ctx), ctx.outcomes, list(ctx.runs))
 
 
 def _trace_stats(book: FactBook, ctx: MeasureContext,
@@ -329,7 +338,8 @@ REGISTRY: dict[str, ToolSpec] = {spec.name: spec for spec in (
     ToolSpec("failure_clusters", 2, ("scores",), {"runs": "runs"}, _failure_clusters,
              context_runs=True),
     ToolSpec("latch_consistency", 1, ("scores",), {"runs": "runs"}, _latch_consistency),
-    ToolSpec("signal_presence", 1, ("scores",), {"labels": "labels"}, _signal_presence,
+    # v2: a signal of `signal_measures` counts when the run's outcomes carry its measures
+    ToolSpec("signal_presence", 2, ("scores",), {"labels": "labels"}, _signal_presence,
              reads_all=True),
     ToolSpec("paired_compare", 1, ("scores",), {"pairs": "pairs", "levels": "levels"},
              _paired_compare),
@@ -337,10 +347,11 @@ REGISTRY: dict[str, ToolSpec] = {spec.name: spec for spec in (
     ToolSpec("train_window", 1, ("metrics",), {"jobs": "jobs", "window": "window"},
              _train_window),
     ToolSpec("lineage", 1, ("scores",), {}, _lineage, reads_all=True),
-    ToolSpec("coverage_distance", 1, ("scores", "conditions"), {"runs": "runs"},
+    ToolSpec("coverage_distance", 2, ("scores", "conditions"), {"runs": "runs"},
              _coverage_distance),
     ToolSpec("cost_lookup", 2, ("ledger",),
              {"checks": "checks", "interventions": "interventions"}, _cost_lookup),
     ToolSpec("history_lookup", 2, ("fix_rate",), {"interventions": "interventions"},
              _history_lookup),
+    ToolSpec("relaxed_sweep", 1, ("scores", "outcomes"), {"runs": "runs"}, _relaxed_sweep),
 )}

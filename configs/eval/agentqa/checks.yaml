@@ -47,6 +47,8 @@ checks:
       - [weak_skill, out_of_domain]
       - [coverage_gap, none]
       - [out_of_domain, none]
+      - [near_miss_placement, coverage_gap]
+      - [near_miss_placement, out_of_domain]
     needs: "the train and eval conditions of the run in the pack (CPU analysis)"
     cost_key: cpu_analysis
     cost_rank: 1
