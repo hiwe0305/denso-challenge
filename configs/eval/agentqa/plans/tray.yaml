@@ -18,3 +18,4 @@ calls:
   - {tool: coverage_distance, params: {runs: all}}        # is each failure cluster near the train conditions?
   - {tool: cost_lookup, params: {checks: all, interventions: all}}  # unit prices; estimated and measured cost apart
   - {tool: history_lookup, params: {interventions: all}}  # what past interventions of each kind fixed
+  - {tool: relaxed_sweep, params: {runs: all}}            # successes when the place tolerance is widened (K1 outcomes)

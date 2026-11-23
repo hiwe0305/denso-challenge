@@ -27,6 +27,7 @@ PARAMS: dict[str, dict[str, Any]] = {
     "coverage_distance": {"runs": "all"},
     "cost_lookup": {"checks": "all", "interventions": "all"},
     "history_lookup": {"interventions": "all"},
+    "relaxed_sweep": {"runs": "all"},
 }
 
 
@@ -180,6 +181,7 @@ def _param_sets(ctx: MeasureContext) -> dict[str, list[dict[str, Any]]]:
                         {"checks": ["inspect_latch_on_successes"], "interventions": ["sim_s2"]}],
         "history_lookup": [{"interventions": "all"}, {"interventions": ["sim_s1"]},
                            {"interventions": ["sim_s2", "sim_s3"]}],
+        "relaxed_sweep": [{"runs": "all"}, {"runs": [first]}],
     }
 
 

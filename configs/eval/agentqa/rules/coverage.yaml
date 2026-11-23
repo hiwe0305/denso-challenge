@@ -8,6 +8,10 @@
 # facts (no conditions entry, a level not judged) matches none of these rules; the tool's
 # `_not_judged` fact says why.
 #
+# tau_cov is `tau_cov_l{level}` while the pack's train conditions are pooled and
+# `{run}_tau_cov_l{level}` once a train entry names its run (`subject.run`); the support
+# lists both spellings and the one the tool did not write is left out.
+#
 # Row 5 of the design also asks "the planner succeeds" for a weak skill. No tool computes
 # it yet: the check `planner_on_failed_conditions` is what tells weak_skill apart.
 
@@ -29,6 +33,7 @@ rules:
       - "{run}_cluster_{cluster_slug}_coverage_d_mean"
       - "{run}_cluster_{cluster_slug}_coverage_matched"
       - "tau_cov_l{level}"
+      - "{run}_tau_cov_l{level}"
     contra: []
 
   - id: coverage_gap
@@ -46,6 +51,7 @@ rules:
       - "{run}_cluster_{cluster_slug}_coverage_above_tau"
       - "{run}_cluster_{cluster_slug}_coverage_d_mean"
       - "tau_cov_l{level}"
+      - "{run}_tau_cov_l{level}"
       - "{run}_cluster_{cluster_slug}_coverage_matched"
       - "{run}_cluster_{cluster_slug}_coverage_in_domain"
     contra: []

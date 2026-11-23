@@ -14,8 +14,15 @@ the task view gives it; an angle takes the shorter way round. The lane cannot im
 adapter's own distance, so the groups, scales and `k` are the task view's (`coverage`).
 
 The pack says which `conditions` entry is train and which is eval (`subject.role`); an entry
-that does not say is not read. A cluster gets a verdict only from members whose condition is
-found (by the level and seed of the rollout's `episode_id`); the rest are counted and said.
+that does not say is not read. An entry may also name the run it belongs to (`subject.run`):
+runs of one pack may have trained on different cuts. A run reads the entries of its role that
+name it, else those that name no run. While no train entry names a run, every run reads the
+same pooled train conditions and the facts are `tau_cov_l{level}` and
+`coverage_train_l{level}`; once one does, each run has its own tau_cov and the facts are
+`{run}_tau_cov_l{level}` and `{run}_coverage_train_l{level}` (never the unprefixed ones).
+
+A cluster gets a verdict only from members whose condition is found (by the level and seed
+of the rollout's `episode_id`); the rest are counted and said.
 Evidence cards are not an admitted kind, so no `coverage_distance` check is taken from one.
 """
 
@@ -23,7 +30,7 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 from flywheel.contracts.entities import Condition
@@ -47,8 +54,11 @@ _CONDITION = re.compile(r"^l(?P<level>\d+)-s(?P<seed>\d+)$")
 Matrix = NDArray[np.float64]
 
 
-def _split(sets: Sequence[ConditionSet], role: str) -> list[Condition]:
-    return [c for s in sets if s.role == role for c in s.conditions]
+def _split(sets: Sequence[ConditionSet], role: str, run: str = "") -> list[Condition]:
+    """The conditions of `role` for `run`: the entries naming the run, else the undeclared ones."""
+    of_role = [s for s in sets if s.role == role]
+    named = [s for s in of_role if run and s.run == run]
+    return [c for s in (named or [s for s in of_role if not s.run]) for c in s.conditions]
 
 
 def _distances(spec: CoverageSpec, names: Sequence[str], point: Matrix, others: Matrix) -> Matrix:
@@ -96,25 +106,11 @@ def _level_reference(spec: CoverageSpec, level: int, train: Matrix) -> float:
     return float(np.percentile(loo, spec.percentile))
 
 
-def coverage_distance(book: FactBook, task: TaskView, runs: Sequence[RunScores],
-                      sets: Sequence[ConditionSet]) -> ToolResult:
-    spec = task.coverage
-    if spec is None:
-        return not_judged(book, TOOL, f"the task view of {task.task_id} has no coverage block",
-                          task.source_ref)
-    undeclared = [s.ref for s in sets if s.role not in ("train", "eval")]
-    if undeclared:
-        return not_judged(book, TOOL, f"{', '.join(undeclared)}: the pack does not declare "
-                          "subject.role as train or eval", "pack.json")
-    train, evals = _split(sets, "train"), _split(sets, "eval")
-    if not train or not evals:
-        missing = "train" if not train else "eval"
-        return not_judged(book, TOOL, f"no conditions entry has the role {missing}", "pack.json")
+def _scope(book: FactBook, task: TaskView, spec: CoverageSpec, runs: Sequence[RunScores],
+           train: list[Condition], evals: Mapping[str, list[Condition]], prefix: str,
+           facts: list[str], rows: list[Row], reasons: list[str]) -> None:
+    """One tau_cov per level over `train`, then the clusters of `runs` against it."""
     ref = task.source_ref
-    facts = [book.add("coverage_k", spec.k, ref, "conditions"),
-             book.add("coverage_percentile", spec.percentile, ref, "%")]
-    reasons: list[str] = []
-    rows: list[Row] = []
     levels = sorted({s.level for r in runs for s in r.scores if not s.success
                      and s.level is not None})
     reference: dict[int, tuple[float, Matrix] | None] = {}
@@ -126,16 +122,20 @@ def coverage_distance(book: FactBook, task: TaskView, runs: Sequence[RunScores],
             why = (f"level {level}: train conditions: {missing}" if matrix is None else
                    f"level {level}: {len(mine)} train conditions, leave-one-out needs more "
                    f"than k = {spec.k}")
-            facts.append(book.add(f"{TOOL}_l{level}_not_judged", why, "pack.json"))
+            if prefix:
+                why = f"run {prefix}, {why}"
+            facts.append(book.add(f"{TOOL}_{prefix + '_' if prefix else ''}l{level}_not_judged",
+                                  why, "pack.json"))
             reasons.append(why)
             reference[level] = None
             continue
         tau = _level_reference(spec, level, matrix)
         reference[level] = (tau, matrix)
-        facts += [book.add(f"coverage_train_l{level}", len(mine), "pack.json", "conditions"),
-                  book.add(f"tau_cov_l{level}", tau, ref, UNIT)]
-    by_key = {(c.level, c.condition_seed): c for c in evals}
+        pre = f"{prefix}_" if prefix else ""
+        facts += [book.add(f"{pre}coverage_train_l{level}", len(mine), "pack.json", "conditions"),
+                  book.add(f"{pre}tau_cov_l{level}", tau, ref, UNIT)]
     for run in runs:
+        by_key = {(c.level, c.condition_seed): c for c in evals[run.run]}
         lost = 0
         for key, members in keys_of(task, run).items():
             lv = key[2]
@@ -175,4 +175,45 @@ def coverage_distance(book: FactBook, task: TaskView, runs: Sequence[RunScores],
             why = f"run {run.run}: {lost} failed rollouts have no condition of role eval"
             facts.append(book.add(f"{TOOL}_{run.run}_not_judged", why, run.ref))
             reasons.append(why)
+
+
+def coverage_distance(book: FactBook, task: TaskView, runs: Sequence[RunScores],
+                      sets: Sequence[ConditionSet]) -> ToolResult:
+    spec = task.coverage
+    if spec is None:
+        return not_judged(book, TOOL, f"the task view of {task.task_id} has no coverage block",
+                          task.source_ref)
+    undeclared = [s.ref for s in sets if s.role not in ("train", "eval")]
+    if undeclared:
+        return not_judged(book, TOOL, f"{', '.join(undeclared)}: the pack does not declare "
+                          "subject.role as train or eval", "pack.json")
+    if not any(s.role == "train" and s.conditions for s in sets) or not any(
+            s.role == "eval" and s.conditions for s in sets):
+        missing = "train" if not any(s.role == "train" and s.conditions for s in sets) else "eval"
+        return not_judged(book, TOOL, f"no conditions entry has the role {missing}", "pack.json")
+    ref = task.source_ref
+    facts = [book.add("coverage_k", spec.k, ref, "conditions"),
+             book.add("coverage_percentile", spec.percentile, ref, "%")]
+    reasons: list[str] = []
+    rows: list[Row] = []
+    in_pack = {r.run for r in runs}
+    per_run = any(s.role == "train" and s.run for s in sets)
+    for s in sets:
+        if s.run and s.role == "train" and s.run not in in_pack:
+            why = f"{s.ref}: names run {s.run!r}, which is not in the pack"
+            facts.append(book.add(f"{TOOL}_train_run_{s.run}_not_judged", why, "pack.json"))
+            reasons.append(why)
+    if not per_run:
+        _scope(book, task, spec, runs, _split(sets, "train"),
+               {r.run: _split(sets, "eval", r.run) for r in runs}, "", facts, rows, reasons)
+    else:
+        for run in runs:
+            train, evals = _split(sets, "train", run.run), _split(sets, "eval", run.run)
+            if not train or not evals:
+                missing = "train" if not train else "eval"
+                why = f"run {run.run}: no conditions entry of the role {missing} for it"
+                facts.append(book.add(f"{TOOL}_{run.run}_not_judged", why, run.ref))
+                reasons.append(why)
+                continue
+            _scope(book, task, spec, [run], train, {run.run: evals}, run.run, facts, rows, reasons)
     return ToolResult(TOOL, tuple(facts), tuple(rows), tuple(reasons))

@@ -87,13 +87,32 @@ provides:
   trace: [cmd_upper, meas_upper, cmd_lower, meas_lower, t_state, t_image]
   sources: []       # provenance records: no signal of a rollout (listed so it is not "unknown")
   metrics: []       # train log: no signal of a rollout
+  outcomes: []      # K1 outcomes: checked rollout by rollout through `signal_measures` below
+
+# Where a signal sits in the K1 outcome (`RolloutOutcome`, contract flywheel.contracts.outcome).
+# THE ONE PLACE that names outcome measures: `signal_presence` and `relaxed_sweep` read them
+# from here. With an `outcomes` entry for a run, a signal of this map is available for a label
+# when every failed rollout of that label in the run carries every name, not null.
+#   where  final | extrema (the outcome's measure maps), at_failure (the verdict's), verdict
+#          (a field of the verdict itself: failure_t, failure_label, step_latch_t, at_failure)
+#   names  measure names; a number ends in its unit (_m, _deg, _rad, _s, _quat, _frac)
+# ASSUMPTION (giả định): the names below are defaults until the adapter's export of K1
+# outcomes (flywheel_psi0) fixes them; adjust them here, nowhere else.
+signal_measures:
+  final_tray_pose: {where: final, names: [tray_pos_m, tray_quat]}
+  target_pose: {where: final, names: [target_xy_m, target_yaw_rad]}
+  failure_t: {where: verdict, names: [failure_t]}
+  # the relaxed sweep's: one name in _m (distance to the target), one in _deg (yaw error)
+  place_error: {where: final, names: [place_distance_m, place_yaw_error_deg]}
 
 # Relaxed success (tray.md 19.2 c): only this label is relaxed, on this grid; the
 # yaw tolerance stays the scorer's. The first position is the scorer's own.
+# `signal` names the `signal_measures` entry whose final measures the sweep compares.
 relaxed:
   label: L-PLACE-POSE
   position_m: [0.05, 0.075, 0.10, 0.15, 0.20]
   yaw_deg: 10.0
+  signal: place_error
 
 # How `coverage_distance` reads `Condition.vector` (spec 6.8 step 8): d is the mean distance
 # to the k nearest TRAIN conditions of the same level, tau_cov the percentile of the same
