@@ -260,6 +260,10 @@ class HypothesisView(Record):
 class OfferedFact(Record):
     unit: str = ""
     provenance: Literal["code", "vision", "history"]
+    comparison: bool = Field(
+        default=False,
+        description="The code did the comparison itself (a boolean, or a name marked in "
+                    "roles.yaml); old files lack it and `verify` recomputes it.")
 
 
 class Offered(Record):

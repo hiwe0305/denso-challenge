@@ -46,6 +46,15 @@ ANSWERED = ("ok", "cut")
 _FACT_NUMBER = re.compile(r"^F([0-9]+)$")
 
 
+COMPARISON_MARKERS = ("_above_tau", "_exceeds_tau", "_separates_", "_in_domain", "_near_miss",
+                      "_within_", "_matches_", "_judgeable", "_largest_drop")
+
+
+def is_comparison_fact(name: str, value: object, markers: tuple[str, ...]) -> bool:
+    """A comparison fact: the code compared for the model (a boolean, or a marked name)."""
+    return isinstance(value, bool) or any(m in name for m in markers)
+
+
 class RolesRefused(ValueError):
     """`roles.yaml` or a prompt cannot be used; no call was made."""
 
@@ -55,6 +64,7 @@ class RankLimits(BaseModel):
 
     max_clusters: int = Field(default=MAX_RANK_CLUSTERS, ge=0)
     max_facts: int = Field(default=MAX_RANK_FACTS, ge=0)
+    comparison_markers: tuple[str, ...] = Field(default=COMPARISON_MARKERS)
 
 
 class Roles(BaseModel):
@@ -139,7 +149,8 @@ def _checks(members: list[HypothesisRecord]) -> list[dict[str, Any]]:
 
 
 def build_unit(members: list[HypothesisRecord], facts: list[FactRecord],
-               titles: dict[str, str], max_facts: int) -> tuple[dict[str, Any], Offered]:
+               titles: dict[str, str], max_facts: int,
+               markers: tuple[str, ...] = COMPARISON_MARKERS) -> tuple[dict[str, Any], Offered]:
     """The user payload of one rank call, and what it offered."""
     cluster = members[0].cluster
     chosen = offered_facts(members, facts, max_facts)
@@ -161,7 +172,9 @@ def build_unit(members: list[HypothesisRecord], facts: list[FactRecord],
         cluster_id=cluster.cluster_id, hypotheses=[h.hypothesis_id for h in members],
         interventions={h.hypothesis_id: list(h.interventions) for h in members},
         checks=[c["id"] for c in checks],
-        facts={f.fact_id: OfferedFact(unit=f.unit, provenance=f.provenance) for f in chosen},
+        facts={f.fact_id: OfferedFact(
+            unit=f.unit, provenance=f.provenance,
+            comparison=is_comparison_fact(f.name, f.value, markers)) for f in chosen},
         blocked_data_spend=members[0].blocked_data_spend)
     return payload, offered
 
@@ -206,7 +219,8 @@ def judge(out: Path, gateway: Gateway, *, roles: Roles | None = None,
     titles = {r.id: r.title for r in load_rules()}
     result = JudgeResult()
     for k, members in enumerate(clusters_of(hypotheses)):
-        payload, offered = build_unit(members, facts, titles, limits.max_facts)
+        payload, offered = build_unit(members, facts, titles, limits.max_facts,
+                                     limits.comparison_markers)
         unit = offered.cluster_id
         if k >= limits.max_clusters:
             result.items.append(JudgedItem(item_id=f"rank:{unit}", role="rank", unit=unit,

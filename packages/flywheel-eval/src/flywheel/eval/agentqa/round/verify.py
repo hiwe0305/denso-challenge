@@ -16,8 +16,16 @@ from __future__ import annotations
 from pathlib import Path
 
 from flywheel.eval.agentqa.round.gateway import MODEL_CALLS_FILE
-from flywheel.eval.agentqa.round.judge import JUDGED_FILE
+from flywheel.eval.agentqa.round.judge import (
+    COMPARISON_MARKERS,
+    JUDGED_FILE,
+    RolesRefused,
+    is_comparison_fact,
+    load_roles,
+)
+from flywheel.eval.agentqa.round.measure import FACTS_FILE
 from flywheel.eval.agentqa.round.records import (
+    FactRecord,
     JudgedItem,
     ModelCallRecord,
     VerdictRecord,
@@ -34,6 +42,20 @@ def _lines(path: Path) -> list[str]:
 def read_calls(out: Path) -> dict[str, ModelCallRecord]:
     calls = (ModelCallRecord.model_validate_json(x) for x in _lines(out / MODEL_CALLS_FILE))
     return {c.call_id: c for c in calls}
+
+
+def _with_comparison(item: JudgedItem, facts: dict[str, FactRecord],
+                     markers: tuple[str, ...]) -> JudgedItem:
+    """The item with every offered fact's `comparison` flag recomputed from `facts.jsonl`.
+
+    Old `judged.jsonl` lines hold no flag (an offer stores no name or value), so the name
+    and value are read from the run's facts; a fact missing there keeps its stored flag.
+    """
+    known = {fid: of.model_copy(update={"comparison": is_comparison_fact(
+        facts[fid].name, facts[fid].value, markers)})
+        for fid, of in item.offered.facts.items() if fid in facts}
+    offered = item.offered.model_copy(update={"facts": {**item.offered.facts, **known}})
+    return item.model_copy(update={"offered": offered})
 
 
 def verdict_of(item: JudgedItem, calls: dict[str, ModelCallRecord]) -> VerdictRecord:
@@ -73,7 +95,13 @@ def verify(out: Path) -> list[VerdictRecord]:
     """Verdicts of every item of `out/judged.jsonl`; writes `verdicts.jsonl`."""
     items = [JudgedItem.model_validate_json(x) for x in _lines(out / JUDGED_FILE)]
     calls = read_calls(out)
-    verdicts = [verdict_of(item, calls) for item in items]
+    facts = {f.fact_id: f for f in
+             (FactRecord.model_validate_json(x) for x in _lines(out / FACTS_FILE))}
+    try:
+        markers = load_roles().rank.comparison_markers
+    except RolesRefused:  # run from another directory: the shipped markers
+        markers = COMPARISON_MARKERS
+    verdicts = [verdict_of(_with_comparison(item, facts, markers), calls) for item in items]
     (out / VERDICTS_FILE).write_text("".join(v.model_dump_json() + "\n" for v in verdicts),
                                      encoding="utf-8")
     return verdicts

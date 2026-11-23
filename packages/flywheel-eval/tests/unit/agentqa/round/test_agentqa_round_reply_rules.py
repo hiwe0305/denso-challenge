@@ -197,3 +197,89 @@ def test_failures_carry_the_rule_and_a_message() -> None:
     failures = rr.check_rank(text_of(reply), OFFERED)
     assert [f.rule for f in failures] == ["cluster", "numbers"]
     assert str(failures[1]).startswith("numbers: why[0] (H1) writes the number(s) ['7']")
+
+
+# comparison facts and trailing commas ----------------------------------------------------
+
+def _with_facts(**extra: OfferedFact) -> Offered:
+    return OFFERED.model_copy(update={"facts": {**OFFERED.facts, **extra}})
+
+
+def test_comparison_passes_when_a_comparison_fact_is_cited() -> None:
+    offered = _with_facts(
+        F4=OfferedFact(unit="m", provenance="code"),
+        F5=OfferedFact(unit="rollouts", provenance="code", comparison=True),
+        F6=OfferedFact(unit="", provenance="code", comparison=True))
+    reply = good()
+    reply["why"][0].update(
+        cites=["F5", "F4", "F6"],
+        text="One rollout {F5} is above the tolerance, the mean {F4} is below it, "
+             "all matched rollouts are in domain {F6}.")
+    assert rules_failed(reply, offered) == []
+    reply["why"][0].update(cites=["F1", "F3"], text="{F1} rollouts is more than {F3}.")
+    assert rules_failed(reply, offered) == ["comparison"]  # none cited
+
+
+def test_comparison_distance_against_time_without_comparison_fact_fails() -> None:
+    offered = _with_facts(F4=OfferedFact(unit="m", provenance="code"))
+    reply = good()
+    reply["why"][0].update(cites=["F4", "F3"], text="The distance {F4} is longer than {F3}, "
+                                                    "which is worse.")
+    assert rules_failed(reply, offered) == ["comparison"]
+
+
+def test_comparison_flag_by_marker_and_by_boolean() -> None:
+    from flywheel.eval.agentqa.round.judge import COMPARISON_MARKERS, is_comparison_fact
+
+    assert is_comparison_fact("r_coverage_above_tau", 1, COMPARISON_MARKERS)
+    assert is_comparison_fact("r_check_separates_h1_h2", 0.3, COMPARISON_MARKERS)
+    assert is_comparison_fact("r_coverage_in_domain", True, COMPARISON_MARKERS)
+    assert is_comparison_fact("r_anything", False, COMPARISON_MARKERS)  # boolean by value
+    assert not is_comparison_fact("r_coverage_mean_distance", 0.4, COMPARISON_MARKERS)
+    assert not is_comparison_fact("r_count", 1, ())
+
+
+def test_old_offered_fact_without_the_flag_loads() -> None:
+    from flywheel.eval.agentqa.round.records import OfferedFact as Fact
+
+    old = Fact.model_validate_json('{"unit": "s", "provenance": "code"}')
+    assert old.comparison is False
+
+
+@pytest.mark.parametrize("closer", ["}", "]"])
+def test_trailing_comma_before_a_closer_is_accepted(closer: str) -> None:
+    text = text_of(good())
+    assert rules_failed(text) == []
+    broken = text.replace('"cites": ["F2"]', '"cites": ["F2",\n ]', 1) if closer == "]" \
+        else text[:-1] + ",\n }"
+    assert broken != text and rules_failed(broken) == []
+
+
+def test_trailing_comma_repair_leaves_strings_alone() -> None:
+    raw = '{"a": "x,}y", "b": [1,2,],\n"c": "q,]", }'
+    fixed = rr.strip_trailing_commas(raw)
+    assert json.loads(fixed) == {"a": "x,}y", "b": [1, 2], "c": "q,]"}
+    assert '"x,}y"' in fixed and '"q,]"' in fixed
+    esc = r'{"a": "he said \",}\" ok",}'
+    assert json.loads(rr.strip_trailing_commas(esc)) == {"a": 'he said ",}" ok'}
+
+
+def test_other_malformed_json_still_fails_schema() -> None:
+    text = text_of(good())
+    for broken in (text[:-1], text.replace('"order"', "order", 1), text + ",", "{'a': 1}"):
+        assert rules_failed(broken) == ["schema"]
+
+
+def test_verify_recomputes_the_flag_from_facts_for_an_old_judged_item() -> None:
+    from flywheel.eval.agentqa.round.judge import COMPARISON_MARKERS
+    from flywheel.eval.agentqa.round.records import FactRecord, JudgedItem
+    from flywheel.eval.agentqa.round.verify import _with_comparison
+
+    item = JudgedItem(item_id="rank:x", role="rank", unit="x", offered=OFFERED)
+    facts = {"F1": FactRecord(fact_id="F1", name="r_coverage_in_domain", value=True,
+                              source_ref="s", provenance="code", tool_call_id="t"),
+             "F3": FactRecord(fact_id="F3", name="r_time", value=1.0, unit="s",
+                              source_ref="s", provenance="code", tool_call_id="t")}
+    new = _with_comparison(item, facts, COMPARISON_MARKERS).offered.facts
+    assert new["F1"].comparison and not new["F3"].comparison
+    assert not new["F2"].comparison  # not in facts.jsonl: the stored flag stands
