@@ -97,8 +97,11 @@ class ScorerVerdict(Artifact):
         # A rollout may end with neither success nor a label (cut before the timeout).
         if self.success and self.failure_label is not None:
             raise ValueError("a successful rollout has no failure label")
-        if (self.failure_label is None) != (self.failure_t is None):
-            raise ValueError("failure_t is set exactly when failure_label is")
+        # A label may come without its time: a scorer that does not record when it set the
+        # label (the tray eval before DA-42) still says which label it set. The reader then
+        # treats the time as a missing signal. A time without a label means nothing.
+        if self.failure_t is not None and self.failure_label is None:
+            raise ValueError("failure_t needs a failure label")
         if self.at_failure is not None:
             if self.failure_label is None:
                 raise ValueError("at_failure needs a failure label")

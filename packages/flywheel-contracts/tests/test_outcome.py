@@ -65,7 +65,7 @@ def _verdict(**over: Any) -> dict[str, Any]:
         ({"step_latch_t": [2.5, 3.5, 5.0, 6.0, None, None, None]}, "exactly when the step latched"),
         ({"step_names": ["a", "a", "b", "c", "d", "e", "f"]}, "unique"),
         ({"step_names": ["Approach"] + ["b", "c", "d", "e", "f", "g"]}, "pattern"),
-        ({"failure_t": None}, "failure_t is set exactly when failure_label is"),
+        ({"failure_label": None, "at_failure": None}, "failure_t needs a failure label"),
         ({"failure_label": None, "failure_t": None}, "at_failure needs a failure label"),
         ({"at_failure": {"tilt": 25.0}}, "numeric measure ends in"),
         ({"at_failure": {"tray_quat": [1.0, 0.0]}}, "four numbers"),
@@ -74,6 +74,12 @@ def _verdict(**over: Any) -> dict[str, Any]:
 def test_verdict_rules(over: dict[str, Any], message: str) -> None:
     with pytest.raises(ValidationError, match=message):
         ScorerVerdict.model_validate(_verdict(**over))
+
+
+def test_a_label_without_its_time_is_accepted() -> None:
+    """The tray eval before DA-42 records the label, not when it was set."""
+    v = ScorerVerdict.model_validate(_verdict(failure_t=None, at_failure=None))
+    assert v.failure_label is not None and v.failure_t is None
 
 
 def test_unfinished_rollout_has_neither_success_nor_label() -> None:
