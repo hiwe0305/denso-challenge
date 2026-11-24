@@ -97,9 +97,9 @@ Chưa chạy trên lô mẫu: ingest, phát lại DA-17, QA DA-03, lọc chất 
 
 **Video để xem:** `fwdata/simple/tray/gen/da46-sample/releases/tray_s1place_c4865e156a69/videos/chunk-000/egocentric/episode_000000.mp4` (từ thư mục gốc của repo; seed 510000, mức 1, độ lệch đích −5,3 cm dọc và −9,5 cm ngang, tới nơi lệch 15,6 cm, đặt cuối lệch 0,5 cm; 414 khung, 8,3 s, camera đầu). Episode đầy đủ tương ứng: `releases/tray_s1_07ed947f223c/videos/chunk-000/egocentric/episode_000000.mp4`.
 
-### 3.6 Biên độ đề xuất
+### 3.6 Biên độ đã chốt
 
-**[Đề xuất]** ±10 cm cả hai trục (`--carry-jitter-ahead 0.10 --carry-jitter-side 0.10`).
+**[Đã chốt]** (Hiếu, 24/11/2026) ±10 cm cả hai trục (`--carry-jitter-ahead 0.10 --carry-jitter-side 0.10`). Lý do dưới đây là của đề xuất ngày 23/11/2026.
 
 - Tỉ lệ thành công bằng ±5 cm trên mẫu này (32/36), sai lệch đặt cuối không đổi.
 - Độ đa dạng lúc tới gần gấp đôi (độ lệch chuẩn 5,2 cm so với 2,8 cm mỗi trục), số lượt tới quá đích gần gấp ba (11 so với 4), và mỗi episode cắt dài hơn 22 %.
@@ -116,7 +116,7 @@ Chưa chạy trên lô mẫu: ingest, phát lại DA-17, QA DA-03, lọc chất 
 
 ## 5. Runbook nháp cho lô trên `rtx3060`
 
-**[Đề xuất]**, chưa chạy; chờ Hiếu xem mẫu. Claude không chạy gì trên `rtx3060` trong story này cho tới khi Hiếu đồng ý. Đường dẫn code và venv trên `rtx3060` lấy theo jig.md mục 5 (`~/denso-da41`), **chưa kiểm lại** ngày 23/11/2026.
+**[Đề xuất]**, chưa chạy. Biên độ ±10 cm đã chốt ngày 24/11/2026; lệnh chạy lô còn chờ Hiếu đồng ý. Claude không chạy gì trên `rtx3060` trong story này cho tới khi Hiếu đồng ý. Đường dẫn code và venv trên `rtx3060` lấy theo jig.md mục 5 (`~/denso-da41`), **chưa kiểm lại** ngày 23/11/2026.
 
 | Mục | Giá trị |
 |---|---|

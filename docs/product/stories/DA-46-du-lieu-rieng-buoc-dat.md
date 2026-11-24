@@ -88,5 +88,6 @@ Theo 07 mục 3.1. File story luôn được sửa.
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 24/11/2026 | Hiếu chốt biên độ lệch đích CARRY ±10 cm cả hai trục cho lô `rtx3060` (5.1); lô chưa chạy | Hiếu (soạn với Claude) |
 | 23/11/2026 | Lô mẫu laptop (4.1): đính chính mục Story về độ lệch dọc sẵn có; đề xuất biên độ ±10 cm | Hiếu (soạn với Claude) |
 | 23/11/2026 | Tạo story theo quyết định của Hiếu ngày 23/11/2026 (sinh dữ liệu bước đặt trước, train một lần); phương án C do Claude đề xuất | Hiếu (soạn với Claude) |
