@@ -2,6 +2,7 @@
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 24/11/2026 | 0.7 | Mục 18 và quyết định Q8 được thay bởi [design 24/11/2026](2026-11-24-agent-analysis-chat-design.md) (Hiếu duyệt 24/11/2026): hệ sẽ có một agent chat phân tích trên lớp công cụ. Thêm con trỏ ở đầu mục 18; không sửa mục nào khác | Hiếu (soạn với Claude) |
 | 23/11/2026 | 0.6 | Thêm mục 27: hiện trạng mã so với tài liệu này và chỗ mã khác tài liệu. Không sửa mục nào khác | Hiếu (soạn với Claude) |
 | 22/11/2026 | 0.5 | Mục 6, B0: bản chụp kho trong pack (`store_snapshot`); `cost_lookup` và `history_lookup` chỉ đọc pack. Hiếu chốt 22/11/2026 ("Chụp vào pack") | Hiếu (soạn với Claude) |
 | 20/11/2026 | 0.4 | Mục 19.2: bỏ nhớ đệm lời gọi công cụ (khi dựng nhiệm vụ 4.2) | Hiếu (soạn với Claude) |
@@ -392,6 +393,8 @@ Nhiệm vụ 6 (bộ ca), 7 (đo) và 8 (nhìn hình, vai `look`) giữ nguyên.
 # Phần B. Thiết kế chi tiết (bản 0.2)
 
 ## 18. Hai bề mặt: báo cáo vòng và hỏi đáp
+
+> **Bản 0.7, 24/11/2026.** Mục này và Q8 của mục 16 đã được thay bởi [design 24/11/2026](2026-11-24-agent-analysis-chat-design.md). Nội dung dưới đây giữ lại làm lịch sử: nó mô tả quyết định "DA-43 không dựng chat thứ hai" của ngày 20/11/2026.
 
 Câu hỏi "đây là agent chat đúng không" có hai nửa câu trả lời, vì dự án có **hai** thứ đều gọi là agent:
 

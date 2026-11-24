@@ -139,6 +139,7 @@ Danh sách chung của story:
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 24/11/2026 | Hiếu duyệt design 24/11/2026 (Q1–Q7), chưa dựng vội; design lên bản 0.2 (mục 13: model tốt nhất, đa model, `run_analysis`), kiến trúc 20/11 lên bản 0.7 | Hiếu (soạn với Claude) |
 | 24/11/2026 | Thêm nhiệm vụ 0.2 và design 24/11/2026 (agent chat phân tích, đề xuất, chờ duyệt) vào phạm vi file | Hiếu (soạn với Claude) |
 | 24/11/2026 | Thêm nhiệm vụ 5.7 (hai luật kiểm của vai `rank`); agent-qa mục 8 và 9 gộp gọn, thêm 9.5 | Hiếu (soạn với Claude) |
 | 24/11/2026 | Nhiệm vụ 0.1: ghi số đo sáu model, phép thử đảo thứ tự và lần chạy lại bộ lỗi cấy (agent-qa 9.4, design 19/11 bản 0.7) | Hiếu (soạn với Claude) |
