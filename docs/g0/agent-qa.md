@@ -431,3 +431,42 @@ Cách đọc:
 - **τ_cov chưa khớp số của đội.** Công cụ ra 0,868 (mức 1) và 1,920 (mức 2) cho `C_70`; design 19/11 mục 4 ghi số của đội là 1,143 và 1,524. Định nghĩa khoảng cách của công cụ (chuẩn hóa theo thành phần khai trong config task) khác của adapter. Cho tới khi đối chiếu xong, các giả thuyết `weak_skill`, `coverage_gap`, `out_of_domain` trên gói thật là **chưa kiểm chứng**.
 - Cả 8 cụm được xếp hạng vẫn bị chặn tiêu ngân sách dữ liệu vì thiếu tư thế khay; hai điểm bắt buộc còn trượt nằm ở đây.
 
+
+### 9.4 So sáu model qua ckey.vn, phép thử đảo thứ tự và chạy lại bộ lỗi cấy, 24/11/2026
+
+Cùng gói `stage1-60k-k1`, cùng ca `tray-c70-step4`, mã ở `d14bb965`. Mỗi model một lần chạy (Opus 5.5 hai lần), chạy lần lượt trên laptop. Cổng ckey.vn liệt kê 642 tên model; phần lớn là kênh chuyển tiếp của tài khoản khác (tên dạng `<tài khoản>/<model>`). Chỉ dùng tên không có tiền tố. Không xác minh được model đứng sau một tên: `claude-sonnet-4.6` tự xưng là "GPT-5" khi được hỏi. Số token cổng báo không tin được (Haiku báo 82 921 token vào, Opus báo 34 150, cho cùng loại lời gọi).
+
+**Vòng thật.** Sàn code: A1 22/24, bắt buộc 7/9, A2 4/4, A3 0, A5 2/2. Cả sáu model ra đúng các số này và D1 bằng 0 ở mọi cột. Bộ kiểm B1 chạy lại độc lập trên `assembly.json`: 0 câu của model có số ngoài fact ở mọi lần chạy. `facts.jsonl` và `hypotheses.jsonl` giống từng byte giữa tám lần chạy.
+
+| Model | Nhận / sửa / loại (8 cụm) | Lời gọi | Bước `judge` | Cụm bị đổi hạng 1 so với code |
+|---|---|---|---|---|
+| `claude-opus-5-5` (lần hai) | 5 / 3 / 0 | 11 | 221 giây | 0 |
+| `claude-sonnet-4.6` | 6 / 2 / 0 | 10 | 349 giây | 0 |
+| `claude-haiku-4.5` | 6 / 2 / 0 | 10 | 69 giây | 2 (lên `out_of_domain`) |
+| `gpt-5.5` | 3 / 1 / 4 (trượt schema) | 13 | 164 giây | 1 (lên `out_of_domain`) |
+| `deepseek-v4.1-flash` | 1 / 1 / 6 (5 lời gọi trả rỗng, `finish_reason length`) | 10 | 58 giây | 0 |
+| `gemini-2.5-flash-lite` | 7 / 1 / 0 | 9 | 24 giây | 1 (lên `coverage_gap`) |
+
+Hai lần chạy Opus 5.5 (E4): hạng 1 và can thiệp giống nhau ở cả 8 cụm; phép kiểm được chọn khác nhau ở 5 cụm (lần hai trả `null` ở 6 cụm dù cụm có phép kiểm).
+
+Hai điều bảng này cho thấy:
+
+- **Bộ ca chưa phân biệt được model.** Bốn cụm bị ba model đẩy một giả thuyết dữ liệu lên trên giả thuyết "thiếu tín hiệu" trong khi cụm đang bị chặn tiêu ngân sách dữ liệu, nhưng điểm ca không đổi vì đáp án không có điểm chốt nào ở các cụm đó. Một ca, 26 điểm là quá ít.
+- **Thiếu một luật kiểm.** B5 nhận câu trả lời xếp giả thuyết dữ liệu trên giả thuyết lỗi hệ thống khi `blocked_data_spend` đúng. Điều này trái thứ tự của thuật toán (lỗi hệ thống trước). **[Đề xuất]** thêm luật: khi cụm bị chặn, hạng 1 phải thuộc nhóm hệ thống hoặc bộ chấm.
+
+**Phép thử đảo thứ tự** (thí nghiệm ngoài đường ống, `fwdata/agentqa/probe/`). 16 cụm (8 cụm lớn nhất có hai giả thuyết, 8 cụm lớn nhất có ba), gửi với danh sách giả thuyết đảo ngược và id đánh lại, để vị trí và số id không còn mang thứ tự của code. Một lời gọi mỗi cụm, không gửi lại. "Khớp code" nghĩa là hạng 1 của model trùng hạng 1 của code; đây là số đo độ bám fact, không phải độ đúng, vì chưa đối chiếu với đáp án.
+
+| Model | Trả lời hợp lệ ngay lần đầu | Khớp code, cụm hai giả thuyết | Khớp code, cụm ba giả thuyết | Trung vị một lời gọi |
+|---|---|---|---|---|
+| `gpt-5.5` | 12/16 | 6/8 | 6/8 | 12–15 giây |
+| `claude-sonnet-4.6` | 9/15 (một lời gọi rớt mạng) | 7/7 | 3/8 | 18–36 giây |
+| `deepseek-v4.1-flash` | 11/16 | 8/8 | 0/8 | 17–21 giây |
+| `claude-haiku-4.5` | 11/16 | 5/8 | 2/8 | 7–10 giây |
+| `claude-opus-5-5` | 13/16 | 4/8 | 2/8 | 28 giây |
+| `gemini-2.5-flash-lite` | 13/16 | 3/8 | 0/8 | 3 giây |
+
+Cách đọc: khi code đưa thứ tự, mọi model giữ gần nguyên; khi bỏ thứ tự, phần lớn model không tự dựng lại được nó. Ở cụm ba giả thuyết, năm trên sáu model đặt "thiếu tín hiệu" trên "chuỗi bước gãy" (hạng 1 của code và của đội). Prompt có luật 7 ("fact không quyết được thì giữ thứ tự đã cho"), nên một phần kết quả là model làm đúng lời dặn. Kết luận: trên dữ liệu hiện có, hạng do model đưa ra phần lớn là hạng của code; chưa có bằng chứng model nào tự xếp hạng tốt hơn bảng luật.
+
+**Bộ lỗi cấy (C1), đường bản 3.** Dựng lại bộ log bằng `log_defects` mặc định (ra đúng `bench-c6da75e9ff36`, `bench-cfcb0ba66776`), phát lại file `--record` của lần chạy Nemotron 12/11 qua mã hiện tại, chấm bằng DA-31. Kết quả khớp bản 12/11 ở mọi số đếm (recall 30/30, báo nhầm bản sạch 1/40, T4 3/4); khác biệt chỉ ở id báo cáo, ngày và nhãn revision. Đường ống vòng mới chưa chạy được bộ này vì chưa có vai `adjudicate`.
+
+Chưa đo trong lượt này: C2 (gói khỏe), D2 (kỹ sư duyệt), chi phí thật (chỉ có số cổng báo), model cục bộ M1.
