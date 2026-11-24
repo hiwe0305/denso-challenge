@@ -2,6 +2,7 @@
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 24/11/2026 | 0.7 | Mục 15: thêm đoạn "Đo ngày 24/11/2026 (bản 0.7)" (sáu model, phép thử đảo thứ tự, chạy lại bộ lỗi cấy). Không sửa mục nào khác | Hiếu (soạn với Claude) |
 | 23/11/2026 | 0.6 | Mục 15 viết lại theo hiện trạng 23/11/2026 (sau PR 207, 208 và nhánh `DA-43-model-layer`): bảng đối chiếu, số đo đầu, việc chờ quyết định. Không sửa mục nào khác | Hiếu (soạn với Claude) |
 | 22/11/2026 | 0.5 | Thêm mục 11.5 (bộ metric và cổng qua của một phiên bản, **[Đề xuất]**) và mục 15 (hiện trạng mã so với design, thứ tự làm tiếp). Không sửa mục nào khác | Hiếu (soạn với Claude) |
 | 20/11/2026 | 0.4 | Hiếu duyệt [kiến trúc 20/11/2026](2026-11-20-agent-qaqc-architecture-design.md) bản 0.3. Từ nay mục 5.1, 5.4, 12, phần chọn model của mục 8 và luật 8 của mục 6 đọc theo tài liệu đó; cửa xin thêm công cụ rút khỏi DA-43; bản ghi lời gọi công cụ rút khỏi K3. Thân bài ở đây giữ nguyên làm lịch sử | Hiếu (soạn với Claude) |
@@ -550,6 +551,17 @@ Ghi chú về cách đọc:
 | `INTERVENTIONS_OF_DIAGNOSIS["unknown"]` chỉ cho `repair_ticket` | Không viết được luật "policy, không phải controller" (design 5.3 dòng 4): mở phiếu sửa cho lỗi của policy là sai | Hiếu: PR hợp đồng (cho `unknown` thêm `report_only`, hoặc thêm một chẩn đoán) |
 
 Khi mỗi cụm chỉ có một giả thuyết thì model không có gì để xếp hạng; D1 bằng 0 vì thế chưa nói gì về model.
+
+**Đo ngày 24/11/2026 (bản 0.7).** Chi tiết ở [agent-qa.md](../../g0/agent-qa.md) mục 9.3 và 9.4. Gói nay có điều kiện train (PR 210): 53 trên 64 cụm có từ hai giả thuyết, nên câu trên không còn đúng cho gói này.
+
+| Mục | Kết quả (đo, một ca tập phát triển) |
+|---|---|
+| 8, chọn model | Sáu model qua ckey.vn chạy cùng gói: mọi model ra đúng điểm của sàn code (A1 22/24, bắt buộc 7/9, A3 0) và D1 bằng 0. Ba model đẩy một giả thuyết dữ liệu lên hạng 1 ở cụm đang bị chặn; bộ ca không bắt được |
+| 8, model có tự xếp hạng không | Phép thử đảo thứ tự, 16 cụm: hạng 1 khớp code từ 3/16 (`gemini-2.5-flash-lite`) tới 12/16 (`gpt-5.5`); `claude-opus-5-5` 6/16. Chưa có bằng chứng model nào xếp hạng tốt hơn bảng luật |
+| 11.1 | Đường bản 3 phát lại qua mã hiện tại: khớp mốc 30/30, 1/40, T4 3/4. Đường mới chưa đo (thiếu vai `adjudicate`) |
+| 11.4 | Bước model từ 24 giây (`gemini-2.5-flash-lite`) tới 349 giây (`claude-sonnet-4.6`) cho 8 cụm; B1 kiểm độc lập bằng 0 ở mọi lần chạy; hai lần chạy Opus 5.5 giống hạng 1 ở 8/8 cụm |
+
+Theo ghi chú D1 của mục 11.5, kết quả này chỉ vào **vai của model**, không vào model nào. **[Đề xuất]** trước khi chọn model: thêm luật kiểm "cụm bị chặn thì hạng 1 thuộc nhóm hệ thống hoặc bộ chấm", thêm ca có đáp án ở cụm nhiều giả thuyết, và đo lại sau khi có outcome thật (PR 211).
 
 **Thứ tự làm tiếp [Đề xuất].**
 
