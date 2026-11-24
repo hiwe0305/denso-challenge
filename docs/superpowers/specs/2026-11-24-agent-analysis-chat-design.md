@@ -2,9 +2,10 @@
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 24/11/2026 | 0.2 | Hiếu duyệt theo đề xuất: Q1–Q7 của mục 11 thành **[Đã chốt]**; chưa dựng vội. Thêm mục 13 (yêu cầu thêm của Hiếu cùng ngày: model tốt nhất, đa phương thức và đa model, câu hỏi về quyền terminal), **[Đề xuất]**, chờ duyệt Q8–Q10 | Hiếu (soạn với Claude) |
 | 24/11/2026 | 0.1 | Bản đầu, **[Đề xuất]**, chờ Hiếu duyệt trước khi viết mã | Hiếu (soạn với Claude) |
 
-_Trạng thái: **chờ duyệt**. Nếu duyệt, tài liệu này thay mục 18 và quyết định Q8 của [kiến trúc 20/11/2026](2026-11-20-agent-qaqc-architecture-design.md) ("DA-43 không dựng chat thứ hai") và mở vòng điều tra của mục 20 ở đó. Các mục khác của hai tài liệu Agent QA/QC giữ nguyên._
+_Trạng thái: **đã duyệt 24/11/2026** (bản 0.2: Q1–Q7 của mục 11 chốt theo đề xuất). **Chưa dựng**: Hiếu yêu cầu chưa làm vội. Tài liệu này thay mục 18 và quyết định Q8 của [kiến trúc 20/11/2026](2026-11-20-agent-qaqc-architecture-design.md) ("DA-43 không dựng chat thứ hai") và mở vòng điều tra của mục 20 ở đó; các mục khác của hai tài liệu Agent QA/QC giữ nguyên. Mục 13 là đề xuất mới, chờ duyệt._
 
 ## 0. Đọc nhanh
 
@@ -255,6 +256,8 @@ Mỗi bước để lại một thứ dùng được. Chưa ước lượng th�
 
 ## 11. Quyết định cần Hiếu
 
+**[Đã chốt 24/11/2026, Hiếu]** "Duyệt theo đề xuất": Q1–Q7 chốt theo cột đề xuất (bản 0.2). Q8–Q10 ở mục 13.4 còn chờ.
+
 | # | Quyết định | Đề xuất |
 |---|---|---|
 | Q1 | Cách dựng | C (mục 4) |
@@ -271,6 +274,71 @@ Mỗi bước để lại một thứ dùng được. Chưa ước lượng th�
 - Cách cắt kết quả công cụ lớn (bảng nhiều hàng) trước khi đưa cho model.
 - Cách hiển thị trên dòng lệnh.
 - Giá trị các trần sau lần đo đầu.
+
+## 13. Yêu cầu thêm của Hiếu, 24/11/2026 (bản 0.2)
+
+**[Đề xuất]**, chờ duyệt. Ba điều Hiếu nêu sau khi duyệt bản 0.1: dùng model tốt nhất; hệ có ảnh, video và nhiều loại dữ liệu nên phải dùng nhiều model để làm tốt nhất; và câu hỏi "nếu cho agent quyền chạy terminal thì nó có tự chạy phân tích và đưa bảng số liệu được như một trợ lý lập trình không".
+
+### 13.1 Model tốt nhất
+
+Mục 5.7 viết "chọn model bằng số". Bản 0.2 đổi mặc định: vai `chat` dùng **model mạnh nhất có được cho lớp dữ liệu đó**; số đo của mục 7 dùng để kiểm, không để chọn model rẻ.
+
+| Lớp dữ liệu | Model của vai `chat` | Ghi chú |
+|---|---|---|
+| `public` (dữ liệu demo trong sim) | Model thuê mạnh nhất qua cổng model; hiện là `claude-opus-5-5` | Cổng đang dùng là bên bán lại, không xác minh được model đứng sau tên (agent-qa 9.4). Muốn chắc thì dùng khóa trực tiếp của nhà cung cấp |
+| `internal`, `restricted` | Model tự host mạnh nhất vừa máy | Chưa đo model nào gọi công cụ ổn định trên `rtx3060`; rào dữ liệu không nới |
+
+Trần tiền mỗi phiên vẫn giữ: nó chặn vòng lặp lỗi, không để tiết kiệm.
+
+### 13.2 Đa phương thức và đa model
+
+Một vòng có nhiều loại dữ liệu. Nguyên tắc: **code biến mỗi loại thành fact hoặc thành thứ model đọc được**, rồi model phù hợp nhất đọc nó. Không model nào tự mở file.
+
+| Loại dữ liệu | Có ở đâu trong một vòng | Code làm gì | Model đọc |
+|---|---|---|---|
+| Điểm số, log train, sổ chi phí, catalog | `Score`, log, ledger | 13 công cụ ra fact | Vai `chat` |
+| Trace theo thời gian (khớp, lệnh, độ trễ) | trace của rollout | Công cụ tính thống kê; vẽ biểu đồ cho kỹ sư xem | Vai `chat` đọc fact; biểu đồ dành cho người |
+| Ảnh | Khung hình camera đầu của rollout | `frames_at` cắt khung tại thời điểm code chọn (bước hỏng đầu tiên, trước và sau) | Vai `look`: model có thị giác |
+| Video | Video rollout, video egocentric | Cắt thành chuỗi khung quanh sự kiện; cả đoạn video chỉ dùng khi có model đọc video và phép đo cho thấy nó hơn chuỗi khung | Vai `look` |
+| Egocentric của người | Dataset egocentric | Phải qua che danh tính trước mọi bước (bất biến của repo), trừ mẫu EgoDex công bố | Như ảnh và video |
+
+Ba vai model, mỗi vai định tuyến riêng theo lớp dữ liệu qua cổng model:
+
+| Vai | Việc | Vì sao tách |
+|---|---|---|
+| `chat` | Lập luận, chọn công cụ, viết câu trả lời | Cần model lập luận và gọi công cụ tốt nhất |
+| `look` | Trả lời câu hỏi đóng về một ảnh hoặc chuỗi khung ("khay có nghiêng không") | Model thị giác tốt nhất chưa chắc là model `chat`; kết quả là fact nguồn gốc `vision`, chỉ ủng hộ (luật đã có) |
+| `second` | Một model **khác họ** đọc lại kết luận quan trọng (chẩn đoán cuối, đề xuất tiêu ngân sách) cùng các fact đã trích, trả "đồng ý" hoặc "không, vì fact nào" | Bắt lỗi lập luận mà luật kiểm không bắt được. Hai model bất đồng thì kỹ sư thấy cả hai |
+
+Lợi ích của vai `second` và của việc đọc cả đoạn video là **giả định**, chưa đo. Mỗi thứ chỉ giữ lại nếu số của mục 7 (H1, H2) tốt hơn khi có nó.
+
+### 13.3 Câu hỏi về quyền terminal
+
+Trả lời: **được.** Với quyền chạy mã, một model mạnh tự viết script, chạy, đọc kết quả và dựng bảng số liệu được, đúng như cách bản thiết kế này và các bảng số của agent-qa 9.4 được làm ra. Điều kiện là kết quả đó phải kiểm lại được, vì mã do model viết có thể sai mà trông vẫn hợp lý.
+
+Bản 0.1 xếp việc này vào phản mục tiêu (cách B của mục 4). Đề xuất của bản 0.2 là mở nó dưới dạng **một công cụ có hộp cát**, không phải một terminal tự do:
+
+| Điều | Quy định |
+|---|---|
+| Công cụ | `run_analysis(code)`: Python với pandas, numpy; không shell |
+| Thấy gì | Bản chỉ đọc của thư mục vòng và thư mục phiên. Không `vault/`, không `answers/`, không `docs/`, không mạng, không biến môi trường |
+| Trần | Thời gian, bộ nhớ và số lần chạy mỗi lượt do code giữ |
+| Kết quả | Bảng và số thành fact có nguồn gốc mới `model_code`; đoạn mã và đầu ra lưu trong phiên, kỹ sư mở xem được |
+| Hiển thị | Mọi số `model_code` mang nhãn "tính bằng mã của model, chưa qua công cụ đã kiểm" |
+| Giới hạn dùng | Fact `model_code` không được là chỗ dựa duy nhất của một đề xuất tiêu ngân sách dữ liệu; phải có fact `code` đi kèm, như luật của `vision` |
+| Vòng đời | Đoạn mã được dùng lại nhiều lần thì chuyển thành công cụ đăng ký có test; đó là cách lớp công cụ lớn lên |
+
+Như vậy luật "model không viết số" đọc lại là: **model không gõ số; số đến từ mã chạy thật, và người đọc luôn biết mã đó là của ai.** Phần thay đổi so với bản 0.1: phản mục tiêu "agent tự chạy mã Python tự viết" được thay bằng "agent chạy mã ngoài hộp cát".
+
+Việc này làm sau bước 4 của mục 9 (luật của câu trả lời), không trước: hộp cát và nhãn nguồn gốc phải có trước khi model được viết mã.
+
+### 13.4 Quyết định cần Hiếu
+
+| # | Quyết định | Đề xuất |
+|---|---|---|
+| Q8 | Vai `chat` mặc định dùng model mạnh nhất của lớp dữ liệu (13.1) | Có |
+| Q9 | Ba vai `chat`, `look`, `second`; vai `second` và đọc cả đoạn video chỉ giữ nếu số đo tốt hơn (13.2) | Có |
+| Q10 | Mở `run_analysis` có hộp cát và nguồn gốc `model_code` (13.3) | Có, sau bước 4 |
 
 ## Nguồn
 
