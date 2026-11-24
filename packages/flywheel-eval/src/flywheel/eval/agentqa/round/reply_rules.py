@@ -41,7 +41,7 @@ class WhyItem(_Strict):
 
 
 class CheckPick(_Strict):
-    id: str
+    id: str | None  # null: no offered check separates the first two; same as `check: null`
     cites: list[str]
     text: str
 
@@ -179,6 +179,15 @@ def rule_order_permutation(reply: RankReply, offered: Offered) -> list[str]:
     return []
 
 
+def rule_system_first(reply: RankReply, offered: Offered) -> list[str]:
+    """While data spend is blocked, a system fault leads: the algorithm checks systems first."""
+    if (offered.blocked_data_spend and offered.system and reply.order
+            and reply.order[0] not in offered.system):
+        return [f"{reply.order[0]!r} is first, but data spend is blocked: a system-fault "
+                f"hypothesis ({', '.join(offered.system)}) must come first"]
+    return []
+
+
 def rule_intervention_allowed(reply: RankReply, offered: Offered) -> list[str]:
     """The intervention must be one its hypothesis allows; never a data spend when blocked."""
     pick = reply.intervention
@@ -195,7 +204,8 @@ def rule_intervention_allowed(reply: RankReply, offered: Offered) -> list[str]:
 
 def rule_check_offered_or_null(reply: RankReply, offered: Offered) -> list[str]:
     """Null is allowed, even when checks were offered; a check id not offered is not."""
-    if reply.check is not None and reply.check.id not in offered.checks:
+    if reply.check is not None and reply.check.id is not None \
+            and reply.check.id not in offered.checks:
         return [f"check {reply.check.id!r} was not offered"]
     return []
 
@@ -254,6 +264,7 @@ RANK_RULES: tuple[tuple[str, Callable[[RankReply, Offered], list[str]]], ...] = 
     ("cluster", rule_cluster),
     ("ids_offered", rule_ids_offered),
     ("order_permutation", rule_order_permutation),
+    ("system_first", rule_system_first),
     ("intervention_allowed", rule_intervention_allowed),
     ("check_offered_or_null", rule_check_offered_or_null),
     ("cites_present", rule_cites_present),

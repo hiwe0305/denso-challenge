@@ -16,6 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from flywheel.eval.agentqa.round.gateway import MODEL_CALLS_FILE
+from flywheel.eval.agentqa.round.hypotheses import HYPOTHESES_FILE, RulesRefused, load_rules
 from flywheel.eval.agentqa.round.judge import (
     COMPARISON_MARKERS,
     JUDGED_FILE,
@@ -26,6 +27,7 @@ from flywheel.eval.agentqa.round.judge import (
 from flywheel.eval.agentqa.round.measure import FACTS_FILE
 from flywheel.eval.agentqa.round.records import (
     FactRecord,
+    HypothesisRecord,
     JudgedItem,
     ModelCallRecord,
     VerdictRecord,
@@ -56,6 +58,29 @@ def _with_comparison(item: JudgedItem, facts: dict[str, FactRecord],
         for fid, of in item.offered.facts.items() if fid in facts}
     offered = item.offered.model_copy(update={"facts": {**item.offered.facts, **known}})
     return item.model_copy(update={"offered": offered})
+
+
+def _with_system(item: JudgedItem, system_of: dict[tuple[str, str], bool]) -> JudgedItem:
+    """The item with `offered.system` recomputed from `hypotheses.jsonl` and the rules.
+
+    Old `judged.jsonl` lines hold no list; when a hypothesis is unknown the stored list stays.
+    """
+    cid = item.offered.cluster_id
+    if any((cid, h) not in system_of for h in item.offered.hypotheses):
+        return item
+    system = [h for h in item.offered.hypotheses if system_of[(cid, h)]]
+    return item.model_copy(update={"offered": item.offered.model_copy(update={"system": system})})
+
+
+def _system_flags(out: Path) -> dict[tuple[str, str], bool]:
+    """(cluster id, hypothesis id) -> whether its rule is a system fault; {} if no rules load."""
+    try:
+        by_rule = {r.id: r.system for r in load_rules()}
+    except RulesRefused:
+        return {}
+    records = (HypothesisRecord.model_validate_json(x) for x in _lines(out / HYPOTHESES_FILE))
+    return {(h.cluster.cluster_id, h.hypothesis_id): by_rule[h.rule_id]
+            for h in records if h.rule_id in by_rule}
 
 
 def verdict_of(item: JudgedItem, calls: dict[str, ModelCallRecord]) -> VerdictRecord:
@@ -101,7 +126,9 @@ def verify(out: Path) -> list[VerdictRecord]:
         markers = load_roles().rank.comparison_markers
     except RolesRefused:  # run from another directory: the shipped markers
         markers = COMPARISON_MARKERS
-    verdicts = [verdict_of(_with_comparison(item, facts, markers), calls) for item in items]
+    system_of = _system_flags(out)
+    verdicts = [verdict_of(_with_system(_with_comparison(item, facts, markers), system_of), calls)
+                for item in items]
     (out / VERDICTS_FILE).write_text("".join(v.model_dump_json() + "\n" for v in verdicts),
                                      encoding="utf-8")
     return verdicts

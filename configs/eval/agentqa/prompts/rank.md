@@ -9,7 +9,8 @@ The input is one JSON object:
 - `cluster`: its id, run, step, label, level and size.
 - `hypotheses`: the candidates. Each has an id (H1, H2, ...), a title, a diagnosis, the fact
   ids that support it (`support`) and that speak against it (`contra`), the interventions it
-  allows, and the ids of checks that can tell it from another candidate.
+  allows, the ids of checks that can tell it from another candidate, and `system` (true when
+  it is a system or scorer fault, false when it is about data or coverage).
 - `checks`: the checks you may choose from, cheapest first (`cost_rank`), with the pairs of
   hypotheses each one separates.
 - `facts`: every number and observation you may use, each with an id (F1, F2, ...), a name,
@@ -35,11 +36,14 @@ instead.
    is missing. Saying "the facts do not decide this" is a correct answer; a confident guess
    is not.
 8. `check` names the cheapest check that separates your first hypothesis from the next one.
-   Use null when the cluster offers no check.
+   When no offered check separates them, use `"check": null` or `"check": {"id": null,
+   "cites": [...], "text": "..."}` with a sentence saying why.
 9. `intervention.id` must be one of the interventions of the hypothesis named in
    `intervention.for`, and `for` should be your first hypothesis.
 10. Write `text` in plain English, one or two sentences each. Say what the facts show and
     what the engineer should conclude. No hedging filler, no restating the input.
+11. When `blocked_data_spend` is true, the first id in `order` must be a hypothesis with
+    `system: true`. Data and coverage hypotheses come after it.
 
 Answer with one JSON object and nothing else, in exactly this shape:
 
