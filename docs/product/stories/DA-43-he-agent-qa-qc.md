@@ -38,6 +38,7 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
 
 - [x] 0. Design và story (docs), chờ Hiếu duyệt
   - [x] 0.1 Bộ metric, cổng qua và hiện trạng so với design (design bản 0.5, mục 11.5 và 15; **[Đề xuất]**, chờ Hiếu duyệt)
+  - [x] 0.2 Design agent chat phân tích ([design 24/11/2026](../../superpowers/specs/2026-11-24-agent-analysis-chat-design.md), **[Đề xuất]**, chờ Hiếu duyệt; việc dựng thuộc story mới)
 - [ ] 1. Nền (1 ngày)
   - [x] 1.1 Issue "Contract change" cho K1 (cùng DA-42), K2, K3; soạn PR hợp đồng trên `DA-43-contract` kèm file mẫu và test (PR riêng, không thuộc phạm vi file dưới đây)
   - [x] 1.2 Lệnh xuất eval khay sang `scores.jsonl` theo `Score` trong adapter `flywheel_psi0`; test trên một lô mẫu
@@ -101,6 +102,7 @@ Danh sách chung của story:
 
 - `docs/superpowers/specs/2026-11-19-agent-qaqc-system-design.md`
 - `docs/superpowers/specs/2026-11-20-agent-qaqc-architecture-design.md`
+- `docs/superpowers/specs/2026-11-24-agent-analysis-chat-design.md`
 - `docs/g0/agent-qa.md`
 - `packages/flywheel-eval/src/flywheel/eval/agentqa/tools/`
 - `packages/flywheel-eval/src/flywheel/eval/agentqa/round/`
@@ -137,6 +139,7 @@ Danh sách chung của story:
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 24/11/2026 | Thêm nhiệm vụ 0.2 và design 24/11/2026 (agent chat phân tích, đề xuất, chờ duyệt) vào phạm vi file | Hiếu (soạn với Claude) |
 | 24/11/2026 | Thêm nhiệm vụ 5.7 (hai luật kiểm của vai `rank`); agent-qa mục 8 và 9 gộp gọn, thêm 9.5 | Hiếu (soạn với Claude) |
 | 24/11/2026 | Nhiệm vụ 0.1: ghi số đo sáu model, phép thử đảo thứ tự và lần chạy lại bộ lỗi cấy (agent-qa 9.4, design 19/11 bản 0.7) | Hiếu (soạn với Claude) |
 | 23/11/2026 | Hiếu mở rộng phạm vi file sang hai lệnh xuất mới trong adapter psi0 (`export_outcomes.py`, `export_conditions.py`); thêm nhiệm vụ 1.4 | Hiếu |
