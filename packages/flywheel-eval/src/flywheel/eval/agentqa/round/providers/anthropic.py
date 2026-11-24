@@ -12,6 +12,7 @@ reply instead). Thinking, when asked for, is adaptive and its blocks are dropped
 
 from __future__ import annotations
 
+import importlib
 import os
 from typing import Any
 from urllib.parse import urlparse
@@ -23,12 +24,12 @@ DEFAULT_HOST = "api.anthropic.com"
 
 
 def _sdk() -> Any:
+    # Imported by name: the SDK is an optional group, absent from the default environment.
     try:
-        import anthropic
+        return importlib.import_module("anthropic")
     except ImportError as error:
         raise GatewayRefused("the anthropic SDK is not installed; install the "
                              "agentqa-hosted group (uv sync --extra agentqa-hosted)") from error
-    return anthropic
 
 
 def _count(value: object) -> int | None:
