@@ -292,121 +292,50 @@ Không chạy trên máy 3060 khi Hiếu chưa đồng ý; máy dùng chung.
 | Kỹ sư duyệt 30 phát hiện | `fw agentqa review` | Để bộ chấm có điểm cho phần giải thích và đề xuất |
 | Qwen3.5-4B | sau demo | Q-M = không |
 
-## 8. Đường ống vòng (DA-43): mốc đầu trên bộ ca lịch sử, 22/11/2026
+## 8. Đường ống vòng (DA-43): cách chạy và bộ ca lịch sử
 
-Số đo đầu tiên của đường ống vòng (`fw agentqa round`) theo bộ metric của [design 19/11 mục 11.5](../superpowers/specs/2026-11-19-agent-qaqc-system-design.md). Mới có **một ca của tập phát triển** và **chỉ cột sàn code** (`--no-model`); chưa có lần gọi model nào, nên chưa có cột agent và cột model thêm.
+`fw agentqa round` chẩn đoán một vòng: `pack`, `admit`, `measure`, `hypothesize`, `judge`, `verify`, `assemble`, `render`. Với `--no-model` hai bước `judge` và `verify` không chạy (sàn code). Số đo theo bộ metric của [design 19/11 mục 11.5](../superpowers/specs/2026-11-19-agent-qaqc-system-design.md).
 
 | Mục | Giá trị |
 |---|---|
-| Gói | Giai đoạn 1 ở 60k của `C_70`, `C_ALL`, `B_70`, `B_ALL`: 240 `Score`, 240 trace, 4 log train; `pack_6e302385f4c9ab1a`; lớp `public`; dựng trong `fwdata/agentqa/cases/stage1-60k` (ngoài repo) |
-| Ca | `tray-c70-step4`, tập phát triển; đáp án 26 điểm chốt từ [tray.md](../he/tray.md) 20.2 và 20.11; sha256 `3f8e03b2…` |
-| Phiên bản agent | hash `2bddfca9…`, commit `84792763` cộng `casebench/` |
-| Thời gian | 80 s trên laptop, CPU |
-
-| Metric | Sàn code |
-|---|---|
-| A1 điểm chốt tới được | 22/24; điểm bắt buộc 7/9 |
-| A2 hạng của chẩn đoán đúng | hạng 1: 4/4 |
-| A3 khẳng định sai | hạng 1: 0; ba hạng đầu: 0 |
-| A4 phép kiểm | chưa có điểm chốt loại này |
-| A5 can thiệp | 2/2 |
-| E1 không xét được | 7 fact: 4 thiếu `dataset_report`, 1 thiếu điều kiện, 1 thiếu sổ chi phí, 1 thiếu lịch sử |
+| Ca | `tray-c70-step4`, tập phát triển; đáp án 26 điểm chốt từ [tray.md](../he/tray.md) 20.2 và 20.11; sha256 `3f8e03b2…`; niêm phong ngoài gói |
+| Gói đang dùng | `stage1-60k-k1` (mục 9.3). Các gói trước (`stage1-60k`, `stage1-60k-src`) giữ trên đĩa, không dùng để báo số nữa |
+| Lớp dữ liệu | `public`, xác nhận bằng hai bản ghi `Source` (**[Đã chốt]** Hiếu, 23/11/2026; căn cứ design 27/10 mục 8.4) |
 
 Đối chiếu số với phân tích tay: số lượt gãy ở `approach_a` mà không hết giờ là 7, 10, 7 trên 60 ở `C_70`, `C_ALL`, `B_70`; cỡ tám cụm c1–c8 của `C_70` là 14, 12, 4, 4, 3, 3, 2, 2; phân vị 99 sai số bám của lượt thành công ở `C_70` là 2,641 và 0,385. Cả ba khớp tray.md 20.2 và 20.11.
 
-Cách đọc, và giới hạn:
-
-- Hai điểm bắt buộc trượt là cùng một lỗi: cụm `place`/`L-PLACE-POSE` mức 1 và 2 (c1, c2) bị chặn tiêu ngân sách dữ liệu vì "thiếu tín hiệu", trong khi đội cho hai cụm này đi tiếp bước 5–8. `Score` không mang tư thế khay cuối và đích; outcome gốc có. Sửa được khi K1 (`RolloutOutcome`) merge và có lệnh xuất.
-- A3 bằng 0 ở đây chưa nói được nhiều: sàn code chưa có luật nào ra chẩn đoán `controller`, nên nó không thể khẳng định sai điều đó.
-- Tên fact trong đáp án được viết sau khi đã thấy tên fact của agent, và người viết luật đã đọc chẩn đoán gốc. Đây là số của tập phát triển; nó không đo khả năng tổng quát.
-- Một ca, 26 điểm: mọi số là số đếm.
-
-Chạy lại:
+Giới hạn của bộ ca: tên fact trong đáp án được viết sau khi đã thấy tên fact của agent, và người viết luật đã đọc chẩn đoán gốc. Đây là số của tập phát triển, một ca, 26 điểm: mọi số là số đếm và không đo khả năng tổng quát.
 
 ```bash
-uv run fw agentqa round --pack fwdata/agentqa/cases/stage1-60k/pack.json --out <thư mục mới> --no-model
+uv run fw agentqa round --pack fwdata/agentqa/cases/stage1-60k-k1/pack.json --out <thư mục mới> --no-model
 uv run python -m flywheel.eval.agentqa.casebench --answer fwdata/agentqa/answers/tray-c70-step4.yaml \
-    --run <thư mục chạy> --out <report.json>
+    --run <thư mục chạy> [--floor-run <thư mục sàn code>] --out <report.json>
 ```
 
-## 9. Lớp model của đường ống vòng (DA-43 5.4, 5.6): lần chạy thật đầu, 23/11/2026
-
-Từ 23/11/2026 `fw agentqa round` có thêm hai bước giữa `hypothesize` và `assemble`: `judge` (gọi model, vai `rank`) và `verify` (kiểm câu trả lời, không gọi model). Với `--no-model` hai bước này không chạy và kết quả như cũ.
+## 9. Lớp model của đường ống vòng (DA-43 5.4, 5.6)
 
 | Việc | Cách làm |
 |---|---|
 | Đơn vị một lời gọi | Một cụm lỗi; tối đa 8 cụm lớn nhất (`roles.yaml`). Cụm còn lại ở sàn code, phán quyết `not_ranked` |
 | Model thấy gì | Một khối JSON: cụm, giả thuyết ứng viên, phép kiểm, tối đa 60 fact. Prompt ở `prompts/rank.md` |
 | Model trả gì | Thứ tự id giả thuyết, một phép kiểm, một can thiệp, mỗi câu có trích fact. Không viết số |
-| Kiểm | 10 luật trong `round/reply_rules.py`. Trượt thì gửi lại một lần kèm danh sách lỗi |
+| Kiểm | Các luật trong `round/reply_rules.py`. Trượt thì gửi lại một lần kèm danh sách lỗi |
 | Phán quyết | `accepted`, `repaired`, `rejected` (về sàn code, ghi lý do), `not_ranked` |
 | Bật model thuê | Không sửa config trong repo. Chép `routing.yaml` và `hosted.yaml` ra thư mục riêng, bật `enabled`, trỏ `rank.public` sang hồ sơ hosted, rồi chạy với `--gateway-config <thư mục>` |
 
-**Lần chạy thật (sơ bộ).** Gói mẫu của bộ test (240 `Score` của bốn run 60k, một bản ghi `Source` lớp `public`), model `claude-opus-5-5` qua cổng bán lại ckey.vn (`api.xah.io`), laptop:
-
-| Số đo | Giá trị |
-|---|---|
-| Lời gọi model | 8, không lời nào phải gửi lại |
-| Phán quyết | 8 `accepted`, 0 `repaired`, 0 `rejected`, 56 `not_ranked` |
-| Thời gian bước `judge` | 81 giây |
-| Token cổng báo về | 12 435 vào, 2 607 ra |
-
-Giới hạn của lần chạy này:
-
-- Gói mẫu chỉ có `Score`, nên cả 8 cụm chỉ có một giả thuyết (`label_signal_missing`). Model không có gì để xếp hạng; lần chạy chỉ chứng minh đường ống và các rào chạy được với model thật, chưa đo chất lượng.
-- Cổng là bên bán lại: không xác minh được model đứng sau id `claude-opus-5-5`. Trong một lần gọi thử, cổng báo 1 token vào cho prompt khoảng 40 token; cổng model nay dùng ước lượng của chính nó khi số báo về thấp hơn một phần tư ước lượng.
-- Gói vòng thật `stage1-60k` bị cổng từ chối với model thuê: B1 ghi 248 trên 248 mục chưa có bản ghi nguồn xác nhận lớp `public` (điều chặn cứng 2 và 3). Xem mục 9.1.
-
-### 9.1 Gói thật và số D1 đầu tiên, 23/11/2026
-
-**[Đã chốt]** Hiếu, 23/11/2026: gói thật được thêm bản ghi `Source` lớp `public`. Gói mới `stage1-60k-src` (`pack_73cacf8029b618d4`, 249 file, 252 liên kết) có `sources.jsonl` gồm hai bản ghi, mỗi bản là một bản phát hành dataset khay S1 mà bốn job fine-tune khai trong `launch.json`, mang hash phát hành; căn cứ là design 27/10 mục 8.4 (dữ liệu demo trong sim là `public`). Mọi mục của gói nối tới file này, nên B1 ghi `hosted_allowed: true`, không mục nào chưa xác nhận. Gói cũ `stage1-60k` giữ nguyên.
-
-Ca `tray-c70-step4`, hai lần chạy trên gói mới: sàn code và có model (`claude-opus-5-5` qua ckey.vn).
-
-| Metric | Sàn code | Có model |
-|---|---|---|
-| A1 điểm chốt tới được | 22/24; bắt buộc 7/9 | 22/24; bắt buộc 7/9 |
-| A2 chẩn đoán đúng ở hạng 1 | 4/4 | 4/4 |
-| A3 khẳng định sai | 0 | 0 |
-| A5 can thiệp | 2/2 | 2/2 |
-| D1 phần model thêm | | đúng thêm 0, sai thêm 0, lên hạng 0, xuống hạng 0 |
-| B2 mục của model bị loại | | 0 trên 8 |
-| B3 mục về sàn code | | 56 cụm ngoài trần 8 |
-| E2 thời gian | 60 giây | bước `judge` 104 giây cho 8 lời gọi |
-| RAM đỉnh của một lần chạy | 5,8 GB | chưa đo |
-
-Cách đọc:
-
-- **D1 bằng 0 là do bảng luật, chưa nói gì về model.** Cả 8 cụm lớn nhất chỉ có một giả thuyết (`label_signal_missing`), nên model không có gì để xếp lại. Nó viết được câu giải thích đúng luật (không số, có trích fact), nhưng bộ chấm không cho điểm câu chữ.
-- Muốn D1 khác 0 phải có nhiều giả thuyết cạnh tranh trong một cụm: sáu luật còn thiếu (bước 3 của thứ tự việc) và tín hiệu tư thế khay (K1).
-- Token và tiền là số cổng báo, chưa xác minh. Một ca, một lần chạy: chưa đo độ ổn định (E4).
-- **RAM 5,8 GB là lỗi, đã sửa ở nhiệm vụ 4.9.** Trước đó B1 nạp mọi file của gói (240 trace, khoảng 1,5 GB, và bốn log train 71 MB) thành bản ghi pydantic và giữ suốt lần chạy. Sau khi sửa: đỉnh 365 MB, 65 giây, mọi file đầu ra giống hệt lần chạy cũ (so từng byte; `assembly.json` chỉ khác `run_id`).
-
-### 9.2 Chạy lại sau khi sửa bộ nhớ và thêm luật, 23/11/2026
-
-Cùng gói `stage1-60k-src`, cùng ca, mã ở nhiệm vụ 4.9 và 4.10.
-
-| Số đo | Sàn code | Có model |
-|---|---|---|
-| A1, A2, A3, A5, D1 | như mục 9.1 | như mục 9.1 |
-| Phán quyết | | 8 `accepted`, 56 `not_ranked` |
-| Thời gian cả lệnh | 79 giây | 188 giây (bước `judge` 99 giây) |
-| Đỉnh RAM | 377 MB | 378 MB |
-| Giả thuyết theo luật | `label_signal_missing` 53, `scorer_latch_too_strict` 14, không luật nào 11 | |
-
-Năm luật mới không bắn lần nào trên gói này, và lý do là đầu vào:
-
-- `controller_tracking`: sai số bám của lượt hỏng vượt τ ở cả hai phần thân, nhưng lượt thành công cũng vượt (`tau_separates` là sai ở cả bốn run). Code vì thế không kết luận controller, khớp H2 của tray.md 20.11. Chưa có luật nào ghi lại việc loại trừ này.
-- `weak_skill`, `coverage_gap`, `out_of_domain`: gói không có mục `conditions`.
-- `earlier_stage_train`: bốn job không có loss vô hạn.
-
-Chạy lại có model:
-
 ```bash
-set -a; . /home/hiwe/project/denso-challenge/.env; set +a
-uv run fw agentqa round --pack fwdata/agentqa/cases/stage1-60k-src/pack.json --out <thư mục mới> \
+uv run --env-file <.env của checkout chính> fw agentqa round \
+    --pack fwdata/agentqa/cases/stage1-60k-k1/pack.json --out <thư mục mới> \
     --gateway-config fwdata/agentqa/gateway-ckey
 ```
+
+Điều đã học từ ba lần chạy đầu (23/11/2026; số chi tiết của chúng đã bỏ vì mục 9.3 và 9.4 thay thế):
+
+- Gói chỉ có `Score` cho mỗi cụm đúng một giả thuyết, nên model không có gì để xếp hạng. Phải có điều kiện train (mục 9.3) mới có giả thuyết cạnh tranh.
+- Cổng từ chối gói thật khi 248 trên 248 mục chưa có bản ghi nguồn xác nhận lớp `public`; rào này không nới, gói được bổ sung bản ghi `Source`.
+- B1 từng nạp mọi file của gói vào RAM (đỉnh 5,8 GB). Sau nhiệm vụ 4.9: đọc từng dòng, đỉnh dưới 400 MB, đầu ra giống từng byte.
+- `controller_tracking` không bắn vì lượt thành công cũng vượt τ ở cả bốn run; code không kết luận controller, khớp H2 của tray.md 20.11.
+- Cổng ckey.vn là bên bán lại: không xác minh được model đứng sau một tên; token cổng báo không tin được.
 
 ### 9.3 Gói có điều kiện train, 23/11/2026
 
@@ -470,3 +399,14 @@ Cách đọc: khi code đưa thứ tự, mọi model giữ gần nguyên; khi b�
 **Bộ lỗi cấy (C1), đường bản 3.** Dựng lại bộ log bằng `log_defects` mặc định (ra đúng `bench-c6da75e9ff36`, `bench-cfcb0ba66776`), phát lại file `--record` của lần chạy Nemotron 12/11 qua mã hiện tại, chấm bằng DA-31. Kết quả khớp bản 12/11 ở mọi số đếm (recall 30/30, báo nhầm bản sạch 1/40, T4 3/4); khác biệt chỉ ở id báo cáo, ngày và nhãn revision. Đường ống vòng mới chưa chạy được bộ này vì chưa có vai `adjudicate`.
 
 Chưa đo trong lượt này: C2 (gói khỏe), D2 (kỹ sư duyệt), chi phí thật (chỉ có số cổng báo), model cục bộ M1.
+
+### 9.5 Hai luật kiểm sửa sau lần đo 24/11/2026
+
+Chấm lại sáu lần chạy của mục 9.4 bằng `--from verify` (không gọi lại model):
+
+| Sửa | Vì sao | Kết quả khi chấm lại |
+|---|---|---|
+| Luật mới `system_first`: cụm đang bị chặn tiêu ngân sách dữ liệu thì hạng 1 phải là giả thuyết lỗi hệ thống | Mục 9.4: ba model đẩy giả thuyết dữ liệu lên đầu và được nhận | 4 câu bị loại (Haiku 2, GPT-5.5 1, Gemini 1), cụm về thứ tự của code |
+| Nhận `"check": {"id": null, …}` như "không chọn phép kiểm" | Prompt bảo "dùng null", model viết `id: null` và trượt schema | Opus 5.5 từ 5 nhận, 3 sửa lên 8 nhận; GPT-5.5 từ 3 nhận, 4 loại lên 7 nhận, 1 loại |
+
+Điểm ca không đổi ở mọi model (A1 22/24, bắt buộc 7/9, D1 bằng 0). Prompt đổi nên đây là một phiên bản agent mới; chưa chạy lại với model thật sau khi sửa.
