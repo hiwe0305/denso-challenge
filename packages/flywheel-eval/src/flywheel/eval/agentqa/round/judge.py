@@ -150,7 +150,8 @@ def _checks(members: list[HypothesisRecord]) -> list[dict[str, Any]]:
 
 def build_unit(members: list[HypothesisRecord], facts: list[FactRecord],
                titles: dict[str, str], max_facts: int,
-               markers: tuple[str, ...] = COMPARISON_MARKERS) -> tuple[dict[str, Any], Offered]:
+               markers: tuple[str, ...] = COMPARISON_MARKERS,
+               system_rules: frozenset[str] = frozenset()) -> tuple[dict[str, Any], Offered]:
     """The user payload of one rank call, and what it offered."""
     cluster = members[0].cluster
     chosen = offered_facts(members, facts, max_facts)
@@ -162,7 +163,8 @@ def build_unit(members: list[HypothesisRecord], facts: list[FactRecord],
             "id": h.hypothesis_id, "title": rule_title(h.rule_id, titles),
             "diagnosis": h.diagnosis, "note": h.note, "support": h.support,
             "contra": h.contra, "interventions": list(h.interventions),
-            "checks": [c.check_id for c in h.checks]} for h in members],
+            "checks": [c.check_id for c in h.checks],
+            "system": h.rule_id in system_rules} for h in members],
         "checks": checks,
         "facts": [{"id": f.fact_id, "name": f.name[:FACT_TEXT_CHARS], "value": _value(f.value),
                    "unit": f.unit, "provenance": f.provenance} for f in chosen],
@@ -175,7 +177,8 @@ def build_unit(members: list[HypothesisRecord], facts: list[FactRecord],
         facts={f.fact_id: OfferedFact(
             unit=f.unit, provenance=f.provenance,
             comparison=is_comparison_fact(f.name, f.value, markers)) for f in chosen},
-        blocked_data_spend=members[0].blocked_data_spend)
+        blocked_data_spend=members[0].blocked_data_spend,
+        system=[h.hypothesis_id for h in members if h.rule_id in system_rules])
     return payload, offered
 
 
@@ -216,11 +219,13 @@ def judge(out: Path, gateway: Gateway, *, roles: Roles | None = None,
     prompt = system if system is not None else load_prompt()
     hypotheses = [HypothesisRecord.model_validate_json(x) for x in _lines(out / HYPOTHESES_FILE)]
     facts = [FactRecord.model_validate_json(x) for x in _lines(out / FACTS_FILE)]
-    titles = {r.id: r.title for r in load_rules()}
+    rules = load_rules()
+    titles = {r.id: r.title for r in rules}
+    system_rules = frozenset(r.id for r in rules if r.system)
     result = JudgeResult()
     for k, members in enumerate(clusters_of(hypotheses)):
         payload, offered = build_unit(members, facts, titles, limits.max_facts,
-                                     limits.comparison_markers)
+                                     limits.comparison_markers, system_rules)
         unit = offered.cluster_id
         if k >= limits.max_clusters:
             result.items.append(JudgedItem(item_id=f"rank:{unit}", role="rank", unit=unit,

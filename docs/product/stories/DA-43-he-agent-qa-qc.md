@@ -70,6 +70,7 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
   - [ ] 5.3 B5: các phép kiểm của kiến trúc mục 25 (luật của design mục 6), ba sửa của bản 3 và ca kiểm của AC 5, phán quyết và sàn code
   - [x] 5.4 Lớp hosted kiểu OpenAI (OpenRouter) và lớp Anthropic
   - [x] 5.6 Vai `rank` chạy được trong đường ống vòng (23/11/2026; phần `rank` của 5.2 và 5.3): bước `judge` và `verify`, thư viện luật kiểm, phán quyết và sàn code, `--gateway-config`. Vai `adjudicate`, `look` và các luật kiểm riêng của chúng còn mở ở 5.2, 5.3
+  - [x] 5.7 Hai luật kiểm sau lần đo 24/11/2026: `system_first` (cụm bị chặn thì hạng 1 là giả thuyết lỗi hệ thống) và nhận `check.id: null` như "không chọn phép kiểm"; chấm lại sáu lần chạy bằng `--from verify` (agent-qa 9.5)
   - [ ] 5.5 Xuất `round_diagnosis.json` theo `RoundDiagnosis` sau khi PR hợp đồng K2 merge
 - [ ] 6. Bộ ca lịch sử (1,5 ngày)
   - [ ] 6.1 Kiểm artifact của từng ca ứng viên còn đủ; loại ca thiếu, ghi lý do
@@ -136,6 +137,7 @@ Danh sách chung của story:
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 24/11/2026 | Thêm nhiệm vụ 5.7 (hai luật kiểm của vai `rank`); agent-qa mục 8 và 9 gộp gọn, thêm 9.5 | Hiếu (soạn với Claude) |
 | 24/11/2026 | Nhiệm vụ 0.1: ghi số đo sáu model, phép thử đảo thứ tự và lần chạy lại bộ lỗi cấy (agent-qa 9.4, design 19/11 bản 0.7) | Hiếu (soạn với Claude) |
 | 23/11/2026 | Hiếu mở rộng phạm vi file sang hai lệnh xuất mới trong adapter psi0 (`export_outcomes.py`, `export_conditions.py`); thêm nhiệm vụ 1.4 | Hiếu |
 | 23/11/2026 | Thêm nhiệm vụ 4.9 (bộ nhớ) và 4.10 (bảng luật); design 19/11 bản 0.6 và kiến trúc 20/11 bản 0.6 ghi hiện trạng | Hiếu (soạn với Claude) |

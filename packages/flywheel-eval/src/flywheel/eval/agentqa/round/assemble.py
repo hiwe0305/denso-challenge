@@ -88,17 +88,18 @@ def _ranked(members: list[HypothesisRecord], titles: dict[str, str],
         "rank": k, "source": "model", "explanation": why.get(hid, "")})
         for k, hid in enumerate(reply.order, start=1)]
     checks = {c.check_id: c for h in members for c in h.checks}
-    cites = [f for w in reply.why for f in w.cites]
-    if reply.check is not None:
-        cites += reply.check.cites
+    pick = reply.check if reply.check is not None and reply.check.id is not None else None
+    cites = [f for w in reply.why for f in w.cites]  # a check with no id is `check: null`
+    if pick is not None:
+        cites += pick.cites
     cites += reply.intervention.cites
     return ClusterView(
         cluster=members[0].cluster, hypotheses=views,
         blocked_data_spend=members[0].blocked_data_spend,
-        check=checks.get(reply.check.id) if reply.check is not None else None,
+        check=checks.get(pick.id or "") if pick is not None else None,
         intervention=reply.intervention.id, intervention_source="model", costed=False,
         verdict=verdict.verdict, ranked_by=call.model,
-        check_text=reply.check.text if reply.check is not None else "",
+        check_text=pick.text if pick is not None else "",
         intervention_text=reply.intervention.text, intervention_for=reply.intervention.for_,
         model_cites=list(dict.fromkeys(cites)))
 

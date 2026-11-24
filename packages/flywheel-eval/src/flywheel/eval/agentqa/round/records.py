@@ -275,6 +275,10 @@ class Offered(Record):
     checks: list[str] = Field(default_factory=list, description="Check ids, cheapest first.")
     facts: dict[str, OfferedFact] = Field(default_factory=dict)
     blocked_data_spend: bool
+    system: list[str] = Field(
+        default_factory=list,
+        description="Offered hypothesis ids whose rule is a system or scorer fault; old files "
+                    "lack it and `verify` recomputes it.")
 
 
 class JudgedItem(Record):

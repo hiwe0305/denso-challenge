@@ -283,3 +283,116 @@ def test_verify_recomputes_the_flag_from_facts_for_an_old_judged_item() -> None:
     new = _with_comparison(item, facts, COMPARISON_MARKERS).offered.facts
     assert new["F1"].comparison and not new["F3"].comparison
     assert not new["F2"].comparison  # not in facts.jsonl: the stored flag stands
+
+
+# system first ----------------------------------------------------------------------------
+
+BLOCKED = OFFERED.model_copy(update={"blocked_data_spend": True, "system": ["H2"]})
+
+
+def test_system_first_fails_when_a_data_hypothesis_leads_a_blocked_cluster() -> None:
+    assert rules_failed(good(), BLOCKED) == ["system_first"]  # H1 is not a system fault
+    message = rr.check_rank(text_of(good()), BLOCKED)[0].message
+    assert "'H1'" in message and "system-fault" in message
+
+
+def test_system_first_passes_with_a_system_hypothesis_first() -> None:
+    reply = good()
+    reply["order"] = ["H2", "H1"]
+    reply["why"][0]["hypothesis"] = "H2"
+    reply["intervention"].update(id="report_only", **{"for": "H2"})
+    assert rules_failed(reply, BLOCKED) == []
+
+
+def test_system_first_passes_when_not_blocked_or_system_list_empty() -> None:
+    assert rules_failed(good(), BLOCKED.model_copy(update={"blocked_data_spend": False})) == []
+    assert rules_failed(good(), BLOCKED.model_copy(update={"system": []})) == []
+
+
+def test_build_unit_fills_system_in_offer_and_payload() -> None:
+    from flywheel.eval.agentqa.round.judge import build_unit
+    from flywheel.eval.agentqa.round.records import ClusterRef, HypothesisRecord
+
+    cluster = ClusterRef(cluster_id="C/x", run="C", step="place", label="L", level=1, size=3)
+    members = [HypothesisRecord(
+        hypothesis_id=h, cluster=cluster, rule_id=rid, group="scorer" if rid == "a" else "data",
+        diagnosis="unknown", note="n", interventions=["report_only"],
+        code_rank=k, blocked_data_spend=True) for k, (h, rid) in enumerate(
+            [("H1", "a"), ("H2", "b")], start=1)]
+    payload, offered = build_unit(members, [], {"a": "A", "b": "B"}, 5,
+                                  system_rules=frozenset({"a"}))
+    assert offered.system == ["H1"]
+    assert [h["system"] for h in payload["hypotheses"]] == [True, False]
+
+
+def test_verify_recomputes_system_for_an_old_judged_item_and_rejects() -> None:
+    from flywheel.eval.agentqa.round.records import JudgedItem
+    from flywheel.eval.agentqa.round.verify import _with_system
+
+    old = JudgedItem(item_id="rank:x", role="rank", unit="x",
+                     offered=OFFERED.model_copy(update={"blocked_data_spend": True}))
+    assert old.offered.system == []
+    assert rules_failed(good(), old.offered) == []  # nothing known yet: passes
+    new = _with_system(old, {(old.offered.cluster_id, "H1"): False,
+                             (old.offered.cluster_id, "H2"): True}).offered
+    assert new.system == ["H2"]
+    assert rules_failed(good(), new) == ["system_first"]
+    # an unknown hypothesis keeps the stored list
+    assert _with_system(old, {}).offered.system == []
+
+
+# check with a null id --------------------------------------------------------------------
+
+def _null_id_reply(text: str = "No offered check separates the two, see {F2}.") -> dict[str, Any]:
+    reply = good()
+    reply["check"] = {"id": None, "cites": ["F2"], "text": text}
+    return reply
+
+
+def test_a_check_with_a_null_id_passes_every_rule() -> None:
+    assert rr.check_rank(text_of(_null_id_reply()), OFFERED) == []
+
+
+def test_a_null_id_check_sentence_is_still_checked() -> None:
+    assert rules_failed(_null_id_reply("No check separates them in 12 rollouts.")) == ["numbers"]
+    reply = _null_id_reply("No offered check separates the two.")
+    reply["check"]["cites"] = []
+    assert rules_failed(reply) == ["cites_present"]
+    reply = _null_id_reply("No check separates them, see {F77}.")
+    reply["check"]["cites"] = ["F77"]
+    assert rules_failed(reply) == ["ids_offered"]
+
+
+def test_a_null_id_check_assembles_like_check_null() -> None:
+    from flywheel.eval.agentqa.round.assemble import _ranked
+    from flywheel.eval.agentqa.round.records import (
+        CheckRef,
+        ClusterRef,
+        HypothesisRecord,
+        ModelCallRecord,
+        VerdictRecord,
+    )
+
+    cluster = ClusterRef(cluster_id="C_70/place/L-PLACE-POSE/l1", run="C_70", step="place",
+                         label="L-PLACE-POSE", level=1, size=3)
+    members = [HypothesisRecord(
+        hypothesis_id=h, cluster=cluster, rule_id=f"r{k}", group="data", diagnosis="unknown",
+        note="n", interventions=["repair_ticket", "sim_s1", "report_only"], code_rank=k,
+        blocked_data_spend=False,
+        checks=[CheckRef(check_id="K1", cost_key="rerun", cost_rank=1)])
+        for k, h in enumerate(["H1", "H2"], start=1)]
+    verdict = VerdictRecord(item_id="rank:x", role="rank", unit="x", verdict="accepted")
+    sha = "0" * 64
+
+    def view(reply: dict[str, Any]) -> Any:
+        call = ModelCallRecord(
+            call_id="M1", role="rank", unit="x", attempt=1, request_sha256=sha,
+            prompt_sha256=sha, data_class="public", profile="p", provider="x", hosted=False,
+            model="m", revision="", host="", tokens_in=0, tokens_out=0, usd=0, seconds=0,
+            tries=1, status="ok", reply=text_of(reply))
+        return _ranked(members, {}, verdict, call)
+
+    none = good()
+    none["check"] = None
+    assert view(_null_id_reply()) == view(none)
+    assert view(none).check is None and view(none).check_text == ""
