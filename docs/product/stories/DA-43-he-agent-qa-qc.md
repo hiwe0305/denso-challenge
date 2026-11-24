@@ -136,10 +136,10 @@ Danh sách chung của story:
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 24/11/2026 | Nhiệm vụ 0.1: ghi số đo sáu model, phép thử đảo thứ tự và lần chạy lại bộ lỗi cấy (agent-qa 9.4, design 19/11 bản 0.7) | Hiếu (soạn với Claude) |
 | 23/11/2026 | Hiếu mở rộng phạm vi file sang hai lệnh xuất mới trong adapter psi0 (`export_outcomes.py`, `export_conditions.py`); thêm nhiệm vụ 1.4 | Hiếu |
 | 23/11/2026 | Thêm nhiệm vụ 4.9 (bộ nhớ) và 4.10 (bảng luật); design 19/11 bản 0.6 và kiến trúc 20/11 bản 0.6 ghi hiện trạng | Hiếu (soạn với Claude) |
 | 23/11/2026 | Thêm nhiệm vụ 5.6 (vai `rank` trong đường ống); 5.4 xong. Hiếu chọn cổng ckey.vn và model `claude-opus-5-5` cho lần chạy thật | Hiếu (soạn với Claude) |
-| 24/11/2026 | Nhiệm vụ 0.1: ghi số đo sáu model, phép thử đảo thứ tự và lần chạy lại bộ lỗi cấy (agent-qa 9.4, design 19/11 bản 0.7) | Hiếu (soạn với Claude) |
 | 22/11/2026 | Thêm nhiệm vụ 0.1: bộ metric và hiện trạng (design 19/11 bản 0.5) | Hiếu (soạn với Claude) |
 | 20/11/2026 | Hiếu duyệt kiến trúc 20/11 (Q1–Q9). Sắp lại nhiệm vụ 4 và 5 theo đường ống; thêm AC 11; phạm vi file thêm `anthropic` trong nhóm tùy chọn `agentqa-hosted`; cửa xin thêm công cụ rút khỏi story | Hiếu |
 | 20/11/2026 | Thêm [kiến trúc 20/11/2026](../../superpowers/specs/2026-11-20-agent-qaqc-architecture-design.md) vào phạm vi file (đề xuất, chờ duyệt). Nhiệm vụ 4 và 5 sẽ sắp lại theo mục 15 của tài liệu đó sau khi Hiếu duyệt | Hiếu (soạn với Claude) |
