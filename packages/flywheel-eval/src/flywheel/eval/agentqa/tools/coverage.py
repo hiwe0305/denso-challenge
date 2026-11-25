@@ -2,11 +2,15 @@
 
 Spec 6.8, step 8. For each failed eval rollout whose condition the pack holds:
 
-- `d`: the mean distance to the `k` nearest train conditions of the same level;
+- `d`: the mean distance to the `k` nearest train conditions;
 - `tau_cov` per level: the percentile (`coverage.percentile`) of the same quantity over the
-  train conditions of the level, each left out of its own neighbours (leave-one-out);
+  train conditions, each left out of its own neighbours (leave-one-out);
 - in domain: every component the level varies lies within [min, max] of the train
-  conditions of the level.
+  conditions.
+
+The train conditions are all of the run's, both levels (spec 6.8: "in the train set"); the
+level only picks which components enter the vector (`level_components`). With
+`coverage.pool_levels: false` only the train conditions of the failure's own level are used.
 
 Each component is read by name from `Condition.values`, never by its place in `vector`.
 The distance is the Euclidean norm of the component differences, each divided by the scale
@@ -115,7 +119,7 @@ def _scope(book: FactBook, task: TaskView, spec: CoverageSpec, runs: Sequence[Ru
                      and s.level is not None})
     reference: dict[int, tuple[float, Matrix] | None] = {}
     for level in levels:
-        mine = [c for c in train if c.level == level]
+        mine = list(train) if spec.pool_levels else [c for c in train if c.level == level]
         matrix, missing = (_matrix(spec, level, mine) if level in spec.level_components
                            else (None, "not in the coverage block of the task view"))
         if matrix is None or len(mine) <= spec.k:

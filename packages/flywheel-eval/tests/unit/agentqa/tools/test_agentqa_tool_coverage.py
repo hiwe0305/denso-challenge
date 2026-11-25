@@ -19,7 +19,8 @@ from helpers_tools import condition, score
 SPEC = CoverageSpec(
     k=2, percentile=95,
     components=[Component(name="x", scale=1.0), Component(name="yaw", scale=1.0, periodic=True)],
-    level_components={1: ["x"], 2: ["x", "yaw"]})
+    level_components={1: ["x"], 2: ["x", "yaw"]}, pool_levels=False)
+POOLED = SPEC.model_copy(update={"pool_levels": True})
 
 
 def xy(x: float, yaw: float = 0.0) -> dict[str, object]:
@@ -32,8 +33,8 @@ TRAIN = ConditionSet("train.jsonl", "train", tuple(
        condition(2, 12, xy(0.0, 3.0))]))
 
 
-def task() -> TaskView:
-    return load_task("tray").model_copy(update={"coverage": SPEC})
+def task(spec: CoverageSpec = SPEC) -> TaskView:
+    return load_task("tray").model_copy(update={"coverage": spec})
 
 
 def failures(spec: dict[str, str]) -> RunScores:
@@ -50,9 +51,10 @@ def evals(*conds: Condition) -> ConditionSet:
     return ConditionSet("eval.jsonl", "eval", conds)
 
 
-def run(run: RunScores, *sets: ConditionSet) -> tuple[ToolResult, dict[str, object]]:
+def run(run: RunScores, *sets: ConditionSet,
+        spec: CoverageSpec = SPEC) -> tuple[ToolResult, dict[str, object]]:
     book = FactBook()
-    result = coverage_distance(book, task(), [run], sets)
+    result = coverage_distance(book, task(spec), [run], sets)
     return result, {book.get(f).name: book.get(f).value for f in result.facts}
 
 
@@ -146,6 +148,40 @@ def test_the_tray_task_view_declares_the_block() -> None:
     spec = load_task("tray").coverage
     assert spec is not None and (spec.k, spec.percentile) == (5, 95.0)
     assert len(spec.components) == 10 and sorted(spec.level_components) == [1, 2]
+    assert spec.pool_levels is True
+    assert "light_scale" not in spec.level_components[2]  # light: the visual check of step 7
+    assert "light_scale" in {c.name for c in spec.components}
+
+
+# Pooled train set (spec 6.8: the train set is every train condition of the run)
+
+# level 1 x = 0..4 plus two level-2 conditions at x = 100, 101: pooled and per-level differ
+MIXED = ConditionSet("train.jsonl", "train", (
+    *TRAIN.conditions[:5], condition(2, 10, xy(100.0)), condition(2, 11, xy(101.0))))
+
+
+def test_the_default_pools_both_levels_for_tau_d_and_the_domain() -> None:
+    probe = evals(condition(1, 20, xy(60.0)))
+    _, per = run(failures({"l1-s20": "L-A"}), MIXED, probe)
+    _, got = run(failures({"l1-s20": "L-A"}), MIXED, probe, spec=POOLED)
+    assert per["tau_cov_l1"] == pytest.approx(1.5) and per["coverage_train_l1"] == 5
+    # 7 train conditions, x = 0, 1, 2, 3, 4, 100, 101; leave-one-out means with k = 2:
+    # 1.5, 1, 1, 1, 1.5, 48.5 (x = 100: 101 and 4), 49 (x = 101: 100 and 4); p95 = 48.85
+    assert got["coverage_train_l1"] == 7
+    assert got["tau_cov_l1"] == pytest.approx(48.85)
+    a = "R_cluster_grasp_L-A_l1_coverage"
+    # x = 60: nearest 100 and 101 -> mean 40.5 (per level: 4 and 3 -> 56.5)
+    assert got[f"{a}_d_mean"] == pytest.approx(40.5)
+    assert per[f"{a}_d_mean"] == pytest.approx(56.5)
+    assert got[f"{a}_in_domain"] is True and per[f"{a}_in_domain"] is False  # [0, 101] vs [0, 4]
+
+
+def test_a_level_two_vector_has_no_light() -> None:
+    spec = load_task("tray").coverage
+    assert spec is not None
+    names = [c.name for c in spec.components if c.name in spec.level_components[2]]
+    assert names == ["tray_x", "tray_y", "tray_yaw", "target_x", "target_y", "target_yaw",
+                     "table_gap", "spawn_x", "part_mass"]
 
 
 # Train conditions per run (subject.run)
