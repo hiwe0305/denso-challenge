@@ -28,6 +28,12 @@ the quality filter, and listed with their reasons (decision of 5/11/2026);
 must be of this export, every episode needs exactly one report and each report
 must parse as a `QAReport`.
 
+With `--keep-seeds` (a JSON list of seeds, DA-48), only those episodes are candidates,
+before QA, the quality filter and the ranking, so `--size Q=<len(list)>` gives exactly
+that list. A seed missing from the release, a repeated seed or anything but a list of
+integers is refused. The file's sha256 and its seed count are recorded (`keep`); a file
+written without the option has no `keep` field, byte for byte as before.
+
 Run on a release directory (no simulator):
 
     python -m flywheel_psi0.tray.demo_sets --release <release dir> \
@@ -39,6 +45,8 @@ Run on a release directory (no simulator):
     python -m flywheel_psi0.tray.demo_sets --release <release dir> --qa-work <work dir> \
         --quality quality.jsonl --max-tilt-carry-deg 10 --max-part-shift-end-mm 20 \
         --size N40=40 --size N80=80 --size C=160 --size A=320 --out ...
+    python -m flywheel_psi0.tray.demo_sets --release <release dir> --keep-seeds keep.json \
+        --size Q=<number of seeds in keep.json> --out ...
 """
 
 from __future__ import annotations
@@ -47,6 +55,7 @@ import argparse
 import hashlib
 import json
 import sys
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -106,6 +115,13 @@ class QaPin(_Frozen):
     excluded: list[QaExclusion]  # ascending seed
 
 
+class KeepPin(_Frozen):
+    """The seed list the candidates were restricted to (`--keep-seeds`, DA-48)."""
+
+    file_sha256: str  # sha256 of the keep file as read
+    seeds: int = Field(gt=0)  # how many seeds it lists
+
+
 class DemoSets(_Frozen):
     release_id: str
     release_hash: str
@@ -113,6 +129,7 @@ class DemoSets(_Frozen):
     sets: dict[str, DemoSet]
     quality: QualityPin | None = None
     qa: QaPin | None = None
+    keep: KeepPin | None = None  # left out of the file when unset (sets_json)
 
 
 def canonical_sha256(value: Any) -> str:
@@ -145,6 +162,7 @@ def nested_sets(
     salt: str = SALT,
     quality: QualityPin | None = None,
     qa: QaPin | None = None,
+    keep: KeepPin | None = None,
 ) -> DemoSets:
     """One set per name, each the first n of `rank`, so every smaller set is in every larger.
 
@@ -171,7 +189,37 @@ def nested_sets(
         sets=sets,
         quality=quality,
         qa=qa,
+        keep=keep,
     )
+
+
+def sets_json(sets: DemoSets) -> str:
+    """The file `--out` writes: without `keep` when unset, as files written before DA-48."""
+    exclude = {"keep"} if sets.keep is None else None
+    return sets.model_dump_json(indent=1, exclude=exclude) + "\n"
+
+
+def read_keep(path: Path) -> tuple[list[int], KeepPin]:
+    """The seeds of a keep file (a JSON list of integers, no repeats) and its pin."""
+    data = path.read_bytes()
+    seeds = json.loads(data)
+    if not isinstance(seeds, list) or not seeds:
+        raise ValueError(f"{path} is not a non-empty JSON list of seeds")
+    if not all(isinstance(s, int) and not isinstance(s, bool) for s in seeds):
+        raise ValueError(f"{path}: every seed must be an integer")
+    repeated = sorted(s for s, n in Counter(seeds).items() if n > 1)
+    if repeated:
+        raise ValueError(f"{path} lists seeds {repeated[:10]} more than once")
+    return seeds, KeepPin(file_sha256=hashlib.sha256(data).hexdigest(), seeds=len(seeds))
+
+
+def apply_keep(episodes: Sequence[ReleaseEpisode], seeds: Sequence[int]) -> list[ReleaseEpisode]:
+    """The release episodes whose seed is in `seeds`; every seed must be in the release."""
+    wanted = set(seeds)
+    missing = sorted(wanted - {e.seed for e in episodes})
+    if missing:
+        raise ValueError(f"keep seeds {missing[:10]} are not in the release")
+    return [e for e in episodes if e.seed in wanted]
 
 
 def apply_quality(
@@ -281,6 +329,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--release", type=Path, required=True)
     parser.add_argument("--size", type=_size, action="append", required=True)
     parser.add_argument("--qa-work", type=Path, help="`fw data ingest` work dir after `fw data qa`")
+    parser.add_argument("--keep-seeds", type=Path, help="JSON list: the only candidate seeds")
     parser.add_argument("--quality", type=Path, help="quality.jsonl of the release's batch")
     parser.add_argument("--max-tilt-carry-deg", type=float)
     parser.add_argument("--max-part-shift-end-mm", type=float)
@@ -290,7 +339,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     release_hash, episodes = read_release(args.release)
-    qa_pin = pin = None
+    qa_pin = pin = keep = None
+    if args.keep_seeds is not None:
+        seeds, keep = read_keep(args.keep_seeds)
+        episodes = apply_keep(episodes, seeds)
     if args.qa_work is not None:
         episodes, qa_pin = apply_qa(episodes, args.qa_work, args.release)
     if args.quality is not None:
@@ -300,12 +352,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         episodes, pin = apply_quality(episodes, args.quality, limits)
     sets = nested_sets(
-        args.release.name, release_hash, episodes, dict(args.size), quality=pin, qa=qa_pin
+        args.release.name,
+        release_hash,
+        episodes,
+        dict(args.size),
+        quality=pin,
+        qa=qa_pin,
+        keep=keep,
     )
-    text = sets.model_dump_json(indent=1) + "\n"
     if args.out is not None:
-        args.out.write_text(text, encoding="utf-8")
+        args.out.write_text(sets_json(sets), encoding="utf-8")
         print(f"wrote {args.out}: " + ", ".join(f"{k}={v.set_hash}" for k, v in sets.sets.items()))
+        if keep is not None:
+            print(f"keep file sha256 {keep.file_sha256} ({keep.seeds} seeds)")
         return 0
     recorded = DemoSets.model_validate_json(args.check.read_text(encoding="utf-8"))
     if recorded != sets:
