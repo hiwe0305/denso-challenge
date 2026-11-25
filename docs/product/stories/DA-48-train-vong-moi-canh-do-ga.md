@@ -73,7 +73,7 @@ Vì sao cần mã mới (đã đọc mã ở `origin/master` `d54a4d89`):
 
 - [x] 1.1 Viết story (file này)
 - [x] 2.1 `demo_sets --keep-seeds`, có test (AC 1)
-- [ ] 2.2 `tray/mixplan.py`: `TrayMixPlan`, `check`, `freeze`, `pack`, có test (AC 2)
+- [x] 2.2 `tray/mixplan.py`: `TrayMixPlan`, `check`, `freeze`, `pack`, có test (AC 2)
 - [ ] 2.3 `colab_train --branch M`, plan nháp `he-tray-jig-m.yaml`, thư mục Drive theo plan, pha `restore`, có test (AC 3)
 - [ ] 2.4 Chạy đủ kiểm tra, `check_links`, `pr_guard` (AC 4)
 - [ ] 3.1 Trên `rtx3060`: tách file giữ, `demo_sets --keep-seeds` cho bốn release, `demo_subset` bốn phần, `cplus_cut` ghép, đọc các giá trị cần ghim (AC 5)
