@@ -828,19 +828,24 @@ def _frozen_m(tmp_path: Path) -> tuple[Path, str, Path]:
     return repo, frozen, drive
 
 
-def test_m_does_not_run_from_the_draft_plan() -> None:
+def test_m_plan_is_frozen_and_refuses_without_its_approval(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from flywheel_psi0.tray import mixplan
 
-    assert colab_train.MIX_FROZEN is None  # set by the freeze PR (task 3.2)
+    # task 3.2 (25/11/2026): pins in, draft dropped, frozen as MIX_FROZEN
+    assert colab_train.MIX_FROZEN == "rp_a410d01efa62"
     plan = mixplan.TrayMixPlan.load(REPO / colab_train.MIX_PLAN)
-    assert mixplan.check(plan, REPO) == []  # the draft holds as a draft
-    todo = mixplan.pending(plan)
-    assert len(todo) == 14 and any("stats_sha256" in p for p in todo)
+    assert mixplan.check(plan, REPO) == [] and mixplan.pending(plan) == []
     assert plan.steps() == 100000 and plan.checkpoints.reads == [60000, 80000]
-    with pytest.raises(SystemExit) as refused:
+    job = colab_train.load_job("M")
+    assert job.run_plan_id == colab_train.MIX_FROZEN and job.job_id == "da48-ft-m-s0"
+    monkeypatch.setattr(colab_train, "MIX_FROZEN", None)
+    with pytest.raises(SystemExit, match="MIX_FROZEN is unset"):
         colab_train.load_job("M")
-    for reason in ("MIX_FROZEN is unset", "DRAFT", "PENDING", "not frozen"):
-        assert reason in str(refused.value)
+    monkeypatch.setattr(colab_train, "MIX_FROZEN", "rp_000000000000")
+    with pytest.raises(SystemExit, match="only rp_000000000000 is approved"):
+        colab_train.load_job("M")
 
 
 def test_m_runs_only_the_approved_frozen_plan_with_its_own_drive_folder(
@@ -849,6 +854,7 @@ def test_m_runs_only_the_approved_frozen_plan_with_its_own_drive_folder(
     from test_psi0_tray_mixplan import JIG_ENV_NAME
 
     repo, frozen, drive = _frozen_m(tmp_path)
+    monkeypatch.setattr(colab_train, "MIX_FROZEN", None)
     with pytest.raises(SystemExit, match="MIX_FROZEN is unset"):
         colab_train.load_job("M", repo)
     monkeypatch.setattr(colab_train, "MIX_FROZEN", "rp_000000000000")

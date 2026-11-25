@@ -164,9 +164,9 @@ ROUND_C70_PLAN = "configs/runplans/tray/round-tray-c70.yaml"
 ROUND_C70_FROZEN: str | None = "rp_aae292bc79da"
 ROUND_C70 = "C70_R1"
 MIX_PLAN = "configs/runplans/tray/he-tray-jig-m.yaml"
-# Set by DA-48's freeze PR (task 3.2) to he-tray-jig-m.lock.json's id; until then no M job
-# runs, whatever the plan file says.
-MIX_FROZEN: str | None = None
+# he-tray-jig-m.lock.json's id, set by DA-48's freeze PR (task 3.2, 25/11/2026): the only
+# M plan that runs, whatever the plan file says.
+MIX_FROZEN: str | None = "rp_a410d01efa62"
 MIX = "M"
 DRIVE = Path("/content/drive/MyDrive")  # `colab drivemount -s <session> /content/drive`
 STAGE1_DIR = "cache/checkpoints/stage1"  # under Psi0, beside the psi-model snapshot
