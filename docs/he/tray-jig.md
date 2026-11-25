@@ -94,6 +94,8 @@ python3 fw/scripts/he/he1_colab.py persist --work /content/da48 --to /content/dr
 
 Trên laptop theo dõi bằng `he1_fetch.py follow --stop-when-done --total-steps 100000 --gpu L4`, để VM dừng ngay khi train xong.
 
+Mặc định wandb chạy `offline`. Muốn đồ thị lên wandb.ai theo thời gian thực, người vận hành tự chạy `wandb login` trên VM (khóa không nằm trong repo, plan hay nhật ký chat) rồi khởi động `train` với `FW_WANDB_MODE=online` (chỉ nhận `offline` hoặc `online`). Biến này được xuất ra môi trường của tiến trình train, thắng dòng `WANDB_MODE=offline` trong `.env` của Psi0 (`scripts/train.py` gọi `load_dotenv()` không ghi đè). Dữ liệu của run này là `public`.
+
 **E. Nếu mất VM giữa chừng.** Mở VM mới, làm lại `setup`, rồi trước `train`:
 
 ```bash
@@ -109,3 +111,4 @@ python3 -m flywheel_psi0.tray.colab_train restore --branch M --work /content/da4
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 25/11/2026 | Tạo: mô tả run M, quy tắc đọc kết quả (đề xuất), runbook | Hiếu (soạn với Claude) |
+| 25/11/2026 | Thêm đoạn bật wandb online qua `FW_WANDB_MODE` ở bước D (ngoài khối luật đọc) | Hiếu (soạn với Claude) |
