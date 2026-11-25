@@ -30,11 +30,20 @@ class ProviderReply:
 
 
 class ProviderError(RuntimeError):
-    """A call that brought no reply. `retryable`: network, timeout or overload."""
+    """A call that brought no reply. `retryable`: network, timeout or overload.
 
-    def __init__(self, message: str, *, retryable: bool = True) -> None:
+    `billed`: the server answered (HTTP 200) but the answer is no reply (a refusal, empty
+    text, a body that is not a chat reply), so the call was charged; `tokens_in` and
+    `tokens_out` are what the body reported, None when it did not. A network or HTTP
+    error is not billed.
+    """
+
+    def __init__(self, message: str, *, retryable: bool = True, billed: bool = False,
+                 tokens_in: int | None = None, tokens_out: int | None = None) -> None:
         super().__init__(message)
         self.retryable = retryable
+        self.billed = billed
+        self.tokens_in, self.tokens_out = tokens_in, tokens_out
 
 
 class ChatModel(Protocol):

@@ -12,16 +12,20 @@ import io
 import json
 import urllib.error
 import urllib.request
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from flywheel.eval.agentqa.round.gateway import build_provider
-from flywheel.eval.agentqa.round.gateway_config import GatewayRefused, Profile
+from flywheel.eval.agentqa.round.gateway import Gateway, build_provider
+from flywheel.eval.agentqa.round.gateway_config import Budget, GatewayRefused, Profile
 from flywheel.eval.agentqa.round.providers import ProviderError
 from flywheel.eval.agentqa.round.providers import anthropic as anthropic_provider
 from flywheel.eval.agentqa.round.providers.anthropic import AnthropicModel
 from flywheel.eval.agentqa.round.providers.openai_hosted import OpenAICompatibleModel
+from flywheel.eval.agentqa.round.records import ModelCallRecord, ModelRequest
+from helpers_round import admitted_run
+from test_agentqa_round_gateway import make_config
 
 KEY_ENV = "FW_TEST_HOSTED_KEY"
 SECRET = "sk-test-secret-value"
@@ -125,6 +129,36 @@ def test_openai_bad_replies_are_not_retryable(body: dict[str, Any]) -> None:
     with pytest.raises(ProviderError) as info:
         ask(openai(body)[0])
     assert not info.value.retryable
+
+
+@pytest.mark.parametrize(("body", "tokens"), [
+    ({"choices": [], "usage": {"prompt_tokens": 40, "completion_tokens": 9}}, (40, 9)),
+    (chat_body(content=""), (5, 3)),
+    ({"error": "no"}, (None, None)),
+    ([1, 2], (None, None)),
+])
+def test_openai_answered_failures_are_billed_with_their_usage(
+        body: Any, tokens: tuple[int | None, int | None]) -> None:
+    with pytest.raises(ProviderError) as info:
+        ask(openai(body)[0])
+    assert info.value.billed and (info.value.tokens_in, info.value.tokens_out) == tokens
+
+
+def test_openai_non_json_body_is_billed_without_usage() -> None:
+    model, opener = openai({})
+    opener.open = lambda request, timeout: Resp(b"<html>oops</html>")  # type: ignore[method-assign]
+    with pytest.raises(ProviderError) as info:
+        ask(model)
+    assert info.value.billed and info.value.tokens_in is None
+
+
+@pytest.mark.parametrize("error", [
+    urllib.error.HTTPError("https://h.example", 500, "x", {}, None),  # type: ignore[arg-type]
+    urllib.error.URLError("down")])
+def test_openai_http_and_network_errors_are_not_billed(error: Exception) -> None:
+    with pytest.raises(ProviderError) as info:
+        ask(openai(error)[0])
+    assert not info.value.billed
 
 
 # --- the profile and the seam ---------------------------------------------------------
@@ -247,3 +281,86 @@ def test_anthropic_refuses_custom_headers_from_the_environment(
     assert "other" not in str(info.value) and fake_sdk.client_kwargs == {}
     monkeypatch.setenv("ANTHROPIC_CUSTOM_HEADERS", "  ")  # blank: nothing to send
     AnthropicModel("m", KEY_ENV)
+
+
+# --- anthropic without the SDK: failures the server answered are billed --------------------
+
+class StatusError(Exception):
+    def __init__(self, code: int) -> None:
+        super().__init__(f"HTTP {code}")
+        self.status_code = code
+
+
+def claude_message(text: str, stop: str, usage: Any) -> Any:
+    blocks = [SimpleNamespace(type="text", text=text)] if text else [
+        SimpleNamespace(type="thinking")]
+    return SimpleNamespace(content=blocks, stop_reason=stop, usage=usage)
+
+
+def claude(outcome: Any) -> AnthropicModel:
+    def create(**kwargs: Any) -> Any:
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+    return AnthropicModel("claude-x", KEY_ENV,
+                          client=SimpleNamespace(messages=SimpleNamespace(create=create)))
+
+
+THINKING_ONLY = claude_message("", "max_tokens",
+                               SimpleNamespace(input_tokens=1200, output_tokens=4096))
+
+
+@pytest.mark.parametrize(("outcome", "tokens"), [
+    (THINKING_ONLY, (1200, 4096)),
+    (claude_message("no", "refusal", SimpleNamespace(input_tokens=30, output_tokens=2)),
+     (30, 2)),
+    (claude_message(" ", "end_turn", None), (None, None)),
+])
+def test_anthropic_answered_failures_are_billed_with_their_usage(
+        fake_sdk: FakeSDK, outcome: Any, tokens: tuple[int | None, int | None]) -> None:
+    with pytest.raises(ProviderError) as info:
+        ask(claude(outcome))
+    failure = info.value
+    assert failure.billed and not failure.retryable
+    assert (failure.tokens_in, failure.tokens_out) == tokens
+
+
+def test_anthropic_status_and_connection_errors_are_not_billed(fake_sdk: FakeSDK) -> None:
+    for error in (StatusError(500), FakeSDK.APIConnectionError()):
+        with pytest.raises(ProviderError) as info:
+            ask(claude(error))
+        assert not info.value.billed
+
+
+def gateway_lines(run: Path) -> list[ModelCallRecord]:
+    return [ModelCallRecord.model_validate_json(x)
+            for x in (run / "model_calls.jsonl").read_text().splitlines()]
+
+
+def anthropic_gateway(tmp_path: Path, outcome: Any) -> tuple[Gateway, Path]:
+    run = admitted_run(tmp_path, "public")
+    budget = Budget(max_calls=10, max_input_tokens=10_000, max_usd=100.0, chars_per_token=2)
+    config = make_config(rank_public="hosted", hosted=True, budget=budget, retries=0)
+    model = claude(outcome)
+    return Gateway(run, config, factory=lambda name, profile: model), run
+
+
+def test_an_empty_anthropic_reply_is_charged_by_the_gateway(fake_sdk: FakeSDK,
+                                                            tmp_path: Path) -> None:
+    gateway, run = anthropic_gateway(tmp_path, THINKING_ONLY)
+    reply = gateway.call("rank", ModelRequest(unit="u", system="s", user="u", max_tokens=200))
+    assert reply.status == "failed" and "empty reply" in reply.error and reply.text == ""
+    (line,) = gateway_lines(run)
+    usd = (1200 + 4096) * 1000.0 / 1e6  # the HOSTED profile's prices
+    assert (line.tokens_in, line.tokens_out, line.tokens_estimated) == (1200, 4096, False)
+    assert line.usd == pytest.approx(usd) and line.status == "failed"
+    assert gateway.usage.usd == pytest.approx(usd) and gateway.usage.tokens_out == 4096
+
+
+def test_an_empty_anthropic_reply_without_usage_is_charged_at_the_bounds(
+        fake_sdk: FakeSDK, tmp_path: Path) -> None:
+    gateway, run = anthropic_gateway(tmp_path, claude_message("", "end_turn", None))
+    gateway.call("rank", ModelRequest(unit="u", system="s" * 10, user="u" * 30, max_tokens=200))
+    (line,) = gateway_lines(run)
+    assert (line.tokens_in, line.tokens_out, line.tokens_estimated) == (20, 200, True)
+    assert line.usd == pytest.approx((20 + 200) * 1000.0 / 1e6) == gateway.usage.usd

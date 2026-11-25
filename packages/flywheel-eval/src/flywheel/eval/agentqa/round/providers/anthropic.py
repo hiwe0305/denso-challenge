@@ -115,13 +115,19 @@ class AnthropicModel:
         except Exception as error:
             raise self._classify(error) from error
         stop = getattr(message, "stop_reason", None)
+        usage = getattr(message, "usage", None)
+        tokens_in = _count(getattr(usage, "input_tokens", None))
+        tokens_out = _count(getattr(usage, "output_tokens", None))
+        # The server answered, so a refusal or an empty reply was charged: say so and
+        # pass on what it reported, so the gateway counts it against the budget.
         if stop == "refusal":
-            raise ProviderError(f"{self.host}: the model refused", retryable=False)
+            raise ProviderError(f"{self.host}: the model refused", retryable=False,
+                                billed=True, tokens_in=tokens_in, tokens_out=tokens_out)
         text = "".join(b.text for b in message.content
                        if getattr(b, "type", None) == "text" and isinstance(b.text, str))
         if not text.strip():
-            raise ProviderError(f"{self.host}: empty reply (stop_reason {stop})", retryable=False)
-        usage = getattr(message, "usage", None)
-        return ProviderReply(text=text, tokens_in=_count(getattr(usage, "input_tokens", None)),
-                             tokens_out=_count(getattr(usage, "output_tokens", None)),
+            raise ProviderError(f"{self.host}: empty reply (stop_reason {stop})",
+                                retryable=False, billed=True, tokens_in=tokens_in,
+                                tokens_out=tokens_out)
+        return ProviderReply(text=text, tokens_in=tokens_in, tokens_out=tokens_out,
                              cut=stop == "max_tokens")
