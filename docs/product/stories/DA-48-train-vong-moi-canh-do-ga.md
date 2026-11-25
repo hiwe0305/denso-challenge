@@ -78,6 +78,7 @@ Vì sao cần mã mới (đã đọc mã ở `origin/master` `d54a4d89`):
 - [x] 2.4 Chạy đủ kiểm tra, `check_links`, `pr_guard` (AC 4)
 - [x] 3.1 Trên `rtx3060`: tách file giữ, `demo_sets --keep-seeds` cho bốn release, `demo_subset` bốn phần, `cplus_cut` ghép, đọc các giá trị cần ghim (AC 5)
 - [x] 3.2 PR freeze: điền ghim vào plan, bỏ `status: draft`, `mixplan freeze`, đặt frozen id trong `colab_train`, luật đọc và runbook trong `docs/he/tray-jig.md` (AC 5)
+- [x] 4.0 Cho phép wandb online qua FW_WANDB_MODE (Hiếu yêu cầu 25/11/2026), có test
 - [ ] 4.1 `mixplan pack`, đưa tar lên Drive, launch trên Colab L4 dưới watcher (AC 5)
 - [ ] 4.2 Persist checkpoint lên Drive, dừng VM, dòng sổ chi phí thực đo, giao checkpoint cho DA-47 nhóm A (AC 5)
 
@@ -87,6 +88,8 @@ Theo 07 mục 3.1. File story luôn được sửa.
 
 - `packages/flywheel-psi0/src/flywheel_psi0/tray/`
 - `packages/flywheel-psi0/tests/tray/`
+- `packages/flywheel-psi0/src/flywheel_psi0/trainer/` (chỉ `psi0_trainer.py`, công tắc wandb)
+- `packages/flywheel-psi0/tests/` (chỉ test của trainer)
 - `scripts/he/demo_subset.py` (chỉ khi một lỗi chặn release cắt)
 - `configs/runplans/tray/`
 - `docs/he/` (file mới `docs/he/tray-jig.md` cho luật đọc và runbook; `docs/he/tray.md` chỉ thêm tối đa một dòng chỉ mục)
@@ -119,3 +122,4 @@ Theo 07 mục 3.1. File story luôn được sửa.
 |---|---|---|
 | 25/11/2026 | 3.1, 3.2: tập M dựng trên `rtx3060` (1 037 episode, 948 639 khung, thực đo) và ghim vào plan; Hiếu chốt GPU L4, trần 60 CU; plan đóng băng `rp_a410d01efa62`; luật đọc và runbook ở `docs/he/tray-jig.md` | Hiếu (soạn với Claude) |
 | 25/11/2026 | Tạo story theo quyết định của Hiếu ngày 25/11/2026 (ngưỡng lọc ≤ 3 cm và ≤ 5°, một run M); phương án do Claude đề xuất | Hiếu (soạn với Claude) |
+| 25/11/2026 | 4.0: công tắc `FW_WANDB_MODE` (offline mặc định, online khi đặt) cho trainer, để run M ghi wandb.ai trực tiếp; thêm hai đường dẫn vào Phạm vi file | Hiếu (soạn với Claude) |

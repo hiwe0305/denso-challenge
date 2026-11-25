@@ -384,3 +384,25 @@ def test_loss_tap_records_only_unreduced_loss_inside_training_step() -> None:
 
     assert seen == [("none", 4.0)]
     assert tap.relu == "passed through"
+
+
+def test_wandb_is_offline_by_default(
+    fake_psi0: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("FW_WANDB_MODE", raising=False)
+    assert trainer(fake_psi0, tmp_path).environment()["WANDB_MODE"] == "offline"
+
+
+def test_fw_wandb_mode_online_switches_wandb(
+    fake_psi0: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FW_WANDB_MODE", "online")
+    assert trainer(fake_psi0, tmp_path).environment()["WANDB_MODE"] == "online"
+
+
+def test_fw_wandb_mode_rejects_other_values(
+    fake_psi0: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FW_WANDB_MODE", "disabled")
+    with pytest.raises(ValueError, match="FW_WANDB_MODE"):
+        trainer(fake_psi0, tmp_path).environment()

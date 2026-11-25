@@ -61,6 +61,18 @@ def _src_dir(module: str) -> str:
     return str(package_dir.parents[module.count(".")])
 
 
+WANDB_MODE_VARIABLE = "FW_WANDB_MODE"
+_WANDB_MODES = ("offline", "online")
+
+
+def wandb_mode() -> str:
+    """`offline` unless `FW_WANDB_MODE=online`; the key itself comes from `wandb login`."""
+    mode = os.environ.get(WANDB_MODE_VARIABLE, "offline")
+    if mode not in _WANDB_MODES:
+        raise ValueError(f"{WANDB_MODE_VARIABLE} must be one of {_WANDB_MODES}, got {mode!r}")
+    return mode
+
+
 class Psi0Trainer:
     """Train one Psi0 stage per TrainSpec with the author's code, unmodified."""
 
@@ -154,7 +166,7 @@ class Psi0Trainer:
             "PYTHONPATH": os.pathsep.join(
                 [*dict.fromkeys(paths), *([existing] if existing else [])]
             ),
-            "WANDB_MODE": "offline",
+            "WANDB_MODE": wandb_mode(),
         }
 
     def next_attempt(self, spec: TrainSpec) -> int:
