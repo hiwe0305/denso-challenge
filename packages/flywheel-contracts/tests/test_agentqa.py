@@ -15,7 +15,6 @@ from flywheel.contracts.agentqa import (
     AgentReview,
     FindingDecision,
     RoundDiagnosis,
-    bare_numbers,
 )
 from pydantic import ValidationError
 
@@ -338,18 +337,19 @@ def test_invalid_round_fixture_fails_on_a_bare_number() -> None:
         RoundDiagnosis.model_validate(raw)
 
 
-@pytest.mark.parametrize(
-    ("text", "numbers"),
-    [
-        ("{F1} of rollouts pass", []),
-        ("p99 of H2 on episode_000012 and T1", []),
-        ("Only 3 of 6 pass", ["3", "6"]),
-        ("tilt above 0.4 rad", ["0", "4"]),
-        ("45/90", ["4", "9"]),
-    ],
-)
-def test_bare_numbers(text: str, numbers: list[str]) -> None:
-    assert bare_numbers(text) == numbers
+def test_round_explanation_may_name_a_run_id() -> None:
+    raw = _round()
+    raw["hypotheses"][1]["explanation"] = (
+        "Run pair60k-C_ALL-60000-rp_abc of 19/11/2026 fails the carry step ({F1})."
+    )
+    assert RoundDiagnosis.model_validate(raw).hypotheses[1].explanation
+
+
+def test_round_explanation_refuses_a_non_ascii_digit() -> None:
+    raw = _round()
+    raw["hypotheses"][1]["explanation"] = "Only \uff13 of the rollouts pass."
+    with pytest.raises(ValidationError, match="H2: explanation writes number"):
+        RoundDiagnosis.model_validate(raw)
 
 
 def _broken(mutate) -> dict:  # type: ignore[no-untyped-def]

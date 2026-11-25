@@ -241,15 +241,37 @@ HYPOTHESIS_ID = r"^H[1-9][0-9]*$"
 SHA256 = r"^[0-9a-f]{64}$"
 Source = Literal["code", "model"]
 RunStatus = Literal["ok", "degraded", "broken"]
-# A digit that starts a number: not glued to a letter, digit or underscore of a name, so
-# `p99`, `H2`, `T1` and `episode_000012` pass and `0.4`, `12 ms`, `45/90` do not.
-_BARE_NUMBER = re.compile(r"(?<![A-Za-z0-9_])[0-9]")
+
+
+# The number rule of the eval lane (`flywheel.eval.agentqa.numbers.numbers_in` at
+# dae6b13c, same regexes), kept here as its one definition so the lane can import it.
+# Digits inside a name are not numbers: `job-cf631ab2655c`, `episode_000012`, `T1`,
+# `p99`, `F3`, `pair60k-C_ALL-60000`, `v1.2` are identifiers. A number with a unit glued
+# on (`120ms`, `10x`, `4GB`, `12k`) is still a number, both sides of `45/90` are numbers,
+# `12,000` is twelve thousand, and a date such as `6/11/2026` is not a number.
+_UNITS = "ms|s|sec|min|h|hz|khz|kb|mb|gb|px|cm|mm|m|x|k|fps"
+_NUMBER = re.compile(
+    r"(?<![\w.\-/])[-+]?(?:\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?|\.\d+)(?:e[-+]?\d+)?"
+    rf"(?:%|(?:{_UNITS})\b)?(?![\w\-/])",
+    re.IGNORECASE,
+)
+_FRACTION = re.compile(r"(?<![\w.\-/])(\d+(?:\.\d+)?)/(\d+(?:\.\d+)?)(?![\w\-/])")
+
+
+def numbers_in(text: str) -> list[str]:
+    """The bare numbers of `text`, placeholders removed, in the order they appear."""
+    stripped = _PLACEHOLDER.sub(" ", text)
+    stripped = _FRACTION.sub(lambda m: f" {m.group(1)} {m.group(2)} ", stripped)
+    return [m.group(0) for m in _NUMBER.finditer(stripped)]
 
 
 def bare_numbers(text: str) -> list[str]:
-    """The numbers `text` writes itself, outside `{F#}` placeholders."""
-    stripped = _PLACEHOLDER.sub(" ", text)
-    return [m.group(0) for m in _BARE_NUMBER.finditer(stripped)]
+    """The numbers `text` writes itself, outside `{F#}` placeholders: the lane's rule.
+
+    `p99`, `H2`, `episode_000012`, run ids and dates pass; `0.4`, `12 ms`, `45/90`
+    and non-ASCII digits do not (see `numbers_in`).
+    """
+    return numbers_in(text)
 
 
 class RoundCluster(Artifact):
