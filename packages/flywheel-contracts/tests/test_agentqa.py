@@ -388,6 +388,48 @@ def test_round_rules(mutate, message: str) -> None:  # type: ignore[no-untyped-d
         RoundDiagnosis.model_validate(_broken(mutate))
 
 
+def _data_proposal(raw: dict) -> dict:
+    """A teleop correction for H2 (weak_skill): the kind of proposal that spends data budget."""
+    return {
+        "proposal_id": "P2",
+        "hypothesis_id": "H2",
+        "proposal": {
+            "kind": "teleop_correction",
+            "description": "Record teleop corrections of the carry turn.",
+            "consumes_budget": True,
+            "quantity": 6,
+            "unit": "corrections",
+            "gain": {
+                "n_failures": 6,
+                "cap": 6,
+                "n_effective": 6,
+                "n_dev": 60,
+                "fix_rate_alpha": 1.0,
+                "fix_rate_beta": 1.0,
+                "expected_gain_pp": 5.0,
+            },
+            "cost": raw["checks"][0]["cost"],
+        },
+        "source": "code",
+    }
+
+
+def test_round_refuses_data_spend_on_a_blocked_cluster() -> None:
+    raw = _round()
+    assert raw["clusters"][0]["blocked_data_spend"] is True
+    raw["proposals"].append(_data_proposal(raw))
+    with pytest.raises(ValidationError, match="P2: cluster .* is blocked"):
+        RoundDiagnosis.model_validate(raw)
+
+
+def test_round_allows_data_spend_on_an_open_cluster() -> None:
+    raw = _round()
+    raw["clusters"][0]["blocked_data_spend"] = False
+    raw["proposals"].append(_data_proposal(raw))
+    value = RoundDiagnosis.model_validate(raw)
+    assert value.proposals[1].proposal.consumes_budget
+
+
 def test_round_ok_with_no_hypotheses() -> None:
     raw = _round()
     raw.update(status="ok", problems=[], hypotheses=[], checks=[], proposals=[])

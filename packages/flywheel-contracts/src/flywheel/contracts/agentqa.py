@@ -360,6 +360,7 @@ class RoundDiagnosis(Artifact):
         facts = {f.fact_id: f for f in self.facts}
         unique("fact ids", [f.fact_id for f in self.facts])
         clusters = unique("cluster ids", [c.cluster_id for c in self.clusters])
+        blocked = {c.cluster_id for c in self.clusters if c.blocked_data_spend}
         hypotheses = {h.hypothesis_id: h for h in self.hypotheses}
         unique("hypothesis ids", [h.hypothesis_id for h in self.hypotheses])
         unique("check ids", [c.check_id for c in self.checks])
@@ -401,6 +402,14 @@ class RoundDiagnosis(Artifact):
             if p.proposal.kind not in allowed:
                 raise ValueError(
                     f"{p.proposal_id}: {diagnosis} may propose {sorted(allowed)}, "
+                    f"not {p.proposal.kind}"
+                )
+            # Design 19/11/2026 section 5.3: while a system or scorer hypothesis of the
+            # cluster stands, code refuses any proposal that spends the data budget.
+            cluster_id = hypotheses[p.hypothesis_id].cluster_id
+            if p.proposal.consumes_budget and cluster_id in blocked:
+                raise ValueError(
+                    f"{p.proposal_id}: cluster {cluster_id!r} is blocked from data spend, "
                     f"not {p.proposal.kind}"
                 )
 
