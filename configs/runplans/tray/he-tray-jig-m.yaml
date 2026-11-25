@@ -59,37 +59,73 @@ cut:
   parts:
     - release_id: tray_s1_bfbdcbcf719e # store tray-s1-jig2-20261122, level 1 full episodes
       n: 356
-      release: null
-      demo_sets: null
-      set_name: null
+      release:
+        id: tray_s1_bfbdcbcf719e
+        release_hash: bfbdcbcf719e9a7f7363c73694647210b16f86d4d53a289beed2dc7c33f32bda
+        location: rtx3060:~/fwdata/datasets/tray-s1-jig2-20261122/releases/tray_s1_bfbdcbcf719e
+        data_class: public
+      demo_sets:
+        file: configs/runplans/tray/demo_sets-jig-m-tray_s1_bfbdcbcf719e.json
+        file_sha256: bf5287fd85ecf11bfdab10be0d756e53df18cd072968c8aa0a2c488185586a4a
+        salt: DA-34/demo-sets/v1
+        hashes:
+          Q: 012d5120f2a8cd3dc5d0c8e9a07ef94a94cc7e1c4e50edf53976f5dc2c491490
+      set_name: Q
     - release_id: tray_s1_8631ace9b1b3 # store tray-s1-jig2-20261122, level 2 full episodes
       n: 142
-      release: null
-      demo_sets: null
-      set_name: null
+      release:
+        id: tray_s1_8631ace9b1b3
+        release_hash: 8631ace9b1b31c2febe93d5fd6a974f0c4d87a853040f94bdcecb66558f0e7b1
+        location: rtx3060:~/fwdata/datasets/tray-s1-jig2-20261122/releases/tray_s1_8631ace9b1b3
+        data_class: public
+      demo_sets:
+        file: configs/runplans/tray/demo_sets-jig-m-tray_s1_8631ace9b1b3.json
+        file_sha256: db6d83db463a84c785efe6928f867fb671721d5688aa9cd1fc49255fac706a2f
+        salt: DA-34/demo-sets/v1
+        hashes:
+          Q: 6bed7561e34f3e17d39e6ccf5862705f0079307875347b6b3802ea253cc74e77
+      set_name: Q
     - release_id: tray_s1place_a1797e480160 # store tray-s1place-jig2-20261124, place cut of the level 1 jittered parent
       n: 377
-      release: null
-      demo_sets: null
-      set_name: null
+      release:
+        id: tray_s1place_a1797e480160
+        release_hash: a1797e480160e4fcbc3115de3e63a2b4e429bb6e07f40f059efde5a42e069c64
+        location: rtx3060:~/fwdata/datasets/tray-s1place-jig2-20261124/releases/tray_s1place_a1797e480160
+        data_class: public
+      demo_sets:
+        file: configs/runplans/tray/demo_sets-jig-m-tray_s1place_a1797e480160.json
+        file_sha256: 0ba11dc1faeb8ce2834fdecf10594e1abd83ec3fe745ce8f842b704f6feea276
+        salt: DA-34/demo-sets/v1
+        hashes:
+          Q: 07aa6707bd44a662a5717d0649dd038c2070870bbe76a53d0bcf4d6f3641de6f
+      set_name: Q
     - release_id: tray_s1place_56e6d006d8d1 # store tray-s1place-jig2-20261124, place cut
       n: 162
-      release: null
-      demo_sets: null
-      set_name: null
+      release:
+        id: tray_s1place_56e6d006d8d1
+        release_hash: 56e6d006d8d16fc7054a324a909fad3bedf9a5cadc5d21060923bf8be24a1c7c
+        location: rtx3060:~/fwdata/datasets/tray-s1place-jig2-20261124/releases/tray_s1place_56e6d006d8d1
+        data_class: public
+      demo_sets:
+        file: configs/runplans/tray/demo_sets-jig-m-tray_s1place_56e6d006d8d1.json
+        file_sha256: c2d16f02fa0b183c9f6eb0d397857e30f83a4c8b1d82ab33e95d2c614610769e
+        salt: DA-34/demo-sets/v1
+        hashes:
+          Q: d0ce06e8e14723905fdecd137d4746c56b943fe4429b7cf756de3f833eab3459
+      set_name: Q
   episodes: 1037 # 356 + 142 + 377 + 162
   # Measured 25/11/2026 on the generation host (sum of the kept episodes' lengths); the
   # joined dataset's meta/info.json total_frames must equal it (mixplan.cut_problems).
   frames: 948639
-  stats_sha256: null # meta/stats_psi0.json of the joined set, task 3.1
+  stats_sha256: 3c31da5e43acbb22f668e07e3ae4a63643595b248ebc2a3ff745313f82cc85ce # meta/stats_psi0.json of the joined set, task 3.1
 
 recipe:
   file: configs/models/psi0-stage3.yaml # batch 16, lr 1e-4 cosine, warmup 1000, VLM frozen
   sha256: 71ba5de8ef22a11432a829e86e93b7e662f5f38f453cca27f73d6fbe777a1dbd # recipe_sha256, no `estimate`
   overrides:
     train.validation_steps: 2000 # PO 4/11/2026 (S1-04 4.1), as the DA-34 plans
-    train.max_training_steps: 100000 # one A100; may change until the freeze (then the checkpoints too)
-  nproc_per_node: 1 # one Colab A100: global batch 16
+    train.max_training_steps: 100000 # one L4; may change until the freeze (then the checkpoints too)
+  nproc_per_node: 1 # one Colab L4 (Hieu 25/11/2026): global batch 16
   dataset_stats: own_train_set
 train_seeds: [0]
 
@@ -108,15 +144,16 @@ interpretation:
   rules_sha256: null # pinned by task 3.2
 pricebook: "assumption: Colab 100 CU pack, 0.0999 USD per CU (docs/g0/ledger/DA-19.csv)"
 
-# Estimate, not measured on this data: about 130 CU for 100000 steps (77.27 CU measured
-# for 60000 steps of C70_R1 on an A100, DA-34 ledger, x 100/60); about 13 h at 0.47 s/step
-# (S1-04), up to about 19 h at C70_R1's pace (11.5 h for 60000 steps). [Đề xuất] cap 150
-# CU (about 15 % over the estimate); the floor 14 needs a balance of at least 164 CU.
+# Estimate, not measured on this data: about 40 CU and about 20 h for 100000 steps on an
+# L4 (run C of DA-34 measured 15.99 CU and 8.27 h for 40000 steps, x 100/40). An A100 was
+# no faster in practice (C70_R1: 11.5 h and 77.27 CU for 60000 steps), so Hieu chose L4 on
+# 25/11/2026. [De xuat] cap 60 CU (50 % over the estimate); with the floor 14 the account
+# must hold at least 74 CU at launch.
 budget:
-  ceiling_cu: 150
-  cap_cu_per_run: 150
+  ceiling_cu: 60
+  cap_cu_per_run: 60
   runs: [M]
-  watcher: "scripts/colab/cu_watch.py session --gpu A100 --cap 150 --floor 14, under one guard"
+  watcher: "scripts/colab/cu_watch.py session --gpu L4 --cap 60 --floor 14, under one guard"
 
 schedule:
   mode: sequential

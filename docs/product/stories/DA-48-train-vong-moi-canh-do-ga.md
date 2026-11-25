@@ -35,7 +35,7 @@ Số episode và số khung là **thực đo ngày 25/11/2026** trên máy sinh.
 
 | Phương án | Nội dung | Được | Mất |
 |---|---|---|---|
-| **A (chọn)** | Một run M trên cả bốn phần ghép | Một phiên A100, checkpoint sớm nhất; dùng hết dữ liệu đã lọc | Không có đối chứng cặp trong cùng plan |
+| **A (chọn)** | Một run M trên cả bốn phần ghép | Một phiên Colab, checkpoint sớm nhất; dùng hết dữ liệu đã lọc | Không có đối chứng cặp trong cùng plan |
 | B | M và run đối chứng K (chỉ 498 episode đầy đủ) song song | Đo được phần đóng góp của đoạn đặt | Gấp đôi CU; trễ nếu Colab từ chối phiên thứ hai |
 | C | Mở rộng plan cặp `he-tray-pair60k.yaml` | Dùng lại mã | Plan cặp cần hai cha trong lưới đầy đủ và env eval cũ, không hợp |
 
@@ -47,13 +47,13 @@ Công thức train:
 |---|---|
 | Recipe | `configs/models/psi0-stage3.yaml`, batch 16, seed train 0 |
 | Cha | Cùng cặp checkpoint cha của plan cặp DA-34 (`configs/runplans/tray/he-tray-pair60k.yaml`); bản nháp chọn cha của C (`psi0-baseline-egodex-he`), cần Hiếu xác nhận |
-| Số bước | `max_training_steps` 100 000 trên một A100; là trường của plan, đổi được trước freeze |
+| Số bước | `max_training_steps` 100 000 trên một L4 (Hiếu chốt 25/11/2026); là trường của plan, đổi được trước freeze |
 | Checkpoint đọc | Chính: 100 000. Đọc sớm: 60 000 và 80 000 |
 | Stats | Của chính tập ghép (`own_train_set`) |
 | Job | `da48-ft-m-s0`; thư mục Drive dưới `MyDrive/denso/da48/` (`cuts/`, `runs/`) |
 | Plan | `configs/runplans/tray/he-tray-jig-m.yaml`, schema mới `flywheel_psi0.tray.mixplan` (`TrayMixPlan`, một run, N phần) |
 
-Chi phí và thời gian (**ước lượng**, chưa đo trên dữ liệu này): khoảng 130 CU cho 100 000 bước trên A100, từ 77,27 CU cho 60 000 bước thực đo ở DA-34 (`C70_R1`). Thời gian khoảng 13 giờ nếu tính 100 000 × 0,47 s/bước (A100, S1-04); phiên `C70_R1` chạy 60 000 bước trong khoảng 11,5 giờ, nên 100 000 bước có thể tới khoảng 19 giờ. Số đo thật ghi ở 4.2.
+Chi phí và thời gian (**ước lượng**, chưa đo trên dữ liệu này): khoảng 40 CU và khoảng 20 giờ cho 100 000 bước trên L4, từ run C của DA-34 (40 000 bước, 15,99 CU, 8,27 giờ, thực đo). A100 không nhanh hơn trong thực tế (`C70_R1`: 60 000 bước mất khoảng 11,5 giờ và 77,27 CU), nên Hiếu chọn L4 ngày 25/11/2026. Số đo thật ghi ở 4.2.
 
 Vì sao cần mã mới (đã đọc mã ở `origin/master` `d54a4d89`):
 
@@ -67,7 +67,7 @@ Vì sao cần mã mới (đã đọc mã ở `origin/master` `d54a4d89`):
 2. `tray/mixplan.py`: plan một run `TrayMixPlan` (N ≥ 1 phần, mỗi phần ghim release, file demo set và sha256, tên tập, `set_hash`, n), ghim `episodes`, `frames`, `stats_sha256`, nhánh `M` với cha, số bước trong `recipe.overrides`, `checkpoints` (chính và đọc sớm, bội của `checkpointing_steps`, không quá số bước), luật đọc (`interpretation`). Lệnh `check` (đọc JSON, chạy được trên VM Colab trước khi cài), `freeze` (ghi lock), `pack` (tar và `.json` có số byte, sha256). Có test, gồm ghép bốn phần qua `cplus_cut.join_cuts` và các ca từ chối (sai số phần, sai sha256 stats, chưa freeze).
 3. `colab_train --branch M` đọc `configs/runplans/tray/he-tray-jig-m.yaml`, job `da48-ft-m-s0`, lấy tar từ thư mục Drive của plan; từ chối chạy khi hằng frozen id còn `None` hoặc plan còn chỗ ghim trống; có pha `restore` đưa `runs/<job>` từ Drive về VM để `Psi0Trainer` chạy tiếp. Các nhánh cũ giữ nguyên hành vi (test chứng minh).
 4. `uv run ruff check`, `uv run mypy` (không thêm lỗi), `uv run pytest`, `uv run lint-imports`, `scripts/repo/check_links.py`, `scripts/repo/pr_guard.py` qua.
-5. Sau PR mã: bốn phần, tập ghép và các chỗ ghim dựng trên `rtx3060`; PR freeze (ghim plan, lock, frozen id, luật đọc, runbook); job chạy đủ trên Colab A100; checkpoint lưu Drive, VM dừng, có dòng sổ chi phí thực đo; checkpoint giao cho DA-47.
+5. Sau PR mã: bốn phần, tập ghép và các chỗ ghim dựng trên `rtx3060`; PR freeze (ghim plan, lock, frozen id, luật đọc, runbook); job chạy đủ trên Colab L4; checkpoint lưu Drive, VM dừng, có dòng sổ chi phí thực đo; checkpoint giao cho DA-47.
 
 ## Nhiệm vụ
 
@@ -76,9 +76,9 @@ Vì sao cần mã mới (đã đọc mã ở `origin/master` `d54a4d89`):
 - [x] 2.2 `tray/mixplan.py`: `TrayMixPlan`, `check`, `freeze`, `pack`, có test (AC 2)
 - [x] 2.3 `colab_train --branch M`, plan nháp `he-tray-jig-m.yaml`, thư mục Drive theo plan, pha `restore`, có test (AC 3)
 - [x] 2.4 Chạy đủ kiểm tra, `check_links`, `pr_guard` (AC 4)
-- [ ] 3.1 Trên `rtx3060`: tách file giữ, `demo_sets --keep-seeds` cho bốn release, `demo_subset` bốn phần, `cplus_cut` ghép, đọc các giá trị cần ghim (AC 5)
+- [x] 3.1 Trên `rtx3060`: tách file giữ, `demo_sets --keep-seeds` cho bốn release, `demo_subset` bốn phần, `cplus_cut` ghép, đọc các giá trị cần ghim (AC 5)
 - [ ] 3.2 PR freeze: điền ghim vào plan, bỏ `status: draft`, `mixplan freeze`, đặt frozen id trong `colab_train`, luật đọc và runbook trong `docs/he/tray-jig.md` (AC 5)
-- [ ] 4.1 `mixplan pack`, đưa tar lên Drive, launch trên Colab A100 dưới watcher (AC 5)
+- [ ] 4.1 `mixplan pack`, đưa tar lên Drive, launch trên Colab L4 dưới watcher (AC 5)
 - [ ] 4.2 Persist checkpoint lên Drive, dừng VM, dòng sổ chi phí thực đo, giao checkpoint cho DA-47 nhóm A (AC 5)
 
 ## Phạm vi file
