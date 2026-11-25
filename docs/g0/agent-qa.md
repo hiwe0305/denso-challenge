@@ -430,3 +430,35 @@ Chấm lại sáu lần chạy của mục 9.4 bằng `--from verify` (không g�
 | Nhận `"check": {"id": null, …}` như "không chọn phép kiểm" | Prompt bảo "dùng null", model viết `id: null` và trượt schema | Opus 5.5 từ 5 nhận, 3 sửa lên 8 nhận; GPT-5.5 từ 3 nhận, 4 loại lên 7 nhận, 1 loại |
 
 Điểm ca không đổi ở mọi model (A1 22/24, bắt buộc 7/9, D1 bằng 0). Prompt đổi nên đây là một phiên bản agent mới; chưa chạy lại với model thật sau khi sửa.
+
+### 9.6 Outcome thật và ngưỡng vùng phủ theo spec, 25/11/2026
+
+Gói `stage1-60k-out` (`pack_d1b5f9462d0d6b36`, 258 file): gói 9.3 cộng `outcomes.jsonl` của bốn run (60 lượt mỗi run), xuất bằng `flywheel_psi0.tray.export_outcomes` từ lô eval gốc. Số lượt thành công trong outcome là 10, 5, 7, 6 trên 60 cho `C_70`, `C_ALL`, `B_70`, `B_ALL`, khớp `Score`.
+
+**Ngưỡng vùng phủ.** Công cụ `coverage_distance` bản 2 ra τ_cov 0,868 và 1,920 cho `C_70`; phân tích tay của đội ra 1,143 và 1,524. Cả hai cặp số tái hiện được từ cùng dữ liệu; hai chỗ khác nhau giải thích toàn bộ độ lệch:
+
+| Chỗ khác | Bản 2 | Đội, và spec 6.8 |
+|---|---|---|
+| Tập train | Chỉ điều kiện train cùng mức với lượt hỏng (362 ở mức 1, 63 ở mức 2) | Cả 425 điều kiện; mức chỉ quyết định thành phần nào vào vector |
+| Ánh sáng ở mức 2 | Có trong vector | Không; để cho phép kiểm thị giác của bước 7 |
+
+Hai định nghĩa cho kết luận khác nhau ở 11 trên 50 lượt hỏng của `C_70`. Bản 3 của công cụ theo định nghĩa của spec và của đội (`pool_levels: true` trong config task; đặt `false` để có cách cũ) và ra đúng 1,14288 và 1,52408. Ánh sáng bị bỏ khỏi mức 2 là theo cách của đội; spec 4.2 có ghi ánh sáng trong vector điều kiện, nên đây là điểm **[Đề xuất]** chờ Hiếu xác nhận.
+
+**Kết quả, ca `tray-c70-step4`.**
+
+| Số đo | Gói 9.3, công cụ bản 2 | Gói có outcome, công cụ bản 3 |
+|---|---|---|
+| A1 điểm chốt tới được | 22/24; bắt buộc 7/9 | **24/24; bắt buộc 9/9** |
+| A2, A3, A5 | 4/4; 0; 2/2 | 4/4; 0; 2/2 |
+| Cụm bị chặn tiêu ngân sách dữ liệu | 53 trên 64 | 40 trên 64 |
+| Giả thuyết theo luật | `label_signal_missing` 53, `weak_skill` 32, `out_of_domain` 17, `coverage_gap` 15, `scorer_latch_too_strict` 14 | `weak_skill` 40, `label_signal_missing` 32, `coverage_gap` 18, `scorer_latch_too_strict` 14, `near_miss_placement` 10, `out_of_domain` 6 |
+| Hạng 1 của cụm `place`/`L-PLACE-POSE` mức 1 của `C_70` (c1) | "thiếu tín hiệu", bị chặn | `weak_skill`, can thiệp `teleop_correction` |
+| D1 với `claude-opus-5-5` | 0 | 0; 8 trên 8 câu được nhận ngay, bước `judge` 120 giây |
+| Thời gian sàn code, đỉnh RAM | 95 giây, 371 MB | 113 giây, 397 MB |
+
+Cách đọc:
+
+- Hai điểm bắt buộc trượt từ 22/11 nay tới được: outcome mang tư thế khay cuối và đích nên nhãn `L-PLACE-POSE` chấm được.
+- c1 ra `weak_skill`, khớp chẩn đoán "bước đặt yếu" của đội. Với công cụ bản 2 cùng gói, c1 ra `coverage_gap` và đề xuất sinh dữ liệu sim: sai ngưỡng dẫn thẳng tới sai can thiệp.
+- D1 vẫn bằng 0, nhưng lý do đã đổi. Trước đây model không có gì để xếp; nay tín hiệu đủ nên bảng luật tự quyết, 5 trên 8 cụm lớn nhất chỉ còn một giả thuyết. Vai `rank` không còn chỗ để thêm giá trị trên ca này.
+- Ca này vẫn là tập phát triển, một ca. 24/24 không nói gì về vòng chưa thấy.

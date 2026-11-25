@@ -43,12 +43,13 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
   - [x] 1.1 Issue "Contract change" cho K1 (cùng DA-42), K2, K3; soạn PR hợp đồng trên `DA-43-contract` kèm file mẫu và test (PR riêng, không thuộc phạm vi file dưới đây)
   - [x] 1.2 Lệnh xuất eval khay sang `scores.jsonl` theo `Score` trong adapter `flywheel_psi0`; test trên một lô mẫu
   - [ ] 1.3 Gói vòng mẫu cho test: `Score`, `TraceStep`, `TrainingMetric`, `Condition`, outcome theo K1 khi có; dựng từ lô `C_70` giai đoạn 1, chỉ dữ liệu `public`
-  - [ ] 1.4 Lệnh xuất eval khay sang `outcomes.jsonl` theo `RolloutOutcome` (K1) và điều kiện eval, train sang `Condition`, trong adapter `flywheel_psi0`; test trên lô mẫu (23/11/2026)
+  - [x] 1.4 Lệnh xuất eval khay sang `outcomes.jsonl` theo `RolloutOutcome` (K1) và điều kiện eval, train sang `Condition`, trong adapter `flywheel_psi0`; test trên lô mẫu (23/11/2026); outcome thật của bốn run 60k xuất ngày 25/11/2026 (agent-qa 9.6)
 - [ ] 2. Lớp công cụ, phần eval (2 ngày)
   - [x] 2.1 `ToolResult`, đăng ký công cụ, `task_lookup`, quy tắc "không xét được"
   - [x] 2.2 `step_pass_table`, `failure_clusters`, `paired_compare` và test đối chiếu số
   - [x] 2.3 `latch_consistency`, `signal_presence`
   - [x] 2.4 `relaxed_sweep`; gói nhận loại `outcomes` (K1); `signal_presence` xét theo số đo có trong outcome; `coverage_distance` tính theo điều kiện train của từng run; luật `near_miss_placement` (23/11/2026; chạy trên file mẫu, file outcome thật chờ PR 211)
+  - [x] 2.5 `coverage_distance` bản 3: τ_cov, d và miền tính trên mọi điều kiện train của run (spec 6.8), bỏ ánh sáng khỏi mức 2; khớp số của đội 1,14288 và 1,52408 (design 19/11 Q9; agent-qa 9.6)
 - [x] 3. Lớp công cụ, phần trace, train, dữ liệu (1,5 ngày)
   - [x] 3.1 `trace_stats` gồm phép đo trên lượt thành công (thời điểm quay đầu không tính được: `TraceStep` không có vị trí trong thế giới)
   - [x] 3.2 `train_window`, `lineage`
@@ -139,6 +140,7 @@ Danh sách chung của story:
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 25/11/2026 | 1.4 xong (outcome thật); thêm nhiệm vụ 2.5 (ngưỡng vùng phủ theo spec 6.8) | Hiếu (soạn với Claude) |
 | 24/11/2026 | Hiếu duyệt design 24/11/2026 (Q1–Q7), chưa dựng vội; design lên bản 0.2 (mục 13: model tốt nhất, đa model, `run_analysis`), kiến trúc 20/11 lên bản 0.7 | Hiếu (soạn với Claude) |
 | 24/11/2026 | Thêm nhiệm vụ 0.2 và design 24/11/2026 (agent chat phân tích, đề xuất, chờ duyệt) vào phạm vi file | Hiếu (soạn với Claude) |
 | 24/11/2026 | Thêm nhiệm vụ 5.7 (hai luật kiểm của vai `rank`); agent-qa mục 8 và 9 gộp gọn, thêm 9.5 | Hiếu (soạn với Claude) |
