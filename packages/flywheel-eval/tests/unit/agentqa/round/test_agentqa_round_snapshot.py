@@ -101,6 +101,59 @@ def test_the_snapshot_refusals_are_one_line_each(tmp_path: Path) -> None:
         build_pack(decl, store=store)
 
 
+def test_a_refused_link_writes_nothing_and_the_corrected_retry_packs(tmp_path: Path) -> None:
+    store = fill(tmp_path / "store")
+    decl = declare(tmp_path / "r", GOOD)
+    raw = yaml.safe_load(decl.read_text())
+    link = {"source": f"{SNAPSHOT_DIR}/ledger.jsonl", "target": "a.jsonl", "relation": "data_of"}
+    raw["links"] = [{**link, "source": f"{SNAPSHOT_DIR}/legder.jsonl"}]  # the typo
+    decl.write_text(yaml.safe_dump(raw))
+    with pytest.raises(PackRefused, match="legder.jsonl is not an entry"):
+        build_pack(decl, store=store)
+    assert not (tmp_path / "r" / SNAPSHOT_DIR).exists()
+    raw["links"] = [link]
+    decl.write_text(yaml.safe_dump(raw))
+    pack = build_pack(decl, store=store)
+    assert f"{SNAPSHOT_DIR}/ledger.jsonl" in [e.ref for e in pack.entries]
+
+
+def test_a_failed_write_leaves_no_snapshot_file(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    store = fill(tmp_path / "store")
+    decl = declare(tmp_path / "r", GOOD)
+    write_text = Path.write_text
+
+    def failing(self: Path, *args: object, **kwargs: object) -> int:
+        if "fix_rate" in self.name:  # the second table, after the ledger is written
+            raise OSError("disk full")
+        return write_text(self, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(Path, "write_text", failing)
+    with pytest.raises(PackRefused, match="disk full"):
+        build_pack(decl, store=store)
+    monkeypatch.undo()
+    snapshot = tmp_path / "r" / SNAPSHOT_DIR
+    assert not snapshot.exists() or list(snapshot.iterdir()) == []
+    assert len(build_pack(decl, store=store).entries) == 3  # the retry is not blocked
+
+
+def test_a_store_that_is_not_there_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(PackRefused, match="no such directory"):
+        build_pack(declare(tmp_path / "a", GOOD), store=tmp_path / "no-such-store")
+    (tmp_path / "not-a-store").mkdir()  # a directory, but no site in it: a wrong path
+    with pytest.raises(PackRefused, match="not a store"):
+        build_pack(declare(tmp_path / "b", GOOD), store=tmp_path / "not-a-store")
+    for name in ("a", "b"):
+        assert not (tmp_path / name / SNAPSHOT_DIR).exists()
+
+
+def test_a_real_store_with_no_rows_packs_zero_rows(tmp_path: Path) -> None:
+    StorePaths(tmp_path / "store").ensure_dirs()
+    pack = build_pack(declare(tmp_path / "r", GOOD), store=tmp_path / "store")
+    rows = {e.subject["table"]: e.subject["rows"] for e in pack.entries if e.subject}
+    assert rows == {"ledger": "0", "fix_rate": "0"}
+
+
 def test_a_pack_without_the_block_needs_no_store(tmp_path: Path) -> None:
     pack = build_pack(declare(tmp_path / "r"))
     assert [e.ref for e in pack.entries] == ["a.jsonl"]

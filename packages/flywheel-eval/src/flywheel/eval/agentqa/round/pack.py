@@ -117,11 +117,32 @@ def sha256_of(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _snapshot_entries(decl: Declaration, root: Path, store: Path | None) -> list[PackEntry]:
-    """Write the store snapshot files under `root` and describe them as pack entries."""
+def _check_store(store: Path) -> StorePaths:
+    """Refuse a `--store` that is not a store, before it freezes an empty snapshot.
+
+    A store has the directory of its site (`sites/local/`); a real store with no rows yet
+    has it too. A path that does not exist, or a directory without it (a typo, the parent
+    of the store), would read as zero rows and the pack could never be corrected.
+    """
+    if not store.is_dir():
+        raise PackRefused(f"--store {store}: no such directory")
+    paths = StorePaths(store)
+    if not paths.site_dir.is_dir():
+        raise PackRefused(f"--store {store}: not a store, it has no "
+                          f"{paths.site_dir.relative_to(paths.root).as_posix()}/")
+    return paths
+
+
+def _plan_snapshot(decl: Declaration, root: Path,
+                   store: Path | None) -> tuple[list[PackEntry], dict[Path, str]]:
+    """Check the `store_snapshot` block and read its rows; write nothing yet.
+
+    Returns the entries of the snapshot files and the text of each file, so `build_pack`
+    can check the whole pack before the first file is written.
+    """
     block = decl.store_snapshot
     if block is None:
-        return []
+        return [], {}
     unknown = [t for t in block.tables if t not in TABLES]
     if unknown:
         raise PackRefused(f"store_snapshot: unknown table {', '.join(unknown)} "
@@ -136,18 +157,52 @@ def _snapshot_entries(decl: Declaration, root: Path, store: Path | None) -> list
                               "once, declare the round in a new directory")
     if (root / PACK_FILE).exists():
         raise PackRefused(f"{root / PACK_FILE} exists: a pack is immutable")
+    paths = _check_store(store)
     entries: list[PackEntry] = []
+    files: dict[Path, str] = {}
     for table in block.tables:
-        taken = read_table(table, StorePaths(store))
+        taken = read_table(table, paths)
         path = snapshot_path(root, table)
-        path.parent.mkdir(exist_ok=True)
-        path.write_text(canonical_lines(taken.rows), encoding="utf-8")
+        text = canonical_lines(taken.rows)
+        data = text.encode("utf-8")
+        files[path] = text
         entries.append(PackEntry(
-            ref=path.relative_to(root).as_posix(), kind=taken.kind, sha256=sha256_of(path),
-            bytes=path.stat().st_size, data_class=block.data_class,
+            ref=path.relative_to(root).as_posix(), kind=taken.kind,
+            sha256=hashlib.sha256(data).hexdigest(), bytes=len(data),
+            data_class=block.data_class,
             subject={"table": table, "rows": str(len(taken.rows)),
                      "unreadable": str(taken.unreadable)}))
-    return entries
+    return entries, files
+
+
+def _write_snapshot(files: dict[Path, str]) -> None:
+    """Write every snapshot file or none: temporary names first, renamed once all are written.
+
+    A partial snapshot would block every retry (a snapshot is written once), so on any
+    error the files written so far, and the directory if this call made it, are removed.
+    """
+    if not files:
+        return
+    parent = next(iter(files)).parent
+    made_dir = not parent.exists()
+    temps = {path: path.with_name(f".{path.name}.partial") for path in files}
+    placed: list[Path] = []
+    try:
+        parent.mkdir(exist_ok=True)
+        for path, text in files.items():
+            temps[path].write_text(text, encoding="utf-8")
+        for path, temp in temps.items():
+            temp.replace(path)
+            placed.append(path)
+    except OSError as error:
+        for leftover in [*temps.values(), *placed]:
+            leftover.unlink(missing_ok=True)
+        if made_dir:
+            try:
+                parent.rmdir()
+            except OSError:
+                pass
+        raise PackRefused(f"cannot write the store snapshot under {parent}: {error}") from error
 
 
 def build_pack(declaration: Path, now: datetime | None = None,
@@ -155,7 +210,9 @@ def build_pack(declaration: Path, now: datetime | None = None,
     """Read `round.yaml`, check and hash every file it names, return the manifest.
 
     With a `store_snapshot` block the rows of the named tables are copied from `store` into
-    the pack first; rows that do not parse are counted in the entry's `subject.unreadable`.
+    the pack; rows that do not parse are counted in the entry's `subject.unreadable`. The
+    snapshot files are written only after the whole declaration is checked, and all of them
+    or none, so a refused pack leaves nothing behind that blocks the corrected retry.
     """
     decl = read_declaration(declaration)
     root = declaration.parent
@@ -174,7 +231,8 @@ def build_pack(declaration: Path, now: datetime | None = None,
             data_class=item.data_class or decl.data_class or "restricted",
             subject=item.subject,
         ))
-    entries += _snapshot_entries(decl, root, store)
+    snapshot_entries, snapshot_files = _plan_snapshot(decl, root, store)
+    entries += snapshot_entries
     refs = [e.ref for e in entries]
     if len(set(refs)) != len(refs):
         raise PackRefused("an entry is declared twice")
@@ -182,6 +240,7 @@ def build_pack(declaration: Path, now: datetime | None = None,
         for end in (link.source, link.target):
             if end not in refs:
                 raise PackRefused(f"link {link.relation}: {end} is not an entry")
+    _write_snapshot(snapshot_files)
     body = json.dumps([e.model_dump() for e in entries] + [li.model_dump() for li in decl.links],
                       sort_keys=True)
     pack_id = "pack_" + hashlib.sha256((decl.task_id + body).encode()).hexdigest()[:16]
