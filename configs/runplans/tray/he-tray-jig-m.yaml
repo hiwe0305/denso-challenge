@@ -1,7 +1,7 @@
 # DA-48: run M, one Psi0 stage 3 fine-tune on the fixed-jig tray scene (DA-41 jig2) over
-# one dataset joined from four demo sets. DRAFT: every pin not known yet is null, so
-# `mixplan check` passes as a draft and `mixplan freeze` and `check --launch` refuse and
-# list what is missing; `colab_train --branch M` also refuses while MIX_FROZEN is None.
+# one dataset joined from four demo sets. Frozen 25/11/2026 (task 3.2) on Hieu's order
+# (lock he-tray-jig-m.lock.json); `colab_train --branch M` runs only the plan whose id is
+# MIX_FROZEN. A change to any pinned value needs a new freeze and a new MIX_FROZEN.
 #
 # Hiếu 25/11/2026: keep the seeds whose placement error is within 3 cm and 5 degrees,
 # train once (no paired control; a control run K on the 498 full episodes alone is
@@ -13,7 +13,6 @@
 name: he-tray-psi0-jig-m
 purpose: mix_train
 story: DA-48
-status: draft
 site_id: local
 task:
   id: g1_wholebody_tray_transfer_jig_teleop # JIG_TASK_UID of flywheel_simple.tray.jig_task
@@ -141,7 +140,7 @@ checkpoints:
 interpretation:
   doc: docs/he/tray-jig.md # written by task 3.2 with the runbook
   rules_marker: jig-m-rules
-  rules_sha256: null # pinned by task 3.2
+  rules_sha256: 78d6b682765ee9bce60f109876229bc2cb10bbbe533825b9ee298671779695e8
 pricebook: "assumption: Colab 100 CU pack, 0.0999 USD per CU (docs/g0/ledger/DA-19.csv)"
 
 # Estimate, not measured on this data: about 40 CU and about 20 h for 100000 steps on an

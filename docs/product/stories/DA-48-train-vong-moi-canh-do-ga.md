@@ -77,7 +77,7 @@ Vì sao cần mã mới (đã đọc mã ở `origin/master` `d54a4d89`):
 - [x] 2.3 `colab_train --branch M`, plan nháp `he-tray-jig-m.yaml`, thư mục Drive theo plan, pha `restore`, có test (AC 3)
 - [x] 2.4 Chạy đủ kiểm tra, `check_links`, `pr_guard` (AC 4)
 - [x] 3.1 Trên `rtx3060`: tách file giữ, `demo_sets --keep-seeds` cho bốn release, `demo_subset` bốn phần, `cplus_cut` ghép, đọc các giá trị cần ghim (AC 5)
-- [ ] 3.2 PR freeze: điền ghim vào plan, bỏ `status: draft`, `mixplan freeze`, đặt frozen id trong `colab_train`, luật đọc và runbook trong `docs/he/tray-jig.md` (AC 5)
+- [x] 3.2 PR freeze: điền ghim vào plan, bỏ `status: draft`, `mixplan freeze`, đặt frozen id trong `colab_train`, luật đọc và runbook trong `docs/he/tray-jig.md` (AC 5)
 - [ ] 4.1 `mixplan pack`, đưa tar lên Drive, launch trên Colab L4 dưới watcher (AC 5)
 - [ ] 4.2 Persist checkpoint lên Drive, dừng VM, dòng sổ chi phí thực đo, giao checkpoint cho DA-47 nhóm A (AC 5)
 
@@ -117,4 +117,5 @@ Theo 07 mục 3.1. File story luôn được sửa.
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 25/11/2026 | 3.1, 3.2: tập M dựng trên `rtx3060` (1 037 episode, 948 639 khung, thực đo) và ghim vào plan; Hiếu chốt GPU L4, trần 60 CU; plan đóng băng `rp_a410d01efa62`; luật đọc và runbook ở `docs/he/tray-jig.md` | Hiếu (soạn với Claude) |
 | 25/11/2026 | Tạo story theo quyết định của Hiếu ngày 25/11/2026 (ngưỡng lọc ≤ 3 cm và ≤ 5°, một run M); phương án do Claude đề xuất | Hiếu (soạn với Claude) |
