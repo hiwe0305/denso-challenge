@@ -23,6 +23,14 @@ Architecture 20/11 section 8. In order, for every call:
    Values of the key variables are scrubbed from the reply and the error before writing.
    A reported input token count below a quarter of the gateway's estimate is replaced
    by the estimate and marked `tokens_estimated` (a reseller under-reported it).
+6. What a try costs. A reply costs its reported tokens (input as in 5, output 0 when
+   not reported). A failure the server answered with HTTP 200 (a refusal, an empty
+   reply, a body that is not a chat reply: `ProviderError.billed`) was charged, so it
+   costs like a reply, except that an unreported output count is taken as the call's
+   `max_tokens`, an upper bound, so the dollar cap never under-counts; either side
+   estimated marks `tokens_estimated`. A network or HTTP error costs nothing. Every
+   charged try of a request is added to the usage as soon as it returns, so the budget
+   check before the next try sees it; the line holds the sum over its tries.
 
 Calls are sequential (one local GPU); hosted concurrency comes with task 5.4.
 """
@@ -151,6 +159,16 @@ class Usage:
     hosts: set[str] = field(default_factory=set)
 
 
+@dataclass
+class _Spent:
+    """What the charged tries of one request cost; the sum goes on its line."""
+
+    tokens_in: int = 0
+    tokens_out: int = 0
+    usd: float = 0.0
+    estimated: bool = False
+
+
 class Gateway:
     """See the module docstring. One gateway per command; usage and caps are the run directory's."""
 
@@ -231,6 +249,22 @@ class Gateway:
             return f"max_usd {budget.max_usd:g}"
         return ""
 
+    def _charge(self, spent: _Spent, profile: Profile, est_in: int, reported_in: int | None,
+                tokens_out: int, *, out_estimated: bool) -> None:
+        """Cost one charged try (rule 6) into the request's sum and the run's usage."""
+        tokens_in = reported_in
+        if tokens_in is not None and tokens_in * UNDER_REPORT < est_in:
+            tokens_in = None  # under-reported (a reseller said 1 for ~40): use the estimate
+        t_in = tokens_in if tokens_in is not None else est_in
+        usd = (t_in * profile.usd_per_mtok_in + tokens_out * profile.usd_per_mtok_out) / 1e6
+        spent.tokens_in += t_in
+        spent.tokens_out += tokens_out
+        spent.usd += usd
+        spent.estimated = spent.estimated or tokens_in is None or out_estimated
+        self.usage.tokens_in += t_in
+        self.usage.tokens_out += tokens_out
+        self.usage.usd += usd
+
     def call(self, role: str, request: ModelRequest) -> GatewayReply:
         """Answer `request` for `role`; raises only `GatewayRefused`."""
         name, profile = self._route(role)
@@ -253,6 +287,7 @@ class Gateway:
         reply: ProviderReply | None = None
         status: CallStatus = "failed"
         error, tries = "", 0
+        spent = _Spent()  # the charged tries of this request
         for retry in range(self._config.retry.retries + 1):
             cap = self.usage.exhausted or self._over_budget(profile, est_in, max_tokens)
             if cap:
@@ -268,24 +303,19 @@ class Gateway:
                                       max_tokens=max_tokens, timeout_s=profile.timeout_s)
             except ProviderError as failure:
                 error = str(failure)
+                if failure.billed:  # answered but no reply: charged all the same
+                    self._charge(spent, profile, est_in, failure.tokens_in,
+                                 failure.tokens_out if failure.tokens_out is not None
+                                 else max_tokens, out_estimated=failure.tokens_out is None)
                 if not failure.retryable:
                     break
                 continue
+            self._charge(spent, profile, est_in, reply.tokens_in, reply.tokens_out or 0,
+                         out_estimated=False)
             status = "cut" if reply.cut else "ok"
             error = ""
             break
 
-        tokens_in = reply.tokens_in if reply and reply.tokens_in is not None else None
-        if tokens_in is not None and tokens_in * UNDER_REPORT < est_in:
-            tokens_in = None  # under-reported (a reseller said 1 for ~40): use the estimate
-        tokens_out = reply.tokens_out if reply and reply.tokens_out is not None else None
-        if reply is not None:
-            self.usage.tokens_in += tokens_in if tokens_in is not None else est_in
-            self.usage.tokens_out += tokens_out or 0
-        t_in = tokens_in if tokens_in is not None else (est_in if reply else 0)
-        t_out = tokens_out or 0
-        usd = (t_in * profile.usd_per_mtok_in + t_out * profile.usd_per_mtok_out) / 1e6
-        self.usage.usd += usd
         if tries:
             self.usage.hosts.add(provider.host)
         record = ModelCallRecord(
@@ -293,8 +323,8 @@ class Gateway:
             attempt=request.attempt, request_sha256=request_sha, prompt_sha256=_sha(prompt),
             data_class=self._admission.data_class, profile=name, provider=profile.provider,
             hosted=profile.hosted, model=provider.model, revision=provider.revision,
-            host=provider.host, tokens_in=t_in, tokens_out=t_out,
-            tokens_estimated=reply is not None and tokens_in is None, usd=usd,
+            host=provider.host, tokens_in=spent.tokens_in, tokens_out=spent.tokens_out,
+            tokens_estimated=spent.estimated, usd=spent.usd,
             seconds=max(self._clock() - began, 0.0), tries=tries, status=status,
             reply=self._scrub(reply.text, provider) if reply else "",
             error=self._scrub(error, provider))

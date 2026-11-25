@@ -86,18 +86,26 @@ class OpenAICompatibleModel:
         except (urllib.error.URLError, OSError) as error:  # incl. TimeoutError
             raise ProviderError(f"{self._host}: {type(error).__name__}",
                                 retryable=True) from error
+        # From here the server answered HTTP 200: a failure was charged, so it is billed
+        # and carries the usage the body reported, if any.
+        data: Any = None
         try:
             data = json.loads(raw)
             choice = data["choices"][0]
             text = choice["message"]["content"]
             finish = choice.get("finish_reason")
         except (ValueError, KeyError, IndexError, TypeError, AttributeError) as error:
-            raise ProviderError(f"{self._host}: the reply is not a chat reply",
-                                retryable=False) from error
+            raise self._billed(f"{self._host}: the reply is not a chat reply", data) from error
         if not isinstance(text, str) or not text.strip():
-            raise ProviderError(f"{self._host}: empty reply (finish_reason {finish})",
-                                retryable=False)
+            raise self._billed(f"{self._host}: empty reply (finish_reason {finish})", data)
         usage = data.get("usage")
         return ProviderReply(text=text, tokens_in=_count(usage, "prompt_tokens"),
                              tokens_out=_count(usage, "completion_tokens"),
                              cut=finish == "length")
+
+    @staticmethod
+    def _billed(message: str, data: Any) -> ProviderError:
+        usage = data.get("usage") if isinstance(data, dict) else None
+        return ProviderError(message, retryable=False, billed=True,
+                             tokens_in=_count(usage, "prompt_tokens"),
+                             tokens_out=_count(usage, "completion_tokens"))

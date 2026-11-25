@@ -165,7 +165,9 @@ class ModelCallRecord(Record):
     """One line of `model_calls.jsonl` (step B4): one request through the gateway.
 
     The only file of a run that holds durations; no key or header is ever in it.
-    `tries` counts provider calls (0 when the budget stopped the request).
+    `tries` counts provider calls (0 when the budget stopped the request). Tokens and
+    `usd` sum its charged tries: a reply, or a failure the server answered (HTTP 200), so
+    a `failed` line may cost money (gateway rule 6).
     """
 
     call_id: str = Field(pattern=r"^M[1-9][0-9]*$")

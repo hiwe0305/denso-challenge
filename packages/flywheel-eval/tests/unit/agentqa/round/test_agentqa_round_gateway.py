@@ -300,3 +300,92 @@ def test_an_under_reported_input_count_is_replaced_by_the_estimate(tmp_path: Pat
     assert (first.tokens_in, first.tokens_estimated) == (est, True)
     assert (second.tokens_in, second.tokens_estimated) == (est // 4 + 1, False)
     assert gateway.usage.tokens_in == est + est // 4 + 1
+
+
+# --- failures the server answered are charged (rule 6) ---------------------------------
+
+def billed(tokens_in: int | None = None, tokens_out: int | None = None, *,
+           retryable: bool = False) -> ProviderError:
+    return ProviderError("h.example: empty reply", retryable=retryable, billed=True,
+                         tokens_in=tokens_in, tokens_out=tokens_out)
+
+
+def hosted_gateway(tmp_path: Path, script: list[Any], *, max_usd: float = 100.0,
+                   retries: int = 2) -> tuple[Gateway, ScriptedChat, Path]:
+    run = admitted_run(tmp_path)
+    budget = Budget(max_calls=10, max_input_tokens=10_000, max_usd=max_usd, chars_per_token=2)
+    hosted = ScriptedChat(script, host="h.example")
+    gateway = Gateway(run, make_config(rank_public="hosted", hosted=True, budget=budget,
+                                       retries=retries),
+                      factory=Factory(local=ScriptedChat([]), hosted=hosted),
+                      sleep=lambda s: None)
+    return gateway, hosted, run
+
+
+EST_IN = -(-(len("You rank.") + len('{"facts": []}')) // 2)  # request(): 11 tokens
+TRY_USD = (EST_IN + 200) * 1000.0 / 1e6  # a try of request() at the HOSTED prices: 0.211
+
+
+def test_a_billed_failure_costs_its_reported_tokens(tmp_path: Path) -> None:
+    gateway, _, run = hosted_gateway(tmp_path, [billed(1200, 4096)])
+    reply = gateway.call("rank", request())
+    (line,) = lines(run)
+    assert reply.status == "failed" == line.status and line.reply == ""
+    assert (line.tokens_in, line.tokens_out, line.tokens_estimated) == (1200, 4096, False)
+    assert line.usd == pytest.approx((1200 + 4096) * 1000.0 / 1e6) == gateway.usage.usd
+    assert (gateway.usage.tokens_in, gateway.usage.tokens_out) == (1200, 4096)
+
+
+def test_a_billed_failure_without_usage_costs_the_estimate_and_max_tokens(
+        tmp_path: Path) -> None:
+    gateway, _, run = hosted_gateway(tmp_path, [billed()])
+    gateway.call("rank", request(max_tokens=200))
+    (line,) = lines(run)
+    assert (line.tokens_in, line.tokens_out, line.tokens_estimated) == (EST_IN, 200, True)
+    assert line.usd == pytest.approx(TRY_USD) == gateway.usage.usd
+
+
+def test_a_billed_failure_keeps_the_under_report_rule(tmp_path: Path) -> None:
+    gateway, _, run = hosted_gateway(tmp_path, [billed(1, 7)])
+    gateway.call("rank", request())
+    (line,) = lines(run)
+    assert (line.tokens_in, line.tokens_out, line.tokens_estimated) == (EST_IN, 7, True)
+
+
+def test_an_http_error_still_costs_nothing(tmp_path: Path) -> None:
+    gateway, hosted, run = hosted_gateway(tmp_path, [ProviderError("h.example: HTTP 500")] * 3)
+    assert gateway.call("rank", request()).status == "failed" and len(hosted.calls) == 3
+    (line,) = lines(run)
+    assert (line.tokens_in, line.tokens_out, line.usd, line.tokens_estimated) == (0, 0, 0, False)
+    assert (gateway.usage.usd, gateway.usage.tokens_in, gateway.usage.calls) == (0, 0, 3)
+
+
+def test_every_billed_try_counts_and_the_line_holds_the_sum(tmp_path: Path) -> None:
+    gateway, hosted, run = hosted_gateway(
+        tmp_path, [billed(100, 50, retryable=True), ProviderReply("{}", 100, 20)])
+    assert gateway.call("rank", request()).status == "ok" and len(hosted.calls) == 2
+    (line,) = lines(run)
+    assert (line.tries, line.tokens_in, line.tokens_out) == (2, 200, 70)
+    assert line.usd == pytest.approx(270 * 1000.0 / 1e6) == gateway.usage.usd
+    assert not line.tokens_estimated
+
+
+def test_the_budget_sees_a_billed_try_before_the_next_try(tmp_path: Path) -> None:
+    # each try is estimated at TRY_USD (0.211); the first costs 0.15, so 0.361 > 0.3
+    gateway, hosted, run = hosted_gateway(tmp_path, [billed(100, 50, retryable=True), "{}"],
+                                          max_usd=0.3)
+    reply = gateway.call("rank", request())
+    assert reply.status == "budget_exhausted" and len(hosted.calls) == 1
+    (line,) = lines(run)
+    assert line.tries == 1 and line.usd == pytest.approx(0.15)
+
+
+def test_a_billed_failure_pushes_the_run_over_max_usd(tmp_path: Path) -> None:
+    gateway, hosted, run = hosted_gateway(tmp_path, [billed(), "{}"], max_usd=0.3)
+    assert gateway.call("rank", request(unit="a")).status == "failed"
+    assert gateway.usage.usd == pytest.approx(TRY_USD)  # it cost 0 before rule 6
+    assert gateway.call("rank", request(unit="b")).status == "budget_exhausted"
+    assert len(hosted.calls) == 1 and gateway.usage.exhausted == "max_usd 0.3"
+    again = Gateway(run, make_config(rank_public="hosted", hosted=True),
+                    factory=Factory(local=ScriptedChat([]), hosted=hosted))
+    assert again.usage.usd == pytest.approx(TRY_USD)  # recounted from the file
