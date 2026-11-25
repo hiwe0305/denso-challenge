@@ -960,3 +960,120 @@ def test_the_b_decision_is_an_open_draft_on_the_b_plan_and_its_rules() -> None:
     assert (base["stage1_n"], base["stage1_successes"]) == (60, 7)
     assert decision.metrics["stage1"]["chunks"] == two["stage1_chunks"]
     assert decision.metrics["stage1"]["outcome"] is None
+
+
+# DA-42: a signed `<stem>.pins.decision.json` lets named changed pinned files through.
+PIN_REL = "sim/scorer.py"
+PIN_SUBJECT = "rp_0123456789ab"
+# Bound at import, before conftest sets live drift aside: the live check needs it.
+REAL_FILE_PIN_DRIFT = runplan.file_pin_drift
+
+
+def _pin_setup(tmp_path: Path, **change: Any) -> tuple[Path, dict[str, str]]:
+    """A repo whose pinned file changed after the plan, and a sidecar accepting it."""
+    (tmp_path / "sim").mkdir()
+    (tmp_path / PIN_REL).write_text("v2\n")
+    pins = {PIN_REL: hashlib.sha256(b"v1\n").hexdigest()}
+    plan_path = tmp_path / "plan.yaml"
+    entry = {
+        "pinned_sha256": pins[PIN_REL],
+        "accepted_sha256": hashlib.sha256(b"v2\n").hexdigest(),
+        **change.pop("entry", {}),
+    }
+    fields: dict[str, Any] = {
+        "kind": "plan_review",
+        "subject_kind": "run_plan",
+        "subject_id": PIN_SUBJECT,
+        "verdict": "approved",
+        "meta": {"status": "signed"},
+        "criteria": {"accepted_files": {PIN_REL: entry}},
+        "signed_by": "Hiếu",
+        "reason": "test",
+        **change,
+    }
+    runplan.pin_decision_path(plan_path).write_text(Decision(**fields).model_dump_json())
+    return plan_path, pins
+
+
+CHANGED = f"pinned file {PIN_REL} changed since the plan pinned it"
+
+
+def test_pin_decision_waives_the_change_it_names(tmp_path: Path) -> None:
+    plan_path, pins = _pin_setup(tmp_path)
+    assert runplan.pin_decision_path(plan_path).name == "plan.pins.decision.json"
+    assert runplan.file_pin_drift(pins, tmp_path) == [CHANGED]
+    assert runplan.accepted_pin_drift(plan_path, pins, PIN_SUBJECT, tmp_path) == []
+
+
+def test_pin_decision_does_not_waive_a_later_change(tmp_path: Path) -> None:
+    plan_path, pins = _pin_setup(tmp_path)
+    (tmp_path / PIN_REL).write_text("v3\n")
+    drift = runplan.accepted_pin_drift(plan_path, pins, PIN_SUBJECT, tmp_path)
+    assert drift[0] == CHANGED and "changed again since" in drift[1] and len(drift) == 2
+
+
+def test_pin_decision_needs_the_plans_own_pin(tmp_path: Path) -> None:
+    plan_path, pins = _pin_setup(tmp_path, entry={"pinned_sha256": "0" * 64})
+    drift = runplan.accepted_pin_drift(plan_path, pins, PIN_SUBJECT, tmp_path)
+    assert drift[0] == CHANGED and "not the plan's pin" in drift[1]
+
+
+@pytest.mark.parametrize(
+    ("change", "why"),
+    [
+        ({"subject_id": "rp_ba9876543210"}, "not run_plan:rp_0123456789ab"),
+        ({"subject_kind": "round_plan"}, "not run_plan:rp_0123456789ab"),
+        ({"meta": {"status": "draft"}}, "meta.status 'draft'"),
+        ({"meta": {}}, "meta.status None"),
+        ({"verdict": "open"}, "verdict 'open'"),
+        ({"kind": "dev_gate"}, "kind 'dev_gate'"),
+        ({"criteria": {}}, "no criteria.accepted_files"),
+    ],
+)
+def test_pin_decision_applies_only_signed_approved_to_this_plan(
+    tmp_path: Path, change: dict[str, Any], why: str
+) -> None:
+    plan_path, pins = _pin_setup(tmp_path, **change)
+    drift = runplan.accepted_pin_drift(plan_path, pins, PIN_SUBJECT, tmp_path)
+    assert drift[0] == CHANGED and len(drift) == 2
+    assert drift[1].startswith("plan.pins.decision.json does not apply:") and why in drift[1]
+
+
+def test_pin_decision_needs_a_frozen_id_and_a_valid_file(tmp_path: Path) -> None:
+    plan_path, pins = _pin_setup(tmp_path)
+    drift = runplan.accepted_pin_drift(plan_path, pins, None, tmp_path)
+    assert drift[0] == CHANGED and "no frozen id" in drift[1]
+    runplan.pin_decision_path(plan_path).write_text('{"kind": "plan_review"}')
+    drift = runplan.accepted_pin_drift(plan_path, pins, PIN_SUBJECT, tmp_path)
+    assert drift[0] == CHANGED and "not a Decision" in drift[1]
+
+
+def test_pin_decision_never_waives_a_missing_file(tmp_path: Path) -> None:
+    plan_path, pins = _pin_setup(tmp_path)
+    (tmp_path / PIN_REL).unlink()
+    missing = [f"pinned file {PIN_REL} is missing"]
+    assert runplan.accepted_pin_drift(plan_path, pins, PIN_SUBJECT, tmp_path) == missing
+
+
+def test_no_pin_decision_is_plain_drift(tmp_path: Path) -> None:
+    plan_path, pins = _pin_setup(tmp_path)
+    runplan.pin_decision_path(plan_path).unlink()
+    assert runplan.accepted_pin_drift(plan_path, pins, PIN_SUBJECT, tmp_path) == [CHANGED]
+    # a drift list handed in is filtered, not recomputed
+    (tmp_path / "again").mkdir()
+    plan_path, pins = _pin_setup(tmp_path / "again")
+    assert runplan.accepted_pin_drift(plan_path, pins, PIN_SUBJECT, tmp_path, ["x"]) == ["x"]
+
+
+@pytest.mark.parametrize("sidecar", sorted(PLANS.glob("*.pins.decision.json")), ids=str)
+def test_live_pin_decisions_waive_exactly_their_plans_drift(sidecar: Path) -> None:
+    decision = Decision.model_validate_json(sidecar.read_text(encoding="utf-8"))
+    plan_path = sidecar.with_name(sidecar.name.removesuffix(".pins.decision.json") + ".yaml")
+    pins = yaml.safe_load(plan_path.read_text(encoding="utf-8"))["pinned_files"]
+    assert decision.subject_id == runplan.locked_id(plan_path)
+    accepted = decision.criteria["accepted_files"]
+    drift = REAL_FILE_PIN_DRIFT(pins, REPO)
+    named = [f"pinned file {rel} changed since the plan pinned it" for rel in accepted]
+    assert set(named) <= set(drift), "a file the Decision accepts no longer drifts"
+    left = runplan.accepted_pin_drift(plan_path, pins, decision.subject_id, REPO, drift)
+    assert left == [d for d in drift if d not in named], "the Decision no longer waives its files"

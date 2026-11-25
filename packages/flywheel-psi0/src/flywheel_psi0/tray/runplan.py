@@ -694,6 +694,75 @@ def file_pin_drift(pins: dict[str, str] | None, repo: Path = REPO) -> list[str]:
     return drift
 
 
+def pin_decision_path(plan_path: Path) -> Path:
+    return plan_path.with_name(plan_path.name.removesuffix(".yaml") + ".pins.decision.json")
+
+
+def locked_id(plan_path: Path) -> str | None:
+    """The run_plan_id of the plan's lock file, or None while it is not frozen."""
+    lock = lock_path(plan_path)
+    if not lock.is_file():
+        return None
+    return str(json.loads(lock.read_text(encoding="utf-8"))["run_plan_id"])
+
+
+def accepted_pin_drift(
+    plan_path: Path,
+    pins: dict[str, str] | None,
+    subject_id: str | None,
+    repo: Path = REPO,
+    drift: list[str] | None = None,
+) -> list[str]:
+    """`file_pin_drift` less the changed files a signed `<stem>.pins.decision.json` accepts.
+
+    A file passes only if the Decision is a signed, approved plan_review of run_plan
+    `subject_id` (the plan's frozen id) whose `criteria.accepted_files` entry holds the
+    plan's pin and the file's sha256 now. A missing file never passes. A Decision that
+    does not apply adds a line saying why. `drift`: the list to filter (default: the pins').
+    """
+    from flywheel.contracts.entities import Decision
+
+    drift = file_pin_drift(pins, repo) if drift is None else drift
+    path = pin_decision_path(plan_path)
+    if not drift or not path.is_file():
+        return drift
+    try:
+        d = Decision.model_validate_json(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        first = str(error).splitlines()[0]
+        return [*drift, f"{path.name} does not apply: not a Decision ({first})"]
+    refused = []
+    if d.kind != "plan_review":
+        refused.append(f"kind {d.kind!r}, not 'plan_review'")
+    if subject_id is None:
+        refused.append("the plan has no frozen id")
+    elif (d.subject_kind, d.subject_id) != ("run_plan", subject_id):
+        refused.append(f"subject {d.subject_kind}:{d.subject_id}, not run_plan:{subject_id}")
+    if d.verdict != "approved":
+        refused.append(f"verdict {d.verdict!r}, not 'approved'")
+    if d.meta.get("status") != "signed":
+        refused.append(f"meta.status {d.meta.get('status')!r}, not 'signed'")
+    accepted = d.criteria.get("accepted_files")
+    if not isinstance(accepted, dict):
+        refused.append("no criteria.accepted_files")
+    if refused:
+        return [*drift, f"{path.name} does not apply: " + "; ".join(refused)]
+    assert isinstance(accepted, dict)
+    kept = list(drift)
+    for rel, sha in (pins or {}).items():
+        line = f"pinned file {rel} changed since the plan pinned it"
+        entry = accepted.get(rel)
+        if line not in kept or entry is None:
+            continue
+        if not isinstance(entry, dict) or entry.get("pinned_sha256") != sha:
+            kept.append(f"{path.name} does not accept {rel}: pinned_sha256 is not the plan's pin")
+        elif entry.get("accepted_sha256") != file_sha256(repo / rel):
+            kept.append(f"{path.name} does not accept {rel}: it changed again since")
+        else:
+            kept.remove(line)
+    return kept
+
+
 def check_release(plan: TrayRunPlan, release_root: Path, repo: Path = REPO) -> list[str]:
     """Every set's episode indices against the release's own export (needs the release).
 
@@ -920,6 +989,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             parser.error("a paired plan checks its cut parts itself: no --release")
         return pairplan.main(["check", str(args.plan), *(["--launch"] if args.launch else [])])
     plan: TrayRunPlan | None
+    plan_path = args.plan  # the plan whose pins are checked: a round checks the one it inherits
     if raw.get("purpose") == "round":
         round_plan = TrayRoundPlan.model_validate(raw)
         problems = check_round(round_plan, repo)
@@ -927,7 +997,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         # A C+ job runs on the frozen plan it inherits: launch checks that plan too.
         plan = None
         if args.launch or args.release is not None:
-            plan = TrayRunPlan.load(repo / round_plan.inherits)
+            plan_path = repo / round_plan.inherits
+            plan = TrayRunPlan.load(plan_path)
             problems += check(plan, repo)
         if args.launch:
             lock = lock_path(args.plan)
@@ -964,7 +1035,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if plan is not None:
         if args.release is not None:
             problems += check_release(plan, args.release, repo)
-        drift = pinned_file_drift(plan, repo)
+        drift = accepted_pin_drift(
+            plan_path, plan.pinned_files, locked_id(plan_path), repo, pinned_file_drift(plan, repo)
+        )
         if args.launch:
             problems += [f"{d}: re-freeze or record a Decision" for d in drift]
         else:
