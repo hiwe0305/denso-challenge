@@ -485,7 +485,22 @@ Với `--no-model`, bước này dùng lớp code: giữ mọi ứng viên của
 | Báo nhầm trên bản sạch | 0/40 | 0/40 |
 | Thời gian, RAM một bản | | khoảng 1,6 giây, 150 MB |
 
-Đường bản 3 chạy lại hôm nay trên cùng hai bản cho đúng các phát hiện đó. **Chưa đo với model**: gói log cấy khai lớp `public` nhưng chưa có bản ghi `Source` xác nhận, nên cổng từ chối model thuê; model cục bộ cần `rtx3060`.
+Đường bản 3 chạy lại hôm nay trên cùng hai bản cho đúng các phát hiện đó.
+
+**Bộ log cấy với model, đường mới.** **[Đã chốt]** Hiếu, 25/11/2026: hai bản log cấy (log tổng hợp do `log_defects` sinh, không có dữ liệu robot, site hay người thật) nhận bản ghi `Source` lớp `public`. Model `claude-opus-5-5` qua cổng ckey.vn (không xác minh được model đứng sau tên), prompt của bản 3 không đổi.
+
+| Đại lượng | Bản 3, Nemotron cục bộ (12/11) | Đường ống vòng, `claude-opus-5-5` (25/11) |
+|---|---|---|
+| Recall T1–T8, R1, R2 | 30/30 | 30/30 |
+| Precision theo mã | 3/3 ở 9 mã; T4 3/4 | 3/3 ở cả 10 mã |
+| Báo nhầm trên bản sạch | 1/40 (cận trên) | 0/40 (cận trên) |
+| Model thêm so với code (`agent_adds`) | 0; hai mục tự thêm đều là T4 sai | 0; không tự thêm mục nào |
+| Ứng viên của code bị model bỏ | 6 (lý do tự mâu thuẫn) | 0 |
+| Báo cáo `ok` / `broken` | 80 / 0 | 80 / 0 |
+| Lời gọi model, gửi lại | 96 câu | 89 lời gọi, 0 gửi lại |
+| Thời gian | 1714 giây và 757 giây | 850 giây và 271 giây |
+
+Hai lỗi của bản 3 với Nemotron (T4 tự thêm sai, lý do bỏ tự mâu thuẫn) không xuất hiện. Nhưng model cũng không bắt thêm lỗi cấy nào ngoài điều code đã bắt: trên bộ này lớp code đã đạt 30/30, nên phần model thêm chỉ có thể bằng 0 hoặc âm. Điều kiện qua của design 19/11 mục 11.1 (recall không giảm, hai T4 sai biến mất, không lần bỏ tự mâu thuẫn) đạt với model này; chưa đo với model cục bộ.
 
 Giới hạn đã biết:
 
